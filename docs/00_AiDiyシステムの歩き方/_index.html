@@ -1,0 +1,75 @@
+﻿<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AiDiyシステムの歩き方</title>
+  <link rel="stylesheet" href="../_shared/doc.css" />
+  <script defer src="../_shared/doc.js"></script>
+</head>
+<body class="theme-ink">
+  <header class="page-header">
+    <div class="header-eyebrow">AiDiy Docs</div>
+    <h1 class="page-title">AiDiyシステムの歩き方</h1>
+    <p class="page-subtitle">はじめて触る人のための、迷子にならない地図。</p>
+    <nav class="page-nav">
+      <a class="nav-link is-active" href="_index.html">入口ガイド</a>
+      <a class="nav-link" href="01_スタートガイド.html">起動とログイン</a>
+      <a class="nav-link" href="02_APIとデータの流れ.html">APIとデータの流れ</a>
+      <a class="nav-link" href="03_認証と権限の基本.html">認証と権限</a>
+      <a class="nav-link" href="04_データ追加の流れ.html">データ追加</a>
+      <a class="nav-link" href="05_よくある質問.html">よくある質問</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="card">
+      <span class="badge">資料構成</span>
+      <h2 class="card-title">この資料の並び</h2>
+      <ol class="steps">
+        <li><a href="_index.html">入口ガイド</a> - 全体像をつかむ</li>
+        <li><a href="01_スタートガイド.html">起動とログイン</a> - まず動かす</li>
+        <li><a href="02_APIとデータの流れ.html">APIとデータの流れ</a> - 通信の道筋</li>
+        <li><a href="03_認証と権限の基本.html">認証と権限</a> - セキュリティの基本</li>
+        <li><a href="04_データ追加の流れ.html">データ追加</a> - 実データ投入の流れ</li>
+        <li><a href="05_よくある質問.html">よくある質問</a> - 詰まりやすい点</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <span class="badge">3分で全体像</span>
+      <h2 class="card-title">このシステムは何をする？</h2>
+      <p>AiDiyは「管理画面中心の業務アプリ」をサクッと構築できる仕組みです。日本語のテーブル/JSON/URLで、現場の言葉にそのまま合わせて使います。</p>
+      <div class="grid two">
+        <div class="card">
+          <h3 class="card-title">フロント</h3>
+          <p>Vue 3 + Pinia。画面は管理向けに集約。ログイン後のメニューから各マスタへ移動。</p>
+          <div class="tag-list">
+            <span class="tag">http://localhost:8090</span>
+            <span class="tag">日本語UI</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">バックエンド</h3>
+          <p>FastAPI + SQLite。APIは原則POST。日本語キーで統一されたレスポンス。</p>
+          <div class="tag-list">
+            <span class="tag">http://localhost:8091</span>
+            <span class="tag">JWT認証</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">ざっくり構成図</h2>
+      <p>まずは「誰が何を話しているか」を押さえます。</p>
+      <pre class="code-block" data-src="code_samples/architecture.txt" data-label="構成イメージ">
+        <code>読み込み中...</code>
+      </pre>
+    </section>
+  </main>
+
+  <footer class="footer-note">AiDiy Docs / 00_AiDiyシステムの歩き方</footer>
+</body>
+</html>
+

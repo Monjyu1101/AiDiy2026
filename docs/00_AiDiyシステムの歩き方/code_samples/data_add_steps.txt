@@ -1,0 +1,5 @@
+﻿1) ログインして token を取得
+2) create API に JSON を送る
+3) get API で登録内容を確認
+4) list API で一覧反映を確認
+

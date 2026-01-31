@@ -1,0 +1,55 @@
+﻿<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APIとデータの流れ | AiDiyシステムの歩き方</title>
+  <link rel="stylesheet" href="../_shared/doc.css" />
+  <script defer src="../_shared/doc.js"></script>
+</head>
+<body class="theme-ink">
+  <header class="page-header">
+    <div class="header-eyebrow">AiDiy Docs</div>
+    <h1 class="page-title">APIとデータの流れ</h1>
+    <p class="page-subtitle">フロントからDBまでの道のりを、最短で理解する。</p>
+    <nav class="page-nav">
+      <a class="nav-link" href="_index.html">入口ガイド</a>
+      <a class="nav-link" href="01_スタートガイド.html">起動とログイン</a>
+      <a class="nav-link is-active" href="02_APIとデータの流れ.html">APIとデータの流れ</a>
+      <a class="nav-link" href="03_認証と権限の基本.html">認証と権限</a>
+      <a class="nav-link" href="04_データ追加の流れ.html">データ追加</a>
+      <a class="nav-link" href="05_よくある質問.html">よくある質問</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="card">
+      <h2 class="card-title">APIの流れ（ざっくり）</h2>
+      <pre class="code-block" data-src="code_samples/api_flow.txt" data-label="リクエストの流れ">
+        <code>読み込み中...</code>
+      </pre>
+      <p>認証トークンはフロント側で保持し、APIごとに付与されます。</p>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">一覧レスポンスの型</h2>
+      <p>一覧は `items / total / limit`。V系APIもこの形に合わせています。</p>
+      <pre class="code-block" data-src="code_samples/response_list.json" data-label="一覧レスポンス例">
+        <code>読み込み中...</code>
+      </pre>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">監査項目のルール</h2>
+      <p>すべてのテーブルに共通の「登録/更新」情報を持ちます。</p>
+      <pre class="code-block" data-src="code_samples/audit_fields.txt" data-label="共通カラム">
+        <code>読み込み中...</code>
+      </pre>
+      <div class="callout">追加テーブルでもこの項目を必ず持たせるのがルールです。</div>
+    </section>
+  </main>
+
+  <footer class="footer-note">AiDiy Docs / APIとデータの流れ</footer>
+</body>
+</html>
+

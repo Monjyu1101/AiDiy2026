@@ -1,0 +1,4 @@
+﻿- 401 Unauthorized: token が無い/期限切れ
+- DUPLICATE: 既存IDで create
+- NOT_FOUND: get/変更/削除 で存在しないID
+

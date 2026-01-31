@@ -1,0 +1,9 @@
+﻿{
+  "status": "OK",
+  "message": "ログインしました",
+  "data": {
+    "access_token": "<JWTトークン>",
+    "token_type": "bearer"
+  }
+}
+

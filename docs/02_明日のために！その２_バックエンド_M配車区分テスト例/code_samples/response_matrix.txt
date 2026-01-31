@@ -1,0 +1,6 @@
+﻿create : status=OK / data に登録内容
+get    : status=OK / data に1件
+update : status=OK / data に更新内容
+list   : status=OK / data.items が配列
+delete : status=OK / data は空 or 削除ID
+

@@ -1,0 +1,12 @@
+﻿[ブラウザ]
+   |
+   v
+[Vue 3 フロント]  http://localhost:8090
+   |
+   |  POST (JSON + Authorization)
+   v
+[FastAPI]          http://localhost:8091
+   |
+   v
+[SQLite database]
+

@@ -1,0 +1,25 @@
+[project]
+name = "fastapi-server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bcrypt",
+    "fastapi",
+    "numpy",
+    "pillow",
+    "passlib[bcrypt]",
+    "pydantic",
+    "python-jose[cryptography]",
+    "python-multipart",
+    "requests",
+    "sqlalchemy",
+    "uvicorn[standard]",
+    "speechrecognition",
+    "google-genai",
+    "claude-agent-sdk",
+    "openai",
+    "anthropic>=0.76.0",
+    "websocket-client>=1.9.0",
+]

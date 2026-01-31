@@ -1,0 +1,5 @@
+﻿1. /core/auth/ログイン で token を取得
+2. フロントが token を保存
+3. API呼び出し時に Authorization: Bearer <token>
+4. FastAPI が token を検証し現在利用者を取得
+

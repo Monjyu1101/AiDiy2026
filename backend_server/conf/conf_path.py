@@ -1,0 +1,131 @@
+# -*- coding: utf-8 -*-
+
+# ------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU.
+# This software is licensed under the MIT License.
+# https://github.com/monjyu1101
+# Thank you for keeping the rules.
+# ------------------------------------------------
+
+# モジュール名
+MODULE_NAME = 'path'
+
+# ロガーの設定
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(MODULE_NAME)
+
+import os
+from typing import Dict, Optional
+
+class conf_path:
+    """パス管理クラス"""
+
+    def __init__(self):
+        """パス管理クラスの初期化(/形式)"""
+        self.conf = None
+
+        # 実行中の絶対パス（初期値は相対パス）
+        self.exec_abs_path = './'
+
+        # 実行中のルートパス(1階層上、初期値は相対パス)
+        self.exec_abs_root = '../'
+
+        # 外部パス一覧のルート(2階層上、初期値は相対パス)
+        self.external_root_path = '../../'
+
+        # 外部パス一覧 - _AIDIY.md を含むプロジェクト検出
+        self.external_root_dic = {}
+
+    def init(self) -> bool:
+        """パス情報の初期化"""
+        try:
+            # 生成するパスはすべて / 形式・末尾スラッシュ付きで統一
+
+            # 実行中の絶対パス
+            current_file_dir = os.path.dirname(os.path.abspath(__file__))
+            self.exec_abs_path = self._normalize_path(current_file_dir)
+
+            # 実行中のルートパス(1階層上)
+            parent_path = os.path.abspath(os.path.join(current_file_dir, '..'))
+            if parent_path == current_file_dir or not os.path.exists(parent_path):
+                self.exec_abs_root = self.exec_abs_path
+            else:
+                self.exec_abs_root = self._normalize_path(parent_path)
+
+            # 外部パス一覧のルート(2階層上)
+            grandparent_path = os.path.abspath(os.path.join(current_file_dir, '..', '..'))
+            if grandparent_path == parent_path or not os.path.exists(grandparent_path):
+                self.external_root_path = self.exec_abs_root
+            else:
+                self.external_root_path = self._normalize_path(grandparent_path)
+
+            # 外部パス一覧の構築
+            self.external_root_dic = self._discover_agents_projects(self.external_root_path)
+
+            logger.info('パス情報の初期化が完了しました')
+            return True
+
+        except Exception as e:
+            logger.error(f'パス初期化エラー: {e}')
+            return False
+
+    def _normalize_path(self, path: str, base: Optional[str] = None) -> str:
+        """パスを / 形式・末尾スラッシュ付きで正規化する"""
+        if not os.path.isabs(path):
+            if base and os.path.isabs(base):
+                base_dir = base
+            else:
+                base_dir = os.getcwd()
+            path = os.path.join(base_dir, path)
+
+        normalized = os.path.abspath(path).replace('\\', '/')
+        if not normalized.endswith('/'):
+            normalized += '/'
+        return normalized
+
+    def _discover_agents_projects(self, search_root: Optional[str] = None) -> Dict[str, str]:
+        """指定ルート直下、およびその1階層下で「_AIDIY.md」を含むフォルダを列挙"""
+        result: Dict[str, str] = {}
+        try:
+            if search_root and not os.path.isabs(search_root):
+                search_root = os.path.abspath(search_root)
+
+            base = search_root or self.external_root_path
+            if not base or not os.path.isabs(base):
+                base = os.getcwd()
+
+            root_dir = self._normalize_path(base).rstrip('/')
+
+            if not os.path.exists(root_dir) or not os.path.isdir(root_dir):
+                return result
+
+            def try_add(path: str) -> None:
+                agents_file = os.path.join(path, '_AIDIY.md')
+                if os.path.isfile(agents_file):
+                    key = os.path.basename(path)
+                    if key not in result:
+                        result[key] = self._normalize_path(path)
+
+            for entry in os.scandir(root_dir):
+                if not entry.is_dir():
+                    continue
+                try_add(entry.path)
+                try:
+                    for sub_entry in os.scandir(entry.path):
+                        if sub_entry.is_dir():
+                            try_add(sub_entry.path)
+                except (PermissionError, OSError):
+                    continue
+        except Exception as e:
+            logger.warning(f'外部パス探索エラー: {e}')
+        return result
+
+
+__all__ = [
+    "conf_path",
+]

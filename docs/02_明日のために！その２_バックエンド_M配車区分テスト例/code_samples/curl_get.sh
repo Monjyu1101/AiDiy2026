@@ -1,0 +1,5 @@
+﻿curl -X POST http://localhost:8091/apps/M配車区分/取得 \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"配車区分ID\": \"99\"}"
+

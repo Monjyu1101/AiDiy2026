@@ -1,0 +1,8 @@
+﻿[フロント] → /core/C権限/一覧
+   ↓
+[routers/C権限.py]
+   ↓
+[crud/C権限.py]
+   ↓
+[models/C権限.py] → SQLite
+

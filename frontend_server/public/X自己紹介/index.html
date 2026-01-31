@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RiKi AiDiy - AI支援開発環境の革新</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', 'Orbitron', sans-serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* パーティクル背景 */
+        #particles-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+        }
+
+        /* アニメーション背景 */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(255, 255, 0, 0.05) 0%, transparent 50%),
+                linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #0a0a0a 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
+            z-index: -1;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 0%; }
+            25% { background-position: 100% 0%; }
+            50% { background-position: 100% 100%; }
+            75% { background-position: 0% 100%; }
+        }
+
+        /* サイバーグリッド */
+        .cyber-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 30s linear infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        /* ヒーローセクション */
+        .hero-section {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 4.5rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff, #ffff00, #00ffff);
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: heroGlow 3s ease-in-out infinite, textGradient 8s ease infinite;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+        }
+
+        @keyframes heroGlow {
+            0%, 100% { text-shadow: 0 0 30px rgba(0, 255, 255, 0.5); }
+            50% { text-shadow: 0 0 50px rgba(255, 0, 255, 0.8), 0 0 80px rgba(0, 255, 255, 0.3); }
+        }
+
+        @keyframes textGradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .hero-subtitle {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.5rem;
+            color: #00ffff;
+            margin-bottom: 10px;
+            opacity: 0;
+            animation: fadeInUp 2s ease 1s forwards;
+        }
+
+        .hero-description {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: fadeInUp 2s ease 1.5s forwards;
+            line-height: 1.8;
+        }
+
+        .typing-text {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.1rem;
+            color: #ffff00;
+            border-right: 2px solid #ffff00;
+            white-space: nowrap;
+            overflow: hidden;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { border-color: #ffff00; }
+            51%, 100% { border-color: transparent; }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* セクション共通 */
+        .section {
+            padding: 50px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .section-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff);
+            border-radius: 2px;
+        }
+
+        /* コア機能カード */
+        .core-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(265px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 20px 15px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            transform: translateY(50px);
+            opacity: 0;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .feature-card:hover::before {
+            left: 100%;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: #00ffff;
+            box-shadow: 0 20px 40px rgba(0, 255, 255, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            display: block;
+            animation: iconFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes iconFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .feature-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.5rem;
+            color: #00ffff;
+            margin-bottom: 10px;
+        }
+
+        .feature-description {
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        /* 技術統計 */
+        .tech-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            background: rgba(0, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+
+        .stat-number {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #ffff00;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        /* 設計思想 */
+        .philosophy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .philosophy-item {
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.1), rgba(0, 255, 255, 0.1));
+            border: 1px solid rgba(255, 0, 255, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .philosophy-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, #ff00ff, #00ffff);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .philosophy-item:hover::after {
+            transform: scaleY(1);
+        }
+
+        .philosophy-item:hover {
+            transform: translateX(10px);
+            border-color: #ff00ff;
+        }
+
+        .philosophy-title {
+            font-family: 'Orbitron', monospace;
+            color: #ff00ff;
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        /* 拡張性セクション */
+        .expansion-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .expansion-item {
+            background: rgba(255, 255, 0, 0.05);
+            border: 1px solid rgba(255, 255, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .expansion-item::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(255, 255, 0, 0.1), transparent);
+            border-radius: 50%;
+            transition: all 0.5s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .expansion-item:hover::before {
+            width: 200px;
+            height: 200px;
+        }
+
+        .expansion-item:hover {
+            border-color: #ffff00;
+            transform: scale(1.05);
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 1280px) {
+            .hero-title {
+                font-size: 3.5rem;
+            }
+            
+            .hero-subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .hero-description {
+                font-size: 1rem;
+            }
+            
+            .hero-section {
+                height: auto;
+                padding: 100px 20px;
+            }
+            
+            .section {
+                padding: 30px 15px;
+            }
+            
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .core-features {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            
+        }
+
+        /* スクロールアニメーション用 */
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 0.8s ease;
+        }
+
+        .animate-on-scroll.animated {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* サイバーボタン */
+        .cyber-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: transparent;
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .cyber-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            transition: left 0.5s ease;
+        }
+
+        .cyber-button:hover::before {
+            left: 100%;
+        }
+
+        .cyber-button:hover {
+            color: #000;
+            background: #00ffff;
+            box-shadow: 0 0 30px #00ffff;
+        }
+
+        .rainbow-blink {
+            animation: rainbow-glow 4s linear infinite, blink-opacity 1s infinite alternate;
+        }
+
+        @keyframes rainbow-glow {
+            0%, 100% { border-color: #ff00ff; box-shadow: 0 0 20px #ff00ff; color: #ff00ff; }
+            25% { border-color: #00ffff; box-shadow: 0 0 20px #00ffff; color: #00ffff; }
+            50% { border-color: #ffff00; box-shadow: 0 0 20px #ffff00; color: #ffff00; }
+            75% { border-color: #00ff00; box-shadow: 0 0 20px #00ff00; color: #00ff00; }
+        }
+
+        @keyframes blink-opacity {
+            0% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+    <!-- パーティクル背景 -->
+    <canvas id="particles-bg"></canvas>
+    
+    <!-- アニメーション背景 -->
+    <div class="animated-bg"></div>
+    <div class="cyber-grid"></div>
+
+    <!-- ヒーローセクション -->
+    <section class="hero-section">
+        <h1 class="hero-title">私はアイディ</h1>
+        <h2 class="hero-subtitle">AiDiy : Do it yourself with AI</h2>
+        <p class="hero-description">
+            日本語ファーストの革新的AI支援開発環境。<br>
+            リアルタイム音声AI（20種類以上の音声選択）、動的AIモデル選択、プログラミング支援、<br>
+            AI/App独立内部再起動システムによるゼロダウンタイム開発を実現する次世代プラットフォーム
+        </p>
+        <div class="typing-text" id="typing-text"></div>
+    </section>
+
+    <!-- コア機能セクション -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Core Features</h2>
+        <div class="core-features">
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon"></span>
+                <h3 class="feature-title">リアルタイム音声AI</h3>
+                <p class="feature-description">
+                    Gemini Live / OpenAI Realtimeによるリアルタイム音声対話。
+                    Gemini 20種類以上、OpenAI 13種類の音声から選択可能。
+                    動的AIモデル選択機能で画面上から即座に切り替え
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon"></span>
+                <h3 class="feature-title">プログラミング支援</h3>
+                <p class="feature-description">
+                    Claude（SDK）/ OpenAI・Gemini・Copilot（CLI）の4プロバイダー対応。
+                    AIとの対話でコードを生成し、即座にプロジェクトに反映。
+                    ChatAI機能でOpenRouter経由の多様なモデルも利用可能
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">⚡</span>
+                <h3 class="feature-title">革新的開発サイクル</h3>
+                <p class="feature-description">
+                    開発→テスト→確認のサイクルを極限まで短縮。AI系とApp系を独立して
+                    再起動可能な内部再起動システム（reboot_AIs/reboot_Apps）で
+                    ゼロダウンタイム開発を実現
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🎯</span>
+                <h3 class="feature-title">階層アーキテクチャ</h3>
+                <p class="feature-description">
+                    業務ドメイン分類（A,C,M,T,S,V,X）によるdata/API統合。
+                    6つのAPIサーバー（coreAPI1,2,3,5,6,9）で分散処理。
+                    配車管理・商品在庫管理システムのサンプル実装でAiDiyプラットフォームの実力を実証。
+                    HTML 24個、JavaScript 27個、総フロントエンド51ファイル
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 技術統計 -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Technical Specifications</h2>
+        <div class="tech-stats">
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-label">APIサーバー</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="24">0</span>
+                <span class="stat-label">画面システム</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="45">0</span>
+                <span class="stat-label">Pythonファイル</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="51">0</span>
+                <span class="stat-label">フロントエンド</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="33">0</span>
+                <span class="stat-label">音声選択種類</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-label">AIプロバイダー</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- 設計思想 -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Design Philosophy</h2>
+        <div class="philosophy-grid">
+            <div class="philosophy-item animate-on-scroll">
+                <h3 class="philosophy-title"> 日本語ファースト</h3>
+                <p>UI、データベース、API、AI対話まで全て日本語で設計。日本語開発者のための最適化されたエクスペリエンス</p>
+            </div>
+            <div class="philosophy-item animate-on-scroll">
+                <h3 class="philosophy-title">⚡ ゼロダウンタイム</h3>
+                <p>reboot_AIs/reboot_Apps技術によるAI/App独立内部再起動システム。AI系（data2/coreAPI2）とApp系（data3,5,6,9/coreAPI3,5,6,9）を独立して再起動可能。コア機能（data1/coreAPI1）とWebUIは常時稼働で開発効率を最大化</p>
+            </div>
+            <div class="philosophy-item animate-on-scroll">
+                <h3 class="philosophy-title"> AI協力開発</h3>
+                <p>人間とAIが協力して開発。音声対話（20種類以上の音声選択）とコード生成の融合で革新的な開発体験を実現。動的AIモデル選択機能で最適なAIプロバイダーを即座に切り替え</p>
+            </div>
+            <div class="philosophy-item animate-on-scroll">
+                <h3 class="philosophy-title">⚡ リアルタイム性</h3>
+                <p>WebSocket双方向通信、音声VAD制御、CPU最適化により究極のリアルタイム体験を提供</p>
+            </div>
+            <div class="philosophy-item animate-on-scroll">
+                <h3 class="philosophy-title">🏗️ 階層型分散アーキテクチャ</h3>
+                <p>業務ドメイン（A,C,M,T,S,V,X）別のdata/API層統合による6つのAPIサーバー（coreAPI1,2,3,5,6,9）分散処理。45個のPythonファイルによるモジュラー設計でスケーラブルな構成。AI系とApp系の独立再起動で柔軟な開発</p>
+            </div>
+            <div class="philosophy-item animate-on-scroll">
+                <h3 class="philosophy-title"> パフォーマンス重視</h3>
+                <p>適応的sleep制御、ログ最適化、メモリ管理により最高のパフォーマンスを実現</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 拡張性・できること -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Capabilities & Extensibility</h2>
+        <div class="expansion-grid">
+            <div class="expansion-item animate-on-scroll">
+                <h4> マルチモーダル処理</h4>
+                <p>テキスト・音声・画像の統合処理</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4> 動的機能追加</h4>
+                <p>AIとの対話で新機能をリアルタイム追加</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4> Docker対応</h4>
+                <p>本格運用とシンプル起動の両対応</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4> セキュア</h4>
+                <p>Bearer Token認証と統一認証システム</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🏗️ 階層型アーキテクチャ</h4>
+                <p>data1(C系)・data2(A系)・data3(M系)・data5(T系)・data6(S,V系)・data9(X系)による業務ドメイン統合。6つのcoreAPI（1,2,3,5,6,9）分散サーバー構成で最適な処理分離</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🎙️ 動的AI選択</h4>
+                <p>設定パネル（左上歯車アイコン）から即座にAIモデル・音声を切り替え可能。Gemini/OpenAI/OpenRouter/Claude/Copilot 6プロバイダー対応</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>📊 サンプル実装システム</h4>
+                <p>配車管理システム（M車両・M配車区分・T配車・S週日表示）と商品在庫管理システム（M商品・T入出庫棚卸・V商品推移表）によるAiDiyプラットフォームの実力実証</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🎮 エンターテイメント</h4>
+                <p>ゲーム機能（インベーダー・リバーシ）でシステムの柔軟性を実証</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🔄 自動復旧・再起動</h4>
+                <p>AI/App独立内部再起動システム（reboot_AIs/reboot_Apps）。エラー連続時の自動停止機能付き</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4> スケーラブル</h4>
+                <p>モジュラー設計で無限の拡張可能性</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- フッター -->
+    <section class="section" style="text-align: center; padding-bottom: 30px;">
+        <h2 class="section-title animate-on-scroll">Ready to Experience?</h2>
+        <p class="animate-on-scroll" style="margin-bottom: 15px; font-size: 1.1rem;">
+            AiDiyで未来の開発体験を始めましょう
+        </p>
+        <a href="/index.html?inner_page=AコアAI" class="cyber-button animate-on-scroll rainbow-blink" target="_parent">
+            Start with AiDiy
+        </a>
+    </section>
+
+    <!-- JavaScript -->
+    <script src="index.js"></script>
+</body>
+</html>
