@@ -1,0 +1,156 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.pyo
+*.pdb
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenv
+.env
+.env.*
+.venv/
+env/
+venv/
+ENV/
+backend_server/.env/
+backend_server/.venv/
+backend_server/env/
+backend_server/venv/
+backend_server/env.bak/
+backend_server/venv.bak/
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+cover/
+coverage/
+
+# Logs & temp
+*.log
+logs/
+temp/
+backend_server/temp/
+backend_server/temp/**
+_work/
+_log/
+
+# Runtime data / pids
+pids
+*.pid
+*.seed
+*.pid.lock
+_data/
+**/_data/**
+backend_server/_data/
+backend_server/_data/**
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+frontend_server/node_modules/
+dist/
+frontend_server/dist/
+.npm
+.node_repl_history
+*.tgz
+.yarn-integrity
+
+# IDEs / Editors
+.idea/
+.vscode/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific directories
+_cache/
+_controls/
+_datas/
+backup/
+julius/
+_MCP/
+aidiy/temp/_log/
+aidiy/temp/live_audio/
+aidiy/temp/_work/
+aidiy/temp/input/
+aidiy/temp/output/
+aidiy/temp/sandbox/
+
+# Secrets / sensitive
+*key.py
+*key.json
+*key.*
+*_key*
+*key*
+*.key
+*secret*
+*config*key*
+AZiP*.*
+firiend*
