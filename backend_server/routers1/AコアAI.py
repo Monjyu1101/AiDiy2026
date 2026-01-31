@@ -597,19 +597,67 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
         # 出力ソケット接続時にwelcome_infoと履歴を送信
         if int(ソケット番号) in [0, 1, 2, 3, 4]:
-            ウェルカムメッセージ = {
-                0: "ようこそ AiDiy へ",
-                1: "コードエージェント1 です。",
-                2: "コードエージェント2 です。",
-                3: "コードエージェント3 です。",
-                4: "コードエージェント4 です。"
-            }
-            if int(ソケット番号) in ウェルカムメッセージ:
+            if int(ソケット番号) == 0:
+                last_update = セッション.ソース最終更新日時
+                if not last_update:
+                    last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                if not isinstance(last_update, str):
+                    last_update = str(last_update)
+
+                live_ai = セッション.モデル設定.get("LIVE_AI", "")
+                live_model = ""
+                live_voice = ""
+                if live_ai in ("gemini_live", "freeai_live"):
+                    model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
+                    voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
+                    live_model = セッション.モデル設定.get(model_key, "")
+                    live_voice = セッション.モデル設定.get(voice_key, "")
+                elif live_ai == "openai_live":
+                    live_model = セッション.モデル設定.get("LIVE_OPENAI_MODEL", "")
+                    live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
+                if not live_model:
+                    live_model = セッション.モデル設定.get("LIVE_GEMINI_MODEL", "") or セッション.モデル設定.get("LIVE_FREEAI_MODEL", "")
+                if not live_voice:
+                    live_voice = セッション.モデル設定.get("LIVE_GEMINI_VOICE", "") or セッション.モデル設定.get("LIVE_FREEAI_VOICE", "")
+
+                ウェルカム本文 = (
+                    f"私は AiDiy(アイディ) です。 (LastUpdate: {last_update})\n"
+                    f"（Model: \"{live_model}\", Voice: \"{live_voice}\"）\n"
+                    "音声、テキスト、画像共有しての会話ができます！"
+                )
+            else:
+                idx = int(ソケット番号)
+                ai_key = f"CODE_AI{idx}"
+                model_key = f"CODE_AI{idx}_MODEL"
+                ai_name = セッション.モデル設定.get(ai_key, "")
+                ai_model = セッション.モデル設定.get(model_key, "")
+                if not ai_model or ai_model == "auto":
+                    provider_key = ""
+                    if ai_name == "claude_sdk":
+                        provider_key = "CODE_CLAUDE_SDK_MODEL"
+                    elif ai_name == "claude_cli":
+                        provider_key = "CODE_CLAUDE_CLI_MODEL"
+                    elif ai_name == "copilot_cli":
+                        provider_key = "CODE_COPILOT_CLI_MODEL"
+                    elif ai_name == "gemini_cli":
+                        provider_key = "CODE_GEMINI_CLI_MODEL"
+                    elif ai_name == "codex_cli":
+                        provider_key = "CODE_CODEX_CLI_MODEL"
+                    if provider_key:
+                        ai_model = セッション.モデル設定.get(provider_key, "")
+
+                ウェルカム本文 = (
+                    f"私は Code Agent ({idx}) です。\n"
+                    f"（Name: \"{ai_name}\", Model: \"{ai_model}\"）\n"
+                    "システム開発を支援します。"
+                )
+
+            if ウェルカム本文:
                 await セッション.send_to_channel(int(ソケット番号), {
                     "ソケットID": ソケットID,
                     "チャンネル": int(ソケット番号),
                     "メッセージ識別": "welcome_info",
-                    "メッセージ内容": ウェルカムメッセージ[int(ソケット番号)],
+                    "メッセージ内容": ウェルカム本文,
                     "ファイル名": None,
                     "サムネイル画像": None
                 })
@@ -620,6 +668,18 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 await 送信_会話履歴(セッション, ソケットID, チャンネル=int(ソケット番号))
             except Exception as e:
                 logger.exception(f"会話履歴送信エラー: {e}")
+            try:
+                追加メッセージ = "会話準備できました。よろしくお願いします。" if int(ソケット番号) == 0 else "準備できました。"
+                await セッション.send_to_channel(int(ソケット番号), {
+                    "ソケットID": ソケットID,
+                    "チャンネル": int(ソケット番号),
+                    "メッセージ識別": "output_text",
+                    "メッセージ内容": 追加メッセージ,
+                    "ファイル名": None,
+                    "サムネイル画像": None
+                })
+            except Exception as e:
+                logger.exception(f"準備メッセージ送信エラー: {e}")
 
         # メインループ：メッセージを受信し処理（入力ソケットのみ）
         while True:
@@ -665,6 +725,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         "ファイル名": None,
                         "サムネイル画像": None
                     })
+                    if 1 <= 出力先チャンネル <= 4:
+                        await asyncio.sleep(0.1)
 
                     保存_会話履歴(
                         ソケットID=ソケットID,
@@ -699,6 +761,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                 await セッション.chat_processor.チャット要求(受信データ)
                         elif 1 <= 出力先チャンネル <= 4 and hasattr(セッション, 'code_agent_processors'):
                             await セッション.code_agent_processors[出力先チャンネル - 1].コード要求(受信データ)
+                            await asyncio.sleep(0.1)
                     finally:
                         セッション.set_channel_processing(出力先チャンネル, False)
 

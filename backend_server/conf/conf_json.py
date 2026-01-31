@@ -33,23 +33,18 @@ class conf_json:
         'CORE_BASE': '8080',
         'WEBUI_FIRST_PAGE': '_テスト',
 
-        # APIキー
-        'gemini_key_id': '< your gemini api key >',
-        'freeai_key_id': '< your freeai api key >',  # GeminiのAPI別キー（実態はGemini API）
-        'claude_key_id': '< your claude api key >',
+        # APIキー（省略値には含めない）
+
+        # OpenAI/Azureの基本設定
         'openai_api_type': 'openai',
         'openai_organization': '< your openai organization id >',
-        'openai_key_id': '< your openai api key >',
         'azure_endpoint': '< your azure openai endpoint >',
         'azure_version': 'yyyy-mm-dd-preview',
-        'azure_key_id': '< your azure openai api key >',
-        'copilot_key_id': '< your copilot api key >',
-        'openrt_key_id': '< your openrouter api key >',
 
         # ChatAI設定
         'CHAT_AI': 'freeai',
         'CHAT_GEMINI_MODEL': 'gemini-3-pro-image-preview',
-        'CHAT_FREEAI_MODEL': 'gemini-2.5-flash',
+        'CHAT_FREEAI_MODEL': 'gemini-2.5-flash-preview-09-2025',
         'CHAT_OPENRT_MODEL': 'google/gemini-3-pro-image-preview',
 
         # LiveAI設定
@@ -63,13 +58,13 @@ class conf_json:
 
         # CodeAI設定
         'CODE_BASE_PATH': '../',
-        'CODE_AI1': 'copilot',
+        'CODE_AI1': 'copilot_cli',
         'CODE_AI1_MODEL': 'auto',
-        'CODE_AI2': 'auto',
+        'CODE_AI2': 'claude_sdk',
         'CODE_AI2_MODEL': 'auto',
-        'CODE_AI3': 'auto',
+        'CODE_AI3': 'codex_cli',
         'CODE_AI3_MODEL': 'auto',
-        'CODE_AI4': 'auto',
+        'CODE_AI4': 'gemini_cli',
         'CODE_AI4_MODEL': 'auto',
         'CODE_CLAUDE_SDK_MODEL': 'auto',
         'CODE_CLAUDE_CLI_MODEL': 'auto',
@@ -103,7 +98,7 @@ class conf_json:
 
         if os.path.exists(config_file):
             try:
-                with open(config_file, 'r', encoding='utf-8') as f:
+                with open(config_file, 'r', encoding='utf-8-sig') as f:
                     config_data = json.load(f)
                 object.__setattr__(self, '_config_data', config_data)
                 logger.info(f'設定ファイル読み込み完了: {config_file}')

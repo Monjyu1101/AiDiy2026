@@ -60,6 +60,8 @@ origins = [
     "http://localhost:5173", # Vite default
     "http://localhost:3000",
     "http://localhost:8090", # New Port
+    "https://localhost",     # Docker Nginx HTTPS
+    "http://localhost",      # Docker Nginx HTTP
 ]
 
 app.add_middleware(

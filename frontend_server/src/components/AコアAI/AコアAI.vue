@@ -40,6 +40,8 @@ const モデル設定 = ref({
   CODE_AI4: ''
 });
 
+const chatMode = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>('live');
+
 // エラーメッセージ
 const errorMessage = ref('');
 
@@ -230,7 +232,10 @@ const initializeWebSocket = async (既存ソケットID?: string) => {
         enableAgent2Button.value = 初期データ.ボタン.エージェント2 || false;
         enableAgent3Button.value = 初期データ.ボタン.エージェント3 || false;
         enableAgent4Button.value = 初期データ.ボタン.エージェント4 || false;
+        chatMode.value = 初期データ.ボタン.チャットモード || 'live';
         console.log('[AコアAI] ボタン状態を初期化:', 初期データ.ボタン);
+      } else {
+        chatMode.value = 'live';
       }
 
       showImage.value = enableCamera.value; // 常にfalse
@@ -239,6 +244,7 @@ const initializeWebSocket = async (既存ソケットID?: string) => {
       // WebSocket接続確立フラグを設定（子コンポーネントのマウント前に設定）
       wsConnected.value = true;
       console.log('[AコアAI] WebSocket接続確立完了');
+      saveState();
 
       // nextTickで画面状態を復元（子コンポーネントがマウントされてから）
       nextTick(() => {
@@ -405,7 +411,8 @@ const saveState = async () => {
     エージェント1: enableAgent1Button.value,
     エージェント2: enableAgent2Button.value,
     エージェント3: enableAgent3Button.value,
-    エージェント4: enableAgent4Button.value
+    エージェント4: enableAgent4Button.value,
+    チャットモード: chatMode.value
   };
 
   try {
@@ -501,6 +508,10 @@ watch(enableAgent3Button, () => {
 });
 
 watch(enableAgent4Button, () => {
+  saveState();
+});
+
+watch(chatMode, () => {
   saveState();
 });
 
@@ -640,8 +651,10 @@ const gridLayoutClass = computed(() => {
           :チャンネル="0"
           :chat-ai="モデル設定.CHAT_AI"
           :live-ai="モデル設定.LIVE_AI"
+          :chat-mode="chatMode"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
+          @mode-change="chatMode = $event"
           @close="handleCloseChat" 
         />
       </div>

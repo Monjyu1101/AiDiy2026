@@ -50,8 +50,6 @@ const contentArea = ref<HTMLElement | null>(null);
 const connectionStatus = computed<'disconnected' | 'connected'>(() => (
   isWsConnected.value ? 'connected' : 'disconnected'
 ));
-const hasWelcomeInfo = ref(false);
-const welcomeInfo = ref<string>('');
 
 // テキスト入力関連
 const inputText = ref('');
@@ -304,6 +302,9 @@ const addLine = (text: string) => {
 };
 
 // WebSocketイベントハンドラ
+const hasWelcomeInfo = ref(false);
+const welcomeInfo = ref<string>('');
+
 const handleWelcomeInfo = (message: any) => {
   const content = message.メッセージ内容 ?? message.text ?? '';
   if (!content) return;
@@ -311,7 +312,6 @@ const handleWelcomeInfo = (message: any) => {
   welcomeInfo.value = text;
   hasWelcomeInfo.value = true;
 };
-
 const handleInputText = (message: any) => {
   const content = message.メッセージ内容 ?? message.text ?? '';
   if (!content) return;
@@ -512,7 +512,7 @@ const getStatusText = () => {
   <div class="agent-container show">
     <div class="agent-header">
       <button class="close-btn" @click="emit('close')" title="閉じる">×</button>
-      <h1>Code Agent{{ チャンネル }} <span v-if="codeAi" class="model-info">({{ codeAi }})</span></h1>
+      <h1>Code Agent ({{ チャンネル }}) <span v-if="codeAi" class="model-info">({{ codeAi }})</span></h1>
       <div class="agent-status">
         <div :class="['agent-status-dot', connectionStatus]"></div>
         <span>{{ getStatusText() }}</span>
@@ -520,10 +520,10 @@ const getStatusText = () => {
     </div>
 
     <div ref="contentArea" class="agent-content">
-      <div class="welcome-message" v-if="messages.length === 0 && welcomeInfo">
+      <div class="welcome-message" v-if="welcomeInfo">
         {{ welcomeInfo }}
       </div>
-      
+
       <div
         v-for="message in messages"
         :key="message.id"
@@ -715,7 +715,9 @@ const getStatusText = () => {
   max-width: 85%;
   font-family: 'Courier New', monospace;
   font-size: 11px;
+  white-space: pre-line;
 }
+
 
 .terminal-line {
   margin: 0;

@@ -19,6 +19,7 @@ const props = defineProps<{
   チャンネル?: number;
   chatAi?: string;
   liveAi?: string;
+  chatMode?: 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4';
   inputWsClient?: IWebSocketClient | null;
   inputConnected?: boolean;
 }>();
@@ -26,6 +27,7 @@ const props = defineProps<{
 // Emits
 const emit = defineEmits<{
   close: [];
+  'mode-change': ['chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'];
 }>();
 
 const outputWsClient = ref<IWebSocketClient | null>(null);
@@ -49,12 +51,11 @@ interface Message {
 
 const messages = ref<Message[]>([]);
 const inputText = ref('');
-const selectedMode = ref<'chat' | 'live' | 'code'>('code');
+const selectedMode = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>(props.chatMode || 'live');
 const chatArea = ref<HTMLElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const isDragOver = ref(false);
 let messageIdCounter = 0;
-const welcomeInfo = ref<string>('');
 
 // テキストエリアの自動リサイズ
 const autoResize = () => {
@@ -199,14 +200,15 @@ const addFileMessage = (role: Message['role'], fileName?: string | null, thumbna
 };
 
 // WebSocketイベントハンドラ
+const welcomeInfo = ref<string>('');
+
 const handleWelcomeInfo = (message: any) => {
   console.log('[チャット] welcome_info受信:', message);
   const content = message.メッセージ内容 ?? message.text ?? '';
   if (!content) return;
-  console.log('[チャット] welcome_info処理:', content);
-  welcomeInfo.value = typeof content === 'string' ? content : JSON.stringify(content);
+  const text = typeof content === 'string' ? content : JSON.stringify(content);
+  welcomeInfo.value = text;
 };
-
 const handleInputText = (message: any) => {
   console.log('[チャット] input_text受信:', message);
   const content = message.メッセージ内容 ?? message.text ?? '';
@@ -425,6 +427,18 @@ watch(() => props.socketId, (newId, oldId) => {
   connectOutputSocket();
 });
 
+watch(
+  () => props.chatMode,
+  (newMode) => {
+    if (!newMode || newMode === selectedMode.value) return;
+    selectedMode.value = newMode;
+  }
+);
+
+watch(selectedMode, (newMode) => {
+  emit('mode-change', newMode);
+});
+
 // クリーンアップ
 onBeforeUnmount(() => {
   if (outputWsClient.value) {
@@ -449,15 +463,23 @@ const sendMessage = async () => {
 
   // WebSocket経由でメッセージを送信（サーバーが即座にエコーバック）
   if (props.inputWsClient && props.inputWsClient.isConnected()) {
-    const チャンネル = props.チャンネル ?? 0;
-    console.log('[チャット] WebSocket経由でメッセージ送信 (input_text):', { userMessage, チャンネル, mode: selectedMode.value });
+    const baseChannel = props.チャンネル ?? 0;
+    const mode = selectedMode.value;
+    const isCodeMode = mode.startsWith('code');
+    const 出力先チャンネル = isCodeMode ? Number(mode.replace('code', '')) || 1 : baseChannel;
+    const 送信モード = isCodeMode ? 'code' : mode;
+    console.log('[チャット] WebSocket経由でメッセージ送信 (input_text):', {
+      userMessage,
+      チャンネル: 出力先チャンネル,
+      mode: 送信モード
+    });
     props.inputWsClient.send({
       ソケットID: props.socketId ?? '',
       チャンネル: -1,
-      出力先チャンネル: チャンネル,
+      出力先チャンネル: 出力先チャンネル,
       メッセージ識別: 'input_text',
       メッセージ内容: userMessage,
-      ファイル名: selectedMode.value,  // chat, live, code
+      ファイル名: 送信モード,  // chat, live, code
       サムネイル画像: null
     });
   } else {
@@ -496,7 +518,10 @@ const sendInputFile = async (file: File) => {
   if (!props.inputWsClient || !props.inputWsClient.isConnected()) return;
   try {
     const base64Data = await readFileAsBase64(file);
-    const 出力先チャンネル = props.チャンネル ?? 0;
+    const baseChannel = props.チャンネル ?? 0;
+    const mode = selectedMode.value;
+    const isCodeMode = mode.startsWith('code');
+    const 出力先チャンネル = isCodeMode ? Number(mode.replace('code', '')) || 1 : baseChannel;
     props.inputWsClient.send({
       ソケットID: props.socketId ?? '',
       チャンネル: -1,  // 入力は常に-1
@@ -572,7 +597,7 @@ const statusText = computed(() => {
     </div>
 
     <div ref="chatArea" class="chat-area">
-      <div class="welcome-message" v-if="messages.length === 0 && welcomeInfo">
+      <div class="welcome-message" v-if="welcomeInfo">
         {{ welcomeInfo }}
       </div>
 
@@ -645,19 +670,36 @@ const statusText = computed(() => {
       </div>
 
       <!-- モード選択（縦並び） -->
-      <div class="mode-selector">
-        <label class="mode-option">
-          <input type="radio" v-model="selectedMode" value="chat" name="mode" />
-          <span>Chat</span>
-        </label>
-        <label class="mode-option">
-          <input type="radio" v-model="selectedMode" value="live" name="mode" />
-          <span>Live</span>
-        </label>
-        <label class="mode-option">
-          <input type="radio" v-model="selectedMode" value="code" name="mode" />
-          <span>Code</span>
-        </label>
+      <div class="mode-panel">
+        <div class="mode-selector">
+          <label class="mode-option">
+            <input type="radio" v-model="selectedMode" value="chat" name="mode" />
+            <span>Chat</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="selectedMode" value="live" name="mode" />
+            <span>Live</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="selectedMode" value="code1" name="mode" />
+            <span>Code1</span>
+          </label>
+        </div>
+
+        <div class="code-selector">
+          <label class="mode-option">
+            <input type="radio" v-model="selectedMode" value="code2" name="mode" />
+            <span>Code2</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="selectedMode" value="code3" name="mode" />
+            <span>Code3</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="selectedMode" value="code4" name="mode" />
+            <span>Code4</span>
+          </label>
+        </div>
       </div>
 
       <!-- 送信ボタン -->
@@ -785,7 +827,9 @@ const statusText = computed(() => {
   max-width: 85%;
   font-family: 'Courier New', monospace;
   font-size: 11px;
+  white-space: pre-line;
 }
+
 
 .message {
   margin-bottom: 1px;
@@ -995,41 +1039,53 @@ const statusText = computed(() => {
   border-top: 1px solid #484848;
   display: flex;
   flex-direction: row;
-  gap: 15px;
+  gap: 10px;
   align-items: flex-end;
 }
 
-.mode-selector {
+.mode-panel {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  padding-bottom: 16px;
+  justify-content: center;
+  margin-top: -4px;
+}
+
+.mode-selector,
+.code-selector {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-bottom: 20px;
-  justify-content: center;
+  gap: 4px;
 }
 
 .mode-option {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   color: #e0e0e0;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
   user-select: none;
-  line-height: 1;
-  padding: 1px 0;
+  line-height: 1.1;
+  padding: 0;
 }
 
 .mode-option input[type="radio"] {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
   cursor: pointer;
   accent-color: #667eea;
   margin: 0;
+  position: relative;
+  top: -8px;
 }
 
 .mode-option span {
   font-family: 'Courier New', monospace;
   font-weight: normal;
+  position: relative;
+  top: -4px;
 }
 
 .text-input-area {

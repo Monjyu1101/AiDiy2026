@@ -10,7 +10,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, reactive, computed } from 'vue';
+import { ref, watch, reactive, computed, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import apiClient from '@/api/client';
 import RebootDialog from './AコアAI_再起動.vue';
@@ -32,6 +32,7 @@ const availableModels = ref<Record<string, any>>({});
 const currentSettings = ref<Record<string, any>>({});
 const codeBaseOptions = ref<Record<string, string>>({});
 const showRebootDialog = ref(false);
+const isInitializing = ref(false);
 
 const selections = reactive({
   chatAi: '',
@@ -143,6 +144,7 @@ const loadConfig = async () => {
       currentSettings.value = data.モデル設定 || {};
       codeBaseOptions.value = data.external_root_dic || {};
 
+      isInitializing.value = true;
       const chatModels = availableModels.value.chat_models || {};
       const liveModels = availableModels.value.live_models || {};
       const liveVoices = availableModels.value.live_voices || {};
@@ -169,12 +171,18 @@ const loadConfig = async () => {
       selections.codeModel2 = currentSettings.value.CODE_AI2_MODEL || Object.keys(codeModels?.[selections.codeAi2] || {})[0] || '';
       selections.codeModel3 = currentSettings.value.CODE_AI3_MODEL || Object.keys(codeModels?.[selections.codeAi3] || {})[0] || '';
       selections.codeModel4 = currentSettings.value.CODE_AI4_MODEL || Object.keys(codeModels?.[selections.codeAi4] || {})[0] || '';
+      await nextTick();
+      isInitializing.value = false;
     } else {
       errorMessage.value = response?.data?.message || '取得に失敗しました';
     }
   } catch (error: any) {
     errorMessage.value = `取得エラー: ${error?.response?.data?.message || error?.message || error}`;
   } finally {
+    if (isInitializing.value) {
+      await nextTick();
+      isInitializing.value = false;
+    }
     loading.value = false;
   }
 };
@@ -273,6 +281,7 @@ watch(
 watch(
   () => selections.codeAi1,
   (newValue) => {
+    if (isInitializing.value) return;
     const models = availableModels.value?.code_models?.[newValue] || {};
     const newModel = currentSettings.value.CODE_AI1_MODEL || Object.keys(models)[0] || '';
     selections.codeModel1 = newModel;
@@ -289,6 +298,7 @@ watch(
 watch(
   () => selections.codeModel1,
   (newValue) => {
+    if (isInitializing.value) return;
     // AI1_MODEL変更時、AI2-4に両方（AIとMODEL）をコピー
     selections.codeAi2 = selections.codeAi1;
     selections.codeAi3 = selections.codeAi1;
@@ -302,6 +312,7 @@ watch(
 watch(
   () => selections.codeAi2,
   (newValue) => {
+    if (isInitializing.value) return;
     // AI2個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
     if (!availableModels.value?.code_models?.[newValue]) return;
     const models = Object.keys(availableModels.value.code_models[newValue]);
@@ -314,6 +325,7 @@ watch(
 watch(
   () => selections.codeAi3,
   (newValue) => {
+    if (isInitializing.value) return;
     // AI3個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
     if (!availableModels.value?.code_models?.[newValue]) return;
     const models = Object.keys(availableModels.value.code_models[newValue]);
@@ -326,6 +338,7 @@ watch(
 watch(
   () => selections.codeAi4,
   (newValue) => {
+    if (isInitializing.value) return;
     // AI4個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
     if (!availableModels.value?.code_models?.[newValue]) return;
     const models = Object.keys(availableModels.value.code_models[newValue]);
