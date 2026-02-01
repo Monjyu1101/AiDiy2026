@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   -*- coding: utf-8 -*-
 
   ------------------------------------------------
@@ -370,7 +370,7 @@ watch(
     <div class="config-panel" role="document">
       <div class="config-panel-header" id="configPanelTitle">
         <button class="config-panel-close" type="button" @click="handleCancel">×</button>
-        <div class="config-panel-title">AI設定</div>
+        <div class="config-panel-title">モデル設定 / 再起動</div>
         <div class="config-panel-spacer" aria-hidden="true"></div>
       </div>
       <div class="config-panel-body">
@@ -723,4 +723,3 @@ watch(
   }
 }
 </style>
-

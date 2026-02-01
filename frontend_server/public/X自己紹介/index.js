@@ -1,38 +1,33 @@
-// X自己紹介.js - AiDiy自己紹介ページの動的機能
+// index.js - AiDiy_next 自己紹介ページの動的機能
 
-class AiDiySelfIntroduction {
+class AiDiyIntroduction {
     constructor() {
         this.particleCanvas = null;
         this.particleCtx = null;
         this.particles = [];
         this.animationId = null;
         this.typewriterTexts = [
-            "System.initialize() → Ready",
+            "FastAPI Dual Server → Ready",
+            "Vue 3 + Vite + TypeScript → Active",
+            "4 Parallel Code Agents → Running",
             "Gemini Live API → Connected",
-            "Claude Code SDK → Integrated",
+            "Claude SDK → Integrated",
             "WebSocket Channel → Active",
-            "Development Cycle → Optimized",
-            "Real-time Processing → Enabled",
             "Japanese-First Design → Complete",
-            "Zero-Downtime Reload → Standby",
-            "Multi-modal AI → Operational",
-            "Welcome to the Future of Development"
+            "qTubler System → Operational",
+            "JWT Authentication → Secured",
+            "Welcome to AiDiy_next"
         ];
         this.currentTextIndex = 0;
         this.typewriterSpeed = 50;
         this.countersAnimated = false;
-        this.scrollElement = null;
 
         // 自動スクロール設定
+        this.autoScrollEnabled = false;
+        this.scrollTimeout = null;
         this.userInteracted = false;
-        this.autoScrollDelayMs = 10000;
-        this.autoScrollIntervalMs = 20;
-        this.autoScrollStep = 1;
-        this.autoScrollActive = false;
-        this.autoScrollTimer = null;
-        this.autoScrollStartTimer = null;
-        this.autoScrollCancelEvents = ['wheel', 'touchstart', 'keydown', 'mousedown'];
-        this.autoScrollCancelHandler = null;
+        this.autoScrollSpeed = 1;
+        this.expectedScrollY = 0;
 
         this.init();
     }
@@ -42,46 +37,9 @@ class AiDiySelfIntroduction {
         this.startParticleAnimation();
         this.setupTypewriter();
         this.setupScrollAnimations();
-        this.setupCounterAnimations();
         this.setupInteractiveEffects();
         this.setupAutoScroll();
     }
-
-    getScrollElement() {
-        if (!this.scrollElement) {
-            const scrollingElement = document.scrollingElement || document.documentElement || document.body;
-            if (scrollingElement && scrollingElement.scrollHeight > scrollingElement.clientHeight) {
-                this.scrollElement = scrollingElement;
-            } else if (document.documentElement && document.documentElement.scrollHeight > document.documentElement.clientHeight) {
-                this.scrollElement = document.documentElement;
-            } else {
-                this.scrollElement = document.body || scrollingElement;
-            }
-        }
-        return this.scrollElement;
-    }
-
-    getScrollTop() {
-        return window.pageYOffset
-            || (document.documentElement ? document.documentElement.scrollTop : 0)
-            || (document.body ? document.body.scrollTop : 0)
-            || 0;
-    }
-
-    setScrollTop(value) {
-        if (document.documentElement) {
-            document.documentElement.scrollTop = value;
-        }
-        if (document.body) {
-            document.body.scrollTop = value;
-        }
-        const scrollingElement = document.scrollingElement;
-        if (scrollingElement && scrollingElement !== document.documentElement && scrollingElement !== document.body) {
-            scrollingElement.scrollTop = value;
-        }
-        window.scrollTo(0, value);
-    }
-
 
     setupParticleCanvas() {
         this.particleCanvas = document.getElementById('particles-bg');
@@ -90,7 +48,6 @@ class AiDiySelfIntroduction {
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
 
-        // パーティクル初期化
         this.initParticles();
     }
 
@@ -134,11 +91,9 @@ class AiDiySelfIntroduction {
             this.particleCtx.clearRect(0, 0, this.particleCanvas.width, this.particleCanvas.height);
 
             this.particles.forEach(particle => {
-                // パーティクル移動
                 particle.x += particle.vx;
                 particle.y += particle.vy;
 
-                // 画面端での反転
                 if (particle.x < 0 || particle.x > this.particleCanvas.width) {
                     particle.vx *= -1;
                 }
@@ -146,26 +101,21 @@ class AiDiySelfIntroduction {
                     particle.vy *= -1;
                 }
 
-                // パルス効果
                 particle.pulsePhase += particle.pulseSpeed;
                 const pulseOpacity = particle.opacity + Math.sin(particle.pulsePhase) * 0.2;
 
-                // パーティクル描画
                 this.particleCtx.beginPath();
                 this.particleCtx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
                 this.particleCtx.fillStyle = particle.color + pulseOpacity + ')';
                 this.particleCtx.fill();
 
-                // グロー効果
                 this.particleCtx.shadowBlur = 10;
                 this.particleCtx.shadowColor = particle.color + '0.8)';
                 this.particleCtx.fill();
                 this.particleCtx.shadowBlur = 0;
             });
 
-            // 接続線描画
             this.drawConnections();
-
             this.animationId = requestAnimationFrame(animate);
         };
 
@@ -233,7 +183,6 @@ class AiDiySelfIntroduction {
                 if (entry.isIntersecting) {
                     entry.target.classList.add('animated');
 
-                    // カウンターアニメーション
                     if (entry.target.classList.contains('stat-item') && !this.countersAnimated) {
                         this.animateCounters();
                         this.countersAnimated = true;
@@ -247,10 +196,6 @@ class AiDiySelfIntroduction {
         });
     }
 
-    setupCounterAnimations() {
-        // 初期化時は何もしない - スクロール時に実行
-    }
-
     animateCounters() {
         document.querySelectorAll('.stat-number').forEach(counter => {
             const target = parseInt(counter.dataset.count);
@@ -260,8 +205,6 @@ class AiDiySelfIntroduction {
             const updateCounter = (currentTime) => {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-
-                // イージング関数（ease-out）
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 const currentValue = Math.floor(target * easeOut);
 
@@ -279,28 +222,24 @@ class AiDiySelfIntroduction {
     }
 
     setupInteractiveEffects() {
-        // フィーチャーカードホバー効果
         document.querySelectorAll('.feature-card').forEach(card => {
             card.addEventListener('mouseenter', () => {
                 this.createHoverParticles(card);
             });
         });
 
-        // 哲学アイテムホバー効果
-        document.querySelectorAll('.philosophy-item').forEach(item => {
+        document.querySelectorAll('.architecture-item').forEach(item => {
             item.addEventListener('mouseenter', () => {
                 this.createRippleEffect(item);
             });
         });
 
-        // 拡張性アイテムホバー効果
         document.querySelectorAll('.expansion-item').forEach(item => {
             item.addEventListener('mouseenter', () => {
                 this.createPulseEffect(item);
             });
         });
 
-        // サイバーボタン効果
         document.querySelectorAll('.cyber-button').forEach(button => {
             button.addEventListener('click', (e) => {
                 this.createClickEffect(e.target, e.clientX, e.clientY);
@@ -336,7 +275,6 @@ class AiDiySelfIntroduction {
             }, 1500);
         }
 
-        // 動的キーフレーム作成
         this.createHoverParticleAnimations();
     }
 
@@ -366,7 +304,6 @@ class AiDiySelfIntroduction {
     }
 
     createRippleEffect(element) {
-        const rect = element.getBoundingClientRect();
         const ripple = document.createElement('div');
         ripple.style.cssText = `
             position: absolute;
@@ -420,10 +357,10 @@ class AiDiySelfIntroduction {
             }, 800);
         }
 
-        this.createClickSparkAnimations(clickX, clickY);
+        this.createClickSparkAnimations();
     }
 
-    createClickSparkAnimations(centerX, centerY) {
+    createClickSparkAnimations() {
         if (document.getElementById('click-spark-styles')) {
             document.getElementById('click-spark-styles').remove();
         }
@@ -450,59 +387,89 @@ class AiDiySelfIntroduction {
         document.head.appendChild(style);
     }
 
-    // 自動スクロール機能のセットアップ
     setupAutoScroll() {
-        // 初期遅延を3秒に変更
-        this.autoScrollDelayMs = 3000;
-
-        this.autoScrollCancelHandler = () => {
-            this.stopAutoScroll();
-
-            if (this.autoScrollStartTimer) {
-                clearTimeout(this.autoScrollStartTimer);
-            }
-
-            this.autoScrollStartTimer = setTimeout(() => {
+        setTimeout(() => {
+            if (!this.userInteracted) {
                 this.startAutoScroll();
-            }, this.autoScrollDelayMs);
-        };
+            }
+        }, 10000);
 
-        this.autoScrollCancelEvents.forEach((eventName) => {
-            window.addEventListener(eventName, this.autoScrollCancelHandler, { passive: true });
+        this.setupUserInteractionDetection();
+    }
+
+    setupUserInteractionDetection() {
+        const events = ['wheel', 'touchstart', 'touchmove', 'keydown', 'click'];
+
+        events.forEach(eventName => {
+            window.addEventListener(eventName, () => {
+                if (this.autoScrollEnabled) {
+                    this.userInteracted = true;
+                    this.stopAutoScroll();
+                }
+            }, { passive: true });
         });
 
-        // 初期タイマー開始
-        this.autoScrollCancelHandler();
+        window.addEventListener('scroll', () => {
+            if (!this.autoScrollEnabled) return;
+
+            const currentScrollY = window.scrollY;
+            const diff = Math.abs(currentScrollY - this.expectedScrollY);
+
+            if (diff > 10) {
+                this.userInteracted = true;
+                this.stopAutoScroll();
+            }
+        }, { passive: true });
     }
 
     startAutoScroll() {
-        if (this.autoScrollActive) return;
+        if (this.scrollTimeout || this.userInteracted) return;
 
-        this.autoScrollActive = true;
-        this.showAutoScrollNotification('自動スクロール開始しました', 1500);
+        this.autoScrollEnabled = true;
+        this.expectedScrollY = window.scrollY;
 
-        this.autoScrollTimer = setInterval(() => {
-            const previousScrollY = this.getScrollTop();
-            this.setScrollTop(previousScrollY + this.autoScrollStep);
-            const currentScrollY = this.getScrollTop();
+        this.showNotification('自動スクロール開始', 2000);
 
-            if (currentScrollY === previousScrollY) {
-                this.stopAutoScroll();
+        const scrollInterval = 21;
+
+        const autoScroll = () => {
+            if (!this.autoScrollEnabled) {
+                clearTimeout(this.scrollTimeout);
+                return;
             }
-        }, this.autoScrollIntervalMs);
+
+            const previousScrollY = window.scrollY;
+            window.scrollBy(0, this.autoScrollSpeed);
+            const currentScrollY = window.scrollY;
+
+            this.expectedScrollY = currentScrollY;
+
+            if (previousScrollY === currentScrollY) {
+                this.showNotification('最下部に到達', 2000);
+                this.stopAutoScroll();
+                return;
+            }
+
+            this.scrollTimeout = setTimeout(autoScroll, scrollInterval);
+        };
+
+        autoScroll();
     }
 
     stopAutoScroll() {
-        if (this.autoScrollTimer) {
-            clearInterval(this.autoScrollTimer);
-            this.autoScrollTimer = null;
+        if (this.scrollTimeout) {
+            clearTimeout(this.scrollTimeout);
+            this.scrollTimeout = null;
         }
-        this.autoScrollActive = false;
+
+        if (this.autoScrollEnabled && this.userInteracted) {
+            this.showNotification('自動スクロール停止', 1500);
+        }
+
+        this.autoScrollEnabled = false;
     }
 
-    // 自動スクロール通知の表示
-    showAutoScrollNotification(message, duration = 2000) {
-        // 既存の通知があれば削除
+    showNotification(message, duration = 2000) {
         const existing = document.querySelector('.auto-scroll-notification');
         if (existing) {
             existing.remove();
@@ -531,12 +498,10 @@ class AiDiySelfIntroduction {
 
         document.body.appendChild(notification);
 
-        // フェードアウトアニメーション
         setTimeout(() => {
             notification.style.animation = 'notification-fade-out 0.3s ease-in forwards';
         }, duration - 300);
 
-        // 削除
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.remove();
@@ -544,96 +509,34 @@ class AiDiySelfIntroduction {
         }, duration);
     }
 
-    // クリーンアップ
     destroy() {
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
         }
 
         this.stopAutoScroll();
-        if (this.autoScrollStartTimer) {
-            clearTimeout(this.autoScrollStartTimer);
-            this.autoScrollStartTimer = null;
-        }
-        if (this.autoScrollCancelHandler) {
-            this.autoScrollCancelEvents.forEach((eventName) => {
-                window.removeEventListener(eventName, this.autoScrollCancelHandler, { passive: true });
-            });
-        }
         window.removeEventListener('resize', this.resizeCanvas);
     }
 }
 
 // 追加のCSSアニメーション
-document.addEventListener('DOMContentLoaded', () => {
-    // 動的CSSアニメーション追加
+$(document).ready(function() {
     const additionalStyles = `
         <style>
         @keyframes ripple-expand {
             0% { width: 0; height: 0; opacity: 0.8; }
             100% { width: 200px; height: 200px; opacity: 0; }
         }
-        
+
         @keyframes pulse-glow {
             0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 0, 0.3); }
             50% { box-shadow: 0 0 40px rgba(255, 255, 0, 0.8); }
         }
-        
-        .cyber-particle {
-            position: fixed;
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 1000;
-            animation: cyber-float 3s ease-in-out infinite;
-        }
-        
-        @keyframes cyber-float {
-            0% { 
-                opacity: 1; 
-                transform: translateY(0) rotate(0deg); 
-            }
-            50% { 
-                opacity: 0.7; 
-                transform: translateY(-100px) rotate(180deg); 
-            }
-            100% { 
-                opacity: 0; 
-                transform: translateY(-200px) rotate(360deg); 
-            }
-        }
-        
-        .pass-message {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: linear-gradient(45deg, #ff00ff, #00ffff);
-            color: #000;
-            padding: 20px 40px;
-            border-radius: 10px;
-            font-family: 'Orbitron', monospace;
-            font-size: 1.5rem;
-            font-weight: bold;
-            z-index: 10000;
-            animation: pass-message-show 1.5s ease-in-out;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-            box-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
-        }
-        
-        @keyframes pass-message-show {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        }
-        
-        /* スムーズスクロール */
+
         html {
             scroll-behavior: smooth;
         }
-        
-        /* セクション間の視覚効果 */
+
         .section::before {
             content: '';
             position: absolute;
@@ -644,15 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
             background: linear-gradient(90deg, transparent, #00ffff, transparent);
             opacity: 0.3;
         }
-        
-        /* ホバー時のテキストシャドウ効果 */
+
         .feature-title:hover,
-        .philosophy-title:hover {
+        .architecture-title:hover {
             text-shadow: 0 0 20px currentColor;
             transition: text-shadow 0.3s ease;
         }
-        
-        /* 自動スクロール通知アニメーション */
+
         @keyframes notification-fade-in {
             0% {
                 opacity: 0;
@@ -663,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 transform: translateX(0) scale(1);
             }
         }
-        
+
         @keyframes notification-fade-out {
             0% {
                 opacity: 1;
@@ -675,18 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        /* モバイル最適化 */
         @media (max-width: 768px) {
-            .cyber-particle {
-                width: 2px;
-                height: 2px;
-            }
-            
-            .pass-message {
-                font-size: 1rem;
-                padding: 15px 30px;
-            }
-            
             .auto-scroll-notification {
                 top: 10px !important;
                 right: 10px !important;
@@ -697,12 +587,11 @@ document.addEventListener('DOMContentLoaded', () => {
         </style>
     `;
 
-    document.head.insertAdjacentHTML('beforeend', additionalStyles);
+    $('head').append(additionalStyles);
 
-    // メインクラス初期化
-    const aiDiyIntro = new AiDiySelfIntroduction();
+    const aiDiyIntro = new AiDiyIntroduction();
 
-    // 動的背景エフェクト（追加）
+    // 動的背景エフェクト
     setInterval(() => {
         if (Math.random() < 0.1) {
             createRandomGlow();
@@ -710,28 +599,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2000);
 
     function createRandomGlow() {
-        const glow = document.createElement('div');
-        glow.className = 'random-glow';
-        glow.style.position = 'fixed';
-        glow.style.width = Math.random() * 200 + 100 + 'px';
-        glow.style.height = Math.random() * 200 + 100 + 'px';
-        glow.style.background = `radial-gradient(circle, rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 255, 0.1), transparent)`;
-        glow.style.borderRadius = '50%';
-        glow.style.left = Math.random() * window.innerWidth + 'px';
-        glow.style.top = Math.random() * window.innerHeight + 'px';
-        glow.style.pointerEvents = 'none';
-        glow.style.zIndex = '-1';
-        glow.style.animation = 'glow-fade 4s ease-out forwards';
+        const glow = $('<div class="random-glow"></div>');
+        glow.css({
+            position: 'fixed',
+            width: Math.random() * 200 + 100 + 'px',
+            height: Math.random() * 200 + 100 + 'px',
+            background: `radial-gradient(circle, rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 255, 0.1), transparent)`,
+            borderRadius: '50%',
+            left: Math.random() * window.innerWidth + 'px',
+            top: Math.random() * window.innerHeight + 'px',
+            pointerEvents: 'none',
+            zIndex: -1,
+            animation: 'glow-fade 4s ease-out forwards'
+        });
 
-        document.body.appendChild(glow);
+        $('body').append(glow);
 
         setTimeout(() => {
             glow.remove();
         }, 4000);
     }
 
-    // 追加のキーフレーム
-    document.head.insertAdjacentHTML('beforeend', `
+    $('head').append(`
         <style>
         @keyframes glow-fade {
             0% { opacity: 0; transform: scale(0.5); }
@@ -741,32 +630,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </style>
     `);
 
-    // パフォーマンス監視（デバッグ用）
-    let frameCount = 0;
-    let lastTime = performance.now();
-
-    function monitorPerformance() {
-        frameCount++;
-        const currentTime = performance.now();
-
-        if (currentTime - lastTime >= 1000) {
-            const fps = frameCount;
-            frameCount = 0;
-            lastTime = currentTime;
-
-            // パフォーマンスが低い場合はエフェクトを削減
-            if (fps < 30) {
-                document.documentElement.style.setProperty('--animation-speed', '0.5');
-            }
-        }
-
-        requestAnimationFrame(monitorPerformance);
-    }
-
-    // パフォーマンス監視開始（デバッグ時のみ）
-    // monitorPerformance();
-
-    // ページ離脱時のクリーンアップ
     window.addEventListener('beforeunload', () => {
         if (aiDiyIntro) {
             aiDiyIntro.destroy();

@@ -35,6 +35,12 @@ interface OutputAudioState {
   audioContext: AudioContext | null;
   audioAnalyser: AnalyserNode | null;
   audioDataArray: Uint8Array | null;
+  // ビジュアライザー専用キュー
+  visualizerQueue: Array<{ base64Audio: string; mimeType: string }>;
+  isVisualizerProcessing: boolean;
+  // ビジュアライザー専用analyser（destinationに接続しない）
+  visualizerAnalyser: AnalyserNode | null;
+  visualizerDataArray: Uint8Array | null;
 }
 
 export class AudioStreamProcessor {
@@ -57,7 +63,11 @@ export class AudioStreamProcessor {
     isPlaying: false,
     audioContext: null,
     audioAnalyser: null,
-    audioDataArray: null
+    audioDataArray: null,
+    visualizerQueue: [],
+    isVisualizerProcessing: false,
+    visualizerAnalyser: null,
+    visualizerDataArray: null
   };
 
   // サンプリングレート
@@ -164,7 +174,7 @@ export class AudioStreamProcessor {
     if (this.isVisualizerLoopStarted) return;
     this.isVisualizerLoopStarted = true;
     const visualize = () => {
-      if (!this.inputAudioState.isRecording && !this.outputAudioState.isPlaying) {
+      if (!this.inputAudioState.isRecording && !this.outputAudioState.isPlaying && !this.outputAudioState.isVisualizerProcessing) {
         requestAnimationFrame(visualize);
         return;
       }
@@ -177,8 +187,13 @@ export class AudioStreamProcessor {
 
       // 出力音声のビジュアライザー更新
       if (this.outputAudioState.isPlaying && this.outputAudioState.audioAnalyser) {
+        // スピーカー再生中は通常のanalyserを使用
         this.outputAudioState.audioAnalyser.getByteFrequencyData(this.outputAudioState.audioDataArray! as any);
         this.updateVisualizerBars(this.outputVisualizerBars, this.outputAudioState.audioDataArray!);
+      } else if (this.outputAudioState.isVisualizerProcessing && this.outputAudioState.visualizerAnalyser) {
+        // ビジュアライザー専用処理中はビジュアライザー専用analyserを使用
+        this.outputAudioState.visualizerAnalyser.getByteFrequencyData(this.outputAudioState.visualizerDataArray! as any);
+        this.updateVisualizerBars(this.outputVisualizerBars, this.outputAudioState.visualizerDataArray!);
       }
 
       requestAnimationFrame(visualize);
@@ -369,10 +384,19 @@ export class AudioStreamProcessor {
     this.outputAudioState.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
       sampleRate: this.outputSampleRate
     });
+    
+    // スピーカー出力用analyser（destinationに接続）
     this.outputAudioState.audioAnalyser = this.outputAudioState.audioContext.createAnalyser();
     this.outputAudioState.audioAnalyser.fftSize = 256;
     this.outputAudioState.audioAnalyser.connect(this.outputAudioState.audioContext.destination);
     this.outputAudioState.audioDataArray = new Uint8Array(this.outputAudioState.audioAnalyser.frequencyBinCount);
+    
+    // ビジュアライザー専用analyser（destinationに接続しない）
+    this.outputAudioState.visualizerAnalyser = this.outputAudioState.audioContext.createAnalyser();
+    this.outputAudioState.visualizerAnalyser.fftSize = 256;
+    this.outputAudioState.visualizerDataArray = new Uint8Array(this.outputAudioState.visualizerAnalyser.frequencyBinCount);
+    
+    console.log('[AudioStreamProcessor] 出力AudioContextセットアップ完了（analyser × 2）');
   }
 
   /**
@@ -384,17 +408,117 @@ export class AudioStreamProcessor {
       const base64Audio = data?.ファイル名 || data?.base64_data || data?.audio || data?.data;
       const mimeType = data?.メッセージ内容 || data?.mime_type || 'audio/pcm';
       if (base64Audio) {
-        this.queueAudio({ base64Audio, mimeType });
+        // ビジュアライザーキューには常に追加
+        this.queueVisualizerAudio({ base64Audio, mimeType });
+        
+        // 音声再生キューにはスピーカーオンの時だけ追加
+        if (this.isSpeakerOn.value) {
+          this.queueAudio({ base64Audio, mimeType });
+        }
       }
     }
   }
 
   /**
-   * 音声をキューに追加
+   * ビジュアライザー用音声をキューに追加
+   */
+  private queueVisualizerAudio(audioData: { base64Audio: string; mimeType: string }) {
+    this.outputAudioState.visualizerQueue.push(audioData);
+    console.log('[AudioStreamProcessor] ビジュアライザーキュー追加:', this.outputAudioState.visualizerQueue.length);
+
+    if (!this.outputAudioState.isVisualizerProcessing) {
+      this.processVisualizerQueue();
+    }
+  }
+
+  /**
+   * ビジュアライザーキュー処理
+   */
+  private async processVisualizerQueue() {
+    if (this.outputAudioState.visualizerQueue.length === 0) {
+      this.outputAudioState.isVisualizerProcessing = false;
+      console.log('[AudioStreamProcessor] ビジュアライザーキュー処理完了');
+      return;
+    }
+
+    this.outputAudioState.isVisualizerProcessing = true;
+    console.log('[AudioStreamProcessor] ビジュアライザーキュー処理開始:', this.outputAudioState.visualizerQueue.length);
+
+    const { base64Audio, mimeType } = this.outputAudioState.visualizerQueue.shift()!;
+    await this.playAudioForVisualizer(base64Audio, mimeType);
+
+    this.processVisualizerQueue();
+  }
+
+  /**
+   * ビジュアライザー専用音声再生（音は出さない、analyserにだけデータを流す）
+   */
+  private async playAudioForVisualizer(base64Audio: string, mimeType: string = 'audio/pcm') {
+    console.log('[AudioStreamProcessor] ビジュアライザー専用再生開始');
+    const binaryString = window.atob(base64Audio);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    if (!this.outputAudioState.audioContext) {
+      this.setupOutputAudio();
+    }
+
+    if (this.outputAudioState.audioContext!.state === 'suspended') {
+      try {
+        await this.outputAudioState.audioContext!.resume();
+      } catch (e) {
+        console.warn('audioContext resume失敗:', e);
+      }
+    }
+
+    let audioBuffer: AudioBuffer;
+
+    // audio/pcmは手動でFloat32に変換
+    if (mimeType && mimeType.toLowerCase().includes('pcm')) {
+      const pcmData = new Int16Array(bytes.buffer);
+      const float32Data = new Float32Array(pcmData.length);
+      for (let i = 0; i < pcmData.length; i++) {
+        float32Data[i] = pcmData[i] / 32768;
+      }
+      audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
+      audioBuffer.copyToChannel(float32Data, 0);
+    } else {
+      try {
+        audioBuffer = await this.outputAudioState.audioContext!.decodeAudioData(bytes.buffer);
+      } catch (e) {
+        const pcmData = new Int16Array(bytes.buffer);
+        const float32Data = new Float32Array(pcmData.length);
+        for (let i = 0; i < pcmData.length; i++) {
+          float32Data[i] = pcmData[i] / 32768;
+        }
+        audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
+        audioBuffer.copyToChannel(float32Data, 0);
+      }
+    }
+
+    const source = this.outputAudioState.audioContext!.createBufferSource();
+    source.buffer = audioBuffer;
+    // ビジュアライザー専用analyserに接続（destinationには接続しないので音は出ない）
+    source.connect(this.outputAudioState.visualizerAnalyser!);
+
+    console.log('[AudioStreamProcessor] ビジュアライザー専用再生: visualizerAnalyserに接続完了（音は出ない）');
+
+    return new Promise<void>((resolve) => {
+      source.onended = () => {
+        console.log('[AudioStreamProcessor] ビジュアライザー専用再生終了');
+        resolve();
+      };
+      source.start(0);
+    });
+  }
+
+  /**
+   * 音声をキューに追加（スピーカー再生用）
    */
   private queueAudio(audioData: { base64Audio: string; mimeType: string }) {
-    if (!this.isSpeakerOn.value) return;
-
     this.outputAudioState.audioQueue.push(audioData);
 
     if (!this.outputAudioState.isPlaying) {

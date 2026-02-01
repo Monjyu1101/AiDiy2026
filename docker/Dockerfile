@@ -1,6 +1,6 @@
 # Multi-stage build for AiDiy2026
 # Stage 1: Backend dependencies
-FROM python:3.13-slim as backend-builder
+FROM python:3.13-slim AS backend-builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ WORKDIR /app/backend_server
 RUN pip install --no-cache-dir .
 
 # Stage 2: Frontend build
-FROM node:20-alpine as frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend_server
 

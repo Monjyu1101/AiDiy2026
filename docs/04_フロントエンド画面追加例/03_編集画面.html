@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>編集画面 | フロントエンド画面追加例</title>
+  <link rel="stylesheet" href="../_shared/doc.css" />
+  <script defer src="../_shared/doc.js"></script>
+</head>
+<body class="theme-ink">
+  <header class="page-header">
+    <div class="header-eyebrow">AiDiy Frontend Lab</div>
+    <h1 class="page-title">編集画面</h1>
+    <p class="page-subtitle">新規作成と編集を兼ねる画面の作り方。</p>
+    <nav class="page-nav">
+      <a class="nav-link" href="_index.html">全体マップ</a>
+      <a class="nav-link" href="01_ディレクトリ構成.html">ディレクトリ構成</a>
+      <a class="nav-link" href="02_一覧画面.html">一覧画面</a>
+      <a class="nav-link is-active" href="03_編集画面.html">編集画面</a>
+      <a class="nav-link" href="04_ルートとメニュー.html">ルートとメニュー</a>
+      <a class="nav-link" href="05_チェックリスト.html">チェックリスト</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="card">
+      <h2 class="card-title">編集画面の特徴</h2>
+      <ul>
+        <li>クエリパラメータでIDがあれば「編集モード」</li>
+        <li>IDがなければ「新規作成モード」</li>
+        <li>保存時は登録APIまたは変更APIを使い分け</li>
+        <li>削除は編集モードのみ表示</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">編集画面</h2>
+      <pre class="code-block" data-src="code_samples/edit_page.vue" data-label="編集.vue">
+        <code>読み込み中...</code>
+      </pre>
+    </section>
+  </main>
+
+  <footer class="footer-note">AiDiy Docs / 編集画面</footer>
+</body>
+</html>

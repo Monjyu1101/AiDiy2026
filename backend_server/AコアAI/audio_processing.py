@@ -13,6 +13,7 @@ AコアAI 音声処理（旧実装寄せ）
 """
 
 import asyncio
+import base64
 import json
 import time
 from typing import Tuple
@@ -191,6 +192,24 @@ async def 統合音声分離ワーカー(接続):
                     output_data["音声出力開始時刻"] = None
                     output_data["音声出力最終時刻"] = None
                     output_data["音声出力バッファ"] = []
+
+                    # 1秒のゼロ値（無音）パケットをフロントに送信してビジュアライザーをクリア
+                    # 16kHz, 16bit, mono = 32000 bytes/sec
+                    silence_duration_bytes = 32000  # 1秒分
+                    silence_packet = b'\x00' * silence_duration_bytes
+                    silence_base64 = base64.b64encode(silence_packet).decode("utf-8")
+                    
+                    try:
+                        await 接続.send_to_channel(-1, {
+                            "ソケットID": 接続.socket_id,
+                            "メッセージ識別": "output_audio",
+                            "メッセージ内容": "audio/pcm",
+                            "ファイル名": silence_base64,
+                            "サムネイル画像": None
+                        })
+                        logger.debug(f"無音パケット送信（ビジュアライザークリア用）")
+                    except Exception as e:
+                        logger.warning(f"無音パケット送信エラー: {e}")
 
                     combined_audio = b"".join(audio_buffer)
                     if len(combined_audio) >= MIN_AUDIO_BYTES and 接続.recognition_processor:

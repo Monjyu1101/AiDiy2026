@@ -567,6 +567,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 await agent.開始()
                 セッション.code_agent_processors.append(agent)
 
+        # Toolsインスタンスを作成（コードエージェント初期化後）
+        if not hasattr(セッション, "tools_instance"):
+            from AコアAI.live_tools import Tools
+            セッション.tools_instance = Tools(セッション=セッション)
+
         if not hasattr(セッション, "live_processor"):
             live_ai = セッション.モデル設定.get("LIVE_AI", "")
             live_model = ""
@@ -673,7 +678,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 await セッション.send_to_channel(int(ソケット番号), {
                     "ソケットID": ソケットID,
                     "チャンネル": int(ソケット番号),
-                    "メッセージ識別": "output_text",
+                    "メッセージ識別": "welcome_text",
                     "メッセージ内容": 追加メッセージ,
                     "ファイル名": None,
                     "サムネイル画像": None
@@ -725,8 +730,6 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         "ファイル名": None,
                         "サムネイル画像": None
                     })
-                    if 1 <= 出力先チャンネル <= 4:
-                        await asyncio.sleep(0.1)
 
                     保存_会話履歴(
                         ソケットID=ソケットID,
@@ -746,6 +749,9 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                 f"input_text分岐判定: socket={ソケットID} channel=0 "
                                 f"file='{ファイル名}' live={'live' in ファイル名_判定}"
                             )
+                            if "code" in ファイル名_判定:
+                                logger.info(f"input_text: codeモードのためチャット/ライブ処理をスキップ ({ソケットID})")
+                                continue
                             if "live" in ファイル名_判定:
                                 if hasattr(セッション, "live_processor") and セッション.live_processor:
                                     logger.info(f"LiveAI起動要求: socket={ソケットID}")
@@ -761,7 +767,60 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                 await セッション.chat_processor.チャット要求(受信データ)
                         elif 1 <= 出力先チャンネル <= 4 and hasattr(セッション, 'code_agent_processors'):
                             await セッション.code_agent_processors[出力先チャンネル - 1].コード要求(受信データ)
-                            await asyncio.sleep(0.1)
+                    finally:
+                        セッション.set_channel_processing(出力先チャンネル, False)
+
+                elif メッセージ識別 == "input_request":
+                    メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
+                    入力チャンネル = 受信データ.get("チャンネル", -1)
+                    出力先チャンネル = 受信データ.get("出力先チャンネル", 1)
+                    logger.debug(f"リクエスト受信 (入力={入力チャンネル}, 出力先={出力先チャンネル}, {ソケットID}): {メッセージ内容}")
+
+                    # input_requestはコードエージェント専用（チャンネル1-4のみ）
+                    if not (1 <= 出力先チャンネル <= 4):
+                        logger.warning(f"input_requestはチャンネル1-4のみ対応: 出力先={出力先チャンネル}")
+                        continue
+
+                    if セッション.is_channel_processing(出力先チャンネル):
+                        await セッション.send_to_channel(出力先チャンネル, {
+                            "ソケットID": ソケットID,
+                            "チャンネル": 出力先チャンネル,
+                            "メッセージ識別": "output_text",
+                            "メッセージ内容": f"⏳ チャンネル{出力先チャンネル}は処理中です。キューに追加しました...",
+                            "ファイル名": None,
+                            "サムネイル画像": None
+                        })
+                        logger.info(f"チャンネル{出力先チャンネル}処理中のため、キューに追加: {ソケットID}")
+                        continue
+
+                    セッション.set_channel_processing(出力先チャンネル, True)
+
+                    # input_requestメッセージをエコーバック
+                    await セッション.send_to_channel(出力先チャンネル, {
+                        "ソケットID": ソケットID,
+                        "チャンネル": 出力先チャンネル,
+                        "メッセージ識別": "input_request",
+                        "メッセージ内容": メッセージ内容,
+                        "ファイル名": None,
+                        "サムネイル画像": None
+                    })
+
+                    # 会話履歴保存
+                    保存_会話履歴(
+                        ソケットID=ソケットID,
+                        チャンネル=出力先チャンネル,
+                        メッセージ識別="input_request",
+                        メッセージ内容=メッセージ内容,
+                        ファイル名=None,
+                        サムネイル画像=None
+                    )
+
+                    受信データ["チャンネル"] = 出力先チャンネル
+
+                    # コードエージェントに処理を投入
+                    try:
+                        if hasattr(セッション, 'code_agent_processors'):
+                            await セッション.code_agent_processors[出力先チャンネル - 1].コード要求(受信データ)
                     finally:
                         セッション.set_channel_processing(出力先チャンネル, False)
 

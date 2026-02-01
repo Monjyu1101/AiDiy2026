@@ -1,0 +1,31 @@
+■ 新規CRUD画面で作成・編集するファイル
+
+frontend_server/src/
+├── components/
+│   └── <カテゴリ>/              # 例: C管理/
+│       └── <テーブル名>/        # 例: C新テーブル/
+│           ├── <テーブル名>一覧.vue       # 新規作成
+│           ├── <テーブル名>編集.vue       # 新規作成
+│           └── components/
+│               └── <テーブル名>一覧テーブル.vue  # 新規作成
+│
+├── router/
+│   └── index.ts                 # 編集: ルート追加
+│
+└── components/
+    └── <カテゴリ>.vue           # 編集: メニューカード追加
+                                 # 例: C管理.vue
+
+■ 例: C新テーブルの場合
+
+components/C管理/C新テーブル/
+├── C新テーブル一覧.vue
+├── C新テーブル編集.vue
+└── components/
+    └── C新テーブル一覧テーブル.vue
+
+router/index.ts に追加:
+- /C管理/C新テーブル/一覧
+- /C管理/C新テーブル/編集
+
+components/C管理.vue にカード追加

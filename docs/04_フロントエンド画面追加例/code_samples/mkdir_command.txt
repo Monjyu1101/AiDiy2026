@@ -1,0 +1,16 @@
+■ ディレクトリ作成コマンド（例: C新テーブル）
+
+# Windows
+mkdir frontend_server\src\components\C管理\C新テーブル
+mkdir frontend_server\src\components\C管理\C新テーブル\components
+
+# Linux/Mac
+mkdir -p frontend_server/src/components/C管理/C新テーブル/components
+
+■ 作成するファイル
+
+C新テーブル/
+├── C新テーブル一覧.vue           # 一覧画面
+├── C新テーブル編集.vue           # 編集画面
+└── components/
+    └── C新テーブル一覧テーブル.vue  # qTublerラッパー

@@ -42,7 +42,7 @@ from websocket import WebSocketTimeoutException
 
 # ツールモジュールのインポート（存在しない場合は無効化）
 try:
-    from RiKi_AiDiy_AコアAI__tools import Tools
+    from AコアAI.live_tools import Tools
 except Exception as e:
     Tools = None
     logger.warning(f"ツールモジュール無効: {e}")
@@ -184,34 +184,22 @@ class LiveAI:
     
     def 関数インスタンス設定(self, functions_instance=None):
         """ツールインスタンスを設定"""
-        # logger.info("=== ツールインスタンス設定開始 ===")
-        pass
         if functions_instance is not None:
-            # logger.info("外部からツールインスタンスを受け取りました")
-            pass
             self.tool_instance = functions_instance
         else:
-            # logger.info("ツールインスタンスを作成します")
-            pass
-            # 通常のインポートでインスタンス作成
+            # セッションから取得を試みる
             try:
-                if Tools is None:
-                    logger.warning("ツールモジュール未ロードのため、functionsは無効")
-                    self.tool_instance = None
+                from ws_manager import ws_manager
+                セッション = ws_manager.get_session(self.ソケットID)
+                if セッション and hasattr(セッション, "tools_instance"):
+                    self.tool_instance = セッション.tools_instance
+                    logger.info("セッションからツールインスタンスを取得しました")
                 else:
-                    self.tool_instance = Tools(session_manager=self.parent_manager)
-                # logger.info("ツールインスタンス初期化完了")
-                pass
-                # logger.info(f"ツール初期化完了: {list(self.tool_instance.tool_functions.keys())}")
-                pass
+                    self.tool_instance = None
+                    logger.warning("セッションにツールインスタンスがありません")
             except Exception as e:
-                logger.error(f"ツールインスタンス初期化エラー: {e}")
+                logger.error(f"セッションからツール取得失敗: {e}")
                 self.tool_instance = None
-        
-        # logger.info(f"ツールインスタンス設定完了: {self.tool_instance is not None}")
-        pass
-        # logger.info("=== ツールインスタンス設定終了 ===\n")
-        pass
     
     def _エラーフラグ制限設定(self, reason: str = ""):
         """
@@ -968,24 +956,21 @@ class LiveAI:
             # ツール呼び出し機能を追加
             if self.tool_instance is not None:
                 try:
-                    # OpenAI形式のツール定義を取得
-                    # logger.info("ツール呼び出し機能追加準備")
-                    pass
-                    # OpenAI Realtime apiのツール設定形式に変換
                     tools = []
-                    if hasattr(self.tool_instance, 'tool_functions'):
-                        for func_name, func_obj in self.tool_instance.tool_functions.items():
-                            if hasattr(self.tool_instance, 'get_tool_definition'):
-                                tool_def = self.tool_instance.get_tool_definition(func_name)
-                                if tool_def:
-                                    # OpenAI形式に変換
-                                    openai_tool = {
-                                        "type": "function",
-                                        "name": func_name,
-                                        "description": tool_def.get("description", ""),
-                                        "parameters": tool_def.get("parameters", {})
-                                    }
-                                    tools.append(openai_tool)
+                    if hasattr(self.tool_instance, 'ツールインスタンス辞書'):
+                        for ツール名, ツール in self.tool_instance.ツールインスタンス辞書.items():
+                            try:
+                                定義 = ツール.get_tool_definition()
+                            except Exception:
+                                定義 = None
+                            if not 定義:
+                                continue
+                            tools.append({
+                                "type": "function",
+                                "name": 定義.get("name", ツール名),
+                                "description": 定義.get("description", ""),
+                                "parameters": 定義.get("parameters", {}),
+                            })
                     if tools:
                         session_config["tools"] = tools
                         session_config["tool_choice"] = "auto"
@@ -1020,46 +1005,44 @@ class LiveAI:
             f_name = response_data.get('name')
             f_kwargs = response_data.get('arguments')
 
-            if self.tool_instance and hasattr(self.tool_instance, 'tool_functions'):
-                if f_name in self.tool_instance.tool_functions:
-                    # パラメータ処理（文字列の場合はJSON変換）
-                    if isinstance(f_kwargs, str):
-                        try:
-                            f_args_dict = json.loads(f_kwargs)
-                        except:
-                            f_args_dict = {}
-                    else:
-                        f_args_dict = f_kwargs if isinstance(f_kwargs, dict) else {}
+            if self.tool_instance and hasattr(self.tool_instance, 'execute_tool_call'):
+                # パラメータ処理（文字列の場合はJSON変換）
+                if isinstance(f_kwargs, str):
+                    try:
+                        f_args_dict = json.loads(f_kwargs)
+                    except Exception:
+                        f_args_dict = {}
+                else:
+                    f_args_dict = f_kwargs if isinstance(f_kwargs, dict) else {}
 
-                    # パラメータを20文字制限、改行エスケープ
-                    f_kwargs_full = json.dumps(f_args_dict, ensure_ascii=False)
-                    f_kwargs_escaped = f_kwargs_full.replace('\n', '\\n').replace('\r', '\\r')
-                    f_kwargs_short = f_kwargs_escaped[:20] + ("..." if len(f_kwargs_escaped) > 20 else "")
+                # パラメータを20文字制限、改行エスケープ
+                f_kwargs_full = json.dumps(f_args_dict, ensure_ascii=False)
+                f_kwargs_escaped = f_kwargs_full.replace('\n', '\\n').replace('\r', '\\r')
+                f_kwargs_short = f_kwargs_escaped[:20] + ("..." if len(f_kwargs_escaped) > 20 else "")
 
-                    # ツール実行（文字列形式で渡す）
-                    tool_func = self.tool_instance.tool_functions[f_name]
-                    res_json = await asyncio.to_thread(tool_func, f_kwargs_full)
+                # ツール実行（共通インターフェース）
+                result = await self.tool_instance.execute_tool_call(f_name, f_args_dict)
 
-                    # リアルタイム処理最適化：ツール名を行内に埋め込み、パラメータ・結果を別行表示
-                    result_escaped = str(res_json).replace('\n', '\\n').replace('\r', '\\r')
-                    result_short = result_escaped[:20] + ("..." if len(result_escaped) > 20 else "")
-                    logger.info(f"Tool[{f_name}] Request: {f_kwargs_short}")
-                    logger.info(f"Tool[{f_name}] Result: {result_short}")
+                # リアルタイム処理最適化：ツール名を行内に埋め込み、パラメータ・結果を別行表示
+                result_escaped = str(result).replace('\n', '\\n').replace('\r', '\\r')
+                result_short = result_escaped[:20] + ("..." if len(result_escaped) > 20 else "")
+                logger.info(f"Tool[{f_name}] Request: {f_kwargs_short}")
+                logger.info(f"Tool[{f_name}] Result: {result_short}")
 
-                    # 結果送信（WebSocket送信を非同期化）
-                    result_msg = {
-                        "type": "conversation.item.create",
-                        "item": {
-                            "type": "function_call_output",
-                            "call_id": f_id,
-                            "output": res_json,
-                        },
-                    }
-                    await asyncio.to_thread(self.ws_session.send, json.dumps(result_msg))
+                # 結果送信（WebSocket送信を非同期化）
+                result_msg = {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "function_call_output",
+                        "call_id": f_id,
+                        "output": str(result),
+                    },
+                }
+                await asyncio.to_thread(self.ws_session.send, json.dumps(result_msg))
 
-                    # 応答生成指示（WebSocket送信を非同期化）
-                    response_msg = {"type": "response.create"}
-                    await asyncio.to_thread(self.ws_session.send, json.dumps(response_msg))
+                # 応答生成指示（WebSocket送信を非同期化）
+                response_msg = {"type": "response.create"}
+                await asyncio.to_thread(self.ws_session.send, json.dumps(response_msg))
 
         except Exception as e:
             logger.error(f"ツール呼び出し処理エラー: {e}")

@@ -1,0 +1,25 @@
+■ フロントエンド CRUD画面 実装完了チェックリスト
+
+□ ディレクトリ構成
+  [ ] components/<カテゴリ>/<テーブル名>/ フォルダ作成
+  [ ] components/<カテゴリ>/<テーブル名>/components/ フォルダ作成
+
+□ コンポーネント作成
+  [ ] <テーブル名>一覧.vue 作成
+  [ ] <テーブル名>編集.vue 作成
+  [ ] components/<テーブル名>一覧テーブル.vue 作成
+
+□ ルーティング
+  [ ] router/index.ts に一覧ルート追加
+  [ ] router/index.ts に編集ルート追加
+  [ ] meta.requiresAuth: true 設定
+
+□ メニュー
+  [ ] カテゴリ.vue にメニューカード追加
+
+□ コード品質
+  [ ] UTF-8エンコーディング
+  [ ] script setup 使用
+  [ ] qAlert/qConfirm 使用（ネイティブダイアログ不使用）
+  [ ] エラーハンドリング（try-catch）
+  [ ] 日本語タグは <component :is="..."> で対応

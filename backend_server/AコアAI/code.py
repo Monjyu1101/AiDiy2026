@@ -126,10 +126,13 @@ class CodeAgent:
                     continue
                     
                 メッセージ識別 = 受信データ.get("メッセージ識別", "")
-                
+
                 if メッセージ識別 == "input_text":
                     # テキスト処理: [ECHO]付きoutput_text送信 → 会話履歴保存
                     await self._処理_input_text(受信データ)
+                elif メッセージ識別 == "input_request":
+                    # リクエスト処理: 前後処理付きでAI実行
+                    await self._処理_input_request(受信データ)
                 elif メッセージ識別 == "input_file":
                     # ファイル処理: temp/outputコピー → output_file送信 → 会話履歴保存
                     await self._処理_input_file(受信データ)
@@ -192,6 +195,117 @@ class CodeAgent:
                 )
         except Exception as e:
             logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_text処理エラー: {e}")
+
+    async def _処理_input_request(self, 受信データ: dict):
+        """input_request処理: 前後処理付きでAI実行"""
+        try:
+            メッセージ内容 = 受信データ.get("メッセージ内容", "")
+            ソケットID_短縮 = self.ソケットID[:10] if self.ソケットID else '不明'
+
+            # 処理要求ログ
+            logger.info(
+                f"処理要求(input_request): チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{メッセージ内容.rstrip()}\n"
+            )
+
+            # 通常処理の前: チャンネル-1へ処理開始を連絡
+            開始メッセージ = (
+                f"コードエージェント{self.チャンネル}です。\n"
+                f"処理要求を開始しました。\n"
+                f"詳細を省き、端的に音声で処理の開始を伝えてください。\n"
+                f"``` 要求\n"
+                f"{メッセージ内容}\n"
+                f"```"
+            )
+            try:
+                await self.接続.send_to_channel(-1, {
+                    "ソケットID": self.ソケットID,
+                    "チャンネル": -1,
+                    "メッセージ識別": "input_text",
+                    "メッセージ内容": 開始メッセージ,
+                    "ファイル名": None,
+                    "サムネイル画像": None
+                })
+            except Exception as e:
+                logger.warning(f"[CodeAgent] チャンネル-1への開始メッセージ送信エラー: {e}")
+            try:
+                if hasattr(self.接続, "live_processor") and self.接続.live_processor:
+                    await self.接続.live_processor.開始()
+                    await self.接続.live_processor.テキスト送信(開始メッセージ)
+            except Exception as e:
+                logger.warning(f"[CodeAgent] LiveAI開始メッセージ送信エラー: {e}")
+
+            # 通常処理: AI実行
+            出力メッセージ内容 = ""
+            try:
+                ai_instance = await self._ensure_ai_instance()
+                if ai_instance:
+                    出力メッセージ内容 = await ai_instance.実行(
+                        要求テキスト=メッセージ内容,
+                        絶対パス=self.絶対パス or None,
+                    )
+            except Exception as e:
+                logger.error(f"[CodeAgent] AI実行エラー: {e}")
+                出力メッセージ内容 = "!"
+            if not 出力メッセージ内容:
+                出力メッセージ内容 = "!"
+
+            # 処理応答ログ
+            logger.info(
+                f"処理応答(input_request): チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
+            )
+
+            # 通常のoutput_text送信
+            await self.接続.send_to_channel(self.チャンネル, {
+                "ソケットID": self.ソケットID,
+                "メッセージ識別": "output_text",
+                "メッセージ内容": 出力メッセージ内容,
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+
+            # 会話履歴保存
+            if self.保存関数:
+                self.保存関数(
+                    ソケットID=self.ソケットID,
+                    チャンネル=self.チャンネル,
+                    メッセージ識別="output_text",
+                    メッセージ内容=出力メッセージ内容,
+                    ファイル名=None,
+                    サムネイル画像=None
+                )
+
+            # 通常処理の後: チャンネル-1へ処理終了を連絡
+            完了メッセージ = (
+                f"コードエージェント{self.チャンネル}です。\n"
+                f"処理要求が完了しました。\n"
+                f"詳細を省き、端的に音声で処理の完了を伝えてください。\n"
+                f"``` 要求\n"
+                f"{メッセージ内容}\n"
+                f"```\n"
+                f"``` 結果\n"
+                f"{出力メッセージ内容}\n"
+                f"```"
+            )
+            try:
+                await self.接続.send_to_channel(-1, {
+                    "ソケットID": self.ソケットID,
+                    "チャンネル": -1,
+                    "メッセージ識別": "input_text",
+                    "メッセージ内容": 完了メッセージ,
+                    "ファイル名": None,
+                    "サムネイル画像": None
+                })
+            except Exception as e:
+                logger.warning(f"[CodeAgent] チャンネル-1への完了メッセージ送信エラー: {e}")
+            try:
+                if hasattr(self.接続, "live_processor") and self.接続.live_processor:
+                    await self.接続.live_processor.開始()
+                    await self.接続.live_processor.テキスト送信(完了メッセージ)
+            except Exception as e:
+                logger.warning(f"[CodeAgent] LiveAI完了メッセージ送信エラー: {e}")
+
+        except Exception as e:
+            logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_request処理エラー: {e}")
 
     async def _処理_input_file(self, 受信データ: dict):
         """input_file処理: temp/outputコピー → output_file送信"""

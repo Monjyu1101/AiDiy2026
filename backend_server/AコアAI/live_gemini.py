@@ -42,7 +42,7 @@ from google.genai import types
 
 # ツールモジュールのインポート（存在しない場合は無効化）
 try:
-    from RiKi_AiDiy_AコアAI__tools import Tools
+    from AコアAI.live_tools import Tools
 except Exception as e:
     Tools = None
     logger.warning(f"ツールモジュール無効: {e}")
@@ -219,34 +219,22 @@ class LiveAI:
     
     def 関数インスタンス設定(self, functions_instance=None):
         """ツールインスタンスを設定"""
-        # logger.info("=== ツールインスタンス設定開始 ===")
-        pass
         if functions_instance is not None:
-            # logger.info("外部からツールインスタンスを受け取りました")
-            pass
             self.tool_instance = functions_instance
         else:
-            # logger.info("ツールインスタンスを作成します")
-            pass
-            # 通常のインポートでインスタンス作成
+            # セッションから取得を試みる
             try:
-                if Tools is None:
-                    logger.warning("ツールモジュール未ロードのため、functionsは無効")
-                    self.tool_instance = None
+                from ws_manager import ws_manager
+                セッション = ws_manager.get_session(self.ソケットID)
+                if セッション and hasattr(セッション, "tools_instance"):
+                    self.tool_instance = セッション.tools_instance
+                    logger.info("セッションからツールインスタンスを取得しました")
                 else:
-                    self.tool_instance = Tools(session_manager=self.parent_manager)
-                # logger.info("ツールインスタンス初期化完了")
-                pass
-                # logger.info(f"ツール初期化完了: {list(self.tool_instance.tool_functions.keys())}")
-                pass
+                    self.tool_instance = None
+                    logger.warning("セッションにツールインスタンスがありません")
             except Exception as e:
-                logger.error(f"ツールインスタンス初期化エラー: {e}")
+                logger.error(f"セッションからツール取得失敗: {e}")
                 self.tool_instance = None
-        
-        # logger.info(f"ツールインスタンス設定完了: {self.tool_instance is not None}")
-        pass
-        # logger.info("=== ツールインスタンス設定終了 ===\n")
-        pass
     
     def _エラーフラグ制限設定(self, reason: str = ""):
         """
@@ -775,9 +763,18 @@ class LiveAI:
             # ツール呼び出し機能を追加
             if self.tool_instance is not None:
                 try:
-                    function_tools = self.tool_instance.get_tool_calling_tools()
-                    tools.extend(function_tools)
-                    # logger.info(f"ツール呼び出し機能追加: {len(function_tools)} 個")
+                    function_declarations = []
+                    if hasattr(self.tool_instance, 'ツールインスタンス辞書'):
+                        for ツール in self.tool_instance.ツールインスタンス辞書.values():
+                            try:
+                                定義 = ツール.get_tool_definition()
+                            except Exception:
+                                定義 = None
+                            if 定義:
+                                function_declarations.append(定義)
+                    if function_declarations:
+                        tools.append({"function_declarations": function_declarations})
+                    # logger.info(f"ツール呼び出し機能追加: {len(function_declarations)} 個")
                     pass
                 except Exception as e:
                     logger.warning(f"ツール呼び出し機能取得エラー: {e}")

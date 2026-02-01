@@ -8,7 +8,7 @@
 - 日本語の命名規約（テーブル/カラム/API/コンポーネント）を遵守
 - 既存ドキュメントに従う
   - `AGENTS.md`
-  - `このシステムの歩き方.md`
+  - `docs/` フォルダ（コーディングルール、実装例など）
   - `backend_server/AGENTS.md`
   - `frontend_server/AGENTS.md`
 

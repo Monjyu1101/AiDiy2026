@@ -13,11 +13,11 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/api/client';
-import AコアAI_モデル設定 from './dialog/AコアAI_モデル設定.vue';
+import AコアAI_設定再起動 from './dialog/AコアAI_設定再起動.vue';
 import { AコアAIWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import AコアAIチャット from './compornents/AコアAI_チャット.vue';
 import AコアAIイメージ from './compornents/AコアAI_イメージ.vue';
-import AコアAIエージェント from './compornents/AコアAI_エージェント.vue';
+import AコアAIコード from './compornents/AコアAI_コード.vue';
 import { AudioStreamProcessor } from './AコアAI_音声処理';
 
 const route = useRoute();
@@ -592,7 +592,7 @@ const gridLayoutClass = computed(() => {
         :class="{ inactive: !enableAgent1Button, active: enableAgent1Button }"
         :disabled="!wsConnected"
         @click="toggleAgent1"
-        title="エージェント1"
+        title="コード1"
       >
         1
       </button>
@@ -610,7 +610,7 @@ const gridLayoutClass = computed(() => {
         :class="{ inactive: !enableAgent2Button, active: enableAgent2Button }"
         :disabled="!wsConnected"
         @click="toggleAgent2"
-        title="エージェント2"
+        title="コード2"
       >
         2
       </button>
@@ -619,7 +619,7 @@ const gridLayoutClass = computed(() => {
         :class="{ inactive: !enableAgent3Button, active: enableAgent3Button }"
         :disabled="!wsConnected"
         @click="toggleAgent3"
-        title="エージェント3"
+        title="コード3"
       >
         3
       </button>
@@ -628,7 +628,7 @@ const gridLayoutClass = computed(() => {
         :class="{ inactive: !enableAgent4Button, active: enableAgent4Button }"
         :disabled="!wsConnected"
         @click="toggleAgent4"
-        title="エージェント4"
+        title="コード4"
       >
         4
       </button>
@@ -655,19 +655,21 @@ const gridLayoutClass = computed(() => {
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
           @mode-change="chatMode = $event"
+          @activate="showChat = true; enableChatButton = true"
           @close="handleCloseChat" 
         />
       </div>
 
       <!-- エージェント1 -->
       <div v-show="showAgent1" class="component-panel">
-        <AコアAIエージェント
-          key="agent-1"
+        <AコアAIコード
+          key="code-1"
           :socket-id="ソケットID"
           :チャンネル="1"
           :code-ai="モデル設定.CODE_AI1"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
+          @activate="showAgent1 = true; enableAgent1Button = true"
           @close="handleCloseAgent1"
         />
       </div>
@@ -689,44 +691,47 @@ const gridLayoutClass = computed(() => {
 
       <!-- エージェント2 -->
       <div v-show="showAgent2" class="component-panel">
-        <AコアAIエージェント
-          key="agent-2"
+        <AコアAIコード
+          key="code-2"
           :socket-id="ソケットID"
           :チャンネル="2"
           :code-ai="モデル設定.CODE_AI2"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
+          @activate="showAgent2 = true; enableAgent2Button = true"
           @close="handleCloseAgent2"
         />
       </div>
 
       <!-- エージェント3 -->
       <div v-show="showAgent3" class="component-panel">
-        <AコアAIエージェント
-          key="agent-3"
+        <AコアAIコード
+          key="code-3"
           :socket-id="ソケットID"
           :チャンネル="3"
           :code-ai="モデル設定.CODE_AI3"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
+          @activate="showAgent3 = true; enableAgent3Button = true"
           @close="handleCloseAgent3"
         />
       </div>
 
       <!-- エージェント4 -->
       <div v-show="showAgent4" class="component-panel">
-        <AコアAIエージェント
-          key="agent-4"
+        <AコアAIコード
+          key="code-4"
           :socket-id="ソケットID"
           :チャンネル="4"
           :code-ai="モデル設定.CODE_AI4"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
+          @activate="showAgent4 = true; enableAgent4Button = true"
           @close="handleCloseAgent4"
         />
       </div>
     </div>
-    <AコアAI_モデル設定
+    <AコアAI_設定再起動
       :is-open="showModelConfig"
       @close="showModelConfig = false"
     />

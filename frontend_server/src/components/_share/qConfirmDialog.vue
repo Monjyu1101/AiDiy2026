@@ -102,7 +102,7 @@ defineExpose({ show });
 
 .dialog-buttons {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
 }
 

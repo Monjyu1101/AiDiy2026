@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RiKi AiDiy - AI支援開発環境の革新</title>
+    <title>AiDiy_next - 日本語ファースト AI開発プラットフォーム</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700;900&display=swap');
-        
+
         * {
             margin: 0;
             padding: 0;
@@ -38,7 +39,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: 
+            background:
                 radial-gradient(circle at 20% 20%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
                 radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
                 radial-gradient(circle at 40% 60%, rgba(255, 255, 0, 0.05) 0%, transparent 50%),
@@ -62,7 +63,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: 
+            background-image:
                 linear-gradient(rgba(0, 255, 255, 0.02) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 255, 255, 0.02) 1px, transparent 1px);
             background-size: 50px 50px;
@@ -290,14 +291,14 @@
             font-weight: bold;
         }
 
-        /* 設計思想 */
-        .philosophy-grid {
+        /* アーキテクチャ */
+        .architecture-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 25px;
         }
 
-        .philosophy-item {
+        .architecture-item {
             background: linear-gradient(135deg, rgba(255, 0, 255, 0.1), rgba(0, 255, 255, 0.1));
             border: 1px solid rgba(255, 0, 255, 0.3);
             border-radius: 12px;
@@ -307,7 +308,7 @@
             transition: all 0.3s ease;
         }
 
-        .philosophy-item::after {
+        .architecture-item::after {
             content: '';
             position: absolute;
             top: 0;
@@ -319,16 +320,16 @@
             transition: transform 0.3s ease;
         }
 
-        .philosophy-item:hover::after {
+        .architecture-item:hover::after {
             transform: scaleY(1);
         }
 
-        .philosophy-item:hover {
+        .architecture-item:hover {
             transform: translateX(10px);
             border-color: #ff00ff;
         }
 
-        .philosophy-title {
+        .architecture-title {
             font-family: 'Orbitron', monospace;
             color: #ff00ff;
             font-size: 1.3rem;
@@ -381,24 +382,24 @@
             .hero-title {
                 font-size: 3.5rem;
             }
-            
+
             .hero-subtitle {
                 font-size: 1.2rem;
             }
-            
+
             .hero-description {
                 font-size: 1rem;
             }
-            
+
             .hero-section {
                 height: auto;
                 padding: 100px 20px;
             }
-            
+
             .section {
                 padding: 30px 15px;
             }
-            
+
             .section-title {
                 font-size: 2rem;
             }
@@ -406,8 +407,6 @@
             .core-features {
                 grid-template-columns: repeat(2, 1fr);
             }
-            
-            
         }
 
         /* スクロールアニメーション用 */
@@ -480,19 +479,19 @@
 <body>
     <!-- パーティクル背景 -->
     <canvas id="particles-bg"></canvas>
-    
+
     <!-- アニメーション背景 -->
     <div class="animated-bg"></div>
     <div class="cyber-grid"></div>
 
     <!-- ヒーローセクション -->
     <section class="hero-section">
-        <h1 class="hero-title">私はアイディ</h1>
-        <h2 class="hero-subtitle">AiDiy : Do it yourself with AI</h2>
+        <h1 class="hero-title">AiDiy_next</h1>
+        <h2 class="hero-subtitle">Japanese-First Full-Stack AI Platform</h2>
         <p class="hero-description">
-            日本語ファーストの革新的AI支援開発環境。<br>
-            リアルタイム音声AI（20種類以上の音声選択）、動的AIモデル選択、プログラミング支援、<br>
-            AI/App独立内部再起動システムによるゼロダウンタイム開発を実現する次世代プラットフォーム
+            日本語ファーストの次世代フルスタック開発プラットフォーム。<br>
+            Vue 3 + TypeScript + FastAPI デュアルサーバー構成。<br>
+            4画面並列コードエージェント、リアルタイム音声AI、WebSocket統合を実現。
         </p>
         <div class="typing-text" id="typing-text"></div>
     </section>
@@ -502,40 +501,43 @@
         <h2 class="section-title animate-on-scroll">Core Features</h2>
         <div class="core-features">
             <div class="feature-card animate-on-scroll">
-                <span class="feature-icon"></span>
-                <h3 class="feature-title">リアルタイム音声AI</h3>
+                <span class="feature-icon">🖥️</span>
+                <h3 class="feature-title">デュアルサーバー</h3>
                 <p class="feature-description">
-                    Gemini Live / OpenAI Realtimeによるリアルタイム音声対話。
-                    Gemini 20種類以上、OpenAI 13種類の音声から選択可能。
-                    動的AIモデル選択機能で画面上から即座に切り替え
-                </p>
-            </div>
-            <div class="feature-card animate-on-scroll">
-                <span class="feature-icon"></span>
-                <h3 class="feature-title">プログラミング支援</h3>
-                <p class="feature-description">
-                    Claude（SDK）/ OpenAI・Gemini・Copilot（CLI）の4プロバイダー対応。
-                    AIとの対話でコードを生成し、即座にプロジェクトに反映。
-                    ChatAI機能でOpenRouter経由の多様なモデルも利用可能
+                    FastAPI デュアルサーバー構成。<br>
+                    Core（8091）: 認証・利用者・権限・AI<br>
+                    Apps（8092）: マスタ・トランザクション・ビュー<br>
+                    機能のモジュラー化と独立デプロイを実現
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">⚡</span>
-                <h3 class="feature-title">革新的開発サイクル</h3>
+                <h3 class="feature-title">モダンフロントエンド</h3>
                 <p class="feature-description">
-                    開発→テスト→確認のサイクルを極限まで短縮。AI系とApp系を独立して
-                    再起動可能な内部再起動システム（reboot_AIs/reboot_Apps）で
-                    ゼロダウンタイム開発を実現
+                    Vue 3 + Vite + TypeScript + Pinia。<br>
+                    UIフレームワーク不使用の軽量設計。<br>
+                    qTublerカスタムテーブルシステム。<br>
+                    日本語コンポーネント・日本語URL対応
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
-                <span class="feature-icon">🎯</span>
-                <h3 class="feature-title">階層アーキテクチャ</h3>
+                <span class="feature-icon">🤖</span>
+                <h3 class="feature-title">4画面並列エージェント</h3>
                 <p class="feature-description">
-                    業務ドメイン分類（A,C,M,T,S,V,X）によるdata/API統合。
-                    6つのAPIサーバー（coreAPI1,2,3,5,6,9）で分散処理。
-                    配車管理・商品在庫管理システムのサンプル実装でAiDiyプラットフォームの実力を実証。
-                    HTML 24個、JavaScript 27個、総フロントエンド51ファイル
+                    4つのコードエージェントを並列実行。<br>
+                    Claude SDK / OpenAI / Gemini 対応。<br>
+                    チャット・イメージ・エージェント統合。<br>
+                    WebSocketリアルタイム通信
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🎙️</span>
+                <h3 class="feature-title">リアルタイム音声AI</h3>
+                <p class="feature-description">
+                    Gemini Live / OpenAI Realtime 対応。<br>
+                    20種類以上の音声から選択可能。<br>
+                    音声・画像・テキストの統合処理。<br>
+                    動的AIモデル切り替え機能
                 </p>
             </div>
         </div>
@@ -543,121 +545,140 @@
 
     <!-- 技術統計 -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">Technical Specifications</h2>
+        <h2 class="section-title animate-on-scroll">Technical Stack</h2>
         <div class="tech-stats">
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-number" data-count="2">0</span>
                 <span class="stat-label">APIサーバー</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="24">0</span>
-                <span class="stat-label">画面システム</span>
+                <span class="stat-number" data-count="4">0</span>
+                <span class="stat-label">並列エージェント</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="45">0</span>
-                <span class="stat-label">Pythonファイル</span>
-            </div>
-            <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="51">0</span>
-                <span class="stat-label">フロントエンド</span>
-            </div>
-            <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="33">0</span>
-                <span class="stat-label">音声選択種類</span>
-            </div>
-            <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-number" data-count="3">0</span>
                 <span class="stat-label">AIプロバイダー</span>
             </div>
-        </div>
-    </section>
-
-    <!-- 設計思想 -->
-    <section class="section">
-        <h2 class="section-title animate-on-scroll">Design Philosophy</h2>
-        <div class="philosophy-grid">
-            <div class="philosophy-item animate-on-scroll">
-                <h3 class="philosophy-title"> 日本語ファースト</h3>
-                <p>UI、データベース、API、AI対話まで全て日本語で設計。日本語開発者のための最適化されたエクスペリエンス</p>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="7">0</span>
+                <span class="stat-label">テーブル分類</span>
             </div>
-            <div class="philosophy-item animate-on-scroll">
-                <h3 class="philosophy-title">⚡ ゼロダウンタイム</h3>
-                <p>reboot_AIs/reboot_Apps技術によるAI/App独立内部再起動システム。AI系（data2/coreAPI2）とApp系（data3,5,6,9/coreAPI3,5,6,9）を独立して再起動可能。コア機能（data1/coreAPI1）とWebUIは常時稼働で開発効率を最大化</p>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="20">0</span>
+                <span class="stat-label">音声種類+</span>
             </div>
-            <div class="philosophy-item animate-on-scroll">
-                <h3 class="philosophy-title"> AI協力開発</h3>
-                <p>人間とAIが協力して開発。音声対話（20種類以上の音声選択）とコード生成の融合で革新的な開発体験を実現。動的AIモデル選択機能で最適なAIプロバイダーを即座に切り替え</p>
-            </div>
-            <div class="philosophy-item animate-on-scroll">
-                <h3 class="philosophy-title">⚡ リアルタイム性</h3>
-                <p>WebSocket双方向通信、音声VAD制御、CPU最適化により究極のリアルタイム体験を提供</p>
-            </div>
-            <div class="philosophy-item animate-on-scroll">
-                <h3 class="philosophy-title">🏗️ 階層型分散アーキテクチャ</h3>
-                <p>業務ドメイン（A,C,M,T,S,V,X）別のdata/API層統合による6つのAPIサーバー（coreAPI1,2,3,5,6,9）分散処理。45個のPythonファイルによるモジュラー設計でスケーラブルな構成。AI系とApp系の独立再起動で柔軟な開発</p>
-            </div>
-            <div class="philosophy-item animate-on-scroll">
-                <h3 class="philosophy-title"> パフォーマンス重視</h3>
-                <p>適応的sleep制御、ログ最適化、メモリ管理により最高のパフォーマンスを実現</p>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="60">0</span>
+                <span class="stat-label">JWT有効期限(分)</span>
             </div>
         </div>
     </section>
 
-    <!-- 拡張性・できること -->
+    <!-- アーキテクチャ -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">Capabilities & Extensibility</h2>
+        <h2 class="section-title animate-on-scroll">Architecture</h2>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🗄️ バックエンド</h3>
+                <p>FastAPI + SQLAlchemy + SQLite。デュアルサーバー（Core: 8091 / Apps: 8092）。POST中心API設計、統一レスポンス形式。Alembic不使用のシンプルなスキーマ管理</p>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎨 フロントエンド</h3>
+                <p>Vue 3 Composition API + Vite + TypeScript + Pinia。qTublerカスタムテーブル、共通ダイアログシステム。UIフレームワーク不使用の軽量設計</p>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🇯🇵 日本語ファースト</h3>
+                <p>テーブル名・カラム名・APIエンドポイント・JSONキー・Vueコンポーネント全て日本語。ビジネスドメインとコードの完全一致</p>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔐 認証システム</h3>
+                <p>JWT認証（HS256、60分有効期限）。Pinia + Axios interceptorによる自動トークン管理。401エラー時の自動ログアウト</p>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔢 C採番システム</h3>
+                <p>AUTOINCREMENT不使用のカスタムID生成。C採番テーブルで一元管理。トランザクション保護された予測可能なID</p>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔄 Reboot機構</h3>
+                <p>reboot1.txt/reboot2.txt による内部再起動システム。ゼロダウンタイムでのコード更新。_start.pyによる自動プロセス監視</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- テーブル分類 -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Table Classification</h2>
         <div class="expansion-grid">
             <div class="expansion-item animate-on-scroll">
-                <h4> マルチモーダル処理</h4>
-                <p>テキスト・音声・画像の統合処理</p>
+                <h4>C系 - Core</h4>
+                <p>権限・利用者・採番</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4> 動的機能追加</h4>
-                <p>AIとの対話で新機能をリアルタイム追加</p>
+                <h4>M系 - Master</h4>
+                <p>配車区分・車両・商品</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4> Docker対応</h4>
-                <p>本格運用とシンプル起動の両対応</p>
+                <h4>T系 - Transaction</h4>
+                <p>配車・入庫・出庫・棚卸</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4> セキュア</h4>
-                <p>Bearer Token認証と統一認証システム</p>
+                <h4>V系 - View</h4>
+                <p>生SQLクエリによる結合表示</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>🏗️ 階層型アーキテクチャ</h4>
-                <p>data1(C系)・data2(A系)・data3(M系)・data5(T系)・data6(S,V系)・data9(X系)による業務ドメイン統合。6つのcoreAPI（1,2,3,5,6,9）分散サーバー構成で最適な処理分離</p>
+                <h4>S系 - Scheduler</h4>
+                <p>週表示・日表示</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>🎙️ 動的AI選択</h4>
-                <p>設定パネル（左上歯車アイコン）から即座にAIモデル・音声を切り替え可能。Gemini/OpenAI/OpenRouter/Claude/Copilot 6プロバイダー対応</p>
+                <h4>A系 - AI</h4>
+                <p>AコアAI・会話履歴</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>📊 サンプル実装システム</h4>
-                <p>配車管理システム（M車両・M配車区分・T配車・S週日表示）と商品在庫管理システム（M商品・T入出庫棚卸・V商品推移表）によるAiDiyプラットフォームの実力実証</p>
+                <h4>X系 - Experimental</h4>
+                <p>テスト・ゲーム機能</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 特徴 -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Key Features</h2>
+        <div class="expansion-grid">
+            <div class="expansion-item animate-on-scroll">
+                <h4>📊 qTublerシステム</h4>
+                <p>独自カスタムテーブルコンポーネント。ソート・ページング・行選択</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>🎮 エンターテイメント</h4>
-                <p>ゲーム機能（インベーダー・リバーシ）でシステムの柔軟性を実証</p>
+                <h4>🌐 WebSocket統合</h4>
+                <p>AコアAIリアルタイム通信。セッション永続化対応</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>🔄 自動復旧・再起動</h4>
-                <p>AI/App独立内部再起動システム（reboot_AIs/reboot_Apps）。エラー連続時の自動停止機能付き</p>
+                <h4>📝 監査フィールド</h4>
+                <p>全テーブルに登録/更新情報を自動付与</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4> スケーラブル</h4>
-                <p>モジュラー設計で無限の拡張可能性</p>
+                <h4>🚀 POST中心API</h4>
+                <p>全CRUDをPOSTで統一。一貫したレスポンス形式</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🎯 V系実装</h4>
+                <p>Database VIEW不使用。生SQLクエリでJOIN</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🎮 サンプル実装</h4>
+                <p>配車管理・在庫管理システム完備</p>
             </div>
         </div>
     </section>
 
     <!-- フッター -->
     <section class="section" style="text-align: center; padding-bottom: 30px;">
-        <h2 class="section-title animate-on-scroll">Ready to Experience?</h2>
+        <h2 class="section-title animate-on-scroll">Start Building</h2>
         <p class="animate-on-scroll" style="margin-bottom: 15px; font-size: 1.1rem;">
-            AiDiyで未来の開発体験を始めましょう
+            AiDiy_next で次世代の開発体験を
         </p>
-        <a href="/index.html?inner_page=AコアAI" class="cyber-button animate-on-scroll rainbow-blink" target="_parent">
-            Start with AiDiy
+        <a href="/AコアAI" class="cyber-button animate-on-scroll rainbow-blink" target="_parent">
+            Launch AコアAI
         </a>
     </section>
 

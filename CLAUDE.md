@@ -2,184 +2,194 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 本書の目的
+## Critical Constraints (MUST READ)
 
-このファイルは **Claude Code 向けのインデックスドキュメント** です。
+**Japanese-First Implementation:**
+- Table names, column names, API endpoints, JSON keys, Vue components are ALL in Japanese
+- System/framework terms remain English: `request`, `router`, `items`, `total`
+- All files MUST be UTF-8 encoded
 
-**重要:** このドキュメントは各種ドキュメントへのナビゲーション（索引）のみを提供します。**新しいドキュメントが追加されない限り、ここには詳細な実装情報を書き込まないでください。** 詳細情報は全て参照先ドキュメントに記載されています。
+**Vue Component Tag Constraint:**
+- Japanese component tags are INVALID in HTML: `<C利用者一覧 />` will NOT work
+- Use dynamic component syntax: `<component :is="C利用者一覧" />`
+- File names can be Japanese: `C利用者一覧.vue` is OK
 
-### CLAUDE.md更新時の必須事項（Claude Code向けの注意）
+**API Design:**
+- ALL CRUD operations use POST method (no GET/PUT/DELETE for data)
+- Unified response: `{"status": "OK"/"NG", "message": "...", "data": {...}}`
+- List responses: `{"items": [], "total": N, "limit": 10000}`
 
-**🚫 このファイルに詳細情報を書いてはいけません！**
+**Dual Server Architecture:**
+- main1.py (port 8091): C系 (Core), A系 (AI) - `/core/*` endpoints
+- main2.py (port 8092): M系 (Master), T系 (Transaction), V系 (View), S系 (Scheduler) - `/apps/*` endpoints
+- BOTH servers must be running
 
-このファイルは **インデックス（目次）専用** です。以下を厳守してください：
+**No Database VIEWs:**
+- V系 endpoints use raw SQL queries with JOINs, NOT database VIEW objects
 
-**禁止事項：**
-- ❌ 具体的な手順やコマンドの詳細説明
-- ❌ トラブルシューティングの詳細
-- ❌ コード例や設定例
-- ❌ 「開発時のポイント」「ベストプラクティス」などの詳細内容
-- ❌ 100文字を超える説明文
-
-**許可事項：**
-- ✅ 「〇〇については [ファイル名] の××セクションを参照」という案内のみ
-- ✅ プロジェクト概要の簡潔な説明（3-5行程度）
-- ✅ クイックスタートコマンド（コメントなし）
-
-**このファイルを更新する前に：**
-1. **先に各AGENTS.mdを確認すること** - 追加したい情報が既に存在しないか確認
-2. **このファイルはインデックスとして使うこと** - 詳細情報は書かず、参照先を示すのみ
-3. 詳細情報は適切なドキュメントに記載する：
-   - プロジェクト全体・開発方法・よくある問題 → `AGENTS.md`
-   - コーディングルール・手順 → `このシステムの歩き方.md`
-   - バックエンド詳細 → `backend_server/AGENTS.md`
-   - フロントエンド詳細 → `frontend_server/AGENTS.md`
+**権限ID is String Type:**
+- Compare with `'1'`, `'2'`, NOT integers `1`, `2`
 
 ---
 
-## ドキュメント体系
-
-プロジェクトのドキュメントは以下の役割で分類されています：
-
-| ドキュメント | 役割 |
-|------------|------|
-| **[README.md](./README.md)** | 初回セットアップ・起動・停止・クリーンアップ手順（初心者向け） |
-| **[AGENTS.md](./AGENTS.md)** | プロジェクト全体方針、基本方針、テーブル命名規則、開発コマンド、アクセスURL、よくある問題 |
-| **[このシステムの歩き方.md](./このシステムの歩き方.md)** | コーディングルール、命名規則、開発フロー、新規機能追加の詳細手順、ベストプラクティス |
-| **[backend_server/AGENTS.md](./backend_server/AGENTS.md)** | バックエンド実装詳細（FastAPI/SQLAlchemy/SQLite/API/DB/認証/初期データ/追加手順/Debugging） |
-| **[frontend_server/AGENTS.md](./frontend_server/AGENTS.md)** | フロントエンド実装詳細（Vue 3/Vite/TypeScript/Pinia/画面/ルーティング/認証/追加手順/Debugging） |
-
-### 参照順序の推奨
-
-**初めての方:**
-1. **[README.md](./README.md)** - セットアップと起動方法を確認
-2. **[AGENTS.md](./AGENTS.md)** - プロジェクト全体像を把握
-3. **[このシステムの歩き方.md](./このシステムの歩き方.md)** - コーディングルールを理解
-
-**バックエンド開発:**
-1. **[backend_server/AGENTS.md](./backend_server/AGENTS.md)** - バックエンド実装を理解
-2. **[このシステムの歩き方.md](./このシステムの歩き方.md)** - 新規テーブル追加手順を参照
-
-**フロントエンド開発:**
-1. **[frontend_server/AGENTS.md](./frontend_server/AGENTS.md)** - フロントエンド実装を理解
-2. **[このシステムの歩き方.md](./このシステムの歩き方.md)** - 新規画面追加手順を参照
-
-**コーディングルール確認:**
-- **[このシステムの歩き方.md](./このシステムの歩き方.md)** - 命名規則、ファイルエンコーディング、コメント規則、インデント規則
-
-### 必須理解事項（CRITICAL）
-
-**このプロジェクトの特徴:**
-- **日本語優先実装** - これはこのシステムの設計上の特徴です（課題や問題ではありません）
-- テーブル名・カラム名・API endpoint・JSON keys・Vue components は日本語
-- システム/フレームワーク用語（`request`, `router`, `items`, `total`）は英語
-- この命名規則は意図的な設計であり、変更の必要はありません
-
-**ファイルエンコーディング:**
-- 全ファイルは **UTF-8 エンコーディング必須**（日本語識別子使用のため）
-- 新規ファイル作成時は必ずUTF-8で保存
-
-**実装上の制約:**
-- Vue component tags は ASCII のみ（`<component :is="日本語名" />` で対応）
-
----
-
-## プロジェクト概要
-
-**AiDiy_next** は日本語を第一言語とするフルスタックビジネス管理システムです。
-
-**特徴:**
-- データベーステーブル名、カラム名、API endpoints、JSON keys、Vue componentsが全て日本語
-- デュアルサーバー構成（Core: port 8091 / Apps: port 8092）
-- JWT認証、カスタムID生成（C採番）、WebSocket統合（AコアAI）
-
-**技術スタック:**
-- **バックエンド**: FastAPI (Python 3.13) + SQLAlchemy + SQLite
-- **フロントエンド**: Vue 3 + Vite + TypeScript + Pinia
-
-**詳細:** [AGENTS.md](./AGENTS.md) を参照してください。
-
----
-
-## クイックスタート
-
-### 初回セットアップ
+## Quick Commands
 
 ```bash
+# Initial setup
 python _setup.py
-```
 
-### システム起動
-
-```bash
-# 両方起動（デフォルト）
+# Start all servers (frontend + backend)
 python _start.py
 
-# フロントのみ起動
-python _start.py --frontend=yes
-
-# バックのみ起動
-python _start.py --backend=yes
-```
-
-### アクセスURL
-
-| サービス | URL |
-|---------|-----|
-| **フロントエンド** | http://localhost:8090 |
-| **API (Core)** | http://localhost:8091/docs |
-| **API (Apps)** | http://localhost:8092/docs |
-
-### デフォルトログイン
-
-- **ユーザー名**: `admin`
-- **パスワード**: `********`
-
-### システム停止
-
-```bash
-# 両方停止（デフォルト）
+# Stop all servers
 python _stop.py
 
-# フロントのみ停止
-python _stop.py --frontend=yes
+# Backend with hot-reload (dev)
+cd backend_server && .venv/Scripts/python.exe -m uvicorn main1:app --reload --host 0.0.0.0 --port 8091
+cd backend_server && .venv/Scripts/python.exe -m uvicorn main2:app --reload --host 0.0.0.0 --port 8092
 
-# バックのみ停止
-python _stop.py --backend=yes
+# Frontend only
+cd frontend_server && npm run dev
+
+# Type checking (frontend)
+cd frontend_server && npm run type-check
+
+# Build (frontend)
+cd frontend_server && npm run build
+
+# Backend dependencies
+cd backend_server && uv sync
+
+# Frontend dependencies
+cd frontend_server && npm install
+
+# Trigger backend reload (without --reload flag)
+echo. > backend_server/temp/reboot1.txt   # main1
+echo. > backend_server/temp/reboot2.txt   # main2
+
+# Database reset (delete and restart servers to recreate)
+del backend_server\_data\AiDiy\database.db
 ```
 
-### 注意点（概要）
-- `_start.py` / `_stop.py` はパラメータなし=両方、パラメータあり=yes指定のみ実行
-- `_start.py` で起動したバックエンドは `--reload` なし（詳細は [README.md](./README.md) または [AGENTS.md](./AGENTS.md) を参照）
-- 初期データの投入は「admin が未存在のときのみ」（詳細は [backend_server/AGENTS.md](./backend_server/AGENTS.md) を参照）
-- デュアルサーバー構成: main1.py (C系, A系) + main2.py (M系, T系, V系, S系) - 両方必要
+## Access URLs
 
-### 詳細な手順
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:8090 |
+| API Docs (Core) | http://localhost:8091/docs |
+| API Docs (Apps) | http://localhost:8092/docs |
 
-- **セットアップ**: [README.md](./README.md) の「セットアップ」セクション
-- **起動・停止**: [README.md](./README.md) の「システム起動」「システム停止」セクション
-- **開発コマンド**: [AGENTS.md](./AGENTS.md) の「Development Commands」セクション
-- **よくある問題**: [AGENTS.md](./AGENTS.md) の「Common Issues」セクション
-- **新規機能追加**: [このシステムの歩き方.md](./このシステムの歩き方.md) の「新規機能の追加手順」セクション
-- **ベストプラクティス**: [このシステムの歩き方.md](./このシステムの歩き方.md) の「ベストプラクティス」セクション
+**Default login:** `admin` / `********`
 
 ---
 
-## 主要なインデックス
+## Architecture Overview
 
-**アーキテクチャ理解:**
-- Database VIEWs（V系実装）: [AGENTS.md](./AGENTS.md) - "Architecture Overview" セクション
-- カスタムID生成（C採番）: [backend_server/AGENTS.md](./backend_server/AGENTS.md) - "Custom ID Generation System" セクション
-- API設計パターン: [backend_server/AGENTS.md](./backend_server/AGENTS.md) - "API Design Pattern" セクション
-- 認証フロー: [backend_server/AGENTS.md](./backend_server/AGENTS.md) - "Authentication & Security" セクション
-- 監査フィールド: [backend_server/AGENTS.md](./backend_server/AGENTS.md) - "Audit Fields Pattern" セクション
+```
+AiDiy2026/
+├── backend_server/          # FastAPI (Python 3.13) + SQLAlchemy + SQLite
+│   ├── main1.py            # Port 8091 - Core/AI features (C系, A系)
+│   ├── main2.py            # Port 8092 - App features (M系, T系, V系, S系)
+│   ├── models1/, models2/  # SQLAlchemy ORM models
+│   ├── crud1/, crud2/      # Database operations
+│   ├── routers1/, routers2/ # API endpoints
+│   ├── schemas.py          # Pydantic models (ALL in one file)
+│   ├── database.py         # SQLite config (shared by both servers)
+│   ├── auth.py, deps.py    # JWT authentication
+│   └── _data/AiDiy/database.db  # SQLite database
+│
+├── frontend_server/         # Vue 3 + Vite + TypeScript + Pinia
+│   ├── src/
+│   │   ├── components/     # Feature components by category
+│   │   │   ├── C管理/      # C系 (Core) CRUD screens
+│   │   │   ├── Mマスタ/    # M系 (Master) screens
+│   │   │   ├── Tトラン/    # T系 (Transaction) screens
+│   │   │   ├── Sスケジューラー/  # S系 (Scheduler) screens
+│   │   │   ├── Vビュー/    # V系 (View) screens
+│   │   │   ├── AコアAI/    # AI interface
+│   │   │   └── _share/     # Shared components (qTubler, dialogs)
+│   │   ├── stores/auth.ts  # Pinia auth store
+│   │   ├── api/client.ts   # Axios with JWT interceptors
+│   │   └── router/         # Vue Router (Japanese URLs)
+│   └── vite.config.ts      # Proxy: /core→8091, /apps→8092
+```
 
-**開発タスク:**
-- 新規テーブル追加: [このシステムの歩き方.md](./このシステムの歩き方.md) - 「バックエンド：新規テーブルの追加」「フロントエンド：新規CRUD画面の追加」セクション
-- 新規VIEW追加: [このシステムの歩き方.md](./このシステムの歩き方.md) - 対応するセクション
-- データベースリセット: [README.md](./README.md) - トラブルシューティング、または [AGENTS.md](./AGENTS.md) - "Common Issues"
+**Table Naming Convention:**
+- `C` = Core/Common (C権限, C利用者, C採番)
+- `M` = Master (M配車区分, M車両, M商品)
+- `T` = Transaction (T配車, T商品入庫, T商品出庫, T商品棚卸)
+- `V` = View endpoints (raw SQL, not DB views)
+- `S` = Scheduler/Special
+- `A` = AI/Advanced (AコアAI, A会話履歴)
 
-**デバッグ:**
-- バックエンドデバッグ: [backend_server/AGENTS.md](./backend_server/AGENTS.md) - "Debugging" セクション
-- フロントエンドデバッグ: [frontend_server/AGENTS.md](./frontend_server/AGENTS.md) - "Debugging" セクション
+---
+
+## Key Patterns
+
+**Backend - Adding a new table (C系/A系 in main1):**
+1. Create model in `models1/<テーブル名>.py`
+2. Export in `models1/__init__.py`
+3. Add Pydantic schemas to `schemas.py`
+4. Create CRUD in `crud1/<テーブル名>.py`
+5. Create router in `routers1/<テーブル名>.py`
+6. Register in `main1.py` with `include_router` and `create_all`
+
+**Backend - Audit fields (required on all tables):**
+```python
+from crud1.utils import create_audit_fields, update_audit_fields
+
+# Create
+監査項目 = create_audit_fields(認証情報)
+db.add(Model(..., **監査項目))
+
+# Update
+監査項目 = update_audit_fields(認証情報)
+for key, value in 監査項目.items():
+    setattr(record, key, value)
+```
+
+**Frontend - CRUD screen structure:**
+```
+components/<カテゴリ>/<テーブル名>/
+├── <テーブル名>一覧.vue           # List page
+├── <テーブル名>編集.vue           # Edit/Create page
+└── components/
+    └── <テーブル名>一覧テーブル.vue  # qTubler wrapper
+```
+
+**Frontend - API calls:**
+```typescript
+import apiClient from '@/api/client'
+const response = await apiClient.post('/core/C利用者/一覧')
+if (response.data.status === 'OK') {
+  items.value = response.data.data.items
+}
+```
+
+---
+
+## Documentation Index
+
+| Document | Purpose |
+|----------|---------|
+| [README.md](./README.md) | Setup, start/stop, cleanup |
+| [AGENTS.md](./AGENTS.md) | Project overview, commands, common issues |
+| [backend_server/AGENTS.md](./backend_server/AGENTS.md) | Backend implementation details |
+| [frontend_server/AGENTS.md](./frontend_server/AGENTS.md) | Frontend implementation details |
+
+**HTML Docs (docs/ folder):**
+| Folder | Purpose |
+|--------|---------|
+| [00_AiDiyシステムの歩き方](./docs/00_AiDiyシステムの歩き方/_index.html) | System overview, start guide, FAQ |
+| [01_バックエンド_M配車区分実装例](./docs/01_明日のために！その１_バックエンド_M配車区分実装例/_index.html) | Backend implementation example |
+| [02_バックエンド_M配車区分テスト例](./docs/02_明日のために！その２_バックエンド_M配車区分テスト例/_index.html) | Backend testing example |
+| [03_コーディングルール](./docs/03_コーディングルール/_index.html) | Coding rules, naming, best practices |
+| [04_フロントエンド画面追加例](./docs/04_フロントエンド画面追加例/_index.html) | Frontend CRUD screen guide |
+
+**For detailed procedures, see:**
+- Backend patterns: [backend_server/AGENTS.md](./backend_server/AGENTS.md)
+- Frontend patterns: [frontend_server/AGENTS.md](./frontend_server/AGENTS.md)
+- Coding rules: [docs/03_コーディングルール](./docs/03_コーディングルール/_index.html)
+- New frontend screen: [docs/04_フロントエンド画面追加例](./docs/04_フロントエンド画面追加例/_index.html)
+- Troubleshooting: [AGENTS.md](./AGENTS.md) - "Common Issues"
 

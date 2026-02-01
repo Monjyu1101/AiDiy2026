@@ -12,7 +12,7 @@
 **関連ドキュメント：**
 - **[./CLAUDE.md](./CLAUDE.md)** - Claude Code向けインデックス（クイックスタート、アーキテクチャサマリー）
 - **[./AGENTS.md](./AGENTS.md)** - プロジェクト全体方針（基本方針、テーブル命名規則、開発コマンド）
-- **[./このシステムの歩き方.md](./このシステムの歩き方.md)** - コーディングルール、命名規則、開発フロー
+- **[./docs/](./docs/)** - HTML形式の詳細ドキュメント（コーディングルール、実装例など）
 - **[./backend_server/AGENTS.md](./backend_server/AGENTS.md)** - バックエンド実装詳細
 - **[./frontend_server/AGENTS.md](./frontend_server/AGENTS.md)** - フロントエンド実装詳細
 
@@ -387,7 +387,7 @@ FastAPI の自動生成ドキュメント（Swagger UI）で API をテストで
 セットアップと起動が完了したら、以下のドキュメントを参照してください：
 
 1. **[./AGENTS.md](./AGENTS.md)** - プロジェクト全体の方針と基本情報
-2. **[./このシステムの歩き方.md](./このシステムの歩き方.md)** - コーディングルールと開発フロー
+2. **[./docs/](./docs/)** - HTML形式の詳細ドキュメント（コーディングルール、実装例など）
 3. **[./backend_server/AGENTS.md](./backend_server/AGENTS.md)** - バックエンド実装詳細
 4. **[./frontend_server/AGENTS.md](./frontend_server/AGENTS.md)** - フロントエンド実装詳細
 5. **[./CLAUDE.md](./CLAUDE.md)** - Claude Code (claude.ai/code) 向けインデックス
