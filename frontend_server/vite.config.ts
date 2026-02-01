@@ -15,10 +15,12 @@ export default defineConfig({
       '/core': {
         target: 'http://127.0.0.1:8091',
         changeOrigin: true,
+        ws: true,  // WebSocketサポートを有効化
       },
       '/apps': {
         target: 'http://127.0.0.1:8092',
         changeOrigin: true,
+        ws: true,  // WebSocketサポートを有効化
       }
     }
   }

@@ -476,7 +476,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "message": f"モデル設定エラー: {str(e)}"
         }
 
-@router.websocket("/ws/AコアAI")
+@router.websocket("/core/ws/AコアAI")
 async def websocket_endpoint(WebSocket接続: WebSocket):
     """
     AコアAI WebSocketエンドポイント

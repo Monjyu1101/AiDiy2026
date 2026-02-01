@@ -336,13 +336,10 @@ export class AコアAIWebSocket implements IWebSocketClient {
  * WebSocket URLを生成
  */
 export function createWebSocketUrl(path: string): string {
-  // 現在のプロトコルとホストを使用
+  // 現在のプロトコルとホストを使用（Vite proxyを経由）
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.hostname;
-
-  // 開発環境では ws://localhost:8091、本番環境では適切に設定
-  // import.meta.env.DEV は開発サーバーで true になる
-  const port = import.meta.env.DEV ? '8091' : window.location.port;
+  const port = window.location.port;
 
   const url = `${protocol}//${host}:${port}${path}`;
   console.log('[WebSocket] URL生成:', url, '(DEV:', import.meta.env.DEV, ')');

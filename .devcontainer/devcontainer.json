@@ -1,0 +1,40 @@
+{
+  "name": "AiDiy2026",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  
+  // ポートの自動転送設定
+  "forwardPorts": [8090, 8091, 8092],
+  
+  // ポートの可視性を自動的にpublicに設定
+  "portsAttributes": {
+    "8090": {
+      "label": "Frontend (Vite)",
+      "visibility": "public",
+      "onAutoForward": "notify"
+    },
+    "8091": {
+      "label": "Backend Core (main1)",
+      "visibility": "public",
+      "onAutoForward": "silent"
+    },
+    "8092": {
+      "label": "Backend Apps (main2)",
+      "visibility": "public",
+      "onAutoForward": "silent"
+    }
+  },
+  
+  // 起動後のコマンド
+  "postCreateCommand": "echo 'Codespace ready!'",
+  
+  // VS Code拡張機能
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "Vue.volar",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}

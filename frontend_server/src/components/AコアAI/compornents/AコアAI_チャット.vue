@@ -458,7 +458,7 @@ const 出力ソケット接続 = async () => {
     return;
   }
 
-  const wsUrl = createWebSocketUrl('/ws/AコアAI');
+  const wsUrl = createWebSocketUrl('/core/ws/AコアAI');
   出力WebSocket.value = new AコアAIWebSocket(wsUrl, ソケットID.value, チャンネル);
   WSハンドラ登録(出力WebSocket.value);
 

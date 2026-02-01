@@ -196,7 +196,7 @@ const handleImageCheckboxChange = async (newValue: boolean, oldValue: boolean) =
 // WebSocket接続を初期化
 const initializeWebSocket = async (既存ソケットID?: string) => {
   try {
-    const wsUrl = createWebSocketUrl('/ws/AコアAI');
+    const wsUrl = createWebSocketUrl('/core/ws/AコアAI');
     console.log('[AコアAI] WebSocket接続開始:', wsUrl, 'ソケットID:', 既存ソケットID);
 
     wsClient.value = new AコアAIWebSocket(wsUrl, 既存ソケットID, -1);
