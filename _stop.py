@@ -11,6 +11,7 @@ Usage:
 import argparse
 import subprocess
 import sys
+import time
 
 # ============================================================
 # プロジェクト設定
@@ -90,6 +91,8 @@ def main():
     print("=" * 60)
     print("停止処理が完了しました")
     print("=" * 60)
+    print("停止処理は正常終了しました。5秒後に終了します...")
+    time.sleep(5)
 
 
 if __name__ == "__main__":

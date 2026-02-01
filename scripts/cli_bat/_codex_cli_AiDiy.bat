@@ -1,5 +1,5 @@
 @echo off
-CD /D "%~dp0.."
+cd /d "%~dp0../.."
 
 ECHO codex --dangerously-bypass-approvals-and-sandbox
 start "Codex CLI" "%USERPROFILE%\AppData\Roaming\npm\codex.cmd" --dangerously-bypass-approvals-and-sandbox

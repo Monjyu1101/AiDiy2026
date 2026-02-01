@@ -1,5 +1,5 @@
 @echo off
-CD /D "%~dp0.."
+cd /d "%~dp0../.."
 
 ECHO copilot --allow-all-tools
 start "Copilot CLI" "%USERPROFILE%\AppData\Roaming\npm\copilot.cmd" --allow-all-tools

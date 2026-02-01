@@ -37,19 +37,15 @@ if %errorlevel% == 0 (
 )
 
 if %OPENSSL_FOUND% == 1 (
-    rem Generate new SSL certificates
-    echo Generating new SSL certificate for localhost...
+    rem Generate new SSL certificates (SAN: localhost, kondou-envy.local)
+    echo Generating new SSL certificate for localhost and kondou-envy.local...
     openssl genrsa -out ssl/key.pem 2048 >nul 2>&1
-    openssl req -new -key ssl/key.pem -out ssl/cert.csr -subj "/C=JP/ST=Tokyo/L=Tokyo/O=AiDiy2026/OU=Development/CN=localhost/emailAddress=admin@localhost" >nul 2>&1
-    openssl x509 -req -days 365 -in ssl/cert.csr -signkey ssl/key.pem -out ssl/cert.pem >nul 2>&1
-    del ssl\cert.csr >nul 2>&1
+    openssl req -x509 -new -key ssl/key.pem -sha256 -days 365 -out ssl/cert.pem -subj "/C=JP/ST=Tokyo/L=Tokyo/O=AiDiy2026/OU=Development/CN=localhost/emailAddress=admin@localhost" -addext "subjectAltName=DNS:localhost,DNS:kondou-envy.local" >nul 2>&1
     echo [OK] SSL certificates generated
 ) else (
     echo [WARN] OpenSSL not found. Using Docker to generate SSL certificates...
     docker run --rm -v "%cd%\ssl:/ssl" alpine/openssl genrsa -out /ssl/key.pem 2048
-    docker run --rm -v "%cd%\ssl:/ssl" alpine/openssl req -new -key /ssl/key.pem -out /ssl/cert.csr -subj "/C=JP/ST=Tokyo/L=Tokyo/O=AiDiy2026/OU=Development/CN=localhost/emailAddress=admin@localhost"
-    docker run --rm -v "%cd%\ssl:/ssl" alpine/openssl x509 -req -days 365 -in /ssl/cert.csr -signkey /ssl/key.pem -out /ssl/cert.pem
-    docker run --rm -v "%cd%\ssl:/ssl" alpine sh -c "rm -f /ssl/cert.csr"
+    docker run --rm -v "%cd%\ssl:/ssl" alpine/openssl req -x509 -new -key /ssl/key.pem -sha256 -days 365 -out /ssl/cert.pem -subj "/C=JP/ST=Tokyo/L=Tokyo/O=AiDiy2026/OU=Development/CN=localhost/emailAddress=admin@localhost" -addext "subjectAltName=DNS:localhost,DNS:kondou-envy.local"
     echo [OK] SSL certificates generated via Docker
 )
 

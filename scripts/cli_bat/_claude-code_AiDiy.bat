@@ -1,5 +1,5 @@
 @echo off
-CD ".."
+cd /d "%~dp0../.."
 
 ECHO claude --dangerously-skip-permissions --chrome
 start "cmd.exe" "%USERPROFILE%\AppData\Roaming\npm\claude.cmd" --dangerously-skip-permissions --chrome

@@ -29,7 +29,10 @@ if errorlevel 1 (
 rem Start containers
 echo Starting containers...
 docker-compose up -d
+set START_ERROR=%errorlevel%
 
+rem Check running containers (ignore docker-compose exit code quirks)
+docker ps --format "{{.Names}}" | findstr /i /c:"aidiy2026" >nul 2>&1
 if %errorlevel% == 0 (
     echo.
     echo =============================================
@@ -38,30 +41,29 @@ if %errorlevel% == 0 (
     echo.
     echo *** IMPORTANT: For audio/video features, use HTTPS ***
     echo.
-    echo Primary Access (HTTPS - Required for audio):
-    echo   - Frontend (HTTPS):  https://localhost/
+    echo Allowed Access ^(HTTPS^):
+    echo   - Frontend ^(HTTPS^):  https://localhost/
+    echo   - Frontend ^(HTTPS^):  https://kondou-envy.local/
     echo.
-    echo Alternative Access (HTTP - No audio support):
-    echo   - Frontend (HTTP):   http://localhost:8090
-    echo   - Frontend (Nginx):  http://localhost/
-    echo.
-    echo Backend API Documentation:
-    echo   - Core API (Direct): http://localhost:8091/docs
-    echo   - Apps API (Direct): http://localhost:8092/docs
-    echo   - Core API (Nginx):  http://localhost/api/core/docs
-    echo   - Apps API (Nginx):  http://localhost/api/apps/docs
+    echo Backend API Documentation ^(Direct only^):
+    echo   - Core API ^(Direct^): http://kondou-envy:8091/docs
+    echo   - Apps API ^(Direct^): http://kondou-envy:8092/docs
     echo.
     echo Default Login:
     echo   - Username: admin
-    echo   - Password: (check README.md)
+    echo   - Password: ^(check README.md^)
     echo.
     echo Note: You will need to accept the self-signed certificate warning
     echo       in your browser when accessing HTTPS for the first time.
     echo.
     docker-compose ps
+    echo.
+    echo Opening browser: https://localhost/
+    start "" "https://localhost/"
 ) else (
     echo.
     echo ERROR: Failed to start containers
+    echo docker-compose exit code: %START_ERROR%
     docker-compose logs --tail=20
 )
 

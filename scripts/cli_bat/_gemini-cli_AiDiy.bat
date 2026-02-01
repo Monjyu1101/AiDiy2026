@@ -1,5 +1,5 @@
 @echo off
-CD /D "%~dp0.."
+cd /d "%~dp0../.."
 
 ECHO gemini --yolo
 start "Gemini CLI" "%USERPROFILE%\AppData\Roaming\npm\gemini.cmd" --yolo

@@ -17,6 +17,7 @@ Usage:
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # ============================================================
@@ -392,6 +393,8 @@ def main():
     print()
     print_info("または VS Code で F5 キーを押してください。")
     print()
+    print_info("セットアップは正常終了しました。5秒後に終了します...")
+    time.sleep(5)
 
 
 if __name__ == "__main__":

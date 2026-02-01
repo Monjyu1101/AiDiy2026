@@ -22,6 +22,7 @@ docker-compose down --remove-orphans
 rem Remove specific images
 echo Removing Docker images...
 for /f "tokens=*" %%i in ('docker images "aidiy2026*" -q 2^>nul') do docker rmi %%i 2>nul
+for /f "tokens=*" %%i in ('docker images "docker-aidiy2026*" -q 2^>nul') do docker rmi %%i 2>nul
 for /f "tokens=*" %%i in ('docker images "nginx" -q 2^>nul') do docker rmi %%i 2>nul
 
 rem Clean up Docker system
@@ -39,6 +40,7 @@ if exist ssl (
 
 rem Clean up any remaining Docker volumes
 echo Cleaning up Docker volumes...
+docker volume rm docker_frontend-dist >nul 2>&1
 docker volume prune -f >nul 2>&1
 
 rem Clean up any orphaned networks

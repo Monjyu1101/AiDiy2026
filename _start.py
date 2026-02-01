@@ -495,6 +495,8 @@ def main():
 
             print_header("停止完了")
             print_success("すべてのサーバーを停止しました")
+            print_info("開発環境は正常終了しました。5秒後に終了します...")
+            time.sleep(5)
             break
 
 

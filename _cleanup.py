@@ -13,6 +13,7 @@ import os
 import shutil
 import stat
 import sys
+import time
 from pathlib import Path
 
 # ============================================================
@@ -345,6 +346,8 @@ def main():
     print_header("クリーンアップ完了")
     print_success("プロジェクトのクリーンアップが完了しました")
     print_info("他の担当者にプロジェクトを渡す準備ができました")
+    print_info("クリーンアップは正常終了しました。5秒後に終了します...")
+    time.sleep(5)
 
 
 if __name__ == "__main__":
