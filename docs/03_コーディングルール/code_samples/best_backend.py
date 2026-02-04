@@ -2,7 +2,7 @@
 # ■ バックエンド ベストプラクティス
 
 # 1. 監査フィールドは必ずヘルパー関数を使用
-from crud1.utils import create_audit_fields, update_audit_fields
+from core_crud.utils import create_audit_fields, update_audit_fields
 
 # ✅ 正解
 認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}

@@ -24,7 +24,7 @@
 
 **アーキテクチャ：**
 - **バックエンド**: FastAPI (Python 3.13) + SQLAlchemy + SQLite
-  - **デュアルサーバー構成**: main1.py (port 8091) + main2.py (port 8092)
+  - **デュアルサーバー構成**: core_main.py (port 8091) + apps_main.py (port 8092)
 - **フロントエンド**: Vue 3 + Vite + TypeScript + Pinia
   - **port 8090**
 
@@ -32,7 +32,7 @@
 - データベーステーブル名、カラム名、API endpoints、JSON keys、Vue componentsが全て日本語
 - JWT認証（60分有効期限）
 - カスタムID生成システム (C採番)
-- WebSocket統合 (AコアAI)
+- WebSocket統合 (AIコア)
 - 自動再起動機能
 
 ---
@@ -79,16 +79,16 @@ python _start.py
 
 ## 1.5. APIキー設定（公開リポジトリ向け）
 
-APIキーは `backend_server/_config/RiKi_AiDiy_key.json` に保存されます。  
+APIキーは `backend_server/_config/AiDiy_key.json` に保存されます。  
 このフォルダは **公開リポジトリに含めない** 方針のため、`.gitignore` で除外しています。
 
 初回セットアップ時は以下の手順で作成してください。
 
 ```bash
-copy backend_server\\RiKi_AiDiy_key.example.json backend_server\\_config\\RiKi_AiDiy_key.json
+copy backend_server\\AiDiy_key.example.json backend_server\\_config\\AiDiy_key.json
 ```
 
-作成後、`RiKi_AiDiy_key.json` 内の各APIキーを設定してください。
+作成後、`AiDiy_key.json` 内の各APIキーを設定してください。
 
 ---
 
@@ -122,8 +122,8 @@ python _start.py --backend=no --frontend=yes
    - 既にプロセスが使用している場合、自動的に停止します
 
 2. **バックエンドサーバー起動**
-   - **main1.py** (port 8091) - Core/Common機能 (C系, A系)
-   - **main2.py** (port 8092) - Application機能 (M系, T系, V系, S系)
+   - **core_main.py** (port 8091) - Core/Common機能 (C系, A系)
+   - **apps_main.py** (port 8092) - Application機能 (M系, T系, V系, S系)
    - 仮想環境 (.venv) があれば使用、なければ uv run で起動
 
 3. **フロントエンドサーバー起動**
@@ -157,10 +157,10 @@ python _start.py --backend=no --frontend=yes
 
 ### 実装確認済みの注意点（間違いやすいポイント）
 
-- **初期パスワードの反映タイミング**: `backend_server/crud1/init.py` の初期データ投入は「**admin が未存在**」のときだけ実行されます。既に DB がある場合、`admin` のパスワードは自動では更新されません。
-- **DBファイルの場所**: SQLite は `backend_server/_data/AiDiy/database.db` に作成され、main1 / main2 で共有されます。
+- **初期パスワードの反映タイミング**: `backend_server/core_crud/init.py` の初期データ投入は「**admin が未存在**」のときだけ実行されます。既に DB がある場合、`admin` のパスワードは自動では更新されません。
+- **DBファイルの場所**: SQLite は `backend_server/_data/AiDiy/database.db` に作成され、core_main / apps_main で共有されます。
 - **_setup.py の案内表示**: セットアップ完了メッセージに `python start.py` と出ますが、実際の起動ファイルは **`_start.py`** です。
-- **ポート変更時の連動修正**: フロントエンドのポートを変える場合、`frontend_server/vite.config.ts` に加えて `backend_server/main1.py` と `backend_server/main2.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要です。
+- **ポート変更時の連動修正**: フロントエンドのポートを変える場合、`frontend_server/vite.config.ts` に加えて `backend_server/core_main.py` と `backend_server/apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要です。
 
 ### 停止方法
 
@@ -339,7 +339,7 @@ VS Code を使用している場合、F5キーでデバッグ起動が可能で�
 - `_start.py` を実行する設定
 
 **`backend_server/.vscode/launch.json`:**
-- main1.py または main2.py を個別に起動・デバッグ
+- core_main.py または apps_main.py を個別に起動・デバッグ
 
 **`frontend_server/.vscode/launch.json`:**
 - Vite dev server を起動し、Chrome でデバッグ
@@ -397,4 +397,5 @@ FastAPI の自動生成ドキュメント（Swagger UI）で API をテストで
 ## ライセンスとサポート
 
 プロジェクトの詳細な実装方針やトラブルシューティングについては、上記の関連ドキュメントを参照してください。
+
 

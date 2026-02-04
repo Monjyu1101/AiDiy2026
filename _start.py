@@ -72,8 +72,8 @@ def print_info(message):
 BACKEND_PATH = "backend_server"           # バックエンドフォルダ名
 BACKEND_CORE_PORT = 8091                  # coreサーバーポート番号
 BACKEND_APPS_PORT = 8092                  # appsサーバーポート番号
-BACKEND_CORE_APP = "main1:app"            # coreサーバーアプリケーションモジュール
-BACKEND_APPS_APP = "main2:app"            # appsサーバーアプリケーションモジュール
+BACKEND_CORE_APP = "core_main:app"            # coreサーバーアプリケーションモジュール
+BACKEND_APPS_APP = "apps_main:app"            # appsサーバーアプリケーションモジュール
 BACKEND_ENV_CANDIDATES = [".venv", "venv"]  # venv フォルダ候補 (優先順)
 
 # フロントエンド設定

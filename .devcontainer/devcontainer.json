@@ -13,12 +13,12 @@
       "onAutoForward": "notify"
     },
     "8091": {
-      "label": "Backend Core (main1)",
+      "label": "Backend Core (core_main)",
       "visibility": "public",
       "onAutoForward": "silent"
     },
     "8092": {
-      "label": "Backend Apps (main2)",
+      "label": "Backend Apps (apps_main)",
       "visibility": "public",
       "onAutoForward": "silent"
     }

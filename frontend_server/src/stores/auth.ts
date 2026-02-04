@@ -16,6 +16,7 @@ export const useAuthStore = defineStore('auth', {
     state: (): AuthState => ({
         token: localStorage.getItem('token') || '',
         user: JSON.parse(localStorage.getItem('user') || 'null'),
+        authChecked: false as boolean,
     }),
     getters: {
         isAuthenticated: (state): boolean => !!state.token,
@@ -23,6 +24,15 @@ export const useAuthStore = defineStore('auth', {
         isAdmin: (state): boolean => state.user?.権限ID === '1', // ID '1' を管理者とする
     },
     actions: {
+        async ensureAuth(): Promise<void> {
+            if (!this.token) {
+                this.user = null
+                this.authChecked = true
+                return
+            }
+            if (this.authChecked) return
+            await this.fetchUser()
+        },
         async login(username: string, password: string): Promise<LoginResult> {
             try {
                 const response = await apiClient.post('/core/auth/ログイン', {
@@ -32,6 +42,7 @@ export const useAuthStore = defineStore('auth', {
                 if (response.data.status === 'OK') {
                     this.token = response.data.data.access_token
                     localStorage.setItem('token', this.token)
+                    this.authChecked = false
                     await this.fetchUser()
                     router.push('/Xその他')
                     return { success: true }
@@ -43,12 +54,17 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         async fetchUser(): Promise<void> {
-            if (!this.token) return
+            if (!this.token) {
+                this.user = null
+                this.authChecked = true
+                return
+            }
             try {
                 const response = await apiClient.post('/core/auth/現在利用者')
                 if (response.data.status === 'OK') {
                     this.user = response.data.data
                     localStorage.setItem('user', JSON.stringify(this.user))
+                    this.authChecked = true
                 }
             } catch (error) {
                 this.logout()
@@ -57,6 +73,7 @@ export const useAuthStore = defineStore('auth', {
         logout(): void {
             this.token = ''
             this.user = null
+            this.authChecked = false
             localStorage.removeItem('token')
             localStorage.removeItem('user')
             router.push('/ログイン')

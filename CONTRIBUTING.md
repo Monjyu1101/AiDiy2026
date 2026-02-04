@@ -28,7 +28,7 @@
 ## セキュリティ
 
 - APIキーなどの機密情報はコミットしないでください
-- `backend_server/_config/RiKi_AiDiy_key.json` は `.gitignore` で除外しています
+- `backend_server/_config/AiDiy_key.json` は `.gitignore` で除外しています
 
 ## 相談
 

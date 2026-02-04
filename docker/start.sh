@@ -9,16 +9,16 @@ echo "=========================================="
 
 cd /app
 
-# Start Backend Core API (main1) in background
+# Start Backend Core API (core_main) in background
 echo "[1/3] Starting Backend Core API (port 8091)..."
 cd /app/backend_server
-python -m uvicorn main1:app --host 0.0.0.0 --port 8091 --log-level info &
+python -m uvicorn core_main:app --host 0.0.0.0 --port 8091 --log-level info &
 CORE_PID=$!
 sleep 2
 
-# Start Backend Apps API (main2) in background
+# Start Backend Apps API (apps_main) in background
 echo "[2/3] Starting Backend Apps API (port 8092)..."
-python -m uvicorn main2:app --host 0.0.0.0 --port 8092 --log-level info &
+python -m uvicorn apps_main:app --host 0.0.0.0 --port 8092 --log-level info &
 APPS_PID=$!
 sleep 2
 

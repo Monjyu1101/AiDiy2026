@@ -1,6 +1,6 @@
 ﻿from sqlalchemy.orm import Session
 from typing import Optional, Dict
-import models, schemas
+import models, apps_schema as schemas
 from crud.utils import create_audit_fields
 
 def get_M配車区分(db: Session, 配車区分ID: str):

@@ -36,7 +36,7 @@
 - API Client（Axios JWT インターセプター）
 - Component Structure（レイアウト、共通、機能別コンポーネント）
 - qTublerシステム（カスタムテーブルコンポーネント）
-- AコアAI frontend実装（WebSocket統合）
+- AIコア frontend実装（WebSocket統合）
 - Authentication Flow（frontend視点）
 - Development Commands（frontend固有）
 - 新規テーブル/ビュー/機能 追加手順
@@ -104,7 +104,7 @@
 - `Tトラン/` - Transaction管理画面（T配車、T商品入庫/出庫/棚卸）
 - `Sスケジューラー/` - Special processing画面（S配車_週表示、S配車_日表示）
 - `Vビュー/` - View画面（V商品推移表）
-- `AコアAI/` - AI Core interface（WebSocket統合、マルチパネルUI）
+- `AIコア/` - AI Core interface（WebSocket統合、マルチパネルUI）
 - `Xテスト/` - Experimental features（Xテトリス、Xインベーダー、Xリバーシ）
 - `_share/` - 共有ユーティリティ（ダイアログ、qTubler）
 - `_Layout`, `_TopBar`, `_TopMenu` - レイアウトコンポーネント
@@ -137,14 +137,14 @@
 
 **7. Vite Proxy設定（開発サーバー）:**
 - フロントエンド: `http://localhost:8090`
-- `/core/*` → `http://127.0.0.1:8091` (main1 - コア機能)
-- `/apps/*` → `http://127.0.0.1:8092` (main2 - アプリ機能)
+- `/core/*` → `http://127.0.0.1:8091` (core_main - コア機能)
+- `/apps/*` → `http://127.0.0.1:8092` (apps_main - アプリ機能)
 - バックエンドとのシームレスな統合
-- **注意**: フロントのポートを変更したら、`backend_server/main1.py` と `main2.py` の CORS 許可リストも更新する。
+- **注意**: フロントのポートを変更したら、`backend_server/core_main.py` と `apps_main.py` の CORS 許可リストも更新する。
 
-**8. WebSocket統合 (AコアAI):**
+**8. WebSocket統合 (AIコア):**
 - `api/websocket.ts` で WebSocket client 提供
-- `AコアAIWebSocket` クラス
+- `AIコアWebSocket` クラス
 - 自動再接続機能（最大5回、3秒間隔）
 - セッション永続化（リロード対応、URLクエリパラメータでソケットID管理）
 - メッセージハンドラーシステム
@@ -170,7 +170,7 @@
 - 401エラーで自動ログアウト
 - Vue Router guard で未認証時は `/ログイン` へリダイレクト
 
-**12. AコアAI マルチパネルUI:**
+**12. AIコア マルチパネルUI:**
 - 6つの独立パネル（チャット、イメージ、エージェント1-4）
 - 動的グリッドレイアウト（1-6パネル対応）
 - ポートレート/ランドスケープ対応
@@ -217,8 +217,8 @@ app.mount('#app')
 - Port: `8090`
 - Path alias: `@` → `./src`
 - Proxy設定:
-  - `/core` → `http://127.0.0.1:8091` (main1)
-  - `/apps` → `http://127.0.0.1:8092` (main2)
+  - `/core` → `http://127.0.0.1:8091` (core_main)
+  - `/apps` → `http://127.0.0.1:8092` (apps_main)
 
 **tsconfig.json** - TypeScript設定:
 - Target: ES2020
@@ -313,7 +313,7 @@ router.beforeEach((to, from, next) => {
 - `/Vビュー/V商品推移表` - 商品推移表
 
 **A系（AI）画面:**
-- `/AコアAI` - AコアAI インターフェース（新しいタブで開く）
+- `/AIコア` - AIコア インターフェース（新しいタブで開く）
 
 **X系（テスト）画面:**
 - `/Xその他/Xテトリス` - テトリスゲーム
@@ -475,15 +475,15 @@ const response = await apiClient.post('/core/C利用者/一覧', {
 ```
 
 **Vite Proxy経由のリクエスト:**
-- `/core/*` → `http://127.0.0.1:8091` (main1)
-- `/apps/*` → `http://127.0.0.1:8092` (main2)
+- `/core/*` → `http://127.0.0.1:8091` (core_main)
+- `/apps/*` → `http://127.0.0.1:8092` (apps_main)
 - 例: `apiClient.post('/core/C利用者/一覧')` → `http://127.0.0.1:8091/core/C利用者/一覧`
 
-**api/websocket.ts** - WebSocket client (AコアAI用):
+**api/websocket.ts** - WebSocket client (AIコア用):
 
-**AコアAIWebSocket クラス:**
+**AIコアWebSocket クラス:**
 ```typescript
-export class AコアAIWebSocket implements IWebSocketClient {
+export class AIコアWebSocket implements IWebSocketClient {
   constructor(private url: string, socketId?: string)
 
   // 接続管理
@@ -496,7 +496,7 @@ export class AコアAIWebSocket implements IWebSocketClient {
   on(messageType: string, handler: MessageHandler): void
   off(messageType: string, handler?: MessageHandler): void
 
-  // AコアAI専用メソッド
+  // AIコア専用メソッド
   sendPing(): void
   updateState(画面: any, ボタン: any): void
   sendChatMessage(message: string): void
@@ -513,10 +513,10 @@ export class AコアAIWebSocket implements IWebSocketClient {
 
 **使用例:**
 ```typescript
-import { AコアAIWebSocket } from '@/api/websocket'
+import { AIコアWebSocket } from '@/api/websocket'
 
 // WebSocket接続
-const ws = new AコアAIWebSocket('ws://localhost:8091/core/ws/AコアAI', socketId)
+const ws = new AIコアWebSocket('ws://localhost:8091/core/ws/AIコア', socketId)
 const newSocketId = await ws.connect()
 
 // メッセージハンドラー登録
@@ -554,7 +554,7 @@ ws.disconnect()
 
 **_TopMenu.vue** - タブ型メインナビゲーション:
 - タブ一覧:
-  1. **AコアAI** - `/AコアAI` (新しいタブで開く)
+  1. **AIコア** - `/AIコア` (新しいタブで開く)
   2. **管理** - `/C管理`
   3. **マスタ** - `/Mマスタ`
   4. **トラン** - `/Tトラン`
@@ -564,7 +564,7 @@ ws.disconnect()
   8. **その他** - `/Xその他`
   9. **ログアウト** - `/ログアウト`
 - アクティブタブハイライト
-- クリックでルート遷移（AコアAIのみ新しいタブ）
+- クリックでルート遷移（AIコアのみ新しいタブ）
 
 **Shared Components（共有コンポーネント）:**
 
@@ -647,7 +647,7 @@ export async function qColorPicker(initialColor?: string, title?: string): Promi
 - **V商品推移表.vue** - 商品推移表
   - `components/V商品推移表テーブル.vue` - カスタムテーブル
 
-**AコアAI/** - AI Core インターフェース（詳細は後述）
+**AIコア/** - AI Core インターフェース（詳細は後述）
 
 **Xテスト/** - X系 (Experimental) テスト機能:
 - **Xその他.vue** - カテゴリメニュー
@@ -793,9 +793,9 @@ const handleRowDblClick = (row: any) => {
 - 全てのCRUD画面で同じテーブルUI
 - 一貫した操作感
 
-## AコアAI Component System (A系)
+## AIコア Component System (A系)
 
-The **AコアAI** (Core AI) is a multi-panel AI interface system with flexible grid layouts.
+The **AIコア** (Core AI) is a multi-panel AI interface system with flexible grid layouts.
 
 **Key features:**
 - **Session persistence**: Uses URL-based session IDs to persist component visibility and control states across page reloads
@@ -804,7 +804,7 @@ The **AコアAI** (Core AI) is a multi-panel AI interface system with flexible g
 - **Floating controls**: Microphone, speaker, camera, and component selection toggle
 - **Responsive design**: Adapts layouts for portrait/landscape orientations
 
-**Main container** (`AコアAI.vue`):
+**Main container** (`AIコア.vue`):
 - Manages session ID in URL query parameter `?セッションID=<uuid>`
 - Tracks visibility state for 6 components (チャット, イメージ, エージェント1-4)
 - Controls audio/video buttons (マイク, スピーカー, カメラ)
@@ -829,7 +829,7 @@ The **AコアAI** (Core AI) is a multi-panel AI interface system with flexible g
 - 5-6 panels: 3×2 grid
 
 **Access:**
-- URL: http://localhost:8090/AコアAI (opens in new tab from top menu)
+- URL: http://localhost:8090/AIコア (opens in new tab from top menu)
 - Linked from `_TopMenu.vue` as leftmost menu item
 
 **Implementation notes:**
@@ -1092,7 +1092,7 @@ const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD')
 - 変更する場合は `auth.ts` を修正
 
 **5. WebSocketのリロード対応:**
-- AコアAIのWebSocket接続はリロード時にソケットIDを保持
+- AIコアのWebSocket接続はリロード時にソケットIDを保持
 - URLクエリパラメータ `?セッションID=<uuid>` で管理
 
 ## 注意点
@@ -1103,4 +1103,5 @@ const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD')
 - 一覧などで子コンポーネントを呼び出すタグはASCII名で統一（日本語タグはブラウザが無効扱いでテキスト表示される）。
 - **Vue component tags must use ASCII names**
 - 日本語名を使う場合は `<component :is="日本語コンポーネント名" />` を使用する。
+
 

@@ -25,29 +25,29 @@ const props = defineProps({
     <div class="tabs">
       <div class="tab-container">
         <!-- カテゴリーメニュー -->
-        <a href="/AコアAI" target="_blank" class="tab">
-          [AコアAI]
+        <a href="/AIコア" target="_blank" class="tab">
+          AiDiy
         </a>
         <RouterLink to="/C管理" active-class="active" class="tab">
-          [C管理]
+          C管理
         </RouterLink>
         <RouterLink to="/Mマスタ" active-class="active" class="tab">
-          [Mマスタ]
+          Mマスタ
         </RouterLink>
         <RouterLink to="/Tトラン" active-class="active" class="tab">
-          [Tトラン]
+          Tトラン
         </RouterLink>
         <RouterLink to="/Sスケジュール" active-class="active" class="tab">
-          [Sスケジュール]
+          Sスケジュール
         </RouterLink>
         <RouterLink to="/Vビュー" active-class="active" class="tab">
-          [Vビュー]
+          Vビュー
         </RouterLink>
         <RouterLink to="/リンク" active-class="active" class="tab">
-          [リンク]
+          リンク
         </RouterLink>
         <RouterLink to="/Xその他" active-class="active" class="tab">
-          [Xその他]
+          Xその他
         </RouterLink>
 
         <!-- ログアウト -->
@@ -198,4 +198,3 @@ const props = defineProps({
   }
 }
 </style>
-

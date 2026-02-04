@@ -1,5 +1,5 @@
 ﻿models/M配車区分.py
-schemas.py (M配車区分Base/登録/変更/削除/取得)
+apps_schema.py (M配車区分Base/登録/変更/削除/取得)
 crud/M配車区分.py
 routers/M配車区分.py
 routers/V配車区分.py

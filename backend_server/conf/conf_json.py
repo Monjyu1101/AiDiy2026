@@ -84,7 +84,7 @@ class conf_json:
             json: 設定ファイルパス（省略時はデフォルト）
         """
         if json is None:
-            json = '_config/RiKi_AiDiy_key.json'
+            json = '_config/AiDiy_key.json'
 
         object.__setattr__(self, '_config_file', json)
         object.__setattr__(self, '_config_data', {})

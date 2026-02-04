@@ -9,7 +9,7 @@
 
 /**
  * WebSocketクライアント
- * AコアAIのWebSocket接続を管理
+ * AIコアのWebSocket接続を管理
  */
 
 export interface WebSocketMessage {
@@ -36,7 +36,7 @@ export interface IWebSocketClient {
   requestStream(data: any): void;
 }
 
-export class AコアAIWebSocket implements IWebSocketClient {
+export class AIコアWebSocket implements IWebSocketClient {
   private ws: WebSocket | null = null;
   private socketId: string | null = null;
   private messageHandlers: Map<string, MessageHandler[]> = new Map();
@@ -345,4 +345,5 @@ export function createWebSocketUrl(path: string): string {
   console.log('[WebSocket] URL生成:', url, '(DEV:', import.meta.env.DEV, ')');
   return url;
 }
+
 

@@ -92,9 +92,9 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'その他' }
     },
     {
-        path: '/AコアAI',
+        path: '/AIコア',
         name: 'コアAI',
-        component: () => import('../components/AコアAI/AコアAI.vue'),
+        component: () => import('../components/AIコア/AIコア.vue'),
         meta: { requiresAuth: true, title: 'コアAI' }
     },
     {
@@ -266,9 +266,7 @@ router.beforeEach(async (to, _from, next) => {
             next('/ログイン')
             return
         }
-        if (!authStore.user) {
-            await authStore.fetchUser()
-        }
+        await authStore.ensureAuth()
         if (!authStore.user) {
             next('/ログイン')
             return

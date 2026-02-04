@@ -1,4 +1,4 @@
-■ API関連
+﻿■ API関連
 
 Q. APIが404になる
 A. すべてPOST。URLは日本語です。
@@ -10,7 +10,7 @@ Q. 401 Unauthorizedエラー
 A. JWTトークンが60分で期限切れ。再ログインしてください。
 
 Q. CORSエラー
-A. main1.py/main2.pyの許可リストを確認。
+A. core_main.py/apps_main.pyの許可リストを確認。
    localhost:8090, localhost:5173, localhost:3000 のみ許可。
 
 ■ 認証関連
@@ -50,5 +50,6 @@ A. 日本語タグは無効。<component :is="日本語名" /> を使用。
 Q. 文字化け
 A. すべてのファイルがUTF-8か確認。
 
-Q. WebSocket接続エラー（AコアAI）
+Q. WebSocket接続エラー（AIコア）
 A. 接続→設定送信の順序を確認。バックエンドログで初期化ステップ確認。
+

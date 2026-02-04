@@ -50,8 +50,8 @@
 | フォルダ | 内容 |
 |---------|------|
 | **[docs/00_AiDiyシステムの歩き方/](./docs/00_AiDiyシステムの歩き方/_index.html)** | システム全体の概要、FAQ |
-| **[docs/01_全体像/](./docs/01_全体像/_index.html)** | アーキテクチャ、技術スタック |
-| **[docs/02_バックエンドAPI追加例/](./docs/02_バックエンドAPI追加例/_index.html)** | バックエンドAPI追加手順 |
+| **[docs/01_明日のために！その１_バックエンド_M配車区分実装例/](./docs/01_明日のために！その１_バックエンド_M配車区分実装例/_index.html)** | バックエンドAPI実装例 |
+| **[docs/02_明日のために！その２_バックエンド_M配車区分テスト例/](./docs/02_明日のために！その２_バックエンド_M配車区分テスト例/_index.html)** | バックエンドテスト手順 |
 | **[docs/03_コーディングルール/](./docs/03_コーディングルール/_index.html)** | 命名規則、ベストプラクティス、レビューチェックリスト |
 | **[docs/04_フロントエンド画面追加例/](./docs/04_フロントエンド画面追加例/_index.html)** | フロントエンドCRUD画面追加手順 |
 
@@ -77,7 +77,7 @@
 3. **AI統合の実験場**
    - マルチベンダーAI対応（Anthropic Claude, OpenAI, Google Gemini）
    - WebSocketによるリアルタイムAI対話
-   - 音声・画像・テキスト統合インターフェース (AコアAI)
+   - 音声・画像・テキスト統合インターフェース (AIコア)
 
 ### 提供される機能
 
@@ -105,7 +105,7 @@
   - S配車_週表示、S配車_日表示 - スケジュール表示
 
 - **A系 (AI/Advanced)** - AI integration
-  - AコアAI - Multi-panel AI interface
+  - AIコア - Multi-panel AI interface
   - A会話履歴 - Conversation history storage
 
 - **X系 (Experimental)** - Test/example features
@@ -136,8 +136,8 @@
 ### 2. デュアルサーバーアーキテクチャ
 
 **2つの独立したFastAPIサーバー：**
-- **main1.py** (port 8091) - Core/Common features (C系, A系)
-- **main2.py** (port 8092) - Application features (M系, T系, V系, S系)
+- **core_main.py** (port 8091) - Core/Common features (C系, A系)
+- **apps_main.py** (port 8092) - Application features (M系, T系, V系, S系)
 - 同じSQLiteデータベースを共有
 - Vite Proxy で `/core/*` と `/apps/*` を自動振り分け
 
@@ -189,7 +189,7 @@
 - SQLAlchemyモデル更新 + データベースリセットで対応
 - シンプルで迅速な開発サイクル
 
-### 8. AI統合システム (AコアAI)
+### 8. AI統合システム (AIコア)
 
 **マルチベンダーAI対応：**
 - Anthropic Claude (claude-agent-sdk)
@@ -266,7 +266,7 @@ Full-stack business management system with JWT authentication, using FastAPI (Py
 - `T` = Transaction tables (T配車, T商品入庫, T商品出庫, T商品棚卸)
 - `V` = Database VIEWs (V利用者, V車両, V商品)
 - `S` = Scheduler/Special processing (S配車_週表示, S配車_日表示)
-- `A` = AI/Advanced features (AコアAI, A会話履歴)
+- `A` = AI/Advanced features (AIコア, A会話履歴)
 - `X` = Experimental/Test features
 
 ## Japanese Naming Convention
@@ -301,15 +301,15 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 - AI SDKs: anthropic, openai, google-genai, claude-agent-sdk
 
 **主要な設計パターン：**
-- デュアルサーバーアーキテクチャ (main1.py + main2.py)
+- デュアルサーバーアーキテクチャ (core_main.py + apps_main.py)
 - POST中心のAPI設計（統一レスポンス形式）
 - Database VIEWsを使わない（生SQLクエリ）
 - カスタムID生成システム (C採番)
 - 監査フィールドの標準化
 - Reboot機構（内部再起動システム）
 - 構成管理システム (conf/)
-- WebSocket統合 (ws_manager.py)
-- AI統合機能 (AコアAI/)
+- WebSocket統合 (AIコア/AIソケット管理.py)
+- AI統合機能 (AIコア/)
 
 **詳細は [backend_server/AGENTS.md](backend_server/AGENTS.md) を参照**
 
@@ -322,17 +322,17 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 - **まず知っておくこと（基本原則）** - 技術スタック、命名規約、API設計原則
 - **実装の全体像と特徴** - デュアルサーバーアーキテクチャ、11項目の主要な特徴
 - **バックエンド構成** - ファイル構成と役割
-  - Core Files: main1.py/main2.py の詳細説明
+  - Core Files: core_main.py/apps_main.py の詳細説明
   - 共通データベースモジュール (database.py)
-  - 共通スキーマ (schemas.py - 全テーブルのPydanticモデル)
+- 共通スキーマ (core_schema.py / apps_schema.py - 分割管理)
   - 共通認証モジュール (auth.py, deps.py)
   - 共通ログモジュール (log_config.py)
-  - 共通WebSocketモジュール (ws_manager.py)
+- 共通WebSocketモジュール (AIコア/AIソケット管理.py)
   - 構成管理システム (conf/ - ConfigManager singleton)
   - データ・設定ディレクトリ (_data/, _config/, temp/)
-  - Models (models1/, models2/ - SQLAlchemy ORM)
-  - CRUD Operations (crud1/, crud2/ - データベース操作関数、監査フィールドヘルパー、初期データ投入)
-  - API Routers (routers1/, routers2/ - FastAPI endpoints)
+  - Models (core_models/, apps_models/ - SQLAlchemy ORM)
+  - CRUD Operations (core_crud/, apps_crud/ - データベース操作関数、監査フィールドヘルパー、初期データ投入)
+  - API Routers (core_router/, apps_router/ - FastAPI endpoints)
 - **Key Architectural Patterns**
   - Database VIEWs (V系は生SQLクエリで実装)
   - Custom ID Generation System (C採番テーブルによる採番管理)
@@ -350,9 +350,9 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
   - レスポンス形式（共通）
   - エンドポイント一覧（認証系、コア系CRUD、AI系、アプリ系CRUD、V系、S系）
   - 一覧検索・ページング
-- **AコアAI Component System (A系)**
+- **AIコア Component System (A系)**
   - バックエンド実装（WebSocketエンドポイント、HTTP REST エンドポイント）
-  - AI Integration (streaming.py, audio_processing.py, recognition.py, chat.py, code.py)
+  - AI Integration (AIソケット管理.py, AIストリーミング処理.py, AI音声処理.py, AI音声認識.py, AIチャット*.py, AIライブ*.py, AIコード*.py, AI内部ツール.py)
   - AI Providers (Anthropic Claude, OpenAI, Google Gemini)
   - 設定管理（API keys、モデル設定）
   - 会話履歴（A会話履歴テーブル）
@@ -390,7 +390,7 @@ Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 - qTublerシステム（カスタムテーブルコンポーネント）
 - 共通ダイアログシステム (qAlert, qConfirm, qColorPicker)
 - レイアウトシステム (_Layout, _TopBar, _TopMenu)
-- WebSocket統合 (AコアAIWebSocket)
+- WebSocket統合 (AIコアWebSocket)
 
 **詳細は [frontend_server/AGENTS.md](frontend_server/AGENTS.md) を参照**
 
@@ -410,15 +410,15 @@ Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
   - Component Structure (components/ - 全コンポーネントの説明)
     - Layout Components (_Layout, _TopBar, _TopMenu)
     - Shared Components (_Modal, qAlertDialog, qConfirmDialog, qColorPickerDialog, qTubler, qTublerFrame, qAlert.ts)
-    - Feature Components (C管理/, Mマスタ/, Tトラン/, Sスケジューラー/, Vビュー/, AコアAI/, Xテスト/)
+    - Feature Components (C管理/, Mマスタ/, Tトラン/, Sスケジューラー/, Vビュー/, AIコア/, Xテスト/)
   - Styles (assets/ - グローバルCSS、メニューCSS、Scoped Styles)
 - **qTublerシステム（カスタムテーブルコンポーネント）**
   - コンポーネント構成 (qTubler.vue, qTublerFrame.vue)
   - Props, Emits, Column型定義
   - 使用例（コード付き）
   - qTublerの5つの特徴
-- **AコアAI Component System (A系)**
-  - Main container (AコアAI.vue - セッション管理、グリッドレイアウト)
+- **AIコア Component System (A系)**
+  - Main container (AIコア.vue - セッション管理、グリッドレイアウト)
   - Sub components (チャット、イメージ、エージェント)
   - Component communication pattern
   - Image capture flow
@@ -448,8 +448,8 @@ python _start.py
 ```
 This launcher:
 - Kills any processes on ports 8090/8091/8092
-- Starts FastAPI backend main1 (port 8091 - コア機能)
-- Starts FastAPI backend main2 (port 8092 - アプリ機能)
+- Starts FastAPI backend core_main (port 8091 - コア機能)
+- Starts FastAPI backend apps_main (port 8092 - アプリ機能)
 - Starts Vite dev server (port 8090)
 - Opens browser to http://localhost:8090
 - Monitors servers and auto-restarts crashed processes after 15 seconds
@@ -460,11 +460,11 @@ This launcher:
 ```bash
 # バックエンド Core のみ（プロジェクトルートから）
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn main1:app --reload --host 0.0.0.0 --port 8091
+.venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
 
 # バックエンド Apps のみ（プロジェクトルートから）
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn main2:app --reload --host 0.0.0.0 --port 8092
+.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
 # フロントエンドのみ（プロジェクトルートから）
 cd frontend_server
@@ -483,17 +483,17 @@ Press F5 in VS Code:
 
 **方法1: Reboot機構を使う（推奨）**
 ```bash
-# main1.py を再起動
+# core_main.py を再起動
 echo. > backend_server/temp/reboot1.txt
 
-# main2.py を再起動
+# apps_main.py を再起動
 echo. > backend_server/temp/reboot2.txt
 ```
 
 **方法2: 個別起動で --reload を有効化**
 ```bash
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn main1:app --reload --host 0.0.0.0 --port 8091
+.venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
 ```
 
 **方法3: _start.py を再起動**
@@ -555,8 +555,8 @@ backend_server/_data/AiDiy/database.db
 ## Access URLs & Port Configuration
 
 - フロントエンド: http://localhost:8090
-- バックエンドAPI（Core - main1）: http://localhost:8091
-- バックエンドAPI（Apps - main2）: http://localhost:8092
+- バックエンドAPI（Core - core_main）: http://localhost:8091
+- バックエンドAPI（Apps - apps_main）: http://localhost:8092
 - API Documentation (Core): http://localhost:8091/docs (FastAPI Swagger UI)
 - API Documentation (Apps): http://localhost:8092/docs (FastAPI Swagger UI)
 
@@ -568,17 +568,17 @@ backend_server/_data/AiDiy/database.db
 - Other: `other` / `other`
 
 **実装確認済みの補足（間違いやすい点）:**
-- **初期データ投入の条件**: `crud1.init_db_data()` は **admin が未存在のときだけ** C利用者を投入します。既存DBでは自動更新されません。
-- **DBファイル位置**: `backend_server/_data/AiDiy/database.db`（main1 / main2 で共有）。
+- **初期データ投入の条件**: `core_crud.init_db_data()` は **admin が未存在のときだけ** C利用者を投入します。既存DBでは自動更新されません。
+- **DBファイル位置**: `backend_server/_data/AiDiy/database.db`（core_main / apps_main で共有）。
 - **_start.py の起動挙動**: `uvicorn --reload` は付かないため、バックエンドは自動リロードされません（手動再起動 or reboot1/2.txt を利用）。
-- **ポート変更の連動修正**: `frontend_server/vite.config.ts` の `server.port` を変える場合、`backend_server/main1.py` と `main2.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要。
+- **ポート変更の連動修正**: `frontend_server/vite.config.ts` の `server.port` を変える場合、`backend_server/core_main.py` と `apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要。
 - **_setup.py の案内文**: 画面表示は `python start.py` ですが、実ファイルは **`_start.py`** です。
 
 **Vite Proxy Configuration** (`frontend_server/vite.config.ts`):
-- `/core/*` → `http://127.0.0.1:8091` (main1 - コア機能)
-- `/apps/*` → `http://127.0.0.1:8092` (main2 - アプリ機能)
+- `/core/*` → `http://127.0.0.1:8091` (core_main - コア機能)
+- `/apps/*` → `http://127.0.0.1:8092` (apps_main - アプリ機能)
 
-**CORS allowed origins** (`backend_server/main1.py` and `main2.py`):
+**CORS allowed origins** (`backend_server/core_main.py` and `apps_main.py`):
 - `http://localhost:8090` (production Vite server)
 - `http://localhost:5173` (default Vite dev server)
 - `http://localhost:3000` (alternative port)
@@ -600,16 +600,16 @@ lsof -ti:8091 | xargs kill -9
 | **Port conflicts** | `_start.py` fails with "address already in use" | `_start.py` auto-kills processes on 8090/8091/8092, but may fail if unresponsive. Manually kill with `taskkill /F /PID <pid>` on Windows |
 | **Japanese characters garbled** | 文字化け in console or UI | Ensure all files are UTF-8 encoded. `_start.py` は出力を cp932/UTF-8 でデコードしますが、**コンソール設定は変更しません** |
 | **401 Unauthorized** | API calls fail with 401, redirected to login | JWT token expired or invalid. Check `localStorage` for token, re-login if needed |
-| **CORS errors** | "blocked by CORS policy" in browser console | Verify origin in `main1.py` and `main2.py` allowed list: `localhost:8090`, `localhost:5173`, `localhost:3000` |
+| **CORS errors** | "blocked by CORS policy" in browser console | Verify origin in `core_main.py` and `apps_main.py` allowed list: `localhost:8090`, `localhost:5173`, `localhost:3000` |
 | **Module not found (Python)** | `ModuleNotFoundError` when starting backend | Run `cd backend_server && uv sync` to install dependencies |
 | **Module not found (npm)** | Vite build errors or missing packages | Run `cd frontend_server && npm install` |
 | **Database locked** | `sqlite3.OperationalError: database is locked` | Close any SQLite browser/tools accessing `database.db` |
-| **Tables not created** | API errors about missing tables | Restart backend servers (main1 and main2) - tables auto-create on startup |
+| **Tables not created** | API errors about missing tables | Restart backend servers (core_main and apps_main) - tables auto-create on startup |
 | **Auto-restart loop** | `_start.py` restarts servers repeatedly | Check for Python/Node errors in console. Servers restart 15 seconds after crash. Fix the underlying error to stop the loop |
 | **Initial data not updating** | admin password or initial records not changing | Initial data only inserts when DB is empty or specific records don't exist. To force re-initialization: stop servers → delete `backend_server/_data/AiDiy/database.db` → restart servers |
 | **Vue component shows as text** | Japanese component name appears as text in browser | Japanese tags are invalid in HTML. Use `<component :is="日本語コンポーネント名" />` instead of `<日本語コンポーネント名 />` |
 | **Database reset needed** | Need to recreate tables from scratch | Stop all servers → Delete `backend_server/_data/AiDiy/database.db` → Restart servers (tables and initial data auto-created) |
-| **WebSocket接続エラー (AコアAI)** | `LiveAI未初期化のため音声送信不可: ws-xxxx` | WebSocket接続と LiveAI 初期化のタイミング問題。フロントエンドで接続→設定送信の順序を確認。バックエンドログで初期化ステップを確認。詳細は [backend_server/AGENTS.md](./backend_server/AGENTS.md) の「AコアAI Component System」セクション参照 |
+| **WebSocket接続エラー (AIコア)** | `LiveAI未初期化のため音声送信不可: ws-xxxx` | WebSocket接続と LiveAI 初期化のタイミング問題。フロントエンドで接続→設定送信の順序を確認。バックエンドログで初期化ステップを確認。詳細は [backend_server/AGENTS.md](./backend_server/AGENTS.md) の「AIコア Component System」セクション参照 |
 | **コード変更が反映されない** | バックエンドのコードを変更しても動作が変わらない | `_start.py` で起動した場合は `--reload` なし。`temp/reboot1.txt` または `temp/reboot2.txt` を作成して再起動、または上記「バックエンドのコード変更を反映する方法」参照 |
 
 ## Testing
@@ -644,6 +644,6 @@ No automated test suites are configured. Testing is done manually:
 
 **Database VIEWs:**
 - VIEWs are not created as database objects in this implementation
-- VIEW endpoints (`routers1/V*.py`, `routers2/V*.py`) use raw SQL queries with JOINs
+- VIEW endpoints (`core_router/V*.py`, `apps_router/V*.py`) use raw SQL queries with JOINs
 - Each VIEW router directly executes SELECT statements to fetch joined data
 

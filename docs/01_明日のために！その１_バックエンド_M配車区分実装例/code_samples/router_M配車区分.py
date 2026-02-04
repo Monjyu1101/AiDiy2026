@@ -1,6 +1,6 @@
 ﻿from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-import schemas, crud, deps, models
+import apps_schema as schemas, crud, deps, models
 from routers.list_config import MAX_ITEMS
 
 router = APIRouter(prefix="/apps/M配車区分", tags=["M配車区分"])

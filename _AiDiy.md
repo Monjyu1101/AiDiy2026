@@ -1,4 +1,4 @@
-# AiDiy について
+﻿# AiDiy について
 
 ## 本書について
 
@@ -28,14 +28,14 @@
 
 - **AI統合の実験場**
   - マルチベンダーAI対応（Anthropic Claude, OpenAI, Google Gemini）
-  - リアルタイムAI対話インターフェース（AコアAI）
+  - リアルタイムAI対話インターフェース（AIコア）
 
 ---
 
 ## 実装メモ（概要）
 
 - 起動は `python _start.py`（backend 8091/8092 + frontend 8090 を同時起動）
-- SQLite DB は `backend_server/_data/AiDiy/database.db` に作成され、main1 / main2 で共有
+- SQLite DB は `backend_server/_data/AiDiy/database.db` に作成され、core_main / apps_main で共有
 - 初期ログインは `admin / ********`（初期データ投入は admin 未存在時のみ）
 
 ---
@@ -43,3 +43,4 @@
 ## 詳細な内容
 
 詳細はプロジェクトルートの **[AGENTS.md](./AGENTS.md)** を参照してください。
+

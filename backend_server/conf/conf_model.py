@@ -24,7 +24,7 @@ import requests
 from typing import Dict, Optional
 
 class conf_models:
-    """AコアAIモデル管理クラス"""
+    """AIコアモデル管理クラス"""
 
     def __init__(self, conf=None):
         self.conf = conf

@@ -20,7 +20,8 @@
 
 **📚 ドキュメントリソース（docs/フォルダ）：**
 プロジェクトの詳細なドキュメントは `docs/` フォルダにHTML形式で整備されています。
-- **[../docs/02_バックエンドAPI追加例/](../docs/02_バックエンドAPI追加例/_index.html)** - バックエンドAPI追加手順
+- **[../docs/01_明日のために！その１_バックエンド_M配車区分実装例/](../docs/01_明日のために！その１_バックエンド_M配車区分実装例/_index.html)** - バックエンドAPI実装例
+- **[../docs/02_明日のために！その２_バックエンド_M配車区分テスト例/](../docs/02_明日のために！その２_バックエンド_M配車区分テスト例/_index.html)** - バックエンドテスト手順
 - **[../docs/03_コーディングルール/](../docs/03_コーディングルール/_index.html)** - 命名規則、ベストプラクティス、レビューチェックリスト（**必読**）
 
 **フロントエンド（frontend_server/）の情報は別ドキュメント：**
@@ -32,7 +33,7 @@
 - Key Architectural Patterns（DB VIEWs、ID生成、API設計、監査フィールド、ログ、WebSocket、認証、Reboot機構）
 - Database & Data Management（DB設定、初期データ、ログイン情報）
 - API エンドポイント一覧とレスポンス形式
-- AコアAI backend実装
+- AIコア backend実装
 - Development Commands（backend固有）
 - 追加手順（新規テーブル、VIEW、機能）
 - Debugging方法
@@ -67,13 +68,13 @@
 ### デュアルサーバーアーキテクチャ
 このプロジェクトは **2つの独立したFastAPIサーバー** で構成されています：
 
-**main1.py (port 8091) - コア機能サーバー:**
+**core_main.py (port 8091) - コア機能サーバー:**
 - C系（Core/Common）: 権限、利用者、採番
-- A系（AI/Advanced）: AコアAI、会話履歴
+- A系（AI/Advanced）: AIコア、会話履歴
 - WebSocket機能: リアルタイムAI通信
 - `/core/*` エンドポイント
 
-**main2.py (port 8092) - アプリケーション機能サーバー:**
+**apps_main.py (port 8092) - アプリケーション機能サーバー:**
 - M系（Master）: 配車区分、車両、商品
 - T系（Transaction）: 配車、商品入庫/出庫/棚卸
 - V系（View）: 各マスタ・トランザクションの結合ビュー
@@ -82,7 +83,7 @@
 
 **共有リソース:**
 - **同じデータベース** (`_data/AiDiy/database.db`)
-- **共通モジュール**: `database.py`, `schemas.py`, `auth.py`, `deps.py`, `log_config.py`, `ws_manager.py`
+- **共通モジュール**: `database.py`, `core_schema.py`, `apps_schema.py`, `auth.py`, `deps.py`, `log_config.py`, `AIコア/AIソケット管理.py`
 
 ### 実装の主要な特徴
 
@@ -110,7 +111,7 @@
 
 **5. 監査フィールドの標準化:**
 - 全テーブルに自動付与: `登録日時`, `登録利用者ID`, `登録利用者名`, `登録端末ID`, `更新日時`, `更新利用者ID`, `更新利用者名`, `更新端末ID`
-- `crud1/utils.py` と `crud2/utils.py` の共通ヘルパー関数で統一生成
+- `core_crud/utils.py` と `apps_crud/utils.py` の共通ヘルパー関数で統一生成
 - `create_audit_fields(認証情報)` と `update_audit_fields(認証情報)` を使用
 
 **6. Reboot機構（内部再起動システム）:**
@@ -121,22 +122,22 @@
 
 **7. 構成管理システム (conf/):**
 - シングルトン `ConfigManager` (`conf/__main__.py`)
-- JSON設定ファイル (`_config/RiKi_AiDiy_key.json`) から読み込み
+- JSON設定ファイル (`_config/AiDiy_key.json`) から読み込み
 - AI APIキー、モデル設定などを一元管理
 - `app.conf` でアクセス可能
 
-**8. WebSocket統合 (ws_manager.py):**
+**8. WebSocket統合 (AIコア/AIソケット管理.py):**
 - `WebSocketManager` クラスで接続管理
 - セッション状態の永続化（リロード対応）
-- AコアAIの音声・画像・テキストストリーミング
+- AIコアの音声・画像・テキストストリーミング
 - プロセス間通信対応（PIDベースのソケットID生成）
 
-**9. AI統合機能 (AコアAI/):**
+**9. AI統合機能 (AIコア/):**
 - マルチベンダーAI対応: Anthropic Claude, OpenAI, Google Gemini
-- ストリーミング処理: `streaming.py`
-- 音声処理: `audio_processing.py`, `recognition.py`
-- チャット: `chat.py`
-- コード生成: `code.py`
+- ストリーミング処理: `AIストリーミング処理.py`
+- 音声処理: `AI音声処理.py`, `AI音声認識.py`
+- チャット: `AIチャット.py`
+- コード生成: `AIコード.py`
 
 **10. ログシステム (log_config.py):**
 - 統一ログフォーマット
@@ -146,7 +147,7 @@
 **11. パスワード管理の現状:**
 - **警告**: 現在パスワードは **平文保存**
 - bcrypt/passlibはインストール済みだが未使用
-- `crud1/C利用者.py` の `authenticate_C利用者` で平文比較
+- `core_crud/C利用者.py` の `authenticate_C利用者` で平文比較
 - **本番環境では必ずハッシュ化実装が必要**
 
 ### No Alembic Migrations（マイグレーションなし）
@@ -162,26 +163,26 @@
 ### Core Files（エントリーポイントと共通モジュール）
 
 **エントリーポイント（FastAPIサーバー）:**
-- **main1.py** (port 8091) - Core/Common features (C系, A系)
+- **core_main.py** (port 8091) - Core/Common features (C系, A系)
   - 管理するテーブル: `C採番`, `C権限`, `C利用者`, `A会話履歴`
-  - 登録するルーター: `auth`, `C権限`, `V権限`, `C利用者`, `V利用者`, `C採番`, `V採番`, `AコアAI`, `A会話履歴`
+  - 登録するルーター: `auth`, `C権限`, `V権限`, `C利用者`, `V利用者`, `C採番`, `V採番`, `AIコア`, `A会話履歴`
   - `@app.on_event("startup")`:
     - Reboot監視スレッド起動 (`temp/reboot1.txt`)
     - ログ設定初期化 (`setup_logging()`)
     - 設定管理初期化 (`app_conf.init()`)
-    - C系初期データ投入 (`crud1.init_db_data(db)`)
+    - C系初期データ投入 (`core_crud.init_db_data(db)`)
   - エンドポイント:
     - `GET /` - 疎通確認
     - `GET /core/サーバー状態` - サーバー状態取得（ready_count/busy_count）
 
-- **main2.py** (port 8092) - Application features (M系, T系, V系, S系)
+- **apps_main.py** (port 8092) - Application features (M系, T系, V系, S系)
   - 管理するテーブル: `M配車区分`, `M車両`, `M商品`, `T配車`, `T商品出庫`, `T商品棚卸`, `T商品入庫`
   - 登録するルーター: `M配車区分`, `V配車区分`, `M車両`, `V車両`, `M商品`, `V商品`, `T配車`, `V配車`, `T商品出庫`, `V商品出庫`, `T商品棚卸`, `V商品棚卸`, `T商品入庫`, `V商品入庫`, `V商品推移表`, `S配車_週表示`, `S配車_日表示`
   - `@app.on_event("startup")`:
     - Reboot監視スレッド起動 (`temp/reboot2.txt`)
     - ログ設定初期化 (`setup_logging()`)
     - 設定管理初期化 (`app_conf.init(conf_path_enabled=False, conf_models_enabled=False)`)
-    - M/T系初期データ投入 (`crud2.init_db_data(db)`)
+    - M/T系初期データ投入 (`apps_crud.init_db_data(db)`)
   - エンドポイント:
     - `GET /` - 疎通確認
 
@@ -193,7 +194,7 @@
   - `get_db()`: DBセッション取得用依存関係関数
 
 **共通スキーマ:**
-- **schemas.py** - Pydantic models（全テーブル分を1ファイルに集約）
+- **core_schema.py / apps_schema.py** - Pydantic models（core/apps分離）
   - 共通レスポンス: `ResponseBase`, `ErrorResponse`
   - 認証: `LoginRequest`, `Token`
   - 各テーブル: `<テーブル名>Base`, `<テーブル名>Create`, `<テーブル名>Update`, `<テーブル名>Delete`, `<テーブル名>Get`, `<テーブル名>Response`
@@ -220,7 +221,7 @@
   - ログ出力先: `backend_server/temp/logs/yyyyMMdd.AiDiy.log`（日付が変わると自動で新規ファイル）
 
 **共通WebSocketモジュール:**
-- **ws_manager.py** - WebSocket connection manager
+- **AIコア/AIソケット管理.py** - WebSocket connection manager
   - `WebSocketConnection`: 個別接続管理クラス
     - 接続状態、画面状態、ボタン状態、モデル設定を保持
     - ストリーミングプロセッサと音声処理を管理
@@ -229,11 +230,11 @@
     - `connect()`, `disconnect()`: 接続管理
     - `save_session_state()`: セッション永続化（リロード対応）
     - `get_connection()`, `send_to_socket()`, `broadcast()`: メッセージング
-  - グローバルインスタンス: `ws_manager`
+  - グローバルインスタンス: `AIソケット管理`
 
 **重要**: バックエンドは2つのFastAPIサーバーに分かれています：
-  - main1 (port 8091) - コア機能 (C系, A系) + WebSocket
-  - main2 (port 8092) - アプリ機能 (M系, T系, V系, S系)
+  - core_main (port 8091) - コア機能 (C系, A系) + WebSocket
+  - apps_main (port 8092) - アプリ機能 (M系, T系, V系, S系)
 
 ### Configuration System (conf/) - 設定管理システム
 
@@ -252,7 +253,7 @@
 
 - **conf_json.py** - JSON設定ファイル管理
   - `ConfigJsonManager` クラス
-  - `_config/RiKi_AiDiy_key.json` からAPI keys、モデル設定などを読み込み
+  - `_config/AiDiy_key.json` からAPI keys、モデル設定などを読み込み
   - 設定項目例: `CHAT_AI`, `CHAT_GEMINI_MODEL`, `LIVE_AI`, `CODE_AI1`, API keys
 
 - **conf_path.py** - パス解決ユーティリティ
@@ -265,7 +266,7 @@
 ```python
 from conf import conf as app_conf
 
-# main1.py/main2.py startup event
+# core_main.py/apps_main.py startup event
 app_conf.init()  # 設定初期化
 app.conf = app_conf  # FastAPIアプリに添付
 
@@ -278,9 +279,9 @@ def some_endpoint(request: Request):
     api_key = request.app.conf.json.get("OPENAI_API_KEY")
 ```
 
-**main2.pyでの特殊な初期化:**
+**apps_main.pyでの特殊な初期化:**
 ```python
-# main2.pyでは path/models 機能を無効化（コア機能はmain1で初期化済み）
+# apps_main.pyでは path/models 機能を無効化（コア機能はmain1で初期化済み）
 app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
 ```
 
@@ -293,7 +294,7 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
 
 **設定ディレクトリ (_config/):**
 - **_config/** - 設定ファイル（.gitignoreに追加推奨）
-  - `RiKi_AiDiy_key.json` - API keys、モデル設定などの機密情報
+  - `AiDiy_key.json` - API keys、モデル設定などの機密情報
   - ファイルが存在しない場合は `conf_json.py` で自動作成（デフォルト値）
   - 設定項目例:
     ```json
@@ -314,11 +315,11 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
   - `reboot2.txt` - main2サーバー再起動トリガー（作成されると自動再起動）
   - startup時に自動作成 (`os.makedirs(temp_dir, exist_ok=True)`)
 
-### Models (models1/ and models2/) - SQLAlchemy ORMモデル
+### Models (core_models/ and apps_models/) - SQLAlchemy ORMモデル
 
 カテゴリ別に分離されたSQLAlchemy ORM models。日本語テーブル名・カラム名を使用。
 
-**models1/** - Core/Common tables (C系, A系):
+**core_models/** - Core/Common tables (C系, A系):
 - **__init__.py** - モデルのエクスポート
   - `from .C採番 import C採番`
   - `from .C権限 import C権限`
@@ -346,7 +347,7 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
   - 主キー: `ソケットID` + `シーケンス` (複合)
   - カラム: `チャンネル`, `メッセージ識別`, `メッセージ内容`, `ファイル名`, `サムネイル画像`, + 監査フィールド
 
-**models2/** - Application tables (M系, T系):
+**apps_models/** - Application tables (M系, T系):
 - **__init__.py** - モデルのエクスポート
   - `from .M配車区分 import M配車区分`
   - `from .M車両 import M車両`
@@ -371,11 +372,11 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
 - `__tablename__` は日本語（例: `"C権限"`, `"M商品"`, `"T配車"`）
 - カラム名も日本語（例: `利用者ID`, `配車日付`, `商品名`）
 
-### CRUD Operations (crud1/ and crud2/) - データベース操作関数
+### CRUD Operations (core_crud/ and apps_crud/) - データベース操作関数
 
 カテゴリ別に分離されたCRUD操作関数。監査フィールドの自動付与を提供。
 
-**crud1/** - Core/Common operations (C系, A系):
+**core_crud/** - Core/Common operations (C系, A系):
 - **__init__.py** - CRUD modules と utilities をエクスポート
   - `from .C権限 import *`
   - `from .C利用者 import *`
@@ -392,7 +393,7 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
   - 認証情報: `{"利用者ID": "admin", "利用者名": "Administrator"}`
   - 認証情報がNoneの場合: `"system"` を使用
 
-- **init.py** - 初期データ投入（main1.py startup時に呼出）
+- **init.py** - 初期データ投入（core_main.py startup時に呼出）
   - `init_db_data(db: Session)` - C系、A系の初期データを投入
   - C権限: 5件（1=システム管理者, 2=管理者, 3=利用者, 4=閲覧者, 9=その他）
   - C利用者: 5件（admin/leader/user/guest/other + パスワード）
@@ -420,18 +421,18 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
   - `update_A会話履歴(db, ソケットID, シーケンス, 会話: schemas.A会話履歴Update, 認証情報)` - 更新
   - `delete_A会話履歴(db, ソケットID, シーケンス)` - 削除
 
-- **Note**: C採番のCRUD操作は `routers1/C採番.py` で直接models1にアクセス（crud1/に独立ファイルなし）
+- **Note**: C採番のCRUD操作は `core_router/C採番.py` で直接models1にアクセス（core_crud/に独立ファイルなし）
 
-**crud2/** - Application operations (M系, T系):
+**apps_crud/** - Application operations (M系, T系):
 - **__init__.py** - CRUD modules と utilities をエクスポート
   - M系、T系の各CRUD module をエクスポート
   - `from .init import init_db_data`
   - `from .utils import create_audit_fields, update_audit_fields, get_current_datetime`
 
-- **utils.py** - crud1/utils.py と同一内容（監査フィールドヘルパー）
+- **utils.py** - core_crud/utils.py と同一内容（監査フィールドヘルパー）
   - NOTE: crud1とcrud2で同じutils.pyを保持（通常は変更しない）
 
-- **init.py** - 初期データ投入（main2.py startup時に呼出）
+- **init.py** - 初期データ投入（apps_main.py startup時に呼出）
   - `init_db_data(db: Session)` - M系、T系の初期データを投入
   - M配車区分: 8件（1〜8: 通常/定期/予備/緊急/特別/巡回/回送/予備）
   - M車両: 8件（1001〜1007 + 1099: １号車〜７号車 + 未定）
@@ -449,17 +450,17 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
 
 **重要**: このプロジェクトでは Database VIEWs は作成しません。V系エンドポイントは全て生SQLクエリで実装されています。
 
-### API Routers (routers1/ and routers2/) - APIエンドポイント
+### API Routers (core_router/ and apps_router/) - APIエンドポイント
 
 カテゴリ別に分離されたFastAPI routers。日本語エンドポイント、POST中心設計。
 
-**routers1/** - Core/Common endpoints (main1.pyで使用):
+**core_router/** - Core/Common endpoints (core_main.pyで使用):
 
 - **auth.py** - 認証関連エンドポイント
   - `POST /core/auth/ログイン` - ログイン（認証不要）
     - Request: `schemas.LoginRequest` (`利用者ID`, `パスワード`)
     - Response: `{"access_token": "...", "token_type": "bearer"}`
-    - 内部: `crud1.authenticate_C利用者()` で平文パスワード比較
+    - 内部: `core_crud.authenticate_C利用者()` で平文パスワード比較
   - `POST /core/auth/token` - OAuth2トークン取得（FastAPI docsUI用、認証不要）
   - `POST /core/auth/ログアウト` - ログアウト（認証必要）
     - JWTはステートレスなのでサーバー側では無効化なし（クライアントでトークン破棄）
@@ -480,8 +481,8 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
     - `POST /core/V<名前>/一覧` - 一覧取得（生SQLクエリ、LEFT JOIN使用）
   - 例: `V利用者` は `C利用者` と `C権限` をJOIN
 
-- **AコアAI.py** - AコアAI WebSocketエンドポイント
-  - `WebSocket /core/ws/AコアAI` - WebSocket接続
+- **AIコア.py** - AIコア WebSocketエンドポイント
+  - `WebSocket /core/ws/AIコア` - WebSocket接続
   - セッション管理、画面状態/ボタン状態の永続化
   - ストリーミングプロセッサとの統合
 
@@ -492,7 +493,7 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
   - `POST /core/A会話履歴/変更` - 更新
   - `POST /core/A会話履歴/削除` - 削除
 
-**routers2/** - Application endpoints (main2.pyで使用):
+**apps_router/** - Application endpoints (apps_main.pyで使用):
 
 - **M配車区分.py**, **M車両.py**, **M商品.py** - M系テーブルCRUDエンドポイント
   - 各テーブルで以下のエンドポイントを提供:
@@ -533,7 +534,7 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
 V系エンドポイントは全て生SQLクエリ（SELECT + JOIN）で実装されています:
 
 **How V系 endpoints work:**
-1. VIEW routers (`routers1/V*.py`, `routers2/V*.py`) contain raw SQL SELECT statements
+1. VIEW routers (`core_router/V*.py`, `apps_router/V*.py`) contain raw SQL SELECT statements
 2. SQL queries use LEFT JOINs to combine tables (e.g., V利用者 joins C利用者 + C権限)
 3. Each V系 router has `/一覧` endpoint that executes SQL directly
 4. No database VIEW objects are created
@@ -545,9 +546,9 @@ V系エンドポイントは全て生SQLクエリ（SELECT + JOIN）で実装さ
 - `POST /apps/V商品推移表/一覧` - Product transaction history aggregations
 
 **To add a new V系 endpoint:**
-1. Create router in `routers1/V[名前].py` or `routers2/V[名前].py` with raw SQL query
+1. Create router in `core_router/V[名前].py` or `apps_router/V[名前].py` with raw SQL query
 2. Implement `/一覧` endpoint with `db.execute(text(sql))` 
-3. Register router in `main1.py` or `main2.py`
+3. Register router in `core_main.py` or `apps_main.py`
 4. Restart server
 
 ### Custom ID Generation System (C採番 Table)
@@ -561,14 +562,14 @@ The system uses a **centralized sequential ID generator** instead of database AU
 4. Transaction-based increments ensure no ID conflicts
 
 **Implementation:**
-- **Allocation API**: `POST /core/C採番/採番` (defined in `routers1/C採番.py`)
+- **Allocation API**: `POST /core/C採番/採番` (defined in `core_router/C採番.py`)
 - **Request**: `{"採番区分": "C利用者", "採番数": 1}`
 - **Response**: Returns next available ID(s) and increments counter atomically
-- **Initial setup**: IDs are seeded in `crud1/init.py` during first startup
+- **Initial setup**: IDs are seeded in `core_crud/init.py` during first startup
 
 **When to use:**
 - Use for tables that need predictable, sequential IDs (C系, M系 tables)
-- Add new entries in `crud1/init.py` when creating new tables that use this system
+- Add new entries in `core_crud/init.py` when creating new tables that use this system
 - Can be bypassed for simple tables that don't need custom ID management
 
 ### API Design Pattern
@@ -600,7 +601,7 @@ All database tables include standard audit fields:
   - `更新利用者名` - User name who last updated
   - `更新端末ID` - Terminal/device ID
 
-**Helper functions in `crud1/utils.py` and `crud2/utils.py`:**
+**Helper functions in `core_crud/utils.py` and `apps_crud/utils.py`:**
 Always use these helpers to populate audit fields automatically.
 
 ### Logging System
@@ -622,7 +623,7 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
 
 ### WebSocket Support（WebSocket統合）
 
-`ws_manager.py` でWebSocket接続を一元管理。AコアAIのリアルタイム通信を提供。
+`AIコア/AIソケット管理.py` でWebSocket接続を一元管理。AIコアのリアルタイム通信を提供。
 
 **WebSocketConnection クラス:**
 - 個別のWebSocket接続を管理
@@ -644,7 +645,7 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
   - `update_model_settings(設定, manager)`: モデル設定更新とセッション保存
 
 **WebSocketManager クラス:**
-- グローバルな接続マネージャー（シングルトン `ws_manager` インスタンス）
+- グローバルな接続マネージャー（シングルトン `AIソケット管理` インスタンス）
 - プロパティ:
   - `active_connections`: アクティブ接続の辞書 (`socket_id` → `WebSocketConnection`)
   - `session_states`: セッション状態の辞書（リロード後も状態復元）
@@ -662,25 +663,25 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
 
 **使用例:**
 ```python
-# routers1/AコアAI.py
-from ws_manager import ws_manager
+# core_router/AIコア.py
+from AIコア.AIソケット管理 import AIソケット管理
 
-@router.websocket("/ws/AコアAI")
+@router.websocket("/core/ws/AIコア")
 async def websocket_endpoint(websocket: WebSocket, ...):
-    socket_id = await ws_manager.connect(websocket, socket_id, request.app.conf)
+    socket_id = await AIソケット管理.connect(websocket, socket_id, request.app.conf)
     try:
         while True:
             message = await connection.receive_json()
-            await ws_manager.handle_message(socket_id, message)
+            await AIソケット管理.handle_message(socket_id, message)
     finally:
-        await ws_manager.disconnect(socket_id, keep_session=True)
+        await AIソケット管理.disconnect(socket_id, keep_session=True)
 ```
 
-**Note**: WebSocket routesは `routers1/AコアAI.py` で実装され、main1.pyに登録済み。
+**Note**: WebSocket routesは `core_router/AIコア.py` で実装され、core_main.pyに登録済み。
 
 ### Reboot機構（内部再起動システム）
 
-main1.pyとmain2.pyに組み込まれた自動再起動機構。
+core_main.pyとapps_main.pyに組み込まれた自動再起動機構。
 
 **仕組み:**
 1. startup時に `temp/` ディレクトリを作成
@@ -708,8 +709,8 @@ with open("backend_server/temp/reboot2.txt", "w") as f:
 - 設定変更や動的なコード再読み込みに使用可能
 
 **実装詳細:**
-- main1.py:74-98 でreboot1.txt監視スレッド起動
-- main2.py:93-117 でreboot2.txt監視スレッド起動
+- core_main.py:74-98 でreboot1.txt監視スレッド起動
+- apps_main.py:93-117 でreboot2.txt監視スレッド起動
 - デーモンスレッドとして起動（メインプロセス終了時に自動終了）
 
 ### Authentication & Security
@@ -722,7 +723,7 @@ with open("backend_server/temp/reboot2.txt", "w") as f:
 
 **CRITICAL - Passwords are stored in plaintext:**
 - Despite bcrypt/passlib being installed, authentication uses plaintext comparison
-- See `crud1/C利用者.py` for current implementation
+- See `core_crud/C利用者.py` for current implementation
 - **Implement password hashing before production use**
 
 **CORS Configuration:**
@@ -734,24 +735,24 @@ Allowed origins (in `main.py`):
 ## Database & Data Management
 
 ### Database Configuration
-- **Location**: `backend_server/_data/AiDiy/database.db` (shared by main1 and main2)
-- **Schema creation**: Auto-created on startup via `models1.Base.metadata.create_all()` in `main1.py` and `models2.Base.metadata.create_all()` in `main2.py`
+- **Location**: `backend_server/_data/AiDiy/database.db` (shared by core_main and apps_main)
+- **Schema creation**: Auto-created on startup via `core_models.Base.metadata.create_all()` in `core_main.py` and `apps_models.Base.metadata.create_all()` in `apps_main.py`
 - **Initial data seeding**: 
-  - Core data: `crud1.init.init_db_data()` in `main1.py` startup event
-  - App data: `crud2.init.init_db_data()` in `main2.py` startup event
+  - Core data: `core_crud.init.init_db_data()` in `core_main.py` startup event
+  - App data: `apps_crud.init.init_db_data()` in `apps_main.py` startup event
 - **Database VIEWs**: **Not used**. V系 endpoints use raw SQL queries instead
-- **Reset database**: Delete `database.db` and restart both FastAPI servers (main1 and main2)
+- **Reset database**: Delete `database.db` and restart both FastAPI servers (core_main and apps_main)
 
 **Important**: This project does NOT use Alembic migrations. Schema changes are managed through SQLAlchemy model updates and database resets.
 
 ### Initial Data (Startup Seeding)
 
-**Core data (seeded by main1):**
+**Core data (seeded by core_main):**
 - **C権限**: 5件（1/2/3/4/9: システム管理者/管理者/利用者/閲覧者/その他）
 - **C利用者**: 5件（admin/leader/user/guest/other、パスワードは平文）
 - **C採番**: 4件（T配車/T商品棚卸/T商品入庫/T商品出庫）
 
-**Application data (seeded by main2):**
+**Application data (seeded by apps_main):**
 - **M配車区分**: 8件（1-8: 通常/定期/予備/緊急/特別/巡回/回送/予備）
 - **M車両**: 8件（1001-1007, 1099: １号車〜７号車、未定）
 - **M商品**: 5件（H001-H004, H099: 牛飼料/豚飼料/鶏飼料/魚飼料/その他）
@@ -768,9 +769,9 @@ Allowed origins (in `main.py`):
 - Other: `other` / `other`
 
 **実装確認済みの補足（間違いやすい点）:**
-- **初期投入の条件**: `crud1.init_db_data()` は **admin が未存在のときだけ** C利用者を投入します。既にDBに admin がいる場合、パスワード変更は自動反映されません。
-- **DBファイル**: `backend_server/_data/AiDiy/database.db` を main1 / main2 が共有します。
-- **CORS許可リスト**: `main1.py` / `main2.py` は `http://localhost:5173`, `http://localhost:3000`, `http://localhost:8090` のみ許可。ポート変更時は両方更新が必要です。
+- **初期投入の条件**: `core_crud.init_db_data()` は **admin が未存在のときだけ** C利用者を投入します。既にDBに admin がいる場合、パスワード変更は自動反映されません。
+- **DBファイル**: `backend_server/_data/AiDiy/database.db` を core_main / apps_main が共有します。
+- **CORS許可リスト**: `core_main.py` / `apps_main.py` は `http://localhost:5173`, `http://localhost:3000`, `http://localhost:8090` のみ許可。ポート変更時は両方更新が必要です。
 - **ホットリロード**: `_start.py` 経由の起動は `uvicorn --reload` が付かないため自動リロードされません（再起動 or `temp/reboot1.txt` / `temp/reboot2.txt` を利用）。
 
 ## API エンドポイント
@@ -802,23 +803,25 @@ Allowed origins (in `main.py`):
 
 ### エンドポイント一覧（現行）
 
-**認証系 (main1 - port 8091):**
+**認証系 (core_main - port 8091):**
 - `POST /core/auth/ログイン`
 - `POST /core/auth/ログアウト`
 - `POST /core/auth/現在利用者`
 - `POST /core/auth/token`（docs 向け）
 
-**コア系 CRUD (main1 - port 8091):**
+**コア系 CRUD (core_main - port 8091):**
 - `POST /core/C利用者/一覧|get|create|update|delete`
 - `POST /core/C権限/一覧|get|create|update|delete`
 - `POST /core/C採番/一覧|get|create|update|delete|allocate`
 
-**AI系 (main1 - port 8091):**
-- `POST /core/AコアAI/初期化`
-- `POST /core/AコアAI/画面変更`
+**AI系 (core_main - port 8091):**
+- `POST /core/AIコア/初期化`
+- `POST /core/AIコア/セッション一覧`
+- `POST /core/AIコア/モデル情報/取得`
+- `POST /core/AIコア/モデル情報/設定`
 - `POST /core/A会話履歴/一覧|get|create|update|delete`
 
-**アプリ系 CRUD (main2 - port 8092):**
+**アプリ系 CRUD (apps_main - port 8092):**
 - `POST /apps/M配車区分/一覧|get|create|update|delete`
 - `POST /apps/M車両/一覧|get|create|update|delete`
 - `POST /apps/M商品/一覧|get|create|update|delete`
@@ -828,11 +831,11 @@ Allowed origins (in `main.py`):
 - `POST /apps/T商品棚卸/一覧|get|create|update|delete`
 
 **V系（一覧専用）:**
-- **Core VIEWs (main1 - port 8091):**
+- **Core VIEWs (core_main - port 8091):**
   - `POST /core/V利用者/一覧`
   - `POST /core/V権限/一覧`
   - `POST /core/V採番/一覧`
-- **Apps VIEWs (main2 - port 8092):**
+- **Apps VIEWs (apps_main - port 8092):**
   - `POST /apps/V配車区分/一覧`
   - `POST /apps/V車両/一覧`
   - `POST /apps/V商品/一覧`
@@ -842,64 +845,71 @@ Allowed origins (in `main.py`):
   - `POST /apps/V商品棚卸/一覧`
   - `POST /apps/V商品推移表/一覧`
 
-**S系（スケジューラー）(main2 - port 8092):**
+**S系（スケジューラー）(apps_main - port 8092):**
 - `POST /apps/S配車_週表示/一覧`
 - `POST /apps/S配車_日表示/一覧`
 
 **例外の GET:**
-- `GET /` (main1 & main2)（疎通確認）
-- `GET /core/サーバー状態` (main1)（ready/busy の固定レスポンス）
+- `GET /` (core_main & apps_main)（疎通確認）
+- `GET /core/サーバー状態` (core_main)（ready/busy の固定レスポンス）
 
 ### 一覧検索・ページング
 - 一覧 API は基本パラメータなし、`MAX_ITEMS` 上限で取得。
 - `T配車` と `V配車` のみ `開始日付`/`終了日付` の絞り込みあり。
 
-## AコアAI Component System (A系) - AI統合システム
+## AIコア Component System (A系) - AI統合システム
 
-AコアAIは、複数のAIサービスを統合したマルチパネルAIインターフェースのバックエンド実装です。
+AIコアは、複数のAIサービスを統合したマルチパネルAIインターフェースのバックエンド実装です。
 
 ### バックエンド実装
 
-**WebSocketエンドポイント** (`routers1/AコアAI.py`):
-- **`WebSocket /core/ws/AコアAI`** - メインWebSocket接続
+**WebSocketエンドポイント** (`core_router/AIコア.py`):
+- **`WebSocket /core/ws/AIコア`** - メインWebSocket接続
   - クエリパラメータ: `ソケットID` (リロード時に指定)
   - 接続時:
-    1. `ws_manager.connect()` で接続登録
+    1. `AIソケット管理.connect()` で接続登録
     2. セッション状態を復元または新規作成
     3. 初期化メッセージ送信（画面状態、ボタン状態）
     4. ストリーミングプロセッサ起動
   - メッセージ受信:
-    - クライアントからのメッセージを `ws_manager.handle_message()` へ転送
+    - クライアントからのメッセージを `AIソケット管理.handle_message()` へ転送
     - ストリーミングプロセッサが処理
   - 切断時:
     - セッション状態を保存（keep_session=True）
     - プロセッサ停止、接続クローズ
 
 **HTTP REST エンドポイント** (廃止済み - 互換性のため残存):
-- `POST /core/AコアAI/初期化` - セッション初期化（現在はWebSocketで代替）
-- `POST /core/AコアAI/画面変更` - 画面状態保存（現在はWebSocketで代替）
+- `POST /core/AIコア/初期化` - セッション初期化（現在はWebSocketで代替）
+- `POST /core/AIコア/セッション一覧` - デバッグ用セッション一覧取得
+- `POST /core/AIコア/モデル情報/取得` - モデル設定情報の取得
+- `POST /core/AIコア/モデル情報/設定` - モデル設定の更新
 
-### AI Integration（AI統合モジュール - AコアAI/）
+### AI Integration（AI統合モジュール - AIコア/）
 
 **モジュール構成:**
-- **__init__.py** - AコアAI modules エクスポート
-- **streaming.py** - `StreamingProcessor` クラス
+- **__init__.py** - AIコア modules エクスポート
+- **AIソケット管理.py** - WebSocket接続管理
+- **AIストリーミング処理.py** - `StreamingProcessor` クラス
   - 音声・画像・テキストのストリーミング処理
   - メッセージキュー管理
   - AI API呼び出し統合
-- **audio_processing.py** - 音声データ処理
+- **AI音声処理.py** - 音声データ処理
   - `初期化_音声データ()` - 音声バッファ初期化
   - 音声データの分割・バッファリング
-- **recognition.py** - 音声認識処理
+- **AI音声認識.py** - 音声認識処理
   - SpeechRecognition ライブラリ統合
   - マイク入力からテキスト変換
-- **chat.py** - チャットAI処理
-  - テキストベースのAI対話
-  - 会話履歴管理
-- **code.py** - コードAI処理
-  - Claude Agent SDK統合
-  - コード生成・実行
-- **backup.py** - バックアップ処理
+- **AIチャット.py** - チャットAI処理（共通インターフェース）
+- **AIチャット_gemini.py** - Google Gemini チャット実装
+- **AIチャット_openrt.py** - OpenAI Realtime チャット実装
+- **AIライブ.py** - ライブAI処理（共通インターフェース）
+- **AIライブ_gemini.py** - Google Gemini Live 実装
+- **AIライブ_openai.py** - OpenAI Realtime 実装
+- **AIコード.py** - コードAI処理（共通インターフェース）
+- **AIコード_claude.py** - Claude Agent SDK 実装
+- **AIコード_etc.py** - その他コードAI実装
+- **AI内部ツール.py** - 内部ツール処理
+- **AIバックアップ.py** - バックアップ処理
 
 ### AI Providers（AI統合）
 
@@ -923,11 +933,11 @@ AコアAIは、複数のAIサービスを統合したマルチパネルAIイン�
   - 音声機能: Native Audio Preview対応
 
 **設定管理:**
-- API keys: `_config/RiKi_AiDiy_key.json`
+- API keys: `_config/AiDiy_key.json`
   - `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY`
   - `GEMINI_API_KEY`
-- モデル設定: WebSocketセッション毎にapp.confからコピー（ws_manager.py:186-219）
+- モデル設定: WebSocketセッション毎にapp.confからコピー（AIコア/AIソケット管理.py）
 
 **会話履歴:**
 - **A会話履歴** テーブルでセッション永続化
@@ -956,24 +966,24 @@ uv add <package> # Add new dependency
 
 **Running backend only:**
 ```bash
-# Core server (main1)
+# Core server (core_main)
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn main1:app --reload --host 0.0.0.0 --port 8091
+.venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
 
-# Apps server (main2) - in separate terminal
+# Apps server (apps_main) - in separate terminal
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn main2:app --reload --host 0.0.0.0 --port 8092
+.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 ```
 
 **VS Code Debugging:**
 - `backend_server/.vscode/launch.json`: バックエンドのみ（debugpy）
 
 ## M配車区分の実装（現行）
-- モデル: `models2/M配車区分.py`
-- CRUD: `crud2/M配車区分.py`
-- API: `routers2/M配車区分.py`
-- 一覧ビュー: `routers2/V配車区分.py`（生 SQL で取得）
-- スキーマ: `schemas.py` の `M配車区分Base/登録/変更/削除/取得`
+- モデル: `apps_models/M配車区分.py`
+- CRUD: `apps_crud/M配車区分.py`
+- API: `apps_router/M配車区分.py`
+- 一覧ビュー: `apps_router/V配車区分.py`（生 SQL で取得）
+- スキーマ: `apps_schema.py` の `M配車区分Base/登録/変更/削除/取得`
 
 使うエンドポイント:
 - `POST /apps/M配車区分/一覧|get|create|update|delete`
@@ -985,40 +995,40 @@ cd backend_server
 ## 追加・変更の手順
 
 ### 新しいテーブルを追加する（C系 or A系の場合）
-1. `models1/` にモデル追加（`__tablename__` は日本語、監査カラム統一）。
-2. `models1/__init__.py` に追加して `create_all()` 対象に含める。
-3. `schemas.py` に `Base/登録/変更/削除/取得` を追加。
-4. `crud1/` に取得/一覧/作成などの関数を追加し `crud1/__init__.py` に公開。
-5. `routers1/` に CRUD ルーターを追加。
-6. `main1.py` に `include_router` を追加。
-7. 初期データが必要なら `crud1/init.py` に追加。
+1. `core_models/` にモデル追加（`__tablename__` は日本語、監査カラム統一）。
+2. `core_models/__init__.py` に追加して `create_all()` 対象に含める。
+3. `core_schema.py` または `apps_schema.py` に `Base/登録/変更/削除/取得` を追加。
+4. `core_crud/` に取得/一覧/作成などの関数を追加し `core_crud/__init__.py` に公開。
+5. `core_router/` に CRUD ルーターを追加。
+6. `core_main.py` に `include_router` を追加。
+7. 初期データが必要なら `core_crud/init.py` に追加。
 8. 採番が必要なら `C採番` の初期データも追加。
 
 ### 新しいテーブルを追加する（M系, T系, S系の場合）
-1. `models2/` にモデル追加（`__tablename__` は日本語、監査カラム統一）。
-2. `models2/__init__.py` に追加して `create_all()` 対象に含める。
-3. `schemas.py` に `Base/登録/変更/削除/取得` を追加。
-4. `crud2/` に取得/一覧/作成などの関数を追加し `crud2/__init__.py` に公開。
-5. `routers2/` に CRUD ルーターを追加。
-6. `main2.py` に `include_router` を追加。
-7. 初期データが必要なら `crud2/init.py` に追加。
+1. `apps_models/` にモデル追加（`__tablename__` は日本語、監査カラム統一）。
+2. `apps_models/__init__.py` に追加して `create_all()` 対象に含める。
+3. `core_schema.py` または `apps_schema.py` に `Base/登録/変更/削除/取得` を追加。
+4. `apps_crud/` に取得/一覧/作成などの関数を追加し `apps_crud/__init__.py` に公開。
+5. `apps_router/` に CRUD ルーターを追加。
+6. `apps_main.py` に `include_router` を追加。
+7. 初期データが必要なら `apps_crud/init.py` に追加。
 
 ### 新しい V 系（一覧）を追加する
-1. `routers1/V*.py` (C系) or `routers2/V*.py` (M系/T系) を作成し、生 SQL で `SELECT` / `LEFT JOIN` を組み立てる。
+1. `core_router/V*.py` (C系) or `apps_router/V*.py` (M系/T系) を作成し、生 SQL で `SELECT` / `LEFT JOIN` を組み立てる。
 2. `count(*)` は同じ FROM/JOIN 条件で取得する。
-3. `main1.py` or `main2.py` に `include_router` を追加。
+3. `core_main.py` or `apps_main.py` に `include_router` を追加。
 
 ### 新しい機能（API）を追加する
-1. `schemas.py` に request/response モデル追加。
-2. `crud1/` or `crud2/` に処理を追加（必要ならトランザクション）。
-3. `routers1/` or `routers2/` にエンドポイント追加（POST 前提）。
-4. `main1.py` or `main2.py` に `include_router` を追加。
+1. `core_schema.py` または `apps_schema.py` に request/response モデル追加。
+2. `core_crud/` or `apps_crud/` に処理を追加（必要ならトランザクション）。
+3. `core_router/` or `apps_router/` にエンドポイント追加（POST 前提）。
+4. `core_main.py` or `apps_main.py` に `include_router` を追加。
 
 ## Debugging
 
 **API Testing:**
-- FastAPI Swagger UI (Core): http://localhost:8091/docs (interactive API documentation for main1)
-- FastAPI Swagger UI (Apps): http://localhost:8092/docs (interactive API documentation for main2)
+- FastAPI Swagger UI (Core): http://localhost:8091/docs (interactive API documentation for core_main)
+- FastAPI Swagger UI (Apps): http://localhost:8092/docs (interactive API documentation for apps_main)
 - All endpoints accept JSON POST requests
 - Test authentication by clicking "Authorize" button in Swagger UI
 
@@ -1038,14 +1048,14 @@ cd backend_server
 ### 必須の注意事項
 
 **1. デュアルサーバー起動:**
-- **必ず両方のサーバー (main1 + main2) を起動する必要があります**
+- **必ず両方のサーバー (core_main + apps_main) を起動する必要があります**
 - `_start.py` を使えば自動で両方起動
-- 個別起動の場合: 2つのターミナルで main1.py と main2.py を起動
+- 個別起動の場合: 2つのターミナルで core_main.py と apps_main.py を起動
 
 **2. パスワードセキュリティ:**
 - **現在パスワードは平文保存** - 本番環境では必ずハッシュ化実装が必要
 - bcrypt/passlibはインストール済みだが未使用
-- `crud1/C利用者.py` の `authenticate_C利用者` で平文比較
+- `core_crud/C利用者.py` の `authenticate_C利用者` で平文比較
 - 実装例:
   ```python
   from passlib.context import CryptContext
@@ -1073,7 +1083,7 @@ cd backend_server
 
 **1. 監査フィールドの使用:**
 ```python
-from crud1.utils import create_audit_fields, update_audit_fields
+from core_crud.utils import create_audit_fields, update_audit_fields
 
 # 作成時
 認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
@@ -1112,7 +1122,7 @@ logger.debug("デバッグメッセージ")
 **4. JWT認証の使用:**
 ```python
 from deps import get_現在利用者
-from models1 import C利用者
+from core_models import C利用者
 
 @router.post("/protected/endpoint")
 def protected_endpoint(現在利用者: C利用者 = Depends(get_現在利用者)):
@@ -1122,23 +1132,23 @@ def protected_endpoint(現在利用者: C利用者 = Depends(get_現在利用者
 
 **5. WebSocket使用:**
 ```python
-from ws_manager import ws_manager
+from AIソケット管理 import AIソケット管理
 
 @router.websocket("/ws/custom")
 async def custom_websocket(websocket: WebSocket, request: Request):
-    socket_id = await ws_manager.connect(websocket, None, request.app.conf)
+    socket_id = await AIソケット管理.connect(websocket, None, request.app.conf)
     try:
         while True:
-            data = await ws_manager.get_connection(socket_id).receive_json()
-            await ws_manager.send_to_socket(socket_id, {"response": "..."})
+            data = await AIソケット管理.get_connection(socket_id).receive_json()
+            await AIソケット管理.send_to_socket(socket_id, {"response": "..."})
     finally:
-        await ws_manager.disconnect(socket_id)
+        await AIソケット管理.disconnect(socket_id)
 ```
 
 ### よくある落とし穴
 
 **1. C採番の使い忘れ:**
-- 新規テーブル追加時は `crud1/init.py` または `crud2/init.py` にC採番の初期値を追加
+- 新規テーブル追加時は `core_crud/init.py` または `apps_crud/init.py` にC採番の初期値を追加
 - ID生成時は `POST /core/C採番/採番` を呼び出す
 
 **2. 監査フィールドの設定漏れ:**
@@ -1161,6 +1171,5 @@ async def custom_websocket(websocket: WebSocket, request: Request):
 - **V 系 API は DB VIEW を作らず、生 SQL で取得します。**
 - `T配車/変更` は `配車伝票ID` を **関数パラメータ** として受け取ります（POST bodyとは別）。
 - パスワードは平文保存のため、運用前にハッシュ化対応が必要です。
-- **両方のサーバー (main1 + main2) を起動する必要があります。** `_start.py` を使えば自動で両方起動します。
-
+- **両方のサーバー (core_main + apps_main) を起動する必要があります。** `_start.py` を使えば自動で両方起動します。
 

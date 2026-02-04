@@ -1,7 +1,7 @@
 ■ バックエンド落とし穴
 
 1. C採番の使い忘れ
-   新規テーブル追加時はcrud1/init.py または crud2/init.py に
+   新規テーブル追加時はcore_crud/init.py または apps_crud/init.py に
    C採番の初期値を追加する
 
 2. 監査フィールドの設定漏れ

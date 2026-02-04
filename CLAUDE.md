@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -20,8 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - List responses: `{"items": [], "total": N, "limit": 10000}`
 
 **Dual Server Architecture:**
-- main1.py (port 8091): C系 (Core), A系 (AI) - `/core/*` endpoints
-- main2.py (port 8092): M系 (Master), T系 (Transaction), V系 (View), S系 (Scheduler) - `/apps/*` endpoints
+- core_main.py (port 8091): C系 (Core), A系 (AI) - `/core/*` endpoints
+- apps_main.py (port 8092): M系 (Master), T系 (Transaction), V系 (View), S系 (Scheduler) - `/apps/*` endpoints
 - BOTH servers must be running
 
 **No Database VIEWs:**
@@ -45,8 +45,8 @@ python _start.py
 python _stop.py
 
 # Backend with hot-reload (dev)
-cd backend_server && .venv/Scripts/python.exe -m uvicorn main1:app --reload --host 0.0.0.0 --port 8091
-cd backend_server && .venv/Scripts/python.exe -m uvicorn main2:app --reload --host 0.0.0.0 --port 8092
+cd backend_server && .venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
+cd backend_server && .venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
 # Frontend only
 cd frontend_server && npm run dev
@@ -64,8 +64,8 @@ cd backend_server && uv sync
 cd frontend_server && npm install
 
 # Trigger backend reload (without --reload flag)
-echo. > backend_server/temp/reboot1.txt   # main1
-echo. > backend_server/temp/reboot2.txt   # main2
+echo. > backend_server/temp/reboot1.txt   # core_main
+echo. > backend_server/temp/reboot2.txt   # apps_main
 
 # Database reset (delete and restart servers to recreate)
 del backend_server\_data\AiDiy\database.db
@@ -88,12 +88,13 @@ del backend_server\_data\AiDiy\database.db
 ```
 AiDiy2026/
 ├── backend_server/          # FastAPI (Python 3.13) + SQLAlchemy + SQLite
-│   ├── main1.py            # Port 8091 - Core/AI features (C系, A系)
-│   ├── main2.py            # Port 8092 - App features (M系, T系, V系, S系)
-│   ├── models1/, models2/  # SQLAlchemy ORM models
-│   ├── crud1/, crud2/      # Database operations
-│   ├── routers1/, routers2/ # API endpoints
-│   ├── schemas.py          # Pydantic models (ALL in one file)
+│   ├── core_main.py            # Port 8091 - Core/AI features (C系, A系)
+│   ├── apps_main.py            # Port 8092 - App features (M系, T系, V系, S系)
+│   ├── core_models/, apps_models/  # SQLAlchemy ORM models
+│   ├── core_crud/, apps_crud/      # Database operations
+│   ├── core_router/, apps_router/ # API endpoints
+│   ├── core_schema.py      # Core Pydantic models
+│   ├── apps_schema.py      # Apps Pydantic models
 │   ├── database.py         # SQLite config (shared by both servers)
 │   ├── auth.py, deps.py    # JWT authentication
 │   └── _data/AiDiy/database.db  # SQLite database
@@ -106,7 +107,7 @@ AiDiy2026/
 │   │   │   ├── Tトラン/    # T系 (Transaction) screens
 │   │   │   ├── Sスケジューラー/  # S系 (Scheduler) screens
 │   │   │   ├── Vビュー/    # V系 (View) screens
-│   │   │   ├── AコアAI/    # AI interface
+│   │   │   ├── AIコア/    # AI interface
 │   │   │   └── _share/     # Shared components (qTubler, dialogs)
 │   │   ├── stores/auth.ts  # Pinia auth store
 │   │   ├── api/client.ts   # Axios with JWT interceptors
@@ -120,23 +121,23 @@ AiDiy2026/
 - `T` = Transaction (T配車, T商品入庫, T商品出庫, T商品棚卸)
 - `V` = View endpoints (raw SQL, not DB views)
 - `S` = Scheduler/Special
-- `A` = AI/Advanced (AコアAI, A会話履歴)
+- `A` = AI/Advanced (AIコア, A会話履歴)
 
 ---
 
 ## Key Patterns
 
-**Backend - Adding a new table (C系/A系 in main1):**
-1. Create model in `models1/<テーブル名>.py`
-2. Export in `models1/__init__.py`
-3. Add Pydantic schemas to `schemas.py`
-4. Create CRUD in `crud1/<テーブル名>.py`
-5. Create router in `routers1/<テーブル名>.py`
-6. Register in `main1.py` with `include_router` and `create_all`
+**Backend - Adding a new table (C系/A系 in core_main):**
+1. Create model in `core_models/<テーブル名>.py`
+2. Export in `core_models/__init__.py`
+3. Add Pydantic schemas to `core_schema.py` or `apps_schema.py`
+4. Create CRUD in `core_crud/<テーブル名>.py`
+5. Create router in `core_router/<テーブル名>.py`
+6. Register in `core_main.py` with `include_router` and `create_all`
 
 **Backend - Audit fields (required on all tables):**
 ```python
-from crud1.utils import create_audit_fields, update_audit_fields
+from core_crud.utils import create_audit_fields, update_audit_fields
 
 # Create
 監査項目 = create_audit_fields(認証情報)

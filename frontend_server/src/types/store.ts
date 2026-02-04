@@ -15,6 +15,7 @@ import type { C利用者 } from './entities'
 export interface AuthState {
   token: string
   user: C利用者 | null
+  authChecked: boolean
 }
 
 /**
