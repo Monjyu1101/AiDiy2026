@@ -540,106 +540,106 @@ const gridLayoutClass = computed(() => {
 </script>
 
 <template>
+  <!-- WebSocket接続状態インジケーター（fixedレイヤー） -->
+  <div class="ws-status" :class="{ connected: wsConnected }">
+    <span class="ws-status-dot"></span>
+    <span class="ws-status-text">{{ wsConnected ? 'WS接続中' : 'WS切断' }}</span>
+  </div>
+
+  <!-- 音声ビジュアライザー（fixedレイヤー） -->
+  <div id="audioVisualizerOverlay" class="audio-visualizer-overlay">
+    <div id="audioBars" class="audio-bars"></div>
+  </div>
+
+  <!-- 音声・画像制御フローティングアイコン（fixedレイヤー） -->
+  <div class="floating-controls">
+    <button
+      class="floating-icon microphone-icon"
+      :class="{ active: enableMicrophone }"
+      :disabled="!wsConnected"
+      @click="enableMicrophone = !enableMicrophone"
+      title="マイク"
+    >
+      <img src="/icons/microphone.png" alt="マイク" />
+    </button>
+    <button
+      class="floating-icon speaker-icon"
+      :class="{ inactive: !enableSpeaker, active: enableSpeaker }"
+      :disabled="!wsConnected"
+      @click="enableSpeaker = !enableSpeaker"
+      title="スピーカー"
+    >
+      <img src="/icons/speaker.png" alt="スピーカー" />
+    </button>
+    <button
+      class="floating-icon chat-icon"
+      :class="{ inactive: !enableChatButton, active: enableChatButton }"
+      :disabled="!wsConnected"
+      @click="toggleChat"
+      title="チャット"
+    >
+      {{ chatCount }}
+    </button>
+    <button
+      class="floating-icon agent-icon"
+      :class="{ inactive: !enableAgent1Button, active: enableAgent1Button }"
+      :disabled="!wsConnected"
+      @click="toggleAgent1"
+      title="コード1"
+    >
+      1
+    </button>
+    <button
+      class="floating-icon camera-icon"
+      :class="{ active: enableCamera }"
+      :disabled="!wsConnected"
+      @click="handleCameraToggle"
+      title="カメラ"
+    >
+      <img src="/icons/camera.png" alt="カメラ" />
+    </button>
+    <button
+      class="floating-icon agent-icon"
+      :class="{ inactive: !enableAgent2Button, active: enableAgent2Button }"
+      :disabled="!wsConnected"
+      @click="toggleAgent2"
+      title="コード2"
+    >
+      2
+    </button>
+    <button
+      class="floating-icon agent-icon"
+      :class="{ inactive: !enableAgent3Button, active: enableAgent3Button }"
+      :disabled="!wsConnected"
+      @click="toggleAgent3"
+      title="コード3"
+    >
+      3
+    </button>
+    <button
+      class="floating-icon agent-icon"
+      :class="{ inactive: !enableAgent4Button, active: enableAgent4Button }"
+      :disabled="!wsConnected"
+      @click="toggleAgent4"
+      title="コード4"
+    >
+      4
+    </button>
+    <button
+      class="floating-icon config-icon"
+      :disabled="!wsConnected"
+      @click="showModelConfig = true"
+      title="モデル設定"
+    >
+      <img src="/icons/setting.png" alt="設定" class="icon-image" />
+    </button>
+  </div>
+
   <div class="ai-core-view">
-    <!-- WebSocket接続状態インジケーター -->
-    <div class="ws-status" :class="{ connected: wsConnected }">
-      <span class="ws-status-dot"></span>
-      <span class="ws-status-text">{{ wsConnected ? 'WS接続中' : 'WS切断' }}</span>
-    </div>
-
-    <!-- 音声ビジュアライザー（WS接続状態の左側） -->
-    <div id="audioVisualizerOverlay" class="audio-visualizer-overlay">
-      <div id="audioBars" class="audio-bars"></div>
-    </div>
-
     <!-- エラーメッセージ表示 -->
     <div v-if="errorMessage" class="error-message">
       <button class="error-close" @click="errorMessage = ''">×</button>
       <strong>エラー:</strong> {{ errorMessage }}
-    </div>
-
-    <!-- 音声・画像制御フローティングアイコン -->
-    <div class="floating-controls">
-      <button
-        class="floating-icon microphone-icon"
-        :class="{ active: enableMicrophone }"
-        :disabled="!wsConnected"
-        @click="enableMicrophone = !enableMicrophone"
-        title="マイク"
-      >
-        <img src="/icons/microphone.png" alt="マイク" />
-      </button>
-      <button
-        class="floating-icon speaker-icon"
-        :class="{ inactive: !enableSpeaker, active: enableSpeaker }"
-        :disabled="!wsConnected"
-        @click="enableSpeaker = !enableSpeaker"
-        title="スピーカー"
-      >
-        <img src="/icons/speaker.png" alt="スピーカー" />
-      </button>
-      <button
-        class="floating-icon chat-icon"
-        :class="{ inactive: !enableChatButton, active: enableChatButton }"
-        :disabled="!wsConnected"
-        @click="toggleChat"
-        title="チャット"
-      >
-        {{ chatCount }}
-      </button>
-      <button
-        class="floating-icon agent-icon"
-        :class="{ inactive: !enableAgent1Button, active: enableAgent1Button }"
-        :disabled="!wsConnected"
-        @click="toggleAgent1"
-        title="コード1"
-      >
-        1
-      </button>
-      <button
-        class="floating-icon camera-icon"
-        :class="{ active: enableCamera }"
-        :disabled="!wsConnected"
-        @click="handleCameraClick"
-        title="カメラ"
-      >
-        <img src="/icons/camera.png" alt="カメラ" />
-      </button>
-      <button
-        class="floating-icon agent-icon"
-        :class="{ inactive: !enableAgent2Button, active: enableAgent2Button }"
-        :disabled="!wsConnected"
-        @click="toggleAgent2"
-        title="コード2"
-      >
-        2
-      </button>
-      <button
-        class="floating-icon agent-icon"
-        :class="{ inactive: !enableAgent3Button, active: enableAgent3Button }"
-        :disabled="!wsConnected"
-        @click="toggleAgent3"
-        title="コード3"
-      >
-        3
-      </button>
-      <button
-        class="floating-icon agent-icon"
-        :class="{ inactive: !enableAgent4Button, active: enableAgent4Button }"
-        :disabled="!wsConnected"
-        @click="toggleAgent4"
-        title="コード4"
-      >
-        4
-      </button>
-      <button
-        class="floating-icon config-icon"
-        :disabled="!wsConnected"
-        @click="showModelConfig = true"
-        title="モデル設定"
-      >
-        <img src="/icons/setting.png" alt="設定" class="icon-image" />
-      </button>
     </div>
 
     <!-- コンポーネントグリッド -->
@@ -744,13 +744,14 @@ const gridLayoutClass = computed(() => {
   height: calc(100vh - 100px);
   position: relative;
   background: #1a1a1a;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* WebSocket接続状態インジケーター（マイクボタンの真上） */
 .ws-status {
-  position: absolute;
-  top: 12px;
+  position: fixed;
+  top: 112px;
   right: 20px;
   background: rgba(50, 50, 50, 0.9);
   border: 2px solid #ff4444;
@@ -850,8 +851,8 @@ const gridLayoutClass = computed(() => {
 
 /* 音声・画像制御フローティングアイコン */
 .floating-controls {
-  position: absolute;
-  top: 50px;
+  position: fixed;
+  top: 150px;
   right: 20px; /* 元に戻す */
   display: flex;
   flex-direction: column;
@@ -1154,9 +1155,9 @@ const gridLayoutClass = computed(() => {
 
 /* 音声ビジュアライザー（WS接続中インジケーターの左側） */
 .audio-visualizer-overlay {
-  position: absolute;
-  top: 12px;
-  right: 140px;
+  position: fixed;
+  top: 112px;
+  right: 160px;
   width: 170px;
   height: 27px;
   background: rgba(255, 255, 255, 0.85);
@@ -1164,7 +1165,7 @@ const gridLayoutClass = computed(() => {
   border-radius: 4px;
   overflow: visible;
   z-index: 999;
-  display: none; /* 初期は非表示 */
+  display: flex; /* デバッグ用: 常に表示 */
   align-items: flex-end;
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -1311,18 +1312,41 @@ const gridLayoutClass = computed(() => {
     min-height: 400px;
   }
 
-  /* 小さい画面ではビジュアライザーを非表示 */
+  /* 小さい画面ではビジュアライザーとWS状態を小さく */
   .audio-visualizer-overlay {
-    display: none !important;
+    width: 120px;
+    right: 110px;
+  }
+
+  .ws-status {
+    font-size: 9px;
+    padding: 0 8px;
+    height: 24px;
+  }
+
+  .floating-controls {
+    gap: 6px;
+  }
+
+  .floating-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .floating-icon img {
+    width: 18px;
+    height: 18px;
   }
 }
 
 /* 縦長画面での調整 */
 @media (max-aspect-ratio: 1/1) {
-  /* 1枚表示は上下に余白 */
+  /* 1枚表示は左右の余白を減らしてパネル幅を広げる */
   .layout-single {
     padding-top: 10%;
     padding-bottom: 10%;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   /* 2枚表示は上下配置 */
@@ -1333,6 +1357,20 @@ const gridLayoutClass = computed(() => {
     padding-right: 16px;
     column-gap: 16px;
     row-gap: 16px;
+  }
+
+  /* 固定要素は常に表示 */
+  .ws-status,
+  .audio-visualizer-overlay,
+  .floating-controls {
+    display: flex !important;
+  }
+
+  /* ビジュアライザーを画面中央に配置 */
+  .audio-visualizer-overlay {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
   }
 }
 

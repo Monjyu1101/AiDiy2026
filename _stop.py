@@ -27,33 +27,60 @@ def kill_process_on_port(port: int) -> bool:
     print(f"[ポート {port}] 使用中のプロセスを検索...")
 
     try:
-        result = subprocess.run(
-            ["netstat", "-ano"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-
-        pid = None
-        for line in result.stdout.splitlines():
-            if f":{port}" in line and "LISTENING" in line:
-                parts = line.split()
-                if len(parts) >= 5:
-                    pid = parts[-1]
-                    break
-
-        if pid and pid != "0":
-            print(f"[ポート {port}] プロセス検出: PID={pid}")
-            subprocess.run(
-                ["taskkill", "/F", "/PID", pid],
+        if sys.platform == "win32":
+            # Windows: netstat + taskkill
+            result = subprocess.run(
+                ["netstat", "-ano"],
                 capture_output=True,
+                text=True,
                 timeout=5
             )
-            print(f"[ポート {port}] プロセスを強制停止しました")
-            return True
+
+            pid = None
+            for line in result.stdout.splitlines():
+                if f":{port}" in line and "LISTENING" in line:
+                    parts = line.split()
+                    if len(parts) >= 5:
+                        pid = parts[-1]
+                        break
+
+            if pid and pid != "0":
+                print(f"[ポート {port}] プロセス検出: PID={pid}")
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", pid],
+                    capture_output=True,
+                    timeout=5
+                )
+                print(f"[ポート {port}] プロセスを強制停止しました")
+                return True
+            else:
+                print(f"[ポート {port}] 使用中のプロセスなし")
+                return False
         else:
-            print(f"[ポート {port}] 使用中のプロセスなし")
-            return False
+            # Linux/Mac: lsof + kill
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            pids = result.stdout.strip().split('\n')
+            killed = False
+            for pid in pids:
+                if pid and pid.isdigit():
+                    print(f"[ポート {port}] プロセス検出: PID={pid}")
+                    subprocess.run(
+                        ["kill", "-9", pid],
+                        capture_output=True,
+                        timeout=5
+                    )
+                    print(f"[ポート {port}] プロセスを強制停止しました (PID={pid})")
+                    killed = True
+            
+            if not killed:
+                print(f"[ポート {port}] 使用中のプロセスなし")
+            return killed
 
     except Exception as e:
         print(f"[ポート {port}] エラー: {e}")
