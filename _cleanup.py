@@ -21,7 +21,7 @@ from pathlib import Path
 # ============================================================
 # バックエンド設定
 BACKEND_PATH = "backend_server"      # バックエンドフォルダ名
-BACKEND_ENV = ".venv"                # Python環境: ".venv" (uv使用)
+BACKEND_ENV_LIST = [".venv", "venv"] # Python環境: ".venv" または "venv" (uv使用)
 
 # フロントエンド設定
 FRONTEND_PATH = "frontend_server"    # フロントエンドフォルダパス
@@ -230,14 +230,16 @@ def cleanup_server(base_dir):
         if remove_directory(pytest_cache, ".pytest_cache"):
             deleted_count += 1
     
-    # Python環境フォルダ削除の確認
-    venv_dir = server_dir / BACKEND_ENV
-    if venv_dir.exists():
-        if ask_yes_no(f"  {BACKEND_ENV} フォルダも削除しますか？", default="y"):
-            if remove_directory(venv_dir, BACKEND_ENV):
-                deleted_count += 1
-        else:
-            print_info(f"  {BACKEND_ENV} フォルダはそのまま残します")
+    # Python環境フォルダ削除の確認 (BACKEND_ENV_LIST に従う)
+    print_info(f"削除対象の仮想環境リスト: {', '.join(BACKEND_ENV_LIST)}")
+    for venv_name in BACKEND_ENV_LIST:
+        venv_dir = server_dir / venv_name
+        if venv_dir.exists():
+            if ask_yes_no(f"  {venv_name} フォルダを削除しますか？", default="y"):
+                if remove_directory(venv_dir, venv_name):
+                    deleted_count += 1
+            else:
+                print_info(f"  {venv_name} フォルダはそのまま残します")
     
     # logs フォルダの中身を削除するか確認(存在する場合のみ)
     logs_dir = server_dir / "logs"

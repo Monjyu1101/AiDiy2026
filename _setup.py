@@ -328,6 +328,100 @@ def run_migration():
         return False
 
 
+def upgrade_global_tools():
+    """グローバル環境のツールをアップグレード"""
+    print_header("グローバルツールのアップグレード")
+    
+    print_info("グローバル環境で必要なツールをアップグレードします...")
+    
+    commands = [
+        (["python", "-m", "pip", "install", "--upgrade", "pip"], "pip"),
+        (["pip", "install", "--upgrade", "wheel"], "wheel"),
+        (["pip", "install", "--upgrade", "setuptools"], "setuptools"),
+        (["pip", "install", "--upgrade", "uv"], "uv"),
+    ]
+    
+    failed_tools = []
+    for cmd, tool_name in commands:
+        if not run_command(cmd, cwd=None, shell=False):
+            failed_tools.append(tool_name)
+    
+    if failed_tools:
+        print_warning(f"以下のツールのアップグレードに失敗しました: {', '.join(failed_tools)}")
+        return False
+    else:
+        print_success("すべてのグローバルツールをアップグレードしました。")
+        return True
+
+
+def install_global_npm_tools():
+    """グローバルnpmパッケージをインストール（並行実行）"""
+    print_header("グローバルnpmツールのインストール")
+    
+    print_info("グローバル環境でAI関連のnpmツールをインストールします...")
+    print_info("各パッケージを別シェルで並行インストール中...")
+    
+    # npmコマンドを取得（Windows対応）
+    npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
+    
+    packages = [
+        "@anthropic-ai/claude-code",
+        "@github/copilot",
+        "@openai/codex",
+        "@google/gemini-cli"
+    ]
+    
+    # 並行実行用プロセスリスト
+    processes = []
+    for i, package in enumerate(packages, 1):
+        print_info(f"  [{i}/{len(packages)}] 起動: {npm_cmd} install -g {package}")
+        cmd = [npm_cmd, "install", "-g", package]
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+            )
+            processes.append((package, process))
+            print_success(f"  [{i}/{len(packages)}] {package}: プロセス起動成功")
+        except Exception as e:
+            print_error(f"  [{i}/{len(packages)}] {package}: プロセス起動失敗 - {e}")
+    
+    print()
+    print_info(f"起動完了: {len(processes)}/{len(packages)} パッケージ")
+    print_info("インストール完了を待機中...")
+    print()
+    
+    # 全プロセスの完了を待つ
+    failed_packages = []
+    for i, (package, process) in enumerate(processes, 1):
+        try:
+            stdout, stderr = process.communicate(timeout=300)  # 5分タイムアウト
+            if process.returncode == 0:
+                print_success(f"  [{i}/{len(processes)}] {package}: インストール完了")
+            else:
+                print_error(f"  [{i}/{len(processes)}] {package}: インストール失敗 (終了コード: {process.returncode})")
+                if stderr and stderr.strip():
+                    print_error(f"      エラー内容: {stderr.strip()[:200]}")
+                failed_packages.append(package)
+        except subprocess.TimeoutExpired:
+            print_error(f"  [{i}/{len(processes)}] {package}: タイムアウト")
+            process.kill()
+            failed_packages.append(package)
+        except Exception as e:
+            print_error(f"  [{i}/{len(processes)}] {package}: エラー - {e}")
+            failed_packages.append(package)
+    
+    if failed_packages:
+        print_warning(f"以下のパッケージのインストールに失敗しました: {', '.join(failed_packages)}")
+        return False
+    else:
+        print_success("すべてのグローバルnpmツールをインストールしました。")
+        return True
+
+
 def main():
     """メイン処理"""
     print_header("プロジェクト セットアップ")
@@ -339,6 +433,20 @@ def main():
     if not ask_yes_no("セットアップを実行しますか?", default="n"):
         print_warning("セットアップをキャンセルしました。")
         sys.exit(0)
+    
+    # グローバルツールのアップグレード
+    if ask_yes_no("グローバル環境のツール(pip, wheel, setuptools, uv)をアップグレードしますか?", default="y"):
+        if not upgrade_global_tools():
+            print_warning("一部のツールのアップグレードに失敗しましたが、続行します。")
+    else:
+        print_warning("グローバルツールのアップグレードをスキップしました。")
+    
+    # グローバルnpmツールのインストール
+    if ask_yes_no("グローバル環境のnpmツール(AI CLIツール)をインストール/アップデートしますか?", default="y"):
+        if not install_global_npm_tools():
+            print_warning("一部のnpmツールのインストールに失敗しましたが、続行します。")
+    else:
+        print_warning("グローバルnpmツールのインストールをスキップしました。")
     
     # バックエンド環境準備
     if ask_yes_no("バックエンド環境準備(uv sync)を実行しますか?", default="y"):

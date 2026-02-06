@@ -104,6 +104,67 @@ def find_venv_python():
     return None
 
 
+def check_venv_exists():
+    """venv環境が存在するか確認"""
+    venv_python = find_venv_python()
+    if venv_python is None:
+        return False, None
+    
+    # pyproject.tomlの存在も確認
+    pyproject_file = SERVER_DIR / "pyproject.toml"
+    if not pyproject_file.exists():
+        return False, "pyproject.toml が見つかりません"
+    
+    return True, str(venv_python)
+
+
+def check_node_modules_exists():
+    """node_modules が存在するか確認"""
+    node_modules_dir = CLIENT_DIR / "node_modules"
+    package_json = CLIENT_DIR / "package.json"
+    
+    if not package_json.exists():
+        return False, "package.json が見つかりません"
+    
+    if not node_modules_dir.exists() or not node_modules_dir.is_dir():
+        return False, "node_modules フォルダが見つかりません"
+    
+    # node_modules内に何かファイルがあるか確認
+    try:
+        contents = list(node_modules_dir.iterdir())
+        if len(contents) == 0:
+            return False, "node_modules が空です"
+    except Exception as e:
+        return False, f"node_modules の確認エラー: {e}"
+    
+    return True, str(node_modules_dir)
+
+
+def get_npm_command():
+    """npmコマンドを取得（Windows対応）"""
+    if sys.platform == "win32":
+        # Windowsでは npm.cmd を確認
+        npm_cmd = f"{FRONTEND_COMMAND}.cmd"
+        # PATH上に npm.cmd が存在するか確認
+        try:
+            subprocess.run([npm_cmd, "--version"], capture_output=True, check=True, timeout=5)
+            return npm_cmd
+        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+            # npm.cmd が見つからない場合は npm を試す
+            try:
+                subprocess.run([FRONTEND_COMMAND, "--version"], capture_output=True, check=True, timeout=5)
+                return FRONTEND_COMMAND
+            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                return None
+    else:
+        # Linux/Mac
+        try:
+            subprocess.run([FRONTEND_COMMAND, "--version"], capture_output=True, check=True, timeout=5)
+            return FRONTEND_COMMAND
+        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+            return None
+
+
 def get_backend_command(app_module: str, port: int):
     """バックエンド起動コマンドを取得 (venv優先、無ければuv)"""
     venv_python = find_venv_python()
@@ -230,11 +291,12 @@ def open_browser(frontend_port):
 
 
 def stream_output_backend(name, stream, label, last_output_times):
-    """バックエンドプロセスの出力をストリーム表示（CP932エンコーディング）"""
+    """バックエンドプロセスの出力をストリーム表示（UTF-8エンコーディング）"""
     if stream is None:
         return
     
-    encoding = 'cp932' if sys.platform == "win32" else 'utf-8'
+    # バックエンド（Python）の出力はUTF-8として処理
+    encoding = 'utf-8'
 
     try:
         while True:
@@ -283,7 +345,7 @@ def stream_output_frontend(name, stream, label, last_output_times):
         pass
 
 
-def wait_for_quiet(last_output_times, key, seconds=5, max_wait=60):
+def wait_for_quiet(last_output_times, key, seconds=10, max_wait=60):
     """メッセージが途切れるまで待機（最終出力からN秒静か）"""
     start_time = time.time()
     while True:
@@ -361,6 +423,132 @@ def main():
         print_warning("起動対象が指定されていません (backend=no, frontend=no)")
         sys.exit(0)
 
+    # 環境の事前確認
+    print_header("環境確認")
+    
+    has_error = False
+    npm_cmd = None
+    
+    # バックエンド環境確認
+    if start_backend_enabled:
+        venv_exists, venv_info = check_venv_exists()
+        if not venv_exists:
+            print_error("バックエンド環境が準備されていません")
+            if venv_info:
+                print_error(f"  理由: {venv_info}")
+            else:
+                print_error(f"  理由: Python仮想環境 ({' または '.join(BACKEND_ENV_CANDIDATES)}) が見つかりません")
+            print_info("  解決方法:")
+            print_info(f"    cd {BACKEND_PATH}")
+            print_info("    uv sync")
+            has_error = True
+        else:
+            print_success(f"バックエンド環境: OK ({venv_info})")
+    
+    # フロントエンド環境確認
+    if start_frontend_enabled:
+        # npmコマンドの確認
+        npm_cmd = get_npm_command()
+        if npm_cmd is None:
+            print_error(f"{FRONTEND_COMMAND} コマンドが見つかりません")
+            print_info("  解決方法:")
+            print_info("    Node.js をインストールしてください: https://nodejs.org/")
+            has_error = True
+        else:
+            print_success(f"npm コマンド: OK ({npm_cmd})")
+        
+        node_modules_exists, node_info = check_node_modules_exists()
+        if not node_modules_exists:
+            print_error("フロントエンド環境が準備されていません")
+            print_error(f"  理由: {node_info}")
+            print_info("  解決方法:")
+            print_info(f"    cd {FRONTEND_PATH}")
+            if npm_cmd:
+                print_info(f"    {npm_cmd} install")
+            else:
+                print_info(f"    {FRONTEND_COMMAND} install")
+            has_error = True
+        else:
+            print_success(f"フロントエンド環境: OK ({node_info})")
+    
+    if has_error:
+        print()
+        print_error("必要な環境が準備されていないため、起動を中止します")
+        print_info("上記の解決方法を実行するか、以下のコマンドでセットアップしてください:")
+        print_info("  python _setup.py")
+        sys.exit(1)
+
+    # 手動起動ガイダンスを表示
+    print_header("手動起動方法")
+    print_info("このスクリプトを使わずに手動で起動する場合:")
+    print()
+    
+    # venv の python パスを取得（環境確認済み）
+    venv_python = find_venv_python()
+    venv_found = venv_python is not None
+    
+    if start_backend_enabled:
+        print(f"{Colors.OKGREEN}【バックエンド(core)】{Colors.ENDC}")
+        print(f"  cd {BACKEND_PATH}")
+        if venv_found:
+            if sys.platform == "win32":
+                # Windowsの場合: 相対パスで venv内のpythonを表示
+                venv_rel = venv_python.relative_to(SERVER_DIR)
+                print(f"  {venv_rel} -m uvicorn {BACKEND_CORE_APP} --reload --host 0.0.0.0 --port {BACKEND_CORE_PORT}")
+            else:
+                # Linux/Macの場合: activate してから uvicorn
+                venv_name = None
+                for env_name in BACKEND_ENV_CANDIDATES:
+                    if (SERVER_DIR / env_name).exists():
+                        venv_name = env_name
+                        break
+                if venv_name:
+                    print(f"  source {venv_name}/bin/activate")
+                    print(f"  uvicorn {BACKEND_CORE_APP} --reload --host 0.0.0.0 --port {BACKEND_CORE_PORT}")
+                else:
+                    print(f"  uvicorn {BACKEND_CORE_APP} --reload --host 0.0.0.0 --port {BACKEND_CORE_PORT}")
+        else:
+            # venvがない場合は uv run を使用
+            print(f"  uv run uvicorn {BACKEND_CORE_APP} --reload --host 0.0.0.0 --port {BACKEND_CORE_PORT}")
+        print()
+        
+        print(f"{Colors.OKGREEN}【バックエンド(apps)】{Colors.ENDC}")
+        print(f"  cd {BACKEND_PATH}")
+        if venv_found:
+            if sys.platform == "win32":
+                # Windowsの場合: 相対パスで venv内のpythonを表示
+                venv_rel = venv_python.relative_to(SERVER_DIR)
+                print(f"  {venv_rel} -m uvicorn {BACKEND_APPS_APP} --reload --host 0.0.0.0 --port {BACKEND_APPS_PORT}")
+            else:
+                # Linux/Macの場合: activate してから uvicorn
+                venv_name = None
+                for env_name in BACKEND_ENV_CANDIDATES:
+                    if (SERVER_DIR / env_name).exists():
+                        venv_name = env_name
+                        break
+                if venv_name:
+                    print(f"  source {venv_name}/bin/activate")
+                    print(f"  uvicorn {BACKEND_APPS_APP} --reload --host 0.0.0.0 --port {BACKEND_APPS_PORT}")
+                else:
+                    print(f"  uvicorn {BACKEND_APPS_APP} --reload --host 0.0.0.0 --port {BACKEND_APPS_PORT}")
+        else:
+            # venvがない場合は uv run を使用
+            print(f"  uv run uvicorn {BACKEND_APPS_APP} --reload --host 0.0.0.0 --port {BACKEND_APPS_PORT}")
+        print()
+    
+    if start_frontend_enabled:
+        print(f"{Colors.OKGREEN}【フロントエンド】{Colors.ENDC}")
+        print(f"  cd {FRONTEND_PATH}")
+        # 確認したnpmコマンドを使用
+        if npm_cmd:
+            print(f"  {npm_cmd} run dev -- --port {FRONTEND_PORT}")
+        else:
+            print(f"  {FRONTEND_COMMAND} run dev -- --port {FRONTEND_PORT}")
+        print()
+    
+    print(f"{Colors.WARNING}※ 自動起動を開始します...{Colors.ENDC}")
+    print()
+
     def start_selected_services(processes, last_output_times, open_browser_enabled: bool = True):
         # 1) ポート確認と既存プロセスの停止
         print_info("既存プロセスの停止を確認中...")
@@ -383,7 +571,7 @@ def main():
                     daemon=True
                 )
                 thread_out.start()
-                wait_for_quiet(last_output_times, "バックエンド(core)")
+                wait_for_quiet(last_output_times, "バックエンド(core)", seconds=15)
 
             print_header("バックエンド(apps) 起動")
             apps_process = start_backend(BACKEND_APPS_APP, BACKEND_APPS_PORT, "バックエンド(apps)")

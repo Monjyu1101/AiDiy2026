@@ -30,6 +30,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **権限ID is String Type:**
 - Compare with `'1'`, `'2'`, NOT integers `1`, `2`
 
+**Passwords are Plaintext:**
+- `C利用者.パスワード` is stored as plaintext (bcrypt is installed but not used)
+- `authenticate_C利用者` uses direct string comparison
+- Do NOT assume hashing when modifying auth code
+
+**No Automated Tests:**
+- No pytest or vitest configured
+- Test manually via Swagger UI (`:8091/docs`, `:8092/docs`) and browser
+
 ---
 
 ## Quick Commands
@@ -134,6 +143,16 @@ AiDiy2026/
 4. Create CRUD in `core_crud/<テーブル名>.py`
 5. Create router in `core_router/<テーブル名>.py`
 6. Register in `core_main.py` with `include_router` and `create_all`
+
+**Backend - Authenticated endpoints (dependency injection):**
+```python
+from deps import get_db, get_現在利用者
+from core_models import C利用者
+
+@router.post("/一覧")
+def list_items(db: Session = Depends(get_db), 現在利用者: C利用者 = Depends(get_現在利用者)):
+    # 現在利用者 contains the JWT-authenticated user
+```
 
 **Backend - Audit fields (required on all tables):**
 ```python

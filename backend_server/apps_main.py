@@ -7,6 +7,15 @@
 # Thank you for keeping the rules.
 # ------------------------------------------------
 
+import os
+import sys
+
+# UTF-8出力を強制（Windows文字化け対策）
+if sys.platform == "win32":
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import database, apps_crud, apps_models

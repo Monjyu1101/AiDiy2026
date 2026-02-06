@@ -128,7 +128,7 @@ const toggleAgent4 = () => {
 };
 
 // カメラボタンクリック時
-const handleCameraClick = () => {
+const handleCameraToggle = () => {
   if (enableCamera.value) {
     enableCamera.value = false;
     showImage.value = false;

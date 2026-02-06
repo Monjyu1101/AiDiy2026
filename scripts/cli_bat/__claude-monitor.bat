@@ -4,9 +4,11 @@ cd /d "%~dp0../.."
 ECHO python -m pip install --upgrade pip
 ECHO pip install --upgrade wheel
 ECHO pip install --upgrade setuptools
+ECHO pip install --upgrade uv
      python -m pip install --upgrade pip
      pip install --upgrade wheel
      pip install --upgrade setuptools
+     pip install --upgrade uv
 
 ECHO pip install --upgrade claude-monitor
      pip install --upgrade claude-monitor

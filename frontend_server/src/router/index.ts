@@ -93,9 +93,9 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/AIコア',
-        name: 'コアAI',
+        name: 'AIコア',
         component: () => import('../components/AIコア/AIコア.vue'),
-        meta: { requiresAuth: true, title: 'コアAI' }
+        meta: { requiresAuth: true, title: 'AIコア' }
     },
     {
         path: '/C管理/C権限/一覧',
