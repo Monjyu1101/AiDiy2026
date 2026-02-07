@@ -389,81 +389,91 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
         # ホワイトリストにあるキーのみをフィルタリング
         許可設定 = {k: v for k, v in 設定.items() if k in 許可キー}
 
-        if not 許可設定:
+        # 再起動のみの場合は設定更新をスキップ
+        再起動のみ = not 許可設定 and 再起動要求
+
+        if not 許可設定 and not 再起動のみ:
             return {
                 "status": "NG",
                 "message": "有効な設定項目がありません"
             }
 
         # ソケットのモデル設定を更新（ファイル保存はしない）
-        接続.update_model_settings(許可設定, manager=AIソケット管理)
+        if 許可設定:
+            接続.update_model_settings(許可設定, manager=AIソケット管理)
 
-        # 既存プロセッサに反映（即時反映）
-        try:
-            if hasattr(接続, "chat_processor") and 接続.chat_processor:
-                chat_ai = 接続.モデル設定.get("CHAT_AI", "")
-                chat_model = ""
-                if chat_ai == "openrt":
-                    chat_model = 接続.モデル設定.get("CHAT_OPENRT_MODEL", "")
-                elif chat_ai in ("gemini", "freeai"):
-                    key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai" else "CHAT_GEMINI_MODEL"
-                    chat_model = 接続.モデル設定.get(key, "")
-                接続.chat_processor.AI_NAME = chat_ai
-                接続.chat_processor.AI_MODEL = chat_model
-                if hasattr(接続.chat_processor, "_select_ai_module"):
-                    接続.chat_processor.AIモジュール = 接続.chat_processor._select_ai_module()
-                接続.chat_processor.AIインスタンス = None
+        # 既存プロセッサに反映（即時反映、設定変更がある場合のみ）
+        if 許可設定:
+            try:
+                if hasattr(接続, "chat_processor") and 接続.chat_processor:
+                    chat_ai = 接続.モデル設定.get("CHAT_AI", "")
+                    chat_model = ""
+                    if chat_ai == "openrt":
+                        chat_model = 接続.モデル設定.get("CHAT_OPENRT_MODEL", "")
+                    elif chat_ai in ("gemini", "freeai"):
+                        key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai" else "CHAT_GEMINI_MODEL"
+                        chat_model = 接続.モデル設定.get(key, "")
+                    接続.chat_processor.AI_NAME = chat_ai
+                    接続.chat_processor.AI_MODEL = chat_model
+                    if hasattr(接続.chat_processor, "_select_ai_module"):
+                        接続.chat_processor.AIモジュール = 接続.chat_processor._select_ai_module()
+                    接続.chat_processor.AIインスタンス = None
 
-            if hasattr(接続, "code_agent_processors") and 接続.code_agent_processors:
-                for idx, agent in enumerate(接続.code_agent_processors, start=1):
-                    ai_key = f"CODE_AI{idx}"
-                    model_key = f"CODE_AI{idx}_MODEL"
-                    agent.AI_NAME = 接続.モデル設定.get(ai_key, "")
-                    agent.AI_MODEL = 接続.モデル設定.get(model_key, "")
-                    if hasattr(agent, "_select_ai_module"):
-                        agent.AIモジュール = agent._select_ai_module()
-                    agent.AIインスタンス = None
+                if hasattr(接続, "code_agent_processors") and 接続.code_agent_processors:
+                    for idx, agent in enumerate(接続.code_agent_processors, start=1):
+                        ai_key = f"CODE_AI{idx}"
+                        model_key = f"CODE_AI{idx}_MODEL"
+                        agent.AI_NAME = 接続.モデル設定.get(ai_key, "")
+                        agent.AI_MODEL = 接続.モデル設定.get(model_key, "")
+                        if hasattr(agent, "_select_ai_module"):
+                            agent.AIモジュール = agent._select_ai_module()
+                        agent.AIインスタンス = None
 
-            if hasattr(接続, "live_processor") and 接続.live_processor:
-                live_ai = 接続.モデル設定.get("LIVE_AI", "")
-                live_model = ""
-                live_voice = ""
-                if live_ai in ("gemini_live", "freeai_live"):
-                    model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
-                    voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
-                    live_model = 接続.モデル設定.get(model_key, "")
-                    live_voice = 接続.モデル設定.get(voice_key, "")
-                elif live_ai == "openai_live":
-                    live_model = 接続.モデル設定.get("LIVE_OPENAI_MODEL", "")
-                    live_voice = 接続.モデル設定.get("LIVE_OPENAI_VOICE", "")
-                接続.live_processor.AI_NAME = live_ai
-                接続.live_processor.AI_MODEL = live_model
-                接続.live_processor.AI_VOICE = live_voice
-                if hasattr(接続.live_processor, "_select_ai_module"):
-                    接続.live_processor.AIモジュール = 接続.live_processor._select_ai_module()
-                接続.live_processor.AIインスタンス = None
-                try:
-                    await 接続.live_processor.開始()
-                except Exception:
-                    logger.exception("LiveAI再開始に失敗しました")
-        except Exception:
-            logger.exception("モデル設定の反映に失敗しました")
+                if hasattr(接続, "live_processor") and 接続.live_processor:
+                    live_ai = 接続.モデル設定.get("LIVE_AI", "")
+                    live_model = ""
+                    live_voice = ""
+                    if live_ai in ("gemini_live", "freeai_live"):
+                        model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
+                        voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
+                        live_model = 接続.モデル設定.get(model_key, "")
+                        live_voice = 接続.モデル設定.get(voice_key, "")
+                    elif live_ai == "openai_live":
+                        live_model = 接続.モデル設定.get("LIVE_OPENAI_MODEL", "")
+                        live_voice = 接続.モデル設定.get("LIVE_OPENAI_VOICE", "")
+                    接続.live_processor.AI_NAME = live_ai
+                    接続.live_processor.AI_MODEL = live_model
+                    接続.live_processor.AI_VOICE = live_voice
+                    if hasattr(接続.live_processor, "_select_ai_module"):
+                        接続.live_processor.AIモジュール = 接続.live_processor._select_ai_module()
+                    接続.live_processor.AIインスタンス = None
+                    try:
+                        await 接続.live_processor.開始()
+                    except Exception:
+                        logger.exception("LiveAI再開始に失敗しました")
+            except Exception:
+                logger.exception("モデル設定の反映に失敗しました")
 
         # 再起動要求があればフラグファイルを作成
         try:
-            reboot1 = bool(再起動要求.get("reboot1"))
-            reboot2 = bool(再起動要求.get("reboot2"))
-            if reboot1:
-                with open(os.path.join(バックエンドディレクトリ, "temp", "reboot1.txt"), "w", encoding="utf-8") as f:
+            reboot_core = bool(再起動要求.get("reboot_core"))
+            reboot_apps = bool(再起動要求.get("reboot_apps"))
+            if reboot_core:
+                with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_core.txt"), "w", encoding="utf-8") as f:
                     f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            if reboot2:
-                with open(os.path.join(バックエンドディレクトリ, "temp", "reboot2.txt"), "w", encoding="utf-8") as f:
+            if reboot_apps:
+                with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_apps.txt"), "w", encoding="utf-8") as f:
                     f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            if reboot1 or reboot2:
-                logger.info(f"再起動要求受信: reboot1={reboot1} reboot2={reboot2}")
+            if reboot_core or reboot_apps:
+                logger.info(f"再起動要求受信: reboot_core={reboot_core} reboot_apps={reboot_apps}")
         except Exception:
             logger.exception("再起動要求の処理に失敗しました")
 
+        if 再起動のみ:
+            return {
+                "status": "OK",
+                "message": "再起動要求を受け付けました"
+            }
         return {
             "status": "OK",
             "message": f"{len(許可設定)}件の設定を更新しました（セッション内のみ）"

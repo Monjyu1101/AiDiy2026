@@ -834,15 +834,16 @@ const 状態表示テキスト = () => {
 }
 
 .terminal-line.stream-output .line-content {
-  background: rgba(0, 255, 0, 0.08);
+  background: rgba(220, 230, 255, 0.1);
+  border: 1px solid rgba(100, 140, 220, 0.4);
   border-radius: 4px;
-  padding: 8px 12px;
+  padding: 0;
   display: block;
   position: relative;
 }
 
 .terminal-line.stream-output.collapsed .line-content {
-  padding: 4px 8px;
+  padding: 8px 8px;
 }
 
 .collapsed-wrapper {
@@ -854,28 +855,30 @@ const 状態表示テキスト = () => {
 }
 
 .collapsed-indicator {
-  color: #00cc00;
+  color: #ffffff;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .collapsed-arrow {
-  color: #00cc00;
+  color: #ffffff;
   font-size: 14px;
+  line-height: 1;
 }
 
 .expand-indicator {
   position: absolute;
   top: 4px;
   right: 8px;
-  color: #00cc00;
-  font-size: 12px;
+  color: #ffffff;
+  font-size: 18px;
   cursor: pointer;
   user-select: none;
 }
 
 .expand-indicator:hover {
-  color: #00ff00;
+  color: #cccccc;
 }
 
 .terminal-line.input_file .line-content,

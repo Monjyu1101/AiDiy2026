@@ -15,6 +15,7 @@ AIコア コードエージェント処理プロセッサ
 
 import asyncio
 import importlib
+import os
 from typing import Optional
 
 from log_config import get_logger
@@ -274,6 +275,12 @@ class CodeAgent:
                     サムネイル画像=None
                 )
 
+            # バックアップ＋自己検証ループ
+            try:
+                await self._バックアップ検証ループ(ai_instance)
+            except Exception as e:
+                logger.error(f"[CodeAgent] バックアップ検証ループエラー: {e}")
+
             # 通常処理の後: チャンネル-1へ処理終了を連絡
             完了メッセージ = (
                 f"コードエージェント{self.チャンネル}です。\n"
@@ -306,6 +313,95 @@ class CodeAgent:
 
         except Exception as e:
             logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_request処理エラー: {e}")
+
+    async def _バックアップ検証ループ(self, ai_instance):
+        """バックアップ実行 → 変更ファイルがあればAIに自己検証させる（最大5回）"""
+        from AIコア.AIバックアップ import バックアップ実行
+
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        アプリ設定 = getattr(self.親, "conf", None)
+
+        最大検証回数 = 5
+        for n in range(1, 最大検証回数 + 1):
+            # バックアップ実行
+            try:
+                result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir)
+            except Exception as e:
+                logger.error(f"[CodeAgent] バックアップ実行エラー: {e}")
+                break
+
+            # バックアップファイルがなければ終了
+            if result is None:
+                logger.info("[CodeAgent] バックアップ: 対象なし（スキップ）")
+                break
+            最大日時, 全ファイル, バックアップファイル, 全件フラグ, バックアップフォルダ絶対パス = result
+            if not バックアップファイル:
+                logger.info("[CodeAgent] バックアップ: 差分ファイルなし（検証終了）")
+                break
+
+            # 検証開始メッセージ送信
+            検証開始テキスト = f"{n}回目の検証作業を開始します。"
+            logger.info(f"[CodeAgent] {検証開始テキスト}")
+            await self.接続.send_to_channel(self.チャンネル, {
+                "ソケットID": self.ソケットID,
+                "メッセージ識別": "output_text",
+                "メッセージ内容": 検証開始テキスト,
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+
+            # 検証プロンプト構築
+            変更ファイル一覧テキスト = "\n".join(f"- {f}" for f in バックアップファイル)
+            バックアップフォルダ名 = os.path.basename(バックアップフォルダ絶対パス)
+            検証プロンプト = (
+                f"{n}回目の検証作業を開始します。\n"
+                f"\n"
+                f"変更ファイル一覧:\n"
+                f"{変更ファイル一覧テキスト}\n"
+                f"\n"
+                f"バックアップ先: {バックアップフォルダ絶対パス}\n"
+                f"\n"
+                f"以下の作業を行ってください:\n"
+                f"1) バックアップフォルダ「{バックアップフォルダ名}」を変更点の要約名にリネームしてください（例: {バックアップフォルダ名}.リブートファイル名変更）\n"
+                f"2) 並行開発の可能性もあるため、上記の変更ファイルが自分の変更として正しいか検証してください。問題があれば修正してください。\n"
+            )
+
+            # AI検証実行
+            検証結果 = ""
+            try:
+                検証結果 = await ai_instance.実行(
+                    要求テキスト=検証プロンプト,
+                    変更ファイル一覧=バックアップファイル,
+                    絶対パス=self.絶対パス or None,
+                )
+            except Exception as e:
+                logger.error(f"[CodeAgent] 検証AI実行エラー: {e}")
+                検証結果 = f"検証中にエラーが発生しました: {e}"
+            if not 検証結果:
+                検証結果 = "（検証結果なし）"
+
+            # 検証結果送信
+            await self.接続.send_to_channel(self.チャンネル, {
+                "ソケットID": self.ソケットID,
+                "メッセージ識別": "output_text",
+                "メッセージ内容": 検証結果,
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+
+            # 会話履歴保存
+            if self.保存関数:
+                self.保存関数(
+                    ソケットID=self.ソケットID,
+                    チャンネル=self.チャンネル,
+                    メッセージ識別="output_text",
+                    メッセージ内容=検証結果,
+                    ファイル名=None,
+                    サムネイル画像=None
+                )
+
+        else:
+            logger.warning(f"[CodeAgent] 検証ループが最大回数({最大検証回数})に到達しました")
 
     async def _処理_input_file(self, 受信データ: dict):
         """input_file処理: temp/outputコピー → output_file送信"""

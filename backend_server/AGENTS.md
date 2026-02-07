@@ -115,7 +115,7 @@
 - `create_audit_fields(認証情報)` と `update_audit_fields(認証情報)` を使用
 
 **6. Reboot機構（内部再起動システム）:**
-- `temp/reboot1.txt` (main1用) または `temp/reboot2.txt` (main2用) を作成するとサーバーが自動再起動
+- `temp/reboot_core.txt` (core_main用) または `temp/reboot_apps.txt` (apps_main用) を作成するとサーバーが自動再起動
 - 起動時に `@app.on_event("startup")` でファイルを検知して `os._exit(0)`
 - バックグラウンドスレッドで1秒毎に監視
 - `_start.py` によるプロセス監視と組み合わせて使用
@@ -167,7 +167,7 @@
   - 管理するテーブル: `C採番`, `C権限`, `C利用者`, `A会話履歴`
   - 登録するルーター: `auth`, `C権限`, `V権限`, `C利用者`, `V利用者`, `C採番`, `V採番`, `AIコア`, `A会話履歴`
   - `@app.on_event("startup")`:
-    - Reboot監視スレッド起動 (`temp/reboot1.txt`)
+    - Reboot監視スレッド起動 (`temp/reboot_core.txt`)
     - ログ設定初期化 (`setup_logging()`)
     - 設定管理初期化 (`app_conf.init()`)
     - C系初期データ投入 (`core_crud.init_db_data(db)`)
@@ -179,7 +179,7 @@
   - 管理するテーブル: `M配車区分`, `M車両`, `M商品`, `T配車`, `T商品出庫`, `T商品棚卸`, `T商品入庫`
   - 登録するルーター: `M配車区分`, `V配車区分`, `M車両`, `V車両`, `M商品`, `V商品`, `T配車`, `V配車`, `T商品出庫`, `V商品出庫`, `T商品棚卸`, `V商品棚卸`, `T商品入庫`, `V商品入庫`, `V商品推移表`, `S配車_週表示`, `S配車_日表示`
   - `@app.on_event("startup")`:
-    - Reboot監視スレッド起動 (`temp/reboot2.txt`)
+    - Reboot監視スレッド起動 (`temp/reboot_apps.txt`)
     - ログ設定初期化 (`setup_logging()`)
     - 設定管理初期化 (`app_conf.init(conf_path_enabled=False, conf_models_enabled=False)`)
     - M/T系初期データ投入 (`apps_crud.init_db_data(db)`)
@@ -311,8 +311,8 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
 
 **tempディレクトリ (temp/):**
 - **temp/** - 一時ファイル・Reboot制御ファイル
-  - `reboot1.txt` - main1サーバー再起動トリガー（作成されると自動再起動）
-  - `reboot2.txt` - main2サーバー再起動トリガー（作成されると自動再起動）
+  - `reboot_core.txt` - core_mainサーバー再起動トリガー（作成されると自動再起動）
+  - `reboot_apps.txt` - apps_mainサーバー再起動トリガー（作成されると自動再起動）
   - startup時に自動作成 (`os.makedirs(temp_dir, exist_ok=True)`)
 
 ### Models (core_models/ and apps_models/) - SQLAlchemy ORMモデル
@@ -685,21 +685,21 @@ core_main.pyとapps_main.pyに組み込まれた自動再起動機構。
 
 **仕組み:**
 1. startup時に `temp/` ディレクトリを作成
-2. `temp/reboot1.txt` (main1用) または `temp/reboot2.txt` (main2用) の存在を確認
+2. `temp/reboot_core.txt` (core_main用) または `temp/reboot_apps.txt` (apps_main用) の存在を確認
 3. ファイルが存在する場合:
    - ファイルを削除
-   - `raise SystemExit("reboot1.txt detected")` でプロセス終了
+   - `raise SystemExit("reboot_core.txt detected")` でプロセス終了
 4. バックグラウンドスレッドで1秒毎にファイル監視
 5. ファイルが作成されると `os._exit(0)` でプロセス終了
 
 **使用方法:**
 ```python
-# main1を再起動する場合
-with open("backend_server/temp/reboot1.txt", "w") as f:
+# core_mainを再起動する場合
+with open("backend_server/temp/reboot_core.txt", "w") as f:
     f.write("reboot")
 
-# main2を再起動する場合
-with open("backend_server/temp/reboot2.txt", "w") as f:
+# apps_mainを再起動する場合
+with open("backend_server/temp/reboot_apps.txt", "w") as f:
     f.write("reboot")
 ```
 
@@ -709,8 +709,8 @@ with open("backend_server/temp/reboot2.txt", "w") as f:
 - 設定変更や動的なコード再読み込みに使用可能
 
 **実装詳細:**
-- core_main.py:74-98 でreboot1.txt監視スレッド起動
-- apps_main.py:93-117 でreboot2.txt監視スレッド起動
+- core_main.py:74-98 でreboot_core.txt監視スレッド起動
+- apps_main.py:93-117 でreboot_apps.txt監視スレッド起動
 - デーモンスレッドとして起動（メインプロセス終了時に自動終了）
 
 ### Authentication & Security
@@ -772,7 +772,7 @@ Allowed origins (in `main.py`):
 - **初期投入の条件**: `core_crud.init_db_data()` は **admin が未存在のときだけ** C利用者を投入します。既にDBに admin がいる場合、パスワード変更は自動反映されません。
 - **DBファイル**: `backend_server/_data/AiDiy/database.db` を core_main / apps_main が共有します。
 - **CORS許可リスト**: `core_main.py` / `apps_main.py` は `http://localhost:5173`, `http://localhost:3000`, `http://localhost:8090` のみ許可。ポート変更時は両方更新が必要です。
-- **ホットリロード**: `_start.py` 経由の起動は `uvicorn --reload` が付かないため自動リロードされません（再起動 or `temp/reboot1.txt` / `temp/reboot2.txt` を利用）。
+- **ホットリロード**: `_start.py` 経由の起動は `uvicorn --reload` が付かないため自動リロードされません（再起動 or `temp/reboot_core.txt` / `temp/reboot_apps.txt` を利用）。
 
 ## API エンドポイント
 

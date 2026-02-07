@@ -210,7 +210,7 @@
 
 ### 10. Reboot機構（内部再起動システム）
 
-- `temp/reboot1.txt` または `temp/reboot2.txt` でサーバー再起動
+- `temp/reboot_core.txt` または `temp/reboot_apps.txt` でサーバー再起動
 - `_start.py` による自動プロセス監視
 - 設定変更やコード再読み込みに便利
 
@@ -340,7 +340,7 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
   - Audit Fields Pattern (監査フィールドの自動付与)
   - Logging System (EndpointFilter)
   - WebSocket Support (WebSocketManager, セッション管理)
-  - Reboot機構（temp/reboot1.txt, temp/reboot2.txt）
+  - Reboot機構（temp/reboot_core.txt, temp/reboot_apps.txt）
   - Authentication & Security (JWT, 平文パスワード警告)
 - **Database & Data Management**
   - Database Configuration (SQLite設定、テーブル自動作成)
@@ -484,10 +484,10 @@ Press F5 in VS Code:
 **方法1: Reboot機構を使う（推奨）**
 ```bash
 # core_main.py を再起動
-echo. > backend_server/temp/reboot1.txt
+echo. > backend_server/temp/reboot_core.txt
 
 # apps_main.py を再起動
-echo. > backend_server/temp/reboot2.txt
+echo. > backend_server/temp/reboot_apps.txt
 ```
 
 **方法2: 個別起動で --reload を有効化**
@@ -570,7 +570,7 @@ backend_server/_data/AiDiy/database.db
 **実装確認済みの補足（間違いやすい点）:**
 - **初期データ投入の条件**: `core_crud.init_db_data()` は **admin が未存在のときだけ** C利用者を投入します。既存DBでは自動更新されません。
 - **DBファイル位置**: `backend_server/_data/AiDiy/database.db`（core_main / apps_main で共有）。
-- **_start.py の起動挙動**: `uvicorn --reload` は付かないため、バックエンドは自動リロードされません（手動再起動 or reboot1/2.txt を利用）。
+- **_start.py の起動挙動**: `uvicorn --reload` は付かないため、バックエンドは自動リロードされません（手動再起動 or reboot_core/reboot_apps.txt を利用）。
 - **ポート変更の連動修正**: `frontend_server/vite.config.ts` の `server.port` を変える場合、`backend_server/core_main.py` と `apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要。
 - **_setup.py の案内文**: 画面表示は `python start.py` ですが、実ファイルは **`_start.py`** です。
 
@@ -610,7 +610,7 @@ lsof -ti:8091 | xargs kill -9
 | **Vue component shows as text** | Japanese component name appears as text in browser | Japanese tags are invalid in HTML. Use `<component :is="日本語コンポーネント名" />` instead of `<日本語コンポーネント名 />` |
 | **Database reset needed** | Need to recreate tables from scratch | Stop all servers → Delete `backend_server/_data/AiDiy/database.db` → Restart servers (tables and initial data auto-created) |
 | **WebSocket接続エラー (AIコア)** | `LiveAI未初期化のため音声送信不可: ws-xxxx` | WebSocket接続と LiveAI 初期化のタイミング問題。フロントエンドで接続→設定送信の順序を確認。バックエンドログで初期化ステップを確認。詳細は [backend_server/AGENTS.md](./backend_server/AGENTS.md) の「AIコア Component System」セクション参照 |
-| **コード変更が反映されない** | バックエンドのコードを変更しても動作が変わらない | `_start.py` で起動した場合は `--reload` なし。`temp/reboot1.txt` または `temp/reboot2.txt` を作成して再起動、または上記「バックエンドのコード変更を反映する方法」参照 |
+| **コード変更が反映されない** | バックエンドのコードを変更しても動作が変わらない | `_start.py` で起動した場合は `--reload` なし。`temp/reboot_core.txt` または `temp/reboot_apps.txt` を作成して再起動、または上記「バックエンドのコード変更を反映する方法」参照 |
 
 ## Testing
 

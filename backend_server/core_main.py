@@ -25,7 +25,6 @@ import threading
 import time
 from conf import conf as app_conf
 from log_config import setup_logging, get_logger
-from AIコア.AIバックアップ import バックアップ実行
 
 # ロガー取得
 logger = get_logger(__name__)
@@ -88,13 +87,13 @@ def startup_event():
     # tempフォルダ準備 & 再起動フラグ処理
     temp_dir = os.path.join(os.path.dirname(__file__), "temp")
     os.makedirs(temp_dir, exist_ok=True)
-    reboot_self_path = os.path.join(temp_dir, "reboot1.txt")
+    reboot_self_path = os.path.join(temp_dir, "reboot_core.txt")
     if os.path.isfile(reboot_self_path):
         try:
             os.remove(reboot_self_path)
         except Exception:
             pass
-        raise SystemExit("reboot1.txt detected")
+        raise SystemExit("reboot_core.txt detected")
     def reboot_watcher() -> None:
         while True:
             try:
@@ -124,29 +123,6 @@ def startup_event():
         core_crud.init_db_data(db)
     finally:
         db.close()
-
-    # バックアップ実行
-    try:
-        backend_dir = os.path.dirname(__file__)
-        logger.info("バックアップ処理を開始します...")
-        result = バックアップ実行(アプリ設定=app_conf, backend_dir=backend_dir)
-        if result:
-            最終時刻, ファイル一覧, バックアップファイル一覧, 全件フラグ = result
-            if 全件フラグ:
-                logger.info(f"バックアップ完了 最終更新時刻={最終時刻}, 総ファイル数={len(ファイル一覧)},")
-            else:
-                if バックアップファイル一覧:
-                    logger.info(f"バックアップ完了 最終更新時刻={最終時刻}, 総ファイル数={len(ファイル一覧)}, 差分ファイル数={len(バックアップファイル一覧)},")
-                    for file in バックアップファイル一覧[:10]:  # 最大10件表示
-                        logger.info(f"・{file}")
-                    if len(バックアップファイル一覧) > 10:
-                        logger.info(f"... 他 {len(バックアップファイル一覧) - 10}件")
-                else:
-                    logger.info(f"バックアップ完了 最終更新時刻={最終時刻}, 総ファイル数={len(ファイル一覧)}, 差分ファイル=なし,")
-        else:
-            logger.info("バックアップスキップ（更新ファイルなし）")
-    except Exception as e:
-        logger.error(f"バックアップ実行時エラー: {e}")
 
 @app.get("/")
 def read_root():

@@ -99,13 +99,13 @@ def _最新更新と全ファイル一覧(ベースパス: str) -> Tuple[float, 
     return max_mtime, files
 
 
-def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = None) -> Optional[Tuple[str, List[str], List[str], bool]]:
+def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = None) -> Optional[Tuple[str, List[str], List[str], bool, str]]:
     """
     自動バックアップ実行（全件/差分を自動判定）
     - 最大日付フォルダ無し または *.allフォルダ無し → 全件バックアップ
     - それ以外 → 最終バックアップ時刻+1秒からの差分バックアップ
 
-    戻り値: (最大日時文字列, 全ファイル一覧, バックアップファイル一覧, 全件フラグ) または None
+    戻り値: (最大日時文字列, 全ファイル一覧, バックアップファイル一覧, 全件フラグ, バックアップフォルダ絶対パス) または None
     """
     try:
         base_path = _コードベース絶対パス取得(アプリ設定, backend_dir=backend_dir)
@@ -127,8 +127,9 @@ def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = 
         # 最大日付フォルダの存在確認
         if not os.path.isdir(date_folder):
             # 日付フォルダ無し → 全件バックアップ
+            all_target = os.path.abspath(os.path.join(backup_root, date_dir, f"{time_dir}.all"))
             result = _全件バックアップ作成(base_path, all_files, backup_root, date_dir, time_dir, last_time)
-            return (last_time, all_files, all_files, True) if result else None
+            return (last_time, all_files, all_files, True, all_target) if result else None
 
         # *.allフォルダの存在確認
         all_folder_exists = any(
@@ -137,15 +138,17 @@ def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = 
         )
         if not all_folder_exists:
             # *.allフォルダ無し → 全件バックアップ
+            all_target = os.path.abspath(os.path.join(backup_root, date_dir, f"{time_dir}.all"))
             result = _全件バックアップ作成(base_path, all_files, backup_root, date_dir, time_dir, last_time)
-            return (last_time, all_files, all_files, True) if result else None
+            return (last_time, all_files, all_files, True, all_target) if result else None
 
         # 差分バックアップ: 同日内の最終バックアップ時刻を取得
         最終時刻 = _最終バックアップ時刻取得(date_folder)
         if not 最終時刻:
             # 時刻取得失敗 → 全件バックアップ
+            all_target = os.path.abspath(os.path.join(backup_root, date_dir, f"{time_dir}.all"))
             result = _全件バックアップ作成(base_path, all_files, backup_root, date_dir, time_dir, last_time)
-            return (last_time, all_files, all_files, True) if result else None
+            return (last_time, all_files, all_files, True, all_target) if result else None
 
         # 最終時刻+1秒以降の更新ファイルのみ抽出
         threshold_ts = 最終時刻 + 1.0
@@ -164,12 +167,12 @@ def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = 
 
         if not changed_files:
             # 差分なし
-            return (last_time, all_files, [], False)
+            return (last_time, all_files, [], False, "")
 
         # 差分バックアップ作成
-        target_dir = os.path.join(backup_root, date_dir, time_dir)
+        target_dir = os.path.abspath(os.path.join(backup_root, date_dir, time_dir))
         if os.path.isdir(target_dir):
-            return (last_time, all_files, [], False)
+            return (last_time, all_files, [], False, "")
 
         os.makedirs(target_dir, exist_ok=True)
         copied = 0
@@ -183,10 +186,10 @@ def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = 
             copied += 1
 
         if copied == 0:
-            return (last_time, all_files, [], False)
+            return (last_time, all_files, [], False, "")
 
         logger.info(f"AIコア差分バックアップ作成: {date_dir}/{time_dir} ({copied}件)")
-        return (last_time, all_files, changed_files, False)
+        return (last_time, all_files, changed_files, False, target_dir)
 
     except Exception as e:
         logger.warning(f"AIコアバックアップ失敗: {e}")
@@ -234,8 +237,8 @@ def _最終バックアップ時刻取得(date_folder: str) -> Optional[float]:
             item_path = os.path.join(date_folder, item)
             if not os.path.isdir(item_path):
                 continue
-            # フォルダ名から時刻を抽出（"HHMMSS" または "HHMMSS.all"）
-            time_str = item.replace(".all", "")
+            # フォルダ名から時刻を抽出（"HHMMSS", "HHMMSS.all", "HHMMSS.コメント" 等）
+            time_str = item.split(".")[0]
             if len(time_str) != 6 or not time_str.isdigit():
                 continue
             # HHMMSS をタイムスタンプに変換

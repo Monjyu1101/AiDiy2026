@@ -12,7 +12,7 @@
    エラー時は必ず db.rollback() を呼び出す
 
 4. Rebootファイルの削除忘れ
-   temp/reboot1.txt, temp/reboot2.txt は自動削除される
+   temp/reboot_core.txt, temp/reboot_apps.txt は自動削除される
 
 ■ フロントエンド落とし穴
 

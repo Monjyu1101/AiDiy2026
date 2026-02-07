@@ -7,7 +7,7 @@
 # Thank you for keeping the rules.
 # ------------------------------------------------
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -24,7 +24,7 @@ def issue_token(利用者: C利用者):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/ログイン", response_model=schemas.ResponseBase)
-def login(request: schemas.LoginRequest, db: Session = Depends(deps.get_db)):
+def login(request: schemas.LoginRequest, http_request: Request, db: Session = Depends(deps.get_db)):
     利用者 = crud.authenticate_C利用者(db, 利用者ID=request.利用者ID, パスワード=request.パスワード)
     if not 利用者:
         return schemas.ResponseBase(
@@ -33,10 +33,16 @@ def login(request: schemas.LoginRequest, db: Session = Depends(deps.get_db)):
             data={"error": {"code": "AUTH_FAILED"}}
         )
 
+    token_data = issue_token(利用者)
+    # 設定から初期ページを取得
+    app_conf = getattr(http_request.app, "conf", None)
+    初期ページ = app_conf.get("WEBUI_FIRST_PAGE", "") if app_conf else ""
+    token_data["初期ページ"] = 初期ページ
+
     return schemas.ResponseBase(
         status="OK",
         message="ログインしました",
-        data=issue_token(利用者)
+        data=token_data
     )
 
 @router.post("/token", response_model=schemas.Token)

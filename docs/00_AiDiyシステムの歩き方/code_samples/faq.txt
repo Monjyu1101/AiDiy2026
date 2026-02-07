@@ -27,8 +27,8 @@ Q. ポート競合エラー
 A. _stop.py を実行するか、_start.py が自動でポートをクリア。
 
 Q. コード変更が反映されない
-A. _start.pyは--reloadなし。temp/reboot1.txt または
-   temp/reboot2.txt を作成して再起動。
+A. _start.pyは--reloadなし。temp/reboot_core.txt または
+   temp/reboot_apps.txt を作成して再起動。
 
 Q. サーバーが再起動を繰り返す
 A. コンソールでエラーを確認。モジュール不足や構文エラーが原因。

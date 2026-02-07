@@ -1,4 +1,4 @@
-// index.js - AiDiy_next 自己紹介ページの動的機能
+// index.js - AiDiy 自己紹介ページの動的機能
 
 class AiDiyIntroduction {
     constructor() {
@@ -16,7 +16,7 @@ class AiDiyIntroduction {
             "Japanese-First Design → Complete",
             "qTubler System → Operational",
             "JWT Authentication → Secured",
-            "Welcome to AiDiy_next"
+            "Welcome to AiDiy"
         ];
         this.currentTextIndex = 0;
         this.typewriterSpeed = 50;

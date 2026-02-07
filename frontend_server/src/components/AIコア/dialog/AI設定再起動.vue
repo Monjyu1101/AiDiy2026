@@ -13,6 +13,7 @@
 import { ref, watch, reactive, computed, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import apiClient from '@/api/client';
+import { qConfirm } from '@/utils/qAlert';
 import RebootDialog from './再起動カウントダウン.vue';
 
 const route = useRoute();
@@ -32,6 +33,7 @@ const availableModels = ref<Record<string, any>>({});
 const currentSettings = ref<Record<string, any>>({});
 const codeBaseOptions = ref<Record<string, string>>({});
 const showRebootDialog = ref(false);
+const rebootWaitSeconds = ref(15);
 const isInitializing = ref(false);
 
 const selections = reactive({
@@ -191,19 +193,7 @@ const handleCancel = () => {
   emit('close');
 };
 
-const handleSave = async () => {
-  loading.value = true;
-  errorMessage.value = '';
-  try {
-    // URLからソケットIDを取得
-    const ソケットID = (route.query.セッションID as string) || (route.query.ソケットID as string);
-
-    if (!ソケットID) {
-      errorMessage.value = 'ソケットIDが見つかりません。画面をリロードしてください。';
-      loading.value = false;
-      return;
-    }
-
+const buildNextSettings = () => {
     const nextSettings = { ...currentSettings.value };
     nextSettings.CHAT_AI = selections.chatAi;
     nextSettings.LIVE_AI = selections.liveAi;
@@ -233,25 +223,67 @@ const handleSave = async () => {
     if (voiceKey) {
       nextSettings[voiceKey] = selections.liveVoice;
     }
+    return nextSettings;
+};
+
+const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_apps: boolean }, waitSeconds: number = 15) => {
+  loading.value = true;
+  errorMessage.value = '';
+  try {
+    const ソケットID = (route.query.セッションID as string) || (route.query.ソケットID as string);
+
+    if (!ソケットID) {
+      errorMessage.value = 'ソケットIDが見つかりません。画面をリロードしてください。';
+      loading.value = false;
+      return;
+    }
 
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       ソケットID,
-      モデル設定: nextSettings,
-      再起動要求: {
-        reboot1: false,
-        reboot2: true
-      }
+      モデル設定: buildNextSettings(),
+      再起動要求
     });
 
     if (response?.data?.status === 'OK') {
-      // emit('saved'); // Replaced by reload
-      // emit('close'); // Replaced by reload
+      rebootWaitSeconds.value = waitSeconds;
       showRebootDialog.value = true;
     } else {
       errorMessage.value = response?.data?.message || '保存に失敗しました';
     }
   } catch (error: any) {
     errorMessage.value = `保存エラー: ${error?.response?.data?.message || error?.message || error}`;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true });
+
+const handleResetReboot = async () => {
+  const confirmed = await qConfirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？');
+  if (!confirmed) return;
+  loading.value = true;
+  errorMessage.value = '';
+  try {
+    const ソケットID = (route.query.セッションID as string) || (route.query.ソケットID as string);
+    if (!ソケットID) {
+      errorMessage.value = 'ソケットIDが見つかりません。画面をリロードしてください。';
+      loading.value = false;
+      return;
+    }
+    const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
+      ソケットID,
+      モデル設定: {},
+      再起動要求: { reboot_core: true, reboot_apps: true }
+    });
+    if (response?.data?.status === 'OK') {
+      rebootWaitSeconds.value = 45;
+      showRebootDialog.value = true;
+    } else {
+      errorMessage.value = response?.data?.message || 'リセット再起動に失敗しました';
+    }
+  } catch (error: any) {
+    errorMessage.value = `リセット再起動エラー: ${error?.response?.data?.message || error?.message || error}`;
   } finally {
     loading.value = false;
   }
@@ -512,13 +544,19 @@ watch(
         </div>
       </div>
       <div class="config-panel-actions">
-        <button type="button" @click="handleCancel">キャンセル</button>
-        <button type="button" class="primary" :disabled="loading" @click="handleSave">設定/再起動</button>
+        <div class="config-panel-actions-edge" aria-hidden="true"></div>
+        <div class="config-panel-actions-center">
+          <button type="button" @click="handleCancel">キャンセル</button>
+          <button type="button" class="primary" :disabled="loading" @click="handleSave">設定/再起動</button>
+        </div>
+        <div class="config-panel-actions-edge">
+          <button type="button" class="danger" :disabled="loading" @click="handleResetReboot">リセット/再起動</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <RebootDialog :show="showRebootDialog" :wait-seconds="15" />
+  <RebootDialog :show="showRebootDialog" :wait-seconds="rebootWaitSeconds" />
 </template>
 
 <style scoped>
@@ -681,10 +719,24 @@ watch(
 .config-panel-actions {
   padding: 8px 12px;
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
   border-top: 1px solid #e2e8f0;
   background: #f8fafc;
+}
+
+.config-panel-actions-edge {
+  flex: 1;
+  display: flex;
+}
+
+.config-panel-actions-edge:last-child {
+  justify-content: flex-end;
+}
+
+.config-panel-actions-center {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 
 .config-panel-actions button {
@@ -712,7 +764,18 @@ watch(
   background: #1d4ed8;
 }
 
-.config-panel-actions button.primary:disabled {
+.config-panel-actions button.danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+.config-panel-actions button.danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.config-panel-actions button.primary:disabled,
+.config-panel-actions button.danger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

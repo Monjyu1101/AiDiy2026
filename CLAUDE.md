@@ -73,8 +73,8 @@ cd backend_server && uv sync
 cd frontend_server && npm install
 
 # Trigger backend reload (without --reload flag)
-echo. > backend_server/temp/reboot1.txt   # core_main
-echo. > backend_server/temp/reboot2.txt   # apps_main
+echo. > backend_server/temp/reboot_core.txt   # core_main
+echo. > backend_server/temp/reboot_apps.txt   # apps_main
 
 # Database reset (delete and restart servers to recreate)
 del backend_server\_data\AiDiy\database.db

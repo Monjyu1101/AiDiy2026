@@ -44,7 +44,8 @@ export const useAuthStore = defineStore('auth', {
                     localStorage.setItem('token', this.token)
                     this.authChecked = false
                     await this.fetchUser()
-                    router.push('/Xその他')
+                    const 初期ページ = response.data.data.初期ページ
+                    router.push(初期ページ ? `/${初期ページ}` : '/Xその他')
                     return { success: true }
                 }
                 return { success: false, message: response.data.message }
