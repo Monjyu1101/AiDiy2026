@@ -1,12 +1,17 @@
-﻿[ブラウザ]
+[ブラウザ]
    |
    v
 [Vue 3 フロント]  http://localhost:8090
    |
-   |  POST (JSON + Authorization)
+   |  /core/* (POST, JSON + Authorization)
    v
-[FastAPI]          http://localhost:8091
+[FastAPI Core]     http://localhost:8091
+   |
+   |  共有DB
+   |
+   |  /apps/* (POST, JSON + Authorization)
+   v
+[FastAPI Apps]     http://localhost:8092
    |
    v
-[SQLite database]
-
+[SQLite database]  backend_server/_data/AiDiy/database.db

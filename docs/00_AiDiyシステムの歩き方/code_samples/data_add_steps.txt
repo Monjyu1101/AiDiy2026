@@ -1,5 +1,10 @@
-﻿1) ログインして token を取得
-2) create API に JSON を送る
-3) get API で登録内容を確認
-4) list API で一覧反映を確認
+﻿1) 送信先を決める（/core or /apps）
+2) ログインして token を取得
+3) 登録API に JSON を送る（POST）
+4) 取得API で登録内容を確認
+5) 一覧API で反映を確認
 
+完了条件:
+- status がすべて OK
+- 一覧に追加データが表示される
+- 失敗時は message をそのまま記録して原因切り分け

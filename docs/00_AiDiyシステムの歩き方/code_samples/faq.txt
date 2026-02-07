@@ -11,7 +11,8 @@ A. JWTトークンが60分で期限切れ。再ログインしてください。
 
 Q. CORSエラー
 A. core_main.py/apps_main.pyの許可リストを確認。
-   localhost:8090, localhost:5173, localhost:3000 のみ許可。
+   localhost:8090, localhost:5173, localhost:3000 に加えて
+   http://localhost / https://localhost も許可。
 
 ■ 認証関連
 
@@ -52,4 +53,3 @@ A. すべてのファイルがUTF-8か確認。
 
 Q. WebSocket接続エラー（AIコア）
 A. 接続→設定送信の順序を確認。バックエンドログで初期化ステップ確認。
-

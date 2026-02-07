@@ -1,16 +1,16 @@
-■ ディレクトリ作成コマンド（例: C新テーブル）
+﻿■ M商品 実装ファイル位置（作成済み）
+
+frontend_server/src/components/Mマスタ/M商品/
+├── M商品一覧.vue
+├── M商品編集.vue
+└── components/
+    └── M商品一覧テーブル.vue
+
+■ 参考: 新規M系CRUDを追加する場合の作成コマンド
 
 # Windows
-mkdir frontend_server\src\components\C管理\C新テーブル
-mkdir frontend_server\src\components\C管理\C新テーブル\components
+mkdir frontend_server\src\components\Mマスタ\M新テーブル
+mkdir frontend_server\src\components\Mマスタ\M新テーブル\components
 
 # Linux/Mac
-mkdir -p frontend_server/src/components/C管理/C新テーブル/components
-
-■ 作成するファイル
-
-C新テーブル/
-├── C新テーブル一覧.vue           # 一覧画面
-├── C新テーブル編集.vue           # 編集画面
-└── components/
-    └── C新テーブル一覧テーブル.vue  # qTublerラッパー
+mkdir -p frontend_server/src/components/Mマスタ/M新テーブル/components

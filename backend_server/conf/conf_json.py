@@ -31,15 +31,22 @@ class conf_json:
         # WebUI設定
         'WEB_BASE': '8080',
         'CORE_BASE': '8080',
-        'WEBUI_FIRST_PAGE': '_テスト',
+        'WEBUI_FIRST_PAGE': 'Sスケジュール',
 
-        # APIキー（省略値には含めない）
+        # APIキー
+        'gemini_key_id': '< your gemini api key >',
+        'freeai_key_id': '< your freeai api key >',
+        'claude_key_id': '< your claude api key >',
 
         # OpenAI/Azureの基本設定
         'openai_api_type': 'openai',
         'openai_organization': '< your openai organization id >',
+        'openai_key_id': '< your openai api key >',
         'azure_endpoint': '< your azure openai endpoint >',
         'azure_version': 'yyyy-mm-dd-preview',
+        'azure_key_id': '< your azure openai api key >',
+        'copilot_key_id': '< your copilot api key >',
+        'openrt_key_id': '< your openrouter api key >',
 
         # ChatAI設定
         'CHAT_AI': 'freeai',
@@ -58,9 +65,9 @@ class conf_json:
 
         # CodeAI設定
         'CODE_BASE_PATH': '../',
-        'CODE_AI1': 'copilot_cli',
+        'CODE_AI1': 'claude_sdk',
         'CODE_AI1_MODEL': 'auto',
-        'CODE_AI2': 'claude_sdk',
+        'CODE_AI2': 'copilot_cli',
         'CODE_AI2_MODEL': 'auto',
         'CODE_AI3': 'codex_cli',
         'CODE_AI3_MODEL': 'auto',
@@ -95,27 +102,61 @@ class conf_json:
     def _load_or_create(self) -> None:
         """設定ファイルの読み込み、または初期値で作成"""
         config_file = object.__getattribute__(self, '_config_file')
+        保存要否 = False
 
         if os.path.exists(config_file):
             try:
                 with open(config_file, 'r', encoding='utf-8-sig') as f:
                     config_data = json.load(f)
+                if not isinstance(config_data, dict):
+                    raise ValueError("設定JSONのルートはオブジェクト(dict)である必要があります")
                 object.__setattr__(self, '_config_data', config_data)
                 logger.info(f'設定ファイル読み込み完了: {config_file}')
             except Exception as e:
                 logger.error(f'設定ファイル読み込みエラー: {e}')
                 object.__setattr__(self, '_config_data', self.DEFAULT_CONFIG.copy())
+                保存要否 = True
         else:
             logger.warning(f'設定ファイルが存在しません: {config_file}')
             object.__setattr__(self, '_config_data', self.DEFAULT_CONFIG.copy())
-            self._save()
+            保存要否 = True
+
+        # 既存設定に不足しているデフォルト項目を補完
+        if self._apply_default_keys():
+            保存要否 = True
 
         # CODE_AI2～4が"auto"の場合、CODE_AI1の値をコピー
-        self._apply_code_ai_auto()
+        if self._apply_code_ai_auto():
+            保存要否 = True
 
-    def _apply_code_ai_auto(self) -> None:
+        if 保存要否:
+            self._save()
+
+    def _apply_default_keys(self) -> bool:
+        """不足しているデフォルト設定キーを補完"""
+        config_data = object.__getattribute__(self, '_config_data')
+        変更あり = False
+        for key, value in self.DEFAULT_CONFIG.items():
+            if key not in config_data:
+                config_data[key] = value
+                変更あり = True
+        # 並び順をDEFAULT_CONFIG準拠に統一（未知キーは末尾維持）
+        ordered = {}
+        for key in self.DEFAULT_CONFIG.keys():
+            if key in config_data:
+                ordered[key] = config_data[key]
+        for key, value in config_data.items():
+            if key not in ordered:
+                ordered[key] = value
+        if list(ordered.keys()) != list(config_data.keys()):
+            変更あり = True
+        object.__setattr__(self, '_config_data', ordered)
+        return 変更あり
+
+    def _apply_code_ai_auto(self) -> bool:
         """CODE_AI2～4が'auto'の場合、CODE_AI1の値をコピー"""
         config_data = object.__getattribute__(self, '_config_data')
+        変更あり = False
         
         code_ai1 = config_data.get('CODE_AI1', 'auto')
         code_ai1_model = config_data.get('CODE_AI1_MODEL', 'auto')
@@ -129,7 +170,9 @@ class conf_json:
             if config_data.get(code_ai_key, 'auto') == 'auto':
                 config_data[code_ai_key] = code_ai1
                 config_data[code_model_key] = code_ai1_model
+                変更あり = True
                 logger.debug(f'{code_ai_key}が"auto"のため、CODE_AI1の値({code_ai1})をコピーしました')
+        return 変更あり
 
     def _save(self) -> bool:
         """設定ファイルを保存"""

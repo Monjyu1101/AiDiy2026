@@ -1,9 +1,10 @@
 ﻿import requests
 
-BASE_URL = "http://localhost:8091"
+BASE_CORE_URL = "http://localhost:8091"
+BASE_APPS_URL = "http://localhost:8092"
 
 login_res = requests.post(
-    f"{BASE_URL}/core/auth/ログイン",
+    f"{BASE_CORE_URL}/core/auth/ログイン",
     json={"利用者ID": "admin", "パスワード": "********"},
     timeout=10
 )
@@ -21,7 +22,7 @@ payload = {
 }
 
 create_res = requests.post(
-    f"{BASE_URL}/apps/M配車区分/登録",
+    f"{BASE_APPS_URL}/apps/M配車区分/登録",
     json=payload,
     headers=headers,
     timeout=10
@@ -29,7 +30,7 @@ create_res = requests.post(
 print("create:", create_res.json()["status"])
 
 get_res = requests.post(
-    f"{BASE_URL}/apps/M配車区分/取得",
+    f"{BASE_APPS_URL}/apps/M配車区分/取得",
     json={"配車区分ID": "99"},
     headers=headers,
     timeout=10
@@ -38,7 +39,7 @@ print("get:", get_res.json()["status"])
 
 payload.update({"配車区分備考": "赤", "配色枠": "#660000", "配色背景": "#ffcccc"})
 update_res = requests.post(
-    f"{BASE_URL}/apps/M配車区分/変更",
+    f"{BASE_APPS_URL}/apps/M配車区分/変更",
     json=payload,
     headers=headers,
     timeout=10
@@ -46,7 +47,7 @@ update_res = requests.post(
 print("update:", update_res.json()["status"])
 
 list_res = requests.post(
-    f"{BASE_URL}/apps/M配車区分/一覧",
+    f"{BASE_APPS_URL}/apps/M配車区分/一覧",
     json={},
     headers=headers,
     timeout=10
@@ -54,10 +55,9 @@ list_res = requests.post(
 print("list:", list_res.json()["status"], "total:", list_res.json()["data"]["total"])
 
 delete_res = requests.post(
-    f"{BASE_URL}/apps/M配車区分/削除",
+    f"{BASE_APPS_URL}/apps/M配車区分/削除",
     json={"配車区分ID": "99"},
     headers=headers,
     timeout=10
 )
 print("delete:", delete_res.json()["status"])
-

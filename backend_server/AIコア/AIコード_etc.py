@@ -695,6 +695,18 @@ class CodeAI:
                                 テキスト受信処理Ｑ.put_nowait({"text": line_text, "json": json.dumps(data, ensure_ascii=False)})
                             except Exception:
                                 pass
+
+                        # parent_manager経由でoutput_stream送信（stderr）
+                        if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                            try:
+                                await self.parent_manager.接続.send_json({
+                                    "ソケットID": self.ソケットID,
+                                    "チャンネル": self.チャンネル,
+                                    "メッセージ識別": "output_stream",
+                                    "メッセージ内容": line_text,
+                                })
+                            except Exception as e:
+                                logger.error(f"[CodeEtc] output_stream送信エラー(stderr): {e}")
                 except Exception as e:
                     logger.error(f"stderr読み取りエラー: {e}")
 

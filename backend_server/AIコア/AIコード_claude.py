@@ -99,8 +99,8 @@ class CodeAI:
         self.履歴最終時刻 = time.time()
         self.履歴辞書 = {}
         
-        # SDK session管理
-        self.ソケットID = None
+        # SDK session管理（WebSocketのソケットIDとは分離）
+        self.SDKセッションID = None
         
         # 生存状態管理
         self.is_alive = True
@@ -166,8 +166,8 @@ class CodeAI:
         try:
             # パラメータで渡されたapiキーを優先使用（親からの再取得は不要）
 
-            # セッション初期化（最初の実行時に作成）
-            self.ソケットID = None
+            # SDK resumeセッション初期化（最初の実行時に作成）
+            self.SDKセッションID = None
             self.is_alive = True
             # logger.info("CodeAI: セッション開始完了")
             pass
@@ -342,7 +342,7 @@ class CodeAI:
                     # オプション設定（初回はresume=False、2回目以降のみセッションID使用）
                     # 読取専用パラメータに応じてallowed_toolsを設定
                     allowed_tools_list = ["Read", "Write", "Bash"] if not 読取専用 else ["Read"]
-                    logger.info(f"ClaudeSDK許可ツール: {allowed_tools_list}, 読取専用={読取専用}, ソケットID={self.ソケットID}")
+                    logger.info(f"ClaudeSDK許可ツール: {allowed_tools_list}, 読取専用={読取専用}, SDKセッションID={self.SDKセッションID}")
 
                     # Claude Agent SDK用のパス設定（Windows環境ではパス区切り文字を変換）
                     if os.name == 'nt':
@@ -351,7 +351,7 @@ class CodeAI:
                         cwd = cwd_posix
 
                     logger.info(f"ClaudeSDK実行パス: {cwd}")
-                    if not self.ソケットID:
+                    if not self.SDKセッションID:
                         # 初回：新規セッション作成
                         options = ClaudeAgentOptions(
                             max_turns=self.base_options["max_turns"],
@@ -370,19 +370,19 @@ class CodeAI:
                             allowed_tools=allowed_tools_list,  # 毎回正しく設定
                             permission_mode="acceptEdits",
                             continue_conversation=True,
-                            resume=self.ソケットID
+                            resume=self.SDKセッションID
                         )
                      
                     # テスト用：初回のみ system_prompt、毎回「今回の依頼」（送信用）を標準出力に表示（平文）
                     try:
                         print("\n" + "=" * 80)
-                        if not self.ソケットID:
+                        if not self.SDKセッションID:
                             print("送信コンテキスト（Claude Agent SDK / 初回）")
                         else:
                             print("送信コンテキスト（Claude Agent SDK）")
                         print(f"AI={self.code_ai} model={self.code_model} resume={resume} 読取専用={読取専用}")
                         print(f"allowed_tools={allowed_tools_list} cwd={cwd}")
-                        if not self.ソケットID:
+                        if not self.SDKセッションID:
                             print("-" * 80)
                             print("【system_prompt】")
                             print(self.base_options.get("system_prompt", ""))
@@ -396,11 +396,17 @@ class CodeAI:
                     async for message in query(prompt=送信用要求テキスト, options=options):
                         last_stream_time = time.time()
                         
-                        # セッションIDを取得・保存
-                        if hasattr(message, 'ソケットID') and message.ソケットID and not self.ソケットID:
-                            self.ソケットID = message.ソケットID
-                            # logger.info(f"ソケットID取得: {self.ソケットID}")
-                            pass
+                        # SDKセッションIDを取得・保存（属性名差異に対応）
+                        if not self.SDKセッションID:
+                            sdk_id = (
+                                getattr(message, "session_id", None)
+                                or getattr(message, "ソケットID", None)
+                                or getattr(message, "sessionId", None)
+                            )
+                            if sdk_id:
+                                self.SDKセッションID = sdk_id
+                                # logger.info(f"SDKセッションID取得: {self.SDKセッションID}")
+                                pass
                         
                         # ストリーミングコンテンツを抽出
                         content = self.メッセージ内容抽出(message)

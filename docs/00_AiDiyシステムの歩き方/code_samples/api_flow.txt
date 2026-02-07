@@ -1,8 +1,9 @@
-﻿[フロント] → /core/C権限/一覧
+﻿[例1: Core系]
+[フロント] → /core/C利用者/一覧
    ↓
-[routers/C権限.py]
-   ↓
-[crud/C権限.py]
-   ↓
-[models/C権限.py] → SQLite
+[core_router] → [core_crud] → [core_models] → SQLite
 
+[例2: Apps系]
+[フロント] → /apps/V商品/一覧
+   ↓
+[apps_router] → [apps_crud or 生SQL] → [apps_models] → SQLite

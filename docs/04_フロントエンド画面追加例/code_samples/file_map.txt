@@ -1,31 +1,29 @@
-■ 新規CRUD画面で作成・編集するファイル
+﻿■ M商品画面（実装済み）で参照するファイル
 
 frontend_server/src/
 ├── components/
-│   └── <カテゴリ>/              # 例: C管理/
-│       └── <テーブル名>/        # 例: C新テーブル/
-│           ├── <テーブル名>一覧.vue       # 新規作成
-│           ├── <テーブル名>編集.vue       # 新規作成
-│           └── components/
-│               └── <テーブル名>一覧テーブル.vue  # 新規作成
+│   ├── Mマスタ/
+│   │   ├── Mマスタ.vue                            # メニューカード配置
+│   │   └── M商品/
+│   │       ├── M商品一覧.vue                      # 一覧画面
+│   │       ├── M商品編集.vue                      # 編集画面
+│   │       └── components/
+│   │           └── M商品一覧テーブル.vue          # 一覧テーブル
+│   └── _share/
+│       └── qTublerFrame.vue                       # 共通テーブルフレーム
 │
 ├── router/
-│   └── index.ts                 # 編集: ルート追加
+│   └── index.ts                                   # /Mマスタ/M商品/一覧, /編集
 │
-└── components/
-    └── <カテゴリ>.vue           # 編集: メニューカード追加
-                                 # 例: C管理.vue
+├── api/
+│   └── client.ts                                  # APIクライアント
+│
+└── utils/
+    └── qAlert.ts                                  # qConfirm 利用
 
-■ 例: C新テーブルの場合
-
-components/C管理/C新テーブル/
-├── C新テーブル一覧.vue
-├── C新テーブル編集.vue
-└── components/
-    └── C新テーブル一覧テーブル.vue
-
-router/index.ts に追加:
-- /C管理/C新テーブル/一覧
-- /C管理/C新テーブル/編集
-
-components/C管理.vue にカード追加
+■ M商品で使う主なAPI
+- POST /apps/V商品/一覧
+- POST /apps/M商品/取得
+- POST /apps/M商品/登録
+- POST /apps/M商品/変更
+- POST /apps/M商品/削除
