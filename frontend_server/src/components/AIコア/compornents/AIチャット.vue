@@ -40,7 +40,7 @@ const ライブAI = computed(() => プロパティ.liveAi ?? '');
 
 // チャット履歴
 interface メッセージ {
-  role: 'input_text' | 'output_text' | 'input_file' | 'output_file' | 'recognition_input' | 'recognition_output' | 'input_request' | 'welcome_text';
+  role: 'input_text' | 'output_text' | 'input_file' | 'output_file' | 'recognition_input' | 'recognition_output' | 'input_request' | 'output_request' | 'welcome_text';
   content: string;
   id: string;
   kind?: 'text' | 'file';
@@ -236,6 +236,9 @@ const ターミナルメッセージ追加 = (role: メッセージ['role'], 内
     case 'output_text':
       カーソル色 = '#00ff00';  // 緑
       break;
+    case 'output_request':
+      カーソル色 = '#00ffff';  // シアン
+      break;
     case 'welcome_text':
       カーソル色 = '#00ff00';  // 緑（output_textと同じ）
       break;
@@ -314,6 +317,18 @@ const 出力テキスト受信処理 = (受信データ: any) => {
   }
   console.log('[チャット] output_text表示開始:', 内容);
   ターミナルメッセージ追加('output_text', 内容);
+};
+
+const 出力リクエスト受信処理 = (受信データ: any) => {
+  通知('activate');
+  console.log('[チャット] output_request受信:', 受信データ);
+  const 内容 = 受信内容文字列(受信データ);
+  if (!内容) {
+    console.log('[チャット] output_request 内容なしでスキップ');
+    return;
+  }
+  console.log('[チャット] output_request表示開始:', 内容);
+  ターミナルメッセージ追加('output_request', 内容);
 };
 
 const ウェルカムテキスト受信処理 = (受信データ: any) => {
@@ -424,6 +439,7 @@ const WSハンドラ登録 = (クライアント?: IWebSocketClient | null) => {
   クライアント.on('input_request', 入力リクエスト受信処理);
   クライアント.on('input_file', 入力ファイル受信処理);
   クライアント.on('output_text', 出力テキスト受信処理);
+  クライアント.on('output_request', 出力リクエスト受信処理);
   クライアント.on('welcome_text', ウェルカムテキスト受信処理);
   クライアント.on('output_stream', 出力ストリーム受信処理);
   クライアント.on('output_file', 出力ファイル受信処理);
@@ -442,6 +458,7 @@ const WSハンドラ解除 = (クライアント?: IWebSocketClient | null) => {
   クライアント.off('input_request', 入力リクエスト受信処理);
   クライアント.off('input_file', 入力ファイル受信処理);
   クライアント.off('output_text', 出力テキスト受信処理);
+  クライアント.off('output_request', 出力リクエスト受信処理);
   クライアント.off('welcome_text', ウェルカムテキスト受信処理);
   クライアント.off('output_stream', 出力ストリーム受信処理);
   クライアント.off('output_file', 出力ファイル受信処理);
@@ -963,6 +980,12 @@ const 接続状態表示 = computed(() => {
 .message.output_text .message-bubble {
   color: #00ff00;
   border-left: 4px solid rgba(0, 255, 0, 0.7);
+  min-width: 200px;
+}
+
+.message.output_request .message-bubble {
+  color: #00ffff;
+  border-left: 4px solid rgba(0, 255, 255, 0.7);
   min-width: 200px;
 }
 

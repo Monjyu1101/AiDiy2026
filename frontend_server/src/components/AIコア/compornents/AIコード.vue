@@ -322,7 +322,7 @@ const ターミナルメッセージ追加 = (role: メッセージ['role'], 内
       カーソル色 = '#ffffff';  // 白
       break;
     case 'input_request':
-      カーソル色 = '#ffaa66';  // オレンジ
+      カーソル色 = '#00ffff';  // シアン
       break;
     case 'output_text':
       カーソル色 = '#00ff00';  // 緑
@@ -812,13 +812,13 @@ const 状態表示テキスト = () => {
 }
 
 .terminal-line.input_request .line-content {
-  color: #ffaa66;
+  color: #00ffff;
 }
 
 .terminal-line.input_request .line-content::before {
   content: "REQ > ";
   font-weight: bold;
-  color: #ffaa66;
+  color: #00ffff;
 }
 
 .terminal-line.input_request .content-area {

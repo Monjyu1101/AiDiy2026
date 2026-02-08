@@ -509,11 +509,13 @@ class CodeAI:
             # parent_manager経由でoutput_stream送信（処理開始）
             if self.parent_manager and hasattr(self.parent_manager, '接続'):
                 try:
-                    await self.parent_manager.接続.send_json({
+                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
                         "ソケットID": self.ソケットID,
                         "チャンネル": self.チャンネル,
                         "メッセージ識別": "output_stream",
                         "メッセージ内容": "<<< 処理開始 >>>",
+                        "ファイル名": None,
+                        "サムネイル画像": None
                     })
                     logger.info(f"テキストストリーム送信開始: チャンネル={self.チャンネル}, <<< 処理開始 >>>")
                 except Exception as e:
@@ -588,11 +590,13 @@ class CodeAI:
             # parent_manager経由でoutput_stream送信（処理終了）
             if self.parent_manager and hasattr(self.parent_manager, '接続'):
                 try:
-                    await self.parent_manager.接続.send_json({
+                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
                         "ソケットID": self.ソケットID,
                         "チャンネル": self.チャンネル,
                         "メッセージ識別": "output_stream",
                         "メッセージ内容": "<<< 処理終了 >>>",
+                        "ファイル名": None,
+                        "サムネイル画像": None
                     })
                     logger.info(f"テキストストリーム送信終了: チャンネル={self.チャンネル}, <<< 処理終了 >>>")
                 except Exception as e:
@@ -664,11 +668,13 @@ class CodeAI:
                         # parent_manager経由でoutput_stream送信
                         if self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
-                                await self.parent_manager.接続.send_json({
+                                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
                                     "ソケットID": self.ソケットID,
                                     "チャンネル": self.チャンネル,
                                     "メッセージ識別": "output_stream",
                                     "メッセージ内容": line_text,
+                                    "ファイル名": None,
+                                    "サムネイル画像": None
                                 })
                             except Exception as e:
                                 logger.error(f"[CodeEtc] output_stream送信エラー(stream): {e}")
@@ -699,11 +705,13 @@ class CodeAI:
                         # parent_manager経由でoutput_stream送信（stderr）
                         if self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
-                                await self.parent_manager.接続.send_json({
+                                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
                                     "ソケットID": self.ソケットID,
                                     "チャンネル": self.チャンネル,
                                     "メッセージ識別": "output_stream",
                                     "メッセージ内容": line_text,
+                                    "ファイル名": None,
+                                    "サムネイル画像": None
                                 })
                             except Exception as e:
                                 logger.error(f"[CodeEtc] output_stream送信エラー(stderr): {e}")

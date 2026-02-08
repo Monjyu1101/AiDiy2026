@@ -153,9 +153,32 @@ class Chat:
                 logger.error(f"[Chat] チャンネル{self.チャンネル} 処理エラー: {e}")
                 await asyncio.sleep(0.2)
 
-    async def _処理_input_text(self, 受信データ: dict):
-        """input_text処理: [ECHO]付きoutput_text送信"""
+    def _サムネイル生成(self, ファイルパス: str) -> str | None:
+        """画像ファイルからサムネイルを生成してbase64で返す"""
         try:
+            import base64
+            from io import BytesIO
+            from PIL import Image
+            image = Image.open(ファイルパス)
+            image = image.convert("RGBA")
+            width, height = image.size
+            if width > 0 and height > 0:
+                new_width = 320
+                new_height = int(height * (new_width / width))
+                thumbnail = image.resize((new_width, new_height), Image.LANCZOS)
+                buf = BytesIO()
+                thumbnail.save(buf, format="PNG")
+                return base64.b64encode(buf.getvalue()).decode("ascii")
+        except Exception as e:
+            logger.debug(f"[Chat] サムネイル生成スキップ: {e}")
+        return None
+
+    async def _AI実行と応答送信(self, 受信データ: dict, file_path: str = None):
+        """AI実行 → output_text送信 + 出力ファイルがあればoutput_fileをチャンネル-1に送信"""
+        try:
+            import os
+            import re
+
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
 
             # 処理要求ログ
@@ -165,6 +188,7 @@ class Chat:
             )
 
             出力メッセージ内容 = ""
+            出力ファイル一覧 = []
             try:
                 ai_instance = await self._ensure_ai_instance()
                 if ai_instance:
@@ -173,10 +197,13 @@ class Chat:
                     )
                     出力メッセージ内容 = await ai_instance.実行(
                         要求テキスト=メッセージ内容,
+                        file_path=file_path,
                     )
                     logger.info(
                         f"[Chat] AI実行結果: 文字数={len(出力メッセージ内容) if 出力メッセージ内容 is not None else 'None'}"
                     )
+                    # AI側が保存したファイル一覧を取得
+                    出力ファイル一覧 = getattr(ai_instance, "last_output_files", []) or []
             except Exception as e:
                 logger.error(f"[Chat] AI実行エラー: {e}")
                 出力メッセージ内容 = "!"
@@ -184,12 +211,18 @@ class Chat:
             if not 出力メッセージ内容:
                 出力メッセージ内容 = "!"
 
+            # テキストから [画像ファイル: ...] 行を除去（ファイルは別途output_fileで送る）
+            if 出力ファイル一覧:
+                出力メッセージ内容 = re.sub(r'\n?\[画像ファイル: [^\]]+\]', '', 出力メッセージ内容).strip()
+                if not 出力メッセージ内容:
+                    出力メッセージ内容 = "画像を生成しました。"
+
             # 処理応答ログ
             logger.info(
                 f"処理応答: チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
             )
 
-            # 1) output_text送信（チャンネル登録されている場合のみ）
+            # 1) output_text送信
             await self.接続.send_to_channel(self.チャンネル, {
                 "ソケットID": self.ソケットID,
                 "メッセージ識別": "output_text",
@@ -197,8 +230,8 @@ class Chat:
                 "ファイル名": None,
                 "サムネイル画像": None
             })
-            
-            # 2) 会話履歴保存
+
+            # 2) 会話履歴保存（テキスト）
             if self.保存関数:
                 self.保存関数(
                     ソケットID=self.ソケットID,
@@ -208,56 +241,52 @@ class Chat:
                     ファイル名=None,
                     サムネイル画像=None
                 )
+
+            # 3) 出力ファイルがあればoutput_fileとしてチャンネル-1に送信
+            for 出力ファイルパス in 出力ファイル一覧:
+                if not os.path.exists(出力ファイルパス):
+                    logger.warning(f"[Chat] 出力ファイルが見つかりません: {出力ファイルパス}")
+                    continue
+                ファイル名のみ = os.path.basename(出力ファイルパス)
+                相対パス = f"temp/output/{ファイル名のみ}"
+                # サムネイル生成
+                サムネイル_base64 = self._サムネイル生成(出力ファイルパス)
+                await self.接続.send_to_channel(self.チャンネル, {
+                    "ソケットID": self.ソケットID,
+                    "メッセージ識別": "output_file",
+                    "メッセージ内容": f"ファイル出力: {ファイル名のみ}",
+                    "ファイル名": 相対パス,
+                    "サムネイル画像": サムネイル_base64
+                })
+                # 会話履歴保存（ファイル）
+                if self.保存関数:
+                    self.保存関数(
+                        ソケットID=self.ソケットID,
+                        チャンネル=self.チャンネル,
+                        メッセージ識別="output_file",
+                        メッセージ内容=f"ファイル出力: {ファイル名のみ}",
+                        ファイル名=相対パス,
+                        サムネイル画像=サムネイル_base64
+                    )
+
         except Exception as e:
-            logger.error(f"[Chat] チャンネル{self.チャンネル} input_text処理エラー: {e}")
+            logger.error(f"[Chat] チャンネル{self.チャンネル} AI実行応答エラー: {e}")
+
+    async def _処理_input_text(self, 受信データ: dict):
+        """input_text処理: AI実行 → output_text送信"""
+        await self._AI実行と応答送信(受信データ)
 
     async def _処理_input_file(self, 受信データ: dict):
-        """input_file処理: temp/outputコピー → output_file送信"""
-        try:
-            import shutil
-            import os
-            import random
-            
-            # 受信データから相対パスを取得
-            入力ファイル名 = 受信データ.get("ファイル名")  # "temp/input/20260128.123456.xxx.png"
-            サムネイル = 受信データ.get("サムネイル画像")
-            
-            if not 入力ファイル名:
-                return
-            
-            if not os.path.exists(入力ファイル名):
-                logger.warning(f"[Chat] 入力ファイルが見つかりません: {入力ファイル名}")
-                return
-            
-            # AI処理を模倣（1～10秒のランダムsleep）
-            待機時間 = random.uniform(1.0, 10.0)
-            await asyncio.sleep(待機時間)
-            
-            # 同じファイル名でtemp/outputへコピー
-            ファイル名のみ = os.path.basename(入力ファイル名)  # "20260128.123456.xxx.png"
-            os.makedirs("temp/output", exist_ok=True)
-            出力ファイル名 = f"temp/output/{ファイル名のみ}"
-            shutil.copyfile(入力ファイル名, 出力ファイル名)
-            
-            # 1) output_file送信（チャンネル登録されている場合のみ）
-            await self.接続.send_to_channel(self.チャンネル, {
-                "ソケットID": self.ソケットID,
-                "メッセージ識別": "output_file",
-                "メッセージ内容": f"ファイル出力: {ファイル名のみ}",
-                "ファイル名": 出力ファイル名,
-                "サムネイル画像": サムネイル
-            })
-            
-            # 2) 会話履歴保存
-            if self.保存関数:
-                self.保存関数(
-                    ソケットID=self.ソケットID,
-                    チャンネル=self.チャンネル,
-                    メッセージ識別="output_file",
-                    メッセージ内容=f"ファイル出力: {ファイル名のみ}",
-                    ファイル名=出力ファイル名,
-                    サムネイル画像=サムネイル
-                )
-        except Exception as e:
-            logger.error(f"[Chat] チャンネル{self.チャンネル} input_file処理エラー: {e}")
+        """input_file処理: AIにファイルを渡して実行 → output_text + output_file送信"""
+        import os
+
+        入力ファイル名 = 受信データ.get("ファイル名")
+        if not 入力ファイル名:
+            return
+        # 絶対パスに変換
+        file_path = os.path.abspath(入力ファイル名) if 入力ファイル名 else None
+        if file_path and not os.path.exists(file_path):
+            logger.warning(f"[Chat] 入力ファイルが見つかりません: {file_path}")
+            return
+        await self._AI実行と応答送信(受信データ, file_path=file_path)
 

@@ -59,19 +59,6 @@
           </router-link>
         </div>
 
-        <!-- M得意先カード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">M得</span>
-            M得意先
-          </div>
-          <div class="menu-card-description">
-            得意先マスター管理・得意先情報登録・連絡先設定
-          </div>
-          <router-link to="/Mマスタ/M得意先/一覧" class="menu-card-link">
-            開く →
-          </router-link>
-        </div>
       </div>
     </div>
   </div>

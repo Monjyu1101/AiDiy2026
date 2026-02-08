@@ -275,11 +275,39 @@ class CodeAgent:
                     サムネイル画像=None
                 )
 
+
             # バックアップ＋自己検証ループ
             try:
                 await self._バックアップ検証ループ(ai_instance)
             except Exception as e:
                 logger.error(f"[CodeAgent] バックアップ検証ループエラー: {e}")
+
+            # 生成されたファイルをチェックしてチャンネル-1に通知
+            try:
+                await self._生成ファイル通知()
+            except Exception as e:
+                logger.error(f"[CodeAgent] 生成ファイル通知エラー: {e}")
+
+            # 通常のoutput_request送信
+
+            await self.接続.send_to_channel(0, {
+                "ソケットID": self.ソケットID,
+                "メッセージ識別": "output_request",
+                "メッセージ内容": 出力メッセージ内容,
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+
+            # 会話履歴保存
+            if self.保存関数:
+                self.保存関数(
+                    ソケットID=self.ソケットID,
+                    チャンネル=0,
+                    メッセージ識別="output_request",
+                    メッセージ内容=出力メッセージ内容,
+                    ファイル名=None,
+                    サムネイル画像=None
+                )
 
             # 通常処理の後: チャンネル-1へ処理終了を連絡
             完了メッセージ = (
@@ -402,6 +430,60 @@ class CodeAgent:
 
         else:
             logger.warning(f"[CodeAgent] 検証ループが最大回数({最大検証回数})に到達しました")
+
+    async def _生成ファイル通知(self):
+        """生成された画像などのファイルをチェックしてチャンネル-1に通知"""
+        import glob
+        import time
+        
+        # チェック対象ディレクトリと画像拡張子
+        チェックディレクトリ = ["output", "temp/output", "images", "assets"]
+        画像拡張子 = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"]
+        
+        # 現在時刻から1分以内に作成されたファイルを検出
+        現在時刻 = time.time()
+        検出時間範囲秒 = 60  # 1分
+        
+        検出ファイル一覧 = []
+        
+        for ディレクトリ in チェックディレクトリ:
+            if not os.path.exists(ディレクトリ):
+                continue
+                
+            for 拡張子 in 画像拡張子:
+                パターン = os.path.join(ディレクトリ, "**", 拡張子)
+                for ファイルパス in glob.glob(パターン, recursive=True):
+                    try:
+                        # ファイルの作成時刻を確認
+                        ファイル作成時刻 = os.path.getctime(ファイルパス)
+                        if 現在時刻 - ファイル作成時刻 <= 検出時間範囲秒:
+                            検出ファイル一覧.append(ファイルパス)
+                    except Exception as e:
+                        logger.warning(f"[CodeAgent] ファイル時刻チェックエラー: {ファイルパス}, {e}")
+        
+        # 検出されたファイルをチャンネル-1に通知
+        for ファイルパス in 検出ファイル一覧:
+            try:
+                # サムネイル生成（オプション：ここでは省略し、Noneを送信）
+                サムネイル = None
+                
+                通知メッセージ = f"ファイルが生成されました: {ファイルパス}"
+                
+                # チャンネル-1にoutput_file送信
+                await self.接続.send_to_channel(-1, {
+                    "ソケットID": self.ソケットID,
+                    "チャンネル": -1,
+                    "メッセージ識別": "output_file",
+                    "メッセージ内容": 通知メッセージ,
+                    "ファイル名": ファイルパス,
+                    "サムネイル画像": サムネイル
+                })
+                
+                logger.info(f"[CodeAgent] ファイル生成通知送信: {ファイルパス}")
+                
+            except Exception as e:
+                logger.error(f"[CodeAgent] ファイル通知送信エラー: {ファイルパス}, {e}")
+
 
     async def _処理_input_file(self, 受信データ: dict):
         """input_file処理: temp/outputコピー → output_file送信"""
