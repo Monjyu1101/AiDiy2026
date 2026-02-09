@@ -11,10 +11,12 @@
 WebSocket接続管理システム
 AIコアのセッション管理とストリーミング処理を担当
 """
-from typing import Dict, Optional
+from typing import Dict, List, Optional
+from datetime import datetime, timedelta
 from fastapi import WebSocket
 import asyncio
 import json
+import os
 import uuid
 from log_config import get_logger
 from AIコア.AIストリーミング処理 import StreamingProcessor
@@ -123,6 +125,34 @@ class SessionConnection:
             4: False
         }
 
+        # チャンネル別ファイルリスト: {チャンネル: [{パス: str, 時刻: datetime}, ...]}
+        self.チャンネル別ファイルリスト: Dict[int, List[dict]] = {}
+
+    def ファイル登録(self, チャンネル: int, ファイルパス: str):
+        """チャンネルのファイルリストにファイルを追加"""
+        if チャンネル not in self.チャンネル別ファイルリスト:
+            self.チャンネル別ファイルリスト[チャンネル] = []
+        self.チャンネル別ファイルリスト[チャンネル].append({
+            "パス": ファイルパス,
+            "時刻": datetime.now()
+        })
+        logger.debug(f"ファイル登録: ch={チャンネル} path={ファイルパス}")
+
+    def 最近のファイル取得(self, チャンネル: int, 秒数: int = 60) -> List[str]:
+        """指定チャンネル＋チャンネル0の最近のファイルを絶対パスで取得"""
+        基準時刻 = datetime.now() - timedelta(seconds=秒数)
+        結果 = []
+        対象チャンネル = [チャンネル] if チャンネル == 0 else [チャンネル, 0]
+        for ch in 対象チャンネル:
+            for item in self.チャンネル別ファイルリスト.get(ch, []):
+                if item["時刻"] >= 基準時刻:
+                    パス = item["パス"]
+                    if not os.path.isabs(パス):
+                        パス = os.path.abspath(パス)
+                    if パス not in 結果:
+                        結果.append(パス)
+        return 結果
+
     @property
     def is_connected(self) -> bool:
         return any(conn and conn.is_connected for conn in self.sockets.values())
@@ -145,6 +175,10 @@ class SessionConnection:
         await connection.send_json(data)
 
     async def send_to_channel(self, チャンネル: int, data: dict):
+        # output_fileの自動追跡
+        if data.get("メッセージ識別") == "output_file" and data.get("ファイル名"):
+            self.ファイル登録(チャンネル, data["ファイル名"])
+
         既存チャンネル = data.get("チャンネル", None)
         if 既存チャンネル is not None and 既存チャンネル != チャンネル:
             logger.error(

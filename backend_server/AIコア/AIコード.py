@@ -146,9 +146,22 @@ class CodeAgent:
                 await asyncio.sleep(0.2)
 
     async def _処理_input_text(self, 受信データ: dict):
-        """input_text処理: [ECHO]付きoutput_text送信"""
+        """input_text処理: [ECHO]付きoutput_text送信（添付ファイルがあれば追記）"""
         try:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
+
+            # 添付ファイル一覧があればメッセージに追記
+            添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
+            if 添付ファイル一覧:
+                import os
+                有効ファイル = [p for p in 添付ファイル一覧 if os.path.exists(p)]
+                if 有効ファイル:
+                    添付テキスト = "\n``` 添付ファイル\n"
+                    for パス in 有効ファイル:
+                        添付テキスト += f"{パス}\n"
+                    添付テキスト += "```"
+                    メッセージ内容 = メッセージ内容 + 添付テキスト
+                    logger.info(f"[CodeAgent] 添付ファイル追記: {len(有効ファイル)}件")
 
             # 処理要求ログ
             セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
@@ -198,9 +211,23 @@ class CodeAgent:
             logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_text処理エラー: {e}")
 
     async def _処理_input_request(self, 受信データ: dict):
-        """input_request処理: 前後処理付きでAI実行"""
+        """input_request処理: 前後処理付きでAI実行（添付ファイルがあれば追記）"""
         try:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
+
+            # 添付ファイル一覧があればメッセージに追記
+            添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
+            if 添付ファイル一覧:
+                import os
+                有効ファイル = [p for p in 添付ファイル一覧 if os.path.exists(p)]
+                if 有効ファイル:
+                    添付テキスト = "\n``` 添付ファイル\n"
+                    for パス in 有効ファイル:
+                        添付テキスト += f"{パス}\n"
+                    添付テキスト += "```"
+                    メッセージ内容 = メッセージ内容 + 添付テキスト
+                    logger.info(f"[CodeAgent] 添付ファイル追記(request): {len(有効ファイル)}件")
+
             セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
 
             # 処理要求ログ

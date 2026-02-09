@@ -778,6 +778,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                     受信データ["チャンネル"] = 出力先チャンネル
 
+                    # 1分以内のファイルを添付
+                    添付ファイル一覧 = セッション.最近のファイル取得(出力先チャンネル, 秒数=60)
+                    if 添付ファイル一覧:
+                        受信データ["添付ファイル一覧"] = 添付ファイル一覧
+                        logger.info(f"添付ファイル({出力先チャンネル}): {len(添付ファイル一覧)}件 {添付ファイル一覧}")
+
                     try:
                         if 出力先チャンネル == 0:
                             ファイル名_判定 = ファイル名.lower() if isinstance(ファイル名, str) else ""
@@ -855,6 +861,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                     受信データ["チャンネル"] = 出力先チャンネル
 
+                    # 1分以内のファイルを添付
+                    添付ファイル一覧 = セッション.最近のファイル取得(出力先チャンネル, 秒数=60)
+                    if 添付ファイル一覧:
+                        受信データ["添付ファイル一覧"] = 添付ファイル一覧
+                        logger.info(f"添付ファイル(request ch{出力先チャンネル}): {len(添付ファイル一覧)}件 {添付ファイル一覧}")
+
                     # コードエージェントに処理を投入
                     try:
                         if hasattr(セッション, 'code_agent_processors'):
@@ -924,23 +936,23 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         サムネイル画像=サムネイル_base64
                     )
 
-                    if セッション:
-                        セッション.set_channel_processing(出力先チャンネル, True)
+                    # ファイルリストに登録（1分以内のチャット/コード要求時に添付用）
+                    if セッション and 保存ファイル名:
+                        セッション.ファイル登録(出力先チャンネル, f"temp/input/{保存ファイル名}")
+
+                    # チャンネル0: 画像の場合はライブAIへ送信
+                    if セッション and 出力先チャンネル == 0 and サムネイル_base64 and Base64ペイロード:
                         try:
-                            更新済み受信データ = {
-                                "セッションID": セッションID,
-                                "チャンネル": 出力先チャンネル,
-                                "メッセージ識別": "input_file",
-                                "メッセージ内容": f"ファイル受信: {ファイル名}" if ファイル名 else "ファイル受信",
-                                "ファイル名": f"temp/input/{保存ファイル名}" if 保存ファイル名 else None,
-                                "サムネイル画像": サムネイル_base64
-                            }
-                            if 出力先チャンネル == 0 and hasattr(セッション, 'chat_processor'):
-                                await セッション.chat_processor.チャット要求(更新済み受信データ)
-                            elif 1 <= 出力先チャンネル <= 4 and hasattr(セッション, 'code_agent_processors'):
-                                await セッション.code_agent_processors[出力先チャンネル - 1].コード要求(更新済み受信データ)
-                        finally:
-                            セッション.set_channel_processing(出力先チャンネル, False)
+                            if hasattr(セッション, "live_processor") and セッション.live_processor:
+                                await セッション.live_processor.開始()
+                                画像形式 = "png"
+                                if ファイル名 and "." in ファイル名:
+                                    拡張子 = ファイル名.rsplit(".", 1)[1].lower()
+                                    if 拡張子 in ("jpg", "jpeg", "png", "gif", "webp"):
+                                        画像形式 = 拡張子 if 拡張子 != "jpg" else "jpeg"
+                                await セッション.live_processor.画像送信(Base64ペイロード, format=画像形式)
+                        except Exception as e:
+                            logger.warning(f"LiveAI画像送信エラー(input_file): {e}")
 
                 elif メッセージ識別 == "input_audio":
                     try:

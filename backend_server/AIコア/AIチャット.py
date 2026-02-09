@@ -273,7 +273,28 @@ class Chat:
             logger.error(f"[Chat] チャンネル{self.チャンネル} AI実行応答エラー: {e}")
 
     async def _処理_input_text(self, 受信データ: dict):
-        """input_text処理: AI実行 → output_text送信"""
+        """input_text処理: AI実行 → output_text送信（添付ファイルがあれば渡す）"""
+        添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
+        if 添付ファイル一覧:
+            # 最初の画像ファイルをfile_pathとして渡す
+            import os
+            file_path = None
+            for パス in 添付ファイル一覧:
+                if os.path.exists(パス):
+                    拡張子 = os.path.splitext(パス)[1].lower()
+                    if 拡張子 in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
+                        file_path = パス
+                        break
+            # file_pathが無い場合は最初の存在するファイルを使用
+            if not file_path:
+                for パス in 添付ファイル一覧:
+                    if os.path.exists(パス):
+                        file_path = パス
+                        break
+            if file_path:
+                logger.info(f"[Chat] 添付ファイル渡し: {file_path}")
+                await self._AI実行と応答送信(受信データ, file_path=file_path)
+                return
         await self._AI実行と応答送信(受信データ)
 
     async def _処理_input_file(self, 受信データ: dict):
