@@ -26,9 +26,13 @@ const router = useRouter();
 // セッションID（全コンポーネント共通）
 const セッションID = ref('');
 
-// 親WebSocket接続（音声・画像用のみ、チャンネル-1）
+// 親WebSocket接続（テキスト・画像・操作、チャンネル-1）
 const wsClient = ref<IWebSocketClient | null>(null);
+// 音声専用WebSocket接続（チャンネル-2）
+const wsAudioClient = ref<IWebSocketClient | null>(null);
 const wsConnected = ref(false);
+const wsAudioConnected = ref(false);
+const isInitializingAudioState = ref(true);
 
 // モデル設定情報
 const モデル設定 = ref({
@@ -196,6 +200,7 @@ const handleImageCheckboxChange = async (newValue: boolean, oldValue: boolean) =
 // WebSocket接続を初期化
 const initializeWebSocket = async (既存セッションID?: string) => {
   try {
+    isInitializingAudioState.value = true;
     const wsUrl = createWebSocketUrl('/core/ws/AIコア');
     console.log('[AIコア] WebSocket接続開始:', wsUrl, 'セッションID:', 既存セッションID);
 
@@ -204,6 +209,9 @@ const initializeWebSocket = async (既存セッションID?: string) => {
     // メッセージハンドラを登録（connect()の前に登録）
     wsClient.value.on('init', (message) => {
       console.log('[AIコア] 初期化完了:', message.セッションID);
+      if (message.セッションID) {
+        セッションID.value = message.セッションID;
+      }
       
       const 初期データ = message.メッセージ内容 || {};
       
@@ -241,21 +249,19 @@ const initializeWebSocket = async (既存セッションID?: string) => {
       showImage.value = enableCamera.value; // 常にfalse
       syncVisualizerVisibility();
 
-      // WebSocket接続確立フラグを設定（子コンポーネントのマウント前に設定）
-      wsConnected.value = true;
-      console.log('[AIコア] WebSocket接続確立完了');
-      saveState();
+      // 接続完了フラグは main + audio 両方接続完了後に設定
+      console.log('[AIコア] WebSocket初期化完了（音声WS待機中）');
 
-      // nextTickで画面状態を復元（子コンポーネントがマウントされてから）
+      // nextTickで表示状態を復元（子コンポーネントがマウントされてから）
       nextTick(() => {
-        console.log('[AIコア] 画面状態を復元開始');
-        // ボタン状態から画面状態を復元
+        console.log('[AIコア] 表示状態を復元開始');
+        // ボタン状態から表示状態を復元
         showChat.value = enableChatButton.value;
         showAgent1.value = enableAgent1Button.value;
         showAgent2.value = enableAgent2Button.value;
         showAgent3.value = enableAgent3Button.value;
         showAgent4.value = enableAgent4Button.value;
-        console.log('[AIコア] 画面状態復元完了:', {
+        console.log('[AIコア] 表示状態復元完了:', {
           showChat: showChat.value,
           showAgent1: showAgent1.value,
           showAgent2: showAgent2.value,
@@ -288,32 +294,114 @@ const initializeWebSocket = async (既存セッションID?: string) => {
       console.error('[AIコア] エラー:', message.error);
     });
 
-    // 音声メッセージハンドラー
-    wsClient.value.on('output_audio', (message) => {
-      console.log('[AIコア] 音声出力受信');
-      if (audioProcessor) {
-        audioProcessor.handleAudioMessage(message);
-      }
-    });
-
-    wsClient.value.on('cancel_audio', () => {
-      console.log('[AIコア] 音声キャンセル');
-      if (audioProcessor) {
-        audioProcessor.cancelAudioOutput();
-      }
-    });
-
     // 接続を確立してセッションIDを取得
     console.log('[AIコア] WebSocket.connect()呼び出し');
     const 取得セッションID = await wsClient.value.connect();
     セッションID.value = 取得セッションID;
     console.log('[AIコア] WebSocket接続完了 セッションID:', 取得セッションID);
 
+    // 音声専用WebSocket接続（チャンネル-2）
+    if (!wsAudioClient.value || !wsAudioClient.value.isConnected()) {
+      await initializeAudioWebSocket(取得セッションID);
+    } else {
+      wsAudioConnected.value = true;
+    }
+    wsConnected.value = true;
+    isInitializingAudioState.value = false;
+    console.log('[AIコア] WebSocket接続確立完了（main + audio）');
+    saveState();
+    if (enableMicrophone.value) {
+      await applyMicrophoneState(true, false);
+    }
+
     return 取得セッションID;
   } catch (error) {
     console.error('[AIコア] WebSocket接続エラー:', error);
     wsConnected.value = false;
+    wsAudioConnected.value = false;
+    isInitializingAudioState.value = true;
     throw error;
+  }
+};
+
+// 音声専用WebSocket接続を初期化
+const initializeAudioWebSocket = async (既存セッションID: string) => {
+  // 既存の音声WSがあれば張り直し
+  if (wsAudioClient.value) {
+    try {
+      wsAudioClient.value.disconnect();
+    } catch (e) {
+      // no-op
+    }
+    wsAudioClient.value = null;
+  }
+  wsAudioConnected.value = false;
+
+  const wsUrl = createWebSocketUrl('/core/ws/AIコア');
+  wsAudioClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, -2);
+
+  wsAudioClient.value.on('output_audio', (message) => {
+    console.log('[AIコア] 音声出力受信(-2)');
+    if (audioProcessor) {
+      audioProcessor.handleAudioMessage(message);
+    }
+  });
+
+  wsAudioClient.value.on('cancel_audio', () => {
+    console.log('[AIコア] 音声キャンセル(-2)');
+    if (audioProcessor) {
+      audioProcessor.cancelAudioOutput();
+    }
+  });
+
+  await wsAudioClient.value.connect();
+  wsAudioConnected.value = true;
+  console.log('[AIコア] 音声WebSocket接続完了(-2)');
+};
+
+// 音声WS接続を保証（切断時の再接続用）
+const ensureAudioWebSocketConnected = async (): Promise<boolean> => {
+  if (!セッションID.value) return false;
+  if (wsAudioClient.value && wsAudioClient.value.isConnected()) {
+    wsAudioConnected.value = true;
+    return true;
+  }
+  try {
+    await initializeAudioWebSocket(セッションID.value);
+    return !!(wsAudioClient.value && wsAudioClient.value.isConnected());
+  } catch (e) {
+    wsAudioConnected.value = false;
+    return false;
+  }
+};
+
+const applyMicrophoneState = async (newValue: boolean, oldValue: boolean) => {
+  if (!audioProcessor) return;
+
+  // ビジュアライザー表示状態を更新
+  audioProcessor.updateVisualizerVisibility(newValue, enableSpeaker.value);
+
+  if (newValue && !oldValue) {
+    // 音声専用WSの接続を保証
+    const 音声接続OK = await ensureAudioWebSocketConnected();
+    if (!音声接続OK) {
+      errorMessage.value = '音声WebSocket(-2)に接続できません。再読み込みしてください。';
+      enableMicrophone.value = false;
+      return;
+    }
+
+    // マイクON
+    console.log('[AIコア] マイク起動');
+    const result = await audioProcessor.startMicrophone();
+    if (!result.success) {
+      console.error('[AIコア] マイク起動失敗:', result.error);
+      errorMessage.value = result.error || 'マイクの起動に失敗しました。';
+      enableMicrophone.value = false;
+    }
+  } else if (!newValue && oldValue) {
+    // マイクOFF
+    console.log('[AIコア] マイク停止');
+    audioProcessor.stopMicrophone();
   }
 };
 
@@ -326,7 +414,7 @@ onMounted(async () => {
   console.log('[AIコア] ========================================');
 
   // 音声処理プロセッサを初期化
-  audioProcessor = new AudioStreamProcessor(wsClient, セッションID, enableSpeaker);
+  audioProcessor = new AudioStreamProcessor(wsAudioClient, セッションID, enableSpeaker);
   audioProcessor.setupOutputAudio();
 
   // ビジュアライザーセットアップ（DOM確実に準備されるまで待つ）
@@ -394,11 +482,18 @@ onBeforeUnmount(() => {
     console.log('[AIコア] WebSocket接続を切断します');
     wsClient.value.disconnect();
     wsClient.value = null;
-    wsConnected.value = false;
   }
+  if (wsAudioClient.value) {
+    console.log('[AIコア] 音声WebSocket接続を切断します');
+    wsAudioClient.value.disconnect();
+    wsAudioClient.value = null;
+  }
+  wsConnected.value = false;
+  wsAudioConnected.value = false;
+  isInitializingAudioState.value = true;
 });
 
-// 画面状態が変わったら保存
+// ボタン状態が変わったら保存
 const saveState = async () => {
   if (!セッションID.value) return;
 
@@ -416,7 +511,7 @@ const saveState = async () => {
 
   try {
     if (wsClient.value && wsConnected.value) {
-      wsClient.value.updateState({}, ボタン); // 画面状態は空オブジェクト
+      wsClient.value.updateState(ボタン);
       console.log('[AIコア] 状態更新 (WebSocket):', { ボタン });
     }
   } catch (error) {
@@ -450,25 +545,8 @@ watch(() => モデル設定.value.LIVE_AI, () => {
 
 // マイクボタンの状態変化を監視
 watch(enableMicrophone, async (newValue, oldValue) => {
-  if (!audioProcessor) return;
-
-  // ビジュアライザー表示状態を更新
-  audioProcessor.updateVisualizerVisibility(newValue, enableSpeaker.value);
-
-  if (newValue && !oldValue) {
-    // マイクON
-    console.log('[AIコア] マイク起動');
-    const result = await audioProcessor.startMicrophone();
-    if (!result.success) {
-      console.error('[AIコア] マイク起動失敗:', result.error);
-      errorMessage.value = result.error || 'マイクの起動に失敗しました。';
-      enableMicrophone.value = false;
-    }
-  } else if (!newValue && oldValue) {
-    // マイクOFF
-    console.log('[AIコア] マイク停止');
-    audioProcessor.stopMicrophone();
-  }
+  if (isInitializingAudioState.value) return;
+  await applyMicrophoneState(newValue, oldValue);
 });
 
 // スピーカーボタンの状態変化を監視
@@ -477,12 +555,6 @@ watch(enableSpeaker, (newValue, oldValue) => {
 
   // ビジュアライザー表示状態を更新
   audioProcessor.updateVisualizerVisibility(enableMicrophone.value, newValue);
-
-  if (!newValue && oldValue) {
-    // スピーカーOFF時は再生中の音声をクリア
-    console.log('[AIコア] スピーカーOFF - 音声クリア');
-    audioProcessor.clearAudioPlayback();
-  }
 
   // 状態を保存
   saveState();
@@ -555,7 +627,7 @@ const gridLayoutClass = computed(() => {
     <button
       class="floating-icon microphone-icon"
       :class="{ active: enableMicrophone }"
-      :disabled="!wsConnected"
+      :disabled="!wsConnected || !wsAudioConnected"
       @click="enableMicrophone = !enableMicrophone"
       title="マイク"
     >
@@ -564,7 +636,7 @@ const gridLayoutClass = computed(() => {
     <button
       class="floating-icon speaker-icon"
       :class="{ inactive: !enableSpeaker, active: enableSpeaker }"
-      :disabled="!wsConnected"
+      :disabled="!wsConnected || !wsAudioConnected"
       @click="enableSpeaker = !enableSpeaker"
       title="スピーカー"
     >

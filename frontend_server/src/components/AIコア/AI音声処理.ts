@@ -28,15 +28,16 @@ interface InputAudioState {
 
 // 音声出力状態
 interface OutputAudioState {
-  currentAudioSource: { source: AudioBufferSourceNode; id: number } | null;
+  currentAudioSources: Array<{ source: AudioBufferSourceNode; id: number }>;
+  currentVisualizerSources: Array<{ source: AudioBufferSourceNode; id: number }>;
   audioSourceCounter: number;
   audioQueue: Array<{ base64Audio: string; mimeType: string }>;
   isPlaying: boolean;
+  isQueueProcessing: boolean;
+  nextPlayTime: number;
   audioContext: AudioContext | null;
   audioAnalyser: AnalyserNode | null;
   audioDataArray: Uint8Array | null;
-  // ビジュアライザー専用キュー
-  visualizerQueue: Array<{ base64Audio: string; mimeType: string }>;
   isVisualizerProcessing: boolean;
   // ビジュアライザー専用analyser（destinationに接続しない）
   visualizerAnalyser: AnalyserNode | null;
@@ -57,14 +58,16 @@ export class AudioStreamProcessor {
 
   // 音声出力状態
   private outputAudioState: OutputAudioState = {
-    currentAudioSource: null,
+    currentAudioSources: [],
+    currentVisualizerSources: [],
     audioSourceCounter: 0,
     audioQueue: [],
     isPlaying: false,
+    isQueueProcessing: false,
+    nextPlayTime: 0,
     audioContext: null,
     audioAnalyser: null,
     audioDataArray: null,
-    visualizerQueue: [],
     isVisualizerProcessing: false,
     visualizerAnalyser: null,
     visualizerDataArray: null
@@ -347,7 +350,7 @@ export class AudioStreamProcessor {
         // リアルタイムストリーミング送信
         this.wsClient.value.send({
           セッションID: this.wsClient.value.セッションID取得?.() ?? '',
-          チャンネル: -1,
+          チャンネル: -2,
           メッセージ識別: 'input_audio',
           メッセージ内容: 'audio/pcm',
           ファイル名: base64Audio,
@@ -384,6 +387,11 @@ export class AudioStreamProcessor {
     this.outputAudioState.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
       sampleRate: this.outputSampleRate
     });
+    this.outputAudioState.nextPlayTime = 0;
+    this.outputAudioState.currentAudioSources = [];
+    this.outputAudioState.currentVisualizerSources = [];
+    this.outputAudioState.isPlaying = false;
+    this.outputAudioState.isVisualizerProcessing = false;
     
     // スピーカー出力用analyser（destinationに接続）
     this.outputAudioState.audioAnalyser = this.outputAudioState.audioContext.createAnalyser();
@@ -408,145 +416,43 @@ export class AudioStreamProcessor {
       const base64Audio = data?.ファイル名 || data?.base64_data || data?.audio || data?.data;
       const mimeType = data?.メッセージ内容 || data?.mime_type || 'audio/pcm';
       if (base64Audio) {
-        // ビジュアライザーキューには常に追加
-        this.queueVisualizerAudio({ base64Audio, mimeType });
-        
-        // 音声再生キューにはスピーカーオンの時だけ追加
-        if (this.isSpeakerOn.value) {
-          this.queueAudio({ base64Audio, mimeType });
-        }
+        // 受信キューは一本化し、デコードは1回だけ実行する
+        this.queueAudio({ base64Audio, mimeType });
       }
     }
   }
 
   /**
-   * ビジュアライザー用音声をキューに追加
-   */
-  private queueVisualizerAudio(audioData: { base64Audio: string; mimeType: string }) {
-    this.outputAudioState.visualizerQueue.push(audioData);
-    console.log('[AudioStreamProcessor] ビジュアライザーキュー追加:', this.outputAudioState.visualizerQueue.length);
-
-    if (!this.outputAudioState.isVisualizerProcessing) {
-      this.processVisualizerQueue();
-    }
-  }
-
-  /**
-   * ビジュアライザーキュー処理
-   */
-  private async processVisualizerQueue() {
-    if (this.outputAudioState.visualizerQueue.length === 0) {
-      this.outputAudioState.isVisualizerProcessing = false;
-      console.log('[AudioStreamProcessor] ビジュアライザーキュー処理完了');
-      return;
-    }
-
-    this.outputAudioState.isVisualizerProcessing = true;
-    console.log('[AudioStreamProcessor] ビジュアライザーキュー処理開始:', this.outputAudioState.visualizerQueue.length);
-
-    const { base64Audio, mimeType } = this.outputAudioState.visualizerQueue.shift()!;
-    await this.playAudioForVisualizer(base64Audio, mimeType);
-
-    this.processVisualizerQueue();
-  }
-
-  /**
-   * ビジュアライザー専用音声再生（音は出さない、analyserにだけデータを流す）
-   */
-  private async playAudioForVisualizer(base64Audio: string, mimeType: string = 'audio/pcm') {
-    console.log('[AudioStreamProcessor] ビジュアライザー専用再生開始');
-    const binaryString = window.atob(base64Audio);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    if (!this.outputAudioState.audioContext) {
-      this.setupOutputAudio();
-    }
-
-    if (this.outputAudioState.audioContext!.state === 'suspended') {
-      try {
-        await this.outputAudioState.audioContext!.resume();
-      } catch (e) {
-        console.warn('audioContext resume失敗:', e);
-      }
-    }
-
-    let audioBuffer: AudioBuffer;
-
-    // audio/pcmは手動でFloat32に変換
-    if (mimeType && mimeType.toLowerCase().includes('pcm')) {
-      const pcmData = new Int16Array(bytes.buffer);
-      const float32Data = new Float32Array(pcmData.length);
-      for (let i = 0; i < pcmData.length; i++) {
-        float32Data[i] = pcmData[i] / 32768;
-      }
-      audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
-      audioBuffer.copyToChannel(float32Data, 0);
-    } else {
-      try {
-        audioBuffer = await this.outputAudioState.audioContext!.decodeAudioData(bytes.buffer);
-      } catch (e) {
-        const pcmData = new Int16Array(bytes.buffer);
-        const float32Data = new Float32Array(pcmData.length);
-        for (let i = 0; i < pcmData.length; i++) {
-          float32Data[i] = pcmData[i] / 32768;
-        }
-        audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
-        audioBuffer.copyToChannel(float32Data, 0);
-      }
-    }
-
-    const source = this.outputAudioState.audioContext!.createBufferSource();
-    source.buffer = audioBuffer;
-    // ビジュアライザー専用analyserに接続（destinationには接続しないので音は出ない）
-    source.connect(this.outputAudioState.visualizerAnalyser!);
-
-    console.log('[AudioStreamProcessor] ビジュアライザー専用再生: visualizerAnalyserに接続完了（音は出ない）');
-
-    return new Promise<void>((resolve) => {
-      source.onended = () => {
-        console.log('[AudioStreamProcessor] ビジュアライザー専用再生終了');
-        resolve();
-      };
-      source.start(0);
-    });
-  }
-
-  /**
-   * 音声をキューに追加（スピーカー再生用）
+   * 音声をキューに追加（スピーカー再生＋ビジュアライザー共通）
    */
   private queueAudio(audioData: { base64Audio: string; mimeType: string }) {
     this.outputAudioState.audioQueue.push(audioData);
-
-    if (!this.outputAudioState.isPlaying) {
-      this.processAudioQueue();
+    if (!this.outputAudioState.isQueueProcessing) {
+      void this.processAudioQueue();
     }
   }
 
   /**
-   * 音声キュー処理
+   * 音声キュー処理（デコードを一度だけ実行し、先行スケジューリング）
    */
   private async processAudioQueue() {
-    if (this.outputAudioState.audioQueue.length === 0) {
-      this.outputAudioState.isPlaying = false;
-      return;
+    if (this.outputAudioState.isQueueProcessing) return;
+    this.outputAudioState.isQueueProcessing = true;
+    try {
+      while (this.outputAudioState.audioQueue.length > 0) {
+        const { base64Audio, mimeType } = this.outputAudioState.audioQueue.shift()!;
+        const audioBuffer = await this.decodeAudioBuffer(base64Audio, mimeType);
+        this.scheduleAudioBuffer(audioBuffer);
+      }
+    } finally {
+      this.outputAudioState.isQueueProcessing = false;
     }
-
-    this.outputAudioState.isPlaying = true;
-
-    const { base64Audio, mimeType } = this.outputAudioState.audioQueue.shift()!;
-    await this.playAudioFromBuffer(base64Audio, mimeType);
-
-    this.processAudioQueue();
   }
 
   /**
-   * AudioBufferから音声再生
+   * Base64音声をAudioBufferへ変換
    */
-  private async playAudioFromBuffer(base64Audio: string, mimeType: string = 'audio/pcm') {
+  private async decodeAudioBuffer(base64Audio: string, mimeType: string = 'audio/pcm'): Promise<AudioBuffer> {
     const binaryString = window.atob(base64Audio);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
@@ -566,8 +472,6 @@ export class AudioStreamProcessor {
       }
     }
 
-    let audioBuffer: AudioBuffer;
-
     // audio/pcmは手動でFloat32に変換
     if (mimeType && mimeType.toLowerCase().includes('pcm')) {
       const pcmData = new Int16Array(bytes.buffer);
@@ -575,39 +479,83 @@ export class AudioStreamProcessor {
       for (let i = 0; i < pcmData.length; i++) {
         float32Data[i] = pcmData[i] / 32768;
       }
-      audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
+      const audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
       audioBuffer.copyToChannel(float32Data, 0);
+      return audioBuffer;
     } else {
       try {
-        audioBuffer = await this.outputAudioState.audioContext!.decodeAudioData(bytes.buffer);
+        return await this.outputAudioState.audioContext!.decodeAudioData(bytes.buffer);
       } catch (e) {
         const pcmData = new Int16Array(bytes.buffer);
         const float32Data = new Float32Array(pcmData.length);
         for (let i = 0; i < pcmData.length; i++) {
           float32Data[i] = pcmData[i] / 32768;
         }
-        audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
+        const audioBuffer = this.outputAudioState.audioContext!.createBuffer(1, float32Data.length, this.outputSampleRate);
         audioBuffer.copyToChannel(float32Data, 0);
+        return audioBuffer;
       }
     }
+  }
 
-    const source = this.outputAudioState.audioContext!.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(this.outputAudioState.audioAnalyser!);
+  /**
+   * AudioBufferを先行スケジューリングして再生
+   */
+  private scheduleAudioBuffer(audioBuffer: AudioBuffer) {
+    if (!this.outputAudioState.audioContext) {
+      this.setupOutputAudio();
+    }
+    const context = this.outputAudioState.audioContext!;
+    const now = context.currentTime;
+    const startAt = Math.max(now + 0.03, this.outputAudioState.nextPlayTime || 0);
+    this.outputAudioState.nextPlayTime = startAt + audioBuffer.duration;
+    this.outputAudioState.isVisualizerProcessing = true;
+    if (this.audioVisualizerOverlay) {
+      this.audioVisualizerOverlay.style.display = 'flex';
+      this.isVisualizerVisible = true;
+    }
 
+    // ビジュアライザーは常時更新する（スピーカーOFF時も可視化）
+    const visualizerSource = context.createBufferSource();
+    visualizerSource.buffer = audioBuffer;
     this.outputAudioState.audioSourceCounter++;
-    const currentSourceId = this.outputAudioState.audioSourceCounter;
-    this.outputAudioState.currentAudioSource = { source, id: currentSourceId };
+    const visualizerSourceId = this.outputAudioState.audioSourceCounter;
+    this.outputAudioState.currentVisualizerSources.push({ source: visualizerSource, id: visualizerSourceId });
+    visualizerSource.connect(this.outputAudioState.visualizerAnalyser!);
+    visualizerSource.onended = () => {
+      this.outputAudioState.currentVisualizerSources = this.outputAudioState.currentVisualizerSources.filter((x) => x.id !== visualizerSourceId);
+      this.refreshPlaybackFlags();
+    };
+    visualizerSource.start(startAt);
 
-    return new Promise<void>((resolve) => {
-      source.onended = () => {
-        if (this.outputAudioState.currentAudioSource?.id === currentSourceId) {
-          this.outputAudioState.currentAudioSource = null;
-        }
-        resolve();
+    if (this.isSpeakerOn.value) {
+      this.outputAudioState.isPlaying = true;
+      const speakerSource = context.createBufferSource();
+      speakerSource.buffer = audioBuffer;
+      this.outputAudioState.audioSourceCounter++;
+      const speakerSourceId = this.outputAudioState.audioSourceCounter;
+      this.outputAudioState.currentAudioSources.push({ source: speakerSource, id: speakerSourceId });
+      speakerSource.connect(this.outputAudioState.audioAnalyser!);
+      speakerSource.onended = () => {
+        this.outputAudioState.currentAudioSources = this.outputAudioState.currentAudioSources.filter((x) => x.id !== speakerSourceId);
+        this.refreshPlaybackFlags();
       };
-      source.start(0);
-    });
+      speakerSource.start(startAt);
+    }
+  }
+
+  private refreshPlaybackFlags() {
+    const now = this.outputAudioState.audioContext?.currentTime ?? 0;
+    this.outputAudioState.isPlaying = this.outputAudioState.currentAudioSources.length > 0;
+    this.outputAudioState.isVisualizerProcessing = this.outputAudioState.currentVisualizerSources.length > 0;
+    if (
+      this.outputAudioState.currentAudioSources.length === 0 &&
+      this.outputAudioState.currentVisualizerSources.length === 0 &&
+      this.outputAudioState.audioQueue.length === 0 &&
+      !this.outputAudioState.isQueueProcessing
+    ) {
+      this.outputAudioState.nextPlayTime = Math.max(now, 0);
+    }
   }
 
   /**
@@ -615,24 +563,35 @@ export class AudioStreamProcessor {
    */
   cancelAudioOutput() {
     // 再生中の音声を停止
-    if (this.outputAudioState.currentAudioSource) {
+    for (const item of this.outputAudioState.currentAudioSources) {
       try {
-        this.outputAudioState.currentAudioSource.source.stop();
+        item.source.stop();
       } catch (e) {
         // Already stopped
       }
-      this.outputAudioState.currentAudioSource = null;
     }
+    for (const item of this.outputAudioState.currentVisualizerSources) {
+      try {
+        item.source.stop();
+      } catch (e) {
+        // Already stopped
+      }
+    }
+    this.outputAudioState.currentAudioSources = [];
+    this.outputAudioState.currentVisualizerSources = [];
 
     // キューをクリア
     this.outputAudioState.audioQueue = [];
+    this.outputAudioState.isQueueProcessing = false;
     this.outputAudioState.isPlaying = false;
+    this.outputAudioState.isVisualizerProcessing = false;
+    this.outputAudioState.nextPlayTime = this.outputAudioState.audioContext?.currentTime ?? 0;
 
     // サーバーにキャンセル通知（統一フォーマット）
     if (this.wsClient.value && this.wsClient.value.isConnected()) {
       this.wsClient.value.send({
         セッションID: this.セッションID.value,
-        チャンネル: -1,
+        チャンネル: -2,
         メッセージ識別: 'cancel_audio',
         メッセージ内容: null,
         ファイル名: null,
@@ -645,16 +604,18 @@ export class AudioStreamProcessor {
    * スピーカーOFF時のクリーンアップ
    */
   clearAudioPlayback() {
-    if (this.outputAudioState.currentAudioSource) {
+    for (const item of this.outputAudioState.currentAudioSources) {
       try {
-        this.outputAudioState.currentAudioSource.source.stop();
+        item.source.stop();
       } catch (e) {
         // Already stopped
       }
-      this.outputAudioState.currentAudioSource = null;
     }
+    this.outputAudioState.currentAudioSources = [];
     this.outputAudioState.audioQueue = [];
+    this.outputAudioState.isQueueProcessing = false;
     this.outputAudioState.isPlaying = false;
+    this.outputAudioState.nextPlayTime = this.outputAudioState.audioContext?.currentTime ?? 0;
   }
 
   /**
@@ -665,13 +626,27 @@ export class AudioStreamProcessor {
       this.stopMicrophone();
     }
 
-    if (this.outputAudioState.currentAudioSource) {
+    for (const item of this.outputAudioState.currentAudioSources) {
       try {
-        this.outputAudioState.currentAudioSource.source.stop();
+        item.source.stop();
       } catch (e) {
         // Already stopped
       }
     }
+    for (const item of this.outputAudioState.currentVisualizerSources) {
+      try {
+        item.source.stop();
+      } catch (e) {
+        // Already stopped
+      }
+    }
+    this.outputAudioState.currentAudioSources = [];
+    this.outputAudioState.currentVisualizerSources = [];
+    this.outputAudioState.audioQueue = [];
+    this.outputAudioState.isQueueProcessing = false;
+    this.outputAudioState.isPlaying = false;
+    this.outputAudioState.isVisualizerProcessing = false;
+    this.outputAudioState.nextPlayTime = 0;
 
     if (this.inputAudioState.audioContext) {
       this.inputAudioState.audioContext.close();

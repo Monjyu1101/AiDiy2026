@@ -10,7 +10,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, reactive, computed, nextTick } from 'vue';
+import { ref, watch, reactive, computed, nextTick, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import apiClient from '@/api/client';
 import { qConfirm } from '@/utils/qAlert';
@@ -35,6 +35,7 @@ const codeBaseOptions = ref<Record<string, string>>({});
 const showRebootDialog = ref(false);
 const rebootWaitSeconds = ref(15);
 const isInitializing = ref(false);
+const hasLoadedConfig = ref(false);
 
 const selections = reactive({
   chatAi: '',
@@ -175,6 +176,7 @@ const loadConfig = async () => {
       selections.codeModel4 = currentSettings.value.CODE_AI4_MODEL || Object.keys(codeModels?.[selections.codeAi4] || {})[0] || '';
       await nextTick();
       isInitializing.value = false;
+      hasLoadedConfig.value = true;
     } else {
       errorMessage.value = response?.data?.message || '取得に失敗しました';
     }
@@ -380,14 +382,11 @@ watch(
   }
 );
 
-watch(
-  () => props.isOpen,
-  (isOpen) => {
-    if (isOpen) {
-      loadConfig();
-    }
+onMounted(() => {
+  if (!hasLoadedConfig.value) {
+    loadConfig();
   }
-);
+});
 </script>
 
 <template>
@@ -406,8 +405,7 @@ watch(
         <div class="config-panel-spacer" aria-hidden="true"></div>
       </div>
       <div class="config-panel-body">
-        <p v-if="loading" class="config-panel-placeholder">設定を読み込み中です…</p>
-        <p v-else-if="errorMessage" class="config-panel-error">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="config-panel-error">{{ errorMessage }}</p>
         <div v-else class="config-panel-content">
           <p class="config-panel-description">AI設定を選択してください。</p>
           <div class="config-panel-form">

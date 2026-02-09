@@ -38,8 +38,30 @@ from log_config import get_logger
 # ロガー取得
 logger = get_logger(__name__)
 
+
+def _short_sid(セッションID: Optional[str]) -> str:
+    if not セッションID:
+        return "-"
+    sid = str(セッションID)
+    if len(sid) <= 23:
+        return sid
+    return f"{sid[:10]}...{sid[-10:]}"
+
+
+def _ws_log(ch: int, 内容: str, セッションID: Optional[str] = None, level: str = "info"):
+    sid = _short_sid(セッションID)
+    msg = f"チャンネル={ch}, {内容}, セッションID={sid}"
+    if level == "debug":
+        logger.debug(msg)
+    elif level == "warning":
+        logger.warning(msg)
+    elif level == "error":
+        logger.error(msg)
+    else:
+        logger.info(msg)
+
 try:
-    from AIコア.AIソケット管理 import AIソケット管理, SessionConnection
+    from AIコア.AIセッション管理 import AIセッション管理, SessionConnection
     from AIコア.AIストリーミング処理 import StreamingProcessor
     from AIコア.AI音声認識 import Recognition
     from AIコア.AI音声処理 import 音声入力データ処理, 統合音声分離ワーカー
@@ -213,7 +235,7 @@ async def 送信_会話履歴(
             "サムネイル画像": item.サムネイル画像
         }
         await 接続.send_json(payload)
-    logger.info(f"会話履歴送信: チャンネル={チャンネル}, 件数={len(履歴一覧)}")
+    logger.info(f"チャンネル={チャンネル}, 会話履歴送信, 件数={len(履歴一覧)}")
 
 class 初期化リクエスト(BaseModel):
     セッションID: str = ""
@@ -236,11 +258,11 @@ async def 初期化(http_request: Request, request: 初期化リクエスト):
 
         # セッションIDがない場合は新規生成
         if not セッションID:
-            セッションID = AIソケット管理.セッションID生成()
+            セッションID = AIセッション管理.セッションID生成()
             バックアップ実行(getattr(http_request.app, "conf", None), backend_dir=バックエンドディレクトリ)
 
         # セッションを確実に作成（存在しなければ新規）
-        AIソケット管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
+        AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
 
         return 初期化レスポンス(
             status="OK",
@@ -270,8 +292,8 @@ async def セッション一覧():
         "data": {
             "REST_セッション数": len(セッション情報),
             "REST_セッションID一覧": list(セッション情報.keys()),
-            "WebSocket_セッション数": AIソケット管理.get_session_count(),
-            "WebSocket_セッション一覧": AIソケット管理.get_session_list()
+            "WebSocket_セッション数": AIセッション管理.get_session_count(),
+            "WebSocket_セッション一覧": AIセッション管理.get_session_list()
         }
     }
 
@@ -301,7 +323,7 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
             }
 
         # WebSocketマネージャーから接続を取得
-        接続 = AIソケット管理.get_session(セッションID)
+        接続 = AIセッション管理.get_session(セッションID)
 
         if not 接続:
             return {
@@ -360,7 +382,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             }
 
         # WebSocketマネージャーから接続を取得
-        接続 = AIソケット管理.get_session(セッションID)
+        接続 = AIセッション管理.get_session(セッションID)
 
         if not 接続:
             return {
@@ -399,7 +421,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
 
         # ソケットのモデル設定を更新（ファイル保存はしない）
         if 許可設定:
-            接続.update_model_settings(許可設定, manager=AIソケット管理)
+            接続.update_model_settings(許可設定, manager=AIセッション管理)
 
         # 既存プロセッサに反映（即時反映、設定変更がある場合のみ）
         if 許可設定:
@@ -496,7 +518,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
     try:
         await WebSocket接続.accept()
-        logger.info("WebSocket /ws/AIコア 接続受付")
+        _ws_log(ch=-99, 内容="接続受付")
 
         # 初回メッセージでセッションID・ソケット番号を受信
         try:
@@ -507,14 +529,14 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 ソケット番号 = 初期データ.get("チャンネル")
             if ソケット番号 is None:
                 ソケット番号 = -1
-            logger.debug(f"接続要求受信 (セッションID: {クライアントセッションID}, ソケット番号: {ソケット番号})")
+            _ws_log(ch=int(ソケット番号), 内容="接続要求", セッションID=クライアントセッションID)
         except Exception as e:
-            logger.error(f"初回メッセージ受信エラー: {e}")
+            _ws_log(ch=-99, 内容=f"初回受信エラー: {e}", level="error")
             クライアントセッションID = None
             ソケット番号 = -1
 
         # WebSocket接続を登録（accept済み）
-        セッションID = await AIソケット管理.connect(
+        セッションID = await AIセッション管理.connect(
             WebSocket接続,
             セッションID=クライアントセッションID,
             socket_no=int(ソケット番号),
@@ -522,7 +544,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             accept_in_connect=False
         )
 
-        セッション = AIソケット管理.get_session(セッションID)
+        セッション = AIセッション管理.get_session(セッションID)
         if not セッション:
             raise RuntimeError("セッションの作成に失敗しました")
 
@@ -675,7 +697,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     "ファイル名": None,
                     "サムネイル画像": None
                 })
-                logger.info(f"welcome_info送信: チャンネル={ソケット番号}")
+                _ws_log(ch=int(ソケット番号), 内容="welcome_info送信", セッションID=セッションID)
 
             await asyncio.sleep(0.1)
             try:
@@ -701,16 +723,21 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 受信データ = await WebSocket接続.receive_json()
                 メッセージ識別 = 受信データ.get("メッセージ識別")
 
-                if int(ソケット番号) != -1:
+                if int(ソケット番号) not in (-1, -2):
                     continue
 
                 if メッセージ識別 == "operations":
+                    if int(ソケット番号) != -1:
+                        continue
                     内容 = 受信データ.get("メッセージ内容", {})
-                    画面 = 内容.get("画面", {})
                     ボタン = 内容.get("ボタン", {})
-                    セッション.update_state(画面, ボタン, manager=AIソケット管理)
+                    if not isinstance(ボタン, dict):
+                        ボタン = {}
+                    セッション.update_state(ボタン, manager=AIセッション管理)
 
                 elif メッセージ識別 == "input_text":
+                    if int(ソケット番号) != -1:
+                        continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
                     ファイル名 = 受信データ.get("ファイル名") or ""
                     入力チャンネル = 受信データ.get("チャンネル", -1)
@@ -780,6 +807,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         セッション.set_channel_processing(出力先チャンネル, False)
 
                 elif メッセージ識別 == "input_request":
+                    if int(ソケット番号) != -1:
+                        continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
                     入力チャンネル = 受信データ.get("チャンネル", -1)
                     出力先チャンネル = 受信データ.get("出力先チャンネル", 1)
@@ -834,6 +863,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         セッション.set_channel_processing(出力先チャンネル, False)
 
                 elif メッセージ識別 == "input_file":
+                    if int(ソケット番号) != -1:
+                        continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or ""
                     入力チャンネル = 受信データ.get("チャンネル", -1)
                     出力先チャンネル = 受信データ.get("出力先チャンネル", 0)
@@ -988,7 +1019,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     logger.error(f"不明なメッセージ識別 ({セッションID}): {メッセージ識別} data={json.dumps(受信データ, ensure_ascii=False)}")
 
             except WebSocketDisconnect:
-                logger.info(f"クライアント切断: {セッションID} socket={ソケット番号}")
+                _ws_log(ch=int(ソケット番号), 内容="接続切断", セッションID=セッションID)
                 break
             except Exception as e:
                 logger.error(f"メッセージ処理エラー ({セッションID}): {e}")
@@ -999,12 +1030,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 })
 
     except WebSocketDisconnect:
-        logger.info(f"接続切断 (初期): {セッションID}")
+        _ws_log(ch=int(ソケット番号) if ソケット番号 is not None else -99, 内容="接続切断", セッションID=セッションID)
     except Exception as e:
         logger.error(f"エラー ({セッションID}): {e}")
     finally:
         if セッションID is not None:
-            logger.info(f"WebSocket /ws/AIコア 切断: {セッションID} socket={ソケット番号}")
-            await AIソケット管理.disconnect(セッションID, socket_no=ソケット番号)
+            _ws_log(ch=int(ソケット番号), 内容="接続切断", セッションID=セッションID)
+            await AIセッション管理.disconnect(セッションID, socket_no=ソケット番号)
             logger.debug(f"クリーンアップ完了: {セッションID}")
-

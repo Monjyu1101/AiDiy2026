@@ -30,7 +30,7 @@ export interface IWebSocketClient {
   セッションID取得(): string | null;
   isConnected(): boolean;
   sendPing(): void;
-  updateState(画面: any, ボタン: any): void;
+  updateState(ボタン: any): void;
   sendChatMessage(message: string): void;
   sendInputText(text: string, チャンネル?: number): void;
   requestStream(data: any): void;
@@ -286,17 +286,14 @@ export class AIコアWebSocket implements IWebSocketClient {
   }
 
   /**
-   * 画面状態を更新
+   * ボタン状態を更新
    */
-  updateState(画面: any, ボタン: any): void {
+  updateState(ボタン: any): void {
     this.send({
       セッションID: this.セッションID,
       チャンネル: null,
       メッセージ識別: 'operations',
-      メッセージ内容: {
-        画面,
-        ボタン
-      }
+      メッセージ内容: { ボタン }
     });
   }
 

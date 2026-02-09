@@ -83,7 +83,7 @@
 
 **共有リソース:**
 - **同じデータベース** (`_data/AiDiy/database.db`)
-- **共通モジュール**: `database.py`, `core_schema.py`, `apps_schema.py`, `auth.py`, `deps.py`, `log_config.py`, `AIコア/AIソケット管理.py`
+- **共通モジュール**: `database.py`, `core_schema.py`, `apps_schema.py`, `auth.py`, `deps.py`, `log_config.py`, `AIコア/AIセッション管理.py`
 
 ### 実装の主要な特徴
 
@@ -126,7 +126,7 @@
 - AI APIキー、モデル設定などを一元管理
 - `app.conf` でアクセス可能
 
-**8. WebSocket統合 (AIコア/AIソケット管理.py):**
+**8. WebSocket統合 (AIコア/AIセッション管理.py):**
 - `WebSocketManager` クラスで接続管理
 - セッション状態の永続化（リロード対応）
 - AIコアの音声・画像・テキストストリーミング
@@ -221,16 +221,16 @@
   - ログ出力先: `backend_server/temp/logs/yyyyMMdd.AiDiy.log`（日付が変わると自動で新規ファイル）
 
 **共通WebSocketモジュール:**
-- **AIコア/AIソケット管理.py** - WebSocket connection manager
+- **AIコア/AIセッション管理.py** - WebSocket connection manager
   - `WebSocketConnection`: 個別接続管理クラス
-    - 接続状態、画面状態、ボタン状態、モデル設定を保持
+    - 接続状態、ボタン状態、モデル設定を保持
     - ストリーミングプロセッサと音声処理を管理
   - `WebSocketManager`: グローバル接続マネージャー
     - `generate_socket_id()`: PID + タイムスタンプ + UUID でユニークID生成
     - `connect()`, `disconnect()`: 接続管理
     - `save_session_state()`: セッション永続化（リロード対応）
     - `get_connection()`, `send_to_socket()`, `broadcast()`: メッセージング
-  - グローバルインスタンス: `AIソケット管理`
+  - グローバルインスタンス: `AIセッション管理`
 
 **重要**: バックエンドは2つのFastAPIサーバーに分かれています：
   - core_main (port 8091) - コア機能 (C系, A系) + WebSocket
@@ -483,7 +483,7 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
 
 - **AIコア.py** - AIコア WebSocketエンドポイント
   - `WebSocket /core/ws/AIコア` - WebSocket接続
-  - セッション管理、画面状態/ボタン状態の永続化
+  - セッション管理、ボタン状態の永続化
   - ストリーミングプロセッサとの統合
 
 - **A会話履歴.py** - A会話履歴CRUDエンドポイント
@@ -623,7 +623,7 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
 
 ### WebSocket Support（WebSocket統合）
 
-`AIコア/AIソケット管理.py` でWebSocket接続を一元管理。AIコアのリアルタイム通信を提供。
+`AIコア/AIセッション管理.py` でWebSocket接続を一元管理。AIコアのリアルタイム通信を提供。
 
 **WebSocketConnection クラス:**
 - 個別のWebSocket接続を管理
@@ -631,8 +631,7 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
   - `websocket`: FastAPI WebSocketオブジェクト
   - `socket_id`: ユニークなソケットID（PID + タイムスタンプ + UUID）
   - `is_connected`: 接続状態フラグ
-  - `画面状態`: 6つのコンポーネント表示状態（チャット、イメージ、エージェント1〜4）
-  - `ボタン状態`: 3つのボタン状態（スピーカー、マイク、カメラ）
+  - `ボタン状態`: ボタンの状態（スピーカー、マイク、カメラ、チャット、エージェント1〜4、チャットモード）
   - `モデル設定`: AI modelの設定（app.confからコピー）
   - `streaming_processor`: StreamingProcessor インスタンス
   - `recognition_processor`: 音声認識プロセッサ
@@ -641,11 +640,11 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
   - `accept()`: WebSocket接続受け入れ
   - `send_json(data)`, `receive_json()`: JSON送受信
   - `close()`: 接続クローズ（プロセッサ停止含む）
-  - `update_state(画面, ボタン, manager)`: 画面・ボタン状態更新とセッション保存
+  - `update_state(ボタン, manager)`: ボタン状態更新とセッション保存
   - `update_model_settings(設定, manager)`: モデル設定更新とセッション保存
 
 **WebSocketManager クラス:**
-- グローバルな接続マネージャー（シングルトン `AIソケット管理` インスタンス）
+- グローバルな接続マネージャー（シングルトン `AIセッション管理` インスタンス）
 - プロパティ:
   - `active_connections`: アクティブ接続の辞書 (`socket_id` → `WebSocketConnection`)
   - `session_states`: セッション状態の辞書（リロード後も状態復元）
@@ -654,7 +653,7 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
   - `connect(websocket, socket_id, app_conf)`: 接続登録（新規またはリロード）
     - 新規セッション: app.confからモデル設定をコピー
     - 既存セッション: session_statesから状態復元
-  - `save_session_state(socket_id, 画面, ボタン, モデル設定, ソース最終更新日時)`: セッション保存
+  - `save_session_state(socket_id, ボタン, モデル設定, ソース最終更新日時)`: セッション保存
   - `disconnect(socket_id, keep_session)`: 接続切断（オプションでセッション保持）
   - `send_to_socket(socket_id, data)`: 特定ソケットへ送信
   - `broadcast(data)`: 全接続へブロードキャスト
@@ -664,17 +663,17 @@ Logging is initialized in `main.py` startup event via `setup_logging()`.
 **使用例:**
 ```python
 # core_router/AIコア.py
-from AIコア.AIソケット管理 import AIソケット管理
+from AIコア.AIセッション管理 import AIセッション管理
 
 @router.websocket("/core/ws/AIコア")
 async def websocket_endpoint(websocket: WebSocket, ...):
-    socket_id = await AIソケット管理.connect(websocket, socket_id, request.app.conf)
+    socket_id = await AIセッション管理.connect(websocket, socket_id, request.app.conf)
     try:
         while True:
             message = await connection.receive_json()
-            await AIソケット管理.handle_message(socket_id, message)
+            await AIセッション管理.handle_message(socket_id, message)
     finally:
-        await AIソケット管理.disconnect(socket_id, keep_session=True)
+        await AIセッション管理.disconnect(socket_id, keep_session=True)
 ```
 
 **Note**: WebSocket routesは `core_router/AIコア.py` で実装され、core_main.pyに登録済み。
@@ -867,12 +866,12 @@ AIコアは、複数のAIサービスを統合したマルチパネルAIイン�
 - **`WebSocket /core/ws/AIコア`** - メインWebSocket接続
   - クエリパラメータ: `ソケットID` (リロード時に指定)
   - 接続時:
-    1. `AIソケット管理.connect()` で接続登録
+    1. `AIセッション管理.connect()` で接続登録
     2. セッション状態を復元または新規作成
-    3. 初期化メッセージ送信（画面状態、ボタン状態）
+    3. 初期化メッセージ送信（ボタン状態）
     4. ストリーミングプロセッサ起動
   - メッセージ受信:
-    - クライアントからのメッセージを `AIソケット管理.handle_message()` へ転送
+    - クライアントからのメッセージを `AIセッション管理.handle_message()` へ転送
     - ストリーミングプロセッサが処理
   - 切断時:
     - セッション状態を保存（keep_session=True）
@@ -888,7 +887,7 @@ AIコアは、複数のAIサービスを統合したマルチパネルAIイン�
 
 **モジュール構成:**
 - **__init__.py** - AIコア modules エクスポート
-- **AIソケット管理.py** - WebSocket接続管理
+- **AIセッション管理.py** - WebSocket接続管理
 - **AIストリーミング処理.py** - `StreamingProcessor` クラス
   - 音声・画像・テキストのストリーミング処理
   - メッセージキュー管理
@@ -937,7 +936,7 @@ AIコアは、複数のAIサービスを統合したマルチパネルAIイン�
   - `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY`
   - `GEMINI_API_KEY`
-- モデル設定: WebSocketセッション毎にapp.confからコピー（AIコア/AIソケット管理.py）
+- モデル設定: WebSocketセッション毎にapp.confからコピー（AIコア/AIセッション管理.py）
 
 **会話履歴:**
 - **A会話履歴** テーブルでセッション永続化
@@ -1132,17 +1131,17 @@ def protected_endpoint(現在利用者: C利用者 = Depends(get_現在利用者
 
 **5. WebSocket使用:**
 ```python
-from AIソケット管理 import AIソケット管理
+from AIセッション管理 import AIセッション管理
 
 @router.websocket("/ws/custom")
 async def custom_websocket(websocket: WebSocket, request: Request):
-    socket_id = await AIソケット管理.connect(websocket, None, request.app.conf)
+    socket_id = await AIセッション管理.connect(websocket, None, request.app.conf)
     try:
         while True:
-            data = await AIソケット管理.get_connection(socket_id).receive_json()
-            await AIソケット管理.send_to_socket(socket_id, {"response": "..."})
+            data = await AIセッション管理.get_connection(socket_id).receive_json()
+            await AIセッション管理.send_to_socket(socket_id, {"response": "..."})
     finally:
-        await AIソケット管理.disconnect(socket_id)
+        await AIセッション管理.disconnect(socket_id)
 ```
 
 ### よくある落とし穴

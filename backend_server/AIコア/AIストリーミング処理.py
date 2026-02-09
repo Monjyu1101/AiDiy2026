@@ -17,7 +17,7 @@ from typing import Optional, TYPE_CHECKING
 from log_config import get_logger
 
 if TYPE_CHECKING:
-    from AIコア.AIソケット管理 import SessionConnection
+    from AIコア.AIセッション管理 import SessionConnection
 
 logger = get_logger(__name__)
 
@@ -115,23 +115,21 @@ class StreamingProcessor:
     async def _process_ai_tasks(self):
         """
         AI処理タスク
-        画面状態に応じて適切なAI処理を実行
+        ボタン状態に応じて適切なAI処理を実行
         """
-        画面状態 = self.connection.画面状態
         ボタン状態 = self.connection.ボタン状態
-        モデル設定 = self.connection.モデル設定
 
         # チャットAI処理
-        if 画面状態.get("チャット", False):
+        if ボタン状態.get("チャット", False):
             await self._process_chat_ai()
 
         # イメージAI処理
-        if 画面状態.get("イメージ", False) and ボタン状態.get("カメラ", False):
+        if ボタン状態.get("カメラ", False):
             await self._process_image_ai()
 
         # エージェントAI処理
         for i in range(1, 5):
-            if 画面状態.get(f"エージェント{i}", False):
+            if ボタン状態.get(f"エージェント{i}", False):
                 await self._process_agent_ai(i)
 
     async def _process_chat_ai(self):
@@ -167,7 +165,7 @@ class StreamingProcessor:
             **data
         })
 
-    async def send_output_audio(self, base64_audio: str, mime_type: str = "audio/pcm", チャンネル: int = -1):
+    async def send_output_audio(self, base64_audio: str, mime_type: str = "audio/pcm", チャンネル: int = -2):
         """
         音声出力メッセージを送信
 

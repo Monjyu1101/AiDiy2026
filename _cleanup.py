@@ -30,6 +30,9 @@ FRONTEND_PATH = "frontend_server"    # フロントエンドフォルダパス
 DATABASE_TYPE = "sqlite"             # "postgresql" or "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
 
+# a/auto 指定時に、以降の質問をデフォルト値で自動回答する
+AUTO_MODE = False
+
 # ============================================================
 
 
@@ -83,6 +86,12 @@ def ask_yes_no(prompt, default="n"):
     Returns:
         bool: Yesの場合True、Noの場合False
     """
+    global AUTO_MODE
+
+    if AUTO_MODE:
+        print_info(f"[AUTO] {prompt} -> {'Yes' if default.lower() == 'y' else 'No'} (default)")
+        return default.lower() == "y"
+
     if default == "y":
         prompt_text = f"\n{prompt}([y]/n): "
     else:
@@ -100,6 +109,33 @@ def ask_yes_no(prompt, default="n"):
             return False
         else:
             print_warning("'y' または 'n' で答えてください")
+
+
+def ask_start_mode(prompt, default="n"):
+    """開始質問 (y/n/a) を表示して実行モードを取得
+
+    Returns:
+        tuple[bool, bool]: (実行するか, autoモードか)
+    """
+    if default.lower() == "y":
+        prompt_text = f"\n{prompt}([y]/n/a=auto): "
+    else:
+        prompt_text = f"\n{prompt}([n]/y/a=auto): "
+
+    while True:
+        answer = input(prompt_text).strip().lower()
+
+        if answer == "":
+            answer = default.lower()
+
+        if answer in ["y", "yes"]:
+            return True, False
+        if answer in ["n", "no"]:
+            return False, False
+        if answer in ["a", "auto"]:
+            return True, True
+
+        print_warning("'y' または 'n' または 'a'(auto) で答えてください")
 
 
 def handle_remove_readonly(func, path, exc_info):
@@ -309,6 +345,8 @@ def cleanup_client(base_dir):
 
 def main():
     """メイン処理"""
+    global AUTO_MODE
+
     print_header("プロジェクト クリーンアップ")
     
     # プロジェクトのルートディレクトリ
@@ -318,9 +356,13 @@ def main():
     print()
     
     # クリーンアップ実行の確認
-    if not ask_yes_no("フォルダをクリーンアップしますか？", default="n"):
+    run_cleanup, AUTO_MODE = ask_start_mode("フォルダをクリーンアップしますか？", default="n")
+    if not run_cleanup:
         print_info("クリーンアップをキャンセルしました")
         return
+
+    if AUTO_MODE:
+        print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
 
     # backup フォルダの削除確認（先に実施）
     backup_dir = base_dir / "backup"

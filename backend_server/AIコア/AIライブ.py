@@ -240,7 +240,7 @@ class Live:
             if not bytes_data:
                 return False
             base64_audio = base64.b64encode(bytes_data).decode("utf-8")
-            await self.接続.send_to_channel(-1, {
+            await self.接続.send_to_channel(-2, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_audio",
                 "メッセージ内容": mime_type,
@@ -305,7 +305,7 @@ class Live:
                 if self.音声受信Ｑ.qsize() > 0:
                     pass  # データあり：高速処理
                 else:
-                    await asyncio.sleep(0.10)
+                    await asyncio.sleep(0.05)
 
             except asyncio.CancelledError:
                 break
@@ -377,4 +377,3 @@ class Live:
         except Exception as e:
             logger.error(f"[Live] 画像送信エラー: {e}")
             return False
-

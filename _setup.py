@@ -44,6 +44,9 @@ CLIENT_DIR = BASE_DIR / FRONTEND_PATH
 POSTGRES_DIR = BASE_DIR / POSTGRES_PATH
 VENV_DIR = SERVER_DIR / BACKEND_ENV
 
+# a/auto 指定時に、以降の質問をデフォルト値で自動回答する
+AUTO_MODE = False
+
 
 # 色付き出力用
 class Colors:
@@ -95,6 +98,12 @@ def ask_yes_no(prompt, default="n"):
     Returns:
         bool: Yesの場合True、Noの場合False
     """
+    global AUTO_MODE
+
+    if AUTO_MODE:
+        print_info(f"[AUTO] {prompt} -> {'Yes' if default.lower() == 'y' else 'No'} (default)")
+        return default.lower() == "y"
+
     if default.lower() == "y":
         prompt_text = f"\n{prompt} ([y]/n): "
     else:
@@ -113,6 +122,33 @@ def ask_yes_no(prompt, default="n"):
             return False
         else:
             print_warning("'y' または 'n' で答えてください。")
+
+
+def ask_start_mode(prompt, default="n"):
+    """開始質問 (y/n/a) を表示して実行モードを取得
+
+    Returns:
+        tuple[bool, bool]: (実行するか, autoモードか)
+    """
+    if default.lower() == "y":
+        prompt_text = f"\n{prompt} ([y]/n/a=auto): "
+    else:
+        prompt_text = f"\n{prompt} (y/[n]/a=auto): "
+
+    while True:
+        response = input(prompt_text).strip().lower()
+
+        if response == "":
+            response = default.lower()
+
+        if response in ["y", "yes"]:
+            return True, False
+        if response in ["n", "no"]:
+            return False, False
+        if response in ["a", "auto"]:
+            return True, True
+
+        print_warning("'y' または 'n' または 'a'(auto) で答えてください。")
 
 
 def run_command(command, cwd=None, shell=False):
@@ -424,15 +460,21 @@ def install_global_npm_tools():
 
 def main():
     """メイン処理"""
+    global AUTO_MODE
+
     print_header("プロジェクト セットアップ")
     
     print(f"{Colors.BOLD}このスクリプトは、プロジェクトの初期セットアップを実行します。{Colors.ENDC}")
     print()
     
     # セットアップ実行確認
-    if not ask_yes_no("セットアップを実行しますか?", default="n"):
+    run_setup, AUTO_MODE = ask_start_mode("セットアップを実行しますか?", default="n")
+    if not run_setup:
         print_warning("セットアップをキャンセルしました。")
         sys.exit(0)
+
+    if AUTO_MODE:
+        print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
     
     # グローバルツールのアップグレード
     if ask_yes_no("グローバル環境のツール(pip, wheel, setuptools, uv)をアップグレードしますか?", default="y"):

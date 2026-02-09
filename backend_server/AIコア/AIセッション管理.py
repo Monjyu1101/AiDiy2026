@@ -77,7 +77,8 @@ class SessionConnection:
     """
     セッション構造体
     ソケット構造体:
-    -1: 共通入力チャンネル（音声、画像）
+    -2: 音声入力チャンネル
+    -1: 共通入力チャンネル（テキスト、画像、操作）
      0: チャット出力チャンネル
      1: エージェント1出力チャンネル
      2: エージェント2出力チャンネル
@@ -88,6 +89,7 @@ class SessionConnection:
     def __init__(self, セッションID: str):
         self.セッションID = セッションID
         self.sockets: Dict[int, Optional[WebSocketConnection]] = {
+            -2: None,
             -1: None,
             0: None,
             1: None,
@@ -96,14 +98,6 @@ class SessionConnection:
             4: None
         }
         self.output_audio_paused = False
-        self.画面状態 = {
-            "チャット": True,
-            "イメージ": False,
-            "エージェント1": False,
-            "エージェント2": False,
-            "エージェント3": False,
-            "エージェント4": False
-        }
         self.ボタン状態 = {
             "スピーカー": True,
             "マイク": False,
@@ -120,6 +114,7 @@ class SessionConnection:
         self.チャンネル別処理中: Dict[int, bool] = {}
 
         self.チャンネル登録状態: Dict[int, bool] = {
+            -2: True,
             -1: True,
             0: False,
             1: False,
@@ -182,19 +177,39 @@ class SessionConnection:
         self.チャンネル別処理中[チャンネル] = 処理中
         logger.debug(f"チャンネル{チャンネル}の処理状態: {処理中} ({self.セッションID})")
 
-    def update_state(self, 画面: dict, ボタン: dict, manager=None):
-        self.画面状態.update(画面)
-        self.ボタン状態.update(ボタン)
+    def update_state(self, ボタン: dict, manager=None):
+        if isinstance(ボタン, dict):
+            self.ボタン状態.update(ボタン)
         if manager:
-            manager.save_session_state(self.セッションID, self.画面状態, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
+            manager.save_session_state(self.セッションID, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
     def update_model_settings(self, 設定: dict, manager=None):
         self.モデル設定.update(設定)
         if manager:
-            manager.save_session_state(self.セッションID, self.画面状態, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
+            manager.save_session_state(self.セッションID, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
+
+    async def stop_runtime_processors(self):
+        """WebSocket切断後に残る実行系プロセッサを停止（セッション状態は保持）"""
+        if hasattr(self, "live_processor") and self.live_processor:
+            try:
+                await self.live_processor.終了()
+            except Exception:
+                pass
+        if hasattr(self, "chat_processor") and self.chat_processor:
+            try:
+                await self.chat_processor.終了()
+            except Exception:
+                pass
+        if hasattr(self, "code_agent_processors") and self.code_agent_processors:
+            for agent in self.code_agent_processors:
+                try:
+                    await agent.終了()
+                except Exception:
+                    pass
 
     async def close(self):
         """セッション全体をクローズ"""
+        await self.stop_runtime_processors()
         if self.streaming_processor:
             await self.streaming_processor.stop()
             self.streaming_processor = None
@@ -235,6 +250,18 @@ class WebSocketManager:
         self.sessions: Dict[str, SessionConnection] = {}
         self.session_states: Dict[str, dict] = {}
 
+    def _short_sid(self, セッションID: Optional[str]) -> str:
+        if not セッションID:
+            return "-"
+        sid = str(セッションID)
+        if len(sid) <= 23:
+            return sid
+        return f"{sid[:10]}...{sid[-10:]}"
+
+    def _fmt_log(self, ch: int, 内容: str, セッションID: Optional[str] = None) -> str:
+        sid = self._short_sid(セッションID)
+        return f"チャンネル={ch}, {内容}, セッションID={sid}"
+
     def セッションID生成(self) -> str:
         """新しいセッションIDを生成（プロセスIDベース）"""
         import os
@@ -272,7 +299,6 @@ class WebSocketManager:
             # セッション状態を復元または初期化
             if セッションID in self.session_states:
                 saved_state = self.session_states[セッションID]
-                session.画面状態 = saved_state.get("画面", session.画面状態)
                 session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
                 session.モデル設定 = saved_state.get("モデル設定", {})
                 session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
@@ -315,7 +341,6 @@ class WebSocketManager:
                     logger.debug(f"app.confからモデル設定をコピー: {セッションID}")
 
                 self.session_states[セッションID] = {
-                    "画面": session.画面状態.copy(),
                     "ボタン": session.ボタン状態.copy(),
                     "モデル設定": session.モデル設定.copy(),
                     "ソース最終更新日時": session.ソース最終更新日時
@@ -350,13 +375,12 @@ class WebSocketManager:
         }
         if socket_no == -1:
             init_payload["メッセージ内容"] = {
-                "画面": session.画面状態,
                 "ボタン": session.ボタン状態,
                 "モデル設定": session.モデル設定
             }
         await connection.send_json(init_payload)
 
-        logger.info(f"接続登録完了: チャンネル={socket_no}, セッションID={セッションID}")
+        logger.info(self._fmt_log(ch=socket_no, 内容="接続登録", セッションID=セッションID))
         return セッションID
 
     def ensure_session(self, セッションID: Optional[str] = None, app_conf=None) -> str:
@@ -373,7 +397,6 @@ class WebSocketManager:
         session = SessionConnection(セッションID)
         if セッションID in self.session_states:
             saved_state = self.session_states[セッションID]
-            session.画面状態 = saved_state.get("画面", session.画面状態)
             session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
             session.モデル設定 = saved_state.get("モデル設定", {})
             session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
@@ -410,7 +433,6 @@ class WebSocketManager:
                     "CODE_BASE_PATH": app_conf.json.get("CODE_BASE_PATH", "../"),
                 }
             self.session_states[セッションID] = {
-                "画面": session.画面状態.copy(),
                 "ボタン": session.ボタン状態.copy(),
                 "モデル設定": session.モデル設定.copy(),
                 "ソース最終更新日時": session.ソース最終更新日時
@@ -419,10 +441,9 @@ class WebSocketManager:
         logger.info(f"セッションを作成(ensure): {セッションID}")
         return セッションID
 
-    def save_session_state(self, セッションID: str, 画面: dict, ボタン: dict, モデル設定: dict = None, ソース最終更新日時: Optional[str] = None):
+    def save_session_state(self, セッションID: str, ボタン: dict, モデル設定: dict = None, ソース最終更新日時: Optional[str] = None):
         """セッション状態を保存"""
         state = {
-            "画面": 画面.copy(),
             "ボタン": ボタン.copy()
         }
         if モデル設定 is not None:
@@ -448,7 +469,6 @@ class WebSocketManager:
         if keep_session:
             self.save_session_state(
                 セッションID,
-                session.画面状態,
                 session.ボタン状態,
                 session.モデル設定,
                 session.ソース最終更新日時
@@ -461,8 +481,12 @@ class WebSocketManager:
             if connection:
                 await connection.close()
                 session.set_socket(socket_no, None)
+            # セッションは保持しても、接続がゼロなら実行系ループは停止
+            if not session.is_connected:
+                await session.stop_runtime_processors()
 
-        logger.info(f"接続切断: session={セッションID} socket={socket_no} (セッション保持: {keep_session})")
+        ch = socket_no if socket_no is not None else -99
+        logger.info(self._fmt_log(ch=ch, 内容="接続切断", セッションID=セッションID))
 
     def get_session(self, セッションID: str) -> Optional[SessionConnection]:
         """セッションIDからセッションを取得"""
@@ -544,7 +568,6 @@ class WebSocketManager:
             {
                 "セッションID": session.セッションID,
                 "is_connected": session.is_connected,
-                "画面状態": session.画面状態,
                 "ボタン状態": session.ボタン状態,
                 "モデル設定": session.モデル設定,
                 "ソース最終更新日時": session.ソース最終更新日時,
@@ -561,6 +584,5 @@ class WebSocketManager:
         ]
 
 
-# グローバルなWebSocketマネージャーインスタンス
-AIソケット管理 = WebSocketManager()
-
+# グローバルなセッションマネージャーインスタンス
+AIセッション管理 = WebSocketManager()

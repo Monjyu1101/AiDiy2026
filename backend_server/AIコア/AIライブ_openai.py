@@ -189,8 +189,8 @@ class LiveAI:
         else:
             # セッションから取得を試みる
             try:
-                from AIコア.AIソケット管理 import AIソケット管理
-                セッション = AIソケット管理.get_session(self.セッションID)
+                from AIコア.AIセッション管理 import AIセッション管理
+                セッション = AIセッション管理.get_session(self.セッションID)
                 if セッション and hasattr(セッション, "tools_instance"):
                     self.tool_instance = セッション.tools_instance
                     logger.info("セッションからツールインスタンスを取得しました")

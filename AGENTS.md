@@ -308,7 +308,7 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 - 監査フィールドの標準化
 - Reboot機構（内部再起動システム）
 - 構成管理システム (conf/)
-- WebSocket統合 (AIコア/AIソケット管理.py)
+- WebSocket統合 (AIコア/AIセッション管理.py)
 - AI統合機能 (AIコア/)
 
 **詳細は [backend_server/AGENTS.md](backend_server/AGENTS.md) を参照**
@@ -327,7 +327,7 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 - 共通スキーマ (core_schema.py / apps_schema.py - 分割管理)
   - 共通認証モジュール (auth.py, deps.py)
   - 共通ログモジュール (log_config.py)
-- 共通WebSocketモジュール (AIコア/AIソケット管理.py)
+- 共通WebSocketモジュール (AIコア/AIセッション管理.py)
   - 構成管理システム (conf/ - ConfigManager singleton)
   - データ・設定ディレクトリ (_data/, _config/, temp/)
   - Models (core_models/, apps_models/ - SQLAlchemy ORM)
@@ -352,7 +352,7 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
   - 一覧検索・ページング
 - **AIコア Component System (A系)**
   - バックエンド実装（WebSocketエンドポイント、HTTP REST エンドポイント）
-  - AI Integration (AIソケット管理.py, AIストリーミング処理.py, AI音声処理.py, AI音声認識.py, AIチャット*.py, AIライブ*.py, AIコード*.py, AI内部ツール.py)
+  - AI Integration (AIセッション管理.py, AIストリーミング処理.py, AI音声処理.py, AI音声認識.py, AIチャット*.py, AIライブ*.py, AIコード*.py, AI内部ツール.py)
   - AI Providers (Anthropic Claude, OpenAI, Google Gemini)
   - 設定管理（API keys、モデル設定）
   - 会話履歴（A会話履歴テーブル）
@@ -646,4 +646,5 @@ No automated test suites are configured. Testing is done manually:
 - VIEWs are not created as database objects in this implementation
 - VIEW endpoints (`core_router/V*.py`, `apps_router/V*.py`) use raw SQL queries with JOINs
 - Each VIEW router directly executes SELECT statements to fetch joined data
+
 

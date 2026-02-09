@@ -85,7 +85,7 @@ async def _send_cancel_audio_user(接続):
             # クライアント側の再生停止
             message = {
                 "セッションID": 接続.セッションID,
-                "チャンネル": -1,
+                "チャンネル": -2,
                 "メッセージ識別": "cancel_audio",
                 "メッセージ内容": "人間の音声を検出しました。AI音声再生を停止します。",
                 "ファイル名": None,
@@ -200,7 +200,7 @@ async def 統合音声分離ワーカー(接続):
                     silence_base64 = base64.b64encode(silence_packet).decode("utf-8")
                     
                     try:
-                        await 接続.send_to_channel(-1, {
+                        await 接続.send_to_channel(-2, {
                             "セッションID": 接続.セッションID,
                             "メッセージ識別": "output_audio",
                             "メッセージ内容": "audio/pcm",
@@ -213,9 +213,18 @@ async def 統合音声分離ワーカー(接続):
 
                     combined_audio = b"".join(audio_buffer)
                     if len(combined_audio) >= MIN_AUDIO_BYTES and 接続.recognition_processor:
-                        # TODO: LiveAI連携時は出力音声の認識投入可否を条件分岐する
-                        # 例: if 接続.LIVE_AI != 'openai': await 接続.recognition_processor.音声認識要求("output", combined_audio)
-                        await 接続.recognition_processor.音声認識要求("output", combined_audio)
+                        # openai_live実行中は、送信音声のローカル音声認識を停止する
+                        # （OpenAI Realtimeがテキストを返すため重複回避）
+                        live = getattr(接続, "live_processor", None)
+                        live_ai = None
+                        if live and getattr(live, "AIインスタンス", None):
+                            live_ai = getattr(live.AIインスタンス, "LIVE_AI", None)
+                        if live_ai != "openai_live":
+                            await 接続.recognition_processor.音声認識要求("output", combined_audio)
+                        else:
+                            # await 接続.recognition_processor.音声認識要求("output", combined_audio)
+                            # openai_live実行中は、OpenAI Realtimeのtext返却を使用するため送信しない
+                            pass
 
                 await asyncio.sleep(0.25 if _音声バッファあり(接続) else 0.50)
 
@@ -235,4 +244,3 @@ def _音声バッファあり(接続) -> bool:
         return bool(input_buf or output_buf)
     except Exception:
         return False
-
