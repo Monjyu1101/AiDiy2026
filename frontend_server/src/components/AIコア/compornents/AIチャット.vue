@@ -15,7 +15,7 @@ import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/
 
 // Props
 const プロパティ = defineProps<{
-  socketId?: string;
+  セッションID?: string;
   チャンネル?: number;
   chatAi?: string;
   liveAi?: string;
@@ -34,7 +34,7 @@ const 通知 = defineEmits<{
 const 出力WebSocket = ref<IWebSocketClient | null>(null);
 const 出力接続済み = ref(false);
 const WebSocket接続中 = computed(() => (プロパティ.inputConnected ?? false) && 出力接続済み.value);
-const ソケットID = computed(() => プロパティ.socketId ?? '');
+const セッションID = computed(() => プロパティ.セッションID ?? '');
 const チャットAI = computed(() => プロパティ.chatAi ?? '');
 const ライブAI = computed(() => プロパティ.liveAi ?? '');
 
@@ -68,7 +68,7 @@ const テキストエリア自動調整 = () => {
 };
 
 const 新規メッセージID = () => {
-  const ソケット = ソケットID.value || 'nosocket';
+  const ソケット = セッションID.value || 'nosocket';
   const チャンネル = プロパティ.チャンネル ?? 0;
   return `chat-${ソケット}-${チャンネル}-${メッセージID連番++}`;
 };
@@ -470,13 +470,13 @@ const WSハンドラ解除 = (クライアント?: IWebSocketClient | null) => {
 
 const 出力ソケット接続 = async () => {
   const チャンネル = プロパティ.チャンネル ?? 0;
-  if (!ソケットID.value) {
-    console.warn('[チャット] socketId未確定のため出力ソケットを保留');
+  if (!セッションID.value) {
+    console.warn('[チャット] セッションID未確定のため出力ソケットを保留');
     return;
   }
 
   const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-  出力WebSocket.value = new AIコアWebSocket(wsUrl, ソケットID.value, チャンネル);
+  出力WebSocket.value = new AIコアWebSocket(wsUrl, セッションID.value, チャンネル);
   WSハンドラ登録(出力WebSocket.value);
 
   try {
@@ -493,14 +493,14 @@ onMounted(() => {
   const チャンネル = プロパティ.チャンネル ?? 0;
   console.log(`[チャット] ========== onMounted開始 ==========`);
   console.log(`[チャット] チャンネル=${チャンネル}`);
-  console.log(`[チャット] socketId=${ソケットID.value}`);
+  console.log(`[チャット] セッションID=${セッションID.value}`);
   console.log(`[チャット] inputWsClient=${!!プロパティ.inputWsClient}`);
   console.log(`[チャット] inputConnected=${プロパティ.inputConnected}`);
   出力ソケット接続();
   console.log(`[チャット] ========== onMounted完了 ==========`);
 });
 
-watch(() => プロパティ.socketId, (新ID, 旧ID) => {
+watch(() => プロパティ.セッションID, (新ID, 旧ID) => {
   if (!新ID || 新ID === 旧ID) return;
   if (出力WebSocket.value) {
     WSハンドラ解除(出力WebSocket.value);
@@ -561,7 +561,7 @@ const メッセージ送信 = async () => {
     if (コードモード) {
       // codeモードでも入力値をチャンネル0に表示・履歴保存する
       プロパティ.inputWsClient.send({
-        ソケットID: ソケットID.value,
+        セッションID: セッションID.value,
         チャンネル: -1,
         出力先チャンネル: 0,
         メッセージ識別: 'input_text',
@@ -571,7 +571,7 @@ const メッセージ送信 = async () => {
       });
     }
     プロパティ.inputWsClient.send({
-      ソケットID: ソケットID.value,
+      セッションID: セッションID.value,
       チャンネル: -1,
       出力先チャンネル: 出力先チャンネル,
       メッセージ識別: メッセージ識別,
@@ -620,7 +620,7 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
     const コードモード = 現在モード.startsWith('code');
     const 出力先チャンネル = コードモード ? Number(現在モード.replace('code', '')) || 1 : 基本チャンネル;
     プロパティ.inputWsClient.send({
-      ソケットID: ソケットID.value,
+      セッションID: セッションID.value,
       チャンネル: -1,  // 入力は常に-1
       出力先チャンネル: 出力先チャンネル,  // バックエンドが振り分け
       メッセージ識別: 'input_file',

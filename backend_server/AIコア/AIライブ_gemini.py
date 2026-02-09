@@ -118,13 +118,13 @@ class LiveAI:
     初期化、開始、終了、送信メソッド(text,audio,image)、受信バッファ取得メソッドを提供
     """
 
-    def __init__(self, ソケットID: str, parent_manager=None,
+    def __init__(self, セッションID: str, parent_manager=None,
                  live_ai: str = "gemini", live_model: str = "gemini-live-2.5-flash-preview", live_voice: str = "Zephyr",
                  api_key: str = None):
         """初期化"""
         
         # セッションID
-        self.ソケットID = ソケットID
+        self.セッションID = セッションID
         
         # 親参照（セッションマネージャー）
         self.parent_manager = parent_manager
@@ -225,7 +225,7 @@ class LiveAI:
             # セッションから取得を試みる
             try:
                 from AIコア.AIソケット管理 import AIソケット管理
-                セッション = AIソケット管理.get_session(self.ソケットID)
+                セッション = AIソケット管理.get_session(self.セッションID)
                 if セッション and hasattr(セッション, "tools_instance"):
                     self.tool_instance = セッション.tools_instance
                     logger.info("セッションからツールインスタンスを取得しました")
@@ -572,13 +572,13 @@ class LiveAI:
                         # logger.info("Live apiセッション接続成功")  # 通常時はコメント化
                         pass
                         session_start_time = time.time()  # セッション開始時刻記録
-                        ソケットID = f"{int(session_start_time % 10000)}"  # セッション識別用ID（下4桁）
+                        セッションID = f"{int(session_start_time % 10000)}"  # セッション識別用ID（下4桁）
                         self.live_session = session
                         self.task_group = tg
                         self.is_alive = True  # live_session確立時にTrueに設定
                         self.live_lasttime = time.time()  # セッション開始時にlive_lasttime更新
                         self.再接続試行回数 = 0  # 接続成功時にリセット
-                        logger.info(f"セッション維持ループ開始 (ID:{ソケットID})")
+                        logger.info(f"セッション維持ループ開始 (ID:{セッションID})")
                         # logger.info(f"live_session設定完了: {self.live_session is not None}")  # 通常時はコメント化
                         # logger.info(f"live_sessionタイプ: {type(self.live_session)}")  # 通常時はコメント化
                         pass
@@ -605,7 +605,7 @@ class LiveAI:
                                 pass
                         
                         session_duration = time.time() - session_start_time
-                        logger.error(f"セッション維持ループ終了 (ID:{ソケットID}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
+                        logger.error(f"セッション維持ループ終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
                         logger.error(f"async withブロック終了直前 - live_session破棄予定")
                         
                 except Exception as e:
@@ -697,7 +697,7 @@ class LiveAI:
             self.エラーフラグ = True
         finally:
             session_duration = time.time() - session_start_time
-            logger.error(f"受信ワーカー:終了 (ID:{ソケットID}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
+            logger.error(f"受信ワーカー:終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
             pass
     
     async def _設定構成作成(self):
@@ -789,7 +789,8 @@ class LiveAI:
             from google.genai import types
             
             try:
-                speech_config = types.LiveConnectConfig(
+                # Live接続設定（正しい構造）
+                config = types.LiveConnectConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
                         language_code="ja-JP",
@@ -797,35 +798,30 @@ class LiveAI:
                             prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=self.LIVE_VOICE)
                         )
                     ),
-                )
-                # logger.info(f"音声設定作成完了: voice={self.LIVE_VOICE}")
-                pass
-                
-                config = {
-                    "generation_config": speech_config,
-                    "system_instruction": types.Content(
+                    generation_config=types.GenerationConfig(
+                        temperature=1.0,
+                        max_output_tokens=8192,
+                    ),
+                    system_instruction=types.Content(
                         parts=[types.Part(text=instructions)]
                     ),
-                    "tools": tools,
-                }
-                
-                # logger.info("設定構成作成完了")
-                pass
+                    tools=tools,
+                )
+                # logger.info(f"Live接続設定作成完了: voice={self.LIVE_VOICE}")
                 return config
-                
+
             except Exception as e:
                 logger.error(f"設定構成作成エラー: {type(e).__name__}: {e}")
                 # エラー時は最小設定で復旧を試行
                 logger.warning("最小設定で復旧試行")
-                return {
-                    "generation_config": types.LiveConnectConfig(
-                        response_modalities=["AUDIO"],
-                        speech_config=types.SpeechConfig(language_code="ja-JP"),
-                    ),
-                    "system_instruction": types.Content(
+                return types.LiveConnectConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(language_code="ja-JP"),
+                    generation_config=types.GenerationConfig(),
+                    system_instruction=types.Content(
                         parts=[types.Part(text="あなたは賢いアシスタントです。")]
                     ),
-                }
+                )
                 
         except Exception as e:
             logger.error(f"設定構成作成で予期しないエラー: {e}")

@@ -146,7 +146,7 @@ class CodeAgentRequestTool(ToolInterface):
             
             # 1) フロントエンドへ送信（表示用）
             要求データ = {
-                "ソケットID": self.セッション.socket_id,
+                "セッションID": self.セッション.セッションID,
                 "メッセージ識別": "input_request",
                 "メッセージ内容": 要求内容,
                 "チャンネル": チャンネル,
@@ -158,7 +158,7 @@ class CodeAgentRequestTool(ToolInterface):
             # 2) 会話履歴保存
             if hasattr(エージェント, "保存関数") and エージェント.保存関数:
                 エージェント.保存関数(
-                    ソケットID=self.セッション.socket_id,
+                    セッションID=self.セッション.セッションID,
                     チャンネル=チャンネル,
                     メッセージ識別="input_request",
                     メッセージ内容=要求内容,

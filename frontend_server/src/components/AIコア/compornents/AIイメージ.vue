@@ -15,7 +15,7 @@ import type { IWebSocketClient } from '@/api/websocket';
 
 const プロパティ = defineProps<{
   autoShowSelection?: boolean;
-  socketId?: string;
+  セッションID?: string;
   active?: boolean;
   wsConnected?: boolean;
   チャンネル?: number;
@@ -443,7 +443,7 @@ const 画像送信 = async (データURL: string | null) => {
       return;
     }
     プロパティ.wsClient.send({
-      ソケットID: プロパティ.socketId ?? '',
+      セッションID: プロパティ.セッションID ?? '',
       チャンネル: -1,
       メッセージ識別: 'input_image',
       メッセージ内容: 'image/png',

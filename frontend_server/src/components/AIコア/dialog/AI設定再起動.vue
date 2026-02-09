@@ -127,17 +127,17 @@ const loadConfig = async () => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    // URLからソケットIDを取得
-    const ソケットID = (route.query.セッションID as string) || (route.query.ソケットID as string);
+    // URLからセッションIDを取得
+    const セッションID = route.query.セッションID as string;
 
-    if (!ソケットID) {
-      errorMessage.value = 'ソケットIDが見つかりません。画面をリロードしてください。';
+    if (!セッションID) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。';
       loading.value = false;
       return;
     }
 
     const response = await apiClient.post('/core/AIコア/モデル情報/取得', {
-      ソケットID
+      セッションID
     });
 
     if (response?.data?.status === 'OK') {
@@ -230,16 +230,16 @@ const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_ap
   loading.value = true;
   errorMessage.value = '';
   try {
-    const ソケットID = (route.query.セッションID as string) || (route.query.ソケットID as string);
+    const セッションID = route.query.セッションID as string;
 
-    if (!ソケットID) {
-      errorMessage.value = 'ソケットIDが見つかりません。画面をリロードしてください。';
+    if (!セッションID) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。';
       loading.value = false;
       return;
     }
 
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
-      ソケットID,
+      セッションID,
       モデル設定: buildNextSettings(),
       再起動要求
     });
@@ -265,14 +265,14 @@ const handleResetReboot = async () => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const ソケットID = (route.query.セッションID as string) || (route.query.ソケットID as string);
-    if (!ソケットID) {
-      errorMessage.value = 'ソケットIDが見つかりません。画面をリロードしてください。';
+    const セッションID = route.query.セッションID as string;
+    if (!セッションID) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。';
       loading.value = false;
       return;
     }
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
-      ソケットID,
+      セッションID,
       モデル設定: {},
       再起動要求: { reboot_core: true, reboot_apps: true }
     });

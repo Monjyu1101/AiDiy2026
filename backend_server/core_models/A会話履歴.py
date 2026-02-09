@@ -20,7 +20,7 @@ class A会話履歴(Base):
     __table_args__ = {'extend_existing': True}
 
     # 複合主キー
-    ソケットID = Column(Text, primary_key=True)
+    セッションID = Column(Text, primary_key=True)
     シーケンス = Column(Integer, primary_key=True)
 
     # 会話データ

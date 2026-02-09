@@ -24,8 +24,8 @@ def list_A会話履歴(
 ):
     query = db.query(models.A会話履歴)
 
-    if request and request.ソケットID:
-        query = query.filter(models.A会話履歴.ソケットID == request.ソケットID)
+    if request and request.セッションID:
+        query = query.filter(models.A会話履歴.セッションID == request.セッションID)
     if request and request.チャンネル is not None:
         query = query.filter(models.A会話履歴.チャンネル == request.チャンネル)
 
@@ -36,7 +36,7 @@ def list_A会話履歴(
         limit = min(request.件数, MAX_ITEMS) if request.件数 > 0 else MAX_ITEMS
 
     items = query.order_by(
-        models.A会話履歴.ソケットID,
+        models.A会話履歴.セッションID,
         models.A会話履歴.シーケンス.desc()
     ).limit(limit).all()
 
@@ -57,7 +57,7 @@ def get_A会話履歴(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    item = crud.get_会話履歴(db, request.ソケットID, request.シーケンス)
+    item = crud.get_会話履歴(db, request.セッションID, request.シーケンス)
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された会話履歴が見つかりません", error={"code": "NOT_FOUND"})
 
@@ -74,14 +74,14 @@ def create_A会話履歴(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    existing = crud.get_会話履歴(db, request.ソケットID, request.シーケンス)
+    existing = crud.get_会話履歴(db, request.セッションID, request.シーケンス)
     if existing:
         return schemas.ResponseBase(status="NG", message="この会話履歴は既に登録されています", error={"code": "DUPLICATE"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
     item = crud.create_会話履歴(
         db,
-        ソケットID=request.ソケットID,
+        セッションID=request.セッションID,
         シーケンス=request.シーケンス,
         チャンネル=request.チャンネル,
         メッセージ識別=request.メッセージ識別,
@@ -107,7 +107,7 @@ def update_A会話履歴(
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
     item = crud.update_会話履歴(
         db,
-        ソケットID=request.ソケットID,
+        セッションID=request.セッションID,
         シーケンス=request.シーケンス,
         メッセージ内容=request.メッセージ内容,
         ファイル名=request.ファイル名,
@@ -131,13 +131,13 @@ def delete_A会話履歴(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    success = crud.delete_会話履歴(db, request.ソケットID, request.シーケンス)
+    success = crud.delete_会話履歴(db, request.セッションID, request.シーケンス)
     if not success:
         return schemas.ResponseBase(status="NG", message="削除対象が見つかりません", error={"code": "NOT_FOUND"})
 
     return schemas.ResponseBase(
         status="OK",
         message="会話履歴を削除しました",
-        data={"ソケットID": request.ソケットID, "シーケンス": request.シーケンス}
+        data={"セッションID": request.セッションID, "シーケンス": request.シーケンス}
     )
 

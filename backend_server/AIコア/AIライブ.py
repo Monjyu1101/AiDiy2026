@@ -32,7 +32,7 @@ class Live:
     def __init__(
         self,
         親=None,
-        ソケットID: str = "",
+        セッションID: str = "",
         チャンネル: int = 0,
         絶対パス: str = "",
         AI_NAME: str = "",
@@ -41,7 +41,7 @@ class Live:
         接続=None,
         保存関数=None,
     ):
-        self.ソケットID = ソケットID
+        self.セッションID = セッションID
         self.チャンネル = チャンネル
         self.絶対パス = 絶対パス
         self.AI_NAME = AI_NAME
@@ -82,7 +82,7 @@ class Live:
         if self.AIインスタンス:
             return self.AIインスタンス
 
-        logger.info(f"[Live] LiveAI初期化開始: {self.AI_NAME} (AIコアセッション: {self.ソケットID})")
+        logger.info(f"[Live] LiveAI初期化開始: {self.AI_NAME} (AIコアセッション: {self.セッションID})")
         try:
             api_key = ""
             organization = ""
@@ -120,7 +120,7 @@ class Live:
 
             if live_ai == "openai_live":
                 self.AIインスタンス = LiveAI(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     parent_manager=self.親,
                     live_ai=live_ai,
                     live_model=self.AI_MODEL,
@@ -130,7 +130,7 @@ class Live:
                 )
             else:
                 self.AIインスタンス = LiveAI(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     parent_manager=self.親,
                     live_ai=live_ai,
                     live_model=self.AI_MODEL,
@@ -142,7 +142,7 @@ class Live:
             if self.テキスト受信Ｑ is None:
                 self.テキスト受信Ｑ = asyncio.Queue()
             await self.AIインスタンス.開始(self.音声受信Ｑ, self.テキスト受信Ｑ)
-            logger.info(f"[Live] LiveAI初期化完了: {self.AI_NAME} (AIコアセッション: {self.ソケットID})")
+            logger.info(f"[Live] LiveAI初期化完了: {self.AI_NAME} (AIコアセッション: {self.セッションID})")
             return self.AIインスタンス
         except Exception as e:
             logger.error(f"[Live] LiveAI初期化エラー: {e}")
@@ -241,7 +241,7 @@ class Live:
                 return False
             base64_audio = base64.b64encode(bytes_data).decode("utf-8")
             await self.接続.send_to_channel(-1, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_audio",
                 "メッセージ内容": mime_type,
                 "ファイル名": base64_audio,
@@ -261,12 +261,12 @@ class Live:
             if not text:
                 return False
             # Chatと共通の処理応答ログ形式
-            ソケットID_短縮 = self.ソケットID[:10] if self.ソケットID else '不明'
+            セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
             logger.info(
-                f"処理応答: チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{text.rstrip()}\n"
+                f"処理応答: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
             )
             await self.接続.send_to_channel(0, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
                 "メッセージ内容": text,
                 "ファイル名": None,
@@ -356,9 +356,9 @@ class Live:
         try:
             if self.AIインスタンス and self.AIインスタンス.is_alive:
                 # Chatと共通の処理要求ログ形式
-                ソケットID_短縮 = self.ソケットID[:10] if self.ソケットID else '不明'
+                セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
                 logger.info(
-                    f"処理要求: チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{text.rstrip()}\n"
+                    f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
                 )
                 return await self.AIインスタンス.テキスト送信(text)
             return False
@@ -371,7 +371,7 @@ class Live:
         try:
             if self.AIインスタンス and self.AIインスタンス.is_alive:
                 image_size = len(image_data) if isinstance(image_data, bytes) else "unknown"
-                logger.info(f"[Live] 画像入力: format={format} size={image_size}bytes ({self.ソケットID})")
+                logger.info(f"[Live] 画像入力: format={format} size={image_size}bytes ({self.セッションID})")
                 return await self.AIインスタンス.画像送信(image_data, format)
             return False
         except Exception as e:

@@ -84,8 +84,8 @@ export class AudioStreamProcessor {
   // WebSocketクライアント
   private wsClient: Ref<IWebSocketClient | null>;
 
-  // ソケットID
-  private socketId: Ref<string>;
+  // セッションID
+  private セッションID: Ref<string>;
 
   // スピーカー状態
   private isSpeakerOn: Ref<boolean>;
@@ -95,9 +95,9 @@ export class AudioStreamProcessor {
   private isVisualizerVisible = false;
   private isVisualizerLoopStarted = false;
 
-  constructor(wsClient: Ref<IWebSocketClient | null>, socketId: Ref<string>, isSpeakerOn: Ref<boolean>) {
+  constructor(wsClient: Ref<IWebSocketClient | null>, セッションID: Ref<string>, isSpeakerOn: Ref<boolean>) {
     this.wsClient = wsClient;
-    this.socketId = socketId;
+    this.セッションID = セッションID;
     this.isSpeakerOn = isSpeakerOn;
   }
 
@@ -346,7 +346,7 @@ export class AudioStreamProcessor {
 
         // リアルタイムストリーミング送信
         this.wsClient.value.send({
-          ソケットID: this.wsClient.value.getSocketId?.() ?? '',
+          セッションID: this.wsClient.value.セッションID取得?.() ?? '',
           チャンネル: -1,
           メッセージ識別: 'input_audio',
           メッセージ内容: 'audio/pcm',
@@ -631,7 +631,7 @@ export class AudioStreamProcessor {
     // サーバーにキャンセル通知（統一フォーマット）
     if (this.wsClient.value && this.wsClient.value.isConnected()) {
       this.wsClient.value.send({
-        ソケットID: this.socketId.value,
+        セッションID: this.セッションID.value,
         チャンネル: -1,
         メッセージ識別: 'cancel_audio',
         メッセージ内容: null,

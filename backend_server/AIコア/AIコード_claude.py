@@ -44,13 +44,13 @@ class CodeAI:
     Claude Agent SDK統合クラス（履歴管理 + SDK resume混合実装）
     """
     
-    def __init__(self, 親=None, ソケットID: str = "", チャンネル: int = 0, 絶対パス: str = None,
+    def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "claude", AI_MODEL: str = "sonnet", max_turns: int = 999,
                  code_plan: str = "auto", code_verify: str = "auto"):
         """初期化"""
 
-        # ソケットID・チャンネル
-        self.ソケットID = ソケットID
+        # セッションID・チャンネル
+        self.セッションID = セッションID
         self.チャンネル = チャンネル
 
         # 親参照（セッションマネージャー）
@@ -99,8 +99,8 @@ class CodeAI:
         self.履歴最終時刻 = time.time()
         self.履歴辞書 = {}
         
-        # SDK session管理（WebSocketのソケットIDとは分離）
-        self.SDKセッションID = None
+        # SDK session管理（WebSocketのセッションIDとは分離）
+        self.AIセッションID = None
         
         # 生存状態管理
         self.is_alive = True
@@ -167,7 +167,7 @@ class CodeAI:
             # パラメータで渡されたapiキーを優先使用（親からの再取得は不要）
 
             # SDK resumeセッション初期化（最初の実行時に作成）
-            self.SDKセッションID = None
+            self.AIセッションID = None
             self.is_alive = True
             # logger.info("CodeAI: セッション開始完了")
             pass
@@ -182,7 +182,7 @@ class CodeAI:
         try:
             self.is_alive = False
             # SDK session終了処理は不要（実行ベースのため）
-            # logger.info(f"CodeAI: 終了完了 ソケットID={self.ソケットID[:8]}")
+            # logger.info(f"CodeAI: 終了完了 セッションID={self.セッションID[:8]}")
             pass
         except Exception as e:
             logger.error(f"CodeAI終了:エラー {e}")
@@ -317,7 +317,7 @@ class CodeAI:
             if self.parent_manager and hasattr(self.parent_manager, '接続'):
                 try:
                     await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "ソケットID": self.ソケットID,
+                        "セッションID": self.セッションID,
                         "チャンネル": self.チャンネル,
                         "メッセージ識別": "output_stream",
                         "メッセージ内容": "<<< 処理開始 >>>",
@@ -344,7 +344,7 @@ class CodeAI:
                     # オプション設定（初回はresume=False、2回目以降のみセッションID使用）
                     # 読取専用パラメータに応じてallowed_toolsを設定
                     allowed_tools_list = ["Read", "Write", "Bash"] if not 読取専用 else ["Read"]
-                    logger.info(f"ClaudeSDK許可ツール: {allowed_tools_list}, 読取専用={読取専用}, SDKセッションID={self.SDKセッションID}")
+                    logger.info(f"ClaudeSDK許可ツール: {allowed_tools_list}, 読取専用={読取専用}, AIセッションID={self.AIセッションID}")
 
                     # Claude Agent SDK用のパス設定（Windows環境ではパス区切り文字を変換）
                     if os.name == 'nt':
@@ -353,7 +353,7 @@ class CodeAI:
                         cwd = cwd_posix
 
                     logger.info(f"ClaudeSDK実行パス: {cwd}")
-                    if not self.SDKセッションID:
+                    if not self.AIセッションID:
                         # 初回：新規セッション作成
                         options = ClaudeAgentOptions(
                             max_turns=self.base_options["max_turns"],
@@ -372,19 +372,19 @@ class CodeAI:
                             allowed_tools=allowed_tools_list,  # 毎回正しく設定
                             permission_mode="acceptEdits",
                             continue_conversation=True,
-                            resume=self.SDKセッションID
+                            resume=self.AIセッションID
                         )
                      
                     # テスト用：初回のみ system_prompt、毎回「今回の依頼」（送信用）を標準出力に表示（平文）
                     try:
                         print("\n" + "=" * 80)
-                        if not self.SDKセッションID:
+                        if not self.AIセッションID:
                             print("送信コンテキスト（Claude Agent SDK / 初回）")
                         else:
                             print("送信コンテキスト（Claude Agent SDK）")
                         print(f"AI={self.code_ai} model={self.code_model} resume={resume} 読取専用={読取専用}")
                         print(f"allowed_tools={allowed_tools_list} cwd={cwd}")
-                        if not self.SDKセッションID:
+                        if not self.AIセッションID:
                             print("-" * 80)
                             print("【system_prompt】")
                             print(self.base_options.get("system_prompt", ""))
@@ -398,16 +398,12 @@ class CodeAI:
                     async for message in query(prompt=送信用要求テキスト, options=options):
                         last_stream_time = time.time()
                         
-                        # SDKセッションIDを取得・保存（属性名差異に対応）
-                        if not self.SDKセッションID:
-                            sdk_id = (
-                                getattr(message, "session_id", None)
-                                or getattr(message, "ソケットID", None)
-                                or getattr(message, "sessionId", None)
-                            )
+                        # AIセッションIDを取得・保存（SDK仕様のsession_id属性）
+                        if not self.AIセッションID:
+                            sdk_id = getattr(message, "session_id", None)
                             if sdk_id:
-                                self.SDKセッションID = sdk_id
-                                # logger.info(f"SDKセッションID取得: {self.SDKセッションID}")
+                                self.AIセッションID = sdk_id
+                                # logger.info(f"AIセッションID取得: {self.AIセッションID}")
                                 pass
                         
                         # ストリーミングコンテンツを抽出
@@ -420,7 +416,7 @@ class CodeAI:
                         if content and self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
                                 await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                                    "ソケットID": self.ソケットID,
+                                    "セッションID": self.セッションID,
                                     "チャンネル": self.チャンネル,
                                     "メッセージ識別": "output_stream",
                                     "メッセージ内容": content,
@@ -493,7 +489,7 @@ class CodeAI:
             if self.parent_manager and hasattr(self.parent_manager, '接続'):
                 try:
                     await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "ソケットID": self.ソケットID,
+                        "セッションID": self.セッションID,
                         "チャンネル": self.チャンネル,
                         "メッセージ識別": "output_stream",
                         "メッセージ内容": "<<< 処理終了 >>>",
@@ -508,8 +504,8 @@ class CodeAI:
             
         except Exception as e:
             # ツールエラーログ（必須）
-            ソケットID_str = (self.ソケットID[:10] + '...') if self.ソケットID else '新規'
-            logger.error(f"ClaudeSDK実行エラー: {e} 要求=[{要求テキスト[:10]}...] セッション={ソケットID_str}")
+            セッションID_str = (self.セッションID[:10] + '...') if self.セッションID else '新規'
+            logger.error(f"ClaudeSDK実行エラー: {e} 要求=[{要求テキスト[:10]}...] セッション={セッションID_str}")
             エラーメッセージ = f"実行エラー: {str(e)}"
             
             if テキスト受信処理Ｑ:
@@ -561,7 +557,7 @@ async def session_test(AI_NAME="claude", AI_MODEL="sonnet"):
     print("=" * 50)
 
     # ClaudeSDKインスタンス作成
-    codeai = CodeAI(親=None, ソケットID="test_session", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
+    codeai = CodeAI(親=None, セッションID="test_session", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
 
     try:
         # セッション開始
@@ -634,7 +630,7 @@ async def simple_test(AI_NAME="claude", AI_MODEL="sonnet"):
     print("=" * 30)
 
     # ClaudeSDKインスタンス作成
-    codeai = CodeAI(親=None, ソケットID="simple_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
+    codeai = CodeAI(親=None, セッションID="simple_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
 
     try:
         # セッション開始

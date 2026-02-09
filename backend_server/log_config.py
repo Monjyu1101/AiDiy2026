@@ -13,10 +13,23 @@
 """
 import logging
 import os
+import sys
 from datetime import datetime
 
 # ログ設定済みフラグ
 _logging_configured = False
+
+
+def _detect_instance_name() -> str:
+    """
+    起動引数からインスタンス名を推定する
+    """
+    args = " ".join(sys.argv).lower()
+    if "core_main:app" in args or "core_main.py" in args:
+        return "core_main"
+    if "apps_main:app" in args or "apps_main.py" in args:
+        return "apps_main"
+    return "AiDiy"
 
 
 class EndpointFilter(logging.Filter):
@@ -71,7 +84,7 @@ class DailyDateFileHandler(logging.FileHandler):
             self.handleError(record)
 
 
-def setup_logging():
+def setup_logging(instance_name: str | None = None):
     """
     アプリケーション全体のログ設定を初期化
     最初に1回だけ呼ばれる
@@ -81,6 +94,7 @@ def setup_logging():
     if _logging_configured:
         return
 
+    instance = (instance_name or _detect_instance_name()).strip() or "AiDiy"
     log_dir = os.path.join(os.path.dirname(__file__), "temp", "logs")
     formatter = logging.Formatter(
         '%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
@@ -88,7 +102,7 @@ def setup_logging():
     )
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
-    file_handler = DailyDateFileHandler(log_dir=log_dir, prefix="AiDiy")
+    file_handler = DailyDateFileHandler(log_dir=log_dir, prefix=instance)
     file_handler.setFormatter(formatter)
 
     logging.basicConfig(
@@ -130,7 +144,7 @@ def setup_logging():
 
     # 初期化完了ログ
     logger = logging.getLogger('log_config')
-    logger.info("ログ設定を初期化しました")
+    logger.info(f"ログ設定を初期化しました (instance={instance})")
     logger.debug("サーバー状態取得のアクセスログを非表示にしました")
 
 

@@ -14,7 +14,7 @@ import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 
 const プロパティ = defineProps<{
-  socketId?: string;
+  セッションID?: string;
   チャンネル?: number;
   codeAi?: string;
   inputWsClient?: IWebSocketClient | null;
@@ -29,7 +29,7 @@ const 通知 = defineEmits<{
 const 出力WebSocket = ref<IWebSocketClient | null>(null);
 const 出力接続済み = ref(false);
 const WebSocket接続中 = computed(() => (プロパティ.inputConnected ?? false) && 出力接続済み.value);
-const ソケットID = computed(() => プロパティ.socketId ?? '');
+const セッションID = computed(() => プロパティ.セッションID ?? '');
 
 // メッセージ構造体
 interface メッセージ {
@@ -76,7 +76,7 @@ const メッセージ送信 = async () => {
   if (プロパティ.inputWsClient && プロパティ.inputWsClient.isConnected()) {
     const 出力先チャンネル = プロパティ.チャンネル ?? 0;
     プロパティ.inputWsClient.send({
-      ソケットID: ソケットID.value,
+      セッションID: セッションID.value,
       チャンネル: -1,  // 入力は常に-1
       出力先チャンネル: 出力先チャンネル,  // バックエンドが振り分け
       メッセージ識別: 'input_text',
@@ -98,7 +98,7 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
       // ローカルフィードバック表示は不要（サーバーからのエコーバックで表示）
 
       プロパティ.inputWsClient?.send({
-        ソケットID: ソケットID.value,
+        セッションID: セッションID.value,
         チャンネル: -1,  // 入力は常に-1
         出力先チャンネル: 出力先チャンネル,  // バックエンドが振り分け
         メッセージ識別: 'input_file',
@@ -159,7 +159,7 @@ const 最下部スクロール = () => {
 };
 
 const 新規メッセージID = () => {
-  const ソケット = ソケットID.value || 'nosocket';
+  const ソケット = セッションID.value || 'nosocket';
   const チャンネル = プロパティ.チャンネル ?? 0;
   return `code-${ソケット}-${チャンネル}-${メッセージID連番++}`;
 };
@@ -500,13 +500,13 @@ const WSハンドラ解除 = (client?: IWebSocketClient | null) => {
 
 const 出力ソケット接続 = async () => {
   const チャンネル = プロパティ.チャンネル ?? 0;
-  if (!ソケットID.value) {
-    console.warn(`[エージェント${チャンネル}] socketId未確定のため出力ソケットを保留`);
+  if (!セッションID.value) {
+    console.warn(`[エージェント${チャンネル}] セッションID未確定のため出力ソケットを保留`);
     return;
   }
 
   const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-  出力WebSocket.value = new AIコアWebSocket(wsUrl, ソケットID.value, チャンネル);
+  出力WebSocket.value = new AIコアWebSocket(wsUrl, セッションID.value, チャンネル);
   WSハンドラ登録(出力WebSocket.value);
 
   try {
@@ -523,14 +523,14 @@ onMounted(() => {
   const チャンネル = プロパティ.チャンネル ?? 0;
   console.log(`[エージェント${チャンネル}] ========== onMounted開始 ==========`);
   console.log(`[エージェント${チャンネル}] チャンネル=${チャンネル}`);
-  console.log(`[エージェント${チャンネル}] socketId=${ソケットID.value}`);
+  console.log(`[エージェント${チャンネル}] セッションID=${セッションID.value}`);
   console.log(`[エージェント${チャンネル}] inputWsClient=${!!プロパティ.inputWsClient}`);
   console.log(`[エージェント${チャンネル}] inputConnected=${プロパティ.inputConnected}`);
   出力ソケット接続();
   console.log(`[エージェント${チャンネル}] ========== onMounted完了 ==========`);
 });
 
-watch(() => プロパティ.socketId, (newId, oldId) => {
+watch(() => プロパティ.セッションID, (newId, oldId) => {
   if (!newId || newId === oldId) return;
   if (出力WebSocket.value) {
     WSハンドラ解除(出力WebSocket.value);

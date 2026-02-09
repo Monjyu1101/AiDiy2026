@@ -14,7 +14,7 @@
 
 export interface WebSocketMessage {
   type?: string;
-  socket_id?: string;
+  セッションID?: string;
   [key: string]: any;
 }
 
@@ -27,7 +27,7 @@ export interface IWebSocketClient {
   on(messageType: string, handler: MessageHandler): void;
   off(messageType: string, handler?: MessageHandler): void;
   disconnect(): void;
-  getSocketId(): string | null;
+  セッションID取得(): string | null;
   isConnected(): boolean;
   sendPing(): void;
   updateState(画面: any, ボタン: any): void;
@@ -38,19 +38,19 @@ export interface IWebSocketClient {
 
 export class AIコアWebSocket implements IWebSocketClient {
   private ws: WebSocket | null = null;
-  private socketId: string | null = null;
+  private セッションID: string | null = null;
   private messageHandlers: Map<string, MessageHandler[]> = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000; // 3秒
   private isIntentionallyClosed = false;
   private isInitialConnection = true; // 初回接続フラグ
-  private requestedSocketId: string | null = null; // 要求されたソケットID
-  private requestedSocketNo: number | null = null; // 要求されたソケット番号
+  private 要求セッションID: string | null = null; // 要求されたセッションID
+  private 要求ソケット番号: number | null = null; // 要求されたソケット番号
 
-  constructor(private url: string, socketId?: string, socketNo?: number) {
-    this.requestedSocketId = socketId || null;
-    this.requestedSocketNo = typeof socketNo === 'number' ? socketNo : null;
+  constructor(private url: string, セッションID?: string, ソケット番号?: number) {
+    this.要求セッションID = セッションID || null;
+    this.要求ソケット番号 = typeof ソケット番号 === 'number' ? ソケット番号 : null;
   }
 
   /**
@@ -68,14 +68,14 @@ export class AIコアWebSocket implements IWebSocketClient {
           this.reconnectAttempts = 0;
           this.isInitialConnection = false; // 初回接続完了
 
-          // ソケットIDを送信
+          // セッションIDを送信
           if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             const initMessage = {
               type: 'connect',
-              ソケットID: this.requestedSocketId,
-              ソケット番号: this.requestedSocketNo
+              セッションID: this.要求セッションID,
+              ソケット番号: this.要求ソケット番号
             };
-            console.log('[WebSocket] ソケットID送信:', this.requestedSocketId, 'ソケット番号:', this.requestedSocketNo);
+            console.log('[WebSocket] セッションID送信:', this.要求セッションID, 'ソケット番号:', this.要求ソケット番号);
             this.ws.send(JSON.stringify(initMessage));
           }
         };
@@ -89,16 +89,16 @@ export class AIコアWebSocket implements IWebSocketClient {
             const channel = message.チャンネル ?? 'null';
             console.log(`[WebSocket] 受信: type="${messageType}", チャンネル=${channel}`, message);
 
-            // 初期化メッセージの場合、ソケットIDを保存
+            // 初期化メッセージの場合、セッションIDを保存
             const initType = message.type || message.メッセージ識別;
-            if (initType === 'init' && message.ソケットID) {
-              this.socketId = message.ソケットID;
-              this.requestedSocketId = message.ソケットID; // 以降の再接続で使用
+            if (initType === 'init' && message.セッションID) {
+              this.セッションID = message.セッションID;
+              this.要求セッションID = message.セッションID; // 以降の再接続で使用
               if (typeof message.ソケット番号 === 'number') {
-                this.requestedSocketNo = message.ソケット番号;
+                this.要求ソケット番号 = message.ソケット番号;
               }
-              console.log('[WebSocket] ソケットID確定:', this.socketId);
-              resolve(this.socketId);
+              console.log('[WebSocket] セッションID確定:', this.セッションID);
+              resolve(this.セッションID);
             }
 
             // 登録されたハンドラを実行
@@ -122,7 +122,7 @@ export class AIコアWebSocket implements IWebSocketClient {
 
         this.ws.onclose = (event) => {
           console.log('[WebSocket] 接続切断:', event.code, event.reason);
-          this.socketId = null;
+          this.セッションID = null;
 
           // 初回接続時のエラーはすぐにreject
           if (this.isInitialConnection) {
@@ -145,7 +145,7 @@ export class AIコアWebSocket implements IWebSocketClient {
 
         // 初期化タイムアウト（30秒）
         setTimeout(() => {
-          if (!this.socketId) {
+          if (!this.セッションID) {
             console.error('[WebSocket] 初期化タイムアウト (30秒)');
             reject(new Error('WebSocket initialization timeout'));
           }
@@ -256,16 +256,16 @@ export class AIコアWebSocket implements IWebSocketClient {
       this.isIntentionallyClosed = true;
       this.ws.close();
       this.ws = null;
-      this.socketId = null;
+      this.セッションID = null;
       console.log('[WebSocket] 切断完了');
     }
   }
 
   /**
-   * ソケットIDを取得
+   * セッションIDを取得
    */
-  getSocketId(): string | null {
-    return this.socketId;
+  セッションID取得(): string | null {
+    return this.セッションID;
   }
 
   /**
@@ -290,7 +290,7 @@ export class AIコアWebSocket implements IWebSocketClient {
    */
   updateState(画面: any, ボタン: any): void {
     this.send({
-      ソケットID: this.socketId,
+      セッションID: this.セッションID,
       チャンネル: null,
       メッセージ識別: 'operations',
       メッセージ内容: {
@@ -314,7 +314,7 @@ export class AIコアWebSocket implements IWebSocketClient {
   sendInputText(text: string, 出力先チャンネル: number): void {
     console.log(`[WebSocket] sendInputText: 入力チャンネル=-1, 出力先チャンネル=${出力先チャンネル}, text="${text.substring(0, 50)}..."`);
     this.send({
-      ソケットID: this.socketId,
+      セッションID: this.セッションID,
       チャンネル: -1,  // 入力は常に-1
       メッセージ識別: 'input_text',
       メッセージ内容: text,

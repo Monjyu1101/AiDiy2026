@@ -59,7 +59,7 @@ router = APIRouter()
 
 
 def 保存_会話履歴(
-    ソケットID: str,
+    セッションID: str,
     チャンネル: int,
     メッセージ識別: str,
     メッセージ内容: Optional[str] = None,
@@ -69,10 +69,10 @@ def 保存_会話履歴(
     """会話履歴を保存（AIコア用）"""
     db = database.SessionLocal()
     try:
-        シーケンス = crud.get_next_sequence(db, ソケットID)
+        シーケンス = crud.get_next_sequence(db, セッションID)
         crud.create_会話履歴(
             db,
-            ソケットID=ソケットID,
+            セッションID=セッションID,
             シーケンス=シーケンス,
             チャンネル=チャンネル,
             メッセージ識別=メッセージ識別,
@@ -86,7 +86,7 @@ def 保存_会話履歴(
 
 
 def 取得_会話履歴一覧(
-    ソケットID: str,
+    セッションID: str,
     チャンネル: int = 0
 ):
     """会話履歴一覧を取得（シーケンス昇順）"""
@@ -94,7 +94,7 @@ def 取得_会話履歴一覧(
     try:
         items = (
             db.query(models.A会話履歴)
-            .filter(models.A会話履歴.ソケットID == ソケットID)
+            .filter(models.A会話履歴.セッションID == セッションID)
             .filter(models.A会話履歴.チャンネル == チャンネル)
             .order_by(models.A会話履歴.シーケンス.asc())
             .all()
@@ -198,14 +198,14 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
 
 async def 送信_会話履歴(
     接続: SessionConnection,
-    ソケットID: str,
+    セッションID: str,
     チャンネル: int = 0
 ):
     """会話履歴をソケット送出（シーケンス昇順）"""
-    履歴一覧 = 取得_会話履歴一覧(ソケットID, チャンネル=チャンネル)
+    履歴一覧 = 取得_会話履歴一覧(セッションID, チャンネル=チャンネル)
     for item in 履歴一覧:
         payload = {
-            "ソケットID": item.ソケットID,
+            "セッションID": item.セッションID,
             "チャンネル": item.チャンネル,
             "メッセージ識別": item.メッセージ識別,
             "メッセージ内容": item.メッセージ内容,
@@ -216,7 +216,6 @@ async def 送信_会話履歴(
     logger.info(f"会話履歴送信: チャンネル={チャンネル}, 件数={len(履歴一覧)}")
 
 class 初期化リクエスト(BaseModel):
-    ソケットID: str = ""
     セッションID: str = ""
 
 
@@ -230,24 +229,24 @@ class 初期化レスポンス(BaseModel):
 async def 初期化(http_request: Request, request: 初期化リクエスト):
     """
     AIコア画面の初期化
-    ソケットIDがなければ新規生成、あれば既存データを返す
+    セッションIDがなければ新規生成、あれば既存データを返す
     """
     try:
-        ソケットID = request.ソケットID or request.セッションID
+        セッションID = request.セッションID
 
-        # ソケットIDがない場合は新規生成
-        if not ソケットID:
-            ソケットID = AIソケット管理.generate_socket_id()
+        # セッションIDがない場合は新規生成
+        if not セッションID:
+            セッションID = AIソケット管理.セッションID生成()
             バックアップ実行(getattr(http_request.app, "conf", None), backend_dir=バックエンドディレクトリ)
 
         # セッションを確実に作成（存在しなければ新規）
-        AIソケット管理.ensure_session(ソケットID, app_conf=getattr(http_request.app, "conf", None))
+        AIソケット管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
 
         return 初期化レスポンス(
             status="OK",
             message="初期化成功",
             data={
-                "ソケットID": ソケットID
+                "セッションID": セッションID
             }
         )
 
@@ -278,11 +277,11 @@ async def セッション一覧():
 
 
 class モデル情報取得リクエスト(BaseModel):
-    ソケットID: str
+    セッションID: str
 
 
 class モデル設定リクエスト(BaseModel):
-    ソケットID: str
+    セッションID: str
     モデル設定: dict
     再起動要求: Optional[dict] = None
 
@@ -292,22 +291,22 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
     ソケットのAIモデル情報と設定を取得
     """
     try:
-        ソケットID = request.ソケットID
+        セッションID = request.セッションID
 
-        if not ソケットID:
+        if not セッションID:
             return {
                 "status": "NG",
-                "message": "ソケットIDが指定されていません",
+                "message": "セッションIDが指定されていません",
                 "data": {}
             }
 
         # WebSocketマネージャーから接続を取得
-        接続 = AIソケット管理.get_session(ソケットID)
+        接続 = AIソケット管理.get_session(セッションID)
 
         if not 接続:
             return {
                 "status": "NG",
-                "message": f"ソケットID {ソケットID} が見つかりません",
+                "message": f"セッションID {セッションID} が見つかりません",
                 "data": {}
             }
 
@@ -350,23 +349,23 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
     ソケットのAIモデル設定を更新（セッション内のみ、ファイル保存しない）
     """
     try:
-        ソケットID = request.ソケットID
+        セッションID = request.セッションID
         設定 = request.モデル設定
         再起動要求 = request.再起動要求 or {}
 
-        if not ソケットID:
+        if not セッションID:
             return {
                 "status": "NG",
-                "message": "ソケットIDが指定されていません"
+                "message": "セッションIDが指定されていません"
             }
 
         # WebSocketマネージャーから接続を取得
-        接続 = AIソケット管理.get_session(ソケットID)
+        接続 = AIソケット管理.get_session(セッションID)
 
         if not 接続:
             return {
                 "status": "NG",
-                "message": f"ソケットID {ソケットID} が見つかりません"
+                "message": f"セッションID {セッションID} が見つかりません"
             }
 
         # 設定可能なキーのホワイトリスト（セキュリティのため）
@@ -492,7 +491,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
     AIコア WebSocketエンドポイント
     セッション確立、状態同期、ストリーミング処理を行う
     """
-    ソケットID = None
+    セッションID = None
     ソケット番号 = -1
 
     try:
@@ -502,38 +501,38 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         # 初回メッセージでセッションID・ソケット番号を受信
         try:
             初期データ = await WebSocket接続.receive_json()
-            クライアントソケットID = 初期データ.get("ソケットID") or 初期データ.get("セッションID")
+            クライアントセッションID = 初期データ.get("セッションID")
             ソケット番号 = 初期データ.get("ソケット番号")
             if ソケット番号 is None:
                 ソケット番号 = 初期データ.get("チャンネル")
             if ソケット番号 is None:
                 ソケット番号 = -1
-            logger.debug(f"接続要求受信 (ソケットID: {クライアントソケットID}, ソケット番号: {ソケット番号})")
+            logger.debug(f"接続要求受信 (セッションID: {クライアントセッションID}, ソケット番号: {ソケット番号})")
         except Exception as e:
             logger.error(f"初回メッセージ受信エラー: {e}")
-            クライアントソケットID = None
+            クライアントセッションID = None
             ソケット番号 = -1
 
         # WebSocket接続を登録（accept済み）
-        ソケットID = await AIソケット管理.connect(
+        セッションID = await AIソケット管理.connect(
             WebSocket接続,
-            socket_id=クライアントソケットID,
+            セッションID=クライアントセッションID,
             socket_no=int(ソケット番号),
             app_conf=getattr(WebSocket接続.app, "conf", None),
             accept_in_connect=False
         )
 
-        セッション = AIソケット管理.get_session(ソケットID)
+        セッション = AIソケット管理.get_session(セッションID)
         if not セッション:
             raise RuntimeError("セッションの作成に失敗しました")
 
         # 初回のみプロセッサを起動
         if セッション.streaming_processor is None and int(ソケット番号) == -1:
-            セッション.streaming_processor = StreamingProcessor(ソケットID, セッション)
+            セッション.streaming_processor = StreamingProcessor(セッションID, セッション)
             await セッション.streaming_processor.start()
 
         if セッション.recognition_processor is None:
-            セッション.recognition_processor = Recognition(ソケットID, セッション, 保存_会話履歴)
+            セッション.recognition_processor = Recognition(セッションID, セッション, 保存_会話履歴)
             await セッション.recognition_processor.開始()
 
         if not hasattr(セッション, "chat_processor"):
@@ -548,7 +547,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 chat_model = セッション.モデル設定.get(key, "")
             セッション.chat_processor = Chat(
                 親=WebSocket接続.app,
-                ソケットID=ソケットID,
+                セッションID=セッションID,
                 チャンネル=0,
                 絶対パス=チャット保存基準パス,
                 AI_NAME=chat_ai,
@@ -566,7 +565,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 model_key = f"CODE_AI{i}_MODEL"
                 agent = CodeAgent(
                     親=WebSocket接続.app,
-                    ソケットID=ソケットID,
+                    セッションID=セッションID,
                     チャンネル=i,
                     絶対パス=実行パス,
                     AI_NAME=セッション.モデル設定.get(ai_key, ""),
@@ -596,7 +595,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
             セッション.live_processor = Live(
                 親=WebSocket接続.app,
-                ソケットID=ソケットID,
+                セッションID=セッションID,
                 チャンネル=0,
                 絶対パス=実行パス,
                 AI_NAME=live_ai,
@@ -669,7 +668,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
             if ウェルカム本文:
                 await セッション.send_to_channel(int(ソケット番号), {
-                    "ソケットID": ソケットID,
+                    "セッションID": セッションID,
                     "チャンネル": int(ソケット番号),
                     "メッセージ識別": "welcome_info",
                     "メッセージ内容": ウェルカム本文,
@@ -680,13 +679,13 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
             await asyncio.sleep(0.1)
             try:
-                await 送信_会話履歴(セッション, ソケットID, チャンネル=int(ソケット番号))
+                await 送信_会話履歴(セッション, セッションID, チャンネル=int(ソケット番号))
             except Exception as e:
                 logger.exception(f"会話履歴送信エラー: {e}")
             try:
                 追加メッセージ = "会話準備できました。よろしくお願いします。" if int(ソケット番号) == 0 else "準備できました。"
                 await セッション.send_to_channel(int(ソケット番号), {
-                    "ソケットID": ソケットID,
+                    "セッションID": セッションID,
                     "チャンネル": int(ソケット番号),
                     "メッセージ識別": "welcome_text",
                     "メッセージ内容": 追加メッセージ,
@@ -716,24 +715,24 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     ファイル名 = 受信データ.get("ファイル名") or ""
                     入力チャンネル = 受信データ.get("チャンネル", -1)
                     出力先チャンネル = 受信データ.get("出力先チャンネル", 0)
-                    logger.debug(f"テキスト受信 (入力={入力チャンネル}, 出力先={出力先チャンネル}, {ソケットID}): {メッセージ内容}")
+                    logger.debug(f"テキスト受信 (入力={入力チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     if セッション.is_channel_processing(出力先チャンネル):
                         await セッション.send_to_channel(出力先チャンネル, {
-                            "ソケットID": ソケットID,
+                            "セッションID": セッションID,
                             "チャンネル": 出力先チャンネル,
                             "メッセージ識別": "output_text",
                             "メッセージ内容": f"⏳ チャンネル{出力先チャンネル}は処理中です。キューに追加しました...",
                             "ファイル名": None,
                             "サムネイル画像": None
                         })
-                        logger.info(f"チャンネル{出力先チャンネル}処理中のため、キューに追加: {ソケットID}")
+                        logger.info(f"チャンネル{出力先チャンネル}処理中のため、キューに追加: {セッションID}")
                         continue
 
                     セッション.set_channel_processing(出力先チャンネル, True)
 
                     await セッション.send_to_channel(出力先チャンネル, {
-                        "ソケットID": ソケットID,
+                        "セッションID": セッションID,
                         "チャンネル": 出力先チャンネル,
                         "メッセージ識別": "input_text",
                         "メッセージ内容": メッセージ内容,
@@ -742,7 +741,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     })
 
                     保存_会話履歴(
-                        ソケットID=ソケットID,
+                        セッションID=セッションID,
                         チャンネル=出力先チャンネル,
                         メッセージ識別="input_text",
                         メッセージ内容=メッセージ内容,
@@ -756,21 +755,21 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         if 出力先チャンネル == 0:
                             ファイル名_判定 = ファイル名.lower() if isinstance(ファイル名, str) else ""
                             logger.info(
-                                f"input_text分岐判定: socket={ソケットID} channel=0 "
+                                f"input_text分岐判定: socket={セッションID} channel=0 "
                                 f"file='{ファイル名}' live={'live' in ファイル名_判定}"
                             )
                             if "code" in ファイル名_判定:
-                                logger.info(f"input_text: codeモードのためチャット/ライブ処理をスキップ ({ソケットID})")
+                                logger.info(f"input_text: codeモードのためチャット/ライブ処理をスキップ ({セッションID})")
                                 continue
                             if "live" in ファイル名_判定:
                                 if hasattr(セッション, "live_processor") and セッション.live_processor:
-                                    logger.info(f"LiveAI起動要求: socket={ソケットID}")
+                                    logger.info(f"LiveAI起動要求: socket={セッションID}")
                                     await セッション.live_processor.開始()
-                                    logger.info(f"LiveAIテキスト送信開始: socket={ソケットID}")
+                                    logger.info(f"LiveAIテキスト送信開始: socket={セッションID}")
                                     await セッション.live_processor.テキスト送信(メッセージ内容)
-                                    logger.info(f"LiveAIテキスト送信完了: socket={ソケットID}")
+                                    logger.info(f"LiveAIテキスト送信完了: socket={セッションID}")
                                 else:
-                                    logger.warning(f"LiveAI未初期化のためChatへフォールバック ({ソケットID})")
+                                    logger.warning(f"LiveAI未初期化のためChatへフォールバック ({セッションID})")
                                     if hasattr(セッション, "chat_processor"):
                                         await セッション.chat_processor.チャット要求(受信データ)
                             elif hasattr(セッション, "chat_processor"):
@@ -784,7 +783,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
                     入力チャンネル = 受信データ.get("チャンネル", -1)
                     出力先チャンネル = 受信データ.get("出力先チャンネル", 1)
-                    logger.debug(f"リクエスト受信 (入力={入力チャンネル}, 出力先={出力先チャンネル}, {ソケットID}): {メッセージ内容}")
+                    logger.debug(f"リクエスト受信 (入力={入力チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     # input_requestはコードエージェント専用（チャンネル1-4のみ）
                     if not (1 <= 出力先チャンネル <= 4):
@@ -793,21 +792,21 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                     if セッション.is_channel_processing(出力先チャンネル):
                         await セッション.send_to_channel(出力先チャンネル, {
-                            "ソケットID": ソケットID,
+                            "セッションID": セッションID,
                             "チャンネル": 出力先チャンネル,
                             "メッセージ識別": "output_text",
                             "メッセージ内容": f"⏳ チャンネル{出力先チャンネル}は処理中です。キューに追加しました...",
                             "ファイル名": None,
                             "サムネイル画像": None
                         })
-                        logger.info(f"チャンネル{出力先チャンネル}処理中のため、キューに追加: {ソケットID}")
+                        logger.info(f"チャンネル{出力先チャンネル}処理中のため、キューに追加: {セッションID}")
                         continue
 
                     セッション.set_channel_processing(出力先チャンネル, True)
 
                     # input_requestメッセージをエコーバック
                     await セッション.send_to_channel(出力先チャンネル, {
-                        "ソケットID": ソケットID,
+                        "セッションID": セッションID,
                         "チャンネル": 出力先チャンネル,
                         "メッセージ識別": "input_request",
                         "メッセージ内容": メッセージ内容,
@@ -817,7 +816,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                     # 会話履歴保存
                     保存_会話履歴(
-                        ソケットID=ソケットID,
+                        セッションID=セッションID,
                         チャンネル=出力先チャンネル,
                         メッセージ識別="input_request",
                         メッセージ内容=メッセージ内容,
@@ -877,7 +876,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             logger.exception(f"ファイル保存エラー: {e}")
 
                     await セッション.send_to_channel(出力先チャンネル, {
-                        "ソケットID": ソケットID,
+                        "セッションID": セッションID,
                         "チャンネル": 出力先チャンネル,
                         "メッセージ識別": "input_file",
                         "メッセージ内容": f"ファイル受信: {ファイル名}" if ファイル名 else "ファイル受信",
@@ -886,7 +885,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     })
 
                     保存_会話履歴(
-                        ソケットID=ソケットID,
+                        セッションID=セッションID,
                         チャンネル=出力先チャンネル,
                         メッセージ識別="input_file",
                         メッセージ内容=f"ファイル受信: {ファイル名}" if ファイル名 else "ファイル受信",
@@ -898,7 +897,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         セッション.set_channel_processing(出力先チャンネル, True)
                         try:
                             更新済み受信データ = {
-                                "ソケットID": ソケットID,
+                                "セッションID": セッションID,
                                 "チャンネル": 出力先チャンネル,
                                 "メッセージ識別": "input_file",
                                 "メッセージ内容": f"ファイル受信: {ファイル名}" if ファイル名 else "ファイル受信",
@@ -968,7 +967,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             保存パス = os.path.join(保存ディレクトリ, 保存ファイル名)
                             with open(保存パス, "wb") as f:
                                 f.write(image_bytes)
-                            logger.info(f"画像保存完了 ({ソケットID}): {保存パス}")
+                            logger.info(f"画像保存完了 ({セッションID}): {保存パス}")
                         except Exception as e:
                             logger.exception(f"画像保存エラー: {e}")
                             continue
@@ -986,26 +985,26 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         logger.warning(f"画像入力処理エラー: {e}")
 
                 else:
-                    logger.error(f"不明なメッセージ識別 ({ソケットID}): {メッセージ識別} data={json.dumps(受信データ, ensure_ascii=False)}")
+                    logger.error(f"不明なメッセージ識別 ({セッションID}): {メッセージ識別} data={json.dumps(受信データ, ensure_ascii=False)}")
 
             except WebSocketDisconnect:
-                logger.info(f"クライアント切断: {ソケットID} socket={ソケット番号}")
+                logger.info(f"クライアント切断: {セッションID} socket={ソケット番号}")
                 break
             except Exception as e:
-                logger.error(f"メッセージ処理エラー ({ソケットID}): {e}")
+                logger.error(f"メッセージ処理エラー ({セッションID}): {e}")
                 await WebSocket接続.send_json({
                     "メッセージ識別": "error",
-                    "ソケットID": ソケットID,
+                    "セッションID": セッションID,
                     "メッセージ内容": str(e)
                 })
 
     except WebSocketDisconnect:
-        logger.info(f"接続切断 (初期): {ソケットID}")
+        logger.info(f"接続切断 (初期): {セッションID}")
     except Exception as e:
-        logger.error(f"エラー ({ソケットID}): {e}")
+        logger.error(f"エラー ({セッションID}): {e}")
     finally:
-        if ソケットID is not None:
-            logger.info(f"WebSocket /ws/AIコア 切断: {ソケットID} socket={ソケット番号}")
-            await AIソケット管理.disconnect(ソケットID, socket_no=ソケット番号)
-            logger.debug(f"クリーンアップ完了: {ソケットID}")
+        if セッションID is not None:
+            logger.info(f"WebSocket /ws/AIコア 切断: {セッションID} socket={ソケット番号}")
+            await AIソケット管理.disconnect(セッションID, socket_no=ソケット番号)
+            logger.debug(f"クリーンアップ完了: {セッションID}")
 

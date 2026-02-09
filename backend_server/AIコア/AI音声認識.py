@@ -34,8 +34,8 @@ except Exception:
 class Recognition:
     """音声認識処理クラス（キュー処理）"""
 
-    def __init__(self, ソケットID: str, 接続=None, 保存関数=None):
-        self.ソケットID = ソケットID
+    def __init__(self, セッションID: str, 接続=None, 保存関数=None):
+        self.セッションID = セッションID
         self.接続 = 接続
         self.保存関数 = 保存関数
         self.is_alive = False
@@ -119,7 +119,7 @@ class Recognition:
         if callable(self.保存関数):
             try:
                 self.保存関数(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     チャンネル=0,
                     メッセージ識別=f"recognition_{message_type}",
                     メッセージ内容=text,
@@ -129,7 +129,7 @@ class Recognition:
             except Exception:
                 pass
         await self.接続.send_json({
-            "ソケットID": self.ソケットID,
+            "セッションID": self.セッションID,
             "チャンネル": 0,
             "メッセージ識別": f"recognition_{message_type}",
             "メッセージ内容": text,

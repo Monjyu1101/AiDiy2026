@@ -29,7 +29,7 @@ class CodeAgent:
     def __init__(
         self,
         親=None,
-        ソケットID: str = "",
+        セッションID: str = "",
         チャンネル: int = 0,
         絶対パス: str = "",
         AI_NAME: str = "",
@@ -37,7 +37,7 @@ class CodeAgent:
         接続=None,
         保存関数=None,
     ):
-        self.ソケットID = ソケットID
+        self.セッションID = セッションID
         self.チャンネル = チャンネル
         self.接続 = 接続
         self.保存関数 = 保存関数
@@ -76,7 +76,7 @@ class CodeAgent:
                 return None
             self.AIインスタンス = CodeAI(
                 親=self,
-                ソケットID=self.ソケットID,
+                セッションID=self.セッションID,
                 チャンネル=self.チャンネル,
                 AI_NAME=self.AI_NAME,
                 AI_MODEL=self.AI_MODEL,
@@ -151,9 +151,9 @@ class CodeAgent:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
 
             # 処理要求ログ
-            ソケットID_短縮 = self.ソケットID[:10] if self.ソケットID else '不明'
+            セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
             logger.info(
-                f"処理要求: チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{メッセージ内容.rstrip()}\n"
+                f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
             )
 
             出力メッセージ内容 = ""
@@ -172,12 +172,12 @@ class CodeAgent:
 
             # 処理応答ログ
             logger.info(
-                f"処理応答: チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
+                f"処理応答: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
             )
 
             # 1) output_text送信（チャンネル登録されている場合のみ）
             await self.接続.send_to_channel(self.チャンネル, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
                 "メッセージ内容": 出力メッセージ内容,
                 "ファイル名": None,
@@ -187,7 +187,7 @@ class CodeAgent:
             # 2) 会話履歴保存
             if self.保存関数:
                 self.保存関数(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     チャンネル=self.チャンネル,
                     メッセージ識別="output_text",
                     メッセージ内容=出力メッセージ内容,
@@ -201,11 +201,11 @@ class CodeAgent:
         """input_request処理: 前後処理付きでAI実行"""
         try:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
-            ソケットID_短縮 = self.ソケットID[:10] if self.ソケットID else '不明'
+            セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
 
             # 処理要求ログ
             logger.info(
-                f"処理要求(input_request): チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{メッセージ内容.rstrip()}\n"
+                f"処理要求(input_request): チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
             )
 
             # 通常処理の前: チャンネル-1へ処理開始を連絡
@@ -219,7 +219,7 @@ class CodeAgent:
             )
             try:
                 await self.接続.send_to_channel(-1, {
-                    "ソケットID": self.ソケットID,
+                    "セッションID": self.セッションID,
                     "チャンネル": -1,
                     "メッセージ識別": "input_text",
                     "メッセージ内容": 開始メッセージ,
@@ -252,12 +252,12 @@ class CodeAgent:
 
             # 処理応答ログ
             logger.info(
-                f"処理応答(input_request): チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
+                f"処理応答(input_request): チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
             )
 
             # 通常のoutput_text送信
             await self.接続.send_to_channel(self.チャンネル, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
                 "メッセージ内容": 出力メッセージ内容,
                 "ファイル名": None,
@@ -267,7 +267,7 @@ class CodeAgent:
             # 会話履歴保存
             if self.保存関数:
                 self.保存関数(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     チャンネル=self.チャンネル,
                     メッセージ識別="output_text",
                     メッセージ内容=出力メッセージ内容,
@@ -291,7 +291,7 @@ class CodeAgent:
             # 通常のoutput_request送信
 
             await self.接続.send_to_channel(0, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_request",
                 "メッセージ内容": 出力メッセージ内容,
                 "ファイル名": None,
@@ -301,7 +301,7 @@ class CodeAgent:
             # 会話履歴保存
             if self.保存関数:
                 self.保存関数(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     チャンネル=0,
                     メッセージ識別="output_request",
                     メッセージ内容=出力メッセージ内容,
@@ -323,7 +323,7 @@ class CodeAgent:
             )
             try:
                 await self.接続.send_to_channel(-1, {
-                    "ソケットID": self.ソケットID,
+                    "セッションID": self.セッションID,
                     "チャンネル": -1,
                     "メッセージ識別": "input_text",
                     "メッセージ内容": 完了メッセージ,
@@ -371,7 +371,7 @@ class CodeAgent:
             検証開始テキスト = f"{n}回目の検証作業を開始します。"
             logger.info(f"[CodeAgent] {検証開始テキスト}")
             await self.接続.send_to_channel(self.チャンネル, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
                 "メッセージ内容": 検証開始テキスト,
                 "ファイル名": None,
@@ -410,7 +410,7 @@ class CodeAgent:
 
             # 検証結果送信
             await self.接続.send_to_channel(self.チャンネル, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
                 "メッセージ内容": 検証結果,
                 "ファイル名": None,
@@ -420,7 +420,7 @@ class CodeAgent:
             # 会話履歴保存
             if self.保存関数:
                 self.保存関数(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     チャンネル=self.チャンネル,
                     メッセージ識別="output_text",
                     メッセージ内容=検証結果,
@@ -471,7 +471,7 @@ class CodeAgent:
                 
                 # チャンネル-1にoutput_file送信
                 await self.接続.send_to_channel(-1, {
-                    "ソケットID": self.ソケットID,
+                    "セッションID": self.セッションID,
                     "チャンネル": -1,
                     "メッセージ識別": "output_file",
                     "メッセージ内容": 通知メッセージ,
@@ -515,7 +515,7 @@ class CodeAgent:
             
             # 1) output_file送信（チャンネル登録されている場合のみ）
             await self.接続.send_to_channel(self.チャンネル, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_file",
                 "メッセージ内容": f"ファイル出力: {ファイル名のみ}",
                 "ファイル名": 出力ファイル名,
@@ -525,7 +525,7 @@ class CodeAgent:
             # 2) 会話履歴保存
             if self.保存関数:
                 self.保存関数(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     チャンネル=self.チャンネル,
                     メッセージ識別="output_file",
                     メッセージ内容=f"ファイル出力: {ファイル名のみ}",

@@ -25,15 +25,15 @@ logger = get_logger(__name__)
 class StreamingProcessor:
     """ストリーミング処理を担当するクラス"""
 
-    def __init__(self, socket_id: str, connection: "SessionConnection"):
+    def __init__(self, セッションID: str, connection: "SessionConnection"):
         """
         初期化
 
         Args:
-            socket_id: ソケットID
+            セッションID: セッションID
             connection: WebSocket接続オブジェクト
         """
-        self.socket_id = socket_id
+        self.セッションID = セッションID
         self.connection = connection
         self.is_running = False
         self.task: Optional[asyncio.Task] = None
@@ -41,12 +41,12 @@ class StreamingProcessor:
     async def start(self):
         """ストリーミング処理を開始"""
         if self.is_running:
-            logger.warning(f"既にストリーミング処理が実行中です: {self.socket_id}")
+            logger.warning(f"既にストリーミング処理が実行中です: {self.セッションID}")
             return
 
         self.is_running = True
         self.task = asyncio.create_task(self._process())
-        logger.debug(f"ストリーミング処理開始: {self.socket_id}")
+        logger.debug(f"ストリーミング処理開始: {self.セッションID}")
 
     async def stop(self):
         """ストリーミング処理を停止"""
@@ -59,20 +59,20 @@ class StreamingProcessor:
             except asyncio.CancelledError:
                 pass
 
-        logger.debug(f"ストリーミング処理停止: {self.socket_id}")
+        logger.debug(f"ストリーミング処理停止: {self.セッションID}")
 
     async def _process(self):
         """
         ストリーミング処理のメインループ
         各セッション専用のストリーミングタスクとして動作
         """
-        logger.debug(f"ストリーミングタスク起動: {self.socket_id}")
+        logger.debug(f"ストリーミングタスク起動: {self.セッションID}")
 
         try:
             # ストリーミング開始通知
             await self.connection.send_json({
                 "メッセージ識別": "streaming_started",
-                "ソケットID": self.socket_id,
+                "セッションID": self.セッションID,
                 "メッセージ内容": "ストリーミング処理を開始しました"
             })
 
@@ -85,7 +85,7 @@ class StreamingProcessor:
                 # ハートビートメッセージ
                 await self.connection.send_json({
                     "メッセージ識別": "heartbeat",
-                    "ソケットID": self.socket_id,
+                    "セッションID": self.セッションID,
                     "メッセージ内容": {
                         "カウント": counter,
                         "時刻": asyncio.get_event_loop().time()
@@ -99,18 +99,18 @@ class StreamingProcessor:
                 await self._process_ai_tasks()
 
         except asyncio.CancelledError:
-            logger.debug(f"ストリーミングタスクキャンセル: {self.socket_id}")
+            logger.debug(f"ストリーミングタスクキャンセル: {self.セッションID}")
             raise
         except Exception as e:
-            logger.error(f"ストリーミングエラー ({self.socket_id}): {e}")
+            logger.error(f"ストリーミングエラー ({self.セッションID}): {e}")
             await self.connection.send_json({
                 "メッセージ識別": "error",
-                "ソケットID": self.socket_id,
+                "セッションID": self.セッションID,
                 "メッセージ内容": str(e)
             })
         finally:
             self.is_running = False
-            logger.debug(f"ストリーミングタスク終了: {self.socket_id}")
+            logger.debug(f"ストリーミングタスク終了: {self.セッションID}")
 
     async def _process_ai_tasks(self):
         """
@@ -163,7 +163,7 @@ class StreamingProcessor:
         """
         await self.connection.send_json({
             "メッセージ識別": message_type,
-            "ソケットID": self.socket_id,
+            "セッションID": self.セッションID,
             **data
         })
 
@@ -178,11 +178,11 @@ class StreamingProcessor:
         """
         # 音声出力が一時停止中（人間の音声入力中）はスキップ
         if self.connection.output_audio_paused:
-            logger.debug(f"音声出力スキップ（一時停止中）: {self.socket_id}")
+            logger.debug(f"音声出力スキップ（一時停止中）: {self.セッションID}")
             return
 
         await self.connection.send_json({
-            "ソケットID": self.socket_id,
+            "セッションID": self.セッションID,
             "チャンネル": チャンネル,
             "メッセージ識別": "output_audio",
             "メッセージ内容": mime_type,

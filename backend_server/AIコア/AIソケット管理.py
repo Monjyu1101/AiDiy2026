@@ -30,9 +30,9 @@ class WebSocketConnection:
     セッション内のソケット(-1,0-4)単位で保持
     """
 
-    def __init__(self, websocket: WebSocket, session_id: str, socket_no: int):
+    def __init__(self, websocket: WebSocket, セッションID: str, socket_no: int):
         self.websocket = websocket
-        self.session_id = session_id
+        self.セッションID = セッションID
         self.socket_no = socket_no
         self.is_connected = False
 
@@ -40,7 +40,7 @@ class WebSocketConnection:
         """WebSocket接続を受け入れる"""
         await self.websocket.accept()
         self.is_connected = True
-        logger.debug(f"接続確立: session={self.session_id} socket={self.socket_no}")
+        logger.debug(f"接続確立: session={self.セッションID} socket={self.socket_no}")
 
     async def send_json(self, data: dict):
         """JSONデータを送信"""
@@ -48,7 +48,7 @@ class WebSocketConnection:
             try:
                 await self.websocket.send_json(data)
             except Exception as e:
-                logger.error(f"送信エラー (session={self.session_id} socket={self.socket_no}): {e}")
+                logger.error(f"送信エラー (session={self.セッションID} socket={self.socket_no}): {e}")
                 self.is_connected = False
 
     async def receive_json(self) -> Optional[dict]:
@@ -57,7 +57,7 @@ class WebSocketConnection:
             try:
                 return await self.websocket.receive_json()
             except Exception as e:
-                logger.error(f"受信エラー (session={self.session_id} socket={self.socket_no}): {e}")
+                logger.error(f"受信エラー (session={self.セッションID} socket={self.socket_no}): {e}")
                 self.is_connected = False
                 return None
         return None
@@ -70,7 +70,7 @@ class WebSocketConnection:
             except Exception:
                 pass
             self.is_connected = False
-            logger.debug(f"接続クローズ: session={self.session_id} socket={self.socket_no}")
+            logger.debug(f"接続クローズ: session={self.セッションID} socket={self.socket_no}")
 
 
 class SessionConnection:
@@ -85,8 +85,8 @@ class SessionConnection:
      4: エージェント4出力チャンネル
     """
 
-    def __init__(self, session_id: str):
-        self.socket_id = session_id
+    def __init__(self, セッションID: str):
+        self.セッションID = セッションID
         self.sockets: Dict[int, Optional[WebSocketConnection]] = {
             -1: None,
             0: None,
@@ -145,7 +145,7 @@ class SessionConnection:
             チャンネル = -1
         connection = self.sockets.get(チャンネル)
         if not connection or not connection.is_connected:
-            logger.warning(f"送信先ソケット未接続: session={self.socket_id} ch={チャンネル}")
+            logger.warning(f"送信先ソケット未接続: session={self.セッションID} ch={チャンネル}")
             return
         await connection.send_json(data)
 
@@ -160,10 +160,10 @@ class SessionConnection:
         logger.debug(f"チャンネル{チャンネル}に送信: {data.get('メッセージ識別', 'unknown')}")
 
     def register_channel(self, チャンネル: int):
-        logger.info(f"チャンネル{チャンネル}登録通知: {self.socket_id}")
+        logger.info(f"チャンネル{チャンネル}登録通知: {self.セッションID}")
 
     def unregister_channel(self, チャンネル: int):
-        logger.info(f"チャンネル{チャンネル}解除通知: {self.socket_id}")
+        logger.info(f"チャンネル{チャンネル}解除通知: {self.セッションID}")
 
     def is_channel_registered(self, チャンネル: int) -> bool:
         return True
@@ -172,7 +172,7 @@ class SessionConnection:
         if チャンネル not in self.チャンネル別キュー:
             self.チャンネル別キュー[チャンネル] = asyncio.Queue()
             self.チャンネル別処理中[チャンネル] = False
-            logger.debug(f"チャンネル{チャンネル}のキューを作成: {self.socket_id}")
+            logger.debug(f"チャンネル{チャンネル}のキューを作成: {self.セッションID}")
         return self.チャンネル別キュー[チャンネル]
 
     def is_channel_processing(self, チャンネル: int) -> bool:
@@ -180,18 +180,18 @@ class SessionConnection:
 
     def set_channel_processing(self, チャンネル: int, 処理中: bool):
         self.チャンネル別処理中[チャンネル] = 処理中
-        logger.debug(f"チャンネル{チャンネル}の処理状態: {処理中} ({self.socket_id})")
+        logger.debug(f"チャンネル{チャンネル}の処理状態: {処理中} ({self.セッションID})")
 
     def update_state(self, 画面: dict, ボタン: dict, manager=None):
         self.画面状態.update(画面)
         self.ボタン状態.update(ボタン)
         if manager:
-            manager.save_session_state(self.socket_id, self.画面状態, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
+            manager.save_session_state(self.セッションID, self.画面状態, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
     def update_model_settings(self, 設定: dict, manager=None):
         self.モデル設定.update(設定)
         if manager:
-            manager.save_session_state(self.socket_id, self.画面状態, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
+            manager.save_session_state(self.セッションID, self.画面状態, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
     async def close(self):
         """セッション全体をクローズ"""
@@ -235,48 +235,48 @@ class WebSocketManager:
         self.sessions: Dict[str, SessionConnection] = {}
         self.session_states: Dict[str, dict] = {}
 
-    def generate_socket_id(self) -> str:
-        """新しいソケットIDを生成（プロセスIDベース）"""
+    def セッションID生成(self) -> str:
+        """新しいセッションIDを生成（プロセスIDベース）"""
         import os
         import time
         # PID + タイムスタンプ + UUIDの組み合わせで一意性を保証
         pid = os.getpid()
         timestamp = int(time.time() * 1000)
         unique_id = str(uuid.uuid4())[:8]
-        socket_id = f"ws-{pid}-{timestamp}-{unique_id}"
-        return socket_id
+        セッションID = f"ws-{pid}-{timestamp}-{unique_id}"
+        return セッションID
 
-    async def connect(self, websocket: WebSocket, socket_id: Optional[str] = None, socket_no: int = -1, app_conf=None, accept_in_connect: bool = True) -> str:
+    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: int = -1, app_conf=None, accept_in_connect: bool = True) -> str:
         """
         WebSocket接続を登録（セッション単位）
 
         Args:
             websocket: WebSocket接続
-            socket_id: 既存のソケットID（リロード時）。Noneの場合は新規生成
+            セッションID: 既存のセッションID（リロード時）。Noneの場合は新規生成
             app_conf: アプリケーション設定（新規接続時にコピー）
 
         Returns:
-            socket_id: 使用するソケットID
+            セッションID: 使用するセッションID
         """
         # セッションID決定
-        if socket_id and socket_id in self.sessions:
-            logger.debug(f"既存セッション再接続: {socket_id}")
+        if セッションID and セッションID in self.sessions:
+            logger.debug(f"既存セッション再接続: {セッションID}")
         else:
-            socket_id = socket_id if socket_id else self.generate_socket_id()
-            logger.debug(f"新規セッション作成: {socket_id}")
+            セッションID = セッションID if セッションID else self.セッションID生成()
+            logger.debug(f"新規セッション作成: {セッションID}")
 
         # セッション作成または取得
-        if socket_id not in self.sessions:
-            session = SessionConnection(socket_id)
+        if セッションID not in self.sessions:
+            session = SessionConnection(セッションID)
 
             # セッション状態を復元または初期化
-            if socket_id in self.session_states:
-                saved_state = self.session_states[socket_id]
+            if セッションID in self.session_states:
+                saved_state = self.session_states[セッションID]
                 session.画面状態 = saved_state.get("画面", session.画面状態)
                 session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
                 session.モデル設定 = saved_state.get("モデル設定", {})
                 session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
-                logger.debug(f"セッション状態を復元: {socket_id}")
+                logger.debug(f"セッション状態を復元: {セッションID}")
             else:
                 if app_conf and hasattr(app_conf, 'json'):
                     session.モデル設定 = {
@@ -312,28 +312,28 @@ class WebSocketManager:
                         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
                         "CODE_BASE_PATH": app_conf.json.get("CODE_BASE_PATH", "../"),
                     }
-                    logger.debug(f"app.confからモデル設定をコピー: {socket_id}")
+                    logger.debug(f"app.confからモデル設定をコピー: {セッションID}")
 
-                self.session_states[socket_id] = {
+                self.session_states[セッションID] = {
                     "画面": session.画面状態.copy(),
                     "ボタン": session.ボタン状態.copy(),
                     "モデル設定": session.モデル設定.copy(),
                     "ソース最終更新日時": session.ソース最終更新日時
                 }
-            self.sessions[socket_id] = session
+            self.sessions[セッションID] = session
         else:
-            session = self.sessions[socket_id]
+            session = self.sessions[セッションID]
 
-        logger.debug(f"セッションに接続: {socket_id}")
+        logger.debug(f"セッションに接続: {セッションID}")
 
         # 既存の同一ソケットがあれば切断
         old_conn = session.get_socket(socket_no)
         if old_conn:
-            logger.debug(f"既存接続を切断: session={socket_id} socket={socket_no}")
+            logger.debug(f"既存接続を切断: session={セッションID} socket={socket_no}")
             await old_conn.close()
 
         # 接続を作成
-        connection = WebSocketConnection(websocket, socket_id, socket_no)
+        connection = WebSocketConnection(websocket, セッションID, socket_no)
         if accept_in_connect:
             await connection.accept()
         else:
@@ -342,7 +342,7 @@ class WebSocketManager:
 
         # 初期化メッセージを送信（各ソケット共通）
         init_payload = {
-            "ソケットID": socket_id,
+            "セッションID": セッションID,
             "ソケット番号": socket_no,
             "チャンネル": socket_no,
             "メッセージ識別": "init",
@@ -356,23 +356,23 @@ class WebSocketManager:
             }
         await connection.send_json(init_payload)
 
-        logger.info(f"接続登録完了: チャンネル={socket_no}, ソケットID={socket_id}")
-        return socket_id
+        logger.info(f"接続登録完了: チャンネル={socket_no}, セッションID={セッションID}")
+        return セッションID
 
-    def ensure_session(self, socket_id: Optional[str] = None, app_conf=None) -> str:
+    def ensure_session(self, セッションID: Optional[str] = None, app_conf=None) -> str:
         """
         セッションを確実に作成（WebSocket未接続でも状態だけ確保）
         """
-        if socket_id and socket_id in self.sessions:
-            return socket_id
+        if セッションID and セッションID in self.sessions:
+            return セッションID
 
-        socket_id = socket_id if socket_id else self.generate_socket_id()
-        if socket_id in self.sessions:
-            return socket_id
+        セッションID = セッションID if セッションID else self.セッションID生成()
+        if セッションID in self.sessions:
+            return セッションID
 
-        session = SessionConnection(socket_id)
-        if socket_id in self.session_states:
-            saved_state = self.session_states[socket_id]
+        session = SessionConnection(セッションID)
+        if セッションID in self.session_states:
+            saved_state = self.session_states[セッションID]
             session.画面状態 = saved_state.get("画面", session.画面状態)
             session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
             session.モデル設定 = saved_state.get("モデル設定", {})
@@ -409,17 +409,17 @@ class WebSocketManager:
                     "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
                     "CODE_BASE_PATH": app_conf.json.get("CODE_BASE_PATH", "../"),
                 }
-            self.session_states[socket_id] = {
+            self.session_states[セッションID] = {
                 "画面": session.画面状態.copy(),
                 "ボタン": session.ボタン状態.copy(),
                 "モデル設定": session.モデル設定.copy(),
                 "ソース最終更新日時": session.ソース最終更新日時
             }
-        self.sessions[socket_id] = session
-        logger.info(f"セッションを作成(ensure): {socket_id}")
-        return socket_id
+        self.sessions[セッションID] = session
+        logger.info(f"セッションを作成(ensure): {セッションID}")
+        return セッションID
 
-    def save_session_state(self, socket_id: str, 画面: dict, ボタン: dict, モデル設定: dict = None, ソース最終更新日時: Optional[str] = None):
+    def save_session_state(self, セッションID: str, 画面: dict, ボタン: dict, モデル設定: dict = None, ソース最終更新日時: Optional[str] = None):
         """セッション状態を保存"""
         state = {
             "画面": 画面.copy(),
@@ -430,24 +430,24 @@ class WebSocketManager:
         if ソース最終更新日時 is not None:
             state["ソース最終更新日時"] = ソース最終更新日時
 
-        self.session_states[socket_id] = state
-        logger.debug(f"セッション状態保存: {socket_id}")
+        self.session_states[セッションID] = state
+        logger.debug(f"セッション状態保存: {セッションID}")
 
-    async def disconnect(self, socket_id: str, socket_no: Optional[int] = None, keep_session: bool = True):
+    async def disconnect(self, セッションID: str, socket_no: Optional[int] = None, keep_session: bool = True):
         """
         WebSocket接続を切断（セッション内のソケット単位）
 
         Args:
-            socket_id: ソケットID
+            セッションID: セッションID
             keep_session: セッション状態を保持するか（デフォルト: True）
         """
-        session = self.sessions.get(socket_id)
+        session = self.sessions.get(セッションID)
         if not session:
             return
 
         if keep_session:
             self.save_session_state(
-                socket_id,
+                セッションID,
                 session.画面状態,
                 session.ボタン状態,
                 session.モデル設定,
@@ -462,43 +462,43 @@ class WebSocketManager:
                 await connection.close()
                 session.set_socket(socket_no, None)
 
-        logger.info(f"接続切断: session={socket_id} socket={socket_no} (セッション保持: {keep_session})")
+        logger.info(f"接続切断: session={セッションID} socket={socket_no} (セッション保持: {keep_session})")
 
-    def get_session(self, socket_id: str) -> Optional[SessionConnection]:
+    def get_session(self, セッションID: str) -> Optional[SessionConnection]:
         """セッションIDからセッションを取得"""
-        return self.sessions.get(socket_id)
+        return self.sessions.get(セッションID)
 
-    def get_connection(self, socket_id: str, socket_no: int = -1) -> Optional[WebSocketConnection]:
+    def get_connection(self, セッションID: str, socket_no: int = -1) -> Optional[WebSocketConnection]:
         """セッションIDとソケット番号から接続を取得"""
-        session = self.get_session(socket_id)
+        session = self.get_session(セッションID)
         if not session:
             return None
         return session.get_socket(socket_no)
 
-    async def send_to_socket(self, socket_id: str, data: dict):
+    async def send_to_socket(self, セッションID: str, data: dict):
         """特定のソケットにデータを送信"""
-        session = self.get_session(socket_id)
+        session = self.get_session(セッションID)
         if session:
             await session.send_json(data)
     
-    async def send_to_channel(self, socket_id: str, チャンネル: int, data: dict):
+    async def send_to_channel(self, セッションID: str, チャンネル: int, data: dict):
         """
         特定のソケットの指定チャンネルにデータを送信
         チャンネルが登録されている場合のみ送信
         """
-        session = self.get_session(socket_id)
+        session = self.get_session(セッションID)
         if session:
             await session.send_to_channel(チャンネル, data)
     
-    def register_channel(self, socket_id: str, チャンネル: int):
+    def register_channel(self, セッションID: str, チャンネル: int):
         """チャンネルを登録"""
-        session = self.get_session(socket_id)
+        session = self.get_session(セッションID)
         if session:
             session.register_channel(チャンネル)
     
-    def unregister_channel(self, socket_id: str, チャンネル: int):
+    def unregister_channel(self, セッションID: str, チャンネル: int):
         """チャンネルを解除"""
-        session = self.get_session(socket_id)
+        session = self.get_session(セッションID)
         if session:
             session.unregister_channel(チャンネル)
 
@@ -507,17 +507,17 @@ class WebSocketManager:
         for session in self.sessions.values():
             await session.send_json(data)
 
-    async def handle_message(self, socket_id: str, message: dict):
+    async def handle_message(self, セッションID: str, message: dict):
         """
         クライアントからのメッセージをチャンネル別キューに追加
 
         Args:
-            socket_id: ソケットID
+            セッションID: セッションID
             message: 受信メッセージ
         """
-        session = self.get_session(socket_id)
+        session = self.get_session(セッションID)
         if not session:
-            logger.warning(f"メッセージ処理失敗: 接続が見つかりません ({socket_id})")
+            logger.warning(f"メッセージ処理失敗: 接続が見つかりません ({セッションID})")
             return
         
         # チャンネルを取得（デフォルト: 0）
@@ -526,13 +526,13 @@ class WebSocketManager:
         # チャンネル別キューに追加
         キュー = session.get_or_create_queue(チャンネル)
         await キュー.put(message)
-        logger.debug(f"メッセージをキューに追加: チャンネル={チャンネル}, socket_id={socket_id}, キューサイズ={キュー.qsize()}")
+        logger.debug(f"メッセージをキューに追加: チャンネル={チャンネル}, セッションID={セッションID}, キューサイズ={キュー.qsize()}")
         
         # ストリーミングプロセッサに処理を委譲
         if session.streaming_processor:
             await session.streaming_processor.handle_client_message(message)
         else:
-            logger.warning(f"メッセージ処理失敗: プロセッサが見つかりません ({socket_id})")
+            logger.warning(f"メッセージ処理失敗: プロセッサが見つかりません ({セッションID})")
 
     def get_session_count(self) -> int:
         """アクティブなセッション数を取得"""
@@ -542,7 +542,7 @@ class WebSocketManager:
         """アクティブなセッションのリストを取得"""
         return [
             {
-                "ソケットID": session.socket_id,
+                "セッションID": session.セッションID,
                 "is_connected": session.is_connected,
                 "画面状態": session.画面状態,
                 "ボタン状態": session.ボタン状態,

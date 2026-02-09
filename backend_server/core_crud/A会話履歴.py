@@ -16,7 +16,7 @@ from typing import Optional, List
 
 def create_会話履歴(
     db: Session,
-    ソケットID: str,
+    セッションID: str,
     シーケンス: int,
     チャンネル: int,
     メッセージ識別: str,
@@ -29,7 +29,7 @@ def create_会話履歴(
     audit_fields = create_audit_fields(認証情報)
 
     db_record = A会話履歴(
-        ソケットID=ソケットID,
+        セッションID=セッションID,
         シーケンス=シーケンス,
         チャンネル=チャンネル,
         メッセージ識別=メッセージ識別,
@@ -44,11 +44,11 @@ def create_会話履歴(
     return db_record
 
 
-def get_会話履歴(db: Session, ソケットID: str, シーケンス: int) -> Optional[A会話履歴]:
+def get_会話履歴(db: Session, セッションID: str, シーケンス: int) -> Optional[A会話履歴]:
     """会話履歴を1件取得"""
     return db.query(A会話履歴).filter(
         and_(
-            A会話履歴.ソケットID == ソケットID,
+            A会話履歴.セッションID == セッションID,
             A会話履歴.シーケンス == シーケンス
         )
     ).first()
@@ -56,12 +56,12 @@ def get_会話履歴(db: Session, ソケットID: str, シーケンス: int) -> 
 
 def get_会話履歴_by_socket(
     db: Session,
-    ソケットID: str,
+    セッションID: str,
     チャンネル: Optional[int] = None,
     limit: int = 100
 ) -> List[A会話履歴]:
-    """ソケットIDで会話履歴を取得（チャンネル指定可能）"""
-    query = db.query(A会話履歴).filter(A会話履歴.ソケットID == ソケットID)
+    """セッションIDで会話履歴を取得（チャンネル指定可能）"""
+    query = db.query(A会話履歴).filter(A会話履歴.セッションID == セッションID)
 
     if チャンネル is not None:
         query = query.filter(A会話履歴.チャンネル == チャンネル)
@@ -69,10 +69,10 @@ def get_会話履歴_by_socket(
     return query.order_by(desc(A会話履歴.シーケンス)).limit(limit).all()
 
 
-def get_next_sequence(db: Session, ソケットID: str) -> int:
+def get_next_sequence(db: Session, セッションID: str) -> int:
     """次のシーケンス番号を取得"""
     max_seq = db.query(A会話履歴.シーケンス).filter(
-        A会話履歴.ソケットID == ソケットID
+        A会話履歴.セッションID == セッションID
     ).order_by(desc(A会話履歴.シーケンス)).first()
 
     return (max_seq[0] + 1) if max_seq else 1
@@ -80,7 +80,7 @@ def get_next_sequence(db: Session, ソケットID: str) -> int:
 
 def update_会話履歴(
     db: Session,
-    ソケットID: str,
+    セッションID: str,
     シーケンス: int,
     メッセージ内容: Optional[str] = None,
     ファイル名: Optional[str] = None,
@@ -88,7 +88,7 @@ def update_会話履歴(
     認証情報: dict = None
 ) -> Optional[A会話履歴]:
     """会話履歴を更新"""
-    db_record = get_会話履歴(db, ソケットID, シーケンス)
+    db_record = get_会話履歴(db, セッションID, シーケンス)
     if not db_record:
         return None
 
@@ -109,9 +109,9 @@ def update_会話履歴(
     return db_record
 
 
-def delete_会話履歴(db: Session, ソケットID: str, シーケンス: int) -> bool:
+def delete_会話履歴(db: Session, セッションID: str, シーケンス: int) -> bool:
     """会話履歴を削除"""
-    db_record = get_会話履歴(db, ソケットID, シーケンス)
+    db_record = get_会話履歴(db, セッションID, シーケンス)
     if not db_record:
         return False
 
@@ -120,9 +120,9 @@ def delete_会話履歴(db: Session, ソケットID: str, シーケンス: int) 
     return True
 
 
-def delete_会話履歴_by_socket(db: Session, ソケットID: str) -> int:
-    """ソケットIDに紐づく会話履歴を全削除"""
-    count = db.query(A会話履歴).filter(A会話履歴.ソケットID == ソケットID).count()
-    db.query(A会話履歴).filter(A会話履歴.ソケットID == ソケットID).delete()
+def delete_会話履歴_by_socket(db: Session, セッションID: str) -> int:
+    """セッションIDに紐づく会話履歴を全削除"""
+    count = db.query(A会話履歴).filter(A会話履歴.セッションID == セッションID).count()
+    db.query(A会話履歴).filter(A会話履歴.セッションID == セッションID).delete()
     db.commit()
     return count

@@ -13,7 +13,7 @@ from typing import Optional
 # --- A会話履歴 ---
 
 class A会話履歴Base(BaseModel):
-    ソケットID: str
+    セッションID: str
     シーケンス: int
     チャンネル: int
     メッセージ識別: str
@@ -27,7 +27,7 @@ class A会話履歴Create(A会話履歴Base):
 
 
 class A会話履歴Update(BaseModel):
-    ソケットID: str
+    セッションID: str
     シーケンス: int
     メッセージ内容: Optional[str] = None
     ファイル名: Optional[str] = None
@@ -35,17 +35,17 @@ class A会話履歴Update(BaseModel):
 
 
 class A会話履歴Delete(BaseModel):
-    ソケットID: str
+    セッションID: str
     シーケンス: int
 
 
 class A会話履歴Get(BaseModel):
-    ソケットID: str
+    セッションID: str
     シーケンス: int
 
 
 class A会話履歴ListRequest(BaseModel):
-    ソケットID: Optional[str] = None
+    セッションID: Optional[str] = None
     チャンネル: Optional[int] = None
     件数: Optional[int] = None
 

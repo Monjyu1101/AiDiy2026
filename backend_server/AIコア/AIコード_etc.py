@@ -42,13 +42,13 @@ class CodeAI:
     claude code などのコマンドラインツールをsubprocessで実行
     """
 
-    def __init__(self, 親=None, ソケットID: str = "", チャンネル: int = 0, 絶対パス: str = None,
+    def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "claude_cli", AI_MODEL: str = "auto", max_turns: int = 999,
                  code_plan: str = "auto", code_verify: str = "auto"):
         """初期化"""
 
-        # ソケットID・チャンネル
-        self.ソケットID = ソケットID
+        # セッションID・チャンネル
+        self.セッションID = セッションID
         self.チャンネル = チャンネル
 
         # 親参照（セッションマネージャー）
@@ -87,7 +87,7 @@ class CodeAI:
         self.session_started = False
 
         # codex専用：セッションID管理
-        self.codex_ソケットID = None
+        self.codex_セッションID = None
 
         # 最終実行のstderr出力（セッションID抽出用）
         self.last_stderr_output = ""
@@ -177,8 +177,8 @@ class CodeAI:
                 base_args.extend(["--model", self.code_model])
 
             # 継続の場合は resume <session-id> を追加
-            if not 初回 and self.codex_ソケットID:
-                base_args.extend(["resume", self.codex_ソケットID])
+            if not 初回 and self.codex_セッションID:
+                base_args.extend(["resume", self.codex_セッションID])
 
             base_args.append(プロンプト)
             return base_args
@@ -377,9 +377,9 @@ class CodeAI:
             match = re.search(pattern, full_output, re.IGNORECASE)
 
             if match:
-                ソケットID = match.group(1)
-                logger.debug(f"codexセッションID抽出成功: {ソケットID}")
-                return ソケットID
+                セッションID = match.group(1)
+                logger.debug(f"codexセッションID抽出成功: {セッションID}")
+                return セッションID
             else:
                 logger.debug("codexセッションID抽出: セッションIDが見つかりませんでした")
                 return None
@@ -510,7 +510,7 @@ class CodeAI:
             if self.parent_manager and hasattr(self.parent_manager, '接続'):
                 try:
                     await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "ソケットID": self.ソケットID,
+                        "セッションID": self.セッションID,
                         "チャンネル": self.チャンネル,
                         "メッセージ識別": "output_stream",
                         "メッセージ内容": "<<< 処理開始 >>>",
@@ -573,10 +573,10 @@ class CodeAI:
 
             # codexの場合、セッションIDを抽出して保存（stderr から抽出）
             if self.code_ai == "codex_cli":
-                ソケットID = self._codexセッションID抽出(self.last_stderr_output)
-                if ソケットID:
-                    self.codex_ソケットID = ソケットID
-                    logger.info(f"codexセッションID保存: {ソケットID}")
+                セッションID = self._codexセッションID抽出(self.last_stderr_output)
+                if セッションID:
+                    self.codex_セッションID = セッションID
+                    logger.info(f"codexセッションID保存: {セッションID}")
 
             # 履歴に結果を追加
             final_result = result_text.strip() if result_text.strip() else "!"
@@ -591,7 +591,7 @@ class CodeAI:
             if self.parent_manager and hasattr(self.parent_manager, '接続'):
                 try:
                     await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "ソケットID": self.ソケットID,
+                        "セッションID": self.セッションID,
                         "チャンネル": self.チャンネル,
                         "メッセージ識別": "output_stream",
                         "メッセージ内容": "<<< 処理終了 >>>",
@@ -669,7 +669,7 @@ class CodeAI:
                         if self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
                                 await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                                    "ソケットID": self.ソケットID,
+                                    "セッションID": self.セッションID,
                                     "チャンネル": self.チャンネル,
                                     "メッセージ識別": "output_stream",
                                     "メッセージ内容": line_text,
@@ -706,7 +706,7 @@ class CodeAI:
                         if self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
                                 await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                                    "ソケットID": self.ソケットID,
+                                    "セッションID": self.セッションID,
                                     "チャンネル": self.チャンネル,
                                     "メッセージ識別": "output_stream",
                                     "メッセージ内容": line_text,
@@ -790,7 +790,7 @@ async def session_test(AI_NAME="openai", AI_MODEL="auto"):
     print("=" * 50)
 
     # CodeAIインスタンス作成
-    codeai = CodeAI(親=None, ソケットID="test_session", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
+    codeai = CodeAI(親=None, セッションID="test_session", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
 
     try:
         # セッション開始
@@ -866,7 +866,7 @@ async def simple_test(AI_NAME="openai", AI_MODEL="auto"):
     print("=" * 30)
 
     # CodeAIインスタンス作成
-    codeai = CodeAI(親=None, ソケットID="simple_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
+    codeai = CodeAI(親=None, セッションID="simple_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, max_turns=10)
 
     try:
         # セッション開始

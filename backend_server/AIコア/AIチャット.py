@@ -27,7 +27,7 @@ class Chat:
     def __init__(
         self,
         親=None,
-        ソケットID: str = "",
+        セッションID: str = "",
         チャンネル: int = 0,
         絶対パス: str = "",
         AI_NAME: str = "",
@@ -35,7 +35,7 @@ class Chat:
         接続=None,
         保存関数=None,
     ):
-        self.ソケットID = ソケットID
+        self.セッションID = セッションID
         self.チャンネル = チャンネル
         self.接続 = 接続
         self.保存関数 = 保存関数
@@ -86,7 +86,7 @@ class Chat:
                 return None
             self.AIインスタンス = ChatAI(
                 親=self.親,
-                ソケットID=self.ソケットID,
+                セッションID=self.セッションID,
                 チャンネル=self.チャンネル,
                 AI_NAME=self.AI_NAME,
                 AI_MODEL=self.AI_MODEL,
@@ -182,9 +182,9 @@ class Chat:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
 
             # 処理要求ログ
-            ソケットID_短縮 = self.ソケットID[:10] if self.ソケットID else '不明'
+            セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
             logger.info(
-                f"処理要求: チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{メッセージ内容.rstrip()}\n"
+                f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
             )
 
             出力メッセージ内容 = ""
@@ -219,12 +219,12 @@ class Chat:
 
             # 処理応答ログ
             logger.info(
-                f"処理応答: チャンネル={self.チャンネル}, ソケット={ソケットID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
+                f"処理応答: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
             )
 
             # 1) output_text送信
             await self.接続.send_to_channel(self.チャンネル, {
-                "ソケットID": self.ソケットID,
+                "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
                 "メッセージ内容": 出力メッセージ内容,
                 "ファイル名": None,
@@ -234,7 +234,7 @@ class Chat:
             # 2) 会話履歴保存（テキスト）
             if self.保存関数:
                 self.保存関数(
-                    ソケットID=self.ソケットID,
+                    セッションID=self.セッションID,
                     チャンネル=self.チャンネル,
                     メッセージ識別="output_text",
                     メッセージ内容=出力メッセージ内容,
@@ -252,7 +252,7 @@ class Chat:
                 # サムネイル生成
                 サムネイル_base64 = self._サムネイル生成(出力ファイルパス)
                 await self.接続.send_to_channel(self.チャンネル, {
-                    "ソケットID": self.ソケットID,
+                    "セッションID": self.セッションID,
                     "メッセージ識別": "output_file",
                     "メッセージ内容": f"ファイル出力: {ファイル名のみ}",
                     "ファイル名": 相対パス,
@@ -261,7 +261,7 @@ class Chat:
                 # 会話履歴保存（ファイル）
                 if self.保存関数:
                     self.保存関数(
-                        ソケットID=self.ソケットID,
+                        セッションID=self.セッションID,
                         チャンネル=self.チャンネル,
                         メッセージ識別="output_file",
                         メッセージ内容=f"ファイル出力: {ファイル名のみ}",

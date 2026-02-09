@@ -23,8 +23,8 @@ import { AudioStreamProcessor } from './AI音声処理';
 const route = useRoute();
 const router = useRouter();
 
-// ソケットID（全コンポーネント共通）
-const ソケットID = ref('');
+// セッションID（全コンポーネント共通）
+const セッションID = ref('');
 
 // 親WebSocket接続（音声・画像用のみ、チャンネル-1）
 const wsClient = ref<IWebSocketClient | null>(null);
@@ -194,16 +194,16 @@ const handleImageCheckboxChange = async (newValue: boolean, oldValue: boolean) =
 };
 
 // WebSocket接続を初期化
-const initializeWebSocket = async (既存ソケットID?: string) => {
+const initializeWebSocket = async (既存セッションID?: string) => {
   try {
     const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-    console.log('[AIコア] WebSocket接続開始:', wsUrl, 'ソケットID:', 既存ソケットID);
+    console.log('[AIコア] WebSocket接続開始:', wsUrl, 'セッションID:', 既存セッションID);
 
-    wsClient.value = new AIコアWebSocket(wsUrl, 既存ソケットID, -1);
+    wsClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, -1);
 
     // メッセージハンドラを登録（connect()の前に登録）
     wsClient.value.on('init', (message) => {
-      console.log('[AIコア] 初期化完了:', message.ソケットID);
+      console.log('[AIコア] 初期化完了:', message.セッションID);
       
       const 初期データ = message.メッセージ内容 || {};
       
@@ -303,13 +303,13 @@ const initializeWebSocket = async (既存ソケットID?: string) => {
       }
     });
 
-    // 接続を確立してソケットIDを取得
+    // 接続を確立してセッションIDを取得
     console.log('[AIコア] WebSocket.connect()呼び出し');
-    const 取得ソケットID = await wsClient.value.connect();
-    ソケットID.value = 取得ソケットID;
-    console.log('[AIコア] WebSocket接続完了 ソケットID:', 取得ソケットID);
+    const 取得セッションID = await wsClient.value.connect();
+    セッションID.value = 取得セッションID;
+    console.log('[AIコア] WebSocket接続完了 セッションID:', 取得セッションID);
 
-    return 取得ソケットID;
+    return 取得セッションID;
   } catch (error) {
     console.error('[AIコア] WebSocket接続エラー:', error);
     wsConnected.value = false;
@@ -319,14 +319,14 @@ const initializeWebSocket = async (既存ソケットID?: string) => {
 
 // 初期化処理
 onMounted(async () => {
-  const URLのセッションID = (route.query.セッションID as string) || (route.query.ソケットID as string);
+  const URLのセッションID = route.query.セッションID as string;
   console.log('[AIコア] ========================================');
   console.log('[AIコア] 初期化開始');
   console.log('[AIコア] URLからのセッションID:', URLのセッションID);
   console.log('[AIコア] ========================================');
 
   // 音声処理プロセッサを初期化
-  audioProcessor = new AudioStreamProcessor(wsClient, ソケットID, enableSpeaker);
+  audioProcessor = new AudioStreamProcessor(wsClient, セッションID, enableSpeaker);
   audioProcessor.setupOutputAudio();
 
   // ビジュアライザーセットアップ（DOM確実に準備されるまで待つ）
@@ -350,29 +350,28 @@ onMounted(async () => {
   }, 500);
 
   try {
-    // REST APIで初期化（ソケットIDのみ取得）
+    // REST APIで初期化（セッションIDのみ取得）
     const response = await apiClient.post('/core/AIコア/初期化', {
-      ソケットID: URLのセッションID || '',
       セッションID: URLのセッションID || ''
     });
 
     if (response.data.status === 'OK') {
       const data = response.data.data;
-      ソケットID.value = data.ソケットID;
+      セッションID.value = data.セッションID;
 
       if (!URLのセッションID) {
-        const newUrl = `${window.location.pathname}?セッションID=${ソケットID.value}`;
+        const newUrl = `${window.location.pathname}?セッションID=${セッションID.value}`;
         window.location.href = newUrl;
         return;
       }
     }
 
-    // WebSocket接続を確立（RESTで取得したソケットIDを使用）
+    // WebSocket接続を確立（RESTで取得したセッションIDを使用）
     console.log('[AIコア] WebSocket接続を開始...');
-    const 確立済みソケットID = await initializeWebSocket(ソケットID.value || URLのセッションID);
+    const 確立済みセッションID = await initializeWebSocket(セッションID.value || URLのセッションID);
     console.log('[AIコア] ========================================');
     console.log('[AIコア] ✅ 初期化完了');
-    console.log('[AIコア] ソケットID:', 確立済みソケットID);
+    console.log('[AIコア] セッションID:', 確立済みセッションID);
     console.log('[AIコア] wsConnected:', wsConnected.value);
     console.log('[AIコア] ========================================');
   } catch (error) {
@@ -401,7 +400,7 @@ onBeforeUnmount(() => {
 
 // 画面状態が変わったら保存
 const saveState = async () => {
-  if (!ソケットID.value) return;
+  if (!セッションID.value) return;
 
   const ボタン = {
     スピーカー: enableSpeaker.value,
@@ -647,7 +646,7 @@ const gridLayoutClass = computed(() => {
       <!-- チャット -->
       <div v-show="showChat" class="component-panel">
         <AIコアチャット 
-          :socket-id="ソケットID"
+          :セッションID="セッションID"
           :チャンネル="0"
           :chat-ai="モデル設定.CHAT_AI"
           :live-ai="モデル設定.LIVE_AI"
@@ -664,7 +663,7 @@ const gridLayoutClass = computed(() => {
       <div v-show="showAgent1" class="component-panel">
         <AIコアコード
           key="code-1"
-          :socket-id="ソケットID"
+          :セッションID="セッションID"
           :チャンネル="1"
           :code-ai="モデル設定.CODE_AI1"
           :input-ws-client="wsClient"
@@ -678,7 +677,7 @@ const gridLayoutClass = computed(() => {
       <div v-show="showImage" class="component-panel">
         <AIコアイメージ
           :auto-show-selection="autoShowSelection"
-          :socket-id="ソケットID"
+          :セッションID="セッションID"
           :active="showImage"
           :ws-connected="wsConnected"
           :ws-client="wsClient ?? null"
@@ -693,7 +692,7 @@ const gridLayoutClass = computed(() => {
       <div v-show="showAgent2" class="component-panel">
         <AIコアコード
           key="code-2"
-          :socket-id="ソケットID"
+          :セッションID="セッションID"
           :チャンネル="2"
           :code-ai="モデル設定.CODE_AI2"
           :input-ws-client="wsClient"
@@ -707,7 +706,7 @@ const gridLayoutClass = computed(() => {
       <div v-show="showAgent3" class="component-panel">
         <AIコアコード
           key="code-3"
-          :socket-id="ソケットID"
+          :セッションID="セッションID"
           :チャンネル="3"
           :code-ai="モデル設定.CODE_AI3"
           :input-ws-client="wsClient"
@@ -721,7 +720,7 @@ const gridLayoutClass = computed(() => {
       <div v-show="showAgent4" class="component-panel">
         <AIコアコード
           key="code-4"
-          :socket-id="ソケットID"
+          :セッションID="セッションID"
           :チャンネル="4"
           :code-ai="モデル設定.CODE_AI4"
           :input-ws-client="wsClient"

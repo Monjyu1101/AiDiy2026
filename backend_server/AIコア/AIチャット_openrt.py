@@ -41,13 +41,13 @@ class ChatAI:
     OpenRouter Chat api統合クラス（履歴管理 + テキストチャット実装）
     """
 
-    def __init__(self, 親=None, ソケットID: str = "", チャンネル: int = 0, 絶対パス: str = None,
+    def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "openrt", AI_MODEL: str = "google/gemini-2.5-flash",
                  api_key: str = None):
         """初期化"""
 
-        # ソケットID・チャンネル
-        self.ソケットID = ソケットID
+        # セッションID・チャンネル
+        self.セッションID = セッションID
         self.チャンネル = チャンネル
 
         # 親参照（セッションマネージャー）
@@ -262,8 +262,8 @@ class ChatAI:
 
         except Exception as e:
             # ツールエラーログ（必須）
-            ソケットID_str = self.ソケットID[:10] + '...' if self.ソケットID else '不明'
-            logger.error(f"ChatAI実行エラー: {e} 要求=[{要求テキスト[:10]}...] セッション={ソケットID_str}")
+            セッションID_str = self.セッションID[:10] + '...' if self.セッションID else '不明'
+            logger.error(f"ChatAI実行エラー: {e} 要求=[{要求テキスト[:10]}...] セッション={セッションID_str}")
             エラーメッセージ = f"実行エラー: {str(e)}"
 
             if テキスト受信処理Ｑ:
@@ -569,7 +569,7 @@ if __name__ == "__main__":
 
     async def _main(api_key: str, AI_MODEL: str):
         AI_NAME = "openrt"
-        chatai = ChatAI(親=None, ソケットID="image_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, api_key=api_key)
+        chatai = ChatAI(親=None, セッションID="image_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, api_key=api_key)
 
         try:
             print(f"モデル: {AI_MODEL}")

@@ -118,13 +118,13 @@ class LiveAI:
     初期化、開始、終了、送信メソッド(text,audio,image)、受信バッファ取得メソッドを提供
     """
 
-    def __init__(self, ソケットID: str, parent_manager=None, 
+    def __init__(self, セッションID: str, parent_manager=None, 
                  live_ai: str = "openai", live_model: str = "gpt-realtime-mini", live_voice: str = "marin", 
                  api_key: str = None, organization: str = None):
         """初期化"""
 
         # セッションID
-        self.ソケットID = ソケットID
+        self.セッションID = セッションID
 
         # 親参照（セッションマネージャー）
         self.parent_manager = parent_manager
@@ -165,7 +165,7 @@ class LiveAI:
 
         # セッション情報管理（受信ワーカーから参照可能にする）
         self.session_start_time = None
-        self.ソケットID_internal = None  # 内部セッションID（Gemini版と統一）
+        self.セッションID_internal = None  # 内部セッションID（Gemini版と統一）
 
         # TaskGroupパターン用の管理変数
         self.task_group = None
@@ -190,7 +190,7 @@ class LiveAI:
             # セッションから取得を試みる
             try:
                 from AIコア.AIソケット管理 import AIソケット管理
-                セッション = AIソケット管理.get_session(self.ソケットID)
+                セッション = AIソケット管理.get_session(self.セッションID)
                 if セッション and hasattr(セッション, "tools_instance"):
                     self.tool_instance = セッション.tools_instance
                     logger.info("セッションからツールインスタンスを取得しました")
@@ -619,12 +619,12 @@ class LiveAI:
 
                         # セッション開始時刻とIDを記録（受信ワーカーから参照可能にするため）
                         self.session_start_time = time.time()
-                        self.ソケットID_internal = f"{int(self.session_start_time % 10000)}"
+                        self.セッションID_internal = f"{int(self.session_start_time % 10000)}"
                         self.is_alive = True
                         self.live_lasttime = time.time()
                         self.再接続試行回数 = 0  # 接続成功時にリセット
-                        logger.info(f"OpenAI WebSocket接続成功 (ID:{self.ソケットID_internal})")
-                        logger.info(f"セッション維持ループ開始 (ID:{self.ソケットID_internal})")
+                        logger.info(f"OpenAI WebSocket接続成功 (ID:{self.セッションID_internal})")
+                        logger.info(f"セッション維持ループ開始 (ID:{self.セッションID_internal})")
                         # logger.info(f"live_session設定完了: {self.live_session is not None}")  # 通常時はコメント化
                         # logger.info(f"live_sessionタイプ: {type(self.live_session)}")  # 通常時はコメント化
                         pass
@@ -667,10 +667,10 @@ class LiveAI:
                             session_duration = time.time() - self.session_start_time
                             # 正常終了（中断停止フラグがTrueでエラーフラグがFalse）の場合は情報ログ
                             if self.中断停止フラグ and not self.エラーフラグ:
-                                # logger.info(f"セッション維持ループ正常終了 (ID:{self.ソケットID_internal}, セッション時間{session_duration:.0f}秒)")
+                                # logger.info(f"セッション維持ループ正常終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒)")
                                 pass
                             else:
-                                logger.error(f"セッション維持ループ終了 (ID:{self.ソケットID_internal}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
+                                logger.error(f"セッション維持ループ終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
                                 logger.error(f"async withブロック終了直前 - live_session破棄予定")
                     else:
                         self.再接続試行回数 += 1  # エラー時にカウンタ増加
@@ -884,7 +884,7 @@ class LiveAI:
             else:
                 # エラー終了の場合のみエラーログ
                 session_duration = time.time() - self.session_start_time
-                logger.error(f"受信ワーカー:終了 (ID:{self.ソケットID_internal}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
+                logger.error(f"受信ワーカー:終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
             pass
 
     async def _設定構成作成(self):

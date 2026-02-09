@@ -40,13 +40,13 @@ class ChatAI:
     Gemini Chat api統合クラス（履歴管理 + テキストチャット実装）
     """
 
-    def __init__(self, 親=None, ソケットID: str = "", チャンネル: int = 0, 絶対パス: str = None,
+    def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "gemini", AI_MODEL: str = "gemini-2.5-flash",
                  api_key: str = None):
         """初期化"""
 
-        # ソケットID・チャンネル
-        self.ソケットID = ソケットID
+        # セッションID・チャンネル
+        self.セッションID = セッションID
         self.チャンネル = チャンネル
 
         # 親参照（セッションマネージャー）
@@ -158,7 +158,7 @@ class ChatAI:
         try:
             self.is_alive = False
             self.client = None
-            # logger.info(f"ChatAI: 終了完了 ソケットID={self.ソケットID[:8]}")
+            # logger.info(f"ChatAI: 終了完了 セッションID={self.セッションID[:8]}")
             pass
         except Exception as e:
             logger.error(f"ChatAI終了:エラー {e}")
@@ -444,9 +444,9 @@ class ChatAI:
 
         except Exception as e:
             # ツールエラーログ（必須）
-            ソケットID_str = self.ソケットID[:10] + '...' if self.ソケットID else '不明'
+            セッションID_str = self.セッションID[:10] + '...' if self.セッションID else '不明'
             logger.exception(
-                f"ChatAI実行エラー: {e} 要求=[{要求テキスト[:10]}...] AI={self.chat_ai} モデル={self.chat_model} セッション={ソケットID_str}"
+                f"ChatAI実行エラー: {e} 要求=[{要求テキスト[:10]}...] AI={self.chat_ai} モデル={self.chat_model} セッション={セッションID_str}"
             )
             エラーメッセージ = f"実行エラー: {str(e)}"
 
@@ -466,7 +466,7 @@ if __name__ == "__main__":
 
     async def _main(api_key: str, AI_MODEL: str):
         AI_NAME = "gemini"
-        chatai = ChatAI(親=None, ソケットID="image_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, api_key=api_key)
+        chatai = ChatAI(親=None, セッションID="image_test", AI_NAME=AI_NAME, AI_MODEL=AI_MODEL, api_key=api_key)
 
         try:
             print(f"モデル: {AI_MODEL}")
