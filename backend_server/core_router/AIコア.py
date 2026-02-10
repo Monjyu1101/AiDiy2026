@@ -955,77 +955,19 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             logger.warning(f"LiveAI画像送信エラー(input_file): {e}")
 
                 elif メッセージ識別 == "input_audio":
-                    try:
-                        base64_audio = 受信データ.get("ファイル名") or ""
-                        mime_type = 受信データ.get("メッセージ内容", "audio/pcm")
-                        if not base64_audio:
-                            continue
-                        try:
-                            audio_bytes = base64.b64decode(base64_audio)
-                        except Exception:
-                            audio_bytes = b""
-                        if not audio_bytes:
-                            continue
-                        if セッション:
-                            # LiveAI初期化確認（未初期化の場合は再試行）
-                            if getattr(セッション, "live_processor", None) and not getattr(セッション.live_processor, "AIインスタンス", None):
-                                try:
-                                    await セッション.live_processor.開始()
-                                except Exception:
-                                    logger.exception("LiveAI初期化再試行エラー")
-                            # AIインスタンス未初期化でも音声入力データ処理は実行
-                            # （audio_processing.pyでAIインスタンスがない場合は送信スキップされる）
-                            await 音声入力データ処理(セッション, audio_bytes)
-                    except Exception as e:
-                        logger.warning(f"音声入力処理エラー: {e}")
+                    # 音声送受信は無視
+                    logger.debug(f"音声入力を無視: {セッションID}")
+                    continue
 
                 elif メッセージ識別 == "cancel_audio":
-                    try:
-                        if セッション:
-                            セッション.output_audio_paused = True
-                            logger.info("音声出力停止")
-                    except Exception as e:
-                        logger.warning(f"cancel_audio処理エラー: {e}")
+                    # 音声キャンセルは無視
+                    logger.debug(f"音声キャンセルを無視: {セッションID}")
+                    continue
 
                 elif メッセージ識別 == "input_image":
-                    try:
-                        base64_image = 受信データ.get("ファイル名") or ""
-                        mime_type = 受信データ.get("メッセージ内容", "image/png")
-                        if not base64_image:
-                            continue
-                        Base64ペイロード = base64_image
-                        if "base64," in base64_image:
-                            Base64ペイロード = base64_image.split("base64,", 1)[1]
-                        try:
-                            image_bytes = base64.b64decode(Base64ペイロード)
-                        except Exception:
-                            image_bytes = b""
-                        if not image_bytes:
-                            continue
-                        try:
-                            保存ディレクトリ = os.path.join(バックエンドディレクトリ, "temp", "input")
-                            os.makedirs(保存ディレクトリ, exist_ok=True)
-                            タイムスタンプ = datetime.now().strftime("%Y%m%d.%H%M%S")
-                            保存ファイル名 = f"{タイムスタンプ}.image.png"
-                            保存パス = os.path.join(保存ディレクトリ, 保存ファイル名)
-                            with open(保存パス, "wb") as f:
-                                f.write(image_bytes)
-                            logger.info(f"画像保存完了 ({セッションID}): {保存パス}")
-                        except Exception as e:
-                            logger.exception(f"画像保存エラー: {e}")
-                            continue
-                        # LiveAIへ画像送信（大きい画像はLive側でリサイズ）
-                        try:
-                            if セッション and getattr(セッション, "live_processor", None):
-                                await セッション.live_processor.開始()
-                                画像形式 = "png"
-                                if isinstance(mime_type, str) and "/" in mime_type:
-                                    画像形式 = mime_type.split("/", 1)[1].strip() or "png"
-                                await セッション.live_processor.画像送信(Base64ペイロード, format=画像形式)
-                        except Exception as e:
-                            logger.warning(f"LiveAI画像送信エラー: {e}")
-                    except Exception as e:
-                        logger.warning(f"画像入力処理エラー: {e}")
+                    # 画像送信は無視
+                    logger.debug(f"画像入力を無視: {セッションID}")
+                    continue
 
                 else:
                     logger.error(f"不明なメッセージ識別 ({セッションID}): {メッセージ識別} data={json.dumps(受信データ, ensure_ascii=False)}")

@@ -152,7 +152,7 @@ class ChatAI:
         try:
             if not self.is_alive:
                 logger.warning("ChatAI実行:ChatAIが開始されていません")
-                return "ChatAIが停止状態です。開始してください。"
+                return "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
 
             # ファイル添付処理
             image_data = None

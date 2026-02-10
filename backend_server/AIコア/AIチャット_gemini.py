@@ -238,7 +238,7 @@ class ChatAI:
             # 生存状態チェック
             if not self.is_alive:
                 logger.warning("ChatAI実行:ChatAIが開始されていません")
-                return "ChatAIが停止状態です。開始してください。"
+                return "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
 
             # デフォルトシステムプロンプト
             if not システムプロンプト:

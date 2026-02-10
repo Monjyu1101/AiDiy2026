@@ -360,8 +360,31 @@ class Live:
                 logger.info(
                     f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
                 )
-                return await self.AIインスタンス.テキスト送信(text)
-            return False
+                result = await self.AIインスタンス.テキスト送信(text)
+                # テキスト送信が失敗した場合（APIキーなしなど）にエラーメッセージを表示
+                if not result:
+                    logger.warning("LiveAI実行:テキスト送信に失敗しました")
+                    if self.接続:
+                        await self.接続.send_to_channel(0, {
+                            "セッションID": self.セッションID,
+                            "メッセージ識別": "output_text",
+                            "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",
+                            "ファイル名": None,
+                            "サムネイル画像": None
+                        })
+                return result
+            else:
+                # LiveAI未初期化時のエラーメッセージ送信
+                logger.warning("LiveAI実行:LiveAIが開始されていません")
+                if self.接続:
+                    await self.接続.send_to_channel(0, {
+                        "セッションID": self.セッションID,
+                        "メッセージ識別": "output_text",
+                        "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",
+                        "ファイル名": None,
+                        "サムネイル画像": None
+                    })
+                return False
         except Exception as e:
             logger.error(f"[Live] テキスト送信エラー: {e}")
             return False
