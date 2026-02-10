@@ -20,6 +20,8 @@ logging.basicConfig(
 logger = logging.getLogger(MODULE_NAME)
 
 import datetime
+import json
+import os
 import requests
 from typing import Dict, Optional
 
@@ -35,11 +37,13 @@ class conf_models:
 
         # ライブAIモデル一覧
         self.LIVE_GEMINI_MODELS = {
+            "gemini-2.5-flash-native-audio-preview-12-2025": "yyyy/mm/dd - gemini-2.5-flash-native-audio-preview-12-2025",
             "gemini-2.5-flash-native-audio-preview-09-2025": "yyyy/mm/dd - gemini-2.5-flash-native-audio-preview-09-2025",
             "gemini-live-2.5-flash-preview": "yyyy/mm/dd - gemini-live-2.5-flash-preview",
         }
         self.LIVE_OPENAI_MODELS = {
             "gpt-realtime-mini": "yyyy/mm/dd - gpt-realtime-mini",
+            "gpt-realtime": "yyyy/mm/dd - gpt-realtime"
         }
 
         # ライブAIボイス一覧
@@ -125,6 +129,128 @@ class conf_models:
             "gpt-5.1-codex-mini": "yyyy/mm/dd - gpt-5.1-codex-mini",
             "gpt-5.1": "yyyy/mm/dd - gpt-5.1",
         }
+
+        # _config 下の設定JSONと同期（無ければ作成、あれば読込）
+        self._sync_local_model_configs()
+
+    def _config_dir_path(self) -> str:
+        """backend_server/_config ディレクトリを返す"""
+        return os.path.normpath(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config")
+        )
+
+    def _config_file_path(self, filename: str) -> str:
+        """設定ファイルの絶対パスを返す（ディレクトリは自動作成）"""
+        config_dir = self._config_dir_path()
+        os.makedirs(config_dir, exist_ok=True)
+        return os.path.join(config_dir, filename)
+
+    def _write_json_file(self, file_path: str, payload: dict) -> None:
+        """JSONファイルを書き込む"""
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=4, ensure_ascii=False)
+
+    def _load_or_create_live_config(
+        self,
+        filename: str,
+        default_models: Dict[str, str],
+        default_voices: Dict[str, str],
+    ) -> tuple[Dict[str, str], Dict[str, str]]:
+        """
+        ライブ設定JSONを読込。無ければデフォルトで作成。
+        返却値は（models, voices）。
+        """
+        file_path = self._config_file_path(filename)
+        default_payload = {
+            "models": default_models,
+            "voices": default_voices,
+        }
+
+        if not os.path.exists(file_path):
+            self._write_json_file(file_path, default_payload)
+            logger.info(f"ライブ設定JSONを作成: {file_path}")
+            return default_models.copy(), default_voices.copy()
+
+        try:
+            with open(file_path, "r", encoding="utf-8-sig") as f:
+                payload = json.load(f)
+            if not isinstance(payload, dict):
+                raise ValueError("JSONのルートはobject(dict)である必要があります")
+            models = payload.get("models", {})
+            voices = payload.get("voices", {})
+            if not isinstance(models, dict) or not isinstance(voices, dict):
+                raise ValueError("models/voices は object(dict)である必要があります")
+            logger.info(f"ライブ設定JSONを読込: {file_path}")
+            return dict(models), dict(voices)
+        except Exception as e:
+            logger.error(f"ライブ設定JSON読込エラー: {file_path}, {e}")
+            return default_models.copy(), default_voices.copy()
+
+    def _load_or_create_code_config(
+        self,
+        filename: str,
+        default_models: Dict[str, str],
+    ) -> Dict[str, str]:
+        """
+        コード設定JSONを読込。無ければデフォルトで作成。
+        返却値は models。
+        """
+        file_path = self._config_file_path(filename)
+        default_payload = {
+            "models": default_models,
+        }
+
+        if not os.path.exists(file_path):
+            self._write_json_file(file_path, default_payload)
+            logger.info(f"コード設定JSONを作成: {file_path}")
+            return default_models.copy()
+
+        try:
+            with open(file_path, "r", encoding="utf-8-sig") as f:
+                payload = json.load(f)
+            if not isinstance(payload, dict):
+                raise ValueError("JSONのルートはobject(dict)である必要があります")
+            models = payload.get("models", {})
+            if not isinstance(models, dict):
+                raise ValueError("models は object(dict)である必要があります")
+            logger.info(f"コード設定JSONを読込: {file_path}")
+            return dict(models)
+        except Exception as e:
+            logger.error(f"コード設定JSON読込エラー: {file_path}, {e}")
+            return default_models.copy()
+
+    def _sync_local_model_configs(self) -> None:
+        """ローカル設定JSONとモデル定義を同期"""
+        self.LIVE_GEMINI_MODELS, self.LIVE_GEMINI_VOICES = self._load_or_create_live_config(
+            "AiDiy_live_gemini.json",
+            self.LIVE_GEMINI_MODELS,
+            self.LIVE_GEMINI_VOICES,
+        )
+        self.LIVE_OPENAI_MODELS, self.LIVE_OPENAI_VOICES = self._load_or_create_live_config(
+            "AiDiy_live_openai.json",
+            self.LIVE_OPENAI_MODELS,
+            self.LIVE_OPENAI_VOICES,
+        )
+        self.CODE_CLAUDE_SDK_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_claude_sdk.json",
+            self.CODE_CLAUDE_SDK_MODELS,
+        )
+        self.CODE_CLAUDE_CLI_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_claude_cli.json",
+            self.CODE_CLAUDE_CLI_MODELS,
+        )
+        self.CODE_COPILOT_CLI_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_copilot_cli.json",
+            self.CODE_COPILOT_CLI_MODELS,
+        )
+        self.CODE_GEMINI_CLI_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_gemini_cli.json",
+            self.CODE_GEMINI_CLI_MODELS,
+        )
+        self.CODE_CODEX_CLI_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_codex_cli.json",
+            self.CODE_CODEX_CLI_MODELS,
+        )
 
     def fetch_all_models(self):
         """起動時に全モデルを一括取得"""

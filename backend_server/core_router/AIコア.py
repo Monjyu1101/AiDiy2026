@@ -393,13 +393,13 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
         # 設定可能なキーのホワイトリスト（セキュリティのため）
         許可キー = {
             # ChatAI設定
-            "CHAT_AI", "CHAT_GEMINI_MODEL", "CHAT_FREEAI_MODEL", "CHAT_OPENRT_MODEL",
+            "CHAT_AI_NAME", "CHAT_GEMINI_MODEL", "CHAT_FREEAI_MODEL", "CHAT_OPENRT_MODEL",
             # LiveAI設定
-            "LIVE_AI", "LIVE_GEMINI_MODEL", "LIVE_GEMINI_VOICE",
+            "LIVE_AI_NAME", "LIVE_GEMINI_MODEL", "LIVE_GEMINI_VOICE",
             "LIVE_FREEAI_MODEL", "LIVE_FREEAI_VOICE",
             "LIVE_OPENAI_MODEL", "LIVE_OPENAI_VOICE",
             # CodeAI設定
-            "CODE_AI1", "CODE_AI2", "CODE_AI3", "CODE_AI4",
+            "CODE_AI1_NAME", "CODE_AI2_NAME", "CODE_AI3_NAME", "CODE_AI4_NAME",
             "CODE_AI1_MODEL", "CODE_AI2_MODEL", "CODE_AI3_MODEL", "CODE_AI4_MODEL",
             "CODE_CLAUDE_SDK_MODEL", "CODE_CLAUDE_CLI_MODEL",
             "CODE_COPILOT_CLI_MODEL", "CODE_GEMINI_CLI_MODEL", "CODE_CODEX_CLI_MODEL",
@@ -427,7 +427,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
         if 許可設定:
             try:
                 if hasattr(接続, "chat_processor") and 接続.chat_processor:
-                    chat_ai = 接続.モデル設定.get("CHAT_AI", "")
+                    chat_ai = 接続.モデル設定.get("CHAT_AI_NAME", "")
                     chat_model = ""
                     if chat_ai == "openrt":
                         chat_model = 接続.モデル設定.get("CHAT_OPENRT_MODEL", "")
@@ -442,7 +442,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
 
                 if hasattr(接続, "code_agent_processors") and 接続.code_agent_processors:
                     for idx, agent in enumerate(接続.code_agent_processors, start=1):
-                        ai_key = f"CODE_AI{idx}"
+                        ai_key = f"CODE_AI{idx}_NAME"
                         model_key = f"CODE_AI{idx}_MODEL"
                         agent.AI_NAME = 接続.モデル設定.get(ai_key, "")
                         agent.AI_MODEL = 接続.モデル設定.get(model_key, "")
@@ -451,7 +451,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                         agent.AIインスタンス = None
 
                 if hasattr(接続, "live_processor") and 接続.live_processor:
-                    live_ai = 接続.モデル設定.get("LIVE_AI", "")
+                    live_ai = 接続.モデル設定.get("LIVE_AI_NAME", "")
                     live_model = ""
                     live_voice = ""
                     if live_ai in ("gemini_live", "freeai_live"):
@@ -557,16 +557,17 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             セッション.recognition_processor = Recognition(セッションID, セッション, 保存_会話履歴)
             await セッション.recognition_processor.開始()
 
+        実行パス = セッション.モデル設定.get("CODE_BASE_PATH", "")
+        チャット保存基準パス = バックエンドディレクトリ
+        chat_ai = セッション.モデル設定.get("CHAT_AI_NAME", "")
+        chat_model = ""
+        if chat_ai == "openrt":
+            chat_model = セッション.モデル設定.get("CHAT_OPENRT_MODEL", "")
+        elif chat_ai in ("gemini", "freeai"):
+            key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai" else "CHAT_GEMINI_MODEL"
+            chat_model = セッション.モデル設定.get(key, "")
+
         if not hasattr(セッション, "chat_processor"):
-            実行パス = セッション.モデル設定.get("CODE_BASE_PATH", "")
-            チャット保存基準パス = バックエンドディレクトリ
-            chat_ai = セッション.モデル設定.get("CHAT_AI", "")
-            chat_model = ""
-            if chat_ai == "openrt":
-                chat_model = セッション.モデル設定.get("CHAT_OPENRT_MODEL", "")
-            elif chat_ai in ("gemini", "freeai"):
-                key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai" else "CHAT_GEMINI_MODEL"
-                chat_model = セッション.モデル設定.get(key, "")
             セッション.chat_processor = Chat(
                 親=WebSocket接続.app,
                 セッションID=セッションID,
@@ -578,12 +579,19 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 保存関数=保存_会話履歴,
             )
             await セッション.chat_processor.開始()
+        else:
+            セッション.chat_processor.AI_NAME = chat_ai
+            セッション.chat_processor.AI_MODEL = chat_model
+            if hasattr(セッション.chat_processor, "_select_ai_module"):
+                セッション.chat_processor.AIモジュール = セッション.chat_processor._select_ai_module()
+            セッション.chat_processor.AIインスタンス = None
+            if not getattr(セッション.chat_processor, "is_alive", False):
+                await セッション.chat_processor.開始()
 
-        if not hasattr(セッション, "code_agent_processors"):
+        if (not hasattr(セッション, "code_agent_processors")) or (not isinstance(セッション.code_agent_processors, list)) or (len(セッション.code_agent_processors) != 4):
             セッション.code_agent_processors = []
-            実行パス = セッション.モデル設定.get("CODE_BASE_PATH", "")
             for i in range(1, 5):
-                ai_key = f"CODE_AI{i}"
+                ai_key = f"CODE_AI{i}_NAME"
                 model_key = f"CODE_AI{i}_MODEL"
                 agent = CodeAgent(
                     親=WebSocket接続.app,
@@ -597,24 +605,36 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 )
                 await agent.開始()
                 セッション.code_agent_processors.append(agent)
+        else:
+            for i, agent in enumerate(セッション.code_agent_processors, start=1):
+                ai_key = f"CODE_AI{i}_NAME"
+                model_key = f"CODE_AI{i}_MODEL"
+                agent.AI_NAME = セッション.モデル設定.get(ai_key, "")
+                agent.AI_MODEL = セッション.モデル設定.get(model_key, "")
+                if hasattr(agent, "_select_ai_module"):
+                    agent.AIモジュール = agent._select_ai_module()
+                agent.AIインスタンス = None
+                if not getattr(agent, "is_alive", False):
+                    await agent.開始()
 
         # Toolsインスタンスを作成（コードエージェント初期化後）
         if not hasattr(セッション, "tools_instance"):
             from AIコア.AI内部ツール import Tools
             セッション.tools_instance = Tools(セッション=セッション)
 
+        live_ai = セッション.モデル設定.get("LIVE_AI_NAME", "")
+        live_model = ""
+        live_voice = ""
+        if live_ai in ("gemini_live", "freeai_live"):
+            model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
+            voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
+            live_model = セッション.モデル設定.get(model_key, "")
+            live_voice = セッション.モデル設定.get(voice_key, "")
+        elif live_ai == "openai_live":
+            live_model = セッション.モデル設定.get("LIVE_OPENAI_MODEL", "")
+            live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
+
         if not hasattr(セッション, "live_processor"):
-            live_ai = セッション.モデル設定.get("LIVE_AI", "")
-            live_model = ""
-            live_voice = ""
-            if live_ai in ("gemini_live", "freeai_live"):
-                model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
-                voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
-                live_model = セッション.モデル設定.get(model_key, "")
-                live_voice = セッション.モデル設定.get(voice_key, "")
-            elif live_ai == "openai_live":
-                live_model = セッション.モデル設定.get("LIVE_OPENAI_MODEL", "")
-                live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
             セッション.live_processor = Live(
                 親=WebSocket接続.app,
                 セッションID=セッションID,
@@ -627,6 +647,15 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 保存関数=保存_会話履歴,
             )
             await セッション.live_processor.開始()
+        else:
+            セッション.live_processor.AI_NAME = live_ai
+            セッション.live_processor.AI_MODEL = live_model
+            セッション.live_processor.AI_VOICE = live_voice
+            if hasattr(セッション.live_processor, "_select_ai_module"):
+                セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
+            セッション.live_processor.AIインスタンス = None
+            if not getattr(セッション.live_processor, "is_alive", False):
+                await セッション.live_processor.開始()
 
         if セッション.audio_split_task is None or セッション.audio_split_task.done():
             セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
@@ -640,7 +669,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 if not isinstance(last_update, str):
                     last_update = str(last_update)
 
-                live_ai = セッション.モデル設定.get("LIVE_AI", "")
+                live_ai = セッション.モデル設定.get("LIVE_AI_NAME", "")
                 live_model = ""
                 live_voice = ""
                 if live_ai in ("gemini_live", "freeai_live"):
@@ -663,7 +692,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 )
             else:
                 idx = int(ソケット番号)
-                ai_key = f"CODE_AI{idx}"
+                ai_key = f"CODE_AI{idx}_NAME"
                 model_key = f"CODE_AI{idx}_MODEL"
                 ai_name = セッション.モデル設定.get(ai_key, "")
                 ai_model = セッション.モデル設定.get(model_key, "")
@@ -799,8 +828,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                     logger.info(f"LiveAI起動要求: socket={セッションID}")
                                     await セッション.live_processor.開始()
                                     logger.info(f"LiveAIテキスト送信開始: socket={セッションID}")
-                                    await セッション.live_processor.テキスト送信(メッセージ内容)
-                                    logger.info(f"LiveAIテキスト送信完了: socket={セッションID}")
+                                    送信成功 = await セッション.live_processor.テキスト送信(メッセージ内容)
+                                    if 送信成功:
+                                        logger.info(f"LiveAIテキスト送信完了: socket={セッションID}")
+                                    else:
+                                        logger.warning(f"LiveAIテキスト送信失敗: socket={セッションID}")
                                 else:
                                     logger.warning(f"LiveAI未初期化のためChatへフォールバック ({セッションID})")
                                     if hasattr(セッション, "chat_processor"):
@@ -955,19 +987,77 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             logger.warning(f"LiveAI画像送信エラー(input_file): {e}")
 
                 elif メッセージ識別 == "input_audio":
-                    # 音声送受信は無視
-                    logger.debug(f"音声入力を無視: {セッションID}")
-                    continue
+                    try:
+                        base64_audio = 受信データ.get("ファイル名") or ""
+                        mime_type = 受信データ.get("メッセージ内容", "audio/pcm")
+                        if not base64_audio:
+                            continue
+                        try:
+                            audio_bytes = base64.b64decode(base64_audio)
+                        except Exception:
+                            audio_bytes = b""
+                        if not audio_bytes:
+                            continue
+                        if セッション:
+                            # LiveAI初期化確認（未初期化の場合は再試行）
+                            if getattr(セッション, "live_processor", None) and not getattr(セッション.live_processor, "AIインスタンス", None):
+                                try:
+                                    await セッション.live_processor.開始()
+                                except Exception:
+                                    logger.exception("LiveAI初期化再試行エラー")
+                            # AIインスタンス未初期化でも音声入力データ処理は実行
+                            # （audio_processing.pyでAIインスタンスがない場合は送信スキップされる）
+                            await 音声入力データ処理(セッション, audio_bytes)
+                    except Exception as e:
+                        logger.warning(f"音声入力処理エラー: {e}")
 
                 elif メッセージ識別 == "cancel_audio":
-                    # 音声キャンセルは無視
-                    logger.debug(f"音声キャンセルを無視: {セッションID}")
-                    continue
+                    try:
+                        if セッション:
+                            セッション.output_audio_paused = True
+                            logger.info("音声出力停止")
+                    except Exception as e:
+                        logger.warning(f"cancel_audio処理エラー: {e}")
 
                 elif メッセージ識別 == "input_image":
-                    # 画像送信は無視
-                    logger.debug(f"画像入力を無視: {セッションID}")
-                    continue
+                    try:
+                        base64_image = 受信データ.get("ファイル名") or ""
+                        mime_type = 受信データ.get("メッセージ内容", "image/png")
+                        if not base64_image:
+                            continue
+                        Base64ペイロード = base64_image
+                        if "base64," in base64_image:
+                            Base64ペイロード = base64_image.split("base64,", 1)[1]
+                        try:
+                            image_bytes = base64.b64decode(Base64ペイロード)
+                        except Exception:
+                            image_bytes = b""
+                        if not image_bytes:
+                            continue
+                        try:
+                            保存ディレクトリ = os.path.join(バックエンドディレクトリ, "temp", "input")
+                            os.makedirs(保存ディレクトリ, exist_ok=True)
+                            タイムスタンプ = datetime.now().strftime("%Y%m%d.%H%M%S")
+                            保存ファイル名 = f"{タイムスタンプ}.image.png"
+                            保存パス = os.path.join(保存ディレクトリ, 保存ファイル名)
+                            with open(保存パス, "wb") as f:
+                                f.write(image_bytes)
+                            logger.info(f"画像保存完了 ({セッションID}): {保存パス}")
+                        except Exception as e:
+                            logger.exception(f"画像保存エラー: {e}")
+                            continue
+                        # LiveAIへ画像送信（大きい画像はLive側でリサイズ）
+                        try:
+                            if セッション and getattr(セッション, "live_processor", None):
+                                await セッション.live_processor.開始()
+                                画像形式 = "png"
+                                if isinstance(mime_type, str) and "/" in mime_type:
+                                    画像形式 = mime_type.split("/", 1)[1].strip() or "png"
+                                await セッション.live_processor.画像送信(Base64ペイロード, format=画像形式)
+                        except Exception as e:
+                            logger.warning(f"LiveAI画像送信エラー: {e}")
+                    except Exception as e:
+                        logger.warning(f"画像入力処理エラー: {e}")
 
                 else:
                     logger.error(f"不明なメッセージ識別 ({セッションID}): {メッセージ識別} data={json.dumps(受信データ, ensure_ascii=False)}")

@@ -1,0 +1,7 @@
+{
+    "models": {
+        "auto": "yyyy/mm/dd - auto (default)",
+        "gemini-2.5-flash": "yyyy/mm/dd - gemini-2.5-flash",
+        "gemini-3-pro-preview": "yyyy/mm/dd - gemini-3-pro-preview"
+    }
+}

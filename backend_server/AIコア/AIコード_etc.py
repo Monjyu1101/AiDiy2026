@@ -492,7 +492,7 @@ class CodeAI:
             # 生存状態チェック
             if not self.is_alive:
                 logger.warning("CodeAI実行:CodeAIが開始されていません")
-                return "CodeAIが停止状態です。APIキーの設定を確認、再起動してください。"
+                return "CodeAIが停止状態です。開始してください。"
 
             # 履歴管理
             if len(self.履歴辞書) == 0:

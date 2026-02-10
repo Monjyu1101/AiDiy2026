@@ -93,7 +93,14 @@ class Chat:
                 絶対パス=self.絶対パス or None,
                 api_key=api_key or None,
             )
-            await self.AIインスタンス.開始()
+            開始成功 = await self.AIインスタンス.開始()
+            if (開始成功 is False) or (not getattr(self.AIインスタンス, "is_alive", False)):
+                logger.error(
+                    f"[Chat] ChatAI開始失敗: AI={self.AI_NAME} モデル={self.AI_MODEL} "
+                    f"セッション={self.セッションID}"
+                )
+                self.AIインスタンス = None
+                return None
             return self.AIインスタンス
         except Exception as e:
             logger.error(f"[Chat] ChatAI初期化エラー: {e}")
@@ -121,6 +128,17 @@ class Chat:
     async def チャット要求(self, 受信データ: dict):
         """チャット要求をキューに追加（受信データ構造体をそのまま投入）"""
         if not 受信データ:
+            return
+        if not self.is_alive:
+            logger.warning("[Chat] チャット要求: Chatプロセッサが開始されていません")
+            if self.接続:
+                await self.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID,
+                    "メッセージ識別": "output_text",
+                    "メッセージ内容": "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。",
+                    "ファイル名": None,
+                    "サムネイル画像": None
+                })
             return
         await self.チャット処理Ｑ.put(受信データ)
 
@@ -310,4 +328,3 @@ class Chat:
             logger.warning(f"[Chat] 入力ファイルが見つかりません: {file_path}")
             return
         await self._AI実行と応答送信(受信データ, file_path=file_path)
-

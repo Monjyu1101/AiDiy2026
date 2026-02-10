@@ -254,7 +254,7 @@
 - **conf_json.py** - JSON設定ファイル管理
   - `ConfigJsonManager` クラス
   - `_config/AiDiy_key.json` からAPI keys、モデル設定などを読み込み
-  - 設定項目例: `CHAT_AI`, `CHAT_GEMINI_MODEL`, `LIVE_AI`, `CODE_AI1`, API keys
+  - 設定項目例: `CHAT_AI_NAME`, `CHAT_GEMINI_MODEL`, `LIVE_AI_NAME`, `CODE_AI1_NAME`, API keys
 
 - **conf_path.py** - パス解決ユーティリティ
   - プロジェクトルート、データディレクトリ、設定ファイルパスの解決
@@ -275,7 +275,7 @@ from fastapi import Request
 
 @router.post("/some/endpoint")
 def some_endpoint(request: Request):
-    config_value = request.app.conf.json.get("CHAT_AI", "freeai")
+    config_value = request.app.conf.json.get("CHAT_AI_NAME", "freeai")
     api_key = request.app.conf.json.get("OPENAI_API_KEY")
 ```
 
@@ -299,10 +299,10 @@ app_conf.init(conf_path_enabled=False, conf_models_enabled=False)
   - 設定項目例:
     ```json
     {
-      "CHAT_AI": "freeai",
+      "CHAT_AI_NAME": "freeai",
       "CHAT_GEMINI_MODEL": "gemini-3-pro-image-preview",
-      "LIVE_AI": "freeai_live",
-      "CODE_AI1": "copilot",
+      "LIVE_AI_NAME": "freeai_live",
+      "CODE_AI1_NAME": "copilot",
       "OPENAI_API_KEY": "",
       "ANTHROPIC_API_KEY": "",
       "GEMINI_API_KEY": ""

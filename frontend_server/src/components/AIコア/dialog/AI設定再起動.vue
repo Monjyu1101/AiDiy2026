@@ -153,12 +153,12 @@ const loadConfig = async () => {
       const liveVoices = availableModels.value.live_voices || {};
       const codeModels = availableModels.value.code_models || {};
 
-      selections.chatAi = currentSettings.value.CHAT_AI || chatAiOptions.value[0] || '';
-      selections.liveAi = currentSettings.value.LIVE_AI || liveAiOptions.value[0] || '';
-      selections.codeAi1 = currentSettings.value.CODE_AI1 || codeAiOptions.value[0] || '';
-      selections.codeAi2 = currentSettings.value.CODE_AI2 || codeAiOptions.value[0] || '';
-      selections.codeAi3 = currentSettings.value.CODE_AI3 || codeAiOptions.value[0] || '';
-      selections.codeAi4 = currentSettings.value.CODE_AI4 || codeAiOptions.value[0] || '';
+      selections.chatAi = currentSettings.value.CHAT_AI_NAME || chatAiOptions.value[0] || '';
+      selections.liveAi = currentSettings.value.LIVE_AI_NAME || liveAiOptions.value[0] || '';
+      selections.codeAi1 = currentSettings.value.CODE_AI1_NAME || codeAiOptions.value[0] || '';
+      selections.codeAi2 = currentSettings.value.CODE_AI2_NAME || codeAiOptions.value[0] || '';
+      selections.codeAi3 = currentSettings.value.CODE_AI3_NAME || codeAiOptions.value[0] || '';
+      selections.codeAi4 = currentSettings.value.CODE_AI4_NAME || codeAiOptions.value[0] || '';
       selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || '';
 
       const chatKey = CHAT_MODEL_KEYS[selections.chatAi];
@@ -197,15 +197,15 @@ const handleCancel = () => {
 
 const buildNextSettings = () => {
     const nextSettings = { ...currentSettings.value };
-    nextSettings.CHAT_AI = selections.chatAi;
-    nextSettings.LIVE_AI = selections.liveAi;
-    nextSettings.CODE_AI1 = selections.codeAi1;
+    nextSettings.CHAT_AI_NAME = selections.chatAi;
+    nextSettings.LIVE_AI_NAME = selections.liveAi;
+    nextSettings.CODE_AI1_NAME = selections.codeAi1;
     nextSettings.CODE_AI1_MODEL = selections.codeModel1;
-    nextSettings.CODE_AI2 = selections.codeAi2;
+    nextSettings.CODE_AI2_NAME = selections.codeAi2;
     nextSettings.CODE_AI2_MODEL = selections.codeModel2;
-    nextSettings.CODE_AI3 = selections.codeAi3;
+    nextSettings.CODE_AI3_NAME = selections.codeAi3;
     nextSettings.CODE_AI3_MODEL = selections.codeModel3;
-    nextSettings.CODE_AI4 = selections.codeAi4;
+    nextSettings.CODE_AI4_NAME = selections.codeAi4;
     nextSettings.CODE_AI4_MODEL = selections.codeModel4;
     if (selections.codeBasePath) {
       nextSettings.CODE_BASE_PATH = selections.codeBasePath;
@@ -412,7 +412,7 @@ onMounted(() => {
             <div class="config-panel-section">
               <div class="config-panel-section-header">Chat AI</div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-chat-ai-select">CHAT_AI:</label>
+                <label class="config-panel-label" for="config-chat-ai-select">CHAT_AI_NAME:</label>
                 <div class="config-panel-control">
                   <select id="config-chat-ai-select" v-model="selections.chatAi" class="config-panel-select">
                     <option v-for="ai in chatAiOptions" :key="ai" :value="ai">{{ ai }}</option>
@@ -432,7 +432,7 @@ onMounted(() => {
             <div class="config-panel-section">
               <div class="config-panel-section-header">Live AI</div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-live-ai-select">LIVE_AI:</label>
+                <label class="config-panel-label" for="config-live-ai-select">LIVE_AI_NAME:</label>
                 <div class="config-panel-control">
                   <select id="config-live-ai-select" v-model="selections.liveAi" class="config-panel-select">
                     <option v-for="ai in liveAiOptions" :key="ai" :value="ai">{{ ai }}</option>
@@ -474,7 +474,7 @@ onMounted(() => {
                 </div>
               </div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-code-ai1-select">CODE_AI1:</label>
+                <label class="config-panel-label" for="config-code-ai1-select">CODE_AI1_NAME:</label>
                 <div class="config-panel-control">
                   <select id="config-code-ai1-select" v-model="selections.codeAi1" class="config-panel-select">
                     <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
@@ -490,7 +490,7 @@ onMounted(() => {
                 </div>
               </div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-code-ai2-select">CODE_AI2:</label>
+                <label class="config-panel-label" for="config-code-ai2-select">CODE_AI2_NAME:</label>
                 <div class="config-panel-control">
                   <select id="config-code-ai2-select" v-model="selections.codeAi2" class="config-panel-select">
                     <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
@@ -506,7 +506,7 @@ onMounted(() => {
                 </div>
               </div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-code-ai3-select">CODE_AI3:</label>
+                <label class="config-panel-label" for="config-code-ai3-select">CODE_AI3_NAME:</label>
                 <div class="config-panel-control">
                   <select id="config-code-ai3-select" v-model="selections.codeAi3" class="config-panel-select">
                     <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
@@ -522,7 +522,7 @@ onMounted(() => {
                 </div>
               </div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-code-ai4-select">CODE_AI4:</label>
+                <label class="config-panel-label" for="config-code-ai4-select">CODE_AI4_NAME:</label>
                 <div class="config-panel-control">
                   <select id="config-code-ai4-select" v-model="selections.codeAi4" class="config-panel-select">
                     <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>

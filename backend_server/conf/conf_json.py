@@ -29,8 +29,8 @@ class conf_json:
     # デフォルト設定値
     DEFAULT_CONFIG = {
         # WebUI設定
-        'WEB_BASE': '8080',
-        'CORE_BASE': '8080',
+        'WEB_BASE': '8090',
+        'CORE_BASE': '8091',
         'WEBUI_FIRST_PAGE': 'Sスケジュール',
 
         # APIキー
@@ -49,14 +49,14 @@ class conf_json:
         'openrt_key_id': '< your openrouter api key >',
 
         # ChatAI設定
-        'CHAT_AI': 'freeai',
+        'CHAT_AI_NAME': 'freeai',
         'CHAT_GEMINI_MODEL': 'gemini-3-pro-image-preview',
         'CHAT_FREEAI_MODEL': 'gemini-2.5-flash-preview-09-2025',
         'CHAT_OPENRT_MODEL': 'google/gemini-3-pro-image-preview',
 
         # LiveAI設定
-        'LIVE_AI': 'freeai_live',
-        'LIVE_GEMINI_MODEL': 'gemini-2.5-flash-native-audio-preview-09-2025',
+        'LIVE_AI_NAME': 'freeai_live',
+        'LIVE_GEMINI_MODEL': 'gemini-2.5-flash-native-audio-preview-12-2025',
         'LIVE_GEMINI_VOICE': 'Zephyr',
         'LIVE_FREEAI_MODEL': 'gemini-2.5-flash-native-audio-preview-09-2025',
         'LIVE_FREEAI_VOICE': 'Zephyr',
@@ -65,13 +65,13 @@ class conf_json:
 
         # CodeAI設定
         'CODE_BASE_PATH': '../',
-        'CODE_AI1': 'claude_sdk',
+        'CODE_AI1_NAME': 'claude_sdk',
         'CODE_AI1_MODEL': 'auto',
-        'CODE_AI2': 'copilot_cli',
+        'CODE_AI2_NAME': 'copilot_cli',
         'CODE_AI2_MODEL': 'auto',
-        'CODE_AI3': 'codex_cli',
+        'CODE_AI3_NAME': 'codex_cli',
         'CODE_AI3_MODEL': 'auto',
-        'CODE_AI4': 'gemini_cli',
+        'CODE_AI4_NAME': 'gemini_cli',
         'CODE_AI4_MODEL': 'auto',
         'CODE_CLAUDE_SDK_MODEL': 'auto',
         'CODE_CLAUDE_CLI_MODEL': 'auto',
@@ -125,7 +125,7 @@ class conf_json:
         if self._apply_default_keys():
             保存要否 = True
 
-        # CODE_AI2～4が"auto"の場合、CODE_AI1の値をコピー
+        # CODE_AI2_NAME～4_NAMEが"auto"の場合、CODE_AI1_NAMEの値をコピー
         if self._apply_code_ai_auto():
             保存要否 = True
 
@@ -154,24 +154,24 @@ class conf_json:
         return 変更あり
 
     def _apply_code_ai_auto(self) -> bool:
-        """CODE_AI2～4が'auto'の場合、CODE_AI1の値をコピー"""
+        """CODE_AI2_NAME～4_NAMEが'auto'の場合、CODE_AI1_NAMEの値をコピー"""
         config_data = object.__getattribute__(self, '_config_data')
         変更あり = False
         
-        code_ai1 = config_data.get('CODE_AI1', 'auto')
+        code_ai1 = config_data.get('CODE_AI1_NAME', 'auto')
         code_ai1_model = config_data.get('CODE_AI1_MODEL', 'auto')
         
-        # CODE_AI2～4をチェック
+        # CODE_AI2_NAME～4_NAMEをチェック
         for i in range(2, 5):
-            code_ai_key = f'CODE_AI{i}'
+            code_ai_key = f'CODE_AI{i}_NAME'
             code_model_key = f'CODE_AI{i}_MODEL'
             
-            # CODE_AInが"auto"の場合、CODE_AI1の値をコピー
+            # CODE_AIn_NAMEが"auto"の場合、CODE_AI1_NAMEの値をコピー
             if config_data.get(code_ai_key, 'auto') == 'auto':
                 config_data[code_ai_key] = code_ai1
                 config_data[code_model_key] = code_ai1_model
                 変更あり = True
-                logger.debug(f'{code_ai_key}が"auto"のため、CODE_AI1の値({code_ai1})をコピーしました')
+                logger.debug(f'{code_ai_key}が"auto"のため、CODE_AI1_NAMEの値({code_ai1})をコピーしました')
         return 変更あり
 
     def _save(self) -> bool:

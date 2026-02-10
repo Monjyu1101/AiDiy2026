@@ -1,0 +1,8 @@
+{
+    "models": {
+        "auto": "yyyy/mm/dd - auto (default)",
+        "sonnet": "yyyy/mm/dd - sonnet",
+        "opus": "yyyy/mm/dd - opus",
+        "haiku": "yyyy/mm/dd - haiku"
+    }
+}

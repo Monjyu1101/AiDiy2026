@@ -1,0 +1,10 @@
+{
+    "models": {
+        "auto": "yyyy/mm/dd - auto (default)",
+        "gpt-5.2": "yyyy/mm/dd - gpt-5.2",
+        "gpt-5.1-codex": "yyyy/mm/dd - gpt-5.1-codex",
+        "gpt-5.1-codex-max": "yyyy/mm/dd - gpt-5.1-codex-max",
+        "gpt-5.1-codex-mini": "yyyy/mm/dd - gpt-5.1-codex-mini",
+        "gpt-5.1": "yyyy/mm/dd - gpt-5.1"
+    }
+}

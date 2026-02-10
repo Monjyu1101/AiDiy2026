@@ -270,7 +270,7 @@ class CodeAI:
             # 生存状態チェック
             if not self.is_alive:
                 logger.warning("ClaudeSDK実行:ClaudeSDKが開始されていません")
-                return "ClaudeSDKが停止状態です。APIキーの設定を確認、再起動してください。"
+                return "ClaudeSDKが停止状態です。開始してください。"
 
             # 履歴管理（セッション内で自動管理されるが、独自履歴も維持）
             if len(self.履歴辞書) == 0:

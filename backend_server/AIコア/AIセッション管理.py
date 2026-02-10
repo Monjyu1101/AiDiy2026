@@ -25,6 +25,44 @@ from AIコア.AI音声処理 import 初期化_音声データ
 # ロガー取得
 logger = get_logger(__name__)
 
+def 初期モデル設定生成(app_conf) -> dict:
+    if not (app_conf and hasattr(app_conf, 'json')):
+        return {}
+
+    return {
+        # ChatAI設定
+        "CHAT_AI_NAME": app_conf.json.get("CHAT_AI_NAME", "freeai"),
+        "CHAT_GEMINI_MODEL": app_conf.json.get("CHAT_GEMINI_MODEL", "gemini-3-pro-image-preview"),
+        "CHAT_FREEAI_MODEL": app_conf.json.get("CHAT_FREEAI_MODEL", "gemini-2.5-flash"),
+        "CHAT_OPENRT_MODEL": app_conf.json.get("CHAT_OPENRT_MODEL", "google/gemini-3-pro-image-preview"),
+        # LiveAI設定
+        "LIVE_AI_NAME": app_conf.json.get("LIVE_AI_NAME", "freeai_live"),
+        "LIVE_GEMINI_MODEL": app_conf.json.get("LIVE_GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
+        "LIVE_GEMINI_VOICE": app_conf.json.get("LIVE_GEMINI_VOICE", "Zephyr"),
+        "LIVE_FREEAI_MODEL": app_conf.json.get("LIVE_FREEAI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
+        "LIVE_FREEAI_VOICE": app_conf.json.get("LIVE_FREEAI_VOICE", "Zephyr"),
+        "LIVE_OPENAI_MODEL": app_conf.json.get("LIVE_OPENAI_MODEL", "gpt-realtime-mini"),
+        "LIVE_OPENAI_VOICE": app_conf.json.get("LIVE_OPENAI_VOICE", "marin"),
+        # CodeAI設定
+        "CODE_AI1_NAME": app_conf.json.get("CODE_AI1_NAME", "copilot"),
+        "CODE_AI1_MODEL": app_conf.json.get("CODE_AI1_MODEL", "auto"),
+        "CODE_AI2_NAME": app_conf.json.get("CODE_AI2_NAME", "auto"),
+        "CODE_AI2_MODEL": app_conf.json.get("CODE_AI2_MODEL", "auto"),
+        "CODE_AI3_NAME": app_conf.json.get("CODE_AI3_NAME", "auto"),
+        "CODE_AI3_MODEL": app_conf.json.get("CODE_AI3_MODEL", "auto"),
+        "CODE_AI4_NAME": app_conf.json.get("CODE_AI4_NAME", "auto"),
+        "CODE_AI4_MODEL": app_conf.json.get("CODE_AI4_MODEL", "auto"),
+        "CODE_CLAUDE_SDK_MODEL": app_conf.json.get("CODE_CLAUDE_SDK_MODEL", "auto"),
+        "CODE_CLAUDE_CLI_MODEL": app_conf.json.get("CODE_CLAUDE_CLI_MODEL", "auto"),
+        "CODE_COPILOT_CLI_MODEL": app_conf.json.get("CODE_COPILOT_CLI_MODEL", "auto"),
+        "CODE_GEMINI_CLI_MODEL": app_conf.json.get("CODE_GEMINI_CLI_MODEL", "auto"),
+        "CODE_CODEX_CLI_MODEL": app_conf.json.get("CODE_CODEX_CLI_MODEL", "auto"),
+        "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
+        "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
+        "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
+        "CODE_BASE_PATH": app_conf.json.get("CODE_BASE_PATH", "../"),
+    }
+
 
 class WebSocketConnection:
     """
@@ -338,40 +376,8 @@ class WebSocketManager:
                 session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
                 logger.debug(f"セッション状態を復元: {セッションID}")
             else:
-                if app_conf and hasattr(app_conf, 'json'):
-                    session.モデル設定 = {
-                        # ChatAI設定
-                        "CHAT_AI": app_conf.json.get("CHAT_AI", "freeai"),
-                        "CHAT_GEMINI_MODEL": app_conf.json.get("CHAT_GEMINI_MODEL", "gemini-3-pro-image-preview"),
-                        "CHAT_FREEAI_MODEL": app_conf.json.get("CHAT_FREEAI_MODEL", "gemini-2.5-flash"),
-                        "CHAT_OPENRT_MODEL": app_conf.json.get("CHAT_OPENRT_MODEL", "google/gemini-3-pro-image-preview"),
-                        # LiveAI設定
-                        "LIVE_AI": app_conf.json.get("LIVE_AI", "freeai_live"),
-                        "LIVE_GEMINI_MODEL": app_conf.json.get("LIVE_GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
-                        "LIVE_GEMINI_VOICE": app_conf.json.get("LIVE_GEMINI_VOICE", "Zephyr"),
-                        "LIVE_FREEAI_MODEL": app_conf.json.get("LIVE_FREEAI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
-                        "LIVE_FREEAI_VOICE": app_conf.json.get("LIVE_FREEAI_VOICE", "Zephyr"),
-                        "LIVE_OPENAI_MODEL": app_conf.json.get("LIVE_OPENAI_MODEL", "gpt-realtime-mini"),
-                        "LIVE_OPENAI_VOICE": app_conf.json.get("LIVE_OPENAI_VOICE", "marin"),
-                        # CodeAI設定
-                        "CODE_AI1": app_conf.json.get("CODE_AI1", "copilot"),
-                        "CODE_AI1_MODEL": app_conf.json.get("CODE_AI1_MODEL", "auto"),
-                        "CODE_AI2": app_conf.json.get("CODE_AI2", "auto"),
-                        "CODE_AI2_MODEL": app_conf.json.get("CODE_AI2_MODEL", "auto"),
-                        "CODE_AI3": app_conf.json.get("CODE_AI3", "auto"),
-                        "CODE_AI3_MODEL": app_conf.json.get("CODE_AI3_MODEL", "auto"),
-                        "CODE_AI4": app_conf.json.get("CODE_AI4", "auto"),
-                        "CODE_AI4_MODEL": app_conf.json.get("CODE_AI4_MODEL", "auto"),
-                        "CODE_CLAUDE_SDK_MODEL": app_conf.json.get("CODE_CLAUDE_SDK_MODEL", "auto"),
-                        "CODE_CLAUDE_CLI_MODEL": app_conf.json.get("CODE_CLAUDE_CLI_MODEL", "auto"),
-                        "CODE_COPILOT_CLI_MODEL": app_conf.json.get("CODE_COPILOT_CLI_MODEL", "auto"),
-                        "CODE_GEMINI_CLI_MODEL": app_conf.json.get("CODE_GEMINI_CLI_MODEL", "auto"),
-                        "CODE_CODEX_CLI_MODEL": app_conf.json.get("CODE_CODEX_CLI_MODEL", "auto"),
-                        "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
-                        "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
-                        "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
-                        "CODE_BASE_PATH": app_conf.json.get("CODE_BASE_PATH", "../"),
-                    }
+                session.モデル設定 = 初期モデル設定生成(app_conf)
+                if session.モデル設定:
                     logger.debug(f"app.confからモデル設定をコピー: {セッションID}")
 
                 self.session_states[セッションID] = {
@@ -435,37 +441,7 @@ class WebSocketManager:
             session.モデル設定 = saved_state.get("モデル設定", {})
             session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
         else:
-            if app_conf and hasattr(app_conf, 'json'):
-                session.モデル設定 = {
-                    "CHAT_AI": app_conf.json.get("CHAT_AI", "freeai"),
-                    "CHAT_GEMINI_MODEL": app_conf.json.get("CHAT_GEMINI_MODEL", "gemini-3-pro-image-preview"),
-                    "CHAT_FREEAI_MODEL": app_conf.json.get("CHAT_FREEAI_MODEL", "gemini-2.5-flash"),
-                    "CHAT_OPENRT_MODEL": app_conf.json.get("CHAT_OPENRT_MODEL", "google/gemini-3-pro-image-preview"),
-                    "LIVE_AI": app_conf.json.get("LIVE_AI", "freeai_live"),
-                    "LIVE_GEMINI_MODEL": app_conf.json.get("LIVE_GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
-                    "LIVE_GEMINI_VOICE": app_conf.json.get("LIVE_GEMINI_VOICE", "Zephyr"),
-                    "LIVE_FREEAI_MODEL": app_conf.json.get("LIVE_FREEAI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
-                    "LIVE_FREEAI_VOICE": app_conf.json.get("LIVE_FREEAI_VOICE", "Zephyr"),
-                    "LIVE_OPENAI_MODEL": app_conf.json.get("LIVE_OPENAI_MODEL", "gpt-realtime-mini"),
-                    "LIVE_OPENAI_VOICE": app_conf.json.get("LIVE_OPENAI_VOICE", "marin"),
-                    "CODE_AI1": app_conf.json.get("CODE_AI1", "copilot"),
-                    "CODE_AI1_MODEL": app_conf.json.get("CODE_AI1_MODEL", "auto"),
-                    "CODE_AI2": app_conf.json.get("CODE_AI2", "auto"),
-                    "CODE_AI2_MODEL": app_conf.json.get("CODE_AI2_MODEL", "auto"),
-                    "CODE_AI3": app_conf.json.get("CODE_AI3", "auto"),
-                    "CODE_AI3_MODEL": app_conf.json.get("CODE_AI3_MODEL", "auto"),
-                    "CODE_AI4": app_conf.json.get("CODE_AI4", "auto"),
-                    "CODE_AI4_MODEL": app_conf.json.get("CODE_AI4_MODEL", "auto"),
-                    "CODE_CLAUDE_SDK_MODEL": app_conf.json.get("CODE_CLAUDE_SDK_MODEL", "auto"),
-                    "CODE_CLAUDE_CLI_MODEL": app_conf.json.get("CODE_CLAUDE_CLI_MODEL", "auto"),
-                    "CODE_COPILOT_CLI_MODEL": app_conf.json.get("CODE_COPILOT_CLI_MODEL", "auto"),
-                    "CODE_GEMINI_CLI_MODEL": app_conf.json.get("CODE_GEMINI_CLI_MODEL", "auto"),
-                    "CODE_CODEX_CLI_MODEL": app_conf.json.get("CODE_CODEX_CLI_MODEL", "auto"),
-                    "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
-                    "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
-                    "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
-                    "CODE_BASE_PATH": app_conf.json.get("CODE_BASE_PATH", "../"),
-                }
+            session.モデル設定 = 初期モデル設定生成(app_conf)
             self.session_states[セッションID] = {
                 "ボタン": session.ボタン状態.copy(),
                 "モデル設定": session.モデル設定.copy(),

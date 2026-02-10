@@ -60,6 +60,7 @@ class ChatAI:
             # logger.info("ChatAI: OpenRouter apiキー設定完了")
             pass
         else:
+            self.api_key = None
             logger.warning("ChatAI: apiキーが未設定です")
 
         # モデル設定
@@ -120,6 +121,7 @@ class ChatAI:
 
         except Exception as e:
             logger.error(f"ChatAI開始エラー: {e}")
+            self.is_alive = False
             return False
 
     async def 終了(self):

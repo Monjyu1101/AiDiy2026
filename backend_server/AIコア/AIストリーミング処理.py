@@ -135,7 +135,7 @@ class StreamingProcessor:
     async def _process_chat_ai(self):
         """チャットAI処理（実装予定）"""
         # TODO: ChatAIの実装
-        # モデル設定: self.connection.モデル設定["CHAT_AI"]
+        # モデル設定: self.connection.モデル設定["CHAT_AI_NAME"]
         # 音声入力: self.connection.ボタン状態["マイク"]
         # 音声出力: self.connection.ボタン状態["スピーカー"]
         pass

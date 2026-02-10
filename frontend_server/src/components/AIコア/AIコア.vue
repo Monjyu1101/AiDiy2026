@@ -36,12 +36,12 @@ const isInitializingAudioState = ref(true);
 
 // モデル設定情報
 const モデル設定 = ref({
-  CHAT_AI: '',
-  LIVE_AI: '',
-  CODE_AI1: '',
-  CODE_AI2: '',
-  CODE_AI3: '',
-  CODE_AI4: ''
+  CHAT_AI_NAME: '',
+  LIVE_AI_NAME: '',
+  CODE_AI1_NAME: '',
+  CODE_AI2_NAME: '',
+  CODE_AI3_NAME: '',
+  CODE_AI4_NAME: ''
 });
 
 const chatMode = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>('live');
@@ -96,7 +96,7 @@ const syncVisualizerVisibility = () => {
 
 const syncLiveSampleRate = () => {
   if (!audioProcessor) return;
-  const liveAi = モデル設定.value.LIVE_AI || '';
+  const liveAi = モデル設定.value.LIVE_AI_NAME || '';
   const provider = liveAi === 'openai_live' ? 'openai' : liveAi;
   audioProcessor.setSampleRate(provider);
 };
@@ -218,12 +218,12 @@ const initializeWebSocket = async (既存セッションID?: string) => {
       // モデル設定を保存
       if (初期データ.モデル設定) {
         モデル設定.value = {
-          CHAT_AI: 初期データ.モデル設定.CHAT_AI || '',
-          LIVE_AI: 初期データ.モデル設定.LIVE_AI || '',
-          CODE_AI1: 初期データ.モデル設定.CODE_AI1 || '',
-          CODE_AI2: 初期データ.モデル設定.CODE_AI2 || '',
-          CODE_AI3: 初期データ.モデル設定.CODE_AI3 || '',
-          CODE_AI4: 初期データ.モデル設定.CODE_AI4 || ''
+          CHAT_AI_NAME: 初期データ.モデル設定.CHAT_AI_NAME || '',
+          LIVE_AI_NAME: 初期データ.モデル設定.LIVE_AI_NAME || '',
+          CODE_AI1_NAME: 初期データ.モデル設定.CODE_AI1_NAME || '',
+          CODE_AI2_NAME: 初期データ.モデル設定.CODE_AI2_NAME || '',
+          CODE_AI3_NAME: 初期データ.モデル設定.CODE_AI3_NAME || '',
+          CODE_AI4_NAME: 初期データ.モデル設定.CODE_AI4_NAME || ''
         };
         console.log('[AIコア] モデル設定:', モデル設定.value);
       }
@@ -539,7 +539,7 @@ watch([enableMicrophone, enableSpeaker, enableCamera], () => {
   saveState();
 });
 
-watch(() => モデル設定.value.LIVE_AI, () => {
+watch(() => モデル設定.value.LIVE_AI_NAME, () => {
   syncLiveSampleRate();
 });
 
@@ -720,8 +720,8 @@ const gridLayoutClass = computed(() => {
         <AIコアチャット 
           :セッションID="セッションID"
           :チャンネル="0"
-          :chat-ai="モデル設定.CHAT_AI"
-          :live-ai="モデル設定.LIVE_AI"
+          :chat-ai="モデル設定.CHAT_AI_NAME"
+          :live-ai="モデル設定.LIVE_AI_NAME"
           :chat-mode="chatMode"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
@@ -737,7 +737,7 @@ const gridLayoutClass = computed(() => {
           key="code-1"
           :セッションID="セッションID"
           :チャンネル="1"
-          :code-ai="モデル設定.CODE_AI1"
+          :code-ai="モデル設定.CODE_AI1_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
           @activate="showAgent1 = true; enableAgent1Button = true"
@@ -766,7 +766,7 @@ const gridLayoutClass = computed(() => {
           key="code-2"
           :セッションID="セッションID"
           :チャンネル="2"
-          :code-ai="モデル設定.CODE_AI2"
+          :code-ai="モデル設定.CODE_AI2_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
           @activate="showAgent2 = true; enableAgent2Button = true"
@@ -780,7 +780,7 @@ const gridLayoutClass = computed(() => {
           key="code-3"
           :セッションID="セッションID"
           :チャンネル="3"
-          :code-ai="モデル設定.CODE_AI3"
+          :code-ai="モデル設定.CODE_AI3_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
           @activate="showAgent3 = true; enableAgent3Button = true"
@@ -794,7 +794,7 @@ const gridLayoutClass = computed(() => {
           key="code-4"
           :セッションID="セッションID"
           :チャンネル="4"
-          :code-ai="モデル設定.CODE_AI4"
+          :code-ai="モデル設定.CODE_AI4_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
           @activate="showAgent4 = true; enableAgent4Button = true"

@@ -1,0 +1,21 @@
+{
+    "models": {
+        "gpt-realtime-mini": "yyyy/mm/dd - gpt-realtime-mini",
+        "gpt-realtime": "yyyy/mm/dd - gpt-realtime"
+    },
+    "voices": {
+        "marin": "Marin Female",
+        "alloy": "Alloy Female",
+        "ash": "Ash",
+        "ballad": "Ballad Female",
+        "ceder": "Cedar",
+        "coral": "Coral Female",
+        "echo": "Echo",
+        "fable": "Fable",
+        "nova": "Nova Female",
+        "onyx": "Onyx",
+        "sage": "Sage Female",
+        "shimmer": "Shimmer Female",
+        "verse": "Verse Female"
+    }
+}
