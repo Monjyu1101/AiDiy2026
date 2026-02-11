@@ -48,6 +48,7 @@
 ## まず知っておくこと（基本原則）
 
 ### 技術スタック
+- **Node.js v22.14.0 + npm 11.3.0**
 - **Vue 3 Composition API + Vite + TypeScript**
 - **Pinia** (状態管理)
 - **Vue Router 4** (ルーティング、日本語URL対応)

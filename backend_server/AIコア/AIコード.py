@@ -16,7 +16,11 @@ AIコア コードエージェント処理プロセッサ
 import asyncio
 import importlib
 import os
-from typing import Optional
+import shutil
+import random
+from typing import Optional, Any
+from types import ModuleType
+from AIコア.AIバックアップ import バックアップ実行
 
 from log_config import get_logger
 
@@ -51,8 +55,30 @@ class CodeAgent:
         self.コード処理Ｑ = asyncio.Queue()
         self.worker_task: Optional[asyncio.Task] = None
         self.会話履歴 = []  # エージェント専用の会話履歴
+        self.累積変更ファイル: list[str] = []  # 検証対象ファイルを累積
+        self._累積変更ファイルキー: set[str] = set()  # パス正規化キーで重複排除
 
-    def _select_ai_module(self):
+    def _変更ファイルキー(self, ファイルパス: str) -> str:
+        """重複判定用の正規化キーを返す"""
+        if not ファイルパス:
+            return ""
+        return os.path.normcase(os.path.normpath(ファイルパス.replace("/", os.sep)))
+
+    def _累積変更ファイル追加(self, 変更ファイル一覧: list[str]) -> int:
+        """累積変更ファイルへ重複なしで追加し、追加件数を返す"""
+        追加件数 = 0
+        for ファイル in 変更ファイル一覧:
+            キー = self._変更ファイルキー(ファイル)
+            if not キー:
+                continue
+            if キー in self._累積変更ファイルキー:
+                continue
+            self._累積変更ファイルキー.add(キー)
+            self.累積変更ファイル.append(ファイル)
+            追加件数 += 1
+        return 追加件数
+
+    def _select_ai_module(self) -> Optional[ModuleType]:
         """AI_NAMEに応じたコードモジュールを選択してインポート"""
         module_name = "AIコア.AIコード_etc"
         if self.AI_NAME == "claude-sdk":
@@ -63,7 +89,7 @@ class CodeAgent:
             logger.error(f"[CodeAgent] AIモジュールのインポート失敗: {module_name} error={e}")
             return None
 
-    async def _ensure_ai_instance(self):
+    async def _ensure_ai_instance(self) -> Optional[Any]:
         """AIモジュールのCodeAIインスタンスを生成・開始"""
         if not self.AIモジュール:
             return None
@@ -89,14 +115,14 @@ class CodeAgent:
             self.AIインスタンス = None
             return None
 
-    async def 開始(self):
+    async def 開始(self) -> None:
         """コード処理ワーカーを開始"""
         self.is_alive = True
         if self.worker_task is None or self.worker_task.done():
             self.worker_task = asyncio.create_task(self._コード処理ワーカー())
             logger.debug(f"[CodeAgent] チャンネル{self.チャンネル} 開始")
 
-    async def 終了(self):
+    async def 終了(self) -> None:
         """コード処理ワーカーを終了"""
         self.is_alive = False
         if self.worker_task and not self.worker_task.done():
@@ -107,13 +133,13 @@ class CodeAgent:
                 pass
         logger.debug(f"[CodeAgent] チャンネル{self.チャンネル} 終了")
 
-    async def コード要求(self, 受信データ: dict):
+    async def コード要求(self, 受信データ: dict) -> None:
         """コード要求をキューに追加（受信データ構造体をそのまま投入）"""
         if not 受信データ:
             return
         await self.コード処理Ｑ.put(受信データ)
 
-    async def _コード処理ワーカー(self):
+    async def _コード処理ワーカー(self) -> None:
         """コード処理ワーカー（キューから取り出して処理）"""
         while self.is_alive:
             try:
@@ -145,80 +171,34 @@ class CodeAgent:
                 logger.error(f"[CodeAgent] チャンネル{self.チャンネル} 処理エラー: {e}")
                 await asyncio.sleep(0.2)
 
-    async def _処理_input_text(self, 受信データ: dict):
-        """input_text処理: [ECHO]付きoutput_text送信（添付ファイルがあれば追記）"""
+    async def _処理_input_text(self, 受信データ: dict) -> None:
+        """
+        input_text処理:
+        1. AI実行 + output_stream/output_text送信
+        2. バックアップ検証ループ（最大5回）
+        3. 生成ファイル通知
+        4. update_info送信
+        """
+        # 累積変更ファイルをクリア
+        self.累積変更ファイル = []
+        self._累積変更ファイルキー = set()
+        
+        await self._基本AI処理(受信データ)
+
+    async def _処理_input_request(self, 受信データ: dict) -> None:
+        """
+        input_request処理:
+        1. チャンネル-1へ開始通知（音声付き）
+        2. input_text処理（_基本AI処理）
+        3. output_request送信（チャンネル0へ）
+        4. チャンネル-1へ完了通知（音声付き）
+        """
         try:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
-
-            # 添付ファイル一覧があればメッセージに追記
-            添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
-            if 添付ファイル一覧:
-                import os
-                有効ファイル = [p for p in 添付ファイル一覧 if os.path.exists(p)]
-                if 有効ファイル:
-                    添付テキスト = "\n``` 添付ファイル\n"
-                    for パス in 有効ファイル:
-                        添付テキスト += f"{パス}\n"
-                    添付テキスト += "```"
-                    メッセージ内容 = メッセージ内容 + 添付テキスト
-                    logger.info(f"[CodeAgent] 添付ファイル追記: {len(有効ファイル)}件")
-
-            # 処理要求ログ
-            セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
-            logger.info(
-                f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
-            )
-
-            出力メッセージ内容 = ""
-            try:
-                ai_instance = await self._ensure_ai_instance()
-                if ai_instance:
-                    出力メッセージ内容 = await ai_instance.実行(
-                        要求テキスト=メッセージ内容,
-                        絶対パス=self.絶対パス or None,
-                    )
-            except Exception as e:
-                logger.error(f"[CodeAgent] AI実行エラー: {e}")
-                出力メッセージ内容 = "!"
-            if not 出力メッセージ内容:
-                出力メッセージ内容 = "!"
-
-            # 処理応答ログ
-            logger.info(
-                f"処理応答: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
-            )
-
-            # 1) output_text送信（チャンネル登録されている場合のみ）
-            await self.接続.send_to_channel(self.チャンネル, {
-                "セッションID": self.セッションID,
-                "メッセージ識別": "output_text",
-                "メッセージ内容": 出力メッセージ内容,
-                "ファイル名": None,
-                "サムネイル画像": None
-            })
             
-            # 2) 会話履歴保存
-            if self.保存関数:
-                self.保存関数(
-                    セッションID=self.セッションID,
-                    チャンネル=self.チャンネル,
-                    メッセージ識別="output_text",
-                    メッセージ内容=出力メッセージ内容,
-                    ファイル名=None,
-                    サムネイル画像=None
-                )
-        except Exception as e:
-            logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_text処理エラー: {e}")
-
-    async def _処理_input_request(self, 受信データ: dict):
-        """input_request処理: 前後処理付きでAI実行（添付ファイルがあれば追記）"""
-        try:
-            メッセージ内容 = 受信データ.get("メッセージ内容", "")
-
             # 添付ファイル一覧があればメッセージに追記
             添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
             if 添付ファイル一覧:
-                import os
                 有効ファイル = [p for p in 添付ファイル一覧 if os.path.exists(p)]
                 if 有効ファイル:
                     添付テキスト = "\n``` 添付ファイル\n"
@@ -226,16 +206,13 @@ class CodeAgent:
                         添付テキスト += f"{パス}\n"
                     添付テキスト += "```"
                     メッセージ内容 = メッセージ内容 + 添付テキスト
-                    logger.info(f"[CodeAgent] 添付ファイル追記(request): {len(有効ファイル)}件")
+                    受信データ["メッセージ内容"] = メッセージ内容
 
-            セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
-
-            # 処理要求ログ
-            logger.info(
-                f"処理要求(input_request): チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
-            )
-
-            # 通常処理の前: チャンネル-1へ処理開始を連絡
+            # 1. チャンネル-1へ処理開始を連絡
+            # 累積変更ファイルをクリア
+            self.累積変更ファイル = []
+            self._累積変更ファイルキー = set()
+            
             開始メッセージ = (
                 f"コードエージェント{self.チャンネル}です。\n"
                 f"処理要求を開始しました。\n"
@@ -262,61 +239,10 @@ class CodeAgent:
             except Exception as e:
                 logger.warning(f"[CodeAgent] LiveAI開始メッセージ送信エラー: {e}")
 
-            # 通常処理: AI実行
-            出力メッセージ内容 = ""
-            try:
-                ai_instance = await self._ensure_ai_instance()
-                if ai_instance:
-                    出力メッセージ内容 = await ai_instance.実行(
-                        要求テキスト=メッセージ内容,
-                        絶対パス=self.絶対パス or None,
-                    )
-            except Exception as e:
-                logger.error(f"[CodeAgent] AI実行エラー: {e}")
-                出力メッセージ内容 = "!"
-            if not 出力メッセージ内容:
-                出力メッセージ内容 = "!"
+            # 2. 基本AI処理（input_text処理と同じ）
+            出力メッセージ内容 = await self._基本AI処理(受信データ)
 
-            # 処理応答ログ
-            logger.info(
-                f"処理応答(input_request): チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
-            )
-
-            # 通常のoutput_text送信
-            await self.接続.send_to_channel(self.チャンネル, {
-                "セッションID": self.セッションID,
-                "メッセージ識別": "output_text",
-                "メッセージ内容": 出力メッセージ内容,
-                "ファイル名": None,
-                "サムネイル画像": None
-            })
-
-            # 会話履歴保存
-            if self.保存関数:
-                self.保存関数(
-                    セッションID=self.セッションID,
-                    チャンネル=self.チャンネル,
-                    メッセージ識別="output_text",
-                    メッセージ内容=出力メッセージ内容,
-                    ファイル名=None,
-                    サムネイル画像=None
-                )
-
-
-            # バックアップ＋自己検証ループ
-            try:
-                await self._バックアップ検証ループ(ai_instance)
-            except Exception as e:
-                logger.error(f"[CodeAgent] バックアップ検証ループエラー: {e}")
-
-            # 生成されたファイルをチェックしてチャンネル-1に通知
-            try:
-                await self._生成ファイル通知()
-            except Exception as e:
-                logger.error(f"[CodeAgent] 生成ファイル通知エラー: {e}")
-
-            # 通常のoutput_request送信
-
+            # 3. output_request送信（チャンネル0へ）
             await self.接続.send_to_channel(0, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_request",
@@ -325,7 +251,7 @@ class CodeAgent:
                 "サムネイル画像": None
             })
 
-            # 会話履歴保存
+            # 会話履歴保存（チャンネル0）
             if self.保存関数:
                 self.保存関数(
                     セッションID=self.セッションID,
@@ -336,7 +262,7 @@ class CodeAgent:
                     サムネイル画像=None
                 )
 
-            # 通常処理の後: チャンネル-1へ処理終了を連絡
+            # 4. チャンネル-1へ処理終了を連絡
             完了メッセージ = (
                 f"コードエージェント{self.チャンネル}です。\n"
                 f"処理要求が完了しました。\n"
@@ -369,72 +295,170 @@ class CodeAgent:
         except Exception as e:
             logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_request処理エラー: {e}")
 
-    async def _バックアップ検証ループ(self, ai_instance):
-        """バックアップ実行 → 変更ファイルがあればAIに自己検証させる（最大5回）"""
-        from AIコア.AIバックアップ import バックアップ実行
+    async def _基本AI処理(self, 受信データ: dict) -> str:
+        """
+        基本AI処理（input_text/input_request共通）:
+        1. AI実行 + output_text送信
+        2. バックアップ検証ループ（最大7回）
+        3. 生成ファイル通知
+        4. update_info送信
 
-        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        アプリ設定 = getattr(self.親, "conf", None)
+        Returns:
+            出力メッセージ内容（output_requestで使用）
+        """
+        出力メッセージ内容 = ""
+        受信種別 = ""
+        try:
+            メッセージ内容 = 受信データ.get("メッセージ内容", "")
+            受信種別 = 受信データ.get("メッセージ識別", "")
 
-        最大検証回数 = 5
-        for n in range(1, 最大検証回数 + 1):
-            # バックアップ実行
+            # 添付ファイル一覧があればメッセージに追記
+            添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
+            if 添付ファイル一覧:
+                有効ファイル = [p for p in 添付ファイル一覧 if os.path.exists(p)]
+                if 有効ファイル:
+                    添付テキスト = "\n``` 添付ファイル\n"
+                    for パス in 有効ファイル:
+                        添付テキスト += f"{パス}\n"
+                    添付テキスト += "```"
+                    メッセージ内容 = メッセージ内容 + 添付テキスト
+                    logger.info(f"[CodeAgent] 添付ファイル追記: {len(有効ファイル)}件")
+
+            # 処理要求ログ
+            セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
+            logger.info(
+                f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
+            )
+
+            # AI実行
             try:
-                result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir)
+                ai_instance = await self._ensure_ai_instance()
+                if ai_instance:
+                    出力メッセージ内容 = await ai_instance.実行(
+                        要求テキスト=メッセージ内容,
+                        絶対パス=self.絶対パス or None,
+                    )
             except Exception as e:
-                logger.error(f"[CodeAgent] バックアップ実行エラー: {e}")
-                break
+                logger.error(f"[CodeAgent] AI実行エラー: {e}")
+                出力メッセージ内容 = "!"
+            if not 出力メッセージ内容:
+                出力メッセージ内容 = "!"
 
-            # バックアップファイルがなければ終了
-            if result is None:
-                logger.info("[CodeAgent] バックアップ: 対象なし（スキップ）")
-                break
-            最大日時, 全ファイル, バックアップファイル, 全件フラグ, バックアップフォルダ絶対パス = result
-            if not バックアップファイル:
-                logger.info("[CodeAgent] バックアップ: 差分ファイルなし（検証終了）")
-                break
+            # 処理応答ログ
+            logger.info(
+                f"処理応答: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
+            )
 
-            # 検証開始メッセージ送信
-            検証開始テキスト = f"{n}回目の検証作業を開始します。"
-            logger.info(f"[CodeAgent] {検証開始テキスト}")
+            # output_text送信（自チャンネル）
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": 検証開始テキスト,
+                "メッセージ内容": 出力メッセージ内容,
                 "ファイル名": None,
                 "サムネイル画像": None
             })
 
-            # 検証プロンプト構築
-            変更ファイル一覧テキスト = "\n".join(f"- {f}" for f in バックアップファイル)
-            バックアップフォルダ名 = os.path.basename(バックアップフォルダ絶対パス)
-            検証プロンプト = (
-                f"{n}回目の検証作業を開始します。\n"
-                f"\n"
-                f"変更ファイル一覧:\n"
-                f"{変更ファイル一覧テキスト}\n"
-                f"\n"
-                f"バックアップ先: {バックアップフォルダ絶対パス}\n"
-                f"\n"
-                f"以下の作業を行ってください:\n"
-                f"1) バックアップフォルダ「{バックアップフォルダ名}」を変更点の要約名にリネームしてください（例: {バックアップフォルダ名}.リブートファイル名変更）\n"
-                f"2) 並行開発の可能性もあるため、上記の変更ファイルが自分の変更として正しいか検証してください。問題があれば修正してください。\n"
-            )
-
-            # AI検証実行
-            検証結果 = ""
-            try:
-                検証結果 = await ai_instance.実行(
-                    要求テキスト=検証プロンプト,
-                    変更ファイル一覧=バックアップファイル,
-                    絶対パス=self.絶対パス or None,
+            # 会話履歴保存（自チャンネル）
+            if self.保存関数:
+                self.保存関数(
+                    セッションID=self.セッションID,
+                    チャンネル=self.チャンネル,
+                    メッセージ識別="output_text",
+                    メッセージ内容=出力メッセージ内容,
+                    ファイル名=None,
+                    サムネイル画像=None
                 )
-            except Exception as e:
-                logger.error(f"[CodeAgent] 検証AI実行エラー: {e}")
-                検証結果 = f"検証中にエラーが発生しました: {e}"
-            if not 検証結果:
-                検証結果 = "（検証結果なし）"
 
+            # バックアップ＋自己検証ループ
+            今回更新あり = False
+            try:
+                logger.info("[CodeAgent] バックアップ検証ループを開始します")
+                今回更新あり = await self._バックアップ検証ループ(ai_instance)
+                logger.info(f"[CodeAgent] バックアップ検証ループ完了: 更新あり={今回更新あり}")
+            except Exception as e:
+                logger.error(f"[CodeAgent] バックアップ検証ループエラー: {e}")
+
+            # 生成されたファイルをチェックしてチャンネル-1に通知
+            try:
+                await self._生成ファイル通知()
+            except Exception as e:
+                logger.error(f"[CodeAgent] 生成ファイル通知エラー: {e}")
+
+            # update_info送信（今回更新があった場合のみ）
+            if 今回更新あり:
+                try:
+                    通知チャンネル一覧 = [self.チャンネル]
+                    # input_text経由の処理はチャット側（チャンネル0）にも更新完了を通知
+                    if 受信種別 == "input_text" and self.チャンネル != 0:
+                        通知チャンネル一覧.append(0)
+                    await self._update_info送信(通知チャンネル一覧=通知チャンネル一覧)
+                except Exception as e:
+                    logger.error(f"[CodeAgent] update_info送信エラー: {e}")
+
+        except Exception as e:
+            logger.error(f"[CodeAgent] 基本AI処理エラー: {e}")
+        
+        return 出力メッセージ内容
+
+    async def _バックアップ検証ループ(self, ai_instance: Any) -> bool:
+        """バックアップ→検証→修正を繰り返すシンプルループ（最大5回）"""
+
+
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        アプリ設定 = getattr(self.親, "conf", None)
+        今回更新あり = False
+
+        logger.info("[検証ループ] 開始（最大5回）")
+
+        # 初回バックアップ前に少し待機（ファイル書き込み完了を待つ）
+        await asyncio.sleep(0.5)
+
+        for n in range(1, 6):  # 最大5回
+            # バックアップ実行（差分のみ）
+            logger.debug(f"[検証{n}回目] バックアップ実行を呼び出します")
+            result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir)
+            
+            # 差分なし → 終了
+            if not result:
+                logger.info(f"[検証{n}回目] 差分なし → 検証終了")
+                break
+            
+            最終時刻, 全ファイル, 差分ファイル, 全件フラグ, バックアップフォルダ = result
+            今回更新あり = True
+            
+            # 累積変更ファイルに追加
+            追加件数 = self._累積変更ファイル追加(差分ファイル)
+            logger.info(f"[検証{n}回目] 総ファイル数={len(全ファイル)}, 差分={len(差分ファイル)}件, 累積={len(self.累積変更ファイル)}件, 全件={全件フラグ}")
+            
+            # 検証メッセージ送信
+            フォルダ名 = os.path.basename(バックアップフォルダ)
+            ファイル一覧 = "\n".join(f"・{f}" for f in 差分ファイル)
+            
+            await self.接続.send_to_channel(self.チャンネル, {
+                "セッションID": self.セッションID,
+                "メッセージ識別": "output_text",
+                "メッセージ内容": f"【{n}回目の検証】\n差分ファイル{len(差分ファイル)}件:\n{ファイル一覧}",
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+            
+            # 検証プロンプト
+            プロンプトファイル一覧 = "\n".join(f"- {f}" for f in 差分ファイル)
+            検証プロンプト = (
+                f"【{n}回目の検証】\n"
+                f"差分ファイル{len(差分ファイル)}件:\n{プロンプトファイル一覧}\n\n"
+                f"バックアップフォルダ「{フォルダ名}」を変更内容でリネームし、\n"
+                f"ファイルの検証を行い、問題があれば修正してください。\n"
+                f"問題がなければ「検証完了」とだけ回答してください。"
+            )
+            
+            # AI検証実行
+            検証結果 = await ai_instance.実行(
+                要求テキスト=検証プロンプト,
+                変更ファイル一覧=差分ファイル,
+                絶対パス=self.絶対パス or None,
+            ) or "（応答なし）"
+            
             # 検証結果送信
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
@@ -443,7 +467,7 @@ class CodeAgent:
                 "ファイル名": None,
                 "サムネイル画像": None
             })
-
+            
             # 会話履歴保存
             if self.保存関数:
                 self.保存関数(
@@ -455,28 +479,27 @@ class CodeAgent:
                     サムネイル画像=None
                 )
 
-        else:
-            logger.warning(f"[CodeAgent] 検証ループが最大回数({最大検証回数})に到達しました")
+        return 今回更新あり
 
-    async def _生成ファイル通知(self):
+    async def _生成ファイル通知(self) -> None:
         """生成された画像などのファイルをチェックしてチャンネル-1に通知"""
         import glob
         import time
-        
+
         # チェック対象ディレクトリと画像拡張子
         チェックディレクトリ = ["output", "temp/output", "images", "assets"]
         画像拡張子 = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"]
-        
+
         # 現在時刻から1分以内に作成されたファイルを検出
         現在時刻 = time.time()
         検出時間範囲秒 = 60  # 1分
-        
+
         検出ファイル一覧 = []
-        
+
         for ディレクトリ in チェックディレクトリ:
             if not os.path.exists(ディレクトリ):
                 continue
-                
+
             for 拡張子 in 画像拡張子:
                 パターン = os.path.join(ディレクトリ, "**", 拡張子)
                 for ファイルパス in glob.glob(パターン, recursive=True):
@@ -487,15 +510,15 @@ class CodeAgent:
                             検出ファイル一覧.append(ファイルパス)
                     except Exception as e:
                         logger.warning(f"[CodeAgent] ファイル時刻チェックエラー: {ファイルパス}, {e}")
-        
+
         # 検出されたファイルをチャンネル-1に通知
         for ファイルパス in 検出ファイル一覧:
             try:
                 # サムネイル生成（オプション：ここでは省略し、Noneを送信）
                 サムネイル = None
-                
+
                 通知メッセージ = f"ファイルが生成されました: {ファイルパス}"
-                
+
                 # チャンネル-1にoutput_file送信
                 await self.接続.send_to_channel(-1, {
                     "セッションID": self.セッションID,
@@ -505,19 +528,50 @@ class CodeAgent:
                     "ファイル名": ファイルパス,
                     "サムネイル画像": サムネイル
                 })
-                
+
                 logger.info(f"[CodeAgent] ファイル生成通知送信: {ファイルパス}")
-                
+
             except Exception as e:
                 logger.error(f"[CodeAgent] ファイル通知送信エラー: {ファイルパス}, {e}")
 
+    async def _update_info送信(self, 通知チャンネル一覧=None) -> None:
+        """累積変更ファイルがある場合、update_infoメッセージを送信"""
+        if not self.累積変更ファイル:
+            logger.debug("[CodeAgent] 累積変更ファイルなし、update_info送信スキップ")
+            return
 
-    async def _処理_input_file(self, 受信データ: dict):
+        # 相対パス一覧（重複排除）
+        相対パス一覧 = list(dict.fromkeys(self.累積変更ファイル))
+
+        if not 通知チャンネル一覧:
+            通知チャンネル一覧 = [self.チャンネル]
+        送信先チャンネル一覧 = list(dict.fromkeys(通知チャンネル一覧))
+
+        # update_infoメッセージ送信
+        for 送信先チャンネル in 送信先チャンネル一覧:
+            await self.接続.send_to_channel(送信先チャンネル, {
+                "セッションID": self.セッションID,
+                "メッセージ識別": "update_info",
+                "メッセージ内容": {
+                    "update_files": 相対パス一覧
+                },
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+
+        logger.info(
+            f"[CodeAgent] update_info送信完了: {len(相対パス一覧)}件のファイル, "
+            f"送信先={送信先チャンネル一覧}"
+        )
+
+        # 注意: 累積変更ファイルはクリアしない（次回のリクエストでも累積し続ける）
+        # クリアが必要な場合は、ユーザーがアプリ再起動またはリセット再起動を実行する
+
+
+    async def _処理_input_file(self, 受信データ: dict) -> None:
         """input_file処理: temp/outputコピー → output_file送信"""
         try:
-            import shutil
-            import os
-            import random
+
             
             # 受信データから相対パスを取得
             入力ファイル名 = 受信データ.get("ファイル名")  # "temp/input/20260128.123456.xxx.png"
@@ -561,4 +615,3 @@ class CodeAgent:
                 )
         except Exception as e:
             logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_file処理エラー: {e}")
-

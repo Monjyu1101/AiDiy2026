@@ -6,7 +6,6 @@
         <span>システム再起動</span>
       </div>
       <div class="reboot-message">
-        設定が保存されました。<br />
         システムが再起動します。
       </div>
       <div class="countdown-number">{{ countdown }}</div>

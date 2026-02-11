@@ -94,7 +94,7 @@ class CodeAI:
 
         pass
 
-    def _コマンド構築(self, プロンプト: str, 初回: bool = False, repo_path: str = None) -> list:
+    def _コマンド構築(self, プロンプト: str, 初回: bool = False, repo_path: str = None, 読取専用: bool = False) -> list:
         """
         プロバイダー別のコマンドを構築
 
@@ -171,7 +171,13 @@ class CodeAI:
                     cmd = 'codex'
 
             # openai codex
-            base_args = [cmd, "exec", "--full-auto", "--skip-git-repo-check", "--sandbox", "danger-full-access"]
+            # 注意:
+            #   --sandbox danger-full-access が環境によって read-only に固定されることがあるため、
+            #   書込モードでは bypass フラグを優先する。
+            if 読取専用:
+                base_args = [cmd, "exec", "--skip-git-repo-check", "--sandbox", "read-only"]
+            else:
+                base_args = [cmd, "exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 base_args.extend(["--model", self.code_model])
@@ -388,7 +394,7 @@ class CodeAI:
             logger.error(f"codexセッションID抽出エラー: {e}")
             return None
 
-    async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 600,
+    async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 1200,
                    resume: bool = True, 読取専用: bool = False, 絶対パス: str = None, file_path: str = None, 変更ファイル一覧: list = None, 再プラン要求: bool = False) -> str:
         """
         CLI (subprocess) 実行
@@ -550,7 +556,12 @@ class CodeAI:
             # コマンド構築（プロバイダー別・初回判定付き）
             作業ディレクトリ = 絶対パス if 絶対パス else self.cwd_str
             repo_path = Path(作業ディレクトリ).resolve().as_posix()
-            command = self._コマンド構築(プロンプト=完全プロンプト, 初回=初回送信, repo_path=repo_path)
+            command = self._コマンド構築(
+                プロンプト=完全プロンプト,
+                初回=初回送信,
+                repo_path=repo_path,
+                読取専用=読取専用
+            )
 
             # テスト用：送信コンテキスト（完全プロンプト）を標準出力に表示（平文）
             try:

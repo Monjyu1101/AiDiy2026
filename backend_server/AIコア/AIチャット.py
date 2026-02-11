@@ -158,7 +158,7 @@ class Chat:
                 メッセージ識別 = 受信データ.get("メッセージ識別", "")
                 
                 if メッセージ識別 == "input_text":
-                    # テキスト処理: [ECHO]付きoutput_text送信 → 会話履歴保存
+                    # テキスト処理: AI実行 → output_text送信（エコーバックは既に実施済み）
                     await self._処理_input_text(受信データ)
                 elif メッセージ識別 == "input_file":
                     # ファイル処理: temp/outputコピー → output_file送信 → 会話履歴保存
@@ -291,12 +291,31 @@ class Chat:
             logger.error(f"[Chat] チャンネル{self.チャンネル} AI実行応答エラー: {e}")
 
     async def _処理_input_text(self, 受信データ: dict):
-        """input_text処理: AI実行 → output_text送信（添付ファイルがあれば渡す）"""
+        """input_text処理: AI実行 → output_text送信（画像自動添付対応）"""
+        import os
+        
+        元のメッセージ内容 = 受信データ.get("メッセージ内容", "")
         添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
+        
+        # 添付ファイルが無い場合、最近1分以内の画像を自動添付
+        # （実際は core_router/AIコア.py で既に添付済みだが、念のため再確認）
+        if not 添付ファイル一覧:
+            # 親のセッション管理から最近のファイルを取得（1分 = 60秒）
+            if hasattr(self.親, "最近のファイル取得"):
+                最近のファイル一覧 = self.親.最近のファイル取得(self.チャンネル, 秒数=60)
+                if 最近のファイル一覧:
+                    # 最初の画像ファイルを添付
+                    for パス in 最近のファイル一覧:
+                        if os.path.exists(パス):
+                            拡張子 = os.path.splitext(パス)[1].lower()
+                            if 拡張子 in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
+                                添付ファイル一覧 = [パス]
+                                logger.info(f"[Chat] 最近の画像を自動添付: {パス}")
+                                break
+        
+        file_path = None
         if 添付ファイル一覧:
             # 最初の画像ファイルをfile_pathとして渡す
-            import os
-            file_path = None
             for パス in 添付ファイル一覧:
                 if os.path.exists(パス):
                     拡張子 = os.path.splitext(パス)[1].lower()
@@ -309,11 +328,13 @@ class Chat:
                     if os.path.exists(パス):
                         file_path = パス
                         break
+            
             if file_path:
                 logger.info(f"[Chat] 添付ファイル渡し: {file_path}")
-                await self._AI実行と応答送信(受信データ, file_path=file_path)
-                return
-        await self._AI実行と応答送信(受信データ)
+        
+        # AI実行と応答送信（エコーバックは core_router/AIコア.py で既に実施済み）
+        受信データ["メッセージ内容"] = 元のメッセージ内容
+        await self._AI実行と応答送信(受信データ, file_path=file_path)
 
     async def _処理_input_file(self, 受信データ: dict):
         """input_file処理: AIにファイルを渡して実行 → output_text + output_file送信"""

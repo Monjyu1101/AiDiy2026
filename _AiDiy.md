@@ -17,8 +17,8 @@
   - ビジネスドメインと完全に一致したコード
 
 - **フルスタック構成**
-  - バックエンド: FastAPI (Python 3.13) + SQLAlchemy + SQLite
-  - フロントエンド: Vue 3 + Vite + TypeScript + Pinia
+  - バックエンド: FastAPI (Python 3.13.3) + SQLAlchemy + SQLite
+  - フロントエンド: Vue 3 + Vite + TypeScript + Pinia (Node.js v22.14.0 / npm 11.3.0)
   - デュアルサーバー構成（Core: 8091 / Apps: 8092）
 
 - **実用的なテンプレート実装**
@@ -40,6 +40,8 @@
 - 起動は `python _start.py`（backend 8091/8092 + frontend 8090 を同時起動）
 - SQLite DB は `backend_server/_data/AiDiy/database.db` に作成され、core_main / apps_main で共有
 - 初期ログインは `admin / ********`（初期データ投入は admin 未存在時のみ）
+- 開発環境: Python 3.13.3 + uv (backend) / Node.js v22.14.0 + npm 11.3.0 (frontend)
+- CRUD操作は全てPOSTメソッド（統一API設計）
 
 ---
 

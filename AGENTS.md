@@ -108,8 +108,9 @@
   - AIコア - Multi-panel AI interface
   - A会話履歴 - Conversation history storage
 
-- **X系 (Experimental)** - Test/example features
+- **X系 (Experimental)** - Test/example features (フロントエンドのみ)
   - Xテトリス、Xインベーダー、Xリバーシ - ゲーム実装例
+  - X自己紹介 - 静的コンテンツの実装例
 
 ### 対象ユーザー
 
@@ -245,7 +246,7 @@
 
 ## 概要
 
-Full-stack business management system with JWT authentication, using FastAPI (Python 3.13) + SQLite backend and Vue.js 3 frontend.
+Full-stack business management system with JWT authentication, using FastAPI (Python 3.13.3) + SQLite backend and Vue.js 3 frontend.
 
 日本語標準のVue 3フロントエンド + 日本語APIのFastAPIバックエンド。DBはSQLiteを採用し、管理画面中心の構成。
 
@@ -267,7 +268,7 @@ Full-stack business management system with JWT authentication, using FastAPI (Py
 - `V` = Database VIEWs (V利用者, V車両, V商品)
 - `S` = Scheduler/Special processing (S配車_週表示, S配車_日表示)
 - `A` = AI/Advanced features (AIコア, A会話履歴)
-- `X` = Experimental/Test features
+- `X` = Experimental/Test features (Xテトリス, Xインベーダー, Xリバーシ)
 
 ## Japanese Naming Convention
 
@@ -293,7 +294,7 @@ This project consists of three main parts:
 FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authentication.
 
 **技術スタック：**
-- Python 3.13 + uv (package manager)
+- Python 3.13.3 + uv (package manager)
 - FastAPI + Uvicorn (ASGI server)
 - SQLAlchemy (ORM, no Alembic)
 - SQLite (single file database)
@@ -313,68 +314,12 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 
 **詳細は [backend_server/AGENTS.md](backend_server/AGENTS.md) を参照**
 
-**backend_server/AGENTS.md に記載されている内容：**
-
-<details>
-<summary>📚 バックエンドドキュメントの内容（クリックで展開）</summary>
-
-- **本書の目的** - ドキュメントの対象読者と役割
-- **まず知っておくこと（基本原則）** - 技術スタック、命名規約、API設計原則
-- **実装の全体像と特徴** - デュアルサーバーアーキテクチャ、11項目の主要な特徴
-- **バックエンド構成** - ファイル構成と役割
-  - Core Files: core_main.py/apps_main.py の詳細説明
-  - 共通データベースモジュール (database.py)
-- 共通スキーマ (core_schema.py / apps_schema.py - 分割管理)
-  - 共通認証モジュール (auth.py, deps.py)
-  - 共通ログモジュール (log_config.py)
-- 共通WebSocketモジュール (AIコア/AIセッション管理.py)
-  - 構成管理システム (conf/ - ConfigManager singleton)
-  - データ・設定ディレクトリ (_data/, _config/, temp/)
-  - Models (core_models/, apps_models/ - SQLAlchemy ORM)
-  - CRUD Operations (core_crud/, apps_crud/ - データベース操作関数、監査フィールドヘルパー、初期データ投入)
-  - API Routers (core_router/, apps_router/ - FastAPI endpoints)
-- **Key Architectural Patterns**
-  - Database VIEWs (V系は生SQLクエリで実装)
-  - Custom ID Generation System (C採番テーブルによる採番管理)
-  - API Design Pattern (POST中心、統一レスポンス)
-  - Audit Fields Pattern (監査フィールドの自動付与)
-  - Logging System (EndpointFilter)
-  - WebSocket Support (WebSocketManager, セッション管理)
-  - Reboot機構（temp/reboot_core.txt, temp/reboot_apps.txt）
-  - Authentication & Security (JWT, 平文パスワード警告)
-- **Database & Data Management**
-  - Database Configuration (SQLite設定、テーブル自動作成)
-  - Initial Data (初期データ投入の詳細)
-  - Default Login Credentials (5件のユーザー)
-- **API エンドポイント**
-  - レスポンス形式（共通）
-  - エンドポイント一覧（認証系、コア系CRUD、AI系、アプリ系CRUD、V系、S系）
-  - 一覧検索・ページング
-- **AIコア Component System (A系)**
-  - バックエンド実装（WebSocketエンドポイント、HTTP REST エンドポイント）
-  - AI Integration (AIセッション管理.py, AIストリーミング処理.py, AI音声処理.py, AI音声認識.py, AIチャット*.py, AIライブ*.py, AIコード*.py, AI内部ツール.py)
-  - AI Providers (Anthropic Claude, OpenAI, Google Gemini)
-  - 設定管理（API keys、モデル設定）
-  - 会話履歴（A会話履歴テーブル）
-- **Development Commands** - backend固有のコマンド
-- **追加・変更の手順**
-  - 新しいテーブルを追加する（C系/A系の場合）
-  - 新しいテーブルを追加する（M系/T系/S系の場合）
-  - 新しいV系（一覧）を追加する
-  - 新しい機能（API）を追加する
-- **デバッグ** - APIテスト、バックエンドログ、DB検証
-- **実装の注意点とベストプラクティス**
-  - 必須の注意事項 (5項目)
-  - ベストプラクティス (5項目、コード例付き)
-  - よくある落とし穴 (5項目)
-
-</details>
-
 ### フロントエンド (frontend_server/)
 
 Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 
 **技術スタック：**
+- Node.js v22.14.0 + npm 11.3.0
 - Vue 3 Composition API + script setup
 - Vite (build tool)
 - TypeScript (strict mode disabled)
@@ -393,50 +338,6 @@ Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 - WebSocket統合 (AIコアWebSocket)
 
 **詳細は [frontend_server/AGENTS.md](frontend_server/AGENTS.md) を参照**
-
-**frontend_server/AGENTS.md に記載されている内容：**
-
-<details>
-<summary>📚 フロントエンドドキュメントの内容（クリックで展開）</summary>
-
-- **本書の目的** - ドキュメントの対象読者と役割
-- **まず知っておくこと（基本原則）** - 技術スタック、命名規約、TypeScript設定、コンポーネント設計原則
-- **実装の全体像と特徴** - 12項目の主要な特徴、No UI Framework説明
-- **フロントエンド構成** - ファイル構成と役割
-  - Core Files: main.ts, App.vue, vite.config.ts, tsconfig.json の詳細
-  - Routing (router/ - Vue Router設定、認証ガード、日本語URL対応、全ルート一覧)
-  - State Management (stores/ - Pinia auth store の詳細、State/取得ters/Actions)
-  - API Client (api/ - Axios client, WebSocket client の詳細)
-  - Component Structure (components/ - 全コンポーネントの説明)
-    - Layout Components (_Layout, _TopBar, _TopMenu)
-    - Shared Components (_Modal, qAlertDialog, qConfirmDialog, qColorPickerDialog, qTubler, qTublerFrame, qAlert.ts)
-    - Feature Components (C管理/, Mマスタ/, Tトラン/, Sスケジューラー/, Vビュー/, AIコア/, Xテスト/)
-  - Styles (assets/ - グローバルCSS、メニューCSS、Scoped Styles)
-- **qTublerシステム（カスタムテーブルコンポーネント）**
-  - コンポーネント構成 (qTubler.vue, qTublerFrame.vue)
-  - Props, Emits, Column型定義
-  - 使用例（コード付き）
-  - qTublerの5つの特徴
-- **AIコア Component System (A系)**
-  - Main container (AIコア.vue - セッション管理、グリッドレイアウト)
-  - Sub components (チャット、イメージ、エージェント)
-  - Component communication pattern
-  - Image capture flow
-  - Layout behavior (1-6パネル)
-  - WebSocket統合
-- **Authentication Flow** - フロントエンド視点の認証フロー
-- **Development Commands** - frontend固有のコマンド
-- **新規テーブル/ビュー/機能 追加手順**
-  - 新規テーブル（管理系のCRUD画面）
-  - 新規V系（参照系の一覧）
-  - 新規機能（カテゴリ追加）
-- **Debugging** - Browser DevTools、VS Code debugging
-- **実装の注意点とベストプラクティス**
-  - 必須の注意事項 (6項目)
-  - ベストプラクティス (6項目、コード例付き)
-  - よくある落とし穴 (5項目)
-
-</details>
 
 ## Development Commands
 
@@ -504,7 +405,7 @@ python _start.py
 
 ### Dependency Management
 
-**バックエンド（Python 3.13 + uv）:**
+**バックエンド（Python 3.13.3 + uv）:**
 ```bash
 cd backend_server
 uv sync          # Install/sync dependencies from pyproject.toml
@@ -572,7 +473,7 @@ backend_server/_data/AiDiy/database.db
 - **DBファイル位置**: `backend_server/_data/AiDiy/database.db`（core_main / apps_main で共有）。
 - **_start.py の起動挙動**: `uvicorn --reload` は付かないため、バックエンドは自動リロードされません（手動再起動 or reboot_core/reboot_apps.txt を利用）。
 - **ポート変更の連動修正**: `frontend_server/vite.config.ts` の `server.port` を変える場合、`backend_server/core_main.py` と `apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要。
-- **_setup.py の案内文**: 画面表示は `python start.py` ですが、実ファイルは **`_start.py`** です。
+- **_setup.py の案内文**: `_setup.py` のセットアップ完了メッセージは `python _start.py` を正確に表示するよう修正されましたが、以前のバージョンでは `python start.py` と表示されることがあったため、注意点として記載しています。実ファイルは **`_start.py`** です。
 
 **Vite Proxy Configuration** (`frontend_server/vite.config.ts`):
 - `/core/*` → `http://127.0.0.1:8091` (core_main - コア機能)

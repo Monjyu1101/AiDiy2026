@@ -117,6 +117,7 @@ AiDiy2026/
 │   │   │   ├── Sスケジューラー/  # S系 (Scheduler) screens
 │   │   │   ├── Vビュー/    # V系 (View) screens
 │   │   │   ├── AIコア/    # AI interface
+│   │   │   ├── Xテスト/    # Experimental features (Xテトリス, Xインベーダー, Xリバーシ)
 │   │   │   └── _share/     # Shared components (qTubler, dialogs)
 │   │   ├── stores/auth.ts  # Pinia auth store
 │   │   ├── api/client.ts   # Axios with JWT interceptors
@@ -129,8 +130,9 @@ AiDiy2026/
 - `M` = Master (M配車区分, M車両, M商品)
 - `T` = Transaction (T配車, T商品入庫, T商品出庫, T商品棚卸)
 - `V` = View endpoints (raw SQL, not DB views)
-- `S` = Scheduler/Special
+- `S` = Scheduler/Special (S配車_週表示, S配車_日表示)
 - `A` = AI/Advanced (AIコア, A会話履歴)
+- `X` = Experimental/Test features (Xテトリス, Xインベーダー, Xリバーシ)
 
 ---
 

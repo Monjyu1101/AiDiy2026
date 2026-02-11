@@ -23,9 +23,11 @@
 **AiDiy** は、日本語を第一言語とするフルスタックビジネス管理システムです。
 
 **アーキテクチャ：**
-- **バックエンド**: FastAPI (Python 3.13) + SQLAlchemy + SQLite
+- **バックエンド**: FastAPI (Python 3.13.3) + SQLAlchemy + SQLite
   - **デュアルサーバー構成**: core_main.py (port 8091) + apps_main.py (port 8092)
+  - **スキーマ分離**: core_schema.py + apps_schema.py（Pydanticモデル）
 - **フロントエンド**: Vue 3 + Vite + TypeScript + Pinia
+  - **Node.js v22.14.0 / npm 11.3.0**
   - **port 8090**
 
 **特徴：**
@@ -159,7 +161,7 @@ python _start.py --backend=no --frontend=yes
 
 - **初期パスワードの反映タイミング**: `backend_server/core_crud/init.py` の初期データ投入は「**admin が未存在**」のときだけ実行されます。既に DB がある場合、`admin` のパスワードは自動では更新されません。
 - **DBファイルの場所**: SQLite は `backend_server/_data/AiDiy/database.db` に作成され、core_main / apps_main で共有されます。
-- **_setup.py の案内表示**: セットアップ完了メッセージに `python start.py` と出ますが、実際の起動ファイルは **`_start.py`** です。
+- **_setup.py の案内表示**: `_setup.py` のセットアップ完了メッセージは `python _start.py` を正確に表示するよう修正されましたが、以前のバージョンでは `python start.py` と表示されることがあったため、注意点として記載しています。実際の起動ファイルは **`_start.py`** です。
 - **ポート変更時の連動修正**: フロントエンドのポートを変える場合、`frontend_server/vite.config.ts` に加えて `backend_server/core_main.py` と `backend_server/apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要です。
 
 ### 停止方法

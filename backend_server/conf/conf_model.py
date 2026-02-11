@@ -168,7 +168,7 @@ class conf_models:
 
         if not os.path.exists(file_path):
             self._write_json_file(file_path, default_payload)
-            logger.info(f"ライブ設定JSONを作成: {file_path}")
+            logger.info(f"ライブ設定JSONを作成: {os.path.relpath(file_path)}")
             return default_models.copy(), default_voices.copy()
 
         try:
@@ -180,10 +180,10 @@ class conf_models:
             voices = payload.get("voices", {})
             if not isinstance(models, dict) or not isinstance(voices, dict):
                 raise ValueError("models/voices は object(dict)である必要があります")
-            logger.info(f"ライブ設定JSONを読込: {file_path}")
+            logger.info(f"ライブ設定JSONを読込: {os.path.relpath(file_path)}")
             return dict(models), dict(voices)
         except Exception as e:
-            logger.error(f"ライブ設定JSON読込エラー: {file_path}, {e}")
+            logger.error(f"ライブ設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
             return default_models.copy(), default_voices.copy()
 
     def _load_or_create_code_config(
@@ -202,7 +202,7 @@ class conf_models:
 
         if not os.path.exists(file_path):
             self._write_json_file(file_path, default_payload)
-            logger.info(f"コード設定JSONを作成: {file_path}")
+            logger.info(f"コード設定JSONを作成: {os.path.relpath(file_path)}")
             return default_models.copy()
 
         try:
@@ -213,10 +213,10 @@ class conf_models:
             models = payload.get("models", {})
             if not isinstance(models, dict):
                 raise ValueError("models は object(dict)である必要があります")
-            logger.info(f"コード設定JSONを読込: {file_path}")
+            logger.info(f"コード設定JSONを読込: {os.path.relpath(file_path)}")
             return dict(models)
         except Exception as e:
-            logger.error(f"コード設定JSON読込エラー: {file_path}, {e}")
+            logger.error(f"コード設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
             return default_models.copy()
 
     def _sync_local_model_configs(self) -> None:

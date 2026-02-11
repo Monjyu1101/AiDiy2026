@@ -133,23 +133,47 @@ class StreamingProcessor:
                 await self._process_agent_ai(i)
 
     async def _process_chat_ai(self):
-        """チャットAI処理（実装予定）"""
-        # TODO: ChatAIの実装
-        # モデル設定: self.connection.モデル設定["CHAT_AI_NAME"]
-        # 音声入力: self.connection.ボタン状態["マイク"]
-        # 音声出力: self.connection.ボタン状態["スピーカー"]
-        pass
+        """チャットAI処理"""
+        # マイクが有効な場合、LiveAIプロセッサをアクティブに保つ
+        if self.connection.ボタン状態.get("マイク", False):
+            live_processor = getattr(self.connection, "live_processor", None)
+            if live_processor:
+                try:
+                    # AIインスタンスがなければ開始を試みる
+                    if not getattr(live_processor, "AIインスタンス", None):
+                        logger.info("マイクONのため、LiveAIを開始します。")
+                        await live_processor.開始()
+                except Exception as e:
+                    logger.error(f"LiveAIの開始に失敗しました: {e}")
 
     async def _process_image_ai(self):
-        """イメージAI処理（実装予定）"""
-        # TODO: 画像認識AIの実装
-        pass
+        """イメージAI処理"""
+        # カメラが有効な場合、LiveAIプロセッサをアクティブに保つ
+        if self.connection.ボタン状態.get("カメラ", False):
+            live_processor = getattr(self.connection, "live_processor", None)
+            if live_processor:
+                try:
+                    # AIインスタンスがなければ開始を試みる
+                    if not getattr(live_processor, "AIインスタンス", None):
+                        logger.info("カメラONのため、LiveAIを開始します。")
+                        await live_processor.開始()
+                except Exception as e:
+                    logger.error(f"LiveAIの開始に失敗しました: {e}")
 
     async def _process_agent_ai(self, agent_number: int):
-        """エージェントAI処理（実装予定）"""
-        # TODO: CodeAI/エージェントの実装
-        # モデル設定: self.connection.モデル設定[f"CODE_AI{agent_number}"]
-        pass
+        """エージェントAI処理"""
+        # 対応するエージェントプロセッサがアクティブであることを確認
+        agent_processors = getattr(self.connection, "code_agent_processors", [])
+        if 0 <= agent_number - 1 < len(agent_processors):
+            agent = agent_processors[agent_number - 1]
+            if agent:
+                try:
+                    # is_aliveがFalse、またはワーカーが停止している場合に再開を試みる
+                    if not agent.is_alive or (agent.worker_task and agent.worker_task.done()):
+                        logger.info(f"エージェント{agent_number}が非アクティブなため、再開します。")
+                        await agent.開始()
+                except Exception as e:
+                    logger.error(f"エージェント{agent_number}の再開に失敗しました: {e}")
 
     async def send_message(self, message_type: str, data: dict):
         """
@@ -213,16 +237,66 @@ class StreamingProcessor:
             logger.warning(f"未知のメッセージタイプ: {msg_type}")
 
     async def _handle_chat_input(self, text: str):
-        """チャット入力の処理（実装予定）"""
-        # TODO: チャット入力の処理
-        pass
+        """チャット入力の処理"""
+        logger.info(f"チャット入力処理: {text[:50]}...")
+        chat_processor = getattr(self.connection, "chat_processor", None)
+        live_processor = getattr(self.connection, "live_processor", None)
+
+        # マイクがONならLiveAI、OFFなら通常のChatAIに処理を渡す
+        if self.connection.ボタン状態.get("マイク", False) and live_processor:
+            try:
+                await live_processor.テキスト送信(text)
+            except Exception as e:
+                logger.error(f"LiveAIへのテキスト送信に失敗: {e}")
+        elif chat_processor:
+            try:
+                受信データ = {
+                    "メッセージ識別": "input_text",
+                    "メッセージ内容": text,
+                    "チャンネル": 0,
+                }
+                await chat_processor.チャット要求(受信データ)
+            except Exception as e:
+                logger.error(f"ChatAIへの要求に失敗: {e}")
+        else:
+            logger.warning("チャットプロセッサが見つからないため、入力を破棄します。")
 
     async def _handle_image_input(self, image_data):
-        """画像入力の処理（実装予定）"""
-        # TODO: 画像入力の処理
-        pass
+        """画像入力の処理"""
+        logger.info("画像入力処理...")
+        live_processor = getattr(self.connection, "live_processor", None)
+        if live_processor:
+            try:
+                # image_dataが 'data:image/png;base64,xxxx' の形式を想定
+                if "base64," in image_data:
+                    payload = image_data.split("base64,", 1)[1]
+                    await live_processor.画像送信(payload)
+                else:
+                    logger.warning("無効な画像データ形式です。base64エンコードされた文字列が必要です。")
+            except Exception as e:
+                logger.error(f"LiveAIへの画像送信に失敗: {e}")
+        else:
+            logger.warning("Liveプロセッサが見つからないため、画像を破棄します。")
 
     async def _handle_agent_command(self, agent_number: int, command: str):
-        """エージェントコマンドの処理（実装予定）"""
-        # TODO: エージェントコマンドの処理
-        pass
+        """エージェントコマンドの処理"""
+        logger.info(f"エージェント{agent_number}へのコマンド処理: {command[:50]}...")
+        agent_processors = getattr(self.connection, "code_agent_processors", [])
+
+        if not (isinstance(agent_number, int) and 1 <= agent_number <= len(agent_processors)):
+            logger.warning(f"無効なエージェント番号です: {agent_number}")
+            return
+
+        agent = agent_processors[agent_number - 1]
+        if agent:
+            try:
+                受信データ = {
+                    "メッセージ識別": "input_text",
+                    "メッセージ内容": command,
+                    "チャンネル": agent_number,
+                }
+                await agent.コード要求(受信データ)
+            except Exception as e:
+                logger.error(f"エージェント{agent_number}へのコマンド要求に失敗: {e}")
+        else:
+            logger.warning(f"エージェント{agent_number}のプロセッサが見つかりません。")

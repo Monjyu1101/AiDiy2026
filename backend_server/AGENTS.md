@@ -44,7 +44,7 @@
 
 ### 技術スタック
 - **FastAPI + SQLAlchemy + SQLite** で構成
-- **Python 3.13** + **uv** (パッケージマネージャ)
+- **Python 3.13.3** + **uv** (パッケージマネージャ)
 - **JWT認証** (python-jose, HS256, 60分有効期限)
 - **AI統合** (Anthropic Claude, OpenAI, Google Gemini via respective SDKs)
 
@@ -947,7 +947,7 @@ AIコアは、複数のAIサービスを統合したマルチパネルAIイン�
 
 ## Development Commands
 
-**バックエンド依存関係 (Python 3.13 + uv):**
+**バックエンド依存関係 (Python 3.13.3 + uv):**
 ```bash
 cd backend_server
 uv sync          # Install/sync dependencies from pyproject.toml

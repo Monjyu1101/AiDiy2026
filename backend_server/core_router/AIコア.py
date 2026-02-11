@@ -475,10 +475,19 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             except Exception:
                 logger.exception("モデル設定の反映に失敗しました")
 
-        # 再起動要求があればフラグファイルを作成
+        # 再起動要求があればバックアップ実行とフラグファイルを作成
         try:
             reboot_core = bool(再起動要求.get("reboot_core"))
             reboot_apps = bool(再起動要求.get("reboot_apps"))
+            if reboot_core or reboot_apps:
+                # バックアップ実行
+                バックアップ結果 = バックアップ実行(getattr(http_request.app, "conf", None), backend_dir=バックエンドディレクトリ)
+                if バックアップ結果:
+                    最終時刻, 全ファイル, バックアップファイル, 全件フラグ, バックアップフォルダ = バックアップ結果
+                    バックアップ種別 = "全件" if 全件フラグ else "差分"
+                    logger.info(f"バックアップ成功: {バックアップ種別} {len(バックアップファイル)}件, フォルダ={バックアップフォルダ}")
+                else:
+                    logger.info("バックアップ: 差分なし、またはエラー")
             if reboot_core:
                 with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_core.txt"), "w", encoding="utf-8") as f:
                     f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -787,11 +796,45 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                     セッション.set_channel_processing(出力先チャンネル, True)
 
+                    # 1分以内のファイルを添付（エコーバック前に取得）
+                    添付ファイル一覧 = セッション.最近のファイル取得(出力先チャンネル, 秒数=60)
+                    エコーバック用メッセージ = メッセージ内容
+                    
+                    # 画像ファイルがあればメッセージに添付通知を追加
+                    if 添付ファイル一覧:
+                        受信データ["添付ファイル一覧"] = 添付ファイル一覧
+                        logger.info(f"添付ファイル({出力先チャンネル}): {len(添付ファイル一覧)}件 {添付ファイル一覧}")
+                        
+                        # 最初の画像ファイルを検索
+                        画像ファイル = None
+                        for パス in 添付ファイル一覧:
+                            if os.path.exists(パス):
+                                拡張子 = os.path.splitext(パス)[1].lower()
+                                if 拡張子 in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
+                                    画像ファイル = パス
+                                    break
+                        
+                        # 画像ファイルがあればエコーバックメッセージに添付通知を追加
+                        if 画像ファイル:
+                            try:
+                                カレントディレクトリ = os.getcwd()
+                                if 画像ファイル.startswith(カレントディレクトリ):
+                                    相対パス = os.path.relpath(画像ファイル, カレントディレクトリ).replace("\\", "/")
+                                else:
+                                    ファイル名のみ = os.path.basename(画像ファイル)
+                                    相対パス = f"temp/output/{ファイル名のみ}"
+                            except (ValueError, OSError) as e:
+                                logger.debug(f"相対パス計算エラー: {e}")
+                                ファイル名のみ = os.path.basename(画像ファイル)
+                                相対パス = f"temp/output/{ファイル名のみ}"
+                            エコーバック用メッセージ = f"{メッセージ内容}\n[ファイル添付: {相対パス}]"
+                            logger.info(f"画像自動添付通知追加: {相対パス}")
+
                     await セッション.send_to_channel(出力先チャンネル, {
                         "セッションID": セッションID,
                         "チャンネル": 出力先チャンネル,
                         "メッセージ識別": "input_text",
-                        "メッセージ内容": メッセージ内容,
+                        "メッセージ内容": エコーバック用メッセージ,
                         "ファイル名": None,
                         "サムネイル画像": None
                     })
@@ -800,18 +843,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         セッションID=セッションID,
                         チャンネル=出力先チャンネル,
                         メッセージ識別="input_text",
-                        メッセージ内容=メッセージ内容,
+                        メッセージ内容=エコーバック用メッセージ,
                         ファイル名=None,
                         サムネイル画像=None
                     )
 
                     受信データ["チャンネル"] = 出力先チャンネル
-
-                    # 1分以内のファイルを添付
-                    添付ファイル一覧 = セッション.最近のファイル取得(出力先チャンネル, 秒数=60)
-                    if 添付ファイル一覧:
-                        受信データ["添付ファイル一覧"] = 添付ファイル一覧
-                        logger.info(f"添付ファイル({出力先チャンネル}): {len(添付ファイル一覧)}件 {添付ファイル一覧}")
 
                     try:
                         if 出力先チャンネル == 0:
