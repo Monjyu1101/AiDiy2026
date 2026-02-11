@@ -326,6 +326,7 @@ class CodeAgent:
 
             # 処理要求ログ
             セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
+            logger.info(f"[CodeAgent] 実行パス: {self.絶対パス}")
             logger.info(
                 f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
             )
@@ -404,8 +405,11 @@ class CodeAgent:
         """バックアップ→検証→修正を繰り返すシンプルループ（最大5回）"""
 
 
+        # プロジェクトルート（backend_serverの親ディレクトリ）を対象とする
         backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         アプリ設定 = getattr(self.親, "conf", None)
+        # セッション固有のCODE_BASE_PATHを使用
+        セッション設定 = self.接続.モデル設定 if self.接続 and hasattr(self.接続, "モデル設定") else None
         今回更新あり = False
 
         logger.info("[検証ループ] 開始（最大5回）")
@@ -414,9 +418,9 @@ class CodeAgent:
         await asyncio.sleep(0.5)
 
         for n in range(1, 6):  # 最大5回
-            # バックアップ実行（差分のみ）
+            # バックアップ実行（差分のみ、セッション固有のCODE_BASE_PATHを使用）
             logger.debug(f"[検証{n}回目] バックアップ実行を呼び出します")
-            result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir)
+            result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
             
             # 差分なし → 終了
             if not result:

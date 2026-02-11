@@ -19,8 +19,6 @@ if sys.platform == "win32":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import database, core_crud, core_models
-import os
-import sys
 import threading
 import time
 from conf import conf as app_conf

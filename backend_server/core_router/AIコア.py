@@ -30,6 +30,8 @@ import core_models as models
 # backend_serverディレクトリをパスに追加
 現在ディレクトリ = os.path.dirname(os.path.abspath(__file__))
 バックエンドディレクトリ = os.path.dirname(現在ディレクトリ)
+# プロジェクトルート（backend_serverの親ディレクトリ）
+プロジェクトルート = os.path.dirname(バックエンドディレクトリ)
 if バックエンドディレクトリ not in sys.path:
     sys.path.insert(0, バックエンドディレクトリ)
 
@@ -65,7 +67,7 @@ try:
     from AIコア.AIストリーミング処理 import StreamingProcessor
     from AIコア.AI音声認識 import Recognition
     from AIコア.AI音声処理 import 音声入力データ処理, 統合音声分離ワーカー
-    from AIコア.AIバックアップ import バックアップ実行
+    from AIコア.AIバックアップ import バックアップ実行_共通ログ, コードベース絶対パス取得
     from AIコア.AIチャット import Chat
     from AIコア.AIコード import CodeAgent
     from AIコア.AIライブ import Live
@@ -259,10 +261,22 @@ async def 初期化(http_request: Request, request: 初期化リクエスト):
         # セッションIDがない場合は新規生成
         if not セッションID:
             セッションID = AIセッション管理.セッションID生成()
-            バックアップ実行(getattr(http_request.app, "conf", None), backend_dir=バックエンドディレクトリ)
-
-        # セッションを確実に作成（存在しなければ新規）
-        AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
+            
+            # セッションを確実に作成（存在しなければ新規）
+            AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
+            
+            # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
+            session = AIセッション管理.sessions.get(セッションID)
+            if session and session.モデル設定:
+                バックアップ実行_共通ログ(
+                    呼出しロガー=logger,
+                    アプリ設定=getattr(http_request.app, "conf", None),
+                    backend_dir=バックエンドディレクトリ,
+                    セッション設定=session.モデル設定,
+                )
+        else:
+            # セッションを確実に作成（存在しなければ新規）
+            AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
 
         return 初期化レスポンス(
             status="OK",
@@ -419,13 +433,27 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                 "message": "有効な設定項目がありません"
             }
 
-        # ソケットのモデル設定を更新（ファイル保存はしない）
+        # ソケットのモデル設定を更新（セッション内のみ、ファイル保存はしない）
         if 許可設定:
+            # CODE_BASE_PATHが含まれている場合は絶対パスに変換（セッション用）
+            if "CODE_BASE_PATH" in 許可設定:
+                code_base_path_raw = 許可設定["CODE_BASE_PATH"]
+                # backend_server/core_router → backend_server/ に移動
+                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                code_base_path_abs = os.path.abspath(os.path.join(backend_dir, code_base_path_raw))
+                許可設定["CODE_BASE_PATH"] = code_base_path_abs
+                logger.info(f"CODE_BASE_PATHをセッションに設定しました: {code_base_path_abs} (元: {code_base_path_raw})")
+            
             接続.update_model_settings(許可設定, manager=AIセッション管理)
 
         # 既存プロセッサに反映（即時反映、設定変更がある場合のみ）
         if 許可設定:
             try:
+                実行パス = コードベース絶対パス取得(
+                    アプリ設定=getattr(http_request.app, "conf", None),
+                    backend_dir=バックエンドディレクトリ,
+                    セッション設定=接続.モデル設定,
+                )
                 if hasattr(接続, "chat_processor") and 接続.chat_processor:
                     chat_ai = 接続.モデル設定.get("CHAT_AI_NAME", "")
                     chat_model = ""
@@ -446,6 +474,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                         model_key = f"CODE_AI{idx}_MODEL"
                         agent.AI_NAME = 接続.モデル設定.get(ai_key, "")
                         agent.AI_MODEL = 接続.モデル設定.get(model_key, "")
+                        agent.絶対パス = 実行パス
                         if hasattr(agent, "_select_ai_module"):
                             agent.AIモジュール = agent._select_ai_module()
                         agent.AIインスタンス = None
@@ -465,6 +494,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                     接続.live_processor.AI_NAME = live_ai
                     接続.live_processor.AI_MODEL = live_model
                     接続.live_processor.AI_VOICE = live_voice
+                    接続.live_processor.絶対パス = 実行パス
                     if hasattr(接続.live_processor, "_select_ai_module"):
                         接続.live_processor.AIモジュール = 接続.live_processor._select_ai_module()
                     接続.live_processor.AIインスタンス = None
@@ -480,18 +510,25 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             reboot_core = bool(再起動要求.get("reboot_core"))
             reboot_apps = bool(再起動要求.get("reboot_apps"))
             if reboot_core or reboot_apps:
-                # バックアップ実行
-                バックアップ結果 = バックアップ実行(getattr(http_request.app, "conf", None), backend_dir=バックエンドディレクトリ)
-                if バックアップ結果:
-                    最終時刻, 全ファイル, バックアップファイル, 全件フラグ, バックアップフォルダ = バックアップ結果
-                    バックアップ種別 = "全件" if 全件フラグ else "差分"
-                    logger.info(f"バックアップ成功: {バックアップ種別} {len(バックアップファイル)}件, フォルダ={バックアップフォルダ}")
-                else:
-                    logger.info("バックアップ: 差分なし、またはエラー")
+                # バックアップ実行（セッション固有のCODE_BASE_PATHを使用）
+                バックアップ実行_共通ログ(
+                    呼出しロガー=logger,
+                    アプリ設定=getattr(http_request.app, "conf", None),
+                    backend_dir=バックエンドディレクトリ,
+                    セッション設定=接続.モデル設定,
+                )
             if reboot_core:
                 with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_core.txt"), "w", encoding="utf-8") as f:
                     f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             if reboot_apps:
+                # apps_main再起動時にセッションのCODE_BASE_PATHを引き継ぐ
+                try:
+                    code_base_path_for_apps = str(接続.モデル設定.get("CODE_BASE_PATH", "")).strip()
+                    if code_base_path_for_apps:
+                        with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_apps_code_base_path.txt"), "w", encoding="utf-8") as f:
+                            f.write(code_base_path_for_apps)
+                except Exception:
+                    logger.exception("reboot_apps用CODE_BASE_PATHの保存に失敗しました")
                 with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_apps.txt"), "w", encoding="utf-8") as f:
                     f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             if reboot_core or reboot_apps:
@@ -545,6 +582,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             ソケット番号 = -1
 
         # WebSocket接続を登録（accept済み）
+        新規セッション = not クライアントセッションID or クライアントセッションID not in AIセッション管理.sessions
         セッションID = await AIセッション管理.connect(
             WebSocket接続,
             セッションID=クライアントセッションID,
@@ -556,6 +594,18 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         セッション = AIセッション管理.get_session(セッションID)
         if not セッション:
             raise RuntimeError("セッションの作成に失敗しました")
+        
+        # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
+        if 新規セッション and セッション.モデル設定 and int(ソケット番号) == -1:
+            try:
+                バックアップ実行_共通ログ(
+                    呼出しロガー=logger,
+                    アプリ設定=getattr(WebSocket接続.app, "conf", None),
+                    backend_dir=バックエンドディレクトリ,
+                    セッション設定=セッション.モデル設定,
+                )
+            except Exception as e:
+                logger.error(f"WebSocket接続時バックアップエラー: {e}")
 
         # 初回のみプロセッサを起動
         if セッション.streaming_processor is None and int(ソケット番号) == -1:
@@ -566,7 +616,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             セッション.recognition_processor = Recognition(セッションID, セッション, 保存_会話履歴)
             await セッション.recognition_processor.開始()
 
-        実行パス = セッション.モデル設定.get("CODE_BASE_PATH", "")
+        実行パス = コードベース絶対パス取得(
+            アプリ設定=getattr(WebSocket接続.app, "conf", None),
+            backend_dir=バックエンドディレクトリ,
+            セッション設定=セッション.モデル設定,
+        )
         チャット保存基準パス = バックエンドディレクトリ
         chat_ai = セッション.モデル設定.get("CHAT_AI_NAME", "")
         chat_model = ""
@@ -620,6 +674,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 model_key = f"CODE_AI{i}_MODEL"
                 agent.AI_NAME = セッション.モデル設定.get(ai_key, "")
                 agent.AI_MODEL = セッション.モデル設定.get(model_key, "")
+                agent.絶対パス = 実行パス
                 if hasattr(agent, "_select_ai_module"):
                     agent.AIモジュール = agent._select_ai_module()
                 agent.AIインスタンス = None
@@ -660,6 +715,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             セッション.live_processor.AI_NAME = live_ai
             セッション.live_processor.AI_MODEL = live_model
             セッション.live_processor.AI_VOICE = live_voice
+            セッション.live_processor.絶対パス = 実行パス
             if hasattr(セッション.live_processor, "_select_ai_module"):
                 セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
             セッション.live_processor.AIインスタンス = None

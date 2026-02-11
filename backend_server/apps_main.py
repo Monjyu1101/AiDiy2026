@@ -20,12 +20,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import database, apps_crud, apps_models
 from conf import conf as app_conf
-import os
-import sys
 import threading
 import time
 from log_config import setup_logging, get_logger
-from AIコア.AIバックアップ import バックアップ実行
+from AIコア.AIバックアップ import バックアップ実行_共通ログ
 
 # ロガー取得
 logger = get_logger(__name__)
@@ -144,25 +142,34 @@ def startup_event():
     finally:
         db.close()
 
-    # バックアップ実行
-    try:
-        backend_dir = os.path.dirname(__file__)
-        logger.info("バックアップ処理を開始します...")
-        result = バックアップ実行(アプリ設定=app_conf, backend_dir=backend_dir)
-        if result:
-            最終時刻, 全ファイル一覧, バックアップファイル一覧, 全件フラグ, バックアップフォルダ = result
-            if 全件フラグ:
-                logger.info(f"全件バックアップ完了 最終更新={最終時刻}, 総ファイル数={len(全ファイル一覧)}, 保存先={バックアップフォルダ}")
-            else:
-                logger.info(f"差分バックアップ完了 最終更新={最終時刻}, 総ファイル数={len(全ファイル一覧)}, 差分ファイル数={len(バックアップファイル一覧)}, 保存先={バックアップフォルダ}")
-                for file in バックアップファイル一覧[:10]:  # 最大10件表示
-                    logger.info(f"・{file}")
-                if len(バックアップファイル一覧) > 10:
-                    logger.info(f"... 他 {len(バックアップファイル一覧) - 10}件")
-        else:
-            logger.info("バックアップスキップ（差分なし）")
-    except Exception as e:
-        logger.error(f"バックアップ実行時エラー: {e}")
+    # ベースラインバックアップ実行（並列スレッドで処理）
+    def バックアップ並列処理():
+        try:
+            # CODE_BASE_PATHの相対解決は backend_server 基準に統一
+            backend_dir = os.path.dirname(os.path.abspath(__file__))
+            セッション設定 = None
+            reboot_apps_code_base_path = os.path.join(temp_dir, "reboot_apps_code_base_path.txt")
+            if os.path.isfile(reboot_apps_code_base_path):
+                try:
+                    with open(reboot_apps_code_base_path, "r", encoding="utf-8") as f:
+                        code_base_path = f.read().strip()
+                    if code_base_path:
+                        セッション設定 = {"CODE_BASE_PATH": code_base_path}
+                finally:
+                    try:
+                        os.remove(reboot_apps_code_base_path)
+                    except Exception:
+                        pass
+            バックアップ実行_共通ログ(
+                呼出しロガー=logger,
+                アプリ設定=app_conf,
+                backend_dir=backend_dir,
+                セッション設定=セッション設定,
+            )
+        except Exception as e:
+            logger.error(f"バックアップ実行時エラー: {e}")
+    
+    threading.Thread(target=バックアップ並列処理, daemon=True).start()
 
 @app.get("/")
 def read_root():

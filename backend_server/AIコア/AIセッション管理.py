@@ -29,9 +29,8 @@ def 初期モデル設定生成(app_conf) -> dict:
     if not (app_conf and hasattr(app_conf, 'json')):
         return {}
     
-    # CODE_BASE_PATHを絶対パスに変換
+    # CODE_BASE_PATHは相対パスのまま保存（セッション固有の絶対パス変換は使用時に行う）
     code_base_path_raw = app_conf.json.get("CODE_BASE_PATH", "../")
-    code_base_path_abs = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", code_base_path_raw))
 
     return {
         # ChatAI設定
@@ -64,7 +63,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
         "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
-        "CODE_BASE_PATH": code_base_path_abs,
+        "CODE_BASE_PATH": code_base_path_raw,
     }
 
 

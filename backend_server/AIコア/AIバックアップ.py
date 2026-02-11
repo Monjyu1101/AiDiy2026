@@ -9,12 +9,13 @@
 
 import os
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, List
 
 from log_config import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger("バックアップ")
 
 _バックアップ除外フォルダ = (
     "__pycache__",
@@ -60,16 +61,63 @@ _バックアップ除外拡張子 = (
     ".swp",
 )
 
+# ファイルコピーは軽量な並列数で実行（呼び出し元APIは同期で待機）
+_バックアップコピー並列数 = 4
 
-def _コードベース絶対パス取得(アプリ設定=None, backend_dir: Optional[str] = None) -> str:
+
+def _コードベース絶対パス取得(アプリ設定=None, backend_dir: Optional[str] = None, セッション設定: Optional[dict] = None) -> str:
+    """
+    CODE_BASE_PATHの絶対パスを取得
+    優先順位: 1. セッション設定, 2. アプリ設定, 3. デフォルト("../")
+    """
     raw_path = "../"
-    if アプリ設定 and hasattr(アプリ設定, "json"):
+    
+    # 1. セッション設定から取得（最優先）
+    if セッション設定 and "CODE_BASE_PATH" in セッション設定:
+        raw_path = セッション設定["CODE_BASE_PATH"]
+    # 2. アプリ設定から取得
+    elif アプリ設定 and hasattr(アプリ設定, "json"):
         raw_path = アプリ設定.json.get("CODE_BASE_PATH", "../")
+    
     normalized = raw_path.replace("\\", "/").strip()
     base_dir = backend_dir or os.path.dirname(os.path.abspath(__file__))
     if os.path.isabs(normalized):
         return os.path.abspath(normalized)
     return os.path.abspath(os.path.join(base_dir, normalized))
+
+
+def コードベース絶対パス取得(アプリ設定=None, backend_dir: Optional[str] = None, セッション設定: Optional[dict] = None) -> str:
+    """CODE_BASE_PATH の絶対パスを返す公開ヘルパー"""
+    return _コードベース絶対パス取得(アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
+
+
+def バックアップ実行_共通ログ(
+    呼出しロガー=None,
+    アプリ設定=None,
+    backend_dir: Optional[str] = None,
+    セッション設定: Optional[dict] = None,
+) -> Optional[Tuple[str, List[str], List[str], bool, str]]:
+    """
+    呼び出し元ロガーに開始/終了を必ず出す共通ラッパー
+    - 開始は呼び出し直後に出力
+    - 終了は結果の有無に関わらず出力（差分なしは件数0）
+    """
+    base_path = _コードベース絶対パス取得(
+        アプリ設定=アプリ設定,
+        backend_dir=backend_dir,
+        セッション設定=セッション設定,
+    )
+    log = 呼出しロガー or logger
+    log.info(f"バックアップ開始({base_path})")
+    result = バックアップ実行(
+        アプリ設定=アプリ設定,
+        backend_dir=backend_dir,
+        セッション設定=セッション設定,
+        ログ出力=False,
+    )
+    count = len(result[2]) if result else 0
+    log.info(f"バックアップ終了(件数={count})")
+    return result
 
 
 def _最新更新と全ファイル一覧(ベースパス: str) -> Tuple[float, List[str]]:
@@ -105,16 +153,22 @@ def _最新更新と全ファイル一覧(ベースパス: str) -> Tuple[float, 
     return max_mtime, files
 
 
-def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = None) -> Optional[Tuple[str, List[str], List[str], bool, str]]:
+def バックアップ実行(
+    アプリ設定=None,
+    backend_dir: Optional[str] = None,
+    セッション設定: Optional[dict] = None,
+    ログ出力: bool = True,
+) -> Optional[Tuple[str, List[str], List[str], bool, str]]:
     """
     シンプル差分バックアップ実行
     - 初回（*.allフォルダなし）→ 全件バックアップ
     - 2回目以降 → 最終バックアップ時刻+1秒以降の差分のみ
     
+    セッション設定: セッション固有のCODE_BASE_PATHを含む辞書（オプション）
     戻り値: (最終更新時刻, 全ファイル一覧, バックアップファイル一覧, 全件フラグ, バックアップフォルダ絶対パス) または None（差分なしまたはエラー）
     """
     try:
-        base_path = _コードベース絶対パス取得(アプリ設定, backend_dir=backend_dir)
+        base_path = _コードベース絶対パス取得(アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
         if not os.path.isdir(base_path):
             return None
 
@@ -136,9 +190,12 @@ def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = 
         
         # 初回（全件バックアップ）
         if not 最終バックアップ結果:
-            logger.info(f"初回全件バックアップ作成: {len(all_files)}件")
             target_dir = os.path.abspath(os.path.join(backup_root, date_dir, f"{time_dir}.all"))
+            if ログ出力:
+                logger.info(f"バックアップ開始({base_path})")
             if _ファイルコピー実行(base_path, all_files, target_dir):
+                if ログ出力:
+                    logger.info(f"バックアップ終了(件数={len(all_files)})")
                 return (最終時刻, all_files, all_files, True, target_dir)
             return None
         
@@ -160,17 +217,18 @@ def バックアップ実行(アプリ設定=None, backend_dir: Optional[str] = 
                 continue
         
         if not changed_files:
-            logger.debug(f"差分なし: 最終={datetime.fromtimestamp(最終タイムスタンプ).strftime('%Y-%m-%d %H:%M:%S')}")
             return None
         
         # 差分バックアップ作成
         target_dir = os.path.abspath(os.path.join(backup_root, date_dir, time_dir))
         if os.path.isdir(target_dir):
-            logger.info(f"バックアップ既存: {target_dir}")
             return None
         
-        logger.info(f"差分バックアップ作成: {len(changed_files)}件")
+        if ログ出力:
+            logger.info(f"バックアップ開始({base_path})")
         if _ファイルコピー実行(base_path, changed_files, target_dir):
+            if ログ出力:
+                logger.info(f"バックアップ終了(件数={len(changed_files)})")
             return (最終時刻, all_files, changed_files, False, target_dir)
         return None
 
@@ -183,16 +241,36 @@ def _ファイルコピー実行(base_path: str, file_list: List[str], target_di
     """ファイルリストをtarget_dirにコピー"""
     try:
         os.makedirs(target_dir, exist_ok=True)
+        targets: List[Tuple[str, str]] = []
         for rel_path in file_list:
             src_path = os.path.join(base_path, rel_path.replace("/", os.sep))
             if not os.path.exists(src_path):
                 continue
             dest_path = os.path.join(target_dir, rel_path.replace("/", os.sep))
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            shutil.copy2(src_path, dest_path)
+            targets.append((src_path, dest_path))
+
+        if not targets:
+            return True
+
+        max_workers = min(_バックアップコピー並列数, len(targets))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_単一ファイルコピー, src_path, dest_path) for src_path, dest_path in targets]
+            for future in as_completed(futures):
+                if not future.result():
+                    return False
         return True
     except Exception as e:
         logger.error(f"ファイルコピーエラー: {e}")
+        return False
+
+
+def _単一ファイルコピー(src_path: str, dest_path: str) -> bool:
+    try:
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        shutil.copy2(src_path, dest_path)
+        return True
+    except Exception as e:
+        logger.error(f"ファイルコピー失敗: {src_path} -> {dest_path}, エラー: {e}")
         return False
 
 
@@ -330,6 +408,3 @@ def 差分ファイル取得(アプリ設定=None, backend_dir: Optional[str] = 
     except Exception as e:
         logger.warning(f"差分ファイル取得失敗: {e}")
         return None
-
-
-
