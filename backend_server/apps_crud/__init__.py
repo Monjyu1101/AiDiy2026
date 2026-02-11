@@ -1,11 +1,12 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
-# ------------------------------------------------
-# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU.
-# This software is licensed under the MIT License.
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101
-# Thank you for keeping the rules.
-# ------------------------------------------------
+# -------------------------------------------------------------------------
 
 from apps_crud.utils import get_current_datetime, create_audit_fields, update_audit_fields
 from apps_crud.M配車区分 import get_M配車区分, get_M配車区分一覧, create_M配車区分

@@ -1,11 +1,12 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
-# ------------------------------------------------
-# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU.
-# This software is licensed under the MIT License.
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101
-# Thank you for keeping the rules.
-# ------------------------------------------------
+# -------------------------------------------------------------------------
 
 from core_crud.utils import get_current_datetime, create_audit_fields, update_audit_fields
 from core_crud.A会話履歴 import create_会話履歴, get_会話履歴, get_会話履歴_by_socket, get_next_sequence, update_会話履歴, delete_会話履歴, delete_会話履歴_by_socket
