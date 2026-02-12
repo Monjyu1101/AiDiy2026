@@ -300,7 +300,7 @@ class CodeAgent:
         """
         基本AI処理（input_text/input_request共通）:
         1. AI実行 + output_text送信
-        2. バックアップ検証ループ（最大7回）
+        2. バックアップ検証ループ（最大5回）
         3. 生成ファイル通知
         4. update_info送信
 

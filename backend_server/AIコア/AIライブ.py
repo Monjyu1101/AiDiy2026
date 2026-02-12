@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#
+
 # -------------------------------------------------------------------------
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 # Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
@@ -361,18 +361,31 @@ class Live:
                 logger.info(
                     f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
                 )
-                送信成功 = await self.AIインスタンス.テキスト送信(text)
-                if not 送信成功:
-                    logger.warning("[Live] テキスト送信: LiveAI内部送信に失敗しました")
-                    await self._send_output_text({
-                        "text": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。"
+                result = await self.AIインスタンス.テキスト送信(text)
+                # テキスト送信が失敗した場合（APIキーなしなど）にエラーメッセージを表示
+                if not result:
+                    logger.warning("LiveAI実行:テキスト送信に失敗しました")
+                    if self.接続:
+                        await self.接続.send_to_channel(0, {
+                            "セッションID": self.セッションID,
+                            "メッセージ識別": "output_text",
+                            "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",
+                            "ファイル名": None,
+                            "サムネイル画像": None
+                        })
+                return result
+            else:
+                # LiveAI未初期化時のエラーメッセージ送信
+                logger.warning("LiveAI実行:LiveAIが開始されていません")
+                if self.接続:
+                    await self.接続.send_to_channel(0, {
+                        "セッションID": self.セッションID,
+                        "メッセージ識別": "output_text",
+                        "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",
+                        "ファイル名": None,
+                        "サムネイル画像": None
                     })
-                return 送信成功
-            logger.warning("[Live] テキスト送信: LiveAIが開始されていません")
-            await self._send_output_text({
-                "text": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。"
-            })
-            return False
+                return False
         except Exception as e:
             logger.error(f"[Live] テキスト送信エラー: {e}")
             return False
