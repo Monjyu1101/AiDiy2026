@@ -299,17 +299,17 @@ def check_postgres_user():
     print_header("PostgreSQL ユーザー確認")
     
     print_info("PostgreSQLに以下のユーザーを作成する必要があります:")
-    print_info("  ユーザー名: baseuser")
-    print_info("  パスワード: basepass")
+    print_info("  ユーザー名: appsuser")
+    print_info("  パスワード: appspass")
     print()
     print_info("作成方法:")
     print_info("  psql -U postgres")
-    print_info("  CREATE USER baseuser WITH PASSWORD 'basepass';")
-    print_info("  CREATE DATABASE basedb OWNER baseuser;")
-    print_info("  GRANT ALL PRIVILEGES ON DATABASE basedb TO baseuser;")
+    print_info("  CREATE USER appsuser WITH PASSWORD 'appspass';")
+    print_info("  CREATE DATABASE appsdb OWNER appsuser;")
+    print_info("  GRANT ALL PRIVILEGES ON DATABASE appsdb TO appsuser;")
     print()
     
-    return ask_yes_no("PostgreSQLユーザー(baseuser)を作成しましたか?", default="y")
+    return ask_yes_no("PostgreSQLユーザー(appsuser)を作成しましたか?", default="y")
 
 
 def restore_initial_database():
@@ -322,7 +322,7 @@ def restore_initial_database():
         return True
     
     create_db_script = POSTGRES_DIR / "create_database.py"
-    initial_sql = POSTGRES_DIR / "initial_basedb.sql"
+    initial_sql = POSTGRES_DIR / "initial_appsdb.sql"
     
     # スクリプトとSQLファイルの存在確認
     if not create_db_script.exists():

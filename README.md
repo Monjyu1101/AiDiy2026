@@ -39,6 +39,38 @@
 
 ---
 
+## 0. 事前準備
+
+### 必要なソフトウェア
+
+セットアップ前に、以下のソフトウェアをダウンロード・インストールしてください。
+
+| ソフトウェア | ダウンロード先 |
+|---|---|
+| **Python** (3.13以上) | https://www.python.org/downloads/ |
+| **Node.js** (v22以上) | https://nodejs.org/ja/download |
+| **Git** | https://gitforwindows.org/ |
+
+### プロキシ設定（必要な場合のみ）
+
+社内ネットワークなどプロキシ環境下では、以下の設定が必要な場合があります。
+
+```bash
+git config --global http.proxy http://n.n.n.n:nnnn
+npm config set proxy http://n.n.n.n:nnnn
+```
+
+※ `n.n.n.n:nnnn` はご利用のプロキシサーバーのアドレスとポート番号に置き換えてください。
+
+### リポジトリの取得
+
+```bash
+git clone https://github.com/Monjyu1101/AiDiy2026
+cd AiDiy2026
+```
+
+---
+
 ## 1. セットアップ (_setup.py)
 
 初回起動前に、プロジェクトの依存関係をインストールします。
@@ -81,16 +113,11 @@ python _start.py
 
 ## 1.5. APIキー設定（公開リポジトリ向け）
 
-APIキーは `backend_server/_config/AiDiy_key.json` に保存されます。  
+APIキーは `backend_server/_config/AiDiy_key.json` に保存されます。
 このフォルダは **公開リポジトリに含めない** 方針のため、`.gitignore` で除外しています。
 
-初回セットアップ時は以下の手順で作成してください。
-
-```bash
-copy backend_server\\AiDiy_key.example.json backend_server\\_config\\AiDiy_key.json
-```
-
-作成後、`AiDiy_key.json` 内の各APIキーを設定してください。
+ファイルが無ければ、初回起動時にひな形が自動的に保存されるため、手動コピーは不要です。
+起動後、`AiDiy_key.json` 内の各APIキーを設定してください。
 
 ---
 

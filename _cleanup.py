@@ -12,6 +12,7 @@ Usage:
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -343,6 +344,43 @@ def cleanup_client(base_dir):
         print_info("削除対象のフォルダはありませんでした")
 
 
+def uninstall_global_npm_tools():
+    """グローバルnpmパッケージをアンインストール"""
+    print_header("グローバルnpmツールのアンインストール")
+
+    # npmコマンドを取得（Windows対応）
+    npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
+
+    packages = [
+        "@anthropic-ai/claude-code",
+        "@github/copilot",
+        "@openai/codex",
+        "@google/gemini-cli",
+    ]
+
+    uninstalled_count = 0
+    for i, package in enumerate(packages, 1):
+        if ask_yes_no(f"  [{i}/{len(packages)}] {package} をアンインストールしますか？", default="n"):
+            cmd = [npm_cmd, "uninstall", "-g", package]
+            print_info(f"実行中: {' '.join(cmd)}")
+            try:
+                subprocess.run(cmd, check=True, capture_output=False, text=True)
+                print_success(f"  {package} をアンインストールしました")
+                uninstalled_count += 1
+            except subprocess.CalledProcessError as e:
+                print_error(f"  {package} のアンインストールに失敗しました: {e}")
+            except FileNotFoundError:
+                print_error(f"  {npm_cmd} が見つかりません。Node.jsがインストールされているか確認してください")
+                break
+        else:
+            print_info(f"  {package} はそのまま残します")
+
+    if uninstalled_count > 0:
+        print_success(f"グローバルnpmツールのアンインストール完了 ({uninstalled_count}個削除)")
+    else:
+        print_info("アンインストール対象はありませんでした")
+
+
 def main():
     """メイン処理"""
     global AUTO_MODE
@@ -363,6 +401,12 @@ def main():
 
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
+
+    # グローバルnpmツールのアンインストール
+    if ask_yes_no("グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n"):
+        uninstall_global_npm_tools()
+    else:
+        print_info("グローバルnpmツールのアンインストールをスキップしました")
 
     # backup フォルダの削除確認（先に実施）
     backup_dir = base_dir / "backup"
@@ -385,7 +429,7 @@ def main():
         cleanup_client(base_dir)
     else:
         print_info("フロントエンドのクリーンアップをスキップしました")
-    
+
     print()
     print_header("クリーンアップ完了")
     print_success("プロジェクトのクリーンアップが完了しました")
