@@ -21,6 +21,36 @@ from datetime import datetime
 _logging_configured = False
 
 
+class ByteAlignedFormatter(logging.Formatter):
+    """
+    ロガー名をShift_JISバイト幅で揃えるフォーマッタ
+    - 24バイト以下: 半角スペースで右埋め
+    - 24バイト超過: そのまま表示（切り詰めない）
+    """
+
+    def __init__(self, fmt: str, datefmt: str | None = None, name_width_bytes: int = 24, encoding: str = "shift_jis"):
+        super().__init__(fmt=fmt, datefmt=datefmt)
+        self.name_width_bytes = max(0, int(name_width_bytes))
+        self.encoding = encoding
+
+    def _byte_width(self, text: str) -> int:
+        try:
+            return len(text.encode(self.encoding, errors="replace"))
+        except Exception:
+            return len(text.encode("shift_jis", errors="replace"))
+
+    def _pad_name_by_width(self, name: str) -> str:
+        text = str(name)
+        width = self._byte_width(text)
+        if width >= self.name_width_bytes:
+            return text
+        return text + (" " * (self.name_width_bytes - width))
+
+    def format(self, record: logging.LogRecord) -> str:
+        record.name_aligned = self._pad_name_by_width(record.name)
+        return super().format(record)
+
+
 def _detect_instance_name() -> str:
     """
     起動引数からインスタンス名を推定する
@@ -97,8 +127,8 @@ def setup_logging(instance_name: str | None = None):
 
     instance = (instance_name or _detect_instance_name()).strip() or "AiDiy"
     log_dir = os.path.join(os.path.dirname(__file__), "temp", "logs")
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
+    formatter = ByteAlignedFormatter(
+        '%(asctime)s - %(name_aligned)s - %(levelname)-8s - %(message)s',
         datefmt='%H:%M:%S'
     )
     console_handler = logging.StreamHandler()
@@ -109,6 +139,7 @@ def setup_logging(instance_name: str | None = None):
     logging.basicConfig(
         level=logging.INFO,
         handlers=[console_handler, file_handler],
+        force=True,
     )
 
     # 特定のライブラリのログレベルを調整

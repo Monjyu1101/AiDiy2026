@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
@@ -9,17 +9,8 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-# モジュール名
-MODULE_NAME = '_gemini'
-
-# ロガーの設定
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(MODULE_NAME)
+from log_config import get_logger
+logger = get_logger(__name__)
 
 import os
 import time
@@ -43,7 +34,7 @@ class ChatAI:
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "gemini", AI_MODEL: str = "gemini-2.5-flash",
-                 api_key: str = None):
+                 api_key: str = None, system_instruction: str = None):
         """初期化"""
 
         # セッションID・チャンネル
@@ -90,6 +81,11 @@ class ChatAI:
         # モデル設定
         self.chat_ai = AI_NAME
         self.chat_model = AI_MODEL
+        self.system_instruction = (
+            system_instruction.strip()
+            if isinstance(system_instruction, str) and system_instruction.strip()
+            else None
+        )
 
         # 作業ディレクトリ設定
         if 絶対パス and isinstance(絶対パス, str):
@@ -243,7 +239,10 @@ class ChatAI:
 
             # デフォルトシステムプロンプト
             if not システムプロンプト:
-                システムプロンプト = "あなたは美しい日本語を話す賢いアシスタントです。"
+                if self.system_instruction:
+                    システムプロンプト = self.system_instruction
+                else:
+                    システムプロンプト = "あなたは、美しい日本語を話す、賢いAIアシスタントです。"
 
             # 履歴管理
             if len(self.履歴辞書) == 0:
@@ -537,3 +536,4 @@ if __name__ == "__main__":
         print("APIキーが設定されていません。_config/AiDiy_key.json を確認してください。")
     else:
         asyncio.run(_main(api_key=api_key, AI_MODEL=AI_MODEL))
+

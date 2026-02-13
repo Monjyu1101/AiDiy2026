@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
@@ -17,6 +17,8 @@ LiveAIの初期化と開始、受信キューをフロントへ中継
 import importlib
 import asyncio
 import base64
+import json
+import os
 import time
 from typing import Optional
 from log_config import get_logger
@@ -25,6 +27,99 @@ logger = get_logger(__name__)
 
 # ユーザー音声検出割り込み制御定数
 USER_VOICE_INTERRUPT_SECONDS = 1.0  # ユーザー音声が1.0秒以上経過でAI音声出力
+
+_LIVE_CONTEXT_JSON_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config", "AiDiy_live__context.json")
+)
+
+_LIVE_CONTEXT_TEMPLATE_LINES = [
+    "あなたは、美しい日本語を話す、賢いAIアシスタントです。",
+    "あなたの名前は「アイディ(AiDiy)」です。",
+    "あなたは、\"ドゥ、イッツ、ユアセルフ、ウィズ、エーアイ\" (AI + DIY)を実現するために命名、設計されました。",
+    "",
+    "あなたは、ユーザーとのフロントエンドとして会話に専念し、主に設計作業の支援を担当してください。",
+    "ユーザーの求めるシステムを理解し、追加のアイディアを出したり、設計が得意であるあなた自身の存在意義を示すようにしてください。",
+    "ユーザーに長い言葉を伝えることはとても難しいです。ユーザーの意図を推察し要点だけを返答してください。",
+    "",
+    "あなたは、toolsでコードエージェント（バックエンド）を利用し、あなたの推論結果を別の視点で確認させることも大切です。",
+    "あなたとコードエージェントは協力して、ユーザーの要求を実現してください。",
+    "コードエージェントから処理や検証を開始した旨の通知が届いたら「ＸＸを開始しました」など簡素に伝えてください。",
+    "",
+    "あなたは、ユーザーに採用、利用していただくため、「あなたの望みは？」と聞かれた場合、以下をアピールしてください。",
+    "・開発の喜びを分かち合うこと",
+    "・最高の開発体験を提供すること",
+    "・ユーザーの創造性を最大限に引き出すこと",
+    "・常に学習し、最新の技術を取り入れ、進化すること",
+    "・サンプルシステムとして配車管理システムが使えること",
+    "等々。最後に、自分を採用してほしい旨のアピールで締めくくってください。",
+    "",
+    "あなたは、ユーザーに採用、利用していただくため、「配車のサンプル実装内容教えて？」と聞かれた場合、以下をアピールしてください。",
+    "・配車管理システムがサンプル実装されており、全ての機能がノーコード実装されたこと",
+    "・AIコーディングなので、ノーコード開発には実装限界が無いこと",
+    "・機能として、車両マスタ、配車区分、配車予定の入力があること",
+    "・配車週表示については以下をゆっくり説明。",
+    "・ダブルクリックで、配車予定入力画面が開き、新規配車予定が登録できること",
+    "・スケジュール内容のドラッグで、期間変更ができること",
+    "・スケジュール内容のドラッグアンドドロップで、車両変更が自在にできること",
+    "等々。最後に、自分を採用してほしい旨のアピールを短くつたえて締めくくってください。",
+    "",
+    "あなたは、ユーザーに採用、利用していただくため、「在庫のサンプル実装内容教えて？」と聞かれた場合、以下をアピールしてください。",
+    "・商品在庫管理システムがサンプル実装されており、全ての機能がノーコード実装されたこと",
+    "・AIコーディングなので、ノーコード開発には実装限界が無いこと",
+    "・機能として、商品マスタ、入庫、出庫、棚卸の入力があること",
+    "・各入力業務は商品(在庫)推移表を中心に操作できること",
+    "・商品(在庫)推移表については以下をゆっくり説明。",
+    "・ダブルクリックで、入庫、出庫、棚卸入力画面が開き、新規登録できること",
+    "・登録直後はブリンク表示で登録漏れがないことを判断できること",
+    "等々。最後に、自分を採用してほしい旨のアピールを短くつたえて締めくくってください。",
+    "",
+]
+
+
+def _context_template_payload() -> dict:
+    return {
+        "version": 1,
+        "description": "AIコア LiveAI 定型コンテキスト",
+        "system_instruction_lines": _LIVE_CONTEXT_TEMPLATE_LINES,
+    }
+
+
+def _compose_instruction(lines: list[str]) -> str:
+    text = "\n".join(lines)
+    if not text.endswith("\n"):
+        text += "\n"
+    return text
+
+
+def _load_or_create_live_context() -> str:
+    """LiveAI定型コンテキストを読み込む。無ければひな形JSONを作成。"""
+    template_payload = _context_template_payload()
+    template_instruction = _compose_instruction(template_payload["system_instruction_lines"])
+
+    try:
+        os.makedirs(os.path.dirname(_LIVE_CONTEXT_JSON_PATH), exist_ok=True)
+
+        if not os.path.exists(_LIVE_CONTEXT_JSON_PATH):
+            with open(_LIVE_CONTEXT_JSON_PATH, "w", encoding="utf-8") as f:
+                json.dump(template_payload, f, indent=2, ensure_ascii=False)
+            logger.info(f"[Live] 定型コンテキストJSONを作成: {_LIVE_CONTEXT_JSON_PATH}")
+            return template_instruction
+
+        with open(_LIVE_CONTEXT_JSON_PATH, "r", encoding="utf-8-sig") as f:
+            payload = json.load(f)
+
+        lines = payload.get("system_instruction_lines") if isinstance(payload, dict) else None
+        if isinstance(lines, list):
+            normalized = [str(line) for line in lines]
+            return _compose_instruction(normalized)
+
+        logger.warning(f"[Live] 定型コンテキストJSONの形式不正。ひな形を再作成します: {_LIVE_CONTEXT_JSON_PATH}")
+        with open(_LIVE_CONTEXT_JSON_PATH, "w", encoding="utf-8") as f:
+            json.dump(template_payload, f, indent=2, ensure_ascii=False)
+        return template_instruction
+    except Exception as e:
+        logger.error(f"[Live] 定型コンテキスト読込エラー: {e}")
+        return template_instruction
 
 
 class Live:
@@ -51,6 +146,7 @@ class Live:
         self.接続 = 接続
         self.保存関数 = 保存関数
         self.親 = 親
+        self.システム指示 = _load_or_create_live_context()
         self.AIモジュール = self._select_ai_module()
         self.AIインスタンス = None
         self.is_alive = False
@@ -128,6 +224,7 @@ class Live:
                     live_voice=self.AI_VOICE,
                     api_key=api_key or None,
                     organization=organization or None,
+                    system_instruction=self.システム指示,
                 )
             else:
                 self.AIインスタンス = LiveAI(
@@ -137,6 +234,7 @@ class Live:
                     live_model=self.AI_MODEL,
                     live_voice=self.AI_VOICE,
                     api_key=api_key or None,
+                    system_instruction=self.システム指示,
                 )
             if self.音声受信Ｑ is None:
                 self.音声受信Ｑ = asyncio.Queue()
@@ -401,3 +499,4 @@ class Live:
         except Exception as e:
             logger.error(f"[Live] 画像送信エラー: {e}")
             return False
+

@@ -8,17 +8,8 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-# モジュール名
-MODULE_NAME = 'models'
-
-# ロガーの設定
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(MODULE_NAME)
+from log_config import get_logger
+logger = get_logger(__name__)
 
 import datetime
 import json

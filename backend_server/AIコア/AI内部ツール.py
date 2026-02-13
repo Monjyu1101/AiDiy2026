@@ -9,12 +9,8 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-# モジュール名
-MODULE_NAME = 'ai_tools'
-
-# ロガーの設定
-import logging
-logger = logging.getLogger(MODULE_NAME)
+from log_config import get_logger
+logger = get_logger(__name__)
 
 import json
 import asyncio

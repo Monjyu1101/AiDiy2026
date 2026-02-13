@@ -13,6 +13,7 @@ AIコア APIエンドポイント
 WebSocketベースのセッション管理とストリーミング処理
 """
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request
+from starlette.websockets import WebSocketState
 from pydantic import BaseModel
 from typing import Dict, Optional
 import uuid
@@ -46,9 +47,7 @@ def _short_sid(セッションID: Optional[str]) -> str:
     if not セッションID:
         return "-"
     sid = str(セッションID)
-    if len(sid) <= 23:
-        return sid
-    return f"{sid[:10]}...{sid[-10:]}"
+    return sid[:10]
 
 
 def _ws_log(ch: int, 内容: str, セッションID: Optional[str] = None, level: str = "info"):
@@ -62,6 +61,19 @@ def _ws_log(ch: int, 内容: str, セッションID: Optional[str] = None, level
         logger.error(msg)
     else:
         logger.info(msg)
+
+
+def _is_disconnect_like_error(e: Exception) -> bool:
+    msg = str(e)
+    return any([
+        "Cannot call \"receive\" once a disconnect message has been received." in msg,
+        "Unexpected ASGI message 'websocket.send', after sending 'websocket.close'" in msg,
+        "WebSocket is not connected" in msg,
+    ])
+
+
+def _is_ws_connected(ws: WebSocket) -> bool:
+    return getattr(ws, "application_state", None) == WebSocketState.CONNECTED
 
 try:
     from AIコア.AIセッション管理 import AIセッション管理, SessionConnection
@@ -565,7 +577,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
     try:
         await WebSocket接続.accept()
-        _ws_log(ch=-99, 内容="接続受付")
+        # ノイズ削減: 接続受付ログは通常運用では出力しない
 
         # 初回メッセージでセッションID・ソケット番号を受信
         try:
@@ -577,10 +589,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             if ソケット番号 is None:
                 ソケット番号 = -1
             _ws_log(ch=int(ソケット番号), 内容="接続要求", セッションID=クライアントセッションID)
+        except WebSocketDisconnect as e:
+            _ws_log(ch=-99, 内容=f"初回受信前に切断: code={getattr(e, 'code', '-')}", level="info")
+            return
         except Exception as e:
             _ws_log(ch=-99, 内容=f"初回受信エラー: {e}", level="error")
-            クライアントセッションID = None
-            ソケット番号 = -1
+            return
 
         # WebSocket接続を登録（accept済み）
         新規セッション = not クライアントセッションID or クライアントセッションID not in AIセッション管理.sessions
@@ -608,123 +622,123 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             except Exception as e:
                 logger.error(f"WebSocket接続時バックアップエラー: {e}")
 
-        # 初回のみプロセッサを起動
-        if セッション.streaming_processor is None and int(ソケット番号) == -1:
-            セッション.streaming_processor = StreamingProcessor(セッションID, セッション)
-            await セッション.streaming_processor.start()
+        # セッション内の初期化は1回ずつ直列化（複数ソケット同時接続での重複起動防止）
+        async with セッション.初期化ロック:
+            # 初回のみプロセッサを起動
+            if セッション.streaming_processor is None and int(ソケット番号) == -1:
+                セッション.streaming_processor = StreamingProcessor(セッションID, セッション)
+                await セッション.streaming_processor.start()
 
-        if セッション.recognition_processor is None:
-            セッション.recognition_processor = Recognition(セッションID, セッション, 保存_会話履歴)
-            await セッション.recognition_processor.開始()
+            if セッション.recognition_processor is None:
+                セッション.recognition_processor = Recognition(セッションID, セッション, 保存_会話履歴)
+                await セッション.recognition_processor.開始()
 
-        実行パス = コードベース絶対パス取得(
-            アプリ設定=getattr(WebSocket接続.app, "conf", None),
-            backend_dir=バックエンドディレクトリ,
-            セッション設定=セッション.モデル設定,
-        )
-        チャット保存基準パス = バックエンドディレクトリ
-        chat_ai = セッション.モデル設定.get("CHAT_AI_NAME", "")
-        chat_model = ""
-        if chat_ai == "openrt":
-            chat_model = セッション.モデル設定.get("CHAT_OPENRT_MODEL", "")
-        elif chat_ai in ("gemini", "freeai"):
-            key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai" else "CHAT_GEMINI_MODEL"
-            chat_model = セッション.モデル設定.get(key, "")
-
-        if not hasattr(セッション, "chat_processor"):
-            セッション.chat_processor = Chat(
-                親=WebSocket接続.app,
-                セッションID=セッションID,
-                チャンネル=0,
-                絶対パス=チャット保存基準パス,
-                AI_NAME=chat_ai,
-                AI_MODEL=chat_model,
-                接続=セッション,
-                保存関数=保存_会話履歴,
+            実行パス = コードベース絶対パス取得(
+                アプリ設定=getattr(WebSocket接続.app, "conf", None),
+                backend_dir=バックエンドディレクトリ,
+                セッション設定=セッション.モデル設定,
             )
-            await セッション.chat_processor.開始()
-        else:
-            セッション.chat_processor.AI_NAME = chat_ai
-            セッション.chat_processor.AI_MODEL = chat_model
-            if hasattr(セッション.chat_processor, "_select_ai_module"):
-                セッション.chat_processor.AIモジュール = セッション.chat_processor._select_ai_module()
-            セッション.chat_processor.AIインスタンス = None
-            if not getattr(セッション.chat_processor, "is_alive", False):
-                await セッション.chat_processor.開始()
+            チャット保存基準パス = バックエンドディレクトリ
+            chat_ai = セッション.モデル設定.get("CHAT_AI_NAME", "")
+            chat_model = ""
+            if chat_ai == "openrt":
+                chat_model = セッション.モデル設定.get("CHAT_OPENRT_MODEL", "")
+            elif chat_ai in ("gemini", "freeai"):
+                key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai" else "CHAT_GEMINI_MODEL"
+                chat_model = セッション.モデル設定.get(key, "")
 
-        if (not hasattr(セッション, "code_agent_processors")) or (not isinstance(セッション.code_agent_processors, list)) or (len(セッション.code_agent_processors) != 4):
-            セッション.code_agent_processors = []
-            for i in range(1, 5):
-                ai_key = f"CODE_AI{i}_NAME"
-                model_key = f"CODE_AI{i}_MODEL"
-                agent = CodeAgent(
+            if not hasattr(セッション, "chat_processor"):
+                セッション.chat_processor = Chat(
                     親=WebSocket接続.app,
                     セッションID=セッションID,
-                    チャンネル=i,
-                    絶対パス=実行パス,
-                    AI_NAME=セッション.モデル設定.get(ai_key, ""),
-                    AI_MODEL=セッション.モデル設定.get(model_key, ""),
+                    チャンネル=0,
+                    絶対パス=チャット保存基準パス,
+                    AI_NAME=chat_ai,
+                    AI_MODEL=chat_model,
                     接続=セッション,
                     保存関数=保存_会話履歴,
                 )
-                await agent.開始()
-                セッション.code_agent_processors.append(agent)
-        else:
-            for i, agent in enumerate(セッション.code_agent_processors, start=1):
-                ai_key = f"CODE_AI{i}_NAME"
-                model_key = f"CODE_AI{i}_MODEL"
-                agent.AI_NAME = セッション.モデル設定.get(ai_key, "")
-                agent.AI_MODEL = セッション.モデル設定.get(model_key, "")
-                agent.絶対パス = 実行パス
-                if hasattr(agent, "_select_ai_module"):
-                    agent.AIモジュール = agent._select_ai_module()
-                agent.AIインスタンス = None
-                if not getattr(agent, "is_alive", False):
+                await セッション.chat_processor.開始()
+            else:
+                セッション.chat_processor.AI_NAME = chat_ai
+                セッション.chat_processor.AI_MODEL = chat_model
+                if hasattr(セッション.chat_processor, "_select_ai_module"):
+                    セッション.chat_processor.AIモジュール = セッション.chat_processor._select_ai_module()
+                if not getattr(セッション.chat_processor, "is_alive", False):
+                    await セッション.chat_processor.開始()
+
+            if (not hasattr(セッション, "code_agent_processors")) or (not isinstance(セッション.code_agent_processors, list)) or (len(セッション.code_agent_processors) != 4):
+                セッション.code_agent_processors = []
+                for i in range(1, 5):
+                    ai_key = f"CODE_AI{i}_NAME"
+                    model_key = f"CODE_AI{i}_MODEL"
+                    agent = CodeAgent(
+                        親=WebSocket接続.app,
+                        セッションID=セッションID,
+                        チャンネル=i,
+                        絶対パス=実行パス,
+                        AI_NAME=セッション.モデル設定.get(ai_key, ""),
+                        AI_MODEL=セッション.モデル設定.get(model_key, ""),
+                        接続=セッション,
+                        保存関数=保存_会話履歴,
+                    )
                     await agent.開始()
+                    セッション.code_agent_processors.append(agent)
+            else:
+                for i, agent in enumerate(セッション.code_agent_processors, start=1):
+                    ai_key = f"CODE_AI{i}_NAME"
+                    model_key = f"CODE_AI{i}_MODEL"
+                    agent.AI_NAME = セッション.モデル設定.get(ai_key, "")
+                    agent.AI_MODEL = セッション.モデル設定.get(model_key, "")
+                    agent.絶対パス = 実行パス
+                    if hasattr(agent, "_select_ai_module"):
+                        agent.AIモジュール = agent._select_ai_module()
+                    if not getattr(agent, "is_alive", False):
+                        await agent.開始()
 
-        # Toolsインスタンスを作成（コードエージェント初期化後）
-        if not hasattr(セッション, "tools_instance"):
-            from AIコア.AI内部ツール import Tools
-            セッション.tools_instance = Tools(セッション=セッション)
+            # Toolsインスタンスを作成（コードエージェント初期化後）
+            if not hasattr(セッション, "tools_instance"):
+                from AIコア.AI内部ツール import Tools
+                セッション.tools_instance = Tools(セッション=セッション)
 
-        live_ai = セッション.モデル設定.get("LIVE_AI_NAME", "")
-        live_model = ""
-        live_voice = ""
-        if live_ai in ("gemini_live", "freeai_live"):
-            model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
-            voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
-            live_model = セッション.モデル設定.get(model_key, "")
-            live_voice = セッション.モデル設定.get(voice_key, "")
-        elif live_ai == "openai_live":
-            live_model = セッション.モデル設定.get("LIVE_OPENAI_MODEL", "")
-            live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
+            live_ai = セッション.モデル設定.get("LIVE_AI_NAME", "")
+            live_model = ""
+            live_voice = ""
+            if live_ai in ("gemini_live", "freeai_live"):
+                model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
+                voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
+                live_model = セッション.モデル設定.get(model_key, "")
+                live_voice = セッション.モデル設定.get(voice_key, "")
+            elif live_ai == "openai_live":
+                live_model = セッション.モデル設定.get("LIVE_OPENAI_MODEL", "")
+                live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
 
-        if not hasattr(セッション, "live_processor"):
-            セッション.live_processor = Live(
-                親=WebSocket接続.app,
-                セッションID=セッションID,
-                チャンネル=0,
-                絶対パス=実行パス,
-                AI_NAME=live_ai,
-                AI_MODEL=live_model,
-                AI_VOICE=live_voice,
-                接続=セッション,
-                保存関数=保存_会話履歴,
-            )
-            await セッション.live_processor.開始()
-        else:
-            セッション.live_processor.AI_NAME = live_ai
-            セッション.live_processor.AI_MODEL = live_model
-            セッション.live_processor.AI_VOICE = live_voice
-            セッション.live_processor.絶対パス = 実行パス
-            if hasattr(セッション.live_processor, "_select_ai_module"):
-                セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
-            セッション.live_processor.AIインスタンス = None
-            if not getattr(セッション.live_processor, "is_alive", False):
+            if not hasattr(セッション, "live_processor"):
+                セッション.live_processor = Live(
+                    親=WebSocket接続.app,
+                    セッションID=セッションID,
+                    チャンネル=0,
+                    絶対パス=実行パス,
+                    AI_NAME=live_ai,
+                    AI_MODEL=live_model,
+                    AI_VOICE=live_voice,
+                    接続=セッション,
+                    保存関数=保存_会話履歴,
+                )
+            else:
+                セッション.live_processor.AI_NAME = live_ai
+                セッション.live_processor.AI_MODEL = live_model
+                セッション.live_processor.AI_VOICE = live_voice
+                セッション.live_processor.絶対パス = 実行パス
+                if hasattr(セッション.live_processor, "_select_ai_module"):
+                    セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
+
+            # LiveAIは音声チャンネル(-2)接続時にのみ起動
+            if int(ソケット番号) == -2 and not getattr(セッション.live_processor, "is_alive", False):
                 await セッション.live_processor.開始()
 
-        if セッション.audio_split_task is None or セッション.audio_split_task.done():
-            セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
+            if セッション.audio_split_task is None or セッション.audio_split_task.done():
+                セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
 
         # 出力ソケット接続時にwelcome_infoと履歴を送信
         if int(ソケット番号) in [0, 1, 2, 3, 4]:
@@ -919,8 +933,6 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                 continue
                             if "live" in ファイル名_判定:
                                 if hasattr(セッション, "live_processor") and セッション.live_processor:
-                                    logger.info(f"LiveAI起動要求: socket={セッションID}")
-                                    await セッション.live_processor.開始()
                                     logger.info(f"LiveAIテキスト送信開始: socket={セッションID}")
                                     送信成功 = await セッション.live_processor.テキスト送信(メッセージ内容)
                                     if 送信成功:
@@ -1070,7 +1082,6 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     if セッション and 出力先チャンネル == 0 and サムネイル_base64 and Base64ペイロード:
                         try:
                             if hasattr(セッション, "live_processor") and セッション.live_processor:
-                                await セッション.live_processor.開始()
                                 画像形式 = "png"
                                 if ファイル名 and "." in ファイル名:
                                     拡張子 = ファイル名.rsplit(".", 1)[1].lower()
@@ -1093,14 +1104,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         if not audio_bytes:
                             continue
                         if セッション:
-                            # LiveAI初期化確認（未初期化の場合は再試行）
-                            if getattr(セッション, "live_processor", None) and not getattr(セッション.live_processor, "AIインスタンス", None):
-                                try:
-                                    await セッション.live_processor.開始()
-                                except Exception:
-                                    logger.exception("LiveAI初期化再試行エラー")
-                            # AIインスタンス未初期化でも音声入力データ処理は実行
-                            # （audio_processing.pyでAIインスタンスがない場合は送信スキップされる）
+                            # 音声入力では起動要求を行わない（接続初期化時の起動のみ許可）
                             await 音声入力データ処理(セッション, audio_bytes)
                     except Exception as e:
                         logger.warning(f"音声入力処理エラー: {e}")
@@ -1143,7 +1147,6 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         # LiveAIへ画像送信（大きい画像はLive側でリサイズ）
                         try:
                             if セッション and getattr(セッション, "live_processor", None):
-                                await セッション.live_processor.開始()
                                 画像形式 = "png"
                                 if isinstance(mime_type, str) and "/" in mime_type:
                                     画像形式 = mime_type.split("/", 1)[1].strip() or "png"
@@ -1157,18 +1160,28 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     logger.error(f"不明なメッセージ識別 ({セッションID}): {メッセージ識別} data={json.dumps(受信データ, ensure_ascii=False)}")
 
             except WebSocketDisconnect:
-                _ws_log(ch=int(ソケット番号), 内容="接続切断", セッションID=セッションID)
                 break
             except Exception as e:
+                if _is_disconnect_like_error(e):
+                    _ws_log(ch=int(ソケット番号), 内容=f"切断検出: {e}", セッションID=セッションID, level="info")
+                    break
                 logger.error(f"メッセージ処理エラー ({セッションID}): {e}")
-                await WebSocket接続.send_json({
-                    "メッセージ識別": "error",
-                    "セッションID": セッションID,
-                    "メッセージ内容": str(e)
-                })
+                if not _is_ws_connected(WebSocket接続):
+                    break
+                try:
+                    await WebSocket接続.send_json({
+                        "メッセージ識別": "error",
+                        "セッションID": セッションID,
+                        "メッセージ内容": str(e)
+                    })
+                except Exception as send_e:
+                    if _is_disconnect_like_error(send_e):
+                        break
+                    logger.debug(f"エラー通知送信失敗 ({セッションID}): {send_e}")
+                    break
 
     except WebSocketDisconnect:
-        _ws_log(ch=int(ソケット番号) if ソケット番号 is not None else -99, 内容="接続切断", セッションID=セッションID)
+        pass
     except Exception as e:
         logger.error(f"エラー ({セッションID}): {e}")
     finally:

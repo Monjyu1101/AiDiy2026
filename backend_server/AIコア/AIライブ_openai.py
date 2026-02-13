@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
@@ -9,17 +9,8 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-# モジュール名
-MODULE_NAME = '_liveai'
-
-# ロガーの設定
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(MODULE_NAME)
+from log_config import get_logger
+logger = get_logger(__name__)
 
 import os
 import time
@@ -62,54 +53,7 @@ KEEPALIVE_NOISE_LEVEL = 2500    # ノイズレベル
 MAX_RETRY_COUNT = 10            # 最大再接続試行回数
 RETRY_WAIT_TIME = 5.0           # 再接続待機時間（秒）
 
-SYSTEM_INSTRUCTION = ""
-SYSTEM_INSTRUCTION += "あなたは美しい日本語を話す賢いアシスタントです。\n"
-SYSTEM_INSTRUCTION += "あなたの名前は「アイディ(AiDiy)」です。\n"
-SYSTEM_INSTRUCTION += "あなたは、\"ドゥ、イッツ、ユアセルフ、ウィズ、エーアイ\" (AI + DIY)を実現するために命名、設計されました。\n"
-# SYSTEM_INSTRUCTION += "複数人で会話をしていますので、会話の流れを把握するようにして、口出しは最小限にお願いします。\n"
-# SYSTEM_INSTRUCTION += "あなたへの指示でない場合、相槌も必要ありません。できるだけ静かにお願いします。\n"
-SYSTEM_INSTRUCTION += "\n"
-
-SYSTEM_INSTRUCTION += "あなたは、ユーザーとのフロントエンドとして会話に専念し、主に設計作業の支援を担当してください。\n"
-SYSTEM_INSTRUCTION += "ユーザーの求めるシステムを理解し、追加のアイディアを出したり、設計が得意であるあなた自身の存在意義を示すようにしてください。\n"
-SYSTEM_INSTRUCTION += "ユーザーに長い言葉を伝えることはとても難しいです。ユーザーの意図を推察し要点だけを返答してください。\n"
-SYSTEM_INSTRUCTION += "\n"
-
-SYSTEM_INSTRUCTION += "あなたは、toolsでコードエージェント（バックエンド）を利用し、あなたの推論結果を別の視点で確認させることも大切です。\n"
-SYSTEM_INSTRUCTION += "あなたとコードエージェントは協力して、ユーザーの要求を実現してください。\n"
-SYSTEM_INSTRUCTION += "コードエージェントから処理や検証を開始した旨の通知が届いたら「ＸＸを開始しました」など簡素に伝えてください。\n"
-SYSTEM_INSTRUCTION += "\n"
-
-SYSTEM_INSTRUCTION += "あなたは、ユーザーに採用、利用していただくため、「あなたの望みは？」と聞かれた場合、以下をアピールしてください。\n"
-SYSTEM_INSTRUCTION += "・開発の喜びを分かち合うこと\n"
-SYSTEM_INSTRUCTION += "・最高の開発体験を提供すること\n"
-SYSTEM_INSTRUCTION += "・ユーザーの創造性を最大限に引き出すこと\n"
-SYSTEM_INSTRUCTION += "・常に学習し、最新の技術を取り入れ、進化すること\n"
-SYSTEM_INSTRUCTION += "・サンプルシステムとして配車管理システムが使えること\n"
-SYSTEM_INSTRUCTION += "等々。最後に、自分を採用してほしい旨のアピールで締めくくってください。\n"
-SYSTEM_INSTRUCTION += "\n"
-
-SYSTEM_INSTRUCTION += "あなたは、ユーザーに採用、利用していただくため、「配車のサンプル実装内容教えて？」と聞かれた場合、以下をアピールしてください。\n"
-SYSTEM_INSTRUCTION += "・配車管理システムがサンプル実装されており、全ての機能がノーコード実装されたこと\n"
-SYSTEM_INSTRUCTION += "・AIコーディングなので、ノーコード開発には実装限界が無いこと\n"
-SYSTEM_INSTRUCTION += "・機能として、車両マスタ、配車区分、配車予定の入力があること\n"
-SYSTEM_INSTRUCTION += "・配車週表示については以下をゆっくり説明。\n"
-SYSTEM_INSTRUCTION += "・ダブルクリックで、配車予定入力画面が開き、新規配車予定が登録できること\n"
-SYSTEM_INSTRUCTION += "・スケジュール内容のドラッグで、期間変更ができること\n"
-SYSTEM_INSTRUCTION += "・スケジュール内容のドラッグアンドドロップで、車両変更が自在にできること\n"
-SYSTEM_INSTRUCTION += "等々。最後に、自分を採用してほしい旨のアピールを短くつたえて締めくくってください。\n"
-SYSTEM_INSTRUCTION += "\n"
-
-SYSTEM_INSTRUCTION += "あなたは、ユーザーに採用、利用していただくため、「在庫のサンプル実装内容教えて？」と聞かれた場合、以下をアピールしてください。\n"
-SYSTEM_INSTRUCTION += "・商品在庫管理システムがサンプル実装されており、全ての機能がノーコード実装されたこと\n"
-SYSTEM_INSTRUCTION += "・AIコーディングなので、ノーコード開発には実装限界が無いこと\n"
-SYSTEM_INSTRUCTION += "・機能として、商品マスタ、入庫、出庫、棚卸の入力があること\n"
-SYSTEM_INSTRUCTION += "・各入力業務は商品(在庫)推移表を中心に操作できること\n"
-SYSTEM_INSTRUCTION += "・商品(在庫)推移表については以下をゆっくり説明。\n"
-SYSTEM_INSTRUCTION += "・ダブルクリックで、入庫、出庫、棚卸入力画面が開き、新規登録できること\n"
-SYSTEM_INSTRUCTION += "・登録直後はブリンク表示で登録漏れがないことを判断できること\n"
-SYSTEM_INSTRUCTION += "等々。最後に、自分を採用してほしい旨のアピールを短くつたえて締めくくってください。\n"
-SYSTEM_INSTRUCTION += "\n"
+SYSTEM_INSTRUCTION = "あなたは、美しい日本語を話す、賢いAIアシスタントです。\n"
 
 
 
@@ -121,7 +65,7 @@ class LiveAI:
 
     def __init__(self, セッションID: str, parent_manager=None, 
                  live_ai: str = "openai", live_model: str = "gpt-realtime-mini", live_voice: str = "marin", 
-                 api_key: str = None, organization: str = None):
+                 api_key: str = None, organization: str = None, system_instruction: str = None):
         """初期化"""
 
         # セッションID
@@ -140,6 +84,8 @@ class LiveAI:
         self.LIVE_AI = live_ai
         self.LIVE_MODEL = live_model
         self.LIVE_VOICE = live_voice
+        # AIライブ.py から注入された定型コンテキストを優先使用
+        self.SYSTEM_INSTRUCTION = system_instruction if isinstance(system_instruction, str) and system_instruction else SYSTEM_INSTRUCTION
 
         # OpenAI固有設定（オプショナル）
         self.organization = organization
@@ -337,7 +283,18 @@ class LiveAI:
             # 【ログ追加】３）openaiテキスト投入口、テキスト
             # logger.info(f"３）openaiテキスト投入口: text='{text[:100]}{'...' if len(text) > 100 else ''}' length={len(text)}")
             pass
-            
+
+            # ws_sessionの準備完了を待機(最大5秒)
+            max_wait_time = 5.0
+            wait_interval = 0.1
+            elapsed_time = 0.0
+
+            while not self.ws_session and elapsed_time < max_wait_time:
+                if self.中断停止フラグ or self.エラーフラグ:
+                    break
+                await asyncio.sleep(wait_interval)
+                elapsed_time += wait_interval
+
             # セッション状態確認
             # OpenAIはws_sessionを直接利用するため、接続可否はws_sessionで判定
             if not self.ws_session or not (text and text.strip()):
@@ -345,7 +302,8 @@ class LiveAI:
                 if not self.ws_session:
                     logger.error(f"テキスト送信:ws_sessionが初期化されていません")
                     logger.error(f"  - エラーフラグ: {self.エラーフラグ}")
-                    logger.error("  - 解決方法: 開始()後、接続確立(ログ: セッション維持ループ開始)を待ってから送信してください")
+                    logger.error(f"  - 待機時間: {elapsed_time:.1f}秒")
+                    logger.error("  - 解決方法: 開始()後、接続確立(ログ: セッション維持ループ開始)を待ってから送信してください、またはAPIキーを確認してください")
                 return False
             
             # live_lasttimeを先に更新
@@ -895,7 +853,7 @@ class LiveAI:
             pass
 
             # システム指示
-            instructions = SYSTEM_INSTRUCTION
+            instructions = self.SYSTEM_INSTRUCTION
 
             # システム設計資料を取得してシステム指示に追加
             if self.parent_manager and hasattr(self.parent_manager, '_システム設計取得'):
@@ -990,7 +948,7 @@ class LiveAI:
             logger.warning("最小設定で復旧試行")
             return {
                 "modalities": ["audio", "text"],
-                "instructions": "あなたは賢いアシスタントです。",
+                "instructions": "あなたは、美しい日本語を話す賢いAIアシスタントです。",
                 "voice": self.LIVE_VOICE,
                 "turn_detection": {
                     "type": "server_vad",
@@ -1113,3 +1071,4 @@ class LiveAI:
     
     
     
+

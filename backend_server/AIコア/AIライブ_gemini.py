@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
@@ -9,17 +9,8 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-# モジュール名
-MODULE_NAME = '_liveai'
-
-# ロガーの設定
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(MODULE_NAME)
+from log_config import get_logger
+logger = get_logger(__name__)
 
 import os
 import time
@@ -63,7 +54,7 @@ MAX_RETRY_COUNT = 10            # 最大再接続試行回数
 RETRY_WAIT_TIME = 5.0           # 再接続待機時間（秒）
 
 SYSTEM_INSTRUCTION = ""
-SYSTEM_INSTRUCTION += "あなたは美しい日本語を話す賢いアシスタントです。\n"
+SYSTEM_INSTRUCTION += "あなたは、美しい日本語を話す賢いAIアシスタントです。\n"
 SYSTEM_INSTRUCTION += "あなたの名前は「アイディ(AiDiy)」です。\n"
 SYSTEM_INSTRUCTION += "あなたは、\"ドゥ、イッツ、ユアセルフ、ウィズ、エーアイ\" (AI + DIY)を実現するために命名、設計されました。\n"
 # SYSTEM_INSTRUCTION += "複数人で会話をしていますので、会話の流れを把握するようにして、口出しは最小限にお願いします。\n"
@@ -121,7 +112,7 @@ class LiveAI:
 
     def __init__(self, セッションID: str, parent_manager=None,
                  live_ai: str = "gemini", live_model: str = "gemini-live-2.5-flash-preview", live_voice: str = "Zephyr",
-                 api_key: str = None):
+                 api_key: str = None, system_instruction: str = None):
         """初期化"""
         
         # セッションID
@@ -167,6 +158,8 @@ class LiveAI:
         self.LIVE_AI = live_ai
         self.LIVE_MODEL = live_model
         self.LIVE_VOICE = live_voice
+        # AIライブ.py から注入された定型コンテキストを優先使用
+        self.SYSTEM_INSTRUCTION = system_instruction if isinstance(system_instruction, str) and system_instruction else SYSTEM_INSTRUCTION
 
         # Gemini Client初期化
         self.client = None
@@ -366,7 +359,18 @@ class LiveAI:
             # 【ログ追加】３）geminiテキスト投入口、テキスト
             # logger.info(f"３）geminiテキスト投入口: text='{text[:100]}{'...' if len(text) > 100 else ''}' length={len(text)}")
             pass
-            
+
+            # live_sessionの準備完了を待機(最大5秒)
+            max_wait_time = 5.0
+            wait_interval = 0.1
+            elapsed_time = 0.0
+
+            while not self.live_session and elapsed_time < max_wait_time:
+                if self.中断停止フラグ or self.エラーフラグ:
+                    break
+                await asyncio.sleep(wait_interval)
+                elapsed_time += wait_interval
+
             # セッション状態確認
             if not self.live_session or not (text and text.strip()):
                 logger.warning(f"テキスト送信:条件不適合: live_session={self.live_session is not None} text={text[:30] if text else 'None'}")
@@ -374,8 +378,9 @@ class LiveAI:
                     logger.error(f"テキスト送信:live_sessionが初期化されていません")
                     logger.error(f"  - クライアント状態: {self.client is not None}")
                     logger.error(f"  - エラーフラグ: {self.エラーフラグ}")
+                    logger.error(f"  - 待機時間: {elapsed_time:.1f}秒")
                     # logger.error(f"  - 中断停止フラグ: {self.中断停止フラグ}")  # パフォーマンス最適化
-                    logger.error("  - 解決方法: 開始()メソッドが正常に実行されているか確認してください")
+                    logger.error("  - 解決方法: 開始()メソッドが正常に実行されているか、APIキーが正しいか確認してください")
                 return False
             
             # live_lasttimeを先に更新
@@ -408,11 +413,22 @@ class LiveAI:
             # 【ログ追加】１）gemini音声入力の投入口。バイト数
             # logger.info(f"１）gemini音声入力の投入口: bytes={len(bytes_data)} mime_type=audio/pcm")
             pass
-            
+
+            # live_sessionの準備完了を待機(最大5秒)
+            max_wait_time = 5.0
+            wait_interval = 0.1
+            elapsed_time = 0.0
+
+            while not self.live_session and elapsed_time < max_wait_time:
+                if self.中断停止フラグ or self.エラーフラグ:
+                    break
+                await asyncio.sleep(wait_interval)
+                elapsed_time += wait_interval
+
             # セッション状態確認
             # logger.info(f"【デバッグ】live_session状態: {self.live_session is not None} type={type(self.live_session) if self.live_session else 'None'}")
             pass
-            
+
             if not self.live_session or not bytes_data:
                 # logger.warning(f"音声送信:条件不適合 live_session={self.live_session is not None} bytes_data={len(bytes_data) if bytes_data else 0}")
                 pass
@@ -499,11 +515,22 @@ class LiveAI:
         image_dataはbase64文字列を受け取り、960x540にリサイズしてから送信
         """
         try:
+            # live_sessionの準備完了を待機(最大5秒)
+            max_wait_time = 5.0
+            wait_interval = 0.1
+            elapsed_time = 0.0
+
+            while not self.live_session and elapsed_time < max_wait_time:
+                if self.中断停止フラグ or self.エラーフラグ:
+                    break
+                await asyncio.sleep(wait_interval)
+                elapsed_time += wait_interval
+
             if not self.live_session or not image_data:
                 # logger.warning(f"画像送信:条件不適合 live_session={self.live_session is not None} image_data={bool(image_data)}")
                 pass
                 return False
-            
+
             # 送信直前に960x540にリサイズ
             resized_image_data = self._画像リサイズBase64(image_data)
             
@@ -708,7 +735,7 @@ class LiveAI:
             pass
             
             # システム指示
-            instructions = SYSTEM_INSTRUCTION
+            instructions = self.SYSTEM_INSTRUCTION
             
             # システム設計資料を取得してシステム指示に追加
             if self.parent_manager and hasattr(self.parent_manager, '_システム設計取得'):
@@ -820,7 +847,7 @@ class LiveAI:
                     speech_config=types.SpeechConfig(language_code="ja-JP"),
                     generation_config=types.GenerationConfig(),
                     system_instruction=types.Content(
-                        parts=[types.Part(text="あなたは賢いアシスタントです。")]
+                        parts=[types.Part(text="あなたは、美しい日本語を話す、賢いAIアシスタントです。")]
                     ),
                 )
                 
@@ -1085,3 +1112,4 @@ class LiveAI:
     
     
     
+

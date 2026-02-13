@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import re
 import subprocess
 import sys
 import time
@@ -28,58 +29,122 @@ def kill_process_on_port(port: int) -> bool:
 
     try:
         if sys.platform == "win32":
-            # Windows: netstat + taskkill
-            result = subprocess.run(
-                ["netstat", "-ano"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-
-            pid = None
-            for line in result.stdout.splitlines():
-                if f":{port}" in line and "LISTENING" in line:
-                    parts = line.split()
-                    if len(parts) >= 5:
-                        pid = parts[-1]
-                        break
-
-            if pid and pid != "0":
-                print(f"[ポート {port}] プロセス検出: PID={pid}")
-                subprocess.run(
-                    ["taskkill", "/F", "/PID", pid],
+            # Windows: 複数PIDに対応し、終了後に解放確認
+            def list_pids():
+                result = subprocess.run(
+                    ["netstat", "-ano", "-p", "tcp"],
                     capture_output=True,
+                    text=True,
                     timeout=5
                 )
-                print(f"[ポート {port}] プロセスを強制停止しました")
-                return True
-            else:
-                print(f"[ポート {port}] 使用中のプロセスなし")
-                return False
-        else:
-            # Linux/Mac: lsof + kill
-            result = subprocess.run(
-                ["lsof", "-ti", f":{port}"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            
-            pids = result.stdout.strip().split('\n')
+                if result.returncode != 0:
+                    return []
+                pids = set()
+                for line in result.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) < 5:
+                        continue
+                    local_address = parts[1]
+                    state = parts[3].upper()
+                    pid = parts[-1]
+                    local_port = local_address.rsplit(":", 1)[-1]
+                    if local_port != str(port):
+                        continue
+                    if state not in ("LISTENING", "待ち受け"):
+                        continue
+                    if pid.isdigit() and pid != "0":
+                        pids.add(pid)
+                return sorted(pids, key=int)
+
             killed = False
-            for pid in pids:
-                if pid and pid.isdigit():
+            for _ in range(8):
+                pids = list_pids()
+                if not pids:
+                    if killed:
+                        print(f"[ポート {port}] ポート解放を確認しました")
+                    else:
+                        print(f"[ポート {port}] 使用中のプロセスなし")
+                    return killed
+
+                for pid in pids:
                     print(f"[ポート {port}] プロセス検出: PID={pid}")
-                    subprocess.run(
-                        ["kill", "-9", pid],
+                    result = subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", pid],
                         capture_output=True,
+                        text=True,
+                        timeout=8
+                    )
+                    if result.returncode == 0:
+                        print(f"[ポート {port}] プロセスを強制停止しました (PID={pid})")
+                        killed = True
+                    else:
+                        detail = (result.stderr or result.stdout or "").strip()
+                        print(f"[ポート {port}] 停止失敗 (PID={pid}): {detail}")
+                time.sleep(0.5)
+
+            remaining = list_pids()
+            if remaining:
+                print(f"[ポート {port}] 停止後もLISTEN中です: PID={','.join(remaining)}")
+            return killed
+        else:
+            # Linux/Mac: 複数PIDに対応し、終了後に解放確認
+            def list_pids():
+                try:
+                    result = subprocess.run(
+                        ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+                        capture_output=True,
+                        text=True,
                         timeout=5
                     )
-                    print(f"[ポート {port}] プロセスを強制停止しました (PID={pid})")
-                    killed = True
-            
-            if not killed:
-                print(f"[ポート {port}] 使用中のプロセスなし")
+                    if result.returncode in (0, 1):
+                        pids = {pid.strip() for pid in result.stdout.splitlines() if pid.strip().isdigit()}
+                        return sorted(pids, key=int)
+                except FileNotFoundError:
+                    pass
+
+                try:
+                    result = subprocess.run(
+                        ["ss", "-ltnp", f"sport = :{port}"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.returncode != 0:
+                        return []
+                    pids = set(re.findall(r"pid=(\d+)", result.stdout))
+                    return sorted(pids, key=int)
+                except FileNotFoundError:
+                    return []
+
+            killed = False
+            for _ in range(8):
+                pids = list_pids()
+                if not pids:
+                    if killed:
+                        print(f"[ポート {port}] ポート解放を確認しました")
+                    else:
+                        print(f"[ポート {port}] 使用中のプロセスなし")
+                    return killed
+
+                for pid in pids:
+                    print(f"[ポート {port}] プロセス検出: PID={pid}")
+                    result = subprocess.run(
+                        ["kill", "-9", pid],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0:
+                        print(f"[ポート {port}] プロセスを強制停止しました (PID={pid})")
+                        killed = True
+                    else:
+                        detail = (result.stderr or result.stdout or "").strip()
+                        print(f"[ポート {port}] 停止失敗 (PID={pid}): {detail}")
+                time.sleep(0.5)
+
+            remaining = list_pids()
+            if remaining:
+                print(f"[ポート {port}] 停止後もLISTEN中です: PID={','.join(remaining)}")
             return killed
 
     except Exception as e:

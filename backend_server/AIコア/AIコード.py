@@ -16,6 +16,7 @@ AIコア コードエージェント処理プロセッサ
 
 import asyncio
 import importlib
+import json
 import os
 import shutil
 import random
@@ -26,6 +27,64 @@ from AIコア.AIバックアップ import バックアップ実行
 from log_config import get_logger
 
 logger = get_logger(__name__)
+
+_CODE_CONTEXT_JSON_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config", "AiDiy_code__context.json")
+)
+
+_CODE_CONTEXT_TEMPLATE_LINES = [
+    "あなたは、美しい日本語を話す、賢いコードエージェントです。",
+    "このプロジェクトの概要は`_AIDIY.md`を確認してください。",
+    "概要以外にも`*.md`の記載内容は必要に応じて確認してください。",
+    "概要が不明な場合は、プログラムコードの説明、分析、実装支援を行います。",
+    "機能追加、修正操作時は、同類のソースを参考にしてください。",
+]
+
+
+def _context_template_payload() -> dict:
+    return {
+        "version": 1,
+        "description": "AIコア CodeAI 定型コンテキスト",
+        "system_instruction_lines": _CODE_CONTEXT_TEMPLATE_LINES,
+    }
+
+
+def _compose_instruction(lines: list[str]) -> str:
+    text = "\n".join(lines)
+    if not text.endswith("\n"):
+        text += "\n"
+    return text
+
+
+def _load_or_create_code_context() -> str:
+    """CodeAI定型コンテキストを読み込む。無ければひな形JSONを作成。"""
+    template_payload = _context_template_payload()
+    template_instruction = _compose_instruction(template_payload["system_instruction_lines"])
+
+    try:
+        os.makedirs(os.path.dirname(_CODE_CONTEXT_JSON_PATH), exist_ok=True)
+
+        if not os.path.exists(_CODE_CONTEXT_JSON_PATH):
+            with open(_CODE_CONTEXT_JSON_PATH, "w", encoding="utf-8") as f:
+                json.dump(template_payload, f, indent=2, ensure_ascii=False)
+            logger.info(f"[CodeAgent] 定型コンテキストJSONを作成: {_CODE_CONTEXT_JSON_PATH}")
+            return template_instruction
+
+        with open(_CODE_CONTEXT_JSON_PATH, "r", encoding="utf-8-sig") as f:
+            payload = json.load(f)
+
+        lines = payload.get("system_instruction_lines") if isinstance(payload, dict) else None
+        if isinstance(lines, list):
+            normalized = [str(line) for line in lines]
+            return _compose_instruction(normalized)
+
+        logger.warning(f"[CodeAgent] 定型コンテキストJSONの形式不正。ひな形を再作成します: {_CODE_CONTEXT_JSON_PATH}")
+        with open(_CODE_CONTEXT_JSON_PATH, "w", encoding="utf-8") as f:
+            json.dump(template_payload, f, indent=2, ensure_ascii=False)
+        return template_instruction
+    except Exception as e:
+        logger.error(f"[CodeAgent] 定型コンテキスト読込エラー: {e}")
+        return template_instruction
 
 
 class CodeAgent:
@@ -50,6 +109,7 @@ class CodeAgent:
         self.AI_MODEL = AI_MODEL
         self.絶対パス = 絶対パス
         self.親 = 親
+        self.システム指示 = _load_or_create_code_context()
         self.AIモジュール = self._select_ai_module()
         self.AIインスタンス = None
         self.is_alive = False
@@ -108,6 +168,7 @@ class CodeAgent:
                 AI_NAME=self.AI_NAME,
                 AI_MODEL=self.AI_MODEL,
                 絶対パス=self.絶対パス or None,
+                system_instruction=self.システム指示,
             )
             await self.AIインスタンス.開始()
             return self.AIインスタンス

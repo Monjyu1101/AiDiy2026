@@ -15,16 +15,27 @@ AIコアのセッション管理とストリーミング処理を担当
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 import asyncio
 import json
 import os
-import uuid
+import secrets
 from log_config import get_logger
 from AIコア.AIストリーミング処理 import StreamingProcessor
 from AIコア.AI音声処理 import 初期化_音声データ
 
 # ロガー取得
 logger = get_logger(__name__)
+
+
+def _is_disconnect_like_error(e: Exception) -> bool:
+    msg = str(e)
+    return any([
+        "Unexpected ASGI message 'websocket.send', after sending 'websocket.close'" in msg,
+        "Cannot call \"receive\" once a disconnect message has been received." in msg,
+        "WebSocket is not connected" in msg,
+    ])
+
 
 def 初期モデル設定生成(app_conf) -> dict:
     if not (app_conf and hasattr(app_conf, 'json')):
@@ -92,7 +103,10 @@ class WebSocketConnection:
             try:
                 await self.websocket.send_json(data)
             except Exception as e:
-                logger.error(f"送信エラー (session={self.セッションID} socket={self.socket_no}): {e}")
+                if _is_disconnect_like_error(e):
+                    logger.info(f"送信スキップ(切断済み) (session={self.セッションID} socket={self.socket_no}): {e}")
+                else:
+                    logger.error(f"送信エラー (session={self.セッションID} socket={self.socket_no}): {e}")
                 self.is_connected = False
 
     async def receive_json(self) -> Optional[dict]:
@@ -132,6 +146,8 @@ class SessionConnection:
 
     def __init__(self, セッションID: str):
         self.セッションID = セッションID
+        # セッション内ランタイム初期化の多重実行を防止
+        self.初期化ロック = asyncio.Lock()
         self.sockets: Dict[int, Optional[WebSocketConnection]] = {
             -2: None,
             -1: None,
@@ -339,15 +355,9 @@ class WebSocketManager:
         return f"チャンネル={ch}, {内容}, セッションID={sid}"
 
     def セッションID生成(self) -> str:
-        """新しいセッションIDを生成（プロセスIDベース）"""
-        import os
-        import time
-        # PID + タイムスタンプ + UUIDの組み合わせで一意性を保証
-        pid = os.getpid()
-        timestamp = int(time.time() * 1000)
-        unique_id = str(uuid.uuid4())[:8]
-        セッションID = f"ws-{pid}-{timestamp}-{unique_id}"
-        return セッションID
+        """新しいセッションIDを生成（10文字程度）"""
+        # 10文字（16進）: URL/ログで扱いやすい短いID
+        return secrets.token_hex(5)
 
     async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: int = -1, app_conf=None, accept_in_connect: bool = True) -> str:
         """
@@ -422,7 +432,11 @@ class WebSocketManager:
                 "ボタン": session.ボタン状態,
                 "モデル設定": session.モデル設定
             }
-        await connection.send_json(init_payload)
+        if getattr(websocket, "application_state", None) == WebSocketState.CONNECTED:
+            await connection.send_json(init_payload)
+        else:
+            connection.is_connected = False
+            logger.debug(f"初期化メッセージ送信をスキップ(未接続): session={セッションID} socket={socket_no}")
 
         logger.info(self._fmt_log(ch=socket_no, 内容="接続登録", セッションID=セッションID))
         return セッションID

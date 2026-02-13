@@ -10,6 +10,7 @@
 
 import os
 import shutil
+import ctypes
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, List
@@ -60,6 +61,13 @@ _バックアップ除外拡張子 = (
     ".log",
     ".tmp",
     ".swp",
+)
+
+# Windows予約デバイス名（削除不可能）
+_WINDOWS予約デバイス名 = (
+    "con", "prn", "aux", "nul",
+    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
 )
 
 # ファイルコピーは軽量な並列数で実行（呼び出し元APIは同期で待機）
@@ -130,13 +138,12 @@ def _最新更新と全ファイル一覧(ベースパス: str) -> Tuple[float, 
         for file_name in file_names:
             file_path = os.path.join(root, file_name)
 
-            # "nul" または "null" ファイルを強制削除
-            if file_name.lower() in ("nul", "null"):
-                try:
-                    os.remove(file_path)
-                    logger.warning(f"不正なファイル名を削除: {file_path}")
-                except Exception as e:
-                    logger.error(f"ファイル削除失敗: {file_path}, エラー: {e}")
+            # Windows予約デバイス名 + null チェック（削除不可能/問題ファイルのため警告のみ）
+            base_name = os.path.splitext(file_name)[0].lower()
+            if base_name in _WINDOWS予約デバイス名 or base_name == "null":
+                if os.name == "nt" and base_name in ("nul", "null"):
+                    _nul_nullファイル削除試行(file_path)
+                logger.warning(f"問題のあるファイル名を検出（バックアップ対象外）: {file_path}")
                 continue
 
             if any(marker in file_path for marker in _バックアップ除外フォルダ):
@@ -152,6 +159,40 @@ def _最新更新と全ファイル一覧(ベースパス: str) -> Tuple[float, 
             if mtime > max_mtime:
                 max_mtime = mtime
     return max_mtime, files
+
+
+def _nul_nullファイル削除試行(file_path: str) -> bool:
+    """Windows環境で nul/null ファイル削除を試行（失敗しても継続）"""
+    if os.name != "nt":
+        return False
+
+    try:
+        abs_path = os.path.abspath(file_path)
+        if abs_path.startswith("\\\\"):
+            unc_path = "\\\\?\\UNC\\" + abs_path[2:]
+        else:
+            unc_path = "\\\\?\\" + abs_path
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        delete_file_w = kernel32.DeleteFileW
+        delete_file_w.argtypes = [ctypes.c_wchar_p]
+        delete_file_w.restype = ctypes.c_int
+
+        result = delete_file_w(unc_path)
+        if result:
+            logger.info(f"問題ファイルを削除しました: {file_path}")
+            return True
+
+        error_code = ctypes.get_last_error()
+        error_message = ctypes.FormatError(error_code).strip()
+        logger.error(
+            f"問題ファイルの削除に失敗しました: {file_path}, "
+            f"error_code={error_code}, error={error_message}"
+        )
+        return False
+    except Exception as e:
+        logger.error(f"問題ファイルの削除中に例外が発生しました: {file_path}, error={e}")
+        return False
 
 
 def バックアップ実行(
@@ -381,13 +422,12 @@ def 差分ファイル取得(アプリ設定=None, backend_dir: Optional[str] = 
             for file_name in file_names:
                 file_path = os.path.join(root, file_name)
 
-                # "nul" または "null" ファイルを強制削除
-                if file_name.lower() in ("nul", "null"):
-                    try:
-                        os.remove(file_path)
-                        logger.warning(f"不正なファイル名を削除: {file_path}")
-                    except Exception as e:
-                        logger.error(f"ファイル削除失敗: {file_path}, エラー: {e}")
+                # Windows予約デバイス名 + null チェック（削除不可能/問題ファイルのため警告のみ）
+                base_name = os.path.splitext(file_name)[0].lower()
+                if base_name in _WINDOWS予約デバイス名 or base_name == "null":
+                    if os.name == "nt" and base_name in ("nul", "null"):
+                        _nul_nullファイル削除試行(file_path)
+                    logger.warning(f"問題のあるファイル名を検出（バックアップ対象外）: {file_path}")
                     continue
 
                 if any(marker in file_path for marker in _バックアップ除外フォルダ):

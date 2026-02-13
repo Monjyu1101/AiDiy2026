@@ -9,17 +9,8 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-# モジュール名
-MODULE_NAME = '_etc'
-
-# ロガーの設定
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(MODULE_NAME)
+from log_config import get_logger
+logger = get_logger(__name__)
 
 import os
 import time
@@ -45,7 +36,7 @@ class CodeAI:
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "claude_cli", AI_MODEL: str = "auto", max_turns: int = 999,
-                 code_plan: str = "auto", code_verify: str = "auto"):
+                 code_plan: str = "auto", code_verify: str = "auto", system_instruction: str = None):
         """初期化"""
 
         # セッションID・チャンネル
@@ -62,6 +53,7 @@ class CodeAI:
         self.max_turns = max_turns
         self.code_plan = code_plan
         self.code_verify = code_verify
+        self.system_instruction = system_instruction if isinstance(system_instruction, str) and system_instruction else None
 
         # 作業ディレクトリ設定
         work_dir_input = 絶対パス if isinstance(絶対パス, str) else None
@@ -223,13 +215,17 @@ class CodeAI:
             システム情報を含む完全なシステムプロンプト
         """
         try:
-            base_prompt = "あなたは日本語対応のコードエージェントです。"
-            base_prompt += "このプロジェクトの概要は`_AIDIY.md`を確認してください。"
-            base_prompt += "概要以外にも`*.md`の記載内容は必要に応じて確認してください。"
+            if self.system_instruction:
+                base_prompt = self.system_instruction.strip()
+            else:
+                # 上位コンテキスト未定義時（テスト等）は簡素な既定文を使用
+                base_prompt = "あなたは、美しい日本語を話す、賢いコードエージェントです。"
+
+            # Windows文言は常に文末へ自動付加（重複は除去）
             if os.name == 'nt':
-                base_prompt += "Windows環境で動作していることを考慮して、適切なコマンドを使用してください。"
-            base_prompt += "概要が不明な場合は、プログラムコードの説明、分析、実装支援を行います。"
-            base_prompt += "機能追加、修正操作時は、同類のソースを参考にしてください。"
+                windows_suffix = "Windows環境で動作していることを考慮して、適切なコマンドを使用してください。"
+                normalized = base_prompt.replace(windows_suffix, "").strip()
+                base_prompt = f"{normalized}\n{windows_suffix}" if normalized else windows_suffix
 
             # _AIDIY.mdファイルのパスを構築（絶対パス）※区切りは"/"に統一
             base_path = getattr(self, "base_abs_path", None)

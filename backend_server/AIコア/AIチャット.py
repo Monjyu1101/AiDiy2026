@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
@@ -15,11 +15,67 @@ AIコア チャット処理プロセッサ
 
 import asyncio
 import importlib
+import json
+import os
 from typing import Optional
 
 from log_config import get_logger
 
 logger = get_logger(__name__)
+
+_CHAT_CONTEXT_JSON_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config", "AiDiy_chat__context.json")
+)
+
+_CHAT_CONTEXT_TEMPLATE_LINES = [
+    "あなたは、美しい日本語を話す、賢いAIアシスタントです。",
+]
+
+
+def _context_template_payload() -> dict:
+    return {
+        "version": 1,
+        "description": "AIコア ChatAI 定型コンテキスト",
+        "system_instruction_lines": _CHAT_CONTEXT_TEMPLATE_LINES,
+    }
+
+
+def _compose_instruction(lines: list[str]) -> str:
+    text = "\n".join(lines)
+    if not text.endswith("\n"):
+        text += "\n"
+    return text
+
+
+def _load_or_create_chat_context() -> str:
+    """ChatAI定型コンテキストを読み込む。無ければひな形JSONを作成。"""
+    template_payload = _context_template_payload()
+    template_instruction = _compose_instruction(template_payload["system_instruction_lines"])
+
+    try:
+        os.makedirs(os.path.dirname(_CHAT_CONTEXT_JSON_PATH), exist_ok=True)
+
+        if not os.path.exists(_CHAT_CONTEXT_JSON_PATH):
+            with open(_CHAT_CONTEXT_JSON_PATH, "w", encoding="utf-8") as f:
+                json.dump(template_payload, f, indent=2, ensure_ascii=False)
+            logger.info(f"[Chat] 定型コンテキストJSONを作成: {_CHAT_CONTEXT_JSON_PATH}")
+            return template_instruction
+
+        with open(_CHAT_CONTEXT_JSON_PATH, "r", encoding="utf-8-sig") as f:
+            payload = json.load(f)
+
+        lines = payload.get("system_instruction_lines") if isinstance(payload, dict) else None
+        if isinstance(lines, list):
+            normalized = [str(line) for line in lines]
+            return _compose_instruction(normalized)
+
+        logger.warning(f"[Chat] 定型コンテキストJSONの形式不正。ひな形を再作成します: {_CHAT_CONTEXT_JSON_PATH}")
+        with open(_CHAT_CONTEXT_JSON_PATH, "w", encoding="utf-8") as f:
+            json.dump(template_payload, f, indent=2, ensure_ascii=False)
+        return template_instruction
+    except Exception as e:
+        logger.error(f"[Chat] 定型コンテキスト読込エラー: {e}")
+        return template_instruction
 
 
 class Chat:
@@ -44,6 +100,7 @@ class Chat:
         self.AI_MODEL = AI_MODEL
         self.絶対パス = 絶対パス
         self.親 = 親
+        self.システム指示 = _load_or_create_chat_context()
         self.AIモジュール = self._select_ai_module()
         self.AIインスタンス = None
         self.is_alive = False
@@ -93,6 +150,7 @@ class Chat:
                 AI_MODEL=self.AI_MODEL,
                 絶対パス=self.絶対パス or None,
                 api_key=api_key or None,
+                system_instruction=self.システム指示,
             )
             開始成功 = await self.AIインスタンス.開始()
             if (開始成功 is False) or (not getattr(self.AIインスタンス, "is_alive", False)):
@@ -350,3 +408,4 @@ class Chat:
             logger.warning(f"[Chat] 入力ファイルが見つかりません: {file_path}")
             return
         await self._AI実行と応答送信(受信データ, file_path=file_path)
+

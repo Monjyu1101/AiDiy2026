@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
@@ -9,17 +9,8 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-# モジュール名
-MODULE_NAME = '_openrt'
-
-# ロガーの設定
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)-10s - %(levelname)-8s - %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(MODULE_NAME)
+from log_config import get_logger
+logger = get_logger(__name__)
 
 import os
 import time
@@ -44,7 +35,7 @@ class ChatAI:
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "openrt", AI_MODEL: str = "google/gemini-2.5-flash",
-                 api_key: str = None):
+                 api_key: str = None, system_instruction: str = None):
         """初期化"""
 
         # セッションID・チャンネル
@@ -67,6 +58,11 @@ class ChatAI:
         # モデル設定
         self.chat_ai = AI_NAME
         self.chat_model = AI_MODEL
+        self.system_instruction = (
+            system_instruction.strip()
+            if isinstance(system_instruction, str) and system_instruction.strip()
+            else None
+        )
 
         # 作業ディレクトリ設定
         if 絶対パス and isinstance(絶対パス, str):
@@ -475,28 +471,24 @@ class ChatAI:
         OpenRouter apiメッセージ形式に変換（vision対応）
         """
         メッセージ = []
+        system_prompt_text = None
+        if isinstance(システムプロンプト, str) and システムプロンプト.strip():
+            system_prompt_text = システムプロンプト.strip()
+        elif self.system_instruction:
+            system_prompt_text = self.system_instruction
+        else:
+            system_prompt_text = "あなたは、美しい日本語を話す、賢いAIアシスタントです。"
 
         # システムプロンプト追加
-        if システムプロンプト:
-            メッセージ.append({
-                "role": "system",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": システムプロンプト
-                    }
-                ]
-            })
-        else:
-            メッセージ.append({
-                "role": "system",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "あなたは美しい日本語を話す賢いアシスタントです。"
-                    }
-                ]
-            })
+        メッセージ.append({
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": system_prompt_text
+                }
+            ]
+        })
 
         # 履歴追加
         履歴 = self._履歴取得()
@@ -642,3 +634,4 @@ if __name__ == "__main__":
         print("APIキーが設定されていません。_config/AiDiy_key.json を確認してください。")
     else:
         asyncio.run(_main(api_key=api_key, AI_MODEL=AI_MODEL))
+

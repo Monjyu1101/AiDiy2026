@@ -40,7 +40,7 @@ const handleLogin = async () => {
 <template>
   <div class="login-container">
     <div class="login-card">
-        <h2 class="title">ログイン</h2>
+        <h2 class="title">AiDiy</h2>
         <form @submit.prevent="handleLogin">
             <div class="form-group">
                 <label>利用者ID</label>
