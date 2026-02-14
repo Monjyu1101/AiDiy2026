@@ -143,21 +143,25 @@ def 取得_会話履歴一覧(
 def 取得_コードベース選択肢(アプリ設定=None) -> dict:
     """コードベースパス選択肢を取得"""
     options = {}
+
+    # 常にデフォルトの ../ を「AiDiy 実行ルート」として追加
+    options["../"] = "AiDiy 実行ルート"
+
     try:
         path_conf = getattr(アプリ設定, 'path', None) if アプリ設定 else None
         external_root_dic = getattr(path_conf, 'external_root_dic', None)
         if isinstance(external_root_dic, dict) and external_root_dic:
-            # _AIDIY.md を含むプロジェクト一覧を相対パスに変換
+            # _AiDiy.md を含むプロジェクト一覧を絶対パスで追加
             for 表示名, 絶対パス in external_root_dic.items():
                 try:
-                    相対パス = os.path.relpath(絶対パス, バックエンドディレクトリ)
-                    相対パス = 相対パス.replace('\\', '/')
-                    if not 相対パス.endswith('/'):
-                        相対パス += '/'
-                    options[相対パス] = 表示名
+                    # 絶対パスをそのまま使用（../ との重複を避けるため）
+                    パス = 絶対パス.replace('\\', '/')
+                    if not パス.endswith('/'):
+                        パス += '/'
+                    options[パス] = 表示名
                 except Exception:
                     continue
-        # external_root_path とその親も探索（_AIDIY.md を含むフォルダ）
+        # external_root_path とその親も探索（_AiDiy.md を含むフォルダ）
         external_root_path = getattr(path_conf, 'external_root_path', None) if path_conf else None
         探索ルート = []
         if external_root_path:
@@ -171,14 +175,15 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
             if not root_dir or not os.path.isdir(root_dir):
                 return
             # ルート自身
-            root_marker = os.path.join(root_dir, '_AIDIY.md')
+            root_marker = os.path.join(root_dir, '_AiDiy.md')
             if os.path.isfile(root_marker):
                 表示名 = os.path.basename(root_dir) or 'project_root'
                 try:
-                    相対パス = os.path.relpath(root_dir, バックエンドディレクトリ).replace('\\', '/')
-                    if not 相対パス.endswith('/'):
-                        相対パス += '/'
-                    options.setdefault(相対パス, 表示名)
+                    # 絶対パスをそのまま使用
+                    パス = root_dir.replace('\\', '/')
+                    if not パス.endswith('/'):
+                        パス += '/'
+                    options.setdefault(パス, 表示名)
                 except Exception:
                     pass
             # ルート直下と1階層下
@@ -194,14 +199,15 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
                     except (PermissionError, OSError):
                         pass
                     for path in candidates:
-                        marker = os.path.join(path, '_AIDIY.md')
+                        marker = os.path.join(path, '_AiDiy.md')
                         if os.path.isfile(marker):
                             表示名 = os.path.basename(path)
                             try:
-                                相対パス = os.path.relpath(path, バックエンドディレクトリ).replace('\\', '/')
-                                if not 相対パス.endswith('/'):
-                                    相対パス += '/'
-                                options.setdefault(相対パス, 表示名)
+                                # 絶対パスをそのまま使用
+                                パス = path.replace('\\', '/')
+                                if not パス.endswith('/'):
+                                    パス += '/'
+                                options.setdefault(パス, 表示名)
                             except Exception:
                                 continue
             except (PermissionError, OSError):

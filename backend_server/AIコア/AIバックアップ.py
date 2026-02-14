@@ -80,16 +80,17 @@ def _コードベース絶対パス取得(アプリ設定=None, backend_dir: Opt
     優先順位: 1. セッション設定, 2. アプリ設定, 3. デフォルト("../")
     """
     raw_path = "../"
-    
+
     # 1. セッション設定から取得（最優先）
     if セッション設定 and "CODE_BASE_PATH" in セッション設定:
         raw_path = セッション設定["CODE_BASE_PATH"]
     # 2. アプリ設定から取得
     elif アプリ設定 and hasattr(アプリ設定, "json"):
         raw_path = アプリ設定.json.get("CODE_BASE_PATH", "../")
-    
+
     normalized = raw_path.replace("\\", "/").strip()
-    base_dir = backend_dir or os.path.dirname(os.path.abspath(__file__))
+    # backend_server/ を基準にする（__file__ の1階層上）
+    base_dir = backend_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if os.path.isabs(normalized):
         return os.path.abspath(normalized)
     return os.path.abspath(os.path.join(base_dir, normalized))

@@ -584,12 +584,10 @@ const checkAiDiyMode = async () => {
     if (response?.data?.status === 'OK') {
       const codeBasePath = response.data.data.モデル設定?.CODE_BASE_PATH || '';
       
-      // AiDiyモード判定: CODE_BASE_PATHがbackend_serverの親ディレクトリを指している場合
-      // - 'AiDiy2026'が含まれている場合
-      // - またはbackend_server/AIコアの2階層上（プロジェクトルート）を指している場合
-      const isAiDiy = codeBasePath.includes('AiDiy2026') || 
-                      codeBasePath.endsWith('AiDiy2026') ||
-                      (codeBasePath.includes('backend_server') && !codeBasePath.endsWith('backend_server'));
+      // AiDiyモード判定: CODE_BASE_PATHがプロジェクトルート（相対パス）を指している場合
+      // '../'（デフォルト）= 実行中のプロジェクトルート
+      // 絶対パス指定の場合は他のプロジェクト = AiDiyモードではない
+      const isAiDiy = codeBasePath === '../';
       
       AiDiyモード.value = isAiDiy;
       console.log('[AiDiyモード判定]', { codeBasePath, isAiDiy });

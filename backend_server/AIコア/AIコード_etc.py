@@ -227,29 +227,7 @@ class CodeAI:
                 normalized = base_prompt.replace(windows_suffix, "").strip()
                 base_prompt = f"{normalized}\n{windows_suffix}" if normalized else windows_suffix
 
-            # _AIDIY.mdファイルのパスを構築（絶対パス）※区切りは"/"に統一
-            base_path = getattr(self, "base_abs_path", None)
-            if not base_path and self.parent_manager and hasattr(self.parent_manager, "CODE_ABS_PATH"):
-                base_path = getattr(self.parent_manager, "CODE_ABS_PATH", None)
-            if not base_path and self.parent_manager and hasattr(self.parent_manager, "utils"):
-                base_path = getattr(self.parent_manager.utils, "CODE_ABS_PATH", None)
-            if not base_path and hasattr(self, "base_options"):
-                base_path = self.base_options.get("cwd")
-            if not base_path:
-                base_path = Path(__file__).resolve().parent.as_posix()
-
-            aidiy_md_path = (Path(base_path) / "_AIDIY.md").as_posix()
-
-            # ファイルの存在確認
-            if not os.path.exists(aidiy_md_path):
-                logger.warning(f"システムプロンプト構築: _AIDIY.mdファイルが存在しません: `{aidiy_md_path}`")
-                return base_prompt
-
-            # システムプロンプトを構築（基本プロンプトのみ）
-            system_prompt = base_prompt
-
-            pass
-            return system_prompt
+            return base_prompt
 
         except Exception as e:
             logger.error(f"システムプロンプト構築エラー: {e}")

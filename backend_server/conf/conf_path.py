@@ -30,7 +30,7 @@ class conf_path:
         # 外部パス一覧のルート(2階層上、初期値は相対パス)
         self.external_root_path = '../../'
 
-        # 外部パス一覧 - _AIDIY.md を含むプロジェクト検出
+        # 外部パス一覧 - _AiDiy.md を含むプロジェクト検出
         self.external_root_dic = {}
 
     def init(self) -> bool:
@@ -38,21 +38,22 @@ class conf_path:
         try:
             # 生成するパスはすべて / 形式・末尾スラッシュ付きで統一
 
-            # 実行中の絶対パス
-            current_file_dir = os.path.dirname(os.path.abspath(__file__))
-            self.exec_abs_path = self._normalize_path(current_file_dir)
+            # 実行中の絶対パス（backend_server/ を基準にする）
+            current_file_dir = os.path.dirname(os.path.abspath(__file__))  # backend_server/conf/
+            backend_dir = os.path.dirname(current_file_dir)  # backend_server/
+            self.exec_abs_path = self._normalize_path(backend_dir)
 
-            # 実行中のルートパス(1階層上)
-            parent_path = os.path.abspath(os.path.join(current_file_dir, '..'))
-            if parent_path == current_file_dir or not os.path.exists(parent_path):
-                self.exec_abs_root = self.exec_abs_path
+            # 実行中のルートパス(1階層上、プロジェクトルート)
+            parent_path = os.path.abspath(os.path.join(backend_dir, '..'))
+            if not os.path.exists(parent_path):
+                self.exec_abs_root = '../'  # 初期値を保持
             else:
                 self.exec_abs_root = self._normalize_path(parent_path)
 
             # 外部パス一覧のルート(2階層上)
-            grandparent_path = os.path.abspath(os.path.join(current_file_dir, '..', '..'))
-            if grandparent_path == parent_path or not os.path.exists(grandparent_path):
-                self.external_root_path = self.exec_abs_root
+            grandparent_path = os.path.abspath(os.path.join(backend_dir, '..', '..'))
+            if not os.path.exists(grandparent_path):
+                self.external_root_path = self.exec_abs_root  # フォールバック
             else:
                 self.external_root_path = self._normalize_path(grandparent_path)
 
@@ -81,7 +82,7 @@ class conf_path:
         return normalized
 
     def _discover_agents_projects(self, search_root: Optional[str] = None) -> Dict[str, str]:
-        """指定ルート直下、およびその1階層下で「_AIDIY.md」を含むフォルダを列挙"""
+        """指定ルート直下、およびその1階層下で「_AiDiy.md」を含むフォルダを列挙"""
         result: Dict[str, str] = {}
         try:
             if search_root and not os.path.isabs(search_root):
@@ -97,7 +98,7 @@ class conf_path:
                 return result
 
             def try_add(path: str) -> None:
-                agents_file = os.path.join(path, '_AIDIY.md')
+                agents_file = os.path.join(path, '_AiDiy.md')
                 if os.path.isfile(agents_file):
                     key = os.path.basename(path)
                     if key not in result:
