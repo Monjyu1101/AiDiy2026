@@ -635,6 +635,27 @@ class CodeAI:
                 nonlocal last_output_time
                 try:
                     while True:
+                        # 強制停止フラグチェック
+                        if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
+                            logger.info(f"[CodeEtc] チャンネル{self.チャンネル} 強制停止フラグ検出(stdout) → プロセス強制終了")
+                            try:
+                                process.kill()
+                            except Exception:
+                                pass
+                            if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                                try:
+                                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                                        "セッションID": self.セッションID,
+                                        "チャンネル": self.チャンネル,
+                                        "メッセージ識別": "output_stream",
+                                        "メッセージ内容": "<<< 処理中断 >>>",
+                                        "ファイル名": None,
+                                        "サムネイル画像": None
+                                    })
+                                except Exception as e:
+                                    logger.error(f"[CodeEtc] output_stream送信エラー(中断): {e}")
+                            break
+
                         line = await process.stdout.readline()
                         if not line:
                             break
@@ -672,6 +693,10 @@ class CodeAI:
                 nonlocal last_output_time
                 try:
                     while True:
+                        # 強制停止フラグチェック
+                        if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
+                            break
+
                         line = await process.stderr.readline()
                         if not line:
                             break
@@ -740,6 +765,10 @@ class CodeAI:
 
             # stderr を保存（セッションID抽出用）
             self.last_stderr_output = "\n".join(stderr_lines)
+
+            # 強制停止フラグが立っている場合は中断メッセージを返す
+            if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
+                return "処理は強制中断しました。"
 
             # stdout全体を結果として返す（フィルタリングなし）
             return full_output.strip() if full_output.strip() else "（応答なし）"

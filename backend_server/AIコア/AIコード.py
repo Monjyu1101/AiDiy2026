@@ -118,6 +118,7 @@ class CodeAgent:
         self.会話履歴 = []  # エージェント専用の会話履歴
         self.累積変更ファイル: list[str] = []  # 検証対象ファイルを累積
         self._累積変更ファイルキー: set[str] = set()  # パス正規化キーで重複排除
+        self.強制停止フラグ = False  # cancel_agent用
 
     def _変更ファイルキー(self, ファイルパス: str) -> str:
         """重複判定用の正規化キーを返す"""
@@ -241,6 +242,8 @@ class CodeAgent:
         3. 生成ファイル通知
         4. update_info送信
         """
+        # 強制停止フラグをリセット
+        self.強制停止フラグ = False
         # 累積変更ファイルをクリア
         self.累積変更ファイル = []
         self._累積変更ファイルキー = set()
@@ -255,6 +258,8 @@ class CodeAgent:
         3. output_request送信（チャンネル0へ）
         4. チャンネル-1へ完了通知（音声付き）
         """
+        # 強制停止フラグをリセット
+        self.強制停止フラグ = False
         try:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
             
@@ -407,6 +412,20 @@ class CodeAgent:
             if not 出力メッセージ内容:
                 出力メッセージ内容 = "!"
 
+            # 強制停止フラグチェック
+            if self.強制停止フラグ:
+                logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止フラグ検出（AI実行後）")
+                出力メッセージ内容 = "処理は強制中断しました。"
+                # output_stream で中断通知
+                await self.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID,
+                    "チャンネル": self.チャンネル,
+                    "メッセージ識別": "output_stream",
+                    "メッセージ内容": "<<< 処理中断 >>>",
+                    "ファイル名": None,
+                    "サムネイル画像": None
+                })
+
             # 処理応答ログ
             logger.info(
                 f"処理応答: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{出力メッセージ内容.rstrip()}\n"
@@ -431,6 +450,11 @@ class CodeAgent:
                     ファイル名=None,
                     サムネイル画像=None
                 )
+
+            # 強制停止時はバックアップ検証・ファイル通知・update_infoをスキップ
+            if self.強制停止フラグ:
+                logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止のため後続処理スキップ")
+                return 出力メッセージ内容
 
             # バックアップ＋自己検証ループ
             今回更新あり = False
@@ -480,6 +504,11 @@ class CodeAgent:
         await asyncio.sleep(0.5)
 
         for n in range(1, 6):  # 最大5回
+            # 強制停止フラグチェック
+            if self.強制停止フラグ:
+                logger.info(f"[検証ループ] 強制停止フラグ検出 → 検証中断")
+                break
+
             # バックアップ実行（差分のみ、セッション固有のCODE_BASE_PATHを使用）
             logger.debug(f"[検証{n}回目] バックアップ実行を呼び出します")
             result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)

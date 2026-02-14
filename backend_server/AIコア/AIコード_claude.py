@@ -371,7 +371,25 @@ class CodeAI:
                     # queryメソッドで実行（ストリーミング対応）
                     async for message in query(prompt=送信用要求テキスト, options=options):
                         last_stream_time = time.time()
-                        
+
+                        # 強制停止フラグチェック
+                        if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
+                            logger.info(f"[CodeClaud] チャンネル{self.チャンネル} 強制停止フラグ検出 → ストリーム中断")
+                            result_text = "処理は強制中断しました。"
+                            if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                                try:
+                                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                                        "セッションID": self.セッションID,
+                                        "チャンネル": self.チャンネル,
+                                        "メッセージ識別": "output_stream",
+                                        "メッセージ内容": "<<< 処理中断 >>>",
+                                        "ファイル名": None,
+                                        "サムネイル画像": None
+                                    })
+                                except Exception as e:
+                                    logger.error(f"[CodeClaud] output_stream送信エラー(中断): {e}")
+                            break
+
                         # AIセッションIDを取得・保存（SDK仕様のsession_id属性）
                         if not self.AIセッションID:
                             sdk_id = getattr(message, "session_id", None)
@@ -379,7 +397,7 @@ class CodeAI:
                                 self.AIセッションID = sdk_id
                                 # logger.info(f"AIセッションID取得: {self.AIセッションID}")
                                 pass
-                        
+
                         # ストリーミングコンテンツを抽出
                         content = self.メッセージ内容抽出(message)
                         if content and テキスト受信処理Ｑ:
@@ -399,7 +417,7 @@ class CodeAI:
                                 })
                             except Exception as e:
                                 logger.error(f"[CodeClaud] output_stream送信エラー(stream): {e}")
-                        
+
                         # 最終結果を取得
                         if hasattr(message, 'result') and message.result:
                             result_text = str(message.result)

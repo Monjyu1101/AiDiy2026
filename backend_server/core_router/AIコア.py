@@ -855,9 +855,9 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
                     ファイル名 = 受信データ.get("ファイル名") or ""
-                    入力チャンネル = 受信データ.get("チャンネル", -1)
-                    出力先チャンネル = 受信データ.get("出力先チャンネル", 0)
-                    logger.debug(f"テキスト受信 (入力={入力チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
+                    チャンネル = 受信データ.get("チャンネル", 0)
+                    出力先チャンネル = 受信データ.get("出力先チャンネル", チャンネル)
+                    logger.debug(f"テキスト受信 (チャンネル={チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     if セッション.is_channel_processing(出力先チャンネル):
                         await セッション.send_to_channel(出力先チャンネル, {
@@ -960,9 +960,9 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     if int(ソケット番号) != -1:
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
-                    入力チャンネル = 受信データ.get("チャンネル", -1)
-                    出力先チャンネル = 受信データ.get("出力先チャンネル", 1)
-                    logger.debug(f"リクエスト受信 (入力={入力チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
+                    チャンネル = 受信データ.get("チャンネル", 1)
+                    出力先チャンネル = 受信データ.get("出力先チャンネル", チャンネル)
+                    logger.debug(f"リクエスト受信 (チャンネル={チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     # input_requestはコードエージェント専用（チャンネル1-4のみ）
                     if not (1 <= 出力先チャンネル <= 4):
@@ -1022,8 +1022,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     if int(ソケット番号) != -1:
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or ""
-                    入力チャンネル = 受信データ.get("チャンネル", -1)
-                    出力先チャンネル = 受信データ.get("出力先チャンネル", 0)
+                    チャンネル = 受信データ.get("チャンネル", 0)
+                    出力先チャンネル = 受信データ.get("出力先チャンネル", チャンネル)
                     ファイル名 = 受信データ.get("ファイル名")
                     保存ファイル名 = None
                     サムネイル_base64 = None
@@ -1122,6 +1122,17 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             logger.info("音声出力停止")
                     except Exception as e:
                         logger.warning(f"cancel_audio処理エラー: {e}")
+
+                elif メッセージ識別 == "cancel_agent":
+                    try:
+                        チャンネル = 受信データ.get("チャンネル", 0)
+                        if 1 <= チャンネル <= 4 and セッション and hasattr(セッション, 'code_agent_processors'):
+                            セッション.code_agent_processors[チャンネル - 1].強制停止フラグ = True
+                            logger.info(f"cancel_agent: チャンネル{チャンネル} 強制停止フラグをオン ({セッションID})")
+                        else:
+                            logger.warning(f"cancel_agent: 無効なチャンネル={チャンネル} ({セッションID})")
+                    except Exception as e:
+                        logger.warning(f"cancel_agent処理エラー: {e}")
 
                 elif メッセージ識別 == "input_image":
                     try:

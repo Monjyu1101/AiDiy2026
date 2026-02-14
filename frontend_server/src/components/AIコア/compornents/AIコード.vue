@@ -64,6 +64,7 @@ const 入力テキスト = ref('');
 const テキストエリア = ref<HTMLTextAreaElement | null>(null);
 const 送信中 = ref(false);
 const ドラッグ中 = ref(false);
+const ストリーム受信中 = ref(false);
 
 // メッセージ送信（input_textとして送信）
 const メッセージ送信 = async () => {
@@ -79,13 +80,12 @@ const メッセージ送信 = async () => {
 
   // ローカル表示はせず、サーバーからのエコーバックで表示
 
-  // input_textとして送信（入力チャンネル=-1、出力先チャンネルで振り分け）
+  // input_textとして送信
   if (プロパティ.inputWsClient && プロパティ.inputWsClient.isConnected()) {
-    const 出力先チャンネル = プロパティ.チャンネル ?? 0;
+    const チャンネル = プロパティ.チャンネル ?? 0;
     プロパティ.inputWsClient.send({
       セッションID: セッションID.value,
-      チャンネル: -1,  // 入力は常に-1
-      出力先チャンネル: 出力先チャンネル,  // バックエンドが振り分け
+      チャンネル: チャンネル,
       メッセージ識別: 'input_text',
       メッセージ内容: 送信内容
     });
@@ -100,14 +100,10 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
     const 読込 = new FileReader();
     読込.onload = async (e) => {
       const Base64データ = e.target?.result as string;
-      const 出力先チャンネル = プロパティ.チャンネル ?? 0;
-
-      // ローカルフィードバック表示は不要（サーバーからのエコーバックで表示）
-
+      const チャンネル = プロパティ.チャンネル ?? 0;
       プロパティ.inputWsClient?.send({
         セッションID: セッションID.value,
-        チャンネル: -1,  // 入力は常に-1
-        出力先チャンネル: 出力先チャンネル,  // バックエンドが振り分け
+        チャンネル: チャンネル,
         メッセージ識別: 'input_file',
         メッセージ内容: Base64データ,
         ファイル名: 入力ファイル.name,
@@ -118,6 +114,20 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
   } catch (error) {
     console.error('[エージェント] ファイル送信エラー:', error);
     行追加('[エラー] ファイル送信に失敗しました。');
+  }
+};
+
+// キャンセル送信（cancel_agent）
+const キャンセル送信 = () => {
+  if (!ストリーム受信中.value || !WebSocket接続中.value) return;
+  if (プロパティ.inputWsClient && プロパティ.inputWsClient.isConnected()) {
+    const チャンネル = プロパティ.チャンネル ?? 0;
+    プロパティ.inputWsClient.send({
+      セッションID: セッションID.value,
+      チャンネル: チャンネル,
+      メッセージ識別: 'cancel_agent',
+      メッセージ内容: ''
+    });
   }
 };
 
@@ -369,6 +379,7 @@ const 受信内容文字列 = (受信データ: any) => {
 
 const ウェルカム処理 = (受信データ: any) => {
   // 通知('activate'); // welcome_infoでは画面表示しない
+
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ウェルカム内容.value = 内容;
@@ -376,6 +387,7 @@ const ウェルカム処理 = (受信データ: any) => {
 };
 const 入力テキスト受信処理 = (受信データ: any) => {
   通知('activate');
+
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ターミナルメッセージ追加('input_text', `> ${内容}`);
@@ -383,6 +395,7 @@ const 入力テキスト受信処理 = (受信データ: any) => {
 
 const 入力リクエスト受信処理 = (受信データ: any) => {
   通知('activate');
+
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ターミナルメッセージ追加('input_request', 内容);
@@ -390,6 +403,7 @@ const 入力リクエスト受信処理 = (受信データ: any) => {
 
 const 入力ファイル受信処理 = (受信データ: any) => {
   通知('activate');
+
   const fileName = 受信データ.ファイル名 ?? null;
   const thumbnail = 受信データ.サムネイル画像 ?? null;
   ファイルメッセージ追加('input_file', fileName, thumbnail);
@@ -397,6 +411,7 @@ const 入力ファイル受信処理 = (受信データ: any) => {
 
 const 出力テキスト受信処理 = (受信データ: any) => {
   通知('activate');
+
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ターミナルメッセージ追加('output_text', 内容);
@@ -404,6 +419,7 @@ const 出力テキスト受信処理 = (受信データ: any) => {
 
 const ウェルカムテキスト受信処理 = (受信データ: any) => {
   // 通知('activate'); // welcome_textでは画面表示しない
+
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ターミナルメッセージ追加('welcome_text', 内容);
@@ -411,6 +427,7 @@ const ウェルカムテキスト受信処理 = (受信データ: any) => {
 
 const 出力ファイル受信処理 = (受信データ: any) => {
   通知('activate');
+
   const fileName = 受信データ.ファイル名 ?? null;
   const thumbnail = 受信データ.サムネイル画像 ?? null;
   ファイルメッセージ追加('output_file', fileName, thumbnail);
@@ -418,6 +435,7 @@ const 出力ファイル受信処理 = (受信データ: any) => {
 
 const update_info受信処理 = (受信データ: any) => {
   通知('activate');
+
   const メッセージ内容 = 受信データ.メッセージ内容;
   let updateFiles: string[] = [];
 
@@ -446,6 +464,7 @@ const 出力ストリーム受信処理 = (受信データ: any) => {
   if (内容 === '<<< 処理開始 >>>') {
     const メッセージID = 新規メッセージID();
     ストリームメッセージID = メッセージID;
+    ストリーム受信中.value = true;
 
     メッセージ一覧.value.push({
       role: 'output_text',
@@ -467,8 +486,8 @@ const 出力ストリーム受信処理 = (受信データ: any) => {
     return;
   }
 
-  // 処理終了
-  if (内容 === '<<< 処理終了 >>>') {
+  // 処理終了・処理中断
+  if (内容 === '<<< 処理終了 >>>' || 内容 === '<<< 処理中断 >>>') {
     if (ストリームメッセージID) {
       演出キュー追加(ストリームメッセージID, `${内容}\n`, true);
       const 対象メッセージ = メッセージ一覧.value.find(m => m.id === ストリームメッセージID);
@@ -477,6 +496,7 @@ const 出力ストリーム受信処理 = (受信データ: any) => {
       }
     }
     ストリームメッセージID = null;
+    ストリーム受信中.value = false;
     return;
   }
 
@@ -818,6 +838,16 @@ const 状態表示テキスト = () => {
         >
           <img src="/icons/sending.png" alt="送信" />
         </button>
+
+        <button
+          class="agent-cancel-btn"
+          :class="{ 'is-active': ストリーム受信中 }"
+          @click="キャンセル送信"
+          :disabled="!ストリーム受信中 || !WebSocket接続中"
+          title="キャンセル"
+        >
+          !
+        </button>
       </div>
     </div>
 
@@ -1004,8 +1034,8 @@ const 状態表示テキスト = () => {
 }
 
 .terminal-line.stream-output .line-content {
-  background: rgba(220, 230, 255, 0.1);
-  border: 1px solid rgba(100, 140, 220, 0.4);
+  background: rgba(255, 180, 200, 0.12);
+  border: 1px solid rgba(255, 100, 150, 0.5);
   border-radius: 4px;
   padding: 0;
   display: block;
@@ -1310,6 +1340,47 @@ const 状態表示テキスト = () => {
 
 .agent-send-btn.ws-disabled:hover {
   transform: none;
+}
+
+/* キャンセルボタン */
+.agent-cancel-btn {
+  border: 2px solid #808080;
+  border-radius: 2px;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 56px;
+  height: 48px;
+  margin-bottom: 20px;
+  margin-left: 4px;
+  background: rgba(128, 128, 128, 0.3);
+  color: #808080;
+  font-size: 24px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  transition: all 0.2s ease;
+}
+
+.agent-cancel-btn.is-active {
+  background: #ff4444;
+  border-color: #ff4444;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.agent-cancel-btn.is-active:hover {
+  background: #cc0000;
+  border-color: #cc0000;
+}
+
+.agent-cancel-btn:disabled {
+  opacity: 0.6;
+}
+
+.agent-cancel-btn.is-active:disabled {
+  opacity: 1;
 }
 </style>
 
