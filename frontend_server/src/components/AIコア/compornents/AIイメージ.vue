@@ -614,17 +614,27 @@ onBeforeUnmount(() => {
 
 .image-area {
   flex: 1;
-  padding: 20px;
+  padding: 5px;
   overflow-y: auto;
-  background: #44ff44; /* 鮮やかな緑 */
+  background: #ff4444; /* 赤 */
   position: relative;
   box-sizing: border-box;
+  animation: pulse-border 2.5s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    background: #ff4444;
+  }
+  50% {
+    background: rgba(255, 68, 68, 0.2);
+  }
 }
 
 .image-preview {
   width: 100%;
   height: 100%;
-  border: 2px dashed #81c784;
+  border: none;
   border-radius: 2px;
   background: #e8f5e9; /* 淡い緑 */
   display: flex;
@@ -635,17 +645,14 @@ onBeforeUnmount(() => {
 }
 
 .image-preview:hover {
-  border-color: #66bb6a;
   background: #e8f5e9; /* ホバー時も淡い緑 */
 }
 .image-preview.disabled {
   cursor: not-allowed;
   opacity: 0.6;
-  border-color: #a5d6a7;
   background: #e8f5e9; /* 淡い緑 */
 }
 .image-preview.disabled:hover {
-  border-color: #a5d6a7;
   background: #e8f5e9; /* 淡い緑 */
 }
 
