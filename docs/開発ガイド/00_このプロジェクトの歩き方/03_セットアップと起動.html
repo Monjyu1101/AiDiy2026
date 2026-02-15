@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>03. セットアップと起動 | このプロジェクトの歩き方</title>
+ <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+ <header>
+ <div>
+ <h1><a href="_index.html">このプロジェクトの歩き方</a></h1>
+ </div>
+ </header>
+
+ <div>
+ <h1> 03. セットアップと起動</h1>
+
+ <section id="prerequisites">
+ <h2>前提条件</h2>
+ <p>以下のツールが事前にインストールされている必要があります。</p>
+
+ <table>
+ <thead>
+ <tr>
+ <th>ツール</th>
+ <th>バージョン</th>
+ <th>確認コマンド</th>
+ <th>備考</th>
+ </tr>
+ </thead>
+ <tbody>
+ <tr>
+ <td><strong>Python</strong></td>
+ <td>3.13</td>
+ <td><code>python --version</code></td>
+ <td>Python 3.13 以上が必要</td>
+ </tr>
+ <tr>
+ <td><strong>Node.js</strong></td>
+ <td>v22以上</td>
+ <td><code>node --version</code></td>
+ <td>v22.14.0 / npm 11.3.0 推奨</td>
+ </tr>
+ <tr>
+ <td><strong>SQLite</strong></td>
+ <td>-</td>
+ <td>-</td>
+ <td>Pythonに同梱のため個別インストール不要</td>
+ </tr>
+ <tr>
+ <td><strong>uv</strong></td>
+ <td>最新</td>
+ <td><code>uv --version</code></td>
+ <td>高速パッケージマネージャ</td>
+ </tr>
+ <tr>
+ <td><strong>Git</strong></td>
+ <td>最新</td>
+ <td><code>git --version</code></td>
+ <td>バージョン管理（<a href="https://gitforwindows.org/" target="_blank">gitforwindows.org</a>）</td>
+ </tr>
+ </tbody>
+ </table>
+
+ <div>
+ <strong>バージョン確認コマンド</strong>
+ <pre><code>python --version
+node --version
+uv --version
+git --version</code></pre>
+ </div>
+
+ <div>
+ <strong>補足: SQLiteについて</strong>
+ <p>
+ 本プロジェクトではSQLiteを使用しますが、SQLiteはPythonに<strong>標準で組み込まれている</strong>ため、
+ 別途インストールする必要はありません。データベースファイルは <code>backend_server\_data\AiDiy\database.db</code> に自動生成されます。
+ </p>
+ </div>
+ </section>
+
+ <section id="setup">
+ <h2>セットアップ手順</h2>
+ <p>初回のみ実行が必要です。</p>
+
+ <pre><code><span># プロジェクトディレクトリへ移動</span>
+cd workspace/AiDiy2026
+
+<span># セットアップ実行</span>
+python _setup.py</code></pre>
+
+ <h3>_setup.py が行うこと</h3>
+ <p>このスクリプトは<strong>対話形式</strong>で以下の処理を実行します。</p>
+ <ol>
+ <li><strong>Python依存パッケージのインストール</strong> — <code>uv sync</code> でバックエンド依存関係を解決
+  <br><small>要件: uv がインストールされていること。未導入の場合: <code>irm https://astral.sh/uv/install.ps1 | iex</code> (PowerShell)</small></li>
+ <li><strong>Node.js依存パッケージのインストール</strong> — <code>npm install</code> でVue関連パッケージをインストール</li>
+ <li><strong>PostgreSQL関連処理</strong> — <code>DATABASE_TYPE="sqlite"</code> のため、PostgreSQLユーザー確認・初期データ復元・マイグレーション実行は<strong>スキップ</strong>されます</li>
+ </ol>
+
+ <div>
+ <strong>補足: データベースとログイン</strong>
+ <p>
+ データベースファイルとテーブルは<strong>サーバー初回起動時に自動作成</strong>されます（_setup.pyでは作成されません）。<br>
+ 初期データ（admin等のアカウント）はサーバー起動時に「adminが未存在」の場合のみ投入されます。
+ </p>
+ </div>
+
+ <div>
+ <strong>セットアップ時の注意</strong>
+ <ul>
+ <li>インターネット接続が必要です（パッケージダウンロードのため）</li>
+ <li>SQLiteデータベースは <code>backend_server\_data\AiDiy\database.db</code> に作成されます</li>
+ </ul>
+ </div>
+
+ <div>
+ <strong>プロキシ環境の場合</strong>
+ <p>社内ネットワークなどプロキシ環境下では、以下の設定が必要な場合があります。</p>
+ <pre><code>git config --global http.proxy http://n.n.n.n:nnnn
+npm config set proxy http://n.n.n.n:nnnn</code></pre>
+ <p><small>※ <code>n.n.n.n:nnnn</code> はプロキシサーバーのアドレスとポートに置き換えてください。</small></p>
+ </div>
+ </section>
+
+ <section id="api-key">
+ <h2>APIキー設定（AI機能を使う場合）</h2>
+ <p>AIコア機能を使用する場合、APIキーの設定が必要です。</p>
+
+ <div>
+ <strong>設定ファイルの場所</strong>
+ <p>
+ <code>backend_server/_config/AiDiy_key.json</code> にAPIキーを保存します。<br>
+ このフォルダは<strong>公開リポジトリに含めない</strong>方針のため、<code>.gitignore</code> で除外されています。
+ </p>
+ </div>
+
+ <ul>
+ <li>ファイルが無ければ、<strong>初回起動時にひな形が自動生成</strong>されるため、手動コピーは不要</li>
+ <li>起動後、<code>AiDiy_key.json</code> 内の各APIキーを設定してください</li>
+ <li>対応AI: Anthropic Claude, OpenAI, Google Gemini</li>
+ </ul>
+ </section>
+
+ <section id="start">
+ <h2>起動方法</h2>
+ <p>全サーバーを一括で起動します。</p>
+
+ <pre><code><span># プロジェクトディレクトリへ移動して起動</span>
+cd workspace/AiDiy2026
+python _start.py</code></pre>
+
+ <h3>_start.py が行うこと</h3>
+ <ul>
+ <li>Core サーバーをポート8091で起動</li>
+ <li>Apps サーバーをポート8092で起動</li>
+ <li>フロントエンドをポート8090で起動</li>
+ <li>全サーバーの起動完了を待機</li>
+ </ul>
+
+ <div>
+ <strong>_start.py の動作詳細</strong>
+ <ul>
+ <li>ポート 8090/8091/8092 を使用中のプロセスを自動で停止</li>
+ <li>起動完了後、ブラウザで http://localhost:8090 を自動的に開く</li>
+ <li>サーバーがクラッシュした場合、15秒後に自動再起動</li>
+ <li>Ctrl+C で全サーバーを一括停止</li>
+ </ul>
+ </div>
+
+ <div>
+ <strong>起動成功時の表示</strong>
+ <p>以下のようなメッセージが表示されれば正常に起動しています。</p>
+ <pre><code> Core サーバー: http://localhost:8091
+ Apps サーバー: http://localhost:8092
+ フロントエンド: http://localhost:8090</code></pre>
+ </div>
+
+ <div>
+ <strong>ポートが使用中の場合</strong>
+ <p>ポート8090/8091/8092が既に使用されている場合はエラーになります。<br>
+ その場合は <code>python.exe</code> や <code>node.exe</code> のプロセスを終了してから再起動してください。</p>
+ </div>
+ </section>
+
+ <section id="individual-start">
+ <h2>個別起動</h2>
+ <p>開発時にサーバーを個別に起動する場合は以下のコマンドを使用します。</p>
+
+ <h3>Core サーバー</h3>
+ <pre><code>cd workspace/AiDiy2026/backend_server
+.venv\Scripts\python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091</code></pre>
+
+ <h3>Apps サーバー</h3>
+ <pre><code>cd workspace/AiDiy2026/backend_server
+.venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092</code></pre>
+
+ <h3>フロントエンド</h3>
+ <pre><code>cd workspace/AiDiy2026/frontend_server
+npm run dev</code></pre>
+
+ <div>
+ <strong>個別起動のメリット</strong>
+ <ul>
+ <li>変更したサーバーだけを再起動できる</li>
+ <li>ホットリロードが有効になる</li>
+ <li>エラーログを個別に確認できる</li>
+ </ul>
+ </div>
+ </section>
+
+ <section id="partial-start">
+ <h2>部分起動と部分停止</h2>
+ <p>バックエンドまたはフロントエンドだけを起動・停止することもできます。</p>
+
+ <h3>部分起動</h3>
+ <pre><code><span># バックエンドのみ起動</span>
+python _start.py --backend=yes --frontend=no
+
+<span># フロントエンドのみ起動</span>
+python _start.py --backend=no --frontend=yes</code></pre>
+
+ <h3>停止コマンド</h3>
+ <pre><code><span># 全サーバー停止</span>
+python _stop.py
+
+<span># バックエンドのみ停止</span>
+python _stop.py --backend=yes --frontend=no
+
+<span># フロントエンドのみ停止</span>
+python _stop.py --backend=no --frontend=yes</code></pre>
+ </section>
+
+ <section id="vscode">
+ <h2>VS Code でのデバッグ起動（F5キー）</h2>
+ <p>VS Code を使用している場合、F5キーでデバッグ起動が可能です。</p>
+ <table>
+ <thead>
+ <tr><th>設定ファイル</th><th>内容</th></tr>
+ </thead>
+ <tbody>
+ <tr>
+ <td><code>.vscode/launch.json</code>（ルート）</td>
+ <td><code>_start.py</code> を実行するフルスタック起動設定</td>
+ </tr>
+ <tr>
+ <td><code>backend_server/.vscode/launch.json</code></td>
+ <td>core_main.py / apps_main.py を個別にデバッグ起動（debugpy）</td>
+ </tr>
+ <tr>
+ <td><code>frontend_server/.vscode/launch.json</code></td>
+ <td>Vite dev server を起動し、Chrome でデバッグ</td>
+ </tr>
+ </tbody>
+ </table>
+ </section>
+
+ <section id="verify">
+ <h2>動作確認</h2>
+ <p>起動後、以下の手順で動作を確認してください。</p>
+
+ <h3>1. ブラウザで確認</h3>
+ <p>ブラウザで <a href="http://localhost:8090/" target="_blank">http://localhost:8090/</a> を開いてログイン画面が表示されることを確認します。</p>
+
+ <h3>2. 初期ログイン</h3>
+ <ul>
+ <li><strong>ユーザー名</strong>: <code>admin</code></li>
+ <li><strong>パスワード</strong>: <code>********</code></li>
+ </ul>
+
+ <h3>3. 画面遷移</h3>
+ <p>ログイン後、メニューから各画面に遷移できることを確認します。</p>
+
+ <h3>4. API確認</h3>
+ <p>以下のURLからSwagger UIでAPIの動作を確認できます。</p>
+ <ul>
+ <li><strong>Core API</strong>: <a href="http://localhost:8091/docs" target="_blank">http://localhost:8091/docs</a> (C系・A系のAPI)</li>
+ <li><strong>Apps API</strong>: <a href="http://localhost:8092/docs" target="_blank">http://localhost:8092/docs</a> (M系・T系・V系・S系のAPI)</li>
+ </ul>
+ </section>
+
+ <section id="health-check">
+  <h2>ヘルスチェック</h2>
+  <p>バックエンドが起動しているか確認するコマンドです。</p>
+  <pre><code>curl http://localhost:8091/core/サーバー状態</code></pre>
+
+  <h3>完了条件チェックリスト</h3>
+  <p>以下を全て満たせば、環境構築は完了です。</p>
+  <ul>
+  <li>localhost:8090 が表示される</li>
+  <li>localhost:8091/docs が表示される</li>
+  <li>localhost:8092/docs が表示される</li>
+  <li>admin でログインに成功する</li>
+  <li>/core/サーバー状態 が応答を返す</li>
+  </ul>
+ </section>
+
+ <section id="troubleshooting">
+ <h2>トラブルシューティング</h2>
+
+ <table>
+ <thead>
+ <tr>
+ <th>症状</th>
+ <th>対処法</th>
+ </tr>
+ </thead>
+ <tbody>
+ <tr>
+ <td><strong>ポート8090/8091/8092が使用中</strong></td>
+ <td>
+ 既存のプロセスを終了してから再起動してください。<br>
+ <code>taskkill /F /IM python.exe</code><br>
+ <code>taskkill /F /IM node.exe</code>
+ </td>
+ </tr>
+ <tr>
+ <td><strong>ログインできない</strong></td>
+ <td>
+ 初期アカウントの認証情報を確認してください。<br>
+ ユーザー名 <code>admin</code> / パスワード <code>********</code>
+ </td>
+ </tr>
+ <tr>
+ <td><strong>APIが404エラーを返す</strong></td>
+ <td>
+ プロキシ設定を確認してください。<br>
+ <code>frontend_server/vite.config.ts</code> のプロキシ設定が正しいか確認
+ </td>
+ </tr>
+ <tr>
+ <td><strong>データベースエラー</strong></td>
+ <td>
+ データベースを削除して再作成してください。<br>
+ <code>del backend_server\_data\AiDiy\database.db</code><br>
+ その後 <code>python _start.py</code> で再起動
+ </td>
+ </tr>
+ <tr>
+ <td><strong>依存パッケージエラー</strong></td>
+ <td>
+ 依存関係を再インストールしてください。<br>
+ <code>cd backend_server && uv sync</code><br>
+ <code>cd frontend_server && npm install</code>
+ </td>
+ </tr>
+ </tbody>
+ </table>
+ </section>
+
+ <section id="stop">
+ <h2>停止方法</h2>
+ <p>サーバーを停止する方法は4通りあります。</p>
+
+ <h3>方法1: _stop.py (推奨)</h3>
+ <pre><code>python _stop.py</code></pre>
+ <p>ポート 8090/8091/8092 を使用しているプロセスを検索して自動停止します。</p>
+
+ <h3>方法2: Ctrl+C</h3>
+ <p>起動中のターミナルで <code>Ctrl+C</code> を押して停止します。</p>
+
+ <h3>方法3: タスクマネージャー</h3>
+ <ol>
+ <li><code>Ctrl+Shift+Esc</code> でタスクマネージャーを開く</li>
+ <li><code>python.exe</code> と <code>node.exe</code> のプロセスを探す</li>
+ <li>選択して「タスクの終了」をクリック → プロセスを終了</li>
+ </ol>
+
+ <h3>方法4: PowerShell</h3>
+ <pre><code><span># Pythonプロセスを停止</span>
+taskkill /F /IM python.exe
+
+<span># Node.jsプロセスを停止</span>
+taskkill /F /IM node.exe</code></pre>
+ </section>
+
+ <section id="next">
+ <h2>次のステップ</h2>
+ <p>セットアップと起動が完了したら、バックエンドの開発方法を学びましょう。</p>
+
+ <div>
+ <a href="04_バックエンド開発.html">
+ <span>次の章へ進む</span>
+ <strong>04. バックエンド開発 →</strong>
+ <span>バックエンドの実装パターンを学びます</span>
+ </a>
+ </div>
+ </section>
+ </div>
+
+ <footer>
+ <p>
+ <a href="02_技術スタックと構成.html">← 前: 02. 技術スタックと構成</a> |
+ <a href="_index.html">トップページ</a> |
+ <a href="04_バックエンド開発.html">次: 04. バックエンド開発 →</a>
+ </p>
+ </footer>
+</body>
+</html>

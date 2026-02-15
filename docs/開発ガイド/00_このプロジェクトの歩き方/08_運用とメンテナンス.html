@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>08. 運用とメンテナンス | このプロジェクトの歩き方</title>
+ <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+ <header>
+ <div>
+ <h1><a href="_index.html">このプロジェクトの歩き方</a></h1>
+ </div>
+ </header>
+
+ <div>
+ <h1>08. 運用とメンテナンス</h1>
+
+ <section id="overview">
+ <h2>運用の概要</h2>
+ <p>このシステムの運用に必要な基本的な知識をまとめています。<br>
+ 開発環境での日常的な運用作業について説明します。</p>
+ </section>
+
+ <section id="database-management">
+ <h2>データベース管理</h2>
+ <p>SQLiteデータベースの管理方法について説明します。</p>
+
+ <h3>リセット手順</h3>
+ <p>データベースを初期状態に戻す手順です。</p>
+
+ <pre><code><span># 1. サーバーを停止 (Ctrl+C または python _stop.py)</span>
+
+<span># 2. データベースファイルを削除</span>
+del workspace/AiDiy2026/backend_server\_data\AiDiy\database.db
+
+<span># 3. サーバーを再起動してDBを再作成</span>
+cd workspace/AiDiy2026
+python _start.py</code></pre>
+
+ <div>
+ <strong>注意 </strong>
+ <p>
+ SQLiteはファイルベースのデータベースです。<br>
+ <code>database.db</code> を削除すると全データが失われます。
+ </p>
+ </div>
+
+ <h3>バックアップ場所</h3>
+ <table>
+ <tbody>
+ <tr>
+ <td><strong>データベースファイル</strong></td>
+ <td><code>backend_server\_data\AiDiy\database.db</code></td>
+ </tr>
+ <tr>
+ <td><strong>バックアップ命名規則</strong></td>
+ <td>日付付き: <code>database_backup_20260214.db</code></td>
+ </tr>
+ <tr>
+ <td><strong>復元方法</strong></td>
+ <td>バックアップファイルを <code>database.db</code> にコピーして上書き</td>
+ </tr>
+ </tbody>
+ </table>
+
+ <div>
+ <strong>ポイント </strong>
+ <p><code>database.db</code> は定期的にバックアップを取ることを推奨します。<br>
+ 特に重要なデータ変更の前にはバックアップを取得してください。</p>
+ </div>
+ </section>
+
+ <section id="logs">
+ <h2>ログ出力</h2>
+ <p>サーバーのログを確認する方法です。</p>
+
+ <h3>ログの出力方法</h3>
+ <p><code>python _start.py</code> の出力がそのままログとなります。</p>
+
+ <div>
+ <strong>ヒント </strong>
+ <p>
+ ログをファイルに保存したい場合は、<br>
+ リダイレクトを使用してください。
+ </p>
+ <pre><code>python _start.py > server.log 2>&1</code></pre>
+ </div>
+
+ <h3>ログレベル</h3>
+ <ul>
+ <li><strong>DEBUG</strong> — 詳細なデバッグ情報</li>
+ <li><strong>INFO</strong> — 一般的な情報メッセージ</li>
+ <li><strong>WARNING</strong> — 警告メッセージ</li>
+ <li><strong>ERROR</strong> — エラーメッセージ</li>
+ <li><strong>CRITICAL</strong> — 致命的なエラー</li>
+ </ul>
+
+ <h3>バックエンドのコード変更を反映する方法</h3>
+ <p><code>_start.py</code> で起動した場合、uvicorn の <code>--reload</code> フラグが付かないため、コード変更が自動で反映されません。</p>
+
+ <div>
+ <strong>方法1: Reboot機構を使う（推奨）</strong>
+ <pre><code><span># core_main.py を再起動</span>
+echo. > backend_server/temp/reboot_core.txt
+
+<span># apps_main.py を再起動</span>
+echo. > backend_server/temp/reboot_apps.txt</code></pre>
+ <p><code>_start.py</code> がファイルの作成を検知して対象サーバーだけを再起動します。</p>
+ </div>
+
+ <div>
+ <strong>方法2: 個別起動で --reload を有効化</strong>
+ <pre><code>cd backend_server
+.venv\Scripts\python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091</code></pre>
+ </div>
+
+ <div>
+ <strong>方法3: _start.py を再起動</strong>
+ <p>Ctrl+C で停止してから <code>python _start.py</code> を再実行します。</p>
+ </div>
+ </section>
+
+ <section id="recovery">
+ <h2>復旧手順</h2>
+
+ <div>
+ <div>ステップ1: 初期アカウントの確認</div>
+ <p>ログインできない場合、初期アカウントを確認してください。</p>
+ <ul>
+ <li><strong>ユーザー名</strong>: <code>admin</code></li>
+ <li><strong>パスワード</strong>: <code>********</code></li>
+ </ul>
+ <p>初期アカウントでもログインできない場合はデータベースをリセットしてください。</p>
+ </div>
+
+ <div>
+ <div>ステップ2: データベースのリセット</div>
+ <pre><code><span># DBファイルを削除</span>
+del workspace/AiDiy2026/backend_server\_data\AiDiy\database.db
+
+<span># サーバー再起動でDBを再作成</span>
+cd workspace/AiDiy2026
+python _start.py</code></pre>
+ </div>
+
+ <div>
+ <div>ステップ3: ポート競合の解消</div>
+ <pre><code><span># 1. サーバーを停止する</span>
+
+<span># 2. ポート 8090/8091/8092 の使用状況を確認</span>
+netstat -ano | findstr :8090
+netstat -ano | findstr :8091
+netstat -ano | findstr :8092
+
+<span># 3. プロセスを強制終了</span>
+taskkill /F /IM python.exe
+taskkill /F /IM node.exe</code></pre>
+ </div>
+
+ <div>
+ <strong>補足</strong>
+ <p><code>python _stop.py</code> を実行すればポート 8090/8091/8092 のプロセスを自動停止できます。</p>
+ </div>
+
+ <div>
+ <div>ステップ4: 依存パッケージの再インストール</div>
+ <pre><code><span># バックエンドの依存パッケージを再インストール</span>
+cd workspace/AiDiy2026/backend_server
+uv sync
+
+cd workspace/AiDiy2026/frontend_server
+npm install</code></pre>
+ </div>
+ </section>
+
+ <section id="cleanup">
+ <h2>クリーンアップ</h2>
+ <p>不要なファイルを削除してプロジェクトを整理します。</p>
+
+ <pre><code>cd workspace/AiDiy2026
+ python _cleanup.py</code></pre>
+
+ <p>このスクリプトは<strong>対話形式</strong>で以下のファイル/フォルダを削除します。</p>
+
+ <h3>バックエンド関連</h3>
+ <table>
+ <thead>
+ <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
+ </thead>
+ <tbody>
+ <tr><td><code>__pycache__/</code></td><td>Pythonバイトコードキャッシュ</td><td>自動削除</td></tr>
+ <tr><td><code>.pytest_cache/</code></td><td>pytestキャッシュ</td><td>自動削除</td></tr>
+ <tr><td><code>.venv/</code></td><td>Python仮想環境</td><td>確認後削除 (y)</td></tr>
+ <tr><td><code>logs/</code></td><td>ログファイル（中身のみ）</td><td>確認後削除 (y)</td></tr>
+ <tr><td><code>temp/</code></td><td>一時ファイル（中身のみ）</td><td>確認後削除 (y)</td></tr>
+ <tr><td><code>database.db</code></td><td>SQLiteデータベース</td><td>確認後削除 (<strong>n</strong>)</td></tr>
+ </tbody>
+ </table>
+
+ <h3>フロントエンド関連</h3>
+ <table>
+ <thead>
+ <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
+ </thead>
+ <tbody>
+ <tr><td><code>node_modules/</code></td><td>Node.jsパッケージ</td><td>確認後削除 (y)</td></tr>
+ <tr><td><code>dist/</code></td><td>ビルド成果物</td><td>自動削除</td></tr>
+ </tbody>
+ </table>
+
+ <h3>その他</h3>
+ <table>
+ <thead>
+ <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
+ </thead>
+ <tbody>
+ <tr><td><code>backup/</code></td><td>バックアップフォルダ</td><td>確認後削除 (y)</td></tr>
+ </tbody>
+ </table>
+
+ <div>
+ <strong>Tip</strong>
+ <p>Gitを使用している場合は<code>.gitignore</code>にこれらを追加してください。<br>
+ _cleanup.py は配布用のZipファイル作成にも使えます。<br>
+ クリーンアップ後は <code>python _setup.py</code> で再セットアップが必要です。</p>
+ </div>
+ </section>
+
+ <section id="backup">
+ <h2>バックアップ</h2>
+ <p>データを安全に保管するためのバックアップ方法です。</p>
+
+ <h3>SQLiteバックアップ</h3>
+ <p>SQLiteはファイルコピーでバックアップできます。</p>
+
+ <pre><code><span># バックアップの作成</span>
+copy workspace/AiDiy2026/backend_server\_data\AiDiy\database.db workspace/AiDiy2026/backup\database_20260214.db
+
+<span># バックアップからの復元</span>
+copy workspace/AiDiy2026/backup\database_20260214.db workspace/AiDiy2026/backend_server\_data\AiDiy\database.db</code></pre>
+
+ <div>
+ <strong>バックアップのポイント </strong>
+ <ul>
+ <li>定期的にバックアップを取得してください</li>
+ <li>重要な変更の前にはバックアップを作成してください</li>
+ <li>バックアップファイルは別フォルダ/別ドライブに保存してください</li>
+ </ul>
+ </div>
+
+ <div>
+ <strong>注意 </strong>
+ <p>
+ Windowsではサーバー停止中にコピーしてください。<br>
+ Windowsのタスクスケジューラで自動バックアップも設定できます。
+ </p>
+ </div>
+ </section>
+
+ <section id="next">
+ <h2>次のステップ</h2>
+ <p>運用の基本を理解したら、次はトラブルシューティングについて学びましょう。</p>
+
+ <div>
+ <a href="09_困ったときは.html">
+ <span>次のページ</span>
+ <strong>09. 困ったときは →</strong>
+ <span>AIを活用したトラブルシューティング</span>
+ </a>
+ </div>
+ </section>
+ </div>
+
+ <footer>
+ <p>
+ <a href="07_テストの書き方.html">← 前: 07. テストの書き方</a> |
+ <a href="_index.html">トップページ</a> |
+ <a href="09_困ったときは.html">次: 09. 困ったときは →</a>
+ </p>
+ </footer>
+</body>
+</html>

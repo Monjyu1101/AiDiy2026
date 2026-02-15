@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02 Schema作成</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="01_準備と進め方.html">前へ: 01_準備と進め方</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="03_Model作成.html">次へ: 03_Model作成</a>
+  </nav>
+
+  <h1>02_Schema作成</h1>
+  <p>SchemaはAPI契約の中心です。入力（Create/Update/Get/Delete）と出力（レスポンス）を分け、型と必須項目を明確にします。</p>
+
+  <h2>作成するSchema</h2>
+  <table>
+    <tr><th>Schema名</th><th>用途</th></tr>
+    <tr><td><code>M商品Base</code></td><td>共通入力項目（商品名、単位、商品備考）</td></tr>
+    <tr><td><code>M商品Create</code></td><td>新規登録用（商品ID含む）</td></tr>
+    <tr><td><code>M商品Update</code></td><td>更新用（商品ID必須、他はOptional）</td></tr>
+    <tr><td><code>M商品Get</code></td><td>1件取得用（商品ID）</td></tr>
+    <tr><td><code>M商品Delete</code></td><td>削除用（商品ID）</td></tr>
+    <tr><td><code>M商品</code></td><td>レスポンス用（監査項目含む）</td></tr>
+  </table>
+
+  <h2>共通レスポンス形式</h2>
+  <p>Routerでは <code>ResponseBase</code> を返却します。</p>
+  <pre><code>{
+  "status": "OK | NG",
+  "message": "メッセージ",
+  "data": {},
+  "error": {}
+}</code></pre>
+
+  <h2>実装例（参照）</h2>
+  <p>以下は <code>code_samples/M商品_schema.py</code> の内容です。</p>
+  <pre data-src="code_samples/M商品_schema.py"><code>読み込み中...</code></pre>
+
+  <h2>設計ポイント</h2>
+  <ul>
+    <li>Updateは変更対象のみ送れるよう Optional を使う</li>
+    <li>レスポンスSchemaには監査項目を含める</li>
+    <li><code>from_attributes = True</code> で ORM オブジェクトを変換可能にする</li>
+  </ul>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] Schema命名とエンドポイント用途が一致している</li>
+    <li>[ ] 商品IDがCreate/Get/Delete/Updateで必須になっている</li>
+    <li>[ ] レスポンスSchemaに監査項目が含まれている</li>
+  </ul>
+
+  <nav>
+    <a href="01_準備と進め方.html">前へ: 01_準備と進め方</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="03_Model作成.html">次へ: 03_Model作成</a>
+  </nav>
+</body>
+</html>
+

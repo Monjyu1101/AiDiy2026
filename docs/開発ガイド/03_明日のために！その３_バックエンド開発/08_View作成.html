@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>08 View作成</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="07_Router作成.html">前へ: 07_Router作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="91_動作確認.html">次へ: 91_動作確認</a>
+  </nav>
+
+  <h1>08_View作成</h1>
+  <p>V系は DBの CREATE VIEW ではなく、Routerで生SQLを実行して一覧を返す方針です。</p>
+
+  <h2>方針</h2>
+  <ul>
+    <li>V系は表示用途の読み取り専用APIとして実装する</li>
+    <li><code>sqlalchemy.text()</code> で明示的にSQLを実行する</li>
+    <li>戻り値は <code>items/total/limit</code> を含む統一形式</li>
+  </ul>
+
+  <h2>実装例（参照）</h2>
+  <p>以下は <code>code_samples/V商品_router.py</code> の内容です。</p>
+  <pre data-src="code_samples/V商品_router.py"><code>読み込み中...</code></pre>
+
+  <h2>M系との使い分け</h2>
+  <table>
+    <tr><th>分類</th><th>用途</th><th>実装スタイル</th></tr>
+    <tr><td>M系</td><td>CRUD操作</td><td>ORM中心（Model + CRUD）</td></tr>
+    <tr><td>V系</td><td>一覧表示・集計表示</td><td>生SQL中心（Router内）</td></tr>
+  </table>
+
+  <h2>拡張時の注意</h2>
+  <ul>
+    <li>検索条件を追加する場合はバインド変数を使う</li>
+    <li>JOIN追加時は返却項目名を画面仕様に合わせる</li>
+    <li>件数SQL（count）もセットで管理する</li>
+  </ul>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] View Routerが <code>apps_main.py</code> に登録されている</li>
+    <li>[ ] SQLインジェクション対策としてバインド変数を使っている</li>
+    <li>[ ] レスポンス形式が一覧API標準に一致している</li>
+  </ul>
+
+  <nav>
+    <a href="07_Router作成.html">前へ: 07_Router作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="91_動作確認.html">次へ: 91_動作確認</a>
+  </nav>
+</body>
+</html>
+
+
+
+

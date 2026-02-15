@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04 一覧テーブル作成</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="03_ルーティング設定.html">前へ: 03_ルーティング設定</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="05_一覧画面作成.html">次へ: 05_一覧画面作成</a>
+  </nav>
+
+  <h1>04_一覧テーブル作成</h1>
+  <p>一覧テーブルは表示専用コンポーネントとして分離します。検索・ソート・ページングをここで扱います。</p>
+
+  <h2>対象ファイル</h2>
+  <p><code>workspace/AiDiy2026/frontend_server/src/components/Mマスタ/M商品/components/M商品一覧テーブル.vue</code></p>
+
+  <h2>主な処理</h2>
+  <ul>
+    <li><code>POST /apps/V商品/一覧</code> で一覧データを取得</li>
+    <li>列定義（商品ID、商品名、単位、商品備考、更新日時、更新利用者名）</li>
+    <li>フィルタ・ソート・ページング計算</li>
+    <li>商品IDクリックで編集画面へ遷移</li>
+  </ul>
+
+  <h2>参照コード</h2>
+  <p>以下は <code>code_samples/M商品一覧テーブル.vue</code> の内容です。</p>
+  <pre data-src="code_samples/M商品一覧テーブル.vue"><code>読み込み中...</code></pre>
+
+  <h2>設計ポイント</h2>
+  <table>
+    <tr><th>観点</th><th>要点</th></tr>
+    <tr><td>データ取得</td><td>エラー時はmessageに集約して表示</td></tr>
+    <tr><td>再利用性</td><td>一覧親から <code>loadData</code> を呼べるよう expose</td></tr>
+    <tr><td>遷移導線</td><td>IDリンクで商品IDクエリ付き遷移</td></tr>
+  </table>
+
+  <h2>AGENTS準拠メモ</h2>
+  <ul>
+    <li>API通信は <code>workspace/AiDiy2026/frontend_server/src/api/client.ts</code> の <code>apiClient</code> を使う</li>
+    <li>一覧表示は <code>workspace/AiDiy2026/frontend_server/src/components/_share/qTublerFrame.vue</code> の利用を前提にする</li>
+    <li><code>&lt;script setup lang="ts"&gt;</code> で記述し、Composition APIに統一する</li>
+  </ul>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] APIから一覧が表示される</li>
+    <li>[ ] フィルタ/ソートが動作する</li>
+    <li>[ ] IDクリックで編集画面へ遷移する</li>
+  </ul>
+
+  <nav>
+    <a href="03_ルーティング設定.html">前へ: 03_ルーティング設定</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="05_一覧画面作成.html">次へ: 05_一覧画面作成</a>
+  </nav>
+</body>
+</html>
+

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>07 Router作成</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="06_Service作成.html">前へ: 06_Service作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="08_View作成.html">次へ: 08_View作成</a>
+  </nav>
+
+  <h1>07_Router作成</h1>
+  <p>Router層でAPIエンドポイントを公開し、認証・入力・業務エラー制御・レスポンス形式を統一します。</p>
+
+  <h2>実装対象</h2>
+  <table>
+    <tr><th>関数</th><th>エンドポイント</th><th>役割</th></tr>
+    <tr><td>list_M商品</td><td><code>POST /apps/M商品/一覧</code></td><td>一覧取得</td></tr>
+    <tr><td>get_M商品</td><td><code>POST /apps/M商品/取得</code></td><td>1件取得</td></tr>
+    <tr><td>create_M商品</td><td><code>POST /apps/M商品/登録</code></td><td>登録</td></tr>
+    <tr><td>update_M商品</td><td><code>POST /apps/M商品/変更</code></td><td>更新</td></tr>
+    <tr><td>delete_M商品</td><td><code>POST /apps/M商品/削除</code></td><td>削除</td></tr>
+  </table>
+
+  <h2>実装例（参照）</h2>
+  <p>以下は <code>code_samples/M商品_router.py</code> の内容です。</p>
+  <pre data-src="code_samples/M商品_router.py"><code>読み込み中...</code></pre>
+
+  <h2>Routerの実装ポイント</h2>
+  <ul>
+    <li><code>Depends(deps.get_db)</code> でDBセッションを受け取る</li>
+    <li><code>Depends(deps.get_現在利用者)</code> でJWT認証済み利用者を取得する</li>
+    <li>重複/未検出は <code>status="NG"</code> と <code>error.code</code> で返す</li>
+    <li>更新時は Optional項目のみ反映する</li>
+  </ul>
+
+  <h2>apps_main.py 登録</h2>
+  <pre><code>from apps_router import M商品
+app.include_router(M商品.router)</code></pre>
+  <p>prefixはRouter側で持つため、<code>include_router</code> で追加prefixを重ねないでください。</p>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] Router関数とSchemaが対応している</li>
+    <li>[ ] 認証依存が全エンドポイントに設定されている</li>
+    <li>[ ] 例外時のNGレスポンス形式が統一されている</li>
+    <li>[ ] <code>apps_main.py</code> にrouter登録済み</li>
+  </ul>
+
+  <nav>
+    <a href="06_Service作成.html">前へ: 06_Service作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="08_View作成.html">次へ: 08_View作成</a>
+  </nav>
+</body>
+</html>
+

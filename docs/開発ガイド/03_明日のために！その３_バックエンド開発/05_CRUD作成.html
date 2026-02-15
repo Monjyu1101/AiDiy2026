@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05 CRUD作成</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="04_Migration実行.html">前へ: 04_Migration実行</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="06_Service作成.html">次へ: 06_Service作成</a>
+  </nav>
+
+  <h1>05_CRUD作成</h1>
+  <p>CRUD層はDB操作に専念させます。HTTP依存や認証依存はRouter層に置き、責務を分離します。</p>
+
+  <h2>主な関数</h2>
+  <table>
+    <tr><th>関数</th><th>役割</th></tr>
+    <tr><td><code>get_M商品</code></td><td>商品IDで1件取得</td></tr>
+    <tr><td><code>get_M商品一覧</code></td><td>一覧取得（商品ID順）</td></tr>
+    <tr><td><code>create_M商品</code></td><td>登録処理（監査項目付与）</td></tr>
+  </table>
+
+  <h2>実装例（参照）</h2>
+  <p>以下は <code>code_samples/M商品_crud.py</code> の内容です。</p>
+  <pre data-src="code_samples/M商品_crud.py"><code>読み込み中...</code></pre>
+
+  <h2>監査項目の扱い</h2>
+  <ul>
+    <li>登録時は登録系+更新系の8項目を設定</li>
+    <li>更新時は更新系4項目のみ更新</li>
+    <li>認証情報がない場合は system を利用（初期化時など）</li>
+  </ul>
+
+  <h2>設計ポイント</h2>
+  <ul>
+    <li>CRUDは例外時に呼び出し元で rollback できるようにする</li>
+    <li>戻り値はRouterでそのままレスポンス化できる形式にする</li>
+    <li>重複チェックや存在チェックはRouterまたはServiceで行う</li>
+  </ul>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] CRUD関数名とRouter呼び出し名が一致する</li>
+    <li>[ ] 監査項目の設定漏れがない</li>
+    <li>[ ] コミット/リフレッシュ処理が適切に配置されている</li>
+  </ul>
+
+  <nav>
+    <a href="04_Migration実行.html">前へ: 04_Migration実行</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="06_Service作成.html">次へ: 06_Service作成</a>
+  </nav>
+</body>
+</html>
+

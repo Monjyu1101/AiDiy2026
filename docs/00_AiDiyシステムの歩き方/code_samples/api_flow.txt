@@ -1,9 +1,0 @@
-﻿[例1: Core系]
-[フロント] → /core/C利用者/一覧
-   ↓
-[core_router] → [core_crud] → [core_models] → SQLite
-
-[例2: Apps系]
-[フロント] → /apps/V商品/一覧
-   ↓
-[apps_router] → [apps_crud or 生SQL] → [apps_models] → SQLite

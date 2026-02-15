@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03 内部設計_API設計</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="02_外部設計_画面設計.html">前へ: 02_外部設計_画面設計</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="04_内部設計_ビジネスロジック.html">次へ: 04_内部設計_ビジネスロジック</a>
+  </nav>
+
+  <h1>03_内部設計_API設計</h1>
+  <p>API設計では、画面操作をサーバー処理へ正確に対応付けます。入力仕様とレスポンス仕様を明確にすると、フロント/バック両方の実装が安定します。</p>
+
+  <h2>M商品API一覧</h2>
+  <table>
+    <tr><th>エンドポイント</th><th>用途</th><th>備考</th></tr>
+    <tr><td><code>POST /apps/V商品/一覧</code></td><td>一覧取得</td><td>画面初期表示、再検索</td></tr>
+    <tr><td><code>POST /apps/M商品/取得</code></td><td>詳細取得</td><td>更新モード初期表示</td></tr>
+    <tr><td><code>POST /apps/M商品/登録</code></td><td>新規登録</td><td>商品ID重複チェックが必要</td></tr>
+    <tr><td><code>POST /apps/M商品/変更</code></td><td>更新</td><td>存在チェックが必要</td></tr>
+    <tr><td><code>POST /apps/M商品/削除</code></td><td>削除</td><td>確認ダイアログ後に呼び出し</td></tr>
+  </table>
+
+  <h2>共通仕様</h2>
+  <ul>
+    <li>認証方式: JWT（Authorization: Bearer ...）</li>
+    <li>正常系/業務エラーともに JSON 形式で返却</li>
+    <li>レスポンスは <code>status</code>, <code>message</code>, <code>data/error</code> で統一</li>
+  </ul>
+
+  <h2>設計時に固定すべき項目</h2>
+  <ol>
+    <li>必須項目と文字数制約</li>
+    <li>重複チェック、存在チェックのタイミング</li>
+    <li>画面表示用の項目名（日本語キー）</li>
+    <li>エラーコードと画面メッセージの対応</li>
+  </ol>
+
+  <h2>外部設計との対応表（例）</h2>
+  <table>
+    <tr><th>画面操作</th><th>API</th><th>期待結果</th></tr>
+    <tr><td>一覧初期表示</td><td><code>/apps/V商品/一覧</code></td><td>items と total が返る</td></tr>
+    <tr><td>編集画面表示（更新）</td><td><code>/apps/M商品/取得</code></td><td>商品ID指定で詳細が返る</td></tr>
+    <tr><td>登録ボタン押下</td><td><code>/apps/M商品/登録</code></td><td>成功時に登録済みデータを返却</td></tr>
+    <tr><td>変更ボタン押下</td><td><code>/apps/M商品/変更</code></td><td>更新監査情報を含んで返却</td></tr>
+  </table>
+
+  <h2>API設計書サンプル（原本）</h2>
+  <p>以下は <code>code_samples/M商品_API設計書.md</code> の内容です。</p>
+  <pre data-src="code_samples/M商品_API設計書.md"><code>読み込み中...</code></pre>
+
+  <h2>次工程へ渡すポイント</h2>
+  <ul>
+    <li>schema / model / crud / router の実装単位を決める</li>
+    <li>Swagger UI で確認する想定リクエストを先に定義する</li>
+    <li>フロント側の入力フォーム仕様と完全一致させる</li>
+  </ul>
+
+  <nav>
+    <a href="02_外部設計_画面設計.html">前へ: 02_外部設計_画面設計</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="04_内部設計_ビジネスロジック.html">次へ: 04_内部設計_ビジネスロジック</a>
+  </nav>
+</body>
+</html>
+

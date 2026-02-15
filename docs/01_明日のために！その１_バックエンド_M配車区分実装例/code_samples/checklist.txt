@@ -1,6 +1,0 @@
-﻿[ ] models に M配車区分が追加済み
-[ ] apps_schema に Create/変更/取得 が追加済み
-[ ] CRUD と router が登録済み
-[ ] main.py に include_router 追加済み
-[ ] 起動後に list が返る
-

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>10. セキュリティと本番環境 | このプロジェクトの歩き方</title>
+ <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+ <header>
+ <div>
+ <h1><a href="_index.html">このプロジェクトの歩き方</a></h1>
+ </div>
+ </header>
+
+ <div>
+ <h1>10. セキュリティと本番環境</h1>
+
+ <section id="overview">
+ <h2>セキュリティの概要</h2>
+ <p><strong>このシステムは学習・開発用です。</strong><br>
+ 本番環境で使用する場合は、以下のセキュリティ対策が必要です。</p>
+
+ <div>
+ <strong>重要 </strong>
+ <p><strong>開発環境のまま本番公開しないでください。</strong><br>
+ セキュリティ上の重大なリスクがあります。</p>
+ </div>
+ </section>
+
+ <section id="comparison">
+ <h2>開発環境 vs 本番環境</h2>
+
+ <table>
+ <thead>
+ <tr>
+ <th>項目</th>
+ <th>開発環境</th>
+ <th>本番環境</th>
+ </tr>
+ </thead>
+ <tbody>
+ <tr>
+ <td><strong>JWT秘密鍵</strong></td>
+ <td><code>your-secret-key-here</code></td>
+ <td>ランダム生成した強力な鍵</td>
+ </tr>
+ <tr>
+ <td><strong>パスワード</strong></td>
+ <td>平文（<code>C利用者.パスワード</code>）</td>
+ <td>bcryptでハッシュ化</td>
+ </tr>
+ <tr>
+ <td><strong>データベース</strong></td>
+ <td>SQLite（ファイル）</td>
+ <td>PostgreSQL/MySQL</td>
+ </tr>
+ <tr>
+ <td><strong>CORS</strong></td>
+ <td>localhost:8090, :5173, :3000 を許可</td>
+ <td>特定ドメインのみ</td>
+ </tr>
+ <tr>
+ <td><strong>HTTPS</strong></td>
+ <td>HTTP（暗号化なし）</td>
+ <td>HTTPS（SSL/TLS必須）</td>
+ </tr>
+ <tr>
+ <td><strong>ログレベル</strong></td>
+ <td>DEBUG</td>
+ <td>WARNING以上</td>
+ </tr>
+ <tr>
+ <td><strong>Webサーバー</strong></td>
+ <td>localhost:8090/8091/8092（開発サーバー）</td>
+ <td>Nginx（リバースプロキシ）</td>
+ </tr>
+ </tbody>
+ </table>
+ </section>
+
+ <section id="security-checklist">
+ <h2>セキュリティチェックリスト</h2>
+ <p>本番環境に移行する前に確認すべき項目です。</p>
+
+ <div>
+ <div>ステップ 1. 認証とアクセス制御</div>
+ <ul>
+ <li>JWT秘密鍵をランダムな32文字以上に変更</li>
+ <li>トークン有効期限を短くする（推奨: 15分）</li>
+ <li>パスワードをハッシュ化する</li>
+ <li>不要なエンドポイントを無効化する</li>
+ </ul>
+ </div>
+
+ <div>
+ <div>ステップ 2. データベースの強化</div>
+ <ul>
+ <li>パスワードをbcryptでハッシュ化</li>
+ <li>SQLiteから本番用DBに移行</li>
+ <li>PostgreSQLまたはMySQLを使用</li>
+ <li>定期バックアップを設定</li>
+ </ul>
+ </div>
+
+ <div>
+ <div>ステップ 3. ネットワークセキュリティ</div>
+ <ul>
+ <li>HTTPSを有効化（Let's Encrypt推奨）</li>
+ <li>CORSを特定ドメインに制限</li>
+ <li>ファイアウォールを設定</li>
+ <li>DDoS対策（Cloudflare等のCDN利用）</li>
+ </ul>
+ </div>
+
+ <div>
+ <div>ステップ 4. ログと監視</div>
+ <ul>
+ <li>ログレベルをWARNING以上に設定</li>
+ <li>エラー通知を設定</li>
+ <li>アクセスログを記録</li>
+ <li>定期的なログ確認の仕組みを構築</li>
+ </ul>
+ </div>
+
+ <div>
+ <div>ステップ 5. 運用体制</div>
+ <ul>
+ <li>バックアップの自動化</li>
+ <li>障害時の復旧手順を文書化</li>
+ <li>セキュリティアップデートの定期適用</li>
+ <li>アクセス権限の定期見直し</li>
+ </ul>
+ </div>
+ </section>
+
+ <section id="env-variables">
+ <h2>環境変数管理</h2>
+ <p>秘密鍵や接続情報の管理方法です。</p>
+
+ <h3>開発環境での設定</h3>
+ <pre><code># backend_server/database.py
+SECRET_KEY = "your-secret-key-here" # 開発環境ではOK
+DATABASE_URL = "sqlite:///backend_server/_data/AiDiy/database.db"</code></pre>
+
+ <h3>本番環境での設定</h3>
+ <pre><code># .env ファイル（Gitに含めない）
+SECRET_KEY=ランダム生成した強力な秘密鍵
+DATABASE_URL=postgresql://dbuser:パスワード@db-server/proddb
+
+# database.py
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+SECRET_KEY = os.getenv("SECRET_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL") # 本番ではPostgreSQLを使用</code></pre>
+
+ <div>
+ <strong>重要 </strong>
+ <p>
+ 本番環境ではSQLiteではなく<strong>PostgreSQLまたはMySQL</strong>を使用してください。<br>
+ SQLiteは同時アクセスに制限があり本番環境には不向きです。
+ </p>
+ </div>
+
+ <pre><code><span># .envファイルをGitから除外する</span>
+echo ".env" >> .gitignore</code></pre>
+ </section>
+
+ <section id="production-config">
+ <h2>本番構成</h2>
+
+ <h3>JWT秘密鍵の生成</h3>
+ <pre><code><span># ランダムな秘密鍵を生成</span>
+python -c "import secrets; print(secrets.token_urlsafe(32))"</code></pre>
+
+ <h3>Nginx設定</h3>
+ <pre><code># /etc/nginx/sites-available/aidiy
+server {
+ listen 80;
+ server_name yourdomain.com;
+
+ # フロントエンド
+ location / {
+ proxy_pass http://localhost:8090;
+ proxy_set_header Host $host;
+ proxy_set_header X-Real-IP $remote_addr;
+ }
+
+ # Core API
+ location /core/ {
+ proxy_pass http://localhost:8091/core/;
+ proxy_set_header Host $host;
+ proxy_set_header X-Real-IP $remote_addr;
+ }
+
+ # Apps API
+ location /apps/ {
+ proxy_pass http://localhost:8092/apps/;
+ proxy_set_header Host $host;
+ proxy_set_header X-Real-IP $remote_addr;
+ }
+}</code></pre>
+
+ <h3>Systemdサービス</h3>
+ <p>Core APIとApps APIの2つのサービスを登録します。</p>
+
+ <pre><code># /etc/systemd/system/aidiy-core.service
+[Unit]
+Description=AiDiy2026 Core API
+After=network.target
+
+[Service]
+User=aidiyuser
+WorkingDirectory=/var/www/AiDiy2026/backend_server
+Environment="PATH=/var/www/AiDiy2026/backend_server/.venv/bin"
+ExecStart=/var/www/AiDiy2026/backend_server/.venv/bin/uvicorn core_main:app --host 0.0.0.0 --port 8091
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+ <pre><code># /etc/systemd/system/aidiy-apps.service
+[Unit]
+Description=AiDiy2026 Apps API
+After=network.target
+
+[Service]
+User=aidiyuser
+WorkingDirectory=/var/www/AiDiy2026/backend_server
+Environment="PATH=/var/www/AiDiy2026/backend_server/.venv/bin"
+ExecStart=/var/www/AiDiy2026/backend_server/.venv/bin/uvicorn apps_main:app --host 0.0.0.0 --port 8092
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+ </section>
+
+ <section id="deployment">
+ <h2>デプロイ手順</h2>
+ <ol>
+ <li><strong>サーバー準備</strong> — Ubuntu/CentOS等のLinuxサーバーを用意</li>
+ <li><strong>必要ソフトウェアのインストール</strong> — Python, PostgreSQL, Nginxをインストール</li>
+ <li><strong>コードのデプロイ</strong> — Git clone または SCP/FTPで転送</li>
+ <li><strong>環境変数の設定</strong> — .envファイルを作成</li>
+ <li><strong>依存パッケージのインストール</strong> — <code>uv sync</code></li>
+ <li><strong>データベースの初期化</strong> — マイグレーションと初期データ投入</li>
+ <li><strong>サービスの起動</strong> — <code>systemctl start aidiy-core</code> および <code>systemctl start aidiy-apps</code></li>
+ <li><strong>Nginx設定</strong> — リバースプロキシとHTTPS設定</li>
+ <li><strong>動作確認</strong> — ブラウザからアクセスして確認</li>
+ </ol>
+
+ <div>
+ <strong>Tip</strong>
+ <p>デプロイ手順をスクリプト化しておくと、再デプロイ時に便利です。</p>
+ </div>
+ </section>
+
+ <section id="docker">
+ <h2>Docker対応</h2>
+ <p>Dockerを使った本番デプロイの例です。</p>
+
+ <pre><code># Dockerfile (例: Core API)
+FROM python:3.13-slim
+WORKDIR /app
+COPY . .
+RUN pip install uv && uv sync
+CMD ["uvicorn", "core_main:app", "--host", "0.0.0.0", "--port", "8091"]</code></pre>
+
+ <pre><code># docker-compose.yml
+version: '3.8'
+services:
+ db:
+   image: postgres:16
+   environment:
+     POSTGRES_PASSWORD: secure_password
+ core:
+   build: ./backend_server
+   depends_on:
+     - db
+   environment:
+     DATABASE_URL: postgresql://postgres:secure_password@db/aidiy
+   command: uvicorn core_main:app --host 0.0.0.0 --port 8091
+ apps:
+   build: ./backend_server
+   depends_on:
+     - db
+   environment:
+     DATABASE_URL: postgresql://postgres:secure_password@db/aidiy
+   command: uvicorn apps_main:app --host 0.0.0.0 --port 8092</code></pre>
+
+ <div>
+ <strong>注意 </strong>
+ <p>本番環境ではDocker Composeの環境変数にパスワードを直接書かないでください。</p>
+ </div>
+ </section>
+
+ <section id="monitoring">
+ <h2>監視とロギング</h2>
+ <p>本番環境での監視項目です。</p>
+
+ <ul>
+ <li><strong>死活監視</strong> — uptimeチェック（UptimeRobot等）</li>
+ <li><strong>エラー監視</strong> — エラートラッキング（Sentry、Rollbar等）</li>
+ <li><strong>リソース監視</strong> — CPU/メモリ使用率の監視</li>
+ <li><strong>アクセスログ</strong> — 不正アクセスの検知</li>
+ <li><strong>バックアップ監視</strong> — DBバックアップの成功確認</li>
+ </ul>
+ </section>
+
+ <section id="final-words">
+ <h2>まとめ</h2>
+ <p>このガイドでは、AiDiyシステムの開発から本番環境への移行までを説明しました。</p>
+
+ <div>
+ <strong>学んだこと </strong>
+ <ul>
+ <li>プロジェクトの全体構成を理解した</li>
+ <li>バックエンド・フロントエンドの4つの開発パターンを習得した</li>
+ <li>データベース管理の方法を学んだ</li>
+ <li>テストの書き方を理解した</li>
+ <li>運用とメンテナンスの基本を学んだ</li>
+ <li>トラブルシューティングの方法を習得した</li>
+ <li>セキュリティと本番環境の考慮事項を理解した</li>
+ </ul>
+ </div>
+
+ <div>
+ <strong>最後に </strong>
+ <p>このシステムは学習と開発のための基盤です。<br>
+ ここから自分のアイデアを形にしていきましょう。</p>
+ </div>
+ </section>
+
+ <section id="back-to-index">
+ <div>
+ <a href="_index.html">
+ <span>トップに戻る</span>
+ <strong>目次ページへ</strong>
+ <span>全ページの一覧を表示</span>
+ </a>
+ </div>
+ </section>
+ </div>
+
+ <footer>
+ <p>
+ <a href="09_困ったときは.html">← 前: 09. 困ったときは</a> |
+ <a href="_index.html">トップページ</a>
+ </p>
+ <p>
+ AiDiy2026 | Version 1.0.0
+ </p>
+ </footer>
+</body>
+</html>

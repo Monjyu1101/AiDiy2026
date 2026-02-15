@@ -1,0 +1,64 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04 Migration実行</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="03_Model作成.html">前へ: 03_Model作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="05_CRUD作成.html">次へ: 05_CRUD作成</a>
+  </nav>
+
+  <h1>04_Migration実行</h1>
+  <p>このプロジェクトの標準運用は SQLite + <code>create_all()</code> です。Alembicを使わず、DB再作成で反映します。</p>
+
+  <h2>手順</h2>
+  <ol>
+    <li>サーバー停止</li>
+    <li><code>database.db</code> を削除</li>
+    <li><code>python _start.py</code> で再起動</li>
+  </ol>
+
+  <pre><code>cd workspace/AiDiy2026
+python _stop.py
+
+del backend_server\_data\AiDiy\database.db
+python _start.py</code></pre>
+
+  <h2>生成確認</h2>
+  <ul>
+    <li><code>http://localhost:8092/docs</code> でM商品APIが表示される</li>
+    <li>SQLiteブラウザで <code>M商品</code> テーブルが作成されている</li>
+  </ul>
+
+  <h2>よくあるつまずき</h2>
+  <table>
+    <tr><th>症状</th><th>原因</th><th>対処</th></tr>
+    <tr><td>テーブルが作成されない</td><td>Model import漏れ</td><td><code>apps_models/__init__.py</code> のimport確認</td></tr>
+    <tr><td>旧定義のまま</td><td>古いDBを参照</td><td><code>database.db</code> 削除後に再起動</td></tr>
+    <tr><td>起動時エラー</td><td>型定義不整合</td><td>Model/Schema/Routerの項目名整合を再確認</td></tr>
+  </table>
+
+  <h2>初期データ投入の考え方</h2>
+  <p>必要に応じて起動時初期化でマスタ初期データを投入します。既存データがある場合はスキップし、冪等性を保ちます。</p>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] <code>M商品</code> テーブルが生成された</li>
+    <li>[ ] 起動ログに致命的エラーがない</li>
+    <li>[ ] 8092 Swagger UIが正常表示される</li>
+  </ul>
+
+  <nav>
+    <a href="03_Model作成.html">前へ: 03_Model作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="05_CRUD作成.html">次へ: 05_CRUD作成</a>
+  </nav>
+</body>
+</html>
+

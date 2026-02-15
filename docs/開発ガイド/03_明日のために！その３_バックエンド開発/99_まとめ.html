@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>99 まとめ</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="91_動作確認.html">前へ: 91_動作確認</a>
+    <a href="_index.html">目次へ戻る</a>
+  </nav>
+
+  <h1>99_まとめ</h1>
+  <p>この章では、M商品を通してバックエンド機能追加の一連手順を実施しました。実装の再現性を上げるため、最後に要点を固定します。</p>
+
+  <h2>実施内容の要約</h2>
+  <ol>
+    <li>Schema作成（API契約）</li>
+    <li>Model作成（DB構造）</li>
+    <li>SQLite再作成でテーブル反映</li>
+    <li>CRUD作成（DB操作）</li>
+    <li>Router作成（認証/レスポンス/業務判定）</li>
+    <li>View作成（生SQL一覧API）</li>
+    <li>Swagger UIで動作確認</li>
+  </ol>
+
+  <h2>重要原則</h2>
+  <ul>
+    <li>POST中心API設計を維持する</li>
+    <li>レスポンス形式は <code>status/message/data/error</code> で統一する</li>
+    <li>監査項目を全テーブルで統一して扱う</li>
+    <li>V系は CREATE VIEW ではなく Router内生SQLで実装する</li>
+    <li>M系は apps_main.py (8092) 側に登録する</li>
+  </ul>
+
+  <h2>最終チェックリスト</h2>
+  <ul>
+    <li>[ ] <code>apps_schema.py</code> にSchema追加済み</li>
+    <li>[ ] <code>apps_models/M商品.py</code> 作成済み</li>
+    <li>[ ] <code>apps_crud/M商品.py</code> 作成済み</li>
+    <li>[ ] <code>apps_router/M商品.py</code> と <code>apps_router/V商品.py</code> 作成済み</li>
+    <li>[ ] <code>apps_main.py</code> にrouter登録済み</li>
+    <li>[ ] 8092 Swagger UIでCRUDとV一覧を確認済み</li>
+  </ul>
+
+  <h2>次に進む章</h2>
+  <ul>
+    <li><a href="../04_明日のために！その４_フロントエンド開発/_index.html">04_明日のために！その４_フロントエンド開発</a></li>
+    <li><a href="../11_コーディングルール/_index.html">11_コーディングルール</a></li>
+  </ul>
+
+  <h2>参照</h2>
+  <ul>
+    <li><code>workspace/AiDiy2026/backend_server/AGENTS.md</code></li>
+    <li><code>workspace/AiDiy2026/docs/開発ガイド/README.md</code></li>
+  </ul>
+
+  <footer>
+    <p><a href="../README.md">開発ガイド README に戻る</a></p>
+  </footer>
+
+  <nav>
+    <a href="91_動作確認.html">前へ: 91_動作確認</a>
+    <a href="_index.html">目次へ戻る</a>
+  </nav>
+</body>
+</html>
+
+
+
+

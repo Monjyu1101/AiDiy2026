@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>07 動作確認</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="06_ルーティング追加とメニュー登録.html">前へ: 06_ルーティング追加とメニュー登録</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="99_まとめ.html">次へ: 99_まとめ</a>
+  </nav>
+
+  <h1>07_動作確認</h1>
+  <p>一覧と編集のE2E動作を確認します。最低限、登録→更新→削除の一連操作を通してください。</p>
+
+  <h2>事前条件</h2>
+  <ul>
+    <li>フロント: <code>http://localhost:8090</code></li>
+    <li>Apps API: <code>http://localhost:8092/docs</code></li>
+    <li>ログイン済み（例: admin）</li>
+  </ul>
+
+  <h2>E2Eテスト手順</h2>
+  <ol>
+    <li>一覧画面を開き、既存データ表示を確認</li>
+    <li>新規ボタンから編集画面へ移動し、商品を登録</li>
+    <li>一覧に戻って対象商品を開き、内容を変更して保存</li>
+    <li>再度開いて削除を実行</li>
+    <li>一覧から対象が消えることを確認</li>
+  </ol>
+
+  <h2>確認観点</h2>
+  <table>
+    <tr><th>観点</th><th>期待結果</th></tr>
+    <tr><td>メッセージ表示</td><td>成功/失敗メッセージが適切に表示される</td></tr>
+    <tr><td>入力検証</td><td>必須未入力で保存できない</td></tr>
+    <tr><td>URL連携</td><td>モードと商品IDクエリが正しく解釈される</td></tr>
+    <tr><td>API連携</td><td>Networkで期待エンドポイントにPOSTされる</td></tr>
+  </table>
+
+  <h2>不具合切り分け</h2>
+  <ul>
+    <li>画面が出ない: router pathとcomponent importを確認</li>
+    <li>APIエラー: 8092側のRouter/URL/認証を確認</li>
+    <li>値が反映されない: formバインディングとpayloadを確認</li>
+    <li>一覧更新されない: 子コンポーネントの再読み込み呼び出しを確認</li>
+  </ul>
+
+  <h2>AGENTS準拠チェック</h2>
+  <ul>
+    <li>Networkで <code>Authorization: Bearer ...</code> が自動付与される（<code>apiClient</code> interceptor）</li>
+    <li>401応答時にログアウトへ遷移する（認証フローと整合）</li>
+    <li>日本語URLをリロードしても対象画面に復帰できる</li>
+  </ul>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] 登録/更新/削除を通せる</li>
+    <li>[ ] 主要エラー時にユーザーへ通知できる</li>
+    <li>[ ] 再読み込み後も画面状態が破綻しない</li>
+  </ul>
+
+  <nav>
+    <a href="06_ルーティング追加とメニュー登録.html">前へ: 06_ルーティング追加とメニュー登録</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="99_まとめ.html">次へ: 99_まとめ</a>
+  </nav>
+</body>
+</html>
+

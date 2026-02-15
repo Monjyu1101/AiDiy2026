@@ -1,9 +1,0 @@
-﻿■ このページの完了条件
-
-[ ] http://localhost:8090 が表示できる
-[ ] http://localhost:8091/docs が表示できる
-[ ] http://localhost:8092/docs が表示できる
-[ ] admin でログインできる
-[ ] /core/サーバー状態 が応答する
-
-すべて満たしたら次に進んでOK。

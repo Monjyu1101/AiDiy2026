@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05 一覧画面作成</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="04_一覧テーブル作成.html">前へ: 04_一覧テーブル作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="06_ルーティング追加とメニュー登録.html">次へ: 06_ルーティング追加とメニュー登録</a>
+  </nav>
+
+  <h1>05_一覧画面作成</h1>
+  <p>一覧画面はページ全体のレイアウトと操作導線を担当します。実データ表示は子コンポーネント（一覧テーブル）へ委譲します。</p>
+
+  <h2>対象ファイル</h2>
+  <p><code>workspace/AiDiy2026/frontend_server/src/components/Mマスタ/M商品/M商品一覧.vue</code></p>
+
+  <h2>主な要素</h2>
+  <ul>
+    <li>再検索ボタン</li>
+    <li>新規ボタン（編集画面の新規モードへ遷移）</li>
+    <li>成功/失敗メッセージ表示</li>
+    <li>一覧テーブルコンポーネントの埋め込み</li>
+  </ul>
+
+  <h2>参照コード</h2>
+  <p>以下は <code>code_samples/M商品一覧.vue</code> の内容です。</p>
+  <pre data-src="code_samples/M商品一覧.vue"><code>読み込み中...</code></pre>
+
+  <h2>実装ポイント</h2>
+  <ul>
+    <li>一覧再読み込みは子コンポーネントの <code>loadData</code> を呼ぶ</li>
+    <li>編集画面から戻る際のクエリメッセージを表示し、表示後にURLを整理する</li>
+    <li>ページコンテナとツールバーは一貫したUIに揃える</li>
+  </ul>
+
+  <h2>AGENTS準拠メモ</h2>
+  <ul>
+    <li>日本語名の子コンポーネントは <code>&lt;component :is="..." /&gt;</code> で埋め込む</li>
+    <li>一覧画面実体: <code>workspace/AiDiy2026/frontend_server/src/components/Mマスタ/M商品/M商品一覧.vue</code></li>
+    <li>編集遷移先は <code>/Mマスタ/M商品/編集</code> に統一する</li>
+  </ul>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] 再検索が動作する</li>
+    <li>[ ] 新規ボタンで編集画面へ遷移する</li>
+    <li>[ ] 編集/登録後のメッセージ表示が機能する</li>
+  </ul>
+
+  <nav>
+    <a href="04_一覧テーブル作成.html">前へ: 04_一覧テーブル作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="06_ルーティング追加とメニュー登録.html">次へ: 06_ルーティング追加とメニュー登録</a>
+  </nav>
+</body>
+</html>
+

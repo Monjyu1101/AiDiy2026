@@ -1,0 +1,65 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03 ルーティング設定</title>
+  <link rel="stylesheet" href="../_shared/doc.css">
+  <script src="../_shared/doc.js" defer></script>
+</head>
+<body>
+  <nav>
+    <a href="02_編集画面作成.html">前へ: 02_編集画面作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="04_一覧テーブル作成.html">次へ: 04_一覧テーブル作成</a>
+  </nav>
+
+  <h1>03_ルーティング設定</h1>
+  <p>Vue Routerへ一覧・編集ルートを追加します。画面遷移を安定させるため、name/path/queryの対応を先に決めます。</p>
+
+  <h2>設定対象</h2>
+  <p><code>workspace/AiDiy2026/frontend_server/src/router/index.ts</code></p>
+
+  <h2>追加するルート（例）</h2>
+  <table>
+    <tr><th>ルート名</th><th>path</th><th>用途</th></tr>
+    <tr><td>M商品一覧</td><td><code>/Mマスタ/M商品/一覧</code></td><td>一覧表示</td></tr>
+    <tr><td>M商品編集</td><td><code>/Mマスタ/M商品/編集</code></td><td>新規/編集/表示</td></tr>
+  </table>
+
+  <h2>クエリパラメータ設計</h2>
+  <ul>
+    <li><code>モード=新規</code>: 新規入力</li>
+    <li><code>商品ID=ITEM001</code>: 編集対象指定</li>
+    <li><code>モード=表示</code> + 商品ID: 参照モード</li>
+  </ul>
+
+  <h2>実装ポイント</h2>
+  <ul>
+    <li>画面名とルート名を一致させる</li>
+    <li>認証が必要な画面は <code>meta.requiresAuth</code> を設定</li>
+    <li>一覧→編集、編集→一覧の遷移を <code>router.push</code> で統一</li>
+  </ul>
+
+  <h2>AGENTS準拠メモ</h2>
+  <ul>
+    <li>ルート定義は <code>workspace/AiDiy2026/frontend_server/src/router/index.ts</code> に集約する</li>
+    <li>コンポーネント読み込みは遅延読み込み（<code>() =&gt; import(...)</code>）を基本にする</li>
+    <li>日本語URLリロード時の復元（decode対応）を壊さないよう既存実装に合わせる</li>
+  </ul>
+
+  <h2>チェック</h2>
+  <ul>
+    <li>[ ] 直接URLアクセスで一覧/編集が表示される</li>
+    <li>[ ] クエリを変えるとモードが正しく切り替わる</li>
+    <li>[ ] 未ログイン時はガードで遷移制御される</li>
+  </ul>
+
+  <nav>
+    <a href="02_編集画面作成.html">前へ: 02_編集画面作成</a>
+    <a href="_index.html">目次へ戻る</a>
+    <a href="04_一覧テーブル作成.html">次へ: 04_一覧テーブル作成</a>
+  </nav>
+</body>
+</html>
+
