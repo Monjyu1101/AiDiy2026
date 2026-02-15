@@ -14,6 +14,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue';
 import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import UpdateFilesDialog from '../dialog/更新ファイル一覧.vue';
+import FileContentDialog from '../dialog/ファイル内容表示.vue';
 import { useRoute } from 'vue-router';
 import apiClient from '@/api/client';
 import { qConfirm } from '@/utils/qAlert';
@@ -65,6 +66,39 @@ const テキストエリア = ref<HTMLTextAreaElement | null>(null);
 const 送信中 = ref(false);
 const ドラッグ中 = ref(false);
 const ストリーム受信中 = ref(false);
+const 入力欄最大到達 = ref(false);
+const 入力欄最小高さ = 60;
+const 入力欄最大高さ = ref(380);
+const 入力欄固定中 = ref(false);
+const 入力欄固定高さ = ref(入力欄最小高さ);
+
+const 入力欄状態リセット = () => {
+  入力欄最大到達.value = false;
+  入力欄固定中.value = false;
+  入力欄固定高さ.value = 入力欄最小高さ;
+  if (テキストエリア.value) {
+    テキストエリア.value.style.height = `${入力欄最小高さ}px`;
+  }
+};
+
+const 入力欄クリア = () => {
+  入力テキスト.value = '';
+  入力欄状態リセット();
+  nextTick(() => {
+    if (!テキストエリア.value) return;
+    テキストエリア.value.focus();
+    テキストエリア自動調整();
+  });
+};
+
+const 入力欄最大高さ更新 = () => {
+  const テキストエリア要素 = テキストエリア.value;
+  if (!テキストエリア要素) return;
+  const コンテナ = テキストエリア要素.closest('.agent-container') as HTMLElement | null;
+  if (!コンテナ) return;
+  const 候補高さ = Math.floor(コンテナ.clientHeight * 0.78);
+  入力欄最大高さ.value = Math.max(入力欄最小高さ, 候補高さ);
+};
 
 // メッセージ送信（input_textとして送信）
 const メッセージ送信 = async () => {
@@ -74,9 +108,7 @@ const メッセージ送信 = async () => {
   入力テキスト.value = '';
 
   // テキストエリアの高さをリセット
-  if (テキストエリア.value) {
-    テキストエリア.value.style.height = '60px';
-  }
+  入力欄状態リセット();
 
   // ローカル表示はせず、サーバーからのエコーバックで表示
 
@@ -159,11 +191,28 @@ const ドロップ処理 = async (イベント: DragEvent) => {
 // テキストエリアの自動リサイズ
 const テキストエリア自動調整 = () => {
   if (!テキストエリア.value) return;
-  テキストエリア.value.style.height = '60px';
-  const スクロール高 = テキストエリア.value.scrollHeight;
-  if (スクロール高 > 60) {
-    テキストエリア.value.style.height = Math.min(スクロール高, 150) + 'px';
+  入力欄最大高さ更新();
+  if (入力テキスト.value.length === 0) {
+    入力欄状態リセット();
+    return;
   }
+  if (入力欄固定中.value) {
+    入力欄最大到達.value = true;
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`;
+    return;
+  }
+  テキストエリア.value.style.height = `${入力欄最小高さ}px`;
+  const スクロール高 = テキストエリア.value.scrollHeight;
+  const 次の高さ = Math.max(スクロール高, 入力欄最小高さ);
+  const 上限到達 = 次の高さ >= 入力欄最大高さ.value;
+  入力欄最大到達.value = 上限到達;
+  if (上限到達) {
+    入力欄固定中.value = true;
+    入力欄固定高さ.value = 入力欄最大高さ.value;
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`;
+    return;
+  }
+  テキストエリア.value.style.height = `${次の高さ}px`;
 };
 
 // 自動スクロール
@@ -370,6 +419,9 @@ const ウェルカム内容 = ref<string>('');
 const 更新ファイル一覧 = ref<string[]>([]);
 const 更新ファイルダイアログ表示 = ref(false);
 const AiDiyモード = ref(false);
+const ファイル内容ダイアログ表示 = ref(false);
+const 表示ファイル名 = ref('');
+const 表示base64_data = ref('');
 
 const 受信内容文字列 = (受信データ: any) => {
   const 内容 = 受信データ.メッセージ内容 ?? 受信データ.text ?? '';
@@ -534,6 +586,122 @@ const 折りたたみ切替 = (メッセージID: string) => {
   if (対象メッセージ && 対象メッセージ.isStream) {
     対象メッセージ.isCollapsed = !対象メッセージ.isCollapsed;
   }
+};
+
+const 貼り付け対象ロール: メッセージ['role'][] = [
+  'input_text',
+  'input_request',
+  'input_file',
+  'output_file',
+  'output_text'
+];
+
+const 右トリム = (text: string) => text.replace(/\s+$/u, '');
+
+const 貼り付け用文字列取得 = (メッセージ項目: メッセージ) => {
+  if (メッセージ項目.kind === 'file') {
+    const ファイル名 = メッセージ項目.fileName ?? '';
+    return ファイル名 ? `"${ファイル名}"` : '';
+  }
+
+  let 内容 = メッセージ項目.content ?? '';
+
+  // input_text は表示用に "> " を先頭へ付与しているため、貼り付け時は外す
+  if (メッセージ項目.role === 'input_text') {
+    内容 = 内容.replace(/^>\s*/, '');
+  }
+
+  return 内容;
+};
+
+const メッセージ貼り付け可能 = (メッセージ項目: メッセージ) => {
+  if (メッセージ項目.isStream) return false;
+  return 貼り付け対象ロール.includes(メッセージ項目.role);
+};
+
+const 画像拡張子セット = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+const テキスト拡張子セット = new Set([
+  'py', 'vue', 'ts', 'tsx', 'js', 'jsx', 'json', 'md', 'txt',
+  'html', 'css', 'scss', 'sass', 'less', 'yml', 'yaml', 'toml',
+  'ini', 'env', 'sql', 'csv', 'log', 'xml', 'sh', 'ps1', 'bat'
+]);
+
+const 拡張子取得 = (ファイル名: string): string => {
+  const クエリ除去 = ファイル名.split(/[?#]/u, 1)[0] || '';
+  const 最後のスラッシュ位置 = Math.max(クエリ除去.lastIndexOf('/'), クエリ除去.lastIndexOf('\\'));
+  const ベース名 = 最後のスラッシュ位置 >= 0 ? クエリ除去.slice(最後のスラッシュ位置 + 1) : クエリ除去;
+  const ドット位置 = ベース名.lastIndexOf('.');
+  if (ドット位置 < 0) return '';
+  return ベース名.slice(ドット位置 + 1).toLowerCase();
+};
+
+const ファイル内容表示対象 = (ファイル名: string): boolean => {
+  const 拡張子 = 拡張子取得(ファイル名);
+  return 画像拡張子セット.has(拡張子) || テキスト拡張子セット.has(拡張子);
+};
+
+const ファイル内容ダイアログ閉じる = () => {
+  ファイル内容ダイアログ表示.value = false;
+  表示ファイル名.value = '';
+  表示base64_data.value = '';
+};
+
+const ファイル内容表示を開く = async (ファイル名: string) => {
+  if (!ファイル内容表示対象(ファイル名)) return;
+
+  try {
+    const response = await apiClient.post('/core/files/内容取得', { ファイル名 });
+    if (response?.data?.status !== 'OK') return;
+    const base64_data = response?.data?.data?.base64_data;
+    if (typeof base64_data !== 'string' || !base64_data) return;
+
+    表示ファイル名.value = ファイル名;
+    表示base64_data.value = base64_data;
+    ファイル内容ダイアログ表示.value = true;
+  } catch (error) {
+    console.error('[エージェント] ファイル内容取得エラー:', error);
+  }
+};
+
+const メッセージ行クリック処理 = async (メッセージ項目: メッセージ) => {
+  if (メッセージ項目.isStream) {
+    if (メッセージ項目.isCollapsed) {
+      折りたたみ切替(メッセージ項目.id);
+    }
+    return;
+  }
+
+  if (!メッセージ貼り付け可能(メッセージ項目)) return;
+
+  const 貼り付け文字列 = 右トリム(貼り付け用文字列取得(メッセージ項目));
+  if (!貼り付け文字列) return;
+
+  const ファイル系メッセージ =
+    メッセージ項目.role === 'input_file' || メッセージ項目.role === 'output_file';
+
+  if (ファイル系メッセージ) {
+    const 区切り = 入力テキスト.value && !入力テキスト.value.endsWith('\n') ? '\n' : '';
+    入力テキスト.value = `${入力テキスト.value}${区切り}${貼り付け文字列}\n`;
+  } else {
+    入力テキスト.value = `${貼り付け文字列}\n`;
+  }
+
+  nextTick(() => {
+    if (!テキストエリア.value) return;
+    テキストエリア.value.focus();
+    テキストエリア自動調整();
+    const 末尾 = テキストエリア.value.value.length;
+    テキストエリア.value.setSelectionRange(末尾, 末尾);
+  });
+
+  if (ファイル系メッセージ && メッセージ項目.fileName) {
+    await ファイル内容表示を開く(メッセージ項目.fileName);
+  }
+};
+
+const メッセージ行カーソル = (メッセージ項目: メッセージ) => {
+  if (メッセージ項目.isStream && メッセージ項目.isCollapsed) return 'pointer';
+  return メッセージ貼り付け可能(メッセージ項目) ? 'pointer' : 'default';
 };
 
 const WSハンドラ登録 = (client?: IWebSocketClient | null) => {
@@ -708,6 +876,11 @@ onMounted(() => {
   console.log(`[エージェント${チャンネル}] inputConnected=${プロパティ.inputConnected}`);
   出力ソケット接続();
   checkAiDiyMode();
+  nextTick(() => {
+    入力欄最大高さ更新();
+    テキストエリア自動調整();
+  });
+  window.addEventListener('resize', テキストエリア自動調整);
   console.log(`[エージェント${チャンネル}] ========== onMounted完了 ==========`);
 });
 
@@ -723,6 +896,7 @@ watch(() => プロパティ.セッションID, (newId, oldId) => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', テキストエリア自動調整);
   if (出力WebSocket.value) {
     WSハンドラ解除(出力WebSocket.value);
     出力WebSocket.value.disconnect();
@@ -765,8 +939,8 @@ const 状態表示テキスト = () => {
       >
         <div
           class="line-content"
-          @click="メッセージ項目.isStream && メッセージ項目.isCollapsed ? 折りたたみ切替(メッセージ項目.id) : null"
-          :style="{ cursor: メッセージ項目.isStream && メッセージ項目.isCollapsed ? 'pointer' : 'default' }"
+          @click="メッセージ行クリック処理(メッセージ項目)"
+          :style="{ cursor: メッセージ行カーソル(メッセージ項目) }"
         >
           <div v-if="メッセージ項目.isStream && メッセージ項目.isCollapsed" class="collapsed-wrapper">
             <span class="collapsed-indicator">...</span>
@@ -814,12 +988,13 @@ const 状態表示テキスト = () => {
         @drop="ドロップ処理"
       >
         <div class="input-container">
-          <span class="prompt-symbol">&gt;</span>
+          <span class="prompt-symbol" @click="入力欄クリア">&gt;</span>
           <textarea
             v-model="入力テキスト"
-            class="input-field"
+            :class="['input-field', { 'at-limit': 入力欄最大到達 }]"
+            :style="{ maxHeight: `${入力欄最大高さ}px` }"
             placeholder="メッセージを入力..."
-            maxlength="500"
+            maxlength="5000"
             :disabled="送信中 || !WebSocket接続中"
             @input="テキストエリア自動調整"
             ref="テキストエリア"
@@ -859,6 +1034,13 @@ const 状態表示テキスト = () => {
       @close="更新ファイルダイアログ閉じる"
       @appReboot="アプリ再起動"
       @resetReboot="リセット再起動"
+    />
+
+    <FileContentDialog
+      :show="ファイル内容ダイアログ表示"
+      :ファイル名="表示ファイル名"
+      :base64_data="表示base64_data"
+      @close="ファイル内容ダイアログ閉じる"
     />
   </div>
 </template>
@@ -1232,7 +1414,9 @@ const 状態表示テキスト = () => {
   font-family: 'Courier New', monospace;
   font-weight: bold;
   font-size: 16px;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
   z-index: 1;
 }
 
@@ -1248,11 +1432,16 @@ const 状態表示テキスト = () => {
   box-sizing: border-box;
   resize: none;
   min-height: 60px;
-  max-height: 150px;
+  max-height: 380px;
   overflow-y: auto;
   font-family: inherit;
   line-height: 1.4;
   height: 60px;
+}
+
+.input-field.at-limit {
+  font-size: 8px;
+  line-height: 1.1;
 }
 
 .input-field:disabled {

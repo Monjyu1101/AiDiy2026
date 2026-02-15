@@ -103,8 +103,13 @@
   - `input_file`（エコーバック）
   - `output_text`
   - `output_file`
-  - `output_request`
   - `output_stream`
+
+補足（`frontend_server/src/components/AIコア/compornents/AIコード.vue` の表示実装）:
+
+- 画面表示対象: `input_text`, `input_request`, `input_file`, `output_text`, `output_file`, `welcome_text`
+- `output_stream` はストリーム表示として受信し、画面上は `output_text` 系表示で扱う
+- `output_request` は現行実装ではハンドラ未登録のため表示しない
 
 ## 5. 負荷最適化上の運用ルール
 

@@ -15,13 +15,16 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import Layout from './components/_Layout.vue';
 import qAlertDialog from './components/_share/qAlertDialog.vue';
-import qConfirmDialog from './components/_share/qConfirmDialog.vue';
 import qColorPickerDialog from './components/_share/qColorPickerDialog.vue';
 import { setAlertInstance, setConfirmInstance, setColorPickerInstance } from './utils/qAlert';
 
 const route = useRoute();
-const alertRef = ref(null);
-const confirmRef = ref(null);
+type AlertDialogInstance = {
+  show: (message: string) => Promise<void>;
+  showConfirm: (message: string) => Promise<boolean>;
+};
+
+const alertRef = ref<AlertDialogInstance | null>(null);
 const colorPickerRef = ref(null);
 
 // ログイン画面以外はレイアウトを適用
@@ -30,9 +33,7 @@ const isLogin = computed(() => route.path === '/ログイン');
 onMounted(() => {
   if (alertRef.value) {
     setAlertInstance(alertRef.value);
-  }
-  if (confirmRef.value) {
-    setConfirmInstance(confirmRef.value);
+    setConfirmInstance({ show: alertRef.value.showConfirm });
   }
   if (colorPickerRef.value) {
     setColorPickerInstance(colorPickerRef.value);
@@ -48,7 +49,6 @@ onMounted(() => {
     <RouterView />
   </Layout>
   <qAlertDialog ref="alertRef" />
-  <qConfirmDialog ref="confirmRef" />
   <qColorPickerDialog ref="colorPickerRef" />
 </template>
 

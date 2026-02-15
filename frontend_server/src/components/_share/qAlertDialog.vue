@@ -15,35 +15,80 @@ import { ref } from 'vue';
 
 const isVisible = ref(false);
 const message = ref('');
-const resolvePromise = ref<((value: void) => void) | null>(null);
+const dialogMode = ref<'alert' | 'confirm'>('alert');
+const resolveAlertPromise = ref<(() => void) | null>(null);
+const resolveConfirmPromise = ref<((value: boolean) => void) | null>(null);
 
 const show = (msg: string): Promise<void> => {
+  dialogMode.value = 'alert';
   message.value = msg;
   isVisible.value = true;
+  resolveConfirmPromise.value = null;
 
   return new Promise((resolve) => {
-    resolvePromise.value = resolve;
+    resolveAlertPromise.value = resolve;
+  });
+};
+
+const showConfirm = (msg: string): Promise<boolean> => {
+  dialogMode.value = 'confirm';
+  message.value = msg;
+  isVisible.value = true;
+  resolveAlertPromise.value = null;
+
+  return new Promise((resolve) => {
+    resolveConfirmPromise.value = resolve;
   });
 };
 
 const handleOk = () => {
   isVisible.value = false;
-  if (resolvePromise.value) {
-    resolvePromise.value();
-    resolvePromise.value = null;
+  if (dialogMode.value === 'confirm') {
+    if (resolveConfirmPromise.value) {
+      resolveConfirmPromise.value(true);
+      resolveConfirmPromise.value = null;
+    }
+    return;
+  }
+  if (resolveAlertPromise.value) {
+    resolveAlertPromise.value();
+    resolveAlertPromise.value = null;
   }
 };
 
-defineExpose({ show });
+const handleCancel = () => {
+  isVisible.value = false;
+  if (resolveConfirmPromise.value) {
+    resolveConfirmPromise.value(false);
+    resolveConfirmPromise.value = null;
+  }
+};
+
+const handleOverlayClick = () => {
+  if (dialogMode.value === 'confirm') {
+    handleCancel();
+    return;
+  }
+  handleOk();
+};
+
+defineExpose({ show, showConfirm });
 </script>
 
 <template>
   <teleport to="body">
-    <div v-if="isVisible" class="dialog-overlay" @click.self="handleOk">
+    <div v-if="isVisible" class="dialog-overlay" @click.self="handleOverlayClick">
       <div class="dialog-container">
         <div class="dialog-content">
           <div class="dialog-message">{{ message }}</div>
           <div class="dialog-buttons">
+            <button
+              v-if="dialogMode === 'confirm'"
+              class="dialog-btn dialog-btn-cancel"
+              @click="handleCancel"
+            >
+              キャンセル
+            </button>
             <button class="dialog-btn dialog-btn-ok" @click="handleOk">
               OK
             </button>
@@ -114,6 +159,15 @@ defineExpose({ show });
 
 .dialog-btn-ok:hover {
   background-color: #0056b3;
+}
+
+.dialog-btn-cancel {
+  background-color: #6c757d;
+  color: white;
+}
+
+.dialog-btn-cancel:hover {
+  background-color: #545b62;
 }
 </style>
 

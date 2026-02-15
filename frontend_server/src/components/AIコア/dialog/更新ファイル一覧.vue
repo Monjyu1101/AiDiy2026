@@ -16,6 +16,7 @@ import { useRoute } from 'vue-router';
 import apiClient from '@/api/client';
 import { qConfirm } from '@/utils/qAlert';
 import RebootDialog from './再起動カウントダウン.vue';
+import FileContentDialog from './ファイル内容表示.vue';
 
 const route = useRoute();
 
@@ -32,9 +33,54 @@ const emit = defineEmits<{
 const loading = ref(false);
 const showRebootDialog = ref(false);
 const rebootWaitSeconds = ref(15);
+const showFileContentDialog = ref(false);
+const dialogFileName = ref('');
+const dialogBase64Data = ref('');
+
+const 画像拡張子セット = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+const テキスト拡張子セット = new Set([
+  'py', 'vue', 'ts', 'tsx', 'js', 'jsx', 'json', 'md', 'txt',
+  'html', 'css', 'scss', 'sass', 'less', 'yml', 'yaml', 'toml',
+  'ini', 'env', 'sql', 'csv', 'log', 'xml', 'sh', 'ps1', 'bat'
+]);
 
 const handleClose = () => {
   emit('close');
+};
+
+const 拡張子取得 = (ファイル名: string): string => {
+  const クエリ除去 = (ファイル名 || '').split(/[?#]/u, 1)[0] || '';
+  const 最後のスラッシュ位置 = Math.max(クエリ除去.lastIndexOf('/'), クエリ除去.lastIndexOf('\\'));
+  const ベース名 = 最後のスラッシュ位置 >= 0 ? クエリ除去.slice(最後のスラッシュ位置 + 1) : クエリ除去;
+  const ドット位置 = ベース名.lastIndexOf('.');
+  if (ドット位置 < 0) return '';
+  return ベース名.slice(ドット位置 + 1).toLowerCase();
+};
+
+const ファイル内容表示対象 = (ファイル名: string): boolean => {
+  const 拡張子 = 拡張子取得(ファイル名);
+  return 画像拡張子セット.has(拡張子) || テキスト拡張子セット.has(拡張子);
+};
+
+const handleFileContentDialogClose = () => {
+  showFileContentDialog.value = false;
+  dialogFileName.value = '';
+  dialogBase64Data.value = '';
+};
+
+const handleFileClick = async (file: string) => {
+  if (!file || !ファイル内容表示対象(file)) return;
+  try {
+    const response = await apiClient.post('/core/files/内容取得', { ファイル名: file });
+    if (response?.data?.status !== 'OK') return;
+    const base64_data = response?.data?.data?.base64_data;
+    if (typeof base64_data !== 'string' || !base64_data) return;
+    dialogFileName.value = file;
+    dialogBase64Data.value = base64_data;
+    showFileContentDialog.value = true;
+  } catch (error) {
+    console.error('[更新ファイル一覧] ファイル内容取得エラー:', error);
+  }
 };
 
 const handleAppReboot = async () => {
@@ -116,7 +162,13 @@ const handleResetReboot = async () => {
       <!-- ファイルリスト -->
       <div class="update-files-list-container">
         <div class="update-files-list">
-          <div v-for="(file, index) in files" :key="index" class="update-file-item">
+          <div
+            v-for="(file, index) in files"
+            :key="index"
+            class="update-file-item"
+            @click="handleFileClick(file)"
+            title="クリックで内容表示"
+          >
             {{ index + 1 }}. {{ file }}
           </div>
         </div>
@@ -151,6 +203,12 @@ const handleResetReboot = async () => {
   </div>
 
   <RebootDialog :show="showRebootDialog" :wait-seconds="rebootWaitSeconds" />
+  <FileContentDialog
+    :show="showFileContentDialog"
+    :ファイル名="dialogFileName"
+    :base64_data="dialogBase64Data"
+    @close="handleFileContentDialogClose"
+  />
 </template>
 
 <style scoped>
@@ -244,6 +302,12 @@ const handleResetReboot = async () => {
   border-radius: 3px;
   color: #ffd0e8;
   word-break: break-all;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.update-file-item:hover {
+  background: rgba(255, 105, 180, 0.2);
 }
 
 /* 確認メッセージ */

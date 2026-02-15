@@ -35,6 +35,7 @@ from core_router import C利用者
 from core_router import V利用者
 from core_router import C採番
 from core_router import V採番
+from core_router import files
 
 from core_router import AIコア
 from core_router import A会話履歴
@@ -77,6 +78,7 @@ app.include_router(C利用者.router)
 app.include_router(V利用者.router)
 app.include_router(C採番.router)
 app.include_router(V採番.router)
+app.include_router(files.router)
 
 app.include_router(AIコア.router)
 app.include_router(A会話履歴.router)

@@ -48,7 +48,7 @@ export async function qAlert(message: string): Promise<void> {
 
 export async function qConfirm(message: string): Promise<boolean> {
   if (!confirmInstance) {
-    console.error('qConfirmDialog not initialized. Please add qConfirmDialog to your App.vue')
+    console.error('qConfirm not initialized. Please map confirm handler in App.vue')
     return confirm(message) // フォールバック
   }
   return await confirmInstance.show(message)
