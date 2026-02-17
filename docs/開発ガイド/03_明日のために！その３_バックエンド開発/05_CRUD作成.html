@@ -43,11 +43,26 @@
     <li>重複チェックや存在チェックはRouterまたはServiceで行う</li>
   </ul>
 
+  <h2>【重要】apps_crud/__init__.py への登録を忘れずに</h2>
+  <p><strong>新規CRUD作成後は必ず <code>apps_crud/__init__.py</code> への登録が必要です。</strong></p>
+  <ul>
+    <li>CRUDファイル（例: <code>apps_crud/M得意先.py</code>）を作成しただけでは不十分</li>
+    <li><code>apps_crud/__init__.py</code> に以下を追加する必要があります:
+      <ul>
+        <li>import 文: <code>from apps_crud.M得意先 import get_M得意先, get_M得意先一覧, create_M得意先</code></li>
+        <li>__all__ リスト: <code>'get_M得意先', 'get_M得意先一覧', 'create_M得意先'</code></li>
+      </ul>
+    </li>
+    <li>忘れると Router で <code>crud.get_M得意先</code> が使えず、ImportErrorやAttributeErrorが発生します</li>
+    <li>過去実績: M得意先追加時にこの登録漏れでエラーが発生しました</li>
+  </ul>
+
   <h2>チェック</h2>
   <ul>
     <li>[ ] CRUD関数名とRouter呼び出し名が一致する</li>
     <li>[ ] 監査項目の設定漏れがない</li>
     <li>[ ] コミット/リフレッシュ処理が適切に配置されている</li>
+    <li>[ ] <strong>【重要】apps_crud/__init__.py にimportと__all__追加済み</strong></li>
   </ul>
 
   <nav>

@@ -13,7 +13,9 @@ Ctrl+Cで両方のサーバーを停止します。
 """
 
 import argparse
+import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -24,7 +26,6 @@ from pathlib import Path
 
 if sys.platform == "win32":
     import msvcrt
-    import os
 
 # 色付き出力用
 class Colors:
@@ -318,14 +319,25 @@ def start_backend(app_module: str, port: int, label: str):
     cmd = get_backend_command(app_module, port)
     print_info(f"コマンド: {' '.join(cmd)}")
     
-    process = subprocess.Popen(
-        cmd,
-        cwd=str(SERVER_DIR),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,  # stderrをstdoutにマージ
-        bufsize=0,
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
-    )
+    # Linuxではプロセスグループを作成
+    if sys.platform == "win32":
+        process = subprocess.Popen(
+            cmd,
+            cwd=str(SERVER_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=0,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+    else:
+        process = subprocess.Popen(
+            cmd,
+            cwd=str(SERVER_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=0,
+            preexec_fn=os.setpgrp  # 新しいプロセスグループを作成
+        )
     
     print_success(f"{label} 起動完了 (http://localhost:{port})")
     return process
@@ -337,14 +349,26 @@ def start_frontend():
     print_info(f"コマンド: {FRONTEND_COMMAND} run dev -- --port {FRONTEND_PORT}")
     
     cmd = f"{FRONTEND_COMMAND}.cmd" if sys.platform == "win32" else FRONTEND_COMMAND
-    process = subprocess.Popen(
-        [cmd, "run", "dev", "--", "--port", str(FRONTEND_PORT)],
-        cwd=str(CLIENT_DIR),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,  # stderrをstdoutにマージ
-        bufsize=0,
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
-    )
+    
+    # Linuxではプロセスグループを作成
+    if sys.platform == "win32":
+        process = subprocess.Popen(
+            [cmd, "run", "dev", "--", "--port", str(FRONTEND_PORT)],
+            cwd=str(CLIENT_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=0,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+    else:
+        process = subprocess.Popen(
+            [cmd, "run", "dev", "--", "--port", str(FRONTEND_PORT)],
+            cwd=str(CLIENT_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=0,
+            preexec_fn=os.setpgrp  # 新しいプロセスグループを作成
+        )
     
     print_success(f"フロントエンド起動完了 (http://localhost:{FRONTEND_PORT})")
     return process
@@ -460,7 +484,25 @@ def stop_processes(processes):
                     timeout=5
                 )
             else:
-                process.terminate()
+                # Linuxではプロセスグループ全体を強制終了
+                try:
+                    # プロセスグループIDを取得して全て終了
+                    pgid = os.getpgid(process.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                    time.sleep(0.5)
+                    # まだ生きていたら強制終了
+                    try:
+                        os.killpg(pgid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass  # 既に終了している
+                except (ProcessLookupError, PermissionError):
+                    # プロセスが既に終了しているか、権限がない場合は通常のkill
+                    process.terminate()
+                    time.sleep(0.5)
+                    try:
+                        process.kill()
+                    except:
+                        pass
 
             try:
                 process.wait(timeout=5)
@@ -713,6 +755,9 @@ def main():
                     crash_time = process_crash_time.get("バックエンド(core)", 0)
                     if crash_time > 0 and current_time - crash_time >= 15:
                         print_info("[バックエンド(core)] 再起動を試みます...")
+                        # 再起動前にポートをクリア
+                        kill_process_on_port(BACKEND_CORE_PORT)
+                        time.sleep(1)
                         new_process = start_backend(BACKEND_CORE_APP, BACKEND_CORE_PORT, "バックエンド(core)")
                         if new_process:
                             processes["バックエンド(core)"] = new_process
@@ -734,6 +779,9 @@ def main():
                     crash_time = process_crash_time.get("バックエンド(apps)", 0)
                     if crash_time > 0 and current_time - crash_time >= 15:
                         print_info("[バックエンド(apps)] 再起動を試みます...")
+                        # 再起動前にポートをクリア
+                        kill_process_on_port(BACKEND_APPS_PORT)
+                        time.sleep(1)
                         new_process = start_backend(BACKEND_APPS_APP, BACKEND_APPS_PORT, "バックエンド(apps)")
                         if new_process:
                             processes["バックエンド(apps)"] = new_process
@@ -755,6 +803,9 @@ def main():
                     crash_time = process_crash_time.get("フロントエンド", 0)
                     if crash_time > 0 and current_time - crash_time >= 15:
                         print_info("[フロントエンド] 再起動を試みます...")
+                        # 再起動前にポートをクリア
+                        kill_process_on_port(FRONTEND_PORT)
+                        time.sleep(1)
                         new_process = start_frontend()
                         if new_process:
                             processes["フロントエンド"] = new_process
