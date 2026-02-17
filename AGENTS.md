@@ -74,7 +74,7 @@
 3. `apps_main.py` に Router 登録済み
 4. 初期データ作成時は `apps_crud/init.py` に初期化処理追加済み
 
-過去実績: M仕入先追加時に `apps_crud/__init__.py` への登録漏れでエラー発生。CRUD関数が import されておらず、Router で `crud.get_M仕入先` などが使えませんでした。
+過去実績: マスタテーブル追加時に `apps_crud/__init__.py` への登録漏れでエラー発生。CRUD関数が import されておらず、Router で CRUD関数が使えませんでした。
 
 ---
 
@@ -531,7 +531,7 @@ lsof -ti:8091 | xargs kill -9
 | **Database reset needed** | Need to recreate tables from scratch | Stop all servers → Delete `backend_server/_data/AiDiy/database.db` → Restart servers (tables and initial data auto-created) |
 | **WebSocket接続エラー (AIコア)** | `LiveAI未初期化のため音声送信不可: ws-xxxx` | WebSocket接続と LiveAI 初期化のタイミング問題。フロントエンドで接続→設定送信の順序を確認。バックエンドログで初期化ステップを確認。詳細は [backend_server/AGENTS.md](./backend_server/AGENTS.md) の「AIコア Component System」セクション参照 |
 | **コード変更が反映されない** | バックエンドのコードを変更しても動作が変わらない | `_start.py` で起動した場合は `--reload` なし。`temp/reboot_core.txt` または `temp/reboot_apps.txt` を作成して再起動、または上記「バックエンドのコード変更を反映する方法」参照 |
-| **M系マスタ一覧でエラー** | M仕入先・M車両・M商品などの一覧画面でエラーが発生 | フロントエンドはV系エンドポイント（`/apps/V仕入先/一覧` など）を使用します。**M系テーブル追加時はV系エンドポイントも必ず作成**してください。詳細は [backend_server/AGENTS.md](./backend_server/AGENTS.md) の「新しいテーブルを追加する（M系, T系, S系の場合）」参照 |
+| **M系マスタ一覧でエラー** | M車両・M商品などの一覧画面でエラーが発生 | フロントエンドはV系エンドポイント（`/apps/V車両/一覧` など）を使用します。**M系テーブル追加時はV系エンドポイントも必ず作成**してください。詳細は [backend_server/AGENTS.md](./backend_server/AGENTS.md) の「新しいテーブルを追加する（M系, T系, S系の場合）」参照 |
 
 ## Testing
 

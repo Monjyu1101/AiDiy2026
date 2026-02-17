@@ -1010,13 +1010,13 @@ cd backend_server
 4. `apps_crud/` に取得/一覧/作成などの関数を追加し `apps_crud/__init__.py` に公開。
 5. `apps_router/` に CRUD ルーター（M*/T*/S*）を追加。
 6. **【重要】`apps_router/` に V系エンドポイント（V*）も必ず追加** - M系・T系の一覧表示に使用
-   - V車両、V商品、V仕入先などの実装例を参考にする
+   - V車両、V商品などの実装例を参考にする
    - 生SQLで `SELECT` / `LEFT JOIN` を組み立て
    - `count(*)` で total を取得
 7. `apps_main.py` に `include_router` を追加（**M/T/S系とV系の両方**）。
 8. 初期データが必要なら `apps_crud/init.py` に追加。
 
-**補足:** M系テーブルにはV系エンドポイントが必須です。フロントエンドの一覧画面は通常V系エンドポイントを使用します（例: M仕入先一覧テーブル.vue は `/apps/V仕入先/一覧` を呼び出す）。V系エンドポイントがないと一覧取得でエラーが発生します。
+**補足:** M系テーブルにはV系エンドポイントが必須です。フロントエンドの一覧画面は通常V系エンドポイントを使用します（例: M車両一覧テーブル.vue は `/apps/V車両/一覧` を呼び出す）。V系エンドポイントがないと一覧取得でエラーが発生します。
 
 ### 新しい V 系（一覧）を追加する
 1. `core_router/V*.py` (C系) or `apps_router/V*.py` (M系/T系) を作成し、生 SQL で `SELECT` / `LEFT JOIN` を組み立てる。
@@ -1176,10 +1176,10 @@ async def custom_websocket(websocket: WebSocket, request: Request):
 - 新規テーブル（M系/T系）追加時、`apps_crud/<テーブル名>.py` を作成するだけでは不十分
 - **必ず `apps_crud/__init__.py` に import と __all__ への追加が必要**
 - 忘れると `crud.get_M○○` や `crud.create_M○○` が使えず、ImportErrorやAttributeErrorが発生
-- 例: M仕入先追加時は以下を追加:
+- 例: マスタテーブル追加時は以下を追加:
   ```python
-  from apps_crud.M仕入先 import get_M仕入先, get_M仕入先一覧, create_M仕入先
-  # __all__ リストにも 'get_M仕入先', 'get_M仕入先一覧', 'create_M仕入先' を追加
+  from apps_crud.M○○ import get_M○○, get_M○○一覧, create_M○○
+  # __all__ リストにも 'get_M○○', 'get_M○○一覧', 'create_M○○' を追加
   ```
 - 同様に `core_crud/__init__.py` も C系/A系追加時に更新必要
 
