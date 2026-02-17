@@ -32,6 +32,15 @@
   </section>
 
   <section>
+    <h2>実装時の最重要注意</h2>
+    <ul>
+      <li>新規M系（例: M○○）を追加したら、<code>backend_server/apps_crud/init.py</code> の <code>init_db_data()</code> へ初期化処理を必ず追加する</li>
+      <li>初回動作確認で一覧が空にならないよう、可能な限り業務で意味のあるサンプルデータを投入する</li>
+      <li>初期化処理は冪等に実装し、既存データがある場合は重複投入しない</li>
+    </ul>
+  </section>
+
+  <section>
     <h2>目次</h2>
     <ul>
       <li>01 準備と進め方 - <a href="01_準備と進め方.html">開く</a></li>

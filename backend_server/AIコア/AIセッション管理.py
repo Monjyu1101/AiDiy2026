@@ -82,10 +82,10 @@ def 初期モデル設定生成(app_conf) -> dict:
 class WebSocketConnection:
     """
     個別のWebSocket接続を管理するクラス
-    セッション内のソケット(-1,0-4)単位で保持
+    セッション内のソケット(input/audio/0-4)単位で保持
     """
 
-    def __init__(self, websocket: WebSocket, セッションID: str, socket_no: int):
+    def __init__(self, websocket: WebSocket, セッションID: str, socket_no: str):
         self.websocket = websocket
         self.セッションID = セッションID
         self.socket_no = socket_no
@@ -135,27 +135,27 @@ class SessionConnection:
     """
     セッション構造体
     ソケット構造体:
-    -2: 音声入力チャンネル
-    -1: 共通入力チャンネル（テキスト、画像、操作）
-     0: チャット出力チャンネル
-     1: エージェント1出力チャンネル
-     2: エージェント2出力チャンネル
-     3: エージェント3出力チャンネル
-     4: エージェント4出力チャンネル
+    audio: 音声入出力チャンネル
+    input: 共通入力チャンネル（テキスト、画像、操作）
+    0: チャット出力チャンネル
+    1: エージェント1出力チャンネル
+    2: エージェント2出力チャンネル
+    3: エージェント3出力チャンネル
+    4: エージェント4出力チャンネル
     """
 
     def __init__(self, セッションID: str):
         self.セッションID = セッションID
         # セッション内ランタイム初期化の多重実行を防止
         self.初期化ロック = asyncio.Lock()
-        self.sockets: Dict[int, Optional[WebSocketConnection]] = {
-            -2: None,
-            -1: None,
-            0: None,
-            1: None,
-            2: None,
-            3: None,
-            4: None
+        self.sockets: Dict[str, Optional[WebSocketConnection]] = {
+            "audio": None,
+            "input": None,
+            "0": None,
+            "1": None,
+            "2": None,
+            "3": None,
+            "4": None
         }
         self.output_audio_paused = False
         self.ボタン状態 = {
@@ -170,23 +170,23 @@ class SessionConnection:
         self.audio_split_task: Optional[asyncio.Task] = None
         self.audio_data = 初期化_音声データ()
 
-        self.チャンネル別キュー: Dict[int, asyncio.Queue] = {}
-        self.チャンネル別処理中: Dict[int, bool] = {}
+        self.チャンネル別キュー: Dict[str, asyncio.Queue] = {}
+        self.チャンネル別処理中: Dict[str, bool] = {}
 
-        self.チャンネル登録状態: Dict[int, bool] = {
-            -2: True,
-            -1: True,
-            0: False,
-            1: False,
-            2: False,
-            3: False,
-            4: False
+        self.チャンネル登録状態: Dict[str, bool] = {
+            "audio": True,
+            "input": True,
+            "0": False,
+            "1": False,
+            "2": False,
+            "3": False,
+            "4": False
         }
 
         # チャンネル別ファイルリスト: {チャンネル: [{パス: str, 時刻: datetime}, ...]}
-        self.チャンネル別ファイルリスト: Dict[int, List[dict]] = {}
+        self.チャンネル別ファイルリスト: Dict[str, List[dict]] = {}
 
-    def ファイル登録(self, チャンネル: int, ファイルパス: str):
+    def ファイル登録(self, チャンネル: str, ファイルパス: str):
         """チャンネルのファイルリストにファイルを追加"""
         if チャンネル not in self.チャンネル別ファイルリスト:
             self.チャンネル別ファイルリスト[チャンネル] = []
@@ -196,11 +196,11 @@ class SessionConnection:
         })
         logger.debug(f"ファイル登録: ch={チャンネル} path={ファイルパス}")
 
-    def 最近のファイル取得(self, チャンネル: int, 秒数: int = 60) -> List[str]:
+    def 最近のファイル取得(self, チャンネル: str, 秒数: int = 60) -> List[str]:
         """指定チャンネル＋チャンネル0の最近のファイルを絶対パスで取得"""
         基準時刻 = datetime.now() - timedelta(seconds=秒数)
         結果 = []
-        対象チャンネル = [チャンネル] if チャンネル == 0 else [チャンネル, 0]
+        対象チャンネル = [チャンネル] if チャンネル == "0" else [チャンネル, "0"]
         for ch in 対象チャンネル:
             for item in self.チャンネル別ファイルリスト.get(ch, []):
                 if item["時刻"] >= 基準時刻:
@@ -215,24 +215,27 @@ class SessionConnection:
     def is_connected(self) -> bool:
         return any(conn and conn.is_connected for conn in self.sockets.values())
 
-    def set_socket(self, socket_no: int, connection: Optional[WebSocketConnection]):
+    def set_socket(self, socket_no: str, connection: Optional[WebSocketConnection]):
         self.sockets[socket_no] = connection
 
-    def get_socket(self, socket_no: int) -> Optional[WebSocketConnection]:
+    def get_socket(self, socket_no: str) -> Optional[WebSocketConnection]:
         return self.sockets.get(socket_no)
 
     async def send_json(self, data: dict):
         """チャンネルに応じて送信先ソケットを決定"""
         チャンネル = data.get("チャンネル", None)
         if チャンネル is None:
-            チャンネル = -1
+            チャンネル = "input"
         connection = self.sockets.get(チャンネル)
-        if not connection or not connection.is_connected:
+        if not connection:
             logger.warning(f"送信先ソケット未接続: session={self.セッションID} ch={チャンネル}")
+            return
+        if not connection.is_connected:
+            logger.warning(f"送信先ソケット切断: session={self.セッションID} ch={チャンネル}")
             return
         await connection.send_json(data)
 
-    async def send_to_channel(self, チャンネル: int, data: dict):
+    async def send_to_channel(self, チャンネル: str, data: dict):
         # output_fileの自動追跡
         if data.get("メッセージ識別") == "output_file" and data.get("ファイル名"):
             self.ファイル登録(チャンネル, data["ファイル名"])
@@ -246,26 +249,26 @@ class SessionConnection:
         await self.send_json(data)
         logger.debug(f"チャンネル{チャンネル}に送信: {data.get('メッセージ識別', 'unknown')}")
 
-    def register_channel(self, チャンネル: int):
+    def register_channel(self, チャンネル: str):
         logger.info(f"チャンネル{チャンネル}登録通知: {self.セッションID}")
 
-    def unregister_channel(self, チャンネル: int):
+    def unregister_channel(self, チャンネル: str):
         logger.info(f"チャンネル{チャンネル}解除通知: {self.セッションID}")
 
-    def is_channel_registered(self, チャンネル: int) -> bool:
+    def is_channel_registered(self, チャンネル: str) -> bool:
         return True
 
-    def get_or_create_queue(self, チャンネル: int) -> asyncio.Queue:
+    def get_or_create_queue(self, チャンネル: str) -> asyncio.Queue:
         if チャンネル not in self.チャンネル別キュー:
             self.チャンネル別キュー[チャンネル] = asyncio.Queue()
             self.チャンネル別処理中[チャンネル] = False
             logger.debug(f"チャンネル{チャンネル}のキューを作成: {self.セッションID}")
         return self.チャンネル別キュー[チャンネル]
 
-    def is_channel_processing(self, チャンネル: int) -> bool:
+    def is_channel_processing(self, チャンネル: str) -> bool:
         return self.チャンネル別処理中.get(チャンネル, False)
 
-    def set_channel_processing(self, チャンネル: int, 処理中: bool):
+    def set_channel_processing(self, チャンネル: str, 処理中: bool):
         self.チャンネル別処理中[チャンネル] = 処理中
         logger.debug(f"チャンネル{チャンネル}の処理状態: {処理中} ({self.セッションID})")
 
@@ -350,7 +353,7 @@ class WebSocketManager:
             return sid
         return f"{sid[:10]}...{sid[-10:]}"
 
-    def _fmt_log(self, ch: int, 内容: str, セッションID: Optional[str] = None) -> str:
+    def _fmt_log(self, ch: str, 内容: str, セッションID: Optional[str] = None) -> str:
         sid = self._short_sid(セッションID)
         return f"チャンネル={ch}, {内容}, セッションID={sid}"
 
@@ -359,7 +362,7 @@ class WebSocketManager:
         # 10文字（16進）: URL/ログで扱いやすい短いID
         return secrets.token_hex(5)
 
-    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: int = -1, app_conf=None, accept_in_connect: bool = True) -> str:
+    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True) -> str:
         """
         WebSocket接続を登録（セッション単位）
 
@@ -427,7 +430,7 @@ class WebSocketManager:
             "メッセージ識別": "init",
             "メッセージ内容": {}
         }
-        if socket_no == -1:
+        if socket_no == "input":
             init_payload["メッセージ内容"] = {
                 "ボタン": session.ボタン状態,
                 "モデル設定": session.モデル設定
@@ -482,7 +485,7 @@ class WebSocketManager:
         self.session_states[セッションID] = state
         logger.debug(f"セッション状態保存: {セッションID}")
 
-    async def disconnect(self, セッションID: str, socket_no: Optional[int] = None, keep_session: bool = True):
+    async def disconnect(self, セッションID: str, socket_no: Optional[str] = None, keep_session: bool = True):
         """
         WebSocket接続を切断（セッション内のソケット単位）
 
@@ -513,14 +516,14 @@ class WebSocketManager:
             if not session.is_connected:
                 await session.stop_runtime_processors()
 
-        ch = socket_no if socket_no is not None else -99
+        ch = socket_no if socket_no is not None else "-99"
         logger.info(self._fmt_log(ch=ch, 内容="接続切断", セッションID=セッションID))
 
     def get_session(self, セッションID: str) -> Optional[SessionConnection]:
         """セッションIDからセッションを取得"""
         return self.sessions.get(セッションID)
 
-    def get_connection(self, セッションID: str, socket_no: int = -1) -> Optional[WebSocketConnection]:
+    def get_connection(self, セッションID: str, socket_no: str = "input") -> Optional[WebSocketConnection]:
         """セッションIDとソケット番号から接続を取得"""
         session = self.get_session(セッションID)
         if not session:
@@ -533,7 +536,7 @@ class WebSocketManager:
         if session:
             await session.send_json(data)
     
-    async def send_to_channel(self, セッションID: str, チャンネル: int, data: dict):
+    async def send_to_channel(self, セッションID: str, チャンネル: str, data: dict):
         """
         特定のソケットの指定チャンネルにデータを送信
         チャンネルが登録されている場合のみ送信
@@ -542,13 +545,13 @@ class WebSocketManager:
         if session:
             await session.send_to_channel(チャンネル, data)
     
-    def register_channel(self, セッションID: str, チャンネル: int):
+    def register_channel(self, セッションID: str, チャンネル: str):
         """チャンネルを登録"""
         session = self.get_session(セッションID)
         if session:
             session.register_channel(チャンネル)
-    
-    def unregister_channel(self, セッションID: str, チャンネル: int):
+
+    def unregister_channel(self, セッションID: str, チャンネル: str):
         """チャンネルを解除"""
         session = self.get_session(セッションID)
         if session:
@@ -572,8 +575,8 @@ class WebSocketManager:
             logger.warning(f"メッセージ処理失敗: 接続が見つかりません ({セッションID})")
             return
         
-        # チャンネルを取得（デフォルト: 0）
-        チャンネル = message.get("チャンネル", 0)
+        # チャンネルを取得（デフォルト: "0"）
+        チャンネル = str(message.get("チャンネル", "0"))
         
         # チャンネル別キューに追加
         キュー = session.get_or_create_queue(チャンネル)

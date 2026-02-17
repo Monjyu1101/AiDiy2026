@@ -34,6 +34,8 @@
     <li>監査項目を全テーブルで統一して扱う</li>
     <li>V系は CREATE VIEW ではなく Router内生SQLで実装する</li>
     <li>M系は apps_main.py (8092) 側に登録する</li>
+    <li>新規M系（例: M○○）では <code>apps_crud/init.py</code> の初期化処理追加を必須とする</li>
+    <li>初回確認しやすいよう、可能な限りサンプルデータを投入する</li>
   </ul>
 
   <h2>最終チェックリスト</h2>
@@ -41,6 +43,8 @@
     <li>[ ] <code>apps_schema.py</code> にSchema追加済み</li>
     <li>[ ] <code>apps_models/M商品.py</code> 作成済み</li>
     <li>[ ] <code>apps_crud/M商品.py</code> 作成済み</li>
+    <li>[ ] <code>apps_crud/init.py</code> に初期化処理を追加済み</li>
+    <li>[ ] サンプルデータ投入後に一覧で取得確認済み</li>
     <li>[ ] <code>apps_router/M商品.py</code> と <code>apps_router/V商品.py</code> 作成済み</li>
     <li>[ ] <code>apps_main.py</code> にrouter登録済み</li>
     <li>[ ] 8092 Swagger UIでCRUDとV一覧を確認済み</li>

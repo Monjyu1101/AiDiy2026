@@ -25,7 +25,7 @@ class A会話履歴(Base):
     シーケンス = Column(Integer, primary_key=True)
 
     # 会話データ
-    チャンネル = Column(Integer, nullable=False)
+    チャンネル = Column(Text, nullable=False)
     メッセージ識別 = Column(Text, nullable=False)
     メッセージ内容 = Column(Text)
     ファイル名 = Column(Text)

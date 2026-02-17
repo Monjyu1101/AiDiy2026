@@ -20,9 +20,17 @@
   <h2>対応箇所</h2>
   <table>
     <tr><th>ファイル</th><th>対応</th></tr>
-    <tr><td><code>workspace/AiDiy2026/frontend_server/src/router/index.ts</code></td><td>M商品一覧・編集ルートを追加</td></tr>
-    <tr><td><code>workspace/AiDiy2026/frontend_server/src/components/_TopMenu.vue</code></td><td>上位タブ（Mマスタ）導線を確認</td></tr>
-    <tr><td><code>workspace/AiDiy2026/frontend_server/src/components/Mマスタ.vue</code></td><td>M商品カード導線を確認/追加</td></tr>
+    <tr><td><code>src/router/appsRouter.ts</code></td><td>M商品一覧・編集ルートを追加 ← M系はここ</td></tr>
+    <tr><td><code>src/components/_TopMenu.vue</code></td><td>上位タブ（Mマスタ）導線を確認</td></tr>
+    <tr><td><code>src/components/Mマスタ.vue</code></td><td>M商品カード導線を確認/追加</td></tr>
+  </table>
+
+  <h2>ルーターファイルの構成（参考）</h2>
+  <table>
+    <tr><th>ファイル</th><th>管理する系</th></tr>
+    <tr><td><code>src/router/appsRouter.ts</code></td><td>M系, T系, V系, S系</td></tr>
+    <tr><td><code>src/router/coreRouter.ts</code></td><td>C系（C管理等）, A系（AIコア）</td></tr>
+    <tr><td><code>src/router/index.ts</code></td><td>ベースルート（ログイン, X系）のみ ← 通常は触らない</td></tr>
   </table>
 
   <h2>ポイント</h2>

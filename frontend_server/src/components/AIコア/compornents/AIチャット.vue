@@ -19,7 +19,7 @@ import FileContentDialog from '../dialog/ファイル内容表示.vue';
 // Props
 const プロパティ = defineProps<{
   セッションID?: string;
-  チャンネル?: number;
+  チャンネル?: string;
   chatAi?: string;
   liveAi?: string;
   chatMode?: 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4';
@@ -128,7 +128,7 @@ const テキストエリア自動調整 = () => {
 
 const 新規メッセージID = () => {
   const ソケット = セッションID.value || 'nosocket';
-  const チャンネル = プロパティ.チャンネル ?? 0;
+  const チャンネル = プロパティ.チャンネル ?? '0';
   return `chat-${ソケット}-${チャンネル}-${メッセージID連番++}`;
 };
 
@@ -321,6 +321,12 @@ const ターミナルメッセージ追加 = (role: メッセージ['role'], 内
 
 // WebSocketイベントハンドラ
 const ウェルカム内容 = ref<string>('');
+const ウェルカムテキスト受信済み = ref(false);
+
+const 表示時アクティブ化 = () => {
+  if (!ウェルカムテキスト受信済み.value) return;
+  通知('activate');
+};
 
 const 受信内容文字列 = (受信データ: any) => {
   const 内容 = 受信データ.メッセージ内容 ?? 受信データ.text ?? '';
@@ -329,14 +335,14 @@ const 受信内容文字列 = (受信データ: any) => {
 };
 
 const ウェルカム受信処理 = (受信データ: any) => {
-  // 通知('activate'); // welcome_infoでは画面表示しない
+  表示時アクティブ化();
   console.log('[チャット] welcome_info受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ウェルカム内容.value = 内容;
 };
 const 入力テキスト受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   console.log('[チャット] input_text受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) {
@@ -348,7 +354,7 @@ const 入力テキスト受信処理 = (受信データ: any) => {
 };
 
 const 入力リクエスト受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   console.log('[チャット] input_request受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) {
@@ -360,14 +366,14 @@ const 入力リクエスト受信処理 = (受信データ: any) => {
 };
 
 const 入力ファイル受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   const ファイル名 = 受信データ.ファイル名 ?? null;
   const サムネイル = 受信データ.サムネイル画像 ?? null;
   ファイルメッセージ追加('input_file', ファイル名, サムネイル);
 };
 
 const 出力テキスト受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   console.log('[チャット] output_text受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) {
@@ -379,7 +385,7 @@ const 出力テキスト受信処理 = (受信データ: any) => {
 };
 
 const 出力リクエスト受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   console.log('[チャット] output_request受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) {
@@ -391,7 +397,10 @@ const 出力リクエスト受信処理 = (受信データ: any) => {
 };
 
 const ウェルカムテキスト受信処理 = (受信データ: any) => {
-  // 通知('activate'); // welcome_textでは画面表示しない
+  if (ウェルカムテキスト受信済み.value) {
+    表示時アクティブ化();
+  }
+  ウェルカムテキスト受信済み.value = true;
   console.log('[チャット] welcome_text受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) {
@@ -403,21 +412,21 @@ const ウェルカムテキスト受信処理 = (受信データ: any) => {
 };
 
 const 出力ファイル受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   const ファイル名 = 受信データ.ファイル名 ?? null;
   const サムネイル = 受信データ.サムネイル画像 ?? null;
   ファイルメッセージ追加('output_file', ファイル名, サムネイル);
 };
 
 const 音声入力受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ターミナルメッセージ追加('recognition_input', 内容);
 };
 
 const 音声出力受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
   ターミナルメッセージ追加('recognition_output', 内容);
@@ -427,7 +436,7 @@ const 音声出力受信処理 = (受信データ: any) => {
 let ストリームメッセージID: string | null = null;
 
 const 出力ストリーム受信処理 = (受信データ: any) => {
-  通知('activate');
+  表示時アクティブ化();
   console.log('[チャット] output_stream受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
@@ -602,7 +611,7 @@ const メッセージ行カーソル = (メッセージ項目: メッセージ) 
 
 const WSハンドラ登録 = (クライアント?: IWebSocketClient | null) => {
   if (!クライアント) return;
-  const ch = プロパティ.チャンネル ?? 0;
+  const ch = プロパティ.チャンネル ?? '0';
 
   クライアント.on('welcome_info', ウェルカム受信処理);
   クライアント.on('input_text', 入力テキスト受信処理);
@@ -621,7 +630,7 @@ const WSハンドラ登録 = (クライアント?: IWebSocketClient | null) => {
 
 const WSハンドラ解除 = (クライアント?: IWebSocketClient | null) => {
   if (!クライアント) return;
-  const ch = プロパティ.チャンネル ?? 0;
+  const ch = プロパティ.チャンネル ?? '0';
 
   クライアント.off('welcome_info', ウェルカム受信処理);
   クライアント.off('input_text', 入力テキスト受信処理);
@@ -639,7 +648,7 @@ const WSハンドラ解除 = (クライアント?: IWebSocketClient | null) => {
 };
 
 const 出力ソケット接続 = async () => {
-  const チャンネル = プロパティ.チャンネル ?? 0;
+  const チャンネル = プロパティ.チャンネル ?? '0';
   if (!セッションID.value) {
     console.warn('[チャット] セッションID未確定のため出力ソケットを保留');
     return;
@@ -660,7 +669,7 @@ const 出力ソケット接続 = async () => {
 };
 
 onMounted(() => {
-  const チャンネル = プロパティ.チャンネル ?? 0;
+  const チャンネル = プロパティ.チャンネル ?? '0';
   console.log(`[チャット] ========== onMounted開始 ==========`);
   console.log(`[チャット] チャンネル=${チャンネル}`);
   console.log(`[チャット] セッションID=${セッションID.value}`);
@@ -677,6 +686,7 @@ onMounted(() => {
 
 watch(() => プロパティ.セッションID, (新ID, 旧ID) => {
   if (!新ID || 新ID === 旧ID) return;
+  ウェルカムテキスト受信済み.value = false;
   if (出力WebSocket.value) {
     WSハンドラ解除(出力WebSocket.value);
     出力WebSocket.value.disconnect();
@@ -724,10 +734,10 @@ const メッセージ送信 = async () => {
 
   // WebSocket経由でメッセージを送信（サーバーが即座にエコーバック）
   if (プロパティ.inputWsClient && プロパティ.inputWsClient.isConnected()) {
-    const 基本チャンネル = プロパティ.チャンネル ?? 0;
+    const 基本チャンネル = プロパティ.チャンネル ?? '0';
     const 現在モード = 選択モード.value;
     const コードモード = 現在モード.startsWith('code');
-    const 出力先チャンネル = コードモード ? Number(現在モード.replace('code', '')) || 1 : 基本チャンネル;
+    const 出力先チャンネル = コードモード ? (現在モード.replace('code', '') || '1') : 基本チャンネル;
     const 送信モード = コードモード ? 'code' : 現在モード;
     const メッセージ識別 = コードモード ? 'input_request' : 'input_text';
     console.log(`[チャット] WebSocket経由でメッセージ送信 (${メッセージ識別}):`, {
@@ -739,8 +749,8 @@ const メッセージ送信 = async () => {
       // codeモードでも入力値をチャンネル0に表示・履歴保存する
       プロパティ.inputWsClient.send({
         セッションID: セッションID.value,
-        チャンネル: 0,
-        出力先チャンネル: 0,
+        チャンネル: '0',
+        出力先チャンネル: '0',
         メッセージ識別: 'input_text',
         メッセージ内容: 送信内容,
         ファイル名: 'code',
@@ -749,7 +759,7 @@ const メッセージ送信 = async () => {
     }
     プロパティ.inputWsClient.send({
       セッションID: セッションID.value,
-      チャンネル: 0,
+      チャンネル: '0',
       出力先チャンネル: 出力先チャンネル,
       メッセージ識別: メッセージ識別,
       メッセージ内容: 送信内容,
@@ -792,13 +802,11 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
   if (!プロパティ.inputWsClient || !プロパティ.inputWsClient.isConnected()) return;
   try {
     const Base64データ = await ファイルをBase64読込(入力ファイル);
-    const 基本チャンネル = プロパティ.チャンネル ?? 0;
-    const 現在モード = 選択モード.value;
-    const コードモード = 現在モード.startsWith('code');
-    const チャンネル = コードモード ? Number(現在モード.replace('code', '')) || 1 : 基本チャンネル;
+    // ファイルは常にチャット(チャンネル0)に表示・履歴保存する
     プロパティ.inputWsClient.send({
       セッションID: セッションID.value,
-      チャンネル: チャンネル,
+      チャンネル: '0',
+      出力先チャンネル: '0',
       メッセージ識別: 'input_file',
       メッセージ内容: Base64データ,
       ファイル名: 入力ファイル.name,

@@ -121,7 +121,7 @@ class Recognition:
             try:
                 self.保存関数(
                     セッションID=self.セッションID,
-                    チャンネル=0,
+                    チャンネル="0",
                     メッセージ識別=f"recognition_{message_type}",
                     メッセージ内容=text,
                     ファイル名=None,
@@ -131,10 +131,9 @@ class Recognition:
                 pass
         await self.接続.send_json({
             "セッションID": self.セッションID,
-            "チャンネル": 0,
+            "チャンネル": "0",
             "メッセージ識別": f"recognition_{message_type}",
             "メッセージ内容": text,
             "ファイル名": None,
             "サムネイル画像": None
         })
-

@@ -19,7 +19,7 @@ const プロパティ = defineProps<{
   セッションID?: string;
   active?: boolean;
   wsConnected?: boolean;
-  チャンネル?: number;
+  チャンネル?: string;
   wsClient?: IWebSocketClient | null;
 }>();
 
@@ -445,7 +445,7 @@ const 画像送信 = async (データURL: string | null) => {
     }
     プロパティ.wsClient.send({
       セッションID: プロパティ.セッションID ?? '',
-      チャンネル: -1,
+      チャンネル: 'input',
       メッセージ識別: 'input_image',
       メッセージ内容: 'image/png',
       ファイル名: Base64データ,

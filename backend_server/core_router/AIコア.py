@@ -50,7 +50,7 @@ def _short_sid(セッションID: Optional[str]) -> str:
     return sid[:10]
 
 
-def _ws_log(ch: int, 内容: str, セッションID: Optional[str] = None, level: str = "info"):
+def _ws_log(ch: str, 内容: str, セッションID: Optional[str] = None, level: str = "info"):
     sid = _short_sid(セッションID)
     msg = f"チャンネル={ch}, {内容}, セッションID={sid}"
     if level == "debug":
@@ -97,7 +97,7 @@ router = APIRouter()
 
 def 保存_会話履歴(
     セッションID: str,
-    チャンネル: int,
+    チャンネル: str,
     メッセージ識別: str,
     メッセージ内容: Optional[str] = None,
     ファイル名: Optional[str] = None,
@@ -124,7 +124,7 @@ def 保存_会話履歴(
 
 def 取得_会話履歴一覧(
     セッションID: str,
-    チャンネル: int = 0
+    チャンネル: str = "0"
 ):
     """会話履歴一覧を取得（シーケンス昇順）"""
     db = database.SessionLocal()
@@ -242,7 +242,7 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
 async def 送信_会話履歴(
     接続: SessionConnection,
     セッションID: str,
-    チャンネル: int = 0
+    チャンネル: str = "0"
 ):
     """会話履歴をソケット送出（シーケンス昇順）"""
     履歴一覧 = 取得_会話履歴一覧(セッションID, チャンネル=チャンネル)
@@ -579,7 +579,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
     セッション確立、状態同期、ストリーミング処理を行う
     """
     セッションID = None
-    ソケット番号 = -1
+    ソケット番号 = "input"
 
     try:
         await WebSocket接続.accept()
@@ -593,8 +593,10 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             if ソケット番号 is None:
                 ソケット番号 = 初期データ.get("チャンネル")
             if ソケット番号 is None:
-                ソケット番号 = -1
-            _ws_log(ch=int(ソケット番号), 内容="接続要求", セッションID=クライアントセッションID)
+                ソケット番号 = "input"
+            else:
+                ソケット番号 = str(ソケット番号)
+            _ws_log(ch=ソケット番号, 内容="接続要求", セッションID=クライアントセッションID)
         except WebSocketDisconnect as e:
             _ws_log(ch=-99, 内容=f"初回受信前に切断: code={getattr(e, 'code', '-')}", level="info")
             return
@@ -607,7 +609,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         セッションID = await AIセッション管理.connect(
             WebSocket接続,
             セッションID=クライアントセッションID,
-            socket_no=int(ソケット番号),
+            socket_no=ソケット番号,
             app_conf=getattr(WebSocket接続.app, "conf", None),
             accept_in_connect=False
         )
@@ -617,7 +619,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             raise RuntimeError("セッションの作成に失敗しました")
         
         # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
-        if 新規セッション and セッション.モデル設定 and int(ソケット番号) == -1:
+        if 新規セッション and セッション.モデル設定 and ソケット番号 == "input":
             try:
                 バックアップ実行_共通ログ(
                     呼出しロガー=logger,
@@ -631,7 +633,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         # セッション内の初期化は1回ずつ直列化（複数ソケット同時接続での重複起動防止）
         async with セッション.初期化ロック:
             # 初回のみプロセッサを起動
-            if セッション.streaming_processor is None and int(ソケット番号) == -1:
+            if セッション.streaming_processor is None and ソケット番号 == "input":
                 セッション.streaming_processor = StreamingProcessor(セッションID, セッション)
                 await セッション.streaming_processor.start()
 
@@ -657,7 +659,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 セッション.chat_processor = Chat(
                     親=WebSocket接続.app,
                     セッションID=セッションID,
-                    チャンネル=0,
+                    チャンネル="0",
                     絶対パス=チャット保存基準パス,
                     AI_NAME=chat_ai,
                     AI_MODEL=chat_model,
@@ -681,7 +683,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     agent = CodeAgent(
                         親=WebSocket接続.app,
                         セッションID=セッションID,
-                        チャンネル=i,
+                        チャンネル=str(i),
                         絶対パス=実行パス,
                         AI_NAME=セッション.モデル設定.get(ai_key, ""),
                         AI_MODEL=セッション.モデル設定.get(model_key, ""),
@@ -723,7 +725,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 セッション.live_processor = Live(
                     親=WebSocket接続.app,
                     セッションID=セッションID,
-                    チャンネル=0,
+                    チャンネル="0",
                     絶対パス=実行パス,
                     AI_NAME=live_ai,
                     AI_MODEL=live_model,
@@ -739,16 +741,16 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 if hasattr(セッション.live_processor, "_select_ai_module"):
                     セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
 
-            # LiveAIは音声チャンネル(-2)接続時にのみ起動
-            if int(ソケット番号) == -2 and not getattr(セッション.live_processor, "is_alive", False):
+            # LiveAIは音声チャンネル(audio)接続時にのみ起動
+            if ソケット番号 == "audio" and not getattr(セッション.live_processor, "is_alive", False):
                 await セッション.live_processor.開始()
 
             if セッション.audio_split_task is None or セッション.audio_split_task.done():
                 セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
 
         # 出力ソケット接続時にwelcome_infoと履歴を送信
-        if int(ソケット番号) in [0, 1, 2, 3, 4]:
-            if int(ソケット番号) == 0:
+        if ソケット番号 in ["0", "1", "2", "3", "4"]:
+            if ソケット番号 == "0":
                 last_update = セッション.ソース最終更新日時
                 if not last_update:
                     last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -778,7 +780,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 )
             else:
                 idx = int(ソケット番号)
-                ai_key = f"CODE_AI{idx}_NAME"
+                ai_key = f"CODE_AI{idx}_NAME"  # intに変換して使用
                 model_key = f"CODE_AI{idx}_MODEL"
                 ai_name = セッション.モデル設定.get(ai_key, "")
                 ai_model = セッション.モデル設定.get(model_key, "")
@@ -804,26 +806,26 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 )
 
             if ウェルカム本文:
-                await セッション.send_to_channel(int(ソケット番号), {
+                await セッション.send_to_channel(ソケット番号, {
                     "セッションID": セッションID,
-                    "チャンネル": int(ソケット番号),
+                    "チャンネル": ソケット番号,
                     "メッセージ識別": "welcome_info",
                     "メッセージ内容": ウェルカム本文,
                     "ファイル名": None,
                     "サムネイル画像": None
                 })
-                _ws_log(ch=int(ソケット番号), 内容="welcome_info送信", セッションID=セッションID)
+                _ws_log(ch=ソケット番号, 内容="welcome_info送信", セッションID=セッションID)
 
             await asyncio.sleep(0.1)
             try:
-                await 送信_会話履歴(セッション, セッションID, チャンネル=int(ソケット番号))
+                await 送信_会話履歴(セッション, セッションID, チャンネル=ソケット番号)
             except Exception as e:
                 logger.exception(f"会話履歴送信エラー: {e}")
             try:
-                追加メッセージ = "会話準備できました。よろしくお願いします。" if int(ソケット番号) == 0 else "準備できました。"
-                await セッション.send_to_channel(int(ソケット番号), {
+                追加メッセージ = "会話準備できました。よろしくお願いします。" if ソケット番号 == "0" else "準備できました。"
+                await セッション.send_to_channel(ソケット番号, {
                     "セッションID": セッションID,
-                    "チャンネル": int(ソケット番号),
+                    "チャンネル": ソケット番号,
                     "メッセージ識別": "welcome_text",
                     "メッセージ内容": 追加メッセージ,
                     "ファイル名": None,
@@ -838,11 +840,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 受信データ = await WebSocket接続.receive_json()
                 メッセージ識別 = 受信データ.get("メッセージ識別")
 
-                if int(ソケット番号) not in (-1, -2):
+                if ソケット番号 not in ("input", "audio"):
                     continue
 
                 if メッセージ識別 == "operations":
-                    if int(ソケット番号) != -1:
+                    if ソケット番号 != "input":
                         continue
                     内容 = 受信データ.get("メッセージ内容", {})
                     ボタン = 内容.get("ボタン", {})
@@ -851,12 +853,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     セッション.update_state(ボタン, manager=AIセッション管理)
 
                 elif メッセージ識別 == "input_text":
-                    if int(ソケット番号) != -1:
+                    if ソケット番号 != "input":
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
                     ファイル名 = 受信データ.get("ファイル名") or ""
-                    チャンネル = 受信データ.get("チャンネル", 0)
-                    出力先チャンネル = 受信データ.get("出力先チャンネル", チャンネル)
+                    チャンネル = str(受信データ.get("チャンネル", "0"))
+                    出力先チャンネル = str(受信データ.get("出力先チャンネル", チャンネル))
                     logger.debug(f"テキスト受信 (チャンネル={チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     if セッション.is_channel_processing(出力先チャンネル):
@@ -928,7 +930,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     受信データ["チャンネル"] = 出力先チャンネル
 
                     try:
-                        if 出力先チャンネル == 0:
+                        if 出力先チャンネル == "0":
                             ファイル名_判定 = ファイル名.lower() if isinstance(ファイル名, str) else ""
                             logger.info(
                                 f"input_text分岐判定: socket={セッションID} channel=0 "
@@ -951,21 +953,21 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                         await セッション.chat_processor.チャット要求(受信データ)
                             elif hasattr(セッション, "chat_processor"):
                                 await セッション.chat_processor.チャット要求(受信データ)
-                        elif 1 <= 出力先チャンネル <= 4 and hasattr(セッション, 'code_agent_processors'):
-                            await セッション.code_agent_processors[出力先チャンネル - 1].コード要求(受信データ)
+                        elif 出力先チャンネル in ("1", "2", "3", "4") and hasattr(セッション, 'code_agent_processors'):
+                            await セッション.code_agent_processors[int(出力先チャンネル) - 1].コード要求(受信データ)
                     finally:
                         セッション.set_channel_processing(出力先チャンネル, False)
 
                 elif メッセージ識別 == "input_request":
-                    if int(ソケット番号) != -1:
+                    if ソケット番号 != "input":
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
-                    チャンネル = 受信データ.get("チャンネル", 1)
-                    出力先チャンネル = 受信データ.get("出力先チャンネル", チャンネル)
+                    チャンネル = str(受信データ.get("チャンネル", "1"))
+                    出力先チャンネル = str(受信データ.get("出力先チャンネル", チャンネル))
                     logger.debug(f"リクエスト受信 (チャンネル={チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     # input_requestはコードエージェント専用（チャンネル1-4のみ）
-                    if not (1 <= 出力先チャンネル <= 4):
+                    if 出力先チャンネル not in ("1", "2", "3", "4"):
                         logger.warning(f"input_requestはチャンネル1-4のみ対応: 出力先={出力先チャンネル}")
                         continue
 
@@ -1014,16 +1016,16 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     # コードエージェントに処理を投入
                     try:
                         if hasattr(セッション, 'code_agent_processors'):
-                            await セッション.code_agent_processors[出力先チャンネル - 1].コード要求(受信データ)
+                            await セッション.code_agent_processors[int(出力先チャンネル) - 1].コード要求(受信データ)
                     finally:
                         セッション.set_channel_processing(出力先チャンネル, False)
 
                 elif メッセージ識別 == "input_file":
-                    if int(ソケット番号) != -1:
+                    if ソケット番号 != "input":
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or ""
-                    チャンネル = 受信データ.get("チャンネル", 0)
-                    出力先チャンネル = 受信データ.get("出力先チャンネル", チャンネル)
+                    チャンネル = str(受信データ.get("チャンネル", "0"))
+                    出力先チャンネル = str(受信データ.get("出力先チャンネル", チャンネル))
                     ファイル名 = 受信データ.get("ファイル名")
                     保存ファイル名 = None
                     サムネイル_base64 = None
@@ -1085,7 +1087,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         セッション.ファイル登録(出力先チャンネル, f"temp/input/{保存ファイル名}")
 
                     # チャンネル0: 画像の場合はライブAIへ送信
-                    if セッション and 出力先チャンネル == 0 and サムネイル_base64 and Base64ペイロード:
+                    if セッション and 出力先チャンネル == "0" and サムネイル_base64 and Base64ペイロード:
                         try:
                             if hasattr(セッション, "live_processor") and セッション.live_processor:
                                 画像形式 = "png"
@@ -1125,9 +1127,9 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                 elif メッセージ識別 == "cancel_agent":
                     try:
-                        チャンネル = 受信データ.get("チャンネル", 0)
-                        if 1 <= チャンネル <= 4 and セッション and hasattr(セッション, 'code_agent_processors'):
-                            セッション.code_agent_processors[チャンネル - 1].強制停止フラグ = True
+                        チャンネル = str(受信データ.get("チャンネル", "0"))
+                        if チャンネル in ("1", "2", "3", "4") and セッション and hasattr(セッション, 'code_agent_processors'):
+                            セッション.code_agent_processors[int(チャンネル) - 1].強制停止フラグ = True
                             logger.info(f"cancel_agent: チャンネル{チャンネル} 強制停止フラグをオン ({セッションID})")
                         else:
                             logger.warning(f"cancel_agent: 無効なチャンネル={チャンネル} ({セッションID})")
@@ -1180,7 +1182,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 break
             except Exception as e:
                 if _is_disconnect_like_error(e):
-                    _ws_log(ch=int(ソケット番号), 内容=f"切断検出: {e}", セッションID=セッションID, level="info")
+                    _ws_log(ch=ソケット番号, 内容=f"切断検出: {e}", セッションID=セッションID, level="info")
                     break
                 logger.error(f"メッセージ処理エラー ({セッションID}): {e}")
                 if not _is_ws_connected(WebSocket接続):
@@ -1203,6 +1205,6 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         logger.error(f"エラー ({セッションID}): {e}")
     finally:
         if セッションID is not None:
-            _ws_log(ch=int(ソケット番号), 内容="接続切断", セッションID=セッションID)
+            _ws_log(ch=ソケット番号, 内容="接続切断", セッションID=セッションID)
             await AIセッション管理.disconnect(セッションID, socket_no=ソケット番号)
             logger.debug(f"クリーンアップ完了: {セッションID}")

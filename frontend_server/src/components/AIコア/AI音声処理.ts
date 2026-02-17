@@ -351,7 +351,7 @@ export class AudioStreamProcessor {
         // リアルタイムストリーミング送信
         this.wsClient.value.send({
           セッションID: this.wsClient.value.セッションID取得?.() ?? '',
-          チャンネル: -2,
+          チャンネル: 'audio',
           メッセージ識別: 'input_audio',
           メッセージ内容: 'audio/pcm',
           ファイル名: base64Audio,
@@ -592,7 +592,7 @@ export class AudioStreamProcessor {
     if (this.wsClient.value && this.wsClient.value.isConnected()) {
       this.wsClient.value.send({
         セッションID: this.セッションID.value,
-        チャンネル: -2,
+        チャンネル: 'audio',
         メッセージ識別: 'cancel_audio',
         メッセージ内容: null,
         ファイル名: null,

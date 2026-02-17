@@ -19,7 +19,7 @@ def create_会話履歴(
     db: Session,
     セッションID: str,
     シーケンス: int,
-    チャンネル: int,
+    チャンネル: str,
     メッセージ識別: str,
     メッセージ内容: Optional[str] = None,
     ファイル名: Optional[str] = None,
@@ -58,7 +58,7 @@ def get_会話履歴(db: Session, セッションID: str, シーケンス: int) 
 def get_会話履歴_by_socket(
     db: Session,
     セッションID: str,
-    チャンネル: Optional[int] = None,
+    チャンネル: Optional[str] = None,
     limit: int = 100
 ) -> List[A会話履歴]:
     """セッションIDで会話履歴を取得（チャンネル指定可能）"""

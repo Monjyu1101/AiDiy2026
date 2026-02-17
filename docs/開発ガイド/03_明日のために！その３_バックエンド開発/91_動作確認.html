@@ -33,6 +33,12 @@ python _start.py</code></pre>
     <li>8092のSwaggerでも Authorize に同じトークンを設定</li>
   </ol>
 
+  <h2>初期データ確認（必須）</h2>
+  <ul>
+    <li><code>backend_server/apps_crud/init.py</code> の <code>init_db_data()</code> に、対象マスタ（例: M○○）の初期化処理が追加されていることを確認する</li>
+    <li>一覧APIで、投入したサンプルデータが取得できることを確認する</li>
+  </ul>
+
   <h2>CRUDテスト順</h2>
   <table>
     <tr><th>順番</th><th>API</th><th>確認点</th></tr>
@@ -65,6 +71,7 @@ curl -X POST http://localhost:8092/apps/M商品/登録 \
   <h2>チェック</h2>
   <ul>
     <li>[ ] 認証トークンを取得し、apps側に設定できた</li>
+    <li>[ ] 初期化処理とサンプルデータ投入が反映されている</li>
     <li>[ ] CRUD5操作を順番通り確認できた</li>
     <li>[ ] エラーケース（重複/未検出）を再現できた</li>
   </ul>

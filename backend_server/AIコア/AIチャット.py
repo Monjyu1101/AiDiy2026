@@ -85,7 +85,7 @@ class Chat:
         self,
         親=None,
         セッションID: str = "",
-        チャンネル: int = 0,
+        チャンネル: str = "0",
         絶対パス: str = "",
         AI_NAME: str = "",
         AI_MODEL: str = "",
@@ -251,7 +251,7 @@ class Chat:
         return None
 
     async def _AI実行と応答送信(self, 受信データ: dict, file_path: str = None):
-        """AI実行 → output_text送信 + 出力ファイルがあればoutput_fileをチャンネル-1に送信"""
+        """AI実行 → output_text送信 + 出力ファイルがあればoutput_fileをinputチャンネルに送信"""
         try:
             import os
             import re
@@ -319,7 +319,7 @@ class Chat:
                     サムネイル画像=None
                 )
 
-            # 3) 出力ファイルがあればoutput_fileとしてチャンネル-1に送信
+            # 3) 出力ファイルがあればoutput_fileとしてinputチャンネルに送信
             for 出力ファイルパス in 出力ファイル一覧:
                 if not os.path.exists(出力ファイルパス):
                     logger.warning(f"[Chat] 出力ファイルが見つかりません: {出力ファイルパス}")
@@ -408,4 +408,3 @@ class Chat:
             logger.warning(f"[Chat] 入力ファイルが見つかりません: {file_path}")
             return
         await self._AI実行と応答送信(受信データ, file_path=file_path)
-

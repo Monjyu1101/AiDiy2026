@@ -129,7 +129,7 @@ class Live:
         self,
         親=None,
         セッションID: str = "",
-        チャンネル: int = 0,
+        チャンネル: str = "0",
         絶対パス: str = "",
         AI_NAME: str = "",
         AI_MODEL: str = "",
@@ -339,7 +339,7 @@ class Live:
             if not bytes_data:
                 return False
             base64_audio = base64.b64encode(bytes_data).decode("utf-8")
-            await self.接続.send_to_channel(-2, {
+            await self.接続.send_to_channel("audio", {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_audio",
                 "メッセージ内容": mime_type,
@@ -364,7 +364,7 @@ class Live:
             logger.info(
                 f"処理応答: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
             )
-            await self.接続.send_to_channel(0, {
+            await self.接続.send_to_channel("0", {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
                 "メッセージ内容": text,
@@ -464,7 +464,7 @@ class Live:
                 if not result:
                     logger.warning("LiveAI実行:テキスト送信に失敗しました")
                     if self.接続:
-                        await self.接続.send_to_channel(0, {
+                        await self.接続.send_to_channel("0", {
                             "セッションID": self.セッションID,
                             "メッセージ識別": "output_text",
                             "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",
@@ -476,7 +476,7 @@ class Live:
                 # LiveAI未初期化時のエラーメッセージ送信
                 logger.warning("LiveAI実行:LiveAIが開始されていません")
                 if self.接続:
-                    await self.接続.send_to_channel(0, {
+                    await self.接続.send_to_channel("0", {
                         "セッションID": self.セッションID,
                         "メッセージ識別": "output_text",
                         "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",

@@ -33,7 +33,7 @@ export interface IWebSocketClient {
   sendPing(): void;
   updateState(ボタン: any): void;
   sendChatMessage(message: string): void;
-  sendInputText(text: string, チャンネル?: number): void;
+  sendInputText(text: string, チャンネル?: string): void;
   requestStream(data: any): void;
 }
 
@@ -47,11 +47,11 @@ export class AIコアWebSocket implements IWebSocketClient {
   private isIntentionallyClosed = false;
   private isInitialConnection = true; // 初回接続フラグ
   private 要求セッションID: string | null = null; // 要求されたセッションID
-  private 要求ソケット番号: number | null = null; // 要求されたソケット番号
+  private 要求ソケット番号: string | null = null; // 要求されたソケット番号
 
-  constructor(private url: string, セッションID?: string, ソケット番号?: number) {
+  constructor(private url: string, セッションID?: string, ソケット番号?: string) {
     this.要求セッションID = セッションID || null;
-    this.要求ソケット番号 = typeof ソケット番号 === 'number' ? ソケット番号 : null;
+    this.要求ソケット番号 = typeof ソケット番号 === 'string' ? ソケット番号 : null;
   }
 
   /**
@@ -95,8 +95,8 @@ export class AIコアWebSocket implements IWebSocketClient {
             if (initType === 'init' && message.セッションID) {
               this.セッションID = message.セッションID;
               this.要求セッションID = message.セッションID; // 以降の再接続で使用
-              if (typeof message.ソケット番号 === 'number') {
-                this.要求ソケット番号 = message.ソケット番号;
+              if (message.ソケット番号 !== undefined && message.ソケット番号 !== null) {
+                this.要求ソケット番号 = String(message.ソケット番号);
               }
               console.log('[WebSocket] セッションID確定:', this.セッションID);
               resolve(this.セッションID);
@@ -307,13 +307,13 @@ export class AIコアWebSocket implements IWebSocketClient {
 
   /**
    * テキスト入力を送信
-   * 入力は常にチャンネル-1で送信、出力先チャンネルを別途指定
+   * 入力は常にチャンネルinputで送信、出力先チャンネルを別途指定
    */
-  sendInputText(text: string, 出力先チャンネル: number): void {
-    console.log(`[WebSocket] sendInputText: 入力チャンネル=-1, 出力先チャンネル=${出力先チャンネル}, text="${text.substring(0, 50)}..."`);
+  sendInputText(text: string, 出力先チャンネル: string): void {
+    console.log(`[WebSocket] sendInputText: 入力チャンネル="input", 出力先チャンネル=${出力先チャンネル}, text="${text.substring(0, 50)}..."`);
     this.send({
       セッションID: this.セッションID,
-      チャンネル: -1,  // 入力は常に-1
+      チャンネル: 'input',  // 入力は常にinput
       メッセージ識別: 'input_text',
       メッセージ内容: text,
       出力先チャンネル: 出力先チャンネル,  // バックエンドが参照して振り分け

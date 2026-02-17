@@ -190,23 +190,22 @@ class StreamingProcessor:
             **data
         })
 
-    async def send_output_audio(self, base64_audio: str, mime_type: str = "audio/pcm", チャンネル: int = -2):
+    async def send_output_audio(self, base64_audio: str, mime_type: str = "audio/pcm", チャンネル: str = "audio"):
         """
         音声出力メッセージを送信
 
         Args:
             base64_audio: Base64エンコードされた音声データ
             mime_type: MIMEタイプ（デフォルト: audio/pcm）
-            チャンネル: チャンネル番号（デフォルト: -1、ストリーム処理用）
+            チャンネル: 送信先チャンネル（デフォルト: "audio"）
         """
         # 音声出力が一時停止中（人間の音声入力中）はスキップ
         if self.connection.output_audio_paused:
             logger.debug(f"音声出力スキップ（一時停止中）: {self.セッションID}")
             return
 
-        await self.connection.send_json({
+        await self.connection.send_to_channel(チャンネル, {
             "セッションID": self.セッションID,
-            "チャンネル": チャンネル,
             "メッセージ識別": "output_audio",
             "メッセージ内容": mime_type,
             "ファイル名": base64_audio,
@@ -254,7 +253,7 @@ class StreamingProcessor:
                 受信データ = {
                     "メッセージ識別": "input_text",
                     "メッセージ内容": text,
-                    "チャンネル": 0,
+                    "チャンネル": "0",
                 }
                 await chat_processor.チャット要求(受信データ)
             except Exception as e:

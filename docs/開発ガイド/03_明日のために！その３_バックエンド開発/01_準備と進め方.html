@@ -47,6 +47,13 @@
     <li>Swagger UIで動作確認する</li>
   </ol>
 
+  <h2>実装時の注意（必須）</h2>
+  <ul>
+    <li>新規M系（例: M○○）を実装したら、<code>backend_server/apps_crud/init.py</code> の <code>init_db_data()</code> に初期化処理を必ず追加する</li>
+    <li>初回確認の効率を上げるため、可能な限りサンプルデータを投入する（一覧・検索・変更確認ができる件数を推奨）</li>
+    <li>初期化処理は冪等にし、既存データがあるときはスキップする</li>
+  </ul>
+
   <h2>デュアルサーバーの注意点</h2>
   <ul>
     <li>core_main.py (8091): C系/A系</li>

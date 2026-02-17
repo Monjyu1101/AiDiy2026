@@ -18,7 +18,13 @@
   <p>Vue Routerへ一覧・編集ルートを追加します。画面遷移を安定させるため、name/path/queryの対応を先に決めます。</p>
 
   <h2>設定対象</h2>
-  <p><code>workspace/AiDiy2026/frontend_server/src/router/index.ts</code></p>
+  <p>ルーターはバックエンドと対応する形で分割されています。<strong>M系（マスタ）はappsRouter.ts</strong>に追加します。</p>
+  <table>
+    <tr><th>ファイル</th><th>対象系</th></tr>
+    <tr><td><code>src/router/appsRouter.ts</code></td><td>M系, T系, V系, S系 ← M商品はここ</td></tr>
+    <tr><td><code>src/router/coreRouter.ts</code></td><td>C系（C管理, C権限, C利用者, C採番）, A系（AIコア）</td></tr>
+    <tr><td><code>src/router/index.ts</code></td><td>ベースルート（ログイン, X系）+ ルーター本体</td></tr>
+  </table>
 
   <h2>追加するルート（例）</h2>
   <table>
@@ -43,7 +49,8 @@
 
   <h2>AGENTS準拠メモ</h2>
   <ul>
-    <li>ルート定義は <code>workspace/AiDiy2026/frontend_server/src/router/index.ts</code> に集約する</li>
+    <li>M/T/V/S系のルート定義は <code>src/router/appsRouter.ts</code> に追加する（index.tsは触らない）</li>
+    <li>C系/A系のルート定義は <code>src/router/coreRouter.ts</code> に追加する</li>
     <li>コンポーネント読み込みは遅延読み込み（<code>() =&gt; import(...)</code>）を基本にする</li>
     <li>日本語URLリロード時の復元（decode対応）を壊さないよう既存実装に合わせる</li>
   </ul>

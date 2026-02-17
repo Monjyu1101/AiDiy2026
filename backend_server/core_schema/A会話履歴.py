@@ -16,7 +16,7 @@ from typing import Optional
 class A会話履歴Base(BaseModel):
     セッションID: str
     シーケンス: int
-    チャンネル: int
+    チャンネル: str
     メッセージ識別: str
     メッセージ内容: Optional[str] = None
     ファイル名: Optional[str] = None
@@ -47,7 +47,7 @@ class A会話履歴Get(BaseModel):
 
 class A会話履歴ListRequest(BaseModel):
     セッションID: Optional[str] = None
-    チャンネル: Optional[int] = None
+    チャンネル: Optional[str] = None
     件数: Optional[int] = None
 
 

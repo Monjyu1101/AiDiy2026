@@ -38,6 +38,7 @@ _CODE_CONTEXT_TEMPLATE_LINES = [
     "概要以外にも`*.md`の記載内容は必要に応じて確認してください。",
     "概要が不明な場合は、プログラムコードの説明、分析、実装支援を行います。",
     "機能追加、修正操作時は、同類のソースを参考にしてください。",
+    "AiDiy自体の改造時、reboot_core.txt,reboot_apps.txtでシステム再起動できますが、再起動はユーザー判断にゆだねてください。"
 ]
 
 
@@ -94,7 +95,7 @@ class CodeAgent:
         self,
         親=None,
         セッションID: str = "",
-        チャンネル: int = 0,
+        チャンネル: str = "0",
         絶対パス: str = "",
         AI_NAME: str = "",
         AI_MODEL: str = "",
@@ -253,10 +254,10 @@ class CodeAgent:
     async def _処理_input_request(self, 受信データ: dict) -> None:
         """
         input_request処理:
-        1. チャンネル-1へ開始通知（音声付き）
+        1. inputチャンネルへ開始通知（音声付き）
         2. input_text処理（_基本AI処理）
         3. output_request送信（チャンネル0へ）
-        4. チャンネル-1へ完了通知（音声付き）
+        4. inputチャンネルへ完了通知（音声付き）
         """
         # 強制停止フラグをリセット
         self.強制停止フラグ = False
@@ -275,7 +276,7 @@ class CodeAgent:
                     メッセージ内容 = メッセージ内容 + 添付テキスト
                     受信データ["メッセージ内容"] = メッセージ内容
 
-            # 1. チャンネル-1へ処理開始を連絡
+            # 1. inputチャンネルへ処理開始を連絡
             # 累積変更ファイルをクリア
             self.累積変更ファイル = []
             self._累積変更ファイルキー = set()
@@ -289,16 +290,16 @@ class CodeAgent:
                 f"```"
             )
             try:
-                await self.接続.send_to_channel(-1, {
+                await self.接続.send_to_channel("input", {
                     "セッションID": self.セッションID,
-                    "チャンネル": -1,
+                    "チャンネル": "input",
                     "メッセージ識別": "input_text",
                     "メッセージ内容": 開始メッセージ,
                     "ファイル名": None,
                     "サムネイル画像": None
                 })
             except Exception as e:
-                logger.warning(f"[CodeAgent] チャンネル-1への開始メッセージ送信エラー: {e}")
+                logger.warning(f"[CodeAgent] inputチャンネルへの開始メッセージ送信エラー: {e}")
             try:
                 if hasattr(self.接続, "live_processor") and self.接続.live_processor:
                     await self.接続.live_processor.開始()
@@ -310,7 +311,7 @@ class CodeAgent:
             出力メッセージ内容 = await self._基本AI処理(受信データ)
 
             # 3. output_request送信（チャンネル0へ）
-            await self.接続.send_to_channel(0, {
+            await self.接続.send_to_channel("0", {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_request",
                 "メッセージ内容": 出力メッセージ内容,
@@ -322,14 +323,14 @@ class CodeAgent:
             if self.保存関数:
                 self.保存関数(
                     セッションID=self.セッションID,
-                    チャンネル=0,
+                    チャンネル="0",
                     メッセージ識別="output_request",
                     メッセージ内容=出力メッセージ内容,
                     ファイル名=None,
                     サムネイル画像=None
                 )
 
-            # 4. チャンネル-1へ処理終了を連絡
+            # 4. inputチャンネルへ処理終了を連絡
             完了メッセージ = (
                 f"コードエージェント{self.チャンネル}です。\n"
                 f"処理要求が完了しました。\n"
@@ -342,16 +343,16 @@ class CodeAgent:
                 f"```"
             )
             try:
-                await self.接続.send_to_channel(-1, {
+                await self.接続.send_to_channel("input", {
                     "セッションID": self.セッションID,
-                    "チャンネル": -1,
+                    "チャンネル": "input",
                     "メッセージ識別": "input_text",
                     "メッセージ内容": 完了メッセージ,
                     "ファイル名": None,
                     "サムネイル画像": None
                 })
             except Exception as e:
-                logger.warning(f"[CodeAgent] チャンネル-1への完了メッセージ送信エラー: {e}")
+                logger.warning(f"[CodeAgent] inputチャンネルへの完了メッセージ送信エラー: {e}")
             try:
                 if hasattr(self.接続, "live_processor") and self.接続.live_processor:
                     await self.接続.live_processor.開始()
@@ -465,7 +466,7 @@ class CodeAgent:
             except Exception as e:
                 logger.error(f"[CodeAgent] バックアップ検証ループエラー: {e}")
 
-            # 生成されたファイルをチェックしてチャンネル-1に通知
+            # 生成されたファイルをチェックしてinputチャンネルに通知
             try:
                 await self._生成ファイル通知()
             except Exception as e:
@@ -476,8 +477,8 @@ class CodeAgent:
                 try:
                     通知チャンネル一覧 = [self.チャンネル]
                     # input_text経由の処理はチャット側（チャンネル0）にも更新完了を通知
-                    if 受信種別 == "input_text" and self.チャンネル != 0:
-                        通知チャンネル一覧.append(0)
+                    if 受信種別 == "input_text" and self.チャンネル != "0":
+                        通知チャンネル一覧.append("0")
                     await self._update_info送信(通知チャンネル一覧=通知チャンネル一覧)
                 except Exception as e:
                     logger.error(f"[CodeAgent] update_info送信エラー: {e}")
@@ -577,7 +578,7 @@ class CodeAgent:
         return 今回更新あり
 
     async def _生成ファイル通知(self) -> None:
-        """生成された画像などのファイルをチェックしてチャンネル-1に通知"""
+        """生成された画像などのファイルをチェックしてinputチャンネルに通知"""
         import glob
         import time
 
@@ -606,7 +607,7 @@ class CodeAgent:
                     except Exception as e:
                         logger.warning(f"[CodeAgent] ファイル時刻チェックエラー: {ファイルパス}, {e}")
 
-        # 検出されたファイルをチャンネル-1に通知
+        # 検出されたファイルをinputチャンネルに通知
         for ファイルパス in 検出ファイル一覧:
             try:
                 # サムネイル生成（オプション：ここでは省略し、Noneを送信）
@@ -614,10 +615,10 @@ class CodeAgent:
 
                 通知メッセージ = f"ファイルが生成されました: {ファイルパス}"
 
-                # チャンネル-1にoutput_file送信
-                await self.接続.send_to_channel(-1, {
+                # inputチャンネルにoutput_file送信
+                await self.接続.send_to_channel("input", {
                     "セッションID": self.セッションID,
-                    "チャンネル": -1,
+                    "チャンネル": "input",
                     "メッセージ識別": "output_file",
                     "メッセージ内容": 通知メッセージ,
                     "ファイル名": ファイルパス,

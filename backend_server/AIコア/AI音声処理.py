@@ -83,16 +83,14 @@ async def _send_cancel_audio_user(接続):
     """人間音声検出時に音声出力停止を通知（旧実装寄せ）"""
     try:
         if 接続:
-            # クライアント側の再生停止
-            message = {
+            # クライアント側の再生停止（音声ソケットへ送信）
+            await 接続.send_to_channel("audio", {
                 "セッションID": 接続.セッションID,
-                "チャンネル": -2,
                 "メッセージ識別": "cancel_audio",
                 "メッセージ内容": "人間の音声を検出しました。AI音声再生を停止します。",
                 "ファイル名": None,
                 "サムネイル画像": None
-            }
-            await 接続.send_json(message)
+            })
     except Exception as e:
         logger.error(f"cancel_audio送信エラー: {e}")
 
@@ -201,7 +199,7 @@ async def 統合音声分離ワーカー(接続):
                     silence_base64 = base64.b64encode(silence_packet).decode("utf-8")
                     
                     try:
-                        await 接続.send_to_channel(-2, {
+                        await 接続.send_to_channel("audio", {
                             "セッションID": 接続.セッションID,
                             "メッセージ識別": "output_audio",
                             "メッセージ内容": "audio/pcm",

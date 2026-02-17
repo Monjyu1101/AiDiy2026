@@ -12,7 +12,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/api/client';
 import AI設定再起動 from './dialog/AI設定再起動.vue';
 import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
@@ -21,15 +20,12 @@ import AIコアイメージ from './compornents/AIイメージ.vue';
 import AIコアコード from './compornents/AIコード.vue';
 import { AudioStreamProcessor } from './AI音声処理';
 
-const route = useRoute();
-const router = useRouter();
-
 // セッションID（全コンポーネント共通）
 const セッションID = ref('');
 
-// 親WebSocket接続（テキスト・画像・操作、チャンネル-1）
+// 親WebSocket接続（テキスト・画像・操作、チャンネルinput）
 const wsClient = ref<IWebSocketClient | null>(null);
-// 音声専用WebSocket接続（チャンネル-2）
+// 音声専用WebSocket接続（チャンネルaudio）
 const wsAudioClient = ref<IWebSocketClient | null>(null);
 const wsConnected = ref(false);
 const wsAudioConnected = ref(false);
@@ -205,7 +201,7 @@ const initializeWebSocket = async (既存セッションID?: string) => {
     const wsUrl = createWebSocketUrl('/core/ws/AIコア');
     console.log('[AIコア] WebSocket接続開始:', wsUrl, 'セッションID:', 既存セッションID);
 
-    wsClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, -1);
+    wsClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, 'input');
 
     // メッセージハンドラを登録（connect()の前に登録）
     wsClient.value.on('init', (message) => {
@@ -301,7 +297,7 @@ const initializeWebSocket = async (既存セッションID?: string) => {
     セッションID.value = 取得セッションID;
     console.log('[AIコア] WebSocket接続完了 セッションID:', 取得セッションID);
 
-    // 音声専用WebSocket接続（チャンネル-2）
+    // 音声専用WebSocket接続（チャンネルaudio）
     if (!wsAudioClient.value || !wsAudioClient.value.isConnected()) {
       await initializeAudioWebSocket(取得セッションID);
     } else {
@@ -339,17 +335,17 @@ const initializeAudioWebSocket = async (既存セッションID: string) => {
   wsAudioConnected.value = false;
 
   const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-  wsAudioClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, -2);
+  wsAudioClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, 'audio');
 
   wsAudioClient.value.on('output_audio', (message) => {
-    console.log('[AIコア] 音声出力受信(-2)');
+    console.log('[AIコア] 音声出力受信(audio)');
     if (audioProcessor) {
       audioProcessor.handleAudioMessage(message);
     }
   });
 
   wsAudioClient.value.on('cancel_audio', () => {
-    console.log('[AIコア] 音声キャンセル(-2)');
+    console.log('[AIコア] 音声キャンセル(audio)');
     if (audioProcessor) {
       audioProcessor.cancelAudioOutput();
     }
@@ -357,7 +353,7 @@ const initializeAudioWebSocket = async (既存セッションID: string) => {
 
   await wsAudioClient.value.connect();
   wsAudioConnected.value = true;
-  console.log('[AIコア] 音声WebSocket接続完了(-2)');
+  console.log('[AIコア] 音声WebSocket接続完了(audio)');
 };
 
 // 音声WS接続を保証（切断時の再接続用）
@@ -386,7 +382,7 @@ const applyMicrophoneState = async (newValue: boolean, oldValue: boolean) => {
     // 音声専用WSの接続を保証
     const 音声接続OK = await ensureAudioWebSocketConnected();
     if (!音声接続OK) {
-      errorMessage.value = '音声WebSocket(-2)に接続できません。再読み込みしてください。';
+      errorMessage.value = '音声WebSocket(audio)に接続できません。再読み込みしてください。';
       enableMicrophone.value = false;
       return;
     }
@@ -408,7 +404,7 @@ const applyMicrophoneState = async (newValue: boolean, oldValue: boolean) => {
 
 // 初期化処理
 onMounted(async () => {
-  const URLのセッションID = route.query.セッションID as string;
+  const URLのセッションID = new URLSearchParams(window.location.search).get('セッションID') || '';
   console.log('[AIコア] ========================================');
   console.log('[AIコア] 初期化開始');
   console.log('[AIコア] URLからのセッションID:', URLのセッションID);
@@ -718,9 +714,9 @@ const gridLayoutClass = computed(() => {
     <div class="components-grid" :class="gridLayoutClass">
       <!-- チャット -->
       <div v-show="showChat" class="component-panel">
-        <AIコアチャット 
+        <AIコアチャット
           :セッションID="セッションID"
-          :チャンネル="0"
+          チャンネル="0"
           :chat-ai="モデル設定.CHAT_AI_NAME"
           :live-ai="モデル設定.LIVE_AI_NAME"
           :chat-mode="chatMode"
@@ -737,7 +733,7 @@ const gridLayoutClass = computed(() => {
         <AIコアコード
           key="code-1"
           :セッションID="セッションID"
-          :チャンネル="1"
+          チャンネル="1"
           :code-ai="モデル設定.CODE_AI1_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
@@ -754,7 +750,7 @@ const gridLayoutClass = computed(() => {
           :active="showImage"
           :ws-connected="wsConnected"
           :ws-client="wsClient ?? null"
-          :チャンネル="0"
+          チャンネル="0"
           @selection-cancel="handleImageSelectionCancel"
           @selection-complete="autoShowSelection = false"
           @close="handleCloseImage"
@@ -766,7 +762,7 @@ const gridLayoutClass = computed(() => {
         <AIコアコード
           key="code-2"
           :セッションID="セッションID"
-          :チャンネル="2"
+          チャンネル="2"
           :code-ai="モデル設定.CODE_AI2_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
@@ -780,7 +776,7 @@ const gridLayoutClass = computed(() => {
         <AIコアコード
           key="code-3"
           :セッションID="セッションID"
-          :チャンネル="3"
+          チャンネル="3"
           :code-ai="モデル設定.CODE_AI3_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
@@ -794,7 +790,7 @@ const gridLayoutClass = computed(() => {
         <AIコアコード
           key="code-4"
           :セッションID="セッションID"
-          :チャンネル="4"
+          チャンネル="4"
           :code-ai="モデル設定.CODE_AI4_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
