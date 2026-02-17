@@ -692,62 +692,84 @@ def main():
             print_info("Ctrl+Cで停止します")
 
             # 監視・再起動ループ (Ctrl-C待ち)
-            last_restart_attempt = {"バックエンド(core)": 0, "バックエンド(apps)": 0, "フロントエンド": 0}
+            process_crash_time = {}
 
             while True:
                 current_time = time.time()
 
+                # プロセス終了チェック
                 for name in list(processes.keys()):
                     process = processes[name]
                     if process.poll() is not None:
                         exit_code = process.returncode
                         print_warning(f"{name} が終了しました (終了コード: {exit_code})")
                         del processes[name]
+                        # 終了時刻を記録
+                        if name not in process_crash_time:
+                            process_crash_time[name] = current_time
 
+                # バックエンド(core) 自動復旧
                 if start_backend_enabled and "バックエンド(core)" not in processes:
-                    if current_time - last_restart_attempt["バックエンド(core)"] >= 15:
-                        print_info("[バックエンド(core)] 15秒後に再起動します...")
-                        time.sleep(15)
-                        print_info("[バックエンド(core)] 起動を試みます...")
+                    crash_time = process_crash_time.get("バックエンド(core)", 0)
+                    if crash_time > 0 and current_time - crash_time >= 15:
+                        print_info("[バックエンド(core)] 再起動を試みます...")
                         new_process = start_backend(BACKEND_CORE_APP, BACKEND_CORE_PORT, "バックエンド(core)")
                         if new_process:
                             processes["バックエンド(core)"] = new_process
                             thread_out = threading.Thread(target=stream_output_backend, args=("バックエンド(core)", new_process.stdout, "out", last_output_times), daemon=True)
                             thread_out.start()
                             print_success("[バックエンド(core)] 起動成功")
+                            # 復旧成功したらクラッシュ時刻をクリア
+                            process_crash_time.pop("バックエンド(core)", None)
                         else:
-                            print_error("[バックエンド(core)] 起動失敗")
-                        last_restart_attempt["バックエンド(core)"] = time.time()
+                            print_error("[バックエンド(core)] 起動失敗 - 15秒後に再試行します")
+                            process_crash_time["バックエンド(core)"] = current_time
+                    elif crash_time == 0:
+                        # 初回クラッシュ検出
+                        process_crash_time["バックエンド(core)"] = current_time
+                        print_info("[バックエンド(core)] 15秒後に再起動します...")
 
+                # バックエンド(apps) 自動復旧
                 if start_backend_enabled and "バックエンド(apps)" not in processes:
-                    if current_time - last_restart_attempt["バックエンド(apps)"] >= 15:
-                        print_info("[バックエンド(apps)] 15秒後に再起動します...")
-                        time.sleep(15)
-                        print_info("[バックエンド(apps)] 起動を試みます...")
+                    crash_time = process_crash_time.get("バックエンド(apps)", 0)
+                    if crash_time > 0 and current_time - crash_time >= 15:
+                        print_info("[バックエンド(apps)] 再起動を試みます...")
                         new_process = start_backend(BACKEND_APPS_APP, BACKEND_APPS_PORT, "バックエンド(apps)")
                         if new_process:
                             processes["バックエンド(apps)"] = new_process
                             thread_out = threading.Thread(target=stream_output_backend, args=("バックエンド(apps)", new_process.stdout, "out", last_output_times), daemon=True)
                             thread_out.start()
                             print_success("[バックエンド(apps)] 起動成功")
+                            # 復旧成功したらクラッシュ時刻をクリア
+                            process_crash_time.pop("バックエンド(apps)", None)
                         else:
-                            print_error("[バックエンド(apps)] 起動失敗")
-                        last_restart_attempt["バックエンド(apps)"] = time.time()
+                            print_error("[バックエンド(apps)] 起動失敗 - 15秒後に再試行します")
+                            process_crash_time["バックエンド(apps)"] = current_time
+                    elif crash_time == 0:
+                        # 初回クラッシュ検出
+                        process_crash_time["バックエンド(apps)"] = current_time
+                        print_info("[バックエンド(apps)] 15秒後に再起動します...")
 
+                # フロントエンド 自動復旧
                 if start_frontend_enabled and "フロントエンド" not in processes:
-                    if current_time - last_restart_attempt["フロントエンド"] >= 15:
-                        print_info("[フロントエンド] 15秒後に再起動します...")
-                        time.sleep(15)
-                        print_info("[フロントエンド] 起動を試みます...")
+                    crash_time = process_crash_time.get("フロントエンド", 0)
+                    if crash_time > 0 and current_time - crash_time >= 15:
+                        print_info("[フロントエンド] 再起動を試みます...")
                         new_process = start_frontend()
                         if new_process:
                             processes["フロントエンド"] = new_process
                             thread_out = threading.Thread(target=stream_output_frontend, args=("フロントエンド", new_process.stdout, "out", last_output_times), daemon=True)
                             thread_out.start()
                             print_success("[フロントエンド] 起動成功")
+                            # 復旧成功したらクラッシュ時刻をクリア
+                            process_crash_time.pop("フロントエンド", None)
                         else:
-                            print_error("[フロントエンド] 起動失敗")
-                        last_restart_attempt["フロントエンド"] = time.time()
+                            print_error("[フロントエンド] 起動失敗 - 15秒後に再試行します")
+                            process_crash_time["フロントエンド"] = current_time
+                    elif crash_time == 0:
+                        # 初回クラッシュ検出
+                        process_crash_time["フロントエンド"] = current_time
+                        print_info("[フロントエンド] 15秒後に再起動します...")
 
                 time.sleep(1)
 
