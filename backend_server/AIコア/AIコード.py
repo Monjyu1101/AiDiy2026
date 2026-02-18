@@ -144,7 +144,7 @@ class CodeAgent:
     def _select_ai_module(self) -> Optional[ModuleType]:
         """AI_NAMEに応じたコードモジュールを選択してインポート"""
         module_name = "AIコア.AIコード_etc"
-        if self.AI_NAME == "claude-sdk":
+        if self.AI_NAME == "claude_sdk":
             module_name = "AIコア.AIコード_claude"
         try:
             return importlib.import_module(module_name)
