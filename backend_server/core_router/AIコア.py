@@ -144,11 +144,8 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
     """コードベースパス選択肢を取得"""
     options = {}
 
-    # 常にデフォルトの AiDiy 実行ルートを絶対パスで追加（再起動後も選択肢と一致させるため絶対パスをキーに使用）
-    abs_default = プロジェクトルート.replace('\\', '/')
-    if not abs_default.endswith('/'):
-        abs_default += '/'
-    options[abs_default] = "AiDiy 実行ルート"
+    # 常にデフォルトの ../ を「AiDiy 実行ルート」として追加
+    options["../"] = "AiDiy 実行ルート"
 
     try:
         path_conf = getattr(アプリ設定, 'path', None) if アプリ設定 else None
@@ -380,16 +377,7 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
             }
 
         # ソケットのモデル設定を取得
-        現在設定 = dict(接続.モデル設定)
-        # CODE_BASE_PATH を絶対パス（末尾 / 付き）に正規化してフロントに返す（選択肢キーと一致させるため）
-        if "CODE_BASE_PATH" in 現在設定:
-            _path = 現在設定["CODE_BASE_PATH"]
-            if _path and not os.path.isabs(_path):
-                _path = os.path.abspath(os.path.join(バックエンドディレクトリ, _path))
-            _path = _path.replace('\\', '/') if _path else ''
-            if _path and not _path.endswith('/'):
-                _path += '/'
-            現在設定["CODE_BASE_PATH"] = _path
+        現在設定 = 接続.モデル設定
 
         return {
             "status": "OK",
@@ -466,18 +454,6 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
 
         # ソケットのモデル設定を更新（セッション内のみ、ファイル保存はしない）
         if 許可設定:
-            # CODE_BASE_PATHが含まれている場合は絶対パスに変換（セッション用）
-            if "CODE_BASE_PATH" in 許可設定:
-                code_base_path_raw = 許可設定["CODE_BASE_PATH"]
-                # backend_server/core_router → backend_server/ に移動
-                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                code_base_path_abs = os.path.abspath(os.path.join(backend_dir, code_base_path_raw)).replace('\\', '/')
-                # 末尾スラッシュを統一（選択肢キーと一致させるため）
-                if not code_base_path_abs.endswith('/'):
-                    code_base_path_abs += '/'
-                許可設定["CODE_BASE_PATH"] = code_base_path_abs
-                logger.info(f"CODE_BASE_PATHをセッションに設定しました: {code_base_path_abs} (元: {code_base_path_raw})")
-            
             接続.update_model_settings(許可設定, manager=AIセッション管理)
 
         # 既存プロセッサに反映（即時反映、設定変更がある場合のみ）
