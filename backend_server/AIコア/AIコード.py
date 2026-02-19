@@ -575,8 +575,8 @@ class CodeAgent:
                     サムネイル画像=None
                 )
 
-        # 検証完了メッセージ送信（強制停止でない場合）
-        if not self.強制停止フラグ:
+        # 検証完了メッセージ送信（強制停止でなく、かつ検証を実行した場合のみ）
+        if not self.強制停止フラグ and 今回更新あり:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",

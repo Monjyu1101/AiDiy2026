@@ -280,7 +280,7 @@ const handleResetReboot = async () => {
       再起動要求: { reboot_core: true, reboot_apps: true }
     });
     if (response?.data?.status === 'OK') {
-      rebootWaitSeconds.value = 45;
+      rebootWaitSeconds.value = 60;
       showRebootDialog.value = true;
     } else {
       errorMessage.value = response?.data?.message || 'リセット再起動に失敗しました';

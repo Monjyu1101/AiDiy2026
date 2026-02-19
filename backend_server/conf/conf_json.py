@@ -43,7 +43,7 @@ class conf_json:
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai',
         'CHAT_GEMINI_MODEL': 'gemini-3-pro-image-preview',
-        'CHAT_FREEAI_MODEL': 'gemini-2.5-flash-preview-09-2025',
+        'CHAT_FREEAI_MODEL': 'gemini-2.5-flash-image',
         'CHAT_OPENRT_MODEL': 'google/gemini-3-pro-image-preview',
 
         # LiveAI設定

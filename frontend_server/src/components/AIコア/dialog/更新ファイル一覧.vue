@@ -137,7 +137,7 @@ const handleResetReboot = async () => {
     });
 
     if (response?.data?.status === 'OK') {
-      rebootWaitSeconds.value = 45;
+      rebootWaitSeconds.value = 60;
       showRebootDialog.value = true;
     } else {
       alert(response?.data?.message || 'リセット再起動に失敗しました');

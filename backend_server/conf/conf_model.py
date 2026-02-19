@@ -294,7 +294,7 @@ class conf_models:
 
             current_time = datetime.datetime.now()
             filter_1year = (current_time - datetime.timedelta(days=365)).timestamp()
-            filter_6months = (current_time - datetime.timedelta(days=180)).timestamp()
+            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
             filter_3months = (current_time - datetime.timedelta(days=90)).timestamp()
 
             very_long_filter_providers = ["perplexity"]
@@ -313,7 +313,7 @@ class conf_models:
                     if created_timestamp < filter_1year:
                         continue
                 elif provider in long_filter_providers:
-                    if created_timestamp < filter_6months:
+                    if created_timestamp < filter_8months:
                         continue
                 else:
                     if created_timestamp < filter_3months:
@@ -404,7 +404,7 @@ class conf_models:
             return {}
 
     def get_openai_models(self, api_key: str, organization: str = None) -> Dict[str, Dict[str, str]]:
-        """OpenAI apiからモデル一覧を取得（6ヶ月以内のモデル）"""
+        """OpenAI apiからモデル一覧を取得（8ヶ月以内のモデル）"""
         try:
             if not api_key or api_key.startswith('<'):
                 logger.warning("OpenAI apiキーが未設定です")
@@ -420,13 +420,13 @@ class conf_models:
             result_models = {}
 
             current_time = datetime.datetime.now()
-            filter_6months = (current_time - datetime.timedelta(days=180)).timestamp()
+            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
 
             for model in models:
                 model_id = model.id
                 created_timestamp = model.created
 
-                if created_timestamp < filter_6months:
+                if created_timestamp < filter_8months:
                     continue
 
                 created_date = datetime.datetime.fromtimestamp(created_timestamp).strftime("%Y/%m/%d")
@@ -453,7 +453,7 @@ class conf_models:
 
             self.openai_models = result_models
 
-            filter_info = "全てのモデル" if not has_openrouter else "6ヶ月以内"
+            filter_info = "全てのモデル" if not has_openrouter else "8ヶ月以内"
             logger.info(f"OpenAIモデル取得完了: {len(result_models)}個のモデル（{filter_info}）")
 
             return result_models
@@ -466,7 +466,7 @@ class conf_models:
             return {}
 
     def get_claude_models(self, api_key: str) -> Dict[str, Dict[str, str]]:
-        """Anthropic Claude apiからモデル一覧を取得（6ヶ月以内のモデル）"""
+        """Anthropic Claude apiからモデル一覧を取得（8ヶ月以内のモデル）"""
         try:
             if not api_key or api_key.startswith('<'):
                 logger.warning("Claude apiキーが未設定です")
@@ -479,7 +479,7 @@ class conf_models:
             result_models = {}
 
             current_time = datetime.datetime.now()
-            filter_6months = (current_time - datetime.timedelta(days=180)).timestamp()
+            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
 
             for model in models.data:
                 model_id = model.id
@@ -498,7 +498,7 @@ class conf_models:
                 except Exception as e:
                     logger.debug(f"日付変換エラー ({model_id}): {e}")
 
-                if created_timestamp is not None and created_timestamp < filter_6months:
+                if created_timestamp is not None and created_timestamp < filter_8months:
                     continue
 
                 result_models[model_id] = {
@@ -529,7 +529,7 @@ class conf_models:
 
             self.claude_models = result_models
 
-            filter_info = "全てのモデル" if not has_openrouter else "6ヶ月以内"
+            filter_info = "全てのモデル" if not has_openrouter else "8ヶ月以内"
             logger.info(f"Claudeモデル取得完了: {len(result_models)}個のモデル（{filter_info}）")
 
             return result_models
