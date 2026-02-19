@@ -533,7 +533,7 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": f"【{n}回目の検証】\n差分ファイル{len(差分ファイル)}件:\n{ファイル一覧}",
+                "メッセージ内容": f"\n【検証開始】({n}回目)\n",
                 "ファイル名": None,
                 "サムネイル画像": None
             })
@@ -574,6 +574,16 @@ class CodeAgent:
                     ファイル名=None,
                     サムネイル画像=None
                 )
+
+        # 検証完了メッセージ送信（強制停止でない場合）
+        if not self.強制停止フラグ:
+            await self.接続.send_to_channel(self.チャンネル, {
+                "セッションID": self.セッションID,
+                "メッセージ識別": "output_text",
+                "メッセージ内容": "\n【検証完了】\n",
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
 
         return 今回更新あり
 

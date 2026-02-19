@@ -140,23 +140,24 @@ class CodeAgentRequestTool(ToolInterface):
                 return f"エラー: エージェント{チャンネル}が未初期化です"
             
             エージェント = code_agents[チャンネル - 1]
+            チャンネルStr = str(チャンネル)  # sockets辞書は文字列キー
             
             # 1) フロントエンドへ送信（表示用）
             要求データ = {
                 "セッションID": self.セッション.セッションID,
                 "メッセージ識別": "input_request",
                 "メッセージ内容": 要求内容,
-                "チャンネル": チャンネル,
+                "チャンネル": チャンネルStr,
                 "ファイル名": None,
                 "サムネイル画像": None
             }
-            await self.セッション.send_to_channel(チャンネル, 要求データ)
+            await self.セッション.send_to_channel(チャンネルStr, 要求データ)
             
             # 2) 会話履歴保存
             if hasattr(エージェント, "保存関数") and エージェント.保存関数:
                 エージェント.保存関数(
                     セッションID=self.セッション.セッションID,
-                    チャンネル=チャンネル,
+                    チャンネル=チャンネルStr,
                     メッセージ識別="input_request",
                     メッセージ内容=要求内容,
                     ファイル名=None,
