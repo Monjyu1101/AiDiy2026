@@ -208,6 +208,10 @@
 - マイグレーションツール不使用
 - SQLAlchemyモデル更新 + データベースリセットで対応
 - シンプルで迅速な開発サイクル
+- **テーブル追加・項目追加時は既存DBへの `ALTER TABLE` 適用が必須**
+  （既存データが残っている場合、モデルとDBのスキーマが乖離してサーバー起動エラーになる）
+- **機能削除時は不要テーブルを `DROP TABLE` で削除すること**
+- 詳細な手順・サンプルコード → **[backend_server/AGENTS.md](./backend_server/AGENTS.md)** の「テーブルスキーマ変更時の必須対応」参照
 
 ### 8. AI統合システム (AIコア)
 
@@ -560,8 +564,10 @@ No automated test suites are configured. Testing is done manually:
 
 **No Alembic Migrations:**
 - This project does NOT use Alembic migrations
-- Schema changes are managed through SQLAlchemy model updates and database resets
-- The `samplePY/` implementation uses Alembic if migrations are needed
+- Schema changes: SQLAlchemy model update + **ALTER TABLE** for existing DB (or full DB reset)
+- **カラム追加・テーブル追加時**: `PRAGMA table_info` で確認 → `ALTER TABLE ADD COLUMN` を `init.py` に組み込む
+- **機能削除時**: 不要テーブルを `DROP TABLE IF EXISTS` で削除する
+- **詳細手順** → [backend_server/AGENTS.md](./backend_server/AGENTS.md) 「テーブルスキーマ変更時の必須対応」
 
 **Database VIEWs:**
 - VIEWs are not created as database objects in this implementation

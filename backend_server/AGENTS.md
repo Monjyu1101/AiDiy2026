@@ -158,6 +158,118 @@
   2. `_data/AiDiy/database.db` を削除
   3. サーバー再起動（テーブル自動作成 + 初期データ投入）
 
+### テーブルスキーマ変更時の必須対応（重要）
+
+テーブル追加・項目追加などスキーマを変更した場合、**既存のデータベースファイルには古いスキーマが残っている**可能性があります。
+以下の対応を **必ず** 実施してください。
+
+#### SQLite の ALTER TABLE 制約（重要）
+
+SQLite の `ALTER TABLE` は以下の操作**のみ**サポートしています：
+
+| 操作 | 可否 |
+|------|------|
+| `ADD COLUMN` カラム追加 | ✅ 可能 |
+| `RENAME TABLE` テーブル名変更 | ✅ 可能 |
+| `RENAME COLUMN` カラム名変更 | ✅ 可能 |
+| カラム削除 | ❌ 直接不可（テーブル再作成が必要） |
+| カラムの型・制約変更 | ❌ 直接不可（テーブル再作成が必要） |
+
+#### 1. カラム追加・テーブル追加時（ALTER TABLE ADD COLUMN）
+
+既存データベースを調べ、テーブルやカラムが存在しない場合は `ALTER TABLE` で追加してください。
+サーバー起動時（`on_event("startup")`）に自動適用されるよう、`init.py` などに組み込むのが推奨です。
+
+```python
+# 例: M得意先 に 得意先略称 を追加する場合（apps_crud/init.py に追記）
+from sqlalchemy import text
+
+def apply_schema_migrations(db: Session):
+    """既存DBへのスキーマ変更を適用する（起動時に自動実行）"""
+    # カラムの存在確認
+    result = db.execute(text("PRAGMA table_info(M得意先)")).fetchall()
+    existing_columns = [row[1] for row in result]
+
+    # カラムが存在しない場合のみ追加（冪等性を保つ）
+    if "得意先略称" not in existing_columns:
+        db.execute(text("ALTER TABLE M得意先 ADD COLUMN 得意先略称 TEXT"))
+        db.commit()
+```
+
+**手順:**
+1. `PRAGMA table_info(<テーブル名>)` で既存カラム一覧を確認
+2. 想定カラムが存在しない場合のみ `ALTER TABLE ... ADD COLUMN` を実行（冪等性を保つ）
+3. `apps_crud/init.py` または `core_crud/init.py` の起動処理（`init_db_data`）に組み込む
+
+> **過去事例（M得意先）:** `得意先略称` カラムをモデルに追加したが既存DBに未反映のため起動エラー。
+> `apply_schema_migrations` で `ALTER TABLE` を実行して解決。同様の事象は**どのマスタ追加時も発生しうる**。
+
+#### 2. カラム削除・型変更時（テーブル再作成パターン）
+
+カラム削除や型変更が必要な場合は、**テーブル再作成**が必要です。
+
+```python
+# 例: テーブル再作成（カラム削除・型変更時）
+def recreate_table_without_old_column(db: Session):
+    db.execute(text("""
+        CREATE TABLE M得意先_new (
+            得意先ID TEXT PRIMARY KEY,
+            得意先名 TEXT NOT NULL,
+            得意先略称 TEXT,
+            -- ... 必要なカラムのみ定義
+            登録日時 TEXT, 登録利用者ID TEXT, 登録利用者名 TEXT, 登録端末ID TEXT,
+            更新日時 TEXT, 更新利用者ID TEXT, 更新利用者名 TEXT, 更新端末ID TEXT
+        )
+    """))
+    db.execute(text("""
+        INSERT INTO M得意先_new SELECT 得意先ID, 得意先名, 得意先略称, ...
+        FROM M得意先
+    """))
+    db.execute(text("DROP TABLE M得意先"))
+    db.execute(text("ALTER TABLE M得意先_new RENAME TO M得意先"))
+    db.commit()
+```
+
+#### 3. 機能削除時（DROP TABLE）
+
+機能削除により不要になったテーブルは、既存データベースに残り続けます。
+不要テーブルは **必ず削除** してください。
+
+```python
+# 例: 不要になった T旧テーブル を削除する場合
+def drop_obsolete_tables(db: Session):
+    """不要になったテーブルを削除する"""
+    db.execute(text("DROP TABLE IF EXISTS T旧テーブル"))
+    db.commit()
+```
+
+**手順:**
+1. 削除対象テーブルに関連する Model / CRUD / Router / Schema / `__init__.py` の登録をすべて削除
+2. `apps_main.py` または `core_main.py` の `create_all` 対象からも除外
+3. `DROP TABLE IF EXISTS` で既存DBのテーブルを削除（起動時処理に組み込む）
+
+#### 4. 確認コマンド（SQLite）
+
+```bash
+# 現在のテーブル一覧を確認
+sqlite3 backend_server/_data/AiDiy/database.db ".tables"
+
+# テーブルのカラム構成を確認
+sqlite3 backend_server/_data/AiDiy/database.db "PRAGMA table_info(テーブル名);"
+```
+
+#### 5. チェックリスト（テーブル構造変更時）
+
+- [ ] `apps_models/` または `core_models/` のモデルを変更した
+- [ ] 変更内容（追加/削除/リネーム）を確認した
+- [ ] カラム追加 → `ALTER TABLE ADD COLUMN` を `init.py` に追加した
+- [ ] カラム削除・型変更 → テーブル再作成スクリプトを `init.py` に追加した
+- [ ] 不要テーブル → `DROP TABLE IF EXISTS` を `init.py` に追加した
+- [ ] `apps_crud/` または `core_crud/` の CRUD 関数を更新した
+- [ ] `apps_schema/` または `core_schema/` の Pydantic スキーマを更新した
+- [ ] `apps_crud/__init__.py` または `core_crud/__init__.py` を確認した
+- [ ] バックエンドを再起動してエラーがないことを確認した
+
 ## バックエンド構成 (backend_server/)
 
 ### Core Files（エントリーポイントと共通モジュール）
