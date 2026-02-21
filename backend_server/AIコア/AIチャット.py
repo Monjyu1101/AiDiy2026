@@ -194,9 +194,7 @@ class Chat:
                 await self.接続.send_to_channel(self.チャンネル, {
                     "セッションID": self.セッションID,
                     "メッセージ識別": "output_text",
-                    "メッセージ内容": "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。",
-                    "ファイル名": None,
-                    "サムネイル画像": None
+                    "メッセージ内容": "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
                 })
             return
         await self.チャット処理Ｑ.put(受信データ)
@@ -303,9 +301,7 @@ class Chat:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": 出力メッセージ内容,
-                "ファイル名": None,
-                "サムネイル画像": None
+                "メッセージ内容": 出力メッセージ内容
             })
 
             # 2) 会話履歴保存（テキスト）

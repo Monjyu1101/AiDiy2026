@@ -1,4 +1,4 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -39,6 +39,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - No pytest or vitest configured
 - Test manually via Swagger UI (`:8091/docs`, `:8092/docs`) and browser
 
+**No Alembic Migrations:**
+- Schema changes require `ALTER TABLE` in `init.py` for existing DBs (see Schema Changes section)
+- Or full DB reset: stop servers → delete `database.db` → restart
+
 ---
 
 ## Quick Commands
@@ -78,6 +82,10 @@ echo. > backend_server/temp/reboot_apps.txt   # apps_main
 
 # Database reset (delete and restart servers to recreate)
 del backend_server\_data\AiDiy\database.db
+
+# Inspect database
+sqlite3 backend_server/_data/AiDiy/database.db ".tables"
+sqlite3 backend_server/_data/AiDiy/database.db "PRAGMA table_info(テーブル名);"
 ```
 
 ## Access URLs
@@ -88,7 +96,7 @@ del backend_server\_data\AiDiy\database.db
 | API Docs (Core) | http://localhost:8091/docs |
 | API Docs (Apps) | http://localhost:8092/docs |
 
-**Default login:** `admin` / `********`
+**Default login:** `admin` / `********` (also: `leader`/`secret`, `user`/`user`, `guest`/`guest`)
 
 ---
 
@@ -102,11 +110,13 @@ AiDiy2026/
 │   ├── core_models/, apps_models/  # SQLAlchemy ORM models
 │   ├── core_crud/, apps_crud/      # Database operations
 │   ├── core_router/, apps_router/ # API endpoints
-│   ├── core_schema.py      # Core Pydantic models
-│   ├── apps_schema.py      # Apps Pydantic models
+│   ├── core_schema.py, apps_schema.py  # Pydantic models
 │   ├── database.py         # SQLite config (shared by both servers)
-│   ├── auth.py, deps.py    # JWT authentication
-│   └── _data/AiDiy/database.db  # SQLite database
+│   ├── auth.py, deps.py    # JWT authentication (HS256, 60min expiry)
+│   ├── log_config.py       # Logging (daily files: temp/logs/yyyyMMdd.AiDiy.log)
+│   ├── conf/               # ConfigManager singleton (reads _config/AiDiy_key.json)
+│   ├── AIコア/             # AI integration modules (WebSocket, streaming, audio)
+│   └── _data/AiDiy/database.db  # SQLite database (shared by both servers)
 │
 ├── frontend_server/         # Vue 3 + Vite + TypeScript + Pinia
 │   ├── src/
@@ -116,13 +126,15 @@ AiDiy2026/
 │   │   │   ├── Tトラン/    # T系 (Transaction) screens
 │   │   │   ├── Sスケジューラー/  # S系 (Scheduler) screens
 │   │   │   ├── Vビュー/    # V系 (View) screens
-│   │   │   ├── AIコア/    # AI interface
-│   │   │   ├── Xテスト/    # Experimental features (Xテトリス, Xインベーダー, Xリバーシ)
+│   │   │   ├── AIコア/    # AI interface (WebSocket, multi-panel)
+│   │   │   ├── Xテスト/    # Experimental features
 │   │   │   └── _share/     # Shared components (qTubler, dialogs)
-│   │   ├── stores/auth.ts  # Pinia auth store
+│   │   ├── stores/auth.ts  # Pinia auth store (JWT in localStorage)
 │   │   ├── api/client.ts   # Axios with JWT interceptors
+│   │   ├── api/websocket.ts # WebSocket client (AIコア)
+│   │   ├── types/          # TypeScript types (api.ts, entities.ts, qTubler.ts)
 │   │   └── router/         # Vue Router (Japanese URLs)
-│   └── vite.config.ts      # Proxy: /core→8091, /apps→8092
+│   └── vite.config.ts      # Proxy: /core→8091, /apps→8092, port 8090
 ```
 
 **Table Naming Convention:**
@@ -132,7 +144,7 @@ AiDiy2026/
 - `V` = View endpoints (raw SQL, not DB views)
 - `S` = Scheduler/Special (S配車_週表示, S配車_日表示)
 - `A` = AI/Advanced (AIコア, A会話履歴)
-- `X` = Experimental/Test features (Xテトリス, Xインベーダー, Xリバーシ)
+- `X` = Experimental/Test features
 
 ---
 
@@ -141,10 +153,30 @@ AiDiy2026/
 **Backend - Adding a new table (C系/A系 in core_main):**
 1. Create model in `core_models/<テーブル名>.py`
 2. Export in `core_models/__init__.py`
-3. Add Pydantic schemas to `core_schema.py` or `apps_schema.py`
+3. Add Pydantic schemas to `core_schema.py`
 4. Create CRUD in `core_crud/<テーブル名>.py`
-5. Create router in `core_router/<テーブル名>.py`
-6. Register in `core_main.py` with `include_router` and `create_all`
+5. **Export in `core_crud/__init__.py` (easy to forget — causes AttributeError if missed)**
+6. Create router in `core_router/<テーブル名>.py`
+7. Register in `core_main.py` with `include_router` and `create_all`
+
+**Backend - Adding a new table (M系/T系 in apps_main):**
+- Same as above, but use `apps_models/`, `apps_crud/`, `apps_router/`, `apps_main.py`
+- **Also create a V系 router** (`apps_router/V<テーブル名>.py`) — frontend list screens use V系 endpoints, not M系 directly
+- Register both M系 and V系 routers in `apps_main.py`
+
+**Backend - Schema changes (ALTER TABLE for existing DB):**
+```python
+# In apps_crud/init.py (or core_crud/init.py) — runs at startup
+from sqlalchemy import text
+
+def apply_schema_migrations(db: Session):
+    result = db.execute(text("PRAGMA table_info(テーブル名)")).fetchall()
+    existing_columns = [row[1] for row in result]
+    if "新カラム名" not in existing_columns:
+        db.execute(text("ALTER TABLE テーブル名 ADD COLUMN 新カラム名 TEXT"))
+        db.commit()
+```
+SQLite only supports `ADD COLUMN` / `RENAME` via ALTER TABLE. Column deletion requires table recreation.
 
 **Backend - Authenticated endpoints (dependency injection):**
 ```python
@@ -153,7 +185,7 @@ from core_models import C利用者
 
 @router.post("/一覧")
 def list_items(db: Session = Depends(get_db), 現在利用者: C利用者 = Depends(get_現在利用者)):
-    # 現在利用者 contains the JWT-authenticated user
+    pass
 ```
 
 **Backend - Audit fields (required on all tables):**
@@ -161,6 +193,7 @@ def list_items(db: Session = Depends(get_db), 現在利用者: C利用者 = Depe
 from core_crud.utils import create_audit_fields, update_audit_fields
 
 # Create
+認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
 監査項目 = create_audit_fields(認証情報)
 db.add(Model(..., **監査項目))
 
@@ -170,10 +203,15 @@ for key, value in 監査項目.items():
     setattr(record, key, value)
 ```
 
+**Backend - AI API keys:**
+- Store in `backend_server/_config/AiDiy_key.json` (auto-created with defaults if missing)
+- Keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`
+- Access via `request.app.conf.json.get("KEY_NAME")`
+
 **Frontend - CRUD screen structure:**
 ```
 components/<カテゴリ>/<テーブル名>/
-├── <テーブル名>一覧.vue           # List page
+├── <テーブル名>一覧.vue           # List page (calls V系 API)
 ├── <テーブル名>編集.vue           # Edit/Create page
 └── components/
     └── <テーブル名>一覧テーブル.vue  # qTubler wrapper
@@ -188,6 +226,17 @@ if (response.data.status === 'OK') {
 }
 ```
 
+**Frontend - Dialogs:**
+```typescript
+import { qAlert, qConfirm } from '@/utils/qAlert'
+await qAlert('保存しました')
+const ok = await qConfirm('削除しますか？')
+```
+
+**Frontend - TypeScript note:**
+- Strict mode is **disabled** (`strict: false`) — intentional for development speed
+- Type definitions in `src/types/` (api.ts, entities.ts, qTubler.ts, store.ts)
+
 ---
 
 ## Documentation Index
@@ -199,19 +248,13 @@ if (response.data.status === 'OK') {
 | [backend_server/AGENTS.md](./backend_server/AGENTS.md) | Backend implementation details |
 | [frontend_server/AGENTS.md](./frontend_server/AGENTS.md) | Frontend implementation details |
 
-**HTML Docs (docs/ folder):**
+**HTML Docs (docs/開発ガイド/ folder):**
 | Folder | Purpose |
 |--------|---------|
-| [00_AiDiyシステムの歩き方](./docs/00_AiDiyシステムの歩き方/_index.html) | System overview, start guide, FAQ |
-| [01_バックエンド_M配車区分実装例](./docs/01_明日のために！その１_バックエンド_M配車区分実装例/_index.html) | Backend implementation example |
-| [02_バックエンド_M配車区分テスト例](./docs/02_明日のために！その２_バックエンド_M配車区分テスト例/_index.html) | Backend testing example |
-| [03_コーディングルール](./docs/03_コーディングルール/_index.html) | Coding rules, naming, best practices |
-| [04_フロントエンド画面追加例](./docs/04_フロントエンド画面追加例/_index.html) | Frontend CRUD screen guide |
-
-**For detailed procedures, see:**
-- Backend patterns: [backend_server/AGENTS.md](./backend_server/AGENTS.md)
-- Frontend patterns: [frontend_server/AGENTS.md](./frontend_server/AGENTS.md)
-- Coding rules: [docs/03_コーディングルール](./docs/03_コーディングルール/_index.html)
-- New frontend screen: [docs/04_フロントエンド画面追加例](./docs/04_フロントエンド画面追加例/_index.html)
-- Troubleshooting: [AGENTS.md](./AGENTS.md) - "Common Issues"
-
+| [00_このプロジェクトの歩き方](./docs/開発ガイド/00_このプロジェクトの歩き方/_index.html) | System overview, FAQ |
+| [01_環境構築ハンズオン](./docs/開発ガイド/01_明日のために！その１_環境構築ハンズオン/_index.html) | Environment setup |
+| [02_設計](./docs/開発ガイド/02_明日のために！その２_設計/_index.html) | Design policy |
+| [03_バックエンド開発](./docs/開発ガイド/03_明日のために！その３_バックエンド開発/_index.html) | Backend API implementation |
+| [04_フロントエンド開発](./docs/開発ガイド/04_明日のために！その４_フロントエンド開発/_index.html) | Frontend CRUD screen guide |
+| [11_コーディングルール](./docs/開発ガイド/11_コーディングルール/_index.html) | Coding rules, naming, best practices **(必読)** |
+| [12_フロントエンド画面追加例](./docs/開発ガイド/12_フロントエンド画面追加例/_index.html) | Frontend screen addition example |

@@ -367,9 +367,7 @@ class Live:
             await self.接続.send_to_channel("0", {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": text,
-                "ファイル名": None,
-                "サムネイル画像": None
+                "メッセージ内容": text
             })
             return True
         except Exception as e:
@@ -467,9 +465,7 @@ class Live:
                         await self.接続.send_to_channel("0", {
                             "セッションID": self.セッションID,
                             "メッセージ識別": "output_text",
-                            "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",
-                            "ファイル名": None,
-                            "サムネイル画像": None
+                            "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。"
                         })
                 return result
             else:
@@ -479,9 +475,7 @@ class Live:
                     await self.接続.send_to_channel("0", {
                         "セッションID": self.セッションID,
                         "メッセージ識別": "output_text",
-                        "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。",
-                        "ファイル名": None,
-                        "サムネイル画像": None
+                        "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。"
                     })
                 return False
         except Exception as e:

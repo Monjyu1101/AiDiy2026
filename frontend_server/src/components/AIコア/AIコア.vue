@@ -611,7 +611,7 @@ const gridLayoutClass = computed(() => {
   <!-- WebSocket接続状態インジケーター（fixedレイヤー） -->
   <div class="ws-status" :class="{ connected: wsConnected }">
     <span class="ws-status-dot"></span>
-    <span class="ws-status-text">{{ wsConnected ? 'WS接続中' : 'WS切断' }}</span>
+    <span class="ws-status-text">{{ wsConnected ? '接続中' : '切断中' }}</span>
   </div>
 
   <!-- 音声ビジュアライザー（fixedレイヤー） -->
@@ -750,7 +750,7 @@ const gridLayoutClass = computed(() => {
           :active="showImage"
           :ws-connected="wsConnected"
           :ws-client="wsClient ?? null"
-          チャンネル="0"
+          チャンネル="input"
           @selection-cancel="handleImageSelectionCancel"
           @selection-complete="autoShowSelection = false"
           @close="handleCloseImage"
@@ -816,16 +816,27 @@ const gridLayoutClass = computed(() => {
   overflow-x: hidden;
 }
 
+/* 固定UI要素の位置・サイズの共通変数 */
+.ws-status,
+.audio-visualizer-overlay,
+.floating-controls {
+  --ws-top: 112px;
+  --ws-right: 20px;
+  --ws-height: 27px;
+  --status-block-gap: 6px;
+  --visualizer-height: 27px;
+}
+
 /* WebSocket接続状態インジケーター（マイクボタンの真上） */
 .ws-status {
   position: fixed;
-  top: 112px;
-  right: 20px;
+  top: var(--ws-top);
+  right: var(--ws-right);
   background: rgba(50, 50, 50, 0.9);
   border: 2px solid #ff4444;
   border-radius: 4px;
   padding: 0 12px;
-  height: 27px;
+  height: var(--ws-height);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -920,8 +931,8 @@ const gridLayoutClass = computed(() => {
 /* 音声・画像制御フローティングアイコン */
 .floating-controls {
   position: fixed;
-  top: 150px;
-  right: 20px; /* 元に戻す */
+  top: calc(var(--ws-top) + var(--ws-height) + var(--visualizer-height) + (var(--status-block-gap) * 2));
+  right: var(--ws-right);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1221,19 +1232,19 @@ const gridLayoutClass = computed(() => {
   }
 }
 
-/* 音声ビジュアライザー（WS接続中インジケーターの左側） */
+/* 音声ビジュアライザー（WS接続中インジケーターの直下） */
 .audio-visualizer-overlay {
   position: fixed;
-  top: 112px;
-  right: 160px;
+  top: calc(var(--ws-top) + var(--ws-height) + var(--status-block-gap));
+  right: var(--ws-right);
   width: 170px;
-  height: 27px;
+  height: var(--visualizer-height);
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 4px;
   overflow: visible;
   z-index: 999;
-  display: flex; /* デバッグ用: 常に表示 */
+  display: none;
   align-items: flex-end;
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -1368,6 +1379,13 @@ const gridLayoutClass = computed(() => {
 }
 
 @media (max-width: 900px) {
+  .ws-status,
+  .audio-visualizer-overlay,
+  .floating-controls {
+    --ws-height: 24px;
+    --status-block-gap: 4px;
+  }
+
   .layout-double,
   .layout-triple,
   .layout-quad,
@@ -1383,13 +1401,11 @@ const gridLayoutClass = computed(() => {
   /* 小さい画面ではビジュアライザーとWS状態を小さく */
   .audio-visualizer-overlay {
     width: 120px;
-    right: 110px;
   }
 
   .ws-status {
     font-size: 9px;
     padding: 0 8px;
-    height: 24px;
   }
 
   .floating-controls {
@@ -1429,16 +1445,8 @@ const gridLayoutClass = computed(() => {
 
   /* 固定要素は常に表示 */
   .ws-status,
-  .audio-visualizer-overlay,
   .floating-controls {
     display: flex !important;
-  }
-
-  /* ビジュアライザーを画面中央に配置 */
-  .audio-visualizer-overlay {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
   }
 }
 

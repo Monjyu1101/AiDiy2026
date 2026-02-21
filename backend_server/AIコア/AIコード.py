@@ -294,9 +294,7 @@ class CodeAgent:
                     "セッションID": self.セッションID,
                     "チャンネル": "input",
                     "メッセージ識別": "input_text",
-                    "メッセージ内容": 開始メッセージ,
-                    "ファイル名": None,
-                    "サムネイル画像": None
+                    "メッセージ内容": 開始メッセージ
                 })
             except Exception as e:
                 logger.warning(f"[CodeAgent] inputチャンネルへの開始メッセージ送信エラー: {e}")
@@ -347,9 +345,7 @@ class CodeAgent:
                     "セッションID": self.セッションID,
                     "チャンネル": "input",
                     "メッセージ識別": "input_text",
-                    "メッセージ内容": 完了メッセージ,
-                    "ファイル名": None,
-                    "サムネイル画像": None
+                    "メッセージ内容": 完了メッセージ
                 })
             except Exception as e:
                 logger.warning(f"[CodeAgent] inputチャンネルへの完了メッセージ送信エラー: {e}")
@@ -436,9 +432,7 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": 出力メッセージ内容,
-                "ファイル名": None,
-                "サムネイル画像": None
+                "メッセージ内容": 出力メッセージ内容
             })
 
             # 会話履歴保存（自チャンネル）
@@ -533,9 +527,7 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": f"\n【検証開始】({n}回目)\n",
-                "ファイル名": None,
-                "サムネイル画像": None
+                "メッセージ内容": f"\n【検証開始】({n}回目)\n"
             })
             
             # 検証プロンプト
@@ -559,9 +551,7 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": 検証結果,
-                "ファイル名": None,
-                "サムネイル画像": None
+                "メッセージ内容": 検証結果
             })
             
             # 会話履歴保存
@@ -580,9 +570,7 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": "\n【検証完了】\n",
-                "ファイル名": None,
-                "サムネイル画像": None
+                "メッセージ内容": "\n【検証完了】\n"
             })
 
         return 今回更新あり

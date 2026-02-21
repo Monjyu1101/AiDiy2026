@@ -847,10 +847,22 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     if ソケット番号 != "input":
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
-                    ファイル名 = 受信データ.get("ファイル名") or ""
+                    送信モード = str(受信データ.get("送信モード", ""))
                     チャンネル = str(受信データ.get("チャンネル", "0"))
-                    出力先チャンネル = str(受信データ.get("出力先チャンネル", チャンネル))
-                    logger.debug(f"テキスト受信 (チャンネル={チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
+                    # チャンネルでルーティング先を決定
+                    # "1"-"4": AIコード.vue（コードエージェント）
+                    # "input": AIイメージ.vue（ライブ）
+                    # "0": AIチャット.vue → 送信モードで判断
+                    if チャンネル in ("1", "2", "3", "4"):
+                        出力先チャンネル = チャンネル
+                    elif チャンネル == "input":
+                        出力先チャンネル = "0"  # エコーバック先はch0
+                    elif 送信モード.startswith("Code") and 送信モード[4:].isdigit():
+                        出力先チャンネル = 送信モード[4:]
+                    else:
+                        出力先チャンネル = "0"
+                    入力フィードバック対象 = チャンネル in ("0", "1", "2", "3", "4")
+                    logger.debug(f"テキスト受信 (チャンネル={チャンネル}, 送信モード={送信モード}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     if セッション.is_channel_processing(出力先チャンネル):
                         await セッション.send_to_channel(出力先チャンネル, {
@@ -900,52 +912,57 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             エコーバック用メッセージ = f"{メッセージ内容}\n[ファイル添付: {相対パス}]"
                             logger.info(f"画像自動添付通知追加: {相対パス}")
 
-                    await セッション.send_to_channel(出力先チャンネル, {
-                        "セッションID": セッションID,
-                        "チャンネル": 出力先チャンネル,
-                        "メッセージ識別": "input_text",
-                        "メッセージ内容": エコーバック用メッセージ,
-                        "ファイル名": None,
-                        "サムネイル画像": None
-                    })
+                    # 入力フィードバックはチャンネル0/1/2/3/4のみ表示する。
+                    # チャンネルinput（AIイメージ）からのinput_textはLiveAIへ送るが、チャットへの入力エコーは出さない。
+                    if 入力フィードバック対象:
+                        フィードバック表示チャンネル一覧 = [出力先チャンネル]
+                        # AIチャット.vue（ch0）からCode1-4へ送信した場合は、
+                        # 実行先ch1-4に加えてチャット画面(ch0)にも入力フィードバックを表示する。
+                        if チャンネル == "0" and 出力先チャンネル in ("1", "2", "3", "4"):
+                            フィードバック表示チャンネル一覧.append("0")
 
-                    保存_会話履歴(
-                        セッションID=セッションID,
-                        チャンネル=出力先チャンネル,
-                        メッセージ識別="input_text",
-                        メッセージ内容=エコーバック用メッセージ,
-                        ファイル名=None,
-                        サムネイル画像=None
-                    )
+                        for フィードバック表示チャンネル in dict.fromkeys(フィードバック表示チャンネル一覧):
+                            await セッション.send_to_channel(フィードバック表示チャンネル, {
+                                "セッションID": セッションID,
+                                "チャンネル": フィードバック表示チャンネル,
+                                "メッセージ識別": "input_text",
+                                "メッセージ内容": エコーバック用メッセージ,
+                                "ファイル名": None,
+                                "サムネイル画像": None
+                            })
+
+                            保存_会話履歴(
+                                セッションID=セッションID,
+                                チャンネル=フィードバック表示チャンネル,
+                                メッセージ識別="input_text",
+                                メッセージ内容=エコーバック用メッセージ,
+                                ファイル名=None,
+                                サムネイル画像=None
+                            )
 
                     受信データ["チャンネル"] = 出力先チャンネル
 
                     try:
-                        if 出力先チャンネル == "0":
-                            ファイル名_判定 = ファイル名.lower() if isinstance(ファイル名, str) else ""
-                            logger.info(
-                                f"input_text分岐判定: socket={セッションID} channel=0 "
-                                f"file='{ファイル名}' live={'live' in ファイル名_判定}"
-                            )
-                            if "code" in ファイル名_判定:
-                                logger.info(f"input_text: codeモードのためチャット/ライブ処理をスキップ ({セッションID})")
-                                continue
-                            if "live" in ファイル名_判定:
-                                if hasattr(セッション, "live_processor") and セッション.live_processor:
-                                    logger.info(f"LiveAIテキスト送信開始: socket={セッションID}")
-                                    送信成功 = await セッション.live_processor.テキスト送信(メッセージ内容)
-                                    if 送信成功:
-                                        logger.info(f"LiveAIテキスト送信完了: socket={セッションID}")
-                                    else:
-                                        logger.warning(f"LiveAIテキスト送信失敗: socket={セッションID}")
-                                else:
-                                    logger.warning(f"LiveAI未初期化のためChatへフォールバック ({セッションID})")
-                                    if hasattr(セッション, "chat_processor"):
-                                        await セッション.chat_processor.チャット要求(受信データ)
-                            elif hasattr(セッション, "chat_processor"):
-                                await セッション.chat_processor.チャット要求(受信データ)
-                        elif 出力先チャンネル in ("1", "2", "3", "4") and hasattr(セッション, 'code_agent_processors'):
+                        if 出力先チャンネル in ("1", "2", "3", "4") and hasattr(セッション, 'code_agent_processors'):
+                            # コードエージェント（AIコード.vue: チャンネル1-4 / AIチャット.vue: 送信モードCode1-4）
                             await セッション.code_agent_processors[int(出力先チャンネル) - 1].コード要求(受信データ)
+                        elif チャンネル == "input" or 送信モード == "Live":
+                            # ライブAI（AIイメージ.vue: チャンネルinput / AIチャット.vue: 送信モードLive）
+                            logger.info(f"input_text: LiveAIへルーティング (チャンネル={チャンネル}, 送信モード={送信モード}) socket={セッションID}")
+                            if hasattr(セッション, "live_processor") and セッション.live_processor:
+                                送信成功 = await セッション.live_processor.テキスト送信(メッセージ内容)
+                                if 送信成功:
+                                    logger.info(f"LiveAIテキスト送信完了: socket={セッションID}")
+                                else:
+                                    logger.warning(f"LiveAIテキスト送信失敗: socket={セッションID}")
+                            else:
+                                logger.warning(f"LiveAI未初期化のためChatへフォールバック ({セッションID})")
+                                if hasattr(セッション, "chat_processor"):
+                                    await セッション.chat_processor.チャット要求(受信データ)
+                        else:
+                            # チャットAI（AIチャット.vue: 送信モードChat）
+                            if hasattr(セッション, "chat_processor"):
+                                await セッション.chat_processor.チャット要求(受信データ)
                     finally:
                         セッション.set_channel_processing(出力先チャンネル, False)
 
@@ -953,9 +970,14 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     if ソケット番号 != "input":
                         continue
                     メッセージ内容 = 受信データ.get("メッセージ内容") or 受信データ.get("text", "")
+                    送信モード = str(受信データ.get("送信モード", ""))
                     チャンネル = str(受信データ.get("チャンネル", "1"))
-                    出力先チャンネル = str(受信データ.get("出力先チャンネル", チャンネル))
-                    logger.debug(f"リクエスト受信 (チャンネル={チャンネル}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
+                    # 送信モードからルーティングチャンネルを決定（後方互換: 出力先チャンネルも参照）
+                    if 送信モード.startswith("Code") and 送信モード[4:].isdigit():
+                        出力先チャンネル = 送信モード[4:]
+                    else:
+                        出力先チャンネル = str(受信データ.get("出力先チャンネル", チャンネル))
+                    logger.debug(f"リクエスト受信 (送信モード={送信モード}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     # input_requestはコードエージェント専用（チャンネル1-4のみ）
                     if 出力先チャンネル not in ("1", "2", "3", "4"):

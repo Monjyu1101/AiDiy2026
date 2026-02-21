@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import type { IWebSocketClient } from '@/api/websocket';
 
 const プロパティ = defineProps<{
@@ -52,10 +52,144 @@ const ファイル画像タイマー = ref<number | null>(null);
 const 選択画像 = ref<HTMLImageElement | null>(null);
 const ファイル画像モード = ref(false);
 
+// テキスト入力関連
+const 入力テキスト = ref('');
+const テキストエリア = ref<HTMLTextAreaElement | null>(null);
+const テキスト送信中 = ref(false);
+const ドラッグ中 = ref(false);
+const 入力欄最大到達 = ref(false);
+const 入力欄最小高さ = 60;
+const 入力欄最大高さ = ref(380);
+const 入力欄固定中 = ref(false);
+const 入力欄固定高さ = ref(入力欄最小高さ);
+
 const CAPTURE_INTERVAL_MS = 500;
 const STABLE_DURATION_MS = 1500;
 const FORCE_SEND_INTERVAL_MS = 60000;
 const DIFF_THRESHOLD = 3;
+const ライブ入力チャンネル = 'input';
+const ライブ出力先チャンネル = '0';
+
+// テキスト入力欄の状態管理
+const 入力欄状態リセット = () => {
+  入力欄最大到達.value = false;
+  入力欄固定中.value = false;
+  入力欄固定高さ.value = 入力欄最小高さ;
+  if (テキストエリア.value) {
+    テキストエリア.value.style.height = `${入力欄最小高さ}px`;
+  }
+};
+
+const 入力欄クリア = () => {
+  入力テキスト.value = '';
+  入力欄状態リセット();
+  nextTick(() => {
+    if (!テキストエリア.value) return;
+    テキストエリア.value.focus();
+    テキストエリア自動調整();
+  });
+};
+
+const 入力欄最大高さ更新 = () => {
+  const テキストエリア要素 = テキストエリア.value;
+  if (!テキストエリア要素) return;
+  const コンテナ = テキストエリア要素.closest('.image-container') as HTMLElement | null;
+  if (!コンテナ) return;
+  const 候補高さ = Math.floor(コンテナ.clientHeight * 0.30);
+  入力欄最大高さ.value = Math.max(入力欄最小高さ, 候補高さ);
+};
+
+// テキストメッセージ送信（AIチャット.vueのliveモードと同じパケット形式）
+const テキストメッセージ送信 = async (送信後クリア = false) => {
+  if (!入力テキスト.value.trim() || テキスト送信中.value || !WebSocket接続中.value) return;
+
+  const 送信内容 = 入力テキスト.value.trim();
+  if (送信後クリア) {
+    入力テキスト.value = '';
+    入力欄状態リセット();
+  }
+
+  // inputソケット経由で送信し、LiveAIへルーティング
+  if (プロパティ.wsClient && プロパティ.wsClient.isConnected()) {
+    プロパティ.wsClient.send({
+      セッションID: プロパティ.セッションID ?? '',
+      チャンネル: ライブ入力チャンネル,
+      メッセージ識別: 'input_text',
+      メッセージ内容: 送信内容
+    });
+    console.log('[イメージ] テキスト送信完了 (liveモード):', 送信内容);
+  }
+};
+
+const 送信ボタン処理 = async () => {
+  await テキストメッセージ送信(true);
+};
+
+// ドラッグ&ドロップ
+const ドラッグオーバー処理 = (イベント: DragEvent) => {
+  イベント.preventDefault();
+  if (!WebSocket接続中.value) return;
+  ドラッグ中.value = true;
+};
+
+const ドラッグ離脱処理 = (イベント: DragEvent) => {
+  イベント.preventDefault();
+  if (イベント.currentTarget === イベント.target) {
+    ドラッグ中.value = false;
+  }
+};
+
+const ドロップ処理 = async (イベント: DragEvent) => {
+  イベント.preventDefault();
+  ドラッグ中.value = false;
+  if (!WebSocket接続中.value) return;
+  const ファイル一覧 = イベント.dataTransfer?.files;
+  if (!ファイル一覧 || ファイル一覧.length === 0) return;
+
+  for (const ファイル of Array.from(ファイル一覧)) {
+    if (ファイル.type.startsWith('image/')) {
+      // 画像ファイルはファイル選択処理へ
+      const 読込 = new FileReader();
+      読込.onload = (e) => {
+        const データURL = e.target?.result as string;
+        const 画像 = new Image();
+        画像.onload = () => {
+          ファイル画像キャプチャ開始(画像);
+          通知('selectionComplete');
+        };
+        画像.src = データURL;
+      };
+      読込.readAsDataURL(ファイル);
+    }
+  }
+};
+
+// テキストエリアの自動リサイズ
+const テキストエリア自動調整 = () => {
+  if (!テキストエリア.value) return;
+  入力欄最大高さ更新();
+  if (入力テキスト.value.length === 0) {
+    入力欄状態リセット();
+    return;
+  }
+  if (入力欄固定中.value) {
+    入力欄最大到達.value = true;
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`;
+    return;
+  }
+  テキストエリア.value.style.height = `${入力欄最小高さ}px`;
+  const スクロール高 = テキストエリア.value.scrollHeight;
+  const 次の高さ = Math.max(スクロール高, 入力欄最小高さ);
+  const 上限到達 = 次の高さ >= 入力欄最大高さ.value;
+  入力欄最大到達.value = 上限到達;
+  if (上限到達) {
+    入力欄固定中.value = true;
+    入力欄固定高さ.value = 入力欄最大高さ.value;
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`;
+    return;
+  }
+  テキストエリア.value.style.height = `${次の高さ}px`;
+};
 
 // リソース選択を表示
 const 選択表示 = () => {
@@ -445,13 +579,18 @@ const 画像送信 = async (データURL: string | null) => {
     }
     プロパティ.wsClient.send({
       セッションID: プロパティ.セッションID ?? '',
-      チャンネル: 'input',
+      チャンネル: ライブ入力チャンネル,
+      出力先チャンネル: ライブ出力先チャンネル,
       メッセージ識別: 'input_image',
-      メッセージ内容: 'image/png',
+      メッセージ内容: 'image/jpeg',
       ファイル名: Base64データ,
       サムネイル画像: null
     });
     console.log('[イメージ] 画像送信完了');
+    if (入力テキスト.value.trim()) {
+      await テキストメッセージ送信();
+      console.log('[イメージ] 画像送信にあわせて入力テキストを自動送信');
+    }
   } catch (error) {
     console.error('[イメージ] 画像送信エラー:', error);
   } finally {
@@ -475,9 +614,15 @@ const 状態表示テキスト = () => {
 onMounted(() => {
   接続状態.value = 'disconnected';
   WebSocket接続中.value = !!プロパティ.wsConnected;
+  nextTick(() => {
+    入力欄最大高さ更新();
+    テキストエリア自動調整();
+  });
+  window.addEventListener('resize', テキストエリア自動調整);
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', テキストエリア自動調整);
   キャプチャ停止();
   ファイル画像タイマー停止();
 });
@@ -516,6 +661,45 @@ onBeforeUnmount(() => {
         :disabled="!WebSocket接続中"
         @change="ファイル変更処理"
       />
+    </div>
+
+    <!-- テキスト入力エリア -->
+    <div class="control-area">
+      <div
+        class="text-input-area"
+        :class="{ 'drag-over': ドラッグ中 }"
+        @dragover="ドラッグオーバー処理"
+        @dragleave="ドラッグ離脱処理"
+        @drop="ドロップ処理"
+      >
+        <div class="input-container">
+          <span class="prompt-symbol" @click="入力欄クリア">&gt;</span>
+          <textarea
+            v-model="入力テキスト"
+            :class="['input-field', { 'at-limit': 入力欄最大到達 }]"
+            :style="{ maxHeight: `${入力欄最大高さ}px` }"
+            placeholder="画像についてのメッセージを入力..."
+            maxlength="5000"
+            :disabled="テキスト送信中 || !WebSocket接続中"
+            @input="テキストエリア自動調整"
+            ref="テキストエリア"
+          ></textarea>
+        </div>
+
+        <button
+          class="image-send-btn"
+          :class="{
+            'ws-disabled': !WebSocket接続中,
+            'has-text': 入力テキスト.length > 0
+          }"
+          @click="送信ボタン処理"
+          :disabled="!入力テキスト.trim() || テキスト送信中 || !WebSocket接続中"
+          title="送信"
+        >
+          <img src="/icons/sending.png" alt="送信" />
+          <span class="send-live-label">LIVE</span>
+        </button>
+      </div>
     </div>
 
     <!-- 選択ポップアップ（コンテナ内に移動） -->
@@ -753,6 +937,186 @@ onBeforeUnmount(() => {
 
 .selection-cancel:hover {
   background: #e0e0e0;
+}
+
+/* テキスト入力エリア */
+.control-area {
+  padding: 10px 20px 0 20px;
+  background: #202020;
+  border-top: 1px solid #484848;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.text-input-area {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.text-input-area.drag-over {
+  background: rgba(102, 126, 234, 0.2);
+  border: 2px dashed #667eea;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.input-container {
+  position: relative;
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.prompt-symbol {
+  position: absolute;
+  left: 8px;
+  top: 16px;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 16px;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  z-index: 1;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px 16px 6px 30px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0;
+  outline: none;
+  font-size: 14px;
+  background: transparent;
+  color: #e0e0e0;
+  box-sizing: border-box;
+  resize: none;
+  min-height: 60px;
+  max-height: 380px;
+  overflow-y: auto;
+  font-family: inherit;
+  line-height: 1.4;
+  height: 60px;
+}
+
+.input-field.at-limit {
+  font-size: 8px;
+  line-height: 1.1;
+}
+
+.input-field:disabled {
+  border-color: #808080;
+  color: #666;
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.input-field:focus {
+  border-color: #ffffff;
+}
+
+.input-field::placeholder {
+  color: #888;
+}
+
+/* 送信ボタン */
+.image-send-btn {
+  border: 2px solid #667eea;
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: none;
+  padding: 0;
+  width: 56px;
+  height: 48px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  color: white;
+  margin-left: 10px;
+}
+
+.image-send-btn img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: brightness(0);
+}
+
+.send-live-label {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.7px;
+  color: #334155;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
+}
+
+.image-send-btn:hover:not(:disabled) {
+  background: rgba(240, 240, 240, 0.95);
+  border-color: #5a6fd8;
+}
+
+.image-send-btn.has-text {
+  background: #667eea;
+  border-color: #667eea;
+}
+
+.image-send-btn.has-text img {
+  filter: brightness(0) invert(1);
+}
+
+.image-send-btn.has-text .send-live-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.image-send-btn.has-text:hover:not(:disabled) {
+  background: #5a6fd8;
+  border-color: #5a6fd8;
+}
+
+.image-send-btn:disabled:not(.ws-disabled) {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #667eea;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.image-send-btn:disabled:not(.ws-disabled) img {
+  filter: brightness(0);
+}
+
+.image-send-btn.ws-disabled {
+  background: #808080 !important;
+  border-color: #808080 !important;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.image-send-btn.ws-disabled img {
+  filter: brightness(0) invert(1) !important;
+}
+
+.image-send-btn.ws-disabled .send-live-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.image-send-btn.ws-disabled:hover {
+  transform: none;
 }
 </style>
 

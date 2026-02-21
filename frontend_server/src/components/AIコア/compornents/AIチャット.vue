@@ -734,37 +734,17 @@ const メッセージ送信 = async () => {
 
   // WebSocket経由でメッセージを送信（サーバーが即座にエコーバック）
   if (プロパティ.inputWsClient && プロパティ.inputWsClient.isConnected()) {
-    const 基本チャンネル = プロパティ.チャンネル ?? '0';
     const 現在モード = 選択モード.value;
     const コードモード = 現在モード.startsWith('code');
-    const 出力先チャンネル = コードモード ? (現在モード.replace('code', '') || '1') : 基本チャンネル;
-    const 送信モード = コードモード ? 'code' : 現在モード;
-    const メッセージ識別 = コードモード ? 'input_request' : 'input_text';
-    console.log(`[チャット] WebSocket経由でメッセージ送信 (${メッセージ識別}):`, {
-      userMessage: 送信内容,
-      チャンネル: 出力先チャンネル,
-      mode: 送信モード
-    });
-    if (コードモード) {
-      // codeモードでも入力値をチャンネル0に表示・履歴保存する
-      プロパティ.inputWsClient.send({
-        セッションID: セッションID.value,
-        チャンネル: '0',
-        出力先チャンネル: '0',
-        メッセージ識別: 'input_text',
-        メッセージ内容: 送信内容,
-        ファイル名: 'code',
-        サムネイル画像: null
-      });
-    }
+    const コード番号 = コードモード ? (現在モード.replace('code', '') || '1') : '';
+    const 送信モード = コードモード ? `Code${コード番号}` : (現在モード === 'live' ? 'Live' : 'Chat');
+    console.log(`[チャット] WebSocket経由でメッセージ送信:`, { userMessage: 送信内容, 送信モード });
     プロパティ.inputWsClient.send({
       セッションID: セッションID.value,
       チャンネル: '0',
-      出力先チャンネル: 出力先チャンネル,
-      メッセージ識別: メッセージ識別,
-      メッセージ内容: 送信内容,
-      ファイル名: 送信モード,  // chat, live, code
-      サムネイル画像: null
+      送信モード: 送信モード,
+      メッセージ識別: 'input_text',
+      メッセージ内容: 送信内容
     });
   } else {
     console.log('[チャット] WebSocket未接続のため送信失敗');
@@ -806,7 +786,6 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
     プロパティ.inputWsClient.send({
       セッションID: セッションID.value,
       チャンネル: '0',
-      出力先チャンネル: '0',
       メッセージ識別: 'input_file',
       メッセージ内容: Base64データ,
       ファイル名: 入力ファイル.name,

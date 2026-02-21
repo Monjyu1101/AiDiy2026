@@ -1033,6 +1033,7 @@ const 状態表示テキスト = () => {
           title="送信"
         >
           <img src="/icons/sending.png" alt="送信" />
+          <span class="send-code-label">CODE</span>
         </button>
 
         <button
@@ -1484,6 +1485,7 @@ const 状態表示テキスト = () => {
   border: 2px solid #667eea;
   border-radius: 2px;
   cursor: pointer;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1506,6 +1508,20 @@ const 状態表示テキスト = () => {
   filter: brightness(0);
 }
 
+.send-code-label {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.7px;
+  color: #334155;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
+}
+
 .agent-send-btn:hover:not(:disabled) {
   background: rgba(240, 240, 240, 0.95);
   border-color: #5a6fd8;
@@ -1518,6 +1534,11 @@ const 状態表示テキスト = () => {
 
 .agent-send-btn.has-text img {
   filter: brightness(0) invert(1);
+}
+
+.agent-send-btn.has-text .send-code-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .agent-send-btn.has-text:hover:not(:disabled) {
@@ -1546,6 +1567,11 @@ const 状態表示テキスト = () => {
 
 .agent-send-btn.ws-disabled img {
   filter: brightness(0) invert(1) !important;
+}
+
+.agent-send-btn.ws-disabled .send-code-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .agent-send-btn.ws-disabled:hover {
