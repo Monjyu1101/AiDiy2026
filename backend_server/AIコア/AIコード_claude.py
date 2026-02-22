@@ -14,17 +14,9 @@ logger = get_logger(__name__)
 
 import os
 import time
-import datetime
-import threading
-import json
 import asyncio
-import queue
-import base64
-from collections import deque
 from pathlib import Path
-from typing import Optional, Dict, Any
-from PIL import Image
-import io
+from typing import Optional
 
 # Claude Agent SDK
 import anyio
@@ -97,6 +89,7 @@ class CodeAI:
         
         # 生存状態管理
         self.is_alive = True
+        self._停止マーカー送信済み = False
         
         # バージョン管理（変化検出用）
         self.last_version = None
@@ -160,6 +153,43 @@ class CodeAI:
         except Exception as e:
             logger.error(f"CodeAI終了:エラー {e}")
             self.is_alive = False
+
+    async def 強制終了(self):
+        """
+        Claude SDKの実行を中断
+
+        Note: Claude SDKはストリーミング実行のため、
+        親タスクのキャンセルで自動的に中断される。
+        このメソッドは互換性のために用意。
+        """
+        self.is_alive = False
+        logger.info("[CodeAI] Claude SDK強制終了（タスクキャンセルで中断）")
+
+    def _強制停止要求あり(self) -> bool:
+        """親側フラグも含めて強制停止要求を判定"""
+        if not self.is_alive:
+            return True
+        if self.parent_manager and getattr(self.parent_manager, "強制停止フラグ", False):
+            return True
+        return False
+
+    async def _停止マーカー送信(self) -> None:
+        """強制停止時のストリーム終端マーカー（!）を1回だけ送信"""
+        if self._停止マーカー送信済み:
+            return
+        self._停止マーカー送信済み = True
+        if self.parent_manager and hasattr(self.parent_manager, '接続'):
+            try:
+                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID,
+                    "チャンネル": self.チャンネル,
+                    "メッセージ識別": "output_stream",
+                    "メッセージ内容": "!",
+                    "ファイル名": None,
+                    "サムネイル画像": None
+                })
+            except Exception as e:
+                logger.error(f"[CodeClaud] 停止マーカー送信エラー: {e}")
     
     def _履歴追加(self, text: str, type: str):
         """履歴に項目を追加"""
@@ -200,14 +230,14 @@ class CodeAI:
     
         
     
-    async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 1200,
+    async def 実行(self, 要求テキスト: str, タイムアウト秒数: int = 1200,
                    resume: bool = True, 読取専用: bool = False, 絶対パス: str = None, file_path: str = None, 変更ファイル一覧: list = None, 再プラン要求: bool = False) -> str:
         """
         Claude Agent SDK実行（セッション.chatメソッド使用）
+        ストリーム出力のみ行い、開始/終了/中断通知は親側で行う
 
         Args:
             要求テキスト: ユーザーの要求テキスト
-            テキスト受信処理Ｑ: ストリーミング用キュー
             タイムアウト秒数: タイムアウト時間
             resume: セッション継続フラグ
             読取専用: 読取専用モード
@@ -217,6 +247,7 @@ class CodeAI:
             再プラン要求: 修正内容の再プラン要求フラグ（オプション）
         """
         try:
+            self._停止マーカー送信済み = False
             # 添付ファイルを後段で埋め込むためのブロックを準備（ログには含めない）
             attachment_block = ""
             if file_path:
@@ -279,31 +310,6 @@ class CodeAI:
 
             self._履歴追加(最終要求テキスト, "user")
 
-            # 実行開始通知
-            if テキスト受信処理Ｑ is not None:
-                try:
-                    data = {"type": "start", "content": "<<< 処理開始 >>>", "timestamp": time.time()}
-                    テキスト受信処理Ｑ.put_nowait({"text": data["content"], "json": json.dumps(data, ensure_ascii=False)})
-                except Exception:
-                    pass
-
-            # parent_manager経由でoutput_stream送信（処理開始）
-            if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                try:
-                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "セッションID": self.セッションID,
-                        "チャンネル": self.チャンネル,
-                        "メッセージ識別": "output_stream",
-                        "メッセージ内容": "<<< 処理開始 >>>",
-                        "ファイル名": None,
-                        "サムネイル画像": None
-                    })
-                    logger.info(f"テキストストリーム送信開始: チャンネル={self.チャンネル}, <<< 処理開始 >>>")
-                except Exception as e:
-                    logger.error(f"[CodeClaud] output_stream送信エラー(開始): {e}")
-            else:
-                logger.warning(f"[CodeClaud] parent_manager未設定またはparent_manager.接続なし")
-            
             result_text = ""
             last_stream_time = time.time()
             
@@ -370,25 +376,13 @@ class CodeAI:
 
                     # queryメソッドで実行（ストリーミング対応）
                     async for message in query(prompt=送信用要求テキスト, options=options):
-                        last_stream_time = time.time()
-
-                        # 強制停止フラグチェック
-                        if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
-                            logger.info(f"[CodeClaud] チャンネル{self.チャンネル} 強制停止フラグ検出 → ストリーム中断")
-                            result_text = "処理は強制中断しました。"
-                            if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                                try:
-                                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                                        "セッションID": self.セッションID,
-                                        "チャンネル": self.チャンネル,
-                                        "メッセージ識別": "output_stream",
-                                        "メッセージ内容": "<<< 処理中断 >>>",
-                                        "ファイル名": None,
-                                        "サムネイル画像": None
-                                    })
-                                except Exception as e:
-                                    logger.error(f"[CodeClaud] output_stream送信エラー(中断): {e}")
+                        # 強制停止チェック（is_aliveがFalseならストリーム中断）
+                        if self._強制停止要求あり():
+                            logger.info("[CodeAI] 強制停止要求検出、ストリーム中断")
+                            await self._停止マーカー送信()
                             break
+
+                        last_stream_time = time.time()
 
                         # AIセッションIDを取得・保存（SDK仕様のsession_id属性）
                         if not self.AIセッションID:
@@ -400,11 +394,14 @@ class CodeAI:
 
                         # ストリーミングコンテンツを抽出
                         content = self.メッセージ内容抽出(message)
-                        if content and テキスト受信処理Ｑ:
-                            data = {"type": "stream", "content": content, "timestamp": time.time()}
-                            テキスト受信処理Ｑ.put_nowait({"text": content, "json": json.dumps(data, ensure_ascii=False)})
 
-                        # parent_manager経由でoutput_stream送信（ストリーム）
+                        # parent_manager経由でoutput_stream送信（ストリーム出力のみ）
+                        # 強制停止チェック（送信前にも再確認）
+                        if self._強制停止要求あり():
+                            logger.info("[CodeAI] 強制停止要求検出、ストリーム送信スキップ")
+                            await self._停止マーカー送信()
+                            break
+
                         if content and self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
                                 await self.parent_manager.接続.send_to_channel(self.チャンネル, {
@@ -426,6 +423,10 @@ class CodeAI:
                 async def _timeout_monitor():
                     while True:
                         await asyncio.sleep(1)
+                        if self._強制停止要求あり():
+                            logger.info("[CodeAI] 強制停止要求検出（monitor）")
+                            await self._停止マーカー送信()
+                            return "stop_requested"
                         if time.time() - last_stream_time > タイムアウト秒数:
                             raise asyncio.TimeoutError(f"タイムアウト({タイムアウト秒数}秒)")
                 
@@ -444,66 +445,35 @@ class CodeAI:
                 
                 for task in done:
                     if task == monitor_task:
-                        raise asyncio.TimeoutError(f"タイムアウト({タイムアウト秒数}秒)")
+                        monitor_result = task.result()
+                        if monitor_result == "stop_requested":
+                            result_text = "!"
+                        else:
+                            raise asyncio.TimeoutError(f"タイムアウト({タイムアウト秒数}秒)")
                 
             except asyncio.TimeoutError:
                 logger.warning(f"ClaudeSDK タイムアウト ({タイムアウト秒数}秒)")
                 result_text = f"処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
-                
-                if テキスト受信処理Ｑ:
-                    data = {"type": "timeout", "content": "!!! 処理タイムアウト !!!", "timestamp": time.time()}
-                    テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理タイムアウト !!!", "json": json.dumps(data, ensure_ascii=False)})
-                        
+
             except Exception as sdk_error:
                 logger.error(f"ClaudeSDK エラー: {sdk_error}")
                 result_text = f"ClaudeSDK実行エラー: {str(sdk_error)}"
-                
-                if テキスト受信処理Ｑ:
-                    data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
-                    テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理エラー !!!", "json": json.dumps(data, ensure_ascii=False)})
-            
+
+            if self._停止マーカー送信済み and result_text.strip() == "":
+                result_text = "!"
+
             # 履歴に結果を追加
             final_result = result_text.strip() if result_text.strip() else "!"
             self._履歴追加(final_result, "agent")
-            if final_result == "!" and テキスト受信処理Ｑ:
-                try:
-                    data = {"type": "stream", "content": "!", "timestamp": time.time()}
-                    テキスト受信処理Ｑ.put_nowait({"text": "!", "json": json.dumps(data, ensure_ascii=False)})
-                except Exception:
-                    pass
-            
-            # 完了通知
-            if テキスト受信処理Ｑ:
-                data = {"type": "complete", "content": "<<< 処理終了 >>>", "timestamp": time.time()}
-                テキスト受信処理Ｑ.put_nowait({"text": "<<< 処理終了 >>>", "json": json.dumps(data, ensure_ascii=False)})
-
-            # parent_manager経由でoutput_stream送信（処理終了）
-            if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                try:
-                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "セッションID": self.セッションID,
-                        "チャンネル": self.チャンネル,
-                        "メッセージ識別": "output_stream",
-                        "メッセージ内容": "<<< 処理終了 >>>",
-                        "ファイル名": None,
-                        "サムネイル画像": None
-                    })
-                    logger.info(f"テキストストリーム送信終了: チャンネル={self.チャンネル}, <<< 処理終了 >>>")
-                except Exception as e:
-                    logger.error(f"[CodeClaud] output_stream送信エラー(終了): {e}")
 
             return final_result
-            
+
         except Exception as e:
             # ツールエラーログ（必須）
             セッションID_str = (self.セッションID[:10] + '...') if self.セッションID else '新規'
             logger.error(f"ClaudeSDK実行エラー: {e} 要求=[{要求テキスト[:10]}...] セッション={セッションID_str}")
             エラーメッセージ = f"実行エラー: {str(e)}"
-            
-            if テキスト受信処理Ｑ:
-                data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
-                テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理エラー !!!", "json": json.dumps(data, ensure_ascii=False)})
-            
+
             return エラーメッセージ
     
     def メッセージ内容抽出(self, message) -> Optional[str]:

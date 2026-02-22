@@ -15,15 +15,10 @@ logger = get_logger(__name__)
 import os
 import time
 import datetime
-import threading
-import json
 import asyncio
-import subprocess
-import queue
 import base64
-from collections import deque
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 from PIL import Image
 import io
 
@@ -75,6 +70,7 @@ class CodeAI:
 
         # 生存状態管理
         self.is_alive = True
+        self._停止マーカー送信済み = False
 
         # セッション状態管理（初回判定用）
         self.session_started = False
@@ -85,7 +81,8 @@ class CodeAI:
         # 最終実行のstderr出力（セッションID抽出用）
         self.last_stderr_output = ""
 
-        pass
+        # 現在実行中のsubprocess（強制終了用）
+        self.current_process: Optional[asyncio.subprocess.Process] = None
 
     def _コマンド構築(self, プロンプト: str, 初回: bool = False, repo_path: str = None, 読取専用: bool = False) -> list:
         """
@@ -248,10 +245,50 @@ class CodeAI:
         """CodeAI終了"""
         try:
             self.is_alive = False
-            pass
+            # 実行中のsubprocessがあれば終了
+            await self.強制終了()
         except Exception as e:
             logger.error(f"CodeAI終了:エラー {e}")
             self.is_alive = False
+
+    async def 強制終了(self):
+        """実行中のsubprocessを強制終了"""
+        self.is_alive = False  # ストリーム送信を即座に停止
+        if self.current_process and self.current_process.returncode is None:
+            try:
+                self.current_process.kill()
+                await self.current_process.wait()
+                logger.info(f"[CodeAI] subprocess強制終了完了")
+            except Exception as e:
+                logger.warning(f"[CodeAI] subprocess強制終了エラー: {e}")
+            finally:
+                self.current_process = None
+
+    def _強制停止要求あり(self) -> bool:
+        """親側フラグも含めて強制停止要求を判定"""
+        if not self.is_alive:
+            return True
+        if self.parent_manager and getattr(self.parent_manager, "強制停止フラグ", False):
+            return True
+        return False
+
+    async def _停止マーカー送信(self) -> None:
+        """強制停止時のストリーム終端マーカー（!）を1回だけ送信"""
+        if self._停止マーカー送信済み:
+            return
+        self._停止マーカー送信済み = True
+        if self.parent_manager and hasattr(self.parent_manager, '接続'):
+            try:
+                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID,
+                    "チャンネル": self.チャンネル,
+                    "メッセージ識別": "output_stream",
+                    "メッセージ内容": "!",
+                    "ファイル名": None,
+                    "サムネイル画像": None
+                })
+            except Exception as e:
+                logger.error(f"[CodeCli] 停止マーカー送信エラー: {e}")
 
     def _履歴追加(self, text: str, type: str):
         """履歴に項目を追加"""
@@ -369,14 +406,13 @@ class CodeAI:
             logger.error(f"codexセッションID抽出エラー: {e}")
             return None
 
-    async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 1200,
+    async def 実行(self, 要求テキスト: str, タイムアウト秒数: int = 1200,
                    resume: bool = True, 読取専用: bool = False, 絶対パス: str = None, file_path: str = None, 変更ファイル一覧: list = None, 再プラン要求: bool = False) -> str:
         """
         CLI (subprocess) 実行
 
         Args:
             要求テキスト: ユーザーからの要求
-            テキスト受信処理Ｑ: テキスト受信用キュー
             タイムアウト秒数: タイムアウト時間
             resume: セッション継続（履歴利用）
             読取専用: 読み取り専用モード
@@ -389,6 +425,7 @@ class CodeAI:
             実行結果テキスト
         """
         try:
+            self._停止マーカー送信済み = False
             # 添付ファイル（絶対パス）がある場合は先に付与
             if file_path:
                 try:
@@ -470,39 +507,22 @@ class CodeAI:
             else:
                 送信用要求テキスト = f"【今回の依頼】\n{依頼本文}\n"
 
-            # 生存状態チェック
+            # 生存状態チェック（停止中なら自動再開始を試行）
             if not self.is_alive:
-                logger.warning("CodeAI実行:CodeAIが開始されていません")
-                return "CodeAIが停止状態です。開始してください。"
+                logger.warning("CodeAI実行:停止状態を検出。自動再開始を試行します")
+                try:
+                    開始成功 = await self.開始()
+                    if (開始成功 is False) or (not self.is_alive):
+                        logger.warning("CodeAI実行:自動再開始に失敗")
+                        return "CodeAIが停止状態です。開始してください。"
+                    logger.info("CodeAI実行:自動再開始に成功")
+                except Exception as start_error:
+                    logger.error(f"CodeAI実行:自動再開始エラー {start_error}")
+                    return "CodeAIが停止状態です。開始してください。"
 
             # 履歴管理
             if len(self.履歴辞書) == 0:
                 self._履歴追加(self.system_prompt, "system")
-
-            # 実行開始通知
-            if テキスト受信処理Ｑ is not None:
-                try:
-                    data = {"type": "start", "content": "<<< 処理開始 >>>", "timestamp": time.time()}
-                    テキスト受信処理Ｑ.put_nowait({"text": data["content"], "json": json.dumps(data, ensure_ascii=False)})
-                except Exception:
-                    pass
-
-            # parent_manager経由でoutput_stream送信（処理開始）
-            if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                try:
-                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "セッションID": self.セッションID,
-                        "チャンネル": self.チャンネル,
-                        "メッセージ識別": "output_stream",
-                        "メッセージ内容": "<<< 処理開始 >>>",
-                        "ファイル名": None,
-                        "サムネイル画像": None
-                    })
-                    logger.info(f"テキストストリーム送信開始: チャンネル={self.チャンネル}, <<< 処理開始 >>>")
-                except Exception as e:
-                    logger.error(f"[CodeEtc] output_stream送信エラー(開始): {e}")
-            else:
-                logger.warning(f"[CodeEtc] parent_manager未設定またはparent_manager.接続なし")
 
             # 初回判定（resumeがFalseまたはセッション未開始）
             初回送信 = not resume or not self.session_started
@@ -553,8 +573,7 @@ class CodeAI:
             result_text = await self._subprocess実行(
                 command=command,
                 cwd=作業ディレクトリ,
-                timeout=タイムアウト秒数,
-                テキスト受信処理Ｑ=テキスト受信処理Ｑ
+                timeout=タイムアウト秒数
             )
 
             # codexの場合、セッションIDを抽出して保存（stderr から抽出）
@@ -568,26 +587,6 @@ class CodeAI:
             final_result = result_text.strip() if result_text.strip() else "!"
             self._履歴追加(final_result, "agent")
 
-            # 完了通知
-            if テキスト受信処理Ｑ:
-                data = {"type": "complete", "content": "<<< 処理終了 >>>", "timestamp": time.time()}
-                テキスト受信処理Ｑ.put_nowait({"text": "<<< 処理終了 >>>", "json": json.dumps(data, ensure_ascii=False)})
-
-            # parent_manager経由でoutput_stream送信（処理終了）
-            if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                try:
-                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                        "セッションID": self.セッションID,
-                        "チャンネル": self.チャンネル,
-                        "メッセージ識別": "output_stream",
-                        "メッセージ内容": "<<< 処理終了 >>>",
-                        "ファイル名": None,
-                        "サムネイル画像": None
-                    })
-                    logger.info(f"テキストストリーム送信終了: チャンネル={self.チャンネル}, <<< 処理終了 >>>")
-                except Exception as e:
-                    logger.error(f"[CodeEtc] output_stream送信エラー(終了): {e}")
-
             return final_result
 
         except Exception as e:
@@ -597,26 +596,23 @@ class CodeAI:
             )
             エラーメッセージ = f"実行エラー: {str(e)}"
 
-            if テキスト受信処理Ｑ:
-                data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
-                テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理エラー !!!", "json": json.dumps(data, ensure_ascii=False)})
-
             return エラーメッセージ
 
-    async def _subprocess実行(self, command: list, cwd: str, timeout: int, テキスト受信処理Ｑ=None) -> str:
+    async def _subprocess実行(self, command: list, cwd: str, timeout: int) -> str:
         """
         subprocessでコマンドを実行し、stdoutをリアルタイムで監視
+        ストリーム出力のみ行い、開始/終了/中断通知は親側で行う
 
         Args:
             command: 実行コマンド配列
             cwd: 作業ディレクトリ
             timeout: タイムアウト秒数
-            テキスト受信処理Ｑ: テキスト受信用キュー
 
         Returns:
             実行結果の全テキスト
         """
         try:
+            self._停止マーカー送信済み = False
             # プロセス起動
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -625,6 +621,8 @@ class CodeAI:
                 cwd=cwd,
                 env=os.environ.copy()
             )
+            # 強制終了用に参照を保持
+            self.current_process = process
 
             result_lines = []
             stderr_lines = []
@@ -635,25 +633,10 @@ class CodeAI:
                 nonlocal last_output_time
                 try:
                     while True:
-                        # 強制停止フラグチェック
-                        if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
-                            logger.info(f"[CodeEtc] チャンネル{self.チャンネル} 強制停止フラグ検出(stdout) → プロセス強制終了")
-                            try:
-                                process.kill()
-                            except Exception:
-                                pass
-                            if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                                try:
-                                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                                        "セッションID": self.セッションID,
-                                        "チャンネル": self.チャンネル,
-                                        "メッセージ識別": "output_stream",
-                                        "メッセージ内容": "<<< 処理中断 >>>",
-                                        "ファイル名": None,
-                                        "サムネイル画像": None
-                                    })
-                                except Exception as e:
-                                    logger.error(f"[CodeEtc] output_stream送信エラー(中断): {e}")
+                        # 強制停止チェック（is_aliveがFalseならストリーム中断）
+                        if self._強制停止要求あり():
+                            logger.info("[CodeAI] 強制停止要求検出、stdout読み取り中断")
+                            await self._停止マーカー送信()
                             break
 
                         line = await process.stdout.readline()
@@ -664,15 +647,13 @@ class CodeAI:
                         line_text = line.decode('utf-8', errors='replace').rstrip()
                         result_lines.append(line_text)
 
-                        # リアルタイムでキューに送信
-                        if テキスト受信処理Ｑ:
-                            try:
-                                data = {"type": "stream", "content": line_text, "timestamp": time.time()}
-                                テキスト受信処理Ｑ.put_nowait({"text": line_text, "json": json.dumps(data, ensure_ascii=False)})
-                            except Exception:
-                                pass
+                        # 強制停止チェック（送信前にも再確認）
+                        if self._強制停止要求あり():
+                            logger.info("[CodeAI] 強制停止要求検出、stdout送信スキップ")
+                            await self._停止マーカー送信()
+                            break
 
-                        # parent_manager経由でoutput_stream送信
+                        # parent_manager経由でoutput_stream送信（ストリーム出力のみ）
                         if self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
                                 await self.parent_manager.接続.send_to_channel(self.チャンネル, {
@@ -684,7 +665,7 @@ class CodeAI:
                                     "サムネイル画像": None
                                 })
                             except Exception as e:
-                                logger.error(f"[CodeEtc] output_stream送信エラー(stream): {e}")
+                                logger.error(f"[CodeCli] output_stream送信エラー(stream): {e}")
                 except Exception as e:
                     logger.error(f"stdout読み取りエラー: {e}")
 
@@ -693,8 +674,10 @@ class CodeAI:
                 nonlocal last_output_time
                 try:
                     while True:
-                        # 強制停止フラグチェック
-                        if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
+                        # 強制停止チェック（is_aliveがFalseならストリーム中断）
+                        if self._強制停止要求あり():
+                            logger.info("[CodeAI] 強制停止要求検出、stderr読み取り中断")
+                            await self._停止マーカー送信()
                             break
 
                         line = await process.stderr.readline()
@@ -705,13 +688,11 @@ class CodeAI:
                         line_text = line.decode('utf-8', errors='replace').rstrip()
                         stderr_lines.append(line_text)
 
-                        # リアルタイムでキューに送信（詳細情報として）
-                        if テキスト受信処理Ｑ:
-                            try:
-                                data = {"type": "detail", "content": line_text, "timestamp": time.time()}
-                                テキスト受信処理Ｑ.put_nowait({"text": line_text, "json": json.dumps(data, ensure_ascii=False)})
-                            except Exception:
-                                pass
+                        # 強制停止チェック（送信前にも再確認）
+                        if self._強制停止要求あり():
+                            logger.info("[CodeAI] 強制停止要求検出、stderr送信スキップ")
+                            await self._停止マーカー送信()
+                            break
 
                         # parent_manager経由でoutput_stream送信（stderr）
                         if self.parent_manager and hasattr(self.parent_manager, '接続'):
@@ -725,7 +706,7 @@ class CodeAI:
                                     "サムネイル画像": None
                                 })
                             except Exception as e:
-                                logger.error(f"[CodeEtc] output_stream送信エラー(stderr): {e}")
+                                logger.error(f"[CodeCli] output_stream送信エラー(stderr): {e}")
                 except Exception as e:
                     logger.error(f"stderr読み取りエラー: {e}")
 
@@ -733,6 +714,10 @@ class CodeAI:
             async def timeout_monitor():
                 while True:
                     await asyncio.sleep(1)
+                    if self._強制停止要求あり():
+                        logger.info("[CodeAI] 強制停止要求検出（monitor）")
+                        await self._停止マーカー送信()
+                        return
                     if time.time() - last_output_time > timeout:
                         raise asyncio.TimeoutError(f"タイムアウト({timeout}秒)")
 
@@ -760,31 +745,26 @@ class CodeAI:
                 process.kill()
                 await process.wait()
 
+            # プロセス参照をクリア
+            self.current_process = None
+
             # 結果を結合（stdout全体をそのまま返す - 抽出処理は行わない）
             full_output = "\n".join(result_lines)
 
             # stderr を保存（セッションID抽出用）
             self.last_stderr_output = "\n".join(stderr_lines)
 
-            # 強制停止フラグが立っている場合は中断メッセージを返す
-            if self.parent_manager and getattr(self.parent_manager, '強制停止フラグ', False):
-                return "処理は強制中断しました。"
-
             # stdout全体を結果として返す（フィルタリングなし）
+            if self._停止マーカー送信済み:
+                return "!"
             return full_output.strip() if full_output.strip() else "（応答なし）"
 
         except asyncio.TimeoutError as e:
             logger.warning(f"subprocess タイムアウト: {e}")
-            if テキスト受信処理Ｑ:
-                data = {"type": "timeout", "content": "!!! 処理タイムアウト !!!", "timestamp": time.time()}
-                テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理タイムアウト !!!", "json": json.dumps(data, ensure_ascii=False)})
             return f"処理タイムアウト({timeout}秒)が発生しました。"
 
         except Exception as e:
             logger.error(f"subprocess実行エラー (command={command}, cwd={cwd}): {e}")
-            if テキスト受信処理Ｑ:
-                data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
-                テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理エラー !!!", "json": json.dumps(data, ensure_ascii=False)})
             return f"subprocess実行エラー: {str(e)}"
 
 

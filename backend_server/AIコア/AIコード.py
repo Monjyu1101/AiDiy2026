@@ -119,7 +119,8 @@ class CodeAgent:
         self.会話履歴 = []  # エージェント専用の会話履歴
         self.累積変更ファイル: list[str] = []  # 検証対象ファイルを累積
         self._累積変更ファイルキー: set[str] = set()  # パス正規化キーで重複排除
-        self.強制停止フラグ = False  # cancel_agent用
+        self.強制停止フラグ = False  # cancel_run用
+        self.現在タスク: Optional[asyncio.Task] = None  # 実行中の処理タスク
 
     def _変更ファイルキー(self, ファイルパス: str) -> str:
         """重複判定用の正規化キーを返す"""
@@ -143,7 +144,7 @@ class CodeAgent:
 
     def _select_ai_module(self) -> Optional[ModuleType]:
         """AI_NAMEに応じたコードモジュールを選択してインポート"""
-        module_name = "AIコア.AIコード_etc"
+        module_name = "AIコア.AIコード_cli"
         if self.AI_NAME == "claude_sdk":
             module_name = "AIコア.AIコード_claude"
         try:
@@ -157,7 +158,20 @@ class CodeAgent:
         if not self.AIモジュール:
             return None
         if self.AIインスタンス:
-            return self.AIインスタンス
+            if not getattr(self.AIインスタンス, "is_alive", False):
+                logger.info(f"[CodeAgent] チャンネル{self.チャンネル} CodeAI停止状態を検出。再開始します")
+                try:
+                    開始成功 = await self.AIインスタンス.開始()
+                    if (開始成功 is False) or (not getattr(self.AIインスタンス, "is_alive", False)):
+                        logger.warning(f"[CodeAgent] チャンネル{self.チャンネル} CodeAI再開始失敗。再生成します")
+                        self.AIインスタンス = None
+                    else:
+                        return self.AIインスタンス
+                except Exception as e:
+                    logger.warning(f"[CodeAgent] チャンネル{self.チャンネル} CodeAI再開始エラー: {e}")
+                    self.AIインスタンス = None
+            else:
+                return self.AIインスタンス
         try:
             CodeAI = getattr(self.AIモジュール, "CodeAI", None)
             if CodeAI is None:
@@ -172,7 +186,14 @@ class CodeAgent:
                 絶対パス=self.絶対パス or None,
                 system_instruction=self.システム指示,
             )
-            await self.AIインスタンス.開始()
+            開始成功 = await self.AIインスタンス.開始()
+            if (開始成功 is False) or (not getattr(self.AIインスタンス, "is_alive", False)):
+                logger.error(
+                    f"[CodeAgent] CodeAI開始失敗: AI={self.AI_NAME} モデル={self.AI_MODEL} "
+                    f"セッション={self.セッションID} チャンネル={self.チャンネル}"
+                )
+                self.AIインスタンス = None
+                return None
             return self.AIインスタンス
         except Exception as e:
             logger.error(f"[CodeAgent] CodeAI初期化エラー: {e}")
@@ -196,6 +217,113 @@ class CodeAgent:
             except asyncio.CancelledError:
                 pass
         logger.debug(f"[CodeAgent] チャンネル{self.チャンネル} 終了")
+
+    async def 強制停止(self) -> bool:
+        """
+        現在実行中のタスクを強制停止
+
+        Returns:
+            True: タスクをキャンセルした
+            False: 実行中のタスクがなかった
+        """
+        # 1. フラグを立てる（互換性のため - subprocess内のポーリング用）
+        self.強制停止フラグ = True
+
+        # 2. 実行中のタスクをキャンセル
+        if self.現在タスク and not self.現在タスク.done():
+            # 即時に中断通知を送信（停止処理完了を待たない）
+            await self._中断通知送信()
+
+            # 3. AIインスタンスのis_aliveをFalseに（ストリーム送信を即座に停止）
+            if self.AIインスタンス and hasattr(self.AIインスタンス, '強制終了'):
+                try:
+                    await self.AIインスタンス.強制終了()
+                except Exception as e:
+                    logger.warning(f"[CodeAgent] AIインスタンス強制終了エラー: {e}")
+
+            # 4. タスクをキャンセル
+            self.現在タスク.cancel()
+            try:
+                await asyncio.wait_for(asyncio.shield(self.現在タスク), timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+            except Exception as e:
+                logger.warning(f"[CodeAgent] タスクキャンセル待機エラー: {e}")
+
+            # 5. 次回実行のためにAIインスタンスを再開（claude_sdkはis_aliveをTrueに戻す）
+            if self.AIインスタンス and hasattr(self.AIインスタンス, '開始'):
+                try:
+                    await self.AIインスタンス.開始()
+                    logger.info(f"[CodeAgent] チャンネル{self.チャンネル} AIインスタンス再開完了")
+                except Exception as e:
+                    logger.warning(f"[CodeAgent] AIインスタンス再開エラー: {e}")
+
+            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止完了")
+            return True
+
+        # 実行中タスクが無くても、前回中断でCodeAIが停止状態なら復帰させる
+        if self.AIインスタンス and (not getattr(self.AIインスタンス, "is_alive", False)) and hasattr(self.AIインスタンス, '開始'):
+            try:
+                await self.AIインスタンス.開始()
+                logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 実行タスクなしだがAIインスタンスを再開")
+            except Exception as e:
+                logger.warning(f"[CodeAgent] 実行タスクなし時のAIインスタンス再開エラー: {e}")
+
+        logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 実行中のタスクなし")
+        return False
+
+    async def _ストリーム開始通知送信(self) -> None:
+        """ストリーム開始通知をクライアントに送信"""
+        try:
+            await self.接続.send_to_channel(self.チャンネル, {
+                "セッションID": self.セッションID,
+                "チャンネル": self.チャンネル,
+                "メッセージ識別": "output_stream",
+                "メッセージ内容": "<<< 処理開始 >>>",
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} <<< 処理開始 >>>")
+        except Exception as e:
+            logger.error(f"[CodeAgent] ストリーム開始通知送信エラー: {e}")
+
+    async def _ストリーム終了通知送信(self) -> None:
+        """ストリーム終了通知をクライアントに送信"""
+        try:
+            await self.接続.send_to_channel(self.チャンネル, {
+                "セッションID": self.セッションID,
+                "チャンネル": self.チャンネル,
+                "メッセージ識別": "output_stream",
+                "メッセージ内容": "<<< 処理終了 >>>",
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} <<< 処理終了 >>>")
+        except Exception as e:
+            logger.error(f"[CodeAgent] ストリーム終了通知送信エラー: {e}")
+
+    async def _中断通知送信(self) -> None:
+        """中断通知をクライアントに送信"""
+        try:
+            await self.接続.send_to_channel(self.チャンネル, {
+                "セッションID": self.セッションID,
+                "チャンネル": self.チャンネル,
+                "メッセージ識別": "output_stream",
+                "メッセージ内容": "<<< 処理中断 >>>",
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+            await self.接続.send_to_channel(self.チャンネル, {
+                "セッションID": self.セッションID,
+                "チャンネル": self.チャンネル,
+                "メッセージ識別": "output_text",
+                "メッセージ内容": "処理は強制中断しました。",
+                "ファイル名": None,
+                "サムネイル画像": None
+            })
+            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} <<< 処理中断 >>>")
+        except Exception as e:
+            logger.error(f"[CodeAgent] 中断通知送信エラー: {e}")
 
     async def コード要求(self, 受信データ: dict) -> None:
         """コード要求をキューに追加（受信データ構造体をそのまま投入）"""
@@ -242,28 +370,41 @@ class CodeAgent:
         2. バックアップ検証ループ（最大5回）
         3. 生成ファイル通知
         4. update_info送信
+
+        asyncio.Taskでラップし、強制停止時にキャンセル可能
         """
         # 強制停止フラグをリセット
         self.強制停止フラグ = False
         # 累積変更ファイルをクリア
         self.累積変更ファイル = []
         self._累積変更ファイルキー = set()
-        
-        await self._基本AI処理(受信データ)
+
+        # タスク化して実行
+        self.現在タスク = asyncio.create_task(self._基本AI処理(受信データ))
+        try:
+            await self.現在タスク
+        except asyncio.CancelledError:
+            # 中断通知は強制停止()で即時送信済み
+            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} タスクがキャンセルされました")
+        finally:
+            self.現在タスク = None
 
     async def _処理_input_request(self, 受信データ: dict) -> None:
         """
         input_request処理:
         1. inputチャンネルへ開始通知（音声付き）
-        2. input_text処理（_基本AI処理）
+        2. input_text処理（_基本AI処理）- タスク化
         3. output_request送信（チャンネル0へ）
         4. inputチャンネルへ完了通知（音声付き）
+
+        asyncio.Taskでラップし、強制停止時にキャンセル可能
         """
         # 強制停止フラグをリセット
         self.強制停止フラグ = False
+        メッセージ内容 = ""
         try:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
-            
+
             # 添付ファイル一覧があればメッセージに追記
             添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
             if 添付ファイル一覧:
@@ -280,7 +421,7 @@ class CodeAgent:
             # 累積変更ファイルをクリア
             self.累積変更ファイル = []
             self._累積変更ファイルキー = set()
-            
+
             開始メッセージ = (
                 f"コードエージェント{self.チャンネル}です。\n"
                 f"処理要求を開始しました。\n"
@@ -305,8 +446,30 @@ class CodeAgent:
             except Exception as e:
                 logger.warning(f"[CodeAgent] LiveAI開始メッセージ送信エラー: {e}")
 
-            # 2. 基本AI処理（input_text処理と同じ）
-            出力メッセージ内容 = await self._基本AI処理(受信データ)
+            # 2. 基本AI処理（タスク化して実行）
+            self.現在タスク = asyncio.create_task(self._基本AI処理(受信データ))
+            try:
+                出力メッセージ内容 = await self.現在タスク
+            except asyncio.CancelledError:
+                # 中断通知は強制停止()で即時送信済み
+                logger.info(f"[CodeAgent] チャンネル{self.チャンネル} タスクがキャンセルされました(request)")
+                # 中断メッセージをinputチャンネルへ通知
+                中断メッセージ = (
+                    f"コードエージェント{self.チャンネル}です。\n"
+                    f"処理要求が中断されました。\n"
+                )
+                try:
+                    await self.接続.send_to_channel("input", {
+                        "セッションID": self.セッションID,
+                        "チャンネル": "input",
+                        "メッセージ識別": "input_text",
+                        "メッセージ内容": 中断メッセージ
+                    })
+                except Exception:
+                    pass
+                return
+            finally:
+                self.現在タスク = None
 
             # 3. output_request送信（チャンネル0へ）
             await self.接続.send_to_channel("0", {
@@ -362,10 +525,12 @@ class CodeAgent:
     async def _基本AI処理(self, 受信データ: dict) -> str:
         """
         基本AI処理（input_text/input_request共通）:
-        1. AI実行 + output_text送信
-        2. バックアップ検証ループ（最大5回）
-        3. 生成ファイル通知
-        4. update_info送信
+        1. ストリーム開始通知
+        2. AI実行 + output_text送信
+        3. ストリーム終了通知
+        4. バックアップ検証ループ（最大5回）
+        5. 生成ファイル通知
+        6. update_info送信
 
         Returns:
             出力メッセージ内容（output_requestで使用）
@@ -395,6 +560,9 @@ class CodeAgent:
                 f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{メッセージ内容.rstrip()}\n"
             )
 
+            # ストリーム開始通知
+            await self._ストリーム開始通知送信()
+
             # AI実行
             try:
                 ai_instance = await self._ensure_ai_instance()
@@ -409,19 +577,15 @@ class CodeAgent:
             if not 出力メッセージ内容:
                 出力メッセージ内容 = "!"
 
-            # 強制停止フラグチェック
+            # 強制停止フラグチェック → 中断通知は強制停止()で送信済みなのでここでは戻り値のみ設定
             if self.強制停止フラグ:
                 logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止フラグ検出（AI実行後）")
                 出力メッセージ内容 = "処理は強制中断しました。"
-                # output_stream で中断通知
-                await self.接続.send_to_channel(self.チャンネル, {
-                    "セッションID": self.セッションID,
-                    "チャンネル": self.チャンネル,
-                    "メッセージ識別": "output_stream",
-                    "メッセージ内容": "<<< 処理中断 >>>",
-                    "ファイル名": None,
-                    "サムネイル画像": None
-                })
+                # _中断通知送信は強制停止()で既に送信済みのため、ここでは呼ばない
+                return 出力メッセージ内容
+
+            # ストリーム終了通知
+            await self._ストリーム終了通知送信()
 
             # 処理応答ログ
             logger.info(
@@ -445,11 +609,6 @@ class CodeAgent:
                     ファイル名=None,
                     サムネイル画像=None
                 )
-
-            # 強制停止時はバックアップ検証・ファイル通知・update_infoをスキップ
-            if self.強制停止フラグ:
-                logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止のため後続処理スキップ")
-                return 出力メッセージ内容
 
             # バックアップ＋自己検証ループ
             今回更新あり = False
@@ -527,9 +686,9 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": f"\n【検証開始】({n}回目)\n"
+                "メッセージ内容": f"\n【検証開始】({n}回目)\n\n"
             })
-            
+
             # 検証プロンプト
             プロンプトファイル一覧 = "\n".join(f"- {f}" for f in 差分ファイル)
             検証プロンプト = (
@@ -539,14 +698,20 @@ class CodeAgent:
                 f"ファイルの検証を行い、問題があれば修正してください。\n"
                 f"問題がなければ「検証完了」とだけ回答してください。"
             )
-            
+
+            # ストリーム開始通知（検証）
+            await self._ストリーム開始通知送信()
+
             # AI検証実行
             検証結果 = await ai_instance.実行(
                 要求テキスト=検証プロンプト,
                 変更ファイル一覧=差分ファイル,
                 絶対パス=self.絶対パス or None,
             ) or "（応答なし）"
-            
+
+            # ストリーム終了通知（検証）
+            await self._ストリーム終了通知送信()
+
             # 検証結果送信
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
@@ -570,7 +735,7 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": "\n【検証完了】\n"
+                "メッセージ内容": "\n【検証完了】\n\n"
             })
 
         return 今回更新あり

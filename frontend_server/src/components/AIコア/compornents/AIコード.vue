@@ -42,7 +42,7 @@ const セッションID = computed(() => プロパティ.セッションID ?? ''
 // メッセージ構造体
 interface メッセージ {
   id: string;
-  role: 'input_text' | 'input_request' | 'output_text' | 'welcome_text' | 'input_file' | 'output_file';
+  role: 'input_text' | 'input_request' | 'output_text' | 'welcome_text' | 'input_file' | 'output_file' | 'cancel_run';
   content: string;
   render: 'effect' | 'static';
   kind: 'text' | 'file';
@@ -149,7 +149,7 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
   }
 };
 
-// キャンセル送信（cancel_agent）
+// キャンセル送信（cancel_run）
 const キャンセル送信 = () => {
   if (!ストリーム受信中.value || !WebSocket接続中.value) return;
   if (プロパティ.inputWsClient && プロパティ.inputWsClient.isConnected()) {
@@ -157,8 +157,8 @@ const キャンセル送信 = () => {
     プロパティ.inputWsClient.send({
       セッションID: セッションID.value,
       チャンネル: チャンネル,
-      メッセージ識別: 'cancel_agent',
-      メッセージ内容: ''
+      メッセージ識別: 'cancel_run',
+      メッセージ内容: '強制停止！'
     });
   }
 };
@@ -408,6 +408,9 @@ const ターミナルメッセージ追加 = (role: メッセージ['role'], 内
     case 'welcome_text':
       カーソル色 = '#00ff00';  // 緑（output_textと同じ）
       break;
+    case 'cancel_run':
+      カーソル色 = '#ff4444';  // 赤
+      break;
   }
 
   nextTick(() => {
@@ -423,6 +426,13 @@ const ターミナルメッセージ追加 = (role: メッセージ['role'], 内
 // ターミナル風の出力を追加
 const 行追加 = (text: string) => {
   ターミナルメッセージ追加('output_text', text);
+};
+
+const cancel_run受信処理 = (受信データ: any) => {
+  表示時アクティブ化();
+  const 内容 = 受信内容文字列(受信データ);
+  if (!内容) return;
+  ターミナルメッセージ追加('cancel_run', `> ${内容}`);
 };
 
 // WebSocketイベントハンドラ
@@ -558,8 +568,12 @@ const 出力ストリーム受信処理 = (受信データ: any) => {
     return;
   }
 
-  // 処理終了・処理中断
-  if (内容 === '<<< 処理終了 >>>' || 内容 === '<<< 処理中断 >>>') {
+  // 処理終了・処理中断・エラーマーカー("!")
+  if (
+    内容 === '<<< 処理終了 >>>' ||
+    内容 === '<<< 処理中断 >>>' ||
+    内容 === '!'
+  ) {
     if (ストリームメッセージID) {
       演出キュー追加(ストリームメッセージID, `${内容}\n`, true);
       const 対象メッセージ = メッセージ一覧.value.find(m => m.id === ストリームメッセージID);
@@ -737,6 +751,7 @@ const WSハンドラ登録 = (client?: IWebSocketClient | null) => {
   client.on('output_stream', 出力ストリーム受信処理);
   client.on('output_file', 出力ファイル受信処理);
   client.on('update_info', update_info受信処理);
+  client.on('cancel_run', cancel_run受信処理);
 
   console.log(`[エージェント${ch}] ハンドラ登録完了`);
 };
@@ -754,6 +769,7 @@ const WSハンドラ解除 = (client?: IWebSocketClient | null) => {
   client.off('output_stream', 出力ストリーム受信処理);
   client.off('output_file', 出力ファイル受信処理);
   client.off('update_info', update_info受信処理);
+  client.off('cancel_run', cancel_run受信処理);
 
   console.log(`[エージェント${ch}] ハンドラ削除完了`);
 };
@@ -1235,6 +1251,11 @@ const 状態表示テキスト = () => {
 
 .terminal-line.welcome_text .line-content {
   color: #00ff00;
+}
+
+.terminal-line.cancel_run .line-content {
+  color: #ff4444;
+  font-weight: bold;
 }
 
 .terminal-line.stream-output .line-content {

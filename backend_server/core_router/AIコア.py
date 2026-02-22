@@ -1138,16 +1138,25 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     except Exception as e:
                         logger.warning(f"cancel_audio処理エラー: {e}")
 
-                elif メッセージ識別 == "cancel_agent":
+                elif メッセージ識別 == "cancel_run":
                     try:
                         チャンネル = str(受信データ.get("チャンネル", "0"))
                         if チャンネル in ("1", "2", "3", "4") and セッション and hasattr(セッション, 'code_agent_processors'):
-                            セッション.code_agent_processors[int(チャンネル) - 1].強制停止フラグ = True
-                            logger.info(f"cancel_agent: チャンネル{チャンネル} 強制停止フラグをオン ({セッションID})")
+                            agent = セッション.code_agent_processors[int(チャンネル) - 1]
+                            # 即時フィードバック送信（強制停止完了を待たずに先行送信）
+                            await セッション.send_to_channel(チャンネル, {
+                                "セッションID": セッションID,
+                                "チャンネル": チャンネル,
+                                "メッセージ識別": "cancel_run",
+                                "メッセージ内容": "処理中断！",
+                            })
+                            # asyncio.Taskベースの強制停止を呼び出し
+                            停止成功 = await agent.強制停止()
+                            logger.info(f"cancel_run: チャンネル{チャンネル} 強制停止{'成功' if 停止成功 else '(タスクなし)'} ({セッションID})")
                         else:
-                            logger.warning(f"cancel_agent: 無効なチャンネル={チャンネル} ({セッションID})")
+                            logger.warning(f"cancel_run: 無効なチャンネル={チャンネル} ({セッションID})")
                     except Exception as e:
-                        logger.warning(f"cancel_agent処理エラー: {e}")
+                        logger.warning(f"cancel_run処理エラー: {e}")
 
                 elif メッセージ識別 == "input_image":
                     try:

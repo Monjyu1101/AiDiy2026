@@ -1018,7 +1018,7 @@ AIコアは、複数のAIサービスを統合したマルチパネルAIイン�
 - **AIライブ_openai.py** - OpenAI Realtime 実装
 - **AIコード.py** - コードAI処理（共通インターフェース）
 - **AIコード_claude.py** - Claude Agent SDK 実装
-- **AIコード_etc.py** - その他コードAI実装
+- **AIコード_cli.py** - その他コードAI実装
 - **AI内部ツール.py** - 内部ツール処理
 - **AIバックアップ.py** - バックアップ処理
 
