@@ -57,7 +57,6 @@ export const appsRoutes: RouteRecordRaw[] = [
         component: () => import('../components/Mマスタ/M商品/M商品編集.vue'),
         meta: { requiresAuth: true, title: 'M商品編集' }
     },
-
     // ---- T系 (トランザクション) ----
     {
         path: '/Tトラン',

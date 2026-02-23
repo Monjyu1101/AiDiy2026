@@ -151,7 +151,7 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
         path_conf = getattr(アプリ設定, 'path', None) if アプリ設定 else None
         external_root_dic = getattr(path_conf, 'external_root_dic', None)
         if isinstance(external_root_dic, dict) and external_root_dic:
-            # _AiDiy.md を含むプロジェクト一覧を絶対パスで追加
+            # _AIDIY.md を含むプロジェクト一覧を絶対パスで追加
             for 表示名, 絶対パス in external_root_dic.items():
                 try:
                     # 絶対パスをそのまま使用（../ との重複を避けるため）
@@ -161,7 +161,7 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
                     options[パス] = 表示名
                 except Exception:
                     continue
-        # external_root_path とその親も探索（_AiDiy.md を含むフォルダ）
+        # external_root_path とその親も探索（_AIDIY.md を含むフォルダ）
         external_root_path = getattr(path_conf, 'external_root_path', None) if path_conf else None
         探索ルート = []
         if external_root_path:
@@ -175,7 +175,7 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
             if not root_dir or not os.path.isdir(root_dir):
                 return
             # ルート自身
-            root_marker = os.path.join(root_dir, '_AiDiy.md')
+            root_marker = os.path.join(root_dir, '_AIDIY.md')
             if os.path.isfile(root_marker):
                 表示名 = os.path.basename(root_dir) or 'project_root'
                 try:
@@ -199,7 +199,7 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
                     except (PermissionError, OSError):
                         pass
                     for path in candidates:
-                        marker = os.path.join(path, '_AiDiy.md')
+                        marker = os.path.join(path, '_AIDIY.md')
                         if os.path.isfile(marker):
                             表示名 = os.path.basename(path)
                             try:
@@ -507,7 +507,15 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                     接続.live_processor.絶対パス = 実行パス
                     if hasattr(接続.live_processor, "_select_ai_module"):
                         接続.live_processor.AIモジュール = 接続.live_processor._select_ai_module()
-                    接続.live_processor.AIインスタンス = None
+                    # プロジェクト切り替え時はシステム指示を再構築
+                    if hasattr(接続.live_processor, "システム指示更新"):
+                        code_base_path = str(接続.モデル設定.get("CODE_BASE_PATH", ""))
+                        接続.live_processor.システム指示更新(code_base_path)
+                    if getattr(接続.live_processor, "AIインスタンス", None) or getattr(接続.live_processor, "is_alive", False):
+                        try:
+                            await 接続.live_processor.終了()
+                        except Exception:
+                            logger.exception("LiveAI停止に失敗しました")
                     try:
                         await 接続.live_processor.開始()
                     except Exception:
@@ -596,6 +604,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             return
 
         # WebSocket接続を登録（accept済み）
+        既存セッション再接続 = bool(クライアントセッションID and クライアントセッションID in AIセッション管理.sessions)
         新規セッション = not クライアントセッションID or クライアントセッションID not in AIセッション管理.sessions
         セッションID = await AIセッション管理.connect(
             WebSocket接続,
@@ -731,6 +740,24 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 セッション.live_processor.絶対パス = 実行パス
                 if hasattr(セッション.live_processor, "_select_ai_module"):
                     セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
+                # リロード再接続時もCODE_BASE_PATHに応じたコンテキストを毎回再構築
+                if hasattr(セッション.live_processor, "システム指示更新"):
+                    code_base_path = str(セッション.モデル設定.get("CODE_BASE_PATH", ""))
+                    セッション.live_processor.システム指示更新(code_base_path)
+
+            # 画面リフレッシュ再接続時はLive接続を張り直し、コンテキスト反映漏れを防ぐ
+            if (
+                ソケット番号 == "audio"
+                and 既存セッション再接続
+                and hasattr(セッション, "live_processor")
+                and セッション.live_processor
+                and (getattr(セッション.live_processor, "AIインスタンス", None) or getattr(セッション.live_processor, "is_alive", False))
+            ):
+                try:
+                    await セッション.live_processor.終了()
+                    _ws_log(ch=ソケット番号, 内容="Live接続をリセット", セッションID=セッションID)
+                except Exception:
+                    logger.exception("Live接続リセットに失敗しました")
 
             # LiveAIは音声チャンネル(audio)接続時にのみ起動
             if ソケット番号 == "audio" and not getattr(セッション.live_processor, "is_alive", False):
@@ -917,34 +944,55 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     if 入力フィードバック対象:
                         フィードバック表示チャンネル一覧 = [出力先チャンネル]
                         # AIチャット.vue（ch0）からCode1-4へ送信した場合は、
-                        # 実行先ch1-4に加えてチャット画面(ch0)にも入力フィードバックを表示する。
+                        # チャット画面(ch0)にも入力フィードバックを表示する。
                         if チャンネル == "0" and 出力先チャンネル in ("1", "2", "3", "4"):
                             フィードバック表示チャンネル一覧.append("0")
 
                         for フィードバック表示チャンネル in dict.fromkeys(フィードバック表示チャンネル一覧):
-                            await セッション.send_to_channel(フィードバック表示チャンネル, {
-                                "セッションID": セッションID,
-                                "チャンネル": フィードバック表示チャンネル,
-                                "メッセージ識別": "input_text",
-                                "メッセージ内容": エコーバック用メッセージ,
-                                "ファイル名": None,
-                                "サムネイル画像": None
-                            })
-
-                            保存_会話履歴(
-                                セッションID=セッションID,
-                                チャンネル=フィードバック表示チャンネル,
-                                メッセージ識別="input_text",
-                                メッセージ内容=エコーバック用メッセージ,
-                                ファイル名=None,
-                                サムネイル画像=None
-                            )
+                            # ch0からCode1-4へ送信時: ch1-4にはinput_request、ch0にはinput_text
+                            if チャンネル == "0" and フィードバック表示チャンネル in ("1", "2", "3", "4"):
+                                await セッション.send_to_channel(フィードバック表示チャンネル, {
+                                    "セッションID": セッションID,
+                                    "チャンネル": フィードバック表示チャンネル,
+                                    "メッセージ識別": "input_request",
+                                    "メッセージ内容": エコーバック用メッセージ,
+                                    "ファイル名": None,
+                                    "サムネイル画像": None
+                                })
+                                保存_会話履歴(
+                                    セッションID=セッションID,
+                                    チャンネル=フィードバック表示チャンネル,
+                                    メッセージ識別="input_request",
+                                    メッセージ内容=エコーバック用メッセージ,
+                                    ファイル名=None,
+                                    サムネイル画像=None
+                                )
+                            else:
+                                await セッション.send_to_channel(フィードバック表示チャンネル, {
+                                    "セッションID": セッションID,
+                                    "チャンネル": フィードバック表示チャンネル,
+                                    "メッセージ識別": "input_text",
+                                    "メッセージ内容": エコーバック用メッセージ,
+                                    "ファイル名": None,
+                                    "サムネイル画像": None
+                                })
+                                保存_会話履歴(
+                                    セッションID=セッションID,
+                                    チャンネル=フィードバック表示チャンネル,
+                                    メッセージ識別="input_text",
+                                    メッセージ内容=エコーバック用メッセージ,
+                                    ファイル名=None,
+                                    サムネイル画像=None
+                                )
 
                     受信データ["チャンネル"] = 出力先チャンネル
 
                     try:
                         if 出力先チャンネル in ("1", "2", "3", "4") and hasattr(セッション, 'code_agent_processors'):
                             # コードエージェント（AIコード.vue: チャンネル1-4 / AIチャット.vue: 送信モードCode1-4）
+                            # ch0からの送信はinput_requestとして処理する
+                            if チャンネル == "0":
+                                受信データ["メッセージ識別"] = "input_request"
                             await セッション.code_agent_processors[int(出力先チャンネル) - 1].コード要求(受信データ)
                         elif チャンネル == "input" or 送信モード == "Live":
                             # ライブAI（AIイメージ.vue: チャンネルinput / AIチャット.vue: 送信モードLive）

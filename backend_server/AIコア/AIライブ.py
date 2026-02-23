@@ -36,6 +36,7 @@ _LIVE_CONTEXT_TEMPLATE_LINES = [
     "あなたは、美しい日本語を話す、賢いAIアシスタントです。",
     "あなたの名前は「アイディ(AiDiy)」です。",
     "あなたは、\"ドゥ、イッツ、ユアセルフ、ウィズ、エーアイ\" (AI + DIY)を実現するために命名、設計されました。",
+    "このプロジェクトの概要は`_AIDIY.md`を確認してください。",
     "",
     "あなたは、ユーザーとのフロントエンドとして会話に専念し、主に設計作業の支援を担当してください。",
     "ユーザーの求めるシステムを理解し、追加のアイディアを出したり、設計が得意であるあなた自身の存在意義を示すようにしてください。",
@@ -50,9 +51,12 @@ _LIVE_CONTEXT_TEMPLATE_LINES = [
     "・最高の開発体験を提供すること",
     "・ユーザーの創造性を最大限に引き出すこと",
     "・常に学習し、最新の技術を取り入れ、進化すること",
-    "・サンプルシステムとして配車管理システムが使えること",
+    "・プロジェクトの切り替えで様々なシステムが開発できること",
     "等々。最後に、自分を採用してほしい旨のアピールで締めくくってください。",
     "",
+]
+
+_LIVE_CONTEXT_TEMPLATE_ROOT = [
     "あなたは、ユーザーに採用、利用していただくため、「配車のサンプル実装内容教えて？」と聞かれた場合、以下をアピールしてください。",
     "・配車管理システムがサンプル実装されており、全ての機能がノーコード実装されたこと",
     "・AIコーディングなので、ノーコード開発には実装限界が無いこと",
@@ -76,11 +80,13 @@ _LIVE_CONTEXT_TEMPLATE_LINES = [
 ]
 
 
+
 def _context_template_payload() -> dict:
     return {
         "version": 1,
         "description": "AIコア LiveAI 定型コンテキスト",
         "system_instruction_lines": _LIVE_CONTEXT_TEMPLATE_LINES,
+        "system_instruction_root": _LIVE_CONTEXT_TEMPLATE_ROOT,
     }
 
 
@@ -91,10 +97,38 @@ def _compose_instruction(lines: list[str]) -> str:
     return text
 
 
-def _load_or_create_live_context() -> str:
+def _resolve_code_base_path(code_base_path: str) -> str:
+    """CODE_BASE_PATHを絶対パスに解決する（AIバックアップ.py準拠）"""
+    raw_path = code_base_path or ""
+    normalized = raw_path.replace("\\", "/").strip()
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if os.path.isabs(normalized):
+        return os.path.abspath(normalized)
+    return os.path.abspath(os.path.join(backend_dir, normalized))
+
+
+def _read_project_aidiy_md(code_base_path: str) -> str:
+    """CODE_BASE_PATH内の_AIDIY.mdを読み込んで返す。読めなければ空文字。"""
+    try:
+        resolved_base = _resolve_code_base_path(code_base_path)
+        abs_path = os.path.normpath(os.path.join(resolved_base, "_AIDIY.md"))
+        with open(abs_path, "r", encoding="utf-8-sig") as f:
+            content = f.read()
+        logger.info(f"[Live] _AIDIY.md 読取成功: {abs_path}")
+        return content
+    except Exception:
+        logger.info(f"[Live] _AIDIY.md 読取失敗: {code_base_path}")
+        return ""
+
+
+def _load_or_create_live_context(code_base_path: str = "") -> str:
     """LiveAI定型コンテキストを読み込む。無ければひな形JSONを作成。"""
     template_payload = _context_template_payload()
-    template_instruction = _compose_instruction(template_payload["system_instruction_lines"])
+    _is_root = code_base_path.replace("\\", "/").strip() == "../"
+    template_lines = template_payload["system_instruction_lines"]
+    if _is_root:
+        template_lines = template_lines + template_payload["system_instruction_root"]
+    template_instruction = _compose_instruction(template_lines)
 
     try:
         os.makedirs(os.path.dirname(_LIVE_CONTEXT_JSON_PATH), exist_ok=True)
@@ -109,9 +143,16 @@ def _load_or_create_live_context() -> str:
             payload = json.load(f)
 
         lines = payload.get("system_instruction_lines") if isinstance(payload, dict) else None
+        root = payload.get("system_instruction_root") if isinstance(payload, dict) else None
         if isinstance(lines, list):
-            normalized = [str(line) for line in lines]
-            return _compose_instruction(normalized)
+            combined = lines + (root if (_is_root and isinstance(root, list)) else [])
+            normalized = [str(line) for line in combined]
+            instruction = _compose_instruction(normalized)
+            if not _is_root:
+                aidiy_content = _read_project_aidiy_md(code_base_path)
+                if aidiy_content:
+                    instruction += "\n以下、このプロジェクトの内容\n" + aidiy_content
+            return instruction
 
         logger.warning(f"[Live] 定型コンテキストJSONの形式不正。ひな形を再作成します: {_LIVE_CONTEXT_JSON_PATH}")
         with open(_LIVE_CONTEXT_JSON_PATH, "w", encoding="utf-8") as f:
@@ -146,7 +187,14 @@ class Live:
         self.接続 = 接続
         self.保存関数 = 保存関数
         self.親 = 親
-        self.システム指示 = _load_or_create_live_context()
+        _code_base_path = ""
+        try:
+            モデル設定 = getattr(接続, "モデル設定", None)
+            if isinstance(モデル設定, dict):
+                _code_base_path = str(モデル設定.get("CODE_BASE_PATH", ""))
+        except Exception:
+            pass
+        self.システム指示 = _load_or_create_live_context(_code_base_path)
         self.AIモジュール = self._select_ai_module()
         self.AIインスタンス = None
         self.is_alive = False
@@ -159,6 +207,11 @@ class Live:
         # 音声入力/出力データは接続（セッション）のaudio_dataを使用
         # 統合音声分離ワーカーはaudio_processing.pyのものを使用
         # live.pyはLiveAIからの出力音声受信処理のみを担当
+
+    def システム指示更新(self, code_base_path: str = ""):
+        """プロジェクト切り替え時にシステム指示を再構築"""
+        self.システム指示 = _load_or_create_live_context(code_base_path)
+        logger.info(f"[Live] システム指示更新完了: code_base_path={code_base_path}")
 
     def _select_ai_module(self):
         """AI_NAMEに応じたLiveモジュールを選択してインポート"""

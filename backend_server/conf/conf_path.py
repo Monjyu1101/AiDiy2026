@@ -30,7 +30,7 @@ class conf_path:
         # 外部パス一覧のルート(2階層上、初期値は相対パス)
         self.external_root_path = '../../'
 
-        # 外部パス一覧 - _AiDiy.md を含むプロジェクト検出
+        # 外部パス一覧 - _AIDIY.md を含むプロジェクト検出
         self.external_root_dic = {}
 
     def init(self) -> bool:
@@ -82,7 +82,7 @@ class conf_path:
         return normalized
 
     def _discover_agents_projects(self, search_root: Optional[str] = None) -> Dict[str, str]:
-        """指定ルート直下、およびその1階層下で「_AiDiy.md」を含むフォルダを列挙"""
+        """指定ルート直下、およびその1階層下で「_AIDIY.md」を含むフォルダを列挙"""
         result: Dict[str, str] = {}
         try:
             if search_root and not os.path.isabs(search_root):
@@ -98,7 +98,7 @@ class conf_path:
                 return result
 
             def try_add(path: str) -> None:
-                agents_file = os.path.join(path, '_AiDiy.md')
+                agents_file = os.path.join(path, '_AIDIY.md')
                 if os.path.isfile(agents_file):
                     key = os.path.basename(path)
                     if key not in result:

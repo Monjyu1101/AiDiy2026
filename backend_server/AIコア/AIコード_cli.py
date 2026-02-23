@@ -192,8 +192,8 @@ class CodeAI:
                     # Linux/Mac: PATH経由でコマンド直接実行
                     cmd = 'claude'
 
-            # copilot
-            common = [cmd, "--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions"]
+            # claude
+            common = [cmd, "--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions", "--chrome"]
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 common.extend(["--model", self.code_model])

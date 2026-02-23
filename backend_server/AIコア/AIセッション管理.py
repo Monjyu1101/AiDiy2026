@@ -41,8 +41,8 @@ def 初期モデル設定生成(app_conf) -> dict:
     if not (app_conf and hasattr(app_conf, 'json')):
         return {}
     
-    # CODE_BASE_PATHは相対パスのまま保存（セッション固有の絶対パス変換は使用時に行う）
-    code_base_path_raw = app_conf.json.get("CODE_BASE_PATH", "../")
+    # CODE_BASE_PATHは相対パスのまま保存（絶対パス変換は使用時に行う）
+    code_base_path_raw = str(app_conf.json.get("CODE_BASE_PATH", "../")).strip() or "../"
 
     return {
         # ChatAI設定
@@ -362,6 +362,14 @@ class WebSocketManager:
         # 10文字（16進）: URL/ログで扱いやすい短いID
         return secrets.token_hex(5)
 
+    def _新規セッション初期モデル設定(self, app_conf, セッションID: str) -> dict:
+        """新規セッション用の初期モデル設定を生成（conf値をそのまま使用）"""
+        model_settings = 初期モデル設定生成(app_conf=app_conf)
+        if model_settings:
+            code_base_path = str(model_settings.get("CODE_BASE_PATH", "")).strip()
+            logger.info(f"新規セッション初期CODE_BASE_PATH: {code_base_path} (session={セッションID})")
+        return model_settings
+
     async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True) -> str:
         """
         WebSocket接続を登録（セッション単位）
@@ -393,7 +401,7 @@ class WebSocketManager:
                 session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
                 logger.debug(f"セッション状態を復元: {セッションID}")
             else:
-                session.モデル設定 = 初期モデル設定生成(app_conf)
+                session.モデル設定 = self._新規セッション初期モデル設定(app_conf, セッションID)
                 if session.モデル設定:
                     logger.debug(f"app.confからモデル設定をコピー: {セッションID}")
 
@@ -462,7 +470,7 @@ class WebSocketManager:
             session.モデル設定 = saved_state.get("モデル設定", {})
             session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
         else:
-            session.モデル設定 = 初期モデル設定生成(app_conf)
+            session.モデル設定 = self._新規セッション初期モデル設定(app_conf, セッションID)
             self.session_states[セッションID] = {
                 "ボタン": session.ボタン状態.copy(),
                 "モデル設定": session.モデル設定.copy(),

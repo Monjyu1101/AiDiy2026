@@ -35,7 +35,6 @@ from apps_router import M車両
 from apps_router import V車両
 from apps_router import M商品
 from apps_router import V商品
-
 from apps_router import T配車
 from apps_router import V配車
 from apps_router import T商品出庫
@@ -88,7 +87,6 @@ app.include_router(M車両.router)
 app.include_router(V車両.router)
 app.include_router(M商品.router)
 app.include_router(V商品.router)
-
 app.include_router(T配車.router)
 app.include_router(V配車.router)
 app.include_router(T商品出庫.router)
