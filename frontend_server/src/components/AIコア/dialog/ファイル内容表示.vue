@@ -11,7 +11,8 @@
 -->
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { シキHTML生成 } from '@/utils/shiki';
 
 const props = defineProps<{
   show: boolean;
@@ -70,100 +71,120 @@ const テキスト内容 = computed(() => {
   }
 });
 
+const ハイライトHTML = ref('');
+let ハイライト要求連番 = 0;
+
+const テキストハイライト更新 = async () => {
+  if (!props.show || !テキスト表示.value || !テキスト内容.value) {
+    ハイライトHTML.value = '';
+    return;
+  }
+
+  const 現在連番 = ++ハイライト要求連番;
+  try {
+    const html = await シキHTML生成(テキスト内容.value, props.ファイル名);
+    if (現在連番 !== ハイライト要求連番) return;
+    ハイライトHTML.value = html;
+  } catch {
+    if (現在連番 !== ハイライト要求連番) return;
+    ハイライトHTML.value = '';
+  }
+};
+
+watch(
+  [() => props.show, () => props.ファイル名, () => props.base64_data, テキスト表示],
+  () => {
+    void テキストハイライト更新();
+  },
+  { immediate: true }
+);
+
 const handleClose = () => {
   emit('close');
+};
+
+const handleDownload = () => {
+  if (!props.base64_data) return;
+  const ベース名 = props.ファイル名.replace(/\\/g, '/').split('/').pop() ?? props.ファイル名;
+  const a = document.createElement('a');
+  a.href = `data:application/octet-stream;base64,${props.base64_data}`;
+  a.download = ベース名;
+  a.click();
 };
 </script>
 
 <template>
   <div v-if="show" class="file-content-overlay" @click.self="handleClose">
     <div class="file-content-dialog">
-      <div class="file-content-header">
-        <div class="file-content-title">ファイル内容表示</div>
-        <button type="button" class="close-button" @click="handleClose">×</button>
-      </div>
-
       <div class="file-name">{{ ファイル名 }}</div>
 
       <div class="file-content-body">
         <img v-if="画像表示 && 画像DataUrl" class="preview-image" :src="画像DataUrl" alt="image preview" />
+        <div v-else-if="テキスト表示 && ハイライトHTML" class="preview-text preview-highlight" v-html="ハイライトHTML"></div>
         <pre v-else-if="テキスト表示" class="preview-text">{{ テキスト内容 }}</pre>
         <div v-else class="unsupported-message">この拡張子はプレビュー対象外です。</div>
+      </div>
+
+      <div class="file-content-footer">
+        <button type="button" class="btn-download" @click="handleDownload" :disabled="!base64_data">ダウンロード</button>
+        <button type="button" class="btn-close" @click="handleClose">閉じる</button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .file-content-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10001;
+  animation: fadeIn 0.3s ease;
 }
 
 .file-content-dialog {
-  width: min(1000px, 92vw);
-  max-height: 88vh;
-  background: #0f1115;
-  color: #e5e7eb;
-  border: 1px solid #30363d;
-  border-radius: 8px;
+  max-width: 90%;
+  max-height: 90%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  align-items: center;
+  gap: 16px;
 }
 
 .file-content-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid #30363d;
-}
-
-.file-content-title {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.close-button {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #444c56;
-  background: #161b22;
-  color: #e5e7eb;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.close-button:hover {
-  background: #1f2630;
+  display: none;
 }
 
 .file-name {
-  padding: 10px 14px;
-  border-bottom: 1px solid #30363d;
   font-family: 'Courier New', monospace;
-  font-size: 12px;
+  font-size: 13px;
   word-break: break-all;
+  color: #ffffff;
+  text-align: center;
 }
 
 .file-content-body {
-  padding: 12px 14px;
   overflow: auto;
-  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .preview-image {
   display: block;
   max-width: 100%;
-  max-height: 72vh;
-  margin: 0 auto;
-  border: 1px solid #30363d;
+  max-height: calc(90vh - 120px);
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3);
 }
 
 .preview-text {
@@ -173,10 +194,83 @@ const handleClose = () => {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+  color: #e5e7eb;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 12px;
+  border-radius: 4px;
+  max-height: calc(90vh - 140px);
+  overflow: auto;
+}
+
+.preview-highlight {
+  padding: 0;
+  background: transparent;
+}
+
+.preview-highlight :deep(pre.shiki-pre) {
+  margin: 0;
+  padding: 12px;
+  background: transparent !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  max-height: calc(90vh - 140px);
+  overflow: auto;
+}
+
+.preview-highlight :deep(pre.shiki-pre code) {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .unsupported-message {
   color: #9ca3af;
   font-size: 13px;
+}
+
+.file-content-footer {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-shrink: 0;
+}
+
+.btn-download,
+.btn-close {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-download {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.btn-download:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.btn-download:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-close {
+  background: #808080;
+  color: white;
+}
+
+.btn-close:hover {
+  background: #666666;
+  transform: scale(1.05);
 }
 </style>

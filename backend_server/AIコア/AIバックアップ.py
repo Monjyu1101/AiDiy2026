@@ -126,7 +126,7 @@ def バックアップ実行_共通ログ(
         ログ出力=False,
     )
     count = len(result[2]) if result else 0
-    log.info(f"バックアップ終了(件数={count})")
+    log.info(f"バックアップ終了(件数={count}, 全件={len(result[1]) if result else 0})")
     return result
 
 
@@ -206,9 +206,9 @@ def バックアップ実行(
     シンプル差分バックアップ実行
     - 初回（*.allフォルダなし）→ 全件バックアップ
     - 2回目以降 → 最終バックアップ時刻+1秒以降の差分のみ
-    
+
     セッション設定: セッション固有のCODE_BASE_PATHを含む辞書（オプション）
-    戻り値: (最終更新時刻, 全ファイル一覧, バックアップファイル一覧, 全件フラグ, バックアップフォルダ絶対パス) または None（差分なしまたはエラー）
+    戻り値: (最終更新時刻, 全ファイル一覧, バックアップファイル一覧, 全件フラグ, バックアップフォルダ絶対パス) または None（エラー時のみ）
     """
     try:
         base_path = _コードベース絶対パス取得(アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
@@ -216,21 +216,21 @@ def バックアップ実行(
             return None
 
         backup_root = os.path.join(base_path, "backup")
-        
+
         # 最終バックアップ時刻を取得
         最終バックアップ結果 = _バックアップ全体の最終日時取得(backup_root)
-        
+
         # 全ファイル一覧と最大更新時刻を取得
         max_mtime, all_files = _最新更新と全ファイル一覧(base_path)
         if not max_mtime or not all_files:
             return None
-        
+
         # バックアップフォルダ名を作成
         timestamp = datetime.fromtimestamp(max_mtime)
         date_dir = timestamp.strftime("%Y%m%d")
         time_dir = timestamp.strftime("%H%M%S")
         最終時刻 = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-        
+
         # 初回（全件バックアップ）
         if not 最終バックアップ結果:
             target_dir = os.path.abspath(os.path.join(backup_root, date_dir, f"{time_dir}.all"))
@@ -240,12 +240,13 @@ def バックアップ実行(
                 if ログ出力:
                     logger.info(f"バックアップ終了(件数={len(all_files)})")
                 return (最終時刻, all_files, all_files, True, target_dir)
-            return None
-        
+            return (最終時刻, all_files, [], False, "")
+
         # 差分バックアップ: 最終バックアップ時刻+1秒以降
         最終タイムスタンプ, _ = 最終バックアップ結果
+        最終時刻 = datetime.fromtimestamp(最終タイムスタンプ).strftime("%Y-%m-%d %H:%M:%S")
         threshold_ts = 最終タイムスタンプ + 1.0
-        
+
         # 差分ファイル抽出
         changed_files = []
         for rel_path in all_files:
@@ -258,22 +259,23 @@ def バックアップ実行(
                     changed_files.append(rel_path)
             except OSError:
                 continue
-        
+
+        # 差分なし → 全ファイル一覧だけ返す
         if not changed_files:
-            return None
-        
+            return (最終時刻, all_files, [], False, "")
+
         # 差分バックアップ作成
         target_dir = os.path.abspath(os.path.join(backup_root, date_dir, time_dir))
         if os.path.isdir(target_dir):
-            return None
-        
+            return (最終時刻, all_files, [], False, target_dir)
+
         if ログ出力:
             logger.info(f"バックアップ開始({base_path})")
         if _ファイルコピー実行(base_path, changed_files, target_dir):
             if ログ出力:
                 logger.info(f"バックアップ終了(件数={len(changed_files)})")
             return (最終時刻, all_files, changed_files, False, target_dir)
-        return None
+        return (最終時刻, all_files, [], False, "")
 
     except Exception as e:
         logger.error(f"バックアップ実行エラー: {e}")

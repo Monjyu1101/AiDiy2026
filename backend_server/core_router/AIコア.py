@@ -237,6 +237,36 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
     return options
 
 
+def 取得_CODE_ROOT_PATH(
+    セッション: Optional[SessionConnection],
+    アプリ設定=None,
+) -> str:
+    """セッション設定に基づくCODE_ROOT_PATH（絶対パス）を取得"""
+    try:
+        セッション設定 = セッション.モデル設定 if セッション else None
+        return コードベース絶対パス取得(
+            アプリ設定=アプリ設定,
+            backend_dir=バックエンドディレクトリ,
+            セッション設定=セッション設定,
+        )
+    except Exception:
+        logger.exception("CODE_ROOT_PATH解決エラー")
+        return ""
+
+
+def 読取_AIDIY_MD内容(CODE_ROOT_PATH: str) -> str:
+    """指定ルート配下の_AIDIY.md内容を返す（失敗時は空文字）"""
+    if not CODE_ROOT_PATH:
+        return ""
+    try:
+        aidiy_path = os.path.normpath(os.path.join(CODE_ROOT_PATH, "_AIDIY.md"))
+        with open(aidiy_path, "r", encoding="utf-8-sig") as f:
+            return f.read()
+    except Exception:
+        logger.info(f"_AIDIY.md読取失敗: root={CODE_ROOT_PATH}")
+        return ""
+
+
 
 
 async def 送信_会話履歴(
@@ -287,12 +317,16 @@ async def 初期化(http_request: Request, request: 初期化リクエスト):
             # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
             session = AIセッション管理.sessions.get(セッションID)
             if session and session.モデル設定:
-                バックアップ実行_共通ログ(
+                _result = バックアップ実行_共通ログ(
                     呼出しロガー=logger,
                     アプリ設定=getattr(http_request.app, "conf", None),
                     backend_dir=バックエンドディレクトリ,
                     セッション設定=session.モデル設定,
                 )
+                if _result:
+                    session.ソース最終更新日時 = _result[0]
+                    session.全ファイルリスト = _result[1]
+                    session.バックアップベースパス = _result[4]
         else:
             # セッションを確実に作成（存在しなければ新規）
             AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
@@ -529,12 +563,16 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             reboot_apps = bool(再起動要求.get("reboot_apps"))
             if reboot_core or reboot_apps:
                 # バックアップ実行（セッション固有のCODE_BASE_PATHを使用）
-                バックアップ実行_共通ログ(
+                _result = バックアップ実行_共通ログ(
                     呼出しロガー=logger,
                     アプリ設定=getattr(http_request.app, "conf", None),
                     backend_dir=バックエンドディレクトリ,
                     セッション設定=接続.モデル設定,
                 )
+                if _result and 接続:
+                    接続.ソース最終更新日時 = _result[0]
+                    接続.全ファイルリスト = _result[1]
+                    接続.バックアップベースパス = _result[4]
             if reboot_core:
                 with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_core.txt"), "w", encoding="utf-8") as f:
                     f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -621,12 +659,16 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
         if 新規セッション and セッション.モデル設定 and ソケット番号 == "input":
             try:
-                バックアップ実行_共通ログ(
+                _result = バックアップ実行_共通ログ(
                     呼出しロガー=logger,
                     アプリ設定=getattr(WebSocket接続.app, "conf", None),
                     backend_dir=バックエンドディレクトリ,
                     セッション設定=セッション.モデル設定,
                 )
+                if _result:
+                    セッション.ソース最終更新日時 = _result[0]
+                    セッション.全ファイルリスト = _result[1]
+                    セッション.バックアップベースパス = _result[4]
             except Exception as e:
                 logger.error(f"WebSocket接続時バックアップエラー: {e}")
 
@@ -766,9 +808,18 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             if セッション.audio_split_task is None or セッション.audio_split_task.done():
                 セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
 
-        # 出力ソケット接続時にwelcome_infoと履歴を送信
-        if ソケット番号 in ["0", "1", "2", "3", "4"]:
-            if ソケット番号 == "0":
+        # 出力ソケット接続時にwelcome_info/welcome_textを送信（input含む）
+        if ソケット番号 in ["0", "1", "2", "3", "4", "input"]:
+            追加メッセージ = ""
+            if ソケット番号 == "input":
+                CODE_ROOT_PATH = 取得_CODE_ROOT_PATH(
+                    セッション=セッション,
+                    アプリ設定=getattr(WebSocket接続.app, "conf", None),
+                )
+                ウェルカム本文 = f"Root: {CODE_ROOT_PATH}" if CODE_ROOT_PATH else "Root: (not found)"
+                aidiy内容 = 読取_AIDIY_MD内容(CODE_ROOT_PATH)
+                追加メッセージ = aidiy内容 if aidiy内容 else "_AIDIY.md にプロジェクト概要を記載してください。"
+            elif ソケット番号 == "0":
                 last_update = セッション.ソース最終更新日時
                 if not last_update:
                     last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -796,6 +847,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     f"（Model: \"{live_model}\", Voice: \"{live_voice}\"）\n"
                     "音声、テキスト、画像共有しての会話ができます！"
                 )
+                追加メッセージ = "会話準備できました。よろしくお願いします。"
             else:
                 idx = int(ソケット番号)
                 ai_key = f"CODE_AI{idx}_NAME"  # intに変換して使用
@@ -822,6 +874,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     f"（Name: \"{ai_name}\", Model: \"{ai_model}\"）\n"
                     "システム開発を支援します。"
                 )
+                追加メッセージ = "準備できました。"
 
             if ウェルカム本文:
                 await セッション.send_to_channel(ソケット番号, {
@@ -835,12 +888,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 _ws_log(ch=ソケット番号, 内容="welcome_info送信", セッションID=セッションID)
 
             await asyncio.sleep(0.1)
+            if ソケット番号 in ["0", "1", "2", "3", "4"]:
+                try:
+                    await 送信_会話履歴(セッション, セッションID, チャンネル=ソケット番号)
+                except Exception as e:
+                    logger.exception(f"会話履歴送信エラー: {e}")
             try:
-                await 送信_会話履歴(セッション, セッションID, チャンネル=ソケット番号)
-            except Exception as e:
-                logger.exception(f"会話履歴送信エラー: {e}")
-            try:
-                追加メッセージ = "会話準備できました。よろしくお願いします。" if ソケット番号 == "0" else "準備できました。"
                 await セッション.send_to_channel(ソケット番号, {
                     "セッションID": セッションID,
                     "チャンネル": ソケット番号,
@@ -1205,6 +1258,58 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             logger.warning(f"cancel_run: 無効なチャンネル={チャンネル} ({セッションID})")
                     except Exception as e:
                         logger.warning(f"cancel_run処理エラー: {e}")
+
+                elif メッセージ識別 == "file_list":
+                    try:
+                        チャンネル = str(受信データ.get("チャンネル", "file"))
+
+                        # セッションに保存済みのバックアップ情報を使用
+                        最終ファイル日時 = セッション.ソース最終更新日時 if セッション else None
+                        最終ファイルリスト = list(セッション.全ファイルリスト) if セッション else []
+                        バックアップベースパス = セッション.バックアップベースパス if セッション else ""
+                        # CODE_BASE_PATHを絶対パスに解決してフロントエンドへ送る
+                        _raw = str((セッション.モデル設定 or {}).get("CODE_BASE_PATH", "")).strip() if セッション else ""
+                        if _raw:
+                            プロジェクトパス = os.path.abspath(_raw) if os.path.isabs(_raw) else os.path.abspath(os.path.join(バックエンドディレクトリ, _raw))
+                        else:
+                            プロジェクトパス = ""
+
+                        # tempフォルダのファイル一覧（1時間以内に更新されたもののみ）
+                        tempパス = os.path.join(バックエンドディレクトリ, "temp")
+                        作業ファイル日時 = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+                        作業ファイルリスト = []
+                        一時間前 = datetime.now().timestamp() - 3600
+                        if os.path.exists(tempパス):
+                            for root, dirs, files in os.walk(tempパス):
+                                dirs[:] = [d for d in dirs if d not in ["logs"]]
+                                for file in files:
+                                    if file.endswith(".log"):
+                                        continue
+                                    full_path = os.path.join(root, file)
+                                    try:
+                                        if os.path.getmtime(full_path) < 一時間前:
+                                            continue
+                                    except OSError:
+                                        continue
+                                    相対パス = "temp/" + os.path.relpath(full_path, tempパス).replace("\\", "/")
+                                    作業ファイルリスト.append(相対パス)
+
+                        await セッション.send_to_channel(チャンネル, {
+                            "セッションID": セッションID,
+                            "チャンネル": チャンネル,
+                            "メッセージ識別": "file_list",
+                            "メッセージ内容": {
+                                "プロジェクトパス": プロジェクトパス,
+                                "バックアップベースパス": バックアップベースパス,
+                                "最終ファイル日時": 最終ファイル日時,
+                                "最終ファイルリスト": sorted(最終ファイルリスト),
+                                "作業ファイル日時": 作業ファイル日時,
+                                "作業ファイルリスト": sorted(作業ファイルリスト),
+                            }
+                        })
+                        logger.info(f"[file_list] 返信: バックアップ{len(最終ファイルリスト)}件, temp{len(作業ファイルリスト)}件 ({セッションID})")
+                    except Exception as e:
+                        logger.error(f"[file_list] エラー: {e}", exc_info=True)
 
                 elif メッセージ識別 == "input_image":
                     try:

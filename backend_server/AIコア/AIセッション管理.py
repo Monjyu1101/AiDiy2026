@@ -165,6 +165,8 @@ class SessionConnection:
         }
         self.モデル設定 = {}
         self.ソース最終更新日時 = None
+        self.全ファイルリスト: List[str] = []
+        self.バックアップベースパス: str = ""
         self.streaming_processor: Optional[StreamingProcessor] = None
         self.recognition_processor = None
         self.audio_split_task: Optional[asyncio.Task] = None

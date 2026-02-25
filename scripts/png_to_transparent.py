@@ -6,6 +6,11 @@ from PIL import Image
 import sys
 import os
 
+# Windowsコンソールでの文字化け対策
+if sys.stdout.encoding != 'utf-8':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
 
 def make_transparent(input_path, output_path=None, keep_color=(0, 0, 0), threshold=30):
     """
@@ -22,21 +27,21 @@ def make_transparent(input_path, output_path=None, keep_color=(0, 0, 0), thresho
         img = Image.open(input_path).convert("RGBA")
         
         # ピクセルデータを取得
-        datas = img.getdata()
-        
+        pixels = list(img.getdata())
+
         new_data = []
-        for item in datas:
+        for item in pixels:
             # RGBの差分を計算
             r_diff = abs(item[0] - keep_color[0])
             g_diff = abs(item[1] - keep_color[1])
             b_diff = abs(item[2] - keep_color[2])
-            
+
             # しきい値以内なら残す、それ以外は透明にする
             if r_diff < threshold and g_diff < threshold and b_diff < threshold:
                 new_data.append(item)  # そのまま残す
             else:
                 new_data.append((255, 255, 255, 0))  # 完全に透明
-        
+
         # 新しいデータを適用
         img.putdata(new_data)
         

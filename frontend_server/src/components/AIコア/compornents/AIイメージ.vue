@@ -942,8 +942,8 @@ onBeforeUnmount(() => {
 /* テキスト入力エリア */
 .control-area {
   padding: 10px 20px 0 20px;
-  background: #202020;
-  border-top: 1px solid #484848;
+  background: #101010;
+  border-top: 1px solid #2c2c2c;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -990,7 +990,7 @@ onBeforeUnmount(() => {
   border-radius: 0;
   outline: none;
   font-size: 14px;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.35);
   color: #e0e0e0;
   box-sizing: border-box;
   resize: none;

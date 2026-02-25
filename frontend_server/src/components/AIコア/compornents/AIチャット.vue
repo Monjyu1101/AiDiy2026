@@ -334,7 +334,17 @@ const 受信内容文字列 = (受信データ: any) => {
   return typeof 内容 === 'string' ? 内容 : JSON.stringify(内容);
 };
 
+const 受信チャンネル一致 = (受信データ: any): boolean => {
+  const 期待チャンネル = String(プロパティ.チャンネル ?? '0');
+  const 実受信チャンネル = 受信データ?.チャンネル;
+  if (実受信チャンネル === undefined || 実受信チャンネル === null || 実受信チャンネル === '') {
+    return true;
+  }
+  return String(実受信チャンネル) === 期待チャンネル;
+};
+
 const ウェルカム受信処理 = (受信データ: any) => {
+  if (!受信チャンネル一致(受信データ)) return;
   表示時アクティブ化();
   console.log('[チャット] welcome_info受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
@@ -397,6 +407,7 @@ const 出力リクエスト受信処理 = (受信データ: any) => {
 };
 
 const ウェルカムテキスト受信処理 = (受信データ: any) => {
+  if (!受信チャンネル一致(受信データ)) return;
   if (ウェルカムテキスト受信済み.value) {
     表示時アクティブ化();
   }
@@ -989,7 +1000,7 @@ const 接続状態表示 = computed(() => {
 
 <style scoped>
 .chat-container {
-  background: rgba(255, 255, 255, 0.95);
+  background: #ffffff;
   border-radius: 2px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   display: flex;
@@ -1337,8 +1348,8 @@ const 接続状態表示 = computed(() => {
 
 .control-area {
   padding: 10px 20px 0 20px;
-  background: #202020;
-  border-top: 1px solid #484848;
+  background: #101010;
+  border-top: 1px solid #2c2c2c;
   display: flex;
   flex-direction: row;
   gap: 10px;
@@ -1431,7 +1442,7 @@ const 接続状態表示 = computed(() => {
   border-radius: 0;
   outline: none;
   font-size: 14px;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.35);
   color: #e0e0e0;
   box-sizing: border-box;
   resize: none;

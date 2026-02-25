@@ -1059,7 +1059,7 @@ const 状態表示テキスト = () => {
           :disabled="!ストリーム受信中 || !WebSocket接続中"
           title="キャンセル"
         >
-          !
+          <img src="/icons/abort.png" alt="キャンセル" />
         </button>
       </div>
     </div>
@@ -1422,8 +1422,8 @@ const 状態表示テキスト = () => {
 /* テキスト入力エリア */
 .control-area {
   padding: 10px 20px 0 20px; /* チャットと同じpadding */
-  background: #000000; /* 黒背景を維持 */
-  border-top: 1px solid #333;
+  background: #101010;
+  border-top: 1px solid #2c2c2c;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1470,7 +1470,7 @@ const 状態表示テキスト = () => {
   border-radius: 0;
   outline: none;
   font-size: 14px;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.35);
   color: #e0e0e0;
   box-sizing: border-box;
   resize: none;
@@ -1613,18 +1613,25 @@ const 状態表示テキスト = () => {
   margin-bottom: 20px;
   margin-left: 4px;
   background: rgba(128, 128, 128, 0.3);
-  color: #808080;
-  font-size: 24px;
-  font-weight: bold;
-  font-family: 'Courier New', monospace;
   transition: all 0.2s ease;
+}
+
+.agent-cancel-btn img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: brightness(0) invert(1) opacity(0.6);
 }
 
 .agent-cancel-btn.is-active {
   background: #ff4444;
   border-color: #ff4444;
-  color: #ffffff;
   cursor: pointer;
+}
+
+.agent-cancel-btn.is-active img {
+  filter: brightness(0) invert(1);
 }
 
 .agent-cancel-btn.is-active:hover {

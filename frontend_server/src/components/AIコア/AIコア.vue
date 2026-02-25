@@ -18,6 +18,7 @@ import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/
 import AIコアチャット from './compornents/AIチャット.vue';
 import AIコアイメージ from './compornents/AIイメージ.vue';
 import AIコアコード from './compornents/AIコード.vue';
+import AIコアファイル from './compornents/AIファイル.vue';
 import { AudioStreamProcessor } from './AI音声処理';
 
 // セッションID（全コンポーネント共通）
@@ -45,19 +46,51 @@ const chatMode = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>('l
 
 // エラーメッセージ
 const errorMessage = ref('');
+const 入力ウェルカム情報 = ref('');
+const 入力ウェルカム本文 = ref('');
+const AIコアビュー要素 = ref<HTMLElement | null>(null);
+const ガイド要素 = ref<HTMLElement | null>(null);
+const ガイドホバー中 = ref(false);
+
+const 受信内容文字列 = (受信データ: any) => {
+  const 内容 = 受信データ?.メッセージ内容 ?? 受信データ?.text ?? '';
+  if (!内容) return '';
+  return typeof 内容 === 'string' ? 内容 : JSON.stringify(内容);
+};
+
+const 入力ウェルカム情報表示 = computed(() => 入力ウェルカム情報.value.trim());
+const 入力ウェルカム本文表示 = computed(() => 入力ウェルカム本文.value.trim());
+
+const ガイド領域マウス移動 = (event: MouseEvent) => {
+  if (!入力ウェルカム本文表示.value || !ガイド要素.value) {
+    ガイドホバー中.value = false;
+    return;
+  }
+  const rect = ガイド要素.value.getBoundingClientRect();
+  const x = event.clientX;
+  const y = event.clientY;
+  ガイドホバー中.value = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+};
+
+const ガイド領域マウス離脱 = () => {
+  ガイドホバー中.value = false;
+};
 
 // 各コンポーネントの表示状態（初期値は全てfalse、WebSocket接続で初期値受信後に有効化）
-const showChat = ref(false);
-const showImage = ref(false);
-const showAgent1 = ref(false);
-const showAgent2 = ref(false);
-const showAgent3 = ref(false);
-const showAgent4 = ref(false);
+// ※ ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4 → 設定
+const showImage = ref(false);   // カメラ
+const showFile = ref(false);    // ファイル
+const showChat = ref(false);    // チャット
+const showAgent1 = ref(false);  // コード1
+const showAgent2 = ref(false);  // コード2
+const showAgent3 = ref(false);  // コード3
+const showAgent4 = ref(false);  // コード4
 
 // 音声・画像制御（初期値は全てfalse、WebSocket接続で初期値受信後に有効化）
 const enableMicrophone = ref(false);
 const enableSpeaker = ref(false);
 const enableCamera = ref(false);
+const enableFileButton = ref(false);
 
 // チャット数カウント
 const chatCount = ref(0);
@@ -96,6 +129,12 @@ const syncLiveSampleRate = () => {
   const liveAi = モデル設定.value.LIVE_AI_NAME || '';
   const provider = liveAi === 'openai_live' ? 'openai' : liveAi;
   audioProcessor.setSampleRate(provider);
+};
+
+// ファイルボタンクリック時
+const toggleFile = () => {
+  enableFileButton.value = !enableFileButton.value;
+  showFile.value = enableFileButton.value;
 };
 
 // チャットボタンクリック時
@@ -154,9 +193,14 @@ const handleImageSelectionCancel = () => {
 };
 
 // 各コンポーネントを閉じるハンドラー
+const handleCloseFile = () => {
+  showFile.value = false;
+  enableFileButton.value = false;
+};
+
 const handleCloseChat = () => {
   showChat.value = false;
-  enableChatButton.value = false; // ボタンもオフに
+  enableChatButton.value = false;
 };
 
 const handleCloseImage = () => {
@@ -202,8 +246,22 @@ const initializeWebSocket = async (既存セッションID?: string) => {
     console.log('[AIコア] WebSocket接続開始:', wsUrl, 'セッションID:', 既存セッションID);
 
     wsClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, 'input');
+    入力ウェルカム情報.value = '';
+    入力ウェルカム本文.value = '';
 
     // メッセージハンドラを登録（connect()の前に登録）
+    wsClient.value.on('welcome_info_input', (message) => {
+      const 内容 = 受信内容文字列(message);
+      if (!内容) return;
+      入力ウェルカム情報.value = 内容;
+    });
+
+    wsClient.value.on('welcome_text_input', (message) => {
+      const 内容 = 受信内容文字列(message);
+      if (!内容) return;
+      入力ウェルカム本文.value = 内容;
+    });
+
     wsClient.value.on('init', (message) => {
       console.log('[AIコア] 初期化完了:', message.セッションID);
       if (message.セッションID) {
@@ -229,11 +287,13 @@ const initializeWebSocket = async (既存セッションID?: string) => {
       
       // サーバーから受信した初期値でボタン状態を設定
       if (初期データ.ボタン) {
-        enableSpeaker.value = 初期データ.ボタン.スピーカー ?? true; // デフォルトオン
+        // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4
         enableMicrophone.value = 初期データ.ボタン.マイク || false;
-        enableCamera.value = false; // 常にオフで開始
+        enableSpeaker.value = 初期データ.ボタン.スピーカー ?? true; // デフォルトオン
+        enableFileButton.value = 初期データ.ボタン.ファイル || false;
         enableChatButton.value = 初期データ.ボタン.チャット ?? true; // デフォルトオン
         enableAgent1Button.value = 初期データ.ボタン.エージェント1 || false;
+        enableCamera.value = false; // 常にオフで開始
         enableAgent2Button.value = 初期データ.ボタン.エージェント2 || false;
         enableAgent3Button.value = 初期データ.ボタン.エージェント3 || false;
         enableAgent4Button.value = 初期データ.ボタン.エージェント4 || false;
@@ -253,12 +313,15 @@ const initializeWebSocket = async (既存セッションID?: string) => {
       nextTick(() => {
         console.log('[AIコア] 表示状態を復元開始');
         // ボタン状態から表示状態を復元
+        // ボタン配置順で復元
+        showFile.value = enableFileButton.value;
         showChat.value = enableChatButton.value;
         showAgent1.value = enableAgent1Button.value;
         showAgent2.value = enableAgent2Button.value;
         showAgent3.value = enableAgent3Button.value;
         showAgent4.value = enableAgent4Button.value;
         console.log('[AIコア] 表示状態復元完了:', {
+          showFile: showFile.value,
           showChat: showChat.value,
           showAgent1: showAgent1.value,
           showAgent2: showAgent2.value,
@@ -495,11 +558,13 @@ const saveState = async () => {
   if (!セッションID.value) return;
 
   const ボタン = {
-    スピーカー: enableSpeaker.value,
+    // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4
     マイク: enableMicrophone.value,
-    カメラ: enableCamera.value,
+    スピーカー: enableSpeaker.value,
+    ファイル: enableFileButton.value,
     チャット: enableChatButton.value,
     エージェント1: enableAgent1Button.value,
+    カメラ: enableCamera.value,
     エージェント2: enableAgent2Button.value,
     エージェント3: enableAgent3Button.value,
     エージェント4: enableAgent4Button.value,
@@ -557,6 +622,11 @@ watch(enableSpeaker, (newValue, oldValue) => {
   saveState();
 });
 
+// ファイルボタンの状態変化を監視
+watch(enableFileButton, () => {
+  saveState();
+});
+
 // チャットボタンの状態変化を監視
 watch(enableChatButton, () => {
   saveState();
@@ -586,9 +656,11 @@ watch(chatMode, () => {
 // 表示中のパネル数をカウント
 const visiblePanelCount = computed(() => {
   let count = 0;
+  // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4
+  if (showFile.value) count++;
   if (showChat.value) count++;
-  if (showImage.value) count++;
   if (showAgent1.value) count++;
+  if (showImage.value) count++;
   if (showAgent2.value) count++;
   if (showAgent3.value) count++;
   if (showAgent4.value) count++;
@@ -638,6 +710,14 @@ const gridLayoutClass = computed(() => {
       title="スピーカー"
     >
       <img src="/icons/speaker.png" alt="スピーカー" />
+    </button>
+    <button
+      class="floating-icon file-icon"
+      :class="{ inactive: !enableFileButton, active: enableFileButton }"
+      @click="toggleFile"
+      title="ファイル"
+    >
+      <img src="/icons/folder.png" alt="ファイル" />
     </button>
     <button
       class="floating-icon chat-icon"
@@ -703,15 +783,39 @@ const gridLayoutClass = computed(() => {
     </button>
   </div>
 
-  <div class="ai-core-view">
+  <div
+    ref="AIコアビュー要素"
+    class="ai-core-view"
+    @mousemove="ガイド領域マウス移動"
+    @mouseleave="ガイド領域マウス離脱"
+  >
     <!-- エラーメッセージ表示 -->
     <div v-if="errorMessage" class="error-message">
       <button class="error-close" @click="errorMessage = ''">×</button>
       <strong>エラー:</strong> {{ errorMessage }}
     </div>
+    <div
+      v-if="入力ウェルカム情報表示 || 入力ウェルカム本文表示"
+      ref="ガイド要素"
+      :class="['core-guide-overlay', { 'is-hover': ガイドホバー中 }]"
+    >
+      <div v-if="入力ウェルカム情報表示" class="core-guide-info">{{ 入力ウェルカム情報表示 }}</div>
+      <pre v-if="入力ウェルカム本文表示" class="core-guide-text">{{ 入力ウェルカム本文表示 }}</pre>
+    </div>
 
     <!-- コンポーネントグリッド -->
     <div class="components-grid" :class="gridLayoutClass">
+      <!-- ファイル -->
+      <div v-show="showFile" class="component-panel">
+        <AIコアファイル
+          :セッションID="セッションID"
+          :active="showFile"
+          :ws-connected="wsConnected"
+          :ws-client="wsClient ?? null"
+          @close="handleCloseFile"
+        />
+      </div>
+
       <!-- チャット -->
       <div v-show="showChat" class="component-panel">
         <AIコアチャット
@@ -798,6 +902,7 @@ const gridLayoutClass = computed(() => {
           @close="handleCloseAgent4"
         />
       </div>
+
     </div>
     <AI設定再起動
       :is-open="showModelConfig"
@@ -928,6 +1033,84 @@ const gridLayoutClass = computed(() => {
   background: rgba(255, 255, 255, 0.5);
 }
 
+.core-guide-overlay {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  width: 30vw;
+  max-width: 520px;
+  min-width: 220px;
+  height: calc(100% - 24px);
+  overflow: auto;
+  z-index: 1;
+  pointer-events: none;
+  user-select: none;
+  direction: rtl; /* 縦スクロールバーを左側へ */
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.core-guide-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to left, rgba(26, 26, 26, 0.95) 0%, rgba(26, 26, 26, 0) 13%),
+    linear-gradient(to top, rgba(26, 26, 26, 0.95) 0%, rgba(26, 26, 26, 0) 16%);
+  z-index: 2;
+}
+
+.core-guide-overlay::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.core-guide-overlay::-webkit-scrollbar-track {
+  background: rgba(26, 26, 26, 0.35);
+}
+
+.core-guide-overlay::-webkit-scrollbar-thumb {
+  background: rgba(196, 210, 255, 0.35);
+  border-radius: 3px;
+}
+
+.core-guide-info {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  color: #ffffff;
+  text-shadow: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  direction: ltr;
+  text-align: left;
+  position: relative;
+  z-index: 1;
+}
+
+.core-guide-text {
+  margin: 21px 0 0;
+  color: rgba(216, 225, 255, 0.22);
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 1;
+  filter: blur(0.6px);
+  text-shadow: 0 0 2px rgba(216, 225, 255, 0.25);
+  transition: color 0.45s ease, filter 0.45s ease, text-shadow 0.45s ease;
+  direction: ltr;
+  text-align: left;
+  position: relative;
+  z-index: 1;
+}
+
+.core-guide-overlay.is-hover .core-guide-text {
+  color: #ffffff;
+  filter: blur(0);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.65);
+}
+
 /* 音声・画像制御フローティングアイコン */
 .floating-controls {
   position: fixed;
@@ -1029,11 +1212,11 @@ const gridLayoutClass = computed(() => {
   animation: pulse 2.5s infinite;
 }
 
-/* カメラ（イメージ）→OFF時は暗いグレーに暗い緑枠 */
+/* カメラ（イメージ）→OFF時は灰色背景に緑枠、黒アイコン */
 .floating-icon.camera-icon {
-  border-color: #2e7d32; /* 暗い緑 */
-  background: #888888; /* 暗いグレー */
-  box-shadow: 0 2px 8px rgba(0, 191, 255, 0.3);
+  border-color: #2e7d32;
+  background: #888888;
+  box-shadow: 0 2px 8px rgba(68, 255, 68, 0.3);
   border-radius: 0; /* フラット */
   width: 28px; /* 少し小さく */
   height: 28px; /* 少し小さく */
@@ -1048,9 +1231,9 @@ const gridLayoutClass = computed(() => {
   box-shadow: 0 4px 12px rgba(68, 255, 68, 0.4);
 }
 
-/* カメラ（イメージ）→ON時は淡い緑でブリンク */
+/* カメラ（イメージ）→ON時は黒背景に緑枠ブリンク、白アイコン */
 .floating-icon.camera-icon.active {
-  background: #e8f5e9; /* 淡い緑 */
+  background: #000000;
   border-color: #44ff44;
   animation: pulse 2.5s infinite;
   box-shadow: 0 2px 8px rgba(68, 255, 68, 0.5);
@@ -1061,7 +1244,7 @@ const gridLayoutClass = computed(() => {
 }
 
 .floating-icon.camera-icon.active img {
-  filter: none; /* アイコンはそのまま */
+  filter: brightness(0) invert(1); /* 白アイコン */
 }
 
 /* チャットボタン→disable時は灰色背景、黒文字 */
@@ -1173,6 +1356,48 @@ const gridLayoutClass = computed(() => {
 }
 
 .floating-icon.agent-icon:hover {
+  box-shadow: 0 4px 12px rgba(68, 255, 68, 0.4);
+}
+
+/* ファイルボタン共通: 四角 */
+.floating-icon.file-icon {
+  border-radius: 2px;
+}
+
+/* ファイルボタン→OFF時は灰色背景に緑枠、黒アイコン */
+.floating-icon.file-icon.inactive {
+  border-color: #2e7d32;
+  background: #888888;
+  box-shadow: 0 2px 8px rgba(68, 255, 68, 0.3);
+}
+
+.floating-icon.file-icon.inactive img {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+  mix-blend-mode: multiply; /* 白背景を灰色に溶け込ませ黒アイコンだけ残す */
+}
+
+.floating-icon.file-icon.inactive:hover {
+  box-shadow: 0 4px 12px rgba(68, 255, 68, 0.4);
+}
+
+/* ファイルボタン→ON時は黒背景に緑枠ブリンク、白アイコン */
+.floating-icon.file-icon.active {
+  background: #000000;
+  border-color: #44ff44;
+  animation: pulse 2.5s infinite;
+  box-shadow: 0 2px 8px rgba(68, 255, 68, 0.5);
+}
+
+.floating-icon.file-icon.active img {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+  filter: invert(1); /* 白背景→黒、黒アイコン→白 */
+}
+
+.floating-icon.file-icon:hover {
   box-shadow: 0 4px 12px rgba(68, 255, 68, 0.4);
 }
 
@@ -1299,6 +1524,8 @@ const gridLayoutClass = computed(() => {
   height: 100%;
   box-sizing: border-box;
   transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
 }
 
 /* レイアウト: 0枚（空） */
@@ -1318,8 +1545,8 @@ const gridLayoutClass = computed(() => {
 .layout-single {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
-  padding-left: 20%;
-  padding-right: 20%;
+  padding-left: 26%;
+  padding-right: 26%;
 }
 
 /* レイアウト: 2枚（左右分割） */
@@ -1349,11 +1576,22 @@ const gridLayoutClass = computed(() => {
   grid-template-rows: repeat(2, 1fr);
 }
 
+/* 横長時: 1〜3枚表示の高さを少し抑える（約 -50px） */
+@media (min-aspect-ratio: 1/1) {
+  .layout-single,
+  .layout-double,
+  .layout-triple {
+    padding-top: 41px;
+    padding-bottom: 41px;
+  }
+}
+
 .component-panel {
   background: #000;
   border: 1px solid #333;
   border-radius: 2px;
   overflow: hidden;
+  position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   transition: all 0.3s ease;
   min-height: 0;
