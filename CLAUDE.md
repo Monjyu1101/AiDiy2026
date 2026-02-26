@@ -35,6 +35,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `authenticate_C利用者` uses direct string comparison
 - Do NOT assume hashing when modifying auth code
 
+**AIコア WebSocket Packet Format:**
+- All packets: `{セッションID, チャンネル, メッセージ識別, メッセージ内容}`
+- `AIコア/AIバックアップ.py` の `全ファイルリスト` は `List[str]`（パスのみ、ファイル個別のmtimeは含まない）
+- `コードベース絶対パス取得` は `CODE_BASE_PATH` 未設定時に `"../"` (backend_server の親) をデフォルトとして返す
+
 **No Automated Tests:**
 - No pytest or vitest configured
 - Test manually via Swagger UI (`:8091/docs`, `:8092/docs`) and browser
@@ -76,9 +81,10 @@ cd backend_server && uv sync
 # Frontend dependencies
 cd frontend_server && npm install
 
-# Trigger backend reload (without --reload flag)
+# Trigger backend reload (without --reload flag) — Windows CMD syntax
 echo. > backend_server/temp/reboot_core.txt   # core_main
 echo. > backend_server/temp/reboot_apps.txt   # apps_main
+# Unix equivalent: touch backend_server/temp/reboot_core.txt
 
 # Database reset (delete and restart servers to recreate)
 del backend_server\_data\AiDiy\database.db
@@ -208,6 +214,12 @@ for key, value in 監査項目.items():
 - Keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`
 - Access via `request.app.conf.json.get("KEY_NAME")`
 
+**Backend - AIコア WebSocket messages (core_router/AIコア.py):**
+- Request/response packets: `{セッションID, チャンネル, メッセージ識別, メッセージ内容}`
+- File list packets: `files_backup` (backup file list) / `files_temp` (temp folder, 1h window)
+- Each file entry: `{"パス": str, "更新日時": str}` — file list is `List[str]` in session, mtimes read on demand
+- Session state: `セッション.全ファイルリスト` = `List[str]` paths, `セッション.バックアップベースパス` = backup dir, `セッション.ソース最終更新日時` = max mtime string
+
 **Frontend - CRUD screen structure:**
 ```
 components/<カテゴリ>/<テーブル名>/
@@ -231,6 +243,15 @@ if (response.data.status === 'OK') {
 import { qAlert, qConfirm } from '@/utils/qAlert'
 await qAlert('保存しました')
 const ok = await qConfirm('削除しますか？')
+```
+
+**Frontend - AIコア WebSocket client:**
+```typescript
+// src/api/websocket.ts — channel-based listener
+出力WebSocket.value = new AIコアWebSocket(wsUrl, セッションID, 'file');
+出力WebSocket.value.on('files_backup', ハンドラ関数);
+出力WebSocket.value.on('files_temp', ハンドラ関数);
+// Send: プロパティ.wsClient.send({セッションID, チャンネル, メッセージ識別, メッセージ内容})
 ```
 
 **Frontend - TypeScript note:**

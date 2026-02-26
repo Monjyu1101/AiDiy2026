@@ -13,7 +13,7 @@ import shutil
 import ctypes
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, TypedDict
 
 from log_config import get_logger
 
@@ -74,6 +74,17 @@ _WINDOWS予約デバイス名 = (
 _バックアップコピー並列数 = 4
 
 
+class ファイル情報(TypedDict):
+    パス: str
+    更新日時: str
+
+
+class _内部ファイル情報(TypedDict):
+    パス: str
+    更新日時: str
+    更新時刻: float
+
+
 def _コードベース絶対パス取得(アプリ設定=None, backend_dir: Optional[str] = None, セッション設定: Optional[dict] = None) -> str:
     """
     CODE_BASE_PATHの絶対パスを取得
@@ -106,7 +117,7 @@ def バックアップ実行_共通ログ(
     アプリ設定=None,
     backend_dir: Optional[str] = None,
     セッション設定: Optional[dict] = None,
-) -> Optional[Tuple[str, List[str], List[str], bool, str]]:
+) -> Optional[Tuple[str, List[ファイル情報], List[str], bool, str]]:
     """
     呼び出し元ロガーに開始/終了を必ず出す共通ラッパー
     - 開始は呼び出し直後に出力
@@ -130,9 +141,8 @@ def バックアップ実行_共通ログ(
     return result
 
 
-def _最新更新と全ファイル一覧(ベースパス: str) -> Tuple[float, List[str]]:
-    max_mtime = 0.0
-    files: List[str] = []
+def _全ファイルスキャン(ベースパス: str) -> List[_内部ファイル情報]:
+    files: List[_内部ファイル情報] = []
     workspace_root = os.path.abspath(ベースパス)
     for root, dirs, file_names in os.walk(workspace_root):
         dirs[:] = [d for d in dirs if not any(marker in d for marker in _バックアップ除外フォルダ) and not d.startswith(".")]
@@ -156,10 +166,9 @@ def _最新更新と全ファイル一覧(ベースパス: str) -> Tuple[float, 
             except OSError:
                 continue
             rel_path = os.path.relpath(file_path, workspace_root).replace("\\", "/")
-            files.append(rel_path)
-            if mtime > max_mtime:
-                max_mtime = mtime
-    return max_mtime, files
+            更新日時 = datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M:%S")
+            files.append({"パス": rel_path, "更新日時": 更新日時, "更新時刻": mtime})
+    return files
 
 
 def _nul_nullファイル削除試行(file_path: str) -> bool:
@@ -201,14 +210,14 @@ def バックアップ実行(
     backend_dir: Optional[str] = None,
     セッション設定: Optional[dict] = None,
     ログ出力: bool = True,
-) -> Optional[Tuple[str, List[str], List[str], bool, str]]:
+) -> Optional[Tuple[str, List[ファイル情報], List[str], bool, str]]:
     """
     シンプル差分バックアップ実行
     - 初回（*.allフォルダなし）→ 全件バックアップ
     - 2回目以降 → 最終バックアップ時刻+1秒以降の差分のみ
 
     セッション設定: セッション固有のCODE_BASE_PATHを含む辞書（オプション）
-    戻り値: (最終更新時刻, 全ファイル一覧, バックアップファイル一覧, 全件フラグ, バックアップフォルダ絶対パス) または None（エラー時のみ）
+    戻り値: (最終更新時刻, 全ファイル一覧[パス/更新日時], バックアップファイル一覧, 全件フラグ, バックアップフォルダ絶対パス) または None（エラー時のみ）
     """
     try:
         base_path = _コードベース絶対パス取得(アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
@@ -220,10 +229,12 @@ def バックアップ実行(
         # 最終バックアップ時刻を取得
         最終バックアップ結果 = _バックアップ全体の最終日時取得(backup_root)
 
-        # 全ファイル一覧と最大更新時刻を取得
-        max_mtime, all_files = _最新更新と全ファイル一覧(base_path)
-        if not max_mtime or not all_files:
+        # 全ファイル一覧を走査（パス/更新日時/更新時刻）
+        all_scan = _全ファイルスキャン(base_path)
+        if not all_scan:
             return None
+        max_mtime = max(f["更新時刻"] for f in all_scan)
+        all_files: List[ファイル情報] = [{"パス": f["パス"], "更新日時": f["更新日時"]} for f in all_scan]
 
         # バックアップフォルダ名を作成
         timestamp = datetime.fromtimestamp(max_mtime)
@@ -236,10 +247,11 @@ def バックアップ実行(
             target_dir = os.path.abspath(os.path.join(backup_root, date_dir, f"{time_dir}.all"))
             if ログ出力:
                 logger.info(f"バックアップ開始({base_path})")
-            if _ファイルコピー実行(base_path, all_files, target_dir):
+            全ファイルパス一覧 = [f["パス"] for f in all_files]
+            if _ファイルコピー実行(base_path, 全ファイルパス一覧, target_dir):
                 if ログ出力:
                     logger.info(f"バックアップ終了(件数={len(all_files)})")
-                return (最終時刻, all_files, all_files, True, target_dir)
+                return (最終時刻, all_files, 全ファイルパス一覧, True, target_dir)
             return (最終時刻, all_files, [], False, "")
 
         # 差分バックアップ: 最終バックアップ時刻+1秒以降
@@ -247,18 +259,8 @@ def バックアップ実行(
         最終時刻 = datetime.fromtimestamp(最終タイムスタンプ).strftime("%Y-%m-%d %H:%M:%S")
         threshold_ts = 最終タイムスタンプ + 1.0
 
-        # 差分ファイル抽出
-        changed_files = []
-        for rel_path in all_files:
-            src_path = os.path.join(base_path, rel_path.replace("/", os.sep))
-            if not os.path.exists(src_path):
-                continue
-            try:
-                mtime = os.path.getmtime(src_path)
-                if mtime >= threshold_ts:
-                    changed_files.append(rel_path)
-            except OSError:
-                continue
+        # 差分ファイル抽出（走査済みの更新時刻を使用）
+        changed_files = [f["パス"] for f in all_scan if f["更新時刻"] >= threshold_ts]
 
         # 差分なし → 全ファイル一覧だけ返す
         if not changed_files:
@@ -416,36 +418,9 @@ def 差分ファイル取得(アプリ設定=None, backend_dir: Optional[str] = 
         最終タイムスタンプ, 最終日時文字列 = result
         threshold_ts = 最終タイムスタンプ + 1.0
 
-        # 全ファイルをスキャンして差分を抽出
-        差分ファイル一覧: List[str] = []
-        workspace_root = os.path.abspath(base_path)
-
-        for root, dirs, file_names in os.walk(workspace_root):
-            dirs[:] = [d for d in dirs if not any(marker in d for marker in _バックアップ除外フォルダ) and not d.startswith(".")]
-            for file_name in file_names:
-                file_path = os.path.join(root, file_name)
-
-                # Windows予約デバイス名 + null チェック（削除不可能/問題ファイルのため警告のみ）
-                base_name = os.path.splitext(file_name)[0].lower()
-                if base_name in _WINDOWS予約デバイス名 or base_name == "null":
-                    if os.name == "nt" and base_name in ("nul", "null"):
-                        _nul_nullファイル削除試行(file_path)
-                    logger.warning(f"問題のあるファイル名を検出（バックアップ対象外）: {file_path}")
-                    continue
-
-                if any(marker in file_path for marker in _バックアップ除外フォルダ):
-                    continue
-                if file_name in _バックアップ除外ファイル or file_name.endswith(_バックアップ除外拡張子):
-                    continue
-
-                try:
-                    mtime = os.path.getmtime(file_path)
-                except OSError:
-                    continue
-
-                if mtime >= threshold_ts:
-                    rel_path = os.path.relpath(file_path, workspace_root).replace("\\", "/")
-                    差分ファイル一覧.append(rel_path)
+        # 全ファイルを共通走査して差分を抽出
+        all_scan = _全ファイルスキャン(base_path)
+        差分ファイル一覧: List[str] = [f["パス"] for f in all_scan if f["更新時刻"] >= threshold_ts]
 
         return (最終日時文字列, 差分ファイル一覧)
 

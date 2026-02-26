@@ -1259,7 +1259,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     except Exception as e:
                         logger.warning(f"cancel_run処理エラー: {e}")
 
-                elif メッセージ識別 == "file_list":
+                elif メッセージ識別 == "files_backup":
                     try:
                         チャンネル = str(受信データ.get("チャンネル", "file"))
 
@@ -1273,11 +1273,31 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             プロジェクトパス = os.path.abspath(_raw) if os.path.isabs(_raw) else os.path.abspath(os.path.join(バックエンドディレクトリ, _raw))
                         else:
                             プロジェクトパス = ""
+                        ファイルリスト = sorted(最終ファイルリスト, key=lambda x: x.get("パス", ""))
+
+                        await セッション.send_to_channel(チャンネル, {
+                            "セッションID": セッションID,
+                            "チャンネル": チャンネル,
+                            "メッセージ識別": "files_backup",
+                            "メッセージ内容": {
+                                "プロジェクトパス": プロジェクトパス,
+                                "バックアップベースパス": バックアップベースパス,
+                                "最終ファイル日時": 最終ファイル日時,
+                                "ファイルリスト": ファイルリスト,
+                            }
+                        })
+                        logger.info(f"[files_backup] 返信: {len(ファイルリスト)}件 ({セッションID})")
+                    except Exception as e:
+                        logger.error(f"[files_backup] エラー: {e}", exc_info=True)
+
+                elif メッセージ識別 == "files_temp":
+                    try:
+                        チャンネル = str(受信データ.get("チャンネル", "file"))
 
                         # tempフォルダのファイル一覧（1時間以内に更新されたもののみ）
                         tempパス = os.path.join(バックエンドディレクトリ, "temp")
-                        作業ファイル日時 = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-                        作業ファイルリスト = []
+                        ファイルリスト = []
+                        最新mtime = 0.0
                         一時間前 = datetime.now().timestamp() - 3600
                         if os.path.exists(tempパス):
                             for root, dirs, files in os.walk(tempパス):
@@ -1287,29 +1307,31 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                         continue
                                     full_path = os.path.join(root, file)
                                     try:
-                                        if os.path.getmtime(full_path) < 一時間前:
+                                        mtime = os.path.getmtime(full_path)
+                                        if mtime < 一時間前:
                                             continue
+                                        更新日時 = datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M:%S")
+                                        if mtime > 最新mtime:
+                                            最新mtime = mtime
                                     except OSError:
                                         continue
                                     相対パス = "temp/" + os.path.relpath(full_path, tempパス).replace("\\", "/")
-                                    作業ファイルリスト.append(相対パス)
+                                    ファイルリスト.append({"パス": 相対パス, "更新日時": 更新日時})
+                        # 作業ファイル日時 = 最新ファイルのmtime（変化しない限り同値になる）
+                        作業ファイル日時 = datetime.fromtimestamp(最新mtime).strftime("%Y/%m/%d %H:%M:%S") if 最新mtime else ""
 
                         await セッション.send_to_channel(チャンネル, {
                             "セッションID": セッションID,
                             "チャンネル": チャンネル,
-                            "メッセージ識別": "file_list",
+                            "メッセージ識別": "files_temp",
                             "メッセージ内容": {
-                                "プロジェクトパス": プロジェクトパス,
-                                "バックアップベースパス": バックアップベースパス,
-                                "最終ファイル日時": 最終ファイル日時,
-                                "最終ファイルリスト": sorted(最終ファイルリスト),
                                 "作業ファイル日時": 作業ファイル日時,
-                                "作業ファイルリスト": sorted(作業ファイルリスト),
+                                "ファイルリスト": sorted(ファイルリスト, key=lambda x: x["パス"]),
                             }
                         })
-                        logger.info(f"[file_list] 返信: バックアップ{len(最終ファイルリスト)}件, temp{len(作業ファイルリスト)}件 ({セッションID})")
+                        logger.debug(f"[files_temp] 返信: {len(ファイルリスト)}件 ({セッションID})")
                     except Exception as e:
-                        logger.error(f"[file_list] エラー: {e}", exc_info=True)
+                        logger.error(f"[files_temp] エラー: {e}", exc_info=True)
 
                 elif メッセージ識別 == "input_image":
                     try:

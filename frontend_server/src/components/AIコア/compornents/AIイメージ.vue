@@ -63,10 +63,10 @@ const 入力欄最大高さ = ref(380);
 const 入力欄固定中 = ref(false);
 const 入力欄固定高さ = ref(入力欄最小高さ);
 
-const CAPTURE_INTERVAL_MS = 500;
-const STABLE_DURATION_MS = 1500;
-const FORCE_SEND_INTERVAL_MS = 60000;
-const DIFF_THRESHOLD = 3;
+const CAPTURE_INTERVAL_MS = 550;
+const 自動送信変化率パーセント = ref<number>(3);
+const 自動送信待機秒 = ref<number>(2);
+const 自動送信強制秒 = ref<number>(60);
 const ライブ入力チャンネル = 'input';
 const ライブ出力先チャンネル = '0';
 
@@ -343,6 +343,10 @@ const ファイル画像タイマー停止 = () => {
     window.clearInterval(ファイル画像タイマー.value);
     ファイル画像タイマー.value = null;
   }
+};
+
+const ファイル画像モード解除 = () => {
+  ファイル画像タイマー停止();
   選択画像.value = null;
   ファイル画像モード.value = false;
 };
@@ -375,9 +379,23 @@ const ファイル画像フレーム取得 = () => {
   画像送信(データURL);
 };
 
+const ファイル画像強制送信タイマー再設定 = () => {
+  ファイル画像タイマー停止();
+  if (!ファイル画像モード.value || !選択画像.value) return;
+  if (自動送信強制秒.value <= 0) {
+    console.log('[イメージ] 強制送信タイマー無効 (z=0)');
+    return;
+  }
+  const 間隔ms = 自動送信強制秒.value * 1000;
+  ファイル画像タイマー.value = window.setInterval(() => {
+    console.log('[イメージ] 定期送信タイマー発火 -', 自動送信強制秒.value, '秒経過');
+    ファイル画像フレーム取得();
+  }, 間隔ms);
+  console.log('[イメージ] タイマー設定完了 - ID:', ファイル画像タイマー.value, '間隔:', 間隔ms, 'ms');
+};
+
 // ファイル画像の定期キャプチャ開始
 const ファイル画像キャプチャ開始 = (画像: HTMLImageElement) => {
-  ファイル画像タイマー停止();
   キャプチャ停止(); // 既存のビデオキャプチャは停止
 
   選択画像.value = 画像;
@@ -390,13 +408,8 @@ const ファイル画像キャプチャ開始 = (画像: HTMLImageElement) => {
   // 最初の送信
   ファイル画像フレーム取得();
 
-  // 60秒間隔で送信
-  ファイル画像タイマー.value = window.setInterval(() => {
-    console.log('[イメージ] 定期送信タイマー発火 - 60秒経過');
-    ファイル画像フレーム取得();
-  }, FORCE_SEND_INTERVAL_MS);
-
-  console.log('[イメージ] タイマー設定完了 - ID:', ファイル画像タイマー.value, '間隔:', FORCE_SEND_INTERVAL_MS, 'ms (60秒)');
+  // 強制送信タイマー（z秒, z=0は無効）
+  ファイル画像強制送信タイマー再設定();
 };
 
 const キャプチャ停止 = () => {
@@ -414,7 +427,7 @@ const キャプチャ停止 = () => {
     動画要素.value.srcObject = null;
   }
   前回小画像.value = null;
-  ファイル画像タイマー停止();
+  ファイル画像モード解除();
   接続状態.value = 'disconnected';
 };
 
@@ -431,7 +444,6 @@ watch(
     if (稼働中 === false) {
       // コンポーネントが非アクティブになった時のみクリーンアップ
       キャプチャ停止();
-      ファイル画像タイマー停止();
       画像プレビュー.value = null;
       if (ファイル入力.value) {
         ファイル入力.value.value = '';
@@ -450,7 +462,6 @@ watch(
     WebSocket接続中.value = 接続中;
     if (!接続中) {
       キャプチャ停止();
-      ファイル画像タイマー停止();
       選択ポップアップ表示.value = false;
       接続状態.value = 'disconnected';
     } else if (接続状態.value === 'disconnected') {
@@ -461,6 +472,15 @@ watch(
     }
   },
   { immediate: true }
+);
+
+watch(
+  () => 自動送信強制秒.value,
+  () => {
+    if (ファイル画像モード.value && 選択画像.value) {
+      ファイル画像強制送信タイマー再設定();
+    }
+  }
 );
 
 // カメラキャプチャ
@@ -493,14 +513,19 @@ const 画面共有キャプチャ = async () => {
 
 const 差分計算 = (画像A: ImageData, 画像B: ImageData) => {
   const データ長 = 画像A.data.length;
-  if (データ長 !== 画像B.data.length) return 999;
-  let 差分合計 = 0;
+  if (データ長 !== 画像B.data.length) return 100;
+  let 二乗差分合計 = 0;
   for (let i = 0; i < データ長; i += 4) {
-    差分合計 += Math.abs(画像A.data[i] - 画像B.data[i]);
-    差分合計 += Math.abs(画像A.data[i + 1] - 画像B.data[i + 1]);
-    差分合計 += Math.abs(画像A.data[i + 2] - 画像B.data[i + 2]);
+    const dr = 画像A.data[i] - 画像B.data[i];
+    const dg = 画像A.data[i + 1] - 画像B.data[i + 1];
+    const db = 画像A.data[i + 2] - 画像B.data[i + 2];
+    const pixel差分 = (dr * dr + dg * dg + db * db) / 3;
+    二乗差分合計 += pixel差分;
   }
-  return 差分合計 / (データ長 / 4) / 3;
+  // 局所変化を拾いやすいようにRMSで100分率化
+  const 平均二乗差分 = 二乗差分合計 / (データ長 / 4);
+  const rms = Math.sqrt(平均二乗差分);
+  return (rms / 255) * 100;
 };
 
 const フレーム取得 = () => {
@@ -527,7 +552,7 @@ const フレーム取得 = () => {
 
   if (前回小画像.value) {
     const 差分 = 差分計算(現在小画像, 前回小画像.value);
-    if (差分 > DIFF_THRESHOLD) {
+    if (差分 > 自動送信変化率パーセント.value) {
       最終変化時刻.value = Date.now();
       安定後送信済み.value = false;
     }
@@ -535,8 +560,12 @@ const フレーム取得 = () => {
   前回小画像.value = 現在小画像;
 
   const 現在時刻 = Date.now();
-  const 安定中 = 現在時刻 - 最終変化時刻.value >= STABLE_DURATION_MS;
-  const 強制送信 = 最終送信時刻.value > 0 && (現在時刻 - 最終送信時刻.value >= FORCE_SEND_INTERVAL_MS);
+  const 安定待機ms = 自動送信待機秒.value * 1000;
+  const 強制送信待機ms = 自動送信強制秒.value * 1000;
+  const 安定中 = 現在時刻 - 最終変化時刻.value >= 安定待機ms;
+  const 強制送信 = 自動送信強制秒.value > 0
+    && 最終送信時刻.value > 0
+    && (現在時刻 - 最終送信時刻.value >= 強制送信待機ms);
 
   if ((安定中 && !安定後送信済み.value) || 強制送信) {
     const データURL = 描画キャンバス.value.toDataURL('image/jpeg', 0.8);
@@ -624,7 +653,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', テキストエリア自動調整);
   キャプチャ停止();
-  ファイル画像タイマー停止();
 });
 </script>
 
@@ -699,6 +727,40 @@ onBeforeUnmount(() => {
           <img src="/icons/sending.png" alt="送信" />
           <span class="send-live-label">LIVE</span>
         </button>
+
+        <div class="auto-send-settings">
+          <div class="auto-send-line auto-send-line-top">
+            <span class="auto-send-label">自動送信</span>
+            <span class="auto-send-label auto-send-paren">(待機
+              <select v-model.number="自動送信待機秒" class="auto-send-select">
+                <option :value="1">1</option>
+                <option :value="2">2</option>
+                <option :value="3">3</option>
+                <option :value="5">5</option>
+              </select>秒)</span>
+          </div>
+          <div class="auto-send-line auto-send-line-bot">
+            <span class="auto-send-label">変化</span>
+            <select v-model.number="自動送信変化率パーセント" class="auto-send-select">
+              <option :value="1">1</option>
+              <option :value="2">2</option>
+              <option :value="3">3</option>
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+            </select>
+            <span class="auto-send-unit">%</span>
+            <span class="auto-send-or">or</span>
+            <span class="auto-send-label">経過</span>
+            <select v-model.number="自動送信強制秒" class="auto-send-select">
+              <option :value="0">切</option>
+              <option :value="60">60</option>
+              <option :value="300">300</option>
+              <option :value="600">600</option>
+            </select>
+            <span class="auto-send-unit">秒</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -725,7 +787,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .image-container {
-  background: #e8f5e9; /* 淡い緑 */
+  background: #101010;
   border-radius: 2px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   display: flex;
@@ -820,7 +882,7 @@ onBeforeUnmount(() => {
   height: 100%;
   border: none;
   border-radius: 2px;
-  background: #e8f5e9; /* 淡い緑 */
+  background: #101010;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -829,15 +891,15 @@ onBeforeUnmount(() => {
 }
 
 .image-preview:hover {
-  background: #e8f5e9; /* ホバー時も淡い緑 */
+  background: #101010;
 }
 .image-preview.disabled {
   cursor: not-allowed;
   opacity: 0.6;
-  background: #e8f5e9; /* 淡い緑 */
+  background: #101010;
 }
 .image-preview.disabled:hover {
-  background: #e8f5e9; /* 淡い緑 */
+  background: #101010;
 }
 
 .preview-placeholder {
@@ -954,6 +1016,72 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 10px;
   align-items: flex-end;
+}
+
+.auto-send-settings {
+  min-width: 168px;
+  margin-left: 2px;
+  margin-bottom: 20px;
+  padding: 2px 6px;
+  border: 1px solid rgba(102, 126, 234, 0.45);
+  background: rgba(20, 24, 38, 0.85);
+  color: #d6def8;
+  font-size: 10px;
+  border-radius: 2px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  justify-content: center;
+}
+
+.auto-send-line {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  white-space: nowrap;
+}
+
+.auto-send-line-top {
+  justify-content: space-between;
+}
+
+.auto-send-label {
+  color: #d6def8;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.auto-send-paren {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.auto-send-unit {
+  color: #97a8df;
+  white-space: nowrap;
+}
+
+.auto-send-or {
+  color: #97a8df;
+  margin: 0 3px;
+  white-space: nowrap;
+}
+
+.auto-send-select {
+  width: 44px;
+  height: 18px;
+  border: 1px solid rgba(102, 126, 234, 0.65);
+  background: rgba(6, 9, 16, 0.95);
+  color: #ffffff;
+  border-radius: 2px;
+  font-size: 10px;
+  padding: 0 2px;
+  box-sizing: border-box;
+  position: relative;
+  top: 6px;
 }
 
 .text-input-area.drag-over {
