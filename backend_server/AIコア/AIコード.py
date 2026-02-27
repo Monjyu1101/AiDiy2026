@@ -667,12 +667,18 @@ class CodeAgent:
             logger.debug(f"[検証{n}回目] バックアップ実行を呼び出します")
             result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
             
-            # 差分なし → 終了
-            if not result:
-                logger.info(f"[検証{n}回目] 差分なし → 検証終了")
+            # エラー → 終了
+            if result is None:
+                logger.info(f"[検証{n}回目] バックアップエラー → 検証終了")
                 break
             
             最終時刻, 全ファイル, 差分ファイル, 全件フラグ, バックアップフォルダ = result
+
+            # 差分なし → 終了
+            if not 差分ファイル:
+                logger.info(f"[検証{n}回目] 差分なし → 検証終了")
+                break
+
             今回更新あり = True
             
             # 累積変更ファイルに追加

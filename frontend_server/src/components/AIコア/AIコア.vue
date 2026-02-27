@@ -86,6 +86,15 @@ const showAgent2 = ref(false);  // コード2
 const showAgent3 = ref(false);  // コード3
 const showAgent4 = ref(false);  // コード4
 
+// レイアウト計算用フラグ（退場アニメーション完了後にfalseになる）
+const layoutImage = ref(false);
+const layoutFile = ref(false);
+const layoutChat = ref(false);
+const layoutAgent1 = ref(false);
+const layoutAgent2 = ref(false);
+const layoutAgent3 = ref(false);
+const layoutAgent4 = ref(false);
+
 // 音声・画像制御（初期値は全てfalse、WebSocket接続で初期値受信後に有効化）
 const enableMicrophone = ref(false);
 const enableSpeaker = ref(false);
@@ -134,37 +143,69 @@ const syncLiveSampleRate = () => {
 // ファイルボタンクリック時
 const toggleFile = () => {
   enableFileButton.value = !enableFileButton.value;
-  showFile.value = enableFileButton.value;
+  if (enableFileButton.value) {
+    layoutFile.value = true;
+    showFile.value = true;
+  } else {
+    showFile.value = false;
+    // layoutFile.valueは@after-leaveで更新
+  }
 };
 
 // チャットボタンクリック時
 const toggleChat = () => {
   enableChatButton.value = !enableChatButton.value;
-  showChat.value = enableChatButton.value;
+  if (enableChatButton.value) {
+    layoutChat.value = true;
+    showChat.value = true;
+  } else {
+    showChat.value = false;
+    // layoutChat.valueは@after-leaveで更新
+  }
 };
 
 // エージェント1ボタンクリック時
 const toggleAgent1 = () => {
   enableAgent1Button.value = !enableAgent1Button.value;
-  showAgent1.value = enableAgent1Button.value;
+  if (enableAgent1Button.value) {
+    layoutAgent1.value = true;
+    showAgent1.value = true;
+  } else {
+    showAgent1.value = false;
+  }
 };
 
 // エージェント2ボタンクリック時
 const toggleAgent2 = () => {
   enableAgent2Button.value = !enableAgent2Button.value;
-  showAgent2.value = enableAgent2Button.value;
+  if (enableAgent2Button.value) {
+    layoutAgent2.value = true;
+    showAgent2.value = true;
+  } else {
+    showAgent2.value = false;
+  }
 };
 
 // エージェント3ボタンクリック時
 const toggleAgent3 = () => {
   enableAgent3Button.value = !enableAgent3Button.value;
-  showAgent3.value = enableAgent3Button.value;
+  if (enableAgent3Button.value) {
+    layoutAgent3.value = true;
+    showAgent3.value = true;
+  } else {
+    showAgent3.value = false;
+  }
 };
 
 // エージェント4ボタンクリック時
 const toggleAgent4 = () => {
   enableAgent4Button.value = !enableAgent4Button.value;
-  showAgent4.value = enableAgent4Button.value;
+  if (enableAgent4Button.value) {
+    layoutAgent4.value = true;
+    showAgent4.value = true;
+  } else {
+    showAgent4.value = false;
+  }
 };
 
 // カメラボタンクリック時
@@ -174,12 +215,14 @@ const handleCameraToggle = () => {
     showImage.value = false;
     autoShowSelection.value = false;
     capturedImage.value = null;
+    // layoutImage.valueは@after-leaveで更新
     return;
   }
   autoShowSelection.value = false;
   nextTick(() => {
     autoShowSelection.value = true;
   });
+  layoutImage.value = true;
   showImage.value = true;
   enableCamera.value = true;
 };
@@ -229,6 +272,15 @@ const handleCloseAgent4 = () => {
   showAgent4.value = false;
   enableAgent4Button.value = false; // ボタンもオフに
 };
+
+// 退場アニメーション完了後のハンドラー（レイアウト更新）
+const handleAfterLeaveFile = () => { layoutFile.value = false; };
+const handleAfterLeaveChat = () => { layoutChat.value = false; };
+const handleAfterLeaveImage = () => { layoutImage.value = false; };
+const handleAfterLeaveAgent1 = () => { layoutAgent1.value = false; };
+const handleAfterLeaveAgent2 = () => { layoutAgent2.value = false; };
+const handleAfterLeaveAgent3 = () => { layoutAgent3.value = false; };
+const handleAfterLeaveAgent4 = () => { layoutAgent4.value = false; };
 
 // イメージチェックボックスの変更を監視
 const handleImageCheckboxChange = async (newValue: boolean, oldValue: boolean) => {
@@ -303,6 +355,7 @@ const initializeWebSocket = async (既存セッションID?: string) => {
         chatMode.value = 'live';
       }
 
+      layoutImage.value = enableCamera.value; // 常にfalse
       showImage.value = enableCamera.value; // 常にfalse
       syncVisualizerVisibility();
 
@@ -313,12 +366,18 @@ const initializeWebSocket = async (既存セッションID?: string) => {
       nextTick(() => {
         console.log('[AIコア] 表示状態を復元開始');
         // ボタン状態から表示状態を復元
-        // ボタン配置順で復元
+        // ボタン配置順で復元（layoutとshowを同時に設定）
+        layoutFile.value = enableFileButton.value;
         showFile.value = enableFileButton.value;
+        layoutChat.value = enableChatButton.value;
         showChat.value = enableChatButton.value;
+        layoutAgent1.value = enableAgent1Button.value;
         showAgent1.value = enableAgent1Button.value;
+        layoutAgent2.value = enableAgent2Button.value;
         showAgent2.value = enableAgent2Button.value;
+        layoutAgent3.value = enableAgent3Button.value;
         showAgent3.value = enableAgent3Button.value;
+        layoutAgent4.value = enableAgent4Button.value;
         showAgent4.value = enableAgent4Button.value;
         console.log('[AIコア] 表示状態復元完了:', {
           showFile: showFile.value,
@@ -594,8 +653,10 @@ watch(showImage, async (newValue, oldValue) => {
 watch([enableMicrophone, enableSpeaker, enableCamera], () => {
   if (!enableCamera.value) {
     showImage.value = false;
+    // layoutImage.valueは@after-leaveで更新
     capturedImage.value = null;
   } else {
+    layoutImage.value = true;
     showImage.value = true;
   }
   saveState();
@@ -653,17 +714,17 @@ watch(chatMode, () => {
   saveState();
 });
 
-// 表示中のパネル数をカウント
+// 表示中のパネル数をカウント（レイアウト計算用フラグを使用）
 const visiblePanelCount = computed(() => {
   let count = 0;
   // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4
-  if (showFile.value) count++;
-  if (showChat.value) count++;
-  if (showAgent1.value) count++;
-  if (showImage.value) count++;
-  if (showAgent2.value) count++;
-  if (showAgent3.value) count++;
-  if (showAgent4.value) count++;
+  if (layoutFile.value) count++;
+  if (layoutChat.value) count++;
+  if (layoutAgent1.value) count++;
+  if (layoutImage.value) count++;
+  if (layoutAgent2.value) count++;
+  if (layoutAgent3.value) count++;
+  if (layoutAgent4.value) count++;
   return count;
 });
 
@@ -806,6 +867,7 @@ const gridLayoutClass = computed(() => {
     <!-- コンポーネントグリッド -->
     <div class="components-grid" :class="gridLayoutClass">
       <!-- ファイル -->
+      <Transition name="panel-expand" @after-leave="handleAfterLeaveFile">
       <div v-show="showFile" class="component-panel">
         <AIコアファイル
           :セッションID="セッションID"
@@ -815,8 +877,10 @@ const gridLayoutClass = computed(() => {
           @close="handleCloseFile"
         />
       </div>
+      </Transition>
 
       <!-- チャット -->
+      <Transition name="panel-expand" @after-leave="handleAfterLeaveChat">
       <div v-show="showChat" class="component-panel">
         <AIコアチャット
           :セッションID="セッションID"
@@ -827,12 +891,14 @@ const gridLayoutClass = computed(() => {
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
           @mode-change="chatMode = $event"
-          @activate="showChat = true; enableChatButton = true"
-          @close="handleCloseChat" 
+          @activate="showChat = true; layoutChat = true; enableChatButton = true"
+          @close="handleCloseChat"
         />
       </div>
+      </Transition>
 
       <!-- エージェント1 -->
+      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent1">
       <div v-show="showAgent1" class="component-panel">
         <AIコアコード
           key="code-1"
@@ -841,12 +907,14 @@ const gridLayoutClass = computed(() => {
           :code-ai="モデル設定.CODE_AI1_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
-          @activate="showAgent1 = true; enableAgent1Button = true"
+          @activate="showAgent1 = true; layoutAgent1 = true; enableAgent1Button = true"
           @close="handleCloseAgent1"
         />
       </div>
+      </Transition>
 
       <!-- イメージ -->
+      <Transition name="panel-expand" @after-leave="handleAfterLeaveImage">
       <div v-show="showImage" class="component-panel">
         <AIコアイメージ
           :auto-show-selection="autoShowSelection"
@@ -860,8 +928,10 @@ const gridLayoutClass = computed(() => {
           @close="handleCloseImage"
         />
       </div>
+      </Transition>
 
       <!-- エージェント2 -->
+      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent2">
       <div v-show="showAgent2" class="component-panel">
         <AIコアコード
           key="code-2"
@@ -870,12 +940,14 @@ const gridLayoutClass = computed(() => {
           :code-ai="モデル設定.CODE_AI2_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
-          @activate="showAgent2 = true; enableAgent2Button = true"
+          @activate="showAgent2 = true; layoutAgent2 = true; enableAgent2Button = true"
           @close="handleCloseAgent2"
         />
       </div>
+      </Transition>
 
       <!-- エージェント3 -->
+      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent3">
       <div v-show="showAgent3" class="component-panel">
         <AIコアコード
           key="code-3"
@@ -884,12 +956,14 @@ const gridLayoutClass = computed(() => {
           :code-ai="モデル設定.CODE_AI3_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
-          @activate="showAgent3 = true; enableAgent3Button = true"
+          @activate="showAgent3 = true; layoutAgent3 = true; enableAgent3Button = true"
           @close="handleCloseAgent3"
         />
       </div>
+      </Transition>
 
       <!-- エージェント4 -->
+      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent4">
       <div v-show="showAgent4" class="component-panel">
         <AIコアコード
           key="code-4"
@@ -898,10 +972,11 @@ const gridLayoutClass = computed(() => {
           :code-ai="モデル設定.CODE_AI4_NAME"
           :input-ws-client="wsClient"
           :input-connected="wsConnected"
-          @activate="showAgent4 = true; enableAgent4Button = true"
+          @activate="showAgent4 = true; layoutAgent4 = true; enableAgent4Button = true"
           @close="handleCloseAgent4"
         />
       </div>
+      </Transition>
 
     </div>
     <AI設定再起動
@@ -1696,6 +1771,30 @@ const gridLayoutClass = computed(() => {
   height: 100%;
   border-radius: 0;
   box-shadow: none;
+}
+
+/* パネル展開アニメーション（狭い→広がる） */
+.panel-expand-enter-active {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  transform-origin: center center;
+}
+.panel-expand-leave-active {
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.panel-expand-enter-from {
+  transform: scaleX(0.5) scaleY(0.55);
+  opacity: 0.2;
+}
+.panel-expand-enter-to {
+  transform: scaleX(1) scaleY(1);
+  opacity: 1;
+}
+.panel-expand-leave-from {
+  opacity: 1;
+}
+.panel-expand-leave-to {
+  opacity: 0;
 }
 </style>
 

@@ -22,7 +22,7 @@ import asyncio
 import os
 import sys
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import database
 import core_crud as crud
@@ -74,6 +74,75 @@ def _is_disconnect_like_error(e: Exception) -> bool:
 
 def _is_ws_connected(ws: WebSocket) -> bool:
     return getattr(ws, "application_state", None) == WebSocketState.CONNECTED
+
+
+_要求日時選択値 = {-2, -1, 0, 1, 5, 10, 60}
+
+
+def _要求日時分数取得(受信データ: dict, デフォルト値: int) -> int:
+    内容 = 受信データ.get("メッセージ内容")
+    候補値 = None
+    if isinstance(内容, dict):
+        候補値 = 内容.get("要求日時")
+    elif 内容 not in (None, ""):
+        候補値 = 内容
+
+    try:
+        分数 = int(候補値) if 候補値 is not None else デフォルト値
+    except (TypeError, ValueError):
+        return デフォルト値
+    if 分数 not in _要求日時選択値:
+        return デフォルト値
+    return 分数
+
+
+def _日時文字列解析(日時文字列: Optional[str]) -> Optional[datetime]:
+    if not 日時文字列:
+        return None
+    値 = str(日時文字列).strip().replace("-", "/")
+    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M"):
+        try:
+            return datetime.strptime(値, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _要求日時基準時刻取得(要求日時分数: int) -> Optional[datetime]:
+    now = datetime.now()
+    if 要求日時分数 == 0:
+        return None
+    if 要求日時分数 > 0:
+        return now - timedelta(minutes=要求日時分数)
+    if 要求日時分数 == -1:
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if 要求日時分数 == -2:
+        今日開始 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return 今日開始 - timedelta(days=1)
+    return None
+
+
+def _日時フィルタ適用(ファイルリスト: list[dict], 要求日時分数: int) -> list[dict]:
+    基準時刻 = _要求日時基準時刻取得(要求日時分数)
+    if 基準時刻 is None:
+        return list(ファイルリスト)
+
+    結果 = []
+    for item in ファイルリスト:
+        更新日時 = _日時文字列解析(item.get("更新日時"))
+        if 更新日時 and 更新日時 >= 基準時刻:
+            結果.append(item)
+    return 結果
+
+
+def _最大更新日時文字列(ファイルリスト: list[dict]) -> str:
+    最新 = None
+    for item in ファイルリスト:
+        更新日時 = _日時文字列解析(item.get("更新日時"))
+        if 更新日時 and (最新 is None or 更新日時 > 最新):
+            最新 = 更新日時
+    return 最新.strftime("%Y/%m/%d %H:%M:%S") if 最新 else ""
+
 
 try:
     from AIコア.AIセッション管理 import AIセッション管理, SessionConnection
@@ -1262,9 +1331,9 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 elif メッセージ識別 == "files_backup":
                     try:
                         チャンネル = str(受信データ.get("チャンネル", "file"))
+                        要求日時分数 = _要求日時分数取得(受信データ, デフォルト値=0)
 
                         # セッションに保存済みのバックアップ情報を使用
-                        最終ファイル日時 = セッション.ソース最終更新日時 if セッション else None
                         最終ファイルリスト = list(セッション.全ファイルリスト) if セッション else []
                         バックアップベースパス = セッション.バックアップベースパス if セッション else ""
                         # CODE_BASE_PATHを絶対パスに解決してフロントエンドへ送る
@@ -1273,13 +1342,18 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             プロジェクトパス = os.path.abspath(_raw) if os.path.isabs(_raw) else os.path.abspath(os.path.join(バックエンドディレクトリ, _raw))
                         else:
                             プロジェクトパス = ""
-                        ファイルリスト = sorted(最終ファイルリスト, key=lambda x: x.get("パス", ""))
+                        フィルタ後リスト = _日時フィルタ適用(最終ファイルリスト, 要求日時分数)
+                        ファイルリスト = sorted(フィルタ後リスト, key=lambda x: x.get("パス", ""))
+                        最終ファイル日時 = _最大更新日時文字列(ファイルリスト)
+                        if not 最終ファイル日時:
+                            最終ファイル日時 = (セッション.ソース最終更新日時 if セッション else "") or ""
 
                         await セッション.send_to_channel(チャンネル, {
                             "セッションID": セッションID,
                             "チャンネル": チャンネル,
                             "メッセージ識別": "files_backup",
                             "メッセージ内容": {
+                                "要求日時": 要求日時分数,
                                 "プロジェクトパス": プロジェクトパス,
                                 "バックアップベースパス": バックアップベースパス,
                                 "最終ファイル日時": 最終ファイル日時,
@@ -1293,12 +1367,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 elif メッセージ識別 == "files_temp":
                     try:
                         チャンネル = str(受信データ.get("チャンネル", "file"))
+                        要求日時分数 = _要求日時分数取得(受信データ, デフォルト値=60)
 
-                        # tempフォルダのファイル一覧（1時間以内に更新されたもののみ）
+                        # tempフォルダのファイル一覧（要求日時で絞込）
                         tempパス = os.path.join(バックエンドディレクトリ, "temp")
-                        ファイルリスト = []
-                        最新mtime = 0.0
-                        一時間前 = datetime.now().timestamp() - 3600
+                        全ファイルリスト = []
                         if os.path.exists(tempパス):
                             for root, dirs, files in os.walk(tempパス):
                                 dirs[:] = [d for d in dirs if d not in ["logs"]]
@@ -1308,23 +1381,21 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                     full_path = os.path.join(root, file)
                                     try:
                                         mtime = os.path.getmtime(full_path)
-                                        if mtime < 一時間前:
-                                            continue
                                         更新日時 = datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M:%S")
-                                        if mtime > 最新mtime:
-                                            最新mtime = mtime
                                     except OSError:
                                         continue
                                     相対パス = "temp/" + os.path.relpath(full_path, tempパス).replace("\\", "/")
-                                    ファイルリスト.append({"パス": 相対パス, "更新日時": 更新日時})
-                        # 作業ファイル日時 = 最新ファイルのmtime（変化しない限り同値になる）
-                        作業ファイル日時 = datetime.fromtimestamp(最新mtime).strftime("%Y/%m/%d %H:%M:%S") if 最新mtime else ""
+                                    全ファイルリスト.append({"パス": 相対パス, "更新日時": 更新日時})
+
+                        ファイルリスト = _日時フィルタ適用(全ファイルリスト, 要求日時分数)
+                        作業ファイル日時 = _最大更新日時文字列(ファイルリスト)
 
                         await セッション.send_to_channel(チャンネル, {
                             "セッションID": セッションID,
                             "チャンネル": チャンネル,
                             "メッセージ識別": "files_temp",
                             "メッセージ内容": {
+                                "要求日時": 要求日時分数,
                                 "作業ファイル日時": 作業ファイル日時,
                                 "ファイルリスト": sorted(ファイルリスト, key=lambda x: x["パス"]),
                             }

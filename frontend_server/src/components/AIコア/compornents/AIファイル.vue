@@ -57,6 +57,19 @@ const ファイル読込中 = ref(false);
 const ファイルダウンロード中 = ref(false);
 let ハイライト要求連番 = 0;
 let テンプリスト自動送信タイマー: ReturnType<typeof setInterval> | null = null;
+const 要求日時選択肢 = [
+  { 値: -2, 表示: '前日' },
+  { 値: -1, 表示: '当日' },
+  { 値: 0, 表示: '全て' },
+  { 値: 1, 表示: '<1分' },
+  { 値: 5, 表示: '<5分' },
+  { 値: 10, 表示: '10分' },
+  { 値: 60, 表示: '60分' },
+];
+const バックアップ要求日時 = ref<number>(0);
+const テンプリスト要求日時 = ref<number>(60);
+const 最終受信バックアップ要求日時 = ref<number>(0);
+const 最終受信テンプリスト要求日時 = ref<number>(60);
 
 const 画像拡張子 = new Set(['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico']);
 
@@ -326,19 +339,12 @@ const ファイルダウンロード = async () => {
 
   ファイルダウンロード中.value = true;
   try {
-    const res = await apiClient.post('/core/files/内容取得', { ファイル名: 選択ファイルパス.value });
-    if (res.data.status !== 'OK') {
-      ファイル内容エラー.value = res.data.message ?? 'ダウンロード失敗';
-      return;
-    }
-
-    const base64 = res.data.data.base64_data as string;
-    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const { 配列バッファ, ファイル名 } = await ダウンロードデータ取得();
+    const blob = new Blob([配列バッファ], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 選択ファイル名.value.split(/[\\/]/).pop() || 'download';
+    a.download = ファイル名;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -350,33 +356,74 @@ const ファイルダウンロード = async () => {
   }
 };
 
+const ダウンロードデータ取得 = async (): Promise<{ 配列バッファ: ArrayBuffer; ファイル名: string }> => {
+  const res = await apiClient.post('/core/files/内容取得', { ファイル名: 選択ファイルパス.value });
+  if (res.data.status !== 'OK') {
+    throw new Error(res.data.message ?? 'ダウンロード失敗');
+  }
+  const base64 = res.data.data.base64_data as string;
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  const 配列バッファ = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const ファイル名 = 選択ファイル名.value.split(/[\\/]/).pop() || 'download';
+  return { 配列バッファ, ファイル名 };
+};
+
+const ファイル保存先選択 = async () => {
+  if (!選択ファイルパス.value || ファイルダウンロード中.value) return;
+
+  const win = window as any;
+  if (typeof win.showSaveFilePicker !== 'function') {
+    await ファイルダウンロード();
+    return;
+  }
+
+  ファイルダウンロード中.value = true;
+  try {
+    const { 配列バッファ, ファイル名 } = await ダウンロードデータ取得();
+    const handle = await win.showSaveFilePicker({ suggestedName: ファイル名 });
+    const writable = await handle.createWritable();
+    await writable.write(配列バッファ);
+    await writable.close();
+  } catch (e: any) {
+    if (e?.name !== 'AbortError') {
+      ファイル内容エラー.value = e?.message ?? '保存失敗';
+    }
+  } finally {
+    ファイルダウンロード中.value = false;
+  }
+};
+
 // files_backup / files_temp を非同期で要求する
-const ファイルリスト要求 = () => {
+const バックアップリスト要求 = (読込表示 = false) => {
   if (!プロパティ.wsClient || !プロパティ.wsClient.isConnected()) return;
-  下部ファイル表示クリア();
-  左読込中.value = true;
-  右読込中.value = true;
+  if (読込表示) {
+    左読込中.value = true;
+  }
   プロパティ.wsClient.send({
     セッションID: プロパティ.セッションID ?? '',
     チャンネル: 'file',
     メッセージ識別: 'files_backup',
-    メッセージ内容: ''
-  });
-  プロパティ.wsClient.send({
-    セッションID: プロパティ.セッションID ?? '',
-    チャンネル: 'file',
-    メッセージ識別: 'files_temp',
-    メッセージ内容: ''
+    メッセージ内容: { 要求日時: バックアップ要求日時.value }
   });
 };
 
-const テンプリスト要求 = () => {
+const ファイルリスト要求 = () => {
   if (!プロパティ.wsClient || !プロパティ.wsClient.isConnected()) return;
+  下部ファイル表示クリア();
+  バックアップリスト要求(true);
+  void テンプリスト要求(true);
+};
+
+const テンプリスト要求 = async (読込表示 = false) => {
+  if (!プロパティ.wsClient || !プロパティ.wsClient.isConnected()) return;
+  if (読込表示) {
+    右読込中.value = true;
+  }
   プロパティ.wsClient.send({
     セッションID: プロパティ.セッションID ?? '',
     チャンネル: 'file',
     メッセージ識別: 'files_temp',
-    メッセージ内容: ''
+    メッセージ内容: { 要求日時: テンプリスト要求日時.value }
   });
 };
 
@@ -398,18 +445,25 @@ const テンプリスト自動送信停止 = () => {
 const バックアップリスト受信処理 = (受信データ: any) => {
   const 内容 = 受信データ.メッセージ内容;
   if (!内容) return;
+  const 新要求日時 = Number(内容.要求日時 ?? バックアップ要求日時.value);
   const 新日時 = 内容.最終ファイル日時 ?? null;
   const 新件数 = (内容.ファイルリスト ?? []).length;
-  // 件数・最終更新日時が同じなら表示更新不要
-  if (新日時 === 最終ファイル日時.value && 新件数 === 最終ファイルリスト.value.length) {
+  // 要求日時・件数・最終更新日時が同じなら表示更新不要
+  if (
+    新要求日時 === 最終受信バックアップ要求日時.value
+    && 新日時 === 最終ファイル日時.value
+    && 新件数 === 最終ファイルリスト.value.length
+  ) {
     左読込中.value = false;
     return;
   }
+  最終受信バックアップ要求日時.value = 新要求日時;
   プロジェクトパス.value = 内容.プロジェクトパス ?? '';
   バックアップベースパス.value = 内容.バックアップベースパス ?? '';
   最終ファイル日時.value = 新日時;
   最終ファイルリスト.value = 内容.ファイルリスト ?? [];
-  左展開中フォルダ.value = new Set();
+  const 本日更新ファイル一覧 = 最終ファイルリスト.value.filter((f) => 更新日時が本日(f.更新日時));
+  左展開中フォルダ.value = new Set(全フォルダパス取得(本日更新ファイル一覧));
   左読込中.value = false;
 };
 
@@ -417,6 +471,7 @@ const バックアップリスト受信処理 = (受信データ: any) => {
 const テンプリスト受信処理 = (受信データ: any) => {
   const 内容 = 受信データ.メッセージ内容;
   if (!内容) return;
+  const 新要求日時 = Number(内容.要求日時 ?? テンプリスト要求日時.value);
   const 正規化日時 = 日時文字列正規化(内容.作業ファイル日時);
   const 新日時 = 正規化日時 ?? 内容.作業ファイル日時 ?? null;
   const 新リスト = ((内容.ファイルリスト ?? []) as ファイルエントリ[]).map((f) => ({
@@ -424,11 +479,16 @@ const テンプリスト受信処理 = (受信データ: any) => {
     更新日時: 日時文字列正規化(f.更新日時) ?? (f.更新日時 ?? ''),
   }));
   const 新件数 = 新リスト.length;
-  // 件数・最終更新日時が同じなら表示更新不要
-  if (新日時 === 作業ファイル日時.value && 新件数 === 作業ファイルリスト.value.length) {
+  // 要求日時・件数・最終更新日時が同じなら表示更新不要
+  if (
+    新要求日時 === 最終受信テンプリスト要求日時.value
+    && 新日時 === 作業ファイル日時.value
+    && 新件数 === 作業ファイルリスト.value.length
+  ) {
     右読込中.value = false;
     return;
   }
+  最終受信テンプリスト要求日時.value = 新要求日時;
   作業ファイル日時.value = 新日時;
   作業ファイルリスト.value = 新リスト;
   右展開中フォルダ.value = new Set(全フォルダパス取得(作業ファイルリスト.value));
@@ -480,6 +540,18 @@ watch(() => プロパティ.active, (新値) => {
   }
 });
 
+watch(バックアップ要求日時, () => {
+  if (!プロパティ.active) return;
+  下部ファイル表示クリア();
+  バックアップリスト要求(true);
+});
+
+watch(テンプリスト要求日時, () => {
+  if (!プロパティ.active) return;
+  下部ファイル表示クリア();
+  void テンプリスト要求(true);
+});
+
 // セッションID変化時にソケット再接続
 watch(() => プロパティ.セッションID, async (newId, oldId) => {
   if (!newId || newId === oldId) return;
@@ -519,8 +591,10 @@ onBeforeUnmount(() => {
         <!-- 上段左: 最終バックアップのファイルツリー -->
         <div class="tree-panel left-panel">
           <div class="panel-header">
-            最終バックアップ
-            <span v-if="プロジェクトパス" class="panel-project">{{ プロジェクトパス }}</span>
+            <span>プロジェクト</span>
+            <select v-model.number="バックアップ要求日時" class="request-select" title="プロジェクト 要求日時">
+              <option v-for="opt in 要求日時選択肢" :key="`backup-${opt.値}`" :value="opt.値">{{ opt.表示 }}</option>
+            </select>
             <span class="header-spacer"></span>
             <span v-if="最終ファイルリスト.length > 0" class="panel-count">({{ 最終ファイルリスト.length }})</span>
             <span v-if="最終ファイル日時" class="panel-datetime">{{ 最終ファイル日時 }}</span>
@@ -568,7 +642,10 @@ onBeforeUnmount(() => {
         <!-- 上段右: tempフォルダのファイルツリー -->
         <div class="tree-panel right-panel">
           <div class="panel-header">
-            tempフォルダ(1時間以内)
+            <span>tempフォルダ</span>
+            <select v-model.number="テンプリスト要求日時" class="request-select" title="tempフォルダ 要求日時">
+              <option v-for="opt in 要求日時選択肢" :key="`temp-${opt.値}`" :value="opt.値">{{ opt.表示 }}</option>
+            </select>
             <span class="header-spacer"></span>
             <span v-if="作業ファイルリスト.length > 0" class="panel-count">({{ 作業ファイルリスト.length }})</span>
             <span v-if="作業ファイル日時" class="panel-datetime">{{ 作業ファイル日時 }}</span>
@@ -624,8 +701,9 @@ onBeforeUnmount(() => {
           <button
             class="download-btn"
             @click="ファイルダウンロード"
+            @contextmenu.prevent="ファイル保存先選択"
             :disabled="!選択ファイルパス || ファイル読込中 || ファイルダウンロード中"
-            title="ダウンロード"
+            title="左クリック: ダウンロード / 右クリック: 保存先選択"
           >
             ⬇
           </button>
@@ -804,6 +882,32 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 40%;
+}
+
+.request-select {
+  height: 18px;
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  flex: 0 0 52px;
+  transform: translateY(8px);
+  background: #111111;
+  color: #ffffff;
+  border: 1px solid rgba(151, 168, 223, 0.55);
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.request-select:focus {
+  outline: none;
+}
+
+.request-select option {
+  background: #111111;
+  color: #ffffff;
 }
 
 .panel-count {

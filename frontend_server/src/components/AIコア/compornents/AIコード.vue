@@ -1189,6 +1189,8 @@ const 状態表示テキスト = () => {
   font-family: 'Courier New', monospace;
   font-size: 11px;
   white-space: pre-line;
+  /* 親 .agent-content の line-height: 1.5 / white-space: pre 継承をリセットしてAIチャットに揃える */
+  line-height: normal;
 }
 
 .terminal-line {
