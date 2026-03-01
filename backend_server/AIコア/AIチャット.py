@@ -184,6 +184,50 @@ class Chat:
                 pass
         logger.debug(f"[Chat] チャンネル{self.チャンネル} 終了")
 
+    async def 接続時welcome送信(self) -> None:
+        """チャンネル接続時にChatAI初期化を試み、結果をwelcome_textで送信"""
+        await asyncio.sleep(0.3)  # welcome_info / 会話履歴の後に送信
+        ai_label = f"[{self.AI_NAME or 'Chat'}]"
+
+        # APIキーの事前チェック
+        api_key = ""
+        try:
+            conf_json = getattr(self.親, "conf", None)
+            if conf_json and hasattr(conf_json, "json"):
+                if self.AI_NAME in ("gemini", "freeai"):
+                    api_key = conf_json.json.get("gemini_key_id", "")
+                    if self.AI_NAME == "freeai":
+                        api_key = conf_json.json.get("freeai_key_id", "") or api_key
+                else:
+                    api_key = conf_json.json.get("openrt_key_id", "")
+        except Exception:
+            api_key = ""
+
+        if not api_key or api_key[:1] == '<':
+            メッセージ = f"{ai_label}APIキーが無効です。"
+        else:
+            try:
+                instance = await self._ensure_ai_instance()
+                if instance and getattr(instance, "is_alive", False):
+                    メッセージ = f"{ai_label}会話準備ができました。"
+                else:
+                    メッセージ = f"{ai_label}初期化に失敗しました。"
+            except Exception:
+                メッセージ = f"{ai_label}初期化に失敗しました。"
+
+        if self.接続:
+            try:
+                await self.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID,
+                    "チャンネル": self.チャンネル,
+                    "メッセージ識別": "welcome_text",
+                    "メッセージ内容": メッセージ,
+                    "ファイル名": None,
+                    "サムネイル画像": None,
+                })
+            except Exception as e:
+                logger.error(f"[Chat] welcome_text送信エラー: {e}")
+
     async def チャット要求(self, 受信データ: dict):
         """チャット要求をキューに追加（受信データ構造体をそのまま投入）"""
         if not 受信データ:

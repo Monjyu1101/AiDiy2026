@@ -319,6 +319,44 @@ class Live:
         finally:
             self._initializing = False
 
+    async def 接続時welcome送信(self) -> None:
+        """audioチャンネル接続時にLiveAI APIキーを確認し、結果をwelcome_textでch0に送信"""
+        await asyncio.sleep(0.3)  # welcome_info表示の後に送信
+        ai_label = f"[{self.AI_NAME or 'Live'}]"
+
+        # APIキーの事前チェック（接続は行わずキーの有無のみ確認）
+        api_key = ""
+        try:
+            conf_json = getattr(self.親, "conf", None)
+            if conf_json and hasattr(conf_json, "json"):
+                ai_name = (self.AI_NAME or "").lower()
+                if ai_name in ("gemini_live", "freeai_live"):
+                    api_key = conf_json.json.get("gemini_key_id", "")
+                    if ai_name == "freeai_live":
+                        api_key = conf_json.json.get("freeai_key_id", "") or api_key
+                else:
+                    api_key = conf_json.json.get("openai_key_id", "")
+        except Exception:
+            api_key = ""
+
+        if not api_key or api_key[:1] == '<':
+            メッセージ = f"{ai_label}APIキーが無効です。"
+        else:
+            メッセージ = f"{ai_label}会話準備ができました。"
+
+        if self.接続:
+            try:
+                await self.接続.send_to_channel("0", {
+                    "セッションID": self.セッションID,
+                    "チャンネル": "0",
+                    "メッセージ識別": "welcome_text",
+                    "メッセージ内容": メッセージ,
+                    "ファイル名": None,
+                    "サムネイル画像": None,
+                })
+            except Exception as e:
+                logger.error(f"[Live] welcome_text送信エラー: {e}")
+
     async def 終了(self):
         """Live処理を終了"""
         self.is_alive = False

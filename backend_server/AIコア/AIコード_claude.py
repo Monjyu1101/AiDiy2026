@@ -93,6 +93,9 @@ class CodeAI:
         
         # バージョン管理（変化検出用）
         self.last_version = None
+
+        # バージョン文字列（開始()時に取得）
+        self.バージョン: str = ""
         
         # logger.info(f"初期化:完了 (Claude Agent SDK設定済み, 履歴管理有効)")
         pass
@@ -126,17 +129,50 @@ class CodeAI:
         except Exception as e:
             logger.error(f"システムプロンプト構築エラー: {e}")
             return base_prompt
-    
-    async def 開始(self):
-        """CodeAI開始（セッション作成）"""
-        try:
-            # パラメータで渡されたapiキーを優先使用（親からの再取得は不要）
 
+    async def バージョン確認(self) -> str:
+        """claude --version を実行してバージョン文字列を返す。失敗時は空文字。"""
+        if os.name == 'nt':
+            userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
+            cmd = os.path.join(userprofile, 'AppData', 'Roaming', 'npm', 'claude.cmd')
+        else:
+            cmd = 'claude'
+        custom_cmd = os.environ.get('CLAUDE_CLI_PATH')
+        if custom_cmd:
+            cmd = custom_cmd
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                cmd, "--version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                logger.warning(f"[CodeAI] --version タイムアウト: {cmd}")
+                return ""
+            output = (stdout or b"").decode("utf-8", errors="replace").strip()
+            if not output:
+                output = (stderr or b"").decode("utf-8", errors="replace").strip()
+            first_line = output.splitlines()[0].strip() if output else ""
+            logger.info(f"[CodeAI] {cmd} --version => {first_line}")
+            return first_line
+        except FileNotFoundError:
+            logger.warning(f"[CodeAI] コマンドが見つかりません: {cmd}")
+            return ""
+        except Exception as e:
+            logger.warning(f"[CodeAI] --version 実行エラー: {cmd} {e}")
+            return ""
+
+    async def 開始(self):
+        """コードAI開始（claude --version で利用可能性を確認）"""
+        try:
             # SDK resumeセッション初期化（最初の実行時に作成）
             self.AIセッションID = None
             self.is_alive = True
-            # logger.info("CodeAI: セッション開始完了")
-            pass
+            self.バージョン = await self.バージョン確認()
             return True
         except Exception as e:
             logger.error(f"CodeAI開始:エラー {e}")

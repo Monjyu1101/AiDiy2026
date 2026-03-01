@@ -218,6 +218,52 @@ class CodeAgent:
                 pass
         logger.debug(f"[CodeAgent] チャンネル{self.チャンネル} 終了")
 
+    async def 接続時welcome送信(self) -> None:
+        """チャンネル接続時にCodeAI初期化を試み、結果をwelcome_textで送信"""
+        await asyncio.sleep(0.3)  # welcome_info / 会話履歴の後に送信
+        ai_label = f"[{self.AI_NAME or f'Agent{self.チャンネル}'}]"
+
+        try:
+            instance = await self._ensure_ai_instance()
+            if instance and getattr(instance, "is_alive", False):
+                バージョン = getattr(instance, "バージョン", "") or ""
+                if バージョン:
+                    メッセージ = f"{ai_label}準備できました。({バージョン})"
+                else:
+                    メッセージ = f"{ai_label}会話準備ができました。"
+            else:
+                バージョン = getattr(instance, "バージョン", "") if instance else ""
+                if not バージョン:
+                    ai_name = self.AI_NAME or ""
+                    if ai_name in ("claude_sdk", "claude_cli"):
+                        tool = "claude code"
+                    elif ai_name == "copilot_cli":
+                        tool = "copilot"
+                    elif ai_name == "gemini_cli":
+                        tool = "gemini"
+                    elif ai_name == "codex_cli":
+                        tool = "codex"
+                    else:
+                        tool = ai_name or "コマンド"
+                    メッセージ = f"{ai_label}{tool}が利用できません。（{tool}未インストール?)"
+                else:
+                    メッセージ = f"{ai_label}初期化に失敗しました。"
+        except Exception:
+            メッセージ = f"{ai_label}初期化に失敗しました。"
+
+        if self.接続:
+            try:
+                await self.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID,
+                    "チャンネル": self.チャンネル,
+                    "メッセージ識別": "welcome_text",
+                    "メッセージ内容": メッセージ,
+                    "ファイル名": None,
+                    "サムネイル画像": None,
+                })
+            except Exception as e:
+                logger.error(f"[CodeAgent] welcome_text送信エラー: {e}")
+
     async def 強制停止(self) -> bool:
         """
         現在実行中のタスクを強制停止

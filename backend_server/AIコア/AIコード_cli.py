@@ -84,6 +84,60 @@ class CodeAI:
         # 現在実行中のsubprocess（強制終了用）
         self.current_process: Optional[asyncio.subprocess.Process] = None
 
+        # バージョン文字列（開始()時に取得）
+        self.バージョン: str = ""
+
+    def _コマンドパス取得(self) -> str:
+        """code_ai に対応するCLIコマンドパスを返す"""
+        custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
+        if custom_cmd:
+            return custom_cmd
+        if os.name == 'nt':
+            userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
+            npm_bin = os.path.join(userprofile, 'AppData', 'Roaming', 'npm')
+            names = {
+                "copilot_cli": "copilot.cmd",
+                "gemini_cli": "gemini.cmd",
+                "codex_cli": "codex.cmd",
+            }
+            return os.path.join(npm_bin, names.get(self.code_ai, "claude.cmd"))
+        names = {
+            "copilot_cli": "copilot",
+            "gemini_cli": "gemini",
+            "codex_cli": "codex",
+        }
+        return names.get(self.code_ai, "claude")
+
+    async def バージョン確認(self) -> str:
+        """CLIツールの --version を実行してバージョン文字列を返す。失敗時は空文字。"""
+        cmd = self._コマンドパス取得()
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                cmd, "--version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                logger.warning(f"[CodeAI] --version タイムアウト: {cmd}")
+                return ""
+            output = (stdout or b"").decode("utf-8", errors="replace").strip()
+            if not output:
+                output = (stderr or b"").decode("utf-8", errors="replace").strip()
+            # 最初の1行だけ使用
+            first_line = output.splitlines()[0].strip() if output else ""
+            logger.info(f"[CodeAI] {cmd} --version => {first_line}")
+            return first_line
+        except FileNotFoundError:
+            logger.warning(f"[CodeAI] コマンドが見つかりません: {cmd}")
+            return ""
+        except Exception as e:
+            logger.warning(f"[CodeAI] --version 実行エラー: {cmd} {e}")
+            return ""
+
     def _コマンド構築(self, プロンプト: str, 初回: bool = False, repo_path: str = None, 読取専用: bool = False) -> list:
         """
         プロバイダー別のコマンドを構築
@@ -231,10 +285,10 @@ class CodeAI:
             return base_prompt
 
     async def 開始(self):
-        """CodeAI開始"""
+        """CodeAI開始（CLIツールのバージョン確認を含む）"""
         try:
             self.is_alive = True
-            pass
+            self.バージョン = await self.バージョン確認()
             return True
         except Exception as e:
             logger.error(f"CodeAI開始:エラー {e}")

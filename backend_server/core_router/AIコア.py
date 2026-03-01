@@ -874,6 +874,10 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             if ソケット番号 == "audio" and not getattr(セッション.live_processor, "is_alive", False):
                 await セッション.live_processor.開始()
 
+            # audioチャンネル接続時にLiveAIのAPIキー確認結果をwelcome_textでch0に送信
+            if ソケット番号 == "audio" and hasattr(セッション, "live_processor") and セッション.live_processor:
+                asyncio.create_task(セッション.live_processor.接続時welcome送信())
+
             if セッション.audio_split_task is None or セッション.audio_split_task.done():
                 セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
 
@@ -962,17 +966,28 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     await 送信_会話履歴(セッション, セッションID, チャンネル=ソケット番号)
                 except Exception as e:
                     logger.exception(f"会話履歴送信エラー: {e}")
-            try:
-                await セッション.send_to_channel(ソケット番号, {
-                    "セッションID": セッションID,
-                    "チャンネル": ソケット番号,
-                    "メッセージ識別": "welcome_text",
-                    "メッセージ内容": 追加メッセージ,
-                    "ファイル名": None,
-                    "サムネイル画像": None
-                })
-            except Exception as e:
-                logger.exception(f"準備メッセージ送信エラー: {e}")
+                # 初期化結果をAIモジュールからwelcome_textで通知（バックグラウンドタスク）
+                try:
+                    if ソケット番号 == "0" and hasattr(セッション, "chat_processor") and セッション.chat_processor:
+                        asyncio.create_task(セッション.chat_processor.接続時welcome送信())
+                    elif ソケット番号 in ["1", "2", "3", "4"] and hasattr(セッション, "code_agent_processors"):
+                        idx = int(ソケット番号) - 1
+                        if idx < len(セッション.code_agent_processors):
+                            asyncio.create_task(セッション.code_agent_processors[idx].接続時welcome送信())
+                except Exception as e:
+                    logger.exception(f"welcome_textタスク起動エラー: {e}")
+            elif ソケット番号 == "input":
+                try:
+                    await セッション.send_to_channel(ソケット番号, {
+                        "セッションID": セッションID,
+                        "チャンネル": ソケット番号,
+                        "メッセージ識別": "welcome_text",
+                        "メッセージ内容": 追加メッセージ,
+                        "ファイル名": None,
+                        "サムネイル画像": None
+                    })
+                except Exception as e:
+                    logger.exception(f"準備メッセージ送信エラー: {e}")
 
         # メインループ：メッセージを受信し処理（入力ソケットのみ）
         while True:
