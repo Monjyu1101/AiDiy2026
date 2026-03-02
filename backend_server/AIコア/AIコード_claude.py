@@ -173,6 +173,9 @@ class CodeAI:
             self.AIセッションID = None
             self.is_alive = True
             self.バージョン = await self.バージョン確認()
+            if not self.バージョン:
+                self.is_alive = False
+                return False
             return True
         except Exception as e:
             logger.error(f"CodeAI開始:エラー {e}")
