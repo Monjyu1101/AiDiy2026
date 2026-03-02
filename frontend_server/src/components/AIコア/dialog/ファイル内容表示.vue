@@ -11,8 +11,8 @@
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { シキHTML生成 } from '@/utils/shiki';
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
+import { monaco, モナコ言語推定 } from '@/utils/monaco';
 
 const props = defineProps<{
   show: boolean;
@@ -40,6 +40,8 @@ const テキスト拡張子セット = new Set([
   'ini', 'env', 'sql', 'csv', 'log', 'xml', 'sh', 'ps1', 'bat'
 ]);
 
+const ANSI拡張子 = new Set(['bat', 'cmd']);
+
 const 拡張子 = computed(() => {
   const クエリ除去 = (props.ファイル名 || '').split(/[?#]/u, 1)[0] || '';
   const 最後のスラッシュ位置 = Math.max(クエリ除去.lastIndexOf('/'), クエリ除去.lastIndexOf('\\'));
@@ -65,39 +67,67 @@ const テキスト内容 = computed(() => {
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);
     }
-    return new TextDecoder('utf-8').decode(bytes);
+    const encoding = ANSI拡張子.has(拡張子.value) ? 'shift_jis' : 'utf-8';
+    return new TextDecoder(encoding).decode(bytes);
   } catch (error) {
     return `テキストデコードに失敗しました: ${error}`;
   }
 });
 
-const ハイライトHTML = ref('');
-let ハイライト要求連番 = 0;
+// Monaco Editor
+const monacoコンテナ = ref<HTMLDivElement | null>(null);
+let monacoエディタ: monaco.editor.IStandaloneCodeEditor | null = null;
 
-const テキストハイライト更新 = async () => {
-  if (!props.show || !テキスト表示.value || !テキスト内容.value) {
-    ハイライトHTML.value = '';
-    return;
+const monacoエディタ更新 = async () => {
+  if (!props.show || !テキスト表示.value || !テキスト内容.value) return;
+  const 言語 = モナコ言語推定(props.ファイル名);
+  await nextTick();
+  if (!monacoコンテナ.value) return;
+
+  if (!monacoエディタ) {
+    monacoエディタ = monaco.editor.create(monacoコンテナ.value, {
+      value: テキスト内容.value,
+      language: 言語,
+      theme: 'vs-dark',
+      readOnly: true,
+      automaticLayout: true,
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      fontSize: 12,
+      lineNumbers: 'on',
+      folding: true,
+      wordWrap: 'on',
+      renderLineHighlight: 'none',
+      domReadOnly: true,
+      contextmenu: false,
+      scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+    });
+  } else {
+    const model = monacoエディタ.getModel();
+    if (model) monaco.editor.setModelLanguage(model, 言語);
+    monacoエディタ.setValue(テキスト内容.value);
+    monacoエディタ.revealLine(1);
   }
+};
 
-  const 現在連番 = ++ハイライト要求連番;
-  try {
-    const html = await シキHTML生成(テキスト内容.value, props.ファイル名);
-    if (現在連番 !== ハイライト要求連番) return;
-    ハイライトHTML.value = html;
-  } catch {
-    if (現在連番 !== ハイライト要求連番) return;
-    ハイライトHTML.value = '';
+const monacoエディタ破棄 = () => {
+  if (monacoエディタ) {
+    monacoエディタ.dispose();
+    monacoエディタ = null;
   }
 };
 
 watch(
   [() => props.show, () => props.ファイル名, () => props.base64_data, テキスト表示],
-  () => {
-    void テキストハイライト更新();
-  },
+  () => { void monacoエディタ更新(); },
   { immediate: true }
 );
+
+watch(() => props.show, (v) => {
+  if (!v) monacoエディタ破棄();
+});
+
+onBeforeUnmount(() => { monacoエディタ破棄(); });
 
 const handleClose = () => {
   emit('close');
@@ -120,8 +150,7 @@ const handleDownload = () => {
 
       <div class="file-content-body">
         <img v-if="画像表示 && 画像DataUrl" class="preview-image" :src="画像DataUrl" alt="image preview" />
-        <div v-else-if="テキスト表示 && ハイライトHTML" class="preview-text preview-highlight" v-html="ハイライトHTML"></div>
-        <pre v-else-if="テキスト表示" class="preview-text">{{ テキスト内容 }}</pre>
+        <div v-else-if="テキスト表示" ref="monacoコンテナ" class="monaco-container"></div>
         <div v-else class="unsupported-message">この拡張子はプレビュー対象外です。</div>
       </div>
 
@@ -172,10 +201,12 @@ const handleDownload = () => {
 }
 
 .file-content-body {
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 80vw;
+  max-height: calc(90vh - 120px);
 }
 
 .preview-image {
@@ -187,42 +218,12 @@ const handleDownload = () => {
   box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3);
 }
 
-.preview-text {
-  margin: 0;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #e5e7eb;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 12px;
+.monaco-container {
+  width: 100%;
+  height: calc(90vh - 140px);
+  min-height: 200px;
   border-radius: 4px;
-  max-height: calc(90vh - 140px);
-  overflow: auto;
-}
-
-.preview-highlight {
-  padding: 0;
-  background: transparent;
-}
-
-.preview-highlight :deep(pre.shiki-pre) {
-  margin: 0;
-  padding: 12px;
-  background: transparent !important;
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 1.5;
-  max-height: calc(90vh - 140px);
-  overflow: auto;
-}
-
-.preview-highlight :deep(pre.shiki-pre code) {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
+  overflow: hidden;
 }
 
 .unsupported-message {

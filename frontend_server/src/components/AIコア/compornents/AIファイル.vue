@@ -11,10 +11,10 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue';
 import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import apiClient from '@/api/client';
-import { シキHTML生成 } from '@/utils/shiki';
+import { monaco, モナコ言語推定 } from '@/utils/monaco';
 
 const プロパティ = defineProps<{
   セッションID?: string;
@@ -50,8 +50,11 @@ const 右展開中フォルダ = ref<Set<string>>(new Set());
 const 選択ファイル名 = ref<string>('');
 const 選択ファイルパス = ref<string>('');
 const ファイル内容テキスト = ref<string | null>(null);
-const ファイル内容ハイライトHTML = ref<string>('');
 const ファイル内容画像 = ref<string | null>(null);
+
+// Monaco Editor
+const monacoコンテナ = ref<HTMLDivElement | null>(null);
+let monacoエディタ: monaco.editor.IStandaloneCodeEditor | null = null;
 const ファイル内容エラー = ref<string | null>(null);
 const ファイル読込中 = ref(false);
 const ファイルダウンロード中 = ref(false);
@@ -72,6 +75,7 @@ const 最終受信バックアップ要求日時 = ref<number>(0);
 const 最終受信テンプリスト要求日時 = ref<number>(60);
 
 const 画像拡張子 = new Set(['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico']);
+const ANSI拡張子 = new Set(['bat', 'cmd']);
 
 type ツリーノード種別 = 'folder' | 'file';
 type ツリーノード = {
@@ -277,29 +281,65 @@ const 下部ファイル表示クリア = () => {
   選択ファイル名.value = '';
   選択ファイルパス.value = '';
   ファイル内容テキスト.value = null;
-  ファイル内容ハイライトHTML.value = '';
   ファイル内容画像.value = null;
   ファイル内容エラー.value = null;
   ファイル読込中.value = false;
   ファイルダウンロード中.value = false;
+  // Monaco Editor をクリア
+  if (monacoエディタ) {
+    monacoエディタ.setValue('');
+  }
 };
 
-const ファイル内容ハイライト生成 = async (ファイル名: string, 内容: string) => {
-  const 現在連番 = ++ハイライト要求連番;
-  try {
-    const html = await シキHTML生成(内容, ファイル名);
-    if (現在連番 !== ハイライト要求連番) return;
-    ファイル内容ハイライトHTML.value = html;
-  } catch {
-    if (現在連番 !== ハイライト要求連番) return;
-    ファイル内容ハイライトHTML.value = '';
+/** Monaco Editor を生成または更新する */
+const monacoエディタ更新 = async (ファイル名: string, 内容: string) => {
+  const 言語 = モナコ言語推定(ファイル名);
+  await nextTick();
+  if (!monacoコンテナ.value) return;
+
+  if (!monacoエディタ) {
+    monacoエディタ = monaco.editor.create(monacoコンテナ.value, {
+      value: 内容,
+      language: 言語,
+      theme: 'vs-dark',
+      readOnly: true,
+      automaticLayout: true,
+      minimap: { enabled: true },
+      scrollBeyondLastLine: false,
+      fontSize: 12,
+      lineNumbers: 'on',
+      folding: true,
+      wordWrap: 'on',
+      renderLineHighlight: 'none',
+      domReadOnly: true,
+      contextmenu: false,
+      overviewRulerLanes: 0,
+      hideCursorInOverviewRuler: true,
+      scrollbar: {
+        verticalScrollbarSize: 8,
+        horizontalScrollbarSize: 8,
+      },
+    });
+  } else {
+    const model = monacoエディタ.getModel();
+    if (model) {
+      monaco.editor.setModelLanguage(model, 言語);
+    }
+    monacoエディタ.setValue(内容);
+    monacoエディタ.revealLine(1);
+  }
+};
+
+const monacoエディタ破棄 = () => {
+  if (monacoエディタ) {
+    monacoエディタ.dispose();
+    monacoエディタ = null;
   }
 };
 
 const ファイルクリック = async (ファイル名: string, isBackup: boolean) => {
   選択ファイル名.value = ファイル名;
   ファイル内容テキスト.value = null;
-  ファイル内容ハイライトHTML.value = '';
   ファイル内容画像.value = null;
   ファイル内容エラー.value = null;
   ファイル読込中.value = true;
@@ -323,9 +363,12 @@ const ファイルクリック = async (ファイル名: string, isBackup: boole
       ファイル内容画像.value = `data:${mime};base64,${base64}`;
     } else {
       const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-      const テキスト = new TextDecoder('utf-8').decode(bytes);
+      const encoding = ANSI拡張子.has(ext) ? 'shift_jis' : 'utf-8';
+      const テキスト = new TextDecoder(encoding).decode(bytes);
       ファイル内容テキスト.value = テキスト;
-      void ファイル内容ハイライト生成(ファイル名, テキスト);
+      // ファイル読込中を先にfalseにして v-show を有効化してから Monaco 更新
+      ファイル読込中.value = false;
+      await monacoエディタ更新(ファイル名, テキスト);
     }
   } catch (e: any) {
     ファイル内容エラー.value = e?.message ?? '取得失敗';
@@ -573,6 +616,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   テンプリスト自動送信停止();
   出力ソケット切断();
+  monacoエディタ破棄();
 });
 </script>
 
@@ -718,16 +762,16 @@ onBeforeUnmount(() => {
             <div>{{ ファイル内容エラー }}</div>
           </div>
           <img v-else-if="ファイル内容画像" :src="ファイル内容画像" class="file-image" />
-          <div
-            v-else-if="ファイル内容テキスト !== null && ファイル内容ハイライトHTML"
-            class="file-text file-highlight"
-            v-html="ファイル内容ハイライトHTML"
-          ></div>
-          <pre v-else-if="ファイル内容テキスト !== null" class="file-text">{{ ファイル内容テキスト }}</pre>
-          <div v-else class="placeholder-content">
+          <div v-else-if="ファイル内容テキスト === null && !ファイル読込中" class="placeholder-content">
             <span class="placeholder-icon">📄</span>
             <div>上のツリーからファイルを選択すると<br>テキストまたは画像を表示します</div>
           </div>
+          <!-- Monaco Editor: v-showで常にDOMに残し、エディタインスタンスを維持 -->
+          <div
+            v-show="!ファイル読込中 && !ファイル内容エラー && !ファイル内容画像 && ファイル内容テキスト !== null"
+            ref="monacoコンテナ"
+            class="monaco-container"
+          ></div>
         </div>
       </div>
     </div>
@@ -971,8 +1015,10 @@ onBeforeUnmount(() => {
 
 .lower-area .panel-content {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
+  padding: 0;
+  overflow: hidden;
 }
 
 .panel-content::-webkit-scrollbar {
@@ -999,6 +1045,16 @@ onBeforeUnmount(() => {
   font-size: 12px;
   text-align: center;
   gap: 8px;
+}
+
+.lower-area .placeholder-content {
+  align-self: center;
+  width: 100%;
+}
+
+.lower-area .file-image {
+  align-self: center;
+  padding: 4px 8px;
 }
 
 .placeholder-icon {
@@ -1101,38 +1157,11 @@ onBeforeUnmount(() => {
   color: #ffffff;
 }
 
-.file-text {
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  color: #ffffff;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
-  line-height: 1.5;
+.monaco-container {
   width: 100%;
-  align-self: flex-start;
-}
-
-.file-highlight {
-  width: 100%;
-  align-self: flex-start;
-}
-
-.file-highlight :deep(pre.shiki-pre) {
-  margin: 0;
-  padding: 0;
-  background: #0a0a0a !important;
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.5;
-}
-
-.file-highlight :deep(pre.shiki-pre code) {
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #ffffff;
+  height: 100%;
+  min-height: 100px;
+  align-self: stretch;
 }
 
 .file-image {
