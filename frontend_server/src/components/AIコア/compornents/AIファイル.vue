@@ -60,14 +60,21 @@ const ファイル読込中 = ref(false);
 const ファイルダウンロード中 = ref(false);
 let ハイライト要求連番 = 0;
 let テンプリスト自動送信タイマー: ReturnType<typeof setInterval> | null = null;
+const 更新間隔選択肢 = [
+  { 値: 0, 表示: '切' },
+  { 値: 1, 表示: '1秒間隔' },
+  { 値: 2, 表示: '2秒間隔' },
+  { 値: 5, 表示: '5秒間隔' },
+];
+const テンプ更新間隔 = ref<number>(5);
 const 要求日時選択肢 = [
-  { 値: -2, 表示: '前日' },
-  { 値: -1, 表示: '当日' },
+  { 値: -2, 表示: '前日以内' },
+  { 値: -1, 表示: '当日以内' },
   { 値: 0, 表示: '全て' },
-  { 値: 1, 表示: '<1分' },
-  { 値: 5, 表示: '<5分' },
-  { 値: 10, 表示: '10分' },
-  { 値: 60, 表示: '60分' },
+  { 値: 1, 表示: '1分以内' },
+  { 値: 5, 表示: '5分以内' },
+  { 値: 10, 表示: '10分以内' },
+  { 値: 60, 表示: '60分以内' },
 ];
 const バックアップ要求日時 = ref<number>(0);
 const テンプリスト要求日時 = ref<number>(60);
@@ -471,11 +478,12 @@ const テンプリスト要求 = async (読込表示 = false) => {
 };
 
 const テンプリスト自動送信開始 = () => {
-  if (テンプリスト自動送信タイマー) return;
+  テンプリスト自動送信停止();
+  if (テンプ更新間隔.value === 0) return;
   テンプリスト自動送信タイマー = setInterval(() => {
     if (!プロパティ.active) return;
     void テンプリスト要求();
-  }, 10_000);
+  }, テンプ更新間隔.value * 1_000);
 };
 
 const テンプリスト自動送信停止 = () => {
@@ -595,6 +603,12 @@ watch(テンプリスト要求日時, () => {
   void テンプリスト要求(true);
 });
 
+watch(テンプ更新間隔, () => {
+  if (プロパティ.active) {
+    テンプリスト自動送信開始();
+  }
+});
+
 // セッションID変化時にソケット再接続
 watch(() => プロパティ.セッションID, async (newId, oldId) => {
   if (!newId || newId === oldId) return;
@@ -683,12 +697,15 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 上段右: tempフォルダのファイルツリー -->
+        <!-- 上段右: temp のファイルツリー -->
         <div class="tree-panel right-panel">
           <div class="panel-header">
-            <span>tempフォルダ</span>
-            <select v-model.number="テンプリスト要求日時" class="request-select" title="tempフォルダ 要求日時">
+            <span>temp</span>
+            <select v-model.number="テンプリスト要求日時" class="request-select" title="temp 要求日時">
               <option v-for="opt in 要求日時選択肢" :key="`temp-${opt.値}`" :value="opt.値">{{ opt.表示 }}</option>
+            </select>
+            <select v-model.number="テンプ更新間隔" class="request-select" title="更新間隔">
+              <option v-for="opt in 更新間隔選択肢" :key="`interval-${opt.値}`" :value="opt.値">{{ opt.表示 }}</option>
             </select>
             <span class="header-spacer"></span>
             <span v-if="作業ファイルリスト.length > 0" class="panel-count">({{ 作業ファイルリスト.length }})</span>
@@ -930,10 +947,10 @@ onBeforeUnmount(() => {
 
 .request-select {
   height: 18px;
-  width: 52px;
-  min-width: 52px;
-  max-width: 52px;
-  flex: 0 0 52px;
+  width: 70px;
+  min-width: 70px;
+  max-width: 70px;
+  flex: 0 0 70px;
   transform: translateY(8px);
   background: #111111;
   color: #ffffff;
