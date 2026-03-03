@@ -49,6 +49,7 @@ const 右展開中フォルダ = ref<Set<string>>(new Set());
 // 選択ファイル内容
 const 選択ファイル名 = ref<string>('');
 const 選択ファイルパス = ref<string>('');
+const 選択パネル = ref<'left' | 'right' | null>(null);
 const ファイル内容テキスト = ref<string | null>(null);
 const ファイル内容画像 = ref<string | null>(null);
 
@@ -345,6 +346,7 @@ const monacoエディタ破棄 = () => {
 };
 
 const ファイルクリック = async (ファイル名: string, isBackup: boolean) => {
+  選択パネル.value = isBackup ? 'left' : 'right';
   選択ファイル名.value = ファイル名;
   ファイル内容テキスト.value = null;
   ファイル内容画像.value = null;
@@ -430,7 +432,14 @@ const ファイル保存先選択 = async () => {
   ファイルダウンロード中.value = true;
   try {
     const { 配列バッファ, ファイル名 } = await ダウンロードデータ取得();
-    const handle = await win.showSaveFilePicker({ suggestedName: ファイル名 });
+    const ext = ファイル名.includes('.') ? ファイル名.split('.').pop()?.toLowerCase() ?? '' : '';
+    const handle = await win.showSaveFilePicker({
+      suggestedName: ファイル名,
+      ...(ext ? {
+        types: [{ description: `${ext.toUpperCase()} ファイル`, accept: { [`application/x-${ext}`]: [`.${ext}`] as `.${string}`[] } }],
+        excludeAcceptAllOption: false,
+      } : {}),
+    });
     const writable = await handle.createWritable();
     await writable.write(配列バッファ);
     await writable.close();
@@ -619,15 +628,76 @@ watch(() => プロパティ.セッションID, async (newId, oldId) => {
   }
 });
 
+// コンテキストメニュー
+const コンテキストメニュー表示 = ref(false);
+const コンテキストメニューX = ref(0);
+const コンテキストメニューY = ref(0);
+
+const コンテキストメニュー閉じる = () => {
+  コンテキストメニュー表示.value = false;
+};
+
+const ツリー行右クリック = (e: MouseEvent, 行: ツリー表示行, isBackup: boolean) => {
+  if (行.種別 !== 'file') return;
+  e.preventDefault();
+  void ファイルクリック(行.パス, isBackup);
+  // 画面端に昇らないようクランプ
+  const メニュー幅 = 140;
+  const メニュー高 = 40;
+  const x = e.clientX + メニュー幅 > window.innerWidth ? e.clientX - メニュー幅 : e.clientX;
+  const y = e.clientY + メニュー高 > window.innerHeight ? e.clientY - メニュー高 : e.clientY;
+  コンテキストメニューX.value = x;
+  コンテキストメニューY.value = y;
+  コンテキストメニュー表示.value = true;
+};
+
+const コンテキストメニューダウンロード = async () => {
+  コンテキストメニュー閉じる();
+  await ファイル保存先選択();
+};
+
+const キーボードキーダウン = (e: KeyboardEvent) => {
+  if (!プロパティ.active) return;
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  if (!選択ファイル名.value || !選択パネル.value) return;
+
+  // Monaco Editor にフォーカスが当たっているときは操作しない
+  const active = document.activeElement;
+  if (active && active.classList.contains('monaco-editor')) return;
+  if (active && (active as HTMLElement).closest?.('.monaco-editor')) return;
+
+  const isBackup = 選択パネル.value === 'left';
+  const ファイル行 = (isBackup ? 最終ファイル行.value : 作業ファイル行.value)
+    .filter((行) => 行.種別 === 'file');
+  if (ファイル行.length === 0) return;
+
+  const 現在インデックス = ファイル行.findIndex((行) => 行.パス === 選択ファイル名.value);
+  if (現在インデックス === -1) return;
+
+  e.preventDefault();
+
+  const 次インデックス = e.key === 'ArrowDown'
+    ? Math.min(現在インデックス + 1, ファイル行.length - 1)
+    : Math.max(現在インデックス - 1, 0);
+
+  if (次インデックス !== 現在インデックス) {
+    void ファイルクリック(ファイル行[次インデックス].パス, isBackup);
+  }
+};
+
 onMounted(async () => {
   await 出力ソケット接続();
   if (プロパティ.active) {
     ファイルリスト要求();
     テンプリスト自動送信開始();
   }
+  window.addEventListener('keydown', キーボードキーダウン);
+  window.addEventListener('mousedown', コンテキストメニュー閉じる);
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', キーボードキーダウン);
+  window.removeEventListener('mousedown', コンテキストメニュー閉じる);
   テンプリスト自動送信停止();
   出力ソケット切断();
   monacoエディタ破棄();
@@ -676,6 +746,7 @@ onBeforeUnmount(() => {
                   selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス
                 }"
                 @click="ツリー行クリック(行, true)"
+                @contextmenu="ツリー行右クリック($event, 行, true)"
               >
                 <span class="tree-indent" :style="{ width: `${行.深さ * 14}px` }"></span>
                 <span class="tree-toggle">
@@ -730,6 +801,7 @@ onBeforeUnmount(() => {
                   selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス
                 }"
                 @click="ツリー行クリック(行, false)"
+                @contextmenu="ツリー行右クリック($event, 行, false)"
               >
                 <span class="tree-indent" :style="{ width: `${行.深さ * 14}px` }"></span>
                 <span class="tree-toggle">
@@ -793,6 +865,18 @@ onBeforeUnmount(() => {
       </div>
     </div>
   </div>
+
+  <!-- コンテキストメニュー -->
+  <Teleport to="body">
+    <div
+      v-if="コンテキストメニュー表示"
+      class="context-menu"
+      :style="{ left: コンテキストメニューX + 'px', top: コンテキストメニューY + 'px' }"
+      @mousedown.stop
+    >
+      <button class="context-menu-item" @click="コンテキストメニューダウンロード">⬇ ダウンロード</button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -1187,5 +1271,36 @@ onBeforeUnmount(() => {
   object-fit: contain;
   display: block;
   margin: auto;
+}
+
+/* コンテキストメニュー */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #1e1e2e;
+  border: 1px solid rgba(102, 126, 234, 0.5);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  min-width: 130px;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #c8d0f0;
+  font-size: 12px;
+  text-align: left;
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.context-menu-item:hover {
+  background: rgba(102, 126, 234, 0.25);
+  color: #edf2ff;
 }
 </style>
