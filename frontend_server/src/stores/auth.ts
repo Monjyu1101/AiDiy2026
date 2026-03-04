@@ -80,6 +80,18 @@ export const useAuthStore = defineStore('auth', {
             localStorage.removeItem('user')
             router.push('/ログイン')
         },
+        async refreshToken(): Promise<void> {
+            if (!this.token) return
+            try {
+                const response = await apiClient.post('/core/auth/トークン更新')
+                if (response.data.status === 'OK') {
+                    this.token = response.data.data.access_token
+                    localStorage.setItem('token', this.token)
+                }
+            } catch {
+                // リフレッシュ失敗時はログアウトに任せる（インターセプターが401時にログアウトする）
+            }
+        },
     },
 })
 

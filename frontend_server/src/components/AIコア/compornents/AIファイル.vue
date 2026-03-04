@@ -15,6 +15,9 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import apiClient from '@/api/client';
 import { monaco, モナコ言語推定 } from '@/utils/monaco';
+import { useAuthStore } from '@/stores/auth';
+
+const authStore = useAuthStore();
 
 const プロパティ = defineProps<{
   セッションID?: string;
@@ -60,7 +63,7 @@ const ファイル内容エラー = ref<string | null>(null);
 const ファイル読込中 = ref(false);
 const ファイルダウンロード中 = ref(false);
 let ハイライト要求連番 = 0;
-let テンプリスト自動送信タイマー: ReturnType<typeof setInterval> | null = null;
+let テンプリスト自動送信タイマー: ReturnType<typeof setTimeout> | null = null;
 const 更新間隔選択肢 = [
   { 値: 0, 表示: '切' },
   { 値: 1, 表示: '1秒間隔' },
@@ -478,6 +481,8 @@ const テンプリスト要求 = async (読込表示 = false) => {
   if (読込表示) {
     右読込中.value = true;
   }
+  // files_temp送信＝画面表示中＝操作中とみなしてトークンをリフレッシュ
+  void authStore.refreshToken();
   プロパティ.wsClient.send({
     セッションID: プロパティ.セッションID ?? '',
     チャンネル: 'file',
@@ -489,15 +494,15 @@ const テンプリスト要求 = async (読込表示 = false) => {
 const テンプリスト自動送信開始 = () => {
   テンプリスト自動送信停止();
   if (テンプ更新間隔.value === 0) return;
-  テンプリスト自動送信タイマー = setInterval(() => {
-    if (!プロパティ.active) return;
+  テンプリスト自動送信タイマー = setTimeout(() => {
+    テンプリスト自動送信タイマー = null;
     void テンプリスト要求();
   }, テンプ更新間隔.value * 1_000);
 };
 
 const テンプリスト自動送信停止 = () => {
   if (!テンプリスト自動送信タイマー) return;
-  clearInterval(テンプリスト自動送信タイマー);
+  clearTimeout(テンプリスト自動送信タイマー);
   テンプリスト自動送信タイマー = null;
 };
 
@@ -528,9 +533,15 @@ const バックアップリスト受信処理 = (受信データ: any) => {
 };
 
 // files_temp 受信処理
-const テンプリスト受信処理 = (受信データ: any) => {
+const テンプリスト受信処理 = async (受信データ: any) => {
   const 内容 = 受信データ.メッセージ内容;
-  if (!内容) return;
+  if (!内容) {
+    // 画面表示中ならタイマーセット
+    if (プロパティ.active && テンプ更新間隔.value > 0) {
+      テンプリスト自動送信開始();
+    }
+    return;
+  }
   const 新要求日時 = Number(内容.要求日時 ?? テンプリスト要求日時.value);
   const 正規化日時 = 日時文字列正規化(内容.作業ファイル日時);
   const 新日時 = 正規化日時 ?? 内容.作業ファイル日時 ?? null;
@@ -546,6 +557,10 @@ const テンプリスト受信処理 = (受信データ: any) => {
     && 新件数 === 作業ファイルリスト.value.length
   ) {
     右読込中.value = false;
+    // 変化なしでも画面表示中ならタイマーセット
+    if (プロパティ.active && テンプ更新間隔.value > 0) {
+      テンプリスト自動送信開始();
+    }
     return;
   }
   最終受信テンプリスト要求日時.value = 新要求日時;
@@ -558,8 +573,14 @@ const テンプリスト受信処理 = (受信データ: any) => {
     const 最終日時一致ファイル = 新リスト.find((f) => f.更新日時 === 新日時)
       ?? 新リスト.find((f) => f.更新日時.slice(0, 16) === 新日時.slice(0, 16));
     if (最終日時一致ファイル) {
-      void ファイルクリック(最終日時一致ファイル.パス, false);
+      await ファイルクリック(最終日時一致ファイル.パス, false);
     }
+  }
+
+  // 画面描写完了後、画面表示中ならワンショットタイマーをセット
+  await nextTick();
+  if (プロパティ.active && テンプ更新間隔.value > 0) {
+    テンプリスト自動送信開始();
   }
 };
 
@@ -591,10 +612,10 @@ const 出力ソケット切断 = () => {
 };
 
 // アクティブになったらリスト要求
+// ※ files_tempのタイマーは受信後に描写完了してからセットするため、ここでは開始しない
 watch(() => プロパティ.active, (新値) => {
   if (新値) {
     ファイルリスト要求();
-    テンプリスト自動送信開始();
   } else {
     テンプリスト自動送信停止();
   }
@@ -613,7 +634,10 @@ watch(テンプリスト要求日時, () => {
 });
 
 watch(テンプ更新間隔, () => {
-  if (プロパティ.active) {
+  // タイマー有効中なら一旦キャンセル
+  テンプリスト自動送信停止();
+  // 切る以外かつ画面表示中ならタイマー再セット
+  if (プロパティ.active && テンプ更新間隔.value > 0) {
     テンプリスト自動送信開始();
   }
 });
@@ -656,6 +680,18 @@ const コンテキストメニューダウンロード = async () => {
   await ファイル保存先選択();
 };
 
+const 下段右クリック = (e: MouseEvent) => {
+  if (!選択ファイルパス.value) return;
+  e.preventDefault();
+  const メニュー幅 = 140;
+  const メニュー高 = 40;
+  const x = e.clientX + メニュー幅 > window.innerWidth ? e.clientX - メニュー幅 : e.clientX;
+  const y = e.clientY + メニュー高 > window.innerHeight ? e.clientY - メニュー高 : e.clientY;
+  コンテキストメニューX.value = x;
+  コンテキストメニューY.value = y;
+  コンテキストメニュー表示.value = true;
+};
+
 const キーボードキーダウン = (e: KeyboardEvent) => {
   if (!プロパティ.active) return;
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
@@ -689,7 +725,7 @@ onMounted(async () => {
   await 出力ソケット接続();
   if (プロパティ.active) {
     ファイルリスト要求();
-    テンプリスト自動送信開始();
+    // files_tempタイマーは受信・描写完了後にセットするため、ここでは開始しない
   }
   window.addEventListener('keydown', キーボードキーダウン);
   window.addEventListener('mousedown', コンテキストメニュー閉じる);
@@ -850,7 +886,7 @@ onBeforeUnmount(() => {
             <span class="placeholder-icon">⚠️</span>
             <div>{{ ファイル内容エラー }}</div>
           </div>
-          <img v-else-if="ファイル内容画像" :src="ファイル内容画像" class="file-image" />
+          <img v-else-if="ファイル内容画像" :src="ファイル内容画像" class="file-image" @contextmenu.prevent="下段右クリック($event)" />
           <div v-else-if="ファイル内容テキスト === null && !ファイル読込中" class="placeholder-content">
             <span class="placeholder-icon">📄</span>
             <div>上のツリーからファイルを選択すると<br>テキストまたは画像を表示します</div>
@@ -860,6 +896,7 @@ onBeforeUnmount(() => {
             v-show="!ファイル読込中 && !ファイル内容エラー && !ファイル内容画像 && ファイル内容テキスト !== null"
             ref="monacoコンテナ"
             class="monaco-container"
+            @contextmenu.prevent="下段右クリック($event)"
           ></div>
         </div>
       </div>
