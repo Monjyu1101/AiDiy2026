@@ -43,6 +43,8 @@ const 最終送信時刻 = ref<number>(0);
 const 前回小画像 = ref<ImageData | null>(null);
 const 送信中 = ref(false);
 const 安定後送信済み = ref(false);
+const フラッシュ中 = ref(false);
+let フラッシュタイマーID: number | null = null;
 const WebSocket接続中 = ref(false);
 const ファイル選択中 = ref(false);
 const ファイルダイアログ待機中 = ref(false);
@@ -596,6 +598,17 @@ const 画像送信 = async (データURL: string | null) => {
   接続状態.value = 'sending';
   画像プレビュー.value = データURL;
 
+  // フラッシュ演出
+  if (フラッシュタイマーID !== null) {
+    window.clearTimeout(フラッシュタイマーID);
+    フラッシュタイマーID = null;
+  }
+  フラッシュ中.value = true;
+  フラッシュタイマーID = window.setTimeout(() => {
+    フラッシュ中.value = false;
+    フラッシュタイマーID = null;
+  }, 200);
+
   console.log('[イメージ] 画像送信開始 - データサイズ:', データURL.length, 'bytes');
 
   try {
@@ -625,7 +638,12 @@ const 画像送信 = async (データURL: string | null) => {
   } finally {
     送信中.value = false;
     if (接続状態.value === 'sending') {
-      接続状態.value = 'connecting';
+      // 0.25秒待機してから緑（接続中）に戻す
+      window.setTimeout(() => {
+        if (接続状態.value === 'sending') {
+          接続状態.value = 'connecting';
+        }
+      }, 250);
     }
   }
 };
@@ -667,7 +685,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="image-area">
+    <div class="image-area" :class="{ flashing: フラッシュ中, monitoring: 接続状態 !== 'disconnected' }">
       <div class="image-preview" :class="{ disabled: !WebSocket接続中 }" @click="選択表示">
         <div v-if="!画像プレビュー" class="preview-placeholder">
           <span class="preview-icon">📷</span>
@@ -860,21 +878,37 @@ onBeforeUnmount(() => {
 
 .image-area {
   flex: 1;
-  padding: 5px;
+  padding: 2px;
   overflow-y: auto;
-  background: #ff4444; /* 赤 */
+  background: #101010;
   position: relative;
   box-sizing: border-box;
+}
+
+.image-area.monitoring {
   animation: pulse-border 2.5s infinite;
 }
 
 @keyframes pulse-border {
-  0%, 100% {
-    background: #ff4444;
-  }
-  50% {
-    background: rgba(255, 68, 68, 0.2);
-  }
+  0%, 100% { background: #ff4444; }
+  50%       { background: rgba(255, 68, 68, 0.15); }
+}
+
+.image-area.flashing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.55);
+  animation: flash-once 0.2s ease-out forwards;
+  pointer-events: none;
+  z-index: 10;
+  border-radius: 2px;
+}
+
+@keyframes flash-once {
+  0%   { opacity: 1; }
+  30%  { opacity: 0.8; }
+  100% { opacity: 0; }
 }
 
 .image-preview {
