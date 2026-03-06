@@ -19,6 +19,16 @@ import qColorPickerDialog from './components/_share/qColorPickerDialog.vue';
 import { setAlertInstance, setConfirmInstance, setColorPickerInstance } from './utils/qAlert';
 
 const route = useRoute();
+
+const AIコアパス判定 = (path: string): boolean => {
+  try {
+    const decodedPath = decodeURIComponent(path);
+    return decodedPath === '/AIコア' || decodedPath.startsWith('/AIコア/');
+  } catch {
+    return path.startsWith('/AI');
+  }
+};
+
 type AlertDialogInstance = {
   show: (message: string) => Promise<void>;
   showConfirm: (message: string) => Promise<boolean>;
@@ -29,6 +39,9 @@ const colorPickerRef = ref(null);
 
 // ログイン画面以外はレイアウトを適用
 const isLogin = computed(() => route.path === '/ログイン');
+const isAIコア = computed(() => {
+  return AIコアパス判定(route.path) || AIコアパス判定(window.location.pathname);
+});
 
 onMounted(() => {
   if (alertRef.value) {
@@ -46,9 +59,24 @@ onMounted(() => {
     <RouterView />
   </div>
   <Layout v-else>
-    <RouterView />
+    <RouterView v-slot="{ Component }">
+      <Suspense>
+        <component :is="Component" />
+        <template #fallback>
+          <div v-if="isAIコア" class="ai-core-loading"></div>
+        </template>
+      </Suspense>
+    </RouterView>
   </Layout>
   <qAlertDialog ref="alertRef" />
   <qColorPickerDialog ref="colorPickerRef" />
 </template>
+
+<style scoped>
+.ai-core-loading {
+  width: 100%;
+  min-height: calc(100vh - 100px);
+  background: #1a1a1a;
+}
+</style>
 

@@ -11,6 +11,7 @@
 // コア系ルーター (C系: C管理, C権限, C利用者, C採番 / A系: AIコア)
 
 import type { RouteRecordRaw } from 'vue-router'
+import AIコア画面 from '../components/AIコア/AIコア.vue'
 
 export const coreRoutes: RouteRecordRaw[] = [
     {
@@ -66,7 +67,7 @@ export const coreRoutes: RouteRecordRaw[] = [
     {
         path: '/AIコア',
         name: 'AIコア',
-        component: () => import('../components/AIコア/AIコア.vue'),
+        component: AIコア画面,
         meta: { requiresAuth: true, title: 'AIコア' }
     },
 ]
