@@ -41,10 +41,10 @@ class conf_json:
         'openrt_key_id': '< your openrouter api key >',
 
         # ChatAI設定
-        'CHAT_AI_NAME': 'freeai',
-        'CHAT_GEMINI_MODEL': 'gemini-3-pro-image-preview',
-        'CHAT_FREEAI_MODEL': 'gemini-3-flash-preview',
-        'CHAT_OPENRT_MODEL': 'google/gemini-3-pro-image-preview',
+        'CHAT_AI_NAME': 'freeai_chat',
+        'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image-preview',
+        'CHAT_FREEAI_MODEL': 'gemini-3.1-flash-image-preview',
+        'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image-preview',
 
         # LiveAI設定
         'LIVE_AI_NAME': 'freeai_live',

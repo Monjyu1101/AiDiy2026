@@ -56,21 +56,21 @@ const selections = reactive({
 });
 
 const CHAT_MODEL_KEYS: Record<string, string> = {
-  gemini: 'CHAT_GEMINI_MODEL',
-  freeai: 'CHAT_FREEAI_MODEL',
-  openrt: 'CHAT_OPENRT_MODEL'
+  gemini_chat: 'CHAT_GEMINI_MODEL',
+  freeai_chat: 'CHAT_FREEAI_MODEL',
+  openrt_chat: 'CHAT_OPENRT_MODEL'
 };
 
 const LIVE_MODEL_KEYS: Record<string, string> = {
-  gemini: 'LIVE_GEMINI_MODEL',
-  freeai: 'LIVE_FREEAI_MODEL',
-  openai: 'LIVE_OPENAI_MODEL'
+  gemini_live: 'LIVE_GEMINI_MODEL',
+  freeai_live: 'LIVE_FREEAI_MODEL',
+  openai_live: 'LIVE_OPENAI_MODEL'
 };
 
 const LIVE_VOICE_KEYS: Record<string, string> = {
-  gemini: 'LIVE_GEMINI_VOICE',
-  freeai: 'LIVE_FREEAI_VOICE',
-  openai: 'LIVE_OPENAI_VOICE'
+  gemini_live: 'LIVE_GEMINI_VOICE',
+  freeai_live: 'LIVE_FREEAI_VOICE',
+  openai_live: 'LIVE_OPENAI_VOICE'
 };
 
 const CODE_MODEL_KEYS: Record<string, string> = {

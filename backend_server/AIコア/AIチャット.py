@@ -111,7 +111,7 @@ class Chat:
     def _select_ai_module(self):
         """AI_NAMEに応じたチャットモジュールを選択してインポート"""
         module_name = "AIコア.AIチャット_openrt"
-        if self.AI_NAME in ("gemini", "freeai"):
+        if self.AI_NAME in ("gemini_chat", "freeai_chat"):
             module_name = "AIコア.AIチャット_gemini"
         try:
             return importlib.import_module(module_name)
@@ -130,9 +130,9 @@ class Chat:
             try:
                 conf_json = getattr(self.親, "conf", None)
                 if conf_json and hasattr(conf_json, "json"):
-                    if self.AI_NAME in ("gemini", "freeai"):
+                    if self.AI_NAME in ("gemini_chat", "freeai_chat"):
                         api_key = conf_json.json.get("gemini_key_id", "")
-                        if self.AI_NAME == "freeai":
+                        if self.AI_NAME == "freeai_chat":
                             api_key = conf_json.json.get("freeai_key_id", "") or api_key
                     else:
                         api_key = conf_json.json.get("openrt_key_id", "")

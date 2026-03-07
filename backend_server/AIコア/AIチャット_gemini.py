@@ -54,7 +54,7 @@ class ChatAI:
                 freeai_key = 親.conf.json.freeai_key_id
 
                 # 相互補完ロジック
-                if AI_NAME.lower() == "gemini":
+                if AI_NAME.lower() == "gemini_chat":
                     # gemini選択時: gemini_key → freeai_key
                     if gemini_key and not gemini_key.startswith('<'):
                         self.api_key = gemini_key
@@ -63,7 +63,7 @@ class ChatAI:
                         logger.info("ChatAI(gemini): gemini_keyが未設定のため、freeai_keyを使用します")
                     else:
                         logger.warning("ChatAI(gemini): gemini_key・freeai_keyともに未設定です")
-                elif AI_NAME.lower() == "freeai":
+                elif AI_NAME.lower() == "freeai_chat":
                     # freeai選択時: freeai_key → gemini_key
                     if freeai_key and not freeai_key.startswith('<'):
                         self.api_key = freeai_key

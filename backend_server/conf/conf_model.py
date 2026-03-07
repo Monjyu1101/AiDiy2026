@@ -546,15 +546,15 @@ class conf_models:
     def get_chat_models(self) -> Dict[str, Dict[str, str]]:
         """チャットAIモデル一覧を取得（日付情報付き）"""
         models: Dict[str, Dict[str, str]] = {
-            "gemini": {
+            "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.google_models.items()
             },
-            "freeai": {
+            "freeai_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.google_models.items()
             },
-            "openrt": {
+            "openrt_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.openrt_models.items()
             }

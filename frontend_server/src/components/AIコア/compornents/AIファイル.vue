@@ -14,6 +14,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue';
 import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import apiClient from '@/api/client';
+import { qConfirm } from '@/utils/qAlert';
 import { monaco, モナコ言語推定 } from '@/utils/monaco';
 import { useAuthStore } from '@/stores/auth';
 
@@ -62,6 +63,8 @@ let monacoエディタ: monaco.editor.IStandaloneCodeEditor | null = null;
 const ファイル内容エラー = ref<string | null>(null);
 const ファイル読込中 = ref(false);
 const ファイルダウンロード中 = ref(false);
+const 編集モード = ref(false);
+const ファイル保存中 = ref(false);
 let ハイライト要求連番 = 0;
 let テンプリスト自動送信タイマー: ReturnType<typeof setTimeout> | null = null;
 const 更新間隔選択肢 = [
@@ -287,6 +290,71 @@ const ツリー行クリック = (行: ツリー表示行, isBackup: boolean) =>
   ファイルクリック(行.パス, isBackup);
 };
 
+const 編集モード終了 = () => {
+  編集モード.value = false;
+  if (monacoエディタ) {
+    monacoエディタ.updateOptions({ readOnly: true, domReadOnly: true });
+    monaco.editor.setTheme('vs-dark');
+  }
+};
+
+const 編集キャンセル = async () => {
+  const ok = await qConfirm('編集をキャンセルしますか？');
+  if (!ok) return;
+  // Monaco の内容を元のテキストに戻す
+  if (monacoエディタ && ファイル内容テキスト.value !== null) {
+    monacoエディタ.setValue(ファイル内容テキスト.value);
+  }
+  編集モード終了();
+};
+
+const 編集モード開始 = () => {
+  編集モード.value = true;
+  if (monacoエディタ) {
+    monaco.editor.setTheme('vs');
+    monacoエディタ.updateOptions({ readOnly: false, domReadOnly: false });
+    monacoエディタ.focus();
+  }
+};
+
+const ファイル保存 = async () => {
+  if (!選択ファイルパス.value || ファイル保存中.value) return;
+  if (!monacoエディタ) return;
+
+  const ok = await qConfirm(`上書き保存しますか？\n${選択ファイルパス.value}`);
+  if (!ok) return;
+
+  ファイル保存中.value = true;
+  try {
+    const 内容 = monacoエディタ.getValue();
+    const res = await apiClient.post('/core/files/内容更新', {
+      ファイル名: 選択ファイルパス.value,
+      内容,
+    });
+    if (res.data.status !== 'OK') {
+      ファイル内容エラー.value = res.data.message ?? '保存失敗';
+      return;
+    }
+    ファイル内容テキスト.value = 内容;
+    編集モード終了();
+    // files_save → バックアップ処理 → files_backup / files_temp でリスト更新
+    if (プロパティ.wsClient?.isConnected()) {
+      プロパティ.wsClient.send({
+        セッションID: プロパティ.セッションID ?? '',
+        チャンネル: 'file',
+        メッセージ識別: 'files_save',
+        メッセージ内容: { ファイル名: 選択ファイルパス.value },
+      });
+      バックアップリスト要求(true);
+      void テンプリスト要求(true);
+    }
+  } catch (e: any) {
+    ファイル内容エラー.value = e?.message ?? '保存失敗';
+  } finally {
+    ファイル保存中.value = false;
+  }
+};
+
 const 下部ファイル表示クリア = () => {
   ハイライト要求連番++;
   選択ファイル名.value = '';
@@ -296,6 +364,7 @@ const 下部ファイル表示クリア = () => {
   ファイル内容エラー.value = null;
   ファイル読込中.value = false;
   ファイルダウンロード中.value = false;
+  編集モード終了();
   // Monaco Editor をクリア
   if (monacoエディタ) {
     monacoエディタ.setValue('');
@@ -349,6 +418,7 @@ const monacoエディタ破棄 = () => {
 };
 
 const ファイルクリック = async (ファイル名: string, isBackup: boolean) => {
+  編集モード終了();
   選択パネル.value = isBackup ? 'left' : 'right';
   選択ファイル名.value = ファイル名;
   ファイル内容テキスト.value = null;
@@ -864,18 +934,34 @@ onBeforeUnmount(() => {
       <!-- 下段: 選択ファイル内容表示 -->
       <div class="lower-area">
         <div class="panel-header">
-          <span>ファイル内容</span>
+          <span class="lower-header-left">
+            <span class="lower-title">ファイル :</span>
+            <span v-if="選択ファイル名" class="panel-datetime">{{ 選択ファイル名 }}</span>
+            <button
+              class="download-btn"
+              @click="ファイルダウンロード"
+              @contextmenu.prevent="ファイル保存先選択"
+              :disabled="!選択ファイルパス || ファイル読込中 || ファイルダウンロード中"
+              title="左クリック: ダウンロード / 右クリック: 保存先選択"
+            >⬇</button>
+          </span>
           <span class="header-spacer"></span>
-          <span v-if="選択ファイル名" class="panel-datetime">{{ 選択ファイル名 }}</span>
-          <button
-            class="download-btn"
-            @click="ファイルダウンロード"
-            @contextmenu.prevent="ファイル保存先選択"
-            :disabled="!選択ファイルパス || ファイル読込中 || ファイルダウンロード中"
-            title="左クリック: ダウンロード / 右クリック: 保存先選択"
-          >
-            ⬇
-          </button>
+          <span class="lower-header-right">
+            <button
+              v-if="ファイル内容テキスト !== null && !ファイル読込中 && !ファイル内容エラー"
+              class="edit-btn"
+              :class="{ 'edit-btn-active': 編集モード }"
+              @click="編集モード ? 編集キャンセル() : 編集モード開始()"
+              :title="編集モード ? '編集キャンセル' : '編集'"
+            >✎</button>
+            <button
+              v-if="編集モード"
+              class="upload-btn"
+              @click="ファイル保存"
+              :disabled="ファイル保存中"
+              title="更新（上書き保存）"
+            >⬆</button>
+          </span>
         </div>
         <div class="panel-content">
           <div v-if="ファイル読込中" class="placeholder-content">
@@ -1112,6 +1198,74 @@ onBeforeUnmount(() => {
   background: rgba(102, 126, 234, 0.08);
   color: #b8c5f2;
   border-bottom: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.lower-header-left,
+.lower-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lower-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #b8c5f2;
+  white-space: nowrap;
+}
+
+.edit-btn {
+  background: #667eea;
+  border: 1px solid #5568c8;
+  border-radius: 2px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 14px;
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.edit-btn:hover {
+  background: #768cf0;
+  border-color: #667eea;
+  transform: translateY(1px);
+}
+
+.edit-btn-active {
+  animation: edit-blink 1s ease-in-out infinite;
+}
+
+@keyframes edit-blink {
+  0%, 100% { background: #667eea; opacity: 1; }
+  50%       { background: #3a4a9a; opacity: 0.5; }
+}
+
+.upload-btn {
+  background: #e05a8a;
+  border: 1px solid #c0456f;
+  border-radius: 2px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 14px;
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background: #f072a0;
+  border-color: #e05a8a;
+  transform: translateY(-1px);
+}
+
+.upload-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .download-btn {

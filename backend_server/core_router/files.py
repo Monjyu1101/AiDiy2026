@@ -24,6 +24,11 @@ class ファイル内容取得Request(BaseModel):
     ファイル名: str
 
 
+class ファイル内容更新Request(BaseModel):
+    ファイル名: str
+    内容: str
+
+
 def _解決ファイルパス(ファイル名: str) -> str:
     if os.path.isabs(ファイル名):
         return os.path.normpath(ファイル名)
@@ -72,4 +77,50 @@ def get_ファイル内容(
             "解決ファイルパス": 解決パス,
             "base64_data": base64_data,
         },
+    )
+
+
+@router.post("/内容更新", response_model=schemas.ResponseBase)
+def update_ファイル内容(
+    request: ファイル内容更新Request,
+    現在利用者: models.C利用者 = Depends(deps.get_現在利用者),
+):
+    ファイル名 = (request.ファイル名 or "").strip()
+    if not ファイル名:
+        return schemas.ResponseBase(
+            status="NG",
+            message="ファイル名を指定してください",
+            error={"code": "INVALID_FILE_NAME"},
+        )
+
+    解決パス = _解決ファイルパス(ファイル名)
+    if not os.path.isfile(解決パス):
+        return schemas.ResponseBase(
+            status="NG",
+            message="指定されたファイルが見つかりません",
+            error={"code": "FILE_NOT_FOUND", "file_path": 解決パス},
+        )
+
+    ext = os.path.splitext(解決パス)[1].lower()
+    if ext in (".bat", ".cmd"):
+        encoding = "shift_jis"
+        newline = "\r\n"
+    else:
+        encoding = "utf-8"
+        newline = "\n"
+
+    try:
+        with open(解決パス, "w", encoding=encoding, newline=newline) as f:
+            f.write(request.内容)
+    except Exception as e:
+        return schemas.ResponseBase(
+            status="NG",
+            message=f"ファイルの書き込みに失敗しました: {str(e)}",
+            error={"code": "FILE_WRITE_ERROR", "file_path": 解決パス},
+        )
+
+    return schemas.ResponseBase(
+        status="OK",
+        message="ファイル内容を更新しました",
+        data={"ファイル名": ファイル名, "解決ファイルパス": 解決パス},
     )
