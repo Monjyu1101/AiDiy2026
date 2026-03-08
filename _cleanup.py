@@ -26,6 +26,8 @@ BACKEND_ENV_LIST = [".venv", "venv"] # Python環境: ".venv" または "venv" (u
 
 # フロントエンド設定
 FRONTEND_PATH = "frontend_server"    # フロントエンドフォルダパス
+AVATAR_PATH = "frontend_avatar"      # 独立アバターフォルダパス
+AVATAR_ENV_LIST = [".venv", "venv"]  # アバター用Python環境
 
 # データベース設定
 DATABASE_TYPE = "sqlite"             # "postgresql" or "sqlite"
@@ -344,6 +346,55 @@ def cleanup_client(base_dir):
         print_info("削除対象のフォルダはありませんでした")
 
 
+def cleanup_avatar(base_dir):
+    """frontend_avatar フォルダをクリーンアップ
+
+    Args:
+        base_dir (Path): プロジェクトのルートディレクトリ
+    """
+    print_header("アバターフォルダのクリーンアップ")
+
+    avatar_dir = base_dir / AVATAR_PATH
+    if not avatar_dir.exists():
+        print_warning("アバターフォルダが見つかりません")
+        return
+
+    deleted_count = 0
+
+    print_info("__pycache__ フォルダを検索中...")
+    for pycache in avatar_dir.rglob("__pycache__"):
+        if remove_directory(pycache, f"__pycache__ ({AVATAR_PATH})"):
+            deleted_count += 1
+
+    print_info(".pytest_cache フォルダを検索中...")
+    for pytest_cache in avatar_dir.rglob(".pytest_cache"):
+        if remove_directory(pytest_cache, f".pytest_cache ({AVATAR_PATH})"):
+            deleted_count += 1
+
+    avatar_logs_dir = avatar_dir / "temp" / "logs"
+    if avatar_logs_dir.exists():
+        if ask_yes_no(f"  {AVATAR_PATH}/temp/logs の中身をクリアしますか？", default="y"):
+            if clean_directory_contents(avatar_logs_dir, f"temp/logs ({AVATAR_PATH})"):
+                deleted_count += 1
+        else:
+            print_info(f"  {AVATAR_PATH}/temp/logs はそのまま残します")
+
+    print_info(f"削除対象の仮想環境リスト: {', '.join(AVATAR_ENV_LIST)}")
+    for venv_name in AVATAR_ENV_LIST:
+        venv_dir = avatar_dir / venv_name
+        if venv_dir.exists():
+            if ask_yes_no(f"  {AVATAR_PATH}/{venv_name} フォルダを削除しますか？", default="y"):
+                if remove_directory(venv_dir, f"{venv_name} ({AVATAR_PATH})"):
+                    deleted_count += 1
+            else:
+                print_info(f"  {AVATAR_PATH}/{venv_name} フォルダはそのまま残します")
+
+    if deleted_count > 0:
+        print_success(f"アバターフォルダのクリーンアップ完了 ({deleted_count}個削除)")
+    else:
+        print_info("削除対象のフォルダはありませんでした")
+
+
 def uninstall_global_npm_tools():
     """グローバルnpmパッケージをアンインストール"""
     print_header("グローバルnpmツールのアンインストール")
@@ -429,6 +480,14 @@ def main():
         cleanup_client(base_dir)
     else:
         print_info("フロントエンドのクリーンアップをスキップしました")
+
+    print()
+
+    # アバターフォルダのクリーンアップ
+    if ask_yes_no("アバター(frontend_avatar)をクリーンアップしますか？", default="y"):
+        cleanup_avatar(base_dir)
+    else:
+        print_info("アバター(frontend_avatar)のクリーンアップをスキップしました")
 
     print()
     print_header("クリーンアップ完了")

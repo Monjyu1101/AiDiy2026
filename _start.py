@@ -472,6 +472,16 @@ def is_r_pressed():
         return False
     return key in (b"r", b"R")
 
+
+def clear_keyboard_buffer():
+    """Windowsコンソールの残留キー入力を破棄"""
+    if sys.platform != "win32":
+        return
+    while msvcrt.kbhit():
+        key = msvcrt.getch()
+        if key in (b"\x00", b"\xe0") and msvcrt.kbhit():
+            msvcrt.getch()
+
 def stop_processes(processes):
     """起動中プロセスを停止"""
     for name, process in list(processes.items()):
@@ -830,6 +840,7 @@ def main():
             stop_processes(processes)
 
             if sys.platform == "win32":
+                clear_keyboard_buffer()
                 print("\n\n")
                 print(f"{Colors.FAIL}R を押すとリブートします (10秒以内){Colors.ENDC}")
                 start_time = time.time()

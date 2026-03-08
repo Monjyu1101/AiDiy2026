@@ -62,20 +62,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **No Alembic Migrations:**
 - Schema changes: `ALTER TABLE` in `init.py` for existing DBs, or full DB reset
 
+**新規バックエンドテーブル追加時の必須チェック（M系・T系・S系）:**
+1. `apps_models/__init__.py` に Model import 追加（テーブル生成に必要）
+2. `apps_crud/__init__.py` に CRUD関数の import と `__all__` 追加（**忘れやすい**）
+3. `apps_main.py` に Router 登録
+4. M系テーブル追加時は **V系エンドポイントも必ず作成**（フロントはV系を参照する）
+
 ---
 
 ## Quick Commands
 
 ```bash
+# Initial setup (first time only)
+python _setup.py
+
 # Start all servers
 python _start.py
+python _start.py --backend=yes --frontend=no   # backend only
+python _start.py --backend=no --frontend=yes   # frontend only
 
 # Stop all servers
 python _stop.py
 
-# Trigger backend reload (Unix: touch)
-touch backend_server/temp/reboot_core.txt   # core_main
-touch backend_server/temp/reboot_apps.txt   # apps_main
+# Trigger backend reload (Windows)
+echo. > backend_server/temp/reboot_core.txt   # core_main
+echo. > backend_server/temp/reboot_apps.txt   # apps_main
 
 # Backend with hot-reload (dev)
 cd backend_server && .venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
@@ -91,6 +102,9 @@ cd frontend_server && npm run build
 # Dependencies
 cd backend_server && uv sync
 cd frontend_server && npm install
+
+# Cleanup (reset environment)
+python _cleanup.py
 
 # Database reset
 del backend_server\_data\AiDiy\database.db   # then restart servers
