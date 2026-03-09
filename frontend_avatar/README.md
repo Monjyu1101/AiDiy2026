@@ -18,11 +18,11 @@
 - ログインIDをそのまま使う AIコア WebSocket 接続
 - `audio` `input` `0` ソケットの自動再接続
 - `input` ソケットの `init.ボタン` を使う 3 状態同期
-- 右クリックメニューから `マイク` `スピーカー` `カメラ` をオンオフ
+- 右クリックメニューから `マイク` `スピーカー` `イメージ` をオンオフ
 - マイクON時は `audio/input_audio` をリアルタイム送信
 - `audio` ソケットの `output_audio` を連続ストリームとして受信し、スピーカーON時だけ再生
 - `input_image` を使う画像ストリーム送信
-- 右クリックで `カメラ` を ON にしたとき、`画像ファイル` `カメラキャプチャ` `デスクトップキャプチャ` から送信元を選択
+- 右クリックで `イメージ` を ON にしたとき、`画像ファイル` `カメラキャプチャ` `デスクトップキャプチャ` から送信元を選択
 - `デスクトップキャプチャ` を選んだ場合は `フォーム選択` または `スクリーン選択` を選べる
 - 変化検知後の安定待ち送信と、一定間隔での強制再送
 - `0` チャンネルの `welcome_text` / `output_text` / `recognition_output` の吹き出し反映
@@ -84,7 +84,7 @@ uv run python main.py --skip-login --skip-core-connect --demo-seconds 3
 
 - 表示名
 - 認証先 URL
-- 表示バックエンド
+- メインパネル
 - 初期位置
 - サイズ倍率
 - 最前面表示の初期値
@@ -103,5 +103,5 @@ uv run python main.py --skip-login --skip-core-connect --demo-seconds 3
 - マイク入力は `frontend_server` と同じ方針で、`openai_live` のとき 24kHz、それ以外は 16kHz です。
 - スピーカーOFF時も `audio` ソケットの受信自体は継続し、再生だけ止めます。
 - スピーカー出力は `sounddevice` のストリームを開いたまま維持し、`cancel_audio` では再生バッファだけクリアします。
-- カメラON時は `AIイメージ.vue` と同じ考え方で、内容変化の収束後に `input_image` を送信し、変化がなくても一定間隔で再送します。
+- イメージON時は `AIイメージ.vue` と同じ考え方で、内容変化の収束後に `input_image` を送信し、変化がなくても一定間隔で再送します。
 - `--skip-core-connect` を付けると WebSocket 接続を抑止できます。

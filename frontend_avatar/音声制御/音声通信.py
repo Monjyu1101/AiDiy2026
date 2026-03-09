@@ -69,6 +69,7 @@ class AudioOutputPlayer:
         self.output_stream = None
         self.output_sample_rate = OUTPUT_AUDIO_SAMPLE_RATE
         self.pending_audio = bytearray()
+        self.pending_lip_audio = bytearray()
         self.underflow_count = 0
         self.lip_sync_callback: Callable[[float], None] | None = None
         self._出力ストリームを確保(self.output_sample_rate)
@@ -82,14 +83,20 @@ class AudioOutputPlayer:
         rms = math.sqrt(sum(s * s for s in samples) / n)
         return min(1.0, rms / 8000.0)
 
-    def スピーカー有効を設定(self, enabled: bool) -> None:
+    def スピーカー有効を設定(self, enabled: bool) -> bool:
         self.speaker_enabled = enabled
-        self._出力ストリームを確保(self.output_sample_rate)
+        stream_ready = self._出力ストリームを確保(self.output_sample_rate)
         if not enabled:
             self.再生停止(clear_queue=True)
             logger.info("スピーカーをOFFにしました。受信は継続し、再生バッファのみ破棄します。")
-        else:
-            logger.info("スピーカーをONにしました。出力ストリームは接続維持します。")
+            return True
+        if not stream_ready:
+            self.speaker_enabled = False
+            self.再生停止(clear_queue=True)
+            logger.warning("スピーカーを利用できないため、OFFに戻しました。")
+            return False
+        logger.info("スピーカーをONにしました。出力ストリームは接続維持します。")
+        return True
 
     def base64音声を追加(self, base64_audio: str, mime_type: str) -> None:
         try:
@@ -103,42 +110,43 @@ class AudioOutputPlayer:
         sample_rate = 音声MIMEからレートを抽出(mime_type, self.output_sample_rate)
         self._出力ストリームを確保(sample_rate)
 
-        if self.lip_sync_callback is not None:
-            try:
-                self.lip_sync_callback(self._pcm振幅を計算(audio_bytes))
-            except Exception:
-                pass
+        with self.lock:
+            self.pending_lip_audio.extend(audio_bytes)
+            if self.speaker_enabled:
+                self.pending_audio.extend(audio_bytes)
 
         if not self.speaker_enabled:
-            logger.info("スピーカーOFFのため受信音声を破棄しました: mime=%s bytes=%s", mime_type, len(audio_bytes))
-            return
-
-        with self.lock:
-            self.pending_audio.extend(audio_bytes)
+            logger.info("スピーカーOFFのため無音再生でリップ同期のみ継続します: mime=%s bytes=%s", mime_type, len(audio_bytes))
 
     def 再生停止(self, clear_queue: bool = False) -> None:
         if not clear_queue:
             return
         with self.lock:
             self.pending_audio.clear()
+            self.pending_lip_audio.clear()
+        if self.lip_sync_callback is not None:
+            try:
+                self.lip_sync_callback(0.0)
+            except Exception:
+                pass
 
     def 終了(self) -> None:
         self.stop_requested = True
         self.再生停止(clear_queue=True)
         self._出力ストリームを閉じる()
 
-    def _出力ストリームを確保(self, sample_rate: int) -> None:
+    def _出力ストリームを確保(self, sample_rate: int) -> bool:
         sounddevice = sounddeviceモジュール取得()
         if sounddevice is None:
             logger.warning("sounddevice が未導入のため音声再生を無効化します")
-            return
+            return False
 
         if sample_rate <= 0:
             sample_rate = OUTPUT_AUDIO_SAMPLE_RATE
 
         current_stream = self.output_stream
         if current_stream is not None and self.output_sample_rate == sample_rate:
-            return
+            return True
 
         self._出力ストリームを閉じる()
 
@@ -155,9 +163,11 @@ class AudioOutputPlayer:
             self.output_sample_rate = sample_rate
             self.underflow_count = 0
             logger.info("出力ストリームを開始しました: rate=%s block=%s", sample_rate, OUTPUT_AUDIO_BLOCK_SIZE)
+            return True
         except Exception:
             self.output_stream = None
             logger.exception("出力ストリームの開始に失敗しました")
+            return False
 
     def _出力ストリームを閉じる(self) -> None:
         stream = self.output_stream
@@ -183,9 +193,14 @@ class AudioOutputPlayer:
 
         byte_count = frames * OUTPUT_AUDIO_CHANNELS * OUTPUT_AUDIO_SAMPLE_WIDTH
         chunk = b""
+        lip_chunk = b""
         should_silence = self.stop_requested or not self.speaker_enabled
 
         with self.lock:
+            if self.pending_lip_audio:
+                lip_available = min(byte_count, len(self.pending_lip_audio))
+                lip_chunk = bytes(self.pending_lip_audio[:lip_available])
+                del self.pending_lip_audio[:lip_available]
             if not should_silence and self.pending_audio:
                 available = min(byte_count, len(self.pending_audio))
                 chunk = bytes(self.pending_audio[:available])
@@ -197,6 +212,12 @@ class AudioOutputPlayer:
             chunk += b"\x00" * (byte_count - len(chunk))
         else:
             self.underflow_count = 0
+
+        if self.lip_sync_callback is not None:
+            try:
+                self.lip_sync_callback(self._pcm振幅を計算(lip_chunk))
+            except Exception:
+                pass
 
         outdata[:] = chunk
 

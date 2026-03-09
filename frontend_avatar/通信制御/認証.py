@@ -82,14 +82,9 @@ class LoginDialog:
 
         self.root = tk.Tk()
         self.root.title("AiDiy Avatar Login")
-        self.root.attributes("-alpha", self.透過率)
         self.root.resizable(False, False)
         self.root.configure(bg=self.背景色)
         self.root.protocol("WM_DELETE_WINDOW", self._キャンセル)
-        try:
-            self.root.attributes("-toolwindow", True)
-        except tk.TclError:
-            pass
 
         self.user_id_var = tk.StringVar()
         self.password_var = tk.StringVar()
@@ -191,23 +186,6 @@ class LoginDialog:
             cursor="hand2",
         )
         self.login_button.pack(side="left", fill="x", expand=True)
-        tk.Button(
-            actions,
-            text="終了",
-            command=self._キャンセル,
-            bg=self.面色,
-            fg=self.文字色,
-            activebackground="#202636",
-            activeforeground=self.文字色,
-            relief="flat",
-            bd=0,
-            highlightthickness=1,
-            highlightbackground=self.境界色,
-            font=("Yu Gothic UI", 10, "bold"),
-            padx=10,
-            pady=8,
-            cursor="hand2",
-        ).pack(side="left", fill="x", expand=True, padx=(8, 0))
 
         user_entry.focus_set()
         user_entry.bind("<Return>", self._利用者IDでEnterキー押下)

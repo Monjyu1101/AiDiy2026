@@ -13,7 +13,9 @@ from __future__ import annotations
 import base64
 import ctypes
 import io
+import json
 import queue
+import subprocess
 import sys
 import threading
 import time
@@ -28,6 +30,9 @@ from 通信制御.コア接続 import AIAvatarConnector
 
 logger = get_logger(__name__)
 
+# 画像取得は Tk の座標系に干渉してはいけない。
+# 4K / 表示倍率ありのスクリーン取得だけは別プロセスへ分離し、
+# Tk 本体プロセスでは DPI aware 状態を一切変更しない。
 コンテンツ種別 = Literal["camera", "desktop", "file"]
 
 キャプチャ間隔秒 = 0.55
@@ -35,8 +40,10 @@ logger = get_logger(__name__)
 安定待機秒 = 2.0
 強制送信秒 = 60.0
 比較画像サイズ = (64, 36)
+デスクトップ比較取得最大サイズ = (960, 540)
 送信JPEG品質 = 80
-プレビュー最大サイズ = (132, 74)
+プレビュー最大サイズ = (180, 120)
+スクリーン取得ヘルパー = Path(__file__).with_name("スクリーン取得ヘルパー.py")
 
 
 @dataclass(slots=True)
@@ -78,7 +85,7 @@ class 画像送信制御:
         self._thread: threading.Thread | None = None
         self._active = False
         self._source_type: コンテンツ種別 = "camera"
-        self._source_label = "カメラ"
+        self._source_label = "イメージ"
         self._file_image: Image.Image | None = None
         self._desktop_bbox: tuple[int, int, int, int] | None = None
         self._desktop_window_handle: int | None = None
@@ -89,17 +96,10 @@ class 画像送信制御:
         self._video_capture = None
 
     def 種別一覧(self) -> list[tuple[str, str]]:
-        return [("camera", "カメラ"), ("desktop", "デスクトップ"), ("file", "画像ファイル")]
+        return [("camera", "イメージ"), ("desktop", "デスクトップ"), ("file", "画像ファイル")]
 
     def スクリーン一覧を取得(self) -> list[スクリーン情報]:
-        if sys.platform == "win32":
-            return self._Windowsスクリーン一覧を取得()
-        try:
-            image = ImageGrab.grab()
-            width, height = image.size
-            return [スクリーン情報(index=0, left=0, top=0, right=width, bottom=height, label=f"スクリーン1 ({width}x{height})")]
-        except Exception:
-            return [スクリーン情報(index=0, left=0, top=0, right=1920, bottom=1080, label="スクリーン1")]
+        return self._スクリーン一覧をヘルパーから取得()
 
     def フォーム一覧を取得(self) -> list[フォーム情報]:
         if sys.platform != "win32":
@@ -200,7 +200,7 @@ class 画像送信制御:
         with self._lock:
             self._source_type = source_type
             self._source_label = {
-                "camera": "カメラ",
+                "camera": "イメージ",
                 "desktop": desktop_label,
                 "file": f"画像: {file_path.name}" if file_path else "画像ファイル",
             }[source_type]
@@ -288,6 +288,10 @@ class 画像送信制御:
             self._last_send_at = now
 
     def _動画画像を処理(self) -> None:
+        if self.現在の種別を取得() == "desktop":
+            self._デスクトップ画像を処理()
+            return
+
         image = self._フレームを取得()
         if image is None:
             return
@@ -309,7 +313,34 @@ class 画像送信制御:
             if stable:
                 self._stable_sent = True
 
-    def _フレームを取得(self) -> Image.Image | None:
+    def _デスクトップ画像を処理(self) -> None:
+        preview_image = self._フレームを取得(max_size=デスクトップ比較取得最大サイズ)
+        if preview_image is None:
+            return
+        self._プレビューを通知(preview_image)
+        small = preview_image.resize(比較画像サイズ, Image.Resampling.BILINEAR).convert("RGB")
+        if self._last_small_image is not None:
+            diff = self._差分率を計算(self._last_small_image, small)
+            if diff > 差分しきい値パーセント:
+                self._last_change_at = time.time()
+                self._stable_sent = False
+        self._last_small_image = small
+
+        now = time.time()
+        stable = now - self._last_change_at >= 安定待機秒
+        forced = 強制送信秒 > 0 and self._last_send_at > 0 and (now - self._last_send_at >= 強制送信秒)
+        if not ((stable and not self._stable_sent) or forced):
+            return
+
+        image = self._フレームを取得()
+        if image is None:
+            return
+        self._画像を送信(image)
+        self._last_send_at = now
+        if stable:
+            self._stable_sent = True
+
+    def _フレームを取得(self, max_size: tuple[int, int] | None = None) -> Image.Image | None:
         source_type = self.現在の種別を取得()
         if source_type == "desktop":
             try:
@@ -317,8 +348,13 @@ class 画像送信制御:
                     bbox = self._desktop_bbox
                     window_handle = self._desktop_window_handle
                 if window_handle:
-                    return ImageGrab.grab(window=window_handle).convert("RGB")
-                return ImageGrab.grab(bbox=bbox).convert("RGB")
+                    image = ImageGrab.grab(window=window_handle).convert("RGB")
+                    if max_size is not None:
+                        image.thumbnail(max_size, Image.Resampling.LANCZOS)
+                    return image
+                if bbox is None:
+                    return None
+                return self._スクリーン画像を取得(bbox, max_size=max_size)
             except Exception as exc:
                 logger.error("デスクトップ画像取得に失敗しました: %s", exc)
                 return None
@@ -448,3 +484,67 @@ class 画像送信制御:
 
         ctypes.windll.user32.EnumDisplayMonitors(0, 0, monitor_enum_proc(callback), 0)
         return monitors or [スクリーン情報(index=0, left=0, top=0, right=1920, bottom=1080, label="スクリーン1")]
+
+    def _スクリーン一覧をヘルパーから取得(self) -> list[スクリーン情報]:
+        payload = self._スクリーン取得ヘルパーを実行(["list"], expect_json=True)
+        screens: list[スクリーン情報] = []
+        for index, item in enumerate(payload):
+            left = int(item["left"])
+            top = int(item["top"])
+            width = int(item["width"])
+            height = int(item["height"])
+            screens.append(
+                スクリーン情報(
+                    index=index,
+                    left=left,
+                    top=top,
+                    right=left + width,
+                    bottom=top + height,
+                    label=f"スクリーン{index + 1} ({width}x{height})",
+                )
+            )
+        return screens
+
+    def _スクリーン画像を取得(
+        self,
+        bbox: tuple[int, int, int, int],
+        max_size: tuple[int, int] | None = None,
+    ) -> Image.Image | None:
+        left, top, right, bottom = bbox
+        args = [
+            "grab",
+            "--left",
+            str(int(left)),
+            "--top",
+            str(int(top)),
+            "--right",
+            str(int(right)),
+            "--bottom",
+            str(int(bottom)),
+        ]
+        if max_size is not None:
+            args.extend(["--max-width", str(int(max_size[0])), "--max-height", str(int(max_size[1]))])
+        image_bytes = self._スクリーン取得ヘルパーを実行(args, expect_json=False)
+        if not image_bytes:
+            return None
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            return image.convert("RGB").copy()
+
+    def _スクリーン取得ヘルパーを実行(self, args: list[str], expect_json: bool):
+        command = [sys.executable, str(スクリーン取得ヘルパー), *args]
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            creationflags=creationflags,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(stderr or f"スクリーン取得ヘルパー異常終了: {result.returncode}")
+        if expect_json:
+            return json.loads(result.stdout.decode("utf-8"))
+        return result.stdout

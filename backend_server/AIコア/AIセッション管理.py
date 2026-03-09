@@ -161,7 +161,7 @@ class SessionConnection:
         self.ボタン状態 = {
             "スピーカー": True,
             "マイク": False,
-            "カメラ": False
+            "イメージ": False
         }
         self.モデル設定 = {}
         self.ソース最終更新日時 = None
@@ -442,7 +442,7 @@ class WebSocketManager:
         }
         if socket_no == "input":
             init_payload["メッセージ内容"] = {
-                "ボタン": session.ボタン状態,
+                "ボタン": session.ボタン状態.copy(),
                 "モデル設定": session.モデル設定
             }
         if getattr(websocket, "application_state", None) == WebSocketState.CONNECTED:

@@ -16,7 +16,7 @@ import logging
 import sys
 from pathlib import Path
 
-from アバター制御 import DesktopAvatarApp, ウィンドウアイコンを検出, ポーズ画像一覧を検出
+from アバター制御 import DesktopAvatarApp
 from 通信制御 import LoginDialog
 from log_config import get_current_log_path, get_logger, setup_logging
 from util import AuthSession, AvatarSettings
@@ -95,16 +95,10 @@ def 起動() -> int:
     logger = get_logger("frontend_avatar.main")
     logger.info("frontend_avatar を起動します")
     settings = AvatarSettings.読み込み(args.settings)
-    pose_paths = ポーズ画像一覧を検出(script_dir)
-    icon_path = ウィンドウアイコンを検出(script_dir)
 
     if args.check_assets:
         logger.info("アセット確認モードで起動しました")
         print(f"settings={args.settings}")
-        print(f"poses={len(pose_paths)}")
-        for pose_path in pose_paths:
-            print(pose_path)
-        print(f"icon={icon_path}")
         return 0
 
     if args.skip_login:
@@ -119,9 +113,7 @@ def 起動() -> int:
     try:
         app = DesktopAvatarApp(
             settings=settings,
-            pose_paths=pose_paths,
             auth_session=auth_session,
-            icon_path=icon_path,
             demo_seconds=args.demo_seconds,
             skip_core_connect=args.skip_core_connect,
         )

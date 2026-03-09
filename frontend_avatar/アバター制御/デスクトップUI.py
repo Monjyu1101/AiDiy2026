@@ -13,9 +13,10 @@ from __future__ import annotations
 import queue
 import random
 import tkinter as tk
+import time
+from collections import deque
 from tkinter import filedialog
 from pathlib import Path
-from typing import Sequence
 
 from 通信制御 import AIAvatarConnector
 from 画像制御 import 画像プレビューイベント, 画像送信制御
@@ -23,7 +24,7 @@ from 音声制御 import AudioOutputPlayer, MicrophoneInputStreamer
 from log_config import get_logger
 from util import AuthSession, AvatarSettings, CoreEvent, システムアイドル秒数を取得
 
-from .表示バックエンド import アバター表示バックエンド, 表示イベントコールバック, 表示バックエンドを生成
+from .メインパネル import アバター表示バックエンド, 表示イベントコールバック, 表示バックエンドを生成
 
 logger = get_logger(__name__)
 
@@ -45,7 +46,9 @@ class DesktopAvatarApp:
     メニュー終了待機ミリ秒 = 260
     ダイアログ切替待機ミリ秒 = 160
     入力ダイアログ開始待機ミリ秒 = 60
-    初回welcome表示待機ミリ秒 = 5000
+    吹き出しキュー開始待機ミリ秒 = 5000
+    吹き出し最短表示ミリ秒 = 1000
+    吹き出し単独表示ミリ秒 = 10000
     ダイアログ影色 = "#07060d"
     ダイアログ背景色 = "#111019"
     ダイアログ面色 = "#1a1826"
@@ -66,19 +69,15 @@ class DesktopAvatarApp:
     def __init__(
         self,
         settings: AvatarSettings,
-        pose_paths: Sequence[Path],
         auth_session: AuthSession,
-        icon_path: Path | None = None,
         demo_seconds: float | None = None,
         skip_core_connect: bool = False,
     ) -> None:
         self.settings = settings
-        self.pose_paths = list(pose_paths)
         self.auth_session = auth_session
-        self.icon_path = icon_path
         self.demo_seconds = demo_seconds
         self.skip_core_connect = skip_core_connect
-        self.sprite_mode = self.初期移動モード.lower() == "xneko"
+        self.sprite_mode = False
         self.is_closing = False
         self.吹き出し表示有効 = self.初期吹き出し表示
 
@@ -96,6 +95,7 @@ class DesktopAvatarApp:
         self.facing = "right"
         self.motion_job: str | None = None
         self.bubble_job: str | None = None
+        self.bubble_min_job: str | None = None
         self.message_job: str | None = None
         self.pose_job: str | None = None
         self.core_job: str | None = None
@@ -104,9 +104,10 @@ class DesktopAvatarApp:
         self._last_core_message = ""
         self._core_status = "offline"
         self._welcome_text受信済み = False
-        self._welcome_text表示済み = False
-        self._保留welcome_text = ""
-        self._welcome表示後メッセージ = ""
+        self._吹き出し取り出し開始時刻 = time.monotonic() + (self.吹き出しキュー開始待機ミリ秒 / 1000.0)
+        self._吹き出し表示中 = False
+        self._吹き出し最短表示経過済み = False
+        self._吹き出し表示キュー: deque[tuple[str, bool]] = deque()
         self._保留中のサーバー初期設定: dict[str, object] | None = None
         self.選択入力モード = "live"
         self.入力ダイアログ表示中 = False
@@ -114,7 +115,7 @@ class DesktopAvatarApp:
         self.button_state = {
             "スピーカー": True,
             "マイク": False,
-            "カメラ": False,
+            "イメージ": False,
         }
         self.model_settings: dict[str, object] = {}
         self.core_event_queue: queue.Queue[CoreEvent] = queue.Queue()
@@ -127,10 +128,6 @@ class DesktopAvatarApp:
 
         self.display: アバター表示バックエンド = 表示バックエンドを生成(
             settings=self.settings,
-            pose_paths=self.pose_paths,
-            icon_path=self.icon_path,
-            sprite_mode=self.sprite_mode,
-            sprite_scale=self.スプライト倍率,
         )
         self.animations = self.display.animations
         self.current_animation = getattr(self.display, "current_animation", self.current_animation)
@@ -142,7 +139,7 @@ class DesktopAvatarApp:
             callbacks=表示イベントコールバック(
                 マイク切替=self.マイク切替,
                 スピーカー切替=self.スピーカー切替,
-                カメラ切替=self.カメラ切替,
+                イメージ切替=self.イメージ切替,
                 自走切替=self.自走切替,
                 ランダム発話=self.ランダム発話,
                 最新会話を表示=self.最新会話を表示,
@@ -157,7 +154,7 @@ class DesktopAvatarApp:
                 ダブルクリック=self._ダブルクリック,
             ),
         )
-        self.display.カメラメニュー表示を設定(self.button_state["カメラ"])
+        self.display.イメージUI状態を設定(self.button_state["イメージ"])
         self.display.初期位置へ配置()
         self._ランダム発話を予約()
         self._コア接続を開始()
@@ -194,7 +191,6 @@ class DesktopAvatarApp:
     def _コアイベントを処理(self) -> None:
         if self.is_closing:
             return
-        latest_bubble_message = ""
         while True:
             try:
                 event = self.core_event_queue.get_nowait()
@@ -203,7 +199,8 @@ class DesktopAvatarApp:
 
             bubble_message = self._コアイベントを捌く(event)
             if bubble_message:
-                latest_bubble_message = bubble_message
+                self._last_core_message = bubble_message
+                self.メッセージ表示(bubble_message, force_visible=True)
 
         while True:
             try:
@@ -211,13 +208,6 @@ class DesktopAvatarApp:
             except queue.Empty:
                 break
             self.display.プレビューを表示(preview_event.image, preview_event.source_label, flash=preview_event.flash)
-
-        if latest_bubble_message:
-            self._last_core_message = latest_bubble_message
-            if self._welcome_text受信済み and not self._welcome_text表示済み:
-                self._welcome表示後メッセージ = latest_bubble_message
-            else:
-                self.メッセージ表示(latest_bubble_message, force_visible=True)
 
         if self.core_connector is not None:
             self._コアイベント監視を予約()
@@ -253,10 +243,7 @@ class DesktopAvatarApp:
                 self._welcome_text受信済み = True
                 logger.info("welcome_text を受信しました。以後のイベント処理を開始します。")
                 self._保留中のサーバー初期設定を反映()
-                self._保留welcome_text = self._コアメッセージを整形(message_text)
-                self.display.予約解除(self.welcome_job)
-                self.welcome_job = self.display.予約する(self.初回welcome表示待機ミリ秒, self._保留welcome_textを表示する)
-                return ""
+                return self._コアメッセージを整形(message_text)
             return ""
 
         if message_type == "operations" and isinstance(message_text, dict):
@@ -293,26 +280,49 @@ class DesktopAvatarApp:
             normalized = normalized[:177].rstrip() + "..."
         return normalized
 
-    def _サーバーボタン状態を反映(self, server_state: object, マイクを自動開始する: bool = True) -> None:
+    def _ログ用メッセージを整形(self, message: str) -> str:
+        normalized = message.replace("\r\n", "\n").replace("\n", " / ").strip()
+        if len(normalized) > 120:
+            return normalized[:117].rstrip() + "..."
+        return normalized
+
+    def _サーバーボタン状態を反映(
+        self,
+        server_state: object,
+        マイクを自動開始する: bool = True,
+        イメージを起動時オフにする: bool = False,
+    ) -> None:
         if not isinstance(server_state, dict):
             return
+        corrected = False
         if "スピーカー" in server_state:
             self.button_state["スピーカー"] = bool(server_state.get("スピーカー"))
+            if not self.audio_player.スピーカー有効を設定(self.button_state["スピーカー"]):
+                self.button_state["スピーカー"] = False
+                corrected = True
+                self.メッセージ表示("スピーカーは使えません。", force_visible=True, error=True)
             self.display.スピーカーUI状態を設定(self.button_state["スピーカー"])
-            self.audio_player.スピーカー有効を設定(self.button_state["スピーカー"])
         if "マイク" in server_state:
             new_microphone_state = bool(server_state.get("マイク"))
             changed = new_microphone_state != self.button_state["マイク"]
             self.button_state["マイク"] = new_microphone_state
-            self.display.マイクUI状態を設定(self.button_state["マイク"])
             if changed and マイクを自動開始する:
-                self._マイク送信を同期()
+                if not self._マイク送信を同期():
+                    self.button_state["マイク"] = False
+                    corrected = True
+                    self.メッセージ表示("マイクは使えません。", force_visible=True, error=True)
             elif changed and new_microphone_state:
                 logger.warning("サーバー初期値でマイクONを受信しましたが、自動開始はスキップしました。必要なら右クリックで再開してください。")
-        if "カメラ" in server_state:
-            self.button_state["カメラ"] = bool(server_state.get("カメラ"))
-            self.display.カメラメニュー表示を設定(self.button_state["カメラ"])
+            self.display.マイクUI状態を設定(self.button_state["マイク"])
+        if "イメージ" in server_state:
+            self.button_state["イメージ"] = bool(server_state.get("イメージ"))
+            if イメージを起動時オフにする and self.button_state["イメージ"]:
+                self.button_state["イメージ"] = False
+                corrected = True
+            self.display.イメージUI状態を設定(self.button_state["イメージ"])
             self._画像送信を同期()
+        if corrected:
+            self._ボタン状態を送信()
 
     def _サーバーモデル設定を反映(self, model_settings: object) -> None:
         if not isinstance(model_settings, dict):
@@ -327,7 +337,11 @@ class DesktopAvatarApp:
         logger.info("保留中のサーバー初期設定を反映します")
         initial_settings = self._保留中のサーバー初期設定
         self._保留中のサーバー初期設定 = None
-        self._サーバーボタン状態を反映(initial_settings.get("ボタン"), マイクを自動開始する=True)
+        self._サーバーボタン状態を反映(
+            initial_settings.get("ボタン"),
+            マイクを自動開始する=True,
+            イメージを起動時オフにする=True,
+        )
         self._サーバーモデル設定を反映(initial_settings.get("モデル設定"))
 
     def _マイク送信を同期(self) -> bool:
@@ -349,7 +363,7 @@ class DesktopAvatarApp:
                 "ボタン": {
                     "スピーカー": self.button_state["スピーカー"],
                     "マイク": self.button_state["マイク"],
-                    "カメラ": self.button_state["カメラ"],
+                    "イメージ": self.button_state["イメージ"],
                 }
             },
         }
@@ -388,34 +402,37 @@ class DesktopAvatarApp:
         if not self._マイク送信を同期():
             self.button_state["マイク"] = False
             self.display.マイクUI状態を設定(False)
-            self.メッセージ表示("マイクを開始できませんでした。", force_visible=True)
+            self.メッセージ表示("マイクは使えません。", force_visible=True, error=True)
         self._ボタン状態を送信()
 
     def スピーカー切替(self) -> None:
         self.button_state["スピーカー"] = self.display.スピーカーUI状態を取得()
-        self.audio_player.スピーカー有効を設定(self.button_state["スピーカー"])
+        if not self.audio_player.スピーカー有効を設定(self.button_state["スピーカー"]):
+            self.button_state["スピーカー"] = False
+            self.display.スピーカーUI状態を設定(False)
+            self.メッセージ表示("スピーカーは使えません。", force_visible=True, error=True)
         self._ボタン状態を送信()
 
-    def カメラ切替(self) -> None:
+    def イメージ切替(self) -> None:
         self.display.コンテキストメニューを閉じる()
-        requested_state = self.display.カメラUI状態を取得()
-        if not requested_state:
-            self.button_state["カメラ"] = False
-            self.display.カメラメニュー表示を設定(False)
+        if self.button_state["イメージ"]:
+            self.button_state["イメージ"] = False
+            self.display.イメージUI状態を設定(False)
             self._画像送信を同期()
             self._ボタン状態を送信()
             return
-        self.display.カメラメニュー表示を設定(False)
-        self.display.予約する(self.メニュー終了待機ミリ秒, self._カメラ開始フローを実行)
+        self.button_state["イメージ"] = True
+        self.display.イメージUI状態を設定(True)
+        self.display.予約する(self.メニュー終了待機ミリ秒, self._イメージ開始フローを実行)
 
-    def _カメラ開始フローを実行(self) -> None:
+    def _イメージ開始フローを実行(self) -> None:
         if self.is_closing:
             return
         content_type = self._コンテンツ選択ダイアログを表示()
         selection = self._コンテンツ選択を確定する(content_type)
         if selection is None:
-            self.button_state["カメラ"] = False
-            self.display.カメラメニュー表示を設定(False)
+            self.button_state["イメージ"] = False
+            self.display.イメージUI状態を設定(False)
             self._ボタン状態を送信()
             return
         source_type, screen_index, desktop_mode, window_handle = selection
@@ -426,17 +443,17 @@ class DesktopAvatarApp:
             desktop_mode=desktop_mode,
             window_handle=window_handle,
         ):
-            self.button_state["カメラ"] = False
-            self.display.カメラメニュー表示を設定(False)
+            self.button_state["イメージ"] = False
+            self.display.イメージUI状態を設定(False)
             self.メッセージ表示("画像コンテンツを設定できませんでした。", force_visible=True)
             self._ボタン状態を送信()
             return
 
-        self.button_state["カメラ"] = True
-        self.display.カメラメニュー表示を設定(True)
+        self.button_state["イメージ"] = True
+        self.display.イメージUI状態を設定(True)
         if not self._画像送信を同期():
-            self.button_state["カメラ"] = False
-            self.display.カメラメニュー表示を設定(False)
+            self.button_state["イメージ"] = False
+            self.display.イメージUI状態を設定(False)
             self.メッセージ表示("画像送信を開始できませんでした。", force_visible=True)
         self._ボタン状態を送信()
 
@@ -484,19 +501,16 @@ class DesktopAvatarApp:
     ) -> tuple[tk.Toplevel, tk.Frame]:
         root = self.display.root
         dialog = tk.Toplevel(root)
+        dialog.withdraw()
         dialog.overrideredirect(枠なし)
         dialog.transient(root)
         dialog.title(title)
         dialog.attributes("-topmost", True)
-        dialog.attributes("-alpha", self.ダイアログ透過率)
+        if 枠なし:
+            dialog.attributes("-alpha", self.ダイアログ透過率)
         dialog.configure(bg=self.ダイアログ影色)
         dialog.resizable(*resizable)
         dialog.lift()
-        if not 枠なし:
-            try:
-                dialog.attributes("-toolwindow", True)
-            except tk.TclError:
-                pass
 
         panel = tk.Frame(
             dialog,
@@ -549,10 +563,17 @@ class DesktopAvatarApp:
 
     def _ダークダイアログを中央配置(self, dialog: tk.Toplevel) -> None:
         root = self.display.root
+        root.update_idletasks()
         dialog.update_idletasks()
-        x = max(0, (root.winfo_screenwidth() - dialog.winfo_width()) // 2)
-        y = max(0, (root.winfo_screenheight() - dialog.winfo_height()) // 2)
+        dw = max(dialog.winfo_reqwidth(), dialog.winfo_width())
+        dh = max(dialog.winfo_reqheight(), dialog.winfo_height())
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        x = max(0, (screen_width - dw) // 2)
+        y = max(0, (screen_height - dh) // 2)
         dialog.geometry(f"+{x}+{y}")
+        dialog.deiconify()
+        dialog.lift()
 
     def _入力フォーカスを固定する(self, dialog: tk.Toplevel, focus_widget: tk.Widget) -> None:
         dialog.update_idletasks()
@@ -813,7 +834,7 @@ class DesktopAvatarApp:
     def _画像送信を同期(self) -> bool:
         if self.image_streamer is None:
             return False
-        if self.button_state["カメラ"]:
+        if self.button_state["イメージ"]:
             return self.image_streamer.開始()
         self.image_streamer.停止()
         self.display.プレビューを隠す()
@@ -1146,33 +1167,67 @@ class DesktopAvatarApp:
             return
         self.メッセージ表示("まだ会話メッセージはありません。", force_visible=True)
 
-    def _保留welcome_textを表示する(self) -> None:
-        self.welcome_job = None
-        if self.is_closing or not self._保留welcome_text:
-            return
-        self._welcome_text表示済み = True
-        self._last_core_message = self._保留welcome_text
-        self.メッセージ表示(self._保留welcome_text, force_visible=True)
-        self._保留welcome_text = ""
-        if self._welcome表示後メッセージ:
-            self._last_core_message = self._welcome表示後メッセージ
-            self._welcome表示後メッセージ = ""
+    def _吹き出し最短表示を完了する(self) -> None:
+        self.bubble_min_job = None
+        self._吹き出し最短表示経過済み = True
+        if self._吹き出し表示キュー and self._吹き出し表示中 and self.bubble_job is not None:
+            self.display.予約解除(self.bubble_job)
+            self.bubble_job = None
+            self.吹き出しを隠す()
 
-    def メッセージ表示(self, message: str, force_visible: bool = False) -> None:
+    def _次の吹き出しを表示する(self) -> None:
+        if self.is_closing or self._吹き出し表示中 or not self._吹き出し表示キュー:
+            return
+        message, _error = self._吹き出し表示キュー[0]
+        wait_ms = max(0, int((self._吹き出し取り出し開始時刻 - time.monotonic()) * 1000))
+        if wait_ms > 0:
+            if self.bubble_job is not None:
+                return
+            self.bubble_job = self.display.予約する(wait_ms, self._次の吹き出しを表示する)
+            return
+        self.bubble_job = None
+        if self.is_closing or self._吹き出し表示中 or not self._吹き出し表示キュー:
+            return
+        message, error = self._吹き出し表示キュー.popleft()
+        self._last_message = message
+        self._吹き出し表示中 = True
+        self._吹き出し最短表示経過済み = False
+        self.display.吹き出しを表示(message, error=error)
+        self.display.予約解除(self.bubble_min_job)
+        self.bubble_min_job = self.display.予約する(self.吹き出し最短表示ミリ秒, self._吹き出し最短表示を完了する)
+        display_ms = self.吹き出し最短表示ミリ秒 if self._吹き出し表示キュー else self.吹き出し単独表示ミリ秒
+        logger.info(
+            "吹き出し表示: display_ms=%s pending=%s error=%s message=%s",
+            display_ms,
+            len(self._吹き出し表示キュー),
+            error,
+            self._ログ用メッセージを整形(message),
+        )
+        self.bubble_job = self.display.予約する(display_ms, self.吹き出しを隠す)
+
+    def メッセージ表示(self, message: str, force_visible: bool = False, error: bool = False) -> None:
         if self.is_closing:
             return
-        self._last_message = message
         if not self.吹き出し表示有効 and not force_visible:
             return
-        self.display.吹き出しを表示(message)
-        self.display.予約解除(self.bubble_job)
-        self.bubble_job = self.display.予約する(self.settings.message_duration_ms, self.吹き出しを隠す)
+        self._吹き出し表示キュー.append((message, error))
+        if self._吹き出し表示中 and self.bubble_job is not None and self._吹き出し最短表示経過済み:
+            self.display.予約解除(self.bubble_job)
+            self.bubble_job = None
+            self.吹き出しを隠す()
+            return
+        self._次の吹き出しを表示する()
 
     def 吹き出しを隠す(self) -> None:
         if self.is_closing:
             return
         self.display.吹き出しを隠す()
+        self.display.予約解除(self.bubble_min_job)
+        self.bubble_min_job = None
         self.bubble_job = None
+        self._吹き出し表示中 = False
+        self._吹き出し最短表示経過済み = False
+        self._次の吹き出しを表示する()
 
     def 吹き出し切替(self) -> None:
         self.吹き出し表示有効 = not self.吹き出し表示有効
@@ -1204,7 +1259,7 @@ class DesktopAvatarApp:
         if self.is_closing:
             return
         self.is_closing = True
-        for job_name in ("motion_job", "bubble_job", "message_job", "pose_job", "core_job", "welcome_job"):
+        for job_name in ("motion_job", "bubble_job", "bubble_min_job", "message_job", "pose_job", "core_job", "welcome_job"):
             self.display.予約解除(getattr(self, job_name))
         if self.core_connector is not None:
             self.core_connector.停止()

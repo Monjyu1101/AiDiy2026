@@ -5,6 +5,7 @@ description = "Independent desktop avatar for AiDiy"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "mss>=10.1.0",
     "opencv-python>=4.11.0.86",
     "pillow>=12.1.0",
     "pyside6>=6.9.0",

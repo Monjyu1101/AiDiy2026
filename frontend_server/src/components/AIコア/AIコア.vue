@@ -77,8 +77,8 @@ const ガイド領域マウス離脱 = () => {
 };
 
 // 各コンポーネントの表示状態（初期値は全てfalse、WebSocket接続で初期値受信後に有効化）
-// ※ ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4 → 設定
-const showImage = ref(false);   // カメラ
+// ※ ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4 → 設定
+const showImage = ref(false);   // イメージ
 const showFile = ref(false);    // ファイル
 const showChat = ref(false);    // チャット
 const showAgent1 = ref(false);  // コード1
@@ -208,7 +208,7 @@ const toggleAgent4 = () => {
   }
 };
 
-// カメラボタンクリック時
+// イメージボタンクリック時
 const handleCameraToggle = () => {
   if (enableCamera.value) {
     enableCamera.value = false;
@@ -339,7 +339,7 @@ const initializeWebSocket = async (既存セッションID?: string) => {
       
       // サーバーから受信した初期値でボタン状態を設定
       if (初期データ.ボタン) {
-        // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4
+        // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4
         enableMicrophone.value = 初期データ.ボタン.マイク || false;
         enableSpeaker.value = 初期データ.ボタン.スピーカー ?? true; // デフォルトオン
         enableFileButton.value = 初期データ.ボタン.ファイル || false;
@@ -617,13 +617,13 @@ const saveState = async () => {
   if (!セッションID.value) return;
 
   const ボタン = {
-    // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4
+    // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4
     マイク: enableMicrophone.value,
     スピーカー: enableSpeaker.value,
     ファイル: enableFileButton.value,
     チャット: enableChatButton.value,
     エージェント1: enableAgent1Button.value,
-    カメラ: enableCamera.value,
+    イメージ: enableCamera.value,
     エージェント2: enableAgent2Button.value,
     エージェント3: enableAgent3Button.value,
     エージェント4: enableAgent4Button.value,
@@ -717,7 +717,7 @@ watch(chatMode, () => {
 // 表示中のパネル数をカウント（レイアウト計算用フラグを使用）
 const visiblePanelCount = computed(() => {
   let count = 0;
-  // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → カメラ → 2 → 3 → 4
+  // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4
   if (layoutFile.value) count++;
   if (layoutChat.value) count++;
   if (layoutAgent1.value) count++;
@@ -803,9 +803,9 @@ const gridLayoutClass = computed(() => {
       :class="{ active: enableCamera }"
       :disabled="!wsConnected"
       @click="handleCameraToggle"
-      title="カメラ"
+      title="イメージ"
     >
-      <img src="/icons/camera.png" alt="カメラ" />
+      <img src="/icons/camera.png" alt="イメージ" />
     </button>
     <button
       class="floating-icon agent-icon"
@@ -1287,7 +1287,7 @@ const gridLayoutClass = computed(() => {
   animation: pulse 2.5s infinite;
 }
 
-/* カメラ（イメージ）→OFF時は灰色背景に緑枠、黒アイコン */
+/* イメージ→OFF時は灰色背景に緑枠、黒アイコン */
 .floating-icon.camera-icon {
   border-color: #2e7d32;
   background: #888888;
@@ -1306,7 +1306,7 @@ const gridLayoutClass = computed(() => {
   box-shadow: 0 4px 12px rgba(68, 255, 68, 0.4);
 }
 
-/* カメラ（イメージ）→ON時は黒背景に緑枠ブリンク、白アイコン */
+/* イメージ→ON時は黒背景に緑枠ブリンク、白アイコン */
 .floating-icon.camera-icon.active {
   background: #000000;
   border-color: #44ff44;

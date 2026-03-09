@@ -125,7 +125,7 @@ class StreamingProcessor:
             await self._process_chat_ai()
 
         # イメージAI処理
-        if ボタン状態.get("カメラ", False):
+        if ボタン状態.get("イメージ", False):
             await self._process_image_ai()
 
         # エージェントAI処理
@@ -149,14 +149,14 @@ class StreamingProcessor:
 
     async def _process_image_ai(self):
         """イメージAI処理"""
-        # カメラが有効な場合、LiveAIプロセッサをアクティブに保つ
-        if self.connection.ボタン状態.get("カメラ", False):
+        # イメージが有効な場合、LiveAIプロセッサをアクティブに保つ
+        if self.connection.ボタン状態.get("イメージ", False):
             live_processor = getattr(self.connection, "live_processor", None)
             if live_processor:
                 try:
                     # AIインスタンスがなければ開始を試みる
                     if not getattr(live_processor, "AIインスタンス", None):
-                        logger.info("カメラONのため、LiveAIを開始します。")
+                        logger.info("イメージONのため、LiveAIを開始します。")
                         await live_processor.開始()
                 except Exception as e:
                     logger.error(f"LiveAIの開始に失敗しました: {e}")

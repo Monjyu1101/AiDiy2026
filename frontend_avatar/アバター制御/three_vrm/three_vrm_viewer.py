@@ -140,8 +140,12 @@ class AvatarWindow(QMainWindow):
         y = int(state.get("y", 100))
         width = int(state.get("width", 480))
         height = int(state.get("height", 720))
+        always_on_top = bool(state.get("always_on_top", False))
         self.setGeometry(x, y, width, height)
         self.setWindowTitle(str(state.get("title", "AiDiy Avatar")))
+        if always_on_top != bool(self.last_state.get("always_on_top", False)) or not self.last_state:
+            self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, always_on_top)
+            self.show()
 
         camera_zoom = float(state.get("camera_zoom", 0.0))
         camera_offset_x = float(state.get("camera_offset_x", 0.0))
