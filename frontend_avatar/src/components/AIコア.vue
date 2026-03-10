@@ -20,6 +20,7 @@ defineProps<{
   panelVisibility: Record<PanelKey, boolean>;
   coreBusy: boolean;
   coreError: string;
+  subtitleText: string;
 }>()
 
 const emit = defineEmits<{
@@ -32,14 +33,21 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <component :is="WindowShell" title="AiDiy Desktop Avatar" theme="purple" :closable="false">
+  <component
+    :is="WindowShell"
+    title="AiDiy Desktop Avatar"
+    theme="purple"
+    close-mode="event"
+    @close="emit('logout')"
+  >
     <template #title-right>
-      <span class="mini-pill" :class="{ ok: connectionReady, warn: !connectionReady }">
-        {{ transportState }}
-      </span>
-      <span class="mini-pill" :class="{ ok: inputConnected }">input</span>
-      <span class="mini-pill" :class="{ ok: chatConnected }">chat</span>
-      <span class="mini-pill" :class="{ ok: audioConnected }">audio</span>
+      <span
+        :class="[
+          'core-status-dot',
+          transportState === '接続中' ? 'on' : transportState === '部分接続' || coreBusy ? 'partial' : '',
+        ]"
+      ></span>
+      <span class="core-status-text">{{ transportState }}</span>
     </template>
 
     <div class="core-panel-body">
@@ -55,6 +63,7 @@ const emit = defineEmits<{
         :mic-level="micLevel"
         :speaker-level="speakerLevel"
         :ui-visible="true"
+        :subtitle-text="subtitleText"
       />
 
       <aside class="panel-icons">
@@ -140,9 +149,6 @@ const emit = defineEmits<{
           4
         </button>
         <button class="tool-button sync-button" type="button" title="再接続" @click="emit('reconnect')">S</button>
-        <button class="tool-button exit-button" type="button" title="ログアウト" @click="emit('logout')">
-          EXIT
-        </button>
       </aside>
 
       <div v-if="coreBusy || coreError" class="panel-toast" :class="{ error: coreError }">
@@ -151,3 +157,26 @@ const emit = defineEmits<{
     </div>
   </component>
 </template>
+
+<style scoped>
+.core-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.core-status-dot.on {
+  background: #44ff44;
+}
+
+.core-status-dot.partial {
+  background: #facc15;
+}
+
+.core-status-text {
+  font-size: 10px;
+  font-weight: bold;
+}
+</style>

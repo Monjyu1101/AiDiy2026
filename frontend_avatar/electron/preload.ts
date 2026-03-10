@@ -5,6 +5,13 @@ type WindowMode = 'login' | 'core'
 type WindowRole = WindowMode | PanelKey
 type WindowBounds = { x: number; y: number; width: number; height: number }
 type WindowMetrics = WindowBounds & { minWidth: number; minHeight: number }
+type DisplaySourceKind = 'screen' | 'window'
+type DisplaySourceInfo = {
+  id: string
+  name: string
+  kind: DisplaySourceKind
+  thumbnailDataUrl: string | null
+}
 
 const api = {
   versions: {
@@ -19,11 +26,20 @@ const api = {
   closeCurrentWindow: () => ipcRenderer.invoke('window:close-self'),
   togglePanel: (panel: PanelKey) => ipcRenderer.invoke('panel:toggle', panel),
   getPanelStates: () => ipcRenderer.invoke('panel:get-states') as Promise<Record<PanelKey, boolean>>,
+  listDisplaySources: () => ipcRenderer.invoke('desktop:list-sources') as Promise<DisplaySourceInfo[]>,
+  setDisplaySource: (sourceId: string | null) => ipcRenderer.invoke('desktop:set-source', sourceId),
   onPanelStatesChanged: (callback: (states: Record<PanelKey, boolean>) => void) => {
     const handler = (_event: unknown, states: Record<PanelKey, boolean>) => callback(states)
     ipcRenderer.on('panel:states-changed', handler)
     return () => {
       ipcRenderer.removeListener('panel:states-changed', handler)
+    }
+  },
+  onWindowShown: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('window:shown', handler)
+    return () => {
+      ipcRenderer.removeListener('window:shown', handler)
     }
   },
 }

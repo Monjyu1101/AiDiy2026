@@ -5,11 +5,27 @@ export interface AuthUser {
   [key: string]: unknown;
 }
 
+export type MessageKind =
+  | 'system'
+  | 'user'
+  | 'assistant'
+  | 'recognition-user'
+  | 'recognition-assistant'
+  | 'input-request'
+  | 'output-request'
+  | 'input-file'
+  | 'output-file'
+  | 'stream'
+
 export interface ChatMessage {
   id: string;
-  kind: 'system' | 'user' | 'assistant' | 'recognition-user' | 'recognition-assistant';
+  kind: MessageKind;
   text: string;
   timestamp: string;
+  fileName?: string | null;
+  thumbnail?: string | null;
+  isStream?: boolean;
+  isCollapsed?: boolean;
 }
 
 export interface ModelSettings {

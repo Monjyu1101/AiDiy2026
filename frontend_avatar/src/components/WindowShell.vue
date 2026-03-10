@@ -11,16 +11,22 @@ type ResizeDirection =
   | 'se'
   | 'sw'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   title: string;
   theme?: 'purple' | 'light';
   closable?: boolean;
   resizable?: boolean;
+  closeMode?: 'window' | 'event';
 }>(), {
   theme: 'light',
   closable: true,
   resizable: true,
+  closeMode: 'window',
 })
+
+const emit = defineEmits<{
+  close: []
+}>()
 
 const リサイズ中 = ref(false)
 
@@ -35,6 +41,10 @@ let 最小高 = 0
 let 現在方向: ResizeDirection | null = null
 
 function closeWindow() {
+  if (props.closeMode === 'event') {
+    emit('close')
+    return
+  }
   void window.desktopApi?.closeCurrentWindow?.()
 }
 
@@ -200,6 +210,12 @@ onBeforeUnmount(() => {
   background: rgba(0, 0, 0, 0.72);
   color: #fff;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
 }
 
 .resize-handle {

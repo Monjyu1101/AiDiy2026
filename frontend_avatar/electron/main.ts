@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, session } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -9,6 +9,13 @@ type WindowMode = 'login' | 'core'
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
 type WindowRole = WindowMode | PanelKey
 type WindowBounds = { x: number; y: number; width: number; height: number }
+type DisplaySourceKind = 'screen' | 'window'
+type DisplaySourceInfo = {
+  id: string
+  name: string
+  kind: DisplaySourceKind
+  thumbnailDataUrl: string | null
+}
 
 type BoundsPreset = {
   width: number
@@ -43,6 +50,26 @@ const panelStates: Record<PanelKey, boolean> = {
 let primaryWindow: BrowserWindow | null = null
 const panelWindows = new Map<PanelKey, BrowserWindow>()
 const windowRoles = new Map<number, WindowRole>()
+let selectedDisplaySourceId: string | null = null
+
+function resolveDisplaySourceKind(sourceId: string): DisplaySourceKind {
+  return sourceId.startsWith('window:') ? 'window' : 'screen'
+}
+
+async function listDisplaySources(): Promise<DisplaySourceInfo[]> {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen', 'window'],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true,
+  })
+
+  return sources.map((source) => ({
+    id: source.id,
+    name: source.name,
+    kind: resolveDisplaySourceKind(source.id),
+    thumbnailDataUrl: source.thumbnail.isEmpty() ? null : source.thumbnail.toDataURL(),
+  }))
+}
 
 function getRendererUrl(): string {
   if (isDev) {
@@ -124,6 +151,7 @@ function setPanelVisibility(panel: PanelKey, visible: boolean) {
   if (visible) {
     window.show()
     window.focus()
+    window.webContents.send('window:shown')
   } else {
     window.hide()
   }
@@ -207,6 +235,32 @@ function createPrimaryWindow() {
 }
 
 app.whenReady().then(() => {
+  session.defaultSession.setDisplayMediaRequestHandler(
+    async (_request, callback) => {
+      const sourceId = selectedDisplaySourceId
+      selectedDisplaySourceId = null
+      if (!sourceId) {
+        callback({})
+        return
+      }
+
+      try {
+        const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] })
+        const selectedSource = sources.find((source) => source.id === sourceId)
+        if (!selectedSource) {
+          console.error('[desktop-capture] selected source not found:', sourceId)
+          callback({})
+          return
+        }
+        callback({ video: selectedSource })
+      } catch (error) {
+        console.error('[desktop-capture] source resolve failed:', error)
+        callback({})
+      }
+    },
+    { useSystemPicker: false },
+  )
+
   ipcMain.handle('window:get-role', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return 'login'
@@ -268,6 +322,13 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('panel:get-states', () => ({ ...panelStates }))
+
+  ipcMain.handle('desktop:list-sources', async () => listDisplaySources())
+
+  ipcMain.handle('desktop:set-source', (_event, sourceId: string | null) => {
+    selectedDisplaySourceId = sourceId
+    return selectedDisplaySourceId
+  })
 
   createPrimaryWindow()
 

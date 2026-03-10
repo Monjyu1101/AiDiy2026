@@ -6,7 +6,7 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
 import { DEFAULT_VRM_MODEL_URL, DEFAULT_VRMA_FILES } from '@/lib/config'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   sessionId: string;
   userName: string;
   liveModel: string;
@@ -17,7 +17,10 @@ const props = defineProps<{
   micLevel: number;
   speakerLevel: number;
   uiVisible: boolean;
-}>()
+  subtitleText?: string;
+}>(), {
+  subtitleText: '',
+})
 
 const mountRef = ref<HTMLDivElement | null>(null)
 const loadError = ref('')
@@ -315,6 +318,12 @@ onBeforeUnmount(() => {
     <div class="stage-session" :class="{ visible: uiVisible }">
       <span>{{ sessionId || '未接続' }}</span>
     </div>
+
+    <Transition name="subtitle-fade">
+      <div v-if="subtitleText" class="subtitle-overlay" :key="subtitleText">
+        <span>{{ subtitleText }}</span>
+      </div>
+    </Transition>
   </section>
 </template>
 
@@ -487,6 +496,38 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(12px);
   font-size: 0.68rem;
 }
+
+.subtitle-overlay {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 48px;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+
+.subtitle-overlay span {
+  display: inline-block;
+  max-width: 90%;
+  padding: 8px 14px;
+  border: 1px solid rgba(153, 141, 214, 0.42);
+  background: rgba(3, 5, 10, 0.62);
+  color: rgba(180, 255, 210, 0.95);
+  backdrop-filter: blur(12px);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-line;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 4.2em;
+}
+
+.subtitle-fade-enter-active { transition: opacity 0.3s ease; }
+.subtitle-fade-leave-active { transition: opacity 0.6s ease; }
+.subtitle-fade-enter-from,
+.subtitle-fade-leave-to { opacity: 0; }
 
 @media (max-width: 720px) {
   .avatar-hud {
