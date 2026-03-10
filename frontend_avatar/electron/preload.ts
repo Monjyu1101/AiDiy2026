@@ -1,0 +1,31 @@
+import { contextBridge, ipcRenderer } from 'electron'
+
+type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
+type WindowMode = 'login' | 'core'
+type WindowRole = WindowMode | PanelKey
+type WindowBounds = { x: number; y: number; width: number; height: number }
+type WindowMetrics = WindowBounds & { minWidth: number; minHeight: number }
+
+const api = {
+  versions: {
+    chrome: process.versions.chrome,
+    electron: process.versions.electron,
+    node: process.versions.node,
+  },
+  getWindowRole: () => ipcRenderer.invoke('window:get-role') as Promise<WindowRole>,
+  getWindowBounds: () => ipcRenderer.invoke('window:get-bounds') as Promise<WindowMetrics>,
+  setWindowBounds: (bounds: WindowBounds) => ipcRenderer.invoke('window:set-bounds', bounds),
+  setWindowMode: (mode: WindowMode) => ipcRenderer.invoke('window:set-mode', mode),
+  closeCurrentWindow: () => ipcRenderer.invoke('window:close-self'),
+  togglePanel: (panel: PanelKey) => ipcRenderer.invoke('panel:toggle', panel),
+  getPanelStates: () => ipcRenderer.invoke('panel:get-states') as Promise<Record<PanelKey, boolean>>,
+  onPanelStatesChanged: (callback: (states: Record<PanelKey, boolean>) => void) => {
+    const handler = (_event: unknown, states: Record<PanelKey, boolean>) => callback(states)
+    ipcRenderer.on('panel:states-changed', handler)
+    return () => {
+      ipcRenderer.removeListener('panel:states-changed', handler)
+    }
+  },
+}
+
+contextBridge.exposeInMainWorld('desktopApi', api)

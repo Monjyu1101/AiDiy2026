@@ -28,7 +28,7 @@ BACKEND_PATH = "backend_server" # バックエンドフォルダ名
 BACKEND_ENV = ".venv" # Python環境: ".venv" (uv使用)
 
 # フロントエンド設定
-FRONTEND_PATH = "frontend_server" # フロントエンドフォルダパス
+FRONTEND_PATH = "frontend_web" # フロントエンドフォルダパス
 FRONTEND_COMMAND = "npm" # パッケージマネージャ: "npm" or "pnpm" or "yarn"
 
 # データベース設定

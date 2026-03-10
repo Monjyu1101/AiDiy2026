@@ -1,4 +1,4 @@
-﻿# Contributing
+# Contributing
 
 本プロジェクトへの貢献ありがとうございます。
 
@@ -11,7 +11,7 @@
   - `AGENTS.md`
   - `docs/` フォルダ（コーディングルール、実装例など）
   - `backend_server/AGENTS.md`
-  - `frontend_server/AGENTS.md`
+  - `frontend_web/AGENTS.md`
 
 ## ライセンス（重要）
 

@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
- 
+
 """プロジェクトクリーンアップスクリプト
 
 他の担当者にプロジェクトを渡す前に、
 不要なキャッシュファイルやビルド成果物を削除します。
 
+対象:
+- バックエンド(core,apps): `backend_server`
+- フロントエンド(Web): `frontend_web`
+- フロントエンド(Avatar): `frontend_avatar`
+- フロントエンド(GUI): `frontend_gui`
+
 Usage:
-    python cleanup.py
+    python _cleanup.py
 """
 
 import os
@@ -20,26 +26,23 @@ from pathlib import Path
 # ============================================================
 # プロジェクト設定
 # ============================================================
-# バックエンド設定
-BACKEND_PATH = "backend_server"      # バックエンドフォルダ名
-BACKEND_ENV_LIST = [".venv", "venv"] # Python環境: ".venv" または "venv" (uv使用)
+BACKEND_PATH = "backend_server"
+BACKEND_ENV_LIST = [".venv", "venv"]
 
-# フロントエンド設定
-FRONTEND_PATH = "frontend_server"    # フロントエンドフォルダパス
-AVATAR_PATH = "frontend_avatar"      # 独立アバターフォルダパス
-AVATAR_ENV_LIST = [".venv", "venv"]  # アバター用Python環境
+FRONTEND_WEB_PATH = "frontend_web"
 
-# データベース設定
-DATABASE_TYPE = "sqlite"             # "postgresql" or "sqlite"
+FRONTEND_AVATAR_PATH = "frontend_avatar"
+FRONTEND_AVATAR_BUILD_DIRS = ["dist", "dist-electron"]
+
+FRONTEND_GUI_PATH = "frontend_gui"
+FRONTEND_GUI_ENV_LIST = [".venv", "venv"]
+
+DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
 
-# a/auto 指定時に、以降の質問をデフォルト値で自動回答する
 AUTO_MODE = False
 
-# ============================================================
 
-
-# カラー出力用のクラス
 class Colors:
     HEADER = '\033[97m'
     OKBLUE = '\033[94m'
@@ -53,73 +56,47 @@ class Colors:
 
 
 def print_header(message):
-    """ヘッダーを表示"""
     print(f"\n{Colors.HEADER}{Colors.BOLD}{'=' * 60}{Colors.ENDC}")
     print(f"{Colors.HEADER}{Colors.BOLD}{message}{Colors.ENDC}")
     print(f"{Colors.HEADER}{Colors.BOLD}{'=' * 60}{Colors.ENDC}\n")
 
 
 def print_success(message):
-    """成功メッセージを表示"""
     print(f"{Colors.OKBLUE}[OK] {message}{Colors.ENDC}")
 
 
 def print_info(message):
-    """情報メッセージを表示"""
     print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
 
 
 def print_warning(message):
-    """警告メッセージを表示"""
     print(f"{Colors.WARNING}[WARN] {message}{Colors.ENDC}")
 
 
 def print_error(message):
-    """エラーメッセージを表示"""
     print(f"{Colors.FAIL}[NG] {message}{Colors.ENDC}")
 
 
 def ask_yes_no(prompt, default="n"):
-    """Y/N の質問をする
-    
-    Args:
-        prompt (str): 質問文
-        default (str): デフォルト値 ("y" または "n")
-    
-    Returns:
-        bool: Yesの場合True、Noの場合False
-    """
     global AUTO_MODE
 
     if AUTO_MODE:
         print_info(f"[AUTO] {prompt} -> {'Yes' if default.lower() == 'y' else 'No'} (default)")
         return default.lower() == "y"
 
-    if default == "y":
-        prompt_text = f"\n{prompt}([y]/n): "
-    else:
-        prompt_text = f"\n{prompt}([n]/y): "
-    
+    prompt_text = f"\n{prompt}([y]/n): " if default.lower() == "y" else f"\n{prompt}([n]/y): "
     while True:
         answer = input(prompt_text).strip().lower()
-        
         if answer == "":
-            answer = default
-        
+            answer = default.lower()
         if answer in ["y", "yes"]:
             return True
-        elif answer in ["n", "no"]:
+        if answer in ["n", "no"]:
             return False
-        else:
-            print_warning("'y' または 'n' で答えてください")
+        print_warning("'y' または 'n' で答えてください")
 
 
 def ask_start_mode(prompt, default="n"):
-    """開始質問 (y/n/a) を表示して実行モードを取得
-
-    Returns:
-        tuple[bool, bool]: (実行するか, autoモードか)
-    """
     if default.lower() == "y":
         prompt_text = f"\n{prompt}([y]/n/a=auto): "
     else:
@@ -127,47 +104,26 @@ def ask_start_mode(prompt, default="n"):
 
     while True:
         answer = input(prompt_text).strip().lower()
-
         if answer == "":
             answer = default.lower()
-
         if answer in ["y", "yes"]:
             return True, False
         if answer in ["n", "no"]:
             return False, False
         if answer in ["a", "auto"]:
             return True, True
-
         print_warning("'y' または 'n' または 'a'(auto) で答えてください")
 
 
 def handle_remove_readonly(func, path, exc_info):
-    """読み取り専用ファイルを削除できるようにする
-    
-    Args:
-        func: 失敗した関数
-        path: ファイルパス
-        exc_info: 例外情報
-    """
-    # 読み取り専用属性を解除
+    del exc_info
     os.chmod(path, stat.S_IWRITE)
-    # 再試行
     func(path)
 
 
-def remove_directory(path, description):
-    """ディレクトリを削除
-    
-    Args:
-        path (Path): 削除するディレクトリのパス
-        description (str): 説明文
-    
-    Returns:
-        bool: 削除成功時True
-    """
+def remove_directory(path: Path, description: str) -> bool:
     if path.exists() and path.is_dir():
         try:
-            # Windowsで読み取り専用ファイルも削除できるようにonerrorハンドラを指定
             shutil.rmtree(path, onerror=handle_remove_readonly)
             print_success(f"{description} を削除しました: {path}")
             return True
@@ -179,16 +135,7 @@ def remove_directory(path, description):
     return False
 
 
-def remove_file(path, description):
-    """ファイルを削除
-
-    Args:
-        path (Path): 削除するファイルのパス
-        description (str): 説明文
-
-    Returns:
-        bool: 削除成功時True
-    """
+def remove_file(path: Path, description: str) -> bool:
     if path.exists() and path.is_file():
         try:
             if not os.access(path, os.W_OK):
@@ -204,31 +151,19 @@ def remove_file(path, description):
     return False
 
 
-def clean_directory_contents(path, description):
-    """ディレクトリの中身のみを削除(フォルダ自体は残す)
-    
-    Args:
-        path (Path): クリーンアップするディレクトリのパス
-        description (str): 説明文
-    
-    Returns:
-        bool: 削除成功時True
-    """
+def clean_directory_contents(path: Path, description: str) -> bool:
     if path.exists() and path.is_dir():
         try:
             deleted_count = 0
-            # ディレクトリ内のすべてのファイルとサブディレクトリを削除
             for item in path.iterdir():
                 if item.is_dir():
                     shutil.rmtree(item, onerror=handle_remove_readonly)
-                    deleted_count += 1
                 else:
-                    # 読み取り専用属性を解除してから削除
                     if not os.access(item, os.W_OK):
                         os.chmod(item, stat.S_IWRITE)
                     item.unlink()
-                    deleted_count += 1
-            
+                deleted_count += 1
+
             if deleted_count > 0:
                 print_success(f"{description} の中身を削除しました: {path} ({deleted_count}個)")
             else:
@@ -242,166 +177,164 @@ def clean_directory_contents(path, description):
     return False
 
 
-def cleanup_server(base_dir):
-    """バックエンドフォルダをクリーンアップ
-    
-    Args:
-        base_dir (Path): プロジェクトのルートディレクトリ
-    """
-    print_header("バックエンドフォルダのクリーンアップ")
-    
-    server_dir = base_dir / BACKEND_PATH
-    if not server_dir.exists():
-        print_warning("バックエンドフォルダが見つかりません")
-        return
-    
+def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
     deleted_count = 0
-    
-    # __pycache__ フォルダを削除
-    print_info("__pycache__ フォルダを検索中...")
-    for pycache in server_dir.rglob("__pycache__"):
-        if remove_directory(pycache, "__pycache__"):
+
+    print_info(f"{label}: __pycache__ フォルダを検索中...")
+    for pycache in target_dir.rglob("__pycache__"):
+        if remove_directory(pycache, f"__pycache__ ({label})"):
             deleted_count += 1
-    
-    # .pytest_cache フォルダを削除
-    print_info(".pytest_cache フォルダを検索中...")
-    for pytest_cache in server_dir.rglob(".pytest_cache"):
-        if remove_directory(pytest_cache, ".pytest_cache"):
+
+    print_info(f"{label}: .pytest_cache フォルダを検索中...")
+    for pytest_cache in target_dir.rglob(".pytest_cache"):
+        if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
-    
-    # Python環境フォルダ削除の確認 (BACKEND_ENV_LIST に従う)
-    print_info(f"削除対象の仮想環境リスト: {', '.join(BACKEND_ENV_LIST)}")
-    for venv_name in BACKEND_ENV_LIST:
-        venv_dir = server_dir / venv_name
-        if venv_dir.exists():
-            if ask_yes_no(f"  {venv_name} フォルダを削除しますか？", default="y"):
-                if remove_directory(venv_dir, venv_name):
+
+    return deleted_count
+
+
+def cleanup_backend(base_dir: Path):
+    label = "バックエンド(core,apps)"
+    print_header(f"{label} のクリーンアップ")
+
+    backend_dir = base_dir / BACKEND_PATH
+    if not backend_dir.exists():
+        print_warning(f"{label} のフォルダが見つかりません")
+        return
+
+    deleted_count = cleanup_common_python_caches(backend_dir, label)
+
+    print_info(f"{label}: 削除対象の仮想環境リスト: {', '.join(BACKEND_ENV_LIST)}")
+    for env_name in BACKEND_ENV_LIST:
+        env_dir = backend_dir / env_name
+        if env_dir.exists():
+            if ask_yes_no(f"  {BACKEND_PATH}/{env_name} を削除しますか？", default="y"):
+                if remove_directory(env_dir, f"{env_name} ({label})"):
                     deleted_count += 1
             else:
-                print_info(f"  {venv_name} フォルダはそのまま残します")
-    
-    # logs フォルダの中身を削除するか確認(存在する場合のみ)
-    logs_dir = server_dir / "logs"
-    if logs_dir.exists():
-        if ask_yes_no("  logs フォルダの中身をクリアしますか？", default="y"):
-            if clean_directory_contents(logs_dir, "logs"):
-                deleted_count += 1
-        else:
-            print_info("  logs フォルダはそのまま残します")
-    
-    # temp フォルダの中身を削除するか確認(存在する場合のみ)
-    temp_dir = server_dir / "temp"
-    if temp_dir.exists():
-        if ask_yes_no("  temp フォルダの中身をクリアしますか？", default="y"):
-            if clean_directory_contents(temp_dir, "temp"):
-                deleted_count += 1
-        else:
-            print_info("  temp フォルダはそのまま残します")
+                print_info(f"  {BACKEND_PATH}/{env_name} はそのまま残します")
 
-    # SQLite データベースファイルの削除
+    logs_dir = backend_dir / "logs"
+    if logs_dir.exists():
+        if ask_yes_no(f"  {BACKEND_PATH}/logs の中身をクリアしますか？", default="y"):
+            if clean_directory_contents(logs_dir, f"logs ({label})"):
+                deleted_count += 1
+        else:
+            print_info(f"  {BACKEND_PATH}/logs はそのまま残します")
+
+    temp_dir = backend_dir / "temp"
+    if temp_dir.exists():
+        if ask_yes_no(f"  {BACKEND_PATH}/temp の中身をクリアしますか？", default="y"):
+            if clean_directory_contents(temp_dir, f"temp ({label})"):
+                deleted_count += 1
+        else:
+            print_info(f"  {BACKEND_PATH}/temp はそのまま残します")
+
     if DATABASE_TYPE.lower() == "sqlite":
         sqlite_db = base_dir / SQLITE_DB_REL_PATH
         if sqlite_db.exists():
             if ask_yes_no("  SQLite データベースを削除しますか？", default="n"):
-                if remove_file(sqlite_db, "SQLite データベース"):
+                if remove_file(sqlite_db, f"SQLite データベース ({label})"):
                     deleted_count += 1
             else:
                 print_info("  SQLite データベースはそのまま残します")
-    
+
     if deleted_count > 0:
-        print_success(f"バックエンドフォルダのクリーンアップ完了 ({deleted_count}個削除)")
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
-        print_info("削除対象のフォルダはありませんでした")
+        print_info(f"{label}: 削除対象はありませんでした")
 
 
-def cleanup_client(base_dir):
-    """フロントエンドフォルダをクリーンアップ
-    
-    Args:
-        base_dir (Path): プロジェクトのルートディレクトリ
-    """
-    print_header("フロントエンドフォルダのクリーンアップ")
-    
-    client_dir = base_dir / FRONTEND_PATH
+def cleanup_frontend_web(base_dir: Path):
+    label = "フロントエンド(Web)"
+    print_header(f"{label} のクリーンアップ")
 
-    if not client_dir.exists():
-        print_warning("フロントエンドフォルダが見つかりません")
+    web_dir = base_dir / FRONTEND_WEB_PATH
+    if not web_dir.exists():
+        print_warning(f"{label} のフォルダが見つかりません")
         return
-    
+
     deleted_count = 0
-    
-    # フロントエンドアプリの node_modules フォルダを削除
-    node_modules_dir = client_dir / "node_modules"
-    if remove_directory(node_modules_dir, f"node_modules ({FRONTEND_PATH})"):
+
+    node_modules_dir = web_dir / "node_modules"
+    if remove_directory(node_modules_dir, f"node_modules ({label})"):
         deleted_count += 1
 
-    # dist フォルダを削除
-    dist_dir = client_dir / "dist"
-    if remove_directory(dist_dir, "dist"):
+    dist_dir = web_dir / "dist"
+    if remove_directory(dist_dir, f"dist ({label})"):
         deleted_count += 1
-    
+
     if deleted_count > 0:
-        print_success(f"フロントエンドフォルダのクリーンアップ完了 ({deleted_count}個削除)")
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
-        print_info("削除対象のフォルダはありませんでした")
+        print_info(f"{label}: 削除対象はありませんでした")
 
 
-def cleanup_avatar(base_dir):
-    """frontend_avatar フォルダをクリーンアップ
+def cleanup_frontend_avatar(base_dir: Path):
+    label = "フロントエンド(Avatar)"
+    print_header(f"{label} のクリーンアップ")
 
-    Args:
-        base_dir (Path): プロジェクトのルートディレクトリ
-    """
-    print_header("アバターフォルダのクリーンアップ")
-
-    avatar_dir = base_dir / AVATAR_PATH
+    avatar_dir = base_dir / FRONTEND_AVATAR_PATH
     if not avatar_dir.exists():
-        print_warning("アバターフォルダが見つかりません")
+        print_warning(f"{label} のフォルダが見つかりません")
         return
 
     deleted_count = 0
 
-    print_info("__pycache__ フォルダを検索中...")
-    for pycache in avatar_dir.rglob("__pycache__"):
-        if remove_directory(pycache, f"__pycache__ ({AVATAR_PATH})"):
+    node_modules_dir = avatar_dir / "node_modules"
+    if remove_directory(node_modules_dir, f"node_modules ({label})"):
+        deleted_count += 1
+
+    for build_dir_name in FRONTEND_AVATAR_BUILD_DIRS:
+        build_dir = avatar_dir / build_dir_name
+        if remove_directory(build_dir, f"{build_dir_name} ({label})"):
             deleted_count += 1
 
-    print_info(".pytest_cache フォルダを検索中...")
-    for pytest_cache in avatar_dir.rglob(".pytest_cache"):
-        if remove_directory(pytest_cache, f".pytest_cache ({AVATAR_PATH})"):
-            deleted_count += 1
+    if deleted_count > 0:
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
+    else:
+        print_info(f"{label}: 削除対象はありませんでした")
 
-    avatar_logs_dir = avatar_dir / "temp" / "logs"
-    if avatar_logs_dir.exists():
-        if ask_yes_no(f"  {AVATAR_PATH}/temp/logs の中身をクリアしますか？", default="y"):
-            if clean_directory_contents(avatar_logs_dir, f"temp/logs ({AVATAR_PATH})"):
+
+def cleanup_frontend_gui(base_dir: Path):
+    label = "フロントエンド(GUI)"
+    print_header(f"{label} のクリーンアップ")
+
+    gui_dir = base_dir / FRONTEND_GUI_PATH
+    if not gui_dir.exists():
+        print_warning(f"{label} のフォルダが見つかりません")
+        return
+
+    deleted_count = cleanup_common_python_caches(gui_dir, label)
+
+    logs_dir = gui_dir / "temp" / "logs"
+    if logs_dir.exists():
+        if ask_yes_no(f"  {FRONTEND_GUI_PATH}/temp/logs の中身をクリアしますか？", default="y"):
+            if clean_directory_contents(logs_dir, f"temp/logs ({label})"):
                 deleted_count += 1
         else:
-            print_info(f"  {AVATAR_PATH}/temp/logs はそのまま残します")
+            print_info(f"  {FRONTEND_GUI_PATH}/temp/logs はそのまま残します")
 
-    print_info(f"削除対象の仮想環境リスト: {', '.join(AVATAR_ENV_LIST)}")
-    for venv_name in AVATAR_ENV_LIST:
-        venv_dir = avatar_dir / venv_name
-        if venv_dir.exists():
-            if ask_yes_no(f"  {AVATAR_PATH}/{venv_name} フォルダを削除しますか？", default="y"):
-                if remove_directory(venv_dir, f"{venv_name} ({AVATAR_PATH})"):
+    print_info(f"{label}: 削除対象の仮想環境リスト: {', '.join(FRONTEND_GUI_ENV_LIST)}")
+    for env_name in FRONTEND_GUI_ENV_LIST:
+        env_dir = gui_dir / env_name
+        if env_dir.exists():
+            if ask_yes_no(f"  {FRONTEND_GUI_PATH}/{env_name} を削除しますか？", default="y"):
+                if remove_directory(env_dir, f"{env_name} ({label})"):
                     deleted_count += 1
             else:
-                print_info(f"  {AVATAR_PATH}/{venv_name} フォルダはそのまま残します")
+                print_info(f"  {FRONTEND_GUI_PATH}/{env_name} はそのまま残します")
 
     if deleted_count > 0:
-        print_success(f"アバターフォルダのクリーンアップ完了 ({deleted_count}個削除)")
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
-        print_info("削除対象のフォルダはありませんでした")
+        print_info(f"{label}: 削除対象はありませんでした")
 
 
 def uninstall_global_npm_tools():
-    """グローバルnpmパッケージをアンインストール"""
     print_header("グローバルnpmツールのアンインストール")
 
-    # npmコマンドを取得（Windows対応）
     npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
-
     packages = [
         "@anthropic-ai/claude-code",
         "@github/copilot",
@@ -433,19 +366,20 @@ def uninstall_global_npm_tools():
 
 
 def main():
-    """メイン処理"""
     global AUTO_MODE
 
     print_header("プロジェクト クリーンアップ")
-    
-    # プロジェクトのルートディレクトリ
+
     base_dir = Path(__file__).parent
-    
     print_info(f"プロジェクトディレクトリ: {base_dir}")
+    print_info("クリーンアップ対象:")
+    print_info("  1. バックエンド(core,apps)")
+    print_info("  2. フロントエンド(Web)")
+    print_info("  3. フロントエンド(Avatar)")
+    print_info("  4. フロントエンド(GUI)")
     print()
-    
-    # クリーンアップ実行の確認
-    run_cleanup, AUTO_MODE = ask_start_mode("フォルダをクリーンアップしますか？", default="n")
+
+    run_cleanup, AUTO_MODE = ask_start_mode("クリーンアップを実行しますか？", default="n")
     if not run_cleanup:
         print_info("クリーンアップをキャンセルしました")
         return
@@ -453,41 +387,41 @@ def main():
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
 
-    # グローバルnpmツールのアンインストール
     if ask_yes_no("グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n"):
         uninstall_global_npm_tools()
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
 
-    # backup フォルダの削除確認（先に実施）
     backup_dir = base_dir / "backup"
     if backup_dir.exists():
         if ask_yes_no("backup フォルダを削除しますか？", default="y"):
             remove_directory(backup_dir, "backup")
         else:
             print_info("backup フォルダはそのまま残します")
-    
-    # バックエンドフォルダのクリーンアップ
-    if ask_yes_no("バックエンドをクリーンアップしますか？", default="y"):
-        cleanup_server(base_dir)
-    else:
-        print_info("バックエンドのクリーンアップをスキップしました")
-    
-    print()
-    
-    # フロントエンドフォルダのクリーンアップ
-    if ask_yes_no("フロントエンドをクリーンアップしますか？", default="y"):
-        cleanup_client(base_dir)
-    else:
-        print_info("フロントエンドのクリーンアップをスキップしました")
 
     print()
-
-    # アバターフォルダのクリーンアップ
-    if ask_yes_no("アバター(frontend_avatar)をクリーンアップしますか？", default="y"):
-        cleanup_avatar(base_dir)
+    if ask_yes_no("バックエンド(core,apps)をクリーンアップしますか？", default="y"):
+        cleanup_backend(base_dir)
     else:
-        print_info("アバター(frontend_avatar)のクリーンアップをスキップしました")
+        print_info("バックエンド(core,apps)のクリーンアップをスキップしました")
+
+    print()
+    if ask_yes_no("フロントエンド(Web)をクリーンアップしますか？", default="y"):
+        cleanup_frontend_web(base_dir)
+    else:
+        print_info("フロントエンド(Web)のクリーンアップをスキップしました")
+
+    print()
+    if ask_yes_no("フロントエンド(Avatar)をクリーンアップしますか？", default="y"):
+        cleanup_frontend_avatar(base_dir)
+    else:
+        print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
+
+    print()
+    if ask_yes_no("フロントエンド(GUI)をクリーンアップしますか？", default="y"):
+        cleanup_frontend_gui(base_dir)
+    else:
+        print_info("フロントエンド(GUI)のクリーンアップをスキップしました")
 
     print()
     print_header("クリーンアップ完了")

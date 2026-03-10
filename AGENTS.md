@@ -1,4 +1,4 @@
-﻿# プロジェクト全体方針 (AGENTS.md)
+# プロジェクト全体方針 (AGENTS.md)
 
 ## 本書の目的
 
@@ -18,13 +18,13 @@
 
 **バックエンドサーバーとフロントエンドサーバーの詳細は別ドキュメント：**
 - **バックエンド（FastAPI + SQLAlchemy + SQLite）の実装詳細** → [backend_server/AGENTS.md](./backend_server/AGENTS.md)
-- **フロントエンド（Vue 3 + Vite + TypeScript）の実装詳細** → [frontend_server/AGENTS.md](./frontend_server/AGENTS.md)
+- **フロントエンド（Vue 3 + Vite + TypeScript）の実装詳細** → [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 
 **関連ドキュメント：**
 - **[./CLAUDE.md](./CLAUDE.md)** - Claude Code向けインデックス（クイックスタート、アーキテクチャサマリー）
 - **[./docs/](./docs/)** - HTML形式の詳細ドキュメント（コーディングルール、実装例など）
 - **[./backend_server/AGENTS.md](./backend_server/AGENTS.md)** - バックエンド実装の完全ガイド
-- **[./frontend_server/AGENTS.md](./frontend_server/AGENTS.md)** - フロントエンド実装の完全ガイド
+- **[./frontend_web/AGENTS.md](./frontend_web/AGENTS.md)** - フロントエンド実装の完全ガイド
 
 **このファイルの内容：**
 - AiDiyとは何か（プロジェクトの目的と特徴）
@@ -337,7 +337,7 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 
 **詳細は [backend_server/AGENTS.md](backend_server/AGENTS.md) を参照**
 
-### フロントエンド (frontend_server/)
+### フロントエンド (frontend_web/)
 
 Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 
@@ -360,7 +360,7 @@ Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 - レイアウトシステム (_Layout, _TopBar, _TopMenu)
 - WebSocket統合 (AIコアWebSocket)
 
-**詳細は [frontend_server/AGENTS.md](frontend_server/AGENTS.md) を参照**
+**詳細は [frontend_web/AGENTS.md](frontend_web/AGENTS.md) を参照**
 
 ## Development Commands
 
@@ -391,7 +391,7 @@ cd backend_server
 .venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
 # フロントエンドのみ（プロジェクトルートから）
-cd frontend_server
+cd frontend_web
 npm run dev
 ```
 
@@ -399,7 +399,7 @@ npm run dev
 Press F5 in VS Code:
 - Root `.vscode/launch.json`: Runs `_start.py` with full stack
 - `backend_server/.vscode/launch.json`: バックエンドのみ（debugpy）
-- `frontend_server/.vscode/launch.json`: フロントエンドのみ（Chromeデバッグ）
+- `frontend_web/.vscode/launch.json`: フロントエンドのみ（Chromeデバッグ）
 
 ### バックエンドのコード変更を反映する方法
 
@@ -437,7 +437,7 @@ uv add <package> # Add new dependency
 
 **フロントエンド（Node.js + npm + TypeScript）:**
 ```bash
-cd frontend_server
+cd frontend_web
 npm install        # Install dependencies
 npm run dev        # Start dev server
 npm run build      # Type-check and build for production
@@ -495,10 +495,10 @@ backend_server/_data/AiDiy/database.db
 - **初期データ投入の条件**: `core_crud.init_db_data()` は **admin が未存在のときだけ** C利用者を投入します。既存DBでは自動更新されません。
 - **DBファイル位置**: `backend_server/_data/AiDiy/database.db`（core_main / apps_main で共有）。
 - **_start.py の起動挙動**: `uvicorn --reload` は付かないため、バックエンドは自動リロードされません（手動再起動 or reboot_core/reboot_apps.txt を利用）。
-- **ポート変更の連動修正**: `frontend_server/vite.config.ts` の `server.port` を変える場合、`backend_server/core_main.py` と `apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要。
+- **ポート変更の連動修正**: `frontend_web/vite.config.ts` の `server.port` を変える場合、`backend_server/core_main.py` と `apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要。
 - **_setup.py の案内文**: `_setup.py` のセットアップ完了メッセージは `python _start.py` を正確に表示するよう修正されましたが、以前のバージョンでは `python start.py` と表示されることがあったため、注意点として記載しています。実ファイルは **`_start.py`** です。
 
-**Vite Proxy Configuration** (`frontend_server/vite.config.ts`):
+**Vite Proxy Configuration** (`frontend_web/vite.config.ts`):
 - `/core/*` → `http://127.0.0.1:8091` (core_main - コア機能)
 - `/apps/*` → `http://127.0.0.1:8092` (apps_main - アプリ機能)
 
@@ -526,7 +526,7 @@ lsof -ti:8091 | xargs kill -9
 | **401 Unauthorized** | API calls fail with 401, redirected to login | JWT token expired or invalid. Check `localStorage` for token, re-login if needed |
 | **CORS errors** | "blocked by CORS policy" in browser console | Verify origin in `core_main.py` and `apps_main.py` allowed list: `localhost:8090`, `localhost:5173`, `localhost:3000` |
 | **Module not found (Python)** | `ModuleNotFoundError` when starting backend | Run `cd backend_server && uv sync` to install dependencies |
-| **Module not found (npm)** | Vite build errors or missing packages | Run `cd frontend_server && npm install` |
+| **Module not found (npm)** | Vite build errors or missing packages | Run `cd frontend_web && npm install` |
 | **Database locked** | `sqlite3.OperationalError: database is locked` | Close any SQLite browser/tools accessing `database.db` |
 | **Tables not created** | API errors about missing tables | Restart backend servers (core_main and apps_main) - tables auto-create on startup |
 | **Auto-restart loop** | `_start.py` restarts servers repeatedly | Check for Python/Node errors in console. Servers restart 15 seconds after crash. Fix the underlying error to stop the loop |
@@ -549,7 +549,7 @@ No automated test suites are configured. Testing is done manually:
 実装の詳細は各サブAGENTS.mdを参照：
 
 - **[./backend_server/AGENTS.md](./backend_server/AGENTS.md)** - バックエンド実装詳細（API/DB/認証/初期データ/追加手順）
-- **[./frontend_server/AGENTS.md](./frontend_server/AGENTS.md)** - フロントエンド実装詳細（画面/routing/認証/追加手順）
+- **[./frontend_web/AGENTS.md](./frontend_web/AGENTS.md)** - フロントエンド実装詳細（画面/routing/認証/追加手順）
 
 ## Additional Notes
 

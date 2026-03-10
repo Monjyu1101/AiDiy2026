@@ -132,7 +132,7 @@
   - `cancel_run`（中断完了通知）
     - `メッセージ内容`: `"処理中断！"`
 
-補足（`frontend_server/src/components/AIコア/compornents/AIコード.vue` の表示実装）:
+補足（`frontend_web/src/components/AIコア/compornents/AIコード.vue` の表示実装）:
 
 - 画面表示対象: `input_text`, `input_request`, `input_file`, `output_text`, `output_file`, `welcome_text`
 - `output_stream` はストリーム表示として受信し、画面上は `output_text` 系表示で扱う

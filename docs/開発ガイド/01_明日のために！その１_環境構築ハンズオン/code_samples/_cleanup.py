@@ -25,7 +25,7 @@ BACKEND_PATH = "backend_server" # バックエンドフォルダ名
 BACKEND_ENV_LIST = [".venv", "venv"] # Python環境: ".venv" または "venv" (uv使用)
 
 # フロントエンド設定
-FRONTEND_PATH = "frontend_server" # フロントエンドフォルダパス
+FRONTEND_PATH = "frontend_web" # フロントエンドフォルダパス
 
 # データベース設定
 DATABASE_TYPE = "sqlite" # "postgresql" or "sqlite"

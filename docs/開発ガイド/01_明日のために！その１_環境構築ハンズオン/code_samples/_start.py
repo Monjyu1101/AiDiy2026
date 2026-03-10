@@ -78,7 +78,7 @@ BACKEND_APPS_APP = "apps_main:app" # appsサーバーアプリケーションモ
 BACKEND_ENV_CANDIDATES = [".venv", "venv"] # venv フォルダ候補 (優先順)
 
 # フロントエンド設定
-FRONTEND_PATH = "frontend_server" # フロントエンドフォルダパス
+FRONTEND_PATH = "frontend_web" # フロントエンドフォルダパス
 FRONTEND_PORT = 8090 # フロントエンドポート番号
 FRONTEND_COMMAND = "npm" # パッケージマネージャ: "npm" or "pnpm" or "yarn"
 

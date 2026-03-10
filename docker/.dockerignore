@@ -62,8 +62,8 @@ docker/ssl/
 .gitignore
 
 # Node modules (will be installed in container)
-frontend_server/node_modules/
+frontend_web/node_modules/
 node_modules/
 
 # Frontend build output (will be built in container)
-frontend_server/dist/
+frontend_web/dist/

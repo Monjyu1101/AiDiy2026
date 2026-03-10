@@ -24,7 +24,7 @@ sleep 2
 
 # Start Frontend server with simple HTTP server
 echo "[3/3] Starting Frontend (port 8090)..."
-cd /app/frontend_server/dist
+cd /app/frontend_web/dist
 python -m http.server 8090 &
 FRONTEND_PID=$!
 

@@ -20,16 +20,16 @@ RUN pip install --no-cache-dir .
 # Stage 2: Frontend build
 FROM node:20-alpine AS frontend-builder
 
-WORKDIR /app/frontend_server
+WORKDIR /app/frontend_web
 
 # Copy package files
-COPY frontend_server/package*.json ./
+COPY frontend_web/package*.json ./
 
 # Install dependencies
 RUN npm ci
 
 # Copy frontend source
-COPY frontend_server/ ./
+COPY frontend_web/ ./
 
 # Build frontend
 RUN npm run build
@@ -57,8 +57,8 @@ COPY --from=backend-builder /usr/local/bin /usr/local/bin
 COPY backend_server/ /app/backend_server/
 
 # Copy built frontend files
-COPY --from=frontend-builder /app/frontend_server/dist /app/frontend_server/dist
-COPY --from=frontend-builder /app/frontend_server/public /app/frontend_server/public
+COPY --from=frontend-builder /app/frontend_web/dist /app/frontend_web/dist
+COPY --from=frontend-builder /app/frontend_web/public /app/frontend_web/public
 
 # Create necessary directories
 RUN mkdir -p /app/temp /app/_data

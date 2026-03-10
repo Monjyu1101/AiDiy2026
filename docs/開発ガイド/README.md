@@ -1,4 +1,4 @@
-﻿# このプロジェクトの歩き方
+# このプロジェクトの歩き方
 
 > **フルスタックで保守できる人材になるための道しるべ**
 
@@ -232,7 +232,7 @@ cd workspace/AiDiy2026/base_server
 uv run uvicorn baseapp.main:app --port 8081 --reload
 
 # フロントエンドのみ
-cd workspace/AiDiy2026/frontend_server/base-vue
+cd workspace/AiDiy2026/frontend_web/base-vue
 npm run dev
 ```
 
@@ -541,7 +541,7 @@ def test_login_success(client):
 |-------------|------|-----------|
 | **`workspace/AiDiy2026/AGENTS.md`** | プロジェクト概要、起動方法、クイックスタート | 最初に読む |
 | **`workspace/AiDiy2026/backend_server/AGENTS.md`** | バックエンド詳細、アーキテクチャ、マイグレーション、コーディング規約 | バックエンド開発時 |
-| **`workspace/AiDiy2026/frontend_server/AGENTS.md`** | フロントエンド詳細、コンポーネント構造、API通信実装、命名規則 | フロントエンド開発時 |
+| **`workspace/AiDiy2026/frontend_web/AGENTS.md`** | フロントエンド詳細、コンポーネント構造、API通信実装、命名規則 | フロントエンド開発時 |
 | **本書（`docs\開発ガイド\README.md`）** | 全体の歩き方、学習の道しるべ | 初学者、全体像を掴みたいとき |
 | **`base_server\tests\README.md`** | テストの書き方、実行方法 | テスト実装時 |
 

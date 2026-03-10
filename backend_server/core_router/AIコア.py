@@ -292,7 +292,7 @@ def 取得_コードベース選択肢(アプリ設定=None) -> dict:
         候補 = []
         候補.append(("../", "プロジェクトルート"))
         候補.append(("../backend_server", "backend_server"))
-        候補.append(("../frontend_server", "frontend_server"))
+        候補.append(("../frontend_web", "frontend_web"))
         候補.append(("../docs", "docs"))
 
         for 相対パス, 表示名 in 候補:

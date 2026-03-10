@@ -1,6 +1,6 @@
 ■ M商品画面（実装済み）で参照するファイル
 
-frontend_server/src/
+frontend_web/src/
 ├── components/
 │ ├── Mマスタ/
 │ │ ├── Mマスタ.vue # メニューカード配置

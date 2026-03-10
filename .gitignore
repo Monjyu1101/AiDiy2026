@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -98,9 +98,12 @@ backend_server/_data/**
 
 # Node
 node_modules/
-frontend_server/node_modules/
+frontend_web/node_modules/
+frontend_avatar/node_modules/
 dist/
-frontend_server/dist/
+frontend_web/dist/
+frontend_avatar/dist/
+frontend_avatar/dist-electron/
 .npm
 .node_repl_history
 *.tgz
@@ -154,4 +157,3 @@ aidiy/temp/sandbox/
 *config*key*
 AZiP*.*
 firiend*
-

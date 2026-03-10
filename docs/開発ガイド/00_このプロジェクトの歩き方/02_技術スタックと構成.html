@@ -223,7 +223,7 @@
    database.db # SQLiteデータベースファイル
   AGENTS.md
 
- frontend_server/ # フロントエンドサーバー
+ frontend_web/ # フロントエンドサーバー
   src/
    main.ts # アプリケーションエントリポイント
    App.vue # ルートコンポーネント
@@ -267,7 +267,7 @@
  <td>SQLiteデータベースファイルの格納場所</td>
  </tr>
  <tr>
- <td><code>frontend_server/src/components/</code></td>
+ <td><code>frontend_web/src/components/</code></td>
  <td>Vue コンポーネント（カテゴリ別に整理）</td>
  </tr>
  <tr>
@@ -317,7 +317,7 @@
  <li>Viteの設定で <code>localhost:8091</code> と <code>localhost:8092</code> に振り分け</li>
  <li>全てのAPI操作は<strong>POST</strong>メソッドを使用</li>
  </ul>
- <p>詳細は <code>frontend_server/vite.config.ts</code> を参照してください。</p>
+ <p>詳細は <code>frontend_web/vite.config.ts</code> を参照してください。</p>
  </div>
 
  <div>
@@ -333,7 +333,7 @@
  <div>
  <strong>ポート変更時の注意</strong>
  <p>
- フロントエンドのポートを変更する場合、<code>frontend_server/vite.config.ts</code> の <code>server.port</code> だけでなく、
+ フロントエンドのポートを変更する場合、<code>frontend_web/vite.config.ts</code> の <code>server.port</code> だけでなく、
  以下の設定も連動して更新する必要があります。
  </p>
  <ul>

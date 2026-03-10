@@ -18,7 +18,7 @@ services:
       # Mount config directory for API keys
       - ../backend_server/_config:/app/backend_server/_config:ro
       # Share frontend dist with nginx
-      - frontend-dist:/app/frontend_server/dist
+      - frontend-dist:/app/frontend_web/dist
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONIOENCODING=utf-8

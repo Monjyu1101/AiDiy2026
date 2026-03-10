@@ -197,7 +197,7 @@ python _start.py</code></pre>
 .venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092</code></pre>
 
  <h3>フロントエンド</h3>
- <pre><code>cd workspace/AiDiy2026/frontend_server
+ <pre><code>cd workspace/AiDiy2026/frontend_web
 npm run dev</code></pre>
 
  <div>
@@ -249,7 +249,7 @@ python _stop.py --backend=no --frontend=yes</code></pre>
  <td>core_main.py / apps_main.py を個別にデバッグ起動（debugpy）</td>
  </tr>
  <tr>
- <td><code>frontend_server/.vscode/launch.json</code></td>
+ <td><code>frontend_web/.vscode/launch.json</code></td>
  <td>Vite dev server を起動し、Chrome でデバッグ</td>
  </tr>
  </tbody>
@@ -326,7 +326,7 @@ python _stop.py --backend=no --frontend=yes</code></pre>
  <td><strong>APIが404エラーを返す</strong></td>
  <td>
  プロキシ設定を確認してください。<br>
- <code>frontend_server/vite.config.ts</code> のプロキシ設定が正しいか確認
+ <code>frontend_web/vite.config.ts</code> のプロキシ設定が正しいか確認
  </td>
  </tr>
  <tr>
@@ -342,7 +342,7 @@ python _stop.py --backend=no --frontend=yes</code></pre>
  <td>
  依存関係を再インストールしてください。<br>
  <code>cd backend_server && uv sync</code><br>
- <code>cd frontend_server && npm install</code>
+ <code>cd frontend_web && npm install</code>
  </td>
  </tr>
  </tbody>

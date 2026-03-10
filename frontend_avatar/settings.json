@@ -1,9 +1,0 @@
-{
-  "avatar_name": "AiDiy Avatar",
-  "auth_base_url": "http://localhost:8091",
-  "display_backend": "three-vrm",
-  "start_position": "bottom-right",
-  "vrm_path": "アバター制御/vrm/VRoid_V110_Female_v1.1.3.vrm",
-  "vrm_window_width": 320,
-  "vrm_window_height": 320
-}
