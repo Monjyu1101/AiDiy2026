@@ -98,8 +98,11 @@ const audioSocket = shallowRef<AIWebSocket | null>(null)
 const audioController = shallowRef<AudioController | null>(null)
 const fileRef = ref<{ 接続済み: boolean; 読込中: boolean; ファイルリスト要求: () => void } | null>(null)
 const imageRef = ref<{ 接続状態: 'disconnected' | 'connecting' | 'sending'; 状態表示テキスト: string; WebSocket接続中: boolean } | null>(null)
+const chatRef = ref<{ WebSocket接続中: boolean; チャット接続済み: boolean } | null>(null)
 const codeRef = ref<{ WebSocket接続中: boolean; 接続状態表示: string; 出力接続済み: boolean } | null>(null)
 const subtitleText = ref('')
+const imageAutoShowSelection = ref(true)
+const 認証エラーメッセージKey = 'avatar_auth_error'
 let subtitleTimer: ReturnType<typeof setTimeout> | null = null
 
 function setSubtitle(text: string) {
@@ -119,11 +122,12 @@ const currentPanelKey = computed<PanelKey | null>(() => {
   return PANEL_KEYS.includes(windowRole.value as PanelKey) ? (windowRole.value as PanelKey) : null
 })
 const userLabel = computed(() => user.value?.利用者名 || user.value?.利用者ID || '未ログイン')
-const connectionReady = computed(() => inputConnected.value && chatConnected.value)
+const connectionReady = computed(() => {
+  return inputConnected.value && (!panelVisibility.value.chat || chatConnected.value)
+})
 const transportState = computed(() => {
-  if (connectionReady.value && audioConnected.value) return '接続中'
+  if (audioConnected.value) return '接続中'
   if (coreBusy.value) return '接続中...'
-  if (inputConnected.value || chatConnected.value || audioConnected.value) return '部分接続'
   return '切断'
 })
 
@@ -273,6 +277,20 @@ function handleDesktopChannelMessage(event: MessageEvent) {
 
     if (payload.type === 'set-chat-mode' && チャットモード一覧.includes(payload.mode as チャットモード)) {
       chatMode.value = payload.mode
+      return
+    }
+
+    if (payload.type === 'chat-state' && typeof payload.connected === 'boolean') {
+      chatConnected.value = payload.connected
+      return
+    }
+
+    if (
+      payload.type === 'chat-subtitle'
+      && (payload.messageType === 'welcome_text' || payload.messageType === 'output_text' || payload.messageType === 'recognition_output')
+      && typeof payload.text === 'string'
+    ) {
+      setSubtitle(payload.text)
     }
     return
   }
@@ -378,10 +396,15 @@ function clearAuth(message = '') {
   localStorage.removeItem('token')
   localStorage.removeItem('user')
   localStorage.removeItem('avatar_session_id')
+  if (message) {
+    localStorage.setItem(認証エラーメッセージKey, message)
+  } else {
+    localStorage.removeItem(認証エラーメッセージKey)
+  }
   sessionId.value = ''
   disconnectCore()
   windowRole.value = 'login'
-  void window.desktopApi?.setWindowMode?.('login')
+  void window.desktopApi?.openLoginWindow?.()
 }
 
 function attachSocketState(client: AIWebSocket, target: typeof inputConnected) {
@@ -473,54 +496,6 @@ async function initializeCore(preferredSessionId = '') {
     localStorage.setItem('avatar_session_id', nextSessionId)
     inputSocket.value = nextInputSocket
 
-    const nextChatSocket = new AIWebSocket(AI_WS_ENDPOINT, nextSessionId, '0')
-    attachSocketState(nextChatSocket, chatConnected)
-    nextChatSocket.on('welcome_info', (message) => {
-      welcomeInfo.value = String(message.メッセージ内容 || '').trim()
-    })
-    nextChatSocket.on('welcome_text', (message) => {
-      const text = String(message.メッセージ内容 || '')
-      pushMessage('system', text)
-      setSubtitle(text)
-    })
-    nextChatSocket.on('input_text', (message) => {
-      pushMessage('user', String(message.メッセージ内容 || ''))
-    })
-    nextChatSocket.on('input_request', (message) => {
-      pushMessage('input-request', String(message.メッセージ内容 || ''))
-    })
-    nextChatSocket.on('input_file', (message) => {
-      pushMessage('input-file', '', {
-        fileName: message.ファイル名 ?? null,
-        thumbnail: message.サムネイル画像 ?? null,
-      })
-    })
-    nextChatSocket.on('output_text', (message) => {
-      const text = String(message.メッセージ内容 || '')
-      pushMessage('assistant', text)
-      setSubtitle(text)
-    })
-    nextChatSocket.on('output_request', (message) => {
-      pushMessage('output-request', String(message.メッセージ内容 || ''))
-    })
-    nextChatSocket.on('output_file', (message) => {
-      pushMessage('output-file', '', {
-        fileName: message.ファイル名 ?? null,
-        thumbnail: message.サムネイル画像 ?? null,
-      })
-    })
-    nextChatSocket.on('output_stream', handleOutputStream)
-    nextChatSocket.on('recognition_input', (message) => {
-      pushMessage('recognition-user', String(message.メッセージ内容 || ''))
-    })
-    nextChatSocket.on('recognition_output', (message) => {
-      const text = String(message.メッセージ内容 || '')
-      pushMessage('recognition-assistant', text)
-      setSubtitle(text)
-    })
-    await nextChatSocket.connect()
-    chatSocket.value = nextChatSocket
-
     const nextAudioSocket = new AIWebSocket(AI_WS_ENDPOINT, nextSessionId, 'audio')
     attachSocketState(nextAudioSocket, audioConnected)
     nextAudioSocket.on('output_audio', (message) => {
@@ -566,7 +541,13 @@ function syncOperationState() {
       ボタン: {
         マイク: micEnabled.value,
         スピーカー: speakerEnabled.value,
-        チャット: true,
+        ファイル: panelVisibility.value.file,
+        チャット: panelVisibility.value.chat,
+        エージェント1: panelVisibility.value.code1,
+        イメージ: panelVisibility.value.image,
+        エージェント2: panelVisibility.value.code2,
+        エージェント3: panelVisibility.value.code3,
+        エージェント4: panelVisibility.value.code4,
         チャットモード: chatMode.value.toLowerCase(),
       },
     },
@@ -599,13 +580,11 @@ async function submitLogin(payload: { 利用者ID: string; パスワード: stri
     token.value = response.data.data.access_token
     localStorage.setItem('token', token.value)
     localStorage.setItem('avatar_last_user', payload.利用者ID)
+    localStorage.removeItem('user')
+    localStorage.removeItem(認証エラーメッセージKey)
     localStorage.removeItem('avatar_session_id')
     sessionId.value = ''
-    await fetchCurrentUser()
-    windowRole.value = 'core'
-    await window.desktopApi?.setWindowMode?.('core')
-    await refreshPanelStates()
-    await initializeCore('')
+    await window.desktopApi?.openCoreWindow?.()
   } catch (error) {
     authError.value = error instanceof Error ? error.message : 'ログインエラーが発生しました。'
   } finally {
@@ -643,14 +622,57 @@ function toggleSpeaker() {
 }
 
 async function togglePanel(panel: PanelKey) {
-  const states = await window.desktopApi?.togglePanel?.(panel)
-  if (states) {
-    updatePanelStates(states)
+  const optimisticStates = {
+    ...panelVisibility.value,
+    [panel]: !panelVisibility.value[panel],
   }
+  updatePanelStates(optimisticStates)
+
+  try {
+    const states = await window.desktopApi?.togglePanel?.(panel)
+    if (states) {
+      updatePanelStates(states)
+    }
+  } catch {
+    updatePanelStates({
+      ...optimisticStates,
+      [panel]: !optimisticStates[panel],
+    })
+  }
+}
+
+async function handleImageSelectionCancel() {
+  imageAutoShowSelection.value = false
+  if (currentPanelKey.value === 'image') {
+    const states = await window.desktopApi?.togglePanel?.('image')
+    if (states) {
+      updatePanelStates(states)
+    }
+  }
+}
+
+function handleImageSelectionComplete() {
+  imageAutoShowSelection.value = false
 }
 
 async function reconnect() {
   await initializeCore(sessionId.value || '')
+}
+
+function relayChatState(connected: boolean) {
+  if (isCoreWindow.value) {
+    chatConnected.value = connected
+    return
+  }
+  desktopChannel?.postMessage({ type: 'chat-state', connected })
+}
+
+function relayChatSubtitle(payload: { type: 'welcome_text' | 'output_text' | 'recognition_output'; text: string }) {
+  if (isCoreWindow.value) {
+    setSubtitle(payload.text)
+    return
+  }
+  desktopChannel?.postMessage({ type: 'chat-subtitle', messageType: payload.type, text: payload.text })
 }
 
 function sendInputPayload(message: Record<string, unknown>) {
@@ -802,6 +824,11 @@ watch(chatMode, () => {
   syncOperationState()
 })
 
+watch(panelVisibility, () => {
+  if (!isCoreWindow.value) return
+  syncOperationState()
+}, { deep: true })
+
 watch(speakerEnabled, (enabled) => {
   audioController.value?.setSpeakerEnabled(enabled)
 })
@@ -870,15 +897,21 @@ onMounted(async () => {
   await refreshPanelStates()
 
   if (!token.value) {
+    authError.value = localStorage.getItem(認証エラーメッセージKey) || ''
+    if (authError.value) {
+      localStorage.removeItem(認証エラーメッセージKey)
+    }
     loadingAuth.value = false
-    await window.desktopApi?.setWindowMode?.('login')
     return
   }
 
   try {
+    if (isLoginWindow.value) {
+      await window.desktopApi?.openCoreWindow?.()
+      return
+    }
+
     await fetchCurrentUser()
-    windowRole.value = 'core'
-    await window.desktopApi?.setWindowMode?.('core')
     await initializeCore(sessionId.value || '')
   } catch {
     clearAuth()
@@ -903,7 +936,7 @@ onBeforeUnmount(() => {
   <main class="app-root">
     <component
       :is="ログイン"
-      v-if="isLoginWindow && !isAuthenticated && !loadingAuth"
+      v-if="isLoginWindow && (!isAuthenticated || authBusy) && !loadingAuth"
       :loading="authBusy"
       :error-message="authError"
       :versions="versions"
@@ -943,22 +976,25 @@ onBeforeUnmount(() => {
       theme="purple"
     >
       <template #title-right>
-        <span :class="['chat-status-dot', displayInputConnected && displayChatConnected ? 'on' : '']"></span>
-        <span class="chat-status-text">{{ displayInputConnected && displayChatConnected ? '接続中' : '切断' }}</span>
+        <span :class="['chat-status-dot', chatRef?.WebSocket接続中 ? 'on' : '']"></span>
+        <span class="chat-status-text">{{ chatRef?.WebSocket接続中 ? '接続中' : '切断' }}</span>
       </template>
 
       <component
         :is="AIチャット"
+        ref="chatRef"
         :messages="displayMessages"
         :welcome-info="displayWelcomeInfo"
         :session-id="displaySessionId"
+        :active="panelVisibility.chat"
         :mode="displayChatMode"
         :input-connected="displayInputConnected"
         :chat-connected="displayChatConnected"
         :model-settings="displayModelSettings"
-        @submit="sendMessageFromWindow"
+        @send-input-payload="sendInputPayloadFromWindow"
         @update:mode="updateChatMode"
-        @drop-files="handleChatFileDrop"
+        @chat-state="relayChatState"
+        @subtitle-message="relayChatSubtitle"
       />
     </component>
 
@@ -973,7 +1009,13 @@ onBeforeUnmount(() => {
         <span class="file-status-text">{{ fileRef?.接続済み ? '接続中' : '切断' }}</span>
         <button class="file-reload-btn" type="button" :disabled="fileRef?.読込中" @click="fileRef?.ファイルリスト要求()">↺</button>
       </template>
-      <component :is="AIファイル" ref="fileRef" :session-id="displaySessionId" :active="panelVisibility.file" />
+      <component
+        :is="AIファイル"
+        ref="fileRef"
+        :session-id="displaySessionId"
+        :active="panelVisibility.file"
+        @send-input-payload="sendInputPayloadFromWindow"
+      />
     </component>
 
     <component
@@ -997,9 +1039,11 @@ onBeforeUnmount(() => {
         :session-id="displaySessionId"
         :input-connected="displayInputConnected"
         :active="panelVisibility.image"
-        :auto-show-selection="panelVisibility.image"
+        :auto-show-selection="imageAutoShowSelection"
         @submit-image="handleImageSubmit"
         @submit-text="handleImageTextSubmit"
+        @selection-cancel="handleImageSelectionCancel"
+        @selection-complete="handleImageSelectionComplete"
       />
     </component>
 
@@ -1019,6 +1063,7 @@ onBeforeUnmount(() => {
         ref="codeRef"
         :session-id="displaySessionId"
         :channel="currentCodeChannel"
+        :active="currentPanelKey ? panelVisibility[currentPanelKey] : false"
         :code-ai="currentCodeModel"
         :input-connected="displayInputConnected"
         @submit="handleCodeSubmit"

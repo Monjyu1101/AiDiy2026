@@ -21,14 +21,22 @@ const パスワード = ref('********')
 function submit() {
   emit('submit', { 利用者ID: 利用者ID.value, パスワード: パスワード.value })
 }
+
+function minimizeWindow() {
+  void window.desktopApi?.minimizeCurrentWindow?.()
+}
 </script>
 
 <template>
   <section class="login-shell">
     <form class="login-card" @submit.prevent="submit">
       <div class="title-bar" title="ここをドラッグして移動">
-        <span class="title-dot"></span>
-        <p class="title-text">AiDiy Desktop Avatar</p>
+        <div class="title-left">
+          <strong>AiDiy Desktop Avatar</strong>
+        </div>
+        <div class="title-right">
+          <button class="close-button" type="button" title="最小化" @click="minimizeWindow">−</button>
+        </div>
       </div>
 
       <div class="card-head">
@@ -81,44 +89,61 @@ function submit() {
 }
 
 .title-bar {
-  height: 18px;
+  height: 28px;
   margin: 0 -4px 4px;
   padding: 0 8px;
-  border-radius: 0;
   border-bottom: 1px solid rgba(93, 68, 168, 0.95);
   background: linear-gradient(135deg, rgba(108, 78, 196, 0.94), rgba(143, 104, 221, 0.9));
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 10px;
   cursor: move;
   -webkit-app-region: drag;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -1px 0 rgba(44, 24, 101, 0.28);
+    inset 0 -1px 0 rgba(44, 24, 101, 0.3);
 }
 
-.title-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(246, 241, 255, 0.96);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.38);
-  flex: 0 0 auto;
+.title-left,
+.title-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
-.title-text {
-  margin: 0;
-  font-size: 0.6rem;
+.title-left strong {
+  font-size: 0.74rem;
   line-height: 1;
-  color: rgba(248, 244, 255, 0.96);
-  letter-spacing: 0.04em;
-  user-select: none;
-  text-shadow: 0 1px 4px rgba(47, 24, 99, 0.32);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.title-right {
+  -webkit-app-region: no-drag;
+}
+
+.close-button {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
 }
 
 .card-eyebrow {
   margin: 0;
-  font-size: 0.6rem;
+  font-size: 0.78rem;
   letter-spacing: 0.04em;
   font-weight: 700;
   color: rgba(221, 209, 255, 0.94);
@@ -127,12 +152,17 @@ function submit() {
 }
 
 .card-head {
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
 .field {
   display: block;
-  margin-top: 5px;
+  margin-top: 6px;
+  padding: 0 8px;
+}
+
+.field:last-of-type {
+  margin-bottom: 16px;
 }
 
 .field input {
@@ -164,7 +194,7 @@ function submit() {
 }
 
 .error-box {
-  margin: 6px 0 0;
+  margin: 0 8px 8px;
   padding: 5px 6px;
   border-radius: 0;
   background: rgba(127, 29, 29, 0.18);
@@ -177,8 +207,8 @@ function submit() {
 }
 
 .login-button {
-  width: 72%;
-  margin-top: 6px;
+  width: 60%;
+  margin-top: 0;
   margin-left: auto;
   margin-right: auto;
   display: block;

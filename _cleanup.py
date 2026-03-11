@@ -9,7 +9,6 @@
 - バックエンド(core,apps): `backend_server`
 - フロントエンド(Web): `frontend_web`
 - フロントエンド(Avatar): `frontend_avatar`
-- フロントエンド(GUI): `frontend_gui`
 
 Usage:
     python _cleanup.py
@@ -33,9 +32,6 @@ FRONTEND_WEB_PATH = "frontend_web"
 
 FRONTEND_AVATAR_PATH = "frontend_avatar"
 FRONTEND_AVATAR_BUILD_DIRS = ["dist", "dist-electron"]
-
-FRONTEND_GUI_PATH = "frontend_gui"
-FRONTEND_GUI_ENV_LIST = [".venv", "venv"]
 
 DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
@@ -211,6 +207,8 @@ def cleanup_backend(base_dir: Path):
             if ask_yes_no(f"  {BACKEND_PATH}/{env_name} を削除しますか？", default="y"):
                 if remove_directory(env_dir, f"{env_name} ({label})"):
                     deleted_count += 1
+                else:
+                    print_error(f"  {BACKEND_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
             else:
                 print_info(f"  {BACKEND_PATH}/{env_name} はそのまま残します")
 
@@ -259,6 +257,8 @@ def cleanup_frontend_web(base_dir: Path):
     node_modules_dir = web_dir / "node_modules"
     if remove_directory(node_modules_dir, f"node_modules ({label})"):
         deleted_count += 1
+    elif node_modules_dir.exists():
+        print_error(f"  node_modules 削除失敗。手動で削除してください: {node_modules_dir}")
 
     dist_dir = web_dir / "dist"
     if remove_directory(dist_dir, f"dist ({label})"):
@@ -284,46 +284,13 @@ def cleanup_frontend_avatar(base_dir: Path):
     node_modules_dir = avatar_dir / "node_modules"
     if remove_directory(node_modules_dir, f"node_modules ({label})"):
         deleted_count += 1
+    elif node_modules_dir.exists():
+        print_error(f"  node_modules 削除失敗。手動で削除してください: {node_modules_dir}")
 
     for build_dir_name in FRONTEND_AVATAR_BUILD_DIRS:
         build_dir = avatar_dir / build_dir_name
         if remove_directory(build_dir, f"{build_dir_name} ({label})"):
             deleted_count += 1
-
-    if deleted_count > 0:
-        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
-    else:
-        print_info(f"{label}: 削除対象はありませんでした")
-
-
-def cleanup_frontend_gui(base_dir: Path):
-    label = "フロントエンド(GUI)"
-    print_header(f"{label} のクリーンアップ")
-
-    gui_dir = base_dir / FRONTEND_GUI_PATH
-    if not gui_dir.exists():
-        print_warning(f"{label} のフォルダが見つかりません")
-        return
-
-    deleted_count = cleanup_common_python_caches(gui_dir, label)
-
-    logs_dir = gui_dir / "temp" / "logs"
-    if logs_dir.exists():
-        if ask_yes_no(f"  {FRONTEND_GUI_PATH}/temp/logs の中身をクリアしますか？", default="y"):
-            if clean_directory_contents(logs_dir, f"temp/logs ({label})"):
-                deleted_count += 1
-        else:
-            print_info(f"  {FRONTEND_GUI_PATH}/temp/logs はそのまま残します")
-
-    print_info(f"{label}: 削除対象の仮想環境リスト: {', '.join(FRONTEND_GUI_ENV_LIST)}")
-    for env_name in FRONTEND_GUI_ENV_LIST:
-        env_dir = gui_dir / env_name
-        if env_dir.exists():
-            if ask_yes_no(f"  {FRONTEND_GUI_PATH}/{env_name} を削除しますか？", default="y"):
-                if remove_directory(env_dir, f"{env_name} ({label})"):
-                    deleted_count += 1
-            else:
-                print_info(f"  {FRONTEND_GUI_PATH}/{env_name} はそのまま残します")
 
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
@@ -376,7 +343,6 @@ def main():
     print_info("  1. バックエンド(core,apps)")
     print_info("  2. フロントエンド(Web)")
     print_info("  3. フロントエンド(Avatar)")
-    print_info("  4. フロントエンド(GUI)")
     print()
 
     run_cleanup, AUTO_MODE = ask_start_mode("クリーンアップを実行しますか？", default="n")
@@ -416,12 +382,6 @@ def main():
         cleanup_frontend_avatar(base_dir)
     else:
         print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
-
-    print()
-    if ask_yes_no("フロントエンド(GUI)をクリーンアップしますか？", default="y"):
-        cleanup_frontend_gui(base_dir)
-    else:
-        print_info("フロントエンド(GUI)のクリーンアップをスキップしました")
 
     print()
     print_header("クリーンアップ完了")

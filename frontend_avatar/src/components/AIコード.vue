@@ -26,6 +26,7 @@ type 行データ = {
 
 const props = defineProps<{
   sessionId: string
+  active?: boolean
   channel: コードチャンネル
   codeAi: string
   inputConnected: boolean
@@ -55,7 +56,7 @@ let 出力WebSocket: AIWebSocket | null = null
 let messageSeq = 0
 let streamMessageId: string | null = null
 
-const WebSocket接続中 = computed(() => props.inputConnected && 出力接続済み.value)
+const WebSocket接続中 = computed(() => 出力接続済み.value)
 const 接続状態表示 = computed(() => (WebSocket接続中.value ? '接続中' : '切断'))
 
 // ===================== ターミナルエフェクト =====================
@@ -378,7 +379,15 @@ watch(
 
 watch(入力テキスト, () => nextTick(テキストエリア自動調整))
 
-watch(() => props.sessionId, () => { if (props.sessionId) void connectOutputSocket() })
+watch(() => props.sessionId, (sessionId) => {
+  if (sessionId) {
+    void connectOutputSocket()
+    return
+  }
+  出力WebSocket?.disconnect()
+  出力WebSocket = null
+  出力接続済み.value = false
+})
 
 onMounted(() => {
   if (props.sessionId) void connectOutputSocket()

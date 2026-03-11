@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { AI_WS_ENDPOINT } from '@/lib/config'
+import { AIWebSocket } from '@/lib/websocket'
 import type { ChatMessage, MessageKind, ModelSettings } from '@/types'
 
 type チャットモード = 'Chat' | 'Live' | 'Code1' | 'Code2' | 'Code3' | 'Code4'
@@ -8,6 +10,7 @@ const props = defineProps<{
   messages: ChatMessage[];
   welcomeInfo: string;
   sessionId: string;
+  active?: boolean;
   mode: チャットモード;
   inputConnected: boolean;
   chatConnected: boolean;
@@ -15,9 +18,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  submit: [text: string];
+  'send-input-payload': [message: Record<string, unknown>];
   'update:mode': [mode: チャットモード];
-  'drop-files': [files: File[]];
+  'chat-state': [connected: boolean];
+  'subtitle-message': [payload: { type: 'welcome_text' | 'output_text' | 'recognition_output'; text: string }];
 }>()
 
 const 入力テキスト = ref('')
@@ -39,7 +43,16 @@ const モード一覧: Array<{ value: チャットモード; label: string }> = 
   { value: 'Code4', label: 'Code4' },
 ]
 
-const WebSocket接続中 = computed(() => props.inputConnected && props.chatConnected)
+let チャットWebSocket: AIWebSocket | null = null
+let streamMessageId: string | null = null
+
+const ローカルチャット接続済み = ref(false)
+const ローカルWelcomeInfo = ref('')
+const ローカルメッセージ一覧 = ref<ChatMessage[]>([])
+
+const 表示WelcomeInfo = computed(() => ローカルWelcomeInfo.value || props.welcomeInfo)
+const 表示メッセージ一覧 = computed(() => ローカルメッセージ一覧.value)
+const WebSocket接続中 = computed(() => ローカルチャット接続済み.value)
 const 送信可能 = computed(() => WebSocket接続中.value && 入力テキスト.value.trim().length > 0)
 
 // --- ターミナルエフェクト ---
@@ -163,6 +176,150 @@ function 演出実行(messageId: string) {
   }
 
   tick()
+}
+
+function 新規メッセージID(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function pushMessage(kind: MessageKind, text: string, extra?: Partial<ChatMessage>) {
+  const normalized = String(text || '').trim()
+  if (!normalized && !extra?.fileName) return
+
+  ローカルメッセージ一覧.value.push({
+    id: 新規メッセージID(),
+    kind,
+    text: normalized,
+    timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+    ...extra,
+  })
+}
+
+function handleOutputStream(message: Record<string, any>) {
+  const content = String(message.メッセージ内容 || '').trim()
+  if (!content) return
+
+  if (content === '<<< 処理開始 >>>') {
+    const id = 新規メッセージID()
+    streamMessageId = id
+    ローカルメッセージ一覧.value.push({
+      id,
+      kind: 'stream',
+      text: `${content}\n`,
+      timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+      isStream: true,
+      isCollapsed: false,
+    })
+    return
+  }
+
+  if (content === '<<< 処理終了 >>>') {
+    const target = ローカルメッセージ一覧.value.find((m) => m.id === streamMessageId)
+    if (target) {
+      target.text += `${content}\n`
+      target.isCollapsed = true
+    }
+    streamMessageId = null
+    return
+  }
+
+  const target = ローカルメッセージ一覧.value.find((m) => m.id === streamMessageId)
+  if (target) {
+    target.text += `${content}\n`
+  }
+}
+
+function bindChatSocket(socket: AIWebSocket) {
+  socket.onStateChange((connected) => {
+    ローカルチャット接続済み.value = connected
+    emit('chat-state', connected)
+  })
+  socket.on('welcome_info', (message) => {
+    ローカルWelcomeInfo.value = String(message.メッセージ内容 || '').trim()
+  })
+  socket.on('welcome_text', (message) => {
+    const text = String(message.メッセージ内容 || '')
+    pushMessage('system', text)
+    emit('subtitle-message', { type: 'welcome_text', text })
+  })
+  socket.on('input_text', (message) => {
+    pushMessage('user', String(message.メッセージ内容 || ''))
+  })
+  socket.on('input_request', (message) => {
+    pushMessage('input-request', String(message.メッセージ内容 || ''))
+  })
+  socket.on('input_file', (message) => {
+    pushMessage('input-file', '', {
+      fileName: message.ファイル名 ?? null,
+      thumbnail: message.サムネイル画像 ?? null,
+    })
+  })
+  socket.on('output_text', (message) => {
+    const text = String(message.メッセージ内容 || '')
+    pushMessage('assistant', text)
+    emit('subtitle-message', { type: 'output_text', text })
+  })
+  socket.on('output_request', (message) => {
+    pushMessage('output-request', String(message.メッセージ内容 || ''))
+  })
+  socket.on('output_file', (message) => {
+    pushMessage('output-file', '', {
+      fileName: message.ファイル名 ?? null,
+      thumbnail: message.サムネイル画像 ?? null,
+    })
+  })
+  socket.on('output_stream', handleOutputStream)
+  socket.on('recognition_input', (message) => {
+    pushMessage('recognition-user', String(message.メッセージ内容 || ''))
+  })
+  socket.on('recognition_output', (message) => {
+    const text = String(message.メッセージ内容 || '')
+    pushMessage('recognition-assistant', text)
+    emit('subtitle-message', { type: 'recognition_output', text })
+  })
+}
+
+function resetLocalChat() {
+  ローカルチャット接続済み.value = false
+  ローカルWelcomeInfo.value = ''
+  ローカルメッセージ一覧.value = []
+  streamMessageId = null
+}
+
+async function connectChatSockets() {
+  if (!props.sessionId) return
+
+  チャットWebSocket?.disconnect()
+  resetLocalChat()
+
+  const nextChatSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, '0')
+  bindChatSocket(nextChatSocket)
+
+  try {
+    await nextChatSocket.connect()
+    チャットWebSocket = nextChatSocket
+  } catch {
+    チャットWebSocket?.disconnect()
+    チャットWebSocket = null
+    resetLocalChat()
+  }
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result === 'string') {
+        const i = result.indexOf(',')
+        resolve(i >= 0 ? result.slice(i + 1) : result)
+      } else {
+        reject(new Error('unexpected result type'))
+      }
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 }
 
 function メッセージ描画開始(msg: ChatMessage) {
@@ -330,7 +487,12 @@ function 入力欄クリア() {
 function submit() {
   const text = 入力テキスト.value.trim()
   if (!text || !WebSocket接続中.value) return
-  emit('submit', text)
+  emit('send-input-payload', {
+    チャンネル: '0',
+    送信モード: props.mode,
+    メッセージ識別: 'input_text',
+    メッセージ内容: text,
+  })
   入力欄クリア()
 }
 
@@ -360,7 +522,16 @@ function ドロップ処理(event: DragEvent) {
   if (!WebSocket接続中.value) return
   const files = Array.from(event.dataTransfer?.files || [])
   if (files.length === 0) return
-  emit('drop-files', files)
+  void Promise.all(files.map(async (file) => {
+    const base64 = await fileToBase64(file)
+    emit('send-input-payload', {
+      チャンネル: '0',
+      メッセージ識別: 'input_file',
+      メッセージ内容: base64,
+      ファイル名: file.name,
+      サムネイル画像: null,
+    })
+  }))
 }
 
 // --- スクロール ---
@@ -376,7 +547,7 @@ function 最下部スクロール() {
 // --- メッセージ監視 ---
 
 watch(
-  () => props.messages,
+  表示メッセージ一覧,
   (msgs) => {
     for (const msg of msgs) {
       if (!描画済みID.has(msg.id)) {
@@ -391,30 +562,47 @@ watch(
 )
 
 watch(入力テキスト, () => nextTick(テキストエリア自動調整))
+watch(() => props.sessionId, (sessionId) => {
+  if (sessionId) {
+    void connectChatSockets()
+    return
+  }
+  チャットWebSocket?.disconnect()
+  チャットWebSocket = null
+  resetLocalChat()
+})
 
 onMounted(() => {
+  if (props.sessionId) void connectChatSockets()
   window.addEventListener('resize', テキストエリア自動調整)
   nextTick(テキストエリア自動調整)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', テキストエリア自動調整)
+  チャットWebSocket?.disconnect()
+  チャットWebSocket = null
   for (const state of 演出状態Map.values()) {
     clearInterval(state.blinkInterval)
   }
   演出状態Map.clear()
+})
+
+defineExpose({
+  WebSocket接続中,
+  チャット接続済み: ローカルチャット接続済み,
 })
 </script>
 
 <template>
   <section class="chat-container" data-interactive="true">
     <div ref="チャット領域" class="chat-area">
-      <div v-if="welcomeInfo" class="welcome-message">
-        {{ welcomeInfo }}
+      <div v-if="表示WelcomeInfo" class="welcome-message">
+        {{ 表示WelcomeInfo }}
       </div>
 
       <div
-        v-for="msg in messages"
+        v-for="msg in 表示メッセージ一覧"
         :key="msg.id"
         :id="msg.id"
         :class="[
@@ -465,7 +653,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="messages.length === 0" class="empty-message">
+      <div v-if="表示メッセージ一覧.length === 0" class="empty-message">
         <p>セッション: {{ sessionId || '未接続' }}</p>
       </div>
     </div>

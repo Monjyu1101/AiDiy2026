@@ -860,6 +860,10 @@ npm run preview    # Preview production build
 npm run type-check # Run TypeScript type checking without building
 ```
 
+**重要:**
+- **ユーザーの明示的な指示がない限り、`npm run build` などで `dist` を生成しないこと。**
+- 動作確認や調査では、原則として `npm run dev` または `npm run type-check` を優先すること。
+
 **Running frontend only:**
 ```bash
 cd frontend_web
@@ -1104,5 +1108,5 @@ const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD')
 - 一覧などで子コンポーネントを呼び出すタグはASCII名で統一（日本語タグはブラウザが無効扱いでテキスト表示される）。
 - **Vue component tags must use ASCII names**
 - 日本語名を使う場合は `<component :is="日本語コンポーネント名" />` を使用する。
-
+- **ユーザーの指示なしに `dist` を生成しない。** `npm run build` の実行は、明示的に依頼された場合だけ行う。
 

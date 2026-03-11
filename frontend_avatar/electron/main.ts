@@ -1,9 +1,10 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, session } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const shouldOpenDevTools = process.env.VITE_OPEN_DEVTOOLS === '1'
+const APP_USER_MODEL_ID = 'AiDiy.frontend_avatar'
 
 type WindowMode = 'login' | 'core'
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
@@ -47,10 +48,72 @@ const panelStates: Record<PanelKey, boolean> = {
   code4: false,
 }
 
-let primaryWindow: BrowserWindow | null = null
+let loginWindow: BrowserWindow | null = null
+let coreWindow: BrowserWindow | null = null
 const panelWindows = new Map<PanelKey, BrowserWindow>()
 const windowRoles = new Map<number, WindowRole>()
 let selectedDisplaySourceId: string | null = null
+
+function getWorkArea() {
+  return screen.getPrimaryDisplay().workArea
+}
+
+function getBottomRightPosition(
+  width: number,
+  height: number,
+  margins: { right?: number; bottom?: number } = {},
+) {
+  const area = getWorkArea()
+  const right = margins.right ?? 24
+  const bottom = margins.bottom ?? 0
+  return {
+    x: area.x + Math.max(0, area.width - width - right),
+    y: area.y + Math.max(0, area.height - height - bottom),
+  }
+}
+
+function getBottomLeftPosition(_width: number, height: number, margin = 24) {
+  const area = getWorkArea()
+  return {
+    x: area.x + margin,
+    y: area.y + Math.max(margin, area.height - height - margin),
+  }
+}
+
+function getCenteredPosition(width: number, height: number) {
+  const area = getWorkArea()
+  return {
+    x: area.x + Math.round((area.width - width) / 2),
+    y: area.y + Math.round((area.height - height) / 2),
+  }
+}
+
+function getPanelInitialPosition(panel: PanelKey, width: number, height: number) {
+  if (panel === 'chat') {
+    return getCenteredPosition(width, height)
+  }
+  if (panel === 'image') {
+    return getBottomLeftPosition(width, height)
+  }
+
+  const area = getWorkArea()
+  const baseX = area.x + 24
+  const baseY = area.y + 24
+  const orderMap: Record<Exclude<PanelKey, 'image' | 'chat'>, number> = {
+    file: 0,
+    code1: 1,
+    code2: 2,
+    code3: 3,
+    code4: 4,
+  }
+  const step = 48
+  const order = orderMap[panel as Exclude<PanelKey, 'image' | 'chat'>] ?? 0
+
+  return {
+    x: baseX + (step * order),
+    y: baseY + (step * order),
+  }
+}
 
 function resolveDisplaySourceKind(sourceId: string): DisplaySourceKind {
   return sourceId.startsWith('window:') ? 'window' : 'screen'
@@ -80,6 +143,7 @@ function getRendererUrl(): string {
 
 function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): BrowserWindow {
   const appPath = app.getAppPath()
+  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy.ico')
   const window = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
@@ -93,7 +157,7 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
     resizable: true,
     autoHideMenuBar: true,
     title: 'AiDiy Avatar',
-    icon: path.join(appPath, 'public', 'icons', 'AiDiy.png'),
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -115,6 +179,19 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
   }
 
   return window
+}
+
+function waitForReady(window: BrowserWindow) {
+  if (window.isDestroyed()) {
+    return Promise.resolve()
+  }
+  if (!window.webContents.isLoading()) {
+    return Promise.resolve()
+  }
+  return new Promise<void>((resolve) => {
+    window.once('ready-to-show', () => resolve())
+    window.webContents.once('did-finish-load', () => resolve())
+  })
 }
 
 function clampWindowBounds(window: BrowserWindow, nextBounds: WindowBounds): WindowBounds {
@@ -178,11 +255,19 @@ function closeAllPanelWindows() {
 
 function applyPrimaryMode(window: BrowserWindow, mode: WindowMode) {
   const bounds = mode === 'login' ? LOGIN_BOUNDS : CORE_BOUNDS
+  const position = mode === 'core'
+    ? getBottomRightPosition(bounds.width, bounds.height, { right: 24, bottom: 0 })
+    : getCenteredPosition(bounds.width, bounds.height)
+
   windowRoles.set(window.id, mode)
   window.setMinimumSize(bounds.minWidth, bounds.minHeight)
   window.setResizable(mode === 'core')
-  window.setSize(bounds.width, bounds.height, true)
-  window.center()
+  window.setBounds({
+    x: position.x,
+    y: position.y,
+    width: bounds.width,
+    height: bounds.height,
+  }, false)
 }
 
 function createPanelWindow(panel: PanelKey) {
@@ -194,10 +279,8 @@ function createPanelWindow(panel: PanelKey) {
 
   const bounds = PANEL_BOUNDS[panel]
   const window = createBaseWindow(bounds, panel, false)
-  if (primaryWindow && !primaryWindow.isDestroyed()) {
-    const [primaryX, primaryY] = primaryWindow.getPosition()
-    window.setPosition(primaryX + 44, primaryY + 44)
-  }
+  const { x, y } = getPanelInitialPosition(panel, bounds.width, bounds.height)
+  window.setPosition(x, y)
 
   panelWindows.set(panel, window)
   panelStates[panel] = false
@@ -219,22 +302,94 @@ function ensureAllPanelWindows() {
   })
 }
 
-function createPrimaryWindow() {
-  primaryWindow = createBaseWindow(LOGIN_BOUNDS, 'login')
-  applyPrimaryMode(primaryWindow, 'login')
-
-  primaryWindow.on('closed', () => {
-    closeAllPanelWindows()
-    if (primaryWindow) {
-      windowRoles.delete(primaryWindow.id)
+function createLoginWindow(show = true) {
+  if (loginWindow && !loginWindow.isDestroyed()) {
+    applyPrimaryMode(loginWindow, 'login')
+    if (loginWindow.isMinimized()) {
+      loginWindow.restore()
     }
-    primaryWindow = null
+    loginWindow.center()
+    if (show) loginWindow.show()
+    return loginWindow
+  }
+
+  loginWindow = createBaseWindow(LOGIN_BOUNDS, 'login', show)
+  applyPrimaryMode(loginWindow, 'login')
+
+  loginWindow.on('closed', () => {
+    if (loginWindow) {
+      windowRoles.delete(loginWindow.id)
+    }
+    loginWindow = null
   })
 
-  return primaryWindow
+  return loginWindow
+}
+
+function createCoreWindow(show = true) {
+  if (coreWindow && !coreWindow.isDestroyed()) {
+    applyPrimaryMode(coreWindow, 'core')
+    if (show) coreWindow.show()
+    return coreWindow
+  }
+
+  coreWindow = createBaseWindow(CORE_BOUNDS, 'core', show)
+  applyPrimaryMode(coreWindow, 'core')
+
+  coreWindow.on('closed', () => {
+    closeAllPanelWindows()
+    if (coreWindow) {
+      windowRoles.delete(coreWindow.id)
+    }
+    coreWindow = null
+  })
+
+  return coreWindow
+}
+
+async function openCoreWindow(sourceWindow?: BrowserWindow | null) {
+  const nextCoreWindow = createCoreWindow(false)
+  ensureAllPanelWindows()
+  await waitForReady(nextCoreWindow)
+  if (!nextCoreWindow.isDestroyed()) {
+    nextCoreWindow.show()
+    nextCoreWindow.focus()
+  }
+
+  if (loginWindow && !loginWindow.isDestroyed()) {
+    loginWindow.hide()
+  } else if (sourceWindow && !sourceWindow.isDestroyed() && sourceWindow !== nextCoreWindow) {
+    sourceWindow.hide()
+  }
+
+  return 'core' as const
+}
+
+async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
+  closeAllPanelWindows()
+  const nextLoginWindow = createLoginWindow(false)
+  await waitForReady(nextLoginWindow)
+  if (!nextLoginWindow.isDestroyed()) {
+    if (nextLoginWindow.isMinimized()) {
+      nextLoginWindow.restore()
+    }
+    nextLoginWindow.center()
+    nextLoginWindow.show()
+    nextLoginWindow.focus()
+  }
+
+  if (coreWindow && !coreWindow.isDestroyed()) {
+    coreWindow.close()
+  }
+
+  return 'login' as const
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId(APP_USER_MODEL_ID)
+  }
+
   session.defaultSession.setDisplayMediaRequestHandler(
     async (_request, callback) => {
       const sourceId = selectedDisplaySourceId
@@ -267,18 +422,24 @@ app.whenReady().then(() => {
     return windowRoles.get(window.id) ?? 'login'
   })
 
-  ipcMain.handle('window:set-mode', (event, mode: WindowMode) => {
+  ipcMain.handle('window:set-mode', async (event, mode: WindowMode) => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return mode
 
-    if (mode === 'login') {
-      closeAllPanelWindows()
-    } else {
-      ensureAllPanelWindows()
+    if (mode === 'core') {
+      return openCoreWindow(window)
     }
+    return openLoginWindow(window)
+  })
 
-    applyPrimaryMode(window, mode)
-    return mode
+  ipcMain.handle('window:open-core', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    return openCoreWindow(window)
+  })
+
+  ipcMain.handle('window:open-login', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    return openLoginWindow(window)
   })
 
   ipcMain.handle('window:close-self', (event) => {
@@ -290,6 +451,12 @@ app.whenReady().then(() => {
       return
     }
     window.close()
+  })
+
+  ipcMain.handle('window:minimize-self', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return
+    window.minimize()
   })
 
   ipcMain.handle('window:get-bounds', (event) => {
@@ -330,11 +497,11 @@ app.whenReady().then(() => {
     return selectedDisplaySourceId
   })
 
-  createPrimaryWindow()
+  createLoginWindow()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createPrimaryWindow()
+    if (!loginWindow && !coreWindow && BrowserWindow.getAllWindows().length === 0) {
+      createLoginWindow()
     }
   })
 })

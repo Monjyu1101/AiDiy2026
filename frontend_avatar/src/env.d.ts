@@ -5,20 +5,20 @@ interface ImportMetaEnv {
   readonly VITE_CORE_WS_URL?: string
 }
 
-type AvatarPanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
-type AvatarWindowMode = 'login' | 'core'
-type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey
-type AvatarWindowBounds = { x: number; y: number; width: number; height: number }
-type AvatarWindowMetrics = AvatarWindowBounds & { minWidth: number; minHeight: number }
-type AvatarDisplaySourceKind = 'screen' | 'window'
-type AvatarDisplaySource = {
-  id: string
-  name: string
-  kind: AvatarDisplaySourceKind
-  thumbnailDataUrl: string | null
-}
-
 declare global {
+  type AvatarPanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
+  type AvatarWindowMode = 'login' | 'core'
+  type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey
+  type AvatarWindowBounds = { x: number; y: number; width: number; height: number }
+  type AvatarWindowMetrics = AvatarWindowBounds & { minWidth: number; minHeight: number }
+  type AvatarDisplaySourceKind = 'screen' | 'window'
+  type AvatarDisplaySource = {
+    id: string
+    name: string
+    kind: AvatarDisplaySourceKind
+    thumbnailDataUrl: string | null
+  }
+
   interface Window {
     desktopApi?: {
       versions: {
@@ -30,7 +30,10 @@ declare global {
       getWindowBounds?: () => Promise<AvatarWindowMetrics>
       setWindowBounds?: (bounds: AvatarWindowBounds) => Promise<AvatarWindowBounds>
       setWindowMode?: (mode: AvatarWindowMode) => Promise<AvatarWindowMode>
+      openCoreWindow?: () => Promise<AvatarWindowMode>
+      openLoginWindow?: () => Promise<AvatarWindowMode>
       closeCurrentWindow?: () => Promise<void>
+      minimizeCurrentWindow?: () => Promise<void>
       togglePanel?: (panel: AvatarPanelKey) => Promise<Record<AvatarPanelKey, boolean>>
       getPanelStates?: () => Promise<Record<AvatarPanelKey, boolean>>
       listDisplaySources?: () => Promise<AvatarDisplaySource[]>

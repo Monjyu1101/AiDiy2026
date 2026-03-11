@@ -17,8 +17,10 @@ const props = withDefaults(defineProps<{
   micLevel: number;
   speakerLevel: number;
   uiVisible: boolean;
+  transparentMode?: boolean;
   subtitleText?: string;
 }>(), {
+  transparentMode: false,
   subtitleText: '',
 })
 
@@ -269,7 +271,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="avatar-stage-shell">
+  <section class="avatar-stage-shell" :class="{ transparent: transparentMode }">
     <div
       ref="mountRef"
       class="canvas-host"
@@ -280,50 +282,29 @@ onBeforeUnmount(() => {
       @pointercancel="stopPointerDrag"
       @pointerleave="stopPointerDrag"
     ></div>
-    <div class="glow glow-a" :style="{ opacity: 0.24 + stageTone * 0.45 }"></div>
-    <div class="glow glow-b" :style="{ opacity: 0.14 + stageTone * 0.34 }"></div>
+    <div v-show="!transparentMode" class="glow glow-a" :style="{ opacity: 0.24 + stageTone * 0.45 }"></div>
+    <div v-show="!transparentMode" class="glow glow-b" :style="{ opacity: 0.14 + stageTone * 0.34 }"></div>
 
-    <div class="avatar-hud" :class="{ visible: uiVisible }">
-      <div class="hud-top">
-        <span class="hud-chip">{{ userName }}</span>
-        <span class="hud-chip">{{ liveModel || 'Live AI' }}</span>
-        <span class="hud-chip">{{ currentMotion }}</span>
-      </div>
-
-      <div class="hud-bottom">
-        <span class="state-chip" :class="{ active: inputConnected }">input</span>
-        <span class="state-chip" :class="{ active: audioConnected }">audio</span>
-        <span class="state-chip mic" :class="{ active: micEnabled }">mic</span>
-        <span class="state-chip spk" :class="{ active: speakerEnabled }">spk</span>
-        <div class="voice-meter">
-          <i class="voice-bar mic" :style="{ transform: `scaleX(${Math.max(0.05, micLevel)})` }"></i>
-          <i
-            class="voice-bar spk"
-            :style="{ transform: `scaleX(${Math.max(0.05, speakerLevel)})` }"
-          ></i>
-        </div>
+    <div v-show="!transparentMode" class="avatar-visualizer" :class="{ visible: uiVisible }">
+      <div class="voice-meter">
+        <i class="voice-bar mic" :style="{ transform: `scaleX(${Math.max(0.05, micLevel)})` }"></i>
+        <i
+          class="voice-bar spk"
+          :style="{ transform: `scaleX(${Math.max(0.05, speakerLevel)})` }"
+        ></i>
       </div>
     </div>
 
-    <div v-if="loading" class="stage-status">
+    <div v-if="!transparentMode && loading" class="stage-status">
       <img src="/icons/loading.gif" alt="loading" />
       <span>VRM を読み込んでいます...</span>
     </div>
 
-    <div v-else-if="loadError" class="stage-status error">
+    <div v-else-if="!transparentMode && loadError" class="stage-status error">
       <img src="/icons/abort.png" alt="error" />
       <span>{{ loadError }}</span>
     </div>
 
-    <div class="stage-session" :class="{ visible: uiVisible }">
-      <span>{{ sessionId || '未接続' }}</span>
-    </div>
-
-    <Transition name="subtitle-fade">
-      <div v-if="subtitleText" class="subtitle-overlay" :key="subtitleText">
-        <span>{{ subtitleText }}</span>
-      </div>
-    </Transition>
   </section>
 </template>
 
@@ -336,6 +317,10 @@ onBeforeUnmount(() => {
     radial-gradient(circle at 50% 18%, rgba(255, 198, 86, 0.14), transparent 28%),
     radial-gradient(circle at 78% 78%, rgba(107, 149, 255, 0.12), transparent 24%),
     linear-gradient(180deg, rgba(7, 9, 15, 0.18), rgba(7, 9, 15, 0.04));
+}
+
+.avatar-stage-shell.transparent {
+  background: transparent;
 }
 
 .canvas-host {
@@ -372,8 +357,7 @@ onBeforeUnmount(() => {
   background: rgba(97, 154, 255, 0.66);
 }
 
-.avatar-hud,
-.stage-session {
+.avatar-visualizer {
   position: absolute;
   left: 18px;
   right: 18px;
@@ -382,52 +366,15 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.avatar-hud.visible,
-.stage-session.visible {
+.avatar-visualizer.visible {
   opacity: 1;
 }
 
-.avatar-hud {
-  top: 46px;
-  display: grid;
-  gap: 10px;
-}
-
-.hud-top,
-.hud-bottom {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.hud-chip,
-.state-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border: 1px solid rgba(153, 141, 214, 0.38);
-  background: rgba(3, 5, 10, 0.3);
-  color: rgba(241, 240, 255, 0.92);
-  backdrop-filter: blur(12px);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-}
-
-.state-chip.active {
-  border-color: rgba(156, 240, 203, 0.7);
-  color: #dffff2;
-}
-
-.state-chip.mic.active {
-  border-color: rgba(255, 128, 128, 0.78);
-  color: #ffd8d8;
-}
-
-.state-chip.spk.active {
-  border-color: rgba(117, 221, 255, 0.78);
-  color: #d9f7ff;
+.avatar-visualizer {
+  left: 50%;
+  bottom: 18px;
+  right: auto;
+  transform: translateX(-50%);
 }
 
 .voice-meter {
@@ -482,69 +429,13 @@ onBeforeUnmount(() => {
   border-color: rgba(255, 131, 131, 0.26);
 }
 
-.stage-session {
-  bottom: 18px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.stage-session span {
-  padding: 6px 10px;
-  border: 1px solid rgba(153, 141, 214, 0.32);
-  background: rgba(3, 5, 10, 0.28);
-  color: rgba(214, 212, 235, 0.84);
-  backdrop-filter: blur(12px);
-  font-size: 0.68rem;
-}
-
-.subtitle-overlay {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 48px;
-  pointer-events: none;
-  display: flex;
-  justify-content: center;
-}
-
-.subtitle-overlay span {
-  display: inline-block;
-  max-width: 90%;
-  padding: 8px 14px;
-  border: 1px solid rgba(153, 141, 214, 0.42);
-  background: rgba(3, 5, 10, 0.62);
-  color: rgba(180, 255, 210, 0.95);
-  backdrop-filter: blur(12px);
-  font-size: 0.78rem;
-  line-height: 1.4;
-  white-space: pre-line;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-height: 4.2em;
-}
-
-.subtitle-fade-enter-active { transition: opacity 0.3s ease; }
-.subtitle-fade-leave-active { transition: opacity 0.6s ease; }
-.subtitle-fade-enter-from,
-.subtitle-fade-leave-to { opacity: 0; }
-
 @media (max-width: 720px) {
-  .avatar-hud {
-    top: 42px;
-    left: 12px;
-    right: 12px;
-  }
+  .avatar-visualizer { bottom: 12px; }
 
-  .stage-status,
-  .stage-session {
+  .stage-status {
     left: 12px;
     right: 12px;
     bottom: 12px;
-  }
-
-  .stage-session {
-    justify-content: flex-start;
   }
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 
 type ResizeDirection =
   | 'n'
@@ -16,17 +16,22 @@ const props = withDefaults(defineProps<{
   theme?: 'purple' | 'light';
   closable?: boolean;
   resizable?: boolean;
-  closeMode?: 'window' | 'event';
+  closeMode?: 'window' | 'event' | 'minimize';
+  chromeVisible?: boolean;
 }>(), {
   theme: 'light',
   closable: true,
   resizable: true,
   closeMode: 'window',
+  chromeVisible: true,
 })
 
 const emit = defineEmits<{
   close: []
 }>()
+
+const actionButtonLabel = computed(() => (props.closeMode === 'minimize' ? '−' : '×'))
+const actionButtonTitle = computed(() => (props.closeMode === 'minimize' ? '最小化' : '閉じる'))
 
 const リサイズ中 = ref(false)
 
@@ -43,6 +48,10 @@ let 現在方向: ResizeDirection | null = null
 function closeWindow() {
   if (props.closeMode === 'event') {
     emit('close')
+    return
+  }
+  if (props.closeMode === 'minimize') {
+    void window.desktopApi?.minimizeCurrentWindow?.()
     return
   }
   void window.desktopApi?.closeCurrentWindow?.()
@@ -122,7 +131,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="window-shell" :class="[`theme-${theme}`, { resizing: リサイズ中 }]">
+  <section
+    class="window-shell"
+    :class="[`theme-${theme}`, { resizing: リサイズ中, 'chrome-hidden': !chromeVisible }]"
+  >
     <header class="window-titlebar">
       <div class="title-left">
         <slot name="title-left"></slot>
@@ -130,7 +142,13 @@ onBeforeUnmount(() => {
       </div>
       <div class="title-right">
         <slot name="title-right"></slot>
-        <button v-if="closable" class="close-button" type="button" @click="closeWindow">×</button>
+        <button
+          v-if="closable"
+          class="close-button"
+          type="button"
+          :title="actionButtonTitle"
+          @click="closeWindow"
+        >{{ actionButtonLabel }}</button>
       </div>
     </header>
 
@@ -166,6 +184,12 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 
+.window-shell.chrome-hidden {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
 .window-titlebar {
   height: 28px;
   display: flex;
@@ -175,6 +199,13 @@ onBeforeUnmount(() => {
   padding: 0 8px;
   cursor: move;
   -webkit-app-region: drag;
+}
+
+.window-shell.chrome-hidden .window-titlebar {
+  opacity: 0;
+  pointer-events: none;
+  border-bottom-color: transparent;
+  box-shadow: none;
 }
 
 .title-left,
@@ -226,6 +257,10 @@ onBeforeUnmount(() => {
   margin: 0;
   opacity: 0;
   z-index: 20;
+}
+
+.window-shell.chrome-hidden .resize-handle {
+  pointer-events: none;
 }
 
 .resize-handle:hover,

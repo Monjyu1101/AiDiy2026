@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-type デスクトップソース = AvatarDisplaySource
-
 const props = defineProps<{
   sessionId: string
   inputConnected: boolean
@@ -13,6 +11,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'submit-image': [payload: { text: string; mimeType: string; base64: string }]
   'submit-text': [text: string]
+  'selection-cancel': []
+  'selection-complete': []
 }>()
 
 // --- 画像ソース状態 ---
@@ -56,17 +56,13 @@ const 入力欄固定高さ = ref(入力欄最小高さ)
 
 // --- UI ---
 const 選択ポップアップ表示 = ref(false)
-const デスクトップソース一覧 = ref<デスクトップソース[]>([])
-const デスクトップソース読込中 = ref(false)
-const デスクトップソース選択中 = ref(false)
-
 // --- 自動送信設定 ---
 const CAPTURE_INTERVAL_MS = 550
 const 自動送信変化率パーセント = ref(3)
 const 自動送信待機秒 = ref(2)
 const 自動送信強制秒 = ref(60)
 
-const WebSocket接続中 = computed(() => props.inputConnected)
+const WebSocket接続中 = computed(() => Boolean(props.sessionId))
 const 状態表示テキスト = computed(() => {
   const map: Record<string, string> = { disconnected: '切断', connecting: '接続中', sending: '送信中' }
   return map[接続状態.value] ?? '切断'
@@ -163,79 +159,28 @@ function ドロップ処理(e: DragEvent) {
 function 選択表示() {
   if (!WebSocket接続中.value) return
   エラーメッセージ.value = ''
-  デスクトップソース状態リセット()
   選択ポップアップ表示.value = true
 }
 
 function 選択取消() {
-  デスクトップソース状態リセット()
   選択ポップアップ表示.value = false
-  キャプチャ停止(false)
+  キャプチャ停止()
+  emit('selection-cancel')
 }
 
 function 選択処理(option: 'file' | 'camera' | 'desktop') {
   if (!WebSocket接続中.value) return
+  選択ポップアップ表示.value = false
   switch (option) {
     case 'file':
-      選択ポップアップ表示.value = false
       ファイル選択()
       break
     case 'camera':
-      選択ポップアップ表示.value = false
       void カメラキャプチャ()
       break
     case 'desktop':
-      void デスクトップソース選択開始()
+      void 画面共有キャプチャ()
       break
-  }
-}
-
-function デスクトップソース状態リセット(clearSelectedSource = true) {
-  デスクトップソース一覧.value = []
-  デスクトップソース読込中.value = false
-  デスクトップソース選択中.value = false
-  if (clearSelectedSource) {
-    void window.desktopApi?.setDisplaySource?.(null)
-  }
-}
-
-async function デスクトップソース選択開始() {
-  if (!WebSocket接続中.value) return
-  if (!window.desktopApi?.listDisplaySources || !window.desktopApi?.setDisplaySource) {
-    選択ポップアップ表示.value = false
-    await 画面共有キャプチャ()
-    return
-  }
-
-  エラーメッセージ.value = ''
-  デスクトップソース状態リセット()
-  デスクトップソース選択中.value = true
-  デスクトップソース読込中.value = true
-  try {
-    const sources = await window.desktopApi.listDisplaySources()
-    デスクトップソース一覧.value = sources
-    if (sources.length === 0) {
-      エラーメッセージ.value = '共有可能な画面やウィンドウが見つかりませんでした。'
-    }
-  } catch (error) {
-    console.error('[AIイメージ] 共有元一覧取得エラー:', error)
-    エラーメッセージ.value = '共有元一覧を取得できませんでした。'
-  } finally {
-    デスクトップソース読込中.value = false
-  }
-}
-
-async function デスクトップソース決定(sourceId: string) {
-  if (!WebSocket接続中.value) return
-  try {
-    await window.desktopApi?.setDisplaySource?.(sourceId)
-    選択ポップアップ表示.value = false
-    await 画面共有キャプチャ()
-  } catch (error) {
-    console.error('[AIイメージ] 共有元設定エラー:', error)
-    エラーメッセージ.value = '共有元を設定できませんでした。'
-    選択ポップアップ表示.value = true
-    デスクトップソース選択中.value = true
   }
 }
 
@@ -287,6 +232,7 @@ function ファイル選択() {
           window.clearInterval(ファイルダイアログ確認タイマー.value)
           ファイルダイアログ確認タイマー.value = null
         }
+        emit('selection-cancel')
       }
     }, 100)
   }
@@ -301,13 +247,17 @@ function ファイル変更処理(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file || !file.type.startsWith('image/')) {
     ファイル選択中.value = false
+    emit('selection-cancel')
     return
   }
   const reader = new FileReader()
   reader.onload = (ev) => {
     const dataUrl = ev.target?.result as string
     const img = new Image()
-    img.onload = () => ファイル画像キャプチャ開始(img)
+    img.onload = () => {
+      ファイル画像キャプチャ開始(img)
+      emit('selection-complete')
+    }
     img.src = dataUrl
   }
   reader.readAsDataURL(file)
@@ -321,11 +271,11 @@ async function カメラキャプチャ() {
     if (!WebSocket接続中.value) return
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     await キャプチャ開始(stream)
+    emit('selection-complete')
   } catch (error) {
     console.error('[AIイメージ] カメラ取得エラー:', error)
-    エラーメッセージ.value = 'カメラを開始できませんでした。'
-    キャプチャ停止(false)
-    選択ポップアップ表示.value = true
+    キャプチャ停止()
+    emit('selection-cancel')
   }
 }
 
@@ -334,13 +284,11 @@ async function 画面共有キャプチャ() {
     if (!WebSocket接続中.value) return
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
     await キャプチャ開始(stream)
-    デスクトップソース状態リセット(false)
+    emit('selection-complete')
   } catch (error) {
     console.error('[AIイメージ] 画面共有取得エラー:', error)
-    エラーメッセージ.value = 'デスクトップ共有を開始できませんでした。'
-    デスクトップソース状態リセット()
-    キャプチャ停止(false)
-    選択ポップアップ表示.value = true
+    キャプチャ停止()
+    emit('selection-cancel')
   }
 }
 
@@ -511,7 +459,6 @@ watch(() => props.autoShowSelection, (value) => {
 watch(() => props.active, (active) => {
   if (active === false) {
     キャプチャ停止()
-    デスクトップソース状態リセット()
     画像プレビュー.value = null
     if (ファイル入力.value) {
       ファイル入力.value.value = ''
@@ -525,7 +472,6 @@ watch(() => props.active, (active) => {
 watch(WebSocket接続中, (v) => {
   if (!v) {
     キャプチャ停止()
-    デスクトップソース状態リセット()
     選択ポップアップ表示.value = false
     接続状態.value = 'disconnected'
   } else if (接続状態.value === 'disconnected') {
@@ -552,7 +498,6 @@ onBeforeUnmount(() => {
     window.clearInterval(ファイルダイアログ確認タイマー.value)
     ファイルダイアログ確認タイマー.value = null
   }
-  デスクトップソース状態リセット()
   キャプチャ停止()
 })
 
@@ -655,12 +600,10 @@ defineExpose({
     <!-- リソース選択ポップアップ -->
     <div v-if="選択ポップアップ表示" class="selection-popup" @click.self="選択取消">
       <div class="selection-dialog">
-        <div class="selection-title">ソース選択</div>
-        <p class="selection-caption">
-          {{ デスクトップソース選択中 ? '共有する画面またはウィンドウを選んでください。' : '画像入力ソースを選んでください。' }}
-        </p>
+        <div class="selection-title">リソース選択</div>
+        <p class="selection-caption">画像入力ソースを選んでください。</p>
         <p v-if="エラーメッセージ" class="selection-error">{{ エラーメッセージ }}</p>
-        <div v-if="!デスクトップソース選択中" class="selection-options">
+        <div class="selection-options">
           <button class="selection-option" type="button" @click="選択処理('file')">
             <span class="option-icon">FILE</span>
             <span class="option-main">画像ファイル</span>
@@ -677,39 +620,7 @@ defineExpose({
             <span class="option-sub">画面共有キャプチャ</span>
           </button>
         </div>
-        <div v-else class="desktop-source-wrap">
-          <div v-if="デスクトップソース読込中" class="desktop-source-empty">共有元を取得中...</div>
-          <div v-else-if="デスクトップソース一覧.length === 0" class="desktop-source-empty">
-            利用可能な共有元がありません。
-          </div>
-          <div v-else class="desktop-source-list">
-            <button
-              v-for="source in デスクトップソース一覧"
-              :key="source.id"
-              class="desktop-source-option"
-              type="button"
-              @click="デスクトップソース決定(source.id)"
-            >
-              <div class="desktop-source-thumb">
-                <img v-if="source.thumbnailDataUrl" :src="source.thumbnailDataUrl" :alt="source.name" />
-                <span v-else>{{ source.kind === 'screen' ? '画面' : '窓' }}</span>
-              </div>
-              <div class="desktop-source-body">
-                <span class="desktop-source-kind">{{ source.kind === 'screen' ? '画面共有' : 'ウィンドウ共有' }}</span>
-                <span class="desktop-source-name">{{ source.name }}</span>
-              </div>
-            </button>
-          </div>
-        </div>
         <div class="selection-actions">
-          <button
-            v-if="デスクトップソース選択中"
-            class="selection-back"
-            type="button"
-            @click="デスクトップソース状態リセット()"
-          >
-            戻る
-          </button>
           <button class="selection-cancel" type="button" @click="選択取消">キャンセル</button>
         </div>
       </div>
@@ -829,26 +740,6 @@ defineExpose({
 
 .selection-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 
-.desktop-source-wrap {
-  margin-bottom: 14px;
-}
-
-.desktop-source-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: min(48vh, 360px);
-  overflow-y: auto;
-}
-
-.desktop-source-empty {
-  padding: 20px 12px;
-  border: 1px dashed rgba(143, 104, 221, 0.35);
-  color: #c9c1e8;
-  font-size: 12px;
-  text-align: center;
-}
-
 .selection-option {
   width: 100%;
   padding: 12px 14px;
@@ -867,59 +758,6 @@ defineExpose({
 .selection-option:hover {
   border-color: rgba(162, 143, 255, 0.9);
   background: rgba(143, 104, 221, 0.14);
-}
-
-.desktop-source-option {
-  width: 100%;
-  border: 1px solid rgba(143, 104, 221, 0.4);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 10px;
-  display: grid;
-  grid-template-columns: 112px 1fr;
-  gap: 12px;
-  align-items: center;
-  color: #f3f0ff;
-  text-align: left;
-  cursor: pointer;
-}
-
-.desktop-source-option:hover {
-  border-color: rgba(162, 143, 255, 0.9);
-  background: rgba(143, 104, 221, 0.14);
-}
-
-.desktop-source-thumb {
-  height: 64px;
-  border: 1px solid rgba(162, 143, 255, 0.3);
-  background: rgba(5, 5, 10, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.desktop-source-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.desktop-source-body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.desktop-source-kind {
-  font-size: 11px;
-  color: #b7afd8;
-}
-
-.desktop-source-name {
-  font-size: 13px;
-  color: #ffffff;
-  word-break: break-word;
 }
 
 .option-icon {
@@ -954,13 +792,12 @@ defineExpose({
 
 .selection-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
 }
 
-.selection-back,
 .selection-cancel {
-  width: 100%;
+  width: auto;
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -969,12 +806,6 @@ defineExpose({
   color: #ddd6f7;
 }
 
-.selection-back {
-  width: auto;
-  min-width: 90px;
-}
-
-.selection-back:hover,
 .selection-cancel:hover { background: rgba(255, 255, 255, 0.14); }
 
 /* コントロールエリア */

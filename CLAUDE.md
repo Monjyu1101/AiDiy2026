@@ -76,7 +76,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Initial setup (first time only)
 python _setup.py
 
-# Start servers (interactive: asks backend/web/avatar/gui y/n)
+# Start servers (interactive: asks backend/web/avatar y/n)
 python _start.py
 
 # Trigger backend reload (Windows)

@@ -9,16 +9,20 @@
 - バックエンド(core,apps): `backend_server`
 - フロントエンド(Web): `frontend_web`
 - フロントエンド(Avatar): `frontend_avatar`
-- フロントエンド(GUI): `frontend_gui`
 
 Usage:
     python _setup.py
 """
 
+import json
+import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
+import urllib.request
+import zipfile
 from pathlib import Path
 
 # ============================================================
@@ -29,7 +33,6 @@ BACKEND_ENV = ".venv"
 
 FRONTEND_WEB_PATH = "frontend_web"
 FRONTEND_AVATAR_PATH = "frontend_avatar"
-FRONTEND_GUI_PATH = "frontend_gui"
 
 FRONTEND_COMMAND = "npm"
 DATABASE_TYPE = "sqlite"
@@ -43,7 +46,6 @@ BACKEND_DIR = BASE_DIR / BACKEND_PATH
 BACKEND_VENV_DIR = BACKEND_DIR / BACKEND_ENV
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
-FRONTEND_GUI_DIR = BASE_DIR / FRONTEND_GUI_PATH
 POSTGRES_DIR = BASE_DIR / POSTGRES_PATH
 
 
@@ -115,7 +117,7 @@ def ask_start_mode(prompt, default="n"):
         print_warning("'y' または 'n' または 'a'(auto) で答えてください。")
 
 
-def run_command(command, cwd=None, shell=False):
+def run_command(command, cwd=None, shell=False, env=None):
     try:
         if isinstance(command, list):
             cmd_str = " ".join(str(c) for c in command)
@@ -130,6 +132,7 @@ def run_command(command, cwd=None, shell=False):
             check=True,
             capture_output=False,
             text=True,
+            env=env,
         )
         return True
     except subprocess.CalledProcessError as e:
@@ -142,6 +145,105 @@ def run_command(command, cwd=None, shell=False):
 
 def npm_command():
     return f"{FRONTEND_COMMAND}.cmd" if sys.platform == "win32" else FRONTEND_COMMAND
+
+
+def get_electron_version(frontend_dir: Path) -> str:
+    """node_modules/electron/package.json からバージョンを取得する"""
+    pkg = frontend_dir / "node_modules" / "electron" / "package.json"
+    if pkg.exists():
+        with open(pkg, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("version", "")
+    return ""
+
+
+def get_electron_platform_str() -> str:
+    """Electronリリース用のプラットフォーム文字列を返す (例: win32-x64)"""
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    if system == "windows":
+        plat = "win32"
+    elif system == "darwin":
+        plat = "darwin"
+    else:
+        plat = "linux"
+    arch = "arm64" if machine in ("arm64", "aarch64") else "x64"
+    return f"{plat}-{arch}"
+
+
+def install_electron_binary(frontend_dir: Path, label: str) -> bool:
+    """GitHubからElectronバイナリをダウンロードして配置する"""
+    version = get_electron_version(frontend_dir)
+    if not version:
+        print_error(f"{label}: Electronのバージョンが取得できませんでした。")
+        return False
+
+    plat_str = get_electron_platform_str()
+    zip_name = f"electron-v{version}-{plat_str}.zip"
+    url = f"https://github.com/electron/electron/releases/download/v{version}/{zip_name}"
+
+    print_info(f"{label}: Electron v{version} ({plat_str}) をダウンロードします。")
+    print_info(f"  URL: {url}")
+
+    tmp_dir = Path(tempfile.gettempdir())
+    part_file = tmp_dir / f"{zip_name}.part"
+    final_file = tmp_dir / zip_name
+
+    for stale in [part_file, final_file]:
+        if stale.exists():
+            stale.unlink()
+
+    last_reported = [-1]
+
+    def progress_hook(block_num, block_size, total_size):
+        if total_size > 0:
+            downloaded = min(block_num * block_size, total_size)
+            percent = int(downloaded * 100 / total_size)
+            step = percent // 10 * 10
+            if step != last_reported[0]:
+                mb_done = downloaded // 1024 // 1024
+                mb_total = total_size // 1024 // 1024
+                print_info(f"  ダウンロード中... {step}% ({mb_done}MB / {mb_total}MB)")
+                last_reported[0] = step
+
+    print_info(f"  ダウンロード先: {part_file}")
+    try:
+        urllib.request.urlretrieve(url, str(part_file), reporthook=progress_hook)
+    except Exception as e:
+        print_error(f"{label}: ダウンロード失敗: {e}")
+        if part_file.exists():
+            part_file.unlink()
+        return False
+
+    part_file.rename(final_file)
+    size_mb = final_file.stat().st_size // 1024 // 1024
+    print_success(f"{label}: ダウンロード完了: {final_file} ({size_mb}MB)")
+
+    dist_dir = frontend_dir / "node_modules" / "electron" / "dist"
+    if dist_dir.exists():
+        shutil.rmtree(dist_dir)
+    dist_dir.mkdir(parents=True, exist_ok=True)
+
+    print_info(f"{label}: 展開中: {final_file} -> {dist_dir}")
+    try:
+        with zipfile.ZipFile(final_file, "r") as zf:
+            zf.extractall(dist_dir)
+    except Exception as e:
+        print_error(f"{label}: 展開失敗: {e}")
+        return False
+
+    exe_name = "electron.exe" if sys.platform == "win32" else "electron"
+    exe_path = dist_dir / exe_name
+    if not exe_path.exists():
+        print_error(f"{label}: {exe_name} が展開先に見つかりませんでした: {dist_dir}")
+        return False
+
+    path_txt = frontend_dir / "node_modules" / "electron" / "path.txt"
+    path_txt.write_bytes(exe_name.encode("utf-8"))
+
+    print_success(f"{label}: Electronバイナリの配置が完了しました。")
+    print_info(f"  実行ファイル: {exe_path}")
+    return True
 
 
 def check_uv_installed():
@@ -367,41 +469,21 @@ def setup_frontend_avatar():
         print_error(f"{label}: package.json が見つかりません: {package_json}")
         return False
 
-    if run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-        print_success(f"{label}: セットアップが完了しました。")
-        return True
-
-    print_error(f"{label}: セットアップに失敗しました。")
-    return False
-
-
-def setup_frontend_gui():
-    label = "フロントエンド(GUI)"
-    print_header(f"{label} セットアップ")
-    print_info(f"作業ディレクトリ: {FRONTEND_GUI_DIR}")
-    print_info("対象: Python GUI / PySide6 / OpenCV / sounddevice")
-
-    if not FRONTEND_GUI_DIR.exists():
-        print_error(f"{label}: フォルダが見つかりません: {FRONTEND_GUI_DIR}")
+    print_info(f"{label}: 標準設定で npm install を実行します...")
+    if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
+        print_warning(f"{label}: 標準の npm install に失敗しました。")
+        print_info(f"{label}: 従来どおり GitHub から Electron バイナリ取得へフォールバックできます。")
+        if ask_yes_no(f"{label}: GitHub から electron をインストールしますか？", default="y"):
+            if install_electron_binary(FRONTEND_AVATAR_DIR, label):
+                print_success(f"{label}: セットアップが完了しました。")
+                return True
+            print_error(f"{label}: Electronバイナリのインストールに失敗しました。")
+        else:
+            print_warning(f"{label}: Electronバイナリのインストールをスキップしました。")
         return False
 
-    pyproject_file = FRONTEND_GUI_DIR / "pyproject.toml"
-    if not pyproject_file.exists():
-        print_error(f"{label}: pyproject.toml が見つかりません: {pyproject_file}")
-        return False
-
-    if not check_uv_installed():
-        print_error(f"{label}: uv がインストールされていません。")
-        print_info("  PowerShell: irm https://astral.sh/uv/install.ps1 | iex")
-        print_info("  または: pip install uv")
-        return False
-
-    if run_command(["uv", "sync"], cwd=FRONTEND_GUI_DIR):
-        print_success(f"{label}: セットアップが完了しました。")
-        return True
-
-    print_error(f"{label}: セットアップに失敗しました。")
-    return False
+    print_success(f"{label}: セットアップが完了しました。")
+    return True
 
 
 def main():
@@ -414,7 +496,6 @@ def main():
     print_info("  2. バックエンド(core,apps)")
     print_info("  3. フロントエンド(Web)")
     print_info("  4. フロントエンド(Avatar)")
-    print_info("  5. フロントエンド(GUI)")
     print()
 
     run_setup, AUTO_MODE = ask_start_mode("セットアップを実行しますか?", default="n")
@@ -453,13 +534,6 @@ def main():
         print_warning("フロントエンド(Avatar)のセットアップをスキップしました。")
 
     print()
-    if ask_yes_no("フロントエンド(GUI)のセットアップを実行しますか？", default="y"):
-        if not setup_frontend_gui() and not ask_yes_no("フロントエンド(GUI)で失敗しました。続行しますか？", default="n"):
-            sys.exit(1)
-    else:
-        print_warning("フロントエンド(GUI)のセットアップをスキップしました。")
-
-    print()
     if GLOBAL_NPM_INSTALL_PROCESSES:
         wait_global_npm_tools_install()
 
@@ -468,7 +542,6 @@ def main():
     print_success("セットアップ処理が完了しました。")
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
-    print_info("  GUI単体 : python _start_gui.py")
     print_info("  Avatar開発: cd frontend_avatar && npm run dev")
     print_info("  Web開発   : cd frontend_web && npm run dev")
     print_info("セットアップは正常終了しました。5秒後に終了します...")

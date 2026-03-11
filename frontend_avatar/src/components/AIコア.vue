@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import アバター from '@/components/アバター.vue'
 import WindowShell from '@/components/WindowShell.vue'
 
@@ -30,6 +31,41 @@ const emit = defineEmits<{
   reconnect: [];
   logout: [];
 }>()
+
+const UI自動非表示秒数 = 15000
+const uiVisible = ref(true)
+
+let uiHideTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearUiHideTimer() {
+  if (!uiHideTimer) return
+  clearTimeout(uiHideTimer)
+  uiHideTimer = null
+}
+
+function scheduleUiHide() {
+  clearUiHideTimer()
+  uiHideTimer = setTimeout(() => {
+    uiVisible.value = false
+  }, UI自動非表示秒数)
+}
+
+function handleMouseEnter() {
+  clearUiHideTimer()
+  uiVisible.value = true
+}
+
+function handleMouseLeave() {
+  scheduleUiHide()
+}
+
+onMounted(() => {
+  scheduleUiHide()
+})
+
+onBeforeUnmount(() => {
+  clearUiHideTimer()
+})
 </script>
 
 <template>
@@ -38,9 +74,12 @@ const emit = defineEmits<{
     title="AiDiy Desktop Avatar"
     theme="purple"
     close-mode="event"
+    :chrome-visible="uiVisible"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
     @close="emit('logout')"
   >
-    <template #title-right>
+    <template v-if="uiVisible" #title-right>
       <span
         :class="[
           'core-status-dot',
@@ -62,11 +101,12 @@ const emit = defineEmits<{
         :speaker-enabled="speakerEnabled"
         :mic-level="micLevel"
         :speaker-level="speakerLevel"
-        :ui-visible="true"
+        :ui-visible="uiVisible"
+        :transparent-mode="!uiVisible"
         :subtitle-text="subtitleText"
       />
 
-      <aside class="panel-icons">
+      <aside v-show="uiVisible" class="panel-icons">
         <button
           class="tool-button microphone-button"
           :class="{ active: micEnabled }"
@@ -151,7 +191,7 @@ const emit = defineEmits<{
         <button class="tool-button sync-button" type="button" title="再接続" @click="emit('reconnect')">S</button>
       </aside>
 
-      <div v-if="coreBusy || coreError" class="panel-toast" :class="{ error: coreError }">
+      <div v-if="uiVisible && (coreBusy || coreError)" class="panel-toast" :class="{ error: coreError }">
         {{ coreError || 'AIコアへ接続しています...' }}
       </div>
     </div>

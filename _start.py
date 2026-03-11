@@ -2,18 +2,17 @@
 
 """開発環境起動スクリプト
 
-バックエンド(core,apps)・フロントエンド(Web)・フロントエンド(Avatar)・
-フロントエンド(GUI) の4系統を統一手順で起動します。
+バックエンド(core,apps)・フロントエンド(Web)・フロントエンド(Avatar) の
+3系統を統一手順で起動します。
 
 標準の起動順:
 1. バックエンド(core,apps)
 2. 落ち着き待機
 3. フロントエンド(Avatar) を起動するか 5 秒確認
-4. フロントエンド(GUI) を起動するか 5 秒確認
-5. フロントエンド(Web)
-6. 落ち着き待機
-7. Web ページ表示
-8. 自動再起動監視
+4. フロントエンド(Web)
+5. 落ち着き待機
+6. Web ページ表示
+7. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -78,10 +77,6 @@ FRONTEND_WEB_PORT = 8090
 FRONTEND_AVATAR_PATH = "frontend_avatar"
 FRONTEND_AVATAR_PORT = 8099
 
-FRONTEND_GUI_PATH = "frontend_gui"
-FRONTEND_GUI_ENTRYPOINT = "main"
-FRONTEND_GUI_ENV_CANDIDATES = [".venv", "venv"]
-
 FRONTEND_COMMAND = "npm"
 QUIET_WAIT_SECONDS = 15
 QUIET_MAX_WAIT_SECONDS = 60
@@ -91,9 +86,6 @@ BASE_DIR = Path(__file__).parent
 BACKEND_DIR = BASE_DIR / BACKEND_PATH
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
-FRONTEND_GUI_DIR = BASE_DIR / FRONTEND_GUI_PATH
-
-
 def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
     for env_name in env_candidates:
         if sys.platform == "win32":
@@ -127,13 +119,6 @@ def get_backend_command(app_module: str, port: int) -> list[str]:
     return ["uv", "run", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port)]
 
 
-def get_gui_command() -> list[str]:
-    gui_python = find_python_in_env(FRONTEND_GUI_DIR, FRONTEND_GUI_ENV_CANDIDATES)
-    if gui_python is not None:
-        return [str(gui_python), "-m", FRONTEND_GUI_ENTRYPOINT]
-    return ["uv", "run", "python", "-m", FRONTEND_GUI_ENTRYPOINT]
-
-
 def check_backend_environment() -> tuple[bool, str]:
     if not BACKEND_DIR.exists():
         return False, f"フォルダが見つかりません: {BACKEND_DIR}"
@@ -162,19 +147,6 @@ def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
     except Exception as exc:
         return False, f"node_modules の確認でエラー: {exc}"
     return True, str(node_modules)
-
-
-def check_gui_environment() -> tuple[bool, str]:
-    if not FRONTEND_GUI_DIR.exists():
-        return False, f"フォルダが見つかりません: {FRONTEND_GUI_DIR}"
-    if not (FRONTEND_GUI_DIR / "pyproject.toml").exists():
-        return False, f"pyproject.toml が見つかりません: {FRONTEND_GUI_DIR / 'pyproject.toml'}"
-    gui_python = find_python_in_env(FRONTEND_GUI_DIR, FRONTEND_GUI_ENV_CANDIDATES)
-    if gui_python is not None:
-        return True, str(gui_python)
-    if check_command_exists("uv"):
-        return True, "uv"
-    return False, f"Python 仮想環境 ({' / '.join(FRONTEND_GUI_ENV_CANDIDATES)}) または uv が見つかりません"
 
 
 def _listening_pids_windows(port: int) -> list[str]:
@@ -329,10 +301,6 @@ def start_frontend_avatar(npm_command: str) -> subprocess.Popen[bytes]:
     return launch_process("フロントエンド(Avatar)", [npm_command, "run", "dev"], FRONTEND_AVATAR_DIR)
 
 
-def start_frontend_gui() -> subprocess.Popen[bytes]:
-    return launch_process("フロントエンド(GUI)", get_gui_command(), FRONTEND_GUI_DIR)
-
-
 def stream_output(name: str, stream, last_output_times: dict[str, float]) -> None:
     if stream is None:
         return
@@ -429,13 +397,12 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
     return default_yes
 
 
-def collect_startup_choices() -> tuple[bool, bool, bool, bool]:
+def collect_startup_choices() -> tuple[bool, bool, bool]:
     print_header("起動条件の確認")
     backend_enabled = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
     web_enabled     = prompt_choice("フロントエンド(Web)      起動しますか?", default_yes=True)
     avatar_enabled  = prompt_choice("フロントエンド(Avatar)   起動しますか?", default_yes=False)
-    gui_enabled     = prompt_choice("フロントエンド(GUI)      起動しますか?", default_yes=False)
-    return backend_enabled, web_enabled, avatar_enabled, gui_enabled
+    return backend_enabled, web_enabled, avatar_enabled
 
 
 def open_browser(port: int) -> None:
@@ -487,7 +454,6 @@ def validate_initial_environment(
     backend_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
-    gui_enabled: bool,
 ) -> tuple[bool, str | None]:
     print_header("環境確認")
     has_error = False
@@ -527,40 +493,21 @@ def validate_initial_environment(
             print_info(f"  対応例: cd {FRONTEND_AVATAR_PATH} && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
 
-    if gui_enabled:
-        ok, detail = check_gui_environment()
-        if ok:
-            print_success(f"フロントエンド(GUI): OK")
-        else:
-            print_error(f"フロントエンド(GUI): 未準備 ({detail})")
-            print_info(f"  対応例: cd {FRONTEND_GUI_PATH} && uv sync")
-            has_error = True
-
     return (not has_error), npm_command
 
 
 def ensure_optional_service_ready(name: str, npm_command: str | None) -> bool:
-    if name == "フロントエンド(Avatar)":
-        if npm_command is None:
-            print_warning(f"{name}: npm コマンドが見つからないため起動をスキップします")
-            print_info("  対応例: Node.js をインストールしてください")
-            return False
-        ok, detail = check_npm_project_environment(FRONTEND_AVATAR_DIR)
-        if ok:
-            print_success(f"{name}: OK ({detail})")
-            return True
-        print_warning(f"{name}: 未準備のため起動をスキップします ({detail})")
-        print_info(f"  対応例: cd {FRONTEND_AVATAR_PATH}")
-        print_info(f"  対応例: {get_npm_command() or FRONTEND_COMMAND} install")
+    if npm_command is None:
+        print_warning(f"{name}: npm コマンドが見つからないため起動をスキップします")
+        print_info("  対応例: Node.js をインストールしてください")
         return False
-
-    ok, detail = check_gui_environment()
+    ok, detail = check_npm_project_environment(FRONTEND_AVATAR_DIR)
     if ok:
         print_success(f"{name}: OK ({detail})")
         return True
     print_warning(f"{name}: 未準備のため起動をスキップします ({detail})")
-    print_info(f"  対応例: cd {FRONTEND_GUI_PATH}")
-    print_info("  対応例: uv sync")
+    print_info(f"  対応例: cd {FRONTEND_AVATAR_PATH}")
+    print_info(f"  対応例: {get_npm_command() or FRONTEND_COMMAND} install")
     return False
 
 
@@ -585,8 +532,6 @@ def start_service(
                 print_error("フロントエンド(Avatar): npm コマンドが見つかりません")
                 return False
             process = start_frontend_avatar(npm_command)
-        elif name == "フロントエンド(GUI)":
-            process = start_frontend_gui()
         else:
             print_error(f"未対応のサービスです: {name}")
             return False
@@ -618,7 +563,6 @@ def maybe_kill_initial_ports(
 def start_initial_services(
     start_backend_enabled: bool,
     avatar_enabled: bool,
-    gui_enabled: bool,
     web_enabled: bool,
     processes: dict[str, subprocess.Popen[bytes]],
     last_output_times: dict[str, float],
@@ -629,7 +573,6 @@ def start_initial_services(
         "バックエンド(apps)": start_backend_enabled,
         "フロントエンド(Web)": web_enabled,
         "フロントエンド(Avatar)": False,
-        "フロントエンド(GUI)": False,
     }
 
     maybe_kill_initial_ports(
@@ -653,12 +596,6 @@ def start_initial_services(
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
-
-    if gui_enabled and ensure_optional_service_ready("フロントエンド(GUI)", npm_command):
-        selected_flags["フロントエンド(GUI)"] = True
-        print_header("フロントエンド(GUI) 起動")
-        start_service("フロントエンド(GUI)", processes, last_output_times, npm_command)
-        wait_for_services_quiet(last_output_times, ["フロントエンド(GUI)"], label="フロントエンド(GUI)")
 
     if web_enabled:
         print_header("フロントエンド(Web) 起動")
@@ -728,13 +665,12 @@ def monitor_and_restart(
 
 
 def main() -> None:
-    backend_enabled, web_enabled, avatar_enabled, gui_enabled = collect_startup_choices()
+    backend_enabled, web_enabled, avatar_enabled = collect_startup_choices()
 
     is_ready, npm_command = validate_initial_environment(
         backend_enabled=backend_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
-        gui_enabled=gui_enabled,
     )
     if not is_ready:
         print()
@@ -752,7 +688,6 @@ def main() -> None:
             selected_services = start_initial_services(
                 start_backend_enabled=backend_enabled,
                 avatar_enabled=avatar_enabled,
-                gui_enabled=gui_enabled,
                 web_enabled=web_enabled,
                 processes=processes,
                 last_output_times=last_output_times,
@@ -768,9 +703,6 @@ def main() -> None:
                 print_success(f"フロントエンド(Web): http://localhost:{FRONTEND_WEB_PORT}/")
             if "フロントエンド(Avatar)" in processes:
                 print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{FRONTEND_AVATAR_PORT}")
-            if "フロントエンド(GUI)" in processes:
-                print_success("フロントエンド(GUI): デスクトップアプリ起動中")
-
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)
 
         except KeyboardInterrupt:

@@ -36,9 +36,12 @@ const props = defineProps<{
   active: boolean
 }>()
 
+const emit = defineEmits<{
+  'send-input-payload': [message: Record<string, unknown>]
+}>()
+
 // --- 接続 ---
 let fileSocket: AIWebSocket | null = null
-let requestSocket: AIWebSocket | null = null
 const 接続済み = ref(false)
 // --- ファイルリスト ---
 const プロジェクトパス = ref('')
@@ -381,8 +384,7 @@ const ファイル保存 = async () => {
     }
     ファイル内容テキスト.value = 内容
     編集モード終了()
-    requestSocket?.send({
-      セッションID: props.sessionId,
+    emit('send-input-payload', {
       チャンネル: 'file',
       メッセージ識別: 'files_save',
       メッセージ内容: { ファイル名: 選択ファイルパス.value },
@@ -430,10 +432,8 @@ const ファイルダウンロード = async () => {
 // ===================== WebSocket =====================
 
 const バックアップリスト要求 = (読込表示 = false) => {
-  if (!requestSocket?.isConnected()) return
   if (読込表示) 左読込中.value = true
-  requestSocket.send({
-    セッションID: props.sessionId,
+  emit('send-input-payload', {
     チャンネル: 'file',
     メッセージ識別: 'files_backup',
     メッセージ内容: { 要求日時: バックアップ要求日時.value },
@@ -441,10 +441,8 @@ const バックアップリスト要求 = (読込表示 = false) => {
 }
 
 const テンプリスト要求 = async (読込表示 = false) => {
-  if (!requestSocket?.isConnected()) return
   if (読込表示) 右読込中.value = true
-  requestSocket.send({
-    セッションID: props.sessionId,
+  emit('send-input-payload', {
     チャンネル: 'file',
     メッセージ識別: 'files_temp',
     メッセージ内容: { 要求日時: テンプリスト要求日時.value },
@@ -453,7 +451,7 @@ const テンプリスト要求 = async (読込表示 = false) => {
 
 const ファイルリスト要求 = () => {
   下部ファイル表示クリア()
-  if (props.sessionId && (!requestSocket?.isConnected() || !fileSocket?.isConnected())) {
+  if (props.sessionId && !fileSocket?.isConnected()) {
     void connectFileSocket()
     return
   }
@@ -541,23 +539,17 @@ const テンプリスト受信処理 = async (受信データ: any) => {
 
 async function connectFileSocket() {
   if (!props.sessionId) return
-  requestSocket?.disconnect()
   fileSocket?.disconnect()
-  requestSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, 'input')
   fileSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, 'file')
   const 接続状態更新 = () => {
-    接続済み.value = Boolean(requestSocket?.isConnected() && fileSocket?.isConnected())
+    接続済み.value = Boolean(fileSocket?.isConnected())
   }
-  requestSocket.onStateChange(() => {
-    接続状態更新()
-  })
   fileSocket.onStateChange(() => {
     接続状態更新()
   })
   fileSocket.on('files_backup', バックアップリスト受信処理)
   fileSocket.on('files_temp', テンプリスト受信処理)
   try {
-    await requestSocket.connect()
     await fileSocket.connect()
     接続状態更新()
     ファイルリスト要求()
@@ -591,7 +583,13 @@ const キーボードキーダウン = (e: KeyboardEvent) => {
 // --- watchers ---
 
 watch(() => props.sessionId, () => {
-  if (props.sessionId) void connectFileSocket()
+  if (props.sessionId) {
+    void connectFileSocket()
+    return
+  }
+  fileSocket?.disconnect()
+  fileSocket = null
+  接続済み.value = false
 })
 
 watch(() => props.active, (active) => {
@@ -630,8 +628,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', キーボードキーダウン)
   テンプリスト自動送信停止()
-  requestSocket?.disconnect()
-  requestSocket = null
   fileSocket?.disconnect()
   fileSocket = null
   monacoエディタ破棄()
