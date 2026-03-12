@@ -187,6 +187,10 @@ class SessionConnection:
 
         # チャンネル別ファイルリスト: {チャンネル: [{パス: str, 時刻: datetime}, ...]}
         self.チャンネル別ファイルリスト: Dict[str, List[dict]] = {}
+        # チャンネル0のwelcome_text送信後に output_text/recognition_output を core に転送
+        self.チャンネル0_welcome_text送信済み = False
+        # core再接続時の字幕用に、最新の recognition_output だけ保持
+        self.最新認識出力: Optional[dict] = None
 
     def ファイル登録(self, チャンネル: str, ファイルパス: str):
         """チャンネルのファイルリストにファイルを追加"""
@@ -227,7 +231,7 @@ class SessionConnection:
         """チャンネルに応じて送信先ソケットを決定"""
         チャンネル = data.get("チャンネル", None)
         if チャンネル is None:
-            チャンネル = "input"
+            チャンネル = "core"
         connection = self.sockets.get(チャンネル)
         if not connection:
             logger.warning(f"送信先ソケット未接続: session={self.セッションID} ch={チャンネル}")
@@ -236,6 +240,18 @@ class SessionConnection:
             logger.warning(f"送信先ソケット切断: session={self.セッションID} ch={チャンネル}")
             return
         await connection.send_json(data)
+
+        # チャンネル0の応答系メッセージを core にも転送
+        if チャンネル == "0":
+            識別 = data.get("メッセージ識別", "")
+            if 識別 == "welcome_text":
+                self.チャンネル0_welcome_text送信済み = True
+            elif 識別 == "recognition_output":
+                self.最新認識出力 = {**data}
+            if self.チャンネル0_welcome_text送信済み and 識別 in ("output_text", "recognition_output"):
+                core_conn = self.sockets.get("core")
+                if core_conn and core_conn.is_connected:
+                    await core_conn.send_json({**data, "チャンネル": "core"})
 
     async def send_to_channel(self, チャンネル: str, data: dict):
         # output_fileの自動追跡
@@ -440,7 +456,7 @@ class WebSocketManager:
             "メッセージ識別": "init",
             "メッセージ内容": {}
         }
-        if socket_no == "input":
+        if socket_no == "core":
             init_payload["メッセージ内容"] = {
                 "ボタン": session.ボタン状態.copy(),
                 "モデル設定": session.モデル設定

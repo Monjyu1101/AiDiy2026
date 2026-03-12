@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import apiClient from '@/lib/api'
 import { AI_WS_ENDPOINT } from '@/lib/config'
 import { AIWebSocket } from '@/lib/websocket'
+import AIコードファイル内容表示 from '@/components/AIコード_ファイル内容表示.vue'
+import AIコード更新ファイル一覧 from '@/components/AIコード_更新ファイル一覧.vue'
 
 type コードチャンネル = '1' | '2' | '3' | '4'
 type 行種別 =
@@ -12,13 +15,14 @@ type 行種別 =
   | 'input_file'
   | 'output_file'
   | 'cancel_run'
-  | 'stream'
 
 type 行データ = {
   id: string
   role: 行種別
   content: string
-  fileName?: string
+  render: 'effect' | 'static'
+  kind: 'text' | 'file'
+  fileName?: string | null
   thumbnail?: string | null
   isStream?: boolean
   isCollapsed?: boolean
@@ -39,227 +43,433 @@ const emit = defineEmits<{
 }>()
 
 const 出力接続済み = ref(false)
+const WebSocket接続中 = computed(() => props.inputConnected && 出力接続済み.value)
+const 接続状態表示 = computed(() => (WebSocket接続中.value ? '接続中' : '切断'))
+
 const メッセージ一覧 = ref<行データ[]>([])
+const コンテンツ領域 = ref<HTMLElement | null>(null)
 const 入力テキスト = ref('')
+const テキストエリア = ref<HTMLTextAreaElement | null>(null)
 const 送信中 = ref(false)
 const ストリーム受信中 = ref(false)
 const ドラッグ中 = ref(false)
-const チャット領域 = ref<HTMLElement | null>(null)
-const テキストエリア = ref<HTMLTextAreaElement | null>(null)
 const 入力欄最大到達 = ref(false)
 const 入力欄固定中 = ref(false)
 const 入力欄固定高さ = ref(60)
 const 入力欄最小高さ = 60
 const 入力欄最大高さ = ref(380)
+const ウェルカム内容 = ref('')
+const 更新ファイル一覧 = ref<string[]>([])
+const 更新ファイルダイアログ表示 = ref(false)
+const ファイル内容ダイアログ表示 = ref(false)
+const 表示ファイル名 = ref('')
+const 表示base64_data = ref('')
 
 let 出力WebSocket: AIWebSocket | null = null
+let 出力状態購読解除: (() => void) | null = null
 let messageSeq = 0
-let streamMessageId: string | null = null
-
-const WebSocket接続中 = computed(() => 出力接続済み.value)
-const 接続状態表示 = computed(() => (WebSocket接続中.value ? '接続中' : '切断'))
-
-// ===================== ターミナルエフェクト =====================
+let ストリームメッセージID: string | null = null
 
 type 演出状態 = {
-  container: HTMLElement
   textSpan: HTMLElement
   cursorSpan: HTMLElement
   queue: string[]
   running: boolean
   ready: boolean
   finalizeOnEmpty: boolean
+  isStream: boolean
   blinkInterval: ReturnType<typeof setInterval>
 }
 
 const 演出状態Map = new Map<string, 演出状態>()
-const 描画済みID = new Set<string>()
-const ストリーム既知長 = new Map<string, number>()
 
-function カーソル色取得(role: 行種別): string {
+function 最下部スクロール() {
+  nextTick(() => {
+    if (コンテンツ領域.value) {
+      コンテンツ領域.value.scrollTop = コンテンツ領域.value.scrollHeight
+    }
+  })
+}
+
+function 新規メッセージID() {
+  return `code-${props.channel}-${props.sessionId || 'nosession'}-${messageSeq++}`
+}
+
+function 速度設定(文字数: number, isStream: boolean) {
+  if (isStream) {
+    return { interval: 2, batch: Math.max(8, Math.floor(文字数 / 12) + 2) }
+  }
+  return { interval: 10, batch: Math.floor(文字数 / 50) + 1 }
+}
+
+function カーソル色取得(role: 行種別) {
   switch (role) {
-    case 'input_text': return '#ffffff'
-    case 'input_request': return '#ffaa66'
-    case 'output_text': return '#00ff00'
-    case 'welcome_text': return '#00ff00'
-    case 'cancel_run': return '#ff5555'
-    case 'stream': return '#00ff00'
-    default: return '#00ff00'
+    case 'input_text':
+      return '#ffffff'
+    case 'input_request':
+      return '#00ffff'
+    case 'cancel_run':
+      return '#ff4444'
+    default:
+      return '#00ff00'
   }
 }
 
-function 速度設定(len: number) {
-  return { interval: 10, batch: Math.floor(len / 50) + 1 }
-}
+function 演出初期化(メッセージID: string, 表示領域: HTMLElement, カーソル色: string, isStream: boolean) {
+  表示領域.innerHTML = ''
 
-function 演出初期化(id: string, container: HTMLElement, cursorColor: string) {
-  container.innerHTML = ''
   const textSpan = document.createElement('span')
   textSpan.className = 'terminal-text'
-  container.appendChild(textSpan)
+  表示領域.appendChild(textSpan)
+
   const cursorSpan = document.createElement('span')
   cursorSpan.className = 'terminal-cursor'
   cursorSpan.textContent = '\u0020'
   cursorSpan.style.display = 'inline-block'
   cursorSpan.style.width = '8px'
-  cursorSpan.style.backgroundColor = cursorColor
-  cursorSpan.style.color = '#000'
-  container.appendChild(cursorSpan)
+  cursorSpan.style.backgroundColor = カーソル色
+  cursorSpan.style.color = '#000000'
+  表示領域.appendChild(cursorSpan)
 
   let blinkVisible = true
   const blinkInterval = setInterval(() => {
-    cursorSpan.style.backgroundColor = blinkVisible ? 'transparent' : cursorColor
+    cursorSpan.style.backgroundColor = blinkVisible ? 'transparent' : カーソル色
     blinkVisible = !blinkVisible
   }, 300)
 
-  const state: 演出状態 = { container, textSpan, cursorSpan, queue: [], running: false, ready: false, finalizeOnEmpty: false, blinkInterval }
-  演出状態Map.set(id, state)
+  演出状態Map.set(メッセージID, {
+    textSpan,
+    cursorSpan,
+    queue: [],
+    running: false,
+    ready: false,
+    finalizeOnEmpty: false,
+    isStream,
+    blinkInterval,
+  })
+
   最下部スクロール()
-  window.setTimeout(() => { state.ready = true; 演出実行(id) }, 500)
+
+  window.setTimeout(() => {
+    const state = 演出状態Map.get(メッセージID)
+    if (!state) return
+    state.ready = true
+    演出実行(メッセージID)
+  }, isStream ? 30 : 500)
 }
 
-function 演出キュー追加(id: string, text: string, finalize: boolean) {
-  const state = 演出状態Map.get(id)
+function 演出キュー追加(メッセージID: string, 文字列: string, finalize: boolean) {
+  const state = 演出状態Map.get(メッセージID)
   if (!state) return
-  if (text) state.queue.push(text)
-  if (finalize) state.finalizeOnEmpty = true
-  演出実行(id)
+  if (文字列) {
+    state.queue.push(文字列)
+  }
+  if (finalize) {
+    state.finalizeOnEmpty = true
+  }
+  演出実行(メッセージID)
 }
 
-function 演出実行(id: string) {
-  const state = 演出状態Map.get(id)
+function 演出実行(メッセージID: string) {
+  const state = 演出状態Map.get(メッセージID)
   if (!state || state.running || !state.ready) return
+
   if (state.queue.length === 0) {
-    if (state.finalizeOnEmpty) {
-      state.cursorSpan.remove()
-      clearInterval(state.blinkInterval)
-      演出状態Map.delete(id)
-      最下部スクロール()
-    }
+    if (!state.finalizeOnEmpty) return
+    state.cursorSpan.remove()
+    clearInterval(state.blinkInterval)
+    演出状態Map.delete(メッセージID)
+    最下部スクロール()
     return
   }
+
   state.running = true
   const chunk = state.queue.shift() ?? ''
-  const { interval, batch } = 速度設定(chunk.length)
+  const { interval, batch } = 速度設定(chunk.length, state.isStream)
   let index = 0
+
   const tick = () => {
     const end = Math.min(index + batch, chunk.length)
-    if (end > index) { state.textSpan.textContent += chunk.slice(index, end); index = end; nextTick(最下部スクロール) }
-    if (index >= chunk.length) { state.running = false; nextTick(最下部スクロール); 演出実行(id); return }
+    if (end > index) {
+      state.textSpan.textContent += chunk.slice(index, end)
+      index = end
+      nextTick(最下部スクロール)
+    }
+    if (index >= chunk.length) {
+      state.running = false
+      nextTick(最下部スクロール)
+      演出実行(メッセージID)
+      return
+    }
     window.setTimeout(tick, interval)
   }
+
   tick()
 }
 
-function メッセージ描画開始(msg: 行データ) {
-  if (描画済みID.has(msg.id)) return
-  描画済みID.add(msg.id)
-  if (msg.role === 'input_file' || msg.role === 'output_file') return
-  nextTick(() => {
-    const el = document.getElementById(msg.id)
-    if (!el) return
-    const bubble = el.querySelector('.bubble-content') as HTMLElement | null
-    if (!bubble) return
-    演出初期化(msg.id, bubble, カーソル色取得(msg.role))
-    演出キュー追加(msg.id, msg.content, !msg.isStream)
+function ファイルメッセージ追加(role: 行種別, fileName?: string | null, thumbnail?: string | null) {
+  メッセージ一覧.value.push({
+    id: 新規メッセージID(),
+    role,
+    content: '',
+    render: 'static',
+    kind: 'file',
+    fileName: fileName ?? null,
+    thumbnail: thumbnail ?? null,
   })
-}
-
-function ストリーム追記チェック(msg: 行データ) {
-  if (!msg.isStream) return
-  const state = 演出状態Map.get(msg.id)
-  if (!state) return
-  const prev = ストリーム既知長.get(msg.id) ?? 0
-  if (msg.content.length > prev) {
-    演出キュー追加(msg.id, msg.content.slice(prev), false)
-    ストリーム既知長.set(msg.id, msg.content.length)
-  }
-  if (msg.isCollapsed) {
-    演出キュー追加(msg.id, '', true)
-    ストリーム既知長.delete(msg.id)
-  }
-}
-
-// ===================== メッセージ管理 =====================
-
-function newId() {
-  return `code-${props.channel}-${Date.now()}-${messageSeq++}`
-}
-
-function pushLine(role: 行種別, content: string, extra?: Partial<行データ>) {
-  メッセージ一覧.value.push({ id: newId(), role, content, ...extra })
   最下部スクロール()
 }
 
-function payloadText(message: Record<string, unknown>) {
-  const v = message.メッセージ内容
-  if (typeof v === 'string') return v
-  if (v == null) return ''
-  return JSON.stringify(v, null, 2)
+function ターミナルメッセージ追加(role: 行種別, 内容: string, 追加オプション?: Partial<行データ>, finalize = true) {
+  const メッセージID = 新規メッセージID()
+  メッセージ一覧.value.push({
+    id: メッセージID,
+    role,
+    content: 内容,
+    render: 'effect',
+    kind: 'text',
+    ...(追加オプション || {}),
+  })
+
+  nextTick(() => {
+    const メッセージ要素 = document.getElementById(メッセージID)
+    const bubbleElement = メッセージ要素?.querySelector('.content-area') as HTMLElement | null
+    if (!bubbleElement) return
+    演出初期化(メッセージID, bubbleElement, カーソル色取得(role), Boolean(追加オプション?.isStream))
+    演出キュー追加(メッセージID, 内容, finalize)
+  })
 }
 
-function handleOutputStream(message: Record<string, unknown>) {
-  const content = payloadText(message).trim()
-  if (!content) return
-  if (content === '<<< 処理開始 >>>') {
-    const id = newId()
-    streamMessageId = id
-    ストリーム受信中.value = true
-    メッセージ一覧.value.push({ id, role: 'stream', content: `${content}\n`, isStream: true, isCollapsed: false })
-    最下部スクロール()
+function 受信内容文字列(message: Record<string, unknown>) {
+  const value = message.メッセージ内容 ?? message.text ?? ''
+  if (!value) return ''
+  return typeof value === 'string' ? value : JSON.stringify(value)
+}
+
+function ウェルカム処理(message: Record<string, unknown>) {
+  const 内容 = 受信内容文字列(message)
+  if (内容) {
+    ウェルカム内容.value = 内容
+  }
+}
+
+function 入力テキスト受信処理(message: Record<string, unknown>) {
+  const 内容 = 受信内容文字列(message)
+  if (内容) {
+    ターミナルメッセージ追加('input_text', `> ${内容}`)
+  }
+}
+
+function 入力リクエスト受信処理(message: Record<string, unknown>) {
+  const 内容 = 受信内容文字列(message)
+  if (内容) {
+    ターミナルメッセージ追加('input_request', 内容)
+  }
+}
+
+function 入力ファイル受信処理(message: Record<string, unknown>) {
+  ファイルメッセージ追加('input_file', String(message.ファイル名 || ''), (message.サムネイル画像 as string) ?? null)
+}
+
+function 出力テキスト受信処理(message: Record<string, unknown>) {
+  const 内容 = 受信内容文字列(message)
+  if (内容) {
+    ターミナルメッセージ追加('output_text', 内容)
+  }
+  送信中.value = false
+}
+
+function ウェルカムテキスト受信処理(message: Record<string, unknown>) {
+  const 内容 = 受信内容文字列(message)
+  if (内容) {
+    ターミナルメッセージ追加('welcome_text', 内容)
+  }
+}
+
+function 出力ファイル受信処理(message: Record<string, unknown>) {
+  ファイルメッセージ追加('output_file', String(message.ファイル名 || ''), (message.サムネイル画像 as string) ?? null)
+}
+
+function cancel_run受信処理(message: Record<string, unknown>) {
+  const 内容 = 受信内容文字列(message)
+  if (内容) {
+    ターミナルメッセージ追加('cancel_run', `> ${内容}`)
+  }
+  送信中.value = false
+  ストリーム受信中.value = false
+  ストリームメッセージID = null
+}
+
+function update_info受信処理(message: Record<string, unknown>) {
+  const content = message.メッセージ内容
+  if (!content || typeof content !== 'object' || !Array.isArray((content as { update_files?: unknown[] }).update_files)) {
     return
   }
-  if (content === '<<< 処理終了 >>>') {
-    const target = メッセージ一覧.value.find((m) => m.id === streamMessageId)
-    if (target) { target.content += `${content}\n`; target.isCollapsed = true }
-    streamMessageId = null
+
+  const files = (content as { update_files: unknown[] }).update_files.filter(
+    (file): file is string => typeof file === 'string' && file.length > 0,
+  )
+  if (files.length === 0) return
+
+  更新ファイル一覧.value = files
+  更新ファイルダイアログ表示.value = true
+}
+
+function 出力ストリーム受信処理(message: Record<string, unknown>) {
+  const 内容 = 受信内容文字列(message)
+  if (!内容) return
+
+  if (内容 === '<<< 処理開始 >>>') {
+    const メッセージID = 新規メッセージID()
+    ストリームメッセージID = メッセージID
+    ストリーム受信中.value = true
+
+    メッセージ一覧.value.push({
+      id: メッセージID,
+      role: 'output_text',
+      content: '',
+      render: 'effect',
+      kind: 'text',
+      isStream: true,
+      isCollapsed: false,
+    })
+
+    nextTick(() => {
+      const メッセージ要素 = document.getElementById(メッセージID)
+      const bubbleElement = メッセージ要素?.querySelector('.content-area') as HTMLElement | null
+      if (!bubbleElement) return
+      演出初期化(メッセージID, bubbleElement, '#00ff00', true)
+      演出キュー追加(メッセージID, `${内容}\n`, false)
+    })
+    return
+  }
+
+  if (内容 === '<<< 処理終了 >>>' || 内容 === '<<< 処理中断 >>>' || 内容 === '!') {
+    if (ストリームメッセージID) {
+      演出キュー追加(ストリームメッセージID, `${内容}\n`, true)
+      const target = メッセージ一覧.value.find((msg) => msg.id === ストリームメッセージID)
+      if (target) {
+        target.isCollapsed = true
+      }
+    }
+    ストリームメッセージID = null
     ストリーム受信中.value = false
     送信中.value = false
-    最下部スクロール()
     return
   }
-  const target = メッセージ一覧.value.find((m) => m.id === streamMessageId)
-  if (target) { target.content += `${content}\n` }
-  最下部スクロール()
+
+  if (ストリームメッセージID) {
+    演出キュー追加(ストリームメッセージID, `${内容}\n`, false)
+    return
+  }
+
+  const メッセージID = 新規メッセージID()
+  ストリームメッセージID = メッセージID
+  ストリーム受信中.value = true
+  メッセージ一覧.value.push({
+    id: メッセージID,
+    role: 'output_text',
+    content: '',
+    render: 'effect',
+    kind: 'text',
+    isStream: true,
+    isCollapsed: false,
+  })
+
+  nextTick(() => {
+    const メッセージ要素 = document.getElementById(メッセージID)
+    const bubbleElement = メッセージ要素?.querySelector('.content-area') as HTMLElement | null
+    if (!bubbleElement) return
+    演出初期化(メッセージID, bubbleElement, '#00ff00', true)
+    演出キュー追加(メッセージID, `${内容}\n`, false)
+  })
 }
 
-// ===================== WebSocket =====================
-
 function bindSocket(socket: AIWebSocket) {
-  socket.onStateChange((connected) => { 出力接続済み.value = connected })
-  socket.on('welcome_info', (m) => { const t = payloadText(m).trim(); if (t) pushLine('welcome_text', t) })
-  socket.on('welcome_text', (m) => { const t = payloadText(m).trim(); if (t) pushLine('welcome_text', t) })
-  socket.on('input_text', (m) => { const t = payloadText(m).trim(); if (t) pushLine('input_text', t) })
-  socket.on('input_request', (m) => { const t = payloadText(m).trim(); if (t) pushLine('input_request', t) })
-  socket.on('output_text', (m) => { const t = payloadText(m).trim(); if (t) pushLine('output_text', t); 送信中.value = false })
-  socket.on('output_stream', handleOutputStream)
-  socket.on('cancel_run', (m) => { const t = payloadText(m).trim(); if (t) pushLine('cancel_run', t); 送信中.value = false; ストリーム受信中.value = false })
-  socket.on('input_file', (m) => { pushLine('input_file', '', { fileName: String(m.ファイル名 || ''), thumbnail: (m.サムネイル画像 as string) ?? null }) })
-  socket.on('output_file', (m) => { pushLine('output_file', '', { fileName: String(m.ファイル名 || ''), thumbnail: (m.サムネイル画像 as string) ?? null }) })
-  socket.on('update_info', (m) => {
-    const 内容 = m.メッセージ内容
-    if (内容 && typeof 内容 === 'object' && Array.isArray((内容 as Record<string, unknown>).update_files)) {
-      const files = (内容 as Record<string, unknown>).update_files as string[]
-      if (files.length > 0) pushLine('welcome_text', `[更新] ${files.join(', ')}`)
-    }
+  出力状態購読解除?.()
+  出力状態購読解除 = socket.onStateChange((connected) => {
+    出力接続済み.value = connected
   })
+
+  socket.on('welcome_info', ウェルカム処理)
+  socket.on('welcome_text', ウェルカムテキスト受信処理)
+  socket.on('input_text', 入力テキスト受信処理)
+  socket.on('input_request', 入力リクエスト受信処理)
+  socket.on('input_file', 入力ファイル受信処理)
+  socket.on('output_text', 出力テキスト受信処理)
+  socket.on('output_stream', 出力ストリーム受信処理)
+  socket.on('output_file', 出力ファイル受信処理)
+  socket.on('update_info', update_info受信処理)
+  socket.on('cancel_run', cancel_run受信処理)
 }
 
 async function connectOutputSocket() {
   if (!props.sessionId) return
+  出力状態購読解除?.()
   出力WebSocket?.disconnect()
   出力WebSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, props.channel)
   bindSocket(出力WebSocket)
-  try { await 出力WebSocket.connect() } catch (e) {
-    pushLine('cancel_run', e instanceof Error ? e.message : '接続エラー')
+  try {
+    await 出力WebSocket.connect()
+  } catch (error) {
+    ターミナルメッセージ追加('cancel_run', error instanceof Error ? error.message : '接続エラー')
   }
 }
 
-// ===================== 操作 =====================
+function 入力欄状態リセット() {
+  入力欄最大到達.value = false
+  入力欄固定中.value = false
+  入力欄固定高さ.value = 入力欄最小高さ
+  if (テキストエリア.value) {
+    テキストエリア.value.style.height = `${入力欄最小高さ}px`
+  }
+}
+
+function 入力欄クリア() {
+  入力テキスト.value = ''
+  入力欄状態リセット()
+  nextTick(() => {
+    テキストエリア.value?.focus()
+    テキストエリア自動調整()
+  })
+}
+
+function テキストエリア自動調整() {
+  if (!テキストエリア.value) return
+
+  const container = テキストエリア.value.closest('.agent-container') as HTMLElement | null
+  if (container) {
+    入力欄最大高さ.value = Math.max(入力欄最小高さ, Math.floor(container.clientHeight * 0.78))
+  }
+
+  if (入力テキスト.value.length === 0) {
+    入力欄状態リセット()
+    return
+  }
+
+  if (入力欄固定中.value) {
+    入力欄最大到達.value = true
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`
+    return
+  }
+
+  テキストエリア.value.style.height = `${入力欄最小高さ}px`
+  const nextHeight = Math.max(テキストエリア.value.scrollHeight, 入力欄最小高さ)
+  if (nextHeight >= 入力欄最大高さ.value) {
+    入力欄最大到達.value = true
+    入力欄固定中.value = true
+    入力欄固定高さ.value = 入力欄最大高さ.value
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`
+    return
+  }
+
+  入力欄最大到達.value = false
+  テキストエリア.value.style.height = `${nextHeight}px`
+}
 
 function 送信() {
   const text = 入力テキスト.value.trim()
-  if (!text || !WebSocket接続中.value) return
+  if (!text || 送信中.value || !WebSocket接続中.value) return
   emit('submit', text, props.channel)
   入力テキスト.value = ''
   入力欄状態リセット()
@@ -267,7 +477,7 @@ function 送信() {
 }
 
 function キャンセル() {
-  if (!WebSocket接続中.value) return
+  if (!ストリーム受信中.value || !WebSocket接続中.value) return
   emit('cancel', props.channel)
 }
 
@@ -275,7 +485,9 @@ async function fileToBase64(file: File) {
   const buffer = await file.arrayBuffer()
   let binary = ''
   const bytes = new Uint8Array(buffer)
-  bytes.forEach((b) => { binary += String.fromCharCode(b) })
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte)
+  })
   return btoa(binary)
 }
 
@@ -286,119 +498,182 @@ async function handleFiles(files: File[]) {
   }
 }
 
-function handleDrop(e: DragEvent) {
-  e.preventDefault(); ドラッグ中.value = false
-  const files = Array.from(e.dataTransfer?.files || [])
-  if (files.length) void handleFiles(files)
+function handleDrop(event: DragEvent) {
+  event.preventDefault()
+  ドラッグ中.value = false
+  if (!WebSocket接続中.value) return
+  const files = Array.from(event.dataTransfer?.files || [])
+  if (files.length > 0) {
+    void handleFiles(files)
+  }
 }
 
-function handleDragOver(e: DragEvent) { e.preventDefault(); if (WebSocket接続中.value) ドラッグ中.value = true }
-function handleDragLeave(e: DragEvent) { e.preventDefault(); if (e.currentTarget === e.target) ドラッグ中.value = false }
+function handleDragOver(event: DragEvent) {
+  event.preventDefault()
+  if (WebSocket接続中.value) {
+    ドラッグ中.value = true
+  }
+}
 
-// ===================== クリック→貼り付け =====================
+function handleDragLeave(event: DragEvent) {
+  event.preventDefault()
+  if (event.currentTarget === event.target) {
+    ドラッグ中.value = false
+  }
+}
 
-const 貼り付け対象: 行種別[] = ['input_text', 'output_text', 'input_request', 'cancel_run', 'welcome_text']
+const 貼り付け対象ロール: 行種別[] = ['input_text', 'input_request', 'input_file', 'output_file', 'output_text']
+const 画像拡張子セット = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'])
+const テキスト拡張子セット = new Set([
+  'py', 'vue', 'ts', 'tsx', 'js', 'jsx', 'json', 'md', 'txt',
+  'html', 'css', 'scss', 'sass', 'less', 'yml', 'yaml', 'toml',
+  'ini', 'env', 'sql', 'csv', 'log', 'xml', 'sh', 'ps1', 'bat',
+])
 
-function メッセージクリック(msg: 行データ) {
-  if (msg.isStream && msg.isCollapsed) { msg.isCollapsed = false; return }
-  if (msg.role === 'input_file' || msg.role === 'output_file') {
-    if (msg.fileName) {
-      const sep = 入力テキスト.value && !入力テキスト.value.endsWith('\n') ? '\n' : ''
-      入力テキスト.value = `${入力テキスト.value}${sep}"${msg.fileName}"\n`
+function 右トリム(text: string) {
+  return text.replace(/\s+$/u, '')
+}
+
+function 拡張子取得(fileName: string) {
+  const queryRemoved = (fileName || '').split(/[?#]/u, 1)[0] || ''
+  const slashIndex = Math.max(queryRemoved.lastIndexOf('/'), queryRemoved.lastIndexOf('\\'))
+  const baseName = slashIndex >= 0 ? queryRemoved.slice(slashIndex + 1) : queryRemoved
+  const dotIndex = baseName.lastIndexOf('.')
+  if (dotIndex < 0) return ''
+  return baseName.slice(dotIndex + 1).toLowerCase()
+}
+
+function ファイル内容表示対象(fileName: string) {
+  const ext = 拡張子取得(fileName)
+  return 画像拡張子セット.has(ext) || テキスト拡張子セット.has(ext)
+}
+
+function 貼り付け用文字列取得(message: 行データ) {
+  if (message.kind === 'file') {
+    return message.fileName ? `"${message.fileName}"` : ''
+  }
+  if (message.role === 'input_text') {
+    return message.content.replace(/^>\s*/, '')
+  }
+  return message.content
+}
+
+function メッセージ貼り付け可能(message: 行データ) {
+  if (message.isStream) return false
+  return 貼り付け対象ロール.includes(message.role)
+}
+
+async function ファイル内容表示を開く(fileName: string) {
+  if (!ファイル内容表示対象(fileName)) return
+  try {
+    const response = await apiClient.post('/core/files/内容取得', { ファイル名: fileName })
+    if (response?.data?.status !== 'OK') return
+    const base64_data = response?.data?.data?.base64_data
+    if (typeof base64_data !== 'string' || !base64_data) return
+    表示ファイル名.value = fileName
+    表示base64_data.value = base64_data
+    ファイル内容ダイアログ表示.value = true
+  } catch (error) {
+    console.error('[AIコード] ファイル内容取得エラー:', error)
+  }
+}
+
+function ファイル内容ダイアログ閉じる() {
+  ファイル内容ダイアログ表示.value = false
+  表示ファイル名.value = ''
+  表示base64_data.value = ''
+}
+
+function 更新ファイルダイアログ閉じる() {
+  更新ファイルダイアログ表示.value = false
+  更新ファイル一覧.value = []
+}
+
+async function メッセージクリック(message: 行データ) {
+  if (message.isStream) {
+    if (message.isCollapsed) {
+      message.isCollapsed = false
     }
     return
   }
-  if (!貼り付け対象.includes(msg.role)) return
-  入力テキスト.value = `${msg.content.replace(/\s+$/u, '')}\n`
-  nextTick(() => { テキストエリア.value?.focus(); テキストエリア自動調整() })
-}
 
-function 折りたたみ切替(msg: 行データ) {
-  if (msg.isStream) msg.isCollapsed = !msg.isCollapsed
-}
+  if (!メッセージ貼り付け可能(message)) return
 
-function メッセージカーソル(msg: 行データ): string {
-  if (msg.isStream && msg.isCollapsed) return 'pointer'
-  if (msg.role === 'input_file' || msg.role === 'output_file') return 'pointer'
-  return 貼り付け対象.includes(msg.role) ? 'pointer' : 'default'
-}
+  const 貼り付け文字列 = 右トリム(貼り付け用文字列取得(message))
+  if (!貼り付け文字列) return
 
-function メッセージCSSクラス(role: 行種別): string {
-  switch (role) {
-    case 'input_text': return 'input_text'
-    case 'input_request': return 'input_request'
-    case 'output_text': return 'output_text'
-    case 'welcome_text': return 'welcome_text'
-    case 'cancel_run': return 'cancel_run'
-    case 'input_file': return 'input_file'
-    case 'output_file': return 'output_file'
-    case 'stream': return 'output_text'
+  const fileMessage = message.role === 'input_file' || message.role === 'output_file'
+  if (fileMessage) {
+    const separator = 入力テキスト.value && !入力テキスト.value.endsWith('\n') ? '\n' : ''
+    入力テキスト.value = `${入力テキスト.value}${separator}${貼り付け文字列}\n`
+  } else {
+    入力テキスト.value = `${貼り付け文字列}\n`
   }
-}
 
-// ===================== 入力欄 =====================
-
-function 入力欄状態リセット() {
-  入力欄最大到達.value = false; 入力欄固定中.value = false; 入力欄固定高さ.value = 入力欄最小高さ
-  if (テキストエリア.value) テキストエリア.value.style.height = `${入力欄最小高さ}px`
-}
-
-function テキストエリア自動調整() {
-  if (!テキストエリア.value) return
-  const container = テキストエリア.value.closest('.agent-container') as HTMLElement | null
-  if (container) 入力欄最大高さ.value = Math.max(入力欄最小高さ, Math.floor(container.clientHeight * 0.78))
-  if (入力テキスト.value.length === 0) { 入力欄状態リセット(); return }
-  if (入力欄固定中.value) { 入力欄最大到達.value = true; テキストエリア.value.style.height = `${入力欄固定高さ.value}px`; return }
-  テキストエリア.value.style.height = `${入力欄最小高さ}px`
-  const next = Math.max(テキストエリア.value.scrollHeight, 入力欄最小高さ)
-  if (next >= 入力欄最大高さ.value) {
-    入力欄最大到達.value = true; 入力欄固定中.value = true; 入力欄固定高さ.value = 入力欄最大高さ.value
-    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`; return
-  }
-  入力欄最大到達.value = false
-  テキストエリア.value.style.height = `${next}px`
-}
-
-function 最下部スクロール() {
-  nextTick(() => { if (チャット領域.value) チャット領域.value.scrollTop = チャット領域.value.scrollHeight })
-}
-
-// ===================== Watchers =====================
-
-watch(
-  () => メッセージ一覧.value,
-  (msgs) => {
-    for (const msg of msgs) {
-      if (!描画済みID.has(msg.id)) メッセージ描画開始(msg)
-      else if (msg.isStream) ストリーム追記チェック(msg)
+  nextTick(() => {
+    テキストエリア.value?.focus()
+    テキストエリア自動調整()
+    if (テキストエリア.value) {
+      const length = テキストエリア.value.value.length
+      テキストエリア.value.setSelectionRange(length, length)
     }
-    最下部スクロール()
-  },
-  { deep: true, immediate: true },
-)
+  })
 
-watch(入力テキスト, () => nextTick(テキストエリア自動調整))
+  if (fileMessage && message.fileName) {
+    await ファイル内容表示を開く(message.fileName)
+  }
+}
+
+function 折りたたみ切替(message: 行データ) {
+  if (message.isStream) {
+    message.isCollapsed = !message.isCollapsed
+  }
+}
+
+function メッセージカーソル(message: 行データ) {
+  if (message.isStream && message.isCollapsed) return 'pointer'
+  return メッセージ貼り付け可能(message) ? 'pointer' : 'default'
+}
+
+watch(入力テキスト, () => {
+  nextTick(テキストエリア自動調整)
+})
 
 watch(() => props.sessionId, (sessionId) => {
   if (sessionId) {
     void connectOutputSocket()
     return
   }
+  出力状態購読解除?.()
+  出力状態購読解除 = null
   出力WebSocket?.disconnect()
   出力WebSocket = null
   出力接続済み.value = false
 })
 
+watch(() => props.active, (active) => {
+  if (active) {
+    最下部スクロール()
+  }
+})
+
 onMounted(() => {
-  if (props.sessionId) void connectOutputSocket()
+  if (props.sessionId) {
+    void connectOutputSocket()
+  }
   window.addEventListener('resize', テキストエリア自動調整)
   nextTick(テキストエリア自動調整)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', テキストエリア自動調整)
-  出力WebSocket?.disconnect(); 出力WebSocket = null
-  for (const state of 演出状態Map.values()) clearInterval(state.blinkInterval)
+  出力状態購読解除?.()
+  出力状態購読解除 = null
+  出力WebSocket?.disconnect()
+  出力WebSocket = null
+  for (const state of 演出状態Map.values()) {
+    clearInterval(state.blinkInterval)
+  }
   演出状態Map.clear()
 })
 
@@ -411,45 +686,43 @@ defineExpose({
 
 <template>
   <section class="agent-container">
-    <div ref="チャット領域" class="terminal-area">
+    <div ref="コンテンツ領域" class="agent-content">
+      <div v-if="ウェルカム内容" class="welcome-message">{{ ウェルカム内容 }}</div>
+
       <div
-        v-for="msg in メッセージ一覧"
-        :key="msg.id"
-        :id="msg.id"
-        :class="['message', メッセージCSSクラス(msg.role), msg.isStream ? 'stream-output' : '', msg.isCollapsed ? 'collapsed' : '']"
+        v-for="message in メッセージ一覧"
+        :key="message.id"
+        :id="message.id"
+        :class="['terminal-line', message.role, message.isStream ? 'stream-output' : '', message.isCollapsed ? 'collapsed' : '']"
       >
-        <div
-          class="message-bubble"
-          @click="メッセージクリック(msg)"
-          :style="{ cursor: メッセージカーソル(msg) }"
-        >
-          <!-- 折りたたみ表示 -->
-          <div v-if="msg.isStream && msg.isCollapsed" class="collapsed-wrapper">
+        <div class="line-content" @click="メッセージクリック(message)" :style="{ cursor: メッセージカーソル(message) }">
+          <div v-if="message.isStream && message.isCollapsed" class="collapsed-wrapper">
             <span class="collapsed-indicator">...</span>
-            <span class="collapsed-arrow">&#x25C0;</span>
+            <span class="collapsed-arrow">◀</span>
           </div>
 
-          <div v-show="!(msg.isStream && msg.isCollapsed)" class="bubble-content">
-            <!-- ファイルメッセージ -->
-            <template v-if="msg.role === 'input_file' || msg.role === 'output_file'">
+          <div v-show="!(message.isStream && message.isCollapsed)" class="content-area">
+            <template v-if="message.kind === 'file'">
               <div class="file-message">
                 <div class="file-name">
-                  <span v-if="msg.role === 'input_file'">ファイル入力: </span>
-                  <span v-else>ファイル出力: </span>
-                  {{ msg.fileName || 'ファイル' }}
+                  <span v-if="message.role === 'input_file'">ファイル入力: </span>
+                  <span v-else-if="message.role === 'output_file'">ファイル出力: </span>
+                  {{ message.fileName || 'ファイル' }}
                 </div>
-                <img v-if="msg.thumbnail" class="file-thumbnail" :src="`data:image/png;base64,${msg.thumbnail}`" alt="" />
+                <img v-if="message.thumbnail" class="file-thumbnail" :src="`data:image/png;base64,${message.thumbnail}`" alt="" />
               </div>
             </template>
-            <!-- テキスト: ターミナルエフェクトがDOMを書き込む -->
+            <template v-else-if="message.render === 'static'">
+              {{ message.content }}
+            </template>
           </div>
 
           <span
-            v-if="msg.isStream && !msg.isCollapsed"
+            v-if="message.isStream && !message.isCollapsed"
             class="expand-indicator"
-            @click.stop="折りたたみ切替(msg)"
+            @click.stop="折りたたみ切替(message)"
             title="折りたたむ"
-          >&#x25BC;</span>
+          >▼</span>
         </div>
       </div>
 
@@ -457,9 +730,15 @@ defineExpose({
     </div>
 
     <div class="control-area">
-      <div class="text-input-area" :class="{ 'drag-over': ドラッグ中 }" @dragover="handleDragOver" @dragleave="handleDragLeave" @drop="handleDrop">
+      <div
+        class="text-input-area"
+        :class="{ 'drag-over': ドラッグ中 }"
+        @dragover="handleDragOver"
+        @dragleave="handleDragLeave"
+        @drop="handleDrop"
+      >
         <div class="input-container">
-          <span class="prompt-symbol" @click="入力テキスト = ''; 入力欄状態リセット()">&gt;</span>
+          <span class="prompt-symbol" @click="入力欄クリア">&gt;</span>
           <textarea
             ref="テキストエリア"
             v-model="入力テキスト"
@@ -467,7 +746,7 @@ defineExpose({
             :style="{ maxHeight: `${入力欄最大高さ}px` }"
             placeholder="メッセージを入力..."
             maxlength="5000"
-            :disabled="!WebSocket接続中"
+            :disabled="送信中 || !WebSocket接続中"
             @keydown.enter.exact.prevent="送信"
             @input="テキストエリア自動調整"
           ></textarea>
@@ -475,9 +754,9 @@ defineExpose({
 
         <button
           class="agent-send-btn"
-          :class="{ 'has-text': 入力テキスト.length > 0, 'ws-disabled': !WebSocket接続中 }"
+          :class="{ 'ws-disabled': !WebSocket接続中, 'has-text': 入力テキスト.length > 0 }"
           type="button"
-          :disabled="!WebSocket接続中 || !入力テキスト.trim()"
+          :disabled="!入力テキスト.trim() || 送信中 || !WebSocket接続中"
           @click="送信"
         >
           <img src="/icons/sending.png" alt="送信" />
@@ -495,6 +774,20 @@ defineExpose({
         </button>
       </div>
     </div>
+
+    <AIコード更新ファイル一覧
+      :show="更新ファイルダイアログ表示"
+      :files="更新ファイル一覧"
+      @close="更新ファイルダイアログ閉じる"
+      @select-file="ファイル内容表示を開く"
+    />
+
+    <AIコードファイル内容表示
+      :show="ファイル内容ダイアログ表示"
+      :ファイル名="表示ファイル名"
+      :base64_data="表示base64_data"
+      @close="ファイル内容ダイアログ閉じる"
+    />
   </section>
 </template>
 
@@ -504,54 +797,104 @@ defineExpose({
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #101010;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
 }
 
-.terminal-area {
+.agent-content {
   flex: 1;
-  padding: 18px;
-  overflow: auto;
-  background: #000;
-  font-family: "Courier New", monospace;
+  padding: 20px;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: #000000;
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
   font-size: 11px;
+  line-height: 1.5;
+  white-space: pre;
+  box-sizing: border-box;
 }
 
-.terminal-area::-webkit-scrollbar { width: 8px; height: 8px; }
-.terminal-area::-webkit-scrollbar-track { background: #1a1a1a; }
-.terminal-area::-webkit-scrollbar-thumb { background: #666; border-radius: 2px; }
+.agent-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-.message { margin-bottom: 1px; animation: slideIn 0.3s ease; }
-@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.agent-content::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
 
-.message-bubble {
-  display: inline-block;
-  max-width: 95%;
-  padding: 2px 8px;
+.agent-content::-webkit-scrollbar-thumb {
+  background: #666666;
   border-radius: 2px;
-  word-wrap: break-word;
-  line-height: 1.2;
-  font-family: "Courier New", monospace;
-  font-size: 11px;
-  white-space: pre-wrap;
 }
 
-.message.input_text .message-bubble { color: #fff; border-left: 4px solid rgba(255, 255, 255, 0.7); }
-.message.input_request .message-bubble { color: #ffaa66; border-left: 4px solid rgba(255, 170, 102, 0.7); }
-.message.input_request .message-bubble::before { content: "REQ > "; font-weight: bold; color: #ffaa66; }
-.message.output_text .message-bubble,
-.message.welcome_text .message-bubble { color: #00ff00; border-left: 4px solid rgba(0, 255, 0, 0.7); min-width: 200px; }
-.message.cancel_run .message-bubble { color: #ff7777; border-left: 4px solid rgba(255, 90, 90, 0.7); }
-.message.input_file .message-bubble { color: #fff; border-left: 4px solid rgba(255, 255, 255, 0.7); display: block; }
-.message.output_file .message-bubble { color: #00ff00; border-left: 4px solid rgba(0, 255, 0, 0.7); display: block; }
+.welcome-message {
+  background: rgba(102, 126, 234, 0.08);
+  color: #b8c5f2;
+  padding: 12px 16px;
+  border-radius: 2px;
+  margin: 8px auto;
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-left: 4px solid rgba(102, 126, 234, 0.6);
+  text-align: center;
+  max-width: 85%;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  white-space: pre-line;
+  line-height: normal;
+}
 
-.message.stream-output .message-bubble {
-  background: rgba(0, 255, 0, 0.08);
-  border-radius: 4px;
-  padding: 8px 12px;
+.terminal-line {
+  margin: 0;
+  padding: 0;
+}
+
+.line-content {
+  display: inline;
   position: relative;
 }
 
-.message.stream-output.collapsed .message-bubble { padding: 4px 8px; }
+.content-area {
+  display: inline;
+}
+
+.terminal-line.input_text .line-content {
+  color: #ffffff;
+}
+
+.terminal-line.input_request .line-content {
+  color: #00ffff;
+}
+
+.terminal-line.input_request .line-content::before {
+  content: 'REQ > ';
+  font-weight: bold;
+  color: #00ffff;
+}
+
+.terminal-line.output_text .line-content,
+.terminal-line.welcome_text .line-content {
+  color: #00ff00;
+}
+
+.terminal-line.cancel_run .line-content {
+  color: #ff4444;
+  font-weight: bold;
+}
+
+.terminal-line.stream-output .line-content {
+  background: rgba(255, 180, 200, 0.12);
+  border: 1px solid rgba(255, 100, 150, 0.5);
+  border-radius: 4px;
+  padding: 0;
+  display: block;
+  position: relative;
+}
+
+.terminal-line.stream-output.collapsed .line-content {
+  padding: 8px;
+}
 
 .collapsed-wrapper {
   display: flex;
@@ -561,55 +904,86 @@ defineExpose({
   cursor: pointer;
 }
 
-.collapsed-indicator { color: #00cc00; font-weight: bold; font-size: 16px; }
-.collapsed-arrow { color: #00cc00; font-size: 14px; }
+.collapsed-indicator,
+.collapsed-arrow {
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: bold;
+}
 
 .expand-indicator {
   position: absolute;
   top: 4px;
   right: 8px;
-  color: #00cc00;
-  font-size: 12px;
+  color: #ffffff;
+  font-size: 18px;
   cursor: pointer;
   user-select: none;
 }
 
-.expand-indicator:hover { color: #00ff00; }
+.expand-indicator:hover {
+  color: #cccccc;
+}
+
+.terminal-line.input_file .line-content,
+.terminal-line.output_file .line-content {
+  display: block;
+}
+
+.file-message {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.terminal-line.input_file .file-message {
+  border-left: 4px solid rgba(255, 255, 255, 0.7);
+}
+
+.terminal-line.output_file .file-message {
+  border-left: 4px solid rgba(0, 255, 0, 0.7);
+}
+
+.terminal-line.input_file .file-thumbnail,
+.terminal-line.output_file .file-thumbnail {
+  display: none;
+}
+
+.file-name {
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: #ffffff;
+}
+
+.terminal-line.output_file .file-name {
+  color: #00ff00;
+}
 
 :deep(.terminal-text) {
   display: inline;
   white-space: pre-wrap;
-  font-family: "Courier New", monospace;
+  font-family: 'Courier New', monospace;
   line-height: 1.1;
 }
 
 :deep(.terminal-cursor) {
   display: inline !important;
   background-color: #00ff00 !important;
-  color: #000 !important;
+  color: #000000 !important;
   padding: 0 2px !important;
-  font-family: "Courier New", monospace !important;
+  margin-left: 0 !important;
+  font-family: 'Courier New', monospace !important;
   font-weight: bold !important;
 }
 
-.file-message { display: flex; flex-direction: column; gap: 6px; }
-.file-name { font-family: "Courier New", monospace; font-size: 11px; }
-.message.output_file .file-name { color: #00ff00; }
-
-.file-thumbnail {
-  max-width: 240px;
-  max-height: 180px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-  object-fit: contain;
-  background: #111;
+.empty-message {
+  color: #7f8a99;
 }
 
-.bubble-content { margin: 0; }
-
-.empty-message { color: #7f8a99; }
-
-/* 入力エリア */
 .control-area {
   padding: 10px 20px 0;
   background: #101010;
@@ -621,7 +995,6 @@ defineExpose({
 }
 
 .text-input-area {
-  min-width: 0;
   display: flex;
   gap: 10px;
   align-items: flex-end;
@@ -637,15 +1010,14 @@ defineExpose({
 .input-container {
   position: relative;
   flex: 1;
-  margin-bottom: 0;
 }
 
 .prompt-symbol {
   position: absolute;
   left: 8px;
   top: 16px;
-  color: #fff;
-  font-family: "Courier New", monospace;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
   font-weight: bold;
   font-size: 16px;
   cursor: pointer;
@@ -662,18 +1034,34 @@ defineExpose({
   font-size: 14px;
   background: rgba(0, 0, 0, 0.35);
   color: #e0e0e0;
+  box-sizing: border-box;
   resize: none;
   min-height: 60px;
   max-height: 380px;
   overflow-y: auto;
+  font-family: inherit;
   line-height: 1.4;
   height: 60px;
 }
 
-.input-field.at-limit { font-size: 8px; line-height: 1.1; }
-.input-field:disabled { border-color: #808080; color: #666; background: rgba(128, 128, 128, 0.1); }
-.input-field:focus { border-color: #fff; }
-.input-field::placeholder { color: #888; }
+.input-field.at-limit {
+  font-size: 8px;
+  line-height: 1.1;
+}
+
+.input-field:disabled {
+  border-color: #808080;
+  color: #666666;
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.input-field:focus {
+  border-color: #ffffff;
+}
+
+.input-field::placeholder {
+  color: #888888;
+}
 
 .agent-send-btn {
   border: 2px solid #667eea;
@@ -684,14 +1072,13 @@ defineExpose({
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  box-shadow: none;
   padding: 0;
   width: 56px;
   height: 48px;
   margin-bottom: 20px;
   margin-left: 10px;
   background: rgba(255, 255, 255, 0.95);
-  color: white;
+  color: #ffffff;
 }
 
 .agent-send-btn img {
@@ -726,7 +1113,9 @@ defineExpose({
   border-color: #667eea;
 }
 
-.agent-send-btn.has-text img { filter: brightness(0) invert(1); }
+.agent-send-btn.has-text img {
+  filter: brightness(0) invert(1);
+}
 
 .agent-send-btn.has-text .send-code-label {
   color: #ffffff;
@@ -745,17 +1134,20 @@ defineExpose({
   opacity: 1;
 }
 
-.agent-send-btn:disabled:not(.ws-disabled) img { filter: brightness(0); }
+.agent-send-btn:disabled:not(.ws-disabled) img {
+  filter: brightness(0);
+}
 
 .agent-send-btn.ws-disabled {
   background: #808080 !important;
   border-color: #808080 !important;
-  box-shadow: none;
   cursor: not-allowed;
   opacity: 1;
 }
 
-.agent-send-btn.ws-disabled img { filter: brightness(0) invert(1) !important; }
+.agent-send-btn.ws-disabled img {
+  filter: brightness(0) invert(1) !important;
+}
 
 .agent-send-btn.ws-disabled .send-code-label {
   color: #ffffff;
@@ -792,23 +1184,20 @@ defineExpose({
   cursor: pointer;
 }
 
-.agent-cancel-btn.is-active img { filter: brightness(0) invert(1); }
+.agent-cancel-btn.is-active img {
+  filter: brightness(0) invert(1);
+}
 
 .agent-cancel-btn.is-active:hover {
   background: #cc0000;
   border-color: #cc0000;
 }
 
-.agent-cancel-btn:disabled { opacity: 0.6; }
+.agent-cancel-btn:disabled {
+  opacity: 0.6;
+}
 
-@media (max-width: 480px) {
-  .text-input-area {
-    flex-wrap: wrap;
-  }
-
-  .agent-send-btn,
-  .agent-cancel-btn {
-    margin-bottom: 8px;
-  }
+.agent-cancel-btn.is-active:disabled {
+  opacity: 1;
 }
 </style>

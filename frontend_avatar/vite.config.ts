@@ -5,7 +5,12 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [vue()],
   optimizeDeps: {
-    include: ['monaco-editor'],
+    include: [
+      'monaco-editor',
+      'three',
+      '@pixiv/three-vrm',
+      '@pixiv/three-vrm-animation',
+    ],
   },
   resolve: {
     alias: {

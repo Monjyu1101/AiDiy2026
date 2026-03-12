@@ -16,6 +16,7 @@ Usage:
 
 import json
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -148,12 +149,29 @@ def npm_command():
 
 
 def get_electron_version(frontend_dir: Path) -> str:
-    """node_modules/electron/package.json からバージョンを取得する"""
+    """node_modules/electron/package.json からバージョンを取得する。
+    見つからない場合は package.json の devDependencies から推測する。"""
+    # 1st: インストール済みの node_modules から正確なバージョンを取得
     pkg = frontend_dir / "node_modules" / "electron" / "package.json"
     if pkg.exists():
         with open(pkg, encoding="utf-8") as f:
             data = json.load(f)
-        return data.get("version", "")
+        version = data.get("version", "")
+        if version:
+            return version
+
+    # 2nd: package.json の devDependencies から取得 (^37.7.1 → 37.7.1 など)
+    fallback_pkg = frontend_dir / "package.json"
+    if fallback_pkg.exists():
+        with open(fallback_pkg, encoding="utf-8") as f:
+            data2 = json.load(f)
+        ver_spec = data2.get("devDependencies", {}).get("electron", "")
+        if ver_spec:
+            m = re.search(r"(\d+\.\d+\.\d+)", ver_spec)
+            if m:
+                print_info(f"  node_modules からバージョン取得できず、package.json の指定 ({ver_spec}) より {m.group(1)} を使用します。")
+                return m.group(1)
+
     return ""
 
 
@@ -193,18 +211,20 @@ def install_electron_binary(frontend_dir: Path, label: str) -> bool:
         if stale.exists():
             stale.unlink()
 
+    MILESTONES = [0, 30, 60, 90, 100]
     last_reported = [-1]
 
     def progress_hook(block_num, block_size, total_size):
         if total_size > 0:
             downloaded = min(block_num * block_size, total_size)
             percent = int(downloaded * 100 / total_size)
-            step = percent // 10 * 10
-            if step != last_reported[0]:
-                mb_done = downloaded // 1024 // 1024
-                mb_total = total_size // 1024 // 1024
-                print_info(f"  ダウンロード中... {step}% ({mb_done}MB / {mb_total}MB)")
-                last_reported[0] = step
+            # 次に報告すべきマイルストーンを探す
+            for ms in MILESTONES:
+                if ms > last_reported[0] and percent >= ms:
+                    mb_done = downloaded // 1024 // 1024
+                    mb_total = total_size // 1024 // 1024
+                    print_info(f"  ダウンロード中... {ms}% ({mb_done}MB / {mb_total}MB)")
+                    last_reported[0] = ms
 
     print_info(f"  ダウンロード先: {part_file}")
     try:
@@ -469,18 +489,54 @@ def setup_frontend_avatar():
         print_error(f"{label}: package.json が見つかりません: {package_json}")
         return False
 
-    print_info(f"{label}: 標準設定で npm install を実行します...")
+    exe_name_chk = "electron.exe" if sys.platform == "win32" else "electron"
+    dist_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name_chk
+
+    # Step1: npm install を試みる
+    #        通常環境（GitHub アクセス可）では postinstall でバイナリも取得される
+    print_info(f"{label}: npm install を実行します...")
     if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-        print_warning(f"{label}: 標準の npm install に失敗しました。")
-        print_info(f"{label}: 従来どおり GitHub から Electron バイナリ取得へフォールバックできます。")
-        if ask_yes_no(f"{label}: GitHub から electron をインストールしますか？", default="y"):
-            if install_electron_binary(FRONTEND_AVATAR_DIR, label):
-                print_success(f"{label}: セットアップが完了しました。")
-                return True
-            print_error(f"{label}: Electronバイナリのインストールに失敗しました。")
-        else:
-            print_warning(f"{label}: Electronバイナリのインストールをスキップしました。")
+        print_error(f"{label}: npm install に失敗しました。")
         return False
+    print_success(f"{label}: npm パッケージのインストールが完了しました。")
+
+    # Step2: npm install でバイナリが取得できたか確認
+    #        取得できていればスキップ、できていなければ GitHub から取得
+    if dist_exe.exists():
+        print_success(f"{label}: Electron バイナリは npm install で取得済みです。GitHub 取得をスキップします。")
+    else:
+        print_info(f"{label}: Electron バイナリが見つかりません。GitHub から取得します。")
+        if not install_electron_binary(FRONTEND_AVATAR_DIR, label):
+            print_error(f"{label}: Electronバイナリのインストールに失敗しました。")
+            return False
+        # Step3: バイナリ配置後に postinstall を完了させるため npm install を再実行
+        print_info(f"{label}: npm install を再実行して postinstall を完了させます...")
+        if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
+            print_warning(f"{label}: npm install (再実行) に失敗しましたが続行します。")
+
+    # Step4: TypeScript (electron/) を事前ビルドして dist-electron/ を生成する
+    #        これを省略すると cleanup 後に npm run dev を実行しても
+    #        tsc --watch の完了を wait-on が待つ間、Electron が起動しない問題が起きる
+    print_info(f"{label}: TypeScript (electron/) を事前ビルドします (tsc -p tsconfig.electron.json)...")
+    if not run_command([npm_command(), "run", "build:electron"], cwd=FRONTEND_AVATAR_DIR):
+        print_warning(f"{label}: TypeScript ビルドに失敗しました。npm run dev 起動時に自動ビルドされます。")
+    else:
+        print_success(f"{label}: dist-electron/ の事前ビルドが完了しました。")
+
+    # Step5: Vite 依存関係の事前最適化 (vite optimize)
+    #        cleanup 後の初回 npm run dev では three.js / @pixiv/three-vrm / monaco-editor 等の
+    #        重いパッケージを Vite が最適化するのに 3〜5 分かかる。
+    #        その間 Electron は起動するが Vite が "optimized dependencies changed. reloading" を
+    #        送信するため、ログイン画面がリロードされてブランクになる。
+    #        セットアップ時に事前最適化（node_modules/.vite/deps/ へのキャッシュ生成）しておくことで
+    #        初回 npm run dev から即座に表示される。
+    #        ※ Vite 7.x では "manually calling optimizeDeps is deprecated" の警告が出るが動作する。
+    print_info(f"{label}: Vite 依存関係を事前最適化します (vite optimize --force)...")
+    vite_cmd = [npm_command(), "exec", "--", "vite", "optimize", "--force"]
+    if not run_command(vite_cmd, cwd=FRONTEND_AVATAR_DIR):
+        print_warning(f"{label}: vite optimize に失敗しました。npm run dev 起動時に自動最適化されます（初回は 3〜5 分かかります）。")
+    else:
+        print_success(f"{label}: Vite 依存関係の事前最適化が完了しました。")
 
     print_success(f"{label}: セットアップが完了しました。")
     return True
@@ -542,8 +598,8 @@ def main():
     print_success("セットアップ処理が完了しました。")
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
-    print_info("  Avatar開発: cd frontend_avatar && npm run dev")
     print_info("  Web開発   : cd frontend_web && npm run dev")
+    print_info("  Avatar開発: cd frontend_avatar && npm run dev")
     print_info("セットアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)
 

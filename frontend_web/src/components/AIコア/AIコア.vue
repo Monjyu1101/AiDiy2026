@@ -24,13 +24,15 @@ import { AudioStreamProcessor } from './AI音声処理';
 // セッションID（全コンポーネント共通）
 const セッションID = ref('');
 
-// 親WebSocket接続（テキスト・画像・操作、チャンネルinput）
-const wsClient = ref<IWebSocketClient | null>(null);
-// 音声専用WebSocket接続（チャンネルaudio）
-const wsAudioClient = ref<IWebSocketClient | null>(null);
-const wsConnected = ref(false);
-const wsAudioConnected = ref(false);
-const isInitializingAudioState = ref(true);
+// inputチャンネル（送信専用）
+const inputSocket = ref<IWebSocketClient | null>(null);
+// audioチャンネル
+const audioSocket = ref<IWebSocketClient | null>(null);
+// coreチャンネル（init/welcome/heartbeat受信）
+const coreSocket = ref<IWebSocketClient | null>(null);
+const 入力接続済み = ref(false);
+const 音声接続済み = ref(false);
+const 接続初期化中 = ref(true);
 
 // モデル設定情報
 const モデル設定 = ref({
@@ -42,10 +44,10 @@ const モデル設定 = ref({
   CODE_AI4_NAME: ''
 });
 
-const chatMode = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>('live');
+const チャットモード = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>('live');
 
 // エラーメッセージ
-const errorMessage = ref('');
+const エラーメッセージ = ref('');
 const 入力ウェルカム情報 = ref('');
 const 入力ウェルカム本文 = ref('');
 const AIコアビュー要素 = ref<HTMLElement | null>(null);
@@ -78,251 +80,243 @@ const ガイド領域マウス離脱 = () => {
 
 // 各コンポーネントの表示状態（初期値は全てfalse、WebSocket接続で初期値受信後に有効化）
 // ※ ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4 → 設定
-const showImage = ref(false);   // イメージ
-const showFile = ref(false);    // ファイル
-const showChat = ref(false);    // チャット
-const showAgent1 = ref(false);  // コード1
-const showAgent2 = ref(false);  // コード2
-const showAgent3 = ref(false);  // コード3
-const showAgent4 = ref(false);  // コード4
+const イメージ表示中 = ref(false);   // イメージ
+const ファイル表示中 = ref(false);    // ファイル
+const チャット表示中 = ref(false);    // チャット
+const エージェント1表示中 = ref(false);  // コード1
+const エージェント2表示中 = ref(false);  // コード2
+const エージェント3表示中 = ref(false);  // コード3
+const エージェント4表示中 = ref(false);  // コード4
 
 // レイアウト計算用フラグ（退場アニメーション完了後にfalseになる）
-const layoutImage = ref(false);
-const layoutFile = ref(false);
-const layoutChat = ref(false);
-const layoutAgent1 = ref(false);
-const layoutAgent2 = ref(false);
-const layoutAgent3 = ref(false);
-const layoutAgent4 = ref(false);
+const イメージレイアウト = ref(false);
+const ファイルレイアウト = ref(false);
+const チャットレイアウト = ref(false);
+const エージェント1レイアウト = ref(false);
+const エージェント2レイアウト = ref(false);
+const エージェント3レイアウト = ref(false);
+const エージェント4レイアウト = ref(false);
 
 // 音声・画像制御（初期値は全てfalse、WebSocket接続で初期値受信後に有効化）
-const enableMicrophone = ref(false);
-const enableSpeaker = ref(false);
-const enableCamera = ref(false);
-const enableFileButton = ref(false);
+const マイク有効 = ref(false);
+const スピーカー有効 = ref(false);
+const カメラ有効 = ref(false);
+const ファイルボタン有効 = ref(false);
 
 // チャット数カウント
-const chatCount = ref(0);
-const enableChatButton = ref(false);
+const チャット数 = ref(0);
+const チャットボタン有効 = ref(false);
 
 // エージェント1～4カウント
-const agent1Count = ref(0);
-const enableAgent1Button = ref(false);
-const agent2Count = ref(0);
-const enableAgent2Button = ref(false);
-const agent3Count = ref(0);
-const enableAgent3Button = ref(false);
-const agent4Count = ref(0);
-const enableAgent4Button = ref(false);
+const エージェント1数 = ref(0);
+const エージェント1ボタン有効 = ref(false);
+const エージェント2数 = ref(0);
+const エージェント2ボタン有効 = ref(false);
+const エージェント3数 = ref(0);
+const エージェント3ボタン有効 = ref(false);
+const エージェント4数 = ref(0);
+const エージェント4ボタン有効 = ref(false);
 
 // キャプチャ画像
-const capturedImage = ref<string | null>(null);
+const キャプチャ画像 = ref<string | null>(null);
 
 // 自動選択ポップアップ表示フラグ
-const autoShowSelection = ref(false);
+const 自動選択表示 = ref(false);
 
 // チェックボックスパネルの表示/非表示
-const showModelConfig = ref(false);
+const モデル設定表示 = ref(false);
 
 // 音声処理プロセッサ
-let audioProcessor: AudioStreamProcessor | null = null;
+let 音声処理機: AudioStreamProcessor | null = null;
 
 // ビジュアライザー表示状態を同期
-const syncVisualizerVisibility = () => {
-  if (!audioProcessor) return;
-  audioProcessor.updateVisualizerVisibility(enableMicrophone.value, enableSpeaker.value);
+const ビジュアライザー表示同期 = () => {
+  if (!音声処理機) return;
+  音声処理機.updateVisualizerVisibility(マイク有効.value, スピーカー有効.value);
 };
 
-const syncLiveSampleRate = () => {
-  if (!audioProcessor) return;
+const Liveサンプルレート同期 = () => {
+  if (!音声処理機) return;
   const liveAi = モデル設定.value.LIVE_AI_NAME || '';
   const provider = liveAi === 'openai_live' ? 'openai' : liveAi;
-  audioProcessor.setSampleRate(provider);
+  音声処理機.setSampleRate(provider);
 };
 
 // ファイルボタンクリック時
-const toggleFile = () => {
-  enableFileButton.value = !enableFileButton.value;
-  if (enableFileButton.value) {
-    layoutFile.value = true;
-    showFile.value = true;
+const ファイル切替 = () => {
+  ファイルボタン有効.value = !ファイルボタン有効.value;
+  if (ファイルボタン有効.value) {
+    ファイルレイアウト.value = true;
+    ファイル表示中.value = true;
   } else {
-    showFile.value = false;
-    // layoutFile.valueは@after-leaveで更新
+    ファイル表示中.value = false;
+    // ファイルレイアウト.valueは@after-leaveで更新
   }
 };
 
 // チャットボタンクリック時
-const toggleChat = () => {
-  enableChatButton.value = !enableChatButton.value;
-  if (enableChatButton.value) {
-    layoutChat.value = true;
-    showChat.value = true;
+const チャット切替 = () => {
+  チャットボタン有効.value = !チャットボタン有効.value;
+  if (チャットボタン有効.value) {
+    チャットレイアウト.value = true;
+    チャット表示中.value = true;
   } else {
-    showChat.value = false;
-    // layoutChat.valueは@after-leaveで更新
+    チャット表示中.value = false;
+    // チャットレイアウト.valueは@after-leaveで更新
   }
 };
 
 // エージェント1ボタンクリック時
-const toggleAgent1 = () => {
-  enableAgent1Button.value = !enableAgent1Button.value;
-  if (enableAgent1Button.value) {
-    layoutAgent1.value = true;
-    showAgent1.value = true;
+const エージェント1切替 = () => {
+  エージェント1ボタン有効.value = !エージェント1ボタン有効.value;
+  if (エージェント1ボタン有効.value) {
+    エージェント1レイアウト.value = true;
+    エージェント1表示中.value = true;
   } else {
-    showAgent1.value = false;
+    エージェント1表示中.value = false;
   }
 };
 
 // エージェント2ボタンクリック時
-const toggleAgent2 = () => {
-  enableAgent2Button.value = !enableAgent2Button.value;
-  if (enableAgent2Button.value) {
-    layoutAgent2.value = true;
-    showAgent2.value = true;
+const エージェント2切替 = () => {
+  エージェント2ボタン有効.value = !エージェント2ボタン有効.value;
+  if (エージェント2ボタン有効.value) {
+    エージェント2レイアウト.value = true;
+    エージェント2表示中.value = true;
   } else {
-    showAgent2.value = false;
+    エージェント2表示中.value = false;
   }
 };
 
 // エージェント3ボタンクリック時
-const toggleAgent3 = () => {
-  enableAgent3Button.value = !enableAgent3Button.value;
-  if (enableAgent3Button.value) {
-    layoutAgent3.value = true;
-    showAgent3.value = true;
+const エージェント3切替 = () => {
+  エージェント3ボタン有効.value = !エージェント3ボタン有効.value;
+  if (エージェント3ボタン有効.value) {
+    エージェント3レイアウト.value = true;
+    エージェント3表示中.value = true;
   } else {
-    showAgent3.value = false;
+    エージェント3表示中.value = false;
   }
 };
 
 // エージェント4ボタンクリック時
-const toggleAgent4 = () => {
-  enableAgent4Button.value = !enableAgent4Button.value;
-  if (enableAgent4Button.value) {
-    layoutAgent4.value = true;
-    showAgent4.value = true;
+const エージェント4切替 = () => {
+  エージェント4ボタン有効.value = !エージェント4ボタン有効.value;
+  if (エージェント4ボタン有効.value) {
+    エージェント4レイアウト.value = true;
+    エージェント4表示中.value = true;
   } else {
-    showAgent4.value = false;
+    エージェント4表示中.value = false;
   }
 };
 
 // イメージボタンクリック時
-const handleCameraToggle = () => {
-  if (enableCamera.value) {
-    enableCamera.value = false;
-    showImage.value = false;
-    autoShowSelection.value = false;
-    capturedImage.value = null;
-    // layoutImage.valueは@after-leaveで更新
+const カメラ切替 = () => {
+  if (カメラ有効.value) {
+    カメラ有効.value = false;
+    イメージ表示中.value = false;
+    自動選択表示.value = false;
+    キャプチャ画像.value = null;
+    // イメージレイアウト.valueは@after-leaveで更新
     return;
   }
-  autoShowSelection.value = false;
+  自動選択表示.value = false;
   nextTick(() => {
-    autoShowSelection.value = true;
+    自動選択表示.value = true;
   });
-  layoutImage.value = true;
-  showImage.value = true;
-  enableCamera.value = true;
+  イメージレイアウト.value = true;
+  イメージ表示中.value = true;
+  カメラ有効.value = true;
 };
 
 // イメージ選択がキャンセルされた時
-const handleImageSelectionCancel = () => {
-  showImage.value = false;
-  enableCamera.value = false;
-  autoShowSelection.value = false;
-  capturedImage.value = null;
+const イメージ選択キャンセル = () => {
+  イメージ表示中.value = false;
+  カメラ有効.value = false;
+  自動選択表示.value = false;
+  キャプチャ画像.value = null;
 };
 
 // 各コンポーネントを閉じるハンドラー
-const handleCloseFile = () => {
-  showFile.value = false;
-  enableFileButton.value = false;
+const ファイル閉じる = () => {
+  ファイル表示中.value = false;
+  ファイルボタン有効.value = false;
 };
 
-const handleCloseChat = () => {
-  showChat.value = false;
-  enableChatButton.value = false;
+const チャット閉じる = () => {
+  チャット表示中.value = false;
+  チャットボタン有効.value = false;
 };
 
-const handleCloseImage = () => {
-  showImage.value = false;
-  enableCamera.value = false;
-  autoShowSelection.value = false;
-  capturedImage.value = null;
+const イメージ閉じる = () => {
+  イメージ表示中.value = false;
+  カメラ有効.value = false;
+  自動選択表示.value = false;
+  キャプチャ画像.value = null;
 };
 
-const handleCloseAgent1 = () => {
-  showAgent1.value = false;
-  enableAgent1Button.value = false; // ボタンもオフに
+const エージェント1閉じる = () => {
+  エージェント1表示中.value = false;
+  エージェント1ボタン有効.value = false; // ボタンもオフに
 };
 
-const handleCloseAgent2 = () => {
-  showAgent2.value = false;
-  enableAgent2Button.value = false; // ボタンもオフに
+const エージェント2閉じる = () => {
+  エージェント2表示中.value = false;
+  エージェント2ボタン有効.value = false; // ボタンもオフに
 };
 
-const handleCloseAgent3 = () => {
-  showAgent3.value = false;
-  enableAgent3Button.value = false; // ボタンもオフに
+const エージェント3閉じる = () => {
+  エージェント3表示中.value = false;
+  エージェント3ボタン有効.value = false; // ボタンもオフに
 };
 
-const handleCloseAgent4 = () => {
-  showAgent4.value = false;
-  enableAgent4Button.value = false; // ボタンもオフに
+const エージェント4閉じる = () => {
+  エージェント4表示中.value = false;
+  エージェント4ボタン有効.value = false; // ボタンもオフに
 };
 
 // 退場アニメーション完了後のハンドラー（レイアウト更新）
-const handleAfterLeaveFile = () => { layoutFile.value = false; };
-const handleAfterLeaveChat = () => { layoutChat.value = false; };
-const handleAfterLeaveImage = () => { layoutImage.value = false; };
-const handleAfterLeaveAgent1 = () => { layoutAgent1.value = false; };
-const handleAfterLeaveAgent2 = () => { layoutAgent2.value = false; };
-const handleAfterLeaveAgent3 = () => { layoutAgent3.value = false; };
-const handleAfterLeaveAgent4 = () => { layoutAgent4.value = false; };
+const ファイル退場後 = () => { ファイルレイアウト.value = false; };
+const チャット退場後 = () => { チャットレイアウト.value = false; };
+const イメージ退場後 = () => { イメージレイアウト.value = false; };
+const エージェント1退場後 = () => { エージェント1レイアウト.value = false; };
+const エージェント2退場後 = () => { エージェント2レイアウト.value = false; };
+const エージェント3退場後 = () => { エージェント3レイアウト.value = false; };
+const エージェント4退場後 = () => { エージェント4レイアウト.value = false; };
 
 // イメージチェックボックスの変更を監視
-const handleImageCheckboxChange = async (newValue: boolean, oldValue: boolean) => {
+const イメージチェックボックス変更 = async (newValue: boolean, oldValue: boolean) => {
   // OFFからONになった時のみ選択ポップアップを表示
   if (newValue && !oldValue) {
-    autoShowSelection.value = true;
+    自動選択表示.value = true;
   }
 };
 
 // WebSocket接続を初期化
-const initializeWebSocket = async (既存セッションID?: string) => {
+const WebSocket初期化 = async (既存セッションID?: string) => {
   try {
-    isInitializingAudioState.value = true;
+    接続初期化中.value = true;
     const wsUrl = createWebSocketUrl('/core/ws/AIコア');
     console.log('[AIコア] WebSocket接続開始:', wsUrl, 'セッションID:', 既存セッションID);
 
-    wsClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, 'input');
     入力ウェルカム情報.value = '';
     入力ウェルカム本文.value = '';
 
-    // メッセージハンドラを登録（connect()の前に登録）
-    wsClient.value.on('welcome_info_input', (message) => {
-      const 内容 = 受信内容文字列(message);
-      if (!内容) return;
-      入力ウェルカム情報.value = 内容;
-    });
+    // coreチャンネルを先に接続（init・制御メッセージ・welcome を一括受信）
+    if (coreSocket.value) {
+      try { coreSocket.value.disconnect(); } catch (e) { /* no-op */ }
+      coreSocket.value = null;
+    }
+    const wsCoreWs = new AIコアWebSocket(wsUrl, 既存セッションID, 'core');
 
-    wsClient.value.on('welcome_text_input', (message) => {
-      const 内容 = 受信内容文字列(message);
-      if (!内容) return;
-      入力ウェルカム本文.value = 内容;
-    });
-
-    wsClient.value.on('init', (message) => {
+    wsCoreWs.on('init', (message) => {
       console.log('[AIコア] 初期化完了:', message.セッションID);
       if (message.セッションID) {
         セッションID.value = message.セッションID;
       }
-      
+
       const 初期データ = message.メッセージ内容 || {};
-      
-      // モデル設定を保存
+
       if (初期データ.モデル設定) {
         モデル設定.value = {
           CHAT_AI_NAME: 初期データ.モデル設定.CHAT_AI_NAME || '',
@@ -335,192 +329,184 @@ const initializeWebSocket = async (既存セッションID?: string) => {
         console.log('[AIコア] モデル設定:', モデル設定.value);
       }
 
-      syncLiveSampleRate();
-      
-      // サーバーから受信した初期値でボタン状態を設定
+      Liveサンプルレート同期();
+
       if (初期データ.ボタン) {
-        // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4
-        enableMicrophone.value = 初期データ.ボタン.マイク || false;
-        enableSpeaker.value = 初期データ.ボタン.スピーカー ?? true; // デフォルトオン
-        enableFileButton.value = 初期データ.ボタン.ファイル || false;
-        enableChatButton.value = 初期データ.ボタン.チャット ?? true; // デフォルトオン
-        enableAgent1Button.value = 初期データ.ボタン.エージェント1 || false;
-        enableCamera.value = false; // 常にオフで開始
-        enableAgent2Button.value = 初期データ.ボタン.エージェント2 || false;
-        enableAgent3Button.value = 初期データ.ボタン.エージェント3 || false;
-        enableAgent4Button.value = 初期データ.ボタン.エージェント4 || false;
-        chatMode.value = 初期データ.ボタン.チャットモード || 'live';
+        マイク有効.value = 初期データ.ボタン.マイク || false;
+        スピーカー有効.value = 初期データ.ボタン.スピーカー ?? true;
+        ファイルボタン有効.value = 初期データ.ボタン.ファイル || false;
+        チャットボタン有効.value = 初期データ.ボタン.チャット ?? true;
+        エージェント1ボタン有効.value = 初期データ.ボタン.エージェント1 || false;
+        カメラ有効.value = false;
+        エージェント2ボタン有効.value = 初期データ.ボタン.エージェント2 || false;
+        エージェント3ボタン有効.value = 初期データ.ボタン.エージェント3 || false;
+        エージェント4ボタン有効.value = 初期データ.ボタン.エージェント4 || false;
+        チャットモード.value = 初期データ.ボタン.チャットモード || 'live';
         console.log('[AIコア] ボタン状態を初期化:', 初期データ.ボタン);
       } else {
-        chatMode.value = 'live';
+        チャットモード.value = 'live';
       }
 
-      layoutImage.value = enableCamera.value; // 常にfalse
-      showImage.value = enableCamera.value; // 常にfalse
-      syncVisualizerVisibility();
-
-      // 接続完了フラグは main + audio 両方接続完了後に設定
+      イメージレイアウト.value = カメラ有効.value;
+      イメージ表示中.value = カメラ有効.value;
+      ビジュアライザー表示同期();
       console.log('[AIコア] WebSocket初期化完了（音声WS待機中）');
 
-      // nextTickで表示状態を復元（子コンポーネントがマウントされてから）
       nextTick(() => {
-        console.log('[AIコア] 表示状態を復元開始');
-        // ボタン状態から表示状態を復元
-        // ボタン配置順で復元（layoutとshowを同時に設定）
-        layoutFile.value = enableFileButton.value;
-        showFile.value = enableFileButton.value;
-        layoutChat.value = enableChatButton.value;
-        showChat.value = enableChatButton.value;
-        layoutAgent1.value = enableAgent1Button.value;
-        showAgent1.value = enableAgent1Button.value;
-        layoutAgent2.value = enableAgent2Button.value;
-        showAgent2.value = enableAgent2Button.value;
-        layoutAgent3.value = enableAgent3Button.value;
-        showAgent3.value = enableAgent3Button.value;
-        layoutAgent4.value = enableAgent4Button.value;
-        showAgent4.value = enableAgent4Button.value;
-        console.log('[AIコア] 表示状態復元完了:', {
-          showFile: showFile.value,
-          showChat: showChat.value,
-          showAgent1: showAgent1.value,
-          showAgent2: showAgent2.value,
-          showAgent3: showAgent3.value,
-          showAgent4: showAgent4.value
-        });
+        ファイルレイアウト.value = ファイルボタン有効.value;
+        ファイル表示中.value = ファイルボタン有効.value;
+        チャットレイアウト.value = チャットボタン有効.value;
+        チャット表示中.value = チャットボタン有効.value;
+        エージェント1レイアウト.value = エージェント1ボタン有効.value;
+        エージェント1表示中.value = エージェント1ボタン有効.value;
+        エージェント2レイアウト.value = エージェント2ボタン有効.value;
+        エージェント2表示中.value = エージェント2ボタン有効.value;
+        エージェント3レイアウト.value = エージェント3ボタン有効.value;
+        エージェント3表示中.value = エージェント3ボタン有効.value;
+        エージェント4レイアウト.value = エージェント4ボタン有効.value;
+        エージェント4表示中.value = エージェント4ボタン有効.value;
       });
     });
 
-    wsClient.value.on('streaming_started', (message) => {
+    wsCoreWs.on('welcome_info', (message) => {
+      const 内容 = 受信内容文字列(message);
+      if (!内容) return;
+      入力ウェルカム情報.value = 内容;
+    });
+    wsCoreWs.on('welcome_text', (message) => {
+      const 内容 = 受信内容文字列(message);
+      if (!内容) return;
+      入力ウェルカム本文.value = 内容;
+    });
+    wsCoreWs.on('streaming_started', (message) => {
       console.log('[AIコア] ストリーミング開始:', message);
     });
-
-    wsClient.value.on('heartbeat', (message) => {
+    wsCoreWs.on('heartbeat', (message) => {
       console.log('[AIコア] ハートビート:', message.count);
     });
-
-    // チャンネル登録/解除の確認メッセージ
-    wsClient.value.on('channel_registered', (message) => {
+    wsCoreWs.on('channel_registered', (message) => {
       console.log('[AIコア] チャンネル登録確認:', message);
     });
-
-    wsClient.value.on('channel_unregistered', (message) => {
+    wsCoreWs.on('channel_unregistered', (message) => {
       console.log('[AIコア] チャンネル解除確認:', message);
     });
-
-    // operations 返信は受け取らない
-
-    wsClient.value.on('error', (message) => {
+    wsCoreWs.on('error', (message) => {
       console.error('[AIコア] エラー:', message.error);
     });
 
-    // 接続を確立してセッションIDを取得
-    console.log('[AIコア] WebSocket.connect()呼び出し');
-    const 取得セッションID = await wsClient.value.connect();
+    // coreチャンネル接続でセッションIDを確立
+    console.log('[AIコア] coreチャンネル接続開始');
+    const 取得セッションID = await wsCoreWs.connect();
     セッションID.value = 取得セッションID;
-    console.log('[AIコア] WebSocket接続完了 セッションID:', 取得セッションID);
+    coreSocket.value = wsCoreWs;
+    console.log('[AIコア] coreチャンネル接続完了 セッションID:', 取得セッションID);
+
+    // inputチャンネルを接続（送信専用・ハンドラなし）
+    inputSocket.value = new AIコアWebSocket(wsUrl, 取得セッションID, 'input');
+    inputSocket.value.connect().catch((e) => console.error('[AIコア] inputチャンネル接続エラー:', e));
 
     // 音声専用WebSocket接続（チャンネルaudio）
-    if (!wsAudioClient.value || !wsAudioClient.value.isConnected()) {
-      await initializeAudioWebSocket(取得セッションID);
+    if (!audioSocket.value || !audioSocket.value.isConnected()) {
+      await 音声WebSocket初期化(取得セッションID);
     } else {
-      wsAudioConnected.value = true;
+      音声接続済み.value = true;
     }
-    wsConnected.value = true;
-    isInitializingAudioState.value = false;
+    入力接続済み.value = true;
+    接続初期化中.value = false;
     console.log('[AIコア] WebSocket接続確立完了（main + audio）');
-    saveState();
-    if (enableMicrophone.value) {
-      await applyMicrophoneState(true, false);
+    状態保存();
+    if (マイク有効.value) {
+      await マイク状態適用(true, false);
     }
 
     return 取得セッションID;
   } catch (error) {
     console.error('[AIコア] WebSocket接続エラー:', error);
-    wsConnected.value = false;
-    wsAudioConnected.value = false;
-    isInitializingAudioState.value = true;
+    入力接続済み.value = false;
+    音声接続済み.value = false;
+    接続初期化中.value = true;
     throw error;
   }
 };
 
 // 音声専用WebSocket接続を初期化
-const initializeAudioWebSocket = async (既存セッションID: string) => {
+const 音声WebSocket初期化 = async (既存セッションID: string) => {
   // 既存の音声WSがあれば張り直し
-  if (wsAudioClient.value) {
+  if (audioSocket.value) {
     try {
-      wsAudioClient.value.disconnect();
+      audioSocket.value.disconnect();
     } catch (e) {
       // no-op
     }
-    wsAudioClient.value = null;
+    audioSocket.value = null;
   }
-  wsAudioConnected.value = false;
+  音声接続済み.value = false;
 
   const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-  wsAudioClient.value = new AIコアWebSocket(wsUrl, 既存セッションID, 'audio');
+  audioSocket.value = new AIコアWebSocket(wsUrl, 既存セッションID, 'audio');
 
-  wsAudioClient.value.on('output_audio', (message) => {
+  audioSocket.value.on('output_audio', (message) => {
     console.log('[AIコア] 音声出力受信(audio)');
-    if (audioProcessor) {
-      audioProcessor.handleAudioMessage(message);
+    if (音声処理機) {
+      音声処理機.handleAudioMessage(message);
     }
   });
 
-  wsAudioClient.value.on('cancel_audio', () => {
+  audioSocket.value.on('cancel_audio', () => {
     console.log('[AIコア] 音声キャンセル(audio)');
-    if (audioProcessor) {
-      audioProcessor.cancelAudioOutput();
+    if (音声処理機) {
+      音声処理機.cancelAudioOutput();
     }
   });
 
-  await wsAudioClient.value.connect();
-  wsAudioConnected.value = true;
+  await audioSocket.value.connect();
+  音声接続済み.value = true;
   console.log('[AIコア] 音声WebSocket接続完了(audio)');
 };
 
 // 音声WS接続を保証（切断時の再接続用）
-const ensureAudioWebSocketConnected = async (): Promise<boolean> => {
+const 音声WebSocket接続確認 = async (): Promise<boolean> => {
   if (!セッションID.value) return false;
-  if (wsAudioClient.value && wsAudioClient.value.isConnected()) {
-    wsAudioConnected.value = true;
+  if (audioSocket.value && audioSocket.value.isConnected()) {
+    音声接続済み.value = true;
     return true;
   }
   try {
-    await initializeAudioWebSocket(セッションID.value);
-    return !!(wsAudioClient.value && wsAudioClient.value.isConnected());
+    await 音声WebSocket初期化(セッションID.value);
+    return !!(audioSocket.value && audioSocket.value.isConnected());
   } catch (e) {
-    wsAudioConnected.value = false;
+    音声接続済み.value = false;
     return false;
   }
 };
 
-const applyMicrophoneState = async (newValue: boolean, oldValue: boolean) => {
-  if (!audioProcessor) return;
+const マイク状態適用 = async (newValue: boolean, oldValue: boolean) => {
+  if (!音声処理機) return;
 
   // ビジュアライザー表示状態を更新
-  audioProcessor.updateVisualizerVisibility(newValue, enableSpeaker.value);
+  音声処理機.updateVisualizerVisibility(newValue, スピーカー有効.value);
 
   if (newValue && !oldValue) {
     // 音声専用WSの接続を保証
-    const 音声接続OK = await ensureAudioWebSocketConnected();
+    const 音声接続OK = await 音声WebSocket接続確認();
     if (!音声接続OK) {
-      errorMessage.value = '音声WebSocket(audio)に接続できません。再読み込みしてください。';
-      enableMicrophone.value = false;
+      エラーメッセージ.value = '音声WebSocket(audio)に接続できません。再読み込みしてください。';
+      マイク有効.value = false;
       return;
     }
 
     // マイクON
     console.log('[AIコア] マイク起動');
-    const result = await audioProcessor.startMicrophone();
+    const result = await 音声処理機.startMicrophone();
     if (!result.success) {
       console.error('[AIコア] マイク起動失敗:', result.error);
-      errorMessage.value = result.error || 'マイクの起動に失敗しました。';
-      enableMicrophone.value = false;
+      エラーメッセージ.value = result.error || 'マイクの起動に失敗しました。';
+      マイク有効.value = false;
     }
   } else if (!newValue && oldValue) {
     // マイクOFF
     console.log('[AIコア] マイク停止');
-    audioProcessor.stopMicrophone();
+    音声処理機.stopMicrophone();
   }
 };
 
@@ -533,8 +519,8 @@ onMounted(async () => {
   console.log('[AIコア] ========================================');
 
   // 音声処理プロセッサを初期化
-  audioProcessor = new AudioStreamProcessor(wsAudioClient, セッションID, enableSpeaker);
-  audioProcessor.setupOutputAudio();
+  音声処理機 = new AudioStreamProcessor(audioSocket, セッションID, スピーカー有効);
+  音声処理機.setupOutputAudio();
 
   // ビジュアライザーセットアップ（DOM確実に準備されるまで待つ）
   setTimeout(() => {
@@ -543,13 +529,13 @@ onMounted(async () => {
     const overlayElement = document.getElementById('audioVisualizerOverlay');
     console.log('[AIコア] ビジュアライザー要素:', { audioBarsElement, overlayElement });
 
-    if (audioProcessor && audioBarsElement && overlayElement) {
-      audioProcessor.setupAudioVisualizer(audioBarsElement, overlayElement);
+    if (音声処理機 && audioBarsElement && overlayElement) {
+      音声処理機.setupAudioVisualizer(audioBarsElement, overlayElement);
       console.log('[AIコア] ビジュアライザーセットアップ完了');
-      syncVisualizerVisibility();
+      ビジュアライザー表示同期();
     } else {
       console.error('[AIコア] ビジュアライザー要素が見つかりません', {
-        audioProcessor: !!audioProcessor,
+        音声処理機: !!音声処理機,
         audioBarsElement: !!audioBarsElement,
         overlayElement: !!overlayElement
       });
@@ -575,64 +561,68 @@ onMounted(async () => {
 
     // WebSocket接続を確立（RESTで取得したセッションIDを使用）
     console.log('[AIコア] WebSocket接続を開始...');
-    const 確立済みセッションID = await initializeWebSocket(セッションID.value || URLのセッションID);
+    const 確立済みセッションID = await WebSocket初期化(セッションID.value || URLのセッションID);
     console.log('[AIコア] ========================================');
     console.log('[AIコア] ✅ 初期化完了');
     console.log('[AIコア] セッションID:', 確立済みセッションID);
-    console.log('[AIコア] wsConnected:', wsConnected.value);
+    console.log('[AIコア] 入力接続済み:', 入力接続済み.value);
     console.log('[AIコア] ========================================');
   } catch (error) {
     console.error('[AIコア] ========================================');
     console.error('[AIコア] ❌ 初期化エラー:', error);
     console.error('[AIコア] ========================================');
-    errorMessage.value = `初期化失敗: ${error}`;
+    エラーメッセージ.value = `初期化失敗: ${error}`;
   }
 });
 
 // コンポーネント破棄時にWebSocket接続を切断
 onBeforeUnmount(() => {
   // 音声処理のクリーンアップ
-  if (audioProcessor) {
-    audioProcessor.cleanup();
-    audioProcessor = null;
+  if (音声処理機) {
+    音声処理機.cleanup();
+    音声処理機 = null;
   }
 
-  if (wsClient.value) {
+  if (inputSocket.value) {
     console.log('[AIコア] WebSocket接続を切断します');
-    wsClient.value.disconnect();
-    wsClient.value = null;
+    inputSocket.value.disconnect();
+    inputSocket.value = null;
   }
-  if (wsAudioClient.value) {
+  if (coreSocket.value) {
+    coreSocket.value.disconnect();
+    coreSocket.value = null;
+  }
+  if (audioSocket.value) {
     console.log('[AIコア] 音声WebSocket接続を切断します');
-    wsAudioClient.value.disconnect();
-    wsAudioClient.value = null;
+    audioSocket.value.disconnect();
+    audioSocket.value = null;
   }
-  wsConnected.value = false;
-  wsAudioConnected.value = false;
-  isInitializingAudioState.value = true;
+  入力接続済み.value = false;
+  音声接続済み.value = false;
+  接続初期化中.value = true;
 });
 
 // ボタン状態が変わったら保存
-const saveState = async () => {
+const 状態保存 = async () => {
   if (!セッションID.value) return;
 
   const ボタン = {
     // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4
-    マイク: enableMicrophone.value,
-    スピーカー: enableSpeaker.value,
-    ファイル: enableFileButton.value,
-    チャット: enableChatButton.value,
-    エージェント1: enableAgent1Button.value,
-    イメージ: enableCamera.value,
-    エージェント2: enableAgent2Button.value,
-    エージェント3: enableAgent3Button.value,
-    エージェント4: enableAgent4Button.value,
-    チャットモード: chatMode.value
+    マイク: マイク有効.value,
+    スピーカー: スピーカー有効.value,
+    ファイル: ファイルボタン有効.value,
+    チャット: チャットボタン有効.value,
+    エージェント1: エージェント1ボタン有効.value,
+    イメージ: カメラ有効.value,
+    エージェント2: エージェント2ボタン有効.value,
+    エージェント3: エージェント3ボタン有効.value,
+    エージェント4: エージェント4ボタン有効.value,
+    チャットモード: チャットモード.value
   };
 
   try {
-    if (wsClient.value && wsConnected.value) {
-      wsClient.value.updateState(ボタン);
+    if (inputSocket.value && 入力接続済み.value) {
+      inputSocket.value.updateState(ボタン);
       console.log('[AIコア] 状態更新 (WebSocket):', { ボタン });
     }
   } catch (error) {
@@ -640,97 +630,97 @@ const saveState = async () => {
   }
 };
 
-// showChat等の監視は不要（ボタンで直接制御するため削除）
+// チャット表示中等の監視は不要（ボタンで直接制御するため削除）
 // イメージだけ個別に監視（キャプチャ選択が必要なため）
-watch(showImage, async (newValue, oldValue) => {
+watch(イメージ表示中, async (newValue, oldValue) => {
   if (newValue && !oldValue) {
     // OFFからONになった時はキャプチャ選択を促す
-    await handleImageCheckboxChange(newValue, oldValue);
+    await イメージチェックボックス変更(newValue, oldValue);
   }
-  saveState();
+  状態保存();
 });
 
-watch([enableMicrophone, enableSpeaker, enableCamera], () => {
-  if (!enableCamera.value) {
-    showImage.value = false;
-    // layoutImage.valueは@after-leaveで更新
-    capturedImage.value = null;
+watch([マイク有効, スピーカー有効, カメラ有効], () => {
+  if (!カメラ有効.value) {
+    イメージ表示中.value = false;
+    // イメージレイアウト.valueは@after-leaveで更新
+    キャプチャ画像.value = null;
   } else {
-    layoutImage.value = true;
-    showImage.value = true;
+    イメージレイアウト.value = true;
+    イメージ表示中.value = true;
   }
-  saveState();
+  状態保存();
 });
 
 watch(() => モデル設定.value.LIVE_AI_NAME, () => {
-  syncLiveSampleRate();
+  Liveサンプルレート同期();
 });
 
 // マイクボタンの状態変化を監視
-watch(enableMicrophone, async (newValue, oldValue) => {
-  if (isInitializingAudioState.value) return;
-  await applyMicrophoneState(newValue, oldValue);
+watch(マイク有効, async (newValue, oldValue) => {
+  if (接続初期化中.value) return;
+  await マイク状態適用(newValue, oldValue);
 });
 
 // スピーカーボタンの状態変化を監視
-watch(enableSpeaker, (newValue, oldValue) => {
-  if (!audioProcessor) return;
+watch(スピーカー有効, (newValue, oldValue) => {
+  if (!音声処理機) return;
 
   // ビジュアライザー表示状態を更新
-  audioProcessor.updateVisualizerVisibility(enableMicrophone.value, newValue);
+  音声処理機.updateVisualizerVisibility(マイク有効.value, newValue);
 
   // 状態を保存
-  saveState();
+  状態保存();
 });
 
 // ファイルボタンの状態変化を監視
-watch(enableFileButton, () => {
-  saveState();
+watch(ファイルボタン有効, () => {
+  状態保存();
 });
 
 // チャットボタンの状態変化を監視
-watch(enableChatButton, () => {
-  saveState();
+watch(チャットボタン有効, () => {
+  状態保存();
 });
 
 // エージェント1～4ボタンの状態変化を監視
-watch(enableAgent1Button, () => {
-  saveState();
+watch(エージェント1ボタン有効, () => {
+  状態保存();
 });
 
-watch(enableAgent2Button, () => {
-  saveState();
+watch(エージェント2ボタン有効, () => {
+  状態保存();
 });
 
-watch(enableAgent3Button, () => {
-  saveState();
+watch(エージェント3ボタン有効, () => {
+  状態保存();
 });
 
-watch(enableAgent4Button, () => {
-  saveState();
+watch(エージェント4ボタン有効, () => {
+  状態保存();
 });
 
-watch(chatMode, () => {
-  saveState();
+watch(チャットモード, () => {
+  状態保存();
 });
 
 // 表示中のパネル数をカウント（レイアウト計算用フラグを使用）
-const visiblePanelCount = computed(() => {
+const 表示パネル数 = computed(() => {
   let count = 0;
   // ボタン配置順: マイク → スピーカー → ファイル → チャット → 1 → イメージ → 2 → 3 → 4
-  if (layoutFile.value) count++;
-  if (layoutChat.value) count++;
-  if (layoutAgent1.value) count++;
-  if (layoutImage.value) count++;
-  if (layoutAgent2.value) count++;
-  if (layoutAgent3.value) count++;
-  if (layoutAgent4.value) count++;
+  if (ファイルレイアウト.value) count++;
+  if (チャットレイアウト.value) count++;
+  if (エージェント1レイアウト.value) count++;
+  if (イメージレイアウト.value) count++;
+  if (エージェント2レイアウト.value) count++;
+  if (エージェント3レイアウト.value) count++;
+  if (エージェント4レイアウト.value) count++;
   return count;
 });
 
 // パネル数に応じたレイアウトクラス
-const gridLayoutClass = computed(() => {
-  const count = visiblePanelCount.value;
+const グリッドレイアウトクラス = computed(() => {
+  const count = 表示パネル数.value;
   if (count === 0) return 'layout-empty';
   if (count === 1) return 'layout-single';
   if (count === 2) return 'layout-double';
@@ -742,9 +732,9 @@ const gridLayoutClass = computed(() => {
 
 <template>
   <!-- WebSocket接続状態インジケーター（fixedレイヤー） -->
-  <div class="ws-status" :class="{ connected: wsConnected }">
+  <div class="ws-status" :class="{ connected: 入力接続済み }">
     <span class="ws-status-dot"></span>
-    <span class="ws-status-text">{{ wsConnected ? '接続中' : '切断中' }}</span>
+    <span class="ws-status-text">{{ 入力接続済み ? '接続中' : '切断中' }}</span>
   </div>
 
   <!-- 音声ビジュアライザー（fixedレイヤー） -->
@@ -756,88 +746,88 @@ const gridLayoutClass = computed(() => {
   <div class="floating-controls">
     <button
       class="floating-icon microphone-icon"
-      :class="{ active: enableMicrophone }"
-      :disabled="!wsConnected || !wsAudioConnected"
-      @click="enableMicrophone = !enableMicrophone"
+      :class="{ active: マイク有効 }"
+      :disabled="!入力接続済み || !音声接続済み"
+      @click="マイク有効 = !マイク有効"
       title="マイク"
     >
       <img src="/icons/microphone.png" alt="マイク" />
     </button>
     <button
       class="floating-icon speaker-icon"
-      :class="{ inactive: !enableSpeaker, active: enableSpeaker }"
-      :disabled="!wsConnected || !wsAudioConnected"
-      @click="enableSpeaker = !enableSpeaker"
+      :class="{ inactive: !スピーカー有効, active: スピーカー有効 }"
+      :disabled="!入力接続済み || !音声接続済み"
+      @click="スピーカー有効 = !スピーカー有効"
       title="スピーカー"
     >
       <img src="/icons/speaker.png" alt="スピーカー" />
     </button>
     <button
       class="floating-icon file-icon"
-      :class="{ inactive: !enableFileButton, active: enableFileButton }"
-      @click="toggleFile"
+      :class="{ inactive: !ファイルボタン有効, active: ファイルボタン有効 }"
+      @click="ファイル切替"
       title="ファイル"
     >
       <img src="/icons/folder.png" alt="ファイル" />
     </button>
     <button
       class="floating-icon chat-icon"
-      :class="{ inactive: !enableChatButton, active: enableChatButton }"
-      :disabled="!wsConnected"
-      @click="toggleChat"
+      :class="{ inactive: !チャットボタン有効, active: チャットボタン有効 }"
+      :disabled="!入力接続済み"
+      @click="チャット切替"
       title="チャット"
     >
-      {{ chatCount }}
+      {{ チャット数 }}
     </button>
     <button
       class="floating-icon agent-icon"
-      :class="{ inactive: !enableAgent1Button, active: enableAgent1Button }"
-      :disabled="!wsConnected"
-      @click="toggleAgent1"
+      :class="{ inactive: !エージェント1ボタン有効, active: エージェント1ボタン有効 }"
+      :disabled="!入力接続済み"
+      @click="エージェント1切替"
       title="コード1"
     >
       1
     </button>
     <button
       class="floating-icon camera-icon"
-      :class="{ active: enableCamera }"
-      :disabled="!wsConnected"
-      @click="handleCameraToggle"
+      :class="{ active: カメラ有効 }"
+      :disabled="!入力接続済み"
+      @click="カメラ切替"
       title="イメージ"
     >
       <img src="/icons/camera.png" alt="イメージ" />
     </button>
     <button
       class="floating-icon agent-icon"
-      :class="{ inactive: !enableAgent2Button, active: enableAgent2Button }"
-      :disabled="!wsConnected"
-      @click="toggleAgent2"
+      :class="{ inactive: !エージェント2ボタン有効, active: エージェント2ボタン有効 }"
+      :disabled="!入力接続済み"
+      @click="エージェント2切替"
       title="コード2"
     >
       2
     </button>
     <button
       class="floating-icon agent-icon"
-      :class="{ inactive: !enableAgent3Button, active: enableAgent3Button }"
-      :disabled="!wsConnected"
-      @click="toggleAgent3"
+      :class="{ inactive: !エージェント3ボタン有効, active: エージェント3ボタン有効 }"
+      :disabled="!入力接続済み"
+      @click="エージェント3切替"
       title="コード3"
     >
       3
     </button>
     <button
       class="floating-icon agent-icon"
-      :class="{ inactive: !enableAgent4Button, active: enableAgent4Button }"
-      :disabled="!wsConnected"
-      @click="toggleAgent4"
+      :class="{ inactive: !エージェント4ボタン有効, active: エージェント4ボタン有効 }"
+      :disabled="!入力接続済み"
+      @click="エージェント4切替"
       title="コード4"
     >
       4
     </button>
     <button
       class="floating-icon config-icon"
-      :disabled="!wsConnected"
-      @click="showModelConfig = true"
+      :disabled="!入力接続済み"
+      @click="モデル設定表示 = true"
       title="モデル設定"
     >
       <img src="/icons/setting.png" alt="設定" class="icon-image" />
@@ -851,9 +841,9 @@ const gridLayoutClass = computed(() => {
     @mouseleave="ガイド領域マウス離脱"
   >
     <!-- エラーメッセージ表示 -->
-    <div v-if="errorMessage" class="error-message">
-      <button class="error-close" @click="errorMessage = ''">×</button>
-      <strong>エラー:</strong> {{ errorMessage }}
+    <div v-if="エラーメッセージ" class="error-message">
+      <button class="error-close" @click="エラーメッセージ = ''">×</button>
+      <strong>エラー:</strong> {{ エラーメッセージ }}
     </div>
     <div
       v-if="入力ウェルカム情報表示 || 入力ウェルカム本文表示"
@@ -865,123 +855,123 @@ const gridLayoutClass = computed(() => {
     </div>
 
     <!-- コンポーネントグリッド -->
-    <div class="components-grid" :class="gridLayoutClass">
+    <div class="components-grid" :class="グリッドレイアウトクラス">
       <!-- ファイル -->
-      <Transition name="panel-expand" @after-leave="handleAfterLeaveFile">
-      <div v-show="showFile" class="component-panel">
+      <Transition name="panel-expand" @after-leave="ファイル退場後">
+      <div v-show="ファイル表示中" class="component-panel">
         <AIコアファイル
           :セッションID="セッションID"
-          :active="showFile"
-          :ws-connected="wsConnected"
-          :ws-client="wsClient ?? null"
-          @close="handleCloseFile"
+          :active="ファイル表示中"
+          :ws-connected="入力接続済み"
+          :ws-client="inputSocket ?? null"
+          @close="ファイル閉じる"
         />
       </div>
       </Transition>
 
       <!-- チャット -->
-      <Transition name="panel-expand" @after-leave="handleAfterLeaveChat">
-      <div v-show="showChat" class="component-panel">
+      <Transition name="panel-expand" @after-leave="チャット退場後">
+      <div v-show="チャット表示中" class="component-panel">
         <AIコアチャット
           :セッションID="セッションID"
           チャンネル="0"
           :chat-ai="モデル設定.CHAT_AI_NAME"
           :live-ai="モデル設定.LIVE_AI_NAME"
-          :chat-mode="chatMode"
-          :input-ws-client="wsClient"
-          :input-connected="wsConnected"
-          @mode-change="chatMode = $event"
-          @activate="showChat = true; layoutChat = true; enableChatButton = true"
-          @close="handleCloseChat"
+          :chat-mode="チャットモード"
+          :input-ws-client="inputSocket"
+          :input-connected="入力接続済み"
+          @mode-change="チャットモード = $event"
+          @activate="チャット表示中 = true; チャットレイアウト = true; チャットボタン有効 = true"
+          @close="チャット閉じる"
         />
       </div>
       </Transition>
 
       <!-- エージェント1 -->
-      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent1">
-      <div v-show="showAgent1" class="component-panel">
+      <Transition name="panel-expand" @after-leave="エージェント1退場後">
+      <div v-show="エージェント1表示中" class="component-panel">
         <AIコアコード
           key="code-1"
           :セッションID="セッションID"
           チャンネル="1"
           :code-ai="モデル設定.CODE_AI1_NAME"
-          :input-ws-client="wsClient"
-          :input-connected="wsConnected"
-          @activate="showAgent1 = true; layoutAgent1 = true; enableAgent1Button = true"
-          @close="handleCloseAgent1"
+          :input-ws-client="inputSocket"
+          :input-connected="入力接続済み"
+          @activate="エージェント1表示中 = true; エージェント1レイアウト = true; エージェント1ボタン有効 = true"
+          @close="エージェント1閉じる"
         />
       </div>
       </Transition>
 
       <!-- イメージ -->
-      <Transition name="panel-expand" @after-leave="handleAfterLeaveImage">
-      <div v-show="showImage" class="component-panel">
+      <Transition name="panel-expand" @after-leave="イメージ退場後">
+      <div v-show="イメージ表示中" class="component-panel">
         <AIコアイメージ
-          :auto-show-selection="autoShowSelection"
+          :auto-show-selection="自動選択表示"
           :セッションID="セッションID"
-          :active="showImage"
-          :ws-connected="wsConnected"
-          :ws-client="wsClient ?? null"
+          :active="イメージ表示中"
+          :ws-connected="入力接続済み"
+          :ws-client="inputSocket ?? null"
           チャンネル="input"
-          @selection-cancel="handleImageSelectionCancel"
-          @selection-complete="autoShowSelection = false"
-          @close="handleCloseImage"
+          @selection-cancel="イメージ選択キャンセル"
+          @selection-complete="自動選択表示 = false"
+          @close="イメージ閉じる"
         />
       </div>
       </Transition>
 
       <!-- エージェント2 -->
-      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent2">
-      <div v-show="showAgent2" class="component-panel">
+      <Transition name="panel-expand" @after-leave="エージェント2退場後">
+      <div v-show="エージェント2表示中" class="component-panel">
         <AIコアコード
           key="code-2"
           :セッションID="セッションID"
           チャンネル="2"
           :code-ai="モデル設定.CODE_AI2_NAME"
-          :input-ws-client="wsClient"
-          :input-connected="wsConnected"
-          @activate="showAgent2 = true; layoutAgent2 = true; enableAgent2Button = true"
-          @close="handleCloseAgent2"
+          :input-ws-client="inputSocket"
+          :input-connected="入力接続済み"
+          @activate="エージェント2表示中 = true; エージェント2レイアウト = true; エージェント2ボタン有効 = true"
+          @close="エージェント2閉じる"
         />
       </div>
       </Transition>
 
       <!-- エージェント3 -->
-      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent3">
-      <div v-show="showAgent3" class="component-panel">
+      <Transition name="panel-expand" @after-leave="エージェント3退場後">
+      <div v-show="エージェント3表示中" class="component-panel">
         <AIコアコード
           key="code-3"
           :セッションID="セッションID"
           チャンネル="3"
           :code-ai="モデル設定.CODE_AI3_NAME"
-          :input-ws-client="wsClient"
-          :input-connected="wsConnected"
-          @activate="showAgent3 = true; layoutAgent3 = true; enableAgent3Button = true"
-          @close="handleCloseAgent3"
+          :input-ws-client="inputSocket"
+          :input-connected="入力接続済み"
+          @activate="エージェント3表示中 = true; エージェント3レイアウト = true; エージェント3ボタン有効 = true"
+          @close="エージェント3閉じる"
         />
       </div>
       </Transition>
 
       <!-- エージェント4 -->
-      <Transition name="panel-expand" @after-leave="handleAfterLeaveAgent4">
-      <div v-show="showAgent4" class="component-panel">
+      <Transition name="panel-expand" @after-leave="エージェント4退場後">
+      <div v-show="エージェント4表示中" class="component-panel">
         <AIコアコード
           key="code-4"
           :セッションID="セッションID"
           チャンネル="4"
           :code-ai="モデル設定.CODE_AI4_NAME"
-          :input-ws-client="wsClient"
-          :input-connected="wsConnected"
-          @activate="showAgent4 = true; layoutAgent4 = true; enableAgent4Button = true"
-          @close="handleCloseAgent4"
+          :input-ws-client="inputSocket"
+          :input-connected="入力接続済み"
+          @activate="エージェント4表示中 = true; エージェント4レイアウト = true; エージェント4ボタン有効 = true"
+          @close="エージェント4閉じる"
         />
       </div>
       </Transition>
 
     </div>
     <AI設定再起動
-      :is-open="showModelConfig"
-      @close="showModelConfig = false"
+      :is-open="モデル設定表示"
+      @close="モデル設定表示 = false"
     />
   </div>
 </template>
@@ -994,8 +984,6 @@ const gridLayoutClass = computed(() => {
   background: #1a1a1a;
   overflow-y: auto;
   overflow-x: hidden;
-  --panel-base-width: 520px;
-  --panel-base-height: 620px;
 }
 
 /* 固定UI要素の位置・サイズの共通変数 */
@@ -1595,16 +1583,18 @@ const gridLayoutClass = computed(() => {
 /* コンポーネントグリッド - 基本設定 */
 .components-grid {
   display: grid;
-  gap: 16px;
-  padding: 16px;
+  gap: 18px;
+  padding: 18px;
   width: 100%;
   height: 100%;
+  min-height: 100%;
   box-sizing: border-box;
   transition: all 0.3s ease;
   position: relative;
   z-index: 2;
-  justify-items: center;
-  align-content: center;
+  justify-items: stretch;
+  align-items: stretch;
+  align-content: stretch;
 }
 
 /* レイアウト: 0枚（空） */
@@ -1623,46 +1613,42 @@ const gridLayoutClass = computed(() => {
 /* レイアウト: 1枚（全画面） */
 .layout-single {
   grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-  padding-left: 26%;
-  padding-right: 26%;
+  grid-template-rows: minmax(0, 1fr);
+  padding-top: 40px;
+  padding-bottom: 40px;
+  padding-left: 20%;
+  padding-right: 20%;
 }
 
 /* レイアウト: 2枚（左右分割） */
 .layout-double {
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: 1fr;
-  padding-left: 10%;
-  padding-right: 10%;
-  column-gap: 10%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  padding-top: 40px;
+  padding-bottom: 40px;
+  padding-left: 13%;
+  padding-right: 13%;
+  column-gap: 4%;
 }
 
 /* レイアウト: 3枚（横並び） */
 .layout-triple {
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  padding-top: 40px;
+  padding-bottom: 40px;
 }
 
 /* レイアウト: 4枚（2×2グリッド） */
 .layout-quad {
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
 /* レイアウト: 5枚以上（3×2グリッド） */
 .layout-multi {
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-}
-
-/* 横長時: 1〜3枚表示の高さを少し抑える（約 -50px） */
-@media (min-aspect-ratio: 1/1) {
-  .layout-single,
-  .layout-double,
-  .layout-triple {
-    padding-top: 41px;
-    padding-bottom: 41px;
-  }
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
 .component-panel {
@@ -1673,12 +1659,10 @@ const gridLayoutClass = computed(() => {
   position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   transition: all 0.3s ease;
-  width: min(100%, var(--panel-base-width));
-  max-width: var(--panel-base-width);
-  height: min(100%, var(--panel-base-height));
-  max-height: var(--panel-base-height);
-  min-height: min(420px, 100%);
-  min-width: min(440px, 100%);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .component-panel:hover {
@@ -1689,13 +1673,13 @@ const gridLayoutClass = computed(() => {
 /* レスポンシブ対応 */
 @media (max-width: 1400px) {
   .layout-multi {
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
   }
 
   .layout-triple {
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 
@@ -1712,16 +1696,13 @@ const gridLayoutClass = computed(() => {
   .layout-quad,
   .layout-multi {
     grid-template-columns: 1fr;
-    grid-template-rows: auto;
+    grid-template-rows: repeat(auto-fit, minmax(320px, 1fr));
   }
 
   .component-panel {
     width: 100%;
-    max-width: none;
-    height: auto;
-    max-height: none;
-    min-height: 400px;
-    min-width: 0;
+    height: 100%;
+    min-height: 320px;
   }
 
   /* 小さい画面ではビジュアライザーとWS状態を小さく */
@@ -1751,10 +1732,7 @@ const gridLayoutClass = computed(() => {
 
 /* 縦長画面での調整 */
 @media (max-aspect-ratio: 1/1) {
-  /* 1枚表示は左右の余白を減らしてパネル幅を広げる */
   .layout-single {
-    padding-top: 10%;
-    padding-bottom: 10%;
     padding-left: 16px;
     padding-right: 16px;
   }
@@ -1762,10 +1740,9 @@ const gridLayoutClass = computed(() => {
   /* 2枚表示は上下配置 */
   .layout-double {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(2, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
     padding-left: 16px;
     padding-right: 16px;
-    column-gap: 16px;
     row-gap: 16px;
   }
 

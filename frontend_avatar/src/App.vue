@@ -8,7 +8,6 @@ import AIイメージ from '@/components/AIイメージ.vue'
 import ログイン from '@/components/ログイン.vue'
 import WindowShell from '@/components/WindowShell.vue'
 import apiClient from '@/lib/api'
-import { AudioController } from '@/lib/audio-controller'
 import { AI_WS_ENDPOINT, defaultModelSettings } from '@/lib/config'
 import { AIWebSocket } from '@/lib/websocket'
 import type { AuthUser, ChatMessage, MessageKind, ModelSettings } from '@/types'
@@ -17,23 +16,18 @@ type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4
 type WindowRole = 'login' | 'core' | PanelKey
 type チャットモード = 'Chat' | 'Live' | 'Code1' | 'Code2' | 'Code3' | 'Code4'
 type SharedSnapshot = {
-  isAuthenticated: boolean
-  userLabel: string
-  sessionId: string
-  welcomeInfo: string
-  messages: ChatMessage[]
-  chatMode: チャットモード
-  modelSettings: ModelSettings
-  inputConnected: boolean
-  chatConnected: boolean
-  audioConnected: boolean
-  micEnabled: boolean
-  speakerEnabled: boolean
-  micLevel: number
-  speakerLevel: number
-  panelVisibility: Record<PanelKey, boolean>
-  coreBusy: boolean
-  coreError: string
+  認証済み: boolean
+  利用者ラベル: string
+  セッションID: string
+  入力ウェルカム情報: string
+  メッセージ一覧: ChatMessage[]
+  チャットモード: チャットモード
+  モデル設定: ModelSettings
+  入力接続済み: boolean
+  チャット接続済み: boolean
+  パネル表示状態: Record<PanelKey, boolean>
+  コア処理中: boolean
+  コアエラー: string
 }
 
 const PANEL_KEYS: PanelKey[] = ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4']
@@ -48,19 +42,19 @@ const PANEL_TITLES: Record<PanelKey, string> = {
 }
 const チャットモード一覧: チャットモード[] = ['Chat', 'Live', 'Code1', 'Code2', 'Code3', 'Code4']
 
-function createPanelVisibility(): Record<PanelKey, boolean> {
+function パネル表示状態生成(): Record<PanelKey, boolean> {
   return {
-    chat: false,
-    file: false,
-    image: false,
-    code1: false,
-    code2: false,
-    code3: false,
-    code4: false,
+    chat: true,
+    file: true,
+    image: true,
+    code1: true,
+    code2: true,
+    code3: true,
+    code4: true,
   }
 }
 
-function resolveFallbackRole(): WindowRole {
+function フォールバックロール解決(): WindowRole {
   const role = new URLSearchParams(window.location.search).get('role')
   if (role === 'core' || role === 'login' || PANEL_KEYS.includes(role as PanelKey)) {
     return role as WindowRole
@@ -68,95 +62,89 @@ function resolveFallbackRole(): WindowRole {
   return 'login'
 }
 
-const windowRole = ref<WindowRole>(resolveFallbackRole())
-const token = ref(localStorage.getItem('token') || '')
-const user = ref<AuthUser | null>(JSON.parse(localStorage.getItem('user') || 'null'))
-const loadingAuth = ref(true)
-const authBusy = ref(false)
-const authError = ref('')
-const coreBusy = ref(false)
-const coreError = ref('')
-const sessionId = ref(localStorage.getItem('avatar_session_id') || '')
-const welcomeInfo = ref('')
-const messages = ref<ChatMessage[]>([])
-const chatMode = ref<チャットモード>('Live')
-const modelSettings = ref<ModelSettings>(defaultModelSettings())
-const auxSnapshot = ref<SharedSnapshot | null>(null)
+function 保存利用者読込(): AuthUser | null {
+  const raw = localStorage.getItem('user')
+  if (!raw) {
+    return null
+  }
 
-const inputConnected = ref(false)
-const chatConnected = ref(false)
-const audioConnected = ref(false)
-const micEnabled = ref(false)
-const speakerEnabled = ref(true)
-const micLevel = ref(0)
-const speakerLevel = ref(0)
-const panelVisibility = ref(createPanelVisibility())
+  try {
+    return JSON.parse(raw) as AuthUser
+  } catch {
+    localStorage.removeItem('user')
+    return null
+  }
+}
 
+const ウィンドウロール = ref<WindowRole>(フォールバックロール解決())
+const 認証トークン = ref(localStorage.getItem('token') || '')
+const 利用者 = ref<AuthUser | null>(保存利用者読込())
+const 認証読込中 = ref(true)
+const 認証処理中 = ref(false)
+const 認証エラー = ref('')
+const コア処理中 = ref(false)
+const コアエラー = ref('')
+const セッションID = ref(localStorage.getItem('avatar_session_id') || '')
+const 入力ウェルカム情報 = ref('')
+const メッセージ一覧 = ref<ChatMessage[]>([])
+const チャットモード = ref<チャットモード>('Live')
+const モデル設定 = ref<ModelSettings>(defaultModelSettings())
+const 補助スナップショット = ref<SharedSnapshot | null>(null)
+
+const 入力接続済み = ref(false)
+const チャット接続済み = ref(false)
+const 初期マイク有効 = ref(false)
+const 初期スピーカー有効 = ref(true)
+const 音声状態シード = ref(0)
+const パネル表示状態 = ref(パネル表示状態生成())
+
+const coreSocket = shallowRef<AIWebSocket | null>(null)
 const inputSocket = shallowRef<AIWebSocket | null>(null)
 const chatSocket = shallowRef<AIWebSocket | null>(null)
-const audioSocket = shallowRef<AIWebSocket | null>(null)
-const audioController = shallowRef<AudioController | null>(null)
-const fileRef = ref<{ 接続済み: boolean; 読込中: boolean; ファイルリスト要求: () => void } | null>(null)
-const imageRef = ref<{ 接続状態: 'disconnected' | 'connecting' | 'sending'; 状態表示テキスト: string; WebSocket接続中: boolean } | null>(null)
-const chatRef = ref<{ WebSocket接続中: boolean; チャット接続済み: boolean } | null>(null)
-const codeRef = ref<{ WebSocket接続中: boolean; 接続状態表示: string; 出力接続済み: boolean } | null>(null)
-const subtitleText = ref('')
-const imageAutoShowSelection = ref(true)
+const ファイルRef = ref<{ 接続済み: boolean; 読込中: boolean; ファイルリスト要求: () => void } | null>(null)
+const イメージRef = ref<{ 接続状態: 'disconnected' | 'connecting' | 'sending'; 状態表示テキスト: string; WebSocket接続中: boolean } | null>(null)
+const チャットRef = ref<{ WebSocket接続中: boolean; チャット接続済み: boolean } | null>(null)
+const コードRef = ref<{ WebSocket接続中: boolean; 接続状態表示: string; 出力接続済み: boolean } | null>(null)
+const 自動選択表示 = ref(true)
 const 認証エラーメッセージKey = 'avatar_auth_error'
-let subtitleTimer: ReturnType<typeof setTimeout> | null = null
-
-function setSubtitle(text: string) {
-  subtitleText.value = text
-  if (subtitleTimer) clearTimeout(subtitleTimer)
-  subtitleTimer = setTimeout(() => {
-    subtitleText.value = ''
-  }, 8000)
-}
+const コアViewRef = ref<{ addSubtitle: (text: string) => void } | null>(null)
 
 const versions = window.desktopApi?.versions
 
-const isAuthenticated = computed(() => Boolean(token.value && user.value))
-const isCoreWindow = computed(() => windowRole.value === 'core')
-const isLoginWindow = computed(() => windowRole.value === 'login')
-const currentPanelKey = computed<PanelKey | null>(() => {
-  return PANEL_KEYS.includes(windowRole.value as PanelKey) ? (windowRole.value as PanelKey) : null
+const 認証済み = computed(() => Boolean(認証トークン.value && 利用者.value))
+const コアウィンドウ = computed(() => ウィンドウロール.value === 'core')
+const ログインウィンドウ = computed(() => ウィンドウロール.value === 'login')
+const 現在パネルキー = computed<PanelKey | null>(() => {
+  return PANEL_KEYS.includes(ウィンドウロール.value as PanelKey) ? (ウィンドウロール.value as PanelKey) : null
 })
-const userLabel = computed(() => user.value?.利用者名 || user.value?.利用者ID || '未ログイン')
-const connectionReady = computed(() => {
-  return inputConnected.value && (!panelVisibility.value.chat || chatConnected.value)
-})
-const transportState = computed(() => {
-  if (audioConnected.value) return '接続中'
-  if (coreBusy.value) return '接続中...'
-  return '切断'
-})
+const 利用者ラベル = computed(() => 利用者.value?.利用者名 || 利用者.value?.利用者ID || '未ログイン')
 
-const displayMessages = computed(() => (isCoreWindow.value ? messages.value : auxSnapshot.value?.messages || []))
-const displayWelcomeInfo = computed(() =>
-  isCoreWindow.value ? welcomeInfo.value : auxSnapshot.value?.welcomeInfo || '',
+const 表示メッセージ一覧 = computed(() => (コアウィンドウ.value ? メッセージ一覧.value : 補助スナップショット.value?.メッセージ一覧 || []))
+const 表示ウェルカム情報 = computed(() =>
+  コアウィンドウ.value ? 入力ウェルカム情報.value : 補助スナップショット.value?.入力ウェルカム情報 || '',
 )
-const displaySessionId = computed(() =>
-  isCoreWindow.value ? sessionId.value : auxSnapshot.value?.sessionId || '',
+const 表示セッションID = computed(() =>
+  コアウィンドウ.value ? セッションID.value : 補助スナップショット.value?.セッションID || '',
 )
-const displayChatMode = computed(() =>
-  isCoreWindow.value ? chatMode.value : auxSnapshot.value?.chatMode || 'Live',
+const 表示チャットモード = computed(() =>
+  コアウィンドウ.value ? チャットモード.value : 補助スナップショット.value?.チャットモード || 'Live',
 )
-const displayInputConnected = computed(() =>
-  isCoreWindow.value ? inputConnected.value : Boolean(auxSnapshot.value?.inputConnected),
+const 表示入力接続済み = computed(() =>
+  コアウィンドウ.value ? 入力接続済み.value : Boolean(補助スナップショット.value?.入力接続済み),
 )
-const displayChatConnected = computed(() =>
-  isCoreWindow.value ? chatConnected.value : Boolean(auxSnapshot.value?.chatConnected),
+const 表示チャット接続済み = computed(() =>
+  コアウィンドウ.value ? チャット接続済み.value : Boolean(補助スナップショット.value?.チャット接続済み),
 )
-const displayChatModel = computed(() =>
-  isCoreWindow.value
-    ? modelSettings.value.CHAT_AI_NAME || 'chat'
-    : auxSnapshot.value?.modelSettings.CHAT_AI_NAME || 'chat',
+const 表示チャットモデル = computed(() =>
+  コアウィンドウ.value
+    ? モデル設定.value.CHAT_AI_NAME || 'chat'
+    : 補助スナップショット.value?.モデル設定.CHAT_AI_NAME || 'chat',
 )
-const displayModelSettings = computed(() =>
-  isCoreWindow.value ? modelSettings.value : auxSnapshot.value?.modelSettings || defaultModelSettings(),
+const 表示モデル設定 = computed(() =>
+  コアウィンドウ.value ? モデル設定.value : 補助スナップショット.value?.モデル設定 || defaultModelSettings(),
 )
-const currentCodeChannel = computed<'1' | '2' | '3' | '4' | ''>(() => {
-  switch (currentPanelKey.value) {
+const 現在コードチャンネル = computed<'1' | '2' | '3' | '4' | ''>(() => {
+  switch (現在パネルキー.value) {
     case 'code1':
       return '1'
     case 'code2':
@@ -169,156 +157,170 @@ const currentCodeChannel = computed<'1' | '2' | '3' | '4' | ''>(() => {
       return ''
   }
 })
-const currentCodeModel = computed(() => {
-  switch (currentPanelKey.value) {
+const 現在コードモデル = computed(() => {
+  switch (現在パネルキー.value) {
     case 'code1':
-      return displayModelSettings.value.CODE_AI1_NAME
+      return 表示モデル設定.value.CODE_AI1_NAME
     case 'code2':
-      return displayModelSettings.value.CODE_AI2_NAME
+      return 表示モデル設定.value.CODE_AI2_NAME
     case 'code3':
-      return displayModelSettings.value.CODE_AI3_NAME
+      return 表示モデル設定.value.CODE_AI3_NAME
     case 'code4':
-      return displayModelSettings.value.CODE_AI4_NAME
+      return 表示モデル設定.value.CODE_AI4_NAME
     default:
       return ''
   }
 })
 
-const authExpiredHandler = () => {
-  clearAuth('認証の有効期限が切れました。再ログインしてください。')
+const 認証期限切れ処理 = () => {
+  認証クリア('認証の有効期限が切れました。再ログインしてください。')
 }
 
-let desktopChannel: BroadcastChannel | null = null
-let detachPanelStatesListener: (() => void) | null = null
-let detachWindowShownListener: (() => void) | null = null
-let snapshotRetryTimer: ReturnType<typeof setInterval> | null = null
+let デスクトップチャンネル: BroadcastChannel | null = null
+let パネル状態リスナー解除: (() => void) | null = null
+let ウィンドウ表示リスナー解除: (() => void) | null = null
+let スナップショット再試行タイマー: ReturnType<typeof setInterval> | null = null
 
-function requestSnapshot() {
-  desktopChannel?.postMessage({ type: 'request-snapshot' })
+function ストレージ認証同期(options: { syncError?: boolean } = {}) {
+  認証トークン.value = localStorage.getItem('token') || ''
+  利用者.value = 認証トークン.value ? 保存利用者読込() : null
+
+  if (options.syncError) {
+    認証エラー.value = localStorage.getItem(認証エラーメッセージKey) || ''
+    if (認証エラー.value) {
+      localStorage.removeItem(認証エラーメッセージKey)
+    }
+  }
 }
 
-function startSnapshotRetry() {
-  if (snapshotRetryTimer) return
-  snapshotRetryTimer = setInterval(() => {
-    if (auxSnapshot.value?.sessionId) {
-      stopSnapshotRetry()
+function ストレージ変更処理(event: StorageEvent) {
+  if (
+    event.key
+    && event.key !== 'token'
+    && event.key !== 'user'
+    && event.key !== 認証エラーメッセージKey
+    && event.key !== 'avatar_session_id'
+  ) {
+    return
+  }
+
+  ストレージ認証同期({ syncError: event.key === 認証エラーメッセージKey || !event.key })
+}
+
+function スナップショット要求() {
+  デスクトップチャンネル?.postMessage({ type: 'request-snapshot' })
+}
+
+function スナップショット再試行開始() {
+  if (スナップショット再試行タイマー) return
+  スナップショット再試行タイマー = setInterval(() => {
+    if (補助スナップショット.value?.セッションID) {
+      スナップショット再試行停止()
       return
     }
-    requestSnapshot()
+    スナップショット要求()
   }, 1000)
 }
 
-function stopSnapshotRetry() {
-  if (!snapshotRetryTimer) return
-  clearInterval(snapshotRetryTimer)
-  snapshotRetryTimer = null
+function スナップショット再試行停止() {
+  if (!スナップショット再試行タイマー) return
+  clearInterval(スナップショット再試行タイマー)
+  スナップショット再試行タイマー = null
 }
 
-function updatePanelStates(states?: Record<PanelKey, boolean>) {
-  panelVisibility.value = {
-    ...createPanelVisibility(),
+function パネル状態更新(states?: Record<PanelKey, boolean>) {
+  パネル表示状態.value = {
+    ...パネル表示状態生成(),
     ...(states || {}),
   }
 }
 
-async function refreshPanelStates() {
+async function パネル状態再読込() {
   const states = await window.desktopApi?.getPanelStates?.()
   if (states) {
-    updatePanelStates(states)
+    パネル状態更新(states)
   }
 }
 
-function buildSnapshot(): SharedSnapshot {
+function スナップショット構築(): SharedSnapshot {
   return {
-    isAuthenticated: isAuthenticated.value,
-    userLabel: userLabel.value,
-    sessionId: sessionId.value,
-    welcomeInfo: welcomeInfo.value,
-    messages: [...messages.value],
-    chatMode: chatMode.value,
-    modelSettings: { ...modelSettings.value },
-    inputConnected: inputConnected.value,
-    chatConnected: chatConnected.value,
-    audioConnected: audioConnected.value,
-    micEnabled: micEnabled.value,
-    speakerEnabled: speakerEnabled.value,
-    micLevel: micLevel.value,
-    speakerLevel: speakerLevel.value,
-    panelVisibility: { ...panelVisibility.value },
-    coreBusy: coreBusy.value,
-    coreError: coreError.value,
+    認証済み: 認証済み.value,
+    利用者ラベル: 利用者ラベル.value,
+    セッションID: セッションID.value,
+    入力ウェルカム情報: 入力ウェルカム情報.value,
+    メッセージ一覧: [...メッセージ一覧.value],
+    チャットモード: チャットモード.value,
+    モデル設定: { ...モデル設定.value },
+    入力接続済み: 入力接続済み.value,
+    チャット接続済み: チャット接続済み.value,
+    パネル表示状態: { ...パネル表示状態.value },
+    コア処理中: コア処理中.value,
+    コアエラー: コアエラー.value,
   }
 }
 
-function broadcastSnapshot() {
-  if (!desktopChannel || !isCoreWindow.value) return
-  desktopChannel.postMessage({ type: 'snapshot', snapshot: buildSnapshot() })
+function スナップショット送信() {
+  if (!デスクトップチャンネル || !コアウィンドウ.value) return
+  デスクトップチャンネル.postMessage({ type: 'snapshot', snapshot: スナップショット構築() })
 }
 
-function handleDesktopChannelMessage(event: MessageEvent) {
+function デスクトップチャンネルメッセージ処理(event: MessageEvent) {
   const payload = event.data
   if (!payload || typeof payload !== 'object') return
 
-  if (isCoreWindow.value) {
+  if (コアウィンドウ.value) {
     if (payload.type === 'request-snapshot') {
-      broadcastSnapshot()
+      スナップショット送信()
       return
     }
 
     if (payload.type === 'send-message' && typeof payload.text === 'string') {
-      sendMessage(payload.text)
+      メッセージ送信(payload.text)
       return
     }
 
     if (payload.type === 'send-input-payload' && payload.message) {
-      sendInputPayload(payload.message as Record<string, unknown>)
+      入力ペイロード送信(payload.message as Record<string, unknown>)
       return
     }
 
     if (payload.type === 'set-chat-mode' && チャットモード一覧.includes(payload.mode as チャットモード)) {
-      chatMode.value = payload.mode
+      チャットモード.value = payload.mode
       return
     }
 
     if (payload.type === 'chat-state' && typeof payload.connected === 'boolean') {
-      chatConnected.value = payload.connected
+      チャット接続済み.value = payload.connected
       return
     }
 
-    if (
-      payload.type === 'chat-subtitle'
-      && (payload.messageType === 'welcome_text' || payload.messageType === 'output_text' || payload.messageType === 'recognition_output')
-      && typeof payload.text === 'string'
-    ) {
-      setSubtitle(payload.text)
-    }
     return
   }
 
   if (payload.type === 'snapshot') {
-    auxSnapshot.value = payload.snapshot as SharedSnapshot
-    if (auxSnapshot.value?.sessionId) {
-      stopSnapshotRetry()
+    補助スナップショット.value = payload.snapshot as SharedSnapshot
+    if (補助スナップショット.value?.セッションID) {
+      スナップショット再試行停止()
     }
   }
 }
 
-async function detectWindowRole() {
-  windowRole.value = (await window.desktopApi?.getWindowRole?.()) || resolveFallbackRole()
+async function ウィンドウロール検出() {
+  ウィンドウロール.value = (await window.desktopApi?.getWindowRole?.()) || フォールバックロール解決()
 }
 
-let streamMessageId: string | null = null
+let ストリームメッセージID: string | null = null
 
-function newMessageId(): string {
+function 新規メッセージID(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function pushMessage(kind: MessageKind, text: string, extra?: Partial<ChatMessage>) {
+function メッセージ追加(kind: MessageKind, text: string, extra?: Partial<ChatMessage>) {
   const normalized = String(text || '').trim()
   if (!normalized && !extra?.fileName) return
 
-  messages.value.push({
-    id: newMessageId(),
+  メッセージ一覧.value.push({
+    id: 新規メッセージID(),
     kind,
     text: normalized,
     timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
@@ -326,14 +328,14 @@ function pushMessage(kind: MessageKind, text: string, extra?: Partial<ChatMessag
   })
 }
 
-function handleOutputStream(message: Record<string, any>) {
+function 出力ストリーム処理(message: Record<string, any>) {
   const content = String(message.メッセージ内容 || '').trim()
   if (!content) return
 
   if (content === '<<< 処理開始 >>>') {
-    const id = newMessageId()
-    streamMessageId = id
-    messages.value.push({
+    const id = 新規メッセージID()
+    ストリームメッセージID = id
+    メッセージ一覧.value.push({
       id,
       kind: 'stream',
       text: `${content}\n`,
@@ -345,54 +347,49 @@ function handleOutputStream(message: Record<string, any>) {
   }
 
   if (content === '<<< 処理終了 >>>') {
-    const target = messages.value.find((m) => m.id === streamMessageId)
+    const target = メッセージ一覧.value.find((m) => m.id === ストリームメッセージID)
     if (target) {
       target.text += `${content}\n`
       target.isCollapsed = true
     }
-    streamMessageId = null
+    ストリームメッセージID = null
     return
   }
 
-  const target = messages.value.find((m) => m.id === streamMessageId)
+  const target = メッセージ一覧.value.find((m) => m.id === ストリームメッセージID)
   if (target) {
     target.text += `${content}\n`
   }
 }
 
-function resetCoreState() {
-  inputConnected.value = false
-  chatConnected.value = false
-  audioConnected.value = false
-  welcomeInfo.value = ''
-  messages.value = []
-  micEnabled.value = false
-  speakerEnabled.value = true
-  micLevel.value = 0
-  speakerLevel.value = 0
-  coreError.value = ''
-  modelSettings.value = defaultModelSettings()
-  chatMode.value = 'Live'
+function コア状態リセット() {
+  入力接続済み.value = false
+  チャット接続済み.value = false
+  入力ウェルカム情報.value = ''
+  メッセージ一覧.value = []
+  初期マイク有効.value = false
+  初期スピーカー有効.value = true
+  コアエラー.value = ''
+  モデル設定.value = defaultModelSettings()
+  チャットモード.value = 'Live'
 }
 
-function disconnectCore() {
-  audioController.value?.cleanup()
+function コア切断() {
+  coreSocket.value?.disconnect()
   inputSocket.value?.disconnect()
   chatSocket.value?.disconnect()
-  audioSocket.value?.disconnect()
   inputSocket.value = null
   chatSocket.value = null
-  audioSocket.value = null
-  resetCoreState()
+  コア状態リセット()
 }
 
-function clearAuth(message = '') {
-  token.value = ''
-  user.value = null
-  authBusy.value = false
-  authError.value = message
-  auxSnapshot.value = null
-  updatePanelStates()
+function 認証クリア(message = '') {
+  認証トークン.value = ''
+  利用者.value = null
+  認証処理中.value = false
+  認証エラー.value = message
+  補助スナップショット.value = null
+  パネル状態更新()
   localStorage.removeItem('token')
   localStorage.removeItem('user')
   localStorage.removeItem('avatar_session_id')
@@ -401,24 +398,24 @@ function clearAuth(message = '') {
   } else {
     localStorage.removeItem(認証エラーメッセージKey)
   }
-  sessionId.value = ''
-  disconnectCore()
-  windowRole.value = 'login'
+  セッションID.value = ''
+  コア切断()
+  ウィンドウロール.value = 'login'
   void window.desktopApi?.openLoginWindow?.()
 }
 
-function attachSocketState(client: AIWebSocket, target: typeof inputConnected) {
+function ソケット状態バインド(client: AIWebSocket, target: typeof 入力接続済み) {
   client.onStateChange((connected) => {
     target.value = connected
   })
 }
 
-function handleInputInit(message: Record<string, any>) {
+function 初期化処理(message: Record<string, any>) {
   const payload = message.メッセージ内容 ?? {}
   const buttons = payload.ボタン ?? {}
   const settings = payload.モデル設定 ?? {}
 
-  modelSettings.value = {
+  モデル設定.value = {
     CHAT_AI_NAME: settings.CHAT_AI_NAME || '',
     LIVE_AI_NAME: settings.LIVE_AI_NAME || '',
     CODE_AI1_NAME: settings.CODE_AI1_NAME || '',
@@ -427,41 +424,39 @@ function handleInputInit(message: Record<string, any>) {
     CODE_AI4_NAME: settings.CODE_AI4_NAME || '',
   }
 
-  speakerEnabled.value = buttons.スピーカー ?? true
-  micEnabled.value = buttons.マイク ?? false
+  初期スピーカー有効.value = buttons.スピーカー ?? true
+  初期マイク有効.value = buttons.マイク ?? false
+  音声状態シード.value += 1
   switch (String(buttons.チャットモード || 'live').toLowerCase()) {
     case 'chat':
-      chatMode.value = 'Chat'
+      チャットモード.value = 'Chat'
       break
     case 'code1':
-      chatMode.value = 'Code1'
+      チャットモード.value = 'Code1'
       break
     case 'code2':
-      chatMode.value = 'Code2'
+      チャットモード.value = 'Code2'
       break
     case 'code3':
-      chatMode.value = 'Code3'
+      チャットモード.value = 'Code3'
       break
     case 'code4':
-      chatMode.value = 'Code4'
+      チャットモード.value = 'Code4'
       break
     default:
-      chatMode.value = 'Live'
+      チャットモード.value = 'Live'
       break
   }
-
-  audioController.value?.setLiveModelName(modelSettings.value.LIVE_AI_NAME)
-  audioController.value?.setSpeakerEnabled(speakerEnabled.value)
 }
 
-async function initializeCore(preferredSessionId = '') {
-  if (!user.value) return
+async function コア初期化(preferredSessionId = '') {
+  if (!利用者.value) return
 
-  disconnectCore()
-  coreBusy.value = true
-  coreError.value = ''
+  コア切断()
+  コア処理中.value = true
+  コアエラー.value = ''
 
-  const sessionHint = preferredSessionId || sessionId.value || ''
+  const sessionHint = preferredSessionId || セッションID.value || ''
 
   try {
     // Web版と同様: REST APIでセッションを初期化してIDを取得
@@ -475,248 +470,202 @@ async function initializeCore(preferredSessionId = '') {
       // REST失敗時はヒントをそのまま使用（WebSocket側で生成される）
     }
 
-    const nextInputSocket = new AIWebSocket(AI_WS_ENDPOINT, resolvedSessionId, 'input')
-    attachSocketState(nextInputSocket, inputConnected)
-    nextInputSocket.on('init', handleInputInit)
-    nextInputSocket.on('error', (message) => {
-      coreError.value = String(message.メッセージ内容 || message.error || 'AIコア接続エラー')
+    // coreチャンネルを先に接続（init・制御メッセージ・welcome を一括受信）
+    const nextCoreSocket = new AIWebSocket(AI_WS_ENDPOINT, resolvedSessionId, 'core')
+    ソケット状態バインド(nextCoreSocket, 入力接続済み)
+    nextCoreSocket.on('init', 初期化処理)
+    nextCoreSocket.on('error', (message) => {
+      コアエラー.value = String(message.メッセージ内容 || message.error || 'AIコア接続エラー')
     })
-    nextInputSocket.on('welcome_info', (message) => {
+    nextCoreSocket.on('welcome_info', (message) => {
       const text = String(message.メッセージ内容 || '').trim()
-      if (text) welcomeInfo.value = text
+      if (text) 入力ウェルカム情報.value = text
     })
-    nextInputSocket.on('welcome_text', (message) => {
+    nextCoreSocket.on('welcome_text', (message) => {
       const text = String(message.メッセージ内容 || '')
-      pushMessage('system', text)
-      setSubtitle(text)
+      メッセージ追加('system', text)
+    })
+    nextCoreSocket.on('output_text', (message) => {
+      const text = String(message.メッセージ内容 || '')
+      if (text) コアViewRef.value?.addSubtitle(text)
+    })
+    nextCoreSocket.on('recognition_output', (message) => {
+      const text = String(message.メッセージ内容 || '')
+      if (text) コアViewRef.value?.addSubtitle(text)
     })
 
-    const nextSessionId = await nextInputSocket.connect()
-    sessionId.value = nextSessionId
+    const nextSessionId = await nextCoreSocket.connect()
+    セッションID.value = nextSessionId
     localStorage.setItem('avatar_session_id', nextSessionId)
+    coreSocket.value = nextCoreSocket
+
+    // inputチャンネルを接続（送信専用・ハンドラなし）
+    const nextInputSocket = new AIWebSocket(AI_WS_ENDPOINT, nextSessionId, 'input')
+    nextInputSocket.connect().catch((e) => console.error('[Avatar] inputチャンネル接続エラー:', e))
     inputSocket.value = nextInputSocket
 
-    const nextAudioSocket = new AIWebSocket(AI_WS_ENDPOINT, nextSessionId, 'audio')
-    attachSocketState(nextAudioSocket, audioConnected)
-    nextAudioSocket.on('output_audio', (message) => {
-      audioController.value?.handleAudioMessage(message)
-    })
-    nextAudioSocket.on('cancel_audio', () => {
-      audioController.value?.cancelOutput(false)
-    })
-    await nextAudioSocket.connect()
-    audioSocket.value = nextAudioSocket
-
-    audioController.value?.setAudioSocket(nextAudioSocket)
-    audioController.value?.setSessionId(nextSessionId)
-    audioController.value?.setLiveModelName(modelSettings.value.LIVE_AI_NAME)
-    audioController.value?.setSpeakerEnabled(speakerEnabled.value)
-
-    if (micEnabled.value) {
-      const result = await audioController.value?.startMicrophone()
-      if (!result?.success) {
-        micEnabled.value = false
-        coreError.value = result?.error || 'マイクを開始できませんでした。'
-      }
-    }
-
-    syncOperationState()
-    broadcastSnapshot()
+    操作状態同期()
+    スナップショット送信()
   } catch (error) {
-    coreError.value = error instanceof Error ? error.message : 'AIコアへ接続できませんでした。'
-    disconnectCore()
+    コアエラー.value = error instanceof Error ? error.message : 'AIコアへ接続できませんでした。'
+    コア切断()
   } finally {
-    coreBusy.value = false
+    コア処理中.value = false
   }
 }
 
-function syncOperationState() {
+function 操作状態同期() {
   if (!inputSocket.value?.isConnected()) return
 
   inputSocket.value.send({
-    セッションID: sessionId.value,
+    セッションID: セッションID.value,
     チャンネル: 'input',
     メッセージ識別: 'operations',
     メッセージ内容: {
       ボタン: {
-        マイク: micEnabled.value,
-        スピーカー: speakerEnabled.value,
-        ファイル: panelVisibility.value.file,
-        チャット: panelVisibility.value.chat,
-        エージェント1: panelVisibility.value.code1,
-        イメージ: panelVisibility.value.image,
-        エージェント2: panelVisibility.value.code2,
-        エージェント3: panelVisibility.value.code3,
-        エージェント4: panelVisibility.value.code4,
-        チャットモード: chatMode.value.toLowerCase(),
+        ファイル: パネル表示状態.value.file,
+        チャット: パネル表示状態.value.chat,
+        エージェント1: パネル表示状態.value.code1,
+        イメージ: パネル表示状態.value.image,
+        エージェント2: パネル表示状態.value.code2,
+        エージェント3: パネル表示状態.value.code3,
+        エージェント4: パネル表示状態.value.code4,
+        チャットモード: チャットモード.value.toLowerCase(),
       },
     },
   })
 }
 
-async function fetchCurrentUser() {
-  if (!token.value) return
+async function 現在利用者取得() {
+  if (!認証トークン.value) return
 
   const response = await apiClient.post('/core/auth/現在利用者')
   if (response.data.status !== 'OK') {
     throw new Error(response.data.message || '利用者情報を取得できませんでした。')
   }
 
-  user.value = response.data.data
-  localStorage.setItem('user', JSON.stringify(user.value))
+  利用者.value = response.data.data
+  localStorage.setItem('user', JSON.stringify(利用者.value))
 }
 
-async function submitLogin(payload: { 利用者ID: string; パスワード: string }) {
-  authBusy.value = true
-  authError.value = ''
+async function ログイン送信(payload: { 利用者ID: string; パスワード: string }) {
+  認証処理中.value = true
+  認証エラー.value = ''
 
   try {
     const response = await apiClient.post('/core/auth/ログイン', payload)
     if (response.data.status !== 'OK') {
-      authError.value = response.data.message || 'ログインに失敗しました。'
+      認証エラー.value = response.data.message || 'ログインに失敗しました。'
       return
     }
 
-    token.value = response.data.data.access_token
-    localStorage.setItem('token', token.value)
+    認証トークン.value = response.data.data.access_token
+    localStorage.setItem('token', 認証トークン.value)
     localStorage.setItem('avatar_last_user', payload.利用者ID)
     localStorage.removeItem('user')
     localStorage.removeItem(認証エラーメッセージKey)
     localStorage.removeItem('avatar_session_id')
-    sessionId.value = ''
+    セッションID.value = ''
     await window.desktopApi?.openCoreWindow?.()
   } catch (error) {
-    authError.value = error instanceof Error ? error.message : 'ログインエラーが発生しました。'
+    認証エラー.value = error instanceof Error ? error.message : 'ログインエラーが発生しました。'
   } finally {
-    authBusy.value = false
+    認証処理中.value = false
   }
 }
 
-async function toggleMicrophone() {
-  if (!audioController.value) return
-
-  coreError.value = ''
-  await audioController.value.unlockAudio()
-  if (!micEnabled.value) {
-    const result = await audioController.value.startMicrophone()
-    if (!result.success) {
-      coreError.value = result.error || 'マイクを開始できませんでした。'
-      return
-    }
-    micEnabled.value = true
-  } else {
-    audioController.value.stopMicrophone()
-    micEnabled.value = false
+async function パネル切替(panel: PanelKey) {
+  const nextStates = {
+    ...パネル表示状態.value,
+    [panel]: !パネル表示状態.value[panel],
   }
-
-  syncOperationState()
-}
-
-function toggleSpeaker() {
-  if (!audioController.value) return
-
-  void audioController.value.unlockAudio()
-  speakerEnabled.value = !speakerEnabled.value
-  audioController.value.setSpeakerEnabled(speakerEnabled.value)
-  syncOperationState()
-}
-
-async function togglePanel(panel: PanelKey) {
-  const optimisticStates = {
-    ...panelVisibility.value,
-    [panel]: !panelVisibility.value[panel],
-  }
-  updatePanelStates(optimisticStates)
+  パネル状態更新(nextStates)
+  操作状態同期()
+  スナップショット送信()
 
   try {
     const states = await window.desktopApi?.togglePanel?.(panel)
     if (states) {
-      updatePanelStates(states)
+      パネル状態更新(states)
+      操作状態同期()
+      スナップショット送信()
     }
   } catch {
-    updatePanelStates({
-      ...optimisticStates,
-      [panel]: !optimisticStates[panel],
+    パネル状態更新({
+      ...nextStates,
+      [panel]: !nextStates[panel],
     })
+    操作状態同期()
+    スナップショット送信()
   }
 }
 
-async function handleImageSelectionCancel() {
-  imageAutoShowSelection.value = false
-  if (currentPanelKey.value === 'image') {
+async function イメージ選択キャンセル() {
+  自動選択表示.value = false
+  if (現在パネルキー.value === 'image') {
     const states = await window.desktopApi?.togglePanel?.('image')
     if (states) {
-      updatePanelStates(states)
+      パネル状態更新(states)
     }
   }
 }
 
-function handleImageSelectionComplete() {
-  imageAutoShowSelection.value = false
+function イメージ選択完了() {
+  自動選択表示.value = false
 }
 
-async function reconnect() {
-  await initializeCore(sessionId.value || '')
+async function 再接続() {
+  await コア初期化(セッションID.value || '')
 }
 
-function relayChatState(connected: boolean) {
-  if (isCoreWindow.value) {
-    chatConnected.value = connected
+function チャット状態中継(connected: boolean) {
+  if (コアウィンドウ.value) {
+    チャット接続済み.value = connected
     return
   }
-  desktopChannel?.postMessage({ type: 'chat-state', connected })
+  デスクトップチャンネル?.postMessage({ type: 'chat-state', connected })
 }
 
-function relayChatSubtitle(payload: { type: 'welcome_text' | 'output_text' | 'recognition_output'; text: string }) {
-  if (isCoreWindow.value) {
-    setSubtitle(payload.text)
-    return
-  }
-  desktopChannel?.postMessage({ type: 'chat-subtitle', messageType: payload.type, text: payload.text })
-}
-
-function sendInputPayload(message: Record<string, unknown>) {
+function 入力ペイロード送信(message: Record<string, unknown>) {
   if (!inputSocket.value?.isConnected()) {
-    coreError.value = 'AIコアに未接続です。再接続してください。'
+    コアエラー.value = 'AIコアに未接続です。再接続してください。'
     return
   }
 
   inputSocket.value.send({
-    セッションID: sessionId.value,
+    セッションID: セッションID.value,
     ...message,
   })
 }
 
-function sendMessage(text: string) {
-  void audioController.value?.unlockAudio()
-
-  sendInputPayload({
+function メッセージ送信(text: string) {
+  入力ペイロード送信({
     チャンネル: '0',
-    送信モード: chatMode.value,
+    送信モード: チャットモード.value,
     メッセージ識別: 'input_text',
     メッセージ内容: text,
   })
 }
 
-function sendMessageFromWindow(text: string) {
-  if (isCoreWindow.value) {
-    sendMessage(text)
+function ウィンドウからメッセージ送信(text: string) {
+  if (コアウィンドウ.value) {
+    メッセージ送信(text)
     return
   }
 
-  desktopChannel?.postMessage({ type: 'send-message', text })
+  デスクトップチャンネル?.postMessage({ type: 'send-message', text })
 }
 
-function sendInputPayloadFromWindow(message: Record<string, unknown>) {
-  if (isCoreWindow.value) {
-    sendInputPayload(message)
+function ウィンドウから入力ペイロード送信(message: Record<string, unknown>) {
+  if (コアウィンドウ.value) {
+    入力ペイロード送信(message)
     return
   }
 
-  desktopChannel?.postMessage({ type: 'send-input-payload', message })
+  デスクトップチャンネル?.postMessage({ type: 'send-input-payload', message })
 }
 
-async function fileToBase64(file: File): Promise<string> {
+async function ファイルをBase64変換(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -733,11 +682,11 @@ async function fileToBase64(file: File): Promise<string> {
   })
 }
 
-async function handleChatFileDrop(files: File[]) {
+async function チャットファイルドロップ処理(files: File[]) {
   for (const file of files) {
     try {
-      const base64 = await fileToBase64(file)
-      sendInputPayloadFromWindow({
+      const base64 = await ファイルをBase64変換(file)
+      ウィンドウから入力ペイロード送信({
         チャンネル: '0',
         メッセージ識別: 'input_file',
         メッセージ内容: base64,
@@ -745,29 +694,29 @@ async function handleChatFileDrop(files: File[]) {
         サムネイル画像: null,
       })
     } catch (error) {
-      coreError.value = `ファイル送信エラー: ${file.name}`
+      コアエラー.value = `ファイル送信エラー: ${file.name}`
     }
   }
 }
 
-function handleCodeSubmit(text: string, channel: '1' | '2' | '3' | '4') {
-  sendInputPayloadFromWindow({
+function コード送信処理(text: string, channel: '1' | '2' | '3' | '4') {
+  ウィンドウから入力ペイロード送信({
     チャンネル: channel,
     メッセージ識別: 'input_text',
     メッセージ内容: text,
   })
 }
 
-function handleCodeCancel(channel: '1' | '2' | '3' | '4') {
-  sendInputPayloadFromWindow({
+function コードキャンセル処理(channel: '1' | '2' | '3' | '4') {
+  ウィンドウから入力ペイロード送信({
     チャンネル: channel,
     メッセージ識別: 'cancel_run',
     メッセージ内容: '強制停止！',
   })
 }
 
-function handleCodeFileSend(payload: { channel: '1' | '2' | '3' | '4'; fileName: string; base64: string }) {
-  sendInputPayloadFromWindow({
+function コードファイル送信処理(payload: { channel: '1' | '2' | '3' | '4'; fileName: string; base64: string }) {
+  ウィンドウから入力ペイロード送信({
     チャンネル: payload.channel,
     メッセージ識別: 'input_file',
     メッセージ内容: payload.base64,
@@ -776,17 +725,17 @@ function handleCodeFileSend(payload: { channel: '1' | '2' | '3' | '4'; fileName:
   })
 }
 
-function handleImageSubmit(payload: { text: string; mimeType: string; base64: string }) {
+function イメージ送信処理(payload: { text: string; mimeType: string; base64: string }) {
   const text = payload.text.trim()
   if (text) {
-    sendInputPayloadFromWindow({
+    ウィンドウから入力ペイロード送信({
       チャンネル: 'input',
       メッセージ識別: 'input_text',
       メッセージ内容: text,
     })
   }
 
-  sendInputPayloadFromWindow({
+  ウィンドウから入力ペイロード送信({
     チャンネル: 'input',
     出力先チャンネル: '0',
     メッセージ識別: 'input_image',
@@ -795,140 +744,124 @@ function handleImageSubmit(payload: { text: string; mimeType: string; base64: st
   })
 }
 
-function handleImageTextSubmit(text: string) {
+function イメージテキスト送信処理(text: string) {
   if (!text.trim()) return
-  sendInputPayloadFromWindow({
+  ウィンドウから入力ペイロード送信({
     チャンネル: 'input',
     メッセージ識別: 'input_text',
     メッセージ内容: text.trim(),
   })
 }
 
-function updateChatMode(nextMode: チャットモード) {
-  if (isCoreWindow.value) {
-    chatMode.value = nextMode
+function チャットモード更新(nextMode: チャットモード) {
+  if (コアウィンドウ.value) {
+    チャットモード.value = nextMode
     return
   }
 
-  if (auxSnapshot.value) {
-    auxSnapshot.value = {
-      ...auxSnapshot.value,
-      chatMode: nextMode,
+  if (補助スナップショット.value) {
+    補助スナップショット.value = {
+      ...補助スナップショット.value,
+      チャットモード: nextMode,
     }
   }
-  desktopChannel?.postMessage({ type: 'set-chat-mode', mode: nextMode })
+  デスクトップチャンネル?.postMessage({ type: 'set-chat-mode', mode: nextMode })
 }
 
-watch(chatMode, () => {
-  if (!isCoreWindow.value) return
-  syncOperationState()
+watch(チャットモード, () => {
+  if (!コアウィンドウ.value) return
+  操作状態同期()
 })
 
-watch(panelVisibility, () => {
-  if (!isCoreWindow.value) return
-  syncOperationState()
+watch(パネル表示状態, () => {
+  if (!コアウィンドウ.value) return
+  操作状態同期()
 }, { deep: true })
-
-watch(speakerEnabled, (enabled) => {
-  audioController.value?.setSpeakerEnabled(enabled)
-})
 
 watch(
   () => ({
-    role: windowRole.value,
-    isAuthenticated: isAuthenticated.value,
-    sessionId: sessionId.value,
-    welcomeInfo: welcomeInfo.value,
-    messages: messages.value,
-    chatMode: chatMode.value,
-    modelSettings: modelSettings.value,
-    inputConnected: inputConnected.value,
-    chatConnected: chatConnected.value,
-    audioConnected: audioConnected.value,
-    micEnabled: micEnabled.value,
-    speakerEnabled: speakerEnabled.value,
-    micLevel: micLevel.value,
-    speakerLevel: speakerLevel.value,
-    panelVisibility: panelVisibility.value,
-    coreBusy: coreBusy.value,
-    coreError: coreError.value,
-    userLabel: userLabel.value,
+    role: ウィンドウロール.value,
+    認証済み: 認証済み.value,
+    セッションID: セッションID.value,
+    入力ウェルカム情報: 入力ウェルカム情報.value,
+    メッセージ一覧: メッセージ一覧.value,
+    チャットモード: チャットモード.value,
+    モデル設定: モデル設定.value,
+    入力接続済み: 入力接続済み.value,
+    チャット接続済み: チャット接続済み.value,
+    パネル表示状態: パネル表示状態.value,
+    コア処理中: コア処理中.value,
+    コアエラー: コアエラー.value,
+    利用者ラベル: 利用者ラベル.value,
   }),
   () => {
-    broadcastSnapshot()
+    スナップショット送信()
   },
   { deep: true },
 )
 
 onMounted(async () => {
-  window.addEventListener('auth-expired', authExpiredHandler)
+  window.addEventListener('auth-expired', 認証期限切れ処理)
+  window.addEventListener('storage', ストレージ変更処理)
 
-  desktopChannel = new BroadcastChannel('avatar-desktop-sync')
-  desktopChannel.addEventListener('message', handleDesktopChannelMessage)
+  デスクトップチャンネル = new BroadcastChannel('avatar-desktop-sync')
+  デスクトップチャンネル.addEventListener('message', デスクトップチャンネルメッセージ処理)
 
-  await detectWindowRole()
+  await ウィンドウロール検出()
 
-  detachPanelStatesListener = window.desktopApi?.onPanelStatesChanged?.((states) => {
-    updatePanelStates(states)
+  パネル状態リスナー解除 = window.desktopApi?.onPanelStatesChanged?.((states) => {
+    パネル状態更新(states)
   }) || null
 
-  if (currentPanelKey.value) {
-    loadingAuth.value = false
-    requestSnapshot()
-    startSnapshotRetry()
-    detachWindowShownListener = window.desktopApi?.onWindowShown?.(() => {
-      requestSnapshot()
-      startSnapshotRetry()
-    }) || null
+  ウィンドウ表示リスナー解除 = window.desktopApi?.onWindowShown?.(() => {
+    ストレージ認証同期({ syncError: ログインウィンドウ.value })
+    if (現在パネルキー.value) {
+      スナップショット要求()
+      スナップショット再試行開始()
+    }
+  }) || null
+
+  if (現在パネルキー.value) {
+    認証読込中.value = false
+    スナップショット要求()
+    スナップショット再試行開始()
     return
   }
 
-  audioController.value = new AudioController({
-    onInputLevel: (value) => {
-      micLevel.value = value
-    },
-    onOutputLevel: (value) => {
-      speakerLevel.value = value
-    },
-    getSocket: () => audioSocket.value,
-    getSessionId: () => sessionId.value,
-  })
+  await パネル状態再読込()
+  ストレージ認証同期({ syncError: true })
 
-  await refreshPanelStates()
-
-  if (!token.value) {
-    authError.value = localStorage.getItem(認証エラーメッセージKey) || ''
-    if (authError.value) {
-      localStorage.removeItem(認証エラーメッセージKey)
-    }
-    loadingAuth.value = false
+  if (!認証トークン.value) {
+    認証読込中.value = false
     return
   }
 
   try {
-    if (isLoginWindow.value) {
+    await 現在利用者取得()
+
+    if (ログインウィンドウ.value) {
       await window.desktopApi?.openCoreWindow?.()
       return
     }
 
-    await fetchCurrentUser()
-    await initializeCore(sessionId.value || '')
+    await コア初期化(セッションID.value || '')
   } catch {
-    clearAuth()
+    認証クリア()
   } finally {
-    loadingAuth.value = false
-    await refreshPanelStates()
+    認証読込中.value = false
+    await パネル状態再読込()
   }
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('auth-expired', authExpiredHandler)
-  detachPanelStatesListener?.()
-  detachWindowShownListener?.()
-  desktopChannel?.removeEventListener('message', handleDesktopChannelMessage)
-  desktopChannel?.close()
-  stopSnapshotRetry()
-  disconnectCore()
+  window.removeEventListener('auth-expired', 認証期限切れ処理)
+  window.removeEventListener('storage', ストレージ変更処理)
+  パネル状態リスナー解除?.()
+  ウィンドウ表示リスナー解除?.()
+  デスクトップチャンネル?.removeEventListener('message', デスクトップチャンネルメッセージ処理)
+  デスクトップチャンネル?.close()
+  スナップショット再試行停止()
+  コア切断()
 })
 </script>
 
@@ -936,91 +869,85 @@ onBeforeUnmount(() => {
   <main class="app-root">
     <component
       :is="ログイン"
-      v-if="isLoginWindow && (!isAuthenticated || authBusy) && !loadingAuth"
-      :loading="authBusy"
-      :error-message="authError"
+      v-if="ログインウィンドウ && (!認証済み || 認証処理中) && !認証読込中"
+      :loading="認証処理中"
+      :error-message="認証エラー"
       :versions="versions"
-      @submit="submitLogin"
+      @submit="ログイン送信"
     />
 
     <component
       :is="AIコア"
-      v-else-if="isCoreWindow && isAuthenticated"
-      :session-id="sessionId"
-      :user-label="userLabel"
-      :live-model="modelSettings.LIVE_AI_NAME"
-      :connection-ready="connectionReady"
-      :transport-state="transportState"
-      :input-connected="inputConnected"
-      :chat-connected="chatConnected"
-      :audio-connected="audioConnected"
-      :mic-enabled="micEnabled"
-      :speaker-enabled="speakerEnabled"
-      :mic-level="micLevel"
-      :speaker-level="speakerLevel"
-      :panel-visibility="panelVisibility"
-      :core-busy="coreBusy"
-      :core-error="coreError"
-      :subtitle-text="subtitleText"
-      @toggle-microphone="toggleMicrophone"
-      @toggle-speaker="toggleSpeaker"
-      @toggle-panel="togglePanel"
-      @reconnect="reconnect"
-      @logout="clearAuth()"
+      v-else-if="コアウィンドウ && 認証済み"
+      ref="コアViewRef"
+      :session-id="セッションID"
+      :user-label="利用者ラベル"
+      :live-model="モデル設定.LIVE_AI_NAME"
+      :welcome-info="入力ウェルカム情報"
+      :input-connected="入力接続済み"
+      :input-socket="inputSocket"
+      :initial-mic-enabled="初期マイク有効"
+      :initial-speaker-enabled="初期スピーカー有効"
+      :audio-state-seed="音声状態シード"
+      :panel-visibility="パネル表示状態"
+      :core-busy="コア処理中"
+      :core-error="コアエラー"
+      @toggle-panel="パネル切替"
+      @reconnect="再接続"
+      @logout="認証クリア()"
     />
 
     <component
       :is="WindowShell"
-      v-else-if="currentPanelKey === 'chat'"
+      v-else-if="現在パネルキー === 'chat'"
       :title="PANEL_TITLES.chat"
       theme="purple"
     >
       <template #title-right>
-        <span :class="['chat-status-dot', chatRef?.WebSocket接続中 ? 'on' : '']"></span>
-        <span class="chat-status-text">{{ chatRef?.WebSocket接続中 ? '接続中' : '切断' }}</span>
+        <span :class="['chat-status-dot', チャットRef?.WebSocket接続中 ? 'on' : '']"></span>
+        <span class="chat-status-text">{{ チャットRef?.WebSocket接続中 ? '接続中' : '切断' }}</span>
       </template>
 
       <component
         :is="AIチャット"
-        ref="chatRef"
-        :messages="displayMessages"
-        :welcome-info="displayWelcomeInfo"
-        :session-id="displaySessionId"
-        :active="panelVisibility.chat"
-        :mode="displayChatMode"
-        :input-connected="displayInputConnected"
-        :chat-connected="displayChatConnected"
-        :model-settings="displayModelSettings"
-        @send-input-payload="sendInputPayloadFromWindow"
-        @update:mode="updateChatMode"
-        @chat-state="relayChatState"
-        @subtitle-message="relayChatSubtitle"
+        ref="チャットRef"
+        :messages="表示メッセージ一覧"
+        :welcome-info="表示ウェルカム情報"
+        :session-id="表示セッションID"
+        :active="パネル表示状態.chat"
+        :mode="表示チャットモード"
+        :input-connected="表示入力接続済み"
+        :chat-connected="表示チャット接続済み"
+        :model-settings="表示モデル設定"
+        @send-input-payload="ウィンドウから入力ペイロード送信"
+        @update:mode="チャットモード更新"
+        @chat-state="チャット状態中継"
       />
     </component>
 
     <component
       :is="WindowShell"
-      v-else-if="currentPanelKey === 'file'"
+      v-else-if="現在パネルキー === 'file'"
       :title="PANEL_TITLES.file"
       theme="purple"
     >
       <template #title-right>
-        <span :class="['file-status-dot', fileRef?.接続済み ? 'on' : '']"></span>
-        <span class="file-status-text">{{ fileRef?.接続済み ? '接続中' : '切断' }}</span>
-        <button class="file-reload-btn" type="button" :disabled="fileRef?.読込中" @click="fileRef?.ファイルリスト要求()">↺</button>
+        <span :class="['file-status-dot', ファイルRef?.接続済み ? 'on' : '']"></span>
+        <span class="file-status-text">{{ ファイルRef?.接続済み ? '接続中' : '切断' }}</span>
+        <button class="file-reload-btn" type="button" :disabled="ファイルRef?.読込中" @click="ファイルRef?.ファイルリスト要求()">↺</button>
       </template>
       <component
         :is="AIファイル"
-        ref="fileRef"
-        :session-id="displaySessionId"
-        :active="panelVisibility.file"
-        @send-input-payload="sendInputPayloadFromWindow"
+        ref="ファイルRef"
+        :session-id="表示セッションID"
+        :active="パネル表示状態.file"
+        @send-input-payload="ウィンドウから入力ペイロード送信"
       />
     </component>
 
     <component
       :is="WindowShell"
-      v-else-if="currentPanelKey === 'image'"
+      v-else-if="現在パネルキー === 'image'"
       :title="PANEL_TITLES.image"
       theme="purple"
     >
@@ -1028,47 +955,47 @@ onBeforeUnmount(() => {
         <span
           :class="[
             'image-status-dot',
-            imageRef?.接続状態 === 'sending' ? 'sending' : imageRef?.WebSocket接続中 ? 'on' : '',
+            イメージRef?.接続状態 === 'sending' ? 'sending' : イメージRef?.WebSocket接続中 ? 'on' : '',
           ]"
         ></span>
-        <span class="image-status-text">{{ imageRef?.状態表示テキスト || '切断' }}</span>
+        <span class="image-status-text">{{ イメージRef?.状態表示テキスト || '切断' }}</span>
       </template>
       <component
         :is="AIイメージ"
-        ref="imageRef"
-        :session-id="displaySessionId"
-        :input-connected="displayInputConnected"
-        :active="panelVisibility.image"
-        :auto-show-selection="imageAutoShowSelection"
-        @submit-image="handleImageSubmit"
-        @submit-text="handleImageTextSubmit"
-        @selection-cancel="handleImageSelectionCancel"
-        @selection-complete="handleImageSelectionComplete"
+        ref="イメージRef"
+        :session-id="表示セッションID"
+        :input-connected="表示入力接続済み"
+        :active="パネル表示状態.image"
+        :auto-show-selection="自動選択表示"
+        @submit-image="イメージ送信処理"
+        @submit-text="イメージテキスト送信処理"
+        @selection-cancel="イメージ選択キャンセル"
+        @selection-complete="イメージ選択完了"
       />
     </component>
 
     <component
       :is="WindowShell"
-      v-else-if="currentPanelKey && currentCodeChannel"
-      :title="PANEL_TITLES[currentPanelKey]"
+      v-else-if="現在パネルキー && 現在コードチャンネル"
+      :title="PANEL_TITLES[現在パネルキー]"
       theme="purple"
     >
       <template #title-right>
-        <span v-if="currentCodeModel" class="code-model-text">{{ currentCodeModel }}</span>
-        <span :class="['code-status-dot', codeRef?.WebSocket接続中 ? 'on' : '']"></span>
-        <span class="code-status-text">{{ codeRef?.接続状態表示 || '切断' }}</span>
+        <span v-if="現在コードモデル" class="code-model-text">{{ 現在コードモデル }}</span>
+        <span :class="['code-status-dot', コードRef?.WebSocket接続中 ? 'on' : '']"></span>
+        <span class="code-status-text">{{ コードRef?.接続状態表示 || '切断' }}</span>
       </template>
       <component
         :is="AIコード"
-        ref="codeRef"
-        :session-id="displaySessionId"
-        :channel="currentCodeChannel"
-        :active="currentPanelKey ? panelVisibility[currentPanelKey] : false"
-        :code-ai="currentCodeModel"
-        :input-connected="displayInputConnected"
-        @submit="handleCodeSubmit"
-        @cancel="handleCodeCancel"
-        @send-file="handleCodeFileSend"
+        ref="コードRef"
+        :session-id="表示セッションID"
+        :channel="現在コードチャンネル"
+        :active="現在パネルキー ? パネル表示状態[現在パネルキー] : false"
+        :code-ai="現在コードモデル"
+        :input-connected="表示入力接続済み"
+        @submit="コード送信処理"
+        @cancel="コードキャンセル処理"
+        @send-file="コードファイル送信処理"
       />
     </component>
 

@@ -835,7 +835,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="panel-content">
             <div v-if="左読込中" class="placeholder-content">
-              <span class="placeholder-icon">⏳</span>
+              <img src="/icons/loading_panel.svg" alt="読込中" class="loading-panel-image" />
               <div>読込中...</div>
             </div>
             <div v-else-if="最終ファイルリスト.length === 0" class="placeholder-content">
@@ -890,7 +890,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="panel-content">
             <div v-if="右読込中" class="placeholder-content">
-              <span class="placeholder-icon">⏳</span>
+              <img src="/icons/loading_panel.svg" alt="読込中" class="loading-panel-image" />
               <div>読込中...</div>
             </div>
             <div v-else-if="作業ファイルリスト.length === 0" class="placeholder-content">
@@ -965,7 +965,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="panel-content">
           <div v-if="ファイル読込中" class="placeholder-content">
-            <span class="placeholder-icon">⏳</span>
+            <img src="/icons/loading_panel.svg" alt="読込中" class="loading-panel-image" />
             <div>読込中...</div>
           </div>
           <div v-else-if="ファイル内容エラー" class="placeholder-content">
@@ -1352,6 +1352,13 @@ onBeforeUnmount(() => {
 .placeholder-icon {
   font-size: 32px;
   opacity: 0.4;
+}
+
+.loading-panel-image {
+  width: 27px;
+  max-width: 10.5%;
+  height: auto;
+  display: block;
 }
 
 /* ファイルツリー */

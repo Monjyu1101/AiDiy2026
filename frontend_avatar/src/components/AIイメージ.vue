@@ -601,28 +601,18 @@ defineExpose({
     <div v-if="選択ポップアップ表示" class="selection-popup" @click.self="選択取消">
       <div class="selection-dialog">
         <div class="selection-title">リソース選択</div>
-        <p class="selection-caption">画像入力ソースを選んでください。</p>
-        <p v-if="エラーメッセージ" class="selection-error">{{ エラーメッセージ }}</p>
         <div class="selection-options">
-          <button class="selection-option" type="button" @click="選択処理('file')">
-            <span class="option-icon">FILE</span>
-            <span class="option-main">画像ファイル</span>
-            <span class="option-sub">PNG / JPG / GIF</span>
-          </button>
-          <button class="selection-option" type="button" @click="選択処理('camera')">
-            <span class="option-icon">CAM</span>
-            <span class="option-main">カメラ</span>
-            <span class="option-sub">Web カメラ入力</span>
-          </button>
-          <button class="selection-option" type="button" @click="選択処理('desktop')">
-            <span class="option-icon">DSP</span>
-            <span class="option-main">デスクトップ</span>
-            <span class="option-sub">画面共有キャプチャ</span>
-          </button>
+          <div class="selection-option" @click="選択処理('file')">
+            📁 画像ファイル選択
+          </div>
+          <div class="selection-option" @click="選択処理('camera')">
+            <span class="option-icon">📷</span> カメラキャプチャ
+          </div>
+          <div class="selection-option" @click="選択処理('desktop')">
+            🖥️ デスクトップキャプチャ
+          </div>
         </div>
-        <div class="selection-actions">
-          <button class="selection-cancel" type="button" @click="選択取消">キャンセル</button>
-        </div>
+        <button class="selection-cancel" @click="選択取消">キャンセル</button>
       </div>
     </div>
   </section>
@@ -696,9 +686,7 @@ defineExpose({
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
-  background:
-    radial-gradient(circle at top, rgba(117, 85, 219, 0.18), rgba(0, 0, 0, 0.86) 60%),
-    rgba(0, 0, 0, 0.74);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -706,107 +694,53 @@ defineExpose({
 }
 
 .selection-dialog {
-  width: min(360px, calc(100% - 40px));
-  border: 1px solid rgba(143, 104, 221, 0.7);
-  background: linear-gradient(180deg, rgba(19, 16, 32, 0.98), rgba(8, 8, 12, 0.96));
-  box-shadow:
-    0 20px 44px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 20px;
-  text-align: left;
+  background: white;
+  border-radius: 2px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  min-width: 300px;
+  text-align: center;
 }
 
 .selection-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: bold;
-  margin-bottom: 6px;
-  color: #f3f0ff;
+  margin-bottom: 20px;
+  color: #333;
 }
 
-.selection-caption {
-  margin: 0 0 12px;
-  font-size: 12px;
-  color: #b7afd8;
-}
-
-.selection-error {
-  margin: 0 0 12px;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 92, 92, 0.42);
-  background: rgba(98, 18, 18, 0.42);
-  color: #ffd0d0;
-  font-size: 12px;
-}
-
-.selection-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.selection-options { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
 
 .selection-option {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid rgba(143, 104, 221, 0.4);
-  background: rgba(255, 255, 255, 0.04);
+  padding: 15px 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 2px;
+  background: white;
   cursor: pointer;
-  font-size: 14px;
-  color: #f3f0ff;
-  display: grid;
-  grid-template-columns: 44px 1fr;
-  column-gap: 12px;
-  align-items: center;
-  text-align: left;
+  transition: all 0.2s ease;
+  font-size: 16px;
 }
 
 .selection-option:hover {
-  border-color: rgba(162, 143, 255, 0.9);
-  background: rgba(143, 104, 221, 0.14);
+  border-color: #667eea;
+  background: #f8f9ff;
 }
 
 .option-icon {
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(162, 143, 255, 0.55);
-  background: rgba(93, 68, 168, 0.24);
-  font-size: 11px;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.option-main,
-.option-sub {
-  display: block;
-}
-
-.option-main {
-  font-size: 14px;
-  font-weight: bold;
-  color: #f8f7ff;
-}
-
-.option-sub {
-  margin-top: 3px;
-  font-size: 11px;
-  color: #b7afd8;
-}
-
-.selection-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  margin-right: 8px;
 }
 
 .selection-cancel {
-  width: auto;
   padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 2px;
   cursor: pointer;
   font-size: 14px;
-  color: #ddd6f7;
+  color: #666;
 }
 
-.selection-cancel:hover { background: rgba(255, 255, 255, 0.14); }
+.selection-cancel:hover { background: #e0e0e0; }
 
 /* コントロールエリア */
 .control-area {

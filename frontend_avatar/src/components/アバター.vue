@@ -285,14 +285,8 @@ onBeforeUnmount(() => {
     <div v-show="!transparentMode" class="glow glow-a" :style="{ opacity: 0.24 + stageTone * 0.45 }"></div>
     <div v-show="!transparentMode" class="glow glow-b" :style="{ opacity: 0.14 + stageTone * 0.34 }"></div>
 
-    <div v-show="!transparentMode" class="avatar-visualizer" :class="{ visible: uiVisible }">
-      <div class="voice-meter">
-        <i class="voice-bar mic" :style="{ transform: `scaleX(${Math.max(0.05, micLevel)})` }"></i>
-        <i
-          class="voice-bar spk"
-          :style="{ transform: `scaleX(${Math.max(0.05, speakerLevel)})` }"
-        ></i>
-      </div>
+    <div v-if="subtitleText" class="avatar-subtitle">
+      {{ subtitleText }}
     </div>
 
     <div v-if="!transparentMode && loading" class="stage-status">
@@ -357,51 +351,24 @@ onBeforeUnmount(() => {
   background: rgba(97, 154, 255, 0.66);
 }
 
-.avatar-visualizer {
+.avatar-subtitle {
   position: absolute;
-  left: 18px;
-  right: 18px;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-  pointer-events: none;
-}
-
-.avatar-visualizer.visible {
-  opacity: 1;
-}
-
-.avatar-visualizer {
   left: 50%;
-  bottom: 18px;
-  right: auto;
+  bottom: 62px;
   transform: translateX(-50%);
-}
-
-.voice-meter {
-  width: min(220px, 42vw);
-  padding: 8px;
-  border: 1px solid rgba(153, 141, 214, 0.32);
-  background: rgba(3, 5, 10, 0.26);
+  width: min(520px, calc(100% - 32px));
+  padding: 10px 14px;
+  border: 1px solid rgba(153, 141, 214, 0.34);
+  background: rgba(3, 5, 10, 0.52);
+  color: #f4f4ff;
+  text-align: center;
+  font-size: 1.425rem;
+  line-height: 1.5;
   backdrop-filter: blur(12px);
-}
-
-.voice-bar {
-  display: block;
-  height: 10px;
-  width: 100%;
-  transform-origin: left center;
-}
-
-.voice-bar + .voice-bar {
-  margin-top: 6px;
-}
-
-.voice-bar.mic {
-  background: linear-gradient(90deg, rgba(255, 110, 110, 0.94), rgba(255, 194, 120, 0.92));
-}
-
-.voice-bar.spk {
-  background: linear-gradient(90deg, rgba(84, 210, 255, 0.94), rgba(154, 242, 211, 0.92));
+  pointer-events: none;
+  z-index: 6;
+  white-space: pre-wrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .stage-status {
@@ -430,7 +397,11 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
-  .avatar-visualizer { bottom: 12px; }
+  .avatar-subtitle {
+    bottom: 56px;
+    width: calc(100% - 24px);
+    font-size: 1.32rem;
+  }
 
   .stage-status {
     left: 12px;

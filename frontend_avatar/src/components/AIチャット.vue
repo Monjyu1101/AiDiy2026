@@ -21,7 +21,6 @@ const emit = defineEmits<{
   'send-input-payload': [message: Record<string, unknown>];
   'update:mode': [mode: チャットモード];
   'chat-state': [connected: boolean];
-  'subtitle-message': [payload: { type: 'welcome_text' | 'output_text' | 'recognition_output'; text: string }];
 }>()
 
 const 入力テキスト = ref('')
@@ -240,7 +239,6 @@ function bindChatSocket(socket: AIWebSocket) {
   socket.on('welcome_text', (message) => {
     const text = String(message.メッセージ内容 || '')
     pushMessage('system', text)
-    emit('subtitle-message', { type: 'welcome_text', text })
   })
   socket.on('input_text', (message) => {
     pushMessage('user', String(message.メッセージ内容 || ''))
@@ -257,7 +255,6 @@ function bindChatSocket(socket: AIWebSocket) {
   socket.on('output_text', (message) => {
     const text = String(message.メッセージ内容 || '')
     pushMessage('assistant', text)
-    emit('subtitle-message', { type: 'output_text', text })
   })
   socket.on('output_request', (message) => {
     pushMessage('output-request', String(message.メッセージ内容 || ''))
@@ -275,7 +272,6 @@ function bindChatSocket(socket: AIWebSocket) {
   socket.on('recognition_output', (message) => {
     const text = String(message.メッセージ内容 || '')
     pushMessage('recognition-assistant', text)
-    emit('subtitle-message', { type: 'recognition_output', text })
   })
 }
 

@@ -134,11 +134,14 @@ async function listDisplaySources(): Promise<DisplaySourceInfo[]> {
   }))
 }
 
-function getRendererUrl(): string {
-  if (isDev) {
-    return process.env.VITE_DEV_SERVER_URL as string
-  }
-  return pathToFileURL(path.resolve(__dirname, '../dist/index.html')).toString()
+function getRendererUrl(role: WindowRole): string {
+  const baseUrl = isDev
+    ? (process.env.VITE_DEV_SERVER_URL as string)
+    : pathToFileURL(path.resolve(__dirname, '../dist/index.html')).toString()
+
+  const url = new URL(baseUrl)
+  url.searchParams.set('role', role)
+  return url.toString()
 }
 
 function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): BrowserWindow {
@@ -164,18 +167,19 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
       nodeIntegration: false,
       sandbox: false,
       webSecurity: false,
+      backgroundThrottling: false,
     },
   })
 
   windowRoles.set(window.id, role)
 
   if (isDev) {
-    window.loadURL(getRendererUrl())
+    window.loadURL(getRendererUrl(role))
     if (shouldOpenDevTools) {
       window.webContents.openDevTools({ mode: 'detach' })
     }
   } else {
-    window.loadURL(getRendererUrl())
+    window.loadURL(getRendererUrl(role))
   }
 
   return window
@@ -354,12 +358,22 @@ async function openCoreWindow(sourceWindow?: BrowserWindow | null) {
   if (!nextCoreWindow.isDestroyed()) {
     nextCoreWindow.show()
     nextCoreWindow.focus()
+    nextCoreWindow.webContents.send('window:shown')
   }
 
   if (loginWindow && !loginWindow.isDestroyed()) {
     loginWindow.hide()
   } else if (sourceWindow && !sourceWindow.isDestroyed() && sourceWindow !== nextCoreWindow) {
     sourceWindow.hide()
+  }
+
+  // 全パネルを表示状態で開始
+  for (const panel of Object.keys(panelStates) as PanelKey[]) {
+    const panelWin = panelWindows.get(panel)
+    if (panelWin && !panelWin.isDestroyed()) {
+      await waitForReady(panelWin)
+      setPanelVisibility(panel, true)
+    }
   }
 
   return 'core' as const
@@ -376,6 +390,7 @@ async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
     nextLoginWindow.center()
     nextLoginWindow.show()
     nextLoginWindow.focus()
+    nextLoginWindow.webContents.send('window:shown')
   }
 
   if (coreWindow && !coreWindow.isDestroyed()) {

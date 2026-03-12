@@ -77,6 +77,9 @@ def _is_ws_connected(ws: WebSocket) -> bool:
 
 
 _要求日時選択値 = {-2, -1, 0, 1, 5, 10, 60}
+数値チャンネル一覧 = ["0", "1", "2", "3", "4"]
+コードチャンネル一覧 = ["1", "2", "3", "4"]
+welcome対象チャンネル一覧 = 数値チャンネル一覧 + ["core"]
 
 
 def _要求日時分数取得(受信データ: dict, デフォルト値: int) -> int:
@@ -744,7 +747,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         # セッション内の初期化は1回ずつ直列化（複数ソケット同時接続での重複起動防止）
         async with セッション.初期化ロック:
             # 初回のみプロセッサを起動
-            if セッション.streaming_processor is None and ソケット番号 == "input":
+            if セッション.streaming_processor is None and ソケット番号 == "core":
                 セッション.streaming_processor = StreamingProcessor(セッションID, セッション)
                 await セッション.streaming_processor.start()
 
@@ -881,10 +884,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             if セッション.audio_split_task is None or セッション.audio_split_task.done():
                 セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
 
-        # 出力ソケット接続時にwelcome_info/welcome_textを送信（input含む）
-        if ソケット番号 in ["0", "1", "2", "3", "4", "input"]:
+        # 出力ソケット接続時にwelcome_info/welcome_textを送信（core/input含む）
+        if ソケット番号 in welcome対象チャンネル一覧:
             追加メッセージ = ""
-            if ソケット番号 == "input":
+            ウェルカム本文 = ""
+            if ソケット番号 == "core":
                 CODE_ROOT_PATH = 取得_CODE_ROOT_PATH(
                     セッション=セッション,
                     アプリ設定=getattr(WebSocket接続.app, "conf", None),
@@ -921,7 +925,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     "音声、テキスト、画像共有しての会話ができます！"
                 )
                 追加メッセージ = "会話準備できました。よろしくお願いします。"
-            else:
+            elif ソケット番号 in コードチャンネル一覧:
                 idx = int(ソケット番号)
                 ai_key = f"CODE_AI{idx}_NAME"  # intに変換して使用
                 model_key = f"CODE_AI{idx}_MODEL"
@@ -948,7 +952,6 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     "システム開発を支援します。"
                 )
                 追加メッセージ = "準備できました。"
-
             if ウェルカム本文:
                 await セッション.send_to_channel(ソケット番号, {
                     "セッションID": セッションID,
@@ -961,7 +964,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 _ws_log(ch=ソケット番号, 内容="welcome_info送信", セッションID=セッションID)
 
             await asyncio.sleep(0.1)
-            if ソケット番号 in ["0", "1", "2", "3", "4"]:
+            if ソケット番号 in 数値チャンネル一覧:
                 try:
                     await 送信_会話履歴(セッション, セッションID, チャンネル=ソケット番号)
                 except Exception as e:
@@ -970,13 +973,13 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 try:
                     if ソケット番号 == "0" and hasattr(セッション, "chat_processor") and セッション.chat_processor:
                         asyncio.create_task(セッション.chat_processor.接続時welcome送信())
-                    elif ソケット番号 in ["1", "2", "3", "4"] and hasattr(セッション, "code_agent_processors"):
+                    elif ソケット番号 in コードチャンネル一覧 and hasattr(セッション, "code_agent_processors"):
                         idx = int(ソケット番号) - 1
                         if idx < len(セッション.code_agent_processors):
                             asyncio.create_task(セッション.code_agent_processors[idx].接続時welcome送信())
                 except Exception as e:
                     logger.exception(f"welcome_textタスク起動エラー: {e}")
-            elif ソケット番号 == "input":
+            elif ソケット番号 == "core":
                 try:
                     await セッション.send_to_channel(ソケット番号, {
                         "セッションID": セッションID,
@@ -1017,7 +1020,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     # "1"-"4": AIコード.vue（コードエージェント）
                     # "input": AIイメージ.vue（ライブ）
                     # "0": AIチャット.vue → 送信モードで判断
-                    if チャンネル in ("1", "2", "3", "4"):
+                    if チャンネル in コードチャンネル一覧:
                         出力先チャンネル = チャンネル
                     elif チャンネル == "input":
                         出力先チャンネル = "0"  # エコーバック先はch0
@@ -1025,7 +1028,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         出力先チャンネル = 送信モード[4:]
                     else:
                         出力先チャンネル = "0"
-                    入力フィードバック対象 = チャンネル in ("0", "1", "2", "3", "4")
+                    入力フィードバック対象 = チャンネル in 数値チャンネル一覧
                     logger.debug(f"テキスト受信 (チャンネル={チャンネル}, 送信モード={送信モード}, 出力先={出力先チャンネル}, {セッションID}): {メッセージ内容}")
 
                     if セッション.is_channel_processing(出力先チャンネル):
@@ -1082,12 +1085,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         フィードバック表示チャンネル一覧 = [出力先チャンネル]
                         # AIチャット.vue（ch0）からCode1-4へ送信した場合は、
                         # チャット画面(ch0)にも入力フィードバックを表示する。
-                        if チャンネル == "0" and 出力先チャンネル in ("1", "2", "3", "4"):
+                        if チャンネル == "0" and 出力先チャンネル in コードチャンネル一覧:
                             フィードバック表示チャンネル一覧.append("0")
 
                         for フィードバック表示チャンネル in dict.fromkeys(フィードバック表示チャンネル一覧):
                             # ch0からCode1-4へ送信時: ch1-4にはinput_request、ch0にはinput_text
-                            if チャンネル == "0" and フィードバック表示チャンネル in ("1", "2", "3", "4"):
+                            if チャンネル == "0" and フィードバック表示チャンネル in コードチャンネル一覧:
                                 await セッション.send_to_channel(フィードバック表示チャンネル, {
                                     "セッションID": セッションID,
                                     "チャンネル": フィードバック表示チャンネル,
@@ -1125,7 +1128,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     受信データ["チャンネル"] = 出力先チャンネル
 
                     try:
-                        if 出力先チャンネル in ("1", "2", "3", "4") and hasattr(セッション, 'code_agent_processors'):
+                        if 出力先チャンネル in コードチャンネル一覧 and hasattr(セッション, 'code_agent_processors'):
                             # コードエージェント（AIコード.vue: チャンネル1-4 / AIチャット.vue: 送信モードCode1-4）
                             # ch0からの送信はinput_requestとして処理する
                             if チャンネル == "0":
@@ -1326,7 +1329,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 elif メッセージ識別 == "cancel_run":
                     try:
                         チャンネル = str(受信データ.get("チャンネル", "0"))
-                        if チャンネル in ("1", "2", "3", "4") and セッション and hasattr(セッション, 'code_agent_processors'):
+                        if チャンネル in コードチャンネル一覧 and セッション and hasattr(セッション, 'code_agent_processors'):
                             agent = セッション.code_agent_processors[int(チャンネル) - 1]
                             # 即時フィードバック送信（強制停止完了を待たずに先行送信）
                             await セッション.send_to_channel(チャンネル, {

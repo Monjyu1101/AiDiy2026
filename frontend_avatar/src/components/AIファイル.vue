@@ -429,6 +429,56 @@ const ファイルダウンロード = async () => {
   }
 }
 
+const ファイル保存先選択 = async () => {
+  if (!選択ファイルパス.value || ファイルダウンロード中.value) return
+
+  const win = window as Window & {
+    showSaveFilePicker?: (options?: {
+      suggestedName?: string
+      types?: Array<{
+        description?: string
+        accept: Record<string, `.${string}`[]>
+      }>
+      excludeAcceptAllOption?: boolean
+    }) => Promise<{
+      createWritable: () => Promise<{
+        write: (data: ArrayBuffer) => Promise<void>
+        close: () => Promise<void>
+      }>
+    }>
+  }
+
+  if (typeof win.showSaveFilePicker !== 'function') {
+    await ファイルダウンロード()
+    return
+  }
+
+  ファイルダウンロード中.value = true
+  try {
+    const { 配列バッファ, ファイル名 } = await ダウンロードデータ取得()
+    const ext = ファイル名.includes('.') ? ファイル名.split('.').pop()?.toLowerCase() ?? '' : ''
+    const handle = await win.showSaveFilePicker({
+      suggestedName: ファイル名,
+      ...(ext ? {
+        types: [{
+          description: `${ext.toUpperCase()} ファイル`,
+          accept: { [`application/x-${ext}`]: [`.${ext}`] as `.${string}`[] },
+        }],
+        excludeAcceptAllOption: false,
+      } : {}),
+    })
+    const writable = await handle.createWritable()
+    await writable.write(配列バッファ)
+    await writable.close()
+  } catch (e: any) {
+    if (e?.name !== 'AbortError') {
+      ファイル内容エラー.value = e?.message ?? '保存失敗'
+    }
+  } finally {
+    ファイルダウンロード中.value = false
+  }
+}
+
 // ===================== WebSocket =====================
 
 const バックアップリスト要求 = (読込表示 = false) => {
@@ -558,6 +608,40 @@ async function connectFileSocket() {
   }
 }
 
+const コンテキストメニュー表示 = ref(false)
+const コンテキストメニューX = ref(0)
+const コンテキストメニューY = ref(0)
+
+const コンテキストメニュー閉じる = () => {
+  コンテキストメニュー表示.value = false
+}
+
+const コンテキストメニュー表示位置設定 = (x: number, y: number) => {
+  const メニュー幅 = 140
+  const メニュー高 = 40
+  コンテキストメニューX.value = x + メニュー幅 > window.innerWidth ? x - メニュー幅 : x
+  コンテキストメニューY.value = y + メニュー高 > window.innerHeight ? y - メニュー高 : y
+  コンテキストメニュー表示.value = true
+}
+
+const ツリー行右クリック = (e: MouseEvent, 行: ツリー表示行, isBackup: boolean) => {
+  if (行.種別 !== 'file') return
+  e.preventDefault()
+  void ファイルクリック(行.パス, isBackup)
+  コンテキストメニュー表示位置設定(e.clientX, e.clientY)
+}
+
+const コンテキストメニューダウンロード = async () => {
+  コンテキストメニュー閉じる()
+  await ファイル保存先選択()
+}
+
+const 下段右クリック = (e: MouseEvent) => {
+  if (!選択ファイルパス.value) return
+  e.preventDefault()
+  コンテキストメニュー表示位置設定(e.clientX, e.clientY)
+}
+
 // --- キーボードナビ ---
 const キーボードキーダウン = (e: KeyboardEvent) => {
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
@@ -620,6 +704,7 @@ watch(テンプ更新間隔, () => {
 onMounted(() => {
   if (props.sessionId) void connectFileSocket()
   window.addEventListener('keydown', キーボードキーダウン)
+  window.addEventListener('mousedown', コンテキストメニュー閉じる)
   if (props.active) {
     ファイルリスト要求()
   }
@@ -627,6 +712,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', キーボードキーダウン)
+  window.removeEventListener('mousedown', コンテキストメニュー閉じる)
   テンプリスト自動送信停止()
   fileSocket?.disconnect()
   fileSocket = null
@@ -657,18 +743,22 @@ defineExpose({
             <span v-if="最終ファイル日時" class="panel-datetime">{{ 最終ファイル日時 }}</span>
           </div>
           <div class="panel-content">
-            <div v-if="左読込中" class="placeholder-content"><div>読込中...</div></div>
+            <div v-if="左読込中" class="placeholder-content">
+              <img src="/icons/loading.gif" alt="読込中" class="loading-panel-image" />
+              <div>読込中...</div>
+            </div>
             <div v-else-if="最終ファイルリスト.length === 0" class="placeholder-content"><div>バックアップなし</div></div>
             <ul v-else class="tree-list">
               <li
                 v-for="行 in 最終ファイル行"
                 :key="`l-${行.キー}`"
                 class="tree-item"
-                :class="{
+              :class="{
                   folder: 行.種別 === 'folder',
                   selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'left',
                 }"
                 @click="ツリー行クリック(行, true)"
+                @contextmenu="ツリー行右クリック($event, 行, true)"
               >
                 <span class="tree-indent" :style="{ width: `${行.深さ * 14}px` }"></span>
                 <span class="tree-toggle">{{ 行.種別 === 'folder' ? (行.展開中 ? '▾' : '▸') : ' ' }}</span>
@@ -699,18 +789,22 @@ defineExpose({
             <span v-if="作業ファイル日時" class="panel-datetime">{{ 作業ファイル日時 }}</span>
           </div>
           <div class="panel-content">
-            <div v-if="右読込中" class="placeholder-content"><div>読込中...</div></div>
+            <div v-if="右読込中" class="placeholder-content">
+              <img src="/icons/loading.gif" alt="読込中" class="loading-panel-image" />
+              <div>読込中...</div>
+            </div>
             <div v-else-if="作業ファイルリスト.length === 0" class="placeholder-content"><div>ファイルなし</div></div>
             <ul v-else class="tree-list">
               <li
                 v-for="行 in 作業ファイル行"
                 :key="`r-${行.キー}`"
                 class="tree-item"
-                :class="{
+              :class="{
                   folder: 行.種別 === 'folder',
                   selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'right',
                 }"
                 @click="ツリー行クリック(行, false)"
+                @contextmenu="ツリー行右クリック($event, 行, false)"
               >
                 <span class="tree-indent" :style="{ width: `${行.深さ * 14}px` }"></span>
                 <span class="tree-toggle">{{ 行.種別 === 'folder' ? (行.展開中 ? '▾' : '▸') : ' ' }}</span>
@@ -737,8 +831,9 @@ defineExpose({
               class="action-btn download"
               type="button"
               @click="ファイルダウンロード"
+              @contextmenu.prevent="ファイル保存先選択"
               :disabled="!選択ファイルパス || ファイル読込中 || ファイルダウンロード中"
-              title="ダウンロード"
+              title="左クリック: ダウンロード / 右クリック: 保存先選択"
             >⬇</button>
           </span>
           <span class="header-spacer"></span>
@@ -762,9 +857,12 @@ defineExpose({
           </span>
         </div>
         <div class="lower-content">
-          <div v-if="ファイル読込中" class="placeholder-content"><div>読込中...</div></div>
+          <div v-if="ファイル読込中" class="placeholder-content">
+            <img src="/icons/loading.gif" alt="読込中" class="loading-panel-image" />
+            <div>読込中...</div>
+          </div>
           <div v-else-if="ファイル内容エラー" class="placeholder-content error"><div>{{ ファイル内容エラー }}</div></div>
-          <img v-else-if="ファイル内容画像" :src="ファイル内容画像" class="file-image" />
+          <img v-else-if="ファイル内容画像" :src="ファイル内容画像" class="file-image" @contextmenu.prevent="下段右クリック($event)" />
           <div v-else-if="ファイル内容テキスト === null && !ファイル読込中" class="placeholder-content">
             <div>ツリーからファイルを選択してください</div>
           </div>
@@ -772,11 +870,23 @@ defineExpose({
             v-show="!ファイル読込中 && !ファイル内容エラー && !ファイル内容画像 && ファイル内容テキスト !== null"
             ref="monacoコンテナ"
             class="monaco-container"
+            @contextmenu.prevent="下段右クリック($event)"
           ></div>
         </div>
       </div>
     </div>
   </section>
+
+  <Teleport to="body">
+    <div
+      v-if="コンテキストメニュー表示"
+      class="context-menu"
+      :style="{ left: `${コンテキストメニューX}px`, top: `${コンテキストメニューY}px` }"
+      @mousedown.stop
+    >
+      <button class="context-menu-item" type="button" @click="コンテキストメニューダウンロード">⬇ ダウンロード</button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -887,6 +997,13 @@ defineExpose({
 
 .placeholder-content.error { color: #ffb4b4; }
 
+.loading-panel-image {
+  width: 27px;
+  max-width: 10.5%;
+  height: auto;
+  display: block;
+}
+
 /* ファイルツリー */
 .tree-list { list-style: none; margin: 0; padding: 0; }
 
@@ -984,6 +1101,36 @@ defineExpose({
   display: block;
   margin: auto;
   padding: 4px 8px;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #1e1e2e;
+  border: 1px solid rgba(102, 126, 234, 0.5);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  min-width: 130px;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #c8d0f0;
+  font-size: 12px;
+  text-align: left;
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.context-menu-item:hover {
+  background: rgba(102, 126, 234, 0.25);
+  color: #edf2ff;
 }
 
 @media (max-width: 480px) {

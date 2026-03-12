@@ -256,6 +256,64 @@ def kill_process_on_port(port: int) -> bool:
         return False
 
 
+def kill_electron_processes() -> None:
+    """このプロジェクトの Electron / electronmon プロセスを強制終了する。
+
+    npm プロセスツリーを taskkill /T で終了しても、electronmon が spawn した
+    electron.exe は別プロセスグループに属して残留することがある。
+    起動前・停止後に呼ぶことで残留プロセスを確実に排除する。
+    """
+    electron_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / "electron.exe"
+    electron_path_str = str(electron_exe).lower()
+
+    if sys.platform == "win32":
+        # wmic は Windows 11 新ビルドで削除されたため PowerShell の Get-CimInstance を使用
+        try:
+            result = subprocess.run(
+                [
+                    "powershell", "-NoProfile", "-Command",
+                    "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId),$($_.ExecutablePath)\" }",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            killed_pids = []
+            for line in result.stdout.splitlines():
+                lower = line.lower()
+                if "electron" not in lower:
+                    continue
+                parts = line.strip().split(",", 1)
+                if len(parts) >= 2:
+                    pid = parts[0].strip()
+                    exe_path = parts[1].lower()
+                    if electron_path_str in exe_path and pid.isdigit():
+                        subprocess.run(
+                            ["taskkill", "/F", "/T", "/PID", pid],
+                            capture_output=True,
+                            timeout=5,
+                        )
+                        killed_pids.append(pid)
+            if killed_pids:
+                print_success(f"[Electron] 残留プロセスを停止しました: PID={','.join(killed_pids)}")
+            else:
+                print_info("[Electron] 残留プロセスはありません")
+        except Exception as exc:
+            print_warning(f"[Electron] プロセス確認でエラー: {exc}")
+    else:
+        # Linux/Mac: electronmon と electron を pkill
+        for proc_name in ("electronmon", "electron"):
+            try:
+                subprocess.run(
+                    ["pkill", "-9", "-f", f"frontend_avatar.*{proc_name}"],
+                    capture_output=True,
+                    timeout=5,
+                )
+            except Exception:
+                pass
+        print_info("[Electron] 残留プロセスの停止を試みました")
+
+
 def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen[bytes]:
     print_info(f"[{name}] 作業ディレクトリ: {cwd}")
     print_info(f"[{name}] コマンド: {' '.join(command)}")
@@ -416,6 +474,7 @@ def open_browser(port: int) -> None:
 
 
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
+    avatar_was_running = "フロントエンド(Avatar)" in processes
     for name, process in list(processes.items()):
         try:
             print_info(f"[{name}] 停止しています")
@@ -447,6 +506,11 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
             print_error(f"[{name}] 停止時にエラーが発生しました: {exc}")
         finally:
             processes.pop(name, None)
+
+    # Avatar を起動していた場合は残留 Electron プロセスも終了する
+    # (electronmon が spawn した electron.exe は別プロセスグループで残留するため)
+    if avatar_was_running:
+        kill_electron_processes()
 
 
 
@@ -557,6 +621,9 @@ def maybe_kill_initial_ports(
         kill_process_on_port(FRONTEND_WEB_PORT)
     if avatar_enabled:
         kill_process_on_port(FRONTEND_AVATAR_PORT)
+        # electronmon が spawn した electron.exe は別プロセスグループで残留する場合があるため
+        # ポートkillだけでなく、プロセス名でも明示的に停止する
+        kill_electron_processes()
     time.sleep(1)
 
 
