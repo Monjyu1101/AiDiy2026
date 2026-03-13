@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { monaco, モナコ言語推定 } from '@/lib/monaco'
+import { monaco, モナコ言語推定 } from '@/_share/monaco'
 
 const props = defineProps<{
   show: boolean

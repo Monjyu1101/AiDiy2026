@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import { DEFAULT_VRM_MODEL_URL, DEFAULT_VRMA_FILES } from '@/lib/config'
+import { DEFAULT_VRM_MODEL_URL, DEFAULT_VRMA_FILES } from '@/_share/config'
 
 const props = withDefaults(defineProps<{
   sessionId: string;

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import apiClient from '@/lib/api'
-import { AI_WS_ENDPOINT } from '@/lib/config'
-import { AIWebSocket } from '@/lib/websocket'
+import apiClient from '@/_share/api'
+import { AI_WS_ENDPOINT } from '@/_share/config'
+import { AIWebSocket } from '@/_share/websocket'
 import AIコードファイル内容表示 from '@/components/AIコード_ファイル内容表示.vue'
 import AIコード更新ファイル一覧 from '@/components/AIコード_更新ファイル一覧.vue'
 

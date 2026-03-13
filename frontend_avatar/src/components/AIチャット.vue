@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AI_WS_ENDPOINT } from '@/lib/config'
-import { AIWebSocket } from '@/lib/websocket'
+import { AI_WS_ENDPOINT } from '@/_share/config'
+import { AIWebSocket } from '@/_share/websocket'
 import type { ChatMessage, MessageKind, ModelSettings } from '@/types'
 
 type チャットモード = 'Chat' | 'Live' | 'Code1' | 'Code2' | 'Code3' | 'Code4'

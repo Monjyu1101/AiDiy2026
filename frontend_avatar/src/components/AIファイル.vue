@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import apiClient from '@/lib/api'
-import { AI_WS_ENDPOINT } from '@/lib/config'
-import { monaco, モナコ言語推定 } from '@/lib/monaco'
-import { AIWebSocket } from '@/lib/websocket'
+import apiClient from '@/_share/api'
+import { AI_WS_ENDPOINT } from '@/_share/config'
+import { monaco, モナコ言語推定 } from '@/_share/monaco'
+import { AIWebSocket } from '@/_share/websocket'
 
 type ファイルエントリ = { パス: string; 更新日時: string }
 type ツリーノード種別 = 'folder' | 'file'

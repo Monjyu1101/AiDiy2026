@@ -2,9 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import アバター from '@/components/アバター.vue'
 import WindowShell from '@/components/WindowShell.vue'
-import { AudioController } from '@/lib/audio-controller'
-import { AI_WS_ENDPOINT } from '@/lib/config'
-import { AIWebSocket } from '@/lib/websocket'
+import { AudioController } from '@/_share/audio-controller'
+import { AI_WS_ENDPOINT } from '@/_share/config'
+import { AIWebSocket } from '@/_share/websocket'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
 
