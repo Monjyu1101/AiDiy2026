@@ -358,7 +358,7 @@ def setup_common_global_tools():
     print_header("共通セットアップ")
     print_info("対象: pip / wheel / setuptools / uv / AI CLI ツール")
 
-    if ask_yes_no("共通: グローバル環境の Python ツールをアップグレードしますか？", default="y"):
+    if ask_yes_no("共通: グローバル環境의 Python ツールをアップグレードしますか？", default="y"):
         commands = [
             (["python", "-m", "pip", "install", "--upgrade", "pip"], "pip"),
             (["pip", "install", "--upgrade", "wheel"], "wheel"),
@@ -484,59 +484,30 @@ def setup_frontend_avatar():
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
         return False
 
-    package_json = FRONTEND_AVATAR_DIR / "package.json"
-    if not package_json.exists():
-        print_error(f"{label}: package.json が見つかりません: {package_json}")
-        return False
+    # 1. npm install（postinstall で Electron バイナリも取得を試みる。失敗しても続行）
+    print_info(f"{label}: npm install を実行します...")
+    if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
+        print_warning(f"{label}: npm install が失敗しました。Electron バイナリの手動取得を試みます。")
 
-    # Step1: --ignore-scripts でパッケージ一式を確実にインストール
-    #        (省略しないとElectronのpostinstallがGitHubにアクセスして失敗し、
-    #         concurrently等の他パッケージも揃わない)
-    print_info(f"{label}: npm パッケージをインストールします (--ignore-scripts)...")
-    if not run_command([npm_command(), "install", "--ignore-scripts"], cwd=FRONTEND_AVATAR_DIR):
-        print_error(f"{label}: npm install --ignore-scripts に失敗しました。")
-        return False
-    print_success(f"{label}: npm パッケージのインストールが完了しました。")
-
-    # Step2: Electron バイナリが既に存在するか確認
-    exe_name_chk = "electron.exe" if sys.platform == "win32" else "electron"
-    dist_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name_chk
-    if dist_exe.exists():
-        print_success(f"{label}: Electron バイナリは既に存在します。スキップします。")
-    else:
-        print_info(f"{label}: GitHub から Electron バイナリを取得します。")
+    # テスト用: electron.exe を削除してフォールバックを検証
+    exe_name = "electron.exe" if sys.platform == "win32" else "electron"
+    electron_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name
+    if electron_exe.exists():
+        electron_exe.unlink()
+        print_warning(f"{label}: [テスト用] {electron_exe} を削除しました。")
+    if not electron_exe.exists():
+        # a. GitHub からバイナリ取得
         if not install_electron_binary(FRONTEND_AVATAR_DIR, label):
-            print_error(f"{label}: Electronバイナリのインストールに失敗しました。")
+            return False
+        # b. npm install を再実行して仕上げ
+        print_info(f"{label}: npm install を再実行してセットアップを完了させます...")
+        if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
             return False
 
-    # Step3: バイナリ配置後に npm install を再実行して残りの postinstall を完了
-    print_info(f"{label}: npm install を再実行して postinstall を完了させます...")
-    if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-        print_warning(f"{label}: npm install (再実行) に失敗しましたが続行します。")
-
-    # Step4: TypeScript (electron/) を事前ビルドして dist-electron/ を生成する
-    #        これを省略すると cleanup 後に npm run dev を実行しても
-    #        tsc --watch の完了を wait-on が待つ間、Electron が起動しない問題が起きる
-    print_info(f"{label}: TypeScript (electron/) を事前ビルドします (tsc -p tsconfig.electron.json)...")
-    if not run_command([npm_command(), "run", "build:electron"], cwd=FRONTEND_AVATAR_DIR):
-        print_warning(f"{label}: TypeScript ビルドに失敗しました。npm run dev 起動時に自動ビルドされます。")
-    else:
-        print_success(f"{label}: dist-electron/ の事前ビルドが完了しました。")
-
-    # Step5: Vite 依存関係の事前最適化 (vite optimize)
-    #        cleanup 後の初回 npm run dev では three.js / @pixiv/three-vrm / monaco-editor 等の
-    #        重いパッケージを Vite が最適化するのに 3〜5 分かかる。
-    #        その間 Electron は起動するが Vite が "optimized dependencies changed. reloading" を
-    #        送信するため、ログイン画面がリロードされてブランクになる。
-    #        セットアップ時に事前最適化（node_modules/.vite/deps/ へのキャッシュ生成）しておくことで
-    #        初回 npm run dev から即座に表示される。
-    #        ※ Vite 7.x では "manually calling optimizeDeps is deprecated" の警告が出るが動作する。
-    print_info(f"{label}: Vite 依存関係を事前最適化します (vite optimize --force)...")
-    vite_cmd = [npm_command(), "exec", "--", "vite", "optimize", "--force"]
-    if not run_command(vite_cmd, cwd=FRONTEND_AVATAR_DIR):
-        print_warning(f"{label}: vite optimize に失敗しました。npm run dev 起動時に自動最適化されます（初回は 3〜5 分かかります）。")
-    else:
-        print_success(f"{label}: Vite 依存関係の事前最適化が完了しました。")
+    # (事前ビルドなどは環境維持のため最後に実行)
+    # print_info(f"{label}: electron 実行環境を準備します...")
+    # run_command([npm_command(), "run", "build:electron"], cwd=FRONTEND_AVATAR_DIR)
+    # run_command([npm_command(), "exec", "--", "vite", "optimize", "--force"], cwd=FRONTEND_AVATAR_DIR)
 
     print_success(f"{label}: セットアップが完了しました。")
     return True

@@ -22,6 +22,7 @@ const api = {
   getWindowRole: () => ipcRenderer.invoke('window:get-role') as Promise<WindowRole>,
   getWindowBounds: () => ipcRenderer.invoke('window:get-bounds') as Promise<WindowMetrics>,
   setWindowBounds: (bounds: WindowBounds) => ipcRenderer.invoke('window:set-bounds', bounds),
+  setWindowInteractive: (interactive: boolean) => ipcRenderer.invoke('window:set-interactive', interactive) as Promise<boolean>,
   setWindowMode: (mode: WindowMode) => ipcRenderer.invoke('window:set-mode', mode),
   openCoreWindow: () => ipcRenderer.invoke('window:open-core') as Promise<WindowMode>,
   openLoginWindow: () => ipcRenderer.invoke('window:open-login') as Promise<WindowMode>,

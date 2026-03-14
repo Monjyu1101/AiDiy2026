@@ -3,17 +3,27 @@ import type { AIWebSocket, WebSocketMessage } from '@/_share/websocket'
 type AudioControllerOptions = {
   onInputLevel?: (value: number) => void
   onOutputLevel?: (value: number) => void
+  onInputSpectrum?: (values: number[]) => void
+  onOutputSpectrum?: (values: number[]) => void
   getSocket: () => AIWebSocket | null
   getSessionId: () => string
 }
 
 type StartResult = { success: boolean; error?: string }
+type CancelOutputOptions = {
+  resetLevel?: boolean
+  notifyServer?: boolean
+}
+
+const VISUALIZER_BAR_COUNT = 32
 
 export class AudioController {
   private inputAudioContext: AudioContext | null = null
   private outputAudioContext: AudioContext | null = null
   private inputAnalyser: AnalyserNode | null = null
   private outputAnalyser: AnalyserNode | null = null
+  private visualizerAnalyser: AnalyserNode | null = null
+  private outputGain: GainNode | null = null
   private inputProcessor: ScriptProcessorNode | null = null
   private inputStream: MediaStream | null = null
   private audioSocket: AIWebSocket | null = null
@@ -21,9 +31,14 @@ export class AudioController {
   private speakerEnabled = true
   private inputLevelFrame = 0
   private outputLevelFrame = 0
-  private outputSources = new Set<AudioBufferSourceNode>()
+  private speakerSources = new Set<AudioBufferSourceNode>()
+  private visualizerSources = new Set<AudioBufferSourceNode>()
+  private outputQueue: Array<{ base64Audio: string; mimeType: string }> = []
+  private outputQueueProcessing = false
+  private outputQueueGeneration = 0
   private inputSampleRate = 16000
   private outputSampleRate = 24000
+  private nextPlaybackTime = 0
 
   constructor(private readonly options: AudioControllerOptions) {}
 
@@ -39,12 +54,26 @@ export class AudioController {
     const normalized = modelName.toLowerCase()
     this.inputSampleRate = normalized.includes('openai') ? 24000 : 16000
     this.outputSampleRate = 24000
+
+    const outputContext = this.outputAudioContext
+    if (outputContext && outputContext.sampleRate !== this.outputSampleRate) {
+      this.cancelOutput()
+      void outputContext.close()
+      this.outputAudioContext = null
+      this.outputAnalyser = null
+      this.visualizerAnalyser = null
+      this.outputGain = null
+      this.nextPlaybackTime = 0
+    }
   }
 
   setSpeakerEnabled(enabled: boolean): void {
     this.speakerEnabled = enabled
+    if (this.outputGain) {
+      this.outputGain.gain.value = enabled ? 1 : 0
+    }
     if (!enabled) {
-      this.cancelOutput(false)
+      this.stopSpeakerSources()
     }
   }
 
@@ -64,6 +93,7 @@ export class AudioController {
     try {
       await this.unlockAudio()
       await this.stopMicrophoneInternal()
+      this.cancelOutput({ resetLevel: false, notifyServer: true })
 
       this.inputStream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -119,21 +149,31 @@ export class AudioController {
     const base64Audio = this.extractBase64Audio(message)
     if (!base64Audio) return
 
-    void this.playAudio(base64Audio, String(message.メッセージ内容 || 'audio/pcm'))
+    this.outputQueue.push({
+      base64Audio,
+      mimeType: String(message.メッセージ内容 || 'audio/pcm'),
+    })
+    if (!this.outputQueueProcessing) {
+      void this.processOutputQueue()
+    }
   }
 
-  cancelOutput(resetLevel = true): void {
-    this.outputSources.forEach((source) => {
-      try {
-        source.stop()
-      } catch {
-        return
-      }
-    })
-    this.outputSources.clear()
+  cancelOutput(options: CancelOutputOptions = {}): void {
+    const { resetLevel = true, notifyServer = false } = options
+    this.outputQueueGeneration += 1
+    this.stopSpeakerSources()
+    this.stopVisualizerSources()
+    this.outputQueue = []
+    this.outputQueueProcessing = false
+    this.nextPlaybackTime = this.outputAudioContext?.currentTime ?? 0
+
+    if (notifyServer) {
+      this.notifyCancelAudio()
+    }
 
     if (resetLevel) {
       this.options.onOutputLevel?.(0)
+      this.options.onOutputSpectrum?.(this.emptySpectrum())
     }
   }
 
@@ -148,33 +188,90 @@ export class AudioController {
       void this.outputAudioContext.close()
       this.outputAudioContext = null
       this.outputAnalyser = null
+      this.visualizerAnalyser = null
+      this.outputGain = null
     }
   }
 
-  private async playAudio(base64Audio: string, mimeType: string): Promise<void> {
+  private async processOutputQueue(): Promise<void> {
+    if (this.outputQueueProcessing) return
+    this.outputQueueProcessing = true
+    const queueGeneration = this.outputQueueGeneration
+    try {
+      while (this.outputQueue.length > 0) {
+        if (queueGeneration !== this.outputQueueGeneration) {
+          break
+        }
+        const nextAudio = this.outputQueue.shift()
+        if (!nextAudio) {
+          continue
+        }
+        const audioBuffer = await this.decodeAudioBuffer(nextAudio.base64Audio, nextAudio.mimeType)
+        if (queueGeneration !== this.outputQueueGeneration) {
+          break
+        }
+        this.scheduleAudioBuffer(audioBuffer)
+      }
+    } finally {
+      if (queueGeneration === this.outputQueueGeneration) {
+        this.outputQueueProcessing = false
+      }
+    }
+  }
+
+  private async decodeAudioBuffer(base64Audio: string, mimeType: string): Promise<AudioBuffer> {
     const context = this.ensureOutputContext()
     if (context.state === 'suspended') {
       await context.resume()
     }
 
-    const audioBuffer = mimeType.includes('audio/pcm')
-      ? this.createPcmAudioBuffer(context, base64Audio)
-      : await context.decodeAudioData(this.base64ToArrayBuffer(base64Audio))
-
-    const source = context.createBufferSource()
-    source.buffer = audioBuffer
-    source.connect(this.outputAnalyser ?? context.destination)
-    if (!this.speakerEnabled) {
-      source.connect(context.createGain())
+    if (mimeType.toLowerCase().includes('audio/pcm')) {
+      return this.createPcmAudioBuffer(context, base64Audio)
     }
-    source.onended = () => {
-      this.outputSources.delete(source)
-      if (this.outputSources.size === 0) {
-        this.options.onOutputLevel?.(0)
+
+    try {
+      return await context.decodeAudioData(this.base64ToArrayBuffer(base64Audio))
+    } catch {
+      return this.createPcmAudioBuffer(context, base64Audio)
+    }
+  }
+
+  private scheduleAudioBuffer(audioBuffer: AudioBuffer): void {
+    const context = this.ensureOutputContext()
+    const leadTime = 0.03
+    const now = context.currentTime
+    if (this.nextPlaybackTime < now - 0.1) {
+      this.nextPlaybackTime = now
+    }
+    const startAt = Math.max(now + leadTime, this.nextPlaybackTime)
+    this.nextPlaybackTime = startAt + audioBuffer.duration
+
+    const visualizerSource = context.createBufferSource()
+    visualizerSource.buffer = audioBuffer
+    visualizerSource.connect(this.visualizerAnalyser ?? context.destination)
+    visualizerSource.onended = () => {
+      this.visualizerSources.delete(visualizerSource)
+      if (this.visualizerSources.size === 0 && this.speakerSources.size === 0) {
+        this.nextPlaybackTime = 0
       }
     }
-    this.outputSources.add(source)
-    source.start()
+    this.visualizerSources.add(visualizerSource)
+    visualizerSource.start(startAt)
+
+    if (this.speakerEnabled) {
+      const speakerSource = context.createBufferSource()
+      speakerSource.buffer = audioBuffer
+      speakerSource.connect(this.outputAnalyser ?? context.destination)
+      speakerSource.onended = () => {
+        this.speakerSources.delete(speakerSource)
+        if (this.visualizerSources.size === 0 && this.speakerSources.size === 0) {
+          this.nextPlaybackTime = 0
+        }
+      }
+      this.speakerSources.add(speakerSource)
+      speakerSource.start(startAt)
+    }
+
     this.startOutputLevelLoop()
   }
 
@@ -183,7 +280,12 @@ export class AudioController {
       this.outputAudioContext = new AudioContext({ sampleRate: this.outputSampleRate })
       this.outputAnalyser = this.outputAudioContext.createAnalyser()
       this.outputAnalyser.fftSize = 256
-      this.outputAnalyser.connect(this.outputAudioContext.destination)
+      this.visualizerAnalyser = this.outputAudioContext.createAnalyser()
+      this.visualizerAnalyser.fftSize = 256
+      this.outputGain = this.outputAudioContext.createGain()
+      this.outputGain.gain.value = this.speakerEnabled ? 1 : 0
+      this.outputAnalyser.connect(this.outputGain)
+      this.outputGain.connect(this.outputAudioContext.destination)
     }
     return this.outputAudioContext
   }
@@ -194,11 +296,13 @@ export class AudioController {
     const tick = () => {
       if (!this.inputAnalyser) {
         this.options.onInputLevel?.(0)
+        this.options.onInputSpectrum?.(this.emptySpectrum())
         this.inputLevelFrame = 0
         return
       }
       this.inputAnalyser.getByteFrequencyData(data)
       this.options.onInputLevel?.(this.computeLevel(data))
+      this.options.onInputSpectrum?.(this.buildSpectrum(data))
       this.inputLevelFrame = window.requestAnimationFrame(tick)
     }
     if (!this.inputLevelFrame) {
@@ -207,32 +311,107 @@ export class AudioController {
   }
 
   private startOutputLevelLoop(): void {
-    if (!this.outputAnalyser) return
-    const data = new Uint8Array(this.outputAnalyser.frequencyBinCount)
+    const speakerData = new Uint8Array((this.outputAnalyser?.frequencyBinCount ?? 0) || 0)
+    const visualizerData = new Uint8Array((this.visualizerAnalyser?.frequencyBinCount ?? 0) || 0)
     const tick = () => {
-      if (!this.outputAnalyser) {
+      const analyser = this.speakerSources.size > 0 ? this.outputAnalyser : this.visualizerAnalyser
+      const data = this.speakerSources.size > 0 ? speakerData : visualizerData
+
+      if (!analyser || data.length === 0) {
         this.options.onOutputLevel?.(0)
+        this.options.onOutputSpectrum?.(this.emptySpectrum())
         this.outputLevelFrame = 0
         return
       }
-      this.outputAnalyser.getByteFrequencyData(data)
+
+      analyser.getByteFrequencyData(data)
       this.options.onOutputLevel?.(this.computeLevel(data))
-      if (this.outputSources.size > 0) {
+      this.options.onOutputSpectrum?.(this.buildSpectrum(data))
+
+      if (this.speakerSources.size > 0 || this.visualizerSources.size > 0) {
         this.outputLevelFrame = window.requestAnimationFrame(tick)
       } else {
         this.options.onOutputLevel?.(0)
+        this.options.onOutputSpectrum?.(this.emptySpectrum())
         this.outputLevelFrame = 0
       }
     }
+
     if (!this.outputLevelFrame) {
       tick()
     }
+  }
+
+  private stopSpeakerSources(): void {
+    this.speakerSources.forEach((source) => {
+      try {
+        source.stop()
+      } catch {
+        return
+      }
+    })
+    this.speakerSources.clear()
+  }
+
+  private stopVisualizerSources(): void {
+    this.visualizerSources.forEach((source) => {
+      try {
+        source.stop()
+      } catch {
+        return
+      }
+    })
+    this.visualizerSources.clear()
+  }
+
+  private notifyCancelAudio(): void {
+    const socket = this.options.getSocket()
+    if (!socket?.isConnected()) return
+
+    socket.send({
+      セッションID: this.sessionId || this.options.getSessionId(),
+      チャンネル: 'audio',
+      メッセージ識別: 'cancel_audio',
+      メッセージ内容: null,
+      ファイル名: null,
+      サムネイル画像: null,
+    })
   }
 
   private computeLevel(data: Uint8Array): number {
     if (data.length === 0) return 0
     const sum = data.reduce((acc, value) => acc + value, 0)
     return Math.min(1, sum / data.length / 128)
+  }
+
+  private buildSpectrum(data: Uint8Array): number[] {
+    if (data.length === 0) {
+      return this.emptySpectrum()
+    }
+
+    const bucketSize = Math.max(1, Math.floor(data.length / VISUALIZER_BAR_COUNT))
+    const values = Array.from({ length: VISUALIZER_BAR_COUNT }, (_, index) => {
+      const start = index * bucketSize
+      const end = Math.min(data.length, start + bucketSize)
+      if (start >= data.length) {
+        return 0.05
+      }
+
+      let sum = 0
+      let count = 0
+      for (let cursor = start; cursor < end; cursor += 1) {
+        sum += data[cursor] ?? 0
+        count += 1
+      }
+      const normalized = count > 0 ? sum / count / 255 : 0
+      return Math.max(0.05, Math.min(1, normalized))
+    })
+
+    return values
+  }
+
+  private emptySpectrum(): number[] {
+    return Array.from({ length: VISUALIZER_BAR_COUNT }, () => 0.05)
   }
 
   private floatTo16BitPCM(input: Float32Array): Int16Array {
@@ -284,6 +463,7 @@ export class AudioController {
       this.inputLevelFrame = 0
     }
     this.options.onInputLevel?.(0)
+    this.options.onInputSpectrum?.(this.emptySpectrum())
 
     if (this.inputProcessor) {
       this.inputProcessor.disconnect()

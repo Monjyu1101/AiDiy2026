@@ -6,13 +6,12 @@
 3系統を統一手順で起動します。
 
 標準の起動順:
-1. バックエンド(core,apps)
-2. 落ち着き待機
-3. フロントエンド(Avatar) を起動するか 5 秒確認
-4. フロントエンド(Web)
-5. 落ち着き待機
-6. Web ページ表示
-7. 自動再起動監視
+1. バックエンド(core)
+2. バックエンド(apps)
+3. フロントエンド(Web)
+4. フロントエンド(Avatar)
+5. Web ページ表示
+6. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -657,6 +656,11 @@ def start_initial_services(
         start_service("バックエンド(apps)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["バックエンド(apps)"], label="バックエンド(apps)")
 
+    if web_enabled:
+        print_header("フロントエンド(Web) 起動")
+        if start_service("フロントエンド(Web)", processes, last_output_times, npm_command):
+            wait_for_services_quiet(last_output_times, ["フロントエンド(Web)"], label="フロントエンド(Web)")
+
     if avatar_enabled and ensure_optional_service_ready("フロントエンド(Avatar)", npm_command):
         selected_flags["フロントエンド(Avatar)"] = True
         kill_process_on_port(FRONTEND_AVATAR_PORT)
@@ -664,11 +668,8 @@ def start_initial_services(
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
 
-    if web_enabled:
-        print_header("フロントエンド(Web) 起動")
-        if start_service("フロントエンド(Web)", processes, last_output_times, npm_command):
-            wait_for_services_quiet(last_output_times, ["フロントエンド(Web)"], label="フロントエンド(Web)")
-            open_browser(FRONTEND_WEB_PORT)
+    if web_enabled and "フロントエンド(Web)" in processes:
+        open_browser(FRONTEND_WEB_PORT)
 
     return selected_flags
 

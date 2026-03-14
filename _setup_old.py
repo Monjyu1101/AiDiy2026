@@ -489,30 +489,30 @@ def setup_frontend_avatar():
         print_error(f"{label}: package.json が見つかりません: {package_json}")
         return False
 
-    exe_name_chk = "electron.exe" if sys.platform == "win32" else "electron"
-    dist_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name_chk
-
-    # Step1: npm install を試みる
-    #        通常環境（GitHub アクセス可）では postinstall でバイナリも取得される
-    print_info(f"{label}: npm install を実行します...")
-    if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-        print_error(f"{label}: npm install に失敗しました。")
+    # Step1: --ignore-scripts でパッケージ一式を確実にインストール
+    #        (省略しないとElectronのpostinstallがGitHubにアクセスして失敗し、
+    #         concurrently等の他パッケージも揃わない)
+    print_info(f"{label}: npm パッケージをインストールします (--ignore-scripts)...")
+    if not run_command([npm_command(), "install", "--ignore-scripts"], cwd=FRONTEND_AVATAR_DIR):
+        print_error(f"{label}: npm install --ignore-scripts に失敗しました。")
         return False
     print_success(f"{label}: npm パッケージのインストールが完了しました。")
 
-    # Step2: npm install でバイナリが取得できたか確認
-    #        取得できていればスキップ、できていなければ GitHub から取得
+    # Step2: Electron バイナリが既に存在するか確認
+    exe_name_chk = "electron.exe" if sys.platform == "win32" else "electron"
+    dist_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name_chk
     if dist_exe.exists():
-        print_success(f"{label}: Electron バイナリは npm install で取得済みです。GitHub 取得をスキップします。")
+        print_success(f"{label}: Electron バイナリは既に存在します。スキップします。")
     else:
-        print_info(f"{label}: Electron バイナリが見つかりません。GitHub から取得します。")
+        print_info(f"{label}: GitHub から Electron バイナリを取得します。")
         if not install_electron_binary(FRONTEND_AVATAR_DIR, label):
             print_error(f"{label}: Electronバイナリのインストールに失敗しました。")
             return False
-        # Step3: バイナリ配置後に postinstall を完了させるため npm install を再実行
-        print_info(f"{label}: npm install を再実行して postinstall を完了させます...")
-        if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-            print_warning(f"{label}: npm install (再実行) に失敗しましたが続行します。")
+
+    # Step3: バイナリ配置後に npm install を再実行して残りの postinstall を完了
+    print_info(f"{label}: npm install を再実行して postinstall を完了させます...")
+    if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
+        print_warning(f"{label}: npm install (再実行) に失敗しましたが続行します。")
 
     # Step4: TypeScript (electron/) を事前ビルドして dist-electron/ を生成する
     #        これを省略すると cleanup 後に npm run dev を実行しても

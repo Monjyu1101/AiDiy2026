@@ -29,6 +29,7 @@ declare global {
       getWindowRole?: () => Promise<AvatarWindowRole>
       getWindowBounds?: () => Promise<AvatarWindowMetrics>
       setWindowBounds?: (bounds: AvatarWindowBounds) => Promise<AvatarWindowBounds>
+      setWindowInteractive?: (interactive: boolean) => Promise<boolean>
       setWindowMode?: (mode: AvatarWindowMode) => Promise<AvatarWindowMode>
       openCoreWindow?: () => Promise<AvatarWindowMode>
       openLoginWindow?: () => Promise<AvatarWindowMode>

@@ -367,15 +367,6 @@ async function openCoreWindow(sourceWindow?: BrowserWindow | null) {
     sourceWindow.hide()
   }
 
-  // 全パネルを表示状態で開始
-  for (const panel of Object.keys(panelStates) as PanelKey[]) {
-    const panelWin = panelWindows.get(panel)
-    if (panelWin && !panelWin.isDestroyed()) {
-      await waitForReady(panelWin)
-      setPanelVisibility(panel, true)
-    }
-  }
-
   return 'core' as const
 }
 
@@ -495,6 +486,20 @@ app.whenReady().then(() => {
     const bounds = clampWindowBounds(window, nextBounds)
     window.setBounds(bounds)
     return bounds
+  })
+
+  ipcMain.handle('window:set-interactive', (event, interactive: boolean) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return false
+
+    window.setIgnoreMouseEvents(!interactive, { forward: true })
+    if (interactive) {
+      window.setFocusable(true)
+    } else {
+      window.blur()
+      window.setFocusable(false)
+    }
+    return interactive
   })
 
   ipcMain.handle('panel:toggle', (_event, panel: PanelKey) => {
