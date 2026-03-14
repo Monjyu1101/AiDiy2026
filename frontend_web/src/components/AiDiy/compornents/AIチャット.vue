@@ -858,12 +858,8 @@ const 接続状態表示 = computed(() => {
   return WebSocket接続中.value ? '接続中' : '切断';
 });
 
-// Enterキーで送信（Shift+Enterで改行）
-const キー入力処理 = (event: KeyboardEvent) => {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault();
-    メッセージ送信();
-  }
+// 送信はボタンのみ
+const キー入力処理 = (_event: KeyboardEvent) => {
 };
 </script>
 

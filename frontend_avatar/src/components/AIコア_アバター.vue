@@ -372,7 +372,7 @@ onBeforeUnmount(() => {
   padding: 10px 14px;
   border: 1px solid rgba(153, 141, 214, 0.34);
   background: rgba(3, 5, 10, 0.52);
-  color: #f4f4ff;
+  color: #00ff00;
   text-align: center;
   font-size: 1.425rem;
   line-height: 1.5;

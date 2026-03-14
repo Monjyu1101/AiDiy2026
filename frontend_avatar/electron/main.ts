@@ -8,7 +8,7 @@ const APP_USER_MODEL_ID = 'AiDiy.frontend_avatar'
 
 type WindowMode = 'login' | 'core'
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
-type WindowRole = WindowMode | PanelKey
+type WindowRole = WindowMode | PanelKey | 'settings'
 type WindowBounds = { x: number; y: number; width: number; height: number }
 type DisplaySourceKind = 'screen' | 'window'
 type DisplaySourceInfo = {
@@ -28,6 +28,7 @@ type BoundsPreset = {
 const LOGIN_BOUNDS: BoundsPreset = { width: 320, height: 240, minWidth: 320, minHeight: 240 }
 const CORE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const CHAT_BASE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
+const SETTINGS_BOUNDS: BoundsPreset = { width: 760, height: 700, minWidth: 600, minHeight: 400 }
 const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   chat: CHAT_BASE_BOUNDS,
   file: CHAT_BASE_BOUNDS,
@@ -50,9 +51,12 @@ const panelStates: Record<PanelKey, boolean> = {
 
 let loginWindow: BrowserWindow | null = null
 let coreWindow: BrowserWindow | null = null
+let settingsWindow: BrowserWindow | null = null
 const panelWindows = new Map<PanelKey, BrowserWindow>()
 const windowRoles = new Map<number, WindowRole>()
 let selectedDisplaySourceId: string | null = null
+// Electronのバグ回避: getMinimumSize()が初期サイズを返す場合があるため独自管理
+const windowMinSizes = new Map<number, { minWidth: number; minHeight: number }>()
 
 function getWorkArea() {
   return screen.getPrimaryDisplay().workArea
@@ -173,6 +177,17 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
 
   windowRoles.set(window.id, role)
 
+  // min サイズを独自管理し、ロード後に再適用（Electron Windowsバグ対策）
+  windowMinSizes.set(window.id, { minWidth: bounds.minWidth, minHeight: bounds.minHeight })
+  window.webContents.once('did-finish-load', () => {
+    if (!window.isDestroyed()) {
+      window.setMinimumSize(bounds.minWidth, bounds.minHeight)
+    }
+  })
+  window.on('closed', () => {
+    windowMinSizes.delete(window.id)
+  })
+
   if (isDev) {
     window.loadURL(getRendererUrl(role))
     if (shouldOpenDevTools) {
@@ -199,10 +214,10 @@ function waitForReady(window: BrowserWindow) {
 }
 
 function clampWindowBounds(window: BrowserWindow, nextBounds: WindowBounds): WindowBounds {
-  const [minWidth, minHeight] = window.getMinimumSize()
+  const minSizes = windowMinSizes.get(window.id) ?? { minWidth: 100, minHeight: 100 }
   const currentBounds = window.getBounds()
-  const clampedWidth = Math.max(minWidth || 0, Math.round(nextBounds.width))
-  const clampedHeight = Math.max(minHeight || 0, Math.round(nextBounds.height))
+  const clampedWidth = Math.max(minSizes.minWidth, Math.round(nextBounds.width))
+  const clampedHeight = Math.max(minSizes.minHeight, Math.round(nextBounds.height))
 
   return {
     x: Math.round(nextBounds.x ?? currentBounds.x),
@@ -391,6 +406,71 @@ async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
   return 'login' as const
 }
 
+function openSettingsWindow(sessionId: string) {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send('settings:session-id', sessionId)
+    settingsWindow.show()
+    settingsWindow.focus()
+    settingsWindow.webContents.send('window:shown')
+    return
+  }
+
+  const appPath = app.getAppPath()
+  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy.ico')
+
+  settingsWindow = new BrowserWindow({
+    width: SETTINGS_BOUNDS.width,
+    height: SETTINGS_BOUNDS.height,
+    minWidth: SETTINGS_BOUNDS.minWidth,
+    minHeight: SETTINGS_BOUNDS.minHeight,
+    show: false,
+    backgroundColor: '#f8fafc',
+    transparent: false,
+    frame: false,
+    resizable: true,
+    autoHideMenuBar: true,
+    title: 'AiDiy Avatar',
+    icon: iconPath,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      webSecurity: false,
+      backgroundThrottling: false,
+    },
+  })
+
+  windowRoles.set(settingsWindow.id, 'settings')
+  windowMinSizes.set(settingsWindow.id, { minWidth: SETTINGS_BOUNDS.minWidth, minHeight: SETTINGS_BOUNDS.minHeight })
+
+  settingsWindow.once('ready-to-show', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.setMinimumSize(SETTINGS_BOUNDS.minWidth, SETTINGS_BOUNDS.minHeight)
+      settingsWindow.center()
+      settingsWindow.webContents.send('settings:session-id', sessionId)
+      settingsWindow.show()
+      settingsWindow.focus()
+      settingsWindow.webContents.send('window:shown')
+    }
+  })
+
+  settingsWindow.on('closed', () => {
+    if (settingsWindow) {
+      windowRoles.delete(settingsWindow.id)
+      windowMinSizes.delete(settingsWindow.id)
+    }
+    settingsWindow = null
+  })
+
+  const baseUrl = isDev
+    ? (process.env.VITE_DEV_SERVER_URL as string)
+    : pathToFileURL(path.resolve(__dirname, '../dist/index.html')).toString()
+  const url = new URL(baseUrl)
+  url.searchParams.set('role', 'settings')
+  void settingsWindow.loadURL(url.toString())
+}
+
 app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId(APP_USER_MODEL_ID)
@@ -452,8 +532,8 @@ app.whenReady().then(() => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return
     const role = windowRoles.get(window.id)
-    if (role && role !== 'login' && role !== 'core') {
-      setPanelVisibility(role, false)
+    if (role && role !== 'login' && role !== 'core' && role !== 'settings') {
+      setPanelVisibility(role as PanelKey, false)
       return
     }
     window.close()
@@ -468,14 +548,14 @@ app.whenReady().then(() => {
   ipcMain.handle('window:get-bounds', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) {
-      return { x: 0, y: 0, width: 0, height: 0, minWidth: 0, minHeight: 0 }
+      return { x: 0, y: 0, width: 0, height: 0, minWidth: 100, minHeight: 100 }
     }
     const bounds = window.getBounds()
-    const [minWidth, minHeight] = window.getMinimumSize()
+    const minSizes = windowMinSizes.get(window.id) ?? { minWidth: 100, minHeight: 100 }
     return {
       ...bounds,
-      minWidth,
-      minHeight,
+      minWidth: minSizes.minWidth,
+      minHeight: minSizes.minHeight,
     }
   })
 
@@ -517,6 +597,17 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('panel:get-states', () => ({ ...panelStates }))
+
+  ipcMain.handle('settings:open', (_event, sessionId: string) => {
+    openSettingsWindow(sessionId)
+  })
+
+  ipcMain.handle('settings:close', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window && !window.isDestroyed()) {
+      window.hide()
+    }
+  })
 
   ipcMain.handle('desktop:list-sources', async () => listDisplaySources())
 

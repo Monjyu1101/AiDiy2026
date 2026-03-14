@@ -50,10 +50,12 @@ const リサイズ中 = ref(false)
 let 最小幅 = 0
 let 最小高 = 0
 let 現在方向: ResizeDirection | null = null
-let 現在幅 = 0
-let 現在高 = 0
-let 現在X = 0
-let 現在Y = 0
+let 初期幅 = 0
+let 初期高 = 0
+let 初期X = 0
+let 初期Y = 0
+let 初期スクリーンX = 0
+let 初期スクリーンY = 0
 let 初期化済み = false
 
 function closeWindow() {
@@ -80,6 +82,9 @@ function 開始リサイズ(event: PointerEvent, direction: ResizeDirection) {
   event.preventDefault()
   event.stopPropagation()
 
+  // pointerdown 時点のスクリーン座標を記録（絶対デルタ方式）
+  初期スクリーンX = event.screenX
+  初期スクリーンY = event.screenY
   現在方向 = direction
   初期化済み = false
   リサイズ中.value = true
@@ -92,10 +97,10 @@ function 開始リサイズ(event: PointerEvent, direction: ResizeDirection) {
   void (async () => {
     const metrics = await window.desktopApi?.getWindowBounds?.()
     if (!metrics || !現在方向) return
-    現在幅 = metrics.width
-    現在高 = metrics.height
-    現在X = metrics.x
-    現在Y = metrics.y
+    初期幅 = metrics.width
+    初期高 = metrics.height
+    初期X = metrics.x
+    初期Y = metrics.y
     最小幅 = metrics.minWidth
     最小高 = metrics.minHeight
     初期化済み = true
@@ -105,38 +110,32 @@ function 開始リサイズ(event: PointerEvent, direction: ResizeDirection) {
 function リサイズ処理(event: PointerEvent) {
   if (!現在方向 || !初期化済み) return
 
-  // movementX/Y を累積（screenX座標系の不一致を回避）
-  const dx = event.movementX
-  const dy = event.movementY
+  // screenX/Y の絶対デルタ（累積誤差なし・DPI無関係）
+  const dx = event.screenX - 初期スクリーンX
+  const dy = event.screenY - 初期スクリーンY
 
-  let nextX = 現在X
-  let nextY = 現在Y
-  let nextWidth = 現在幅
-  let nextHeight = 現在高
+  let nextX = 初期X
+  let nextY = 初期Y
+  let nextWidth = 初期幅
+  let nextHeight = 初期高
 
   if (現在方向.includes('e')) {
-    nextWidth = Math.max(最小幅, 現在幅 + dx)
+    nextWidth = Math.max(最小幅, 初期幅 + dx)
   }
 
   if (現在方向.includes('s')) {
-    nextHeight = Math.max(最小高, 現在高 + dy)
+    nextHeight = Math.max(最小高, 初期高 + dy)
   }
 
   if (現在方向.includes('w')) {
-    nextWidth = Math.max(最小幅, 現在幅 - dx)
-    nextX = 現在X + (現在幅 - nextWidth)
+    nextWidth = Math.max(最小幅, 初期幅 - dx)
+    nextX = 初期X + (初期幅 - nextWidth)
   }
 
   if (現在方向.includes('n')) {
-    nextHeight = Math.max(最小高, 現在高 - dy)
-    nextY = 現在Y + (現在高 - nextHeight)
+    nextHeight = Math.max(最小高, 初期高 - dy)
+    nextY = 初期Y + (初期高 - nextHeight)
   }
-
-  // 次回計算のために現在値を更新
-  現在幅 = nextWidth
-  現在高 = nextHeight
-  現在X = nextX
-  現在Y = nextY
 
   void window.desktopApi?.setWindowBounds?.({
     x: nextX,

@@ -709,11 +709,11 @@ defineExpose({ 字幕追加 })
 
 .welcome-body-text {
   margin: 21px 0 0;
-  color: rgba(216, 225, 255, 0.22);
+  color: #ffffff;
   white-space: pre-wrap;
   word-break: break-word;
   opacity: 1;
-  filter: blur(0.6px);
+  filter: blur(0);
   text-shadow: 0 0 2px rgba(216, 225, 255, 0.25);
   transition: color 0.45s ease, filter 0.45s ease, text-shadow 0.45s ease;
   direction: ltr;
@@ -762,8 +762,12 @@ defineExpose({ 字幕追加 })
 }
 
 .floating-icon img {
-  width: 21px;
-  height: 21px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  max-width: 22px;
+  max-height: 22px;
   object-fit: contain;
   pointer-events: none;
   filter: brightness(0);
@@ -825,6 +829,11 @@ defineExpose({ 字幕追加 })
 
 .floating-icon.camera-icon.active img {
   filter: brightness(0) invert(1);
+}
+
+.floating-icon.chat-icon,
+.floating-icon.agent-icon {
+  padding-top: 3px;
 }
 
 .floating-icon.chat-icon:disabled,

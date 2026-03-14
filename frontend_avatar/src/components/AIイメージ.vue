@@ -70,6 +70,10 @@ const 入力欄固定高さ = ref(入力欄最小高さ)
 
 // --- UI ---
 const 選択ポップアップ表示 = ref(false)
+// --- デスクトップソース選択 ---
+type DisplaySource = { id: string; name: string; thumbnailDataUrl: string | null }
+const デスクトップソース一覧 = ref<DisplaySource[]>([])
+const デスクトップソース選択中 = ref(false)
 // --- 自動送信設定 ---
 const CAPTURE_INTERVAL_MS = 550
 const 自動送信変化率パーセント = ref(3)
@@ -300,8 +304,28 @@ async function カメラキャプチャ() {
 }
 
 async function 画面共有キャプチャ() {
+  if (!WebSocket接続中.value) return
+
+  // Electron環境: desktopApiでソース一覧を取得してユーザーに選ばせる
+  if (window.desktopApi?.listDisplaySources) {
+    try {
+      const sources = await window.desktopApi.listDisplaySources()
+      if (!sources || sources.length === 0) {
+        console.error('[AIイメージ] デスクトップソースが見つかりません')
+        通知('selection-cancel')
+        return
+      }
+      デスクトップソース一覧.value = sources
+      デスクトップソース選択中.value = true
+    } catch (error) {
+      console.error('[AIイメージ] デスクトップソース取得エラー:', error)
+      通知('selection-cancel')
+    }
+    return
+  }
+
+  // Web環境: ブラウザ標準のgetDisplayMedia
   try {
-    if (!WebSocket接続中.value) return
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
     await キャプチャ開始(stream)
     通知('selection-complete')
@@ -310,6 +334,28 @@ async function 画面共有キャプチャ() {
     キャプチャ停止()
     通知('selection-cancel')
   }
+}
+
+async function デスクトップソース確定(sourceId: string) {
+  デスクトップソース選択中.value = false
+  デスクトップソース一覧.value = []
+  try {
+    await window.desktopApi?.setDisplaySource?.(sourceId)
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+    await キャプチャ開始(stream)
+    通知('selection-complete')
+  } catch (error) {
+    console.error('[AIイメージ] デスクトップキャプチャエラー:', error)
+    await window.desktopApi?.setDisplaySource?.(null)
+    キャプチャ停止()
+    通知('selection-cancel')
+  }
+}
+
+function デスクトップソースキャンセル() {
+  デスクトップソース選択中.value = false
+  デスクトップソース一覧.value = []
+  通知('selection-cancel')
 }
 
 async function キャプチャ開始(映像ストリーム: MediaStream) {
@@ -521,6 +567,10 @@ watch(自動送信強制秒, () => {
 
 onMounted(() => {
   接続状態.value = WebSocket接続中.value ? 'connecting' : 'disconnected'
+  // マウント時に接続済み＆autoShowSelectionなら即ポップアップ表示
+  if (WebSocket接続中.value && プロパティ.autoShowSelection) {
+    選択ポップアップ表示.value = true
+  }
   nextTick(テキストエリア自動調整)
   window.addEventListener('resize', テキストエリア自動調整)
 })
@@ -648,6 +698,26 @@ defineExpose({
         <button class="selection-cancel" @click="選択取消">キャンセル</button>
       </div>
     </div>
+
+    <!-- デスクトップソース選択ポップアップ（Electron用） -->
+    <div v-if="デスクトップソース選択中" class="selection-popup" @click.self="デスクトップソースキャンセル">
+      <div class="selection-dialog desktop-source-dialog">
+        <div class="selection-title">画面・ウィンドウを選択</div>
+        <div class="desktop-source-list">
+          <div
+            v-for="src in デスクトップソース一覧"
+            :key="src.id"
+            class="desktop-source-item"
+            @click="デスクトップソース確定(src.id)"
+          >
+            <img v-if="src.thumbnailDataUrl" :src="src.thumbnailDataUrl" class="desktop-source-thumb" />
+            <div v-else class="desktop-source-thumb-placeholder">🖥️</div>
+            <span class="desktop-source-name">{{ src.name }}</span>
+          </div>
+        </div>
+        <button class="selection-cancel" @click="デスクトップソースキャンセル">キャンセル</button>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -757,6 +827,7 @@ defineExpose({
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 16px;
+  color: #333;
 }
 
 .selection-option:hover {
@@ -779,6 +850,54 @@ defineExpose({
 }
 
 .selection-cancel:hover { background: #e0e0e0; }
+
+/* デスクトップソース選択 */
+.desktop-source-dialog { max-width: 520px; width: 90%; }
+.desktop-source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.desktop-source-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 140px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #f5f5f5;
+  transition: background 0.15s;
+}
+.desktop-source-item:hover { background: #dde7ff; }
+.desktop-source-thumb {
+  width: 120px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+.desktop-source-thumb-placeholder {
+  width: 120px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  background: #ddd;
+  border-radius: 4px;
+}
+.desktop-source-name {
+  font-size: 11px;
+  text-align: center;
+  word-break: break-all;
+  color: #333;
+  max-width: 120px;
+}
 
 /* コントロールエリア */
 .control-area {

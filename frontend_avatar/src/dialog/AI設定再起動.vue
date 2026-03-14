@@ -14,6 +14,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import apiClient from '@/api/client'
 import RebootDialog from '@/dialog/再起動カウントダウン.vue'
+import { qConfirm } from '@/utils/qAlert'
 
 const props = defineProps<{
   isOpen: boolean
@@ -22,7 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'saved'): void
+  (e: 'saved', waitSeconds: number): void
 }>()
 
 const loading = ref(false)
@@ -188,7 +189,7 @@ function buildNextSettings() {
   return nextSettings
 }
 
-async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean }, waitSeconds = 15) {
+async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean }, waitSeconds = 30) {
   loading.value = true
   errorMessage.value = ''
 
@@ -209,9 +210,7 @@ async function submitSettings(再起動要求: { reboot_core: boolean; reboot_ap
       return
     }
 
-    rebootWaitSeconds.value = waitSeconds
-    showRebootDialog.value = true
-    emit('saved')
+    emit('saved', waitSeconds)
   } catch (error: any) {
     errorMessage.value = `保存エラー: ${error?.response?.data?.message || error?.message || error}`
   } finally {
@@ -224,7 +223,7 @@ function handleSave() {
 }
 
 async function handleResetReboot() {
-  const confirmed = window.confirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？')
+  const confirmed = await qConfirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？')
   if (!confirmed) return
 
   loading.value = true
@@ -248,8 +247,7 @@ async function handleResetReboot() {
     }
 
     rebootWaitSeconds.value = 60
-    showRebootDialog.value = true
-    emit('saved')
+    emit('saved', 60)
   } catch (error: any) {
     errorMessage.value = `リセット再起動エラー: ${error?.response?.data?.message || error?.message || error}`
   } finally {
@@ -480,7 +478,7 @@ onMounted(() => {
     </div>
   </div>
 
-  <RebootDialog :show="showRebootDialog" :wait-seconds="rebootWaitSeconds" />
+  <RebootDialog v-if="false" :show="false" :wait-seconds="0" />
 </template>
 
 <style scoped>
@@ -600,6 +598,11 @@ onMounted(() => {
   grid-template-columns: 120px 1fr;
   gap: 4px;
   align-items: center;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .config-panel-label {
@@ -607,6 +610,13 @@ onMounted(() => {
   color: #334155;
   text-align: right;
   margin: 0;
+  padding: 0;
+}
+
+.config-panel-control {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .config-panel-select {
@@ -683,9 +693,9 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-@media (max-width: 1000px) {
-  .config-panel-field {
-    grid-template-columns: 1fr;
-  }
+.config-panel-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
+
 </style>

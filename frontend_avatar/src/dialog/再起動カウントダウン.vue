@@ -34,6 +34,10 @@ const props = defineProps<{
   waitSeconds?: number
 }>()
 
+const emit = defineEmits<{
+  end: []
+}>()
+
 const isVisible = ref(false)
 const countdown = ref(0)
 let timer: number | ReturnType<typeof setInterval> | undefined
@@ -61,7 +65,7 @@ function startCountdown(seconds: number) {
     countdown.value -= 1
     if (countdown.value <= 0) {
       stopCountdown()
-      reloadPage()
+      onCountdownEnd()
     }
   }, 1000)
 }
@@ -74,12 +78,8 @@ function stopCountdown() {
   isVisible.value = false
 }
 
-function reloadPage() {
-  if (window.parent && window.parent !== window) {
-    window.parent.location.reload()
-  } else {
-    window.location.reload()
-  }
+function onCountdownEnd() {
+  emit('end')
 }
 </script>
 
@@ -93,6 +93,7 @@ function reloadPage() {
   justify-content: center;
   z-index: 10000;
   backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease-out;
 }
 
 .reboot-dialog {
@@ -105,6 +106,7 @@ function reloadPage() {
   font-family: 'Segoe UI', 'Roboto', sans-serif;
   min-width: 380px;
   text-align: center;
+  animation: popIn 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 
 .reboot-title {
@@ -144,6 +146,22 @@ function reloadPage() {
   font-size: 14px;
   color: #a0aec0;
   margin-top: 15px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.8) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 @keyframes spin {

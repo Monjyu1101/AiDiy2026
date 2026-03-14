@@ -18,7 +18,7 @@ interface ImportMetaEnv {
 declare global {
   type AvatarPanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
   type AvatarWindowMode = 'login' | 'core'
-  type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey
+  type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey | 'settings'
   type AvatarWindowBounds = { x: number; y: number; width: number; height: number }
   type AvatarWindowMetrics = AvatarWindowBounds & { minWidth: number; minHeight: number }
   type AvatarDisplaySourceKind = 'screen' | 'window'
@@ -50,6 +50,9 @@ declare global {
       getPanelStates?: () => Promise<Record<AvatarPanelKey, boolean>>
       listDisplaySources?: () => Promise<AvatarDisplaySource[]>
       setDisplaySource?: (sourceId: string | null) => Promise<string | null>
+      openSettingsWindow?: (sessionId: string) => Promise<void>
+      closeSettingsWindow?: () => Promise<void>
+      onSettingsPrepare?: (callback: (sessionId: string) => void) => (() => void)
       onPanelStatesChanged?: (
         callback: (states: Record<AvatarPanelKey, boolean>) => void,
       ) => () => void

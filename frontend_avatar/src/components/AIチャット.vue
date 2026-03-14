@@ -591,11 +591,8 @@ function メッセージ送信() {
   入力欄クリア()
 }
 
-function キー入力処理(event: KeyboardEvent) {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    メッセージ送信()
-  }
+function キー入力処理(_event: KeyboardEvent) {
+  // 送信はボタンのみ
 }
 
 // --- ファイル送信 ---

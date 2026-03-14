@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, watchEffect } from 'vue'
 import AIコアチャット from '@/components/AIチャット.vue'
 import AIコアコントロール from '@/components/AIコア.vue'
 import AIコアコード from '@/components/AIコード.vue'
@@ -19,14 +19,17 @@ import AIコアファイル from '@/components/AIファイル.vue'
 import AIコアイメージ from '@/components/AIイメージ.vue'
 import ログイン from '@/components/ログイン.vue'
 import AI設定再起動 from '@/dialog/AI設定再起動.vue'
+import 再起動カウントダウン from '@/dialog/再起動カウントダウン.vue'
 import WindowShell from '@/components/_WindowShell.vue'
+import qAlertDialogComp from '@/_share/qAlertDialog.vue'
 import apiClient from '@/api/client'
 import { defaultModelSettings } from '@/api/config'
 import { AIWebSocket, createWebSocketUrl } from '@/api/websocket'
+import { setAlertInstance, setConfirmInstance } from '@/utils/qAlert'
 import type { AuthUser, ChatMessage, MessageKind, ModelSettings } from '@/types'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
-type WindowRole = 'login' | 'core' | PanelKey
+type WindowRole = 'login' | 'core' | PanelKey | 'settings'
 type チャットモード型 = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'
 type SharedSnapshot = {
   認証済み: boolean
@@ -76,7 +79,7 @@ function パネル状態生成(): Record<PanelKey, boolean> {
 
 function フォールバックロール解決(): WindowRole {
   const role = new URLSearchParams(window.location.search).get('role')
-  if (role === 'core' || role === 'login' || PANEL_KEYS.includes(role as PanelKey)) {
+  if (role === 'core' || role === 'login' || role === 'settings' || PANEL_KEYS.includes(role as PanelKey)) {
     return role as WindowRole
   }
   return 'login'
@@ -118,7 +121,9 @@ const 初期マイク有効 = ref(false)
 const 初期スピーカー有効 = ref(true)
 const 音声状態シード = ref(0)
 const パネル表示状態 = ref(パネル状態生成())
-const 設定再起動表示 = ref(false)
+const 再起動カウントダウン表示 = ref(false)
+const 再起動待機秒数 = ref(30)
+const パネル再接続キー = ref(0)
 
 const コアソケット = shallowRef<AIWebSocket | null>(null)
 const 入力ソケット = shallowRef<AIWebSocket | null>(null)
@@ -129,12 +134,16 @@ const コードRef = ref<{ WebSocket接続中: boolean; 接続状態表示: stri
 const 自動選択表示 = ref(true)
 const 認証エラーメッセージKey = 'avatar_auth_error'
 const コアViewRef = ref<{ 字幕追加: (text: string) => void } | null>(null)
+const qAlertDialogRef = ref<{ show: (msg: string) => Promise<void>; showConfirm: (msg: string) => Promise<boolean> } | null>(null)
 
 const versions = window.desktopApi?.versions
 
 const 認証済み = computed(() => Boolean(認証トークン.value && 利用者.value))
 const コアウィンドウ = computed(() => ウィンドウロール.value === 'core')
 const ログインウィンドウ = computed(() => ウィンドウロール.value === 'login')
+const 設定ウィンドウ = computed(() => ウィンドウロール.value === 'settings')
+const 設定SessionID = ref(new URLSearchParams(window.location.search).get('sessionId') || '')
+const 設定キー = ref(0)
 const 現在パネルキー = computed<PanelKey | null>(() => {
   return PANEL_KEYS.includes(ウィンドウロール.value as PanelKey) ? (ウィンドウロール.value as PanelKey) : null
 })
@@ -315,6 +324,12 @@ function デスクトップチャンネルメッセージ処理(event: MessageEv
       return
     }
 
+    if (payload.type === 'settings-saved') {
+      再起動待機秒数.value = typeof payload.waitSeconds === 'number' ? payload.waitSeconds : 30
+      再起動カウントダウン表示.value = true
+      return
+    }
+
     return
   }
 
@@ -323,6 +338,11 @@ function デスクトップチャンネルメッセージ処理(event: MessageEv
     if (補助スナップショット.value?.セッションID) {
       スナップショット再試行停止()
     }
+  }
+
+  if (payload.type === 'reboot-reconnect') {
+    パネル再接続キー.value++
+    スナップショット要求()
   }
 }
 
@@ -641,17 +661,23 @@ async function 再接続() {
   await コア初期化(セッションID.value || '')
 }
 
-function 設定再起動を開く() {
-  設定再起動表示.value = true
-}
-
-function 設定再起動を閉じる() {
-  設定再起動表示.value = false
-}
-
-async function 設定再起動保存完了() {
-  設定再起動表示.value = false
+async function 再起動後再接続() {
+  再起動カウントダウン表示.value = false
   await コア初期化(セッションID.value || '')
+  デスクトップチャンネル?.postMessage({ type: 'reboot-reconnect' })
+}
+
+function 設定再起動を開く() {
+  void window.desktopApi?.openSettingsWindow?.(セッションID.value || '')
+}
+
+function 設定ウィンドウを閉じる() {
+  void window.desktopApi?.closeSettingsWindow?.()
+}
+
+async function 設定保存完了通知(waitSeconds: number = 30) {
+  void window.desktopApi?.closeSettingsWindow?.()
+  デスクトップチャンネル?.postMessage({ type: 'settings-saved', waitSeconds })
 }
 
 function チャット状態中継(connected: boolean) {
@@ -837,6 +863,13 @@ watch(
   { deep: true },
 )
 
+watchEffect(() => {
+  if (qAlertDialogRef.value) {
+    setAlertInstance(qAlertDialogRef.value)
+    setConfirmInstance(qAlertDialogRef.value)
+  }
+})
+
 onMounted(async () => {
   window.addEventListener('auth-expired', 認証期限切れ処理)
   window.addEventListener('storage', ストレージ変更処理)
@@ -862,6 +895,18 @@ onMounted(async () => {
     認証読込中.value = false
     スナップショット要求()
     スナップショット再試行開始()
+    return
+  }
+
+  if (設定ウィンドウ.value) {
+    認証読込中.value = false
+    window.desktopApi?.onSettingsPrepare?.((sid) => {
+      設定SessionID.value = sid
+      設定キー.value++
+    })
+    window.desktopApi?.onWindowShown?.(() => {
+      設定キー.value++
+    })
     return
   }
 
@@ -936,13 +981,24 @@ onBeforeUnmount(() => {
       @logout="認証クリア()"
     />
 
-    <AI設定再起動
-      v-if="コアウィンドウ && 認証済み"
-      :is-open="設定再起動表示"
-      :session-id="セッションID"
-      @close="設定再起動を閉じる"
-      @saved="設定再起動保存完了"
-    />
+    <div v-else-if="設定ウィンドウ" class="settings-window-root">
+      <component
+        :is="WindowShell"
+        title="AiDiy モデル設定 / 再起動"
+        theme="purple"
+        close-mode="event"
+        @close="設定ウィンドウを閉じる"
+      >
+        <component
+          :is="AI設定再起動"
+          :key="設定キー"
+          :is-open="true"
+          :session-id="設定SessionID"
+          @close="設定ウィンドウを閉じる"
+          @saved="(s: number) => 設定保存完了通知(s)"
+        />
+      </component>
+    </div>
 
     <component
       :is="WindowShell"
@@ -957,6 +1013,7 @@ onBeforeUnmount(() => {
 
       <component
         :is="AIコアチャット"
+        :key="パネル再接続キー"
         ref="チャットRef"
         :messages="表示メッセージ一覧"
         :ウェルカム情報="表示ウェルカム情報"
@@ -985,6 +1042,7 @@ onBeforeUnmount(() => {
       </template>
       <component
         :is="AIコアファイル"
+        :key="パネル再接続キー"
         ref="ファイルRef"
         :セッションID="表示セッションID"
         :active="パネル表示状態.file"
@@ -1010,6 +1068,7 @@ onBeforeUnmount(() => {
       </template>
       <component
         :is="AIコアイメージ"
+        :key="パネル再接続キー"
         ref="イメージRef"
         :セッションID="表示セッションID"
         :入力接続済み="表示入力接続済み"
@@ -1034,6 +1093,7 @@ onBeforeUnmount(() => {
       </template>
       <component
         :is="AIコアコード"
+        :key="パネル再接続キー"
         ref="コードRef"
         :セッションID="表示セッションID"
         :チャンネル="現在コードチャンネル"
@@ -1050,6 +1110,16 @@ onBeforeUnmount(() => {
       <img class="loading-logo" src="/icons/loading.gif" alt="loading" />
       <p>認証状態を確認しています...</p>
     </section>
+
+    <component
+      v-if="コアウィンドウ"
+      :is="再起動カウントダウン"
+      :show="再起動カウントダウン表示"
+      :wait-seconds="再起動待機秒数"
+      @end="再起動後再接続"
+    />
+
+    <component :is="qAlertDialogComp" ref="qAlertDialogRef" />
   </main>
 </template>
 
@@ -1106,4 +1176,33 @@ onBeforeUnmount(() => {
 }
 .code-status-dot.on { background: #44ff44; }
 .code-status-text { font-size: 10px; font-weight: bold; }
+.settings-window-root {
+  width: 100%;
+  height: 100%;
+}
+/* _WindowShell 内でダイアログを全体表示: overlayを静的配置に */
+.settings-window-root :deep(.config-panel-overlay) {
+  position: static;
+  background: transparent;
+  z-index: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: stretch;
+  height: 100%;
+}
+/* 既存ヘッダーは_WindowShellのタイトルバーで代替 */
+.settings-window-root :deep(.config-panel-header) { display: none; }
+/* パネルカードを全幅・角丸なしで展開 */
+.settings-window-root :deep(.config-panel) {
+  width: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+}
+.settings-window-root :deep(button),
+.settings-window-root :deep(select),
+.settings-window-root :deep(input) { -webkit-app-region: no-drag; }
 </style>
