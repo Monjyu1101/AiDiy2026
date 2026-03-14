@@ -26,7 +26,7 @@ const props = defineProps({
     <div class="tabs">
       <div class="tab-container">
         <!-- カテゴリーメニュー -->
-        <a href="/AIコア" target="_blank" class="tab">
+        <a href="/AiDiy" target="_blank" class="tab">
           AiDiy
         </a>
         <RouterLink to="/C管理" active-class="active" class="tab">

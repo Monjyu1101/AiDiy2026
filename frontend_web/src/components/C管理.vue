@@ -18,16 +18,16 @@
       <p>管理機能へのアクセスリンクです。下記から選択してください。</p>
 
       <div class="menu-grid">
-        <!-- AIコアカード -->
+        <!-- AiDiyカード -->
         <div class="menu-card">
           <div class="menu-card-title">
             <span class="icon">AI</span>
-            AIコア
+            AiDiy
           </div>
           <div class="menu-card-description">
             AI対話機能・音声認識・画像生成・コードエージェント
           </div>
-          <a href="/AIコア" target="_blank" class="menu-card-link">
+          <a href="/AiDiy" target="_blank" class="menu-card-link">
             開く →
           </a>
         </div>

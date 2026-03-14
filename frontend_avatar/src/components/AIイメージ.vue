@@ -1,14 +1,26 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101
+  -------------------------------------------------------------------------
+-->
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-const props = defineProps<{
-  sessionId: string
-  inputConnected: boolean
+const プロパティ = defineProps<{
+  セッションID: string
+  入力接続済み: boolean
   active?: boolean
   autoShowSelection?: boolean
 }>()
 
-const emit = defineEmits<{
+const 通知 = defineEmits<{
   'submit-image': [payload: { text: string; mimeType: string; base64: string }]
   'submit-text': [text: string]
   'selection-cancel': []
@@ -33,6 +45,7 @@ const ファイルダイアログ確認タイマー = ref<number | null>(null)
 
 // --- 送信状態 ---
 const 接続状態 = ref<'disconnected' | 'connecting' | 'sending'>('disconnected')
+const WebSocket接続中 = ref(false)
 const 送信中 = ref(false)
 const フラッシュ中 = ref(false)
 const エラーメッセージ = ref('')
@@ -47,6 +60,7 @@ const 安定後送信済み = ref(false)
 // --- テキスト入力 ---
 const 入力テキスト = ref('')
 const テキストエリア = ref<HTMLTextAreaElement | null>(null)
+const テキスト送信中 = ref(false)
 const ドラッグ中 = ref(false)
 const 入力欄最大到達 = ref(false)
 const 入力欄最小高さ = 60
@@ -62,7 +76,6 @@ const 自動送信変化率パーセント = ref(3)
 const 自動送信待機秒 = ref(2)
 const 自動送信強制秒 = ref(60)
 
-const WebSocket接続中 = computed(() => Boolean(props.sessionId))
 const 状態表示テキスト = computed(() => {
   const map: Record<string, string> = { disconnected: '切断', connecting: '接続中', sending: '送信中' }
   return map[接続状態.value] ?? '切断'
@@ -112,13 +125,13 @@ function テキストエリア自動調整() {
   テキストエリア.value.style.height = `${next}px`
 }
 
-function テキスト送信() {
-  if (!入力テキスト.value.trim() || !WebSocket接続中.value) return
-  emit('submit-text', 入力テキスト.value.trim())
+function テキストメッセージ送信() {
+  if (!入力テキスト.value.trim() || テキスト送信中.value || !WebSocket接続中.value) return
+  通知('submit-text', 入力テキスト.value.trim())
 }
 
 function 送信ボタン処理() {
-  テキスト送信()
+  テキストメッセージ送信()
   入力欄クリア()
 }
 
@@ -139,18 +152,21 @@ function ドロップ処理(e: DragEvent) {
   e.preventDefault()
   ドラッグ中.value = false
   if (!WebSocket接続中.value) return
-  const files = e.dataTransfer?.files
-  if (!files || files.length === 0) return
-  for (const f of Array.from(files)) {
-    if (!f.type.startsWith('image/')) continue
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string
-      const img = new Image()
-      img.onload = () => ファイル画像キャプチャ開始(img)
-      img.src = dataUrl
+  const ファイル一覧 = e.dataTransfer?.files
+  if (!ファイル一覧 || ファイル一覧.length === 0) return
+  for (const ファイル of Array.from(ファイル一覧)) {
+    if (!ファイル.type.startsWith('image/')) continue
+    const 読込 = new FileReader()
+    読込.onload = (ev) => {
+      const データURL = ev.target?.result as string
+      const 画像 = new Image()
+      画像.onload = () => {
+        ファイル画像キャプチャ開始(画像)
+        通知('selection-complete')
+      }
+      画像.src = データURL
     }
-    reader.readAsDataURL(f)
+    読込.readAsDataURL(ファイル)
   }
 }
 
@@ -165,7 +181,7 @@ function 選択表示() {
 function 選択取消() {
   選択ポップアップ表示.value = false
   キャプチャ停止()
-  emit('selection-cancel')
+  通知('selection-cancel')
 }
 
 function 選択処理(option: 'file' | 'camera' | 'desktop') {
@@ -232,7 +248,7 @@ function ファイル選択() {
           window.clearInterval(ファイルダイアログ確認タイマー.value)
           ファイルダイアログ確認タイマー.value = null
         }
-        emit('selection-cancel')
+        通知('selection-cancel')
       }
     }, 100)
   }
@@ -244,23 +260,27 @@ function ファイル選択() {
 function ファイル変更処理(e: Event) {
   ファイルダイアログ変更済み.value = true
   ファイルダイアログ待機中.value = false
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file || !file.type.startsWith('image/')) {
-    ファイル選択中.value = false
-    emit('selection-cancel')
-    return
-  }
-  const reader = new FileReader()
-  reader.onload = (ev) => {
-    const dataUrl = ev.target?.result as string
-    const img = new Image()
-    img.onload = () => {
-      ファイル画像キャプチャ開始(img)
-      emit('selection-complete')
+  const 対象要素 = e.target as HTMLInputElement
+  const 選択ファイル = 対象要素.files?.[0]
+
+  if (選択ファイル && 選択ファイル.type.startsWith('image/')) {
+    const 読込 = new FileReader()
+    読込.onload = (ev) => {
+      const データURL = ev.target?.result as string
+      const 画像 = new Image()
+      画像.onload = () => {
+        ファイル画像キャプチャ開始(画像)
+        通知('selection-complete')
+      }
+      画像.onerror = () => {
+        通知('selection-cancel')
+      }
+      画像.src = データURL
     }
-    img.src = dataUrl
+    読込.readAsDataURL(選択ファイル)
+  } else {
+    通知('selection-cancel')
   }
-  reader.readAsDataURL(file)
   ファイル選択中.value = false
 }
 
@@ -271,11 +291,11 @@ async function カメラキャプチャ() {
     if (!WebSocket接続中.value) return
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     await キャプチャ開始(stream)
-    emit('selection-complete')
+    通知('selection-complete')
   } catch (error) {
     console.error('[AIイメージ] カメラ取得エラー:', error)
     キャプチャ停止()
-    emit('selection-cancel')
+    通知('selection-cancel')
   }
 }
 
@@ -284,11 +304,11 @@ async function 画面共有キャプチャ() {
     if (!WebSocket接続中.value) return
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
     await キャプチャ開始(stream)
-    emit('selection-complete')
+    通知('selection-complete')
   } catch (error) {
     console.error('[AIイメージ] 画面共有取得エラー:', error)
     キャプチャ停止()
-    emit('selection-cancel')
+    通知('selection-cancel')
   }
 }
 
@@ -320,17 +340,17 @@ function ファイル画像キャプチャ開始(img: HTMLImageElement) {
 
 function ファイル画像フレーム取得() {
   if (!選択画像.value || !描画キャンバス.value) return
-  const img = 選択画像.value
-  const w = img.naturalWidth || img.width
-  const h = img.naturalHeight || img.height
-  描画キャンバス.value.width = w
-  描画キャンバス.value.height = h
-  const ctx = 描画キャンバス.value.getContext('2d')
-  if (!ctx) return
-  ctx.drawImage(img, 0, 0, w, h)
-  const dataUrl = 描画キャンバス.value.toDataURL('image/jpeg', 0.8)
-  画像プレビュー.value = dataUrl
-  画像送信(dataUrl)
+  const 画像 = 選択画像.value
+  const 幅 = 画像.naturalWidth || 画像.width
+  const 高さ = 画像.naturalHeight || 画像.height
+  描画キャンバス.value.width = 幅
+  描画キャンバス.value.height = 高さ
+  const 描画コンテキスト = 描画キャンバス.value.getContext('2d')
+  if (!描画コンテキスト) return
+  描画コンテキスト.drawImage(画像, 0, 0, 幅, 高さ)
+  const データURL = 描画キャンバス.value.toDataURL('image/jpeg', 0.8)
+  画像プレビュー.value = データURL
+  画像送信(データURL)
 }
 
 function ファイル画像タイマー停止() {
@@ -370,57 +390,65 @@ function キャプチャ停止(状態を切断へ戻す = true) {
 
 // ===================== 変化検出 + 自動送信 =====================
 
-function 差分計算(a: ImageData, b: ImageData): number {
-  const len = a.data.length
-  if (len !== b.data.length) return 100
-  let sum = 0
-  for (let i = 0; i < len; i += 4) {
-    const dr = a.data[i]! - b.data[i]!
-    const dg = a.data[i + 1]! - b.data[i + 1]!
-    const db = a.data[i + 2]! - b.data[i + 2]!
-    sum += (dr * dr + dg * dg + db * db) / 3
+function 差分計算(画像A: ImageData, 画像B: ImageData): number {
+  const データ長 = 画像A.data.length
+  if (データ長 !== 画像B.data.length) return 100
+  let 二乗差分合計 = 0
+  for (let i = 0; i < データ長; i += 4) {
+    const dr = 画像A.data[i]! - 画像B.data[i]!
+    const dg = 画像A.data[i + 1]! - 画像B.data[i + 1]!
+    const db = 画像A.data[i + 2]! - 画像B.data[i + 2]!
+    const pixel差分 = (dr * dr + dg * dg + db * db) / 3
+    二乗差分合計 += pixel差分
   }
-  return (Math.sqrt(sum / (len / 4)) / 255) * 100
+  const 平均二乗差分 = 二乗差分合計 / (データ長 / 4)
+  const rms = Math.sqrt(平均二乗差分)
+  return (rms / 255) * 100
 }
 
 function フレーム取得() {
   if (!動画要素.value || !描画キャンバス.value || !小型キャンバス.value) return
   if (動画要素.value.readyState < 2) return
 
-  const w = 動画要素.value.videoWidth || 640
-  const h = 動画要素.value.videoHeight || 360
-  描画キャンバス.value.width = w
-  描画キャンバス.value.height = h
-  const ctx = 描画キャンバス.value.getContext('2d')
-  if (!ctx) return
-  ctx.drawImage(動画要素.value, 0, 0, w, h)
+  const 幅 = 動画要素.value.videoWidth || 640
+  const 高さ = 動画要素.value.videoHeight || 360
+  描画キャンバス.value.width = 幅
+  描画キャンバス.value.height = 高さ
+  const 描画コンテキスト = 描画キャンバス.value.getContext('2d')
+  if (!描画コンテキスト) return
+  描画コンテキスト.drawImage(動画要素.value, 0, 0, 幅, 高さ)
 
-  const sw = 64, sh = 36
-  小型キャンバス.value.width = sw
-  小型キャンバス.value.height = sh
-  const sctx = 小型キャンバス.value.getContext('2d')
-  if (!sctx) return
-  sctx.drawImage(動画要素.value, 0, 0, sw, sh)
-  const current = sctx.getImageData(0, 0, sw, sh)
+  const 小幅 = 64
+  const 小高さ = 36
+  小型キャンバス.value.width = 小幅
+  小型キャンバス.value.height = 小高さ
+  const 小型コンテキスト = 小型キャンバス.value.getContext('2d')
+  if (!小型コンテキスト) return
+  小型コンテキスト.drawImage(動画要素.value, 0, 0, 小幅, 小高さ)
+  const 現在小画像 = 小型コンテキスト.getImageData(0, 0, 小幅, 小高さ)
 
   if (前回小画像.value) {
-    const diff = 差分計算(current, 前回小画像.value)
-    if (diff > 自動送信変化率パーセント.value) {
+    const 差分 = 差分計算(現在小画像, 前回小画像.value)
+    if (差分 > 自動送信変化率パーセント.value) {
       最終変化時刻.value = Date.now()
       安定後送信済み.value = false
     }
   }
-  前回小画像.value = current
+  前回小画像.value = 現在小画像
 
-  const now = Date.now()
-  const stable = now - 最終変化時刻.value >= 自動送信待機秒.value * 1000
-  const forced = 自動送信強制秒.value > 0 && 最終送信時刻.value > 0 && now - 最終送信時刻.value >= 自動送信強制秒.value * 1000
+  const 現在時刻 = Date.now()
+  const 安定待機ms = 自動送信待機秒.value * 1000
+  const 強制送信待機ms = 自動送信強制秒.value * 1000
+  const 安定中 = 現在時刻 - 最終変化時刻.value >= 安定待機ms
+  const 強制送信 = 自動送信強制秒.value > 0
+    && 最終送信時刻.value > 0
+    && (現在時刻 - 最終送信時刻.value >= 強制送信待機ms)
 
-  if ((stable && !安定後送信済み.value) || forced) {
-    const dataUrl = 描画キャンバス.value.toDataURL('image/jpeg', 0.8)
-    画像送信(dataUrl)
-    最終送信時刻.value = now
-    if (stable) 安定後送信済み.value = true
+  if ((安定中 && !安定後送信済み.value) || 強制送信) {
+    const データURL = 描画キャンバス.value.toDataURL('image/jpeg', 0.8)
+    画像送信(データURL)
+    最終送信時刻.value = 現在時刻
+    if (安定中) 安定後送信済み.value = true
   } else {
     画像プレビュー.value = 描画キャンバス.value.toDataURL('image/jpeg', 0.6)
   }
@@ -440,7 +468,7 @@ function 画像送信(dataUrl: string | null) {
   フラッシュタイマーID = window.setTimeout(() => { フラッシュ中.value = false; フラッシュタイマーID = null }, 200)
 
   const base64 = dataUrl.includes('base64,') ? dataUrl.split('base64,', 2)[1]! : dataUrl
-  emit('submit-image', { text: 入力テキスト.value.trim(), mimeType: 'image/jpeg', base64 })
+  通知('submit-image', { text: 入力テキスト.value.trim(), mimeType: 'image/jpeg', base64 })
 
   送信中.value = false
   window.setTimeout(() => {
@@ -450,13 +478,31 @@ function 画像送信(dataUrl: string | null) {
 
 // ===================== Watchers =====================
 
-watch(() => props.autoShowSelection, (value) => {
+watch(
+  () => プロパティ.入力接続済み,
+  (接続中) => {
+    WebSocket接続中.value = 接続中
+    if (!接続中) {
+      キャプチャ停止()
+      選択ポップアップ表示.value = false
+      接続状態.value = 'disconnected'
+    } else if (接続状態.value === 'disconnected') {
+      接続状態.value = 'connecting'
+      if (プロパティ.autoShowSelection) {
+        選択ポップアップ表示.value = true
+      }
+    }
+  },
+  { immediate: true }
+)
+
+watch(() => プロパティ.autoShowSelection, (value) => {
   if (value && WebSocket接続中.value) {
     選択ポップアップ表示.value = true
   }
 }, { immediate: true })
 
-watch(() => props.active, (active) => {
+watch(() => プロパティ.active, (active) => {
   if (active === false) {
     キャプチャ停止()
     画像プレビュー.value = null
@@ -464,23 +510,10 @@ watch(() => props.active, (active) => {
       ファイル入力.value.value = ''
     }
     選択ポップアップ表示.value = false
-  } else if (active && props.autoShowSelection && WebSocket接続中.value) {
+  } else if (active && プロパティ.autoShowSelection && WebSocket接続中.value) {
     選択ポップアップ表示.value = true
   }
 }, { immediate: true })
-
-watch(WebSocket接続中, (v) => {
-  if (!v) {
-    キャプチャ停止()
-    選択ポップアップ表示.value = false
-    接続状態.value = 'disconnected'
-  } else if (接続状態.value === 'disconnected') {
-    接続状態.value = 'connecting'
-    if (props.autoShowSelection) {
-      選択ポップアップ表示.value = true
-    }
-  }
-})
 
 watch(自動送信強制秒, () => {
   if (ファイル画像モード.value && 選択画像.value) ファイル画像強制送信タイマー再設定()
@@ -520,9 +553,9 @@ defineExpose({
         <img v-else :src="画像プレビュー" alt="プレビュー" class="preview-image" />
       </div>
 
-      <video ref="動画要素" class="hidden-el" playsinline muted></video>
-      <canvas ref="描画キャンバス" class="hidden-el"></canvas>
-      <canvas ref="小型キャンバス" class="hidden-el"></canvas>
+      <video ref="動画要素" class="hidden-video" playsinline muted></video>
+      <canvas ref="描画キャンバス" class="hidden-canvas"></canvas>
+      <canvas ref="小型キャンバス" class="hidden-canvas"></canvas>
       <input ref="ファイル入力" type="file" accept="image/*" class="hidden-el" @change="ファイル変更処理" />
     </div>
 
@@ -544,7 +577,7 @@ defineExpose({
             :style="{ maxHeight: `${入力欄最大高さ}px` }"
             placeholder="画像についてのメッセージを入力..."
             maxlength="5000"
-            :disabled="!WebSocket接続中"
+            :disabled="テキスト送信中 || !WebSocket接続中"
             @input="テキストエリア自動調整"
           ></textarea>
         </div>
@@ -553,7 +586,7 @@ defineExpose({
           class="image-send-btn"
           :class="{ 'ws-disabled': !WebSocket接続中, 'has-text': 入力テキスト.length > 0 }"
           type="button"
-          :disabled="!入力テキスト.trim() || !WebSocket接続中"
+          :disabled="!入力テキスト.trim() || テキスト送信中 || !WebSocket接続中"
           title="送信"
           @click="送信ボタン処理"
         >
@@ -572,7 +605,7 @@ defineExpose({
                 <option :value="5">5</option>
               </select>秒)</span>
           </div>
-          <div class="auto-send-line">
+          <div class="auto-send-line auto-send-line-bot">
             <span class="auto-send-label">変化</span>
             <select v-model.number="自動送信変化率パーセント" class="auto-send-select">
               <option :value="1">1</option>
@@ -681,6 +714,11 @@ defineExpose({
 
 .hidden-el { display: none; }
 
+.hidden-video,
+.hidden-canvas {
+  display: none;
+}
+
 /* 選択ポップアップ */
 .selection-popup {
   position: absolute;
@@ -747,15 +785,16 @@ defineExpose({
   padding: 10px 20px 0 20px;
   background: #101010;
   border-top: 1px solid #2c2c2c;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  gap: 15px;
 }
 
 .text-input-area {
   display: flex;
   gap: 10px;
   align-items: flex-end;
-  min-width: 0;
 }
 
 .text-input-area.drag-over {
@@ -848,6 +887,7 @@ defineExpose({
 /* 自動送信設定 */
 .auto-send-settings {
   min-width: 168px;
+  margin-left: 2px;
   margin-bottom: 20px;
   padding: 2px 6px;
   border: 1px solid rgba(102, 126, 234, 0.45);
@@ -855,14 +895,15 @@ defineExpose({
   color: #d6def8;
   font-size: 10px;
   border-radius: 2px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  gap: 0px;
   justify-content: center;
 }
 
 .auto-send-line { display: flex; align-items: center; gap: 3px; height: 20px; white-space: nowrap; }
-.auto-send-line-top { justify-content: space-between; }
-.auto-send-label { color: #d6def8; white-space: nowrap; line-height: 1; }
+.auto-send-line-top { justify-content: space-between; }.auto-send-label { color: #d6def8; white-space: nowrap; line-height: 1; }
 .auto-send-paren { display: flex; align-items: center; gap: 2px; }
 .auto-send-unit { color: #97a8df; white-space: nowrap; }
 .auto-send-or { color: #97a8df; margin: 0 3px; white-space: nowrap; }
@@ -872,10 +913,11 @@ defineExpose({
   height: 18px;
   border: 1px solid rgba(102, 126, 234, 0.65);
   background: rgba(6, 9, 16, 0.95);
-  color: #fff;
+  color: #ffffff;
   border-radius: 2px;
   font-size: 10px;
   padding: 0 2px;
+  box-sizing: border-box;
   position: relative;
   top: 6px;
 }

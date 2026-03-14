@@ -321,7 +321,7 @@ class Live:
 
     async def 接続時welcome送信(self) -> None:
         """audioチャンネル接続時にLiveAI APIキーを確認し、結果をwelcome_textでch0に送信"""
-        await asyncio.sleep(0.3)  # welcome_info表示の後に送信
+        await asyncio.sleep(0.7)  # chatより後に送信（chat=0.3s → live=0.7s）
         ai_label = f"[{self.AI_NAME or 'Live'}]"
 
         # APIキーの事前チェック（接続は行わずキーの有無のみ確認）

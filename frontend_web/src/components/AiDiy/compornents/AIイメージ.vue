@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import type { IWebSocketClient } from '@/api/websocket';
 
 const プロパティ = defineProps<{
@@ -414,7 +414,7 @@ const ファイル画像キャプチャ開始 = (画像: HTMLImageElement) => {
   ファイル画像強制送信タイマー再設定();
 };
 
-const キャプチャ停止 = () => {
+const キャプチャ停止 = (状態を切断へ戻す = true) => {
   if (キャプチャタイマー.value) {
     window.clearInterval(キャプチャタイマー.value);
     キャプチャタイマー.value = null;
@@ -430,12 +430,12 @@ const キャプチャ停止 = () => {
   }
   前回小画像.value = null;
   ファイル画像モード解除();
-  接続状態.value = 'disconnected';
+  接続状態.value = 状態を切断へ戻す ? 'disconnected' : (WebSocket接続中.value ? 'connecting' : 'disconnected');
 };
 
 // 自動選択ポップアップ表示
 watch(() => プロパティ.autoShowSelection, (新値) => {
-  if (新値) {
+  if (新値 && WebSocket接続中.value) {
     選択ポップアップ表示.value = true;
   }
 }, { immediate: true });
@@ -444,15 +444,15 @@ watch(
   () => プロパティ.active,
   (稼働中) => {
     if (稼働中 === false) {
-      // コンポーネントが非アクティブになった時のみクリーンアップ
       キャプチャ停止();
       画像プレビュー.value = null;
       if (ファイル入力.value) {
         ファイル入力.value.value = '';
       }
       選択ポップアップ表示.value = false;
+    } else if (稼働中 && プロパティ.autoShowSelection && WebSocket接続中.value) {
+      選択ポップアップ表示.value = true;
     }
-    // 稼働中 === true の時は何もしない（タイマーは維持）
   },
   { immediate: true }
 );
@@ -468,9 +468,9 @@ watch(
       接続状態.value = 'disconnected';
     } else if (接続状態.value === 'disconnected') {
       接続状態.value = 'connecting';
-    }
-    if (接続中 && プロパティ.autoShowSelection) {
-      選択ポップアップ表示.value = true;
+      if (プロパティ.autoShowSelection) {
+        選択ポップアップ表示.value = true;
+      }
     }
   },
   { immediate: true }
@@ -649,18 +649,17 @@ const 画像送信 = async (データURL: string | null) => {
 };
 
 // ステータステキスト
-const 状態表示テキスト = () => {
-  const 状態表示一覧 = {
+const 状態表示テキスト = computed(() => {
+  const 状態表示一覧: Record<string, string> = {
     disconnected: '切断',
     connecting: '接続中',
     sending: '送信中'
   };
-  return 状態表示一覧[接続状態.value];
-};
+  return 状態表示一覧[接続状態.value] ?? '切断';
+});
 
 onMounted(() => {
-  接続状態.value = 'disconnected';
-  WebSocket接続中.value = !!プロパティ.wsConnected;
+  接続状態.value = WebSocket接続中.value ? 'connecting' : 'disconnected';
   nextTick(() => {
     入力欄最大高さ更新();
     テキストエリア自動調整();
@@ -670,6 +669,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', テキストエリア自動調整);
+  if (ファイルダイアログ確認タイマー.value) {
+    window.clearInterval(ファイルダイアログ確認タイマー.value);
+    ファイルダイアログ確認タイマー.value = null;
+  }
   キャプチャ停止();
 });
 </script>
@@ -681,7 +684,7 @@ onBeforeUnmount(() => {
       <h1>Live Capture</h1>
       <div class="image-status">
         <div :class="['image-status-dot', 接続状態]"></div>
-        <span>{{ 状態表示テキスト() }}</span>
+        <span>{{ 状態表示テキスト }}</span>
       </div>
     </div>
 

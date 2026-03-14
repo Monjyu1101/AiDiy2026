@@ -187,8 +187,8 @@ class SessionConnection:
 
         # チャンネル別ファイルリスト: {チャンネル: [{パス: str, 時刻: datetime}, ...]}
         self.チャンネル別ファイルリスト: Dict[str, List[dict]] = {}
-        # チャンネル0のwelcome_text送信後に output_text/recognition_output を core に転送
-        self.チャンネル0_welcome_text送信済み = False
+        # welcome_info受信で False、welcome_text受信で True → True の間のみ output_text/recognition_output を core に転送
+        self.チャンネル0toCore_並行出力フラグ = False
         # core再接続時の字幕用に、最新の recognition_output だけ保持
         self.最新認識出力: Optional[dict] = None
 
@@ -244,14 +244,17 @@ class SessionConnection:
         # チャンネル0の応答系メッセージを core にも転送
         if チャンネル == "0":
             識別 = data.get("メッセージ識別", "")
-            if 識別 == "welcome_text":
-                self.チャンネル0_welcome_text送信済み = True
+            if 識別 == "welcome_info":
+                self.チャンネル0toCore_並行出力フラグ = False
+            elif 識別 == "welcome_text":
+                self.チャンネル0toCore_並行出力フラグ = True
             elif 識別 == "recognition_output":
                 self.最新認識出力 = {**data}
-            if self.チャンネル0_welcome_text送信済み and 識別 in ("output_text", "recognition_output"):
+            if self.チャンネル0toCore_並行出力フラグ and 識別 in ("output_text", "recognition_output", "welcome_text"):
                 core_conn = self.sockets.get("core")
                 if core_conn and core_conn.is_connected:
-                    await core_conn.send_json({**data, "チャンネル": "core"})
+                    送信識別 = "output_text" if 識別 == "welcome_text" else 識別
+                    await core_conn.send_json({**data, "チャンネル": "core", "メッセージ識別": 送信識別})
 
     async def send_to_channel(self, チャンネル: str, data: dict):
         # output_fileの自動追跡

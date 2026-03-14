@@ -12,14 +12,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue';
-import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
+import { AIWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import UpdateFilesDialog from '../dialog/更新ファイル一覧.vue';
 import FileContentDialog from '../dialog/ファイル内容表示.vue';
-import { useRoute } from 'vue-router';
 import apiClient from '@/api/client';
-import { qConfirm } from '@/utils/qAlert';
-
-const route = useRoute();
 
 const プロパティ = defineProps<{
   セッションID?: string;
@@ -144,7 +140,7 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
     };
     読込.readAsDataURL(入力ファイル);
   } catch (error) {
-    console.error('[エージェント] ファイル送信エラー:', error);
+    console.error('[AIコード] ファイル送信エラー:', error);
     行追加('[エラー] ファイル送信に失敗しました。');
   }
 };
@@ -252,6 +248,7 @@ type 演出状態 = {
   ready: boolean;
   finalizeOnEmpty: boolean;
   isStream: boolean;
+  blinkInterval: ReturnType<typeof setInterval>;
 };
 
 const 演出状態Map = new Map<string, 演出状態>();
@@ -309,7 +306,8 @@ const 演出初期化 = (
     running: false,
     ready: false,
     finalizeOnEmpty: false,
-    isStream
+    isStream,
+    blinkInterval
   };
   演出状態Map.set(メッセージID, state);
 
@@ -323,8 +321,8 @@ const 演出初期化 = (
     演出実行(メッセージID);
   }, 開始待機ms);
   
-  // 演出完了時にクリアできるように保存
-  (state as any).blinkInterval = blinkInterval;
+  // 演出完了時にクリアできるように保存（型安全）
+  state.blinkInterval = blinkInterval;
 };
 
 const 演出キュー追加 = (メッセージID: string, 文字列: string, finalize: boolean) => {
@@ -349,8 +347,8 @@ const 演出実行 = (メッセージID: string) => {
         state.cursorSpan.remove();
       }
       // 明滅タイマーをクリア
-      if ((state as any).blinkInterval) {
-        clearInterval((state as any).blinkInterval);
+      if (state.blinkInterval) {
+        clearInterval(state.blinkInterval);
       }
       console.log(`[コード演出] ${メッセージID}: 完了（カーソル削除）`);
       演出状態Map.delete(メッセージID);
@@ -382,6 +380,15 @@ const 演出実行 = (メッセージID: string) => {
   tick();
 };
 
+const カーソル色取得 = (role: メッセージ['role']): string => {
+  switch (role) {
+    case 'input_text': return '#ffffff'
+    case 'input_request': return '#00ffff'
+    case 'cancel_run': return '#ff4444'
+    default: return '#00ff00'
+  }
+};
+
 const ターミナルメッセージ追加 = (role: メッセージ['role'], 内容: string, 追加オプション?: Partial<メッセージ>, finalize = true) => {
   const メッセージID = 新規メッセージID();
   メッセージ一覧.value.push({
@@ -393,25 +400,7 @@ const ターミナルメッセージ追加 = (role: メッセージ['role'], 内
     ...(追加オプション || {})
   });
 
-  // roleに応じたカーソル色を決定（コードエージェントは緑系統で統一）
-  let カーソル色 = '#00ff00';  // デフォルト緑
-  switch (role) {
-    case 'input_text':
-      カーソル色 = '#ffffff';  // 白
-      break;
-    case 'input_request':
-      カーソル色 = '#00ffff';  // シアン
-      break;
-    case 'output_text':
-      カーソル色 = '#00ff00';  // 緑
-      break;
-    case 'welcome_text':
-      カーソル色 = '#00ff00';  // 緑（output_textと同じ）
-      break;
-    case 'cancel_run':
-      カーソル色 = '#ff4444';  // 赤
-      break;
-  }
+  const カーソル色 = カーソル色取得(role);
 
   nextTick(() => {
     const メッセージ要素 = document.getElementById(メッセージID);
@@ -441,7 +430,6 @@ const ウェルカム内容 = ref<string>('');
 const ウェルカムテキスト受信済み = ref(false);
 const 更新ファイル一覧 = ref<string[]>([]);
 const 更新ファイルダイアログ表示 = ref(false);
-const AiDiyモード = ref(false);
 const ファイル内容ダイアログ表示 = ref(false);
 const 表示ファイル名 = ref('');
 const 表示base64_data = ref('');
@@ -693,7 +681,7 @@ const ファイル内容表示を開く = async (ファイル名: string) => {
     表示base64_data.value = base64_data;
     ファイル内容ダイアログ表示.value = true;
   } catch (error) {
-    console.error('[エージェント] ファイル内容取得エラー:', error);
+    console.error('[AIコード] ファイル内容取得エラー:', error);
   }
 };
 
@@ -753,7 +741,7 @@ const WSハンドラ登録 = (client?: IWebSocketClient | null) => {
   client.on('update_info', update_info受信処理);
   client.on('cancel_run', cancel_run受信処理);
 
-  console.log(`[エージェント${ch}] ハンドラ登録完了`);
+  console.log(`[AIコード${ch}] ハンドラ登録完了`);
 };
 
 const WSハンドラ解除 = (client?: IWebSocketClient | null) => {
@@ -771,53 +759,27 @@ const WSハンドラ解除 = (client?: IWebSocketClient | null) => {
   client.off('update_info', update_info受信処理);
   client.off('cancel_run', cancel_run受信処理);
 
-  console.log(`[エージェント${ch}] ハンドラ削除完了`);
+  console.log(`[AIコード${ch}] ハンドラ削除完了`);
 };
 
 const 出力ソケット接続 = async () => {
   const チャンネル = プロパティ.チャンネル ?? '0';
   if (!セッションID.value) {
-    console.warn(`[エージェント${チャンネル}] セッションID未確定のため出力ソケットを保留`);
+    console.warn(`[AIコード${チャンネル}] セッションID未確定のため出力ソケットを保留`);
     return;
   }
 
   const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-  出力WebSocket.value = new AIコアWebSocket(wsUrl, セッションID.value, チャンネル);
+  出力WebSocket.value = new AIWebSocket(wsUrl, セッションID.value, チャンネル);
   WSハンドラ登録(出力WebSocket.value);
 
   try {
     await 出力WebSocket.value.connect();
     出力接続済み.value = true;
-    console.log(`[エージェント${チャンネル}] 出力ソケット接続完了`);
+    console.log(`[AIコード${チャンネル}] 出力ソケット接続完了`);
   } catch (error) {
     出力接続済み.value = false;
-    console.error(`[エージェント${チャンネル}] 出力ソケット接続エラー:`, error);
-  }
-};
-
-// 作業モード判定（CODE_BASE_PATHからAiDiy作業中かどうかを判定）
-const checkAiDiyMode = async () => {
-  try {
-    const セッションID値 = route.query.セッションID as string;
-    if (!セッションID値) return;
-
-    const response = await apiClient.post('/core/AIコア/モデル情報/取得', {
-      セッションID: セッションID値
-    });
-
-    if (response?.data?.status === 'OK') {
-      const codeBasePath = response.data.data.モデル設定?.CODE_BASE_PATH || '';
-      
-      // AiDiyモード判定: CODE_BASE_PATHがプロジェクトルート（相対パス）を指している場合
-      // '../'（デフォルト）= 実行中のプロジェクトルート
-      // 絶対パス指定の場合は他のプロジェクト = AiDiyモードではない
-      const isAiDiy = codeBasePath === '../';
-      
-      AiDiyモード.value = isAiDiy;
-      console.log('[AiDiyモード判定]', { codeBasePath, isAiDiy });
-    }
-  } catch (error) {
-    console.error('[AiDiyモード判定エラー]', error);
+    console.error(`[AIコード${チャンネル}] 出力ソケット接続エラー:`, error);
   }
 };
 
@@ -827,97 +789,20 @@ const 更新ファイルダイアログ閉じる = () => {
   更新ファイル一覧.value = [];
 };
 
-const アプリ再起動 = async () => {
-  try {
-    const セッションID値 = route.query.セッションID as string;
-    if (!セッションID値) {
-      console.error('セッションIDが見つかりません');
-      return;
-    }
-
-    // 現在の設定を取得
-    const getResponse = await apiClient.post('/core/AIコア/モデル情報/取得', {
-      セッションID: セッションID値
-    });
-
-    if (getResponse?.data?.status !== 'OK') {
-      console.error('設定取得に失敗しました');
-      return;
-    }
-
-    const currentSettings = getResponse.data.data.モデル設定 || {};
-
-    // アプリのみ再起動
-    const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
-      セッションID: セッションID値,
-      モデル設定: currentSettings,
-      再起動要求: { reboot_core: false, reboot_apps: true }
-    });
-
-    if (response?.data?.status === 'OK') {
-      更新ファイルダイアログ表示.value = false;
-      // 15秒後にリロード
-      setTimeout(() => {
-        if (window.parent && window.parent !== window) {
-          window.parent.location.reload();
-        } else {
-          window.location.reload();
-        }
-      }, 15000);
-    }
-  } catch (error) {
-    console.error('[アプリ再起動エラー]', error);
-  }
-};
-
-const リセット再起動 = async () => {
-  const confirmed = await qConfirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？');
-  if (!confirmed) return;
-
-  try {
-    const セッションID値 = route.query.セッションID as string;
-    if (!セッションID値) {
-      console.error('セッションIDが見つかりません');
-      return;
-    }
-
-    const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
-      セッションID: セッションID値,
-      モデル設定: {},
-      再起動要求: { reboot_core: true, reboot_apps: true }
-    });
-
-    if (response?.data?.status === 'OK') {
-      更新ファイルダイアログ表示.value = false;
-      // 45秒後にリロード
-      setTimeout(() => {
-        if (window.parent && window.parent !== window) {
-          window.parent.location.reload();
-        } else {
-          window.location.reload();
-        }
-      }, 45000);
-    }
-  } catch (error) {
-    console.error('[リセット再起動エラー]', error);
-  }
-};
-
 onMounted(() => {
   const チャンネル = プロパティ.チャンネル ?? '0';
-  console.log(`[エージェント${チャンネル}] ========== onMounted開始 ==========`);
-  console.log(`[エージェント${チャンネル}] チャンネル=${チャンネル}`);
-  console.log(`[エージェント${チャンネル}] セッションID=${セッションID.value}`);
-  console.log(`[エージェント${チャンネル}] inputWsClient=${!!プロパティ.inputWsClient}`);
-  console.log(`[エージェント${チャンネル}] inputConnected=${プロパティ.inputConnected}`);
+  console.log(`[AIコード${チャンネル}] ========== onMounted開始 ==========`);
+  console.log(`[AIコード${チャンネル}] チャンネル=${チャンネル}`);
+  console.log(`[AIコード${チャンネル}] セッションID=${セッションID.value}`);
+  console.log(`[AIコード${チャンネル}] inputWsClient=${!!プロパティ.inputWsClient}`);
+  console.log(`[AIコード${チャンネル}] inputConnected=${プロパティ.inputConnected}`);
   出力ソケット接続();
-  checkAiDiyMode();
   nextTick(() => {
     入力欄最大高さ更新();
     テキストエリア自動調整();
   });
   window.addEventListener('resize', テキストエリア自動調整);
-  console.log(`[エージェント${チャンネル}] ========== onMounted完了 ==========`);
+  console.log(`[AIコード${チャンネル}] ========== onMounted完了 ==========`);
 });
 
 watch(() => プロパティ.セッションID, (newId, oldId) => {
@@ -956,7 +841,7 @@ const 状態表示テキスト = () => {
   <div class="agent-container show">
     <div class="agent-header">
       <button class="close-btn" @click="通知('close')" title="閉じる">×</button>
-      <h1>Code Agent ({{ チャンネル }}) <span v-if="codeAi" class="model-info">({{ codeAi }})</span></h1>
+      <h1>Code Agent {{ チャンネル }} <span v-if="codeAi" class="model-info">({{ codeAi }})</span></h1>
       <div class="agent-status">
         <div :class="['agent-status-dot', 接続状態]"></div>
         <span>{{ 状態表示テキスト() }}</span>
@@ -1068,10 +953,8 @@ const 状態表示テキスト = () => {
     <UpdateFilesDialog
       :show="更新ファイルダイアログ表示"
       :files="更新ファイル一覧"
-      :isAiDiyMode="AiDiyモード"
       @close="更新ファイルダイアログ閉じる"
-      @appReboot="アプリ再起動"
-      @resetReboot="リセット再起動"
+      @select-file="ファイル内容表示を開く"
     />
 
     <FileContentDialog

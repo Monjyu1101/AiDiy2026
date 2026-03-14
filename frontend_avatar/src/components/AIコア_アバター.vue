@@ -1,10 +1,22 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101
+  -------------------------------------------------------------------------
+-->
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import { DEFAULT_VRM_MODEL_URL, DEFAULT_VRMA_FILES } from '@/_share/config'
+import { DEFAULT_VRM_MODEL_URL, DEFAULT_VRMA_FILES } from '@/api/config'
 
 const props = withDefaults(defineProps<{
   sessionId: string;

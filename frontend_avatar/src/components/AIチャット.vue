@@ -1,27 +1,54 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101
+  -------------------------------------------------------------------------
+-->
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AI_WS_ENDPOINT } from '@/_share/config'
-import { AIWebSocket } from '@/_share/websocket'
-import type { ChatMessage, MessageKind, ModelSettings } from '@/types'
+import { AI_WS_ENDPOINT } from '@/api/config'
+import { AIWebSocket } from '@/api/websocket'
+import apiClient from '@/api/client'
+import ファイル内容表示ダイアログ from '@/components/ファイル内容表示.vue'
 
-type チャットモード = 'Chat' | 'Live' | 'Code1' | 'Code2' | 'Code3' | 'Code4'
+type チャットモード = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'
 
-const props = defineProps<{
-  messages: ChatMessage[];
-  welcomeInfo: string;
-  sessionId: string;
-  active?: boolean;
-  mode: チャットモード;
-  inputConnected: boolean;
-  chatConnected: boolean;
-  modelSettings: ModelSettings;
+// props（messages/チャット接続済み/モデル設定 はdeprecated扱い）
+const プロパティ = defineProps<{
+  messages?: any[]
+  ウェルカム情報: string
+  セッションID: string
+  チャンネル?: string
+  active?: boolean
+  chatMode: チャットモード
+  入力接続済み: boolean
+  チャット接続済み?: boolean
+  モデル設定?: any
 }>()
 
-const emit = defineEmits<{
-  'send-input-payload': [message: Record<string, unknown>];
-  'update:mode': [mode: チャットモード];
-  'chat-state': [connected: boolean];
+const 通知 = defineEmits<{
+  'send-input-payload': [message: Record<string, unknown>]
+  'mode-change': [mode: チャットモード]
+  'chat-state': [connected: boolean]
 }>()
+
+interface メッセージ {
+  role: 'input_text' | 'output_text' | 'input_file' | 'output_file' | 'recognition_input' | 'recognition_output' | 'input_request' | 'output_request' | 'welcome_text'
+  content: string
+  id: string
+  kind?: 'text' | 'file'
+  render?: 'effect' | 'static'
+  fileName?: string | null
+  thumbnail?: string | null
+  isStream?: boolean
+  isCollapsed?: boolean
+}
 
 const 入力テキスト = ref('')
 const チャット領域 = ref<HTMLElement | null>(null)
@@ -30,29 +57,73 @@ const ドラッグ中 = ref(false)
 const 入力欄最大到達 = ref(false)
 const 入力欄固定中 = ref(false)
 const 入力欄固定高さ = ref(60)
-
 const 入力欄最小高さ = 60
 const 入力欄最大高さ = ref(380)
-const モード一覧: Array<{ value: チャットモード; label: string }> = [
-  { value: 'Chat', label: 'Chat' },
-  { value: 'Live', label: 'Live' },
-  { value: 'Code1', label: 'Code1' },
-  { value: 'Code2', label: 'Code2' },
-  { value: 'Code3', label: 'Code3' },
-  { value: 'Code4', label: 'Code4' },
-]
 
-let チャットWebSocket: AIWebSocket | null = null
-let streamMessageId: string | null = null
+const 出力WebSocket = ref<AIWebSocket | null>(null)
+let ストリームメッセージID: string | null = null
+let メッセージID連番 = 0
 
-const ローカルチャット接続済み = ref(false)
-const ローカルWelcomeInfo = ref('')
-const ローカルメッセージ一覧 = ref<ChatMessage[]>([])
+const 出力接続済み = ref(false)
+const メッセージ一覧 = ref<メッセージ[]>([])
+const ウェルカムテキスト受信済み = ref(false)
 
-const 表示WelcomeInfo = computed(() => ローカルWelcomeInfo.value || props.welcomeInfo)
-const 表示メッセージ一覧 = computed(() => ローカルメッセージ一覧.value)
-const WebSocket接続中 = computed(() => ローカルチャット接続済み.value)
-const 送信可能 = computed(() => WebSocket接続中.value && 入力テキスト.value.trim().length > 0)
+const ファイル内容ダイアログ表示 = ref(false)
+const 表示ファイル名 = ref('')
+const 表示base64_data = ref('')
+
+const 画像拡張子セット = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'])
+const テキスト拡張子セット = new Set([
+  'py', 'vue', 'ts', 'tsx', 'js', 'jsx', 'json', 'md', 'txt',
+  'html', 'css', 'scss', 'sass', 'less', 'yml', 'yaml', 'toml',
+  'ini', 'env', 'sql', 'csv', 'log', 'xml', 'sh', 'ps1', 'bat'
+])
+
+const 拡張子取得 = (ファイル名: string): string => {
+  const クエリ除去 = (ファイル名 || '').split(/[?#]/u, 1)[0] || ''
+  const 最後のスラッシュ位置 = Math.max(クエリ除去.lastIndexOf('/'), クエリ除去.lastIndexOf('\\'))
+  const ベース名 = 最後のスラッシュ位置 >= 0 ? クエリ除去.slice(最後のスラッシュ位置 + 1) : クエリ除去
+  const ドット位置 = ベース名.lastIndexOf('.')
+  if (ドット位置 < 0) return ''
+  return ベース名.slice(ドット位置 + 1).toLowerCase()
+}
+
+const ファイル内容表示対象 = (ファイル名: string): boolean => {
+  const 拡張子 = 拡張子取得(ファイル名)
+  return 画像拡張子セット.has(拡張子) || テキスト拡張子セット.has(拡張子)
+}
+
+const ファイル内容ダイアログ閉じる = () => {
+  ファイル内容ダイアログ表示.value = false
+  表示ファイル名.value = ''
+  表示base64_data.value = ''
+}
+
+const ファイル内容表示を開く = async (ファイル名: string) => {
+  if (!ファイル内容表示対象(ファイル名)) return
+  try {
+    const response = await apiClient.post('/core/files/内容取得', { ファイル名 })
+    if (response?.data?.status !== 'OK') return
+    const base64_data = response?.data?.data?.base64_data
+    if (typeof base64_data !== 'string' || !base64_data) return
+    表示ファイル名.value = ファイル名
+    表示base64_data.value = base64_data
+    ファイル内容ダイアログ表示.value = true
+  } catch (error) {
+    console.error('[チャット] ファイル内容取得エラー:', error)
+  }
+}
+const 選択モード = ref<チャットモード>(プロパティ.chatMode || 'live')
+
+const 送信モードラベル = computed(() => {
+  const m = 選択モード.value
+  if (m.startsWith('code')) return `CODE ${m.replace('code', '')}`
+  if (m === 'live') return 'LIVE'
+  return 'CHAT'
+})
+
+const ウェルカム内容 = ref(プロパティ.ウェルカム情報 || '')
+const WebSocket接続中 = computed(() => 出力接続済み.value)
 
 // --- ターミナルエフェクト ---
 
@@ -64,100 +135,70 @@ type 演出状態 = {
   running: boolean
   ready: boolean
   finalizeOnEmpty: boolean
-  blinkInterval: ReturnType<typeof setInterval>
 }
 
 const 演出状態Map = new Map<string, 演出状態>()
-const 描画済みID = new Set<string>()
 
-function カーソル色取得(kind: MessageKind): string {
-  switch (kind) {
-    case 'user': return '#ffffff'
-    case 'input-request': return '#ffaa66'
-    case 'assistant': return '#00ff00'
-    case 'output-request': return '#00ffff'
-    case 'system': return '#00ff00'
-    case 'recognition-user': return '#e5e7eb'
-    case 'recognition-assistant': return '#9ae6b4'
-    case 'stream': return '#00ff00'
-    default: return '#00ff00'
-  }
-}
-
-function 速度設定(文字数: number) {
+const 速度設定 = (文字数: number) => {
   const batch = Math.floor(文字数 / 50) + 1
   return { interval: 10, batch }
 }
 
-function 演出初期化(messageId: string, container: HTMLElement, cursorColor: string) {
-  container.innerHTML = ''
-
+const 演出初期化 = (メッセージID: string, 表示領域: HTMLElement, カーソル色: string = '#00ff00') => {
+  表示領域.innerHTML = ''
   const textSpan = document.createElement('span')
   textSpan.className = 'terminal-text'
-  container.appendChild(textSpan)
-
+  表示領域.appendChild(textSpan)
   const cursorSpan = document.createElement('span')
   cursorSpan.className = 'terminal-cursor'
   cursorSpan.textContent = '\u0020'
   cursorSpan.style.display = 'inline-block'
   cursorSpan.style.width = '8px'
-  cursorSpan.style.backgroundColor = cursorColor
+  cursorSpan.style.backgroundColor = カーソル色
   cursorSpan.style.color = '#000000'
-  container.appendChild(cursorSpan)
-
+  表示領域.appendChild(cursorSpan)
   let blinkVisible = true
   const blinkInterval = setInterval(() => {
-    cursorSpan.style.backgroundColor = blinkVisible ? 'transparent' : cursorColor
+    cursorSpan.style.backgroundColor = blinkVisible ? 'transparent' : カーソル色
     blinkVisible = !blinkVisible
   }, 300)
-
   const state: 演出状態 = {
-    container,
-    textSpan,
-    cursorSpan,
-    queue: [],
-    running: false,
-    ready: false,
-    finalizeOnEmpty: false,
-    blinkInterval,
+    container: 表示領域, textSpan, cursorSpan,
+    queue: [], running: false, ready: false, finalizeOnEmpty: false,
   }
-  演出状態Map.set(messageId, state)
-
+  演出状態Map.set(メッセージID, state)
+  ;(state as any).blinkInterval = blinkInterval
   最下部スクロール()
-
   window.setTimeout(() => {
     state.ready = true
-    演出実行(messageId)
+    演出実行(メッセージID)
   }, 500)
 }
 
-function 演出キュー追加(messageId: string, text: string, finalize: boolean) {
-  const state = 演出状態Map.get(messageId)
+const 演出キュー追加 = (メッセージID: string, 文字列: string, finalize: boolean) => {
+  const state = 演出状態Map.get(メッセージID)
   if (!state) return
-  if (text) state.queue.push(text)
+  if (文字列) state.queue.push(文字列)
   if (finalize) state.finalizeOnEmpty = true
-  演出実行(messageId)
+  演出実行(メッセージID)
 }
 
-function 演出実行(messageId: string) {
-  const state = 演出状態Map.get(messageId)
+const 演出実行 = (メッセージID: string) => {
+  const state = 演出状態Map.get(メッセージID)
   if (!state || state.running || !state.ready) return
-
   if (state.queue.length === 0) {
     if (state.finalizeOnEmpty) {
-      state.cursorSpan.remove()
-      clearInterval(state.blinkInterval)
-      演出状態Map.delete(messageId)
+      if (state.cursorSpan && state.cursorSpan.parentNode) state.cursorSpan.remove()
+      if ((state as any).blinkInterval) clearInterval((state as any).blinkInterval)
+      演出状態Map.delete(メッセージID)
       最下部スクロール()
     }
     return
   }
-
   state.running = true
   const chunk = state.queue.shift() ?? ''
   const { interval, batch } = 速度設定(chunk.length)
   let index = 0
-
   const tick = () => {
     const end = Math.min(index + batch, chunk.length)
     if (end > index) {
@@ -168,334 +209,434 @@ function 演出実行(messageId: string) {
     if (index >= chunk.length) {
       state.running = false
       nextTick(() => 最下部スクロール())
-      演出実行(messageId)
+      演出実行(メッセージID)
       return
     }
     window.setTimeout(tick, interval)
   }
-
   tick()
 }
 
-function 新規メッセージID(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+// --- メッセージID ---
+
+const 新規メッセージID = () => {
+  const ソケット = プロパティ.セッションID || 'nosocket'
+  const チャンネル = プロパティ.チャンネル ?? '0'
+  return `chat-${ソケット}-${チャンネル}-${メッセージID連番++}`
 }
 
-function pushMessage(kind: MessageKind, text: string, extra?: Partial<ChatMessage>) {
-  const normalized = String(text || '').trim()
-  if (!normalized && !extra?.fileName) return
+// --- メッセージ追加 ---
 
-  ローカルメッセージ一覧.value.push({
-    id: 新規メッセージID(),
-    kind,
-    text: normalized,
-    timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-    ...extra,
+const ターミナルメッセージ追加 = (role: メッセージ['role'], 内容: string, 追加オプション?: Partial<メッセージ>, finalize = true) => {
+  const メッセージID = 新規メッセージID()
+  メッセージ一覧.value.push({
+    role, content: 内容, id: メッセージID, kind: 'text', render: 'effect',
+    ...(追加オプション || {}),
   })
-}
-
-function handleOutputStream(message: Record<string, any>) {
-  const content = String(message.メッセージ内容 || '').trim()
-  if (!content) return
-
-  if (content === '<<< 処理開始 >>>') {
-    const id = 新規メッセージID()
-    streamMessageId = id
-    ローカルメッセージ一覧.value.push({
-      id,
-      kind: 'stream',
-      text: `${content}\n`,
-      timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-      isStream: true,
-      isCollapsed: false,
-    })
-    return
+  let カーソル色 = '#00ff00'
+  switch (role) {
+    case 'input_text':         カーソル色 = '#ffffff'; break
+    case 'input_request':      カーソル色 = '#ffaa66'; break
+    case 'output_text':        カーソル色 = '#00ff00'; break
+    case 'output_request':     カーソル色 = '#00ffff'; break
+    case 'welcome_text':       カーソル色 = '#00ff00'; break
+    case 'recognition_input':  カーソル色 = '#e5e7eb'; break
+    case 'recognition_output': カーソル色 = '#9ae6b4'; break
   }
-
-  if (content === '<<< 処理終了 >>>') {
-    const target = ローカルメッセージ一覧.value.find((m) => m.id === streamMessageId)
-    if (target) {
-      target.text += `${content}\n`
-      target.isCollapsed = true
-    }
-    streamMessageId = null
-    return
-  }
-
-  const target = ローカルメッセージ一覧.value.find((m) => m.id === streamMessageId)
-  if (target) {
-    target.text += `${content}\n`
-  }
-}
-
-function bindChatSocket(socket: AIWebSocket) {
-  socket.onStateChange((connected) => {
-    ローカルチャット接続済み.value = connected
-    emit('chat-state', connected)
-  })
-  socket.on('welcome_info', (message) => {
-    ローカルWelcomeInfo.value = String(message.メッセージ内容 || '').trim()
-  })
-  socket.on('welcome_text', (message) => {
-    const text = String(message.メッセージ内容 || '')
-    pushMessage('system', text)
-  })
-  socket.on('input_text', (message) => {
-    pushMessage('user', String(message.メッセージ内容 || ''))
-  })
-  socket.on('input_request', (message) => {
-    pushMessage('input-request', String(message.メッセージ内容 || ''))
-  })
-  socket.on('input_file', (message) => {
-    pushMessage('input-file', '', {
-      fileName: message.ファイル名 ?? null,
-      thumbnail: message.サムネイル画像 ?? null,
-    })
-  })
-  socket.on('output_text', (message) => {
-    const text = String(message.メッセージ内容 || '')
-    pushMessage('assistant', text)
-  })
-  socket.on('output_request', (message) => {
-    pushMessage('output-request', String(message.メッセージ内容 || ''))
-  })
-  socket.on('output_file', (message) => {
-    pushMessage('output-file', '', {
-      fileName: message.ファイル名 ?? null,
-      thumbnail: message.サムネイル画像 ?? null,
-    })
-  })
-  socket.on('output_stream', handleOutputStream)
-  socket.on('recognition_input', (message) => {
-    pushMessage('recognition-user', String(message.メッセージ内容 || ''))
-  })
-  socket.on('recognition_output', (message) => {
-    const text = String(message.メッセージ内容 || '')
-    pushMessage('recognition-assistant', text)
-  })
-}
-
-function resetLocalChat() {
-  ローカルチャット接続済み.value = false
-  ローカルWelcomeInfo.value = ''
-  ローカルメッセージ一覧.value = []
-  streamMessageId = null
-}
-
-async function connectChatSockets() {
-  if (!props.sessionId) return
-
-  チャットWebSocket?.disconnect()
-  resetLocalChat()
-
-  const nextChatSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, '0')
-  bindChatSocket(nextChatSocket)
-
-  try {
-    await nextChatSocket.connect()
-    チャットWebSocket = nextChatSocket
-  } catch {
-    チャットWebSocket?.disconnect()
-    チャットWebSocket = null
-    resetLocalChat()
-  }
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result
-      if (typeof result === 'string') {
-        const i = result.indexOf(',')
-        resolve(i >= 0 ? result.slice(i + 1) : result)
-      } else {
-        reject(new Error('unexpected result type'))
-      }
-    }
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-function メッセージ描画開始(msg: ChatMessage) {
-  if (描画済みID.has(msg.id)) return
-  描画済みID.add(msg.id)
-
-  if (msg.kind === 'input-file' || msg.kind === 'output-file') return
-
   nextTick(() => {
-    const el = document.getElementById(msg.id)
-    if (!el) return
-    const bubble = el.querySelector('.bubble-content') as HTMLElement | null
-    if (!bubble) return
-
-    const color = カーソル色取得(msg.kind)
-    演出初期化(msg.id, bubble, color)
-    演出キュー追加(msg.id, msg.text, !msg.isStream)
+    const メッセージ要素 = document.getElementById(メッセージID)
+    if (!メッセージ要素) return
+    const bubbleElement = メッセージ要素.querySelector('.bubble-content') as HTMLElement | null
+    if (!bubbleElement) return
+    演出初期化(メッセージID, bubbleElement, カーソル色)
+    演出キュー追加(メッセージID, 内容, finalize)
   })
 }
 
-// ストリーム追記を検出（メッセージIDごとに前回テキスト長を記録）
-const ストリーム既知長 = new Map<string, number>()
+const ファイルメッセージ追加 = (role: メッセージ['role'], fileName?: string | null, thumbnail?: string | null) => {
+  メッセージ一覧.value.push({
+    role, content: '', id: 新規メッセージID(),
+    kind: 'file', render: 'static',
+    fileName: fileName ?? null, thumbnail: thumbnail ?? null,
+  })
+  最下部スクロール()
+}
 
-function ストリーム追記チェック(msg: ChatMessage) {
-  if (!msg.isStream) return
-  const state = 演出状態Map.get(msg.id)
-  if (!state) return
+// --- WebSocketハンドラーヘルパー ---
 
-  const prev = ストリーム既知長.get(msg.id) ?? 0
-  if (msg.text.length > prev) {
-    const newText = msg.text.slice(prev)
-    演出キュー追加(msg.id, newText, false)
-    ストリーム既知長.set(msg.id, msg.text.length)
+const 受信内容文字列 = (受信データ: any) => {
+  const 内容 = 受信データ.メッセージ内容 ?? 受信データ.text ?? ''
+  if (!内容) return ''
+  return typeof 内容 === 'string' ? 内容 : JSON.stringify(内容)
+}
+
+const 受信チャンネル一致 = (受信データ: any): boolean => {
+  const 期待チャンネル = String(プロパティ.チャンネル ?? '0')
+  const 実受信チャンネル = 受信データ?.チャンネル
+  if (実受信チャンネル === undefined || 実受信チャンネル === null || 実受信チャンネル === '') {
+    return true
+  }
+  return String(実受信チャンネル) === 期待チャンネル
+}
+
+// --- 個別受信ハンドラー ---
+
+const ウェルカム受信処理 = (受信データ: any) => {
+  if (!受信チャンネル一致(受信データ)) return
+  console.log('[チャット] welcome_info受信:', 受信データ)
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) return
+  ウェルカム内容.value = 内容
+}
+
+const 入力テキスト受信処理 = (受信データ: any) => {
+  console.log('[チャット] input_text受信:', 受信データ)
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) { console.log('[チャット] input_text 内容なしでスキップ'); return }
+  console.log('[チャット] input_text表示開始:', 内容)
+  ターミナルメッセージ追加('input_text', 内容)
+}
+
+const 入力リクエスト受信処理 = (受信データ: any) => {
+  console.log('[チャット] input_request受信:', 受信データ)
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) { console.log('[チャット] input_request 内容なしでスキップ'); return }
+  console.log('[チャット] input_request表示開始:', 内容)
+  ターミナルメッセージ追加('input_request', 内容)
+}
+
+const 入力ファイル受信処理 = (受信データ: any) => {
+  ファイルメッセージ追加('input_file', 受信データ.ファイル名 ?? null, 受信データ.サムネイル画像 ?? null)
+}
+
+const 出力テキスト受信処理 = (受信データ: any) => {
+  console.log('[チャット] output_text受信:', 受信データ)
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) { console.log('[チャット] output_text 内容なしでスキップ'); return }
+  console.log('[チャット] output_text表示開始:', 内容)
+  ターミナルメッセージ追加('output_text', 内容)
+}
+
+const 出力リクエスト受信処理 = (受信データ: any) => {
+  console.log('[チャット] output_request受信:', 受信データ)
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) { console.log('[チャット] output_request 内容なしでスキップ'); return }
+  console.log('[チャット] output_request表示開始:', 内容)
+  ターミナルメッセージ追加('output_request', 内容)
+}
+
+const ウェルカムテキスト受信処理 = (受信データ: any) => {
+  if (!受信チャンネル一致(受信データ)) return
+  ウェルカムテキスト受信済み.value = true
+  console.log('[チャット] welcome_text受信:', 受信データ)
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) { console.log('[チャット] welcome_text 内容なしでスキップ'); return }
+  console.log('[チャット] welcome_text表示開始:', 内容)
+  ターミナルメッセージ追加('welcome_text', 内容)
+}
+
+const 出力ファイル受信処理 = (受信データ: any) => {
+  ファイルメッセージ追加('output_file', 受信データ.ファイル名 ?? null, 受信データ.サムネイル画像 ?? null)
+}
+
+const 音声入力受信処理 = (受信データ: any) => {
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) return
+  ターミナルメッセージ追加('recognition_input', 内容)
+}
+
+const 音声出力受信処理 = (受信データ: any) => {
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) return
+  ターミナルメッセージ追加('recognition_output', 内容)
+}
+
+const 出力ストリーム受信処理 = (受信データ: any) => {
+  console.log('[チャット] output_stream受信:', 受信データ)
+  const 内容 = 受信内容文字列(受信データ)
+  if (!内容) return
+
+  if (内容 === '<<< 処理開始 >>>') {
+    const メッセージID = `stream-${新規メッセージID()}`
+    ストリームメッセージID = メッセージID
+    メッセージ一覧.value.push({
+      role: 'output_text', content: `${内容}\n`, id: メッセージID,
+      kind: 'text', render: 'effect', isStream: true,
+    })
+    nextTick(() => {
+      const メッセージ要素 = document.getElementById(メッセージID)
+      if (!メッセージ要素) return
+      const bubbleElement = メッセージ要素.querySelector('.bubble-content') as HTMLElement | null
+      if (!bubbleElement) return
+      演出初期化(メッセージID, bubbleElement)
+      演出キュー追加(メッセージID, `${内容}\n`, false)
+    })
+    return
   }
 
-  if (msg.isCollapsed) {
-    演出キュー追加(msg.id, '', true)
-    ストリーム既知長.delete(msg.id)
+  if (内容 === '<<< 処理終了 >>>') {
+    const 対象メッセージ = メッセージ一覧.value.find(m => m.id === ストリームメッセージID)
+    if (対象メッセージ) {
+      対象メッセージ.content += `${内容}\n`
+      対象メッセージ.isCollapsed = true
+    }
+    if (ストリームメッセージID) 演出キュー追加(ストリームメッセージID, `${内容}\n`, true)
+    ストリームメッセージID = null
+    最下部スクロール()
+    return
+  }
+
+  const 対象メッセージ = メッセージ一覧.value.find(m => m.id === ストリームメッセージID)
+  if (対象メッセージ) {
+    対象メッセージ.content += `${内容}\n`
+    if (ストリームメッセージID) 演出キュー追加(ストリームメッセージID, `${内容}\n`, false)
+    最下部スクロール()
   }
 }
 
-// --- メッセージ種別CSS ---
+// --- WSハンドラ登録/解除 ---
 
-function メッセージCSSクラス(kind: MessageKind): string {
-  switch (kind) {
-    case 'user': return 'input_text'
-    case 'assistant': return 'output_text'
-    case 'system': return 'welcome_text'
-    case 'recognition-user': return 'recognition_input'
-    case 'recognition-assistant': return 'recognition_output'
-    case 'input-request': return 'input_request'
-    case 'output-request': return 'output_request'
-    case 'input-file': return 'input_file'
-    case 'output-file': return 'output_file'
-    case 'stream': return 'output_text'
-    default: return 'welcome_text'
+function WSハンドラ登録(socket: AIWebSocket) {
+  socket.on('welcome_info',       ウェルカム受信処理)
+  socket.on('input_text',         入力テキスト受信処理)
+  socket.on('input_request',      入力リクエスト受信処理)
+  socket.on('input_file',         入力ファイル受信処理)
+  socket.on('output_text',        出力テキスト受信処理)
+  socket.on('output_request',     出力リクエスト受信処理)
+  socket.on('welcome_text',       ウェルカムテキスト受信処理)
+  socket.on('output_stream',      出力ストリーム受信処理)
+  socket.on('output_file',        出力ファイル受信処理)
+  socket.on('recognition_input',  音声入力受信処理)
+  socket.on('recognition_output', 音声出力受信処理)
+}
+
+function WSハンドラ解除(socket: AIWebSocket) {
+  socket.off('welcome_info',       ウェルカム受信処理)
+  socket.off('input_text',         入力テキスト受信処理)
+  socket.off('input_request',      入力リクエスト受信処理)
+  socket.off('input_file',         入力ファイル受信処理)
+  socket.off('output_text',        出力テキスト受信処理)
+  socket.off('output_request',     出力リクエスト受信処理)
+  socket.off('welcome_text',       ウェルカムテキスト受信処理)
+  socket.off('output_stream',      出力ストリーム受信処理)
+  socket.off('output_file',        出力ファイル受信処理)
+  socket.off('recognition_input',  音声入力受信処理)
+  socket.off('recognition_output', 音声出力受信処理)
+}
+
+// --- チャット接続管理 ---
+
+function チャットリセット() {
+  出力接続済み.value = false
+  ウェルカム内容.value = ''
+  メッセージ一覧.value = []
+  ストリームメッセージID = null
+  ウェルカムテキスト受信済み.value = false
+  通知('chat-state', false)
+}
+
+async function 出力ソケット接続() {
+  if (!プロパティ.セッションID) return
+  const チャンネル = プロパティ.チャンネル ?? '0'
+  出力WebSocket.value?.disconnect()
+  チャットリセット()
+  const nextSocket = new AIWebSocket(AI_WS_ENDPOINT, プロパティ.セッションID, チャンネル)
+  nextSocket.onStateChange((connected) => {
+    出力接続済み.value = connected
+    通知('chat-state', connected)
+  })
+  WSハンドラ登録(nextSocket)
+  try {
+    await nextSocket.connect()
+    出力WebSocket.value = nextSocket
+  } catch {
+    出力WebSocket.value?.disconnect()
+    出力WebSocket.value = null
+    チャットリセット()
   }
 }
 
-// --- クリック→貼り付け ---
+// --- 折りたたみ ---
 
-const 貼り付け対象: MessageKind[] = [
-  'user', 'assistant', 'input-request', 'output-request',
-  'input-file', 'output-file', 'recognition-user', 'recognition-assistant',
+const 折りたたみ切替 = (メッセージID: string) => {
+  const 対象メッセージ = メッセージ一覧.value.find(m => m.id === メッセージID)
+  if (対象メッセージ && 対象メッセージ.isStream) {
+    対象メッセージ.isCollapsed = !対象メッセージ.isCollapsed
+  }
+}
+
+// --- 貼り付けヘルパー ---
+
+const 右トリム = (text: string) => text.replace(/\s+$/u, '')
+
+const 貼り付け対象ロール: メッセージ['role'][] = [
+  'input_text', 'input_request', 'input_file',
+  'output_text', 'output_request', 'output_file',
+  'recognition_input', 'recognition_output',
 ]
 
-function 折りたたみ切替(msg: ChatMessage) {
-  if (msg.isStream) {
-    msg.isCollapsed = !msg.isCollapsed
+const 貼り付け用文字列取得 = (メッセージ項目: メッセージ) => {
+  if (メッセージ項目.kind === 'file') {
+    const ファイル名 = メッセージ項目.fileName ?? ''
+    return ファイル名 ? `"${ファイル名}"` : ''
   }
+  return メッセージ項目.content ?? ''
 }
 
-function メッセージクリック(msg: ChatMessage) {
-  if (msg.isStream) {
-    if (msg.isCollapsed) 折りたたみ切替(msg)
+const メッセージ貼り付け可能 = (メッセージ項目: メッセージ) => {
+  if (メッセージ項目.isStream) return false
+  return 貼り付け対象ロール.includes(メッセージ項目.role)
+}
+
+// --- クリック処理 ---
+
+const メッセージ行クリック処理 = async (メッセージ項目: メッセージ) => {
+  if (メッセージ項目.isStream) {
+    if (メッセージ項目.isCollapsed) 折りたたみ切替(メッセージ項目.id)
     return
   }
-
-  if (!貼り付け対象.includes(msg.kind)) return
-
-  let pasteText = ''
-  if (msg.kind === 'input-file' || msg.kind === 'output-file') {
-    pasteText = msg.fileName ? `"${msg.fileName}"` : ''
+  if (!メッセージ貼り付け可能(メッセージ項目)) return
+  const 貼り付け文字列 = 右トリム(貼り付け用文字列取得(メッセージ項目))
+  if (!貼り付け文字列) return
+  const ファイル系 = メッセージ項目.role === 'input_file' || メッセージ項目.role === 'output_file'
+  if (ファイル系) {
+    const 区切り = 入力テキスト.value && !入力テキスト.value.endsWith('\n') ? '\n' : ''
+    入力テキスト.value = `${入力テキスト.value}${区切り}${貼り付け文字列}\n`
   } else {
-    pasteText = msg.text.replace(/\s+$/u, '')
+    入力テキスト.value = `${貼り付け文字列}\n`
   }
-  if (!pasteText) return
-
-  const isFile = msg.kind === 'input-file' || msg.kind === 'output-file'
-  if (isFile) {
-    const sep = 入力テキスト.value && !入力テキスト.value.endsWith('\n') ? '\n' : ''
-    入力テキスト.value = `${入力テキスト.value}${sep}${pasteText}\n`
-  } else {
-    入力テキスト.value = `${pasteText}\n`
-  }
-
   nextTick(() => {
     if (!テキストエリア.value) return
     テキストエリア.value.focus()
     テキストエリア自動調整()
-    const len = テキストエリア.value.value.length
-    テキストエリア.value.setSelectionRange(len, len)
+    const 末尾 = テキストエリア.value.value.length
+    テキストエリア.value.setSelectionRange(末尾, 末尾)
   })
+  if (ファイル系 && メッセージ項目.fileName) {
+    await ファイル内容表示を開く(メッセージ項目.fileName)
+  }
 }
 
-function メッセージカーソル(msg: ChatMessage): string {
-  if (msg.isStream && msg.isCollapsed) return 'pointer'
-  return 貼り付け対象.includes(msg.kind) ? 'pointer' : 'default'
+const メッセージ行カーソル = (メッセージ項目: メッセージ): string => {
+  if (メッセージ項目.isStream && メッセージ項目.isCollapsed) return 'pointer'
+  return メッセージ貼り付け可能(メッセージ項目) ? 'pointer' : 'default'
 }
 
 // --- 入力欄 ---
-
-function テキストエリア自動調整() {
-  if (!テキストエリア.value) return
-
-  const コンテナ = テキストエリア.value.closest('.chat-container') as HTMLElement | null
-  if (コンテナ) {
-    const 候補高さ = Math.floor(コンテナ.clientHeight * 0.78)
-    入力欄最大高さ.value = Math.max(入力欄最小高さ, 候補高さ)
-  }
-
-  if (入力テキスト.value.length === 0) {
-    入力欄状態リセット()
-    return
-  }
-
-  if (入力欄固定中.value) {
-    入力欄最大到達.value = true
-    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`
-    return
-  }
-
-  テキストエリア.value.style.height = `${入力欄最小高さ}px`
-  const scrollH = テキストエリア.value.scrollHeight
-  const next = Math.max(scrollH, 入力欄最小高さ)
-  const atLimit = next >= 入力欄最大高さ.value
-  入力欄最大到達.value = atLimit
-  if (atLimit) {
-    入力欄固定中.value = true
-    入力欄固定高さ.value = 入力欄最大高さ.value
-    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`
-    return
-  }
-  テキストエリア.value.style.height = `${next}px`
-}
 
 function 入力欄状態リセット() {
   入力欄最大到達.value = false
   入力欄固定中.value = false
   入力欄固定高さ.value = 入力欄最小高さ
-  if (テキストエリア.value) {
-    テキストエリア.value.style.height = `${入力欄最小高さ}px`
-  }
+  if (テキストエリア.value) テキストエリア.value.style.height = `${入力欄最小高さ}px`
 }
 
 function 入力欄クリア() {
   入力テキスト.value = ''
   入力欄状態リセット()
   nextTick(() => {
-    テキストエリア.value?.focus()
+    if (!テキストエリア.value) return
+    テキストエリア.value.focus()
     テキストエリア自動調整()
   })
 }
 
-function submit() {
+const 入力欄最大高さ更新 = () => {
+  const テキストエリア要素 = テキストエリア.value
+  if (!テキストエリア要素) return
+  const コンテナ = テキストエリア要素.closest('.chat-container') as HTMLElement | null
+  if (!コンテナ) return
+  const 候補高さ = Math.floor(コンテナ.clientHeight * 0.78)
+  入力欄最大高さ.value = Math.max(入力欄最小高さ, 候補高さ)
+}
+
+function テキストエリア自動調整() {
+  if (!テキストエリア.value) return
+  入力欄最大高さ更新()
+  if (入力テキスト.value.length === 0) { 入力欄状態リセット(); return }
+  if (入力欄固定中.value) {
+    入力欄最大到達.value = true
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`
+    return
+  }
+  テキストエリア.value.style.height = `${入力欄最小高さ}px`
+  const スクロール高 = テキストエリア.value.scrollHeight
+  const 次の高さ = Math.max(スクロール高, 入力欄最小高さ)
+  const 上限到達 = 次の高さ >= 入力欄最大高さ.value
+  入力欄最大到達.value = 上限到達
+  if (上限到達) {
+    入力欄固定中.value = true
+    入力欄固定高さ.value = 入力欄最大高さ.value
+    テキストエリア.value.style.height = `${入力欄固定高さ.value}px`
+    return
+  }
+  テキストエリア.value.style.height = `${次の高さ}px`
+}
+
+// --- 送信 ---
+
+function メッセージ送信() {
   const text = 入力テキスト.value.trim()
   if (!text || !WebSocket接続中.value) return
-  emit('send-input-payload', {
+  const 現在モード = 選択モード.value
+  const コードモード = 現在モード.startsWith('code')
+  const コード番号 = コードモード ? (現在モード.replace('code', '') || '1') : ''
+  const 送信モード = コードモード ? `Code${コード番号}` : (現在モード === 'live' ? 'Live' : 'Chat')
+  通知('send-input-payload', {
     チャンネル: '0',
-    送信モード: props.mode,
+    送信モード: 送信モード,
     メッセージ識別: 'input_text',
     メッセージ内容: text,
   })
   入力欄クリア()
 }
 
-function handleKeydown(event: KeyboardEvent) {
+function キー入力処理(event: KeyboardEvent) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
-    submit()
+    メッセージ送信()
+  }
+}
+
+// --- ファイル送信 ---
+
+const ファイルをBase64読込 = (入力ファイル: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const 読込 = new FileReader()
+    読込.onload = () => {
+      const result = 読込.result
+      if (typeof result === 'string') {
+        const commaIndex = result.indexOf(',')
+        resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result)
+        return
+      }
+      if (result instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(result)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+        resolve(window.btoa(binary))
+        return
+      }
+      reject(new Error('不明なファイル形式です'))
+    }
+    読込.onerror = () => reject(読込.error || new Error('ファイル読み込みに失敗しました'))
+    読込.readAsDataURL(入力ファイル)
+  })
+}
+
+const 入力ファイル送信 = async (入力ファイル: File) => {
+  try {
+    const Base64データ = await ファイルをBase64読込(入力ファイル)
+    通知('send-input-payload', {
+      チャンネル: '0',
+      メッセージ識別: 'input_file',
+      メッセージ内容: Base64データ,
+      ファイル名: 入力ファイル.name,
+      サムネイル画像: null,
+    })
+  } catch (error) {
+    console.error('[チャット] ファイル送信エラー:', error)
+    ターミナルメッセージ追加('output_text', 'ファイル送信に失敗しました。')
   }
 }
 
@@ -512,127 +653,122 @@ function ドラッグ離脱処理(event: DragEvent) {
   if (event.currentTarget === event.target) ドラッグ中.value = false
 }
 
-function ドロップ処理(event: DragEvent) {
+async function ドロップ処理(event: DragEvent) {
   event.preventDefault()
   ドラッグ中.value = false
   if (!WebSocket接続中.value) return
-  const files = Array.from(event.dataTransfer?.files || [])
-  if (files.length === 0) return
-  void Promise.all(files.map(async (file) => {
-    const base64 = await fileToBase64(file)
-    emit('send-input-payload', {
-      チャンネル: '0',
-      メッセージ識別: 'input_file',
-      メッセージ内容: base64,
-      ファイル名: file.name,
-      サムネイル画像: null,
-    })
-  }))
+  const ファイル一覧 = Array.from(event.dataTransfer?.files || [])
+  if (ファイル一覧.length === 0) return
+  for (const ファイル of ファイル一覧) {
+    await 入力ファイル送信(ファイル)
+  }
 }
 
 // --- スクロール ---
 
 function 最下部スクロール() {
   nextTick(() => {
-    if (チャット領域.value) {
-      チャット領域.value.scrollTop = チャット領域.value.scrollHeight
-    }
+    if (チャット領域.value) チャット領域.value.scrollTop = チャット領域.value.scrollHeight
   })
 }
 
-// --- メッセージ監視 ---
-
-watch(
-  表示メッセージ一覧,
-  (msgs) => {
-    for (const msg of msgs) {
-      if (!描画済みID.has(msg.id)) {
-        メッセージ描画開始(msg)
-      } else if (msg.isStream) {
-        ストリーム追記チェック(msg)
-      }
-    }
-    最下部スクロール()
-  },
-  { deep: true, immediate: true },
-)
+// --- Watch ---
 
 watch(入力テキスト, () => nextTick(テキストエリア自動調整))
-watch(() => props.sessionId, (sessionId) => {
-  if (sessionId) {
-    void connectChatSockets()
-    return
+
+watch(() => プロパティ.セッションID, (新ID, 旧ID) => {
+  if (!新ID || 新ID === 旧ID) return
+  ウェルカムテキスト受信済み.value = false
+  if (出力WebSocket.value) {
+    WSハンドラ解除(出力WebSocket.value)
+    出力WebSocket.value.disconnect()
+    出力WebSocket.value = null
+    出力接続済み.value = false
   }
-  チャットWebSocket?.disconnect()
-  チャットWebSocket = null
-  resetLocalChat()
+  void 出力ソケット接続()
 })
 
+watch(() => プロパティ.chatMode, (新モード) => {
+  if (新モード && 新モード !== 選択モード.value) 選択モード.value = 新モード
+})
+
+watch(選択モード, (新モード) => {
+  通知('mode-change', 新モード)
+})
+
+// --- ライフサイクル ---
+
 onMounted(() => {
-  if (props.sessionId) void connectChatSockets()
+  if (プロパティ.セッションID) void 出力ソケット接続()
   window.addEventListener('resize', テキストエリア自動調整)
-  nextTick(テキストエリア自動調整)
+  nextTick(() => {
+    入力欄最大高さ更新()
+    テキストエリア自動調整()
+  })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', テキストエリア自動調整)
-  チャットWebSocket?.disconnect()
-  チャットWebSocket = null
+  if (出力WebSocket.value) {
+    WSハンドラ解除(出力WebSocket.value)
+    出力WebSocket.value.disconnect()
+    出力WebSocket.value = null
+  }
   for (const state of 演出状態Map.values()) {
-    clearInterval(state.blinkInterval)
+    clearInterval((state as any).blinkInterval)
   }
   演出状態Map.clear()
 })
 
 defineExpose({
   WebSocket接続中,
-  チャット接続済み: ローカルチャット接続済み,
+  チャット接続済み: 出力接続済み,
 })
 </script>
 
 <template>
   <section class="chat-container" data-interactive="true">
     <div ref="チャット領域" class="chat-area">
-      <div v-if="表示WelcomeInfo" class="welcome-message">
-        {{ 表示WelcomeInfo }}
+      <div v-if="ウェルカム内容" class="welcome-message">
+        {{ ウェルカム内容 }}
       </div>
 
       <div
-        v-for="msg in 表示メッセージ一覧"
-        :key="msg.id"
-        :id="msg.id"
+        v-for="メッセージ項目 in メッセージ一覧"
+        :key="メッセージ項目.id"
+        :id="メッセージ項目.id"
         :class="[
           'message',
-          メッセージCSSクラス(msg.kind),
-          msg.kind === 'input-file' || msg.kind === 'output-file' ? 'is-file' : '',
-          msg.isStream ? 'stream-output' : '',
-          msg.isCollapsed ? 'collapsed' : '',
+          メッセージ項目.role,
+          メッセージ項目.kind === 'file' ? 'is-file' : '',
+          メッセージ項目.isStream ? 'stream-output' : '',
+          メッセージ項目.isCollapsed ? 'collapsed' : '',
         ]"
       >
         <div
           class="message-bubble"
-          @click="メッセージクリック(msg)"
-          :style="{ cursor: メッセージカーソル(msg) }"
+          @click="メッセージ行クリック処理(メッセージ項目)"
+          :style="{ cursor: メッセージ行カーソル(メッセージ項目) }"
         >
           <!-- 折りたたみ表示 -->
-          <div v-if="msg.isStream && msg.isCollapsed" class="collapsed-wrapper">
+          <div v-if="メッセージ項目.isStream && メッセージ項目.isCollapsed" class="collapsed-wrapper">
             <span class="collapsed-indicator">...</span>
             <span class="collapsed-arrow">&#x25C0;</span>
           </div>
 
-          <div v-show="!(msg.isStream && msg.isCollapsed)" class="bubble-content">
+          <div v-show="!(メッセージ項目.isStream && メッセージ項目.isCollapsed)" class="bubble-content">
             <!-- ファイルメッセージ -->
-            <template v-if="msg.kind === 'input-file' || msg.kind === 'output-file'">
+            <template v-if="メッセージ項目.kind === 'file'">
               <div class="file-message">
                 <div class="file-name">
-                  <span v-if="msg.kind === 'input-file'">ファイル入力: </span>
-                  <span v-if="msg.kind === 'output-file'">ファイル出力: </span>
-                  {{ msg.fileName || 'ファイル受信' }}
+                  <span v-if="メッセージ項目.role === 'input_file'">ファイル入力: </span>
+                  <span v-if="メッセージ項目.role === 'output_file'">ファイル出力: </span>
+                  {{ メッセージ項目.fileName || 'ファイル受信' }}
                 </div>
                 <img
-                  v-if="msg.thumbnail"
+                  v-if="メッセージ項目.thumbnail"
                   class="file-thumbnail"
-                  :src="`data:image/png;base64,${msg.thumbnail}`"
+                  :src="`data:image/png;base64,${メッセージ項目.thumbnail}`"
                   alt="thumbnail"
                 />
               </div>
@@ -641,16 +777,16 @@ defineExpose({
           </div>
 
           <span
-            v-if="msg.isStream && !msg.isCollapsed"
+            v-if="メッセージ項目.isStream && !メッセージ項目.isCollapsed"
             class="expand-indicator"
-            @click.stop="折りたたみ切替(msg)"
+            @click.stop="折りたたみ切替(メッセージ項目.id)"
             title="折りたたむ"
           >&#x25BC;</span>
         </div>
       </div>
 
-      <div v-if="表示メッセージ一覧.length === 0" class="empty-message">
-        <p>セッション: {{ sessionId || '未接続' }}</p>
+      <div v-if="メッセージ一覧.length === 0" class="empty-message">
+        <p>セッション: {{ プロパティ.セッションID || '未接続' }}</p>
       </div>
     </div>
 
@@ -672,33 +808,39 @@ defineExpose({
             placeholder="メッセージを入力..."
             maxlength="5000"
             :disabled="!WebSocket接続中"
-            @keydown="handleKeydown"
             @input="テキストエリア自動調整"
+            @keydown="キー入力処理"
           ></textarea>
         </div>
       </div>
 
       <div class="mode-panel">
         <div class="mode-selector">
-          <label v-for="option in モード一覧.slice(0, 3)" :key="option.value" class="mode-option">
-            <input
-              type="radio"
-              :checked="mode === option.value"
-              name="avatar-chat-mode"
-              @change="emit('update:mode', option.value)"
-            />
-            <span>{{ option.label }}</span>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="chat" name="avatar-chat-mode" />
+            <span>Chat</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="live" name="avatar-chat-mode" />
+            <span>Live</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code1" name="avatar-chat-mode" />
+            <span>Code1</span>
           </label>
         </div>
         <div class="code-selector">
-          <label v-for="option in モード一覧.slice(3)" :key="option.value" class="mode-option">
-            <input
-              type="radio"
-              :checked="mode === option.value"
-              name="avatar-chat-mode"
-              @change="emit('update:mode', option.value)"
-            />
-            <span>{{ option.label }}</span>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code2" name="avatar-chat-mode" />
+            <span>Code2</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code3" name="avatar-chat-mode" />
+            <span>Code3</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code4" name="avatar-chat-mode" />
+            <span>Code4</span>
           </label>
         </div>
       </div>
@@ -710,13 +852,22 @@ defineExpose({
           'has-text': 入力テキスト.length > 0,
         }"
         type="button"
-        :disabled="!送信可能"
+        :disabled="!入力テキスト.trim() || !WebSocket接続中"
         title="送信"
-        @click="submit"
+        @click="メッセージ送信"
       >
         <img src="/icons/sending.png" alt="送信" />
+        <span class="send-mode-label">{{ 送信モードラベル }}</span>
       </button>
     </div>
+
+    <component
+      :is="ファイル内容表示ダイアログ"
+      :show="ファイル内容ダイアログ表示"
+      :ファイル名="表示ファイル名"
+      :base64_data="表示base64_data"
+      @close="ファイル内容ダイアログ閉じる"
+    />
   </section>
 </template>
 
@@ -883,7 +1034,6 @@ defineExpose({
   border-top: 1px solid #2c2c2c;
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
   gap: 10px;
   align-items: flex-end;
 }
@@ -950,7 +1100,6 @@ defineExpose({
   padding-bottom: 16px;
   justify-content: center;
   margin-top: -4px;
-  flex-shrink: 0;
 }
 
 .mode-selector,
@@ -984,6 +1133,7 @@ defineExpose({
 
 .mode-option span {
   font-family: "Courier New", monospace;
+  font-weight: normal;
   position: relative;
   top: -4px;
 }
@@ -992,6 +1142,7 @@ defineExpose({
   border: 2px solid #667eea;
   border-radius: 2px;
   cursor: pointer;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1020,6 +1171,29 @@ defineExpose({
 .chat-send-btn:disabled:not(.ws-disabled) img { filter: brightness(0); }
 .chat-send-btn.ws-disabled { background: #808080 !important; border-color: #808080 !important; cursor: not-allowed; opacity: 1; }
 .chat-send-btn.ws-disabled img { filter: brightness(0) invert(1) !important; }
+
+.send-mode-label {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.7px;
+  color: #334155;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+.chat-send-btn.has-text .send-mode-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.chat-send-btn.ws-disabled .send-mode-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
 
 @media (max-width: 480px) {
   .control-area { flex-direction: column; align-items: stretch; padding-bottom: 12px; }

@@ -1,10 +1,22 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101
+  -------------------------------------------------------------------------
+-->
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import アバター from '@/components/アバター.vue'
-import WindowShell from '@/components/WindowShell.vue'
-import { AudioController } from '@/_share/audio-controller'
-import { AI_WS_ENDPOINT } from '@/_share/config'
-import { AIWebSocket } from '@/_share/websocket'
+import アバター from '@/components/AIコア_アバター.vue'
+import WindowShell from '@/components/_WindowShell.vue'
+import { AudioController } from '@/components/AIコア_音声処理'
+import { AI_WS_ENDPOINT } from '@/api/config'
+import { AIWebSocket } from '@/api/websocket'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
 
@@ -13,80 +25,85 @@ const props = defineProps<{
   userLabel: string;
   liveModel: string;
   welcomeInfo: string;
+  welcomeBody?: string;
   inputConnected: boolean;
   inputSocket: AIWebSocket | null;
   initialMicEnabled: boolean;
   initialSpeakerEnabled: boolean;
   audioStateSeed: number;
   panelVisibility: Record<PanelKey, boolean>;
+  chatCount?: number;
   coreBusy: boolean;
   coreError: string;
 }>()
 
 // --- 字幕キュー（最小5秒・最大30秒表示） ---
 
-const subtitleDisplay = ref('')
-const subtitleQueue: string[] = []
-let subtitleMinTimer: ReturnType<typeof setTimeout> | null = null
-let subtitleMaxTimer: ReturnType<typeof setTimeout> | null = null
+const 字幕表示 = ref('')
+const 字幕キュー: string[] = []
+let 字幕最小表示タイマー: ReturnType<typeof setTimeout> | null = null
+let 字幕最大表示タイマー: ReturnType<typeof setTimeout> | null = null
 
-function clearSubtitleTimers() {
-  if (subtitleMinTimer) { clearTimeout(subtitleMinTimer); subtitleMinTimer = null }
-  if (subtitleMaxTimer) { clearTimeout(subtitleMaxTimer); subtitleMaxTimer = null }
+function 字幕タイマー停止() {
+  if (字幕最小表示タイマー) { clearTimeout(字幕最小表示タイマー); 字幕最小表示タイマー = null }
+  if (字幕最大表示タイマー) { clearTimeout(字幕最大表示タイマー); 字幕最大表示タイマー = null }
 }
 
-function advanceSubtitle() {
-  clearSubtitleTimers()
-  if (subtitleQueue.length > 0) {
-    subtitleDisplay.value = subtitleQueue.shift()!
-    subtitleMinTimer = setTimeout(() => {
-      subtitleMinTimer = null
-      if (subtitleQueue.length > 0) {
-        advanceSubtitle()
+function 字幕送り() {
+  字幕タイマー停止()
+  if (字幕キュー.length > 0) {
+    字幕表示.value = 字幕キュー.shift()!
+    字幕最小表示タイマー = setTimeout(() => {
+      字幕最小表示タイマー = null
+      if (字幕キュー.length > 0) {
+        字幕送り()
       } else {
-        subtitleMaxTimer = setTimeout(() => {
-          subtitleDisplay.value = ''
-          subtitleMaxTimer = null
+        字幕最大表示タイマー = setTimeout(() => {
+          字幕表示.value = ''
+          字幕最大表示タイマー = null
         }, 25000)
       }
     }, 5000)
   } else {
-    subtitleDisplay.value = ''
+    字幕表示.value = ''
   }
 }
 
-function addSubtitle(text: string) {
+function 字幕追加(text: string) {
   if (!text.trim()) return
-  subtitleQueue.push(text)
-  if (!subtitleDisplay.value) {
-    advanceSubtitle()
+  字幕キュー.push(text)
+  if (!字幕表示.value) {
+    字幕送り()
     return
   }
-  if (!subtitleMinTimer && subtitleMaxTimer) {
-    advanceSubtitle()
+  if (!字幕最小表示タイマー && 字幕最大表示タイマー) {
+    字幕送り()
   }
 }
 
 const emit = defineEmits<{
   togglePanel: [panel: PanelKey];
   reconnect: [];
+  openSettingRestart: [];
+  audioStateChange: [payload: { micEnabled: boolean; speakerEnabled: boolean; audioConnected: boolean }];
   logout: [];
 }>()
 
 const UI自動非表示秒数 = 15000
 const ビジュアライザーバー数 = 32
-const uiVisible = ref(true)
+const UI表示中 = ref(true)
 const 音声接続済み = ref(false)
 const マイク有効 = ref(false)
 const スピーカー有効 = ref(true)
 const マイクレベル = ref(0)
 const スピーカーレベル = ref(0)
 const 音声エラー = ref('')
+const ウェルカムホバー中 = ref(false)
 const 入力スペクトラム = ref<number[]>(初期スペクトラム())
 const 出力スペクトラム = ref<number[]>(初期スペクトラム())
-const audioSocket = shallowRef<AIWebSocket | null>(null)
+const 音声Socket = shallowRef<AIWebSocket | null>(null)
 
-let uiHideTimer: ReturnType<typeof setTimeout> | null = null
+let UI非表示タイマー: ReturnType<typeof setTimeout> | null = null
 let 音声接続世代 = 0
 
 const 音声処理機 = shallowRef(new AudioController({
@@ -102,37 +119,49 @@ const 音声処理機 = shallowRef(new AudioController({
   onOutputSpectrum: (values) => {
     出力スペクトラム.value = values
   },
-  getSocket: () => audioSocket.value,
+  getSocket: () => 音声Socket.value,
   getSessionId: () => props.sessionId,
 }))
 
-const transportState = computed(() => {
+const 接続状態表示 = computed(() => {
   if (props.inputConnected && 音声接続済み.value) return '接続中'
   if (props.coreBusy) return '接続中...'
   if (props.inputConnected || 音声接続済み.value) return '部分接続'
   return '切断'
 })
 
-const statusDotClass = computed(() => ({
-  on: transportState.value === '接続中',
-  partial: transportState.value === '部分接続' || transportState.value === '接続中...',
+const 接続状態ドットクラス = computed(() => ({
+  on: 接続状態表示.value === '接続中',
+  partial: 接続状態表示.value === '部分接続' || 接続状態表示.value === '接続中...',
 }))
 
-const visualizerVisible = computed(() => {
-  return uiVisible.value && (マイク有効.value || スピーカー有効.value || マイクレベル.value > 0.03 || スピーカーレベル.value > 0.03)
+const ビジュアライザー表示中 = computed(() => {
+  return UI表示中.value && (マイク有効.value || スピーカー有効.value || マイクレベル.value > 0.03 || スピーカーレベル.value > 0.03)
 })
 
-const panelToastText = computed(() => {
+const 案内表示テキスト = computed(() => {
   if (props.coreError) return props.coreError
   if (音声エラー.value) return 音声エラー.value
   if (props.coreBusy) return 'AIコアへ接続しています...'
   return ''
 })
 
-const panelToastIsError = computed(() => Boolean(props.coreError || 音声エラー.value))
+const 案内表示エラー = computed(() => Boolean(props.coreError || 音声エラー.value))
 
 function 初期スペクトラム() {
   return Array.from({ length: ビジュアライザーバー数 }, () => 0.05)
+}
+
+function 音声状態通知() {
+  emit('audioStateChange', {
+    micEnabled: マイク有効.value,
+    speakerEnabled: スピーカー有効.value,
+    audioConnected: 音声接続済み.value,
+  })
+}
+
+function 音声モデル同期() {
+  音声処理機.value.setLiveModelName(props.liveModel)
 }
 
 function ビジュアライザー初期化() {
@@ -140,33 +169,48 @@ function ビジュアライザー初期化() {
   出力スペクトラム.value = 初期スペクトラム()
 }
 
-function clearUiHideTimer() {
-  if (!uiHideTimer) return
-  clearTimeout(uiHideTimer)
-  uiHideTimer = null
+function UI自動非表示停止() {
+  if (!UI非表示タイマー) return
+  clearTimeout(UI非表示タイマー)
+  UI非表示タイマー = null
 }
 
-function scheduleUiHide() {
-  clearUiHideTimer()
-  uiHideTimer = setTimeout(() => {
-    uiVisible.value = false
+function UI自動非表示予約() {
+  UI自動非表示停止()
+  UI非表示タイマー = setTimeout(() => {
+    UI表示中.value = false
   }, UI自動非表示秒数)
 }
 
-function handleMouseEnter() {
-  clearUiHideTimer()
-  uiVisible.value = true
+function UI表示開始() {
+  UI自動非表示停止()
+  UI表示中.value = true
 }
 
-function handleMouseLeave() {
-  scheduleUiHide()
+function UI表示終了() {
+  UI自動非表示予約()
 }
 
 function パネル切替要求(panel: PanelKey) {
   emit('togglePanel', panel)
 }
 
+function 再表示要求() {
+  UI表示中.value = true
+  UI自動非表示予約()
+  再接続要求()
+}
+
+function 再接続要求() {
+  emit('reconnect')
+}
+
+function 設定再起動要求() {
+  emit('openSettingRestart')
+}
+
 function 音声操作状態同期() {
+  音声状態通知()
   if (!props.inputSocket?.isConnected()) return
 
   props.inputSocket.send({
@@ -187,14 +231,15 @@ function 音声切断(incrementGeneration = true) {
     音声接続世代 += 1
   }
 
-  audioSocket.value?.disconnect()
-  audioSocket.value = null
+  音声Socket.value?.disconnect()
+  音声Socket.value = null
   音声接続済み.value = false
   音声処理機.value.setAudioSocket(null)
   音声処理機.value.cleanup()
   マイクレベル.value = 0
   スピーカーレベル.value = 0
   ビジュアライザー初期化()
+  音声状態通知()
 }
 
 async function マイク開始反映() {
@@ -209,13 +254,14 @@ function 音声シード反映() {
   マイク有効.value = props.initialMicEnabled
   スピーカー有効.value = props.initialSpeakerEnabled
   音声処理機.value.setSessionId(props.sessionId)
-  音声処理機.value.setLiveModelName(props.liveModel)
+  音声モデル同期()
   音声処理機.value.setSpeakerEnabled(スピーカー有効.value)
   if (!マイク有効.value) {
     音声処理機.value.stopMicrophone()
   } else if (音声接続済み.value) {
     void マイク開始反映()
   }
+  音声状態通知()
 }
 
 async function 音声接続開始() {
@@ -249,15 +295,17 @@ async function 音声接続開始() {
       return
     }
 
-    audioSocket.value = nextSocket
+    音声Socket.value = nextSocket
     音声処理機.value.setAudioSocket(nextSocket)
     音声処理機.value.setSessionId(connectedSessionId)
-    音声処理機.value.setLiveModelName(props.liveModel)
+    音声モデル同期()
     音声処理機.value.setSpeakerEnabled(スピーカー有効.value)
     音声エラー.value = ''
+    音声状態通知()
 
     if (マイク有効.value) {
       await マイク開始反映()
+      音声状態通知()
     }
   } catch (error) {
     if (currentGeneration !== 音声接続世代) return
@@ -279,6 +327,7 @@ async function マイク切替() {
     マイク有効.value = true
     await マイク開始反映()
     if (!マイク有効.value) {
+      音声状態通知()
       return
     }
   } else {
@@ -307,7 +356,7 @@ watch(() => props.audioStateSeed, () => {
 }, { immediate: true })
 
 watch(() => props.liveModel, (model) => {
-  音声処理機.value.setLiveModelName(model)
+  音声モデル同期()
 })
 
 watch(
@@ -319,7 +368,7 @@ watch(
       return
     }
 
-    if (!prevInputConnected || sessionId !== prevSessionId || !audioSocket.value?.isConnected()) {
+    if (!prevInputConnected || sessionId !== prevSessionId || !音声Socket.value?.isConnected()) {
       void 音声接続開始()
     }
   },
@@ -327,36 +376,37 @@ watch(
 )
 
 onMounted(() => {
-  scheduleUiHide()
+  UI自動非表示予約()
 })
 
 onBeforeUnmount(() => {
-  clearUiHideTimer()
-  clearSubtitleTimers()
+  UI自動非表示停止()
+  字幕タイマー停止()
   音声切断()
 })
 
-defineExpose({ addSubtitle })
+defineExpose({ 字幕追加 })
 </script>
 
 <template>
   <component
     :is="WindowShell"
-    title="AiDiy Desktop Avatar"
+    :title="props.liveModel ? `AiDiy Desktop Avatar (${props.liveModel})` : 'AiDiy Desktop Avatar'"
     theme="purple"
     close-mode="event"
-    :chrome-visible="uiVisible"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
+    :chrome-visible="UI表示中"
+    @mouseenter="UI表示開始"
+    @mouseleave="UI表示終了"
     @close="emit('logout')"
   >
-    <template v-if="uiVisible" #title-right>
-      <span class="core-status-dot" :class="statusDotClass"></span>
-      <span class="core-status-text">{{ transportState }}</span>
+    <template v-if="UI表示中" #title-right>
+      <span class="core-status-dot" :class="接続状態ドットクラス"></span>
+      <span class="core-status-text">{{ 接続状態表示 }}</span>
+      <button class="title-action-button" type="button" title="再表示" @click="再表示要求">↺</button>
     </template>
 
     <div class="core-panel-body">
-      <div v-show="visualizerVisible" class="audio-visualizer-overlay">
+      <div v-show="ビジュアライザー表示中" class="audio-visualizer-overlay">
         <div class="audio-bars">
           <div v-for="(_, index) in 入力スペクトラム" :key="index" class="audio-bar-container">
             <i class="audio-bar output-audio" :style="{ height: `${Math.round((出力スペクトラム[index] || 0.05) * 100)}%` }"></i>
@@ -365,12 +415,19 @@ defineExpose({ addSubtitle })
         </div>
       </div>
 
-      <div v-if="uiVisible && welcomeInfo" class="welcome-info-overlay">
-        {{ welcomeInfo }}
+      <div
+        v-if="UI表示中 && (props.welcomeInfo || props.welcomeBody)"
+        :class="['welcome-info-overlay', { 'is-hover': ウェルカムホバー中 }]"
+        @mouseenter="ウェルカムホバー中 = true"
+        @mouseleave="ウェルカムホバー中 = false"
+      >
+        <div v-if="props.welcomeInfo" class="welcome-info-text">{{ props.welcomeInfo }}</div>
+        <pre v-if="props.welcomeBody" class="welcome-body-text">{{ props.welcomeBody }}</pre>
       </div>
 
       <component
         :is="アバター"
+        class="avatar-layer"
         :session-id="sessionId"
         :user-name="userLabel"
         :live-model="liveModel"
@@ -380,14 +437,14 @@ defineExpose({ addSubtitle })
         :speaker-enabled="スピーカー有効"
         :mic-level="マイクレベル"
         :speaker-level="スピーカーレベル"
-        :ui-visible="uiVisible"
-        :transparent-mode="!uiVisible"
-        :subtitle-text="subtitleDisplay"
+        :ui-visible="UI表示中"
+        :transparent-mode="!UI表示中"
+        :subtitle-text="字幕表示"
       />
 
-      <aside v-show="uiVisible" class="panel-icons">
+      <aside v-show="UI表示中" class="floating-controls">
         <button
-          class="tool-button microphone-button"
+          class="floating-icon microphone-icon"
           :class="{ active: マイク有効 }"
           :disabled="!inputConnected || !音声接続済み"
           type="button"
@@ -397,7 +454,7 @@ defineExpose({ addSubtitle })
           <img src="/icons/microphone.png" alt="マイク" />
         </button>
         <button
-          class="tool-button speaker-button"
+          class="floating-icon speaker-icon"
           :class="{ inactive: !スピーカー有効, active: スピーカー有効 }"
           :disabled="!inputConnected || !音声接続済み"
           type="button"
@@ -407,74 +464,84 @@ defineExpose({ addSubtitle })
           <img src="/icons/speaker.png" alt="スピーカー" />
         </button>
         <button
-          class="tool-button file-button"
+          class="floating-icon file-icon"
           :class="{ inactive: !panelVisibility.file, active: panelVisibility.file }"
           type="button"
-          title="AIファイル"
+          title="ファイル"
           @click="パネル切替要求('file')"
         >
-          <img src="/icons/folder_transparent.png" alt="ファイル" />
+          <img src="/icons/folder.png" alt="ファイル" />
         </button>
         <button
-          class="tool-button chat-button"
+          class="floating-icon chat-icon"
           :class="{ inactive: !panelVisibility.chat, active: panelVisibility.chat }"
+          :disabled="!inputConnected"
           type="button"
-          title="AIチャット"
+          title="チャット"
           @click="パネル切替要求('chat')"
         >
-          0
+          {{ props.chatCount ?? 0 }}
         </button>
         <button
-          class="tool-button agent-button"
+          class="floating-icon agent-icon"
           :class="{ inactive: !panelVisibility.code1, active: panelVisibility.code1 }"
+          :disabled="!inputConnected"
           type="button"
-          title="AIコード1"
+          title="コード1"
           @click="パネル切替要求('code1')"
         >
           1
         </button>
         <button
-          class="tool-button camera-button"
-          :class="{ inactive: !panelVisibility.image, active: panelVisibility.image }"
+          class="floating-icon camera-icon"
+          :class="{ active: panelVisibility.image }"
+          :disabled="!inputConnected"
           type="button"
-          title="AIイメージ"
+          title="イメージ"
           @click="パネル切替要求('image')"
         >
           <img src="/icons/camera.png" alt="イメージ" />
         </button>
         <button
-          class="tool-button agent-button"
+          class="floating-icon agent-icon"
           :class="{ inactive: !panelVisibility.code2, active: panelVisibility.code2 }"
+          :disabled="!inputConnected"
           type="button"
-          title="AIコード2"
+          title="コード2"
           @click="パネル切替要求('code2')"
         >
           2
         </button>
         <button
-          class="tool-button agent-button"
+          class="floating-icon agent-icon"
           :class="{ inactive: !panelVisibility.code3, active: panelVisibility.code3 }"
+          :disabled="!inputConnected"
           type="button"
-          title="AIコード3"
+          title="コード3"
           @click="パネル切替要求('code3')"
         >
           3
         </button>
         <button
-          class="tool-button agent-button"
+          class="floating-icon agent-icon"
           :class="{ inactive: !panelVisibility.code4, active: panelVisibility.code4 }"
+          :disabled="!inputConnected"
           type="button"
-          title="AIコード4"
+          title="コード4"
           @click="パネル切替要求('code4')"
         >
           4
         </button>
-        <button class="tool-button sync-button" type="button" title="再接続" @click="emit('reconnect')">S</button>
+        <button
+          class="floating-icon config-icon"
+          :disabled="!inputConnected"
+          type="button"
+          title="モデル設定"
+          @click="設定再起動要求"
+        >
+          <img src="/icons/setting.png" alt="設定" class="icon-image" />
+        </button>
       </aside>
-
-      <div v-if="uiVisible && panelToastText" class="panel-toast" :class="{ error: panelToastIsError }">
-        {{ panelToastText }}
-      </div>
     </div>
   </component>
 </template>
@@ -505,6 +572,30 @@ defineExpose({ addSubtitle })
 .core-status-text {
   font-size: 10px;
   font-weight: bold;
+}
+
+.title-action-button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #16a34a;
+  background: #22c55e;
+  color: #ffffff;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 18px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.title-action-button:hover {
+  background: #34d399;
+  border-color: #22c55e;
+  transform: translateY(-1px);
 }
 
 .audio-visualizer-overlay {
@@ -566,35 +657,102 @@ defineExpose({ addSubtitle })
 
 .welcome-info-overlay {
   position: absolute;
-  top: 8px;
-  left: 10px;
-  max-width: min(360px, calc(100% - 84px));
-  padding: 4px 6px;
-  color: rgba(196, 200, 208, 0.78);
-  font-size: 0.78rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
+  inset: 0;
+  z-index: 1;
+  overflow: auto;
   pointer-events: none;
-  z-index: 8;
+  user-select: none;
+  direction: rtl;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  padding: 12px 56px 12px 12px;
 }
 
-.panel-icons {
+.welcome-info-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to left, rgba(26, 26, 26, 0.95) 0%, rgba(26, 26, 26, 0) 13%),
+    linear-gradient(to top, rgba(26, 26, 26, 0.95) 0%, rgba(26, 26, 26, 0) 16%);
+  z-index: 2;
+}
+
+.welcome-info-overlay::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.welcome-info-overlay::-webkit-scrollbar-track {
+  background: rgba(26, 26, 26, 0.35);
+}
+
+.welcome-info-overlay::-webkit-scrollbar-thumb {
+  background: rgba(196, 210, 255, 0.35);
+  border-radius: 3px;
+}
+
+.welcome-info-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  color: #ffffff;
+  white-space: pre-wrap;
+  word-break: break-word;
+  direction: ltr;
+  text-align: left;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-body-text {
+  margin: 21px 0 0;
+  color: rgba(216, 225, 255, 0.22);
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 1;
+  filter: blur(0.6px);
+  text-shadow: 0 0 2px rgba(216, 225, 255, 0.25);
+  transition: color 0.45s ease, filter 0.45s ease, text-shadow 0.45s ease;
+  direction: ltr;
+  text-align: left;
+  position: relative;
+  z-index: 1;
+  font-family: 'Courier New', monospace;
+}
+
+.welcome-info-overlay.is-hover .welcome-body-text {
+  color: #ffffff;
+  filter: blur(0);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.65);
+}
+
+.avatar-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.floating-controls {
   position: absolute;
   top: 20px;
   right: 14px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
   z-index: 9;
 }
 
-.tool-button {
+.floating-icon {
   width: 32px;
   height: 32px;
   border-radius: 50%;
   border: 2px solid transparent;
   background: rgba(255, 255, 255, 0.95);
-  color: #ffffff;
+  color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -603,149 +761,168 @@ defineExpose({ addSubtitle })
   box-shadow: 0 2px 8px rgba(128, 128, 128, 0.3);
 }
 
-.tool-button img {
+.floating-icon img {
   width: 21px;
   height: 21px;
-  display: block;
   object-fit: contain;
   pointer-events: none;
   filter: brightness(0);
 }
 
-.tool-button:hover:not(:disabled) {
+.floating-icon:hover {
   transform: scale(1.05);
 }
 
-.tool-button.microphone-button {
+.floating-icon.microphone-icon {
   border-color: #ff4444;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 2px 8px rgba(255, 68, 68, 0.3);
 }
 
-.tool-button.microphone-button:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
-}
-
-.tool-button.microphone-button.active {
+.floating-icon.microphone-icon.active {
   background: #ff4444;
   border-color: #ff4444;
   animation: pulse 2.5s infinite;
   box-shadow: 0 2px 8px rgba(255, 68, 68, 0.5);
 }
 
-.tool-button.microphone-button.active img {
+.floating-icon.microphone-icon.active img {
   filter: brightness(0) invert(1);
 }
 
-.tool-button.speaker-button.inactive {
+.floating-icon.speaker-icon.inactive {
   border-color: #00bfff;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 2px 8px rgba(68, 255, 68, 0.3);
 }
 
-.tool-button.speaker-button.inactive:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(0, 191, 255, 0.4);
-}
-
-.tool-button.speaker-button {
+.floating-icon.speaker-icon {
   background: #00bfff;
   border-color: #00bfff;
   box-shadow: 0 2px 8px rgba(68, 255, 68, 0.3);
 }
 
-.tool-button.speaker-button:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(0, 191, 255, 0.4);
-}
-
-.tool-button.speaker-button.active {
+.floating-icon.speaker-icon.active {
   animation: pulse 2.5s infinite;
 }
 
-.tool-button.speaker-button.active img {
-  filter: brightness(0) invert(1);
-}
-
-.tool-button.chat-button,
-.tool-button.agent-button,
-.tool-button.camera-button {
-  border-radius: 0;
-  width: 28px;
-  height: 28px;
-  margin-left: 2px;
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 17px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tool-button.file-button {
-  border-radius: 2px;
-}
-
-.tool-button.file-button.inactive,
-.tool-button.chat-button.inactive,
-.tool-button.agent-button.inactive,
-.tool-button.camera-button.inactive {
+.floating-icon.camera-icon {
   border-color: #2e7d32;
   background: #888888;
   box-shadow: 0 2px 8px rgba(68, 255, 68, 0.3);
-  color: #000000;
+  border-radius: 0;
+  width: 28px;
+  height: 28px;
+
 }
 
-.tool-button.file-button.inactive img,
-.tool-button.camera-button.inactive img {
-  mix-blend-mode: multiply;
-}
-
-.tool-button.file-button.active,
-.tool-button.chat-button.active,
-.tool-button.agent-button.active,
-.tool-button.camera-button.active {
+.floating-icon.camera-icon.active {
   background: #000000;
   border-color: #44ff44;
   animation: pulse 2.5s infinite;
   box-shadow: 0 2px 8px rgba(68, 255, 68, 0.5);
 }
 
-.tool-button.file-button.active img,
-.tool-button.camera-button.active img {
+.floating-icon.camera-icon.active img {
   filter: brightness(0) invert(1);
 }
 
-.tool-button.chat-button.active,
-.tool-button.agent-button.active {
-  color: #00ff00;
-}
-
-.tool-button.chat-button.inactive,
-.tool-button.agent-button.inactive {
+.floating-icon.chat-icon:disabled,
+.floating-icon.agent-icon:disabled {
+  background: #cccccc;
+  border-color: #cccccc;
   color: #000000;
+  cursor: not-allowed;
+  opacity: 0.6;
+  border-radius: 0;
+  width: 28px;
+  height: 28px;
+
+  font-size: 17px;
 }
 
-.tool-button.file-button:hover:not(:disabled),
-.tool-button.chat-button:hover:not(:disabled),
-.tool-button.agent-button:hover:not(:disabled),
-.tool-button.camera-button:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(68, 255, 68, 0.4);
+.floating-icon.chat-icon.inactive,
+.floating-icon.agent-icon.inactive {
+  border-color: #2e7d32;
+  background: #888888;
+  color: #000000;
+  font-weight: 900;
+  font-size: 17px;
+  border-radius: 0;
+  width: 28px;
+  height: 28px;
+
 }
 
-.tool-button.sync-button {
+.floating-icon.chat-icon.active,
+.floating-icon.agent-icon.active {
+  background: #000000;
+  border-color: #44ff44;
+  color: #00ff00;
+  font-weight: 900;
+  font-size: 17px;
+  animation: pulse 2.5s infinite;
+  box-shadow: 0 2px 8px rgba(0, 255, 0, 0.5);
+  border-radius: 0;
+  width: 28px;
+  height: 28px;
+
+}
+
+.floating-icon.file-icon {
+  border-radius: 2px;
+  width: 28px;
+  height: 28px;
+
+}
+
+.floating-icon.file-icon.inactive {
+  border-color: #2e7d32;
+  background: #888888;
+  box-shadow: 0 2px 8px rgba(68, 255, 68, 0.3);
+}
+
+.floating-icon.file-icon.inactive img {
+  mix-blend-mode: multiply;
+}
+
+.floating-icon.file-icon.active {
+  background: #000000;
+  border-color: #44ff44;
+  animation: pulse 2.5s infinite;
+  box-shadow: 0 2px 8px rgba(68, 255, 68, 0.5);
+}
+
+.floating-icon.file-icon.active img {
+  filter: invert(1);
+}
+
+.floating-icon.config-icon {
   background: #ffffff;
   border: 2px solid #ffffff;
   color: #000000;
   box-shadow: 0 2px 8px rgba(255, 255, 255, 0.3);
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 15px;
-  font-weight: 700;
+  padding: 3px;
 }
 
-.tool-button.sync-button:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.5);
+.floating-icon.config-icon .icon-image {
+  width: 29px;
+  height: 29px;
+  display: block;
+  filter: brightness(0);
 }
 
-.tool-button:disabled {
+.floating-icon.config-icon:disabled {
+  background: #888888;
+  border-color: #888888;
+  box-shadow: none;
+}
+
+.floating-icon.config-icon:disabled .icon-image {
+  filter: brightness(0.6);
+}
+
+.floating-icon:disabled {
   background: #808080 !important;
   border-color: #808080 !important;
   cursor: not-allowed !important;
@@ -753,12 +930,11 @@ defineExpose({ addSubtitle })
   animation: none !important;
 }
 
-.tool-button:disabled img {
+.floating-icon:disabled img {
   filter: brightness(0) invert(1) !important;
-  mix-blend-mode: normal !important;
 }
 
-.tool-button:disabled:hover {
+.floating-icon:disabled:hover {
   transform: none !important;
 }
 
@@ -771,64 +947,10 @@ defineExpose({ addSubtitle })
   }
 }
 
-.panel-toast {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(30, 30, 60, 0.85);
-  border: 1px solid rgba(100, 100, 200, 0.4);
-  backdrop-filter: blur(8px);
-  white-space: nowrap;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.panel-toast.error {
-  color: #ff9999;
-  background: rgba(60, 20, 20, 0.9);
-  border-color: rgba(200, 60, 60, 0.6);
-}
-
-@media (max-width: 720px) {
-  .audio-visualizer-overlay {
-    bottom: 12px;
-    width: min(220px, 52vw);
-  }
-
+@media (max-width: 900px) {
   .welcome-info-overlay {
-    top: 6px;
-    left: 8px;
-    max-width: calc(100% - 76px);
-    font-size: 0.72rem;
-  }
-
-  .panel-icons {
-    top: 20px;
-    right: 10px;
-    gap: 8px;
-  }
-
-  .tool-button {
-    width: 30px;
-    height: 30px;
-  }
-
-  .tool-button img {
-    width: 19px;
-    height: 19px;
-  }
-
-  .tool-button.chat-button,
-  .tool-button.agent-button,
-  .tool-button.camera-button {
-    width: 26px;
-    height: 26px;
-    font-size: 15px;
+    inset: 0;
+    padding: 10px 46px 10px 10px;
   }
 }
 </style>

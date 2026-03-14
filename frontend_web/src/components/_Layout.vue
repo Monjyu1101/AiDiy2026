@@ -21,7 +21,7 @@ const route = useRoute();
 const AIコアパス判定 = (path: string): boolean => {
   try {
     const decodedPath = decodeURIComponent(path);
-    return decodedPath === '/AIコア' || decodedPath.startsWith('/AIコア/');
+    return decodedPath === '/AiDiy' || decodedPath.startsWith('/AiDiy/');
   } catch {
     return path.startsWith('/AI');
   }

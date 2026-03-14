@@ -105,7 +105,7 @@
 - `Tトラン/` - Transaction管理画面（T配車、T商品入庫/出庫/棚卸）
 - `Sスケジューラー/` - Special processing画面（S配車_週表示、S配車_日表示）
 - `Vビュー/` - View画面（V商品推移表）
-- `AIコア/` - AI Core interface（WebSocket統合、マルチパネルUI）
+- `AiDiy/` - AI Core interface（WebSocket統合、マルチパネルUI）
 - `Xテスト/` - Experimental features（Xテトリス、Xインベーダー、Xリバーシ）
 - `_share/` - 共有ユーティリティ（ダイアログ、qTubler）
 - `_Layout`, `_TopBar`, `_TopMenu` - レイアウトコンポーネント
@@ -648,7 +648,7 @@ export async function qColorPicker(initialColor?: string, title?: string): Promi
 - **V商品推移表.vue** - 商品推移表
   - `components/V商品推移表テーブル.vue` - カスタムテーブル
 
-**AIコア/** - AI Core インターフェース（詳細は後述）
+**AiDiy/** - AI Core インターフェース（詳細は後述）
 
 **Xテスト/** - X系 (Experimental) テスト機能:
 - **Xその他.vue** - カテゴリメニュー
@@ -805,7 +805,7 @@ The **AIコア** (Core AI) is a multi-panel AI interface system with flexible gr
 - **Floating controls**: Microphone, speaker, camera, and component selection toggle
 - **Responsive design**: Adapts layouts for portrait/landscape orientations
 
-**Main container** (`AIコア.vue`):
+**Main container** (`AiDiy.vue`):
 - Manages session ID in URL query parameter `?セッションID=<uuid>`
 - Tracks visibility state for 6 components (チャット, イメージ, エージェント1-4)
 - Controls audio/video buttons (マイク, スピーカー, カメラ)
@@ -1109,4 +1109,3 @@ const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD')
 - **Vue component tags must use ASCII names**
 - 日本語名を使う場合は `<component :is="日本語コンポーネント名" />` を使用する。
 - **ユーザーの指示なしに `dist` を生成しない。** `npm run build` の実行は、明示的に依頼された場合だけ行う。
-

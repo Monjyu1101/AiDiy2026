@@ -1,10 +1,22 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101
+  -------------------------------------------------------------------------
+-->
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import apiClient from '@/_share/api'
-import { AI_WS_ENDPOINT } from '@/_share/config'
-import { AIWebSocket } from '@/_share/websocket'
-import AIコードファイル内容表示 from '@/components/AIコード_ファイル内容表示.vue'
-import AIコード更新ファイル一覧 from '@/components/AIコード_更新ファイル一覧.vue'
+import apiClient from '@/api/client'
+import { AI_WS_ENDPOINT } from '@/api/config'
+import { AIWebSocket } from '@/api/websocket'
+import AIコードファイル内容表示 from '@/dialog/ファイル内容表示.vue'
+import AIコード更新ファイル一覧 from '@/dialog/更新ファイル一覧.vue'
 
 type コードチャンネル = '1' | '2' | '3' | '4'
 type 行種別 =
@@ -28,22 +40,22 @@ type 行データ = {
   isCollapsed?: boolean
 }
 
-const props = defineProps<{
-  sessionId: string
+const プロパティ = defineProps<{
+  セッションID: string
   active?: boolean
-  channel: コードチャンネル
+  チャンネル: コードチャンネル
   codeAi: string
-  inputConnected: boolean
+  入力接続済み: boolean
 }>()
 
-const emit = defineEmits<{
+const 通知 = defineEmits<{
   submit: [text: string, channel: コードチャンネル]
   cancel: [channel: コードチャンネル]
   'send-file': [payload: { channel: コードチャンネル; fileName: string; base64: string }]
 }>()
 
 const 出力接続済み = ref(false)
-const WebSocket接続中 = computed(() => props.inputConnected && 出力接続済み.value)
+const WebSocket接続中 = computed(() => プロパティ.入力接続済み && 出力接続済み.value)
 const 接続状態表示 = computed(() => (WebSocket接続中.value ? '接続中' : '切断'))
 
 const メッセージ一覧 = ref<行データ[]>([])
@@ -65,9 +77,11 @@ const ファイル内容ダイアログ表示 = ref(false)
 const 表示ファイル名 = ref('')
 const 表示base64_data = ref('')
 
-let 出力WebSocket: AIWebSocket | null = null
+const ウェルカムテキスト受信済み = ref(false)
+
+const 出力WebSocket = ref<AIWebSocket | null>(null)
 let 出力状態購読解除: (() => void) | null = null
-let messageSeq = 0
+let メッセージID連番 = 0
 let ストリームメッセージID: string | null = null
 
 type 演出状態 = {
@@ -92,7 +106,7 @@ function 最下部スクロール() {
 }
 
 function 新規メッセージID() {
-  return `code-${props.channel}-${props.sessionId || 'nosession'}-${messageSeq++}`
+  return `code-${プロパティ.チャンネル}-${プロパティ.セッションID || 'nosession'}-${メッセージID連番++}`
 }
 
 function 速度設定(文字数: number, isStream: boolean) {
@@ -283,6 +297,7 @@ function ウェルカムテキスト受信処理(message: Record<string, unknown
   const 内容 = 受信内容文字列(message)
   if (内容) {
     ターミナルメッセージ追加('welcome_text', 内容)
+    ウェルカムテキスト受信済み.value = true
   }
 }
 
@@ -385,12 +400,7 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
   })
 }
 
-function bindSocket(socket: AIWebSocket) {
-  出力状態購読解除?.()
-  出力状態購読解除 = socket.onStateChange((connected) => {
-    出力接続済み.value = connected
-  })
-
+function WSハンドラ登録(socket: AIWebSocket) {
   socket.on('welcome_info', ウェルカム処理)
   socket.on('welcome_text', ウェルカムテキスト受信処理)
   socket.on('input_text', 入力テキスト受信処理)
@@ -403,14 +413,36 @@ function bindSocket(socket: AIWebSocket) {
   socket.on('cancel_run', cancel_run受信処理)
 }
 
-async function connectOutputSocket() {
-  if (!props.sessionId) return
-  出力状態購読解除?.()
-  出力WebSocket?.disconnect()
-  出力WebSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, props.channel)
-  bindSocket(出力WebSocket)
+function WSハンドラ解除(socket: AIWebSocket) {
+  socket.off('welcome_info', ウェルカム処理)
+  socket.off('welcome_text', ウェルカムテキスト受信処理)
+  socket.off('input_text', 入力テキスト受信処理)
+  socket.off('input_request', 入力リクエスト受信処理)
+  socket.off('input_file', 入力ファイル受信処理)
+  socket.off('output_text', 出力テキスト受信処理)
+  socket.off('output_stream', 出力ストリーム受信処理)
+  socket.off('output_file', 出力ファイル受信処理)
+  socket.off('update_info', update_info受信処理)
+  socket.off('cancel_run', cancel_run受信処理)
+}
+
+async function 出力ソケット接続() {
+  if (!プロパティ.セッションID) return
+  if (出力WebSocket.value) {
+    WSハンドラ解除(出力WebSocket.value)
+    出力状態購読解除?.()
+    出力WebSocket.value.disconnect()
+    出力WebSocket.value = null
+    出力状態購読解除 = null
+  }
+  const socket = new AIWebSocket(AI_WS_ENDPOINT, プロパティ.セッションID, プロパティ.チャンネル)
+  出力WebSocket.value = socket
+  出力状態購読解除 = socket.onStateChange((connected) => {
+    出力接続済み.value = connected
+  })
+  WSハンドラ登録(socket)
   try {
-    await 出力WebSocket.connect()
+    await socket.connect()
   } catch (error) {
     ターミナルメッセージ追加('cancel_run', error instanceof Error ? error.message : '接続エラー')
   }
@@ -434,14 +466,18 @@ function 入力欄クリア() {
   })
 }
 
-function テキストエリア自動調整() {
+function 入力欄最大高さ更新() {
   if (!テキストエリア.value) return
-
   const container = テキストエリア.value.closest('.agent-container') as HTMLElement | null
   if (container) {
     入力欄最大高さ.value = Math.max(入力欄最小高さ, Math.floor(container.clientHeight * 0.78))
   }
+}
 
+function テキストエリア自動調整() {
+  if (!テキストエリア.value) return
+
+  入力欄最大高さ更新()
   if (入力テキスト.value.length === 0) {
     入力欄状態リセット()
     return
@@ -467,21 +503,21 @@ function テキストエリア自動調整() {
   テキストエリア.value.style.height = `${nextHeight}px`
 }
 
-function 送信() {
+function メッセージ送信() {
   const text = 入力テキスト.value.trim()
   if (!text || 送信中.value || !WebSocket接続中.value) return
-  emit('submit', text, props.channel)
+  通知('submit', text, プロパティ.チャンネル)
   入力テキスト.value = ''
   入力欄状態リセット()
   送信中.value = true
 }
 
-function キャンセル() {
+function キャンセル送信() {
   if (!ストリーム受信中.value || !WebSocket接続中.value) return
-  emit('cancel', props.channel)
+  通知('cancel', プロパティ.チャンネル)
 }
 
-async function fileToBase64(file: File) {
+async function ファイルをBase64読込(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
   let binary = ''
   const bytes = new Uint8Array(buffer)
@@ -491,31 +527,29 @@ async function fileToBase64(file: File) {
   return btoa(binary)
 }
 
-async function handleFiles(files: File[]) {
-  for (const file of files) {
-    const base64 = await fileToBase64(file)
-    emit('send-file', { channel: props.channel, fileName: file.name, base64 })
-  }
+async function 入力ファイル送信(ファイル: File) {
+  const base64 = await ファイルをBase64読込(ファイル)
+  通知('send-file', { channel: プロパティ.チャンネル, fileName: ファイル.name, base64 })
 }
 
-function handleDrop(event: DragEvent) {
+function ドロップ処理(event: DragEvent) {
   event.preventDefault()
   ドラッグ中.value = false
   if (!WebSocket接続中.value) return
   const files = Array.from(event.dataTransfer?.files || [])
-  if (files.length > 0) {
-    void handleFiles(files)
+  for (const ファイル of files) {
+    void 入力ファイル送信(ファイル)
   }
 }
 
-function handleDragOver(event: DragEvent) {
+function ドラッグオーバー処理(event: DragEvent) {
   event.preventDefault()
   if (WebSocket接続中.value) {
     ドラッグ中.value = true
   }
 }
 
-function handleDragLeave(event: DragEvent) {
+function ドラッグ離脱処理(event: DragEvent) {
   event.preventDefault()
   if (event.currentTarget === event.target) {
     ドラッグ中.value = false
@@ -589,10 +623,10 @@ function 更新ファイルダイアログ閉じる() {
   更新ファイル一覧.value = []
 }
 
-async function メッセージクリック(message: 行データ) {
+async function メッセージ行クリック処理(message: 行データ) {
   if (message.isStream) {
     if (message.isCollapsed) {
-      message.isCollapsed = false
+      折りたたみ切替(message.id)
     }
     return
   }
@@ -624,13 +658,14 @@ async function メッセージクリック(message: 行データ) {
   }
 }
 
-function 折りたたみ切替(message: 行データ) {
-  if (message.isStream) {
-    message.isCollapsed = !message.isCollapsed
+function 折りたたみ切替(メッセージID: string) {
+  const target = メッセージ一覧.value.find((m) => m.id === メッセージID)
+  if (target?.isStream) {
+    target.isCollapsed = !target.isCollapsed
   }
 }
 
-function メッセージカーソル(message: 行データ) {
+function メッセージ行カーソル(message: 行データ) {
   if (message.isStream && message.isCollapsed) return 'pointer'
   return メッセージ貼り付け可能(message) ? 'pointer' : 'default'
 }
@@ -639,38 +674,47 @@ watch(入力テキスト, () => {
   nextTick(テキストエリア自動調整)
 })
 
-watch(() => props.sessionId, (sessionId) => {
+watch(() => プロパティ.セッションID, (sessionId) => {
   if (sessionId) {
-    void connectOutputSocket()
+    void 出力ソケット接続()
     return
   }
-  出力状態購読解除?.()
-  出力状態購読解除 = null
-  出力WebSocket?.disconnect()
-  出力WebSocket = null
+  if (出力WebSocket.value) {
+    WSハンドラ解除(出力WebSocket.value)
+    出力状態購読解除?.()
+    出力WebSocket.value.disconnect()
+    出力WebSocket.value = null
+    出力状態購読解除 = null
+  }
   出力接続済み.value = false
 })
 
-watch(() => props.active, (active) => {
+watch(() => プロパティ.active, (active) => {
   if (active) {
     最下部スクロール()
   }
 })
 
 onMounted(() => {
-  if (props.sessionId) {
-    void connectOutputSocket()
+  if (プロパティ.セッションID) {
+    void 出力ソケット接続()
   }
   window.addEventListener('resize', テキストエリア自動調整)
-  nextTick(テキストエリア自動調整)
+  nextTick(() => {
+    入力欄最大高さ更新()
+    テキストエリア自動調整()
+  })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', テキストエリア自動調整)
-  出力状態購読解除?.()
-  出力状態購読解除 = null
-  出力WebSocket?.disconnect()
-  出力WebSocket = null
+  if (出力WebSocket.value) {
+    WSハンドラ解除(出力WebSocket.value)
+    出力状態購読解除?.()
+    出力WebSocket.value.disconnect()
+    出力WebSocket.value = null
+    出力状態購読解除 = null
+  }
   for (const state of 演出状態Map.values()) {
     clearInterval(state.blinkInterval)
   }
@@ -695,7 +739,7 @@ defineExpose({
         :id="message.id"
         :class="['terminal-line', message.role, message.isStream ? 'stream-output' : '', message.isCollapsed ? 'collapsed' : '']"
       >
-        <div class="line-content" @click="メッセージクリック(message)" :style="{ cursor: メッセージカーソル(message) }">
+        <div class="line-content" @click="メッセージ行クリック処理(message)" :style="{ cursor: メッセージ行カーソル(message) }">
           <div v-if="message.isStream && message.isCollapsed" class="collapsed-wrapper">
             <span class="collapsed-indicator">...</span>
             <span class="collapsed-arrow">◀</span>
@@ -720,22 +764,22 @@ defineExpose({
           <span
             v-if="message.isStream && !message.isCollapsed"
             class="expand-indicator"
-            @click.stop="折りたたみ切替(message)"
+            @click.stop="折りたたみ切替(message.id)"
             title="折りたたむ"
           >▼</span>
         </div>
       </div>
 
-      <div v-if="メッセージ一覧.length === 0" class="empty-message">コードチャンネル {{ channel }}</div>
+      <div v-if="メッセージ一覧.length === 0" class="empty-message">コードチャンネル {{ プロパティ.チャンネル }}</div>
     </div>
 
     <div class="control-area">
       <div
         class="text-input-area"
         :class="{ 'drag-over': ドラッグ中 }"
-        @dragover="handleDragOver"
-        @dragleave="handleDragLeave"
-        @drop="handleDrop"
+        @dragover="ドラッグオーバー処理"
+        @dragleave="ドラッグ離脱処理"
+        @drop="ドロップ処理"
       >
         <div class="input-container">
           <span class="prompt-symbol" @click="入力欄クリア">&gt;</span>
@@ -747,7 +791,6 @@ defineExpose({
             placeholder="メッセージを入力..."
             maxlength="5000"
             :disabled="送信中 || !WebSocket接続中"
-            @keydown.enter.exact.prevent="送信"
             @input="テキストエリア自動調整"
           ></textarea>
         </div>
@@ -757,7 +800,8 @@ defineExpose({
           :class="{ 'ws-disabled': !WebSocket接続中, 'has-text': 入力テキスト.length > 0 }"
           type="button"
           :disabled="!入力テキスト.trim() || 送信中 || !WebSocket接続中"
-          @click="送信"
+          @click="メッセージ送信"
+          title="送信"
         >
           <img src="/icons/sending.png" alt="送信" />
           <span class="send-code-label">CODE</span>
@@ -768,7 +812,8 @@ defineExpose({
           :class="{ 'is-active': ストリーム受信中 }"
           type="button"
           :disabled="!ストリーム受信中 || !WebSocket接続中"
-          @click="キャンセル"
+          @click="キャンセル送信"
+          title="キャンセル"
         >
           <img src="/icons/abort.png" alt="停止" />
         </button>
@@ -1010,6 +1055,7 @@ defineExpose({
 .input-container {
   position: relative;
   flex: 1;
+  margin-bottom: 0;
 }
 
 .prompt-symbol {

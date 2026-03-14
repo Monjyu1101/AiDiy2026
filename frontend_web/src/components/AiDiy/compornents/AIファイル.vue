@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue';
-import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
+import { AIWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import apiClient from '@/api/client';
 import { qConfirm } from '@/utils/qAlert';
 import { monaco, モナコ言語推定 } from '@/utils/monaco';
@@ -23,7 +23,7 @@ const authStore = useAuthStore();
 const プロパティ = defineProps<{
   セッションID?: string;
   active?: boolean;
-  wsConnected?: boolean;
+  入力接続済み?: boolean;
   wsClient?: IWebSocketClient | null;
 }>();
 
@@ -34,6 +34,7 @@ const 通知 = defineEmits<{
 // 出力WebSocket（channel="file" でサーバーからの返信を受信）
 const 出力WebSocket = ref<IWebSocketClient | null>(null);
 const 出力接続済み = ref(false);
+let fileSocketStateUnsubscribe: (() => void) | null = null;
 
 // ファイルエントリ型
 type ファイルエントリ = { パス: string; 更新日時: string };
@@ -338,8 +339,8 @@ const ファイル保存 = async () => {
     ファイル内容テキスト.value = 内容;
     編集モード終了();
     // files_save → バックアップ処理 → files_backup / files_temp でリスト更新
-    if (プロパティ.wsClient?.isConnected()) {
-      プロパティ.wsClient.send({
+    if (出力WebSocket.value?.isConnected()) {
+      出力WebSocket.value.send({
         セッションID: プロパティ.セッションID ?? '',
         チャンネル: 'file',
         メッセージ識別: 'files_save',
@@ -527,11 +528,11 @@ const ファイル保存先選択 = async () => {
 
 // files_backup / files_temp を非同期で要求する
 const バックアップリスト要求 = (読込表示 = false) => {
-  if (!プロパティ.wsClient || !プロパティ.wsClient.isConnected()) return;
+  if (!出力WebSocket.value || !出力WebSocket.value.isConnected()) return;
   if (読込表示) {
     左読込中.value = true;
   }
-  プロパティ.wsClient.send({
+  出力WebSocket.value.send({
     セッションID: プロパティ.セッションID ?? '',
     チャンネル: 'file',
     メッセージ識別: 'files_backup',
@@ -540,20 +541,23 @@ const バックアップリスト要求 = (読込表示 = false) => {
 };
 
 const ファイルリスト要求 = () => {
-  if (!プロパティ.wsClient || !プロパティ.wsClient.isConnected()) return;
+  if (!出力WebSocket.value || !出力WebSocket.value.isConnected()) return;
+  // 明示的な再要求時はdedupキャッシュをリセットして強制再描画
+  最終受信バックアップ要求日時.value = -1;
+  最終受信テンプリスト要求日時.value = -1;
   下部ファイル表示クリア();
   バックアップリスト要求(true);
   void テンプリスト要求(true);
 };
 
 const テンプリスト要求 = async (読込表示 = false) => {
-  if (!プロパティ.wsClient || !プロパティ.wsClient.isConnected()) return;
+  if (!出力WebSocket.value || !出力WebSocket.value.isConnected()) return;
   if (読込表示) {
     右読込中.value = true;
   }
   // files_temp送信＝画面表示中＝操作中とみなしてトークンをリフレッシュ
   void authStore.refreshToken();
-  プロパティ.wsClient.send({
+  出力WebSocket.value.send({
     セッションID: プロパティ.セッションID ?? '',
     チャンネル: 'file',
     メッセージ識別: 'files_temp',
@@ -658,13 +662,15 @@ const テンプリスト受信処理 = async (受信データ: any) => {
 const 出力ソケット接続 = async () => {
   if (!プロパティ.セッションID) return;
   const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-  出力WebSocket.value = new AIコアWebSocket(wsUrl, プロパティ.セッションID, 'file');
+  出力WebSocket.value = new AIWebSocket(wsUrl, プロパティ.セッションID, 'file');
+  fileSocketStateUnsubscribe = 出力WebSocket.value.onStateChange((connected) => {
+    出力接続済み.value = connected;
+  });
   出力WebSocket.value.on('files_backup', バックアップリスト受信処理);
   出力WebSocket.value.on('files_temp', テンプリスト受信処理);
   try {
     await 出力WebSocket.value.connect();
     出力接続済み.value = true;
-    console.log('[AIファイル] 出力ソケット接続完了 (ch=file)');
   } catch (error) {
     出力接続済み.value = false;
     console.error('[AIファイル] 出力ソケット接続エラー:', error);
@@ -675,6 +681,10 @@ const 出力ソケット切断 = () => {
   if (出力WebSocket.value) {
     出力WebSocket.value.off('files_backup', バックアップリスト受信処理);
     出力WebSocket.value.off('files_temp', テンプリスト受信処理);
+    if (fileSocketStateUnsubscribe) {
+      fileSocketStateUnsubscribe();
+      fileSocketStateUnsubscribe = null;
+    }
     出力WebSocket.value.disconnect();
     出力WebSocket.value = null;
   }
@@ -722,6 +732,26 @@ watch(() => プロパティ.セッションID, async (newId, oldId) => {
   }
 });
 
+// ソケット自動再接続後にリスト再取得
+watch(出力接続済み, (v, old) => {
+  if (v && !old && プロパティ.active) {
+    ファイルリスト要求();
+  }
+});
+
+// 親の接続状態が回復したらfileソケットも再接続
+// inputSocket接続完了後にバックアップが走るため500ms待ってから要求
+watch(() => プロパティ.入力接続済み, async (v, old) => {
+  if (v && !old) {
+    出力ソケット切断();
+    await 出力ソケット接続();
+    if (プロパティ.active) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      ファイルリスト要求();
+    }
+  }
+});
+
 // コンテキストメニュー
 const コンテキストメニュー表示 = ref(false);
 const コンテキストメニューX = ref(0);
@@ -731,18 +761,19 @@ const コンテキストメニュー閉じる = () => {
   コンテキストメニュー表示.value = false;
 };
 
+const コンテキストメニュー表示位置設定 = (x: number, y: number) => {
+  const メニュー幅 = 140;
+  const メニュー高 = 40;
+  コンテキストメニューX.value = x + メニュー幅 > window.innerWidth ? x - メニュー幅 : x;
+  コンテキストメニューY.value = y + メニュー高 > window.innerHeight ? y - メニュー高 : y;
+  コンテキストメニュー表示.value = true;
+};
+
 const ツリー行右クリック = (e: MouseEvent, 行: ツリー表示行, isBackup: boolean) => {
   if (行.種別 !== 'file') return;
   e.preventDefault();
   void ファイルクリック(行.パス, isBackup);
-  // 画面端に昇らないようクランプ
-  const メニュー幅 = 140;
-  const メニュー高 = 40;
-  const x = e.clientX + メニュー幅 > window.innerWidth ? e.clientX - メニュー幅 : e.clientX;
-  const y = e.clientY + メニュー高 > window.innerHeight ? e.clientY - メニュー高 : e.clientY;
-  コンテキストメニューX.value = x;
-  コンテキストメニューY.value = y;
-  コンテキストメニュー表示.value = true;
+  コンテキストメニュー表示位置設定(e.clientX, e.clientY);
 };
 
 const コンテキストメニューダウンロード = async () => {
@@ -753,13 +784,7 @@ const コンテキストメニューダウンロード = async () => {
 const 下段右クリック = (e: MouseEvent) => {
   if (!選択ファイルパス.value) return;
   e.preventDefault();
-  const メニュー幅 = 140;
-  const メニュー高 = 40;
-  const x = e.clientX + メニュー幅 > window.innerWidth ? e.clientX - メニュー幅 : e.clientX;
-  const y = e.clientY + メニュー高 > window.innerHeight ? e.clientY - メニュー高 : e.clientY;
-  コンテキストメニューX.value = x;
-  コンテキストメニューY.value = y;
-  コンテキストメニュー表示.value = true;
+  コンテキストメニュー表示位置設定(e.clientX, e.clientY);
 };
 
 const キーボードキーダウン = (e: KeyboardEvent) => {
@@ -815,6 +840,12 @@ onBeforeUnmount(() => {
     <div class="file-header">
       <button class="close-btn" @click="通知('close')" title="閉じる">×</button>
       <h1>File Manager</h1>
+      <span class="status-group">
+        <span
+          :class="['status-dot', 出力接続済み ? 'connecting' : 'disconnected']"
+        ></span>
+        <span class="status-label">{{ 出力接続済み ? '接続中' : '切断' }}</span>
+      </span>
       <button class="reload-btn" @click="ファイルリスト要求" title="再読込" :disabled="左読込中 || 右読込中">↺</button>
     </div>
 
@@ -849,7 +880,7 @@ onBeforeUnmount(() => {
                 class="tree-item"
                 :class="{
                   folder: 行.種別 === 'folder',
-                  selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス
+                  selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'left',
                 }"
                 @click="ツリー行クリック(行, true)"
                 @contextmenu="ツリー行右クリック($event, 行, true)"
@@ -904,7 +935,7 @@ onBeforeUnmount(() => {
                 class="tree-item"
                 :class="{
                   folder: 行.種別 === 'folder',
-                  selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス
+                  selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'right',
                 }"
                 @click="ツリー行クリック(行, false)"
                 @contextmenu="ツリー行右クリック($event, 行, false)"
@@ -1052,6 +1083,31 @@ onBeforeUnmount(() => {
 .close-btn:hover {
   color: #ff4444;
   transform: translateY(-50%) scale(1.2);
+}
+
+.status-group {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.disconnected { background: #888888; }
+.status-dot.connecting { background: #44ff44; }
+
+.status-label {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .reload-btn {

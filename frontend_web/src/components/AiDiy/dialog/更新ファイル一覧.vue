@@ -1,20 +1,32 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101
+  -------------------------------------------------------------------------
+-->
+
 <script setup lang="ts">
 const props = defineProps<{
-  show: boolean
-  files: string[]
-}>()
+  show: boolean;
+  files: string[];
+}>();
 
 const emit = defineEmits<{
-  close: []
-  'select-file': [fileName: string]
-}>()
+  close: [];
+  'select-file': [fileName: string];
+}>();
 
 function 閉じる() {
-  emit('close')
+  emit('close');
 }
 
 function ファイル選択(fileName: string) {
-  emit('select-file', fileName)
+  emit('select-file', fileName);
 }
 </script>
 

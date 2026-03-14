@@ -11,7 +11,7 @@
 // コア系ルーター (C系: C管理, C権限, C利用者, C採番 / A系: AIコア)
 
 import type { RouteRecordRaw } from 'vue-router'
-import AIコア画面 from '../components/AIコア/AIコア.vue'
+import AIコア画面 from '../components/AiDiy/AiDiy.vue'
 
 export const coreRoutes: RouteRecordRaw[] = [
     {
@@ -63,11 +63,11 @@ export const coreRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'C採番編集' }
     },
 
-    // ---- A系 (AIコア) ----
+    // ---- A系 (AiDiy) ----
     {
-        path: '/AIコア',
-        name: 'AIコア',
+        path: '/AiDiy',
+        name: 'AiDiy',
         component: AIコア画面,
-        meta: { requiresAuth: true, title: 'AIコア' }
+        meta: { requiresAuth: true, title: 'AiDiy' }
     },
 ]

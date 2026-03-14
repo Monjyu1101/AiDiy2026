@@ -20,6 +20,7 @@ export interface WebSocketMessage {
 }
 
 export type MessageHandler = (message: WebSocketMessage) => void;
+export type StateHandler = (connected: boolean) => void;
 
 // WebSocketクライアントの公開インターフェース
 export interface IWebSocketClient {
@@ -33,14 +34,16 @@ export interface IWebSocketClient {
   sendPing(): void;
   updateState(ボタン: any): void;
   sendChatMessage(message: string): void;
-  sendInputText(text: string, チャンネル?: string): void;
+  sendInputText(text: string, 出力先チャンネル?: string): void;
   requestStream(data: any): void;
+  onStateChange(handler: StateHandler): () => void;
 }
 
-export class AIコアWebSocket implements IWebSocketClient {
+export class AIWebSocket implements IWebSocketClient {
   private ws: WebSocket | null = null;
   private セッションID: string | null = null;
   private messageHandlers: Map<string, MessageHandler[]> = new Map();
+  private stateHandlers: Set<StateHandler> = new Set();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000; // 3秒
@@ -68,6 +71,7 @@ export class AIコアWebSocket implements IWebSocketClient {
           console.log('[WebSocket] 接続確立');
           this.reconnectAttempts = 0;
           this.isInitialConnection = false; // 初回接続完了
+          this.emitState(true);
 
           // セッションIDを送信
           if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -124,6 +128,7 @@ export class AIコアWebSocket implements IWebSocketClient {
         this.ws.onclose = (event) => {
           console.log('[WebSocket] 接続切断:', event.code, event.reason);
           this.セッションID = null;
+          this.emitState(false);
 
           // 初回接続時のエラーはすぐにreject
           if (this.isInitialConnection) {
@@ -163,7 +168,11 @@ export class AIコアWebSocket implements IWebSocketClient {
    */
   send(message: WebSocketMessage): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
+      const payload: WebSocketMessage = {
+        ...message,
+        セッションID: message.セッションID ?? this.セッションID ?? this.要求セッションID,
+      };
+      this.ws.send(JSON.stringify(payload));
       console.log('[WebSocket] 送信:', message.type);
     } else {
       console.error('[WebSocket] 送信失敗: 接続されていません');
@@ -196,6 +205,14 @@ export class AIコアWebSocket implements IWebSocketClient {
         }
       }
     }
+  }
+
+  onStateChange(handler: StateHandler): () => void {
+    this.stateHandlers.add(handler);
+    handler(this.isConnected());
+    return () => {
+      this.stateHandlers.delete(handler);
+    };
   }
 
   /**
@@ -258,6 +275,7 @@ export class AIコアWebSocket implements IWebSocketClient {
       this.ws.close();
       this.ws = null;
       this.セッションID = null;
+      this.emitState(false);
       console.log('[WebSocket] 切断完了');
     }
   }
@@ -328,7 +346,13 @@ export class AIコアWebSocket implements IWebSocketClient {
   requestStream(data: any): void {
     console.warn('[WebSocket] requestStream は廃止されました');
   }
+
+  private emitState(connected: boolean): void {
+    this.stateHandlers.forEach((handler) => handler(connected));
+  }
 }
+
+export { AIWebSocket as AIコアWebSocket };
 
 /**
  * WebSocket URLを生成

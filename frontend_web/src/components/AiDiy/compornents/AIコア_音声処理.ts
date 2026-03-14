@@ -45,7 +45,7 @@ interface OutputAudioState {
   visualizerDataArray: Uint8Array | null;
 }
 
-export class AudioStreamProcessor {
+export class AudioController {
   // 音声入力状態
   private inputAudioState: InputAudioState = {
     mediaRecorder: null,
@@ -128,10 +128,10 @@ export class AudioStreamProcessor {
    * ビジュアライザーセットアップ
    */
   setupAudioVisualizer(audioBarsElement: HTMLElement | null, overlayElement: HTMLElement | null) {
-    console.log('[AudioStreamProcessor] ビジュアライザーセットアップ開始', { audioBarsElement, overlayElement });
+    console.log('[AudioController] ビジュアライザーセットアップ開始', { audioBarsElement, overlayElement });
 
     if (!audioBarsElement) {
-      console.warn('[AudioStreamProcessor] audioBarsElement が見つかりません');
+      console.warn('[AudioController] audioBarsElement が見つかりません');
       return;
     }
 
@@ -163,7 +163,7 @@ export class AudioStreamProcessor {
       this.outputVisualizerBars.push(outputBar);
     }
 
-    console.log('[AudioStreamProcessor] ビジュアライザーセットアップ完了', {
+    console.log('[AudioController] ビジュアライザーセットアップ完了', {
       barCount: this.inputVisualizerBars.length,
       overlayElement: this.audioVisualizerOverlay,
       firstInputBar: this.inputVisualizerBars[0],
@@ -249,12 +249,12 @@ export class AudioStreamProcessor {
       await this.startAudioCapture();
 
       // ビジュアライザー表示
-      console.log('[AudioStreamProcessor] ビジュアライザー表示', this.audioVisualizerOverlay);
+      console.log('[AudioController] ビジュアライザー表示', this.audioVisualizerOverlay);
       if (this.audioVisualizerOverlay) {
         this.audioVisualizerOverlay.style.display = 'flex';
-        console.log('[AudioStreamProcessor] ビジュアライザー表示設定完了');
+        console.log('[AudioController] ビジュアライザー表示設定完了');
       } else {
-        console.warn('[AudioStreamProcessor] audioVisualizerOverlay が null です');
+        console.warn('[AudioController] audioVisualizerOverlay が null です');
       }
 
       this.startAudioVisualization();
@@ -405,7 +405,7 @@ export class AudioStreamProcessor {
     this.outputAudioState.visualizerAnalyser.fftSize = 256;
     this.outputAudioState.visualizerDataArray = new Uint8Array(this.outputAudioState.visualizerAnalyser.frequencyBinCount);
     
-    console.log('[AudioStreamProcessor] 出力AudioContextセットアップ完了（analyser × 2）');
+    console.log('[AudioController] 出力AudioContextセットアップ完了（analyser × 2）');
   }
 
   /**
@@ -692,14 +692,16 @@ export class AudioStreamProcessor {
       }
       this.startAudioVisualization();
       this.isVisualizerVisible = true;
-      console.log('[AudioStreamProcessor] ビジュアライザー表示 (マイク:', microphoneEnabled, 'スピーカー:', speakerEnabled, ')');
+      console.log('[AudioController] ビジュアライザー表示 (マイク:', microphoneEnabled, 'スピーカー:', speakerEnabled, ')');
     } else {
       this.resetVisualizerBars();
       this.audioVisualizerOverlay.style.display = 'none';
       this.isVisualizerVisible = false;
-      console.log('[AudioStreamProcessor] ビジュアライザー非表示');
+      console.log('[AudioController] ビジュアライザー非表示');
     }
   }
 }
+
+export { AudioController as AudioStreamProcessor };
 
 

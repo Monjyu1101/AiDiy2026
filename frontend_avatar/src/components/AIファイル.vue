@@ -1,9 +1,21 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101
+  -------------------------------------------------------------------------
+-->
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import apiClient from '@/_share/api'
-import { AI_WS_ENDPOINT } from '@/_share/config'
-import { monaco, モナコ言語推定 } from '@/_share/monaco'
-import { AIWebSocket } from '@/_share/websocket'
+import apiClient from '@/api/client'
+import { AI_WS_ENDPOINT } from '@/api/config'
+import { monaco, モナコ言語推定 } from '@/utils/monaco'
+import { AIWebSocket } from '@/api/websocket'
 
 type ファイルエントリ = { パス: string; 更新日時: string }
 type ツリーノード種別 = 'folder' | 'file'
@@ -31,20 +43,24 @@ type ツリー内部ノード = {
   子Map: Map<string, ツリー内部ノード>
 }
 
-const props = defineProps<{
-  sessionId: string
+const プロパティ = defineProps<{
+  セッションID: string
   active: boolean
+  入力接続済み: boolean
 }>()
 
-const emit = defineEmits<{
+const 通知 = defineEmits<{
   'send-input-payload': [message: Record<string, unknown>]
 }>()
 
 // --- 接続 ---
-let fileSocket: AIWebSocket | null = null
-const 接続済み = ref(false)
+const 出力WebSocket = ref<AIWebSocket | null>(null)
+const 出力接続済み = ref(false)
+let fileSocketStateUnsubscribe: (() => void) | null = null
+let ハイライト要求連番 = 0
 // --- ファイルリスト ---
 const プロジェクトパス = ref('')
+const バックアップベースパス = ref('')
 const 最終ファイル日時 = ref<string | null>(null)
 const 最終ファイルリスト = ref<ファイルエントリ[]>([])
 const 作業ファイル日時 = ref<string | null>(null)
@@ -73,9 +89,9 @@ let monacoエディタ: monaco.editor.IStandaloneCodeEditor | null = null
 let テンプリスト自動送信タイマー: ReturnType<typeof setTimeout> | null = null
 const 更新間隔選択肢 = [
   { 値: 0, 表示: '切' },
-  { 値: 1, 表示: '1秒' },
-  { 値: 2, 表示: '2秒' },
-  { 値: 5, 表示: '5秒' },
+  { 値: 1, 表示: '1秒間隔' },
+  { 値: 2, 表示: '2秒間隔' },
+  { 値: 5, 表示: '5秒間隔' },
 ]
 const テンプ更新間隔 = ref<number>(5)
 const 要求日時選択肢 = [
@@ -122,12 +138,12 @@ const 日時文字列正規化 = (日時?: string | null): string | null => {
   const d = 日時文字列をDate化(日時)
   if (!d) return null
   const y = d.getFullYear()
-  const mo = String(d.getMonth() + 1).padStart(2, '0')
-  const da = String(d.getDate()).padStart(2, '0')
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
   const h = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
   const s = String(d.getSeconds()).padStart(2, '0')
-  return `${y}/${mo}/${da} ${h}:${mi}:${s}`
+  return `${y}/${m}/${day} ${h}:${mm}:${s}`
 }
 
 const 右側更新日時表示 = (更新日時?: string): string => {
@@ -316,6 +332,7 @@ const 編集キャンセル = () => {
 // ===================== ファイル操作 =====================
 
 const 下部ファイル表示クリア = () => {
+  ハイライト要求連番++
   選択ファイル名.value = ''
   選択ファイルパス.value = ''
   ファイル内容テキスト.value = null
@@ -384,13 +401,17 @@ const ファイル保存 = async () => {
     }
     ファイル内容テキスト.value = 内容
     編集モード終了()
-    emit('send-input-payload', {
-      チャンネル: 'file',
-      メッセージ識別: 'files_save',
-      メッセージ内容: { ファイル名: 選択ファイルパス.value },
-    })
-    バックアップリスト要求(true)
-    void テンプリスト要求(true)
+    // files_save → バックアップ処理 → files_backup / files_temp でリスト更新
+    if (出力WebSocket.value?.isConnected()) {
+      出力WebSocket.value.send({
+        セッションID: プロパティ.セッションID,
+        チャンネル: 'file',
+        メッセージ識別: 'files_save',
+        メッセージ内容: { ファイル名: 選択ファイルパス.value },
+      })
+      バックアップリスト要求(true)
+      void テンプリスト要求(true)
+    }
   } catch (e: any) {
     ファイル内容エラー.value = e?.message ?? '保存失敗'
   } finally {
@@ -482,8 +503,10 @@ const ファイル保存先選択 = async () => {
 // ===================== WebSocket =====================
 
 const バックアップリスト要求 = (読込表示 = false) => {
+  if (!出力WebSocket.value || !出力WebSocket.value.isConnected()) return
   if (読込表示) 左読込中.value = true
-  emit('send-input-payload', {
+  出力WebSocket.value.send({
+    セッションID: プロパティ.セッションID,
     チャンネル: 'file',
     メッセージ識別: 'files_backup',
     メッセージ内容: { 要求日時: バックアップ要求日時.value },
@@ -491,8 +514,10 @@ const バックアップリスト要求 = (読込表示 = false) => {
 }
 
 const テンプリスト要求 = async (読込表示 = false) => {
+  if (!出力WebSocket.value || !出力WebSocket.value.isConnected()) return
   if (読込表示) 右読込中.value = true
-  emit('send-input-payload', {
+  出力WebSocket.value.send({
+    セッションID: プロパティ.セッションID,
     チャンネル: 'file',
     メッセージ識別: 'files_temp',
     メッセージ内容: { 要求日時: テンプリスト要求日時.value },
@@ -500,11 +525,10 @@ const テンプリスト要求 = async (読込表示 = false) => {
 }
 
 const ファイルリスト要求 = () => {
+  // 明示的な再要求時はdedupキャッシュをリセットして強制再描画
+  最終受信バックアップ要求日時.value = -1
+  最終受信テンプリスト要求日時.value = -1
   下部ファイル表示クリア()
-  if (props.sessionId && !fileSocket?.isConnected()) {
-    void connectFileSocket()
-    return
-  }
   バックアップリスト要求(true)
   void テンプリスト要求(true)
 }
@@ -540,6 +564,7 @@ const バックアップリスト受信処理 = (受信データ: any) => {
   }
   最終受信バックアップ要求日時.value = 新要求日時
   プロジェクトパス.value = 内容.プロジェクトパス ?? ''
+  バックアップベースパス.value = 内容.バックアップベースパス ?? ''
   最終ファイル日時.value = 新日時
   最終ファイルリスト.value = 内容.ファイルリスト ?? []
   const 本日更新ファイル一覧 = 最終ファイルリスト.value.filter((f) => 更新日時が本日(f.更新日時))
@@ -550,7 +575,7 @@ const バックアップリスト受信処理 = (受信データ: any) => {
 const テンプリスト受信処理 = async (受信データ: any) => {
   const 内容 = 受信データ.メッセージ内容
   if (!内容) {
-    if (テンプ更新間隔.value > 0) テンプリスト自動送信開始()
+    if (プロパティ.active && テンプ更新間隔.value > 0) テンプリスト自動送信開始()
     return
   }
   const 新要求日時 = Number(内容.要求日時 ?? テンプリスト要求日時.value)
@@ -567,7 +592,7 @@ const テンプリスト受信処理 = async (受信データ: any) => {
     新件数 === 作業ファイルリスト.value.length
   ) {
     右読込中.value = false
-    if (テンプ更新間隔.value > 0) テンプリスト自動送信開始()
+    if (プロパティ.active && テンプ更新間隔.value > 0) テンプリスト自動送信開始()
     return
   }
   最終受信テンプリスト要求日時.value = 新要求日時
@@ -584,28 +609,38 @@ const テンプリスト受信処理 = async (受信データ: any) => {
   }
 
   await nextTick()
-  if (テンプ更新間隔.value > 0) テンプリスト自動送信開始()
+  if (プロパティ.active && テンプ更新間隔.value > 0) テンプリスト自動送信開始()
 }
 
-async function connectFileSocket() {
-  if (!props.sessionId) return
-  fileSocket?.disconnect()
-  fileSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, 'file')
-  const 接続状態更新 = () => {
-    接続済み.value = Boolean(fileSocket?.isConnected())
-  }
-  fileSocket.onStateChange(() => {
-    接続状態更新()
+const 出力ソケット接続 = async () => {
+  if (!プロパティ.セッションID) return
+  出力ソケット切断()
+  出力WebSocket.value = new AIWebSocket(AI_WS_ENDPOINT, プロパティ.セッションID, 'file')
+  fileSocketStateUnsubscribe = 出力WebSocket.value.onStateChange(() => {
+    出力接続済み.value = Boolean(出力WebSocket.value?.isConnected())
   })
-  fileSocket.on('files_backup', バックアップリスト受信処理)
-  fileSocket.on('files_temp', テンプリスト受信処理)
+  出力WebSocket.value.on('files_backup', バックアップリスト受信処理)
+  出力WebSocket.value.on('files_temp', テンプリスト受信処理)
   try {
-    await fileSocket.connect()
-    接続状態更新()
-    ファイルリスト要求()
+    await 出力WebSocket.value.connect()
+    出力接続済み.value = true
   } catch (error) {
     ファイル内容エラー.value = error instanceof Error ? error.message : 'file channel 接続失敗'
   }
+}
+
+const 出力ソケット切断 = () => {
+  if (出力WebSocket.value) {
+    出力WebSocket.value.off('files_backup', バックアップリスト受信処理)
+    出力WebSocket.value.off('files_temp', テンプリスト受信処理)
+    if (fileSocketStateUnsubscribe) {
+      fileSocketStateUnsubscribe()
+      fileSocketStateUnsubscribe = null
+    }
+    出力WebSocket.value.disconnect()
+    出力WebSocket.value = null
+  }
+  出力接続済み.value = false
 }
 
 const コンテキストメニュー表示 = ref(false)
@@ -644,10 +679,14 @@ const 下段右クリック = (e: MouseEvent) => {
 
 // --- キーボードナビ ---
 const キーボードキーダウン = (e: KeyboardEvent) => {
+  if (!プロパティ.active) return
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
   if (!選択ファイル名.value || !選択パネル.value) return
-  const active = document.activeElement as HTMLElement | null
-  if (active?.closest?.('.monaco-editor')) return
+
+  // Monaco Editor にフォーカスが当たっているときは操作しない
+  const active = document.activeElement
+  if (active && active.classList.contains('monaco-editor')) return
+  if (active && (active as HTMLElement).closest?.('.monaco-editor')) return
 
   const isBackup = 選択パネル.value === 'left'
   const ファイル行 = (isBackup ? 最終ファイル行.value : 作業ファイル行.value).filter((行) => 行.種別 === 'file')
@@ -666,17 +705,36 @@ const キーボードキーダウン = (e: KeyboardEvent) => {
 
 // --- watchers ---
 
-watch(() => props.sessionId, () => {
-  if (props.sessionId) {
-    void connectFileSocket()
-    return
+watch(() => プロパティ.セッションID, async (newId, oldId) => {
+  if (!newId || newId === oldId) return
+  出力ソケット切断()
+  await 出力ソケット接続()
+  if (プロパティ.active) {
+    ファイルリスト要求()
   }
-  fileSocket?.disconnect()
-  fileSocket = null
-  接続済み.value = false
 })
 
-watch(() => props.active, (active) => {
+// 接続リセット後の復帰時に再取得
+watch(出力接続済み, (v, old) => {
+  if (v && !old && プロパティ.active) {
+    ファイルリスト要求()
+  }
+})
+
+// 親の接続状態が回復したら自身のソケットも再接続
+// inputSocket接続完了後にバックアップが走るため500ms待ってから要求
+watch(() => プロパティ.入力接続済み, async (v, old) => {
+  if (v && !old) {
+    出力ソケット切断()
+    await 出力ソケット接続()
+    if (プロパティ.active) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500))
+      ファイルリスト要求()
+    }
+  }
+})
+
+watch(() => プロパティ.active, (active) => {
   if (active) {
     ファイルリスト要求()
   } else {
@@ -685,42 +743,41 @@ watch(() => props.active, (active) => {
 })
 
 watch(バックアップ要求日時, () => {
-  if (!props.active) return
+  if (!プロパティ.active) return
   下部ファイル表示クリア()
   バックアップリスト要求(true)
 })
 
 watch(テンプリスト要求日時, () => {
-  if (!props.active) return
+  if (!プロパティ.active) return
   下部ファイル表示クリア()
   void テンプリスト要求(true)
 })
 
 watch(テンプ更新間隔, () => {
   テンプリスト自動送信停止()
-  if (props.active && テンプ更新間隔.value > 0) テンプリスト自動送信開始()
+  if (プロパティ.active && テンプ更新間隔.value > 0) テンプリスト自動送信開始()
 })
 
-onMounted(() => {
-  if (props.sessionId) void connectFileSocket()
-  window.addEventListener('keydown', キーボードキーダウン)
-  window.addEventListener('mousedown', コンテキストメニュー閉じる)
-  if (props.active) {
+onMounted(async () => {
+  await 出力ソケット接続()
+  if (プロパティ.active) {
     ファイルリスト要求()
   }
+  window.addEventListener('keydown', キーボードキーダウン)
+  window.addEventListener('mousedown', コンテキストメニュー閉じる)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', キーボードキーダウン)
   window.removeEventListener('mousedown', コンテキストメニュー閉じる)
   テンプリスト自動送信停止()
-  fileSocket?.disconnect()
-  fileSocket = null
+  出力ソケット切断()
   monacoエディタ破棄()
 })
 
 defineExpose({
-  接続済み,
+  出力接続済み,
   読込中: computed(() => 左読込中.value || 右読込中.value),
   ファイルリスト要求,
 })
@@ -747,11 +804,14 @@ defineExpose({
               <img src="/icons/loading.gif" alt="読込中" class="loading-panel-image" />
               <div>読込中...</div>
             </div>
-            <div v-else-if="最終ファイルリスト.length === 0" class="placeholder-content"><div>バックアップなし</div></div>
+            <div v-else-if="最終ファイルリスト.length === 0" class="placeholder-content">
+              <span class="placeholder-icon">🗂️</span>
+              <div>バックアップなし</div>
+            </div>
             <ul v-else class="tree-list">
               <li
                 v-for="行 in 最終ファイル行"
-                :key="`l-${行.キー}`"
+                :key="`left-${行.キー}`"
                 class="tree-item"
               :class="{
                   folder: 行.種別 === 'folder',
@@ -793,11 +853,14 @@ defineExpose({
               <img src="/icons/loading.gif" alt="読込中" class="loading-panel-image" />
               <div>読込中...</div>
             </div>
-            <div v-else-if="作業ファイルリスト.length === 0" class="placeholder-content"><div>ファイルなし</div></div>
+            <div v-else-if="作業ファイルリスト.length === 0" class="placeholder-content">
+              <span class="placeholder-icon">📁</span>
+              <div>ファイルなし</div>
+            </div>
             <ul v-else class="tree-list">
               <li
                 v-for="行 in 作業ファイル行"
-                :key="`r-${行.キー}`"
+                :key="`right-${行.キー}`"
                 class="tree-item"
               :class="{
                   folder: 行.種別 === 'folder',
@@ -828,7 +891,7 @@ defineExpose({
             <span class="lower-title">ファイル :</span>
             <span v-if="選択ファイル名" class="panel-datetime">{{ 選択ファイル名 }}</span>
             <button
-              class="action-btn download"
+              class="download-btn"
               type="button"
               @click="ファイルダウンロード"
               @contextmenu.prevent="ファイル保存先選択"
@@ -840,19 +903,19 @@ defineExpose({
           <span class="lower-header-right">
             <button
               v-if="ファイル内容テキスト !== null && !ファイル読込中 && !ファイル内容エラー"
-              class="action-btn edit"
-              :class="{ 'edit-active': 編集モード }"
+              class="edit-btn"
+              :class="{ 'edit-btn-active': 編集モード }"
               type="button"
               @click="編集モード ? 編集キャンセル() : 編集モード開始()"
               :title="編集モード ? '編集キャンセル' : '編集'"
             >✎</button>
             <button
               v-if="編集モード"
-              class="action-btn save"
+              class="upload-btn"
               type="button"
               @click="ファイル保存"
               :disabled="ファイル保存中"
-              title="上書き保存"
+              title="更新（上書き保存）"
             >⬆</button>
           </span>
         </div>
@@ -861,10 +924,14 @@ defineExpose({
             <img src="/icons/loading.gif" alt="読込中" class="loading-panel-image" />
             <div>読込中...</div>
           </div>
-          <div v-else-if="ファイル内容エラー" class="placeholder-content error"><div>{{ ファイル内容エラー }}</div></div>
+          <div v-else-if="ファイル内容エラー" class="placeholder-content">
+            <span class="placeholder-icon">⚠️</span>
+            <div>{{ ファイル内容エラー }}</div>
+          </div>
           <img v-else-if="ファイル内容画像" :src="ファイル内容画像" class="file-image" @contextmenu.prevent="下段右クリック($event)" />
           <div v-else-if="ファイル内容テキスト === null && !ファイル読込中" class="placeholder-content">
-            <div>ツリーからファイルを選択してください</div>
+            <span class="placeholder-icon">📄</span>
+            <div>上のツリーからファイルを選択すると<br>テキストまたは画像を表示します</div>
           </div>
           <div
             v-show="!ファイル読込中 && !ファイル内容エラー && !ファイル内容画像 && ファイル内容テキスト !== null"
@@ -995,7 +1062,10 @@ defineExpose({
   gap: 8px;
 }
 
-.placeholder-content.error { color: #ffb4b4; }
+.placeholder-icon {
+  font-size: 32px;
+  opacity: 0.4;
+}
 
 .loading-panel-image {
   width: 27px;
@@ -1054,7 +1124,7 @@ defineExpose({
 
 .lower-title { font-size: 12px; font-weight: bold; color: #b8c5f2; white-space: nowrap; }
 
-.action-btn {
+.edit-btn {
   background: #667eea;
   border: 1px solid #5568c8;
   border-radius: 2px;
@@ -1065,18 +1135,53 @@ defineExpose({
   padding: 0;
   width: 18px;
   height: 18px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.action-btn:hover:not(:disabled) { background: #768cf0; border-color: #667eea; }
-.action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.action-btn.save { background: #e05a8a; border-color: #c0456f; }
-.action-btn.save:hover:not(:disabled) { background: #f072a0; }
-.action-btn.edit-active { animation: edit-blink 1s ease-in-out infinite; }
+.edit-btn:hover:not(:disabled) { background: #768cf0; border-color: #667eea; transform: translateY(1px); }
+.edit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.edit-btn-active { animation: edit-blink 1s ease-in-out infinite; }
 
 @keyframes edit-blink {
   0%, 100% { background: #667eea; opacity: 1; }
   50% { background: #3a4a9a; opacity: 0.5; }
 }
+
+.upload-btn {
+  background: #e05a8a;
+  border: 1px solid #c0456f;
+  border-radius: 2px;
+  color: #fff;
+  font-size: 14px;
+  line-height: 14px;
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.upload-btn:hover:not(:disabled) { background: #f072a0; border-color: #e05a8a; transform: translateY(-1px); }
+.upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.download-btn {
+  margin-left: 4px;
+  background: #667eea;
+  border: 1px solid #5568c8;
+  border-radius: 2px;
+  color: #fff;
+  font-size: 14px;
+  line-height: 14px;
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.download-btn:hover:not(:disabled) { background: #768cf0; border-color: #667eea; transform: translateY(1px); }
+.download-btn:disabled { opacity: 0.35; background: #4b5da8; border-color: #3f4f8f; cursor: not-allowed; }
 
 .lower-content {
   flex: 1;

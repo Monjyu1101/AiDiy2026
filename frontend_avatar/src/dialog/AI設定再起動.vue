@@ -11,32 +11,29 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, reactive, computed, nextTick, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
-import apiClient from '@/api/client';
-import { qConfirm } from '@/utils/qAlert';
-import RebootDialog from './再起動カウントダウン.vue';
-
-const route = useRoute();
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import apiClient from '@/api/client'
+import RebootDialog from '@/dialog/再起動カウントダウン.vue'
 
 const props = defineProps<{
-  isOpen: boolean;
-}>();
+  isOpen: boolean
+  sessionId: string
+}>()
 
 const emit = defineEmits<{
-  (e: 'close'): void;
-  (e: 'saved'): void;
-}>();
+  (e: 'close'): void
+  (e: 'saved'): void
+}>()
 
-const loading = ref(false);
-const errorMessage = ref('');
-const availableModels = ref<Record<string, any>>({});
-const currentSettings = ref<Record<string, any>>({});
-const codeBaseOptions = ref<Record<string, string>>({});
-const showRebootDialog = ref(false);
-const rebootWaitSeconds = ref(15);
-const isInitializing = ref(false);
-const hasLoadedConfig = ref(false);
+const loading = ref(false)
+const errorMessage = ref('')
+const availableModels = ref<Record<string, any>>({})
+const currentSettings = ref<Record<string, any>>({})
+const codeBaseOptions = ref<Record<string, string>>({})
+const showRebootDialog = ref(false)
+const rebootWaitSeconds = ref(15)
+const isInitializing = ref(false)
+const hasLoadedConfig = ref(false)
 
 const selections = reactive({
   chatAi: '',
@@ -52,342 +49,276 @@ const selections = reactive({
   codeModel3: '',
   codeAi4: '',
   codeModel4: '',
-  codeBasePath: ''
-});
+  codeBasePath: '',
+})
 
 const CHAT_MODEL_KEYS: Record<string, string> = {
   gemini_chat: 'CHAT_GEMINI_MODEL',
   freeai_chat: 'CHAT_FREEAI_MODEL',
-  openrt_chat: 'CHAT_OPENRT_MODEL'
-};
+  openrt_chat: 'CHAT_OPENRT_MODEL',
+}
 
 const LIVE_MODEL_KEYS: Record<string, string> = {
   gemini_live: 'LIVE_GEMINI_MODEL',
   freeai_live: 'LIVE_FREEAI_MODEL',
-  openai_live: 'LIVE_OPENAI_MODEL'
-};
+  openai_live: 'LIVE_OPENAI_MODEL',
+}
 
 const LIVE_VOICE_KEYS: Record<string, string> = {
   gemini_live: 'LIVE_GEMINI_VOICE',
   freeai_live: 'LIVE_FREEAI_VOICE',
-  openai_live: 'LIVE_OPENAI_VOICE'
-};
+  openai_live: 'LIVE_OPENAI_VOICE',
+}
 
-const CODE_MODEL_KEYS: Record<string, string> = {
-  claude_sdk: 'CODE_CLAUDE_SDK_MODEL',
-  claude_cli: 'CODE_CLAUDE_CLI_MODEL',
-  copilot_cli: 'CODE_COPILOT_CLI_MODEL',
-  gemini_cli: 'CODE_GEMINI_CLI_MODEL',
-  codex_cli: 'CODE_CODEX_CLI_MODEL'
-};
-
-const chatAiOptions = computed(() => Object.keys(availableModels.value?.chat_models || {}));
-const liveAiOptions = computed(() => Object.keys(availableModels.value?.live_models || {}));
-const codeAiOptions = computed(() => Object.keys(availableModels.value?.code_models || {}));
+const chatAiOptions = computed(() => Object.keys(availableModels.value?.chat_models || {}))
+const liveAiOptions = computed(() => Object.keys(availableModels.value?.live_models || {}))
+const codeAiOptions = computed(() => Object.keys(availableModels.value?.code_models || {}))
+const codeBaseOptionsList = computed(() => Object.entries(codeBaseOptions.value || {}).map(([value, label]) => ({ value, label })))
 
 const chatModelOptions = computed(() => {
-  const models = availableModels.value?.chat_models?.[selections.chatAi] || {};
-  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
-});
+  const models = availableModels.value?.chat_models?.[selections.chatAi] || {}
+  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }))
+})
 
 const liveModelOptions = computed(() => {
-  const models = availableModels.value?.live_models?.[selections.liveAi] || {};
-  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
-});
+  const models = availableModels.value?.live_models?.[selections.liveAi] || {}
+  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }))
+})
 
 const liveVoiceOptions = computed(() => {
-  const voices = availableModels.value?.live_voices?.[selections.liveAi] || {};
-  return Object.entries(voices).map(([value, label]) => ({ value, label: label || value }));
-});
+  const voices = availableModels.value?.live_voices?.[selections.liveAi] || {}
+  return Object.entries(voices).map(([value, label]) => ({ value, label: label || value }))
+})
 
-const codeModelOptions1 = computed(() => {
-  const models = availableModels.value?.code_models?.[selections.codeAi1] || {};
-  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
-});
+const codeModelOptions1 = computed(() => buildCodeModelOptions(selections.codeAi1))
+const codeModelOptions2 = computed(() => buildCodeModelOptions(selections.codeAi2))
+const codeModelOptions3 = computed(() => buildCodeModelOptions(selections.codeAi3))
+const codeModelOptions4 = computed(() => buildCodeModelOptions(selections.codeAi4))
 
-const codeModelOptions2 = computed(() => {
-  const models = availableModels.value?.code_models?.[selections.codeAi2] || {};
-  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
-});
+function buildCodeModelOptions(aiName: string) {
+  const models = availableModels.value?.code_models?.[aiName] || {}
+  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }))
+}
 
-const codeModelOptions3 = computed(() => {
-  const models = availableModels.value?.code_models?.[selections.codeAi3] || {};
-  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
-});
+async function loadConfig() {
+  loading.value = true
+  errorMessage.value = ''
 
-const codeModelOptions4 = computed(() => {
-  const models = availableModels.value?.code_models?.[selections.codeAi4] || {};
-  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
-});
-
-const codeBasePath = computed(() => selections.codeBasePath || currentSettings.value?.CODE_BASE_PATH || '');
-const codeBaseOptionsList = computed(() =>
-  Object.entries(codeBaseOptions.value || {}).map(([value, label]) => ({ value, label }))
-);
-
-const loadConfig = async () => {
-  loading.value = true;
-  errorMessage.value = '';
   try {
-    // URLからセッションIDを取得
-    const セッションID = route.query.セッションID as string;
-
-    if (!セッションID) {
-      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。';
-      loading.value = false;
-      return;
+    if (!props.sessionId) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。'
+      return
     }
 
     const response = await apiClient.post('/core/AIコア/モデル情報/取得', {
-      セッションID
-    });
+      セッションID: props.sessionId,
+    })
 
-    if (response?.data?.status === 'OK') {
-      const data = response.data.data;
-      availableModels.value = data.available_models || {};
-      currentSettings.value = data.モデル設定 || {};
-      codeBaseOptions.value = data.external_root_dic || {};
-
-      isInitializing.value = true;
-      const chatModels = availableModels.value.chat_models || {};
-      const liveModels = availableModels.value.live_models || {};
-      const liveVoices = availableModels.value.live_voices || {};
-      const codeModels = availableModels.value.code_models || {};
-
-      selections.chatAi = currentSettings.value.CHAT_AI_NAME || chatAiOptions.value[0] || '';
-      selections.liveAi = currentSettings.value.LIVE_AI_NAME || liveAiOptions.value[0] || '';
-      selections.codeAi1 = currentSettings.value.CODE_AI1_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi2 = currentSettings.value.CODE_AI2_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi3 = currentSettings.value.CODE_AI3_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi4 = currentSettings.value.CODE_AI4_NAME || codeAiOptions.value[0] || '';
-      selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || '';
-
-      const chatKey = CHAT_MODEL_KEYS[selections.chatAi];
-      selections.chatModel = (chatKey && currentSettings.value[chatKey]) || Object.keys(chatModels?.[selections.chatAi] || {})[0] || '';
-
-      const liveKey = LIVE_MODEL_KEYS[selections.liveAi];
-      selections.liveModel = (liveKey && currentSettings.value[liveKey]) || Object.keys(liveModels?.[selections.liveAi] || {})[0] || '';
-
-      const voiceKey = LIVE_VOICE_KEYS[selections.liveAi];
-      selections.liveVoice = (voiceKey && currentSettings.value[voiceKey]) || Object.keys(liveVoices?.[selections.liveAi] || {})[0] || '';
-
-      selections.codeModel1 = currentSettings.value.CODE_AI1_MODEL || Object.keys(codeModels?.[selections.codeAi1] || {})[0] || '';
-      selections.codeModel2 = currentSettings.value.CODE_AI2_MODEL || Object.keys(codeModels?.[selections.codeAi2] || {})[0] || '';
-      selections.codeModel3 = currentSettings.value.CODE_AI3_MODEL || Object.keys(codeModels?.[selections.codeAi3] || {})[0] || '';
-      selections.codeModel4 = currentSettings.value.CODE_AI4_MODEL || Object.keys(codeModels?.[selections.codeAi4] || {})[0] || '';
-      await nextTick();
-      isInitializing.value = false;
-      hasLoadedConfig.value = true;
-    } else {
-      errorMessage.value = response?.data?.message || '取得に失敗しました';
+    if (response?.data?.status !== 'OK') {
+      errorMessage.value = response?.data?.message || '取得に失敗しました'
+      return
     }
+
+    const data = response.data.data
+    availableModels.value = data.available_models || {}
+    currentSettings.value = data.モデル設定 || {}
+    codeBaseOptions.value = data.external_root_dic || {}
+
+    isInitializing.value = true
+
+    selections.chatAi = currentSettings.value.CHAT_AI_NAME || chatAiOptions.value[0] || ''
+    selections.liveAi = currentSettings.value.LIVE_AI_NAME || liveAiOptions.value[0] || ''
+    selections.codeAi1 = currentSettings.value.CODE_AI1_NAME || codeAiOptions.value[0] || ''
+    selections.codeAi2 = currentSettings.value.CODE_AI2_NAME || codeAiOptions.value[0] || ''
+    selections.codeAi3 = currentSettings.value.CODE_AI3_NAME || codeAiOptions.value[0] || ''
+    selections.codeAi4 = currentSettings.value.CODE_AI4_NAME || codeAiOptions.value[0] || ''
+    selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || ''
+
+    const chatKey = CHAT_MODEL_KEYS[selections.chatAi]
+    const liveKey = LIVE_MODEL_KEYS[selections.liveAi]
+    const voiceKey = LIVE_VOICE_KEYS[selections.liveAi]
+
+    selections.chatModel = (chatKey && currentSettings.value[chatKey]) || Object.keys(availableModels.value?.chat_models?.[selections.chatAi] || {})[0] || ''
+    selections.liveModel = (liveKey && currentSettings.value[liveKey]) || Object.keys(availableModels.value?.live_models?.[selections.liveAi] || {})[0] || ''
+    selections.liveVoice = (voiceKey && currentSettings.value[voiceKey]) || Object.keys(availableModels.value?.live_voices?.[selections.liveAi] || {})[0] || ''
+    selections.codeModel1 = currentSettings.value.CODE_AI1_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi1] || {})[0] || ''
+    selections.codeModel2 = currentSettings.value.CODE_AI2_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi2] || {})[0] || ''
+    selections.codeModel3 = currentSettings.value.CODE_AI3_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi3] || {})[0] || ''
+    selections.codeModel4 = currentSettings.value.CODE_AI4_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi4] || {})[0] || ''
+
+    await nextTick()
+    hasLoadedConfig.value = true
   } catch (error: any) {
-    errorMessage.value = `取得エラー: ${error?.response?.data?.message || error?.message || error}`;
+    errorMessage.value = `取得エラー: ${error?.response?.data?.message || error?.message || error}`
   } finally {
-    if (isInitializing.value) {
-      await nextTick();
-      isInitializing.value = false;
-    }
-    loading.value = false;
+    isInitializing.value = false
+    loading.value = false
   }
-};
+}
 
-const handleCancel = () => {
-  emit('close');
-};
+function handleCancel() {
+  emit('close')
+}
 
-const buildNextSettings = () => {
-    const nextSettings = { ...currentSettings.value };
-    nextSettings.CHAT_AI_NAME = selections.chatAi;
-    nextSettings.LIVE_AI_NAME = selections.liveAi;
-    nextSettings.CODE_AI1_NAME = selections.codeAi1;
-    nextSettings.CODE_AI1_MODEL = selections.codeModel1;
-    nextSettings.CODE_AI2_NAME = selections.codeAi2;
-    nextSettings.CODE_AI2_MODEL = selections.codeModel2;
-    nextSettings.CODE_AI3_NAME = selections.codeAi3;
-    nextSettings.CODE_AI3_MODEL = selections.codeModel3;
-    nextSettings.CODE_AI4_NAME = selections.codeAi4;
-    nextSettings.CODE_AI4_MODEL = selections.codeModel4;
-    if (selections.codeBasePath) {
-      nextSettings.CODE_BASE_PATH = selections.codeBasePath;
-    }
+function buildNextSettings() {
+  const nextSettings = { ...currentSettings.value }
+  nextSettings.CHAT_AI_NAME = selections.chatAi
+  nextSettings.LIVE_AI_NAME = selections.liveAi
+  nextSettings.CODE_AI1_NAME = selections.codeAi1
+  nextSettings.CODE_AI1_MODEL = selections.codeModel1
+  nextSettings.CODE_AI2_NAME = selections.codeAi2
+  nextSettings.CODE_AI2_MODEL = selections.codeModel2
+  nextSettings.CODE_AI3_NAME = selections.codeAi3
+  nextSettings.CODE_AI3_MODEL = selections.codeModel3
+  nextSettings.CODE_AI4_NAME = selections.codeAi4
+  nextSettings.CODE_AI4_MODEL = selections.codeModel4
 
-    const chatKey = CHAT_MODEL_KEYS[selections.chatAi];
-    if (chatKey) {
-      nextSettings[chatKey] = selections.chatModel;
-    }
+  if (selections.codeBasePath) {
+    nextSettings.CODE_BASE_PATH = selections.codeBasePath
+  }
 
-    const liveKey = LIVE_MODEL_KEYS[selections.liveAi];
-    if (liveKey) {
-      nextSettings[liveKey] = selections.liveModel;
-    }
+  const chatKey = CHAT_MODEL_KEYS[selections.chatAi]
+  const liveKey = LIVE_MODEL_KEYS[selections.liveAi]
+  const voiceKey = LIVE_VOICE_KEYS[selections.liveAi]
 
-    const voiceKey = LIVE_VOICE_KEYS[selections.liveAi];
-    if (voiceKey) {
-      nextSettings[voiceKey] = selections.liveVoice;
-    }
-    return nextSettings;
-};
+  if (chatKey) nextSettings[chatKey] = selections.chatModel
+  if (liveKey) nextSettings[liveKey] = selections.liveModel
+  if (voiceKey) nextSettings[voiceKey] = selections.liveVoice
 
-const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_apps: boolean }, waitSeconds: number = 15) => {
-  loading.value = true;
-  errorMessage.value = '';
+  return nextSettings
+}
+
+async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean }, waitSeconds = 15) {
+  loading.value = true
+  errorMessage.value = ''
+
   try {
-    const セッションID = route.query.セッションID as string;
-
-    if (!セッションID) {
-      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。';
-      loading.value = false;
-      return;
+    if (!props.sessionId) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。'
+      return
     }
 
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
-      セッションID,
+      セッションID: props.sessionId,
       モデル設定: buildNextSettings(),
-      再起動要求
-    });
+      再起動要求,
+    })
 
-    if (response?.data?.status === 'OK') {
-      rebootWaitSeconds.value = waitSeconds;
-      showRebootDialog.value = true;
-    } else {
-      errorMessage.value = response?.data?.message || '保存に失敗しました';
+    if (response?.data?.status !== 'OK') {
+      errorMessage.value = response?.data?.message || '保存に失敗しました'
+      return
     }
+
+    rebootWaitSeconds.value = waitSeconds
+    showRebootDialog.value = true
+    emit('saved')
   } catch (error: any) {
-    errorMessage.value = `保存エラー: ${error?.response?.data?.message || error?.message || error}`;
+    errorMessage.value = `保存エラー: ${error?.response?.data?.message || error?.message || error}`
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true });
+function handleSave() {
+  void submitSettings({ reboot_core: false, reboot_apps: true })
+}
 
-const handleResetReboot = async () => {
-  const confirmed = await qConfirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？');
-  if (!confirmed) return;
-  loading.value = true;
-  errorMessage.value = '';
+async function handleResetReboot() {
+  const confirmed = window.confirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？')
+  if (!confirmed) return
+
+  loading.value = true
+  errorMessage.value = ''
+
   try {
-    const セッションID = route.query.セッションID as string;
-    if (!セッションID) {
-      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。';
-      loading.value = false;
-      return;
+    if (!props.sessionId) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。'
+      return
     }
+
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
-      セッションID,
+      セッションID: props.sessionId,
       モデル設定: {},
-      再起動要求: { reboot_core: true, reboot_apps: true }
-    });
-    if (response?.data?.status === 'OK') {
-      rebootWaitSeconds.value = 60;
-      showRebootDialog.value = true;
-    } else {
-      errorMessage.value = response?.data?.message || 'リセット再起動に失敗しました';
+      再起動要求: { reboot_core: true, reboot_apps: true },
+    })
+
+    if (response?.data?.status !== 'OK') {
+      errorMessage.value = response?.data?.message || 'リセット再起動に失敗しました'
+      return
     }
+
+    rebootWaitSeconds.value = 60
+    showRebootDialog.value = true
+    emit('saved')
   } catch (error: any) {
-    errorMessage.value = `リセット再起動エラー: ${error?.response?.data?.message || error?.message || error}`;
+    errorMessage.value = `リセット再起動エラー: ${error?.response?.data?.message || error?.message || error}`
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-watch(
-  () => selections.chatAi,
-  (newValue) => {
-    const models = availableModels.value?.chat_models?.[newValue] || {};
-    const key = CHAT_MODEL_KEYS[newValue];
-    selections.chatModel = (key && currentSettings.value[key]) || Object.keys(models)[0] || '';
+watch(() => props.isOpen, (isOpen) => {
+  if (isOpen && props.sessionId) {
+    void loadConfig()
   }
-);
+}, { immediate: true })
 
-watch(
-  () => selections.liveAi,
-  (newValue) => {
-    const models = availableModels.value?.live_models?.[newValue] || {};
-    const voices = availableModels.value?.live_voices?.[newValue] || {};
-    const modelKey = LIVE_MODEL_KEYS[newValue];
-    const voiceKey = LIVE_VOICE_KEYS[newValue];
-    selections.liveModel = (modelKey && currentSettings.value[modelKey]) || Object.keys(models)[0] || '';
-    selections.liveVoice = (voiceKey && currentSettings.value[voiceKey]) || Object.keys(voices)[0] || '';
-  }
-);
+watch(() => selections.chatAi, (newValue) => {
+  const models = availableModels.value?.chat_models?.[newValue] || {}
+  const key = CHAT_MODEL_KEYS[newValue]
+  selections.chatModel = (key && currentSettings.value[key]) || Object.keys(models)[0] || ''
+})
 
-watch(
-  () => selections.codeAi1,
-  (newValue) => {
-    if (isInitializing.value) return;
-    const models = availableModels.value?.code_models?.[newValue] || {};
-    const newModel = currentSettings.value.CODE_AI1_MODEL || Object.keys(models)[0] || '';
-    selections.codeModel1 = newModel;
-    // AI1変更時、AI2-4に両方（AIとMODEL）をコピー
-    selections.codeAi2 = newValue;
-    selections.codeAi3 = newValue;
-    selections.codeAi4 = newValue;
-    selections.codeModel2 = selections.codeModel1;
-    selections.codeModel3 = selections.codeModel1;
-    selections.codeModel4 = selections.codeModel1;
-  }
-);
+watch(() => selections.liveAi, (newValue) => {
+  const models = availableModels.value?.live_models?.[newValue] || {}
+  const voices = availableModels.value?.live_voices?.[newValue] || {}
+  const modelKey = LIVE_MODEL_KEYS[newValue]
+  const voiceKey = LIVE_VOICE_KEYS[newValue]
+  selections.liveModel = (modelKey && currentSettings.value[modelKey]) || Object.keys(models)[0] || ''
+  selections.liveVoice = (voiceKey && currentSettings.value[voiceKey]) || Object.keys(voices)[0] || ''
+})
 
-watch(
-  () => selections.codeModel1,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI1_MODEL変更時、AI2-4に両方（AIとMODEL）をコピー
-    selections.codeAi2 = selections.codeAi1;
-    selections.codeAi3 = selections.codeAi1;
-    selections.codeAi4 = selections.codeAi1;
-    selections.codeModel2 = newValue;
-    selections.codeModel3 = newValue;
-    selections.codeModel4 = newValue;
-  }
-);
+watch(() => selections.codeAi1, (newValue) => {
+  const models = availableModels.value?.code_models?.[newValue] || {}
+  const newModel = currentSettings.value.CODE_AI1_MODEL || Object.keys(models)[0] || ''
+  selections.codeModel1 = newModel
+  if (isInitializing.value) return
+  selections.codeAi2 = newValue
+  selections.codeAi3 = newValue
+  selections.codeAi4 = newValue
+  selections.codeModel2 = selections.codeModel1
+  selections.codeModel3 = selections.codeModel1
+  selections.codeModel4 = selections.codeModel1
+})
 
-watch(
-  () => selections.codeAi2,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI2個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length > 0 && !models.includes(selections.codeModel2)) {
-      selections.codeModel2 = models[0];
-    }
-  }
-);
+watch(() => selections.codeModel1, (newValue) => {
+  if (isInitializing.value) return
+  selections.codeAi2 = selections.codeAi1
+  selections.codeAi3 = selections.codeAi1
+  selections.codeAi4 = selections.codeAi1
+  selections.codeModel2 = newValue
+  selections.codeModel3 = newValue
+  selections.codeModel4 = newValue
+})
 
-watch(
-  () => selections.codeAi3,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI3個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length > 0 && !models.includes(selections.codeModel3)) {
-      selections.codeModel3 = models[0];
-    }
-  }
-);
+watch(() => selections.codeAi2, (newValue) => syncCodeModel('codeModel2', newValue))
+watch(() => selections.codeAi3, (newValue) => syncCodeModel('codeModel3', newValue))
+watch(() => selections.codeAi4, (newValue) => syncCodeModel('codeModel4', newValue))
 
-watch(
-  () => selections.codeAi4,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI4個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length > 0 && !models.includes(selections.codeModel4)) {
-      selections.codeModel4 = models[0];
-    }
+function syncCodeModel(targetKey: 'codeModel2' | 'codeModel3' | 'codeModel4', aiName: string) {
+  if (isInitializing.value) return
+  if (!availableModels.value?.code_models?.[aiName]) return
+  const models = Object.keys(availableModels.value.code_models[aiName])
+  if (models.length > 0 && !models.includes(selections[targetKey])) {
+    selections[targetKey] = models[0]!
   }
-);
+}
 
 onMounted(() => {
-  if (!hasLoadedConfig.value) {
-    loadConfig();
+  if (props.isOpen && !hasLoadedConfig.value) {
+    void loadConfig()
   }
-});
+})
 </script>
 
 <template>
@@ -463,14 +394,8 @@ onMounted(() => {
               <div v-if="codeBaseOptionsList.length > 0" class="config-panel-field">
                 <label class="config-panel-label" for="config-code-base-path">CODE_BASE_PATH:</label>
                 <div class="config-panel-control">
-                  <select
-                    id="config-code-base-path"
-                    v-model="selections.codeBasePath"
-                    class="config-panel-select"
-                  >
-                    <option v-for="opt in codeBaseOptionsList" :key="opt.value" :value="opt.value">
-                      {{ opt.label }}
-                    </option>
+                  <select id="config-code-base-path" v-model="selections.codeBasePath" class="config-panel-select">
+                    <option v-for="opt in codeBaseOptionsList" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </select>
                 </div>
               </div>
@@ -626,12 +551,6 @@ onMounted(() => {
   flex: 1;
 }
 
-.config-panel-placeholder {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-}
-
 .config-panel-error {
   margin: 0;
   padding: 12px;
@@ -681,11 +600,6 @@ onMounted(() => {
   grid-template-columns: 120px 1fr;
   gap: 4px;
   align-items: center;
-  padding: 0;
-  margin: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
 }
 
 .config-panel-label {
@@ -693,13 +607,6 @@ onMounted(() => {
   color: #334155;
   text-align: right;
   margin: 0;
-  padding: 0;
-}
-
-.config-panel-control {
-  width: 100%;
-  margin: 0;
-  padding: 0;
 }
 
 .config-panel-select {
@@ -711,9 +618,7 @@ onMounted(() => {
   font-size: 11px;
   background: #ffffff;
   color: #0f172a;
-  margin: 0;
 }
-
 
 .config-panel-actions {
   padding: 8px 12px;
@@ -773,8 +678,7 @@ onMounted(() => {
   background: #b91c1c;
 }
 
-.config-panel-actions button.primary:disabled,
-.config-panel-actions button.danger:disabled {
+.config-panel-actions button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

@@ -29,6 +29,7 @@ const api = {
   closeCurrentWindow: () => ipcRenderer.invoke('window:close-self'),
   minimizeCurrentWindow: () => ipcRenderer.invoke('window:minimize-self'),
   togglePanel: (panel: PanelKey) => ipcRenderer.invoke('panel:toggle', panel),
+  applyPanelStates: (states: Record<PanelKey, boolean>) => ipcRenderer.invoke('panel:apply-states', states) as Promise<Record<PanelKey, boolean>>,
   getPanelStates: () => ipcRenderer.invoke('panel:get-states') as Promise<Record<PanelKey, boolean>>,
   listDisplaySources: () => ipcRenderer.invoke('desktop:list-sources') as Promise<DisplaySourceInfo[]>,
   setDisplaySource: (sourceId: string | null) => ipcRenderer.invoke('desktop:set-source', sourceId),

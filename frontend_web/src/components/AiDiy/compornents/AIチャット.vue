@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue';
-import { AIコアWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
+import { AIWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import apiClient from '@/api/client';
 import FileContentDialog from '../dialog/ファイル内容表示.vue';
 
@@ -57,6 +57,13 @@ interface メッセージ {
 const メッセージ一覧 = ref<メッセージ[]>([]);
 const 入力テキスト = ref('');
 const 選択モード = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>(プロパティ.chatMode || 'live');
+
+const 送信モードラベル = computed(() => {
+  const m = 選択モード.value;
+  if (m.startsWith('code')) return `CODE ${m.replace('code', '')}`;
+  if (m === 'live') return 'LIVE';
+  return 'CHAT';
+});
 const チャット領域 = ref<HTMLElement | null>(null);
 const テキストエリア = ref<HTMLTextAreaElement | null>(null);
 const ドラッグ中 = ref(false);
@@ -666,7 +673,7 @@ const 出力ソケット接続 = async () => {
   }
 
   const wsUrl = createWebSocketUrl('/core/ws/AIコア');
-  出力WebSocket.value = new AIコアWebSocket(wsUrl, セッションID.value, チャンネル);
+  出力WebSocket.value = new AIWebSocket(wsUrl, セッションID.value, チャンネル);
   WSハンドラ登録(出力WebSocket.value);
 
   try {
@@ -728,6 +735,10 @@ onBeforeUnmount(() => {
     出力WebSocket.value = null;
   }
   出力接続済み.value = false;
+  for (const state of 演出状態Map.values()) {
+    clearInterval((state as any).blinkInterval)
+  }
+  演出状態Map.clear();
 });
 
 // メッセージ送信
@@ -809,24 +820,24 @@ const 入力ファイル送信 = async (入力ファイル: File) => {
 };
 
 // ドラッグ&ドロップ
-const ドラッグオーバー処理 = (イベント: DragEvent) => {
-  イベント.preventDefault();
+const ドラッグオーバー処理 = (event: DragEvent) => {
+  event.preventDefault();
   if (!WebSocket接続中.value) return;
   ドラッグ中.value = true;
 };
 
-const ドラッグ離脱処理 = (イベント: DragEvent) => {
-  イベント.preventDefault();
-  if (イベント.currentTarget === イベント.target) {
+const ドラッグ離脱処理 = (event: DragEvent) => {
+  event.preventDefault();
+  if (event.currentTarget === event.target) {
     ドラッグ中.value = false;
   }
 };
 
-const ドロップ処理 = async (イベント: DragEvent) => {
-  イベント.preventDefault();
+const ドロップ処理 = async (event: DragEvent) => {
+  event.preventDefault();
   ドラッグ中.value = false;
   if (!WebSocket接続中.value) return;
-  const ファイル一覧 = イベント.dataTransfer?.files;
+  const ファイル一覧 = event.dataTransfer?.files;
   if (!ファイル一覧 || ファイル一覧.length === 0) return;
   for (const ファイル of Array.from(ファイル一覧)) {
     await 入力ファイル送信(ファイル);
@@ -847,13 +858,13 @@ const 接続状態表示 = computed(() => {
   return WebSocket接続中.value ? '接続中' : '切断';
 });
 
-// Enterキーで改行（送信しない）
-// const handleKeydown = (e: KeyboardEvent) => {
-//   if (e.key === 'Enter' && !e.shiftKey) {
-//     e.preventDefault();
-//     メッセージ送信();
-//   }
-// };
+// Enterキーで送信（Shift+Enterで改行）
+const キー入力処理 = (event: KeyboardEvent) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    メッセージ送信();
+  }
+};
 </script>
 
 <template>
@@ -936,6 +947,7 @@ const 接続状態表示 = computed(() => {
             maxlength="5000"
             :disabled="!WebSocket接続中"
             @input="テキストエリア自動調整"
+            @keydown="キー入力処理"
             ref="テキストエリア"
           ></textarea>
         </div>
@@ -986,6 +998,7 @@ const 接続状態表示 = computed(() => {
         title="送信"
       >
         <img src="/icons/sending.png" alt="送信" />
+        <span class="send-mode-label">{{ 送信モードラベル }}</span>
       </button>
     </div>
 
@@ -1478,6 +1491,7 @@ const 接続状態表示 = computed(() => {
   border: 2px solid #667eea;
   border-radius: 2px;
   cursor: pointer;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1543,6 +1557,29 @@ const 接続状態表示 = computed(() => {
 
 .chat-send-btn.ws-disabled img {
   filter: brightness(0) invert(1) !important; /* 白アイコン */
+}
+
+.send-mode-label {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.7px;
+  color: #334155;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+.chat-send-btn.has-text .send-mode-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.chat-send-btn.ws-disabled .send-mode-label {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .chat-send-btn.ws-disabled:hover {

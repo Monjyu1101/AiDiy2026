@@ -26,7 +26,7 @@ type BoundsPreset = {
 }
 
 const LOGIN_BOUNDS: BoundsPreset = { width: 320, height: 240, minWidth: 320, minHeight: 240 }
-const CORE_BOUNDS: BoundsPreset = { width: 560, height: 720, minWidth: 520, minHeight: 640 }
+const CORE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const CHAT_BASE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   chat: CHAT_BASE_BOUNDS,
@@ -505,6 +505,14 @@ app.whenReady().then(() => {
   ipcMain.handle('panel:toggle', (_event, panel: PanelKey) => {
     createPanelWindow(panel)
     setPanelVisibility(panel, !panelStates[panel])
+    return { ...panelStates }
+  })
+
+  ipcMain.handle('panel:apply-states', (_event, states: Record<PanelKey, boolean>) => {
+    ;(Object.keys(states) as PanelKey[]).forEach((panel) => {
+      createPanelWindow(panel)
+      setPanelVisibility(panel, Boolean(states[panel]))
+    })
     return { ...panelStates }
   })
 
