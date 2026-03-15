@@ -49,6 +49,7 @@ declare global {
       applyPanelStates?: (states: Record<AvatarPanelKey, boolean>) => Promise<Record<AvatarPanelKey, boolean>>
       getPanelStates?: () => Promise<Record<AvatarPanelKey, boolean>>
       listDisplaySources?: () => Promise<AvatarDisplaySource[]>
+      listVrmaFiles?: (folderName: string) => Promise<string[]>
       setDisplaySource?: (sourceId: string | null) => Promise<string | null>
       openSettingsWindow?: (sessionId: string) => Promise<void>
       closeSettingsWindow?: () => Promise<void>

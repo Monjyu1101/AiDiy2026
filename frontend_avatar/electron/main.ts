@@ -1,4 +1,5 @@
 import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session } from 'electron'
+import { readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -136,6 +137,35 @@ async function listDisplaySources(): Promise<DisplaySourceInfo[]> {
     kind: resolveDisplaySourceKind(source.id),
     thumbnailDataUrl: source.thumbnail.isEmpty() ? null : source.thumbnail.toDataURL(),
   }))
+}
+
+async function listVrmaFiles(folderName: string): Promise<string[]> {
+  const safeFolderName = path.basename(folderName)
+  const appPath = app.getAppPath()
+  const candidateDirs = [
+    path.join(appPath, 'public', 'vrma', safeFolderName),
+    path.join(appPath, 'frontend_avatar', 'public', 'vrma', safeFolderName),
+    path.join(process.cwd(), 'public', 'vrma', safeFolderName),
+    path.join(process.cwd(), 'frontend_avatar', 'public', 'vrma', safeFolderName),
+  ]
+
+  for (const vrmaDir of candidateDirs) {
+    try {
+      const entries = await readdir(vrmaDir, { withFileTypes: true })
+      const files = entries
+        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.vrma'))
+        .map((entry) => `/vrma/${safeFolderName}/${entry.name}`)
+        .sort((a, b) => a.localeCompare(b, 'ja'))
+      if (files.length > 0) {
+        return files
+      }
+    } catch {
+      // Try the next candidate directory.
+    }
+  }
+
+  console.error('[vrma] list failed:', safeFolderName, candidateDirs)
+  return []
 }
 
 function getRendererUrl(role: WindowRole): string {
@@ -610,6 +640,8 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('desktop:list-sources', async () => listDisplaySources())
+
+  ipcMain.handle('desktop:list-vrma-files', async (_event, folderName: string) => listVrmaFiles(folderName))
 
   ipcMain.handle('desktop:set-source', (_event, sourceId: string | null) => {
     selectedDisplaySourceId = sourceId

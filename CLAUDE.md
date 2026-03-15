@@ -84,8 +84,14 @@ python _setup.py
 
 # Start servers (interactive: asks backend/web/avatar y/n)
 python _start.py
+python _start.py --backend=yes --frontend=no   # backend only
+python _start.py --backend=no  --frontend=yes  # frontend only
 
-# Trigger backend reload (Windows)
+# Stop servers
+python _stop.py
+python _stop.py --backend=yes --frontend=no    # backend only
+
+# Trigger backend reload (Windows) — when started via _start.py (no --reload)
 echo. > backend_server/temp/reboot_core.txt   # core_main
 echo. > backend_server/temp/reboot_apps.txt   # apps_main
 
@@ -96,9 +102,13 @@ cd backend_server && .venv/Scripts/python.exe -m uvicorn apps_main:app --reload 
 # Frontend only
 cd frontend_web && npm run dev
 
-# Type checking / build (frontend)
+# Type checking / build (frontend web)
 cd frontend_web && npm run type-check
 cd frontend_web && npm run build
+
+# frontend_avatar — DO NOT run npm run build unless explicitly requested (generates dist/)
+cd frontend_avatar && npm run dev
+cd frontend_avatar && npm run type-check
 
 # Dependencies
 cd backend_server && uv sync
@@ -114,6 +124,8 @@ del backend_server\_data\AiDiy\database.db   # then restart servers
 sqlite3 backend_server/_data/AiDiy/database.db ".tables"
 sqlite3 backend_server/_data/AiDiy/database.db "PRAGMA table_info(テーブル名);"
 ```
+
+**API key configuration:** `backend_server/_config/AiDiy_key.json` (auto-created on first run; excluded from git). Edit this file to set AI provider keys (Anthropic, OpenAI, Google Gemini).
 
 ## Access URLs
 

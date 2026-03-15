@@ -16,7 +16,11 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import { DEFAULT_VRM_MODEL_URL, DEFAULT_VRMA_FILES } from '@/api/config'
+import {
+  DEFAULT_VRM_MODEL_URL,
+  SAMPLE_VRMA_FOLDER_NAME,
+  STANDARD_VRMA_FOLDER_NAME,
+} from '@/api/config'
 import {
   自立身体制御初期化,
   自立身体制御リセット,
@@ -25,9 +29,12 @@ import {
 } from '@/components/AIコア_自立身体制御'
 import {
   カメラ距離倍率適用,
+  カメラ距離倍率即時適用,
   自動カメラワーク初期化,
   自動カメラワーク適用,
+  追従カメラワーク適用,
   手動カメラ周回適用,
+  type 自動カメラ追従入力,
   type 自動カメラワーク設定,
 } from '@/components/AIコア_自動カメラワーク'
 
@@ -45,12 +52,12 @@ const props = withDefaults(defineProps<{
   transparentMode?: boolean;
   subtitleText?: string;
   bodyAutonomousEnabled?: boolean;
-  cameraAutoEnabled?: boolean;
+  cameraMode?: '停止' | '追従' | '回転';
 }>(), {
   transparentMode: false,
   subtitleText: '',
   bodyAutonomousEnabled: false,
-  cameraAutoEnabled: true,
+  cameraMode: '停止',
 })
 
 const mountRef = ref<HTMLDivElement | null>(null)
@@ -70,9 +77,9 @@ let motionLoader: GLTFLoader | null = null
 let modelLoader: GLTFLoader | null = null
 let mixer: THREE.AnimationMixer | null = null
 let currentAction: THREE.AnimationAction | null = null
+let 最後に終了したアクション: THREE.AnimationAction | null = null
 let modelSize: THREE.Vector3 | null = null
 let destroyed = false
-let currentMotionIndex = -1
 let lipCurrent = 0
 const _lookAtPos = new THREE.Vector3()
 let manualCameraAngle = 0
@@ -89,7 +96,10 @@ let autoBodySettings: 自立身体制御設定 | null = null
 let autoCameraSettings: 自動カメラワーク設定 | null = null
 
 const モーション補間秒数 = 0.3
+const 体姿勢補正秒数 = 0.42
+const 体姿勢誤差許容 = 0.0001
 const 視線補間速度 = 10
+const カメラ高さ戻し速度 = 1.4
 const カメラ目線オフセット = 0.18
 const 視線補助最大ヨー角 = 48
 const 視線補助最大ピッチ角 = 26
@@ -106,13 +116,50 @@ type 視線補助設定 = {
   頭: 視線補助骨設定 | null
 }
 
+type 体姿勢状態 = {
+  rotationY: number
+  positionY: number
+}
+
+type 体姿勢補正設定 = {
+  開始時刻: number
+  開始回転Y: number
+  開始位置Y: number
+  完了後処理: (() => void) | null
+}
+
+type カメラ表示状態 = {
+  angle: number
+  radius: number
+  displayedHeightOffset: number
+  lookAtY: number
+}
+
+type VRMA再生設定 = {
+  フォルダ名: string
+  連続再生: boolean
+  選択モード: 'サンプル巡回' | '標準巡回'
+}
+
 const _cameraPos = new THREE.Vector3()
 const _cameraForward = new THREE.Vector3()
 const _gazeEuler = new THREE.Euler(0, 0, 0, 'YXZ')
 const _gazeQuat = new THREE.Quaternion()
 const _baseQuat = new THREE.Quaternion()
+const _headWorldPos = new THREE.Vector3()
+const _avatarWorldQuat = new THREE.Quaternion()
+const _avatarWorldEuler = new THREE.Euler(0, 0, 0, 'YXZ')
 let lookAtTarget: THREE.Object3D | null = null
 let gazeAssistSettings: 視線補助設定 | null = null
+let vrma再生準備中 = false
+let vrma再生中 = false
+let vrma連続再生有効 = false
+let 体姿勢補正状態: 体姿勢補正設定 | null = null
+let 現在VRMA再生設定: VRMA再生設定 | null = null
+let 最後に再生したVRMAファイル: string | null = null
+let シャッフル済みVRMAキュー: string[] = []
+let vrma再生要求番号 = 0
+let カメラ目線一時解除中 = false
 
 function 視線補助骨作成(
   node: THREE.Object3D | null | undefined,
@@ -196,39 +243,217 @@ function 目線制御状態同期(enabled: boolean) {
   }
 }
 
-function 現在カメラ状態取得(設定: 自動カメラワーク設定, autoEnabled: boolean, elapsed: number) {
+function 首顔カメラ目線有効(): boolean {
+  return !カメラ目線一時解除中 && !vrma再生中
+}
+
+function 体姿勢取得(): 体姿勢状態 {
+  if (!currentVrm?.scene) {
+    return { rotationY: 0, positionY: 0 }
+  }
+  return {
+    rotationY: currentVrm.scene.rotation.y,
+    positionY: currentVrm.scene.position.y,
+  }
+}
+
+function 体姿勢補正開始(完了後処理: (() => void) | null = null) {
+  const 現在姿勢 = 体姿勢取得()
+  if (
+    Math.abs(現在姿勢.rotationY) <= 体姿勢誤差許容
+    && Math.abs(現在姿勢.positionY) <= 体姿勢誤差許容
+  ) {
+    体姿勢補正状態 = null
+    完了後処理?.()
+    return
+  }
+
+  体姿勢補正状態 = {
+    開始時刻: clock?.elapsedTime ?? 0,
+    開始回転Y: 現在姿勢.rotationY,
+    開始位置Y: 現在姿勢.positionY,
+    完了後処理,
+  }
+  currentMotion.value = '体補正'
+}
+
+function 体姿勢補正更新(elapsed: number): 体姿勢状態 | null {
+  if (!体姿勢補正状態) return null
+
+  const progress = THREE.MathUtils.clamp(
+    (elapsed - 体姿勢補正状態.開始時刻) / 体姿勢補正秒数,
+    0,
+    1,
+  )
+  const bodyState = {
+    rotationY: THREE.MathUtils.lerp(体姿勢補正状態.開始回転Y, 0, progress),
+    positionY: THREE.MathUtils.lerp(体姿勢補正状態.開始位置Y, 0, progress),
+  }
+
+  if (progress >= 1) {
+    const 完了後処理 = 体姿勢補正状態.完了後処理
+    体姿勢補正状態 = null
+    完了後処理?.()
+  }
+
+  return bodyState
+}
+
+function 現在カメラ状態取得(設定: 自動カメラワーク設定, autoEnabled: boolean, elapsed: number): カメラ表示状態 {
+  if (camera) {
+    return {
+      angle: Math.atan2(camera.position.x, -camera.position.z),
+      radius: Math.hypot(camera.position.x, camera.position.z),
+      displayedHeightOffset: camera.position.y - 設定.注視Y,
+      lookAtY: 設定.注視Y,
+    }
+  }
+
   const angle = 設定.初期角度 + manualCameraAngle + (autoEnabled ? elapsed * 設定.角速度 : 0)
   const displayedHeightOffset = manualCameraHeight + (autoEnabled ? Math.sin(angle * 0.5) * 設定.高さ振幅 : 0)
-  return { angle, displayedHeightOffset }
+  return {
+    angle,
+    radius: 設定.半径,
+    displayedHeightOffset,
+    lookAtY: 設定.注視Y,
+  }
+}
+
+function カメラ自動有効(モード: '停止' | '追従' | '回転'): boolean {
+  return モード !== '停止'
+}
+
+function カメラ回転モード(モード: '停止' | '追従' | '回転'): boolean {
+  return モード === '回転'
 }
 
 function カメラ状態復元(
   設定: 自動カメラワーク設定,
-  angle: number,
-  displayedHeightOffset: number,
+  状態: カメラ表示状態,
   autoEnabled: boolean,
   elapsed: number,
 ) {
-  設定.初期角度 = angle - manualCameraAngle - (autoEnabled ? elapsed * 設定.角速度 : 0)
-  manualCameraHeight = displayedHeightOffset - (autoEnabled ? Math.sin(angle * 0.5) * 設定.高さ振幅 : 0)
+  設定.初期角度 = 状態.angle - manualCameraAngle - (autoEnabled ? elapsed * 設定.角速度 : 0)
+  設定.半径 = 状態.radius
+  設定.目標半径 = 状態.radius
+  設定.注視Y = 状態.lookAtY
+  manualCameraHeight = 状態.displayedHeightOffset - (autoEnabled ? Math.sin(状態.angle * 0.5) * 設定.高さ振幅 : 0)
 }
 
-function カメラ位置反映(autoEnabled: boolean, elapsed = clock?.elapsedTime ?? 0) {
+function カメラ位置反映(mode: '停止' | '追従' | '回転', elapsed = clock?.elapsedTime ?? 0) {
   if (!camera || !autoCameraSettings) return
-  if (autoEnabled) {
-    自動カメラワーク適用(camera, elapsed, autoCameraSettings, manualCameraAngle, manualCameraHeight)
+  if (mode === '回転') {
+    自動カメラワーク適用(
+      camera,
+      elapsed,
+      autoCameraSettings,
+      manualCameraAngle,
+      manualCameraHeight,
+    )
+  } else if (mode === '追従') {
+    const 追従入力 = 自動カメラ追従入力取得()
+    if (追従入力) {
+      追従カメラワーク適用(
+        camera,
+        elapsed,
+        autoCameraSettings,
+        追従入力,
+        manualCameraAngle,
+        manualCameraHeight,
+      )
+    } else {
+      手動カメラ周回適用(camera, autoCameraSettings, manualCameraAngle, manualCameraHeight, elapsed)
+    }
   } else {
-    手動カメラ周回適用(camera, autoCameraSettings, manualCameraAngle, manualCameraHeight)
+    手動カメラ周回適用(camera, autoCameraSettings, manualCameraAngle, manualCameraHeight, elapsed)
   }
+}
+
+function 追従角度差取得(追従入力: 自動カメラ追従入力): number {
+  if (camera) {
+    const 現在カメラ角度 = Math.atan2(camera.position.x, -camera.position.z)
+    const 正面目標角 = THREE.MathUtils.euclideanModulo(追従入力.アバター向きY - Math.PI + Math.PI, Math.PI * 2) - Math.PI
+    return Math.atan2(
+      Math.sin(正面目標角 - 現在カメラ角度),
+      Math.cos(正面目標角 - 現在カメラ角度),
+    )
+  }
+
+  const 現在カメラ角度 = autoCameraSettings
+    ? autoCameraSettings.初期角度 + manualCameraAngle
+    : manualCameraAngle
+  const 正面目標角 = THREE.MathUtils.euclideanModulo(追従入力.アバター向きY - Math.PI + Math.PI, Math.PI * 2) - Math.PI
+  return Math.atan2(
+    Math.sin(正面目標角 - 現在カメラ角度),
+    Math.cos(正面目標角 - 現在カメラ角度),
+  )
+}
+
+function カメラ高さ標準化更新(
+  mode: '停止' | '追従' | '回転',
+  delta: number,
+  追従入力?: 自動カメラ追従入力,
+) {
+  if (delta <= 0) return
+
+  let 高さ戻し有効 = mode === '回転'
+  if (mode === '追従' && 追従入力) {
+    高さ戻し有効 = Math.abs(追従角度差取得(追従入力)) <= THREE.MathUtils.degToRad(30)
+  }
+  if (!高さ戻し有効) return
+
+  const blend = 1 - Math.exp(-delta * カメラ高さ戻し速度)
+  manualCameraHeight = THREE.MathUtils.lerp(manualCameraHeight, 0, blend)
+}
+
+function 自動カメラ追従入力取得(): 自動カメラ追従入力 | undefined {
+  if (!currentVrm || !modelSize) return undefined
+
+  const 身体中心Y = currentVrm.scene.position.y + modelSize.y * 0.5
+  const 頭node = gazeAssistSettings?.頭?.node
+  const 頭位置Y = 頭node
+    ? 頭node.getWorldPosition(_headWorldPos).y
+    : currentVrm.scene.position.y + modelSize.y * 0.88
+  currentVrm.scene.getWorldQuaternion(_avatarWorldQuat)
+  _avatarWorldEuler.setFromQuaternion(_avatarWorldQuat, 'YXZ')
+
+  return {
+    アバター向きY: _avatarWorldEuler.y,
+    身体中心Y,
+    頭位置Y,
+  }
+}
+
+function カメラ手動基準更新(autoEnabled: boolean) {
+  if (!autoCameraSettings) return
+
+  const elapsed = clock?.elapsedTime ?? 0
+  const currentState = 現在カメラ状態取得(autoCameraSettings, autoEnabled, elapsed)
+  manualCameraAngle = 0
+  manualCameraHeight = 0
+  カメラ状態復元(autoCameraSettings, currentState, autoEnabled, elapsed)
+  autoCameraSettings.最終更新時刻 = elapsed
+  if (autoEnabled) {
+    cameraDistanceScale = autoCameraSettings.基準半径 > 0
+      ? autoCameraSettings.半径 / autoCameraSettings.基準半径
+      : cameraDistanceScale
+    return
+  }
+  autoCameraSettings.目標半径 = autoCameraSettings.半径
+  cameraDistanceScale = autoCameraSettings.基準半径 > 0
+    ? autoCameraSettings.半径 / autoCameraSettings.基準半径
+    : cameraDistanceScale
 }
 
 function fitCamera() {
   if (!camera || !modelSize) return
 
   const elapsed = clock?.elapsedTime ?? 0
+  const cameraMode = props.cameraMode
+  const autoEnabled = カメラ回転モード(cameraMode)
   const previousSettings = autoCameraSettings
   const previousState = previousSettings
-    ? 現在カメラ状態取得(previousSettings, props.cameraAutoEnabled, elapsed)
+    ? 現在カメラ状態取得(previousSettings, autoEnabled, elapsed)
     : null
 
   const padding = 1.06
@@ -240,15 +465,15 @@ function fitCamera() {
   const distanceForWidth = halfWidth / Math.tan(horizontalFov / 2)
   const distance = Math.max(distanceForHeight, distanceForWidth) * padding * 0.54
 
-  cameraBaseY = modelSize.y * 0.74
+  cameraBaseY = modelSize.y * 0.76
   cameraBaseZ = -Math.max(1.1, distance)
   autoBodySettings = currentVrm ? 自立身体制御初期化(currentVrm, modelSize) : null
   autoCameraSettings = 自動カメラワーク初期化(cameraBaseY, cameraBaseZ, modelSize)
   カメラ距離倍率適用(autoCameraSettings, cameraDistanceScale)
   if (previousState) {
-    カメラ状態復元(autoCameraSettings, previousState.angle, previousState.displayedHeightOffset, props.cameraAutoEnabled, elapsed)
+    カメラ状態復元(autoCameraSettings, previousState, autoEnabled, elapsed)
   }
-  カメラ位置反映(props.cameraAutoEnabled, elapsed)
+  カメラ位置反映(cameraMode, elapsed)
 }
 
 function resizeStage() {
@@ -264,38 +489,104 @@ function resizeStage() {
 
 function モーション終了時処理(event: THREE.Event & { action?: THREE.AnimationAction }) {
   if (!event.action || event.action !== currentAction) return
-  playRandomMotion()
+  vrma再生中 = false
+  最後に終了したアクション = event.action
+  currentAction = null
+
+  if (vrma連続再生有効 && 現在VRMA再生設定) {
+    void VRMA再生開始(現在VRMA再生設定)
+    return
+  }
+
+  if (props.bodyAutonomousEnabled) {
+    currentMotion.value = '自立'
+  }
 }
 
-function playRandomMotion() {
+function 配列シャッフル<T>(items: T[]): T[] {
+  const shuffled = [...items]
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = shuffled[i] as T
+    shuffled[i] = shuffled[j] as T
+    shuffled[j] = temp
+  }
+  return shuffled
+}
+
+async function VRMAファイル一覧取得(設定: VRMA再生設定): Promise<string[]> {
+  const files = await window.desktopApi?.listVrmaFiles?.(設定.フォルダ名)
+  return (files ?? []).filter((file) => file.toLowerCase().endsWith('.vrma'))
+}
+
+async function 巡回キューからVRMAファイル選択(設定: VRMA再生設定): Promise<string> {
+  if (シャッフル済みVRMAキュー.length === 0) {
+    const files = await VRMAファイル一覧取得(設定)
+    if (files.length === 0) return ''
+    const reshuffled = 配列シャッフル(files)
+    if (reshuffled.length > 1 && reshuffled[0] === 最後に再生したVRMAファイル) {
+      const first = reshuffled.shift()
+      if (first) reshuffled.push(first)
+    }
+    シャッフル済みVRMAキュー = reshuffled
+  }
+
+  const nextMotion = シャッフル済みVRMAキュー.shift() || ''
+  最後に再生したVRMAファイル = nextMotion || null
+  return nextMotion
+}
+
+async function サンプルVRMAファイル選択(設定: VRMA再生設定): Promise<string> {
+  return 巡回キューからVRMAファイル選択(設定)
+}
+
+async function 標準VRMAファイル選択(設定: VRMA再生設定): Promise<string> {
+  return 巡回キューからVRMAファイル選択(設定)
+}
+
+async function VRMAファイル選択(設定: VRMA再生設定): Promise<string> {
+  if (設定.選択モード === '標準巡回') {
+    return 標準VRMAファイル選択(設定)
+  }
+  return サンプルVRMAファイル選択(設定)
+}
+
+async function VRMA再生実行(設定: VRMA再生設定, requestId: number) {
   if (!motionLoader || !currentVrm || destroyed) return
   if (!mixer) {
     mixer = new THREE.AnimationMixer(currentVrm.scene)
     mixer.addEventListener('finished', モーション終了時処理)
   }
 
-  let nextIndex = 0
-  if (DEFAULT_VRMA_FILES.length > 1) {
-    do {
-      nextIndex = Math.floor(Math.random() * DEFAULT_VRMA_FILES.length)
-    } while (nextIndex === currentMotionIndex)
+  const nextMotion = await VRMAファイル選択(設定)
+  if (requestId !== vrma再生要求番号 || destroyed) return
+
+  if (!nextMotion) {
+    vrma再生準備中 = false
+    vrma再生中 = false
+    currentMotion.value = 'motion error'
+    return
   }
-  currentMotionIndex = nextIndex
-  const nextMotion = DEFAULT_VRMA_FILES[nextIndex] || DEFAULT_VRMA_FILES[0] || ''
-  if (!nextMotion) return
   currentMotion.value = nextMotion.split('/').pop() || 'motion'
 
   motionLoader.load(
     nextMotion,
     (gltf: any) => {
-      if (destroyed || !currentVrm || !mixer) return
+      if (destroyed || requestId !== vrma再生要求番号 || !currentVrm || !mixer) return
 
       const vrmAnimation = gltf.userData?.vrmAnimations?.[0]
-      if (!vrmAnimation) return
+      if (!vrmAnimation) {
+        vrma再生準備中 = false
+        vrma再生中 = false
+        カメラ目線一時解除中 = false
+        目線制御状態同期(true)
+        currentMotion.value = 'motion error'
+        return
+      }
 
       const clip = createVRMAnimationClip(vrmAnimation, currentVrm)
       const action = mixer.clipAction(clip)
-      const previousAction = currentAction
+      const previousAction = currentAction ?? 最後に終了したアクション
 
       action.reset()
       action.setLoop(THREE.LoopOnce, 1)
@@ -309,13 +600,62 @@ function playRandomMotion() {
         action.crossFadeFrom(previousAction, モーション補間秒数, false)
       }
 
+      vrma再生準備中 = false
+      vrma再生中 = true
+      カメラ目線一時解除中 = false
+      mixer.timeScale = 1
+      最後に終了したアクション = null
       currentAction = action
+      目線制御状態同期(true)
     },
     undefined,
     () => {
+      if (requestId !== vrma再生要求番号) return
+      vrma再生準備中 = false
+      vrma再生中 = false
+      カメラ目線一時解除中 = false
+      目線制御状態同期(true)
       currentMotion.value = 'motion error'
     },
   )
+}
+
+async function VRMA再生開始(options: VRMA再生設定) {
+  if (!motionLoader || !currentVrm || destroyed) return
+
+  const requestId = ++vrma再生要求番号
+  現在VRMA再生設定 = {
+    フォルダ名: options.フォルダ名,
+    連続再生: options.連続再生,
+    選択モード: options.選択モード,
+  }
+  vrma連続再生有効 = options.連続再生
+  vrma再生準備中 = true
+  カメラ目線一時解除中 = true
+  目線制御状態同期(false)
+
+  体姿勢補正開始(() => {
+    if (!現在VRMA再生設定) return
+    void VRMA再生実行(現在VRMA再生設定, requestId)
+  })
+}
+
+function サンプルVRMA再生開始() {
+  シャッフル済みVRMAキュー = []
+  void VRMA再生開始({
+    フォルダ名: SAMPLE_VRMA_FOLDER_NAME,
+    連続再生: true,
+    選択モード: 'サンプル巡回',
+  })
+}
+
+function 標準VRMA再生開始() {
+  シャッフル済みVRMAキュー = []
+  void VRMA再生開始({
+    フォルダ名: STANDARD_VRMA_FOLDER_NAME,
+    連続再生: true,
+    選択モード: '標準巡回',
+  })
 }
 
 function initScene() {
@@ -382,14 +722,14 @@ function initScene() {
       modelSize = size.clone()
       currentVrm = vrm
       gazeAssistSettings = 視線補助初期化(vrm)
-      目線制御状態同期(props.bodyAutonomousEnabled)
+      目線制御状態同期(true)
       container.add(vrm.scene)
       fitCamera()
       if (props.bodyAutonomousEnabled) {
         autoBodySettings = currentVrm ? 自立身体制御初期化(currentVrm, modelSize) : autoBodySettings
-        currentMotion.value = '自立'
+        標準VRMA再生開始()
       } else {
-        playRandomMotion()
+        サンプルVRMA再生開始()
       }
       loading.value = false
     },
@@ -406,25 +746,34 @@ function initScene() {
     const delta = clock.getDelta()
     const elapsed = clock.elapsedTime
 
-    if (!props.bodyAutonomousEnabled) {
+    if ((vrma再生中 || (!props.bodyAutonomousEnabled && !vrma再生準備中)) && !体姿勢補正状態) {
       mixer?.update(delta)
     }
 
     if (currentVrm) {
       const blink = Math.sin(elapsed * 2.4) > 0.985 ? 1 : 0
-      const bodyState = props.bodyAutonomousEnabled && autoBodySettings
-        ? 自立身体制御適用(elapsed, autoBodySettings)
-        : { rotationY: 0, positionY: 0 }
+      const 補正姿勢 = 体姿勢補正更新(elapsed)
+      const bodyState = 補正姿勢 ?? (
+        props.bodyAutonomousEnabled && autoBodySettings
+          ? 自立身体制御適用(elapsed, autoBodySettings)
+          : { rotationY: 0, positionY: 0 }
+      )
 
       currentVrm.expressionManager?.setValue('blink', blink)
       currentVrm.expressionManager?.setValue('aa', Math.min(1, props.speakerLevel))
       currentVrm.scene.rotation.y = bodyState.rotationY
       currentVrm.scene.position.y = bodyState.positionY
-      カメラ位置反映(props.cameraAutoEnabled, elapsed)
-      if (props.bodyAutonomousEnabled && currentVrm.lookAt) {
+      const 追従入力 = 自動カメラ追従入力取得()
+      カメラ高さ標準化更新(props.cameraMode, delta, 追従入力)
+      カメラ位置反映(props.cameraMode, elapsed)
+      if (currentVrm.lookAt && !カメラ目線一時解除中) {
         目線ターゲット更新()
         currentVrm.lookAt.lookAt(_lookAtPos)
-        視線補助適用(delta)
+        if (首顔カメラ目線有効()) {
+          視線補助適用(delta)
+        } else {
+          視線補助リセット(gazeAssistSettings)
+        }
       }
       currentVrm.update(delta)
     }
@@ -440,6 +789,7 @@ function initScene() {
 
 function handlePointerDown(event: PointerEvent) {
   if (!mountRef.value) return
+  カメラ手動基準更新(カメラ回転モード(props.cameraMode))
   dragging.value = true
   dragPointerId = event.pointerId
   dragStartX = event.clientX
@@ -469,49 +819,61 @@ function handleWheel(event: WheelEvent) {
   if (!event.ctrlKey || !camera || !autoCameraSettings) return
   event.preventDefault()
 
-  const nextScale = THREE.MathUtils.clamp(
-    cameraDistanceScale * (event.deltaY > 0 ? 1.08 : 0.92),
-    0.08,
-    3.2,
-  )
-  cameraDistanceScale = nextScale
-  カメラ距離倍率適用(autoCameraSettings, cameraDistanceScale)
+  const cameraMode = props.cameraMode
+  const autoEnabled = カメラ自動有効(cameraMode)
+  カメラ手動基準更新(カメラ回転モード(cameraMode))
 
-  カメラ位置反映(props.cameraAutoEnabled)
+  const currentRadius = autoCameraSettings.半径
+  const nextRadius = THREE.MathUtils.clamp(
+    currentRadius * (event.deltaY > 0 ? 1.08 : 0.92),
+    autoCameraSettings.最小半径,
+    autoCameraSettings.最大半径,
+  )
+  autoCameraSettings.半径 = nextRadius
+  autoCameraSettings.最終更新時刻 = clock?.elapsedTime ?? 0
+  if (autoEnabled) {
+    autoCameraSettings.目標半径 = autoCameraSettings.基準半径
+    cameraDistanceScale = 1
+  } else {
+    cameraDistanceScale = autoCameraSettings.基準半径 > 0
+      ? nextRadius / autoCameraSettings.基準半径
+      : cameraDistanceScale
+    カメラ距離倍率即時適用(autoCameraSettings, cameraDistanceScale)
+  }
+
+  カメラ位置反映(cameraMode)
 }
 
 watch(() => props.bodyAutonomousEnabled, (enabled) => {
   if (!currentVrm) return
 
-  目線制御状態同期(enabled)
-
   if (enabled) {
-    if (mixer) {
-      mixer.timeScale = 0
-    }
+    vrma再生準備中 = false
+    vrma再生中 = false
+    vrma連続再生有効 = false
+    体姿勢補正状態 = null
     autoBodySettings = modelSize ? 自立身体制御初期化(currentVrm, modelSize) : autoBodySettings
-    currentMotion.value = '自立'
+    標準VRMA再生開始()
     return
   }
 
-  if (mixer) {
-    mixer.timeScale = 1
-  }
   if (autoBodySettings) {
     自立身体制御リセット(autoBodySettings)
   }
-  if (!currentAction) {
-    playRandomMotion()
-  }
+  サンプルVRMA再生開始()
 }, { immediate: false })
 
-watch(() => props.cameraAutoEnabled, (enabled, previousEnabled) => {
+watch(() => props.cameraMode, (mode, previousMode) => {
   if (!autoCameraSettings) return
-  const oldEnabled = previousEnabled ?? enabled
+  const oldEnabled = カメラ回転モード(previousMode ?? mode)
+  const nextEnabled = カメラ回転モード(mode)
   const elapsed = clock?.elapsedTime ?? 0
   const previousState = 現在カメラ状態取得(autoCameraSettings, oldEnabled, elapsed)
-  カメラ状態復元(autoCameraSettings, previousState.angle, previousState.displayedHeightOffset, enabled, elapsed)
-  カメラ位置反映(enabled, elapsed)
+  manualCameraAngle = 0
+  manualCameraHeight = 0
+  カメラ状態復元(autoCameraSettings, previousState, nextEnabled, elapsed)
+  autoCameraSettings.最終更新時刻 = elapsed
+  カメラ位置反映(mode, elapsed)
 })
 
 onMounted(() => {
@@ -525,6 +887,15 @@ onBeforeUnmount(() => {
   mixer?.removeEventListener('finished', モーション終了時処理)
   mixer?.stopAllAction()
   currentAction = null
+  最後に終了したアクション = null
+  vrma再生準備中 = false
+  vrma再生中 = false
+  vrma連続再生有効 = false
+  カメラ目線一時解除中 = false
+  体姿勢補正状態 = null
+  現在VRMA再生設定 = null
+  最後に再生したVRMAファイル = null
+  シャッフル済みVRMAキュー = []
   視線補助リセット(gazeAssistSettings)
   renderer?.dispose()
   if (currentVrm?.lookAt) {
@@ -543,6 +914,8 @@ onBeforeUnmount(() => {
   gazeAssistSettings = null
   lookAtTarget = null
 })
+
+defineExpose({ VRMA再生開始 })
 </script>
 
 <template>

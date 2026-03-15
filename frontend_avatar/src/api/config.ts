@@ -38,15 +38,8 @@ function resolveWebSocketEndpoint(): string {
 export const CORE_BASE_URL = resolveHttpBaseUrl()
 export const AI_WS_ENDPOINT = resolveWebSocketEndpoint()
 export const DEFAULT_VRM_MODEL_URL = '/vrm/AiDiy_Sample_M.vrm'
-export const DEFAULT_VRMA_FILES = [
-  '/vrma/VRMA_01.vrma',
-  '/vrma/VRMA_02.vrma',
-  '/vrma/VRMA_03.vrma',
-  '/vrma/VRMA_04.vrma',
-  '/vrma/VRMA_05.vrma',
-  '/vrma/VRMA_06.vrma',
-  '/vrma/VRMA_07.vrma',
-]
+export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'
+export const STANDARD_VRMA_FOLDER_NAME = '標準'
 
 export function defaultModelSettings(): ModelSettings {
   return {

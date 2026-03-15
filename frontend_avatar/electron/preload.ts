@@ -32,6 +32,7 @@ const api = {
   applyPanelStates: (states: Record<PanelKey, boolean>) => ipcRenderer.invoke('panel:apply-states', states) as Promise<Record<PanelKey, boolean>>,
   getPanelStates: () => ipcRenderer.invoke('panel:get-states') as Promise<Record<PanelKey, boolean>>,
   listDisplaySources: () => ipcRenderer.invoke('desktop:list-sources') as Promise<DisplaySourceInfo[]>,
+  listVrmaFiles: (folderName: string) => ipcRenderer.invoke('desktop:list-vrma-files', folderName) as Promise<string[]>,
   setDisplaySource: (sourceId: string | null) => ipcRenderer.invoke('desktop:set-source', sourceId),
   openSettingsWindow: (sessionId: string) => ipcRenderer.invoke('settings:open', sessionId),
   closeSettingsWindow: () => ipcRenderer.invoke('settings:close'),

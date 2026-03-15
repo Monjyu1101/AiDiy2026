@@ -101,6 +101,7 @@ const 音声エラー = ref('')
 const ウェルカムホバー中 = ref(false)
 const 自立身体制御有効 = ref(false)
 const 自動カメラワーク有効 = ref(false)
+const カメラモード = ref<'追従' | '回転'>('追従')
 const 入力スペクトラム = ref<number[]>(初期スペクトラム())
 const 出力スペクトラム = ref<number[]>(初期スペクトラム())
 const 音声Socket = shallowRef<AIWebSocket | null>(null)
@@ -443,7 +444,7 @@ defineExpose({ 字幕追加 })
         :transparent-mode="!UI表示中"
         :subtitle-text="字幕表示"
         :body-autonomous-enabled="自立身体制御有効"
-        :camera-auto-enabled="自動カメラワーク有効"
+        :camera-mode="自動カメラワーク有効 ? カメラモード : '停止'"
       />
 
       <div v-show="UI表示中" class="left-bottom-settings">
@@ -451,10 +452,20 @@ defineExpose({ 字幕追加 })
           <input v-model="自立身体制御有効" type="checkbox" />
           <span>不完全な自立身体制御</span>
         </label>
-        <label class="setting-checkbox">
-          <input v-model="自動カメラワーク有効" type="checkbox" />
-          <span>不完全な自動カメラワーク</span>
-        </label>
+        <div class="setting-row">
+          <label class="setting-checkbox">
+            <input v-model="自動カメラワーク有効" type="checkbox" />
+            <span>不完全な自動カメラワーク</span>
+          </label>
+          <label class="setting-radio" :class="{ disabled: !自動カメラワーク有効 }">
+            <input v-model="カメラモード" type="radio" value="追従" :disabled="!自動カメラワーク有効" />
+            <span>追従</span>
+          </label>
+          <label class="setting-radio" :class="{ disabled: !自動カメラワーク有効 }">
+            <input v-model="カメラモード" type="radio" value="回転" :disabled="!自動カメラワーク有効" />
+            <span>回転</span>
+          </label>
+        </div>
       </div>
 
       <aside v-show="UI表示中" class="floating-controls">
@@ -615,11 +626,10 @@ defineExpose({ 字幕追加 })
 
 .audio-visualizer-overlay {
   position: absolute;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
-  width: min(220px, 42vw);
-  height: 34px;
+  top: 20px;
+  right: 54px; /* floating-controls right(14px) + mic button width(32px) + gap(8px) */
+  width: min(180px, 28vw);
+  height: 32px;
   background: rgba(3, 5, 10, 0.26);
   border: 1px solid rgba(153, 141, 214, 0.32);
   border-radius: 0;
@@ -629,7 +639,7 @@ defineExpose({ 字幕追加 })
   align-items: flex-end;
   justify-content: center;
   pointer-events: none;
-  padding: 8px;
+  padding: 4px 6px;
   backdrop-filter: blur(12px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
@@ -774,6 +784,12 @@ defineExpose({ 字幕追加 })
   cursor: pointer;
 }
 
+.setting-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .setting-checkbox input {
   width: 12px;
   height: 12px;
@@ -800,6 +816,55 @@ defineExpose({ 字幕追加 })
 
 .setting-checkbox input:checked::before {
   transform: scale(1);
+}
+
+.setting-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #f4f4ff;
+  font-size: 10px;
+  line-height: 1.2;
+  user-select: none;
+  cursor: pointer;
+}
+
+.setting-radio.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.setting-radio input[type="radio"] {
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(244, 244, 255, 0.82);
+  border-radius: 50%;
+  background: transparent;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.setting-radio input[type="radio"]::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  background: #44ff44;
+}
+
+.setting-radio input[type="radio"]:checked::before {
+  transform: scale(1);
+}
+
+.setting-radio input[type="radio"]:disabled {
+  cursor: not-allowed;
 }
 
 .floating-controls {
