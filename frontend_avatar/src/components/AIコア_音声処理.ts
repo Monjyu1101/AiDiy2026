@@ -256,6 +256,16 @@ export class AudioController {
     const startAt = Math.max(now + leadTime, this.nextPlaybackTime)
     this.nextPlaybackTime = startAt + audioBuffer.duration
 
+    // チャンクの平均振幅をリップシンク用レベルとして再生開始タイミングで通知
+    const channelData = audioBuffer.getChannelData(0)
+    let sumAbs = 0
+    for (let i = 0; i < channelData.length; i++) {
+      sumAbs += Math.abs(channelData[i] ?? 0)
+    }
+    const chunkLevel = Math.min(1, (sumAbs / channelData.length) * 6)
+    const playDelay = Math.max(0, (startAt - context.currentTime) * 1000)
+    setTimeout(() => { this.options.onOutputLevel?.(chunkLevel) }, playDelay)
+
     const visualizerSource = context.createBufferSource()
     visualizerSource.buffer = audioBuffer
     visualizerSource.connect(this.visualizerAnalyser ?? context.destination)
@@ -263,6 +273,7 @@ export class AudioController {
       this.visualizerSources.delete(visualizerSource)
       if (this.visualizerSources.size === 0 && this.speakerSources.size === 0) {
         this.nextPlaybackTime = 0
+        this.options.onOutputLevel?.(0)
       }
     }
     this.visualizerSources.add(visualizerSource)
@@ -328,20 +339,17 @@ export class AudioController {
       const data = this.speakerSources.size > 0 ? speakerData : visualizerData
 
       if (!analyser || data.length === 0) {
-        this.options.onOutputLevel?.(0)
         this.options.onOutputSpectrum?.(this.emptySpectrum())
         this.outputLevelFrame = 0
         return
       }
 
       analyser.getByteFrequencyData(data)
-      this.options.onOutputLevel?.(this.computeLevel(data))
       this.options.onOutputSpectrum?.(this.buildSpectrum(data))
 
       if (this.speakerSources.size > 0 || this.visualizerSources.size > 0) {
         this.outputLevelFrame = window.requestAnimationFrame(tick)
       } else {
-        this.options.onOutputLevel?.(0)
         this.options.onOutputSpectrum?.(this.emptySpectrum())
         this.outputLevelFrame = 0
       }

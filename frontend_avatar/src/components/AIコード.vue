@@ -14,7 +14,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiClient from '@/api/client'
 import { AI_WS_ENDPOINT } from '@/api/config'
-import { AIWebSocket } from '@/api/websocket'
+import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import AIコードファイル内容表示 from '@/dialog/ファイル内容表示.vue'
 import AIコード更新ファイル一覧 from '@/dialog/更新ファイル一覧.vue'
 
@@ -79,7 +79,7 @@ const 表示base64_data = ref('')
 
 const ウェルカムテキスト受信済み = ref(false)
 
-const 出力WebSocket = ref<AIWebSocket | null>(null)
+const 出力WebSocket = ref<IWebSocketClient | null>(null)
 let 出力状態購読解除: (() => void) | null = null
 let メッセージID連番 = 0
 let ストリームメッセージID: string | null = null
@@ -400,7 +400,7 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
   })
 }
 
-function WSハンドラ登録(socket: AIWebSocket) {
+function WSハンドラ登録(socket: IWebSocketClient) {
   socket.on('welcome_info', ウェルカム処理)
   socket.on('welcome_text', ウェルカムテキスト受信処理)
   socket.on('input_text', 入力テキスト受信処理)
@@ -413,7 +413,7 @@ function WSハンドラ登録(socket: AIWebSocket) {
   socket.on('cancel_run', cancel_run受信処理)
 }
 
-function WSハンドラ解除(socket: AIWebSocket) {
+function WSハンドラ解除(socket: IWebSocketClient) {
   socket.off('welcome_info', ウェルカム処理)
   socket.off('welcome_text', ウェルカムテキスト受信処理)
   socket.off('input_text', 入力テキスト受信処理)

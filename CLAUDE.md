@@ -2,10 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **詳細ドキュメント方針**: CLAUDE.md はクイックリファレンスのみ。実装詳細・追加手順・アーキテクチャ詳細は以下を参照。
-> - [AGENTS.md](./AGENTS.md) — プロジェクト全体方針・共通問題
-> - [backend_server/AGENTS.md](./backend_server/AGENTS.md) — バックエンド実装詳細
-> - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md) — フロントエンド実装詳細
+> **このファイルの役割**: CLAUDE.md は **インデックス兼クイックリファレンス**。実装詳細・追加手順・アーキテクチャ詳細は以下の AGENTS.md を参照。実装作業では必ず該当 AGENTS.md を読むこと。
+> - [AGENTS.md](./AGENTS.md) — プロジェクト全体方針・共通問題・よくあるトラブル
+> - [backend_server/AGENTS.md](./backend_server/AGENTS.md) — バックエンド実装詳細（API/DB/認証/追加手順）
+> - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md) — フロントエンド Web 実装詳細（画面/routing/コンポーネント/追加手順）
+> - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md) — フロントエンド Avatar 実装詳細（Electron/WebSocket/VRM/音声処理）
 
 ---
 
@@ -21,8 +22,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use dynamic component syntax: `<component :is="C利用者一覧" />`
 - File names can be Japanese: `C利用者一覧.vue` is OK
 
+**Frontend TypeScript:**
+- Strict mode disabled (`strict: false`, `strictNullChecks: false`, `noImplicitAny: false`)
+- jQuery is used in some legacy features alongside Vue 3
+
 **API Design:**
 - ALL CRUD operations use POST method (no GET/PUT/DELETE for data)
+- Exception: `GET /` (health check), `GET /core/サーバー状態` (status)
 - Unified response: `{"status": "OK"/"NG", "message": "...", "data": {...}}`
 - List responses: `{"items": [], "total": N, "limit": 10000}`
 

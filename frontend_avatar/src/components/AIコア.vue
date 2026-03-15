@@ -99,6 +99,8 @@ const マイクレベル = ref(0)
 const スピーカーレベル = ref(0)
 const 音声エラー = ref('')
 const ウェルカムホバー中 = ref(false)
+const 自立身体制御有効 = ref(false)
+const 自動カメラワーク有効 = ref(false)
 const 入力スペクトラム = ref<number[]>(初期スペクトラム())
 const 出力スペクトラム = ref<number[]>(初期スペクトラム())
 const 音声Socket = shallowRef<AIWebSocket | null>(null)
@@ -440,7 +442,20 @@ defineExpose({ 字幕追加 })
         :ui-visible="UI表示中"
         :transparent-mode="!UI表示中"
         :subtitle-text="字幕表示"
+        :body-autonomous-enabled="自立身体制御有効"
+        :camera-auto-enabled="自動カメラワーク有効"
       />
+
+      <div v-show="UI表示中" class="left-bottom-settings">
+        <label class="setting-checkbox">
+          <input v-model="自立身体制御有効" type="checkbox" />
+          <span>不完全な自立身体制御</span>
+        </label>
+        <label class="setting-checkbox">
+          <input v-model="自動カメラワーク有効" type="checkbox" />
+          <span>不完全な自動カメラワーク</span>
+        </label>
+      </div>
 
       <aside v-show="UI表示中" class="floating-controls">
         <button
@@ -601,7 +616,7 @@ defineExpose({ 字幕追加 })
 .audio-visualizer-overlay {
   position: absolute;
   left: 50%;
-  bottom: 18px;
+  bottom: 12px;
   transform: translateX(-50%);
   width: min(220px, 42vw);
   height: 34px;
@@ -733,6 +748,58 @@ defineExpose({ 字幕追加 })
   position: absolute;
   inset: 0;
   z-index: 2;
+}
+
+.left-bottom-settings {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  min-height: 34px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+}
+
+.setting-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f4f4ff;
+  font-size: 10px;
+  line-height: 1.2;
+  user-select: none;
+  cursor: pointer;
+}
+
+.setting-checkbox input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(244, 244, 255, 0.82);
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.setting-checkbox input::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  background: #44ff44;
+}
+
+.setting-checkbox input:checked::before {
+  transform: scale(1);
 }
 
 .floating-controls {
@@ -960,6 +1027,16 @@ defineExpose({ 字幕追加 })
   .welcome-info-overlay {
     inset: 0;
     padding: 10px 46px 10px 10px;
+  }
+
+  .left-bottom-settings {
+    left: 12px;
+    bottom: 12px;
+    padding: 0;
+  }
+
+  .setting-checkbox {
+    font-size: 9px;
   }
 }
 </style>

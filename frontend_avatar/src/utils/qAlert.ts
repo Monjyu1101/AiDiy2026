@@ -14,7 +14,7 @@ interface AlertDialogInstance {
 }
 
 interface ConfirmDialogInstance {
-  show: (message: string) => Promise<boolean>
+  showConfirm: (message: string) => Promise<boolean>
 }
 
 interface ColorPickerDialogInstance {
@@ -51,7 +51,7 @@ export async function qConfirm(message: string): Promise<boolean> {
     console.error('qConfirm not initialized. Please map confirm handler in App.vue')
     return confirm(message) // フォールバック
   }
-  return await confirmInstance.show(message)
+  return await confirmInstance.showConfirm(message)
 }
 
 export async function qColorPicker(initialColor = '#000000', title = '色選択'): Promise<string | null> {

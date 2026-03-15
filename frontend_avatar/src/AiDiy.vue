@@ -127,7 +127,7 @@ const パネル再接続キー = ref(0)
 
 const コアソケット = shallowRef<AIWebSocket | null>(null)
 const 入力ソケット = shallowRef<AIWebSocket | null>(null)
-const ファイルRef= ref<{ 接続済み: boolean; 読込中: boolean; ファイルリスト要求: () => void } | null>(null)
+const ファイルRef = ref<{ 出力接続済み: boolean; 読込中: boolean; ファイルリスト要求: () => void } | null>(null)
 const イメージRef = ref<{ 接続状態: 'disconnected' | 'connecting' | 'sending'; 状態表示テキスト: string; WebSocket接続中: boolean } | null>(null)
 const チャットRef = ref<{ WebSocket接続中: boolean; チャット接続済み: boolean } | null>(null)
 const コードRef = ref<{ WebSocket接続中: boolean; 接続状態表示: string; 出力接続済み: boolean } | null>(null)

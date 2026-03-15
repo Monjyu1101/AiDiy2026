@@ -16,7 +16,8 @@
 - **[../CLAUDE.md](../CLAUDE.md)** - Claude Code向けインデックス（プロジェクト全体概要）
 - **[../AGENTS.md](../AGENTS.md)** - プロジェクト全体方針（基本方針、開発コマンド、共通問題）
 - **[../docs/03_コーディングルール/](../docs/03_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
-- **[../frontend_web/AGENTS.md](../frontend_web/AGENTS.md)** - フロントエンド実装詳細（Vue 3 + TypeScript）
+- **[../frontend_web/AGENTS.md](../frontend_web/AGENTS.md)** - フロントエンド Web 実装詳細（Vue 3 + TypeScript）
+- **[../frontend_avatar/AGENTS.md](../frontend_avatar/AGENTS.md)** - フロントエンド Avatar 実装詳細（Electron + WebSocket + VRM）
 
 **📚 ドキュメントリソース（docs/フォルダ）：**
 プロジェクトの詳細なドキュメントは `docs/` フォルダにHTML形式で整備されています。
@@ -24,8 +25,10 @@
 - **[../docs/02_明日のために！その２_バックエンド_M配車区分テスト例/](../docs/02_明日のために！その２_バックエンド_M配車区分テスト例/_index.html)** - バックエンドテスト手順
 - **[../docs/03_コーディングルール/](../docs/03_コーディングルール/_index.html)** - 命名規則、ベストプラクティス、レビューチェックリスト（**必読**）
 
-**フロントエンド（frontend_web/）の情報は別ドキュメント：**
-このドキュメントはバックエンドに特化しています。フロントエンド（Vue.js、Vite、Pinia、ルーティング、コンポーネント構造など）の詳細は `frontend_web/AGENTS.md` を参照してください。
+**フロントエンドの情報は別ドキュメント：**
+このドキュメントはバックエンドに特化しています。
+- ブラウザ向け業務UI → `frontend_web/AGENTS.md`
+- Electron アバタークライアント（AIコア専用） → `frontend_avatar/AGENTS.md`
 
 **このファイルの内容：**
 - まず知っておくこと（基本原則）

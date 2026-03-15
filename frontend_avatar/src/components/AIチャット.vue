@@ -13,7 +13,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AI_WS_ENDPOINT } from '@/api/config'
-import { AIWebSocket } from '@/api/websocket'
+import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import apiClient from '@/api/client'
 import ファイル内容表示ダイアログ from '@/components/ファイル内容表示.vue'
 
@@ -60,7 +60,7 @@ const 入力欄固定高さ = ref(60)
 const 入力欄最小高さ = 60
 const 入力欄最大高さ = ref(380)
 
-const 出力WebSocket = ref<AIWebSocket | null>(null)
+const 出力WebSocket = ref<IWebSocketClient | null>(null)
 let ストリームメッセージID: string | null = null
 let メッセージID連番 = 0
 
@@ -396,7 +396,7 @@ const 出力ストリーム受信処理 = (受信データ: any) => {
 
 // --- WSハンドラ登録/解除 ---
 
-function WSハンドラ登録(socket: AIWebSocket) {
+function WSハンドラ登録(socket: IWebSocketClient) {
   socket.on('welcome_info',       ウェルカム受信処理)
   socket.on('input_text',         入力テキスト受信処理)
   socket.on('input_request',      入力リクエスト受信処理)
@@ -410,7 +410,7 @@ function WSハンドラ登録(socket: AIWebSocket) {
   socket.on('recognition_output', 音声出力受信処理)
 }
 
-function WSハンドラ解除(socket: AIWebSocket) {
+function WSハンドラ解除(socket: IWebSocketClient) {
   socket.off('welcome_info',       ウェルカム受信処理)
   socket.off('input_text',         入力テキスト受信処理)
   socket.off('input_request',      入力リクエスト受信処理)
@@ -610,7 +610,7 @@ const ファイルをBase64読込 = (入力ファイル: File): Promise<string> 
       if (result instanceof ArrayBuffer) {
         const bytes = new Uint8Array(result)
         let binary = ''
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i] ?? 0)
         resolve(window.btoa(binary))
         return
       }

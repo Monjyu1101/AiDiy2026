@@ -167,24 +167,39 @@
 - `src/style.css` - 全体スタイル
 - `src/types.ts` - 共通型
 
+### Renderer ルート
+
+- `src/AiDiy.vue` - 認証・接続・role 管理の中心コンポーネント（`App.vue` からマウント）
+
 ### コンポーネント
 
 - `src/components/ログイン.vue` - ログイン画面
 - `src/components/AIコア.vue` - 常駐アバターウィンドウ
-- `src/components/アバター.vue` - VRM / VRMA 表示
-- `src/components/WindowShell.vue` - フレームレスウィンドウ共通シェル
+- `src/components/AIコア_アバター.vue` - VRM / VRMA 3D表示
+- `src/components/_WindowShell.vue` - フレームレスウィンドウ共通シェル
 - `src/components/AIチャット.vue` - チャットパネル
 - `src/components/AIファイル.vue` - ファイルパネル
 - `src/components/AIイメージ.vue` - 画像・画面取得パネル
 - `src/components/AIコード.vue` - コード支援パネル
+- `src/components/ファイル内容表示.vue` - ファイル内容ビューア
 
-### ライブラリ
+### ダイアログ
 
-- `src/lib/api.ts` - Axios クライアント
-- `src/lib/config.ts` - 接続先URL、VRM/VRMA初期設定
-- `src/lib/websocket.ts` - AI用 WebSocket クライアント
-- `src/lib/audio-controller.ts` - マイク入力 / 音声再生
-- `src/lib/monaco.ts` - Monaco 初期化関連
+- `src/dialog/AI設定再起動.vue` - モデル設定ダイアログ
+- `src/dialog/再起動カウントダウン.vue` - 再起動カウントダウン表示
+
+### 共有コンポーネント
+
+- `src/_share/qAlertDialog.vue` - アラート/確認ダイアログ実装
+
+### API / ユーティリティ
+
+- `src/api/client.ts` - Axios クライアント（`CORE_BASE_URL` 使用、401で自動ログアウト）
+- `src/api/config.ts` - 接続先URL・VRM/VRMA初期設定（環境変数 `VITE_CORE_BASE_URL` 参照）
+- `src/api/websocket.ts` - AI用 WebSocket クライアント（自動再接続、ソケット番号分離）
+- `src/api/monaco.ts` - Monaco Editor 初期化関連
+- `src/api/qAlert.ts` - アラート/確認ダイアログ呼び出しユーティリティ
+- `src/utils/AIコア_音声処理.ts` - マイク入力・PCM変換・音声再生・レベル計測
 
 ### アセット
 
@@ -235,7 +250,7 @@ core ウィンドウの状態を他パネルへ配信しています。
 
 ### HTTP API
 
-ファイル: `src/lib/api.ts`
+ファイル: `src/api/client.ts`
 
 特徴:
 - `CORE_BASE_URL` を `baseURL` に使用
@@ -244,7 +259,7 @@ core ウィンドウの状態を他パネルへ配信しています。
 
 ### WebSocket
 
-ファイル: `src/lib/websocket.ts`
+ファイル: `src/api/websocket.ts`
 
 特徴:
 - 接続時に `connect` メッセージを送信
@@ -266,7 +281,7 @@ core ウィンドウの状態を他パネルへ配信しています。
 
 ## 音声処理
 
-ファイル: `src/lib/audio-controller.ts`
+ファイル: `src/utils/AIコア_音声処理.ts`
 
 責務:
 - マイク入力開始 / 停止
@@ -284,7 +299,7 @@ core ウィンドウの状態を他パネルへ配信しています。
 
 ## アバター表示
 
-ファイル: `src/components/アバター.vue`
+ファイル: `src/components/AIコア_アバター.vue`
 
 構成:
 - Three.js の renderer / scene / camera を自前構築
@@ -403,16 +418,16 @@ npm run start
 
 次の連動を確認してください。
 
-- `src/lib/config.ts`
-- `src/lib/api.ts`
-- `src/lib/websocket.ts`
+- `src/api/config.ts`
+- `src/api/client.ts`
+- `src/api/websocket.ts`
 - バックエンド側の API / WebSocket エンドポイント
 
 ### 5. アバター演出を変更する場合
 
 次を確認してください。
 
-- `アバター.vue` の Three.js 初期化
+- `AIコア_アバター.vue` の Three.js 初期化
 - UI 表示だけの変更か、3D シーンそのものの変更か
 - 透明ウィンドウ時に残す要素 / 消す要素の切り分け
 

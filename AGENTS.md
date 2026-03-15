@@ -337,7 +337,7 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 
 **詳細は [backend_server/AGENTS.md](backend_server/AGENTS.md) を参照**
 
-### フロントエンド (frontend_web/)
+### フロントエンド Web (frontend_web/)
 
 Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 
@@ -350,6 +350,7 @@ Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 - Vue Router 4 (日本語URL対応)
 - Axios (HTTP client with interceptors)
 - dayjs (日付処理)
+- jQuery（一部レガシー機能）
 
 **主要な設計パターン：**
 - シングルページアプリケーション (SPA)
@@ -358,9 +359,31 @@ Vue 3 + Vite + TypeScript frontend with Japanese component names and routes.
 - qTublerシステム（カスタムテーブルコンポーネント）
 - 共通ダイアログシステム (qAlert, qConfirm, qColorPicker)
 - レイアウトシステム (_Layout, _TopBar, _TopMenu)
-- WebSocket統合 (AIコアWebSocket)
 
 **詳細は [frontend_web/AGENTS.md](frontend_web/AGENTS.md) を参照**
+
+### フロントエンド Avatar (frontend_avatar/)
+
+Electron + Vue 3 + Vite + TypeScript によるAIコア専用デスクトップアバタークライアント。
+
+**技術スタック：**
+- Node.js + npm
+- Vue 3 Composition API + Vite + TypeScript
+- Electron（デスクトップアプリ）
+- Three.js + @pixiv/three-vrm / @pixiv/three-vrm-animation（3D VRMアバター）
+- Monaco Editor（コード表示）
+- Axios（REST API通信）
+- WebSocket（AIコアとのリアルタイム通信）
+
+**主要な設計パターン：**
+- Vue Router / Pinia を**使用しない**（単一 App + 複数 Electron ウィンドウ）
+- ウィンドウ role 制御（login / core / chat / file / image / code1-4）
+- BroadcastChannel (`avatar-desktop-sync`) でウィンドウ間状態同期
+- フレームレス＋透明ウィンドウ（`transparent: true`, `frame: false`）
+- REST API（認証・初期化）+ WebSocket（ストリーミング）の2段構成
+- VRM/VRMAアバター表示（Three.js）
+
+**詳細は [frontend_avatar/AGENTS.md](frontend_avatar/AGENTS.md) を参照**
 
 ## Development Commands
 
@@ -375,6 +398,7 @@ This launcher:
 - Starts FastAPI backend core_main (port 8091 - コア機能)
 - Starts FastAPI backend apps_main (port 8092 - アプリ機能)
 - Starts Vite dev server (port 8090)
+- Optionally starts frontend_avatar (Electron, port 8099) — **デフォルト無効**、起動時に確認あり
 - Opens browser to http://localhost:8090
 - Monitors servers and auto-restarts crashed processes after 15 seconds
 - Stops gracefully on Ctrl+C
@@ -390,8 +414,12 @@ cd backend_server
 cd backend_server
 .venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
-# フロントエンドのみ（プロジェクトルートから）
+# フロントエンド Web のみ
 cd frontend_web
+npm run dev
+
+# フロントエンド Avatar のみ（Electron + Vite on 8099）
+cd frontend_avatar
 npm run dev
 ```
 
@@ -435,7 +463,7 @@ uv sync          # Install/sync dependencies from pyproject.toml
 uv add <package> # Add new dependency
 ```
 
-**フロントエンド（Node.js + npm + TypeScript）:**
+**フロントエンド Web（Node.js + npm + TypeScript）:**
 ```bash
 cd frontend_web
 npm install        # Install dependencies
@@ -443,6 +471,15 @@ npm run dev        # Start dev server
 npm run build      # Type-check and build for production
 npm run preview    # Preview production build
 npm run type-check # Run TypeScript type checking without building
+```
+
+**フロントエンド Avatar（Node.js + Electron）:**
+```bash
+cd frontend_avatar
+npm install        # Install dependencies
+npm run dev        # Start Electron + Vite dev server (port 8099)
+npm run type-check # Run TypeScript type checking
+# ※ npm run build は明示的な指示があるときのみ実行（dist/ を生成する）
 ```
 
 ### Database Management
@@ -478,11 +515,12 @@ backend_server/_data/AiDiy/database.db
 
 ## Access URLs & Port Configuration
 
-- フロントエンド: http://localhost:8090
+- フロントエンド Web: http://localhost:8090
 - バックエンドAPI（Core - core_main）: http://localhost:8091
 - バックエンドAPI（Apps - apps_main）: http://localhost:8092
 - API Documentation (Core): http://localhost:8091/docs (FastAPI Swagger UI)
 - API Documentation (Apps): http://localhost:8092/docs (FastAPI Swagger UI)
+- フロントエンド Avatar (Vite renderer): http://127.0.0.1:8099 ※Electronアプリとして起動
 
 **Default Login Credentials** (seeded on first startup):
 - Admin: `admin` / `********`
@@ -498,9 +536,10 @@ backend_server/_data/AiDiy/database.db
 - **ポート変更の連動修正**: `frontend_web/vite.config.ts` の `server.port` を変える場合、`backend_server/core_main.py` と `apps_main.py` の CORS 許可リスト、`_start.py` のポート設定も更新が必要。
 - **_setup.py の案内文**: `_setup.py` のセットアップ完了メッセージは `python _start.py` を正確に表示するよう修正されましたが、以前のバージョンでは `python start.py` と表示されることがあったため、注意点として記載しています。実ファイルは **`_start.py`** です。
 
-**Vite Proxy Configuration** (`frontend_web/vite.config.ts`):
+**Vite Proxy Configuration** (`frontend_web/vite.config.ts` / `frontend_avatar/vite.config.ts`):
 - `/core/*` → `http://127.0.0.1:8091` (core_main - コア機能)
 - `/apps/*` → `http://127.0.0.1:8092` (apps_main - アプリ機能)
+- ※ frontend_avatar も同じプロキシ設定を持つ
 
 **CORS allowed origins** (`backend_server/core_main.py` and `apps_main.py`):
 - `http://localhost:8090` (production Vite server)
@@ -549,7 +588,8 @@ No automated test suites are configured. Testing is done manually:
 実装の詳細は各サブAGENTS.mdを参照：
 
 - **[./backend_server/AGENTS.md](./backend_server/AGENTS.md)** - バックエンド実装詳細（API/DB/認証/初期データ/追加手順）
-- **[./frontend_web/AGENTS.md](./frontend_web/AGENTS.md)** - フロントエンド実装詳細（画面/routing/認証/追加手順）
+- **[./frontend_web/AGENTS.md](./frontend_web/AGENTS.md)** - フロントエンド Web 実装詳細（画面/routing/認証/追加手順）
+- **[./frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)** - フロントエンド Avatar 実装詳細（Electron/WebSocket/VRM/音声処理）
 
 ## Additional Notes
 

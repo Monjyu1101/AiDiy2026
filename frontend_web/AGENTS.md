@@ -18,14 +18,17 @@
 - **[../docs/03_コーディングルール/](../docs/03_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
 - **[../docs/04_フロントエンド画面追加例/](../docs/04_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順
 - **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細（FastAPI + SQLAlchemy + SQLite）
+- **[../frontend_avatar/AGENTS.md](../frontend_avatar/AGENTS.md)** - デスクトップアバタークライアント（Electron + WebSocket + VRM）
 
 **📚 ドキュメントリソース（docs/フォルダ）：**
 プロジェクトの詳細なドキュメントは `docs/` フォルダにHTML形式で整備されています。
 - **[../docs/03_コーディングルール/](../docs/03_コーディングルール/_index.html)** - 命名規則、ベストプラクティス、レビューチェックリスト（**必読**）
 - **[../docs/04_フロントエンド画面追加例/](../docs/04_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順（**必読**）
 
-**バックエンド（backend_server/）の情報は別ドキュメント：**
-このドキュメントはフロントエンドに特化しています。バックエンド（FastAPI、SQLAlchemy、データベース、API設計、認証システムなど）の詳細は `backend_server/AGENTS.md` を参照してください。
+**バックエンド・他フロントエンドの情報は別ドキュメント：**
+このドキュメントは `frontend_web`（ブラウザ向け業務UI）に特化しています。
+- バックエンド → `backend_server/AGENTS.md`
+- AIコア専用デスクトップアバタークライアント → `frontend_avatar/AGENTS.md`（Vue Router / Pinia 不使用、Electron マルチウィンドウ構成）
 
 **このファイルの内容：**
 - まず知っておくこと（基本原則）
