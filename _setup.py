@@ -18,6 +18,7 @@ import json
 import platform
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -226,14 +227,48 @@ def install_electron_binary(frontend_dir: Path, label: str) -> bool:
                     print_info(f"  ダウンロード中... {ms}% ({mb_done}MB / {mb_total}MB)")
                     last_reported[0] = ms
 
+    def _download_with_ctx(ctx=None):
+        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx)) if ctx else urllib.request.build_opener()
+        with opener.open(url) as response:
+            total_size = int(response.headers.get("Content-Length", 0))
+            downloaded = 0
+            block_size = 8192
+            last_rep = [-1]
+            with open(part_file, "wb") as f:
+                while True:
+                    block = response.read(block_size)
+                    if not block:
+                        break
+                    f.write(block)
+                    downloaded += len(block)
+                    if total_size > 0:
+                        percent = int(downloaded * 100 / total_size)
+                        for ms in MILESTONES:
+                            if ms > last_rep[0] and percent >= ms:
+                                mb_done = downloaded // 1024 // 1024
+                                mb_total = total_size // 1024 // 1024
+                                print_info(f"  ダウンロード中... {ms}% ({mb_done}MB / {mb_total}MB)")
+                                last_rep[0] = ms
+
     print_info(f"  ダウンロード先: {part_file}")
     try:
-        urllib.request.urlretrieve(url, str(part_file), reporthook=progress_hook)
+        _download_with_ctx()
     except Exception as e:
-        print_error(f"{label}: ダウンロード失敗: {e}")
-        if part_file.exists():
-            part_file.unlink()
-        return False
+        is_ssl_error = "SSL" in str(e) or "certificate" in str(e).lower()
+        if is_ssl_error:
+            print_warning(f"{label}: SSL証明書エラー。証明書検証をスキップして再試行します。")
+            try:
+                _download_with_ctx(ssl._create_unverified_context())
+            except Exception as e2:
+                print_error(f"{label}: ダウンロード失敗: {e2}")
+                if part_file.exists():
+                    part_file.unlink()
+                return False
+        else:
+            print_error(f"{label}: ダウンロード失敗: {e}")
+            if part_file.exists():
+                part_file.unlink()
+            return False
 
     part_file.rename(final_file)
     size_mb = final_file.stat().st_size // 1024 // 1024
@@ -246,14 +281,33 @@ def install_electron_binary(frontend_dir: Path, label: str) -> bool:
 
     print_info(f"{label}: 展開中: {final_file} -> {dist_dir}")
     try:
-        with zipfile.ZipFile(final_file, "r") as zf:
-            zf.extractall(dist_dir)
+        # macOS/Linux では unzip コマンドを使用してシンボリックリンクを正しく展開する
+        # (Python の zipfile モジュールはシンボリックリンクをテキストファイルとして展開するため)
+        if sys.platform != "win32" and shutil.which("unzip"):
+            result = subprocess.run(
+                ["unzip", "-q", "-o", str(final_file), "-d", str(dist_dir)],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr or result.stdout)
+        else:
+            with zipfile.ZipFile(final_file, "r") as zf:
+                zf.extractall(dist_dir)
     except Exception as e:
         print_error(f"{label}: 展開失敗: {e}")
         return False
 
-    exe_name = "electron.exe" if sys.platform == "win32" else "electron"
-    exe_path = dist_dir / exe_name
+    if sys.platform == "win32":
+        exe_name = "electron.exe"
+        exe_path = dist_dir / exe_name
+    elif sys.platform == "darwin":
+        exe_name = "Electron.app/Contents/MacOS/Electron"
+        exe_path = dist_dir / "Electron.app" / "Contents" / "MacOS" / "Electron"
+    else:
+        exe_name = "electron"
+        exe_path = dist_dir / exe_name
+
     if not exe_path.exists():
         print_error(f"{label}: {exe_name} が展開先に見つかりませんでした: {dist_dir}")
         return False
@@ -360,7 +414,7 @@ def setup_common_global_tools():
 
     if ask_yes_no("共通: グローバル環境의 Python ツールをアップグレードしますか？", default="y"):
         commands = [
-            (["python", "-m", "pip", "install", "--upgrade", "pip"], "pip"),
+            ([sys.executable, "-m", "pip", "install", "--upgrade", "pip"], "pip"),
             (["pip", "install", "--upgrade", "wheel"], "wheel"),
             (["pip", "install", "--upgrade", "setuptools"], "setuptools"),
             (["pip", "install", "--upgrade", "uv"], "uv"),
