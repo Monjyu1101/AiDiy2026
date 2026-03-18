@@ -40,6 +40,22 @@ export const AI_WS_ENDPOINT = resolveWebSocketEndpoint()
 export const DEFAULT_VRM_MODEL_URL = '/vrm/AiDiy_Sample_M.vrm'
 export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'
 export const STANDARD_VRMA_FOLDER_NAME = '標準'
+export const SAMPLE_VRMA_FILES = [
+  '/vrma/サンプル/VRMA_01.vrma',
+  '/vrma/サンプル/VRMA_02.vrma',
+  '/vrma/サンプル/VRMA_03.vrma',
+  '/vrma/サンプル/VRMA_04.vrma',
+  '/vrma/サンプル/VRMA_05.vrma',
+  '/vrma/サンプル/VRMA_06.vrma',
+  '/vrma/サンプル/VRMA_07.vrma',
+]
+export const STANDARD_VRMA_FILES = [
+  '/vrma/標準/VRMA_01.vrma',
+  '/vrma/標準/VRMA_02.vrma',
+  '/vrma/標準/VRMA_03.vrma',
+  '/vrma/標準/VRMA_04.vrma',
+  '/vrma/標準/VRMA_05.vrma',
+]
 
 export function defaultModelSettings(): ModelSettings {
   return {

@@ -44,7 +44,7 @@ function minimizeWindow() {
     <form class="login-card" @submit.prevent="submit">
       <div class="title-bar" title="ここをドラッグして移動">
         <div class="title-left">
-          <strong>AiDiy Desktop Avatar</strong>
+          <strong>AiDiy Avatar</strong>
         </div>
         <div class="title-right">
           <button class="close-button" type="button" title="最小化" @click="minimizeWindow">−</button>

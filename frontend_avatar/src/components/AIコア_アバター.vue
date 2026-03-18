@@ -19,7 +19,9 @@ import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-v
 import {
   DEFAULT_VRM_MODEL_URL,
   SAMPLE_VRMA_FOLDER_NAME,
+  SAMPLE_VRMA_FILES,
   STANDARD_VRMA_FOLDER_NAME,
+  STANDARD_VRMA_FILES,
 } from '@/api/config'
 import {
   自立身体制御初期化,
@@ -94,6 +96,7 @@ let cameraBaseZ = -1.1
 let cameraDistanceScale = 1
 let autoBodySettings: 自立身体制御設定 | null = null
 let autoCameraSettings: 自動カメラワーク設定 | null = null
+let stageResizeObserver: ResizeObserver | null = null
 
 const モーション補間秒数 = 0.3
 const 体姿勢補正秒数 = 0.42
@@ -484,7 +487,18 @@ function resizeStage() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(width, height)
   camera.aspect = width / height
+  camera.updateProjectionMatrix()
   fitCamera()
+}
+
+function stageResize監視開始() {
+  if (!mountRef.value || typeof ResizeObserver === 'undefined') return
+
+  stageResizeObserver?.disconnect()
+  stageResizeObserver = new ResizeObserver(() => {
+    resizeStage()
+  })
+  stageResizeObserver.observe(mountRef.value)
 }
 
 function モーション終了時処理(event: THREE.Event & { action?: THREE.AnimationAction }) {
@@ -516,7 +530,16 @@ function 配列シャッフル<T>(items: T[]): T[] {
 
 async function VRMAファイル一覧取得(設定: VRMA再生設定): Promise<string[]> {
   const files = await window.desktopApi?.listVrmaFiles?.(設定.フォルダ名)
-  return (files ?? []).filter((file) => file.toLowerCase().endsWith('.vrma'))
+  if (files && files.length > 0) {
+    return files.filter((file) => file.toLowerCase().endsWith('.vrma'))
+  }
+  if (設定.フォルダ名 === SAMPLE_VRMA_FOLDER_NAME) {
+    return [...SAMPLE_VRMA_FILES]
+  }
+  if (設定.フォルダ名 === STANDARD_VRMA_FOLDER_NAME) {
+    return [...STANDARD_VRMA_FILES]
+  }
+  return []
 }
 
 async function 巡回キューからVRMAファイル選択(設定: VRMA再生設定): Promise<string> {
@@ -783,6 +806,7 @@ function initScene() {
   }
 
   resizeStage()
+  stageResize監視開始()
   window.addEventListener('resize', resizeStage)
   animate()
 }
@@ -844,6 +868,42 @@ function handleWheel(event: WheelEvent) {
   カメラ位置反映(cameraMode)
 }
 
+function 表示復帰() {
+  resizeStage()
+  clock?.getDelta()
+
+  if (mixer) {
+    mixer.timeScale = 1
+  }
+  if (currentAction) {
+    currentAction.paused = false
+    currentAction.enabled = true
+    currentAction.play()
+  }
+  if (renderer && scene && camera) {
+    renderer.render(scene, camera)
+  }
+
+  if (!currentVrm || vrma再生準備中 || vrma再生中 || currentAction) return
+
+  if (props.bodyAutonomousEnabled) {
+    標準VRMA再生開始()
+    return
+  }
+  サンプルVRMA再生開始()
+}
+
+function 表示更新() {
+  表示復帰()
+}
+
+function ページ表示復帰処理() {
+  if (document.visibilityState === 'hidden') return
+  window.requestAnimationFrame(() => {
+    表示復帰()
+  })
+}
+
 watch(() => props.bodyAutonomousEnabled, (enabled) => {
   if (!currentVrm) return
 
@@ -876,14 +936,27 @@ watch(() => props.cameraMode, (mode, previousMode) => {
   カメラ位置反映(mode, elapsed)
 })
 
+watch(() => props.uiVisible, (visible) => {
+  if (!visible) return
+  ページ表示復帰処理()
+})
+
 onMounted(() => {
   initScene()
+  window.addEventListener('focus', ページ表示復帰処理)
+  window.addEventListener('pageshow', ページ表示復帰処理)
+  document.addEventListener('visibilitychange', ページ表示復帰処理)
 })
 
 onBeforeUnmount(() => {
   destroyed = true
   window.cancelAnimationFrame(frameHandle)
   window.removeEventListener('resize', resizeStage)
+  window.removeEventListener('focus', ページ表示復帰処理)
+  window.removeEventListener('pageshow', ページ表示復帰処理)
+  document.removeEventListener('visibilitychange', ページ表示復帰処理)
+  stageResizeObserver?.disconnect()
+  stageResizeObserver = null
   mixer?.removeEventListener('finished', モーション終了時処理)
   mixer?.stopAllAction()
   currentAction = null
@@ -915,7 +988,7 @@ onBeforeUnmount(() => {
   lookAtTarget = null
 })
 
-defineExpose({ VRMA再生開始 })
+defineExpose({ VRMA再生開始, 表示更新, 表示復帰 })
 </script>
 
 <template>

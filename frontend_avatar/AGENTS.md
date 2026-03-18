@@ -131,17 +131,17 @@
 
 ### 3. Renderer
 
-ファイル: `src/App.vue`
+エントリーポイント: `src/main.ts` → `src/AiDiy.vue` を直接マウント（`App.vue` は存在しない）
 
-責務:
+`src/AiDiy.vue` の責務:
 - 現在ウィンドウの role 判定
 - ログイン状態の管理
 - セッションIDの維持
 - AIコアへの WebSocket 接続
-- 補助ウィンドウ向けの状態同期
+- 補助ウィンドウ向けの状態同期（BroadcastChannel）
 - 各 Vue コンポーネントの切り替え
 
-`frontend_avatar` では Vue Router を使わず、`App.vue` が role に応じて描画を切り替えます。
+`frontend_avatar` では Vue Router を使わず、`AiDiy.vue` が role に応じて描画を切り替えます。
 
 ---
 
@@ -162,31 +162,33 @@
 
 ### Renderer
 
-- `src/main.ts` - Vue 起動
-- `src/App.vue` - アプリ本体
+- `src/main.ts` - Vue 起動（`AiDiy.vue` を直接マウント）
+- `src/AiDiy.vue` - 認証・接続・role 管理の中心コンポーネント（エントリーポイント）
 - `src/style.css` - 全体スタイル
 - `src/types.ts` - 共通型
-
-### Renderer ルート
-
-- `src/AiDiy.vue` - 認証・接続・role 管理の中心コンポーネント（`App.vue` からマウント）
+- `src/env.d.ts` - Electron `desktopApi` の型宣言
 
 ### コンポーネント
 
 - `src/components/ログイン.vue` - ログイン画面
 - `src/components/AIコア.vue` - 常駐アバターウィンドウ
 - `src/components/AIコア_アバター.vue` - VRM / VRMA 3D表示
+- `src/components/AIコア_音声処理.ts` - AudioController クラス（マイク入力・PCM変換・音声再生・レベル計測）
+- `src/components/AIコア_自立身体制御.ts` - Three.js 身体制御（腕の動き・上下揺れのアニメーション）
+- `src/components/AIコア_自動カメラワーク.ts` - Three.js カメラアニメーション制御
 - `src/components/_WindowShell.vue` - フレームレスウィンドウ共通シェル
 - `src/components/AIチャット.vue` - チャットパネル
 - `src/components/AIファイル.vue` - ファイルパネル
 - `src/components/AIイメージ.vue` - 画像・画面取得パネル
 - `src/components/AIコード.vue` - コード支援パネル
-- `src/components/ファイル内容表示.vue` - ファイル内容ビューア
+- `src/components/ファイル内容表示.vue` - ファイル内容インラインビューア
 
 ### ダイアログ
 
-- `src/dialog/AI設定再起動.vue` - モデル設定ダイアログ
+- `src/dialog/AI設定再起動.vue` - モデル設定ダイアログ（CHAT_AI_NAME / LIVE_AI_NAME 等の変更後に再起動をトリガー）
 - `src/dialog/再起動カウントダウン.vue` - 再起動カウントダウン表示
+- `src/dialog/更新ファイル一覧.vue` - ファイル更新確認ダイアログ
+- `src/dialog/ファイル内容表示.vue` - ダイアログ形式のファイル内容表示
 
 ### 共有コンポーネント
 
@@ -195,11 +197,10 @@
 ### API / ユーティリティ
 
 - `src/api/client.ts` - Axios クライアント（`CORE_BASE_URL` 使用、401で自動ログアウト）
-- `src/api/config.ts` - 接続先URL・VRM/VRMA初期設定（環境変数 `VITE_CORE_BASE_URL` 参照）
+- `src/api/config.ts` - 接続先URL・VRM/VRMA初期設定・デフォルトモデル設定（環境変数 `VITE_CORE_BASE_URL` 参照）
 - `src/api/websocket.ts` - AI用 WebSocket クライアント（自動再接続、ソケット番号分離）
-- `src/api/monaco.ts` - Monaco Editor 初期化関連
-- `src/api/qAlert.ts` - アラート/確認ダイアログ呼び出しユーティリティ
-- `src/utils/AIコア_音声処理.ts` - マイク入力・PCM変換・音声再生・レベル計測
+- `src/utils/monaco.ts` - Monaco Editor 初期化関連
+- `src/utils/qAlert.ts` - アラート/確認ダイアログ呼び出しユーティリティ
 
 ### アセット
 
@@ -231,7 +232,7 @@
 
 ### 状態同期
 
-`App.vue` では **BroadcastChannel (`avatar-desktop-sync`)** を使って、  
+`AiDiy.vue` では **BroadcastChannel (`avatar-desktop-sync`)** を使って、
 core ウィンドウの状態を他パネルへ配信しています。
 
 同期される主な情報:
@@ -264,36 +265,63 @@ core ウィンドウの状態を他パネルへ配信しています。
 特徴:
 - 接続時に `connect` メッセージを送信
 - `init` メッセージ受信時にセッションIDを確定
-- 最大5回まで自動再接続
+- 最大5回まで自動再接続（3秒間隔）
 - ソケット番号ごとに接続を分離
+- チャンネルつきイベントは `メッセージ識別_チャンネル` でもディスパッチされる
 
-現在の主なソケット:
-- `input`
-- `audio`
-- `chat` 系は各コンポーネント側で利用
+**WebSocketMessage 型（主なフィールド）:**
+
+```ts
+{
+  type?: string            // 接続制御用（'connect' / 'ping' 等）
+  セッションID?: string
+  ソケット番号?: string
+  チャンネル?: string | null  // 入力チャンネル（'input' / 'audio' 等）
+  出力先チャンネル?: string   // 出力先（'0' = メインチャンネル）
+  メッセージ識別?: string    // メッセージ種別（'input_text' / 'input_audio' / 'init' 等）
+  メッセージ内容?: unknown   // ペイロード本体
+  ファイル名?: string | null
+  サムネイル画像?: string | null  // Base64
+}
+```
+
+**主なソケット用途:**
+- `input` チャンネル: テキスト入力（`input_text`）
+- `audio` チャンネル: 音声データ（`input_audio`）
+- `operations` メッセージ: UI ボタン状態送信
+- `chat` 系は各パネルコンポーネント側で WebSocket インスタンスを持つ
+
+**WebSocket エンドポイント:** `/core/ws/AIコア`（`src/api/config.ts` の `AI_WS_ENDPOINT`）
 
 ### セッション管理
 
-`App.vue` が `avatar_session_id` を `localStorage` に保持します。  
+`AiDiy.vue` が `avatar_session_id` を `localStorage` に保持します。
 補助ウィンドウは core ウィンドウから snapshot を受け取り、同一セッションを参照します。
 
 ---
 
 ## 音声処理
 
-ファイル: `src/utils/AIコア_音声処理.ts`
+ファイル: `src/components/AIコア_音声処理.ts`（クラス名: `AudioController`）
 
 責務:
 - マイク入力開始 / 停止
-- PCM 変換
-- WebSocket 経由で `input_audio` 送信
-- 受信音声の再生
-- 入出力レベルの計測
+- PCM 変換（ScriptProcessorNode 使用）
+- WebSocket `audio` チャンネル経由で `input_audio` 送信
+- 受信音声のキューバッファ再生
+- 入出力レベル・スペクトラムの計測（32バンド）
 
 **実装上の注意:**
-- モデルにより入力サンプルレートが切り替わる
-- スピーカー無効時は再生キューを止める
+- 入力サンプルレートはデフォルト 16kHz（`inputSampleRate = 16000`）、モデルにより切替
+- 出力サンプルレートはデフォルト 24kHz（`outputSampleRate = 24000`）
+- スピーカー無効時は再生キューを積まない（既存キューもクリア）
 - マイク開始にはブラウザ/Electron のメディア権限が必要
+- `AudioController` には専用の `audioSocket` を渡す（メインソケットと分離）
+- `cancelOutput()` で再生中のすべての音声を即停止しキュークリア可能
+
+**ビジュアライザー:**
+- バンド数: 32（`VISUALIZER_BAR_COUNT = 32`）
+- 入力・出力それぞれ独立した `AnalyserNode` で計測
 
 ---
 
@@ -311,7 +339,35 @@ core ウィンドウの状態を他パネルへ配信しています。
 **重要な前提:**
 - `alpha: true` と `setClearColor(..., 0)` により背景透過対応
 - 見た目だけを透明にしたい変更は CSS と props で吸収しやすい
-- モデルやモーションの追加時は `src/lib/config.ts` と `public/vrm`, `public/vrma` を合わせて更新する
+- モデルやモーションの追加時は `src/api/config.ts` の定数と `public/vrm`, `public/vrma` を合わせて更新する
+- `AIコア_自立身体制御.ts` が腕・上下揺れを制御、`AIコア_自動カメラワーク.ts` がカメラアニメーションを担当
+
+---
+
+## AI名命名規則と config.ts エクスポート定数
+
+### AI名命名規則（重要）
+
+`src/api/config.ts` の `defaultModelSettings()` で定義。CLAUDE.md の命名規則と同一。
+
+| キー | サフィックス規則 | 例 |
+|------|-----------|-----|
+| `CHAT_AI_NAME` | 必ず `_chat` で終わる | `gemini_chat` / `freeai_chat` / `openai_chat` |
+| `LIVE_AI_NAME` | 必ず `_live` で終わる | `gemini_live` / `freeai_live` / `openai_live` |
+| `CODE_AI1_NAME` 〜 `CODE_AI4_NAME` | 必ず `_code` で終わる | `claude_code` / `openai_code` |
+
+**比較は完全一致**（`startswith` 等の前方一致は使用禁止）
+
+### config.ts 主なエクスポート定数
+
+```ts
+CORE_BASE_URL          // バックエンド HTTP ベースURL（既定: http://127.0.0.1:8091）
+AI_WS_ENDPOINT         // WebSocket エンドポイント（既定: ws://127.0.0.1:8091/core/ws/AIコア）
+DEFAULT_VRM_MODEL_URL  // デフォルト VRM モデルパス（'/vrm/AiDiy_Sample_M.vrm'）
+SAMPLE_VRMA_FOLDER_NAME    // サンプルモーションフォルダ名（'サンプル'）
+STANDARD_VRMA_FOLDER_NAME  // 標準モーションフォルダ名（'標準'）
+defaultModelSettings() // モデル設定デフォルト値を返す関数
+```
 
 ---
 
@@ -374,7 +430,7 @@ npm run start
 
 ### 環境変数
 
-`src/lib/config.ts` で次を参照します。
+`src/api/config.ts` で次を参照します。
 
 - `VITE_CORE_BASE_URL`
 - `VITE_CORE_WS_URL`
@@ -393,7 +449,7 @@ npm run start
 
 - `electron/main.ts` の `PanelKey` / `WindowRole`
 - `electron/preload.ts` の型
-- `src/App.vue` の `PanelKey` / タイトル / 表示制御
+- `src/AiDiy.vue` の `PanelKey` / タイトル / 表示制御
 - 必要なら `AIコア.vue` のボタン群
 
 ### 2. パネルの表示状態を変える場合
@@ -428,8 +484,17 @@ npm run start
 次を確認してください。
 
 - `AIコア_アバター.vue` の Three.js 初期化
+- `AIコア_自立身体制御.ts`: 腕・上下揺れのアニメーション制御
+- `AIコア_自動カメラワーク.ts`: カメラ位置・視点のアニメーション制御
 - UI 表示だけの変更か、3D シーンそのものの変更か
 - 透明ウィンドウ時に残す要素 / 消す要素の切り分け
+
+### 6. AI名（モデル設定）を変更する場合
+
+- `src/api/config.ts` の `defaultModelSettings()` のデフォルト値を更新
+- `CHAT_AI_NAME` は `_chat` 末尾、`LIVE_AI_NAME` は `_live` 末尾、`CODE_AI*_NAME` は `_code` 末尾 **必須**
+- バックエンド側の `AIコア/AIコア_設定.py` の定数と一致させる
+- 比較箇所は完全一致（`===`）で記述し、`startswith` は使わない
 
 ---
 
@@ -467,9 +532,9 @@ npm run start
 - ただし **テンプレート上のタグ名は ASCII で扱う**
 - 必要なら `<component :is="コンポーネント変数" />` を使う
 
-### App.vue は肥大化しやすい
+### AiDiy.vue は肥大化しやすい
 
-`src/App.vue` は現在、認証・接続・同期・role切替の中心です。  
+`src/AiDiy.vue` は現在、認証・接続・同期・role切替の中心です。  
 修正時は「一見 unrelated に見える副作用」が多いため、次を意識してください。
 
 - login/core/panel どの role に効く変更か

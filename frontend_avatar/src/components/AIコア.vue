@@ -35,6 +35,8 @@ const props = defineProps<{
   chatCount?: number;
   coreBusy: boolean;
   coreError: string;
+  showUserLabel?: boolean;
+  titleStatusSource?: 'core' | 'input';
 }>()
 
 // --- 字幕キュー（最小5秒・最大30秒表示） ---
@@ -105,6 +107,7 @@ const カメラモード = ref<'追従' | '回転'>('追従')
 const 入力スペクトラム = ref<number[]>(初期スペクトラム())
 const 出力スペクトラム = ref<number[]>(初期スペクトラム())
 const 音声Socket = shallowRef<AIWebSocket | null>(null)
+const アバターRef = ref<{ 表示更新: () => void } | null>(null)
 
 let UI非表示タイマー: ReturnType<typeof setTimeout> | null = null
 let 音声接続世代 = 0
@@ -133,10 +136,25 @@ const 接続状態表示 = computed(() => {
   return '切断'
 })
 
-const 接続状態ドットクラス = computed(() => ({
-  on: 接続状態表示.value === '接続中',
-  partial: 接続状態表示.value === '部分接続' || 接続状態表示.value === '接続中...',
-}))
+const タイトル接続状態表示 = computed(() => {
+  if (props.titleStatusSource === 'input') {
+    return props.inputConnected ? '接続中' : '切断'
+  }
+  return 接続状態表示.value
+})
+
+const 接続状態ドットクラス = computed(() => {
+  if (props.titleStatusSource === 'input') {
+    return {
+      on: props.inputConnected,
+      partial: false,
+    }
+  }
+  return {
+    on: 接続状態表示.value === '接続中',
+    partial: 接続状態表示.value === '部分接続' || 接続状態表示.value === '接続中...',
+  }
+})
 
 const ビジュアライザー表示中 = computed(() => {
   return UI表示中.value && (マイク有効.value || スピーカー有効.value || マイクレベル.value > 0.03 || スピーカーレベル.value > 0.03)
@@ -201,7 +219,7 @@ function パネル切替要求(panel: PanelKey) {
 function 再表示要求() {
   UI表示中.value = true
   UI自動非表示予約()
-  再接続要求()
+  アバターRef.value?.表示更新()
 }
 
 function 再接続要求() {
@@ -394,7 +412,7 @@ defineExpose({ 字幕追加 })
 <template>
   <component
     :is="WindowShell"
-    :title="props.liveModel ? `AiDiy Desktop Avatar (${props.liveModel})` : 'AiDiy Desktop Avatar'"
+    :title="props.liveModel ? `AiDiy Avatar (${props.liveModel})` : 'AiDiy Avatar'"
     theme="purple"
     close-mode="event"
     :chrome-visible="UI表示中"
@@ -404,8 +422,9 @@ defineExpose({ 字幕追加 })
   >
     <template v-if="UI表示中" #title-right>
       <span class="core-status-dot" :class="接続状態ドットクラス"></span>
-      <span class="core-status-text">{{ 接続状態表示 }}</span>
+      <span class="core-status-text">{{ タイトル接続状態表示 }}</span>
       <button class="title-action-button" type="button" title="再表示" @click="再表示要求">↺</button>
+      <span v-if="props.showUserLabel !== false" class="core-user-label" :title="props.userLabel">{{ props.userLabel }}</span>
     </template>
 
     <div class="core-panel-body">
@@ -430,6 +449,7 @@ defineExpose({ 字幕追加 })
 
       <component
         :is="アバター"
+        ref="アバターRef"
         class="avatar-layer"
         :session-id="sessionId"
         :user-name="userLabel"
@@ -598,6 +618,15 @@ defineExpose({ 字幕追加 })
 .core-status-text {
   font-size: 10px;
   font-weight: bold;
+}
+
+.core-user-label {
+  max-width: 180px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .title-action-button {

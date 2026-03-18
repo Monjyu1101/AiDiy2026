@@ -11,7 +11,8 @@
 3. フロントエンド(Web)
 4. フロントエンド(Avatar)
 5. Web ページ表示
-6. 自動再起動監視
+6. Avatar ページ表示
+7. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -670,6 +671,9 @@ def start_initial_services(
 
     if web_enabled and "フロントエンド(Web)" in processes:
         open_browser(FRONTEND_WEB_PORT)
+
+    if avatar_enabled and "フロントエンド(Avatar)" in processes:
+        open_browser(FRONTEND_AVATAR_PORT)
 
     return selected_flags
 

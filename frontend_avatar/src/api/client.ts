@@ -19,8 +19,10 @@ const apiClient = axios.create({
   },
 })
 
+const authStorage = window.desktopApi ? localStorage : sessionStorage
+
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem('token')
+  const token = authStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -31,9 +33,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error?.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      localStorage.removeItem('avatar_session_id')
+      authStorage.removeItem('token')
+      authStorage.removeItem('user')
+      authStorage.removeItem('avatar_session_id')
       window.dispatchEvent(new Event('auth-expired'))
     }
     return Promise.reject(error)

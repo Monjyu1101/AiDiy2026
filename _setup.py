@@ -489,12 +489,13 @@ def setup_frontend_avatar():
     if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
         print_warning(f"{label}: npm install が失敗しました。Electron バイナリの手動取得を試みます。")
 
-    # テスト用: electron.exe を削除してフォールバックを検証
     exe_name = "electron.exe" if sys.platform == "win32" else "electron"
     electron_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name
-    if electron_exe.exists():
-        electron_exe.unlink()
-        print_warning(f"{label}: [テスト用] {electron_exe} を削除しました。")
+
+    # テスト用: electron.exe を削除してフォールバックを検証
+    # if electron_exe.exists():
+    #     electron_exe.unlink()
+    #     print_warning(f"{label}: [テスト用] {electron_exe} を削除しました。")
 
     # electron リカバリ処理
     if not electron_exe.exists():
@@ -514,11 +515,6 @@ def setup_frontend_avatar():
             return False
         # d. electron install 成功
         print_info(f"{label}: electron がインストール出来ました。")
-
-        # (事前ビルドなどは環境維持のため最後に実行)
-        # print_info(f"{label}: electron 実行環境を準備します...")
-        # run_command([npm_command(), "run", "build:electron"], cwd=FRONTEND_AVATAR_DIR)
-        # run_command([npm_command(), "exec", "--", "vite", "optimize", "--force"], cwd=FRONTEND_AVATAR_DIR)
 
     print_success(f"{label}: セットアップが完了しました。")
     return True
