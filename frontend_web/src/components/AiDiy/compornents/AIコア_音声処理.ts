@@ -43,6 +43,8 @@ interface OutputAudioState {
   // ビジュアライザー専用analyser（destinationに接続しない）
   visualizerAnalyser: AnalyserNode | null;
   visualizerDataArray: Uint8Array | null;
+  // フェードアウト用GainNode
+  outputGain: GainNode | null;
 }
 
 export class AudioController {
@@ -71,7 +73,8 @@ export class AudioController {
     audioDataArray: null,
     isVisualizerProcessing: false,
     visualizerAnalyser: null,
-    visualizerDataArray: null
+    visualizerDataArray: null,
+    outputGain: null
   };
 
   // サンプリングレート
@@ -98,6 +101,16 @@ export class AudioController {
   private audioVisualizerOverlay: HTMLElement | null = null;
   private isVisualizerVisible = false;
   private isVisualizerLoopStarted = false;
+
+  // エコー抑制関連
+  private currentSpeakerLevel = 0;           // スピーカー出力の現在レベル（0〜1）、エコー抑制に使用
+  private suppressionBuffer: Float32Array | null = null;  // エコー抑制用バッファ（事前確保）
+  private fadeOutTimer: ReturnType<typeof setTimeout> | null = null;  // フェードアウトタイマーID（競合防止）
+
+  // フェードアウト・エコー抑制パラメータ
+  private static readonly FADE_OUT_DURATION = 0.1;           // キャンセル時フェードアウト秒数（人間の割り込みを最優先）
+  private static readonly ECHO_SUPPRESSION_GAIN = 1.5;       // 抑制係数（1.0=等倍、大きいほど強く抑制）
+  private static readonly ECHO_SUPPRESSION_THRESHOLD = 0.01; // この値未満のスピーカーレベルは処理をスキップ
 
   constructor(wsClient: Ref<IWebSocketClient | null>, セッションID: Ref<string>, isSpeakerOn: Ref<boolean>) {
     this.wsClient = wsClient;
@@ -193,11 +206,16 @@ export class AudioController {
       if (this.outputAudioState.isPlaying && this.outputAudioState.audioAnalyser) {
         // スピーカー再生中は通常のanalyserを使用
         this.outputAudioState.audioAnalyser.getByteFrequencyData(this.outputAudioState.audioDataArray! as any);
+        this.updateSpeakerLevel(this.computeOutputLevel(this.outputAudioState.audioDataArray!));
         this.updateVisualizerBars(this.outputVisualizerBars, this.outputAudioState.audioDataArray!);
       } else if (this.outputAudioState.isVisualizerProcessing && this.outputAudioState.visualizerAnalyser) {
         // ビジュアライザー専用処理中はビジュアライザー専用analyserを使用
         this.outputAudioState.visualizerAnalyser.getByteFrequencyData(this.outputAudioState.visualizerDataArray! as any);
+        this.updateSpeakerLevel(this.computeOutputLevel(this.outputAudioState.visualizerDataArray!));
         this.updateVisualizerBars(this.outputVisualizerBars, this.outputAudioState.visualizerDataArray!);
+      } else {
+        // 出力がない場合はスピーカーレベルをリセット
+        this.currentSpeakerLevel = 0;
       }
 
       requestAnimationFrame(visualize);
@@ -297,6 +315,8 @@ export class AudioController {
       this.inputAudioState.audioContext = null;
     }
 
+    this.suppressionBuffer = null;
+
     // ビジュアライザー表示は updateVisualizerVisibility に委譲
   }
 
@@ -328,10 +348,12 @@ export class AudioController {
     // ScriptProcessorNodeを使用
     const bufferSize = 1024;
     const processor = this.inputAudioState.audioContext.createScriptProcessor(bufferSize, 1, 1);
+    this.suppressionBuffer = new Float32Array(bufferSize);  // エコー抑制用バッファを事前確保
 
     processor.onaudioprocess = (event) => {
       if (this.wsClient.value && this.wsClient.value.isConnected()) {
-        const inputBuffer = event.inputBuffer.getChannelData(0);
+        const rawInput = event.inputBuffer.getChannelData(0);
+        const inputBuffer = this.applyEchoSuppression(rawInput);
 
         // Float32ArrayをInt16Arrayに変換（16-bit PCM）
         const pcmData = new Int16Array(inputBuffer.length);
@@ -393,19 +415,22 @@ export class AudioController {
     this.outputAudioState.currentVisualizerSources = [];
     this.outputAudioState.isPlaying = false;
     this.outputAudioState.isVisualizerProcessing = false;
-    
-    // スピーカー出力用analyser（destinationに接続）
+
+    // スピーカー出力用analyser → GainNode（フェードアウト制御）→ destination
     this.outputAudioState.audioAnalyser = this.outputAudioState.audioContext.createAnalyser();
     this.outputAudioState.audioAnalyser.fftSize = 256;
-    this.outputAudioState.audioAnalyser.connect(this.outputAudioState.audioContext.destination);
+    this.outputAudioState.outputGain = this.outputAudioState.audioContext.createGain();
+    this.outputAudioState.outputGain.gain.value = this.isSpeakerOn.value ? 1 : 0;
+    this.outputAudioState.audioAnalyser.connect(this.outputAudioState.outputGain);
+    this.outputAudioState.outputGain.connect(this.outputAudioState.audioContext.destination);
     this.outputAudioState.audioDataArray = new Uint8Array(this.outputAudioState.audioAnalyser.frequencyBinCount);
-    
+
     // ビジュアライザー専用analyser（destinationに接続しない）
     this.outputAudioState.visualizerAnalyser = this.outputAudioState.audioContext.createAnalyser();
     this.outputAudioState.visualizerAnalyser.fftSize = 256;
     this.outputAudioState.visualizerDataArray = new Uint8Array(this.outputAudioState.visualizerAnalyser.frequencyBinCount);
-    
-    console.log('[AudioController] 出力AudioContextセットアップ完了（analyser × 2）');
+
+    console.log('[AudioController] 出力AudioContextセットアップ完了（analyser × 2 + GainNode）');
   }
 
   /**
@@ -561,32 +586,72 @@ export class AudioController {
 
   /**
    * 音声出力キャンセル
+   * 0.1秒フェードアウト後にソースを停止（人間の割り込みを妨げない最短フェード）
+   * ※フェード中もエコー抑制（currentSpeakerLevel）を維持し、AI音声をマイクが拾わないようにする
    */
   cancelAudioOutput() {
-    // 再生中の音声を停止
-    for (const item of this.outputAudioState.currentAudioSources) {
-      try {
-        item.source.stop();
-      } catch (e) {
-        // Already stopped
-      }
-    }
-    for (const item of this.outputAudioState.currentVisualizerSources) {
-      try {
-        item.source.stop();
-      } catch (e) {
-        // Already stopped
-      }
-    }
-    this.outputAudioState.currentAudioSources = [];
-    this.outputAudioState.currentVisualizerSources = [];
-
-    // キューをクリア
+    // キューを即時クリア（新規追加をブロック）
     this.outputAudioState.audioQueue = [];
     this.outputAudioState.isQueueProcessing = false;
-    this.outputAudioState.isPlaying = false;
-    this.outputAudioState.isVisualizerProcessing = false;
     this.outputAudioState.nextPlayTime = this.outputAudioState.audioContext?.currentTime ?? 0;
+
+    const context = this.outputAudioState.audioContext;
+    const gain = this.outputAudioState.outputGain;
+    const hasSources = this.outputAudioState.currentAudioSources.length > 0;
+
+    if (context && gain && hasSources) {
+      // 0.1秒フェードアウト（GainNodeで振幅を下げる）
+      const now = context.currentTime;
+      const fadeDuration = AudioController.FADE_OUT_DURATION;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + fadeDuration);
+
+      // ソース参照を退避してクリア
+      const sourcesToStop = [...this.outputAudioState.currentAudioSources];
+      const vizSourcesToStop = [...this.outputAudioState.currentVisualizerSources];
+      this.outputAudioState.currentAudioSources = [];
+      this.outputAudioState.currentVisualizerSources = [];
+      this.outputAudioState.isPlaying = false;
+      this.outputAudioState.isVisualizerProcessing = false;
+
+      // ビジュアライザーは即時停止
+      for (const item of vizSourcesToStop) {
+        try { item.source.stop(); } catch { /* 既に停止済み */ }
+      }
+
+      // 旧タイマーをキャンセルして競合防止（0.1秒以内の連続キャンセル時にゲインが誤復元されないよう）
+      if (this.fadeOutTimer !== null) clearTimeout(this.fadeOutTimer);
+      this.fadeOutTimer = setTimeout(() => {
+        this.fadeOutTimer = null;
+        // スピーカーソースを物理停止
+        for (const item of sourcesToStop) {
+          try { item.source.stop(); } catch { /* 既に停止済み */ }
+        }
+        // フェード完了後にエコー抑制レベルをリセット（フェード中は抑制を維持）
+        this.currentSpeakerLevel = 0;
+        // ゲインを元に戻す
+        if (this.outputAudioState.outputGain && this.outputAudioState.audioContext) {
+          const t = this.outputAudioState.audioContext.currentTime;
+          const targetGain = this.isSpeakerOn.value ? 1 : 0;
+          this.outputAudioState.outputGain.gain.cancelScheduledValues(t);
+          this.outputAudioState.outputGain.gain.setValueAtTime(targetGain, t);
+        }
+      }, (AudioController.FADE_OUT_DURATION * 1000) + 20);
+    } else {
+      // ソースなし：即時停止＋即時リセット
+      for (const item of this.outputAudioState.currentAudioSources) {
+        try { item.source.stop(); } catch { /* 既に停止済み */ }
+      }
+      for (const item of this.outputAudioState.currentVisualizerSources) {
+        try { item.source.stop(); } catch { /* 既に停止済み */ }
+      }
+      this.outputAudioState.currentAudioSources = [];
+      this.outputAudioState.currentVisualizerSources = [];
+      this.outputAudioState.isPlaying = false;
+      this.outputAudioState.isVisualizerProcessing = false;
+      this.currentSpeakerLevel = 0;
+    }
 
     // サーバーにキャンセル通知（統一フォーマット）
     if (this.wsClient.value && this.wsClient.value.isConnected()) {
@@ -602,7 +667,7 @@ export class AudioController {
   }
 
   /**
-   * スピーカーOFF時のクリーンアップ
+   * スピーカーOFF時のクリーンアップ（即時停止）
    */
   clearAudioPlayback() {
     for (const item of this.outputAudioState.currentAudioSources) {
@@ -617,6 +682,12 @@ export class AudioController {
     this.outputAudioState.isQueueProcessing = false;
     this.outputAudioState.isPlaying = false;
     this.outputAudioState.nextPlayTime = this.outputAudioState.audioContext?.currentTime ?? 0;
+    this.currentSpeakerLevel = 0;
+    // GainNodeをゼロにリセット（スピーカーOFF）
+    if (this.outputAudioState.outputGain && this.outputAudioState.audioContext) {
+      this.outputAudioState.outputGain.gain.cancelScheduledValues(this.outputAudioState.audioContext.currentTime);
+      this.outputAudioState.outputGain.gain.setValueAtTime(0, this.outputAudioState.audioContext.currentTime);
+    }
   }
 
   /**
@@ -648,6 +719,7 @@ export class AudioController {
     this.outputAudioState.isPlaying = false;
     this.outputAudioState.isVisualizerProcessing = false;
     this.outputAudioState.nextPlayTime = 0;
+    this.currentSpeakerLevel = 0;  // クリーンアップ時にエコー抑制レベルをリセット
 
     if (this.inputAudioState.audioContext) {
       this.inputAudioState.audioContext.close();
@@ -699,6 +771,41 @@ export class AudioController {
       this.isVisualizerVisible = false;
       console.log('[AudioController] ビジュアライザー非表示');
     }
+  }
+
+  /**
+   * 出力音声レベルを計算（エコー抑制に使用）
+   */
+  private computeOutputLevel(dataArray: Uint8Array): number {
+    if (dataArray.length === 0) return 0;
+    const sum = dataArray.reduce((acc, value) => acc + value, 0);
+    return Math.min(1, sum / dataArray.length / 128);
+  }
+
+  /**
+   * スピーカーレベルを即時更新（人の声割り込みを最優先）
+   */
+  private updateSpeakerLevel(newLevel: number): void {
+    this.currentSpeakerLevel = newLevel;
+  }
+
+  /**
+   * スピーカー出力レベル分をマイク入力振幅から差し引くエコー抑制処理
+   * マイクのハードウェアレベルは変えず、数値的に振幅を削減する
+   */
+  private applyEchoSuppression(rawInput: Float32Array): Float32Array {
+    const speakerLevel = this.currentSpeakerLevel;
+    if (speakerLevel <= AudioController.ECHO_SUPPRESSION_THRESHOLD) {
+      return rawInput;
+    }
+    const suppression = speakerLevel * AudioController.ECHO_SUPPRESSION_GAIN;
+    const buffer = this.suppressionBuffer ?? new Float32Array(rawInput.length);
+    for (let i = 0; i < rawInput.length; i++) {
+      const sample = rawInput[i] ?? 0;
+      const sign = sample >= 0 ? 1 : -1;
+      buffer[i] = sign * Math.max(0, Math.abs(sample) - suppression);
+    }
+    return buffer;
   }
 }
 

@@ -49,6 +49,14 @@ export class AudioController {
   private inputSampleRate = 16000
   private outputSampleRate = 24000
   private nextPlaybackTime = 0
+  private currentSpeakerLevel = 0        // スピーカー出力の現在レベル（0〜1）、エコー抑制に使用
+  private suppressionBuffer: Float32Array | null = null  // エコー抑制用バッファ（事前確保）
+  private fadeOutTimer: ReturnType<typeof setTimeout> | null = null  // フェードアウトタイマーID（競合防止）
+
+  // フェードアウト・エコー抑制パラメータ
+  private static readonly FADE_OUT_DURATION = 0.1           // キャンセル時フェードアウト秒数（人間の割り込みを最優先）
+  private static readonly ECHO_SUPPRESSION_GAIN = 1.5       // 抑制係数（1.0=等倍、大きいほど強く抑制）
+  private static readonly ECHO_SUPPRESSION_THRESHOLD = 0.01 // この値未満のスピーカーレベルは処理をスキップ
 
   constructor(private readonly options: AudioControllerOptions) {}
 
@@ -84,6 +92,7 @@ export class AudioController {
     }
     if (!enabled) {
       this.stopSpeakerSources()
+      this.currentSpeakerLevel = 0  // スピーカーOFF時はエコー抑制レベルをリセット
     }
   }
 
@@ -121,14 +130,16 @@ export class AudioController {
       this.inputAnalyser.fftSize = 256
       source.connect(this.inputAnalyser)
 
-      this.inputProcessor = this.inputAudioContext.createScriptProcessor(2048, 1, 1)
+      this.inputProcessor = this.inputAudioContext.createScriptProcessor(1024, 1, 1)
+      this.suppressionBuffer = new Float32Array(1024)  // ScriptProcessorのバッファサイズに合わせて事前確保
       source.connect(this.inputProcessor)
       this.inputProcessor.connect(this.inputAudioContext.destination)
       this.inputProcessor.onaudioprocess = (event) => {
         const activeSocket = this.options.getSocket()
         if (!activeSocket?.isConnected()) return
 
-        const pcm = this.floatTo16BitPCM(event.inputBuffer.getChannelData(0))
+        const inputData = this.applyEchoSuppression(event.inputBuffer.getChannelData(0))
+        const pcm = this.floatTo16BitPCM(inputData)
         const pcmBuffer = pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength) as ArrayBuffer
         activeSocket.send({
           セッションID: this.sessionId || this.options.getSessionId(),
@@ -171,11 +182,48 @@ export class AudioController {
   cancelOutput(options: CancelOutputOptions = {}): void {
     const { resetLevel = true, notifyServer = false } = options
     this.outputQueueGeneration += 1
-    this.stopSpeakerSources()
-    this.stopVisualizerSources()
     this.outputQueue = []
     this.outputQueueProcessing = false
     this.nextPlaybackTime = this.outputAudioContext?.currentTime ?? 0
+
+    // 0.1秒フェードアウト後にソースを停止（人間の割り込みを妨げない最短フェード）
+    // ※フェード中もエコー抑制（currentSpeakerLevel）を維持し、AI音声をマイクが拾わないようにする
+    const context = this.outputAudioContext
+    const gain = this.outputGain
+    if (context && gain && this.speakerSources.size > 0) {
+      const now = context.currentTime
+      const fadeDuration = AudioController.FADE_OUT_DURATION
+      gain.gain.cancelScheduledValues(now)
+      gain.gain.setValueAtTime(gain.gain.value, now)
+      gain.gain.linearRampToValueAtTime(0, now + fadeDuration)
+
+      const sourcesToStop = [...this.speakerSources]  // Setコピー不要・スプレッドで十分
+      this.speakerSources.clear()
+      this.stopVisualizerSources()
+
+      // 旧タイマーをキャンセルして競合防止（0.1秒以内の連続キャンセル時にゲインが誤復元されないよう）
+      if (this.fadeOutTimer !== null) clearTimeout(this.fadeOutTimer)
+      this.fadeOutTimer = setTimeout(() => {
+        this.fadeOutTimer = null
+        for (const source of sourcesToStop) {
+          try { source.stop() } catch { /* 既に停止済み */ }
+        }
+        // フェード完了後にエコー抑制レベルをリセット（フェード中は抑制を維持）
+        this.currentSpeakerLevel = 0
+        // フェード後にゲインを元に戻す
+        if (this.outputGain && this.outputAudioContext) {
+          const t = this.outputAudioContext.currentTime
+          const targetGain = this.speakerEnabled ? 1 : 0
+          this.outputGain.gain.cancelScheduledValues(t)
+          this.outputGain.gain.setValueAtTime(targetGain, t)
+        }
+      }, (AudioController.FADE_OUT_DURATION * 1000) + 20)
+    } else {
+      // ソースなし：即時停止＋即時リセット
+      this.currentSpeakerLevel = 0
+      this.stopSpeakerSources()
+      this.stopVisualizerSources()
+    }
 
     if (notifyServer) {
       this.notifyCancelAudio()
@@ -339,17 +387,20 @@ export class AudioController {
       const data = this.speakerSources.size > 0 ? speakerData : visualizerData
 
       if (!analyser || data.length === 0) {
+        this.currentSpeakerLevel = 0  // analyser未初期化時はエコー抑制レベルをリセット
         this.options.onOutputSpectrum?.(this.emptySpectrum())
         this.outputLevelFrame = 0
         return
       }
 
       analyser.getByteFrequencyData(data)
+      this.updateSpeakerLevel(this.computeLevel(data))
       this.options.onOutputSpectrum?.(this.buildSpectrum(data))
 
       if (this.speakerSources.size > 0 || this.visualizerSources.size > 0) {
         this.outputLevelFrame = window.requestAnimationFrame(tick)
       } else {
+        this.currentSpeakerLevel = 0
         this.options.onOutputSpectrum?.(this.emptySpectrum())
         this.outputLevelFrame = 0
       }
@@ -466,6 +517,28 @@ export class AudioController {
     return window.btoa(binary)
   }
 
+  // スピーカー出力レベル分をマイク入力振幅から差し引くエコー抑制処理
+  // マイクのハードウェアレベルは変えず、数値的に振幅を削減する
+  private applyEchoSuppression(rawInput: Float32Array): Float32Array {
+    const speakerLevel = this.currentSpeakerLevel
+    if (speakerLevel <= AudioController.ECHO_SUPPRESSION_THRESHOLD) {
+      return rawInput
+    }
+    const suppression = speakerLevel * AudioController.ECHO_SUPPRESSION_GAIN
+    const buffer = this.suppressionBuffer ?? new Float32Array(rawInput.length)
+    for (let i = 0; i < rawInput.length; i++) {
+      const sample = rawInput[i] ?? 0
+      const sign = sample >= 0 ? 1 : -1
+      buffer[i] = sign * Math.max(0, Math.abs(sample) - suppression)
+    }
+    return buffer
+  }
+
+  // スピーカーレベルを即時更新（人の声割り込みを最優先）
+  private updateSpeakerLevel(newLevel: number): void {
+    this.currentSpeakerLevel = newLevel
+  }
+
   private base64ToArrayBuffer(base64: string): ArrayBuffer {
     const binary = window.atob(base64)
     const bytes = new Uint8Array(binary.length)
@@ -489,6 +562,7 @@ export class AudioController {
       this.inputProcessor = null
     }
 
+    this.suppressionBuffer = null
     this.inputStream?.getTracks().forEach((track) => track.stop())
     this.inputStream = null
     this.inputAnalyser = null

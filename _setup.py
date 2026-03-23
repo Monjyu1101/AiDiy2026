@@ -412,7 +412,7 @@ def setup_common_global_tools():
     print_header("共通セットアップ")
     print_info("対象: pip / wheel / setuptools / uv / AI CLI ツール")
 
-    if ask_yes_no("共通: グローバル環境의 Python ツールをアップグレードしますか？", default="y"):
+    if ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y"):
         commands = [
             ([sys.executable, "-m", "pip", "install", "--upgrade", "pip"], "pip"),
             (["pip", "install", "--upgrade", "wheel"], "wheel"),
