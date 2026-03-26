@@ -14,6 +14,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import apiClient from '@/api/client';
 import AI設定再起動 from './dialog/AI設定再起動.vue';
+import FileContentDialog from './dialog/ファイル内容表示.vue';
 import { AIWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import AIコアコントロール from './compornents/AIコア.vue';
 import AIコアチャット from './compornents/AIチャット.vue';
@@ -69,6 +70,9 @@ const チャット数 = computed(() => 0);
 
 const 自動選択表示 = ref(false);
 const 設定再起動表示 = ref(false);
+const ファイル内容ダイアログ表示 = ref(false);
+const 表示ファイル名 = ref('');
+const 表示base64_data = ref('');
 const パネル表示状態 = computed<Record<PanelKey, boolean>>(() => ({ ...パネルボタン状態.value }));
 
 function 受信内容文字列(受信データ: any) {
@@ -226,6 +230,18 @@ function パネル切替(panel: PanelKey) {
   if (panel === 'image') {
     自動選択表示.value = false;
   }
+}
+
+function ファイル内容ダイアログ開く(payload: { ファイル名: string; base64_data: string }) {
+  表示ファイル名.value = payload.ファイル名;
+  表示base64_data.value = payload.base64_data;
+  ファイル内容ダイアログ表示.value = true;
+}
+
+function ファイル内容ダイアログ閉じる() {
+  ファイル内容ダイアログ表示.value = false;
+  表示ファイル名.value = '';
+  表示base64_data.value = '';
 }
 
 function 設定再起動を開く() {
@@ -466,6 +482,7 @@ onBeforeUnmount(() => {
           @mode-change="チャットモード更新"
           @activate="パネル有効化('chat')"
           @close="パネル閉じる('chat')"
+          @open-file-dialog="ファイル内容ダイアログ開く"
         />
       </div>
       </Transition>
@@ -482,6 +499,7 @@ onBeforeUnmount(() => {
           :input-connected="入力接続済み"
           @activate="パネル有効化('code1')"
           @close="パネル閉じる('code1')"
+          @open-file-dialog="ファイル内容ダイアログ開く"
         />
       </div>
       </Transition>
@@ -515,6 +533,7 @@ onBeforeUnmount(() => {
           :input-connected="入力接続済み"
           @activate="パネル有効化('code2')"
           @close="パネル閉じる('code2')"
+          @open-file-dialog="ファイル内容ダイアログ開く"
         />
       </div>
       </Transition>
@@ -531,6 +550,7 @@ onBeforeUnmount(() => {
           :input-connected="入力接続済み"
           @activate="パネル有効化('code3')"
           @close="パネル閉じる('code3')"
+          @open-file-dialog="ファイル内容ダイアログ開く"
         />
       </div>
       </Transition>
@@ -547,6 +567,7 @@ onBeforeUnmount(() => {
           :input-connected="入力接続済み"
           @activate="パネル有効化('code4')"
           @close="パネル閉じる('code4')"
+          @open-file-dialog="ファイル内容ダイアログ開く"
         />
       </div>
       </Transition>
@@ -557,6 +578,12 @@ onBeforeUnmount(() => {
       :session-id="セッションID"
       @close="設定再起動を閉じる"
       @saved="設定再起動保存完了"
+    />
+    <FileContentDialog
+      :show="ファイル内容ダイアログ表示"
+      :ファイル名="表示ファイル名"
+      :base64_data="表示base64_data"
+      @close="ファイル内容ダイアログ閉じる"
     />
   </div>
 </template>

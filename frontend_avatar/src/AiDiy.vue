@@ -20,6 +20,7 @@ import AIコアイメージ from '@/components/AIイメージ.vue'
 import ログイン from '@/components/ログイン.vue'
 import AI設定再起動 from '@/dialog/AI設定再起動.vue'
 import 再起動カウントダウン from '@/dialog/再起動カウントダウン.vue'
+import ファイル内容表示ダイアログ from '@/dialog/ファイル内容表示.vue'
 import WindowShell from '@/components/_WindowShell.vue'
 import qAlertDialogComp from '@/_share/qAlertDialog.vue'
 import apiClient from '@/api/client'
@@ -181,6 +182,9 @@ const コード2Ref = ref<コードパネル参照型 | null>(null)
 const コード3Ref = ref<コードパネル参照型 | null>(null)
 const コード4Ref = ref<コードパネル参照型 | null>(null)
 const 自動選択表示 = ref(true)
+const ファイル内容ダイアログ表示 = ref(false)
+const 表示ファイル名 = ref('')
+const 表示base64_data = ref('')
 const 認証エラーメッセージKey = 'avatar_auth_error'
 const コアViewRef = ref<{ 字幕追加: (text: string) => void } | null>(null)
 const qAlertDialogRef = ref<{ show: (msg: string) => Promise<void>; showConfirm: (msg: string) => Promise<boolean> } | null>(null)
@@ -838,6 +842,18 @@ async function 再起動後再接続() {
   デスクトップチャンネル?.postMessage({ type: 'reboot-reconnect' })
 }
 
+function ファイル内容ダイアログ開く(payload: { ファイル名: string; base64_data: string }) {
+  表示ファイル名.value = payload.ファイル名
+  表示base64_data.value = payload.base64_data
+  ファイル内容ダイアログ表示.value = true
+}
+
+function ファイル内容ダイアログ閉じる() {
+  ファイル内容ダイアログ表示.value = false
+  表示ファイル名.value = ''
+  表示base64_data.value = ''
+}
+
 function 設定再起動を開く() {
   void window.desktopApi?.openSettingsWindow?.(セッションID.value || '')
 }
@@ -1193,6 +1209,7 @@ onBeforeUnmount(() => {
               @send-input-payload="入力ペイロード送信"
               @mode-change="チャットモード更新"
               @chat-state="チャット状態中継"
+              @open-file-dialog="ファイル内容ダイアログ開く"
             />
           </div>
 
@@ -1240,6 +1257,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '1')"
               @cancel="() => コードキャンセル処理('1')"
               @send-file="コードファイル送信処理"
+              @open-file-dialog="ファイル内容ダイアログ開く"
             />
           </div>
 
@@ -1257,6 +1275,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '2')"
               @cancel="() => コードキャンセル処理('2')"
               @send-file="コードファイル送信処理"
+              @open-file-dialog="ファイル内容ダイアログ開く"
             />
           </div>
 
@@ -1274,6 +1293,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '3')"
               @cancel="() => コードキャンセル処理('3')"
               @send-file="コードファイル送信処理"
+              @open-file-dialog="ファイル内容ダイアログ開く"
             />
           </div>
 
@@ -1291,6 +1311,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '4')"
               @cancel="() => コードキャンセル処理('4')"
               @send-file="コードファイル送信処理"
+              @open-file-dialog="ファイル内容ダイアログ開く"
             />
           </div>
         </div>
@@ -1405,6 +1426,7 @@ onBeforeUnmount(() => {
         @send-input-payload="ウィンドウから入力ペイロード送信"
         @mode-change="チャットモード更新"
         @chat-state="チャット状態中継"
+        @open-file-dialog="ファイル内容ダイアログ開く"
       />
     </component>
 
@@ -1482,6 +1504,7 @@ onBeforeUnmount(() => {
         @submit="コード送信処理"
         @cancel="コードキャンセル処理"
         @send-file="コードファイル送信処理"
+        @open-file-dialog="ファイル内容ダイアログ開く"
       />
     </component>
 
@@ -1499,6 +1522,14 @@ onBeforeUnmount(() => {
     />
 
     <component :is="qAlertDialogComp" ref="qAlertDialogRef" />
+
+    <component
+      :is="ファイル内容表示ダイアログ"
+      :show="ファイル内容ダイアログ表示"
+      :ファイル名="表示ファイル名"
+      :base64_data="表示base64_data"
+      @close="ファイル内容ダイアログ閉じる"
+    />
   </main>
 </template>
 

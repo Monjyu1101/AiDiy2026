@@ -15,7 +15,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiClient from '@/api/client'
 import { AI_WS_ENDPOINT } from '@/api/config'
 import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
-import AIコードファイル内容表示 from '@/dialog/ファイル内容表示.vue'
 import AIコード更新ファイル一覧 from '@/dialog/更新ファイル一覧.vue'
 
 type コードチャンネル = '1' | '2' | '3' | '4'
@@ -52,6 +51,7 @@ const 通知 = defineEmits<{
   submit: [text: string, channel: コードチャンネル]
   cancel: [channel: コードチャンネル]
   'send-file': [payload: { channel: コードチャンネル; fileName: string; base64: string }]
+  'open-file-dialog': [payload: { ファイル名: string; base64_data: string }]
 }>()
 
 const 出力接続済み = ref(false)
@@ -73,9 +73,6 @@ const 入力欄最大高さ = ref(380)
 const ウェルカム内容 = ref('')
 const 更新ファイル一覧 = ref<string[]>([])
 const 更新ファイルダイアログ表示 = ref(false)
-const ファイル内容ダイアログ表示 = ref(false)
-const 表示ファイル名 = ref('')
-const 表示base64_data = ref('')
 
 const ウェルカムテキスト受信済み = ref(false)
 
@@ -604,18 +601,10 @@ async function ファイル内容表示を開く(fileName: string) {
     if (response?.data?.status !== 'OK') return
     const base64_data = response?.data?.data?.base64_data
     if (typeof base64_data !== 'string' || !base64_data) return
-    表示ファイル名.value = fileName
-    表示base64_data.value = base64_data
-    ファイル内容ダイアログ表示.value = true
+    通知('open-file-dialog', { ファイル名: fileName, base64_data })
   } catch (error) {
     console.error('[AIコード] ファイル内容取得エラー:', error)
   }
-}
-
-function ファイル内容ダイアログ閉じる() {
-  ファイル内容ダイアログ表示.value = false
-  表示ファイル名.value = ''
-  表示base64_data.value = ''
 }
 
 function 更新ファイルダイアログ閉じる() {
@@ -827,12 +816,6 @@ defineExpose({
       @select-file="ファイル内容表示を開く"
     />
 
-    <AIコードファイル内容表示
-      :show="ファイル内容ダイアログ表示"
-      :ファイル名="表示ファイル名"
-      :base64_data="表示base64_data"
-      @close="ファイル内容ダイアログ閉じる"
-    />
   </section>
 </template>
 

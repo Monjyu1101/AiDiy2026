@@ -15,7 +15,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AI_WS_ENDPOINT } from '@/api/config'
 import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import apiClient from '@/api/client'
-import ファイル内容表示ダイアログ from '@/components/ファイル内容表示.vue'
 
 type チャットモード = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'
 
@@ -36,6 +35,7 @@ const 通知 = defineEmits<{
   'send-input-payload': [message: Record<string, unknown>]
   'mode-change': [mode: チャットモード]
   'chat-state': [connected: boolean]
+  'open-file-dialog': [payload: { ファイル名: string; base64_data: string }]
 }>()
 
 interface メッセージ {
@@ -68,10 +68,6 @@ const 出力接続済み = ref(false)
 const メッセージ一覧 = ref<メッセージ[]>([])
 const ウェルカムテキスト受信済み = ref(false)
 
-const ファイル内容ダイアログ表示 = ref(false)
-const 表示ファイル名 = ref('')
-const 表示base64_data = ref('')
-
 const 画像拡張子セット = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'])
 const テキスト拡張子セット = new Set([
   'py', 'vue', 'ts', 'tsx', 'js', 'jsx', 'json', 'md', 'txt',
@@ -93,12 +89,6 @@ const ファイル内容表示対象 = (ファイル名: string): boolean => {
   return 画像拡張子セット.has(拡張子) || テキスト拡張子セット.has(拡張子)
 }
 
-const ファイル内容ダイアログ閉じる = () => {
-  ファイル内容ダイアログ表示.value = false
-  表示ファイル名.value = ''
-  表示base64_data.value = ''
-}
-
 const ファイル内容表示を開く = async (ファイル名: string) => {
   if (!ファイル内容表示対象(ファイル名)) return
   try {
@@ -106,9 +96,7 @@ const ファイル内容表示を開く = async (ファイル名: string) => {
     if (response?.data?.status !== 'OK') return
     const base64_data = response?.data?.data?.base64_data
     if (typeof base64_data !== 'string' || !base64_data) return
-    表示ファイル名.value = ファイル名
-    表示base64_data.value = base64_data
-    ファイル内容ダイアログ表示.value = true
+    通知('open-file-dialog', { ファイル名, base64_data })
   } catch (error) {
     console.error('[チャット] ファイル内容取得エラー:', error)
   }
@@ -858,13 +846,6 @@ defineExpose({
       </button>
     </div>
 
-    <component
-      :is="ファイル内容表示ダイアログ"
-      :show="ファイル内容ダイアログ表示"
-      :ファイル名="表示ファイル名"
-      :base64_data="表示base64_data"
-      @close="ファイル内容ダイアログ閉じる"
-    />
   </section>
 </template>
 

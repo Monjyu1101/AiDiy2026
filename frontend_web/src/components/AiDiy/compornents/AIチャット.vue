@@ -14,7 +14,6 @@
 import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue';
 import { AIWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import apiClient from '@/api/client';
-import FileContentDialog from '../dialog/ファイル内容表示.vue';
 
 // Props
 const プロパティ = defineProps<{
@@ -32,6 +31,7 @@ const 通知 = defineEmits<{
   close: [];
   'mode-change': ['chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'];
   activate: [];
+  'open-file-dialog': [payload: { ファイル名: string; base64_data: string }];
 }>();
 
 const 出力WebSocket = ref<IWebSocketClient | null>(null);
@@ -73,9 +73,6 @@ const 入力欄最大高さ = ref(380);
 const 入力欄固定中 = ref(false);
 const 入力欄固定高さ = ref(入力欄最小高さ);
 let メッセージID連番 = 0;
-const ファイル内容ダイアログ表示 = ref(false);
-const 表示ファイル名 = ref('');
-const 表示base64_data = ref('');
 
 const 入力欄状態リセット = () => {
   入力欄最大到達.value = false;
@@ -563,12 +560,6 @@ const ファイル内容表示対象 = (ファイル名: string): boolean => {
   return 画像拡張子セット.has(拡張子) || テキスト拡張子セット.has(拡張子);
 };
 
-const ファイル内容ダイアログ閉じる = () => {
-  ファイル内容ダイアログ表示.value = false;
-  表示ファイル名.value = '';
-  表示base64_data.value = '';
-};
-
 const ファイル内容表示を開く = async (ファイル名: string) => {
   if (!ファイル内容表示対象(ファイル名)) return;
 
@@ -578,9 +569,7 @@ const ファイル内容表示を開く = async (ファイル名: string) => {
     const base64_data = response?.data?.data?.base64_data;
     if (typeof base64_data !== 'string' || !base64_data) return;
 
-    表示ファイル名.value = ファイル名;
-    表示base64_data.value = base64_data;
-    ファイル内容ダイアログ表示.value = true;
+    通知('open-file-dialog', { ファイル名, base64_data });
   } catch (error) {
     console.error('[チャット] ファイル内容取得エラー:', error);
   }
@@ -998,12 +987,6 @@ const キー入力処理 = (_event: KeyboardEvent) => {
       </button>
     </div>
 
-    <FileContentDialog
-      :show="ファイル内容ダイアログ表示"
-      :ファイル名="表示ファイル名"
-      :base64_data="表示base64_data"
-      @close="ファイル内容ダイアログ閉じる"
-    />
   </div>
 </template>
 
