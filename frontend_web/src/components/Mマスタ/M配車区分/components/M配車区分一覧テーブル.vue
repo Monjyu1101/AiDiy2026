@@ -17,6 +17,11 @@ import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
 import type { Column } from '../../../../types/qTubler';
 
+const props = defineProps({
+  includeInactive: { type: Boolean, default: false },
+  戻URL: { type: String, default: '' }
+});
+
 const router = useRouter();
 
 const 配車区分一覧 = ref([]);
@@ -42,6 +47,7 @@ const columns: Column[] = [
   { key: '配色枠', label: '配色枠', width: '120px', sortable: true },
   { key: '配色背景', label: '配色背景', width: '120px', sortable: true },
   { key: '配色前景', label: '配色前景', width: '120px', sortable: true },
+  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
   { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
   { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
 ];
@@ -59,6 +65,7 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return 配車区分一覧.value.filter((row) => {
+    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -110,7 +117,11 @@ const goToPage = (page) => {
 };
 
 const openDetail = (row) => {
-  router.push({ path: '/Mマスタ/M配車区分/編集', query: { モード: '編集', 配車区分ID: row.配車区分ID } });
+  const query: Record<string, string> = { モード: '編集', 配車区分ID: row.配車区分ID };
+  if (props.戻URL) {
+    query.戻URL = props.戻URL;
+  }
+  router.push({ path: '/Mマスタ/M配車区分/編集', query });
 };
 
 // ==================================================
@@ -174,6 +185,9 @@ defineExpose({
       <template v-if="column.key === '配車区分ID'">
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.配車区分ID }}</a>
       </template>
+      <template v-else-if="column.key === '有効'">
+        <span>{{ row.有効 ? '✅' : '□' }}</span>
+      </template>
       <template v-else>
         {{ value ?? '' }}
       </template>
@@ -181,5 +195,7 @@ defineExpose({
   </qTublerFrame>
 </template>
 
+<style scoped>
+</style>
 
 

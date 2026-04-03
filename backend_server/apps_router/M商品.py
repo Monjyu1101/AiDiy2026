@@ -87,6 +87,8 @@ def update_M商品(
         item.単位 = request.単位
     if request.商品備考 is not None:
         item.商品備考 = request.商品備考
+    if request.有効 is not None:
+        item.有効 = request.有効
 
     for key, value in 更新項目.items():
         setattr(item, key, value)
@@ -110,13 +112,17 @@ def delete_M商品(
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された商品が見つかりません", error={"code": "NOT_FOUND"})
 
-    db.delete(item)
+    認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
+    更新項目 = crud.create_audit_fields(認証情報, is_update=True)
+    item.有効 = False
+    for key, value in 更新項目.items():
+        setattr(item, key, value)
     db.commit()
+    db.refresh(item)
 
     return schemas.ResponseBase(
         status="OK",
-        message="商品を削除しました",
-        data={"商品ID": request.商品ID}
+        message="商品の有効をオフにしました",
+        data=schemas.M商品.from_orm(item)
     )
-
 

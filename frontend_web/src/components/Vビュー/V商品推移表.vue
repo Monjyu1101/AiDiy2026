@@ -16,6 +16,7 @@ import dayjs from 'dayjs';
 import apiClient from '../../api/client';
 import TransitionTable from './components/V商品推移表テーブル.vue';
 import { useRoute, useRouter } from 'vue-router';
+import { qMessage } from '../../utils/qAlert';
 
 const DISPLAY_DAYS = 32;
 
@@ -34,6 +35,11 @@ const lastModifiedTime = ref<string | null>(null);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const normalizeQueryValue = (value: any): any => (Array.isArray(value) ? value[0] : value);
+const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const 戻URL = computed(() => {
+  const value = normalizeQueryValue(route.query.戻URL);
+  return value ? String(value) : '';
+});
 
 const parseStartDate = (value: any): any => {
   if (!value) return null;
@@ -146,15 +152,7 @@ const fetchData = async () => {
 };
 
 const showMessage = (msg: string, type = 'info') => {
-  message.value = msg;
-  messageType.value = type;
-  if (messageTimer) {
-    clearTimeout(messageTimer);
-  }
-  messageTimer = setTimeout(() => {
-    message.value = '';
-    messageTimer = null;
-  }, 3000);
+  void qMessage(msg, type);
 };
 
 const initLastModified = async () => {
@@ -215,15 +213,28 @@ const stopAutoRefresh = () => {
 // ナビゲーション操作
 const moveMonth = async (months: number) => {
   currentDate.value = currentDate.value.add(months, 'month');
-  router.replace({ path: route.path, query: { 開始日付: startDate.value } });
+  router.replace({ path: route.path, query: buildPageQuery(startDate.value) });
   await fetchData();
 };
 
 const moveDay = async (days: number) => {
   currentDate.value = currentDate.value.add(days, 'day');
   applyFallbackDateList();
-  router.replace({ path: route.path, query: { 開始日付: startDate.value } });
+  router.replace({ path: route.path, query: buildPageQuery(startDate.value) });
   await fetchData();
+};
+
+const buildPageQuery = (開始日付: string) => {
+  const query: Record<string, string> = { 開始日付 };
+  if (戻URL.value) {
+    query.戻URL = 戻URL.value;
+  }
+  return query;
+};
+
+const handleReturn = () => {
+  if (!戻URL.value) return;
+  router.push(toHalfwidthUrl(戻URL.value));
 };
 
 onMounted(() => {
@@ -249,7 +260,10 @@ watch(() => route.query.開始日付, () => {
 
 <template>
   <div class="page-container">
-    <h2 class="page-title">【 V商品推移表 】</h2>
+    <h2 class="page-title">
+      <span class="title-text">【 V商品推移表 】</span>
+      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+    </h2>
     
     <!-- ナビゲーション -->
     <div class="navigation">
@@ -262,11 +276,6 @@ watch(() => route.query.開始日付, () => {
       <button class="nav-button" @click="moveMonth(1)">翌月 ▶</button>
     </div>
     
-    <!-- メッセージ -->
-    <div v-if="message" class="message" :class="'message-' + messageType">
-      {{ message }}
-    </div>
-
     <!-- コンテンツ -->
     <div class="content">
         <div v-if="isLoading" class="loading">
@@ -305,6 +314,28 @@ watch(() => route.query.開始日付, () => {
   color: #5a4a3a;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3);
+  display: flex;
+  align-items: center;
+}
+
+.title-text {
+  flex: 1;
+}
+
+.btn-return {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.btn-return:hover {
+  background-color: #c82333;
 }
 
 .navigation {

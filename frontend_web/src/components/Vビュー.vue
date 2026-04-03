@@ -19,7 +19,7 @@
 
       <div class="menu-grid">
         <!-- V商品推移表カード -->
-        <div class="menu-card">
+        <div class="menu-card menu-card-fixed">
           <div class="menu-card-title">
             <span class="icon">V推</span>
             V商品推移表
@@ -27,7 +27,7 @@
           <div class="menu-card-description">
             商品推移グラフ表示・在庫推移分析・トレンド確認
           </div>
-          <router-link to="/Vビュー/V商品推移表" class="menu-card-link">
+          <router-link to="/Vビュー/V商品推移表?戻URL=/Vビュー" class="menu-card-link">
             開く
           </router-link>
         </div>
@@ -38,6 +38,26 @@
 
 <style scoped src="../assets/menu-common.css"></style>
 <style scoped>
-/* 追加のスタイルがあればここに記述 */
+.menu-card-fixed {
+  width: 320px;
+  min-width: 320px;
+  height: 158px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-card-fixed .menu-card-description {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .menu-card-fixed {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 158px;
+  }
+}
 </style>
 

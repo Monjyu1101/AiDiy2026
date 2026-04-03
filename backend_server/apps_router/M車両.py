@@ -85,6 +85,8 @@ def update_M車両(
         item.車両名 = request.車両名
     if request.車両備考 is not None:
         item.車両備考 = request.車両備考
+    if request.有効 is not None:
+        item.有効 = request.有効
 
     for key, value in 更新項目.items():
         setattr(item, key, value)
@@ -108,13 +110,17 @@ def delete_M車両(
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された車両が見つかりません", error={"code": "NOT_FOUND"})
 
-    db.delete(item)
+    認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
+    更新項目 = crud.create_audit_fields(認証情報, is_update=True)
+    item.有効 = False
+    for key, value in 更新項目.items():
+        setattr(item, key, value)
     db.commit()
+    db.refresh(item)
 
     return schemas.ResponseBase(
         status="OK",
-        message="車両を削除しました",
-        data={"車両ID": request.車両ID}
+        message="車両の有効をオフにしました",
+        data=schemas.M車両.from_orm(item)
     )
-
 

@@ -10,9 +10,16 @@
 
 from apps_crud.utils import get_current_datetime, create_audit_fields, update_audit_fields
 from apps_crud.M配車区分 import get_M配車区分, get_M配車区分一覧, create_M配車区分
+from apps_crud.M生産区分 import get_M生産区分, get_M生産区分一覧, create_M生産区分
+from apps_crud.M工程 import get_M工程, get_M工程一覧, create_M工程
 from apps_crud.M車両 import get_M車両, get_M車両一覧, create_M車両
 from apps_crud.M商品 import get_M商品, get_M商品一覧, create_M商品
+from apps_crud.M商品構成 import (
+    get_M商品構成, get_M商品構成一覧, get_M商品構成明細一覧,
+    build_M商品構成_data, create_M商品構成, update_M商品構成, delete_M商品構成,
+)
 from apps_crud.T配車 import get_T配車, get_T配車一覧, create_T配車, update_T配車, delete_T配車, init_T配車_data
+from apps_crud.T生産 import get_T生産, get_T生産一覧, create_T生産, update_T生産, delete_T生産, init_T生産_data
 from apps_crud.T商品出庫 import get_T商品出庫, get_T商品出庫一覧, create_T商品出庫, update_T商品出庫, delete_T商品出庫, init_T商品出庫_data
 from apps_crud.T商品棚卸 import get_T商品棚卸, get_T商品棚卸一覧, create_T商品棚卸, update_T商品棚卸, delete_T商品棚卸, init_T商品棚卸_data
 from apps_crud.T商品入庫 import get_T商品入庫, get_T商品入庫一覧, create_T商品入庫, update_T商品入庫, delete_T商品入庫, init_T商品入庫_data
@@ -27,6 +34,14 @@ __all__ = [
     'get_M配車区分',
     'get_M配車区分一覧',
     'create_M配車区分',
+    # M生産区分
+    'get_M生産区分',
+    'get_M生産区分一覧',
+    'create_M生産区分',
+    # M工程
+    'get_M工程',
+    'get_M工程一覧',
+    'create_M工程',
     # M車両
     'get_M車両',
     'get_M車両一覧',
@@ -35,6 +50,14 @@ __all__ = [
     'get_M商品',
     'get_M商品一覧',
     'create_M商品',
+    # M商品構成
+    'get_M商品構成',
+    'get_M商品構成一覧',
+    'get_M商品構成明細一覧',
+    'build_M商品構成_data',
+    'create_M商品構成',
+    'update_M商品構成',
+    'delete_M商品構成',
     # T配車
     'get_T配車',
     'get_T配車一覧',
@@ -42,6 +65,13 @@ __all__ = [
     'update_T配車',
     'delete_T配車',
     'init_T配車_data',
+    # T生産
+    'get_T生産',
+    'get_T生産一覧',
+    'create_T生産',
+    'update_T生産',
+    'delete_T生産',
+    'init_T生産_data',
     # T商品出庫
     'get_T商品出庫',
     'get_T商品出庫一覧',

@@ -14,7 +14,7 @@
 import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
-import { qConfirm } from '../../../utils/qAlert';
+import { qConfirm, qMessage } from '../../../utils/qAlert';
 
 const route = useRoute();
 const router = useRouter();
@@ -68,8 +68,7 @@ const requiredFields = computed(() => ['出庫日', '商品ID', '出庫数量'])
 // ユーティリティ関数
 // ==================================================
 const showMessage = (text: string, type: string = 'success') => {
-  message.value = text;
-  messageType.value = type;
+  void qMessage(text, type);
 };
 
 const resetValidation = () => {
@@ -344,12 +343,6 @@ watch(() => route.query, async (query) => {
       <div class="section">
         <div class="toolbar">
           <button class="btn btn-secondary" @click="backToList">一覧に戻る</button>
-          <div
-            v-if="message"
-            :class="['message', messageType === 'error' ? 'message-error' : 'message-success']"
-          >
-            {{ message }}
-          </div>
         </div>
 
         <form class="detail-form" @submit.prevent="saveData">

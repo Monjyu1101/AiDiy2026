@@ -34,6 +34,18 @@ export const appsRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'M配車区分編集' }
     },
     {
+        path: '/Mマスタ/M生産区分/一覧',
+        name: 'M生産区分一覧',
+        component: () => import('../components/Mマスタ/M生産区分/M生産区分一覧.vue'),
+        meta: { requiresAuth: true, title: 'M生産区分一覧' }
+    },
+    {
+        path: '/Mマスタ/M生産区分/編集',
+        name: 'M生産区分編集',
+        component: () => import('../components/Mマスタ/M生産区分/M生産区分編集.vue'),
+        meta: { requiresAuth: true, title: 'M生産区分編集' }
+    },
+    {
         path: '/Mマスタ/M車両/一覧',
         name: 'M車両一覧',
         component: () => import('../components/Mマスタ/M車両/M車両一覧.vue'),
@@ -46,6 +58,18 @@ export const appsRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'M車両編集' }
     },
     {
+        path: '/Mマスタ/M工程/一覧',
+        name: 'M工程一覧',
+        component: () => import('../components/Mマスタ/M工程/M工程一覧.vue'),
+        meta: { requiresAuth: true, title: 'M工程一覧' }
+    },
+    {
+        path: '/Mマスタ/M工程/編集',
+        name: 'M工程編集',
+        component: () => import('../components/Mマスタ/M工程/M工程編集.vue'),
+        meta: { requiresAuth: true, title: 'M工程編集' }
+    },
+    {
         path: '/Mマスタ/M商品/一覧',
         name: 'M商品一覧',
         component: () => import('../components/Mマスタ/M商品/M商品一覧.vue'),
@@ -56,6 +80,18 @@ export const appsRoutes: RouteRecordRaw[] = [
         name: 'M商品編集',
         component: () => import('../components/Mマスタ/M商品/M商品編集.vue'),
         meta: { requiresAuth: true, title: 'M商品編集' }
+    },
+    {
+        path: '/Mマスタ/M商品構成/一覧',
+        name: 'M商品構成一覧',
+        component: () => import('../components/Mマスタ/M商品構成/M商品構成一覧.vue'),
+        meta: { requiresAuth: true, title: 'M商品構成一覧' }
+    },
+    {
+        path: '/Mマスタ/M商品構成/編集',
+        name: 'M商品構成編集',
+        component: () => import('../components/Mマスタ/M商品構成/M商品構成編集.vue'),
+        meta: { requiresAuth: true, title: 'M商品構成編集' }
     },
     // ---- T系 (トランザクション) ----
     {
@@ -75,6 +111,18 @@ export const appsRoutes: RouteRecordRaw[] = [
         name: 'T配車編集',
         component: () => import('../components/Tトラン/T配車/T配車編集.vue'),
         meta: { requiresAuth: true, title: 'T配車編集' }
+    },
+    {
+        path: '/Tトラン/T生産/一覧',
+        name: 'T生産一覧',
+        component: () => import('../components/Tトラン/T生産/T生産一覧.vue'),
+        meta: { requiresAuth: true, title: 'T生産一覧' }
+    },
+    {
+        path: '/Tトラン/T生産/編集',
+        name: 'T生産編集',
+        component: () => import('../components/Tトラン/T生産/T生産編集.vue'),
+        meta: { requiresAuth: true, title: 'T生産編集' }
     },
     {
         path: '/Tトラン/T商品入庫/一覧',
@@ -145,5 +193,17 @@ export const appsRoutes: RouteRecordRaw[] = [
         name: 'S配車日表示',
         component: () => import('../components/Sスケジューラー/S配車_日表示.vue'),
         meta: { requiresAuth: true, title: 'S配車_日表示' }
+    },
+    {
+        path: '/Sスケジュール/S生産_週表示',
+        name: 'S生産週表示',
+        component: () => import('../components/Sスケジューラー/S生産_週表示.vue'),
+        meta: { requiresAuth: true, title: 'S生産_週表示' }
+    },
+    {
+        path: '/Sスケジュール/S生産_日表示',
+        name: 'S生産日表示',
+        component: () => import('../components/Sスケジューラー/S生産_日表示.vue'),
+        meta: { requiresAuth: true, title: 'S生産_日表示' }
     },
 ]

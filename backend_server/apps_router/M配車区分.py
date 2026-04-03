@@ -83,6 +83,7 @@ def update_M配車区分(
     if request.配色枠 is not None: item.配色枠 = request.配色枠
     if request.配色背景 is not None: item.配色背景 = request.配色背景
     if request.配色前景 is not None: item.配色前景 = request.配色前景
+    if request.有効 is not None: item.有効 = request.有効
 
     item.更新日時 = crud.get_current_datetime()
     item.更新利用者ID = 現在利用者.利用者ID
@@ -107,8 +108,12 @@ def delete_M配車区分(
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された配車区分が見つかりません", error={"code": "NOT_FOUND"})
 
-    db.delete(item)
+    item.有効 = False
+    item.更新日時 = crud.get_current_datetime()
+    item.更新利用者ID = 現在利用者.利用者ID
+    item.更新利用者名 = 現在利用者.利用者名
+    item.更新端末ID = "localhost"
     db.commit()
-    return schemas.ResponseBase(status="OK", message="配車区分を削除しました")
-
+    db.refresh(item)
+    return schemas.ResponseBase(status="OK", message="配車区分の有効をオフにしました", data=schemas.M配車区分.from_orm(item))
 

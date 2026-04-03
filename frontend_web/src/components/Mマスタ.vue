@@ -17,49 +17,94 @@
     <div class="content">
       <p>マスタ管理機能へのアクセスリンクです。下記から選択してください。</p>
 
-      <div class="menu-grid">
-        <!-- M車両カード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">M車</span>
-            M車両
+      <div class="master-menu-sections">
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M車</span>
+              M車両
+            </div>
+            <div class="menu-card-description">
+              車両マスター管理・車両情報登録・車両設定
+            </div>
+            <router-link to="/Mマスタ/M車両/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <div class="menu-card-description">
-            車両マスター管理・車両情報登録・車両設定
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M配</span>
+              M配車区分
+            </div>
+            <div class="menu-card-description">
+              配車区分マスター・配車カテゴリ管理・色設定
+            </div>
+            <router-link to="/Mマスタ/M配車区分/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <router-link to="/Mマスタ/M車両/一覧" class="menu-card-link">
-            開く →
-          </router-link>
         </div>
 
-        <!-- M配車区分カード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">M配</span>
-            M配車区分
+        <div class="menu-hairline"></div>
+
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M商</span>
+              M商品
+            </div>
+            <div class="menu-card-description">
+              商品マスター管理・商品情報登録・在庫設定
+            </div>
+            <router-link to="/Mマスタ/M商品/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <div class="menu-card-description">
-            配車区分マスター・配車カテゴリ管理・色設定
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M構</span>
+              M商品構成
+            </div>
+            <div class="menu-card-description">
+              生産ロット単位の構成商品マスター・構成比率と構成数量の管理
+            </div>
+            <router-link to="/Mマスタ/M商品構成/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <router-link to="/Mマスタ/M配車区分/一覧" class="menu-card-link">
-            開く →
-          </router-link>
         </div>
 
-        <!-- M商品カード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">M商</span>
-            M商品
-          </div>
-          <div class="menu-card-description">
-            商品マスター管理・商品情報登録・在庫設定
-          </div>
-          <router-link to="/Mマスタ/M商品/一覧" class="menu-card-link">
-            開く →
-          </router-link>
-        </div>
+        <div class="menu-hairline"></div>
 
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M工</span>
+              M工程
+            </div>
+            <div class="menu-card-description">
+              工程マスター管理・ライン１からライン７までの工程登録
+            </div>
+            <router-link to="/Mマスタ/M工程/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M生</span>
+              M生産区分
+            </div>
+            <div class="menu-card-description">
+              生産区分マスター・牛飼料からその他までの区分管理・色設定
+            </div>
+            <router-link to="/Mマスタ/M生産区分/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -67,6 +112,53 @@
 
 <style scoped src="../assets/menu-common.css"></style>
 <style scoped>
-/* 追加のスタイルがあればここに記述 */
+.master-menu-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.menu-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.menu-card-fixed {
+  width: 320px;
+  min-width: 320px;
+  height: 158px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-card-fixed .menu-card-description {
+  flex: 1;
+}
+
+.menu-hairline {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(90, 74, 58, 0.12) 0%, rgba(90, 74, 58, 0.45) 50%, rgba(90, 74, 58, 0.12) 100%);
+}
+
+@media (max-width: 768px) {
+  .menu-row {
+    flex-direction: column;
+  }
+
+  .menu-card-fixed {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 158px;
+  }
+
+  .menu-hairline {
+    width: 100%;
+  }
+}
 </style>
 

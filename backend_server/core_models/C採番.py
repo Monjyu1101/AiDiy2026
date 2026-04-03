@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from sqlalchemy import Column, Text, Integer
+from sqlalchemy import Column, Boolean, Text, Integer
 from database import Base
 
 class C採番(Base):
@@ -19,6 +19,7 @@ class C採番(Base):
     採番ID = Column(Text, primary_key=True)
     最終採番値 = Column(Integer, nullable=False)
     採番備考 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)
     登録利用者ID = Column(Text, nullable=False)
     登録利用者名 = Column(Text)

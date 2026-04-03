@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from sqlalchemy import Column, Text
+from sqlalchemy import Column, Boolean, Text
 from database import Base
 
 class M車両(Base):
@@ -19,6 +19,7 @@ class M車両(Base):
     車両ID = Column(Text, primary_key=True)
     車両名 = Column(Text, nullable=False)
     車両備考 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)
     登録利用者ID = Column(Text, nullable=False)
     登録利用者名 = Column(Text)

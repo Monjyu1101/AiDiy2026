@@ -25,6 +25,7 @@ def list_V商品(
 
     sql = f"""
     SELECT 商品ID, 商品名, 単位, 商品備考,
+           有効,
            登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
            更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
     FROM M商品
@@ -41,6 +42,7 @@ def list_V商品(
             "商品名": row.商品名,
             "単位": row.単位,
             "商品備考": row.商品備考,
+            "有効": bool(row.有効) if row.有効 is not None else True,
             "登録日時": row.登録日時,
             "登録利用者ID": row.登録利用者ID,
             "登録利用者名": row.登録利用者名,

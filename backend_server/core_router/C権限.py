@@ -70,6 +70,7 @@ def update_C権限(
     
     if request.権限名 is not None: 権限.権限名 = request.権限名
     if request.権限備考 is not None: 権限.権限備考 = request.権限備考
+    if request.有効 is not None: 権限.有効 = request.有効
     権限.更新日時 = crud.get_current_datetime()
     権限.更新利用者ID = 現在利用者.利用者ID
     権限.更新利用者名 = 現在利用者.利用者名
@@ -87,8 +88,12 @@ def delete_C権限(
 ):
     権限 = crud.get_C権限(db, request.権限ID)
     if not 権限: return schemas.ResponseBase(status="NG", message="権限なし", error={"code": "NOT_FOUND"})
-    db.delete(権限)
+    権限.有効 = False
+    権限.更新日時 = crud.get_current_datetime()
+    権限.更新利用者ID = 現在利用者.利用者ID
+    権限.更新利用者名 = 現在利用者.利用者名
+    権限.更新端末ID = "localhost"
     db.commit()
-    return schemas.ResponseBase(status="OK", message="削除しました")
-
+    db.refresh(権限)
+    return schemas.ResponseBase(status="OK", message="有効をオフにしました", data=schemas.C権限.from_orm(権限))
 

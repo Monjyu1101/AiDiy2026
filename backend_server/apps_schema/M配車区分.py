@@ -19,6 +19,7 @@ class M配車区分Base(BaseModel):
     配色枠: str
     配色背景: str
     配色前景: str
+    有効: bool = True
 
 
 class M配車区分Create(M配車区分Base):
@@ -32,6 +33,7 @@ class M配車区分Update(BaseModel):
     配色枠: str
     配色背景: str
     配色前景: str
+    有効: Optional[bool] = None
 
 
 class M配車区分Delete(BaseModel):
@@ -44,6 +46,7 @@ class M配車区分Get(BaseModel):
 
 class M配車区分(M配車区分Base):
     配車区分ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

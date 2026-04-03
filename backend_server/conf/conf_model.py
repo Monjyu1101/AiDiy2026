@@ -29,8 +29,9 @@ class conf_models:
 
         # ライブAIモデル一覧
         self.LIVE_GEMINI_MODELS = {
-            "gemini-2.5-flash-native-audio-preview-12-2025": "yyyy/mm/dd - gemini-2.5-flash-native-audio-preview-12-2025",
-            "gemini-2.5-flash-native-audio-preview-09-2025": "yyyy/mm/dd - gemini-2.5-flash-native-audio-preview-09-2025",
+            "gemini-3.1-flash-live-preview": "2026/03/-- - gemini-3.1-flash-live-preview",
+            "gemini-2.5-flash-native-audio-preview-12-2025": "2025/12/-- - gemini-2.5-flash-native-audio-preview-12-2025",
+            "gemini-2.5-flash-native-audio-preview-09-2025": "2925/09/-- - gemini-2.5-flash-native-audio-preview-09-2025",
             "gemini-live-2.5-flash-preview": "yyyy/mm/dd - gemini-live-2.5-flash-preview",
         }
         self.LIVE_OPENAI_MODELS = {

@@ -29,6 +29,7 @@ def create_M車両(db: Session, 車両: schemas.M車両Create, 認証情報: Opt
         車両ID=車両.車両ID,
         車両名=車両.車両名,
         車両備考=車両.車両備考,
+        有効=True,
         **audit
     )
     db.add(db_車両)

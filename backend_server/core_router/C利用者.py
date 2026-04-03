@@ -82,6 +82,7 @@ def update_C利用者(
     if request.パスワード is not None: 利用者.パスワード = request.パスワード
     if request.権限ID is not None: 利用者.権限ID = request.権限ID
     if request.利用者備考 is not None: 利用者.利用者備考 = request.利用者備考
+    if request.有効 is not None: 利用者.有効 = request.有効
 
     利用者.更新日時 = crud.get_current_datetime()
     利用者.更新利用者ID = 現在利用者.利用者ID
@@ -106,8 +107,12 @@ def delete_C利用者(
     if not 利用者:
         return schemas.ResponseBase(status="NG", message="指定された利用者が見つかりません", error={"code": "NOT_FOUND"})
     
-    db.delete(利用者)
+    利用者.有効 = False
+    利用者.更新日時 = crud.get_current_datetime()
+    利用者.更新利用者ID = 現在利用者.利用者ID
+    利用者.更新利用者名 = 現在利用者.利用者名
+    利用者.更新端末ID = "localhost"
     db.commit()
-    return schemas.ResponseBase(status="OK", message="利用者を削除しました")
-
+    db.refresh(利用者)
+    return schemas.ResponseBase(status="OK", message="利用者の有効をオフにしました", data=schemas.C利用者.from_orm(利用者))
 

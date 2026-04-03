@@ -32,6 +32,7 @@ def create_M配車区分(db: Session, 配車区分: schemas.M配車区分Create,
         配色枠=配車区分.配色枠,
         配色背景=配車区分.配色背景,
         配色前景=配車区分.配色前景,
+        有効=True,
         **audit
     )
     db.add(db_配車区分)

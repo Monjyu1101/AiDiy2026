@@ -11,66 +11,99 @@
 -->
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import RoleListTable from './components/C権限一覧テーブル.vue';
+import { qMessage } from '../../../utils/qAlert';
 
 const router = useRouter();
 const route = useRoute();
 const roleListTableRef = ref(null);
-const message = ref('');
-const messageType = ref('success');
+const includeInactive = ref(false);
+const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const 戻URL = computed(() => {
+  const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
+  return value ? String(value) : '';
+});
+const 編集戻URL = computed(() => {
+  const query = { ...route.query };
+  delete query.message;
+  delete query.type;
+  delete query.戻URL;
+  return router.resolve({ path: route.path, query }).fullPath;
+});
 
 const handleReload = () => {
   roleListTableRef.value?.loadData();
 };
 
 const openCreate = () => {
-  router.push({ path: '/C管理/C権限/編集', query: { モード: '新規' } });
+  const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
+  router.push({ path: '/C管理/C権限/編集', query });
 };
 
-const showMessage = (msg, type) => {
-  message.value = msg;
-  messageType.value = type || 'success';
-  setTimeout(() => {
-    message.value = '';
-  }, 3000);
+const showMessage = (msg: string, type?: string) => {
+  void qMessage(msg, type || 'success');
+};
+
+const clearMessageQuery = (query: typeof route.query) => {
+  const nextQuery = { ...query };
+  delete nextQuery.message;
+  delete nextQuery.type;
+  router.replace({ path: route.path, query: nextQuery });
+};
+
+const handleCancel = () => {
+  if (!戻URL.value) return;
+  router.push(toHalfwidthUrl(戻URL.value));
 };
 
 onMounted(() => {
   if (route.query.message) {
-    showMessage(route.query.message, route.query.type);
-    // クエリパラメータをクリア
-    router.replace({ path: route.path });
+    const text = normalizeQueryValue(route.query.message as string | string[] | undefined);
+    const type = normalizeQueryValue(route.query.type as string | string[] | undefined);
+    showMessage(String(text ?? ''), type ? String(type) : undefined);
+    clearMessageQuery(route.query);
   }
 });
 
 watch(() => route.query.message, (newMessage) => {
   if (newMessage) {
-    showMessage(newMessage, route.query.type);
-    router.replace({ path: route.path });
+    const text = normalizeQueryValue(newMessage as string | string[] | undefined);
+    const type = normalizeQueryValue(route.query.type as string | string[] | undefined);
+    showMessage(String(text ?? ''), type ? String(type) : undefined);
+    clearMessageQuery(route.query);
   }
 });
 </script>
 
 <template>
   <div class="page-container">
-    <h2 class="page-title">【 C権限 】</h2>
+    <h2 class="page-title">
+      <span class="title-text">【 C権限 】</span>
+      <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
+    </h2>
 
     <div class="content">
       <div class="section">
         <div class="toolbar">
-          <button class="btn btn-primary" @click="handleReload">再検索</button>
-          <button class="btn btn-success" @click="openCreate">新規</button>
-          <div
-            v-if="message"
-            :class="['message', messageType === 'error' ? 'message-error' : 'message-success']"
-          >
-            {{ message }}
+          <div class="toolbar-left">
+            <div class="search-area">
+              <button class="btn btn-primary" @click="handleReload">再検索</button>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="includeInactive" />
+                無効も検索
+              </label>
+            </div>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-success" @click="openCreate">新規</button>
           </div>
         </div>
 
-        <RoleListTable ref="roleListTableRef" />
+        <RoleListTable ref="roleListTableRef" :includeInactive="includeInactive" :戻URL="編集戻URL" />
       </div>
     </div>
   </div>
@@ -97,6 +130,28 @@ watch(() => route.query.message, (newMessage) => {
   color: #5a4a3a;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3);
+  display: flex;
+  align-items: center;
+}
+
+.title-text {
+  flex: 1;
+}
+
+.btn-return {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.btn-return:hover {
+  background-color: #c82333;
 }
 
 .content {
@@ -118,9 +173,26 @@ watch(() => route.query.message, (newMessage) => {
 .toolbar {
   margin-bottom: 8px;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.toolbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.search-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: flex-start;
 }
 
 .btn {
@@ -129,7 +201,6 @@ watch(() => route.query.message, (newMessage) => {
   border-radius: 0;
   cursor: pointer;
   font-size: 14px;
-  margin-right: 10px;
   margin-bottom: 0;
 }
 
@@ -169,5 +240,21 @@ watch(() => route.query.message, (newMessage) => {
   color: #721c24;
   border: 1px solid #f5c6cb;
 }
-</style>
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #5a4a3a;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+}
+</style>

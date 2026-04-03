@@ -25,6 +25,7 @@ def list_V車両(
 
     sql = f"""
     SELECT 車両ID, 車両名, 車両備考,
+           有効,
            登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
            更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
     FROM M車両
@@ -40,6 +41,7 @@ def list_V車両(
             "車両ID": row.車両ID,
             "車両名": row.車両名,
             "車両備考": row.車両備考,
+            "有効": bool(row.有効) if row.有効 is not None else True,
             "登録日時": row.登録日時,
             "登録利用者ID": row.登録利用者ID,
             "登録利用者名": row.登録利用者名,

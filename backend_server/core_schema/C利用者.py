@@ -17,6 +17,7 @@ class C利用者Base(BaseModel):
     利用者名: str
     権限ID: str
     利用者備考: Optional[str] = None
+    有効: bool = True
 
 
 class C利用者Create(C利用者Base):
@@ -30,6 +31,7 @@ class C利用者Update(BaseModel):
     パスワード: Optional[str] = None
     権限ID: Optional[str] = None
     利用者備考: Optional[str] = None
+    有効: Optional[bool] = None
 
 
 class C利用者Delete(BaseModel):
@@ -42,6 +44,7 @@ class C利用者Get(BaseModel):
 
 class C利用者(C利用者Base):
     利用者ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from sqlalchemy import Column, Text
+from sqlalchemy import Column, Boolean, Text
 from database import Base
 
 class M配車区分(Base):
@@ -22,6 +22,7 @@ class M配車区分(Base):
     配色枠 = Column(Text)
     配色背景 = Column(Text)
     配色前景 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)
     登録利用者ID = Column(Text, nullable=False)
     登録利用者名 = Column(Text)

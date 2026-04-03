@@ -16,6 +16,7 @@ from typing import Optional
 class C権限Base(BaseModel):
     権限名: str
     権限備考: Optional[str] = None
+    有効: bool = True
 
 
 class C権限Create(C権限Base):
@@ -26,6 +27,7 @@ class C権限Update(BaseModel):
     権限ID: str
     権限名: Optional[str] = None
     権限備考: Optional[str] = None
+    有効: Optional[bool] = None
 
 
 class C権限Delete(BaseModel):
@@ -34,6 +36,7 @@ class C権限Delete(BaseModel):
 
 class C権限(C権限Base):
     権限ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

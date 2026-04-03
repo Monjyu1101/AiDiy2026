@@ -1,0 +1,34 @@
+# -*- coding: utf-8 -*-
+
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101
+# -------------------------------------------------------------------------
+
+from sqlalchemy import Column, Boolean, Text, Float, Integer
+from database import Base
+
+
+class M商品構成(Base):
+    __tablename__ = "M商品構成"
+
+    商品ID = Column(Text, primary_key=True)
+    明細番号 = Column(Integer, primary_key=True)
+    生産ロット = Column(Float, nullable=False)
+    商品構成備考 = Column(Text)
+    構成商品ID = Column(Text)
+    構成数量分子 = Column(Float)
+    構成数量分母 = Column(Float)
+    構成商品備考 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
+    登録日時 = Column(Text, nullable=False)
+    登録利用者ID = Column(Text, nullable=False)
+    登録利用者名 = Column(Text)
+    登録端末ID = Column(Text, nullable=False)
+    更新日時 = Column(Text, nullable=False)
+    更新利用者ID = Column(Text, nullable=False)
+    更新利用者名 = Column(Text)
+    更新端末ID = Column(Text, nullable=False)

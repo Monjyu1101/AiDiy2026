@@ -12,8 +12,10 @@ from sqlalchemy.orm import Session
 from typing import Optional, Dict
 import apps_models as models, apps_schema as schemas
 from apps_crud.utils import create_audit_fields, update_audit_fields
+from apps_crud.seed_data import INITIAL_PRODUCT_IDS
 from log_config import get_logger
 import datetime
+import random
 
 logger = get_logger(__name__)
 
@@ -85,23 +87,25 @@ def init_T商品棚卸_data(db: Session, 認証情報: Optional[Dict] = None):
     now = datetime.datetime.now()
     today = now.date()
 
-    # T商品棚卸の初期データ作成（本日のH001商品、実棚数量200の1件のみ）
-    棚卸日 = today
-    商品ID = "H001"
-    実棚数量 = 200
-    伝票番号 = "HT00000001"
-    備考 = ""
+    rng = random.Random(20260405)
+    商品ID一覧 = INITIAL_PRODUCT_IDS[:]
+    rng.shuffle(商品ID一覧)
 
-    # SQLAlchemyモデルでINSERT
-    棚卸データ = models.T商品棚卸(
-        棚卸伝票ID=伝票番号,
-        棚卸日=棚卸日.isoformat(),
-        商品ID=商品ID,
-        実棚数量=実棚数量,
-        棚卸備考=備考,
-        **audit
-    )
-    db.add(棚卸データ)
+    for i, 商品ID in enumerate(商品ID一覧, start=1):
+        棚卸日 = today + datetime.timedelta(days=rng.randint(0, 14))
+        実棚数量 = rng.choice([150, 200, 250, 300, 350, 400, 500])
+        伝票番号 = f"HT{str(i).zfill(8)}"
+        備考 = ""
+
+        棚卸データ = models.T商品棚卸(
+            棚卸伝票ID=伝票番号,
+            棚卸日=棚卸日.isoformat(),
+            商品ID=商品ID,
+            実棚数量=実棚数量,
+            棚卸備考=備考,
+            **audit
+        )
+        db.add(棚卸データ)
 
     db.commit()
     logger.info("Initialized T商品棚卸")

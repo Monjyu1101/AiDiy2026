@@ -11,8 +11,10 @@
 -->
 
 <script setup lang="ts">
+import { watch } from 'vue';
 import type { PropType } from 'vue';
 import type { Column } from '@/types/qTubler';
+import { qMessage } from '@/utils/qAlert';
 
 const props = defineProps({
   columns: {
@@ -103,16 +105,18 @@ const handleSort = (column: Column) => {
   if (!isSortable(column)) return;
   emit('sort', column);
 };
+
+watch(
+  () => [props.message, props.messageType] as const,
+  ([message, messageType]) => {
+    if (!message) return;
+    void qMessage(message, messageType || 'success');
+  }
+);
 </script>
 
 <template>
   <div class="table-wrapper">
-    <div
-      v-if="message"
-      :class="['message', messageType === 'error' ? 'message-error' : 'message-success']"
-    >
-      {{ message }}
-    </div>
     <div class="table-container">
       <div class="common-table">
         <table>
@@ -435,23 +439,5 @@ tbody td {
   text-decoration: underline;
 }
 
-/* 共通メッセージスタイル */
-.message {
-  padding: 10px;
-  border-radius: 0;
-  margin-bottom: 10px;
-}
-
-.message-success {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.message-error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
 </style>
 

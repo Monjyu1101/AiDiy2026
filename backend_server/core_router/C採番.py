@@ -91,6 +91,8 @@ def update_C採番(
         item.最終採番値 = request.最終採番値
     if request.採番備考 is not None:
         item.採番備考 = request.採番備考
+    if request.有効 is not None:
+        item.有効 = request.有効
     item.更新日時 = crud.get_current_datetime()
     item.更新利用者ID = 現在利用者.利用者ID
     item.更新利用者名 = 現在利用者.利用者名
@@ -115,9 +117,14 @@ def delete_C採番(
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された採番が見つかりません", error={"code": "NOT_FOUND"})
 
-    db.delete(item)
+    item.有効 = False
+    item.更新日時 = crud.get_current_datetime()
+    item.更新利用者ID = 現在利用者.利用者ID
+    item.更新利用者名 = 現在利用者.利用者名
+    item.更新端末ID = "localhost"
     db.commit()
-    return schemas.ResponseBase(status="OK", message="採番を削除しました")
+    db.refresh(item)
+    return schemas.ResponseBase(status="OK", message="採番の有効をオフにしました", data=schemas.C採番.from_orm(item))
 
 @router.post("/採番", response_model=schemas.ResponseBase)
 def allocate_number(
@@ -152,5 +159,4 @@ def allocate_number(
             "最終採番値": item.最終採番値
         }
     )
-
 

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, Dict
 import apps_models as models, apps_schema as schemas
 from apps_crud.utils import create_audit_fields, update_audit_fields
+from apps_crud.seed_data import INITIAL_PRODUCT_IDS
 from log_config import get_logger
 import datetime
 import random
@@ -86,22 +87,16 @@ def init_T商品出庫_data(db: Session, 認証情報: Optional[Dict] = None):
     now = datetime.datetime.now()
     today = now.date()
 
-    # H001商品の出庫データを6件作成（明日から2週間以内、数量100〜500のランダム値）
-    出庫日リスト = []
-    for i in range(6):
-        days_offset = random.randint(1, 14)  # 明日から2週間以内
-        出庫日リスト.append(today + datetime.timedelta(days=days_offset))
+    rng = random.Random(20260404)
+    商品ID一覧 = INITIAL_PRODUCT_IDS[:]
+    rng.shuffle(商品ID一覧)
+    出庫日リスト = sorted(today + datetime.timedelta(days=rng.randint(1, 14)) for _ in 商品ID一覧)
 
-    出庫日リスト.sort()  # 日付順にソート
-
-    for i in range(6):
-        伝票番号 = f"HO{str(i+1).zfill(8)}"  # HO00000001〜HO00000006
-        出庫日 = 出庫日リスト[i]
-        商品ID = "H001"
-        出庫数量 = random.choice([100, 200, 300, 400, 500])
+    for i, (商品ID, 出庫日) in enumerate(zip(商品ID一覧, 出庫日リスト), start=1):
+        伝票番号 = f"HO{str(i).zfill(8)}"
+        出庫数量 = rng.choice([100, 200, 300, 400, 500])
         備考 = ""
 
-        # SQLAlchemyモデルでINSERT
         出庫データ = models.T商品出庫(
             出庫伝票ID=伝票番号,
             出庫日=出庫日.isoformat(),

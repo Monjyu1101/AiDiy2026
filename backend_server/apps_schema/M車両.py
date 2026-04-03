@@ -16,6 +16,7 @@ from typing import Optional
 class M車両Base(BaseModel):
     車両名: str
     車両備考: Optional[str] = None
+    有効: bool = True
 
 
 class M車両Create(M車両Base):
@@ -26,6 +27,7 @@ class M車両Update(BaseModel):
     車両ID: str
     車両名: Optional[str] = None
     車両備考: Optional[str] = None
+    有効: Optional[bool] = None
 
 
 class M車両Delete(BaseModel):
@@ -38,6 +40,7 @@ class M車両Get(BaseModel):
 
 class M車両(M車両Base):
     車両ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

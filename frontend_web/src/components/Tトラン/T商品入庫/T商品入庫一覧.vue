@@ -15,6 +15,7 @@ import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import apiClient from '../../../api/client';
 import 商品入庫一覧テーブル from './components/T商品入庫一覧テーブル.vue';
+import { qMessage } from '../../../utils/qAlert';
 
 const router = useRouter();
 const route = useRoute();
@@ -27,9 +28,31 @@ const 商品ID = ref('');
 const 商品一覧 = ref<any[]>([]);
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const normalizeRouteUrl = (value: string): string => {
+  const halfwidth = toHalfwidthUrl(value);
+  try {
+    return decodeURIComponent(halfwidth);
+  } catch {
+    return halfwidth;
+  }
+};
+const isTトランURL = (value: string): boolean => {
+  const normalized = normalizeRouteUrl(value);
+  return normalized === '/Tトラン' || normalized.startsWith('/Tトラン/');
+};
 const 戻URL = computed(() => {
   const value = normalizeQueryValue(route.query.戻URL);
   return value ? String(value) : '';
+});
+const 編集戻URL = computed(() => {
+  if (戻URL.value && !isTトランURL(戻URL.value)) {
+    return normalizeRouteUrl(戻URL.value);
+  }
+  const query = { ...route.query };
+  delete query.message;
+  delete query.type;
+  delete query.戻URL;
+  return router.resolve({ path: route.path, query }).fullPath;
 });
 
 const handleReload = () => {
@@ -37,23 +60,16 @@ const handleReload = () => {
 };
 
 const openCreate = () => {
-  const query: Record<string, string> = { モード: '新規' };
+  const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
   if (開始日付.value && 開始日付.value === 終了日付.value && 商品ID.value) {
     query.入庫日 = 開始日付.value;
     query.商品ID = 商品ID.value;
-  }
-  if (戻URL.value) {
-    query.戻URL = 戻URL.value;
   }
   router.push({ path: '/Tトラン/T商品入庫/編集', query });
 };
 
 const showMessage = (msg: string, type: string) => {
-  message.value = msg;
-  messageType.value = type || 'success';
-  setTimeout(() => {
-    message.value = '';
-  }, 3000);
+  void qMessage(msg, type || 'success');
 };
 
 const applyQueryParams = (query: any) => {
@@ -87,7 +103,7 @@ const loadProductList = async (shouldNotify = true) => {
 
 const handleCancel = () => {
   if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  router.push(normalizeRouteUrl(戻URL.value));
 };
 
 applyQueryParams(route.query);
@@ -156,12 +172,6 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
         <div class="toolbar">
           <button class="btn btn-primary" @click="handleReload">再検索</button>
           <button class="btn btn-success" @click="openCreate">新規</button>
-          <div
-            v-if="message"
-            :class="['message', messageType === 'error' ? 'message-error' : 'message-success']"
-          >
-            {{ message }}
-          </div>
         </div>
 
         <component
@@ -170,7 +180,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
           :開始日付="開始日付"
           :終了日付="終了日付"
           :商品ID="商品ID"
-          :戻URL="戻URL"
+          :戻URL="編集戻URL"
         />
       </div>
     </div>

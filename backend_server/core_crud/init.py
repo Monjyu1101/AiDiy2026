@@ -19,6 +19,15 @@ logger = get_logger(__name__)
 
 def init_db_data(db: Session):
     """初期データを投入"""
+    # 有効カラムの追加（既存DBマイグレーション）
+    from sqlalchemy import text, inspect
+    inspector = inspect(db.bind)
+    for テーブル名 in ["C権限", "C利用者", "C採番"]:
+        columns = [col['name'] for col in inspector.get_columns(テーブル名)]
+        if "有効" not in columns:
+            db.execute(text(f'ALTER TABLE "{テーブル名}" ADD COLUMN "有効" INTEGER NOT NULL DEFAULT 1'))
+    db.commit()
+
     # 権限の初期化
     if not db.query(core_models.C権限).first():
         初期日時 = get_current_datetime()
@@ -58,6 +67,7 @@ def init_db_data(db: Session):
     if not db.query(core_models.C採番).first():
         初期値 = [
             ("T配車", 10000, "配車の採番"),
+            ("T生産", 10000, "生産の採番"),
             ("T商品棚卸", 10000, "商品棚卸の採番"),
             ("T商品入庫", 10000, "商品入庫の採番"),
             ("T商品出庫", 10000, "商品出庫の採番")
@@ -69,6 +79,7 @@ def init_db_data(db: Session):
                 採番ID=採番ID,
                 最終採番値=最終採番値,
                 採番備考=採番備考,
+                有効=True,
                 **登録項目
             ))
         db.commit()

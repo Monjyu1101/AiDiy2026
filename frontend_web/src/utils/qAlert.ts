@@ -17,12 +17,17 @@ interface ConfirmDialogInstance {
   show: (message: string) => Promise<boolean>
 }
 
+interface MessageDialogInstance {
+  show: (message: string, type?: string, durationMs?: number) => Promise<void>
+}
+
 interface ColorPickerDialogInstance {
   show: (initialColor: string, title: string) => Promise<string | null>
 }
 
 let alertInstance: AlertDialogInstance | null = null
 let confirmInstance: ConfirmDialogInstance | null = null
+let messageInstance: MessageDialogInstance | null = null
 let colorPickerInstance: ColorPickerDialogInstance | null = null
 
 export function setAlertInstance(instance: AlertDialogInstance): void {
@@ -31,6 +36,10 @@ export function setAlertInstance(instance: AlertDialogInstance): void {
 
 export function setConfirmInstance(instance: ConfirmDialogInstance): void {
   confirmInstance = instance
+}
+
+export function setMessageInstance(instance: MessageDialogInstance): void {
+  messageInstance = instance
 }
 
 export function setColorPickerInstance(instance: ColorPickerDialogInstance): void {
@@ -52,6 +61,23 @@ export async function qConfirm(message: string): Promise<boolean> {
     return confirm(message) // フォールバック
   }
   return await confirmInstance.show(message)
+}
+
+export async function qMessage(
+  message: string,
+  type = 'success',
+  durationMs = 3000
+): Promise<void> {
+  if (!messageInstance) {
+    console.error('qMessageDialog not initialized. Please add qMessageDialog to your App.vue')
+    if (type === 'error') {
+      console.error(message)
+    } else {
+      console.log(message)
+    }
+    return
+  }
+  await messageInstance.show(message, type, durationMs)
 }
 
 export async function qColorPicker(initialColor = '#000000', title = '色選択'): Promise<string | null> {

@@ -24,6 +24,7 @@ export interface C権限 extends AuditFields {
   権限ID: string  // STRING, not number!
   権限名: string
   権限備考: string | null
+  有効: boolean
 }
 
 /**
@@ -35,6 +36,7 @@ export interface C利用者 extends AuditFields {
   パスワード: string
   権限ID: string    // STRING, not number!
   利用者備考: string | null
+  有効: boolean
 }
 
 /**
@@ -44,6 +46,7 @@ export interface C採番 extends AuditFields {
   採番ID: string
   最終採番値: number
   採番備考: string | null
+  有効: boolean
 }
 
 // ==================== M系（マスタ） ====================
@@ -55,6 +58,17 @@ export interface M車両 extends AuditFields {
   車両ID: string
   車両名: string
   車両備考: string | null
+  有効: boolean
+}
+
+/**
+ * M工程（工程マスタ）
+ */
+export interface M工程 extends AuditFields {
+  工程ID: string
+  工程名: string
+  工程備考: string | null
+  有効: boolean
 }
 
 /**
@@ -63,7 +77,40 @@ export interface M車両 extends AuditFields {
 export interface M商品 extends AuditFields {
   商品ID: string
   商品名: string
+  単位: string
   商品備考: string | null
+  有効: boolean
+}
+
+export interface M商品構成明細 {
+  明細番号: number
+  構成商品ID: string
+  構成商品名?: string | null
+  構成数量分子: number
+  構成数量分母: number
+  構成数量?: number | null
+  構成単位?: string | null
+  構成商品備考: string | null
+}
+
+export interface M商品構成 extends AuditFields {
+  商品ID: string
+  商品名?: string | null
+  単位?: string | null
+  生産ロット: number
+  商品構成備考: string | null
+  有効: boolean
+  明細一覧: M商品構成明細[]
+}
+
+export interface M生産区分 extends AuditFields {
+  生産区分ID: string
+  生産区分名: string
+  生産区分備考: string | null
+  配色枠?: string | null
+  配色背景?: string | null
+  配色前景?: string | null
+  有効: boolean
 }
 
 /**
@@ -73,6 +120,10 @@ export interface M配車区分 extends AuditFields {
   配車区分ID: string
   配車区分名: string
   配車区分備考: string | null
+  配色枠?: string | null
+  配色背景?: string | null
+  配色前景?: string | null
+  有効: boolean
 }
 
 // ==================== T系（トランザクション） ====================
@@ -138,10 +189,30 @@ export interface V車両 extends M車両 {
 }
 
 /**
+ * V工程（工程ビュー）
+ */
+export interface V工程 extends M工程 {
+  // 追加のビュー固有フィールドがあればここに定義
+}
+
+/**
  * V商品（商品ビュー）
  */
 export interface V商品 extends M商品 {
   // 追加のビュー固有フィールドがあればここに定義
+}
+
+export interface V商品構成 extends AuditFields {
+  商品ID: string
+  商品名?: string | null
+  単位?: string | null
+  生産ロット: number
+  商品構成備考: string | null
+  有効: boolean
+  構成商品件数: number
+}
+
+export interface V生産区分 extends M生産区分 {
 }
 
 /**

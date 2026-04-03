@@ -14,10 +14,16 @@
 import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
-import { qConfirm } from '../../../utils/qAlert';
+import { qConfirm, qMessage } from '../../../utils/qAlert';
 
 const route = useRoute();
 const router = useRouter();
+const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
+const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const 戻URL = computed(() => {
+  const value = normalizeQueryValue(route.query.戻URL);
+  return value ? String(value) : '';
+});
 
 // ==================================================
 // 状態管理
@@ -31,7 +37,8 @@ const messageType = ref('success');
 const form = reactive({
   権限ID: '',
   権限名: '',
-  権限備考: ''
+  権限備考: '',
+  有効: true
 });
 
 const errors = reactive({
@@ -58,8 +65,7 @@ const requiredFields = computed(() => ['権限ID', '権限名']);
 // ユーティリティ関数
 // ==================================================
 const showMessage = (text, type = 'success') => {
-  message.value = text;
-  messageType.value = type;
+  void qMessage(text, type);
 };
 
 const resetValidation = () => {
@@ -75,12 +81,14 @@ const resetForm = () => {
   form.権限ID = '';
   form.権限名 = '';
   form.権限備考 = '';
+  form.有効 = true;
 };
 
 const applyDataToForm = (data) => {
   form.権限ID = data?.権限ID || '';
   form.権限名 = data?.権限名 || '';
   form.権限備考 = data?.権限備考 || '';
+  form.有効 = data?.有効 ?? true;
 };
 
 // ==================================================
@@ -189,8 +197,32 @@ const applyQueryParams = async (query) => {
   resetForm();
 };
 
+const buildListQuery = (extra = {}) => {
+  const query: Record<string, any> = { ...extra };
+  if (戻URL.value) {
+    query.戻URL = 戻URL.value;
+  }
+  return Object.keys(query).length ? query : undefined;
+};
+
+const handleSuccess = (messageText) => {
+  if (戻URL.value) {
+    router.push(toHalfwidthUrl(戻URL.value));
+    return;
+  }
+  router.push({
+    path: '/C管理/C権限/一覧',
+    query: buildListQuery({ message: messageText, type: 'success' })
+  });
+};
+
 const backToList = () => {
-  router.push({ path: '/C管理/C権限/一覧' });
+  router.push({ path: '/C管理/C権限/一覧', query: buildListQuery() });
+};
+
+const handleReturn = () => {
+  if (!戻URL.value) return;
+  router.push(toHalfwidthUrl(戻URL.value));
 };
 
 // ==================================================
@@ -210,21 +242,20 @@ const saveData = async () => {
       res = await apiClient.post('/core/C権限/登録', {
         権限ID: form.権限ID,
         権限名: form.権限名,
-        権限備考: form.権限備考
+        権限備考: form.権限備考,
+        有効: form.有効
       });
     } else {
       res = await apiClient.post('/core/C権限/変更', {
         権限ID: form.権限ID,
         権限名: form.権限名,
-        権限備考: form.権限備考
+        権限備考: form.権限備考,
+        有効: form.有効
       });
     }
 
     if (res.data.status === 'OK') {
-      router.push({
-        path: '/C管理/C権限/一覧',
-        query: { message: res.data.message, type: 'success' }
-      });
+      handleSuccess(res.data.message);
     } else {
       showMessage(res.data.message || (isCreateMode.value ? '登録に失敗しました。' : '更新に失敗しました。'), 'error');
     }
@@ -242,10 +273,7 @@ const deleteData = async () => {
   try {
     const res = await apiClient.post('/core/C権限/削除', { 権限ID: form.権限ID });
     if (res.data.status === 'OK') {
-      router.push({
-        path: '/C管理/C権限/一覧',
-        query: { message: res.data.message, type: 'success' }
-      });
+      handleSuccess(res.data.message);
     } else {
       showMessage(res.data.message || '削除に失敗しました。', 'error');
     }
@@ -268,18 +296,15 @@ watch(() => route.query, async (query) => {
 
 <template>
   <div class="page-container">
-    <h2 class="page-title">【 C権限 】</h2>
+    <h2 class="page-title">
+      <span class="title-text">【 C権限 】</span>
+      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+    </h2>
 
     <div class="content">
       <div class="section">
         <div class="toolbar">
           <button class="btn btn-secondary" @click="backToList">一覧に戻る</button>
-          <div
-            v-if="message"
-            :class="['message', messageType === 'error' ? 'message-error' : 'message-success']"
-          >
-            {{ message }}
-          </div>
         </div>
 
         <form class="detail-form" @submit.prevent="saveData">
@@ -365,6 +390,23 @@ watch(() => route.query, async (query) => {
             </template>
 
             <template v-if="activeTab === 'others'">
+              <div class="detail-row row-valid">
+                <div class="detail-label">有効</div>
+                <div class="detail-value">
+                  <label class="valid-checkbox-label" :class="{ 'is-disabled': isViewMode }">
+                    <input
+                      type="checkbox"
+                      v-model="form.有効"
+                      :disabled="isViewMode"
+                      class="valid-checkbox"
+                    />
+                    <span
+                      class="valid-checkbox-display"
+                      :class="{ 'valid-checkbox-inactive': !form.有効 }"
+                    >{{ form.有効 ? '✅' : '☐' }}</span>
+                  </label>
+                </div>
+              </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">登録日時</div>
                 <div class="detail-value">
@@ -467,6 +509,28 @@ watch(() => route.query, async (query) => {
   color: #5a4a3a;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3);
+  display: flex;
+  align-items: center;
+}
+
+.title-text {
+  flex: 1;
+}
+
+.btn-return {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.btn-return:hover {
+  background-color: #b52a37;
 }
 
 .content {
@@ -829,6 +893,54 @@ watch(() => route.query, async (query) => {
     border-right: none;
   }
 }
+
+.row-valid {
+  width: fit-content;
+}
+
+.valid-checkbox-label {
+  width: 320px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: 1px solid #bfc7d1;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 0;
+}
+
+.valid-checkbox {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.valid-checkbox-display {
+  color: #1f8a3b;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.valid-checkbox-inactive {
+  color: #222;
+}
+
+.valid-checkbox-label.is-disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.valid-checkbox-label:focus-within {
+  border-color: #007bff;
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
+}
 </style>
-
-

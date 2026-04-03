@@ -80,61 +80,63 @@ onBeforeUnmount(() => {
     <div class="content">
       <p>テスト機能・ゲームへのアクセスリンクです。下記から選択してください。</p>
 
-      <div class="menu-grid">
-        <!-- Xインベーダーカード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">X侵</span>
-            Xインベーダー
+      <div class="other-menu-sections">
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X自</span>
+              X自己紹介
+            </div>
+            <div class="menu-card-description">
+              システム自己紹介・プロフィール表示
+            </div>
+            <router-link to="/Xその他/X自己紹介/表示?戻URL=/Xその他" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <div class="menu-card-description">
-            クラシックインベーダーゲーム・レトロゲーム体験
-          </div>
-          <router-link to="/Xその他/Xインベーダー/ゲーム" class="menu-card-link">
-            開く →
-          </router-link>
         </div>
 
-        <!-- Xテトリスカード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">Xテ</span>
-            Xテトリス
-          </div>
-          <div class="menu-card-description">
-            テトリスゲーム・パズルゲーム体験
-          </div>
-          <router-link to="/Xその他/Xテトリス/ゲーム" class="menu-card-link">
-            開く →
-          </router-link>
-        </div>
+        <div class="menu-hairline"></div>
 
-        <!-- Xリバーシカード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">Xリ</span>
-            Xリバーシ
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X侵</span>
+              Xインベーダー
+            </div>
+            <div class="menu-card-description">
+              クラシックインベーダーゲーム・レトロゲーム体験
+            </div>
+            <router-link to="/Xその他/Xインベーダー/ゲーム?戻URL=/Xその他" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <div class="menu-card-description">
-            リバーシ（オセロ）ゲーム・対戦ゲーム体験
-          </div>
-          <router-link to="/Xその他/Xリバーシ/ゲーム" class="menu-card-link">
-            開く →
-          </router-link>
-        </div>
 
-        <!-- X自己紹介カード -->
-        <div class="menu-card">
-          <div class="menu-card-title">
-            <span class="icon">X自</span>
-            X自己紹介
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">Xテ</span>
+              Xテトリス
+            </div>
+            <div class="menu-card-description">
+              テトリスゲーム・パズルゲーム体験
+            </div>
+            <router-link to="/Xその他/Xテトリス/ゲーム?戻URL=/Xその他" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <div class="menu-card-description">
-            システム自己紹介・プロフィール表示
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">Xリ</span>
+              Xリバーシ
+            </div>
+            <div class="menu-card-description">
+              リバーシ（オセロ）ゲーム・対戦ゲーム体験
+            </div>
+            <router-link to="/Xその他/Xリバーシ/ゲーム?戻URL=/Xその他" class="menu-card-link">
+              開く →
+            </router-link>
           </div>
-          <router-link to="/Xその他/X自己紹介/表示" class="menu-card-link">
-            開く →
-          </router-link>
         </div>
       </div>
     </div>
@@ -143,6 +145,49 @@ onBeforeUnmount(() => {
 
 <style scoped src="../assets/menu-common.css"></style>
 <style scoped>
-/* 追加のスタイルがあればここに記述 */
+.other-menu-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.menu-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.menu-card-fixed {
+  width: 320px;
+  min-width: 320px;
+  height: 158px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-card-fixed .menu-card-description {
+  flex: 1;
+}
+
+.menu-hairline {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(90, 74, 58, 0.12) 0%, rgba(90, 74, 58, 0.45) 50%, rgba(90, 74, 58, 0.12) 100%);
+}
+
+@media (max-width: 768px) {
+  .menu-row {
+    flex-direction: column;
+  }
+
+  .menu-card-fixed {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 158px;
+  }
+}
 </style>
 

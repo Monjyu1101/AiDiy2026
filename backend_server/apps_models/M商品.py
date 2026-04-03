@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from sqlalchemy import Column, Text
+from sqlalchemy import Column, Boolean, Text
 from database import Base
 
 class M商品(Base):
@@ -18,6 +18,7 @@ class M商品(Base):
     商品名 = Column(Text, nullable=False)
     単位 = Column(Text, nullable=False)
     商品備考 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)
     登録利用者ID = Column(Text, nullable=False)
     登録利用者名 = Column(Text)

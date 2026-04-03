@@ -16,6 +16,7 @@ from typing import Optional
 class C採番Base(BaseModel):
     最終採番値: int
     採番備考: Optional[str] = None
+    有効: bool = True
 
 
 class C採番Create(C採番Base):
@@ -26,6 +27,7 @@ class C採番Update(BaseModel):
     採番ID: str
     最終採番値: Optional[int] = None
     採番備考: Optional[str] = None
+    有効: Optional[bool] = None
 
 
 class C採番Delete(BaseModel):
@@ -38,6 +40,7 @@ class C採番Get(BaseModel):
 
 class C採番(C採番Base):
     採番ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

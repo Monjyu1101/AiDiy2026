@@ -12,8 +12,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+const props = defineProps({
+  includeInactive: { type: Boolean, default: false },
+  戻URL: { type: String, default: '' }
+});
 import { useRouter } from 'vue-router';
-import type { V利用者 } from '../../../../types';
+import type { V利用者, Column } from '../../../../types';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
 
@@ -33,11 +37,12 @@ const filters = reactive({
   更新利用者名: ''
 });
 const rowKey = '利用者ID';
-const columns = [
+const columns: Column[] = [
   { key: '利用者ID', label: '利用者ID', width: '100px', sortable: true },
   { key: '利用者名', label: '利用者名', width: '140px', sortable: true },
   { key: '権限名', label: '権限名', width: '120px', sortable: true },
   { key: '利用者備考', label: '利用者備考', width: '250px', sortable: true },
+  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
   { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
   { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
 ];
@@ -61,6 +66,7 @@ const displayRows = computed(() => {
 });
 const filteredRows = computed(() => {
   return displayRows.value.filter((row) => {
+    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -112,7 +118,11 @@ const goToPage = (page) => {
 };
 
 const openDetail = (row) => {
-  router.push({ path: '/C管理/C利用者/編集', query: { モード: '編集', 利用者ID: row.利用者ID } });
+  const query: Record<string, string> = { モード: '編集', 利用者ID: row.利用者ID };
+  if (props.戻URL) {
+    query.戻URL = props.戻URL;
+  }
+  router.push({ path: '/C管理/C利用者/編集', query });
 };
 
 // ==================================================
@@ -176,6 +186,9 @@ defineExpose({
       <template v-if="column.key === '利用者ID'">
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.利用者ID }}</a>
       </template>
+      <template v-else-if="column.key === '有効'">
+        <span>{{ row.有効 ? '✅' : '□' }}</span>
+      </template>
       <template v-else>
         {{ value ?? '' }}
       </template>
@@ -183,5 +196,6 @@ defineExpose({
   </qTublerFrame>
 </template>
 
-
+<style scoped>
+</style>
 

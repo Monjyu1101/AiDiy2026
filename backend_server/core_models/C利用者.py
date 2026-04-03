@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from sqlalchemy import Column, Text
+from sqlalchemy import Column, Boolean, Text
 from database import Base
 
 class C利用者(Base):
@@ -21,6 +21,7 @@ class C利用者(Base):
     パスワード = Column(Text, nullable=False)
     権限ID = Column(Text, nullable=False)
     利用者備考 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)
     登録利用者ID = Column(Text, nullable=False)
     登録利用者名 = Column(Text)

@@ -11,10 +11,11 @@
 -->
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../api/client';
 import WeeklyTable from './components/S配車_週表示テーブル.vue';
+import { qMessage } from '../../utils/qAlert';
 
 const route = useRoute();
 const router = useRouter();
@@ -31,7 +32,12 @@ const lastModifiedTime = ref<string | null>(null);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const normalizeQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
+const toHalfwidthUrl = (value) => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const toVisibleUrlValue = (value) => value.replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
+const 戻URL = computed(() => {
+  const value = normalizeQueryValue(route.query.戻URL);
+  return value ? String(value) : '';
+});
 
 const formatDate = (date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -60,15 +66,7 @@ const weekDisplay = computed(() => {
 });
 
 const showMessage = (text, type = 'info') => {
-  message.value = text;
-  messageType.value = type;
-  if (messageTimer) {
-    clearTimeout(messageTimer);
-  }
-  messageTimer = setTimeout(() => {
-    message.value = '';
-    messageTimer = null;
-  }, 3000);
+  void qMessage(text, type);
 };
 
 const applyQueryParams = (query) => {
@@ -208,16 +206,29 @@ const openEditForm = (scheduleId = null, vehicleId = null, dateStr = null) => {
   }
 };
 
+const buildPageQuery = (開始日付) => {
+  const query: Record<string, string> = { 開始日付 };
+  if (戻URL.value) {
+    query.戻URL = 戻URL.value;
+  }
+  return query;
+};
+
 const moveWeek = async (delta) => {
   対象日付.value = addDays(対象日付.value, delta * 7);
-  router.replace({ path: route.path, query: { 開始日付: formatDateISO(対象日付.value) } });
+  router.replace({ path: route.path, query: buildPageQuery(formatDateISO(対象日付.value)) });
   await loadSchedules();
 };
 
 const moveDay = async (delta) => {
   対象日付.value = addDays(対象日付.value, delta);
-  router.replace({ path: route.path, query: { 開始日付: formatDateISO(対象日付.value) } });
+  router.replace({ path: route.path, query: buildPageQuery(formatDateISO(対象日付.value)) });
   await loadSchedules();
+};
+
+const handleReturn = () => {
+  if (!戻URL.value) return;
+  router.push(toHalfwidthUrl(戻URL.value));
 };
 
 const initLastModified = async () => {
@@ -307,7 +318,10 @@ watch(() => route.query, async (query) => {
 
 <template>
   <div class="page-container">
-    <h2 class="page-title">【 S配車_週表示 】</h2>
+    <h2 class="page-title">
+      <span class="title-text">【 S配車_週表示 】</span>
+      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+    </h2>
 
     <div class="navigation">
       <button class="nav-button" @click="moveWeek(-1)">&#x25c0; 前週</button>
@@ -315,10 +329,6 @@ watch(() => route.query, async (query) => {
       <div class="current-period">{{ weekDisplay }}</div>
       <button class="nav-button period-nav" @click="moveDay(1)">翌日 &#x25b7;</button>
       <button class="nav-button" @click="moveWeek(1)">翌週 &#x25b6;</button>
-    </div>
-
-    <div v-if="message" class="message" :class="`message-${messageType}`">
-      {{ message }}
     </div>
 
     <div class="table-container">
@@ -358,6 +368,28 @@ watch(() => route.query, async (query) => {
   color: #5a4a3a;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3);
+  display: flex;
+  align-items: center;
+}
+
+.title-text {
+  flex: 1;
+}
+
+.btn-return {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.btn-return:hover {
+  background-color: #c82333;
 }
 
 .navigation {

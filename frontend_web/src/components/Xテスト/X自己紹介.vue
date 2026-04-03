@@ -10,28 +10,94 @@
   -------------------------------------------------------------------------
 -->
 
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
+const baseUrl = import.meta.env.BASE_URL || '/';
+const frameSrc = `${baseUrl}X自己紹介/index.html`;
+const route = useRoute();
+const router = useRouter();
+const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const 戻URL = computed(() => {
+  const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
+  return value ? String(value) : '';
+});
+const handleReturn = () => {
+  if (!戻URL.value) return;
+  router.push(toHalfwidthUrl(戻URL.value));
+};
+</script>
+
 <template>
-  <div class="iframe-wrapper">
-    <iframe
-      class="game-frame"
-      :src="frameSrc"
-      title="X自己紹介"
-      frameborder="0"
-      allow="autoplay; fullscreen"
-      loading="lazy"
-    ></iframe>
+  <div class="page-container">
+    <h2 class="page-title">
+      <span class="title-text">【 X自己紹介 】</span>
+      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+    </h2>
+    <div class="iframe-wrapper">
+      <iframe
+        class="game-frame"
+        :src="frameSrc"
+        title="X自己紹介"
+        frameborder="0"
+        allow="autoplay; fullscreen"
+        loading="lazy"
+      ></iframe>
+    </div>
   </div>
 </template>
 
-<script setup lang="ts">
-const baseUrl = import.meta.env.BASE_URL || '/';
-const frameSrc = `${baseUrl}X自己紹介/index.html`;
-</script>
-
 <style scoped>
-.iframe-wrapper {
+.page-container {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #faf7f2 0%, #f5f1e8 50%, #f0ebe0 100%);
+}
+
+.page-title {
+  background: linear-gradient(135deg, #e6d5b7 0%, #dcc8a6 50%, #d2bb95 100%);
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 20px 10px 40px;
+  height: 35px;
+  line-height: 20px;
+  color: #5a4a3a;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3);
+  display: flex;
+  align-items: center;
+}
+
+.title-text {
+  flex: 1;
+}
+
+.btn-return {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.btn-return:hover {
+  background-color: #c82333;
+}
+
+.iframe-wrapper {
+  width: 100%;
+  flex: 1;
 }
 
 .game-frame {

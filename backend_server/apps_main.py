@@ -31,12 +31,20 @@ logger = get_logger(__name__)
 
 from apps_router import M配車区分
 from apps_router import V配車区分
+from apps_router import M生産区分
+from apps_router import V生産区分
+from apps_router import M工程
+from apps_router import V工程
 from apps_router import M車両
 from apps_router import V車両
 from apps_router import M商品
 from apps_router import V商品
+from apps_router import M商品構成
+from apps_router import V商品構成
 from apps_router import T配車
 from apps_router import V配車
+from apps_router import T生産
+from apps_router import V生産
 from apps_router import T商品出庫
 from apps_router import V商品出庫
 from apps_router import T商品棚卸
@@ -46,6 +54,8 @@ from apps_router import V商品入庫
 from apps_router import V商品推移表
 from apps_router import S配車_週表示
 from apps_router import S配車_日表示
+from apps_router import S生産_週表示
+from apps_router import S生産_日表示
 
 app = FastAPI(title="Welcome to AiDiy system")
 
@@ -54,9 +64,13 @@ database.Base.metadata.create_all(
     bind=database.engine,
     tables=[
         apps_models.M配車区分.__table__,
+        apps_models.M生産区分.__table__,
+        apps_models.M工程.__table__,
         apps_models.M車両.__table__,
         apps_models.M商品.__table__,
+        apps_models.M商品構成.__table__,
         apps_models.T配車.__table__,
+        apps_models.T生産.__table__,
         apps_models.T商品出庫.__table__,
         apps_models.T商品棚卸.__table__,
         apps_models.T商品入庫.__table__,
@@ -83,12 +97,20 @@ app.add_middleware(
 # ルーター登録
 app.include_router(M配車区分.router)
 app.include_router(V配車区分.router)
+app.include_router(M生産区分.router)
+app.include_router(V生産区分.router)
+app.include_router(M工程.router)
+app.include_router(V工程.router)
 app.include_router(M車両.router)
 app.include_router(V車両.router)
 app.include_router(M商品.router)
 app.include_router(V商品.router)
+app.include_router(M商品構成.router)
+app.include_router(V商品構成.router)
 app.include_router(T配車.router)
 app.include_router(V配車.router)
+app.include_router(T生産.router)
+app.include_router(V生産.router)
 app.include_router(T商品出庫.router)
 app.include_router(V商品出庫.router)
 app.include_router(T商品棚卸.router)
@@ -98,6 +120,8 @@ app.include_router(V商品入庫.router)
 app.include_router(V商品推移表.router)
 app.include_router(S配車_週表示.router)
 app.include_router(S配車_日表示.router)
+app.include_router(S生産_週表示.router)
+app.include_router(S生産_日表示.router)
 
 @app.on_event("startup")
 def startup_event():

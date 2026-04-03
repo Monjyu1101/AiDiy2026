@@ -38,12 +38,14 @@ export interface C権限CreateRequest {
   権限ID: string
   権限名: string
   権限備考?: string
+  有効?: boolean
 }
 
 export interface C権限UpdateRequest {
   権限ID: string
   権限名?: string
   権限備考?: string
+  有効?: boolean
 }
 
 export interface C権限DeleteRequest {
@@ -63,6 +65,7 @@ export interface C利用者CreateRequest {
   パスワード: string
   権限ID: string
   利用者備考?: string
+  有効?: boolean
 }
 
 export interface C利用者UpdateRequest {
@@ -71,6 +74,7 @@ export interface C利用者UpdateRequest {
   パスワード?: string
   権限ID?: string
   利用者備考?: string
+  有効?: boolean
 }
 
 export interface C利用者DeleteRequest {
@@ -88,12 +92,14 @@ export interface C採番CreateRequest {
   採番ID: string
   最終採番値: number
   採番備考?: string
+  有効?: boolean
 }
 
 export interface C採番UpdateRequest {
   採番ID: string
   最終採番値?: number
   採番備考?: string
+  有効?: boolean
 }
 
 export interface C採番DeleteRequest {
@@ -109,6 +115,174 @@ export interface C採番次番取得Response {
   次番開始: number
   次番終了: number
   次番リスト: number[]
+}
+
+/**
+ * M配車区分 API
+ */
+export interface M配車区分GetRequest {
+  配車区分ID: string
+}
+
+export interface M配車区分CreateRequest {
+  配車区分ID: string
+  配車区分名: string
+  配車区分備考?: string
+  配色枠: string
+  配色背景: string
+  配色前景: string
+  有効?: boolean
+}
+
+export interface M配車区分UpdateRequest {
+  配車区分ID: string
+  配車区分名?: string
+  配車区分備考?: string
+  配色枠?: string
+  配色背景?: string
+  配色前景?: string
+  有効?: boolean
+}
+
+export interface M配車区分DeleteRequest {
+  配車区分ID: string
+}
+
+export interface M生産区分GetRequest {
+  生産区分ID: string
+}
+
+export interface M生産区分CreateRequest {
+  生産区分ID: string
+  生産区分名: string
+  生産区分備考?: string
+  配色枠: string
+  配色背景: string
+  配色前景: string
+  有効?: boolean
+}
+
+export interface M生産区分UpdateRequest {
+  生産区分ID: string
+  生産区分名?: string
+  生産区分備考?: string
+  配色枠?: string
+  配色背景?: string
+  配色前景?: string
+  有効?: boolean
+}
+
+export interface M生産区分DeleteRequest {
+  生産区分ID: string
+}
+
+/**
+ * M車両 API
+ */
+export interface M車両GetRequest {
+  車両ID: string
+}
+
+export interface M車両CreateRequest {
+  車両ID: string
+  車両名: string
+  車両備考?: string
+  有効?: boolean
+}
+
+export interface M車両UpdateRequest {
+  車両ID: string
+  車両名?: string
+  車両備考?: string
+  有効?: boolean
+}
+
+export interface M車両DeleteRequest {
+  車両ID: string
+}
+
+/**
+ * M工程 API
+ */
+export interface M工程GetRequest {
+  工程ID: string
+}
+
+export interface M工程CreateRequest {
+  工程ID: string
+  工程名: string
+  工程備考?: string
+  有効?: boolean
+}
+
+export interface M工程UpdateRequest {
+  工程ID: string
+  工程名?: string
+  工程備考?: string
+  有効?: boolean
+}
+
+export interface M工程DeleteRequest {
+  工程ID: string
+}
+
+/**
+ * M商品 API
+ */
+export interface M商品GetRequest {
+  商品ID: string
+}
+
+export interface M商品CreateRequest {
+  商品ID: string
+  商品名: string
+  単位: string
+  商品備考?: string
+  有効?: boolean
+}
+
+export interface M商品UpdateRequest {
+  商品ID: string
+  商品名?: string
+  単位?: string
+  商品備考?: string
+  有効?: boolean
+}
+
+export interface M商品DeleteRequest {
+  商品ID: string
+}
+
+export interface M商品構成明細Request {
+  明細番号: number
+  構成商品ID: string
+  構成数量分子: number
+  構成数量分母: number
+  構成商品備考?: string | null
+}
+
+export interface M商品構成GetRequest {
+  商品ID: string
+}
+
+export interface M商品構成CreateRequest {
+  商品ID: string
+  生産ロット: number
+  商品構成備考?: string | null
+  有効?: boolean
+  明細一覧: M商品構成明細Request[]
+}
+
+export interface M商品構成UpdateRequest {
+  商品ID: string
+  生産ロット?: number
+  商品構成備考?: string | null
+  有効?: boolean
+  明細一覧?: M商品構成明細Request[]
+}
+
+export interface M商品構成DeleteRequest {
+  商品ID: string
 }
 
 /**

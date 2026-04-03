@@ -29,6 +29,7 @@ def create_C権限(db: Session, 権限: schemas.C権限Create, 認証情報: Opt
         権限ID=権限.権限ID,
         権限名=権限.権限名,
         権限備考=権限.権限備考,
+        有効=True,
         **audit
     )
     db.add(db_権限)

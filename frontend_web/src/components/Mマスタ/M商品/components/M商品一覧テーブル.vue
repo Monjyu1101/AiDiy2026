@@ -15,10 +15,16 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import type { Column, V商品 } from '../../../../types';
+
+const props = defineProps({
+  includeInactive: { type: Boolean, default: false },
+  戻URL: { type: String, default: '' }
+});
 
 const router = useRouter();
 
-const 商品一覧 = ref([]);
+const 商品一覧 = ref<V商品[]>([]);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('商品ID');
@@ -32,11 +38,12 @@ const filters = reactive({
   更新利用者名: ''
 });
 const rowKey = '商品ID';
-const columns = [
+const columns: Column[] = [
   { key: '商品ID', label: '商品ID', width: '120px', sortable: true },
   { key: '商品名', label: '商品名', width: '200px', sortable: true },
   { key: '単位', label: '単位', width: '100px', sortable: true },
   { key: '商品備考', label: '商品備考', width: '220px', sortable: true },
+  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
   { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
   { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
 ];
@@ -54,6 +61,7 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return 商品一覧.value.filter((row) => {
+    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -105,7 +113,11 @@ const goToPage = (page) => {
 };
 
 const openDetail = (row) => {
-  router.push({ path: '/Mマスタ/M商品/編集', query: { モード: '編集', 商品ID: row.商品ID } });
+  const query: Record<string, string> = { モード: '編集', 商品ID: row.商品ID };
+  if (props.戻URL) {
+    query.戻URL = props.戻URL;
+  }
+  router.push({ path: '/Mマスタ/M商品/編集', query });
 };
 
 // ==================================================
@@ -169,6 +181,9 @@ defineExpose({
       <template v-if="column.key === '商品ID'">
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.商品ID }}</a>
       </template>
+      <template v-else-if="column.key === '有効'">
+        <span>{{ row.有効 ? '✅' : '□' }}</span>
+      </template>
       <template v-else>
         {{ value ?? '' }}
       </template>
@@ -176,5 +191,6 @@ defineExpose({
   </qTublerFrame>
 </template>
 
-
+<style scoped>
+</style>
 

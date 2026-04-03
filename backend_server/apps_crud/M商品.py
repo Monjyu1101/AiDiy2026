@@ -30,6 +30,7 @@ def create_M商品(db: Session, 商品: schemas.M商品Create, 認証情報: Opt
         商品名=商品.商品名,
         単位=商品.単位,
         商品備考=商品.商品備考,
+        有効=True,
         **audit
     )
     db.add(db_商品)
