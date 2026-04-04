@@ -18,6 +18,7 @@ class T商品入庫Base(BaseModel):
     商品ID: str
     入庫数量: int
     入庫備考: Optional[str] = None
+    有効: bool = True
 
 
 class T商品入庫Create(T商品入庫Base):
@@ -29,6 +30,7 @@ class T商品入庫Update(BaseModel):
     商品ID: Optional[str] = None
     入庫数量: Optional[int] = None
     入庫備考: Optional[str] = None
+    有効: Optional[bool] = None
 
 
 class T商品入庫Delete(BaseModel):
@@ -41,6 +43,7 @@ class T商品入庫Get(BaseModel):
 
 class T商品入庫(T商品入庫Base):
     入庫伝票ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

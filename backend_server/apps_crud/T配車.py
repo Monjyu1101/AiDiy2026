@@ -41,6 +41,7 @@ def create_T配車(db: Session, 配車: schemas.T配車Create, 認証情報: Opt
         車両ID=配車.車両ID,
         配車内容=配車.配車内容,
         配車備考=配車.配車備考,
+        有効=配車.有効,
         **audit
     )
     db.add(db_配車)
@@ -67,13 +68,16 @@ def update_T配車(db: Session, 配車伝票ID: str, 配車: schemas.T配車Upda
     db.refresh(db_配車)
     return db_配車
 
-def delete_T配車(db: Session, 配車伝票ID: str):
-    """配車データを削除"""
+def delete_T配車(db: Session, 配車伝票ID: str, 認証情報: Optional[Dict] = None):
+    """配車データを論理削除"""
     db_配車 = get_T配車(db, 配車伝票ID)
     if not db_配車:
         return False
 
-    db.delete(db_配車)
+    audit = update_audit_fields(認証情報)
+    db_配車.有効 = False
+    for key, value in audit.items():
+        setattr(db_配車, key, value)
     db.commit()
     return True
 
@@ -124,6 +128,7 @@ def init_T配車_data(db: Session, 認証情報: Optional[Dict] = None):
             車両ID=車両ID,
             配車内容=content,
             配車備考=remarks,
+            有効=True,
             **audit
         )
         db.add(配車データ)

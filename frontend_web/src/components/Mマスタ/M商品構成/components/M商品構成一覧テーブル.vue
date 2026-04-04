@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   -*- coding: utf-8 -*-
 
   -------------------------------------------------------------------------
@@ -15,16 +15,20 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
 import type { Column, V商品構成 } from '../../../../types';
 
 const props = defineProps({
-  includeInactive: { type: Boolean, default: false },
+  生産区分ID: { type: String, default: '' },
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
 const router = useRouter();
 
 const 商品構成一覧 = ref<V商品構成[]>([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('商品ID');
@@ -33,7 +37,7 @@ const filters = reactive({
   商品ID: '',
   商品名: '',
   単位: '',
-  生産ロット: '',
+  最小ロット数量: '',
   構成商品件数: '',
   商品構成備考: '',
   更新日時: '',
@@ -41,10 +45,10 @@ const filters = reactive({
 });
 const rowKey = '商品ID';
 const columns: Column[] = [
-  { key: '商品ID', label: '商品ID', width: '120px', sortable: true },
+  { key: '商品ID', label: '商品ID', width: '120px', sortable: true, align: 'center' },
   { key: '商品名', label: '商品名', width: '180px', sortable: true },
   { key: '単位', label: '単位', width: '90px', sortable: true },
-  { key: '生産ロット', label: '生産ロット', width: '110px', sortable: true, align: 'right' },
+  { key: '最小ロット数量', label: '最小ロット数量', width: '110px', sortable: true, align: 'right' },
   { key: '構成商品件数', label: '構成件数', width: '90px', sortable: true, align: 'right' },
   { key: '商品構成備考', label: '商品構成備考', width: '220px', sortable: true },
   { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
@@ -63,7 +67,6 @@ const setMessage = (text: string, type = 'success') => {
 const hasFilter = computed(() => Object.values(filters).some((value) => String(value || '').trim() !== ''));
 const filteredRows = computed(() => {
   return 商品構成一覧.value.filter((row) => {
-    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -73,7 +76,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => 商品構成一覧.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -125,11 +128,16 @@ const openDetail = (row: any) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const res = await apiClient.post('/apps/V商品構成/一覧');
+    const res = await apiClient.post('/apps/V商品構成/一覧', {
+      生産区分ID: props.生産区分ID || null,
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    });
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       商品構成一覧.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'M商品構成一覧の取得に失敗しました。', 'error');
@@ -174,11 +182,11 @@ defineExpose({
       />
     </template>
     <template #cell="{ row, column, value }">
-      <template v-if="column.key === '商品ID'">
-        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.商品ID }}</a>
+      <template v-if="column.key === '商品ID' || column.key === '商品名'">
+        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ value ?? '' }}</a>
       </template>
       <template v-else-if="column.key === '有効'">
-        <span>{{ row.有効 ? '✅' : '□' }}</span>
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}
@@ -189,3 +197,5 @@ defineExpose({
 
 <style scoped>
 </style>
+
+

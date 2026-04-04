@@ -11,21 +11,25 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from typing import Optional
 import core_schema as schemas, deps, core_models as models
-MAX_ITEMS = 10000
+from list_controls import append_active_condition, get_limit_clause
 
 router = APIRouter(prefix="/core/V利用者", tags=["V利用者"])
 
 @router.post("/一覧", response_model=schemas.ResponseBase)
 def list_V利用者(
+    request: Optional[schemas.ListRequest] = None,
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    # Viewのクエリ (SQLAlchemyのモデルとしてViewを定義していないため直接SQLか、モデル定義が必要)
-    # 今回はmodels.pyにはView定義がないため、生SQLで取得して辞書にマッピングするか、Viewモデルを追加定義する。
-    # ここではシンプルにJOINクエリを自分で構築するか、Viewを使う。Viewを定義したとしてSQLを投げる。
-    
-    params = {"limit": MAX_ITEMS}
+    conditions = []
+    append_active_condition(conditions, request, 'u."有効"')
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    limit_sql, limit_value = get_limit_clause(request)
+    params = {}
+    if limit_value is not None:
+        params["limit"] = limit_value
 
     sql = f"""
     SELECT
@@ -46,7 +50,8 @@ def list_V利用者(
         COALESCE(p."権限備考", '') AS "権限備考"
     FROM "C利用者" u
     LEFT JOIN "C権限" p ON u."権限ID" = p."権限ID"
-    LIMIT :limit
+    {where_sql}
+    {limit_sql}
     """
     
     result = db.execute(text(sql), params).fetchall()
@@ -75,12 +80,13 @@ def list_V利用者(
         items.append(item)
         
     # トータル件数
-    count_sql = """
+    count_sql = f"""
     SELECT count(*)
     FROM "C利用者" u
     LEFT JOIN "C権限" p ON u."権限ID" = p."権限ID"
+    {where_sql}
     """
-    total = db.execute(text(count_sql)).scalar()
+    total = db.execute(text(count_sql), params).scalar()
 
     return schemas.ResponseBase(
         status="OK",
@@ -88,9 +94,8 @@ def list_V利用者(
         data={
             "items": items,
             "total": total,
-            "limit": MAX_ITEMS
+            "limit": limit_value
         }
     )
-
 
 

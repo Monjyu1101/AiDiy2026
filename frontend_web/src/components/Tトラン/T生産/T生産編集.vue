@@ -11,10 +11,21 @@
 -->
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, watch } from 'vue';
+import { ref, onMounted, reactive, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
+
+type 生産明細Form = {
+  明細SEQ: number
+  払出商品ID: string
+  計算分子数量: string
+  計算分母数量: string
+  最小ロット構成数量: string
+  払出数量: string
+  所要数量備考: string
+  isUserAdded: boolean
+}
 
 const route = useRoute();
 const router = useRouter();
@@ -31,35 +42,45 @@ const 戻URL = computed(() => {
 const mode = ref('edit');
 const activeTab = ref('content');
 const detailData = ref(null);
-const message = ref('');
-const messageType = ref('success');
+const 商品一覧 = ref([]);
+const 生産工程一覧 = ref([]);
+const 生産区分一覧 = ref([]);
+const detailError = ref('');
+const isLoading = ref(false);
 
 const form = reactive({
   生産伝票ID: '',
   生産開始日時: '',
   生産終了日時: '',
   生産区分ID: '',
-  工程ID: '',
+  生産工程ID: '',
+  受入商品ID: '',
+  最小ロット数量: '',
+  受入数量: '',
   生産内容: '',
-  生産備考: ''
+  生産備考: '',
+  有効: true
 });
 
 const errors = reactive({
   生産開始日時: '',
   生産終了日時: '',
-  工程ID: '',
-  生産区分ID: ''
+  受入商品ID: '',
+  最小ロット数量: '',
+  生産区分ID: '',
+  生産工程ID: ''
 });
 
 const touched = reactive({
   生産開始日時: false,
   生産終了日時: false,
-  工程ID: false,
-  生産区分ID: false
+  受入商品ID: false,
+  最小ロット数量: false,
+  生産区分ID: false,
+  生産工程ID: false
 });
 
-const 工程一覧 = ref([]);
-const 生産区分一覧 = ref([]);
+const 明細一覧 = ref<生産明細Form[]>([]);
 
 // ==================================================
 // 計算プロパティ
@@ -67,22 +88,97 @@ const 生産区分一覧 = ref([]);
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
-const requiredFields = computed(() => ['生産開始日時', '生産終了日時', '工程ID', '生産区分ID']);
+const requiredFields = computed(() => ['生産開始日時', '生産終了日時', '受入商品ID', '最小ロット数量', '生産区分ID', '生産工程ID']);
+
+const 表示用生産工程一覧 = computed(() => isCreateMode.value
+  ? 生産工程一覧.value.filter((item: any) => item?.有効 !== false)
+  : 生産工程一覧.value);
+const 表示用生産区分一覧 = computed(() => isCreateMode.value
+  ? 生産区分一覧.value.filter((item: any) => item?.有効 !== false)
+  : 生産区分一覧.value);
+const 表示用商品一覧 = computed(() => isCreateMode.value
+  ? 商品一覧.value.filter((item: any) => item?.有効 !== false)
+  : 商品一覧.value);
+
+const 商品マップ = computed<Record<string, any>>(() => {
+  const result: Record<string, any> = {};
+  (商品一覧.value as any[]).forEach((item) => { result[item.商品ID] = item; });
+  return result;
+});
+
+const 選択商品 = computed(() => 商品マップ.value[form.受入商品ID] || null);
+const 商品名表示 = computed(() => 選択商品.value?.商品名 || '');
+const 商品単位表示 = computed(() => 選択商品.value?.単位 || '');
 
 // ==================================================
-// ユーティリティ関数
+// ユーティリティ
 // ==================================================
-const showMessage = (text: string, type: string = 'success') => {
-  void qMessage(text, type);
+const showMessage = (text: string, type = 'success') => { void qMessage(text, type); };
+
+const toNumber = (value: any) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
+const formatNumber = (value: number) => value.toLocaleString('ja-JP', { maximumFractionDigits: 3 });
+const get払出商品 = (商品ID: string) => 商品マップ.value[String(商品ID)] || null;
+
+const calc最小ロット構成数量 = (row: 生産明細Form) => {
+  const 受入 = toNumber(form.受入数量);
+  const numerator = toNumber(row.計算分子数量);
+  const denominator = toNumber(row.計算分母数量);
+  if (!denominator) return 0;
+  return Math.ceil(numerator / denominator * 受入);
 };
 
+const recalcRow = (row: 生産明細Form) => {
+  const val = calc最小ロット構成数量(row);
+  const str = val === 0 ? '' : String(val);
+  if (row.isUserAdded) {
+    // 追加行：計算値をそのままセット
+    row.最小ロット構成数量 = str;
+    row.払出数量 = str;
+  } else {
+    // 流し込み行：受入数量が最小ロット数量の整数倍なら最小ロット構成数量の整数倍を優先
+    const 受入 = toNumber(form.受入数量);
+    const 最小ロット = toNumber(form.最小ロット数量);
+    const 最小ロット構成 = toNumber(row.最小ロット構成数量);
+    if (最小ロット > 0 && 最小ロット構成 > 0) {
+      const 倍数 = 受入 / 最小ロット;
+      if (Number.isInteger(Math.round(倍数 * 1e9) / 1e9)) {
+        row.払出数量 = String(最小ロット構成 * 倍数);
+      } else {
+        row.払出数量 = str;
+      }
+    } else {
+      row.払出数量 = str;
+    }
+  }
+};
+
+const recalcAll = () => { 明細一覧.value.forEach(recalcRow); };
+
+const createEmptyDetail = (明細SEQ = 1): 生産明細Form => ({
+  明細SEQ,
+  払出商品ID: '',
+  計算分子数量: '',
+  計算分母数量: '1000',
+  最小ロット構成数量: '',
+  払出数量: '',
+  所要数量備考: '',
+  isUserAdded: true
+});
+
+const renumberDetails = () => {
+  明細一覧.value.forEach((row, index) => { row.明細SEQ = index + 1; });
+};
+
+// ==================================================
+// フォームリセット・適用
+// ==================================================
 const resetValidation = () => {
-  Object.keys(errors).forEach((key) => {
-    errors[key] = '';
-  });
-  Object.keys(touched).forEach((key) => {
-    touched[key] = false;
-  });
+  Object.keys(errors).forEach((key) => { errors[key] = ''; });
+  Object.keys(touched).forEach((key) => { touched[key] = false; });
+  detailError.value = '';
 };
 
 const resetForm = () => {
@@ -90,54 +186,105 @@ const resetForm = () => {
   form.生産開始日時 = '';
   form.生産終了日時 = '';
   form.生産区分ID = '';
-  form.工程ID = '';
+  form.生産工程ID = '';
+  form.受入商品ID = '';
+  form.最小ロット数量 = '';
+  form.受入数量 = '';
   form.生産内容 = '';
   form.生産備考 = '';
+  form.有効 = true;
+  明細一覧.value = [];
 };
 
-const applyDataToForm = (data) => {
+const applyDataToForm = async (data: any) => {
+  isLoading.value = true;
   form.生産伝票ID = data?.生産伝票ID || '';
   form.生産開始日時 = data?.生産開始日時 || '';
   form.生産終了日時 = data?.生産終了日時 || '';
   form.生産区分ID = data?.生産区分ID || '';
-  form.工程ID = data?.工程ID || '';
+  form.生産工程ID = data?.生産工程ID || '';
+  form.受入商品ID = data?.受入商品ID || '';
+  form.最小ロット数量 = data?.最小ロット数量 === null || data?.最小ロット数量 === undefined ? '' : String(data.最小ロット数量);
+  form.受入数量 = data?.受入数量 === null || data?.受入数量 === undefined ? '' : String(data.受入数量);
   form.生産内容 = data?.生産内容 || '';
   form.生産備考 = data?.生産備考 || '';
+  form.有効 = data?.有効 ?? true;
+  明細一覧.value = Array.isArray(data?.明細一覧) && data.明細一覧.length
+    ? data.明細一覧.map((item: any, index: number) => ({
+        明細SEQ: Number(item?.明細SEQ ?? index + 1),
+        払出商品ID: item?.払出商品ID || '',
+        計算分子数量: item?.計算分子数量 === null || item?.計算分子数量 === undefined ? '' : String(item.計算分子数量),
+        計算分母数量: item?.計算分母数量 === null || item?.計算分母数量 === undefined ? '1000' : String(item.計算分母数量),
+        最小ロット構成数量: item?.最小ロット構成数量 !== null && item?.最小ロット構成数量 !== undefined ? String(item.最小ロット構成数量) : '',
+        払出数量: item?.払出数量 !== null && item?.払出数量 !== undefined ? String(item.払出数量) : '',
+        所要数量備考: item?.所要数量備考 || '',
+        isUserAdded: false
+      }))
+    : [];
+  renumberDetails();
+  await nextTick();
+  isLoading.value = false;
 };
 
 // ==================================================
 // バリデーション
 // ==================================================
-const validateField = (field, showMessage = true) => {
+const validateField = (field: string, showError = true) => {
   const value = String(form[field] ?? '').trim();
-
-  if (!requiredFields.value.includes(field)) {
-    errors[field] = '';
-    return true;
-  }
-  if (!value) {
-    errors[field] = showMessage ? `${field}は必須です。` : 'ERROR';
+  if (!requiredFields.value.includes(field)) { errors[field] = ''; return true; }
+  if (!value) { errors[field] = showError ? `${field}は必須です。` : 'ERROR'; return false; }
+  if (field === '最小ロット数量' && toNumber(value) <= 0) {
+    errors[field] = showError ? '最小ロット数量は0より大きい値を入力してください。' : 'ERROR';
     return false;
   }
-
   errors[field] = '';
   return true;
 };
 
-const handleBlur = (field) => {
-  touched[field] = true;
-  validateField(field);
+const handleBlur = (field: string) => { touched[field] = true; validateField(field); };
+const handleInput = (field: string) => { if (touched[field]) validateField(field); };
+
+const sanitizeDetails = () => {
+  return 明細一覧.value
+    .map((row, index) => ({
+      明細SEQ: index + 1,
+      払出商品ID: String(row.払出商品ID || '').trim(),
+      計算分子数量: String(row.計算分子数量 || '').trim(),
+      計算分母数量: String(row.計算分母数量 || '').trim(),
+      最小ロット構成数量: String(row.最小ロット構成数量 || '').trim(),
+      払出数量: String(row.払出数量 || '').trim(),
+      所要数量備考: String(row.所要数量備考 || '').trim()
+    }))
+    .filter((row) => row.払出商品ID || row.計算分子数量 || row.最小ロット構成数量);
 };
 
-const handleInput = (field) => {
-  if (touched[field]) {
-    validateField(field);
+const validateDetails = () => {
+  const rows = sanitizeDetails();
+  if (!rows.length) return [];  // 明細なしは許可
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNo = i + 1;
+    if (!row.払出商品ID) { detailError.value = `${rowNo}行目の払出商品IDを選択してください。`; return null; }
+    if (row.計算分子数量 && !row.計算分母数量) { detailError.value = `${rowNo}行目の計算分母数量を入力してください。`; return null; }
+    if (row.計算分母数量 && toNumber(row.計算分母数量) <= 0) { detailError.value = `${rowNo}行目の計算分母数量は0より大きい値を入力してください。`; return null; }
   }
+
+  detailError.value = '';
+  return rows.map((row, index) => ({
+    明細SEQ: index + 1,
+    払出商品ID: row.払出商品ID,
+    計算分子数量: row.計算分子数量 ? toNumber(row.計算分子数量) : null,
+    計算分母数量: row.計算分母数量 ? toNumber(row.計算分母数量) : null,
+    最小ロット構成数量: row.最小ロット構成数量 ? toNumber(row.最小ロット構成数量) : null,
+    払出数量: row.払出数量 ? toNumber(row.払出数量) : null,
+    所要数量備考: row.所要数量備考 || null
+  }));
 };
 
 const validateForm = () => {
   let isValid = true;
-  let firstErrorField = null;
+  let firstErrorField: string | null = null;
 
   requiredFields.value.forEach((field) => {
     touched[field] = true;
@@ -148,20 +295,37 @@ const validateForm = () => {
   });
 
   if (firstErrorField) {
-    const fieldMap = {
+    const fieldMap: Record<string, string> = {
       '生産開始日時': 'form-start-datetime',
       '生産終了日時': 'form-end-datetime',
-      '工程ID': 'form-process-id',
-      '生産区分ID': 'form-production-type'
+      '受入商品ID': 'form-product-id',
+      '最小ロット数量': 'form-lot',
+      '生産区分ID': 'form-production-type',
+      '生産工程ID': 'form-process-id'
     };
-    const elementId = fieldMap[firstErrorField];
-    if (elementId) {
-      const element = document.getElementById(elementId);
-      if (element) element.focus();
-    }
+    const el = document.getElementById(fieldMap[firstErrorField]);
+    if (el) el.focus();
   }
 
   return isValid;
+};
+
+// ==================================================
+// 明細操作
+// ==================================================
+const addDetailRow = () => {
+  明細一覧.value.push(createEmptyDetail(明細一覧.value.length + 1));
+  detailError.value = '';
+};
+
+const removeDetailRow = (index: number) => {
+  if (明細一覧.value.length === 1) {
+    明細一覧.value = [];
+  } else {
+    明細一覧.value.splice(index, 1);
+    renumberDetails();
+  }
+  detailError.value = '';
 };
 
 // ==================================================
@@ -169,21 +333,24 @@ const validateForm = () => {
 // ==================================================
 const loadMasterData = async () => {
   try {
-    const [resProcess, resCategory] = await Promise.all([
-      apiClient.post('/apps/M工程/一覧'),
-      apiClient.post('/apps/M生産区分/一覧')
+    const [resProcess, resCategory, resProduct] = await Promise.all([
+      apiClient.post('/apps/M生産工程/一覧'),
+      apiClient.post('/apps/M生産区分/一覧'),
+      apiClient.post('/apps/M商品/一覧')
     ]);
-
     if (resProcess.data.status === 'OK') {
       const data = resProcess.data.data;
-      工程一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+      生産工程一覧.value = Array.isArray(data) ? data : data?.items ?? [];
     }
-
     if (resCategory.data.status === 'OK') {
       const data = resCategory.data.data;
       生産区分一覧.value = Array.isArray(data) ? data : data?.items ?? [];
     }
-  } catch (e) {
+    if (resProduct.data.status === 'OK') {
+      const data = resProduct.data.data;
+      商品一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    }
+  } catch (_e) {
     showMessage('マスターデータの取得でエラーが発生しました。', 'error');
   }
 };
@@ -191,17 +358,16 @@ const loadMasterData = async () => {
 // ==================================================
 // 詳細データ取得
 // ==================================================
-const loadDetail = async (id) => {
-  message.value = '';
+const loadDetail = async (id: string) => {
   try {
     const res = await apiClient.post('/apps/T生産/取得', { 生産伝票ID: String(id) });
     if (res.data.status === 'OK' && res.data.data) {
       detailData.value = res.data.data;
-      applyDataToForm(res.data.data);
+      await applyDataToForm(res.data.data);
     } else {
       showMessage(res.data.message || '生産情報の取得に失敗しました。', 'error');
     }
-  } catch (e) {
+  } catch (_e) {
     showMessage('生産情報の取得でエラーが発生しました。', 'error');
   }
 };
@@ -209,7 +375,7 @@ const loadDetail = async (id) => {
 // ==================================================
 // ルーティング処理
 // ==================================================
-const formatLocalDate = (date) => {
+const formatLocalDate = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -217,7 +383,6 @@ const formatLocalDate = (date) => {
 };
 
 const applyQueryParams = async (query: any) => {
-  message.value = '';
   resetValidation();
   activeTab.value = 'content';
 
@@ -225,8 +390,6 @@ const applyQueryParams = async (query: any) => {
     mode.value = 'create';
     detailData.value = null;
     resetForm();
-
-    // デフォルト値設定
     const today = new Date();
     const todayStr = formatLocalDate(today);
     form.生産開始日時 = `${todayStr}T08:00`;
@@ -234,34 +397,16 @@ const applyQueryParams = async (query: any) => {
     const queryDate = normalizeQueryValue(query.生産開始日付);
     const queryStartDateTime = normalizeQueryValue(query.生産開始日時);
     const queryEndDateTime = normalizeQueryValue(query.生産終了日時);
-    const queryProcessId = normalizeQueryValue(query.工程ID);
-    if (queryDate) {
-      form.生産開始日時 = `${String(queryDate)}T08:00`;
-      form.生産終了日時 = `${String(queryDate)}T17:00`;
-    }
-    if (queryStartDateTime) {
-      form.生産開始日時 = String(queryStartDateTime);
-    }
-    if (queryEndDateTime) {
-      form.生産終了日時 = String(queryEndDateTime);
-    }
-    if (queryProcessId) {
-      form.工程ID = String(queryProcessId);
-    }
+    const queryProcessId = normalizeQueryValue(query.生産工程ID);
+    if (queryDate) { form.生産開始日時 = `${String(queryDate)}T08:00`; form.生産終了日時 = `${String(queryDate)}T17:00`; }
+    if (queryStartDateTime) form.生産開始日時 = String(queryStartDateTime);
+    if (queryEndDateTime) form.生産終了日時 = String(queryEndDateTime);
+    if (queryProcessId) form.生産工程ID = String(queryProcessId);
     return;
   }
 
-  if (query.モード === '表示' && query.生産伝票ID) {
-    mode.value = 'view';
-    await loadDetail(query.生産伝票ID);
-    return;
-  }
-
-  if (query.生産伝票ID) {
-    mode.value = 'edit';
-    await loadDetail(query.生産伝票ID);
-    return;
-  }
+  if (query.モード === '表示' && query.生産伝票ID) { mode.value = 'view'; await loadDetail(query.生産伝票ID); return; }
+  if (query.生産伝票ID) { mode.value = 'edit'; await loadDetail(query.生産伝票ID); return; }
 
   mode.value = 'create';
   detailData.value = null;
@@ -270,83 +415,65 @@ const applyQueryParams = async (query: any) => {
 
 const buildListQuery = (extra = {}) => {
   const query: Record<string, any> = { ...extra };
-  if (戻URL.value) {
-    query.戻URL = 戻URL.value;
-  }
+  if (戻URL.value) query.戻URL = 戻URL.value;
   return Object.keys(query).length ? query : undefined;
 };
 
-const handleSuccess = (messageText) => {
-  if (戻URL.value) {
-    router.push(toHalfwidthUrl(戻URL.value));
-    return;
-  }
-  router.push({
-    path: '/Tトラン/T生産/一覧',
-    query: buildListQuery({ message: messageText, type: 'success' })
-  });
+const handleSuccess = (messageText: string) => {
+  if (戻URL.value) { router.push(toHalfwidthUrl(戻URL.value)); return; }
+  router.push({ path: '/Tトラン/T生産/一覧', query: buildListQuery({ message: messageText, type: 'success' }) });
 };
-
-const backToList = () => {
-  router.push({ path: '/Tトラン/T生産/一覧', query: buildListQuery() });
-};
-
-const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
-};
+const backToList = () => { router.push({ path: '/Tトラン/T生産/一覧', query: buildListQuery() }); };
+const handleReturn = () => { if (!戻URL.value) return; router.push(toHalfwidthUrl(戻URL.value)); };
 
 // ==================================================
 // CRUD操作
 // ==================================================
 const saveData = async () => {
-  message.value = '';
-  if (!validateForm()) {
-    showMessage('入力内容を確認してください。', 'error');
+  if (!validateForm()) { showMessage('入力内容を確認してください。', 'error'); activeTab.value = 'content'; return; }
+
+  const detailPayload = validateDetails();
+  if (detailPayload === null) {
+    showMessage(detailError.value || '明細の入力内容を確認してください。', 'error');
     activeTab.value = 'content';
     return;
   }
+
+  const payload: any = {
+    生産開始日時: form.生産開始日時,
+    生産終了日時: form.生産終了日時,
+    生産区分ID: form.生産区分ID || null,
+    生産工程ID: form.生産工程ID,
+    受入商品ID: form.受入商品ID || null,
+    最小ロット数量: form.最小ロット数量 ? toNumber(form.最小ロット数量) : null,
+    受入数量: form.受入数量 ? toNumber(form.受入数量) : null,
+    生産内容: form.生産内容 || null,
+    生産備考: form.生産備考 || null,
+    有効: form.有効,
+    明細一覧: detailPayload
+  };
+
   try {
     let res;
     if (isCreateMode.value) {
-      // 新規作成時は生産伝票IDを送らない（自動採番）
-      res = await apiClient.post('/apps/T生産/登録', {
-        生産開始日時: form.生産開始日時,
-        生産終了日時: form.生産終了日時,
-        生産区分ID: form.生産区分ID,
-        工程ID: form.工程ID,
-        生産内容: form.生産内容,
-        生産備考: form.生産備考
-      });
+      res = await apiClient.post('/apps/T生産/登録', payload);
     } else {
-      res = await apiClient.post('/apps/T生産/変更', {
-        生産開始日時: form.生産開始日時,
-        生産終了日時: form.生産終了日時,
-        生産区分ID: form.生産区分ID,
-        工程ID: form.工程ID,
-        生産内容: form.生産内容,
-        生産備考: form.生産備考
-      }, {
-        params: { 生産伝票ID: form.生産伝票ID }
-      });
+      res = await apiClient.post('/apps/T生産/変更', payload, { params: { 生産伝票ID: form.生産伝票ID } });
     }
-
     if (res.data.status === 'OK') {
       handleSuccess(res.data.message);
     } else {
       showMessage(res.data.message || (isCreateMode.value ? '登録に失敗しました。' : '更新に失敗しました。'), 'error');
     }
-  } catch (e) {
+  } catch (_e) {
     showMessage(isCreateMode.value ? '登録に失敗しました。' : '更新に失敗しました。', 'error');
   }
 };
 
 const deleteData = async () => {
   if (!form.生産伝票ID) return;
-
-  const confirmed = await qConfirm(`T生産「${form.生産伝票ID}」を削除しますか？この操作は取り消せません。`);
+  const confirmed = await qConfirm(`T生産「${form.生産伝票ID}」の有効をオフにしますか？`);
   if (!confirmed) return;
-
   try {
     const res = await apiClient.post('/apps/T生産/削除', { 生産伝票ID: form.生産伝票ID });
     if (res.data.status === 'OK') {
@@ -354,8 +481,48 @@ const deleteData = async () => {
     } else {
       showMessage(res.data.message || '削除に失敗しました。', 'error');
     }
-  } catch (e) {
+  } catch (_e) {
     showMessage('削除に失敗しました。', 'error');
+  }
+};
+
+// ==================================================
+// M商品構成から自動取得
+// ==================================================
+const loadM商品構成 = async (受入商品ID: string) => {
+  if (!受入商品ID) {
+    form.最小ロット数量 = '';
+    form.受入数量 = '';
+    form.生産区分ID = '';
+    form.生産工程ID = '';
+    form.生産備考 = '';
+    明細一覧.value = [];
+    return;
+  }
+  try {
+    const res = await apiClient.post('/apps/M商品構成/取得', { 商品ID: 受入商品ID });
+    if (res.data.status === 'OK' && res.data.data) {
+      const data = res.data.data;
+      form.最小ロット数量 = data.最小ロット数量 !== null && data.最小ロット数量 !== undefined ? String(data.最小ロット数量) : '';
+      form.受入数量 = data.最小ロット数量 !== null && data.最小ロット数量 !== undefined ? String(data.最小ロット数量) : '';
+      form.生産区分ID = data.生産区分ID || '';
+      form.生産工程ID = data.生産工程ID || '';
+      form.生産備考 = data.商品構成備考 || '';
+      明細一覧.value = Array.isArray(data.明細一覧) && data.明細一覧.length
+        ? data.明細一覧.map((item: any, index: number) => ({
+            明細SEQ: index + 1,
+            払出商品ID: item.構成商品ID || '',
+            計算分子数量: item.計算分子数量 !== null && item.計算分子数量 !== undefined ? String(item.計算分子数量) : '',
+            計算分母数量: item.計算分母数量 !== null && item.計算分母数量 !== undefined ? String(item.計算分母数量) : '1000',
+            最小ロット構成数量: item.最小ロット構成数量 !== null && item.最小ロット構成数量 !== undefined ? String(item.最小ロット構成数量) : '',
+            払出数量: item.最小ロット構成数量 !== null && item.最小ロット構成数量 !== undefined ? String(item.最小ロット構成数量) : '',
+            所要数量備考: item.構成商品備考 || '',
+            isUserAdded: false
+          }))
+        : [];
+    }
+  } catch (_e) {
+    // 商品構成が未登録の場合はスキップ
   }
 };
 
@@ -367,8 +534,11 @@ onMounted(async () => {
   await applyQueryParams(route.query);
 });
 
-watch(() => route.query, async (query) => {
-  await applyQueryParams(query);
+watch(() => route.query, async (query) => { await applyQueryParams(query); });
+
+watch(() => form.受入商品ID, async (newValue) => {
+  if (isViewMode.value || isLoading.value) return;
+  await loadM商品構成(newValue);
 });
 </script>
 
@@ -387,53 +557,30 @@ watch(() => route.query, async (query) => {
 
         <form class="detail-form" @submit.prevent="saveData">
           <div class="tab-header">
-            <button
-              type="button"
-              class="tab-btn"
-              :class="{ active: activeTab === 'content' }"
-              @click="activeTab = 'content'"
-            >
-              内容
-            </button>
-            <button
-              type="button"
-              class="tab-btn"
-              :class="{ active: activeTab === 'others' }"
-              @click="activeTab = 'others'"
-            >
-              その他
-            </button>
+            <button type="button" class="tab-btn" :class="{ active: activeTab === 'content' }" @click="activeTab = 'content'">内容</button>
+            <button type="button" class="tab-btn" :class="{ active: activeTab === 'others' }" @click="activeTab = 'others'">その他</button>
           </div>
 
           <div class="detail-panel">
             <template v-if="activeTab === 'content'">
+
+              <!-- 生産伝票ID -->
               <div v-if="!isCreateMode" class="detail-row row-id">
                 <div class="detail-label">生産伝票ID</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    v-model="form.生産伝票ID"
-                    class="detail-input id-input center-input"
-                    readonly
-                  />
+                  <input type="text" v-model="form.生産伝票ID" class="detail-input id-input center-input" readonly />
                 </div>
               </div>
 
+              <!-- 生産開始日時 -->
               <div class="detail-row row-datetime">
                 <div class="detail-label">生産開始日時<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">
-                      <input
-                        id="form-start-datetime"
-                        type="datetime-local"
-                        v-model="form.生産開始日時"
-                        class="detail-input datetime-input"
-                        :class="{ 'input-error': errors.生産開始日時 }"
-                        :readonly="isViewMode"
-                        @blur="handleBlur('生産開始日時')"
-                        @input="handleInput('生産開始日時')"
-                      />
+                      <input id="form-start-datetime" type="datetime-local" v-model="form.生産開始日時"
+                        class="detail-input datetime-input" :class="{ 'input-error': errors.生産開始日時 }"
+                        :readonly="isViewMode" @blur="handleBlur('生産開始日時')" @input="handleInput('生産開始日時')" />
                       <span v-if="errors.生産開始日時" class="input-alert">!</span>
                     </div>
                     <div v-if="errors.生産開始日時 && errors.生産開始日時 !== 'ERROR'" class="field-error">{{ errors.生産開始日時 }}</div>
@@ -441,21 +588,15 @@ watch(() => route.query, async (query) => {
                 </div>
               </div>
 
+              <!-- 生産終了日時 -->
               <div class="detail-row row-datetime">
                 <div class="detail-label">生産終了日時<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">
-                      <input
-                        id="form-end-datetime"
-                        type="datetime-local"
-                        v-model="form.生産終了日時"
-                        class="detail-input datetime-input"
-                        :class="{ 'input-error': errors.生産終了日時 }"
-                        :readonly="isViewMode"
-                        @blur="handleBlur('生産終了日時')"
-                        @input="handleInput('生産終了日時')"
-                      />
+                      <input id="form-end-datetime" type="datetime-local" v-model="form.生産終了日時"
+                        class="detail-input datetime-input" :class="{ 'input-error': errors.生産終了日時 }"
+                        :readonly="isViewMode" @blur="handleBlur('生産終了日時')" @input="handleInput('生産終了日時')" />
                       <span v-if="errors.生産終了日時" class="input-alert">!</span>
                     </div>
                     <div v-if="errors.生産終了日時 && errors.生産終了日時 !== 'ERROR'" class="field-error">{{ errors.生産終了日時 }}</div>
@@ -463,48 +604,77 @@ watch(() => route.query, async (query) => {
                 </div>
               </div>
 
+              <!-- 受入商品ID -->
               <div class="detail-row row-select">
-                <div class="detail-label">工程<span class="required-mark">*</span></div>
+                <div class="detail-label">受入商品ID<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">
-                      <select
-                        id="form-process-id"
-                        v-model="form.工程ID"
-                        class="detail-input select-input"
-                        :class="{ 'input-error': errors.工程ID }"
-                        :disabled="isViewMode"
-                        @blur="handleBlur('工程ID')"
-                        @change="handleInput('工程ID')"
-                      >
+                      <select id="form-product-id" v-model="form.受入商品ID"
+                        class="detail-input select-input" :class="{ 'input-error': errors.受入商品ID }"
+                        :disabled="isViewMode" @blur="handleBlur('受入商品ID')" @change="handleInput('受入商品ID')">
                         <option value="">選択してください</option>
-                        <option v-for="item in 工程一覧" :key="item.工程ID" :value="item.工程ID">
-                          {{ item.工程名 }} ({{ item.工程ID }})
+                        <option v-for="item in 表示用商品一覧" :key="item.商品ID" :value="item.商品ID">
+                          {{ item.商品ID }} / {{ item.商品名 }}
                         </option>
                       </select>
-                      <span v-if="errors.工程ID" class="input-alert">!</span>
+                      <span v-if="errors.受入商品ID" class="input-alert">!</span>
                     </div>
-                    <div v-if="errors.工程ID && errors.工程ID !== 'ERROR'" class="field-error">{{ errors.工程ID }}</div>
+                    <div v-if="errors.受入商品ID && errors.受入商品ID !== 'ERROR'" class="field-error">{{ errors.受入商品ID }}</div>
                   </div>
                 </div>
               </div>
 
+              <!-- 受入商品名 -->
+              <div class="detail-row row-name">
+                <div class="detail-label">受入商品名</div>
+                <div class="detail-value">
+                  <input type="text" :value="商品名表示" class="detail-input wide-input" readonly />
+                </div>
+              </div>
+
+              <!-- 最小ロット数量 -->
+              <div class="detail-row row-lot">
+                <div class="detail-label">最小ロット数量<span class="required-mark">*</span></div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="lot-wrap">
+                      <div class="input-wrap">
+                        <input id="form-lot" type="number" step="0.001" v-model="form.最小ロット数量"
+                          class="detail-input number-input" :class="{ 'input-error': errors.最小ロット数量 }"
+                          :readonly="true" @blur="handleBlur('最小ロット数量')" />
+                        <span v-if="errors.最小ロット数量" class="input-alert">!</span>
+                      </div>
+                      <span class="unit-text">{{ 商品単位表示 }}</span>
+                    </div>
+                    <div v-if="errors.最小ロット数量 && errors.最小ロット数量 !== 'ERROR'" class="field-error">{{ errors.最小ロット数量 }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 受入数量 -->
+              <div class="detail-row row-lot">
+                <div class="detail-label">受入数量</div>
+                <div class="detail-value">
+                  <div class="lot-wrap">
+                    <input type="number" step="0.001" v-model="form.受入数量"
+                      class="detail-input number-input" :readonly="isViewMode" @input="recalcAll()" />
+                    <span class="unit-text">{{ 商品単位表示 }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 生産区分 -->
               <div class="detail-row row-select">
                 <div class="detail-label">生産区分<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">
-                      <select
-                        id="form-production-type"
-                        v-model="form.生産区分ID"
-                        class="detail-input select-input"
-                        :class="{ 'input-error': errors.生産区分ID }"
-                        :disabled="isViewMode"
-                        @blur="handleBlur('生産区分ID')"
-                        @change="handleInput('生産区分ID')"
-                      >
+                      <select id="form-production-type" v-model="form.生産区分ID"
+                        class="detail-input select-input" :class="{ 'input-error': errors.生産区分ID }"
+                        :disabled="isViewMode" @blur="handleBlur('生産区分ID')" @change="handleInput('生産区分ID')">
                         <option value="">選択してください</option>
-                        <option v-for="item in 生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
+                        <option v-for="item in 表示用生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
                           {{ item.生産区分名 }}
                         </option>
                       </select>
@@ -515,109 +685,154 @@ watch(() => route.query, async (query) => {
                 </div>
               </div>
 
-              <div class="detail-row row-remarks">
-                <div class="detail-label">生産内容</div>
+              <!-- 生産工程 -->
+              <div class="detail-row row-select">
+                <div class="detail-label">生産工程<span class="required-mark">*</span></div>
                 <div class="detail-value">
-                  <div class="input-wrap">
-                    <textarea
-                      v-model="form.生産内容"
-                      class="detail-textarea remarks-textarea"
-                      rows="3"
-                      :readonly="isViewMode"
-                    ></textarea>
+                  <div class="value-column">
+                    <div class="input-wrap">
+                      <select id="form-process-id" v-model="form.生産工程ID"
+                        class="detail-input select-input" :class="{ 'input-error': errors.生産工程ID }"
+                        :disabled="isViewMode" @blur="handleBlur('生産工程ID')" @change="handleInput('生産工程ID')">
+                        <option value="">選択してください</option>
+                        <option v-for="item in 表示用生産工程一覧" :key="item.生産工程ID" :value="item.生産工程ID">
+                          {{ item.生産工程名 }} ({{ item.生産工程ID }})
+                        </option>
+                      </select>
+                      <span v-if="errors.生産工程ID" class="input-alert">!</span>
+                    </div>
+                    <div v-if="errors.生産工程ID && errors.生産工程ID !== 'ERROR'" class="field-error">{{ errors.生産工程ID }}</div>
                   </div>
                 </div>
               </div>
 
+              <!-- 生産内容 -->
+              <div class="detail-row row-remarks">
+                <div class="detail-label">生産内容</div>
+                <div class="detail-value">
+                  <textarea v-model="form.生産内容" class="detail-textarea remarks-textarea" rows="2" :readonly="isViewMode"></textarea>
+                </div>
+              </div>
+
+              <!-- 生産備考 -->
               <div class="detail-row row-remarks">
                 <div class="detail-label">生産備考</div>
                 <div class="detail-value">
-                  <div class="input-wrap">
-                    <textarea
-                      v-model="form.生産備考"
-                      class="detail-textarea remarks-textarea"
-                      rows="3"
-                      :readonly="isViewMode"
-                    ></textarea>
-                  </div>
+                  <textarea v-model="form.生産備考" class="detail-textarea remarks-textarea" rows="2" :readonly="isViewMode"></textarea>
                 </div>
+              </div>
+
+              <!-- 明細テーブル（所要量計算） -->
+              <div class="composition-block">
+                <div class="composition-header">
+                  <div class="composition-title">所要量計算</div>
+                  <button v-if="!isViewMode" type="button" class="btn btn-add-row" @click="addDetailRow">行追加</button>
+                </div>
+
+                <div class="composition-table-wrap">
+                  <table class="composition-table">
+                    <thead>
+                      <tr>
+                        <th class="w-seq">SEQ</th>
+                        <th class="w-product">払出商品ID</th>
+                        <th class="w-name">払出商品名</th>
+                        <th class="w-ratio">計算分子数量</th>
+                        <th class="w-ratio">計算分母数量</th>
+                        <th class="w-result">計算式(参考:切上整数)</th>
+                        <th class="w-qty">最小ロット構成数量</th>
+                        <th class="w-qty">払出数量</th>
+                        <th class="w-unit">単位</th>
+                        <th class="w-note">所要量備考</th>
+                        <th v-if="!isViewMode" class="w-action">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-if="明細一覧.length === 0">
+                        <td :colspan="isViewMode ? 10 : 11" class="cell-center no-data">明細なし</td>
+                      </tr>
+                      <tr v-for="(row, index) in 明細一覧" :key="`detail-${index}`">
+                        <td class="cell-center">{{ row.明細SEQ }}</td>
+                        <td>
+                          <select v-model="row.払出商品ID" class="table-input select-cell" :disabled="isViewMode || !row.isUserAdded">
+                            <option value="">選択</option>
+                            <option v-for="item in 表示用商品一覧" :key="`${index}-${item.商品ID}`" :value="item.商品ID">
+                              {{ item.商品ID }}
+                            </option>
+                          </select>
+                        </td>
+                        <td>{{ get払出商品(row.払出商品ID)?.商品名 || '' }}</td>
+                        <td>
+                          <input v-model="row.計算分子数量" type="number" step="0.001" class="table-input number-cell"
+                            :readonly="isViewMode || !row.isUserAdded" @input="recalcRow(row)" />
+                        </td>
+                        <td>
+                          <input v-model="row.計算分母数量" type="number" step="0.001" class="table-input number-cell"
+                            :readonly="isViewMode || !row.isUserAdded" @input="recalcRow(row)" />
+                        </td>
+                        <td class="formula-cell">
+                          {{ row.計算分子数量 || '0' }} / {{ row.計算分母数量 || '0' }} × {{ form.受入数量 || '0' }} = {{ calc最小ロット構成数量(row) }}
+                        </td>
+                        <td>
+                          <input v-model="row.最小ロット構成数量" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode || !row.isUserAdded" />
+                        </td>
+                        <td>
+                          <input v-model="row.払出数量" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode" />
+                        </td>
+                        <td class="cell-center">{{ get払出商品(row.払出商品ID)?.単位 || '' }}</td>
+                        <td>
+                          <input v-model="row.所要数量備考" type="text" class="table-input note-cell" :readonly="isViewMode" />
+                        </td>
+                        <td v-if="!isViewMode && row.isUserAdded" class="cell-center">
+                          <button type="button" class="btn btn-row-delete" @click="removeDetailRow(index)">削除</button>
+                        </td>
+                        <td v-else-if="!isViewMode" class="cell-center"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div v-if="detailError" class="detail-error">{{ detailError }}</div>
               </div>
             </template>
 
             <template v-if="activeTab === 'others'">
+              <div class="detail-row row-valid">
+                <div class="detail-label">有効</div>
+                <div class="detail-value">
+                  <label class="valid-checkbox-label" :class="{ 'valid-checkbox-label-disabled': isViewMode }">
+                    <input type="checkbox" v-model="form.有効" :disabled="isViewMode" class="valid-checkbox" aria-label="有効の切り替え" />
+                    <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !form.有効 }">{{ form.有効 ? '✅' : '☐' }}</span>
+                  </label>
+                </div>
+              </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">登録日時</div>
-                <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録日時 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
-                </div>
+                <div class="detail-value"><input type="text" :value="detailData?.登録日時 || ''" class="detail-input w-2x center-input" readonly /></div>
               </div>
               <div class="detail-row row-user">
                 <div class="detail-label">登録利用者</div>
-                <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録利用者名 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
-                </div>
+                <div class="detail-value"><input type="text" :value="detailData?.登録利用者名 || ''" class="detail-input w-2x center-input" readonly /></div>
               </div>
               <div class="detail-row row-terminal">
                 <div class="detail-label">登録端末</div>
-                <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録端末ID || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
-                </div>
+                <div class="detail-value"><input type="text" :value="detailData?.登録端末ID || ''" class="detail-input w-2x center-input" readonly /></div>
               </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">更新日時</div>
-                <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新日時 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
-                </div>
+                <div class="detail-value"><input type="text" :value="detailData?.更新日時 || ''" class="detail-input w-2x center-input" readonly /></div>
               </div>
               <div class="detail-row row-user">
                 <div class="detail-label">更新利用者</div>
-                <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新利用者名 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
-                </div>
+                <div class="detail-value"><input type="text" :value="detailData?.更新利用者名 || ''" class="detail-input w-2x center-input" readonly /></div>
               </div>
               <div class="detail-row row-terminal">
                 <div class="detail-label">更新端末</div>
-                <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新端末ID || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
-                </div>
+                <div class="detail-value"><input type="text" :value="detailData?.更新端末ID || ''" class="detail-input w-2x center-input" readonly /></div>
               </div>
             </template>
           </div>
 
           <div class="form-buttons" v-if="!isViewMode">
-            <button type="submit" class="btn btn-success">
-              {{ isCreateMode ? '登録' : '更新' }}
-            </button>
+            <button type="submit" class="btn btn-success">{{ isCreateMode ? '登録' : '更新' }}</button>
             <button v-if="isEditMode" type="button" class="btn btn-danger" @click="deleteData">削除</button>
           </div>
         </form>
@@ -664,7 +879,6 @@ watch(() => route.query, async (query) => {
   background-color: #dc3545;
   color: #fff;
 }
-
 .btn-return:hover { background-color: #c82333; }
 
 .content {
@@ -733,7 +947,6 @@ watch(() => route.query, async (query) => {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 700px;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -750,7 +963,10 @@ watch(() => route.query, async (query) => {
 .detail-row.row-id,
 .detail-row.row-datetime,
 .detail-row.row-select,
+.detail-row.row-name,
+.detail-row.row-lot,
 .detail-row.row-remarks,
+.detail-row.row-valid,
 .detail-row.row-user,
 .detail-row.row-terminal {
   width: fit-content;
@@ -791,7 +1007,10 @@ watch(() => route.query, async (query) => {
 .row-id .detail-value,
 .row-datetime .detail-value,
 .row-select .detail-value,
+.row-name .detail-value,
+.row-lot .detail-value,
 .row-remarks .detail-value,
+.row-valid .detail-value,
 .row-user .detail-value,
 .row-terminal .detail-value {
   width: auto;
@@ -805,11 +1024,10 @@ watch(() => route.query, async (query) => {
   gap: 2px;
 }
 
-.detail-input {
-  width: 100%;
+.detail-input,
+.table-input {
   height: 28px;
   padding: 0 8px;
-  padding-right: 26px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   background: #fff;
@@ -819,20 +1037,22 @@ watch(() => route.query, async (query) => {
 }
 
 .detail-input:focus,
-.detail-textarea:focus {
+.detail-textarea:focus,
+.table-input:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
 }
 
-.detail-input.input-error,
-.detail-textarea.input-error {
+.detail-input.input-error {
   border-color: #dc2626;
   background-color: #fff8f8;
 }
 
 .detail-input[readonly],
-.detail-input[disabled] {
+.detail-input[disabled],
+.table-input[readonly],
+.table-input[disabled] {
   color: #555;
   background-color: #f8f9fa;
 }
@@ -840,11 +1060,25 @@ watch(() => route.query, async (query) => {
 .id-input { width: 160px; text-align: center; }
 .datetime-input { width: 240px; }
 .select-input { width: 320px; padding-right: 8px; }
-.remarks-textarea { width: 320px; }
+.wide-input { width: 420px; }
+.number-input { width: 180px; text-align: right; }
+
+.lot-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.unit-text {
+  min-width: 60px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.remarks-textarea { width: 420px; }
 
 .detail-textarea {
   height: auto;
-  min-height: 60px;
+  min-height: 50px;
   padding: 4px 8px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
@@ -862,7 +1096,6 @@ watch(() => route.query, async (query) => {
 .input-wrap {
   position: relative;
   width: 100%;
-  margin: 0;
   display: flex;
   align-items: center;
 }
@@ -874,7 +1107,6 @@ watch(() => route.query, async (query) => {
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
-  border-radius: 0;
   background: #dc2626;
   color: #fff;
   font-weight: 700;
@@ -885,18 +1117,80 @@ watch(() => route.query, async (query) => {
   pointer-events: none;
 }
 
-.field-error {
+.field-error,
+.detail-error {
   font-size: 11px;
   color: #dc2626;
-  line-height: 1;
-  margin: 0;
-  padding: 0;
+  line-height: 1.3;
+  margin-top: 4px;
 }
 
 .required-mark {
   color: #dc2626;
   font-weight: 700;
   margin-left: 4px;
+}
+
+.composition-block {
+  margin-top: 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+}
+
+.composition-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.composition-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.composition-table-wrap {
+  overflow-x: auto;
+  position: relative;
+}
+
+.composition-table {
+  width: auto;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.composition-table th,
+.composition-table td {
+  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.composition-table th {
+  background: #37474f;
+  color: #fff;
+  font-weight: 600;
+}
+
+.w-seq { width: 50px; }
+.w-unit { width: 60px; }
+.w-action { width: 70px; }
+
+.cell-center { text-align: center; }
+.no-data { color: #888; padding: 16px; }
+
+.select-cell { width: 140px; }
+.number-cell { width: 110px; text-align: right; }
+.note-cell { width: 170px; }
+
+.formula-cell {
+  color: #1f2937;
+  font-weight: 600;
+  background: #f8fafc;
 }
 
 .form-buttons {
@@ -921,6 +1215,68 @@ watch(() => route.query, async (query) => {
 .btn-success:hover { background-color: #1e7e34; }
 .btn-danger { background-color: #dc3545; color: white; }
 .btn-danger:hover { background-color: #c82333; }
-.btn-secondary { background-color: #6c757d; color: white; }
-.btn-secondary:hover { background-color: #545b62; }
+.btn-secondary { background-color: #ffffff; color: #000000; border: 1px solid #000000; }
+.btn-secondary:hover { background-color: #f2f2f2; }
+
+.btn-add-row {
+  padding: 6px 14px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+}
+.btn-add-row:hover { background: #1d4ed8; }
+
+.btn-add-row-top {
+  display: block;
+  margin-left: auto;
+  margin-bottom: 4px;
+}
+
+.btn-row-delete {
+  padding: 4px 8px;
+  background: #dc3545;
+  color: #fff;
+  font-size: 12px;
+}
+.btn-row-delete:hover { background: #c82333; }
+
+.valid-checkbox-label {
+  width: 320px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f8f9fa;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.valid-checkbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.valid-checkbox-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 16px;
+  color: #16a34a;
+}
+
+.valid-checkbox-inactive { color: #222; }
+.valid-checkbox-label-disabled { cursor: default; }
+.valid-checkbox-label:focus-within { border-color: #007bff; }
 </style>

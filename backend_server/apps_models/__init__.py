@@ -13,7 +13,8 @@ from core_models.C利用者 import C利用者
 from core_models.C採番 import C採番
 from apps_models.M配車区分 import M配車区分
 from apps_models.M生産区分 import M生産区分
-from apps_models.M工程 import M工程
+from apps_models.M生産工程 import M生産工程
+from apps_models.M商品分類 import M商品分類
 from apps_models.M車両 import M車両
 from apps_models.M商品 import M商品
 from apps_models.M商品構成 import M商品構成
@@ -29,7 +30,8 @@ __all__ = [
     'C採番',
     'M配車区分',
     'M生産区分',
-    'M工程',
+    'M生産工程',
+    'M商品分類',
     'M車両',
     'M商品',
     'M商品構成',

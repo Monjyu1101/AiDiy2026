@@ -53,7 +53,7 @@
  <tr>
  <td><strong>データベース</strong></td>
  <td>SQLite（ファイル）</td>
- <td>PostgreSQL/MySQL</td>
+ <td>SQLite（現行実装）</td>
  </tr>
  <tr>
  <td><strong>CORS</strong></td>
@@ -97,8 +97,8 @@
  <div>ステップ 2. データベースの強化</div>
  <ul>
  <li>パスワードをbcryptでハッシュ化</li>
- <li>SQLiteから本番用DBに移行</li>
- <li>PostgreSQLまたはMySQLを使用</li>
+ <li>SQLiteファイルの配置先・権限・バックアップ運用を固定する</li>
+ <li>外部RDBへ移行する場合は実装差分の洗い出しを行う</li>
  <li>定期バックアップを設定</li>
  </ul>
  </div>
@@ -146,7 +146,7 @@ DATABASE_URL = "sqlite:///backend_server/_data/AiDiy/database.db"</code></pre>
  <h3>本番環境での設定</h3>
  <pre><code># .env ファイル（Gitに含めない）
 SECRET_KEY=ランダム生成した強力な秘密鍵
-DATABASE_URL=postgresql://dbuser:パスワード@db-server/proddb
+DATABASE_URL=sqlite:///backend_server/_data/AiDiy/database.db
 
 # database.py
 import os
@@ -154,13 +154,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
-DATABASE_URL = os.getenv("DATABASE_URL") # 本番ではPostgreSQLを使用</code></pre>
+DATABASE_URL = os.getenv("DATABASE_URL")</code></pre>
 
  <div>
  <strong>重要 </strong>
  <p>
- 本番環境ではSQLiteではなく<strong>PostgreSQLまたはMySQL</strong>を使用してください。<br>
- SQLiteは同時アクセスに制限があり本番環境には不向きです。
+ 現行リポジトリの実装は<strong>SQLite前提</strong>です。<br>
+ 本番運用時はバックアップ、排他制御、配置先、同時アクセス量を事前に評価してください。外部RDB化は追加実装が必要です。
  </p>
  </div>
 
@@ -239,11 +239,11 @@ WantedBy=multi-user.target</code></pre>
  <h2>デプロイ手順</h2>
  <ol>
  <li><strong>サーバー準備</strong> — Ubuntu/CentOS等のLinuxサーバーを用意</li>
- <li><strong>必要ソフトウェアのインストール</strong> — Python, PostgreSQL, Nginxをインストール</li>
+ <li><strong>必要ソフトウェアのインストール</strong> — Python, Nginxをインストール</li>
  <li><strong>コードのデプロイ</strong> — Git clone または SCP/FTPで転送</li>
  <li><strong>環境変数の設定</strong> — .envファイルを作成</li>
  <li><strong>依存パッケージのインストール</strong> — <code>uv sync</code></li>
- <li><strong>データベースの初期化</strong> — マイグレーションと初期データ投入</li>
+ <li><strong>データベースの初期化</strong> — SQLiteファイル配置と初期データ投入を確認</li>
  <li><strong>サービスの起動</strong> — <code>systemctl start aidiy-core</code> および <code>systemctl start aidiy-apps</code></li>
  <li><strong>Nginx設定</strong> — リバースプロキシとHTTPS設定</li>
  <li><strong>動作確認</strong> — ブラウザからアクセスして確認</li>
@@ -269,23 +269,11 @@ CMD ["uvicorn", "core_main:app", "--host", "0.0.0.0", "--port", "8091"]</code></
  <pre><code># docker-compose.yml
 version: '3.8'
 services:
- db:
-   image: postgres:16
-   environment:
-     POSTGRES_PASSWORD: secure_password
  core:
    build: ./backend_server
-   depends_on:
-     - db
-   environment:
-     DATABASE_URL: postgresql://postgres:secure_password@db/aidiy
    command: uvicorn core_main:app --host 0.0.0.0 --port 8091
  apps:
    build: ./backend_server
-   depends_on:
-     - db
-   environment:
-     DATABASE_URL: postgresql://postgres:secure_password@db/aidiy
    command: uvicorn apps_main:app --host 0.0.0.0 --port 8092</code></pre>
 
  <div>

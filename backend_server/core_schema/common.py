@@ -25,6 +25,11 @@ class ErrorResponse(BaseModel):
     message: str
     error: Optional[dict] = None
 
+
+class ListRequest(BaseModel):
+    件数制限: Optional[bool] = True
+    無効も表示: Optional[bool] = False
+
 # --- 認証 ---
 
 class LoginRequest(BaseModel):

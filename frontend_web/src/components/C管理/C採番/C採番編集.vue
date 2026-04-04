@@ -440,7 +440,7 @@ watch(() => route.query, async (query) => {
                 <div class="detail-value">
                   <input
                     type="text"
-                    :value="detailData?.登録端末 || ''"
+                    :value="detailData?.登録端末ID || ''"
                     class="detail-input w-2x center-input"
                     readonly
                   />
@@ -473,7 +473,7 @@ watch(() => route.query, async (query) => {
                 <div class="detail-value">
                   <input
                     type="text"
-                    :value="detailData?.更新端末 || ''"
+                    :value="detailData?.更新端末ID || ''"
                     class="detail-input w-2x center-input"
                     readonly
                   />
@@ -843,12 +843,13 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-secondary {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
 }
 
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: #f2f2f2;
 }
 
 .message {

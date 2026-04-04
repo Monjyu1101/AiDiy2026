@@ -39,3 +39,27 @@ def create_M配車区分(db: Session, 配車区分: schemas.M配車区分Create,
     db.commit()
     db.refresh(db_配車区分)
     return db_配車区分
+
+
+def init_M配車区分_data(db: Session, 認証情報: Optional[Dict] = None):
+    """M配車区分の初期データを投入"""
+    from log_config import get_logger
+    if db.query(models.M配車区分).first():
+        return
+    logger = get_logger(__name__)
+    初期データ = [
+        ('1', '通常', '青', '#001f3f', '#cce6ff', '#000000'),
+        ('2', '定期', '緑', '#003300', '#ccffcc', '#000000'),
+        ('3', '予備', '黄', '#4d3300', '#ffffcc', '#000000'),
+        ('4', '緊急', '赤', '#660000', '#ffcccc', '#000000'),
+        ('5', '特別', '紫', '#330044', '#e6ccff', '#000000'),
+        ('6', '巡回', '水', '#004444', '#ccffff', '#000000'),
+        ('7', '回送', '黒', '#000000', '#e6e6e6', '#000000'),
+        ('8', '予備', '灰', '#1a1a1a', '#f0f0f0', '#000000'),
+    ]
+    for 配車区分ID, 配車区分名, 配車区分備考, 配色枠, 配色背景, 配色前景 in 初期データ:
+        create_M配車区分(db, schemas.M配車区分Create(
+            配車区分ID=配車区分ID, 配車区分名=配車区分名, 配車区分備考=配車区分備考,
+            配色枠=配色枠, 配色背景=配色背景, 配色前景=配色前景,
+        ), 認証情報=認証情報)
+    logger.info("Initialized M配車区分")

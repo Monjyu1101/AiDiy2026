@@ -51,6 +51,19 @@
         <div class="menu-row">
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
+              <span class="icon">M分</span>
+              M商品分類
+            </div>
+            <div class="menu-card-description">
+              商品分類マスター・牛飼料系から原材料他までの分類管理
+            </div>
+            <router-link to="/Mマスタ/M商品分類/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
               <span class="icon">M商</span>
               M商品
             </div>
@@ -79,18 +92,6 @@
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
-            <div class="menu-card-title">
-              <span class="icon">M工</span>
-              M工程
-            </div>
-            <div class="menu-card-description">
-              工程マスター管理・ライン１からライン７までの工程登録
-            </div>
-            <router-link to="/Mマスタ/M工程/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
 
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
@@ -101,6 +102,19 @@
               生産区分マスター・牛飼料からその他までの区分管理・色設定
             </div>
             <router-link to="/Mマスタ/M生産区分/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M工</span>
+              M生産工程
+            </div>
+            <div class="menu-card-description">
+              生産工程マスター管理・ライン１からライン７までの生産工程登録
+            </div>
+            <router-link to="/Mマスタ/M生産工程/一覧?戻URL=/Mマスタ" class="menu-card-link">
               開く →
             </router-link>
           </div>

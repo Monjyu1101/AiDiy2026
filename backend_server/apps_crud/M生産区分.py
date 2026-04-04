@@ -42,3 +42,24 @@ def create_M生産区分(db: Session, 生産区分: schemas.M生産区分Create,
     db.commit()
     db.refresh(db_生産区分)
     return db_生産区分
+
+
+def init_M生産区分_data(db: Session, 認証情報: Optional[Dict] = None):
+    """M生産区分の初期データを投入"""
+    from log_config import get_logger
+    if db.query(models.M生産区分).first():
+        return
+    logger = get_logger(__name__)
+    初期データ = [
+        ('A', '牛飼料', '', '#001f3f', '#cce6ff', '#000000'),
+        ('B', '豚飼料', '', '#003300', '#ccffcc', '#000000'),
+        ('C', '鶏飼料', '', '#4d3300', '#ffffcc', '#000000'),
+        ('D', '魚飼料', '', '#660000', '#ffcccc', '#000000'),
+        ('Z', 'その他', '', '#1a1a1a', '#f0f0f0', '#000000'),
+    ]
+    for 生産区分ID, 生産区分名, 生産区分備考, 配色枠, 配色背景, 配色前景 in 初期データ:
+        create_M生産区分(db, schemas.M生産区分Create(
+            生産区分ID=生産区分ID, 生産区分名=生産区分名, 生産区分備考=生産区分備考,
+            配色枠=配色枠, 配色背景=配色背景, 配色前景=配色前景,
+        ), 認証情報=認証情報)
+    logger.info("Initialized M生産区分")

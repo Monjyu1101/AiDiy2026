@@ -202,28 +202,53 @@ export interface M車両DeleteRequest {
 }
 
 /**
- * M工程 API
+ * M生産工程 API
  */
-export interface M工程GetRequest {
-  工程ID: string
+export interface M生産工程GetRequest {
+  生産工程ID: string
 }
 
-export interface M工程CreateRequest {
-  工程ID: string
-  工程名: string
-  工程備考?: string
+export interface M生産工程CreateRequest {
+  生産工程ID: string
+  生産工程名: string
+  生産工程備考?: string
   有効?: boolean
 }
 
-export interface M工程UpdateRequest {
-  工程ID: string
-  工程名?: string
-  工程備考?: string
+export interface M生産工程UpdateRequest {
+  生産工程ID: string
+  生産工程名?: string
+  生産工程備考?: string
   有効?: boolean
 }
 
-export interface M工程DeleteRequest {
-  工程ID: string
+export interface M生産工程DeleteRequest {
+  生産工程ID: string
+}
+
+/**
+ * M商品分類 API
+ */
+export interface M商品分類GetRequest {
+  商品分類ID: string
+}
+
+export interface M商品分類CreateRequest {
+  商品分類ID: string
+  商品分類名: string
+  商品分類備考?: string
+  有効?: boolean
+}
+
+export interface M商品分類UpdateRequest {
+  商品分類ID: string
+  商品分類名?: string
+  商品分類備考?: string
+  有効?: boolean
+}
+
+export interface M商品分類DeleteRequest {
+  商品分類ID: string
 }
 
 /**
@@ -237,6 +262,7 @@ export interface M商品CreateRequest {
   商品ID: string
   商品名: string
   単位: string
+  商品分類ID: string
   商品備考?: string
   有効?: boolean
 }
@@ -245,6 +271,7 @@ export interface M商品UpdateRequest {
   商品ID: string
   商品名?: string
   単位?: string
+  商品分類ID?: string
   商品備考?: string
   有効?: boolean
 }
@@ -254,10 +281,10 @@ export interface M商品DeleteRequest {
 }
 
 export interface M商品構成明細Request {
-  明細番号: number
+  明細SEQ: number
   構成商品ID: string
-  構成数量分子: number
-  構成数量分母: number
+  計算分子数量: number
+  計算分母数量: number
   構成商品備考?: string | null
 }
 
@@ -267,7 +294,9 @@ export interface M商品構成GetRequest {
 
 export interface M商品構成CreateRequest {
   商品ID: string
-  生産ロット: number
+  最小ロット数量: number
+  生産区分ID: string
+  生産工程ID: string
   商品構成備考?: string | null
   有効?: boolean
   明細一覧: M商品構成明細Request[]
@@ -275,7 +304,9 @@ export interface M商品構成CreateRequest {
 
 export interface M商品構成UpdateRequest {
   商品ID: string
-  生産ロット?: number
+  最小ロット数量?: number
+  生産区分ID?: string
+  生産工程ID?: string
   商品構成備考?: string | null
   有効?: boolean
   明細一覧?: M商品構成明細Request[]
@@ -301,4 +332,3 @@ export interface TableColumn {
 export type FilterObject<T> = {
   [K in keyof T]?: string
 }
-

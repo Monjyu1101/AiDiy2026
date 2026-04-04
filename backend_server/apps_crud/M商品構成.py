@@ -22,7 +22,7 @@ def get_M商品構成(db: Session, 商品ID: str):
     return (
         db.query(models.M商品構成)
         .filter(models.M商品構成.商品ID == 商品ID)
-        .order_by(models.M商品構成.明細番号)
+        .order_by(models.M商品構成.明細SEQ)
         .all()
     )
 
@@ -41,14 +41,14 @@ def get_M商品構成明細一覧(db: Session, 商品ID: str):
     """指定商品の構成明細を取得"""
     return (
         db.query(models.M商品構成)
-        .filter(models.M商品構成.商品ID == 商品ID, models.M商品構成.明細番号 > 0)
-        .order_by(models.M商品構成.明細番号)
+        .filter(models.M商品構成.商品ID == 商品ID, models.M商品構成.明細SEQ > 0)
+        .order_by(models.M商品構成.明細SEQ)
         .all()
     )
 
 
-def _build_明細一覧(db: Session, 明細一覧, 生産ロット: float):
-    明細行一覧 = [item for item in 明細一覧 if item.明細番号 > 0]
+def _build_明細一覧(db: Session, 明細一覧):
+    明細行一覧 = [item for item in 明細一覧 if item.明細SEQ > 0]
     if not 明細行一覧:
         return []
 
@@ -61,17 +61,13 @@ def _build_明細一覧(db: Session, 明細一覧, 生産ロット: float):
     result = []
     for item in 明細行一覧:
         構成商品 = 商品マップ.get(item.構成商品ID)
-        構成数量 = 0.0
-        if item.構成数量分母:
-            構成数量 = float(item.構成数量分子) / float(item.構成数量分母) * float(生産ロット)
-
         result.append({
-            "明細番号": item.明細番号,
+            "明細SEQ": item.明細SEQ,
             "構成商品ID": item.構成商品ID,
             "構成商品名": 構成商品.商品名 if 構成商品 else None,
-            "構成数量分子": float(item.構成数量分子),
-            "構成数量分母": float(item.構成数量分母),
-            "構成数量": 構成数量,
+            "計算分子数量": float(item.計算分子数量),
+            "計算分母数量": float(item.計算分母数量),
+            "最小ロット構成数量": float(item.最小ロット構成数量) if item.最小ロット構成数量 is not None else None,
             "構成単位": 構成商品.単位 if 構成商品 else None,
             "構成商品備考": item.構成商品備考,
         })
@@ -84,17 +80,23 @@ def build_M商品構成_data(db: Session, 商品構成一覧):
     if not 商品構成一覧:
         return None
 
-    見出し = next((item for item in 商品構成一覧 if item.明細番号 == 0), 商品構成一覧[0])
+    見出し = next((item for item in 商品構成一覧 if item.明細SEQ == 0), 商品構成一覧[0])
     商品 = db.query(models.M商品).filter(models.M商品.商品ID == 見出し.商品ID).first()
+    生産区分 = db.query(models.M生産区分).filter(models.M生産区分.生産区分ID == 見出し.生産区分ID).first()
+    工程 = db.query(models.M生産工程).filter(models.M生産工程.生産工程ID == 見出し.生産工程ID).first()
 
     return {
         "商品ID": 見出し.商品ID,
         "商品名": 商品.商品名 if 商品 else None,
         "単位": 商品.単位 if 商品 else None,
-        "生産ロット": float(見出し.生産ロット),
+        "最小ロット数量": float(見出し.最小ロット数量),
+        "生産区分ID": 見出し.生産区分ID,
+        "生産区分名": 生産区分.生産区分名 if 生産区分 else None,
+        "生産工程ID": 見出し.生産工程ID,
+        "生産工程名": 工程.生産工程名 if 工程 else None,
         "商品構成備考": 見出し.商品構成備考,
         "有効": bool(見出し.有効),
-        "明細一覧": _build_明細一覧(db, 商品構成一覧, 見出し.生産ロット),
+        "明細一覧": _build_明細一覧(db, 商品構成一覧),
         "登録日時": 見出し.登録日時,
         "登録利用者ID": 見出し.登録利用者ID,
         "登録利用者名": 見出し.登録利用者名,
@@ -109,7 +111,9 @@ def build_M商品構成_data(db: Session, 商品構成一覧):
 def _create_レコード一覧(
     db: Session,
     商品ID: str,
-    生産ロット: float,
+    最小ロット数量: float,
+    生産区分ID: str,
+    生産工程ID: str,
     商品構成備考: Optional[str],
     有効: bool,
     明細一覧: list[schemas.M商品構成明細Base],
@@ -118,12 +122,15 @@ def _create_レコード一覧(
     db.add(
         models.M商品構成(
             商品ID=商品ID,
-            明細番号=0,
-            生産ロット=生産ロット,
+            明細SEQ=0,
+            最小ロット数量=最小ロット数量,
+            生産区分ID=生産区分ID,
+            生産工程ID=生産工程ID,
             商品構成備考=商品構成備考,
             構成商品ID=None,
-            構成数量分子=None,
-            構成数量分母=None,
+            計算分子数量=None,
+            計算分母数量=None,
+            最小ロット構成数量=None,
             構成商品備考=None,
             有効=有効,
             **監査項目,
@@ -134,12 +141,15 @@ def _create_レコード一覧(
         db.add(
             models.M商品構成(
                 商品ID=商品ID,
-                明細番号=明細.明細番号,
-                生産ロット=生産ロット,
+                明細SEQ=明細.明細SEQ,
+                最小ロット数量=最小ロット数量,
+                生産区分ID=生産区分ID,
+                生産工程ID=生産工程ID,
                 商品構成備考=商品構成備考,
                 構成商品ID=明細.構成商品ID,
-                構成数量分子=明細.構成数量分子,
-                構成数量分母=明細.構成数量分母,
+                計算分子数量=明細.計算分子数量,
+                計算分母数量=明細.計算分母数量,
+                最小ロット構成数量=明細.最小ロット構成数量,
                 構成商品備考=明細.構成商品備考,
                 有効=有効,
                 **監査項目,
@@ -157,7 +167,9 @@ def create_M商品構成(
     _create_レコード一覧(
         db,
         商品構成.商品ID,
-        商品構成.生産ロット,
+        商品構成.最小ロット数量,
+        商品構成.生産区分ID,
+        商品構成.生産工程ID,
         商品構成.商品構成備考,
         商品構成.有効,
         商品構成.明細一覧,
@@ -178,20 +190,22 @@ def update_M商品構成(
     if not 既存一覧:
         return None
 
-    見出し = next((item for item in 既存一覧 if item.明細番号 == 0), 既存一覧[0])
-    生産ロット = 商品構成.生産ロット if 商品構成.生産ロット is not None else 見出し.生産ロット
+    見出し = next((item for item in 既存一覧 if item.明細SEQ == 0), 既存一覧[0])
+    最小ロット数量 = 商品構成.最小ロット数量 if 商品構成.最小ロット数量 is not None else 見出し.最小ロット数量
+    生産区分ID = 商品構成.生産区分ID if 商品構成.生産区分ID is not None else 見出し.生産区分ID
+    生産工程ID = 商品構成.生産工程ID if 商品構成.生産工程ID is not None else 見出し.生産工程ID
     商品構成備考 = 商品構成.商品構成備考 if 商品構成.商品構成備考 is not None else 見出し.商品構成備考
     有効 = 商品構成.有効 if 商品構成.有効 is not None else 見出し.有効
     明細一覧 = 商品構成.明細一覧 if 商品構成.明細一覧 is not None else [
         schemas.M商品構成明細Base(
-            明細番号=item.明細番号,
+            明細SEQ=item.明細SEQ,
             構成商品ID=item.構成商品ID,
-            構成数量分子=item.構成数量分子,
-            構成数量分母=item.構成数量分母,
+            計算分子数量=item.計算分子数量,
+            計算分母数量=item.計算分母数量,
             構成商品備考=item.構成商品備考,
         )
         for item in 既存一覧
-        if item.明細番号 > 0
+        if item.明細SEQ > 0
     ]
 
     監査項目 = {
@@ -205,7 +219,7 @@ def update_M商品構成(
     db.query(models.M商品構成).filter(models.M商品構成.商品ID == 商品ID).delete(synchronize_session=False)
     db.flush()
     db.expunge_all()
-    _create_レコード一覧(db, 商品ID, 生産ロット, 商品構成備考, 有効, 明細一覧, 監査項目)
+    _create_レコード一覧(db, 商品ID, 最小ロット数量, 生産区分ID, 生産工程ID, 商品構成備考, 有効, 明細一覧, 監査項目)
     db.commit()
     return get_M商品構成(db, 商品ID)
 
@@ -224,3 +238,23 @@ def delete_M商品構成(db: Session, 商品ID: str, 認証情報: Optional[Dict
 
     db.commit()
     return get_M商品構成(db, 商品ID)
+
+
+def init_M商品構成_data(db: Session, 認証情報: Optional[Dict] = None):
+    """M商品構成の初期データを投入"""
+    from log_config import get_logger
+    from apps_crud.seed_data import INITIAL_PRODUCT_COMPOSITIONS
+    if db.query(models.M商品構成).first():
+        return
+    logger = get_logger(__name__)
+    for item in INITIAL_PRODUCT_COMPOSITIONS:
+        create_M商品構成(db, schemas.M商品構成Create(
+            商品ID=item["商品ID"],
+            最小ロット数量=item["最小ロット数量"],
+            生産区分ID=item["商品ID"][:1],
+            生産工程ID="L99",
+            商品構成備考=item.get("商品構成備考", ""),
+            有効=True,
+            明細一覧=[schemas.M商品構成明細Base(**明細) for 明細 in item["明細一覧"]],
+        ), 認証情報=認証情報)
+    logger.info("Initialized M商品構成")

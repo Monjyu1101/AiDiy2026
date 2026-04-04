@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   -*- coding: utf-8 -*-
 
   -------------------------------------------------------------------------
@@ -15,16 +15,19 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
 import type { Column, V車両 } from '../../../../types';
 
 const props = defineProps({
-  includeInactive: { type: Boolean, default: false },
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
 const router = useRouter();
 
 const 車両一覧 = ref<V車両[]>([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('車両ID');
@@ -38,7 +41,7 @@ const filters = reactive({
 });
 const rowKey = '車両ID';
 const columns: Column[] = [
-  { key: '車両ID', label: '車両ID', width: '120px', sortable: true },
+  { key: '車両ID', label: '車両ID', width: '120px', sortable: true, align: 'center' },
   { key: '車両名', label: '車両名', width: '200px', sortable: true },
   { key: '車両備考', label: '車両備考', width: '220px', sortable: true },
   { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
@@ -59,7 +62,6 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return 車両一覧.value.filter((row) => {
-    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -69,7 +71,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => 車両一覧.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -124,11 +126,15 @@ const openDetail = (row) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const res = await apiClient.post('/apps/V車両/一覧');
+    const res = await apiClient.post('/apps/V車両/一覧', {
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    });
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       車両一覧.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'M車両一覧の取得に失敗しました。', 'error');
@@ -176,11 +182,11 @@ defineExpose({
       />
     </template>
     <template #cell="{ row, column, value }">
-      <template v-if="column.key === '車両ID'">
-        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.車両ID }}</a>
+      <template v-if="column.key === '車両ID' || column.key === '車両名'">
+        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ value ?? '' }}</a>
       </template>
       <template v-else-if="column.key === '有効'">
-        <span>{{ row.有効 ? '✅' : '□' }}</span>
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}
@@ -191,4 +197,5 @@ defineExpose({
 
 <style scoped>
 </style>
+
 

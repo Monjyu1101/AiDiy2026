@@ -13,13 +13,14 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import 工程一覧テーブル from './components/M工程一覧テーブル.vue';
+import 生産工程一覧テーブル from './components/M生産工程一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
 
 const router = useRouter();
 const route = useRoute();
-const 工程一覧テーブルRef = ref(null);
-const includeInactive = ref(false);
+const 生産工程一覧テーブルRef = ref(null);
+const 件数制限 = ref(true);
+const 無効も表示 = ref(false);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
@@ -36,12 +37,12 @@ const 編集戻URL = computed(() => {
 });
 
 const handleReload = () => {
-  工程一覧テーブルRef.value?.loadData();
+  生産工程一覧テーブルRef.value?.loadData();
 };
 
 const openCreate = () => {
   const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
-  router.push({ path: '/Mマスタ/M工程/編集', query });
+  router.push({ path: '/Mマスタ/M生産工程/編集', query });
 };
 
 const showMessage = (msg: string, type?: string) => {
@@ -82,7 +83,7 @@ watch(() => route.query.message, (newMessage) => {
 <template>
   <div class="page-container">
     <h2 class="page-title">
-      <span class="title-text">【 M工程 】</span>
+      <span class="title-text">【 M生産工程 】</span>
       <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
     </h2>
 
@@ -92,10 +93,6 @@ watch(() => route.query.message, (newMessage) => {
           <div class="toolbar-left">
             <div class="search-area">
               <button class="btn btn-primary" @click="handleReload">再検索</button>
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="includeInactive" />
-                無効も検索
-              </label>
             </div>
           </div>
           <div class="toolbar-right">
@@ -103,7 +100,18 @@ watch(() => route.query.message, (newMessage) => {
           </div>
         </div>
 
-        <component :is="工程一覧テーブル" ref="工程一覧テーブルRef" :includeInactive="includeInactive" :戻URL="編集戻URL" />
+        <div class="table-options">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="件数制限" @change="handleReload" />
+            件数制限
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="無効も表示" @change="handleReload" />
+            無効も表示
+          </label>
+        </div>
+
+        <component :is="生産工程一覧テーブル" ref="生産工程一覧テーブルRef" :件数制限="件数制限" :無効も表示="無効も表示" :戻URL="編集戻URL" />
       </div>
     </div>
   </div>
@@ -193,6 +201,13 @@ watch(() => route.query.message, (newMessage) => {
 .toolbar-right {
   display: flex;
   align-items: flex-start;
+}
+
+.table-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 
 .btn {

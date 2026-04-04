@@ -78,7 +78,7 @@ FRONTEND_AVATAR_PATH = "frontend_avatar"
 FRONTEND_AVATAR_PORT = 8099
 
 FRONTEND_COMMAND = "npm"
-QUIET_WAIT_SECONDS = 15
+QUIET_WAIT_SECONDS = 20
 QUIET_MAX_WAIT_SECONDS = 60
 RESTART_WAIT_SECONDS = 15
 
@@ -390,7 +390,7 @@ def wait_for_services_quiet(
     label: str | None = None,
 ) -> None:
     label_text = label or ", ".join(names)
-    print_header(f"{label_text} 落ち着き待機")
+    print_header(f"{label_text} 落ち着き待機 ({seconds}s)")
     start_time = time.time()
 
     while True:

@@ -40,6 +40,7 @@ def create_T商品出庫(db: Session, 商品出庫: schemas.T商品出庫Create,
         商品ID=商品出庫.商品ID,
         出庫数量=商品出庫.出庫数量,
         出庫備考=商品出庫.出庫備考,
+        有効=商品出庫.有効,
         **audit
     )
     db.add(db_商品出庫)
@@ -66,13 +67,16 @@ def update_T商品出庫(db: Session, 出庫伝票ID: str, 商品出庫: schemas
     db.refresh(db_商品出庫)
     return db_商品出庫
 
-def delete_T商品出庫(db: Session, 出庫伝票ID: str):
-    """商品出庫データを削除"""
+def delete_T商品出庫(db: Session, 出庫伝票ID: str, 認証情報: Optional[Dict] = None):
+    """商品出庫データを論理削除"""
     db_商品出庫 = get_T商品出庫(db, 出庫伝票ID)
     if not db_商品出庫:
         return False
 
-    db.delete(db_商品出庫)
+    audit = update_audit_fields(認証情報)
+    db_商品出庫.有効 = False
+    for key, value in audit.items():
+        setattr(db_商品出庫, key, value)
     db.commit()
     return True
 
@@ -103,6 +107,7 @@ def init_T商品出庫_data(db: Session, 認証情報: Optional[Dict] = None):
             商品ID=商品ID,
             出庫数量=出庫数量,
             出庫備考=備考,
+            有効=True,
             **audit
         )
         db.add(出庫データ)

@@ -59,7 +59,12 @@ const addDays = (date, days) => {
 
 const dateDisplay = computed(() => {
   if (!表示日付.value) return '';
-  return `${formatDate(表示日付.value)}`;
+  const year = 表示日付.value.getFullYear();
+  const month = String(表示日付.value.getMonth() + 1).padStart(2, '0');
+  const day = String(表示日付.value.getDate()).padStart(2, '0');
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  const dayName = dayNames[表示日付.value.getDay()];
+  return `${year}/${month}/${day} (${dayName})`;
 });
 
 const showMessage = (text, type = 'info') => {
@@ -400,7 +405,7 @@ watch(() => route.query, async (query) => {
   align-items: center;
   margin: 5px 10px;
   padding: 5px 10px;
-  background-color: #f8f9fa;
+  background-color: transparent;
   border-radius: 5px;
   gap: 10px;
 }
@@ -430,7 +435,7 @@ watch(() => route.query, async (query) => {
 
 .current-period {
   font-weight: bold;
-  font-size: 22px;
+  font-size: 24px;
   text-align: center;
   flex-grow: 1;
   color: #5a4a3a;

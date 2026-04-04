@@ -85,6 +85,8 @@ def update_M商品(
         item.商品名 = request.商品名
     if request.単位 is not None:
         item.単位 = request.単位
+    if request.商品分類ID is not None:
+        item.商品分類ID = request.商品分類ID
     if request.商品備考 is not None:
         item.商品備考 = request.商品備考
     if request.有効 is not None:
@@ -125,4 +127,3 @@ def delete_M商品(
         message="商品の有効をオフにしました",
         data=schemas.M商品.from_orm(item)
     )
-

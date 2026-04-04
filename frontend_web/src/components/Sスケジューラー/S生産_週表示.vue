@@ -89,14 +89,14 @@ const ensureCurrentWeekStart = () => {
 const loadProcesses = async () => {
   isLoading.value = true;
   try {
-    const response = await apiClient.post('/apps/S生産_週表示/工程一覧');
+    const response = await apiClient.post('/apps/S生産_週表示/生産工程一覧');
     if (response.data.status === 'OK') {
-      工程リスト.value = response.data.data?.工程一覧 ?? [];
+      工程リスト.value = response.data.data?.生産工程一覧 ?? [];
     } else {
-      showMessage('工程一覧の取得に失敗しました。', 'error');
+      showMessage('生産工程一覧の取得に失敗しました。', 'error');
     }
   } catch (error) {
-    showMessage('工程一覧の取得でエラーが発生しました。', 'error');
+    showMessage('生産工程一覧の取得でエラーが発生しました。', 'error');
   } finally {
     isLoading.value = false;
   }
@@ -171,7 +171,7 @@ const handleDropUpdate = async ({ scheduleId, processId, dateStr }) => {
   try {
     const response = await apiClient.post('/apps/S生産_週表示/ドラッグ更新', {
       生産伝票ID: scheduleId,
-      工程ID: String(processId),
+      生産工程ID: String(processId),
       変更後日付: dateStr,
       変更後開始日時: newStart.toISOString(),
       変更後終了日時: newEnd.toISOString()
@@ -200,7 +200,7 @@ const openEditForm = (scheduleId = null, processId = null, dateStr = null) => {
   } else if (processId && dateStr) {
     const startDateTime = `${dateStr}T08:00`;
     const endDateTime = `${dateStr}T17:00`;
-    const queryString = `モード=${encodeURIComponent('新規')}&工程ID=${encodeURIComponent(String(processId))}&生産開始日時=${encodeURIComponent(startDateTime)}&生産終了日時=${encodeURIComponent(endDateTime)}&戻URL=${resolvedReturnUrl}`;
+    const queryString = `モード=${encodeURIComponent('新規')}&生産工程ID=${encodeURIComponent(String(processId))}&生産開始日時=${encodeURIComponent(startDateTime)}&生産終了日時=${encodeURIComponent(endDateTime)}&戻URL=${resolvedReturnUrl}`;
     router.push(`/Tトラン/T生産/編集?${queryString}`);
   }
 };
@@ -391,7 +391,7 @@ watch(() => route.query, async (query) => {
   align-items: center;
   margin: 5px 10px;
   padding: 5px 10px;
-  background-color: #f8f9fa;
+  background-color: transparent;
   border-radius: 5px;
   gap: 10px;
 }
@@ -417,7 +417,7 @@ watch(() => route.query, async (query) => {
 
 .current-period {
   font-weight: bold;
-  font-size: 22px;
+  font-size: 24px;
   text-align: center;
   flex-grow: 1;
   color: #5a4a3a;

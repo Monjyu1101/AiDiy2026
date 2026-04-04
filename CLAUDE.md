@@ -1,139 +1,82 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides a quick index for working in this repository.
 
-> **このファイルの役割**: CLAUDE.md は **インデックス兼クイックリファレンス**。実装詳細・追加手順・アーキテクチャ詳細は以下の AGENTS.md を参照。実装作業では必ず該当 AGENTS.md を読むこと。
-> - [AGENTS.md](./AGENTS.md) — プロジェクト全体方針・共通問題・よくあるトラブル
-> - [backend_server/AGENTS.md](./backend_server/AGENTS.md) — バックエンド実装詳細（API/DB/認証/追加手順）
-> - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md) — フロントエンド Web 実装詳細（画面/routing/コンポーネント/追加手順）
-> - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md) — フロントエンド Avatar 実装詳細（Electron/WebSocket/VRM/音声処理）
-
----
-
-## Critical Constraints (MUST READ)
-
-**Japanese-First Implementation:**
-- Table names, column names, API endpoints, JSON keys, Vue components are ALL in Japanese
-- System/framework terms remain English: `request`, `router`, `items`, `total`
-- All files MUST be UTF-8 encoded
-
-**Vue Component Tag Constraint:**
-- Japanese component tags are INVALID in HTML: `<C利用者一覧 />` will NOT work
-- Use dynamic component syntax: `<component :is="C利用者一覧" />`
-- File names can be Japanese: `C利用者一覧.vue` is OK
-
-**Frontend TypeScript:**
-- Strict mode disabled (`strict: false`, `strictNullChecks: false`, `noImplicitAny: false`)
-- jQuery is used in some legacy features alongside Vue 3
-
-**API Design:**
-- ALL CRUD operations use POST method (no GET/PUT/DELETE for data)
-- Exception: `GET /` (health check), `GET /core/サーバー状態` (status)
-- Unified response: `{"status": "OK"/"NG", "message": "...", "data": {...}}`
-- List responses: `{"items": [], "total": N, "limit": 10000}`
-
-**Dual Server Architecture:**
-- core_main.py (port 8091): C系 (Core), A系 (AI) — `/core/*` endpoints
-- apps_main.py (port 8092): M系 (Master), T系 (Transaction), V系 (View), S系 (Scheduler) — `/apps/*` endpoints
-- BOTH servers must be running
-
-**No Database VIEWs:**
-- V系 endpoints use raw SQL queries with JOINs, NOT database VIEW objects
-
-**権限ID is String Type:**
-- Compare with `'1'`, `'2'`, NOT integers `1`, `2`
-
-**Passwords are Plaintext:**
-- `C利用者.パスワード` is stored as plaintext (bcrypt is installed but not used)
-- Do NOT assume hashing when modifying auth code
-
-**AI名 命名規則:**
-- `CHAT_AI_NAME` の値は `_chat` サフィックス必須: `gemini_chat` / `freeai_chat` / `openrt_chat`
-- `LIVE_AI_NAME` の値は `_live` サフィックス必須: `gemini_live` / `freeai_live` / `openai_live`
-- 比較は厳格に完全一致（`startswith` 不使用）
-
-**AIコア WebSocket Packet Format:**
-- All packets: `{セッションID, チャンネル, メッセージ識別, メッセージ内容}`
-- `全ファイルリスト` は `List[str]`（パスのみ）、mtimes は都度読取
-- `files_save` 受信時はバックアップ再実行後にセッションの `全ファイルリスト` を更新（返信なし）
-- `コードベース絶対パス取得` は `CODE_BASE_PATH` 未設定時に `"../"` をデフォルトとして返す
-
-**ファイル書き込み改行:**
-- 通常ファイル: UTF-8 + LF (`newline="\n"`) — Windows 自動変換を抑止
-- `.bat` / `.cmd`: Shift-JIS + CRLF (`newline="\r\n"`)
-
-**No Automated Tests:**
-- Test manually via Swagger UI (`:8091/docs`, `:8092/docs`) and browser
-
-**No Alembic Migrations:**
-- Schema changes: `ALTER TABLE` in `init.py` for existing DBs, or full DB reset
-
-**新規バックエンドテーブル追加時の必須チェック（M系・T系・S系）:**
-1. `apps_models/__init__.py` に Model import 追加（テーブル生成に必要）
-2. `apps_crud/__init__.py` に CRUD関数の import と `__all__` 追加（**忘れやすい**）
-3. `apps_main.py` に Router 登録
-4. M系テーブル追加時は **V系エンドポイントも必ず作成**（フロントはV系を参照する）
+> 実装詳細は次を参照してください。
+> - [AGENTS.md](./AGENTS.md)
+> - [backend_server/AGENTS.md](./backend_server/AGENTS.md)
+> - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
+> - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 
 ---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3.13.3, FastAPI, SQLAlchemy, SQLite, uv |
+| Frontend Web | Node.js 22, Vue 3, Vite, TypeScript, Pinia, Vue Router 4 |
+| Frontend Avatar | Vue 3, Vite, TypeScript, Electron, Three.js, WebSocket |
+| Auth | JWT (python-jose, HS256, 60分) |
+| AI | Anthropic Claude, OpenAI, Google Gemini |
+
+## Critical Constraints
+
+- Japanese-first implementation
+- All files must be UTF-8
+- CRUD APIs are POST-based
+- V系は DB VIEW ではなく生 SQL
+- Passwords are plaintext today
+- No Alembic migrations
+- `frontend_avatar` は Electron / Web デュアルモード
+- Web 版 AI 画面ルートは `/AiDiy`
 
 ## Quick Commands
 
 ```bash
-# Initial setup (first time only)
+# Initial setup
 python _setup.py
 
-# Start servers (interactive: asks backend/web/avatar y/n)
+# Start services (interactive prompt)
 python _start.py
-python _start.py --backend=yes --frontend=no   # backend only
-python _start.py --backend=no  --frontend=yes  # frontend only
 
-# Stop servers
-python _stop.py
-python _stop.py --backend=yes --frontend=no    # backend only
-
-# Trigger backend reload (Windows) — when started via _start.py (no --reload)
-echo. > backend_server/temp/reboot_core.txt   # core_main
-echo. > backend_server/temp/reboot_apps.txt   # apps_main
-
-# Backend with hot-reload (dev)
+# Backend hot reload (manual)
 cd backend_server && .venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
 cd backend_server && .venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
-# Frontend only
+# Frontend
 cd frontend_web && npm run dev
-
-# Type checking / build (frontend web)
 cd frontend_web && npm run type-check
-cd frontend_web && npm run build
 
-# frontend_avatar — DO NOT run npm run build unless explicitly requested (generates dist/)
+# Avatar
 cd frontend_avatar && npm run dev
 cd frontend_avatar && npm run type-check
 
-# Dependencies
+# Backend dependency sync
 cd backend_server && uv sync
-cd frontend_web && npm install
 
-# Cleanup (reset environment)
+# Cleanup
 python _cleanup.py
 
-# Database reset
-del backend_server\_data\AiDiy\database.db   # then restart servers
-
-# Inspect database
-sqlite3 backend_server/_data/AiDiy/database.db ".tables"
-sqlite3 backend_server/_data/AiDiy/database.db "PRAGMA table_info(テーブル名);"
+# Backend reboot trigger when started via _start.py
+echo. > backend_server/temp/reboot_core.txt
+echo. > backend_server/temp/reboot_apps.txt
 ```
 
-**API key configuration:** `backend_server/_config/AiDiy_key.json` (auto-created on first run; excluded from git). Edit this file to set AI provider keys (Anthropic, OpenAI, Google Gemini).
+補足:
+
+- `_start.py` は引数指定ではなく対話形式です。
+- `_stop.py` は現在ありません。停止は `Ctrl+C` または手動のポート解放で行います。
+- `frontend_avatar` の `npm run build` は明示依頼時のみ実行します。
 
 ## Access URLs
 
 | Service | URL |
 |---------|-----|
 | Frontend (Web) | http://localhost:8090 |
-| API Docs (Core) | http://localhost:8091/docs |
-| API Docs (Apps) | http://localhost:8092/docs |
-| Frontend (Avatar) | http://localhost:8099 |
+| Core API Docs | http://localhost:8091/docs |
+| Apps API Docs | http://localhost:8092/docs |
+| Frontend (Avatar Web) | http://localhost:8099/AiDiy |
+| Frontend (Avatar Electron) | `npm run dev` で起動 |
 
-**Default login:** `admin` / `********` (also: `leader`/`secret`, `user`/`user`, `guest`/`guest`)
+**Default login:** `admin / ********`

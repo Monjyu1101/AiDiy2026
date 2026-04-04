@@ -19,7 +19,8 @@ import { qMessage } from '../../../utils/qAlert';
 const router = useRouter();
 const route = useRoute();
 const serialListTableRef = ref(null);
-const includeInactive = ref(false);
+const 件数制限 = ref(true);
+const 無効も表示 = ref(false);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
@@ -92,10 +93,6 @@ watch(() => route.query.message, (newMessage) => {
           <div class="toolbar-left">
             <div class="search-area">
               <button class="btn btn-primary" @click="handleReload">再検索</button>
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="includeInactive" />
-                無効も検索
-              </label>
             </div>
           </div>
           <div class="toolbar-right">
@@ -103,7 +100,18 @@ watch(() => route.query.message, (newMessage) => {
           </div>
         </div>
 
-        <SerialListTable ref="serialListTableRef" :includeInactive="includeInactive" :戻URL="編集戻URL" />
+        <div class="table-options">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="件数制限" @change="handleReload" />
+            件数制限
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="無効も表示" @change="handleReload" />
+            無効も表示
+          </label>
+        </div>
+
+        <SerialListTable ref="serialListTableRef" :件数制限="件数制限" :無効も表示="無効も表示" :戻URL="編集戻URL" />
       </div>
     </div>
   </div>
@@ -193,6 +201,13 @@ watch(() => route.query.message, (newMessage) => {
 .toolbar-right {
   display: flex;
   align-items: flex-start;
+}
+
+.table-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 
 .btn {

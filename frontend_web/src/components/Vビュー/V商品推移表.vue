@@ -27,6 +27,8 @@ const currentDate = ref(dayjs().startOf('day')); // 表示開始日
 const 日付リスト = ref<string[]>([]);
 const 商品データ = ref<any[]>([]);
 const 商品一覧 = ref<any[]>([]);
+const 商品分類ID = ref('');
+const 商品分類一覧 = ref<any[]>([]);
 const isLoading = ref(false);
 const message = ref('');
 const messageType = ref('info');
@@ -54,6 +56,8 @@ const applyQueryParams = (query: any) => {
   const raw = normalizeQueryValue(query.開始日付);
   const parsed = parseStartDate(raw);
   currentDate.value = parsed || dayjs().startOf('day');
+  const 分類ID = normalizeQueryValue(query.商品分類ID);
+  if (分類ID) 商品分類ID.value = String(分類ID);
 };
 
 // 期間計算 (開始日から32日固定)
@@ -100,7 +104,9 @@ const 表示商品データ = computed(() => {
 
 const loadProductList = async () => {
   try {
-    const response = await apiClient.post('/apps/V商品/一覧');
+    const payload: Record<string, any> = {};
+    if (商品分類ID.value) payload.商品分類ID = 商品分類ID.value;
+    const response = await apiClient.post('/apps/V商品/一覧', Object.keys(payload).length ? payload : undefined);
     if (response.data.status === 'OK') {
       const data = response.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
@@ -114,24 +120,28 @@ const loadProductList = async () => {
   }
 };
 
+const loadCategoryList = async () => {
+  try {
+    const response = await apiClient.post('/apps/M商品分類/一覧');
+    if (response.data.status === 'OK') {
+      const data = response.data.data;
+      商品分類一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    }
+  } catch { /* 無視 */ }
+};
+
 // APIデータ取得
 const fetchData = async () => {
   isLoading.value = true;
   message.value = '';
   
   try {
-    const payload = {
+    const payload: Record<string, any> = {
       開始日付: startDate.value,
       終了日付: endDate.value
     };
+    if (商品分類ID.value) payload.商品分類ID = 商品分類ID.value;
     
-    // axiosインスタンスを使用するか、直接axiosを使うか。ここでは直接。
-    // 認証トークンが必要な場合はstoreから取得するロジックが必要だが、
-    // 既存のaxios設定(interceptor)があればそれに任せる。
-    // ここでは簡易的にlocalStorageから取得してみる、あるいはTトラン.vueなどを参照。
-    // AuthStoreを使うのがベスト。
-    
-    // Auth Storeからトークン取得（簡易実装）
     const response = await apiClient.post('/apps/V商品推移表/一覧', payload);
     
     if (response.data.status === 'OK') {
@@ -210,6 +220,13 @@ const stopAutoRefresh = () => {
   }
 };
 
+const handleCategoryChange = async () => {
+  商品データ.value = [];
+  商品一覧.value = [];
+  await fetchData();
+  await initLastModified();
+};
+
 // ナビゲーション操作
 const moveMonth = async (months: number) => {
   currentDate.value = currentDate.value.add(months, 'month');
@@ -226,9 +243,8 @@ const moveDay = async (days: number) => {
 
 const buildPageQuery = (開始日付: string) => {
   const query: Record<string, string> = { 開始日付 };
-  if (戻URL.value) {
-    query.戻URL = 戻URL.value;
-  }
+  if (商品分類ID.value) query.商品分類ID = 商品分類ID.value;
+  if (戻URL.value) query.戻URL = 戻URL.value;
   return query;
 };
 
@@ -240,6 +256,7 @@ const handleReturn = () => {
 onMounted(() => {
   applyQueryParams(route.query);
   applyFallbackDateList();
+  loadCategoryList();
   loadProductList();
   fetchData();
   initLastModified();
@@ -275,6 +292,19 @@ watch(() => route.query.開始日付, () => {
       <button class="nav-button period-nav" @click="moveDay(1)">翌日 ▷</button>
       <button class="nav-button" @click="moveMonth(1)">翌月 ▶</button>
     </div>
+
+    <!-- 絞り込み -->
+    <div class="filter-bar">
+      <div class="category-label">商品分類ID</div>
+      <div class="category-value">
+        <select v-model="商品分類ID" class="category-select" @change="handleCategoryChange">
+          <option value="">すべて</option>
+          <option v-for="item in 商品分類一覧" :key="item.商品分類ID" :value="item.商品分類ID">
+            {{ item.商品分類名 }}
+          </option>
+        </select>
+      </div>
+    </div>
     
     <!-- コンテンツ -->
     <div class="content">
@@ -283,10 +313,11 @@ watch(() => route.query.開始日付, () => {
             <div>読み込み中...</div>
         </div>
         
-        <TransitionTable 
+        <TransitionTable
             v-else
-            :日付リスト="日付リスト" 
-            :商品データ="表示商品データ" 
+            :日付リスト="日付リスト"
+            :商品データ="表示商品データ"
+            :商品分類ID="商品分類ID"
         />
     </div>
   </div>
@@ -343,7 +374,7 @@ watch(() => route.query.開始日付, () => {
   align-items: center;
   margin: 5px 10px;
   padding: 5px 10px;
-  background-color: #f8f9fa;
+  background-color: transparent;
   border-radius: 5px;
   gap: 10px;
 }
@@ -373,9 +404,62 @@ watch(() => route.query.開始日付, () => {
   background-color: #a9d4ee;
 }
 
+.filter-bar {
+  display: flex;
+  width: fit-content;
+  margin: 0 10px 6px 10px;
+}
+
+.category-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: #333;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  padding: 4px 10px;
+  border: 1px solid #b3e5fc;
+  background: #e1f5fe;
+  min-height: 30px;
+  width: 120px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.category-value {
+  display: flex;
+  align-items: center;
+  width: auto;
+  padding: 3px 10px;
+  border: 1px solid #ccc;
+  border-left: none;
+  background: #fff;
+  min-height: 30px;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+.category-select {
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  min-width: 200px;
+  cursor: pointer;
+  box-sizing: border-box;
+  margin: 0;
+}
+.category-select:focus {
+  outline: none;
+  border-color: #81d4fa;
+}
+
 .current-period {
   font-weight: bold;
-  font-size: 22px;
+  font-size: 24px;
   text-align: center;
   flex-grow: 1;
   color: #5a4a3a;

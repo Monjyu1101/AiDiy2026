@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>04 Migration実行</title>
+  <title>04 DB再作成と反映</title>
   <link rel="stylesheet" href="../_shared/doc.css">
   <script src="../_shared/doc.js" defer></script>
 </head>
@@ -14,7 +14,7 @@
     <a href="05_CRUD作成.html">次へ: 05_CRUD作成</a>
   </nav>
 
-  <h1>04_Migration実行</h1>
+  <h1>04_DB再作成と反映</h1>
   <p>このプロジェクトの標準運用は SQLite + <code>create_all()</code> です。Alembicを使わず、DB再作成で反映します。</p>
 
   <h2>手順</h2>
@@ -25,8 +25,6 @@
   </ol>
 
   <pre><code>cd workspace/AiDiy2026
-python _stop.py
-
 del backend_server\_data\AiDiy\database.db
 python _start.py</code></pre>
 

@@ -40,6 +40,7 @@ def create_T商品棚卸(db: Session, 商品棚卸: schemas.T商品棚卸Create,
         商品ID=商品棚卸.商品ID,
         実棚数量=商品棚卸.実棚数量,
         棚卸備考=商品棚卸.棚卸備考,
+        有効=商品棚卸.有効,
         **audit
     )
     db.add(db_商品棚卸)
@@ -66,13 +67,16 @@ def update_T商品棚卸(db: Session, 棚卸伝票ID: str, 商品棚卸: schemas
     db.refresh(db_商品棚卸)
     return db_商品棚卸
 
-def delete_T商品棚卸(db: Session, 棚卸伝票ID: str):
-    """商品棚卸データを削除"""
+def delete_T商品棚卸(db: Session, 棚卸伝票ID: str, 認証情報: Optional[Dict] = None):
+    """商品棚卸データを論理削除"""
     db_商品棚卸 = get_T商品棚卸(db, 棚卸伝票ID)
     if not db_商品棚卸:
         return False
 
-    db.delete(db_商品棚卸)
+    audit = update_audit_fields(認証情報)
+    db_商品棚卸.有効 = False
+    for key, value in audit.items():
+        setattr(db_商品棚卸, key, value)
     db.commit()
     return True
 
@@ -103,6 +107,7 @@ def init_T商品棚卸_data(db: Session, 認証情報: Optional[Dict] = None):
             商品ID=商品ID,
             実棚数量=実棚数量,
             棚卸備考=備考,
+            有効=True,
             **audit
         )
         db.add(棚卸データ)

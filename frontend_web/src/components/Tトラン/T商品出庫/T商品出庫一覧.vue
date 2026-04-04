@@ -20,6 +20,8 @@ import { qMessage } from '../../../utils/qAlert';
 const router = useRouter();
 const route = useRoute();
 const 商品出庫一覧テーブルRef = ref<any>(null);
+const 件数制限 = ref(true);
+const 無効も表示 = ref(false);
 const message = ref('');
 const messageType = ref('success');
 const 開始日付 = ref('');
@@ -145,33 +147,47 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
 
     <div class="content">
       <div class="section">
-        <div class="search-panel">
-          <div class="detail-row">
-            <div class="detail-label">日付範囲</div>
-            <div class="detail-value">
-              <div class="date-range">
-                <input type="date" v-model="開始日付" class="detail-input date-input" />
-                <span class="range-separator">〜</span>
-                <input type="date" v-model="終了日付" class="detail-input date-input" />
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="search-panel">
+              <div class="detail-row">
+                <div class="detail-label">日付範囲</div>
+                <div class="detail-value">
+                  <div class="date-range">
+                    <input type="date" v-model="開始日付" class="detail-input date-input" />
+                    <span class="range-separator">〜</span>
+                    <input type="date" v-model="終了日付" class="detail-input date-input" />
+                  </div>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">商品ID</div>
+                <div class="detail-value">
+                  <select v-model="商品ID" class="detail-input select-input">
+                    <option value="">すべて</option>
+                    <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
+                      {{ item.商品名 }} ({{ item.商品ID }})
+                    </option>
+                  </select>
+                </div>
               </div>
             </div>
+            <button class="btn btn-primary" @click="handleReload">再検索</button>
           </div>
-          <div class="detail-row">
-            <div class="detail-label">商品ID</div>
-            <div class="detail-value">
-              <select v-model="商品ID" class="detail-input select-input">
-                <option value="">すべて</option>
-                <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
-                  {{ item.商品名 }} ({{ item.商品ID }})
-                </option>
-              </select>
-            </div>
+          <div class="toolbar-right">
+            <button class="btn btn-success" @click="openCreate">新規</button>
           </div>
         </div>
 
-        <div class="toolbar">
-          <button class="btn btn-primary" @click="handleReload">再検索</button>
-          <button class="btn btn-success" @click="openCreate">新規</button>
+        <div class="table-options">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="件数制限" @change="handleReload" />
+            件数制限
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="無効も表示" @change="handleReload" />
+            無効も表示
+          </label>
         </div>
 
         <component
@@ -180,6 +196,8 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
           :開始日付="開始日付"
           :終了日付="終了日付"
           :商品ID="商品ID"
+          :件数制限="件数制限"
+          :無効も表示="無効も表示"
           :戻URL="編集戻URL"
         />
       </div>
@@ -252,7 +270,6 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin-bottom: 8px;
   width: fit-content;
   --range-width: 360px;
 }
@@ -340,9 +357,23 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
 .toolbar {
   margin-bottom: 8px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: flex-start;
+  margin-left: auto;
 }
 
 .btn {
@@ -351,7 +382,6 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
   border-radius: 0;
   cursor: pointer;
   font-size: 14px;
-  margin-right: 10px;
   margin-bottom: 0;
 }
 
@@ -390,6 +420,30 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
   background-color: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;
+}
+
+.table-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #5a4a3a;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
 }
 </style>
 

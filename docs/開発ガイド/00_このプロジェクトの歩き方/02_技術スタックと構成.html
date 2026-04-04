@@ -61,7 +61,7 @@
  <p>
  <strong>バックエンドは2つのサーバーで構成されます</strong><br>
  • <strong>Core API (8091)</strong>: C系（共通管理）とA系（AI機能）を担当<br>
- • <strong>Apps API (8092)</strong>: M系（マスタ）、T系（トランザクション）、V系（ビュー）、S系（スケジューラー）、X系（実験）を担当
+ • <strong>Apps API (8092)</strong>: M系（マスタ）、T系（トランザクション）、V系（ビュー）、S系（スケジューラー）を担当
  </p>
  </div>
  </section>
@@ -148,9 +148,9 @@
  <td>Vue状態管理ライブラリ</td>
  </tr>
  <tr>
- <td><strong>Bootstrap</strong></td>
- <td>5.x</td>
- <td>CSSフレームワーク</td>
+ <td><strong>jQuery</strong></td>
+ <td>3.x</td>
+ <td>一部レガシー機能の補助</td>
  </tr>
  <tr>
  <td><strong>TypeScript</strong></td>
@@ -199,7 +199,6 @@
 
  _start.py # 全サーバー起動スクリプト
  _setup.py # 初期セットアップスクリプト
- _stop.py # 全サーバー停止スクリプト
  _cleanup.py # クリーンアップスクリプト
  CLAUDE.md # Claude Code用ガイド
  AGENTS.md # エージェント用ガイド
@@ -211,11 +210,11 @@
   auth.py, deps.py # JWT認証・依存性注入
 
   core_models/ # C系・A系のモデル定義
-  apps_models/ # M系・T系・V系・S系・X系のモデル定義
+  apps_models/ # M系・T系・V系・S系のモデル定義
   core_crud/ # C系・A系のDB操作
-  apps_crud/ # M系・T系・V系・S系・X系のDB操作
+  apps_crud/ # M系・T系・V系・S系のDB操作
   core_router/ # C系・A系のAPIエンドポイント
-  apps_router/ # M系・T系・V系・S系・X系のAPIエンドポイント
+  apps_router/ # M系・T系・V系・S系のAPIエンドポイント
   core_schema.py # Core用 Pydantic models
   apps_schema.py # Apps用 Pydantic models
 
@@ -234,12 +233,17 @@
     Tトラン/ # T系トランザクションスクリーン
     Vビュー/ # V系ビュースクリーン
     Sスケジューラー/ # S系スケジューラースクリーン
-    AIコア/ # AI機能インターフェース
+    AiDiy/ # AI機能インターフェース
     Xテスト/ # 実験的機能
     _share/ # 共有コンポーネント
    stores/ # 状態管理(Pinia)
    api/client.ts # Axios with JWT
   vite.config.ts
+  AGENTS.md
+
+ frontend_avatar/ # AIアバタークライアント
+  src/ # Vue 3 + TypeScript
+  vite.config.ts # Avatar Webモード (8099)
   AGENTS.md
 
  docs/開発ガイド/
@@ -260,7 +264,7 @@
  </tr>
  <tr>
  <td><code>backend_server/apps_*</code></td>
- <td>Apps API関連のModel・CRUD・Router（M系・T系・V系・S系・X系を担当）</td>
+ <td>Apps API関連のModel・CRUD・Router（M系・T系・V系・S系を担当）</td>
  </tr>
  <tr>
  <td><code>backend_server/_data/</code></td>
@@ -294,7 +298,12 @@
  <tr>
  <td><strong>フロントエンド画面</strong></td>
  <td><a href="http://localhost:8090/" target="_blank">http://localhost:8090/</a></td>
- <td><code>admin</code> / <code>********</code> でログイン</td>
+ <td><code>admin</code> / <code>********</code> でログイン。AI画面は <code>/AiDiy</code></td>
+ </tr>
+ <tr>
+ <td><strong>Avatar Webモード</strong></td>
+ <td><a href="http://127.0.0.1:8099/" target="_blank">http://127.0.0.1:8099/</a></td>
+ <td><code>frontend_avatar</code> のVite開発サーバー</td>
  </tr>
  <tr>
  <td><strong>Swagger Core API</strong></td>
@@ -333,7 +342,7 @@
  <div>
  <strong>ポート変更時の注意</strong>
  <p>
- フロントエンドのポートを変更する場合、<code>frontend_web/vite.config.ts</code> の <code>server.port</code> だけでなく、
+ フロントエンドのポートを変更する場合、<code>frontend_web/vite.config.ts</code> または <code>frontend_avatar/vite.config.ts</code> の <code>server.port</code> だけでなく、
  以下の設定も連動して更新する必要があります。
  </p>
  <ul>
@@ -368,7 +377,7 @@
  <ul>
  <li>全てのAPI操作は<strong>POST</strong>メソッドのみ（GET・PUT・DELETEは使わない）</li>
  <li>レスポンス形式は統一: <code>{"status": "OK"/"NG", "message": "...", "data": {...}}</code> </li>
- <li>Serviceレイヤーは無し。RouterからCRUDを直接呼び出す</li>
+ <li>Serviceレイヤーは原則無し。RouterからCRUDを直接呼び出す</li>
  <li>一覧の上限は10000件</li>
  </ul>
  </div>

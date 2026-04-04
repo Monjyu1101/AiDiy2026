@@ -18,6 +18,7 @@ class T商品棚卸Base(BaseModel):
     商品ID: str
     実棚数量: int
     棚卸備考: Optional[str] = None
+    有効: bool = True
 
 
 class T商品棚卸Create(T商品棚卸Base):
@@ -29,6 +30,7 @@ class T商品棚卸Update(BaseModel):
     商品ID: Optional[str] = None
     実棚数量: Optional[int] = None
     棚卸備考: Optional[str] = None
+    有効: Optional[bool] = None
 
 
 class T商品棚卸Delete(BaseModel):
@@ -41,6 +43,7 @@ class T商品棚卸Get(BaseModel):
 
 class T商品棚卸(T商品棚卸Base):
     棚卸伝票ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

@@ -14,16 +14,16 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 
 interface 工程型 {
-  工程ID: string
-  工程名: string
-  工程備考?: string
+  生産工程ID: string
+  生産工程名: string
+  生産工程備考?: string
 }
 
 interface 生産型 {
   生産伝票ID: string
   生産開始日時: string
   生産終了日時: string
-  工程ID: string
+  生産工程ID: string
   生産区分ID: string
   生産内容?: string
   生産備考?: string
@@ -148,7 +148,7 @@ const renderSchedule = (schedule, startTime, endTime, currentDay, rangeStartHour
 
   if (displayStartHour >= rangeEndHour || displayEndHour <= rangeStartHour) return;
 
-  const startCellId = `seisan-day-cell-${schedule.工程ID}-${String(displayStartHour).padStart(2, '0')}:00`;
+  const startCellId = `seisan-day-cell-${schedule.生産工程ID}-${String(displayStartHour).padStart(2, '0')}:00`;
   const targetCell = document.getElementById(startCellId);
   if (!targetCell) return;
 
@@ -165,7 +165,10 @@ const renderSchedule = (schedule, startTime, endTime, currentDay, rangeStartHour
   }
 
   const categoryName = schedule.生産区分名 || '';
-  const content = schedule.生産内容 || '';
+  const 商品名 = schedule.商品名 || '';
+  const 受入数量 = schedule.受入数量 != null ? schedule.受入数量 : '';
+  const 単位 = schedule.単位 || '';
+  const centerText = 商品名 ? `${商品名} (${受入数量} ${単位})` : (schedule.生産内容 || '');
   const backgroundColor = schedule.配色背景 || '#007bff';
   const borderColor = schedule.配色枠 || '#0056b3';
   const textColor = schedule.配色前景 || '#ffffff';
@@ -199,7 +202,7 @@ const renderSchedule = (schedule, startTime, endTime, currentDay, rangeStartHour
   scheduleElement.style.color = textColor;
   scheduleElement.innerHTML = `
     <div class="schedule-text schedule-text-start">${startTimeStr} ${categoryName}</div>
-    <div class="schedule-text schedule-text-center">${content || '&nbsp;'}</div>
+    <div class="schedule-text schedule-text-center">${centerText || '&nbsp;'}</div>
     <div class="schedule-text schedule-text-end">${endTimeStr}</div>
   `;
 
@@ -362,19 +365,19 @@ onBeforeUnmount(() => {
       <div class="time-header">{{ String(hour).padStart(2, '0') }}:00</div>
     </div>
 
-    <template v-for="process in 工程リスト" :key="process.工程ID">
+    <template v-for="process in 工程リスト" :key="process.生産工程ID">
       <div class="grid-cell vehicle-cell">
-        <div class="vehicle-id">{{ process.工程ID }} {{ process.工程備考 || '' }}</div>
-        <div class="vehicle-name">{{ process.工程名 }}</div>
+        <div class="vehicle-id">{{ process.生産工程ID }} {{ process.生産工程備考 || '' }}</div>
+        <div class="vehicle-name">{{ process.生産工程名 }}</div>
       </div>
       <div
         v-for="hour in displayHours"
-        :key="`${process.工程ID}-${hour}`"
-        :id="`seisan-day-cell-${process.工程ID}-${String(hour).padStart(2, '0')}:00`"
+        :key="`${process.生産工程ID}-${hour}`"
+        :id="`seisan-day-cell-${process.生産工程ID}-${String(hour).padStart(2, '0')}:00`"
         class="grid-cell droppable-area empty-cell"
         @dragover.prevent
-        @drop="(event) => handleDrop(event, process.工程ID, `${String(hour).padStart(2, '0')}:00`)"
-        @dblclick="openProductionScheduleForm(process.工程ID, `${String(hour).padStart(2, '0')}:00`)"
+        @drop="(event) => handleDrop(event, process.生産工程ID, `${String(hour).padStart(2, '0')}:00`)"
+        @dblclick="openProductionScheduleForm(process.生産工程ID, `${String(hour).padStart(2, '0')}:00`)"
       ></div>
     </template>
   </div>

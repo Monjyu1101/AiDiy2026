@@ -41,6 +41,7 @@ def create_T商品入庫(db: Session, 商品入庫: schemas.T商品入庫Create,
         商品ID=商品入庫.商品ID,
         入庫数量=商品入庫.入庫数量,
         入庫備考=商品入庫.入庫備考,
+        有効=商品入庫.有効,
         **audit
     )
     db.add(db_商品入庫)
@@ -67,13 +68,16 @@ def update_T商品入庫(db: Session, 入庫伝票ID: str, 商品入庫: schemas
     db.refresh(db_商品入庫)
     return db_商品入庫
 
-def delete_T商品入庫(db: Session, 入庫伝票ID: str):
-    """T商品入庫を削除"""
+def delete_T商品入庫(db: Session, 入庫伝票ID: str, 認証情報: Optional[Dict] = None):
+    """T商品入庫を論理削除"""
     db_商品入庫 = get_T商品入庫(db, 入庫伝票ID)
     if not db_商品入庫:
         return False
 
-    db.delete(db_商品入庫)
+    audit = update_audit_fields(認証情報)
+    db_商品入庫.有効 = False
+    for key, value in audit.items():
+        setattr(db_商品入庫, key, value)
     db.commit()
     return True
 
@@ -104,6 +108,7 @@ def init_T商品入庫_data(db: Session, 認証情報: Optional[Dict] = None):
             商品ID=商品ID,
             入庫数量=入庫数量,
             入庫備考=備考,
+            有効=True,
             **audit
         )
         db.add(入庫データ)

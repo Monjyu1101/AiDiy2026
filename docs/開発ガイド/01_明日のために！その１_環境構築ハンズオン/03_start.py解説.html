@@ -15,7 +15,7 @@
   </nav>
 
   <h1>03_start.py解説</h1>
-  <p>対象ファイルは <code>workspace/AiDiy2026/_start.py</code> です。このスクリプトは「起動」だけでなく、環境確認、ポート解放、監視、再起動、停止まで担当します。</p>
+  <p>対象ファイルは <code>workspace/AiDiy2026/_start.py</code> です。このスクリプトは「起動」だけでなく、対話選択、環境確認、ポート解放、監視、再起動、停止まで担当します。</p>
 
   <h2>コード全体（参照）</h2>
   <pre data-src="code_samples/_start.py"><code>読み込み中...</code></pre>
@@ -25,7 +25,8 @@
     <tr><th>対象</th><th>ポート</th><th>URL</th></tr>
     <tr><td>バックエンド core_main</td><td>8091</td><td><code>http://localhost:8091</code></td></tr>
     <tr><td>バックエンド apps_main</td><td>8092</td><td><code>http://localhost:8092</code></td></tr>
-    <tr><td>フロントエンド Vite</td><td>8090</td><td><code>http://localhost:8090</code></td></tr>
+    <tr><td>フロントエンド Web</td><td>8090</td><td><code>http://localhost:8090</code></td></tr>
+    <tr><td>フロントエンド Avatar</td><td>8099</td><td><code>http://127.0.0.1:8099</code></td></tr>
   </table>
 
   <h2>起動前チェック</h2>
@@ -35,22 +36,29 @@
     <li>不足時は理由と解決コマンドを表示して中止</li>
   </ul>
 
+  <h2>起動前の選択</h2>
+  <pre><code>バックエンド(core,apps) 起動しますか? [y]/n
+フロントエンド(Web)      起動しますか? [y]/n
+フロントエンド(Avatar)   起動しますか? y/[n]</code></pre>
+
   <h2>自動起動の流れ</h2>
   <pre><code>1. 既存ポートの解放
-   - 8090 / 8091 / 8092 の LISTEN プロセスを停止
+   - 選択した 8090 / 8091 / 8092 / 8099 の LISTEN プロセスを停止
 
 2. バックエンド起動
    - core_main:app (8091)
    - apps_main:app (8092)
 
 3. フロントエンド起動
-   - npm run dev -- --port 8090
+   - frontend_web: npm run dev
+   - frontend_avatar: npm run dev / npm run dev:renderer
 
 4. 出力ストリームを監視
    - サービスごとにログをプレフィックス付きで表示
 
 5. ブラウザを自動起動
    - http://localhost:8090
+   - http://127.0.0.1:8099 (Avatar選択時)
 
 6. 異常終了を検知したら15秒後に再起動</code></pre>
 
@@ -75,11 +83,7 @@
   <pre><code>cd workspace/AiDiy2026
 python _start.py
 
-# バックエンドのみ起動
-python _start.py --backend=yes --frontend=no
-
-# フロントエンドのみ起動
-python _start.py --backend=no --frontend=yes</code></pre>
+# 対話で必要なサービスだけ選択して起動</code></pre>
 
   <h2>トラブル切り分けの順序</h2>
   <ol>

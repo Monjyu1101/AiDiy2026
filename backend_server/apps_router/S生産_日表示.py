@@ -38,7 +38,7 @@ class 日付範囲Request(BaseModel):
 
 class 生産ドラッグRequest(BaseModel):
     生産伝票ID: str
-    工程ID: str
+    生産工程ID: str
     変更後日付: Optional[str] = None
     変更後開始日時: Optional[str] = None
     変更後終了日時: Optional[str] = None
@@ -77,25 +77,25 @@ def _expand_target_date(target_date: Optional[str]) -> Dict[str, Optional[str]]:
     return {"開始日付": start_date, "終了日付": end_date}
 
 
-@router.post("/工程一覧", response_model=schemas.ResponseBase)
+@router.post("/生産工程一覧", response_model=schemas.ResponseBase)
 def get_daily_processes(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    processes = db.query(models.M工程).order_by(models.M工程.工程ID).all()
+    processes = db.query(models.M生産工程).order_by(models.M生産工程.生産工程ID).all()
     items = [
         {
-            "工程ID": process.工程ID,
-            "工程名": process.工程名,
-            "工程備考": process.工程備考 or ""
+            "生産工程ID": process.生産工程ID,
+            "生産工程名": process.生産工程名,
+            "生産工程備考": process.生産工程備考 or ""
         }
         for process in processes
     ]
-    logger.info("S生産_日表示 工程一覧取得: 件数=%d", len(items))
+    logger.info("S生産_日表示 生産工程一覧取得: 件数=%d", len(items))
     return schemas.ResponseBase(
         status="OK",
-        message="工程一覧を取得しました",
-        data={"工程一覧": items}
+        message="生産工程一覧を取得しました",
+        data={"生産工程一覧": items}
     )
 
 
@@ -112,6 +112,8 @@ def get_daily_schedules(
 
     conditions = []
     params: Dict[str, Any] = {}
+    conditions.append("T.明細SEQ = 0")  # ヘッダ行のみ
+    conditions.append("T.有効 = 1")
     if start_date:
         conditions.append("date(T.生産終了日時) >= :start_date")
         params["start_date"] = start_date
@@ -126,6 +128,9 @@ def get_daily_schedules(
     sql = f"""
     SELECT
         T.生産伝票ID,
+        T.受入商品ID,
+        T.最小ロット数量,
+        T.受入数量,
         T.生産開始日時,
         T.生産終了日時,
         T.生産区分ID,
@@ -134,10 +139,13 @@ def get_daily_schedules(
         COALESCE(M2.配色背景, '#e6f2ff') AS 配色背景,
         COALESCE(M2.配色前景, '#0066cc') AS 配色前景,
         COALESCE(T.生産内容, '') AS 生産内容,
-        T.工程ID,
-        COALESCE(T.生産備考, '') AS 生産備考
+        T.生産工程ID,
+        COALESCE(T.生産備考, '') AS 生産備考,
+        COALESCE(M.商品名, '') AS 商品名,
+        COALESCE(M.単位, '') AS 単位
     FROM T生産 T
     LEFT JOIN M生産区分 M2 ON T.生産区分ID = M2.生産区分ID
+    LEFT JOIN M商品 M ON T.受入商品ID = M.商品ID
     {where_sql}
     ORDER BY T.生産開始日時 DESC
     """
@@ -147,6 +155,9 @@ def get_daily_schedules(
     for row in rows:
         items.append({
             "生産伝票ID": row.生産伝票ID,
+            "受入商品ID": row.受入商品ID,
+            "最小ロット数量": row.最小ロット数量,
+            "受入数量": row.受入数量,
             "生産開始日時": row.生産開始日時,
             "生産終了日時": row.生産終了日時,
             "生産区分ID": row.生産区分ID,
@@ -155,8 +166,10 @@ def get_daily_schedules(
             "配色背景": row.配色背景,
             "配色前景": row.配色前景,
             "生産内容": row.生産内容,
-            "工程ID": row.工程ID,
-            "生産備考": row.生産備考
+            "生産工程ID": row.生産工程ID,
+            "生産備考": row.生産備考,
+            "商品名": row.商品名,
+            "単位": row.単位
         })
 
     logger.info("S生産_日表示 生産一覧取得: 開始=%s 終了=%s 件数=%d", start_date, end_date, len(items))
@@ -182,15 +195,15 @@ def get_daily_view_data(
         return schedules_response
 
     logger.info(
-        "S生産_日表示 データ取得: 工程=%d 生産=%d",
-        len(processes_response.data.get("工程一覧", [])) if processes_response.data else 0,
+        "S生産_日表示 データ取得: 生産工程=%d 生産=%d",
+        len(processes_response.data.get("生産工程一覧", [])) if processes_response.data else 0,
         len(schedules_response.data.get("生産一覧", [])) if schedules_response.data else 0,
     )
     return schemas.ResponseBase(
         status="OK",
         message="S生産_日表示データを取得しました",
         data={
-            "工程一覧": processes_response.data.get("工程一覧", []) if processes_response.data else [],
+            "生産工程一覧": processes_response.data.get("生産工程一覧", []) if processes_response.data else [],
             "生産一覧": schedules_response.data.get("生産一覧", []) if schedules_response.data else []
         }
     )
@@ -202,8 +215,12 @@ def update_schedule_drag(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    logger.info("S生産_日表示 ドラッグ更新開始: 生産伝票ID=%s 工程ID=%s", request.生産伝票ID, request.工程ID)
-    record = db.query(models.T生産).filter(models.T生産.生産伝票ID == request.生産伝票ID).first()
+    logger.info("S生産_日表示 ドラッグ更新開始: 生産伝票ID=%s 生産工程ID=%s", request.生産伝票ID, request.生産工程ID)
+    record = db.query(models.T生産).filter(
+        models.T生産.生産伝票ID == request.生産伝票ID,
+        models.T生産.明細SEQ == 0,
+        models.T生産.有効 == True
+    ).first()
     if not record:
         logger.warning("S生産_日表示 ドラッグ更新失敗: 生産伝票ID=%s が未存在", request.生産伝票ID)
         return schemas.ResponseBase(status="NG", message="生産伝票が見つかりません", error={"code": "NOT_FOUND"})
@@ -218,7 +235,7 @@ def update_schedule_drag(
         if not request.変更後日付:
             return schemas.ResponseBase(
                 status="NG",
-                message="必須パラメータが不足しています（生産伝票ID, 工程ID, 変更後日付）",
+                message="必須パラメータが不足しています（生産伝票ID, 生産工程ID, 変更後日付）",
                 error={"code": "MISSING_PARAMS"}
             )
         start_dt = _parse_datetime(record.生産開始日時)
@@ -238,7 +255,9 @@ def update_schedule_drag(
     new_end_iso = _to_naive_iso(new_end_datetime)
 
     overlapping = db.query(models.T生産).filter(
-        models.T生産.工程ID == request.工程ID,
+        models.T生産.明細SEQ == 0,
+        models.T生産.有効 == True,
+        models.T生産.生産工程ID == request.生産工程ID,
         models.T生産.生産伝票ID != request.生産伝票ID,
         models.T生産.生産開始日時 < new_end_iso,
         models.T生産.生産終了日時 > new_start_iso
@@ -246,11 +265,11 @@ def update_schedule_drag(
     if overlapping:
         return schemas.ResponseBase(
             status="NG",
-            message=f"工程 {request.工程ID} が既存の生産（{overlapping.生産伝票ID}）と重複します",
+            message=f"生産工程 {request.生産工程ID} が既存の生産（{overlapping.生産伝票ID}）と重複します",
             error={"code": "OVERLAP"}
         )
 
-    record.工程ID = request.工程ID
+    record.生産工程ID = request.生産工程ID
     record.生産開始日時 = new_start_iso
     record.生産終了日時 = new_end_iso
     for key, value in audit.items():
@@ -272,7 +291,11 @@ def update_schedule_resize(
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
     logger.info("S生産_日表示 リサイズ更新開始: 生産伝票ID=%s", request.生産伝票ID)
-    record = db.query(models.T生産).filter(models.T生産.生産伝票ID == request.生産伝票ID).first()
+    record = db.query(models.T生産).filter(
+        models.T生産.生産伝票ID == request.生産伝票ID,
+        models.T生産.明細SEQ == 0,
+        models.T生産.有効 == True
+    ).first()
     if not record:
         logger.warning("S生産_日表示 リサイズ更新失敗: 生産伝票ID=%s が未存在", request.生産伝票ID)
         return schemas.ResponseBase(status="NG", message="生産伝票が見つかりません", error={"code": "NOT_FOUND"})
@@ -290,7 +313,9 @@ def update_schedule_resize(
     new_end_iso = _to_naive_iso(new_end_datetime)
 
     overlapping = db.query(models.T生産).filter(
-        models.T生産.工程ID == record.工程ID,
+        models.T生産.明細SEQ == 0,
+        models.T生産.有効 == True,
+        models.T生産.生産工程ID == record.生産工程ID,
         models.T生産.生産伝票ID != request.生産伝票ID,
         models.T生産.生産開始日時 < new_end_iso,
         models.T生産.生産終了日時 > new_start_iso
@@ -298,7 +323,7 @@ def update_schedule_resize(
     if overlapping:
         return schemas.ResponseBase(
             status="NG",
-            message=f"工程 {record.工程ID} が既存の生産（{overlapping.生産伝票ID}）と重複します",
+            message=f"生産工程 {record.生産工程ID} が既存の生産（{overlapping.生産伝票ID}）と重複します",
             error={"code": "OVERLAP"}
         )
 
@@ -334,6 +359,8 @@ def get_display_data_last_modified(
         )
 
     最終更新日時 = db.query(func.max(models.T生産.更新日時)).filter(
+        models.T生産.明細SEQ == 0,
+        models.T生産.有効 == True,
         or_(
             func.date(models.T生産.生産開始日時).between(request.開始日付, request.終了日付),
             func.date(models.T生産.生産終了日時).between(request.開始日付, request.終了日付),

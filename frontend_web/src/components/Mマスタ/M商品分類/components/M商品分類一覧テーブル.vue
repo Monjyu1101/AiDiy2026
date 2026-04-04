@@ -15,32 +15,35 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
-import type { Column, V工程 } from '../../../../types';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
+import type { Column, V商品分類 } from '../../../../types';
 
 const props = defineProps({
-  includeInactive: { type: Boolean, default: false },
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
 const router = useRouter();
 
-const 工程一覧 = ref<V工程[]>([]);
+const 商品分類一覧 = ref<V商品分類[]>([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
-const sortKey = ref('工程ID');
+const sortKey = ref('商品分類ID');
 const sortOrder = ref('asc');
 const filters = reactive({
-  工程ID: '',
-  工程名: '',
-  工程備考: '',
+  商品分類ID: '',
+  商品分類名: '',
+  商品分類備考: '',
   更新日時: '',
   更新利用者名: ''
 });
-const rowKey = '工程ID';
+const rowKey = '商品分類ID';
 const columns: Column[] = [
-  { key: '工程ID', label: '工程ID', width: '120px', sortable: true },
-  { key: '工程名', label: '工程名', width: '200px', sortable: true },
-  { key: '工程備考', label: '工程備考', width: '220px', sortable: true },
+  { key: '商品分類ID', label: '商品分類ID', width: '120px', sortable: true, align: 'center' },
+  { key: '商品分類名', label: '商品分類名', width: '200px', sortable: true },
+  { key: '商品分類備考', label: '商品分類備考', width: '220px', sortable: true },
   { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
   { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
   { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
@@ -58,8 +61,7 @@ const hasFilter = computed(() => {
   return Object.values(filters).some((value) => String(value || '').trim() !== '');
 });
 const filteredRows = computed(() => {
-  return 工程一覧.value.filter((row) => {
-    if (!props.includeInactive && !row.有効) return false;
+  return 商品分類一覧.value.filter((row) => {
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -69,7 +71,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => 工程一覧.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -111,27 +113,31 @@ const goToPage = (page) => {
 };
 
 const openDetail = (row) => {
-  const query: Record<string, string> = { モード: '編集', 工程ID: row.工程ID };
+  const query: Record<string, string> = { モード: '編集', 商品分類ID: row.商品分類ID };
   if (props.戻URL) {
     query.戻URL = props.戻URL;
   }
-  router.push({ path: '/Mマスタ/M工程/編集', query });
+  router.push({ path: '/Mマスタ/M商品分類/編集', query });
 };
 
 const loadData = async () => {
   message.value = '';
   try {
-    const res = await apiClient.post('/apps/V工程/一覧');
+    const res = await apiClient.post('/apps/V商品分類/一覧', {
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    });
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
-      工程一覧.value = items;
+      商品分類一覧.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
-      setMessage(res.data.message || 'M工程一覧の取得に失敗しました。', 'error');
+      setMessage(res.data.message || 'M商品分類一覧の取得に失敗しました。', 'error');
     }
   } catch (e) {
-    setMessage('M工程一覧の取得でエラーが発生しました。', 'error');
+    setMessage('M商品分類一覧の取得でエラーが発生しました。', 'error');
   }
 };
 
@@ -170,11 +176,11 @@ defineExpose({
       />
     </template>
     <template #cell="{ row, column, value }">
-      <template v-if="column.key === '工程ID'">
-        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.工程ID }}</a>
+      <template v-if="column.key === '商品分類ID' || column.key === '商品分類名'">
+        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ value ?? '' }}</a>
       </template>
       <template v-else-if="column.key === '有効'">
-        <span>{{ row.有効 ? '✅' : '□' }}</span>
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}

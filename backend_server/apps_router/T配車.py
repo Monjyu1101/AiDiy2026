@@ -138,14 +138,13 @@ def delete_T配車(
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された配車伝票が見つかりません", error={"code": "NOT_FOUND"})
 
-    success = crud.delete_T配車(db, request.配車伝票ID)
+    認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
+    success = crud.delete_T配車(db, request.配車伝票ID, 認証情報=認証情報)
     if not success:
         return schemas.ResponseBase(status="NG", message="配車の削除に失敗しました", error={"code": "DELETE_FAILED"})
 
     return schemas.ResponseBase(
         status="OK",
-        message="配車を削除しました",
-        data={"配車伝票ID": request.配車伝票ID}
+        message="配車の有効をオフにしました",
+        data=schemas.T配車.from_orm(crud.get_T配車(db, request.配車伝票ID))
     )
-
-

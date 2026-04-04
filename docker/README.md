@@ -143,7 +143,7 @@ docker_3stop.bat
 
 # データベース削除
 cd ..
-move _data\database.db _data\database.db.backup
+move _data\AiDiy\database.db _data\AiDiy\database.db.backup
 
 # 再起動（新規DB自動作成）
 cd docker

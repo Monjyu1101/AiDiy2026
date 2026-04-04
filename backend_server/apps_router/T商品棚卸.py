@@ -128,13 +128,13 @@ def delete_T商品棚卸(
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された棚卸伝票が見つかりません", error={"code": "NOT_FOUND"})
 
-    success = crud.delete_T商品棚卸(db, request.棚卸伝票ID)
+    認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
+    success = crud.delete_T商品棚卸(db, request.棚卸伝票ID, 認証情報=認証情報)
     if not success:
         return schemas.ResponseBase(status="NG", message="商品棚卸の削除に失敗しました", error={"code": "DELETE_FAILED"})
 
     return schemas.ResponseBase(
         status="OK",
-        message="商品棚卸を削除しました",
-        data={"棚卸伝票ID": request.棚卸伝票ID}
+        message="商品棚卸の有効をオフにしました",
+        data=schemas.T商品棚卸.from_orm(crud.get_T商品棚卸(db, request.棚卸伝票ID))
     )
-

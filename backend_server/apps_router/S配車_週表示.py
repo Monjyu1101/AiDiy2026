@@ -111,6 +111,7 @@ def get_weekly_schedules(
 
     conditions = []
     params: Dict[str, Any] = {}
+    conditions.append("T.有効 = 1")
     if start_date:
         conditions.append("date(T.配車終了日時) >= :start_date")
         params["start_date"] = start_date
@@ -202,7 +203,10 @@ def update_schedule_drag(
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
     logger.info("S配車_週表示 ドラッグ更新開始: 配車伝票ID=%s 車両ID=%s", request.配車伝票ID, request.車両ID)
-    record = db.query(models.T配車).filter(models.T配車.配車伝票ID == request.配車伝票ID).first()
+    record = db.query(models.T配車).filter(
+        models.T配車.配車伝票ID == request.配車伝票ID,
+        models.T配車.有効 == True
+    ).first()
     if not record:
         logger.warning("S配車_週表示 ドラッグ更新失敗: 配車伝票ID=%s が未存在", request.配車伝票ID)
         return schemas.ResponseBase(status="NG", message="配車伝票が見つかりません", error={"code": "NOT_FOUND"})
@@ -241,6 +245,7 @@ def update_schedule_drag(
     new_end_iso = _to_naive_iso(new_end_datetime)
 
     overlapping = db.query(models.T配車).filter(
+        models.T配車.有効 == True,
         models.T配車.車両ID == request.車両ID,
         models.T配車.配車伝票ID != request.配車伝票ID,
         models.T配車.配車開始日時 < new_end_iso,
@@ -275,7 +280,10 @@ def update_schedule_resize(
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
     logger.info("S配車_週表示 リサイズ更新開始: 配車伝票ID=%s", request.配車伝票ID)
-    record = db.query(models.T配車).filter(models.T配車.配車伝票ID == request.配車伝票ID).first()
+    record = db.query(models.T配車).filter(
+        models.T配車.配車伝票ID == request.配車伝票ID,
+        models.T配車.有効 == True
+    ).first()
     if not record:
         logger.warning("S配車_週表示 リサイズ更新失敗: 配車伝票ID=%s が未存在", request.配車伝票ID)
         return schemas.ResponseBase(status="NG", message="配車伝票が見つかりません", error={"code": "NOT_FOUND"})
@@ -293,6 +301,7 @@ def update_schedule_resize(
     new_end_iso = _to_naive_iso(new_end_datetime)
 
     overlapping = db.query(models.T配車).filter(
+        models.T配車.有効 == True,
         models.T配車.車両ID == record.車両ID,
         models.T配車.配車伝票ID != request.配車伝票ID,
         models.T配車.配車開始日時 < new_end_iso,
@@ -337,6 +346,7 @@ def get_display_data_last_modified(
         )
 
     最終更新日時 = db.query(func.max(models.T配車.更新日時)).filter(
+        models.T配車.有効 == True,
         or_(
             func.date(models.T配車.配車開始日時).between(request.開始日付, request.終了日付),
             func.date(models.T配車.配車終了日時).between(request.開始日付, request.終了日付),
@@ -356,4 +366,3 @@ def get_display_data_last_modified(
         message="最終更新日時を取得しました",
         data={"最終更新日時": 最終更新日時}
     )
-

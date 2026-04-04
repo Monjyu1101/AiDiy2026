@@ -31,28 +31,28 @@ const detailData = ref(null);
 const message = ref('');
 
 const form = reactive({
-  工程ID: '',
-  工程名: '',
-  工程備考: '',
+  商品分類ID: '',
+  商品分類名: '',
+  商品分類備考: '',
   有効: true
 });
 
 const errors = reactive({
-  工程ID: '',
-  工程名: '',
-  工程備考: ''
+  商品分類ID: '',
+  商品分類名: '',
+  商品分類備考: ''
 });
 
 const touched = reactive({
-  工程ID: false,
-  工程名: false,
-  工程備考: false
+  商品分類ID: false,
+  商品分類名: false,
+  商品分類備考: false
 });
 
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
-const requiredFields = computed(() => ['工程ID', '工程名']);
+const requiredFields = computed(() => ['商品分類ID', '商品分類名']);
 
 const showMessage = (text, type = 'success') => {
   void qMessage(text, type);
@@ -68,16 +68,16 @@ const resetValidation = () => {
 };
 
 const resetForm = () => {
-  form.工程ID = '';
-  form.工程名 = '';
-  form.工程備考 = '';
+  form.商品分類ID = '';
+  form.商品分類名 = '';
+  form.商品分類備考 = '';
   form.有効 = true;
 };
 
 const applyDataToForm = (data) => {
-  form.工程ID = data?.工程ID || '';
-  form.工程名 = data?.工程名 || '';
-  form.工程備考 = data?.工程備考 || '';
+  form.商品分類ID = data?.商品分類ID || '';
+  form.商品分類名 = data?.商品分類名 || '';
+  form.商品分類備考 = data?.商品分類備考 || '';
   form.有効 = data?.有効 ?? true;
 };
 
@@ -122,8 +122,8 @@ const validateForm = () => {
 
   if (firstErrorField) {
     const fieldMap = {
-      '工程ID': 'form-process-id',
-      '工程名': 'form-process-name'
+      '商品分類ID': 'form-product-category-id',
+      '商品分類名': 'form-product-category-name'
     };
     const elementId = fieldMap[firstErrorField];
     if (elementId) {
@@ -135,18 +135,18 @@ const validateForm = () => {
   return isValid;
 };
 
-const loadDetail = async (processId) => {
+const loadDetail = async (productCategoryId) => {
   message.value = '';
   try {
-    const res = await apiClient.post('/apps/M工程/取得', { 工程ID: String(processId) });
+    const res = await apiClient.post('/apps/M商品分類/取得', { 商品分類ID: String(productCategoryId) });
     if (res.data.status === 'OK' && res.data.data) {
       detailData.value = res.data.data;
       applyDataToForm(res.data.data);
     } else {
-      showMessage(res.data.message || '工程情報の取得に失敗しました。', 'error');
+      showMessage(res.data.message || '商品分類情報の取得に失敗しました。', 'error');
     }
   } catch (e) {
-    showMessage('工程情報の取得でエラーが発生しました。', 'error');
+    showMessage('商品分類情報の取得でエラーが発生しました。', 'error');
   }
 };
 
@@ -162,15 +162,15 @@ const applyQueryParams = async (query) => {
     return;
   }
 
-  if (query.モード === '表示' && query.工程ID) {
+  if (query.モード === '表示' && query.商品分類ID) {
     mode.value = 'view';
-    await loadDetail(query.工程ID);
+    await loadDetail(query.商品分類ID);
     return;
   }
 
-  if (query.工程ID) {
+  if (query.商品分類ID) {
     mode.value = 'edit';
-    await loadDetail(query.工程ID);
+    await loadDetail(query.商品分類ID);
     return;
   }
 
@@ -193,13 +193,13 @@ const handleSuccess = (messageText) => {
     return;
   }
   router.push({
-    path: '/Mマスタ/M工程/一覧',
+    path: '/Mマスタ/M商品分類/一覧',
     query: buildListQuery({ message: messageText, type: 'success' })
   });
 };
 
 const backToList = () => {
-  router.push({ path: '/Mマスタ/M工程/一覧', query: buildListQuery() });
+  router.push({ path: '/Mマスタ/M商品分類/一覧', query: buildListQuery() });
 };
 
 const handleReturn = () => {
@@ -217,17 +217,17 @@ const saveData = async () => {
   try {
     let res;
     if (isCreateMode.value) {
-      res = await apiClient.post('/apps/M工程/登録', {
-        工程ID: form.工程ID,
-        工程名: form.工程名,
-        工程備考: form.工程備考,
+      res = await apiClient.post('/apps/M商品分類/登録', {
+        商品分類ID: form.商品分類ID,
+        商品分類名: form.商品分類名,
+        商品分類備考: form.商品分類備考,
         有効: form.有効
       });
     } else {
-      res = await apiClient.post('/apps/M工程/変更', {
-        工程ID: form.工程ID,
-        工程名: form.工程名,
-        工程備考: form.工程備考,
+      res = await apiClient.post('/apps/M商品分類/変更', {
+        商品分類ID: form.商品分類ID,
+        商品分類名: form.商品分類名,
+        商品分類備考: form.商品分類備考,
         有効: form.有効
       });
     }
@@ -243,13 +243,13 @@ const saveData = async () => {
 };
 
 const deleteData = async () => {
-  if (!form.工程ID) return;
+  if (!form.商品分類ID) return;
 
-  const confirmed = await qConfirm(`M工程「${form.工程ID}」を削除しますか？この操作は取り消せません。`);
+  const confirmed = await qConfirm(`M商品分類「${form.商品分類ID}」を削除しますか？この操作は取り消せません。`);
   if (!confirmed) return;
 
   try {
-    const res = await apiClient.post('/apps/M工程/削除', { 工程ID: form.工程ID });
+    const res = await apiClient.post('/apps/M商品分類/削除', { 商品分類ID: form.商品分類ID });
     if (res.data.status === 'OK') {
       handleSuccess(res.data.message);
     } else {
@@ -272,7 +272,7 @@ watch(() => route.query, async (query) => {
 <template>
   <div class="page-container">
     <h2 class="page-title">
-      <span class="title-text">【 M工程 】</span>
+      <span class="title-text">【 M商品分類 】</span>
       <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
     </h2>
 
@@ -284,20 +284,10 @@ watch(() => route.query, async (query) => {
 
         <form class="detail-form" @submit.prevent="saveData">
           <div class="tab-header">
-            <button
-              type="button"
-              class="tab-btn"
-              :class="{ active: activeTab === 'content' }"
-              @click="activeTab = 'content'"
-            >
+            <button type="button" class="tab-btn" :class="{ active: activeTab === 'content' }" @click="activeTab = 'content'">
               内容
             </button>
-            <button
-              type="button"
-              class="tab-btn"
-              :class="{ active: activeTab === 'others' }"
-              @click="activeTab = 'others'"
-            >
+            <button type="button" class="tab-btn" :class="{ active: activeTab === 'others' }" @click="activeTab = 'others'">
               その他
             </button>
           </div>
@@ -305,56 +295,56 @@ watch(() => route.query, async (query) => {
           <div class="detail-panel">
             <template v-if="activeTab === 'content'">
               <div class="detail-row row-id">
-                <div class="detail-label">工程ID<span class="required-mark">*</span></div>
+                <div class="detail-label">商品分類ID<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">
                       <input
-                        id="form-process-id"
+                        id="form-product-category-id"
                         type="text"
-                        v-model="form.工程ID"
+                        v-model="form.商品分類ID"
                         :readonly="!isCreateMode || isViewMode"
                         class="detail-input id-input"
-                        :class="{ 'input-error': errors.工程ID }"
-                        @blur="handleBlur('工程ID')"
-                        @input="handleInput('工程ID')"
+                        :class="{ 'input-error': errors.商品分類ID }"
+                        @blur="handleBlur('商品分類ID')"
+                        @input="handleInput('商品分類ID')"
                       />
-                      <span v-if="errors.工程ID" class="input-alert">!</span>
+                      <span v-if="errors.商品分類ID" class="input-alert">!</span>
                     </div>
-                    <div v-if="errors.工程ID && errors.工程ID !== 'ERROR'" class="field-error">{{ errors.工程ID }}</div>
+                    <div v-if="errors.商品分類ID && errors.商品分類ID !== 'ERROR'" class="field-error">{{ errors.商品分類ID }}</div>
                   </div>
                 </div>
               </div>
 
               <div class="detail-row row-name">
-                <div class="detail-label">工程名<span class="required-mark">*</span></div>
+                <div class="detail-label">商品分類名<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">
                       <input
-                        id="form-process-name"
+                        id="form-product-category-name"
                         type="text"
-                        v-model="form.工程名"
+                        v-model="form.商品分類名"
                         class="detail-input name-input"
-                        :class="{ 'input-error': errors.工程名 }"
+                        :class="{ 'input-error': errors.商品分類名 }"
                         :readonly="isViewMode"
-                        @blur="handleBlur('工程名')"
-                        @input="handleInput('工程名')"
+                        @blur="handleBlur('商品分類名')"
+                        @input="handleInput('商品分類名')"
                       />
-                      <span v-if="errors.工程名" class="input-alert">!</span>
+                      <span v-if="errors.商品分類名" class="input-alert">!</span>
                     </div>
-                    <div v-if="errors.工程名 && errors.工程名 !== 'ERROR'" class="field-error">{{ errors.工程名 }}</div>
+                    <div v-if="errors.商品分類名 && errors.商品分類名 !== 'ERROR'" class="field-error">{{ errors.商品分類名 }}</div>
                   </div>
                 </div>
               </div>
 
               <div class="detail-row row-remarks">
-                <div class="detail-label">工程備考</div>
+                <div class="detail-label">商品分類備考</div>
                 <div class="detail-value">
                   <div class="input-wrap">
                     <textarea
-                      id="form-process-remarks"
-                      v-model="form.工程備考"
+                      id="form-product-category-remarks"
+                      v-model="form.商品分類備考"
                       class="detail-textarea remarks-textarea"
                       rows="3"
                       :readonly="isViewMode"
@@ -368,10 +358,7 @@ watch(() => route.query, async (query) => {
               <div class="detail-row row-valid">
                 <div class="detail-label">有効</div>
                 <div class="detail-value">
-                  <label
-                    class="valid-checkbox-label"
-                    :class="{ 'valid-checkbox-label-disabled': isViewMode }"
-                  >
+                  <label class="valid-checkbox-label" :class="{ 'valid-checkbox-label-disabled': isViewMode }">
                     <input
                       type="checkbox"
                       v-model="form.有効"
@@ -379,77 +366,44 @@ watch(() => route.query, async (query) => {
                       class="valid-checkbox"
                       aria-label="有効の切り替え"
                     />
-                    <span
-                      class="valid-checkbox-mark"
-                      :class="{ 'valid-checkbox-inactive': !form.有効 }"
-                    >{{ form.有効 ? '✅' : '☐' }}</span>
+                    <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !form.有効 }">{{ form.有効 ? '✅' : '☐' }}</span>
                   </label>
                 </div>
               </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">登録日時</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録日時 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.登録日時 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-user">
                 <div class="detail-label">登録利用者</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録利用者名 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.登録利用者名 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-terminal">
                 <div class="detail-label">登録端末</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録端末ID || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.登録端末ID || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">更新日時</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新日時 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.更新日時 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-user">
                 <div class="detail-label">更新利用者</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新利用者名 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.更新利用者名 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-terminal">
                 <div class="detail-label">更新端末</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新端末ID || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.更新端末ID || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
             </template>
@@ -800,12 +754,13 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-secondary {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
 }
 
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: #f2f2f2;
 }
 
 @media (max-width: 720px) {

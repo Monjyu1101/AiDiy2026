@@ -15,15 +15,15 @@
 **関連ドキュメント：**
 - **[../CLAUDE.md](../CLAUDE.md)** - Claude Code向けインデックス（プロジェクト全体概要）
 - **[../AGENTS.md](../AGENTS.md)** - プロジェクト全体方針（基本方針、開発コマンド、共通問題）
-- **[../docs/03_コーディングルール/](../docs/03_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
-- **[../docs/04_フロントエンド画面追加例/](../docs/04_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順
+- **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
+- **[../docs/開発ガイド/12_フロントエンド画面追加例/](../docs/開発ガイド/12_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順
 - **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細（FastAPI + SQLAlchemy + SQLite）
 - **[../frontend_avatar/AGENTS.md](../frontend_avatar/AGENTS.md)** - デスクトップアバタークライアント（Electron + WebSocket + VRM）
 
 **📚 ドキュメントリソース（docs/フォルダ）：**
-プロジェクトの詳細なドキュメントは `docs/` フォルダにHTML形式で整備されています。
-- **[../docs/03_コーディングルール/](../docs/03_コーディングルール/_index.html)** - 命名規則、ベストプラクティス、レビューチェックリスト（**必読**）
-- **[../docs/04_フロントエンド画面追加例/](../docs/04_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順（**必読**）
+プロジェクトの詳細なドキュメントは `docs/開発ガイド/` フォルダにHTML形式で整備されています。
+- **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - 命名規則、ベストプラクティス、レビューチェックリスト（**必読**）
+- **[../docs/開発ガイド/12_フロントエンド画面追加例/](../docs/開発ガイド/12_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順（**必読**）
 
 **バックエンド・他フロントエンドの情報は別ドキュメント：**
 このドキュメントは `frontend_web`（ブラウザ向け業務UI）に特化しています。
@@ -104,9 +104,9 @@
 
 **3. カテゴリベースのコンポーネント構成:**
 - `C管理/` - Core/Common管理画面（C権限、C利用者、C採番）
-- `Mマスタ/` - Master data管理画面（M配車区分、M車両、M商品）
-- `Tトラン/` - Transaction管理画面（T配車、T商品入庫/出庫/棚卸）
-- `Sスケジューラー/` - Special processing画面（S配車_週表示、S配車_日表示）
+- `Mマスタ/` - Master data管理画面（M配車区分、M生産区分、M生産工程、M商品分類、M車両、M商品、M商品構成）
+- `Tトラン/` - Transaction管理画面（T配車、T生産、T生産払出、T商品入庫/出庫/棚卸）
+- `Sスケジューラー/` - Special processing画面（S配車_週/日表示、S生産_週/日表示）
 - `Vビュー/` - View画面（V商品推移表）
 - `AiDiy/` - AI Core interface（WebSocket統合、マルチパネルUI）
 - `Xテスト/` - Experimental features（Xテトリス、Xインベーダー、Xリバーシ）
@@ -300,11 +300,17 @@ router.beforeEach((to, from, next) => {
 
 **M系（マスタ）画面:**
 - `/Mマスタ/M配車区分/一覧`, `/Mマスタ/M配車区分/編集`
+- `/Mマスタ/M生産区分/一覧`, `/Mマスタ/M生産区分/編集`
+- `/Mマスタ/M生産工程/一覧`, `/Mマスタ/M生産工程/編集`
+- `/Mマスタ/M商品分類/一覧`, `/Mマスタ/M商品分類/編集`
 - `/Mマスタ/M車両/一覧`, `/Mマスタ/M車両/編集`
 - `/Mマスタ/M商品/一覧`, `/Mマスタ/M商品/編集`
+- `/Mマスタ/M商品構成/一覧`, `/Mマスタ/M商品構成/編集`（明細型マスタ）
 
 **T系（トランザクション）画面:**
 - `/Tトラン/T配車/一覧`, `/Tトラン/T配車/編集`
+- `/Tトラン/T生産/一覧`, `/Tトラン/T生産/編集`（明細型トランザクション）
+- `/Tトラン/T生産払出/一覧`（払出一覧、編集なし）
 - `/Tトラン/T商品入庫/一覧`, `/Tトラン/T商品入庫/編集`
 - `/Tトラン/T商品出庫/一覧`, `/Tトラン/T商品出庫/編集`
 - `/Tトラン/T商品棚卸/一覧`, `/Tトラン/T商品棚卸/編集`
@@ -312,18 +318,20 @@ router.beforeEach((to, from, next) => {
 **S系（スケジューラー）画面:**
 - `/Sスケジュール/S配車_週表示` - 週別配車表示
 - `/Sスケジュール/S配車_日表示` - 日別配車表示
+- `/Sスケジュール/S生産_週表示` - 週別生産表示
+- `/Sスケジュール/S生産_日表示` - 日別生産表示
 
 **V系（ビュー）画面:**
 - `/Vビュー/V商品推移表` - 商品推移表
 
 **A系（AI）画面:**
-- `/AIコア` - AIコア インターフェース（新しいタブで開く）
+- `/AiDiy` - AIコア インターフェース（新しいタブで開く）
 
 **X系（テスト）画面:**
-- `/Xその他/Xテトリス` - テトリスゲーム
-- `/Xその他/Xインベーダー` - インベーダーゲーム
-- `/Xその他/Xリバーシ` - リバーシゲーム
-- `/Xその他/X自己紹介` - 自己紹介画面
+- `/Xその他/Xテトリス/ゲーム` - テトリスゲーム
+- `/Xその他/Xインベーダー/ゲーム` - インベーダーゲーム
+- `/Xその他/Xリバーシ/ゲーム` - リバーシゲーム
+- `/Xその他/X自己紹介/表示` - 自己紹介画面
 
 **ルーティング設計の特徴:**
 - Lazy loading: `() => import(...)` で必要な時だけコンポーネント読み込み
@@ -358,7 +366,7 @@ getters: {
 1. `POST /core/auth/ログイン` with `{利用者ID, パスワード}`
 2. Success時: `token` を `localStorage` に保存
 3. `fetchUser()` で利用者情報取得
-4. `/Xその他` へリダイレクト
+4. レスポンス `初期ページ` があれば `/${初期ページ}` へ、未設定なら `/Xその他` へリダイレクト
 5. Return: `{success: true/false, message?: string}`
 
 **`fetchUser()`** - 現在利用者情報取得:
@@ -558,7 +566,7 @@ ws.disconnect()
 
 **_TopMenu.vue** - タブ型メインナビゲーション:
 - タブ一覧:
-  1. **AIコア** - `/AIコア` (新しいタブで開く)
+  1. **AIコア** - `/AiDiy` (新しいタブで開く)
   2. **管理** - `/C管理`
   3. **マスタ** - `/Mマスタ`
   4. **トラン** - `/Tトラン`
@@ -571,6 +579,13 @@ ws.disconnect()
 - クリックでルート遷移（AIコアのみ新しいタブ）
 
 **Shared Components（共有コンポーネント）:**
+
+**_share/qBooleanCheckbox.vue** - Boolean値専用チェックボックス:
+- 0/1 または true/false をトグル
+- フォーム内の有効/無効フラグ等で使用
+
+**_share/qMessageDialog.vue** - メッセージダイアログ:
+- シンプルなメッセージ表示ダイアログ
 
 **_Modal.vue** - 再利用可能なモーダルダイアログベース:
 - Props: `show` (Boolean)
@@ -633,18 +648,20 @@ export async function qColorPicker(initialColor?: string, title?: string): Promi
 
 **Mマスタ/** - M系 (Master) データ管理画面:
 - **Mマスタ.vue** - カテゴリメニュー
-- **M配車区分/**, **M車両/**, **M商品/** - CRUD pages
+- **M配車区分/**, **M生産区分/**, **M生産工程/**, **M商品分類/**, **M車両/**, **M商品/** - 標準 CRUD pages（一覧/編集/components）
+- **M商品構成/** - 明細型マスタ CRUD（`M商品構成一覧.vue`, `M商品構成編集.vue`, `components/`）
+- ※ `M生産分類/`, `M工程/` フォルダが残存しているが旧名称の空フォルダ（未使用）
 
 **Tトラン/** - T系 (Transaction) 管理画面:
 - **Tトラン.vue** - カテゴリメニュー
-- **T配車/**, **T商品入庫/**, **T商品出庫/**, **T商品棚卸/** - CRUD pages
+- **T配車/**, **T商品入庫/**, **T商品出庫/**, **T商品棚卸/** - 標準 CRUD pages
+- **T生産/** - 明細型トランザクション CRUD（`T生産一覧.vue`, `T生産編集.vue`, `T生産払出一覧.vue`, `components/`）
 
 **Sスケジューラー/** - S系 (Scheduler) 特殊処理画面:
 - **Sスケジュール.vue** - カテゴリメニュー
-- **S配車_週表示.vue** - 週別配車スケジュール
-  - `components/S配車_週表示テーブル.vue` - カスタムテーブル
-- **S配車_日表示.vue** - 日別配車スケジュール
-  - `components/S配車_日表示テーブル.vue` - カスタムテーブル
+- **S配車_週表示.vue**, **S配車_日表示.vue** - 配車スケジュール表示
+- **S生産_週表示.vue**, **S生産_日表示.vue** - 生産スケジュール表示
+  - 各 `components/<テーブル>テーブル.vue` でカスタムテーブル実装
 
 **Vビュー/** - V系 (View) 表示画面:
 - **Vビュー.vue** - カテゴリメニュー
@@ -652,6 +669,13 @@ export async function qColorPicker(initialColor?: string, title?: string): Promi
   - `components/V商品推移表テーブル.vue` - カスタムテーブル
 
 **AiDiy/** - AI Core インターフェース（詳細は後述）
+- **AiDiy.vue** - AIコアメインコンポーネント
+- **compornents/** - AIコアパネルコンポーネント（AIチャット/AIイメージ/AIコード/AIファイル/AIコア音声処理）
+- **dialog/** - AIコア専用ダイアログコンポーネント
+  - `AI設定再起動.vue` - AI設定変更後のサーバー再起動UI
+  - `ファイル内容表示.vue` - ファイル内容表示・編集ダイアログ（`POST /core/files/内容取得|内容更新` を使用）
+  - `再起動カウントダウン.vue` - 再起動カウントダウン表示
+  - `更新ファイル一覧.vue` - 変更ファイル一覧表示
 
 **Xテスト/** - X系 (Experimental) テスト機能:
 - **Xその他.vue** - カテゴリメニュー
@@ -833,8 +857,14 @@ The **AIコア** (Core AI) is a multi-panel AI interface system with flexible gr
 - 5-6 panels: 3×2 grid
 
 **Access:**
-- URL: http://localhost:8090/AIコア (opens in new tab from top menu)
+- URL: http://localhost:8090/AiDiy (opens in new tab from top menu)
 - Linked from `_TopMenu.vue` as leftmost menu item
+
+**ダイアログコンポーネント (`AiDiy/dialog/`):**
+- `AI設定再起動.vue` - AI設定（モデル・APIキー等）変更後にサーバー再起動を促すUI。`temp/reboot_core.txt` 経由で backend を再起動
+- `ファイル内容表示.vue` - コードベース内のファイルを表示・編集するダイアログ。`POST /core/files/内容取得` と `POST /core/files/内容更新` を呼び出し
+- `再起動カウントダウン.vue` - 再起動完了までのカウントダウン表示
+- `更新ファイル一覧.vue` - AIエージェントが変更したファイルの一覧表示
 
 **Implementation notes:**
 - Image component uses `v-show` (not `v-if`) to preserve state when toggling visibility
@@ -895,6 +925,98 @@ npm run dev
 1. 機能カテゴリに応じて `/Tトラン` / `/Sスケジュール` / `/Xその他` 配下に画面を作成。
 2. `src/router/index.ts` にルートを追加（`meta.requiresAuth` 付与）。
 3. 必要に応じて `_TopMenu.vue` のタブや各カテゴリ画面のカードを追加。
+
+## 明細型マスタ 編集コンポーネントのパターン（M商品構成編集.vue が実装例）
+
+ヘッダー項目＋複数の明細行を1画面で編集する「明細型マスタ」共通の実装パターンです。
+通常の単一レコード編集と異なり、明細一覧を配列で保持して動的に行追加・削除します。
+
+### 型定義の基本構造
+
+```typescript
+// 明細行 Form 型（数値項目も string で保持して空欄を表現する）
+type 明細行Form = {
+  明細SEQ: number      // 表示用連番（送信時は index+1 で再採番）
+  // ... 各明細固有のフィールド（string or boolean）
+}
+```
+
+> **注意**: 数値項目（金額・数量など）は `string` で保持する。`number` にすると空欄が `0` になり UX が悪化する。
+
+### 明細行の操作パターン
+
+```typescript
+const createEmptyDetail = (明細SEQ = 1): 明細行Form => ({
+  明細SEQ, /* 各フィールドの初期値 */
+});
+
+// 行追加
+const addDetailRow = () => {
+  明細一覧.value.push(createEmptyDetail(明細一覧.value.length + 1));
+};
+
+// 行削除 → SEQ を再採番
+const removeDetailRow = (index: number) => {
+  明細一覧.value.splice(index, 1);
+  明細一覧.value.forEach((row, i) => { row.明細SEQ = i + 1; });
+};
+```
+
+### 送信前のサニタイズと検証
+
+```typescript
+// 1. sanitize: 明細SEQ を index+1 で振り直し、空行を除去して送信用に変換
+const sanitizeDetails = () =>
+  明細一覧.value
+    .map((row, i) => ({ 明細SEQ: i + 1, /* 各フィールドを trim/変換 */ }))
+    .filter((row) => /* 空行判定 */);
+
+// 2. validate: 必須チェック等を行い、問題があれば null を返す
+const validateDetails = () => {
+  const rows = sanitizeDetails();
+  if (!rows.length) { detailError.value = '明細を1件以上入力してください。'; return null; }
+  for (const [i, row] of rows.entries()) {
+    if (!row.必須項目) { detailError.value = `${i+1}行目の...を入力してください。`; return null; }
+  }
+  return rows; // 送信可能なオブジェクト配列
+};
+```
+
+> **重要**: フォーム上で表示専用の計算値（M商品構成の `構成数量` など）は payload に含めない。バックエンドのスキーマに存在しないフィールドはバリデーションエラーになる。
+
+### API 送信の基本構造
+
+```typescript
+const detailPayload = validateDetails();
+if (!detailPayload) return;  // バリデーション失敗
+
+const payload = {
+  /* ヘッダー項目 */,
+  明細一覧: detailPayload,
+};
+await apiClient.post('/apps/<テーブル名>/登録', payload);  // 登録・変更とも同一構造
+```
+
+### M商品構成固有の実装（参考）
+
+以下は M商品構成 特有の実装であり、明細型マスタの汎用パターンではありません。
+
+**構成数量の自動計算**（`分子 / 分母 × 生産ロット`）:
+
+```typescript
+// ヘッダーの生産ロット変更時 → 全明細を再計算
+watch(() => form.生産ロット, () => { 明細一覧.value.forEach(recalcRow); });
+
+// 分子/分母変更時 → その行のみ再計算（@input="recalcRow(row)"）
+const recalcRow = (row) => {
+  const val = toNumber(row.構成数量分子) / toNumber(row.構成数量分母) * toNumber(form.生産ロット);
+  row.構成数量 = val === 0 ? '' : String(val);
+};
+// ユーザーが構成数量を直接入力した場合もその値が有効。
+// ただし、生産ロット/分子/分母を再変更すると再計算で上書きされる（フラグ管理なし）。
+```
+
+**テーブル列**: No / 構成商品ID / 構成商品名 / 構成数量(分子) / 構成数量(分母) / **(参考)計算式** / **構成数量** / 構成単位 / 備考 / 操作
 
 ## Debugging
 
@@ -1096,8 +1218,8 @@ const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD')
 - `any` の多用は避ける
 
 **4. ログイン後のリダイレクト:**
-- ログイン成功時は `/Xその他` へリダイレクト（`stores/auth.ts:36`）
-- 変更する場合は `auth.ts` を修正
+- ログイン成功時はレスポンスの `初期ページ` を優先し、未設定なら `/Xその他` へリダイレクト（`stores/auth.ts`）
+- 変更する場合は `stores/auth.ts` を修正
 
 **5. WebSocketのリロード対応:**
 - AIコアのWebSocket接続はリロード時にソケットIDを保持
@@ -1105,7 +1227,7 @@ const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD')
 
 ## 注意点
 - ログイン画面は開発用にID/パスワードがプリフィル（`admin / ********`）。
-- ログイン成功後は `/Xその他` に遷移する実装（`stores/auth.ts`）。変更したい場合は `auth.ts` を修正。
+- ログイン成功後は `初期ページ` を優先し、未設定なら `/Xその他` に遷移する実装（`stores/auth.ts`）。
 - APIクライアントの `baseURL` は `'/'` で、Vite Proxy を前提（`/core` と `/apps` を Vite が転送）。直叩きする場合は baseURL と CORS を合わせる。
 - `_TopBar.vue` のサーバー状態取得URLは固定（ポート変更時は要調整）。
 - 一覧などで子コンポーネントを呼び出すタグはASCII名で統一（日本語タグはブラウザが無効扱いでテキスト表示される）。

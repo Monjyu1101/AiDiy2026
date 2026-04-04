@@ -20,6 +20,7 @@ class T配車Base(BaseModel):
     車両ID: str
     配車内容: Optional[str] = None
     配車備考: Optional[str] = None
+    有効: bool = True
 
 
 class T配車Create(T配車Base):
@@ -33,6 +34,7 @@ class T配車Update(BaseModel):
     車両ID: Optional[str] = None
     配車内容: Optional[str] = None
     配車備考: Optional[str] = None
+    有効: Optional[bool] = None
 
 
 class T配車Delete(BaseModel):
@@ -45,6 +47,7 @@ class T配車Get(BaseModel):
 
 class T配車(T配車Base):
     配車伝票ID: str
+    有効: bool
     登録日時: str
     登録利用者ID: str
     登録利用者名: Optional[str]

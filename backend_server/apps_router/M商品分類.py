@@ -13,23 +13,23 @@ from sqlalchemy.orm import Session
 import apps_schema as schemas, apps_crud as crud, deps, apps_models as models
 MAX_ITEMS = 10000
 
-router = APIRouter(prefix="/apps/M工程", tags=["M工程"])
+router = APIRouter(prefix="/apps/M商品分類", tags=["M商品分類"])
 
 
 @router.post("/一覧", response_model=schemas.ResponseBase)
-def list_M工程(
+def list_M商品分類(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    query = db.query(models.M工程)
+    query = db.query(models.M商品分類)
     total = query.count()
-    items = query.order_by(models.M工程.工程ID).limit(MAX_ITEMS).all()
+    items = query.order_by(models.M商品分類.商品分類ID).limit(MAX_ITEMS).all()
 
     return schemas.ResponseBase(
         status="OK",
-        message="工程一覧を取得しました",
+        message="商品分類一覧を取得しました",
         data={
-            "items": [schemas.M工程.from_orm(item) for item in items],
+            "items": [schemas.M商品分類.from_orm(item) for item in items],
             "total": total,
             "limit": MAX_ITEMS
         }
@@ -37,58 +37,58 @@ def list_M工程(
 
 
 @router.post("/取得", response_model=schemas.ResponseBase)
-def get_M工程(
-    request: schemas.M工程Get,
+def get_M商品分類(
+    request: schemas.M商品分類Get,
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    item = crud.get_M工程(db, request.工程ID)
+    item = crud.get_M商品分類(db, request.商品分類ID)
     if not item:
-        return schemas.ResponseBase(status="NG", message="指定された工程が見つかりません", error={"code": "NOT_FOUND"})
+        return schemas.ResponseBase(status="NG", message="指定された商品分類が見つかりません", error={"code": "NOT_FOUND"})
 
     return schemas.ResponseBase(
         status="OK",
-        message="工程情報を取得しました",
-        data=schemas.M工程.from_orm(item)
+        message="商品分類情報を取得しました",
+        data=schemas.M商品分類.from_orm(item)
     )
 
 
 @router.post("/登録", response_model=schemas.ResponseBase)
-def create_M工程(
-    request: schemas.M工程Create,
+def create_M商品分類(
+    request: schemas.M商品分類Create,
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    existing = crud.get_M工程(db, request.工程ID)
+    existing = crud.get_M商品分類(db, request.商品分類ID)
     if existing:
-        return schemas.ResponseBase(status="NG", message="この工程IDは既に登録されています", error={"code": "DUPLICATE"})
+        return schemas.ResponseBase(status="NG", message="この商品分類IDは既に登録されています", error={"code": "DUPLICATE"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
-    item = crud.create_M工程(db, request, 認証情報=認証情報)
+    item = crud.create_M商品分類(db, request, 認証情報=認証情報)
     return schemas.ResponseBase(
         status="OK",
-        message="工程を作成しました",
-        data=schemas.M工程.from_orm(item)
+        message="商品分類を作成しました",
+        data=schemas.M商品分類.from_orm(item)
     )
 
 
 @router.post("/変更", response_model=schemas.ResponseBase)
-def update_M工程(
-    request: schemas.M工程Update,
+def update_M商品分類(
+    request: schemas.M商品分類Update,
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    item = crud.get_M工程(db, request.工程ID)
+    item = crud.get_M商品分類(db, request.商品分類ID)
     if not item:
-        return schemas.ResponseBase(status="NG", message="指定された工程が見つかりません", error={"code": "NOT_FOUND"})
+        return schemas.ResponseBase(status="NG", message="指定された商品分類が見つかりません", error={"code": "NOT_FOUND"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
     更新項目 = crud.create_audit_fields(認証情報, is_update=True)
 
-    if request.工程名 is not None:
-        item.工程名 = request.工程名
-    if request.工程備考 is not None:
-        item.工程備考 = request.工程備考
+    if request.商品分類名 is not None:
+        item.商品分類名 = request.商品分類名
+    if request.商品分類備考 is not None:
+        item.商品分類備考 = request.商品分類備考
     if request.有効 is not None:
         item.有効 = request.有効
 
@@ -100,20 +100,20 @@ def update_M工程(
 
     return schemas.ResponseBase(
         status="OK",
-        message="工程を更新しました",
-        data=schemas.M工程.from_orm(item)
+        message="商品分類を更新しました",
+        data=schemas.M商品分類.from_orm(item)
     )
 
 
 @router.post("/削除", response_model=schemas.ResponseBase)
-def delete_M工程(
-    request: schemas.M工程Delete,
+def delete_M商品分類(
+    request: schemas.M商品分類Delete,
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    item = crud.get_M工程(db, request.工程ID)
+    item = crud.get_M商品分類(db, request.商品分類ID)
     if not item:
-        return schemas.ResponseBase(status="NG", message="指定された工程が見つかりません", error={"code": "NOT_FOUND"})
+        return schemas.ResponseBase(status="NG", message="指定された商品分類が見つかりません", error={"code": "NOT_FOUND"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
     更新項目 = crud.create_audit_fields(認証情報, is_update=True)
@@ -125,6 +125,6 @@ def delete_M工程(
 
     return schemas.ResponseBase(
         status="OK",
-        message="工程の有効をオフにしました",
-        data=schemas.M工程.from_orm(item)
+        message="商品分類の有効をオフにしました",
+        data=schemas.M商品分類.from_orm(item)
     )

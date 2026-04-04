@@ -397,7 +397,7 @@ watch(() => route.query, async (query) => {
   align-items: center;
   margin: 5px 10px;
   padding: 5px 10px;
-  background-color: #f8f9fa;
+  background-color: transparent;
   border-radius: 5px;
   gap: 10px;
 }
@@ -427,7 +427,7 @@ watch(() => route.query, async (query) => {
 
 .current-period {
   font-weight: bold;
-  font-size: 22px;
+  font-size: 24px;
   text-align: center;
   flex-grow: 1;
   color: #5a4a3a;

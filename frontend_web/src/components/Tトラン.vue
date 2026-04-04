@@ -95,6 +95,18 @@ import { RouterLink } from 'vue-router';
               一覧を開く
             </RouterLink>
           </div>
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">T払</span>
+              T生産払出
+            </div>
+            <div class="menu-card-description">
+              生産払出一覧・払出商品・原材料確認
+            </div>
+            <RouterLink to="/Tトラン/T生産払出/一覧?戻URL=/Tトラン" class="menu-card-link">
+              一覧を開く
+            </RouterLink>
+          </div>
         </div>
       </div>
     </div>

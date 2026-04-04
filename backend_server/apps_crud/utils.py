@@ -23,7 +23,7 @@ def create_audit_fields(認証情報: Optional[Dict] = None, is_update: bool = F
     now = get_current_datetime()
     利用者ID = 認証情報.get('利用者ID', 'system') if 認証情報 else 'system'
     利用者名 = 認証情報.get('利用者名', 'system') if 認証情報 else 'system'
-    端末ID = 'localhost'
+    端末ID = 認証情報.get('端末ID', 'localhost') if 認証情報 else 'localhost'
 
     if is_update:
         # 更新時は更新項目のみ

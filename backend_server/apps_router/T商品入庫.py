@@ -128,13 +128,13 @@ def delete_T商品入庫(
     if not item:
         return schemas.ResponseBase(status="NG", message="指定された入庫伝票が見つかりません", error={"code": "NOT_FOUND"})
 
-    success = crud.delete_T商品入庫(db, request.入庫伝票ID)
+    認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
+    success = crud.delete_T商品入庫(db, request.入庫伝票ID, 認証情報=認証情報)
     if not success:
         return schemas.ResponseBase(status="NG", message="商品入庫の削除に失敗しました", error={"code": "DELETE_FAILED"})
 
     return schemas.ResponseBase(
         status="OK",
-        message="商品入庫を削除しました",
-        data={"入庫伝票ID": request.入庫伝票ID}
+        message="商品入庫の有効をオフにしました",
+        data=schemas.T商品入庫.from_orm(crud.get_T商品入庫(db, request.入庫伝票ID))
     )
-

@@ -31,6 +31,7 @@ router = APIRouter(prefix="/apps/V商品推移表", tags=["V商品推移表"])
 class TransitionRequest(BaseModel):
     開始日付: str  # YYYY-MM-DD
     終了日付: str  # YYYY-MM-DD
+    商品分類ID: Optional[str] = None
 
 
 class 日付範囲Request(BaseModel):
@@ -42,10 +43,14 @@ class DayData(BaseModel):
     入庫数量: int = 0
     出庫数量: int = 0
     棚卸数量: Optional[int] = None
+    生産受入数量: int = 0
+    生産払出数量: int = 0
     推定在庫: int = 0
     入庫最終更新日時: Optional[str] = None
     出庫最終更新日時: Optional[str] = None
     棚卸最終更新日時: Optional[str] = None
+    生産受入最終更新日時: Optional[str] = None
+    生産払出最終更新日時: Optional[str] = None
 
 class ProductTransitionData(BaseModel):
     商品ID: str
@@ -69,8 +74,11 @@ def list_transition(
         start_date_str = request.開始日付
         end_date_str = request.終了日付
         
-        # 1. 全商品取得
-        products = db.query(models.M商品).all()
+        # 1. 全商品取得（商品分類IDで絞り込み）
+        product_query = db.query(models.M商品).filter(models.M商品.有効 == True)
+        if request.商品分類ID:
+            product_query = product_query.filter(models.M商品.商品分類ID == request.商品分類ID)
+        products = product_query.all()
         # 商品ID順にソート
         products.sort(key=lambda x: x.商品ID)
         product_map = {p.商品ID: p.商品名 for p in products}
@@ -78,9 +86,22 @@ def list_transition(
         # 2. 全トランザクション取得（効率のため全件取得してからメモリで処理）
         # ※データ量が膨大になった場合はSQLで期間絞り込みと集計を行うべきですが、
         #   在庫推移計算のためには期間前のデータも必要なため、今回は全件取得方式を採用
-        inbounds = db.query(models.T商品入庫).all()
-        outbounds = db.query(models.T商品出庫).all()
-        inventories = db.query(models.T商品棚卸).all()
+        inbounds = db.query(models.T商品入庫).filter(models.T商品入庫.有効 == True).all()
+        outbounds = db.query(models.T商品出庫).filter(models.T商品出庫.有効 == True).all()
+        inventories = db.query(models.T商品棚卸).filter(models.T商品棚卸.有効 == True).all()
+
+        # T生産: ヘッダ行（生産受入）と明細行（生産払出）を取得
+        prod_headers = db.query(models.T生産).filter(
+            models.T生産.明細SEQ == 0, models.T生産.有効 == True
+        ).all()
+        prod_details = db.query(models.T生産).filter(
+            models.T生産.明細SEQ > 0, models.T生産.有効 == True
+        ).all()
+        # ヘッダの生産開始日時マップ（払出日付参照用）
+        header_start_map = {
+            h.生産伝票ID: h.生産開始日時[:10] if h.生産開始日時 else None
+            for h in prod_headers
+        }
         
         # 3. 日付リスト生成
         date_list = []
@@ -99,8 +120,19 @@ def list_transition(
             p_inbounds = [x for x in inbounds if x.商品ID == pid]
             p_outbounds = [x for x in outbounds if x.商品ID == pid]
             p_inventories = [x for x in inventories if x.商品ID == pid]
-            
+            # 生産受入: ヘッダ行の受入商品ID=pid、日付=生産終了日
+            p_prod_in = [
+                x for x in prod_headers
+                if x.受入商品ID == pid and x.生産終了日時 and x.受入数量
+            ]
+            # 生産払出: 明細行の払出商品ID=pid、日付=ヘッダの生産開始日
+            p_prod_out = [
+                x for x in prod_details
+                if x.払出商品ID == pid and header_start_map.get(x.生産伝票ID) and x.払出数量
+            ]
+
             # 全イベントをフラットな辞書リストに変換
+            # type: in/out/inv/prod_in/prod_out
             events = []
             for x in p_inbounds:
                 events.append({"date": x.入庫日, "type": "in", "qty": int(x.入庫数量 or 0), "updated": x.更新日時})
@@ -108,62 +140,70 @@ def list_transition(
                 events.append({"date": x.出庫日, "type": "out", "qty": int(x.出庫数量 or 0), "updated": x.更新日時})
             for x in p_inventories:
                 events.append({"date": x.棚卸日, "type": "inv", "qty": int(x.実棚数量 or 0), "updated": x.更新日時})
-                
-            # 日付順、同日の場合は 入庫 -> 出庫 -> 棚卸 の順とする
-            # typeの優先度: in(1), out(2), inv(3)
-            type_order = {"in": 1, "out": 2, "inv": 3}
-            events.sort(key=lambda x: (x["date"], type_order[x["type"]]))
+            for x in p_prod_in:
+                events.append({"date": x.生産終了日時[:10], "type": "prod_in", "qty": int(x.受入数量 or 0), "updated": x.更新日時})
+            for x in p_prod_out:
+                start_date = header_start_map.get(x.生産伝票ID)
+                events.append({"date": start_date, "type": "prod_out", "qty": int(x.払出数量 or 0), "updated": x.更新日時})
+
+            # 日付順、同日優先度: prod_out(1) -> in(2) -> prod_in(3) -> out(4) -> inv(5)
+            type_order = {"prod_out": 1, "in": 2, "prod_in": 3, "out": 4, "inv": 5}
+            events.sort(key=lambda x: (x["date"], type_order.get(x["type"], 9)))
             
             # 初期在庫計算（開始日より前のイベントを処理）
             current_stock = 0
-            
-            # 開始日より前のイベントのみ処理
-            # 文字列比較で判定 (YYYY-MM-DD形式前提)
+
             for ev in events:
                 if ev["date"] < start_date_str:
-                    if ev["type"] == "in":
+                    if ev["type"] in ("in", "prod_in"):
                         current_stock += ev["qty"]
-                    elif ev["type"] == "out":
+                    elif ev["type"] in ("out", "prod_out"):
                         current_stock -= ev["qty"]
                     elif ev["type"] == "inv":
-                        current_stock = ev["qty"] # 棚卸で強制上書き
-            
+                        current_stock = ev["qty"]
+
             # 期間内の日別データ作成
             product_daily_data = []
-            
+
             for d_str in date_list:
-                # その日のイベントを取得
                 days_events = [e for e in events if e["date"] == d_str]
-                
-                # 集計
-                in_qty = sum(e["qty"] for e in days_events if e["type"] == "in")
-                out_qty = sum(e["qty"] for e in days_events if e["type"] == "out")
-                inv_event = next((e for e in reversed(days_events) if e["type"] == "inv"), None) # 同日に複数あれば最後を採用
-                
-                # 更新日時（最新のもの）
-                in_updated = max([e["updated"] for e in days_events if e["type"] == "in"], default=None)
-                out_updated = max([e["updated"] for e in days_events if e["type"] == "out"], default=None)
-                inv_updated = inv_event["updated"] if inv_event else None
-                
-                # 在庫推移計算
-                current_stock += in_qty
-                current_stock -= out_qty
-                
-                # 棚卸があれば上書き
+
+                in_qty      = sum(e["qty"] for e in days_events if e["type"] == "in")
+                out_qty     = sum(e["qty"] for e in days_events if e["type"] == "out")
+                prod_in_qty = sum(e["qty"] for e in days_events if e["type"] == "prod_in")
+                prod_out_qty= sum(e["qty"] for e in days_events if e["type"] == "prod_out")
+                inv_event   = next((e for e in reversed(days_events) if e["type"] == "inv"), None)
+
+                in_updated       = max([e["updated"] for e in days_events if e["type"] == "in"],       default=None)
+                out_updated      = max([e["updated"] for e in days_events if e["type"] == "out"],      default=None)
+                prod_in_updated  = max([e["updated"] for e in days_events if e["type"] == "prod_in"],  default=None)
+                prod_out_updated = max([e["updated"] for e in days_events if e["type"] == "prod_out"], default=None)
+                inv_updated      = inv_event["updated"] if inv_event else None
+
+                # 在庫推移計算（同日優先度に従い処理）
+                current_stock -= prod_out_qty   # 払出（生産開始日）
+                current_stock += in_qty         # 仕入入庫
+                current_stock += prod_in_qty    # 生産受入（生産終了日）
+                current_stock -= out_qty        # 仕入出庫
+
                 inv_qty = None
                 if inv_event:
                     current_stock = inv_event["qty"]
                     inv_qty = inv_event["qty"]
-                    
+
                 product_daily_data.append(DayData(
                     日付=d_str,
                     入庫数量=in_qty,
                     出庫数量=out_qty,
                     棚卸数量=inv_qty,
+                    生産受入数量=prod_in_qty,
+                    生産払出数量=prod_out_qty,
                     推定在庫=current_stock,
                     入庫最終更新日時=in_updated,
                     出庫最終更新日時=out_updated,
-                    棚卸最終更新日時=inv_updated
+                    棚卸最終更新日時=inv_updated,
+                    生産受入最終更新日時=prod_in_updated,
+                    生産払出最終更新日時=prod_out_updated,
                 ))
             
             result_data.append(ProductTransitionData(
@@ -204,16 +244,25 @@ def get_transition_last_modified(
         )
 
     入庫最終更新日時 = db.query(func.max(models.T商品入庫.更新日時)).filter(
+        models.T商品入庫.有効 == True,
         func.date(models.T商品入庫.入庫日).between(request.開始日付, request.終了日付)
     ).scalar()
     出庫最終更新日時 = db.query(func.max(models.T商品出庫.更新日時)).filter(
+        models.T商品出庫.有効 == True,
         func.date(models.T商品出庫.出庫日).between(request.開始日付, request.終了日付)
     ).scalar()
     棚卸最終更新日時 = db.query(func.max(models.T商品棚卸.更新日時)).filter(
+        models.T商品棚卸.有効 == True,
         func.date(models.T商品棚卸.棚卸日).between(request.開始日付, request.終了日付)
     ).scalar()
+    生産最終更新日時 = db.query(func.max(models.T生産.更新日時)).filter(
+        models.T生産.有効 == True,
+        func.date(
+            func.coalesce(models.T生産.生産終了日時, models.T生産.生産開始日時)
+        ).between(request.開始日付, request.終了日付)
+    ).scalar()
 
-    候補リスト = [値 for 値 in [入庫最終更新日時, 出庫最終更新日時, 棚卸最終更新日時] if 値 is not None]
+    候補リスト = [値 for 値 in [入庫最終更新日時, 出庫最終更新日時, 棚卸最終更新日時, 生産最終更新日時] if 値 is not None]
     if not 候補リスト:
         最終更新日時 = None
     else:
@@ -224,4 +273,3 @@ def get_transition_last_modified(
         message="最終更新日時を取得しました",
         data={"最終更新日時": 最終更新日時}
     )
-

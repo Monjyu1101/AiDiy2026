@@ -73,7 +73,7 @@
  <section id="schema-change">
  <h2>スキーマ変更手順</h2>
  <p>このプロジェクトではAlembic等のマイグレーションツールは<strong>使用していません</strong>。<br>
- スキーマ変更はデータベースファイルを削除して再作成する方式です。</p>
+ 開発中はデータベースファイルを削除して再作成する運用が基本ですが、既存データを残す場合は <code>ALTER TABLE</code> などを手動で適用する必要があります。</p>
 
  <h3>1. Modelファイルを編集</h3>
  <p><code>backend_server/core_models/</code> または <code>backend_server/apps_models/</code> のModelファイルを編集します。</p>
@@ -88,7 +88,7 @@ class C利用者(Base):
 
  <h3>2. データベースを削除</h3>
  <p>既存のデータベースファイルを削除します。</p>
- <pre><code><span># サーバーを停止 Ctrl+C または python _stop.py</span>
+ <pre><code><span># サーバーを停止 (Ctrl+C 推奨)</span>
 
 <span># データベースファイルを削除</span>
 del workspace/AiDiy2026/backend_server\_data\AiDiy\database.db</code></pre>
@@ -119,8 +119,8 @@ python _start.py</code></pre>
  <div>
  <strong>補足情報</strong>
  <p>
- 本番環境ではマイグレーションツールの導入を検討してください。<br>
- Alembicを使えばデータを保持したままスキーマ変更が可能です。
+ 既存DBを残したまま項目追加・削除を行う場合は、モデル変更だけでは不十分です。<br>
+ 現行実装では必要に応じて <code>ALTER TABLE</code> / <code>DROP TABLE</code> を手動で適用してください。
  </p>
  </div>
  </section>
@@ -163,7 +163,7 @@ sqlite3 workspace/AiDiy2026/backend_server\_data\AiDiy\database.db
 
  <h3>リセット手順</h3>
  <p>データベースを初期状態に戻すには以下の手順を実行します。</p>
- <pre><code><span># 1. サーバーを停止 Ctrl+C または python _stop.py</span>
+ <pre><code><span># 1. サーバーを停止 (Ctrl+C 推奨)</span>
 
 <span># 2. データベースファイルを削除</span>
 del workspace/AiDiy2026/backend_server\_data\AiDiy\database.db

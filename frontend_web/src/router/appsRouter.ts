@@ -58,16 +58,28 @@ export const appsRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'M車両編集' }
     },
     {
-        path: '/Mマスタ/M工程/一覧',
-        name: 'M工程一覧',
-        component: () => import('../components/Mマスタ/M工程/M工程一覧.vue'),
-        meta: { requiresAuth: true, title: 'M工程一覧' }
+        path: '/Mマスタ/M生産工程/一覧',
+        name: 'M生産工程一覧',
+        component: () => import('../components/Mマスタ/M生産工程/M生産工程一覧.vue'),
+        meta: { requiresAuth: true, title: 'M生産工程一覧' }
     },
     {
-        path: '/Mマスタ/M工程/編集',
-        name: 'M工程編集',
-        component: () => import('../components/Mマスタ/M工程/M工程編集.vue'),
-        meta: { requiresAuth: true, title: 'M工程編集' }
+        path: '/Mマスタ/M生産工程/編集',
+        name: 'M生産工程編集',
+        component: () => import('../components/Mマスタ/M生産工程/M生産工程編集.vue'),
+        meta: { requiresAuth: true, title: 'M生産工程編集' }
+    },
+    {
+        path: '/Mマスタ/M商品分類/一覧',
+        name: 'M商品分類一覧',
+        component: () => import('../components/Mマスタ/M商品分類/M商品分類一覧.vue'),
+        meta: { requiresAuth: true, title: 'M商品分類一覧' }
+    },
+    {
+        path: '/Mマスタ/M商品分類/編集',
+        name: 'M商品分類編集',
+        component: () => import('../components/Mマスタ/M商品分類/M商品分類編集.vue'),
+        meta: { requiresAuth: true, title: 'M商品分類編集' }
     },
     {
         path: '/Mマスタ/M商品/一覧',
@@ -123,6 +135,12 @@ export const appsRoutes: RouteRecordRaw[] = [
         name: 'T生産編集',
         component: () => import('../components/Tトラン/T生産/T生産編集.vue'),
         meta: { requiresAuth: true, title: 'T生産編集' }
+    },
+    {
+        path: '/Tトラン/T生産払出/一覧',
+        name: 'T生産払出一覧',
+        component: () => import('../components/Tトラン/T生産/T生産払出一覧.vue'),
+        meta: { requiresAuth: true, title: 'T生産払出一覧' }
     },
     {
         path: '/Tトラン/T商品入庫/一覧',

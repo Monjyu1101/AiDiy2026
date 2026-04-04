@@ -17,6 +17,7 @@ class M商品(Base):
     商品ID = Column(Text, primary_key=True)
     商品名 = Column(Text, nullable=False)
     単位 = Column(Text, nullable=False)
+    商品分類ID = Column(Text, nullable=False)
     商品備考 = Column(Text)
     有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)

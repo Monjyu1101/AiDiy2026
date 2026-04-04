@@ -39,7 +39,8 @@ const form = reactive({
   入庫日: '',
   商品ID: '',
   入庫数量: '',
-  入庫備考: ''
+  入庫備考: '',
+  有効: true
 });
 
 const errors = reactive({
@@ -62,6 +63,9 @@ const 商品一覧 = ref([]);
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
+const 表示用商品一覧 = computed(() => isCreateMode.value
+  ? 商品一覧.value.filter((item: any) => item?.有効 !== false)
+  : 商品一覧.value);
 const requiredFields = computed(() => ['入庫日', '商品ID', '入庫数量']);
 
 // ==================================================
@@ -86,6 +90,7 @@ const resetForm = () => {
   form.商品ID = '';
   form.入庫数量 = '';
   form.入庫備考 = '';
+  form.有効 = true;
 };
 
 const applyDataToForm = (data) => {
@@ -94,6 +99,7 @@ const applyDataToForm = (data) => {
   form.商品ID = data?.商品ID || '';
   form.入庫数量 = data?.入庫数量 || '';
   form.入庫備考 = data?.入庫備考 || '';
+  form.有効 = data?.有効 ?? true;
 };
 
 // ==================================================
@@ -278,14 +284,16 @@ const saveData = async () => {
         入庫日: form.入庫日,
         商品ID: form.商品ID,
         入庫数量: Number(form.入庫数量),
-        入庫備考: form.入庫備考
+        入庫備考: form.入庫備考,
+        有効: form.有効
       });
     } else {
       res = await apiClient.post('/apps/T商品入庫/変更', {
         入庫日: form.入庫日,
         商品ID: form.商品ID,
         入庫数量: Number(form.入庫数量),
-        入庫備考: form.入庫備考
+        入庫備考: form.入庫備考,
+        有効: form.有効
       }, {
         params: { 入庫伝票ID: form.入庫伝票ID }
       });
@@ -304,7 +312,7 @@ const saveData = async () => {
 const deleteData = async () => {
   if (!form.入庫伝票ID) return;
 
-  const confirmed = await qConfirm(`T商品入庫「${form.入庫伝票ID}」を削除しますか？この操作は取り消せません。`);
+  const confirmed = await qConfirm(`T商品入庫「${form.入庫伝票ID}」の有効をオフにしますか？`);
   if (!confirmed) return;
 
   try {
@@ -416,7 +424,7 @@ watch(() => route.query, async (query) => {
                         @change="handleInput('商品ID')"
                       >
                         <option value="">選択してください</option>
-                        <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
+                        <option v-for="item in 表示用商品一覧" :key="item.商品ID" :value="item.商品ID">
                           {{ item.商品名 }} ({{ item.商品ID }})
                         </option>
                       </select>
@@ -465,6 +473,27 @@ watch(() => route.query, async (query) => {
             </template>
 
             <template v-if="activeTab === 'others'">
+              <div class="detail-row row-valid">
+                <div class="detail-label">有効</div>
+                <div class="detail-value">
+                  <label
+                    class="valid-checkbox-label"
+                    :class="{ 'valid-checkbox-label-disabled': isViewMode }"
+                  >
+                    <input
+                      type="checkbox"
+                      v-model="form.有効"
+                      :disabled="isViewMode"
+                      class="valid-checkbox"
+                      aria-label="有効の切り替え"
+                    />
+                    <span
+                      class="valid-checkbox-mark"
+                      :class="{ 'valid-checkbox-inactive': !form.有効 }"
+                    >{{ form.有効 ? '✅' : '☐' }}</span>
+                  </label>
+                </div>
+              </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">登録日時</div>
                 <div class="detail-value">
@@ -898,12 +927,66 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-secondary {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
 }
 
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: #f2f2f2;
+}
+
+.row-valid {
+  width: fit-content;
+}
+
+.valid-checkbox-label {
+  width: 320px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f8f9fa;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.valid-checkbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.valid-checkbox-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 16px;
+  color: #16a34a;
+}
+
+.valid-checkbox-inactive {
+  color: #222;
+}
+
+.valid-checkbox-label-disabled {
+  cursor: default;
+}
+
+.valid-checkbox-label:focus-within {
+  border-color: #007bff;
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
 }
 
 .message {

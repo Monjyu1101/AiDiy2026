@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from sqlalchemy import Column, Text, Integer
+from sqlalchemy import Boolean, Column, Integer, Text
 from database import Base
 
 class T商品出庫(Base):
@@ -21,6 +21,7 @@ class T商品出庫(Base):
     商品ID = Column(Text, nullable=False)
     出庫数量 = Column(Integer, nullable=False)
     出庫備考 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)
     登録利用者ID = Column(Text, nullable=False)
     登録利用者名 = Column(Text)

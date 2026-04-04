@@ -27,17 +27,26 @@
 
 ## 概要
 
-`frontend_avatar` は、**Vue 3 + Vite + TypeScript + Electron** で構成された  
-**AIコア専用のデスクトップアバタークライアント** です。
+`frontend_avatar` は、**Vue 3 + Vite + TypeScript** で構成された **AIコア専用クライアント** です。  
+**Electron デスクトップアプリ** としても **Web ブラウザ単体** でも動作する **デュアルモード** 設計です。
 
 `frontend_web` がブラウザ向けの業務UIであるのに対し、`frontend_avatar` は次の役割に特化しています。
 
-- ログイン用の小さなデスクトップウィンドウ
-- 常駐型のアバターウィンドウ
-- チャット / ファイル / 画像 / コード用の補助パネルウィンドウ
+- ログイン用の小さなウィンドウ（Electron: 専用ウィンドウ / Web: 画面内ログインフォーム）
+- 常駐型のアバターウィンドウ（VRM / VRMA 3D 表示）
+- チャット / ファイル / 画像 / コード用の補助パネル（Electron: 個別ウィンドウ / Web: タブ切替）
 - WebSocket による AIコアとのリアルタイム通信
-- VRM / VRMA を使った 3D アバター表示
 - マイク入力 / スピーカー出力の双方向音声連携
+
+### Electron モードと Web モードの違い
+
+| 項目 | Electron モード | Web モード |
+|------|---------------|-----------|
+| 判定方法 | `!!window.desktopApi` が `true` | `!!window.desktopApi` が `false` |
+| 認証Storage | `localStorage` | `sessionStorage` |
+| ウィンドウ | 複数 BrowserWindow（role で分離） | 単一タブ（`/AiDiy?role=core`） |
+| パネル表示 | 独立ウィンドウを `show()`/`hide()` | 左右分割レイアウト内タブ切替 |
+| アクセス URL | Electron アプリ起動 | `http://localhost:8099/AiDiy` |
 
 ---
 
@@ -66,9 +75,10 @@
 ### 重要な前提
 
 - Electron ウィンドウは **透明 + フレームレス** が基本です
-- 画面の表示切替は URL ルーティングではなく、**ウィンドウ role** と IPC で制御します
-- 認証情報は `localStorage` に保持します
+- 画面の表示切替は URL ルーティングではなく、**ウィンドウ role** と IPC で制御します（`?role=<role>` クエリパラメータで役割を伝達）
+- 認証情報: **Electron** は `localStorage`、**Web** は `sessionStorage` に保持します
 - バックエンドへの HTTP は `8091`、Vite 開発サーバーは `8099` が前提です
+- Web モードでは Vite Proxy 経由（`/core` → `8091`, `/apps` → `8092`）でアクセス
 
 ---
 
@@ -90,15 +100,15 @@
 
 このアプリは次の role を扱います。
 
-- `login`
-- `core`
-- `chat`
-- `file`
-- `image`
-- `code1`
-- `code2`
-- `code3`
-- `code4`
+- `login` - ログイン画面（初期表示）
+- `core` - アバター常駐ウィンドウ（メイン）
+- `chat` - チャットパネル
+- `file` - ファイルパネル
+- `image` - 画像・画面取得パネル
+- `code1` 〜 `code4` - コード支援パネル（4つ）
+- `settings` - AI設定ダイアログウィンドウ（**新規追加**）
+
+`settings` ウィンドウは `electron/main.ts` の `settingsWindow` で管理され、core ウィンドウからの IPC で開閉します。
 
 **重要な設計ポイント：**
 - `createBaseWindow()` で全ウィンドウ共通設定を適用
@@ -134,14 +144,22 @@
 エントリーポイント: `src/main.ts` → `src/AiDiy.vue` を直接マウント（`App.vue` は存在しない）
 
 `src/AiDiy.vue` の責務:
-- 現在ウィンドウの role 判定
-- ログイン状態の管理
-- セッションIDの維持
-- AIコアへの WebSocket 接続
-- 補助ウィンドウ向けの状態同期（BroadcastChannel）
+- Electron / Web の動作モード判定（`isElectron = !!window.desktopApi`）
+- 現在ウィンドウの role 判定（IPC または `?role=` クエリパラメータ）
+- ログイン状態の管理（`認証Storage` で Electron=localStorage / Web=sessionStorage を切替）
+- セッションIDの維持（`localStorage` の `avatar_session_id`）
+- AIコアへの WebSocket 接続（`コアソケット` / `入力ソケット` の 2 本）
+- 補助ウィンドウ向けの状態同期（BroadcastChannel `avatar-desktop-sync`）
 - 各 Vue コンポーネントの切り替え
+- **Web モード固有**: 左右分割レイアウト＋タブ切替（`web-split-layout`）の制御
 
 `frontend_avatar` では Vue Router を使わず、`AiDiy.vue` が role に応じて描画を切り替えます。
+
+**Web モード専用レイアウト（`isElectron === false` の core ロール）:**
+- 左ペイン: アバター（`AIコア.vue`）
+- 右ペイン: タブバー＋パネルエリア（`chat` / `file` / `image` / `code1〜4` をタブ切替）
+- タブ切替は `アクティブタブ` ref で管理（`webTabs` 配列で定義）
+- ペイン幅はドラッグリサイズ可能（`リサイズ中` フラグ + `mousemove` ハンドラー）
 
 ---
 
@@ -235,15 +253,16 @@
 `AiDiy.vue` では **BroadcastChannel (`avatar-desktop-sync`)** を使って、
 core ウィンドウの状態を他パネルへ配信しています。
 
-同期される主な情報:
-- 認証状態
-- 利用者表示名
-- セッションID
-- メッセージ一覧
-- モデル設定
-- マイク / スピーカー状態
-- 接続状態
-- パネル表示状態
+同期される主な情報（`SharedSnapshot` 型）:
+- `認証済み` / `利用者ラベル` - 認証状態・表示名
+- `セッションID` - WebSocket セッション
+- `メッセージ一覧` - チャット履歴
+- `チャットモード` - `'chat'` / `'live'` / `'code1'〜'code4'`
+- `モデル設定` - AI モデル設定（CHAT_AI_NAME 等）
+- `入力接続済み` / `チャット接続済み` - WebSocket 接続状態
+- `コア処理中` / `コアエラー` - AI 処理ステータス
+- `入力ウェルカム情報` / `入力ウェルカム本文` - セッション開始メッセージ
+- `パネル表示状態` - 各補助パネルの表示/非表示
 
 ---
 
@@ -361,13 +380,17 @@ core ウィンドウの状態を他パネルへ配信しています。
 ### config.ts 主なエクスポート定数
 
 ```ts
-CORE_BASE_URL          // バックエンド HTTP ベースURL（既定: http://127.0.0.1:8091）
-AI_WS_ENDPOINT         // WebSocket エンドポイント（既定: ws://127.0.0.1:8091/core/ws/AIコア）
+CORE_BASE_URL          // バックエンド HTTP ベースURL
+                       // 優先順: VITE_CORE_BASE_URL 環境変数 > DEV時は '/' > 本番 'http://127.0.0.1:8091'
+AI_WS_ENDPOINT         // WebSocket エンドポイント
+                       // 優先順: VITE_CORE_WS_URL 環境変数 > ブラウザのホストから動的生成（ws://host/core/ws/AIコア）> 'ws://127.0.0.1:8091/core/ws/AIコア'
 DEFAULT_VRM_MODEL_URL  // デフォルト VRM モデルパス（'/vrm/AiDiy_Sample_M.vrm'）
 SAMPLE_VRMA_FOLDER_NAME    // サンプルモーションフォルダ名（'サンプル'）
 STANDARD_VRMA_FOLDER_NAME  // 標準モーションフォルダ名（'標準'）
 defaultModelSettings() // モデル設定デフォルト値を返す関数
 ```
+
+**Web モードでの URL 解決:** 開発時（`import.meta.env.DEV`）は `baseURL='/'` となり、Vite Proxy を経由して `/core/*` → `8091` へルーティングされます。WebSocket も `window.location.host` から動的に生成されるため、ホスト名変更に自動追随します。
 
 ---
 
@@ -443,6 +466,18 @@ npm run start
 
 ## 実装変更時の重要チェック
 
+### 0. Electron / Web 両モード共通の注意
+
+`AiDiy.vue` は `isElectron` フラグで動作を分岐しています。  
+**UI や接続まわりを修正する際は、Electron と Web の両方で動作を確認してください。**
+
+| 修正箇所 | Electron への影響 | Web への影響 |
+|---------|-----------------|------------|
+| `AiDiy.vue` の状態管理 | core ウィンドウ + BroadcastChannel | 単一タブ内で完結 |
+| パネル表示制御 | IPC `panel:toggle` → `show()`/`hide()` | `アクティブタブ` ref の切替 |
+| 認証情報保存先 | `localStorage` | `sessionStorage` |
+| WebSocket URL | 環境変数 or `127.0.0.1:8091` | Vite Proxy or ホスト動的解決 |
+
 ### 1. ウィンドウ role を増やす場合
 
 次の連動修正が必要です。
@@ -493,7 +528,7 @@ npm run start
 
 - `src/api/config.ts` の `defaultModelSettings()` のデフォルト値を更新
 - `CHAT_AI_NAME` は `_chat` 末尾、`LIVE_AI_NAME` は `_live` 末尾、`CODE_AI*_NAME` は `_code` 末尾 **必須**
-- バックエンド側の `AIコア/AIコア_設定.py` の定数と一致させる
+- バックエンド側の `_config/AiDiy_*.json` と `AIコア/AIセッション管理.py` の初期設定と整合させる
 - 比較箇所は完全一致（`===`）で記述し、`startswith` は使わない
 
 ---
@@ -521,6 +556,9 @@ npm run start
 - **補助パネルが同期しない**: BroadcastChannel snapshot が届いていない
 - **透明ウィンドウが期待通りでない**: CSS だけでなく `WindowShell.vue` と `アバター.vue` の両方を確認
 - **デスクトップキャプチャできない**: `desktop:set-source` の設定漏れ、または source 未選択
+- **Web モードでセッションが消える**: `sessionStorage` を使用しているためタブを閉じると失われる（Electron の `localStorage` とは異なる）
+- **Web モードでパネルが開かない**: Web では IPC は使えないため `アクティブタブ` ref の切替ロジックを確認
+- **Web モード WebSocket が繋がらない**: Vite Proxy の設定（`/core` → `8091`）および `AI_WS_ENDPOINT` の動的 URL 解決を確認
 
 ---
 
@@ -540,6 +578,7 @@ npm run start
 - login/core/panel どの role に効く変更か
 - snapshot に載せるべき状態か
 - core 専用状態を panel 側へ誤って持ち込んでいないか
+- **`isElectron` 分岐を見落としていないか**（Electron と Web で挙動が変わる箇所が多い）
 
 ### Electron と Renderer の責務を混ぜない
 
@@ -564,6 +603,6 @@ npm run start
 
 - `frontend_web` の実装パターンをそのまま持ち込まないでください。`frontend_avatar` は Router / Pinia 中心ではありません。
 - ポートを `8099` から変更する場合は、必要に応じて起動スクリプトや接続手順も見直してください。
-- API 接続先を変える場合は `src/lib/config.ts` を起点に確認してください。
+- API 接続先を変える場合は `src/api/config.ts` を起点に確認してください。
 - 全ファイルは UTF-8 必須です。
 - **ユーザーの指示なしに `dist` / `dist-electron` を生成しないでください。** ビルド系コマンドは明示依頼時のみ実行します。

@@ -11,10 +11,11 @@
 -->
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
 import type { Column } from '../../../../types/qTubler';
 
 const router = useRouter();
@@ -28,9 +29,25 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  工程ID: {
+  生産工程ID: {
     type: String,
     default: ''
+  },
+  生産区分ID: {
+    type: String,
+    default: ''
+  },
+  受入商品ID: {
+    type: String,
+    default: ''
+  },
+  件数制限: {
+    type: Boolean,
+    default: true
+  },
+  無効も表示: {
+    type: Boolean,
+    default: false
   },
   戻URL: {
     type: String,
@@ -39,6 +56,7 @@ const props = defineProps({
 });
 
 const 生産一覧 = ref([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('生産開始日時');
@@ -47,22 +65,33 @@ const filters = reactive({
   生産伝票ID: '',
   生産開始日時: '',
   生産終了日時: '',
-  工程名: '',
+  受入商品ID: '',
+  受入商品名: '',
+  受入数量: '',
+  単位: '',
   生産区分名: '',
+  生産工程名: '',
   生産内容: '',
+  生産備考: '',
   更新日時: '',
   更新利用者名: ''
 });
 const rowKey = '生産伝票ID';
 const columns: Column[] = [
-  { key: '生産伝票ID', label: '生産伝票ID', width: '120px', sortable: true },
-  { key: '生産開始日時', label: '開始日時', width: '160px', sortable: true, align: 'center' },
-  { key: '生産終了日時', label: '終了日時', width: '160px', sortable: true, align: 'center' },
-  { key: '工程名', label: '工程名', width: '150px', sortable: true },
-  { key: '生産区分名', label: '生産区分', width: '120px', sortable: true },
-  { key: '生産内容', label: '生産内容', width: '220px', sortable: true },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  { key: '生産伝票ID',   label: '生産伝票ID',   width: '120px', sortable: true },
+  { key: '生産開始日時', label: '開始日時',     width: '155px', sortable: true, align: 'center' },
+  { key: '生産終了日時', label: '終了日時',     width: '155px', sortable: true, align: 'center' },
+  { key: '受入商品ID',   label: '受入商品ID',   width: '100px', sortable: true },
+  { key: '受入商品名',   label: '受入商品名',   width: '160px', sortable: true },
+  { key: '受入数量',     label: '受入数量',     width: '100px', sortable: true, align: 'right' },
+  { key: '単位',         label: '単位',         width: '70px',  sortable: true, align: 'center' },
+  { key: '生産区分名',   label: '生産区分',     width: '110px', sortable: true },
+  { key: '生産工程名',   label: '生産工程',     width: '130px', sortable: true },
+  { key: '生産内容',     label: '生産内容',     width: '200px', sortable: true },
+  { key: '生産備考',     label: '生産備考',     width: '180px', sortable: true },
+  { key: '有効',         label: '有効',         width: '60px',  sortable: true, align: 'center' },
+  { key: '更新日時',     label: '更新日時',     width: '155px', sortable: true },
+  { key: '更新利用者名', label: '更新利用者名', width: '120px', sortable: true }
 ];
 
 const formatDateTime = (val: string | null | undefined) => {
@@ -86,7 +115,9 @@ const hasFilter = computed((): boolean => {
   return Boolean(Object.values(filters).some((value) => String(value || '').trim() !== '') ||
     props.開始日付 ||
     props.終了日付 ||
-    props.工程ID);
+    props.生産工程ID ||
+    props.生産区分ID ||
+    props.受入商品ID);
 });
 const filteredRows = computed(() => {
   return 生産一覧.value.filter((row) => {
@@ -118,16 +149,25 @@ const filteredRows = computed(() => {
       if (!endOk) return false;
     }
 
-    if (props.工程ID) {
-      const rowProcessId = String(row?.工程ID ?? '');
-      if (rowProcessId !== String(props.工程ID)) return false;
+    if (props.生産工程ID) {
+      const rowProcessId = String(row?.生産工程ID ?? '');
+      if (rowProcessId !== String(props.生産工程ID)) return false;
+    }
+
+    if (props.生産区分ID) {
+      if (String(row?.生産区分ID ?? '') !== String(props.生産区分ID)) return false;
+    }
+
+    if (props.受入商品ID) {
+      const filter = props.受入商品ID.toLowerCase();
+      if (!String(row?.受入商品ID ?? '').toLowerCase().includes(filter)) return false;
     }
 
     return true;
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => 生産一覧.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -182,9 +222,15 @@ const openDetail = (row) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const payload: Record<string, string> = {};
+    const payload: Record<string, string | boolean> = {
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    };
     if (props.開始日付) payload.開始日付 = String(props.開始日付);
     if (props.終了日付) payload.終了日付 = String(props.終了日付);
+    if (props.生産区分ID) payload.生産区分ID = String(props.生産区分ID);
+    if (props.生産工程ID) payload.生産工程ID = String(props.生産工程ID);
+    if (props.受入商品ID) payload.受入商品ID = String(props.受入商品ID);
     const res = await apiClient.post(
       '/apps/V生産/一覧',
       Object.keys(payload).length ? payload : undefined
@@ -193,6 +239,7 @@ const loadData = async () => {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       生産一覧.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'T生産一覧の取得に失敗しました。', 'error');
@@ -243,8 +290,14 @@ defineExpose({
       <template v-if="column.key === '生産伝票ID'">
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.生産伝票ID }}</a>
       </template>
-      <template v-else-if="['生産開始日時', '生産終了日時'].includes(column.key)">
+      <template v-else-if="column.key === '有効'">
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
+      </template>
+      <template v-else-if="['生産開始日時', '生産終了日時', '更新日時'].includes(column.key)">
         {{ formatDateTime(value) }}
+      </template>
+      <template v-else-if="column.key === '受入数量'">
+        {{ value != null ? Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 3 }) : '' }}
       </template>
       <template v-else>
         {{ value ?? '' }}
@@ -252,3 +305,11 @@ defineExpose({
     </template>
   </qTublerFrame>
 </template>
+
+<style scoped>
+.unit-label {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #666;
+}
+</style>

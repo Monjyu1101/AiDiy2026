@@ -9,9 +9,9 @@
 </head>
 <body>
   <nav>
-    <a href="04_Migration実行.html">前へ: 04_Migration実行</a>
+    <a href="04_Migration実行.html">前へ: 04_DB再作成と反映</a>
     <a href="_index.html">目次へ戻る</a>
-    <a href="06_Service作成.html">次へ: 06_Service作成</a>
+    <a href="06_Service作成.html">次へ: 06_実装方針整理</a>
   </nav>
 
   <h1>05_CRUD作成</h1>
@@ -40,7 +40,7 @@
   <ul>
     <li>CRUDは例外時に呼び出し元で rollback できるようにする</li>
     <li>戻り値はRouterでそのままレスポンス化できる形式にする</li>
-    <li>重複チェックや存在チェックはRouterまたはServiceで行う</li>
+    <li>重複チェックや存在チェックはRouterで行う（必要時のみ補助関数へ切り出す）</li>
   </ul>
 
   <h2>【重要】apps_crud/__init__.py への登録を忘れずに</h2>
@@ -66,9 +66,9 @@
   </ul>
 
   <nav>
-    <a href="04_Migration実行.html">前へ: 04_Migration実行</a>
+    <a href="04_Migration実行.html">前へ: 04_DB再作成と反映</a>
     <a href="_index.html">目次へ戻る</a>
-    <a href="06_Service作成.html">次へ: 06_Service作成</a>
+    <a href="06_Service作成.html">次へ: 06_実装方針整理</a>
   </nav>
 </body>
 </html>

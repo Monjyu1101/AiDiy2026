@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   -*- coding: utf-8 -*-
 
   -------------------------------------------------------------------------
@@ -13,17 +13,20 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 const props = defineProps({
-  includeInactive: { type: Boolean, default: false },
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 import { useRouter } from 'vue-router';
 import type { V利用者, Column } from '../../../../types';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
 
 const router = useRouter();
 
 const users = ref<V利用者[]>([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('利用者ID');
@@ -38,7 +41,7 @@ const filters = reactive({
 });
 const rowKey = '利用者ID';
 const columns: Column[] = [
-  { key: '利用者ID', label: '利用者ID', width: '100px', sortable: true },
+  { key: '利用者ID', label: '利用者ID', width: '100px', sortable: true, align: 'center' },
   { key: '利用者名', label: '利用者名', width: '140px', sortable: true },
   { key: '権限名', label: '権限名', width: '120px', sortable: true },
   { key: '利用者備考', label: '利用者備考', width: '250px', sortable: true },
@@ -66,7 +69,6 @@ const displayRows = computed(() => {
 });
 const filteredRows = computed(() => {
   return displayRows.value.filter((row) => {
-    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -76,7 +78,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => displayRows.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -131,11 +133,15 @@ const openDetail = (row) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const res = await apiClient.post('/core/V利用者/一覧');
+    const res = await apiClient.post('/core/V利用者/一覧', {
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    });
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       users.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'C利用者一覧の取得に失敗しました。', 'error');
@@ -183,11 +189,11 @@ defineExpose({
       />
     </template>
     <template #cell="{ row, column, value }">
-      <template v-if="column.key === '利用者ID'">
-        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.利用者ID }}</a>
+      <template v-if="column.key === '利用者ID' || column.key === '利用者名'">
+        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ value ?? '' }}</a>
       </template>
       <template v-else-if="column.key === '有効'">
-        <span>{{ row.有効 ? '✅' : '□' }}</span>
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}
@@ -198,4 +204,5 @@ defineExpose({
 
 <style scoped>
 </style>
+
 

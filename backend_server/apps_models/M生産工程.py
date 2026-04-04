@@ -12,14 +12,14 @@ from sqlalchemy import Column, Boolean, Text
 from database import Base
 
 
-class M工程(Base):
-    """M工程テーブル（工程マスタ）"""
-    __tablename__ = "M工程"
+class M生産工程(Base):
+    """M生産工程テーブル（生産工程マスタ）"""
+    __tablename__ = "M生産工程"
     __table_args__ = {'extend_existing': True}
 
-    工程ID = Column(Text, primary_key=True)
-    工程名 = Column(Text, nullable=False)
-    工程備考 = Column(Text)
+    生産工程ID = Column(Text, primary_key=True)
+    生産工程名 = Column(Text, nullable=False)
+    生産工程備考 = Column(Text)
     有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)
     登録利用者ID = Column(Text, nullable=False)

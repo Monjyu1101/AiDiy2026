@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from core_schema.common import ResponseBase, ErrorResponse, LoginRequest, Token
+from core_schema.common import ResponseBase, ErrorResponse, LoginRequest, Token, ListRequest
 from core_schema.A会話履歴 import (
     A会話履歴Base, A会話履歴Create, A会話履歴Update, A会話履歴Delete,
     A会話履歴Get, A会話履歴ListRequest, A会話履歴Response,
@@ -20,7 +20,7 @@ from core_schema.C利用者 import (
 from core_schema.C採番 import C採番Base, C採番Create, C採番Update, C採番Delete, C採番Get, C採番
 
 __all__ = [
-    'ResponseBase', 'ErrorResponse', 'LoginRequest', 'Token',
+    'ResponseBase', 'ErrorResponse', 'LoginRequest', 'Token', 'ListRequest',
     'A会話履歴Base', 'A会話履歴Create', 'A会話履歴Update', 'A会話履歴Delete',
     'A会話履歴Get', 'A会話履歴ListRequest', 'A会話履歴Response',
     'C権限Base', 'C権限Create', 'C権限Update', 'C権限Delete', 'C権限',

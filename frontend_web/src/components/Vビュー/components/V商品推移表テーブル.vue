@@ -19,9 +19,13 @@ interface 日別データ型 {
   出庫数量?: number
   推定在庫?: number
   棚卸数量?: number | null
+  生産受入数量?: number
+  生産払出数量?: number
   入庫最終更新日時?: string
   出庫最終更新日時?: string
   棚卸最終更新日時?: string
+  生産受入最終更新日時?: string
+  生産払出最終更新日時?: string
   [key: string]: any
 }
 
@@ -42,6 +46,11 @@ const props = defineProps({
     type: Array as () => 商品型[],
     required: false,
     default: () => []
+  },
+  商品分類ID: {
+    type: String,
+    required: false,
+    default: ''
   }
 });
 
@@ -145,11 +154,16 @@ const toVisibleUrlValue = (value: string): string => {
   return value.replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
 };
 
+const buildReturnUrl = (date: string): string => {
+  const returnDate = displayDates.value[0] || date;
+  let url = `/Vビュー/V商品推移表?開始日付=${returnDate}`;
+  if (props.商品分類ID) url += `&商品分類ID=${encodeURIComponent(props.商品分類ID)}`;
+  return toVisibleUrlValue(url);
+};
+
 const openList = (type: string, product: 商品型, date: string) => {
   if (!date || !product?.商品ID) return;
-  const returnDate = displayDates.value[0] || date;
-  const returnUrl = `/Vビュー/V商品推移表?開始日付=${returnDate}`;
-  const visibleReturnUrl = toVisibleUrlValue(returnUrl);
+  const visibleReturnUrl = buildReturnUrl(date);
 
   const pathMap = {
     入庫: '/Tトラン/T商品入庫/一覧',
@@ -161,6 +175,19 @@ const openList = (type: string, product: 商品型, date: string) => {
   if (!path) return;
   const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&商品ID=${encodeURIComponent(product.商品ID)}&戻URL=${visibleReturnUrl}`;
   router.push(`${path}?${queryString}`);
+};
+
+const openSeisanList = (type: string, product: 商品型, date: string) => {
+  if (!date || !product?.商品ID) return;
+  const visibleReturnUrl = buildReturnUrl(date);
+
+  if (type === '受入') {
+    const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&受入商品ID=${encodeURIComponent(product.商品ID)}&戻URL=${visibleReturnUrl}`;
+    router.push(`/Tトラン/T生産/一覧?${queryString}`);
+  } else if (type === '払出') {
+    const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&払出商品ID=${encodeURIComponent(product.商品ID)}&戻URL=${visibleReturnUrl}`;
+    router.push(`/Tトラン/T生産払出/一覧?${queryString}`);
+  }
 };
 
 const parseUpdateDate = (value: any): Date | null => {
@@ -179,7 +206,7 @@ const isRecentUpdate = (updatedStr: any): boolean => {
   if (!updated) return false;
   const now = new Date();
   const diffMs = now.getTime() - updated.getTime();
-  return diffMs >= 0 && diffMs <= 60 * 60 * 1000;
+  return diffMs >= 0 && diffMs <= 5 * 60 * 1000;
 };
 </script>
 
@@ -200,7 +227,7 @@ const isRecentUpdate = (updatedStr: any): boolean => {
         <template v-for="product in 商品データ" :key="product.商品ID">
           <!-- 入庫行 -->
           <tr>
-            <td class="product-cell" rowspan="3">
+            <td class="product-cell" rowspan="5">
               {{ product.商品名 }}
               <div v-if="product.商品ID" class="product-sub">{{ product.商品ID }}</div>
             </td>
@@ -216,6 +243,38 @@ const isRecentUpdate = (updatedStr: any): boolean => {
               @dblclick="openList('入庫', product, date)"
             >
               {{ getDayData(product, index).入庫数量 > 0 ? getDayData(product, index).入庫数量 : '' }}
+            </td>
+          </tr>
+          <!-- 生産受入行 -->
+          <tr>
+            <td class="type-cell prod-inbound">受</td>
+            <td
+              v-for="(date, index) in displayDates"
+              :key="'prod-in-' + index"
+              class="data-cell prod-inbound-data"
+              :class="[
+                getDayClass(date),
+                { 'recent-update': isRecentUpdate(getDayData(product, index).生産受入最終更新日時) }
+              ]"
+              @dblclick="openSeisanList('受入', product, date)"
+            >
+              {{ getDayData(product, index).生産受入数量 > 0 ? getDayData(product, index).生産受入数量 : '' }}
+            </td>
+          </tr>
+          <!-- 生産払出行 -->
+          <tr>
+            <td class="type-cell prod-outbound">払</td>
+            <td
+              v-for="(date, index) in displayDates"
+              :key="'prod-out-' + index"
+              class="data-cell prod-outbound-data"
+              :class="[
+                getDayClass(date),
+                { 'recent-update': isRecentUpdate(getDayData(product, index).生産払出最終更新日時) }
+              ]"
+              @dblclick="openSeisanList('払出', product, date)"
+            >
+              {{ getDayData(product, index).生産払出数量 > 0 ? getDayData(product, index).生産払出数量 : '' }}
             </td>
           </tr>
           <!-- 出庫行 -->
@@ -287,19 +346,21 @@ const isRecentUpdate = (updatedStr: any): boolean => {
   box-sizing: border-box;
 }
 
-/* 1行目と2行目の間の線を削除 */
-.transition-table tbody tr:nth-child(3n+2) td {
-    border-top: none !important; /* 2行目（出庫行）の上の線を削除 */
+/* 1行目（入）: 下線なし */
+.transition-table tbody tr:nth-child(5n+1) td {
+    border-bottom: none !important;
 }
-
-/* 商品グループ内の1行目（入庫）の下の線も削除 */
-.transition-table tbody tr:nth-child(3n+1) td {
-    border-bottom: none !important; /* 1行目（入庫行）の下の線を削除 */
-    /* border-top: 1px solid #999; 商品ごとの区分け線を少し濃く */
+/* 2〜4行目（受・払・出）: 上下線なし */
+.transition-table tbody tr:nth-child(5n+2) td,
+.transition-table tbody tr:nth-child(5n+3) td,
+.transition-table tbody tr:nth-child(5n+4) td {
+    border-top: none !important;
+    border-bottom: none !important;
 }
-/* 商品グループ最後の行（在庫）の下線 */
-.transition-table tbody tr:nth-child(3n) td {
-    border-bottom: 2px solid #aaa; /* 商品ブロックの区切りを太く */
+/* 5行目（在）: 商品ブロックの区切り */
+.transition-table tbody tr:nth-child(5n) td {
+    border-top: none !important;
+    border-bottom: 2px solid #aaa;
 }
 
 
@@ -381,6 +442,16 @@ const isRecentUpdate = (updatedStr: any): boolean => {
   color: #28a745;
 }
 
+.transition-table td.type-cell.prod-inbound {
+  background: #e0f7f0;
+  color: #0d9488;
+}
+
+.transition-table td.type-cell.prod-outbound {
+  background: #fff4e5;
+  color: #e67e00;
+}
+
 .transition-table td.type-cell.outbound {
   background: #fdf2f2;
   color: #000;
@@ -407,6 +478,18 @@ const isRecentUpdate = (updatedStr: any): boolean => {
   color: #28a745;
   text-align: left;
   padding-left: 6px;
+}
+
+.data-cell.prod-inbound-data {
+  background: #f0faf7;
+  color: #0d9488;
+  text-align: center;
+}
+
+.data-cell.prod-outbound-data {
+  background: #fffaf0;
+  color: #e67e00;
+  text-align: center;
 }
 
 .data-cell.outbound-data {

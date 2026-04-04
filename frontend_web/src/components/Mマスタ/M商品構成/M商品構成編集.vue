@@ -15,13 +15,14 @@ import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
-import type { M商品 } from '../../../types';
+import type { M商品, M生産区分, M生産工程 } from '../../../types';
 
 type 商品構成明細Form = {
-  明細番号: number
+  明細SEQ: number
   構成商品ID: string
-  構成数量分子: string
-  構成数量分母: string
+  計算分子数量: string
+  計算分母数量: string
+  最小ロット構成数量: string
   構成商品備考: string
 }
 
@@ -38,23 +39,31 @@ const mode = ref('edit');
 const activeTab = ref('content');
 const detailData = ref<any>(null);
 const 商品一覧 = ref<M商品[]>([]);
+const 生産区分一覧 = ref<M生産区分[]>([]);
+const 生産工程一覧 = ref<M生産工程[]>([]);
 const detailError = ref('');
 
 const form = reactive({
   商品ID: '',
-  生産ロット: '',
+  最小ロット数量: '',
+  生産区分ID: '',
+  生産工程ID: '',
   商品構成備考: '',
   有効: true
 });
 
 const errors = reactive({
   商品ID: '',
-  生産ロット: ''
+  最小ロット数量: '',
+  生産区分ID: '',
+  生産工程ID: ''
 });
 
 const touched = reactive({
   商品ID: false,
-  生産ロット: false
+  最小ロット数量: false,
+  生産区分ID: false,
+  生産工程ID: false
 });
 
 const 明細一覧 = ref<商品構成明細Form[]>([]);
@@ -62,7 +71,16 @@ const 明細一覧 = ref<商品構成明細Form[]>([]);
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
-const requiredFields = computed(() => ['商品ID', '生産ロット']);
+const requiredFields = computed(() => ['商品ID', '最小ロット数量', '生産区分ID', '生産工程ID']);
+const 表示用商品一覧 = computed(() => isCreateMode.value
+  ? 商品一覧.value.filter((item) => item?.有効 !== false)
+  : 商品一覧.value);
+const 表示用生産区分一覧 = computed(() => isCreateMode.value
+  ? 生産区分一覧.value.filter((item) => item?.有効 !== false)
+  : 生産区分一覧.value);
+const 表示用生産工程一覧 = computed(() => isCreateMode.value
+  ? 生産工程一覧.value.filter((item) => item?.有効 !== false)
+  : 生産工程一覧.value);
 
 const 商品マップ = computed<Record<string, M商品>>(() => {
   const result: Record<string, M商品> = {};
@@ -76,11 +94,12 @@ const 選択商品 = computed(() => 商品マップ.value[form.商品ID] || null
 const 商品名表示 = computed(() => 選択商品.value?.商品名 || '');
 const 商品単位表示 = computed(() => 選択商品.value?.単位 || '');
 
-const createEmptyDetail = (明細番号 = 1): 商品構成明細Form => ({
-  明細番号,
+const createEmptyDetail = (明細SEQ = 1): 商品構成明細Form => ({
+  明細SEQ,
   構成商品ID: '',
-  構成数量分子: '',
-  構成数量分母: '1000',
+  計算分子数量: '',
+  計算分母数量: '1000',
+  最小ロット構成数量: '',
   構成商品備考: ''
 });
 
@@ -100,13 +119,15 @@ const resetValidation = () => {
 
 const renumberDetails = () => {
   明細一覧.value.forEach((row, index) => {
-    row.明細番号 = index + 1;
+    row.明細SEQ = index + 1;
   });
 };
 
 const resetForm = () => {
   form.商品ID = '';
-  form.生産ロット = '';
+  form.最小ロット数量 = '';
+  form.生産区分ID = '';
+  form.生産工程ID = 'L99';
   form.商品構成備考 = '';
   form.有効 = true;
   明細一覧.value = [createEmptyDetail(1)];
@@ -114,15 +135,18 @@ const resetForm = () => {
 
 const applyDataToForm = (data: any) => {
   form.商品ID = data?.商品ID || '';
-  form.生産ロット = data?.生産ロット === null || data?.生産ロット === undefined ? '' : String(data.生産ロット);
+  form.最小ロット数量 = data?.最小ロット数量 === null || data?.最小ロット数量 === undefined ? '' : String(data.最小ロット数量);
+  form.生産区分ID = data?.生産区分ID || '';
+  form.生産工程ID = data?.生産工程ID || '';
   form.商品構成備考 = data?.商品構成備考 || '';
   form.有効 = data?.有効 ?? true;
   明細一覧.value = Array.isArray(data?.明細一覧) && data.明細一覧.length
     ? data.明細一覧.map((item: any, index: number) => ({
-        明細番号: Number(item?.明細番号 ?? index + 1),
+        明細SEQ: Number(item?.明細SEQ ?? index + 1),
         構成商品ID: item?.構成商品ID || '',
-        構成数量分子: item?.構成数量分子 === null || item?.構成数量分子 === undefined ? '' : String(item.構成数量分子),
-        構成数量分母: item?.構成数量分母 === null || item?.構成数量分母 === undefined ? '1000' : String(item.構成数量分母),
+        計算分子数量: item?.計算分子数量 === null || item?.計算分子数量 === undefined ? '' : String(item.計算分子数量),
+        計算分母数量: item?.計算分母数量 === null || item?.計算分母数量 === undefined ? '1000' : String(item.計算分母数量),
+        最小ロット構成数量: item?.最小ロット構成数量 !== null && item?.最小ロット構成数量 !== undefined ? String(item.最小ロット構成数量) : '',
         構成商品備考: item?.構成商品備考 || ''
       }))
     : [createEmptyDetail(1)];
@@ -137,27 +161,37 @@ const toNumber = (value: any) => {
 const formatNumber = (value: number) => value.toLocaleString('ja-JP', { maximumFractionDigits: 3 });
 const get構成商品 = (商品ID: string) => 商品マップ.value[String(商品ID)] || null;
 
-const calc構成数量 = (row: 商品構成明細Form) => {
-  const lot = toNumber(form.生産ロット);
-  const numerator = toNumber(row.構成数量分子);
-  const denominator = toNumber(row.構成数量分母);
+const calc最小ロット構成数量 = (row: 商品構成明細Form) => {
+  const lot = toNumber(form.最小ロット数量);
+  const numerator = toNumber(row.計算分子数量);
+  const denominator = toNumber(row.計算分母数量);
   if (!denominator) return 0;
-  return numerator / denominator * lot;
+  return Math.ceil(numerator / denominator * lot);
+};
+
+const recalcRow = (row: 商品構成明細Form) => {
+  const val = calc最小ロット構成数量(row);
+  row.最小ロット構成数量 = val === 0 ? '' : String(val);
+};
+
+const recalcAll = () => {
+  明細一覧.value.forEach(recalcRow);
 };
 
 const sanitizeDetails = () => {
   return 明細一覧.value
     .map((row, index) => ({
-      明細番号: index + 1,
+      明細SEQ: index + 1,
       構成商品ID: String(row.構成商品ID || '').trim(),
-      構成数量分子: String(row.構成数量分子 || '').trim(),
-      構成数量分母: String(row.構成数量分母 || '').trim(),
+      計算分子数量: String(row.計算分子数量 || '').trim(),
+      計算分母数量: String(row.計算分母数量 || '').trim(),
+      最小ロット構成数量: String(row.最小ロット構成数量 || '').trim(),
       構成商品備考: String(row.構成商品備考 || '').trim()
     }))
-    .filter((row) => row.構成商品ID || row.構成数量分子 || row.構成数量分母 || row.構成商品備考);
+    .filter((row) => row.構成商品ID || row.計算分子数量 || row.計算分母数量 || row.構成商品備考);
 };
 
-const validateField = (field: '商品ID' | '生産ロット', showErrorMessage = true) => {
+const validateField = (field: '商品ID' | '最小ロット数量' | '生産区分ID' | '生産工程ID', showErrorMessage = true) => {
   const value = String(form[field] ?? '').trim();
   if (!requiredFields.value.includes(field)) {
     errors[field] = '';
@@ -167,20 +201,20 @@ const validateField = (field: '商品ID' | '生産ロット', showErrorMessage =
     errors[field] = showErrorMessage ? `${field}は必須です。` : 'ERROR';
     return false;
   }
-  if (field === '生産ロット' && toNumber(value) <= 0) {
-    errors[field] = showErrorMessage ? '生産ロットは0より大きい値を入力してください。' : 'ERROR';
+  if (field === '最小ロット数量' && toNumber(value) <= 0) {
+    errors[field] = showErrorMessage ? '最小ロット数量は0より大きい値を入力してください。' : 'ERROR';
     return false;
   }
   errors[field] = '';
   return true;
 };
 
-const handleBlur = (field: '商品ID' | '生産ロット') => {
+const handleBlur = (field: '商品ID' | '最小ロット数量' | '生産区分ID' | '生産工程ID') => {
   touched[field] = true;
   validateField(field);
 };
 
-const handleInput = (field: '商品ID' | '生産ロット') => {
+const handleInput = (field: '商品ID' | '最小ロット数量' | '生産区分ID' | '生産工程ID') => {
   if (touched[field]) {
     validateField(field);
   }
@@ -200,26 +234,27 @@ const validateDetails = () => {
       detailError.value = `${rowNo}行目の構成商品IDを入力してください。`;
       return null;
     }
-    if (!row.構成数量分子) {
-      detailError.value = `${rowNo}行目の構成数量(分子)を入力してください。`;
+    if (!row.計算分子数量) {
+      detailError.value = `${rowNo}行目の計算分子数量を入力してください。`;
       return null;
     }
-    if (!row.構成数量分母) {
-      detailError.value = `${rowNo}行目の構成数量(分母)を入力してください。`;
+    if (!row.計算分母数量) {
+      detailError.value = `${rowNo}行目の計算分母数量を入力してください。`;
       return null;
     }
-    if (toNumber(row.構成数量分母) <= 0) {
-      detailError.value = `${rowNo}行目の構成数量(分母)は0より大きい値を入力してください。`;
+    if (toNumber(row.計算分母数量) <= 0) {
+      detailError.value = `${rowNo}行目の計算分母数量は0より大きい値を入力してください。`;
       return null;
     }
   }
 
   detailError.value = '';
   return rows.map((row, index) => ({
-    明細番号: index + 1,
+    明細SEQ: index + 1,
     構成商品ID: row.構成商品ID,
-    構成数量分子: toNumber(row.構成数量分子),
-    構成数量分母: toNumber(row.構成数量分母),
+    計算分子数量: toNumber(row.計算分子数量),
+    計算分母数量: toNumber(row.計算分母数量),
+    最小ロット構成数量: row.最小ロット構成数量 !== '' ? toNumber(row.最小ロット構成数量) : null,
     構成商品備考: row.構成商品備考 || null
   }));
 };
@@ -229,8 +264,8 @@ const validateForm = () => {
   let firstErrorField: string | null = null;
 
   requiredFields.value.forEach((field) => {
-    touched[field as '商品ID' | '生産ロット'] = true;
-    if (!validateField(field as '商品ID' | '生産ロット', false)) {
+    touched[field as '商品ID' | '最小ロット数量' | '生産区分ID' | '生産工程ID'] = true;
+    if (!validateField(field as '商品ID' | '最小ロット数量' | '生産区分ID' | '生産工程ID', false)) {
       isValid = false;
       if (!firstErrorField) firstErrorField = field;
     }
@@ -239,7 +274,9 @@ const validateForm = () => {
   if (firstErrorField) {
     const fieldMap: Record<string, string> = {
       商品ID: 'form-product-id',
-      生産ロット: 'form-lot'
+      最小ロット数量: 'form-lot',
+      生産区分ID: 'form-production-type-id',
+      生産工程ID: 'form-process-id'
     };
     const elementId = fieldMap[firstErrorField];
     if (elementId) {
@@ -268,10 +305,23 @@ const removeDetailRow = (index: number) => {
 
 const loadMasterData = async () => {
   try {
-    const res = await apiClient.post('/apps/M商品/一覧');
-    if (res.data.status === 'OK') {
-      const data = res.data.data;
+    const [resProducts, resProductionTypes, resProcesses] = await Promise.all([
+      apiClient.post('/apps/M商品/一覧'),
+      apiClient.post('/apps/M生産区分/一覧'),
+      apiClient.post('/apps/M生産工程/一覧')
+    ]);
+
+    if (resProducts.data.status === 'OK') {
+      const data = resProducts.data.data;
       商品一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    }
+    if (resProductionTypes.data.status === 'OK') {
+      const data = resProductionTypes.data.data;
+      生産区分一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    }
+    if (resProcesses.data.status === 'OK') {
+      const data = resProcesses.data.data;
+      生産工程一覧.value = Array.isArray(data) ? data : data?.items ?? [];
     }
   } catch (_e) {
     showMessage('商品マスタの取得でエラーが発生しました。', 'error');
@@ -365,7 +415,9 @@ const saveData = async () => {
   try {
     const payload = {
       商品ID: form.商品ID,
-      生産ロット: toNumber(form.生産ロット),
+      最小ロット数量: toNumber(form.最小ロット数量),
+      生産区分ID: form.生産区分ID,
+      生産工程ID: form.生産工程ID,
       商品構成備考: form.商品構成備考 || null,
       有効: form.有効,
       明細一覧: detailPayload
@@ -410,6 +462,11 @@ onMounted(async () => {
 watch(() => route.query, async (query) => {
   await applyQueryParams(query);
 });
+
+watch(() => form.商品ID, (newValue) => {
+  if (!isCreateMode.value) return;
+  form.生産区分ID = newValue ? String(newValue).slice(0, 1) : '';
+});
 </script>
 
 <template>
@@ -448,7 +505,7 @@ watch(() => route.query, async (query) => {
                         @change="handleInput('商品ID')"
                       >
                         <option value="">選択してください</option>
-                        <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
+                        <option v-for="item in 表示用商品一覧" :key="item.商品ID" :value="item.商品ID">
                           {{ item.商品ID }} / {{ item.商品名 }}
                         </option>
                       </select>
@@ -467,27 +524,79 @@ watch(() => route.query, async (query) => {
               </div>
 
               <div class="detail-row row-lot">
-                <div class="detail-label">生産ロット<span class="required-mark">*</span></div>
+                <div class="detail-label">最小ロット数量<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="lot-wrap">
                       <div class="input-wrap">
-                        <input
+                         <input
                           id="form-lot"
                           type="number"
                           step="0.001"
-                          v-model="form.生産ロット"
+                          v-model="form.最小ロット数量"
                           class="detail-input number-input"
-                          :class="{ 'input-error': errors.生産ロット }"
+                          :class="{ 'input-error': errors.最小ロット数量 }"
                           :readonly="isViewMode"
-                          @blur="handleBlur('生産ロット')"
-                          @input="handleInput('生産ロット')"
+                          @blur="handleBlur('最小ロット数量')"
+                          @input="handleInput('最小ロット数量'); recalcAll()"
                         />
-                        <span v-if="errors.生産ロット" class="input-alert">!</span>
+                        <span v-if="errors.最小ロット数量" class="input-alert">!</span>
                       </div>
                       <span class="unit-text">{{ 商品単位表示 || '単位未設定' }}</span>
                     </div>
-                    <div v-if="errors.生産ロット && errors.生産ロット !== 'ERROR'" class="field-error">{{ errors.生産ロット }}</div>
+                    <div v-if="errors.最小ロット数量 && errors.最小ロット数量 !== 'ERROR'" class="field-error">{{ errors.最小ロット数量 }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-row row-select">
+                <div class="detail-label">生産区分<span class="required-mark">*</span></div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="input-wrap">
+                      <select
+                        id="form-production-type-id"
+                        v-model="form.生産区分ID"
+                        class="detail-input select-input"
+                        :class="{ 'input-error': errors.生産区分ID }"
+                        :disabled="isViewMode"
+                        @blur="handleBlur('生産区分ID')"
+                        @change="handleInput('生産区分ID')"
+                      >
+                        <option value="">選択してください</option>
+                        <option v-for="item in 表示用生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
+                          {{ item.生産区分名 }} ({{ item.生産区分ID }})
+                        </option>
+                      </select>
+                      <span v-if="errors.生産区分ID" class="input-alert">!</span>
+                    </div>
+                    <div v-if="errors.生産区分ID && errors.生産区分ID !== 'ERROR'" class="field-error">{{ errors.生産区分ID }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-row row-select">
+                <div class="detail-label">生産工程<span class="required-mark">*</span></div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="input-wrap">
+                      <select
+                        id="form-process-id"
+                        v-model="form.生産工程ID"
+                        class="detail-input select-input"
+                        :class="{ 'input-error': errors.生産工程ID }"
+                        :disabled="isViewMode"
+                        @blur="handleBlur('生産工程ID')"
+                        @change="handleInput('生産工程ID')"
+                      >
+                        <option value="">選択してください</option>
+                        <option v-for="item in 表示用生産工程一覧" :key="item.生産工程ID" :value="item.生産工程ID">
+                          {{ item.生産工程名 }} ({{ item.生産工程ID }})
+                        </option>
+                      </select>
+                      <span v-if="errors.生産工程ID" class="input-alert">!</span>
+                    </div>
+                    <div v-if="errors.生産工程ID && errors.生産工程ID !== 'ERROR'" class="field-error">{{ errors.生産工程ID }}</div>
                   </div>
                 </div>
               </div>
@@ -509,12 +618,13 @@ watch(() => route.query, async (query) => {
                   <table class="composition-table">
                     <thead>
                       <tr>
-                        <th class="w-no">No</th>
+                        <th class="w-seq">SEQ</th>
                         <th class="w-product">構成商品ID</th>
                         <th class="w-name">構成商品名</th>
-                        <th class="w-ratio">構成数量(分子)</th>
-                        <th class="w-ratio">構成数量(分母)</th>
-                        <th class="w-result">計算</th>
+                        <th class="w-ratio">計算分子数量</th>
+                        <th class="w-ratio">計算分母数量</th>
+                        <th class="w-result">計算式(参考:切上整数)</th>
+                        <th class="w-qty">最小ロット構成数量</th>
                         <th class="w-unit">構成単位</th>
                         <th class="w-note">備考</th>
                         <th v-if="!isViewMode" class="w-action">操作</th>
@@ -522,24 +632,27 @@ watch(() => route.query, async (query) => {
                     </thead>
                     <tbody>
                       <tr v-for="(row, index) in 明細一覧" :key="`detail-${index}`">
-                        <td class="cell-center">{{ row.明細番号 }}</td>
+                        <td class="cell-center">{{ row.明細SEQ }}</td>
                         <td>
                           <select v-model="row.構成商品ID" class="table-input select-cell" :disabled="isViewMode">
                             <option value="">選択してください</option>
-                            <option v-for="item in 商品一覧" :key="`${index}-${item.商品ID}`" :value="item.商品ID">
+                            <option v-for="item in 表示用商品一覧" :key="`${index}-${item.商品ID}`" :value="item.商品ID">
                               {{ item.商品ID }}
                             </option>
                           </select>
                         </td>
                         <td>{{ get構成商品(row.構成商品ID)?.商品名 || '' }}</td>
                         <td>
-                          <input v-model="row.構成数量分子" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode" />
+                          <input v-model="row.計算分子数量" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode" @input="recalcRow(row)" />
                         </td>
                         <td>
-                          <input v-model="row.構成数量分母" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode" />
+                          <input v-model="row.計算分母数量" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode" @input="recalcRow(row)" />
                         </td>
                         <td class="formula-cell">
-                          {{ row.構成数量分子 || '0' }} / {{ row.構成数量分母 || '0' }} x {{ form.生産ロット || '0' }} = {{ formatNumber(calc構成数量(row)) }}
+                          {{ row.計算分子数量 || '0' }} / {{ row.計算分母数量 || '0' }} x {{ form.最小ロット数量 || '0' }} = {{ calc最小ロット構成数量(row) }}
+                        </td>
+                        <td>
+                          <input v-model="row.最小ロット構成数量" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode" />
                         </td>
                         <td class="cell-center">{{ get構成商品(row.構成商品ID)?.単位 || '' }}</td>
                         <td>
@@ -724,7 +837,6 @@ watch(() => route.query, async (query) => {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 1320px;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -933,11 +1045,8 @@ watch(() => route.query, async (query) => {
 .composition-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border-bottom: 1px solid #d1d5db;
+  padding: 6px 0;
 }
 
 .composition-title {
@@ -951,7 +1060,8 @@ watch(() => route.query, async (query) => {
 }
 
 .composition-table {
-  width: 100%;
+  width: auto;
+  table-layout: auto;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -970,13 +1080,8 @@ watch(() => route.query, async (query) => {
   font-weight: 600;
 }
 
-.w-no { width: 50px; }
-.w-product { width: 150px; }
-.w-name { width: 180px; }
-.w-ratio { width: 120px; }
-.w-result { width: 280px; }
-.w-unit { width: 90px; }
-.w-note { width: 220px; }
+.w-seq { width: 50px; }
+.w-unit { width: 70px; }
 .w-action { width: 90px; }
 
 .cell-center {
@@ -1039,23 +1144,30 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-secondary {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
 }
 
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: #f2f2f2;
 }
 
 .btn-add-row {
   padding: 6px 14px;
-  background: #0f766e;
+  background: #2563eb;
   color: #fff;
   font-size: 13px;
 }
 
 .btn-add-row:hover {
-  background: #0b5f59;
+  background: #1d4ed8;
+}
+
+.btn-add-row-top {
+  display: block;
+  margin-left: auto;
+  margin-bottom: 4px;
 }
 
 .btn-row-delete {

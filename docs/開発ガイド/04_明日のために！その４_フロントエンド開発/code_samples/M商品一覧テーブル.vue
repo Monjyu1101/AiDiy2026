@@ -16,6 +16,13 @@ import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
 
+const props = defineProps({
+  // 無効レコードも表示するかどうか（一覧ページから制御）
+  includeInactive: { type: Boolean, default: false },
+  // 行クリック時に編集画面へ渡す戻URL（編集完了後にここへ戻る）
+  戻URL: { type: String, default: '' }
+});
+
 const router = useRouter();
 
 const 商品一覧 = ref([]);
@@ -24,157 +31,168 @@ const currentPage = ref(1);
 const sortKey = ref('商品ID');
 const sortOrder = ref('asc');
 const filters = reactive({
- 商品ID: '',
- 商品名: '',
- 単位: '',
- 商品備考: '',
- 更新日時: '',
- 更新利用者名: ''
+  商品ID: '',
+  商品名: '',
+  単位: '',
+  商品備考: '',
+  更新日時: '',
+  更新利用者名: ''
 });
 const rowKey = '商品ID';
 const columns = [
- { key: '商品ID', label: '商品ID', width: '120px', sortable: true },
- { key: '商品名', label: '商品名', width: '200px', sortable: true },
- { key: '単位', label: '単位', width: '100px', sortable: true },
- { key: '商品備考', label: '商品備考', width: '220px', sortable: true },
- { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
- { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  { key: '商品ID', label: '商品ID', width: '120px', sortable: true },
+  { key: '商品名', label: '商品名', width: '200px', sortable: true },
+  { key: '単位', label: '単位', width: '100px', sortable: true },
+  { key: '商品備考', label: '商品備考', width: '220px', sortable: true },
+  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
+  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
 ];
 
 const message = ref('');
 const messageType = ref('success');
 
 const setMessage = (text, type = 'success') => {
- message.value = text;
- messageType.value = type;
+  message.value = text;
+  messageType.value = type;
 };
 
 const hasFilter = computed(() => {
- return Object.values(filters).some((value) => String(value || '').trim() !== '');
+  return Object.values(filters).some((value) => String(value || '').trim() !== '');
 });
 const filteredRows = computed(() => {
- return 商品一覧.value.filter((row) => {
- return columns.every((column) => {
- const filterValue = (filters[column.key] || '').trim();
- if (!filterValue) return true;
- const cellValue = row?.[column.key] ?? '';
- return String(cellValue).toLowerCase().includes(filterValue.toLowerCase());
- });
- });
+  return 商品一覧.value.filter((row) => {
+    // 無効レコードのフィルタリング
+    if (!props.includeInactive && !row.有効) return false;
+    return columns.every((column) => {
+      const filterValue = (filters[column.key] || '').trim();
+      if (!filterValue) return true;
+      const cellValue = row?.[column.key] ?? '';
+      return String(cellValue).toLowerCase().includes(filterValue.toLowerCase());
+    });
+  });
 });
 const totalCount = computed(() => filteredRows.value.length);
 const totalAll = computed(() => 商品一覧.value.length);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
- const rows = [...filteredRows.value];
- if (!sortKey.value) return rows;
- rows.sort((a, b) => {
- const aValue = a?.[sortKey.value] ?? '';
- const bValue = b?.[sortKey.value] ?? '';
- const aNum = Number(aValue);
- const bNum = Number(bValue);
- const isNumeric = !Number.isNaN(aNum) && !Number.isNaN(bNum);
- let result = 0;
- if (isNumeric) {
- result = aNum - bNum;
- } else {
- result = String(aValue).localeCompare(String(bValue), 'ja');
- }
- return sortOrder.value === 'desc' ? -result : result;
- });
- return rows;
+  const rows = [...filteredRows.value];
+  if (!sortKey.value) return rows;
+  rows.sort((a, b) => {
+    const aValue = a?.[sortKey.value] ?? '';
+    const bValue = b?.[sortKey.value] ?? '';
+    const aNum = Number(aValue);
+    const bNum = Number(bValue);
+    const isNumeric = !Number.isNaN(aNum) && !Number.isNaN(bNum);
+    let result = 0;
+    if (isNumeric) {
+      result = aNum - bNum;
+    } else {
+      result = String(aValue).localeCompare(String(bValue), 'ja');
+    }
+    return sortOrder.value === 'desc' ? -result : result;
+  });
+  return rows;
 });
 const pagedRows = computed(() => {
- const startIndex = (currentPage.value - 1) * pageSize.value;
- return sortedRows.value.slice(startIndex, startIndex + pageSize.value);
+  const startIndex = (currentPage.value - 1) * pageSize.value;
+  return sortedRows.value.slice(startIndex, startIndex + pageSize.value);
 });
 
 const handleSort = (column) => {
- if (!column.sortable) return;
- if (sortKey.value === column.key) {
- sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
- } else {
- sortKey.value = column.key;
- sortOrder.value = 'asc';
- }
+  if (!column.sortable) return;
+  if (sortKey.value === column.key) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortKey.value = column.key;
+    sortOrder.value = 'asc';
+  }
 };
 
 const goToPage = (page) => {
- if (page < 1 || page > totalPages.value) return;
- currentPage.value = page;
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
 };
 
+// 行クリックで編集画面へ。props.戻URL があれば渡す（編集完了後にここへ戻る）
 const openDetail = (row) => {
- router.push({ path: '/Mマスタ/M商品/編集', query: { モード: '編集', 商品ID: row.商品ID } });
+  const query: Record<string, string> = { モード: '編集', 商品ID: row.商品ID };
+  if (props.戻URL) {
+    query.戻URL = props.戻URL;
+  }
+  router.push({ path: '/Mマスタ/M商品/編集', query });
 };
 
 // ==================================================
 // 一覧データ取得
 // ==================================================
 const loadData = async () => {
- message.value = '';
- try {
- const res = await apiClient.post('/apps/V商品/一覧');
- if (res.data.status === 'OK') {
- const data = res.data.data;
- const items = Array.isArray(data) ? data : data?.items ?? [];
- 商品一覧.value = items;
- currentPage.value = 1;
- } else {
- setMessage(res.data.message || 'M商品一覧の取得に失敗しました。', 'error');
- }
- } catch (e) {
- setMessage('M商品一覧の取得でエラーが発生しました。', 'error');
- }
+  message.value = '';
+  try {
+    const res = await apiClient.post('/apps/V商品/一覧');
+    if (res.data.status === 'OK') {
+      const data = res.data.data;
+      const items = Array.isArray(data) ? data : data?.items ?? [];
+      商品一覧.value = items;
+      currentPage.value = 1;
+    } else {
+      setMessage(res.data.message || 'M商品一覧の取得に失敗しました。', 'error');
+    }
+  } catch (e) {
+    setMessage('M商品一覧の取得でエラーが発生しました。', 'error');
+  }
 };
 
 // ==================================================
 // 初期化
 // ==================================================
 onMounted(async () => {
- await loadData();
+  await loadData();
 });
 
 defineExpose({
- loadData
+  loadData
 });
 </script>
 
 <template>
- <qTublerFrame
- :columns="columns"
- :rows="pagedRows"
- :rowKey="rowKey"
- :sortKey="sortKey"
- :sortOrder="sortOrder"
- :message="message"
- :messageType="messageType"
- :hasFilter="hasFilter"
- :totalCount="totalCount"
- :totalAll="totalAll"
- :currentPage="currentPage"
- :totalPages="totalPages"
- @sort="handleSort"
- @page="goToPage"
- >
- <template #filter="{ column }">
- <input
- v-if="filters[column.key] !== undefined"
- v-model="filters[column.key]"
- class="filter-input"
- type="text"
- />
- </template>
- <template #cell="{ row, column, value }">
- <template v-if="column.key === '商品ID'">
- <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.商品ID }}</a>
- </template>
- <template v-else>
- {{ value ?? '' }}
- </template>
- </template>
- </qTublerFrame>
+  <qTublerFrame
+    :columns="columns"
+    :rows="pagedRows"
+    :rowKey="rowKey"
+    :sortKey="sortKey"
+    :sortOrder="sortOrder"
+    :message="message"
+    :messageType="messageType"
+    :hasFilter="hasFilter"
+    :totalCount="totalCount"
+    :totalAll="totalAll"
+    :currentPage="currentPage"
+    :totalPages="totalPages"
+    @sort="handleSort"
+    @page="goToPage"
+  >
+    <template #filter="{ column }">
+      <input
+        v-if="filters[column.key] !== undefined"
+        v-model="filters[column.key]"
+        class="filter-input"
+        type="text"
+      />
+    </template>
+    <template #cell="{ row, column, value }">
+      <template v-if="column.key === '商品ID'">
+        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.商品ID }}</a>
+      </template>
+      <template v-else-if="column.key === '有効'">
+        <span>{{ row.有効 ? '✅' : '□' }}</span>
+      </template>
+      <template v-else>
+        {{ value ?? '' }}
+      </template>
+    </template>
+  </qTublerFrame>
 </template>
 
-
-
+<style scoped>
+</style>

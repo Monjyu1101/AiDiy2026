@@ -15,6 +15,7 @@ import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
+import type { M商品分類 } from '../../../types';
 
 const route = useRoute();
 const router = useRouter();
@@ -33,11 +34,13 @@ const activeTab = ref('content');
 const detailData = ref(null);
 const message = ref('');
 const messageType = ref('success');
+const 商品分類一覧 = ref<M商品分類[]>([]);
 
 const form = reactive({
   商品ID: '',
   商品名: '',
   単位: '',
+  商品分類ID: '',
   商品備考: '',
   有効: true
 });
@@ -46,6 +49,7 @@ const errors = reactive({
   商品ID: '',
   商品名: '',
   単位: '',
+  商品分類ID: '',
   商品備考: ''
 });
 
@@ -53,6 +57,7 @@ const touched = reactive({
   商品ID: false,
   商品名: false,
   単位: false,
+  商品分類ID: false,
   商品備考: false
 });
 
@@ -62,7 +67,13 @@ const touched = reactive({
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
-const requiredFields = computed(() => ['商品ID', '商品名', '単位']);
+const requiredFields = computed(() => ['商品ID', '商品名', '単位', '商品分類ID']);
+const 表示用商品分類一覧 = computed(() => {
+  if (!isCreateMode.value) {
+    return 商品分類一覧.value;
+  }
+  return 商品分類一覧.value.filter((item) => item.有効 !== false);
+});
 
 // ==================================================
 // ユーティリティ関数
@@ -84,6 +95,7 @@ const resetForm = () => {
   form.商品ID = '';
   form.商品名 = '';
   form.単位 = '';
+  form.商品分類ID = '';
   form.商品備考 = '';
   form.有効 = true;
 };
@@ -92,6 +104,7 @@ const applyDataToForm = (data) => {
   form.商品ID = data?.商品ID || '';
   form.商品名 = data?.商品名 || '';
   form.単位 = data?.単位 || '';
+  form.商品分類ID = data?.商品分類ID || '';
   form.商品備考 = data?.商品備考 || '';
   form.有効 = data?.有効 ?? true;
 };
@@ -142,7 +155,8 @@ const validateForm = () => {
     const fieldMap = {
       '商品ID': 'form-product-id',
       '商品名': 'form-product-name',
-      '単位': 'form-product-unit'
+      '単位': 'form-product-unit',
+      '商品分類ID': 'form-product-category-id'
     };
     const elementId = fieldMap[firstErrorField];
     if (elementId) {
@@ -170,6 +184,20 @@ const loadDetail = async (productId) => {
   } catch (e) {
     showMessage('商品情報の取得でエラーが発生しました。', 'error');
   }
+};
+
+const loadMasterData = async () => {
+  try {
+    const res = await apiClient.post('/apps/M商品分類/一覧', {});
+    if (res.data.status === 'OK') {
+      const data = res.data.data;
+      商品分類一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+      return;
+    }
+  } catch (e) {
+    // 候補未取得時は保存時バリデーションで止める
+  }
+  商品分類一覧.value = [];
 };
 
 // ==================================================
@@ -249,6 +277,7 @@ const saveData = async () => {
         商品ID: form.商品ID,
         商品名: form.商品名,
         単位: form.単位,
+        商品分類ID: form.商品分類ID,
         商品備考: form.商品備考,
         有効: form.有効
       });
@@ -257,6 +286,7 @@ const saveData = async () => {
         商品ID: form.商品ID,
         商品名: form.商品名,
         単位: form.単位,
+        商品分類ID: form.商品分類ID,
         商品備考: form.商品備考,
         有効: form.有効
       });
@@ -294,6 +324,7 @@ const deleteData = async () => {
 // 初期化
 // ==================================================
 onMounted(async () => {
+  await loadMasterData();
   await applyQueryParams(route.query);
 });
 
@@ -399,6 +430,36 @@ watch(() => route.query, async (query) => {
                       <span v-if="errors.単位" class="input-alert">!</span>
                     </div>
                     <div v-if="errors.単位 && errors.単位 !== 'ERROR'" class="field-error">{{ errors.単位 }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-row row-category">
+                <div class="detail-label">商品分類ID<span class="required-mark">*</span></div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="input-wrap">
+                      <select
+                        id="form-product-category-id"
+                        v-model="form.商品分類ID"
+                        class="detail-input category-select"
+                        :class="{ 'input-error': errors.商品分類ID }"
+                        :disabled="isViewMode"
+                        @blur="handleBlur('商品分類ID')"
+                        @change="handleInput('商品分類ID')"
+                      >
+                        <option value=""></option>
+                        <option
+                          v-for="item in 表示用商品分類一覧"
+                          :key="item.商品分類ID"
+                          :value="item.商品分類ID"
+                        >
+                          {{ item.商品分類ID }} : {{ item.商品分類名 }}
+                        </option>
+                      </select>
+                      <span v-if="errors.商品分類ID" class="input-alert">!</span>
+                    </div>
+                    <div v-if="errors.商品分類ID && errors.商品分類ID !== 'ERROR'" class="field-error">{{ errors.商品分類ID }}</div>
                   </div>
                 </div>
               </div>
@@ -652,6 +713,7 @@ watch(() => route.query, async (query) => {
 .detail-row.row-id,
 .detail-row.row-name,
 .detail-row.row-unit,
+.detail-row.row-category,
 .detail-row.row-remarks,
 .detail-row.row-datetime,
 .detail-row.row-user,
@@ -694,6 +756,7 @@ watch(() => route.query, async (query) => {
 .row-id .detail-value,
 .row-name .detail-value,
 .row-unit .detail-value,
+.row-category .detail-value,
 .row-remarks .detail-value,
 .row-datetime .detail-value,
 .row-user .detail-value,
@@ -756,6 +819,11 @@ watch(() => route.query, async (query) => {
 
 .unit-input {
   width: 160px;
+}
+
+.category-select {
+  width: 220px;
+  padding-right: 8px;
 }
 
 .center-input {
@@ -861,12 +929,13 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-secondary {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
 }
 
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: #f2f2f2;
 }
 
 .message {

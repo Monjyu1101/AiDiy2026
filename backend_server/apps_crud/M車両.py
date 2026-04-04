@@ -36,3 +36,24 @@ def create_M車両(db: Session, 車両: schemas.M車両Create, 認証情報: Opt
     db.commit()
     db.refresh(db_車両)
     return db_車両
+
+
+def init_M車両_data(db: Session, 認証情報: Optional[Dict] = None):
+    """M車両の初期データを投入"""
+    from log_config import get_logger
+    if db.query(models.M車両).first():
+        return
+    logger = get_logger(__name__)
+    初期データ = [
+        ('1001', '１号車', '近藤'),
+        ('1002', '２号車', '藤原'),
+        ('1003', '３号車', '津村'),
+        ('1004', '４号車', '鈴木'),
+        ('1005', '５号車', '高松'),
+        ('1006', '６号車', '藤井'),
+        ('1007', '７号車', '山田'),
+        ('1099', '未定', ''),
+    ]
+    for 車両ID, 車両名, 車両備考 in 初期データ:
+        create_M車両(db, schemas.M車両Create(車両ID=車両ID, 車両名=車両名, 車両備考=車両備考), 認証情報=認証情報)
+    logger.info("Initialized M車両")

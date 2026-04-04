@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
 import apps_schema as schemas, deps, apps_models as models
-MAX_ITEMS = 10000
+from list_controls import append_active_condition, get_limit_clause
 
 router = APIRouter(prefix="/apps/V商品棚卸", tags=["V商品棚卸"])
 
@@ -25,6 +25,7 @@ def list_V商品棚卸(
 ):
     filter_params = {}
     conditions = []
+    append_active_condition(conditions, request, "T.有効")
 
     if request and request.開始日付:
         conditions.append("date(T.棚卸日) >= :start_date")
@@ -38,6 +39,7 @@ def list_V商品棚卸(
     if conditions:
         where_sql = "WHERE " + " AND ".join(conditions)
 
+    limit_sql, limit_value = get_limit_clause(request)
     sql = f"""
     SELECT
         T.棚卸伝票ID,
@@ -45,6 +47,7 @@ def list_V商品棚卸(
         T.商品ID,
         T.実棚数量,
         T.棚卸備考,
+        T.有効,
         T.登録日時,
         T.登録利用者ID,
         T.登録利用者名,
@@ -60,10 +63,12 @@ def list_V商品棚卸(
     LEFT JOIN M商品 M ON T.商品ID = M.商品ID
     {where_sql}
     ORDER BY T.棚卸日 DESC
-    LIMIT :limit
+    {limit_sql}
     """
 
-    params = {"limit": MAX_ITEMS, **filter_params}
+    params = {**filter_params}
+    if limit_value is not None:
+        params["limit"] = limit_value
     result = db.execute(text(sql), params).fetchall()
 
     items = []
@@ -74,6 +79,7 @@ def list_V商品棚卸(
             "商品ID": row.商品ID,
             "実棚数量": row.実棚数量,
             "棚卸備考": row.棚卸備考,
+            "有効": bool(row.有効) if row.有効 is not None else True,
             "登録日時": row.登録日時,
             "登録利用者ID": row.登録利用者ID,
             "登録利用者名": row.登録利用者名,
@@ -101,7 +107,6 @@ def list_V商品棚卸(
         data={
             "items": items,
             "total": total,
-            "limit": MAX_ITEMS
+            "limit": limit_value
         }
     )
-

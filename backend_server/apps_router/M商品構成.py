@@ -22,23 +22,27 @@ router = APIRouter(prefix="/apps/M商品構成", tags=["M商品構成"])
 
 
 def _validate_request(db: Session, request: schemas.M商品構成Base):
-    if request.生産ロット <= 0:
-        return "生産ロットは0より大きい値を入力してください"
+    if request.最小ロット数量 <= 0:
+        return "最小ロット数量は0より大きい値を入力してください"
+    if not request.生産区分ID:
+        return "生産区分IDを入力してください"
+    if not request.生産工程ID:
+        return "生産工程IDを入力してください"
 
     if not request.明細一覧:
         return "構成商品を1件以上入力してください"
 
-    明細番号一覧 = [明細.明細番号 for 明細 in request.明細一覧]
-    if len(明細番号一覧) != len(set(明細番号一覧)):
-        return "明細番号が重複しています"
+    明細SEQ一覧 = [明細.明細SEQ for 明細 in request.明細一覧]
+    if len(明細SEQ一覧) != len(set(明細SEQ一覧)):
+        return "明細SEQが重複しています"
 
     for 明細 in request.明細一覧:
-        if 明細.明細番号 <= 0:
-            return "明細番号は1以上で入力してください"
-        if 明細.構成数量分子 < 0:
-            return "構成数量(分子)は0以上で入力してください"
-        if 明細.構成数量分母 <= 0:
-            return "構成数量(分母)は0より大きい値を入力してください"
+        if 明細.明細SEQ <= 0:
+            return "明細SEQは1以上で入力してください"
+        if 明細.計算分子数量 < 0:
+            return "計算分子数量は0以上で入力してください"
+        if 明細.計算分母数量 <= 0:
+            return "計算分母数量は0より大きい値を入力してください"
 
     return None
 
@@ -54,6 +58,14 @@ def _validate_products_exist(db: Session, 商品ID: str, 明細一覧: list[sche
     missing = sorted(商品ID一覧 - existing_ids)
     if missing:
         return f"商品マスタに存在しない商品IDがあります: {', '.join(missing)}"
+    return None
+
+
+def _validate_master_ids_exist(db: Session, 生産区分ID: str, 生産工程ID: str):
+    if not db.query(models.M生産区分.生産区分ID).filter(models.M生産区分.生産区分ID == 生産区分ID).first():
+        return f"生産区分マスタに存在しない生産区分IDがあります: {生産区分ID}"
+    if not db.query(models.M生産工程.生産工程ID).filter(models.M生産工程.生産工程ID == 生産工程ID).first():
+        return f"生産工程マスタに存在しない生産工程IDがあります: {生産工程ID}"
     return None
 
 
@@ -107,6 +119,9 @@ def create_M商品構成(
     product_error = _validate_products_exist(db, request.商品ID, request.明細一覧)
     if product_error:
         return schemas.ResponseBase(status="NG", message=product_error, error={"code": "PRODUCT_NOT_FOUND"})
+    master_error = _validate_master_ids_exist(db, request.生産区分ID, request.生産工程ID)
+    if master_error:
+        return schemas.ResponseBase(status="NG", message=master_error, error={"code": "MASTER_NOT_FOUND"})
 
     existing = crud.get_M商品構成(db, request.商品ID)
     if existing:
@@ -133,15 +148,17 @@ def update_M商品構成(
 
     明細一覧 = request.明細一覧 if request.明細一覧 is not None else crud.get_M商品構成明細一覧(db, request.商品ID)
     validation_target = schemas.M商品構成Base(
-        生産ロット=request.生産ロット if request.生産ロット is not None else item[0].生産ロット,
+        最小ロット数量=request.最小ロット数量 if request.最小ロット数量 is not None else item[0].最小ロット数量,
+        生産区分ID=request.生産区分ID if request.生産区分ID is not None else item[0].生産区分ID,
+        生産工程ID=request.生産工程ID if request.生産工程ID is not None else item[0].生産工程ID,
         商品構成備考=request.商品構成備考 if request.商品構成備考 is not None else item[0].商品構成備考,
         有効=request.有効 if request.有効 is not None else item[0].有効,
         明細一覧=[
             schemas.M商品構成明細Base(
-                明細番号=明細.明細番号,
+                明細SEQ=明細.明細SEQ,
                 構成商品ID=明細.構成商品ID,
-                構成数量分子=明細.構成数量分子,
-                構成数量分母=明細.構成数量分母,
+                計算分子数量=明細.計算分子数量,
+                計算分母数量=明細.計算分母数量,
                 構成商品備考=明細.構成商品備考,
             )
             if hasattr(明細, "構成商品ID") else 明細
@@ -155,6 +172,9 @@ def update_M商品構成(
     product_error = _validate_products_exist(db, request.商品ID, validation_target.明細一覧)
     if product_error:
         return schemas.ResponseBase(status="NG", message=product_error, error={"code": "PRODUCT_NOT_FOUND"})
+    master_error = _validate_master_ids_exist(db, validation_target.生産区分ID, validation_target.生産工程ID)
+    if master_error:
+        return schemas.ResponseBase(status="NG", message=master_error, error={"code": "MASTER_NOT_FOUND"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
     updated_item = crud.update_M商品構成(db, request.商品ID, request, 認証情報=認証情報)

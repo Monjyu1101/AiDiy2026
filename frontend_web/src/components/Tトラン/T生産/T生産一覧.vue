@@ -20,12 +20,18 @@ import { qMessage } from '../../../utils/qAlert';
 const router = useRouter();
 const route = useRoute();
 const 生産一覧テーブルRef = ref<any>(null);
+const 件数制限 = ref(true);
+const 無効も表示 = ref(false);
 const message = ref('');
 const messageType = ref('success');
 const 開始日付 = ref('');
 const 終了日付 = ref('');
-const 工程ID = ref('');
-const 工程一覧 = ref<any[]>([]);
+const 生産区分ID = ref('');
+const 生産工程ID = ref('');
+const 受入商品ID = ref('');
+const 生産工程一覧 = ref<any[]>([]);
+const 生産区分一覧 = ref<any[]>([]);
+const 商品一覧 = ref<any[]>([]);
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const normalizeRouteUrl = (value: string): string => {
@@ -61,9 +67,9 @@ const handleReload = () => {
 
 const openCreate = () => {
   const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
-  if (開始日付.value && 開始日付.value === 終了日付.value && 工程ID.value) {
+  if (開始日付.value && 開始日付.value === 終了日付.value && 生産工程ID.value) {
     query.生産開始日付 = 開始日付.value;
-    query.工程ID = 工程ID.value;
+    query.生産工程ID = 生産工程ID.value;
   }
   router.push({ path: '/Tトラン/T生産/編集', query });
 };
@@ -75,7 +81,9 @@ const showMessage = (msg: string, type: string) => {
 const applyQueryParams = (query: any) => {
   開始日付.value = String(normalizeQueryValue(query.開始日付) ?? '');
   終了日付.value = String(normalizeQueryValue(query.終了日付) ?? '');
-  工程ID.value = String(normalizeQueryValue(query.工程ID) ?? '');
+  生産区分ID.value = String(normalizeQueryValue(query.生産区分ID) ?? '');
+  生産工程ID.value = String(normalizeQueryValue(query.生産工程ID) ?? '');
+  受入商品ID.value = String(normalizeQueryValue(query.受入商品ID) ?? '');
 };
 
 const clearMessageQuery = (query: any) => {
@@ -87,18 +95,38 @@ const clearMessageQuery = (query: any) => {
 
 const loadProcessList = async (shouldNotify = true) => {
   try {
-    const res = await apiClient.post('/apps/M工程/一覧');
+    const res = await apiClient.post('/apps/M生産工程/一覧');
     if (res.data.status === 'OK') {
       const data = res.data.data;
-      工程一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+      生産工程一覧.value = Array.isArray(data) ? data : data?.items ?? [];
     } else if (shouldNotify) {
-      showMessage(res.data.message || '工程一覧の取得に失敗しました。', 'error');
+      showMessage(res.data.message || '生産工程一覧の取得に失敗しました。', 'error');
     }
   } catch (e) {
     if (shouldNotify) {
-      showMessage('工程一覧の取得でエラーが発生しました。', 'error');
+      showMessage('生産工程一覧の取得でエラーが発生しました。', 'error');
     }
   }
+};
+
+const loadCategoryList = async () => {
+  try {
+    const res = await apiClient.post('/apps/M生産区分/一覧');
+    if (res.data.status === 'OK') {
+      const data = res.data.data;
+      生産区分一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    }
+  } catch { /* 無視 */ }
+};
+
+const loadProductList = async () => {
+  try {
+    const res = await apiClient.post('/apps/M商品/一覧');
+    if (res.data.status === 'OK') {
+      const data = res.data.data;
+      商品一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    }
+  } catch { /* 無視 */ }
 };
 
 const handleCancel = () => {
@@ -117,6 +145,8 @@ onMounted(async () => {
     clearMessageQuery(route.query);
   }
   await loadProcessList(!hasRouteMessage);
+  await loadCategoryList();
+  await loadProductList();
 });
 
 watch(() => route.query.message, (newMessage) => {
@@ -128,7 +158,7 @@ watch(() => route.query.message, (newMessage) => {
   }
 });
 
-watch(() => [route.query.開始日付, route.query.終了日付, route.query.工程ID], () => {
+watch(() => [route.query.開始日付, route.query.終了日付, route.query.生産区分ID, route.query.生産工程ID, route.query.受入商品ID], () => {
   applyQueryParams(route.query);
   if (生産一覧テーブルRef.value) {
     handleReload();
@@ -145,33 +175,69 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.工
 
     <div class="content">
       <div class="section">
-        <div class="search-panel">
-          <div class="detail-row">
-            <div class="detail-label">日付範囲</div>
-            <div class="detail-value">
-              <div class="date-range">
-                <input type="date" v-model="開始日付" class="detail-input date-input" />
-                <span class="range-separator">〜</span>
-                <input type="date" v-model="終了日付" class="detail-input date-input" />
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="search-panel">
+              <div class="detail-row">
+                <div class="detail-label">日付範囲</div>
+                <div class="detail-value">
+                  <div class="date-range">
+                    <input type="date" v-model="開始日付" class="detail-input date-input" />
+                    <span class="range-separator">〜</span>
+                    <input type="date" v-model="終了日付" class="detail-input date-input" />
+                  </div>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">生産区分</div>
+                <div class="detail-value">
+                  <select v-model="生産区分ID" class="detail-input select-input">
+                    <option value="">すべて</option>
+                    <option v-for="item in 生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
+                      {{ item.生産区分名 }} ({{ item.生産区分ID }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">生産工程</div>
+                <div class="detail-value">
+                  <select v-model="生産工程ID" class="detail-input select-input">
+                    <option value="">すべて</option>
+                    <option v-for="item in 生産工程一覧" :key="item.生産工程ID" :value="item.生産工程ID">
+                      {{ item.生産工程名 }} ({{ item.生産工程ID }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">受入商品</div>
+                <div class="detail-value">
+                  <select v-model="受入商品ID" class="detail-input select-input">
+                    <option value="">すべて</option>
+                    <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
+                      {{ item.商品名 }} ({{ item.商品ID }})
+                    </option>
+                  </select>
+                </div>
               </div>
             </div>
+            <button class="btn btn-primary" @click="handleReload">再検索</button>
           </div>
-          <div class="detail-row">
-            <div class="detail-label">工程ID</div>
-            <div class="detail-value">
-              <select v-model="工程ID" class="detail-input select-input">
-                <option value="">すべて</option>
-                <option v-for="item in 工程一覧" :key="item.工程ID" :value="item.工程ID">
-                  {{ item.工程名 }} ({{ item.工程ID }})
-                </option>
-              </select>
-            </div>
+          <div class="toolbar-right">
+            <button class="btn btn-success" @click="openCreate">新規</button>
           </div>
         </div>
 
-        <div class="toolbar">
-          <button class="btn btn-primary" @click="handleReload">再検索</button>
-          <button class="btn btn-success" @click="openCreate">新規</button>
+        <div class="table-options">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="件数制限" @change="handleReload" />
+            件数制限
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="無効も表示" @change="handleReload" />
+            無効も表示
+          </label>
         </div>
 
         <component
@@ -179,7 +245,11 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.工
           ref="生産一覧テーブルRef"
           :開始日付="開始日付"
           :終了日付="終了日付"
-          :工程ID="工程ID"
+          :生産区分ID="生産区分ID"
+          :生産工程ID="生産工程ID"
+          :受入商品ID="受入商品ID"
+          :件数制限="件数制限"
+          :無効も表示="無効も表示"
           :戻URL="編集戻URL"
         />
       </div>
@@ -252,7 +322,6 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.工
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin-bottom: 8px;
   width: fit-content;
   --range-width: 360px;
 }
@@ -337,12 +406,30 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.工
   padding-right: 8px;
 }
 
+.text-input {
+  width: var(--range-width);
+}
+
 .toolbar {
   margin-bottom: 8px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: flex-start;
+  margin-left: auto;
 }
 
 .btn {
@@ -351,7 +438,6 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.工
   border-radius: 0;
   cursor: pointer;
   font-size: 14px;
-  margin-right: 10px;
   margin-bottom: 0;
 }
 
@@ -371,5 +457,29 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.工
 
 .btn-success:hover {
   background-color: #1e7e34;
+}
+
+.table-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #5a4a3a;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
 }
 </style>

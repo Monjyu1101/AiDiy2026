@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   -*- coding: utf-8 -*-
 
   -------------------------------------------------------------------------
@@ -15,16 +15,19 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
 import type { Column } from '../../../../types/qTubler';
 
 const props = defineProps({
-  includeInactive: { type: Boolean, default: false },
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
 const router = useRouter();
 
 const 生産区分一覧 = ref([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('生産区分ID');
@@ -41,7 +44,7 @@ const filters = reactive({
 });
 const rowKey = '生産区分ID';
 const columns: Column[] = [
-  { key: '生産区分ID', label: '生産区分ID', width: '120px', sortable: true },
+  { key: '生産区分ID', label: '生産区分ID', width: '120px', sortable: true, align: 'center' },
   { key: '生産区分名', label: '生産区分名', width: '160px', sortable: true },
   { key: '生産区分備考', label: '生産区分備考', width: '220px', sortable: true },
   { key: '配色枠', label: '配色枠', width: '120px', sortable: true },
@@ -63,7 +66,6 @@ const setMessage = (text, type = 'success') => {
 const hasFilter = computed(() => Object.values(filters).some((value) => String(value || '').trim() !== ''));
 const filteredRows = computed(() => {
   return 生産区分一覧.value.filter((row) => {
-    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -73,7 +75,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => 生産区分一覧.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -125,11 +127,15 @@ const openDetail = (row) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const res = await apiClient.post('/apps/V生産区分/一覧');
+    const res = await apiClient.post('/apps/V生産区分/一覧', {
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    });
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       生産区分一覧.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'M生産区分一覧の取得に失敗しました。', 'error');
@@ -169,11 +175,11 @@ defineExpose({
       <input v-if="filters[column.key] !== undefined" v-model="filters[column.key]" class="filter-input" type="text" />
     </template>
     <template #cell="{ row, column, value }">
-      <template v-if="column.key === '生産区分ID'">
-        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.生産区分ID }}</a>
+      <template v-if="column.key === '生産区分ID' || column.key === '生産区分名'">
+        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ value ?? '' }}</a>
       </template>
       <template v-else-if="column.key === '有効'">
-        <span>{{ row.有効 ? '✅' : '□' }}</span>
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}
@@ -184,3 +190,5 @@ defineExpose({
 
 <style scoped>
 </style>
+
+

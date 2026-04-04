@@ -13,13 +13,18 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import apiClient from '../../../api/client';
 import 商品構成一覧テーブル from './components/M商品構成一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
+import type { M生産区分 } from '../../../types';
 
 const router = useRouter();
 const route = useRoute();
 const 商品構成一覧テーブルRef = ref<any>(null);
-const includeInactive = ref(false);
+const 件数制限 = ref(true);
+const 無効も表示 = ref(false);
+const 生産区分ID = ref('');
+const 生産区分一覧 = ref<M生産区分[]>([]);
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value ?? null);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const 戻URL = computed(() => {
@@ -47,6 +52,22 @@ const showMessage = (msg: string, type?: string) => {
   void qMessage(msg, type || 'success');
 };
 
+const loadProductionTypeList = async (shouldNotify = true) => {
+  try {
+    const res = await apiClient.post('/apps/M生産区分/一覧', {});
+    if (res.data.status === 'OK') {
+      const data = res.data.data;
+      生産区分一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    } else if (shouldNotify) {
+      showMessage(res.data.message || '生産区分一覧の取得に失敗しました。', 'error');
+    }
+  } catch (_e) {
+    if (shouldNotify) {
+      showMessage('生産区分一覧の取得でエラーが発生しました。', 'error');
+    }
+  }
+};
+
 const clearMessageQuery = (query: typeof route.query) => {
   const nextQuery = { ...query };
   delete nextQuery.message;
@@ -66,6 +87,11 @@ onMounted(() => {
     showMessage(String(text ?? ''), type ? String(type) : undefined);
     clearMessageQuery(route.query);
   }
+});
+
+onMounted(async () => {
+  const hasRouteMessage = Boolean(route.query.message);
+  await loadProductionTypeList(!hasRouteMessage);
 });
 
 watch(() => route.query.message, (newMessage) => {
@@ -89,20 +115,38 @@ watch(() => route.query.message, (newMessage) => {
       <div class="section">
         <div class="toolbar">
           <div class="toolbar-left">
-            <div class="search-area">
-              <button class="btn btn-primary" @click="handleReload">再検索</button>
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="includeInactive" />
-                無効も検索
-              </label>
+            <div class="search-panel">
+              <div class="detail-row">
+                <div class="detail-label">生産区分</div>
+                <div class="detail-value">
+                  <select v-model="生産区分ID" class="detail-input select-input">
+                    <option value="">すべて</option>
+                    <option v-for="item in 生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
+                      {{ item.生産区分名 }} ({{ item.生産区分ID }})
+                    </option>
+                  </select>
+                </div>
+              </div>
             </div>
+            <button class="btn btn-primary" @click="handleReload">再検索</button>
           </div>
           <div class="toolbar-right">
             <button class="btn btn-success" @click="openCreate">新規</button>
           </div>
         </div>
 
-        <component :is="商品構成一覧テーブル" ref="商品構成一覧テーブルRef" :includeInactive="includeInactive" :戻URL="編集戻URL" />
+        <div class="table-options">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="件数制限" @change="handleReload" />
+            件数制限
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="無効も表示" @change="handleReload" />
+            無効も表示
+          </label>
+        </div>
+
+        <component :is="商品構成一覧テーブル" ref="商品構成一覧テーブルRef" :生産区分ID="生産区分ID" :件数制限="件数制限" :無効も表示="無効も表示" :戻URL="編集戻URL" />
       </div>
     </div>
   </div>
@@ -169,29 +213,103 @@ watch(() => route.query.message, (newMessage) => {
   min-height: 0;
 }
 
+.search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: fit-content;
+  --select-width: 360px;
+}
+
+.detail-row {
+  display: flex;
+  width: 100%;
+  margin-top: -1px;
+}
+
+.detail-row:first-child {
+  margin-top: 0;
+}
+
+.detail-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: #333;
+  font-weight: 600;
+  text-align: right;
+  padding: 8px 12px;
+  border: 1px solid #b3e5fc;
+  background: #e1f5fe;
+  min-height: 40px;
+  width: 160px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+.detail-value {
+  display: flex;
+  align-items: center;
+  width: auto;
+  color: #333;
+  padding: 4px 12px;
+  border: 1px solid #ccc;
+  border-left: none;
+  background: #fff;
+  min-height: 40px;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+.detail-input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 14px;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.detail-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
+}
+
+.select-input {
+  width: var(--select-width);
+  padding-right: 8px;
+}
+
 .toolbar {
   margin-bottom: 8px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .toolbar-left {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.search-area {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .toolbar-right {
   display: flex;
   align-items: flex-start;
+}
+
+.table-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 
 .btn {

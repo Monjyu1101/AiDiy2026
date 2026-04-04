@@ -50,7 +50,7 @@
   Tトラン/ # T系 (Transaction) 画面
   Vビュー/ # V系 (View) 画面
   Sスケジューラー/ # S系 (Scheduler) 画面
-  AIコア/ # AI インターフェース
+  AiDiy/ # AI インターフェース
   Xテスト/ # 実験的機能
   _share/ # 共通部品 (qTubler, dialogs)
 
@@ -225,19 +225,20 @@ onMounted(() => {
  <p>Vue Routerを使ってURLとコンポーネントを対応付けています。</p>
 
  <h3>1. ページコンポーネント作成</h3>
- <p><code>src/views/MyNewView.vue</code> にページコンポーネントを作成します。</p>
+ <p><code>src/components/Xテスト/MyNew.vue</code> のように既存カテゴリ配下へページコンポーネントを作成します。</p>
 
  <h3>2. ルート登録</h3>
- <p><code>src/router/index.js</code> にルートを追加します。</p>
+ <p><code>src/router/index.ts</code> にルートを追加します。</p>
  <pre><code>{
- path: '/mynew',
+ path: '/Xその他/MyNew/表示',
  name: 'MyNew',
- component: () => import('../views/MyNewView.vue')
+ component: () => import('../components/Xテスト/MyNew.vue'),
+ meta: { requiresAuth: true, title: 'MyNew' }
 }</code></pre>
 
  <h3>3. ナビゲーションリンク</h3>
  <p>テンプレートにリンクを追加します。</p>
- <pre><code>&lt;router-link to="/mynew"&gt;新しいページ&lt;/router-link&gt;</code></pre>
+ <pre><code>&lt;router-link to="/Xその他/MyNew/表示"&gt;新しいページ&lt;/router-link&gt;</code></pre>
  </section>
 
  <section id="state-management">
@@ -245,7 +246,7 @@ onMounted(() => {
  <p>Piniaを使ってコンポーネント間で状態を共有します。</p>
 
  <h3>Storeの定義</h3>
- <pre><code>// stores/auth.js
+ <pre><code>// stores/auth.ts
 import { defineStore } from 'pinia'
 
 export const useAuthStore = defineStore('auth', {
@@ -254,7 +255,7 @@ export const useAuthStore = defineStore('auth', {
  token: null
  }),
  actions: {
- setUser(user) {
+ setUser(user: unknown) {
  this.user = user
  }
  }
@@ -277,6 +278,15 @@ console.log(authStore.user)
  <li><strong>_TopBar</strong> — 画面上部のバー（ユーザー名、ログアウト等）</li>
  <li><strong>_TopMenu</strong> — トップメニュー（カテゴリ別ナビゲーション）</li>
  </ul>
+
+ <div>
+ <strong>補足: 現在の主要ルート</strong>
+ <ul>
+ <li>AI画面は <code>/AiDiy</code>（<code>src/router/coreRouter.ts</code>）</li>
+ <li>X系は <code>/Xその他/Xテトリス/ゲーム</code> などの配下に配置されています</li>
+ <li>ログイン後はAPI応答の <code>初期ページ</code> があればそのパス、無ければ <code>/Xその他</code> に遷移します</li>
+ </ul>
+ </div>
  </section>
 
  <section id="next">

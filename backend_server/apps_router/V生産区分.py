@@ -11,19 +11,26 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from typing import Optional
 import apps_schema as schemas, deps, apps_models as models
-
-MAX_ITEMS = 10000
+from list_controls import append_active_condition, get_limit_clause
 
 router = APIRouter(prefix="/apps/V生産区分", tags=["V生産区分"])
 
 
 @router.post("/一覧", response_model=schemas.ResponseBase)
 def list_V生産区分(
+    request: Optional[schemas.ListRequest] = None,
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    params = {"limit": MAX_ITEMS}
+    conditions = []
+    append_active_condition(conditions, request, "有効")
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    limit_sql, limit_value = get_limit_clause(request)
+    params = {}
+    if limit_value is not None:
+        params["limit"] = limit_value
 
     sql = """
     SELECT 生産区分ID, 生産区分名, 生産区分備考, 配色枠, 配色背景, 配色前景,
@@ -31,10 +38,11 @@ def list_V生産区分(
            登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
            更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
     FROM M生産区分
-    LIMIT :limit
+    {where_sql}
+    {limit_sql}
     """
 
-    result = db.execute(text(sql), params).fetchall()
+    result = db.execute(text(sql.format(where_sql=where_sql, limit_sql=limit_sql)), params).fetchall()
 
     items = []
     for row in result:
@@ -56,8 +64,8 @@ def list_V生産区分(
             "更新端末ID": row.更新端末ID
         })
 
-    count_sql = 'SELECT count(*) FROM M生産区分'
-    total = db.execute(text(count_sql)).scalar()
+    count_sql = f'SELECT count(*) FROM M生産区分 {where_sql}'
+    total = db.execute(text(count_sql), params).scalar()
 
     return schemas.ResponseBase(
         status="OK",
@@ -65,6 +73,6 @@ def list_V生産区分(
         data={
             "items": items,
             "total": total,
-            "limit": MAX_ITEMS
+            "limit": limit_value
         }
     )

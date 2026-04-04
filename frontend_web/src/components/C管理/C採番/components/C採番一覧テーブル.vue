@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   -*- coding: utf-8 -*-
 
   -------------------------------------------------------------------------
@@ -13,17 +13,20 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 const props = defineProps({
-  includeInactive: { type: Boolean, default: false },
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 import { useRouter } from 'vue-router';
 import type { C採番, Column } from '../../../../types';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
 
 const router = useRouter();
 
 const serials = ref<C採番[]>([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('採番ID');
@@ -37,7 +40,7 @@ const filters = reactive({
 });
 const rowKey = '採番ID';
 const columns: Column[] = [
-  { key: '採番ID', label: '採番ID', width: '140px', sortable: true },
+  { key: '採番ID', label: '採番ID', width: '140px', sortable: true, align: 'center' },
   { key: '最終採番値', label: '最終採番値', width: '110px', sortable: true, align: 'right' },
   { key: '採番備考', label: '採番備考', width: '250px', sortable: true },
   { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
@@ -58,7 +61,6 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return serials.value.filter((row) => {
-    if (!props.includeInactive && !row.有効) return false;
     return columns.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
@@ -68,7 +70,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => serials.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -123,11 +125,15 @@ const openDetail = (row) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const res = await apiClient.post('/core/V採番/一覧');
+    const res = await apiClient.post('/core/V採番/一覧', {
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    });
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       serials.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'C採番一覧の取得に失敗しました。', 'error');
@@ -179,7 +185,7 @@ defineExpose({
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.採番ID }}</a>
       </template>
       <template v-else-if="column.key === '有効'">
-        <span>{{ row.有効 ? '✅' : '□' }}</span>
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}
@@ -190,5 +196,6 @@ defineExpose({
 
 <style scoped>
 </style>
+
 
 

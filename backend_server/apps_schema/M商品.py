@@ -16,6 +16,7 @@ from typing import Optional
 class M商品Base(BaseModel):
     商品名: str
     単位: str
+    商品分類ID: str
     商品備考: Optional[str] = None
     有効: bool = True
 
@@ -28,6 +29,7 @@ class M商品Update(BaseModel):
     商品ID: str
     商品名: Optional[str] = None
     単位: Optional[str] = None
+    商品分類ID: Optional[str] = None
     商品備考: Optional[str] = None
     有効: Optional[bool] = None
 

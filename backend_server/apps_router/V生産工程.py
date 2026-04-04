@@ -11,27 +11,36 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from typing import Optional
 import apps_schema as schemas, deps, apps_models as models
-MAX_ITEMS = 10000
+from list_controls import append_active_condition, get_limit_clause
 
-router = APIRouter(prefix="/apps/V工程", tags=["V工程"])
+router = APIRouter(prefix="/apps/V生産工程", tags=["V生産工程"])
 
 
 @router.post("/一覧", response_model=schemas.ResponseBase)
-def list_V工程(
+def list_V生産工程(
+    request: Optional[schemas.ListRequest] = None,
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    params = {"limit": MAX_ITEMS}
+    conditions = []
+    append_active_condition(conditions, request, "有効")
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    limit_sql, limit_value = get_limit_clause(request)
+    params = {}
+    if limit_value is not None:
+        params["limit"] = limit_value
 
     sql = f"""
-    SELECT 工程ID, 工程名, 工程備考,
+    SELECT 生産工程ID, 生産工程名, 生産工程備考,
            有効,
            登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
            更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-    FROM M工程
-    ORDER BY 工程ID
-    LIMIT :limit
+    FROM M生産工程
+    {where_sql}
+    ORDER BY 生産工程ID
+    {limit_sql}
     """
 
     result = db.execute(text(sql), params).fetchall()
@@ -39,9 +48,9 @@ def list_V工程(
     items = []
     for row in result:
         items.append({
-            "工程ID": row.工程ID,
-            "工程名": row.工程名,
-            "工程備考": row.工程備考,
+            "生産工程ID": row.生産工程ID,
+            "生産工程名": row.生産工程名,
+            "生産工程備考": row.生産工程備考,
             "有効": bool(row.有効) if row.有効 is not None else True,
             "登録日時": row.登録日時,
             "登録利用者ID": row.登録利用者ID,
@@ -53,15 +62,15 @@ def list_V工程(
             "更新端末ID": row.更新端末ID
         })
 
-    count_sql = "SELECT count(*) FROM M工程"
-    total = db.execute(text(count_sql)).scalar()
+    count_sql = f"SELECT count(*) FROM M生産工程 {where_sql}"
+    total = db.execute(text(count_sql), params).scalar()
 
     return schemas.ResponseBase(
         status="OK",
-        message="V工程一覧を取得しました",
+        message="V生産工程一覧を取得しました",
         data={
             "items": items,
             "total": total,
-            "limit": MAX_ITEMS
+            "limit": limit_value
         }
     )

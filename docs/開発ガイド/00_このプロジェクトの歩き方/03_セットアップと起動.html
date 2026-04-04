@@ -96,7 +96,7 @@ python _setup.py</code></pre>
  <li><strong>Python依存パッケージのインストール</strong> — <code>uv sync</code> でバックエンド依存関係を解決
   <br><small>要件: uv がインストールされていること。未導入の場合: <code>irm https://astral.sh/uv/install.ps1 | iex</code> (PowerShell)</small></li>
  <li><strong>Node.js依存パッケージのインストール</strong> — <code>npm install</code> でVue関連パッケージをインストール</li>
- <li><strong>PostgreSQL関連処理</strong> — <code>DATABASE_TYPE="sqlite"</code> のため、PostgreSQLユーザー確認・初期データ復元・マイグレーション実行は<strong>スキップ</strong>されます</li>
+ <li><strong>PostgreSQL関連処理</strong> — <code>DATABASE_TYPE="sqlite"</code> のため、PostgreSQLユーザー確認・初期データ復元などの分岐は<strong>通常スキップ</strong>されます</li>
  </ol>
 
  <div>
@@ -145,7 +145,7 @@ npm config set proxy http://n.n.n.n:nnnn</code></pre>
 
  <section id="start">
  <h2>起動方法</h2>
- <p>全サーバーを一括で起動します。</p>
+ <p>対話形式で起動対象を選び、必要なサービスをまとめて起動します。</p>
 
  <pre><code><span># プロジェクトディレクトリへ移動して起動</span>
 cd workspace/AiDiy2026
@@ -153,17 +153,17 @@ python _start.py</code></pre>
 
  <h3>_start.py が行うこと</h3>
  <ul>
- <li>Core サーバーをポート8091で起動</li>
- <li>Apps サーバーをポート8092で起動</li>
- <li>フロントエンドをポート8090で起動</li>
- <li>全サーバーの起動完了を待機</li>
+ <li>バックエンド(core/apps) を起動するか確認</li>
+ <li>フロントエンド(Web 8090) を起動するか確認</li>
+ <li>フロントエンド(Avatar 8099) を起動するか確認</li>
+ <li>選択したサービスだけを順番に起動し、起動完了を待機</li>
  </ul>
 
  <div>
  <strong>_start.py の動作詳細</strong>
  <ul>
- <li>ポート 8090/8091/8092 を使用中のプロセスを自動で停止</li>
- <li>起動完了後、ブラウザで http://localhost:8090 を自動的に開く</li>
+ <li>選択したポート 8090/8091/8092/8099 を使用中のプロセスを自動で停止</li>
+ <li>Web は <code>http://localhost:8090</code>、Avatar は <code>http://127.0.0.1:8099</code> を自動で開く</li>
  <li>サーバーがクラッシュした場合、15秒後に自動再起動</li>
  <li>Ctrl+C で全サーバーを一括停止</li>
  </ul>
@@ -172,14 +172,15 @@ python _start.py</code></pre>
  <div>
  <strong>起動成功時の表示</strong>
  <p>以下のようなメッセージが表示されれば正常に起動しています。</p>
- <pre><code> Core サーバー: http://localhost:8091
- Apps サーバー: http://localhost:8092
- フロントエンド: http://localhost:8090</code></pre>
+ <pre><code>バックエンド(core): http://localhost:8091/docs
+バックエンド(apps): http://localhost:8092/docs
+フロントエンド(Web): http://localhost:8090/
+フロントエンド(Avatar): renderer http://127.0.0.1:8099</code></pre>
  </div>
 
  <div>
  <strong>ポートが使用中の場合</strong>
- <p>ポート8090/8091/8092が既に使用されている場合はエラーになります。<br>
+ <p>ポート8090/8091/8092/8099が既に使用されている場合はエラーになります。<br>
  その場合は <code>python.exe</code> や <code>node.exe</code> のプロセスを終了してから再起動してください。</p>
  </div>
  </section>
@@ -200,6 +201,15 @@ python _start.py</code></pre>
  <pre><code>cd workspace/AiDiy2026/frontend_web
 npm run dev</code></pre>
 
+ <h3>フロントエンド Avatar</h3>
+ <pre><code><span># Webモード (Viteのみ)</span>
+cd workspace/AiDiy2026/frontend_avatar
+npm run dev:renderer
+
+<span># Electronモード</span>
+cd workspace/AiDiy2026/frontend_avatar
+npm run dev</code></pre>
+
  <div>
  <strong>個別起動のメリット</strong>
  <ul>
@@ -211,25 +221,20 @@ npm run dev</code></pre>
  </section>
 
  <section id="partial-start">
- <h2>部分起動と部分停止</h2>
- <p>バックエンドまたはフロントエンドだけを起動・停止することもできます。</p>
+ <h2>部分起動</h2>
+ <p>一部のサービスだけ起動したい場合は、<code>_start.py</code> 実行時の対話で選択します。</p>
 
- <h3>部分起動</h3>
- <pre><code><span># バックエンドのみ起動</span>
-python _start.py --backend=yes --frontend=no
+ <pre><code>cd workspace/AiDiy2026
+python _start.py
 
-<span># フロントエンドのみ起動</span>
-python _start.py --backend=no --frontend=yes</code></pre>
+バックエンド(core,apps) 起動しますか? [y]/n
+フロントエンド(Web)      起動しますか? [y]/n
+フロントエンド(Avatar)   起動しますか? y/[n]</code></pre>
 
- <h3>停止コマンド</h3>
- <pre><code><span># 全サーバー停止</span>
-python _stop.py
-
-<span># バックエンドのみ停止</span>
-python _stop.py --backend=yes --frontend=no
-
-<span># フロントエンドのみ停止</span>
-python _stop.py --backend=no --frontend=yes</code></pre>
+ <p>
+ 例: バックエンドだけ動かしたい場合は 1問目だけ <code>y</code>、残りを <code>n</code> にします。<br>
+ 停止は起動中のターミナルで <code>Ctrl+C</code> を使用します。
+ </p>
  </section>
 
  <section id="vscode">
@@ -351,28 +356,27 @@ python _stop.py --backend=no --frontend=yes</code></pre>
 
  <section id="stop">
  <h2>停止方法</h2>
- <p>サーバーを停止する方法は4通りあります。</p>
+ <p>サーバーを停止する方法は3通りあります。</p>
 
- <h3>方法1: _stop.py (推奨)</h3>
- <pre><code>python _stop.py</code></pre>
- <p>ポート 8090/8091/8092 を使用しているプロセスを検索して自動停止します。</p>
-
- <h3>方法2: Ctrl+C</h3>
+ <h3>方法1: Ctrl+C</h3>
  <p>起動中のターミナルで <code>Ctrl+C</code> を押して停止します。</p>
 
- <h3>方法3: タスクマネージャー</h3>
+ <h3>方法2: タスクマネージャー</h3>
  <ol>
  <li><code>Ctrl+Shift+Esc</code> でタスクマネージャーを開く</li>
  <li><code>python.exe</code> と <code>node.exe</code> のプロセスを探す</li>
  <li>選択して「タスクの終了」をクリック → プロセスを終了</li>
  </ol>
 
- <h3>方法4: PowerShell</h3>
- <pre><code><span># Pythonプロセスを停止</span>
+ <h3>方法3: PowerShell</h3>
+<pre><code><span># Pythonプロセスを停止</span>
 taskkill /F /IM python.exe
 
 <span># Node.jsプロセスを停止</span>
-taskkill /F /IM node.exe</code></pre>
+taskkill /F /IM node.exe
+
+<span># Electronが残っている場合</span>
+taskkill /F /IM electron.exe</code></pre>
  </section>
 
  <section id="next">

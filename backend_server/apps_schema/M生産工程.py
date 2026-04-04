@@ -12,33 +12,33 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-class M工程Base(BaseModel):
-    工程名: str
-    工程備考: Optional[str] = None
+class M生産工程Base(BaseModel):
+    生産工程名: str
+    生産工程備考: Optional[str] = None
     有効: bool = True
 
 
-class M工程Create(M工程Base):
-    工程ID: str
+class M生産工程Create(M生産工程Base):
+    生産工程ID: str
 
 
-class M工程Update(BaseModel):
-    工程ID: str
-    工程名: Optional[str] = None
-    工程備考: Optional[str] = None
+class M生産工程Update(BaseModel):
+    生産工程ID: str
+    生産工程名: Optional[str] = None
+    生産工程備考: Optional[str] = None
     有効: Optional[bool] = None
 
 
-class M工程Delete(BaseModel):
-    工程ID: str
+class M生産工程Delete(BaseModel):
+    生産工程ID: str
 
 
-class M工程Get(BaseModel):
-    工程ID: str
+class M生産工程Get(BaseModel):
+    生産工程ID: str
 
 
-class M工程(M工程Base):
-    工程ID: str
+class M生産工程(M生産工程Base):
+    生産工程ID: str
     有効: bool
     登録日時: str
     登録利用者ID: str

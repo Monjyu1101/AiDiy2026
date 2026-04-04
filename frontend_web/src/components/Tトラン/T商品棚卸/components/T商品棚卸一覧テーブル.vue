@@ -11,10 +11,11 @@
 -->
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
 import type { Column } from '../../../../types/qTubler';
 
 const router = useRouter();
@@ -32,6 +33,14 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  件数制限: {
+    type: Boolean,
+    default: true
+  },
+  無効も表示: {
+    type: Boolean,
+    default: false
+  },
   戻URL: {
     type: String,
     default: ''
@@ -39,6 +48,7 @@ const props = defineProps({
 });
 
 const 商品棚卸一覧 = ref([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('棚卸日');
@@ -59,6 +69,7 @@ const columns: Column[] = [
   { key: '商品名', label: '商品名', width: '150px', sortable: true },
   { key: '実棚数量', label: '実棚数量', width: '100px', sortable: true, align: 'right' },
   { key: '棚卸備考', label: '棚卸備考', width: '220px', sortable: true },
+  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
   { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
   { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
 ];
@@ -109,7 +120,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => 商品棚卸一覧.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -164,7 +175,10 @@ const openDetail = (row) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const payload: Record<string, string> = {};
+    const payload: Record<string, string | boolean> = {
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    };
     if (props.開始日付) payload.開始日付 = String(props.開始日付);
     if (props.終了日付) payload.終了日付 = String(props.終了日付);
     const res = await apiClient.post(
@@ -175,6 +189,7 @@ const loadData = async () => {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       商品棚卸一覧.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'T商品棚卸一覧の取得に失敗しました。', 'error');
@@ -224,6 +239,9 @@ defineExpose({
     <template #cell="{ row, column, value }">
       <template v-if="column.key === '棚卸伝票ID'">
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.棚卸伝票ID }}</a>
+      </template>
+      <template v-else-if="column.key === '有効'">
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}

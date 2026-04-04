@@ -14,16 +14,16 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 
 interface 工程型 {
-  工程ID: string
-  工程名: string
-  工程備考?: string
+  生産工程ID: string
+  生産工程名: string
+  生産工程備考?: string
 }
 
 interface 生産型 {
   生産伝票ID: string
   生産開始日時: string
   生産終了日時: string
-  工程ID: string
+  生産工程ID: string
   生産区分ID: string
   生産区分名?: string
   生産内容?: string
@@ -151,7 +151,7 @@ const renderSchedules = () => {
 };
 
 const renderSchedule = (schedule, startDateTime, endDateTime, displayStart, displayEnd, rangeStart, rangeEnd) => {
-  const processId = schedule.工程ID;
+  const processId = schedule.生産工程ID;
   const renderStartStr = formatDateISO(displayStart);
 
   const startCell = document.getElementById(`seisan-cell-${processId}-${renderStartStr}`);
@@ -199,7 +199,10 @@ const renderSchedule = (schedule, startDateTime, endDateTime, displayStart, disp
   }
 
   const categoryName = schedule.生産区分名 || '';
-  const content = schedule.生産内容 || '';
+  const 商品名 = schedule.商品名 || '';
+  const 受入数量 = schedule.受入数量 != null ? schedule.受入数量 : '';
+  const 単位 = schedule.単位 || '';
+  const centerText = 商品名 ? `${商品名} (${受入数量} ${単位})` : (schedule.生産内容 || '');
   const borderColor = schedule.配色枠 || '#0056b3';
   const backgroundColor = schedule.配色背景 || '#007bff';
   const textColor = schedule.配色前景 || '#ffffff';
@@ -234,7 +237,7 @@ const renderSchedule = (schedule, startDateTime, endDateTime, displayStart, disp
   scheduleElement.style.color = textColor;
   scheduleElement.innerHTML = `
     <div class="schedule-text schedule-text-start">${startTimeStr} ${categoryName}</div>
-    <div class="schedule-text schedule-text-center">${content || '&nbsp;'}</div>
+    <div class="schedule-text schedule-text-center">${centerText || '&nbsp;'}</div>
     <div class="schedule-text schedule-text-end">${endTimeStr}</div>
   `;
 
@@ -401,23 +404,23 @@ onBeforeUnmount(() => {
       <div class="day-header">{{ day.label }} ({{ day.dayName }})</div>
     </div>
 
-    <template v-for="process in 工程リスト" :key="process.工程ID">
+    <template v-for="process in 工程リスト" :key="process.生産工程ID">
       <div class="grid-cell vehicle-cell">
-        <div class="vehicle-id">{{ process.工程ID }} {{ process.工程備考 || '' }}</div>
-        <div class="vehicle-name">{{ process.工程名 }}</div>
+        <div class="vehicle-id">{{ process.生産工程ID }} {{ process.生産工程備考 || '' }}</div>
+        <div class="vehicle-name">{{ process.生産工程名 }}</div>
       </div>
       <div
         v-for="day in displayDates"
-        :key="`${process.工程ID}-${day.dateStr}`"
-        :id="`seisan-cell-${process.工程ID}-${day.dateStr}`"
+        :key="`${process.生産工程ID}-${day.dateStr}`"
+        :id="`seisan-cell-${process.生産工程ID}-${day.dateStr}`"
         class="grid-cell droppable-area empty-cell"
         :class="{
           'sunday-background': day.dayOfWeek === 0,
           'saturday-background': day.dayOfWeek === 6
         }"
         @dragover.prevent
-        @drop="(event) => handleDrop(event, process.工程ID, day.dateStr)"
-        @dblclick="openProductionScheduleForm(process.工程ID, day.dateStr)"
+        @drop="(event) => handleDrop(event, process.生産工程ID, day.dateStr)"
+        @dblclick="openProductionScheduleForm(process.生産工程ID, day.dateStr)"
       ></div>
     </template>
   </div>
@@ -517,6 +520,35 @@ onBeforeUnmount(() => {
 
 <style>
 /* 動的生成される要素用スタイル (scoped外) */
+.schedule-text {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.schedule-text-start {
+  text-align: left;
+  padding-left: 4px;
+  font-size: 12px;
+}
+
+.schedule-text-center {
+  text-align: center;
+  font-size: 14px;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.schedule-text-end {
+  text-align: right;
+  padding-right: 4px;
+  font-size: 12px;
+}
+
 .schedule-item-seisan {
   background-color: #007bff;
   color: #fff;

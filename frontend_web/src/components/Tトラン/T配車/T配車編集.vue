@@ -41,7 +41,8 @@ const form = reactive({
   配車区分ID: '',
   車両ID: '',
   配車内容: '',
-  配車備考: ''
+  配車備考: '',
+  有効: true
 });
 
 const errors = reactive({
@@ -67,6 +68,12 @@ const 配車区分一覧 = ref([]);
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
+const 表示用車両一覧 = computed(() => isCreateMode.value
+  ? 車両一覧.value.filter((item: any) => item?.有効 !== false)
+  : 車両一覧.value);
+const 表示用配車区分一覧 = computed(() => isCreateMode.value
+  ? 配車区分一覧.value.filter((item: any) => item?.有効 !== false)
+  : 配車区分一覧.value);
 const requiredFields = computed(() => ['配車開始日時', '配車終了日時', '車両ID', '配車区分ID']);
 
 // ==================================================
@@ -93,6 +100,7 @@ const resetForm = () => {
   form.車両ID = '';
   form.配車内容 = '';
   form.配車備考 = '';
+  form.有効 = true;
 };
 
 const applyDataToForm = (data) => {
@@ -103,6 +111,7 @@ const applyDataToForm = (data) => {
   form.車両ID = data?.車両ID || '';
   form.配車内容 = data?.配車内容 || '';
   form.配車備考 = data?.配車備考 || '';
+  form.有効 = data?.有効 ?? true;
 };
 
 // ==================================================
@@ -316,7 +325,8 @@ const saveData = async () => {
         配車区分ID: form.配車区分ID,
         車両ID: form.車両ID,
         配車内容: form.配車内容,
-        配車備考: form.配車備考
+        配車備考: form.配車備考,
+        有効: form.有効
       });
     } else {
       res = await apiClient.post('/apps/T配車/変更', {
@@ -325,7 +335,8 @@ const saveData = async () => {
         配車区分ID: form.配車区分ID,
         車両ID: form.車両ID,
         配車内容: form.配車内容,
-        配車備考: form.配車備考
+        配車備考: form.配車備考,
+        有効: form.有効
       }, {
         params: { 配車伝票ID: form.配車伝票ID }
       });
@@ -344,7 +355,7 @@ const saveData = async () => {
 const deleteData = async () => {
   if (!form.配車伝票ID) return;
 
-  const confirmed = await qConfirm(`T配車「${form.配車伝票ID}」を削除しますか？この操作は取り消せません。`);
+  const confirmed = await qConfirm(`T配車「${form.配車伝票ID}」の有効をオフにしますか？`);
   if (!confirmed) return;
 
   try {
@@ -478,7 +489,7 @@ watch(() => route.query, async (query) => {
                         @change="handleInput('車両ID')"
                       >
                         <option value="">選択してください</option>
-                        <option v-for="item in 車両一覧" :key="item.車両ID" :value="item.車両ID">
+                        <option v-for="item in 表示用車両一覧" :key="item.車両ID" :value="item.車両ID">
                           {{ item.車両名 }} ({{ item.車両ID }})
                         </option>
                       </select>
@@ -504,7 +515,7 @@ watch(() => route.query, async (query) => {
                         @change="handleInput('配車区分ID')"
                       >
                         <option value="">選択してください</option>
-                        <option v-for="item in 配車区分一覧" :key="item.配車区分ID" :value="item.配車区分ID">
+                        <option v-for="item in 表示用配車区分一覧" :key="item.配車区分ID" :value="item.配車区分ID">
                           {{ item.配車区分名 }}
                         </option>
                       </select>
@@ -545,6 +556,27 @@ watch(() => route.query, async (query) => {
             </template>
 
             <template v-if="activeTab === 'others'">
+              <div class="detail-row row-valid">
+                <div class="detail-label">有効</div>
+                <div class="detail-value">
+                  <label
+                    class="valid-checkbox-label"
+                    :class="{ 'valid-checkbox-label-disabled': isViewMode }"
+                  >
+                    <input
+                      type="checkbox"
+                      v-model="form.有効"
+                      :disabled="isViewMode"
+                      class="valid-checkbox"
+                      aria-label="有効の切り替え"
+                    />
+                    <span
+                      class="valid-checkbox-mark"
+                      :class="{ 'valid-checkbox-inactive': !form.有効 }"
+                    >{{ form.有効 ? '✅' : '☐' }}</span>
+                  </label>
+                </div>
+              </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">登録日時</div>
                 <div class="detail-value">
@@ -969,12 +1001,66 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-secondary {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
 }
 
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: #f2f2f2;
+}
+
+.row-valid {
+  width: fit-content;
+}
+
+.valid-checkbox-label {
+  width: 320px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f8f9fa;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.valid-checkbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.valid-checkbox-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 16px;
+  color: #16a34a;
+}
+
+.valid-checkbox-inactive {
+  color: #222;
+}
+
+.valid-checkbox-label-disabled {
+  cursor: default;
+}
+
+.valid-checkbox-label:focus-within {
+  border-color: #007bff;
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
 }
 
 .message {
