@@ -32,12 +32,15 @@ from apps_schema.T生産 import (
     V生産ListRequest, T生産払出ListRequest,
 )
 from apps_schema.T商品出庫 import (
+    T商品出庫明細Base, T商品出庫明細,
     T商品出庫Base, T商品出庫Create, T商品出庫Update, T商品出庫Delete, T商品出庫Get, T商品出庫,
 )
 from apps_schema.T商品棚卸 import (
+    T商品棚卸明細Base, T商品棚卸明細,
     T商品棚卸Base, T商品棚卸Create, T商品棚卸Update, T商品棚卸Delete, T商品棚卸Get, T商品棚卸,
 )
 from apps_schema.T商品入庫 import (
+    T商品入庫明細Base, T商品入庫明細,
     T商品入庫Base, T商品入庫Create, T商品入庫Update, T商品入庫Delete, T商品入庫Get, T商品入庫,
 )
 
@@ -55,7 +58,10 @@ __all__ = [
     'T生産明細Base', 'T生産明細',
     'T生産Base', 'T生産Create', 'T生産Update', 'T生産Delete', 'T生産Get', 'T生産',
     'V生産ListRequest', 'T生産払出ListRequest',
+    'T商品出庫明細Base', 'T商品出庫明細',
     'T商品出庫Base', 'T商品出庫Create', 'T商品出庫Update', 'T商品出庫Delete', 'T商品出庫Get', 'T商品出庫',
+    'T商品棚卸明細Base', 'T商品棚卸明細',
     'T商品棚卸Base', 'T商品棚卸Create', 'T商品棚卸Update', 'T商品棚卸Delete', 'T商品棚卸Get', 'T商品棚卸',
+    'T商品入庫明細Base', 'T商品入庫明細',
     'T商品入庫Base', 'T商品入庫Create', 'T商品入庫Update', 'T商品入庫Delete', 'T商品入庫Get', 'T商品入庫',
 ]

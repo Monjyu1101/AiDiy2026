@@ -112,6 +112,8 @@ export interface M商品構成 extends AuditFields {
   生産区分ID: string
   生産区分名?: string | null
   生産工程ID: string
+  段取分数?: number | null
+  時間生産数量?: number | null
   商品構成備考: string | null
   有効: boolean
   明細一覧: M商品構成明細[]
@@ -157,37 +159,67 @@ export interface T配車 extends AuditFields {
 /**
  * T商品入庫（商品入庫トランザクション）
  */
-export interface T商品入庫 extends AuditFields {
-  入庫ID: string
-  入庫日: string
+export interface T商品入庫明細 {
+  明細SEQ: number
   商品ID: string
+  商品名?: string | null
+  単位?: string | null
   入庫数量: number
+  明細備考?: string | null
+}
+
+export interface T商品入庫 extends AuditFields {
+  入庫伝票ID: string
+  入庫日: string
   入庫備考: string | null
   有効: boolean
+  入庫商品件数?: number
+  合計入庫数量?: number
+  明細一覧: T商品入庫明細[]
 }
 
 /**
  * T商品出庫（商品出庫トランザクション）
  */
-export interface T商品出庫 extends AuditFields {
-  出庫ID: string
-  出庫日: string
+export interface T商品出庫明細 {
+  明細SEQ: number
   商品ID: string
+  商品名?: string | null
+  単位?: string | null
   出庫数量: number
+  明細備考?: string | null
+}
+
+export interface T商品出庫 extends AuditFields {
+  出庫伝票ID: string
+  出庫日: string
   出庫備考: string | null
   有効: boolean
+  出庫商品件数?: number
+  合計出庫数量?: number
+  明細一覧: T商品出庫明細[]
 }
 
 /**
  * T商品棚卸（商品棚卸トランザクション）
  */
-export interface T商品棚卸 extends AuditFields {
-  棚卸ID: string
-  棚卸日: string
+export interface T商品棚卸明細 {
+  明細SEQ: number
   商品ID: string
-  棚卸数量: number
+  商品名?: string | null
+  単位?: string | null
+  実棚数量: number
+  明細備考?: string | null
+}
+
+export interface T商品棚卸 extends AuditFields {
+  棚卸伝票ID: string
+  棚卸日: string
   棚卸備考: string | null
   有効: boolean
+  棚卸商品件数?: number
+  合計実棚数量?: number
+  明細一覧: T商品棚卸明細[]
 }
 
 // ==================== V系（ビュー） ====================
@@ -236,10 +268,12 @@ export interface V商品構成 extends AuditFields {
   生産区分名?: string | null
   生産工程ID?: string | null
   生産工程名?: string | null
+  段取分数?: number | null
+  時間生産数量?: number | null
   商品構成備考: string | null
   有効: boolean
   構成商品件数: number
-}
+  }
 
 export interface V生産区分 extends M生産区分 {
 }
@@ -263,21 +297,35 @@ export interface V配車 extends T配車 {
  * V商品入庫（商品入庫ビュー）
  */
 export interface V商品入庫 extends T商品入庫 {
-  商品名?: string
+  商品ID?: string | null
+  商品名?: string | null
+  単位?: string | null
+  商品備考?: string | null
+  入庫内容?: string
 }
 
 /**
  * V商品出庫（商品出庫ビュー）
  */
 export interface V商品出庫 extends T商品出庫 {
-  商品名?: string
+  一覧行ID?: string
+  明細SEQ?: number
+  商品ID?: string | null
+  商品名?: string | null
+  単位?: string | null
+  商品備考?: string | null
 }
 
 /**
  * V商品棚卸（商品棚卸ビュー）
  */
 export interface V商品棚卸 extends T商品棚卸 {
-  商品名?: string
+  一覧行ID?: string
+  明細SEQ?: number
+  商品ID?: string | null
+  商品名?: string | null
+  単位?: string | null
+  商品備考?: string | null
 }
 
 /**

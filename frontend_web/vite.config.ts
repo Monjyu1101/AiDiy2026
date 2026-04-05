@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [vue()],
   optimizeDeps: {
     include: ['monaco-editor'],
+    exclude: ['three', '@pixiv/three-vrm', '@pixiv/three-vrm-animation'],
   },
   resolve: {
     alias: {

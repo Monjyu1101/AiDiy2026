@@ -11,10 +11,17 @@
 -->
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, watch } from 'vue';
+import { ref, onMounted, reactive, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
+
+type 入庫明細Form = {
+  明細SEQ: number
+  商品ID: string
+  入庫数量: string
+  明細備考: string
+}
 
 const route = useRoute();
 const router = useRouter();
@@ -30,32 +37,28 @@ const 戻URL = computed(() => {
 // ==================================================
 const mode = ref('edit');
 const activeTab = ref('content');
-const detailData = ref(null);
-const message = ref('');
-const messageType = ref('success');
+const detailData = ref<any>(null);
+const 商品一覧 = ref<any[]>([]);
+const detailError = ref('');
+const numberFormatter = new Intl.NumberFormat('ja-JP');
+const 数量編集中 = reactive<Record<number, boolean>>({});
 
 const form = reactive({
   入庫伝票ID: '',
   入庫日: '',
-  商品ID: '',
-  入庫数量: '',
   入庫備考: '',
   有効: true
 });
 
 const errors = reactive({
-  入庫日: '',
-  商品ID: '',
-  入庫数量: ''
+  入庫日: ''
 });
 
 const touched = reactive({
-  入庫日: false,
-  商品ID: false,
-  入庫数量: false
+  入庫日: false
 });
 
-const 商品一覧 = ref([]);
+const 明細一覧 = ref<入庫明細Form[]>([]);
 
 // ==================================================
 // 計算プロパティ
@@ -63,57 +66,123 @@ const 商品一覧 = ref([]);
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
+const requiredFields = computed(() => ['入庫日']);
 const 表示用商品一覧 = computed(() => isCreateMode.value
   ? 商品一覧.value.filter((item: any) => item?.有効 !== false)
   : 商品一覧.value);
-const requiredFields = computed(() => ['入庫日', '商品ID', '入庫数量']);
+const 商品マップ = computed<Record<string, any>>(() => {
+  const result: Record<string, any> = {};
+  商品一覧.value.forEach((item: any) => { result[item.商品ID] = item; });
+  return result;
+});
 
 // ==================================================
-// ユーティリティ関数
+// ユーティリティ
 // ==================================================
-const showMessage = (text: string, type: string = 'success') => {
+const showMessage = (text: string, type = 'success') => {
   void qMessage(text, type);
 };
 
+const toNumber = (value: any) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : NaN;
+};
+
+const get商品 = (商品ID: string) => 商品マップ.value[String(商品ID)] || null;
+
+const createEmptyDetail = (明細SEQ = 1, 商品ID = ''): 入庫明細Form => ({
+  明細SEQ,
+  商品ID,
+  入庫数量: '',
+  明細備考: ''
+});
+
+const normalizeNumericInput = (value: any) => String(value ?? '').replace(/,/g, '').trim();
+
+const formatNumericDisplay = (value: any) => {
+  const normalized = normalizeNumericInput(value);
+  if (!normalized) return '';
+  const num = Number(normalized);
+  return Number.isFinite(num) ? numberFormatter.format(num) : normalized;
+};
+
+const clearQuantityEditing = () => {
+  Object.keys(数量編集中).forEach((key) => { delete 数量編集中[Number(key)]; });
+};
+
+const isQuantityEditing = (明細SEQ: number) => Boolean(数量編集中[明細SEQ]);
+
+const handleQuantityFocus = async (row: 入庫明細Form, event: FocusEvent) => {
+  数量編集中[row.明細SEQ] = true;
+  row.入庫数量 = normalizeNumericInput(row.入庫数量);
+  await nextTick();
+  const target = event.target as HTMLInputElement | null;
+  target?.select();
+};
+
+const handleQuantityInput = (row: 入庫明細Form, event: Event) => {
+  const target = event.target as HTMLInputElement | null;
+  row.入庫数量 = normalizeNumericInput(target?.value ?? '');
+};
+
+const handleQuantityBlur = (row: 入庫明細Form) => {
+  row.入庫数量 = normalizeNumericInput(row.入庫数量);
+  delete 数量編集中[row.明細SEQ];
+};
+
+const renumberDetails = () => {
+  明細一覧.value.forEach((row, index) => { row.明細SEQ = index + 1; });
+};
+
+// ==================================================
+// フォームリセット・適用
+// ==================================================
 const resetValidation = () => {
-  Object.keys(errors).forEach((key) => {
-    errors[key] = '';
-  });
-  Object.keys(touched).forEach((key) => {
-    touched[key] = false;
-  });
+  Object.keys(errors).forEach((key) => { errors[key] = ''; });
+  Object.keys(touched).forEach((key) => { touched[key] = false; });
+  detailError.value = '';
 };
 
 const resetForm = () => {
   form.入庫伝票ID = '';
   form.入庫日 = '';
-  form.商品ID = '';
-  form.入庫数量 = '';
   form.入庫備考 = '';
   form.有効 = true;
+  明細一覧.value = [];
+  clearQuantityEditing();
 };
 
-const applyDataToForm = (data) => {
+const applyDataToForm = (data: any) => {
+  clearQuantityEditing();
   form.入庫伝票ID = data?.入庫伝票ID || '';
   form.入庫日 = data?.入庫日 || '';
-  form.商品ID = data?.商品ID || '';
-  form.入庫数量 = data?.入庫数量 || '';
   form.入庫備考 = data?.入庫備考 || '';
   form.有効 = data?.有効 ?? true;
+  明細一覧.value = Array.isArray(data?.明細一覧) && data.明細一覧.length
+    ? data.明細一覧.map((item: any, index: number) => ({
+      明細SEQ: Number(item?.明細SEQ ?? index + 1),
+      商品ID: item?.商品ID || '',
+      入庫数量: item?.入庫数量 === null || item?.入庫数量 === undefined ? '' : String(item.入庫数量),
+      明細備考: item?.明細備考 || ''
+    }))
+    : [];
+  if (!明細一覧.value.length && !isViewMode.value) {
+    明細一覧.value = [createEmptyDetail(1)];
+  }
+  renumberDetails();
 };
 
 // ==================================================
 // バリデーション
 // ==================================================
-const validateField = (field, showMessage = true) => {
+const validateField = (field: string, showError = true) => {
   const value = String(form[field] ?? '').trim();
-
   if (!requiredFields.value.includes(field)) {
     errors[field] = '';
     return true;
   }
   if (!value) {
-    errors[field] = showMessage ? `${field}は必須です。` : 'ERROR';
+    errors[field] = showError ? `${field}は必須です。` : 'ERROR';
     return false;
   }
 
@@ -121,20 +190,65 @@ const validateField = (field, showMessage = true) => {
   return true;
 };
 
-const handleBlur = (field) => {
+const handleBlur = (field: string) => {
   touched[field] = true;
   validateField(field);
 };
 
-const handleInput = (field) => {
+const handleInput = (field: string) => {
   if (touched[field]) {
     validateField(field);
   }
 };
 
+const sanitizeDetails = () => {
+  return 明細一覧.value
+    .map((row, index) => ({
+      明細SEQ: index + 1,
+      商品ID: String(row.商品ID || '').trim(),
+      入庫数量: String(row.入庫数量 || '').trim(),
+      明細備考: String(row.明細備考 || '').trim()
+    }))
+    .filter((row) => row.商品ID || row.入庫数量 || row.明細備考);
+};
+
+const validateDetails = () => {
+  const rows = sanitizeDetails();
+  if (!rows.length) {
+    detailError.value = '明細を1件以上入力してください。';
+    return null;
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNo = i + 1;
+    if (!row.商品ID) {
+      detailError.value = `${rowNo}行目の商品を選択してください。`;
+      return null;
+    }
+    if (!row.入庫数量) {
+      detailError.value = `${rowNo}行目の入庫数量を入力してください。`;
+      return null;
+    }
+    const 数量 = toNumber(row.入庫数量);
+    if (!Number.isInteger(数量) || 数量 <= 0) {
+      detailError.value = `${rowNo}行目の入庫数量は1以上の整数を入力してください。`;
+      return null;
+    }
+  }
+
+  detailError.value = '';
+  return rows.map((row, index) => ({
+    明細SEQ: index + 1,
+    商品ID: row.商品ID,
+    入庫数量: Number(row.入庫数量),
+    明細備考: row.明細備考 || null
+  }));
+};
+
 const validateForm = () => {
   let isValid = true;
-  let firstErrorField = null;
+  let firstErrorField: string | null = null;
 
   requiredFields.value.forEach((field) => {
     touched[field] = true;
@@ -145,19 +259,33 @@ const validateForm = () => {
   });
 
   if (firstErrorField) {
-    const fieldMap = {
-      '入庫日': 'form-date',
-      '商品ID': 'form-product-id',
-      '入庫数量': 'form-quantity'
+    const fieldMap: Record<string, string> = {
+      '入庫日': 'form-date'
     };
-    const elementId = fieldMap[firstErrorField];
-    if (elementId) {
-      const element = document.getElementById(elementId);
-      if (element) element.focus();
-    }
+    const el = document.getElementById(fieldMap[firstErrorField]);
+    if (el) el.focus();
   }
 
   return isValid;
+};
+
+// ==================================================
+// 明細操作
+// ==================================================
+const addDetailRow = () => {
+  明細一覧.value.push(createEmptyDetail(明細一覧.value.length + 1));
+  detailError.value = '';
+};
+
+const removeDetailRow = (index: number) => {
+  if (明細一覧.value.length === 1) {
+    明細一覧.value = [];
+  } else {
+    明細一覧.value.splice(index, 1);
+    renumberDetails();
+  }
+  clearQuantityEditing();
+  detailError.value = '';
 };
 
 // ==================================================
@@ -166,12 +294,11 @@ const validateForm = () => {
 const loadMasterData = async () => {
   try {
     const res = await apiClient.post('/apps/M商品/一覧');
-
     if (res.data.status === 'OK') {
       const data = res.data.data;
       商品一覧.value = Array.isArray(data) ? data : data?.items ?? [];
     }
-  } catch (e) {
+  } catch (_e) {
     showMessage('マスターデータの取得でエラーが発生しました。', 'error');
   }
 };
@@ -179,8 +306,7 @@ const loadMasterData = async () => {
 // ==================================================
 // 詳細データ取得
 // ==================================================
-const loadDetail = async (id) => {
-  message.value = '';
+const loadDetail = async (id: string) => {
   try {
     const res = await apiClient.post('/apps/T商品入庫/取得', { 入庫伝票ID: String(id) });
     if (res.data.status === 'OK' && res.data.data) {
@@ -189,7 +315,7 @@ const loadDetail = async (id) => {
     } else {
       showMessage(res.data.message || '商品入庫情報の取得に失敗しました。', 'error');
     }
-  } catch (e) {
+  } catch (_e) {
     showMessage('商品入庫情報の取得でエラーが発生しました。', 'error');
   }
 };
@@ -198,7 +324,6 @@ const loadDetail = async (id) => {
 // ルーティング処理
 // ==================================================
 const applyQueryParams = async (query: any) => {
-  message.value = '';
   resetValidation();
   activeTab.value = 'content';
 
@@ -207,7 +332,6 @@ const applyQueryParams = async (query: any) => {
     detailData.value = null;
     resetForm();
 
-    // デフォルト値設定（今日の日付）
     const now = new Date();
     form.入庫日 = now.toISOString().slice(0, 10);
     const queryDate = normalizeQueryValue(query.入庫日);
@@ -215,27 +339,26 @@ const applyQueryParams = async (query: any) => {
     if (queryDate) {
       form.入庫日 = String(queryDate);
     }
-    if (queryProductId) {
-      form.商品ID = String(queryProductId);
-    }
+    明細一覧.value = [createEmptyDetail(1, queryProductId ? String(queryProductId) : '')];
     return;
   }
 
   if (query.モード === '表示' && query.入庫伝票ID) {
     mode.value = 'view';
-    await loadDetail(query.入庫伝票ID);
+    await loadDetail(String(query.入庫伝票ID));
     return;
   }
 
   if (query.入庫伝票ID) {
     mode.value = 'edit';
-    await loadDetail(query.入庫伝票ID);
+    await loadDetail(String(query.入庫伝票ID));
     return;
   }
 
   mode.value = 'create';
   detailData.value = null;
   resetForm();
+  明細一覧.value = [createEmptyDetail(1)];
 };
 
 const buildListQuery = (extra = {}) => {
@@ -246,7 +369,7 @@ const buildListQuery = (extra = {}) => {
   return Object.keys(query).length ? query : undefined;
 };
 
-const handleSuccess = (messageText) => {
+const handleSuccess = (messageText: string) => {
   if (戻URL.value) {
     router.push(toHalfwidthUrl(戻URL.value));
     return;
@@ -270,31 +393,32 @@ const handleReturn = () => {
 // CRUD操作
 // ==================================================
 const saveData = async () => {
-  message.value = '';
   if (!validateForm()) {
     showMessage('入力内容を確認してください。', 'error');
     activeTab.value = 'content';
     return;
   }
+
+  const detailPayload = validateDetails();
+  if (detailPayload === null) {
+    showMessage(detailError.value || '明細の入力内容を確認してください。', 'error');
+    activeTab.value = 'content';
+    return;
+  }
+
+  const payload = {
+    入庫日: form.入庫日,
+    入庫備考: form.入庫備考 || null,
+    有効: form.有効,
+    明細一覧: detailPayload
+  };
+
   try {
     let res;
     if (isCreateMode.value) {
-      // 新規作成時は入庫伝票IDを送らない（自動採番）
-      res = await apiClient.post('/apps/T商品入庫/登録', {
-        入庫日: form.入庫日,
-        商品ID: form.商品ID,
-        入庫数量: Number(form.入庫数量),
-        入庫備考: form.入庫備考,
-        有効: form.有効
-      });
+      res = await apiClient.post('/apps/T商品入庫/登録', payload);
     } else {
-      res = await apiClient.post('/apps/T商品入庫/変更', {
-        入庫日: form.入庫日,
-        商品ID: form.商品ID,
-        入庫数量: Number(form.入庫数量),
-        入庫備考: form.入庫備考,
-        有効: form.有効
-      }, {
+      res = await apiClient.post('/apps/T商品入庫/変更', payload, {
         params: { 入庫伝票ID: form.入庫伝票ID }
       });
     }
@@ -304,7 +428,7 @@ const saveData = async () => {
     } else {
       showMessage(res.data.message || (isCreateMode.value ? '登録に失敗しました。' : '更新に失敗しました。'), 'error');
     }
-  } catch (e) {
+  } catch (_e) {
     showMessage(isCreateMode.value ? '登録に失敗しました。' : '更新に失敗しました。', 'error');
   }
 };
@@ -322,7 +446,7 @@ const deleteData = async () => {
     } else {
       showMessage(res.data.message || '削除に失敗しました。', 'error');
     }
-  } catch (e) {
+  } catch (_e) {
     showMessage('削除に失敗しました。', 'error');
   }
 };
@@ -378,12 +502,7 @@ watch(() => route.query, async (query) => {
               <div v-if="!isCreateMode" class="detail-row row-id">
                 <div class="detail-label">入庫伝票ID</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    v-model="form.入庫伝票ID"
-                    class="detail-input id-input center-input"
-                    readonly
-                  />
+                  <input type="text" v-model="form.入庫伝票ID" class="detail-input id-input center-input" readonly />
                 </div>
               </div>
 
@@ -409,66 +528,79 @@ watch(() => route.query, async (query) => {
                 </div>
               </div>
 
-              <div class="detail-row row-select">
-                <div class="detail-label">商品<span class="required-mark">*</span></div>
-                <div class="detail-value">
-                  <div class="value-column">
-                    <div class="input-wrap">
-                      <select
-                        id="form-product-id"
-                        v-model="form.商品ID"
-                        class="detail-input select-input"
-                        :class="{ 'input-error': errors.商品ID }"
-                        :disabled="isViewMode"
-                        @blur="handleBlur('商品ID')"
-                        @change="handleInput('商品ID')"
-                      >
-                        <option value="">選択してください</option>
-                        <option v-for="item in 表示用商品一覧" :key="item.商品ID" :value="item.商品ID">
-                          {{ item.商品名 }} ({{ item.商品ID }})
-                        </option>
-                      </select>
-                      <span v-if="errors.商品ID" class="input-alert">!</span>
-                    </div>
-                    <div v-if="errors.商品ID && errors.商品ID !== 'ERROR'" class="field-error">{{ errors.商品ID }}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="detail-row row-number">
-                <div class="detail-label">入庫数量<span class="required-mark">*</span></div>
-                <div class="detail-value">
-                  <div class="value-column">
-                    <div class="input-wrap">
-                      <input
-                        id="form-quantity"
-                        type="number"
-                        v-model="form.入庫数量"
-                        class="detail-input number-input"
-                        :class="{ 'input-error': errors.入庫数量 }"
-                        :readonly="isViewMode"
-                        @blur="handleBlur('入庫数量')"
-                        @input="handleInput('入庫数量')"
-                      />
-                      <span v-if="errors.入庫数量" class="input-alert">!</span>
-                    </div>
-                    <div v-if="errors.入庫数量 && errors.入庫数量 !== 'ERROR'" class="field-error">{{ errors.入庫数量 }}</div>
-                  </div>
-                </div>
-              </div>
-
               <div class="detail-row row-remarks">
                 <div class="detail-label">入庫備考</div>
                 <div class="detail-value">
-                  <div class="input-wrap">
-                    <textarea
-                      v-model="form.入庫備考"
-                      class="detail-textarea remarks-textarea"
-                      rows="3"
-                      :readonly="isViewMode"
-                    ></textarea>
-                  </div>
+                  <textarea
+                    v-model="form.入庫備考"
+                    class="detail-textarea remarks-textarea"
+                    rows="2"
+                    :readonly="isViewMode"
+                  ></textarea>
                 </div>
+              </div>
+
+              <div class="composition-block">
+                <div class="composition-header">
+                  <div class="composition-title">入庫明細</div>
+                  <button v-if="!isViewMode" type="button" class="btn btn-add-row" @click="addDetailRow">行追加</button>
+                </div>
+
+                <div class="composition-table-wrap">
+                  <table class="composition-table">
+                    <thead>
+                      <tr>
+                        <th class="w-seq">SEQ</th>
+                        <th class="w-product">商品</th>
+                        <th class="w-qty">入庫数量</th>
+                        <th class="w-unit">単位</th>
+                        <th class="w-note">明細備考</th>
+                        <th v-if="!isViewMode" class="w-action">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-if="明細一覧.length === 0">
+                        <td :colspan="isViewMode ? 5 : 6" class="cell-center no-data">明細なし</td>
+                      </tr>
+                      <tr v-for="(row, index) in 明細一覧" :key="`detail-${index}`">
+                        <td class="cell-center">{{ row.明細SEQ }}</td>
+                        <td>
+                          <select v-model="row.商品ID" class="table-input select-cell" :disabled="isViewMode">
+                            <option value="">選択</option>
+                            <option v-for="item in 表示用商品一覧" :key="`${index}-${item.商品ID}`" :value="item.商品ID">
+                              {{ item.商品ID }}:{{ item.商品名 }}
+                            </option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            :value="isQuantityEditing(row.明細SEQ) ? row.入庫数量 : formatNumericDisplay(row.入庫数量)"
+                            type="text"
+                            inputmode="numeric"
+                            class="table-input number-cell"
+                            :readonly="isViewMode"
+                            @focus="handleQuantityFocus(row, $event)"
+                            @input="handleQuantityInput(row, $event)"
+                            @blur="handleQuantityBlur(row)"
+                          />
+                        </td>
+                        <td class="cell-center">{{ get商品(row.商品ID)?.単位 || '' }}</td>
+                        <td>
+                          <input
+                            v-model="row.明細備考"
+                            type="text"
+                            class="table-input note-cell"
+                            :readonly="isViewMode"
+                          />
+                        </td>
+                        <td v-if="!isViewMode" class="cell-center">
+                          <button type="button" class="btn btn-row-delete" @click="removeDetailRow(index)">削除</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div v-if="detailError" class="detail-error">{{ detailError }}</div>
               </div>
             </template>
 
@@ -476,10 +608,7 @@ watch(() => route.query, async (query) => {
               <div class="detail-row row-valid">
                 <div class="detail-label">有効</div>
                 <div class="detail-value">
-                  <label
-                    class="valid-checkbox-label"
-                    :class="{ 'valid-checkbox-label-disabled': isViewMode }"
-                  >
+                  <label class="valid-checkbox-label" :class="{ 'valid-checkbox-label-disabled': isViewMode }">
                     <input
                       type="checkbox"
                       v-model="form.有効"
@@ -487,86 +616,51 @@ watch(() => route.query, async (query) => {
                       class="valid-checkbox"
                       aria-label="有効の切り替え"
                     />
-                    <span
-                      class="valid-checkbox-mark"
-                      :class="{ 'valid-checkbox-inactive': !form.有効 }"
-                    >{{ form.有効 ? '✅' : '☐' }}</span>
+                    <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !form.有効 }">{{ form.有効 ? '✅' : '☐' }}</span>
                   </label>
                 </div>
               </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">登録日時</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録日時 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.登録日時 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-user">
                 <div class="detail-label">登録利用者</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録利用者名 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.登録利用者名 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-terminal">
                 <div class="detail-label">登録端末</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.登録端末ID || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.登録端末ID || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">更新日時</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新日時 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.更新日時 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-user">
                 <div class="detail-label">更新利用者</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新利用者名 || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.更新利用者名 || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
               <div class="detail-row row-terminal">
                 <div class="detail-label">更新端末</div>
                 <div class="detail-value">
-                  <input
-                    type="text"
-                    :value="detailData?.更新端末ID || ''"
-                    class="detail-input w-2x center-input"
-                    readonly
-                  />
+                  <input type="text" :value="detailData?.更新端末ID || ''" class="detail-input w-2x center-input" readonly />
                 </div>
               </div>
             </template>
           </div>
 
           <div class="form-buttons" v-if="!isViewMode">
-            <button type="submit" class="btn btn-success">
-              {{ isCreateMode ? '登録' : '更新' }}
-            </button>
+            <button type="submit" class="btn btn-success">{{ isCreateMode ? '登録' : '更新' }}</button>
             <button v-if="isEditMode" type="button" class="btn btn-danger" @click="deleteData">削除</button>
           </div>
         </form>
@@ -600,9 +694,7 @@ watch(() => route.query, async (query) => {
   align-items: center;
 }
 
-.title-text {
-  flex: 1;
-}
+.title-text { flex: 1; }
 
 .btn-return {
   margin-left: auto;
@@ -616,9 +708,7 @@ watch(() => route.query, async (query) => {
   color: #fff;
 }
 
-.btn-return:hover {
-  background-color: #c82333;
-}
+.btn-return:hover { background-color: #c82333; }
 
 .content {
   padding: 8px 20px 20px 20px;
@@ -680,15 +770,12 @@ watch(() => route.query, async (query) => {
   z-index: 1;
 }
 
-.tab-btn:hover:not(.active) {
-  background: #e9e9e9;
-}
+.tab-btn:hover:not(.active) { background: #e9e9e9; }
 
 .detail-panel {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 700px;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -702,18 +789,13 @@ watch(() => route.query, async (query) => {
   margin-top: -1px;
 }
 
-.row-remarks + .row-remarks {
-  margin-top: 0;
-}
-
 .detail-row.row-id,
 .detail-row.row-date,
-.detail-row.row-select,
-.detail-row.row-number,
 .detail-row.row-remarks,
-.detail-row.row-datetime,
+.detail-row.row-valid,
 .detail-row.row-user,
-.detail-row.row-terminal {
+.detail-row.row-terminal,
+.detail-row.row-datetime {
   width: fit-content;
 }
 
@@ -751,12 +833,11 @@ watch(() => route.query, async (query) => {
 
 .row-id .detail-value,
 .row-date .detail-value,
-.row-select .detail-value,
-.row-number .detail-value,
 .row-remarks .detail-value,
-.row-datetime .detail-value,
+.row-valid .detail-value,
 .row-user .detail-value,
-.row-terminal .detail-value {
+.row-terminal .detail-value,
+.row-datetime .detail-value {
   width: auto;
 }
 
@@ -768,11 +849,10 @@ watch(() => route.query, async (query) => {
   gap: 2px;
 }
 
-.detail-input {
-  width: 100%;
+.detail-input,
+.table-input {
   height: 28px;
   padding: 0 8px;
-  padding-right: 26px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   background: #fff;
@@ -782,55 +862,33 @@ watch(() => route.query, async (query) => {
 }
 
 .detail-input:focus,
-.detail-textarea:focus {
+.detail-textarea:focus,
+.table-input:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
 }
 
-.detail-input.input-error,
-.detail-textarea.input-error {
+.detail-input.input-error {
   border-color: #dc2626;
   background-color: #fff8f8;
 }
 
-.detail-input.input-error:focus {
-  border-color: #dc2626;
-  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.2);
-}
-
 .detail-input[readonly],
-.detail-input[disabled] {
+.detail-input[disabled],
+.table-input[readonly],
+.table-input[disabled] {
   color: #555;
   background-color: #f8f9fa;
 }
 
-.id-input {
-  width: 160px;
-  text-align: center;
-}
-
-.date-input {
-  width: 180px;
-}
-
-.select-input {
-  width: 320px;
-  padding-right: 8px;
-}
-
-.number-input {
-  width: 120px;
-  text-align: right;
-}
-
-.remarks-textarea {
-  width: 320px;
-}
+.id-input { width: 160px; text-align: center; }
+.date-input { width: 160px; text-align: center; }
+.remarks-textarea { width: 320px; }
 
 .detail-textarea {
   height: auto;
-  min-height: 60px;
+  min-height: 50px;
   padding: 4px 8px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
@@ -842,18 +900,12 @@ watch(() => route.query, async (query) => {
   font-family: inherit;
 }
 
-.center-input {
-  text-align: center;
-}
-
-.w-2x {
-  width: 320px !important;
-}
+.center-input { text-align: center; }
+.w-2x { width: 320px !important; }
 
 .input-wrap {
   position: relative;
   width: 100%;
-  margin: 0;
   display: flex;
   align-items: center;
 }
@@ -865,7 +917,6 @@ watch(() => route.query, async (query) => {
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
-  border-radius: 0;
   background: #dc2626;
   color: #fff;
   font-weight: 700;
@@ -876,12 +927,12 @@ watch(() => route.query, async (query) => {
   pointer-events: none;
 }
 
-.field-error {
+.field-error,
+.detail-error {
   font-size: 11px;
   color: #dc2626;
-  line-height: 1;
-  margin: 0;
-  padding: 0;
+  line-height: 1.3;
+  margin-top: 4px;
 }
 
 .required-mark {
@@ -889,6 +940,63 @@ watch(() => route.query, async (query) => {
   font-weight: 700;
   margin-left: 4px;
 }
+
+.composition-block {
+  margin-top: 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+}
+
+.composition-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.composition-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.composition-table-wrap {
+  overflow-x: auto;
+  position: relative;
+}
+
+.composition-table {
+  width: auto;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.composition-table th,
+.composition-table td {
+  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.composition-table th {
+  background: #37474f;
+  color: #fff;
+  font-weight: 600;
+}
+
+.w-seq { width: 50px; }
+.w-unit { width: 70px; }
+.w-note { width: 180px; }
+.w-action { width: 70px; }
+
+.cell-center { text-align: center; }
+.no-data { color: #888; padding: 16px; }
+
+.select-cell { width: 240px; }
+.number-cell { width: 110px; text-align: right; }
+.note-cell { width: 180px; }
 
 .form-buttons {
   margin-top: 8px;
@@ -908,37 +1016,30 @@ watch(() => route.query, async (query) => {
   margin: 0;
 }
 
-.btn-success {
-  background-color: #28a745;
-  color: white;
+.btn-success { background-color: #28a745; color: white; }
+.btn-success:hover { background-color: #1e7e34; }
+.btn-danger { background-color: #dc3545; color: white; }
+.btn-danger:hover { background-color: #c82333; }
+.btn-secondary { background-color: #ffffff; color: #000000; border: 1px solid #000000; }
+.btn-secondary:hover { background-color: #f2f2f2; }
+
+.btn-add-row {
+  padding: 6px 14px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
 }
 
-.btn-success:hover {
-  background-color: #1e7e34;
+.btn-add-row:hover { background: #1d4ed8; }
+
+.btn-row-delete {
+  padding: 4px 8px;
+  background: #dc3545;
+  color: #fff;
+  font-size: 12px;
 }
 
-.btn-danger {
-  background-color: #dc3545;
-  color: white;
-}
-
-.btn-danger:hover {
-  background-color: #c82333;
-}
-
-.btn-secondary {
-  background-color: #ffffff;
-  color: #000000;
-  border: 1px solid #000000;
-}
-
-.btn-secondary:hover {
-  background-color: #f2f2f2;
-}
-
-.row-valid {
-  width: fit-content;
-}
+.btn-row-delete:hover { background: #c82333; }
 
 .valid-checkbox-label {
   width: 320px;
@@ -976,46 +1077,11 @@ watch(() => route.query, async (query) => {
   color: #16a34a;
 }
 
-.valid-checkbox-inactive {
-  color: #222;
-}
-
-.valid-checkbox-label-disabled {
-  cursor: default;
-}
-
-.valid-checkbox-label:focus-within {
-  border-color: #007bff;
-  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
-}
-
-.message {
-  padding: 10px;
-  border-radius: 5px;
-  flex: 1;
-  min-width: 220px;
-}
-
-.message-success {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.message-error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
+.valid-checkbox-inactive { color: #222; }
+.valid-checkbox-label-disabled { cursor: default; }
+.valid-checkbox-label:focus-within { border-color: #007bff; }
 
 @media (max-width: 720px) {
-  .detail-panel {
-    max-width: 100%;
-    grid-template-columns: 1fr;
-    row-gap: 4px;
-    padding: 8px;
-  }
-
   .detail-row {
     display: contents;
   }
@@ -1032,6 +1098,9 @@ watch(() => route.query, async (query) => {
     justify-content: flex-start;
     border-right: none;
   }
+
+  .remarks-textarea {
+    width: 100%;
+  }
 }
 </style>
-

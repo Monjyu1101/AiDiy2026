@@ -36,6 +36,87 @@
  <code>...</code>
  </pre>
  </section>
+
+ <!-- ===== 以下 2026-04-05 追記 ===== -->
+
+ <section>
+ <h2>件数制限・論理削除チェックリスト（バックエンド）</h2>
+ <ul>
+ <li>
+  <label>
+   <input type="checkbox" />
+   V系・T系の一覧エンドポイントで <code>list_controls.py</code>（<code>append_active_condition</code> / <code>get_limit_clause</code>）を使っているか
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   M系・C系の一覧エンドポイントで Router 上部に <code>MAX_ITEMS = 10000</code> を定数定義し、クエリに <code>.limit(MAX_ITEMS)</code> を付けているか
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   <code>.all()</code> のみ（件数制限なし）になっていないか（禁止パターン）
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   <code>/削除</code> エンドポイントが <code>有効 = False</code>（論理削除）になっているか（<code>db.delete()</code> は禁止）
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   論理削除後に <code>db.refresh(item)</code> を呼んでレコードを返しているか
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   <code>/削除</code> のレスポンス <code>message</code> が「〜の有効をオフにしました」形式になっているか
+  </label>
+ </li>
+ </ul>
+ </section>
+
+ <section>
+ <h2>件数制限・無効も表示チェックリスト（フロントエンド）</h2>
+ <ul>
+ <li>
+  <label>
+   <input type="checkbox" />
+   一覧画面（一覧.vue）に「件数制限」チェックボックスがあるか（<code>v-model="件数制限"</code>）
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   一覧画面（一覧.vue）に「無効も表示」チェックボックスがあるか（<code>v-model="無効も表示"</code>）
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   一覧テーブルコンポーネントが <code>件数制限</code> / <code>無効も表示</code> を props で受け取っているか
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   一覧テーブルコンポーネントの API リクエストに <code>件数制限</code> / <code>無効も表示</code> を含めているか
+  </label>
+ </li>
+ <li>
+  <label>
+   <input type="checkbox" />
+   <code>無効も表示 = true</code> のときに「有効」列が表示されるよう <code>有効列表示 = computed(() =&gt; 無効も表示.value)</code> を使っているか
+  </label>
+ </li>
+ </ul>
+ </section>
+
  </main>
 
  <footer>AiDiy Docs / </footer>

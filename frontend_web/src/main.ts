@@ -13,11 +13,13 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
+import { installGlobalEnterAsTab } from './utils/formNavigation'
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+installGlobalEnterAsTab()
 
 app.mount('#app')
 

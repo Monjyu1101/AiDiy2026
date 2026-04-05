@@ -1,210 +1,1119 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AiDiy | X自己紹介</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap');
-    :root{--bg:#071018;--panel:rgba(10,21,35,.78);--line:rgba(144,192,227,.16);--text:#eef7ff;--muted:#90a8bf;--cyan:#64e6ff;--amber:#ffb95a;--mint:#91ffcb;--peach:#ff7a59;--w:min(1220px,calc(100vw - 24px))}
-    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;font-family:'Zen Kaku Gothic New',sans-serif;color:var(--text);line-height:1.7;background:radial-gradient(circle at 20% 15%,rgba(255,185,90,.18),transparent 24%),radial-gradient(circle at 80% 18%,rgba(100,230,255,.15),transparent 25%),linear-gradient(180deg,#071018 0%,#091624 42%,#060d14 100%);overflow-x:hidden}
-    a{color:inherit;text-decoration:none} #bg,#grid,.glow{position:fixed;inset:0;pointer-events:none} #bg{z-index:-3} #grid{z-index:-2;background-image:linear-gradient(rgba(144,192,227,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(144,192,227,.04) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(180deg,#000,transparent 86%)} .glow{z-index:-1;filter:blur(48px);opacity:.6;background:radial-gradient(circle at 28% 28%,rgba(100,230,255,.22),transparent 34%),radial-gradient(circle at 72% 35%,rgba(255,122,89,.18),transparent 34%),radial-gradient(circle at 55% 78%,rgba(145,255,203,.12),transparent 30%);animation:float 18s ease-in-out infinite alternate}
-    .cursor{position:fixed;width:280px;height:280px;margin:-140px 0 0 -140px;border-radius:50%;background:radial-gradient(circle,rgba(100,230,255,.14),transparent 68%);filter:blur(18px);opacity:0;pointer-events:none;z-index:2;transition:opacity .2s ease}
-    .progress{position:fixed;left:0;top:0;width:100%;height:4px;background:rgba(255,255,255,.04);z-index:30}.progress>span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--cyan),var(--mint));box-shadow:0 0 18px rgba(100,230,255,.38)}
-    .shell{width:var(--w);margin:0 auto;padding:28px 0 120px}.hero{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:center;padding:24px 0 38px}.chip{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);font:700 12px/1 'Sora',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)} .chip::before{content:'';width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--amber),var(--peach));box-shadow:0 0 18px rgba(255,185,90,.8)}
-    h1,h2,h3{margin:0;font-family:'Sora',sans-serif;letter-spacing:-.04em}.hero h1{margin-top:18px;font-size:clamp(3rem,7vw,6rem);line-height:.98}.hero h1 .accent{display:block;background:linear-gradient(90deg,#fff7e5 0%,#ffd9a0 22%,#64e6ff 78%,#b9ffe3 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text} .lead{max-width:720px;margin:18px 0 0;color:rgba(238,247,255,.84);font-size:1.05rem}
-    .actions,.tags,.cta-actions,.stats,.cards,.stack,.samples,.advanced{display:flex;gap:14px;flex-wrap:wrap}.actions{margin-top:26px}.btn{position:relative;display:inline-flex;justify-content:center;align-items:center;padding:14px 22px;border-radius:999px;border:1px solid transparent;overflow:hidden;transition:transform .2s ease}.btn::before{content:'';position:absolute;inset:0;transform:translateX(-110%);background:linear-gradient(120deg,transparent,rgba(255,255,255,.28),transparent);transition:transform .55s ease}.btn:hover::before{transform:translateX(110%)} .btn:hover{transform:translateY(-2px)} .btn.primary{background:linear-gradient(135deg,rgba(255,185,90,.94),rgba(255,122,89,.94));color:#102030;box-shadow:0 18px 42px rgba(255,122,89,.24)} .btn.ghost{background:rgba(255,255,255,.03);border-color:rgba(144,192,227,.24)}
-    .tags{margin-top:22px}.tags span,.meta span{padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(144,192,227,.14);font-size:.82rem;color:rgba(238,247,255,.8)}
-    .panel,.metric,.card,.sample,.side,.cta{position:relative;border-radius:28px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(11,24,38,.82),rgba(7,16,24,.92));box-shadow:0 24px 80px rgba(0,0,0,.35);overflow:hidden;backdrop-filter:blur(14px)} .panel::before,.metric::before,.card::before,.sample::before,.side::before,.cta::before{content:'';position:absolute;inset:0;background:linear-gradient(125deg,rgba(255,255,255,.08),transparent 34%,transparent 68%,rgba(255,255,255,.03));pointer-events:none}
-    .stats{margin-top:26px}.metric{padding:18px 20px;flex:1 1 180px}.metric strong{display:block;font:800 1.65rem/1 'Sora',sans-serif;color:#fff7e5}.metric span{display:block;margin-top:6px;color:var(--muted);font-size:.88rem}
-    .hero-side{display:grid;gap:18px}.panel{padding:24px}.head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}.label{font:600 .82rem/1 'Sora',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)} .status{padding:7px 11px;border-radius:999px;border:1px solid rgba(145,255,203,.2);color:var(--mint);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase}
-    #signal{min-height:86px;font:700 clamp(1.35rem,2.3vw,2rem)/1.35 'Sora',sans-serif;color:#fff7e5}.sub{margin:8px 0 0;color:var(--muted)} .stack{margin-top:16px}.stack .side{padding:16px 18px;flex:1 1 180px}.stack small{display:block;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)} .stack strong{display:block;margin-top:6px;font-size:1rem}
-    .orbital{min-height:360px;display:grid;place-items:center}.ringbox{position:relative;width:min(100%,380px);aspect-ratio:1;display:grid;place-items:center}.ring,.core,.orb{position:absolute;border-radius:50%}.ring{border:1px solid rgba(144,192,227,.18);box-shadow:inset 0 0 28px rgba(100,230,255,.05)} .r1{inset:10%;animation:spin 28s linear infinite}.r2{inset:23%;border-style:dashed;animation:spinr 24s linear infinite}.r3{inset:36%;animation:spin 18s linear infinite}.core{position:relative;width:150px;height:150px;display:grid;place-items:center;background:radial-gradient(circle at 35% 35%,rgba(255,247,229,.96),rgba(255,185,90,.72) 36%,rgba(100,230,255,.22) 68%,rgba(9,18,31,.5) 100%);box-shadow:0 0 80px rgba(255,185,90,.28),inset 0 0 18px rgba(255,255,255,.28);color:#071018;font:800 2rem/1 'Sora',sans-serif}
-    .orb{padding:9px 13px;border-radius:999px;background:rgba(7,16,24,.8);border:1px solid rgba(144,192,227,.2);font-size:.84rem;box-shadow:0 10px 26px rgba(0,0,0,.28)} .o1{top:5%;left:50%;transform:translateX(-50%)} .o2{right:5%;top:50%;transform:translateY(-50%)} .o3{bottom:7%;left:49%;transform:translateX(-50%)} .o4{left:5%;top:50%;transform:translateY(-50%)} .o5{top:18%;left:18%} .o6{bottom:18%;right:16%}
-    section{padding:34px 0}.section-head{margin-bottom:22px}.eyebrow2{color:var(--amber);font-size:.82rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}.section-head h2{margin-top:8px;font-size:clamp(2rem,4vw,3.5rem);line-height:1.05}.section-head p{max-width:780px;margin:12px 0 0;color:var(--muted)}
-    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.card{padding:22px}.icon{width:54px;height:54px;display:grid;place-items:center;margin-bottom:16px;border-radius:18px;background:linear-gradient(135deg,rgba(100,230,255,.16),rgba(255,185,90,.12));border:1px solid rgba(144,192,227,.18);font-size:1.35rem}.card p,.sample p,.side p{margin:10px 0 0;color:var(--muted)}
-    .numbers{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}.numbers .card strong{display:block;font:800 clamp(2rem,3vw,2.6rem)/1 'Sora',sans-serif;color:#fff7e5}.numbers .card span{display:block;margin-top:10px;color:var(--muted);font-size:.88rem}
-    .lang{margin-top:18px}.lang .snips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}.lang .side pre{margin:10px 0 0;white-space:pre-wrap;font:600 .88rem/1.7 'Sora',sans-serif;color:rgba(238,247,255,.86)}
-    .cards2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.flow{margin-top:18px}.flow .cards2{grid-template-columns:repeat(4,minmax(0,1fr))}.flow .side{position:relative}.flow .side::after{content:'→';position:absolute;right:-11px;top:50%;transform:translateY(-50%);color:var(--amber);font-size:1.15rem}.flow .side:last-child::after{display:none}
-    .samples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.sample{padding:22px}.advanced{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:18px}.feed{margin-top:18px;display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.feed ul{margin:0;padding:0;list-style:none;display:grid;gap:12px}.feed li{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(144,192,227,.12)} .time{font:600 .82rem/1 'Sora',sans-serif;color:var(--amber)} .copy{color:rgba(238,247,255,.86)} .bars{height:108px;display:flex;align-items:flex-end;gap:8px;margin-top:18px}.bars span{flex:1;border-radius:999px 999px 8px 8px;background:linear-gradient(180deg,var(--mint),var(--cyan) 52%,rgba(100,230,255,.24));animation:eq 1.4s ease-in-out infinite;transform-origin:bottom}.bars span:nth-child(2){animation-delay:.12s}.bars span:nth-child(3){animation-delay:.24s}.bars span:nth-child(4){animation-delay:.36s}.bars span:nth-child(5){animation-delay:.48s}.bars span:nth-child(6){animation-delay:.6s}.bars span:nth-child(7){animation-delay:.72s}.bars span:nth-child(8){animation-delay:.84s}
-    .cta{text-align:center;padding:30px}.cta p{max-width:760px;margin:12px auto 0;color:var(--muted)} .reveal{opacity:0;transform:translateY(32px) scale(.985);transition:opacity .7s ease,transform .7s ease}.reveal.on{opacity:1;transform:none}
-    @keyframes float{0%{transform:translate3d(-2%,-1%,0) scale(1)}50%{transform:translate3d(2%,1%,0) scale(1.05)}100%{transform:translate3d(1%,-2%,0) scale(.98)}} @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}} @keyframes spinr{from{transform:rotate(360deg)}to{transform:rotate(0)}} @keyframes eq{0%,100%{transform:scaleY(.25);opacity:.45}50%{transform:scaleY(1);opacity:1}}
-    @media (max-width:1180px){.hero{grid-template-columns:1fr;min-height:auto;padding-top:52px}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.numbers{grid-template-columns:repeat(3,minmax(0,1fr))}.cards2,.advanced,.feed,.lang .snips{grid-template-columns:1fr}.flow .cards2{grid-template-columns:repeat(2,minmax(0,1fr))}.flow .side::after{display:none}.samples{grid-template-columns:1fr}}
-    @media (max-width:720px){:root{--w:calc(100vw - 20px)}.shell{padding-bottom:96px}.actions,.tags,.cta-actions{flex-direction:column}.btn{width:100%}.hero-panel,.cards,.numbers,.flow .cards2,.lang .snips{grid-template-columns:1fr}.stack,.signal-grid{flex-direction:column}.orbital{min-height:300px}.core{width:126px;height:126px;font-size:1.6rem}.orb{font-size:.75rem;padding:8px 10px}}
-    @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.reveal{opacity:1;transform:none}}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AiDiy - 日本語ファースト AI開発プラットフォーム</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', 'Orbitron', sans-serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* アニメーション背景（静的ベース） */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(0, 255, 255, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 40% 60%, rgba(255, 255, 0, 0.04) 0%, transparent 45%),
+                linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #0a0a0a 100%);
+            z-index: -1;
+            transform: translateZ(0);
+        }
+
+        /* ヒーローセクション */
+        .hero-section {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* タイトル合体アセンブリ */
+        .hero-title-assembly {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 1.15em;
+            margin-bottom: 10px;
+        }
+
+        .title-half {
+            font-family: 'Orbitron', monospace;
+            font-size: 4.5rem;
+            font-weight: 900;
+            display: inline-block;
+            line-height: 1;
+        }
+
+        .title-left {
+            color: #00ffff;
+            text-shadow: 0 0 20px rgba(0,255,255,.9), 0 0 50px rgba(0,255,255,.5);
+            animation: slideInLeft 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+        }
+
+        .title-right {
+            color: #ff00ff;
+            text-shadow: 0 0 20px rgba(255,0,255,.9), 0 0 50px rgba(255,0,255,.5);
+            animation: slideInRight 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+        }
+
+        @keyframes slideInLeft {
+            from { opacity: 1; transform: translateX(-65vw); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInRight {
+            from { opacity: 1; transform: translateX(65vw); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .title-half.merging {
+            animation: mergeFade 0.35s ease-in forwards !important;
+        }
+        @keyframes mergeFade {
+            0%   { opacity: 1; transform: scale(1);    filter: brightness(1); }
+            40%  { opacity: 1; transform: scale(1.15); filter: brightness(6); }
+            100% { opacity: 0; transform: scale(1.3);  filter: brightness(8); }
+        }
+
+        /* 衝撃フラッシュリング */
+        .title-flash {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            opacity: 0;
+        }
+        .title-flash.active {
+            animation: flashBurst 0.55s ease-out forwards;
+        }
+        @keyframes flashBurst {
+            0%  { width: 0;    height: 0;    opacity: 1;
+                  box-shadow: 0 0 0 0 rgba(255,255,255,.9); }
+            40% { width: 280px; height: 280px; opacity: .9;
+                  box-shadow: 0 0 60px 30px rgba(0,255,255,.55),
+                              0 0 120px 60px rgba(255,0,255,.3); }
+            100%{ width: 600px; height: 600px; opacity: 0;
+                  box-shadow: 0 0 0 0 transparent; }
+        }
+
+        /* 最終タイトル */
+        .hero-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 4.5rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff, #ffff00, #00ffff);
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            opacity: 0;
+        }
+
+        .hero-title.revealed {
+            animation: titleReveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+
+        @keyframes titleReveal {
+            0%   { opacity: 0; transform: scale(0.5);  filter: blur(6px) brightness(5); }
+            60%  { opacity: 1; transform: scale(1.08); filter: blur(0)   brightness(1.5); }
+            100% { opacity: 1; transform: scale(1);    filter: blur(0)   brightness(1); }
+        }
+
+        .hero-subtitle {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.5rem;
+            color: #00ffff;
+            margin-bottom: 10px;
+            opacity: 0;
+            animation: fadeInUp 1.6s ease 2.2s forwards;
+        }
+
+        .hero-description {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin-bottom: 15px;
+            opacity: 0;
+            animation: fadeInUp 1.6s ease 2.6s forwards;
+            line-height: 1.8;
+        }
+
+        /* ヒーロー アクションボタン */
+        .hero-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 15px;
+            opacity: 0;
+            animation: fadeInUp 1.6s ease 2.9s forwards;
+        }
+
+        /* ヒーロータグ */
+        .hero-tags {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: fadeInUp 1.6s ease 3.1s forwards;
+        }
+        .hero-tags span {
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.25);
+            font-size: 0.82rem;
+            color: rgba(200, 240, 255, 0.85);
+        }
+
+        .typing-text {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.1rem;
+            color: #ffff00;
+            border-right: 2px solid #ffff00;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* セクション共通 */
+        .section {
+            padding: 50px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .section-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff);
+            border-radius: 2px;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: #99b8cc;
+            font-size: 1rem;
+            margin-top: -15px;
+            margin-bottom: 25px;
+        }
+
+        /* コア機能カード */
+        .core-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(265px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 20px 15px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            will-change: transform, border-color, box-shadow;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .feature-card:hover::before { left: 100%; }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: #00ffff;
+            box-shadow: 0 20px 40px rgba(0, 255, 255, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .feature-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.3rem;
+            color: #00ffff;
+            margin-bottom: 10px;
+        }
+
+        .feature-description {
+            color: #ccc;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        /* 技術統計 */
+        .tech-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            background: rgba(0, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+
+        .stat-number {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #ffff00;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #00ffff;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .stat-sub {
+            display: block;
+            color: #888;
+            font-size: 0.75rem;
+            margin-top: 4px;
+        }
+
+        /* アーキテクチャ */
+        .architecture-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .architecture-item {
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.1), rgba(0, 255, 255, 0.1));
+            border: 1px solid rgba(255, 0, 255, 0.3);
+            border-radius: 12px;
+            padding: 18px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .architecture-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, #ff00ff, #00ffff);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .architecture-item:hover::after { transform: scaleY(1); }
+
+        .architecture-item:hover {
+            transform: translateX(10px);
+            border-color: #ff00ff;
+        }
+
+        .architecture-title {
+            font-family: 'Orbitron', monospace;
+            color: #ff00ff;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .architecture-item p { color: #ccc; font-size: 0.9rem; }
+
+        /* コードブロック（Naming セクション用） */
+        .architecture-item pre {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.45);
+            border-radius: 8px;
+            border-left: 2px solid #00ffff;
+            font-size: 0.82rem;
+            color: #aaf0ff;
+            white-space: pre-wrap;
+            line-height: 1.7;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .architecture-item .meta-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        .architecture-item .meta-tags span {
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(0, 255, 255, 0.08);
+            border: 1px solid rgba(0, 255, 255, 0.25);
+            font-size: 0.75rem;
+            color: #00ffff;
+        }
+
+        /* 拡張性セクション */
+        .expansion-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .expansion-item {
+            background: rgba(255, 255, 0, 0.05);
+            border: 1px solid rgba(255, 255, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .expansion-item::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(255, 255, 0, 0.1), transparent);
+            border-radius: 50%;
+            transition: all 0.5s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .expansion-item:hover::before { width: 200px; height: 200px; }
+        .expansion-item:hover { border-color: #ffff00; transform: scale(1.05); }
+
+        /* ビジネスサンプル */
+        .sample-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .sample-item {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05), rgba(255, 0, 255, 0.05));
+            border: 1px solid rgba(0, 255, 255, 0.25);
+            border-radius: 14px;
+            padding: 22px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            transform: translateY(50px);
+            opacity: 0;
+            will-change: transform, opacity, border-color, box-shadow;
+        }
+
+        .sample-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.07), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .sample-item:hover::before { left: 100%; }
+
+        .sample-item:hover {
+            transform: translateY(-6px);
+            border-color: #00ffff;
+            box-shadow: 0 16px 36px rgba(0, 255, 255, 0.15);
+        }
+
+        .sample-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.1rem;
+            color: #00ffff;
+            margin-bottom: 10px;
+        }
+
+        .sample-item p { color: #bbb; font-size: 0.9rem; line-height: 1.6; }
+
+        .sample-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        .sample-tag {
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(255, 0, 255, 0.08);
+            border: 1px solid rgba(255, 0, 255, 0.3);
+            font-size: 0.74rem;
+            color: #ff88ff;
+        }
+
+        /* Advanced Layer */
+        .advanced-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 1280px) {
+            .hero-title { font-size: 3.5rem; }
+            .title-half { font-size: 3.5rem; }
+            .hero-subtitle { font-size: 1.2rem; }
+            .hero-description { font-size: 1rem; }
+            .hero-section { height: auto; padding: 100px 20px; }
+            .section { padding: 30px 15px; }
+            .section-title { font-size: 2rem; }
+            .core-features { grid-template-columns: repeat(2, 1fr); }
+            .advanced-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 720px) {
+            .hero-tags, .hero-actions { flex-direction: column; align-items: center; }
+            .sample-grid { grid-template-columns: 1fr; }
+        }
+
+        /* スクロールアニメーション用 */
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 0.8s ease;
+            will-change: transform, opacity;
+        }
+
+        .animate-on-scroll.animated {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* サイバーボタン */
+        .cyber-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: transparent;
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            will-change: transform, background-color, box-shadow;
+        }
+
+        .cyber-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            transition: left 0.5s ease;
+        }
+
+        .cyber-button:hover::before { left: 100%; }
+
+        .cyber-button:hover {
+            color: #000;
+            background: #00ffff;
+            box-shadow: 0 0 30px #00ffff;
+        }
+
+        .cyber-button-ghost {
+            display: inline-block;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            color: #aaddee;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .cyber-button-ghost:hover {
+            border-color: #00ffff;
+            color: #00ffff;
+        }
+
+        .rainbow-blink {
+            border-color: #00ffff;
+            box-shadow: 0 0 20px #00ffff;
+            color: #00ffff;
+        }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.179.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.0/examples/jsm/",
+            "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.4.2/lib/three-vrm.module.js",
+            "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.4.2/lib/three-vrm-animation.module.js"
+        }
+    }
+    </script>
 </head>
 <body>
-  <div class="progress"><span id="progress"></span></div>
-  <div id="cursor" class="cursor"></div>
-  <canvas id="bg"></canvas>
-  <div class="glow"></div>
-  <div id="grid"></div>
+    <!-- パーティクル背景 -->
+    <div class="animated-bg"></div>
 
-  <main class="shell">
-    <section class="hero">
-      <div>
-        <div class="chip reveal">AI Do-It-Yourself / X自己紹介</div>
-        <h1 class="reveal"><span class="accent">日本語で設計し、</span><span>音声でもコードでも動かす。</span></h1>
-        <p class="lead reveal">AiDiy は、日本語を第一言語にしたフルスタック業務システム開発フレームワークです。FastAPI デュアルサーバー、Vue 3 Web UI、Electron/Web デュアルモードのアバター、そして WebSocket ベースの AI コアを一体で扱えます。</p>
-        <div class="actions reveal">
-          <a href="/AiDiy" target="_parent" class="btn primary">AiDiyを開く</a>
-          <a href="#業務サンプル" class="btn ghost">業務サンプルを見る</a>
+    <!-- ヒーローセクション -->
+    <section class="hero-section">
+        <!-- タイトル合体アニメーション -->
+        <div class="hero-title-assembly" id="hero-title-assembly">
+            <span class="title-half title-left"  id="title-left">AI</span>
+            <span class="title-half title-right" id="title-right">DIY</span>
+            <div class="title-flash" id="title-flash"></div>
         </div>
-        <div class="tags reveal">
-          <span>日本語テーブル名 / API / JSON / 画面</span>
-          <span>FastAPI 8091 + 8092</span>
-          <span>Vue 3 + Vite + TypeScript</span>
-          <span>Electron + VRM + 音声AI</span>
+        <h1 class="hero-title" id="hero-title-final">AiDiy</h1>
+        <h2 class="hero-subtitle">日本語で設計し、音声でもコードでも動かす。</h2>
+        <p class="hero-description">
+            日本語を第一言語にしたフルスタック業務システム開発フレームワーク。<br>
+            FastAPI デュアルサーバー、Vue 3 Web UI、Electron/Web デュアルモードのアバター、<br>
+            WebSocket ベースの AI コアを一体で扱えます。
+        </p>
+        <div class="hero-actions">
+            <a href="/AiDiy" class="cyber-button" target="_parent">AiDiy を開く</a>
+            <a href="#業務サンプル" class="cyber-button-ghost">業務サンプルを見る</a>
         </div>
-        <div class="stats reveal">
-          <div class="metric" data-tilt><strong>2</strong><span>独立した FastAPI サーバー</span></div>
-          <div class="metric" data-tilt><strong>3</strong><span>Claude / OpenAI / Gemini</span></div>
-          <div class="metric" data-tilt><strong>7</strong><span>C / M / T / V / S / A / X 系統</span></div>
+        <div class="hero-tags">
+            <span>日本語テーブル名 / API / JSON / 画面</span>
+            <span>FastAPI 8091 + 8092</span>
+            <span>Vue 3 + Vite + TypeScript</span>
+            <span>Electron + VRM + 音声AI</span>
         </div>
-      </div>
-
-      <div class="hero-side">
-        <article class="panel reveal" data-tilt>
-          <div class="head"><span class="label">Live Signal</span><span class="status">AGENTS.md Synced</span></div>
-          <div id="signal">最新実装を読込中...</div>
-          <p class="sub">いまの AiDiy が何を備えているかを、そのまま見せる紹介ページです。</p>
-          <div class="stack">
-            <div class="side"><small>frontend_web</small><strong>日本語 URL / qTubler / CRUD UI</strong></div>
-            <div class="side"><small>frontend_avatar</small><strong>Electron / Web デュアルモード</strong></div>
-            <div class="side"><small>AI core</small><strong>音声・画像・コードパネル統合</strong></div>
-            <div class="side"><small>backend</small><strong>SQLite / SQLAlchemy / C採番 / Reboot</strong></div>
-          </div>
-        </article>
-
-        <article class="panel orbital reveal" data-tilt>
-          <div class="ringbox">
-            <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
-            <div class="core">AiDiy</div>
-            <div class="orb o1">Voice</div><div class="orb o2">VRM</div><div class="orb o3">Web UI</div>
-            <div class="orb o4">FastAPI</div><div class="orb o5">SQLite</div><div class="orb o6">Agent x4</div>
-          </div>
-        </article>
-      </div>
+        <div class="typing-text" id="typing-text"></div>
     </section>
 
-    <section id="全体像">
-      <div class="section-head reveal">
-        <div class="eyebrow2">Project Core</div>
-        <h2>AiDiy の輪郭は、業務実装と AI 実装を同じ土台に置くこと。</h2>
-        <p>権限管理やマスタ管理のような実務寄りの基盤から、音声対話、VRM アバター、コード支援まで、ひとつの流れで試せるように全体を組んでいます。</p>
-      </div>
-      <div class="cards">
-        <article class="card reveal" data-tilt><div class="icon">日</div><h3>日本語ファースト</h3><p>テーブル名、API、JSON キー、Vue コンポーネントまで日本語でそろえます。</p></article>
-        <article class="card reveal" data-tilt><div class="icon">双</div><h3>デュアルサーバー</h3><p>`core_main.py` と `apps_main.py` を分離し、AI 系と業務系を明確に分けます。</p></article>
-        <article class="card reveal" data-tilt><div class="icon">実</div><h3>実務サンプル同梱</h3><p>配車、生産、在庫の実装例が、そのままテンプレートになります。</p></article>
-        <article class="card reveal" data-tilt><div class="icon">AI</div><h3>AI コア統合</h3><p>チャット、画像、音声、コード支援、WebSocket をひとつの体験へまとめます。</p></article>
-      </div>
+    <!-- Project Core -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Project Core</h2>
+        <p class="section-subtitle animate-on-scroll">業務実装と AI 実装を同じ土台に置く。</p>
+        <div class="core-features">
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🇯🇵</span>
+                <h3 class="feature-title">日本語ファースト</h3>
+                <p class="feature-description">
+                    テーブル名、API エンドポイント、JSON キー、<br>
+                    Vue コンポーネントまで日本語でそろえます。<br>
+                    ビジネスドメインとコードの完全一致。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🖥️</span>
+                <h3 class="feature-title">デュアルサーバー</h3>
+                <p class="feature-description">
+                    core_main.py と apps_main.py を分離し、<br>
+                    AI 系と業務系を明確に切り分けます。<br>
+                    Vite Proxy で /core と /apps を自動振り分け。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">📦</span>
+                <h3 class="feature-title">実務サンプル同梱</h3>
+                <p class="feature-description">
+                    配車・生産・在庫管理の実装例が、<br>
+                    そのままテンプレートになります。<br>
+                    明細型マスタ・トランザクションも完備。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🤖</span>
+                <h3 class="feature-title">AI コア統合</h3>
+                <p class="feature-description">
+                    チャット・画像・音声・4 画面コード支援を<br>
+                    WebSocket でひとつの体験へまとめます。<br>
+                    Claude / OpenAI / Gemini マルチベンダー対応。
+                </p>
+            </div>
+        </div>
     </section>
 
-    <section>
-      <div class="section-head reveal">
-        <div class="eyebrow2">Current Numbers</div>
-        <h2>AGENTS.md の内容を、そのまま視覚化。</h2>
-      </div>
-      <div class="numbers">
-        <article class="card reveal" data-tilt><strong data-count="2">0</strong><span>API サーバー<br>core 8091 / apps 8092</span></article>
-        <article class="card reveal" data-tilt><strong data-count="3">0</strong><span>AI ベンダー<br>Claude / OpenAI / Gemini</span></article>
-        <article class="card reveal" data-tilt><strong data-count="7">0</strong><span>分類系統<br>C / M / T / V / S / A / X</span></article>
-        <article class="card reveal" data-tilt><strong data-count="4">0</strong><span>コードパネル<br>code1 から code4</span></article>
-        <article class="card reveal" data-tilt><strong data-count="2">0</strong><span>アバター動作モード<br>Electron / Web</span></article>
-        <article class="card reveal" data-tilt><strong data-count="60">0</strong><span>JWT 分<br>認証有効期限</span></article>
-      </div>
-      <article class="panel lang reveal" data-tilt>
-        <div class="head"><span class="label">Japanese Naming</span><span class="status">Business Domain Match</span></div>
-        <h3>DB から API、UI まで名前をズラさない。</h3>
-        <div class="snips">
-          <div class="side"><small>Database</small><pre>Table: C利用者
+    <!-- Current Numbers -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Current Numbers</h2>
+        <p class="section-subtitle animate-on-scroll">AGENTS.md の内容を、そのまま視覚化。</p>
+        <div class="tech-stats">
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="2">0</span>
+                <span class="stat-label">API サーバー</span>
+                <span class="stat-sub">core 8091 / apps 8092</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="3">0</span>
+                <span class="stat-label">AI ベンダー</span>
+                <span class="stat-sub">Claude / OpenAI / Gemini</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="7">0</span>
+                <span class="stat-label">分類系統</span>
+                <span class="stat-sub">C / M / T / V / S / A / X</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="4">0</span>
+                <span class="stat-label">コードパネル</span>
+                <span class="stat-sub">code1 から code4</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="2">0</span>
+                <span class="stat-label">アバターモード</span>
+                <span class="stat-sub">Electron / Web</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="60">0</span>
+                <span class="stat-label">JWT 分</span>
+                <span class="stat-sub">認証有効期限</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Japanese Naming -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Japanese Naming</h2>
+        <p class="section-subtitle animate-on-scroll">DB から API、UI まで名前をズラさない。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🗄️ Database</h3>
+                <p>テーブル名・カラム名まで日本語で統一。ビジネス用語とコードの乖離をゼロにします。</p>
+                <pre>Table:  C利用者
 Column: 利用者ID
-Column: 登録日時</pre></div>
-          <div class="side"><small>API</small><pre>POST /core/利用者/一覧
-{ "利用者ID": "admin" }</pre></div>
-          <div class="side"><small>Frontend</small><pre>Route: /C管理/C利用者/一覧
-Component: C利用者一覧.vue
-JSON key: 利用者名</pre></div>
+Column: 登録日時
+Column: 更新利用者名</pre>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">⚡ API</h3>
+                <p>エンドポイント・JSON キーも日本語。POST 中心の統一 API 設計で一貫性を保ちます。</p>
+                <pre>POST /core/利用者/一覧
+POST /apps/商品/登録
+
+{ "利用者ID": "admin",
+  "権限ID":   "1" }</pre>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎨 Frontend</h3>
+                <p>Vue ルート・コンポーネントファイル名も日本語。ファイル名は日本語 OK、タグは ASCII で動的参照。</p>
+                <pre>Route: /C管理/C利用者/一覧
+File:  C利用者一覧.vue
+Key:   利用者名</pre>
+            </div>
         </div>
-      </article>
     </section>
 
-    <section>
-      <div class="section-head reveal">
-        <div class="eyebrow2">Architecture</div>
-        <h2>構成は分かれていても、体験はひとつに寄せる。</h2>
-      </div>
-      <div class="cards2">
-        <article class="card reveal" data-tilt><h3>backend_server</h3><p>FastAPI + SQLAlchemy + SQLite。POST 中心 API、統一レスポンス、C採番、監査フィールド、Reboot 機構を標準装備。</p><div class="meta"><span>core_main.py</span><span>apps_main.py</span><span>No Alembic</span></div></article>
-        <article class="card reveal" data-tilt><h3>frontend_web</h3><p>Vue 3 + Vite + TypeScript。日本語ルーティング、qTubler、共通ダイアログ、CRUD パターンを維持します。</p><div class="meta"><span>Vue Router</span><span>Pinia</span><span>qTubler</span></div></article>
-        <article class="card reveal" data-tilt><h3>frontend_avatar</h3><p>Electron と通常ブラウザの両対応。BroadcastChannel で状態同期し、AI コアをマルチパネルで扱います。</p><div class="meta"><span>Electron</span><span>Web Mode</span><span>BroadcastChannel</span></div></article>
-        <article class="card reveal" data-tilt><h3>AI Voice + Avatar</h3><p>Gemini Live / OpenAI Realtime と VRM / VRMA の 3D 表示を接続し、口パクと音声再生を同期します。</p><div class="meta"><span>16kHz Input</span><span>24kHz Output</span><span>Three.js + VRM</span></div></article>
-      </div>
-      <article class="panel flow reveal" data-tilt>
-        <div class="head"><span class="label">AI Flow</span><span class="status">Realtime</span></div>
-        <div class="cards2">
-          <div class="side"><h3>Input</h3><p>マイク、テキスト、画像、コード操作</p></div>
-          <div class="side"><h3>Transport</h3><p>REST + WebSocket + Vite Proxy</p></div>
-          <div class="side"><h3>AI Core</h3><p>Claude / GPT / Gemini を用途ごとに切替</p></div>
-          <div class="side"><h3>Output</h3><p>チャット、音声応答、コード表示、アバター演出</p></div>
+    <!-- Architecture -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Architecture</h2>
+        <p class="section-subtitle animate-on-scroll">構成は分かれていても、体験はひとつに寄せる。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🗄️ backend_server</h3>
+                <p>FastAPI + SQLAlchemy + SQLite。POST 中心 API、統一レスポンス形式、C採番、監査フィールド、Reboot 機構を標準装備。Alembic 不使用。</p>
+                <div class="meta-tags"><span>core_main.py</span><span>apps_main.py</span><span>No Alembic</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🌐 frontend_web</h3>
+                <p>Vue 3 + Vite + TypeScript + Pinia。日本語ルーティング、qTubler カスタムテーブル、共通ダイアログ。CRUD 画面パターンで実装を統一。</p>
+                <div class="meta-tags"><span>Vue Router</span><span>Pinia</span><span>qTubler</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">📱 frontend_avatar</h3>
+                <p>Electron と通常ブラウザの両対応。BroadcastChannel で状態同期し、AI コアをマルチパネルで扱います。window.desktopApi でモード判定。</p>
+                <div class="meta-tags"><span>Electron</span><span>Web Mode</span><span>BroadcastChannel</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎙️ AI Voice + Avatar</h3>
+                <p>Gemini Live / OpenAI Realtime と VRM / VRMA の 3D 表示を接続。16kHz 入力・24kHz 出力のリアルタイムパイプラインで口パクと音声再生を同期。</p>
+                <div class="meta-tags"><span>16kHz Input</span><span>24kHz Output</span><span>Three.js + VRM</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔁 AI Flow</h3>
+                <p>マイク・テキスト・画像・コード操作 → REST + WebSocket + Vite Proxy → Claude / GPT / Gemini を用途ごとに切替 → チャット・音声応答・コード表示・アバター演出。</p>
+                <div class="meta-tags"><span>Input</span><span>Transport</span><span>AI Core</span><span>Output</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔒 認証 + 採番</h3>
+                <p>JWT 認証（HS256・60分）を Pinia + Axios interceptor で自動管理。C採番テーブルで AUTOINCREMENT 不使用のカスタム ID を一元管理。</p>
+                <div class="meta-tags"><span>JWT / HS256</span><span>C採番</span><span>監査フィールド</span></div>
+            </div>
         </div>
-      </article>
     </section>
 
-    <section id="業務サンプル">
-      <div class="section-head reveal">
-        <div class="eyebrow2">Business Samples</div>
-        <h2>テンプレートの核は、ちゃんと動く業務システムにあります。</h2>
-      </div>
-      <div class="samples">
-        <article class="sample reveal" data-tilt><h3>配車管理システム</h3><p>配車区分と車両マスタを基に、日次の配車計画と週・日スケジュール表示を実現します。</p><div class="meta"><span>M配車区分</span><span>M車両</span><span>T配車</span><span>S配車_週表示</span></div></article>
-        <article class="sample reveal" data-tilt><h3>生産管理システム</h3><p>商品構成 BOM と生産指示を、明細型マスタ / 明細型トランザクションとして一体管理します。</p><div class="meta"><span>M商品構成</span><span>T生産</span><span>V生産</span><span>S生産_日表示</span></div></article>
-        <article class="sample reveal" data-tilt><h3>資材在庫管理システム</h3><p>入庫・出庫・棚卸を記録し、V商品推移表で期間別の在庫推移を一覧化できます。</p><div class="meta"><span>T商品入庫</span><span>T商品出庫</span><span>T商品棚卸</span><span>V商品推移表</span></div></article>
-      </div>
+    <!-- Business Samples -->
+    <section class="section" id="業務サンプル">
+        <h2 class="section-title animate-on-scroll">Business Samples</h2>
+        <p class="section-subtitle animate-on-scroll">テンプレートの核は、ちゃんと動く業務システムにあります。</p>
+        <div class="sample-grid">
+            <div class="sample-item animate-on-scroll">
+                <h3 class="sample-title">🚚 配車管理システム</h3>
+                <p>配車区分と車両マスタを基に、日次の配車計画と週・日スケジュール表示を実現します。</p>
+                <div class="sample-tags">
+                    <span class="sample-tag">M配車区分</span>
+                    <span class="sample-tag">M車両</span>
+                    <span class="sample-tag">T配車</span>
+                    <span class="sample-tag">S配車_週表示</span>
+                </div>
+            </div>
+            <div class="sample-item animate-on-scroll">
+                <h3 class="sample-title">🏭 生産管理システム</h3>
+                <p>商品構成 BOM と生産指示を、明細型マスタ / 明細型トランザクションとして一体管理します。</p>
+                <div class="sample-tags">
+                    <span class="sample-tag">M商品構成</span>
+                    <span class="sample-tag">T生産</span>
+                    <span class="sample-tag">V生産</span>
+                    <span class="sample-tag">S生産_日表示</span>
+                </div>
+            </div>
+            <div class="sample-item animate-on-scroll">
+                <h3 class="sample-title">📦 資材在庫管理システム</h3>
+                <p>入庫・出庫・棚卸を記録し、V商品推移表で期間別の在庫推移を一覧化できます。</p>
+                <div class="sample-tags">
+                    <span class="sample-tag">T商品入庫</span>
+                    <span class="sample-tag">T商品出庫</span>
+                    <span class="sample-tag">T商品棚卸</span>
+                    <span class="sample-tag">V商品推移表</span>
+                </div>
+            </div>
+        </div>
     </section>
 
-    <section>
-      <div class="section-head reveal">
-        <div class="eyebrow2">Advanced Layer</div>
-        <h2>AI コア、音声対話、3D アバターまで踏み込む。</h2>
-        <p>音声リアルタイム対話とアバター表現を、業務 UI と同じプロジェクトで試せます。</p>
-      </div>
-      <div class="advanced">
-        <article class="sample reveal" data-tilt><h3>音声対話インターフェース</h3><p>16kHz 入力 PCM を WebSocket で AI コアへ送り、24kHz 出力をキュー再生。口パク連動まで一貫して扱います。</p><div class="meta"><span>Gemini Live</span><span>OpenAI Realtime</span><span>AudioController</span></div></article>
-        <article class="sample reveal" data-tilt><h3>VRM アバター表示</h3><p>Three.js と `@pixiv/three-vrm` を使い、背景透過の 3D アバターを Electron 常駐表示または Web 左ペインへ表示します。</p><div class="meta"><span>VRM</span><span>VRMA</span><span>Lip Sync</span></div></article>
-      </div>
-      <article class="panel feed reveal" data-tilt>
-        <div>
-          <div class="head"><span class="label">Implementation Feed</span><span class="status">Rolling</span></div>
-          <ul id="feed"></ul>
+    <!-- Advanced Layer -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Advanced Layer</h2>
+        <p class="section-subtitle animate-on-scroll">AI コア、音声対話、3D アバターまで踏み込む。</p>
+        <div class="advanced-grid">
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🎙️</span>
+                <h3 class="feature-title">音声対話インターフェース</h3>
+                <p class="feature-description">
+                    16kHz 入力 PCM を WebSocket で AI コアへ送り、<br>
+                    24kHz 出力をキュー再生。口パク連動まで<br>
+                    一貫して扱います。Gemini Live / OpenAI Realtime 対応。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">👾</span>
+                <h3 class="feature-title">VRM アバター表示</h3>
+                <p class="feature-description">
+                    Three.js と @pixiv/three-vrm を使い、<br>
+                    背景透過の 3D アバターを Electron 常駐表示<br>
+                    または Web 左ペインへ表示。VRMA モーション対応。
+                </p>
+            </div>
         </div>
-        <div class="side">
-          <h3>Realtime Mood Meter</h3>
-          <p>音声・コード・アバター・業務 UI が別々ではなく、開発体験として連動するのが AiDiy の面白さです。</p>
-          <div class="bars" aria-hidden="true">
-            <span style="height:28%"></span><span style="height:58%"></span><span style="height:44%"></span><span style="height:78%"></span>
-            <span style="height:92%"></span><span style="height:62%"></span><span style="height:70%"></span><span style="height:38%"></span>
-          </div>
-          <p>AiDiy は「管理画面テンプレート」と「AI 実験場」を無理なく同居させるための骨格です。</p>
-        </div>
-      </article>
     </section>
 
-    <section>
-      <article class="cta reveal" data-tilt>
-        <div class="eyebrow2">Launch</div>
-        <h2 style="margin-top:10px">次は、実際に触って確認する番です。</h2>
-        <p>管理画面を見るなら `frontend_web`、AiDiy を試すなら `/AiDiy`、アバター体験まで含めるなら `frontend_avatar`。入口は複数あっても、コンセプトはひとつです。</p>
-        <div class="cta-actions">
-          <a href="/AiDiy" target="_parent" class="btn primary">AiDiyを開く</a>
-          <a href="#全体像" class="btn ghost">上へ戻る</a>
+    <!-- Table Classification -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Table Classification</h2>
+        <div class="expansion-grid">
+            <div class="expansion-item animate-on-scroll">
+                <h4>C系 — Core</h4>
+                <p>権限・利用者・採番</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>M系 — Master</h4>
+                <p>配車区分・車両・商品・工程</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>T系 — Transaction</h4>
+                <p>配車・生産・入庫・出庫・棚卸</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>V系 — View</h4>
+                <p>生 SQL クエリによる結合表示</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>S系 — Scheduler</h4>
+                <p>週表示・日表示スケジューラー</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>A系 — AI</h4>
+                <p>AI コア・会話履歴</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>X系 — Experimental</h4>
+                <p>ゲーム・自己紹介ページ</p>
+            </div>
         </div>
-      </article>
     </section>
-  </main>
 
-  <script src="./index.js"></script>
+    <!-- Key Features -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">Key Features</h2>
+        <div class="expansion-grid">
+            <div class="expansion-item animate-on-scroll">
+                <h4>📊 qTubler</h4>
+                <p>独自カスタムテーブル。ソート・ページング・行選択</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🌐 WebSocket</h4>
+                <p>AI コアリアルタイム通信。セッション永続化対応</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>📝 監査フィールド</h4>
+                <p>全テーブルに登録 / 更新情報を自動付与</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🚀 POST 中心 API</h4>
+                <p>全 CRUD を POST で統一。一貫したレスポンス形式</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🔄 Reboot 機構</h4>
+                <p>txt ファイル作成でサーバー内部再起動。ゼロダウンタイム</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🎯 V系実装</h4>
+                <p>Database VIEW 不使用。生 SQL クエリで JOIN</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Launch -->
+    <section class="section" style="text-align: center; padding-bottom: 120px;">
+        <h2 class="section-title animate-on-scroll">Launch</h2>
+        <p class="animate-on-scroll" style="margin-bottom: 10px; font-size: 1.05rem; color: #aaa;">
+            次は、実際に触って確認する番です。
+        </p>
+        <p class="animate-on-scroll" style="margin-bottom: 25px; font-size: 0.9rem; color: #777;">
+            管理画面を見るなら frontend_web、AI を試すなら /AiDiy、<br>
+            アバター体験まで含めるなら frontend_avatar。
+        </p>
+        <a href="/AiDiy" class="cyber-button animate-on-scroll rainbow-blink" target="_parent">
+            AiDiy を開く
+        </a>
+    </section>
+
+    <!-- JavaScript -->
+    <script src="index.js"></script>
+
+    <!-- VRM Avatar - 右下固定（最下部直前でフェードイン） -->
+    <div id="avatar-container">
+        <canvas id="avatar-canvas"></canvas>
+    </div>
+    <style>
+        #avatar-container {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 400px;
+            height: 680px;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+        #avatar-container.visible {
+            opacity: 1;
+        }
+        #avatar-canvas { display: block; }
+    </style>
+    <script>
+    (function() {
+        function checkAvatarVisibility() {
+            const scrollBottom = window.scrollY + window.innerHeight;
+            const pageHeight = document.documentElement.scrollHeight;
+            // ページ下部 20% に入ったら表示
+            if (scrollBottom >= pageHeight * 0.8) {
+                document.getElementById('avatar-container')?.classList.add('visible');
+            }
+        }
+        window.addEventListener('scroll', checkAvatarVisibility, { passive: true });
+        checkAvatarVisibility(); // 初期チェック（短いページ対応）
+    })();
+    </script>
+    <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+    import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+
+    (async () => {
+        const canvas = document.getElementById('avatar-canvas');
+        if (!canvas) return;
+
+        const W = 400, H = 680;
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.setClearColor(0x000000, 0);
+        renderer.setSize(W, H);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(32, W / H, 0.1, 20);
+        camera.position.set(0, 1.2, 1.6);
+        camera.lookAt(new THREE.Vector3(0, 1.25, 0));
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+        dir.position.set(1, 2, 2);
+        scene.add(dir);
+
+        // frontend_avatar と同様にローダーを分ける（同一ローダーへの複数プラグイン登録は干渉する）
+        const modelLoader = new GLTFLoader();
+        modelLoader.register(p => new VRMLoaderPlugin(p));
+
+        const motionLoader = new GLTFLoader();
+        motionLoader.register(p => new VRMAnimationLoaderPlugin(p));
+
+        const VRMA_FILES = [
+            './vrma/VRMA_01.vrma',
+            './vrma/VRMA_02.vrma',
+            './vrma/VRMA_03.vrma',
+            './vrma/VRMA_04.vrma',
+            './vrma/VRMA_05.vrma',
+        ];
+
+        const loadWith = (loader, url) => new Promise((res, rej) => loader.load(url, res, undefined, rej));
+
+        let vrm = null, mixer = null, currentAction = null;
+        const clips = [];
+
+        function playNext() {
+            if (!mixer || !clips.length) return;
+            
+            const idx = Math.floor(Math.random() * clips.length);
+            const nextAction = mixer.clipAction(clips[idx]);
+            
+            if (currentAction) {
+                currentAction.fadeOut(0.5);
+            }
+            
+            nextAction.reset();
+            nextAction.setLoop(THREE.LoopOnce, 1);
+            nextAction.clampWhenFinished = true;
+            nextAction.fadeIn(0.5);
+            nextAction.play();
+            
+            currentAction = nextAction;
+        }
+
+        try {
+            // VRM ロード
+            const vrmGltf = await loadWith(modelLoader, './AiDiy_Sample_M.vrm');
+            vrm = vrmGltf.userData.vrm;
+            if (!vrm) { console.warn('VRM not found in gltf.userData'); return; }
+            try { VRMUtils.removeUnnecessaryJoints(vrm.scene); } catch {}
+            scene.add(vrm.scene);
+
+            mixer = new THREE.AnimationMixer(vrm.scene);
+            mixer.timeScale = 1;
+            // finished イベントで次を再生
+            mixer.addEventListener('finished', (e) => {
+                setTimeout(playNext, 1000);
+            });
+
+            // VRMA ロード（モーションローダーで）
+            for (const file of VRMA_FILES) {
+                try {
+                    const g = await loadWith(motionLoader, file);
+                    const anim = g.userData.vrmAnimations?.[0];
+                    if (anim) {
+                        clips.push(createVRMAnimationClip(anim, vrm));
+                    } else {
+                        console.warn('vrmAnimations not found:', file);
+                    }
+                } catch (e) { console.warn('VRMA load skip:', file, e); }
+            }
+            console.log('Loaded clips:', clips.length);
+            if (clips.length > 0) playNext();
+        } catch (e) {
+            console.warn('Avatar load error:', e);
+        }
+
+        const clock = new THREE.Clock();
+        const avatarContainer = document.getElementById('avatar-container');
+
+        (function animate() {
+            requestAnimationFrame(animate);
+            // .visible クラスがない場合（画面下部に来ていない場合）は描画をスキップ
+            if (!avatarContainer || !avatarContainer.classList.contains('visible')) return;
+
+            const dt = clock.getDelta();
+            if (mixer) mixer.update(dt);
+            if (vrm) vrm.update(dt);
+            renderer.render(scene, camera);
+        })();
+    })();
+    </script>
 </body>
 </html>

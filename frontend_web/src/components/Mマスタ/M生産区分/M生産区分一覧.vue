@@ -21,6 +21,7 @@ const route = useRoute();
 const 生産区分一覧テーブルRef = ref(null);
 const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
@@ -111,7 +112,7 @@ watch(() => route.query.message, (newMessage) => {
           </label>
         </div>
 
-        <component :is="生産区分一覧テーブル" ref="生産区分一覧テーブルRef" :件数制限="件数制限" :無効も表示="無効も表示" :戻URL="編集戻URL" />
+        <component :is="生産区分一覧テーブル" ref="生産区分一覧テーブルRef" :件数制限="件数制限" :無効も表示="無効も表示" :有効列表示="有効列表示" :戻URL="編集戻URL" />
       </div>
     </div>
   </div>

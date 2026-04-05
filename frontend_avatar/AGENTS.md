@@ -111,12 +111,16 @@
 `settings` ウィンドウは `electron/main.ts` の `settingsWindow` で管理され、core ウィンドウからの IPC で開閉します。
 
 **重要な設計ポイント：**
-- `createBaseWindow()` で全ウィンドウ共通設定を適用
-- `transparent: true`
-- `frame: false`
-- `backgroundColor: '#00000000'`
+- `createBaseWindow()` で login / core / panel ウィンドウ共通設定を適用
+  - `transparent: true`
+  - `frame: false`
+  - `backgroundColor: '#00000000'`
+- `settings` ウィンドウは `createBaseWindow()` を使わず個別生成
+  - `transparent: false`、`backgroundColor: '#f8fafc'`（不透明の白背景）
+  - サイズ: `760×700`（最小 `600×400`）、画面中央に表示
 - `applyPrimaryMode()` で login/core のサイズと位置を切り替え
 - `panelStates` で補助ウィンドウの表示状態を共有
+- ウィンドウの最小サイズは Electron の Windows バグ回避のため `windowMinSizes` Map で独自管理し、ロード後に再適用
 
 ### 2. Preload
 
@@ -127,17 +131,27 @@
 - IPC をラップして、renderer 側から直接 `ipcRenderer` を触らせない
 
 主な公開 API:
-- `getWindowRole()`
-- `getWindowBounds()`
-- `setWindowBounds()`
-- `setWindowMode()`
-- `closeCurrentWindow()`
-- `togglePanel()`
-- `getPanelStates()`
-- `listDisplaySources()`
-- `setDisplaySource()`
-- `onPanelStatesChanged()`
-- `onWindowShown()`
+- `versions` - `{ chrome, electron, node }` バージョン情報
+- `getWindowRole()` - 現在ウィンドウの role を返す
+- `getWindowBounds()` - ウィンドウ位置・サイズ・最小サイズを返す（`WindowMetrics` 型）
+- `setWindowBounds(bounds)` - ウィンドウ位置・サイズを設定
+- `setWindowInteractive(interactive)` - マウスイベントの透過/受付を切り替え
+- `setWindowMode(mode)` - login / core モードを切り替え
+- `openCoreWindow()` - core ウィンドウを開く
+- `openLoginWindow()` - login ウィンドウを開く
+- `closeCurrentWindow()` - 現在ウィンドウを閉じる（パネルなら `hide()`）
+- `minimizeCurrentWindow()` - 現在ウィンドウを最小化
+- `togglePanel(panel)` - 補助パネルの表示/非表示を切り替え
+- `applyPanelStates(states)` - 複数パネルの表示状態を一括適用
+- `getPanelStates()` - 全パネルの表示状態を取得
+- `listDisplaySources()` - デスクトップキャプチャ候補一覧を取得
+- `listVrmaFiles(folderName)` - 指定フォルダの VRMA ファイル一覧を取得（Electron ローカルパス対応）
+- `setDisplaySource(sourceId)` - キャプチャ対象ソースを設定
+- `openSettingsWindow(sessionId)` - 設定ウィンドウを開く（sessionId を渡す）
+- `closeSettingsWindow()` - 設定ウィンドウを閉じる（hide）
+- `onSettingsPrepare(callback)` - 設定ウィンドウ側で `settings:session-id` を受け取るリスナー登録（解除関数を返す）
+- `onPanelStatesChanged(callback)` - パネル表示状態変更イベントのリスナー登録（解除関数を返す）
+- `onWindowShown(callback)` - ウィンドウ表示イベントのリスナー登録（解除関数を返す）
 
 ### 3. Renderer
 
@@ -282,11 +296,25 @@ core ウィンドウの状態を他パネルへ配信しています。
 ファイル: `src/api/websocket.ts`
 
 特徴:
-- 接続時に `connect` メッセージを送信
-- `init` メッセージ受信時にセッションIDを確定
+- 接続時に `connect` メッセージを送信（`セッションID` / `ソケット番号` を含む）
+- `init` メッセージ受信時にセッションIDを確定し `connect()` の Promise が解決
 - 最大5回まで自動再接続（3秒間隔）
 - ソケット番号ごとに接続を分離
 - チャンネルつきイベントは `メッセージ識別_チャンネル` でもディスパッチされる
+- `onStateChange(handler)` で接続状態の変化を監視できる（解除関数を返す）
+- 接続タイムアウトは 30 秒
+
+**主なメソッド:**
+- `connect()` - WebSocket 接続を開始し、セッションID 解決後に resolve
+- `send(message)` - JSON メッセージを送信（未接続時は無視）
+- `on(type, handler)` / `off(type, handler?)` - メッセージハンドラー登録/解除
+- `disconnect()` - 意図的に切断（自動再接続を抑止）
+- `sendPing()` - ping メッセージを送信
+- `updateState(ボタン)` - `operations` メッセージでUIボタン状態をバックエンドへ通知
+- `sendChatMessage(text)` - チャットテキストを `出力先チャンネル='0'` で送信
+- `sendInputText(text, 出力先チャンネル?)` - テキスト入力を `input_text` メッセージで送信
+- `onStateChange(handler)` - 接続状態変化リスナー登録（即時呼び出し＋解除関数返却）
+- `セッションID取得()` - 現在のセッションIDを返す（未接続なら `null`）
 
 **WebSocketMessage 型（主なフィールド）:**
 
@@ -301,14 +329,22 @@ core ウィンドウの状態を他パネルへ配信しています。
   メッセージ内容?: unknown   // ペイロード本体
   ファイル名?: string | null
   サムネイル画像?: string | null  // Base64
+  error?: string           // エラーメッセージ（サーバー側エラー通知時）
+  [key: string]: unknown   // その他の任意フィールド
 }
 ```
 
 **主なソケット用途:**
 - `input` チャンネル: テキスト入力（`input_text`）
 - `audio` チャンネル: 音声データ（`input_audio`）
-- `operations` メッセージ: UI ボタン状態送信
+- `operations` メッセージ: UI ボタン状態送信（`updateState(ボタン)` 経由）
 - `chat` 系は各パネルコンポーネント側で WebSocket インスタンスを持つ
+
+**メッセージハンドラーの登録（`on` / `off`）:**
+- `on('init', handler)` のようにメッセージ識別を指定して登録
+- チャンネルつきメッセージは `メッセージ識別_チャンネル`（例: `output_audio`）でも個別に受け取れる
+- `on('*', handler)` で全メッセージを横断的に受け取るワイルドカードリスナーも登録可能
+- `off(type)` でハンドラー全削除、`off(type, handler)` で個別削除
 
 **WebSocket エンドポイント:** `/core/ws/AIコア`（`src/api/config.ts` の `AI_WS_ENDPOINT`）
 
@@ -387,6 +423,9 @@ AI_WS_ENDPOINT         // WebSocket エンドポイント
 DEFAULT_VRM_MODEL_URL  // デフォルト VRM モデルパス（'/vrm/AiDiy_Sample_M.vrm'）
 SAMPLE_VRMA_FOLDER_NAME    // サンプルモーションフォルダ名（'サンプル'）
 STANDARD_VRMA_FOLDER_NAME  // 標準モーションフォルダ名（'標準'）
+SAMPLE_VRMA_FILES      // サンプルフォルダの VRMA ファイルパス配列（'/vrma/サンプル/VRMA_01.vrma' 〜 VRMA_07.vrma の 7 ファイル）
+STANDARD_VRMA_FILES    // 標準フォルダの VRMA ファイルパス配列（'/vrma/標準/VRMA_01.vrma' 〜 VRMA_05.vrma の 5 ファイル）
+                       // ※ Electron モードでは listVrmaFiles() IPC でローカルファイルを優先使用するため、これらは Web モードのフォールバックとして使用
 defaultModelSettings() // モデル設定デフォルト値を返す関数
 ```
 
@@ -491,10 +530,10 @@ npm run start
 
 次を合わせて確認してください。
 
-- `panelStates` 初期値
-- `createPanelVisibility()`
-- `PANEL_KEYS`
-- snapshot 同期 (`buildSnapshot()`, BroadcastChannel)
+- `panelStates` 初期値（`electron/main.ts`）
+- `setPanelVisibility()` / `createPanelWindow()` / `closePanelWindow()`（`electron/main.ts`）
+- `PANEL_KEYS`（`src/AiDiy.vue`）
+- snapshot 同期 (`buildSnapshot()`, BroadcastChannel)（`src/AiDiy.vue`）
 
 ### 3. Electron IPC を追加する場合
 
@@ -504,6 +543,28 @@ npm run start
 - `electron/preload.ts` の `desktopApi`
 - `src/env.d.ts` または型宣言側
 - renderer 利用箇所
+
+**現在実装済みの IPC ハンドラー一覧（`electron/main.ts`）:**
+
+| IPC チャンネル | 説明 |
+|--------------|------|
+| `window:get-role` | 現在ウィンドウの role を返す |
+| `window:set-mode` | login/core モード切替（ウィンドウ再構築） |
+| `window:open-core` | core ウィンドウを開く |
+| `window:open-login` | login ウィンドウを開く |
+| `window:close-self` | 自身を閉じる（パネルは hide） |
+| `window:minimize-self` | 最小化 |
+| `window:get-bounds` | 現在の位置・サイズ・最小サイズを返す |
+| `window:set-bounds` | 位置・サイズを設定（最小サイズにクランプ） |
+| `window:set-interactive` | `setIgnoreMouseEvents` でマウス透過を切替 |
+| `panel:toggle` | パネルの表示/非表示トグル |
+| `panel:apply-states` | 複数パネルの表示状態を一括適用 |
+| `panel:get-states` | 全パネルの表示状態を返す |
+| `settings:open` | 設定ウィンドウを開く（sessionId 付き） |
+| `settings:close` | 設定ウィンドウを hide |
+| `desktop:list-sources` | デスクトップキャプチャ候補一覧 |
+| `desktop:list-vrma-files` | 指定フォルダの VRMA ファイル一覧 |
+| `desktop:set-source` | キャプチャソースを設定 |
 
 ### 4. 接続まわりを変更する場合
 

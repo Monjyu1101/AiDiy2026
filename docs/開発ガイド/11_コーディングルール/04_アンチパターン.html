@@ -37,6 +37,74 @@
  <code>...</code>
  </pre>
  </section>
+
+ <!-- ===== 以下 2026-04-05 追記 ===== -->
+
+ <section>
+ <h2>件数制限なし・論理削除なし（禁止パターン）</h2>
+
+ <h3>NG: 件数制限なしで全件取得</h3>
+ <pre><code class="language-python"># NG: .all() のみ — 件数制限がなくパフォーマンス問題を引き起こす
+items = db.query(models.M商品).all()
+</code></pre>
+
+ <h3>NG: V系で list_controls を使わず手書き LIMIT</h3>
+ <pre><code class="language-python"># NG: V系・T系で直接 LIMIT を書く — list_controls.py を使わなければならない
+sql = "SELECT * FROM M商品 LIMIT 1000"
+result = db.execute(text(sql)).fetchall()
+</code></pre>
+
+ <h3>NG: 物理削除</h3>
+ <pre><code class="language-python"># NG: db.delete() による物理削除 — 論理削除（有効=False）を使うこと
+db.delete(item)
+db.commit()
+</code></pre>
+
+ <h3>正しいパターン（対比）</h3>
+ <pre><code class="language-python"># OK: M系は MAX_ITEMS 定数で件数制限
+MAX_ITEMS = 10000
+items = (
+    db.query(models.M商品)
+    .order_by(models.M商品.商品ID)
+    .limit(MAX_ITEMS)
+    .all()
+)
+
+# OK: V系・T系は list_controls 使用
+from list_controls import append_active_condition, get_limit_clause
+append_active_condition(conditions, request, 's."有効"')
+limit_sql, limit_value = get_limit_clause(request)
+
+# OK: 論理削除
+item.有効 = False
+for key, value in update_audit_fields(認証情報).items():
+    setattr(item, key, value)
+db.commit()
+db.refresh(item)
+return {"status": "OK", "message": "商品の有効をオフにしました", "data": item}
+</code></pre>
+ </section>
+
+ <section>
+ <h2>フロントエンドの一覧画面 — 件数制限・無効も表示の欠落（禁止パターン）</h2>
+
+ <h3>NG: 件数制限・無効も表示 チェックボックスなし</h3>
+ <pre><code class="language-html">&lt;!-- NG: チェックボックスがない一覧画面 — ユーザーが件数や有効/無効を制御できない --&gt;
+&lt;button @click="handleReload"&gt;再読み込み&lt;/button&gt;
+</code></pre>
+
+ <h3>NG: props を API リクエストに含めていない</h3>
+ <pre><code class="language-typescript">// NG: props を無視して固定パラメータで API 呼び出し
+const res = await apiClient.post('/apps/V商品/一覧', {});
+
+// OK: props を必ず API リクエストに含める
+const res = await apiClient.post('/apps/V商品/一覧', {
+  件数制限: props.件数制限,
+  無効も表示: props.無効も表示,
+});
+</code></pre>
+ </section>
+
  </main>
 
  <footer>AiDiy Docs / </footer>

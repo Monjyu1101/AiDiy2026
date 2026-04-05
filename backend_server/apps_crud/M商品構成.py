@@ -94,6 +94,8 @@ def build_M商品構成_data(db: Session, 商品構成一覧):
         "生産区分名": 生産区分.生産区分名 if 生産区分 else None,
         "生産工程ID": 見出し.生産工程ID,
         "生産工程名": 工程.生産工程名 if 工程 else None,
+        "段取分数": int(見出し.段取分数) if 見出し.段取分数 is not None else None,
+        "時間生産数量": float(見出し.時間生産数量) if 見出し.時間生産数量 is not None else None,
         "商品構成備考": 見出し.商品構成備考,
         "有効": bool(見出し.有効),
         "明細一覧": _build_明細一覧(db, 商品構成一覧),
@@ -114,6 +116,8 @@ def _create_レコード一覧(
     最小ロット数量: float,
     生産区分ID: str,
     生産工程ID: str,
+    段取分数: Optional[int],
+    時間生産数量: Optional[float],
     商品構成備考: Optional[str],
     有効: bool,
     明細一覧: list[schemas.M商品構成明細Base],
@@ -126,6 +130,8 @@ def _create_レコード一覧(
             最小ロット数量=最小ロット数量,
             生産区分ID=生産区分ID,
             生産工程ID=生産工程ID,
+            段取分数=段取分数,
+            時間生産数量=時間生産数量,
             商品構成備考=商品構成備考,
             構成商品ID=None,
             計算分子数量=None,
@@ -145,6 +151,8 @@ def _create_レコード一覧(
                 最小ロット数量=最小ロット数量,
                 生産区分ID=生産区分ID,
                 生産工程ID=生産工程ID,
+                段取分数=段取分数,
+                時間生産数量=時間生産数量,
                 商品構成備考=商品構成備考,
                 構成商品ID=明細.構成商品ID,
                 計算分子数量=明細.計算分子数量,
@@ -170,6 +178,8 @@ def create_M商品構成(
         商品構成.最小ロット数量,
         商品構成.生産区分ID,
         商品構成.生産工程ID,
+        商品構成.段取分数,
+        商品構成.時間生産数量,
         商品構成.商品構成備考,
         商品構成.有効,
         商品構成.明細一覧,
@@ -191,10 +201,13 @@ def update_M商品構成(
         return None
 
     見出し = next((item for item in 既存一覧 if item.明細SEQ == 0), 既存一覧[0])
+    更新項目集合 = getattr(商品構成, "model_fields_set", getattr(商品構成, "__fields_set__", set()))
     最小ロット数量 = 商品構成.最小ロット数量 if 商品構成.最小ロット数量 is not None else 見出し.最小ロット数量
     生産区分ID = 商品構成.生産区分ID if 商品構成.生産区分ID is not None else 見出し.生産区分ID
     生産工程ID = 商品構成.生産工程ID if 商品構成.生産工程ID is not None else 見出し.生産工程ID
-    商品構成備考 = 商品構成.商品構成備考 if 商品構成.商品構成備考 is not None else 見出し.商品構成備考
+    段取分数 = 商品構成.段取分数 if "段取分数" in 更新項目集合 else 見出し.段取分数
+    時間生産数量 = 商品構成.時間生産数量 if "時間生産数量" in 更新項目集合 else 見出し.時間生産数量
+    商品構成備考 = 商品構成.商品構成備考 if "商品構成備考" in 更新項目集合 else 見出し.商品構成備考
     有効 = 商品構成.有効 if 商品構成.有効 is not None else 見出し.有効
     明細一覧 = 商品構成.明細一覧 if 商品構成.明細一覧 is not None else [
         schemas.M商品構成明細Base(
@@ -219,7 +232,19 @@ def update_M商品構成(
     db.query(models.M商品構成).filter(models.M商品構成.商品ID == 商品ID).delete(synchronize_session=False)
     db.flush()
     db.expunge_all()
-    _create_レコード一覧(db, 商品ID, 最小ロット数量, 生産区分ID, 生産工程ID, 商品構成備考, 有効, 明細一覧, 監査項目)
+    _create_レコード一覧(
+        db,
+        商品ID,
+        最小ロット数量,
+        生産区分ID,
+        生産工程ID,
+        段取分数,
+        時間生産数量,
+        商品構成備考,
+        有効,
+        明細一覧,
+        監査項目,
+    )
     db.commit()
     return get_M商品構成(db, 商品ID)
 
@@ -253,6 +278,8 @@ def init_M商品構成_data(db: Session, 認証情報: Optional[Dict] = None):
             最小ロット数量=item["最小ロット数量"],
             生産区分ID=item["商品ID"][:1],
             生産工程ID="L99",
+            段取分数=item.get("段取分数", 30),
+            時間生産数量=item.get("時間生産数量", 500),
             商品構成備考=item.get("商品構成備考", ""),
             有効=True,
             明細一覧=[schemas.M商品構成明細Base(**明細) for 明細 in item["明細一覧"]],

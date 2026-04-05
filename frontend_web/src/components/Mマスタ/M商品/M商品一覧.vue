@@ -23,6 +23,7 @@ const route = useRoute();
 const 商品一覧テーブルRef = ref(null);
 const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
 const 商品分類ID = ref('');
 const 商品分類一覧 = ref<M商品分類[]>([]);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
@@ -123,7 +124,7 @@ watch(() => route.query.message, (newMessage) => {
                   <select v-model="商品分類ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 商品分類一覧" :key="item.商品分類ID" :value="item.商品分類ID">
-                      {{ item.商品分類名 }} ({{ item.商品分類ID }})
+                      {{ item.商品分類ID }} : {{ item.商品分類名 }}
                     </option>
                   </select>
                 </div>
@@ -153,6 +154,7 @@ watch(() => route.query.message, (newMessage) => {
           :商品分類ID="商品分類ID"
           :件数制限="件数制限"
           :無効も表示="無効も表示"
+          :有効列表示="有効列表示"
           :戻URL="編集戻URL"
         />
       </div>
@@ -226,7 +228,7 @@ watch(() => route.query.message, (newMessage) => {
   flex-direction: column;
   gap: 0;
   width: fit-content;
-  --select-width: 360px;
+  --select-width: 320px;
 }
 
 .detail-row {

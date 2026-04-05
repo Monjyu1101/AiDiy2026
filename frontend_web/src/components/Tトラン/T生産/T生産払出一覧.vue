@@ -22,6 +22,7 @@ const route = useRoute();
 const 払出一覧テーブルRef = ref<any>(null);
 const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
 const 開始日付 = ref('');
 const 終了日付 = ref('');
 const 生産区分ID = ref('');
@@ -166,7 +167,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
                   <select v-model="生産区分ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
-                      {{ item.生産区分名 }} ({{ item.生産区分ID }})
+                      {{ item.生産区分ID }} : {{ item.生産区分名 }}
                     </option>
                   </select>
                 </div>
@@ -177,7 +178,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
                   <select v-model="生産工程ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 生産工程一覧" :key="item.生産工程ID" :value="item.生産工程ID">
-                      {{ item.生産工程名 }} ({{ item.生産工程ID }})
+                      {{ item.生産工程ID }} : {{ item.生産工程名 }}
                     </option>
                   </select>
                 </div>
@@ -188,7 +189,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
                   <select v-model="払出商品ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
-                      {{ item.商品名 }} ({{ item.商品ID }})
+                      {{ item.商品ID }} : {{ item.商品名 }}
                     </option>
                   </select>
                 </div>
@@ -199,6 +200,10 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
         </div>
 
         <div class="table-options">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="件数制限" @change="handleReload" />
+            件数制限
+          </label>
           <label class="checkbox-label">
             <input type="checkbox" v-model="無効も表示" @change="handleReload" />
             無効も表示
@@ -215,6 +220,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
           :払出商品ID="払出商品ID"
           :件数制限="件数制限"
           :無効も表示="無効も表示"
+          :有効列表示="有効列表示"
           :戻URL="編集戻URL"
         />
       </div>
@@ -312,6 +318,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
 .detail-value {
   display: flex;
   align-items: center;
+  width: auto;
   color: #333;
   padding: 4px 12px;
   border: 1px solid #ccc;
@@ -319,6 +326,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
   background: #fff;
   min-height: 40px;
   box-sizing: border-box;
+  border-radius: 0;
 }
 
 .detail-input {
@@ -329,10 +337,12 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
   background: #fff;
   font-size: 14px;
   box-sizing: border-box;
+  margin: 0;
 }
 .detail-input:focus {
   outline: none;
   border-color: #007bff;
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
 }
 
 .date-range {
@@ -343,7 +353,10 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
 }
 .range-separator { color: #666; font-weight: 600; }
 .date-input { width: 160px; text-align: center; }
-.select-input { width: var(--range-width); }
+.select-input {
+  width: var(--range-width);
+  padding-right: 8px;
+}
 .text-input { width: var(--range-width); }
 
 .toolbar {

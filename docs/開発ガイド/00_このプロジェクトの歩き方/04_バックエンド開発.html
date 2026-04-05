@@ -345,6 +345,76 @@ for key, value in 監査項目.items():
   </div>
  </section>
 
+ <section id="list-controls">
+  <h2>件数制限・論理削除の実装パターン</h2>
+  <p>V系・T系の一覧APIでは、<code>backend_server/list_controls.py</code> と共通スキーマ <code>ListRequest</code> を組み合わせた標準パターンを使用します。</p>
+
+  <h3>list_controls.py の主要関数</h3>
+  <pre><code>from list_controls import (
+    LIMITED_MAX_ITEMS,     # = 1000
+    is_limit_enabled,      # 件数制限フラグ取得（デフォルトTrue）
+    should_show_inactive,  # 無効も表示フラグ取得（デフォルトFalse）
+    get_list_limit,        # 件数上限値を返す（制限なしの場合はNone）
+    get_limit_clause,      # LIMIT句と値のタプルを返す
+    append_active_condition,  # 生SQL用: conditions リストに有効=1条件を追加
+    apply_active_filter,   # SQLAlchemy用: .filter(有効==True) を適用
+)</code></pre>
+
+  <h3>ListRequest スキーマ（V系・T系の共通リクエストボディ）</h3>
+  <pre><code># apps_schema/common.py
+class ListRequest(BaseModel):
+    件数制限: Optional[bool] = True   # True → LIMIT 1000 適用
+    無効も表示: Optional[bool] = False # False → 有効=1 のみ取得
+    開始日付: Optional[str] = None
+    終了日付: Optional[str] = None
+    # ... その他フィルタ項目</code></pre>
+
+  <h3>API系による違い</h3>
+  <table>
+  <thead>
+   <tr><th>API系</th><th>リクエストボディ</th><th>件数上限</th><th>有効フィルタ</th></tr>
+  </thead>
+  <tbody>
+   <tr><td>V系・T系</td><td>ListRequest</td><td>MAX 1000件（動的）</td><td>デフォルトで有効=1のみ</td></tr>
+   <tr><td>M系・C系</td><td>なし（固定）</td><td>MAX 10000件（固定）</td><td>フィルタなし（全件）</td></tr>
+  </tbody>
+  </table>
+
+  <h3>論理削除の仕様</h3>
+  <ul>
+  <li><strong>/削除 エンドポイント</strong> = <code>有効=False</code> に更新（物理削除なし）</li>
+  <li><strong>V系一覧</strong>: デフォルトで <code>有効=1</code> のみ取得。<code>無効も表示=True</code> 送信で全件取得</li>
+  <li><strong>M系一覧</strong>: 有効フィルタなし（全件取得）</li>
+  </ul>
+
+  <h3>V系 Router での実装例（生SQL）</h3>
+  <pre><code>from list_controls import append_active_condition, get_limit_clause
+
+@router.post("/一覧")
+def list_items(request: ListRequest, db: Session = Depends(get_db), ...):
+    conditions = ["1=1"]
+    params = {}
+    append_active_condition(conditions, request, "t.有効")
+
+    limit_clause, limit_value = get_limit_clause(request)
+    if limit_value:
+        params["limit"] = limit_value
+
+    sql = f"SELECT ... WHERE {' AND '.join(conditions)} {limit_clause}"
+    rows = db.execute(text(sql), params).fetchall()</code></pre>
+
+  <h3>T系 CRUD での実装例（SQLAlchemy）</h3>
+  <pre><code>from list_controls import apply_active_filter, get_list_limit
+
+def get_list(db, request):
+    query = db.query(Model)
+    query = apply_active_filter(query, Model, request)
+    limit = get_list_limit(request)
+    if limit:
+        query = query.limit(limit)
+    return query.all()</code></pre>
+ </section>
+
  <section id="next">
   <h2>次のステップ</h2>
   <div>

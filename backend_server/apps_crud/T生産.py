@@ -112,6 +112,9 @@ def build_T生産_data(db: Session, 行一覧):
         "生産区分名": 生産区分.生産区分名 if 生産区分 else None,
         "生産工程ID": 見出し.生産工程ID,
         "生産工程名": 工程.生産工程名 if 工程 else None,
+        "段取分数": int(見出し.段取分数) if 見出し.段取分数 is not None else None,
+        "時間生産数量": float(見出し.時間生産数量) if 見出し.時間生産数量 is not None else None,
+        "生産時間": float(見出し.生産時間) if 見出し.生産時間 is not None else None,
         "生産開始日時": 見出し.生産開始日時,
         "生産終了日時": 見出し.生産終了日時,
         "生産内容": 見出し.生産内容,
@@ -137,6 +140,9 @@ def _create_行一覧(
     受入数量,
     生産区分ID,
     生産工程ID,
+    段取分数,
+    時間生産数量,
+    生産時間,
     生産開始日時: str,
     生産終了日時: str,
     生産内容,
@@ -154,6 +160,9 @@ def _create_行一覧(
         受入数量=受入数量,
         生産区分ID=生産区分ID,
         生産工程ID=生産工程ID,
+        段取分数=段取分数,
+        時間生産数量=時間生産数量,
+        生産時間=生産時間,
         生産開始日時=生産開始日時,
         生産終了日時=生産終了日時,
         生産内容=生産内容,
@@ -179,6 +188,9 @@ def _create_行一覧(
             受入数量=None,
             生産区分ID=生産区分ID,
             生産工程ID=生産工程ID,
+            段取分数=段取分数,
+            時間生産数量=時間生産数量,
+            生産時間=生産時間,
             生産開始日時=None,
             生産終了日時=None,
             生産内容=None,
@@ -210,6 +222,9 @@ def create_T生産(db: Session, 生産: schemas.T生産Create, 認証情報: Opt
         生産.受入数量,
         生産.生産区分ID,
         生産.生産工程ID,
+        生産.段取分数,
+        生産.時間生産数量,
+        生産.生産時間,
         生産.生産開始日時,
         生産.生産終了日時,
         生産.生産内容,
@@ -235,6 +250,9 @@ def update_T生産(db: Session, 生産伝票ID: str, 生産: schemas.T生産Upda
     受入数量 = 生産.受入数量 if 生産.受入数量 is not None else 見出し.受入数量
     生産区分ID = 生産.生産区分ID if 生産.生産区分ID is not None else 見出し.生産区分ID
     生産工程ID = 生産.生産工程ID if 生産.生産工程ID is not None else 見出し.生産工程ID
+    段取分数 = 生産.段取分数 if 生産.段取分数 is not None else 見出し.段取分数
+    時間生産数量 = 生産.時間生産数量 if 生産.時間生産数量 is not None else 見出し.時間生産数量
+    生産時間 = 生産.生産時間 if 生産.生産時間 is not None else 見出し.生産時間
     生産開始日時 = 生産.生産開始日時 if 生産.生産開始日時 is not None else 見出し.生産開始日時
     生産終了日時 = 生産.生産終了日時 if 生産.生産終了日時 is not None else 見出し.生産終了日時
     生産内容 = 生産.生産内容 if 生産.生産内容 is not None else 見出し.生産内容
@@ -265,7 +283,25 @@ def update_T生産(db: Session, 生産伝票ID: str, 生産: schemas.T生産Upda
     db.query(models.T生産).filter(models.T生産.生産伝票ID == 生産伝票ID).delete(synchronize_session=False)
     db.flush()
     db.expunge_all()
-    _create_行一覧(db, 生産伝票ID, 受入商品ID, 最小ロット数量, 受入数量, 生産区分ID, 生産工程ID, 生産開始日時, 生産終了日時, 生産内容, 生産備考, 有効, 明細一覧, 監査項目)
+    _create_行一覧(
+        db,
+        生産伝票ID,
+        受入商品ID,
+        最小ロット数量,
+        受入数量,
+        生産区分ID,
+        生産工程ID,
+        段取分数,
+        時間生産数量,
+        生産時間,
+        生産開始日時,
+        生産終了日時,
+        生産内容,
+        生産備考,
+        有効,
+        明細一覧,
+        監査項目,
+    )
     db.commit()
     return get_T生産(db, 生産伝票ID)
 
@@ -300,6 +336,15 @@ def init_T生産_data(db: Session, 認証情報: Optional[Dict] = None):
     if not 構成ヘッダ一覧:
         return  # M商品構成が未登録の場合はスキップ
 
+    ランダム工程候補一覧 = [
+        item.生産工程ID
+        for item in db.query(models.M生産工程)
+        .filter(models.M生産工程.生産工程ID.in_([f"L{str(i).zfill(2)}" for i in range(1, 8)]))
+        .all()
+    ]
+    if not ランダム工程候補一覧:
+        ランダム工程候補一覧 = [f"L{str(i).zfill(2)}" for i in range(1, 8)]
+
     # 全商品の明細行を一括取得してマップ化
     全明細マップ: dict = {}
     for ヘッダ in 構成ヘッダ一覧:
@@ -313,73 +358,80 @@ def init_T生産_data(db: Session, 認証情報: Optional[Dict] = None):
     # --- ここ以降は db.query() を呼ばず、db.add() と db.commit() のみ ---
 
     audit = create_audit_fields(認証情報)
-    now = datetime.datetime.now()
-    today = now.date()
+    today = datetime.datetime.now().date()
+    ソート済み構成ヘッダ一覧 = sorted(構成ヘッダ一覧, key=lambda item: item.商品ID)
+    record_index = 0
 
-    start_dates = [today + datetime.timedelta(days=random.randint(0, 14)) for _ in range(8)]
-    end_dates = [start + datetime.timedelta(days=random.randint(3, 10)) for start in start_dates]
-    start_datetimes = [datetime.datetime.combine(d, datetime.time(8, 0)) for d in start_dates]
-    end_datetimes = [datetime.datetime.combine(d, datetime.time(17, 0)) for d in end_dates]
+    for header_index, 構成ヘッダ in enumerate(ソート済み構成ヘッダ一覧):
+        for repeat_index in range(2):
+            day_offset = 2 + ((header_index * 2 + repeat_index) % 4)
+            生産日 = today + datetime.timedelta(days=day_offset)
+            生産開始日時 = datetime.datetime.combine(生産日, datetime.time(8, 0)).isoformat()
+            生産終了日時 = datetime.datetime.combine(生産日, datetime.time(17, 0)).isoformat()
+            record_index += 1
+            受入商品ID = 構成ヘッダ.商品ID
+            最小ロット数量 = float(構成ヘッダ.最小ロット数量) if 構成ヘッダ.最小ロット数量 else 1.0
+            段取分数 = int(構成ヘッダ.段取分数) if getattr(構成ヘッダ, "段取分数", None) is not None else None
+            時間生産数量 = float(構成ヘッダ.時間生産数量) if getattr(構成ヘッダ, "時間生産数量", None) is not None else None
+            生産時間 = round(最小ロット数量 / 時間生産数量, 2) if 時間生産数量 else None
+            明細行一覧 = 全明細マップ.get(受入商品ID, [])
+            伝票番号 = f"SE{str(record_index).zfill(8)}"
+            生産工程ID = random.choice(ランダム工程候補一覧)
 
-    工程ID一覧 = ['L01', 'L02', 'L03', 'L04', 'L05', 'L06', 'L07']
-    割り当て工程ID = random.choices(工程ID一覧, k=8)
-
-    for i in range(8):
-        構成ヘッダ = random.choice(構成ヘッダ一覧)
-        受入商品ID = 構成ヘッダ.商品ID
-        最小ロット数量 = float(構成ヘッダ.最小ロット数量) if 構成ヘッダ.最小ロット数量 else 1.0
-        明細行一覧 = 全明細マップ.get(受入商品ID, [])
-        伝票番号 = f"SE{str(i + 1).zfill(8)}"
-        生産工程ID = 割り当て工程ID[i]
-
-        # ヘッダ行（明細SEQ=0）
-        db.add(models.T生産(
-            生産伝票ID=伝票番号,
-            明細SEQ=0,
-            受入商品ID=受入商品ID,
-            最小ロット数量=最小ロット数量,
-            受入数量=最小ロット数量,
-            生産区分ID=構成ヘッダ.生産区分ID,
-            生産工程ID=生産工程ID,
-            生産開始日時=start_datetimes[i].isoformat(),
-            生産終了日時=end_datetimes[i].isoformat(),
-            生産内容=f"サンプル生産{i + 1}",
-            生産備考=構成ヘッダ.商品構成備考,
-            払出商品ID=None,
-            計算分子数量=None,
-            計算分母数量=None,
-            構成商品備考=None,
-            最小ロット構成数量=None,
-            払出数量=None,
-            所要数量備考=None,
-            有効=True,
-            **audit
-        ))
-
-        # 明細行（M商品構成の明細をコピー）
-        for 明細 in 明細行一覧:
+            # ヘッダ行（明細SEQ=0）
             db.add(models.T生産(
                 生産伝票ID=伝票番号,
-                明細SEQ=明細.明細SEQ,
+                明細SEQ=0,
                 受入商品ID=受入商品ID,
                 最小ロット数量=最小ロット数量,
-                受入数量=None,
+                受入数量=最小ロット数量,
                 生産区分ID=構成ヘッダ.生産区分ID,
                 生産工程ID=生産工程ID,
-                生産開始日時=None,
-                生産終了日時=None,
-                生産内容=None,
-                生産備考=None,
-                払出商品ID=明細.構成商品ID,
-                計算分子数量=明細.計算分子数量,
-                計算分母数量=明細.計算分母数量,
+                段取分数=段取分数,
+                時間生産数量=時間生産数量,
+                生産時間=生産時間,
+                生産開始日時=生産開始日時,
+                生産終了日時=生産終了日時,
+                生産内容=f"サンプル生産{record_index}",
+                生産備考=構成ヘッダ.商品構成備考,
+                払出商品ID=None,
+                計算分子数量=None,
+                計算分母数量=None,
                 構成商品備考=None,
-                最小ロット構成数量=float(明細.最小ロット構成数量) if 明細.最小ロット構成数量 is not None else None,
-                払出数量=float(明細.最小ロット構成数量) if 明細.最小ロット構成数量 is not None else None,
-                所要数量備考=明細.構成商品備考 or None,
+                最小ロット構成数量=None,
+                払出数量=None,
+                所要数量備考=None,
                 有効=True,
                 **audit
             ))
+
+            # 明細行（M商品構成の明細をコピー）
+            for 明細 in 明細行一覧:
+                db.add(models.T生産(
+                    生産伝票ID=伝票番号,
+                    明細SEQ=明細.明細SEQ,
+                    受入商品ID=受入商品ID,
+                    最小ロット数量=最小ロット数量,
+                    受入数量=None,
+                    生産区分ID=構成ヘッダ.生産区分ID,
+                    生産工程ID=生産工程ID,
+                    段取分数=段取分数,
+                    時間生産数量=時間生産数量,
+                    生産時間=生産時間,
+                    生産開始日時=None,
+                    生産終了日時=None,
+                    生産内容=None,
+                    生産備考=None,
+                    払出商品ID=明細.構成商品ID,
+                    計算分子数量=明細.計算分子数量,
+                    計算分母数量=明細.計算分母数量,
+                    構成商品備考=None,
+                    最小ロット構成数量=float(明細.最小ロット構成数量) if 明細.最小ロット構成数量 is not None else None,
+                    払出数量=float(明細.最小ロット構成数量) if 明細.最小ロット構成数量 is not None else None,
+                    所要数量備考=明細.構成商品備考 or None,
+                    有効=True,
+                    **audit
+                ))
 
     db.commit()
     logger.info("Initialized T生産 from M商品構成")

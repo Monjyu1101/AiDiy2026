@@ -28,6 +28,10 @@ def _validate_request(db: Session, request: schemas.M商品構成Base):
         return "生産区分IDを入力してください"
     if not request.生産工程ID:
         return "生産工程IDを入力してください"
+    if request.段取分数 is not None and request.段取分数 < 0:
+        return "段取分数は0以上で入力してください"
+    if request.時間生産数量 is not None and request.時間生産数量 <= 0:
+        return "時間生産数量は0より大きい値を入力してください"
 
     if not request.明細一覧:
         return "構成商品を1件以上入力してください"
@@ -151,6 +155,8 @@ def update_M商品構成(
         最小ロット数量=request.最小ロット数量 if request.最小ロット数量 is not None else item[0].最小ロット数量,
         生産区分ID=request.生産区分ID if request.生産区分ID is not None else item[0].生産区分ID,
         生産工程ID=request.生産工程ID if request.生産工程ID is not None else item[0].生産工程ID,
+        段取分数=request.段取分数 if request.段取分数 is not None else item[0].段取分数,
+        時間生産数量=request.時間生産数量 if request.時間生産数量 is not None else item[0].時間生産数量,
         商品構成備考=request.商品構成備考 if request.商品構成備考 is not None else item[0].商品構成備考,
         有効=request.有効 if request.有効 is not None else item[0].有効,
         明細一覧=[

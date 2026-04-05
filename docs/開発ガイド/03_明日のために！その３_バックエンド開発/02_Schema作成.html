@@ -37,6 +37,29 @@
   "error": {}
 }</code></pre>
 
+  <h2>共通リクエスト形式：ListRequest</h2>
+  <p><code>apps_schema/common.py</code>（および <code>core_schema/common.py</code>）に定義されている一覧取得用の共通スキーマです。</p>
+  <pre><code>from pydantic import BaseModel
+from typing import Optional
+
+class ListRequest(BaseModel):
+    件数制限: Optional[bool] = True   # True のとき LIMIT 1000 を適用
+    無効も表示: Optional[bool] = False  # False のとき 有効=1 のレコードのみ表示</code></pre>
+
+  <p><strong>使い分け:</strong></p>
+  <table>
+    <tr><th>API分類</th><th>リクエスト</th><th>上限件数</th></tr>
+    <tr><td>V系・T系の一覧</td><td><code>request: Optional[ListRequest] = None</code></td><td>デフォルト1,000件（件数制限=False で無制限）</td></tr>
+    <tr><td>M系・C系の一覧</td><td>リクエストボディなし</td><td>固定10,000件（<code>MAX_ITEMS = 10000</code>）</td></tr>
+  </table>
+
+  <p><strong>ポイント:</strong></p>
+  <ul>
+    <li><code>request</code> を省略（<code>None</code>）した場合でも、<code>list_controls.py</code> のデフォルト（件数制限あり・有効のみ）が適用される</li>
+    <li>V系の一覧ではJOINを伴う生SQLに条件を組み込むため、<code>append_active_condition</code> / <code>get_limit_clause</code> を使う</li>
+    <li>T系・M系でORMを使う場合は <code>apply_active_filter</code> / <code>get_list_limit</code> を使う</li>
+  </ul>
+
   <h2>実装例（参照）</h2>
   <p>以下は <code>code_samples/M商品_schema.py</code> の内容です。</p>
   <pre data-src="code_samples/M商品_schema.py"><code>読み込み中...</code></pre>
@@ -53,6 +76,7 @@
     <li>[ ] Schema命名とエンドポイント用途が一致している</li>
     <li>[ ] 商品IDがCreate/Get/Delete/Updateで必須になっている</li>
     <li>[ ] レスポンスSchemaに監査項目が含まれている</li>
+    <li>[ ] V系・T系の一覧Routerでは <code>ListRequest</code> を <code>Optional</code> で受け取るようになっている</li>
   </ul>
 
   <nav>

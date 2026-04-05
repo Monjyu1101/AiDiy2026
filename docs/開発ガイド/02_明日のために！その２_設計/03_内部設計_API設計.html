@@ -24,7 +24,7 @@
     <tr><td><code>POST /apps/M商品/取得</code></td><td>詳細取得</td><td>更新モード初期表示</td></tr>
     <tr><td><code>POST /apps/M商品/登録</code></td><td>新規登録</td><td>商品ID重複チェックが必要</td></tr>
     <tr><td><code>POST /apps/M商品/変更</code></td><td>更新</td><td>存在チェックが必要</td></tr>
-    <tr><td><code>POST /apps/M商品/削除</code></td><td>削除</td><td>確認ダイアログ後に呼び出し</td></tr>
+    <tr><td><code>POST /apps/M商品/削除</code></td><td>論理削除</td><td>確認ダイアログ後に呼び出し。物理削除ではなく <code>有効=False</code> を設定する</td></tr>
   </table>
 
   <h2>共通仕様</h2>
@@ -32,7 +32,61 @@
     <li>認証方式: JWT（Authorization: Bearer ...）</li>
     <li>正常系/業務エラーともに JSON 形式で返却</li>
     <li>レスポンスは <code>status</code>, <code>message</code>, <code>data/error</code> で統一</li>
+    <li>全 CRUD エンドポイントは <code>POST</code> メソッドのみ使用する</li>
   </ul>
+
+  <h2>件数制限・論理削除フラグ（V系・T系一覧）</h2>
+  <p>V系・T系の一覧エンドポイントは、リクエストボディとして <code>ListRequest</code> を受け取ります。M系・C系の一覧はリクエストボディなし（固定上限 10,000 件）です。</p>
+
+  <h3>ListRequest スキーマ（<code>apps_schema/common.py</code>）</h3>
+  <pre><code>class ListRequest(BaseModel):
+    件数制限: Optional[bool] = True   # True=最大1000件、False=無制限
+    無効も表示: Optional[bool] = False  # False=有効レコードのみ、True=全件
+    開始日付: Optional[str] = None
+    終了日付: Optional[str] = None
+    商品ID: Optional[str] = None
+    商品分類ID: Optional[str] = None
+    生産区分ID: Optional[str] = None</code></pre>
+
+  <h3>フィールドの意味</h3>
+  <table>
+    <tr><th>フィールド</th><th>デフォルト</th><th>意味</th></tr>
+    <tr><td><code>件数制限</code></td><td><code>true</code></td><td><code>true</code> のとき最大 1,000 件（<code>LIMITED_MAX_ITEMS</code>）に制限する。<code>false</code> で制限なし。</td></tr>
+    <tr><td><code>無効も表示</code></td><td><code>false</code></td><td><code>false</code> のとき <code>有効=True</code> のレコードのみ返す。<code>true</code> で論理削除済みレコードも含めて全件返す。</td></tr>
+  </table>
+
+  <h3>バックエンドの処理ユーティリティ（<code>backend_server/list_controls.py</code>）</h3>
+  <pre><code>LIMITED_MAX_ITEMS = 1000  # V系・T系の最大件数上限
+
+# 件数制限の ON/OFF を取得
+def is_limit_enabled(request) -> bool: ...
+
+# 無効レコードを含めるかを取得
+def should_show_inactive(request) -> bool: ...
+
+# 有効フィルタを WHERE 句の conditions リストに追加
+def append_active_condition(conditions, request, column_name): ...
+
+# LIMIT 句の文字列と値を返す（件数制限 OFF なら None）
+def get_limit_clause(request) -> tuple[str, Optional[int]]: ...</code></pre>
+
+  <h3>一覧APIのレスポンス例</h3>
+  <pre><code>{
+  "status": "OK",
+  "message": "V商品一覧を取得しました",
+  "data": {
+    "items": [ ... ],
+    "total": 42,
+    "limit": 1000   // 件数制限 OFF の場合は null
+  }
+}</code></pre>
+
+  <h3>M系一覧との違い</h3>
+  <table>
+    <tr><th>種別</th><th>リクエストボディ</th><th>上限件数</th><th>有効フィルタ</th></tr>
+    <tr><td>M系・C系 一覧</td><td>なし（引数なし）</td><td>固定 10,000 件</td><td>なし（全件返す）</td></tr>
+    <tr><td>V系・T系 一覧</td><td><code>ListRequest</code></td><td>デフォルト 1,000 件（制御可）</td><td>デフォルトで <code>有効=True</code> のみ</td></tr>
+  </table>
 
   <h2>設計時に固定すべき項目</h2>
   <ol>

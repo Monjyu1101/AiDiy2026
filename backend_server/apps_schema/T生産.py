@@ -27,6 +27,7 @@ class V生産ListRequest(BaseModel):
 # --- T生産払出一覧リクエスト ---
 
 class T生産払出ListRequest(BaseModel):
+    件数制限: Optional[bool] = True
     無効も表示: Optional[bool] = False
     開始日付: Optional[str] = None
     終了日付: Optional[str] = None
@@ -62,6 +63,9 @@ class T生産Base(BaseModel):
     受入数量: Optional[float] = None
     生産区分ID: Optional[str] = None
     生産工程ID: str
+    段取分数: Optional[int] = None
+    時間生産数量: Optional[float] = None
+    生産時間: Optional[float] = None
     生産開始日時: str
     生産終了日時: str
     生産内容: Optional[str] = None
@@ -80,6 +84,9 @@ class T生産Update(BaseModel):
     受入数量: Optional[float] = None
     生産区分ID: Optional[str] = None
     生産工程ID: Optional[str] = None
+    段取分数: Optional[int] = None
+    時間生産数量: Optional[float] = None
+    生産時間: Optional[float] = None
     生産開始日時: Optional[str] = None
     生産終了日時: Optional[str] = None
     生産内容: Optional[str] = None

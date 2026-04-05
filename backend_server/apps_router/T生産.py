@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import Optional
 import apps_schema as schemas, apps_crud as crud, deps, apps_models as models
-MAX_ITEMS = 10000
+from list_controls import get_list_limit
+
+MAX_ITEMS = 1000
 
 router = APIRouter(prefix="/apps/T生産", tags=["T生産"])
 
@@ -188,7 +190,8 @@ def list_T生産払出(
 
     where_sql = "WHERE " + " AND ".join(conditions)
 
-    limit_clause = f"LIMIT {MAX_ITEMS}"
+    limit_value = get_list_limit(request)
+    limit_clause = "LIMIT :limit" if limit_value is not None else ""
     sql = f"""
     SELECT
         T.生産伝票ID,
@@ -228,7 +231,11 @@ def list_T生産払出(
     {limit_clause}
     """
 
-    result = db.execute(text(sql), filter_params).fetchall()
+    params = {**filter_params}
+    if limit_value is not None:
+        params["limit"] = limit_value
+
+    result = db.execute(text(sql), params).fetchall()
 
     count_sql = f"""
     SELECT count(*) FROM T生産 T
@@ -271,5 +278,5 @@ def list_T生産払出(
     return schemas.ResponseBase(
         status="OK",
         message="生産払出一覧を取得しました",
-        data={"items": items, "total": total, "limit": MAX_ITEMS}
+        data={"items": items, "total": total, "limit": limit_value}
     )

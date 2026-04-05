@@ -22,6 +22,7 @@ const route = useRoute();
 const 生産一覧テーブルRef = ref<any>(null);
 const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
 const message = ref('');
 const messageType = ref('success');
 const 開始日付 = ref('');
@@ -194,7 +195,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
                   <select v-model="生産区分ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
-                      {{ item.生産区分名 }} ({{ item.生産区分ID }})
+                      {{ item.生産区分ID }} : {{ item.生産区分名 }}
                     </option>
                   </select>
                 </div>
@@ -205,7 +206,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
                   <select v-model="生産工程ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 生産工程一覧" :key="item.生産工程ID" :value="item.生産工程ID">
-                      {{ item.生産工程名 }} ({{ item.生産工程ID }})
+                      {{ item.生産工程ID }} : {{ item.生産工程名 }}
                     </option>
                   </select>
                 </div>
@@ -216,7 +217,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
                   <select v-model="受入商品ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
-                      {{ item.商品名 }} ({{ item.商品ID }})
+                      {{ item.商品ID }} : {{ item.商品名 }}
                     </option>
                   </select>
                 </div>
@@ -250,6 +251,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
           :受入商品ID="受入商品ID"
           :件数制限="件数制限"
           :無効も表示="無効も表示"
+          :有効列表示="有効列表示"
           :戻URL="編集戻URL"
         />
       </div>

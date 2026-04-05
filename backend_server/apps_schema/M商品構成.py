@@ -31,6 +31,8 @@ class M商品構成Base(BaseModel):
     最小ロット数量: float
     生産区分ID: str
     生産工程ID: str
+    段取分数: Optional[int] = None
+    時間生産数量: Optional[float] = None
     商品構成備考: Optional[str] = None
     有効: bool = True
     明細一覧: List[M商品構成明細Base] = Field(default_factory=list)
@@ -45,6 +47,8 @@ class M商品構成Update(BaseModel):
     最小ロット数量: Optional[float] = None
     生産区分ID: Optional[str] = None
     生産工程ID: Optional[str] = None
+    段取分数: Optional[int] = None
+    時間生産数量: Optional[float] = None
     商品構成備考: Optional[str] = None
     有効: Optional[bool] = None
     明細一覧: Optional[List[M商品構成明細Base]] = None

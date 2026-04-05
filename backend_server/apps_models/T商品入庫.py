@@ -12,13 +12,18 @@ from sqlalchemy import Boolean, Column, Integer, Text
 from database import Base
 
 class T商品入庫(Base):
+    """T商品入庫テーブル（商品入庫伝票トランザクション、明細付き）
+    明細SEQ=0: ヘッダ行（伝票日付・伝票備考）
+    明細SEQ>0: 明細行（商品・数量）
+    """
     __tablename__ = "T商品入庫"
     __table_args__ = {'extend_existing': True}
 
     入庫伝票ID = Column(Text, primary_key=True)
+    明細SEQ = Column(Integer, primary_key=True)
     入庫日 = Column(Text, nullable=False)
-    商品ID = Column(Text, nullable=False)
-    入庫数量 = Column(Integer, nullable=False)
+    商品ID = Column(Text)
+    入庫数量 = Column(Integer)
     入庫備考 = Column(Text)
     有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)

@@ -36,11 +36,33 @@
     <li>認証情報がない場合は system を利用（初期化時など）</li>
   </ul>
 
+  <h2>論理削除パターン（T系を中心に使用）</h2>
+  <p>物理削除（<code>db.delete()</code>）ではなく <code>有効 = False</code> に設定する論理削除を使います。T系では特に重要です。</p>
+  <pre><code>def delete_T配車(db: Session, 配車伝票ID: str, 認証情報=None):
+    """T配車を論理削除（有効フラグをFalseに設定）"""
+    db_item = get_T配車(db, 配車伝票ID)
+    if not db_item:
+        return False
+    audit = update_audit_fields(認証情報)
+    db_item.有効 = False  # 物理削除ではなく論理削除
+    for key, value in audit.items():
+        setattr(db_item, key, value)
+    db.commit()
+    return True</code></pre>
+
+  <p><strong>ポイント:</strong></p>
+  <ul>
+    <li>CRUD関数内で論理削除する場合は <code>update_audit_fields</code>（更新系4項目のみ）を使う</li>
+    <li>Router側で論理削除する場合は <code>create_audit_fields(認証情報, is_update=True)</code> を使う（どちらも同じ動作）</li>
+    <li>論理削除後も <code>get_</code> 関数では取得できてしまうため、一覧取得時の <code>list_controls.py</code> による有効フィルタが重要</li>
+  </ul>
+
   <h2>設計ポイント</h2>
   <ul>
     <li>CRUDは例外時に呼び出し元で rollback できるようにする</li>
     <li>戻り値はRouterでそのままレスポンス化できる形式にする</li>
     <li>重複チェックや存在チェックはRouterで行う（必要時のみ補助関数へ切り出す）</li>
+    <li><strong>削除はCRUD関数またはRouter内で論理削除（<code>有効 = False</code>）を実装する</strong></li>
   </ul>
 
   <h2>【重要】apps_crud/__init__.py への登録を忘れずに</h2>
@@ -63,6 +85,7 @@
     <li>[ ] 監査項目の設定漏れがない</li>
     <li>[ ] コミット/リフレッシュ処理が適切に配置されている</li>
     <li>[ ] <strong>【重要】apps_crud/__init__.py にimportと__all__追加済み</strong></li>
+    <li>[ ] 削除関数は物理削除（<code>db.delete()</code>）ではなく論理削除（<code>有効 = False</code>）になっている</li>
   </ul>
 
   <nav>

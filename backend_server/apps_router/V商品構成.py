@@ -48,6 +48,8 @@ def list_V商品構成(
         S.生産区分名,
         C.生産工程ID,
         K.生産工程名,
+        C.段取分数,
+        C.時間生産数量,
         C.商品構成備考,
         C.有効,
         (
@@ -84,6 +86,8 @@ def list_V商品構成(
             "生産区分名": row.生産区分名,
             "生産工程ID": row.生産工程ID,
             "生産工程名": row.生産工程名,
+            "段取分数": int(row.段取分数) if row.段取分数 is not None else None,
+            "時間生産数量": float(row.時間生産数量) if row.時間生産数量 is not None else None,
             "商品構成備考": row.商品構成備考,
             "有効": bool(row.有効) if row.有効 is not None else True,
             "構成商品件数": row.構成商品件数,

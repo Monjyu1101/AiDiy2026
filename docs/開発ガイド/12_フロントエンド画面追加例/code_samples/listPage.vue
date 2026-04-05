@@ -19,7 +19,12 @@ import { qMessage } from '../../../utils/qAlert';
 const router = useRouter();
 const route = useRoute();
 const 商品一覧テーブルRef = ref(null);
-const includeInactive = ref(false);
+// -------------------------------------------------------
+// 件数制限・無効も表示（全一覧画面に必須の標準パターン）
+// -------------------------------------------------------
+const 件数制限 = ref(true);      // true: 上限1000件, false: 全件
+const 無効も表示 = ref(false);   // false: 有効レコードのみ, true: 無効も含む
+const 有効列表示 = computed(() => 無効も表示.value); // 無効も表示ONのとき「有効」列を表示
 
 // ==================================================
 // 戻URLユーティリティ
@@ -45,6 +50,7 @@ const 編集戻URL = computed(() => {
   return router.resolve({ path: route.path, query }).fullPath;
 });
 
+// チェックボックス変更時・再検索ボタン押下時に呼ぶ
 const handleReload = () => {
   商品一覧テーブルRef.value?.loadData();
 };
@@ -106,11 +112,6 @@ watch(() => route.query.message, (newMessage) => {
           <div class="toolbar-left">
             <div class="search-area">
               <button class="btn btn-primary" @click="handleReload">再検索</button>
-              <!-- 無効レコードも一覧に表示するかどうか -->
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="includeInactive" />
-                無効も検索
-              </label>
             </div>
           </div>
           <div class="toolbar-right">
@@ -118,14 +119,33 @@ watch(() => route.query.message, (newMessage) => {
           </div>
         </div>
 
+        <!-- 件数制限・無効も表示チェックボックス（標準パターン） -->
+        <div class="table-options">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="件数制限" @change="handleReload" />
+            件数制限
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="無効も表示" @change="handleReload" />
+            無効も表示
+          </label>
+        </div>
+
         <!--
-          :includeInactive  — 無効レコードの表示/非表示をテーブルへ伝える
+          :件数制限     — true: 上限1000件取得, false: 全件取得
+          :無効も表示   — APIリクエストに渡す（false: 有効のみ, true: 全レコード）
+          :有効列表示   — 無効も表示ONのとき「有効」列をテーブルに表示する
           :戻URL="編集戻URL" — 一覧行クリック時に編集画面へ渡す戻URL（編集完了後にここへ戻る）
+
+          ※ Vue コンポーネントタグ名は ASCII のみ有効。
+            日本語コンポーネントは <component :is="..."> で使用する。
         -->
         <component
           :is="商品一覧テーブル"
           ref="商品一覧テーブルRef"
-          :includeInactive="includeInactive"
+          :件数制限="件数制限"
+          :無効も表示="無効も表示"
+          :有効列表示="有効列表示"
           :戻URL="編集戻URL"
         />
       </div>

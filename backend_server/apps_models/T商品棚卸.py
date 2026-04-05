@@ -11,15 +11,20 @@
 from sqlalchemy import Boolean, Column, Integer, Text
 from database import Base
 
+
 class T商品棚卸(Base):
-    """T商品棚卸テーブル（商品棚卸伝票トランザクション）"""
+    """T商品棚卸テーブル（商品棚卸伝票トランザクション、明細付き）
+    明細SEQ=0: ヘッダ行（伝票日付・伝票備考）
+    明細SEQ>0: 明細行（商品・実棚数量）
+    """
     __tablename__ = "T商品棚卸"
     __table_args__ = {'extend_existing': True}
 
     棚卸伝票ID = Column(Text, primary_key=True)
+    明細SEQ = Column(Integer, primary_key=True)
     棚卸日 = Column(Text, nullable=False)
-    商品ID = Column(Text, nullable=False)
-    実棚数量 = Column(Integer, nullable=False)
+    商品ID = Column(Text)
+    実棚数量 = Column(Integer)
     棚卸備考 = Column(Text)
     有効 = Column(Boolean, nullable=False, default=True)
     登録日時 = Column(Text, nullable=False)

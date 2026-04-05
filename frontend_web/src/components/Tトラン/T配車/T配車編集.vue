@@ -490,7 +490,7 @@ watch(() => route.query, async (query) => {
                       >
                         <option value="">選択してください</option>
                         <option v-for="item in 表示用車両一覧" :key="item.車両ID" :value="item.車両ID">
-                          {{ item.車両名 }} ({{ item.車両ID }})
+                          {{ item.車両ID }} : {{ item.車両名 }}
                         </option>
                       </select>
                       <span v-if="errors.車両ID" class="input-alert">!</span>
@@ -516,7 +516,7 @@ watch(() => route.query, async (query) => {
                       >
                         <option value="">選択してください</option>
                         <option v-for="item in 表示用配車区分一覧" :key="item.配車区分ID" :value="item.配車区分ID">
-                          {{ item.配車区分名 }}
+                          {{ item.配車区分ID }} : {{ item.配車区分名 }}
                         </option>
                       </select>
                       <span v-if="errors.配車区分ID" class="input-alert">!</span>
@@ -890,7 +890,8 @@ watch(() => route.query, async (query) => {
 }
 
 .datetime-input {
-  width: 240px;
+  width: 320px;
+  text-align: center;
 }
 
 .select-input {

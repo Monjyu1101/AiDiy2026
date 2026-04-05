@@ -36,6 +36,112 @@
  <code>...</code>
  </pre>
  </section>
+
+ <!-- ===== 以下 2026-04-05 追記 ===== -->
+
+ <section>
+ <h2>件数制限の実装ルール（バックエンド）</h2>
+ <p>一覧エンドポイントは必ず件数制限を設ける。系統によって使う方法が異なる。</p>
+
+ <h3>V系・T系：list_controls.py を使う</h3>
+ <p>直接 <code>.limit()</code> を書いてはいけない。<code>list_controls.py</code> の関数を必ず使用する。</p>
+ <pre><code class="language-python"># V系・T系 一覧エンドポイントの件数制限（正しいパターン）
+from list_controls import append_active_condition, get_limit_clause
+
+# 有効フラグの絞り込みも list_controls で行う
+append_active_condition(conditions, request, 's."有効"')
+
+# LIMIT 句と値を取得して SQL に組み込む
+limit_sql, limit_value = get_limit_clause(request)
+sql = f"""
+    SELECT ...
+    FROM ...
+    WHERE {where_clause}
+    ORDER BY s."商品ID"
+    {limit_sql}
+"""
+result = db.execute(text(sql), {**params, **limit_value}).fetchall()
+</code></pre>
+
+ <h3>M系・C系：MAX_ITEMS 定数を Router 上部に定義して使う</h3>
+ <pre><code class="language-python"># M系・C系 Router ファイル上部に定義
+MAX_ITEMS = 10000
+
+# 一覧クエリで使用
+items = (
+    db.query(models.M商品)
+    .filter(models.M商品.有効 == True)
+    .order_by(models.M商品.商品ID)
+    .limit(MAX_ITEMS)
+    .all()
+)
+</code></pre>
+ </section>
+
+ <section>
+ <h2>論理削除の実装ルール（バックエンド）</h2>
+ <p>物理削除（<code>db.delete()</code> / <code>DROP</code>）は原則禁止。削除は「有効フラグを False にする」論理削除で行う。</p>
+ <pre><code class="language-python"># /削除 エンドポイントの正しい実装パターン
+@router.post("/M商品/削除")
+def M商品_削除(request: M商品削除Request, db: Session = Depends(get_db), 認証情報=Depends(verify_token)):
+    item = db.query(models.M商品).filter(models.M商品.商品ID == request.商品ID).first()
+    if not item:
+        return {"status": "NG", "message": "対象データが見つかりません"}
+
+    # 論理削除: 有効フラグを False にする
+    item.有効 = False
+    for key, value in update_audit_fields(認証情報).items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)  # 削除後もレコードを返す（フロントの状態更新のため）
+
+    return {"status": "OK", "message": "商品の有効をオフにしました", "data": item}
+</code></pre>
+ <ul>
+ <li>レスポンスの <code>message</code> は「〜の有効をオフにしました」形式にする</li>
+ <li><code>db.refresh(item)</code> を必ず呼んでレコードを返す（フロント側の状態更新に必要）</li>
+ </ul>
+ </section>
+
+ <section>
+ <h2>一覧画面の標準パターン（フロントエンド）</h2>
+ <p>一覧画面には「件数制限」「無効も表示」の制御を必ず実装する。</p>
+
+ <h3>親コンポーネント（一覧.vue）の state 定義</h3>
+ <pre><code class="language-typescript">// 一覧.vue — 必須の state
+const 件数制限 = ref(true);
+const 無効も表示 = ref(false);
+
+// 「有効」列の表示制御: 無効も表示している場合だけ列を出す
+const 有効列表示 = computed(() => 無効も表示.value);
+</code></pre>
+
+ <h3>チェックボックス UI（一覧画面に必ず設置）</h3>
+ <pre><code class="language-html">&lt;label&gt;
+  &lt;input type="checkbox" v-model="件数制限" @change="handleReload" /&gt; 件数制限
+&lt;/label&gt;
+&lt;label&gt;
+  &lt;input type="checkbox" v-model="無効も表示" @change="handleReload" /&gt; 無効も表示
+&lt;/label&gt;
+</code></pre>
+
+ <h3>一覧テーブルコンポーネントの props 定義</h3>
+ <pre><code class="language-typescript">// components/一覧テーブル.vue
+const props = defineProps({
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
+});
+</code></pre>
+
+ <h3>API リクエストへの組み込み</h3>
+ <pre><code class="language-typescript">// 一覧テーブルコンポーネント内での API 呼び出し
+const res = await apiClient.post('/apps/V商品/一覧', {
+  件数制限: props.件数制限,
+  無効も表示: props.無効も表示,
+});
+</code></pre>
+ </section>
+
  </main>
 
  <footer>AiDiy Docs / </footer>

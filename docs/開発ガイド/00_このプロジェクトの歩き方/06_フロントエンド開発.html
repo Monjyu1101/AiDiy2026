@@ -289,6 +289,53 @@ console.log(authStore.user)
  </div>
  </section>
 
+ <section id="list-controls-frontend">
+ <h2>一覧画面の標準パターン（件数制限・論理削除）</h2>
+ <p>V系・T系の一覧画面では、件数制限と論理削除（無効も表示）を制御する標準パターンがあります。</p>
+
+ <h3>Script 部分</h3>
+ <pre><code>&lt;script setup&gt;
+import { ref, computed, onMounted } from 'vue'
+import apiClient from '@/api/client'
+
+const 件数制限 = ref(true)
+const 無効も表示 = ref(false)
+
+// 無効も表示がONのとき「有効」列を表示する
+const 有効列表示 = computed(() => 無効も表示.value)
+
+async function handleReload() {
+  const response = await apiClient.post('/apps/V〇〇/一覧', {
+    件数制限: 件数制限.value,
+    無効も表示: 無効も表示.value,
+  })
+  if (response.data.status === 'OK') {
+    items.value = response.data.data.items
+  }
+}
+
+onMounted(handleReload)
+&lt;/script&gt;</code></pre>
+
+ <h3>Template 部分</h3>
+ <pre><code>&lt;template&gt;
+  &lt;label&gt;
+    &lt;input type="checkbox" v-model="件数制限" @change="handleReload" /&gt; 件数制限
+  &lt;/label&gt;
+  &lt;label&gt;
+    &lt;input type="checkbox" v-model="無効も表示" @change="handleReload" /&gt; 無効も表示
+  &lt;/label&gt;
+&lt;/template&gt;</code></pre>
+
+ <h3>ポイント</h3>
+ <ul>
+ <li><code>件数制限=true</code> のとき、バックエンドで LIMIT 1000 が適用されます</li>
+ <li><code>無効も表示=false</code>（デフォルト）のとき、有効=1 のレコードのみ返ります</li>
+ <li><code>有効列表示</code> は <code>computed</code> で <code>無効も表示</code> と連動させ、無効レコード表示時のみ「有効」列を qTubler に表示します</li>
+ <li>M系の一覧はこのパターン不要（リクエストボディなし・全件取得）</li>
+ </ul>
+ </section>
+
  <section id="next">
  <h2>次のステップ</h2>
  <p>フロントエンドの基本を理解したら、次はテストの書き方を学びましょう。</p>

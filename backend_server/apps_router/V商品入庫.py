@@ -17,6 +17,7 @@ from list_controls import append_active_condition, get_limit_clause
 
 router = APIRouter(prefix="/apps/V商品入庫", tags=["V商品入庫"])
 
+
 @router.post("/一覧", response_model=schemas.ResponseBase)
 def list_V商品入庫(
     request: Optional[schemas.ListRequest] = None,
@@ -24,16 +25,20 @@ def list_V商品入庫(
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
     filter_params = {}
-    conditions = []
-    append_active_condition(conditions, request, "T.有効")
+    conditions = ["D.明細SEQ > 0"]
+    append_active_condition(conditions, request, "D.有効")
 
     if request and request.開始日付:
-        conditions.append("date(T.入庫日) >= :start_date")
+        conditions.append("date(H.入庫日) >= :start_date")
         filter_params["start_date"] = request.開始日付
 
     if request and request.終了日付:
-        conditions.append("date(T.入庫日) <= :end_date")
+        conditions.append("date(H.入庫日) <= :end_date")
         filter_params["end_date"] = request.終了日付
+
+    if request and request.商品ID:
+        conditions.append("D.商品ID = :商品ID")
+        filter_params["商品ID"] = request.商品ID
 
     where_sql = ""
     if conditions:
@@ -42,27 +47,30 @@ def list_V商品入庫(
     limit_sql, limit_value = get_limit_clause(request)
     sql = f"""
     SELECT
-        T.入庫伝票ID,
-        T.入庫日,
-        T.商品ID,
-        T.入庫数量,
-        T.入庫備考,
-        T.有効,
-        T.登録日時,
-        T.登録利用者ID,
-        T.登録利用者名,
-        T.登録端末ID,
-        T.更新日時,
-        T.更新利用者ID,
-        T.更新利用者名,
-        T.更新端末ID,
+        (D.入庫伝票ID || '-' || D.明細SEQ) AS 一覧行ID,
+        D.入庫伝票ID,
+        D.明細SEQ,
+        H.入庫日,
+        D.商品ID,
+        D.入庫数量,
+        COALESCE(D.入庫備考, H.入庫備考) AS 入庫備考,
+        D.有効,
+        H.登録日時,
+        H.登録利用者ID,
+        H.登録利用者名,
+        H.登録端末ID,
+        D.更新日時,
+        D.更新利用者ID,
+        D.更新利用者名,
+        D.更新端末ID,
         M.商品名,
         M.単位,
         M.商品備考
-    FROM T商品入庫 T
-    LEFT JOIN M商品 M ON T.商品ID = M.商品ID
+    FROM T商品入庫 D
+    LEFT JOIN T商品入庫 H ON D.入庫伝票ID = H.入庫伝票ID AND H.明細SEQ = 0
+    LEFT JOIN M商品 M ON D.商品ID = M.商品ID
     {where_sql}
-    ORDER BY T.入庫日 DESC
+    ORDER BY H.入庫日 DESC, D.入庫伝票ID DESC, D.明細SEQ
     {limit_sql}
     """
 
@@ -74,7 +82,9 @@ def list_V商品入庫(
     items = []
     for row in result:
         items.append({
+            "一覧行ID": row.一覧行ID,
             "入庫伝票ID": row.入庫伝票ID,
+            "明細SEQ": row.明細SEQ,
             "入庫日": row.入庫日,
             "商品ID": row.商品ID,
             "入庫数量": row.入庫数量,
@@ -95,8 +105,9 @@ def list_V商品入庫(
 
     count_sql = f"""
     SELECT count(*)
-    FROM T商品入庫 T
-    LEFT JOIN M商品 M ON T.商品ID = M.商品ID
+    FROM T商品入庫 D
+    LEFT JOIN T商品入庫 H ON D.入庫伝票ID = H.入庫伝票ID AND H.明細SEQ = 0
+    LEFT JOIN M商品 M ON D.商品ID = M.商品ID
     {where_sql}
     """
     total = db.execute(text(count_sql), filter_params).scalar()

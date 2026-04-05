@@ -28,6 +28,7 @@ const props = defineProps({
   払出商品ID: { type: String, default: '' },
   件数制限: { type: Boolean, default: true },
   無効も表示: { type: Boolean, default: false },
+  有効列表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
@@ -50,7 +51,6 @@ const filters = reactive({
   払出商品名: '',
   払出数量: '',
   払出単位: '',
-  最小ロット構成数量: '',
   所要数量備考: '',
   生産区分名: '',
   生産工程名: '',
@@ -58,27 +58,31 @@ const filters = reactive({
   更新利用者名: ''
 });
 
-const rowKey = '生産伝票ID';
-const columns: Column[] = [
-  { key: '生産伝票ID',       label: '生産伝票ID',     width: '120px', sortable: true },
-  { key: '生産開始日時',     label: '開始日時',       width: '130px', sortable: true, align: 'center' },
-  { key: '生産終了日時',     label: '終了日時',       width: '130px', sortable: true, align: 'center' },
-  { key: '受入商品ID',       label: '受入商品ID',     width: '100px', sortable: true },
-  { key: '受入商品名',       label: '受入商品名',     width: '150px', sortable: true },
-  { key: '受入数量',         label: '受入数量',       width: '90px',  sortable: true, align: 'right' },
-  { key: '受入単位',         label: '単位',           width: '60px',  sortable: true, align: 'center' },
-  { key: '払出商品ID',       label: '払出商品ID',     width: '100px', sortable: true },
-  { key: '払出商品名',       label: '払出商品名',     width: '150px', sortable: true },
-  { key: '払出数量',         label: '払出数量',       width: '90px',  sortable: true, align: 'right' },
-  { key: '払出単位',         label: '単位',           width: '60px',  sortable: true, align: 'center' },
-  { key: '最小ロット構成数量', label: '最小ロット構成', width: '110px', sortable: true, align: 'right' },
-  { key: '所要数量備考',     label: '所要数量備考',   width: '160px', sortable: true },
-  { key: '生産区分名',       label: '生産区分',       width: '100px', sortable: true },
-  { key: '生産工程名',       label: '生産工程',       width: '110px', sortable: true },
-  { key: '有効',             label: '有効',           width: '55px',  sortable: true, align: 'center' },
-  { key: '更新日時',         label: '更新日時',       width: '130px', sortable: true },
-  { key: '更新利用者名',     label: '更新利用者名',   width: '110px', sortable: true }
-];
+const rowKey = '一覧行ID';
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '生産伝票ID',       label: '生産伝票ID',     width: '120px', sortable: true, align: 'center' },
+    { key: '生産開始日時',     label: '開始日時',       width: '130px', sortable: true, align: 'center' },
+    { key: '生産終了日時',     label: '終了日時',       width: '130px', sortable: true, align: 'center' },
+    { key: '受入商品ID',       label: '受入商品ID',     width: '100px', sortable: true, align: 'center' },
+    { key: '受入商品名',       label: '受入商品名',     width: '150px', sortable: true },
+    { key: '受入数量',         label: '受入数量',       width: '90px',  sortable: true, align: 'right' },
+    { key: '受入単位',         label: '単位',           width: '60px',  sortable: true, align: 'center' },
+    { key: '生産区分名',       label: '生産区分',       width: '100px', sortable: true, align: 'center' },
+    { key: '生産工程名',       label: '生産工程',       width: '110px', sortable: true, align: 'center' },
+    { key: '払出商品ID',       label: '払出商品ID',     width: '100px', sortable: true, align: 'center' },
+    { key: '払出商品名',       label: '払出商品名',     width: '150px', sortable: true },
+    { key: '払出数量',         label: '払出数量',       width: '90px',  sortable: true, align: 'right' },
+    { key: '払出単位',         label: '単位',           width: '60px',  sortable: true, align: 'center' },
+    { key: '所要数量備考',     label: '所要数量備考',   width: '160px', sortable: true },
+    { key: '更新日時',         label: '更新日時',       width: '130px', sortable: true },
+    { key: '更新利用者名',     label: '更新利用者名',   width: '110px', sortable: true }
+  ];
+  if (props.有効列表示) {
+    baseColumns.splice(14, 0, { key: '有効', label: '有効', width: '55px', sortable: true, align: 'center' });
+  }
+  return baseColumns;
+});
 
 const formatDateTime = (val: string | null | undefined) => {
   if (!val) return '';
@@ -102,7 +106,7 @@ const hasFilter = computed((): boolean => {
 
 const filteredRows = computed(() => {
   return 払出一覧.value.filter((row) => {
-    const columnMatch = columns.every((col) => {
+    const columnMatch = columns.value.every((col) => {
       const fv = (filters[col.key] || '').trim();
       if (!fv) return true;
       return String(row?.[col.key] ?? '').toLowerCase().includes(fv.toLowerCase());
@@ -165,6 +169,7 @@ const loadData = async () => {
   message.value = '';
   try {
     const payload: Record<string, any> = {
+      件数制限: props.件数制限,
       無効も表示: props.無効も表示
     };
     if (props.開始日付) payload.開始日付 = props.開始日付;
@@ -176,7 +181,10 @@ const loadData = async () => {
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
-      払出一覧.value = items;
+      払出一覧.value = items.map((item: any) => ({
+        ...item,
+        一覧行ID: `${item.生産伝票ID ?? ''}-${item.明細SEQ ?? ''}`
+      }));
       serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
@@ -229,7 +237,7 @@ defineExpose({ loadData });
       <template v-else-if="['生産開始日時', '生産終了日時', '更新日時'].includes(column.key)">
         {{ formatDateTime(value) }}
       </template>
-      <template v-else-if="['受入数量', '払出数量', '最小ロット構成数量'].includes(column.key)">
+      <template v-else-if="['受入数量', '払出数量'].includes(column.key)">
         {{ value != null ? Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 3 }) : '' }}
       </template>
       <template v-else>

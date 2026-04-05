@@ -23,6 +23,7 @@ const route = useRoute();
 const 商品構成一覧テーブルRef = ref<any>(null);
 const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
 const 生産区分ID = ref('');
 const 生産区分一覧 = ref<M生産区分[]>([]);
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value ?? null);
@@ -122,7 +123,7 @@ watch(() => route.query.message, (newMessage) => {
                   <select v-model="生産区分ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
-                      {{ item.生産区分名 }} ({{ item.生産区分ID }})
+                      {{ item.生産区分ID }} : {{ item.生産区分名 }}
                     </option>
                   </select>
                 </div>
@@ -146,7 +147,7 @@ watch(() => route.query.message, (newMessage) => {
           </label>
         </div>
 
-        <component :is="商品構成一覧テーブル" ref="商品構成一覧テーブルRef" :生産区分ID="生産区分ID" :件数制限="件数制限" :無効も表示="無効も表示" :戻URL="編集戻URL" />
+        <component :is="商品構成一覧テーブル" ref="商品構成一覧テーブルRef" :生産区分ID="生産区分ID" :件数制限="件数制限" :無効も表示="無効も表示" :有効列表示="有効列表示" :戻URL="編集戻URL" />
       </div>
     </div>
   </div>
@@ -218,7 +219,7 @@ watch(() => route.query.message, (newMessage) => {
   flex-direction: column;
   gap: 0;
   width: fit-content;
-  --select-width: 360px;
+  --select-width: 320px;
 }
 
 .detail-row {

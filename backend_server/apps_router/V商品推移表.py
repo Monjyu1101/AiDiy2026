@@ -86,9 +86,15 @@ def list_transition(
         # 2. 全トランザクション取得（効率のため全件取得してからメモリで処理）
         # ※データ量が膨大になった場合はSQLで期間絞り込みと集計を行うべきですが、
         #   在庫推移計算のためには期間前のデータも必要なため、今回は全件取得方式を採用
-        inbounds = db.query(models.T商品入庫).filter(models.T商品入庫.有効 == True).all()
-        outbounds = db.query(models.T商品出庫).filter(models.T商品出庫.有効 == True).all()
-        inventories = db.query(models.T商品棚卸).filter(models.T商品棚卸.有効 == True).all()
+        inbounds = db.query(models.T商品入庫).filter(
+            models.T商品入庫.明細SEQ > 0, models.T商品入庫.有効 == True
+        ).all()
+        outbounds = db.query(models.T商品出庫).filter(
+            models.T商品出庫.明細SEQ > 0, models.T商品出庫.有効 == True
+        ).all()
+        inventories = db.query(models.T商品棚卸).filter(
+            models.T商品棚卸.明細SEQ > 0, models.T商品棚卸.有効 == True
+        ).all()
 
         # T生産: ヘッダ行（生産受入）と明細行（生産払出）を取得
         prod_headers = db.query(models.T生産).filter(
@@ -244,14 +250,17 @@ def get_transition_last_modified(
         )
 
     入庫最終更新日時 = db.query(func.max(models.T商品入庫.更新日時)).filter(
+        models.T商品入庫.明細SEQ > 0,
         models.T商品入庫.有効 == True,
         func.date(models.T商品入庫.入庫日).between(request.開始日付, request.終了日付)
     ).scalar()
     出庫最終更新日時 = db.query(func.max(models.T商品出庫.更新日時)).filter(
+        models.T商品出庫.明細SEQ > 0,
         models.T商品出庫.有効 == True,
         func.date(models.T商品出庫.出庫日).between(request.開始日付, request.終了日付)
     ).scalar()
     棚卸最終更新日時 = db.query(func.max(models.T商品棚卸.更新日時)).filter(
+        models.T商品棚卸.明細SEQ > 0,
         models.T商品棚卸.有効 == True,
         func.date(models.T商品棚卸.棚卸日).between(request.開始日付, request.終了日付)
     ).scalar()

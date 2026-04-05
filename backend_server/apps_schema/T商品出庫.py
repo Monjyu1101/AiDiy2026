@@ -8,17 +8,28 @@
 # https://github.com/monjyu1101
 # -------------------------------------------------------------------------
 
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 
 # --- 商品出庫 (T商品出庫) ---
 
-class T商品出庫Base(BaseModel):
-    出庫日: str
+class T商品出庫明細Base(BaseModel):
+    明細SEQ: int
     商品ID: str
     出庫数量: int
+    明細備考: Optional[str] = None
+
+
+class T商品出庫明細(T商品出庫明細Base):
+    商品名: Optional[str] = None
+    単位: Optional[str] = None
+
+
+class T商品出庫Base(BaseModel):
+    出庫日: str
     出庫備考: Optional[str] = None
     有効: bool = True
+    明細一覧: List[T商品出庫明細Base] = Field(default_factory=list)
 
 
 class T商品出庫Create(T商品出庫Base):
@@ -27,10 +38,9 @@ class T商品出庫Create(T商品出庫Base):
 
 class T商品出庫Update(BaseModel):
     出庫日: Optional[str] = None
-    商品ID: Optional[str] = None
-    出庫数量: Optional[int] = None
     出庫備考: Optional[str] = None
     有効: Optional[bool] = None
+    明細一覧: Optional[List[T商品出庫明細Base]] = None
 
 
 class T商品出庫Delete(BaseModel):
@@ -43,6 +53,9 @@ class T商品出庫Get(BaseModel):
 
 class T商品出庫(T商品出庫Base):
     出庫伝票ID: str
+    出庫商品件数: int = 0
+    合計出庫数量: int = 0
+    明細一覧: List[T商品出庫明細] = Field(default_factory=list)
     有効: bool
     登録日時: str
     登録利用者ID: str

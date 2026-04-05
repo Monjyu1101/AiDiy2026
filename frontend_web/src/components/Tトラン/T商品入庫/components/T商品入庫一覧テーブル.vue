@@ -41,6 +41,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  有効列表示: {
+    type: Boolean,
+    default: false
+  },
   戻URL: {
     type: String,
     default: ''
@@ -55,27 +59,37 @@ const sortKey = ref('入庫日');
 const sortOrder = ref('desc');
 const filters = reactive({
   入庫伝票ID: '',
+  明細SEQ: '',
   入庫日: '',
+  商品ID: '',
   商品名: '',
   入庫数量: '',
   入庫備考: '',
   更新日時: '',
   更新利用者名: ''
 });
-const rowKey = '入庫伝票ID';
-const columns: Column[] = [
-  { key: '入庫伝票ID', label: '入庫伝票ID', width: '120px', sortable: true },
-  { key: '入庫日', label: '入庫日', width: '120px', sortable: true, align: 'center' },
-  { key: '商品名', label: '商品名', width: '150px', sortable: true },
-  { key: '入庫数量', label: '入庫数量', width: '100px', sortable: true, align: 'right' },
-  { key: '入庫備考', label: '入庫備考', width: '220px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
-];
+const rowKey = '一覧行ID';
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '入庫伝票ID', label: '入庫伝票ID', width: '120px', sortable: true, align: 'center' },
+    { key: '明細SEQ', label: '行', width: '48px', sortable: true, align: 'center' },
+    { key: '入庫日', label: '入庫日', width: '120px', sortable: true, align: 'center' },
+    { key: '商品ID', label: '商品ID', width: '100px', sortable: true, align: 'center' },
+    { key: '商品名', label: '商品名', width: '150px', sortable: true },
+    { key: '入庫数量', label: '入庫数量', width: '100px', sortable: true, align: 'right' },
+    { key: '入庫備考', label: '入庫備考', width: '220px', sortable: true },
+    { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+    { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  ];
+  if (props.有効列表示) {
+    baseColumns.splice(7, 0, { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' });
+  }
+  return baseColumns;
+});
 
 const message = ref('');
 const messageType = ref('success');
+const numberFormatter = new Intl.NumberFormat('ja-JP');
 
 const setMessage = (text, type = 'success') => {
   message.value = text;
@@ -91,7 +105,7 @@ const hasFilter = computed((): boolean => {
 const filteredRows = computed(() => {
   return 商品入庫一覧.value.filter((row) => {
     // 列フィルタのチェック
-    const columnMatch = columns.every((column) => {
+    const columnMatch = columns.value.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
       const cellValue = row?.[column.key] ?? '';
@@ -181,6 +195,7 @@ const loadData = async () => {
     };
     if (props.開始日付) payload.開始日付 = String(props.開始日付);
     if (props.終了日付) payload.終了日付 = String(props.終了日付);
+    if (props.商品ID) payload.商品ID = String(props.商品ID);
     const res = await apiClient.post(
       '/apps/V商品入庫/一覧',
       Object.keys(payload).length ? payload : undefined
@@ -239,6 +254,9 @@ defineExpose({
     <template #cell="{ row, column, value }">
       <template v-if="column.key === '入庫伝票ID'">
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.入庫伝票ID }}</a>
+      </template>
+      <template v-else-if="column.key === '入庫数量'">
+        {{ value === null || value === undefined || value === '' ? '' : numberFormatter.format(Number(value)) }}
       </template>
       <template v-else-if="column.key === '有効'">
         <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />

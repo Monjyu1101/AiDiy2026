@@ -47,6 +47,9 @@ const 生産工程一覧 = ref([]);
 const 生産区分一覧 = ref([]);
 const detailError = ref('');
 const isLoading = ref(false);
+const numberFormatter = new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 3 });
+const 数値編集中 = reactive<Record<string, boolean>>({});
+const 数値入力開始値 = reactive<Record<string, string>>({});
 
 const form = reactive({
   生産伝票ID: '',
@@ -54,6 +57,9 @@ const form = reactive({
   生産終了日時: '',
   生産区分ID: '',
   生産工程ID: '',
+  段取分数: '',
+  時間生産数量: '',
+  生産時間: '',
   受入商品ID: '',
   最小ロット数量: '',
   受入数量: '',
@@ -67,8 +73,12 @@ const errors = reactive({
   生産終了日時: '',
   受入商品ID: '',
   最小ロット数量: '',
+  受入数量: '',
   生産区分ID: '',
-  生産工程ID: ''
+  生産工程ID: '',
+  段取分数: '',
+  時間生産数量: '',
+  生産時間: ''
 });
 
 const touched = reactive({
@@ -76,8 +86,12 @@ const touched = reactive({
   生産終了日時: false,
   受入商品ID: false,
   最小ロット数量: false,
+  受入数量: false,
   生産区分ID: false,
-  生産工程ID: false
+  生産工程ID: false,
+  段取分数: false,
+  時間生産数量: false,
+  生産時間: false
 });
 
 const 明細一覧 = ref<生産明細Form[]>([]);
@@ -88,7 +102,8 @@ const 明細一覧 = ref<生産明細Form[]>([]);
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
-const requiredFields = computed(() => ['生産開始日時', '生産終了日時', '受入商品ID', '最小ロット数量', '生産区分ID', '生産工程ID']);
+const requiredFields = computed(() => ['生産開始日時', '生産終了日時', '受入商品ID', '最小ロット数量', '受入数量', '生産区分ID', '生産工程ID']);
+type HeaderField = '生産開始日時' | '生産終了日時' | '受入商品ID' | '最小ロット数量' | '受入数量' | '生産区分ID' | '生産工程ID' | '段取分数' | '時間生産数量' | '生産時間';
 
 const 表示用生産工程一覧 = computed(() => isCreateMode.value
   ? 生産工程一覧.value.filter((item: any) => item?.有効 !== false)
@@ -121,6 +136,75 @@ const toNumber = (value: any) => {
 };
 const formatNumber = (value: number) => value.toLocaleString('ja-JP', { maximumFractionDigits: 3 });
 const get払出商品 = (商品ID: string) => 商品マップ.value[String(商品ID)] || null;
+const normalizeNumericInput = (value: any) => String(value ?? '').replace(/,/g, '').trim();
+const formatNumericDisplay = (value: any) => {
+  const normalized = normalizeNumericInput(value);
+  if (!normalized) return '';
+  const num = Number(normalized);
+  return Number.isFinite(num) ? numberFormatter.format(num) : normalized;
+};
+const formatHourDisplay = (value: any) => {
+  const normalized = normalizeNumericInput(value);
+  if (!normalized) return '';
+  const num = Number(normalized);
+  return Number.isFinite(num) ? num.toFixed(2) : normalized;
+};
+const clearNumericEditing = () => {
+  Object.keys(数値編集中).forEach((key) => { delete 数値編集中[key]; });
+  Object.keys(数値入力開始値).forEach((key) => { delete 数値入力開始値[key]; });
+};
+const isNumericEditing = (key: string) => Boolean(数値編集中[key]);
+const setNumericValue = (target: Record<string, any>, field: string, value: any) => {
+  target[field] = normalizeNumericInput(value);
+};
+const handleNumericFocus = async (key: string, target: Record<string, any>, field: string, event: FocusEvent) => {
+  数値編集中[key] = true;
+  setNumericValue(target, field, target[field]);
+  数値入力開始値[key] = String(target[field] ?? '');
+  await nextTick();
+  const input = event.target as HTMLInputElement | null;
+  input?.select();
+};
+const handleNumericInput = (
+  target: Record<string, any>,
+  field: string,
+  event: Event,
+  after?: () => void
+) => {
+  const input = event.target as HTMLInputElement | null;
+  setNumericValue(target, field, input?.value ?? '');
+  after?.();
+};
+const handleNumericBlur = (
+  key: string,
+  target: Record<string, any>,
+  field: string,
+  after?: (changed: boolean) => void
+) => {
+  setNumericValue(target, field, target[field]);
+  const changed = String(target[field] ?? '') !== String(数値入力開始値[key] ?? '');
+  delete 数値編集中[key];
+  delete 数値入力開始値[key];
+  after?.(changed);
+};
+const calcProductionHours = () => {
+  const 受入数量 = toNumber(form.受入数量);
+  const 時間生産数量 = toNumber(form.時間生産数量);
+  if (受入数量 <= 0 || 時間生産数量 <= 0) return '';
+  return String(Math.round((受入数量 / 時間生産数量) * 100) / 100);
+};
+const recalcProductionHours = () => {
+  form.生産時間 = calcProductionHours();
+};
+const calcHourlyQuantity = () => {
+  const 受入数量 = toNumber(form.受入数量);
+  const 生産時間 = toNumber(form.生産時間);
+  if (受入数量 <= 0 || 生産時間 <= 0) return '';
+  return String(Math.round((受入数量 / 生産時間) * 100) / 100);
+};
+const recalcHourlyQuantity = () => {
+  form.時間生産数量 = calcHourlyQuantity();
+};
 
 const calc最小ロット構成数量 = (row: 生産明細Form) => {
   const 受入 = toNumber(form.受入数量);
@@ -169,6 +253,7 @@ const createEmptyDetail = (明細SEQ = 1): 生産明細Form => ({
 });
 
 const renumberDetails = () => {
+  clearNumericEditing();
   明細一覧.value.forEach((row, index) => { row.明細SEQ = index + 1; });
 };
 
@@ -182,11 +267,15 @@ const resetValidation = () => {
 };
 
 const resetForm = () => {
+  clearNumericEditing();
   form.生産伝票ID = '';
   form.生産開始日時 = '';
   form.生産終了日時 = '';
   form.生産区分ID = '';
   form.生産工程ID = '';
+  form.段取分数 = '';
+  form.時間生産数量 = '';
+  form.生産時間 = '';
   form.受入商品ID = '';
   form.最小ロット数量 = '';
   form.受入数量 = '';
@@ -198,11 +287,15 @@ const resetForm = () => {
 
 const applyDataToForm = async (data: any) => {
   isLoading.value = true;
+  clearNumericEditing();
   form.生産伝票ID = data?.生産伝票ID || '';
   form.生産開始日時 = data?.生産開始日時 || '';
   form.生産終了日時 = data?.生産終了日時 || '';
   form.生産区分ID = data?.生産区分ID || '';
   form.生産工程ID = data?.生産工程ID || '';
+  form.段取分数 = data?.段取分数 === null || data?.段取分数 === undefined ? '' : String(data.段取分数);
+  form.時間生産数量 = data?.時間生産数量 === null || data?.時間生産数量 === undefined ? '' : String(data.時間生産数量);
+  form.生産時間 = data?.生産時間 === null || data?.生産時間 === undefined ? '' : String(data.生産時間);
   form.受入商品ID = data?.受入商品ID || '';
   form.最小ロット数量 = data?.最小ロット数量 === null || data?.最小ロット数量 === undefined ? '' : String(data.最小ロット数量);
   form.受入数量 = data?.受入数量 === null || data?.受入数量 === undefined ? '' : String(data.受入数量);
@@ -229,9 +322,23 @@ const applyDataToForm = async (data: any) => {
 // ==================================================
 // バリデーション
 // ==================================================
-const validateField = (field: string, showError = true) => {
+const validateField = (field: HeaderField, showError = true) => {
   const value = String(form[field] ?? '').trim();
-  if (!requiredFields.value.includes(field)) { errors[field] = ''; return true; }
+  if (!requiredFields.value.includes(field)) {
+    if (field === '段取分数' && value) {
+      const num = Number(value);
+      if (!Number.isInteger(num) || num < 0) {
+        errors[field] = showError ? '段取分数は0以上の整数を入力してください。' : 'ERROR';
+        return false;
+      }
+    }
+    if (field === '時間生産数量' && value && toNumber(value) <= 0) {
+      errors[field] = showError ? '時間生産数量は0より大きい値を入力してください。' : 'ERROR';
+      return false;
+    }
+    errors[field] = '';
+    return true;
+  }
   if (!value) { errors[field] = showError ? `${field}は必須です。` : 'ERROR'; return false; }
   if (field === '最小ロット数量' && toNumber(value) <= 0) {
     errors[field] = showError ? '最小ロット数量は0より大きい値を入力してください。' : 'ERROR';
@@ -241,8 +348,8 @@ const validateField = (field: string, showError = true) => {
   return true;
 };
 
-const handleBlur = (field: string) => { touched[field] = true; validateField(field); };
-const handleInput = (field: string) => { if (touched[field]) validateField(field); };
+const handleBlur = (field: HeaderField) => { touched[field] = true; validateField(field); };
+const handleInput = (field: HeaderField) => { if (touched[field]) validateField(field); };
 
 const sanitizeDetails = () => {
   return 明細一覧.value
@@ -287,12 +394,24 @@ const validateForm = () => {
   let firstErrorField: string | null = null;
 
   requiredFields.value.forEach((field) => {
-    touched[field] = true;
-    if (!validateField(field, false)) {
+    touched[field as HeaderField] = true;
+    if (!validateField(field as HeaderField, false)) {
       isValid = false;
       if (!firstErrorField) firstErrorField = field;
     }
   });
+  if (!validateField('段取分数', false)) {
+    isValid = false;
+    if (!firstErrorField) firstErrorField = '段取分数';
+  }
+  if (!validateField('時間生産数量', false)) {
+    isValid = false;
+    if (!firstErrorField) firstErrorField = '時間生産数量';
+  }
+  if (!validateField('生産時間', false)) {
+    isValid = false;
+    if (!firstErrorField) firstErrorField = '生産時間';
+  }
 
   if (firstErrorField) {
     const fieldMap: Record<string, string> = {
@@ -300,8 +419,12 @@ const validateForm = () => {
       '生産終了日時': 'form-end-datetime',
       '受入商品ID': 'form-product-id',
       '最小ロット数量': 'form-lot',
+      '受入数量': 'form-receipt-qty',
       '生産区分ID': 'form-production-type',
-      '生産工程ID': 'form-process-id'
+      '生産工程ID': 'form-process-id',
+      '段取分数': 'form-setup-minutes',
+      '時間生産数量': 'form-hourly-qty',
+      '生産時間': 'form-production-hours'
     };
     const el = document.getElementById(fieldMap[firstErrorField]);
     if (el) el.focus();
@@ -444,6 +567,9 @@ const saveData = async () => {
     生産終了日時: form.生産終了日時,
     生産区分ID: form.生産区分ID || null,
     生産工程ID: form.生産工程ID,
+    段取分数: form.段取分数 ? Math.trunc(Number(form.段取分数)) : null,
+    時間生産数量: form.時間生産数量 ? toNumber(form.時間生産数量) : null,
+    生産時間: calcProductionHours() ? Number(calcProductionHours()) : null,
     受入商品ID: form.受入商品ID || null,
     最小ロット数量: form.最小ロット数量 ? toNumber(form.最小ロット数量) : null,
     受入数量: form.受入数量 ? toNumber(form.受入数量) : null,
@@ -490,7 +616,11 @@ const deleteData = async () => {
 // M商品構成から自動取得
 // ==================================================
 const loadM商品構成 = async (受入商品ID: string) => {
+  clearNumericEditing();
   if (!受入商品ID) {
+    form.段取分数 = '';
+    form.時間生産数量 = '';
+    form.生産時間 = '';
     form.最小ロット数量 = '';
     form.受入数量 = '';
     form.生産区分ID = '';
@@ -507,6 +637,9 @@ const loadM商品構成 = async (受入商品ID: string) => {
       form.受入数量 = data.最小ロット数量 !== null && data.最小ロット数量 !== undefined ? String(data.最小ロット数量) : '';
       form.生産区分ID = data.生産区分ID || '';
       form.生産工程ID = data.生産工程ID || '';
+      form.段取分数 = data.段取分数 !== null && data.段取分数 !== undefined ? String(data.段取分数) : '';
+      form.時間生産数量 = data.時間生産数量 !== null && data.時間生産数量 !== undefined ? String(data.時間生産数量) : '';
+      form.生産時間 = calcProductionHours();
       form.生産備考 = data.商品構成備考 || '';
       明細一覧.value = Array.isArray(data.明細一覧) && data.明細一覧.length
         ? data.明細一覧.map((item: any, index: number) => ({
@@ -604,9 +737,9 @@ watch(() => form.受入商品ID, async (newValue) => {
                 </div>
               </div>
 
-              <!-- 受入商品ID -->
+              <!-- 受入商品 -->
               <div class="detail-row row-select">
-                <div class="detail-label">受入商品ID<span class="required-mark">*</span></div>
+                <div class="detail-label">受入商品<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">
@@ -615,7 +748,7 @@ watch(() => form.受入商品ID, async (newValue) => {
                         :disabled="isViewMode" @blur="handleBlur('受入商品ID')" @change="handleInput('受入商品ID')">
                         <option value="">選択してください</option>
                         <option v-for="item in 表示用商品一覧" :key="item.商品ID" :value="item.商品ID">
-                          {{ item.商品ID }} / {{ item.商品名 }}
+                          {{ item.商品ID }} : {{ item.商品名 }}
                         </option>
                       </select>
                       <span v-if="errors.受入商品ID" class="input-alert">!</span>
@@ -625,22 +758,14 @@ watch(() => form.受入商品ID, async (newValue) => {
                 </div>
               </div>
 
-              <!-- 受入商品名 -->
-              <div class="detail-row row-name">
-                <div class="detail-label">受入商品名</div>
-                <div class="detail-value">
-                  <input type="text" :value="商品名表示" class="detail-input wide-input" readonly />
-                </div>
-              </div>
-
               <!-- 最小ロット数量 -->
               <div class="detail-row row-lot">
                 <div class="detail-label">最小ロット数量<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
-                    <div class="lot-wrap">
-                      <div class="input-wrap">
-                        <input id="form-lot" type="number" step="0.001" v-model="form.最小ロット数量"
+                      <div class="lot-wrap">
+                        <div class="input-wrap">
+                        <input id="form-lot" type="text" :value="formatNumericDisplay(form.最小ロット数量)"
                           class="detail-input number-input" :class="{ 'input-error': errors.最小ロット数量 }"
                           :readonly="true" @blur="handleBlur('最小ロット数量')" />
                         <span v-if="errors.最小ロット数量" class="input-alert">!</span>
@@ -654,12 +779,28 @@ watch(() => form.受入商品ID, async (newValue) => {
 
               <!-- 受入数量 -->
               <div class="detail-row row-lot">
-                <div class="detail-label">受入数量</div>
+                <div class="detail-label">受入数量<span class="required-mark">*</span></div>
                 <div class="detail-value">
-                  <div class="lot-wrap">
-                    <input type="number" step="0.001" v-model="form.受入数量"
-                      class="detail-input number-input" :readonly="isViewMode" @input="recalcAll()" />
-                    <span class="unit-text">{{ 商品単位表示 }}</span>
+                  <div class="value-column">
+                    <div class="lot-wrap">
+                      <div class="input-wrap lot-input-wrap">
+                        <input
+                          id="form-receipt-qty"
+                          :value="isNumericEditing('form-受入数量') ? form.受入数量 : formatNumericDisplay(form.受入数量)"
+                          type="text"
+                          inputmode="decimal"
+                          class="detail-input number-input"
+                          :class="{ 'input-error': errors.受入数量 }"
+                          :readonly="isViewMode"
+                          @focus="handleNumericFocus('form-受入数量', form, '受入数量', $event)"
+                          @input="handleNumericInput(form, '受入数量', $event, () => { handleInput('受入数量'); recalcAll(); recalcProductionHours(); })"
+                          @blur="handleNumericBlur('form-受入数量', form, '受入数量', (changed) => { handleBlur('受入数量'); recalcAll(); if (changed) recalcProductionHours(); })"
+                        />
+                        <span v-if="errors.受入数量" class="input-alert">!</span>
+                      </div>
+                      <span class="unit-text">{{ 商品単位表示 }}</span>
+                    </div>
+                    <div v-if="errors.受入数量 && errors.受入数量 !== 'ERROR'" class="field-error">{{ errors.受入数量 }}</div>
                   </div>
                 </div>
               </div>
@@ -675,7 +816,7 @@ watch(() => form.受入商品ID, async (newValue) => {
                         :disabled="isViewMode" @blur="handleBlur('生産区分ID')" @change="handleInput('生産区分ID')">
                         <option value="">選択してください</option>
                         <option v-for="item in 表示用生産区分一覧" :key="item.生産区分ID" :value="item.生産区分ID">
-                          {{ item.生産区分名 }}
+                          {{ item.生産区分ID }} : {{ item.生産区分名 }}
                         </option>
                       </select>
                       <span v-if="errors.生産区分ID" class="input-alert">!</span>
@@ -696,13 +837,94 @@ watch(() => form.受入商品ID, async (newValue) => {
                         :disabled="isViewMode" @blur="handleBlur('生産工程ID')" @change="handleInput('生産工程ID')">
                         <option value="">選択してください</option>
                         <option v-for="item in 表示用生産工程一覧" :key="item.生産工程ID" :value="item.生産工程ID">
-                          {{ item.生産工程名 }} ({{ item.生産工程ID }})
+                          {{ item.生産工程ID }} : {{ item.生産工程名 }}
                         </option>
                       </select>
                       <span v-if="errors.生産工程ID" class="input-alert">!</span>
                     </div>
                     <div v-if="errors.生産工程ID && errors.生産工程ID !== 'ERROR'" class="field-error">{{ errors.生産工程ID }}</div>
                   </div>
+                </div>
+              </div>
+
+              <div class="detail-row row-lot">
+                <div class="detail-label">段取分数</div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="lot-wrap">
+                      <div class="input-wrap lot-input-wrap">
+                        <input
+                          id="form-setup-minutes"
+                          :value="isNumericEditing('form-段取分数') ? form.段取分数 : formatNumericDisplay(form.段取分数)"
+                          type="text"
+                          inputmode="numeric"
+                          class="detail-input number-input"
+                          :class="{ 'input-error': errors.段取分数 }"
+                          :readonly="isViewMode"
+                          @focus="handleNumericFocus('form-段取分数', form, '段取分数', $event)"
+                          @input="handleNumericInput(form, '段取分数', $event, () => handleInput('段取分数'))"
+                          @blur="handleNumericBlur('form-段取分数', form, '段取分数', () => handleBlur('段取分数'))"
+                        />
+                        <span v-if="errors.段取分数" class="input-alert">!</span>
+                      </div>
+                      <span class="unit-text">分</span>
+                    </div>
+                    <div v-if="errors.段取分数 && errors.段取分数 !== 'ERROR'" class="field-error">{{ errors.段取分数 }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-row row-lot">
+                <div class="detail-label">時間生産数量</div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="lot-wrap">
+                      <div class="input-wrap lot-input-wrap">
+                        <input
+                          id="form-hourly-qty"
+                          :value="isNumericEditing('form-時間生産数量') ? form.時間生産数量 : formatNumericDisplay(form.時間生産数量)"
+                          type="text"
+                          inputmode="decimal"
+                          class="detail-input number-input"
+                          :class="{ 'input-error': errors.時間生産数量 }"
+                          :readonly="isViewMode"
+                          @focus="handleNumericFocus('form-時間生産数量', form, '時間生産数量', $event)"
+                          @input="handleNumericInput(form, '時間生産数量', $event, () => { handleInput('時間生産数量'); recalcProductionHours(); })"
+                          @blur="handleNumericBlur('form-時間生産数量', form, '時間生産数量', (changed) => { handleBlur('時間生産数量'); if (changed) recalcProductionHours(); })"
+                        />
+                        <span v-if="errors.時間生産数量" class="input-alert">!</span>
+                      </div>
+                      <span class="unit-text">{{ 商品単位表示 }}</span>
+                    </div>
+                    <div v-if="errors.時間生産数量 && errors.時間生産数量 !== 'ERROR'" class="field-error">{{ errors.時間生産数量 }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-row row-number">
+                <div class="detail-label">生産時間</div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="lot-wrap">
+                      <div class="input-wrap lot-input-wrap">
+                        <input
+                          id="form-production-hours"
+                          :value="isNumericEditing('form-生産時間') ? form.生産時間 : formatHourDisplay(form.生産時間)"
+                          type="text"
+                          inputmode="decimal"
+                          class="detail-input number-input"
+                          :class="{ 'input-error': errors.生産時間 }"
+                          :readonly="isViewMode"
+                          @focus="handleNumericFocus('form-生産時間', form, '生産時間', $event)"
+                          @input="handleNumericInput(form, '生産時間', $event, () => { handleInput('生産時間'); recalcHourlyQuantity(); })"
+                          @blur="handleNumericBlur('form-生産時間', form, '生産時間', (changed) => { handleBlur('生産時間'); if (changed) recalcHourlyQuantity(); })"
+                        />
+                        <span v-if="errors.生産時間" class="input-alert">!</span>
+                      </div>
+                      <span class="unit-text">ｈ</span>
+                    </div>
+                  </div>
+                  <div v-if="errors.生産時間 && errors.生産時間 !== 'ERROR'" class="field-error">{{ errors.生産時間 }}</div>
                 </div>
               </div>
 
@@ -734,8 +956,7 @@ watch(() => form.受入商品ID, async (newValue) => {
                     <thead>
                       <tr>
                         <th class="w-seq">SEQ</th>
-                        <th class="w-product">払出商品ID</th>
-                        <th class="w-name">払出商品名</th>
+                        <th class="w-product">払出商品</th>
                         <th class="w-ratio">計算分子数量</th>
                         <th class="w-ratio">計算分母数量</th>
                         <th class="w-result">計算式(参考:切上整数)</th>
@@ -748,7 +969,7 @@ watch(() => form.受入商品ID, async (newValue) => {
                     </thead>
                     <tbody>
                       <tr v-if="明細一覧.length === 0">
-                        <td :colspan="isViewMode ? 10 : 11" class="cell-center no-data">明細なし</td>
+                        <td :colspan="isViewMode ? 9 : 10" class="cell-center no-data">明細なし</td>
                       </tr>
                       <tr v-for="(row, index) in 明細一覧" :key="`detail-${index}`">
                         <td class="cell-center">{{ row.明細SEQ }}</td>
@@ -756,27 +977,60 @@ watch(() => form.受入商品ID, async (newValue) => {
                           <select v-model="row.払出商品ID" class="table-input select-cell" :disabled="isViewMode || !row.isUserAdded">
                             <option value="">選択</option>
                             <option v-for="item in 表示用商品一覧" :key="`${index}-${item.商品ID}`" :value="item.商品ID">
-                              {{ item.商品ID }}
+                              {{ item.商品ID }} : {{ item.商品名 }}
                             </option>
                           </select>
                         </td>
-                        <td>{{ get払出商品(row.払出商品ID)?.商品名 || '' }}</td>
                         <td>
-                          <input v-model="row.計算分子数量" type="number" step="0.001" class="table-input number-cell"
-                            :readonly="isViewMode || !row.isUserAdded" @input="recalcRow(row)" />
+                          <input
+                            :value="isNumericEditing(`detail-${row.明細SEQ}-計算分子数量`) ? row.計算分子数量 : formatNumericDisplay(row.計算分子数量)"
+                            type="text"
+                            inputmode="decimal"
+                            class="table-input number-cell"
+                            :readonly="isViewMode || !row.isUserAdded"
+                            @focus="handleNumericFocus(`detail-${row.明細SEQ}-計算分子数量`, row, '計算分子数量', $event)"
+                            @input="handleNumericInput(row, '計算分子数量', $event, () => recalcRow(row))"
+                            @blur="handleNumericBlur(`detail-${row.明細SEQ}-計算分子数量`, row, '計算分子数量', () => recalcRow(row))"
+                          />
                         </td>
                         <td>
-                          <input v-model="row.計算分母数量" type="number" step="0.001" class="table-input number-cell"
-                            :readonly="isViewMode || !row.isUserAdded" @input="recalcRow(row)" />
+                          <input
+                            :value="isNumericEditing(`detail-${row.明細SEQ}-計算分母数量`) ? row.計算分母数量 : formatNumericDisplay(row.計算分母数量)"
+                            type="text"
+                            inputmode="decimal"
+                            class="table-input number-cell"
+                            :readonly="isViewMode || !row.isUserAdded"
+                            @focus="handleNumericFocus(`detail-${row.明細SEQ}-計算分母数量`, row, '計算分母数量', $event)"
+                            @input="handleNumericInput(row, '計算分母数量', $event, () => recalcRow(row))"
+                            @blur="handleNumericBlur(`detail-${row.明細SEQ}-計算分母数量`, row, '計算分母数量', () => recalcRow(row))"
+                          />
                         </td>
                         <td class="formula-cell">
                           {{ row.計算分子数量 || '0' }} / {{ row.計算分母数量 || '0' }} × {{ form.受入数量 || '0' }} = {{ calc最小ロット構成数量(row) }}
                         </td>
                         <td>
-                          <input v-model="row.最小ロット構成数量" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode || !row.isUserAdded" />
+                          <input
+                            :value="isNumericEditing(`detail-${row.明細SEQ}-最小ロット構成数量`) ? row.最小ロット構成数量 : formatNumericDisplay(row.最小ロット構成数量)"
+                            type="text"
+                            inputmode="decimal"
+                            class="table-input number-cell"
+                            :readonly="isViewMode || !row.isUserAdded"
+                            @focus="handleNumericFocus(`detail-${row.明細SEQ}-最小ロット構成数量`, row, '最小ロット構成数量', $event)"
+                            @input="handleNumericInput(row, '最小ロット構成数量', $event)"
+                            @blur="handleNumericBlur(`detail-${row.明細SEQ}-最小ロット構成数量`, row, '最小ロット構成数量')"
+                          />
                         </td>
                         <td>
-                          <input v-model="row.払出数量" type="number" step="0.001" class="table-input number-cell" :readonly="isViewMode" />
+                          <input
+                            :value="isNumericEditing(`detail-${row.明細SEQ}-払出数量`) ? row.払出数量 : formatNumericDisplay(row.払出数量)"
+                            type="text"
+                            inputmode="decimal"
+                            class="table-input number-cell"
+                            :readonly="isViewMode"
+                            @focus="handleNumericFocus(`detail-${row.明細SEQ}-払出数量`, row, '払出数量', $event)"
+                            @input="handleNumericInput(row, '払出数量', $event)"
+                            @blur="handleNumericBlur(`detail-${row.明細SEQ}-払出数量`, row, '払出数量')"
+                          />
                         </td>
                         <td class="cell-center">{{ get払出商品(row.払出商品ID)?.単位 || '' }}</td>
                         <td>
@@ -965,6 +1219,7 @@ watch(() => form.受入商品ID, async (newValue) => {
 .detail-row.row-select,
 .detail-row.row-name,
 .detail-row.row-lot,
+.detail-row.row-number,
 .detail-row.row-remarks,
 .detail-row.row-valid,
 .detail-row.row-user,
@@ -1009,6 +1264,7 @@ watch(() => form.受入商品ID, async (newValue) => {
 .row-select .detail-value,
 .row-name .detail-value,
 .row-lot .detail-value,
+.row-number .detail-value,
 .row-remarks .detail-value,
 .row-valid .detail-value,
 .row-user .detail-value,
@@ -1058,23 +1314,31 @@ watch(() => form.受入商品ID, async (newValue) => {
 }
 
 .id-input { width: 160px; text-align: center; }
-.datetime-input { width: 240px; }
+.datetime-input { width: 320px; text-align: center; }
 .select-input { width: 320px; padding-right: 8px; }
-.wide-input { width: 420px; }
-.number-input { width: 180px; text-align: right; }
+.wide-input { width: 320px; }
+.number-input { width: 160px; text-align: right; }
 
 .lot-wrap {
   display: flex;
   align-items: center;
-  gap: 10px;
+  width: 160px;
+  gap: 0;
+}
+.lot-input-wrap { width: 100px; }
+.lot-wrap .number-input {
+  width: 100%;
+  min-width: 0;
 }
 .unit-text {
+  width: 60px;
   min-width: 60px;
   font-weight: 600;
   color: #4b5563;
+  text-align: center;
 }
 
-.remarks-textarea { width: 420px; }
+.remarks-textarea { width: 320px; }
 
 .detail-textarea {
   height: auto;
@@ -1183,7 +1447,8 @@ watch(() => form.受入商品ID, async (newValue) => {
 .cell-center { text-align: center; }
 .no-data { color: #888; padding: 16px; }
 
-.select-cell { width: 140px; }
+.w-product { width: 220px; }
+.select-cell { width: 220px; }
 .number-cell { width: 110px; text-align: right; }
 .note-cell { width: 170px; }
 

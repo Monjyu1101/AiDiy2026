@@ -41,6 +41,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  有効列表示: {
+    type: Boolean,
+    default: false
+  },
   戻URL: {
     type: String,
     default: ''
@@ -64,17 +68,22 @@ const filters = reactive({
   更新利用者名: ''
 });
 const rowKey = '配車伝票ID';
-const columns: Column[] = [
-  { key: '配車伝票ID', label: '配車伝票ID', width: '120px', sortable: true },
-  { key: '配車開始日時', label: '開始日時', width: '160px', sortable: true, align: 'center' },
-  { key: '配車終了日時', label: '終了日時', width: '160px', sortable: true, align: 'center' },
-  { key: '車両名', label: '車両名', width: '150px', sortable: true },
-  { key: '配車区分名', label: '配車区分', width: '120px', sortable: true },
-  { key: '配車内容', label: '配車内容', width: '220px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
-];
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '配車伝票ID', label: '配車伝票ID', width: '120px', sortable: true },
+    { key: '配車開始日時', label: '開始日時', width: '160px', sortable: true, align: 'center' },
+    { key: '配車終了日時', label: '終了日時', width: '160px', sortable: true, align: 'center' },
+    { key: '車両名', label: '車両名', width: '150px', sortable: true },
+    { key: '配車区分名', label: '配車区分', width: '120px', sortable: true },
+    { key: '配車内容', label: '配車内容', width: '220px', sortable: true },
+    { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+    { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  ];
+  if (props.有効列表示) {
+    baseColumns.splice(6, 0, { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' });
+  }
+  return baseColumns;
+});
 
 const formatDateTime = (val: string | null | undefined) => {
   if (!val) return '';
@@ -102,7 +111,7 @@ const hasFilter = computed((): boolean => {
 const filteredRows = computed(() => {
   return 配車一覧.value.filter((row) => {
     // 列フィルタのチェック
-    const columnMatch = columns.every((column) => {
+    const columnMatch = columns.value.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
       const cellValue = row?.[column.key] ?? '';

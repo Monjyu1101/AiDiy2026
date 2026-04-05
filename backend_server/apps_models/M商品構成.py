@@ -20,6 +20,8 @@ class M商品構成(Base):
     最小ロット数量 = Column(Float, nullable=False)
     生産区分ID = Column(Text, nullable=False)
     生産工程ID = Column(Text, nullable=False)
+    段取分数 = Column(Integer)
+    時間生産数量 = Column(Float)
     商品構成備考 = Column(Text)
     構成商品ID = Column(Text)
     計算分子数量 = Column(Float)

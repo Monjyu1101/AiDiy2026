@@ -22,6 +22,7 @@ const props = defineProps({
   生産区分ID: { type: String, default: '' },
   件数制限: { type: Boolean, default: true },
   無効も表示: { type: Boolean, default: false },
+  有効列表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
@@ -44,17 +45,22 @@ const filters = reactive({
   更新利用者名: ''
 });
 const rowKey = '商品ID';
-const columns: Column[] = [
-  { key: '商品ID', label: '商品ID', width: '120px', sortable: true, align: 'center' },
-  { key: '商品名', label: '商品名', width: '180px', sortable: true },
-  { key: '単位', label: '単位', width: '90px', sortable: true },
-  { key: '最小ロット数量', label: '最小ロット数量', width: '110px', sortable: true, align: 'right' },
-  { key: '構成商品件数', label: '構成件数', width: '90px', sortable: true, align: 'right' },
-  { key: '商品構成備考', label: '商品構成備考', width: '220px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
-];
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '商品ID', label: '商品ID', width: '120px', sortable: true, align: 'center' },
+    { key: '商品名', label: '商品名', width: '180px', sortable: true },
+    { key: '最小ロット数量', label: '最小ロット数量', width: '110px', sortable: true, align: 'right' },
+    { key: '単位', label: '単位', width: '90px', sortable: true, align: 'center' },
+    { key: '構成商品件数', label: '構成件数', width: '90px', sortable: true, align: 'right' },
+    { key: '商品構成備考', label: '商品構成備考', width: '220px', sortable: true },
+    { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+    { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  ];
+  if (props.有効列表示) {
+    baseColumns.splice(6, 0, { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' });
+  }
+  return baseColumns;
+});
 
 const message = ref('');
 const messageType = ref('success');
@@ -67,7 +73,7 @@ const setMessage = (text: string, type = 'success') => {
 const hasFilter = computed(() => Object.values(filters).some((value) => String(value || '').trim() !== ''));
 const filteredRows = computed(() => {
   return 商品構成一覧.value.filter((row) => {
-    return columns.every((column) => {
+    return columns.value.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
       const cellValue = row?.[column.key] ?? '';
@@ -184,6 +190,9 @@ defineExpose({
     <template #cell="{ row, column, value }">
       <template v-if="column.key === '商品ID' || column.key === '商品名'">
         <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ value ?? '' }}</a>
+      </template>
+      <template v-else-if="column.key === '最小ロット数量'">
+        {{ value != null && value !== '' ? Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 3 }) : '' }}
       </template>
       <template v-else-if="column.key === '有効'">
         <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />

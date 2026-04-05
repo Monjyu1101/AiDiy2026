@@ -295,12 +295,12 @@ watch(() => route.query.開始日付, () => {
 
     <!-- 絞り込み -->
     <div class="filter-bar">
-      <div class="category-label">商品分類ID</div>
+      <div class="category-label">商品分類</div>
       <div class="category-value">
         <select v-model="商品分類ID" class="category-select" @change="handleCategoryChange">
           <option value="">すべて</option>
           <option v-for="item in 商品分類一覧" :key="item.商品分類ID" :value="item.商品分類ID">
-            {{ item.商品分類名 }}
+            {{ item.商品分類ID }} : {{ item.商品分類名 }}
           </option>
         </select>
       </div>
@@ -422,7 +422,7 @@ watch(() => route.query.開始日付, () => {
   border: 1px solid #b3e5fc;
   background: #e1f5fe;
   min-height: 30px;
-  width: 120px;
+  width: 160px;
   flex-shrink: 0;
   box-sizing: border-box;
 }
@@ -430,7 +430,7 @@ watch(() => route.query.開始日付, () => {
 .category-value {
   display: flex;
   align-items: center;
-  width: auto;
+  width: 320px;
   padding: 3px 10px;
   border: 1px solid #ccc;
   border-left: none;
@@ -447,7 +447,7 @@ watch(() => route.query.開始日付, () => {
   border-radius: 4px;
   background: #fff;
   font-size: 12px;
-  min-width: 200px;
+  width: 100%;
   cursor: pointer;
   box-sizing: border-box;
   margin: 0;
@@ -510,4 +510,3 @@ watch(() => route.query.開始日付, () => {
   color: #721c24;
 }
 </style>
-

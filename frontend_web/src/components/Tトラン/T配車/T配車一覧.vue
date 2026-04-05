@@ -22,6 +22,7 @@ const route = useRoute();
 const 配車一覧テーブルRef = ref<any>(null);
 const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
 const message = ref('');
 const messageType = ref('success');
 const 開始日付 = ref('');
@@ -161,12 +162,12 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.車
                 </div>
               </div>
               <div class="detail-row">
-                <div class="detail-label">車両ID</div>
+                <div class="detail-label">車両</div>
                 <div class="detail-value">
                   <select v-model="車両ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 車両一覧" :key="item.車両ID" :value="item.車両ID">
-                      {{ item.車両名 }} ({{ item.車両ID }})
+                      {{ item.車両ID }} : {{ item.車両名 }}
                     </option>
                   </select>
                 </div>
@@ -198,6 +199,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.車
           :車両ID="車両ID"
           :件数制限="件数制限"
           :無効も表示="無効も表示"
+          :有効列表示="有効列表示"
           :戻URL="編集戻URL"
         />
       </div>

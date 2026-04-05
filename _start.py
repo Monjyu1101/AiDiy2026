@@ -458,8 +458,8 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
 def collect_startup_choices() -> tuple[bool, bool, bool]:
     print_header("起動条件の確認")
     backend_enabled = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
-    web_enabled     = prompt_choice("フロントエンド(Web)      起動しますか?", default_yes=True)
-    avatar_enabled  = prompt_choice("フロントエンド(Avatar)   起動しますか?", default_yes=False)
+    web_enabled     = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
+    avatar_enabled  = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
     return backend_enabled, web_enabled, avatar_enabled
 
 

@@ -22,6 +22,7 @@ const props = defineProps({
   商品分類ID: { type: String, default: '' },
   件数制限: { type: Boolean, default: true },
   無効も表示: { type: Boolean, default: false },
+  有効列表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
@@ -43,16 +44,21 @@ const filters = reactive({
   更新利用者名: ''
 });
 const rowKey = '商品ID';
-const columns: Column[] = [
-  { key: '商品ID', label: '商品ID', width: '120px', sortable: true, align: 'center' },
-  { key: '商品名', label: '商品名', width: '200px', sortable: true },
-  { key: '単位', label: '単位', width: '100px', sortable: true, align: 'center' },
-  { key: '商品分類名', label: '商品分類名', width: '140px', sortable: true, align: 'center' },
-  { key: '商品備考', label: '商品備考', width: '220px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
-];
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '商品ID', label: '商品ID', width: '120px', sortable: true, align: 'center' },
+    { key: '商品名', label: '商品名', width: '200px', sortable: true },
+    { key: '単位', label: '単位', width: '100px', sortable: true, align: 'center' },
+    { key: '商品分類名', label: '商品分類名', width: '140px', sortable: true, align: 'center' },
+    { key: '商品備考', label: '商品備考', width: '220px', sortable: true },
+    { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+    { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  ];
+  if (props.有効列表示) {
+    baseColumns.splice(5, 0, { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' });
+  }
+  return baseColumns;
+});
 
 const message = ref('');
 const messageType = ref('success');
@@ -67,7 +73,7 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return 商品一覧.value.filter((row) => {
-    return columns.every((column) => {
+    return columns.value.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
       const cellValue = row?.[column.key] ?? '';

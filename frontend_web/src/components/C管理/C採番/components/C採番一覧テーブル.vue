@@ -15,6 +15,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 const props = defineProps({
   件数制限: { type: Boolean, default: true },
   無効も表示: { type: Boolean, default: false },
+  有効列表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 import { useRouter } from 'vue-router';
@@ -39,14 +40,21 @@ const filters = reactive({
   更新利用者名: ''
 });
 const rowKey = '採番ID';
-const columns: Column[] = [
-  { key: '採番ID', label: '採番ID', width: '140px', sortable: true, align: 'center' },
-  { key: '最終採番値', label: '最終採番値', width: '110px', sortable: true, align: 'right' },
-  { key: '採番備考', label: '採番備考', width: '250px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
-];
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '採番ID', label: '採番ID', width: '140px', sortable: true, align: 'center' },
+    { key: '最終採番値', label: '最終採番値', width: '110px', sortable: true, align: 'right' },
+    { key: '採番備考', label: '採番備考', width: '250px', sortable: true },
+    { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+    { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  ];
+
+  if (props.有効列表示) {
+    baseColumns.splice(3, 0, { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' });
+  }
+
+  return baseColumns;
+});
 
 const message = ref('');
 const messageType = ref('success');
@@ -61,7 +69,7 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return serials.value.filter((row) => {
-    return columns.every((column) => {
+    return columns.value.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
       const cellValue = row?.[column.key] ?? '';

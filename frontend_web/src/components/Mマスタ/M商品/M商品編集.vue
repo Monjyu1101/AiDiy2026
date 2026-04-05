@@ -435,7 +435,7 @@ watch(() => route.query, async (query) => {
               </div>
 
               <div class="detail-row row-category">
-                <div class="detail-label">商品分類ID<span class="required-mark">*</span></div>
+                <div class="detail-label">商品分類<span class="required-mark">*</span></div>
                 <div class="detail-value">
                   <div class="value-column">
                     <div class="input-wrap">

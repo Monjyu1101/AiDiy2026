@@ -67,6 +67,11 @@ def init_db_data(db: Session):
             db.execute(text('ALTER TABLE "M商品構成" ADD COLUMN "最小ロット構成数量" REAL'))
             db.execute(text('UPDATE "M商品構成" SET "最小ロット構成数量" = CASE WHEN "計算分母数量" IS NOT NULL AND CAST("計算分母数量" AS REAL) != 0 THEN (CAST("計算分子数量" AS REAL) / CAST("計算分母数量" AS REAL)) * CAST("最小ロット数量" AS REAL) ELSE 0 END WHERE "明細SEQ" > 0'))
             db.commit()
+        if "段取分数" not in columns:
+            db.execute(text('ALTER TABLE "M商品構成" ADD COLUMN "段取分数" INTEGER'))
+        if "時間生産数量" not in columns:
+            db.execute(text('ALTER TABLE "M商品構成" ADD COLUMN "時間生産数量" REAL'))
+        db.commit()
 
     # T生産: 明細SEQ追加対応（複合PK追加のためテーブル再作成）またはカラム名変更対応
     if inspector.has_table("T生産"):
@@ -82,9 +87,124 @@ def init_db_data(db: Session):
             db.execute(text('ALTER TABLE "T生産" ADD COLUMN "最小ロット構成数量" REAL'))
             db.execute(text('UPDATE "T生産" SET "最小ロット構成数量" = CASE WHEN "計算分母数量" IS NOT NULL AND CAST("計算分母数量" AS REAL) != 0 THEN (CAST("計算分子数量" AS REAL) / CAST("計算分母数量" AS REAL)) * COALESCE(CAST("最小ロット数量" AS REAL), 1) ELSE 0 END WHERE "明細SEQ" > 0'))
             db.commit()
+        if "段取分数" not in columns:
+            db.execute(text('ALTER TABLE "T生産" ADD COLUMN "段取分数" INTEGER'))
+        if "時間生産数量" not in columns:
+            db.execute(text('ALTER TABLE "T生産" ADD COLUMN "時間生産数量" REAL'))
+        if "生産時間" not in columns:
+            db.execute(text('ALTER TABLE "T生産" ADD COLUMN "生産時間" REAL'))
+        db.commit()
         if "最小ロット所要数量" in columns:
             db.execute(text('ALTER TABLE "T生産" DROP COLUMN "最小ロット所要数量"'))
             db.commit()
+
+    # T商品入庫: 明細SEQ追加対応（複合PK追加のためテーブル再作成）
+    if inspector.has_table("T商品入庫"):
+        columns = [col['name'] for col in inspector.get_columns("T商品入庫")]
+        if "明細SEQ" not in columns:
+            db.execute(text('ALTER TABLE "T商品入庫" RENAME TO "T商品入庫_old"'))
+            db.commit()
+            models.T商品入庫.__table__.create(bind=db.bind, checkfirst=True)
+            db.commit()
+            db.execute(text("""
+                INSERT INTO "T商品入庫" (
+                    "入庫伝票ID", "明細SEQ", "入庫日", "商品ID", "入庫数量", "入庫備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                )
+                SELECT
+                    "入庫伝票ID", 0, "入庫日", NULL, NULL, "入庫備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                FROM "T商品入庫_old"
+            """))
+            db.execute(text("""
+                INSERT INTO "T商品入庫" (
+                    "入庫伝票ID", "明細SEQ", "入庫日", "商品ID", "入庫数量", "入庫備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                )
+                SELECT
+                    "入庫伝票ID", 1, "入庫日", "商品ID", "入庫数量", NULL, "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                FROM "T商品入庫_old"
+            """))
+            db.execute(text('DROP TABLE IF EXISTS "T商品入庫_old"'))
+            db.commit()
+            inspector = inspect(db.bind)
+
+    # T商品出庫: 明細SEQ追加対応（複合PK追加のためテーブル再作成）
+    if inspector.has_table("T商品出庫"):
+        columns = [col['name'] for col in inspector.get_columns("T商品出庫")]
+        if "明細SEQ" not in columns:
+            db.execute(text('ALTER TABLE "T商品出庫" RENAME TO "T商品出庫_old"'))
+            db.commit()
+            models.T商品出庫.__table__.create(bind=db.bind, checkfirst=True)
+            db.commit()
+            db.execute(text("""
+                INSERT INTO "T商品出庫" (
+                    "出庫伝票ID", "明細SEQ", "出庫日", "商品ID", "出庫数量", "出庫備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                )
+                SELECT
+                    "出庫伝票ID", 0, "出庫日", NULL, NULL, "出庫備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                FROM "T商品出庫_old"
+            """))
+            db.execute(text("""
+                INSERT INTO "T商品出庫" (
+                    "出庫伝票ID", "明細SEQ", "出庫日", "商品ID", "出庫数量", "出庫備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                )
+                SELECT
+                    "出庫伝票ID", 1, "出庫日", "商品ID", "出庫数量", NULL, "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                FROM "T商品出庫_old"
+            """))
+            db.execute(text('DROP TABLE IF EXISTS "T商品出庫_old"'))
+            db.commit()
+            inspector = inspect(db.bind)
+
+    # T商品棚卸: 明細SEQ追加対応（複合PK追加のためテーブル再作成）
+    if inspector.has_table("T商品棚卸"):
+        columns = [col['name'] for col in inspector.get_columns("T商品棚卸")]
+        if "明細SEQ" not in columns:
+            db.execute(text('ALTER TABLE "T商品棚卸" RENAME TO "T商品棚卸_old"'))
+            db.commit()
+            models.T商品棚卸.__table__.create(bind=db.bind, checkfirst=True)
+            db.commit()
+            db.execute(text("""
+                INSERT INTO "T商品棚卸" (
+                    "棚卸伝票ID", "明細SEQ", "棚卸日", "商品ID", "実棚数量", "棚卸備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                )
+                SELECT
+                    "棚卸伝票ID", 0, "棚卸日", NULL, NULL, "棚卸備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                FROM "T商品棚卸_old"
+            """))
+            db.execute(text("""
+                INSERT INTO "T商品棚卸" (
+                    "棚卸伝票ID", "明細SEQ", "棚卸日", "商品ID", "実棚数量", "棚卸備考", "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                )
+                SELECT
+                    "棚卸伝票ID", 1, "棚卸日", "商品ID", "実棚数量", NULL, "有効",
+                    "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+                    "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID"
+                FROM "T商品棚卸_old"
+            """))
+            db.execute(text('DROP TABLE IF EXISTS "T商品棚卸_old"'))
+            db.commit()
+            inspector = inspect(db.bind)
 
     for テーブル名 in ["M配車区分", "M生産区分", "M生産工程", "M商品分類", "M車両", "M商品", "M商品構成"]:
         if not inspector.has_table(テーブル名):

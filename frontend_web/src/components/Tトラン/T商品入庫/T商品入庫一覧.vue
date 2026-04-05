@@ -22,6 +22,7 @@ const route = useRoute();
 const 商品入庫一覧テーブルRef = ref<any>(null);
 const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
 const message = ref('');
 const messageType = ref('success');
 const 開始日付 = ref('');
@@ -63,8 +64,10 @@ const handleReload = () => {
 
 const openCreate = () => {
   const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
-  if (開始日付.value && 開始日付.value === 終了日付.value && 商品ID.value) {
+  if (開始日付.value && 開始日付.value === 終了日付.value) {
     query.入庫日 = 開始日付.value;
+  }
+  if (商品ID.value) {
     query.商品ID = 商品ID.value;
   }
   router.push({ path: '/Tトラン/T商品入庫/編集', query });
@@ -161,12 +164,12 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
                 </div>
               </div>
               <div class="detail-row">
-                <div class="detail-label">商品ID</div>
+                <div class="detail-label">商品</div>
                 <div class="detail-value">
                   <select v-model="商品ID" class="detail-input select-input">
                     <option value="">すべて</option>
                     <option v-for="item in 商品一覧" :key="item.商品ID" :value="item.商品ID">
-                      {{ item.商品名 }} ({{ item.商品ID }})
+                      {{ item.商品ID }} : {{ item.商品名 }}
                     </option>
                   </select>
                 </div>
@@ -198,6 +201,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
           :商品ID="商品ID"
           :件数制限="件数制限"
           :無効も表示="無効も表示"
+          :有効列表示="有効列表示"
           :戻URL="編集戻URL"
         />
       </div>

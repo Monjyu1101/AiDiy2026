@@ -34,6 +34,9 @@ class T生産(Base):
     受入数量 = Column(Float)
     生産区分ID = Column(Text)
     生産工程ID = Column(Text)
+    段取分数 = Column(Integer)
+    時間生産数量 = Column(Float)
+    生産時間 = Column(Float)
 
     # 明細項目（明細SEQ>0 のみ有効）
     払出商品ID = Column(Text)

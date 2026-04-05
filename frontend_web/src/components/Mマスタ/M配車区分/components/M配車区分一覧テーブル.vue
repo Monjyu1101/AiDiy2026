@@ -21,6 +21,7 @@ import type { Column } from '../../../../types/qTubler';
 const props = defineProps({
   件数制限: { type: Boolean, default: true },
   無効も表示: { type: Boolean, default: false },
+  有効列表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
@@ -43,17 +44,22 @@ const filters = reactive({
   更新利用者名: ''
 });
 const rowKey = '配車区分ID';
-const columns: Column[] = [
-  { key: '配車区分ID', label: '配車区分ID', width: '120px', sortable: true, align: 'center' },
-  { key: '配車区分名', label: '配車区分名', width: '160px', sortable: true },
-  { key: '配車区分備考', label: '配車区分備考', width: '220px', sortable: true },
-  { key: '配色枠', label: '配色枠', width: '120px', sortable: true },
-  { key: '配色背景', label: '配色背景', width: '120px', sortable: true },
-  { key: '配色前景', label: '配色前景', width: '120px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
-];
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '配車区分ID', label: '配車区分ID', width: '120px', sortable: true, align: 'center' },
+    { key: '配車区分名', label: '配車区分名', width: '160px', sortable: true },
+    { key: '配車区分備考', label: '配車区分備考', width: '220px', sortable: true },
+    { key: '配色枠', label: '配色枠', width: '120px', sortable: true },
+    { key: '配色背景', label: '配色背景', width: '120px', sortable: true },
+    { key: '配色前景', label: '配色前景', width: '120px', sortable: true },
+    { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+    { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  ];
+  if (props.有効列表示) {
+    baseColumns.splice(6, 0, { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' });
+  }
+  return baseColumns;
+});
 
 const message = ref('');
 const messageType = ref('success');
@@ -68,7 +74,7 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return 配車区分一覧.value.filter((row) => {
-    return columns.every((column) => {
+    return columns.value.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
       const cellValue = row?.[column.key] ?? '';

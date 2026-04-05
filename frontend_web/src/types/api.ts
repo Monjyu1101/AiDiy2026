@@ -297,6 +297,8 @@ export interface M商品構成CreateRequest {
   最小ロット数量: number
   生産区分ID: string
   生産工程ID: string
+  段取分数?: number | null
+  時間生産数量?: number | null
   商品構成備考?: string | null
   有効?: boolean
   明細一覧: M商品構成明細Request[]
@@ -307,6 +309,8 @@ export interface M商品構成UpdateRequest {
   最小ロット数量?: number
   生産区分ID?: string
   生産工程ID?: string
+  段取分数?: number | null
+  時間生産数量?: number | null
   商品構成備考?: string | null
   有効?: boolean
   明細一覧?: M商品構成明細Request[]
