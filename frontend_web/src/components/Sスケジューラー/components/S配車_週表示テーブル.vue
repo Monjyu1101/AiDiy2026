@@ -121,12 +121,33 @@ const getCellWidth = () => {
   return cellWidth;
 };
 
+const SLOT_HEIGHT = 70;
+
 const clearScheduleElements = () => {
   document.querySelectorAll('.schedule-item').forEach((item) => item.remove());
 };
 
+const resetCellHeights = () => {
+  props.車両リスト.forEach((vehicle) => {
+    const vehicleCell = document.getElementById(`vehicle-cell-${vehicle.車両ID}`);
+    if (vehicleCell) {
+      vehicleCell.style.height = `${SLOT_HEIGHT}px`;
+      vehicleCell.style.minHeight = `${SLOT_HEIGHT}px`;
+    }
+    for (const day of displayDates.value) {
+      const cellId = `cell-${vehicle.車両ID}-${day.dateStr}`;
+      const cell = document.getElementById(cellId);
+      if (cell) {
+        cell.style.height = `${SLOT_HEIGHT}px`;
+        cell.style.minHeight = `${SLOT_HEIGHT}px`;
+      }
+    }
+  });
+};
+
 const renderSchedules = () => {
   clearScheduleElements();
+  resetCellHeights();
   if (!props.対象日付) return;
   
   const displayStartDate = new Date(props.対象日付);
@@ -142,24 +163,100 @@ const renderSchedules = () => {
   displayRangeEnd.setDate(displayRangeEnd.getDate() + 1);
   displayRangeEnd.setHours(0, 0, 0, 0);
 
+  // Phase 1: Pre-compute layout info
+  const slotInfos: { schedule: any, dateCols: string[], lane: number }[] = [];
+  const rowSlots = new Map<string, typeof slotInfos>();
+
   props.配車リスト.forEach((schedule) => {
     const startDateTime = new Date(schedule.配車開始日時);
     const endDateTime = new Date(schedule.配車終了日時);
-    
-    // スケジュールが有効かどうかの判定
-    if (endDateTime < displayStartDate || startDateTime >= displayRangeEnd) {
-      return;
-    }
+    if (endDateTime < displayStartDate || startDateTime >= displayRangeEnd) return;
 
+    const dispStart = new Date(Math.max(startDateTime.getTime(), displayStartDate.getTime()));
+    const dispEnd = new Date(Math.min(endDateTime.getTime(), displayRangeEnd.getTime()));
+
+    const dStart = new Date(dispStart); dStart.setHours(0,0,0,0);
+    const dEnd = new Date(dispEnd);
+    if (dEnd.getHours() === 0 && dEnd.getMinutes() === 0 && dEnd > dStart) {
+      dEnd.setDate(dEnd.getDate() - 1);
+    }
+    dEnd.setHours(0,0,0,0);
+
+    const dateCols: string[] = [];
+    let curDate = new Date(dStart);
+    while (curDate <= dEnd) {
+      dateCols.push(formatDateISO(curDate));
+      curDate.setDate(curDate.getDate() + 1);
+    }
+    if (dateCols.length === 0) return;
+
+    const info = { schedule, dateCols, lane: 0 };
+    slotInfos.push(info);
+    const rowKey = schedule.車両ID;
+    if (!rowSlots.has(rowKey)) rowSlots.set(rowKey, []);
+    rowSlots.get(rowKey)!.push(info);
+  });
+
+  // Phase 2: Assign lanes per row
+  for (const [rowKey, infos] of rowSlots) {
+    infos.sort((a, b) => a.dateCols[0].localeCompare(b.dateCols[0]));
+    const lanes: Set<string>[] = [];
+    for (const info of infos) {
+      let lane = 0;
+      while (lane < lanes.length) {
+        let conflict = false;
+        for (const d of info.dateCols) {
+          if (lanes[lane].has(d)) { conflict = true; break; }
+        }
+        if (!conflict) break;
+        lane++;
+      }
+      if (lane === lanes.length) lanes.push(new Set());
+      for (const d of info.dateCols) {
+        lanes[lane].add(d);
+      }
+      info.lane = lane;
+    }
+    // Expand row cells
+    const maxLanes = Math.max(1, lanes.length);
+    const newHeight = maxLanes * SLOT_HEIGHT;
+    const vehicleCell = document.getElementById(`vehicle-cell-${rowKey}`);
+    if (vehicleCell) {
+      vehicleCell.style.height = `${newHeight}px`;
+      vehicleCell.style.minHeight = `${newHeight}px`;
+    }
+    for (const day of displayDates.value) {
+      const cellId = `cell-${rowKey}-${day.dateStr}`;
+      const cell = document.getElementById(cellId);
+      if (cell) {
+        cell.style.height = `${newHeight}px`;
+        cell.style.minHeight = `${newHeight}px`;
+      }
+    }
+  }
+
+  // Force reflow
+  const grid = document.getElementById('weekly-grid');
+  if (grid) void grid.offsetHeight;
+
+  // Phase 3: Build lane map and render
+  const scheduleLaneMap = new Map<string, number>();
+  for (const info of slotInfos) {
+    scheduleLaneMap.set(info.schedule.配車伝票ID, info.lane);
+  }
+
+  props.配車リスト.forEach((schedule) => {
+    const startDateTime = new Date(schedule.配車開始日時);
+    const endDateTime = new Date(schedule.配車終了日時);
+    if (endDateTime < displayStartDate || startDateTime >= displayRangeEnd) return;
     const displayStart = new Date(Math.max(startDateTime.getTime(), displayStartDate.getTime()));
     const displayEnd = new Date(Math.min(endDateTime.getTime(), displayRangeEnd.getTime()));
-    // displayEndが表示範囲の終了日を超えている場合は、その日の終わりまでとする処理は renderSchedule 内で行うか、日数の計算で調整
-
-    renderSchedule(schedule, startDateTime, endDateTime, displayStart, displayEnd, displayStartDate, displayRangeEnd);
+    const lane = scheduleLaneMap.get(schedule.配車伝票ID) || 0;
+    renderSchedule(schedule, startDateTime, endDateTime, displayStart, displayEnd, displayStartDate, displayRangeEnd, lane);
   });
 };
 
-const renderSchedule = (schedule, startDateTime, endDateTime, displayStart, displayEnd, rangeStart, rangeEnd) => {
+const renderSchedule = (schedule, startDateTime, endDateTime, displayStart, displayEnd, rangeStart, rangeEnd, lane = 0) => {
   const vehicleId = schedule.車両ID;
   const renderStartStr = formatDateISO(displayStart);
   
@@ -247,7 +344,7 @@ const renderSchedule = (schedule, startDateTime, endDateTime, displayStart, disp
   const cellRect = startCell.getBoundingClientRect();
 
   const left = cellRect.left - gridRect.left;
-  const top = cellRect.top - gridRect.top;
+  const top = cellRect.top - gridRect.top + lane * SLOT_HEIGHT;
 
   const scheduleElement = document.createElement('div');
   scheduleElement.className = 'schedule-item';
@@ -279,9 +376,15 @@ const renderSchedule = (schedule, startDateTime, endDateTime, displayStart, disp
   scheduleElement.addEventListener('dragstart', (event) => {
     draggingScheduleId = schedule.配車伝票ID;
     event.dataTransfer?.setData('text/plain', schedule.配車伝票ID);
+    requestAnimationFrame(() => {
+      const g = document.getElementById('weekly-grid');
+      if (g) g.classList.add('dragging-active');
+    });
   });
   scheduleElement.addEventListener('dragend', () => {
     draggingScheduleId = null;
+    const g = document.getElementById('weekly-grid');
+    if (g) g.classList.remove('dragging-active');
   });
   scheduleElement.draggable = true;
 
@@ -438,7 +541,7 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-for="vehicle in 車両リスト" :key="vehicle.車両ID">
-      <div class="grid-cell vehicle-cell">
+      <div class="grid-cell vehicle-cell" :id="`vehicle-cell-${vehicle.車両ID}`">
         <div class="vehicle-id">{{ vehicle.車両ID }} {{ vehicle.車両備考 || '' }}</div>
         <div class="vehicle-name">{{ vehicle.車両名 }}</div>
       </div>
@@ -578,6 +681,10 @@ onBeforeUnmount(() => {
 
 .schedule-item:hover {
   z-index: 10;
+}
+
+.dragging-active .schedule-item {
+  pointer-events: none;
 }
 
 .schedule-text {
