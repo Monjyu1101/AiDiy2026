@@ -57,6 +57,11 @@ const addDays = (date, days) => {
   return next;
 };
 
+const toLocalISOString = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
 const dateDisplay = computed(() => {
   if (!表示日付.value) return '';
   const year = 表示日付.value.getFullYear();
@@ -201,8 +206,8 @@ const updateScheduleByResize = async ({ schedule, direction, deltaHours }) => {
   try {
     const response = await apiClient.post('/apps/S生産_日表示/リサイズ更新', {
       生産伝票ID: schedule.生産伝票ID,
-      変更後開始日時: newStart.toISOString(),
-      変更後終了日時: newEnd.toISOString()
+      変更後開始日時: toLocalISOString(newStart),
+      変更後終了日時: toLocalISOString(newEnd)
     });
     if (response.data.status === 'OK') {
       showMessage('生産期間を更新しました。', 'success');
@@ -233,8 +238,8 @@ const handleDropUpdate = async ({ scheduleId, processId, timeSlot }) => {
       生産伝票ID: scheduleId,
       生産工程ID: String(processId),
       変更後日付: formatDateISO(newStartDate),
-      変更後開始日時: newStartDate.toISOString(),
-      変更後終了日時: newEndDate.toISOString()
+      変更後開始日時: toLocalISOString(newStartDate),
+      変更後終了日時: toLocalISOString(newEndDate)
     });
     if (response.data.status === 'OK') {
       showMessage('生産予定を更新しました。', 'success');

@@ -60,7 +60,7 @@ def _parse_date(value: str) -> datetime.date:
 
 def _to_naive_iso(value: datetime) -> str:
     if value.tzinfo:
-        value = value.astimezone(tz=None).replace(tzinfo=None)
+        value = value.replace(tzinfo=None)
     return value.replace(microsecond=0).isoformat()
 
 
