@@ -668,7 +668,7 @@ uv add <package> # Add new dependency
 cd frontend_web
 npm install        # Install dependencies
 npm run dev        # Start dev server
-npm run build      # Type-check and build for production
+npm run build      # Type-check and build for production（※指示がない限り実行禁止）
 npm run preview    # Preview production build
 npm run type-check # Run TypeScript type checking without building
 ```
@@ -679,7 +679,7 @@ cd frontend_avatar
 npm install        # Install dependencies
 npm run dev        # Start Electron + Vite dev server (port 8099)
 npm run type-check # Run TypeScript type checking
-# ※ npm run build は明示的な指示があるときのみ実行（dist/ を生成する）
+# ※ npm run build は明示的な指示があるときのみ実行（dist/ を生成する、指示がない限り実行禁止）
 ```
 
 ### Setup & Cleanup
@@ -838,3 +838,45 @@ No automated test suites are configured. Testing is done manually:
 - VIEWs are not created as database objects in this implementation
 - VIEW endpoints (`core_router/V*.py`, `apps_router/V*.py`) use raw SQL queries with JOINs
 - Each VIEW router directly executes SELECT statements to fetch joined data
+
+## GitHub Issues の確認方法と Close 手順
+
+### issue の確認方法
+
+- issue 内容は GitHub の issue ページで確認する  
+  例: `https://github.com/monjyu1101/AiDiy2026/issues/1`
+- issue 本文・期待動作・最新コメントを確認したうえで、ローカル実装と突き合わせる
+- 実装確認時は、まず関連キーワードを `rg` で検索し、該当ファイルを UTF-8 指定で読む  
+  例: `Get-Content -Encoding UTF8 <file>`
+- 最終判断は、**現在の実装を正とするのか**、**issue 文面を厳密に満たすのか**を明確にしてから行う
+
+### 作者として close する方法
+
+`gh` コマンドが入っていない環境があるため、このリポジトリでは **PowerShell + GitHub REST API** でも close できるようにしておく。
+
+#### 前提
+
+- Windows Credential Manager に GitHub 認証情報が保存されていること
+- 対象 credential の例:
+  - `GitHub - https://api.github.com/<GitHubユーザー名>`
+- **credential blob は Unicode ではなく UTF-8 で読むこと**
+  - Unicode 解釈だと `401 Unauthorized`
+  - UTF-8 解釈で GitHub API 認証が通る場合がある
+
+#### 手順
+
+1. Windows Credential Manager から `CredReadW` で GitHub credential を取得する
+2. `CredentialBlob` を **UTF-8** でデコードして token を得る
+3. GitHub API に対して以下を実行する
+   - コメント追加  
+     `POST https://api.github.com/repos/monjyu1101/AiDiy2026/issues/<番号>/comments`
+   - issue close  
+     `PATCH https://api.github.com/repos/monjyu1101/AiDiy2026/issues/<番号>`
+4. `Authorization: Bearer <token>` を付与する
+5. `PATCH` の body は `{"state":"closed"}` とする
+
+#### 備考
+
+- token や credential の実値はドキュメントやソースに残さない
+- close 前に、issue コメントで「なぜ close するのか」を簡潔に残す
+- 今回の `issue #1`, `issue #2` はこの方法で作者コメント付き close を実施した

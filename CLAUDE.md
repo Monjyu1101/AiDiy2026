@@ -90,7 +90,8 @@ rm backend_server/_data/AiDiy/database.db
 補足:
 
 - `_start.py` は引数指定ではなく対話形式です。
-- `_stop.py` は現在ありません。停止は `Ctrl+C` または手動のポート解放で行います。
+- `_start.py` で起動したバックエンドは `--reload` なし。コード変更を即反映するには個別起動 or reboot 機構を使う。
+- `_stop.py` は現在ありません。停止は `Ctrl+C` または手動のポート解放で行います（`netstat -ano | findstr :8091` → `taskkill /PID <pid> /F`）。
 - `frontend_avatar` の `npm run build` は明示依頼時のみ実行します。
 
 ## Access URLs
@@ -103,7 +104,7 @@ rm backend_server/_data/AiDiy/database.db
 | Frontend (Avatar Web) | http://localhost:8099/AiDiy |
 | Frontend (Avatar Electron) | `npm run dev` で起動 |
 
-**Default login:** `admin / ********`（他: `leader/secret`, `user/user`, `guest/guest`）
+**Default login:** `admin / ********`（他: `leader/secret`, `user/user`, `guest/guest`, `other/other`）
 
 ---
 

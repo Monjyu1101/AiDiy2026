@@ -297,6 +297,7 @@ const ログインウィンドウ = computed(() => ウィンドウロール.valu
 const 設定ウィンドウ = computed(() => ウィンドウロール.value === 'settings')
 const 設定SessionID = ref(new URLSearchParams(window.location.search).get('sessionId') || '')
 const 設定キー = ref(0)
+const Web設定表示 = ref(false)
 const 現在パネルキー = computed<PanelKey | null>(() => {
   return PANEL_KEYS.includes(ウィンドウロール.value as PanelKey) ? (ウィンドウロール.value as PanelKey) : null
 })
@@ -871,16 +872,32 @@ async function 再起動後再接続() {
 }
 
 function 設定再起動を開く() {
-  void window.desktopApi?.openSettingsWindow?.(セッションID.value || '')
+  if (isElectron) {
+    void window.desktopApi?.openSettingsWindow?.(セッションID.value || '')
+  } else {
+    設定SessionID.value = セッションID.value || ''
+    設定キー.value++
+    Web設定表示.value = true
+  }
 }
 
 function 設定ウィンドウを閉じる() {
-  void window.desktopApi?.closeSettingsWindow?.()
+  if (isElectron) {
+    void window.desktopApi?.closeSettingsWindow?.()
+  } else {
+    Web設定表示.value = false
+  }
 }
 
 async function 設定保存完了通知(waitSeconds: number = 30) {
-  void window.desktopApi?.closeSettingsWindow?.()
-  デスクトップチャンネル?.postMessage({ type: 'settings-saved', waitSeconds })
+  if (isElectron) {
+    void window.desktopApi?.closeSettingsWindow?.()
+    デスクトップチャンネル?.postMessage({ type: 'settings-saved', waitSeconds })
+  } else {
+    Web設定表示.value = false
+    再起動待機秒数.value = waitSeconds
+    再起動カウントダウン表示.value = true
+  }
 }
 
 function チャット状態中継(connected: boolean) {
@@ -1538,6 +1555,17 @@ onBeforeUnmount(() => {
     />
 
     <component :is="qAlertDialogComp" ref="qAlertDialogRef" />
+
+    <!-- Web モード 設定ダイアログ（position:fixed オーバーレイ） -->
+    <component
+      v-if="!isElectron && Web設定表示"
+      :is="AI設定再起動"
+      :key="設定キー"
+      :is-open="Web設定表示"
+      :session-id="設定SessionID"
+      @close="設定ウィンドウを閉じる"
+      @saved="(s: number) => 設定保存完了通知(s)"
+    />
   </main>
 </template>
 
@@ -1597,6 +1625,7 @@ onBeforeUnmount(() => {
 .settings-window-root {
   width: 100%;
   height: 100%;
+  background: #f8fafc;
 }
 /* _WindowShell 内でダイアログを全体表示: overlayを静的配置に */
 .settings-window-root :deep(.config-panel-overlay) {
@@ -1619,6 +1648,10 @@ onBeforeUnmount(() => {
   border-left: none;
   border-right: none;
   border-bottom: none;
+}
+.settings-window-root :deep(.window-shell),
+.settings-window-root :deep(.window-body) {
+  background: #f8fafc;
 }
 .settings-window-root :deep(button),
 .settings-window-root :deep(select),

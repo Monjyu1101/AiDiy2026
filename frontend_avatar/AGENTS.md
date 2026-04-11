@@ -456,7 +456,7 @@ npm run build
 ```
 
 **重要:**
-- **ユーザーの明示的な指示がない限り、`npm run build` や `build:renderer` / `build:electron` を実行して `dist` / `dist-electron` を生成しないこと。**
+- **ユーザーの明示的な指示がない限り、`npm run build` や `build:renderer` / `build:electron` を実行して `dist` / `dist-electron` を生成しないこと（指示がない限り実行禁止）。**
 - 調査や実装中の確認は、原則として `npm run dev` または `npm run type-check` を優先すること。
 
 内訳:

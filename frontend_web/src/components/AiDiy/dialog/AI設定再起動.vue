@@ -123,7 +123,7 @@ const codeBaseOptionsList = computed(() =>
   Object.entries(codeBaseOptions.value || {}).map(([value, label]) => ({ value, label }))
 );
 
-const normalizeCodeBasePath = (path: string) => path.trim().replaceAll('\\', '/');
+const normalizeCodeBasePath = (path: string) => path.trim().replace(/\\/g, '/');
 
 const handleBrowseCodeBasePath = async () => {
   browsingCodeBase.value = true;
@@ -505,42 +505,60 @@ onMounted(() => {
 
             <div class="config-panel-section">
               <div class="config-panel-section-header">Code AI</div>
-              <div v-if="codeBaseOptionsList.length > 0" class="config-panel-field">
-                <label class="config-panel-label" for="config-code-base-path">CODE_BASE_PATH:</label>
-                <div class="config-panel-control">
-                  <select
-                    id="config-code-base-path"
-                    v-model="selections.codeBasePath"
-                    class="config-panel-select"
-                  >
-                    <option value="">選択してください</option>
-                    <option v-for="opt in codeBaseOptionsList" :key="opt.value" :value="opt.value">
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
-              </div>
-              <div class="config-panel-field">
-                <label class="config-panel-label" for="config-code-base-path-input">CODE_BASE_PATH:</label>
-                <div class="config-panel-control">
-                  <div class="config-panel-inline">
-                    <input
-                      id="config-code-base-path-input"
-                      v-model.trim="selections.codeBasePath"
-                      type="text"
-                      class="config-panel-input"
-                      placeholder="../ または C:/project/"
-                    />
-                    <button
-                      type="button"
-                      class="config-panel-browse"
-                      :disabled="loading || browsingCodeBase"
-                      @click="handleBrowseCodeBasePath"
-                    >
-                      参照
-                    </button>
-                  </div>
-                </div>
+              <div class="config-panel-code-base-field">
+                <table class="config-panel-code-base-table" role="presentation">
+                  <colgroup>
+                    <col class="config-panel-code-base-col-label" />
+                    <col class="config-panel-code-base-col-value" />
+                    <col class="config-panel-code-base-col-action" />
+                  </colgroup>
+                  <tbody>
+                    <tr v-if="codeBaseOptionsList.length > 0">
+                      <th class="config-panel-code-base-label" scope="row">
+                        <label for="config-code-base-path">CODE_BASE_PATH:</label>
+                      </th>
+                      <td class="config-panel-code-base-value">
+                        <select
+                          id="config-code-base-path"
+                          v-model="selections.codeBasePath"
+                          class="config-panel-select"
+                        >
+                          <option value="">候補から選択してください</option>
+                          <option v-for="opt in codeBaseOptionsList" :key="opt.value" :value="opt.value">
+                            {{ opt.label }}
+                          </option>
+                        </select>
+                      </td>
+                      <td class="config-panel-code-base-action config-panel-code-base-action--empty" aria-hidden="true"></td>
+                    </tr>
+                    <tr>
+                      <th class="config-panel-code-base-label" scope="row">
+                        <label for="config-code-base-path-input">フォルダ:</label>
+                      </th>
+                      <td class="config-panel-code-base-value">
+                        <div class="config-panel-code-base-stack">
+                          <input
+                            id="config-code-base-path-input"
+                            v-model.trim="selections.codeBasePath"
+                            type="text"
+                            class="config-panel-input"
+                            placeholder="../ または C:/project/"
+                          />
+                        </div>
+                      </td>
+                      <td class="config-panel-code-base-action">
+                        <button
+                          type="button"
+                          class="config-panel-browse"
+                          :disabled="loading || browsingCodeBase"
+                          @click="handleBrowseCodeBasePath"
+                        >
+                          参照
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-code-ai1-select">CODE_AI1_NAME:</label>
@@ -782,10 +800,61 @@ onMounted(() => {
   margin: 0;
 }
 
-.config-panel-inline {
+.config-panel-code-base-field {
+  margin: 0;
+}
+
+.config-panel-code-base-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 4px 0;
+}
+
+.config-panel-code-base-col-label {
+  width: 120px;
+}
+
+.config-panel-code-base-col-value {
+  width: auto;
+}
+
+.config-panel-code-base-col-action {
+  width: 40px;
+}
+
+.config-panel-code-base-label,
+.config-panel-code-base-value,
+.config-panel-code-base-action {
+  padding: 0;
+  vertical-align: middle;
+}
+
+.config-panel-code-base-label {
+  width: 120px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 400;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.config-panel-code-base-label label {
+  display: inline-block;
+}
+
+.config-panel-code-base-action {
+  width: 40px;
+}
+
+.config-panel-code-base-action--empty {
+  width: 40px;
+}
+
+.config-panel-code-base-stack {
   display: flex;
-  gap: 6px;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .config-panel-input {
@@ -801,15 +870,20 @@ onMounted(() => {
 }
 
 .config-panel-browse {
-  flex: 0 0 auto;
   height: 22px;
-  border: 1px solid #cbd5f5;
+  border: 1px solid #2563eb;
   border-radius: 3px;
   background: #ffffff;
-  color: #0f172a;
-  padding: 0 10px;
+  color: #2563eb;
+  padding: 0 4px;
   font-size: 11px;
+  line-height: 1;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  width: 40px;
 }
 
 .config-panel-browse:hover:not(:disabled) {

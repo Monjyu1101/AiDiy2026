@@ -122,6 +122,75 @@ class CodeAgent:
         self.強制停止フラグ = False  # cancel_run用
         self.現在タスク: Optional[asyncio.Task] = None  # 実行中の処理タスク
 
+    def _配下パス判定(self, 対象パス: str, 基準パス: str) -> bool:
+        """対象パスが基準パス配下（同一含む）かを返す"""
+        if not 対象パス or not 基準パス:
+            return False
+        try:
+            return os.path.commonpath([os.path.abspath(対象パス), os.path.abspath(基準パス)]) == os.path.abspath(基準パス)
+        except ValueError:
+            return False
+
+    def _添付ファイルパス解決(self, ファイルパス: str) -> Optional[str]:
+        """
+        添付ファイルの実パスを解決する。
+        - 現在の実行プロジェクト配下ならそのまま返す
+        - backend_server/temp 配下で、かつ実行プロジェクト外なら実行先 temp 配下へコピーして返す
+        """
+        if not ファイルパス:
+            return None
+
+        絶対元パス = os.path.abspath(ファイルパス)
+        if not os.path.exists(絶対元パス):
+            logger.warning(f"[CodeAgent] 添付ファイルが見つかりません: {ファイルパス}")
+            return None
+
+        実行基準パス = os.path.abspath(self.絶対パス) if self.絶対パス else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if self._配下パス判定(絶対元パス, 実行基準パス):
+            return 絶対元パス
+
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        backend_temp_dir = os.path.join(backend_dir, "temp")
+        if not self._配下パス判定(絶対元パス, backend_temp_dir):
+            return 絶対元パス
+
+        try:
+            相対パス = os.path.relpath(絶対元パス, backend_dir)
+            コピー先パス = os.path.abspath(os.path.join(実行基準パス, 相対パス))
+
+            if os.path.normcase(os.path.normpath(絶対元パス)) == os.path.normcase(os.path.normpath(コピー先パス)):
+                return 絶対元パス
+
+            os.makedirs(os.path.dirname(コピー先パス), exist_ok=True)
+
+            コピー要否 = True
+            if os.path.exists(コピー先パス):
+                try:
+                    コピー要否 = (
+                        os.path.getsize(絶対元パス) != os.path.getsize(コピー先パス)
+                        or os.path.getmtime(絶対元パス) > os.path.getmtime(コピー先パス)
+                    )
+                except OSError:
+                    コピー要否 = True
+
+            if コピー要否:
+                shutil.copy2(絶対元パス, コピー先パス)
+                logger.info(f"[CodeAgent] temp添付ファイルを作業先へコピー: {絶対元パス} -> {コピー先パス}")
+
+            return コピー先パス
+        except Exception as e:
+            logger.warning(f"[CodeAgent] temp添付ファイルのコピー失敗。元パスを使用します: {絶対元パス} error={e}")
+            return 絶対元パス
+
+    def _添付ファイル一覧解決(self, 添付ファイル一覧: list[str]) -> list[str]:
+        """添付ファイル一覧を実行可能なパスへ解決する"""
+        解決後一覧: list[str] = []
+        for ファイルパス in 添付ファイル一覧 or []:
+            解決後パス = self._添付ファイルパス解決(ファイルパス)
+            if 解決後パス and 解決後パス not in 解決後一覧:
+                解決後一覧.append(解決後パス)
+        return 解決後一覧
+
     def _変更ファイルキー(self, ファイルパス: str) -> str:
         """重複判定用の正規化キーを返す"""
         if not ファイルパス:
@@ -454,8 +523,9 @@ class CodeAgent:
             # 添付ファイル一覧があればメッセージに追記
             添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
             if 添付ファイル一覧:
-                有効ファイル = [p for p in 添付ファイル一覧 if os.path.exists(p)]
+                有効ファイル = self._添付ファイル一覧解決(添付ファイル一覧)
                 if 有効ファイル:
+                    受信データ["添付ファイル一覧"] = 有効ファイル
                     添付テキスト = "\n``` 添付ファイル\n"
                     for パス in 有効ファイル:
                         添付テキスト += f"{パス}\n"
@@ -592,8 +662,9 @@ class CodeAgent:
             # 添付ファイル一覧があればメッセージに追記
             添付ファイル一覧 = 受信データ.get("添付ファイル一覧", [])
             if 添付ファイル一覧:
-                有効ファイル = [p for p in 添付ファイル一覧 if os.path.exists(p)]
+                有効ファイル = self._添付ファイル一覧解決(添付ファイル一覧)
                 if 有効ファイル:
+                    受信データ["添付ファイル一覧"] = 有効ファイル
                     添付テキスト = "\n``` 添付ファイル\n"
                     for パス in 有効ファイル:
                         添付テキスト += f"{パス}\n"

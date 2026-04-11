@@ -1013,7 +1013,7 @@ npm run type-check # Run TypeScript type checking without building
 ```
 
 **重要:**
-- **ユーザーの明示的な指示がない限り、`npm run build` などで `dist` を生成しないこと。**
+- **ユーザーの明示的な指示がない限り、`npm run build` などで `dist` を生成しないこと（指示がない限り実行禁止）。**
 - 動作確認や調査では、原則として `npm run dev` または `npm run type-check` を優先すること。
 
 **Running frontend only:**
