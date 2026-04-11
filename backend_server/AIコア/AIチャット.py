@@ -1,11 +1,11 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 # Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
 # Commercial use requires prior written consent from all copyright holders.
 # See LICENSE for full terms. Thank you for keeping the rules.
-# https://github.com/monjyu1101
+# https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
 """
@@ -430,7 +430,14 @@ class Chat:
             
             if file_path:
                 logger.info(f"[Chat] 添付ファイル渡し: {file_path}")
-        
+
+        # 添付ファイルがなく、ファイルパネルで選択中のパスがある場合はメッセージに追加
+        if not 添付ファイル一覧:
+            選択ファイル情報 = 受信データ.get("選択ファイル情報")
+            if 選択ファイル情報:
+                元のメッセージ内容 = 元のメッセージ内容 + f"\n[{選択ファイル情報}]"
+                logger.info(f"[Chat] 選択ファイル情報をメッセージに追加: {選択ファイル情報}")
+
         # AI実行と応答送信（エコーバックは core_router/AIコア.py で既に実施済み）
         受信データ["メッセージ内容"] = 元のメッセージ内容
         await self._AI実行と応答送信(受信データ, file_path=file_path)

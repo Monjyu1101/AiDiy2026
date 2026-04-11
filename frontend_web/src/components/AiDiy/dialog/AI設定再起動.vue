@@ -6,7 +6,7 @@
   Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
   Commercial use requires prior written consent from all copyright holders.
   See LICENSE for full terms. Thank you for keeping the rules.
-  https://github.com/monjyu1101
+  https://github.com/monjyu1101/AiDiy2026
   -------------------------------------------------------------------------
 -->
 
@@ -27,6 +27,7 @@ const emit = defineEmits<{
 }>();
 
 const loading = ref(false);
+const browsingCodeBase = ref(false);
 const errorMessage = ref('');
 const availableModels = ref<Record<string, any>>({});
 const currentSettings = ref<Record<string, any>>({});
@@ -118,10 +119,33 @@ const codeModelOptions4 = computed(() => {
   return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
 });
 
-const codeBasePath = computed(() => selections.codeBasePath || currentSettings.value?.CODE_BASE_PATH || '');
 const codeBaseOptionsList = computed(() =>
   Object.entries(codeBaseOptions.value || {}).map(([value, label]) => ({ value, label }))
 );
+
+const normalizeCodeBasePath = (path: string) => path.trim().replaceAll('\\', '/');
+
+const handleBrowseCodeBasePath = async () => {
+  browsingCodeBase.value = true;
+  errorMessage.value = '';
+  try {
+    const response = await apiClient.post('/core/AIコア/フォルダ参照', {
+      初期パス: selections.codeBasePath || currentSettings.value?.CODE_BASE_PATH || ''
+    });
+    if (response?.data?.status !== 'OK') {
+      errorMessage.value = response?.data?.message || 'フォルダ参照に失敗しました';
+      return;
+    }
+    const selectedPath = normalizeCodeBasePath(response?.data?.data?.選択パス || '');
+    if (selectedPath) {
+      selections.codeBasePath = selectedPath;
+    }
+  } catch (error: any) {
+    errorMessage.value = `フォルダ参照エラー: ${error?.response?.data?.message || error?.message || error}`;
+  } finally {
+    browsingCodeBase.value = false;
+  }
+};
 
 const loadConfig = async () => {
   loading.value = true;
@@ -207,8 +231,9 @@ const buildNextSettings = () => {
     nextSettings.CODE_AI3_MODEL = selections.codeModel3;
     nextSettings.CODE_AI4_NAME = selections.codeAi4;
     nextSettings.CODE_AI4_MODEL = selections.codeModel4;
-    if (selections.codeBasePath) {
-      nextSettings.CODE_BASE_PATH = selections.codeBasePath;
+    const normalizedCodeBasePath = normalizeCodeBasePath(selections.codeBasePath);
+    if (normalizedCodeBasePath) {
+      nextSettings.CODE_BASE_PATH = normalizedCodeBasePath;
     }
 
     const chatKey = CHAT_MODEL_KEYS[selections.chatAi];
@@ -488,10 +513,33 @@ onMounted(() => {
                     v-model="selections.codeBasePath"
                     class="config-panel-select"
                   >
+                    <option value="">選択してください</option>
                     <option v-for="opt in codeBaseOptionsList" :key="opt.value" :value="opt.value">
                       {{ opt.label }}
                     </option>
                   </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-code-base-path-input">CODE_BASE_PATH:</label>
+                <div class="config-panel-control">
+                  <div class="config-panel-inline">
+                    <input
+                      id="config-code-base-path-input"
+                      v-model.trim="selections.codeBasePath"
+                      type="text"
+                      class="config-panel-input"
+                      placeholder="../ または C:/project/"
+                    />
+                    <button
+                      type="button"
+                      class="config-panel-browse"
+                      :disabled="loading || browsingCodeBase"
+                      @click="handleBrowseCodeBasePath"
+                    >
+                      参照
+                    </button>
+                  </div>
                 </div>
               </div>
               <div class="config-panel-field">
@@ -732,6 +780,45 @@ onMounted(() => {
   background: #ffffff;
   color: #0f172a;
   margin: 0;
+}
+
+.config-panel-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.config-panel-input {
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  border: 1px solid #cbd5f5;
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 11px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.config-panel-browse {
+  flex: 0 0 auto;
+  height: 22px;
+  border: 1px solid #cbd5f5;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.config-panel-browse:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+.config-panel-browse:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 

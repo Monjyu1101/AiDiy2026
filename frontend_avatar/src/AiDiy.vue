@@ -6,7 +6,7 @@
   Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
   Commercial use requires prior written consent from all copyright holders.
   See LICENSE for full terms. Thank you for keeping the rules.
-  https://github.com/monjyu1101
+  https://github.com/monjyu1101/AiDiy2026
   -------------------------------------------------------------------------
 -->
 
@@ -814,6 +814,38 @@ async function パネル切替(panel: PanelKey) {
   }
 }
 
+async function パネル有効化(panel: PanelKey) {
+  if (!isElectron) {
+    if (アクティブタブ.value !== panel) {
+      アクティブタブ.value = panel
+    }
+    return
+  }
+
+  if (パネル表示状態.value[panel]) {
+    return
+  }
+
+  try {
+    const states = await window.desktopApi?.togglePanel?.(panel)
+    if (states) {
+      パネル状態更新(states)
+      await 操作状態同期()
+      スナップショット送信()
+    }
+  } catch (error) {
+    console.warn('[Avatar] パネル自動表示の反映に失敗しました。', panel, error)
+  }
+}
+
+function 現在コードパネル有効化() {
+  const panel = 現在パネルキー.value
+  if (!panel || !panel.startsWith('code')) {
+    return
+  }
+  void パネル有効化(panel)
+}
+
 async function イメージ選択キャンセル() {
   自動選択表示.value = false
   if (現在パネルキー.value === 'image') {
@@ -1193,6 +1225,7 @@ onBeforeUnmount(() => {
               @send-input-payload="入力ペイロード送信"
               @mode-change="チャットモード更新"
               @chat-state="チャット状態中継"
+              @activate="パネル有効化('chat')"
             />
           </div>
 
@@ -1240,6 +1273,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '1')"
               @cancel="() => コードキャンセル処理('1')"
               @send-file="コードファイル送信処理"
+              @activate="パネル有効化('code1')"
             />
           </div>
 
@@ -1257,6 +1291,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '2')"
               @cancel="() => コードキャンセル処理('2')"
               @send-file="コードファイル送信処理"
+              @activate="パネル有効化('code2')"
             />
           </div>
 
@@ -1274,6 +1309,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '3')"
               @cancel="() => コードキャンセル処理('3')"
               @send-file="コードファイル送信処理"
+              @activate="パネル有効化('code3')"
             />
           </div>
 
@@ -1291,6 +1327,7 @@ onBeforeUnmount(() => {
               @submit="(t: string) => コード送信処理(t, '4')"
               @cancel="() => コードキャンセル処理('4')"
               @send-file="コードファイル送信処理"
+              @activate="パネル有効化('code4')"
             />
           </div>
         </div>
@@ -1405,6 +1442,7 @@ onBeforeUnmount(() => {
         @send-input-payload="ウィンドウから入力ペイロード送信"
         @mode-change="チャットモード更新"
         @chat-state="チャット状態中継"
+        @activate="パネル有効化('chat')"
       />
     </component>
 
@@ -1482,6 +1520,7 @@ onBeforeUnmount(() => {
         @submit="コード送信処理"
         @cancel="コードキャンセル処理"
         @send-file="コードファイル送信処理"
+        @activate="現在コードパネル有効化"
       />
     </component>
 

@@ -5,7 +5,7 @@
 # Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
 # Commercial use requires prior written consent from all copyright holders.
 # See LICENSE for full terms. Thank you for keeping the rules.
-# https://github.com/monjyu1101
+# https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
 """
@@ -486,9 +486,10 @@ class CodeAgent:
             except Exception as e:
                 logger.warning(f"[CodeAgent] inputチャンネルへの開始メッセージ送信エラー: {e}")
             try:
-                if hasattr(self.接続, "live_processor") and self.接続.live_processor:
-                    await self.接続.live_processor.開始()
-                    await self.接続.live_processor.テキスト送信(開始メッセージ)
+                lp = getattr(self.接続, "live_processor", None)
+                if lp and getattr(getattr(lp, "AIインスタンス", None), "live_session", None):
+                    await lp.開始()
+                    await lp.テキスト送信(開始メッセージ)
             except Exception as e:
                 logger.warning(f"[CodeAgent] LiveAI開始メッセージ送信エラー: {e}")
 
@@ -559,9 +560,10 @@ class CodeAgent:
             except Exception as e:
                 logger.warning(f"[CodeAgent] inputチャンネルへの完了メッセージ送信エラー: {e}")
             try:
-                if hasattr(self.接続, "live_processor") and self.接続.live_processor:
-                    await self.接続.live_processor.開始()
-                    await self.接続.live_processor.テキスト送信(完了メッセージ)
+                lp = getattr(self.接続, "live_processor", None)
+                if lp and getattr(getattr(lp, "AIインスタンス", None), "live_session", None):
+                    await lp.開始()
+                    await lp.テキスト送信(完了メッセージ)
             except Exception as e:
                 logger.warning(f"[CodeAgent] LiveAI完了メッセージ送信エラー: {e}")
 
@@ -598,6 +600,12 @@ class CodeAgent:
                     添付テキスト += "```"
                     メッセージ内容 = メッセージ内容 + 添付テキスト
                     logger.info(f"[CodeAgent] 添付ファイル追記: {len(有効ファイル)}件")
+            else:
+                # 60s以内のファイルがなく、ファイルパネルで選択中のパスがある場合はメッセージに追加
+                選択ファイル情報 = 受信データ.get("選択ファイル情報")
+                if 選択ファイル情報:
+                    メッセージ内容 = メッセージ内容 + f"\n[{選択ファイル情報}]"
+                    logger.info(f"[CodeAgent] 選択ファイル情報をメッセージに追加: {選択ファイル情報}")
 
             # 処理要求ログ
             セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'

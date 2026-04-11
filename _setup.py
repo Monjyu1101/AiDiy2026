@@ -328,6 +328,16 @@ def check_npm_installed():
     return shutil.which(npm_command()) is not None or shutil.which(FRONTEND_COMMAND) is not None
 
 
+def print_ai_cli_manual_setup():
+    cmd = npm_command()
+    print_info("共通: AI CLI ツールは個別にセットアップできます。")
+    print_info("  個別セットアップ例:")
+    print_info(f"    Claude Code : {cmd} install -g @anthropic-ai/claude-code")
+    print_info(f"    GitHub Copilot: {cmd} install -g @github/copilot")
+    print_info(f"    OpenAI Codex : {cmd} install -g @openai/codex")
+    print_info(f"    Gemini CLI : {cmd} install -g @google/gemini-cli")
+
+
 def start_global_npm_tools_install():
     print_header("共通セットアップ: npm ツール投入")
     print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / Gemini CLI")
@@ -434,6 +444,7 @@ def setup_common_global_tools():
         start_global_npm_tools_install()
     else:
         print_warning("共通: npm ツールのインストールをスキップしました。")
+        print_ai_cli_manual_setup()
 
 
 def setup_backend():

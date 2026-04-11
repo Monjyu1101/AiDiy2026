@@ -6,7 +6,7 @@
   Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
   Commercial use requires prior written consent from all copyright holders.
   See LICENSE for full terms. Thank you for keeping the rules.
-  https://github.com/monjyu1101
+  https://github.com/monjyu1101/AiDiy2026
   -------------------------------------------------------------------------
 -->
 
@@ -52,6 +52,7 @@ const 通知 = defineEmits<{
   submit: [text: string, channel: コードチャンネル]
   cancel: [channel: コードチャンネル]
   'send-file': [payload: { channel: コードチャンネル; fileName: string; base64: string }]
+  activate: []
 }>()
 
 const 出力接続済み = ref(false)
@@ -261,6 +262,7 @@ function 受信内容文字列(message: Record<string, unknown>) {
 }
 
 function ウェルカム処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (内容) {
     ウェルカム内容.value = 内容
@@ -268,6 +270,7 @@ function ウェルカム処理(message: Record<string, unknown>) {
 }
 
 function 入力テキスト受信処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (内容) {
     ターミナルメッセージ追加('input_text', `> ${内容}`)
@@ -275,6 +278,7 @@ function 入力テキスト受信処理(message: Record<string, unknown>) {
 }
 
 function 入力リクエスト受信処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (内容) {
     ターミナルメッセージ追加('input_request', 内容)
@@ -282,10 +286,12 @@ function 入力リクエスト受信処理(message: Record<string, unknown>) {
 }
 
 function 入力ファイル受信処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   ファイルメッセージ追加('input_file', String(message.ファイル名 || ''), (message.サムネイル画像 as string) ?? null)
 }
 
 function 出力テキスト受信処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (内容) {
     ターミナルメッセージ追加('output_text', 内容)
@@ -294,6 +300,9 @@ function 出力テキスト受信処理(message: Record<string, unknown>) {
 }
 
 function ウェルカムテキスト受信処理(message: Record<string, unknown>) {
+  if (ウェルカムテキスト受信済み.value) {
+    表示時アクティブ化()
+  }
   const 内容 = 受信内容文字列(message)
   if (内容) {
     ターミナルメッセージ追加('welcome_text', 内容)
@@ -302,10 +311,12 @@ function ウェルカムテキスト受信処理(message: Record<string, unknown
 }
 
 function 出力ファイル受信処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   ファイルメッセージ追加('output_file', String(message.ファイル名 || ''), (message.サムネイル画像 as string) ?? null)
 }
 
 function cancel_run受信処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (内容) {
     ターミナルメッセージ追加('cancel_run', `> ${内容}`)
@@ -326,11 +337,13 @@ function update_info受信処理(message: Record<string, unknown>) {
   )
   if (files.length === 0) return
 
+  表示時アクティブ化()
   更新ファイル一覧.value = files
   更新ファイルダイアログ表示.value = true
 }
 
 function 出力ストリーム受信処理(message: Record<string, unknown>) {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (!内容) return
 
@@ -398,6 +411,11 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
     演出初期化(メッセージID, bubbleElement, '#00ff00', true)
     演出キュー追加(メッセージID, `${内容}\n`, false)
   })
+}
+
+function 表示時アクティブ化() {
+  if (!ウェルカムテキスト受信済み.value) return
+  通知('activate')
 }
 
 function WSハンドラ登録(socket: IWebSocketClient) {

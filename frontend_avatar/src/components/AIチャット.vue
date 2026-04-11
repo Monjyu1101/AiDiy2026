@@ -6,7 +6,7 @@
   Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
   Commercial use requires prior written consent from all copyright holders.
   See LICENSE for full terms. Thank you for keeping the rules.
-  https://github.com/monjyu1101
+  https://github.com/monjyu1101/AiDiy2026
   -------------------------------------------------------------------------
 -->
 
@@ -36,6 +36,7 @@ const 通知 = defineEmits<{
   'send-input-payload': [message: Record<string, unknown>]
   'mode-change': [mode: チャットモード]
   'chat-state': [connected: boolean]
+  activate: []
 }>()
 
 interface メッセージ {
@@ -270,6 +271,11 @@ const 受信内容文字列 = (受信データ: any) => {
   return typeof 内容 === 'string' ? 内容 : JSON.stringify(内容)
 }
 
+const 表示時アクティブ化 = () => {
+  if (!ウェルカムテキスト受信済み.value) return
+  通知('activate')
+}
+
 const 受信チャンネル一致 = (受信データ: any): boolean => {
   const 期待チャンネル = String(プロパティ.チャンネル ?? '0')
   const 実受信チャンネル = 受信データ?.チャンネル
@@ -283,6 +289,7 @@ const 受信チャンネル一致 = (受信データ: any): boolean => {
 
 const ウェルカム受信処理 = (受信データ: any) => {
   if (!受信チャンネル一致(受信データ)) return
+  表示時アクティブ化()
   console.log('[チャット] welcome_info受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) return
@@ -290,6 +297,7 @@ const ウェルカム受信処理 = (受信データ: any) => {
 }
 
 const 入力テキスト受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   console.log('[チャット] input_text受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) { console.log('[チャット] input_text 内容なしでスキップ'); return }
@@ -298,6 +306,7 @@ const 入力テキスト受信処理 = (受信データ: any) => {
 }
 
 const 入力リクエスト受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   console.log('[チャット] input_request受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) { console.log('[チャット] input_request 内容なしでスキップ'); return }
@@ -306,10 +315,12 @@ const 入力リクエスト受信処理 = (受信データ: any) => {
 }
 
 const 入力ファイル受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   ファイルメッセージ追加('input_file', 受信データ.ファイル名 ?? null, 受信データ.サムネイル画像 ?? null)
 }
 
 const 出力テキスト受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   console.log('[チャット] output_text受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) { console.log('[チャット] output_text 内容なしでスキップ'); return }
@@ -318,6 +329,7 @@ const 出力テキスト受信処理 = (受信データ: any) => {
 }
 
 const 出力リクエスト受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   console.log('[チャット] output_request受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) { console.log('[チャット] output_request 内容なしでスキップ'); return }
@@ -327,6 +339,9 @@ const 出力リクエスト受信処理 = (受信データ: any) => {
 
 const ウェルカムテキスト受信処理 = (受信データ: any) => {
   if (!受信チャンネル一致(受信データ)) return
+  if (ウェルカムテキスト受信済み.value) {
+    表示時アクティブ化()
+  }
   ウェルカムテキスト受信済み.value = true
   console.log('[チャット] welcome_text受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
@@ -336,22 +351,26 @@ const ウェルカムテキスト受信処理 = (受信データ: any) => {
 }
 
 const 出力ファイル受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   ファイルメッセージ追加('output_file', 受信データ.ファイル名 ?? null, 受信データ.サムネイル画像 ?? null)
 }
 
 const 音声入力受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) return
   ターミナルメッセージ追加('recognition_input', 内容)
 }
 
 const 音声出力受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) return
   ターミナルメッセージ追加('recognition_output', 内容)
 }
 
 const 出力ストリーム受信処理 = (受信データ: any) => {
+  表示時アクティブ化()
   console.log('[チャット] output_stream受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) return

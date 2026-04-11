@@ -1,11 +1,11 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 # Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
 # Commercial use requires prior written consent from all copyright holders.
 # See LICENSE for full terms. Thank you for keeping the rules.
-# https://github.com/monjyu1101
+# https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
 """
@@ -549,26 +549,15 @@ class Live:
                     f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
                 )
                 result = await self.AIインスタンス.テキスト送信(text)
-                # テキスト送信が失敗した場合（APIキーなしなど）にエラーメッセージを表示
                 if not result:
-                    logger.warning("LiveAI実行:テキスト送信に失敗しました")
-                    if self.接続:
-                        await self.接続.send_to_channel("0", {
-                            "セッションID": self.セッションID,
-                            "メッセージ識別": "output_text",
-                            "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。"
-                        })
+                    logger.warning("LiveAI実行:テキスト送信に失敗しました（!を返して継続）")
+                    await self._send_output_text({"text": "!"})
                 return result
             else:
-                # LiveAI未初期化時のエラーメッセージ送信
-                logger.warning("LiveAI実行:LiveAIが開始されていません")
-                if self.接続:
-                    await self.接続.send_to_channel("0", {
-                        "セッションID": self.セッションID,
-                        "メッセージ識別": "output_text",
-                        "メッセージ内容": "LiveAIが停止状態です。APIキーの設定を確認、再起動してください。"
-                    })
-                return False
+                # LiveAI停止中："!" を戻り値として返し継続
+                logger.warning("LiveAI実行:LiveAIが開始されていません（!を返して継続）")
+                await self._send_output_text({"text": "!"})
+                return True
         except Exception as e:
             logger.error(f"[Live] テキスト送信エラー: {e}")
             return False
@@ -580,7 +569,9 @@ class Live:
                 image_size = len(image_data) if isinstance(image_data, bytes) else "unknown"
                 logger.info(f"[Live] 画像入力: format={format} size={image_size}bytes ({self.セッションID})")
                 return await self.AIインスタンス.画像送信(image_data, format)
-            return False
+            # LiveAI停止中："!" を戻り値として返し継続
+            await self._send_output_text({"text": "!"})
+            return True
         except Exception as e:
             logger.error(f"[Live] 画像送信エラー: {e}")
             return False

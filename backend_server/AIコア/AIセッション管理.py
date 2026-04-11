@@ -5,7 +5,7 @@
 # Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
 # Commercial use requires prior written consent from all copyright holders.
 # See LICENSE for full terms. Thank you for keeping the rules.
-# https://github.com/monjyu1101
+# https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
 """
@@ -191,6 +191,11 @@ class SessionConnection:
         self.チャンネル0toCore_並行出力フラグ = False
         # core再接続時の字幕用に、最新の recognition_output だけ保持
         self.最新認識出力: Optional[dict] = None
+        # ファイル/フォルダ選択状態
+        self.選択パス: str = ""
+        self.選択種別: str = ""  # "file" or "folder"
+        self.選択パネル: str = ""  # "left" or "right"
+        self.選択タイムスタンプ: str = ""
 
     def ファイル登録(self, チャンネル: str, ファイルパス: str):
         """チャンネルのファイルリストにファイルを追加"""

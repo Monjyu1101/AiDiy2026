@@ -6,7 +6,7 @@
   Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
   Commercial use requires prior written consent from all copyright holders.
   See LICENSE for full terms. Thank you for keeping the rules.
-  https://github.com/monjyu1101
+  https://github.com/monjyu1101/AiDiy2026
   -------------------------------------------------------------------------
 -->
 
@@ -55,6 +55,7 @@ const 右展開中フォルダ = ref<Set<string>>(new Set());
 const 選択ファイル名 = ref<string>('');
 const 選択ファイルパス = ref<string>('');
 const 選択パネル = ref<'left' | 'right' | null>(null);
+const 選択種別 = ref<'file' | 'folder' | null>(null);
 const ファイル内容テキスト = ref<string | null>(null);
 const ファイル内容画像 = ref<string | null>(null);
 
@@ -283,12 +284,50 @@ const フォルダ開閉 = (フォルダパス: string, isBackup: boolean) => {
   展開中.value = 次;
 };
 
+const 選択通知送信 = (パス: string, 種別: 'file' | 'folder', isBackup: boolean) => {
+  if (!出力WebSocket.value?.isConnected()) return;
+  出力WebSocket.value.send({
+    セッションID: プロパティ.セッションID ?? '',
+    チャンネル: 'file',
+    メッセージ識別: 'file_select',
+    メッセージ内容: { パス, 種別, パネル: isBackup ? 'left' : 'right' },
+  });
+};
+
+const 選択解除通知送信 = () => {
+  if (!出力WebSocket.value?.isConnected()) return;
+  出力WebSocket.value.send({
+    セッションID: プロパティ.セッションID ?? '',
+    チャンネル: 'file',
+    メッセージ識別: 'file_deselect',
+    メッセージ内容: {},
+  });
+};
+
 const ツリー行クリック = (行: ツリー表示行, isBackup: boolean) => {
+  const panel = isBackup ? 'left' : 'right';
   if (行.種別 === 'folder') {
     フォルダ開閉(行.パス, isBackup);
+    // フォルダ選択トグル
+    if (選択ファイル名.value === 行.パス && 選択パネル.value === panel && 選択種別.value === 'folder') {
+      下部ファイル表示クリア();
+      選択解除通知送信();
+    } else {
+      下部ファイル表示クリア();
+      選択ファイル名.value = 行.パス;
+      選択パネル.value = panel;
+      選択種別.value = 'folder';
+      選択通知送信(行.パス, 'folder', isBackup);
+    }
     return;
   }
-  ファイルクリック(行.パス, isBackup);
+  // ファイルトグル
+  if (選択ファイル名.value === 行.パス && 選択パネル.value === panel && 選択種別.value === 'file') {
+    下部ファイル表示クリア();
+    選択解除通知送信();
+    return;
+  }
+  void ファイルクリック(行.パス, isBackup);
 };
 
 const 編集モード終了 = () => {
@@ -360,6 +399,8 @@ const 下部ファイル表示クリア = () => {
   ハイライト要求連番++;
   選択ファイル名.value = '';
   選択ファイルパス.value = '';
+  選択パネル.value = null;
+  選択種別.value = null;
   ファイル内容テキスト.value = null;
   ファイル内容画像.value = null;
   ファイル内容エラー.value = null;
@@ -422,6 +463,8 @@ const ファイルクリック = async (ファイル名: string, isBackup: boole
   編集モード終了();
   選択パネル.value = isBackup ? 'left' : 'right';
   選択ファイル名.value = ファイル名;
+  選択種別.value = 'file';
+  選択通知送信(ファイル名, 'file', isBackup);
   ファイル内容テキスト.value = null;
   ファイル内容画像.value = null;
   ファイル内容エラー.value = null;
@@ -695,9 +738,19 @@ const 出力ソケット切断 = () => {
 // ※ files_tempのタイマーは受信後に描写完了してからセットするため、ここでは開始しない
 watch(() => プロパティ.active, (新値) => {
   if (新値) {
+    // 再オープン: 選択クリア後にリスト要求（auto-selectは受信後にファイルクリック経由で通知される）
+    if (選択ファイル名.value) {
+      選択解除通知送信();
+    }
+    下部ファイル表示クリア();
     ファイルリスト要求();
   } else {
     テンプリスト自動送信停止();
+    // クローズ: 選択中であれば解除通知
+    if (選択ファイル名.value) {
+      選択解除通知送信();
+    }
+    下部ファイル表示クリア();
   }
 });
 
@@ -830,6 +883,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', キーボードキーダウン);
   window.removeEventListener('mousedown', コンテキストメニュー閉じる);
   テンプリスト自動送信停止();
+  if (選択ファイル名.value) {
+    選択解除通知送信();
+  }
   出力ソケット切断();
   monacoエディタ破棄();
 });
@@ -880,7 +936,8 @@ onBeforeUnmount(() => {
                 class="tree-item"
                 :class="{
                   folder: 行.種別 === 'folder',
-                  selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'left',
+                  selected: (行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'left' && 選択種別 === 'file')
+                         || (行.種別 === 'folder' && 選択ファイル名 === 行.パス && 選択パネル === 'left' && 選択種別 === 'folder'),
                 }"
                 @click="ツリー行クリック(行, true)"
                 @contextmenu="ツリー行右クリック($event, 行, true)"
@@ -935,7 +992,8 @@ onBeforeUnmount(() => {
                 class="tree-item"
                 :class="{
                   folder: 行.種別 === 'folder',
-                  selected: 行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'right',
+                  selected: (行.種別 === 'file' && 選択ファイル名 === 行.パス && 選択パネル === 'right' && 選択種別 === 'file')
+                         || (行.種別 === 'folder' && 選択ファイル名 === 行.パス && 選択パネル === 'right' && 選択種別 === 'folder'),
                 }"
                 @click="ツリー行クリック(行, false)"
                 @contextmenu="ツリー行右クリック($event, 行, false)"
