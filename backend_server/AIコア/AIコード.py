@@ -211,6 +211,92 @@ class CodeAgent:
             追加件数 += 1
         return 追加件数
 
+    def _aidiyフォルダ取得(self) -> str:
+        """現在の作業先に対応する .aidiy フォルダの絶対パスを返す"""
+        実行基準パス = os.path.abspath(self.絶対パス) if self.絶対パス else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(実行基準パス, ".aidiy")
+
+    def _自己改善プロンプト生成(self, 元要求: str, 最終応答: str) -> str:
+        """自己改善書き込み依頼のプロンプトを生成する"""
+        aidiy_dir = self._aidiyフォルダ取得()
+        aidiy_index = os.path.join(aidiy_dir, "_index.md")
+        aidiy_last = os.path.join(aidiy_dir, "_最終修正")
+        変更ファイル一覧 = "\n".join(f"- {path}" for path in self.累積変更ファイル) if self.累積変更ファイル else "- なし"
+        return (
+            "自己改善書き込みを実施してください。\n"
+            "今回の修正処理は完了済みで、ユーザー向けの完了通知も終わっています。\n"
+            "これ以降は、次回以降の改造精度を上げるための知見整理だけを行ってください。\n\n"
+            f"作業対象フォルダ: `{aidiy_dir}`\n"
+            f"更新必須ファイル: `{aidiy_index}`, `{aidiy_last}`\n"
+            "加えて、今回の修正テーマを表す .md を .aidiy 配下に1件以上作成または更新してください。\n"
+            "テーマ名は内容がわかる日本語ファイル名にしてください。\n\n"
+            "更新内容の要件:\n"
+            "1. `.aidiy/_index.md` に今回の修正知見の索引を追記・更新\n"
+            "2. `.aidiy/_最終修正` に今回の最終修正内容を上書きまたは更新\n"
+            "3. テーマ別 .md に、修正内容・関連ファイル・関連箇所・次回の注意点を整理\n"
+            "4. 既存の .aidiy 記録があれば読み、重複ではなく知見を統合\n"
+            "5. アプリ本体の仕様変更や追加修正は行わず、.aidiy 配下の記録更新だけを実施\n\n"
+            f"【今回の依頼】\n{(元要求 or '').strip()}\n\n"
+            f"【最終応答】\n{(最終応答 or '').strip()}\n\n"
+            f"【変更ファイル一覧】\n{変更ファイル一覧}\n"
+        )
+
+    async def _自己改善書き込み実行(self, ai_instance: Any, 元要求: str, 最終応答: str) -> None:
+        """検証・通知完了後に .aidiy へ知見を書き込ませる"""
+        if self.強制停止フラグ:
+            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止中のため自己改善をスキップ")
+            return
+        if not ai_instance:
+            logger.warning(f"[CodeAgent] チャンネル{self.チャンネル} AIインスタンス未初期化のため自己改善をスキップ")
+            return
+        if not self.累積変更ファイル:
+            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 変更ファイルなしのため自己改善をスキップ")
+            return
+
+        aidiy_dir = self._aidiyフォルダ取得()
+        try:
+            os.makedirs(aidiy_dir, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"[CodeAgent] .aidiy フォルダ作成エラー: {e}")
+
+        自己改善プロンプト = self._自己改善プロンプト生成(元要求=元要求, 最終応答=最終応答)
+        logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 自己改善書き込みを開始: {aidiy_dir}")
+
+        try:
+            await self.接続.send_to_channel(self.チャンネル, {
+                "セッションID": self.セッションID,
+                "メッセージ識別": "output_text",
+                "メッセージ内容": "\n【自己改善開始】\n.aidiy の知見整理を継続します。\n"
+            })
+        except Exception as e:
+            logger.warning(f"[CodeAgent] 自己改善開始通知送信エラー: {e}")
+
+        try:
+            await self._ストリーム開始通知送信()
+            自己改善結果 = await ai_instance.実行(
+                要求テキスト=自己改善プロンプト,
+                絶対パス=self.絶対パス or None,
+            ) or "（応答なし）"
+            await self._ストリーム終了通知送信()
+
+            if 自己改善結果 and 自己改善結果 != "!":
+                await self.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID,
+                    "メッセージ識別": "output_text",
+                    "メッセージ内容": f"\n【自己改善完了】\n{自己改善結果}"
+                })
+                if self.保存関数:
+                    self.保存関数(
+                        セッションID=self.セッションID,
+                        チャンネル=self.チャンネル,
+                        メッセージ識別="output_text",
+                        メッセージ内容=f"【自己改善完了】\n{自己改善結果}",
+                        ファイル名=None,
+                        サムネイル画像=None
+                    )
+        except Exception as e:
+            logger.error(f"[CodeAgent] 自己改善書き込みエラー: {e}")
+
     def _select_ai_module(self) -> Optional[ModuleType]:
         """AI_NAMEに応じたコードモジュールを選択してインポート"""
         module_name = "AIコア.AIコード_cli"
@@ -312,6 +398,8 @@ class CodeAgent:
                         tool = "gemini"
                     elif ai_name == "codex_cli":
                         tool = "codex"
+                    elif ai_name == "hermes_cli":
+                        tool = "hermes"
                     else:
                         tool = ai_name or "コマンド"
                     メッセージ = f"{ai_label}{tool}が利用できません。（{tool}未インストール?)"
@@ -497,7 +585,13 @@ class CodeAgent:
         # タスク化して実行
         self.現在タスク = asyncio.create_task(self._基本AI処理(受信データ))
         try:
-            await self.現在タスク
+            最終応答 = await self.現在タスク
+            ai_instance = await self._ensure_ai_instance()
+            await self._自己改善書き込み実行(
+                ai_instance=ai_instance,
+                元要求=受信データ.get("メッセージ内容", ""),
+                最終応答=最終応答 or "",
+            )
         except asyncio.CancelledError:
             # 中断通知は強制停止()で即時送信済み
             logger.info(f"[CodeAgent] チャンネル{self.チャンネル} タスクがキャンセルされました")
@@ -636,6 +730,13 @@ class CodeAgent:
                     await lp.テキスト送信(完了メッセージ)
             except Exception as e:
                 logger.warning(f"[CodeAgent] LiveAI完了メッセージ送信エラー: {e}")
+
+            ai_instance = await self._ensure_ai_instance()
+            await self._自己改善書き込み実行(
+                ai_instance=ai_instance,
+                元要求=受信データ.get("メッセージ内容", ""),
+                最終応答=出力メッセージ内容,
+            )
 
         except Exception as e:
             logger.error(f"[CodeAgent] チャンネル{self.チャンネル} input_request処理エラー: {e}")

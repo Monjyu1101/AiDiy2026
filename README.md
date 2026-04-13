@@ -27,6 +27,13 @@
 - Web フロントは `8090`
 - Avatar フロントは `8099`
 
+### 主な特徴
+
+- **マルチ Code CLI 対応** — `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `gemini_cli` / `hermes_cli` を切り替えて同時並走
+- **自己改善機構** — コードエージェントが修正完了後に `.aidiy/` へ知見を自動整理し、使うほど修正精度が上がる
+- **日本語ネイティブ** — テーブル名・API・コンポーネント名まで日本語で統一
+- **AI 音声対話コーディング** — Avatar に話しかけながらコードを書き進められる
+
 ---
 
 ## 0. 事前準備
@@ -117,7 +124,7 @@ npm run dev
 | Web フロント | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:8092/docs |
-| Avatar Web モード | http://localhost:8099/AiDiy |
+| Avatar Web モード | http://localhost:8099 |
 | Avatar Electron モード | `npm run dev` で Electron アプリ起動 |
 
 ### 初期ログイン

@@ -130,6 +130,24 @@ class CodeAI:
             logger.error(f"システムプロンプト構築エラー: {e}")
             return base_prompt
 
+    def _aidiy参照プロンプト取得(self, 実行パス: str = None) -> str:
+        """.aidiy/_index.md がある場合のみ、知見参照指示を返す"""
+        try:
+            base_dir = Path(実行パス if 実行パス else self.base_abs_path).resolve()
+            index_path = base_dir / ".aidiy" / "_index.md"
+            if not index_path.exists():
+                return ""
+            return (
+                "\n\n"
+                "プロジェクト内のファイル操作するときは、\n"
+                ".aidiyフォルダ並びに.aidiy/_index.mdを確認し、\n"
+                "類似の操作の記載があれば知見として利用すること。\n"
+                f"参照先: `{index_path.as_posix()}`"
+            )
+        except Exception as e:
+            logger.warning(f"ClaudeSDK .aidiy 参照プロンプト生成エラー: {e}")
+            return ""
+
     async def バージョン確認(self) -> str:
         """claude --version を実行してバージョン文字列を返す。失敗時は空文字。"""
         if os.name == 'nt':
@@ -287,6 +305,7 @@ class CodeAI:
         """
         try:
             self._停止マーカー送信済み = False
+            aidiy_prompt = self._aidiy参照プロンプト取得(絶対パス)
             # 添付ファイルを後段で埋め込むためのブロックを準備（ログには含めない）
             attachment_block = ""
             if file_path:
@@ -331,14 +350,14 @@ class CodeAI:
 {ファイル一覧文字列}
 
 これらのファイルの変更内容を検証し、問題があれば追加修正を行ってください。
-問題がなければ「検証完了」と報告してください。"""
+問題がなければ「検証完了」と報告してください。""" + aidiy_prompt + attachment_block + replan_block
                     logger.info(f"ClaudeSDK: 検証モード - 変更ファイル {len(変更ファイル一覧)}件")
                 except Exception as e:
                     logger.error(f"ClaudeSDK: 変更ファイル一覧処理エラー: {e}")
-                    最終要求テキスト = 要求テキスト + attachment_block + replan_block
+                    最終要求テキスト = 要求テキスト + aidiy_prompt + attachment_block + replan_block
             else:
-                # 通常モード（順序：元の要求 → 添付ファイル → 再プラン要求）
-                最終要求テキスト = 要求テキスト + attachment_block + replan_block
+                # 通常モード（順序：元の要求 → .aidiy知見 → 添付ファイル → 再プラン要求）
+                最終要求テキスト = 要求テキスト + aidiy_prompt + attachment_block + replan_block
 
             # 送信コンテキスト側で「今回の依頼」を必ず明示（オリジナルの要求文は改変しない）
             依頼本文 = (最終要求テキスト or "").strip()

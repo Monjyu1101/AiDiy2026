@@ -17,6 +17,7 @@ import time
 import datetime
 import asyncio
 import base64
+import shlex
 from pathlib import Path
 from typing import Optional
 from PIL import Image
@@ -92,6 +93,8 @@ class CodeAI:
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
         if custom_cmd:
             return custom_cmd
+        if self.code_ai == "hermes_cli":
+            return "hermes"
         if os.name == 'nt':
             userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
             npm_bin = os.path.join(userprofile, 'AppData', 'Roaming', 'npm')
@@ -112,11 +115,19 @@ class CodeAI:
         """CLIツールの --version を実行してバージョン文字列を返す。失敗時は空文字。"""
         cmd = self._コマンドパス取得()
         try:
-            proc = await asyncio.create_subprocess_exec(
-                cmd, "--version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            if self.code_ai == "hermes_cli" and os.name == 'nt':
+                proc = await asyncio.create_subprocess_exec(
+                    "wsl", "bash", "-i", "-c", "hermes --version",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+            else:
+                version_args = [cmd, "--version"]
+                proc = await asyncio.create_subprocess_exec(
+                    *version_args,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
             except asyncio.TimeoutError:
@@ -154,6 +165,29 @@ class CodeAI:
 
         # 環境変数からカスタムコマンドパスを取得（オプション）
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
+
+        if self.code_ai == "hermes_cli":
+            if custom_cmd:
+                cmd = custom_cmd
+            else:
+                cmd = 'hermes'
+
+            model_args = []
+            if self.code_model and self.code_model.lower() != "auto":
+                model_args = ["--model", self.code_model]
+
+            base_args = [cmd, "chat"] + model_args + ["--yolo", "-Q", "-q", プロンプト]
+
+            if os.name == 'nt':
+                shell_command = " ".join(shlex.quote(arg) for arg in base_args)
+                if 初回:
+                    return ["wsl", "bash", "-i", "-c", shell_command]
+                continue_command = " ".join(shlex.quote(arg) for arg in ([cmd, "chat", "--continue"] + model_args + ["--yolo", "-Q", "-q", プロンプト]))
+                return ["wsl", "bash", "-i", "-c", continue_command]
+
+            if 初回:
+                return base_args
+            return [cmd, "chat", "--continue"] + model_args + ["--yolo", "-Q", "-q", プロンプト]
 
         if self.code_ai == "copilot_cli":
             # GitHub Copilot CLI
@@ -283,6 +317,24 @@ class CodeAI:
         except Exception as e:
             logger.error(f"システムプロンプト構築エラー: {e}")
             return base_prompt
+
+    def _aidiy参照プロンプト取得(self, 実行パス: str = None) -> str:
+        """.aidiy/_index.md がある場合のみ、知見参照指示を返す"""
+        try:
+            base_dir = Path(実行パス if 実行パス else self.cwd_str).resolve()
+            index_path = base_dir / ".aidiy" / "_index.md"
+            if not index_path.exists():
+                return ""
+            return (
+                "\n\n"
+                "プロジェクト内のファイル操作するときは、\n"
+                ".aidiyフォルダ並びに.aidiy/_index.mdを確認し、\n"
+                "類似の操作の記載があれば知見として利用すること。\n"
+                f"参照先: `{index_path.as_posix()}`"
+            )
+        except Exception as e:
+            logger.warning(f".aidiy 参照プロンプト生成エラー: {e}")
+            return ""
 
     async def 開始(self):
         """CodeAI開始（CLIツールのバージョン確認を含む）"""
@@ -483,6 +535,9 @@ class CodeAI:
         """
         try:
             self._停止マーカー送信済み = False
+            aidiy_prompt = self._aidiy参照プロンプト取得(絶対パス)
+            if aidiy_prompt:
+                要求テキスト += aidiy_prompt
             # 添付ファイル（絶対パス）がある場合は先に付与
             if file_path:
                 try:

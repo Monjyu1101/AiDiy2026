@@ -27,6 +27,12 @@
   - Claude / OpenAI / Gemini
   - WebSocket ベースの AI コア
   - 音声、画像、コード支援パネル
+- マルチ Code CLI 対応
+  - `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `hermes_cli`
+  - 複数のコードエージェントを同時並走（code1〜code4 パネル）
+- 自己改善機構
+  - コードエージェントが修正完了後、`.aidiy/` フォルダへ知見を自動整理
+  - 使うほど類似修正の精度が上がる「育つシステム」
 
 ---
 
@@ -35,7 +41,7 @@
 - 起動は `python _start.py`
   - 起動時に backend / web / avatar を対話形式で選択
 - Web フロント: `http://localhost:8090`
-- Avatar Web モード: `http://localhost:8099/AiDiy`
+- Avatar Web モード: `http://localhost:8099`
 - SQLite DB: `backend_server/_data/AiDiy/database.db`
 - 初期ログイン: `admin / ********`
 - CRUD は原則 POST
@@ -44,7 +50,7 @@
 - AI 名の規約
   - `CHAT_AI_NAME`: `*_chat`
   - `LIVE_AI_NAME`: `*_live`
-  - `CODE_AI*_NAME`: `*_code`
+  - `CODE_AI*_NAME`: `*_sdk` または `*_cli`
 
 ---
 

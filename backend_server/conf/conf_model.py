@@ -122,6 +122,9 @@ class conf_models:
             "gpt-5.1-codex-mini": "yyyy/mm/dd - gpt-5.1-codex-mini",
             "gpt-5.1": "yyyy/mm/dd - gpt-5.1",
         }
+        self.CODE_HERMES_CLI_MODELS = {
+            "auto": "yyyy/mm/dd - auto (default)",
+        }
 
         # _config 下の設定JSONと同期（無ければ作成、あれば読込）
         self._sync_local_model_configs()
@@ -243,6 +246,10 @@ class conf_models:
         self.CODE_CODEX_CLI_MODELS = self._load_or_create_code_config(
             "AiDiy_code_codex_cli.json",
             self.CODE_CODEX_CLI_MODELS,
+        )
+        self.CODE_HERMES_CLI_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_hermes_cli.json",
+            self.CODE_HERMES_CLI_MODELS,
         )
 
     def fetch_all_models(self):
@@ -587,6 +594,7 @@ class conf_models:
             "copilot_cli": self.CODE_COPILOT_CLI_MODELS,
             "gemini_cli": self.CODE_GEMINI_CLI_MODELS,
             "codex_cli": self.CODE_CODEX_CLI_MODELS,
+            "hermes_cli": self.CODE_HERMES_CLI_MODELS,
         }
 
 

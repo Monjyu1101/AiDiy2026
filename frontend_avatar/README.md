@@ -21,7 +21,7 @@ npm run dev
 ブラウザからは次で確認できます。
 
 ```text
-http://localhost:8099/AiDiy
+http://localhost:8099
 ```
 
 ## 主な構成

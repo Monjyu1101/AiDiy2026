@@ -70,6 +70,7 @@ class conf_json:
         'CODE_COPILOT_CLI_MODEL': 'auto',
         'CODE_GEMINI_CLI_MODEL': 'auto',
         'CODE_CODEX_CLI_MODEL': 'auto',
+        'CODE_HERMES_CLI_MODEL': 'auto',
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',
         'CODE_VERIFY': 'auto',

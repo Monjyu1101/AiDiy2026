@@ -46,7 +46,7 @@
 | 認証Storage | `localStorage` | `sessionStorage` |
 | ウィンドウ | 複数 BrowserWindow（role で分離） | 単一タブ（`/AiDiy?role=core`） |
 | パネル表示 | 独立ウィンドウを `show()`/`hide()` | 左右分割レイアウト内タブ切替 |
-| アクセス URL | Electron アプリ起動 | `http://localhost:8099/AiDiy` |
+| アクセス URL | Electron アプリ起動 | `http://localhost:8099` |
 
 ---
 
@@ -174,6 +174,13 @@
 - 右ペイン: タブバー＋パネルエリア（`chat` / `file` / `image` / `code1〜4` をタブ切替）
 - タブ切替は `アクティブタブ` ref で管理（`webTabs` 配列で定義）
 - ペイン幅はドラッグリサイズ可能（`リサイズ中` フラグ + `mousemove` ハンドラー）
+
+**コードエージェント設定の重要事項:**
+- 設定ダイアログの Code AI 選択肢は backend から返る `available_models.code_models` に依存する
+- 新しい code CLI を追加するときは、frontend 側のキー追加だけでなく backend 側の CLI 実装・設定JSON・モデル定義も必要
+- `.aidiy` はコードエージェント実行ルート直下のプロジェクト専用知見フォルダとして扱う
+- コードエージェントは `.aidiy/_index.md` を参照して類似修正知見を利用し、修正完了後に `.aidiy` へ知見を整理する
+- 詳細は `../backend_server/AGENTS.md` を参照
 
 ---
 
@@ -409,7 +416,7 @@ core ウィンドウの状態を他パネルへ配信しています。
 |------|-----------|-----|
 | `CHAT_AI_NAME` | 必ず `_chat` で終わる | `gemini_chat` / `freeai_chat` / `openai_chat` |
 | `LIVE_AI_NAME` | 必ず `_live` で終わる | `gemini_live` / `freeai_live` / `openai_live` |
-| `CODE_AI1_NAME` 〜 `CODE_AI4_NAME` | 必ず `_code` で終わる | `claude_code` / `openai_code` |
+| `CODE_AI1_NAME` 〜 `CODE_AI4_NAME` | `_sdk` または `_cli` で終わる | `claude_sdk` / `copilot_cli` / `codex_cli` / `gemini_cli` / `hermes_cli` |
 
 **比較は完全一致**（`startswith` 等の前方一致は使用禁止）
 
@@ -588,7 +595,7 @@ npm run start
 ### 6. AI名（モデル設定）を変更する場合
 
 - `src/api/config.ts` の `defaultModelSettings()` のデフォルト値を更新
-- `CHAT_AI_NAME` は `_chat` 末尾、`LIVE_AI_NAME` は `_live` 末尾、`CODE_AI*_NAME` は `_code` 末尾 **必須**
+- `CHAT_AI_NAME` は `_chat` 末尾、`LIVE_AI_NAME` は `_live` 末尾、`CODE_AI*_NAME` は `_sdk` または `_cli` 末尾 **必須**
 - バックエンド側の `_config/AiDiy_*.json` と `AIコア/AIセッション管理.py` の初期設定と整合させる
 - 比較箇所は完全一致（`===`）で記述し、`startswith` は使わない
 
