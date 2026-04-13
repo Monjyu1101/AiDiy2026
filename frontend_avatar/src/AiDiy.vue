@@ -868,6 +868,12 @@ async function 再接続() {
 async function 再起動後再接続() {
   再起動カウントダウン表示.value = false
   await コア初期化(セッションID.value || '')
+
+  // Web モードでは同一ウィンドウ内の各パネルを自前で再マウントしないと、
+  // code/chat/file コンポーネントが旧接続・旧welcome表示を保持することがある。
+  パネル再接続キー.value++
+
+  // Electron の別ウィンドウパネルには BroadcastChannel で再接続を通知する。
   デスクトップチャンネル?.postMessage({ type: 'reboot-reconnect' })
 }
 

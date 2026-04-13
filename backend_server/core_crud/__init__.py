@@ -10,7 +10,7 @@
 
 from core_crud.utils import get_current_datetime, create_audit_fields, update_audit_fields
 from core_crud.A会話履歴 import create_会話履歴, get_会話履歴, get_会話履歴_by_socket, get_next_sequence, update_会話履歴, delete_会話履歴, delete_会話履歴_by_socket
-from core_crud.C利用者 import get_C利用者_by_利用者ID, get_C利用者_by_利用者名, create_C利用者, authenticate_C利用者
+from core_crud.C利用者 import get_C利用者_by_利用者ID, get_C利用者_by_利用者名, create_C利用者, authenticate_C利用者, hash_パスワード, verify_パスワード
 from core_crud.C権限 import get_C権限, get_C権限一覧, create_C権限
 from core_crud.init import init_db_data
 
@@ -32,6 +32,8 @@ __all__ = [
     'get_C利用者_by_利用者名',
     'create_C利用者',
     'authenticate_C利用者',
+    'hash_パスワード',
+    'verify_パスワード',
     # C権限
     'get_C権限',
     'get_C権限一覧',

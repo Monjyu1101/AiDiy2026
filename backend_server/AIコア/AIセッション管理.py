@@ -72,6 +72,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_COPILOT_CLI_MODEL": app_conf.json.get("CODE_COPILOT_CLI_MODEL", "auto"),
         "CODE_GEMINI_CLI_MODEL": app_conf.json.get("CODE_GEMINI_CLI_MODEL", "auto"),
         "CODE_CODEX_CLI_MODEL": app_conf.json.get("CODE_CODEX_CLI_MODEL", "auto"),
+        "CODE_HERMES_CLI_MODEL": app_conf.json.get("CODE_HERMES_CLI_MODEL", "auto"),
         "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
         "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),

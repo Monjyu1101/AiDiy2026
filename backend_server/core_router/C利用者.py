@@ -79,7 +79,7 @@ def update_C利用者(
         return schemas.ResponseBase(status="NG", message="指定された利用者が見つかりません", error={"code": "NOT_FOUND"})
 
     if request.利用者名 is not None: 利用者.利用者名 = request.利用者名
-    if request.パスワード is not None: 利用者.パスワード = request.パスワード
+    if request.パスワード is not None: 利用者.パスワード = crud.hash_パスワード(request.パスワード)
     if request.権限ID is not None: 利用者.権限ID = request.権限ID
     if request.利用者備考 is not None: 利用者.利用者備考 = request.利用者備考
     if request.有効 is not None: 利用者.有効 = request.有効

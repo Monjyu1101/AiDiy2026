@@ -18,6 +18,8 @@ import datetime
 import asyncio
 import base64
 import shlex
+import re
+import subprocess
 from pathlib import Path
 from typing import Optional
 from PIL import Image
@@ -88,6 +90,39 @@ class CodeAI:
         # バージョン文字列（開始()時に取得）
         self.バージョン: str = ""
 
+    def _hermes_wsl利用(self) -> bool:
+        """Windows 上で hermes_cli を WSL 経由実行するか判定"""
+        return self.code_ai == "hermes_cli" and os.name == 'nt'
+
+    def _WSLパス変換(self, path_str: Optional[str]) -> Optional[str]:
+        """Windows 絶対パスを WSL の /mnt/... 形式へ変換"""
+        if not isinstance(path_str, str) or not path_str.strip():
+            return path_str
+
+        normalized = path_str.replace("\\", "/")
+        match = re.match(r"^([A-Za-z]):/(.*)$", normalized)
+        if match:
+            drive = match.group(1).lower()
+            rest = match.group(2)
+            return f"/mnt/{drive}/{rest}"
+        return normalized
+
+    def _CLI向けパス(self, path_str: Optional[str]) -> Optional[str]:
+        """現在のCLI実行環境で解釈できるパス表現へ変換"""
+        if not isinstance(path_str, str) or not path_str.strip():
+            return path_str
+        if self._hermes_wsl利用():
+            return self._WSLパス変換(path_str)
+        return path_str
+
+    def _CLI送信用テキスト正規化(self, text: Optional[str]) -> str:
+        """CLIへ渡す文字列は改行・復帰を空白へ変換して1行化する"""
+        if text is None:
+            return ""
+        if not isinstance(text, str):
+            raise TypeError(f"CLI送信用テキストは文字列である必要があります: {type(text).__name__}")
+        return text.replace('\n', ' ').replace('\r', ' ').strip()
+
     def _コマンドパス取得(self) -> str:
         """code_ai に対応するCLIコマンドパスを返す"""
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
@@ -115,12 +150,23 @@ class CodeAI:
         """CLIツールの --version を実行してバージョン文字列を返す。失敗時は空文字。"""
         cmd = self._コマンドパス取得()
         try:
-            if self.code_ai == "hermes_cli" and os.name == 'nt':
-                proc = await asyncio.create_subprocess_exec(
-                    "wsl", "bash", "-i", "-c", "hermes --version",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+            if self._hermes_wsl利用():
+                hermes_args = ["wsl", "bash", "-lc", "hermes --version"]
+                start_time = time.time()
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    hermes_args,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                    encoding="utf-8",
+                    errors="replace",
                 )
+                elapsed = time.time() - start_time
+                output = (result.stdout or "").strip() or (result.stderr or "").strip()
+                first_line = output.splitlines()[0].strip() if output else ""
+                logger.info(f"[CodeAI] hermes --version => {first_line} ({elapsed:.1f}s)")
+                return first_line
             else:
                 version_args = [cmd, "--version"]
                 proc = await asyncio.create_subprocess_exec(
@@ -145,6 +191,9 @@ class CodeAI:
         except FileNotFoundError:
             logger.warning(f"[CodeAI] コマンドが見つかりません: {cmd}")
             return ""
+        except subprocess.TimeoutExpired:
+            logger.warning(f"[CodeAI] --version タイムアウト: {cmd}")
+            return ""
         except Exception as e:
             logger.warning(f"[CodeAI] --version 実行エラー: {cmd} {e}")
             return ""
@@ -160,8 +209,8 @@ class CodeAI:
         Returns:
             コマンド配列
         """
-        # プロンプトから改行削除
-        プロンプト = プロンプト.replace('\n', ' ').replace('\r', ' ').strip()
+        # プロンプトから改行・復帰を除去してCLIへ渡す
+        プロンプト = self._CLI送信用テキスト正規化(プロンプト)
 
         # 環境変数からカスタムコマンドパスを取得（オプション）
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
@@ -178,12 +227,17 @@ class CodeAI:
 
             base_args = [cmd, "chat"] + model_args + ["--yolo", "-Q", "-q", プロンプト]
 
-            if os.name == 'nt':
+            if self._hermes_wsl利用():
+                wsl_repo_path = self._CLI向けパス(repo_path) if repo_path else None
                 shell_command = " ".join(shlex.quote(arg) for arg in base_args)
+                if wsl_repo_path:
+                    shell_command = f"cd {shlex.quote(wsl_repo_path)} && {shell_command}"
                 if 初回:
-                    return ["wsl", "bash", "-i", "-c", shell_command]
+                    return ["wsl", "bash", "-lc", shell_command]
                 continue_command = " ".join(shlex.quote(arg) for arg in ([cmd, "chat", "--continue"] + model_args + ["--yolo", "-Q", "-q", プロンプト]))
-                return ["wsl", "bash", "-i", "-c", continue_command]
+                if wsl_repo_path:
+                    continue_command = f"cd {shlex.quote(wsl_repo_path)} && {continue_command}"
+                return ["wsl", "bash", "-lc", continue_command]
 
             if 初回:
                 return base_args
@@ -306,11 +360,24 @@ class CodeAI:
                 # 上位コンテキスト未定義時（テスト等）は簡素な既定文を使用
                 base_prompt = "あなたは、美しい日本語を話す、賢いコードエージェントです。"
 
-            # Windows文言は常に文末へ自動付加（重複は除去）
-            if os.name == 'nt':
-                windows_suffix = "Windows環境で動作していることを考慮して、適切なコマンドを使用してください。"
-                normalized = base_prompt.replace(windows_suffix, "").strip()
-                base_prompt = f"{normalized}\n{windows_suffix}" if normalized else windows_suffix
+            # 実行環境に応じた補足を文末へ自動付加（重複は除去）
+            suffixes = [
+                "Windows環境で動作していることを考慮して、適切なコマンドを使用してください。",
+                "Windowsホスト上ですが、hermes_cli は WSL 上の Linux 環境で実行されます。コマンドは Linux 形式を使用し、絶対パスは `/mnt/<drive>/...` 形式で扱ってください。",
+            ]
+            if self._hermes_wsl利用():
+                suffix = suffixes[1]
+            elif os.name == 'nt':
+                suffix = suffixes[0]
+            else:
+                suffix = None
+
+            if suffix:
+                normalized = base_prompt
+                for item in suffixes:
+                    normalized = normalized.replace(item, "")
+                normalized = normalized.strip()
+                base_prompt = f"{normalized}\n{suffix}" if normalized else suffix
 
             return base_prompt
 
@@ -325,12 +392,13 @@ class CodeAI:
             index_path = base_dir / ".aidiy" / "_index.md"
             if not index_path.exists():
                 return ""
+            display_path = self._CLI向けパス(index_path.resolve().as_posix())
             return (
                 "\n\n"
                 "プロジェクト内のファイル操作するときは、\n"
                 ".aidiyフォルダ並びに.aidiy/_index.mdを確認し、\n"
                 "類似の操作の記載があれば知見として利用すること。\n"
-                f"参照先: `{index_path.as_posix()}`"
+                f"参照先: `{display_path}`"
             )
         except Exception as e:
             logger.warning(f".aidiy 参照プロンプト生成エラー: {e}")
@@ -542,7 +610,8 @@ class CodeAI:
             if file_path:
                 try:
                     abs_path_str = Path(file_path).resolve().as_posix()
-                    要求テキスト += f"\n\n添付ファイル: `{abs_path_str}`"
+                    cli_path_str = self._CLI向けパス(abs_path_str)
+                    要求テキスト += f"\n\n添付ファイル: `{cli_path_str}`"
                 except Exception as e:
                     logger.error(f"最終ファイル添付エラー: {e}")
 
@@ -605,9 +674,10 @@ class CodeAI:
                                 rgb_img.save(save_path, format='JPEG')
 
                                 abs_path_str = save_path.resolve().as_posix()
-                                image_prompt_addition = f"\n\n添付ファイル: `{abs_path_str}`"
+                                cli_path_str = self._CLI向けパス(abs_path_str)
+                                image_prompt_addition = f"\n\n添付ファイル: `{cli_path_str}`"
                                 要求テキスト += image_prompt_addition
-                                logger.info(f"最終イメージを添付: {abs_path_str}")
+                                logger.info(f"最終イメージを添付: {cli_path_str}")
 
                         except Exception as e:
                                 logger.error(f"最終イメージの処理中にエラーが発生しました: {e}")
