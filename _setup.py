@@ -35,6 +35,7 @@ BACKEND_ENV = ".venv"
 
 FRONTEND_WEB_PATH = "frontend_web"
 FRONTEND_AVATAR_PATH = "frontend_avatar"
+BACKEND_MCP_PATH = "backend_mcp"
 
 FRONTEND_COMMAND = "npm"
 DATABASE_TYPE = "sqlite"
@@ -48,6 +49,7 @@ BACKEND_DIR = BASE_DIR / BACKEND_PATH
 BACKEND_VENV_DIR = BACKEND_DIR / BACKEND_ENV
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
+BACKEND_MCP_DIR = BASE_DIR / BACKEND_MCP_PATH
 POSTGRES_DIR = BASE_DIR / POSTGRES_PATH
 
 
@@ -142,6 +144,119 @@ def run_command(command, cwd=None, shell=False, env=None):
         return False
     except Exception as e:
         print_error(f"予期しないエラー: {e}")
+        return False
+
+
+def write_json_file(path: Path, data: dict) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return True
+    except Exception as e:
+        print_error(f"設定ファイル書き込みエラー: {path} ({e})")
+        return False
+
+
+def ensure_gitignore_entries(entries: list[str], path: Path | None = None) -> bool:
+    target_path = path or (BASE_DIR / ".gitignore")
+    try:
+        existing_lines: list[str] = []
+        if target_path.exists():
+            existing_lines = target_path.read_text(encoding="utf-8").splitlines()
+
+        normalized = {line.strip() for line in existing_lines}
+        missing_entries = [entry for entry in entries if entry.strip() not in normalized]
+        if not missing_entries:
+            return True
+
+        updated_lines = list(existing_lines)
+        if updated_lines and updated_lines[-1].strip() != "":
+            updated_lines.append("")
+        updated_lines.append("# Local AI CLI settings")
+        updated_lines.extend(missing_entries)
+        target_path.write_text("\n".join(updated_lines).rstrip() + "\n", encoding="utf-8")
+        print_success(f"ignore 設定を更新しました: {target_path}")
+        return True
+    except Exception as e:
+        print_error(f"ignore 設定更新エラー: {target_path} ({e})")
+        return False
+
+
+def upsert_json_mcp_server(path: Path, server_name: str, server_config: dict) -> bool:
+    try:
+        data = {}
+        if path.exists():
+            with open(path, encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                data = loaded
+
+        servers = data.get("mcpServers")
+        if not isinstance(servers, dict):
+            servers = {}
+
+        current = servers.get(server_name)
+        if isinstance(current, dict):
+            merged = dict(current)
+            merged.update(server_config)
+            servers[server_name] = merged
+        else:
+            servers[server_name] = dict(server_config)
+
+        data["mcpServers"] = servers
+        if not write_json_file(path, data):
+            return False
+        print_success(f"MCP設定を書き込みました: {path}")
+        return True
+    except json.JSONDecodeError as e:
+        print_error(f"JSON解析エラー: {path} ({e})")
+        return False
+    except Exception as e:
+        print_error(f"MCP設定更新エラー: {path} ({e})")
+        return False
+
+
+def remove_toml_table(content: str, table_header: str) -> str:
+    lines = content.splitlines()
+    table_index = None
+    for i, line in enumerate(lines):
+        if line.strip() == table_header:
+            table_index = i
+            break
+
+    if table_index is None:
+        return content if content.endswith("\n") or content == "" else content + "\n"
+
+    next_table_index = len(lines)
+    for i in range(table_index + 1, len(lines)):
+        stripped = lines[i].strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            next_table_index = i
+            break
+
+    del lines[table_index:next_table_index]
+    while lines and lines[-1].strip() == "":
+        lines.pop()
+    return "\n".join(lines).rstrip() + ("\n" if lines else "")
+
+
+def remove_codex_backend_mcp_config() -> bool:
+    config_path = Path.home() / ".codex" / "config.toml"
+    try:
+        if not config_path.exists():
+            return True
+        content = config_path.read_text(encoding="utf-8")
+        updated = remove_toml_table(content, "[mcp_servers.backend_mcp]")
+        if updated == content:
+            return True
+        config_path.write_text(updated, encoding="utf-8")
+        print_success(f"Codex の backend_mcp 設定を削除しました: {config_path}")
+        return True
+    except Exception as e:
+        print_error(f"Codex設定更新エラー: {config_path} ({e})")
         return False
 
 
@@ -585,6 +700,114 @@ def setup_frontend_avatar():
     return True
 
 
+# ============================================================
+# (mcp) モジュール定義
+# 新しい (mcp) を追加するときはここにエントリを追加するだけ
+# ============================================================
+MCP_MODULES = [
+    {
+        "name":    "backend_mcp",
+        "dir":     "backend_mcp",
+        "desc":    "Python (uv) + npm",
+        "start":   "uv run mcp_main.py",
+        "sse_url": "http://localhost:8095/chrome_devtools/sse",
+    },
+    # 例: 追加する場合
+    # {
+    #     "name":  "My New MCP",
+    #     "dir":   "backend_mcp_xxx",
+    #     "desc":  "説明",
+    #     "start": "uv run mcp_main.py",
+    # },
+]
+
+
+def setup_mcp_module(module: dict) -> bool:
+    """(mcp) モジュールを汎用的にセットアップする (uv sync + npm install)"""
+    name  = module["name"]
+    label = f"(mcp) {name}"
+    mcp_dir = BASE_DIR / module["dir"]
+
+    print_header(f"{label} セットアップ")
+    print_info(f"作業ディレクトリ: {mcp_dir}")
+    print_info(f"対象: {module.get('desc', '')}")
+
+    if not mcp_dir.exists():
+        print_error(f"{label}: フォルダが見つかりません: {mcp_dir}")
+        return False
+
+    # uv sync (pyproject.toml があれば)
+    if (mcp_dir / "pyproject.toml").exists():
+        if not check_uv_installed():
+            print_error(f"{label}: uv がインストールされていません。")
+            return False
+        if not run_command(["uv", "sync", "--no-install-project"], cwd=mcp_dir):
+            print_error(f"{label}: uv sync に失敗しました。")
+            return False
+        print_success(f"{label}: Python 依存関係のインストールが完了しました。")
+
+    # npm install (package.json があれば)
+    if (mcp_dir / "package.json").exists():
+        if not check_npm_installed():
+            print_error(f"{label}: npm がインストールされていません。")
+            return False
+        if not run_command([npm_command(), "install"], cwd=mcp_dir):
+            print_error(f"{label}: npm install に失敗しました。")
+            return False
+        print_success(f"{label}: npm パッケージのインストールが完了しました。")
+
+    print_success(f"{label}: セットアップが完了しました。")
+    print_info(f"  起動方法: cd {module['dir']} && {module.get('start', 'uv run mcp_main.py')}")
+    if "sse_url" in module:
+        print_info(f"  SSE URL : {module['sse_url']}")
+    return True
+
+
+def setup_backend_mcp() -> bool:
+    """登録済みの (mcp) モジュールを順番にセットアップする"""
+    all_ok = True
+    for module in MCP_MODULES:
+        if not setup_mcp_module(module):
+            all_ok = False
+            break
+    return all_ok
+
+
+def configure_backend_mcp_clients(module: dict) -> bool:
+    """backend_mcp を各 CLI から使うための設定ファイルを書き込む"""
+    label = f"{module['name']} MCP 設定"
+    sse_url = module.get("sse_url", "").strip()
+
+    print_header(label)
+    if not sse_url:
+        print_error(f"{label}: sse_url が未定義です。")
+        return False
+
+    print_info("Claude Code / Gemini CLI 用の設定ファイルを書き込みます。")
+    print_info(f"接続先: {sse_url}")
+    print_warning("Codex CLI は streamable HTTP 用の url 設定は扱えますが、backend_mcp の SSE エンドポイントは直接扱えません。")
+
+    all_ok = True
+    all_ok &= ensure_gitignore_entries([".claude/", ".gemini/"])
+    all_ok &= upsert_json_mcp_server(
+        BASE_DIR / ".mcp.json",
+        module["name"],
+        {"type": "sse", "url": sse_url},
+    )
+    all_ok &= upsert_json_mcp_server(
+        BASE_DIR / ".gemini" / "settings.json",
+        module["name"],
+        {"url": sse_url, "type": "sse"},
+    )
+    all_ok &= remove_codex_backend_mcp_config()
+
+    if all_ok:
+        print_success(f"{label}: 設定ファイルの書き込みが完了しました。")
+    else:
+        print_warning(f"{label}: 一部設定ファイルの書き込みに失敗しました。")
+    return all_ok
+
+
 def main():
     global AUTO_MODE
 
@@ -592,9 +815,10 @@ def main():
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
     print_info("  1. 共通")
-    print_info("  2. バックエンド(core,apps)")
-    print_info("  3. フロントエンド(Web)")
-    print_info("  4. フロントエンド(Avatar)")
+    print_info("  2. バックエンド(mcp)")
+    print_info("  3. バックエンド(core,apps)")
+    print_info("  4. フロントエンド(Web)")
+    print_info("  5. フロントエンド(Avatar)")
     print()
 
     run_setup, AUTO_MODE = ask_start_mode("セットアップを実行しますか?", default="n")
@@ -610,6 +834,22 @@ def main():
         setup_common_global_tools()
     else:
         print_warning("共通セットアップをスキップしました。")
+
+    print()
+    if ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y"):
+        if not setup_backend_mcp() and not ask_yes_no("バックエンド(mcp) で失敗しました。続行しますか？", default="n"):
+            sys.exit(1)
+    else:
+        print_warning("バックエンド(mcp) のセットアップをスキップしました。")
+
+    backend_mcp_module = next((module for module in MCP_MODULES if module.get("name") == "backend_mcp"), None)
+    if backend_mcp_module:
+        print()
+        if ask_yes_no("backend_mcp の mcp機能を使えるよう構成しますか？", default="n"):
+            if not configure_backend_mcp_clients(backend_mcp_module) and not ask_yes_no("backend_mcp の MCP 設定書き込みで失敗しました。続行しますか？", default="n"):
+                sys.exit(1)
+        else:
+            print_warning("backend_mcp の MCP 設定ファイル書き込みをスキップしました。")
 
     print()
     if ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y"):
@@ -643,6 +883,7 @@ def main():
     print_info("  全体起動: python _start.py")
     print_info("  Web開発   : cd frontend_web && npm run dev")
     print_info("  Avatar開発: cd frontend_avatar && npm run dev")
+    print_info("  (mcp)起動 : cd backend_mcp && uv run mcp_main.py")
     print_info("セットアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)
 

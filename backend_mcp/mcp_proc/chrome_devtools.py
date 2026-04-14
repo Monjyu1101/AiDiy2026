@@ -1,0 +1,776 @@
+"""
+Chrome DevTools Protocol (CDP) クライアント
+
+Chrome を --remote-debugging-port=9222 で起動した状態で使用する。
+起動例:
+  chrome --remote-debugging-port=9222
+  chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+"""
+
+import asyncio
+import json
+import urllib.request
+import urllib.error
+import urllib.parse
+from typing import Any, Optional
+
+import websockets
+
+
+class ChromeDevToolsError(Exception):
+    """CDP 接続・操作エラー"""
+    pass
+
+
+class CDPClient:
+    """
+    Chrome DevTools Protocol (CDP) クライアント
+
+    各メソッドは CDP の HTTP エンドポイントまたは WebSocket を介して
+    Chrome を操作する。send_command は毎回新規 WebSocket 接続を確立する
+    シンプルな実装。
+    """
+
+    def __init__(self, host: str = "localhost", port: int = 9222):
+        self.host = host
+        self.port = port
+
+    # ------------------------------------------------------------------ #
+    # 内部ヘルパー
+    # ------------------------------------------------------------------ #
+
+    def _http_get(self, path: str) -> Any:
+        """Chrome DevTools HTTP エンドポイントに GET リクエスト"""
+        url = f"http://{self.host}:{self.port}{path}"
+        try:
+            with urllib.request.urlopen(url, timeout=5) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.URLError as e:
+            raise ChromeDevToolsError(
+                f"Chrome に接続できません ({self.host}:{self.port})。\n"
+                f"Chrome を次のオプションで起動してください:\n"
+                f"  chrome --remote-debugging-port={self.port}\n"
+                f"詳細: {e}"
+            )
+
+    async def send_command(
+        self,
+        ws_url: str,
+        method: str,
+        params: Optional[dict] = None,
+        timeout: float = 30.0,
+    ) -> dict:
+        """
+        CDP コマンドを送信してレスポンスを返す
+
+        Args:
+            ws_url: タブの webSocketDebuggerUrl
+            method: CDP メソッド名 (例: "Page.navigate")
+            params: メソッドパラメータ
+            timeout: タイムアウト秒数
+
+        Returns:
+            CDP レスポンスの result フィールド
+        """
+        cmd = {"id": 1, "method": method, "params": params or {}}
+
+        try:
+            async with websockets.connect(
+                ws_url,
+                max_size=50 * 1024 * 1024,  # 50MB (スクリーンショット対応)
+                open_timeout=10,
+            ) as ws:
+                await ws.send(json.dumps(cmd))
+
+                loop = asyncio.get_running_loop()
+                deadline = loop.time() + timeout
+
+                while True:
+                    remaining = deadline - loop.time()
+                    if remaining <= 0:
+                        raise TimeoutError(
+                            f"CDP コマンド '{method}' がタイムアウトしました ({timeout}秒)"
+                        )
+
+                    raw = await asyncio.wait_for(
+                        ws.recv(), timeout=min(remaining, 5.0)
+                    )
+                    msg = json.loads(raw)
+
+                    # イベント (id なし) はスキップしてレスポンスを待つ
+                    if msg.get("id") == 1:
+                        if "error" in msg:
+                            err = msg["error"]
+                            raise ChromeDevToolsError(
+                                f"CDP エラー [{method}]: "
+                                f"{err.get('message', str(err))}"
+                            )
+                        return msg.get("result", {})
+
+        except websockets.exceptions.WebSocketException as e:
+            raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}")
+
+    def resolve_tab(self, tab_id: Optional[str] = None) -> dict:
+        """
+        タブ情報を返す
+
+        tab_id が None の場合は type=page の最初のタブを返す。
+        """
+        tabs = self.list_tabs()
+        if not tabs:
+            raise ChromeDevToolsError(
+                "タブが見つかりません。Chrome でページを開いてください。"
+            )
+
+        if tab_id:
+            tab = next((t for t in tabs if t["id"] == tab_id), None)
+            if not tab:
+                available = [t["id"] for t in tabs]
+                raise ValueError(
+                    f"タブ ID '{tab_id}' が見つかりません。\n"
+                    f"利用可能な ID: {available}"
+                )
+            return tab
+
+        page_tabs = [t for t in tabs if t.get("type") == "page"]
+        return page_tabs[0] if page_tabs else tabs[0]
+
+    def get_ws_url(self, tab: dict) -> str:
+        """タブの webSocketDebuggerUrl を取得"""
+        ws_url = tab.get("webSocketDebuggerUrl")
+        if not ws_url:
+            raise ChromeDevToolsError(
+                f"タブ '{tab.get('id')}' に WebSocket URL がありません。\n"
+                f"既に別のデバッガが接続している可能性があります。"
+            )
+        return ws_url
+
+    # ------------------------------------------------------------------ #
+    # タブ管理
+    # ------------------------------------------------------------------ #
+
+    def list_tabs(self) -> list[dict]:
+        """開いているタブ/ページの一覧を取得"""
+        raw = self._http_get("/json")
+        return raw if isinstance(raw, list) else []
+
+    def get_version(self) -> dict:
+        """Chrome バージョン情報を取得"""
+        return self._http_get("/json/version")
+
+    def new_tab_sync(self, url: str = "about:blank") -> dict:
+        """新規タブを開く (同期)"""
+        encoded = urllib.parse.quote(url, safe=":/?#[]@!$&'()*+,;=")
+        return self._http_get(f"/json/new?{encoded}")
+
+    def close_tab_sync(self, tab_id: str) -> bool:
+        """タブを閉じる (同期)"""
+        try:
+            self._http_get(f"/json/close/{tab_id}")
+            return True
+        except ChromeDevToolsError:
+            return False
+
+    def activate_tab_sync(self, tab_id: str) -> bool:
+        """タブをアクティブにする (同期)"""
+        try:
+            self._http_get(f"/json/activate/{tab_id}")
+            return True
+        except ChromeDevToolsError:
+            return False
+
+    # ------------------------------------------------------------------ #
+    # ナビゲーション
+    # ------------------------------------------------------------------ #
+
+    async def navigate(self, url: str, tab_id: Optional[str] = None) -> str:
+        """URL に移動する"""
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+        result = await self.send_command(ws, "Page.navigate", {"url": url})
+        frame_id = result.get("frameId", "")
+        error = result.get("errorText", "")
+        if error:
+            return f"移動エラー: {error} → {url}"
+        return f"移動完了: {url} (frame: {frame_id[:8]}...)"
+
+    async def reload(self, tab_id: Optional[str] = None) -> str:
+        """ページをリロードする"""
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+        await self.send_command(ws, "Page.reload", {})
+        return "リロードしました"
+
+    async def go_back(self, tab_id: Optional[str] = None) -> str:
+        """ブラウザの戻るボタン相当"""
+        js = "history.back(); 'back'"
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def go_forward(self, tab_id: Optional[str] = None) -> str:
+        """ブラウザの進むボタン相当"""
+        js = "history.forward(); 'forward'"
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    # ------------------------------------------------------------------ #
+    # ページ情報取得
+    # ------------------------------------------------------------------ #
+
+    async def get_page_info(self, tab_id: Optional[str] = None) -> dict:
+        """URL・タイトル・readyState などページ基本情報を取得"""
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+        result = await self.send_command(
+            ws,
+            "Runtime.evaluate",
+            {
+                "expression": (
+                    "JSON.stringify({"
+                    "url: location.href,"
+                    "title: document.title,"
+                    "readyState: document.readyState,"
+                    "scrollY: window.scrollY,"
+                    "scrollHeight: document.body ? document.body.scrollHeight : 0,"
+                    "width: window.innerWidth,"
+                    "height: window.innerHeight"
+                    "})"
+                ),
+                "returnByValue": True,
+            },
+        )
+        val = result.get("result", {}).get("value", "{}")
+        try:
+            return json.loads(val)
+        except Exception:
+            return {"url": tab.get("url", ""), "title": tab.get("title", "")}
+
+    async def get_current_url(self, tab_id: Optional[str] = None) -> str:
+        """現在の URL を取得"""
+        result = await self.eval_js("location.href", tab_id)
+        return str(result or "")
+
+    async def get_title(self, tab_id: Optional[str] = None) -> str:
+        """ページタイトルを取得"""
+        result = await self.eval_js("document.title", tab_id)
+        return str(result or "")
+
+    async def get_html(self, tab_id: Optional[str] = None) -> str:
+        """ページ全体の HTML を取得"""
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+        doc = await self.send_command(ws, "DOM.getDocument", {"depth": -1})
+        root_node_id = doc["root"]["nodeId"]
+        html = await self.send_command(
+            ws, "DOM.getOuterHTML", {"nodeId": root_node_id}
+        )
+        return html.get("outerHTML", "")
+
+    async def get_text(self, tab_id: Optional[str] = None) -> str:
+        """ページのテキストコンテンツ (innerText) を取得"""
+        result = await self.eval_js(
+            "document.body ? document.body.innerText : document.documentElement.innerText",
+            tab_id,
+        )
+        return str(result or "")
+
+    # ------------------------------------------------------------------ #
+    # スクリーンショット
+    # ------------------------------------------------------------------ #
+
+    async def screenshot(
+        self,
+        tab_id: Optional[str] = None,
+        fmt: str = "png",
+        quality: int = 80,
+        full_page: bool = False,
+    ) -> str:
+        """
+        スクリーンショットを Base64 文字列で返す
+
+        Args:
+            fmt: "png" または "jpeg"
+            quality: JPEG 品質 (1-100)
+            full_page: True でページ全体をキャプチャ
+
+        Returns:
+            Base64 エンコードされた画像データ
+        """
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+
+        params: dict = {"format": fmt}
+        if fmt == "jpeg":
+            params["quality"] = quality
+
+        if full_page:
+            metrics = await self.send_command(ws, "Page.getLayoutMetrics")
+            content = metrics.get("contentSize", {})
+            w = max(1, int(content.get("width", 1280)))
+            h = max(1, int(content.get("height", 800)))
+            await self.send_command(
+                ws,
+                "Emulation.setDeviceMetricsOverride",
+                {"width": w, "height": h, "deviceScaleFactor": 1, "mobile": False},
+            )
+
+        result = await self.send_command(ws, "Page.captureScreenshot", params)
+
+        if full_page:
+            await self.send_command(ws, "Emulation.clearDeviceMetricsOverride")
+
+        return result.get("data", "")
+
+    # ------------------------------------------------------------------ #
+    # JavaScript 実行
+    # ------------------------------------------------------------------ #
+
+    async def eval_js(
+        self,
+        expression: str,
+        tab_id: Optional[str] = None,
+        await_promise: bool = False,
+    ) -> Any:
+        """
+        JavaScript を実行して結果を返す
+
+        Args:
+            expression: 実行する JS コード
+            await_promise: Promise を await する場合 True
+
+        Returns:
+            実行結果 (Python オブジェクト)
+
+        Raises:
+            ChromeDevToolsError: JS 実行時例外が発生した場合
+        """
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+
+        result = await self.send_command(
+            ws,
+            "Runtime.evaluate",
+            {
+                "expression": expression,
+                "returnByValue": True,
+                "awaitPromise": await_promise,
+            },
+        )
+
+        if "exceptionDetails" in result:
+            exc = result["exceptionDetails"]
+            desc = (
+                exc.get("exception", {}).get("description", "")
+                or exc.get("text", "")
+            )
+            raise ChromeDevToolsError(f"JS 実行エラー: {desc}")
+
+        rv = result.get("result", {})
+        return rv.get("value")
+
+    # ------------------------------------------------------------------ #
+    # DOM 操作
+    # ------------------------------------------------------------------ #
+
+    async def click(self, selector: str, tab_id: Optional[str] = None) -> str:
+        """CSS セレクターで要素をクリック"""
+        sel_js = json.dumps(selector)
+        js = f"""
+(function() {{
+    const el = document.querySelector({sel_js});
+    if (!el) return 'エラー: 要素が見つかりません: ' + {sel_js};
+    el.click();
+    const tag = el.tagName.toLowerCase();
+    const id = el.id ? '#' + el.id : '';
+    const cls = el.className ? '.' + el.className.trim().split(' ')[0] : '';
+    return '✓ クリック: ' + tag + id + cls;
+}})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def type_text(
+        self,
+        selector: str,
+        text: str,
+        tab_id: Optional[str] = None,
+        clear_first: bool = True,
+    ) -> str:
+        """CSS セレクターで要素にテキストを入力"""
+        sel_js = json.dumps(selector)
+        txt_js = json.dumps(text)
+        clear_code = (
+            'el.value = ""; el.dispatchEvent(new Event("input"));'
+            if clear_first
+            else ""
+        )
+        js = f"""
+(function() {{
+    const el = document.querySelector({sel_js});
+    if (!el) return 'エラー: 要素が見つかりません: ' + {sel_js};
+    el.focus();
+    {clear_code}
+    el.value = {txt_js};
+    el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+    return '✓ 入力: ' + el.value.slice(0, 40);
+}})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def scroll(
+        self,
+        delta_x: int = 0,
+        delta_y: int = 0,
+        tab_id: Optional[str] = None,
+        selector: Optional[str] = None,
+    ) -> str:
+        """ページ or 要素をスクロール"""
+        if selector:
+            sel_js = json.dumps(selector)
+            js = f"""
+(function() {{
+    const el = document.querySelector({sel_js});
+    if (!el) return 'エラー: 要素が見つかりません: ' + {sel_js};
+    el.scrollBy({delta_x}, {delta_y});
+    return '✓ スクロール (要素): ' + el.tagName.toLowerCase();
+}})()
+"""
+        else:
+            js = (
+                f"window.scrollBy({delta_x}, {delta_y}); "
+                f"'✓ スクロール: dx={delta_x}, dy={delta_y}'"
+            )
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def scroll_to_element(
+        self, selector: str, tab_id: Optional[str] = None
+    ) -> str:
+        """要素が見えるようにスクロール"""
+        sel_js = json.dumps(selector)
+        js = f"""
+(function() {{
+    const el = document.querySelector({sel_js});
+    if (!el) return 'エラー: 要素が見つかりません: ' + {sel_js};
+    el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+    return '✓ 要素へスクロール: ' + el.tagName.toLowerCase();
+}})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def find_elements(
+        self,
+        selector: str,
+        tab_id: Optional[str] = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        """
+        CSS セレクターで要素を検索してプロパティ一覧を返す
+
+        Returns:
+            各要素の tag / id / classes / text / href / value / visible など
+        """
+        sel_js = json.dumps(selector)
+        js = f"""
+(function() {{
+    const els = Array.from(document.querySelectorAll({sel_js})).slice(0, {limit});
+    return els.map(function(el) {{
+        return {{
+            tag: el.tagName.toLowerCase(),
+            id: el.id || null,
+            classes: el.className || null,
+            text: (el.innerText || el.textContent || '').trim().slice(0, 120),
+            href: el.href || null,
+            value: el.value !== undefined ? String(el.value) : null,
+            type: el.type || null,
+            disabled: el.disabled || false,
+            visible: !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
+        }};
+    }});
+}})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return result if isinstance(result, list) else []
+
+    # ------------------------------------------------------------------ #
+    # ビューポート / レイアウト
+    # ------------------------------------------------------------------ #
+
+    async def set_viewport(
+        self, width: int, height: int, tab_id: Optional[str] = None
+    ) -> str:
+        """ビューポートサイズを設定"""
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+        await self.send_command(
+            ws,
+            "Emulation.setDeviceMetricsOverride",
+            {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": False},
+        )
+        return f"ビューポート設定: {width}×{height}"
+
+    async def wait_for_load(
+        self, tab_id: Optional[str] = None, timeout: float = 10.0
+    ) -> str:
+        """
+        document.readyState が 'complete' になるまでポーリング (最大 timeout 秒)
+        """
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+
+        while True:
+            elapsed = loop.time() - start
+            if elapsed > timeout:
+                return f"タイムアウト ({timeout:.0f}秒)"
+
+            result = await self.send_command(
+                ws,
+                "Runtime.evaluate",
+                {"expression": "document.readyState", "returnByValue": True},
+            )
+            state = result.get("result", {}).get("value", "")
+            if state == "complete":
+                return f"ロード完了 ({elapsed:.1f}秒)"
+
+            await asyncio.sleep(0.5)
+
+    # ------------------------------------------------------------------ #
+    # コンソールログ (JS 注入キャプチャ)
+    # ------------------------------------------------------------------ #
+
+    async def install_console_capture(self, tab_id: Optional[str] = None) -> str:
+        """
+        コンソールログのキャプチャスクリプトをページに注入する。
+        注入後の console.log/info/warn/error が window.__mcp_console_logs に蓄積される。
+        """
+        js = r"""
+(function() {
+    if (window.__mcp_console_capture) return '既にインストール済み';
+    window.__mcp_console_capture = true;
+    window.__mcp_console_logs = [];
+
+    ['log', 'info', 'warn', 'error', 'debug'].forEach(function(level) {
+        var orig = console[level].bind(console);
+        console[level] = function() {
+            var args = Array.from(arguments).map(function(a) {
+                if (a === null) return 'null';
+                if (a === undefined) return 'undefined';
+                if (typeof a === 'object') {
+                    try { return JSON.stringify(a); } catch(e) { return String(a); }
+                }
+                return String(a);
+            });
+            window.__mcp_console_logs.push({
+                level: level,
+                message: args.join(' '),
+                timestamp: new Date().toISOString()
+            });
+            if (window.__mcp_console_logs.length > 500) {
+                window.__mcp_console_logs.shift();
+            }
+            orig.apply(console, arguments);
+        };
+    });
+    return 'コンソールキャプチャをインストールしました';
+})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def get_console_logs(
+        self,
+        tab_id: Optional[str] = None,
+        level: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """
+        キャプチャされたコンソールログを取得する。
+        install_console_capture() を先に呼ぶ必要がある。
+
+        Args:
+            level: "log" / "info" / "warn" / "error" / "debug" でフィルタ (None = 全て)
+            limit: 取得する最大件数 (末尾から)
+        """
+        level_filter = (
+            f".filter(function(l) {{ return l.level === {json.dumps(level)}; }})"
+            if level
+            else ""
+        )
+        js = f"""
+(function() {{
+    var logs = (window.__mcp_console_logs || []){level_filter};
+    return logs.slice(-{limit});
+}})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return result if isinstance(result, list) else []
+
+    async def clear_console_logs(self, tab_id: Optional[str] = None) -> str:
+        """キャプチャされたコンソールログをクリア"""
+        result = await self.eval_js(
+            "window.__mcp_console_logs = []; window.__mcp_console_logs.length",
+            tab_id,
+        )
+        return f"クリアしました (0件)"
+
+    # ------------------------------------------------------------------ #
+    # ネットワーク監視 (JS 注入キャプチャ)
+    # ------------------------------------------------------------------ #
+
+    async def install_network_capture(self, tab_id: Optional[str] = None) -> str:
+        """
+        XHR/fetch リクエストのキャプチャスクリプトをページに注入する。
+        注入後のリクエストが window.__mcp_network_logs に蓄積される。
+        """
+        js = r"""
+(function() {
+    if (window.__mcp_network_capture) return '既にインストール済み';
+    window.__mcp_network_capture = true;
+    window.__mcp_network_logs = [];
+
+    function addLog(entry) {
+        window.__mcp_network_logs.push(entry);
+        if (window.__mcp_network_logs.length > 200) {
+            window.__mcp_network_logs.shift();
+        }
+    }
+
+    // fetch をラップ
+    var origFetch = window.fetch.bind(window);
+    window.fetch = function(input, init) {
+        var url = typeof input === 'string' ? input : (input.url || String(input));
+        var method = (init && init.method) || 'GET';
+        var start = Date.now();
+        return origFetch(input, init).then(function(resp) {
+            addLog({
+                type: 'fetch', method: method, url: url,
+                status: resp.status, ok: resp.ok,
+                duration: Date.now() - start,
+                timestamp: new Date().toISOString()
+            });
+            return resp;
+        }).catch(function(err) {
+            addLog({
+                type: 'fetch', method: method, url: url,
+                error: err.message, duration: Date.now() - start,
+                timestamp: new Date().toISOString()
+            });
+            throw err;
+        });
+    };
+
+    // XHR をラップ
+    var origOpen = XMLHttpRequest.prototype.open;
+    var origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url) {
+        this._mcpMethod = method;
+        this._mcpUrl = url;
+        this._mcpStart = Date.now();
+        return origOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function() {
+        var xhr = this;
+        xhr.addEventListener('loadend', function() {
+            addLog({
+                type: 'xhr',
+                method: xhr._mcpMethod || 'GET',
+                url: xhr._mcpUrl || '',
+                status: xhr.status,
+                ok: xhr.status >= 200 && xhr.status < 300,
+                duration: Date.now() - (xhr._mcpStart || Date.now()),
+                timestamp: new Date().toISOString()
+            });
+        });
+        return origSend.apply(this, arguments);
+    };
+
+    return 'ネットワークキャプチャをインストールしました';
+})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def get_network_logs(
+        self, tab_id: Optional[str] = None, limit: int = 50
+    ) -> list[dict]:
+        """
+        キャプチャされたネットワークリクエストを取得する。
+        install_network_capture() を先に呼ぶ必要がある。
+        """
+        js = f"(window.__mcp_network_logs || []).slice(-{limit})"
+        result = await self.eval_js(js, tab_id)
+        return result if isinstance(result, list) else []
+
+    async def clear_network_logs(self, tab_id: Optional[str] = None) -> str:
+        """キャプチャされたネットワークログをクリア"""
+        await self.eval_js("window.__mcp_network_logs = []", tab_id)
+        return "クリアしました"
+
+    async def get_resource_timing(
+        self, tab_id: Optional[str] = None, limit: int = 30
+    ) -> list[dict]:
+        """
+        Performance API からリソースタイミング情報を取得する。
+        ページ読み込み時の静的リソースが対象 (JS 注入不要)。
+        """
+        js = f"""
+(function() {{
+    return performance.getEntriesByType('resource').slice(0, {limit}).map(function(e) {{
+        return {{
+            name: e.name.split('?')[0],
+            type: e.initiatorType,
+            duration: Math.round(e.duration),
+            size: e.transferSize || 0,
+            start: Math.round(e.startTime)
+        }};
+    }});
+}})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return result if isinstance(result, list) else []
+
+    # ------------------------------------------------------------------ #
+    # ストレージ / クッキー
+    # ------------------------------------------------------------------ #
+
+    async def get_cookies(self, tab_id: Optional[str] = None) -> list[dict]:
+        """ページのクッキーを取得"""
+        tab = self.resolve_tab(tab_id)
+        ws = self.get_ws_url(tab)
+        result = await self.send_command(ws, "Network.getAllCookies")
+        return result.get("cookies", [])
+
+    async def get_local_storage(self, tab_id: Optional[str] = None) -> dict:
+        """localStorage の内容を取得"""
+        js = r"""
+(function() {
+    var result = {};
+    for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        result[key] = localStorage.getItem(key);
+    }
+    return result;
+})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return result if isinstance(result, dict) else {}
+
+    async def get_session_storage(self, tab_id: Optional[str] = None) -> dict:
+        """sessionStorage の内容を取得"""
+        js = r"""
+(function() {
+    var result = {};
+    for (var i = 0; i < sessionStorage.length; i++) {
+        var key = sessionStorage.key(i);
+        result[key] = sessionStorage.getItem(key);
+    }
+    return result;
+})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return result if isinstance(result, dict) else {}

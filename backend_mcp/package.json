@@ -1,0 +1,8 @@
+{
+  "name": "chrome-devtools-mcp-wrapper",
+  "private": true,
+  "description": "chrome-devtools-mcp (npm) を SSE で公開するラッパー",
+  "dependencies": {
+    "chrome-devtools-mcp": "latest"
+  }
+}

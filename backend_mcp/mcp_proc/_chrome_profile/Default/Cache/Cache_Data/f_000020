@@ -1,0 +1,212 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/Sスケジュール.vue");import { defineComponent as _defineComponent } from "/node_modules/.vite/deps/vue.js?v=f26217c3";
+import { RouterLink } from "/node_modules/.vite/deps/vue-router.js?v=f26217c3";
+const _sfc_main = /* @__PURE__ */ _defineComponent({
+  __name: "Sスケジュール",
+  setup(__props, { expose: __expose }) {
+    __expose();
+    const __returned__ = { get RouterLink() {
+      return RouterLink;
+    } };
+    Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
+    return __returned__;
+  }
+});
+import { createElementVNode as _createElementVNode, createCommentVNode as _createCommentVNode, createTextVNode as _createTextVNode, withCtx as _withCtx, createVNode as _createVNode, openBlock as _openBlock, createElementBlock as _createElementBlock } from "/node_modules/.vite/deps/vue.js?v=f26217c3";
+const _hoisted_1 = { class: "menu-view" };
+const _hoisted_2 = { class: "content" };
+const _hoisted_3 = { class: "schedule-menu-sections" };
+const _hoisted_4 = { class: "menu-row" };
+const _hoisted_5 = { class: "menu-card menu-card-fixed" };
+const _hoisted_6 = { class: "menu-card menu-card-fixed" };
+const _hoisted_7 = { class: "menu-row" };
+const _hoisted_8 = { class: "menu-card menu-card-fixed" };
+const _hoisted_9 = { class: "menu-card menu-card-fixed" };
+function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
+  return _openBlock(), _createElementBlock("div", _hoisted_1, [
+    _cache[14] || (_cache[14] = _createElementVNode(
+      "h2",
+      { class: "page-title" },
+      "【 スケジュール 】",
+      -1
+      /* CACHED */
+    )),
+    _createElementVNode("div", _hoisted_2, [
+      _cache[13] || (_cache[13] = _createElementVNode(
+        "p",
+        null,
+        "スケジュール管理機能へのアクセスリンクです。下記から選択してください。",
+        -1
+        /* CACHED */
+      )),
+      _createElementVNode("div", _hoisted_3, [
+        _createElementVNode("div", _hoisted_4, [
+          _createCommentVNode(" S配車_週表示カード "),
+          _createElementVNode("div", _hoisted_5, [
+            _cache[1] || (_cache[1] = _createElementVNode(
+              "div",
+              { class: "menu-card-title" },
+              [
+                _createElementVNode("span", { class: "icon" }, "S週"),
+                _createTextVNode(" S配車_週表示 ")
+              ],
+              -1
+              /* CACHED */
+            )),
+            _cache[2] || (_cache[2] = _createElementVNode(
+              "div",
+              { class: "menu-card-description" },
+              " 配車スケジュール週表示・週単位の配車管理・スケジュール調整 ",
+              -1
+              /* CACHED */
+            )),
+            _createVNode($setup["RouterLink"], {
+              class: "menu-card-link",
+              to: "/Sスケジュール/S配車_週表示?戻URL=/Sスケジュール"
+            }, {
+              default: _withCtx(() => [..._cache[0] || (_cache[0] = [
+                _createTextVNode(
+                  " 画面を開く ",
+                  -1
+                  /* CACHED */
+                )
+              ])]),
+              _: 1
+              /* STABLE */
+            })
+          ]),
+          _createCommentVNode(" S配車_日表示カード "),
+          _createElementVNode("div", _hoisted_6, [
+            _cache[4] || (_cache[4] = _createElementVNode(
+              "div",
+              { class: "menu-card-title" },
+              [
+                _createElementVNode("span", { class: "icon" }, "S日"),
+                _createTextVNode(" S配車_日表示 ")
+              ],
+              -1
+              /* CACHED */
+            )),
+            _cache[5] || (_cache[5] = _createElementVNode(
+              "div",
+              { class: "menu-card-description" },
+              " 配車スケジュール日表示・日単位の配車管理・詳細スケジュール ",
+              -1
+              /* CACHED */
+            )),
+            _createVNode($setup["RouterLink"], {
+              class: "menu-card-link",
+              to: "/Sスケジュール/S配車_日表示?戻URL=/Sスケジュール"
+            }, {
+              default: _withCtx(() => [..._cache[3] || (_cache[3] = [
+                _createTextVNode(
+                  " 画面を開く ",
+                  -1
+                  /* CACHED */
+                )
+              ])]),
+              _: 1
+              /* STABLE */
+            })
+          ])
+        ]),
+        _cache[12] || (_cache[12] = _createElementVNode(
+          "div",
+          { class: "menu-hairline" },
+          null,
+          -1
+          /* CACHED */
+        )),
+        _createElementVNode("div", _hoisted_7, [
+          _createCommentVNode(" S生産_週表示カード "),
+          _createElementVNode("div", _hoisted_8, [
+            _cache[7] || (_cache[7] = _createElementVNode(
+              "div",
+              { class: "menu-card-title" },
+              [
+                _createElementVNode("span", { class: "icon" }, "S生週"),
+                _createTextVNode(" S生産_週表示 ")
+              ],
+              -1
+              /* CACHED */
+            )),
+            _cache[8] || (_cache[8] = _createElementVNode(
+              "div",
+              { class: "menu-card-description" },
+              " 生産スケジュール週表示・週単位の生産管理・スケジュール調整 ",
+              -1
+              /* CACHED */
+            )),
+            _createVNode($setup["RouterLink"], {
+              class: "menu-card-link",
+              to: "/Sスケジュール/S生産_週表示?戻URL=/Sスケジュール"
+            }, {
+              default: _withCtx(() => [..._cache[6] || (_cache[6] = [
+                _createTextVNode(
+                  " 画面を開く ",
+                  -1
+                  /* CACHED */
+                )
+              ])]),
+              _: 1
+              /* STABLE */
+            })
+          ]),
+          _createCommentVNode(" S生産_日表示カード "),
+          _createElementVNode("div", _hoisted_9, [
+            _cache[10] || (_cache[10] = _createElementVNode(
+              "div",
+              { class: "menu-card-title" },
+              [
+                _createElementVNode("span", { class: "icon" }, "S生日"),
+                _createTextVNode(" S生産_日表示 ")
+              ],
+              -1
+              /* CACHED */
+            )),
+            _cache[11] || (_cache[11] = _createElementVNode(
+              "div",
+              { class: "menu-card-description" },
+              " 生産スケジュール日表示・日単位の生産管理・詳細スケジュール ",
+              -1
+              /* CACHED */
+            )),
+            _createVNode($setup["RouterLink"], {
+              class: "menu-card-link",
+              to: "/Sスケジュール/S生産_日表示?戻URL=/Sスケジュール"
+            }, {
+              default: _withCtx(() => [..._cache[9] || (_cache[9] = [
+                _createTextVNode(
+                  " 画面を開く ",
+                  -1
+                  /* CACHED */
+                )
+              ])]),
+              _: 1
+              /* STABLE */
+            })
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+import "/src/assets/menu-common.css?vue&type=style&index=0&src=e8062619&scoped=e8062619&lang.css";
+import "/src/components/Sスケジュール.vue?vue&type=style&index=1&scoped=e8062619&lang.css";
+_sfc_main.__hmrId = "e8062619";
+typeof __VUE_HMR_RUNTIME__ !== "undefined" && __VUE_HMR_RUNTIME__.createRecord(_sfc_main.__hmrId, _sfc_main);
+import.meta.hot.on("file-changed", ({ file }) => {
+  __VUE_HMR_RUNTIME__.CHANGED_FILE = file;
+});
+import.meta.hot.accept((mod) => {
+  if (!mod) return;
+  const { default: updated, _rerender_only } = mod;
+  if (_rerender_only) {
+    __VUE_HMR_RUNTIME__.rerender(updated.__hmrId, updated.render);
+  } else {
+    __VUE_HMR_RUNTIME__.reload(updated.__hmrId, updated);
+  }
+});
+import _export_sfc from "/@id/__x00__plugin-vue:export-helper";
+export default /* @__PURE__ */ _export_sfc(_sfc_main, [["render", _sfc_render], ["__scopeId", "data-v-e8062619"], ["__file", "D:/OneDrive/_sandbox/AiDiy2026/frontend_web/src/components/Sスケジュール.vue"]]);
+
+//# sourceMappingURL=data:application/json;base64,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QUFBQSxjQUFpQixJQUFHO0FBQUE7Z0NBQWlDLE1BRXZFO0FBQUE7a0JBRnVFO0FBQUEsa0JBRXZFO0FBQUE7QUFBQTtBQUFBIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJT44K544Kx44K444Ol44O844OrLnZ1ZSJdLCJzb3VyY2VzQ29udGVudCI6WyI8IS0tXG4gIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLVxuXG4gIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS1cbiAgQ09QWVJJR0hUIChDKSAyMDE0LTIwMjYgTWl0c3VvIEtPTkRPVSBhbmQgY29udHJpYnV0b3JzLlxuICBMaWNlbnNlZCB1bmRlciBcIkFpRGl5IOWFrOmWi+WIqeeUqOODqeOCpOOCu+ODs+OCue+8iOmdnuWVhueUqO+8iSB2MS4wXCIuXG4gIENvbW1lcmNpYWwgdXNlIHJlcXVpcmVzIHByaW9yIHdyaXR0ZW4gY29uc2VudCBmcm9tIGFsbCBjb3B5cmlnaHQgaG9sZGVycy5cbiAgU2VlIExJQ0VOU0UgZm9yIGZ1bGwgdGVybXMuIFRoYW5rIHlvdSBmb3Iga2VlcGluZyB0aGUgcnVsZXMuXG4gIGh0dHBzOi8vZ2l0aHViLmNvbS9tb25qeXUxMTAxL0FpRGl5MjAyNlxuICAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXG4tLT5cblxuPHNjcmlwdCBzZXR1cCBsYW5nPVwidHNcIj5cbmltcG9ydCB7IFJvdXRlckxpbmsgfSBmcm9tICd2dWUtcm91dGVyJztcbjwvc2NyaXB0PlxuXG48dGVtcGxhdGU+XG4gIDxkaXYgY2xhc3M9XCJtZW51LXZpZXdcIj5cbiAgICA8aDIgY2xhc3M9XCJwYWdlLXRpdGxlXCI+44CQIOOCueOCseOCuOODpeODvOODqyDjgJE8L2gyPlxuXG4gICAgPGRpdiBjbGFzcz1cImNvbnRlbnRcIj5cbiAgICAgIDxwPuOCueOCseOCuOODpeODvOODq+euoeeQhuapn+iDveOBuOOBruOCouOCr+OCu+OCueODquODs+OCr+OBp+OBmeOAguS4i+iomOOBi+OCiemBuOaKnuOBl+OBpuOBj+OBoOOBleOBhOOAgjwvcD5cblxuICAgICAgPGRpdiBjbGFzcz1cInNjaGVkdWxlLW1lbnUtc2VjdGlvbnNcIj5cbiAgICAgICAgPGRpdiBjbGFzcz1cIm1lbnUtcm93XCI+XG4gICAgICAgICAgPCEtLSBT6YWN6LuKX+mAseihqOekuuOCq+ODvOODiSAtLT5cbiAgICAgICAgICA8ZGl2IGNsYXNzPVwibWVudS1jYXJkIG1lbnUtY2FyZC1maXhlZFwiPlxuICAgICAgICAgICAgPGRpdiBjbGFzcz1cIm1lbnUtY2FyZC10aXRsZVwiPlxuICAgICAgICAgICAgICA8c3BhbiBjbGFzcz1cImljb25cIj5T6YCxPC9zcGFuPlxuICAgICAgICAgICAgICBT6YWN6LuKX+mAseihqOekulxuICAgICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgICA8ZGl2IGNsYXNzPVwibWVudS1jYXJkLWRlc2NyaXB0aW9uXCI+XG4gICAgICAgICAgICAgIOmFjei7iuOCueOCseOCuOODpeODvOODq+mAseihqOekuuODu+mAseWNmOS9jeOBrumFjei7iueuoeeQhuODu+OCueOCseOCuOODpeODvOODq+iqv+aVtFxuICAgICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgICA8Um91dGVyTGluayBjbGFzcz1cIm1lbnUtY2FyZC1saW5rXCIgdG89XCIvU+OCueOCseOCuOODpeODvOODqy9T6YWN6LuKX+mAseihqOekuj/miLtVUkw9L1PjgrnjgrHjgrjjg6Xjg7zjg6tcIj5cbiAgICAgICAgICAgICAg55S76Z2i44KS6ZaL44GPXG4gICAgICAgICAgICA8L1JvdXRlckxpbms+XG4gICAgICAgICAgPC9kaXY+XG5cbiAgICAgICAgICA8IS0tIFPphY3ou4pf5pel6KGo56S644Kr44O844OJIC0tPlxuICAgICAgICAgIDxkaXYgY2xhc3M9XCJtZW51LWNhcmQgbWVudS1jYXJkLWZpeGVkXCI+XG4gICAgICAgICAgICA8ZGl2IGNsYXNzPVwibWVudS1jYXJkLXRpdGxlXCI+XG4gICAgICAgICAgICAgIDxzcGFuIGNsYXNzPVwiaWNvblwiPlPml6U8L3NwYW4+XG4gICAgICAgICAgICAgIFPphY3ou4pf5pel6KGo56S6XG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICAgIDxkaXYgY2xhc3M9XCJtZW51LWNhcmQtZGVzY3JpcHRpb25cIj5cbiAgICAgICAgICAgICAg6YWN6LuK44K544Kx44K444Ol44O844Or5pel6KGo56S644O75pel5Y2Y5L2N44Gu6YWN6LuK566h55CG44O76Kmz57Sw44K544Kx44K444Ol44O844OrXG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICAgIDxSb3V0ZXJMaW5rIGNsYXNzPVwibWVudS1jYXJkLWxpbmtcIiB0bz1cIi9T44K544Kx44K444Ol44O844OrL1PphY3ou4pf5pel6KGo56S6P+aIu1VSTD0vU+OCueOCseOCuOODpeODvOODq1wiPlxuICAgICAgICAgICAgICDnlLvpnaLjgpLplovjgY9cbiAgICAgICAgICAgIDwvUm91dGVyTGluaz5cbiAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgPC9kaXY+XG5cbiAgICAgICAgPGRpdiBjbGFzcz1cIm1lbnUtaGFpcmxpbmVcIj48L2Rpdj5cblxuICAgICAgICA8ZGl2IGNsYXNzPVwibWVudS1yb3dcIj5cbiAgICAgICAgICA8IS0tIFPnlJ/nlKNf6YCx6KGo56S644Kr44O844OJIC0tPlxuICAgICAgICAgIDxkaXYgY2xhc3M9XCJtZW51LWNhcmQgbWVudS1jYXJkLWZpeGVkXCI+XG4gICAgICAgICAgICA8ZGl2IGNsYXNzPVwibWVudS1jYXJkLXRpdGxlXCI+XG4gICAgICAgICAgICAgIDxzcGFuIGNsYXNzPVwiaWNvblwiPlPnlJ/pgLE8L3NwYW4+XG4gICAgICAgICAgICAgIFPnlJ/nlKNf6YCx6KGo56S6XG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICAgIDxkaXYgY2xhc3M9XCJtZW51LWNhcmQtZGVzY3JpcHRpb25cIj5cbiAgICAgICAgICAgICAg55Sf55Sj44K544Kx44K444Ol44O844Or6YCx6KGo56S644O76YCx5Y2Y5L2N44Gu55Sf55Sj566h55CG44O744K544Kx44K444Ol44O844Or6Kq/5pW0XG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICAgIDxSb3V0ZXJMaW5rIGNsYXNzPVwibWVudS1jYXJkLWxpbmtcIiB0bz1cIi9T44K544Kx44K444Ol44O844OrL1PnlJ/nlKNf6YCx6KGo56S6P+aIu1VSTD0vU+OCueOCseOCuOODpeODvOODq1wiPlxuICAgICAgICAgICAgICDnlLvpnaLjgpLplovjgY9cbiAgICAgICAgICAgIDwvUm91dGVyTGluaz5cbiAgICAgICAgICA8L2Rpdj5cblxuICAgICAgICAgIDwhLS0gU+eUn+eUo1/ml6XooajnpLrjgqvjg7zjg4kgLS0+XG4gICAgICAgICAgPGRpdiBjbGFzcz1cIm1lbnUtY2FyZCBtZW51LWNhcmQtZml4ZWRcIj5cbiAgICAgICAgICAgIDxkaXYgY2xhc3M9XCJtZW51LWNhcmQtdGl0bGVcIj5cbiAgICAgICAgICAgICAgPHNwYW4gY2xhc3M9XCJpY29uXCI+U+eUn+aXpTwvc3Bhbj5cbiAgICAgICAgICAgICAgU+eUn+eUo1/ml6XooajnpLpcbiAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgICAgPGRpdiBjbGFzcz1cIm1lbnUtY2FyZC1kZXNjcmlwdGlvblwiPlxuICAgICAgICAgICAgICDnlJ/nlKPjgrnjgrHjgrjjg6Xjg7zjg6vml6XooajnpLrjg7vml6XljZjkvY3jga7nlJ/nlKPnrqHnkIbjg7voqbPntLDjgrnjgrHjgrjjg6Xjg7zjg6tcbiAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgICAgPFJvdXRlckxpbmsgY2xhc3M9XCJtZW51LWNhcmQtbGlua1wiIHRvPVwiL1PjgrnjgrHjgrjjg6Xjg7zjg6svU+eUn+eUo1/ml6XooajnpLo/5oi7VVJMPS9T44K544Kx44K444Ol44O844OrXCI+XG4gICAgICAgICAgICAgIOeUu+mdouOCkumWi+OBj1xuICAgICAgICAgICAgPC9Sb3V0ZXJMaW5rPlxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICA8L2Rpdj5cbiAgICAgIDwvZGl2PlxuICAgIDwvZGl2PlxuICA8L2Rpdj5cbjwvdGVtcGxhdGU+XG5cbjxzdHlsZSBzY29wZWQgc3JjPVwiLi4vYXNzZXRzL21lbnUtY29tbW9uLmNzc1wiPjwvc3R5bGU+XG48c3R5bGUgc2NvcGVkPlxuLnNjaGVkdWxlLW1lbnUtc2VjdGlvbnMge1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xuICBnYXA6IDE0cHg7XG4gIG1hcmdpbi10b3A6IDIwcHg7XG59XG5cbi5tZW51LXJvdyB7XG4gIGRpc3BsYXk6IGZsZXg7XG4gIGZsZXgtd3JhcDogd3JhcDtcbiAgZ2FwOiAyMHB4O1xufVxuXG4ubWVudS1jYXJkLWZpeGVkIHtcbiAgd2lkdGg6IDMyMHB4O1xuICBtaW4td2lkdGg6IDMyMHB4O1xuICBoZWlnaHQ6IDE1OHB4O1xuICBib3gtc2l6aW5nOiBib3JkZXItYm94O1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xufVxuXG4ubWVudS1jYXJkLWZpeGVkIC5tZW51LWNhcmQtZGVzY3JpcHRpb24ge1xuICBmbGV4OiAxO1xufVxuXG4ubWVudS1oYWlybGluZSB7XG4gIHdpZHRoOiAxMDAlO1xuICBoZWlnaHQ6IDFweDtcbiAgYmFja2dyb3VuZDogbGluZWFyLWdyYWRpZW50KDkwZGVnLCByZ2JhKDkwLCA3NCwgNTgsIDAuMTIpIDAlLCByZ2JhKDkwLCA3NCwgNTgsIDAuNDUpIDUwJSwgcmdiYSg5MCwgNzQsIDU4LCAwLjEyKSAxMDAlKTtcbn1cblxuQG1lZGlhIChtYXgtd2lkdGg6IDc2OHB4KSB7XG4gIC5tZW51LXJvdyB7XG4gICAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjtcbiAgfVxuXG4gIC5tZW51LWNhcmQtZml4ZWQge1xuICAgIHdpZHRoOiAxMDAlO1xuICAgIG1pbi13aWR0aDogMDtcbiAgICBoZWlnaHQ6IGF1dG87XG4gICAgbWluLWhlaWdodDogMTU4cHg7XG4gIH1cbn1cbjwvc3R5bGU+XG5cbiJdLCJmaWxlIjoiRDovT25lRHJpdmUvX3NhbmRib3gvQWlEaXkyMDI2L2Zyb250ZW5kX3dlYi9zcmMvY29tcG9uZW50cy9T44K544Kx44K444Ol44O844OrLnZ1ZSJ9

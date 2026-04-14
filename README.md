@@ -67,10 +67,12 @@ python _setup.py
 `_setup.py` は対話形式で以下を実施します。
 
 1. 共通の Python / npm ツール確認
-2. `backend_server` の `uv sync`
-3. `frontend_web` の `npm install`
-4. `frontend_avatar` の `npm install`
-5. 必要に応じて Electron バイナリの補完
+2. `backend_mcp` の `uv sync` / `npm install`
+3. 必要に応じて `backend_mcp` 用の MCP 設定ファイル書き込み（Claude / Gemini 向け）
+4. `backend_server` の `uv sync`
+5. `frontend_web` の `npm install`
+6. `frontend_avatar` の `npm install`
+7. 必要に応じて Electron バイナリの補完
 
 補足:
 

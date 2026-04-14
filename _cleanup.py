@@ -6,6 +6,7 @@
 不要なキャッシュファイルやビルド成果物を削除します。
 
 対象:
+- バックエンド(mcp): `backend_mcp`
 - バックエンド(core,apps): `backend_server`
 - フロントエンド(Web): `frontend_web`
 - フロントエンド(Avatar): `frontend_avatar`
@@ -27,6 +28,9 @@ from pathlib import Path
 # ============================================================
 BACKEND_PATH = "backend_server"
 BACKEND_ENV_LIST = [".venv", "venv"]
+
+BACKEND_MCP_PATH = "backend_mcp"
+BACKEND_MCP_ENV_LIST = [".venv", "venv"]
 
 FRONTEND_WEB_PATH = "frontend_web"
 
@@ -243,6 +247,51 @@ def cleanup_backend(base_dir: Path):
         print_info(f"{label}: 削除対象はありませんでした")
 
 
+def cleanup_backend_mcp(base_dir: Path):
+    label = "バックエンド(mcp)"
+    print_header(f"{label} のクリーンアップ")
+
+    backend_mcp_dir = base_dir / BACKEND_MCP_PATH
+    if not backend_mcp_dir.exists():
+        print_warning(f"{label} のフォルダが見つかりません")
+        return
+
+    deleted_count = cleanup_common_python_caches(backend_mcp_dir, label)
+
+    print_info(f"{label}: 削除対象の仮想環境リスト: {', '.join(BACKEND_MCP_ENV_LIST)}")
+    for env_name in BACKEND_MCP_ENV_LIST:
+        env_dir = backend_mcp_dir / env_name
+        if env_dir.exists():
+            if ask_yes_no(f"  {BACKEND_MCP_PATH}/{env_name} を削除しますか？", default="y"):
+                if remove_directory(env_dir, f"{env_name} ({label})"):
+                    deleted_count += 1
+                else:
+                    print_error(f"  {BACKEND_MCP_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
+            else:
+                print_info(f"  {BACKEND_MCP_PATH}/{env_name} はそのまま残します")
+
+    node_modules_dir = backend_mcp_dir / "node_modules"
+    if node_modules_dir.exists():
+        if ask_yes_no(f"  {BACKEND_MCP_PATH}/node_modules を削除しますか？", default="y"):
+            if remove_directory(node_modules_dir, f"node_modules ({label})"):
+                deleted_count += 1
+        else:
+            print_info(f"  {BACKEND_MCP_PATH}/node_modules はそのまま残します")
+
+    chrome_profile_dir = backend_mcp_dir / "_chrome_profile"
+    if chrome_profile_dir.exists():
+        if ask_yes_no(f"  {BACKEND_MCP_PATH}/_chrome_profile を削除しますか？", default="y"):
+            if remove_directory(chrome_profile_dir, f"_chrome_profile ({label})"):
+                deleted_count += 1
+        else:
+            print_info(f"  {BACKEND_MCP_PATH}/_chrome_profile はそのまま残します")
+
+    if deleted_count > 0:
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
+    else:
+        print_info(f"{label}: 削除対象はありませんでした")
+
+
 def cleanup_frontend_web(base_dir: Path):
     label = "フロントエンド(Web)"
     print_header(f"{label} のクリーンアップ")
@@ -340,9 +389,10 @@ def main():
     base_dir = Path(__file__).parent
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  1. バックエンド(core,apps)")
-    print_info("  2. フロントエンド(Web)")
-    print_info("  3. フロントエンド(Avatar)")
+    print_info("  1. バックエンド(mcp)")
+    print_info("  2. バックエンド(core,apps)")
+    print_info("  3. フロントエンド(Web)")
+    print_info("  4. フロントエンド(Avatar)")
     print()
 
     run_cleanup, AUTO_MODE = ask_start_mode("クリーンアップを実行しますか？", default="n")
@@ -364,6 +414,12 @@ def main():
             remove_directory(backup_dir, "backup")
         else:
             print_info("backup フォルダはそのまま残します")
+
+    print()
+    if ask_yes_no("バックエンド(mcp) をクリーンアップしますか？", default="y"):
+        cleanup_backend_mcp(base_dir)
+    else:
+        print_info("バックエンド(mcp) のクリーンアップをスキップしました")
 
     print()
     if ask_yes_no("バックエンド(core,apps)をクリーンアップしますか？", default="y"):

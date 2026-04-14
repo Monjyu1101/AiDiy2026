@@ -114,6 +114,8 @@ frontend_avatar/dist-electron/
 .vscode/
 .vscode/*
 !.vscode/extensions.json
+.claude/
+.gemini/
 *.swp
 *.swo
 *~
