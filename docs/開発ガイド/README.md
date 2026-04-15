@@ -8,9 +8,10 @@
 
 ## 1. まず押さえること
 
-- バックエンドは **2 サーバー**
+- バックエンドは **3 サーバー**
   - `core_main.py` : `8091`
   - `apps_main.py` : `8092`
+  - `mcp_main.py` : `8095`
 - Web フロントは `frontend_web`、ポート `8090`
 - Avatar フロントは `frontend_avatar`、ポート `8099`
 - DB は **SQLite**
@@ -31,6 +32,10 @@ AiDiy2026/
 ├── _setup.py
 ├── _start.py
 ├── _cleanup.py
+├── backend_mcp/
+│   ├── mcp_main.py
+│   ├── mcp_proc/
+│   └── AGENTS.md
 ├── backend_server/
 │   ├── core_main.py
 │   ├── apps_main.py
@@ -77,6 +82,7 @@ python _start.py
 
 `_start.py` は**対話形式**です。起動時に以下を選択します。
 
+- バックエンド(mcp)
 - バックエンド(core/apps)
 - フロントエンド(Web)
 - フロントエンド(Avatar)
@@ -84,6 +90,10 @@ python _start.py
 ### 個別起動
 
 ```powershell
+# backend mcp
+cd backend_mcp
+.venv/Scripts/python.exe -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
+
 # backend core
 cd backend_server
 .venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
@@ -110,6 +120,7 @@ npm run dev
 | Web フロント | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:8092/docs |
+| Backend MCP (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
 | Avatar Web モード | http://localhost:8099 |
 
 初期ユーザー:
@@ -144,6 +155,7 @@ npm run dev
 - `apps_crud/__init__.py` 追加漏れに注意
 - M 系一覧は通常 V 系エンドポイントを使う
 - パスワードは現状平文比較
+- Claude のブラウザ自動操作は `backend_mcp` と `backend_server/_config/AiDiy_mcp.json` を併用する
 
 ---
 
@@ -224,8 +236,9 @@ echo. > backend_server/temp/reboot_apps.txt
 1. [README.md](../../README.md)
 2. [AGENTS.md](../../AGENTS.md)
 3. [backend_server/AGENTS.md](../../backend_server/AGENTS.md)
-4. [frontend_web/AGENTS.md](../../frontend_web/AGENTS.md)
-5. [frontend_avatar/AGENTS.md](../../frontend_avatar/AGENTS.md)
+4. [backend_mcp/AGENTS.md](../../backend_mcp/AGENTS.md)
+5. [frontend_web/AGENTS.md](../../frontend_web/AGENTS.md)
+6. [frontend_avatar/AGENTS.md](../../frontend_avatar/AGENTS.md)
 
 ---
 

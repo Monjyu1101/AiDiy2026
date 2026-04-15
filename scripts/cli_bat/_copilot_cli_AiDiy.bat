@@ -1,11 +1,8 @@
 @echo off
 cd /d "%~dp0../.."
 
+set "COPILOT_CMD=%USERPROFILE%\AppData\Roaming\npm\copilot.cmd"
 ECHO copilot --allow-all-tools
-start "Copilot CLI" "%USERPROFILE%\AppData\Roaming\npm\copilot.cmd" --allow-all-tools
-
-ECHO;
-ECHO Waiting... 20s
-ping localhost -w 1000 -n 20 >nul
+call "%COPILOT_CMD%" --allow-all-tools
 
 exit

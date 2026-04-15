@@ -1,3 +1,4 @@
+# Copyright (c) 2026 monjyu1101@gmail.com
 """
 Chrome DevTools Protocol (CDP) クライアント
 

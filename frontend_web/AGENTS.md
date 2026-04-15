@@ -18,6 +18,7 @@
 - **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
 - **[../docs/開発ガイド/12_フロントエンド画面追加例/](../docs/開発ガイド/12_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順
 - **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細（FastAPI + SQLAlchemy + SQLite）
+- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - Chrome DevTools MCP サーバー実装詳細
 - **[../frontend_avatar/AGENTS.md](../frontend_avatar/AGENTS.md)** - デスクトップアバタークライアント（Electron + WebSocket + VRM）
 
 **📚 ドキュメントリソース（docs/フォルダ）：**
@@ -28,6 +29,7 @@
 **バックエンド・他フロントエンドの情報は別ドキュメント：**
 このドキュメントは `frontend_web`（ブラウザ向け業務UI）に特化しています。
 - バックエンド → `backend_server/AGENTS.md`
+- ブラウザ自動操作用 MCP サーバー → `backend_mcp/AGENTS.md`
 - AIコア専用デスクトップアバタークライアント → `frontend_avatar/AGENTS.md`（Vue Router / Pinia 不使用、Electron マルチウィンドウ構成）
 
 **このファイルの内容：**
@@ -154,6 +156,11 @@
 - セッション永続化（リロード対応、セッションID・ソケット番号でセッション復元）
 - メッセージハンドラーシステム、接続状態変化ハンドラー
 
+**8.5. backend_mcp 連携（ブラウザ自動操作）:**
+- `frontend_web` 自体は `8095` を直接叩かない
+- Claude Agent SDK などのブラウザ自動操作は `backend_server` が `backend_mcp` の SSE を利用して実行する
+- そのため AI コア画面でブラウザ操作まで使う確認では、`backend_server` に加えて `backend_mcp` も起動しておく
+
 **9. 共通ダイアログシステム:**
 - `qAlert(message)` - アラートダイアログ
 - `qConfirm(message)` - 確認ダイアログ
@@ -188,6 +195,7 @@
 - `.aidiy` はコードエージェントの実行ルート直下に置くプロジェクト専用知見フォルダ
 - コードエージェントは `.aidiy/_index.md` を参照して類似修正知見を利用し、修正完了後は `.aidiy` へ知見整理を追記する
 - 詳細な実装ルールは `../backend_server/AGENTS.md` の「新しい Code CLI を追加する手順」「コードエージェントの自己改善機能」を参照
+- Claude 系のブラウザ自動操作まで扱う場合は `../backend_mcp/AGENTS.md` も合わせて確認する
 
 ### No UI Framework / No CSS Framework
 

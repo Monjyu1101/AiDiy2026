@@ -1,3 +1,4 @@
+# Copyright (c) 2026 monjyu1101@gmail.com
 """
 Chrome DevTools MCP サーバー (共有ブラウザモード)
 
@@ -11,17 +12,17 @@ Chrome DevTools MCP サーバー (共有ブラウザモード)
     Client C ─┘  stdout ────────┴→ 全員に配信
 
 起動:
-    uv run mcp_main.py
+    uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095
 
 SSE エンドポイント:
-    http://localhost:8095/chrome_devtools/sse
+    http://localhost:8095/aidiy_chrome_devtools/sse
 
 Claude Code への登録 (~/.claude/settings.json):
     {
       "mcpServers": {
-        "chrome-devtools": {
+        "aidiy_chrome_devtools": {
           "type": "sse",
-          "url": "http://localhost:8095/chrome_devtools/sse"
+          "url": "http://localhost:8095/aidiy_chrome_devtools/sse"
         }
       }
     }
@@ -38,7 +39,11 @@ from starlette.applications import Starlette
 from starlette.responses import Response, StreamingResponse
 from starlette.routing import Mount, Route
 
+from log_config import setup_logging, get_logger
 from mcp_proc.chrome_manager import ChromeManager
+
+setup_logging()
+logger = get_logger(__name__)
 
 # ------------------------------------------------------------------ #
 # 設定
@@ -46,7 +51,7 @@ from mcp_proc.chrome_manager import ChromeManager
 
 CHROME_PORT = int(os.environ.get("CHROME_DEBUG_PORT", "9222"))
 MCP_PORT    = int(os.environ.get("MCP_PORT", "8095"))
-MOUNT       = os.environ.get("MCP_MOUNT_PATH", "/chrome_devtools")
+MOUNT       = os.environ.get("MCP_MOUNT_PATH", "/aidiy_chrome_devtools")
 
 NODE_BIN = str(
     Path(__file__).parent / "node_modules/chrome-devtools-mcp/build/src/index.js"
@@ -75,7 +80,7 @@ async def _start_subprocess() -> asyncio.subprocess.Process:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
-    print(f"[MCP] subprocess 起動 (PID={_proc.pid})")
+    logger.info(f"subprocess 起動 (PID={_proc.pid})")
     asyncio.create_task(_broadcast(_proc))
     return _proc
 
@@ -103,20 +108,33 @@ async def _broadcast(proc: asyncio.subprocess.Process):
         _queues.difference_update(dead)
 
     # subprocess 終了 → 全クライアントに終了を通知
-    print(f"[MCP] subprocess 終了 (接続数={len(_queues)})")
+    logger.info(f"subprocess 終了 (接続数={len(_queues)})")
     for q in list(_queues):
         q.put_nowait(None)
+
+# ------------------------------------------------------------------ #
+# ローカル接続チェック
+# ------------------------------------------------------------------ #
+
+_ALLOWED_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+def _is_local(request) -> bool:
+    host = request.client.host if request.client else ""
+    return host in _ALLOWED_HOSTS
 
 # ------------------------------------------------------------------ #
 # SSE エンドポイント
 # ------------------------------------------------------------------ #
 
 async def handle_sse(request):
+    if not _is_local(request):
+        logger.warning(f"SSE 接続拒否: {request.client.host}")
+        return Response("Forbidden", status_code=403)
     await _get_proc()                   # 未起動なら起動
     sid = str(uuid.uuid4())
     q   = asyncio.Queue(maxsize=200)
     _queues.add(q)
-    print(f"[MCP] 接続 sid={sid[:8]} (計{len(_queues)}接続)")
+    logger.info(f"接続 sid={sid[:8]} (計{len(_queues)}接続)")
 
     async def stream():
         try:
@@ -129,7 +147,7 @@ async def handle_sse(request):
                 yield f"event: message\ndata: {msg}\n\n"
         finally:
             _queues.discard(q)
-            print(f"[MCP] 切断 sid={sid[:8]} (計{len(_queues)}接続)")
+            logger.info(f"切断 sid={sid[:8]} (計{len(_queues)}接続)")
 
     return StreamingResponse(
         stream(),
@@ -142,6 +160,9 @@ async def handle_sse(request):
 # ------------------------------------------------------------------ #
 
 async def handle_post(request):
+    if not _is_local(request):
+        logger.warning(f"POST 接続拒否: {request.client.host}")
+        return Response("Forbidden", status_code=403)
     proc = await _get_proc()
     proc.stdin.write(await request.body() + b"\n")
     await proc.stdin.drain()
@@ -160,5 +181,5 @@ app = Starlette(routes=[
 ])
 
 if __name__ == "__main__":
-    print(f"SSE: http://localhost:{MCP_PORT}{MOUNT}/sse")
-    uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="info")
+    logger.info(f"SSE: http://localhost:{MCP_PORT}{MOUNT}/sse")
+    uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")

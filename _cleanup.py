@@ -15,6 +15,7 @@ Usage:
     python _cleanup.py
 """
 
+import json
 import os
 import shutil
 import stat
@@ -41,6 +42,7 @@ DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
 
 AUTO_MODE = False
+BACKEND_MCP_SERVER_NAME = "aidiy_chrome_devtools"
 
 
 class Colors:
@@ -177,6 +179,124 @@ def clean_directory_contents(path: Path, description: str) -> bool:
     return False
 
 
+def write_json_file(path: Path, data: dict) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return True
+    except Exception as e:
+        print_error(f"設定ファイル書き込みエラー: {path} ({e})")
+        return False
+
+
+def remove_json_mcp_server(path: Path, server_name: str) -> bool:
+    try:
+        if not path.exists():
+            print_info(f"MCP 設定ファイルなし: {path}")
+            return True
+
+        with open(path, encoding="utf-8-sig") as f:
+            loaded = json.load(f)
+        if not isinstance(loaded, dict):
+            print_warning(f"MCP 設定の形式が不正です。削除をスキップしました: {path}")
+            return False
+
+        servers = loaded.get("mcpServers")
+        if not isinstance(servers, dict) or server_name not in servers:
+            print_info(f"{server_name} は未設定です: {path}")
+            return True
+
+        del servers[server_name]
+        if servers:
+            loaded["mcpServers"] = servers
+        else:
+            loaded.pop("mcpServers", None)
+
+        if not write_json_file(path, loaded):
+            return False
+
+        print_success(f"{server_name} の MCP 設定を削除しました: {path}")
+        return True
+    except json.JSONDecodeError as e:
+        print_error(f"JSON解析エラー: {path} ({e})")
+        return False
+    except Exception as e:
+        print_error(f"MCP 設定更新エラー: {path} ({e})")
+        return False
+
+
+def remove_toml_table(content: str, table_header: str) -> str:
+    lines = content.splitlines()
+    table_index = None
+    for i, line in enumerate(lines):
+        if line.strip() == table_header:
+            table_index = i
+            break
+
+    if table_index is None:
+        return content if content.endswith("\n") or content == "" else content + "\n"
+
+    next_table_index = len(lines)
+    for i in range(table_index + 1, len(lines)):
+        stripped = lines[i].strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            next_table_index = i
+            break
+
+    del lines[table_index:next_table_index]
+    while lines and lines[-1].strip() == "":
+        lines.pop()
+    return "\n".join(lines).rstrip() + ("\n" if lines else "")
+
+
+def remove_codex_mcp_server(server_name: str) -> bool:
+    config_path = Path.home() / ".codex" / "config.toml"
+    table_header = f"[mcp_servers.{server_name}]"
+    try:
+        if not config_path.exists():
+            print_info(f"MCP 設定ファイルなし: {config_path}")
+            return True
+        content = config_path.read_text(encoding="utf-8")
+        updated = remove_toml_table(content, table_header)
+        if updated == content:
+            print_info(f"{server_name} は未設定です: {config_path}")
+            return True
+        config_path.write_text(updated, encoding="utf-8")
+        print_success(f"{server_name} の MCP 設定を削除しました: {config_path}")
+        return True
+    except Exception as e:
+        print_error(f"Codex設定更新エラー: {config_path} ({e})")
+        return False
+
+
+def cleanup_global_mcp_configs(server_name: str):
+    print_header("グローバルMCP設定の解除")
+
+    copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+    targets = [
+        Path.home() / ".claude.json",
+        Path.home() / ".gemini" / "settings.json",
+        copilot_home / "mcp-config.json",
+    ]
+
+    updated_count = 0
+    for path in targets:
+        if remove_json_mcp_server(path, server_name):
+            updated_count += 1
+
+    print_info(f"Codex CLI 設定も解除対象です: {Path.home() / '.codex' / 'config.toml'}")
+    if remove_codex_mcp_server(server_name):
+        updated_count += 1
+
+    if updated_count > 0:
+        print_success(f"グローバルMCP設定の解除処理を完了しました: {server_name}")
+    else:
+        print_warning(f"グローバルMCP設定の解除に失敗しました: {server_name}")
+
+
 def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
     deleted_count = 0
 
@@ -278,13 +398,13 @@ def cleanup_backend_mcp(base_dir: Path):
         else:
             print_info(f"  {BACKEND_MCP_PATH}/node_modules はそのまま残します")
 
-    chrome_profile_dir = backend_mcp_dir / "_chrome_profile"
-    if chrome_profile_dir.exists():
-        if ask_yes_no(f"  {BACKEND_MCP_PATH}/_chrome_profile を削除しますか？", default="y"):
-            if remove_directory(chrome_profile_dir, f"_chrome_profile ({label})"):
+    temp_dir = backend_mcp_dir / "temp"
+    if temp_dir.exists():
+        if ask_yes_no(f"  {BACKEND_MCP_PATH}/temp の中身をクリアしますか？", default="y"):
+            if clean_directory_contents(temp_dir, f"temp ({label})"):
                 deleted_count += 1
         else:
-            print_info(f"  {BACKEND_MCP_PATH}/_chrome_profile はそのまま残します")
+            print_info(f"  {BACKEND_MCP_PATH}/temp はそのまま残します")
 
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
@@ -440,21 +560,15 @@ def main():
         print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
 
     print()
+    if ask_yes_no(f"グローバルMCP設定の {BACKEND_MCP_SERVER_NAME} を解除しますか？", default="y"):
+        cleanup_global_mcp_configs(BACKEND_MCP_SERVER_NAME)
+    else:
+        print_warning(f"グローバルMCP設定の {BACKEND_MCP_SERVER_NAME} はそのまま残します")
+
+    print()
     print_header("クリーンアップ完了")
     print_success("プロジェクトのクリーンアップが完了しました")
     print_info("他の担当者にプロジェクトを渡す準備ができました")
-    print()
-    print_warning("【注意】MCP 設定は自動削除されません。必要であれば手動で削除してください。")
-    print_warning("  対象ファイル（グローバル設定のみ）:")
-    copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
-    mcp_files = [
-        Path.home() / ".claude.json",
-        Path.home() / ".gemini" / "settings.json",
-        copilot_home / "mcp-config.json",
-    ]
-    for f in mcp_files:
-        exists_mark = "[存在]" if f.exists() else "[未設定]"
-        print_warning(f"    {exists_mark} {f}")
     print()
     print_info("クリーンアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)

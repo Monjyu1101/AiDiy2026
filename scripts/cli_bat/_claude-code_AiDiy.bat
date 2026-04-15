@@ -1,11 +1,8 @@
 @echo off
 cd /d "%~dp0../.."
 
-ECHO claude --dangerously-skip-permissions --chrome --mcp-config .mcp.json
-start "cmd.exe" "%USERPROFILE%\AppData\Roaming\npm\claude.cmd" --dangerously-skip-permissions --chrome --mcp-config .mcp.json
-
-ECHO;
-ECHO Waiting... 20s
-ping localhost -w 1000 -n 20 >nul
+set "CLAUDE_CMD=%USERPROFILE%\AppData\Roaming\npm\claude.cmd"
+ECHO claude --dangerously-skip-permissions --chrome
+call "%CLAUDE_CMD%" --dangerously-skip-permissions --chrome
 
 exit

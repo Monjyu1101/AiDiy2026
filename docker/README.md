@@ -31,6 +31,11 @@ http://localhost:8091/docs  # Core API (C系, A系)
 http://localhost:8092/docs  # Apps API (M系, T系, V系, S系)
 ```
 
+## MCP について
+
+- `backend_mcp`（Chrome DevTools MCP, `8095`）は、この Docker ガイドの構成には含めていません。
+- AI のブラウザ自動操作は、現状は通常のローカル開発手順で `backend_mcp` を別途扱う前提です。
+
 ## 🔧 基本操作
 
 ```bash
@@ -162,6 +167,7 @@ docker_2start.bat
 - 8090: Frontend (Vue 3)
 - 8091: Backend Core API
 - 8092: Backend Apps API
+- 8095: Backend MCP（この Docker 構成では未提供）
 - 80: HTTP（Nginxプロキシ、自動的にHTTPSへリダイレクト）
 - 443: HTTPS（Nginxプロキシ）
 

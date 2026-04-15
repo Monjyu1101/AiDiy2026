@@ -26,6 +26,7 @@ class conf_models:
         self.google_models: Dict[str, Dict[str, str]] = {}
         self.openai_models: Dict[str, Dict[str, str]] = {}
         self.claude_models: Dict[str, Dict[str, str]] = {}
+        self.mcp_servers: Dict[str, dict] = {}
 
         # ライブAIモデル一覧
         self.LIVE_GEMINI_MODELS = {
@@ -182,6 +183,29 @@ class conf_models:
             logger.error(f"ライブ設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
             return default_models.copy(), default_voices.copy()
 
+    def _load_mcp_config(self, filename: str) -> Dict[str, dict]:
+        """
+        MCP設定JSONを読込。ファイルが無ければ空dictを返す（ファイル作成は行わない）。
+        期待する形式: {"mcpServers": {"サーバー名": {"type": "sse", "url": "..."}, ...}}
+        """
+        file_path = self._config_file_path(filename)
+        if not os.path.exists(file_path):
+            logger.info(f"MCP設定ファイルが存在しません（スキップ）: {os.path.relpath(file_path)}")
+            return {}
+        try:
+            with open(file_path, "r", encoding="utf-8-sig") as f:
+                payload = json.load(f)
+            if not isinstance(payload, dict):
+                raise ValueError("JSONのルートはobject(dict)である必要があります")
+            servers = payload.get("mcpServers", {})
+            if not isinstance(servers, dict):
+                raise ValueError("mcpServers は object(dict)である必要があります")
+            logger.info(f"MCP設定JSONを読込: {os.path.relpath(file_path)} ({len(servers)}サーバー)")
+            return dict(servers)
+        except Exception as e:
+            logger.error(f"MCP設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
+            return {}
+
     def _load_or_create_code_config(
         self,
         filename: str,
@@ -251,6 +275,7 @@ class conf_models:
             "AiDiy_code_hermes_cli.json",
             self.CODE_HERMES_CLI_MODELS,
         )
+        self.mcp_servers = self._load_mcp_config("AiDiy_mcp.json")
 
     def fetch_all_models(self):
         """起動時に全モデルを一括取得"""

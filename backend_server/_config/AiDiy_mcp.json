@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aidiy_chrome_devtools": {
+      "type": "sse",
+      "url": "http://localhost:8095/aidiy_chrome_devtools/sse"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 monjyu1101@gmail.com
 """
 Chrome プロセス管理
 
@@ -6,10 +7,16 @@ Chrome を --remote-debugging-port で自動起動・状態確認する。
 
 import os
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from log_config import get_logger
+
+logger = get_logger(__name__)
 
 # Windows での Chrome/Edge 候補パス
 _CHROME_CANDIDATES = [
@@ -26,7 +33,7 @@ _CHROME_CANDIDATES = [
 ]
 
 # 専用プロファイルディレクトリ (ユーザーの通常プロファイルと分離)
-_PROFILE_DIR = str(Path(__file__).parent / "_chrome_profile")
+_PROFILE_DIR = str(Path(__file__).parent.parent / "temp" / "_chrome_profile")
 
 
 class ChromeManager:
@@ -116,9 +123,10 @@ class ChromeManager:
             "--no-first-run",
             "--no-default-browser-check",
             "--disable-default-apps",
+            "--enable-automation",   # 「自動制御されています」バナーを表示
         ]
 
-        print(f"[ChromeManager] 起動: {chrome_path}")
+        logger.info(f"起動: {chrome_path}")
         self._process = subprocess.Popen(
             args,
             stdout=subprocess.DEVNULL,
@@ -129,11 +137,11 @@ class ChromeManager:
         deadline = time.monotonic() + wait_timeout
         while time.monotonic() < deadline:
             if self.is_running():
-                print(f"[ChromeManager] 起動完了 (port={self.debug_port})")
+                logger.info(f"起動完了 (port={self.debug_port})")
                 return "launched"
             time.sleep(0.3)
 
-        print("[ChromeManager] 起動タイムアウト")
+        logger.warning("起動タイムアウト")
         return "launch_failed"
 
     def ensure_running(self) -> str:

@@ -2,6 +2,11 @@
 
 `frontend_avatar` は、**Electron デスクトップアプリ** と **通常ブラウザ** の両方で動く AI コア専用クライアントです。
 
+## 前提
+
+- `backend_server`（`8091` / `8092`）が起動していること
+- Claude 系のブラウザ自動操作まで使う場合は `backend_mcp`（`8095`）も起動していること
+
 ## 開発起動
 
 ```powershell
@@ -32,6 +37,12 @@ http://localhost:8099
 - `electron/main.ts` : Electron メインプロセス
 - `electron/preload.ts` : preload
 - `src/api/config.ts` : API / WebSocket / VRM 設定
+
+## 接続先
+
+- Core API / WebSocket: `http://localhost:8091` / `ws://localhost:8091/core/ws/AIコア`
+- Apps API: `http://localhost:8092`
+- Backend MCP (SSE): `http://localhost:8095/aidiy_chrome_devtools/sse`
 
 ## 補足コマンド
 

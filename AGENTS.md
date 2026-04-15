@@ -18,6 +18,7 @@
 
 **バックエンドサーバーとフロントエンドサーバーの詳細は別ドキュメント：**
 - **バックエンド（FastAPI + SQLAlchemy + SQLite）の実装詳細** → [backend_server/AGENTS.md](./backend_server/AGENTS.md)
+- **バックエンド MCP（Chrome DevTools MCP サーバー）の実装詳細** → [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
 - **フロントエンド Web（Vue 3 + Vite + TypeScript）の実装詳細** → [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - **フロントエンド Avatar（Electron/Web デュアルモード）の実装詳細** → [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 
@@ -31,7 +32,7 @@
 - AiDiyとは何か（プロジェクトの目的と特徴）
 - プロジェクト概要と基本方針
 - 日本語命名規約とテーブル命名規則
-- アーキテクチャ概要（デュアルサーバー構成、主要な設計パターン）
+- アーキテクチャ概要（3サーバー構成、主要な設計パターン）
 - 開発コマンド（起動方法、依存関係管理）
 - アクセスURL・ポート設定
 - よくある問題と解決方法
@@ -200,12 +201,13 @@
 - 日本語話者にとって理解しやすい
 - ドキュメントとコードのギャップがない
 
-### 2. デュアルサーバーアーキテクチャ
+### 2. 3サーバーアーキテクチャ
 
-**2つの独立したFastAPIサーバー：**
+**3つの独立したサーバー：**
 - **core_main.py** (port 8091) - Core/Common features (C系, A系)
 - **apps_main.py** (port 8092) - Application features (M系, T系, V系, S系)
-- 同じSQLiteデータベースを共有
+- **mcp_main.py** (port 8095) - MCP サーバー（Chrome DevTools MCP — AIブラウザ自動操作）
+- core/apps は同じSQLiteデータベースを共有
 - Vite Proxy で `/core/*` と `/apps/*` を自動振り分け
 
 **メリット：**
@@ -560,7 +562,7 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 - AI SDKs: anthropic, openai, google-genai, claude-agent-sdk
 
 **主要な設計パターン：**
-- デュアルサーバーアーキテクチャ (core_main.py + apps_main.py)
+- core/apps デュアルサーバー + backend_mcp 連携
 - POST中心のAPI設計（統一レスポンス形式）
 - Database VIEWsを使わない（生SQLクエリ）
 - カスタムID生成システム (C採番)
@@ -782,6 +784,7 @@ backend_server/_data/AiDiy/database.db
 - バックエンドAPI（Apps - apps_main）: http://localhost:8092
 - API Documentation (Core): http://localhost:8091/docs (FastAPI Swagger UI)
 - API Documentation (Apps): http://localhost:8092/docs (FastAPI Swagger UI)
+- バックエンド MCP（mcp_main）SSEエンドポイント: http://localhost:8095/aidiy_chrome_devtools/sse
 - フロントエンド Avatar (Electron): http://127.0.0.1:8099 ※Electronアプリとして起動
 - フロントエンド Avatar (Web ブラウザ): http://localhost:8099 ※通常ブラウザからもアクセス可能
 

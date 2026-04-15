@@ -1,11 +1,8 @@
 @echo off
 cd /d "%~dp0../.."
 
+set "CODEX_CMD=%USERPROFILE%\AppData\Roaming\npm\codex.cmd"
 ECHO codex --dangerously-bypass-approvals-and-sandbox
-start "Codex CLI" "%USERPROFILE%\AppData\Roaming\npm\codex.cmd" --dangerously-bypass-approvals-and-sandbox
-
-ECHO;
-ECHO Waiting... 20s
-ping localhost -w 1000 -n 20 >nul
+call "%CODEX_CMD%" --dangerously-bypass-approvals-and-sandbox
 
 exit

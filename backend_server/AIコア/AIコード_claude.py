@@ -13,14 +13,40 @@ from log_config import get_logger
 logger = get_logger(__name__)
 
 import os
+import json
 import time
 import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 # Claude Agent SDK
 import anyio
 from claude_agent_sdk import query, ClaudeAgentOptions
+
+# MCP設定ファイルパス（backend_server/_config/AiDiy_mcp.json）
+_MCP_CONFIG_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config", "AiDiy_mcp.json")
+)
+
+
+def _load_mcp_servers() -> Dict[str, dict]:
+    """
+    AiDiy_mcp.json から mcpServers を読み取る。
+    ファイルが無い・読み取り失敗の場合は空dictを返す。
+    """
+    if not os.path.exists(_MCP_CONFIG_PATH):
+        return {}
+    try:
+        with open(_MCP_CONFIG_PATH, "r", encoding="utf-8-sig") as f:
+            payload = json.load(f)
+        servers = payload.get("mcpServers", {}) if isinstance(payload, dict) else {}
+        if not isinstance(servers, dict):
+            return {}
+        logger.info(f"[CodeAI] MCP設定読込: {len(servers)}サーバー {list(servers.keys())}")
+        return dict(servers)
+    except Exception as e:
+        logger.error(f"[CodeAI] MCP設定読込エラー: {e}")
+        return {}
 
 
 class CodeAI:
@@ -96,7 +122,10 @@ class CodeAI:
 
         # バージョン文字列（開始()時に取得）
         self.バージョン: str = ""
-        
+
+        # MCP設定（AiDiy_mcp.json から読み込み）
+        self.mcp_servers: Dict[str, dict] = _load_mcp_servers()
+
         # logger.info(f"初期化:完了 (Claude Agent SDK設定済み, 履歴管理有効)")
         pass
     
@@ -391,6 +420,7 @@ class CodeAI:
                         cwd = cwd_posix
 
                     logger.info(f"ClaudeSDK実行パス: {cwd}")
+                    perm_mode = "bypassPermissions"
                     if not self.AIセッションID:
                         # 初回：新規セッション作成
                         options = ClaudeAgentOptions(
@@ -398,8 +428,9 @@ class CodeAI:
                             system_prompt=self.base_options["system_prompt"],
                             cwd=Path(cwd),
                             allowed_tools=allowed_tools_list,
-                            permission_mode="acceptEdits",
-                            continue_conversation=False
+                            permission_mode=perm_mode,
+                            continue_conversation=False,
+                            mcp_servers=self.mcp_servers if self.mcp_servers else {},
                         )
                     else:
                         # 継続会話：読取専用パラメータに応じてallowed_toolsを設定
@@ -408,9 +439,10 @@ class CodeAI:
                             system_prompt=self.base_options["system_prompt"],
                             cwd=Path(cwd),
                             allowed_tools=allowed_tools_list,  # 毎回正しく設定
-                            permission_mode="acceptEdits",
+                            permission_mode=perm_mode,
                             continue_conversation=True,
-                            resume=self.AIセッションID
+                            resume=self.AIセッションID,
+                            mcp_servers=self.mcp_servers if self.mcp_servers else {},
                         )
                      
                     # テスト用：初回のみ system_prompt、毎回「今回の依頼」（送信用）を標準出力に表示（平文）
@@ -421,7 +453,9 @@ class CodeAI:
                         else:
                             print("送信コンテキスト（Claude Agent SDK）")
                         print(f"AI={self.code_ai} model={self.code_model} resume={resume} 読取専用={読取専用}")
-                        print(f"allowed_tools={allowed_tools_list} cwd={cwd}")
+                        print(f"allowed_tools={allowed_tools_list} permission_mode={perm_mode} cwd={cwd}")
+                        if self.mcp_servers:
+                            print(f"mcp_servers={list(self.mcp_servers.keys())}")
                         if not self.AIセッションID:
                             print("-" * 80)
                             print("【system_prompt】")

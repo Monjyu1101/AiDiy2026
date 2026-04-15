@@ -11,7 +11,9 @@
   - `AGENTS.md`
   - `docs/` フォルダ（コーディングルール、実装例など）
   - `backend_server/AGENTS.md`
+  - `backend_mcp/AGENTS.md`
   - `frontend_web/AGENTS.md`
+  - `frontend_avatar/AGENTS.md`
 
 ## ライセンス（重要）
 
@@ -30,6 +32,7 @@
 
 - API: http://localhost:8091/docs / http://localhost:8092/docs
 - UI: http://localhost:8090
+- MCP 連携変更時: `backend_mcp` の SSE `http://localhost:8095/aidiy_chrome_devtools/sse` も確認
 
 ## セキュリティ
 

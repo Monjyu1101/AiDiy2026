@@ -16,6 +16,7 @@
 - **[../CLAUDE.md](../CLAUDE.md)** - Claude Code向けインデックス（プロジェクト全体概要）
 - **[../AGENTS.md](../AGENTS.md)** - プロジェクト全体方針（基本方針、開発コマンド、共通問題）
 - **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
+- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - Chrome DevTools MCP サーバー実装詳細
 - **[../frontend_web/AGENTS.md](../frontend_web/AGENTS.md)** - フロントエンド Web 実装詳細（Vue 3 + TypeScript）
 - **[../frontend_avatar/AGENTS.md](../frontend_avatar/AGENTS.md)** - フロントエンド Avatar 実装詳細（Electron + WebSocket + VRM）
 
@@ -26,6 +27,7 @@
 
 **フロントエンドの情報は別ドキュメント：**
 このドキュメントはバックエンドに特化しています。
+- Chrome DevTools MCP サーバー → `backend_mcp/AGENTS.md`
 - ブラウザ向け業務UI → `frontend_web/AGENTS.md`
 - Electron アバタークライアント（AIコア専用） → `frontend_avatar/AGENTS.md`
 
@@ -67,8 +69,8 @@
 
 ## 実装の全体像と特徴
 
-### デュアルサーバーアーキテクチャ
-このプロジェクトは **2つの独立したFastAPIサーバー** で構成されています：
+### core/apps デュアルサーバー + backend_mcp 連携
+`backend_server` 自体は **2つの独立した FastAPI サーバー** で構成され、プロジェクト全体では別プロセスの `backend_mcp`（port 8095）が連携します。
 
 **core_main.py (port 8091) - コア機能サーバー:**
 - C系（Core/Common）: 権限、利用者、採番
@@ -86,6 +88,12 @@
 **共有リソース:**
 - **同じデータベース** (`_data/AiDiy/database.db`)
 - **共通モジュール**: `database.py`, `core_schema.py`, `apps_schema.py`, `auth.py`, `deps.py`, `log_config.py`, `AIコア/AIセッション管理.py`
+
+**外部連携サーバー (`backend_mcp`, port 8095):**
+- Chrome DevTools MCP を SSE で提供
+- `backend_server/_config/AiDiy_mcp.json` から接続先を定義
+- Claude Agent SDK 系のコード実行でブラウザ自動操作を使う場合に必要
+- 詳細は `../backend_mcp/AGENTS.md` を参照
 
 ### 実装の主要な特徴
 
@@ -1581,10 +1589,11 @@ M商品構成の実装を参考に以下の点に注意してください：
 
 ### 必須の注意事項
 
-**1. デュアルサーバー起動:**
-- **必ず両方のサーバー (core_main + apps_main) を起動する必要があります**
+**1. core/apps サーバー起動:**
+- **`backend_server` を使うには両方のサーバー (core_main + apps_main) を起動する必要があります**
 - `_start.py` を使えば自動で両方起動
 - 個別起動の場合: 2つのターミナルで core_main.py と apps_main.py を起動
+- Claude のブラウザ自動操作も使う場合は、別途 `backend_mcp` も起動します
 
 **2. パスワードセキュリティ:**
 - **現在パスワードは平文保存** - 本番環境では必ずハッシュ化実装が必要
@@ -1716,5 +1725,4 @@ async def custom_websocket(websocket: WebSocket, request: Request):
 - **V 系 API は DB VIEW を作らず、生 SQL で取得します。**
 - `T配車/変更` は `配車伝票ID` を **関数パラメータ** として受け取ります（POST bodyとは別）。
 - パスワードは平文保存のため、運用前にハッシュ化対応が必要です。
-- **両方のサーバー (core_main + apps_main) を起動する必要があります。** `_start.py` を使えば自動で両方起動します。
-
+- **両方のサーバー (core_main + apps_main) を起動する必要があります。** `_start.py` を使えば自動で両方起動します。Claude のブラウザ自動操作まで確認する場合は `backend_mcp` も合わせて起動します。

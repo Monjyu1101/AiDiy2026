@@ -19,6 +19,7 @@
 **関連ドキュメント：**
 - **[../AGENTS.md](../AGENTS.md)** - プロジェクト全体方針
 - **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細
+- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - Chrome DevTools MCP サーバー実装詳細
 - **[../frontend_web/AGENTS.md](../frontend_web/AGENTS.md)** - Web版フロントエンド実装詳細
 - **[../CLAUDE.md](../CLAUDE.md)** - プロジェクト全体インデックス
 - **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール
@@ -79,6 +80,7 @@
 - 認証情報: **Electron** は `localStorage`、**Web** は `sessionStorage` に保持します
 - バックエンドへの HTTP は `8091`、Vite 開発サーバーは `8099` が前提です
 - Web モードでは Vite Proxy 経由（`/core` → `8091`, `/apps` → `8092`）でアクセス
+- Claude 系のブラウザ自動操作を使う場合は、別プロセスの `backend_mcp`（`8095`）も必要です
 
 ---
 
@@ -181,6 +183,7 @@
 - `.aidiy` はコードエージェント実行ルート直下のプロジェクト専用知見フォルダとして扱う
 - コードエージェントは `.aidiy/_index.md` を参照して類似修正知見を利用し、修正完了後に `.aidiy` へ知見を整理する
 - 詳細は `../backend_server/AGENTS.md` を参照
+- ブラウザ自動操作まで含める場合は `../backend_mcp/AGENTS.md` も参照
 
 ---
 

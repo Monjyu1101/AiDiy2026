@@ -1,11 +1,8 @@
 @echo off
 cd /d "%~dp0../.."
 
+set "GEMINI_CMD=%USERPROFILE%\AppData\Roaming\npm\gemini.cmd"
 ECHO gemini --yolo
-start "Gemini CLI" "%USERPROFILE%\AppData\Roaming\npm\gemini.cmd" --yolo
-
-ECHO;
-ECHO Waiting... 20s
-ping localhost -w 1000 -n 20 >nul
+call "%GEMINI_CMD%" --yolo
 
 exit

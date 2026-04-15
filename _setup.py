@@ -52,6 +52,7 @@ FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
 BACKEND_MCP_DIR = BASE_DIR / BACKEND_MCP_PATH
 POSTGRES_DIR = BASE_DIR / POSTGRES_PATH
+BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
 
 
 class Colors:
@@ -190,7 +191,7 @@ def upsert_json_mcp_server(path: Path, server_name: str, server_config: dict) ->
     try:
         data = {}
         if path.exists():
-            with open(path, encoding="utf-8") as f:
+            with open(path, encoding="utf-8-sig") as f:
                 loaded = json.load(f)
             if isinstance(loaded, dict):
                 data = loaded
@@ -219,7 +220,6 @@ def upsert_json_mcp_server(path: Path, server_name: str, server_config: dict) ->
         print_error(f"MCP設定更新エラー: {path} ({e})")
         return False
 
-
 def remove_toml_table(content: str, table_header: str) -> str:
     lines = content.splitlines()
     table_index = None
@@ -244,21 +244,68 @@ def remove_toml_table(content: str, table_header: str) -> str:
     return "\n".join(lines).rstrip() + ("\n" if lines else "")
 
 
-def remove_codex_backend_mcp_config() -> bool:
-    config_path = Path.home() / ".codex" / "config.toml"
+def toml_escape_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def upsert_toml_table(path: Path, table_header: str, body_lines: list[str]) -> bool:
     try:
-        if not config_path.exists():
-            return True
-        content = config_path.read_text(encoding="utf-8")
-        updated = remove_toml_table(content, "[mcp_servers.backend_mcp]")
-        if updated == content:
-            return True
-        config_path.write_text(updated, encoding="utf-8")
-        print_success(f"Codex の backend_mcp 設定を削除しました: {config_path}")
+        content = path.read_text(encoding="utf-8") if path.exists() else ""
+        updated = remove_toml_table(content, table_header).rstrip()
+        block = table_header + "\n" + "\n".join(body_lines).rstrip() + "\n"
+        if updated:
+            updated = updated + "\n\n" + block
+        else:
+            updated = block
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(updated, encoding="utf-8")
         return True
     except Exception as e:
-        print_error(f"Codex設定更新エラー: {config_path} ({e})")
+        print_error(f"TOML設定更新エラー: {path} ({e})")
         return False
+
+
+def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
+    for env_name in env_candidates:
+        if sys.platform == "win32":
+            python_path = base_dir / env_name / "Scripts" / "python.exe"
+        else:
+            python_path = base_dir / env_name / "bin" / "python"
+        if python_path.exists():
+            return python_path
+    return None
+
+
+def upsert_codex_backend_mcp_config(module: dict) -> bool:
+    config_path = Path.home() / ".codex" / "config.toml"
+    server_name = module.get("server_name", module["name"])
+    sse_url = module.get("sse_url", "").strip()
+    table_header = f"[mcp_servers.{server_name}]"
+    python_path = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
+    if python_path is None:
+        print_error(f"Codex 設定用の Python 仮想環境が見つかりません: {BACKEND_MCP_DIR}")
+        return False
+
+    script_path = BACKEND_MCP_DIR / "mcp_stdio.py"
+    if not script_path.exists():
+        print_error(f"Codex 設定用のスクリプトが見つかりません: {script_path}")
+        return False
+
+    body_lines = [
+        f'command = "{toml_escape_string(str(python_path))}"',
+        "args = [",
+        f'    "{toml_escape_string(str(script_path))}",',
+        '    "--sse-url",',
+        f'    "{toml_escape_string(sse_url)}",',
+        "]",
+        "startup_timeout_ms = 20000",
+    ]
+
+    if not upsert_toml_table(config_path, table_header, body_lines):
+        return False
+
+    print_success(f"Codex の {server_name} 設定を書き込みました: {config_path}")
+    return True
 
 
 def npm_command():
@@ -708,11 +755,11 @@ def setup_frontend_avatar():
 MCP_MODULES = [
     {
         "name":        "backend_mcp",
-        "server_name": "chrome-devtools",   # MCP 設定ファイル上のサーバーキー名
+        "server_name": "aidiy_chrome_devtools",   # MCP 設定ファイル上のサーバーキー名
         "dir":         "backend_mcp",
         "desc":        "Python (uv) + npm",
-        "start":       "uv run mcp_main.py",
-        "sse_url":     "http://localhost:8095/chrome_devtools/sse",
+        "start":       "uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095",
+        "sse_url":     "http://localhost:8095/aidiy_chrome_devtools/sse",
     },
     # 例: 追加する場合
     # {
@@ -784,24 +831,34 @@ def show_current_mcp_config(module: dict) -> None:
         ("グローバル ~/.claude.json (Claude Code)",               Path.home() / ".claude.json"),
         ("グローバル ~/.gemini/settings.json (Gemini CLI)",        Path.home() / ".gemini" / "settings.json"),
         ("グローバル ~/.copilot/mcp-config.json (Copilot CLI)",    copilot_home / "mcp-config.json"),
+        ("グローバル ~/.codex/config.toml (Codex CLI)",            Path.home() / ".codex" / "config.toml"),
     ]
 
     print_info("─── MCP 設定ファイルの現在の状態 ───")
     for label, path in targets:
         if path.exists():
             try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                servers = data.get("mcpServers", {})
-                if server_name in servers:
-                    url = servers[server_name].get("url", "(url なし)")
-                    print_success(f"  [{label}]")
-                    print_success(f"    {server_name}: {url}")
-                else:
-                    keys = list(servers.keys()) if servers else []
-                    if keys:
-                        print_warning(f"  [{label}] ファイルあり、{server_name} エントリなし (キー: {', '.join(keys)})")
+                if path.suffix.lower() == ".toml":
+                    content = path.read_text(encoding="utf-8")
+                    table_header = f"[mcp_servers.{server_name}]"
+                    if table_header in content:
+                        print_success(f"  [{label}]")
+                        print_success(f"    {server_name}: stdio bridge configured")
                     else:
-                        print_warning(f"  [{label}] ファイルあり、mcpServers なし")
+                        print_warning(f"  [{label}] ファイルあり、{server_name} エントリなし")
+                else:
+                    data = json.loads(path.read_text(encoding="utf-8-sig"))
+                    servers = data.get("mcpServers", {})
+                    if server_name in servers:
+                        url = servers[server_name].get("url", "(url なし)")
+                        print_success(f"  [{label}]")
+                        print_success(f"    {server_name}: {url}")
+                    else:
+                        keys = list(servers.keys()) if servers else []
+                        if keys:
+                            print_warning(f"  [{label}] ファイルあり、{server_name} エントリなし (キー: {', '.join(keys)})")
+                        else:
+                            print_warning(f"  [{label}] ファイルあり、mcpServers なし")
             except Exception:
                 print_warning(f"  [{label}] 読み取りエラー: {path}")
         else:
@@ -820,15 +877,23 @@ def configure_backend_mcp_clients(module: dict) -> bool:
         print_error(f"{label}: sse_url が未定義です。")
         return False
 
-    print_info("Gemini CLI / GitHub Copilot CLI 用のグローバル設定ファイルを書き込みます。")
+    print_info("Claude / Gemini / GitHub Copilot / Codex 用のグローバル設定ファイルを書き込みます。")
     print_info(f"接続先: {sse_url}")
     print_info(f"サーバー名: {server_name}")
-    print_info("※ AiDiy 起動中にプロジェクトフォルダが変わるため、プロジェクトレベル設定は書き込みません。")
-    print_warning("Codex CLI は streamable HTTP 用の url 設定は扱えますが、backend_mcp の SSE エンドポイントは直接扱えません。")
+    print_info("Codex CLI は stdio の mcp_stdio.py を起動し、その先で backend_mcp の SSE へ接続します。")
 
     all_ok = True
 
-    # グローバルレベル設定のみ書き込む（起動フォルダに依存しない）
+    # backend_server/_config/AiDiy_mcp.json（正規ファイル）
+    aidiy_mcp = BACKEND_DIR / "_config" / "AiDiy_mcp.json"
+    print_info(f"[設定]        {aidiy_mcp} (AiDiy 正規設定)")
+    all_ok &= upsert_json_mcp_server(
+        aidiy_mcp,
+        server_name,
+        {"type": "sse", "url": sse_url},
+    )
+
+    # グローバルレベル設定
     claude_global = Path.home() / ".claude.json"
     print_info(f"[グローバル] {claude_global} (Claude Code)")
     all_ok &= upsert_json_mcp_server(
@@ -854,7 +919,8 @@ def configure_backend_mcp_clients(module: dict) -> bool:
         {"type": "sse", "url": sse_url},
     )
 
-    all_ok &= remove_codex_backend_mcp_config()
+    print_info(f"[グローバル] {Path.home() / '.codex' / 'config.toml'} (Codex CLI)")
+    all_ok &= upsert_codex_backend_mcp_config(module)
 
     if all_ok:
         print_success(f"{label}: 設定ファイルの書き込みが完了しました。")
@@ -939,7 +1005,7 @@ def main():
     print_info("  全体起動: python _start.py")
     print_info("  Web開発   : cd frontend_web && npm run dev")
     print_info("  Avatar開発: cd frontend_avatar && npm run dev")
-    print_info("  (mcp)起動 : cd backend_mcp && uv run mcp_main.py")
+    print_info("  (mcp)起動 : cd backend_mcp && uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095")
     print_info("セットアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)
 

@@ -8,6 +8,7 @@
 
 - [AGENTS.md](./AGENTS.md)
 - [backend_server/AGENTS.md](./backend_server/AGENTS.md)
+- [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
 - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 - [docs/](./docs/)
@@ -19,11 +20,13 @@
 **AiDiy** は、日本語識別子を前提にしたフルスタック業務システムのテンプレートです。
 
 - バックエンド: FastAPI + SQLAlchemy + SQLite
+- バックエンド MCP: FastAPI (SSE) + Node.js + chrome-devtools-mcp
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
-- バックエンドはデュアルサーバー構成
+- バックエンドは **3 サーバー構成**
   - `core_main.py` : `8091`
   - `apps_main.py` : `8092`
+  - `mcp_main.py` : `8095`
 - Web フロントは `8090`
 - Avatar フロントは `8099`
 
@@ -93,6 +96,7 @@ python _start.py
 
 `_start.py` は**対話形式**です。起動時に以下を確認します。
 
+- バックエンド(mcp) を起動するか
 - バックエンド(core, apps) を起動するか
 - フロントエンド(Web) を起動するか
 - フロントエンド(Avatar) を起動するか
@@ -102,6 +106,10 @@ python _start.py
 ### 個別起動
 
 ```bash
+# バックエンド MCP
+cd backend_mcp
+.venv/Scripts/python.exe -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
+
 # バックエンド Core
 cd backend_server
 .venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
@@ -126,6 +134,7 @@ npm run dev
 | Web フロント | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:8092/docs |
+| Backend MCP (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
 | Avatar Web モード | http://localhost:8099 |
 | Avatar Electron モード | `npm run dev` で Electron アプリ起動 |
 
@@ -158,6 +167,7 @@ npm run dev
 netstat -ano | findstr :8090
 netstat -ano | findstr :8091
 netstat -ano | findstr :8092
+netstat -ano | findstr :8095
 netstat -ano | findstr :8099
 taskkill /PID <pid> /F
 ```
@@ -194,6 +204,7 @@ python _cleanup.py
 ## 5. よくある注意点
 
 - `_start.py` は **CLI 引数で backend/web/avatar を切り替える方式ではありません**。起動時の対話で選びます。
+- Claude 系のブラウザ自動操作を使う場合は `backend_mcp` も起動してください。
 - `_start.py` 起動時のバックエンドは `uvicorn --reload` なしです。コード変更を即反映したい場合は個別起動か reboot 機構を使います。
 - Web フロントの AI 画面ルートは **`/AiDiy`** です。
 - Avatar は Electron と Web の両モードがあります。Web モードでは認証情報を `sessionStorage` に保持します。
@@ -205,6 +216,7 @@ python _cleanup.py
 
 1. [AGENTS.md](./AGENTS.md)
 2. [backend_server/AGENTS.md](./backend_server/AGENTS.md)
-3. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
-4. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
-5. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)
+3. [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
+4. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
+5. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
+6. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

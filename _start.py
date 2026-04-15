@@ -77,6 +77,7 @@ BACKEND_ENV_CANDIDATES = [".venv", "venv"]
 
 BACKEND_MCP_PATH = "backend_mcp"
 BACKEND_MCP_PORT = 8095
+BACKEND_MCP_APP = "mcp_main:app"
 BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
 BACKEND_MCP_CHROME_DEBUG_PORT = 9222
 
@@ -132,8 +133,8 @@ def get_backend_command(app_module: str, port: int) -> list[str]:
 def get_backend_mcp_command() -> list[str]:
     backend_mcp_python = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
     if backend_mcp_python is not None:
-        return [str(backend_mcp_python), "mcp_main.py"]
-    return ["uv", "run", "mcp_main.py"]
+        return [str(backend_mcp_python), "-m", "uvicorn", BACKEND_MCP_APP, "--host", "0.0.0.0", "--port", str(BACKEND_MCP_PORT)]
+    return ["uv", "run", "uvicorn", BACKEND_MCP_APP, "--host", "0.0.0.0", "--port", str(BACKEND_MCP_PORT)]
 
 
 def check_backend_environment() -> tuple[bool, str]:
@@ -571,7 +572,7 @@ def ensure_mcp_browser_ready() -> bool:
 
 
 def open_browser_via_mcp(port: int) -> bool:
-    print_header("ページ表示")
+    print_header("ブラウザページ表示")
     url = f"http://localhost:{port}"
 
     if not ensure_mcp_browser_ready():
