@@ -15,6 +15,7 @@ Usage:
 """
 
 import json
+import os
 import platform
 import re
 import shutil
@@ -706,11 +707,12 @@ def setup_frontend_avatar():
 # ============================================================
 MCP_MODULES = [
     {
-        "name":    "backend_mcp",
-        "dir":     "backend_mcp",
-        "desc":    "Python (uv) + npm",
-        "start":   "uv run mcp_main.py",
-        "sse_url": "http://localhost:8095/chrome_devtools/sse",
+        "name":        "backend_mcp",
+        "server_name": "chrome-devtools",   # MCP 設定ファイル上のサーバーキー名
+        "dir":         "backend_mcp",
+        "desc":        "Python (uv) + npm",
+        "start":       "uv run mcp_main.py",
+        "sse_url":     "http://localhost:8095/chrome_devtools/sse",
     },
     # 例: 追加する場合
     # {
@@ -773,32 +775,85 @@ def setup_backend_mcp() -> bool:
     return all_ok
 
 
+def show_current_mcp_config(module: dict) -> None:
+    """MCP 設定ファイルの現在の内容を表示する"""
+    server_name = module.get("server_name", module["name"])
+    copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+
+    targets = [
+        ("グローバル ~/.claude.json (Claude Code)",               Path.home() / ".claude.json"),
+        ("グローバル ~/.gemini/settings.json (Gemini CLI)",        Path.home() / ".gemini" / "settings.json"),
+        ("グローバル ~/.copilot/mcp-config.json (Copilot CLI)",    copilot_home / "mcp-config.json"),
+    ]
+
+    print_info("─── MCP 設定ファイルの現在の状態 ───")
+    for label, path in targets:
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                servers = data.get("mcpServers", {})
+                if server_name in servers:
+                    url = servers[server_name].get("url", "(url なし)")
+                    print_success(f"  [{label}]")
+                    print_success(f"    {server_name}: {url}")
+                else:
+                    keys = list(servers.keys()) if servers else []
+                    if keys:
+                        print_warning(f"  [{label}] ファイルあり、{server_name} エントリなし (キー: {', '.join(keys)})")
+                    else:
+                        print_warning(f"  [{label}] ファイルあり、mcpServers なし")
+            except Exception:
+                print_warning(f"  [{label}] 読み取りエラー: {path}")
+        else:
+            print_info(f"  [{label}] 未設定 (ファイルなし)")
+    print()
+
+
 def configure_backend_mcp_clients(module: dict) -> bool:
     """backend_mcp を各 CLI から使うための設定ファイルを書き込む"""
     label = f"{module['name']} MCP 設定"
     sse_url = module.get("sse_url", "").strip()
+    server_name = module.get("server_name", module["name"])
 
     print_header(label)
     if not sse_url:
         print_error(f"{label}: sse_url が未定義です。")
         return False
 
-    print_info("Claude Code / Gemini CLI 用の設定ファイルを書き込みます。")
+    print_info("Gemini CLI / GitHub Copilot CLI 用のグローバル設定ファイルを書き込みます。")
     print_info(f"接続先: {sse_url}")
+    print_info(f"サーバー名: {server_name}")
+    print_info("※ AiDiy 起動中にプロジェクトフォルダが変わるため、プロジェクトレベル設定は書き込みません。")
     print_warning("Codex CLI は streamable HTTP 用の url 設定は扱えますが、backend_mcp の SSE エンドポイントは直接扱えません。")
 
     all_ok = True
-    all_ok &= ensure_gitignore_entries([".claude/", ".gemini/"])
+
+    # グローバルレベル設定のみ書き込む（起動フォルダに依存しない）
+    claude_global = Path.home() / ".claude.json"
+    print_info(f"[グローバル] {claude_global} (Claude Code)")
     all_ok &= upsert_json_mcp_server(
-        BASE_DIR / ".mcp.json",
-        module["name"],
+        claude_global,
+        server_name,
         {"type": "sse", "url": sse_url},
     )
+
+    gemini_global = Path.home() / ".gemini" / "settings.json"
+    print_info(f"[グローバル] {gemini_global} (Gemini CLI)")
     all_ok &= upsert_json_mcp_server(
-        BASE_DIR / ".gemini" / "settings.json",
-        module["name"],
+        gemini_global,
+        server_name,
         {"url": sse_url, "type": "sse"},
     )
+
+    copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+    copilot_global = copilot_home / "mcp-config.json"
+    print_info(f"[グローバル] {copilot_global} (GitHub Copilot CLI)")
+    all_ok &= upsert_json_mcp_server(
+        copilot_global,
+        server_name,
+        {"type": "sse", "url": sse_url},
+    )
+
     all_ok &= remove_codex_backend_mcp_config()
 
     if all_ok:
@@ -845,7 +900,8 @@ def main():
     backend_mcp_module = next((module for module in MCP_MODULES if module.get("name") == "backend_mcp"), None)
     if backend_mcp_module:
         print()
-        if ask_yes_no("backend_mcp の mcp機能を使えるよう構成しますか？", default="n"):
+        show_current_mcp_config(backend_mcp_module)
+        if ask_yes_no("backend_mcp の mcp機能を使えるよう構成しますか？", default="y"):
             if not configure_backend_mcp_clients(backend_mcp_module) and not ask_yes_no("backend_mcp の MCP 設定書き込みで失敗しました。続行しますか？", default="n"):
                 sys.exit(1)
         else:

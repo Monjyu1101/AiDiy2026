@@ -443,6 +443,19 @@ def main():
     print_header("クリーンアップ完了")
     print_success("プロジェクトのクリーンアップが完了しました")
     print_info("他の担当者にプロジェクトを渡す準備ができました")
+    print()
+    print_warning("【注意】MCP 設定は自動削除されません。必要であれば手動で削除してください。")
+    print_warning("  対象ファイル（グローバル設定のみ）:")
+    copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+    mcp_files = [
+        Path.home() / ".claude.json",
+        Path.home() / ".gemini" / "settings.json",
+        copilot_home / "mcp-config.json",
+    ]
+    for f in mcp_files:
+        exists_mark = "[存在]" if f.exists() else "[未設定]"
+        print_warning(f"    {exists_mark} {f}")
+    print()
     print_info("クリーンアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)
 
