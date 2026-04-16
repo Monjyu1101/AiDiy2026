@@ -92,7 +92,7 @@ class ChromeManager:
 
         return None
 
-    def launch(self, wait_timeout: float = 10.0) -> str:
+    def launch(self, wait_timeout: float = 30.0) -> str:
         """
         Chrome をリモートデバッグモードで起動する。
 
@@ -141,7 +141,7 @@ class ChromeManager:
                 return "launched"
             time.sleep(0.3)
 
-        logger.warning("起動タイムアウト")
+        logger.warning(f"起動タイムアウト ({wait_timeout}秒経過) — Chrome プロセスは起動しましたがデバッグポートが応答しませんでした")
         return "launch_failed"
 
     def ensure_running(self) -> str:

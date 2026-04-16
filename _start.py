@@ -545,23 +545,39 @@ def ensure_mcp_browser_ready() -> bool:
             "from mcp_proc.chrome_manager import ChromeManager; print(ChromeManager().ensure_running())",
         ]
 
+    print_info(f"(mcp) Chrome 起動コマンド: {' '.join(str(c) for c in command)}")
+
     try:
         result = subprocess.run(
             command,
             cwd=str(BACKEND_MCP_DIR),
             capture_output=True,
             text=True,
-            timeout=20,
+            encoding="utf-8",
+            errors="replace",
+            timeout=45,
         )
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
         if result.returncode != 0:
-            detail = (result.stderr or result.stdout or "").strip()
-            print_warning(f"(mcp) ブラウザ起動に失敗しました: {detail}")
+            print_warning(f"(mcp) ブラウザ起動に失敗しました (returncode={result.returncode})")
+            if stdout:
+                print_warning(f"(mcp) stdout: {stdout}")
+            if stderr:
+                print_warning(f"(mcp) stderr: {stderr}")
             return False
+        if stdout:
+            print_info(f"(mcp) Chrome: {stdout}")
+        if stderr:
+            print_info(f"(mcp) Chrome stderr: {stderr}")
+    except subprocess.TimeoutExpired as exc:
+        print_warning(f"(mcp) ブラウザ起動コマンドがタイムアウトしました ({exc.timeout}秒)")
+        return False
     except Exception as exc:
         print_warning(f"(mcp) ブラウザ起動でエラーが発生しました: {exc}")
         return False
 
-    deadline = time.time() + 10
+    deadline = time.time() + 15
     while time.time() < deadline:
         if is_mcp_browser_running():
             return True
@@ -571,31 +587,66 @@ def ensure_mcp_browser_ready() -> bool:
     return False
 
 
+BACKEND_MCP_SSE_URL = f"http://localhost:{BACKEND_MCP_PORT}/aidiy_chrome_devtools/sse"
+
+
 def open_browser_via_mcp(port: int) -> bool:
     print_header("ブラウザページ表示")
     url = f"http://localhost:{port}"
 
-    if not ensure_mcp_browser_ready():
-        print_warning(f"(mcp) ブラウザを用意できなかったため通常ブラウザで開きます: {url}")
-        return False
-
-    debug_url = (
-        f"http://localhost:{BACKEND_MCP_CHROME_DEBUG_PORT}/json/new?"
-        f"{urllib.parse.quote(url, safe='')}"
-    )
-    request = urllib.request.Request(debug_url, method="PUT")
-
-    try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            if response.status == 200:
-                print_success(f"(mcp) ブラウザで開きました: {url}")
+    # MCP SSE サーバー経由で新規ページを開く
+    backend_mcp_python = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
+    if backend_mcp_python is not None:
+        print_info(f"(mcp) MCP接続: {BACKEND_MCP_SSE_URL}")
+        print_info(f"(mcp) {url} 表示指示")
+        script = (
+            "import asyncio, os, sys\n"
+            # プロキシ経由でlocalhostへ接続しないよう NO_PROXY を設定
+            "os.environ['NO_PROXY'] = 'localhost,127.0.0.1'\n"
+            "os.environ['no_proxy'] = 'localhost,127.0.0.1'\n"
+            "from mcp.client.sse import sse_client\n"
+            "from mcp import ClientSession\n"
+            "async def main():\n"
+            f"    sse_url = '{BACKEND_MCP_SSE_URL}'\n"
+            f"    target_url = '{url}'\n"
+            "    async with sse_client(sse_url, timeout=10, sse_read_timeout=30) as (read, write):\n"
+            "        async with ClientSession(read, write) as session:\n"
+            "            await session.initialize()\n"
+            "            await session.call_tool('new_page', {'url': target_url})\n"
+            "            print('OK')\n"
+            "asyncio.run(main())\n"
+        )
+        try:
+            result = subprocess.run(
+                [str(backend_mcp_python), "-c", script],
+                cwd=str(BACKEND_MCP_DIR),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=35,
+            )
+            if result.returncode == 0 and "OK" in result.stdout:
+                print_info(f"(mcp) MCP切断")
                 return True
-    except urllib.error.HTTPError as exc:
-        print_warning(f"(mcp) ブラウザで開けませんでした: HTTP {exc.code}")
-    except Exception as exc:
-        print_warning(f"(mcp) ブラウザで開けませんでした: {exc}")
+            stderr = result.stderr.strip()
+            stdout = result.stdout.strip()
+            print_warning(f"(mcp) MCP経由で開けませんでした (rc={result.returncode})")
+            if stderr:
+                print_warning(f"(mcp) stderr: {stderr}")
+            if stdout:
+                print_info(f"(mcp) stdout: {stdout}")
+        except subprocess.TimeoutExpired:
+            print_warning("(mcp) MCP経由のページ表示がタイムアウトしました")
+        except Exception as exc:
+            print_warning(f"(mcp) MCP経由でエラーが発生しました: {exc}")
 
-    print_warning(f"(mcp) ブラウザで開けなかったため通常ブラウザで開きます: {url}")
+    # フォールバック: 通常ブラウザ
+    print_warning(f"(mcp) 通常ブラウザで開きます: {url}")
+    try:
+        webbrowser.open(url)
+    except Exception as exc:
+        print_warning(f"ブラウザを開けませんでした: {exc}")
     return False
 
 
