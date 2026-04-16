@@ -135,7 +135,7 @@ function onCountdownEnd() {
 
 .countdown-number {
   font-size: 64px;
-  font-weight: 800;
+  font-weight: normal;
   color: #48bb78;
   margin: 10px 0;
   text-shadow: 0 0 15px rgba(72, 187, 120, 0.8);

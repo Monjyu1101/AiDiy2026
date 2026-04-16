@@ -1,21 +1,20 @@
-# Copyright (c) 2026 monjyu1101@gmail.com
+# -*- coding: utf-8 -*-
+
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """
-Chrome DevTools MCP サーバー (共有ブラウザモード)
+Chrome DevTools MCP サーバー (Python純正版)
 
-複数クライアントが同じ Chrome を共有する:
-  - subprocess は 1 つだけ起動し全接続で共有
-  - subprocess の stdout は全クライアントにブロードキャスト
-  - どのクライアントからの POST も同じ subprocess stdin へ
-
-    Client A ─┐  POST → stdin ─┐
-    Client B ─┤                 ├─ [chrome-devtools-mcp] ─ Chrome
-    Client C ─┘  stdout ────────┴→ 全員に配信
-
-起動:
-    uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095
-
-SSE エンドポイント:
-    http://localhost:8095/aidiy_chrome_devtools/sse
+chrome-devtools-mcp (Node.js) を廃止し、Python MCP SDK + CDPClient で直接実装。
+- Chrome を --remote-debugging-port で自動起動
+- CDP (Chrome DevTools Protocol) を MCP ツールとして公開
+- SSE エンドポイント: http://localhost:8095/aidiy_chrome_devtools/sse
 
 Claude Code への登録 (~/.claude/settings.json):
     {
@@ -29,18 +28,32 @@ Claude Code への登録 (~/.claude/settings.json):
 """
 
 import asyncio
+import base64
+import json
 import os
-import uuid
-from pathlib import Path
-from typing import Set
+import sys
+import threading
+import time
+from typing import Optional
+
+# UTF-8出力を強制（Windows文字化け対策）
+if sys.platform == "win32":
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 import uvicorn
+from mcp.server.fastmcp import FastMCP
+from mcp.types import ImageContent
 from starlette.applications import Starlette
-from starlette.responses import Response, StreamingResponse
-from starlette.routing import Mount, Route
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import Route
 
 from log_config import setup_logging, get_logger
 from mcp_proc.chrome_manager import ChromeManager
+from mcp_proc.chrome_devtools import CDPClient
+from mcp_proc.screen_capture import ScreenCapture, ScreenCaptureError
 
 setup_logging()
 logger = get_logger(__name__)
@@ -49,137 +62,523 @@ logger = get_logger(__name__)
 # 設定
 # ------------------------------------------------------------------ #
 
-CHROME_PORT = int(os.environ.get("CHROME_DEBUG_PORT", "9222"))
-MCP_PORT    = int(os.environ.get("MCP_PORT", "8095"))
-MOUNT       = os.environ.get("MCP_MOUNT_PATH", "/aidiy_chrome_devtools")
+CHROME_PORT  = int(os.environ.get("CHROME_DEBUG_PORT", "9222"))
+MCP_PORT     = int(os.environ.get("MCP_PORT", "8095"))
+MOUNT        = os.environ.get("MCP_MOUNT_PATH", "/aidiy_chrome_devtools")
+MOUNT_SS     = os.environ.get("MCP_SS_MOUNT_PATH", "/aidiy_screenshot")
 
-NODE_BIN = str(
-    Path(__file__).parent / "node_modules/chrome-devtools-mcp/build/src/index.js"
+chrome   = ChromeManager(debug_port=CHROME_PORT)
+cdp      = CDPClient(port=CHROME_PORT)
+capture  = ScreenCapture()
+
+# ------------------------------------------------------------------ #
+# 再起動フラグ監視
+# ------------------------------------------------------------------ #
+
+def _setup_reboot_watcher():
+    temp_dir = os.path.join(os.path.dirname(__file__), "temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    reboot_path = os.path.join(temp_dir, "reboot_mcp.txt")
+    if os.path.isfile(reboot_path):
+        try:
+            os.remove(reboot_path)
+        except Exception:
+            pass
+        raise SystemExit("reboot_mcp.txt detected")
+    def watcher():
+        while True:
+            try:
+                if os.path.isfile(reboot_path):
+                    try:
+                        os.remove(reboot_path)
+                    except Exception:
+                        pass
+                    os._exit(0)
+            except Exception:
+                pass
+            time.sleep(1)
+    threading.Thread(target=watcher, daemon=True).start()
+
+_setup_reboot_watcher()
+
+# ------------------------------------------------------------------ #
+# Chrome 保証ヘルパー
+# ------------------------------------------------------------------ #
+
+async def _ensure_chrome():
+    """Chrome が起動していなければ自動起動する"""
+    if not chrome.is_running():
+        await asyncio.to_thread(chrome.ensure_running)
+
+# ------------------------------------------------------------------ #
+# MCP サーバー & ツール定義
+# ------------------------------------------------------------------ #
+
+mcp = FastMCP(
+    "aidiy_chrome_devtools",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT}/sse",
+    message_path=f"{MOUNT}/messages/",
+    warn_on_duplicate_tools=False,
 )
 
-chrome = ChromeManager(debug_port=CHROME_PORT)
+mcp_ss = FastMCP(
+    "aidiy_screenshot",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_SS}/sse",
+    message_path=f"{MOUNT_SS}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+
+# ナビゲーション
+
+@mcp.tool()
+async def navigate(url: str, tab_id: Optional[str] = None) -> str:
+    """指定URLへ移動する"""
+    await _ensure_chrome()
+    return await cdp.navigate(url, tab_id)
+
+@mcp.tool()
+async def reload(tab_id: Optional[str] = None) -> str:
+    """現在のページをリロードする"""
+    await _ensure_chrome()
+    return await cdp.reload(tab_id)
+
+@mcp.tool()
+async def go_back(tab_id: Optional[str] = None) -> str:
+    """ブラウザの戻るボタン相当"""
+    await _ensure_chrome()
+    return await cdp.go_back(tab_id)
+
+@mcp.tool()
+async def go_forward(tab_id: Optional[str] = None) -> str:
+    """ブラウザの進むボタン相当"""
+    await _ensure_chrome()
+    return await cdp.go_forward(tab_id)
+
+# ページ情報取得
+
+@mcp.tool()
+async def screenshot(tab_id: Optional[str] = None, full_page: bool = False) -> list:
+    """スクリーンショットを撮る（PNG画像）"""
+    await _ensure_chrome()
+    data = await cdp.screenshot(tab_id=tab_id, full_page=full_page)
+    return [ImageContent(type="image", data=data, mimeType="image/png")]
+
+@mcp.tool()
+async def get_page_info(tab_id: Optional[str] = None) -> str:
+    """ページのURL・タイトル・readyState などを取得する"""
+    await _ensure_chrome()
+    info = await cdp.get_page_info(tab_id)
+    return json.dumps(info, ensure_ascii=False)
+
+@mcp.tool()
+async def get_html(tab_id: Optional[str] = None) -> str:
+    """ページ全体のHTMLを取得する"""
+    await _ensure_chrome()
+    return await cdp.get_html(tab_id)
+
+@mcp.tool()
+async def get_text(tab_id: Optional[str] = None) -> str:
+    """ページのテキストコンテンツを取得する"""
+    await _ensure_chrome()
+    return await cdp.get_text(tab_id)
+
+# JavaScript・DOM操作
+
+@mcp.tool()
+async def eval_js(expression: str, tab_id: Optional[str] = None, await_promise: bool = False) -> str:
+    """JavaScriptを実行して結果を返す"""
+    await _ensure_chrome()
+    result = await cdp.eval_js(expression, tab_id, await_promise)
+    return json.dumps(result, ensure_ascii=False)
+
+@mcp.tool()
+async def click(selector: str, tab_id: Optional[str] = None) -> str:
+    """CSSセレクターで要素をクリックする"""
+    await _ensure_chrome()
+    return await cdp.click(selector, tab_id)
+
+@mcp.tool()
+async def type_text(selector: str, text: str, tab_id: Optional[str] = None, clear_first: bool = True) -> str:
+    """CSSセレクターで要素にテキストを入力する"""
+    await _ensure_chrome()
+    return await cdp.type_text(selector, text, tab_id, clear_first)
+
+@mcp.tool()
+async def scroll(delta_x: int = 0, delta_y: int = 0, tab_id: Optional[str] = None, selector: Optional[str] = None) -> str:
+    """ページまたは要素をスクロールする"""
+    await _ensure_chrome()
+    return await cdp.scroll(delta_x, delta_y, tab_id, selector)
+
+@mcp.tool()
+async def find_elements(selector: str, tab_id: Optional[str] = None, limit: int = 20) -> str:
+    """CSSセレクターで要素を検索してプロパティ一覧を返す"""
+    await _ensure_chrome()
+    result = await cdp.find_elements(selector, tab_id, limit)
+    return json.dumps(result, ensure_ascii=False)
+
+# タブ管理
+
+@mcp.tool()
+async def list_tabs() -> str:
+    """開いているタブ一覧を取得する"""
+    await _ensure_chrome()
+    tabs = await asyncio.to_thread(cdp.list_tabs)
+    return json.dumps(tabs, ensure_ascii=False)
+
+@mcp.tool()
+async def new_tab(url: str = "about:blank") -> str:
+    """新規タブを開く"""
+    await _ensure_chrome()
+    # Target.createTarget でタブ作成と URL 指定を一括実行（より確実）
+    browser_ws = await asyncio.to_thread(cdp.get_browser_ws_url)
+    result = await cdp.send_command(browser_ws, "Target.createTarget", {"url": url})
+    target_id = result.get("targetId", "")
+    return json.dumps({"id": target_id, "url": url}, ensure_ascii=False)
+
+@mcp.tool()
+async def close_tab(tab_id: str) -> str:
+    """指定タブを閉じる"""
+    await _ensure_chrome()
+    ok = await asyncio.to_thread(cdp.close_tab_sync, tab_id)
+    return "閉じました" if ok else "失敗しました"
+
+@mcp.tool()
+async def activate_tab(tab_id: str) -> str:
+    """指定タブをアクティブにする"""
+    await _ensure_chrome()
+    ok = await asyncio.to_thread(cdp.activate_tab_sync, tab_id)
+    return "アクティブにしました" if ok else "失敗しました"
+
+# ビューポート・ロード待機
+
+@mcp.tool()
+async def set_viewport(width: int, height: int, tab_id: Optional[str] = None) -> str:
+    """ビューポートサイズを設定する"""
+    await _ensure_chrome()
+    return await cdp.set_viewport(width, height, tab_id)
+
+@mcp.tool()
+async def wait_for_load(tab_id: Optional[str] = None, timeout: float = 10.0) -> str:
+    """ページのロード完了を待つ（最大timeout秒）"""
+    await _ensure_chrome()
+    return await cdp.wait_for_load(tab_id, timeout)
+
+# コンソール・ネットワークキャプチャ
+
+@mcp.tool()
+async def install_console_capture(tab_id: Optional[str] = None) -> str:
+    """コンソールログのキャプチャをページに設置する"""
+    await _ensure_chrome()
+    return await cdp.install_console_capture(tab_id)
+
+@mcp.tool()
+async def get_console_logs(tab_id: Optional[str] = None, level: Optional[str] = None, limit: int = 50) -> str:
+    """キャプチャされたコンソールログを取得する（事前にinstall_console_captureが必要）"""
+    await _ensure_chrome()
+    logs = await cdp.get_console_logs(tab_id, level, limit)
+    return json.dumps(logs, ensure_ascii=False)
+
+@mcp.tool()
+async def install_network_capture(tab_id: Optional[str] = None) -> str:
+    """XHR/fetchリクエストのキャプチャをページに設置する"""
+    await _ensure_chrome()
+    return await cdp.install_network_capture(tab_id)
+
+@mcp.tool()
+async def get_network_logs(tab_id: Optional[str] = None, limit: int = 50) -> str:
+    """キャプチャされたネットワークリクエストを取得する（事前にinstall_network_captureが必要）"""
+    await _ensure_chrome()
+    logs = await cdp.get_network_logs(tab_id, limit)
+    return json.dumps(logs, ensure_ascii=False)
+
+# ストレージ・Cookie
+
+@mcp.tool()
+async def get_cookies(tab_id: Optional[str] = None) -> str:
+    """ページのCookieを取得する"""
+    await _ensure_chrome()
+    cookies = await cdp.get_cookies(tab_id)
+    return json.dumps(cookies, ensure_ascii=False)
+
+@mcp.tool()
+async def get_local_storage(tab_id: Optional[str] = None) -> str:
+    """localStorageの内容を取得する"""
+    await _ensure_chrome()
+    data = await cdp.get_local_storage(tab_id)
+    return json.dumps(data, ensure_ascii=False)
+
+@mcp.tool()
+async def get_session_storage(tab_id: Optional[str] = None) -> str:
+    """sessionStorageの内容を取得する"""
+    await _ensure_chrome()
+    data = await cdp.get_session_storage(tab_id)
+    return json.dumps(data, ensure_ascii=False)
+
+@mcp.tool()
+async def get_current_url(tab_id: Optional[str] = None) -> str:
+    """現在のURLを取得する"""
+    await _ensure_chrome()
+    return await cdp.get_current_url(tab_id)
+
+@mcp.tool()
+async def get_title(tab_id: Optional[str] = None) -> str:
+    """ページタイトルを取得する"""
+    await _ensure_chrome()
+    return await cdp.get_title(tab_id)
+
+@mcp.tool()
+async def scroll_to_element(selector: str, tab_id: Optional[str] = None) -> str:
+    """要素が見えるようにスクロールする"""
+    await _ensure_chrome()
+    return await cdp.scroll_to_element(selector, tab_id)
+
+@mcp.tool()
+async def clear_console_logs(tab_id: Optional[str] = None) -> str:
+    """キャプチャされたコンソールログをクリアする"""
+    await _ensure_chrome()
+    return await cdp.clear_console_logs(tab_id)
+
+@mcp.tool()
+async def clear_network_logs(tab_id: Optional[str] = None) -> str:
+    """キャプチャされたネットワークログをクリアする"""
+    await _ensure_chrome()
+    return await cdp.clear_network_logs(tab_id)
+
+@mcp.tool()
+async def get_resource_timing(tab_id: Optional[str] = None, limit: int = 30) -> str:
+    """Performance APIからリソースタイミング情報を取得する"""
+    await _ensure_chrome()
+    data = await cdp.get_resource_timing(tab_id, limit)
+    return json.dumps(data, ensure_ascii=False)
+
+@mcp.tool()
+async def get_version() -> str:
+    """ChromeのバージョンとUserAgent情報を取得する"""
+    await _ensure_chrome()
+    data = await asyncio.to_thread(cdp.get_version)
+    return json.dumps(data, ensure_ascii=False)
+
+@mcp.tool()
+async def cdp_command(method: str, params: Optional[str] = None, tab_id: Optional[str] = None) -> str:
+    """
+    Chrome DevTools Protocol (CDP) コマンドを直接送信する。
+    既存ツールでカバーされない高度な操作に使用する。
+
+    Args:
+        method: CDP メソッド名 (例: "Page.printToPDF", "Network.setExtraHTTPHeaders")
+        params: JSON 文字列形式のパラメータ (例: '{"landscape": true}')
+        tab_id: 対象タブID (省略時は最初のタブ)。
+                "browser" を指定するとブラウザレベルの WebSocket を使用する
+                (Browser.* / Target.* / SystemInfo.* 等のコマンドに必要)。
+
+    Returns:
+        CDP レスポンスの JSON 文字列
+
+    CDP メソッド例 (タブレベル):
+        Page.printToPDF            — PDF出力
+        Network.setExtraHTTPHeaders — リクエストヘッダー追加
+        Emulation.setGeolocationOverride — 位置情報偽装
+        Emulation.setUserAgentOverride   — UserAgent変更
+        DOM.querySelector          — DOM要素取得
+        Input.dispatchKeyEvent     — キーイベント送信
+
+    CDP メソッド例 (ブラウザレベル: tab_id="browser"):
+        Browser.getVersion         — Chrome バージョン情報
+        Target.getTargets          — 全ターゲット一覧
+        Target.createTarget        — 新規ターゲット作成
+        SystemInfo.getInfo         — システム情報
+    """
+    await _ensure_chrome()
+    parsed_params = json.loads(params) if params else {}
+    if tab_id == "browser":
+        ws_url = await asyncio.to_thread(cdp.get_browser_ws_url)
+    else:
+        tab = await asyncio.to_thread(cdp.resolve_tab, tab_id)
+        ws_url = cdp.get_ws_url(tab)
+    result = await cdp.send_command(ws_url, method, parsed_params)
+    return json.dumps(result, ensure_ascii=False)
 
 # ------------------------------------------------------------------ #
-# 共有 subprocess 管理
+# 旧 chrome-devtools-mcp (Node.js版) との互換エイリアス
+# AIが旧ツール名を使う場合に対応
 # ------------------------------------------------------------------ #
 
-_proc:   asyncio.subprocess.Process | None = None
-_queues: Set[asyncio.Queue]                = set()   # 接続中の SSE クライアント
-_lock    = asyncio.Lock()                             # 同時起動防止
+@mcp.tool()
+async def new_page(url: str = "about:blank") -> str:
+    """新規タブを開く（new_tab の別名）"""
+    return await new_tab(url)
+
+@mcp.tool()
+async def close_page(tab_id: str) -> str:
+    """指定タブを閉じる（close_tab の別名）"""
+    return await close_tab(tab_id)
+
+@mcp.tool()
+async def list_pages() -> str:
+    """開いているタブ一覧を取得する（list_tabs の別名）"""
+    return await list_tabs()
+
+@mcp.tool()
+async def click_element(selector: str, tab_id: Optional[str] = None) -> str:
+    """CSSセレクターで要素をクリックする（click の別名）"""
+    return await click(selector, tab_id)
+
+@mcp.tool()
+async def fill(selector: str, value: str, tab_id: Optional[str] = None) -> str:
+    """CSSセレクターで要素にテキストを入力する（type_text の別名）"""
+    return await type_text(selector, value, tab_id)
+
+@mcp.tool()
+async def evaluate(expression: str, tab_id: Optional[str] = None) -> str:
+    """JavaScriptを実行して結果を返す（eval_js の別名）"""
+    return await eval_js(expression, tab_id)
+
+@mcp.tool()
+async def get_page_content(tab_id: Optional[str] = None) -> str:
+    """ページのテキストコンテンツを取得する（get_text の別名）"""
+    return await get_text(tab_id)
+
+# ================================================================== #
+# aidiy_screenshot ツール
+# ================================================================== #
+
+@mcp_ss.tool()
+async def screenshot(
+    screen_number: str = "auto",
+    size: Optional[int] = None,
+    x: Optional[int] = None,
+    y: Optional[int] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    window_title: Optional[str] = None,
+    delay: float = 0.0,
+    format: str = "png",
+    quality: int = 85,
+    crosshair: bool = False,
+    label: bool = False,
+) -> list:
+    """
+    OS のスクリーンショットを撮る（PNG/JPEG 画像）。
+
+    撮影モードはパラメータの組み合わせで自動判定する（優先順位順）:
+      1. window_title 指定あり → ウィンドウキャプチャ（Windows 専用）
+      2. x,y,width,height 全指定 → 指定領域キャプチャ
+      3. size 指定あり → screen_number モニター上でカーソル中心の矩形切り出し
+      4. それ以外 → screen_number モニター全体（デフォルト）
+
+    Args:
+        screen_number: モニター指定。"auto"=カーソルのあるモニター, "all"=全画面結合,
+                       "0"/"1"/...=モニター番号。デフォルト "auto"
+        size: カーソル中心切り出しの一辺 px（例: 600）
+        x: region モードの左上 X 座標（絶対座標）
+        y: region モードの左上 Y 座標（絶対座標）
+        width: region モードの幅 px
+        height: region モードの高さ px
+        window_title: ウィンドウタイトルの部分一致文字列
+        delay: 撮影前の遅延秒数（ツールチップ・メニュー表示待ちに有効）
+        format: "png"（デフォルト）または "jpeg"
+        quality: JPEG 品質 1-100（デフォルト 85）
+        crosshair: True でカーソル位置に赤い十字線を描画（size モード時）
+        label: True で座標・サイズのラベルを右下に追記
+    """
+    if delay > 0:
+        await asyncio.sleep(delay)
+
+    try:
+        img             = None
+        info            = {}
+        crosshair_pos   = None
+
+        if window_title:
+            img, info = await asyncio.to_thread(capture.grab_window, window_title)
+        elif x is not None and y is not None and width is not None and height is not None:
+            img  = await asyncio.to_thread(capture.grab_region, x, y, width, height)
+            info = {"x": x, "y": y, "width": width, "height": height}
+        elif size is not None:
+            img, info = await asyncio.to_thread(capture.grab_cursor_region, size, screen_number)
+            if crosshair:
+                cx = info["cursor_x"] - info["x"] - info.get("crop_rel_x", 0)
+                cy = info["cursor_y"] - info["y"] - info.get("crop_rel_y", 0)
+                crosshair_pos = (cx, cy)
+        else:
+            img, info = await asyncio.to_thread(capture.grab_screen, screen_number)
+
+        label_text = None
+        if label:
+            cx, cy = info.get("cursor_x", 0), info.get("cursor_y", 0)
+            label_text = (
+                f"cursor=({cx},{cy})  "
+                f"region=({info.get('x',0)},{info.get('y',0)}"
+                f" {info.get('width', img.width)}x{info.get('height', img.height)})"
+            )
+
+        if crosshair_pos or label_text:
+            img = await asyncio.to_thread(capture.annotate, img, crosshair_pos, label_text)
+
+        data = await asyncio.to_thread(capture.to_bytes, img, format, quality)
+        b64  = base64.b64encode(data).decode("ascii")
+        mime = "image/jpeg" if format.lower() in ("jpeg", "jpg") else "image/png"
+
+        logger.info(
+            f"screenshot: mode={'window' if window_title else 'region' if x is not None else 'cursor' if size else 'screen'}"
+            f"  size={img.size}  format={format}"
+        )
+        return [ImageContent(type="image", data=b64, mimeType=mime)]
+
+    except ScreenCaptureError as e:
+        raise ValueError(str(e)) from e
 
 
-async def _start_subprocess() -> asyncio.subprocess.Process:
-    """subprocess を起動してブロードキャストタスクを開始する"""
-    global _proc
-    await asyncio.to_thread(chrome.ensure_running)
-    _proc = await asyncio.create_subprocess_exec(
-        "node", NODE_BIN,
-        "--browserUrl", f"http://localhost:{CHROME_PORT}",
-        "--usageStatistics=false",
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    logger.info(f"subprocess 起動 (PID={_proc.pid})")
-    asyncio.create_task(_broadcast(_proc))
-    return _proc
+@mcp_ss.tool()
+async def get_cursor_pos() -> str:
+    """現在のマウスカーソル座標を返す"""
+    x, y = await asyncio.to_thread(capture.cursor_pos)
+    return json.dumps({"x": x, "y": y}, ensure_ascii=False)
 
 
-async def _get_proc() -> asyncio.subprocess.Process:
-    """起動していなければ起動して返す (ロックで同時起動を防ぐ)"""
-    async with _lock:
-        if _proc is None or _proc.returncode is not None:
-            return await _start_subprocess()
-    return _proc
+@mcp_ss.tool()
+async def get_screen_info() -> str:
+    """
+    全モニターの解像度・座標・プライマリフラグを返す。
+
+    Returns:
+        JSON 配列 [{index, x, y, width, height, primary}, ...]
+    """
+    mons = await asyncio.to_thread(capture.monitors)
+    return json.dumps(mons, ensure_ascii=False)
 
 
-async def _broadcast(proc: asyncio.subprocess.Process):
-    """subprocess stdout を接続中の全クライアントへ配信する"""
-    async for raw in proc.stdout:
-        text = raw.decode().strip()
-        if not text:
-            continue
-        dead = set()
-        for q in _queues:
-            try:
-                q.put_nowait(text)
-            except asyncio.QueueFull:
-                dead.add(q)
-        _queues.difference_update(dead)
+@mcp_ss.tool()
+async def list_windows() -> str:
+    """
+    表示中ウィンドウの一覧を返す（Windows 専用）。
 
-    # subprocess 終了 → 全クライアントに終了を通知
-    logger.info(f"subprocess 終了 (接続数={len(_queues)})")
-    for q in list(_queues):
-        q.put_nowait(None)
+    Returns:
+        JSON 配列 [{hwnd, title, x, y, width, height}, ...]
+    """
+    wins = await asyncio.to_thread(capture.list_windows)
+    return json.dumps(wins, ensure_ascii=False)
 
-# ------------------------------------------------------------------ #
-# ローカル接続チェック
-# ------------------------------------------------------------------ #
 
-_ALLOWED_HOSTS = {"127.0.0.1", "::1", "localhost"}
+# ================================================================== #
+# アプリ（chrome + screenshot を1ポートで統合）
+# ================================================================== #
 
-def _is_local(request) -> bool:
-    host = request.client.host if request.client else ""
-    return host in _ALLOWED_HOSTS
-
-# ------------------------------------------------------------------ #
-# SSE エンドポイント
-# ------------------------------------------------------------------ #
-
-async def handle_sse(request):
-    if not _is_local(request):
-        logger.warning(f"SSE 接続拒否: {request.client.host}")
-        return Response("Forbidden", status_code=403)
-    await _get_proc()                   # 未起動なら起動
-    sid = str(uuid.uuid4())
-    q   = asyncio.Queue(maxsize=200)
-    _queues.add(q)
-    logger.info(f"接続 sid={sid[:8]} (計{len(_queues)}接続)")
-
-    async def stream():
-        try:
-            message_endpoint = f"{MOUNT.rstrip('/')}/messages?sessionId={sid}"
-            yield f"id: {sid}\nevent: endpoint\ndata: {message_endpoint}\n\n"
-            while True:
-                msg = await q.get()
-                if msg is None:         # subprocess 終了シグナル
-                    break
-                yield f"event: message\ndata: {msg}\n\n"
-        finally:
-            _queues.discard(q)
-            logger.info(f"切断 sid={sid[:8]} (計{len(_queues)}接続)")
-
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
-    )
-
-# ------------------------------------------------------------------ #
-# POST エンドポイント (sessionId は無視して共有 stdin へ)
-# ------------------------------------------------------------------ #
-
-async def handle_post(request):
-    if not _is_local(request):
-        logger.warning(f"POST 接続拒否: {request.client.host}")
-        return Response("Forbidden", status_code=403)
-    proc = await _get_proc()
-    proc.stdin.write(await request.body() + b"\n")
-    await proc.stdin.drain()
-    return Response(status_code=202)
-
-# ------------------------------------------------------------------ #
-# アプリ
-# ------------------------------------------------------------------ #
+async def _handle_root(request: Request) -> Response:
+    return Response('{"message": "MCP Server is running"}', media_type="application/json")
 
 app = Starlette(routes=[
-    Mount(MOUNT, app=Starlette(routes=[
-        Route("/sse",       handle_sse,  methods=["GET"]),
-        Route("/messages",  handle_post, methods=["POST"]),
-        Route("/messages/", handle_post, methods=["POST"]),
-    ]))
+    Route("/", _handle_root, methods=["GET"]),
+    *mcp.sse_app().routes,
+    *mcp_ss.sse_app().routes,
 ])
 
 if __name__ == "__main__":
-    logger.info(f"SSE: http://localhost:{MCP_PORT}{MOUNT}/sse")
+    logger.info(f"Chrome SSE    : http://localhost:{MCP_PORT}{MOUNT}/sse")
+    logger.info(f"Screenshot SSE: http://localhost:{MCP_PORT}{MOUNT_SS}/sse")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")

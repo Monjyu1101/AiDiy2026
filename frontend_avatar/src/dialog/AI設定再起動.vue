@@ -229,7 +229,7 @@ function buildNextSettings() {
   return nextSettings
 }
 
-async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean }, waitSeconds = 30) {
+async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds = 15) {
   loading.value = true
   errorMessage.value = ''
 
@@ -259,7 +259,7 @@ async function submitSettings(再起動要求: { reboot_core: boolean; reboot_ap
 }
 
 function handleSave() {
-  void submitSettings({ reboot_core: false, reboot_apps: true })
+  void submitSettings({ reboot_core: false, reboot_apps: true, reboot_mcp: true })
 }
 
 async function handleResetReboot() {
@@ -278,7 +278,7 @@ async function handleResetReboot() {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: {},
-      再起動要求: { reboot_core: true, reboot_apps: true },
+      再起動要求: { reboot_core: true, reboot_apps: true, reboot_mcp: true },
     })
 
     if (response?.data?.status !== 'OK') {

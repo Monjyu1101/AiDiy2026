@@ -122,7 +122,7 @@ const reloadPage = () => {
 
 .countdown-number {
   font-size: 64px; /* Larger countdown number */
-  font-weight: extra-bold;
+  font-weight: normal;
   color: #48bb78; /* Green accent for countdown */
   margin: 10px 0;
   text-shadow: 0 0 15px rgba(72, 187, 120, 0.8); /* Glow effect */

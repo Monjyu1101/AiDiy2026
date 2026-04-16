@@ -8,6 +8,9 @@ dependencies = [
     "starlette>=0.48.0",
     "uvicorn>=0.37.0",
     "websockets>=12.0",
+    "Pillow>=10.0.0",
+    "screeninfo>=0.8.1",
+    "pyautogui>=0.9.54",
 ]
 
 [tool.hatch.build.targets.wheel]

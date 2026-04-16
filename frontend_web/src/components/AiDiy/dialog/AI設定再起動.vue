@@ -254,7 +254,7 @@ const buildNextSettings = () => {
     return nextSettings;
 };
 
-const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_apps: boolean }, waitSeconds: number = 15) => {
+const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds: number = 15) => {
   loading.value = true;
   errorMessage.value = '';
   try {
@@ -284,7 +284,7 @@ const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_ap
   }
 };
 
-const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true });
+const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true, reboot_mcp: true });
 
 const handleResetReboot = async () => {
   const confirmed = await qConfirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？');
@@ -300,7 +300,7 @@ const handleResetReboot = async () => {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: {},
-      再起動要求: { reboot_core: true, reboot_apps: true }
+      再起動要求: { reboot_core: true, reboot_apps: true, reboot_mcp: true }
     });
     if (response?.data?.status === 'OK') {
       rebootWaitSeconds.value = 60;

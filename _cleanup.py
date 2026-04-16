@@ -42,7 +42,7 @@ DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
 
 AUTO_MODE = False
-BACKEND_MCP_SERVER_NAME = "aidiy_chrome_devtools"
+BACKEND_MCP_SERVER_NAMES = ["aidiy_chrome_devtools", "aidiy_screenshot"]
 
 
 class Colors:
@@ -560,10 +560,12 @@ def main():
         print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
 
     print()
-    if ask_yes_no(f"グローバルMCP設定の {BACKEND_MCP_SERVER_NAME} を解除しますか？", default="y"):
-        cleanup_global_mcp_configs(BACKEND_MCP_SERVER_NAME)
+    server_names_str = ", ".join(BACKEND_MCP_SERVER_NAMES)
+    if ask_yes_no(f"グローバルMCP設定の {server_names_str} を解除しますか？", default="y"):
+        for server_name in BACKEND_MCP_SERVER_NAMES:
+            cleanup_global_mcp_configs(server_name)
     else:
-        print_warning(f"グローバルMCP設定の {BACKEND_MCP_SERVER_NAME} はそのまま残します")
+        print_warning(f"グローバルMCP設定の {server_names_str} はそのまま残します")
 
     print()
     print_header("クリーンアップ完了")

@@ -137,6 +137,7 @@ def get_backend_mcp_command() -> list[str]:
     return ["uv", "run", "uvicorn", BACKEND_MCP_APP, "--host", "0.0.0.0", "--port", str(BACKEND_MCP_PORT)]
 
 
+
 def check_backend_environment() -> tuple[bool, str]:
     if not BACKEND_DIR.exists():
         return False, f"フォルダが見つかりません: {BACKEND_DIR}"
@@ -166,6 +167,7 @@ def check_backend_mcp_environment() -> tuple[bool, str]:
             return False, detail
 
     return True, str(backend_mcp_python) if backend_mcp_python is not None else "uv"
+
 
 
 def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
@@ -387,6 +389,7 @@ def start_backend_mcp() -> subprocess.Popen[bytes]:
     return launch_process("バックエンド(mcp)", get_backend_mcp_command(), BACKEND_MCP_DIR)
 
 
+
 def start_frontend_web(npm_command: str) -> subprocess.Popen[bytes]:
     return launch_process(
         "フロントエンド(Web)",
@@ -600,7 +603,7 @@ def open_browser_via_mcp(port: int) -> bool:
         print_info(f"(mcp) MCP接続: {BACKEND_MCP_SSE_URL}")
         print_info(f"(mcp) {url} 表示指示")
         script = (
-            "import asyncio, os, sys\n"
+            "import asyncio, os, json\n"
             # プロキシ経由でlocalhostへ接続しないよう NO_PROXY を設定
             "os.environ['NO_PROXY'] = 'localhost,127.0.0.1'\n"
             "os.environ['no_proxy'] = 'localhost,127.0.0.1'\n"
@@ -609,10 +612,19 @@ def open_browser_via_mcp(port: int) -> bool:
             "async def main():\n"
             f"    sse_url = '{BACKEND_MCP_SSE_URL}'\n"
             f"    target_url = '{url}'\n"
-            "    async with sse_client(sse_url, timeout=10, sse_read_timeout=30) as (read, write):\n"
+            "    async with sse_client(sse_url, timeout=10, sse_read_timeout=60) as (read, write):\n"
             "        async with ClientSession(read, write) as session:\n"
             "            await session.initialize()\n"
-            "            await session.call_tool('new_page', {'url': target_url})\n"
+            "            # Step1: タブ一覧確認（Chrome 未起動なら起動も兼ねる）\n"
+            "            r = await session.call_tool('list_tabs', {})\n"
+            "            tabs = json.loads(r.content[0].text)\n"
+            "            found = next((t for t in tabs if target_url in t.get('url', '')), None)\n"
+            "            if found:\n"
+            "                # 既に開いているタブをアクティブにする\n"
+            "                await session.call_tool('activate_tab', {'tab_id': found['id']})\n"
+            "            else:\n"
+            "                # Step2: 新規タブで開く（Chrome は Step1 で起動済み）\n"
+            "                await session.call_tool('new_page', {'url': target_url})\n"
             "            print('OK')\n"
             "asyncio.run(main())\n"
         )
@@ -624,7 +636,7 @@ def open_browser_via_mcp(port: int) -> bool:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=35,
+                timeout=60,
             )
             if result.returncode == 0 and "OK" in result.stdout:
                 print_info(f"(mcp) MCP切断")
@@ -708,7 +720,6 @@ def validate_initial_environment(
         else:
             print_error(f"バックエンド(mcp): 未準備 ({detail})")
             print_info(f"  対応例: cd {BACKEND_MCP_PATH} && uv sync")
-            print_info(f"  対応例: cd {BACKEND_MCP_PATH} && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
 
     if backend_enabled:

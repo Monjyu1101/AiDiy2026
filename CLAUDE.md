@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.13.3, FastAPI, SQLAlchemy, SQLite, uv |
-| Backend MCP | Python 3.13.3, FastAPI (SSE), Node.js, chrome-devtools-mcp |
+| Backend MCP | Python 3.13.3, FastMCP (SSE×2), Chrome DevTools Protocol, pyautogui, PIL |
 | Frontend Web | Node.js 22, Vue 3, Vite, TypeScript, Pinia, Vue Router 4 |
 | Frontend Avatar | Vue 3, Vite, TypeScript, Electron, Three.js, WebSocket |
 | Auth | JWT (python-jose, HS256, 60分) |
@@ -80,15 +80,14 @@ cd frontend_avatar && npm run type-check
 # Backend dependency sync
 cd backend_server && uv sync
 cd backend_mcp && uv sync
-cd backend_mcp && npm install   # chrome-devtools-mcp (Node.js side)
 
 # Cleanup
 python _cleanup.py
 
-# Backend reboot trigger when started via _start.py
-touch backend_server/temp/reboot_core.txt
-touch backend_server/temp/reboot_apps.txt
-# ※ backend_mcp にリブート機構なし。停止は taskkill /PID <pid> /F（ポート 8095）
+# Backend reboot trigger when started via _start.py (Windows)
+echo. > backend_server/temp/reboot_core.txt
+echo. > backend_server/temp/reboot_apps.txt
+echo. > backend_mcp/temp/reboot_mcp.txt
 
 # DB reset (全データ削除・テーブル再作成・初期データ投入)
 # 全サーバー停止後に実行すること
@@ -109,7 +108,8 @@ rm backend_server/_data/AiDiy/database.db
 | Frontend (Web) | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:8092/docs |
-| Backend MCP (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
+| Backend MCP Chrome (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
+| Backend MCP Screenshot (SSE) | http://localhost:8095/aidiy_screenshot/sse |
 | Frontend (Avatar Web) | http://localhost:8099 |
 | Frontend (Avatar Electron) | `npm run dev` で起動 |
 
@@ -137,7 +137,7 @@ rm backend_server/_data/AiDiy/database.db
 
 - **core_main.py** (8091): C系（権限・利用者・採番）、A系（AIコア・会話履歴）、WebSocket
 - **apps_main.py** (8092): M系（マスタ）、T系（トランザクション）、V系（JOIN表示）、S系（スケジューラ）
-- **mcp_main.py** (8095): MCP サーバー（Chrome DevTools MCP）— AIによるブラウザ自動操作を提供
+- **mcp_main.py** (8095): MCP サーバー × 2 エンドポイント — Chrome DevTools (`/aidiy_chrome_devtools/sse`) + Screenshot (`/aidiy_screenshot/sse`)
 
 core_main / apps_main は同じ SQLite DB を共有。Vite Proxy が `/core/*` → 8091、`/apps/*` → 8092 に自動振り分け。フロントのポートを変えたら `core_main.py` / `apps_main.py` の CORS 許可リストも更新すること。
 
@@ -240,6 +240,24 @@ conf.path.exec_abs_path      # backend_server/ の絶対パス
 - 外部 UI フレームワーク不使用（Vuetify/Element Plus 等は使わない）— カスタム CSS + 独自コンポーネント
 - 共通ダイアログ: `qAlert(message)`, `qConfirm(message)`, `qColorPicker(initialColor, title)` — Promise-based、App.vue でグローバル登録
 
+**UI 統一ルール（厳守）:**
+- 数値入力欄: 非フォーカス時は3桁区切り表示、フォーカス時はカンマを外して全選択、フォーカスアウト時にカンマ再表示
+- 日付欄・日時欄: センタリング表示に統一
+- 固定幅入力欄: ラベル幅 `160px` と同一またはその倍数幅で揃える
+- 単位付き入力欄: 「入力欄＋単位」合計幅でラベル幅 `160px` の倍数に揃える
+- ID 選択欄: ラベルは業務名で表示し、選択肢は `ID : 名称` 形式で統一
+- 検索欄: ラベル幅 `160px`、入力欄は `160px` または `320px` 基準
+
+### 明細型マスタ/トランザクションパターン
+
+ヘッダー行と明細行を**単一テーブルで管理**する設計パターン（`M商品構成`・`T生産` が実装例）。
+
+- `明細SEQ=0` がヘッダー行、`明細SEQ≥1` が明細行
+- `get_ヘッダ()` / `get_明細一覧()` で用途別に取得
+- `create/update` は全明細を一括削除→再作成（楽観ロック不要）
+
+---
+
 ### frontend_avatar（Electron / Web デュアルモード）
 
 - `!!window.desktopApi` が `true` → Electron モード（`localStorage`、複数 BrowserWindow）
@@ -249,3 +267,35 @@ conf.path.exec_abs_path      # backend_server/ の絶対パス
 - Electron ウィンドウ role 一覧: `login`, `core`（アバター常駐）, `chat`, `file`, `image`, `code1`〜`code4`, `settings`
 - ウィンドウは透明＋フレームレス基本（settings のみ不透明 760×700）
 - 補助パネル間同期: BroadcastChannel `avatar-desktop-sync`
+
+---
+
+## .aidiy フォルダ（自己改善知見システム）
+
+`.aidiy/` は**このプロジェクト専用の修正知見フォルダ**。コードエージェントが修正精度を高めるために使う。
+
+**ファイル操作を伴う修正を行う前に必ず確認：**
+1. `.aidiy/_index.md` — 知見インデックス（類似テーマがあれば参照）
+2. `.aidiy/_最終変更.md` — 直近の修正要約（再修正依頼時の最優先参照先）
+3. テーマ別メモ（例: `新たなCLI追加時の作業手順.md`、`CLIプロンプト正規化と履歴保持.md` など）
+
+**修正・検証が完了したら：**
+- 次回に再利用できる知見を `.aidiy/` 配下の該当テーマファイルへ追記（or 新規作成）
+- `.aidiy/_index.md` のインデックスを更新
+- 単なる作業ログではなく「次回の修正判断に使える情報」を残す
+- アプリ本体の仕様変更はソースコードへ、知見整理は `.aidiy` へ（混在禁止）
+
+---
+
+## Common Issues
+
+| 現象 | 原因 | 対処 |
+|------|------|------|
+| バックエンドのコード変更が反映されない | `_start.py` 起動は `--reload` なし | `echo. > backend_server/temp/reboot_core.txt` で再起動、または個別起動で `--reload` 付与 |
+| M系マスタ一覧画面でエラー | フロントはV系エンドポイントを使用 | M系テーブル追加時はV系エンドポイントも必ず作成（`apps_router/V*.py`） |
+| Vue コンポーネントがテキストとして表示 | 日本語タグ名は HTML 無効 | `<component :is="日本語コンポーネント名" />` を使う |
+| `apps_crud/__init__.py` 登録漏れでエラー | 新規テーブル追加時に忘れやすい | 新規テーブル追加チェックリスト（上記）を必ず確認 |
+| 初期データが更新されない | admin 未存在のときのみ投入 | DB 削除 → 再起動で再生成 |
+| CORS エラー | フロント URL が許可リストにない | `core_main.py` / `apps_main.py` の CORS 許可リストを更新 |
+| SQLite database is locked | DB ブラウザツールが開いている | SQLite Browser / DBeaver を閉じてから起動 |
+| WebSocket 接続エラー（AIコア） | LiveAI 初期化タイミング問題 | `backend_server/AGENTS.md` の「AIコア Component System」参照 |

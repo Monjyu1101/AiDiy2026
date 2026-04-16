@@ -10,6 +10,7 @@ Chrome を --remote-debugging-port=9222 で起動した状態で使用する。
 
 import asyncio
 import json
+import time
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -159,10 +160,28 @@ class CDPClient:
         """Chrome バージョン情報を取得"""
         return self._http_get("/json/version")
 
-    def new_tab_sync(self, url: str = "about:blank") -> dict:
-        """新規タブを開く (同期)"""
-        encoded = urllib.parse.quote(url, safe=":/?#[]@!$&'()*+,;=")
-        return self._http_get(f"/json/new?{encoded}")
+    def get_browser_ws_url(self) -> str:
+        """ブラウザレベルの WebSocket URL を取得 (Browser.* / Target.* 等のコマンド用)"""
+        version = self._http_get("/json/version")
+        ws_url = version.get("webSocketDebuggerUrl")
+        if not ws_url:
+            raise ChromeDevToolsError(
+                "ブラウザレベルの WebSocket URL が取得できません。"
+                "Chrome が --remote-debugging-port で起動しているか確認してください。"
+            )
+        return ws_url
+
+    def new_tab_sync(self, retries: int = 5, retry_delay: float = 1.5) -> dict:
+        """新規ブランクタブを開く (同期)。Chrome 起動直後のリトライ対応"""
+        last_exc: Exception = ChromeDevToolsError("new_tab_sync: リトライ未実行")
+        for attempt in range(retries):
+            try:
+                return self._http_get("/json/new")
+            except ChromeDevToolsError as e:
+                last_exc = e
+                if attempt < retries - 1:
+                    time.sleep(retry_delay)
+        raise last_exc
 
     def close_tab_sync(self, tab_id: str) -> bool:
         """タブを閉じる (同期)"""
