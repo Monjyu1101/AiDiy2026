@@ -7,6 +7,30 @@
     "aidiy_desktop_capture": {
       "type": "sse",
       "url": "http://localhost:8095/aidiy_desktop_capture/sse"
+    },
+    "aidiy_sqlite": {
+      "type": "sse",
+      "url": "http://localhost:8095/aidiy_sqlite/sse"
+    },
+    "aidiy_postgres": {
+      "type": "sse",
+      "url": "http://localhost:8095/aidiy_postgres/sse"
+    },
+    "aidiy_logs": {
+      "type": "sse",
+      "url": "http://localhost:8095/aidiy_logs/sse"
+    },
+    "aidiy_code_check": {
+      "type": "sse",
+      "url": "http://localhost:8095/aidiy_code_check/sse"
+    },
+    "aidiy_backup_check": {
+      "type": "sse",
+      "url": "http://localhost:8095/aidiy_backup_check/sse"
+    },
+    "aidiy_backup_save": {
+      "type": "sse",
+      "url": "http://localhost:8095/aidiy_backup_save/sse"
     }
   }
 }

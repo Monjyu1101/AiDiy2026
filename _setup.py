@@ -811,6 +811,30 @@ MCP_MODULES = [
                 "server_name": "aidiy_desktop_capture",
                 "sse_url":     "http://localhost:8095/aidiy_desktop_capture/sse",
             },
+            {
+                "server_name": "aidiy_sqlite",
+                "sse_url":     "http://localhost:8095/aidiy_sqlite/sse",
+            },
+            {
+                "server_name": "aidiy_postgres",
+                "sse_url":     "http://localhost:8095/aidiy_postgres/sse",
+            },
+            {
+                "server_name": "aidiy_logs",
+                "sse_url":     "http://localhost:8095/aidiy_logs/sse",
+            },
+            {
+                "server_name": "aidiy_code_check",
+                "sse_url":     "http://localhost:8095/aidiy_code_check/sse",
+            },
+            {
+                "server_name": "aidiy_backup_check",
+                "sse_url":     "http://localhost:8095/aidiy_backup_check/sse",
+            },
+            {
+                "server_name": "aidiy_backup_save",
+                "sse_url":     "http://localhost:8095/aidiy_backup_save/sse",
+            },
         ],
     },
 ]
