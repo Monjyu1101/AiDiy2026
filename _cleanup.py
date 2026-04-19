@@ -24,6 +24,9 @@ import sys
 import time
 from pathlib import Path
 
+if sys.platform == "win32":
+    import msvcrt
+
 # ============================================================
 # プロジェクト設定
 # ============================================================
@@ -42,7 +45,14 @@ DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
 
 AUTO_MODE = False
-BACKEND_MCP_SERVER_NAMES = ["aidiy_chrome_devtools", "aidiy_screenshot"]
+BACKEND_MCP_SERVER_PREFIX = "aidiy_"
+
+NPM_PACKAGES = [
+    "@anthropic-ai/claude-code",
+    "@github/copilot",
+    "@openai/codex",
+    "@google/gemini-cli",
+]
 
 
 class Colors:
@@ -79,6 +89,43 @@ def print_error(message):
     print(f"{Colors.FAIL}[NG] {message}{Colors.ENDC}")
 
 
+def _clear_keyboard_buffer() -> None:
+    if sys.platform != "win32":
+        return
+    while msvcrt.kbhit():
+        key = msvcrt.getch()
+        if key in (b"\x00", b"\xe0") and msvcrt.kbhit():
+            msvcrt.getch()
+
+
+def _read_single_key(valid: tuple[bytes, ...], default_key: bytes) -> bytes:
+    """1文字入力を受け付ける。Enter でデフォルト、valid 以外は無視して待機。"""
+    if sys.platform == "win32":
+        _clear_keyboard_buffer()
+        while True:
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                if key in (b"\x00", b"\xe0"):
+                    if msvcrt.kbhit():
+                        msvcrt.getch()
+                    continue
+                if key in (b"\r", b"\n"):
+                    print(default_key.decode("ascii"))
+                    return default_key
+                if key in valid:
+                    print(key.decode("ascii", errors="replace"))
+                    return key
+            time.sleep(0.05)
+
+    response = input().strip().lower()
+    if response == "":
+        return default_key
+    first = response[0:1].encode("ascii", errors="replace")
+    if first in valid:
+        return first
+    return default_key
+
+
 def ask_yes_no(prompt, default="n"):
     global AUTO_MODE
 
@@ -86,35 +133,23 @@ def ask_yes_no(prompt, default="n"):
         print_info(f"[AUTO] {prompt} -> {'Yes' if default.lower() == 'y' else 'No'} (default)")
         return default.lower() == "y"
 
-    prompt_text = f"\n{prompt}([y]/n): " if default.lower() == "y" else f"\n{prompt}([n]/y): "
-    while True:
-        answer = input(prompt_text).strip().lower()
-        if answer == "":
-            answer = default.lower()
-        if answer in ["y", "yes"]:
-            return True
-        if answer in ["n", "no"]:
-            return False
-        print_warning("'y' または 'n' で答えてください")
+    bracket = "[y]/n" if default.lower() == "y" else "y/[n]"
+    print(f"\n{prompt} ({bracket}): ", end="", flush=True)
+    default_key = b"y" if default.lower() == "y" else b"n"
+    key = _read_single_key((b"y", b"Y", b"n", b"N"), default_key)
+    return key in (b"y", b"Y")
 
 
 def ask_start_mode(prompt, default="n"):
-    if default.lower() == "y":
-        prompt_text = f"\n{prompt}([y]/n/a=auto): "
-    else:
-        prompt_text = f"\n{prompt}([n]/y/a=auto): "
-
-    while True:
-        answer = input(prompt_text).strip().lower()
-        if answer == "":
-            answer = default.lower()
-        if answer in ["y", "yes"]:
-            return True, False
-        if answer in ["n", "no"]:
-            return False, False
-        if answer in ["a", "auto"]:
-            return True, True
-        print_warning("'y' または 'n' または 'a'(auto) で答えてください")
+    bracket = "[y]/n/a=auto" if default.lower() == "y" else "y/[n]/a=auto"
+    print(f"\n{prompt} ({bracket}): ", end="", flush=True)
+    default_key = b"y" if default.lower() == "y" else b"n"
+    key = _read_single_key((b"y", b"Y", b"n", b"N", b"a", b"A"), default_key)
+    if key in (b"a", b"A"):
+        return True, True
+    if key in (b"y", b"Y"):
+        return True, False
+    return False, False
 
 
 def handle_remove_readonly(func, path, exc_info):
@@ -192,7 +227,7 @@ def write_json_file(path: Path, data: dict) -> bool:
         return False
 
 
-def remove_json_mcp_server(path: Path, server_name: str) -> bool:
+def remove_json_mcp_servers_by_prefix(path: Path, prefix: str, top_key: str = "mcpServers") -> bool:
     try:
         if not path.exists():
             print_info(f"MCP 設定ファイルなし: {path}")
@@ -204,21 +239,28 @@ def remove_json_mcp_server(path: Path, server_name: str) -> bool:
             print_warning(f"MCP 設定の形式が不正です。削除をスキップしました: {path}")
             return False
 
-        servers = loaded.get("mcpServers")
-        if not isinstance(servers, dict) or server_name not in servers:
-            print_info(f"{server_name} は未設定です: {path}")
+        servers = loaded.get(top_key)
+        if not isinstance(servers, dict):
+            print_info(f"{prefix}* は未設定です: {path}")
             return True
 
-        del servers[server_name]
+        matched = [name for name in servers if name.startswith(prefix)]
+        if not matched:
+            print_info(f"{prefix}* は未設定です: {path}")
+            return True
+
+        for name in matched:
+            del servers[name]
+
         if servers:
-            loaded["mcpServers"] = servers
+            loaded[top_key] = servers
         else:
-            loaded.pop("mcpServers", None)
+            loaded.pop(top_key, None)
 
         if not write_json_file(path, loaded):
             return False
 
-        print_success(f"{server_name} の MCP 設定を削除しました: {path}")
+        print_success(f"{', '.join(matched)} の MCP 設定を削除しました: {path}")
         return True
     except json.JSONDecodeError as e:
         print_error(f"JSON解析エラー: {path} ({e})")
@@ -226,6 +268,16 @@ def remove_json_mcp_server(path: Path, server_name: str) -> bool:
     except Exception as e:
         print_error(f"MCP 設定更新エラー: {path} ({e})")
         return False
+
+
+def get_vscode_mcp_path() -> Path:
+    """VS Code ユーザー設定フォルダ配下の mcp.json パスを返す。"""
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+        return base / "Code" / "User" / "mcp.json"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Code" / "User" / "mcp.json"
+    return Path.home() / ".config" / "Code" / "User" / "mcp.json"
 
 
 def remove_toml_table(content: str, table_header: str) -> str:
@@ -252,49 +304,71 @@ def remove_toml_table(content: str, table_header: str) -> str:
     return "\n".join(lines).rstrip() + ("\n" if lines else "")
 
 
-def remove_codex_mcp_server(server_name: str) -> bool:
+def remove_codex_mcp_servers_by_prefix(prefix: str) -> bool:
     config_path = Path.home() / ".codex" / "config.toml"
-    table_header = f"[mcp_servers.{server_name}]"
+    header_prefix = f"[mcp_servers.{prefix}"
     try:
         if not config_path.exists():
             print_info(f"MCP 設定ファイルなし: {config_path}")
             return True
         content = config_path.read_text(encoding="utf-8")
-        updated = remove_toml_table(content, table_header)
-        if updated == content:
-            print_info(f"{server_name} は未設定です: {config_path}")
+
+        removed_names: list[str] = []
+        updated = content
+        while True:
+            match_header = None
+            match_name = None
+            for line in updated.splitlines():
+                stripped = line.strip()
+                if stripped.startswith(header_prefix) and stripped.endswith("]"):
+                    match_header = stripped
+                    match_name = stripped[len("[mcp_servers."):-1]
+                    break
+            if match_header is None:
+                break
+            new_updated = remove_toml_table(updated, match_header)
+            if new_updated == updated:
+                break
+            updated = new_updated
+            removed_names.append(match_name)
+
+        if not removed_names:
+            print_info(f"{prefix}* は未設定です: {config_path}")
             return True
+
         config_path.write_text(updated, encoding="utf-8")
-        print_success(f"{server_name} の MCP 設定を削除しました: {config_path}")
+        print_success(f"{', '.join(removed_names)} の MCP 設定を削除しました: {config_path}")
         return True
     except Exception as e:
         print_error(f"Codex設定更新エラー: {config_path} ({e})")
         return False
 
 
-def cleanup_global_mcp_configs(server_name: str):
+def cleanup_global_mcp_configs(prefix: str):
     print_header("グローバルMCP設定の解除")
 
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+    # (path, top_key) の組。VS Code のみ top-level キーが "servers"。
     targets = [
-        Path.home() / ".claude.json",
-        Path.home() / ".gemini" / "settings.json",
-        copilot_home / "mcp-config.json",
+        (Path.home() / ".claude.json",            "mcpServers"),
+        (Path.home() / ".gemini" / "settings.json","mcpServers"),
+        (copilot_home / "mcp-config.json",        "mcpServers"),
+        (get_vscode_mcp_path(),                   "servers"),
     ]
 
     updated_count = 0
-    for path in targets:
-        if remove_json_mcp_server(path, server_name):
+    for path, top_key in targets:
+        if remove_json_mcp_servers_by_prefix(path, prefix, top_key=top_key):
             updated_count += 1
 
     print_info(f"Codex CLI 設定も解除対象です: {Path.home() / '.codex' / 'config.toml'}")
-    if remove_codex_mcp_server(server_name):
+    if remove_codex_mcp_servers_by_prefix(prefix):
         updated_count += 1
 
     if updated_count > 0:
-        print_success(f"グローバルMCP設定の解除処理を完了しました: {server_name}")
+        print_success(f"グローバルMCP設定の解除処理を完了しました: {prefix}*")
     else:
-        print_warning(f"グローバルMCP設定の解除に失敗しました: {server_name}")
+        print_warning(f"グローバルMCP設定の解除に失敗しました: {prefix}*")
 
 
 def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
@@ -313,7 +387,7 @@ def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
     return deleted_count
 
 
-def cleanup_backend(base_dir: Path):
+def cleanup_backend(base_dir: Path, choices: dict):
     label = "バックエンド(core,apps)"
     print_header(f"{label} のクリーンアップ")
 
@@ -324,21 +398,22 @@ def cleanup_backend(base_dir: Path):
 
     deleted_count = cleanup_common_python_caches(backend_dir, label)
 
-    print_info(f"{label}: 削除対象の仮想環境リスト: {', '.join(BACKEND_ENV_LIST)}")
+    backend_envs = choices.get("backend_envs", {})
     for env_name in BACKEND_ENV_LIST:
         env_dir = backend_dir / env_name
-        if env_dir.exists():
-            if ask_yes_no(f"  {BACKEND_PATH}/{env_name} を削除しますか？", default="y"):
-                if remove_directory(env_dir, f"{env_name} ({label})"):
-                    deleted_count += 1
-                else:
-                    print_error(f"  {BACKEND_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
+        if not env_dir.exists():
+            continue
+        if backend_envs.get(env_name):
+            if remove_directory(env_dir, f"{env_name} ({label})"):
+                deleted_count += 1
             else:
-                print_info(f"  {BACKEND_PATH}/{env_name} はそのまま残します")
+                print_error(f"  {BACKEND_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
+        else:
+            print_info(f"  {BACKEND_PATH}/{env_name} はそのまま残します")
 
     logs_dir = backend_dir / "logs"
     if logs_dir.exists():
-        if ask_yes_no(f"  {BACKEND_PATH}/logs の中身をクリアしますか？", default="y"):
+        if choices.get("backend_logs"):
             if clean_directory_contents(logs_dir, f"logs ({label})"):
                 deleted_count += 1
         else:
@@ -346,7 +421,7 @@ def cleanup_backend(base_dir: Path):
 
     temp_dir = backend_dir / "temp"
     if temp_dir.exists():
-        if ask_yes_no(f"  {BACKEND_PATH}/temp の中身をクリアしますか？", default="y"):
+        if choices.get("backend_temp"):
             if clean_directory_contents(temp_dir, f"temp ({label})"):
                 deleted_count += 1
         else:
@@ -355,7 +430,7 @@ def cleanup_backend(base_dir: Path):
     if DATABASE_TYPE.lower() == "sqlite":
         sqlite_db = base_dir / SQLITE_DB_REL_PATH
         if sqlite_db.exists():
-            if ask_yes_no("  SQLite データベースを削除しますか？", default="n"):
+            if choices.get("backend_sqlite"):
                 if remove_file(sqlite_db, f"SQLite データベース ({label})"):
                     deleted_count += 1
             else:
@@ -367,7 +442,7 @@ def cleanup_backend(base_dir: Path):
         print_info(f"{label}: 削除対象はありませんでした")
 
 
-def cleanup_backend_mcp(base_dir: Path):
+def cleanup_backend_mcp(base_dir: Path, choices: dict):
     label = "バックエンド(mcp)"
     print_header(f"{label} のクリーンアップ")
 
@@ -378,21 +453,22 @@ def cleanup_backend_mcp(base_dir: Path):
 
     deleted_count = cleanup_common_python_caches(backend_mcp_dir, label)
 
-    print_info(f"{label}: 削除対象の仮想環境リスト: {', '.join(BACKEND_MCP_ENV_LIST)}")
+    mcp_envs = choices.get("mcp_envs", {})
     for env_name in BACKEND_MCP_ENV_LIST:
         env_dir = backend_mcp_dir / env_name
-        if env_dir.exists():
-            if ask_yes_no(f"  {BACKEND_MCP_PATH}/{env_name} を削除しますか？", default="y"):
-                if remove_directory(env_dir, f"{env_name} ({label})"):
-                    deleted_count += 1
-                else:
-                    print_error(f"  {BACKEND_MCP_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
+        if not env_dir.exists():
+            continue
+        if mcp_envs.get(env_name):
+            if remove_directory(env_dir, f"{env_name} ({label})"):
+                deleted_count += 1
             else:
-                print_info(f"  {BACKEND_MCP_PATH}/{env_name} はそのまま残します")
+                print_error(f"  {BACKEND_MCP_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
+        else:
+            print_info(f"  {BACKEND_MCP_PATH}/{env_name} はそのまま残します")
 
     node_modules_dir = backend_mcp_dir / "node_modules"
     if node_modules_dir.exists():
-        if ask_yes_no(f"  {BACKEND_MCP_PATH}/node_modules を削除しますか？", default="y"):
+        if choices.get("mcp_node_modules"):
             if remove_directory(node_modules_dir, f"node_modules ({label})"):
                 deleted_count += 1
         else:
@@ -400,7 +476,7 @@ def cleanup_backend_mcp(base_dir: Path):
 
     temp_dir = backend_mcp_dir / "temp"
     if temp_dir.exists():
-        if ask_yes_no(f"  {BACKEND_MCP_PATH}/temp の中身をクリアしますか？", default="y"):
+        if choices.get("mcp_temp"):
             if clean_directory_contents(temp_dir, f"temp ({label})"):
                 deleted_count += 1
         else:
@@ -467,20 +543,14 @@ def cleanup_frontend_avatar(base_dir: Path):
         print_info(f"{label}: 削除対象はありませんでした")
 
 
-def uninstall_global_npm_tools():
+def uninstall_global_npm_tools(npm_packages: dict):
     print_header("グローバルnpmツールのアンインストール")
 
     npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
-    packages = [
-        "@anthropic-ai/claude-code",
-        "@github/copilot",
-        "@openai/codex",
-        "@google/gemini-cli",
-    ]
 
     uninstalled_count = 0
-    for i, package in enumerate(packages, 1):
-        if ask_yes_no(f"  [{i}/{len(packages)}] {package} をアンインストールしますか？", default="n"):
+    for i, package in enumerate(NPM_PACKAGES, 1):
+        if npm_packages.get(package):
             cmd = [npm_cmd, "uninstall", "-g", package]
             print_info(f"実行中: {' '.join(cmd)}")
             try:
@@ -501,9 +571,81 @@ def uninstall_global_npm_tools():
         print_info("アンインストール対象はありませんでした")
 
 
-def main():
+def collect_cleanup_choices(base_dir: Path) -> dict | None:
+    """全ての y/n を最初にまとめて聞く。キャンセル時は None を返す。"""
     global AUTO_MODE
 
+    run_cleanup, AUTO_MODE = ask_start_mode("クリーンアップを実行しますか？", default="n")
+    if not run_cleanup:
+        return None
+
+    if AUTO_MODE:
+        print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
+
+    print_header("クリーンアップ内容の選択")
+    print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
+
+    choices: dict = {
+        "npm_uninstall":    False,
+        "npm_packages":     {},
+        "backup":           False,
+        "mcp":              False,
+        "mcp_envs":         {},
+        "mcp_node_modules": False,
+        "mcp_temp":         False,
+        "backend":          False,
+        "backend_envs":     {},
+        "backend_logs":     False,
+        "backend_temp":     False,
+        "backend_sqlite":   False,
+        "web":              False,
+        "avatar":           False,
+        "mcp_configs":      False,
+    }
+
+    choices["npm_uninstall"] = ask_yes_no("グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n")
+    if choices["npm_uninstall"]:
+        for i, package in enumerate(NPM_PACKAGES, 1):
+            choices["npm_packages"][package] = ask_yes_no(f"  [{i}/{len(NPM_PACKAGES)}] {package} をアンインストールしますか？", default="n")
+
+    backup_dir = base_dir / "backup"
+    if backup_dir.exists():
+        choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
+
+    choices["mcp"] = ask_yes_no("バックエンド(mcp) をクリーンアップしますか？", default="y")
+    if choices["mcp"]:
+        backend_mcp_dir = base_dir / BACKEND_MCP_PATH
+        if backend_mcp_dir.exists():
+            for env_name in BACKEND_MCP_ENV_LIST:
+                if (backend_mcp_dir / env_name).exists():
+                    choices["mcp_envs"][env_name] = ask_yes_no(f"  {BACKEND_MCP_PATH}/{env_name} を削除しますか？", default="y")
+            if (backend_mcp_dir / "node_modules").exists():
+                choices["mcp_node_modules"] = ask_yes_no(f"  {BACKEND_MCP_PATH}/node_modules を削除しますか？", default="y")
+            if (backend_mcp_dir / "temp").exists():
+                choices["mcp_temp"] = ask_yes_no(f"  {BACKEND_MCP_PATH}/temp の中身をクリアしますか？", default="y")
+
+    choices["backend"] = ask_yes_no("バックエンド(core,apps)をクリーンアップしますか？", default="y")
+    if choices["backend"]:
+        backend_dir = base_dir / BACKEND_PATH
+        if backend_dir.exists():
+            for env_name in BACKEND_ENV_LIST:
+                if (backend_dir / env_name).exists():
+                    choices["backend_envs"][env_name] = ask_yes_no(f"  {BACKEND_PATH}/{env_name} を削除しますか？", default="y")
+            if (backend_dir / "logs").exists():
+                choices["backend_logs"] = ask_yes_no(f"  {BACKEND_PATH}/logs の中身をクリアしますか？", default="y")
+            if (backend_dir / "temp").exists():
+                choices["backend_temp"] = ask_yes_no(f"  {BACKEND_PATH}/temp の中身をクリアしますか？", default="y")
+            if DATABASE_TYPE.lower() == "sqlite" and (base_dir / SQLITE_DB_REL_PATH).exists():
+                choices["backend_sqlite"] = ask_yes_no("  SQLite データベースを削除しますか？", default="n")
+
+    choices["web"]    = ask_yes_no("フロントエンド(Web)をクリーンアップしますか？", default="y")
+    choices["avatar"] = ask_yes_no("フロントエンド(Avatar)をクリーンアップしますか？", default="y")
+    choices["mcp_configs"] = ask_yes_no(f"グローバルMCP設定の {BACKEND_MCP_SERVER_PREFIX}* を解除しますか？", default="y")
+
+    return choices
+
+
+def main():
     print_header("プロジェクト クリーンアップ")
 
     base_dir = Path(__file__).parent
@@ -515,57 +657,54 @@ def main():
     print_info("  4. フロントエンド(Avatar)")
     print()
 
-    run_cleanup, AUTO_MODE = ask_start_mode("クリーンアップを実行しますか？", default="n")
-    if not run_cleanup:
+    choices = collect_cleanup_choices(base_dir)
+    if choices is None:
         print_info("クリーンアップをキャンセルしました")
         return
 
-    if AUTO_MODE:
-        print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
+    print_header("一括実行開始")
 
-    if ask_yes_no("グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n"):
-        uninstall_global_npm_tools()
+    if choices["npm_uninstall"]:
+        uninstall_global_npm_tools(choices["npm_packages"])
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
 
     backup_dir = base_dir / "backup"
     if backup_dir.exists():
-        if ask_yes_no("backup フォルダを削除しますか？", default="y"):
+        if choices["backup"]:
             remove_directory(backup_dir, "backup")
         else:
             print_info("backup フォルダはそのまま残します")
 
     print()
-    if ask_yes_no("バックエンド(mcp) をクリーンアップしますか？", default="y"):
-        cleanup_backend_mcp(base_dir)
+    if choices["mcp"]:
+        cleanup_backend_mcp(base_dir, choices)
     else:
         print_info("バックエンド(mcp) のクリーンアップをスキップしました")
 
     print()
-    if ask_yes_no("バックエンド(core,apps)をクリーンアップしますか？", default="y"):
-        cleanup_backend(base_dir)
+    if choices["backend"]:
+        cleanup_backend(base_dir, choices)
     else:
         print_info("バックエンド(core,apps)のクリーンアップをスキップしました")
 
     print()
-    if ask_yes_no("フロントエンド(Web)をクリーンアップしますか？", default="y"):
+    if choices["web"]:
         cleanup_frontend_web(base_dir)
     else:
         print_info("フロントエンド(Web)のクリーンアップをスキップしました")
 
     print()
-    if ask_yes_no("フロントエンド(Avatar)をクリーンアップしますか？", default="y"):
+    if choices["avatar"]:
         cleanup_frontend_avatar(base_dir)
     else:
         print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
 
     print()
-    server_names_str = ", ".join(BACKEND_MCP_SERVER_NAMES)
-    if ask_yes_no(f"グローバルMCP設定の {server_names_str} を解除しますか？", default="y"):
-        for server_name in BACKEND_MCP_SERVER_NAMES:
-            cleanup_global_mcp_configs(server_name)
+    if choices["mcp_configs"]:
+        cleanup_global_mcp_configs(BACKEND_MCP_SERVER_PREFIX)
     else:
-        print_warning(f"グローバルMCP設定の {server_names_str} はそのまま残します")
+        print_warning(f"グローバルMCP設定の {BACKEND_MCP_SERVER_PREFIX}* はそのまま残します")
 
     print()
     print_header("クリーンアップ完了")

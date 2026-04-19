@@ -16,12 +16,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.13.3, FastAPI, SQLAlchemy, SQLite, uv |
-| Backend MCP | Python 3.13.3, FastMCP (SSE×2), Chrome DevTools Protocol, pyautogui, PIL |
+| Backend MCP | Python 3.13.3, FastMCP (SSE×6), CDP, pyautogui, PIL, SQLite3, psycopg, subprocess |
 | Frontend Web | Node.js 22, Vue 3, Vite, TypeScript, Pinia, Vue Router 4 |
 | Frontend Avatar | Vue 3, Vite, TypeScript, Electron, Three.js, WebSocket |
 | Auth | JWT (python-jose, HS256, 60分) |
 | AI | Anthropic Claude, OpenAI, Google Gemini |
-| AI Browser | Claude Agent SDK + MCP (chrome-devtools-mcp via backend_mcp) |
+| AI Browser | Claude Agent SDK + MCP (aidiy_chrome_devtools / aidiy_desktop_capture / aidiy_sqlite / aidiy_postgres / aidiy_logs / aidiy_code_check via backend_mcp) |
 
 ## Critical Constraints
 
@@ -108,8 +108,12 @@ rm backend_server/_data/AiDiy/database.db
 | Frontend (Web) | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:8092/docs |
-| Backend MCP Chrome (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
-| Backend MCP Screenshot (SSE) | http://localhost:8095/aidiy_screenshot/sse |
+| Backend MCP Chrome DevTools (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
+| Backend MCP Desktop Capture (SSE) | http://localhost:8095/aidiy_desktop_capture/sse |
+| Backend MCP SQLite (SSE) | http://localhost:8095/aidiy_sqlite/sse |
+| Backend MCP PostgreSQL (SSE) | http://localhost:8095/aidiy_postgres/sse |
+| Backend MCP Logs (SSE) | http://localhost:8095/aidiy_logs/sse |
+| Backend MCP Code Check (SSE) | http://localhost:8095/aidiy_code_check/sse |
 | Frontend (Avatar Web) | http://localhost:8099 |
 | Frontend (Avatar Electron) | `npm run dev` で起動 |
 
@@ -137,13 +141,14 @@ rm backend_server/_data/AiDiy/database.db
 
 - **core_main.py** (8091): C系（権限・利用者・採番）、A系（AIコア・会話履歴）、WebSocket
 - **apps_main.py** (8092): M系（マスタ）、T系（トランザクション）、V系（JOIN表示）、S系（スケジューラ）
-- **mcp_main.py** (8095): MCP サーバー × 2 エンドポイント — Chrome DevTools (`/aidiy_chrome_devtools/sse`) + Screenshot (`/aidiy_screenshot/sse`)
+- **mcp_main.py** (8095): MCP サーバー × 6 エンドポイント — Chrome DevTools (`/aidiy_chrome_devtools/sse`) / Desktop Capture (`/aidiy_desktop_capture/sse`) / SQLite (`/aidiy_sqlite/sse`) / PostgreSQL (`/aidiy_postgres/sse`) / Logs (`/aidiy_logs/sse`) / Code Check (`/aidiy_code_check/sse`)
 
 core_main / apps_main は同じ SQLite DB を共有。Vite Proxy が `/core/*` → 8091、`/apps/*` → 8092 に自動振り分け。フロントのポートを変えたら `core_main.py` / `apps_main.py` の CORS 許可リストも更新すること。
 
 ### AIブラウザ自動操作（MCP連携）
 
-- `backend_mcp/mcp_main.py` が Chrome DevTools MCP サーバーを SSE で提供（ポート 8095）
+- `backend_mcp/mcp_main.py` が 6 つの MCP サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check`）を SSE で提供（ポート 8095）
+- ブラウザ自動操作・画面キャプチャに加え、**AIエージェントの自己検証を支える DB クエリ（SQLite/PostgreSQL）・ログ観測・型チェック**を同居
 - `backend_server/_config/AiDiy_mcp.json` に接続先 MCP サーバーを定義
 - `AIコア/AIコード_claude.py`（Claude Agent SDK）が起動時に `AiDiy_mcp.json` を読み込み、`ClaudeAgentOptions.mcp_servers` に渡す
 - `permission_mode="bypassPermissions"` により MCP ツール（スクリーンショット・クリック・ナビゲーション等）が自動許可で実行される

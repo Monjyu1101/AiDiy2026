@@ -9,10 +9,10 @@
 # -------------------------------------------------------------------------
 
 """
-aidiy_screenshot MCP テスト
+aidiy_desktop_capture MCP テスト
 
 backend_mcp (port 8095) が起動済みの状態で実行すること。
-SSE エンドポイント: http://localhost:8095/aidiy_screenshot/sse
+SSE エンドポイント: http://localhost:8095/aidiy_desktop_capture/sse
 
 実行:
     cd backend_mcp
@@ -37,7 +37,7 @@ os.environ["no_proxy"] = "localhost,127.0.0.1"
 from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 
-SSE_URL    = "http://localhost:8095/aidiy_screenshot/sse"
+SSE_URL    = "http://localhost:8095/aidiy_desktop_capture/sse"
 SAVE_DIR   = Path(__file__).parent / "temp"
 
 
@@ -77,7 +77,7 @@ async def save_image(session: ClientSession, tool: str, filename: str, **kwargs)
 # ------------------------------------------------------------------ #
 
 async def main() -> None:
-    print("=== aidiy_screenshot MCP テスト ===")
+    print("=== aidiy_desktop_capture MCP テスト ===")
     print(f"  SSE URL: {SSE_URL}\n")
 
     async with sse_client(SSE_URL, timeout=10, sse_read_timeout=30) as (read, write):

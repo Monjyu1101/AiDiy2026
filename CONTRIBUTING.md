@@ -32,7 +32,7 @@
 
 - API: http://localhost:8091/docs / http://localhost:8092/docs
 - UI: http://localhost:8090
-- MCP 連携変更時: `backend_mcp` の SSE `http://localhost:8095/aidiy_chrome_devtools/sse` も確認
+- MCP 連携変更時: `backend_mcp` の 6 SSE（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check`、いずれも `http://localhost:8095/<name>/sse`）も確認
 
 ## セキュリティ
 

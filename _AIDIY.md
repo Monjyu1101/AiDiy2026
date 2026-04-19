@@ -21,7 +21,7 @@
 - マルチバックエンド
   - `core_main.py` : `8091`
   - `apps_main.py` : `8092`
-  - `mcp_main.py` : `8095`（Chrome DevTools MCP — AIブラウザ自動操作）
+  - `mcp_main.py` : `8095`（`aidiy_chrome_devtools` + `aidiy_desktop_capture` の 2 つの MCP サーバーを同居）
 - 実用サンプルを同梱
   - C系, M系, T系, V系, S系, A系, X系
 - AI 統合
@@ -31,10 +31,16 @@
 - マルチ Code CLI 対応
   - `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `hermes_cli`
   - 複数のコードエージェントを同時並走（code1〜code4 パネル）
-- AIブラウザ自動操作
-  - `backend_mcp/mcp_main.py`（port 8095）が Chrome DevTools MCP を SSE で提供
-  - `backend_server/_config/AiDiy_mcp.json` で MCP サーバーを定義
-  - Claude Agent SDK（claude_sdk）が MCP 経由でブラウザ操作可能
+- AIブラウザ自動操作・デスクトップキャプチャ・自己検証 MCP
+  - `backend_mcp/mcp_main.py`（port 8095）が 6 MCP サーバーを SSE で提供
+    - `aidiy_chrome_devtools` — CDP でブラウザ操作
+    - `aidiy_desktop_capture` — スクリーンショット取得
+    - `aidiy_sqlite`          — AiDiy DB の read-only 中心クエリ
+    - `aidiy_postgres`        — 外部 PostgreSQL の read-only 中心クエリ
+    - `aidiy_logs`            — バックエンドログの tail・エラー抽出
+    - `aidiy_code_check`      — py_compile / ruff / TypeScript 型チェック
+  - `backend_server/_config/AiDiy_mcp.json` で使う MCP を選んで定義
+  - Claude Agent SDK（claude_sdk）が MCP 経由でブラウザ操作・画面キャプチャ・自己検証可能
 - 自己改善機構
   - コードエージェントが修正完了後、`.aidiy/` フォルダへ知見を自動整理
   - 使うほど類似修正の精度が上がる「育つシステム」
@@ -46,7 +52,7 @@
 - 起動は `python _start.py`
   - 起動時に backend(mcp) / backend(core,apps) / web / avatar を対話形式で選択
 - Web フロント: `http://localhost:8090`
-- MCP SSE: `http://localhost:8095/aidiy_chrome_devtools/sse`
+- MCP SSE (port 8095): `/aidiy_chrome_devtools/sse` / `/aidiy_desktop_capture/sse` / `/aidiy_sqlite/sse` / `/aidiy_postgres/sse` / `/aidiy_logs/sse` / `/aidiy_code_check/sse`
 - Avatar Web モード: `http://localhost:8099`
 - SQLite DB: `backend_server/_data/AiDiy/database.db`
 - 初期ログイン: `admin / ********`

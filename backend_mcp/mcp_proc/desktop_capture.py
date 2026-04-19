@@ -27,14 +27,14 @@ import screeninfo
 from PIL import Image, ImageDraw, ImageFont, ImageGrab
 
 
-class ScreenCaptureError(Exception):
-    """スクリーンショット取得エラー"""
+class DesktopCaptureError(Exception):
+    """デスクトップキャプチャ取得エラー"""
     pass
 
 
-class ScreenCapture:
+class DesktopCapture:
     """
-    スクリーンショット取得クラス
+    デスクトップキャプチャ取得クラス
 
     screen_number パラメータ:
         "auto" — カーソルのあるモニター全体（デフォルト）
@@ -198,7 +198,7 @@ class ScreenCapture:
             (image, info_dict)  info_dict: hwnd, title, x, y, width, height
         """
         if os.name != "nt":
-            raise ScreenCaptureError("ウィンドウキャプチャは Windows のみ対応しています")
+            raise DesktopCaptureError("ウィンドウキャプチャは Windows のみ対応しています")
 
         import ctypes
         from ctypes import wintypes
@@ -226,7 +226,7 @@ class ScreenCapture:
         ctypes.windll.user32.EnumWindows(_enum_cb, 0)
 
         if not found:
-            raise ScreenCaptureError(f"ウィンドウが見つかりません: '{title}'")
+            raise DesktopCaptureError(f"ウィンドウが見つかりません: '{title}'")
 
         hwnd = found["hwnd"]
         rect = wintypes.RECT()
@@ -235,7 +235,7 @@ class ScreenCapture:
         x, y = rect.left, rect.top
         w, h = rect.right - rect.left, rect.bottom - rect.top
         if w <= 0 or h <= 0:
-            raise ScreenCaptureError(f"ウィンドウサイズが不正です: '{found['title']}'")
+            raise DesktopCaptureError(f"ウィンドウサイズが不正です: '{found['title']}'")
 
         img = ImageGrab.grab(bbox=(x, y, x + w, y + h))
         return img, {

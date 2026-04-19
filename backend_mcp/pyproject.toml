@@ -11,6 +11,7 @@ dependencies = [
     "Pillow>=10.0.0",
     "screeninfo>=0.8.1",
     "pyautogui>=0.9.54",
+    "psycopg[binary]>=3.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]

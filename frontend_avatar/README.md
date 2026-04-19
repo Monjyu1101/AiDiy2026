@@ -42,7 +42,12 @@ http://localhost:8099
 
 - Core API / WebSocket: `http://localhost:8091` / `ws://localhost:8091/core/ws/AIコア`
 - Apps API: `http://localhost:8092`
-- Backend MCP (SSE): `http://localhost:8095/aidiy_chrome_devtools/sse`
+- Backend MCP Chrome DevTools (SSE): `http://localhost:8095/aidiy_chrome_devtools/sse`
+- Backend MCP Desktop Capture (SSE): `http://localhost:8095/aidiy_desktop_capture/sse`
+- Backend MCP SQLite (SSE):          `http://localhost:8095/aidiy_sqlite/sse`
+- Backend MCP PostgreSQL (SSE):      `http://localhost:8095/aidiy_postgres/sse`
+- Backend MCP Logs (SSE):            `http://localhost:8095/aidiy_logs/sse`
+- Backend MCP Code Check (SSE):      `http://localhost:8095/aidiy_code_check/sse`
 
 ## 補足コマンド
 

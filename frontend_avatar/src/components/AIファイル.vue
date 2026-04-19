@@ -84,6 +84,7 @@ const ファイル保存中 = ref(false)
 const ファイルダウンロード中 = ref(false)
 
 // --- Monaco ---
+const fileコンテナ = ref<HTMLElement | null>(null)
 const monacoコンテナ = ref<HTMLDivElement | null>(null)
 let monacoエディタ: monaco.editor.IStandaloneCodeEditor | null = null
 // --- 自動更新 ---
@@ -717,7 +718,20 @@ const コンテキストメニューダウンロード = async () => {
 const 下段右クリック = (e: MouseEvent) => {
   if (!選択ファイルパス.value) return
   e.preventDefault()
+  fileコンテナ.value?.focus()
   コンテキストメニュー表示位置設定(e.clientX, e.clientY)
+}
+
+const コンポーネントマウスダウン = (e: MouseEvent) => {
+  const target = e.target
+  if (!(target instanceof HTMLElement)) {
+    fileコンテナ.value?.focus()
+    return
+  }
+  if (target.closest('.monaco-editor, button, select, input, textarea, a, [contenteditable="true"]')) {
+    return
+  }
+  fileコンテナ.value?.focus()
 }
 
 // --- キーボードナビ ---
@@ -726,10 +740,7 @@ const キーボードキーダウン = (e: KeyboardEvent) => {
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
   if (!選択ファイル名.value || !選択パネル.value) return
 
-  // Monaco Editor にフォーカスが当たっているときは操作しない
-  const active = document.activeElement
-  if (active && active.classList.contains('monaco-editor')) return
-  if (active && (active as HTMLElement).closest?.('.monaco-editor')) return
+  if (document.activeElement !== fileコンテナ.value) return
 
   const isBackup = 選択パネル.value === 'left'
   const ファイル行 = (isBackup ? 最終ファイル行.value : 作業ファイル行.value).filter((行) => 行.種別 === 'file')
@@ -840,7 +851,12 @@ defineExpose({
 </script>
 
 <template>
-  <section class="file-container">
+  <section
+    ref="fileコンテナ"
+    class="file-container"
+    tabindex="0"
+    @mousedown.capture="コンポーネントマウスダウン"
+  >
     <div class="file-body">
       <!-- 上段: 左右分割ツリー -->
       <div class="upper-area">
@@ -1022,6 +1038,10 @@ defineExpose({
   flex-direction: column;
   background: #000;
   overflow: hidden;
+}
+
+.file-container:focus {
+  outline: none;
 }
 
 /* body: 上下分割 */

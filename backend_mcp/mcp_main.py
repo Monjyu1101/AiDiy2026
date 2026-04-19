@@ -53,7 +53,11 @@ from starlette.routing import Route
 from log_config import setup_logging, get_logger
 from mcp_proc.chrome_manager import ChromeManager
 from mcp_proc.chrome_devtools import CDPClient
-from mcp_proc.screen_capture import ScreenCapture, ScreenCaptureError
+from mcp_proc.desktop_capture import DesktopCapture, DesktopCaptureError
+from mcp_proc.sqlite_query import SqliteQuery, SqliteQueryError
+from mcp_proc.postgres_query import PgQuery, PgQueryError
+from mcp_proc.log_tailer import LogTailer, LogTailError
+from mcp_proc.code_checker import CodeChecker, CodeCheckError
 
 setup_logging()
 logger = get_logger(__name__)
@@ -65,11 +69,35 @@ logger = get_logger(__name__)
 CHROME_PORT  = int(os.environ.get("CHROME_DEBUG_PORT", "9222"))
 MCP_PORT     = int(os.environ.get("MCP_PORT", "8095"))
 MOUNT        = os.environ.get("MCP_MOUNT_PATH", "/aidiy_chrome_devtools")
-MOUNT_SS     = os.environ.get("MCP_SS_MOUNT_PATH", "/aidiy_screenshot")
+MOUNT_DC     = os.environ.get("MCP_DC_MOUNT_PATH", "/aidiy_desktop_capture")
+MOUNT_SQ     = os.environ.get("MCP_SQ_MOUNT_PATH", "/aidiy_sqlite")
+MOUNT_PG     = os.environ.get("MCP_PG_MOUNT_PATH", "/aidiy_postgres")
+MOUNT_LG     = os.environ.get("MCP_LG_MOUNT_PATH", "/aidiy_logs")
+MOUNT_CC     = os.environ.get("MCP_CC_MOUNT_PATH", "/aidiy_code_check")
 
 chrome   = ChromeManager(debug_port=CHROME_PORT)
 cdp      = CDPClient(port=CHROME_PORT)
-capture  = ScreenCapture()
+capture  = DesktopCapture()
+sqlite_q = SqliteQuery()
+log_t    = LogTailer()
+checker  = CodeChecker()
+
+# PostgreSQL は psycopg 未導入環境でもサーバー起動を阻害しないよう遅延初期化
+_pg_q: Optional[PgQuery] = None
+_pg_init_error: Optional[str] = None
+try:
+    _pg_q = PgQuery()
+except PgQueryError as _e:
+    _pg_init_error = str(_e)
+
+
+def _get_pg() -> PgQuery:
+    """PgQuery インスタンスを取得。未初期化なら明示エラー。"""
+    if _pg_q is None:
+        raise ValueError(
+            f"aidiy_postgres は初期化されていません: {_pg_init_error or '未知の理由'}"
+        )
+    return _pg_q
 
 # ------------------------------------------------------------------ #
 # 再起動フラグ監視
@@ -123,12 +151,48 @@ mcp = FastMCP(
     warn_on_duplicate_tools=False,
 )
 
-mcp_ss = FastMCP(
-    "aidiy_screenshot",
+mcp_dc = FastMCP(
+    "aidiy_desktop_capture",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_SS}/sse",
-    message_path=f"{MOUNT_SS}/messages/",
+    sse_path=f"{MOUNT_DC}/sse",
+    message_path=f"{MOUNT_DC}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_sq = FastMCP(
+    "aidiy_sqlite",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_SQ}/sse",
+    message_path=f"{MOUNT_SQ}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_pg = FastMCP(
+    "aidiy_postgres",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_PG}/sse",
+    message_path=f"{MOUNT_PG}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_lg = FastMCP(
+    "aidiy_logs",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_LG}/sse",
+    message_path=f"{MOUNT_LG}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_cc = FastMCP(
+    "aidiy_code_check",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_CC}/sse",
+    message_path=f"{MOUNT_CC}/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -444,10 +508,10 @@ async def get_page_content(tab_id: Optional[str] = None) -> str:
     return await get_text(tab_id)
 
 # ================================================================== #
-# aidiy_screenshot ツール
+# aidiy_desktop_capture ツール
 # ================================================================== #
 
-@mcp_ss.tool()
+@mcp_dc.tool()
 async def screenshot(
     screen_number: str = "auto",
     size: Optional[int] = None,
@@ -530,18 +594,18 @@ async def screenshot(
         )
         return [ImageContent(type="image", data=b64, mimeType=mime)]
 
-    except ScreenCaptureError as e:
+    except DesktopCaptureError as e:
         raise ValueError(str(e)) from e
 
 
-@mcp_ss.tool()
+@mcp_dc.tool()
 async def get_cursor_pos() -> str:
     """現在のマウスカーソル座標を返す"""
     x, y = await asyncio.to_thread(capture.cursor_pos)
     return json.dumps({"x": x, "y": y}, ensure_ascii=False)
 
 
-@mcp_ss.tool()
+@mcp_dc.tool()
 async def get_screen_info() -> str:
     """
     全モニターの解像度・座標・プライマリフラグを返す。
@@ -553,7 +617,7 @@ async def get_screen_info() -> str:
     return json.dumps(mons, ensure_ascii=False)
 
 
-@mcp_ss.tool()
+@mcp_dc.tool()
 async def list_windows() -> str:
     """
     表示中ウィンドウの一覧を返す（Windows 専用）。
@@ -566,7 +630,266 @@ async def list_windows() -> str:
 
 
 # ================================================================== #
-# アプリ（chrome + screenshot を1ポートで統合）
+# aidiy_sqlite ツール（AiDiy の SQLite DB を自己検証用に読み書き）
+# ================================================================== #
+
+@mcp_sq.tool()
+async def sqlite_list_tables() -> str:
+    """AiDiy DB の全テーブル・VIEW 一覧を返す"""
+    try:
+        items = await asyncio.to_thread(sqlite_q.list_tables)
+    except SqliteQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(items, ensure_ascii=False)
+
+
+@mcp_sq.tool()
+async def sqlite_describe_table(table_name: str) -> str:
+    """指定テーブルのスキーマ（列・FK・索引・件数）を返す"""
+    try:
+        info = await asyncio.to_thread(sqlite_q.describe_table, table_name)
+    except SqliteQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False, default=str)
+
+
+@mcp_sq.tool()
+async def sqlite_count(table_name: str, where: Optional[str] = None) -> str:
+    """件数を返す。where は必要なら SQL の WHERE 節を文字列で渡す（`;` 禁止）"""
+    try:
+        info = await asyncio.to_thread(sqlite_q.count, table_name, where)
+    except SqliteQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_sq.tool()
+async def sqlite_query(
+    sql: str,
+    params: Optional[list] = None,
+    max_rows: int = 200,
+    allow_write: bool = False,
+) -> str:
+    """
+    SELECT を実行して行を返す。既定は読み取り専用。
+    書き込み系は allow_write=True を明示したときのみ許可。
+    複数ステートメント不可。
+    """
+    try:
+        result = await asyncio.to_thread(
+            sqlite_q.query, sql, params, max_rows, allow_write
+        )
+    except SqliteQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@mcp_sq.tool()
+async def sqlite_audit_summary(table_name: str, limit: int = 5) -> str:
+    """監査フィールドのあるテーブルの直近 N 件を返す（更新日時 降順）"""
+    try:
+        info = await asyncio.to_thread(sqlite_q.audit_summary, table_name, limit)
+    except SqliteQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False, default=str)
+
+
+# ================================================================== #
+# aidiy_postgres ツール（外部 PostgreSQL に対する read-only 中心クエリ）
+# ================================================================== #
+
+@mcp_pg.tool()
+async def postgres_server_info(dsn: Optional[str] = None) -> str:
+    """接続先 PostgreSQL のバージョン・現在 DB・ユーザー等を返す"""
+    try:
+        info = await asyncio.to_thread(_get_pg().server_info, dsn)
+    except PgQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False, default=str)
+
+
+@mcp_pg.tool()
+async def postgres_list_databases(dsn: Optional[str] = None) -> str:
+    """テンプレート以外の DB 一覧"""
+    try:
+        items = await asyncio.to_thread(_get_pg().list_databases, dsn)
+    except PgQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(items, ensure_ascii=False)
+
+
+@mcp_pg.tool()
+async def postgres_list_schemas(dsn: Optional[str] = None) -> str:
+    """ユーザースキーマ一覧（pg_catalog / information_schema は除外）"""
+    try:
+        items = await asyncio.to_thread(_get_pg().list_schemas, dsn)
+    except PgQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(items, ensure_ascii=False)
+
+
+@mcp_pg.tool()
+async def postgres_list_tables(
+    schema: str = "public",
+    dsn: Optional[str] = None,
+) -> str:
+    """指定スキーマのテーブル・VIEW 一覧"""
+    try:
+        items = await asyncio.to_thread(_get_pg().list_tables, schema, dsn)
+    except PgQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(items, ensure_ascii=False)
+
+
+@mcp_pg.tool()
+async def postgres_describe_table(
+    table: str,
+    schema: str = "public",
+    dsn: Optional[str] = None,
+) -> str:
+    """列情報・PK・FK・件数を返す"""
+    try:
+        info = await asyncio.to_thread(
+            _get_pg().describe_table, table, schema, dsn
+        )
+    except PgQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False, default=str)
+
+
+@mcp_pg.tool()
+async def postgres_count(
+    table: str,
+    schema: str = "public",
+    where: Optional[str] = None,
+    dsn: Optional[str] = None,
+) -> str:
+    """件数取得（`where` 内の `;` は禁止）"""
+    try:
+        info = await asyncio.to_thread(_get_pg().count, table, schema, where, dsn)
+    except PgQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False, default=str)
+
+
+@mcp_pg.tool()
+async def postgres_query(
+    sql: str,
+    params: Optional[list] = None,
+    max_rows: int = 200,
+    allow_write: bool = False,
+    dsn: Optional[str] = None,
+) -> str:
+    """
+    任意 SQL を実行。既定は読み取り専用トランザクション。
+    複数ステートメント不可。書き込みは allow_write=True が必要。
+    """
+    try:
+        result = await asyncio.to_thread(
+            _get_pg().query, sql, params, max_rows, allow_write, dsn
+        )
+    except PgQueryError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+# ================================================================== #
+# aidiy_logs ツール（バックエンドのログを tail する）
+# ================================================================== #
+
+@mcp_lg.tool()
+async def logs_list() -> str:
+    """監視対象のログファイル一覧を返す（server / mcp）"""
+    try:
+        items = await asyncio.to_thread(log_t.list_logs)
+    except LogTailError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(items, ensure_ascii=False)
+
+
+@mcp_lg.tool()
+async def logs_tail(
+    server: str = "server",
+    lines: int = 100,
+    grep: Optional[str] = None,
+) -> str:
+    """
+    指定サーバーのログ末尾を返す。
+
+    Args:
+        server: 'server'（core/apps 共通）/ 'mcp' / 'core' / 'apps'
+        lines:  末尾 N 行（最大 2000）
+        grep:   指定時は正規表現で抽出
+    """
+    try:
+        result = await asyncio.to_thread(log_t.tail, server, lines, grep)
+    except LogTailError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_lg.tool()
+async def logs_recent_errors(server: str = "server", lines: int = 500) -> str:
+    """直近ログから ERROR/Traceback を抽出し、前後 2 行の文脈付きで返す"""
+    try:
+        result = await asyncio.to_thread(log_t.recent_errors, server, lines)
+    except LogTailError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+# ================================================================== #
+# aidiy_code_check ツール（型チェック・構文チェック・lint）
+# ================================================================== #
+
+@mcp_cc.tool()
+async def check_list_targets() -> str:
+    """チェック対象（Python venv / TS プロジェクト）の存在確認"""
+    try:
+        info = await asyncio.to_thread(checker.list_targets)
+    except CodeCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_cc.tool()
+async def check_python_syntax(
+    file_path: str,
+    venv_project: str = "backend_server",
+) -> str:
+    """Python ファイル 1 つを py_compile で構文チェック（相対パスはプロジェクトルート基準）"""
+    try:
+        result = await asyncio.to_thread(checker.python_syntax, file_path, venv_project)
+    except CodeCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_cc.tool()
+async def check_python_ruff(
+    path: str = "backend_server",
+    venv_project: str = "backend_server",
+) -> str:
+    """Python プロジェクトを ruff check で lint（未インストール時はエラーを返す）"""
+    try:
+        result = await asyncio.to_thread(checker.python_ruff, path, venv_project)
+    except CodeCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_cc.tool()
+async def check_typescript(project: str = "frontend_web") -> str:
+    """npm run type-check を実行（project: 'frontend_web' / 'frontend_avatar'）"""
+    try:
+        result = await asyncio.to_thread(checker.typescript_check, project)
+    except CodeCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+# ================================================================== #
+# アプリ（5 つの MCP サーバーを 1 ポートで統合）
 # ================================================================== #
 
 async def _handle_root(request: Request) -> Response:
@@ -575,10 +898,19 @@ async def _handle_root(request: Request) -> Response:
 app = Starlette(routes=[
     Route("/", _handle_root, methods=["GET"]),
     *mcp.sse_app().routes,
-    *mcp_ss.sse_app().routes,
+    *mcp_dc.sse_app().routes,
+    *mcp_sq.sse_app().routes,
+    *mcp_pg.sse_app().routes,
+    *mcp_lg.sse_app().routes,
+    *mcp_cc.sse_app().routes,
 ])
 
 if __name__ == "__main__":
-    logger.info(f"Chrome SSE    : http://localhost:{MCP_PORT}{MOUNT}/sse")
-    logger.info(f"Screenshot SSE: http://localhost:{MCP_PORT}{MOUNT_SS}/sse")
+    logger.info(f"Chrome SSE         : http://localhost:{MCP_PORT}{MOUNT}/sse")
+    logger.info(f"DesktopCapture SSE : http://localhost:{MCP_PORT}{MOUNT_DC}/sse")
+    logger.info(f"Sqlite SSE         : http://localhost:{MCP_PORT}{MOUNT_SQ}/sse")
+    logger.info(f"Postgres SSE       : http://localhost:{MCP_PORT}{MOUNT_PG}/sse"
+                + (" [psycopg 未導入]" if _pg_init_error else ""))
+    logger.info(f"Logs SSE           : http://localhost:{MCP_PORT}{MOUNT_LG}/sse")
+    logger.info(f"CodeCheck SSE      : http://localhost:{MCP_PORT}{MOUNT_CC}/sse")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")

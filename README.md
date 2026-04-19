@@ -20,7 +20,7 @@
 **AiDiy** は、日本語識別子を前提にしたフルスタック業務システムのテンプレートです。
 
 - バックエンド: FastAPI + SQLAlchemy + SQLite
-- バックエンド MCP: FastAPI (SSE) + Node.js + chrome-devtools-mcp
+- バックエンド MCP: FastAPI (SSE) + Python MCP SDK + 自前 CDP クライアント + psycopg（6 サーバーを同居: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
 - バックエンドは **3 サーバー構成**
@@ -134,7 +134,12 @@ npm run dev
 | Web フロント | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:8092/docs |
-| Backend MCP (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
+| Backend MCP Chrome DevTools (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
+| Backend MCP Desktop Capture (SSE) | http://localhost:8095/aidiy_desktop_capture/sse |
+| Backend MCP SQLite (SSE)          | http://localhost:8095/aidiy_sqlite/sse |
+| Backend MCP PostgreSQL (SSE)      | http://localhost:8095/aidiy_postgres/sse |
+| Backend MCP Logs (SSE)            | http://localhost:8095/aidiy_logs/sse |
+| Backend MCP Code Check (SSE)      | http://localhost:8095/aidiy_code_check/sse |
 | Avatar Web モード | http://localhost:8099 |
 | Avatar Electron モード | `npm run dev` で Electron アプリ起動 |
 

@@ -19,7 +19,7 @@
 **関連ドキュメント：**
 - **[../AGENTS.md](../AGENTS.md)** - プロジェクト全体方針
 - **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細
-- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - Chrome DevTools MCP サーバー実装詳細
+- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - MCP サーバー実装詳細（Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check）
 - **[../frontend_web/AGENTS.md](../frontend_web/AGENTS.md)** - Web版フロントエンド実装詳細
 - **[../CLAUDE.md](../CLAUDE.md)** - プロジェクト全体インデックス
 - **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール

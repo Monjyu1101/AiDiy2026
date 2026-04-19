@@ -4,9 +4,9 @@
       "type": "sse",
       "url": "http://localhost:8095/aidiy_chrome_devtools/sse"
     },
-    "aidiy_screenshot": {
+    "aidiy_desktop_capture": {
       "type": "sse",
-      "url": "http://localhost:8095/aidiy_screenshot/sse"
+      "url": "http://localhost:8095/aidiy_desktop_capture/sse"
     }
   }
 }

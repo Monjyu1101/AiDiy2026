@@ -120,7 +120,12 @@ npm run dev
 | Web フロント | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:8092/docs |
-| Backend MCP (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
+| Backend MCP Chrome DevTools (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
+| Backend MCP Desktop Capture (SSE) | http://localhost:8095/aidiy_desktop_capture/sse |
+| Backend MCP SQLite (SSE)          | http://localhost:8095/aidiy_sqlite/sse |
+| Backend MCP PostgreSQL (SSE)      | http://localhost:8095/aidiy_postgres/sse |
+| Backend MCP Logs (SSE)            | http://localhost:8095/aidiy_logs/sse |
+| Backend MCP Code Check (SSE)      | http://localhost:8095/aidiy_code_check/sse |
 | Avatar Web モード | http://localhost:8099 |
 
 初期ユーザー:

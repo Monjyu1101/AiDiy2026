@@ -28,6 +28,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+if sys.platform == "win32":
+    import msvcrt
+
 # ============================================================
 # プロジェクト設定
 # ============================================================
@@ -89,6 +92,43 @@ def print_info(message):
     print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
 
 
+def _clear_keyboard_buffer() -> None:
+    if sys.platform != "win32":
+        return
+    while msvcrt.kbhit():
+        key = msvcrt.getch()
+        if key in (b"\x00", b"\xe0") and msvcrt.kbhit():
+            msvcrt.getch()
+
+
+def _read_single_key(valid: tuple[bytes, ...], default_key: bytes) -> bytes:
+    """1文字入力を受け付ける。Enter でデフォルト、valid 以外は無視して待機。"""
+    if sys.platform == "win32":
+        _clear_keyboard_buffer()
+        while True:
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                if key in (b"\x00", b"\xe0"):
+                    if msvcrt.kbhit():
+                        msvcrt.getch()
+                    continue
+                if key in (b"\r", b"\n"):
+                    print(default_key.decode("ascii"))
+                    return default_key
+                if key in valid:
+                    print(key.decode("ascii", errors="replace"))
+                    return key
+            time.sleep(0.05)
+
+    response = input().strip().lower()
+    if response == "":
+        return default_key
+    first = response[0:1].encode("ascii", errors="replace")
+    if first in valid:
+        return first
+    return default_key
+
+
 def ask_yes_no(prompt, default="n"):
     global AUTO_MODE
 
@@ -96,31 +136,23 @@ def ask_yes_no(prompt, default="n"):
         print_info(f"[AUTO] {prompt} -> {'Yes' if default.lower() == 'y' else 'No'} (default)")
         return default.lower() == "y"
 
-    prompt_text = f"\n{prompt} ([y]/n): " if default.lower() == "y" else f"\n{prompt} (y/[n]): "
-    while True:
-        response = input(prompt_text).strip().lower()
-        if response == "":
-            response = default.lower()
-        if response in ["y", "yes"]:
-            return True
-        if response in ["n", "no"]:
-            return False
-        print_warning("'y' または 'n' で答えてください。")
+    bracket = "[y]/n" if default.lower() == "y" else "y/[n]"
+    print(f"\n{prompt} ({bracket}): ", end="", flush=True)
+    default_key = b"y" if default.lower() == "y" else b"n"
+    key = _read_single_key((b"y", b"Y", b"n", b"N"), default_key)
+    return key in (b"y", b"Y")
 
 
 def ask_start_mode(prompt, default="n"):
-    prompt_text = f"\n{prompt} ([y]/n/a=auto): " if default.lower() == "y" else f"\n{prompt} (y/[n]/a=auto): "
-    while True:
-        response = input(prompt_text).strip().lower()
-        if response == "":
-            response = default.lower()
-        if response in ["y", "yes"]:
-            return True, False
-        if response in ["n", "no"]:
-            return False, False
-        if response in ["a", "auto"]:
-            return True, True
-        print_warning("'y' または 'n' または 'a'(auto) で答えてください。")
+    bracket = "[y]/n/a=auto" if default.lower() == "y" else "y/[n]/a=auto"
+    print(f"\n{prompt} ({bracket}): ", end="", flush=True)
+    default_key = b"y" if default.lower() == "y" else b"n"
+    key = _read_single_key((b"y", b"Y", b"n", b"N", b"a", b"A"), default_key)
+    if key in (b"a", b"A"):
+        return True, True
+    if key in (b"y", b"Y"):
+        return True, False
+    return False, False
 
 
 def run_command(command, cwd=None, shell=False, env=None):
@@ -187,7 +219,8 @@ def ensure_gitignore_entries(entries: list[str], path: Path | None = None) -> bo
         return False
 
 
-def upsert_json_mcp_server(path: Path, server_name: str, server_config: dict) -> bool:
+def upsert_json_mcp_servers(path: Path, entries: list[tuple[str, dict]], top_key: str = "mcpServers") -> bool:
+    """複数サーバーをまとめて 1 つの JSON ファイルへ書き込む（読み書き各 1 回）。"""
     try:
         data = {}
         if path.exists():
@@ -196,22 +229,24 @@ def upsert_json_mcp_server(path: Path, server_name: str, server_config: dict) ->
             if isinstance(loaded, dict):
                 data = loaded
 
-        servers = data.get("mcpServers")
+        servers = data.get(top_key)
         if not isinstance(servers, dict):
             servers = {}
 
-        current = servers.get(server_name)
-        if isinstance(current, dict):
-            merged = dict(current)
-            merged.update(server_config)
-            servers[server_name] = merged
-        else:
-            servers[server_name] = dict(server_config)
+        for server_name, server_config in entries:
+            current = servers.get(server_name)
+            if isinstance(current, dict):
+                merged = dict(current)
+                merged.update(server_config)
+                servers[server_name] = merged
+            else:
+                servers[server_name] = dict(server_config)
 
-        data["mcpServers"] = servers
+        data[top_key] = servers
         if not write_json_file(path, data):
             return False
-        print_success(f"MCP設定を書き込みました: {path}")
+        names = ", ".join(sn for sn, _ in entries)
+        print_success(f"MCP設定を書き込みました: {path} ({names})")
         return True
     except json.JSONDecodeError as e:
         print_error(f"JSON解析エラー: {path} ({e})")
@@ -219,6 +254,16 @@ def upsert_json_mcp_server(path: Path, server_name: str, server_config: dict) ->
     except Exception as e:
         print_error(f"MCP設定更新エラー: {path} ({e})")
         return False
+
+
+def get_vscode_mcp_path() -> Path:
+    """VS Code ユーザー設定フォルダ配下の mcp.json パスを返す。"""
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+        return base / "Code" / "User" / "mcp.json"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Code" / "User" / "mcp.json"
+    return Path.home() / ".config" / "Code" / "User" / "mcp.json"
 
 def remove_toml_table(content: str, table_header: str) -> str:
     lines = content.splitlines()
@@ -581,11 +626,11 @@ def wait_global_npm_tools_install():
     return True
 
 
-def setup_common_global_tools():
+def setup_common_global_tools(choices: dict):
     print_header("共通セットアップ")
     print_info("対象: pip / wheel / setuptools / uv / AI CLI ツール")
 
-    if ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y"):
+    if choices.get("common_python_upgrade"):
         commands = [
             ([sys.executable, "-m", "pip", "install", "--upgrade", "pip"], "pip"),
             (["pip", "install", "--upgrade", "wheel"], "wheel"),
@@ -603,14 +648,14 @@ def setup_common_global_tools():
     else:
         print_warning("共通: Python ツールのアップグレードをスキップしました。")
 
-    if ask_yes_no("共通: グローバル環境の npm ツール(AI CLI)をインストール/アップデートしますか？", default="y"):
+    if choices.get("common_npm_install"):
         start_global_npm_tools_install()
     else:
         print_warning("共通: npm ツールのインストールをスキップしました。")
         print_ai_cli_manual_setup()
 
 
-def setup_backend():
+def setup_backend(choices: dict):
     label = "バックエンド(core,apps)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {BACKEND_DIR}")
@@ -648,11 +693,11 @@ def setup_backend():
         print_info("  パスワード: appspass")
         print_info("  DB名: appsdb")
 
-        if not ask_yes_no("PostgreSQL ユーザー(appsuser)を作成しましたか？", default="y"):
+        if not choices.get("pg_user_created"):
             print_error("PostgreSQL ユーザーが未作成のため処理を終了します。")
             return False
 
-        if ask_yes_no("初期データベースを復元しますか？", default="n"):
+        if choices.get("pg_restore"):
             create_db_script = POSTGRES_DIR / "create_database.py"
             if create_db_script.exists():
                 if not run_command(["uv", "run", "python", str(create_db_script.name)], cwd=POSTGRES_DIR):
@@ -660,7 +705,7 @@ def setup_backend():
             else:
                 print_warning(f"初期データベース復元をスキップします: {create_db_script} が見つかりません。")
 
-        if ask_yes_no("マイグレーション(alembic upgrade head)を実行しますか？", default="y"):
+        if choices.get("pg_migrate"):
             if not run_command(["uv", "run", "alembic", "upgrade", "head"], cwd=BACKEND_DIR):
                 return False
     else:
@@ -757,14 +802,14 @@ MCP_MODULES = [
         "name":        "backend_mcp",
         "server_name": "aidiy_chrome_devtools",   # MCP 設定ファイル上のサーバーキー名
         "dir":         "backend_mcp",
-        "desc":        "Python (uv) — Chrome DevTools Protocol + Screenshot",
+        "desc":        "Python (uv) — Chrome DevTools Protocol + Desktop Capture",
         "start":       "uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095",
         "sse_url":     "http://localhost:8095/aidiy_chrome_devtools/sse",
         # 同一プロセスで追加公開するサーバー（uv sync は不要、設定書き込みのみ）
         "extra_servers": [
             {
-                "server_name": "aidiy_screenshot",
-                "sse_url":     "http://localhost:8095/aidiy_screenshot/sse",
+                "server_name": "aidiy_desktop_capture",
+                "sse_url":     "http://localhost:8095/aidiy_desktop_capture/sse",
             },
         ],
     },
@@ -830,16 +875,18 @@ def show_current_mcp_config(module: dict) -> None:
         server_names.append(extra["server_name"])
 
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+    vscode_mcp   = get_vscode_mcp_path()
 
     targets = [
-        ("グローバル ~/.claude.json (Claude Code)",               Path.home() / ".claude.json"),
-        ("グローバル ~/.gemini/settings.json (Gemini CLI)",        Path.home() / ".gemini" / "settings.json"),
-        ("グローバル ~/.copilot/mcp-config.json (Copilot CLI)",    copilot_home / "mcp-config.json"),
-        ("グローバル ~/.codex/config.toml (Codex CLI)",            Path.home() / ".codex" / "config.toml"),
+        ("グローバル ~/.claude.json (Claude Code)",               Path.home() / ".claude.json",            "mcpServers"),
+        ("グローバル ~/.gemini/settings.json (Gemini CLI)",        Path.home() / ".gemini" / "settings.json", "mcpServers"),
+        ("グローバル ~/.copilot/mcp-config.json (Copilot CLI)",    copilot_home / "mcp-config.json",        "mcpServers"),
+        ("グローバル ~/.codex/config.toml (Codex CLI)",            Path.home() / ".codex" / "config.toml",  "mcpServers"),
+        ("グローバル Code/User/mcp.json (VS Code)",                vscode_mcp,                              "servers"),
     ]
 
     print_info("─── MCP 設定ファイルの現在の状態 ───")
-    for label, path in targets:
+    for label, path, top_key in targets:
         if path.exists():
             try:
                 if path.suffix.lower() == ".toml":
@@ -852,7 +899,7 @@ def show_current_mcp_config(module: dict) -> None:
                             print_warning(f"  [{label}] ファイルあり、{sn} エントリなし")
                 else:
                     data = json.loads(path.read_text(encoding="utf-8-sig"))
-                    servers = data.get("mcpServers", {})
+                    servers = data.get(top_key, {})
                     for sn in server_names:
                         if sn in servers:
                             url = servers[sn].get("url", "(url なし)")
@@ -862,7 +909,7 @@ def show_current_mcp_config(module: dict) -> None:
                             if keys:
                                 print_warning(f"  [{label}] ファイルあり、{sn} エントリなし (キー: {', '.join(keys)})")
                             else:
-                                print_warning(f"  [{label}] ファイルあり、mcpServers なし")
+                                print_warning(f"  [{label}] ファイルあり、{top_key} なし")
             except Exception:
                 print_warning(f"  [{label}] 読み取りエラー: {path}")
         else:
@@ -870,63 +917,89 @@ def show_current_mcp_config(module: dict) -> None:
     print()
 
 
-def _configure_one_server(server_name: str, sse_url: str, module_for_codex: dict) -> bool:
-    """1サーバー分の設定を全 CLI へ書き込む内部ヘルパー"""
-    all_ok = True
-
-    aidiy_mcp = BACKEND_DIR / "_config" / "AiDiy_mcp.json"
-    print_info(f"  [AiDiy設定]   {aidiy_mcp}")
-    all_ok &= upsert_json_mcp_server(aidiy_mcp, server_name, {"type": "sse", "url": sse_url})
-
-    claude_global = Path.home() / ".claude.json"
-    print_info(f"  [Claude Code] {claude_global}")
-    all_ok &= upsert_json_mcp_server(claude_global, server_name, {"type": "sse", "url": sse_url})
-
-    gemini_global = Path.home() / ".gemini" / "settings.json"
-    print_info(f"  [Gemini CLI]  {gemini_global}")
-    all_ok &= upsert_json_mcp_server(gemini_global, server_name, {"url": sse_url, "type": "sse"})
-
-    copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
-    copilot_global = copilot_home / "mcp-config.json"
-    print_info(f"  [Copilot CLI] {copilot_global}")
-    all_ok &= upsert_json_mcp_server(copilot_global, server_name, {"type": "sse", "url": sse_url})
-
-    print_info(f"  [Codex CLI]   {Path.home() / '.codex' / 'config.toml'}")
-    all_ok &= upsert_codex_backend_mcp_config(module_for_codex)
-
-    return all_ok
-
-
 def configure_backend_mcp_clients(module: dict) -> bool:
-    """backend_mcp を各 CLI から使うための設定ファイルを書き込む（extra_servers も含む）"""
+    """backend_mcp を各 CLI から使うための設定ファイルを書き込む（extra_servers も含む）。
+
+    設定先ごとに全サーバーをまとめて 1 回だけ書き込む方式。
+    """
     label = f"{module['name']} MCP 設定"
     print_header(label)
-    print_info("Claude / Gemini / GitHub Copilot / Codex 用のグローバル設定ファイルを書き込みます。")
+    print_info("Claude / Gemini / GitHub Copilot / Codex / VS Code 用のグローバル設定ファイルを書き込みます。")
     print_info("Codex CLI は stdio の mcp_stdio.py を起動し、その先で backend_mcp の SSE へ接続します。")
 
-    # 書き込み対象リスト: メイン + extra_servers
-    servers_to_write = [{
-        "server_name": module.get("server_name", module["name"]),
-        "sse_url":     module.get("sse_url", ""),
-    }]
+    # 書き込み対象サーバーリスト: メイン + extra_servers
+    servers: list[tuple[str, str]] = []
+    main_sn  = module.get("server_name", module["name"])
+    main_url = module.get("sse_url", "").strip()
+    if main_url:
+        servers.append((main_sn, main_url))
+    else:
+        print_error(f"  {main_sn}: sse_url が未定義です。スキップします。")
     for extra in module.get("extra_servers", []):
-        servers_to_write.append({
-            "server_name": extra["server_name"],
-            "sse_url":     extra["sse_url"],
-        })
+        url = extra.get("sse_url", "").strip()
+        if url:
+            servers.append((extra["server_name"], url))
+        else:
+            print_error(f"  {extra['server_name']}: sse_url が未定義です。スキップします。")
+
+    if not servers:
+        print_warning(f"{label}: 書き込み対象サーバーが 1 つもありません。")
+        return False
+
+    print_info("書き込むサーバー:")
+    for sn, url in servers:
+        print_info(f"  ─ {sn} ({url})")
 
     all_ok = True
-    for entry in servers_to_write:
-        sn  = entry["server_name"]
-        url = entry["sse_url"].strip()
-        if not url:
-            print_error(f"  {sn}: sse_url が未定義です。スキップします。")
-            all_ok = False
-            continue
-        print_info(f"─ {sn} ({url})")
-        # Codex 設定は module の server_name / sse_url を差し替えて渡す
+
+    # 1) AiDiy プロジェクト設定 (mcpServers)
+    aidiy_mcp = BACKEND_DIR / "_config" / "AiDiy_mcp.json"
+    print_info(f"[AiDiy設定]   {aidiy_mcp}")
+    all_ok &= upsert_json_mcp_servers(
+        aidiy_mcp,
+        [(sn, {"type": "sse", "url": url}) for sn, url in servers],
+    )
+
+    # 2) Claude Code (mcpServers)
+    claude_global = Path.home() / ".claude.json"
+    print_info(f"[Claude Code] {claude_global}")
+    all_ok &= upsert_json_mcp_servers(
+        claude_global,
+        [(sn, {"type": "sse", "url": url}) for sn, url in servers],
+    )
+
+    # 3) Gemini CLI (mcpServers)
+    gemini_global = Path.home() / ".gemini" / "settings.json"
+    print_info(f"[Gemini CLI]  {gemini_global}")
+    all_ok &= upsert_json_mcp_servers(
+        gemini_global,
+        [(sn, {"url": url, "type": "sse"}) for sn, url in servers],
+    )
+
+    # 4) GitHub Copilot CLI (mcpServers)
+    copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+    copilot_global = copilot_home / "mcp-config.json"
+    print_info(f"[Copilot CLI] {copilot_global}")
+    all_ok &= upsert_json_mcp_servers(
+        copilot_global,
+        [(sn, {"type": "sse", "url": url}) for sn, url in servers],
+    )
+
+    # 5) Codex CLI (TOML, stdio ブリッジ)
+    codex_path = Path.home() / ".codex" / "config.toml"
+    print_info(f"[Codex CLI]   {codex_path}")
+    for sn, url in servers:
         codex_module = {**module, "server_name": sn, "sse_url": url}
-        all_ok &= _configure_one_server(sn, url, codex_module)
+        all_ok &= upsert_codex_backend_mcp_config(codex_module)
+
+    # 6) VS Code (servers)
+    vscode_mcp = get_vscode_mcp_path()
+    print_info(f"[VS Code]     {vscode_mcp}")
+    all_ok &= upsert_json_mcp_servers(
+        vscode_mcp,
+        [(sn, {"type": "sse", "url": url}) for sn, url in servers],
+        top_key="servers",
+    )
 
     if all_ok:
         print_success(f"{label}: 設定ファイルの書き込みが完了しました。")
@@ -935,9 +1008,53 @@ def configure_backend_mcp_clients(module: dict) -> bool:
     return all_ok
 
 
-def main():
+def collect_setup_choices() -> dict | None:
+    """全ての y/n を最初にまとめて聞く。キャンセル時は None を返す。"""
     global AUTO_MODE
 
+    run_setup, AUTO_MODE = ask_start_mode("セットアップを実行しますか?", default="n")
+    if not run_setup:
+        return None
+
+    if AUTO_MODE:
+        print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
+
+    print_header("セットアップ内容の選択")
+    print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
+
+    choices: dict = {
+        "common":                ask_yes_no("共通セットアップを実行しますか？", default="y"),
+        "common_python_upgrade": False,
+        "common_npm_install":    False,
+        "mcp":                   ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y"),
+        "mcp_config":            False,
+        "backend":               ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y"),
+        "pg_user_created":       False,
+        "pg_restore":            False,
+        "pg_migrate":            False,
+        "web":                   ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y"),
+        "avatar":                ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y"),
+        "continue_on_error":     False,
+    }
+
+    if choices["common"]:
+        choices["common_python_upgrade"] = ask_yes_no("  共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
+        choices["common_npm_install"]    = ask_yes_no("  共通: グローバル環境の npm ツール(AI CLI)をインストール/アップデートしますか？", default="y")
+
+    if choices["mcp"]:
+        choices["mcp_config"] = ask_yes_no("  バックエンド(mcp): backend_mcp の mcp機能を使えるよう構成しますか？", default="y")
+
+    if choices["backend"] and DATABASE_TYPE.lower() == "postgresql":
+        choices["pg_user_created"] = ask_yes_no("  バックエンド: PostgreSQL ユーザー(appsuser)を作成しましたか？", default="y")
+        choices["pg_restore"]      = ask_yes_no("  バックエンド: 初期データベースを復元しますか？", default="n")
+        choices["pg_migrate"]      = ask_yes_no("  バックエンド: マイグレーション(alembic upgrade head)を実行しますか？", default="y")
+
+    choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="n")
+
+    return choices
+
+
+def main():
     print_header("プロジェクト セットアップ")
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
@@ -948,23 +1065,23 @@ def main():
     print_info("  5. フロントエンド(Avatar)")
     print()
 
-    run_setup, AUTO_MODE = ask_start_mode("セットアップを実行しますか?", default="n")
-    if not run_setup:
+    choices = collect_setup_choices()
+    if choices is None:
         print_warning("セットアップをキャンセルしました。")
         sys.exit(0)
 
-    if AUTO_MODE:
-        print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
+    print_header("一括実行開始")
+    continue_on_error = choices["continue_on_error"]
 
     print()
-    if ask_yes_no("共通セットアップを実行しますか？", default="y"):
-        setup_common_global_tools()
+    if choices["common"]:
+        setup_common_global_tools(choices)
     else:
         print_warning("共通セットアップをスキップしました。")
 
     print()
-    if ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y"):
-        if not setup_backend_mcp() and not ask_yes_no("バックエンド(mcp) で失敗しました。続行しますか？", default="n"):
+    if choices["mcp"]:
+        if not setup_backend_mcp() and not continue_on_error:
             sys.exit(1)
     else:
         print_warning("バックエンド(mcp) のセットアップをスキップしました。")
@@ -973,29 +1090,29 @@ def main():
     if backend_mcp_module:
         print()
         show_current_mcp_config(backend_mcp_module)
-        if ask_yes_no("backend_mcp の mcp機能を使えるよう構成しますか？", default="y"):
-            if not configure_backend_mcp_clients(backend_mcp_module) and not ask_yes_no("backend_mcp の MCP 設定書き込みで失敗しました。続行しますか？", default="n"):
+        if choices["mcp_config"]:
+            if not configure_backend_mcp_clients(backend_mcp_module) and not continue_on_error:
                 sys.exit(1)
         else:
             print_warning("backend_mcp の MCP 設定ファイル書き込みをスキップしました。")
 
     print()
-    if ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y"):
-        if not setup_backend() and not ask_yes_no("バックエンド(core,apps)で失敗しました。続行しますか？", default="n"):
+    if choices["backend"]:
+        if not setup_backend(choices) and not continue_on_error:
             sys.exit(1)
     else:
         print_warning("バックエンド(core,apps)のセットアップをスキップしました。")
 
     print()
-    if ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y"):
-        if not setup_frontend_web() and not ask_yes_no("フロントエンド(Web)で失敗しました。続行しますか？", default="n"):
+    if choices["web"]:
+        if not setup_frontend_web() and not continue_on_error:
             sys.exit(1)
     else:
         print_warning("フロントエンド(Web)のセットアップをスキップしました。")
 
     print()
-    if ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y"):
-        if not setup_frontend_avatar() and not ask_yes_no("フロントエンド(Avatar)で失敗しました。続行しますか？", default="n"):
+    if choices["avatar"]:
+        if not setup_frontend_avatar() and not continue_on_error:
             sys.exit(1)
     else:
         print_warning("フロントエンド(Avatar)のセットアップをスキップしました。")

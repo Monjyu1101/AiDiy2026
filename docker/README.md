@@ -33,8 +33,8 @@ http://localhost:8092/docs  # Apps API (M系, T系, V系, S系)
 
 ## MCP について
 
-- `backend_mcp`（Chrome DevTools MCP, `8095`）は、この Docker ガイドの構成には含めていません。
-- AI のブラウザ自動操作は、現状は通常のローカル開発手順で `backend_mcp` を別途扱う前提です。
+- `backend_mcp`（`8095`、6 サーバー同居: `aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check`）は、この Docker ガイドの構成には含めていません。
+- ブラウザ自動操作・デスクトップキャプチャ、AIエージェントの自己検証系 MCP は、現状は通常のローカル開発手順で `backend_mcp` を別途扱う前提です。
 
 ## 🔧 基本操作
 

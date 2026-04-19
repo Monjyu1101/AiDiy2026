@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AiDiy - 日本語ファースト AI開発プラットフォーム</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700;900&display=swap');
 
@@ -657,6 +656,189 @@
             box-shadow: 0 0 20px #00ffff;
             color: #00ffff;
         }
+
+        /* ========================================================== */
+        /*  追加エフェクト: パーティクル Canvas / グロー / バー等         */
+        /* ========================================================== */
+
+        /* 背景パーティクル canvas（GPU 合成フレンドリー） */
+        #fx-particles {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.9;
+        }
+
+        /* 背景グリッド（微細な縦横線） */
+        .fx-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 255, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 0, 255, 0.04) 1px, transparent 1px);
+            background-size: 60px 60px, 60px 60px;
+            pointer-events: none;
+            z-index: -1;
+            mask-image: radial-gradient(ellipse at center, #000 40%, transparent 85%);
+            -webkit-mask-image: radial-gradient(ellipse at center, #000 40%, transparent 85%);
+        }
+
+        /* マウス追従グロー（transform のみ、GPU 合成） */
+        #fx-mouse-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 420px;
+            height: 420px;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                rgba(0, 255, 255, 0.14) 0%,
+                rgba(255, 0, 255, 0.06) 40%,
+                transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            transform: translate3d(-999px, -999px, 0);
+            transition: opacity 0.4s ease;
+            opacity: 0;
+            mix-blend-mode: screen;
+            will-change: transform;
+        }
+
+        /* スクロール進行バー */
+        #fx-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0;
+            background: linear-gradient(90deg, #00ffff, #ff00ff, #ffff00);
+            z-index: 10001;
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.7);
+            transform-origin: left;
+            transition: width 0.12s linear;
+        }
+
+        /* セクション scanline（縦スキャン） */
+        .section {
+            overflow: hidden;
+        }
+        .section.animated-scan::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -20%;
+            width: 140%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            animation: scanSweep 4s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanSweep {
+            0%   { transform: translateX(-100%) scaleX(0.6); opacity: 0; }
+            20%  { opacity: 0.8; }
+            80%  { opacity: 0.8; }
+            100% { transform: translateX(100%) scaleX(1);    opacity: 0; }
+        }
+
+        /* カード 3D tilt: transform-style のみ追加（既存 transition は維持） */
+        .feature-card,
+        .architecture-item,
+        .sample-item,
+        .expansion-item,
+        .stat-item {
+            transform-style: preserve-3d;
+        }
+        /* tilt 中は transform のトランジションを短くしてマウスに追従 */
+        .feature-card.tilt-active,
+        .architecture-item.tilt-active,
+        .sample-item.tilt-active {
+            transition: transform 0.05s linear, opacity 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* stat 数字のグローパルス */
+        .stat-number.counted {
+            animation: statPulse 1.2s ease-out;
+        }
+        @keyframes statPulse {
+            0%   { text-shadow: 0 0 0    rgba(255, 255, 0, 0); }
+            50%  { text-shadow: 0 0 28px rgba(255, 255, 0, 0.9); transform: scale(1.08); }
+            100% { text-shadow: 0 0 10px rgba(255, 255, 0, 0.4); transform: scale(1); }
+        }
+
+        /* クリック波紋 */
+        .fx-ripple {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9998;
+            border: 2px solid rgba(0, 255, 255, 0.8);
+            transform: translate(-50%, -50%);
+            animation: rippleOut 0.7s ease-out forwards;
+        }
+        @keyframes rippleOut {
+            0%   { width: 0;     height: 0;     opacity: 0.9; border-width: 3px; }
+            100% { width: 240px; height: 240px; opacity: 0;   border-width: 0; }
+        }
+
+        /* タイトル revealed 後にグラデーションをゆっくり流す（GPU合成） */
+        .hero-title.revealed {
+            animation: titleReveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+                       titleGradientShift 8s ease-in-out 0.6s infinite;
+        }
+        @keyframes titleGradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50%      { background-position: 100% 50%; }
+        }
+
+        /* 通知トースト */
+        .auto-scroll-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ffff;
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: 1px solid #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.9rem;
+            font-weight: bold;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            animation: notifFadeIn 0.3s ease-out;
+        }
+        .auto-scroll-notification.fade-out {
+            animation: notifFadeOut 0.3s ease-in forwards;
+        }
+        @keyframes notifFadeIn {
+            0%   { opacity: 0; transform: translateX(80px) scale(0.85); }
+            100% { opacity: 1; transform: translateX(0)    scale(1); }
+        }
+        @keyframes notifFadeOut {
+            0%   { opacity: 1; transform: translateX(0)    scale(1); }
+            100% { opacity: 0; transform: translateX(80px) scale(0.85); }
+        }
+
+        /* モーション控えめ設定への配慮 */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            #fx-particles, .fx-grid, #fx-mouse-glow { display: none; }
+        }
+
+        /* スマホではリッチエフェクトを抑える */
+        @media (max-width: 720px) {
+            #fx-mouse-glow { display: none; }
+            .fx-grid { background-size: 40px 40px, 40px 40px; opacity: 0.5; }
+        }
     </style>
     <script type="importmap">
     {
@@ -670,8 +852,12 @@
     </script>
 </head>
 <body>
-    <!-- パーティクル背景 -->
+    <!-- 背景レイヤー -->
     <div class="animated-bg"></div>
+    <div class="fx-grid"></div>
+    <canvas id="fx-particles"></canvas>
+    <div id="fx-mouse-glow"></div>
+    <div id="fx-progress"></div>
 
     <!-- ヒーローセクション -->
     <section class="hero-section">
@@ -681,7 +867,7 @@
             <span class="title-half title-right" id="title-right">DIY</span>
             <div class="title-flash" id="title-flash"></div>
         </div>
-        <h1 class="hero-title" id="hero-title-final">AiDiy</h1>
+        <h1 class="hero-title" id="hero-title-final" data-text="AiDiy">AiDiy</h1>
         <h2 class="hero-subtitle">日本語で設計し、音声でもコードでも動かす。</h2>
         <p class="hero-description">
             日本語を第一言語にしたフルスタック業務システム開発フレームワーク。<br>
@@ -699,6 +885,7 @@
             <span>Electron + VRM + 音声AI</span>
             <span>🧠 自己改善機構 — 使うほど育つ</span>
             <span>claude / copilot / codex / gemini / hermes CLI</span>
+            <span>🔌 MCP Hub ×6 — browser / capture / sqlite / postgres / logs / check</span>
         </div>
         <div class="typing-text" id="typing-text"></div>
     </section>
@@ -781,6 +968,11 @@
                 <span class="stat-number" data-count="2">0</span>
                 <span class="stat-label">アバターモード</span>
                 <span class="stat-sub">Electron / Web</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-label">MCP サーバー</span>
+                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="60">0</span>
@@ -951,6 +1143,49 @@ Key:   利用者名</pre>
         </div>
     </section>
 
+    <!-- MCP Hub -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">MCP Hub — backend_mcp</h2>
+        <p class="section-subtitle animate-on-scroll">ポート 8095 に 6 つの MCP サーバーを同居。人の手数を減らし、AI の自己検証を増やす。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🌐 aidiy_chrome_devtools</h3>
+                <p>Chrome DevTools Protocol を Python 純正実装で MCP 化。navigate / click / screenshot / DOM 取得・JS 実行まで。`chrome-devtools-mcp`（Node）は廃止済。</p>
+                <div class="meta-tags"><span>CDP</span><span>SSE</span><span>Python</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">📸 aidiy_desktop_capture</h3>
+                <p>全画面・領域指定・ウィンドウ指定・マルチモニター対応のスクリーンショット取得。AI が UI を目視確認するチャネル。</p>
+                <div class="meta-tags"><span>pyautogui</span><span>PIL</span><span>multi-monitor</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🗄️ aidiy_sqlite</h3>
+                <p>AiDiy DB に対し、スキーマ確認 / 件数 / 監査フィールド抽出 / SELECT を安全に実行。既定は read-only、書き込みは明示許可のときのみ。</p>
+                <div class="meta-tags"><span>read-only default</span><span>PRAGMA</span><span>audit summary</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🐘 aidiy_postgres</h3>
+                <p>外部 PostgreSQL に psycopg 3 で接続。DB/スキーマ/テーブル探索、describe、件数、任意 SELECT。接続先は環境変数 or 呼び出し時の DSN 引数。</p>
+                <div class="meta-tags"><span>psycopg 3</span><span>read-only tx</span><span>statement_timeout 15s</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">📜 aidiy_logs</h3>
+                <p>`backend_server` と `backend_mcp` のログを tail、正規表現 grep、ERROR/Traceback 抽出（前後 2 行の文脈付き）。変更直後の回帰検知に。</p>
+                <div class="meta-tags"><span>tail</span><span>grep</span><span>error context</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">✅ aidiy_code_check</h3>
+                <p>Python 構文（py_compile）・ruff lint・TypeScript 型チェック（`npm run type-check`）を subprocess で実行。副作用なしの検査系だけ。</p>
+                <div class="meta-tags"><span>py_compile</span><span>ruff</span><span>tsc</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔁 Self-Verification Loop</h3>
+                <p>「コードを直す → DB で結果を見る → ログでエラーを見る → 型で再確認」を AI が自走で回せる。人間は指示と判断に集中できる。</p>
+                <div class="meta-tags"><span>edit</span><span>observe</span><span>verify</span></div>
+            </div>
+        </div>
+    </section>
+
     <!-- Table Classification -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">Table Classification</h2>
@@ -1026,7 +1261,7 @@ Key:   利用者名</pre>
     </section>
 
     <!-- Launch -->
-    <section class="section" style="text-align: center; padding-bottom: 120px;">
+    <section class="section" id="launch-section" style="text-align: center; padding-bottom: 120px;">
         <h2 class="section-title animate-on-scroll">Launch</h2>
         <p class="animate-on-scroll" style="margin-bottom: 10px; font-size: 1.05rem; color: #aaa;">
             次は、実際に触って確認する番です。
@@ -1052,8 +1287,8 @@ Key:   利用者名</pre>
             position: fixed;
             bottom: 0;
             right: 0;
-            width: 400px;
-            height: 680px;
+            width: 200px;
+            height: 340px;
             pointer-events: none;
             z-index: 100;
             opacity: 0;
@@ -1062,20 +1297,42 @@ Key:   利用者名</pre>
         #avatar-container.visible {
             opacity: 1;
         }
-        #avatar-canvas { display: block; }
+        #avatar-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        @media (max-width: 720px) {
+            #avatar-container {
+                width: 140px;
+                height: 238px;
+                right: 8px;
+            }
+        }
     </style>
     <script>
     (function() {
-        function checkAvatarVisibility() {
-            const scrollBottom = window.scrollY + window.innerHeight;
-            const pageHeight = document.documentElement.scrollHeight;
-            // ページ下部 20% に入ったら表示
-            if (scrollBottom >= pageHeight * 0.8) {
-                document.getElementById('avatar-container')?.classList.add('visible');
+        const container = document.getElementById('avatar-container');
+        const launch    = document.getElementById('launch-section');
+        if (!container || !launch) return;
+
+        // Launch セクションが「見える手前」に来たらアバターを visible にする。
+        // rootMargin の bottom を広げると viewport の下方向に余裕ができ、
+        // Launch の上端が画面下 + 余裕の位置に入った時点で intersect = true になる。
+        const io = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (entry.isIntersecting) {
+                    container.classList.add('visible');
+                    io.disconnect();
+                    break;
+                }
             }
-        }
-        window.addEventListener('scroll', checkAvatarVisibility, { passive: true });
-        checkAvatarVisibility(); // 初期チェック（短いページ対応）
+        }, {
+            // Launch の上端が画面下端の 240px 手前に入った時点で fade-in 開始
+            rootMargin: '0px 0px 240px 0px',
+            threshold: 0,
+        });
+        io.observe(launch);
     })();
     </script>
     <script type="module">
@@ -1086,28 +1343,39 @@ Key:   利用者名</pre>
 
     (async () => {
         const canvas = document.getElementById('avatar-canvas');
+        const avatarContainer = document.getElementById('avatar-container');
         if (!canvas) return;
 
-        const W = 400, H = 680;
+        // ---------- Renderer / Scene ----------
+        const getStageSize = () => ({
+            width: Math.max(1, avatarContainer?.clientWidth || 200),
+            height: Math.max(1, avatarContainer?.clientHeight || 340),
+        });
+        const initialSize = getStageSize();
         const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         renderer.setClearColor(0x000000, 0);
-        renderer.setSize(W, H);
+        renderer.setSize(initialSize.width, initialSize.height, false);
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(32, W / H, 0.1, 20);
-        camera.position.set(0, 1.2, 1.6);
-        camera.lookAt(new THREE.Vector3(0, 1.25, 0));
+        const camera = new THREE.PerspectiveCamera(28, initialSize.width / initialSize.height, 0.01, 40);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-        dir.position.set(1, 2, 2);
-        scene.add(dir);
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const key = new THREE.DirectionalLight(0xffffff, 1.0);
+        key.position.set(1.2, 1.5, 1.1);
+        scene.add(key);
+        const rim = new THREE.DirectionalLight(0xdde8ff, 0.8);
+        rim.position.set(-1.3, 0.7, 1.3);
+        scene.add(rim);
 
-        // frontend_avatar と同様にローダーを分ける（同一ローダーへの複数プラグイン登録は干渉する）
+        // frontend_avatar と同じ向きに寄せる
+        const container = new THREE.Group();
+        scene.add(container);
+
+        // ---------- Loaders ----------
         const modelLoader = new GLTFLoader();
         modelLoader.register(p => new VRMLoaderPlugin(p));
-
         const motionLoader = new GLTFLoader();
         motionLoader.register(p => new VRMAnimationLoaderPlugin(p));
 
@@ -1118,77 +1386,156 @@ Key:   利用者名</pre>
             './vrma/VRMA_04.vrma',
             './vrma/VRMA_05.vrma',
         ];
+        const loadWith = (loader, url) =>
+            new Promise((res, rej) => loader.load(url, res, undefined, rej));
 
-        const loadWith = (loader, url) => new Promise((res, rej) => loader.load(url, res, undefined, rej));
-
-        let vrm = null, mixer = null, currentAction = null;
-        const clips = [];
-
-        function playNext() {
-            if (!mixer || !clips.length) return;
-            
-            const idx = Math.floor(Math.random() * clips.length);
-            const nextAction = mixer.clipAction(clips[idx]);
-            
-            if (currentAction) {
-                currentAction.fadeOut(0.5);
-            }
-            
-            nextAction.reset();
-            nextAction.setLoop(THREE.LoopOnce, 1);
-            nextAction.clampWhenFinished = true;
-            nextAction.fadeIn(0.5);
-            nextAction.play();
-            
-            currentAction = nextAction;
-        }
-
+        // ---------- VRM 読み込み ----------
+        let vrm = null, mixer = null;
         try {
-            // VRM ロード
-            const vrmGltf = await loadWith(modelLoader, './AiDiy_Sample_M.vrm');
-            vrm = vrmGltf.userData.vrm;
-            if (!vrm) { console.warn('VRM not found in gltf.userData'); return; }
-            try { VRMUtils.removeUnnecessaryJoints(vrm.scene); } catch {}
-            scene.add(vrm.scene);
+            const gltf = await loadWith(modelLoader, './AiDiy_Sample_M.vrm');
+            vrm = gltf.userData?.vrm;
+            if (!vrm) { console.warn('VRM not found in userData'); return; }
+
+            // 不要要素の掃除（bindings が安定する）
+            try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch {}
+            try { VRMUtils.removeUnnecessaryJoints(gltf.scene);   } catch {}
+
+            // 重要: ボーン変形でメッシュが初期バウンディング外に出ると frustum cull される → 全オブジェクト無効化
+            vrm.scene.traverse(obj => { obj.frustumCulled = false; });
+
+            // 足元 y=0 / 中央に揃える
+            const box    = new THREE.Box3().setFromObject(vrm.scene);
+            const center = box.getCenter(new THREE.Vector3());
+            const size   = box.getSize(new THREE.Vector3());
+            vrm.scene.position.x -= center.x;
+            vrm.scene.position.y -= box.min.y;
+            vrm.scene.position.z -= center.z;
+
+            container.add(vrm.scene);
+
+            // モデル高さから自動でカメラを配置（上半身寄り）
+            const h = Math.max(0.1, size.y);
+            camera.position.set(0, h * 0.78, -h * 1.05);
+            camera.lookAt(0, h * 0.78, 0);
 
             mixer = new THREE.AnimationMixer(vrm.scene);
-            mixer.timeScale = 1;
-            // finished イベントで次を再生
-            mixer.addEventListener('finished', (e) => {
-                setTimeout(playNext, 1000);
-            });
-
-            // VRMA ロード（モーションローダーで）
-            for (const file of VRMA_FILES) {
-                try {
-                    const g = await loadWith(motionLoader, file);
-                    const anim = g.userData.vrmAnimations?.[0];
-                    if (anim) {
-                        clips.push(createVRMAnimationClip(anim, vrm));
-                    } else {
-                        console.warn('vrmAnimations not found:', file);
-                    }
-                } catch (e) { console.warn('VRMA load skip:', file, e); }
-            }
-            console.log('Loaded clips:', clips.length);
-            if (clips.length > 0) playNext();
         } catch (e) {
             console.warn('Avatar load error:', e);
+            return;
         }
 
+        // ---------- VRMA 読み込み ----------
+        const clips = [];
+        for (const file of VRMA_FILES) {
+            try {
+                const g = await loadWith(motionLoader, file);
+                const anim = g.userData?.vrmAnimations?.[0];
+                if (anim) clips.push(createVRMAnimationClip(anim, vrm));
+                else console.warn('vrmAnimations not found:', file);
+            } catch (e) {
+                console.warn('VRMA load skip:', file, e);
+            }
+        }
+        console.log('Loaded VRMA clips:', clips.length);
+
+        // ---------- シーケンシャルループ ----------
+        let prevAction = null;
+        let clipIndex  = 0;
+        const XFADE = 0.4;
+        let nextClipTimer = 0;
+
+        const clearNextClipTimer = () => {
+            if (!nextClipTimer) return;
+            window.clearTimeout(nextClipTimer);
+            nextClipTimer = 0;
+        };
+
+        function playNext() {
+            if (!mixer || clips.length === 0) return;
+            clearNextClipTimer();
+
+            const clip = clips[clipIndex % clips.length];
+            clipIndex += 1;
+
+            const action = mixer.clipAction(clip);
+            action.reset();
+            action.setLoop(THREE.LoopOnce, 1);
+            action.clampWhenFinished = false;
+            action.enabled = true;
+            action.setEffectiveTimeScale(1);
+            action.setEffectiveWeight(1);
+            action.play();
+
+            if (prevAction && prevAction !== action) {
+                // play 済みの action へ、前の action からクロスフェード
+                action.crossFadeFrom(prevAction, XFADE, false);
+            }
+            prevAction = action;
+
+            const nextDelay = Math.max(250, (clip.duration - XFADE) * 1000);
+            nextClipTimer = window.setTimeout(() => {
+                nextClipTimer = 0;
+                playNext();
+            }, nextDelay);
+        }
+
+        // VRMA 一覧を切り替え続ける
+        if (clips.length > 0) playNext();
+
+        // ---------- RAF 制御（可視／タブ可視時だけ回す） ----------
         const clock = new THREE.Clock();
-        const avatarContainer = document.getElementById('avatar-container');
+        let rafId = 0;
+        let pageVisible = !document.hidden;
 
-        (function animate() {
-            requestAnimationFrame(animate);
-            // .visible クラスがない場合（画面下部に来ていない場合）は描画をスキップ
-            if (!avatarContainer || !avatarContainer.classList.contains('visible')) return;
+        const resizeRenderer = () => {
+            const { width, height } = getStageSize();
+            renderer.setSize(width, height, false);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        };
 
+        const tick = () => {
             const dt = clock.getDelta();
             if (mixer) mixer.update(dt);
-            if (vrm) vrm.update(dt);
+            if (vrm)   vrm.update(dt);
             renderer.render(scene, camera);
-        })();
+            rafId = requestAnimationFrame(tick);
+        };
+
+        const start = () => {
+            if (rafId) return;
+            clock.start();
+            rafId = requestAnimationFrame(tick);
+        };
+        const stop = () => {
+            if (!rafId) return;
+            cancelAnimationFrame(rafId);
+            rafId = 0;
+        };
+
+        resizeRenderer();
+        window.addEventListener('resize', resizeRenderer, { passive: true });
+
+        if (avatarContainer) {
+            new MutationObserver(() => {
+                if (avatarContainer.classList.contains('visible') && pageVisible) start();
+                else stop();
+            }).observe(avatarContainer, { attributes: true, attributeFilter: ['class'] });
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            pageVisible = !document.hidden;
+            if (pageVisible && avatarContainer?.classList.contains('visible')) start();
+            else stop();
+        });
+
+        window.addEventListener('beforeunload', () => {
+            clearNextClipTimer();
+            stop();
+            window.removeEventListener('resize', resizeRenderer);
+        });
+
+        if (avatarContainer?.classList.contains('visible')) start();
     })();
     </script>
 </body>

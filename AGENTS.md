@@ -18,7 +18,7 @@
 
 **バックエンドサーバーとフロントエンドサーバーの詳細は別ドキュメント：**
 - **バックエンド（FastAPI + SQLAlchemy + SQLite）の実装詳細** → [backend_server/AGENTS.md](./backend_server/AGENTS.md)
-- **バックエンド MCP（Chrome DevTools MCP サーバー）の実装詳細** → [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
+- **バックエンド MCP（6 サーバー: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check）の実装詳細** → [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
 - **フロントエンド Web（Vue 3 + Vite + TypeScript）の実装詳細** → [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - **フロントエンド Avatar（Electron/Web デュアルモード）の実装詳細** → [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 
@@ -206,7 +206,13 @@
 **3つの独立したサーバー：**
 - **core_main.py** (port 8091) - Core/Common features (C系, A系)
 - **apps_main.py** (port 8092) - Application features (M系, T系, V系, S系)
-- **mcp_main.py** (port 8095) - MCP サーバー（Chrome DevTools MCP — AIブラウザ自動操作）
+- **mcp_main.py** (port 8095) - MCP サーバー（6 サーバー同居）
+  - `aidiy_chrome_devtools` — Chrome ブラウザ自動操作
+  - `aidiy_desktop_capture` — デスクトップキャプチャ
+  - `aidiy_sqlite`          — AiDiy DB の自己検証（read-only 既定の SQL 実行）
+  - `aidiy_postgres`        — 外部 PostgreSQL に対する read-only 中心クエリ（DSN は環境変数 or 引数）
+  - `aidiy_logs`            — `backend_server` / `backend_mcp` のログ tail・エラー抽出
+  - `aidiy_code_check`      — Python 構文 / ruff / TypeScript 型チェック
 - core/apps は同じSQLiteデータベースを共有
 - Vite Proxy で `/core/*` と `/apps/*` を自動振り分け
 
@@ -784,7 +790,12 @@ backend_server/_data/AiDiy/database.db
 - バックエンドAPI（Apps - apps_main）: http://localhost:8092
 - API Documentation (Core): http://localhost:8091/docs (FastAPI Swagger UI)
 - API Documentation (Apps): http://localhost:8092/docs (FastAPI Swagger UI)
-- バックエンド MCP（mcp_main）SSEエンドポイント: http://localhost:8095/aidiy_chrome_devtools/sse
+- バックエンド MCP Chrome DevTools (SSE): http://localhost:8095/aidiy_chrome_devtools/sse
+- バックエンド MCP Desktop Capture (SSE): http://localhost:8095/aidiy_desktop_capture/sse
+- バックエンド MCP SQLite (SSE):          http://localhost:8095/aidiy_sqlite/sse
+- バックエンド MCP PostgreSQL (SSE):      http://localhost:8095/aidiy_postgres/sse
+- バックエンド MCP Logs (SSE):            http://localhost:8095/aidiy_logs/sse
+- バックエンド MCP Code Check (SSE):      http://localhost:8095/aidiy_code_check/sse
 - フロントエンド Avatar (Electron): http://127.0.0.1:8099 ※Electronアプリとして起動
 - フロントエンド Avatar (Web ブラウザ): http://localhost:8099 ※通常ブラウザからもアクセス可能
 

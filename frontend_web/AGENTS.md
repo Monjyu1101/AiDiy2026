@@ -18,7 +18,7 @@
 - **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
 - **[../docs/開発ガイド/12_フロントエンド画面追加例/](../docs/開発ガイド/12_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順
 - **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細（FastAPI + SQLAlchemy + SQLite）
-- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - Chrome DevTools MCP サーバー実装詳細
+- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - MCP サーバー実装詳細（Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check）
 - **[../frontend_avatar/AGENTS.md](../frontend_avatar/AGENTS.md)** - デスクトップアバタークライアント（Electron + WebSocket + VRM）
 
 **📚 ドキュメントリソース（docs/フォルダ）：**
@@ -29,7 +29,7 @@
 **バックエンド・他フロントエンドの情報は別ドキュメント：**
 このドキュメントは `frontend_web`（ブラウザ向け業務UI）に特化しています。
 - バックエンド → `backend_server/AGENTS.md`
-- ブラウザ自動操作用 MCP サーバー → `backend_mcp/AGENTS.md`
+- ブラウザ自動操作・デスクトップキャプチャ用 MCP サーバー → `backend_mcp/AGENTS.md`
 - AIコア専用デスクトップアバタークライアント → `frontend_avatar/AGENTS.md`（Vue Router / Pinia 不使用、Electron マルチウィンドウ構成）
 
 **このファイルの内容：**
