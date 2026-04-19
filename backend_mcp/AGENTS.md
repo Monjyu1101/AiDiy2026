@@ -13,7 +13,7 @@
 
 ## 概要
 
-`backend_mcp` は **ポート `8095` 上で 6 つの MCP サーバーを同居させる FastMCP アプリケーション** です。
+`backend_mcp` は **ポート `8095` 上で 8 つの MCP サーバーを同居させる FastMCP アプリケーション** です。
 ブラウザ自動操作・デスクトップキャプチャに加え、**AIエージェントの自己検証を支える開発効率系 MCP** を提供します。
 
 | MCP サーバー | マウントパス | 役割 |
@@ -24,6 +24,8 @@
 | `aidiy_postgres`        | `/aidiy_postgres`        | 外部 PostgreSQL に対する read-only 中心クエリ（DSN は環境変数 or 引数） |
 | `aidiy_logs`            | `/aidiy_logs`            | `backend_server` / `backend_mcp` のログ tail・エラー抽出 |
 | `aidiy_code_check`      | `/aidiy_code_check`      | Python 構文 / ruff / TypeScript 型チェックを subprocess 実行 |
+| `aidiy_backup_check`    | `/aidiy_backup_check`    | バックアップフォルダから変更前/変更後ソースを抽出（差分検証用） |
+| `aidiy_backup_save`     | `/aidiy_backup_save`     | AiDiy ネイティブの差分バックアップを実行（`バックアップ実行` を動的ロードして流用） |
 
 Chrome 側は `chrome-devtools-mcp`（Node.js 実装）を廃止し、**Python MCP SDK + 自前の CDP クライアント** で直接実装しています。Node.js 依存は不要です。
 

@@ -58,6 +58,8 @@ from mcp_proc.sqlite_query import SqliteQuery, SqliteQueryError
 from mcp_proc.postgres_query import PgQuery, PgQueryError
 from mcp_proc.log_tailer import LogTailer, LogTailError
 from mcp_proc.code_checker import CodeChecker, CodeCheckError
+from mcp_proc.backup_check import BackupCheck, BackupCheckError
+from mcp_proc.backup_save import BackupSave, BackupSaveError
 
 setup_logging()
 logger = get_logger(__name__)
@@ -74,6 +76,8 @@ MOUNT_SQ     = os.environ.get("MCP_SQ_MOUNT_PATH", "/aidiy_sqlite")
 MOUNT_PG     = os.environ.get("MCP_PG_MOUNT_PATH", "/aidiy_postgres")
 MOUNT_LG     = os.environ.get("MCP_LG_MOUNT_PATH", "/aidiy_logs")
 MOUNT_CC     = os.environ.get("MCP_CC_MOUNT_PATH", "/aidiy_code_check")
+MOUNT_BC     = os.environ.get("MCP_BC_MOUNT_PATH", "/aidiy_backup_check")
+MOUNT_BS     = os.environ.get("MCP_BS_MOUNT_PATH", "/aidiy_backup_save")
 
 chrome   = ChromeManager(debug_port=CHROME_PORT)
 cdp      = CDPClient(port=CHROME_PORT)
@@ -81,6 +85,8 @@ capture  = DesktopCapture()
 sqlite_q = SqliteQuery()
 log_t    = LogTailer()
 checker  = CodeChecker()
+bchk     = BackupCheck()
+bsave    = BackupSave()
 
 # PostgreSQL は psycopg 未導入環境でもサーバー起動を阻害しないよう遅延初期化
 _pg_q: Optional[PgQuery] = None
@@ -193,6 +199,24 @@ mcp_cc = FastMCP(
     port=MCP_PORT,
     sse_path=f"{MOUNT_CC}/sse",
     message_path=f"{MOUNT_CC}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_bc = FastMCP(
+    "aidiy_backup_check",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_BC}/sse",
+    message_path=f"{MOUNT_BC}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_bs = FastMCP(
+    "aidiy_backup_save",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_BS}/sse",
+    message_path=f"{MOUNT_BS}/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -889,7 +913,111 @@ async def check_typescript(project: str = "frontend_web") -> str:
 
 
 # ================================================================== #
-# アプリ（5 つの MCP サーバーを 1 ポートで統合）
+# aidiy_backup_check ツール（変更前/変更後ソースの一括抽出）
+# ================================================================== #
+
+@mcp_bc.tool()
+async def backup_info() -> str:
+    """バックアップルートの絶対パスと存在フラグを返す"""
+    try:
+        info = await asyncio.to_thread(bchk.backup_root_path)
+    except BackupCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_bc.tool()
+async def backup_get_before_after(
+    path: str,
+    base_ts: Optional[str] = None,
+) -> str:
+    """
+    指定ソースの現行版（after）と、直前のバックアップ版（before）を同時に返す。
+
+    Args:
+        path: プロジェクトルート相対のファイルパス（例: 'backend_server/core_main.py'）
+        base_ts: 'YYYYMMDD_HHMMSS' 形式。指定時はこの日時より前のバックアップから before を探す
+    """
+    try:
+        info = await asyncio.to_thread(bchk.get_before_after, path, base_ts)
+    except BackupCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_bc.tool()
+async def backup_list_versions(path: str) -> str:
+    """指定ファイルがバックアップに出現する全日時を新しい順で返す"""
+    try:
+        info = await asyncio.to_thread(bchk.list_versions, path)
+    except BackupCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_bc.tool()
+async def backup_find_changed(
+    from_ts: str,
+    to_ts: Optional[str] = None,
+) -> str:
+    """
+    指定期間のバックアップに含まれる相対パス一覧を返す（= 変更のあったファイル）。
+
+    Args:
+        from_ts: 'YYYYMMDD_HHMMSS' 形式の開始日時（必須）
+        to_ts:   終了日時（任意）
+    """
+    try:
+        info = await asyncio.to_thread(bchk.find_changed, from_ts, to_ts)
+    except BackupCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_bc.tool()
+async def backup_diff_stats(
+    path: str,
+    base_ts: Optional[str] = None,
+) -> str:
+    """指定ファイルの before/after の追加・削除行数を軽量サマリで返す"""
+    try:
+        info = await asyncio.to_thread(bchk.diff_stats, path, base_ts)
+    except BackupCheckError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+# ================================================================== #
+# aidiy_backup_save ツール（ネイティブ `バックアップ実行` を流用）
+# ================================================================== #
+
+@mcp_bs.tool()
+async def backup_run() -> str:
+    """
+    AiDiy ネイティブの差分バックアップを実行する。
+    初回は全件スナップショット（HHMMSS.all）、以降は差分のみ（HHMMSS）を保存。
+    """
+    try:
+        info = await asyncio.to_thread(bsave.run)
+    except BackupSaveError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_bs.tool()
+async def backup_diff_scan() -> str:
+    """
+    バックアップを作成せず、現時点で差分対象となるファイル一覧のみ返す（dry-run）。
+    """
+    try:
+        info = await asyncio.to_thread(bsave.diff_scan)
+    except BackupSaveError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+# ================================================================== #
+# アプリ（複数 MCP サーバーを 1 ポートで統合）
 # ================================================================== #
 
 async def _handle_root(request: Request) -> Response:
@@ -903,6 +1031,8 @@ app = Starlette(routes=[
     *mcp_pg.sse_app().routes,
     *mcp_lg.sse_app().routes,
     *mcp_cc.sse_app().routes,
+    *mcp_bc.sse_app().routes,
+    *mcp_bs.sse_app().routes,
 ])
 
 if __name__ == "__main__":
@@ -913,4 +1043,6 @@ if __name__ == "__main__":
                 + (" [psycopg 未導入]" if _pg_init_error else ""))
     logger.info(f"Logs SSE           : http://localhost:{MCP_PORT}{MOUNT_LG}/sse")
     logger.info(f"CodeCheck SSE      : http://localhost:{MCP_PORT}{MOUNT_CC}/sse")
+    logger.info(f"BackupCheck SSE    : http://localhost:{MCP_PORT}{MOUNT_BC}/sse")
+    logger.info(f"BackupSave SSE     : http://localhost:{MCP_PORT}{MOUNT_BS}/sse")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")

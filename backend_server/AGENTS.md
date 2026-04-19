@@ -90,7 +90,7 @@
 - **共通モジュール**: `database.py`, `core_schema.py`, `apps_schema.py`, `auth.py`, `deps.py`, `log_config.py`, `AIコア/AIセッション管理.py`
 
 **外部連携サーバー (`backend_mcp`, port 8095):**
-- 6 つの MCP サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check`）を SSE で提供
+- 8 つの MCP サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup_check` / `aidiy_backup_save`）を SSE で提供
 - `backend_server/_config/AiDiy_mcp.json` から接続先を定義（必要なものだけ列挙可）
 - Claude Agent SDK 系でブラウザ自動操作・画面キャプチャに加え、AIエージェントの自己検証（DB / ログ / 型チェック）にも利用
 - 詳細は `../backend_mcp/AGENTS.md` を参照

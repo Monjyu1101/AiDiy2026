@@ -140,6 +140,8 @@ npm run dev
 | Backend MCP PostgreSQL (SSE)      | http://localhost:8095/aidiy_postgres/sse |
 | Backend MCP Logs (SSE)            | http://localhost:8095/aidiy_logs/sse |
 | Backend MCP Code Check (SSE)      | http://localhost:8095/aidiy_code_check/sse |
+| Backend MCP Backup Check (SSE)    | http://localhost:8095/aidiy_backup_check/sse |
+| Backend MCP Backup Save (SSE)     | http://localhost:8095/aidiy_backup_save/sse |
 | Avatar Web モード | http://localhost:8099 |
 | Avatar Electron モード | `npm run dev` で Electron アプリ起動 |
 

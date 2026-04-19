@@ -114,6 +114,8 @@ rm backend_server/_data/AiDiy/database.db
 | Backend MCP PostgreSQL (SSE) | http://localhost:8095/aidiy_postgres/sse |
 | Backend MCP Logs (SSE) | http://localhost:8095/aidiy_logs/sse |
 | Backend MCP Code Check (SSE) | http://localhost:8095/aidiy_code_check/sse |
+| Backend MCP Backup Check (SSE) | http://localhost:8095/aidiy_backup_check/sse |
+| Backend MCP Backup Save (SSE) | http://localhost:8095/aidiy_backup_save/sse |
 | Frontend (Avatar Web) | http://localhost:8099 |
 | Frontend (Avatar Electron) | `npm run dev` で起動 |
 
@@ -141,13 +143,13 @@ rm backend_server/_data/AiDiy/database.db
 
 - **core_main.py** (8091): C系（権限・利用者・採番）、A系（AIコア・会話履歴）、WebSocket
 - **apps_main.py** (8092): M系（マスタ）、T系（トランザクション）、V系（JOIN表示）、S系（スケジューラ）
-- **mcp_main.py** (8095): MCP サーバー × 6 エンドポイント — Chrome DevTools (`/aidiy_chrome_devtools/sse`) / Desktop Capture (`/aidiy_desktop_capture/sse`) / SQLite (`/aidiy_sqlite/sse`) / PostgreSQL (`/aidiy_postgres/sse`) / Logs (`/aidiy_logs/sse`) / Code Check (`/aidiy_code_check/sse`)
+- **mcp_main.py** (8095): MCP サーバー × 8 エンドポイント — Chrome DevTools (`/aidiy_chrome_devtools/sse`) / Desktop Capture (`/aidiy_desktop_capture/sse`) / SQLite (`/aidiy_sqlite/sse`) / PostgreSQL (`/aidiy_postgres/sse`) / Logs (`/aidiy_logs/sse`) / Code Check (`/aidiy_code_check/sse`)
 
 core_main / apps_main は同じ SQLite DB を共有。Vite Proxy が `/core/*` → 8091、`/apps/*` → 8092 に自動振り分け。フロントのポートを変えたら `core_main.py` / `apps_main.py` の CORS 許可リストも更新すること。
 
 ### AIブラウザ自動操作（MCP連携）
 
-- `backend_mcp/mcp_main.py` が 6 つの MCP サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check`）を SSE で提供（ポート 8095）
+- `backend_mcp/mcp_main.py` が 8 つの MCP サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup_check` / `aidiy_backup_save`）を SSE で提供（ポート 8095）
 - ブラウザ自動操作・画面キャプチャに加え、**AIエージェントの自己検証を支える DB クエリ（SQLite/PostgreSQL）・ログ観測・型チェック**を同居
 - `backend_server/_config/AiDiy_mcp.json` に接続先 MCP サーバーを定義
 - `AIコア/AIコード_claude.py`（Claude Agent SDK）が起動時に `AiDiy_mcp.json` を読み込み、`ClaudeAgentOptions.mcp_servers` に渡す
