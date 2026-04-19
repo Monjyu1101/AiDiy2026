@@ -594,6 +594,24 @@
             transform: translateY(0);
         }
 
+        /* grid 内のカードは左からスライドインさせる（段階表示と合わせて左→右に流れる） */
+        .core-features      > .animate-on-scroll,
+        .architecture-grid  > .animate-on-scroll,
+        .expansion-grid     > .animate-on-scroll,
+        .sample-grid        > .animate-on-scroll,
+        .advanced-grid      > .animate-on-scroll,
+        .tech-stats         > .animate-on-scroll {
+            transform: translate3d(-60px, 0, 0);
+        }
+        .core-features      > .animate-on-scroll.animated,
+        .architecture-grid  > .animate-on-scroll.animated,
+        .expansion-grid     > .animate-on-scroll.animated,
+        .sample-grid        > .animate-on-scroll.animated,
+        .advanced-grid      > .animate-on-scroll.animated,
+        .tech-stats         > .animate-on-scroll.animated {
+            transform: translate3d(0, 0, 0);
+        }
+
         /* サイバーボタン */
         .cyber-button {
             display: inline-block;
@@ -871,7 +889,7 @@
         <h2 class="hero-subtitle">日本語で設計し、音声でもコードでも動かす。</h2>
         <p class="hero-description">
             日本語を第一言語にしたフルスタック業務システム開発フレームワーク。<br>
-            FastAPI デュアルサーバー、Vue 3 Web UI、Electron/Web デュアルモードのアバター、<br>
+            FastAPI マルチサーバー、Vue 3 Web UI、Electron/Web デュアルモードのアバター、<br>
             WebSocket ベースの AI コアを一体で扱えます。
         </p>
         <div class="hero-actions">
@@ -890,27 +908,27 @@
         <div class="typing-text" id="typing-text"></div>
     </section>
 
-    <!-- Project Core -->
+    <!-- Feature Overview（特徴概要） -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">Project Core</h2>
-        <p class="section-subtitle animate-on-scroll">業務実装と AI 実装を同じ土台に置く。</p>
+        <h2 class="section-title animate-on-scroll">Feature Overview</h2>
+        <p class="section-subtitle animate-on-scroll">AiDiy を支える 6 つの特徴。</p>
         <div class="core-features">
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🇯🇵</span>
                 <h3 class="feature-title">日本語ファースト</h3>
                 <p class="feature-description">
-                    テーブル名、API エンドポイント、JSON キー、<br>
-                    Vue コンポーネントまで日本語でそろえます。<br>
-                    ビジネスドメインとコードの完全一致。
+                    テーブル名・API・JSON キー・<br>
+                    Vue コンポーネントまで日本語で統一。<br>
+                    ビジネス用語とコードの完全一致。
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🖥️</span>
-                <h3 class="feature-title">デュアルサーバー</h3>
+                <h3 class="feature-title">マルチサーバー構成</h3>
                 <p class="feature-description">
-                    core_main.py と apps_main.py を分離し、<br>
-                    AI 系と業務系を明確に切り分けます。<br>
-                    Vite Proxy で /core と /apps を自動振り分け。
+                    core 8091 / apps 8092 / mcp 8095 を分離。<br>
+                    AI 系・業務系・自己検証系を切り分け、<br>
+                    Vite Proxy で透過的にまとめます。
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
@@ -924,20 +942,38 @@
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🤖</span>
-                <h3 class="feature-title">AI コア統合</h3>
+                <h3 class="feature-title">AI + 音声 + アバター</h3>
                 <p class="feature-description">
                     チャット・画像・音声・4 画面コード支援を<br>
-                    WebSocket でひとつの体験へまとめます。<br>
+                    WebSocket で一体化。<br>
                     Claude / OpenAI / Gemini マルチベンダー対応。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🧠</span>
+                <h3 class="feature-title">自己改善機構</h3>
+                <p class="feature-description">
+                    修正完了後に <code style="color:#00ffff">.aidiy/</code> へ<br>
+                    知見を自動整理。次回の同種修正で再利用し、<br>
+                    <strong>使うほどに育つ</strong>テンプレート。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🔌</span>
+                <h3 class="feature-title">MCP Hub × 6 + Multi CLI</h3>
+                <p class="feature-description">
+                    browser / capture / sqlite / postgres / logs / check の<br>
+                    6 MCP サーバー同居。claude / copilot / codex / gemini /<br>
+                    hermes など 6 種の Code CLI を並走可能。
                 </p>
             </div>
         </div>
     </section>
 
-    <!-- Current Numbers -->
+    <!-- Current Numbers（数値的根拠） -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">Current Numbers</h2>
-        <p class="section-subtitle animate-on-scroll">AGENTS.md の内容を、そのまま視覚化。</p>
+        <p class="section-subtitle animate-on-scroll">数値で見る AiDiy — AGENTS.md の実構成をそのまま可視化。</p>
         <div class="tech-stats">
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="2">0</span>
@@ -982,9 +1018,13 @@
         </div>
     </section>
 
-    <!-- Japanese Naming -->
+    <!-- ============================================================ -->
+    <!-- Implementation Details（特徴毎の実装詳細）                    -->
+    <!-- ============================================================ -->
+
+    <!-- 1. 日本語ファースト -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">Japanese Naming</h2>
+        <h2 class="section-title animate-on-scroll">🇯🇵 日本語ファースト — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">DB から API、UI まで名前をズラさない。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
@@ -1012,17 +1052,53 @@ File:  C利用者一覧.vue
 Key:   利用者名</pre>
             </div>
         </div>
+        <p class="section-subtitle animate-on-scroll" style="margin-top:36px;">7 系統で全機能を分類。</p>
+        <div class="expansion-grid">
+            <div class="expansion-item animate-on-scroll">
+                <h4>C系 — Core</h4>
+                <p>権限・利用者・採番</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>M系 — Master</h4>
+                <p>配車区分・車両・商品・工程</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>T系 — Transaction</h4>
+                <p>配車・生産・入庫・出庫・棚卸</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>V系 — View</h4>
+                <p>生 SQL クエリによる結合表示</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>S系 — Scheduler</h4>
+                <p>週表示・日表示スケジューラー</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>A系 — AI</h4>
+                <p>AI コア・会話履歴</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>X系 — Experimental</h4>
+                <p>ゲーム・自己紹介ページ</p>
+            </div>
+        </div>
     </section>
 
-    <!-- Architecture -->
+    <!-- 2. マルチサーバー構成 -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">Architecture</h2>
+        <h2 class="section-title animate-on-scroll">🖥️ マルチサーバー構成 — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">構成は分かれていても、体験はひとつに寄せる。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🗄️ backend_server</h3>
                 <p>FastAPI + SQLAlchemy + SQLite。POST 中心 API、統一レスポンス形式、C採番、監査フィールド、Reboot 機構を標準装備。Alembic 不使用。</p>
-                <div class="meta-tags"><span>core_main.py</span><span>apps_main.py</span><span>No Alembic</span></div>
+                <div class="meta-tags"><span>core_main.py:8091</span><span>apps_main.py:8092</span><span>No Alembic</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔌 backend_mcp</h3>
+                <p>FastAPI + SSE で 6 つの MCP サーバーを同一ポートに同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェックを一手に提供。詳細は下の MCP Hub セクションへ。</p>
+                <div class="meta-tags"><span>mcp_main.py:8095</span><span>SSE × 6</span><span>Self-Verify</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 frontend_web</h3>
@@ -1035,26 +1111,43 @@ Key:   利用者名</pre>
                 <div class="meta-tags"><span>Electron</span><span>Web Mode</span><span>BroadcastChannel</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">🎙️ AI Voice + Avatar</h3>
-                <p>Gemini Live / OpenAI Realtime と VRM / VRMA の 3D 表示を接続。16kHz 入力・24kHz 出力のリアルタイムパイプラインで口パクと音声再生を同期。</p>
-                <div class="meta-tags"><span>16kHz Input</span><span>24kHz Output</span><span>Three.js + VRM</span></div>
-            </div>
-            <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">🔁 AI Flow</h3>
-                <p>マイク・テキスト・画像・コード操作 → REST + WebSocket + Vite Proxy → Claude / GPT / Gemini を用途ごとに切替 → チャット・音声応答・コード表示・アバター演出。</p>
-                <div class="meta-tags"><span>Input</span><span>Transport</span><span>AI Core</span><span>Output</span></div>
-            </div>
-            <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔒 認証 + 採番</h3>
                 <p>JWT 認証（HS256・60分）を Pinia + Axios interceptor で自動管理。C採番テーブルで AUTOINCREMENT 不使用のカスタム ID を一元管理。</p>
                 <div class="meta-tags"><span>JWT / HS256</span><span>C採番</span><span>監査フィールド</span></div>
             </div>
         </div>
+        <p class="section-subtitle animate-on-scroll" style="margin-top:36px;">共通基盤機能。</p>
+        <div class="expansion-grid">
+            <div class="expansion-item animate-on-scroll">
+                <h4>📊 qTubler</h4>
+                <p>独自カスタムテーブル。ソート・ページング・行選択</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🌐 WebSocket</h4>
+                <p>AI コアリアルタイム通信。セッション永続化対応</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>📝 監査フィールド</h4>
+                <p>全テーブルに登録 / 更新情報を自動付与</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🚀 POST 中心 API</h4>
+                <p>全 CRUD を POST で統一。一貫したレスポンス形式</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🔄 Reboot 機構</h4>
+                <p>txt ファイル作成でサーバー内部再起動</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🎯 V系実装</h4>
+                <p>Database VIEW 不使用。生 SQL クエリで JOIN</p>
+            </div>
+        </div>
     </section>
 
-    <!-- Business Samples -->
+    <!-- 3. 実務サンプル -->
     <section class="section" id="業務サンプル">
-        <h2 class="section-title animate-on-scroll">Business Samples</h2>
+        <h2 class="section-title animate-on-scroll">📦 実務サンプル — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">テンプレートの核は、ちゃんと動く業務システムにあります。</p>
         <div class="sample-grid">
             <div class="sample-item animate-on-scroll">
@@ -1090,11 +1183,23 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- Advanced Layer -->
+    <!-- 4. AI + 音声 + アバター -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">Advanced Layer</h2>
-        <p class="section-subtitle animate-on-scroll">AI コア、音声対話、3D アバターまで踏み込む。</p>
-        <div class="advanced-grid">
+        <h2 class="section-title animate-on-scroll">🤖 AI + 音声 + アバター — 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">チャット・音声・画像・コード支援をひとつの体験へ。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎙️ AI Voice + Avatar</h3>
+                <p>Gemini Live / OpenAI Realtime と VRM / VRMA の 3D 表示を接続。16kHz 入力・24kHz 出力のリアルタイムパイプラインで口パクと音声再生を同期。</p>
+                <div class="meta-tags"><span>16kHz Input</span><span>24kHz Output</span><span>Three.js + VRM</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔁 AI Flow</h3>
+                <p>マイク・テキスト・画像・コード操作 → REST + WebSocket + Vite Proxy → Claude / GPT / Gemini を用途ごとに切替 → チャット・音声応答・コード表示・アバター演出。</p>
+                <div class="meta-tags"><span>Input</span><span>Transport</span><span>AI Core</span><span>Output</span></div>
+            </div>
+        </div>
+        <div class="advanced-grid" style="margin-top:30px;">
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🎙️</span>
                 <h3 class="feature-title">音声対話インターフェース</h3>
@@ -1113,44 +1218,53 @@ Key:   利用者名</pre>
                     または Web 左ペインへ表示。VRMA モーション対応。
                 </p>
             </div>
-            <div class="feature-card highlight-gold animate-on-scroll">
+        </div>
+    </section>
+
+    <!-- 5. 自己改善機構 -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">🧠 自己改善機構 — 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">使うほど育つ .aidiy/ 知見システム。</p>
+        <div class="advanced-grid">
+            <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🧠</span>
-                <h3 class="feature-title">自己改善機構</h3>
+                <h3 class="feature-title">.aidiy/ 知見フォルダ</h3>
                 <p class="feature-description">
                     コードエージェントは修正が完了するたびに、<br>
-                    プロジェクト専用の <code style="color:#ffd700">.aidiy/</code> フォルダへ<br>
+                    プロジェクト専用の <code style="color:#00ffff">.aidiy/</code> フォルダへ<br>
                     知見を自動整理します。
                 </p>
-                <div class="self-improve-detail">
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     次回の同種修正では <code>.aidiy/_index.md</code> を参照し、<br>
                     過去の成功パターンを再利用して精度を高めます。<br>
                     <strong>使うほどに、システム自体が育ちます。</strong>
                 </div>
             </div>
             <div class="feature-card animate-on-scroll">
-                <span class="feature-icon">🔧</span>
-                <h3 class="feature-title">マルチ Code CLI 対応</h3>
+                <span class="feature-icon">📚</span>
+                <h3 class="feature-title">運用フロー</h3>
                 <p class="feature-description">
-                    6 種の Code CLI を code1〜code4 パネルへ<br>
-                    自由に割り当てて並走できます。<br>
-                    新しいツールも手順に沿って追加可能。
+                    修正前に <code style="color:#00ffff">_index.md</code> と<br>
+                    <code style="color:#00ffff">_最終変更.md</code> を参照。<br>
+                    修正完了後にテーマ別メモへ追記・索引更新。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
-                    claude_sdk &nbsp;/&nbsp; claude_cli &nbsp;/&nbsp; copilot_cli<br>
-                    codex_cli &nbsp;/&nbsp; gemini_cli &nbsp;/&nbsp; hermes_cli
+                    単なる作業ログではなく<br>
+                    「次回の修正判断に使える情報」を残します。<br>
+                    <strong>仕様はソースへ、知見は .aidiy へ。</strong>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- MCP Hub -->
+    <!-- 6. MCP Hub × 6 + Multi CLI -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">MCP Hub — backend_mcp</h2>
+        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 6 + Multi CLI — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">ポート 8095 に 6 つの MCP サーバーを同居。人の手数を減らし、AI の自己検証を増やす。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 aidiy_chrome_devtools</h3>
-                <p>Chrome DevTools Protocol を Python 純正実装で MCP 化。navigate / click / screenshot / DOM 取得・JS 実行まで。`chrome-devtools-mcp`（Node）は廃止済。</p>
+                <p>Chrome DevTools Protocol を Python 純正実装で MCP 化。navigate / click / screenshot / DOM 取得・JS 実行まで。</p>
                 <div class="meta-tags"><span>CDP</span><span>SSE</span><span>Python</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
@@ -1170,92 +1284,74 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">📜 aidiy_logs</h3>
-                <p>`backend_server` と `backend_mcp` のログを tail、正規表現 grep、ERROR/Traceback 抽出（前後 2 行の文脈付き）。変更直後の回帰検知に。</p>
+                <p>backend_server と backend_mcp のログを tail、正規表現 grep、ERROR/Traceback 抽出（前後 2 行の文脈付き）。変更直後の回帰検知に。</p>
                 <div class="meta-tags"><span>tail</span><span>grep</span><span>error context</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">✅ aidiy_code_check</h3>
-                <p>Python 構文（py_compile）・ruff lint・TypeScript 型チェック（`npm run type-check`）を subprocess で実行。副作用なしの検査系だけ。</p>
+                <p>Python 構文（py_compile）・ruff lint・TypeScript 型チェック（npm run type-check）を subprocess で実行。副作用なしの検査系だけ。</p>
                 <div class="meta-tags"><span>py_compile</span><span>ruff</span><span>tsc</span></div>
             </div>
-            <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">🔁 Self-Verification Loop</h3>
-                <p>「コードを直す → DB で結果を見る → ログでエラーを見る → 型で再確認」を AI が自走で回せる。人間は指示と判断に集中できる。</p>
-                <div class="meta-tags"><span>edit</span><span>observe</span><span>verify</span></div>
+        </div>
+        <div class="advanced-grid" style="margin-top:30px;">
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🔁</span>
+                <h3 class="feature-title">Self-Verification Loop</h3>
+                <p class="feature-description">
+                    「コードを直す → DB で結果を見る →<br>
+                    ログでエラーを見る → 型で再確認」を AI が自走。<br>
+                    人間は指示と判断に集中できます。
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    edit → observe → verify<br>
+                    MCP 6 サーバーの連携で、修正の影響範囲を<br>
+                    <strong>AI が自分で確認</strong>してから報告します。
+                </div>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🔧</span>
+                <h3 class="feature-title">マルチ Code CLI 対応</h3>
+                <p class="feature-description">
+                    6 種の Code CLI を code1〜code4 パネルへ<br>
+                    自由に割り当てて並走できます。<br>
+                    新しいツールも手順に沿って追加可能。
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    claude_sdk &nbsp;/&nbsp; claude_cli &nbsp;/&nbsp; copilot_cli<br>
+                    codex_cli &nbsp;/&nbsp; gemini_cli &nbsp;/&nbsp; hermes_cli
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Table Classification -->
+    <!-- Future Roadmap（将来性） -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">Table Classification</h2>
+        <h2 class="section-title animate-on-scroll">Future Roadmap</h2>
+        <p class="section-subtitle animate-on-scroll">育つテンプレート、広がるエコシステム。</p>
         <div class="expansion-grid">
             <div class="expansion-item animate-on-scroll">
-                <h4>C系 — Core</h4>
-                <p>権限・利用者・採番</p>
+                <h4>🌱 蓄積で育つ</h4>
+                <p>.aidiy/ の知見が積み上がるほど、修正の初手精度が上がる。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>M系 — Master</h4>
-                <p>配車区分・車両・商品・工程</p>
+                <h4>🔌 MCP 拡張</h4>
+                <p>AiDiy_mcp.json に追記するだけで新しい外部システム観測・操作を追加可能。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>T系 — Transaction</h4>
-                <p>配車・生産・入庫・出庫・棚卸</p>
+                <h4>🤖 CLI エコシステム</h4>
+                <p>claude / copilot / codex / gemini / hermes に続く新 Code CLI も <code style="color:#00ffff">_sdk</code> / <code style="color:#00ffff">_cli</code> 命名規約で追加可能。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>V系 — View</h4>
-                <p>生 SQL クエリによる結合表示</p>
+                <h4>🏢 業務領域の横展開</h4>
+                <p>配車・生産・在庫の既存パターンを踏襲し、会計・HR・CRM など同じ設計で展開。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>S系 — Scheduler</h4>
-                <p>週表示・日表示スケジューラー</p>
+                <h4>🌏 多言語対応の余地</h4>
+                <p>日本語識別子の設計思想はそのまま、他言語ネイティブの業務命名へ拡張可能。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
-                <h4>A系 — AI</h4>
-                <p>AI コア・会話履歴</p>
-            </div>
-            <div class="expansion-item animate-on-scroll">
-                <h4>X系 — Experimental</h4>
-                <p>ゲーム・自己紹介ページ</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Key Features -->
-    <section class="section">
-        <h2 class="section-title animate-on-scroll">Key Features</h2>
-        <div class="expansion-grid">
-            <div class="expansion-item animate-on-scroll">
-                <h4>📊 qTubler</h4>
-                <p>独自カスタムテーブル。ソート・ページング・行選択</p>
-            </div>
-            <div class="expansion-item animate-on-scroll">
-                <h4>🌐 WebSocket</h4>
-                <p>AI コアリアルタイム通信。セッション永続化対応</p>
-            </div>
-            <div class="expansion-item animate-on-scroll">
-                <h4>📝 監査フィールド</h4>
-                <p>全テーブルに登録 / 更新情報を自動付与</p>
-            </div>
-            <div class="expansion-item animate-on-scroll">
-                <h4>🚀 POST 中心 API</h4>
-                <p>全 CRUD を POST で統一。一貫したレスポンス形式</p>
-            </div>
-            <div class="expansion-item animate-on-scroll">
-                <h4>🔄 Reboot 機構</h4>
-                <p>txt ファイル作成でサーバー内部再起動。ゼロダウンタイム</p>
-            </div>
-            <div class="expansion-item animate-on-scroll">
-                <h4>🎯 V系実装</h4>
-                <p>Database VIEW 不使用。生 SQL クエリで JOIN</p>
-            </div>
-            <div class="expansion-item animate-on-scroll" style="border-color:rgba(255,215,0,0.5); background:rgba(255,215,0,0.06);">
-                <h4 style="color:#ffd700;">🧠 自己改善機構</h4>
-                <p>修正完了後に .aidiy/ へ知見を自動整理。使うほど育つ</p>
-            </div>
-            <div class="expansion-item animate-on-scroll">
-                <h4>🔧 マルチ Code CLI</h4>
-                <p>6種の CLI を並走。hermes / copilot / codex / gemini 対応</p>
+                <h4>🧪 OSS テンプレート化</h4>
+                <p>非商用ライセンスのもと、コミュニティが業務テンプレートを共有・進化させる土台。</p>
             </div>
         </div>
     </section>
@@ -1369,28 +1465,23 @@ Key:   利用者名</pre>
         rim.position.set(-1.3, 0.7, 1.3);
         scene.add(rim);
 
-        // frontend_avatar と同じ向きに寄せる
+        // frontend_avatar と同じ向きに寄せる（VRM 正面 +Z をカメラ側へ向ける）
         const container = new THREE.Group();
+        container.rotation.y = Math.PI;
         scene.add(container);
 
         // ---------- Loaders ----------
         const modelLoader = new GLTFLoader();
         modelLoader.register(p => new VRMLoaderPlugin(p));
+
         const motionLoader = new GLTFLoader();
         motionLoader.register(p => new VRMAnimationLoaderPlugin(p));
 
-        const VRMA_FILES = [
-            './vrma/VRMA_01.vrma',
-            './vrma/VRMA_02.vrma',
-            './vrma/VRMA_03.vrma',
-            './vrma/VRMA_04.vrma',
-            './vrma/VRMA_05.vrma',
-        ];
         const loadWith = (loader, url) =>
             new Promise((res, rej) => loader.load(url, res, undefined, rej));
 
         // ---------- VRM 読み込み ----------
-        let vrm = null, mixer = null;
+        let vrm = null;
         try {
             const gltf = await loadWith(modelLoader, './AiDiy_Sample_M.vrm');
             vrm = gltf.userData?.vrm;
@@ -1418,69 +1509,107 @@ Key:   利用者名</pre>
             camera.position.set(0, h * 0.78, -h * 1.05);
             camera.lookAt(0, h * 0.78, 0);
 
-            mixer = new THREE.AnimationMixer(vrm.scene);
-        } catch (e) {
+            } catch (e) {
             console.warn('Avatar load error:', e);
             return;
         }
 
-        // ---------- VRMA 読み込み ----------
-        const clips = [];
-        for (const file of VRMA_FILES) {
-            try {
-                const g = await loadWith(motionLoader, file);
-                const anim = g.userData?.vrmAnimations?.[0];
-                if (anim) clips.push(createVRMAnimationClip(anim, vrm));
-                else console.warn('vrmAnimations not found:', file);
-            } catch (e) {
-                console.warn('VRMA load skip:', file, e);
+        // ---------- VRMA 連続再生 ----------
+        // 再生間のロード待ちで T-pose（両手広げ）がチラつくのを避けるため、
+        // 全 VRMA を起動時にまとめてロードし、以後はタイマー予約 + crossFade で
+        // シームレスに巡回させる。
+        const VRMA_FILES = [
+            './vrma/VRMA_01.vrma',
+            './vrma/VRMA_02.vrma',
+            './vrma/VRMA_03.vrma',
+            './vrma/VRMA_04.vrma',
+            './vrma/VRMA_05.vrma',
+        ];
+        const VRMA_XFADE = 0.5;
+
+        const mixer = new THREE.AnimationMixer(vrm.scene);
+        let currentAction = null;
+        let clipOrder = [];
+        let clipIndex = 0;
+        let swapTimer = null;
+
+        const shuffleInPlace = (arr) => {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
             }
-        }
-        console.log('Loaded VRMA clips:', clips.length);
-
-        // ---------- シーケンシャルループ ----------
-        let prevAction = null;
-        let clipIndex  = 0;
-        const XFADE = 0.4;
-        let nextClipTimer = 0;
-
-        const clearNextClipTimer = () => {
-            if (!nextClipTimer) return;
-            window.clearTimeout(nextClipTimer);
-            nextClipTimer = 0;
+            return arr;
         };
 
-        function playNext() {
-            if (!mixer || clips.length === 0) return;
-            clearNextClipTimer();
-
-            const clip = clips[clipIndex % clips.length];
-            clipIndex += 1;
-
+        const playClip = (clip) => {
             const action = mixer.clipAction(clip);
             action.reset();
             action.setLoop(THREE.LoopOnce, 1);
-            action.clampWhenFinished = false;
+            action.clampWhenFinished = true;
             action.enabled = true;
             action.setEffectiveTimeScale(1);
             action.setEffectiveWeight(1);
             action.play();
-
-            if (prevAction && prevAction !== action) {
-                // play 済みの action へ、前の action からクロスフェード
-                action.crossFadeFrom(prevAction, XFADE, false);
+            if (currentAction && currentAction !== action) {
+                action.crossFadeFrom(currentAction, VRMA_XFADE, false);
             }
-            prevAction = action;
+            currentAction = action;
 
-            const nextDelay = Math.max(250, (clip.duration - XFADE) * 1000);
-            nextClipTimer = window.setTimeout(() => {
-                nextClipTimer = 0;
-                playNext();
-            }, nextDelay);
-        }
+            if (swapTimer) clearTimeout(swapTimer);
+            const delay = Math.max(500, (clip.duration - VRMA_XFADE) * 1000);
+            swapTimer = setTimeout(playNext, delay);
+        };
 
-        // VRMA 一覧を切り替え続ける
-        if (clips.length > 0) playNext();
+        const playNext = () => {
+            swapTimer = null;
+            if (clipOrder.length === 0) return;
+            // 1 本しかなければ同じものを繰り返す
+            if (clipOrder.length > 1) {
+                const prev = clipIndex;
+                clipIndex = (clipIndex + 1) % clipOrder.length;
+                // 全周したら再シャッフル（直前と被らないように先頭を調整）
+                if (clipIndex === 0) {
+                    const lastClip = clipOrder[prev];
+                    shuffleInPlace(clipOrder);
+                    if (clipOrder[0] === lastClip && clipOrder.length > 1) {
+                        [clipOrder[0], clipOrder[1]] = [clipOrder[1], clipOrder[0]];
+                    }
+                }
+            }
+            playClip(clipOrder[clipIndex]);
+        };
+
+        // finished は保険。通常はタイマー側で遷移する。
+        mixer.addEventListener('finished', () => {
+            if (!swapTimer) playNext();
+        });
+
+        // 全 VRMA を並列ロード。失敗したものは除外。
+        Promise.all(VRMA_FILES.map((url) =>
+            new Promise((resolve) => {
+                motionLoader.load(
+                    url,
+                    (gltf) => {
+                        const vrmAnimation = gltf.userData?.vrmAnimations?.[0];
+                        if (!vrmAnimation || !vrm) { resolve(null); return; }
+                        resolve(createVRMAnimationClip(vrmAnimation, vrm));
+                    },
+                    undefined,
+                    (err) => {
+                        console.warn('VRMA load error:', url, err);
+                        resolve(null);
+                    },
+                );
+            })
+        )).then((clips) => {
+            clipOrder = shuffleInPlace(clips.filter((c) => c));
+            if (clipOrder.length === 0) {
+                console.warn('No VRMA clips loaded.');
+                return;
+            }
+            clipIndex = 0;
+            playClip(clipOrder[0]);
+        });
 
         // ---------- RAF 制御（可視／タブ可視時だけ回す） ----------
         const clock = new THREE.Clock();
@@ -1494,9 +1623,32 @@ Key:   利用者名</pre>
             camera.updateProjectionMatrix();
         };
 
+        // ---------- 自動まばたき ----------
+        // ランダム間隔（2〜5 秒）で約 150ms の開→閉→開を実行する。
+        let blinkTimer = 0;
+        let blinkCooldown = 2 + Math.random() * 3;
+        const BLINK_DURATION = 0.15;
+
+        const updateBlink = (dt) => {
+            if (!vrm?.expressionManager) return;
+            blinkTimer += dt;
+            if (blinkTimer < blinkCooldown) {
+                vrm.expressionManager.setValue('blink', 0);
+            } else if (blinkTimer < blinkCooldown + BLINK_DURATION) {
+                const t = (blinkTimer - blinkCooldown) / BLINK_DURATION;
+                vrm.expressionManager.setValue('blink', Math.sin(t * Math.PI));
+            } else {
+                vrm.expressionManager.setValue('blink', 0);
+                blinkTimer = 0;
+                blinkCooldown = 2 + Math.random() * 3;
+            }
+        };
+
         const tick = () => {
             const dt = clock.getDelta();
+
             if (mixer) mixer.update(dt);
+            updateBlink(dt);
             if (vrm)   vrm.update(dt);
             renderer.render(scene, camera);
             rafId = requestAnimationFrame(tick);
@@ -1530,7 +1682,6 @@ Key:   利用者名</pre>
         });
 
         window.addEventListener('beforeunload', () => {
-            clearNextClipTimer();
             stop();
             window.removeEventListener('resize', resizeRenderer);
         });

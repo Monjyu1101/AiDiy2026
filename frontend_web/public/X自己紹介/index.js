@@ -169,21 +169,50 @@ class AiDiyIntroduction {
     // スクロール連動出現 + カウントアップ + スキャン
     // -----------------------------------------------------------------
     setupScrollAnimations() {
+        // grid コンテナ単位で監視し、中の小パネルを setTimeout で順次発火。
+        // カード単体の intersection timing に依存しないので、スクロール速度に関わらず
+        // 「左→右→次行」の時間差表示が確実に見える。
+        const STAGGER_MS = prefersReducedMotion ? 0 : 110;
+        const gridSelector = '.core-features, .architecture-grid, .expansion-grid, .sample-grid, .advanced-grid, .tech-stats';
+        const gridNodes = document.querySelectorAll(gridSelector);
+        const gridChildren = new Set();
+        gridNodes.forEach(grid => {
+            grid.querySelectorAll(':scope > .animate-on-scroll').forEach(c => gridChildren.add(c));
+        });
+
+        const triggerCard = (el) => {
+            el.classList.add('animated');
+            if (el.classList.contains('stat-item') && !this.countersAnimated) {
+                this.animateCounters();
+                this.countersAnimated = true;
+            }
+        };
+
+        const gridObserver = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) continue;
+                const items = entry.target.querySelectorAll(':scope > .animate-on-scroll');
+                items.forEach((item, i) => {
+                    setTimeout(() => triggerCard(item), i * STAGGER_MS);
+                });
+                gridObserver.unobserve(entry.target);
+            }
+        }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+        gridNodes.forEach(grid => gridObserver.observe(grid));
+
+        // grid の外にある animate-on-scroll（h2 / p / ボタン等）は従来通り個別観測。
         const opts = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
         const observer = new IntersectionObserver((entries) => {
             for (const entry of entries) {
                 if (!entry.isIntersecting) continue;
-                entry.target.classList.add('animated');
-
-                if (entry.target.classList.contains('stat-item') && !this.countersAnimated) {
-                    this.animateCounters();
-                    this.countersAnimated = true;
-                }
+                triggerCard(entry.target);
                 observer.unobserve(entry.target);
             }
         }, opts);
 
-        document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
+        document.querySelectorAll('.animate-on-scroll').forEach(el => {
+            if (!gridChildren.has(el)) observer.observe(el);
+        });
 
         // セクションに scanline を一度だけ付加
         const sectionObserver = new IntersectionObserver((entries) => {
