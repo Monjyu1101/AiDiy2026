@@ -407,33 +407,36 @@ def cleanup_backend(base_dir: Path, choices: dict):
             if remove_directory(env_dir, f"{env_name} ({label})"):
                 deleted_count += 1
             else:
-                print_error(f"  {BACKEND_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
-        else:
+                print_error(
+                    f"  {BACKEND_PATH}/{env_name} 削除失敗。"
+                    f"手動で削除してください: {env_dir}"
+                )
+        elif env_name in backend_envs:
             print_info(f"  {BACKEND_PATH}/{env_name} はそのまま残します")
 
     logs_dir = backend_dir / "logs"
     if logs_dir.exists():
-        if choices.get("backend_logs"):
+        if choices.get("backend_logs") is True:
             if clean_directory_contents(logs_dir, f"logs ({label})"):
                 deleted_count += 1
-        else:
+        elif choices.get("backend_logs") is False:
             print_info(f"  {BACKEND_PATH}/logs はそのまま残します")
 
     temp_dir = backend_dir / "temp"
     if temp_dir.exists():
-        if choices.get("backend_temp"):
+        if choices.get("backend_temp") is True:
             if clean_directory_contents(temp_dir, f"temp ({label})"):
                 deleted_count += 1
-        else:
+        elif choices.get("backend_temp") is False:
             print_info(f"  {BACKEND_PATH}/temp はそのまま残します")
 
     if DATABASE_TYPE.lower() == "sqlite":
         sqlite_db = base_dir / SQLITE_DB_REL_PATH
         if sqlite_db.exists():
-            if choices.get("backend_sqlite"):
+            if choices.get("backend_sqlite") is True:
                 if remove_file(sqlite_db, f"SQLite データベース ({label})"):
                     deleted_count += 1
-            else:
+            elif choices.get("backend_sqlite") is False:
                 print_info("  SQLite データベースはそのまま残します")
 
     if deleted_count > 0:
@@ -462,24 +465,27 @@ def cleanup_backend_mcp(base_dir: Path, choices: dict):
             if remove_directory(env_dir, f"{env_name} ({label})"):
                 deleted_count += 1
             else:
-                print_error(f"  {BACKEND_MCP_PATH}/{env_name} 削除失敗。手動で削除してください: {env_dir}")
-        else:
+                print_error(
+                    f"  {BACKEND_MCP_PATH}/{env_name} 削除失敗。"
+                    f"手動で削除してください: {env_dir}"
+                )
+        elif env_name in mcp_envs:
             print_info(f"  {BACKEND_MCP_PATH}/{env_name} はそのまま残します")
 
     node_modules_dir = backend_mcp_dir / "node_modules"
     if node_modules_dir.exists():
-        if choices.get("mcp_node_modules"):
+        if choices.get("mcp_node_modules") is True:
             if remove_directory(node_modules_dir, f"node_modules ({label})"):
                 deleted_count += 1
-        else:
+        elif choices.get("mcp_node_modules") is False:
             print_info(f"  {BACKEND_MCP_PATH}/node_modules はそのまま残します")
 
     temp_dir = backend_mcp_dir / "temp"
     if temp_dir.exists():
-        if choices.get("mcp_temp"):
+        if choices.get("mcp_temp") is True:
             if clean_directory_contents(temp_dir, f"temp ({label})"):
                 deleted_count += 1
-        else:
+        elif choices.get("mcp_temp") is False:
             print_info(f"  {BACKEND_MCP_PATH}/temp はそのまま残します")
 
     if deleted_count > 0:
@@ -543,27 +549,30 @@ def cleanup_frontend_avatar(base_dir: Path):
         print_info(f"{label}: 削除対象はありませんでした")
 
 
-def uninstall_global_npm_tools(npm_packages: dict):
+def uninstall_global_npm_tools():
     print_header("グローバルnpmツールのアンインストール")
 
     npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
 
     uninstalled_count = 0
     for i, package in enumerate(NPM_PACKAGES, 1):
-        if npm_packages.get(package):
-            cmd = [npm_cmd, "uninstall", "-g", package]
-            print_info(f"実行中: {' '.join(cmd)}")
-            try:
-                subprocess.run(cmd, check=True, capture_output=False, text=True)
-                print_success(f"  {package} をアンインストールしました")
-                uninstalled_count += 1
-            except subprocess.CalledProcessError as e:
-                print_error(f"  {package} のアンインストールに失敗しました: {e}")
-            except FileNotFoundError:
-                print_error(f"  {npm_cmd} が見つかりません。Node.jsがインストールされているか確認してください")
-                break
-        else:
-            print_info(f"  {package} はそのまま残します")
+        cmd = [npm_cmd, "uninstall", "-g", package]
+        print_info(f"実行中: {' '.join(cmd)}")
+        try:
+            subprocess.run(cmd, check=True, capture_output=False, text=True)
+            print_success(
+                f"  [{i}/{len(NPM_PACKAGES)}] "
+                f"{package} をアンインストールしました"
+            )
+            uninstalled_count += 1
+        except subprocess.CalledProcessError as e:
+            print_error(
+                f"  [{i}/{len(NPM_PACKAGES)}] "
+                f"{package} のアンインストールに失敗しました: {e}"
+            )
+        except FileNotFoundError:
+            print_error(f"  {npm_cmd} が見つかりません。Node.jsがインストールされているか確認してください")
+            break
 
     if uninstalled_count > 0:
         print_success(f"グローバルnpmツールのアンインストール完了 ({uninstalled_count}個削除)")
@@ -586,31 +595,24 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
 
     choices: dict = {
-        "npm_uninstall":    False,
-        "npm_packages":     {},
-        "backup":           False,
-        "mcp":              False,
-        "mcp_envs":         {},
-        "mcp_node_modules": False,
-        "mcp_temp":         False,
-        "backend":          False,
-        "backend_envs":     {},
-        "backend_logs":     False,
-        "backend_temp":     False,
-        "backend_sqlite":   False,
-        "web":              False,
-        "avatar":           False,
-        "mcp_configs":      False,
+        "npm_uninstall":  False,
+        "mcp":            False,
+        "mcp_envs":       {},
+        "mcp_node_modules": None,
+        "mcp_temp":       None,
+        "backend":        False,
+        "backend_envs":   {},
+        "backend_logs":   None,
+        "backend_temp":   None,
+        "backend_sqlite": None,
+        "web":            False,
+        "avatar":         False,
     }
 
-    choices["npm_uninstall"] = ask_yes_no("グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n")
-    if choices["npm_uninstall"]:
-        for i, package in enumerate(NPM_PACKAGES, 1):
-            choices["npm_packages"][package] = ask_yes_no(f"  [{i}/{len(NPM_PACKAGES)}] {package} をアンインストールしますか？", default="n")
-
-    backup_dir = base_dir / "backup"
-    if backup_dir.exists():
-        choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
+    choices["npm_uninstall"] = ask_yes_no(
+        "グローバルnpmツール(AI CLIツール)をアンインストールしますか？",
+        default="n",
+    )
 
     choices["mcp"] = ask_yes_no("バックエンド(mcp) をクリーンアップしますか？", default="y")
     if choices["mcp"]:
@@ -618,29 +620,42 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         if backend_mcp_dir.exists():
             for env_name in BACKEND_MCP_ENV_LIST:
                 if (backend_mcp_dir / env_name).exists():
-                    choices["mcp_envs"][env_name] = ask_yes_no(f"  {BACKEND_MCP_PATH}/{env_name} を削除しますか？", default="y")
-            if (backend_mcp_dir / "node_modules").exists():
-                choices["mcp_node_modules"] = ask_yes_no(f"  {BACKEND_MCP_PATH}/node_modules を削除しますか？", default="y")
+                    choices["mcp_envs"][env_name] = ask_yes_no(
+                        f"  {BACKEND_MCP_PATH}/{env_name} を削除しますか？",
+                        default="y",
+                    )
             if (backend_mcp_dir / "temp").exists():
-                choices["mcp_temp"] = ask_yes_no(f"  {BACKEND_MCP_PATH}/temp の中身をクリアしますか？", default="y")
+                choices["mcp_temp"] = ask_yes_no(
+                    f"  {BACKEND_MCP_PATH}/temp の中身をクリアしますか？",
+                    default="y",
+                )
 
-    choices["backend"] = ask_yes_no("バックエンド(core,apps)をクリーンアップしますか？", default="y")
+    choices["backend"] = ask_yes_no(
+        "バックエンド(core,apps)をクリーンアップしますか？",
+        default="y",
+    )
     if choices["backend"]:
         backend_dir = base_dir / BACKEND_PATH
         if backend_dir.exists():
-            for env_name in BACKEND_ENV_LIST:
-                if (backend_dir / env_name).exists():
-                    choices["backend_envs"][env_name] = ask_yes_no(f"  {BACKEND_PATH}/{env_name} を削除しますか？", default="y")
-            if (backend_dir / "logs").exists():
-                choices["backend_logs"] = ask_yes_no(f"  {BACKEND_PATH}/logs の中身をクリアしますか？", default="y")
             if (backend_dir / "temp").exists():
-                choices["backend_temp"] = ask_yes_no(f"  {BACKEND_PATH}/temp の中身をクリアしますか？", default="y")
-            if DATABASE_TYPE.lower() == "sqlite" and (base_dir / SQLITE_DB_REL_PATH).exists():
-                choices["backend_sqlite"] = ask_yes_no("  SQLite データベースを削除しますか？", default="n")
+                choices["backend_temp"] = ask_yes_no(
+                    f"  {BACKEND_PATH}/temp の中身をクリアしますか？",
+                    default="y",
+                )
+            if (
+                DATABASE_TYPE.lower() == "sqlite"
+                and (base_dir / SQLITE_DB_REL_PATH).exists()
+            ):
+                choices["backend_sqlite"] = ask_yes_no(
+                    "  SQLite データベースを削除しますか？",
+                    default="n",
+                )
 
-    choices["web"]    = ask_yes_no("フロントエンド(Web)をクリーンアップしますか？", default="y")
+    choices["web"] = ask_yes_no(
+        "フロントエンド(Web)をクリーンアップしますか？",
+        default="y",
+    )
     choices["avatar"] = ask_yes_no("フロントエンド(Avatar)をクリーンアップしますか？", default="y")
-    choices["mcp_configs"] = ask_yes_no(f"グローバルMCP設定の {BACKEND_MCP_SERVER_PREFIX}* を解除しますか？", default="y")
 
     return choices
 
@@ -665,20 +680,15 @@ def main():
     print_header("一括実行開始")
 
     if choices["npm_uninstall"]:
-        uninstall_global_npm_tools(choices["npm_packages"])
+        uninstall_global_npm_tools()
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
-
-    backup_dir = base_dir / "backup"
-    if backup_dir.exists():
-        if choices["backup"]:
-            remove_directory(backup_dir, "backup")
-        else:
-            print_info("backup フォルダはそのまま残します")
 
     print()
     if choices["mcp"]:
         cleanup_backend_mcp(base_dir, choices)
+        print()
+        cleanup_global_mcp_configs(BACKEND_MCP_SERVER_PREFIX)
     else:
         print_info("バックエンド(mcp) のクリーンアップをスキップしました")
 
@@ -699,12 +709,6 @@ def main():
         cleanup_frontend_avatar(base_dir)
     else:
         print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
-
-    print()
-    if choices["mcp_configs"]:
-        cleanup_global_mcp_configs(BACKEND_MCP_SERVER_PREFIX)
-    else:
-        print_warning(f"グローバルMCP設定の {BACKEND_MCP_SERVER_PREFIX}* はそのまま残します")
 
     print()
     print_header("クリーンアップ完了")

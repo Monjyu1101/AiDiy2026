@@ -92,6 +92,18 @@ def print_info(message):
     print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
 
 
+def print_setup_summary(error_locations: list[str]) -> None:
+    print()
+    print_header("セットアップ完了")
+    if error_locations:
+        print_warning("セットアップ処理は完了しましたが、一部でエラーが発生しました。")
+        print_warning("エラー発生場所:")
+        for location in error_locations:
+            print_warning(f"  - {location}")
+    else:
+        print_success("セットアップ処理が完了しました。")
+
+
 def _clear_keyboard_buffer() -> None:
     if sys.platform != "win32":
         return
@@ -589,9 +601,9 @@ def start_global_npm_tools_install():
     return True
 
 
-def wait_global_npm_tools_install():
+def wait_global_npm_tools_install() -> list[str]:
     if not GLOBAL_NPM_INSTALL_PROCESSES:
-        return True
+        return []
 
     print_header("共通セットアップ: npm ツール完了確認")
     print_info("並列投入した AI CLI ツールの導入結果を確認します...")
@@ -620,15 +632,17 @@ def wait_global_npm_tools_install():
 
     if failed_packages:
         print_warning(f"共通: 一部 npm ツールの導入に失敗しました: {', '.join(failed_packages)}")
-        return False
+        return failed_packages
 
     print_success("共通: AI CLI ツールの導入確認が完了しました。")
-    return True
+    return []
 
 
-def setup_common_global_tools(choices: dict):
+def setup_common_global_tools(choices: dict) -> list[str]:
     print_header("共通セットアップ")
     print_info("対象: pip / wheel / setuptools / uv / AI CLI ツール")
+
+    error_locations: list[str] = []
 
     if choices.get("common_python_upgrade"):
         commands = [
@@ -643,6 +657,9 @@ def setup_common_global_tools(choices: dict):
                 failed_tools.append(tool_name)
         if failed_tools:
             print_warning(f"共通: 一部ツールのアップグレードに失敗しました: {', '.join(failed_tools)}")
+            error_locations.extend(
+                [f"共通: Python ツール更新 ({tool_name})" for tool_name in failed_tools]
+            )
         else:
             print_success("共通: Python ツールのアップグレードが完了しました。")
     else:
@@ -653,6 +670,8 @@ def setup_common_global_tools(choices: dict):
     else:
         print_warning("共通: npm ツールのインストールをスキップしました。")
         print_ai_cli_manual_setup()
+
+    return error_locations
 
 
 def setup_backend(choices: dict):
@@ -1047,33 +1066,39 @@ def collect_setup_choices() -> dict | None:
     print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
 
     choices: dict = {
-        "common":                ask_yes_no("共通セットアップを実行しますか？", default="y"),
+        "common":                False,
         "common_python_upgrade": False,
         "common_npm_install":    False,
-        "mcp":                   ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y"),
+        "mcp":                   False,
         "mcp_config":            False,
-        "backend":               ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y"),
+        "backend":               False,
         "pg_user_created":       False,
         "pg_restore":            False,
         "pg_migrate":            False,
-        "web":                   ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y"),
-        "avatar":                ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y"),
+        "web":                   False,
+        "avatar":                False,
         "continue_on_error":     False,
     }
 
+    choices["common"] = ask_yes_no("共通セットアップを実行しますか？", default="y")
     if choices["common"]:
-        choices["common_python_upgrade"] = ask_yes_no("  共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
-        choices["common_npm_install"]    = ask_yes_no("  共通: グローバル環境の npm ツール(AI CLI)をインストール/アップデートしますか？", default="y")
+        choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
+        choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の npm ツール(AI CLI)をインストール/アップデートしますか？", default="y")
 
+    choices["mcp"] = ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y")
     if choices["mcp"]:
-        choices["mcp_config"] = ask_yes_no("  バックエンド(mcp): backend_mcp の mcp機能を使えるよう構成しますか？", default="y")
+        choices["mcp_config"] = ask_yes_no("バックエンド(mcp): backend_mcp の mcp機能を使えるよう構成しますか？", default="y")
 
+    choices["backend"] = ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y")
     if choices["backend"] and DATABASE_TYPE.lower() == "postgresql":
-        choices["pg_user_created"] = ask_yes_no("  バックエンド: PostgreSQL ユーザー(appsuser)を作成しましたか？", default="y")
-        choices["pg_restore"]      = ask_yes_no("  バックエンド: 初期データベースを復元しますか？", default="n")
-        choices["pg_migrate"]      = ask_yes_no("  バックエンド: マイグレーション(alembic upgrade head)を実行しますか？", default="y")
+        choices["pg_user_created"] = ask_yes_no("バックエンド: PostgreSQL ユーザー(appsuser)を作成しましたか？", default="y")
+        choices["pg_restore"]      = ask_yes_no("バックエンド: 初期データベースを復元しますか？", default="n")
+        choices["pg_migrate"]      = ask_yes_no("バックエンド: マイグレーション(alembic upgrade head)を実行しますか？", default="y")
 
-    choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="n")
+    choices["web"] = ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y")
+    choices["avatar"] = ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y")
+
+    choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="y")
 
     return choices
 
@@ -1096,58 +1121,75 @@ def main():
 
     print_header("一括実行開始")
     continue_on_error = choices["continue_on_error"]
+    error_locations: list[str] = []
 
     print()
     if choices["common"]:
-        setup_common_global_tools(choices)
+        error_locations.extend(setup_common_global_tools(choices))
+        if GLOBAL_NPM_INSTALL_PROCESSES:
+            print()
+            failed_packages = wait_global_npm_tools_install()
+            error_locations.extend(
+                [f"共通: npm ツール導入 ({package})" for package in failed_packages]
+            )
     else:
         print_warning("共通セットアップをスキップしました。")
 
     print()
     if choices["mcp"]:
-        if not setup_backend_mcp() and not continue_on_error:
-            sys.exit(1)
+        if not setup_backend_mcp():
+            error_locations.append("バックエンド(mcp)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
+        backend_mcp_module = next((module for module in MCP_MODULES if module.get("name") == "backend_mcp"), None)
+        if backend_mcp_module:
+            print()
+            show_current_mcp_config(backend_mcp_module)
+            if choices["mcp_config"]:
+                if not configure_backend_mcp_clients(backend_mcp_module):
+                    error_locations.append("バックエンド(mcp): MCP 設定ファイル書き込み")
+                    if not continue_on_error:
+                        print_setup_summary(error_locations)
+                        sys.exit(1)
+            else:
+                print_warning("backend_mcp の MCP 設定ファイル書き込みをスキップしました。")
+        else:
+            print_warning("backend_mcp モジュール定義が見つからないため、MCP 設定をスキップしました。")
     else:
         print_warning("バックエンド(mcp) のセットアップをスキップしました。")
 
-    backend_mcp_module = next((module for module in MCP_MODULES if module.get("name") == "backend_mcp"), None)
-    if backend_mcp_module:
-        print()
-        show_current_mcp_config(backend_mcp_module)
-        if choices["mcp_config"]:
-            if not configure_backend_mcp_clients(backend_mcp_module) and not continue_on_error:
-                sys.exit(1)
-        else:
-            print_warning("backend_mcp の MCP 設定ファイル書き込みをスキップしました。")
-
     print()
     if choices["backend"]:
-        if not setup_backend(choices) and not continue_on_error:
-            sys.exit(1)
+        if not setup_backend(choices):
+            error_locations.append("バックエンド(core,apps)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
     else:
         print_warning("バックエンド(core,apps)のセットアップをスキップしました。")
 
     print()
     if choices["web"]:
-        if not setup_frontend_web() and not continue_on_error:
-            sys.exit(1)
+        if not setup_frontend_web():
+            error_locations.append("フロントエンド(Web)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
     else:
         print_warning("フロントエンド(Web)のセットアップをスキップしました。")
 
     print()
     if choices["avatar"]:
-        if not setup_frontend_avatar() and not continue_on_error:
-            sys.exit(1)
+        if not setup_frontend_avatar():
+            error_locations.append("フロントエンド(Avatar)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
     else:
         print_warning("フロントエンド(Avatar)のセットアップをスキップしました。")
 
-    print()
-    if GLOBAL_NPM_INSTALL_PROCESSES:
-        wait_global_npm_tools_install()
-
-    print()
-    print_header("セットアップ完了")
-    print_success("セットアップ処理が完了しました。")
+    print_setup_summary(error_locations)
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
     print_info("  個別起動:")
