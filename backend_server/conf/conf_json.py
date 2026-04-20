@@ -23,7 +23,7 @@ class conf_json:
         # WebUI設定
         'WEB_BASE': '8090',
         'CORE_BASE': '8091',
-        'WEBUI_FIRST_PAGE': 'Sスケジュール',
+        'WEBUI_FIRST_PAGE': 'サンプル',
 
         # APIキー
         'gemini_key_id': '< your gemini api key >',
@@ -37,6 +37,8 @@ class conf_json:
         'azure_endpoint': '< your azure openai endpoint >',
         'azure_version': 'yyyy-mm-dd-preview',
         'azure_key_id': '< your azure openai api key >',
+
+        # Copilot/OpenRouterの基本設定
         'copilot_key_id': '< your copilot api key >',
         'openrt_key_id': '< your openrouter api key >',
 
