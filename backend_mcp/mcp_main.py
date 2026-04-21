@@ -495,7 +495,19 @@ async def cdp_command(method: str, params: Optional[str] = None, tab_id: Optiona
         SystemInfo.getInfo         — システム情報
     """
     await _ensure_chrome()
-    parsed_params = json.loads(params) if params else {}
+    parsed_params: dict = {}
+    if params:
+        if isinstance(params, dict):
+            parsed_params = params
+        else:
+            stripped = params.strip()
+            if stripped:
+                loaded = json.loads(stripped)
+                if not isinstance(loaded, dict):
+                    raise ValueError(
+                        f"params は JSON オブジェクトである必要があります (例: '{{\"accept\": true}}')"
+                    )
+                parsed_params = loaded
     if tab_id == "browser":
         ws_url = await asyncio.to_thread(cdp.get_browser_ws_url)
     else:
@@ -503,6 +515,96 @@ async def cdp_command(method: str, params: Optional[str] = None, tab_id: Optiona
         ws_url = cdp.get_ws_url(tab)
     result = await cdp.send_command(ws_url, method, parsed_params)
     return json.dumps(result, ensure_ascii=False)
+
+# [DIALOG_TOOLS_PATCH_APPLIED]
+
+# ------------------------------------------------------------------ #
+# ダイアログ操作ツール (js_confirm_result / js_alert_result 等)
+# ------------------------------------------------------------------ #
+
+@mcp.tool()
+async def js_confirm_result(
+    accept: bool = True,
+    dialog_wait: float = 0.0,
+    tab_id: Optional[str] = None,
+) -> str:
+    """
+    現在表示中の confirm ダイアログを CDP 経由で操作する。
+
+    Args:
+        accept: True=OK（確認）、False=キャンセル
+        dialog_wait: ダイアログが表示されるまで待機する最大秒数（デフォルト0=即時応答）。
+                     事前に eval_js で setTimeout クリックをスケジュールした場合は
+                     クリック遅延より大きな値を指定する（例: 30）。
+                     待機中は Page.javascriptDialogOpening イベント駆動で検知する。
+        tab_id: 対象タブID（省略時は最初のタブ）
+    """
+    await _ensure_chrome()
+    return await cdp.handle_dialog(accept, "", tab_id, dialog_wait)
+
+@mcp.tool()
+async def js_alert_result(
+    dialog_wait: float = 0.0,
+    tab_id: Optional[str] = None,
+) -> str:
+    """
+    現在表示中の alert ダイアログを CDP 経由で閉じる。
+
+    典型的な使い方（ダイアログをキャプチャしてから応答する場合）:
+      1. eval_js("setTimeout(()=>document.querySelector('button').click(), 2000)")
+         → ボタンを2秒後に非同期クリック（即座にリターン）
+      2. desktop_screenshot(delay=2.5)
+         → ダイアログ表示中にデスクトップキャプチャ撮影
+      3. js_alert_result(dialog_wait=30)
+         → alert 表示を CDP イベントで検知して自動応答
+
+    Args:
+        dialog_wait: ダイアログが表示されるまで待機する最大秒数（デフォルト0=即時応答）。
+                     事前に eval_js で setTimeout クリックをスケジュールした場合は
+                     クリック遅延より大きな値を指定する（例: 30）。
+                     待機中は Page.javascriptDialogOpening イベント駆動で検知する。
+        tab_id: 対象タブID（省略時は最初のタブ）
+    """
+    await _ensure_chrome()
+    return await cdp.handle_dialog(True, "", tab_id, dialog_wait)
+
+@mcp.tool()
+async def js_install_dialog_override(tab_id: Optional[str] = None) -> str:
+    """
+    window.confirm/alert/prompt をオーバーライドし、ネイティブダイアログの表示をブロックしない形に変更する。
+    インストール後は js_set_confirm_result で confirm の戻り値を事前設定できる。
+
+    Args:
+        tab_id: 対象タブID（省略時は最初のタブ）
+    """
+    await _ensure_chrome()
+    return await cdp.install_dialog_override(tab_id)
+
+@mcp.tool()
+async def js_set_confirm_result(accept: bool = True, tab_id: Optional[str] = None) -> str:
+    """
+    次の confirm() 呼び出しが返す値を設定する（js_install_dialog_override が必要）。
+    ボタンクリック前に呼んでおくと、confirm が表示されずに自動で accept/dismiss される。
+
+    Args:
+        accept: True=OK（確認）、False=キャンセル
+        tab_id: 対象タブID（省略時は最初のタブ）
+    """
+    await _ensure_chrome()
+    return await cdp.set_confirm_result(accept, tab_id)
+
+@mcp.tool()
+async def js_get_dialog_state(tab_id: Optional[str] = None) -> str:
+    """
+    最後に呼ばれたダイアログの情報を取得する（js_install_dialog_override が必要）。
+    last_type/last_message/last_result/next_confirm_result を返す。
+
+    Args:
+        tab_id: 対象タブID（省略時は最初のタブ）
+    """
+    await _ensure_chrome()
+    state = await cdp.get_dialog_state(tab_id)
+    return json.dumps(state, ensure_ascii=False)
 
 # ------------------------------------------------------------------ #
 # 旧 chrome-devtools-mcp (Node.js版) との互換エイリアス

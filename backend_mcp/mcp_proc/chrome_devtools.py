@@ -844,3 +844,165 @@ class CDPClient:
 """
         result = await self.eval_js(js, tab_id)
         return result if isinstance(result, dict) else {}
+
+# [DIALOG_PATCH_APPLIED]
+
+    # ------------------------------------------------------------------ #
+    # ダイアログ操作 (confirm / alert / prompt)
+    # ------------------------------------------------------------------ #
+
+    async def handle_dialog(
+        self,
+        accept: bool = True,
+        prompt_text: str = "",
+        tab_id: Optional[str] = None,
+        dialog_wait: float = 0.0,
+    ) -> str:
+        """
+        CDP Page.handleJavaScriptDialog で現在表示中のダイアログを操作する。
+        confirm/alert/prompt が表示されてブロック中の場合に使用する。
+
+        Args:
+            accept: True=OK/確認、False=キャンセル/閉じる
+            prompt_text: prompt ダイアログへの入力テキスト（任意）
+            tab_id: 対象タブID（省略時は最初のタブ）
+            dialog_wait: ダイアログが表示されるまで待機する最大秒数（0=即時応答）。
+                         eval_js で setTimeout を使いボタンをクリックする場合は
+                         クリック遅延より大きな値を指定する（例: 30）。
+        """
+        tab = self.resolve_tab(tab_id)
+        ws_url = self.get_ws_url(tab)
+        handle_params: dict = {"accept": accept}
+        if prompt_text:
+            handle_params["promptText"] = prompt_text
+
+        if dialog_wait <= 0:
+            # 即時応答（従来の動作）
+            result = await self.send_command(ws_url, "Page.handleJavaScriptDialog", handle_params)
+            return json.dumps(result, ensure_ascii=False)
+
+        # イベント駆動: 同一 WebSocket 上で Page.javascriptDialogOpening を待機してから応答
+        try:
+            async with websockets.connect(
+                ws_url,
+                max_size=50 * 1024 * 1024,
+                open_timeout=10,
+            ) as ws:
+                loop = asyncio.get_running_loop()
+
+                # Page.enable でダイアログイベント購読を有効化
+                await ws.send(json.dumps({"id": 1, "method": "Page.enable", "params": {}}))
+                deadline = loop.time() + 10.0
+                while True:
+                    remaining = deadline - loop.time()
+                    if remaining <= 0:
+                        raise TimeoutError("Page.enable タイムアウト")
+                    raw = await asyncio.wait_for(ws.recv(), timeout=min(remaining, 5.0))
+                    if json.loads(raw).get("id") == 1:
+                        break
+
+                # Page.javascriptDialogOpening イベントを待機
+                deadline = loop.time() + dialog_wait
+                dialog_info: dict = {}
+                while True:
+                    remaining = deadline - loop.time()
+                    if remaining <= 0:
+                        raise TimeoutError(
+                            f"ダイアログが {dialog_wait:.0f}秒以内に表示されませんでした"
+                        )
+                    try:
+                        raw = await asyncio.wait_for(ws.recv(), timeout=min(remaining, 1.0))
+                        msg = json.loads(raw)
+                        if msg.get("method") == "Page.javascriptDialogOpening":
+                            dialog_info = msg.get("params", {})
+                            break
+                    except asyncio.TimeoutError:
+                        continue
+
+                # ダイアログに応答
+                await ws.send(json.dumps({"id": 2, "method": "Page.handleJavaScriptDialog", "params": handle_params}))
+                deadline = loop.time() + 10.0
+                while True:
+                    remaining = deadline - loop.time()
+                    if remaining <= 0:
+                        raise TimeoutError("handleJavaScriptDialog タイムアウト")
+                    raw = await asyncio.wait_for(ws.recv(), timeout=min(remaining, 5.0))
+                    msg = json.loads(raw)
+                    if msg.get("id") == 2:
+                        if "error" in msg:
+                            err = msg["error"]
+                            raise ChromeDevToolsError(
+                                f"CDP エラー [Page.handleJavaScriptDialog]: "
+                                f"{err.get('message', str(err))}"
+                            )
+                        result = msg.get("result", {})
+                        result["_dialog"] = dialog_info
+                        return json.dumps(result, ensure_ascii=False)
+
+        except websockets.exceptions.WebSocketException as e:
+            raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}")
+
+    async def install_dialog_override(self, tab_id: Optional[str] = None) -> str:
+        """
+        window.confirm/alert/prompt をオーバーライドし、ブロッキングを防ぐ。
+        インストール後は set_confirm_result() で confirm の戻り値を事前設定できる。
+        """
+        js = r"""
+(function() {
+    if (window.__mcp_dialog_override) return 'already installed';
+    window.__mcp_dialog_state = {
+        last_type: null,
+        last_message: null,
+        last_result: null,
+        next_confirm_result: true,
+        next_prompt_result: ''
+    };
+    window.confirm = function(message) {
+        var result = window.__mcp_dialog_state.next_confirm_result;
+        window.__mcp_dialog_state.last_type = 'confirm';
+        window.__mcp_dialog_state.last_message = message;
+        window.__mcp_dialog_state.last_result = result;
+        return result;
+    };
+    window.alert = function(message) {
+        window.__mcp_dialog_state.last_type = 'alert';
+        window.__mcp_dialog_state.last_message = message;
+        window.__mcp_dialog_state.last_result = undefined;
+        return undefined;
+    };
+    window.prompt = function(message, defaultValue) {
+        var result = window.__mcp_dialog_state.next_prompt_result;
+        window.__mcp_dialog_state.last_type = 'prompt';
+        window.__mcp_dialog_state.last_message = message;
+        window.__mcp_dialog_state.last_result = result;
+        return result;
+    };
+    window.__mcp_dialog_override = true;
+    return 'installed';
+})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return str(result)
+
+    async def get_dialog_state(self, tab_id: Optional[str] = None) -> dict:
+        """インストール済みダイアログオーバーライドの最終状態を取得する"""
+        js = """
+(function() {
+    if (!window.__mcp_dialog_state) return null;
+    return {
+        last_type: window.__mcp_dialog_state.last_type,
+        last_message: window.__mcp_dialog_state.last_message,
+        last_result: window.__mcp_dialog_state.last_result,
+        next_confirm_result: window.__mcp_dialog_state.next_confirm_result
+    };
+})()
+"""
+        result = await self.eval_js(js, tab_id)
+        return result if isinstance(result, dict) else {}
+
+    async def set_confirm_result(self, accept: bool = True, tab_id: Optional[str] = None) -> str:
+        """次の confirm() 呼び出しが返す値を設定する（install_dialog_override が必要）"""
+        value = "true" if accept else "false"
+        js = f"window.__mcp_dialog_state.next_confirm_result = {value}; \"OK\""
+        result = await self.eval_js(js, tab_id)
+        return str(result)
