@@ -37,6 +37,10 @@ from apps_router import M生産工程
 from apps_router import V生産工程
 from apps_router import M商品分類
 from apps_router import V商品分類
+from apps_router import M取引先分類
+from apps_router import V取引先分類
+from apps_router import M取引先
+from apps_router import V取引先
 from apps_router import M車両
 from apps_router import V車両
 from apps_router import M商品
@@ -70,6 +74,8 @@ database.Base.metadata.create_all(
         apps_models.M生産区分.__table__,
         apps_models.M生産工程.__table__,
         apps_models.M商品分類.__table__,
+        apps_models.M取引先分類.__table__,
+        apps_models.M取引先.__table__,
         apps_models.M車両.__table__,
         apps_models.M商品.__table__,
         apps_models.M商品構成.__table__,
@@ -107,6 +113,10 @@ app.include_router(M生産工程.router)
 app.include_router(V生産工程.router)
 app.include_router(M商品分類.router)
 app.include_router(V商品分類.router)
+app.include_router(M取引先分類.router)
+app.include_router(V取引先分類.router)
+app.include_router(M取引先.router)
+app.include_router(V取引先.router)
 app.include_router(M車両.router)
 app.include_router(V車両.router)
 app.include_router(M商品.router)

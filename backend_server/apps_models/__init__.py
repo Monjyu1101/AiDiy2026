@@ -15,6 +15,8 @@ from apps_models.M配車区分 import M配車区分
 from apps_models.M生産区分 import M生産区分
 from apps_models.M生産工程 import M生産工程
 from apps_models.M商品分類 import M商品分類
+from apps_models.M取引先分類 import M取引先分類
+from apps_models.M取引先 import M取引先
 from apps_models.M車両 import M車両
 from apps_models.M商品 import M商品
 from apps_models.M商品構成 import M商品構成
@@ -32,6 +34,8 @@ __all__ = [
     'M生産区分',
     'M生産工程',
     'M商品分類',
+    'M取引先分類',
+    'M取引先',
     'M車両',
     'M商品',
     'M商品構成',

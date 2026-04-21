@@ -36,10 +36,10 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'リンク' }
     },
     {
-        path: '/サンプル',
-        name: 'サンプル',
-        component: () => import('../components/サンプル.vue'),
-        meta: { requiresAuth: true, title: 'サンプル' }
+        path: '/メインメニュー',
+        name: 'メインメニュー',
+        component: () => import('../components/メインメニュー.vue'),
+        meta: { requiresAuth: true, title: 'メインメニュー' }
     },
     {
         path: '/Xその他',

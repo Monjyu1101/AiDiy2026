@@ -13,6 +13,8 @@ from apps_crud.M配車区分 import get_M配車区分, get_M配車区分一覧, 
 from apps_crud.M生産区分 import get_M生産区分, get_M生産区分一覧, create_M生産区分
 from apps_crud.M生産工程 import get_M生産工程, get_M生産工程一覧, create_M生産工程
 from apps_crud.M商品分類 import get_M商品分類, get_M商品分類一覧, create_M商品分類
+from apps_crud.M取引先分類 import get_M取引先分類, get_M取引先分類一覧, create_M取引先分類
+from apps_crud.M取引先 import get_M取引先, get_M取引先一覧, create_M取引先
 from apps_crud.M車両 import get_M車両, get_M車両一覧, create_M車両
 from apps_crud.M商品 import get_M商品, get_M商品一覧, create_M商品
 from apps_crud.M商品構成 import (
@@ -59,6 +61,14 @@ __all__ = [
     'get_M商品分類',
     'get_M商品分類一覧',
     'create_M商品分類',
+    # M取引先分類
+    'get_M取引先分類',
+    'get_M取引先分類一覧',
+    'create_M取引先分類',
+    # M取引先
+    'get_M取引先',
+    'get_M取引先一覧',
+    'create_M取引先',
     # M車両
     'get_M車両',
     'get_M車両一覧',

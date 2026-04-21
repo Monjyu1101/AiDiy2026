@@ -34,4 +34,5 @@ class ListRequest(BaseModel):
     終了日付: Optional[str] = None
     商品ID: Optional[str] = None
     商品分類ID: Optional[str] = None
+    取引先分類ID: Optional[str] = None
     生産区分ID: Optional[str] = None

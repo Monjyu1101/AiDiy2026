@@ -14,6 +14,8 @@ from apps_crud.M配車区分 import init_M配車区分_data
 from apps_crud.M生産区分 import init_M生産区分_data
 from apps_crud.M生産工程 import init_M生産工程_data
 from apps_crud.M商品分類 import init_M商品分類_data
+from apps_crud.M取引先分類 import init_M取引先分類_data
+from apps_crud.M取引先 import init_M取引先_data
 from apps_crud.M車両 import init_M車両_data
 from apps_crud.M商品 import init_M商品_data
 from apps_crud.M商品構成 import init_M商品構成_data
@@ -206,7 +208,24 @@ def init_db_data(db: Session):
             db.commit()
             inspector = inspect(db.bind)
 
-    for テーブル名 in ["M配車区分", "M生産区分", "M生産工程", "M商品分類", "M車両", "M商品", "M商品構成"]:
+    if not inspector.has_table("M取引先分類"):
+        models.M取引先分類.__table__.create(bind=db.bind, checkfirst=True)
+        db.commit()
+        inspector = inspect(db.bind)
+
+    if inspector.has_table("M取引先"):
+        columns = [col['name'] for col in inspector.get_columns("M取引先")]
+        if "取引先分類ID" not in columns:
+            db.execute(text('DROP TABLE IF EXISTS "M取引先"'))
+            db.commit()
+            inspector = inspect(db.bind)
+
+    if not inspector.has_table("M取引先"):
+        models.M取引先.__table__.create(bind=db.bind, checkfirst=True)
+        db.commit()
+        inspector = inspect(db.bind)
+
+    for テーブル名 in ["M配車区分", "M生産区分", "M生産工程", "M商品分類", "M取引先分類", "M取引先", "M車両", "M商品", "M商品構成"]:
         if not inspector.has_table(テーブル名):
             continue
         columns = [col['name'] for col in inspector.get_columns(テーブル名)]
@@ -241,6 +260,8 @@ def init_db_data(db: Session):
     init_M生産区分_data(db, 認証情報=初期認証情報)
     init_M生産工程_data(db, 認証情報=初期認証情報)
     init_M商品分類_data(db, 認証情報=初期認証情報)
+    init_M取引先分類_data(db, 認証情報=初期認証情報)
+    init_M取引先_data(db, 認証情報=初期認証情報)
     init_M車両_data(db, 認証情報=初期認証情報)
     init_M商品_data(db, 認証情報=初期認証情報)
     init_M商品構成_data(db, 認証情報=初期認証情報)

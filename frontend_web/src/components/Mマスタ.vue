@@ -77,6 +77,32 @@
 
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
+              <span class="icon">M取分</span>
+              M取引先分類
+            </div>
+            <div class="menu-card-description">
+              仕入先・得意先・委託先などの取引先分類管理
+            </div>
+            <router-link to="/Mマスタ/M取引先分類/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">M取</span>
+              M取引先
+            </div>
+            <div class="menu-card-description">
+              取引先マスター管理・住所・電話番号・メールアドレス登録
+            </div>
+            <router-link to="/Mマスタ/M取引先/一覧?戻URL=/Mマスタ" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
               <span class="icon">M構</span>
               M商品構成
             </div>

@@ -252,6 +252,66 @@ export interface M商品分類DeleteRequest {
 }
 
 /**
+ * M取引先分類 API
+ */
+export interface M取引先分類GetRequest {
+  取引先分類ID: string
+}
+
+export interface M取引先分類CreateRequest {
+  取引先分類ID: string
+  取引先分類名: string
+  取引先分類備考?: string
+  有効?: boolean
+}
+
+export interface M取引先分類UpdateRequest {
+  取引先分類ID: string
+  取引先分類名?: string
+  取引先分類備考?: string
+  有効?: boolean
+}
+
+export interface M取引先分類DeleteRequest {
+  取引先分類ID: string
+}
+
+/**
+ * M取引先 API
+ */
+export interface M取引先GetRequest {
+  取引先ID: string
+}
+
+export interface M取引先CreateRequest {
+  取引先ID: string
+  取引先名: string
+  取引先分類ID: string
+  取引先郵便番号?: string
+  取引先住所?: string
+  取引先電話番号?: string
+  取引先メールアドレス?: string
+  取引先備考?: string
+  有効?: boolean
+}
+
+export interface M取引先UpdateRequest {
+  取引先ID: string
+  取引先名?: string
+  取引先分類ID?: string
+  取引先郵便番号?: string
+  取引先住所?: string
+  取引先電話番号?: string
+  取引先メールアドレス?: string
+  取引先備考?: string
+  有効?: boolean
+}
+
+export interface M取引先DeleteRequest {
+  取引先ID: string
+}
+
+/**
  * M商品 API
  */
 export interface M商品GetRequest {

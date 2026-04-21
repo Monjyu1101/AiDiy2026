@@ -23,7 +23,7 @@ class conf_json:
         # WebUI設定
         'WEB_BASE': '8090',
         'CORE_BASE': '8091',
-        'WEBUI_FIRST_PAGE': 'サンプル',
+        'WEBUI_FIRST_PAGE': 'メインメニュー',
 
         # APIキー
         'gemini_key_id': '< your gemini api key >',

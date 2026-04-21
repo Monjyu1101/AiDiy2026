@@ -82,6 +82,31 @@ export interface M商品分類 extends AuditFields {
 }
 
 /**
+ * M取引先分類（取引先分類マスタ）
+ */
+export interface M取引先分類 extends AuditFields {
+  取引先分類ID: string
+  取引先分類名: string
+  取引先分類備考: string | null
+  有効: boolean
+}
+
+/**
+ * M取引先（取引先マスタ）
+ */
+export interface M取引先 extends AuditFields {
+  取引先ID: string
+  取引先名: string
+  取引先分類ID: string
+  取引先郵便番号: string | null
+  取引先住所: string | null
+  取引先電話番号: string | null
+  取引先メールアドレス: string | null
+  取引先備考: string | null
+  有効: boolean
+}
+
+/**
  * M商品（商品マスタ）
  */
 export interface M商品 extends AuditFields {
@@ -250,6 +275,20 @@ export interface V生産工程 extends M生産工程 {
  */
 export interface V商品分類 extends M商品分類 {
   // 追加のビュー固有フィールドがあればここに定義
+}
+
+/**
+ * V取引先分類（取引先分類ビュー）
+ */
+export interface V取引先分類 extends M取引先分類 {
+  // 追加のビュー固有フィールドがあればここに定義
+}
+
+/**
+ * V取引先（取引先ビュー）
+ */
+export interface V取引先 extends M取引先 {
+  取引先分類名?: string | null
 }
 
 /**

@@ -82,6 +82,30 @@ export const appsRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'M商品分類編集' }
     },
     {
+        path: '/Mマスタ/M取引先分類/一覧',
+        name: 'M取引先分類一覧',
+        component: () => import('../components/Mマスタ/M取引先分類/M取引先分類一覧.vue'),
+        meta: { requiresAuth: true, title: 'M取引先分類一覧' }
+    },
+    {
+        path: '/Mマスタ/M取引先分類/編集',
+        name: 'M取引先分類編集',
+        component: () => import('../components/Mマスタ/M取引先分類/M取引先分類編集.vue'),
+        meta: { requiresAuth: true, title: 'M取引先分類編集' }
+    },
+    {
+        path: '/Mマスタ/M取引先/一覧',
+        name: 'M取引先一覧',
+        component: () => import('../components/Mマスタ/M取引先/M取引先一覧.vue'),
+        meta: { requiresAuth: true, title: 'M取引先一覧' }
+    },
+    {
+        path: '/Mマスタ/M取引先/編集',
+        name: 'M取引先編集',
+        component: () => import('../components/Mマスタ/M取引先/M取引先編集.vue'),
+        meta: { requiresAuth: true, title: 'M取引先編集' }
+    },
+    {
         path: '/Mマスタ/M商品/一覧',
         name: 'M商品一覧',
         component: () => import('../components/Mマスタ/M商品/M商品一覧.vue'),

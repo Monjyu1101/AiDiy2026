@@ -15,14 +15,14 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 interface MenuItem { code: string; label: string; desc: string; to: string; }
-interface MenuRow  { axis: string; title: string; accent: string; items: MenuItem[]; }
+interface MenuRow  { axis: string; title: string; accent: string; panelBg: string; panelBgStrong: string; items: MenuItem[]; }
 
-const BACK = '/サンプル';
+const BACK = '/メインメニュー';
 const q = (base: string) => `${base}?戻URL=${encodeURIComponent(BACK)}`;
 
 const rows = ref<MenuRow[]>([
   {
-    axis: 'C', title: '管理', accent: '#4a90e2',
+    axis: 'C', title: '管理', accent: '#6d5a3e', panelBg: '#f4e7c8', panelBgStrong: '#ead5a8',
     items: [
       { code: 'C権', label: 'C権限',   desc: '権限管理・アクセス制御',           to: q('/C管理/C権限/一覧') },
       { code: 'C利', label: 'C利用者', desc: '利用者情報・アカウント設定',       to: q('/C管理/C利用者/一覧') },
@@ -30,19 +30,21 @@ const rows = ref<MenuRow[]>([
     ],
   },
   {
-    axis: 'M', title: 'マスタ', accent: '#e27a5a',
+    axis: 'M', title: 'マスタ', accent: '#7a6250', panelBg: '#f1d6c8', panelBgStrong: '#e8bdad',
     items: [
       { code: 'M車', label: 'M車両',     desc: '車両マスタ・情報登録',           to: q('/Mマスタ/M車両/一覧') },
       { code: 'M配', label: 'M配車区分', desc: '配車カテゴリ・色設定',           to: q('/Mマスタ/M配車区分/一覧') },
       { code: 'M分', label: 'M商品分類', desc: '商品分類・カテゴリ管理',         to: q('/Mマスタ/M商品分類/一覧') },
       { code: 'M商', label: 'M商品',     desc: '商品マスタ・在庫設定',           to: q('/Mマスタ/M商品/一覧') },
+      { code: 'M取分', label: 'M取引先分類', desc: '取引先分類・カテゴリ管理',   to: q('/Mマスタ/M取引先分類/一覧') },
+      { code: 'M取', label: 'M取引先',   desc: '取引先マスタ・連絡先管理',       to: q('/Mマスタ/M取引先/一覧') },
       { code: 'M構', label: 'M商品構成', desc: '構成商品・構成比率管理',         to: q('/Mマスタ/M商品構成/一覧') },
       { code: 'M区', label: 'M生産区分', desc: '生産区分・色設定',               to: q('/Mマスタ/M生産区分/一覧') },
       { code: 'M工', label: 'M生産工程', desc: '生産ライン工程登録',             to: q('/Mマスタ/M生産工程/一覧') },
     ],
   },
   {
-    axis: 'T', title: 'トラン', accent: '#f0b84c',
+    axis: 'T', title: 'トラン', accent: '#5f6f4d', panelBg: '#dceccf', panelBgStrong: '#c8deb8',
     items: [
       { code: 'T配', label: 'T配車',     desc: '配車情報登録・スケジュール',     to: q('/Tトラン/T配車/一覧') },
       { code: 'T入', label: 'T商品入庫', desc: '入庫情報登録',                   to: q('/Tトラン/T商品入庫/一覧') },
@@ -53,7 +55,7 @@ const rows = ref<MenuRow[]>([
     ],
   },
   {
-    axis: 'S', title: 'スケジュール', accent: '#6ac46a',
+    axis: 'S', title: 'スケジュール', accent: '#3f6f78', panelBg: '#cfeaf0', panelBgStrong: '#b8dce5',
     items: [
       { code: 'S配週', label: 'S配車_週表示', desc: '配車週表示・週単位管理',    to: q('/Sスケジュール/S配車_週表示') },
       { code: 'S配日', label: 'S配車_日表示', desc: '配車日表示・詳細管理',      to: q('/Sスケジュール/S配車_日表示') },
@@ -62,7 +64,7 @@ const rows = ref<MenuRow[]>([
     ],
   },
   {
-    axis: 'V', title: 'ビュー', accent: '#9670d4',
+    axis: 'V', title: 'ビュー', accent: '#6f628a', panelBg: '#e4daf2', panelBgStrong: '#d3c3e8',
     items: [
       { code: 'V推', label: 'V商品推移表', desc: '在庫推移・トレンド分析',       to: q('/Vビュー/V商品推移表') },
     ],
@@ -71,7 +73,7 @@ const rows = ref<MenuRow[]>([
 
 const SHIFT_DELAY = 3600;
 const ITEM_UNIT   = 240;
-const STORAGE_KEY = 'サンプル_最終選択';
+const STORAGE_KEY = 'メインメニュー_最終選択';
 
 function loadSaved(): { rowIdx: number; colIdx: number[] } | null {
   try {
@@ -173,8 +175,8 @@ function axisStyle(r: number) {
     const y = sign * (170 + (abs - 1) * 44);
     return {
       top: '50%', left: '50%',
-      transform: `translate(-50%, calc(-50% + ${y}px)) scale(0.5)`,
-      opacity: abs === 1 ? 0.55 : 0.22,
+      transform: `translate(-50%, calc(-50% + ${y}px)) scale(${abs === 1 ? 0.78 : 0.62})`,
+      opacity: abs === 1 ? 0.72 : 0.4,
       zIndex: 1,
     };
   } else {
@@ -216,7 +218,7 @@ onBeforeUnmount(() => {
 
     <!-- ヘッダー -->
     <header class="stage-head">
-      <div class="title">業務メニュー</div>
+      <div class="title">【 メインメニュー 】</div>
       <div class="mode-tag">
         <span class="dot" :style="{ background: currentRow.accent }"></span>
         <span class="tag-text">{{ mode === 'center' ? 'カテゴリ選択中' : '項目選択中' }}</span>
@@ -232,7 +234,7 @@ onBeforeUnmount(() => {
         :key="row.axis"
         class="axis-tile"
         :class="{ selected: r === rowIdx }"
-        :style="{ ...axisStyle(r), '--accent': row.accent }"
+        :style="{ ...axisStyle(r), '--accent': row.accent, '--panel-bg': row.panelBg, '--panel-bg-strong': row.panelBgStrong }"
         @click="selectRow(r)"
       >
         <div class="axis-letter">{{ row.axis }}</div>
@@ -254,7 +256,7 @@ onBeforeUnmount(() => {
       <div
         class="item-panel"
         :class="{ visible: mode === 'item' }"
-        :style="{ '--accent': currentRow.accent }"
+        :style="{ '--accent': currentRow.accent, '--panel-bg': currentRow.panelBg, '--panel-bg-strong': currentRow.panelBgStrong }"
       >
         <div
           class="item-strip"
@@ -306,8 +308,8 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   min-height: calc(100vh - 120px);
-  background: linear-gradient(160deg, #2a3142 0%, #1c2230 55%, #141821 100%);
-  color: #e8ecf3;
+  background: linear-gradient(160deg, #faf7f2 0%, #f5f1e8 55%, #f0ebe0 100%);
+  color: #5a4a3a;
   font-family: 'Segoe UI', 'Noto Sans JP', 'Hiragino Sans', sans-serif;
   overflow: hidden;
   display: flex; flex-direction: column;
@@ -316,8 +318,8 @@ onBeforeUnmount(() => {
   content: '';
   position: absolute; inset: 0;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(255,255,255,0.05), transparent 45%),
-    radial-gradient(ellipse at 80% 80%, rgba(0,0,0,0.35), transparent 55%);
+    radial-gradient(ellipse at 20% 20%, rgba(255,255,255,0.5), transparent 45%),
+    radial-gradient(ellipse at 80% 80%, rgba(210,187,149,0.25), transparent 55%);
   pointer-events: none;
 }
 
@@ -325,18 +327,26 @@ onBeforeUnmount(() => {
 .stage-head {
   position: relative; z-index: 2;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 28px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 28px 10px 40px;
+  height: 35px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #e6d5b7 0%, #dcc8a6 50%, #d2bb95 100%);
+  box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3);
 }
-.title { font-size: 18px; font-weight: 600; letter-spacing: 2px; }
+.title {
+  font-size: medium;
+  font-weight: bold;
+  color: #5a4a3a;
+  line-height: 20px;
+}
 .mode-tag {
   display: flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-  padding: 4px 12px; border-radius: 999px;
-  font-size: 12px; color: rgba(232,236,243,0.85);
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(90,74,58,0.18);
+  padding: 3px 12px; border-radius: 0;
+  font-size: 12px; color: #5a4a3a;
 }
-.dot { width: 8px; height: 8px; border-radius: 50%; transition: background 0.3s; }
+.dot { width: 8px; height: 8px; border-radius: 0; transition: background 0.3s; }
 
 /* ---- 舞台 ---- */
 .board {
@@ -351,27 +361,27 @@ onBeforeUnmount(() => {
   width: 360px; height: 72px;
   display: flex; align-items: center; gap: 16px;
   padding: 0 20px;
-  background: rgba(255,255,255,0.035);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 10px;
+  background: var(--panel-bg);
+  border: 1px solid rgba(90,74,58,0.12);
+  border-radius: 0;
   cursor: pointer;
   box-sizing: border-box;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
   transition:
     top 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
     left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
     transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 0.5s ease,
     background 0.3s,
-    border-color 0.3s,
     box-shadow 0.3s;
   overflow: visible;
   will-change: transform, opacity;
 }
-.axis-tile:hover { background: rgba(255,255,255,0.06); }
+.axis-tile:hover { background: var(--panel-bg-strong); box-shadow: 0 6px 14px rgba(0,0,0,0.12); }
 .axis-tile.selected {
-  background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
-  border-color: var(--accent);
-  box-shadow: 0 10px 32px rgba(0,0,0,0.45), 0 0 0 1px var(--accent) inset;
+  background: var(--panel-bg-strong);
+  border-color: rgba(90,74,58,0.12);
+  box-shadow: 0 10px 28px rgba(90,74,58,0.22), inset 0 -4px 0 rgba(255,255,255,0.55);
 }
 
 .axis-letter {
@@ -380,16 +390,15 @@ onBeforeUnmount(() => {
   min-width: 44px; text-align: center;
   letter-spacing: 1px;
 }
-.axis-info { display: flex; flex-direction: column; gap: 2px; }
-.axis-info { flex: 1; }
-.axis-title { font-size: 16px; font-weight: 600; letter-spacing: 1px; white-space: nowrap; }
-.axis-count { font-size: 11px; color: rgba(232,236,243,0.55); white-space: nowrap; }
+.axis-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.axis-title { font-size: 16px; font-weight: 600; letter-spacing: 1px; white-space: nowrap; color: #5a4a3a; }
+.axis-count { font-size: 11px; color: rgba(90,74,58,0.6); white-space: nowrap; }
 
 .axis-arrow {
   font-size: 20px;
   font-weight: 700;
   color: var(--accent);
-  opacity: 0.35;
+  opacity: 0.4;
   margin-left: auto;
   padding-left: 12px;
   transition: opacity 0.3s, transform 0.3s;
@@ -406,9 +415,9 @@ onBeforeUnmount(() => {
 .axis-progress {
   position: absolute; left: 0; bottom: 0;
   height: 3px; width: 100%;
-  background: rgba(255,255,255,0.06);
+  background: rgba(90,74,58,0.08);
   overflow: hidden;
-  border-radius: 0 0 10px 10px;
+  border-radius: 0;
 }
 .axis-progress-bar {
   height: 100%; width: 100%;
@@ -436,7 +445,7 @@ onBeforeUnmount(() => {
 
 .item-strip {
   position: absolute;
-  left: 50%; top: 50%;
+  left: 33%; top: 50%;
   display: flex; gap: 20px;
   transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform;
@@ -445,39 +454,40 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   width: 220px; height: 240px;
   padding: 20px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
+  background: var(--panel-bg);
+  border: 1px solid rgba(90,74,58,0.12);
+  border-radius: 0;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.08);
   display: flex; flex-direction: column; gap: 10px;
   cursor: pointer;
   transition: all 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
-  opacity: 0.35;
+  opacity: 0.45;
   transform: scale(0.82);
 }
-.item-card.near     { opacity: 0.7;  transform: scale(0.92); }
+.item-card.near     { opacity: 0.8;  transform: scale(0.92); }
 .item-card.selected {
   opacity: 1; transform: scale(1.08);
-  background: linear-gradient(160deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03));
-  border-color: var(--accent);
-  box-shadow: 0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px var(--accent) inset;
+  background: var(--panel-bg-strong);
+  border-color: rgba(90,74,58,0.12);
+  box-shadow: 0 16px 36px rgba(90,74,58,0.25), inset 0 -5px 0 rgba(255,255,255,0.55);
 }
-.item-card:hover:not(.selected) { opacity: 0.9; transform: scale(0.95); }
+.item-card:hover:not(.selected) { opacity: 0.95; transform: scale(0.95); box-shadow: 0 8px 18px rgba(0,0,0,0.12); }
 
 .item-code {
   align-self: flex-start;
   padding: 4px 10px;
   font-size: 14px; font-weight: 700;
   color: var(--accent);
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+  background: rgba(255,255,255,0.58);
+  border: 1px solid rgba(90,74,58,0.12);
+  border-radius: 0;
   letter-spacing: 1px;
 }
-.item-label { font-size: 20px; font-weight: 600; letter-spacing: 1px; }
-.item-desc  { font-size: 13px; color: rgba(232,236,243,0.65); line-height: 1.5; flex: 1; }
+.item-label { font-size: 20px; font-weight: 600; letter-spacing: 1px; color: #5a4a3a; }
+.item-desc  { font-size: 13px; color: rgba(90,74,58,0.7); line-height: 1.5; flex: 1; }
 .item-action {
   align-self: flex-end;
-  font-size: 12px; color: var(--accent);
+  font-size: 12px; color: var(--accent); font-weight: bold;
   opacity: 0; transform: translateX(-6px);
   transition: opacity 0.3s, transform 0.3s;
 }
@@ -488,22 +498,24 @@ onBeforeUnmount(() => {
   position: relative; z-index: 2;
   display: flex; align-items: center; gap: 18px;
   padding: 12px 28px;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  font-size: 12px; color: rgba(232,236,243,0.8);
+  border-top: 1px solid rgba(90,74,58,0.15);
+  background: rgba(255,255,255,0.45);
+  font-size: 12px; color: rgba(90,74,58,0.85);
 }
 .hint { display: inline-flex; align-items: center; gap: 6px; }
-.hint.mute { color: rgba(232,236,243,0.45); }
+.hint.mute { color: rgba(90,74,58,0.55); }
 .hint kbd {
   display: inline-block;
   min-width: 22px; padding: 2px 6px;
   font-family: 'Consolas', monospace; font-size: 11px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: #fff;
+  border: 1px solid rgba(90,74,58,0.25);
   border-radius: 4px; text-align: center;
-  color: #fff;
+  color: #5a4a3a;
+  box-shadow: 0 1px 0 rgba(90,74,58,0.08);
 }
 .spacer { flex: 1; }
-.counter { color: rgba(232,236,243,0.85); letter-spacing: 1px; }
+.counter { color: #5a4a3a; letter-spacing: 1px; font-weight: 600; }
 
 /* ---- レスポンシブ ---- */
 @media (max-width: 768px) {
