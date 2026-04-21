@@ -17,9 +17,11 @@ OS 画面を取得する。ウィンドウ操作は ctypes (Windows 専用、追
 参考: 認証済_スクリーンショット画像取得202405.py (Mitsuo KONDOU)
 """
 
+import base64
 import io
 import os
 import time
+from datetime import datetime
 from typing import Optional
 
 import pyautogui
@@ -336,8 +338,22 @@ class DesktopCapture:
     # 出力
     # ------------------------------------------------------------------ #
 
-    def to_bytes(self, img: Image.Image, fmt: str = "png", quality: int = 85) -> bytes:
-        """PIL Image を PNG または JPEG バイト列に変換する"""
+    def to_base64(
+        self,
+        img: Image.Image,
+        fmt: str = "png",
+        quality: int = 85,
+        save_path: Optional[str] = None,
+    ) -> str:
+        """PIL Image を Base64 文字列で返す（chrome_devtools.screenshot と同形式）。
+
+        Args:
+            fmt: "png" または "jpeg"
+            quality: JPEG 品質 (1-100)
+            save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
+                       ファイル指定なら指定ファイルに上書き保存（拡張子に合わせて変換）。
+                       省略時は保存しない。
+        """
         buf = io.BytesIO()
         fmt_upper = fmt.upper()
         if fmt_upper in ("JPEG", "JPG"):
@@ -345,4 +361,34 @@ class DesktopCapture:
             img.save(buf, format="JPEG", quality=quality, optimize=True)
         else:
             img.save(buf, format="PNG", optimize=True)
-        return buf.getvalue()
+        data = buf.getvalue()
+
+        if save_path:
+            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
+                # フォルダ指定 → yyyymmdd.hhmmss.png で保存（常に PNG）
+                os.makedirs(save_path, exist_ok=True)
+                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
+                dest = os.path.join(save_path, fname)
+                file_buf = io.BytesIO()
+                img.save(file_buf, format="PNG", optimize=True)
+                file_data = file_buf.getvalue()
+            else:
+                # ファイル指定 → 拡張子に合わせて変換して上書き保存
+                dest = save_path
+                parent = os.path.dirname(os.path.abspath(dest))
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+                ext = os.path.splitext(save_path)[1].lower()
+                if ext in (".jpg", ".jpeg"):
+                    file_buf = io.BytesIO()
+                    img.convert("RGB").save(file_buf, format="JPEG", quality=quality, optimize=True)
+                    file_data = file_buf.getvalue()
+                else:
+                    # .png その他 → PNG で保存
+                    file_buf = io.BytesIO()
+                    img.save(file_buf, format="PNG", optimize=True)
+                    file_data = file_buf.getvalue()
+            with open(dest, "wb") as f:
+                f.write(file_data)
+
+        return base64.b64encode(data).decode("ascii")

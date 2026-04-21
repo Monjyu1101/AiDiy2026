@@ -264,21 +264,9 @@ async def screenshot(
                    ファイル指定なら指定ファイルに保存。省略時は保存しない。
     """
     await _ensure_chrome()
-    data = await cdp.screenshot(tab_id=tab_id, full_page=full_page)
-
-    if save_path:
-        raw = base64.b64decode(data)
-        if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
-            os.makedirs(save_path, exist_ok=True)
-            fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
-            dest = os.path.join(save_path, fname)
-        else:
-            os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
-            dest = save_path
-        with open(dest, "wb") as f:
-            f.write(raw)
-        logger.info(f"screenshot saved: {dest}")
-
+    data = await cdp.screenshot(tab_id=tab_id, full_page=full_page, save_path=save_path)
+    if save_path and data:
+        logger.info(f"screenshot saved: {save_path}")
     return [ImageContent(type="image", data=data, mimeType="image/png")]
 
 @mcp.tool()
@@ -636,29 +624,17 @@ async def screenshot(
         if crosshair_pos or label_text:
             img = await asyncio.to_thread(capture.annotate, img, crosshair_pos, label_text)
 
-        data = await asyncio.to_thread(capture.to_bytes, img, format, quality)
-        b64  = base64.b64encode(data).decode("ascii")
+        data = await asyncio.to_thread(capture.to_base64, img, format, quality, save_path)
         mime = "image/jpeg" if format.lower() in ("jpeg", "jpg") else "image/png"
 
         logger.info(
             f"screenshot: mode={'window' if window_title else 'region' if x is not None else 'cursor' if size else 'screen'}"
             f"  size={img.size}  format={format}"
         )
-
         if save_path:
-            # フォルダかどうか判定
-            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
-                os.makedirs(save_path, exist_ok=True)
-                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
-                dest = os.path.join(save_path, fname)
-            else:
-                os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
-                dest = save_path
-            with open(dest, "wb") as f:
-                f.write(data)
-            logger.info(f"screenshot saved: {dest}")
+            logger.info(f"screenshot saved: {save_path}")
 
-        return [ImageContent(type="image", data=b64, mimeType=mime)]
+        return [ImageContent(type="image", data=data, mimeType=mime)]
 
     except DesktopCaptureError as e:
         raise ValueError(str(e)) from e

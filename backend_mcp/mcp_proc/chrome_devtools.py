@@ -9,13 +9,18 @@ Chrome を --remote-debugging-port=9222 で起動した状態で使用する。
 """
 
 import asyncio
+import base64
+import io
 import json
+import os
 import time
 import urllib.request
 import urllib.error
 import urllib.parse
+from datetime import datetime
 from typing import Any, Optional
 
+from PIL import Image as _PILImage
 import websockets
 
 
@@ -304,6 +309,7 @@ class CDPClient:
         fmt: str = "png",
         quality: int = 80,
         full_page: bool = False,
+        save_path: Optional[str] = None,
     ) -> str:
         """
         スクリーンショットを Base64 文字列で返す
@@ -312,6 +318,9 @@ class CDPClient:
             fmt: "png" または "jpeg"
             quality: JPEG 品質 (1-100)
             full_page: True でページ全体をキャプチャ
+            save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
+                       ファイル指定なら指定ファイルに上書き保存（拡張子に合わせて変換）。
+                       省略時は保存しない。
 
         Returns:
             Base64 エンコードされた画像データ
@@ -339,7 +348,48 @@ class CDPClient:
         if full_page:
             await self.send_command(ws, "Emulation.clearDeviceMetricsOverride")
 
-        return result.get("data", "")
+        data = result.get("data", "")
+
+        if save_path and data:
+            raw = base64.b64decode(data)
+            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
+                # フォルダ指定 → yyyymmdd.hhmmss.png で保存
+                os.makedirs(save_path, exist_ok=True)
+                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
+                dest = os.path.join(save_path, fname)
+                # フォルダ保存は常に PNG
+                if fmt == "jpeg":
+                    img = _PILImage.open(io.BytesIO(raw))
+                    buf = io.BytesIO()
+                    img.save(buf, format="PNG", optimize=True)
+                    save_bytes = buf.getvalue()
+                else:
+                    save_bytes = raw
+            else:
+                # ファイル指定 → 拡張子に合わせて変換
+                dest = save_path
+                parent = os.path.dirname(os.path.abspath(dest))
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+                ext = os.path.splitext(save_path)[1].lower()
+                if ext in (".jpg", ".jpeg"):
+                    img = _PILImage.open(io.BytesIO(raw))
+                    buf = io.BytesIO()
+                    img.convert("RGB").save(buf, format="JPEG", quality=quality, optimize=True)
+                    save_bytes = buf.getvalue()
+                else:
+                    # .png その他 → PNG のまま保存
+                    if fmt == "jpeg":
+                        img = _PILImage.open(io.BytesIO(raw))
+                        buf = io.BytesIO()
+                        img.save(buf, format="PNG", optimize=True)
+                        save_bytes = buf.getvalue()
+                    else:
+                        save_bytes = raw
+            with open(dest, "wb") as f:
+                f.write(save_bytes)
+
+        return data
 
     # ------------------------------------------------------------------ #
     # JavaScript 実行
