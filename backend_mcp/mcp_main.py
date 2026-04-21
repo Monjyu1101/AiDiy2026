@@ -34,6 +34,7 @@ import os
 import sys
 import threading
 import time
+from datetime import datetime
 from typing import Optional
 
 # UTF-8出力を強制（Windows文字化け対策）
@@ -250,10 +251,34 @@ async def go_forward(tab_id: Optional[str] = None) -> str:
 # ページ情報取得
 
 @mcp.tool()
-async def screenshot(tab_id: Optional[str] = None, full_page: bool = False) -> list:
-    """スクリーンショットを撮る（PNG画像）"""
+async def screenshot(
+    tab_id: Optional[str] = None,
+    full_page: bool = False,
+    save_path: Optional[str] = None,
+) -> list:
+    """
+    スクリーンショットを撮る（PNG画像）。
+
+    Args:
+        save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
+                   ファイル指定なら指定ファイルに保存。省略時は保存しない。
+    """
     await _ensure_chrome()
     data = await cdp.screenshot(tab_id=tab_id, full_page=full_page)
+
+    if save_path:
+        raw = base64.b64decode(data)
+        if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
+            os.makedirs(save_path, exist_ok=True)
+            fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
+            dest = os.path.join(save_path, fname)
+        else:
+            os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+            dest = save_path
+        with open(dest, "wb") as f:
+            f.write(raw)
+        logger.info(f"screenshot saved: {dest}")
+
     return [ImageContent(type="image", data=data, mimeType="image/png")]
 
 @mcp.tool()
@@ -549,6 +574,7 @@ async def screenshot(
     quality: int = 85,
     crosshair: bool = False,
     label: bool = False,
+    save_path: Optional[str] = None,
 ) -> list:
     """
     OS のスクリーンショットを撮る（PNG/JPEG 画像）。
@@ -573,6 +599,8 @@ async def screenshot(
         quality: JPEG 品質 1-100（デフォルト 85）
         crosshair: True でカーソル位置に赤い十字線を描画（size モード時）
         label: True で座標・サイズのラベルを右下に追記
+        save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
+                   ファイル指定なら指定ファイルに保存。省略時は保存しない。
     """
     if delay > 0:
         await asyncio.sleep(delay)
@@ -616,6 +644,20 @@ async def screenshot(
             f"screenshot: mode={'window' if window_title else 'region' if x is not None else 'cursor' if size else 'screen'}"
             f"  size={img.size}  format={format}"
         )
+
+        if save_path:
+            # フォルダかどうか判定
+            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
+                os.makedirs(save_path, exist_ok=True)
+                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
+                dest = os.path.join(save_path, fname)
+            else:
+                os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+                dest = save_path
+            with open(dest, "wb") as f:
+                f.write(data)
+            logger.info(f"screenshot saved: {dest}")
+
         return [ImageContent(type="image", data=b64, mimeType=mime)]
 
     except DesktopCaptureError as e:
