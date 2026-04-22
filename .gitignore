@@ -74,12 +74,17 @@ coverage.xml
 cover/
 coverage/
 
+# config
+_config/
+
 # Logs & temp
 *.log
 logs/
 temp/
 backend_server/temp/
 backend_server/temp/**
+backend_mcp/temp/
+backend_mcp/temp/**
 _work/
 _log/
 
@@ -98,10 +103,10 @@ backend_server/_data/**
 
 # Node
 node_modules/
-frontend_web/node_modules/
-frontend_avatar/node_modules/
 dist/
+frontend_web/node_modules/
 frontend_web/dist/
+frontend_avatar/node_modules/
 frontend_avatar/dist/
 frontend_avatar/dist-electron/
 .npm
@@ -114,8 +119,6 @@ frontend_avatar/dist-electron/
 .vscode/
 .vscode/*
 !.vscode/extensions.json
-.claude/
-.gemini/
 *.swp
 *.swo
 *~
@@ -141,12 +144,6 @@ _datas/
 backup/
 julius/
 _MCP/
-aidiy/temp/_log/
-aidiy/temp/live_audio/
-aidiy/temp/_work/
-aidiy/temp/input/
-aidiy/temp/output/
-aidiy/temp/sandbox/
 
 # Secrets / sensitive
 *key.py

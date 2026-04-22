@@ -12,8 +12,8 @@
 
 ## 関連ファイル
 - `backend_server/AIコア/AIコード_cli.py`
-- `.aidiy/_index.md`
-- `.aidiy/_最終変更.md`
+- `.aidiy/knowledge/_index.md`
+- `.aidiy/knowledge/_最終変更.md`
 
 ## 関連箇所
 - `_CLI送信用テキスト正規化()`

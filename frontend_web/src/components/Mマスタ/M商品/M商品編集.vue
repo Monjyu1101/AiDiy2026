@@ -16,6 +16,7 @@ import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
 import type { M商品分類 } from '../../../types';
+import qQRcode from '../../_share/qQRcode.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -73,6 +74,11 @@ const 表示用商品分類一覧 = computed(() => {
     return 商品分類一覧.value;
   }
   return 商品分類一覧.value.filter((item) => item.有効 !== false);
+});
+
+const 商品QR値 = computed(() => {
+  if (!form.商品ID) return '';
+  return JSON.stringify({ id: form.商品ID, name: form.商品名 });
 });
 
 // ==================================================
@@ -347,6 +353,8 @@ watch(() => route.query, async (query) => {
         </div>
 
         <form class="detail-form" @submit.prevent="saveData">
+          <div class="form-layout">
+            <div class="form-left">
           <div class="tab-header">
             <button
               type="button"
@@ -577,6 +585,22 @@ watch(() => route.query, async (query) => {
             </button>
             <button v-if="isEditMode" type="button" class="btn btn-danger" @click="deleteData">削除</button>
           </div>
+            </div>
+
+            <div class="form-right">
+              <div class="qr-panel">
+                <div class="qr-title">商品コード QR</div>
+                <div class="qr-code-text">{{ form.商品ID || '—' }}</div>
+                <qQRcode
+                  v-if="form.商品ID"
+                  :value="商品QR値"
+                  :size="120"
+                  :margin="1"
+                />
+                <div v-else class="qr-empty">商品ID 未入力</div>
+              </div>
+            </div>
+          </div>
         </form>
       </div>
     </div>
@@ -656,6 +680,67 @@ watch(() => route.query, async (query) => {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.form-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.form-left {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.form-right {
+  flex: 1;
+  padding-top: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.qr-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #b3e5fc;
+  background: #f6fbff;
+  box-sizing: border-box;
+}
+
+.qr-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+}
+
+.qr-code-text {
+  font-size: 12px;
+  color: #555;
+  font-family: 'Consolas', 'Courier New', monospace;
+  word-break: break-all;
+  text-align: center;
+}
+
+.qr-empty {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 11px;
+  background: #fff;
+  border: 1px dashed #c7d0d8;
 }
 
 .tab-header {
@@ -958,6 +1043,15 @@ watch(() => route.query, async (query) => {
 }
 
 @media (max-width: 720px) {
+  .form-layout {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-right {
+    padding-top: 0;
+  }
+
   .detail-panel {
     max-width: 100%;
     grid-template-columns: 1fr;

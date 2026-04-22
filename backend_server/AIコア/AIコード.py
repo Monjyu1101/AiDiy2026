@@ -212,9 +212,9 @@ class CodeAgent:
         return 追加件数
 
     def _aidiyフォルダ取得(self) -> str:
-        """現在の作業先に対応する .aidiy フォルダの絶対パスを返す"""
+        """現在の作業先に対応する .aidiy/knowledge フォルダの絶対パスを返す"""
         実行基準パス = os.path.abspath(self.絶対パス) if self.絶対パス else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        return os.path.join(実行基準パス, ".aidiy")
+        return os.path.join(実行基準パス, ".aidiy", "knowledge")
 
     def _自己改善プロンプト生成(self, 元要求: str, 最終応答: str) -> str:
         """自己改善書き込み依頼のプロンプトを生成する"""
@@ -228,21 +228,21 @@ class CodeAgent:
             "これ以降は、次回以降の改造精度を上げるための知見整理だけを行ってください。\n\n"
             f"作業対象フォルダ: `{aidiy_dir}`\n"
             f"更新必須ファイル: `{aidiy_index}`, `{aidiy_last}`\n"
-            "加えて、今回の修正テーマを表す .md を .aidiy 配下に1件以上作成または更新してください。\n"
+            "加えて、今回の修正テーマを表す .md を .aidiy/knowledge 配下に1件以上作成または更新してください。\n"
             "テーマ名は内容がわかる日本語ファイル名にしてください。\n\n"
             "更新内容の要件:\n"
-            "1. `.aidiy/_index.md` に今回の修正知見の索引を追記・更新\n"
-            "2. `.aidiy/_最終変更.md` に今回の最終変更内容を上書きまたは更新\n"
+            "1. `.aidiy/knowledge/_index.md` に今回の修正知見の索引を追記・更新\n"
+            "2. `.aidiy/knowledge/_最終変更.md` に今回の最終変更内容を上書きまたは更新\n"
             "3. テーマ別 .md に、修正内容・関連ファイル・関連箇所・次回の注意点を整理\n"
-            "4. 既存の .aidiy 記録があれば読み、重複ではなく知見を統合\n"
-            "5. アプリ本体の仕様変更や追加修正は行わず、.aidiy 配下の記録更新だけを実施\n\n"
+            "4. 既存の .aidiy/knowledge 記録があれば読み、重複ではなく知見を統合\n"
+            "5. アプリ本体の仕様変更や追加修正は行わず、.aidiy/knowledge 配下の記録更新だけを実施\n\n"
             f"【今回の依頼】\n{(元要求 or '').strip()}\n\n"
             f"【最終応答】\n{(最終応答 or '').strip()}\n\n"
             f"【変更ファイル一覧】\n{変更ファイル一覧}\n"
         )
 
     async def _自己改善書き込み実行(self, ai_instance: Any, 元要求: str, 最終応答: str) -> None:
-        """検証・通知完了後に .aidiy へ知見を書き込ませる"""
+        """検証・通知完了後に .aidiy/knowledge へ知見を書き込ませる"""
         if self.強制停止フラグ:
             logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止中のため自己改善をスキップ")
             return
@@ -257,7 +257,7 @@ class CodeAgent:
         try:
             os.makedirs(aidiy_dir, exist_ok=True)
         except Exception as e:
-            logger.warning(f"[CodeAgent] .aidiy フォルダ作成エラー: {e}")
+            logger.warning(f"[CodeAgent] .aidiy/knowledge フォルダ作成エラー: {e}")
 
         自己改善プロンプト = self._自己改善プロンプト生成(元要求=元要求, 最終応答=最終応答)
         logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 自己改善書き込みを開始: {aidiy_dir}")
@@ -266,7 +266,7 @@ class CodeAgent:
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": "\n【自己改善開始】\n.aidiy の知見整理を継続します。\n"
+                "メッセージ内容": "\n【自己改善開始】\n.aidiy/knowledge の知見整理を継続します。\n"
             })
         except Exception as e:
             logger.warning(f"[CodeAgent] 自己改善開始通知送信エラー: {e}")

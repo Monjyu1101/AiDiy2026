@@ -16,6 +16,8 @@ import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
 import type { M取引先分類 } from '../../../types';
+import qQRcode from '../../_share/qQRcode.vue';
+import qGoogleMap from '../../_share/qGoogleMap.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -58,6 +60,12 @@ const requiredFields = computed(() => ['取引先ID', '取引先名', '取引先
 const 表示用取引先分類一覧 = computed(() => {
   if (!isCreateMode.value) return 取引先分類一覧.value;
   return 取引先分類一覧.value.filter((item) => item.有効 !== false);
+});
+
+const 住所URL = computed(() => {
+  const 住所 = (form.取引先住所 || '').trim();
+  if (!住所) return '';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(住所)}`;
 });
 
 const showMessage = (text, type = 'success') => {
@@ -259,6 +267,8 @@ watch(() => route.query, async (query) => {
           <button class="btn btn-secondary" @click="backToList">一覧に戻る</button>
         </div>
         <form class="detail-form" @submit.prevent="saveData">
+          <div class="form-layout">
+            <div class="form-left">
           <div class="tab-header">
             <button type="button" class="tab-btn" :class="{ active: activeTab === 'content' }" @click="activeTab = 'content'">内容</button>
             <button type="button" class="tab-btn" :class="{ active: activeTab === 'others' }" @click="activeTab = 'others'">その他</button>
@@ -347,6 +357,31 @@ watch(() => route.query, async (query) => {
             <button type="submit" class="btn btn-success">{{ isCreateMode ? '登録' : '更新' }}</button>
             <button v-if="isEditMode" type="button" class="btn btn-danger" @click="deleteData">削除</button>
           </div>
+            </div>
+
+            <div class="form-right">
+              <div class="addr-panel">
+                <div class="addr-header">
+                  <div class="addr-title">住所</div>
+                  <div class="addr-text">{{ form.取引先住所 || '—' }}</div>
+                  <div v-if="住所URL" class="addr-url">
+                    <a :href="住所URL" target="_blank" rel="noopener noreferrer">地図で開く</a>
+                  </div>
+                </div>
+                <div v-if="form.取引先住所" class="map-box">
+                  <qGoogleMap
+                    :query="form.取引先住所"
+                    width="100%"
+                    height="100%"
+                  />
+                  <div v-if="住所URL" class="qr-overlay">
+                    <qQRcode :value="住所URL" :size="80" :margin="1" />
+                  </div>
+                </div>
+                <div v-else class="map-empty">住所 未入力</div>
+              </div>
+            </div>
+          </div>
         </form>
       </div>
     </div>
@@ -361,6 +396,22 @@ watch(() => route.query, async (query) => {
 .content { padding: 8px 20px 20px 20px; flex: 1; min-height: 0; }
 .toolbar { margin-bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .detail-form { display: flex; flex-direction: column; gap: 0; }
+.form-layout { display: flex; flex-direction: row; align-items: flex-start; gap: 16px; width: 100%; }
+.form-left { display: flex; flex-direction: column; flex: 0 0 auto; min-width: 0; }
+.form-right { flex: 1; padding-top: 36px; display: flex; justify-content: center; align-items: flex-start; min-width: 0; }
+.addr-panel { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid #b3e5fc; background: #f6fbff; box-sizing: border-box; width: 480px; }
+.addr-header { display: flex; flex-direction: column; gap: 2px; }
+.addr-title { font-size: 12px; font-weight: 700; color: #333; }
+.addr-text { font-size: 13px; color: #333; line-height: 1.4; word-break: break-all; }
+.addr-url a { font-size: 11px; color: #007bff; text-decoration: underline; word-break: break-all; }
+.map-box { position: relative; width: 100%; height: 360px; }
+.qr-overlay { position: absolute; right: 8px; bottom: 8px; padding: 4px; background: #fff; border: 1px solid #b3c5d1; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18); line-height: 0; }
+.map-empty { width: 100%; height: 360px; display: flex; align-items: center; justify-content: center; color: #888; font-size: 11px; background: #fff; border: 1px dashed #c7d0d8; }
+@media (max-width: 720px) {
+  .form-layout { flex-direction: column; gap: 12px; }
+  .form-right { padding-top: 0; }
+  .addr-panel { width: 100%; }
+}
 .tab-header { display: flex; gap: 2px; border-bottom: 1px solid #ccc; }
 .tab-btn { padding: 8px 24px; background: #f1f1f1; border: 1px solid #ccc; border-bottom: none; cursor: pointer; font-size: 14px; color: #555; border-radius: 4px 4px 0 0; margin-bottom: -1px; position: relative; top: 1px; }
 .tab-btn.active { background: #fff; color: #007bff; font-weight: bold; border-bottom: 1px solid #fff; z-index: 1; }

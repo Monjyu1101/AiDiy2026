@@ -42,7 +42,7 @@
   - `backend_server/_config/AiDiy_mcp.json` で使う MCP を選んで定義
   - Claude Agent SDK（claude_sdk）が MCP 経由でブラウザ操作・画面キャプチャ・自己検証可能
 - 自己改善機構
-  - コードエージェントが修正完了後、`.aidiy/` フォルダへ知見を自動整理
+  - コードエージェントが修正完了後、`.aidiy/knowledge/` フォルダへ知見を自動整理
   - 使うほど類似修正の精度が上がる「育つシステム」
 
 ---

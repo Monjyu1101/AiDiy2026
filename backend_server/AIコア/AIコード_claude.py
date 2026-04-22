@@ -160,21 +160,21 @@ class CodeAI:
             return base_prompt
 
     def _aidiy参照プロンプト取得(self, 実行パス: str = None) -> str:
-        """.aidiy/_index.md がある場合のみ、知見参照指示を返す"""
+        """.aidiy/knowledge/_index.md がある場合のみ、知見参照指示を返す"""
         try:
             base_dir = Path(実行パス if 実行パス else self.base_abs_path).resolve()
-            index_path = base_dir / ".aidiy" / "_index.md"
+            index_path = base_dir / ".aidiy" / "knowledge" / "_index.md"
             if not index_path.exists():
                 return ""
             return (
                 "\n\n"
                 "プロジェクト内のファイル操作するときは、\n"
-                ".aidiyフォルダ並びに.aidiy/_index.mdを確認し、\n"
+                ".aidiy/knowledgeフォルダ並びに.aidiy/knowledge/_index.mdを確認し、\n"
                 "類似の操作の記載があれば知見として利用すること。\n"
                 f"参照先: `{index_path.as_posix()}`"
             )
         except Exception as e:
-            logger.warning(f"ClaudeSDK .aidiy 参照プロンプト生成エラー: {e}")
+            logger.warning(f"ClaudeSDK .aidiy/knowledge 参照プロンプト生成エラー: {e}")
             return ""
 
     async def バージョン確認(self) -> str:
@@ -385,7 +385,7 @@ class CodeAI:
                     logger.error(f"ClaudeSDK: 変更ファイル一覧処理エラー: {e}")
                     最終要求テキスト = 要求テキスト + aidiy_prompt + attachment_block + replan_block
             else:
-                # 通常モード（順序：元の要求 → .aidiy知見 → 添付ファイル → 再プラン要求）
+                # 通常モード（順序：元の要求 → .aidiy/knowledge知見 → 添付ファイル → 再プラン要求）
                 最終要求テキスト = 要求テキスト + aidiy_prompt + attachment_block + replan_block
 
             # 送信コンテキスト側で「今回の依頼」を必ず明示（オリジナルの要求文は改変しない）

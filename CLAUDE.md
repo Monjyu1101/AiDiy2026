@@ -16,23 +16,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.13.3, FastAPI, SQLAlchemy, SQLite, uv |
-| Backend MCP | Python 3.13.3, FastMCP (SSE×6), CDP, pyautogui, PIL, SQLite3, psycopg, subprocess |
+| Backend MCP | Python 3.13.3, FastMCP (SSE×8), CDP, pyautogui, PIL, SQLite3, psycopg, subprocess |
 | Frontend Web | Node.js 22, Vue 3, Vite, TypeScript, Pinia, Vue Router 4 |
 | Frontend Avatar | Vue 3, Vite, TypeScript, Electron, Three.js, WebSocket |
 | Auth | JWT (python-jose, HS256, 60分) |
 | AI | Anthropic Claude, OpenAI, Google Gemini |
-| AI Browser | Claude Agent SDK + MCP (aidiy_chrome_devtools / aidiy_desktop_capture / aidiy_sqlite / aidiy_postgres / aidiy_logs / aidiy_code_check via backend_mcp) |
+| AI Browser | Claude Agent SDK + MCP (aidiy_chrome_devtools / aidiy_desktop_capture / aidiy_sqlite / aidiy_postgres / aidiy_logs / aidiy_code_check / aidiy_backup_check / aidiy_backup_save via backend_mcp) |
 
 ## Critical Constraints
 
+- **非商用ライセンス** — 商用利用は事前の書面承諾が必要（`LICENSE` / `CONTRIBUTING.md` 参照）
 - Japanese-first implementation
-- All files must be UTF-8
+- All files must be UTF-8（BOM なし。`scripts/bom_anomaly_list.py` で検出、`scripts/remove_bom.py` で除去）
 - CRUD APIs are POST-based
 - V系は DB VIEW ではなく生 SQL
 - Passwords are plaintext today
 - No Alembic migrations
 - `frontend_avatar` は Electron / Web デュアルモード
 - Web 版 AI 画面ルートは `/AiDiy`
+- AIコア WebSocket: `ws://localhost:8091/core/ws/AIコア`（`backend_server/core_router/AIコア.py`）
 
 ## AI 設定ファイル
 
@@ -81,8 +83,12 @@ cd frontend_avatar && npm run type-check
 cd backend_server && uv sync
 cd backend_mcp && uv sync
 
-# Cleanup
+# Cleanup（`.venv` / `node_modules` / `dist` / `__pycache__` などのキャッシュ・ビルド成果物を削除。DB は対象外）
 python _cleanup.py
+
+# UTF-8 BOM チェック / 除去
+python scripts/bom_anomaly_list.py
+python scripts/remove_bom.py [root]
 
 # Backend reboot trigger when started via _start.py (Windows)
 echo. > backend_server/temp/reboot_core.txt
@@ -92,6 +98,11 @@ echo. > backend_mcp/temp/reboot_mcp.txt
 # DB reset (全データ削除・テーブル再作成・初期データ投入)
 # 全サーバー停止後に実行すること
 rm backend_server/_data/AiDiy/database.db
+
+# Docker deployment (optional, HTTPS 付き Nginx プロキシ構成。詳細は docker/README.md)
+cd docker && docker_1build.bat      # 初回のみ
+cd docker && docker_2start.bat      # 起動（https://localhost/）
+cd docker && docker_3stop.bat       # 停止
 ```
 
 補足:
@@ -100,6 +111,8 @@ rm backend_server/_data/AiDiy/database.db
 - `_start.py` で起動したバックエンドは `--reload` なし。コード変更を即反映するには個別起動 or reboot 機構を使う。
 - `_stop.py` は現在ありません。停止は `Ctrl+C` または手動のポート解放で行います（例: `netstat -ano | findstr :8091` → `taskkill /PID <pid> /F`。8092・8095 も同様）。
 - `frontend_avatar` の `npm run build` は明示依頼時のみ実行します。
+- VS Code は `.vscode/tasks.json` に `Start Frontend`（`frontend_web` の `npm run dev` をバックグラウンド実行）タスクを定義済み。
+- Docker 構成には `backend_mcp`（8095）を含めない — MCP 連携が必要な場合はローカルで別途起動すること。
 
 ## Access URLs
 
@@ -143,7 +156,7 @@ rm backend_server/_data/AiDiy/database.db
 
 - **core_main.py** (8091): C系（権限・利用者・採番）、A系（AIコア・会話履歴）、WebSocket
 - **apps_main.py** (8092): M系（マスタ）、T系（トランザクション）、V系（JOIN表示）、S系（スケジューラ）
-- **mcp_main.py** (8095): MCP サーバー × 8 エンドポイント — Chrome DevTools (`/aidiy_chrome_devtools/sse`) / Desktop Capture (`/aidiy_desktop_capture/sse`) / SQLite (`/aidiy_sqlite/sse`) / PostgreSQL (`/aidiy_postgres/sse`) / Logs (`/aidiy_logs/sse`) / Code Check (`/aidiy_code_check/sse`)
+- **mcp_main.py** (8095): MCP サーバー × 8 エンドポイント — Chrome DevTools (`/aidiy_chrome_devtools/sse`) / Desktop Capture (`/aidiy_desktop_capture/sse`) / SQLite (`/aidiy_sqlite/sse`) / PostgreSQL (`/aidiy_postgres/sse`) / Logs (`/aidiy_logs/sse`) / Code Check (`/aidiy_code_check/sse`) / Backup Check (`/aidiy_backup_check/sse`) / Backup Save (`/aidiy_backup_save/sse`)
 
 core_main / apps_main は同じ SQLite DB を共有。Vite Proxy が `/core/*` → 8091、`/apps/*` → 8092 に自動振り分け。フロントのポートを変えたら `core_main.py` / `apps_main.py` の CORS 許可リストも更新すること。
 
@@ -277,20 +290,20 @@ conf.path.exec_abs_path      # backend_server/ の絶対パス
 
 ---
 
-## .aidiy フォルダ（自己改善知見システム）
+## .aidiy/knowledge フォルダ（自己改善知見システム）
 
-`.aidiy/` は**このプロジェクト専用の修正知見フォルダ**。コードエージェントが修正精度を高めるために使う。
+`.aidiy/knowledge/` は**このプロジェクト専用の修正知見フォルダ**。コードエージェントが修正精度を高めるために使う。
 
 **ファイル操作を伴う修正を行う前に必ず確認：**
-1. `.aidiy/_index.md` — 知見インデックス（類似テーマがあれば参照）
-2. `.aidiy/_最終変更.md` — 直近の修正要約（再修正依頼時の最優先参照先）
+1. `.aidiy/knowledge/_index.md` — 知見インデックス（類似テーマがあれば参照）
+2. `.aidiy/knowledge/_最終変更.md` — 直近の修正要約（再修正依頼時の最優先参照先）
 3. テーマ別メモ（例: `新たなCLI追加時の作業手順.md`、`CLIプロンプト正規化と履歴保持.md` など）
 
 **修正・検証が完了したら：**
-- 次回に再利用できる知見を `.aidiy/` 配下の該当テーマファイルへ追記（or 新規作成）
-- `.aidiy/_index.md` のインデックスを更新
+- 次回に再利用できる知見を `.aidiy/knowledge/` 配下の該当テーマファイルへ追記（or 新規作成）
+- `.aidiy/knowledge/_index.md` のインデックスを更新
 - 単なる作業ログではなく「次回の修正判断に使える情報」を残す
-- アプリ本体の仕様変更はソースコードへ、知見整理は `.aidiy` へ（混在禁止）
+- アプリ本体の仕様変更はソースコードへ、知見整理は `.aidiy/knowledge` へ（混在禁止）
 
 ---
 
@@ -306,3 +319,4 @@ conf.path.exec_abs_path      # backend_server/ の絶対パス
 | CORS エラー | フロント URL が許可リストにない | `core_main.py` / `apps_main.py` の CORS 許可リストを更新 |
 | SQLite database is locked | DB ブラウザツールが開いている | SQLite Browser / DBeaver を閉じてから起動 |
 | WebSocket 接続エラー（AIコア） | LiveAI 初期化タイミング問題 | `backend_server/AGENTS.md` の「AIコア Component System」参照 |
+| ファイル先頭に UTF-8 BOM 混入の疑い | エディタ / OS の自動付与 | `python scripts/bom_anomaly_list.py` で検出、`python scripts/remove_bom.py` で除去 |

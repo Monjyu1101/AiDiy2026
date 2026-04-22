@@ -190,8 +190,8 @@
 **13. コードエージェント設定の重要事項:**
 - AI設定再起動ダイアログの Code AI 選択肢は backend の `available_models.code_models` に依存する
 - 新しい code CLI を追加する場合は、backend 側の CLI 実装・モデル定義・設定JSON追加まで揃わないと UI に出ない
-- `.aidiy` はコードエージェントの実行ルート直下に置くプロジェクト専用知見フォルダ
-- コードエージェントは `.aidiy/_index.md` を参照して類似修正知見を利用し、修正完了後は `.aidiy` へ知見整理を追記する
+- `.aidiy/knowledge` はコードエージェントの実行ルート直下に置くプロジェクト専用知見フォルダ
+- コードエージェントは `.aidiy/knowledge/_index.md` を参照して類似修正知見を利用し、修正完了後は `.aidiy/knowledge` へ知見整理を追記する
 - 詳細な実装ルールは `../backend_server/AGENTS.md` の「新しい Code CLI を追加する手順」「コードエージェントの自己改善機能」を参照
 - Claude 系のブラウザ自動操作まで扱う場合は `../backend_server/AGENTS.md` 内の `mcp_main.py` / `mcp_proc/` 節も合わせて確認する
 
