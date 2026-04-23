@@ -74,7 +74,15 @@ coverage.xml
 cover/
 coverage/
 
-
+# Runtime config (local only)
+# _config directories may exist, but their real contents must not be synced.
+**/_config/*
+!**/_config/.gitkeep
+!**/_config/.gitignore
+!**/_config/README.md
+!**/_config/*.example.json
+!**/_config/*.sample.json
+!**/_config/*.template.json
 
 # Logs & temp
 *.log
