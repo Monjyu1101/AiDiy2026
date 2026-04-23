@@ -50,25 +50,25 @@ const baseRoutes: RouteRecordRaw[] = [
     {
         path: '/Xその他/Xテトリス/ゲーム',
         name: 'Xテトリス',
-        component: () => import('../components/Xテスト/Xテトリス.vue'),
+        component: () => import('../components/Xその他/Xテトリス.vue'),
         meta: { requiresAuth: true, title: 'Xテトリス' }
     },
     {
         path: '/Xその他/Xインベーダー/ゲーム',
         name: 'Xインベーダー',
-        component: () => import('../components/Xテスト/Xインベーダー.vue'),
+        component: () => import('../components/Xその他/Xインベーダー.vue'),
         meta: { requiresAuth: true, title: 'Xインベーダー' }
     },
     {
         path: '/Xその他/Xリバーシ/ゲーム',
         name: 'Xリバーシ',
-        component: () => import('../components/Xテスト/Xリバーシ.vue'),
+        component: () => import('../components/Xその他/Xリバーシ.vue'),
         meta: { requiresAuth: true, title: 'Xリバーシ' }
     },
     {
         path: '/Xその他/X自己紹介/表示',
         name: 'X自己紹介',
-        component: () => import('../components/Xテスト/X自己紹介.vue'),
+        component: () => import('../components/Xその他/X自己紹介.vue'),
         meta: { requiresAuth: true, title: 'X自己紹介' }
     },
 ]

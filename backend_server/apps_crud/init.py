@@ -208,24 +208,7 @@ def init_db_data(db: Session):
             db.commit()
             inspector = inspect(db.bind)
 
-    if not inspector.has_table("M取引先分類"):
-        models.M取引先分類.__table__.create(bind=db.bind, checkfirst=True)
-        db.commit()
-        inspector = inspect(db.bind)
-
-    if inspector.has_table("M取引先"):
-        columns = [col['name'] for col in inspector.get_columns("M取引先")]
-        if "取引先分類ID" not in columns:
-            db.execute(text('DROP TABLE IF EXISTS "M取引先"'))
-            db.commit()
-            inspector = inspect(db.bind)
-
-    if not inspector.has_table("M取引先"):
-        models.M取引先.__table__.create(bind=db.bind, checkfirst=True)
-        db.commit()
-        inspector = inspect(db.bind)
-
-    for テーブル名 in ["M配車区分", "M生産区分", "M生産工程", "M商品分類", "M取引先分類", "M取引先", "M車両", "M商品", "M商品構成"]:
+    for テーブル名 in ["M配車区分", "M生産区分", "M生産工程", "M商品分類", "M車両", "M商品", "M商品構成"]:
         if not inspector.has_table(テーブル名):
             continue
         columns = [col['name'] for col in inspector.get_columns(テーブル名)]

@@ -13,6 +13,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import アバター from '@/components/AIコア_アバター.vue'
+import ネコ from '@/components/AIコア_ネコ.vue'
 import WindowShell from '@/components/_WindowShell.vue'
 import { AudioController } from '@/components/AIコア_音声処理'
 import { AI_WS_ENDPOINT } from '@/api/config'
@@ -103,6 +104,7 @@ const 音声エラー = ref('')
 const ウェルカムホバー中 = ref(false)
 const 自立身体制御有効 = ref(false)
 const 自動カメラワーク有効 = ref(false)
+const アバター表示有効 = ref(true)
 const カメラモード = ref<'追従' | '回転'>('追従')
 const 入力スペクトラム = ref<number[]>(初期スペクトラム())
 const 出力スペクトラム = ref<number[]>(初期スペクトラム())
@@ -448,6 +450,7 @@ defineExpose({ 字幕追加 })
       </div>
 
       <component
+        v-show="アバター表示有効"
         :is="アバター"
         ref="アバターRef"
         class="avatar-layer"
@@ -467,7 +470,17 @@ defineExpose({ 字幕追加 })
         :camera-mode="自動カメラワーク有効 ? カメラモード : '停止'"
       />
 
+      <component
+        v-if="!アバター表示有効"
+        :is="ネコ"
+        :show-boundary="UI表示中"
+      />
+
       <div v-show="UI表示中" class="left-bottom-settings">
+        <label class="setting-checkbox">
+          <input v-model="アバター表示有効" type="checkbox" />
+          <span>アバター表示</span>
+        </label>
         <label class="setting-checkbox">
           <input v-model="自立身体制御有効" type="checkbox" />
           <span>不完全な自立身体制御</span>

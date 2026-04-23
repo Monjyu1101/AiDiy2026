@@ -22,6 +22,8 @@ M商品分類 / M商品 と同じ型の M系マスタを追加するときに参
 - backend は Model / Schema / CRUD / Router / V系Router を揃え、`apps_main.py` へ import と `include_router` を追加する。
 - 新テーブルは `apps_models/__init__.py`、`apps_schema/__init__.py`、`apps_crud/__init__.py` へ必ず登録する。特に `apps_crud/__init__.py` の import / `__all__` は漏れやすい。
 - 初期データが必要な場合は `apps_crud/init.py` へ init 関数 import、テーブル作成、初期投入呼び出しを追加する。
+- 追加直後の新規 M系マスタは `apps_main.py` の `create_all()` で作成する。既存DB移行が不要な場合、`apps_crud/init.py` に個別の `DROP TABLE` / `ALTER TABLE` / 手動 `__table__.create()` を入れない。
+- 初期データ関数は、既存データが1件でもあれば即 `return` する。起動のたびに upsert して監査項目を更新しない。
 - V系一覧で分類条件を使う場合は `apps_schema/common.py` の `ListRequest` に分類IDを追加し、frontend の一覧テーブル prop から `/apps/V.../一覧` へ渡す。
 - frontend は一覧画面、編集画面、qTubler 一覧テーブル、型定義、ルート、メニューを一式で追加する。
 
@@ -29,6 +31,7 @@ M商品分類 / M商品 と同じ型の M系マスタを追加するときに参
 - `Mマスタ.vue` と `メインメニュー.vue` の両方に導線を追加する。片方だけだと画面へ到達しづらい。
 - 分類プルダウンを親画面に作っただけでは絞り込みは効かない。一覧テーブル側で prop を定義し、API payload へ分類IDを入れる。
 - 既に同名テーブルがあるがカラムが古い場合は、`inspect(...).get_columns()` で必要カラムを確認する。開発用初期テーブルなら `DROP TABLE` → 再作成も選択肢だが、実データがある場合は `ALTER TABLE` を優先する。
+- ユーザーが「マイグレーション不要」とした追加テーブルでは、旧スキーマ救済コードを残さない。`create_all()` と空テーブル時の seed だけにする。
 - 画面のカード追加時は重複カードを残さない。既存の仮実装や過去追加分がないか `rg` で確認する。
 
 ## 最低限の確認方法
