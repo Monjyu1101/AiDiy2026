@@ -16,9 +16,11 @@ import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../api/client';
 import WeeklyTable from './components/S配車_週表示テーブル.vue';
 import { qMessage } from '../../utils/qAlert';
+import { useAuthStore } from '../../stores/auth';
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 
 const 車両リスト = ref([]);
 const 配車リスト = ref([]);
@@ -255,6 +257,7 @@ const initLastModified = async () => {
 
 const checkForUpdates = async () => {
   if (!対象日付.value) return;
+  void authStore.refreshToken();
   const displayStart = 対象日付.value;
   const displayEnd = addDays(対象日付.value, 9);
     try {

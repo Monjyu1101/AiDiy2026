@@ -1,29 +1,30 @@
-# backend_server/apps_models/M商品.py
+# -*- coding: utf-8 -*-
 
-from sqlalchemy import Column, Text
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
+from sqlalchemy import Column, Boolean, Text
 from database import Base
 
-
 class M商品(Base):
- """M商品マスタ"""
- __tablename__ = "M商品"
+    __tablename__ = "M商品"
 
- # 主キー
- 商品ID = Column(Text, primary_key=True)
-
- # 業務フィールド
- 商品名 = Column(Text, nullable=False)
- 単位 = Column(Text, nullable=False)
- 商品備考 = Column(Text)
-
- # 監査フィールド（登録）
- 登録日時 = Column(Text, nullable=False)
- 登録利用者ID = Column(Text, nullable=False)
- 登録利用者名 = Column(Text)
- 登録端末ID = Column(Text, nullable=False)
-
- # 監査フィールド（更新）
- 更新日時 = Column(Text, nullable=False)
- 更新利用者ID = Column(Text, nullable=False)
- 更新利用者名 = Column(Text)
- 更新端末ID = Column(Text, nullable=False)
+    商品ID = Column(Text, primary_key=True)
+    商品名 = Column(Text, nullable=False)
+    単位 = Column(Text, nullable=False)
+    商品分類ID = Column(Text, nullable=False)
+    商品備考 = Column(Text)
+    有効 = Column(Boolean, nullable=False, default=True)
+    登録日時 = Column(Text, nullable=False)
+    登録利用者ID = Column(Text, nullable=False)
+    登録利用者名 = Column(Text)
+    登録端末ID = Column(Text, nullable=False)
+    更新日時 = Column(Text, nullable=False)
+    更新利用者ID = Column(Text, nullable=False)
+    更新利用者名 = Column(Text)
+    更新端末ID = Column(Text, nullable=False)

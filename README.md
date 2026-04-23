@@ -20,7 +20,7 @@
 **AiDiy** は、日本語識別子を前提にしたフルスタック業務システムのテンプレートです。
 
 - バックエンド: FastAPI + SQLAlchemy + SQLite
-- バックエンド MCP: FastAPI (SSE) + Python MCP SDK + 自前 CDP クライアント + psycopg（6 サーバーを同居: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check）
+- バックエンド MCP: FastAPI (SSE) + Python MCP SDK + 自前 CDP クライアント + psycopg（8 サーバーを同居: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup Check / Backup Save）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
 - バックエンドは **3 サーバー構成**

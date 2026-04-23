@@ -1,13 +1,13 @@
 <!--
- -*- coding: utf-8 -*-
+  -*- coding: utf-8 -*-
 
- -------------------------------------------------------------------------
- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
- Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
- Commercial use requires prior written consent from all copyright holders.
- See LICENSE for full terms. Thank you for keeping the rules.
- https://github.com/monjyu1101/AiDiy2026
- -------------------------------------------------------------------------
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101/AiDiy2026
+  -------------------------------------------------------------------------
 -->
 
 <script setup lang="ts">
@@ -15,17 +15,21 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
+import qBooleanCheckbox from '../../../_share/qBooleanCheckbox.vue';
+import type { Column, V商品 } from '../../../../types';
 
 const props = defineProps({
-  // 無効レコードも表示するかどうか（一覧ページから制御）
-  includeInactive: { type: Boolean, default: false },
-  // 行クリック時に編集画面へ渡す戻URL（編集完了後にここへ戻る）
+  商品分類ID: { type: String, default: '' },
+  件数制限: { type: Boolean, default: true },
+  無効も表示: { type: Boolean, default: false },
+  有効列表示: { type: Boolean, default: false },
   戻URL: { type: String, default: '' }
 });
 
 const router = useRouter();
 
-const 商品一覧 = ref([]);
+const 商品一覧 = ref<V商品[]>([]);
+const serverTotal = ref(0);
 const pageSize = ref(100);
 const currentPage = ref(1);
 const sortKey = ref('商品ID');
@@ -34,20 +38,27 @@ const filters = reactive({
   商品ID: '',
   商品名: '',
   単位: '',
+  商品分類名: '',
   商品備考: '',
   更新日時: '',
   更新利用者名: ''
 });
 const rowKey = '商品ID';
-const columns = [
-  { key: '商品ID', label: '商品ID', width: '120px', sortable: true },
-  { key: '商品名', label: '商品名', width: '200px', sortable: true },
-  { key: '単位', label: '単位', width: '100px', sortable: true },
-  { key: '商品備考', label: '商品備考', width: '220px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
-  { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
-  { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
-];
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: '商品ID', label: '商品ID', width: '120px', sortable: true, align: 'center' },
+    { key: '商品名', label: '商品名', width: '200px', sortable: true },
+    { key: '単位', label: '単位', width: '100px', sortable: true, align: 'center' },
+    { key: '商品分類名', label: '商品分類名', width: '140px', sortable: true, align: 'center' },
+    { key: '商品備考', label: '商品備考', width: '220px', sortable: true },
+    { key: '更新日時', label: '更新日時', width: '160px', sortable: true },
+    { key: '更新利用者名', label: '更新利用者名', width: '130px', sortable: true }
+  ];
+  if (props.有効列表示) {
+    baseColumns.splice(5, 0, { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' });
+  }
+  return baseColumns;
+});
 
 const message = ref('');
 const messageType = ref('success');
@@ -62,9 +73,7 @@ const hasFilter = computed(() => {
 });
 const filteredRows = computed(() => {
   return 商品一覧.value.filter((row) => {
-    // 無効レコードのフィルタリング
-    if (!props.includeInactive && !row.有効) return false;
-    return columns.every((column) => {
+    return columns.value.every((column) => {
       const filterValue = (filters[column.key] || '').trim();
       if (!filterValue) return true;
       const cellValue = row?.[column.key] ?? '';
@@ -73,7 +82,7 @@ const filteredRows = computed(() => {
   });
 });
 const totalCount = computed(() => filteredRows.value.length);
-const totalAll = computed(() => 商品一覧.value.length);
+const totalAll = computed(() => serverTotal.value);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
 const sortedRows = computed(() => {
   const rows = [...filteredRows.value];
@@ -114,7 +123,6 @@ const goToPage = (page) => {
   currentPage.value = page;
 };
 
-// 行クリックで編集画面へ。props.戻URL があれば渡す（編集完了後にここへ戻る）
 const openDetail = (row) => {
   const query: Record<string, string> = { モード: '編集', 商品ID: row.商品ID };
   if (props.戻URL) {
@@ -129,11 +137,16 @@ const openDetail = (row) => {
 const loadData = async () => {
   message.value = '';
   try {
-    const res = await apiClient.post('/apps/V商品/一覧');
+    const res = await apiClient.post('/apps/V商品/一覧', {
+      商品分類ID: props.商品分類ID || null,
+      件数制限: props.件数制限,
+      無効も表示: props.無効も表示
+    });
     if (res.data.status === 'OK') {
       const data = res.data.data;
       const items = Array.isArray(data) ? data : data?.items ?? [];
       商品一覧.value = items;
+      serverTotal.value = Array.isArray(data) ? items.length : Number(data?.total ?? items.length);
       currentPage.value = 1;
     } else {
       setMessage(res.data.message || 'M商品一覧の取得に失敗しました。', 'error');
@@ -181,11 +194,11 @@ defineExpose({
       />
     </template>
     <template #cell="{ row, column, value }">
-      <template v-if="column.key === '商品ID'">
-        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ row.商品ID }}</a>
+      <template v-if="column.key === '商品ID' || column.key === '商品名'">
+        <a href="#" class="id-link" @click.prevent="openDetail(row)">{{ value ?? '' }}</a>
       </template>
       <template v-else-if="column.key === '有効'">
-        <span>{{ row.有効 ? '✅' : '□' }}</span>
+        <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
       </template>
       <template v-else>
         {{ value ?? '' }}
@@ -196,3 +209,5 @@ defineExpose({
 
 <style scoped>
 </style>
+
+

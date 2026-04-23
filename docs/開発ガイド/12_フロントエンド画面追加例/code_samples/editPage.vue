@@ -1,13 +1,13 @@
 <!--
- -*- coding: utf-8 -*-
+  -*- coding: utf-8 -*-
 
- -------------------------------------------------------------------------
- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
- Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
- Commercial use requires prior written consent from all copyright holders.
- See LICENSE for full terms. Thank you for keeping the rules.
- https://github.com/monjyu1101/AiDiy2026
- -------------------------------------------------------------------------
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101/AiDiy2026
+  -------------------------------------------------------------------------
 -->
 
 <script setup lang="ts">
@@ -15,15 +15,11 @@ import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
+import type { M商品分類 } from '../../../types';
+import qQRcode from '../../_share/qQRcode.vue';
 
 const route = useRoute();
 const router = useRouter();
-
-// ==================================================
-// 戻URLユーティリティ
-// 全角URL文字（？＆＝）を半角に変換する。
-// query.戻URL は配列になる場合があるため normalizeQueryValue で文字列化する。
-// ==================================================
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const 戻URL = computed(() => {
@@ -39,11 +35,13 @@ const activeTab = ref('content');
 const detailData = ref(null);
 const message = ref('');
 const messageType = ref('success');
+const 商品分類一覧 = ref<M商品分類[]>([]);
 
 const form = reactive({
   商品ID: '',
   商品名: '',
   単位: '',
+  商品分類ID: '',
   商品備考: '',
   有効: true
 });
@@ -52,6 +50,7 @@ const errors = reactive({
   商品ID: '',
   商品名: '',
   単位: '',
+  商品分類ID: '',
   商品備考: ''
 });
 
@@ -59,6 +58,7 @@ const touched = reactive({
   商品ID: false,
   商品名: false,
   単位: false,
+  商品分類ID: false,
   商品備考: false
 });
 
@@ -68,7 +68,18 @@ const touched = reactive({
 const isCreateMode = computed(() => mode.value === 'create');
 const isEditMode = computed(() => mode.value === 'edit');
 const isViewMode = computed(() => mode.value === 'view');
-const requiredFields = computed(() => ['商品ID', '商品名', '単位']);
+const requiredFields = computed(() => ['商品ID', '商品名', '単位', '商品分類ID']);
+const 表示用商品分類一覧 = computed(() => {
+  if (!isCreateMode.value) {
+    return 商品分類一覧.value;
+  }
+  return 商品分類一覧.value.filter((item) => item.有効 !== false);
+});
+
+const 商品QR値 = computed(() => {
+  if (!form.商品ID) return '';
+  return JSON.stringify({ id: form.商品ID, name: form.商品名 });
+});
 
 // ==================================================
 // ユーティリティ関数
@@ -90,6 +101,7 @@ const resetForm = () => {
   form.商品ID = '';
   form.商品名 = '';
   form.単位 = '';
+  form.商品分類ID = '';
   form.商品備考 = '';
   form.有効 = true;
 };
@@ -98,6 +110,7 @@ const applyDataToForm = (data) => {
   form.商品ID = data?.商品ID || '';
   form.商品名 = data?.商品名 || '';
   form.単位 = data?.単位 || '';
+  form.商品分類ID = data?.商品分類ID || '';
   form.商品備考 = data?.商品備考 || '';
   form.有効 = data?.有効 ?? true;
 };
@@ -148,7 +161,8 @@ const validateForm = () => {
     const fieldMap = {
       '商品ID': 'form-product-id',
       '商品名': 'form-product-name',
-      '単位': 'form-product-unit'
+      '単位': 'form-product-unit',
+      '商品分類ID': 'form-product-category-id'
     };
     const elementId = fieldMap[firstErrorField];
     if (elementId) {
@@ -176,6 +190,20 @@ const loadDetail = async (productId) => {
   } catch (e) {
     showMessage('商品情報の取得でエラーが発生しました。', 'error');
   }
+};
+
+const loadMasterData = async () => {
+  try {
+    const res = await apiClient.post('/apps/M商品分類/一覧', {});
+    if (res.data.status === 'OK') {
+      const data = res.data.data;
+      商品分類一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+      return;
+    }
+  } catch (e) {
+    // 候補未取得時は保存時バリデーションで止める
+  }
+  商品分類一覧.value = [];
 };
 
 // ==================================================
@@ -210,9 +238,6 @@ const applyQueryParams = async (query) => {
   resetForm();
 };
 
-// 戻URLがあればそれを保持したままリスト画面のクエリを組み立てる。
-// 例: handleSuccess → 一覧に戻るとき message/type を付与
-// 例: backToList → 戻URLだけ引き継ぐ
 const buildListQuery = (extra = {}) => {
   const query: Record<string, any> = { ...extra };
   if (戻URL.value) {
@@ -221,7 +246,6 @@ const buildListQuery = (extra = {}) => {
   return Object.keys(query).length ? query : undefined;
 };
 
-// 保存・削除成功後の遷移。戻URLがあればそちらへ、なければ一覧へ。
 const handleSuccess = (messageText) => {
   if (戻URL.value) {
     router.push(toHalfwidthUrl(戻URL.value));
@@ -233,12 +257,10 @@ const handleSuccess = (messageText) => {
   });
 };
 
-// 「一覧に戻る」ボタン — 戻URLを引き継ぐ
 const backToList = () => {
   router.push({ path: '/Mマスタ/M商品/一覧', query: buildListQuery() });
 };
 
-// タイトルバー「戻る」ボタン — 戻URLへ直接戻る
 const handleReturn = () => {
   if (!戻URL.value) return;
   router.push(toHalfwidthUrl(戻URL.value));
@@ -261,6 +283,7 @@ const saveData = async () => {
         商品ID: form.商品ID,
         商品名: form.商品名,
         単位: form.単位,
+        商品分類ID: form.商品分類ID,
         商品備考: form.商品備考,
         有効: form.有効
       });
@@ -269,6 +292,7 @@ const saveData = async () => {
         商品ID: form.商品ID,
         商品名: form.商品名,
         単位: form.単位,
+        商品分類ID: form.商品分類ID,
         商品備考: form.商品備考,
         有効: form.有効
       });
@@ -306,6 +330,7 @@ const deleteData = async () => {
 // 初期化
 // ==================================================
 onMounted(async () => {
+  await loadMasterData();
   await applyQueryParams(route.query);
 });
 
@@ -316,7 +341,6 @@ watch(() => route.query, async (query) => {
 
 <template>
   <div class="page-container">
-    <!-- タイトルバー: 戻URLがある場合は「戻る」ボタンを表示 -->
     <h2 class="page-title">
       <span class="title-text">【 M商品 】</span>
       <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
@@ -329,6 +353,8 @@ watch(() => route.query, async (query) => {
         </div>
 
         <form class="detail-form" @submit.prevent="saveData">
+          <div class="form-layout">
+            <div class="form-left">
           <div class="tab-header">
             <button
               type="button"
@@ -416,6 +442,36 @@ watch(() => route.query, async (query) => {
                 </div>
               </div>
 
+              <div class="detail-row row-category">
+                <div class="detail-label">商品分類<span class="required-mark">*</span></div>
+                <div class="detail-value">
+                  <div class="value-column">
+                    <div class="input-wrap">
+                      <select
+                        id="form-product-category-id"
+                        v-model="form.商品分類ID"
+                        class="detail-input category-select"
+                        :class="{ 'input-error': errors.商品分類ID }"
+                        :disabled="isViewMode"
+                        @blur="handleBlur('商品分類ID')"
+                        @change="handleInput('商品分類ID')"
+                      >
+                        <option value=""></option>
+                        <option
+                          v-for="item in 表示用商品分類一覧"
+                          :key="item.商品分類ID"
+                          :value="item.商品分類ID"
+                        >
+                          {{ item.商品分類ID }} : {{ item.商品分類名 }}
+                        </option>
+                      </select>
+                      <span v-if="errors.商品分類ID" class="input-alert">!</span>
+                    </div>
+                    <div v-if="errors.商品分類ID && errors.商品分類ID !== 'ERROR'" class="field-error">{{ errors.商品分類ID }}</div>
+                  </div>
+                </div>
+              </div>
+
               <div class="detail-row row-remarks">
                 <div class="detail-label">商品備考</div>
                 <div class="detail-value">
@@ -430,20 +486,30 @@ watch(() => route.query, async (query) => {
                   </div>
                 </div>
               </div>
-
-              <div class="detail-row row-active">
-                <div class="detail-label">有効</div>
-                <div class="detail-value">
-                  <input
-                    type="checkbox"
-                    v-model="form.有効"
-                    :disabled="isViewMode"
-                  />
-                </div>
-              </div>
             </template>
 
             <template v-if="activeTab === 'others'">
+              <div class="detail-row row-valid">
+                <div class="detail-label">有効</div>
+                <div class="detail-value">
+                  <label
+                    class="valid-checkbox-label"
+                    :class="{ 'valid-checkbox-label-disabled': isViewMode }"
+                  >
+                    <input
+                      type="checkbox"
+                      v-model="form.有効"
+                      :disabled="isViewMode"
+                      class="valid-checkbox"
+                      aria-label="有効の切り替え"
+                    />
+                    <span
+                      class="valid-checkbox-mark"
+                      :class="{ 'valid-checkbox-inactive': !form.有効 }"
+                    >{{ form.有効 ? '✅' : '☐' }}</span>
+                  </label>
+                </div>
+              </div>
               <div class="detail-row row-datetime">
                 <div class="detail-label">登録日時</div>
                 <div class="detail-value">
@@ -519,6 +585,22 @@ watch(() => route.query, async (query) => {
             </button>
             <button v-if="isEditMode" type="button" class="btn btn-danger" @click="deleteData">削除</button>
           </div>
+            </div>
+
+            <div class="form-right">
+              <div class="qr-panel">
+                <div class="qr-title">商品コード QR</div>
+                <div class="qr-code-text">{{ form.商品ID || '—' }}</div>
+                <qQRcode
+                  v-if="form.商品ID"
+                  :value="商品QR値"
+                  :size="120"
+                  :margin="1"
+                />
+                <div v-else class="qr-empty">商品ID 未入力</div>
+              </div>
+            </div>
+          </div>
         </form>
       </div>
     </div>
@@ -554,7 +636,6 @@ watch(() => route.query, async (query) => {
   flex: 1;
 }
 
-/* 戻URLがある場合にタイトルバー右端に表示する「戻る」ボタン */
 .btn-return {
   margin-left: auto;
   height: 24px;
@@ -568,7 +649,7 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-return:hover {
-  background-color: #c82333;
+  background-color: #b52a37;
 }
 
 .content {
@@ -599,6 +680,67 @@ watch(() => route.query, async (query) => {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.form-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.form-left {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.form-right {
+  flex: 1;
+  padding-top: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.qr-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #b3e5fc;
+  background: #f6fbff;
+  box-sizing: border-box;
+}
+
+.qr-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+}
+
+.qr-code-text {
+  font-size: 12px;
+  color: #555;
+  font-family: 'Consolas', 'Courier New', monospace;
+  word-break: break-all;
+  text-align: center;
+}
+
+.qr-empty {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 11px;
+  background: #fff;
+  border: 1px dashed #c7d0d8;
 }
 
 .tab-header {
@@ -656,8 +798,8 @@ watch(() => route.query, async (query) => {
 .detail-row.row-id,
 .detail-row.row-name,
 .detail-row.row-unit,
+.detail-row.row-category,
 .detail-row.row-remarks,
-.detail-row.row-active,
 .detail-row.row-datetime,
 .detail-row.row-user,
 .detail-row.row-terminal {
@@ -699,8 +841,8 @@ watch(() => route.query, async (query) => {
 .row-id .detail-value,
 .row-name .detail-value,
 .row-unit .detail-value,
+.row-category .detail-value,
 .row-remarks .detail-value,
-.row-active .detail-value,
 .row-datetime .detail-value,
 .row-user .detail-value,
 .row-terminal .detail-value {
@@ -762,6 +904,11 @@ watch(() => route.query, async (query) => {
 
 .unit-input {
   width: 160px;
+}
+
+.category-select {
+  width: 220px;
+  padding-right: 8px;
 }
 
 .center-input {
@@ -867,15 +1014,44 @@ watch(() => route.query, async (query) => {
 }
 
 .btn-secondary {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
 }
 
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: #f2f2f2;
+}
+
+.message {
+  padding: 10px;
+  border-radius: 5px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.message-success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.message-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
 @media (max-width: 720px) {
+  .form-layout {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-right {
+    padding-top: 0;
+  }
+
   .detail-panel {
     max-width: 100%;
     grid-template-columns: 1fr;
@@ -899,5 +1075,59 @@ watch(() => route.query, async (query) => {
     justify-content: flex-start;
     border-right: none;
   }
+}
+
+.row-valid {
+  width: fit-content;
+}
+
+.valid-checkbox-label {
+  width: 320px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f8f9fa;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+  color: #16a34a;
+  font-weight: 700;
+  gap: 0;
+}
+
+.valid-checkbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.valid-checkbox-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 16px;
+  color: #16a34a;
+}
+
+.valid-checkbox-inactive {
+  color: #222;
+}
+
+.valid-checkbox-label-disabled {
+  cursor: default;
+}
+
+.valid-checkbox-label:focus-within {
+  border-color: #007bff;
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
 }
 </style>

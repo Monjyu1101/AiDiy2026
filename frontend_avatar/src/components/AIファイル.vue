@@ -17,6 +17,8 @@ import { AI_WS_ENDPOINT } from '@/api/config'
 import { monaco, モナコ言語推定 } from '@/utils/monaco'
 import { AIWebSocket } from '@/api/websocket'
 
+const 認証Storage = window.desktopApi ? localStorage : sessionStorage
+
 type ファイルエントリ = { パス: string; 更新日時: string }
 type ツリーノード種別 = 'folder' | 'file'
 type ツリーノード = {
@@ -58,6 +60,7 @@ const 出力WebSocket = ref<AIWebSocket | null>(null)
 const 出力接続済み = ref(false)
 let fileSocketStateUnsubscribe: (() => void) | null = null
 let ハイライト要求連番 = 0
+let トークン更新中 = false
 // --- ファイルリスト ---
 const プロジェクトパス = ref('')
 const バックアップベースパス = ref('')
@@ -546,6 +549,23 @@ const ファイル保存先選択 = async () => {
 
 // ===================== WebSocket =====================
 
+const 認証トークン更新 = async () => {
+  if (!認証Storage.getItem('token') || トークン更新中) return
+
+  トークン更新中 = true
+  try {
+    const response = await apiClient.post('/core/auth/トークン更新')
+    const nextToken = response.data?.data?.access_token
+    if (response.data?.status === 'OK' && nextToken) {
+      認証Storage.setItem('token', nextToken)
+    }
+  } catch {
+    // 401はapiClient側で認証期限切れとして処理する
+  } finally {
+    トークン更新中 = false
+  }
+}
+
 const バックアップリスト要求 = (読込表示 = false) => {
   if (!出力WebSocket.value || !出力WebSocket.value.isConnected()) return
   if (読込表示) 左読込中.value = true
@@ -560,6 +580,8 @@ const バックアップリスト要求 = (読込表示 = false) => {
 const テンプリスト要求 = async (読込表示 = false) => {
   if (!出力WebSocket.value || !出力WebSocket.value.isConnected()) return
   if (読込表示) 右読込中.value = true
+  // files_temp送信＝画面表示中＝操作中とみなしてトークンをリフレッシュ
+  void 認証トークン更新()
   出力WebSocket.value.send({
     セッションID: プロパティ.セッションID,
     チャンネル: 'file',

@@ -9,6 +9,37 @@
 // -------------------------------------------------------------------------
 
 import { AI_WS_ENDPOINT } from '@/api/config'
+import apiClient from '@/api/client'
+
+const 認証延長対象メッセージ識別 = new Set(['input_text', 'input_file', 'input_image', 'input_request'])
+let 認証トークン更新中 = false
+
+function 認証Storage取得(): Storage {
+  return window.desktopApi ? localStorage : sessionStorage
+}
+
+function 入力系認証トークン更新(message: WebSocketMessage): void {
+  const メッセージ識別 = String(message.メッセージ識別 || message.type || '')
+  if (!認証延長対象メッセージ識別.has(メッセージ識別) || 認証トークン更新中) return
+
+  const 認証Storage = 認証Storage取得()
+  if (!認証Storage.getItem('token')) return
+
+  認証トークン更新中 = true
+  void apiClient.post('/core/auth/トークン更新')
+    .then((response) => {
+      const nextToken = response.data?.data?.access_token
+      if (response.data?.status === 'OK' && nextToken) {
+        認証Storage.setItem('token', nextToken)
+      }
+    })
+    .catch(() => {
+      // 401はapiClient側で認証期限切れとして処理する
+    })
+    .finally(() => {
+      認証トークン更新中 = false
+    })
+}
 
 export type WebSocketMessage = {
   type?: string
@@ -145,6 +176,8 @@ export class AIWebSocket implements IWebSocketClient {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       return
     }
+
+    入力系認証トークン更新(message)
 
     const payload: WebSocketMessage = {
       ...message,

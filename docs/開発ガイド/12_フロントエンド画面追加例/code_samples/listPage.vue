@@ -1,47 +1,38 @@
 <!--
- -*- coding: utf-8 -*-
+  -*- coding: utf-8 -*-
 
- -------------------------------------------------------------------------
- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
- Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
- Commercial use requires prior written consent from all copyright holders.
- See LICENSE for full terms. Thank you for keeping the rules.
- https://github.com/monjyu1101/AiDiy2026
- -------------------------------------------------------------------------
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101/AiDiy2026
+  -------------------------------------------------------------------------
 -->
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import apiClient from '../../../api/client';
 import 商品一覧テーブル from './components/M商品一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
+import type { M商品分類 } from '../../../types';
 
 const router = useRouter();
 const route = useRoute();
 const 商品一覧テーブルRef = ref(null);
-// -------------------------------------------------------
-// 件数制限・無効も表示（全一覧画面に必須の標準パターン）
-// -------------------------------------------------------
-const 件数制限 = ref(true);      // true: 上限1000件, false: 全件
-const 無効も表示 = ref(false);   // false: 有効レコードのみ, true: 無効も含む
-const 有効列表示 = computed(() => 無効も表示.value); // 無効も表示ONのとき「有効」列を表示
-
-// ==================================================
-// 戻URLユーティリティ
-// query値は配列になる場合があるため normalizeQueryValue で文字列化する。
-// ==================================================
+const 件数制限 = ref(true);
+const 無効も表示 = ref(false);
+const 有効列表示 = computed(() => 無効も表示.value);
+const 商品分類ID = ref('');
+const 商品分類一覧 = ref<M商品分類[]>([]);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-
-// この一覧画面自身が戻URL付きで呼ばれた場合（例: 別の画面から戻ってきた場合）
 const 戻URL = computed(() => {
   const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
   return value ? String(value) : '';
 });
-
-// 編集画面へ渡す戻URL: 現在の一覧URLからメッセージ系クエリと戻URLを除いたもの
-// 編集完了後に「ここ（一覧）に戻ってくる」ために使う
 const 編集戻URL = computed(() => {
   const query = { ...route.query };
   delete query.message;
@@ -50,12 +41,10 @@ const 編集戻URL = computed(() => {
   return router.resolve({ path: route.path, query }).fullPath;
 });
 
-// チェックボックス変更時・再検索ボタン押下時に呼ぶ
 const handleReload = () => {
   商品一覧テーブルRef.value?.loadData();
 };
 
-// 新規作成画面へ: 編集戻URLを渡す
 const openCreate = () => {
   const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
   router.push({ path: '/Mマスタ/M商品/編集', query });
@@ -65,7 +54,22 @@ const showMessage = (msg: string, type?: string) => {
   void qMessage(msg, type || 'success');
 };
 
-// message/type クエリを URL から除去する（表示後にURLをクリーンアップ）
+const loadProductCategoryList = async (shouldNotify = true) => {
+  try {
+    const res = await apiClient.post('/apps/M商品分類/一覧', {});
+    if (res.data.status === 'OK') {
+      const data = res.data.data;
+      商品分類一覧.value = Array.isArray(data) ? data : data?.items ?? [];
+    } else if (shouldNotify) {
+      showMessage(res.data.message || '商品分類一覧の取得に失敗しました。', 'error');
+    }
+  } catch (e) {
+    if (shouldNotify) {
+      showMessage('商品分類一覧の取得でエラーが発生しました。', 'error');
+    }
+  }
+};
+
 const clearMessageQuery = (query: typeof route.query) => {
   const nextQuery = { ...query };
   delete nextQuery.message;
@@ -73,7 +77,6 @@ const clearMessageQuery = (query: typeof route.query) => {
   router.replace({ path: route.path, query: nextQuery });
 };
 
-// この一覧画面が戻URL付きで呼ばれた場合の「戻る」ハンドラ
 const handleCancel = () => {
   if (!戻URL.value) return;
   router.push(toHalfwidthUrl(戻URL.value));
@@ -88,6 +91,11 @@ onMounted(() => {
   }
 });
 
+onMounted(async () => {
+  const hasRouteMessage = Boolean(route.query.message);
+  await loadProductCategoryList(!hasRouteMessage);
+});
+
 watch(() => route.query.message, (newMessage) => {
   if (newMessage) {
     const text = normalizeQueryValue(newMessage as string | string[] | undefined);
@@ -100,7 +108,6 @@ watch(() => route.query.message, (newMessage) => {
 
 <template>
   <div class="page-container">
-    <!-- タイトルバー: 戻URLがある場合は「戻る」ボタンを右端に表示 -->
     <h2 class="page-title">
       <span class="title-text">【 M商品 】</span>
       <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
@@ -110,16 +117,26 @@ watch(() => route.query.message, (newMessage) => {
       <div class="section">
         <div class="toolbar">
           <div class="toolbar-left">
-            <div class="search-area">
-              <button class="btn btn-primary" @click="handleReload">再検索</button>
+            <div class="search-panel">
+              <div class="detail-row">
+                <div class="detail-label">商品分類</div>
+                <div class="detail-value">
+                  <select v-model="商品分類ID" class="detail-input select-input">
+                    <option value="">すべて</option>
+                    <option v-for="item in 商品分類一覧" :key="item.商品分類ID" :value="item.商品分類ID">
+                      {{ item.商品分類ID }} : {{ item.商品分類名 }}
+                    </option>
+                  </select>
+                </div>
+              </div>
             </div>
+            <button class="btn btn-primary" @click="handleReload">再検索</button>
           </div>
           <div class="toolbar-right">
             <button class="btn btn-success" @click="openCreate">新規</button>
           </div>
         </div>
 
-        <!-- 件数制限・無効も表示チェックボックス（標準パターン） -->
         <div class="table-options">
           <label class="checkbox-label">
             <input type="checkbox" v-model="件数制限" @change="handleReload" />
@@ -131,18 +148,10 @@ watch(() => route.query.message, (newMessage) => {
           </label>
         </div>
 
-        <!--
-          :件数制限     — true: 上限1000件取得, false: 全件取得
-          :無効も表示   — APIリクエストに渡す（false: 有効のみ, true: 全レコード）
-          :有効列表示   — 無効も表示ONのとき「有効」列をテーブルに表示する
-          :戻URL="編集戻URL" — 一覧行クリック時に編集画面へ渡す戻URL（編集完了後にここへ戻る）
-
-          ※ Vue コンポーネントタグ名は ASCII のみ有効。
-            日本語コンポーネントは <component :is="..."> で使用する。
-        -->
         <component
           :is="商品一覧テーブル"
           ref="商品一覧テーブルRef"
+          :商品分類ID="商品分類ID"
           :件数制限="件数制限"
           :無効も表示="無効も表示"
           :有効列表示="有効列表示"
@@ -214,29 +223,104 @@ watch(() => route.query.message, (newMessage) => {
   min-height: 0;
 }
 
+.search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: fit-content;
+  --select-width: 320px;
+}
+
+.detail-row {
+  display: flex;
+  width: 100%;
+  margin-top: -1px;
+}
+
+.detail-row:first-child {
+  margin-top: 0;
+}
+
+.detail-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: #333;
+  font-weight: 600;
+  text-align: right;
+  padding: 8px 12px;
+  border: 1px solid #b3e5fc;
+  background: #e1f5fe;
+  min-height: 40px;
+  width: 160px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+.detail-value {
+  display: flex;
+  align-items: center;
+  width: auto;
+  color: #333;
+  padding: 4px 12px;
+  border: 1px solid #ccc;
+  border-left: none;
+  background: #fff;
+  min-height: 40px;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+.detail-input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 14px;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.detail-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.2);
+}
+
+.select-input {
+  width: var(--select-width);
+  padding-right: 8px;
+}
+
 .toolbar {
   margin-bottom: 8px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .toolbar-left {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.search-area {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .toolbar-right {
   display: flex;
   align-items: flex-start;
+  margin-left: auto;
+}
+
+.table-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 
 .btn {
@@ -264,6 +348,25 @@ watch(() => route.query.message, (newMessage) => {
 
 .btn-success:hover {
   background-color: #1e7e34;
+}
+
+.message {
+  padding: 10px;
+  border-radius: 0;
+  flex: 1;
+  min-width: 220px;
+}
+
+.message-success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.message-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
 .checkbox-label {

@@ -11,9 +11,10 @@ frontend_web/src/
 │ │ └── M商品一覧テーブル.vue # 一覧テーブル
 │ └── _share/
 │ └── qTublerFrame.vue # 共通テーブルフレーム
+│ └── qBooleanCheckbox.vue # 有効列などの読み取り用チェック表示
 │
 ├── router/
-│ └── index.ts # /Mマスタ/M商品/一覧, /編集
+│ └── appsRouter.ts # /Mマスタ/M商品/一覧, /編集
 │
 ├── api/
 │ └── client.ts # APIクライアント
@@ -22,7 +23,8 @@ frontend_web/src/
  └── qAlert.ts # qConfirm 利用
 
 ■ M商品で使う主なAPI
-- POST /apps/V商品/一覧
+- POST /apps/V商品/一覧（商品分類ID / 件数制限 / 無効も表示）
+- POST /apps/M商品分類/一覧
 - POST /apps/M商品/取得
 - POST /apps/M商品/登録
 - POST /apps/M商品/変更

@@ -18,7 +18,8 @@
 
 **関連ドキュメント：**
 - **[../AGENTS.md](../AGENTS.md)** - プロジェクト全体方針
-- **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細（MCP サーバーも同居）
+- **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細
+- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - MCP サーバー実装詳細（ブラウザ操作・DB/ログ/型チェック・バックアップ）
 - **[../frontend_web/AGENTS.md](../frontend_web/AGENTS.md)** - Web版フロントエンド実装詳細
 - **[../CLAUDE.md](../CLAUDE.md)** - プロジェクト全体インデックス
 - **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール
@@ -79,7 +80,7 @@
 - 認証情報: **Electron** は `localStorage`、**Web** は `sessionStorage` に保持します
 - バックエンドへの HTTP は `8091`、Vite 開発サーバーは `8099` が前提です
 - Web モードでは Vite Proxy 経由（`/core` → `8091`, `/apps` → `8092`）でアクセス
-- Claude 系のブラウザ自動操作を使う場合は、別プロセスの `mcp_main`（backend_server 内・port `8095`）も必要です
+- Claude 系のブラウザ自動操作を使う場合は、別プロセスの `backend_mcp/mcp_main.py`（port `8095`）も必要です
 
 ---
 
@@ -182,7 +183,7 @@
 - `.aidiy/knowledge` はコードエージェント実行ルート直下のプロジェクト専用知見フォルダとして扱う
 - コードエージェントは `.aidiy/knowledge/_index.md` を参照して類似修正知見を利用し、修正完了後に `.aidiy/knowledge` へ知見を整理する
 - 詳細は `../backend_server/AGENTS.md` を参照
-- ブラウザ自動操作を含む場合は `../backend_server/AGENTS.md` の MCP セクション（`mcp_main.py` / `mcp_proc/`）を参照
+- ブラウザ自動操作を含む場合は `../backend_mcp/AGENTS.md` の MCP セクション（`mcp_main.py` / `mcp_proc/`）を参照
 
 ---
 
@@ -297,7 +298,7 @@ core ウィンドウの状態を他パネルへ配信しています。
 
 特徴:
 - `CORE_BASE_URL` を `baseURL` に使用
-- `localStorage` の `token` を自動で `Authorization` ヘッダーへ付与
+- Electron は `localStorage`、Web は `sessionStorage` の `token` を自動で `Authorization` ヘッダーへ付与
 - `401` を受けたら `token` と `user` を削除し、`auth-expired` イベントを発火
 
 ### WebSocket
@@ -312,6 +313,8 @@ core ウィンドウの状態を他パネルへ配信しています。
 - チャンネルつきイベントは `メッセージ識別_チャンネル` でもディスパッチされる
 - `onStateChange(handler)` で接続状態の変化を監視できる（解除関数を返す）
 - 接続タイムアウトは 30 秒
+- 音声以外の AI 入力（`input_text`, `input_file`, `input_image`, `input_request`）送信前に `/core/auth/トークン更新` を呼び、認証時間を延長する
+- 音声入力（`input_audio`）、操作状態（`operations`）、停止系（`cancel_run`, `cancel_audio`）は認証時間延長の対象外
 
 **主なメソッド:**
 - `connect()` - WebSocket 接続を開始し、セッションID 解決後に resolve
@@ -412,13 +415,13 @@ core ウィンドウの状態を他パネルへ配信しています。
 
 ### AI名命名規則（重要）
 
-`src/api/config.ts` の `defaultModelSettings()` で定義。CLAUDE.md の命名規則と同一。
+AIコア実行時の値は backend の `/core/AIコア/モデル情報/取得` と `backend_server/_config/AiDiy_key.json` が正です。`src/api/config.ts` の `defaultModelSettings()` は、backend から設定を取得する前のフォールバックとして扱います。
 
 | キー | サフィックス規則 | 例 |
 |------|-----------|-----|
-| `CHAT_AI_NAME` | 必ず `_chat` で終わる | `gemini_chat` / `freeai_chat` / `openai_chat` |
+| `CHAT_AI_NAME` | 必ず `_chat` で終わる | `gemini_chat` / `freeai_chat` / `openrt_chat` |
 | `LIVE_AI_NAME` | 必ず `_live` で終わる | `gemini_live` / `freeai_live` / `openai_live` |
-| `CODE_AI1_NAME` 〜 `CODE_AI4_NAME` | `_sdk` または `_cli` で終わる | `claude_sdk` / `copilot_cli` / `codex_cli` / `gemini_cli` / `hermes_cli` |
+| `CODE_AI1_NAME` 〜 `CODE_AI4_NAME` | `_sdk` または `_cli` で終わる | `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `gemini_cli` / `hermes_cli` |
 
 **比較は完全一致**（`startswith` 等の前方一致は使用禁止）
 
@@ -616,11 +619,12 @@ npm run start
 - DevTools の Console
 - Network で `/core/*` の HTTP エラー確認
 - WebSocket 接続可否
-- `localStorage` の `token`, `user`, `avatar_session_id`
+- Electron: `localStorage` の `token`, `user`, `avatar_session_id`
+- Web: `sessionStorage` の `token`, `user` と `localStorage` の `avatar_session_id`
 
 ### よくある問題
 
-- **401 エラー**: トークン期限切れ。再ログインが必要
+- **401 エラー**: トークン期限切れ。非音声AI入力と AIファイル `files_temp` は送信時に更新を試みるが、期限切れ後は再ログインが必要
 - **音声が出ない**: speaker 無効、AudioContext 未 resume、または audio ソケット未接続
 - **マイクが使えない**: Electron 側権限、または audio ソケット未接続
 - **補助パネルが同期しない**: BroadcastChannel snapshot が届いていない

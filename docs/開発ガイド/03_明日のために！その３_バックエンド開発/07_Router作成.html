@@ -72,7 +72,7 @@ def delete_M商品(
         data=schemas.M商品.from_orm(item)
     )</code></pre>
 
-  <p><strong>注意:</strong> <code>code_samples/M商品_router.py</code> の削除エンドポイントは旧実装（物理削除）です。実際の実装では上記の論理削除パターンを使ってください。</p>
+  <p><strong>注意:</strong> 現在の <code>code_samples/M商品_router.py</code> は論理削除（<code>有効=False</code>）へ更新済みです。新規 Router でも同じパターンを使ってください。</p>
 
   <h2>一覧エンドポイントの件数制限（V系・T系）</h2>
   <p>V系・T系の一覧エンドポイントは <code>list_controls.py</code> の <code>apply_active_filter</code> を使ってORM queryにフィルタを適用できます。</p>
@@ -121,4 +121,3 @@ app.include_router(M商品.router)</code></pre>
   </nav>
 </body>
 </html>
-

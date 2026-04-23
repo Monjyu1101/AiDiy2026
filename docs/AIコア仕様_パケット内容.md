@@ -91,6 +91,10 @@
   - `メッセージ内容`: MIME (`audio/pcm`)
   - `ファイル名`: Base64 PCM
 
+補足:
+
+- `input_audio` / `cancel_audio` は認証延長対象外です。
+
 ### 4.2 `input`
 
 クライアント -> サーバー:
@@ -106,6 +110,8 @@
 
 - `input_text` は `出力先チャンネル` を使って `0` または `1` - `4` に振り分けます。
 - `cancel_run` は `チャンネル` に停止対象のコードチャンネル (`"1"` - `"4"`) を指定します。
+- `input_text` / `input_request` / `input_file` / `input_image` は送信前にクライアント側で `/core/auth/トークン更新` を呼びます。
+- `operations` / `cancel_run` は認証延長対象外です。
 
 サーバー -> クライアント:
 
@@ -123,6 +129,11 @@
 - `files_backup`
 - `files_temp`
 - `files_save`
+
+認証延長:
+
+- `files_temp` 送信前にクライアント側で `/core/auth/トークン更新` を呼びます。
+- `files_backup` / `files_save` / `file_select` / `file_deselect` は認証延長対象外です。
 
 サーバー -> クライアント:
 

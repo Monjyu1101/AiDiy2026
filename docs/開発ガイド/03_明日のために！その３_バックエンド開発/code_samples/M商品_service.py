@@ -12,31 +12,28 @@
 """
 from sqlalchemy.orm import Session
 from core_models import C利用者
-import apps_crud.M商品
+import apps_crud as crud
+import apps_schema as schemas
 
 
 class M商品Service:
- def __init__(self, db: Session, 現在利用者: C利用者):
- self.db = db
- self.現在利用者 = 現在利用者
+    def __init__(self, db: Session, 現在利用者: C利用者):
+        self.db = db
+        self.現在利用者 = 現在利用者
 
- def 登録(self, 商品データ: M商品Create):
- # 権限チェック
- if self.現在利用者.権限ID not in ['1', '2']:
- raise HTTPException(403, "登録権限がありません")
+    def 登録(self, 商品データ: schemas.M商品Create):
+        # 権限チェック
+        if self.現在利用者.権限ID not in ['1', '2']:
+            raise HTTPException(403, "登録権限がありません")
 
- # ビジネスロジック
- existing = apps_crud.M商品.get_商品_by_code(
- self.db, 商品データ.商品コード
- )
- if existing:
- raise HTTPException(400, "商品コードが重複しています")
+        # ビジネスロジック
+        existing = crud.get_M商品(self.db, 商品データ.商品ID)
+        if existing:
+            raise HTTPException(400, "商品IDが重複しています")
 
- # CRUD呼び出し
- 認証情報 = {"ログインID": self.現在利用者.ログインID}
- return apps_crud.M商品.create_商品(
- self.db, 商品データ, 認証情報
- )
+        # CRUD呼び出し
+        認証情報 = {"利用者ID": self.現在利用者.利用者ID, "利用者名": self.現在利用者.利用者名}
+        return crud.create_M商品(self.db, 商品データ, 認証情報=認証情報)
 """
 
 # ============================================================

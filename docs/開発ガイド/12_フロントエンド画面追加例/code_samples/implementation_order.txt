@@ -13,10 +13,13 @@ Step 1. ファイル配置を確認
 
 Step 2. 一覧テーブルを先に完成
 - API: POST /apps/V商品/一覧
+- props: 商品分類ID / 件数制限 / 無効も表示 / 有効列表示 / 戻URL
+- 有効列は 無効も表示=true のときだけ表示
 - カラム/フィルタ/ソート/ページング
 - defineExpose({ loadData })
 
 Step 3. 一覧ページを接続
+- 商品分類プルダウン: POST /apps/M商品分類/一覧
 - 再検索: テーブルの loadData 呼び出し
 - 新規: /Mマスタ/M商品/編集?モード=新規
 - 商品IDリンクで編集遷移
@@ -27,9 +30,10 @@ Step 4. 編集ページを完成
 - 削除: /apps/M商品/削除（qConfirm）
 
 Step 5. ルート/メニュー接続
-- router/index.ts
+- router/appsRouter.ts
 - Mマスタ.vue のカード
+- 必要に応じて メインメニュー.vue の導線
 
 Step 6. 動作確認
-- 一覧・新規・編集・削除を1往復
+- 商品分類絞り込み・件数制限・無効も表示・一覧・新規・編集・削除を1往復
 - NG時は retry_guide.txt を参照

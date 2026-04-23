@@ -18,7 +18,7 @@
 
 **バックエンドサーバーとフロントエンドサーバーの詳細は別ドキュメント：**
 - **バックエンド（FastAPI + SQLAlchemy + SQLite）の実装詳細** → [backend_server/AGENTS.md](./backend_server/AGENTS.md)
-- **バックエンド MCP（6 サーバー: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check）の実装詳細** → [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
+- **バックエンド MCP（8 サーバー: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup Check / Backup Save）の実装詳細** → [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
 - **フロントエンド Web（Vue 3 + Vite + TypeScript）の実装詳細** → [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - **フロントエンド Avatar（Electron/Web デュアルモード）の実装詳細** → [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 
@@ -152,6 +152,8 @@
   - M生産区分 - 生産区分マスタ（例: 原料系・完成品系）
   - M生産工程 - 生産工程マスタ（例: 混合・充填・包装）
   - M商品分類 - 商品分類マスタ
+  - M取引先分類 - 取引先分類マスタ
+  - M取引先 - 取引先マスタ（仕入先・得意先・委託先など）
   - M車両 - 車両マスタ
   - M商品 - 商品マスタ（原料・完成品）
   - M商品構成 - 商品構成マスタ（**明細型マスタ**：ヘッダー＋明細を単一テーブルで管理）
@@ -163,7 +165,7 @@
 
 - **V系 (View)** - Complex query views（生SQLクエリ、DB VIEWオブジェクト不使用）
   - V利用者、V権限、V採番 - コア系JOIN表示（core_main）
-  - V配車区分、V生産区分、V生産工程、V商品分類、V車両、V商品、V商品構成 - マスタJOIN表示
+  - V配車区分、V生産区分、V生産工程、V商品分類、V取引先分類、V取引先、V車両、V商品、V商品構成 - マスタJOIN表示
   - V配車、V生産、V生産払出 - トランザクションJOIN表示
   - V商品入庫、V商品出庫、V商品棚卸、V商品推移表 - 在庫管理JOIN・集計表示
 
@@ -206,13 +208,15 @@
 **3つの独立したサーバー：**
 - **core_main.py** (port 8091) - Core/Common features (C系, A系)
 - **apps_main.py** (port 8092) - Application features (M系, T系, V系, S系)
-- **mcp_main.py** (port 8095) - MCP サーバー（6 サーバー同居）
+- **mcp_main.py** (port 8095) - MCP サーバー（8 サーバー同居）
   - `aidiy_chrome_devtools` — Chrome ブラウザ自動操作
   - `aidiy_desktop_capture` — デスクトップキャプチャ
   - `aidiy_sqlite`          — AiDiy DB の自己検証（read-only 既定の SQL 実行）
   - `aidiy_postgres`        — 外部 PostgreSQL に対する read-only 中心クエリ（DSN は環境変数 or 引数）
   - `aidiy_logs`            — `backend_server` / `backend_mcp` のログ tail・エラー抽出
   - `aidiy_code_check`      — Python 構文 / ruff / TypeScript 型チェック
+  - `aidiy_backup_check`    — 差分バックアップから変更前/変更後ソースを抽出
+  - `aidiy_backup_save`     — AiDiy ネイティブの差分バックアップを実行
 - core/apps は同じSQLiteデータベースを共有
 - Vite Proxy で `/core/*` と `/apps/*` を自動振り分け
 
@@ -305,7 +309,7 @@
 - 権限管理画面（C権限）- 権限マスタのCRUD
 - 利用者管理画面（C利用者）- ユーザーマスタのCRUD
 - 採番管理画面（C採番）- ID採番設定のCRUD
-- マスタデータ管理（M配車区分、M車両、M商品、M商品分類、M生産区分、M生産工程）
+- マスタデータ管理（M配車区分、M車両、M商品、M商品分類、M取引先分類、M取引先、M生産区分、M生産工程）
 - 商品構成マスタ（M商品構成）- 明細型マスタのCRUD（ヘッダー＋材料明細）
 - トランザクション管理（T配車、T商品入庫/出庫/棚卸）
 - 生産トランザクション（T生産）- 明細型トランザクションのCRUD（生産ヘッダー＋材料払出明細）
@@ -524,13 +528,13 @@ Full-stack business management system with JWT authentication, using FastAPI (Py
 ## テーブル命名規則
 
 - `C` = Core/Common tables (C権限, C利用者, C採番)
-- `M` = Master tables (M車両, M商品, M配車区分, M生産区分, M生産工程, M商品分類, M商品構成)
+- `M` = Master tables (M車両, M商品, M配車区分, M生産区分, M生産工程, M商品分類, M取引先分類, M取引先, M商品構成)
   - **明細型マスタ**: M商品構成は `明細SEQ=0` がヘッダー行、`明細SEQ≥1` が明細行として単一テーブルで管理
 - `T` = Transaction tables (T配車, T商品入庫, T商品出庫, T商品棚卸, T生産)
   - **明細型トランザクション**: T生産は `明細SEQ=0` が生産ヘッダー、`明細SEQ≥1` が材料払出明細として単一テーブルで管理
 - `V` = View/Joined data endpoints（DBのVIEWオブジェクトではなく、生SQLクエリ実装）
   - コア系（core_main）: V利用者, V権限, V採番
-  - マスタJOIN表示（apps_main）: V車両, V商品, V配車区分, V生産区分, V生産工程, V商品分類, V商品構成
+  - マスタJOIN表示（apps_main）: V車両, V商品, V配車区分, V生産区分, V生産工程, V商品分類, V取引先分類, V取引先, V商品構成
   - トランザクションJOIN表示（apps_main）: V配車, V生産, V生産払出, V商品入庫, V商品出庫, V商品棚卸, V商品推移表
 - `S` = Scheduler/Special processing (S配車_週表示, S配車_日表示, S生産_週表示, S生産_日表示)
 - `A` = AI/Advanced features (AIコア, A会話履歴)
@@ -796,6 +800,8 @@ backend_server/_data/AiDiy/database.db
 - バックエンド MCP PostgreSQL (SSE):      http://localhost:8095/aidiy_postgres/sse
 - バックエンド MCP Logs (SSE):            http://localhost:8095/aidiy_logs/sse
 - バックエンド MCP Code Check (SSE):      http://localhost:8095/aidiy_code_check/sse
+- バックエンド MCP Backup Check (SSE):    http://localhost:8095/aidiy_backup_check/sse
+- バックエンド MCP Backup Save (SSE):     http://localhost:8095/aidiy_backup_save/sse
 - フロントエンド Avatar (Electron): http://127.0.0.1:8099 ※Electronアプリとして起動
 - フロントエンド Avatar (Web ブラウザ): http://localhost:8099 ※通常ブラウザからもアクセス可能
 
@@ -839,7 +845,7 @@ lsof -ti:8091 | xargs kill -9
 |-------|----------|----------|
 | **Port conflicts** | `_start.py` fails with "address already in use" | `_start.py` auto-kills processes on 8090/8091/8092（Avatar有効時は 8099 も含む）, but may fail if unresponsive. Manually kill with `taskkill /F /PID <pid>` on Windows |
 | **Japanese characters garbled** | 文字化け in console or UI | Ensure all files are UTF-8 encoded. `_start.py` は出力を cp932/UTF-8 でデコードしますが、**コンソール設定は変更しません** |
-| **401 Unauthorized** | API calls fail with 401, redirected to login | JWT token expired or invalid. Check `localStorage` for token, re-login if needed |
+| **401 Unauthorized** | API calls fail with 401, redirected to login | JWT token expired or invalid. Check `localStorage` for token, re-login if needed. Web の C/M/T 操作、S/V 更新監視、AI非音声入力、AIファイル `files_temp` は送信時にトークン更新を試みる |
 | **CORS errors** | "blocked by CORS policy" in browser console | Verify origin in `core_main.py` and `apps_main.py` allowed list: `localhost:8090`, `localhost:5173`, `localhost:3000` |
 | **Module not found (Python)** | `ModuleNotFoundError` when starting backend | Run `cd backend_server && uv sync` to install dependencies |
 | **Module not found (npm)** | Vite build errors or missing packages | Run `cd frontend_web && npm install` |

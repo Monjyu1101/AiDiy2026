@@ -17,7 +17,8 @@
 - **[../AGENTS.md](../AGENTS.md)** - プロジェクト全体方針（基本方針、開発コマンド、共通問題）
 - **[../docs/開発ガイド/11_コーディングルール/](../docs/開発ガイド/11_コーディングルール/_index.html)** - コーディングルール、命名規則、ベストプラクティス
 - **[../docs/開発ガイド/12_フロントエンド画面追加例/](../docs/開発ガイド/12_フロントエンド画面追加例/_index.html)** - フロントエンドCRUD画面追加手順
-- **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細（FastAPI + SQLAlchemy + SQLite、MCP サーバーも同居）
+- **[../backend_server/AGENTS.md](../backend_server/AGENTS.md)** - バックエンド実装詳細（FastAPI + SQLAlchemy + SQLite）
+- **[../backend_mcp/AGENTS.md](../backend_mcp/AGENTS.md)** - MCP サーバー実装詳細（ブラウザ操作・DB/ログ/型チェック・バックアップ）
 - **[../frontend_avatar/AGENTS.md](../frontend_avatar/AGENTS.md)** - デスクトップアバタークライアント（Electron + WebSocket + VRM）
 
 **📚 ドキュメントリソース（docs/フォルダ）：**
@@ -27,7 +28,8 @@
 
 **バックエンド・他フロントエンドの情報は別ドキュメント：**
 このドキュメントは `frontend_web`（ブラウザ向け業務UI）に特化しています。
-- バックエンド → `backend_server/AGENTS.md`（MCP サーバーの詳細もこのドキュメント内に集約）
+- バックエンド → `backend_server/AGENTS.md`
+- MCP サーバー → `backend_mcp/AGENTS.md`
 - AIコア専用デスクトップアバタークライアント → `frontend_avatar/AGENTS.md`（Vue Router / Pinia 不使用、Electron マルチウィンドウ構成）
 
 **このファイルの内容：**
@@ -104,7 +106,7 @@
 
 **3. カテゴリベースのコンポーネント構成:**
 - `C管理/` - Core/Common管理画面（C権限、C利用者、C採番）
-- `Mマスタ/` - Master data管理画面（M配車区分、M生産区分、M生産工程、M商品分類、M車両、M商品、M商品構成）
+- `Mマスタ/` - Master data管理画面（M配車区分、M生産区分、M生産工程、M商品分類、M取引先分類、M取引先、M車両、M商品、M商品構成）
 - `Tトラン/` - Transaction管理画面（T配車、T生産、T生産払出、T商品入庫/出庫/棚卸）
 - `Sスケジューラー/` - Special processing画面（S配車_週/日表示、S生産_週/日表示）
 - `Vビュー/` - View画面（V商品推移表）
@@ -156,8 +158,8 @@
 
 **8.5. mcp_main 連携（ブラウザ自動操作）:**
 - `frontend_web` 自体は `8095` を直接叩かない
-- Claude Agent SDK などのブラウザ自動操作は `backend_server` 内の `core_main` が同居する `mcp_main` の SSE を利用して実行する
-- そのため AI コア画面でブラウザ操作まで使う確認では、`core_main` / `apps_main` に加えて `mcp_main` も起動しておく
+- Claude Agent SDK などのブラウザ自動操作は別プロセスの `backend_mcp/mcp_main.py` が提供する SSE を利用して実行する
+- そのため AI コア画面でブラウザ操作まで使う確認では、`core_main` / `apps_main` に加えて `backend_mcp` も起動しておく
 
 **9. 共通ダイアログシステム:**
 - `qAlert(message)` - アラートダイアログ
@@ -193,7 +195,7 @@
 - `.aidiy/knowledge` はコードエージェントの実行ルート直下に置くプロジェクト専用知見フォルダ
 - コードエージェントは `.aidiy/knowledge/_index.md` を参照して類似修正知見を利用し、修正完了後は `.aidiy/knowledge` へ知見整理を追記する
 - 詳細な実装ルールは `../backend_server/AGENTS.md` の「新しい Code CLI を追加する手順」「コードエージェントの自己改善機能」を参照
-- Claude 系のブラウザ自動操作まで扱う場合は `../backend_server/AGENTS.md` 内の `mcp_main.py` / `mcp_proc/` 節も合わせて確認する
+- Claude 系のブラウザ自動操作まで扱う場合は `../backend_mcp/AGENTS.md` の `mcp_main.py` / `mcp_proc/` 節も合わせて確認する
 
 ### No UI Framework / No CSS Framework
 
@@ -338,6 +340,8 @@ router.beforeEach(async (to, _from, next) => {
 - `/Mマスタ/M生産区分/一覧`, `/Mマスタ/M生産区分/編集`
 - `/Mマスタ/M生産工程/一覧`, `/Mマスタ/M生産工程/編集`
 - `/Mマスタ/M商品分類/一覧`, `/Mマスタ/M商品分類/編集`
+- `/Mマスタ/M取引先分類/一覧`, `/Mマスタ/M取引先分類/編集`
+- `/Mマスタ/M取引先/一覧`, `/Mマスタ/M取引先/編集`
 - `/Mマスタ/M車両/一覧`, `/Mマスタ/M車両/編集`
 - `/Mマスタ/M商品/一覧`, `/Mマスタ/M商品/編集`
 - `/Mマスタ/M商品構成/一覧`, `/Mマスタ/M商品構成/編集`（明細型マスタ）
@@ -424,6 +428,17 @@ getters: {
 2. Success時: 新しい `token` を `localStorage` に保存
 3. Error時: 何もしない（401 時はインターセプターが自動ログアウト）
 
+**認証時間の自動延長対象:**
+- `api/client.ts`: C/M/T 操作系 API（`/core/C*`, `/core/V*`, `/apps/M*`, `/apps/T*`, `/apps/V*`）を送る前に `refreshToken()` を実行
+- `api/websocket.ts`: 音声以外の AI 入力（`input_text`, `input_file`, `input_image`, `input_request`）送信前に `refreshToken()` を実行
+- S系スケジューラーと V系表示の更新日監視: 再描画チェック時に `refreshToken()` を実行
+- AIファイルの temp 一覧（`files_temp`）は送信前に `refreshToken()` を実行
+
+**自動延長しない操作:**
+- メニュー遷移だけの操作、X系画面、ログアウト、認証 API 自体
+- AI操作状態送信（`operations`）、停止系（`cancel_run`, `cancel_audio`）、音声入力（`input_audio`）
+- AIファイルの `files_backup`, `files_save`, `file_select`, `file_deselect`
+
 **使用例:**
 ```typescript
 import { useAuthStore } from '@/stores/auth'
@@ -464,6 +479,7 @@ export interface LoginResult {
 - 権限IDは文字列型 (`'1'`, `'2'`, `'3'`, etc.) - 数値型ではない
 - `isAdmin` getter は `権限ID === '1'` で比較（`=== 1` ではない）
 - JWTトークンは60分で期限切れ（バックエンド設定）
+- C/M/T操作、S/V更新監視、AI非音声入力、AIファイル `files_temp` では送信時に期限延長を試みる
 - 期限切れ時は401エラーで自動ログアウト（Axios interceptor）
 
 ### API Client (api/) - HTTP クライアント
@@ -483,10 +499,13 @@ const apiClient = axios.create({
 })
 ```
 
-**Request Interceptor（JWTトークン自動付与）:**
+**Request Interceptor（JWTトークン自動付与 + 操作系の期限延長）:**
 ```typescript
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const authStore = useAuthStore()
+  if (CMT操作系認証延長対象(config)) {
+    await 操作系認証トークン更新(authStore)
+  }
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
@@ -746,7 +765,7 @@ export async function qColorPicker(initialColor?: string, title?: string): Promi
 
 **Mマスタ/** - M系 (Master) データ管理画面:
 - **Mマスタ.vue** - カテゴリメニュー
-- **M配車区分/**, **M生産区分/**, **M生産工程/**, **M商品分類/**, **M車両/**, **M商品/** - 標準 CRUD pages（一覧/編集/components）
+- **M配車区分/**, **M生産区分/**, **M生産工程/**, **M商品分類/**, **M取引先分類/**, **M取引先/**, **M車両/**, **M商品/** - 標準 CRUD pages（一覧/編集/components）
 - **M商品構成/** - 明細型マスタ CRUD（`M商品構成一覧.vue`, `M商品構成編集.vue`, `components/`）
 - ※ `M生産分類/`, `M工程/` フォルダが残存しているが旧名称の空フォルダ（未使用）
 
@@ -1009,9 +1028,10 @@ The **AIコア** (Core AI) is a multi-panel AI interface system with flexible gr
 2. Server validates and returns JWT token (60-minute expiration)
 3. Client stores token in localStorage via Pinia store (`stores/auth.ts`)
 4. Axios interceptor (`api/client.ts`) adds `Authorization: Bearer <token>` to all requests
-5. バックエンドがトークンを検証し、現在利用者を注入
-6. 401 responses trigger automatic logout and redirect to `/ログイン` via Axios response interceptor
-7. Logout clears token from localStorage
+5. C/M/T操作系 API、S/V更新監視、AI非音声入力、AIファイル `files_temp` は送信時に `/core/auth/トークン更新` で期限延長を試みる
+6. バックエンドがトークンを検証し、現在利用者を注入
+7. 401 responses trigger automatic logout and redirect to `/ログイン` via Axios response interceptor
+8. Logout clears token from localStorage
 
 ## Development Commands
 
@@ -1212,6 +1232,8 @@ if (response.data.status === 'OK') {
 
 **6. JWTトークン期限:**
 - トークンは60分で期限切れ
+- 自動延長対象は C/M/T操作、S/V更新監視、AI非音声入力、AIファイル `files_temp`
+- メニュー遷移、X系、ログアウト、音声入力、停止系、AI操作状態送信は延長対象外
 - 期限切れ時は401エラーで自動ログアウト
 - 再ログインが必要
 

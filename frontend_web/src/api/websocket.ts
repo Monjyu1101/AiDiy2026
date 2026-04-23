@@ -13,6 +13,22 @@
  * AIコアのWebSocket接続を管理
  */
 
+import { useAuthStore } from '@/stores/auth';
+
+const 認証延長対象メッセージ識別 = new Set(['input_text', 'input_file', 'input_image', 'input_request']);
+let 認証トークン更新中 = false;
+
+function 入力系認証トークン更新(message: WebSocketMessage): void {
+  const メッセージ識別 = String(message.メッセージ識別 || message.type || '');
+  if (!認証延長対象メッセージ識別.has(メッセージ識別) || 認証トークン更新中) return;
+
+  認証トークン更新中 = true;
+  void useAuthStore().refreshToken()
+    .finally(() => {
+      認証トークン更新中 = false;
+    });
+}
+
 export interface WebSocketMessage {
   type?: string;
   セッションID?: string;
@@ -168,6 +184,8 @@ export class AIWebSocket implements IWebSocketClient {
    */
   send(message: WebSocketMessage): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      入力系認証トークン更新(message);
+
       const payload: WebSocketMessage = {
         ...message,
         セッションID: message.セッションID ?? this.セッションID ?? this.要求セッションID,

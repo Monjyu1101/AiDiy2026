@@ -17,12 +17,14 @@ import apiClient from '../../api/client';
 import TransitionTable from './components/V商品推移表テーブル.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { qMessage } from '../../utils/qAlert';
+import { useAuthStore } from '../../stores/auth';
 
 const DISPLAY_DAYS = 32;
 
 // 状態管理
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 const currentDate = ref(dayjs().startOf('day')); // 表示開始日
 const 日付リスト = ref<string[]>([]);
 const 商品データ = ref<any[]>([]);
@@ -180,6 +182,7 @@ const initLastModified = async () => {
 };
 
 const checkForUpdates = async () => {
+  void authStore.refreshToken();
   try {
     const response = await apiClient.post('/apps/V商品推移表/最終更新日時', {
       開始日付: startDate.value,
