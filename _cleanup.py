@@ -637,6 +637,12 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     if choices["backend"]:
         backend_dir = base_dir / BACKEND_PATH
         if backend_dir.exists():
+            for env_name in BACKEND_ENV_LIST:
+                if (backend_dir / env_name).exists():
+                    choices["backend_envs"][env_name] = ask_yes_no(
+                        f"  {BACKEND_PATH}/{env_name} を削除しますか？",
+                        default="y",
+                    )
             if (backend_dir / "temp").exists():
                 choices["backend_temp"] = ask_yes_no(
                     f"  {BACKEND_PATH}/temp の中身をクリアしますか？",

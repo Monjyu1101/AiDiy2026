@@ -1,0 +1,367 @@
+<!--
+  -*- coding: utf-8 -*-
+
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101/AiDiy2026
+  -------------------------------------------------------------------------
+-->
+
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+
+const props = withDefaults(defineProps<{ controlsVisible?: boolean }>(), { controlsVisible: true })
+
+const stageRef = ref<HTMLDivElement | null>(null)
+const leftEyeRef = ref<HTMLDivElement | null>(null)
+const rightEyeRef = ref<HTMLDivElement | null>(null)
+const leftPupilStyle = ref<Record<string, string>>({ transform: 'translate3d(0, 0, 0)' })
+const rightPupilStyle = ref<Record<string, string>>({ transform: 'translate3d(0, 0, 0)' })
+const cpuSamples = ref<number[]>([])
+const cpuAverage = ref(0)
+const cpuColorLevel = ref(0)
+const bloodshotLineLevel = ref(0)
+
+let animationId = 0
+let lastSnapshotTimestamp = 0
+let snapshotLoading = false
+let windowRole: AvatarWindowRole = 'core'
+let targetX = 0
+let targetY = 0
+let cpuTimerId: number | null = null
+
+const SNAPSHOT_INTERVAL_MS = 33
+const CPU_SAMPLE_INTERVAL_MS = 500
+const CPU_SAMPLE_LIMIT = 20
+const bloodshotTicks = Array.from({ length: 30 }, (_, index) => {
+  const angleDeg = index * 12
+  const angleRad = angleDeg * Math.PI / 180
+  return {
+    index,
+    major: index % 5 === 0,
+    style: {
+      left: `${50 + (Math.cos(angleRad) * 42)}%`,
+      top: `${50 + (Math.sin(angleRad) * 45)}%`,
+      transform: `translate(-50%, 0) rotate(${angleDeg + 90}deg)`,
+    },
+  }
+})
+
+function updateBloodshotLevel() {
+  const samples = cpuSamples.value
+  cpuAverage.value = samples.length
+    ? samples.reduce((sum, value) => sum + value, 0) / samples.length
+    : 0
+  cpuColorLevel.value = Math.min(1, Math.max(0, (cpuAverage.value - 40) / 50))
+  bloodshotLineLevel.value = Math.min(1, Math.max(0, (cpuAverage.value - 90) / 10))
+}
+
+async function collectCpuUsage() {
+  if (!window.desktopApi?.getSystemCpuUsage) return
+  try {
+    const usage = await window.desktopApi.getSystemCpuUsage()
+    const nextSamples = [...cpuSamples.value, Math.min(100, Math.max(0, usage))]
+    cpuSamples.value = nextSamples.slice(-CPU_SAMPLE_LIMIT)
+    updateBloodshotLevel()
+  } catch {
+    // CPU 表示は補助演出なので、取得失敗時は現状維持する。
+  }
+}
+
+function eyePupilTransform(eye: HTMLDivElement, stageRect: DOMRect) {
+  const eyeRect = eye.getBoundingClientRect()
+  const centerX = eyeRect.left - stageRect.left + (eyeRect.width / 2)
+  const centerY = eyeRect.top - stageRect.top + (eyeRect.height / 2)
+  const diffX = targetX - centerX
+  const diffY = targetY - centerY
+  const distance = Math.hypot(diffX, diffY) || 1
+  const maxOffsetX = Math.max(6, eyeRect.width * 0.20)
+  const maxOffsetY = Math.max(10, eyeRect.height * 0.28)
+  const offsetX = (diffX / distance) * maxOffsetX
+  const offsetY = (diffY / distance) * maxOffsetY
+  return {
+    transform: `translate3d(${offsetX.toFixed(2)}px, ${offsetY.toFixed(2)}px, 0)`,
+  }
+}
+
+function applyPupilPosition() {
+  const stageRect = stageRef.value?.getBoundingClientRect()
+  if (!stageRect || !leftEyeRef.value || !rightEyeRef.value) return
+  leftPupilStyle.value = eyePupilTransform(leftEyeRef.value, stageRect)
+  rightPupilStyle.value = eyePupilTransform(rightEyeRef.value, stageRect)
+}
+
+function setFallbackTarget() {
+  const stageRect = stageRef.value?.getBoundingClientRect()
+  if (!stageRect) return
+  targetX = stageRect.width * 0.5
+  targetY = stageRect.height * 0.42
+}
+
+async function updateElectronPointerTarget() {
+  if (snapshotLoading || !window.desktopApi?.getWindowPointerSnapshot) return
+  const stageRect = stageRef.value?.getBoundingClientRect()
+  if (!stageRect) return
+
+  snapshotLoading = true
+  try {
+    const snapshot = await window.desktopApi.getWindowPointerSnapshot(windowRole)
+    targetX = snapshot.mouse.x - (snapshot.bounds.x + stageRect.left)
+    targetY = snapshot.mouse.y - (snapshot.bounds.y + stageRect.top)
+  } catch {
+    setFallbackTarget()
+  } finally {
+    snapshotLoading = false
+  }
+}
+
+function handlePointerMove(event: PointerEvent) {
+  const stageRect = stageRef.value?.getBoundingClientRect()
+  if (!stageRect) return
+  targetX = event.clientX - stageRect.left
+  targetY = event.clientY - stageRect.top
+  applyPupilPosition()
+}
+
+function onAnimationFrame(timestamp: number) {
+  if (!stageRef.value) return
+
+  if (window.desktopApi?.getWindowPointerSnapshot) {
+    if (timestamp - lastSnapshotTimestamp >= SNAPSHOT_INTERVAL_MS) {
+      lastSnapshotTimestamp = timestamp
+      void updateElectronPointerTarget()
+    }
+  }
+
+  applyPupilPosition()
+  animationId = window.requestAnimationFrame(onAnimationFrame)
+}
+
+onMounted(async () => {
+  windowRole = await window.desktopApi?.getWindowRole?.() ?? 'core'
+  setFallbackTarget()
+  stageRef.value?.addEventListener('pointermove', handlePointerMove)
+  stageRef.value?.addEventListener('pointerdown', handlePointerMove)
+  void collectCpuUsage()
+  cpuTimerId = window.setInterval(() => {
+    void collectCpuUsage()
+  }, CPU_SAMPLE_INTERVAL_MS)
+  animationId = window.requestAnimationFrame(onAnimationFrame)
+})
+
+onBeforeUnmount(() => {
+  stageRef.value?.removeEventListener('pointermove', handlePointerMove)
+  stageRef.value?.removeEventListener('pointerdown', handlePointerMove)
+  if (cpuTimerId !== null) {
+    window.clearInterval(cpuTimerId)
+    cpuTimerId = null
+  }
+  if (animationId) window.cancelAnimationFrame(animationId)
+})
+</script>
+
+<template>
+  <div ref="stageRef" class="xeyes-stage">
+    <div
+      class="xeyes-wrap"
+      aria-hidden="true"
+      :style="{
+        '--cpu-color-level': cpuColorLevel.toFixed(3),
+        '--bloodshot-line-level': bloodshotLineLevel.toFixed(3),
+      }"
+    >
+      <div ref="leftEyeRef" class="xeyes-eye">
+        <span
+          v-for="tick in bloodshotTicks"
+          :key="`left-ray-${tick.index}`"
+          class="bloodshot-ray"
+          :class="{ major: tick.major }"
+          :style="tick.style"
+        ></span>
+        <div class="xeyes-pupil" :style="leftPupilStyle">
+          <span></span>
+        </div>
+      </div>
+      <div ref="rightEyeRef" class="xeyes-eye">
+        <span
+          v-for="tick in bloodshotTicks"
+          :key="`right-ray-${tick.index}`"
+          class="bloodshot-ray"
+          :class="{ major: tick.major }"
+          :style="tick.style"
+        ></span>
+        <div class="xeyes-pupil" :style="rightPupilStyle">
+          <span></span>
+        </div>
+      </div>
+    </div>
+    <div v-if="props.controlsVisible" class="cpu-meter" :style="{ '--cpu-color-level': cpuColorLevel.toFixed(3) }">
+      <div class="cpu-meter-header">
+        <span>CPU</span>
+        <strong>{{ Math.round(cpuAverage) }}%</strong>
+      </div>
+      <div class="cpu-bars">
+        <i
+          v-for="(sample, index) in cpuSamples"
+          :key="index"
+          :style="{ height: `${Math.max(3, Math.round(sample))}%` }"
+        ></i>
+      </div>
+    </div>
+    <div v-if="props.controlsVisible" class="xeyes-shadow"></div>
+  </div>
+</template>
+
+<style scoped>
+.xeyes-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  cursor: crosshair;
+  background: transparent;
+}
+
+.xeyes-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 7%, 40px);
+  padding: clamp(34px, 9%, 64px) clamp(24px, 8%, 56px) clamp(60px, 15%, 98px);
+  pointer-events: none;
+}
+
+.xeyes-eye {
+  position: relative;
+  width: clamp(104px, 31%, 168px);
+  aspect-ratio: 0.55 / 1;
+  border: 2px solid rgba(18, 20, 25, 0.9);
+  border-radius: 50%;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse at 34% 26%,
+      #ffffff 0 22%,
+      rgb(
+        247,
+        calc(251 - (86 * var(--cpu-color-level))),
+        calc(255 - (92 * var(--cpu-color-level)))
+      ) 48%,
+      rgb(
+        214,
+        calc(224 - (96 * var(--cpu-color-level))),
+        calc(234 - (104 * var(--cpu-color-level)))
+      ) 100%
+    );
+  box-shadow:
+    inset -9px -14px 18px rgba(72, 90, 112, 0.22),
+    inset 7px 10px 16px rgba(255, 255, 255, 0.88),
+    0 5px 14px rgba(0, 0, 0, 0.18);
+}
+
+.bloodshot-ray {
+  position: absolute;
+  width: 1px;
+  height: 8%;
+  transform-origin: 50% 0;
+  border-radius: 999px;
+  background: rgba(230, 0, 0, calc(var(--bloodshot-line-level) * 0.55));
+  opacity: var(--bloodshot-line-level);
+  z-index: 1;
+}
+
+.bloodshot-ray.major {
+  width: 2px;
+  height: 11%;
+  background: rgba(238, 0, 0, calc(var(--bloodshot-line-level) * 0.72));
+}
+
+.xeyes-pupil {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28%;
+  aspect-ratio: 0.62 / 1;
+  margin-left: -14%;
+  margin-top: -22.5%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 38% 28%, #2a3038 0 10%, #050505 48%, #000000 100%);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  transition: transform 0.06s linear;
+  z-index: 2;
+}
+
+.xeyes-pupil span {
+  position: absolute;
+  left: 28%;
+  top: 17%;
+  width: 18%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.xeyes-shadow {
+  position: absolute;
+  left: 28%;
+  right: 28%;
+  bottom: 16%;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(5, 8, 14, 0.14);
+  filter: blur(7px);
+  pointer-events: none;
+}
+
+.cpu-meter {
+  position: absolute;
+  left: 50%;
+  bottom: 58px;
+  width: min(220px, 56%);
+  height: 46px;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: grid;
+  grid-template-rows: 15px 1fr;
+  gap: 4px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(4, 8, 14, 0.42);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  pointer-events: none;
+}
+
+.cpu-meter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.cpu-meter-header strong {
+  color: rgb(255, calc(255 - (160 * var(--cpu-color-level))), calc(255 - (180 * var(--cpu-color-level))));
+  font-size: 11px;
+}
+
+.cpu-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 0;
+}
+
+.cpu-bars i {
+  flex: 1;
+  min-width: 4px;
+  border-radius: 1px 1px 0 0;
+  background: rgb(120, calc(235 - (175 * var(--cpu-color-level))), calc(255 - (210 * var(--cpu-color-level))));
+}
+</style>

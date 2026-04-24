@@ -66,6 +66,12 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'Xリバーシ' }
     },
     {
+        path: '/Xその他/X立体リバーシ/ゲーム',
+        name: 'X立体リバーシ',
+        component: () => import('../components/Xその他/X立体リバーシ.vue'),
+        meta: { requiresAuth: true, title: 'X立体リバーシ' }
+    },
+    {
         path: '/Xその他/X自己紹介/表示',
         name: 'X自己紹介',
         component: () => import('../components/Xその他/X自己紹介.vue'),

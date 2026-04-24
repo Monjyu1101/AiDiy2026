@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
@@ -51,15 +51,13 @@ const props = withDefaults(defineProps<{
   micLevel: number;
   speakerLevel: number;
   uiVisible: boolean;
+  controlsVisible?: boolean;
   transparentMode?: boolean;
   subtitleText?: string;
-  bodyAutonomousEnabled?: boolean;
-  cameraMode?: '停止' | '追従' | '回転';
 }>(), {
+  controlsVisible: true,
   transparentMode: false,
   subtitleText: '',
-  bodyAutonomousEnabled: false,
-  cameraMode: '停止',
 })
 
 const mountRef = ref<HTMLDivElement | null>(null)
@@ -67,6 +65,13 @@ const loadError = ref('')
 const currentMotion = ref('待機')
 const loading = ref(true)
 const dragging = ref(false)
+const 自立身体制御有効 = ref(false)
+const 自動カメラワーク有効 = ref(false)
+const カメラモード = ref<'追従' | '回転'>('追従')
+const 実効自立身体制御有効 = computed(() => 自立身体制御有効.value)
+const 実効カメラモード = computed<'停止' | '追従' | '回転'>(() => (
+  自動カメラワーク有効.value ? カメラモード.value : '停止'
+))
 
 
 let renderer: THREE.WebGLRenderer | null = null
@@ -452,7 +457,7 @@ function fitCamera() {
   if (!camera || !modelSize) return
 
   const elapsed = clock?.elapsedTime ?? 0
-  const cameraMode = props.cameraMode
+  const cameraMode = 実効カメラモード.value
   const autoEnabled = カメラ回転モード(cameraMode)
   const previousSettings = autoCameraSettings
   const previousState = previousSettings
@@ -512,7 +517,7 @@ function モーション終了時処理(event: THREE.Event & { action?: THREE.An
     return
   }
 
-  if (props.bodyAutonomousEnabled) {
+  if (実効自立身体制御有効.value) {
     currentMotion.value = '自立'
   }
 }
@@ -748,7 +753,7 @@ function initScene() {
       目線制御状態同期(true)
       container.add(vrm.scene)
       fitCamera()
-      if (props.bodyAutonomousEnabled) {
+      if (実効自立身体制御有効.value) {
         autoBodySettings = currentVrm ? 自立身体制御初期化(currentVrm, modelSize) : autoBodySettings
         標準VRMA再生開始()
       } else {
@@ -769,7 +774,7 @@ function initScene() {
     const delta = clock.getDelta()
     const elapsed = clock.elapsedTime
 
-    if ((vrma再生中 || (!props.bodyAutonomousEnabled && !vrma再生準備中)) && !体姿勢補正状態) {
+    if ((vrma再生中 || (!実効自立身体制御有効.value && !vrma再生準備中)) && !体姿勢補正状態) {
       mixer?.update(delta)
     }
 
@@ -777,7 +782,7 @@ function initScene() {
       const blink = Math.sin(elapsed * 2.4) > 0.985 ? 1 : 0
       const 補正姿勢 = 体姿勢補正更新(elapsed)
       const bodyState = 補正姿勢 ?? (
-        props.bodyAutonomousEnabled && autoBodySettings
+        実効自立身体制御有効.value && autoBodySettings
           ? 自立身体制御適用(elapsed, autoBodySettings)
           : { rotationY: 0, positionY: 0 }
       )
@@ -787,8 +792,8 @@ function initScene() {
       currentVrm.scene.rotation.y = bodyState.rotationY
       currentVrm.scene.position.y = bodyState.positionY
       const 追従入力 = 自動カメラ追従入力取得()
-      カメラ高さ標準化更新(props.cameraMode, delta, 追従入力)
-      カメラ位置反映(props.cameraMode, elapsed)
+      カメラ高さ標準化更新(実効カメラモード.value, delta, 追従入力)
+      カメラ位置反映(実効カメラモード.value, elapsed)
       if (currentVrm.lookAt && !カメラ目線一時解除中) {
         目線ターゲット更新()
         currentVrm.lookAt.lookAt(_lookAtPos)
@@ -813,7 +818,7 @@ function initScene() {
 
 function handlePointerDown(event: PointerEvent) {
   if (!mountRef.value) return
-  カメラ手動基準更新(カメラ回転モード(props.cameraMode))
+  カメラ手動基準更新(カメラ回転モード(実効カメラモード.value))
   dragging.value = true
   dragPointerId = event.pointerId
   dragStartX = event.clientX
@@ -843,7 +848,7 @@ function handleWheel(event: WheelEvent) {
   if (!event.ctrlKey || !camera || !autoCameraSettings) return
   event.preventDefault()
 
-  const cameraMode = props.cameraMode
+  const cameraMode = 実効カメラモード.value
   const autoEnabled = カメラ自動有効(cameraMode)
   カメラ手動基準更新(カメラ回転モード(cameraMode))
 
@@ -886,7 +891,7 @@ function 表示復帰() {
 
   if (!currentVrm || vrma再生準備中 || vrma再生中 || currentAction) return
 
-  if (props.bodyAutonomousEnabled) {
+  if (実効自立身体制御有効.value) {
     標準VRMA再生開始()
     return
   }
@@ -904,7 +909,7 @@ function ページ表示復帰処理() {
   })
 }
 
-watch(() => props.bodyAutonomousEnabled, (enabled) => {
+watch(() => 実効自立身体制御有効.value, (enabled) => {
   if (!currentVrm) return
 
   if (enabled) {
@@ -923,7 +928,7 @@ watch(() => props.bodyAutonomousEnabled, (enabled) => {
   サンプルVRMA再生開始()
 }, { immediate: false })
 
-watch(() => props.cameraMode, (mode, previousMode) => {
+watch(() => 実効カメラモード.value, (mode, previousMode) => {
   if (!autoCameraSettings) return
   const oldEnabled = カメラ回転モード(previousMode ?? mode)
   const nextEnabled = カメラ回転モード(mode)
@@ -992,7 +997,7 @@ defineExpose({ VRMA再生開始, 表示更新, 表示復帰 })
 </script>
 
 <template>
-  <section class="avatar-stage-shell" :class="{ transparent: transparentMode }">
+  <section class="avatar-stage-shell" :class="{ transparent: transparentMode, 'controls-hidden': !controlsVisible }">
     <div
       ref="mountRef"
       class="canvas-host"
@@ -1004,11 +1009,32 @@ defineExpose({ VRMA再生開始, 表示更新, 表示復帰 })
       @pointerleave="stopPointerDrag"
       @wheel="handleWheel"
     ></div>
-    <div class="glow glow-a" :style="{ opacity: micLevel * 0.7 }"></div>
-    <div class="glow glow-b" :style="{ opacity: speakerLevel * 0.7 }"></div>
+    <div v-if="controlsVisible" class="glow glow-a" :style="{ opacity: micLevel * 0.7 }"></div>
+    <div v-if="controlsVisible" class="glow glow-b" :style="{ opacity: speakerLevel * 0.7 }"></div>
 
-    <div v-if="subtitleText" class="avatar-subtitle">
+    <div v-if="controlsVisible && subtitleText" class="avatar-subtitle">
       {{ subtitleText }}
+    </div>
+
+    <div v-if="controlsVisible && !transparentMode" class="avatar-control-settings">
+      <label class="setting-checkbox experimental-setting">
+        <input v-model="自立身体制御有効" type="checkbox" />
+        <span>不完全な自立身体制御</span>
+      </label>
+      <label class="setting-checkbox experimental-setting">
+        <input v-model="自動カメラワーク有効" type="checkbox" />
+        <span>不完全な自動カメラワーク</span>
+      </label>
+      <div class="setting-row camera-mode-row">
+        <label class="setting-radio camera-mode-option" :class="{ disabled: !自動カメラワーク有効 }">
+          <input v-model="カメラモード" type="radio" value="追従" :disabled="!自動カメラワーク有効" />
+          <span>追従</span>
+        </label>
+        <label class="setting-radio camera-mode-option" :class="{ disabled: !自動カメラワーク有効 }">
+          <input v-model="カメラモード" type="radio" value="回転" :disabled="!自動カメラワーク有効" />
+          <span>回転</span>
+        </label>
+      </div>
     </div>
 
     <div v-if="!transparentMode && loading" class="stage-loading">
@@ -1036,6 +1062,14 @@ defineExpose({ VRMA再生開始, 表示更新, 表示復帰 })
 
 .avatar-stage-shell.transparent {
   background: transparent;
+}
+
+.avatar-stage-shell.controls-hidden .canvas-host {
+  cursor: default;
+}
+
+.avatar-stage-shell.controls-hidden .canvas-host:active {
+  cursor: default;
 }
 
 .canvas-host {
@@ -1092,6 +1126,131 @@ defineExpose({ VRMA再生開始, 表示更新, 表示復帰 })
   z-index: 6;
   white-space: pre-wrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.avatar-control-settings {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  min-height: 34px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+}
+
+.setting-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f4f4ff;
+  font-size: 10px;
+  line-height: 1.2;
+  user-select: none;
+  cursor: pointer;
+}
+
+.experimental-setting {
+  box-sizing: border-box;
+  justify-content: flex-start;
+  width: 140px;
+}
+
+.setting-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.camera-mode-row {
+  box-sizing: border-box;
+  justify-content: flex-start;
+  width: 140px;
+  padding-left: 16px;
+}
+
+.camera-mode-option {
+  min-width: 34px;
+}
+
+.setting-checkbox input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(244, 244, 255, 0.82);
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.setting-checkbox input::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  background: #44ff44;
+}
+
+.setting-checkbox input:checked::before {
+  transform: scale(1);
+}
+
+.setting-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #f4f4ff;
+  font-size: 10px;
+  line-height: 1.2;
+  user-select: none;
+  cursor: pointer;
+}
+
+.setting-radio.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.setting-radio input[type="radio"] {
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(244, 244, 255, 0.82);
+  border-radius: 50%;
+  background: transparent;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.setting-radio input[type="radio"]::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  background: #44ff44;
+}
+
+.setting-radio input[type="radio"]:checked::before {
+  transform: scale(1);
+}
+
+.setting-radio input[type="radio"]:disabled {
+  cursor: not-allowed;
 }
 
 .stage-loading {

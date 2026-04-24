@@ -23,6 +23,9 @@
 - `react-neko` という npm パッケージは 2026-04-23 時点で npm registry に存在しない。近いものとして `neko-ts` があるが `UNLICENSED` なので、このプロジェクトへ依存追加する場合はライセンス確認を優先する。
 - `Xネコ` は `oneko.js` 互換の 32px スプライト方式へ変更した。`oneko.gif` は `adryd325/oneko.js` の MIT ライセンス資産なので、`public/Xネコ/NOTICE.md` に出典とライセンスを残す。
 - Vue 直実装で確実に表示したい画像は `public` 直参照ではなく `src/assets` へ置いて import する。日本語 `public` パスや base URL の影響を受けにくい。
+- `X立体リバーシ` は `frontend_web/public/X立体リバーシ/` に静的 HTML/CSS/JS を置き、`src/components/Xその他/X立体リバーシ.vue` を iframe ラッパーとして追加した。ルートは `/Xその他/X立体リバーシ/ゲーム`、メニュー導線は `Xその他.vue` に追加する。盤は 6面×4x4。現在は 6面ネットを表示せず、Three.js の 3D キューブを直接クリックしてプレイする。
+- 6面立方体のように特殊なゲームルールを実装する場合は、ルール説明を画面内に明記し、合法手ハイライト・CPU対戦・終局/特殊モード遷移のログを同時に実装して、単なる盤面だけにしない。
+- Three.js を `frontend_web` に依存追加しない静的ページでは、CDN の ES module import を使うと `node --check` は通るが、オフライン環境では 3D 表示だけ失敗する。3D 表示が必須の画面は、可能ならローカル依存化も検討する。
 
 ## 注意点
 

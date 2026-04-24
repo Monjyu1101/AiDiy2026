@@ -1,5 +1,6 @@
 import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session } from 'electron'
 import { readdir } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -11,6 +12,12 @@ type WindowMode = 'login' | 'core'
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
 type WindowRole = WindowMode | PanelKey | 'settings'
 type WindowBounds = { x: number; y: number; width: number; height: number }
+type WindowPointerSnapshot = {
+  role: WindowRole | null
+  bounds: WindowBounds
+  mouse: { x: number; y: number }
+  insideWindow: boolean
+}
 type DisplaySourceKind = 'screen' | 'window'
 type DisplaySourceInfo = {
   id: string
@@ -56,11 +63,37 @@ let settingsWindow: BrowserWindow | null = null
 const panelWindows = new Map<PanelKey, BrowserWindow>()
 const windowRoles = new Map<number, WindowRole>()
 let selectedDisplaySourceId: string | null = null
+let previousCpuTimes: { idle: number; total: number } | null = null
 // Electronのバグ回避: getMinimumSize()が初期サイズを返す場合があるため独自管理
 const windowMinSizes = new Map<number, { minWidth: number; minHeight: number }>()
 
 function getWorkArea() {
   return screen.getPrimaryDisplay().workArea
+}
+
+function readCpuTimes() {
+  return os.cpus().reduce((summary, cpu) => {
+    const idle = cpu.times.idle
+    const total = Object.values(cpu.times).reduce((sum, value) => sum + value, 0)
+    return {
+      idle: summary.idle + idle,
+      total: summary.total + total,
+    }
+  }, { idle: 0, total: 0 })
+}
+
+function getSystemCpuUsagePercent() {
+  const current = readCpuTimes()
+  if (!previousCpuTimes) {
+    previousCpuTimes = current
+    return 0
+  }
+
+  const idleDelta = current.idle - previousCpuTimes.idle
+  const totalDelta = current.total - previousCpuTimes.total
+  previousCpuTimes = current
+  if (totalDelta <= 0) return 0
+  return Math.min(100, Math.max(0, (1 - (idleDelta / totalDelta)) * 100))
 }
 
 function getBottomRightPosition(
@@ -254,6 +287,33 @@ function clampWindowBounds(window: BrowserWindow, nextBounds: WindowBounds): Win
     y: Math.round(nextBounds.y ?? currentBounds.y),
     width: clampedWidth,
     height: clampedHeight,
+  }
+}
+
+function getWindowByRole(role: WindowRole): BrowserWindow | null {
+  if (role === 'login') return loginWindow && !loginWindow.isDestroyed() ? loginWindow : null
+  if (role === 'core') return coreWindow && !coreWindow.isDestroyed() ? coreWindow : null
+  if (role === 'settings') return settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : null
+  const panelWindow = panelWindows.get(role)
+  return panelWindow && !panelWindow.isDestroyed() ? panelWindow : null
+}
+
+function getWindowPointerSnapshot(window: BrowserWindow, requestedRole?: WindowRole): WindowPointerSnapshot {
+  const targetWindow = requestedRole ? (getWindowByRole(requestedRole) ?? window) : window
+  const role = windowRoles.get(targetWindow.id) ?? null
+  const bounds = targetWindow.getBounds()
+  const mouse = screen.getCursorScreenPoint()
+  const insideWindow =
+    mouse.x >= bounds.x &&
+    mouse.x <= bounds.x + bounds.width &&
+    mouse.y >= bounds.y &&
+    mouse.y <= bounds.y + bounds.height
+
+  return {
+    role,
+    bounds,
+    mouse,
+    insideWindow,
   }
 }
 
@@ -589,6 +649,20 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('window:get-pointer-snapshot', (event, requestedRole?: WindowRole) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) {
+      const mouse = screen.getCursorScreenPoint()
+      return {
+        role: null,
+        bounds: { x: 0, y: 0, width: 0, height: 0 },
+        mouse,
+        insideWindow: false,
+      } satisfies WindowPointerSnapshot
+    }
+    return getWindowPointerSnapshot(window, requestedRole)
+  })
+
   ipcMain.handle('window:set-bounds', (event, nextBounds: WindowBounds) => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return
@@ -647,6 +721,8 @@ app.whenReady().then(() => {
     selectedDisplaySourceId = sourceId
     return selectedDisplaySourceId
   })
+
+  ipcMain.handle('system:get-cpu-usage', () => getSystemCpuUsagePercent())
 
   createLoginWindow()
 

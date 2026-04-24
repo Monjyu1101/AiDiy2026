@@ -21,7 +21,7 @@ type SpriteName =
 
 type SpritePoint = readonly [number, number]
 
-const props = defineProps<{ showBoundary?: boolean }>()
+const props = withDefaults(defineProps<{ controlsVisible?: boolean }>(), { controlsVisible: true })
 
 const stageRef = ref<HTMLDivElement | null>(null)
 const nekoRef  = ref<HTMLDivElement | null>(null)
@@ -78,7 +78,9 @@ const catMaxY = (height: number) => height - CAT_MARGIN_BOTTOM
 const setSprite = (name: SpriteName, frame: number) => {
   const el = nekoRef.value
   if (!el) return
-  const sp = spriteSets[name][frame % spriteSets[name].length]
+  const frames = spriteSets[name]
+  const sp = frames[frame % frames.length]
+  if (!sp) return
   el.style.backgroundPosition = `${sp[0] * 32}px ${sp[1] * 32}px`
 }
 
@@ -286,7 +288,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="stageRef" class="neko-stage">
     <div
-      v-if="props.showBoundary"
+      v-if="props.controlsVisible"
       class="neko-boundary"
       :style="{
         left:   `${CAT_MARGIN}px`,

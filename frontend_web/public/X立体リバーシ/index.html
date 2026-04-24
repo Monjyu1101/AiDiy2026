@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X立体リバーシ - Cube Reversi 4x4</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="play-area">
+      <header class="game-header">
+        <div>
+          <h1>X立体リバーシ</h1>
+          <p>6面立方体 / 4x4 / Cube Flip Reversi</p>
+        </div>
+        <div class="turn-panel">
+          <span id="mode-label">通常モード</span>
+          <strong id="turn-label">黒の手番</strong>
+        </div>
+      </header>
+
+      <div class="score-board">
+        <div class="score-card black">
+          <span>黒</span>
+          <strong id="black-score">12</strong>
+        </div>
+        <div class="score-card white">
+          <span>白</span>
+          <strong id="white-score">12</strong>
+        </div>
+        <div class="score-card empty">
+          <span>空き</span>
+          <strong id="empty-score">192</strong>
+        </div>
+      </div>
+
+      <div id="message" class="message">6面の中央から開始します。</div>
+
+      <section class="cube-3d-panel" aria-label="3D立方体リバーシ盤">
+        <div class="cube-3d-header">
+          <span>3D CUBE VIEW</span>
+          <small>ドラッグで自由回転 / 立方体のマスをクリックして着手</small>
+        </div>
+        <canvas id="cube-3d-canvas"></canvas>
+      </section>
+    </section>
+
+    <aside class="side-panel">
+      <section class="panel-block controls">
+        <h2>操作</h2>
+        <label class="switch-row">
+          <input id="cpu-toggle" type="checkbox" checked>
+          <span>白をCPUにする</span>
+        </label>
+        <div class="button-row">
+          <button id="reset-btn" type="button">新規対局</button>
+          <button id="hint-btn" type="button">置ける場所</button>
+        </div>
+        <div class="legend">
+          <span><i class="legend-dot legal"></i>置ける場所</span>
+          <span><i class="legend-dot last"></i>直前の手</span>
+          <span><i class="legend-dot challenge"></i>チャレンジ</span>
+        </div>
+      </section>
+
+      <section class="panel-block rules">
+        <h2>特別ルール</h2>
+        <ul>
+          <li>盤は 4x4 の面が 6 枚ある立方体です。</li>
+          <li>斜め方向の反転は、同じ面の盤上だけで判定します。</li>
+          <li>縦横方向の反転は、立方体の辺をまたいで隣の面へ続きます。</li>
+          <li>着手は3D立方体上のマスを直接クリックします。</li>
+          <li>通常モードで黒白どちらも置けなくなったら、チャレンジモードへ突入します。</li>
+          <li>チャレンジモード開始時、全6面の内側4マスをクリアします。</li>
+          <li>チャレンジモードでは、黒白が交互に空きマスなら好きな場所へ置けます。反転できる列があれば反転もします。</li>
+        </ul>
+      </section>
+
+      <section class="panel-block ai-log">
+        <h2>戦況</h2>
+        <div id="battle-log" class="battle-log"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="index.js"></script>
+</body>
+</html>

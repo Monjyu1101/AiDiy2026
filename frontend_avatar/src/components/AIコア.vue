@@ -13,7 +13,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import アバター from '@/components/AIコア_アバター.vue'
-import ネコ from '@/components/AIコア_ネコ.vue'
+import xneko from '@/components/AIコア_xneko.vue'
+import xeyes from '@/components/AIコア_xeyes.vue'
+import アナログ時計 from '@/components/AIコア_アナログ時計.vue'
+import デジタル時計 from '@/components/AIコア_デジタル時計.vue'
+import カレンダー from '@/components/AIコア_カレンダー.vue'
 import WindowShell from '@/components/_WindowShell.vue'
 import { AudioController } from '@/components/AIコア_音声処理'
 import { AI_WS_ENDPOINT } from '@/api/config'
@@ -102,10 +106,9 @@ const マイクレベル = ref(0)
 const スピーカーレベル = ref(0)
 const 音声エラー = ref('')
 const ウェルカムホバー中 = ref(false)
-const 自立身体制御有効 = ref(false)
-const 自動カメラワーク有効 = ref(false)
-const アバター表示有効 = ref(true)
-const カメラモード = ref<'追従' | '回転'>('追従')
+type 表示選択型 = 'アバター' | 'カレンダーα' | 'xneko' | 'xeyes' | 'アナログ時計' | 'デジタル時計' | 'カレンダー' | '無し'
+
+const 表示選択 = ref<表示選択型>('アバター')
 const 入力スペクトラム = ref<number[]>(初期スペクトラム())
 const 出力スペクトラム = ref<number[]>(初期スペクトラム())
 const 音声Socket = shallowRef<AIWebSocket | null>(null)
@@ -161,6 +164,14 @@ const 接続状態ドットクラス = computed(() => {
 const ビジュアライザー表示中 = computed(() => {
   return UI表示中.value && (マイク有効.value || スピーカー有効.value || マイクレベル.value > 0.03 || スピーカーレベル.value > 0.03)
 })
+
+const アバター表示中 = computed(() => 表示選択.value === 'アバター')
+const xneko表示中 = computed(() => 表示選択.value === 'xneko')
+const xeyes表示中 = computed(() => 表示選択.value === 'xeyes')
+const アナログ時計表示中 = computed(() => 表示選択.value === 'アナログ時計')
+const デジタル時計表示中 = computed(() => 表示選択.value === 'デジタル時計')
+const カレンダー表示中 = computed(() => 表示選択.value === 'カレンダー')
+const カレンダーα表示中 = computed(() => 表示選択.value === 'カレンダーα')
 
 const 案内表示テキスト = computed(() => {
   if (props.coreError) return props.coreError
@@ -450,7 +461,7 @@ defineExpose({ 字幕追加 })
       </div>
 
       <component
-        v-show="アバター表示有効"
+        v-show="アバター表示中"
         :is="アバター"
         ref="アバターRef"
         class="avatar-layer"
@@ -464,41 +475,78 @@ defineExpose({ 字幕追加 })
         :mic-level="マイクレベル"
         :speaker-level="スピーカーレベル"
         :ui-visible="UI表示中"
+        :controls-visible="UI表示中"
         :transparent-mode="!UI表示中"
         :subtitle-text="字幕表示"
-        :body-autonomous-enabled="自立身体制御有効"
-        :camera-mode="自動カメラワーク有効 ? カメラモード : '停止'"
       />
 
       <component
-        v-if="!アバター表示有効"
-        :is="ネコ"
-        :show-boundary="UI表示中"
+        v-if="xneko表示中"
+        :is="xneko"
+        :controls-visible="UI表示中"
       />
 
+      <component
+        v-if="xeyes表示中"
+        :is="xeyes"
+        :controls-visible="UI表示中"
+      />
+
+      <component
+        v-if="アナログ時計表示中"
+        :is="アナログ時計"
+        class="display-option-layer"
+        :controls-visible="UI表示中"
+      />
+
+      <component
+        v-if="デジタル時計表示中"
+        :is="デジタル時計"
+        class="display-option-layer"
+        :controls-visible="UI表示中"
+      />
+
+      <component
+        v-if="カレンダー表示中"
+        :is="カレンダー"
+        class="display-option-layer"
+        :controls-visible="UI表示中"
+      />
+
+      <!-- カレンダー+α: 金色デジタル時計＋カレンダー＋xneko の重ね合わせ -->
+      <template v-if="カレンダーα表示中">
+        <component
+          :is="デジタル時計"
+          class="display-option-layer カレンダーα時計"
+          :controls-visible="UI表示中"
+          :前景色="'#FFB400'"
+        />
+        <component
+          :is="カレンダー"
+          class="display-option-layer"
+          :controls-visible="UI表示中"
+        />
+        <component
+          :is="xneko"
+          class="display-option-layer"
+          :controls-visible="UI表示中"
+        />
+      </template>
+
       <div v-show="UI表示中" class="left-bottom-settings">
-        <label class="setting-checkbox">
-          <input v-model="アバター表示有効" type="checkbox" />
-          <span>アバター表示</span>
+        <label class="setting-select">
+          <span>表示選択</span>
+          <select v-model="表示選択">
+            <option value="アバター">アバター</option>
+            <option value="カレンダーα">カレンダー+α</option>
+            <option value="xneko">xneko(猫)</option>
+            <option value="xeyes">xeyes(目)</option>
+            <option value="アナログ時計">アナログ時計</option>
+            <option value="デジタル時計">デジタル時計</option>
+            <option value="カレンダー">カレンダー</option>
+            <option value="無し">無し</option>
+          </select>
         </label>
-        <label class="setting-checkbox">
-          <input v-model="自立身体制御有効" type="checkbox" />
-          <span>不完全な自立身体制御</span>
-        </label>
-        <div class="setting-row">
-          <label class="setting-checkbox">
-            <input v-model="自動カメラワーク有効" type="checkbox" />
-            <span>不完全な自動カメラワーク</span>
-          </label>
-          <label class="setting-radio" :class="{ disabled: !自動カメラワーク有効 }">
-            <input v-model="カメラモード" type="radio" value="追従" :disabled="!自動カメラワーク有効" />
-            <span>追従</span>
-          </label>
-          <label class="setting-radio" :class="{ disabled: !自動カメラワーク有効 }">
-            <input v-model="カメラモード" type="radio" value="回転" :disabled="!自動カメラワーク有効" />
-            <span>回転</span>
-          </label>
-        </div>
       </div>
 
       <aside v-show="UI表示中" class="floating-controls">
@@ -802,6 +850,17 @@ defineExpose({ 字幕追加 })
   z-index: 2;
 }
 
+.display-option-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.カレンダーα時計 {
+  align-items: flex-end;
+  padding-bottom: 24px;
+}
+
 .left-bottom-settings {
   position: absolute;
   left: 16px;
@@ -815,7 +874,7 @@ defineExpose({ 字幕追加 })
   padding: 0;
 }
 
-.setting-checkbox {
+.setting-select {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -823,90 +882,19 @@ defineExpose({ 字幕追加 })
   font-size: 10px;
   line-height: 1.2;
   user-select: none;
-  cursor: pointer;
 }
 
-.setting-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.setting-checkbox input {
-  width: 12px;
-  height: 12px;
-  margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
+.setting-select select {
+  width: 112px;
+  height: 20px;
   border: 1px solid rgba(244, 244, 255, 0.82);
   border-radius: 2px;
-  background: transparent;
-  box-shadow: none;
-  display: inline-grid;
-  place-content: center;
-  cursor: pointer;
-}
-
-.setting-checkbox input::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  transform: scale(0);
-  transition: transform 0.12s ease;
-  background: #44ff44;
-}
-
-.setting-checkbox input:checked::before {
-  transform: scale(1);
-}
-
-.setting-radio {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  background: rgba(20, 20, 28, 0.72);
   color: #f4f4ff;
   font-size: 10px;
-  line-height: 1.2;
-  user-select: none;
+  line-height: 1;
+  outline: none;
   cursor: pointer;
-}
-
-.setting-radio.disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
-}
-
-.setting-radio input[type="radio"] {
-  width: 11px;
-  height: 11px;
-  margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  border: 1px solid rgba(244, 244, 255, 0.82);
-  border-radius: 50%;
-  background: transparent;
-  display: inline-grid;
-  place-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.setting-radio input[type="radio"]::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  transform: scale(0);
-  transition: transform 0.12s ease;
-  background: #44ff44;
-}
-
-.setting-radio input[type="radio"]:checked::before {
-  transform: scale(1);
-}
-
-.setting-radio input[type="radio"]:disabled {
-  cursor: not-allowed;
 }
 
 .floating-controls {
@@ -1142,8 +1130,5 @@ defineExpose({ 字幕追加 })
     padding: 0;
   }
 
-  .setting-checkbox {
-    font-size: 9px;
-  }
 }
 </style>

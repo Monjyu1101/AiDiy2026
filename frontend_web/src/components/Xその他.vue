@@ -138,6 +138,19 @@ onBeforeUnmount(() => {
             </router-link>
           </div>
 
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X立</span>
+              X立体リバーシ
+            </div>
+            <div class="menu-card-description">
+              6面立方体リバーシ・CPU対戦・チャレンジモード
+            </div>
+            <router-link to="/Xその他/X立体リバーシ/ゲーム?戻URL=/Xその他" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
         </div>
       </div>
     </div>
@@ -191,4 +204,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-

@@ -5,6 +5,12 @@ type WindowMode = 'login' | 'core'
 type WindowRole = WindowMode | PanelKey | 'settings'
 type WindowBounds = { x: number; y: number; width: number; height: number }
 type WindowMetrics = WindowBounds & { minWidth: number; minHeight: number }
+type WindowPointerSnapshot = {
+  role: WindowRole | null
+  bounds: WindowBounds
+  mouse: { x: number; y: number }
+  insideWindow: boolean
+}
 type DisplaySourceKind = 'screen' | 'window'
 type DisplaySourceInfo = {
   id: string
@@ -21,6 +27,7 @@ const api = {
   },
   getWindowRole: () => ipcRenderer.invoke('window:get-role') as Promise<WindowRole>,
   getWindowBounds: () => ipcRenderer.invoke('window:get-bounds') as Promise<WindowMetrics>,
+  getWindowPointerSnapshot: (role?: WindowRole) => ipcRenderer.invoke('window:get-pointer-snapshot', role) as Promise<WindowPointerSnapshot>,
   setWindowBounds: (bounds: WindowBounds) => ipcRenderer.invoke('window:set-bounds', bounds),
   setWindowInteractive: (interactive: boolean) => ipcRenderer.invoke('window:set-interactive', interactive) as Promise<boolean>,
   setWindowMode: (mode: WindowMode) => ipcRenderer.invoke('window:set-mode', mode),
@@ -34,6 +41,7 @@ const api = {
   listDisplaySources: () => ipcRenderer.invoke('desktop:list-sources') as Promise<DisplaySourceInfo[]>,
   listVrmaFiles: (folderName: string) => ipcRenderer.invoke('desktop:list-vrma-files', folderName) as Promise<string[]>,
   setDisplaySource: (sourceId: string | null) => ipcRenderer.invoke('desktop:set-source', sourceId),
+  getSystemCpuUsage: () => ipcRenderer.invoke('system:get-cpu-usage') as Promise<number>,
   openSettingsWindow: (sessionId: string) => ipcRenderer.invoke('settings:open', sessionId),
   closeSettingsWindow: () => ipcRenderer.invoke('settings:close'),
   onSettingsPrepare: (callback: (sessionId: string) => void) => {

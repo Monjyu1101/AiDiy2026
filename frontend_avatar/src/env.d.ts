@@ -21,6 +21,12 @@ declare global {
   type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey | 'settings'
   type AvatarWindowBounds = { x: number; y: number; width: number; height: number }
   type AvatarWindowMetrics = AvatarWindowBounds & { minWidth: number; minHeight: number }
+  type AvatarWindowPointerSnapshot = {
+    role: AvatarWindowRole | null
+    bounds: AvatarWindowBounds
+    mouse: { x: number; y: number }
+    insideWindow: boolean
+  }
   type AvatarDisplaySourceKind = 'screen' | 'window'
   type AvatarDisplaySource = {
     id: string
@@ -38,6 +44,7 @@ declare global {
       }
       getWindowRole?: () => Promise<AvatarWindowRole>
       getWindowBounds?: () => Promise<AvatarWindowMetrics>
+      getWindowPointerSnapshot?: (role?: AvatarWindowRole) => Promise<AvatarWindowPointerSnapshot>
       setWindowBounds?: (bounds: AvatarWindowBounds) => Promise<AvatarWindowBounds>
       setWindowInteractive?: (interactive: boolean) => Promise<boolean>
       setWindowMode?: (mode: AvatarWindowMode) => Promise<AvatarWindowMode>
@@ -51,6 +58,7 @@ declare global {
       listDisplaySources?: () => Promise<AvatarDisplaySource[]>
       listVrmaFiles?: (folderName: string) => Promise<string[]>
       setDisplaySource?: (sourceId: string | null) => Promise<string | null>
+      getSystemCpuUsage?: () => Promise<number>
       openSettingsWindow?: (sessionId: string) => Promise<void>
       closeSettingsWindow?: () => Promise<void>
       onSettingsPrepare?: (callback: (sessionId: string) => void) => (() => void)
