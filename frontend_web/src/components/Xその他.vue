@@ -15,6 +15,8 @@ import { onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
+const baseUrl = import.meta.env.BASE_URL || '/';
+const helloWorldUrl = `${baseUrl}Xハローワールド/index.html`;
 const AUTO_JUMP_MS = 60000;
 const AUTO_JUMP_PATH = '/Xその他/X自己紹介/表示';
 const cancelEvents = ['mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'];
@@ -99,6 +101,19 @@ onBeforeUnmount(() => {
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X世</span>
+              Xハローワールド
+            </div>
+            <div class="menu-card-description">
+              世界の絶景ランダム巡回・全画面地図ビュー
+            </div>
+            <a :href="helloWorldUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">X侵</span>

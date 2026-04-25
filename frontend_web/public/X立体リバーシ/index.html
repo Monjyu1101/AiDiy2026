@@ -8,25 +8,26 @@
 </head>
 <body>
   <main class="app-shell">
-    <section class="play-area">
+
+    <aside class="side-panel">
       <header class="game-header">
-        <div>
+        <div class="header-title">
           <h1>X立体リバーシ</h1>
           <p>6面立方体 / 4x4 / Cube Flip Reversi</p>
         </div>
         <div class="turn-panel">
           <span id="mode-label">通常モード</span>
-          <strong id="turn-label">黒の手番</strong>
+          <strong id="turn-label">青の手番</strong>
         </div>
       </header>
 
       <div class="score-board">
         <div class="score-card black">
-          <span>黒</span>
+          <span>青</span>
           <strong id="black-score">12</strong>
         </div>
         <div class="score-card white">
-          <span>白</span>
+          <span>赤</span>
           <strong id="white-score">12</strong>
         </div>
         <div class="score-card empty">
@@ -35,46 +36,43 @@
         </div>
       </div>
 
-      <div id="message" class="message">6面の中央から開始します。</div>
+      <div id="message" class="message">青の手番です。光る〇のマスに置けます。</div>
 
-      <section class="cube-3d-panel" aria-label="3D立方体リバーシ盤">
-        <div class="cube-3d-header">
-          <span>3D CUBE VIEW</span>
-          <small>ドラッグで自由回転 / 立方体のマスをクリックして着手</small>
-        </div>
-        <canvas id="cube-3d-canvas"></canvas>
-      </section>
-    </section>
-
-    <aside class="side-panel">
       <section class="panel-block controls">
         <h2>操作</h2>
         <label class="switch-row">
+          <input id="black-cpu-toggle" type="checkbox">
+          <span>青をCPUにする</span>
+        </label>
+        <label class="switch-row">
           <input id="cpu-toggle" type="checkbox" checked>
-          <span>白をCPUにする</span>
+          <span>赤をCPUにする</span>
         </label>
         <div class="button-row">
           <button id="reset-btn" type="button">新規対局</button>
           <button id="hint-btn" type="button">置ける場所</button>
         </div>
         <div class="legend">
-          <span><i class="legend-dot legal"></i>置ける場所</span>
+          <span><i class="legend-dot legal"></i>光る〇: 置ける場所</span>
           <span><i class="legend-dot last"></i>直前の手</span>
-          <span><i class="legend-dot challenge"></i>チャレンジ</span>
+          <span><i class="legend-dot challenge"></i>金の〇: チャレンジ</span>
         </div>
       </section>
 
       <section class="panel-block rules">
-        <h2>特別ルール</h2>
+        <h2>立体リバーシルール</h2>
         <ul>
-          <li>盤は 4x4 の面が 6 枚ある立方体です。</li>
-          <li>斜め方向の反転は、同じ面の盤上だけで判定します。</li>
-          <li>縦横方向の反転は、立方体の辺をまたいで隣の面へ続きます。</li>
-          <li>着手は3D立方体上のマスを直接クリックします。</li>
-          <li>通常モードで黒白どちらも置けなくなったら、チャレンジモードへ突入します。</li>
-          <li>チャレンジモード開始時、全6面の内側4マスをクリアします。</li>
-          <li>チャレンジモードでは、黒白が交互に空きマスなら好きな場所へ置けます。反転できる列があれば反転もします。</li>
+          <li>青と赤が交互に、3D立方体の空いているマスへ石を置きます。</li>
+          <li>盤面は 4x4 マスの面が 6 枚つながった立方体です。</li>
+          <li>通常モードでは、相手の石を自分の石ではさめるマスだけに置けます。</li>
+          <li>横方向と縦方向の判定は、立方体の辺をまたいで隣の面へ続きます。</li>
+          <li>斜め方向の判定は、石を置いた同じ面の中だけで行います。</li>
+          <li>青赤どちらも通常モードで置けなくなると、チャレンジモードへ入ります。</li>
+          <li>チャレンジモード開始時、全6面の中央4マス、合計24マスを空にします。</li>
+          <li>チャレンジモードでは中央24マスだけに置けます。反転の判定は通常モードと同じです。</li>
+          <li>すべての空きマスが埋まった時点で終了し、石が多い色の勝ちです。</li>
         </ul>
+        <p class="copyright">&copy; 2026 Mitsuo KONDOU. All rights reserved.</p>
       </section>
 
       <section class="panel-block ai-log">
@@ -82,6 +80,15 @@
         <div id="battle-log" class="battle-log"></div>
       </section>
     </aside>
+
+    <section class="cube-3d-panel" aria-label="3D立方体リバーシ盤">
+      <div class="cube-3d-header">
+        <span>3D CUBE VIEW</span>
+        <small>ドラッグで自由回転 / 立方体のマスをクリックして着手</small>
+      </div>
+      <canvas id="cube-3d-canvas"></canvas>
+    </section>
+
   </main>
 
   <script type="module" src="index.js"></script>

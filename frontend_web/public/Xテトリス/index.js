@@ -20,16 +20,22 @@ class CyberTetris {
         this.nextPiece = null;
         this.currentX = 0;
         this.currentY = 0;
+        this.pieceLocked = false;
         
         // タイマー
         this.gameLoop = null;
+        this.pendingTimers = [];
         this.dropSpeed = 1000; // 1秒
         
         // テトリスピースの定義（I, O, T, S, Z, J, L）
         this.pieces = {
             I: {
                 shape: [
-                    [[1, 1, 1, 1]]
+                    [[1, 1, 1, 1]],
+                    [[1],
+                     [1],
+                     [1],
+                     [1]]
                 ],
                 color: 'cyan'
             },
@@ -124,6 +130,10 @@ class CyberTetris {
         this.gameRunning = false;
         this.gamePaused = false;
         this.gameOver = false;
+        this.currentPiece = null;
+        this.currentX = 0;
+        this.currentY = 0;
+        this.pieceLocked = false;
         
         // 次のピースを生成
         this.nextPiece = this.generateRandomPiece();
@@ -195,13 +205,30 @@ class CyberTetris {
     
     resetGame() {
         this.stopGameLoop();
+        this.clearPendingTimers();
         this.initializeGame();
         $('#start-btn').text('START');
         $('#pause-btn').text('PAUSE');
         this.hideMessage();
     }
+
+    setManagedTimeout(callback, delay) {
+        const timerId = setTimeout(() => {
+            this.pendingTimers = this.pendingTimers.filter((id) => id !== timerId);
+            callback();
+        }, delay);
+        this.pendingTimers.push(timerId);
+        return timerId;
+    }
+
+    clearPendingTimers() {
+        this.pendingTimers.forEach((timerId) => clearTimeout(timerId));
+        this.pendingTimers = [];
+    }
     
     spawnNewPiece() {
+        if (!this.gameRunning || this.gameOver) return;
+        this.pieceLocked = false;
         this.currentPiece = this.nextPiece;
         this.nextPiece = this.generateRandomPiece();
         this.currentX = Math.floor(this.BOARD_WIDTH / 2) - Math.floor(this.currentPiece.shape[0].length / 2);
@@ -235,6 +262,7 @@ class CyberTetris {
     
     handleKeyPress(e) {
         if (!this.gameRunning || this.gamePaused || this.gameOver) return;
+        if (!this.currentPiece || this.pieceLocked) return;
         
         switch (e.key) {
             case 'ArrowLeft':
@@ -261,6 +289,7 @@ class CyberTetris {
     }
     
     canPlacePiece(x, y, piece) {
+        if (!piece) return false;
         const shape = piece.shape;
         
         for (let row = 0; row < shape.length; row++) {
@@ -291,6 +320,7 @@ class CyberTetris {
     }
     
     movePieceLeft() {
+        if (!this.currentPiece || this.pieceLocked) return;
         if (this.canPlacePiece(this.currentX - 1, this.currentY, this.currentPiece)) {
             this.currentX--;
             this.renderBoard();
@@ -298,6 +328,7 @@ class CyberTetris {
     }
     
     movePieceRight() {
+        if (!this.currentPiece || this.pieceLocked) return;
         if (this.canPlacePiece(this.currentX + 1, this.currentY, this.currentPiece)) {
             this.currentX++;
             this.renderBoard();
@@ -305,6 +336,7 @@ class CyberTetris {
     }
     
     movePieceDown() {
+        if (!this.currentPiece || this.pieceLocked) return;
         if (this.canPlacePiece(this.currentX, this.currentY + 1, this.currentPiece)) {
             this.currentY++;
             this.renderBoard();
@@ -314,6 +346,7 @@ class CyberTetris {
     }
     
     hardDrop() {
+        if (!this.currentPiece || this.pieceLocked) return;
         while (this.canPlacePiece(this.currentX, this.currentY + 1, this.currentPiece)) {
             this.currentY++;
         }
@@ -322,6 +355,7 @@ class CyberTetris {
     }
     
     rotatePiece() {
+        if (!this.currentPiece || this.pieceLocked) return;
         const currentRotation = this.currentPiece.rotation;
         const pieceType = this.currentPiece.type;
         const rotations = this.pieces[pieceType].shape;
@@ -364,6 +398,8 @@ class CyberTetris {
     }
     
     placePiece() {
+        if (!this.currentPiece || this.pieceLocked) return;
+        this.pieceLocked = true;
         const shape = this.currentPiece.shape;
         const color = this.currentPiece.color;
         
@@ -374,7 +410,7 @@ class CyberTetris {
                     const boardX = this.currentX + col;
                     const boardY = this.currentY + row;
                     
-                    if (boardY >= 0) {
+                    if (boardY >= 0 && boardX >= 0 && boardX < this.BOARD_WIDTH && boardY < this.BOARD_HEIGHT) {
                         this.board[boardY][boardX] = color;
                     }
                 }
@@ -384,20 +420,30 @@ class CyberTetris {
         // パーティクルエフェクト
         this.createPlaceEffect();
         
-        // 完成した行をチェック
-        const clearedLines = this.clearCompletedLines();
+        const linesToClear = this.findCompletedLines();
+        const clearedLines = linesToClear.length;
         
         // スコア更新
         this.updateScore(clearedLines);
-        
-        // 次のピースをスポーン
-        setTimeout(() => {
-            this.spawnNewPiece();
-        }, clearedLines > 0 ? 600 : 100);
+
+        this.currentPiece = null;
+        this.renderBoard();
+
+        if (clearedLines > 0) {
+            this.animateLineClear(linesToClear);
+            this.setManagedTimeout(() => {
+                if (!this.gameRunning || this.gameOver) return;
+                this.removeCompletedLines(linesToClear);
+                this.renderBoard();
+                this.createClearEffect(clearedLines);
+                this.setManagedTimeout(() => this.spawnNewPiece(), 100);
+            }, 500);
+        } else {
+            this.setManagedTimeout(() => this.spawnNewPiece(), 100);
+        }
     }
     
-    clearCompletedLines() {
-        let clearedLines = 0;
+    findCompletedLines() {
         let linesToClear = [];
         
         // 完成した行を特定
@@ -406,25 +452,17 @@ class CyberTetris {
                 linesToClear.push(row);
             }
         }
-        
-        if (linesToClear.length > 0) {
-            // クリアアニメーション
-            this.animateLineClear(linesToClear);
-            
-            // 500ms後に実際に行を削除
-            setTimeout(() => {
-                linesToClear.forEach(row => {
-                    this.board.splice(row, 1);
-                    this.board.unshift(Array(this.BOARD_WIDTH).fill(null));
-                });
-                this.renderBoard();
-                this.createClearEffect(linesToClear.length);
-            }, 500);
-            
-            clearedLines = linesToClear.length;
-        }
-        
-        return clearedLines;
+        return linesToClear;
+    }
+
+    removeCompletedLines(linesToClear) {
+        const clearSet = new Set(linesToClear);
+        const remainingRows = this.board.filter((_, rowIndex) => !clearSet.has(rowIndex));
+        const emptyRows = Array.from(
+            { length: linesToClear.length },
+            () => Array(this.BOARD_WIDTH).fill(null)
+        );
+        this.board = [...emptyRows, ...remainingRows];
     }
     
     animateLineClear(lines) {
@@ -625,6 +663,9 @@ class CyberTetris {
         this.gameRunning = false;
         this.gameOver = true;
         this.stopGameLoop();
+        this.clearPendingTimers();
+        this.currentPiece = null;
+        this.pieceLocked = false;
         
         $('#start-btn').text('RESTART');
         

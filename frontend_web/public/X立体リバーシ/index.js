@@ -4,8 +4,8 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.m
 
 const SIZE = 4;
 const PLAYERS = {
-  black: { label: '黒', next: 'white' },
-  white: { label: '白', next: 'black' },
+  black: { label: '青', next: 'white' },
+  white: { label: '赤', next: 'black' },
 };
 const FACES = [
   { id: 'top', label: '上面', short: 'TOP', className: 'face-top' },
@@ -27,6 +27,7 @@ const INNER_CELLS = [
   [1, 1], [1, 2],
   [2, 1], [2, 2],
 ];
+const CHALLENGE_CLEAR_FACE_ORDER = ['front', 'right', 'back', 'left', 'top', 'bottom'];
 const FACE_TRANSFORMS = {
   front:  { position: [0, 0, 2.02], rotation: [0, 0, 0] },
   back:   { position: [0, 0, -2.02], rotation: [0, Math.PI, 0] },
@@ -38,27 +39,36 @@ const FACE_TRANSFORMS = {
 const FACE_CAMERA_TARGETS = {
   front:  { x: -0.36, y: 0.38 },
   back:   { x: -0.28, y: Math.PI + 0.36 },
-  right:  { x: -0.32, y: Math.PI / 2 + 0.34 },
-  left:   { x: -0.32, y: -Math.PI / 2 - 0.34 },
-  top:    { x: -1.08, y: 0.38 },
-  bottom: { x: 0.82, y: 0.38 },
+  right:  { x: -0.32, y: -Math.PI / 2 + 0.34 },
+  left:   { x: -0.32, y: Math.PI / 2 - 0.34 },
+  top:    { x: 1.08, y: 0.38 },
+  bottom: { x: -1.08, y: 0.38 },
 };
+const FACE_NORMALS = {
+  front:  [0, 0, 1],
+  back:   [0, 0, -1],
+  right:  [1, 0, 0],
+  left:   [-1, 0, 0],
+  top:    [0, 1, 0],
+  bottom: [0, -1, 0],
+};
+const FACE_VISIBLE_THRESHOLD = 0.18;
 
-// 黒石・白石のマテリアル定義
+// 青石・赤石のマテリアル定義（先手青 vs 後手赤 サイバーパンク配色）
 const PIECE_DEFS = {
   black: {
-    color: 0x0c0c10,
-    emissive: 0x103050,
-    emissiveIntensity: 0.9,
-    roughness: 0.38,
-    metalness: 0.55,
+    color: 0x00051a,        // 深青（先手）
+    emissive: 0x0055dd,     // 青発光
+    emissiveIntensity: 1.2,
+    roughness: 0.28,
+    metalness: 0.70,
   },
   white: {
-    color: 0xf2eedd,
-    emissive: 0x3a2e14,
-    emissiveIntensity: 0.25,
-    roughness: 0.45,
-    metalness: 0.10,
+    color: 0x1a0003,        // 深紅（後手CPU）
+    emissive: 0xcc1100,     // 赤熱発光
+    emissiveIntensity: 1.2,
+    roughness: 0.28,
+    metalness: 0.70,
   },
 };
 
@@ -68,18 +78,24 @@ class CubeReversi {
     this.currentPlayer = 'black';
     this.mode = 'normal';
     this.gameOver = false;
+    this.blackCpuEnabled = false;
     this.cpuEnabled = true;
     this.cpuThinking = false;
+    this.challengeTransitioning = false;
+    this.challengeTimer = null;
+    this.postMoveTimer = null;
     this.lastMove = null;
     this.lastChangedKeys = new Set();
     this.alwaysShowMoves = true;
     this.logItems = [];
     this.three = null;
     this.cellMeshes = new Map();
+    this.ringMeshes = new Map();
     this.pieceMeshes = new Map();
     this.flipAnimations = [];
     this.cameraMotion = null;
     this.cameraQueue = [];
+    this._tmpColor = null;   // THREE.Color 再利用バッファ（GC 軽減）
     this.isDragging3d = false;
     this.dragMoved3d = false;
     this.dragStart = { x: 0, y: 0 };
@@ -101,8 +117,18 @@ class CubeReversi {
     this.emptyScore = document.getElementById('empty-score');
     this.message = document.getElementById('message');
     this.battleLog = document.getElementById('battle-log');
+    this.blackCpuToggle = document.getElementById('black-cpu-toggle');
     this.cpuToggle = document.getElementById('cpu-toggle');
     this.canvas3d = document.getElementById('cube-3d-canvas');
+    this.challengeBanner = document.createElement('div');
+    this.challengeBanner.className = 'challenge-banner';
+    this.challengeBanner.innerHTML = `
+      <div class="challenge-banner__text">
+        <span>CHALLENGE MODE</span>
+        <strong>チャレンジモード突入</strong>
+      </div>
+    `;
+    document.querySelector('.cube-3d-panel')?.appendChild(this.challengeBanner);
   }
 
   bindEvents() {
@@ -114,7 +140,12 @@ class CubeReversi {
     });
     this.cpuToggle.addEventListener('change', () => {
       this.cpuEnabled = this.cpuToggle.checked;
-      this.addLog(this.cpuEnabled ? '白CPUを有効にしました。' : '白CPUを無効にしました。');
+      this.addLog(this.cpuEnabled ? '赤CPUを有効にしました。' : '赤CPUを無効にしました。');
+      this.maybeCpuTurn();
+    });
+    this.blackCpuToggle.addEventListener('change', () => {
+      this.blackCpuEnabled = this.blackCpuToggle.checked;
+      this.addLog(this.blackCpuEnabled ? '青CPUを有効にしました。' : '青CPUを無効にしました。');
       this.maybeCpuTurn();
     });
   }
@@ -132,16 +163,28 @@ class CubeReversi {
     this.mode = 'normal';
     this.gameOver = false;
     this.cpuThinking = false;
+    this.challengeTransitioning = false;
+    if (this.challengeTimer) {
+      window.clearTimeout(this.challengeTimer);
+      this.challengeTimer = null;
+    }
+    if (this.postMoveTimer) {
+      window.clearTimeout(this.postMoveTimer);
+      this.postMoveTimer = null;
+    }
     this.lastMove = null;
     this.lastChangedKeys = new Set();
     this.logItems = [];
     this.flipAnimations = [];
     this.cameraQueue = [];
+    this.blackCpuEnabled = this.blackCpuToggle.checked;
     this.cpuEnabled = this.cpuToggle.checked;
+    this.showChallengeBanner(false);
     this.addLog('新しい 6 面対局を開始しました。');
-    this.setMessage('黒の手番です。光っているマスに置けます。');
+    this.setMessage('青の手番です。光る〇のマスに置けます。');
     this.render();
     this.sync3dBoard();
+    this.maybeCpuTurn(700);
   }
 
   render() {
@@ -201,6 +244,9 @@ class CubeReversi {
     if (this.gameOver) {
       const result = score.black === score.white ? '引き分け' : `${score.black > score.white ? '黒' : '白'}の勝ち`;
       this.turnLabel.textContent = result;
+    } else if (this.challengeTransitioning) {
+      this.modeLabel.textContent = 'チャレンジモード';
+      this.turnLabel.textContent = '突入中';
     } else if (this.cpuThinking) {
       this.turnLabel.textContent = 'CPU思考中';
     } else {
@@ -218,8 +264,8 @@ class CubeReversi {
   }
 
   handleCellClick(face, row, col) {
-    if (this.gameOver || this.cpuThinking) return;
-    if (this.cpuEnabled && this.currentPlayer === 'white') return;
+    if (this.gameOver || this.cpuThinking || this.challengeTransitioning) return;
+    if (this.isCpuControlled(this.currentPlayer)) return;
     this.playMove({ face, row, col }, 'human');
   }
 
@@ -227,7 +273,7 @@ class CubeReversi {
     const legalMoves = this.getLegalMoves(this.currentPlayer);
     const selected = legalMoves.find((item) => this.sameMove(item, move));
     if (!selected) {
-      this.setMessage(this.mode === 'challenge' ? '空いているマスを選んでください。' : 'そこには置けません。光っているマスを選んでください。');
+      this.setMessage(this.mode === 'challenge' ? '中央24マスの空いている場所を選んでください。' : 'そこには置けません。光る〇のマスを選んでください。');
       return false;
     }
 
@@ -242,43 +288,140 @@ class CubeReversi {
     this.addLog(`${actor === 'cpu' ? 'CPU' : PLAYERS[player].label} が ${FACE_BY_ID[move.face].label} ${move.row + 1}-${move.col + 1} に置きました。反転 ${flips.length} 枚。`);
 
     this.currentPlayer = PLAYERS[player].next;
-    this.afterMove();
-    this.start3dFlipAnimation([move, ...flips], player);
+
+    const cpuThinkDelay = 1500;
+    // モーション完了後に合法手/チャレンジ突入を判定し、その後にCPU思考を始める
+    const motionDelay = this.start3dFlipAnimation([move, ...flips], player);
+    this.afterMove(motionDelay, cpuThinkDelay);
     return true;
   }
 
-  afterMove() {
-    if (this.mode === 'normal') {
-      const currentLegal = this.getLegalMoves(this.currentPlayer);
-      const otherLegal = this.getLegalMoves(PLAYERS[this.currentPlayer].next);
-      if (currentLegal.length === 0 && otherLegal.length === 0) {
-        this.enterChallengeMode();
+  afterMove(motionDelay = 0, cpuThinkDelay = 500) {
+    if (this.postMoveTimer) {
+      window.clearTimeout(this.postMoveTimer);
+      this.postMoveTimer = null;
+    }
+
+    const finalizeMove = () => {
+      this.postMoveTimer = null;
+      if (this.gameOver || this.challengeTransitioning) return;
+
+      if (this.mode === 'normal') {
+        const currentLegal = this.getLegalMoves(this.currentPlayer);
+        const otherLegal = this.getLegalMoves(PLAYERS[this.currentPlayer].next);
+        if (currentLegal.length === 0 && otherLegal.length === 0) {
+          this.enterChallengeMode();
+          return;
+        }
+        if (currentLegal.length === 0) {
+          this.addLog(`${PLAYERS[this.currentPlayer].label} は置けないためパスしました。`);
+          this.currentPlayer = PLAYERS[this.currentPlayer].next;
+        }
+      } else if (this.countPieces().empty === 0) {
+        this.finishGame();
         return;
       }
-      if (currentLegal.length === 0) {
-        this.addLog(`${PLAYERS[this.currentPlayer].label} は置けないためパスしました。`);
-        this.currentPlayer = PLAYERS[this.currentPlayer].next;
-      }
-    } else if (this.countPieces().empty === 0) {
-      this.finishGame();
+
+      this.render();
+      this.setMessage(`${PLAYERS[this.currentPlayer].label}の手番です。`);
+      this.maybeCpuTurn(cpuThinkDelay);
+    };
+
+    if (motionDelay > 0) {
+      this.postMoveTimer = window.setTimeout(finalizeMove, motionDelay);
+    } else {
+      finalizeMove();
+    }
+  }
+
+  enterChallengeMode(delay = 0) {
+    if (this.challengeTransitioning) return;
+    this.challengeTransitioning = true;
+    this.cpuThinking = false;
+    this.addLog('両者とも通常手がなくなりました。チャレンジモード突入。中央24枚をクリア。');
+    this.setMessage('チャレンジモード突入準備中。中央24枚を消去します。');
+    this.updateStatus();
+    this.showChallengeBanner(true);
+
+    if (!this.three) {
+      this.completeChallengeModeEntry();
       return;
     }
 
-    this.render();
-    this.setMessage(`${PLAYERS[this.currentPlayer].label}の手番です。`);
-    this.maybeCpuTurn();
+    this.cameraQueue = this.cameraQueue.filter((item) => item.time <= performance.now());
+    this.challengeTimer = window.setTimeout(() => {
+      this.challengeTimer = null;
+      this.focus3dCamera('front');
+      this.startChallengeClearAnimation();
+    }, Math.max(0, delay));
   }
 
-  enterChallengeMode() {
+  getChallengeClearCells() {
+    return CHALLENGE_CLEAR_FACE_ORDER.flatMap((faceId) => (
+      INNER_CELLS.map(([row, col]) => ({ face: faceId, row, col }))
+    ));
+  }
+
+  showChallengeBanner(visible) {
+    if (!this.challengeBanner) return;
+    this.challengeBanner.classList.toggle('visible', visible);
+  }
+
+  startChallengeClearAnimation() {
+    if (!this.three) {
+      this.completeChallengeModeEntry();
+      return;
+    }
+
+    const cells = this.getChallengeClearCells();
+    const now = performance.now();
+    const camDur = 500;
+    const clearDur = 340;
+    const gap = 70;
+    let stepTime = now + 900;
+    let plannedRotation = this.getCameraTargetRotation('front');
+
+    this.cameraQueue.push({ time: now, face: 'front' });
+
+    cells.forEach((cell) => {
+      const key = this.key(cell);
+      const piece = this.pieceMeshes.get(key);
+      const needsCamera = !this.isFaceVisible(cell.face, plannedRotation);
+      if (needsCamera) {
+        this.cameraQueue.push({ time: stepTime, face: cell.face });
+        plannedRotation = this.getCameraTargetRotation(cell.face, plannedRotation);
+        stepTime += camDur;
+      }
+      if (piece) {
+        this.flipAnimations = this.flipAnimations.filter((anim) => anim.mesh !== piece);
+        this.flipAnimations.push({
+          mesh: piece,
+          key,
+          start: stepTime,
+          duration: clearDur,
+          type: 'clear',
+          player: piece.userData.player,
+        });
+      }
+      stepTime += clearDur + gap;
+    });
+
+    this.cameraQueue.sort((a, b) => a.time - b.time);
+    this.challengeTimer = window.setTimeout(() => {
+      this.challengeTimer = null;
+      this.completeChallengeModeEntry();
+    }, Math.max(0, stepTime - now + 240));
+  }
+
+  completeChallengeModeEntry() {
     this.mode = 'challenge';
-    INNER_CELLS.forEach(([row, col]) => {
-      FACES.forEach((face) => {
-        this.board[face.id][row][col] = null;
-      });
+    this.challengeTransitioning = false;
+    this.getChallengeClearCells().forEach((cell) => {
+      this.board[cell.face][cell.row][cell.col] = null;
     });
     this.lastChangedKeys = new Set(FACES.flatMap((face) => INNER_CELLS.map(([row, col]) => this.key({ face: face.id, row, col }))));
-    this.addLog('両者とも通常手がなくなりました。チャレンジモード突入。全6面の内側4マスをクリア。');
-    this.setMessage('チャレンジモード: 空きマスならどこでも置けます。反転できる列は反転します。');
+    this.showChallengeBanner(false);
+    this.setMessage('チャレンジモード: 中央24マスに置けます。反転ルールは通常モードと同じです。');
     this.render();
     this.maybeCpuTurn();
   }
@@ -286,32 +429,37 @@ class CubeReversi {
   finishGame() {
     this.gameOver = true;
     const score = this.countPieces();
-    const result = score.black === score.white ? '引き分けです。' : `${score.black > score.white ? '黒' : '白'}の勝ちです。`;
-    this.addLog(`終局: 黒 ${score.black} / 白 ${score.white}。${result}`);
+    const result = score.black === score.white ? '引き分けです。' : `${score.black > score.white ? '青' : '赤'}の勝ちです。`;
+    this.addLog(`終局: 青 ${score.black} / 赤 ${score.white}。${result}`);
     this.setMessage(`終局: ${result}`);
     this.render();
   }
 
-  maybeCpuTurn() {
-    if (!this.cpuEnabled || this.gameOver || this.currentPlayer !== 'white') return;
+  maybeCpuTurn(delay = 500) {
+    if (!this.isCpuControlled(this.currentPlayer) || this.gameOver || this.challengeTransitioning) return;
+    const player = this.currentPlayer;
     this.cpuThinking = true;
     this.updateStatus();
     window.setTimeout(() => {
-      if (!this.cpuEnabled || this.gameOver || this.currentPlayer !== 'white') {
+      if (!this.isCpuControlled(player) || this.gameOver || this.challengeTransitioning || this.currentPlayer !== player) {
         this.cpuThinking = false;
         this.render();
         return;
       }
-      const move = this.chooseCpuMove();
+      const move = this.chooseCpuMove(player);
       this.cpuThinking = false;
       if (move) this.playMove(move, 'cpu');
-    }, 420);
+    }, delay);
   }
 
-  chooseCpuMove() {
-    const moves = this.getLegalMoves('white');
+  isCpuControlled(player) {
+    return player === 'black' ? this.blackCpuEnabled : this.cpuEnabled;
+  }
+
+  chooseCpuMove(player) {
+    const moves = this.getLegalMoves(player);
     if (moves.length === 0) return null;
-    const scored = moves.map((move) => ({ move, score: this.evaluateMove(move, 'white') }));
+    const scored = moves.map((move) => ({ move, score: this.evaluateMove(move, player) }));
     scored.sort((a, b) => b.score - a.score);
     const bestScore = scored[0].score;
     const bestMoves = scored.filter((item) => item.score === bestScore);
@@ -322,7 +470,7 @@ class CubeReversi {
     const flips = move.flips?.length ?? 0;
     const edge = move.row === 0 || move.row === SIZE - 1 || move.col === 0 || move.col === SIZE - 1;
     const corner = (move.row === 0 || move.row === SIZE - 1) && (move.col === 0 || move.col === SIZE - 1);
-    const challengeCenter = this.mode === 'challenge' && move.row >= 2 && move.row <= 3 && move.col >= 2 && move.col <= 3;
+    const challengeCenter = this.mode === 'challenge' && this.isChallengeCell(move);
     const boardCopy = this.cloneBoard();
     boardCopy[move.face][move.row][move.col] = player;
     (move.flips ?? []).forEach((cell) => { boardCopy[cell.face][cell.row][cell.col] = player; });
@@ -335,13 +483,15 @@ class CubeReversi {
     FACES.forEach((face) => {
       for (let row = 0; row < SIZE; row += 1) {
         for (let col = 0; col < SIZE; col += 1) {
+          const move = { face: face.id, row, col };
           if (board[face.id][row][col]) continue;
-          if (this.mode === 'challenge' && board === this.board) {
-            const flips = this.collectAllFlips({ face: face.id, row, col }, player, board);
+          if (this.mode === 'challenge' && !this.isChallengeCell(move)) continue;
+          if (this.mode === 'challenge') {
+            const flips = this.collectAllFlips(move, player, board);
             moves.push({ face: face.id, row, col, flips });
             continue;
           }
-          const flips = this.collectAllFlips({ face: face.id, row, col }, player, board);
+          const flips = this.collectAllFlips(move, player, board);
           if (flips.length > 0) moves.push({ face: face.id, row, col, flips });
         }
       }
@@ -358,6 +508,10 @@ class CubeReversi {
       result.push(...this.collectCubeFlips(move, player, dir, board));
     });
     return this.uniqueCells(result);
+  }
+
+  isChallengeCell(cell) {
+    return cell.row > 0 && cell.row < SIZE - 1 && cell.col > 0 && cell.col < SIZE - 1;
   }
 
   collectDiagonalFlips(move, player, dir, board) {
@@ -515,24 +669,25 @@ class CubeReversi {
     const cube = new THREE.Group();
     scene.add(cube);
 
-    // アンビエント光（全体を均一に明るく）
-    scene.add(new THREE.AmbientLight(0xffffff, 0.90));
-    // キーライト（上前方）
-    const keyLight = new THREE.DirectionalLight(0xdcf0ff, 1.4);
+    // サイバーパンクライティング
+    scene.add(new THREE.AmbientLight(0x0a1830, 1.10));
+    // シアンキーライト（上前方）
+    const keyLight = new THREE.DirectionalLight(0x00c8ff, 1.55);
     keyLight.position.set(4, 6, 8);
     scene.add(keyLight);
-    // フィルライト（下後方）
-    const fillLight = new THREE.DirectionalLight(0xfff0cc, 0.55);
+    // マゼンタフィルライト（下後方）
+    const fillLight = new THREE.DirectionalLight(0xaa00ff, 0.65);
     fillLight.position.set(-5, -4, 3);
     scene.add(fillLight);
-    // リムライト（黒石のシルエット強調）
-    const rimLight = new THREE.DirectionalLight(0x88ccff, 0.40);
-    rimLight.position.set(0, -2, -6);
+    // リムライト（コマの輪郭強調）
+    const rimLight = new THREE.DirectionalLight(0x0066ff, 0.45);
+    rimLight.position.set(0, -2, -7);
     scene.add(rimLight);
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     this.three = { renderer, scene, camera, cube, raycaster, pointer };
+    this._tmpColor = new THREE.Color();
     this.build3dCube();
     this.bind3dControls();
     this.resize3d();
@@ -544,17 +699,18 @@ class CubeReversi {
     const { cube } = this.three;
     cube.clear();
     this.cellMeshes.clear();
+    this.ringMeshes.clear();
     this.pieceMeshes.clear();
 
-    // ボード面: 深いグリーン（伝統的なリバーシ盤）
+    // ボード面: サイバーパンク暗黒
     const boardMaterial = new THREE.MeshStandardMaterial({
-      color: 0x1b5230,
-      roughness: 0.70,
-      metalness: 0.06,
+      color: 0x020810,
+      roughness: 0.55,
+      metalness: 0.18,
       side: THREE.DoubleSide,
     });
-    // グリッド線: 明るいグリーン
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x55cc77, transparent: true, opacity: 0.65 });
+    // グリッド線: ネオンシアン
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.62 });
     const cellSize = 4 / SIZE;
     const gap = 0.035;
 
@@ -580,14 +736,34 @@ class CubeReversi {
       for (let row = 0; row < SIZE; row += 1) {
         for (let col = 0; col < SIZE; col += 1) {
           const key = this.key({ face: face.id, row, col });
+          // クリック判定用の不可視プレーン
           const cell = new THREE.Mesh(
             new THREE.PlaneGeometry(cellSize - gap, cellSize - gap),
             new THREE.MeshBasicMaterial({ color: 0x5effc6, transparent: true, opacity: 0, side: THREE.DoubleSide }),
           );
           cell.position.set(-2 + (col + 0.5) * cellSize, 2 - (row + 0.5) * cellSize, 0.025);
-          cell.userData = { type: 'cell', face: face.id, row, col };
+          cell.userData = { type: 'cell', face: face.id, row, col, highlightType: null };
           faceGroup.add(cell);
           this.cellMeshes.set(key, cell);
+          const cx = -2 + (col + 0.5) * cellSize;
+          const cy =  2 - (row + 0.5) * cellSize;
+          // 内側ネオンリング（太め・高輝度）
+          const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(0.32, 0.022, 8, 48),
+            new THREE.MeshStandardMaterial({
+              color: 0x0088ff,
+              emissive: 0x0044ff,
+              emissiveIntensity: 3.0,
+              transparent: true,
+              opacity: 0,
+              roughness: 0.10,
+              metalness: 0.90,
+            }),
+          );
+          ring.position.set(cx, cy, 0.09);
+          ring.userData = { type: 'ring', face: face.id, row, col, highlightType: null };
+          faceGroup.add(ring);
+          this.ringMeshes.set(key, ring);
         }
       }
     });
@@ -599,8 +775,22 @@ class CubeReversi {
     this.cellMeshes.forEach((mesh, key) => {
       const isLast = this.lastMove && this.key(this.lastMove) === key;
       const isLegal = this.alwaysShowMoves && legalKeys.has(key);
-      mesh.material.opacity = isLast ? 0.50 : (isLegal ? 0.36 : 0);
-      mesh.material.color.set(isLast ? 0xffe066 : (this.mode === 'challenge' ? 0xffaa33 : 0x5effc6));
+      const ht = isLast ? 'last' : isLegal ? (this.mode === 'challenge' ? 'challenge' : 'legal') : null;
+      mesh.userData.highlightType = ht;
+      // last マスのみ cellMesh で白フラット表示、他は常に非表示（クリック専用）
+      if (ht === 'last') {
+        mesh.material.color.set(0xffffff);
+        mesh.material.opacity = 0.45;
+      } else {
+        mesh.material.opacity = 0;
+      }
+      // リングの highlightType も同期
+      const htRing = ht === 'last' ? null : ht;
+      const ring = this.ringMeshes.get(key);
+      if (ring) {
+        ring.userData.highlightType = htRing;
+        if (!htRing) ring.material.opacity = 0;
+      }
     });
 
     FACES.forEach((face) => {
@@ -618,7 +808,7 @@ class CubeReversi {
     });
   }
 
-  ensure3dPiece(move, player) {
+  ensure3dPiece(move, player, animateDrop = true) {
     const key = this.key(move);
     const existing = this.pieceMeshes.get(key);
     const def = PIECE_DEFS[player];
@@ -647,7 +837,9 @@ class CubeReversi {
     piece.userData = { player, scaleTarget: 1 };
     cell.parent.add(piece);
     this.pieceMeshes.set(key, piece);
-    this.flipAnimations.push({ mesh: piece, start: performance.now(), duration: 380, type: 'drop', player });
+    if (animateDrop) {
+      this.flipAnimations.push({ mesh: piece, start: performance.now(), duration: 380, type: 'drop', player });
+    }
     return piece;
   }
 
@@ -660,51 +852,111 @@ class CubeReversi {
     this.pieceMeshes.delete(key);
   }
 
-  // 1枚ずつ順番にフリップ + カメラキューを積む
+  // カメラ到着後にフリップ、1コマずつ直列実行
   start3dFlipAnimation(cells, player) {
-    if (!this.three) return;
-    const now = performance.now();
-    const perPiece = 340;   // 次のコマが開始するまでの間隔 (ms)
-    const flipDur = 420;    // 1コマのフリップ所要時間 (ms)
-    const camLead = 80;     // フリップ開始より少し早くカメラを動かす
+    if (!this.three) return 0;
+    const now       = performance.now();
+    const camDur    = 500;   // カメラモーション時間（この後にフリップ開始）
+    const placeDur  = 340;   // 置いたコマの出現時間（消去の逆モーション）
+    const flipDur   = 420;   // 1コマのフリップ所要時間
+    const opponent  = PLAYERS[player].next;
+    let blinkStart = now;
+    let stepTime = now;
+    let plannedRotation = { ...this.cubeRotation };
 
     cells.forEach((cell, index) => {
-      const flipStart = now + index * perPiece;
-
-      // 既存アニメーションと重複しないよう削除
-      this.flipAnimations = this.flipAnimations.filter((a) => a.mesh !== this.pieceMeshes.get(this.key(cell)));
+      const key = this.key(cell);
+      this.flipAnimations = this.flipAnimations.filter((a) => a.mesh !== this.pieceMeshes.get(key));
 
       if (index === 0) {
-        // 置いたコマはドロップアニメーション
-        const piece = this.ensure3dPiece(cell, player);
+        // ── 置いたコマ: 見えていない面ならカメラを向けてから出現 ──
+        const needsCamera = !this.isFaceVisible(cell.face, plannedRotation);
+        if (needsCamera) {
+          plannedRotation = this.getCameraTargetRotation(cell.face, plannedRotation);
+          this.cameraQueue.push({ time: stepTime, face: cell.face });
+          stepTime += camDur;
+        }
+        const piece = this.ensure3dPiece(cell, player, false);
         if (!piece) return;
         this.flipAnimations = this.flipAnimations.filter((a) => a.mesh !== piece);
-        this.flipAnimations.push({ mesh: piece, start: now, duration: 300, type: 'drop', player });
+        piece.scale.setScalar(0.02);
+        piece.position.z = 0.105;
+        this.flipAnimations.push({ mesh: piece, start: stepTime, duration: placeDur, type: 'place', player, fromPlayer: player });
+        stepTime += placeDur;
+        blinkStart = stepTime;
       } else {
-        // 反転コマは順番にフリップ
-        const piece = this.ensure3dPiece(cell, player);
-        if (!piece) return;
-        this.flipAnimations.push({ mesh: piece, start: flipStart, duration: flipDur, type: 'flip', player });
-      }
+        // ── 反転コマ: 見えていない面だけカメラを向けてからフリップ ──
+        const needsCamera = !this.isFaceVisible(cell.face, plannedRotation);
+        const camTime = stepTime;
+        if (needsCamera) {
+          plannedRotation = this.getCameraTargetRotation(cell.face, plannedRotation);
+          this.cameraQueue.push({ time: camTime, face: cell.face });
+          stepTime += camDur;
+        }
+        const flipStart = stepTime;
 
-      // カメラキューにその面へのフォーカスを積む
-      const camTime = Math.max(now, flipStart - camLead);
-      this.cameraQueue.push({ time: camTime, face: cell.face });
+        const piece = this.pieceMeshes.get(key);
+        if (!piece) return;
+        const fromDef = PIECE_DEFS[opponent];
+        piece.material.color.set(fromDef.color);
+        piece.material.emissive.set(fromDef.emissive);
+        piece.material.emissiveIntensity = fromDef.emissiveIntensity;
+
+        // ブリンク: 全コマ同時スタート → 各自のフリップ開始まで継続
+        const blinkDur = flipStart - blinkStart;
+        if (blinkDur > 80) {
+          this.flipAnimations.push({
+            mesh: piece, start: blinkStart, duration: blinkDur,
+            type: 'blink', player, fromPlayer: opponent,
+          });
+        }
+
+        // フリップ: カメラ到着後
+        this.flipAnimations.push({
+          mesh: piece, start: flipStart, duration: flipDur,
+          type: 'flip', player, fromPlayer: opponent,
+        });
+
+        stepTime += flipDur;
+      }
     });
 
-    // カメラキューを時刻順に並べ直す
     this.cameraQueue.sort((a, b) => a.time - b.time);
+    return Math.max(300, stepTime - now);
+  }
+
+  getCameraTargetRotation(face, fromRotation = this.cubeRotation) {
+    const target = FACE_CAMERA_TARGETS[face] ?? FACE_CAMERA_TARGETS.front;
+    const fromX = fromRotation.x;
+    const fromY = fromRotation.y;
+    // Y軸は最短回転経路を取る（反対側を経由しないよう正規化）
+    let dy = (target.y - fromY) % (2 * Math.PI);
+    if (dy > Math.PI)  dy -= 2 * Math.PI;
+    if (dy < -Math.PI) dy += 2 * Math.PI;
+    // X軸は [-1.35, 1.1] のクランプ範囲内なので最短そのまま
+    return { x: target.x, y: fromY + dy };
+  }
+
+  isFaceVisible(face, rotation = this.cubeRotation) {
+    const normal = FACE_NORMALS[face] ?? FACE_NORMALS.front;
+    return new THREE.Vector3(...normal)
+      .applyEuler(new THREE.Euler(rotation.x, rotation.y, 0, 'XYZ'))
+      .z > FACE_VISIBLE_THRESHOLD;
   }
 
   focus3dCamera(face) {
-    const target = FACE_CAMERA_TARGETS[face] ?? FACE_CAMERA_TARGETS.front;
+    const fromX = this.cubeRotation.x;
+    const fromY = this.cubeRotation.y;
+    const target = this.getCameraTargetRotation(face);
+    const toX = target.x;
+    const toY = target.y;
+    const dy = toY - fromY;
+    // すでにほぼ同じ向きなら移動不要
+    if (Math.abs(toX - fromX) < 0.05 && Math.abs(dy) < 0.05) return;
     this.cameraMotion = {
       start: performance.now(),
-      duration: 300,   // 短めにして次のコマに追いつけるようにする
-      fromX: this.cubeRotation.x,
-      fromY: this.cubeRotation.y,
-      toX: target.x,
-      toY: target.y,
+      duration: 500,
+      fromX, fromY, toX, toY,
     };
   }
 
@@ -739,8 +991,8 @@ class CubeReversi {
   }
 
   handle3dPick(event) {
-    if (!this.three || this.gameOver || this.cpuThinking) return;
-    if (this.cpuEnabled && this.currentPlayer === 'white') return;
+    if (!this.three || this.gameOver || this.cpuThinking || this.challengeTransitioning) return;
+    if (this.isCpuControlled(this.currentPlayer)) return;
     const rect = this.canvas3d.getBoundingClientRect();
     this.three.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.three.pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
@@ -765,6 +1017,35 @@ class CubeReversi {
   animate3d() {
     if (!this.three) return;
     const now = performance.now();
+
+    // ネオンリング脈動: アニメーション中は非表示
+    const isAnimating = this.flipAnimations.length > 0;
+    const pulse  = 0.5 + 0.5 * Math.sin(now * 0.0038);
+    const isBlue = this.currentPlayer === 'black';
+
+    this.ringMeshes.forEach((ring) => {
+      const ht = ring.userData.highlightType;
+      if (isAnimating || !ht) { ring.material.opacity = 0; return; }
+      const phase = (ring.userData.row * SIZE + ring.userData.col) * 0.72;
+      ring.position.z = 0.09 + 0.030 * Math.sin(now * 0.0024 + phase);
+      ring.rotation.z = now * 0.0012;
+      if (ht === 'legal') {
+        if (isBlue) {
+          ring.material.color.setRGB(0.0, 0.65 + pulse * 0.10, 1.0);
+          ring.material.emissive.setRGB(0.0, 0.45 + pulse * 0.10, 1.0);
+        } else {
+          ring.material.color.setRGB(1.0, 0.02 + pulse * 0.03, 0.0);
+          ring.material.emissive.setRGB(1.0, 0.01 + pulse * 0.02, 0.0);
+        }
+        ring.material.emissiveIntensity = 1.2 + pulse * 0.4;
+        ring.material.opacity = 0.50 + pulse * 0.15;
+      } else if (ht === 'challenge') {
+        ring.material.color.setRGB(1.0, 0.90 + pulse * 0.08, 0.0);
+        ring.material.emissive.setRGB(1.0, 0.75 + pulse * 0.08, 0.0);
+        ring.material.emissiveIntensity = 1.1 + pulse * 0.35;
+        ring.material.opacity = 0.48 + pulse * 0.15;
+      }
+    });
 
     // カメラキューを処理（時刻が来たものを1つずつ発火）
     if (this.cameraQueue.length > 0 && now >= this.cameraQueue[0].time) {
@@ -793,23 +1074,74 @@ class CubeReversi {
       if (anim.type === 'drop') {
         const eased = 1 - Math.pow(1 - t, 3);
         anim.mesh.scale.setScalar(eased);
-      } else {
-        const spin = Math.sin(t * Math.PI);
-        anim.mesh.rotation.x = Math.PI / 2 + spin * Math.PI;
-        anim.mesh.scale.setScalar(1 + spin * 0.28);
-        // 折り返し点を過ぎたら色を切り替え
-        if (t > 0.48) {
+      } else if (anim.type === 'place') {
+        const blink = 0.5 + 0.5 * Math.sin(elapsed * 0.052);
+        const eased = 1 - Math.pow(1 - t, 3);
+        anim.mesh.material.color.set(def.color);
+        anim.mesh.material.emissive
+          .setRGB(1.0, 0.85 + blink * 0.15, 0.05)
+          .lerp(this._tmpColor.set(def.emissive), eased);
+        anim.mesh.material.emissiveIntensity = 4.8 - eased * (4.8 - def.emissiveIntensity);
+        anim.mesh.scale.setScalar(Math.max(0.02, eased * (1 + (1 - eased) * blink * 0.18)));
+        anim.mesh.position.z = 0.105 + Math.sin(t * Math.PI) * 0.18;
+        if (t >= 1) {
+          anim.mesh.position.z = 0.105;
+          anim.mesh.scale.setScalar(1);
           anim.mesh.material.color.set(def.color);
           anim.mesh.material.emissive.set(def.emissive);
           anim.mesh.material.emissiveIntensity = def.emissiveIntensity;
         }
-      }
-      if (t >= 1) {
-        anim.mesh.rotation.x = Math.PI / 2;
-        anim.mesh.scale.setScalar(1);
+      } else if (anim.type === 'blink') {
+        const fromDef = PIECE_DEFS[anim.fromPlayer];
+        const toDef = PIECE_DEFS[anim.player];
+        const blink = 0.5 + 0.5 * Math.sin(elapsed * 0.022);
+        anim.mesh.material.color.set(fromDef.color);
+        anim.mesh.material.emissive
+          .set(fromDef.emissive)
+          .lerp(this._tmpColor.set(toDef.emissive), blink);
+        anim.mesh.material.emissiveIntensity = fromDef.emissiveIntensity + blink * 1.8;
+        anim.mesh.scale.setScalar(0.95 + blink * 0.11);
+        if (t >= 1) {
+          // flipアニメーションが正しい色から始まるようにfromPlayerの色へリセット
+          anim.mesh.material.color.set(fromDef.color);
+          anim.mesh.material.emissive.set(fromDef.emissive);
+          anim.mesh.material.emissiveIntensity = fromDef.emissiveIntensity;
+          anim.mesh.scale.setScalar(1);
+        }
+      } else if (anim.type === 'clear') {
+        const def = PIECE_DEFS[anim.player] ?? PIECE_DEFS.black;
+        const blink = 0.5 + 0.5 * Math.sin(elapsed * 0.052);
+        const eased = 1 - Math.pow(1 - t, 3);
         anim.mesh.material.color.set(def.color);
-        anim.mesh.material.emissive.set(def.emissive);
-        anim.mesh.material.emissiveIntensity = def.emissiveIntensity;
+        anim.mesh.material.emissive.setRGB(1.0, 0.85 + blink * 0.15, 0.05);
+        anim.mesh.material.emissiveIntensity = 1.6 + blink * 3.2;
+        anim.mesh.scale.setScalar(Math.max(0.02, 1 + blink * 0.18 - eased));
+        anim.mesh.position.z = 0.105 + Math.sin(t * Math.PI) * 0.18;
+        if (t >= 1) {
+          this.remove3dPiece(anim.key);
+        }
+      } else {
+        const spin = Math.sin(t * Math.PI);
+        anim.mesh.rotation.x = Math.PI / 2 + spin * Math.PI;
+        anim.mesh.scale.setScalar(1 + spin * 0.28);
+        // 折り返し点（t=0.5）前後で反転前→反転後の色に切り替え
+        const fromDef = PIECE_DEFS[anim.fromPlayer] ?? def;
+        if (t < 0.5) {
+          anim.mesh.material.color.set(fromDef.color);
+          anim.mesh.material.emissive.set(fromDef.emissive);
+          anim.mesh.material.emissiveIntensity = fromDef.emissiveIntensity;
+        } else {
+          anim.mesh.material.color.set(def.color);
+          anim.mesh.material.emissive.set(def.emissive);
+          anim.mesh.material.emissiveIntensity = def.emissiveIntensity;
+        }
+        if (t >= 1) {
+          anim.mesh.rotation.x = Math.PI / 2;
+          anim.mesh.scale.setScalar(1);
+          anim.mesh.material.color.set(def.color);
+          anim.mesh.material.emissive.set(def.emissive);
+          anim.mesh.material.emissiveIntensity = def.emissiveIntensity;
+        }
       }
       return t < 1;
     });

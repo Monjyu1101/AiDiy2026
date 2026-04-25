@@ -14,6 +14,8 @@ class RetroInvadersGame {
         this.gameStarted = false;
         this.gameRunning = false;
         this.gamePaused = false;
+        this.animationFrameId = null;
+        this.lastFrameTime = 0;
 
         // プレイヤー
         this.playerWidth = 24;   // 旧実装(60/960)比で縮尺
@@ -34,6 +36,8 @@ class RetroInvadersGame {
         this.enemyBulletSpeed = 1.2; // 旧3→約1
         this.canShoot = true;
         this.shootCooldown = 150;
+        this.shootTimer = null;
+        this.rapidFireTimer = null;
 
         // 敵
         this.invaders = [];
@@ -43,6 +47,8 @@ class RetroInvadersGame {
         this.invaderAnimFrame = 0; // 足の開閉アニメ（2フレーム）
         this.invaderAnimTick = 0;
         this.invaderAnimInterval = 400; // ms
+        this.waveTransitioning = false;
+        this.nextWaveTimer = null;
 
         // パワーアップ / UFO / パーティクル
         this.powerups = [];
@@ -51,6 +57,7 @@ class RetroInvadersGame {
         this.ufoSpeed = 1.2;
         this.ufoSpawnTimer = 0;
         this.ufoSpawnInterval = 15000;
+        this.playerInvincibleTimer = 0;
 
         // バンカー（基地）
         this.bunkers = [];
@@ -73,11 +80,11 @@ class RetroInvadersGame {
     bindEvents() {
         document.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
-            if (e.code === 'Space' && this.gameRunning) {
+            if (e.code === 'Space' && this.gameRunning && !this.gamePaused) {
                 e.preventDefault();
                 this.shoot();
             }
-            if (e.code === 'KeyP' && this.gameStarted) this.togglePause();
+            if (e.code === 'KeyP' && this.gameStarted && this.gameRunning) this.togglePause();
         });
         document.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
 
@@ -92,15 +99,16 @@ class RetroInvadersGame {
         this.gameRunning = true;
         this.resetGame();
         this.createInvaders();
-        requestAnimationFrame(this.loop);
+        this.startLoop();
     }
 
     restartGame() {
         $('#over-overlay').addClass('hidden');
+        this.gameStarted = true;
         this.gameRunning = true;
         this.resetGame();
         this.createInvaders();
-        requestAnimationFrame(this.loop);
+        this.startLoop();
     }
 
     showMenu() {
@@ -108,12 +116,33 @@ class RetroInvadersGame {
         $('#start-overlay').removeClass('hidden');
         this.gameStarted = false;
         this.gameRunning = false;
+        this.gamePaused = false;
+        this.clearTimers();
+        this.keys = {};
+        this.stopLoop();
+    }
+
+    clearTimers() {
+        if (this.nextWaveTimer) {
+            clearTimeout(this.nextWaveTimer);
+            this.nextWaveTimer = null;
+        }
+        if (this.shootTimer) {
+            clearTimeout(this.shootTimer);
+            this.shootTimer = null;
+        }
+        if (this.rapidFireTimer) {
+            clearTimeout(this.rapidFireTimer);
+            this.rapidFireTimer = null;
+        }
     }
 
     resetGame() {
+        this.clearTimers();
         this.score = 0;
         this.lives = 3;
         this.wave = 1;
+        this.gamePaused = false;
         this.bullets = [];
         this.enemyBullets = [];
         this.invaders = [];
@@ -122,7 +151,13 @@ class RetroInvadersGame {
         this.particles = [];
         this.playerX = (this.gameWidth - this.playerWidth) / 2;
         this.invaderSpeed = 0.6;
+        this.invaderDirection = 1;
+        this.waveTransitioning = false;
         this.ufoSpawnTimer = 0;
+        this.playerInvincibleTimer = 0;
+        this.canShoot = true;
+        this.shootCooldown = 150;
+        this.keys = {};
         this.createBunkers();
         this.updateDisplay();
     }
@@ -148,72 +183,96 @@ class RetroInvadersGame {
         }
     }
 
-    loop() {
-        if (!this.gameRunning) return;
-        this.update();
-        this.render();
-        requestAnimationFrame(this.loop);
+    startLoop() {
+        this.stopLoop();
+        this.lastFrameTime = 0;
+        this.animationFrameId = requestAnimationFrame(this.loop);
     }
 
-    update() {
+    stopLoop() {
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+
+    loop(timestamp = 0) {
+        if (!this.gameRunning) return;
+        const dt = this.lastFrameTime ? Math.min(50, timestamp - this.lastFrameTime) : 16.67;
+        this.lastFrameTime = timestamp;
+        this.update(dt);
+        this.render();
+        if (!this.gameRunning) {
+            this.animationFrameId = null;
+            return;
+        }
+        this.animationFrameId = requestAnimationFrame(this.loop);
+    }
+
+    update(dt = 16.67) {
         if (this.gamePaused) return;
+        const step = dt / 16.67;
 
         // 背景星
         for (const s of this.stars) {
-            s.y += s.d; if (s.y > this.gameHeight) s.y = 0;
+            s.y += s.d * step; if (s.y > this.gameHeight) s.y = 0;
         }
 
         // 入力
-        if (this.keys['ArrowLeft'] || this.keys['KeyA']) this.playerX -= this.playerSpeed;
-        if (this.keys['ArrowRight'] || this.keys['KeyD']) this.playerX += this.playerSpeed;
+        if (this.keys['ArrowLeft'] || this.keys['KeyA']) this.playerX -= this.playerSpeed * step;
+        if (this.keys['ArrowRight'] || this.keys['KeyD']) this.playerX += this.playerSpeed * step;
         this.playerX = Math.max(0, Math.min(this.gameWidth - this.playerWidth, this.playerX));
 
         // 自弾
         this.bullets = this.bullets.filter(b => {
-            b.y -= this.bulletSpeed; return b.y > -20;
+            b.y -= this.bulletSpeed * step; return b.y > -20;
         });
 
         // 敵弾
         this.enemyBullets = this.enemyBullets.filter(b => {
-            b.y += this.enemyBulletSpeed; return b.y < this.gameHeight + 20;
+            b.y += this.enemyBulletSpeed * step; return b.y < this.gameHeight + 20;
         });
 
         // 敵移動
         if (this.invaders.length) {
             let hitEdge = false;
             for (const inv of this.invaders) {
-                inv.x += this.invaderSpeed * this.invaderDirection;
+                inv.x += this.invaderSpeed * this.invaderDirection * step;
                 if (inv.x <= 0 || inv.x + inv.w >= this.gameWidth) hitEdge = true;
             }
             if (hitEdge) {
                 this.invaderDirection *= -1;
-                for (const inv of this.invaders) inv.y += this.invaderDropDistance;
+                for (const inv of this.invaders) {
+                    inv.x = Math.max(0, Math.min(this.gameWidth - inv.w, inv.x));
+                    inv.y += this.invaderDropDistance;
+                }
             }
             // ランダム射撃
-            if (Math.random() < 0.002 * this.invaders.length) this.enemyShoot();
+            if (Math.random() < Math.min(0.12, 0.002 * this.invaders.length * step)) this.enemyShoot();
         }
 
         // エイリアンの足アニメ（開閉）
-        this.invaderAnimTick += 16.67;
+        this.invaderAnimTick += dt;
         if (this.invaderAnimTick >= this.invaderAnimInterval) {
             this.invaderAnimTick = 0;
             this.invaderAnimFrame = (this.invaderAnimFrame + 1) % 2;
         }
 
         // パワーアップ落下
-        this.powerups = this.powerups.filter(p => { p.y += 1.0; return p.y < this.gameHeight + 10; });
+        this.powerups = this.powerups.filter(p => { p.y += 1.0 * step; return p.y < this.gameHeight + 10; });
 
         // UFO
-        this.ufoSpawnTimer += 16.67;
+        this.ufoSpawnTimer += dt;
         if (this.ufoSpawnTimer >= this.ufoSpawnInterval && this.ufos.length === 0) {
             this.createUfo(); this.ufoSpawnTimer = 0;
         }
         this.ufos = this.ufos.filter(u => {
-            u.x += u.dir * this.ufoSpeed; return (u.x > -60 && u.x < this.gameWidth + 60);
+            u.x += u.dir * this.ufoSpeed * step; return (u.x > -60 && u.x < this.gameWidth + 60);
         });
 
         // パーティクル
-        this.particles = this.particles.filter(p => { p.ttl -= 16; p.x += p.vx; p.y += p.vy; return p.ttl > 0; });
+        this.particles = this.particles.filter(p => { p.ttl -= dt; p.x += p.vx * step; p.y += p.vy * step; return p.ttl > 0; });
+        if (this.playerInvincibleTimer > 0) this.playerInvincibleTimer = Math.max(0, this.playerInvincibleTimer - dt);
 
         // 衝突
         this.handleCollisions();
@@ -221,14 +280,24 @@ class RetroInvadersGame {
     }
 
     shoot() {
-        if (!this.canShoot) return;
+        if (!this.gameRunning || this.gamePaused || !this.canShoot) return;
         this.bullets.push({ x: this.playerX + Math.floor(this.playerWidth/2) - 1, y: this.playerY - 6, w: 2, h: 6 });
-        this.canShoot = false; setTimeout(() => this.canShoot = true, this.shootCooldown);
+        this.canShoot = false;
+        this.shootTimer = setTimeout(() => {
+            this.shootTimer = null;
+            this.canShoot = true;
+        }, this.shootCooldown);
         this.muzzle(this.playerX + Math.floor(this.playerWidth/2), this.playerY - 6);
     }
 
     enemyShoot() {
-        const s = this.invaders[Math.floor(Math.random() * this.invaders.length)];
+        const shooters = this.invaders.filter((inv) => !this.invaders.some((other) => (
+            other !== inv
+            && Math.abs(other.x - inv.x) < inv.w
+            && other.y > inv.y
+        )));
+        const pool = shooters.length ? shooters : this.invaders;
+        const s = pool[Math.floor(Math.random() * pool.length)];
         this.enemyBullets.push({ x: s.x + Math.floor(s.w/2) - 1, y: s.y + s.h, w: 2, h: 6 });
     }
 
@@ -243,7 +312,13 @@ class RetroInvadersGame {
     }
 
     collectPowerup(p) {
-        this.addScore(50); this.shootCooldown = 50; setTimeout(() => this.shootCooldown = 150, 5000);
+        this.addScore(50);
+        this.shootCooldown = 50;
+        if (this.rapidFireTimer) clearTimeout(this.rapidFireTimer);
+        this.rapidFireTimer = setTimeout(() => {
+            this.rapidFireTimer = null;
+            this.shootCooldown = 150;
+        }, 5000);
         this.explode(p.x, p.y, true);
     }
 
@@ -336,9 +411,10 @@ class RetroInvadersGame {
         // 敵弾 vs プレイヤー
         const playerBox = { x: this.playerX, y: this.playerY, w: this.playerWidth, h: this.playerHeight };
         for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
-            if (this.aabb(this.enemyBullets[i], playerBox)) {
+            if (this.playerInvincibleTimer <= 0 && this.aabb(this.enemyBullets[i], playerBox)) {
                 this.explode(this.playerX + this.playerWidth/2, this.playerY + this.playerHeight/2);
                 this.enemyBullets.splice(i, 1); this.loseLife();
+                break;
             }
         }
 
@@ -352,20 +428,39 @@ class RetroInvadersGame {
     }
 
     checkGameState() {
-        if (this.invaders.length === 0) this.nextWave();
+        if (this.invaders.length === 0 && !this.waveTransitioning) this.nextWave();
     }
 
     nextWave() {
+        this.waveTransitioning = true;
         this.wave++; this.invaderSpeed += 0.3; this.updateDisplay();
+        this.bullets = [];
+        this.enemyBullets = [];
         // 少し間を空けて再配置
-        setTimeout(() => this.createInvaders(), 600);
+        this.nextWaveTimer = setTimeout(() => {
+            this.nextWaveTimer = null;
+            if (!this.gameRunning) return;
+            this.invaderDirection = 1;
+            this.createInvaders();
+            this.waveTransitioning = false;
+        }, 600);
     }
 
     addScore(p) { this.score += p; this.updateDisplay(); }
-    loseLife() { this.lives--; this.updateDisplay(); if (this.lives <= 0) this.gameOver(); }
+    loseLife() {
+        this.lives--;
+        this.playerInvincibleTimer = 1200;
+        this.enemyBullets = [];
+        this.playerX = (this.gameWidth - this.playerWidth) / 2;
+        this.updateDisplay();
+        if (this.lives <= 0) this.gameOver();
+    }
 
     gameOver() {
-        this.gameRunning = false; $('#final-score').text(this.score); $('#over-overlay').removeClass('hidden');
+        this.gameRunning = false;
+        this.stopLoop();
+        this.clearTimers();
+        $('#final-score').text(this.score); $('#over-overlay').removeClass('hidden');
     }
 
     togglePause() {
@@ -386,6 +481,7 @@ class RetroInvadersGame {
     }
 
     drawPlayer() {
+        if (this.playerInvincibleTimer > 0 && Math.floor(this.playerInvincibleTimer / 90) % 2 === 0) return;
         const c = this.ctx; const x = this.playerX|0, y = this.playerY|0, w = this.playerWidth, h = this.playerHeight;
         c.fillStyle = '#00ff66';
         // 簡単なドット絵（台形風）
