@@ -149,6 +149,8 @@
 - `listDisplaySources()` - デスクトップキャプチャ候補一覧を取得
 - `listVrmaFiles(folderName)` - 指定フォルダの VRMA ファイル一覧を取得（Electron ローカルパス対応）
 - `setDisplaySource(sourceId)` - キャプチャ対象ソースを設定
+- `getWindowPointerSnapshot(role?)` - 指定 role ウィンドウの bounds と OS カーソル位置（`WindowPointerSnapshot`）を返す
+- `getSystemCpuUsage()` - 直近 CPU 使用率（%）を返す
 - `openSettingsWindow(sessionId)` - 設定ウィンドウを開く（sessionId を渡す）
 - `closeSettingsWindow()` - 設定ウィンドウを閉じる（hide）
 - `onSettingsPrepare(callback)` - 設定ウィンドウ側で `settings:session-id` を受け取るリスナー登録（解除関数を返す）
@@ -213,8 +215,13 @@
 ### コンポーネント
 
 - `src/components/ログイン.vue` - ログイン画面
-- `src/components/AIコア.vue` - 常駐アバターウィンドウ
-- `src/components/AIコア_アバター.vue` - VRM / VRMA 3D表示
+- `src/components/AIコア.vue` - 常駐アバターウィンドウ（`表示選択` select で表示対象を切替）
+- `src/components/AIコア_アバター.vue` - VRM / VRMA 3D表示（Three.js + @pixiv/three-vrm）
+- `src/components/AIコア_xneko.vue` - xneko（猫）スプライトアニメーション。右下オプションパネルでデザイン（oneko / 茶トラ / 三毛）を切替。スプライト画像は `public/oneko.gif` / `public/xneko_chatora.gif` / `public/xneko_mike.gif`
+- `src/components/AIコア_xeyes.vue` - 目玉ウィジェット（カーソル追従・CPU使用率グラフ）。右下オプションパネルでデザイン（通常 / シンプル）とCPU使用率色変化の有無を切替。シンプルモードは透明背景＋白輪郭線＋白瞳で、CPU連動時は白→赤に変化
+- `src/components/AIコア_アナログ時計.vue` - アナログ時計ウィジェット
+- `src/components/AIコア_デジタル時計.vue` - 7セグメントデジタル時計ウィジェット
+- `src/components/AIコア_カレンダー.vue` - カレンダーウィジェット
 - `src/components/AIコア_音声処理.ts` - AudioController クラス（マイク入力・PCM変換・音声再生・レベル計測）
 - `src/components/AIコア_自立身体制御.ts` - Three.js 身体制御（腕の動き・上下揺れのアニメーション）
 - `src/components/AIコア_自動カメラワーク.ts` - Three.js カメラアニメーション制御
@@ -264,6 +271,7 @@
 
 - 右下に常駐するアバター本体
 - AI接続状態、マイク、スピーカー、各パネルのトグルを持つ
+- `表示選択` select で描画対象を切替: `アバター` / `カレンダーα` / `xneko(猫)` / `xeyes(目)` / `アナログ時計` / `デジタル時計` / `カレンダー` / `無し`
 - 透明表示やホバー時 UI 表示など、このウィンドウに対する要件変更が多い
 
 ### 補助パネルウィンドウ
@@ -577,6 +585,8 @@ npm run start
 | `desktop:list-sources` | デスクトップキャプチャ候補一覧 |
 | `desktop:list-vrma-files` | 指定フォルダの VRMA ファイル一覧 |
 | `desktop:set-source` | キャプチャソースを設定 |
+| `window:get-pointer-snapshot` | 指定 role ウィンドウの bounds と OS カーソル位置を返す（xeyes 用） |
+| `system:get-cpu-usage` | 直近 CPU 使用率（%）を返す（xeyes の血走り演出用） |
 
 ### 4. 接続まわりを変更する場合
 

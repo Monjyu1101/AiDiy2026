@@ -14,6 +14,7 @@ import argparse
 import logging
 import os
 from contextlib import AsyncExitStack
+from typing import Any
 
 import anyio
 
@@ -32,6 +33,21 @@ DEFAULT_MOUNT_PATH = "/aidiy_chrome_devtools/sse"
 
 setup_logging()
 logger = get_logger(__name__)
+
+
+def _mcp_model_to_dict(value: Any) -> dict[str, Any] | None:
+    """MCP SDK の params/meta モデルを ClientSession 向けの dict に揃える。"""
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value or None
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(by_alias=True, exclude_none=True)
+        return dumped or None
+    if hasattr(value, "dict"):
+        dumped = value.dict(by_alias=True, exclude_none=True)
+        return dumped or None
+    return dict(value)
 
 
 def build_default_sse_url(host: str, port: int, mount_path: str) -> str:
@@ -159,9 +175,14 @@ class BackendMcpBridge:
         self,
         name: str,
         arguments: dict | None,
-        meta: dict[str, object] | None,
+        meta: dict[str, object] | object | None,
     ) -> types.CallToolResult:
-        return await self._invoke("call_tool", name=name, arguments=arguments, meta=meta)
+        return await self._invoke(
+            "call_tool",
+            name=name,
+            arguments=arguments,
+            meta=_mcp_model_to_dict(meta),
+        )
 
     async def list_prompts(self, params: types.PaginatedRequestParams | None) -> types.ListPromptsResult:
         return await self._invoke("list_prompts", params=params)

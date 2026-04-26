@@ -237,7 +237,7 @@ mcp_main.py (port 8095)
 | `backup_info()` | バックアップルートと検出状況 |
 | `backup_get_before_after(path, version=None)` | 指定ファイルの変更前/変更後ソースを取得 |
 | `backup_list_versions(path)` | 指定ファイルのバックアップ版一覧 |
-| `backup_find_changed(limit=200)` | 変更検出済みファイル一覧 |
+| `backup_find_changed(from_ts: str, to_ts: Optional[str] = None)` | 指定期間のバックアップに含まれる変更ファイル一覧 |
 | `backup_diff_stats(path=None)` | 差分行数などの概要 |
 
 ### aidiy_backup_save（バックアップ保存）
@@ -300,6 +300,7 @@ Node.js 側のセットアップは不要です。
 | `MCP_BS_MOUNT_PATH` | `/aidiy_backup_save`     | Backup Save SSE マウントパス |
 | `AIDIY_PG_DSN` | （未設定） | PostgreSQL DSN を 1 本で渡す（例: `postgresql://user:pw@host:5432/db`） |
 | `AIDIY_PG_HOST` / `AIDIY_PG_PORT` / `AIDIY_PG_USER` / `AIDIY_PG_PASSWORD` / `AIDIY_PG_DATABASE` | （未設定） | DSN が無いとき個別指定 |
+| `CHROME_EXECUTABLE` | （未設定） | Chrome 実行ファイルの絶対パス（自動検出失敗時の明示指定） |
 
 ---
 

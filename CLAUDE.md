@@ -272,7 +272,7 @@ conf.path.exec_abs_path      # backend_server/ の絶対パス
 
 ### X系コンポーネントのパターン
 
-X系（Xテトリス、Xインベーダー、Xリバーシ、X立体リバーシ等）は Vue コンポーネントが **iframe ラッパー**になっており、実体は `frontend_web/public/X*/` 配下のスタンドアロン HTML+JS+CSS アプリ。
+X系（Xテトリス、Xインベーダー、Xリバーシ、X立体リバーシ、Xハローワールド等）は Vue コンポーネントが **iframe ラッパー**になっており、実体は `frontend_web/public/X*/` 配下のスタンドアロン HTML+JS+CSS アプリ。
 
 - Vue ファイル（`frontend_web/src/components/Xその他/X*.vue`）は iframe を表示するだけ
 - ゲームロジック・描画は `frontend_web/public/X*/index.html` + `index.js` + `style.css` で完結

@@ -1146,6 +1146,7 @@ Allowed origins (in `core_main.py` and `apps_main.py`):
 - `POST /core/auth/ログイン`
 - `POST /core/auth/ログアウト`
 - `POST /core/auth/現在利用者`
+- `POST /core/auth/トークン更新`（JWT 有効期限を延長して新トークンを返す）
 - `POST /core/auth/token`（docs 向け）
 
 **コア系 CRUD (core_main - port 8091):**
@@ -1160,6 +1161,7 @@ Allowed origins (in `core_main.py` and `apps_main.py`):
 - `POST /core/AIコア/セッション一覧`（廃止済み互換）
 - `POST /core/AIコア/モデル情報/取得`（廃止済み互換）
 - `POST /core/AIコア/モデル情報/設定`（廃止済み互換）
+- `POST /core/AIコア/フォルダ参照`（OS のフォルダ選択ダイアログを開き、選択パスを返す）
 - `POST /core/A会話履歴/一覧|get|create|update|delete`
 
 **アプリ系 CRUD (apps_main - port 8092):**
@@ -1174,6 +1176,7 @@ Allowed origins (in `core_main.py` and `apps_main.py`):
 - `POST /apps/M商品構成/一覧|get|create|update|delete`
 - `POST /apps/T配車/一覧|get|create|update|delete`
 - `POST /apps/T生産/一覧|get|create|update|delete`
+- `POST /apps/T生産/払出一覧`（明細SEQ≥1 の払出行のみを V生産払出 JOIN で返す）
 - `POST /apps/T商品入庫/一覧|get|create|update|delete`
 - `POST /apps/T商品出庫/一覧|get|create|update|delete`
 - `POST /apps/T商品棚卸/一覧|get|create|update|delete`
@@ -1200,12 +1203,19 @@ Allowed origins (in `core_main.py` and `apps_main.py`):
   - `POST /apps/V商品出庫/一覧`
   - `POST /apps/V商品棚卸/一覧`
   - `POST /apps/V商品推移表/一覧`
+  - `POST /apps/V商品推移表/最終更新日時`
 
 **S系（スケジューラー）(apps_main - port 8092):**
-- `POST /apps/S配車_週表示/一覧`
-- `POST /apps/S配車_日表示/一覧`
-- `POST /apps/S生産_週表示/一覧`
-- `POST /apps/S生産_日表示/一覧`
+
+各 S系ルーターは以下の構造を持つ（配車系は `車両一覧`/`配車一覧`、生産系は `生産工程一覧`/`生産一覧`）：
+
+- `POST /apps/S配車_週表示/車両一覧`
+- `POST /apps/S配車_週表示/配車一覧`
+- `POST /apps/S配車_週表示/データ`
+- `POST /apps/S配車_週表示/ドラッグ更新`
+- `POST /apps/S配車_週表示/リサイズ更新`
+- `POST /apps/S配車_週表示/最終更新日時`
+- （S配車_日表示 / S生産_週表示 / S生産_日表示 も同構造、生産系は `生産工程一覧`・`生産一覧`）
 
 **例外の GET:**
 - `GET /` (core_main & apps_main)（疎通確認）

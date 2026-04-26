@@ -370,6 +370,8 @@ router.beforeEach(async (to, _from, next) => {
 - `/Xその他/Xテトリス/ゲーム` - テトリスゲーム
 - `/Xその他/Xインベーダー/ゲーム` - インベーダーゲーム
 - `/Xその他/Xリバーシ/ゲーム` - リバーシゲーム
+- `/Xその他/X立体リバーシ/ゲーム` - 6面立体リバーシゲーム（Three.js）
+- `/Xその他/Xハローワールド/表示` - 絶景巡回アプリ（Leaflet + OpenStreetMap）
 - `/Xその他/X自己紹介/表示` - 自己紹介画面
 
 **ルーティング設計の特徴:**
@@ -700,6 +702,10 @@ unsubscribe()
 - `showConfirm(message: string): Promise<boolean>` - OK/キャンセルボタン（確認）
 - ※ `qConfirmDialog.vue` は独立コンポーネントとして存在しない。`qAlertDialog.showConfirm` が確認ダイアログを兼任
 
+**_share/qGoogleMap.vue** - Google Maps 埋め込みコンポーネント
+
+**_share/qQRcode.vue** - QR コード生成コンポーネント
+
 **_share/qColorPickerDialog.vue** - カラーピッカーダイアログ:
 - Promise-based API
 - `show(initialColor: string, title: string): Promise<string | null>`
@@ -802,10 +808,12 @@ export async function qColorPicker(initialColor?: string, title?: string): Promi
 
 **Xテスト/** - X系 (Experimental) テスト機能:
 - **Xその他.vue** - カテゴリメニュー
-- **Xテトリス.vue** - テトリスゲーム
-- **Xインベーダー.vue** - インベーダーゲーム
-- **Xリバーシ.vue** - リバーシゲーム
-- **X自己紹介.vue** - 自己紹介画面
+- **Xテトリス.vue** - テトリスゲーム（`public/Xテトリス/`）
+- **Xインベーダー.vue** - インベーダーゲーム（`public/Xインベーダー/`）
+- **Xリバーシ.vue** - リバーシゲーム（`public/Xリバーシ/`）
+- **X立体リバーシ.vue** - 6面立体リバーシゲーム（`public/X立体リバーシ/`、Three.js CDN）
+- **Xハローワールド.vue** - 絶景巡回アプリ（`public/Xハローワールド/`、Leaflet + OpenStreetMap）
+- **X自己紹介.vue** - 自己紹介画面（`public/X自己紹介/`）
 
 **その他:**
 - **ログイン.vue** - ログイン画面（認証不要）

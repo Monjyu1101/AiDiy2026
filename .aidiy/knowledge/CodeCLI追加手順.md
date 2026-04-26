@@ -1,4 +1,4 @@
-# 新たなCLI追加時の作業手順
+# Code CLI 追加手順
 
 ## このメモを使う場面
 - `codex_cli` のような code CLI を新規追加するとき
@@ -60,9 +60,22 @@
 - `CODE_MODEL_KEYS` に新CLI用キーを追加する
 - `availableModels.code_models` に新CLIが来たとき選択肢へ表示されることを確認する
 
+### 6. frontend_avatar の表示・接続連動
+対象:
+- `frontend_avatar/src/AiDiy.vue`
+- `frontend_avatar/src/components/AIコード.vue`
+- `frontend_avatar/src/dialog/AI設定再起動.vue`
+
+対応内容:
+- `CODE_AI1_NAME`〜`CODE_AI4_NAME` は `PANEL_TITLES` の表示名にも使われるため、設定変更後に code1〜code4 のウィンドウタイトルが更新されるか確認する
+- Web モードでは code1〜code4 は別ウィンドウではなくタブなので、`webTabs` と `PANEL_KEYS` は CLI 種別ではなくパネル数を表す。新CLI追加だけなら増やさない
+- 各 `AIコード.vue` は `チャンネル`（code1〜code4）単位で WebSocket 接続する。CLI 名をチャンネル名として増やす設計にしない
+
 ## 実装時の注意点
 - backend の `available_models.code_models` に出ない限り、frontend へ項目を足しても選択できない
 - 設定JSONを追加しても、モデル定義や UI 側のキー追加が漏れると画面で扱えない
+- `CODE_AI*_NAME` の値は `claude_sdk` / `codex_cli` のような AI 種別名。`CODE_AI*_MODEL` はそのスロットで使うモデル名。追加時にこの 2 つを取り違えない
+- 設定 UI の選択肢は backend の `available_models.code_models` から作られるため、frontend に固定 option を直書きしない
 - Windows で WSL 経由実行が必要な CLI は、作業ディレクトリとパス形式の差異を吸収する必要がある
 
 ## Hermes を追加したときの再利用知見
@@ -73,14 +86,13 @@
 
 ## 最低限の確認項目
 - AI設定再起動ダイアログで新CLIを選択できる
+- frontend_avatar の Electron 設定ウィンドウと Web 設定モーダルの両方で新CLIを選択できる
 - `AiDiy_key.json` に新CLI用キーがある
 - `_config/AiDiy_code_<cli名>.json` がある
 - バージョン確認が通る
 - 新規会話コマンドが組める
 - 継続会話コマンドが組める
+- code1〜code4 のどのスロットに割り当てても、WebSocket チャンネルは `code1`〜`code4` のまま動く
 - OS依存条件がある場合、その環境で実行確認できる
 
-## 次回追記する内容
-- 追加した CLI ごとの差分要件
-- モデル選択や設定画面で詰まりやすい点
-- 再起動が必要になる具体的な変更箇所
+新しい CLI を追加したら、Hermes セクションと同じ観点（OS 依存の起動方法、パス変換、モデル選択の差異）をこのファイルの末尾に追記する。

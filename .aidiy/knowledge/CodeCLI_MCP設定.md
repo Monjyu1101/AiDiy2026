@@ -12,7 +12,7 @@
 - `backend_mcp` を Codex から使うときは `mcp_stdio.py --sse-url http://localhost:8095/aidiy_chrome_devtools/sse` を挟む
 - `_setup.py` の `backend_mcp` 向け MCP 設定書き込み前に、ルート `.gitignore` へ `.claude/` と `.gemini/` を自動追記してローカル CLI 設定を同期対象から外す
 
-## 今回の関連ファイル
+## 関連ファイル
 - `.mcp.json`
 - `.gemini/settings.json`
 - `.gitignore`

@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 type SpriteName =
   | 'idle' | 'alert' | 'scratchSelf'
@@ -22,6 +22,13 @@ type SpriteName =
 type SpritePoint = readonly [number, number]
 
 const props = withDefaults(defineProps<{ controlsVisible?: boolean }>(), { controlsVisible: true })
+
+const nekoDesign = ref<'oneko' | 'chatora' | 'mike'>('oneko')
+const nekoImageUrl = computed(() => {
+  if (nekoDesign.value === 'chatora') return "url('/xneko_chatora.gif')"
+  if (nekoDesign.value === 'mike')    return "url('/xneko_mike.gif')"
+  return "url('/oneko.gif')"
+})
 
 const stageRef = ref<HTMLDivElement | null>(null)
 const nekoRef  = ref<HTMLDivElement | null>(null)
@@ -297,7 +304,15 @@ onBeforeUnmount(() => {
         bottom: `${CAT_MARGIN_BOTTOM}px`,
       }"
     ></div>
-    <div ref="nekoRef" class="neko-sprite" aria-hidden="true"></div>
+    <div ref="nekoRef" class="neko-sprite" :style="{ backgroundImage: nekoImageUrl }" aria-hidden="true"></div>
+    <div v-if="props.controlsVisible" class="neko-options">
+      <div class="options-row">
+        <span class="options-label">デザイン</span>
+        <label class="options-radio"><input type="radio" v-model="nekoDesign" value="oneko">  oneko</label>
+        <label class="options-radio"><input type="radio" v-model="nekoDesign" value="chatora">茶トラ</label>
+        <label class="options-radio"><input type="radio" v-model="nekoDesign" value="mike">   三毛</label>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -325,7 +340,6 @@ onBeforeUnmount(() => {
   top: 16px;
   width: 32px;
   height: 32px;
-  background-image: url('/oneko.gif');
   background-repeat: no-repeat;
   background-size: 256px 128px;
   image-rendering: pixelated;
@@ -333,5 +347,45 @@ onBeforeUnmount(() => {
   z-index: 1;
   transform: scale(2);
   transform-origin: center;
+}
+
+.neko-options {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 4;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(4, 8, 14, 0.50);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 1.4;
+  pointer-events: all;
+  user-select: none;
+}
+
+.options-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.options-label {
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.options-radio {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.options-radio input[type="radio"] {
+  accent-color: #7fcfff;
+  cursor: pointer;
 }
 </style>

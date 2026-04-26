@@ -1,8 +1,8 @@
-# アバター表示調整とVRMA再生の連続化
+# アバター表示とVRMA再生
 
-アバターの表示サイズ、向き、およびアニメーション再生の挙動を調整した際の知見を整理します。
+アバターの表示サイズ、向き、およびアニメーション再生の挙動を調整した際の知見を整理する。
 
-## 場面
+## このメモを使う場面
 - アバターが画面に対して大きすぎる（または小さすぎる）場合の調整
 - アバターが初期状態で背中を向けている場合の修正
 - VRMA アニメーションが 1 回で止まってしまい、連続して再生されない場合の対応
@@ -17,7 +17,7 @@
 - `frontend_avatar/electron/main.ts` / `frontend_avatar/electron/preload.ts` / `frontend_avatar/src/env.d.ts`（ウィンドウ role とカーソル位置、CPU 使用率を返す IPC）
 - `frontend_web/public/X自己紹介/index.html`（静的HTMLページ内埋め込みアバター）
 
-## 調整内容と実装の結論
+## 実装の結論
 
 ### 1. アバターの表示サイズ（カメラ距離）
 アバターのサイズ自体を小さくするのではなく、カメラの引き距離（distance）を調整することで、相対的な表示サイズを制御します。
@@ -57,10 +57,26 @@ VRMA が終了した後に次のモーションへ移行、または繰り返す
 - **ボタン非表示時**: `AIコア.vue` から `controls-visible` を渡し、false の間は `AIコア_アバター.vue` 内の設定 UI・字幕・発光を隠してアバター本体だけにする。
 - **注意**: ネコ表示中や `無し` 選択中にアバター固有設定が見えると UI 上の意味が曖昧になるため、アバターコンポーネント内へ閉じ込める。
 
+### 5. xeyes オプションパネル（2026-04-26 追記）
+
+右下に `controls-visible=true` のときのみ表示される半透明パネルを追加。
+
+- **デザイン切替**（通常 / シンプル）: `designMode` ref で管理。シンプルモードは透明背景＋20px白輪郭線＋白瞳のプレーンな目。血走りラインと通常のグラデ・ハイライトは `<template v-if="designMode==='normal'">` で出し分け（`v-if`+`v-for` を同一要素に書かず `<template v-if>` でラップする点に注意）。
+- **CPU使用率色変化**（チェックボックス）: `cpuColorEnabled` ref で管理。オフ時は `effectiveCpuColorLevel` / `effectiveBloodshotLineLevel` が常に 0 を返し、目の色変化と血走りを無効化。
+- **シンプルモードの色変化**: CSS カスタムプロパティ `--cpu-color-level`（`.xeyes-wrap` に設定済み）を子要素で継承し、`rgb(255, calc(255-(255*var(--cpu-color-level))), calc(255-(255*var(--cpu-color-level))))` で白→赤に変化。
+
+### 6. xneko デザイン切替（2026-04-26 追記）
+
+右下オプションパネルに oneko / 茶トラ / 三毛 のラジオボタンを追加。
+
+- **状態**: `nekoDesign` ref（`'oneko' | 'chatora' | 'mike'`）
+- **画像切替**: `nekoImageUrl` computed が GIF パスを返し、`.neko-sprite` の `background-image` に `:style` でバインド。CSS の静的 `background-image: url('/oneko.gif')` は削除済み。
+- **GIF ファイル生成**: `public/xneko_chatora.gif` / `public/xneko_mike.gif` は元画像（PNG・白背景）を Python + Pillow で変換。白背景は四隅フラッドフィルで除去し、1024×512 → 256×128 にリサイズ後、パレットインデックス 255 を透過色として GIF 保存。三毛猫は白い毛を持つため単純な閾値除去ではなくフラッドフィル方式を採用した。
+
 ## 再発しやすい注意点
 - **カメラワークとの干渉**: `fitCamera` で計算した距離は、自動カメラワーク（`AIコア_自動カメラワーク.ts`）の基準値として利用されるため、ここを極端に変えると回転半径などにも影響する。
 - **モーション補間**: 連続再生時、`action.crossFadeFrom` を適切に設定しないと、モーションの切り替わりでモデルが瞬時に初期姿勢に戻る（ガクつく）現象が発生する。
-- **BOM付きファイル**: `VRMA` ファイルや設定 JSON が BOM 付き UTF-8 だと、一部の環境で読み込みエラーになる可能性がある（今回の修正範囲ではないが、過去の知見として留意）。
+- **BOM付きファイル**: `VRMA` ファイルや設定 JSON が BOM 付き UTF-8 だと、一部の環境で読み込みエラーになる可能性がある。
 - **Electron の目線制御**: `mousemove` は BrowserWindow 内に入ったときしか取れない。常駐ウィンドウ外のカーソルを追う表示は、Electron main process 側で `screen.getCursorScreenPoint()` と対象 `BrowserWindow.getBounds()` を返す IPC を追加する。
 - **CPU 使用率の初回値**: `os.cpus()` は前回サンプルとの差分で使用率を出すため、初回は 0% になり得る。1 秒後以降の値を直近 10 秒平均に入れて演出する。
 

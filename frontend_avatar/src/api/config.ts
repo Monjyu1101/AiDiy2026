@@ -61,9 +61,9 @@ export function defaultModelSettings(): ModelSettings {
   return {
     CHAT_AI_NAME: 'gemini_chat',
     LIVE_AI_NAME: 'gemini_live',
-    CODE_AI1_NAME: 'claude_code',
-    CODE_AI2_NAME: 'openai_code',
-    CODE_AI3_NAME: 'gemini_code',
-    CODE_AI4_NAME: 'freeai_code',
+    CODE_AI1_NAME: 'claude_sdk',
+    CODE_AI2_NAME: 'copilot_cli',
+    CODE_AI3_NAME: 'codex_cli',
+    CODE_AI4_NAME: 'gemini_cli',
   }
 }

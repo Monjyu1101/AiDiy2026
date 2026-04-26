@@ -178,7 +178,8 @@
   - A会話履歴 - Conversation history storage
 
 - **X系 (Experimental)** - Test/example features (フロントエンドのみ)
-  - Xテトリス、Xインベーダー、Xリバーシ - ゲーム実装例
+  - Xテトリス、Xインベーダー、Xリバーシ、X立体リバーシ - ゲーム実装例
+  - Xハローワールド - 絶景巡回 Web アプリ（Leaflet + OpenStreetMap）
   - X自己紹介 - 静的コンテンツの実装例
 
 ### 対象ユーザー
@@ -376,6 +377,8 @@
 - Xテトリス - Canvas APIの実装例
 - Xインベーダー - ゲームロジックの実装例
 - Xリバーシ - アルゴリズムの実装例
+- X立体リバーシ - Three.js + 6面立体リバーシゲーム
+- Xハローワールド - Leaflet + OpenStreetMap 絶景巡回アプリ
 - X自己紹介 - 静的コンテンツの実装例
 
 **メリット：**
@@ -538,7 +541,7 @@ Full-stack business management system with JWT authentication, using FastAPI (Py
   - トランザクションJOIN表示（apps_main）: V配車, V生産, V生産払出, V商品入庫, V商品出庫, V商品棚卸, V商品推移表
 - `S` = Scheduler/Special processing (S配車_週表示, S配車_日表示, S生産_週表示, S生産_日表示)
 - `A` = AI/Advanced features (AIコア, A会話履歴)
-- `X` = Experimental/Test features (Xテトリス, Xインベーダー, Xリバーシ, X自己紹介)
+- `X` = Experimental/Test features (Xテトリス, Xインベーダー, Xリバーシ, X立体リバーシ, Xハローワールド, X自己紹介)
 
 ## Japanese Naming Convention
 

@@ -23,7 +23,7 @@
   - `apps_main.py` : `8092`
   - `backend_mcp/mcp_main.py` : `8095`（8 つの MCP サーバーを同居）
 - 実用サンプルを同梱
-  - C系, M系, T系, V系, S系, A系, X系
+  - C系, M系, T系, V系, S系, A系, X系（Xテトリス, Xインベーダー, Xリバーシ, X立体リバーシ, Xハローワールド, X自己紹介）
 - AI 統合
   - Claude / OpenAI / Gemini
   - WebSocket ベースの AI コア

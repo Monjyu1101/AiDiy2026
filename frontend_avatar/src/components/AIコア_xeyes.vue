@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = withDefaults(defineProps<{ controlsVisible?: boolean }>(), { controlsVisible: true })
 
@@ -24,6 +24,11 @@ const cpuSamples = ref<number[]>([])
 const cpuAverage = ref(0)
 const cpuColorLevel = ref(0)
 const bloodshotLineLevel = ref(0)
+const designMode = ref<'normal' | 'simple'>('normal')
+const cpuColorEnabled = ref(true)
+
+const effectiveCpuColorLevel = computed(() => cpuColorEnabled.value ? cpuColorLevel.value : 0)
+const effectiveBloodshotLineLevel = computed(() => cpuColorEnabled.value ? bloodshotLineLevel.value : 0)
 
 let animationId = 0
 let lastSnapshotTimestamp = 0
@@ -169,36 +174,40 @@ onBeforeUnmount(() => {
       class="xeyes-wrap"
       aria-hidden="true"
       :style="{
-        '--cpu-color-level': cpuColorLevel.toFixed(3),
-        '--bloodshot-line-level': bloodshotLineLevel.toFixed(3),
+        '--cpu-color-level': effectiveCpuColorLevel.toFixed(3),
+        '--bloodshot-line-level': effectiveBloodshotLineLevel.toFixed(3),
       }"
     >
-      <div ref="leftEyeRef" class="xeyes-eye">
-        <span
-          v-for="tick in bloodshotTicks"
-          :key="`left-ray-${tick.index}`"
-          class="bloodshot-ray"
-          :class="{ major: tick.major }"
-          :style="tick.style"
-        ></span>
-        <div class="xeyes-pupil" :style="leftPupilStyle">
-          <span></span>
+      <div ref="leftEyeRef" class="xeyes-eye" :class="{ simple: designMode === 'simple' }">
+        <template v-if="designMode === 'normal'">
+          <span
+            v-for="tick in bloodshotTicks"
+            :key="`left-ray-${tick.index}`"
+            class="bloodshot-ray"
+            :class="{ major: tick.major }"
+            :style="tick.style"
+          ></span>
+        </template>
+        <div class="xeyes-pupil" :class="{ simple: designMode === 'simple' }" :style="leftPupilStyle">
+          <span v-if="designMode === 'normal'"></span>
         </div>
       </div>
-      <div ref="rightEyeRef" class="xeyes-eye">
-        <span
-          v-for="tick in bloodshotTicks"
-          :key="`right-ray-${tick.index}`"
-          class="bloodshot-ray"
-          :class="{ major: tick.major }"
-          :style="tick.style"
-        ></span>
-        <div class="xeyes-pupil" :style="rightPupilStyle">
-          <span></span>
+      <div ref="rightEyeRef" class="xeyes-eye" :class="{ simple: designMode === 'simple' }">
+        <template v-if="designMode === 'normal'">
+          <span
+            v-for="tick in bloodshotTicks"
+            :key="`right-ray-${tick.index}`"
+            class="bloodshot-ray"
+            :class="{ major: tick.major }"
+            :style="tick.style"
+          ></span>
+        </template>
+        <div class="xeyes-pupil" :class="{ simple: designMode === 'simple' }" :style="rightPupilStyle">
+          <span v-if="designMode === 'normal'"></span>
         </div>
       </div>
     </div>
-    <div v-if="props.controlsVisible" class="cpu-meter" :style="{ '--cpu-color-level': cpuColorLevel.toFixed(3) }">
+    <div v-if="props.controlsVisible" class="cpu-meter" :style="{ '--cpu-color-level': effectiveCpuColorLevel.toFixed(3) }">
       <div class="cpu-meter-header">
         <span>CPU</span>
         <strong>{{ Math.round(cpuAverage) }}%</strong>
@@ -212,6 +221,19 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div v-if="props.controlsVisible" class="xeyes-shadow"></div>
+    <div v-if="props.controlsVisible" class="xeyes-options">
+      <div class="options-row">
+        <span class="options-label">デザイン</span>
+        <label class="options-radio"><input type="radio" v-model="designMode" value="normal"> 通常</label>
+        <label class="options-radio"><input type="radio" v-model="designMode" value="simple"> シンプル</label>
+      </div>
+      <div class="options-row">
+        <label class="options-check">
+          <input type="checkbox" v-model="cpuColorEnabled">
+          <span>CPU使用率色変化</span>
+        </label>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -363,5 +385,82 @@ onBeforeUnmount(() => {
   min-width: 4px;
   border-radius: 1px 1px 0 0;
   background: rgb(120, calc(235 - (175 * var(--cpu-color-level))), calc(255 - (210 * var(--cpu-color-level))));
+}
+
+/* シンプルモード */
+.xeyes-eye.simple {
+  background: transparent;
+  border: 20px solid rgb(
+    255,
+    calc(255 - (255 * var(--cpu-color-level))),
+    calc(255 - (255 * var(--cpu-color-level)))
+  );
+  box-shadow: none;
+}
+
+.xeyes-pupil.simple {
+  background: rgb(
+    255,
+    calc(255 - (255 * var(--cpu-color-level))),
+    calc(255 - (255 * var(--cpu-color-level)))
+  );
+  box-shadow: none;
+}
+
+/* オプションパネル */
+.xeyes-options {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(4, 8, 14, 0.50);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 1.4;
+  pointer-events: all;
+  user-select: none;
+}
+
+.options-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.options-label {
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.options-radio {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.options-radio input[type="radio"] {
+  accent-color: #7fcfff;
+  cursor: pointer;
+}
+
+.options-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.options-check input[type="checkbox"] {
+  accent-color: #7fcfff;
+  cursor: pointer;
 }
 </style>
