@@ -78,6 +78,12 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'Xハローワールド' }
     },
     {
+        path: '/Xその他/XユーチューブBGM/再生',
+        name: 'XユーチューブBGM',
+        component: () => import('../components/Xその他/XユーチューブBGM.vue'),
+        meta: { requiresAuth: true, title: 'XユーチューブBGM' }
+    },
+    {
         path: '/Xその他/X自己紹介/表示',
         name: 'X自己紹介',
         component: () => import('../components/Xその他/X自己紹介.vue'),

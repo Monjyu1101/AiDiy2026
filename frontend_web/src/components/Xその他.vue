@@ -166,6 +166,19 @@ onBeforeUnmount(() => {
             </router-link>
           </div>
 
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X音</span>
+              XユーチューブBGM
+            </div>
+            <div class="menu-card-description">
+              10曲ランダム交互再生・A/Bクロスフェード・連続BGM
+            </div>
+            <router-link to="/Xその他/XユーチューブBGM/再生?戻URL=/Xその他" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
         </div>
       </div>
     </div>

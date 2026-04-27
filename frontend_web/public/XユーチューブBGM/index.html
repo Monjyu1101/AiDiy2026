@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XユーチューブBGM - 自動交互再生</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+
+    <!-- 2プレイヤー並列表示 -->
+    <div class="players-container">
+      <div id="player-a-wrap" class="player-box active" data-side="A">
+        <div class="player-label">Player A</div>
+        <div id="player-a" class="yt-player"></div>
+      </div>
+      <div id="player-b-wrap" class="player-box inactive" data-side="B">
+        <div class="player-label">Player B</div>
+        <div id="player-b" class="yt-player"></div>
+      </div>
+    </div>
+
+    <!-- 情報パネル -->
+    <section class="info-panel">
+      <div class="info-left">
+        <div class="app-kicker">YOUTUBE BGM</div>
+        <div class="now-playing-row">
+          <span id="player-indicator" class="player-badge player-a">Player A</span>
+          <span id="current-title" class="current-title">読み込み中...</span>
+        </div>
+        <div class="status-row">
+          <span id="status-text" class="status-text">準備中</span>
+          <span class="sep">|</span>
+          <span id="time-elapsed" class="time-val">0:00</span>
+          <span class="time-slash">/</span>
+          <span class="time-val">10:00</span>
+          <span class="sep">|</span>
+          <span id="time-remaining" class="time-remain">残 10:00</span>
+        </div>
+        <div class="progress-track">
+          <div id="play-progress" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <div class="info-right">
+        <div class="playlist-title">PLAYLIST</div>
+        <ol id="playlist-list" class="playlist-list"></ol>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="index.js"></script>
+</body>
+</html>
