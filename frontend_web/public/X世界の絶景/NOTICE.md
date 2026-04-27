@@ -1,4 +1,4 @@
-# Xハローワールド NOTICE
+# X世界の絶景 NOTICE
 
 この画面は Leaflet と OpenStreetMap のタイルを利用します。
 

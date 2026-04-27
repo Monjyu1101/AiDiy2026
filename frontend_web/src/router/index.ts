@@ -72,16 +72,16 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'X立体リバーシ' }
     },
     {
-        path: '/Xその他/Xハローワールド/表示',
-        name: 'Xハローワールド',
-        component: () => import('../components/Xその他/Xハローワールド.vue'),
-        meta: { requiresAuth: true, title: 'Xハローワールド' }
+        path: '/Xその他/X世界の絶景/表示',
+        name: 'X世界の絶景',
+        component: () => import('../components/Xその他/X世界の絶景.vue'),
+        meta: { requiresAuth: true, title: 'X世界の絶景' }
     },
     {
-        path: '/Xその他/XユーチューブBGM/再生',
-        name: 'XユーチューブBGM',
-        component: () => import('../components/Xその他/XユーチューブBGM.vue'),
-        meta: { requiresAuth: true, title: 'XユーチューブBGM' }
+        path: '/Xその他/X動画再生BGM/再生',
+        name: 'X動画再生BGM',
+        component: () => import('../components/Xその他/X動画再生BGM.vue'),
+        meta: { requiresAuth: true, title: 'X動画再生BGM' }
     },
     {
         path: '/Xその他/X自己紹介/表示',

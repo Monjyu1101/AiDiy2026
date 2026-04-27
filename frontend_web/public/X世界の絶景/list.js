@@ -1,10 +1,6 @@
 // -*- coding: utf-8 -*-
 
-const AUTO_INTERVAL_MS = 24000;
-const COUNTRY_HOLD_MS = 3500;  // 国レベル表示の保持時間
-const LOCAL_REVEAL_MS = 5000;  // 地区レベル開始後に photo を許可するまでの時間
-
-const places = [
+window.sceneryPlaces = [
   {
     title: 'グランドキャニオン',
     country: 'アメリカ',
@@ -207,7 +203,7 @@ const places = [
   },
 ];
 
-places.push(
+window.sceneryPlaces.push(
   { title: 'ヴィクトリアの滝', country: 'ザンビア / ジンバブエ', lat: -17.9243, lng: 25.8572, zoom: 13, category: '滝', wikiTitle: 'Victoria_Falls', note: 'ザンベジ川にかかる巨大な滝。水煙が遠くからも見える迫力ある景観です。' },
   { title: 'エンジェルフォール', country: 'ベネズエラ', lat: 5.9675, lng: -62.5356, zoom: 12, category: '滝', wikiTitle: 'Angel_Falls', note: 'テーブルマウンテンから落ちる世界有数の落差を持つ滝です。' },
   { title: 'ヨセミテ渓谷', country: 'アメリカ', lat: 37.7456, lng: -119.5936, zoom: 12, category: '渓谷', wikiTitle: 'Yosemite_Valley', note: '花崗岩の絶壁と滝が並ぶ、アメリカ西部を代表する山岳景観です。' },
@@ -302,355 +298,74 @@ places.push(
   { title: 'スヴァールバル', country: 'ノルウェー', lat: 78.2232, lng: 15.6267, zoom: 6, category: '北極圏', wikiTitle: 'Svalbard', note: '氷河と山、フィヨルドが広がる北極圏の群島です。' },
   { title: '南極半島', country: '南極', lat: -64.0000, lng: -60.0000, zoom: 5, category: '氷雪', wikiTitle: 'Antarctic_Peninsula', note: '氷河と海氷、山が連なる南極で比較的アクセスされる地域です。' },
   { title: 'ロス棚氷', country: '南極', lat: -81.5000, lng: -175.0000, zoom: 4, category: '棚氷', wikiTitle: 'Ross_Ice_Shelf', note: '巨大な氷の平原が海へ張り出す、南極の圧倒的な地形です。' },
+  { title: 'クレーター湖', country: 'アメリカ', lat: 42.9446, lng: -122.1090, zoom: 12, category: '火山湖', wikiTitle: 'Crater_Lake', note: '火山のカルデラに深い青の湖面が広がる、輪郭の美しい火山湖です。' },
+  { title: 'グレイシャー国立公園', country: 'アメリカ', lat: 48.7596, lng: -113.7870, zoom: 9, category: '山岳湖', wikiTitle: 'Glacier_National_Park_(U.S.)', note: '氷河地形、湖、鋭い山稜が重なるロッキー山脈北部の景観です。' },
+  { title: 'オリンピック国立公園', country: 'アメリカ', lat: 47.8021, lng: -123.6044, zoom: 9, category: '温帯雨林', wikiTitle: 'Olympic_National_Park', note: '山岳、海岸、温帯雨林が一つの半島にまとまった変化の大きい国立公園です。' },
+  { title: 'バッドランズ国立公園', country: 'アメリカ', lat: 43.8554, lng: -102.3397, zoom: 11, category: '浸食地形', wikiTitle: 'Badlands_National_Park', note: '縞模様の地層と草原が交互に現れる、乾いた大地の造形です。' },
+  { title: 'グレートサンドデューンズ', country: 'アメリカ', lat: 37.7916, lng: -105.5943, zoom: 12, category: '砂丘', wikiTitle: 'Great_Sand_Dunes_National_Park_and_Preserve', note: '高い砂丘と背後の山脈が同時に見える、コントラストの強い景観です。' },
+  { title: 'カールズバッド洞窟群', country: 'アメリカ', lat: 32.1479, lng: -104.5567, zoom: 12, category: '洞窟', wikiTitle: 'Carlsbad_Caverns_National_Park', note: '石灰岩台地の地下に巨大な鍾乳洞が広がる、地形の奥行きを感じる場所です。' },
+  { title: 'コヨーテ・ビュート', country: 'アメリカ', lat: 36.9950, lng: -112.0066, zoom: 13, category: '砂岩地形', wikiTitle: 'Coyote_Buttes', note: '波打つ砂岩の層が露出する、色と曲線が印象的な地形です。' },
+  { title: 'ジャスパー国立公園', country: 'カナダ', lat: 52.8737, lng: -117.9543, zoom: 8, category: '山岳', wikiTitle: 'Jasper_National_Park', note: 'ロッキー山脈の氷河、湖、谷が広く連なるカナダ西部の景観です。' },
+  { title: 'グロス・モーン国立公園', country: 'カナダ', lat: 49.6910, lng: -57.7380, zoom: 10, category: 'フィヨルド', wikiTitle: 'Gros_Morne_National_Park', note: '氷河が削った谷と海岸地形が広がる、ニューファンドランドの名所です。' },
+  { title: 'ファンディ湾', country: 'カナダ', lat: 45.1667, lng: -64.4167, zoom: 9, category: '湾', wikiTitle: 'Bay_of_Fundy', note: '大きな潮汐差で知られる湾。海岸線と干潟の変化が特徴です。' },
+  { title: 'ナハニ国立公園', country: 'カナダ', lat: 61.5472, lng: -125.5894, zoom: 8, category: '峡谷と滝', wikiTitle: 'Nahanni_National_Park_Reserve', note: '深い峡谷と大きな滝が連なる、カナダ北西部の荒野景観です。' },
+  { title: 'アティトラン湖', country: 'グアテマラ', lat: 14.6907, lng: -91.2025, zoom: 12, category: '火山湖', wikiTitle: 'Lake_Atitlán', note: '火山に囲まれた湖面と湖畔の集落が重なる、中米を代表する湖景です。' },
+  { title: 'ティカル', country: 'グアテマラ', lat: 17.2220, lng: -89.6237, zoom: 14, category: '遺跡と密林', wikiTitle: 'Tikal', note: '熱帯雨林の中から神殿群が立ち上がる、マヤ文明の大遺跡です。' },
+  { title: 'コルカ渓谷', country: 'ペルー', lat: -15.6098, lng: -71.9780, zoom: 10, category: '峡谷', wikiTitle: 'Colca_Canyon', note: 'アンデス山中に深く刻まれた峡谷と段々畑が広がります。' },
+  { title: 'ヴィニクンカ', country: 'ペルー', lat: -13.8697, lng: -71.3022, zoom: 13, category: '彩色山', wikiTitle: 'Vinicunca', note: '鉱物層が縞状に現れる、色彩の強いアンデスの山岳景観です。' },
+  { title: 'チチカカ湖', country: 'ペルー / ボリビア', lat: -15.9254, lng: -69.3354, zoom: 8, category: '高地湖', wikiTitle: 'Lake_Titicaca', note: 'アンデス高地に広がる大きな湖。島々と青い湖面が印象的です。' },
+  { title: 'コトパクシ', country: 'エクアドル', lat: -0.6833, lng: -78.4368, zoom: 11, category: '火山', wikiTitle: 'Cotopaxi', note: '赤道近くにそびえる円錐形の火山。高原と雪峰の対比が鮮やかです。' },
+  { title: 'フェルナンド・デ・ノローニャ', country: 'ブラジル', lat: -3.8549, lng: -32.4233, zoom: 12, category: '諸島', wikiTitle: 'Fernando_de_Noronha', note: '大西洋に浮かぶ火山性の島々と透明度の高い海が広がります。' },
+  { title: 'シャパーダ・ジアマンチーナ', country: 'ブラジル', lat: -12.8800, lng: -41.4100, zoom: 9, category: '高原と滝', wikiTitle: 'Chapada_Diamantina_National_Park', note: 'テーブル状の山地、峡谷、滝が点在するブラジル内陸の景観です。' },
+  { title: 'マーブルカテドラル', country: 'チリ', lat: -46.6575, lng: -72.6275, zoom: 13, category: '湖岸洞窟', wikiTitle: 'Marble_Caves,_Chile', note: '青い湖水に削られた大理石の洞窟が、独特の色と曲線を見せます。' },
+  { title: 'クリフス・オブ・モハー', country: 'アイルランド', lat: 52.9715, lng: -9.4309, zoom: 13, category: '海食崖', wikiTitle: 'Cliffs_of_Moher', note: '大西洋に向かって高い断崖が続く、アイルランド西岸の名景です。' },
+  { title: 'ジャイアンツ・コーズウェー', country: 'イギリス', lat: 55.2408, lng: -6.5116, zoom: 15, category: '柱状節理', wikiTitle: "Giant's_Causeway", note: '六角柱状の玄武岩が海岸に並ぶ、幾何学的な火山地形です。' },
+  { title: 'スカイ島', country: 'イギリス', lat: 57.5359, lng: -6.2263, zoom: 9, category: '島と山岳', wikiTitle: 'Isle_of_Skye', note: '岩峰、草原、海岸線が近接する、スコットランドらしい荒々しい景観です。' },
+  { title: 'フェロー諸島', country: 'フェロー諸島', lat: 62.0079, lng: -6.7900, zoom: 8, category: '北大西洋の島々', wikiTitle: 'Faroe_Islands', note: '海から山が立ち上がる島々と小さな集落が重なる北大西洋の景観です。' },
+  { title: 'プレーケストーレン', country: 'ノルウェー', lat: 58.9864, lng: 6.1904, zoom: 13, category: '断崖', wikiTitle: 'Preikestolen', note: 'フィヨルドを見下ろす平らな岩棚が突き出した、迫力ある展望地です。' },
+  { title: 'モンブラン', country: 'フランス / イタリア', lat: 45.8326, lng: 6.8652, zoom: 10, category: '山岳', wikiTitle: 'Mont_Blanc', note: 'アルプス最高峰を中心に氷河と鋭い山稜が連なります。' },
+  { title: 'エトルタ海岸', country: 'フランス', lat: 49.7076, lng: 0.2050, zoom: 14, category: '白亜の断崖', wikiTitle: 'Étretat', note: '白い崖と自然のアーチが海に面して並ぶ、ノルマンディーの景観です。' },
+  { title: 'ラウターブルンネン', country: 'スイス', lat: 46.5935, lng: 7.9091, zoom: 13, category: '谷と滝', wikiTitle: 'Lauterbrunnen', note: '切り立つ谷壁と滝が村を囲む、アルプスらしい谷景です。' },
+  { title: 'ザクセン・スイス', country: 'ドイツ', lat: 50.9180, lng: 14.2750, zoom: 12, category: '砂岩地形', wikiTitle: 'Saxon_Switzerland', note: '砂岩の岩塔と森が入り組む、エルベ川沿いの奇岩景観です。' },
+  { title: 'ピコス・デ・エウロパ', country: 'スペイン', lat: 43.1870, lng: -4.8210, zoom: 10, category: '山岳', wikiTitle: 'Picos_de_Europa', note: '石灰岩の山塊と深い谷が連なる、スペイン北部の山岳景観です。' },
+  { title: 'セブンリラ湖', country: 'ブルガリア', lat: 42.2043, lng: 23.3202, zoom: 13, category: '氷河湖', wikiTitle: 'Seven_Rila_Lakes', note: '高山帯に湖が階段状に並ぶ、リラ山脈の代表的な景観です。' },
+  { title: 'ソチミルコ', country: 'メキシコ', lat: 19.2570, lng: -99.1030, zoom: 13, category: '水路景観', wikiTitle: 'Xochimilco', note: '古い湖沼地形の水路と緑地が都市の中に残る独特な景観です。' },
+  { title: 'ブライデリバー・キャニオン', country: '南アフリカ', lat: -24.5800, lng: 30.8000, zoom: 11, category: '峡谷', wikiTitle: 'Blyde_River_Canyon', note: '緑に覆われた巨大な峡谷と奇岩が続く、南アフリカの名所です。' },
+  { title: 'フィッシュリバー・キャニオン', country: 'ナミビア', lat: -27.5833, lng: 17.6000, zoom: 10, category: '峡谷', wikiTitle: 'Fish_River_Canyon', note: '乾いた大地を大きく蛇行する峡谷が刻む、ナミビア南部の景観です。' },
+  { title: 'ソススフレイ', country: 'ナミビア', lat: -24.7333, lng: 15.3667, zoom: 12, category: '砂丘', wikiTitle: 'Sossusvlei', note: '赤い砂丘と白い塩性低地が対比する、ナミブ砂漠を象徴する景観です。' },
+  { title: 'バオバブ街道', country: 'マダガスカル', lat: -20.2500, lng: 44.4197, zoom: 14, category: '樹木景観', wikiTitle: 'Avenue_of_the_Baobabs', note: '巨大なバオバブが道沿いに並ぶ、マダガスカルを代表する景観です。' },
+  { title: 'ツィンギ・デ・ベマラハ', country: 'マダガスカル', lat: -18.6667, lng: 44.7500, zoom: 10, category: '石灰岩地形', wikiTitle: 'Tsingy_de_Bemaraha_National_Park', note: '鋭い石灰岩の尖塔が森の中に広がる、独特なカルスト景観です。' },
+  { title: 'ダロール', country: 'エチオピア', lat: 14.2417, lng: 40.3000, zoom: 13, category: '熱水地形', wikiTitle: 'Dallol_(hydrothermal_system)', note: '酸性泉と鉱物の色が地表に現れる、非日常的な熱水景観です。' },
+  { title: 'シミエン山地', country: 'エチオピア', lat: 13.1833, lng: 38.0667, zoom: 10, category: '高原山岳', wikiTitle: 'Simien_Mountains_National_Park', note: '切り立った高原と深い谷が続く、エチオピア北部の山岳景観です。' },
+  { title: 'キブ湖', country: 'ルワンダ / コンゴ民主共和国', lat: -2.0000, lng: 29.0000, zoom: 8, category: '大湖', wikiTitle: 'Lake_Kivu', note: '山地に囲まれた湖と湾が続く、東アフリカ大地溝帯の湖景です。' },
+  { title: 'マラウイ湖', country: 'マラウイ / モザンビーク / タンザニア', lat: -12.1833, lng: 34.3667, zoom: 7, category: '大湖', wikiTitle: 'Lake_Malawi', note: '細長く伸びる湖面と山地が組み合わさった、アフリカ大湖の景観です。' },
+  { title: 'ヘグラ', country: 'サウジアラビア', lat: 26.7900, lng: 37.9550, zoom: 13, category: '砂漠遺跡', wikiTitle: "Hegra_(Mada'in_Salih)", note: '砂漠の岩山に刻まれた墓建築が点在する、アラビア半島の文化景観です。' },
+  { title: 'マサダ', country: 'イスラエル', lat: 31.3156, lng: 35.3539, zoom: 14, category: '台地遺跡', wikiTitle: 'Masada', note: '死海を見下ろす孤立した台地に遺跡が残る、地形と歴史が重なる場所です。' },
+  { title: 'バイカル湖', country: 'ロシア', lat: 53.5000, lng: 108.0000, zoom: 6, category: '大湖', wikiTitle: 'Lake_Baikal', note: '世界有数の深さを持つ湖。細長い湖盆と周囲の山地が大きなスケールを見せます。' },
+  { title: 'カムチャツカ火山群', country: 'ロシア', lat: 56.1325, lng: 160.6419, zoom: 7, category: '火山群', wikiTitle: 'Volcanoes_of_Kamchatka', note: '多数の火山と氷雪地形が並ぶ、環太平洋らしい荒々しい景観です。' },
+  { title: 'モンゴル ゴビ砂漠', country: 'モンゴル / 中国', lat: 42.5900, lng: 103.4300, zoom: 6, category: '砂漠', wikiTitle: 'Gobi_Desert', note: '砂丘、岩山、乾いた平原が広大に続く内陸アジアの景観です。' },
+  { title: '甘粛 張掖丹霞', country: '中国', lat: 38.9739, lng: 100.0844, zoom: 13, category: '彩色地形', wikiTitle: 'Zhangye_National_Geopark', note: '赤や黄色の地層が波状に重なる、色彩豊かな丹霞地形です。' },
+  { title: '稲城亜丁', country: '中国', lat: 28.4610, lng: 100.3310, zoom: 10, category: '高山湖', wikiTitle: 'Yading_Nature_Reserve', note: '雪山、草原、湖が並ぶ、四川省西部の高山景観です。' },
+  { title: 'カイラス山', country: '中国', lat: 31.0675, lng: 81.3119, zoom: 11, category: '聖山', wikiTitle: 'Mount_Kailash', note: 'チベット高原に孤高の山容を見せる、信仰と地形が重なる山です。' },
+  { title: 'ハザン高原', country: 'ベトナム', lat: 23.1667, lng: 105.0000, zoom: 10, category: '石灰岩山地', wikiTitle: 'Hà_Giang_province', note: '石灰岩の山並みと棚田、峠道が続くベトナム北部の山岳景観です。' },
+  { title: 'バナウェ棚田', country: 'フィリピン', lat: 16.9190, lng: 121.0590, zoom: 13, category: '棚田', wikiTitle: 'Banaue_Rice_Terraces', note: '山腹に細かく刻まれた棚田が広がる、ルソン島北部の文化景観です。' },
+  { title: 'パンガー湾', country: 'タイ', lat: 8.2833, lng: 98.6000, zoom: 11, category: '湾と奇岩', wikiTitle: 'Phang_Nga_Bay', note: '海から石灰岩の島々が立ち上がる、タイ南部の湾景です。' },
+  { title: 'コモド国立公園', country: 'インドネシア', lat: -8.5448, lng: 119.4890, zoom: 9, category: '島と海', wikiTitle: 'Komodo_National_Park', note: '乾いた島々と珊瑚礁の海が連なる、インドネシア東部の景観です。' },
+  { title: 'ブロモ山', country: 'インドネシア', lat: -7.9425, lng: 112.9530, zoom: 12, category: '火山', wikiTitle: 'Mount_Bromo', note: 'カルデラ内に火山丘が並ぶ、ジャワ島を代表する火山景観です。' },
+  { title: 'イジェン火山', country: 'インドネシア', lat: -8.0583, lng: 114.2425, zoom: 12, category: '火口湖', wikiTitle: 'Ijen', note: '火口湖と硫黄地形が印象的な、東ジャワの火山景観です。' },
+  { title: 'テガララン棚田', country: 'インドネシア', lat: -8.4317, lng: 115.2797, zoom: 15, category: '棚田', wikiTitle: 'Tegallalang_Rice_Terrace', note: '谷筋に曲線状の棚田が重なる、バリ島らしい緑の景観です。' },
+  { title: 'トンガリロ国立公園', country: 'ニュージーランド', lat: -39.2908, lng: 175.5628, zoom: 11, category: '火山高原', wikiTitle: 'Tongariro_National_Park', note: '火山、火口湖、荒原が連なるニュージーランド北島の景観です。' },
+  { title: 'ベイ・オブ・アイランズ', country: 'ニュージーランド', lat: -35.2000, lng: 174.1000, zoom: 10, category: '湾と島々', wikiTitle: 'Bay_of_Islands', note: '小島が浮かぶ穏やかな湾と入り組んだ海岸線が広がります。' },
+  { title: 'ブルーマウンテンズ', country: 'オーストラリア', lat: -33.7000, lng: 150.3000, zoom: 10, category: '渓谷と森', wikiTitle: 'Blue_Mountains_(New_South_Wales)', note: 'ユーカリの森と砂岩の崖が広がる、シドニー近郊の山岳景観です。' },
+  { title: 'デインツリー熱帯雨林', country: 'オーストラリア', lat: -16.1700, lng: 145.4180, zoom: 10, category: '熱帯雨林', wikiTitle: 'Daintree_Rainforest', note: '熱帯雨林が海岸近くまで迫る、クイーンズランド北部の景観です。' },
+  { title: 'カカドゥ国立公園', country: 'オーストラリア', lat: -12.8654, lng: 132.4737, zoom: 8, category: '湿地と岩山', wikiTitle: 'Kakadu_National_Park', note: '湿地、岩山、滝が広がる、オーストラリア北部の大きな国立公園です。' },
+  { title: '十二使徒', country: 'オーストラリア', lat: -38.6633, lng: 143.1050, zoom: 14, category: '海食岩', wikiTitle: 'The_Twelve_Apostles_(Victoria)', note: '海から石灰岩の柱が立ち上がる、グレートオーシャンロードの名景です。' },
+  { title: 'ワイングラス・ベイ', country: 'オーストラリア', lat: -42.1511, lng: 148.2989, zoom: 13, category: '湾', wikiTitle: 'Wineglass_Bay', note: '弧を描く白い砂浜と青い湾が美しい、タスマニア東岸の景観です。' },
+  { title: '知床半島', country: '日本', lat: 44.1010, lng: 145.1880, zoom: 10, category: '半島と山岳', wikiTitle: 'Shiretoko_Peninsula', note: '山地、断崖、海が一体となる、北海道東部の自然景観です。' },
+  { title: '上高地', country: '日本', lat: 36.2480, lng: 137.6380, zoom: 13, category: '山岳渓谷', wikiTitle: 'Kamikōchi', note: '穂高連峰を背景に梓川が流れる、日本アルプスの代表的な渓谷です。' },
+  { title: '立山黒部アルペンルート', country: '日本', lat: 36.5776, lng: 137.5994, zoom: 11, category: '山岳', wikiTitle: 'Tateyama_Kurobe_Alpine_Route', note: '高山、雪渓、ダム湖が連なる、北アルプスを横断する山岳景観です。' },
+  { title: '阿蘇カルデラ', country: '日本', lat: 32.8840, lng: 131.1040, zoom: 11, category: 'カルデラ', wikiTitle: 'Mount_Aso', note: '巨大なカルデラの中に町や草原が広がる、スケールの大きい火山景観です。' },
+  { title: '奥入瀬渓流', country: '日本', lat: 40.5680, lng: 140.9920, zoom: 14, category: '渓流', wikiTitle: 'Oirase_River', note: '森の中を清流と小さな滝が続く、東北を代表する渓流景観です。' },
+  { title: '那智の滝', country: '日本', lat: 33.6744, lng: 135.8878, zoom: 15, category: '滝と社寺', wikiTitle: 'Nachi_Falls', note: '高い滝と社寺が森の中で重なる、紀伊半島の象徴的な景観です。' },
+  { title: '小笠原諸島', country: '日本', lat: 27.0940, lng: 142.1910, zoom: 8, category: '海洋島', wikiTitle: 'Bonin_Islands', note: '太平洋上に隔絶した島々と青い海が広がる、日本の海洋島景観です。' },
 );
-
-class HelloWorldScenery {
-  constructor() {
-    this.mapSlots = [];
-    this.activeMapIndex = 0;
-    this.currentIndex = -1;
-    this.history = [];
-    this.randomQueue = [];
-    this.autoEnabled = true;
-    this.autoTimer = null;
-    this.progressTimer = null;
-    this.mapReadyPromise = Promise.resolve();
-    this.mapRequestId = 0;
-    this.progressStartedAt = 0;
-    this.photoRequestId = 0;
-    this.photoCache = new Map();
-
-    this.titleEl = document.getElementById('place-title');
-    this.locationEl = document.getElementById('place-location');
-    this.noteEl = document.getElementById('place-note');
-    this.categoryEl = document.getElementById('place-category');
-    this.coordsEl = document.getElementById('place-coords');
-    this.historyEl = document.getElementById('history-list');
-    this.progressEl = document.getElementById('auto-progress');
-    this.nextBtn = document.getElementById('next-btn');
-    this.prevBtn = document.getElementById('prev-btn');
-    this.autoBtn = document.getElementById('auto-btn');
-    this.fullscreenBtn = document.getElementById('fullscreen-btn');
-    this.photoLayer = document.getElementById('photo-layer');
-    this.photoCredit = document.getElementById('photo-credit');
-    this.appShell = document.querySelector('.app-shell');
-
-    this.initMap();
-    this.bindEvents();
-    this.goRandom(true);
-    this.setAuto(true);
-  }
-
-  initMap() {
-    this.mapSlots = ['map-a', 'map-b'].map((id) => ({
-      element: document.getElementById(id),
-    }));
-    // 初期状態：両方非表示
-    this.mapSlots.forEach((s) => {
-      s.element.style.opacity = '0';
-      s.element.style.zIndex = '1';
-    });
-  }
-
-  buildMapUrl(place, zoom) {
-    return `https://maps.google.com/maps?q=${place.lat},${place.lng}&z=${zoom}&t=h&output=embed`;
-  }
-
-  countryZoom(place) {
-    // 目的地の国レベルズーム（上位概観）
-    return Math.min(5, Math.max(2, place.zoom - 4));
-  }
-
-  bindEvents() {
-    this.nextBtn.addEventListener('click', () => {
-      this.goRandom(false);
-      this.restartAutoIfNeeded();
-    });
-    this.prevBtn.addEventListener('click', () => {
-      this.goPrevious();
-      this.restartAutoIfNeeded();
-    });
-    this.autoBtn.addEventListener('click', () => this.setAuto(!this.autoEnabled));
-    this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
-    window.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowRight' || event.key === ' ') {
-        event.preventDefault();
-        this.goRandom(false);
-        this.restartAutoIfNeeded();
-      }
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        this.goPrevious();
-        this.restartAutoIfNeeded();
-      }
-    });
-  }
-
-  goRandom(initial = false) {
-    const nextIndex = this.takeRandomIndex(initial);
-    this.showPlace(nextIndex, true);
-  }
-
-  takeRandomIndex(initial = false) {
-    if (places.length <= 1) return 0;
-    if (this.randomQueue.length === 0) this.refillRandomQueue(initial);
-    return this.randomQueue.pop();
-  }
-
-  refillRandomQueue(initial = false) {
-    this.randomQueue = places
-      .map((_, index) => index)
-      .filter((index) => initial || index !== this.currentIndex);
-
-    for (let i = this.randomQueue.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [this.randomQueue[i], this.randomQueue[j]] = [this.randomQueue[j], this.randomQueue[i]];
-    }
-  }
-
-  goPrevious() {
-    if (this.history.length < 2) return;
-    this.history.pop();
-    const previousIndex = this.history.pop();
-    this.showPlace(previousIndex, false);
-  }
-
-  showPlace(index, addToHistory) {
-    const place = places[index];
-    if (!place) return;
-    this.currentIndex = index;
-    if (addToHistory) this.history.push(index);
-    if (this.history.length > 12) this.history = this.history.slice(-12);
-
-    this.titleEl.textContent = `${place.title} / ${place.country}`;
-    this.locationEl.textContent = `${place.country}`;
-    this.noteEl.textContent = place.note;
-    this.categoryEl.textContent = place.category;
-    this.coordsEl.textContent = `${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}`;
-
-    this.appShell.classList.add('is-traveling');
-    this.mapReadyPromise = this.revealLoadedMap(place);
-    this.loadPhoto(place);
-    this.renderHistory();
-  }
-
-  async loadPhoto(place) {
-    const requestId = ++this.photoRequestId;
-    this.photoLayer.classList.remove('visible');
-    this.appShell.classList.remove('photo-active');
-    this.photoCredit.textContent = 'Photo: loading...';
-
-    const cached = this.photoCache.get(place.wikiTitle);
-    if (cached) {
-      this.applyPhoto(cached, requestId, place);
-      return;
-    }
-
-    try {
-      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(place.wikiTitle)}`;
-      const response = await fetch(url, { headers: { accept: 'application/json' } });
-      if (!response.ok) throw new Error(`photo fetch failed: ${response.status}`);
-      const data = await response.json();
-      const source = data?.originalimage?.source || data?.thumbnail?.source;
-      if (!source) throw new Error('photo not found');
-      const photo = {
-        url: source,
-        credit: `Photo: Wikipedia / Wikimedia Commons - ${data.title || place.title}`,
-      };
-      this.photoCache.set(place.wikiTitle, photo);
-      this.applyPhoto(photo, requestId, place);
-    } catch (error) {
-      if (requestId !== this.photoRequestId) return;
-      this.photoLayer.style.backgroundImage = '';
-      this.photoLayer.classList.remove('visible');
-      this.appShell.classList.remove('photo-active');
-      this.photoCredit.textContent = 'Photo: unavailable';
-      console.warn(error);
-    }
-  }
-
-  applyPhoto(photo, requestId, place) {
-    if (requestId !== this.photoRequestId) return;
-    const image = new Image();
-    image.onload = async () => {
-      if (requestId !== this.photoRequestId) return;
-      const mapReady = await this.mapReadyPromise;
-      if (!mapReady) return;
-      if (requestId !== this.photoRequestId) return;
-      this.photoLayer.style.backgroundImage = `url("${photo.url}")`;
-      this.photoLayer.classList.add('visible');
-      this.appShell.classList.add('photo-active');
-      this.photoCredit.textContent = photo.credit;
-      this.titleEl.textContent = place.title;
-    };
-    image.onerror = () => {
-      if (requestId !== this.photoRequestId) return;
-      this.photoCredit.textContent = 'Photo: unavailable';
-      this.photoLayer.classList.remove('visible');
-      this.appShell.classList.remove('photo-active');
-    };
-    image.src = photo.url;
-  }
-
-  async toggleFullscreen() {
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-        this.fullscreenBtn.textContent = '全画面';
-      } else {
-        await document.documentElement.requestFullscreen();
-        this.fullscreenBtn.textContent = '全画面解除';
-      }
-    } catch (error) {
-      console.warn(error);
-    }
-  }
-
-  // エレメントを即座に指定スタイルへスナップしてからトランジション開始
-  snapThenAnimate(el, snapStyles, animateStyles, transition) {
-    el.style.transition = 'none';
-    Object.assign(el.style, snapStyles);
-    void el.offsetWidth;
-    el.style.transition = transition;
-    Object.assign(el.style, animateStyles);
-  }
-
-  async revealLoadedMap(place) {
-    const requestId = ++this.mapRequestId;
-    const activeIdx = this.activeMapIndex;
-    const activeEl = this.mapSlots[activeIdx].element;
-    const nextIdx = 1 - activeIdx;
-    const nextEl = this.mapSlots[nextIdx].element;
-
-    // ── Phase 1: 国レベル表示（nextEl） ──
-    nextEl.src = this.buildMapUrl(place, this.countryZoom(place));
-    await this.waitForFrameReady(nextEl, 8000);
-    if (requestId !== this.mapRequestId) return false;
-
-    // 旧アクティブをフェードアウト
-    activeEl.style.transition = 'opacity 0.8s ease';
-    activeEl.style.zIndex = '1';
-    activeEl.style.opacity = '0';
-
-    // 国レベルフレームをスナップ→フェードイン＋スケールイン
-    this.snapThenAnimate(
-      nextEl,
-      { opacity: '0', transform: 'scale(1.1)', zIndex: '3' },
-      { opacity: '1', transform: 'scale(1)' },
-      'opacity 1.2s ease, transform 3.5s ease'
-    );
-
-    await this.wait(COUNTRY_HOLD_MS);
-    if (requestId !== this.mapRequestId) return false;
-
-    // ── Phase 2: 地区レベル表示（activeEl を再利用） ──
-    activeEl.src = this.buildMapUrl(place, place.zoom);
-    await this.waitForFrameReady(activeEl, 8000);
-    if (requestId !== this.mapRequestId) return false;
-
-    // 国レベルフレームをフェードアウト
-    nextEl.style.transition = 'opacity 0.8s ease';
-    nextEl.style.opacity = '0';
-
-    // 地区レベルフレームをスナップ→フェードイン＋スケールイン
-    this.snapThenAnimate(
-      activeEl,
-      { opacity: '0', transform: 'scale(1.07)', zIndex: '4' },
-      { opacity: '1', transform: 'scale(1)' },
-      'opacity 1.2s ease, transform 4.5s ease'
-    );
-
-    this.appShell.classList.remove('is-traveling');
-
-    // photo 許可まで少し待つ（地区フレームが見え始めてから）
-    await this.wait(LOCAL_REVEAL_MS);
-    if (requestId !== this.mapRequestId) return false;
-
-    // 落ち着いたら CSS クラスで管理（photo-active 時の opacity 制御に必要）
-    const snap = requestId;
-    this.wait(3000).then(() => {
-      if (snap !== this.mapRequestId) return;
-      activeEl.style.transition = 'none';
-      Object.assign(activeEl.style, { opacity: '', transform: '', zIndex: '' });
-      activeEl.className = 'world-map is-active';
-      nextEl.style.transition = '';
-      Object.assign(nextEl.style, { opacity: '', transform: '', zIndex: '' });
-      nextEl.className = 'world-map';
-      void activeEl.offsetWidth;
-    });
-
-    return true;
-  }
-
-  wait(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-
-  waitForFrameReady(frame, timeoutMs) {
-    return new Promise((resolve) => {
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        frame.removeEventListener('load', finish);
-        window.setTimeout(resolve, 200);
-      };
-      frame.addEventListener('load', finish, { once: true });
-      window.setTimeout(finish, timeoutMs);
-    });
-  }
-
-  renderHistory() {
-    this.historyEl.innerHTML = '';
-    this.history.slice(-3).reverse().forEach((index) => {
-      const place = places[index];
-      const item = document.createElement('li');
-      item.textContent = `${place.title} / ${place.country}`;
-      this.historyEl.appendChild(item);
-    });
-  }
-
-  setAuto(enabled) {
-    this.autoEnabled = enabled;
-    this.autoBtn.classList.toggle('active', enabled);
-    this.autoBtn.textContent = enabled ? '自動巡回 ON' : '自動巡回 OFF';
-    this.clearAutoTimers();
-    if (enabled) this.scheduleAuto();
-    else this.progressEl.style.width = '0%';
-  }
-
-  restartAutoIfNeeded() {
-    if (!this.autoEnabled) return;
-    this.clearAutoTimers();
-    this.scheduleAuto();
-  }
-
-  scheduleAuto() {
-    this.progressStartedAt = performance.now();
-    this.autoTimer = window.setTimeout(() => {
-      this.goRandom(false);
-      this.scheduleAuto();
-    }, AUTO_INTERVAL_MS);
-    this.progressTimer = window.setInterval(() => {
-      const elapsed = performance.now() - this.progressStartedAt;
-      const percent = Math.min(100, (elapsed / AUTO_INTERVAL_MS) * 100);
-      this.progressEl.style.width = `${percent}%`;
-    }, 100);
-  }
-
-  clearAutoTimers() {
-    if (this.autoTimer) {
-      window.clearTimeout(this.autoTimer);
-      this.autoTimer = null;
-    }
-    if (this.progressTimer) {
-      window.clearInterval(this.progressTimer);
-      this.progressTimer = null;
-    }
-    this.progressEl.style.width = '0%';
-  }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  new HelloWorldScenery();
-});

@@ -1,4 +1,4 @@
-/* XユーチューブBGM — ダーク音楽プレイヤーUI */
+/* X動画再生BGM — ダーク音楽プレイヤーUI */
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -30,7 +30,7 @@ html, body {
   display: flex;
   gap: 8px;
   flex: 0 0 auto;
-  height: calc(100% - 130px);
+  height: calc(100% - 190px);
   min-height: 200px;
 }
 
@@ -86,12 +86,14 @@ html, body {
 .info-panel {
   display: flex;
   gap: 12px;
-  flex: 0 0 auto;
-  min-height: 80px;
+  flex: 0 0 190px;
+  height: 190px;
+  min-height: 0;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
+  align-items: stretch;
 }
 
 .info-left {
@@ -100,6 +102,7 @@ html, body {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  min-height: 0;
 }
 
 /* キッカー */
@@ -179,6 +182,41 @@ html, body {
   font-weight: 600;
 }
 
+/* 音量選択 */
+.vol-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.vol-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a90c0;
+}
+
+.vol-select {
+  background: rgba(0, 0, 0, 0.4);
+  color: #e0e0f0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 1px 2px;
+  cursor: pointer;
+  outline: none;
+}
+
+.vol-select:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.vol-select option {
+  background: #1a1a20;
+  color: #e0e0f0;
+}
+
 /* プログレスバー */
 .progress-track {
   height: 4px;
@@ -203,6 +241,38 @@ html, body {
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ===== 開始オーバーレイ ===== */
+#start-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.start-card {
+  padding: 20px 40px;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: white;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.9; }
 }
 
 .playlist-title {
@@ -217,36 +287,55 @@ html, body {
 .playlist-list {
   list-style: none;
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0 4px 0 0;
   scrollbar-width: thin;
   scrollbar-color: #333355 transparent;
+  scroll-snap-type: y proximity;
+  perspective: 800px;
 }
 
-.playlist-list::-webkit-scrollbar { width: 4px; }
+.playlist-list::-webkit-scrollbar { width: 8px; }
 .playlist-list::-webkit-scrollbar-track { background: transparent; }
-.playlist-list::-webkit-scrollbar-thumb { background: #333355; border-radius: 2px; }
+.playlist-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #31507d, #24344f);
+  border-radius: 999px;
+}
 
 .playlist-list li {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 4px;
-  border-radius: 3px;
-  cursor: default;
-  transition: background 0.2s;
+  min-height: 28px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.22s, box-shadow 0.22s, opacity 0.22s, filter 0.22s;
+  transform-origin: center center;
+  scroll-snap-align: center;
 }
 
 .playlist-list li:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(-2px) scale(1.01);
 }
 
 .playlist-list li.active {
-  background: rgba(30, 80, 180, 0.35);
+  position: relative;
+  z-index: 3;
+  background: linear-gradient(90deg, rgba(52, 112, 219, 0.78), rgba(34, 52, 112, 0.85));
+  box-shadow:
+    0 10px 20px rgba(4, 10, 24, 0.45),
+    0 0 0 1px rgba(125, 211, 248, 0.32);
+  transform: scale(1.12) translateZ(24px);
 }
 
 .playlist-list li.active .pl-name {
-  color: #7dd3f8;
-  font-weight: 700;
+  color: #eef8ff;
+  font-weight: 800;
+  font-size: 12px;
 }
 
 .playlist-list li.next {
@@ -264,6 +353,30 @@ html, body {
   text-align: right;
 }
 
+.playlist-list li.active .pl-num {
+  color: #b9dcff;
+}
+
+.playlist-list li.is-before,
+.playlist-list li.is-after {
+  opacity: 0.88;
+  filter: saturate(0.92);
+}
+
+.playlist-list li.is-before {
+  transform: perspective(800px) rotateX(16deg) scale(0.95);
+}
+
+.playlist-list li.is-after {
+  transform: perspective(800px) rotateX(-16deg) scale(0.95);
+}
+
+.playlist-list li.is-far {
+  opacity: 0.48;
+  filter: blur(0.3px) saturate(0.72);
+  transform: scale(0.9);
+}
+
 .pl-name {
   font-size: 11px;
   color: #b0b0cc;
@@ -272,11 +385,74 @@ html, body {
   text-overflow: ellipsis;
 }
 
+.playlist-drum {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 96px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(18, 22, 36, 0.95), rgba(13, 16, 28, 0.95));
+  border: 1px solid rgba(80, 96, 140, 0.18);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.28);
+}
+
+.playlist-drum::before,
+.playlist-drum::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 18px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.playlist-drum::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(15, 18, 30, 0.98), rgba(15, 18, 30, 0));
+}
+
+.playlist-drum::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(15, 18, 30, 0.98), rgba(15, 18, 30, 0));
+}
+
+.playlist-drum .playlist-list {
+  height: 100%;
+  padding: 14px 6px 14px 0;
+}
+
+/* ===== ユーザー操作促進トースト ===== */
+.user-play-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(30, 80, 200, 0.92);
+  color: #fff;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  animation: none;
+}
+
+.user-play-toast.visible {
+  opacity: 1;
+}
+
 /* ===== レスポンシブ ===== */
 @media (max-width: 640px) {
   .players-container {
     flex-direction: column;
-    height: calc(100% - 160px);
+    height: calc(100% - 210px);
   }
   .info-right {
     display: none;

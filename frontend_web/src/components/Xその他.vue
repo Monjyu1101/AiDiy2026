@@ -16,7 +16,8 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const baseUrl = import.meta.env.BASE_URL || '/';
-const helloWorldUrl = `${baseUrl}Xハローワールド/index.html`;
+const worldSceneryUrl = `${baseUrl}X世界の絶景/index.html`;
+const bgmUrl = `${baseUrl}X動画再生BGM/index.html`;
 const AUTO_JUMP_MS = 60000;
 const AUTO_JUMP_PATH = '/Xその他/X自己紹介/表示';
 const cancelEvents = ['mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'];
@@ -98,22 +99,37 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="menu-hairline"></div>
-
         <div class="menu-row">
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">X世</span>
-              Xハローワールド
+              X世界の絶景
             </div>
             <div class="menu-card-description">
               世界の絶景ランダム巡回・全画面地図ビュー
             </div>
-            <a :href="helloWorldUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+            <a :href="worldSceneryUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>
 
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X音</span>
+              X動画再生BGM
+            </div>
+            <div class="menu-card-description">
+              動画ランダム交互再生・A/Bクロスフェード・連続BGM
+            </div>
+            <a :href="bgmUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+        </div>
+
+        <div class="menu-hairline"></div>
+
+        <div class="menu-row">
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">X侵</span>
@@ -162,19 +178,6 @@ onBeforeUnmount(() => {
               6面立方体リバーシ・CPU対戦・チャレンジモード
             </div>
             <router-link to="/Xその他/X立体リバーシ/ゲーム?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
-
-          <div class="menu-card menu-card-fixed">
-            <div class="menu-card-title">
-              <span class="icon">X音</span>
-              XユーチューブBGM
-            </div>
-            <div class="menu-card-description">
-              10曲ランダム交互再生・A/Bクロスフェード・連続BGM
-            </div>
-            <router-link to="/Xその他/XユーチューブBGM/再生?戻URL=/Xその他" class="menu-card-link">
               開く →
             </router-link>
           </div>

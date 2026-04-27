@@ -31,7 +31,7 @@
    - 認証済みレイアウト内で小さく完結するUI、Vueの状態管理や既存部品を使う画面は `.vue` 直実装にする。
 2. 静的HTML型では `src/components/Xその他/<画面名>.vue` を iframe ラッパーとして作る。
 3. `src/router/index.ts` の `baseRoutes` に `/Xその他/<画面名>/ゲーム` または `/Xその他/<画面名>/表示` を追加し、`meta.requiresAuth: true` と `title` を設定する。
-4. `src/components/Xその他.vue` にメニューカードを追加する。通常は `router-link` で `?戻URL=/Xその他` を渡す。全画面体験を優先する静的ページだけ、既存 `Xハローワールド` のように `public` の HTML を別タブで直接開く。
+4. `src/components/Xその他.vue` にメニューカードを追加する。通常は `router-link` で `?戻URL=/Xその他` を渡す。全画面体験を優先する静的ページだけ、既存 `X世界の絶景` のように `public` の HTML を別タブで直接開く。
 5. 外部ライブラリ、画像、音源、地図、フォントなどを同梱または参照する場合は `public/<画面名>/NOTICE.md` を作り、出典、ライセンス、ネットワーク制限時の挙動を残す。
 
 ## iframe ラッパーの基準
@@ -49,6 +49,13 @@
 - 画像や音声の読み込み失敗時も画面が真っ白にならないよう、最低限のエラーメッセージやフォールバック描画を用意する。
 - キーボード操作は入力欄やボタン操作と衝突しないよう、必要なキーだけ `preventDefault()` する。
 - 画面内説明文は長くしすぎず、ゲーム/デモとして最初の画面から操作可能な状態にする。
+- UI から後で変更する設定値（音量上限など）は `const` では持たず、`let` か状態オブジェクトで管理する。`DOMContentLoaded` 内の再代入で例外が出ると、後続の API 読み込みまで止まって静的画面全体が起動しなくなる。
+- 停止復旧の watchdog は毎 tick で `playVideo()` を打たず、1回だけ再開要求を出してから明示的なタイムアウトで次の曲へ切り替える。連打型の復旧は再開ループを起こしやすい。
+- `loadVideoById()` 後に遅延 `playVideo()` を無条件で重ねると、YouTube 側の自動開始と干渉して「開始→停止→再開始」風の挙動になりやすい。旧ロジックのように自動開始を優先し、再開要求は `UNSTARTED` / `CUED` / `PAUSED` の明確な停止状態に限定する。
+- さらに安定優先にするなら、開始再試行そのものをやめて `loadVideoById()` の1回だけにし、10秒以内に `PLAYING` へ入らなければ A/B 反対側へ切り替える方が挙動が読みやすい。
+- A/B 切り替え失敗時は `activePlayer` 基準で次先を決めると、失敗した側をもう一度選ぶことがある。タイムアウトや次側エラーでは、**失敗した側の反対側**を明示的に復旧先として選ぶ helper を使う方が安全。
+- 開始制御を最小化したい場合は、`loadVideoById()` は `videoId` のみで呼び、最初の `PLAYING` を受けてから **音量 0 のまま `seekTo()`** し、シーク後の `PLAYING` でフェードへ進める。`startSeconds` 指定や追加 `playVideo()` を混ぜるより挙動が安定しやすい。
+- それでも不安定化したら、`index_old.js` 型の **単純な状態遷移** に戻す方が安全。`watchdog`、タイムアウト復旧、シーク待ちタイマーなどの補助制御は一旦外し、`PLAYING` 1回目で `seekTo()`、そのまま通常クロスフェードへ進める。
 
 ## X立体リバーシ
 
@@ -67,9 +74,10 @@
 - CPU操作は色ごとのトグルで判定する。青は `blackCpuEnabled` / `black-cpu-toggle`、赤は `cpuEnabled` / `cpu-toggle`、判定は `isCpuControlled(player)` に集約する。
 - Three.js を `frontend_web` に依存追加しない静的ページでは CDN の ES module import を使えるが、オフライン環境では 3D 表示だけ失敗する。必須画面ではローカル依存化も検討する。
 
-## Xハローワールド
+## X世界の絶景
 
-- 本体は `frontend_web/public/Xハローワールド/`、Vue 側は `src/components/Xその他/Xハローワールド.vue` の全画面 iframe ラッパー。
+- 本体は `frontend_web/public/X世界の絶景/`、Vue 側は `src/components/Xその他/X世界の絶景.vue` の全画面 iframe ラッパー。
+- 絶景地点リストは `frontend_web/public/X世界の絶景/list.js` に分離し、`index.html` では `list.js` を `index.js` より先に読み込む。
 - Leaflet + OpenStreetMap の静的地図アプリとして実装し、Wikipedia REST API / Wikimedia Commons の写真へ実行時アクセスする。
 - `NOTICE.md` に Leaflet / OpenStreetMap / Wikipedia / Wikimedia Commons の利用元と、オフラインや外部ネットワーク制限では地図・写真が出ない可能性を残す。
 - Xその他メニューから静的HTMLを別タブで直接開く。ブラウザ全画面はユーザー操作が必要なので、アプリ内に全画面ボタンを置く。

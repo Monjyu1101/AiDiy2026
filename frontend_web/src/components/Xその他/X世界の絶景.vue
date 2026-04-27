@@ -15,7 +15,7 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const baseUrl = import.meta.env.BASE_URL || '/';
-const frameSrc = `${baseUrl}Xハローワールド/index.html`;
+const frameSrc = `${baseUrl}X世界の絶景/index.html`;
 const route = useRoute();
 const router = useRouter();
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
@@ -37,7 +37,7 @@ const handleReturn = () => {
     <iframe
       class="world-frame"
       :src="frameSrc"
-      title="Xハローワールド"
+      title="X世界の絶景"
       frameborder="0"
       allow="fullscreen"
       loading="lazy"

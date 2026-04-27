@@ -42,9 +42,9 @@
 
 ## X系 / Avatar 表示まわりの確認観点
 
-- X系ゲーム一覧: `X立体リバーシ`（Three.js 6面立体）と `Xハローワールド`（Leaflet + OSM 絶景巡回）が追加済み。
-  - 関連: `frontend_web/src/components/Xその他/X立体リバーシ.vue`, `Xハローワールド.vue`
-  - 関連: `frontend_web/public/X立体リバーシ/`, `frontend_web/public/Xハローワールド/`
+- X系ゲーム一覧: `X立体リバーシ`（Three.js 6面立体）と `X世界の絶景`（Leaflet + OSM 絶景巡回）が追加済み。
+  - 関連: `frontend_web/src/components/Xその他/X立体リバーシ.vue`, `X世界の絶景.vue`
+  - 関連: `frontend_web/public/X立体リバーシ/`, `frontend_web/public/X世界の絶景/`
 - `frontend_avatar` の表示コンポーネント: `AIコア_xneko.vue`（旧 AIコア_ネコ.vue）/ `AIコア_xeyes.vue` / `AIコア_アナログ時計.vue` / `AIコア_デジタル時計.vue` / `AIコア_カレンダー.vue` が追加済み。
 - `AIコア.vue` の `アバター表示` チェックボックスは廃止。`表示選択` select（`アバター` / `xneko(猫)` / `xeyes(目)` / `アナログ時計` / `デジタル時計` / `カレンダー` / `無し`）に変更済み。
 - Electron IPC: `window:get-pointer-snapshot` と `system:get-cpu-usage` が追加済み（xeyes 用）。
