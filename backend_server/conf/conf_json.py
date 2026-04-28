@@ -42,11 +42,16 @@ class conf_json:
         'copilot_key_id': '< your copilot api key >',
         'openrt_key_id': '< your openrouter api key >',
 
+        # Ollamaの基本設定（ローカルLLM）
+        'ollama_key_id': '< your ollama api key >',
+        'ollama_host': 'http://localhost:11434',
+
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image-preview',
         'CHAT_FREEAI_MODEL': 'gemini-3.1-flash-image-preview',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image-preview',
+        'CHAT_OLLAMA_MODEL': 'deepseek-v4-flash:cloud',
 
         # LiveAI設定
         'LIVE_AI_NAME': 'freeai_live',

@@ -113,6 +113,8 @@ class Chat:
         module_name = "AIコア.AIチャット_openrt"
         if self.AI_NAME in ("gemini_chat", "freeai_chat"):
             module_name = "AIコア.AIチャット_gemini"
+        elif self.AI_NAME == "ollama_chat":
+            module_name = "AIコア.AIチャット_ollama"
         try:
             return importlib.import_module(module_name)
         except Exception as e:
@@ -134,6 +136,8 @@ class Chat:
                         api_key = conf_json.json.get("gemini_key_id", "")
                         if self.AI_NAME == "freeai_chat":
                             api_key = conf_json.json.get("freeai_key_id", "") or api_key
+                    elif self.AI_NAME == "ollama_chat":
+                        api_key = conf_json.json.get("ollama_key_id", "ollama")
                     else:
                         api_key = conf_json.json.get("openrt_key_id", "")
             except Exception:
@@ -191,17 +195,25 @@ class Chat:
 
         # APIキーの事前チェック
         api_key = ""
-        try:
-            conf_json = getattr(self.親, "conf", None)
-            if conf_json and hasattr(conf_json, "json"):
-                if self.AI_NAME in ("gemini", "freeai"):
-                    api_key = conf_json.json.get("gemini_key_id", "")
-                    if self.AI_NAME == "freeai":
-                        api_key = conf_json.json.get("freeai_key_id", "") or api_key
-                else:
-                    api_key = conf_json.json.get("openrt_key_id", "")
-        except Exception:
-            api_key = ""
+        if self.AI_NAME == "ollama_chat":
+            try:
+                conf_json = getattr(self.親, "conf", None)
+                if conf_json and hasattr(conf_json, "json"):
+                    api_key = conf_json.json.get("ollama_key_id", "ollama")
+            except Exception:
+                api_key = "ollama"
+        else:
+            try:
+                conf_json = getattr(self.親, "conf", None)
+                if conf_json and hasattr(conf_json, "json"):
+                    if self.AI_NAME in ("gemini_chat", "freeai_chat", "gemini", "freeai"):
+                        api_key = conf_json.json.get("gemini_key_id", "")
+                        if self.AI_NAME in ("freeai_chat", "freeai"):
+                            api_key = conf_json.json.get("freeai_key_id", "") or api_key
+                    else:
+                        api_key = conf_json.json.get("openrt_key_id", "")
+            except Exception:
+                api_key = ""
 
         if not api_key or api_key[:1] == '<':
             メッセージ = f"{ai_label}APIキーが無効です。"

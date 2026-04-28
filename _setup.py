@@ -7,8 +7,9 @@
 対象:
 - 共通
 - バックエンド(core,apps): `backend_server`
-- フロントエンド(Web): `frontend_web`
-- フロントエンド(Avatar): `frontend_avatar`
+- バックエンド(mcp)      : `backend_mcp`
+- フロントエンド(Web)    : `frontend_web`
+- フロントエンド(Avatar) : `frontend_avatar`
 
 Usage:
     python _setup.py
@@ -47,6 +48,12 @@ POSTGRES_PATH = "backend_server/postgres"
 
 AUTO_MODE = False
 GLOBAL_NPM_INSTALL_PROCESSES = []
+HERMES_AGENT_INSTALL_COMMAND = (
+    "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
+)
+OLLAMA_INSTALL_COMMAND = (
+    "curl -fsSL https://ollama.com/install.sh | sh"
+)
 
 BASE_DIR = Path(__file__).parent
 BACKEND_DIR = BASE_DIR / BACKEND_PATH
@@ -556,11 +563,17 @@ def print_ai_cli_manual_setup():
     print_info(f"    GitHub Copilot: {cmd} install -g @github/copilot")
     print_info(f"    OpenAI Codex : {cmd} install -g @openai/codex")
     print_info(f"    Gemini CLI : {cmd} install -g @google/gemini-cli")
+    print_info(f"    Hermes Agent: {HERMES_AGENT_INSTALL_COMMAND}")
+    print_info(f"    Ollama     : {OLLAMA_INSTALL_COMMAND}")
 
 
 def start_global_npm_tools_install():
     print_header("共通セットアップ: npm ツール投入")
     print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / Gemini CLI")
+    print_info("参考: Hermes Agent は npm ではなく、次の bash installer で導入します。")
+    print_info(f"      {HERMES_AGENT_INSTALL_COMMAND}")
+    print_info("参考: Ollama は次のコマンドで導入できます。")
+    print_info(f"      {OLLAMA_INSTALL_COMMAND}")
     print_info("AI CLI ツールを並列で投入します。完了確認は最後にまとめて行います。")
 
     if not check_npm_installed():

@@ -26,6 +26,7 @@ class conf_models:
         self.google_models: Dict[str, Dict[str, str]] = {}
         self.openai_models: Dict[str, Dict[str, str]] = {}
         self.claude_models: Dict[str, Dict[str, str]] = {}
+        self.ollama_models: Dict[str, str] = {}
         self.mcp_servers: Dict[str, dict] = {}
 
         # ライブAIモデル一覧
@@ -301,6 +302,42 @@ class conf_models:
             self.get_openai_models(self.conf.json.openai_key_id, org)
 
             self.get_claude_models(self.conf.json.claude_key_id)
+
+            # Ollama（ローカル・CLIで取得）
+            self.get_ollama_models()
+
+    def get_ollama_models(self) -> Dict[str, str]:
+        """ollama list コマンドで利用可能なモデル一覧を取得"""
+        import subprocess
+        result: Dict[str, str] = {}
+        try:
+            proc = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True, text=True, timeout=10
+            )
+            if proc.returncode == 0:
+                lines = proc.stdout.splitlines()
+                for line in lines[1:]:  # ヘッダー行をスキップ
+                    parts = line.split()
+                    if len(parts) < 1:
+                        continue
+                    name = parts[0]
+                    result[name] = f"Ollama - {name}"
+                if result:
+                    logger.info(f"Ollamaモデル取得完了: {len(result)}個")
+                    self.ollama_models = result
+                    return result
+                logger.info("Ollamaモデルが見つかりません")
+            else:
+                logger.info(f"ollama list 失敗: {proc.stderr.strip()}")
+        except FileNotFoundError:
+            logger.info("ollama コマンドが見つかりません（未インストール）")
+        except Exception as e:
+            logger.info(f"ollama list エラー: {e}")
+        # フォールバック
+        fallback: Dict[str, str] = {"deepseek-v4-flash:cloud": "Ollama - deepseek-v4-flash:cloud (default)"}
+        self.ollama_models = fallback
+        return fallback
 
     def get_openrt_models(self, api_key: str) -> Dict[str, Dict[str, str]]:
         """OpenRouter apiからモデル一覧を取得（プロバイダー別フィルタリング）"""
@@ -578,6 +615,8 @@ class conf_models:
 
     def get_chat_models(self) -> Dict[str, Dict[str, str]]:
         """チャットAIモデル一覧を取得（日付情報付き）"""
+        # Ollamaモデル：取得済みがあれば使用、なければデフォルトを表示
+        ollama_dict = self.ollama_models if self.ollama_models else {"deepseek-v4-flash:cloud": "Ollama - deepseek-v4-flash:cloud (default)"}
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
@@ -590,7 +629,8 @@ class conf_models:
             "openrt_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.openrt_models.items()
-            }
+            },
+            "ollama_chat": ollama_dict,
         }
 
         return models

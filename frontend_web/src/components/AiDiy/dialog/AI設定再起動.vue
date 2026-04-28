@@ -57,7 +57,8 @@ const selections = reactive({
 const CHAT_MODEL_KEYS: Record<string, string> = {
   gemini_chat: 'CHAT_GEMINI_MODEL',
   freeai_chat: 'CHAT_FREEAI_MODEL',
-  openrt_chat: 'CHAT_OPENRT_MODEL'
+  openrt_chat: 'CHAT_OPENRT_MODEL',
+  ollama_chat: 'CHAT_OLLAMA_MODEL'
 };
 
 const LIVE_MODEL_KEYS: Record<string, string> = {
