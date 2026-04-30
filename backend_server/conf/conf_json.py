@@ -77,7 +77,7 @@ class conf_json:
         'CODE_COPILOT_CLI_MODEL': 'auto',
         'CODE_GEMINI_CLI_MODEL': 'auto',
         'CODE_CODEX_CLI_MODEL': 'auto',
-        'CODE_HERMES_CLI_MODEL': 'auto',
+        'CODE_AIDIY_HERMES_MODEL': 'auto',
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',
         'CODE_VERIFY': 'auto',
@@ -153,6 +153,20 @@ class conf_json:
         object.__setattr__(self, '_config_data', ordered)
         return 変更あり
 
+    def _normalize_ollama_cloud_model_value(self, key: str, value: Any) -> Any:
+        """Ollama Cloud利用時は読取値だけ :cloud を除去する（設定ファイルは変更しない）"""
+        if key not in ('CHAT_OLLAMA_MODEL', 'OLLAMA_MODEL'):
+            return value
+        if not isinstance(value, str) or ':cloud' not in value:
+            return value
+
+        config_data = object.__getattribute__(self, '_config_data')
+        key_id = config_data.get('ollama_key_id', '')
+        if not isinstance(key_id, str) or not key_id.strip() or key_id.strip().startswith('<'):
+            return value
+        return value.replace(':cloud', '')
+
+
     def _apply_code_ai_auto(self) -> bool:
         """CODE_AI2_NAME～4_NAMEが'auto'の場合、CODE_AI1_NAMEの値をコピー"""
         config_data = object.__getattribute__(self, '_config_data')
@@ -194,7 +208,7 @@ class conf_json:
         """プロパティアクセスで設定値を取得"""
         config_data = object.__getattribute__(self, '_config_data')
         if key in config_data:
-            return config_data[key]
+            return self._normalize_ollama_cloud_model_value(key, config_data[key])
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
 
     def __setattr__(self, key: str, value: Any) -> None:
@@ -209,7 +223,7 @@ class conf_json:
     def get(self, key: str, default: Any = None) -> Any:
         """設定値を取得（辞書形式）"""
         config_data = object.__getattribute__(self, '_config_data')
-        return config_data.get(key, default)
+        return self._normalize_ollama_cloud_model_value(key, config_data.get(key, default))
 
     def set(self, key: str, value: Any) -> bool:
         """設定値を設定し、ファイルに保存（辞書形式）"""

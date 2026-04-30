@@ -81,6 +81,37 @@ frontend の `CHAT_MODEL_KEYS` / `LIVE_MODEL_KEYS` / `LIVE_VOICE_KEYS` / `CODE_M
 
 `CODE_AI1_MODEL`〜`CODE_AI4_MODEL` は選択スロットごとの現在モデルとして保存される。一方で `CODE_CODEX_CLI_MODEL` のような CLI 種別別モデルキーもあるため、追加時は「スロット設定」と「CLI 種別別デフォルト」を混同しない。
 
+## Ollama Chat のローカル / Cloud 切替
+
+対象:
+- `backend_server/AIコア/AIチャット_ollama.py`
+- `backend_server/conf/conf_model.py`
+- `backend_server/AIコア/AIチャット.py`
+
+判断基準:
+- `ollama_key_id` が `<` で始まるプレースホルダーの場合は、従来どおりローカル Ollama を使う
+  - 実行時 base URL: `ollama_host + "/v1"`（既定 `http://localhost:11434/v1`）
+  - モデル一覧: `ollama list`
+  - OpenAI SDK へ渡す API キーはダミーの `ollama`
+- `ollama_key_id` が `<` で始まらない場合は、Ollama Cloud を直接使う
+  - 実行時 base URL: `https://ollama.com/v1`
+  - モデル一覧: `GET https://ollama.com/v1/models`
+  - `Authorization: Bearer <ollama_key_id>` を付ける
+
+モデル名の注意:
+- ローカル経由では `deepseek-v4-flash:cloud` のようなサフィックス付きモデル名をそのまま維持する
+- Cloud 直叩き時は `:cloud` と、入力揺れ対策の `:clude` を外して API に渡す
+- `AiDiy_key.json` 読込時点で `ollama_key_id` が有効なら、`CHAT_OLLAMA_MODEL`（存在する場合は `OLLAMA_MODEL` も）の読取値だけ `conf_json.py` で `replace(":cloud", "")` する
+- `AiDiy_key.json` は正マスタなので、読み取り時の正規化だけを理由にファイルへ保存しない
+- 設定 UI に返す Cloud モデル一覧もサフィックス除去後のキーにする
+- `available_models.chat_models.ollama_chat` の表示値は、他のチャットモデルと同じ `yyyy/mm/dd - model` 形式に揃える
+  - Cloud は `/v1/models` の `created` timestamp を `YYYY/MM/DD` へ変換し、8か月以内（240日）に絞って新しい順で返す
+  - ローカル `ollama list` は安定した作成日が取れないため `yyyy/mm/dd` を使う
+
+welcome 判定の注意:
+- `ollama_chat` は `ollama_key_id` がプレースホルダーでもローカル実行が正しいため、`AIチャット.py` の welcome 事前チェックで API キー無効扱いにしない
+- 実際の疎通失敗は `AIチャット_ollama.py` 側の実行時エラーとして扱う
+
 ## 実装の結論
 
 - `AiDiy_key.json` を正マスタとし、frontend の `defaultModelSettings()` は取得前フォールバックとして扱う

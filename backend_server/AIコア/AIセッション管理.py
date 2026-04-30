@@ -44,7 +44,7 @@ def 初期モデル設定生成(app_conf) -> dict:
     # CODE_BASE_PATHは相対パスのまま保存（絶対パス変換は使用時に行う）
     code_base_path_raw = str(app_conf.json.get("CODE_BASE_PATH", "../")).strip() or "../"
 
-    return {
+    設定 = {
         # ChatAI設定
         "CHAT_AI_NAME": app_conf.json.get("CHAT_AI_NAME", "freeai_chat"),
         "CHAT_GEMINI_MODEL": app_conf.json.get("CHAT_GEMINI_MODEL", "gemini-3-pro-image-preview"),
@@ -73,12 +73,35 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_COPILOT_CLI_MODEL": app_conf.json.get("CODE_COPILOT_CLI_MODEL", "auto"),
         "CODE_GEMINI_CLI_MODEL": app_conf.json.get("CODE_GEMINI_CLI_MODEL", "auto"),
         "CODE_CODEX_CLI_MODEL": app_conf.json.get("CODE_CODEX_CLI_MODEL", "auto"),
-        "CODE_HERMES_CLI_MODEL": app_conf.json.get("CODE_HERMES_CLI_MODEL", "auto"),
+        "CODE_AIDIY_HERMES_MODEL": app_conf.json.get(
+            "CODE_AIDIY_HERMES_MODEL",
+            app_conf.json.get("CODE_HERMES_CLI_MODEL", "auto"),
+        ),
         "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
         "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
         "CODE_BASE_PATH": code_base_path_raw,
     }
+    return モデル設定正規化(設定)
+
+
+def モデル設定正規化(設定: Optional[dict]) -> dict:
+    """旧 Hermes 設定名を現行名へ寄せる。"""
+    if not isinstance(設定, dict):
+        return {}
+
+    正規化後 = dict(設定)
+
+    旧hermesモデル = 正規化後.pop("CODE_HERMES_CLI_MODEL", None)
+    if "CODE_AIDIY_HERMES_MODEL" not in 正規化後 and 旧hermesモデル is not None:
+        正規化後["CODE_AIDIY_HERMES_MODEL"] = 旧hermesモデル
+
+    for i in range(1, 5):
+        ai_key = f"CODE_AI{i}_NAME"
+        if 正規化後.get(ai_key) == "hermes_cli":
+            正規化後[ai_key] = "aidiy_hermes"
+
+    return 正規化後
 
 
 class WebSocketConnection:
@@ -307,7 +330,10 @@ class SessionConnection:
             manager.save_session_state(self.セッションID, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
     def update_model_settings(self, 設定: dict, manager=None):
-        self.モデル設定.update(設定)
+        self.モデル設定 = モデル設定正規化({
+            **self.モデル設定,
+            **(設定 or {}),
+        })
         if manager:
             manager.save_session_state(self.セッションID, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
@@ -425,7 +451,7 @@ class WebSocketManager:
             if セッションID in self.session_states:
                 saved_state = self.session_states[セッションID]
                 session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
-                session.モデル設定 = saved_state.get("モデル設定", {})
+                session.モデル設定 = モデル設定正規化(saved_state.get("モデル設定", {}))
                 session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
                 logger.debug(f"セッション状態を復元: {セッションID}")
             else:
@@ -495,7 +521,7 @@ class WebSocketManager:
         if セッションID in self.session_states:
             saved_state = self.session_states[セッションID]
             session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
-            session.モデル設定 = saved_state.get("モデル設定", {})
+            session.モデル設定 = モデル設定正規化(saved_state.get("モデル設定", {}))
             session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
         else:
             session.モデル設定 = self._新規セッション初期モデル設定(app_conf, セッションID)
@@ -514,7 +540,7 @@ class WebSocketManager:
             "ボタン": ボタン.copy()
         }
         if モデル設定 is not None:
-            state["モデル設定"] = モデル設定.copy()
+            state["モデル設定"] = モデル設定正規化(モデル設定)
         if ソース最終更新日時 is not None:
             state["ソース最終更新日時"] = ソース最終更新日時
 

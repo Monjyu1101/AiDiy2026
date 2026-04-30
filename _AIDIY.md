@@ -16,6 +16,7 @@
   - テーブル名、カラム名、API、JSON キー、Vue ファイル名が日本語中心
 - フルスタック構成
   - バックエンド: FastAPI + SQLAlchemy + SQLite
+  - バックエンド Hermes: `backend_hermes` / `aidiy_hermes`（コード支援用 CLI 基盤）
   - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
   - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
 - マルチバックエンド
@@ -29,7 +30,7 @@
   - WebSocket ベースの AI コア
   - 音声、画像、コード支援パネル
 - マルチ Code CLI 対応
-  - `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `hermes_cli`
+  - `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `aidiy_hermes`
   - 複数のコードエージェントを同時並走（code1〜code4 パネル）
 - AIブラウザ自動操作・デスクトップキャプチャ・自己検証 MCP
   - `backend_mcp/mcp_main.py`（port 8095）が 8 MCP サーバーを SSE で提供
@@ -64,7 +65,7 @@
 - AI 名の規約
   - `CHAT_AI_NAME`: `*_chat`
   - `LIVE_AI_NAME`: `*_live`
-  - `CODE_AI*_NAME`: `*_sdk` または `*_cli`
+  - `CODE_AI*_NAME`: 原則 `*_sdk` または `*_cli`（例外: `aidiy_hermes`）
 
 ---
 

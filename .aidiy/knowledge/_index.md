@@ -57,7 +57,9 @@
 |---------|------|---------|
 | [`CodeCLI追加手順.md`](./CodeCLI追加手順.md) | 新しい code CLI を AiDiy に追加したい | backend 実装・設定 JSON・設定 UI の標準チェックリスト |
 | [`CodeCLIプロンプト整形.md`](./CodeCLIプロンプト整形.md) | CLI の system prompt と送信テキストの整形責務を分けたい | 1行化タイミングの判断基準・履歴可読性の保ち方 |
+| [`CodeCLI表示ANSI制御コード対処.md`](./CodeCLI表示ANSI制御コード対処.md) | CLI回答に `?[36m` などの色記号が出る | subprocess出力とフロント表示直前のANSI除去 |
 | [`CodeCLI_MCP設定.md`](./CodeCLI_MCP設定.md) | `claude` / `gemini` / `codex` に同じ MCP を使わせたい | CLI ごとの設定場所の違い |
+| [`HermesCLI_TUI調整手順.md`](./HermesCLI_TUI調整手順.md) | backend_hermes の TUI・起動ロゴ・スラッシュコマンドを調整したい | 旧Hermes TUI骨格の移植、`/` 補完、履歴、provider/model picker、軽量バナーの実装観点 |
 | [`MCP活用手順.md`](./MCP活用手順.md) | Claude Agent SDK から MCP ツールを使いたい | `AiDiy_mcp.json` の設定形式・8 MCP サーバーの用途・接続確認 |
 | [`AIモデル設定変更手順.md`](./AIモデル設定変更手順.md) | 使用する AI モデルを変更したい | 命名規則（`_chat`/`_live`/`_sdk`/`_cli`）・`AiDiy_key.json` 編集・設定 UI の取得フロー |
 | [`AIコアWebSocket仕様.md`](./AIコアWebSocket仕様.md) | WebSocket 接続フロー・メッセージ形式を把握したい | 2 本ソケット構成・`init` メッセージ・トークン延長ルール |

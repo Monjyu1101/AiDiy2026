@@ -16,8 +16,9 @@
 - 開発環境のセットアップとコマンドの参照
 - バックエンドとフロントエンドの詳細ドキュメントへのナビゲーション
 
-**バックエンドサーバーとフロントエンドサーバーの詳細は別ドキュメント：**
+**バックエンドサーバー / CLI 基盤 / フロントエンドの詳細は別ドキュメント：**
 - **バックエンド（FastAPI + SQLAlchemy + SQLite）の実装詳細** → [backend_server/AGENTS.md](./backend_server/AGENTS.md)
+- **バックエンド Hermes（`aidiy_hermes` CLI 基盤）の実装詳細** → [backend_hermes/AGENTS.md](./backend_hermes/AGENTS.md)
 - **バックエンド MCP（8 サーバー: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup Check / Backup Save）の実装詳細** → [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
 - **フロントエンド Web（Vue 3 + Vite + TypeScript）の実装詳細** → [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - **フロントエンド Avatar（Electron/Web デュアルモード）の実装詳細** → [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
@@ -26,13 +27,14 @@
 - **[./CLAUDE.md](./CLAUDE.md)** - Claude Code向けインデックス（クイックスタート、アーキテクチャサマリー）
 - **[./docs/](./docs/)** - HTML形式の詳細ドキュメント（コーディングルール、実装例など）
 - **[./backend_server/AGENTS.md](./backend_server/AGENTS.md)** - バックエンド実装の完全ガイド
+- **[./backend_hermes/AGENTS.md](./backend_hermes/AGENTS.md)** - `aidiy_hermes` CLI 基盤の完全ガイド
 - **[./frontend_web/AGENTS.md](./frontend_web/AGENTS.md)** - フロントエンド実装の完全ガイド
 
 **このファイルの内容：**
 - AiDiyとは何か（プロジェクトの目的と特徴）
 - プロジェクト概要と基本方針
 - 日本語命名規約とテーブル命名規則
-- アーキテクチャ概要（3サーバー構成、主要な設計パターン）
+- アーキテクチャ概要（3サーバー + CLI基盤構成、主要な設計パターン）
 - 開発コマンド（起動方法、依存関係管理）
 - アクセスURL・ポート設定
 - よくある問題と解決方法
@@ -135,7 +137,7 @@
    - マルチベンダーAI対応（Anthropic Claude, OpenAI, Google Gemini）
    - WebSocketによるリアルタイムAI対話
    - 音声・画像・テキスト統合インターフェース (AIコア)
-   - **マルチ Code CLI 対応** — `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `gemini_cli` / `hermes_cli` を並走
+   - **マルチ Code CLI 対応** — `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `gemini_cli` / `aidiy_hermes` を並走
    - **自己改善機構** — コードエージェントが修正完了後に `.aidiy/knowledge/` へ知見を自動整理し、使うほど修正精度が上がる
 
 ### 提供される機能
@@ -204,9 +206,9 @@
 - 日本語話者にとって理解しやすい
 - ドキュメントとコードのギャップがない
 
-### 2. 3サーバーアーキテクチャ
+### 2. 3サーバー + Hermes CLI 基盤アーキテクチャ
 
-**3つの独立したサーバー：**
+**常駐系は3つの独立したサーバー：**
 - **core_main.py** (port 8091) - Core/Common features (C系, A系)
 - **apps_main.py** (port 8092) - Application features (M系, T系, V系, S系)
 - **mcp_main.py** (port 8095) - MCP サーバー（8 サーバー同居）
@@ -220,6 +222,11 @@
   - `aidiy_backup_save`     — AiDiy ネイティブの差分バックアップを実行
 - core/apps は同じSQLiteデータベースを共有
 - Vite Proxy で `/core/*` と `/apps/*` を自動振り分け
+
+**統合 CLI 基盤：**
+- **backend_hermes** - `aidiy_hermes` コマンドとして動作するコードエージェント CLI
+- `_setup.py` / `_cleanup.py` には統合済みだが、`_start.py` の常駐起動対象ではない
+- AIコアのコードパネルでは `CODE_AI*_NAME = "aidiy_hermes"` として利用する
 
 **メリット：**
 - 機能のモジュラー化
@@ -468,7 +475,7 @@ const isElectron = !!window.desktopApi  // IPC bridge が存在すれば Electro
 **AIモードの種類：**
 - `CHAT_AI_NAME`（`_chat` サフィックス） — テキストチャット専用 AI（Claude / GPT / Gemini）
 - `LIVE_AI_NAME`（`_live` サフィックス） — 音声リアルタイム対話 AI（Gemini Live / OpenAI Realtime）
-- `CODE_AI*_NAME`（`_sdk` または `_cli` サフィックス） — コード支援 AI（コードパネル専用）。有効値: `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `hermes_cli`
+- `CODE_AI*_NAME`（原則 `_sdk` または `_cli`、例外 `aidiy_hermes`） — コード支援 AI（コードパネル専用）。有効値: `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `aidiy_hermes`
 
 音声設定は frontend_avatar の `settings` ウィンドウ（AI設定ダイアログ）から切り替え可能。設定変更後はバックエンドが自動再起動（Reboot機構）。
 
@@ -662,6 +669,7 @@ This launcher:
 - Sets console encoding for Windows
 
 **注意:** `_start.py` は**引数指定ではなく対話形式**で動作します（起動するサービスを対話的に選択）。また uvicorn の `--reload` フラグは付かないため、バックエンドのコード変更は自動で反映されません（Reboot機構 or 手動再起動が必要）。
+`backend_hermes` は on-demand CLI のため、`_start.py` では起動しません。
 
 **Individual servers:**
 ```bash
@@ -672,6 +680,11 @@ cd backend_server
 # バックエンド Apps のみ（プロジェクトルートから）
 cd backend_server
 .venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
+
+# バックエンド Hermes のみ（対話 CLI）
+cd backend_hermes
+.venv/Scripts/python.exe cli_main.py
+# または aidiy_hermes
 
 # フロントエンド Web のみ
 cd frontend_web
@@ -720,6 +733,14 @@ python _start.py
 cd backend_server
 uv sync          # Install/sync dependencies from pyproject.toml
 uv add <package> # Add new dependency
+```
+
+**バックエンド Hermes（Python + requirements.txt）:**
+```bash
+cd backend_hermes
+uv venv .venv
+uv pip install -r requirements.txt
+aidiy_hermes --help   # グローバル登録済みなら
 ```
 
 **フロントエンド Web（Node.js + npm + TypeScript）:**

@@ -8,6 +8,7 @@
 
 1. 実装ファイルを最優先する。
    - 認証: `backend_server/auth.py`, `backend_server/core_router/auth.py`, `frontend_web/src/api/client.ts`, `frontend_web/src/stores/auth.ts`, `frontend_avatar/src/api/client.ts`
+   - Hermes: `backend_hermes/cli_main.py`, `backend_server/AIコア/AIコード_cli.py`, `backend_server/conf/conf_model.py`, `backend_server/conf/conf_json.py`
    - MCP: `backend_mcp/mcp_main.py`, `backend_mcp/mcp_stdio.py`, `backend_mcp/mcp_proc/`
    - 起動・環境: `_setup.py`, `_start.py`, `CLAUDE.md`, 各 `AGENTS.md`
 2. 次に AGENTS/CLAUDE の方針を確認する。
@@ -37,6 +38,9 @@
 - `frontend_web` の認証Storageは `localStorage`。`frontend_avatar` は HTTP 認証Storageが Electron=`localStorage`、Web=`sessionStorage`。
 - MCP 実装詳細は `backend_server/AGENTS.md` ではなく `backend_mcp/AGENTS.md` に分離済み。
 - `_start.py` は対話形式で、`--reload` は付かない。コード変更反映は個別起動または `temp/reboot_*.txt` を使う。
+- `backend_hermes` は `_setup.py` / `_cleanup.py` へ統合済みだが、`_start.py` の常駐起動対象ではない。
+- Code AI 名の現行値は `hermes_cli` ではなく `aidiy_hermes`。
+- `aidiy_hermes` のモデル一覧は `AiDiy_code_*.json` ではなく `conf_model.py` が Ollama モデル一覧から動的生成する。
 - Docker 構成は `backend_mcp` を含まない。MCP 検証手順ではローカル起動を前提にする。
 - `npm run build` は明示依頼時のみ。通常の検証記述は `npm run type-check` を優先する。
 
@@ -55,6 +59,7 @@
 $files = rg --files -g '*.md' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**/dist/**' -g '!**/backup/**'
 rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|openai_chat' $files
 rg -n 'aidiy_backup_check|aidiy_backup_save|M取引先|V取引先|トークン更新|files_temp|reboot_mcp' $files
+rg -n 'hermes_cli|aidiy_hermes|3サーバー構成|_start\.py.*backend_hermes|AiDiy_code_hermes_cli' $files
 rg -n 'includeInactive|無効も検索|router/index\.ts へのルート追加|商品コードが重複|get_商品_by_code|DELETE文でデータを完全に削除' docs
 rg -n 'start\.py|_stop\.py|8095.*Docker|npm run build' $files
 ```

@@ -36,6 +36,9 @@ BACKEND_ENV_LIST = [".venv", "venv"]
 BACKEND_MCP_PATH = "backend_mcp"
 BACKEND_MCP_ENV_LIST = [".venv", "venv"]
 
+BACKEND_HERMES_PATH = "backend_hermes"
+BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
+
 FRONTEND_WEB_PATH = "frontend_web"
 
 FRONTEND_AVATAR_PATH = "frontend_avatar"
@@ -384,6 +387,12 @@ def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
 
+    print_info(f"{label}: *.egg-info フォルダを検索中...")
+    for egg_info in target_dir.rglob("*.egg-info"):
+        if egg_info.is_dir():
+            if remove_directory(egg_info, f".egg-info ({label})"):
+                deleted_count += 1
+
     return deleted_count
 
 
@@ -487,6 +496,39 @@ def cleanup_backend_mcp(base_dir: Path, choices: dict):
                 deleted_count += 1
         elif choices.get("mcp_temp") is False:
             print_info(f"  {BACKEND_MCP_PATH}/temp はそのまま残します")
+
+    if deleted_count > 0:
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
+    else:
+        print_info(f"{label}: 削除対象はありませんでした")
+
+
+def cleanup_backend_hermes(base_dir: Path, choices: dict):
+    label = "バックエンド(hermes)"
+    print_header(f"{label} のクリーンアップ")
+
+    hermes_dir = base_dir / BACKEND_HERMES_PATH
+    if not hermes_dir.exists():
+        print_warning(f"{label} のフォルダが見つかりません")
+        return
+
+    deleted_count = cleanup_common_python_caches(hermes_dir, label)
+
+    hermes_envs = choices.get("hermes_envs", {})
+    for env_name in BACKEND_HERMES_ENV_LIST:
+        env_dir = hermes_dir / env_name
+        if not env_dir.exists():
+            continue
+        if hermes_envs.get(env_name):
+            if remove_directory(env_dir, f"{env_name} ({label})"):
+                deleted_count += 1
+            else:
+                print_error(
+                    f"  {BACKEND_HERMES_PATH}/{env_name} 削除失敗。"
+                    f"手動で削除してください: {env_dir}"
+                )
+        elif env_name in hermes_envs:
+            print_info(f"  {BACKEND_HERMES_PATH}/{env_name} はそのまま残します")
 
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
@@ -605,6 +647,8 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "backend_logs":   None,
         "backend_temp":   None,
         "backend_sqlite": None,
+        "hermes":         False,
+        "hermes_envs":    {},
         "web":            False,
         "avatar":         False,
     }
@@ -613,6 +657,17 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "グローバルnpmツール(AI CLIツール)をアンインストールしますか？",
         default="n",
     )
+
+    choices["hermes"] = ask_yes_no("バックエンド(hermes)をクリーンアップしますか？", default="y")
+    if choices["hermes"]:
+        hermes_dir = base_dir / BACKEND_HERMES_PATH
+        if hermes_dir.exists():
+            for env_name in BACKEND_HERMES_ENV_LIST:
+                if (hermes_dir / env_name).exists():
+                    choices["hermes_envs"][env_name] = ask_yes_no(
+                        f"  {BACKEND_HERMES_PATH}/{env_name} を削除しますか？",
+                        default="y",
+                    )
 
     choices["mcp"] = ask_yes_no("バックエンド(mcp) をクリーンアップしますか？", default="y")
     if choices["mcp"]:
@@ -672,10 +727,11 @@ def main():
     base_dir = Path(__file__).parent
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  1. バックエンド(mcp)")
-    print_info("  2. バックエンド(core,apps)")
-    print_info("  3. フロントエンド(Web)")
-    print_info("  4. フロントエンド(Avatar)")
+    print_info("  1. バックエンド(hermes)")
+    print_info("  2. バックエンド(mcp)")
+    print_info("  3. バックエンド(core,apps)")
+    print_info("  4. フロントエンド(Web)")
+    print_info("  5. フロントエンド(Avatar)")
     print()
 
     choices = collect_cleanup_choices(base_dir)
@@ -689,6 +745,12 @@ def main():
         uninstall_global_npm_tools()
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
+
+    print()
+    if choices["hermes"]:
+        cleanup_backend_hermes(base_dir, choices)
+    else:
+        print_info("バックエンド(hermes) のクリーンアップをスキップしました")
 
     print()
     if choices["mcp"]:

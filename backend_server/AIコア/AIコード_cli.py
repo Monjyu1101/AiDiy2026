@@ -17,8 +17,6 @@ import time
 import datetime
 import asyncio
 import base64
-import shlex
-import re
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -90,31 +88,6 @@ class CodeAI:
         # バージョン文字列（開始()時に取得）
         self.バージョン: str = ""
 
-    def _hermes_wsl利用(self) -> bool:
-        """Windows 上で hermes_cli を WSL 経由実行するか判定"""
-        return self.code_ai == "hermes_cli" and os.name == 'nt'
-
-    def _WSLパス変換(self, path_str: Optional[str]) -> Optional[str]:
-        """Windows 絶対パスを WSL の /mnt/... 形式へ変換"""
-        if not isinstance(path_str, str) or not path_str.strip():
-            return path_str
-
-        normalized = path_str.replace("\\", "/")
-        match = re.match(r"^([A-Za-z]):/(.*)$", normalized)
-        if match:
-            drive = match.group(1).lower()
-            rest = match.group(2)
-            return f"/mnt/{drive}/{rest}"
-        return normalized
-
-    def _CLI向けパス(self, path_str: Optional[str]) -> Optional[str]:
-        """現在のCLI実行環境で解釈できるパス表現へ変換"""
-        if not isinstance(path_str, str) or not path_str.strip():
-            return path_str
-        if self._hermes_wsl利用():
-            return self._WSLパス変換(path_str)
-        return path_str
-
     def _CLI送信用テキスト正規化(self, text: Optional[str]) -> str:
         """CLIへ渡す文字列は改行・復帰を空白へ変換して1行化する"""
         if text is None:
@@ -128,8 +101,13 @@ class CodeAI:
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
         if custom_cmd:
             return custom_cmd
-        if self.code_ai == "hermes_cli":
-            return "hermes"
+        if self.code_ai == "aidiy_hermes":
+            if os.name == 'nt':
+                userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
+                candidate = os.path.join(userprofile, '.local', 'bin', 'aidiy_hermes.exe')
+                if os.path.isfile(candidate):
+                    return candidate
+            return "aidiy_hermes"
         if os.name == 'nt':
             userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
             npm_bin = os.path.join(userprofile, 'AppData', 'Roaming', 'npm')
@@ -150,30 +128,12 @@ class CodeAI:
         """CLIツールの --version を実行してバージョン文字列を返す。失敗時は空文字。"""
         cmd = self._コマンドパス取得()
         try:
-            if self._hermes_wsl利用():
-                hermes_args = ["wsl", "bash", "-lc", "hermes --version"]
-                start_time = time.time()
-                result = await asyncio.to_thread(
-                    subprocess.run,
-                    hermes_args,
-                    capture_output=True,
-                    text=True,
-                    timeout=20,
-                    encoding="utf-8",
-                    errors="replace",
-                )
-                elapsed = time.time() - start_time
-                output = (result.stdout or "").strip() or (result.stderr or "").strip()
-                first_line = output.splitlines()[0].strip() if output else ""
-                logger.info(f"[CodeAI] hermes --version => {first_line} ({elapsed:.1f}s)")
-                return first_line
-            else:
-                version_args = [cmd, "--version"]
-                proc = await asyncio.create_subprocess_exec(
-                    *version_args,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
+            version_args = [cmd, "--version"]
+            proc = await asyncio.create_subprocess_exec(
+                *version_args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
             except asyncio.TimeoutError:
@@ -215,33 +175,10 @@ class CodeAI:
         # 環境変数からカスタムコマンドパスを取得（オプション）
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
 
-        if self.code_ai == "hermes_cli":
-            if custom_cmd:
-                cmd = custom_cmd
-            else:
-                cmd = 'hermes'
-
-            model_args = []
-            if self.code_model and self.code_model.lower() != "auto":
-                model_args = ["--model", self.code_model]
-
-            base_args = [cmd, "chat"] + model_args + ["--yolo", "-Q", "-q", プロンプト]
-
-            if self._hermes_wsl利用():
-                wsl_repo_path = self._CLI向けパス(repo_path) if repo_path else None
-                shell_command = " ".join(shlex.quote(arg) for arg in base_args)
-                if wsl_repo_path:
-                    shell_command = f"cd {shlex.quote(wsl_repo_path)} && {shell_command}"
-                if 初回:
-                    return ["wsl", "bash", "-lc", shell_command]
-                continue_command = " ".join(shlex.quote(arg) for arg in ([cmd, "chat", "--continue"] + model_args + ["--yolo", "-Q", "-q", プロンプト]))
-                if wsl_repo_path:
-                    continue_command = f"cd {shlex.quote(wsl_repo_path)} && {continue_command}"
-                return ["wsl", "bash", "-lc", continue_command]
-
-            if 初回:
-                return base_args
-            return [cmd, "chat", "--continue"] + model_args + ["--yolo", "-Q", "-q", プロンプト]
+        if self.code_ai == "aidiy_hermes":
+            cmd = custom_cmd or self._コマンドパス取得()
+            model_args = ["--model", self.code_model] if self.code_model and self.code_model.lower() != "auto" else []
+            return [cmd, "-Q"] + model_args + ["-z", プロンプト]
 
         if self.code_ai == "copilot_cli":
             # GitHub Copilot CLI
@@ -361,22 +298,10 @@ class CodeAI:
                 base_prompt = "あなたは、美しい日本語を話す、賢いコードエージェントです。"
 
             # 実行環境に応じた補足を文末へ自動付加（重複は除去）
-            suffixes = [
-                "Windows環境で動作していることを考慮して、適切なコマンドを使用してください。",
-                "Windowsホスト上ですが、hermes_cli は WSL 上の Linux 環境で実行されます。コマンドは Linux 形式を使用し、絶対パスは `/mnt/<drive>/...` 形式で扱ってください。",
-            ]
-            if self._hermes_wsl利用():
-                suffix = suffixes[1]
-            elif os.name == 'nt':
-                suffix = suffixes[0]
-            else:
-                suffix = None
+            suffix = "Windows環境で動作していることを考慮して、適切なコマンドを使用してください。" if os.name == 'nt' else None
 
             if suffix:
-                normalized = base_prompt
-                for item in suffixes:
-                    normalized = normalized.replace(item, "")
-                normalized = normalized.strip()
+                normalized = base_prompt.replace(suffix, "").strip()
                 base_prompt = f"{normalized}\n{suffix}" if normalized else suffix
 
             return base_prompt
@@ -392,7 +317,7 @@ class CodeAI:
             index_path = base_dir / ".aidiy" / "knowledge" / "_index.md"
             if not index_path.exists():
                 return ""
-            display_path = self._CLI向けパス(index_path.resolve().as_posix())
+            display_path = index_path.resolve().as_posix()
             return (
                 "\n\n"
                 "プロジェクト内のファイル操作するときは、\n"
@@ -610,8 +535,7 @@ class CodeAI:
             if file_path:
                 try:
                     abs_path_str = Path(file_path).resolve().as_posix()
-                    cli_path_str = self._CLI向けパス(abs_path_str)
-                    要求テキスト += f"\n\n添付ファイル: `{cli_path_str}`"
+                    要求テキスト += f"\n\n添付ファイル: `{abs_path_str}`"
                 except Exception as e:
                     logger.error(f"最終ファイル添付エラー: {e}")
 
@@ -674,10 +598,9 @@ class CodeAI:
                                 rgb_img.save(save_path, format='JPEG')
 
                                 abs_path_str = save_path.resolve().as_posix()
-                                cli_path_str = self._CLI向けパス(abs_path_str)
-                                image_prompt_addition = f"\n\n添付ファイル: `{cli_path_str}`"
+                                image_prompt_addition = f"\n\n添付ファイル: `{abs_path_str}`"
                                 要求テキスト += image_prompt_addition
-                                logger.info(f"最終イメージを添付: {cli_path_str}")
+                                logger.info(f"最終イメージを添付: {abs_path_str}")
 
                         except Exception as e:
                                 logger.error(f"最終イメージの処理中にエラーが発生しました: {e}")

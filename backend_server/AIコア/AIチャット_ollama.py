@@ -26,6 +26,25 @@ from pathlib import Path
 import openai
 
 _DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+_OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1"
+_OLLAMA_CLOUD_SUFFIXES = (":cloud", ":clude")
+
+
+def _is_cloud_key(api_key: str) -> bool:
+    """Ollama Cloud用APIキーが設定されているか判定する。"""
+    return isinstance(api_key, str) and bool(api_key.strip()) and not api_key.strip().startswith("<")
+
+
+def _strip_cloud_suffix(model: str) -> str:
+    """Ollama Cloud直叩き時はローカル転送用サフィックスを外す。"""
+    if not isinstance(model, str):
+        return model
+    model_name = model.strip()
+    lower_name = model_name.lower()
+    for suffix in _OLLAMA_CLOUD_SUFFIXES:
+        if lower_name.endswith(suffix):
+            return model_name[: -len(suffix)]
+    return model_name
 
 
 class ChatAI:
@@ -49,20 +68,23 @@ class ChatAI:
         # Ollama ホスト・APIキー取得
         self.ollama_host = _DEFAULT_OLLAMA_HOST
         self.ollama_key_id = "ollama"  # デフォルト（ダミーキー）
+        self.ollama_cloud_enabled = False
         try:
+            key = api_key or ""
             if 親 and hasattr(親, "conf") and 親.conf and hasattr(親.conf, "json"):
                 host = 親.conf.json.get("ollama_host", "")
                 if host and isinstance(host, str) and not host.startswith("<"):
                     self.ollama_host = host.rstrip("/")
-                key = 親.conf.json.get("ollama_key_id", "")
-                if key and isinstance(key, str) and not key.startswith("<"):
-                    self.ollama_key_id = key
+                key = 親.conf.json.get("ollama_key_id", "") or key
+            if _is_cloud_key(key):
+                self.ollama_key_id = key.strip()
+                self.ollama_cloud_enabled = True
         except Exception:
             pass
 
         # モデル設定
         self.chat_ai = AI_NAME
-        self.chat_model = AI_MODEL
+        self.chat_model = _strip_cloud_suffix(AI_MODEL) if self.ollama_cloud_enabled else AI_MODEL
         self.system_instruction = (
             system_instruction.strip()
             if isinstance(system_instruction, str) and system_instruction.strip()
@@ -96,14 +118,16 @@ class ChatAI:
     async def 開始(self):
         """ChatAI開始（apiクライアント初期化）"""
         try:
-            base_url = f"{self.ollama_host}/v1"
+            base_url = _OLLAMA_CLOUD_BASE_URL if self.ollama_cloud_enabled else f"{self.ollama_host}/v1"
+            api_key = self.ollama_key_id if self.ollama_cloud_enabled else "ollama"
             try:
                 self.client = openai.OpenAI(
-                    api_key=self.ollama_key_id,  # AiDiy_key.json の ollama_key_id を使用
+                    api_key=api_key,
                     base_url=base_url,
                 )
                 self.is_alive = True
-                logger.info(f"ChatAI(Ollama): 初期化完了 host={self.ollama_host} model={self.chat_model}")
+                mode = "cloud" if self.ollama_cloud_enabled else "local"
+                logger.info(f"ChatAI(Ollama): 初期化完了 mode={mode} base_url={base_url} model={self.chat_model}")
                 return True
             except Exception as e:
                 logger.error(f"ChatAI(Ollama): apiクライアント初期化エラー: {e}")

@@ -17,6 +17,38 @@ import os
 import requests
 from typing import Dict, Optional
 
+_OLLAMA_CLOUD_MODELS_URL = "https://ollama.com/v1/models"
+_OLLAMA_CLOUD_SUFFIXES = (":cloud", ":clude")
+
+
+def _is_ollama_cloud_key(api_key: str) -> bool:
+    """Ollama Cloud用APIキーが設定されているか判定する。"""
+    return isinstance(api_key, str) and bool(api_key.strip()) and not api_key.strip().startswith("<")
+
+
+def _strip_ollama_cloud_suffix(model_id: str) -> str:
+    """Ollama Cloud直叩き時に不要なローカル転送用サフィックスを外す。"""
+    if not isinstance(model_id, str):
+        return model_id
+    name = model_id.strip()
+    lower_name = name.lower()
+    for suffix in _OLLAMA_CLOUD_SUFFIXES:
+        if lower_name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def _format_ollama_model_label(model_id: str, created_timestamp=None) -> str:
+    """他のチャットモデルと同じ「日付 - モデル名」形式に整える。"""
+    created_date = "yyyy/mm/dd"
+    try:
+        if created_timestamp:
+            created_date = datetime.datetime.fromtimestamp(int(created_timestamp)).strftime("%Y/%m/%d")
+    except Exception:
+        created_date = "yyyy/mm/dd"
+    return f"{created_date} - {model_id}"
+
+
 class conf_models:
     """AIコアモデル管理クラス"""
 
@@ -123,9 +155,6 @@ class conf_models:
             "gpt-5.1-codex-max": "yyyy/mm/dd - gpt-5.1-codex-max",
             "gpt-5.1-codex-mini": "yyyy/mm/dd - gpt-5.1-codex-mini",
             "gpt-5.1": "yyyy/mm/dd - gpt-5.1",
-        }
-        self.CODE_HERMES_CLI_MODELS = {
-            "auto": "yyyy/mm/dd - auto (default)",
         }
 
         # _config 下の設定JSONと同期（無ければ作成、あれば読込）
@@ -272,10 +301,6 @@ class conf_models:
             "AiDiy_code_codex_cli.json",
             self.CODE_CODEX_CLI_MODELS,
         )
-        self.CODE_HERMES_CLI_MODELS = self._load_or_create_code_config(
-            "AiDiy_code_hermes_cli.json",
-            self.CODE_HERMES_CLI_MODELS,
-        )
         self.mcp_servers = self._load_mcp_config("AiDiy_mcp.json")
 
     def fetch_all_models(self):
@@ -303,11 +328,74 @@ class conf_models:
 
             self.get_claude_models(self.conf.json.claude_key_id)
 
-            # Ollama（ローカル・CLIで取得）
+            # Ollama（APIキーが未設定ならローカルCLI、設定済みならOllama Cloudから取得）
             self.get_ollama_models()
 
     def get_ollama_models(self) -> Dict[str, str]:
-        """ollama list コマンドで利用可能なモデル一覧を取得"""
+        """Ollamaの利用可能モデル一覧を取得"""
+        api_key = ""
+        try:
+            if self.conf and hasattr(self.conf, "json"):
+                api_key = self.conf.json.ollama_key_id
+        except Exception:
+            api_key = ""
+
+        if _is_ollama_cloud_key(api_key):
+            return self._get_ollama_cloud_models(api_key.strip())
+        return self._get_ollama_local_models()
+
+    def _get_ollama_cloud_models(self, api_key: str) -> Dict[str, str]:
+        """Ollama CloudのWeb APIから利用可能モデル一覧を取得"""
+        result: Dict[str, str] = {}
+        try:
+            response = requests.get(
+                _OLLAMA_CLOUD_MODELS_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=30,
+            )
+            if response.status_code != 200:
+                logger.info(f"Ollama Cloudモデル取得失敗: HTTP {response.status_code}")
+                raise RuntimeError(f"HTTP {response.status_code}")
+
+            models_data = response.json()
+            current_time = datetime.datetime.now()
+            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
+            source_models = [
+                model for model in models_data.get("data", [])
+                if isinstance(model, dict)
+            ]
+            source_models.sort(key=lambda model: model.get("created") or 0, reverse=True)
+
+            for model in source_models:
+                if not isinstance(model, dict):
+                    continue
+                raw_model_id = model.get("id", "")
+                model_id = _strip_ollama_cloud_suffix(raw_model_id)
+                if not model_id:
+                    continue
+                created_timestamp = model.get("created")
+                if not created_timestamp or created_timestamp < filter_8months:
+                    continue
+                result[model_id] = _format_ollama_model_label(model_id, created_timestamp)
+
+            if result:
+                logger.info(f"Ollama Cloudモデル取得完了: {len(result)}個（8ヶ月以内・新しい順）")
+                self.ollama_models = result
+                return result
+            logger.info("Ollama Cloudモデルが見つかりません")
+        except requests.exceptions.Timeout:
+            logger.info("Ollama Cloudモデル取得タイムアウト")
+        except requests.exceptions.RequestException as e:
+            logger.info(f"Ollama Cloudモデル取得リクエストエラー: {e}")
+        except Exception as e:
+            logger.info(f"Ollama Cloudモデル取得エラー: {e}")
+
+        fallback: Dict[str, str] = {"deepseek-v4-flash": "yyyy/mm/dd - deepseek-v4-flash"}
+        self.ollama_models = fallback
+        return fallback
+
+    def _get_ollama_local_models(self) -> Dict[str, str]:
+        """ollama list コマンドでローカル利用可能モデル一覧を取得"""
         import subprocess
         result: Dict[str, str] = {}
         try:
@@ -322,7 +410,7 @@ class conf_models:
                     if len(parts) < 1:
                         continue
                     name = parts[0]
-                    result[name] = f"Ollama - {name}"
+                    result[name] = _format_ollama_model_label(name)
                 if result:
                     logger.info(f"Ollamaモデル取得完了: {len(result)}個")
                     self.ollama_models = result
@@ -335,7 +423,7 @@ class conf_models:
         except Exception as e:
             logger.info(f"ollama list エラー: {e}")
         # フォールバック
-        fallback: Dict[str, str] = {"deepseek-v4-flash:cloud": "Ollama - deepseek-v4-flash:cloud (default)"}
+        fallback: Dict[str, str] = {"deepseek-v4-flash:cloud": "yyyy/mm/dd - deepseek-v4-flash:cloud"}
         self.ollama_models = fallback
         return fallback
 
@@ -616,7 +704,7 @@ class conf_models:
     def get_chat_models(self) -> Dict[str, Dict[str, str]]:
         """チャットAIモデル一覧を取得（日付情報付き）"""
         # Ollamaモデル：取得済みがあれば使用、なければデフォルトを表示
-        ollama_dict = self.ollama_models if self.ollama_models else {"deepseek-v4-flash:cloud": "Ollama - deepseek-v4-flash:cloud (default)"}
+        ollama_dict = self.ollama_models if self.ollama_models else {"deepseek-v4-flash:cloud": "yyyy/mm/dd - deepseek-v4-flash:cloud"}
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
@@ -651,6 +739,13 @@ class conf_models:
             "openai_live": self.LIVE_OPENAI_VOICES,
         }
 
+    def _get_aidiy_hermes_models(self) -> Dict[str, str]:
+        """aidiy_hermes のモデル一覧を Ollama モデル一覧から動的生成する。"""
+        result = {"auto": "yyyy/mm/dd - auto (default)"}
+        if self.ollama_models:
+            result.update(self.ollama_models)
+        return result
+
     def get_code_models(self) -> Dict[str, Dict[str, str]]:
         """コードAIモデル一覧を取得（手動保守）"""
         return {
@@ -659,7 +754,7 @@ class conf_models:
             "copilot_cli": self.CODE_COPILOT_CLI_MODELS,
             "gemini_cli": self.CODE_GEMINI_CLI_MODELS,
             "codex_cli": self.CODE_CODEX_CLI_MODELS,
-            "hermes_cli": self.CODE_HERMES_CLI_MODELS,
+            "aidiy_hermes": self._get_aidiy_hermes_models(),
         }
 
 

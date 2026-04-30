@@ -215,7 +215,12 @@ class Chat:
             except Exception:
                 api_key = ""
 
-        if not api_key or api_key[:1] == '<':
+        if self.AI_NAME == "ollama_chat":
+            キー有効 = True
+        else:
+            キー有効 = bool(api_key) and api_key[:1] != '<'
+
+        if not キー有効:
             メッセージ = f"{ai_label}APIキーが無効です。"
         else:
             try:

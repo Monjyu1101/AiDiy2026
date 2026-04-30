@@ -61,6 +61,9 @@ BACKEND_VENV_DIR = BACKEND_DIR / BACKEND_ENV
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
 BACKEND_MCP_DIR = BASE_DIR / BACKEND_MCP_PATH
+BACKEND_HERMES_PATH = "backend_hermes"
+BACKEND_HERMES_DIR = BASE_DIR / BACKEND_HERMES_PATH
+BACKEND_HERMES_ENV = ".venv"
 POSTGRES_DIR = BASE_DIR / POSTGRES_PATH
 BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
 
@@ -923,6 +926,63 @@ def setup_backend_mcp() -> bool:
     return all_ok
 
 
+def setup_backend_hermes() -> bool:
+    label = "バックエンド(hermes)"
+    print_header(f"{label} セットアップ")
+    print_info(f"作業ディレクトリ: {BACKEND_HERMES_DIR}")
+    print_info("対象: Hermes CLI / requirements.txt / uv")
+
+    if not BACKEND_HERMES_DIR.exists():
+        print_error(f"{label}: フォルダが見つかりません: {BACKEND_HERMES_DIR}")
+        return False
+
+    if not check_uv_installed():
+        print_error(f"{label}: uv がインストールされていません。")
+        print_info("  PowerShell: irm https://astral.sh/uv/install.ps1 | iex")
+        print_info("  または: pip install uv")
+        return False
+
+    req_file = BACKEND_HERMES_DIR / "requirements.txt"
+    if not req_file.exists():
+        print_error(f"{label}: requirements.txt が見つかりません: {req_file}")
+        return False
+
+    venv_dir = BACKEND_HERMES_DIR / BACKEND_HERMES_ENV
+    if not venv_dir.exists():
+        print_info(f"{label}: 仮想環境を作成します...")
+        if not run_command(["uv", "venv", BACKEND_HERMES_ENV], cwd=BACKEND_HERMES_DIR):
+            print_error(f"{label}: 仮想環境の作成に失敗しました。")
+            return False
+
+    if not run_command(["uv", "pip", "install", "-r", "requirements.txt"], cwd=BACKEND_HERMES_DIR):
+        print_error(f"{label}: pip install に失敗しました。")
+        return False
+
+    print_info(f"{label}: aidiy_hermes コマンドをグローバルインストールします...")
+    if not run_command(["uv", "tool", "install", "--force", "--editable", "."], cwd=BACKEND_HERMES_DIR):
+        print_warning(f"{label}: uv tool install に失敗しました。")
+        print_warning("  aidiy_hermes コマンドは使えませんが、直接実行は可能です:")
+        print_warning(f"  {BACKEND_HERMES_DIR / BACKEND_HERMES_ENV / 'Scripts' / 'python.exe'} cli_main.py")
+    else:
+        print_success(f"{label}: aidiy_hermes コマンドがグローバルに登録されました。")
+        print_info("  uv の tool bin が PATH に入っていない場合は次を実行してください:")
+        print_info("    uv tool update-shell")
+
+    # editable install が生成した *.egg-info を削除（残骸のため）
+    import glob as _glob
+    for egg_info in BACKEND_HERMES_DIR.rglob("*.egg-info"):
+        if egg_info.is_dir():
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(egg_info)
+                print_info(f"{label}: 削除: {egg_info.relative_to(BACKEND_HERMES_DIR)}")
+            except Exception:
+                pass
+
+    print_success(f"{label}: セットアップが完了しました。")
+    return True
+
+
 def show_current_mcp_config(module: dict) -> None:
     """MCP 設定ファイルの現在の内容を表示する"""
     # 対象サーバー名リスト（メイン + extra_servers）
@@ -1088,6 +1148,7 @@ def collect_setup_choices() -> dict | None:
         "pg_user_created":       False,
         "pg_restore":            False,
         "pg_migrate":            False,
+        "hermes":                False,
         "web":                   False,
         "avatar":                False,
         "continue_on_error":     False,
@@ -1097,6 +1158,8 @@ def collect_setup_choices() -> dict | None:
     if choices["common"]:
         choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
         choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の npm ツール(AI CLI)をインストール/アップデートしますか？", default="y")
+
+    choices["hermes"] = ask_yes_no("バックエンド(hermes)のセットアップを実行しますか？", default="y")
 
     choices["mcp"] = ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y")
     if choices["mcp"]:
@@ -1121,10 +1184,11 @@ def main():
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
     print_info("  1. 共通")
-    print_info("  2. バックエンド(mcp)")
-    print_info("  3. バックエンド(core,apps)")
-    print_info("  4. フロントエンド(Web)")
-    print_info("  5. フロントエンド(Avatar)")
+    print_info("  2. バックエンド(hermes)")
+    print_info("  3. バックエンド(mcp)")
+    print_info("  4. バックエンド(core,apps)")
+    print_info("  5. フロントエンド(Web)")
+    print_info("  6. フロントエンド(Avatar)")
     print()
 
     choices = collect_setup_choices()
@@ -1147,6 +1211,16 @@ def main():
             )
     else:
         print_warning("共通セットアップをスキップしました。")
+
+    print()
+    if choices["hermes"]:
+        if not setup_backend_hermes():
+            error_locations.append("バックエンド(hermes)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
+    else:
+        print_warning("バックエンド(hermes)のセットアップをスキップしました。")
 
     print()
     if choices["mcp"]:
@@ -1206,11 +1280,12 @@ def main():
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
     print_info("  個別起動:")
-    print_info("    MCP起動 : cd backend_mcp && uv run uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095")
-    print_info("    Core起動: cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port 8091")
-    print_info("    Apps起動: cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092")
-    print_info("    Web開発 : cd frontend_web && npm run dev")
-    print_info("    Avatar  : cd frontend_avatar && npm run dev")
+    print_info("    MCP起動  : cd backend_mcp && uv run uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095")
+    print_info("    Core起動 : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port 8091")
+    print_info("    Apps起動 : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092")
+    print_info("    Hermes起動: aidiy_hermes または cd backend_hermes && .venv/Scripts/python.exe cli_main.py")
+    print_info("    Web開発  : cd frontend_web && npm run dev")
+    print_info("    Avatar   : cd frontend_avatar && npm run dev")
     print_info("セットアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)
 

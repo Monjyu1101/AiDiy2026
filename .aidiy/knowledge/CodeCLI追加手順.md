@@ -37,19 +37,20 @@
 
 対応内容:
 - `CODE_<CLI名>_MODELS` を追加する
-- `_sync_local_model_configs()` に `AiDiy_code_<cli名>.json` を追加する
+- 固定モデル一覧やローカル上書きが必要な場合は `_sync_local_model_configs()` に `AiDiy_code_<cli名>.json` を追加する
 - `get_code_models()` の返却対象へ新CLIを追加する
+- 既存 provider のモデル一覧を流用する場合は、`aidiy_hermes` のように `get_code_models()` 側で動的生成してよい
 
 ### 4. 設定JSON
 対象:
 - `backend_server/conf/conf_json.py`
 - `backend_server/_config/AiDiy_key.json`
-- `backend_server/_config/AiDiy_code_<cli名>.json`
+- `backend_server/_config/AiDiy_code_<cli名>.json`（必要な場合）
 
 対応内容:
 - `conf_json.DEFAULT_CONFIG` に `CODE_<CLI名>_MODEL` を追加する
 - `AiDiy_key.json` に同じキーを追加する
-- `AiDiy_code_<cli名>.json` を作成し、最低でも `auto` を定義する
+- 固定モデル一覧を持つなら `AiDiy_code_<cli名>.json` を作成し、最低でも `auto` を定義する
 
 ### 5. frontend の設定UI
 対象:
@@ -78,17 +79,17 @@
 - 設定 UI の選択肢は backend の `available_models.code_models` から作られるため、frontend に固定 option を直書きしない
 - Windows で WSL 経由実行が必要な CLI は、作業ディレクトリとパス形式の差異を吸収する必要がある
 
-## Hermes を追加したときの再利用知見
-- `bash -i -c` は初期化で停止する場合があるため、`bash -lc` を優先する
-- WSL 起動時に作業ディレクトリが自動で一致する前提にしない
-- 絶対パスは `X:/...` ではなく `/mnt/x/...` へ変換して渡す
-- Windows 上の AI へも、CLI 実行環境が WSL 側であることを明示する
+## AiDiy Hermes を統合したときの再利用知見
+- Code AI 名は実行フォルダ名や内部 package 名ではなく、**frontend / backend / 設定JSONで完全一致する公開名** を使う（現行値は `aidiy_hermes`）
+- CLI ごとに専用の `AiDiy_code_*.json` が必要とは限らない。`aidiy_hermes` は Ollama モデル一覧を流用して `conf_model.py` で動的生成している
+- `_setup.py` / `_cleanup.py` に統合しても、常駐起動が不要な CLI は `_start.py` に足さない方が運用が分かりやすい
+- backend 側の `CODE_MODEL_KEYS` と `conf_json.DEFAULT_CONFIG` のキー名は揃える（例: `CODE_AIDIY_HERMES_MODEL`）
 
 ## 最低限の確認項目
 - AI設定再起動ダイアログで新CLIを選択できる
 - frontend_avatar の Electron 設定ウィンドウと Web 設定モーダルの両方で新CLIを選択できる
 - `AiDiy_key.json` に新CLI用キーがある
-- `_config/AiDiy_code_<cli名>.json` がある
+- 固定モデル一覧を持つ方式なら `_config/AiDiy_code_<cli名>.json` がある
 - バージョン確認が通る
 - 新規会話コマンドが組める
 - 継続会話コマンドが組める

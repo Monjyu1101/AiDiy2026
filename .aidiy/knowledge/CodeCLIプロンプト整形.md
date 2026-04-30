@@ -35,7 +35,7 @@ def _コマンド構築(self, プロンプト: str, 初回: bool = False, repo_p
             return common + ["-p", プロンプト]
         else:
             return common + ["--continue", "-p", プロンプト]
-    # copilot_cli / gemini_cli / codex_cli / hermes_cli も同様のパターン
+    # copilot_cli / gemini_cli / codex_cli / aidiy_hermes も同様のパターン
 ```
 
 ### `_システムプロンプト構築()`
@@ -44,7 +44,7 @@ def _コマンド構築(self, プロンプト: str, 初回: bool = False, repo_p
 def _システムプロンプト構築(self) -> str:
     # 複数行のまま返す（1行化しない）
     base_prompt = self.system_instruction.strip() if self.system_instruction else "あなたは賢いコードエージェントです。"
-    # OS に応じた補足を末尾に付加（hermes_cli は WSL 向け文言）
+    # OS に応じた補足を末尾に付加（必要な CLI だけ個別補足を入れる）
     # suffix は OS 判定後に設定される文字列変数（例: "WSL2 環境で実行..." など）
     return f"{base_prompt}\n{suffix}" if suffix else base_prompt
 ```

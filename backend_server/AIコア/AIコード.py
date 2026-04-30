@@ -398,8 +398,8 @@ class CodeAgent:
                         tool = "gemini"
                     elif ai_name == "codex_cli":
                         tool = "codex"
-                    elif ai_name == "hermes_cli":
-                        tool = "hermes"
+                    elif ai_name == "aidiy_hermes":
+                        tool = "aidiy_hermes"
                     else:
                         tool = ai_name or "コマンド"
                     メッセージ = f"{ai_label}{tool}が利用できません。（{tool}未インストール?)"

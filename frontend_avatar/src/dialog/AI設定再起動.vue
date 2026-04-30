@@ -79,7 +79,7 @@ const CODE_MODEL_KEYS: Record<string, string> = {
   copilot_cli: 'CODE_COPILOT_CLI_MODEL',
   gemini_cli: 'CODE_GEMINI_CLI_MODEL',
   codex_cli: 'CODE_CODEX_CLI_MODEL',
-  hermes_cli: 'CODE_HERMES_CLI_MODEL',
+  aidiy_hermes: 'CODE_AIDIY_HERMES_MODEL',
 }
 
 const chatAiOptions = computed(() => Object.keys(availableModels.value?.chat_models || {}))
