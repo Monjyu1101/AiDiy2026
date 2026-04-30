@@ -1,12 +1,24 @@
 """AiDiy Hermes lightweight code execution tool."""
 
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
+from tools.ansi_strip import strip_ansi
 from tools.registry import registry, tool_error, tool_result
+
+
+def _normalize_output(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        text = value.decode("utf-8", errors="replace")
+    else:
+        text = str(value)
+    return strip_ansi(text)[-20000:]
 
 
 def _handle_execute_code(args: Dict[str, Any], **_kw) -> str:
@@ -22,6 +34,9 @@ def _handle_execute_code(args: Dict[str, Any], **_kw) -> str:
     if language not in {"python", "py"}:
         return tool_error("only python is supported by this lightweight execute_code tool")
 
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8:replace"
+
     with tempfile.TemporaryDirectory(prefix="aidiy_hermes_code_") as tmp:
         script = Path(tmp) / "snippet.py"
         script.write_text(code, encoding="utf-8")
@@ -31,13 +46,16 @@ def _handle_execute_code(args: Dict[str, Any], **_kw) -> str:
                 cwd=workdir,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired as exc:
             return tool_error(
                 f"code execution timed out after {timeout}s",
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
+                stdout=_normalize_output(exc.stdout),
+                stderr=_normalize_output(exc.stderr),
             )
         except Exception as exc:
             return tool_error(f"code execution failed: {exc}")
@@ -45,8 +63,8 @@ def _handle_execute_code(args: Dict[str, Any], **_kw) -> str:
     return tool_result(
         success=proc.returncode == 0,
         exit_code=proc.returncode,
-        stdout=proc.stdout[-20000:],
-        stderr=proc.stderr[-20000:],
+        stdout=_normalize_output(proc.stdout),
+        stderr=_normalize_output(proc.stderr),
     )
 
 

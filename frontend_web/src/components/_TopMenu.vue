@@ -29,8 +29,8 @@ const props = defineProps({
         <a href="/AiDiy" target="_blank" class="tab">
           AiDiy
         </a>
-        <RouterLink to="/メインメニュー" active-class="active" class="tab">
-          メインメニュー
+        <RouterLink to="/メニュー" active-class="active" class="tab">
+          メニュー
         </RouterLink>
         <RouterLink to="/C管理" active-class="active" class="tab">
           C管理

@@ -287,11 +287,11 @@ def cleanup_server(base_dir):
  else:
  print_info(" logs フォルダはそのまま残します")
  
- # temp フォルダの中身を削除するか確認(存在する場合のみ)
+ # temp フォルダを削除するか確認(存在する場合のみ)
  temp_dir = server_dir / "temp"
  if temp_dir.exists():
- if ask_yes_no(" temp フォルダの中身をクリアしますか？", default="y"):
- if clean_directory_contents(temp_dir, "temp"):
+ if ask_yes_no(" temp フォルダを削除しますか？", default="y"):
+ if remove_directory(temp_dir, "temp"):
  deleted_count += 1
  else:
  print_info(" temp フォルダはそのまま残します")

@@ -223,7 +223,10 @@ def _cprint(text: str = "") -> None:
 def _eprint(text: str = "") -> None:
     """stderr へ進捗履歴を出す。ANSI は混ぜない。"""
     try:
-        sys.stderr.write(_strip_ansi(text or "") + "\n")
+        line = _strip_ansi(text or "")
+        if _should_skip_progress_stderr(line):
+            return
+        sys.stderr.write(line + "\n")
         sys.stderr.flush()
     except Exception:
         pass
@@ -239,6 +242,28 @@ def _stdout_is_tty() -> bool:
 def _strip_ansi(text: str) -> str:
     """ANSIエスケープを、未対応の表示面へ出す前に除去する。"""
     return _ANSI_RE.sub("", text or "")
+
+
+def _should_skip_progress_stderr(text: str) -> bool:
+    """進捗stderrから不要なロゴ/バージョン行を除外する。"""
+    s = (text or "").strip()
+    if not s:
+        return True
+
+    lower = s.lower()
+    if lower.startswith("aidiy_hermes v"):
+        return True
+
+    logo_prefixes = (
+        "========================================",
+        "_    _ ____  _",
+        "/ \\  (_)  _ \\(_)",
+        "/ _ \\ | | | | | |",
+        "/ ___ \\| | |_| | |",
+        "/_/   \\_\\_|____/|_|",
+        "|___/",
+    )
+    return any(s.startswith(p) for p in logo_prefixes)
 
 
 def _supports_ansi_color() -> bool:
@@ -333,7 +358,7 @@ class HermesCLI:
         # シェル (subprocess) プロバイダー用セッション状態
         self.shell_session_started: bool = False
         self.shell_codex_session_id: Optional[str] = None
-        self.max_turns = max_turns or 30
+        self.max_turns = max_turns or 99
 
         # ツールセット
         self.enabled_toolsets = toolsets or ["aidiy-hermes"]
@@ -456,6 +481,7 @@ class HermesCLI:
         """エージェントの現在ステップを TUI spinner 行へ反映する。"""
         if text:
             self._update_spinner_text(text)
+            _eprint(text)
         else:
             self._stop_spinner()
 
@@ -463,7 +489,9 @@ class HermesCLI:
         """旧版互換のステップ進捗表示。"""
         self._current_step = max(0, int(step or 0))
         self._current_step_max = self.max_turns
-        self._update_spinner_text(f"Step {self._current_step}/{self._current_step_max}: モデル呼び出し中")
+        line = f"Step {self._current_step}/{self._current_step_max}: モデル呼び出し中"
+        self._update_spinner_text(line)
+        _eprint(f"[step] {self._current_step}")
 
     def _on_tool_progress(
         self,
@@ -484,6 +512,7 @@ class HermesCLI:
             if preview:
                 detail += f" {preview}"
             self._update_spinner_text(f"Step {step}/{max_steps}: ツール実行中 {detail}")
+            _eprint(f"[tool] {name} ... {preview or ''}".rstrip())
             return
         if event_type == "tool.completed":
             self._spinner_text = f"Step {step}/{max_steps}: ツール完了 {name}"
@@ -972,6 +1001,9 @@ class HermesCLI:
         """シェル (subprocess) プロバイダーでメッセージを処理する。"""
         first_turn = not self.shell_session_started
         req = message.strip()
+        _eprint(
+            f"[start] provider={self.provider} model={self.model} tools={len(self.enabled_toolsets or []) if self.enabled_toolsets else 'all'}"
+        )
 
         # プロンプト構築: 初回はシステムプロンプトなし (CLI が自身で管理)
         if first_turn:
@@ -1083,8 +1115,10 @@ class HermesCLI:
                 "assistant": response,
             })
             self._turn_log = self._turn_log[-80:]
+            _eprint(f"[done] provider={self.provider} interrupted=False error=False")
         else:
             _cprint(f"  {_RED}WARNING: shell 応答が空です{_RST}")
+            _eprint(f"[done] provider={self.provider} interrupted=False error=True")
 
     # ── エージェント実行 (旧版 chat() 互換) ─────────────────────────
 
@@ -1105,6 +1139,9 @@ class HermesCLI:
 
         self._last_user_message = message
         self._start_spinner(f"Step 0/{self.max_turns}: 準備中")
+        _eprint(
+            f"[start] provider={self.provider} model={self.model} tools={len(self.enabled_toolsets or []) if self.enabled_toolsets else 'all'}"
+        )
 
         agent_thread = None
         result = None
@@ -1159,6 +1196,10 @@ class HermesCLI:
         # 結果を表示
         if result:
             resp = result.get("final_response", "")
+            api_calls = int(result.get("api_calls") or 0)
+            interrupted = bool(result.get("interrupted", False))
+            has_error = bool(result.get("error"))
+            _eprint(f"[done] api_calls={api_calls} interrupted={interrupted} error={has_error}")
             if resp:
                 self._last_assistant_response = resp
                 self._turn_log.append({
@@ -1174,6 +1215,7 @@ class HermesCLI:
                 self.conversation_history = self.conversation_history[-40:]
         else:
             _cprint(f"  {_RED}ERROR: 応答がありません{_RST}")
+            _eprint("[done] api_calls=0 interrupted=False error=True")
 
     # ── スラッシュコマンド ──────────────────────────────────────────
 
@@ -2285,17 +2327,59 @@ def main(argv: Optional[List[str]] = None) -> int:
             cli.show_banner()
             print(f"\nクエリ: {query}")
             print(f"{_ACCENT}{'-' * 40}{_RST}")
+        def _progress_thinking(text: str) -> None:
+            pass  # [step]/[tool]で経過表示済みのため不要
+
+        def _progress_step(step: int, previous_tools: Optional[List[str]] = None) -> None:
+            prev = ",".join(previous_tools or [])
+            if prev:
+                _eprint(f"[step] {step} (prev:{prev})")
+            else:
+                _eprint(f"[step] {step}")
+
+        def _progress_tool(event_type: str, function_name: str, *args, **kwargs) -> None:
+            preview_args = ""
+            if args:
+                try:
+                    preview_args = str(args[0] or "")
+                except Exception:
+                    preview_args = ""
+            if preview_args and len(preview_args) > 120:
+                preview_args = preview_args[:117] + "..."
+            if event_type == "tool.started":
+                if preview_args:
+                    _eprint(f"[tool] {function_name} ... {preview_args}")
+                else:
+                    _eprint(f"[tool] {function_name} ...")
+            elif event_type == "tool.completed":
+                duration = kwargs.get("duration")
+                if duration is not None:
+                    _eprint(f"[tool] {function_name} 完了 ({duration:.1f}s)")
+                else:
+                    _eprint(f"[tool] {function_name} 完了")
+
         try:
+            _eprint(
+                f"[start] provider={provider_entry['slug']} model={model} tools={len(enabled or []) if enabled else 'all'}"
+            )
             agent = AIAgent(
                 base_url=provider_entry["base_url"],
                 api_key=provider_entry["api_key"],
                 model=model,
-                max_iterations=30,
+                max_iterations=99,
                 enabled_toolsets=enabled,
                 provider=provider_entry["slug"],
                 api_mode=provider_entry["api_mode"],
+                thinking_callback=_progress_thinking,
+                tool_progress_callback=_progress_tool,
+                step_callback=_progress_step,
             )
-            resp = agent.chat(query)
+            result = agent.run_conversation(query)
+            resp = result.get("final_response", "")
+            api_calls = result.get("api_calls", 0)
+            interrupted = bool(result.get("interrupted", False))
+            has_error = bool(result.get("error"))
+            _eprint(f"[done] api_calls={api_calls} interrupted={interrupted} error={has_error}")
             if resp:
                 print(f"\n{resp}")
         except Exception as e:

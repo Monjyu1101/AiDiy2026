@@ -17,7 +17,7 @@ import { useRouter } from 'vue-router';
 interface MenuItem { code: string; label: string; desc: string; to: string; }
 interface MenuRow  { axis: string; title: string; accent: string; panelBg: string; panelBgStrong: string; items: MenuItem[]; }
 
-const BACK = '/メインメニュー';
+const BACK = '/メニュー';
 const q = (base: string) => `${base}?戻URL=${encodeURIComponent(BACK)}`;
 
 const rows = ref<MenuRow[]>([
@@ -73,7 +73,7 @@ const rows = ref<MenuRow[]>([
 
 const SHIFT_DELAY = 3600;
 const ITEM_UNIT   = 240;
-const STORAGE_KEY = 'メインメニュー_最終選択';
+const STORAGE_KEY = 'メニュー_最終選択';
 
 function loadSaved(): { rowIdx: number; colIdx: number[] } | null {
   try {
@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
 
     <!-- ヘッダー -->
     <header class="stage-head">
-      <div class="title">【 メインメニュー 】</div>
+      <div class="title">【 メニュー 】</div>
       <div class="mode-tag">
         <span class="dot" :style="{ background: currentRow.accent }"></span>
         <span class="tag-text">{{ mode === 'center' ? 'カテゴリ選択中' : '項目選択中' }}</span>

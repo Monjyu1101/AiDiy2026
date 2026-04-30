@@ -124,7 +124,7 @@
 - slash command 実行中の点滅は、旧版同様 `int(time.monotonic() * 10)` で 10fps 相当にする。描画回数依存で index 加算すると、環境によって点滅速度がずれる
 - 旧版スピナーは点字フレームだが、Windows cp932 では出力できない場合がある。`_spinner_frames()` で `_fits_output_encoding()` を見て、出せる場合は点字、出せない場合は ASCII `| / - \` に fallback する
 - 通常 spinner text は旧版同様、`  text` / `  text  (0.1s)` の形にする。フレームを前置すると旧版より点滅感が強くなる
-- 旧版のステップ進捗表示は、`core.run_agent.AIAgent` から `thinking_callback` / `step_callback` / `tool_progress_callback` へ通知し、`cli_main.py` 側で spinner 行へ反映する。表示形式は `Step 1/30: モデル呼び出し中`、ツール中は `Step 1/30: ツール実行中 read_file ...`
+- 旧版のステップ進捗表示は、`core.run_agent.AIAgent` から `thinking_callback` / `step_callback` / `tool_progress_callback` へ通知し、`cli_main.py` 側で spinner 行へ反映する。表示形式は `Step 1/99: モデル呼び出し中`、ツール中は `Step 1/99: ツール実行中 read_file ...`
 - `tool.completed` では `Step n/max: ツール完了 <tool>` を短く出し、次のモデル呼び出しで `Step n+1/max` に更新する。`_tool_start_time` は tool 実行中だけ有効にし、経過秒表示を旧版同様に維持する
 - 完了したツール履歴は spinner の一時表示とは別に stderr へ `done Step n/max: <tool> (0.1s)` 形式で1行ずつ出す。stdout は会話本文用に残し、stderr は実行ログとして使う
 - `spinner_loop` は command / spinner 表示中に `0.1s` で invalidate、idle では `0.2s` 待機にする。idle でも常時 repaint すると下部入力位置が動いて見えやすい

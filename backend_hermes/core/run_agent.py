@@ -26,7 +26,7 @@ class AIAgent:
         base_url: str = "http://localhost:11434/v1",
         api_key: str = "",
         model: str = "llama3.2",
-        max_iterations: int = 30,
+        max_iterations: int = 99,
         enabled_toolsets: Optional[List[str]] = None,
         system_prompt: Optional[str] = None,
         quiet_mode: bool = False,

@@ -84,6 +84,7 @@
 - CLI ごとに専用の `AiDiy_code_*.json` が必要とは限らない。`aidiy_hermes` は Ollama モデル一覧を流用して `conf_model.py` で動的生成している
 - `_setup.py` / `_cleanup.py` に統合しても、常駐起動が不要な CLI は `_start.py` に足さない方が運用が分かりやすい
 - backend 側の `CODE_MODEL_KEYS` と `conf_json.DEFAULT_CONFIG` のキー名は揃える（例: `CODE_AIDIY_HERMES_MODEL`）
+- `aidiy_hermes --version` は cold start や code1〜code4 の同時接続時に 10 秒を超えることがある。未インストール扱いの誤判定を避けるため、`backend_server/AIコア/AIコード_cli.py` のバージョン確認は `aidiy_hermes` だけ長めに待ち、チャンネル間で結果をキャッシュする。
 
 ## 最低限の確認項目
 - AI設定再起動ダイアログで新CLIを選択できる

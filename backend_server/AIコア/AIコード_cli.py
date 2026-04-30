@@ -29,6 +29,8 @@ class CodeAI:
     CLI (subprocess) ベース CodeAI統合クラス
     claude code などのコマンドラインツールをsubprocessで実行
     """
+    _バージョンキャッシュ: dict[str, str] = {}
+    _バージョン確認ロック: Optional[asyncio.Lock] = None
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "claude_cli", AI_MODEL: str = "auto", max_turns: int = 999,
@@ -127,6 +129,21 @@ class CodeAI:
     async def バージョン確認(self) -> str:
         """CLIツールの --version を実行してバージョン文字列を返す。失敗時は空文字。"""
         cmd = self._コマンドパス取得()
+        cache_key = f"{self.code_ai}:{cmd}"
+        if cache_key in self._バージョンキャッシュ:
+            return self._バージョンキャッシュ[cache_key]
+        if CodeAI._バージョン確認ロック is None:
+            CodeAI._バージョン確認ロック = asyncio.Lock()
+        async with CodeAI._バージョン確認ロック:
+            if cache_key in self._バージョンキャッシュ:
+                return self._バージョンキャッシュ[cache_key]
+            バージョン = await self._バージョン確認実行(cmd)
+            if バージョン:
+                self._バージョンキャッシュ[cache_key] = バージョン
+            return バージョン
+
+    async def _バージョン確認実行(self, cmd: str) -> str:
+        """CLIツールの --version を実行する。aidiy_hermes は初回起動が重いため長めに待つ。"""
         try:
             version_args = [cmd, "--version"]
             proc = await asyncio.create_subprocess_exec(
@@ -135,7 +152,8 @@ class CodeAI:
                 stderr=asyncio.subprocess.PIPE,
             )
             try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+                timeout_sec = 30.0 if self.code_ai == "aidiy_hermes" else 10.0
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
             except asyncio.TimeoutError:
                 proc.kill()
                 await proc.communicate()

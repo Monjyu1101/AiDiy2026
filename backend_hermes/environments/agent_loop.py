@@ -135,7 +135,7 @@ class HermesAgentLoop:
         server,
         tool_schemas: List[Dict[str, Any]],
         valid_tool_names: Set[str],
-        max_turns: int = 30,
+        max_turns: int = 99,
         task_id: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,

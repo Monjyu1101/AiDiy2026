@@ -6,6 +6,8 @@
 不要なキャッシュファイルやビルド成果物を削除します。
 
 対象:
+- バックアップ: `backup`
+- バックエンド(hermes): `backend_hermes`
 - バックエンド(mcp): `backend_mcp`
 - バックエンド(core,apps): `backend_server`
 - フロントエンド(Web): `frontend_web`
@@ -43,6 +45,8 @@ FRONTEND_WEB_PATH = "frontend_web"
 
 FRONTEND_AVATAR_PATH = "frontend_avatar"
 FRONTEND_AVATAR_BUILD_DIRS = ["dist", "dist-electron"]
+
+BACKUP_PATH = "backup"
 
 DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
@@ -434,7 +438,7 @@ def cleanup_backend(base_dir: Path, choices: dict):
     temp_dir = backend_dir / "temp"
     if temp_dir.exists():
         if choices.get("backend_temp") is True:
-            if clean_directory_contents(temp_dir, f"temp ({label})"):
+            if remove_directory(temp_dir, f"temp ({label})"):
                 deleted_count += 1
         elif choices.get("backend_temp") is False:
             print_info(f"  {BACKEND_PATH}/temp はそのまま残します")
@@ -492,7 +496,7 @@ def cleanup_backend_mcp(base_dir: Path, choices: dict):
     temp_dir = backend_mcp_dir / "temp"
     if temp_dir.exists():
         if choices.get("mcp_temp") is True:
-            if clean_directory_contents(temp_dir, f"temp ({label})"):
+            if remove_directory(temp_dir, f"temp ({label})"):
                 deleted_count += 1
         elif choices.get("mcp_temp") is False:
             print_info(f"  {BACKEND_MCP_PATH}/temp はそのまま残します")
@@ -530,10 +534,30 @@ def cleanup_backend_hermes(base_dir: Path, choices: dict):
         elif env_name in hermes_envs:
             print_info(f"  {BACKEND_HERMES_PATH}/{env_name} はそのまま残します")
 
+    temp_dir = hermes_dir / "temp"
+    if temp_dir.exists():
+        if choices.get("hermes_temp") is True:
+            if remove_directory(temp_dir, f"temp ({label})"):
+                deleted_count += 1
+        elif choices.get("hermes_temp") is False:
+            print_info(f"  {BACKEND_HERMES_PATH}/temp はそのまま残します")
+
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
         print_info(f"{label}: 削除対象はありませんでした")
+
+
+def cleanup_backup(base_dir: Path, choices: dict):
+    backup_dir = base_dir / BACKUP_PATH
+    if not backup_dir.exists():
+        return
+
+    print_header("backup フォルダのクリーンアップ")
+    if choices.get("backup") is True:
+        remove_directory(backup_dir, "backup")
+    elif choices.get("backup") is False:
+        print_info("backup フォルダはそのまま残します")
 
 
 def cleanup_frontend_web(base_dir: Path):
@@ -638,6 +662,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
 
     choices: dict = {
         "npm_uninstall":  False,
+        "backup":         None,
         "mcp":            False,
         "mcp_envs":       {},
         "mcp_node_modules": None,
@@ -649,6 +674,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "backend_sqlite": None,
         "hermes":         False,
         "hermes_envs":    {},
+        "hermes_temp":    None,
         "web":            False,
         "avatar":         False,
     }
@@ -657,6 +683,9 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "グローバルnpmツール(AI CLIツール)をアンインストールしますか？",
         default="n",
     )
+
+    if (base_dir / BACKUP_PATH).exists():
+        choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
 
     choices["hermes"] = ask_yes_no("バックエンド(hermes)をクリーンアップしますか？", default="y")
     if choices["hermes"]:
@@ -668,6 +697,11 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                         f"  {BACKEND_HERMES_PATH}/{env_name} を削除しますか？",
                         default="y",
                     )
+            if (hermes_dir / "temp").exists():
+                choices["hermes_temp"] = ask_yes_no(
+                    f"  {BACKEND_HERMES_PATH}/temp フォルダを削除しますか？",
+                    default="y",
+                )
 
     choices["mcp"] = ask_yes_no("バックエンド(mcp) をクリーンアップしますか？", default="y")
     if choices["mcp"]:
@@ -681,7 +715,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     )
             if (backend_mcp_dir / "temp").exists():
                 choices["mcp_temp"] = ask_yes_no(
-                    f"  {BACKEND_MCP_PATH}/temp の中身をクリアしますか？",
+                    f"  {BACKEND_MCP_PATH}/temp フォルダを削除しますか？",
                     default="y",
                 )
 
@@ -700,7 +734,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     )
             if (backend_dir / "temp").exists():
                 choices["backend_temp"] = ask_yes_no(
-                    f"  {BACKEND_PATH}/temp の中身をクリアしますか？",
+                    f"  {BACKEND_PATH}/temp フォルダを削除しますか？",
                     default="y",
                 )
             if (
@@ -727,11 +761,12 @@ def main():
     base_dir = Path(__file__).parent
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  1. バックエンド(hermes)")
-    print_info("  2. バックエンド(mcp)")
-    print_info("  3. バックエンド(core,apps)")
-    print_info("  4. フロントエンド(Web)")
-    print_info("  5. フロントエンド(Avatar)")
+    print_info("  1. backup フォルダ")
+    print_info("  2. バックエンド(hermes)")
+    print_info("  3. バックエンド(mcp)")
+    print_info("  4. バックエンド(core,apps)")
+    print_info("  5. フロントエンド(Web)")
+    print_info("  6. フロントエンド(Avatar)")
     print()
 
     choices = collect_cleanup_choices(base_dir)
@@ -745,6 +780,9 @@ def main():
         uninstall_global_npm_tools()
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
+
+    print()
+    cleanup_backup(base_dir, choices)
 
     print()
     if choices["hermes"]:
