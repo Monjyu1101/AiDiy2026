@@ -746,6 +746,13 @@ class conf_models:
             result.update(self.ollama_models)
         return result
 
+    def _get_opencode_cli_models(self) -> Dict[str, str]:
+        """opencode_cli のモデル一覧を Ollama モデル一覧から動的生成する。"""
+        result = {"auto": "yyyy/mm/dd - auto (default)"}
+        if self.ollama_models:
+            result.update(self.ollama_models)
+        return result
+
     def get_code_models(self) -> Dict[str, Dict[str, str]]:
         """コードAIモデル一覧を取得（手動保守）"""
         return {
@@ -754,6 +761,7 @@ class conf_models:
             "copilot_cli": self.CODE_COPILOT_CLI_MODELS,
             "gemini_cli": self.CODE_GEMINI_CLI_MODELS,
             "codex_cli": self.CODE_CODEX_CLI_MODELS,
+            "opencode_cli": self._get_opencode_cli_models(),
             "aidiy_hermes": self._get_aidiy_hermes_models(),
         }
 

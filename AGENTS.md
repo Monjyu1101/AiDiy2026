@@ -137,7 +137,7 @@
    - マルチベンダーAI対応（Anthropic Claude, OpenAI, Google Gemini）
    - WebSocketによるリアルタイムAI対話
    - 音声・画像・テキスト統合インターフェース (AIコア)
-   - **マルチ Code CLI 対応** — `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `gemini_cli` / `aidiy_hermes` を並走
+   - **マルチ Code CLI 対応** — `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `gemini_cli` / `opencode_cli` / `aidiy_hermes` を並走
    - **自己改善機構** — コードエージェントが修正完了後に `.aidiy/knowledge/` へ知見を自動整理し、使うほど修正精度が上がる
 
 ### 提供される機能
@@ -226,7 +226,7 @@
 **統合 CLI 基盤：**
 - **backend_hermes** - `aidiy_hermes` コマンドとして動作するコードエージェント CLI
 - `_setup.py` / `_cleanup.py` には統合済みだが、`_start.py` の常駐起動対象ではない
-- AIコアのコードパネルでは `CODE_AI*_NAME = "aidiy_hermes"` として利用する
+- AIコアのコードパネルでは `CODE_AI*_NAME = "aidiy_hermes"` や `"opencode_cli"` として利用する
 
 **メリット：**
 - 機能のモジュラー化
@@ -475,7 +475,7 @@ const isElectron = !!window.desktopApi  // IPC bridge が存在すれば Electro
 **AIモードの種類：**
 - `CHAT_AI_NAME`（`_chat` サフィックス） — テキストチャット専用 AI（Claude / GPT / Gemini）
 - `LIVE_AI_NAME`（`_live` サフィックス） — 音声リアルタイム対話 AI（Gemini Live / OpenAI Realtime）
-- `CODE_AI*_NAME`（原則 `_sdk` または `_cli`、例外 `aidiy_hermes`） — コード支援 AI（コードパネル専用）。有効値: `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `aidiy_hermes`
+- `CODE_AI*_NAME`（原則 `_sdk` または `_cli`、例外 `aidiy_hermes`） — コード支援 AI（コードパネル専用）。有効値: `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `opencode_cli`, `aidiy_hermes`
 
 音声設定は frontend_avatar の `settings` ウィンドウ（AI設定ダイアログ）から切り替え可能。設定変更後はバックエンドが自動再起動（Reboot機構）。
 
@@ -580,6 +580,9 @@ FastAPI + SQLAlchemy + SQLite backend with Japanese API endpoints and JWT authen
 - SQLite (single file database)
 - python-jose (JWT authentication, HS256)
 - AI SDKs: anthropic, openai, google-genai, claude-agent-sdk
+- チャットAI: gemini（API）, freeai（freeai_key_idでGemini利用）, ollama（ローカル/クラウド）, openrt（OpenRouter） — `_chat` サフィックスで切替
+- ライブAI: gemini_live, openai_live（音声リアルタイム対話）
+- Code CLI: claude_sdk / claude_cli / copilot_cli / codex_cli / gemini_cli / opencode_cli / aidiy_hermes
 
 **主要な設計パターン：**
 - core/apps デュアルサーバー + backend_mcp 連携

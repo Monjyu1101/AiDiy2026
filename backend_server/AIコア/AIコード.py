@@ -400,6 +400,8 @@ class CodeAgent:
                         tool = "codex"
                     elif ai_name == "aidiy_hermes":
                         tool = "aidiy_hermes"
+                    elif ai_name == "opencode_cli":
+                        tool = "opencode"
                     else:
                         tool = ai_name or "コマンド"
                     メッセージ = f"{ai_label}{tool}が利用できません。（{tool}未インストール?)"

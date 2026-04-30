@@ -78,6 +78,7 @@ class conf_json:
         'CODE_GEMINI_CLI_MODEL': 'auto',
         'CODE_CODEX_CLI_MODEL': 'auto',
         'CODE_AIDIY_HERMES_MODEL': 'auto',
+        'CODE_OPENCODE_CLI_MODEL': 'auto',
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',
         'CODE_VERIFY': 'auto',

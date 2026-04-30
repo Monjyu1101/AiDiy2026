@@ -110,6 +110,17 @@ class CodeAI:
                 if os.path.isfile(candidate):
                     return candidate
             return "aidiy_hermes"
+        if self.code_ai == "opencode_cli":
+            if os.name == 'nt':
+                userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
+                candidate = os.path.join(userprofile, '.local', 'bin', 'opencode.exe')
+                if os.path.isfile(candidate):
+                    return candidate
+                npm_bin = os.path.join(userprofile, 'AppData', 'Roaming', 'npm')
+                candidate2 = os.path.join(npm_bin, 'opencode.cmd')
+                if os.path.isfile(candidate2):
+                    return candidate2
+            return "opencode"
         if os.name == 'nt':
             userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
             npm_bin = os.path.join(userprofile, 'AppData', 'Roaming', 'npm')
@@ -197,6 +208,15 @@ class CodeAI:
             cmd = custom_cmd or self._コマンドパス取得()
             model_args = ["--model", self.code_model] if self.code_model and self.code_model.lower() != "auto" else []
             return [cmd, "-Q"] + model_args + ["-z", プロンプト]
+
+        if self.code_ai == "opencode_cli":
+            cmd = custom_cmd or self._コマンドパス取得()
+            model_args = ["--model", self.code_model] if self.code_model and self.code_model.lower() != "auto" else []
+            cmd_args = [cmd, "run"]
+            cmd_args += model_args + [プロンプト]
+            if not 初回:
+                cmd_args.append("-c")
+            return cmd_args
 
         if self.code_ai == "copilot_cli":
             # GitHub Copilot CLI
@@ -651,7 +671,7 @@ class CodeAI:
             初回送信 = not resume or not self.session_started
 
             # 完全なプロンプト構築（プロバイダー別）
-            if self.code_ai in ["claude_cli", "copilot_cli", "gemini_cli", "codex_cli"]:
+            if self.code_ai in ["claude_cli", "copilot_cli", "gemini_cli", "codex_cli", "opencode_cli"]:
                 # copilot: 履歴送信不要。ただし初回のみ system_prompt（base_prompt）を付与して方針を伝える
                 if 初回送信:
                     完全プロンプト = f"{self.system_prompt}\n\n{送信用要求テキスト}"

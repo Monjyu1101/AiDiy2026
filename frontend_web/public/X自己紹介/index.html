@@ -857,6 +857,88 @@
             #fx-mouse-glow { display: none; }
             .fx-grid { background-size: 40px 40px, 40px 40px; opacity: 0.5; }
         }
+
+        /* ========================================================== */
+        /*  アイコンギャラリー（Powered By セクション）                */
+        /* ========================================================== */
+
+        .icon-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            padding: 10px 0;
+            min-height: 120px;
+        }
+
+        .icon-gallery .icon-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: #fff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            text-decoration: none;
+            transition: all 0.25s ease;
+            cursor: pointer;
+            width: 60px;
+            will-change: transform, border-color, box-shadow;
+        }
+
+        .icon-gallery .icon-card:hover {
+            background: #f0f8ff;
+            border-color: #00cccc;
+            transform: translateY(-4px) scale(1.08);
+            box-shadow: 0 8px 24px rgba(0, 200, 255, 0.3);
+        }
+
+        .icon-gallery .icon-card img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+            border-radius: 4px;
+            filter: none;
+            transition: filter 0.25s ease;
+        }
+
+        .icon-gallery .icon-card:hover img {
+            filter: brightness(1.05);
+        }
+
+        .icon-gallery .icon-card .icon-fallback {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', monospace;
+            font-size: 18px;
+            font-weight: 900;
+            color: #008888;
+            background: rgba(0, 200, 200, 0.08);
+            border-radius: 6px;
+        }
+
+        .icon-gallery .icon-card .icon-label {
+            font-size: 0.65rem;
+            color: #555;
+            text-align: center;
+            line-height: 1.2;
+            max-width: 52px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+
+        @media (max-width: 720px) {
+            .icon-gallery { gap: 8px; }
+            .icon-gallery .icon-card { padding: 6px 8px; }
+            .icon-gallery .icon-card img { width: 28px; height: 28px; }
+            .icon-gallery .icon-card .icon-fallback { width: 28px; height: 28px; font-size: 14px; }
+        }
     </style>
     <script type="importmap">
     {
@@ -902,8 +984,8 @@
             <span>Vue 3 + Vite + TypeScript</span>
             <span>Electron + VRM + 音声AI</span>
             <span>🧠 自己改善機構 — 使うほど育つ</span>
-            <span>claude / copilot / codex / gemini / hermes CLI</span>
-            <span>🔌 MCP Hub ×6 — browser / capture / sqlite / postgres / logs / check</span>
+            <span>claude / copilot / codex / gemini / opencode / hermes CLI</span>
+            <span>🔌 MCP Hub ×8 — browser / capture / sqlite / postgres / logs / check / backup_check / backup_save</span>
         </div>
         <div class="typing-text" id="typing-text"></div>
     </section>
@@ -960,11 +1042,11 @@
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🔌</span>
-                <h3 class="feature-title">MCP Hub × 6 + Multi CLI</h3>
+                <h3 class="feature-title">MCP Hub × 8 + Multi CLI</h3>
                 <p class="feature-description">
-                    browser / capture / sqlite / postgres / logs / check の<br>
-                    6 MCP サーバー同居。claude / copilot / codex / gemini /<br>
-                    hermes など 6 種の Code CLI を並走可能。
+                    browser / capture / sqlite / postgres / logs / check /<br>
+                    backup_check / backup_save の 8 MCP サーバー同居。<br>
+                    6 種の Code CLI を並走可能。
                 </p>
             </div>
         </div>
@@ -996,9 +1078,14 @@
                 <span class="stat-sub">code1 から code4</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-number" data-count="7">0</span>
                 <span class="stat-label">Code CLI 種</span>
-                <span class="stat-sub">sdk / claude / copilot / codex / gemini / hermes</span>
+                <span class="stat-sub">sdk / claude / copilot / codex / gemini / opencode / hermes</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="1">0</span>
+                <span class="stat-label">独自エージェント基盤</span>
+                <span class="stat-sub">aidiy_hermes — カスタムツール・TUI・コンテキスト圧縮</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="2">0</span>
@@ -1006,9 +1093,9 @@
                 <span class="stat-sub">Electron / Web</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-number" data-count="8">0</span>
                 <span class="stat-label">MCP サーバー</span>
-                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check</span>
+                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="60">0</span>
@@ -1195,7 +1282,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔁 AI Flow</h3>
-                <p>マイク・テキスト・画像・コード操作 → REST + WebSocket + Vite Proxy → Claude / GPT / Gemini を用途ごとに切替 → チャット・音声応答・コード表示・アバター演出。</p>
+                <p>マイク・テキスト・画像・コード操作 → REST + WebSocket + Vite Proxy → Claude / GPT / Gemini / Ollama を用途ごとに切替 → チャット・音声応答・コード表示・アバター演出。</p>
                 <div class="meta-tags"><span>Input</span><span>Transport</span><span>AI Core</span><span>Output</span></div>
             </div>
         </div>
@@ -1210,6 +1297,20 @@ Key:   利用者名</pre>
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🦙</span>
+                <h3 class="feature-title">Ollama チャット対応</h3>
+                <p class="feature-description">
+                    ローカル Ollama と Ollama Cloud の両対応。<br>
+                    <code style="color:#00ffff">CHAT_AI_NAME = "ollama_chat"</code> で切替。<br>
+                    OpenAI 互換 API 経由でオープンモデルを利用。
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    ローカル: <code>ollama list</code> から自動取得<br>
+                    クラウド: API キー設定で 8 ヶ月以内のモデル一覧<br>
+                    <strong>画像添付・ストリーミング・履歴管理</strong> 完備
+                </div>
+            </div>
+            <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">👾</span>
                 <h3 class="feature-title">VRM アバター表示</h3>
                 <p class="feature-description">
@@ -1221,7 +1322,74 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 5. 自己改善機構 -->
+    <!-- 5. backend_hermes 独自エージェント基盤 -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">🧰 backend_hermes — 独自エージェント基盤</h2>
+        <p class="section-subtitle animate-on-scroll">AiDiy に統合された on-demand コードエージェント CLI。TUI・ツール・コンテキスト圧縮を内蔵。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🤖 AIAgent コア</h3>
+                <p>OpenAI SDK 経由で Ollama（OpenAI 互換 API）と通信するエージェント中核クラス。最大 99 イテレーションのツール呼び出しループ、割り込み機構（スレッドセーフ）、思考コールバック・ツール進捗コールバックを標準装備。</p>
+                <div class="meta-tags"><span>max_iterations=99</span><span>thread-safe interrupt</span><span>callback chain</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔧 ツールシステム</h3>
+                <p>60 以上のツールをツールセット単位で管理。web / browser / terminal / file / vision / skills / memory / planning / process / mcp / delegate など用途別にグループ化。ツールセットは他のツールセットから構成可能。</p>
+                <div class="meta-tags"><span>60+ tools</span><span>toolset composition</span><span>registry pattern</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">📐 コンテキスト圧縮エンジン</h3>
+                <p>長い会話のコンテキストウィンドウを自動圧縮。ヘッドとテールのコンテキストを保護しながら、補助モデル（安価・高速）で中間ターンを要約。構造化要約テンプレート・画像トークン見積もり・要約失敗クールダウン機構を内蔵。</p>
+                <div class="meta-tags"><span>ContextCompressor</span><span>summary ratio 20%</span><span>tail protection</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">⌨️ TUI + スラッシュコマンド</h3>
+                <p>prompt_toolkit ベースのリッチ TUI。スラッシュコマンド補完（Completer + AutoSuggest）、ファイル履歴、ステータスバー、スピナー、カラー表示。`/help` `/reset` `/compress` `/tokens` `/context` など実用的なスラッシュコマンドを標準搭載。</p>
+                <div class="meta-tags"><span>prompt_toolkit</span><span>slash commands</span><span>status bar</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔌 マルチプロバイダ対応</h3>
+                <p>API provider: ollama / openai / openrt / gemini / freeai / claude。CLI bridge: claude_cli / codex_cli / gemini_cli / copilot_cli。既定は ollama。AiDiy_key.json から API キーを自動解決。</p>
+                <div class="meta-tags"><span>6 API providers</span><span>4 CLI bridges</span><span>AiDiy_key.json</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🧩 プラグイン + スキルシステム</h3>
+                <p>plugins/ ディレクトリに配置するだけで機能拡張可能。skills/ にスキルドキュメントを配置し、エージェントが動的に読み込み。optional-skills/ でオプトイン制御。コンテキストファイル（AGENTS.md / .hermes.md）の自動スキャンとプロンプトインジェクション検出も内蔵。</p>
+                <div class="meta-tags"><span>plugin system</span><span>skill hub</span><span>injection guard</span></div>
+            </div>
+        </div>
+        <div class="advanced-grid" style="margin-top:30px;">
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">⚡</span>
+                <h3 class="feature-title">aidiy_hermes として統合</h3>
+                <p class="feature-description">
+                    AiDiy 本体では <code style="color:#00ffff">CODE_AI*_NAME = "aidiy_hermes"</code><br>
+                    としてコードパネルから呼び出し可能。<br>
+                    backend_server/AIコード_cli.py が subprocess で起動。
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    <code>aidiy_hermes -Q -z "指示"</code> の形式で<br>
+                    ワンショット実行。会話履歴は AiDiy 側が保持。
+                </div>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">📂</span>
+                <h3 class="feature-title">主要ディレクトリ構成</h3>
+                <p class="feature-description">
+                    <code style="color:#00ffff">core/</code> — エージェント・コンテキスト・表示<br>
+                    <code style="color:#00ffff">tools/</code> — 60+ ツール実装<br>
+                    <code style="color:#00ffff">base/</code> — 定数・ツールセット・モデル解決<br>
+                    <code style="color:#00ffff">hermes_cli/</code> — TUI・スラッシュコマンド
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    元の Hermes Agent をベースに、Windows 対応・<br>
+                    AiDiy_key.json 連携・CodeAI 統合を追加。
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. 自己改善機構 -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🧠 自己改善機構 — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">使うほど育つ .aidiy/knowledge/ 知見システム。</p>
@@ -1257,10 +1425,10 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 6. MCP Hub × 6 + Multi CLI -->
+    <!-- 7. MCP Hub × 8 + Multi CLI -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 6 + Multi CLI — 実装詳細</h2>
-        <p class="section-subtitle animate-on-scroll">ポート 8095 に 6 つの MCP サーバーを同居。人の手数を減らし、AI の自己検証を増やす。</p>
+        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 8 + Multi CLI — 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">ポート 8095 に 8 つの MCP サーバーを同居。人の手数を減らし、AI の自己検証を増やす。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 aidiy_chrome_devtools</h3>
@@ -1292,6 +1460,16 @@ Key:   利用者名</pre>
                 <p>Python 構文（py_compile）・ruff lint・TypeScript 型チェック（npm run type-check）を subprocess で実行。副作用なしの検査系だけ。</p>
                 <div class="meta-tags"><span>py_compile</span><span>ruff</span><span>tsc</span></div>
             </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">📦 aidiy_backup_check</h3>
+                <p>差分バックアップから変更前/変更後ソースを抽出。指定ファイルの追加・削除行数を軽量サマリで返す。dry-run スキャンで現時点の差分対象一覧も取得可能。</p>
+                <div class="meta-tags"><span>diff stats</span><span>dry-run</span><span>before/after</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">💾 aidiy_backup_save</h3>
+                <p>AiDiy ネイティブの差分バックアップを実行。初回は全件スナップショット、以降は差分のみを保存。コード修正前の安全なセーブポイントとして機能。</p>
+                <div class="meta-tags"><span>snapshot</span><span>incremental</span><span>savepoint</span></div>
+            </div>
         </div>
         <div class="advanced-grid" style="margin-top:30px;">
             <div class="feature-card animate-on-scroll">
@@ -1303,22 +1481,23 @@ Key:   利用者名</pre>
                     人間は指示と判断に集中できます。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
-                    edit → observe → verify<br>
-                    MCP 6 サーバーの連携で、修正の影響範囲を<br>
-                    <strong>AI が自分で確認</strong>してから報告します。
+                    edit → observe → verify → backup<br>
+                    MCP 8 サーバーの連携で、修正の影響範囲を<br>
+                    <strong>AI が自分で確認</strong>してから報告します。<br>
+                    バックアップ保存→チェックのサイクルも内蔵。
                 </div>
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🔧</span>
                 <h3 class="feature-title">マルチ Code CLI 対応</h3>
                 <p class="feature-description">
-                    6 種の Code CLI を code1〜code4 パネルへ<br>
+                    7 種の Code CLI を code1〜code4 パネルへ<br>
                     自由に割り当てて並走できます。<br>
                     新しいツールも手順に沿って追加可能。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     claude_sdk &nbsp;/&nbsp; claude_cli &nbsp;/&nbsp; copilot_cli<br>
-                    codex_cli &nbsp;/&nbsp; gemini_cli &nbsp;/&nbsp; hermes_cli
+                    codex_cli &nbsp;/&nbsp; gemini_cli &nbsp;/&nbsp; opencode_cli &nbsp;/&nbsp; hermes_cli
                 </div>
             </div>
         </div>
@@ -1339,7 +1518,11 @@ Key:   利用者名</pre>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🤖 CLI エコシステム</h4>
-                <p>claude / copilot / codex / gemini / hermes に続く新 Code CLI も <code style="color:#00ffff">_sdk</code> / <code style="color:#00ffff">_cli</code> 命名規約で追加可能。</p>
+                <p>claude / copilot / codex / gemini / opencode / hermes に続く新 Code CLI も <code style="color:#00ffff">_sdk</code> / <code style="color:#00ffff">_cli</code> 命名規約で追加可能。</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>🧰 hermes 独自エージェント進化</h4>
+                <p>60+ ツール・コンテキスト圧縮・プラグインシステムを備えた aidiy_hermes をさらに拡張。カスタムツールセットの動的構成。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🏢 業務領域の横展開</h4>
@@ -1354,6 +1537,13 @@ Key:   利用者名</pre>
                 <p>非商用ライセンスのもと、コミュニティが業務テンプレートを共有・進化させる土台。</p>
             </div>
         </div>
+    </section>
+
+    <!-- Powered By（アイコンギャラリー） -->
+    <section class="section" id="powered-by-section">
+        <h2 class="section-title animate-on-scroll">⚡ Powered By</h2>
+        <p class="section-subtitle animate-on-scroll">AiDiy を支える企業・プロダクト・規格の数々。クリックで各公式ページへ。</p>
+        <div id="icon-gallery" class="icon-gallery"></div>
     </section>
 
     <!-- Launch -->
@@ -1373,6 +1563,16 @@ Key:   利用者名</pre>
 
     <!-- JavaScript -->
     <script src="index.js"></script>
+    <script src="icons.js"></script>
+    <script>
+      // アイコンギャラリー初期化（スクロールアニメーションと連動）
+      document.addEventListener('DOMContentLoaded', () => {
+        const gallery = document.getElementById('icon-gallery')
+        if (gallery && typeof renderIconGallery === 'function') {
+          renderIconGallery(gallery, { showLabels: true, iconSize: 36 })
+        }
+      })
+    </script>
 
     <!-- VRM Avatar - 右下固定（最下部直前でフェードイン） -->
     <div id="avatar-container">

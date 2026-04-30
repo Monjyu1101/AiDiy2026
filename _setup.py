@@ -566,13 +566,14 @@ def print_ai_cli_manual_setup():
     print_info(f"    GitHub Copilot: {cmd} install -g @github/copilot")
     print_info(f"    OpenAI Codex : {cmd} install -g @openai/codex")
     print_info(f"    Gemini CLI : {cmd} install -g @google/gemini-cli")
+    print_info(f"    OpenCode   : {cmd} install -g opencode-ai")
     print_info(f"    Hermes Agent: {HERMES_AGENT_INSTALL_COMMAND}")
     print_info(f"    Ollama     : {OLLAMA_INSTALL_COMMAND}")
 
 
 def start_global_npm_tools_install():
     print_header("共通セットアップ: npm ツール投入")
-    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / Gemini CLI")
+    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / Gemini CLI / OpenCode")
     print_info("参考: Hermes Agent は npm ではなく、次の bash installer で導入します。")
     print_info(f"      {HERMES_AGENT_INSTALL_COMMAND}")
     print_info("参考: Ollama は次のコマンドで導入できます。")
@@ -590,6 +591,7 @@ def start_global_npm_tools_install():
         "@github/copilot",
         "@openai/codex",
         "@google/gemini-cli",
+        "opencode-ai",
     ]
 
     GLOBAL_NPM_INSTALL_PROCESSES.clear()
