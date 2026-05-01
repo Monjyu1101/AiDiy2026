@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-from base.hermes_constants import get_hermes_home
+from hermes_constants import get_hermes_home
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ def _install_dependencies(provider_name: str) -> None:
 
     try:
         import yaml
-        with open(yaml_path, encoding="utf-8-sig") as f:
+        with open(yaml_path) as f:
             meta = yaml.safe_load(f) or {}
     except Exception:
         return

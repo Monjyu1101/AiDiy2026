@@ -22,8 +22,8 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from core.memory_manager import sanitize_context
-from core.memory_provider import MemoryProvider
+from agent.memory_manager import sanitize_context
+from agent.memory_provider import MemoryProvider
 from tools.registry import tool_error
 
 logger = logging.getLogger(__name__)
@@ -239,7 +239,7 @@ class HonchoMemoryProvider(MemoryProvider):
     def is_available(self) -> bool:
         """Check if Honcho is configured. No network calls."""
         try:
-            from .client import HonchoClientConfig
+            from plugins.memory.honcho.client import HonchoClientConfig
             cfg = HonchoClientConfig.from_global_config()
             # Port #2645: baseUrl-only verification — api_key OR base_url suffices
             return cfg.enabled and bool(cfg.api_key or cfg.base_url)
@@ -269,7 +269,7 @@ class HonchoMemoryProvider(MemoryProvider):
     def post_setup(self, hermes_home: str, config: dict) -> None:
         """Run the full Honcho setup wizard after provider selection."""
         import types
-        from .cli import cmd_setup
+        from plugins.memory.honcho.cli import cmd_setup
         cmd_setup(types.SimpleNamespace())
 
     def initialize(self, session_id: str, **kwargs) -> None:
@@ -289,8 +289,8 @@ class HonchoMemoryProvider(MemoryProvider):
                 self._cron_skipped = True
                 return
 
-            from .client import HonchoClientConfig, get_honcho_client
-            from .session import HonchoSessionManager
+            from plugins.memory.honcho.client import HonchoClientConfig, get_honcho_client
+            from plugins.memory.honcho.session import HonchoSessionManager
 
             cfg = HonchoClientConfig.from_global_config()
             if not cfg.enabled or not (cfg.api_key or cfg.base_url):
@@ -351,8 +351,8 @@ class HonchoMemoryProvider(MemoryProvider):
 
     def _do_session_init(self, cfg, session_id: str, **kwargs) -> None:
         """Shared session initialization logic for both eager and lazy paths."""
-        from .client import get_honcho_client
-        from .session import HonchoSessionManager
+        from plugins.memory.honcho.client import get_honcho_client
+        from plugins.memory.honcho.session import HonchoSessionManager
 
         client = get_honcho_client(cfg)
         self._manager = HonchoSessionManager(
@@ -387,7 +387,7 @@ class HonchoMemoryProvider(MemoryProvider):
         # of performing a one-time migration.
         try:
             if not session.messages and cfg.session_strategy != "per-session":
-                from base.hermes_constants import get_hermes_home
+                from hermes_constants import get_hermes_home
                 mem_dir = str(get_hermes_home() / "memories")
                 self._manager.migrate_memory_files(self._session_key, mem_dir)
                 logger.debug("Honcho memory file migration attempted for new session: %s", self._session_key)

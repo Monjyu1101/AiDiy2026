@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from base.utils import atomic_replace
+from utils import atomic_replace
 
 
 # Env var name suffixes that indicate credential values.  These are the

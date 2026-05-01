@@ -1,6 +1,6 @@
-"""クラウドブラウザプロバイダ抽象の公開口。
+"""Cloud browser provider abstraction.
 
-呼び出し側が次の形式で ABC を import できるようにする::
+Import the ABC so callers can do::
 
     from tools.browser_providers import CloudBrowserProvider
 """

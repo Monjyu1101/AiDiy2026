@@ -1,29 +1,29 @@
 """
-画像生成プロバイダー ABC
-========================
+Image Generation Provider ABC
+=============================
 
-画像生成のプラガブルバックエンドインターフェースを定義する。プロバイダーは
-``PluginContext.register_image_gen_provider()`` でインスタンスを登録し、
-アクティブなもの（``config.yaml`` の ``image_gen.provider`` で選択）が
-全ての ``image_generate`` ツール呼び出しを処理する。
+Defines the pluggable-backend interface for image generation. Providers register
+instances via ``PluginContext.register_image_gen_provider()``; the active one
+(selected via ``image_gen.provider`` in ``config.yaml``) services every
+``image_generate`` tool call.
 
-プロバイダーは ``<repo>/plugins/image_gen/<name>/``（組み込み、
-``kind: backend`` として自動読み込み）または
-``~/.hermes/plugins/image_gen/<name>/``（ユーザー、``plugins.enabled`` でオプトイン）に配置。
+Providers live in ``<repo>/plugins/image_gen/<name>/`` (built-in, auto-loaded
+as ``kind: backend``) or ``~/.hermes/plugins/image_gen/<name>/`` (user, opt-in
+via ``plugins.enabled``).
 
-レスポンス形式
+Response shape
 --------------
-全プロバイダーは :func:`success_response` / :func:`error_response` が生成する
-dict を返す。ツールラッパーがそれを JSON シリアライズする。キー:
+All providers return a dict that :func:`success_response` / :func:`error_response`
+produce. The tool wrapper JSON-serializes it. Keys:
 
     success        bool
-    image          str | None       URL または絶対ファイルパス
-    model          str              プロバイダー固有のモデル識別子
-    prompt         str              エコーされたプロンプト
+    image          str | None       URL or absolute file path
+    model          str              provider-specific model identifier
+    prompt         str              echoed prompt
     aspect_ratio   str              "landscape" | "square" | "portrait"
-    provider       str              プロバイダー名（診断用）
-    error          str              success=False のときのみ
-    error_type     str              success=False のときのみ
+    provider       str              provider name (for diagnostics)
+    error          str              only when success=False
+    error_type     str              only when success=False
 """
 
 from __future__ import annotations
@@ -49,69 +49,69 @@ DEFAULT_ASPECT_RATIO = "landscape"
 
 
 class ImageGenProvider(abc.ABC):
-    """画像生成バックエンドの抽象基底クラス。
+    """Abstract base class for an image generation backend.
 
-    サブクラスは :meth:`generate` を実装する必要がある。その他は適切なデフォルトを持つ
-    — プロバイダーが必要とするものだけをオーバーライドする。
+    Subclasses must implement :meth:`generate`. Everything else has sane
+    defaults — override only what your provider needs.
     """
 
     @property
     @abc.abstractmethod
     def name(self) -> str:
-        """``image_gen.provider`` 設定で使用する安定した短い識別子。
+        """Stable short identifier used in ``image_gen.provider`` config.
 
-        小文字、スペースなし。例: ``fal``、``openai``、``replicate``。
+        Lowercase, no spaces. Examples: ``fal``, ``openai``, ``replicate``.
         """
 
     @property
     def display_name(self) -> str:
-        """``hermes tools`` に表示される人間可読ラベル。デフォルトは ``name.title()``。"""
+        """Human-readable label shown in ``hermes tools``. Defaults to ``name.title()``."""
         return self.name.title()
 
     def is_available(self) -> bool:
-        """このプロバイダーが呼び出しを処理できる場合に True を返す。
+        """Return True when this provider can service calls.
 
-        通常は必要な API キーの存在確認を行う。デフォルト: True
-        （外部依存のないプロバイダーは常に利用可能）。
+        Typically checks for a required API key. Default: True
+        (providers with no external dependencies are always available).
         """
         return True
 
     def list_models(self) -> List[Dict[str, Any]]:
-        """``hermes tools`` のモデルピッカー用カタログエントリを返す。
+        """Return catalog entries for ``hermes tools`` model picker.
 
-        各エントリ::
+        Each entry::
 
             {
-                "id": "gpt-image-1.5",               # 必須
-                "display": "GPT Image 1.5",          # 省略可; デフォルトは id
-                "speed": "~10s",                     # 省略可
-                "strengths": "...",                  # 省略可
-                "price": "$...",                     # 省略可
+                "id": "gpt-image-1.5",               # required
+                "display": "GPT Image 1.5",          # optional; defaults to id
+                "speed": "~10s",                     # optional
+                "strengths": "...",                  # optional
+                "price": "$...",                     # optional
             }
 
-        デフォルト: 空リスト（プロバイダーにユーザー選択可能なモデルがない）。
+        Default: empty list (provider has no user-selectable models).
         """
         return []
 
     def get_setup_schema(self) -> Dict[str, Any]:
-        """``hermes tools`` ピッカー用のプロバイダーメタデータを返す。
+        """Return provider metadata for the ``hermes tools`` picker.
 
-        ``tools_config.py`` が画像生成プロバイダーリストにこのプロバイダーを
-        行として挿入するために使用。形式::
+        Used by ``tools_config.py`` to inject this provider as a row in
+        the Image Generation provider list. Shape::
 
             {
-                "name": "OpenAI",                     # ピッカーラベル
-                "badge": "paid",                      # 省略可の短いタグ
-                "tag": "One-line description...",     # 省略可のサブタイトル
-                "env_vars": [                         # 入力を促すキー
+                "name": "OpenAI",                     # picker label
+                "badge": "paid",                      # optional short tag
+                "tag": "One-line description...",     # optional subtitle
+                "env_vars": [                         # keys to prompt for
                     {"key": "OPENAI_API_KEY",
                      "prompt": "OpenAI API key",
                      "url": "https://platform.openai.com/api-keys"},
                 ],
             }
 
-        デフォルト: ``display_name`` から派生した最小エントリ。API キープロンプトや
-        カスタムバッジを公開するにはオーバーライドする。
+        Default: minimal entry derived from ``display_name``. Override to
+        expose API key prompts and custom badges.
         """
         return {
             "name": self.display_name,
@@ -121,7 +121,7 @@ class ImageGenProvider(abc.ABC):
         }
 
     def default_model(self) -> Optional[str]:
-        """デフォルトのモデル id を返す。適用されない場合は None を返す。"""
+        """Return the default model id, or None if not applicable."""
         models = self.list_models()
         if models:
             return models[0].get("id")
@@ -134,11 +134,12 @@ class ImageGenProvider(abc.ABC):
         aspect_ratio: str = DEFAULT_ASPECT_RATIO,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """画像を生成する。
+        """Generate an image.
 
-        実装は :func:`success_response` または :func:`error_response` の dict を
-        返す必要がある。``kwargs`` には将来のスキーマバージョンが公開する
-        前方互換パラメータが含まれる場合がある — 実装は未知のキーを無視すること。
+        Implementations should return the dict from :func:`success_response`
+        or :func:`error_response`. ``kwargs`` may contain forward-compat
+        parameters future versions of the schema will expose — implementations
+        should ignore unknown keys.
         """
 
 
@@ -148,10 +149,10 @@ class ImageGenProvider(abc.ABC):
 
 
 def resolve_aspect_ratio(value: Optional[str]) -> str:
-    """aspect_ratio 値を有効な集合に丸める。デフォルトは landscape。
+    """Clamp an aspect_ratio value to the valid set, defaulting to landscape.
 
-    無効な値は拒否せずに強制変換するため、エージェントのミスに対して
-    ツールサーフェスが寛容になる。
+    Invalid values are coerced rather than rejected so the tool surface is
+    forgiving of agent mistakes.
     """
     if not isinstance(value, str):
         return DEFAULT_ASPECT_RATIO
@@ -162,8 +163,8 @@ def resolve_aspect_ratio(value: Optional[str]) -> str:
 
 
 def _images_cache_dir() -> Path:
-    """``$HERMES_HOME/cache/images/`` を返す。必要に応じて親ディレクトリを作成する。"""
-    from base.hermes_constants import get_hermes_home
+    """Return ``$HERMES_HOME/cache/images/``, creating parents as needed."""
+    from hermes_constants import get_hermes_home
 
     path = get_hermes_home() / "cache" / "images"
     path.mkdir(parents=True, exist_ok=True)
@@ -176,11 +177,11 @@ def save_b64_image(
     prefix: str = "image",
     extension: str = "png",
 ) -> Path:
-    """Base64 画像データをデコードして ``$HERMES_HOME/cache/images/`` に書き込む。
+    """Decode base64 image data and write it under ``$HERMES_HOME/cache/images/``.
 
-    保存されたファイルへの絶対 :class:`Path` を返す。
+    Returns the absolute :class:`Path` to the saved file.
 
-    ファイル名形式: ``<prefix>_<YYYYMMDD_HHMMSS>_<short-uuid>.<ext>``。
+    Filename format: ``<prefix>_<YYYYMMDD_HHMMSS>_<short-uuid>.<ext>``.
     """
     raw = base64.b64decode(b64_data)
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -199,11 +200,11 @@ def success_response(
     provider: str,
     extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """統一された成功レスポンス dict を構築する。
+    """Build a uniform success response dict.
 
-    ``image`` は HTTP URL または絶対ファイルシステムパス（OpenAI のような
-    b64 プロバイダー用）のいずれか。追加のバックエンド固有フィールドを
-    渡す必要がある呼び出し元は ``extra`` を指定できる。
+    ``image`` may be an HTTP URL or an absolute filesystem path (for b64
+    providers like OpenAI). Callers that need to pass through additional
+    backend-specific fields can supply ``extra``.
     """
     payload: Dict[str, Any] = {
         "success": True,
@@ -228,7 +229,7 @@ def error_response(
     prompt: str = "",
     aspect_ratio: str = DEFAULT_ASPECT_RATIO,
 ) -> Dict[str, Any]:
-    """統一されたエラーレスポンス dict を構築する。"""
+    """Build a uniform error response dict."""
     return {
         "success": False,
         "image": None,

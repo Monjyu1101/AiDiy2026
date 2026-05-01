@@ -27,6 +27,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
+from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ _MEMORY_PLUGINS_DIR = Path(__file__).parent
 def _get_user_plugins_dir() -> Optional[Path]:
     """Return ``$HERMES_HOME/plugins/`` or None if unavailable."""
     try:
-        from base.hermes_constants import get_hermes_home
+        from hermes_constants import get_hermes_home
         d = get_hermes_home() / "plugins"
         return d if d.is_dir() else None
     except Exception:
@@ -134,7 +135,7 @@ def discover_memory_providers() -> List[Tuple[str, str, bool]]:
         if yaml_file.exists():
             try:
                 import yaml
-                with open(yaml_file, encoding="utf-8-sig") as f:
+                with open(yaml_file) as f:
                     meta = yaml.safe_load(f) or {}
                 desc = meta.get("description", "")
             except Exception:
@@ -271,7 +272,7 @@ def _load_provider_from_dir(provider_dir: Path) -> Optional["MemoryProvider"]:
             logger.debug("register() failed for %s: %s", name, e)
 
     # Fallback: find a MemoryProvider subclass and instantiate it
-    from core.memory_provider import MemoryProvider
+    from agent.memory_provider import MemoryProvider
     for attr_name in dir(mod):
         attr = getattr(mod, attr_name, None)
         if (isinstance(attr, type) and issubclass(attr, MemoryProvider)
@@ -314,7 +315,7 @@ def _get_active_memory_provider() -> Optional[str]:
     try:
         from hermes_cli.config import load_config
         config = load_config()
-        return config.get("memory", {}).get("provider") or None
+        return cfg_get(config, "memory", "provider") or None
     except Exception:
         return None
 
@@ -380,7 +381,7 @@ def discover_plugin_cli_commands() -> List[dict]:
         if yaml_file.exists():
             try:
                 import yaml
-                with open(yaml_file, encoding="utf-8-sig") as f:
+                with open(yaml_file) as f:
                     meta = yaml.safe_load(f) or {}
                 desc = meta.get("description", "")
                 if desc:

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Awaitable, Callable
 
-from core.model_metadata import estimate_tokens_rough
+from agent.model_metadata import estimate_tokens_rough
 
 _QUOTED_REFERENCE_VALUE = r'(?:`[^`\n]+`|"[^"\n]+"|\'[^\'\n]+\')'
 REFERENCE_PATTERN = re.compile(
@@ -117,7 +117,7 @@ def preprocess_context_references(
         url_fetcher=url_fetcher,
         allowed_root=allowed_root,
     )
-    # CLI（ループなし）とゲートウェイ（ループ実行中）の両方に対して安全。
+    # Safe for both CLI (no loop) and gateway (loop already running).
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -142,8 +142,8 @@ async def preprocess_context_references_async(
         return ContextReferenceResult(message=message, original_message=message)
 
     cwd_path = Path(cwd).expanduser().resolve()
-    # 呼び出し元が明示的にルートを拡大しない限り、@ 参照がアクティブワークスペースから
-    # 脱出できないよう、デフォルトを現在の作業ディレクトリに設定する。
+    # Default to the current working directory so @ references cannot escape
+    # the active workspace unless a caller explicitly widens the root.
     allowed_root_path = (
         Path(allowed_root).expanduser().resolve() if allowed_root is not None else cwd_path
     )
@@ -327,7 +327,6 @@ async def _default_url_fetcher(url: str) -> str:
 
 
 def _resolve_path(cwd: Path, target: str, *, allowed_root: Path | None = None) -> Path:
-    """パスを解決して絶対パスに変換し、許可されたルート内かを確認する。"""
     path = Path(os.path.expanduser(target))
     if not path.is_absolute():
         path = cwd / path
@@ -341,7 +340,7 @@ def _resolve_path(cwd: Path, target: str, *, allowed_root: Path | None = None) -
 
 
 def _ensure_reference_path_allowed(path: Path) -> None:
-    from base.hermes_constants import get_hermes_home
+    from hermes_constants import get_hermes_home
     home = Path(os.path.expanduser("~")).resolve()
     hermes_home = get_hermes_home().resolve()
 
@@ -362,7 +361,6 @@ def _ensure_reference_path_allowed(path: Path) -> None:
 
 
 def _strip_trailing_punctuation(value: str) -> str:
-    """末尾の句読点と不対応の括弧を取り除く。"""
     stripped = value.rstrip(TRAILING_PUNCTUATION)
     while stripped.endswith((")", "]", "}")):
         closer = stripped[-1]
@@ -375,7 +373,6 @@ def _strip_trailing_punctuation(value: str) -> str:
 
 
 def _strip_reference_wrappers(value: str) -> str:
-    """バッククォート・引用符などのラッパー文字を取り除く。"""
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "`\"'":
         return value[1:-1]
     return value
@@ -408,7 +405,6 @@ def _parse_file_reference_value(value: str) -> tuple[str, int | None, int | None
 
 
 def _remove_reference_tokens(message: str, refs: list[ContextReference]) -> str:
-    """メッセージから @ 参照トークンを取り除く。"""
     pieces: list[str] = []
     cursor = 0
     for ref in refs:
@@ -422,7 +418,6 @@ def _remove_reference_tokens(message: str, refs: list[ContextReference]) -> str:
 
 
 def _is_binary_file(path: Path) -> bool:
-    """ファイルがバイナリかどうかを判定する。"""
     mime, _ = mimetypes.guess_type(path.name)
     if mime and not mime.startswith("text/") and not any(
         path.name.endswith(ext) for ext in (".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".js", ".ts")
@@ -433,7 +428,6 @@ def _is_binary_file(path: Path) -> bool:
 
 
 def _build_folder_listing(path: Path, cwd: Path, limit: int = 200) -> str:
-    """フォルダーの内容リストを構築する。"""
     lines = [f"{path.relative_to(cwd)}/"]
     entries = _iter_visible_entries(path, cwd, limit=limit)
     for entry in entries:
@@ -498,7 +492,6 @@ def _rg_files(path: Path, cwd: Path, limit: int) -> list[Path] | None:
 
 
 def _file_metadata(path: Path) -> str:
-    """ファイルのメタデータ（行数またはバイト数）を返す。"""
     if _is_binary_file(path):
         return f"{path.stat().st_size} bytes"
     try:
@@ -509,7 +502,6 @@ def _file_metadata(path: Path) -> str:
 
 
 def _code_fence_language(path: Path) -> str:
-    """ファイル拡張子からコードフェンスの言語識別子を返す。"""
     mapping = {
         ".py": "python",
         ".js": "javascript",

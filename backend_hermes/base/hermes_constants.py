@@ -1,7 +1,7 @@
-"""Hermes Harness 用の共有定数。
+"""Shared constants for Hermes Agent.
 
-依存関係のないインポートセーフなモジュール — どこからでもインポート可能で、
-循環インポートのリスクがありません。
+Import-safe module with no dependencies — can be imported from anywhere
+without risk of circular imports.
 """
 
 import os
@@ -9,31 +9,30 @@ from pathlib import Path
 
 
 def get_hermes_home() -> Path:
-    """Hermes ホームディレクトリを返す（デフォルト: ~/.hermes）。
+    """Return the Hermes home directory (default: ~/.hermes).
 
-    HERMES_HOME 環境変数を読み取り、未設定の場合は ~/.hermes にフォールバック。
-    これが唯一の情報源 — 他のコピーはすべてこれをインポートすべき。
+    Reads HERMES_HOME env var, falls back to ~/.hermes.
+    This is the single source of truth — all other copies should import this.
     """
     val = os.environ.get("HERMES_HOME", "").strip()
     return Path(val) if val else Path.home() / ".hermes"
 
 
 def get_default_hermes_root() -> Path:
-    """プロファイルレベルの操作のためのルート Hermes ディレクトリを返す。
+    """Return the root Hermes directory for profile-level operations.
 
-    標準的なデプロイでは ``~/.hermes`` になります。
+    In standard deployments this is ``~/.hermes``.
 
-    Docker やカスタムデプロイで ``HERMES_HOME`` が ``~/.hermes`` の外を
-    指している場合（例: ``/opt/data``）、``HERMES_HOME`` をそのまま返します
-    — それがルートです。
+    In Docker or custom deployments where ``HERMES_HOME`` points outside
+    ``~/.hermes`` (e.g. ``/opt/data``), returns ``HERMES_HOME`` directly
+    — that IS the root.
 
-    プロファイルモードで ``HERMES_HOME`` が ``<root>/profiles/<name>`` の
-    場合、``<root>`` を返して ``profile list`` が全プロファイルを
-    見られるようにします。
-    標準レイアウト（``~/.hermes/profiles/coder``）と Docker レイアウト
-    （``/opt/data/profiles/coder``）の両方で動作します。
+    In profile mode where ``HERMES_HOME`` is ``<root>/profiles/<name>``,
+    returns ``<root>`` so that ``profile list`` can see all profiles.
+    Works both for standard (``~/.hermes/profiles/coder``) and Docker
+    (``/opt/data/profiles/coder``) layouts.
 
-    インポートセーフ — stdlib 以外の依存関係は不要。
+    Import-safe — no dependencies beyond stdlib.
     """
     native_home = Path.home() / ".hermes"
     env_home = os.environ.get("HERMES_HOME", "")
@@ -42,27 +41,27 @@ def get_default_hermes_root() -> Path:
     env_path = Path(env_home)
     try:
         env_path.resolve().relative_to(native_home.resolve())
-        # HERMES_HOME は ~/.hermes 配下（通常モードまたはプロファイルモード）
+        # HERMES_HOME is under ~/.hermes (normal or profile mode)
         return native_home
     except ValueError:
         pass
 
-    # Docker / カスタムデプロイ
-    # プロファイルパスかどうかをチェック: <root>/profiles/<name>
-    # 親ディレクトリ名が "profiles" の場合、ルートは祖父母ディレクトリ
-    # — Docker プロファイルも正しくカバー
+    # Docker / custom deployment.
+    # Check if this is a profile path: <root>/profiles/<name>
+    # If the immediate parent dir is named "profiles", the root is
+    # the grandparent — this covers Docker profiles correctly.
     if env_path.parent.name == "profiles":
         return env_path.parent.parent
 
-    # プロファイルパスではない — HERMES_HOME 自体がルート
+    # Not a profile path — HERMES_HOME itself is the root
     return env_path
 
 
 def get_optional_skills_dir(default: Path | None = None) -> Path:
-    """オプションスキルディレクトリを返す。パッケージマネージャラッパーに対応。
+    """Return the optional-skills directory, honoring package-manager wrappers.
 
-    パッケージインストールでは ``optional-skills`` が Python パッケージツリーの
-    外に配置され、``HERMES_OPTIONAL_SKILLS`` 経由で公開されることがあります。
+    Packaged installs may ship ``optional-skills`` outside the Python package
+    tree and expose it via ``HERMES_OPTIONAL_SKILLS``.
     """
     override = os.getenv("HERMES_OPTIONAL_SKILLS", "").strip()
     if override:
@@ -73,19 +72,18 @@ def get_optional_skills_dir(default: Path | None = None) -> Path:
 
 
 def get_hermes_dir(new_subpath: str, old_name: str) -> Path:
-    """Hermes サブディレクトリを解決する。下位互換性あり。
+    """Resolve a Hermes subdirectory with backward compatibility.
 
-    新規インストールは統合レイアウトを使用（例: ``cache/images``）。
-    既存のインストールで古いパス（例: ``image_cache``）がすでにある場合は
-    そのまま使い続けます — 移行不要。
+    New installs get the consolidated layout (e.g. ``cache/images``).
+    Existing installs that already have the old path (e.g. ``image_cache``)
+    keep using it — no migration required.
 
     Args:
-        new_subpath: HERMES_HOME からの推奨パス（例: ``"cache/images"``）。
-        old_name: HERMES_HOME からのレガシーパス（例: ``"image_cache"``）。
+        new_subpath: Preferred path relative to HERMES_HOME (e.g. ``"cache/images"``).
+        old_name: Legacy path relative to HERMES_HOME (e.g. ``"image_cache"``).
 
     Returns:
-        絶対 ``Path`` — 古い場所がディスク上に存在すればそちらを、
-        そうでなければ新しい場所を返す。
+        Absolute ``Path`` — old location if it exists on disk, otherwise the new one.
     """
     home = get_hermes_home()
     old_path = home / old_name
@@ -95,17 +93,17 @@ def get_hermes_dir(new_subpath: str, old_name: str) -> Path:
 
 
 def display_hermes_home() -> str:
-    """現在の HERMES_HOME をユーザーフレンドリーな表示文字列で返す。
+    """Return a user-friendly display string for the current HERMES_HOME.
 
-    可読性のために ``~/`` の短縮形を使用::
+    Uses ``~/`` shorthand for readability::
 
         default:  ``~/.hermes``
         profile:  ``~/.hermes/profiles/coder``
         custom:   ``/opt/hermes-custom``
 
-    これは **ユーザー向け** の print/log メッセージで使用し、``~/.hermes`` を
-    ハードコードしないこと。実際の ``Path`` が必要なコードでは
-    :func:`get_hermes_home` を使用。
+    Use this in **user-facing** print/log messages instead of hardcoding
+    ``~/.hermes``.  For code that needs a real ``Path``, use
+    :func:`get_hermes_home` instead.
     """
     home = get_hermes_home()
     try:
@@ -115,21 +113,21 @@ def display_hermes_home() -> str:
 
 
 def get_subprocess_home() -> str | None:
-    """サブプロセス用のプロファイル別 HOME ディレクトリを返す。なければ None。
+    """Return a per-profile HOME directory for subprocesses, or None.
 
-    ``{HERMES_HOME}/home/`` がディスク上に存在する場合、サブプロセスは
-    それを ``HOME`` として使用し、システムツール（git, ssh, gh, npm …）の
-    設定を OS レベルの ``/root`` や ``~/`` ではなく Hermes データディレクトリ
-    内に書き込むようにする。これにより:
+    When ``{HERMES_HOME}/home/`` exists on disk, subprocesses should use it
+    as ``HOME`` so system tools (git, ssh, gh, npm …) write their configs
+    inside the Hermes data directory instead of the OS-level ``/root`` or
+    ``~/``.  This provides:
 
-    * **Docker の永続性** — ツールの設定が永続ボリューム内に配置される。
-    * **プロファイルの分離** — 各プロファイルが独自の git 識別情報、SSH 鍵、
-      gh トークンなどを持つ。
+    * **Docker persistence** — tool configs land inside the persistent volume.
+    * **Profile isolation** — each profile gets its own git identity, SSH
+      keys, gh tokens, etc.
 
-    Python プロセス自身の ``os.environ["HOME"]`` や ``Path.home()`` は
-    **決して**変更されません — サブプロセスの環境のみがこの値を注入すべきです。
-    アクティベーションはディレクトリベース: ``home/`` サブディレクトリが
-    存在しなければ ``None`` を返し、動作は変わりません。
+    The Python process's own ``os.environ["HOME"]`` and ``Path.home()`` are
+    **never** modified — only subprocess environments should inject this value.
+    Activation is directory-based: if the ``home/`` subdirectory doesn't
+    exist, returns ``None`` and behavior is unchanged.
     """
     hermes_home = os.getenv("HERMES_HOME")
     if not hermes_home:
@@ -144,12 +142,12 @@ VALID_REASONING_EFFORTS = ("minimal", "low", "medium", "high", "xhigh")
 
 
 def parse_reasoning_effort(effort: str) -> dict | None:
-    """推論努力レベルを設定 dict にパースする。
+    """Parse a reasoning effort level into a config dict.
 
-    有効なレベル: "none", "minimal", "low", "medium", "high", "xhigh"。
-    入力が空または認識できない場合は None を返す（呼び出し側はデフォルトを使用）。
-    "none" の場合は {"enabled": False} を返す。
-    有効な努力レベルの場合は {"enabled": True, "effort": <level>} を返す。
+    Valid levels: "none", "minimal", "low", "medium", "high", "xhigh".
+    Returns None when the input is empty or unrecognized (caller uses default).
+    Returns {"enabled": False} for "none".
+    Returns {"enabled": True, "effort": <level>} for valid effort levels.
     """
     if not effort or not effort.strip():
         return None
@@ -162,10 +160,10 @@ def parse_reasoning_effort(effort: str) -> dict | None:
 
 
 def is_termux() -> bool:
-    """Termux（Android）環境内で実行中の場合に True を返す。
+    """Return True when running inside a Termux (Android) environment.
 
-    ``TERMUX_VERSION``（Termux が設定）または Termux 固有の
-    ``PREFIX`` パスをチェック。インポートセーフ — 重い依存関係なし。
+    Checks ``TERMUX_VERSION`` (set by Termux) or the Termux-specific
+    ``PREFIX`` path.  Import-safe — no heavy deps.
     """
     prefix = os.getenv("PREFIX", "")
     return bool(os.getenv("TERMUX_VERSION") or "com.termux/files/usr" in prefix)
@@ -175,20 +173,19 @@ _wsl_detected: bool | None = None
 
 
 def is_wsl() -> bool:
-    """WSL（Windows Subsystem for Linux）内で実行中の場合に True を返す。
+    """Return True when running inside WSL (Windows Subsystem for Linux).
 
-    ``/proc/version`` で WSL1 と WSL2 の両方が注入する ``microsoft``
-    マーカーをチェック。結果はプロセス寿命中キャッシュされる。
-    インポートセーフ — 重い依存関係なし。
+    Checks ``/proc/version`` for the ``microsoft`` marker that both WSL1
+    and WSL2 inject.  Result is cached for the process lifetime.
+    Import-safe — no heavy deps.
     """
     global _wsl_detected
     if _wsl_detected is not None:
         return _wsl_detected
     try:
-        with open("/proc/version", "r") as f:  # Windows ではファイルが存在しない
+        with open("/proc/version", "r") as f:
             _wsl_detected = "microsoft" in f.read().lower()
     except Exception:
-        # Windows ではこの操作は無視される（/proc/version が存在しない）
         _wsl_detected = False
     return _wsl_detected
 
@@ -197,12 +194,11 @@ _container_detected: bool | None = None
 
 
 def is_container() -> bool:
-    """Docker/Podman コンテナ内で実行中の場合に True を返す。
+    """Return True when running inside a Docker/Podman container.
 
-    ``/.dockerenv``（Docker）、``/run/.containerenv``（Podman）、
-    および ``/proc/1/cgroup`` のコンテナランタイムマーカーをチェック。
-    結果はプロセス寿命中キャッシュされる。
-    インポートセーフ — 重い依存関係なし。
+    Checks ``/.dockerenv`` (Docker), ``/run/.containerenv`` (Podman),
+    and ``/proc/1/cgroup`` for container runtime markers.  Result is
+    cached for the process lifetime.  Import-safe — no heavy deps.
     """
     global _container_detected
     if _container_detected is not None:
@@ -214,82 +210,78 @@ def is_container() -> bool:
         _container_detected = True
         return True
     try:
-        with open("/proc/1/cgroup", "r") as f:  # Windows ではファイルが存在しない
+        with open("/proc/1/cgroup", "r") as f:
             cgroup = f.read()
             if "docker" in cgroup or "podman" in cgroup or "/lxc/" in cgroup:
                 _container_detected = True
                 return True
     except OSError:
-        # Windows ではこの操作は無視される（/proc/1/cgroup が存在しない）
         pass
     _container_detected = False
     return False
 
 
-# ─── 既知のパス ───
+# ─── Well-Known Paths ─────────────────────────────────────────────────────────
 
 
 def get_config_path() -> Path:
-    """HERMES_HOME 配下の ``config.yaml`` へのパスを返す。
+    """Return the path to ``config.yaml`` under HERMES_HOME.
 
-    ``get_hermes_home() / "config.yaml"`` のパターンを置き換え、
-    7つ以上のファイル（skill_utils.py, hermes_logging.py,
-    hermes_time.py など）で繰り返されていたものを集約。
+    Replaces the ``get_hermes_home() / "config.yaml"`` pattern repeated
+    in 7+ files (skill_utils.py, hermes_logging.py, hermes_time.py, etc.).
     """
     return get_hermes_home() / "config.yaml"
 
 
 def get_skills_dir() -> Path:
-    """HERMES_HOME 配下のスキルディレクトリへのパスを返す。"""
+    """Return the path to the skills directory under HERMES_HOME."""
     return get_hermes_home() / "skills"
 
 
+
 def get_env_path() -> Path:
-    """HERMES_HOME 配下の ``.env`` ファイルへのパスを返す。"""
+    """Return the path to the ``.env`` file under HERMES_HOME."""
     return get_hermes_home() / ".env"
 
 
-# ─── ネットワーク設定 ───
+# ─── Network Preferences ─────────────────────────────────────────────────────
 
 
 def apply_ipv4_preference(force: bool = False) -> None:
-    """``socket.getaddrinfo`` をモンキーパッチして IPv4 接続を優先する。
+    """Monkey-patch ``socket.getaddrinfo`` to prefer IPv4 connections.
 
-    IPv6 が壊れているか到達不能なサーバーでは、Python は最初に AAAA
-    レコードを試し、IPv4 にフォールバックする前に TCP タイムアウトの
-    全時間を待機してハングします。
-    これは httpx, requests, urllib, OpenAI SDK — ``socket.getaddrinfo``
-    を使用するすべてのものに影響します。
+    On servers with broken or unreachable IPv6, Python tries AAAA records
+    first and hangs for the full TCP timeout before falling back to IPv4.
+    This affects httpx, requests, urllib, the OpenAI SDK — everything that
+    uses ``socket.getaddrinfo``.
 
-    *force* が True の場合、``getaddrinfo`` をパッチして
-    ``family=AF_UNSPEC``（デフォルト）の呼び出しを ``AF_INET`` として
-    解決し、IPv6 を完全にスキップします。A レコードがない場合は、
-    元のフィルタリングなし解決にフォールバックするため、純粋な IPv6
-    ホストでも動作します。
+    When *force* is True, patches ``getaddrinfo`` so that calls with
+    ``family=AF_UNSPEC`` (the default) resolve as ``AF_INET`` instead,
+    skipping IPv6 entirely.  If no A record exists, falls back to the
+    original unfiltered resolution so pure-IPv6 hosts still work.
 
-    複数回呼び出しても安全 — パッチは一度だけ適用されます。
-    有効にするには ``config.yaml`` で ``network.force_ipv4: true``
-    を設定してください。
+    Safe to call multiple times — only patches once.
+    Set ``network.force_ipv4: true`` in ``config.yaml`` to enable.
     """
     if not force:
         return
 
     import socket
 
-    # 二重パッチの防止
+    # Guard against double-patching
     if getattr(socket.getaddrinfo, "_hermes_ipv4_patched", False):
         return
 
     _original_getaddrinfo = socket.getaddrinfo
 
     def _ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        if family == 0:  # AF_UNSPEC — 呼び出し側は特定の family を要求していない
+        if family == 0:  # AF_UNSPEC — caller didn't request a specific family
             try:
                 return _original_getaddrinfo(
                     host, port, socket.AF_INET, type, proto, flags
                 )
             except socket.gaierror:
-                # A レコードなし — フル解決にフォールバック（純粋 IPv6 ホスト用）
+                # No A record — fall back to full resolution (pure-IPv6 hosts)
                 return _original_getaddrinfo(host, port, family, type, proto, flags)
         return _original_getaddrinfo(host, port, family, type, proto, flags)
 

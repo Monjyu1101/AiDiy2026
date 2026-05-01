@@ -1,27 +1,28 @@
-"""プラグイン可能なコンテキストエンジンの抽象基底クラス。
+"""Abstract base class for pluggable context engines.
 
-コンテキストエンジンは、モデルのトークン上限に近づいたときに会話コンテキストを
-どのように管理するかを制御する。組み込みの ContextCompressor がデフォルト実装である。
-サードパーティエンジン（例: LCM）は、プラグインシステム経由または
-``plugins/context_engine/<name>/`` ディレクトリに配置することで置き換えられる。
+A context engine controls how conversation context is managed when
+approaching the model's token limit. The built-in ContextCompressor
+is the default implementation. Third-party engines (e.g. LCM) can
+replace it via the plugin system or by being placed in the
+``plugins/context_engine/<name>/`` directory.
 
-選択は設定駆動: config.yaml の ``context.engine``。
-デフォルトは ``"compressor"``（組み込み）。有効なエンジンは 1 つのみ。
+Selection is config-driven: ``context.engine`` in config.yaml.
+Default is ``"compressor"`` (the built-in). Only one engine is active.
 
-エンジンの責務:
-  - コンパクションをいつ実行するかを決定する
-  - コンパクションを実行する（要約・DAG 構築など）
-  - エージェントが呼び出せるツールをオプションで公開する（例: lcm_grep）
-  - API レスポンスからトークン使用量を追跡する
+The engine is responsible for:
+  - Deciding when compaction should fire
+  - Performing compaction (summarization, DAG construction, etc.)
+  - Optionally exposing tools the agent can call (e.g. lcm_grep)
+  - Tracking token usage from API responses
 
-ライフサイクル:
-  1. エンジンをインスタンス化して登録する（プラグインの register() またはデフォルト）
-  2. 会話開始時に on_session_start() が呼ばれる
-  3. 各 API レスポンス後に usage データとともに update_from_response() が呼ばれる
-  4. 各ターン後に should_compress() がチェックされる
-  5. should_compress() が True を返したら compress() が呼ばれる
-  6. 実際のセッション境界（CLI 終了・/reset・ゲートウェイセッション有効期限）で
-     on_session_end() が呼ばれる — ターンごとではない
+Lifecycle:
+  1. Engine is instantiated and registered (plugin register() or default)
+  2. on_session_start() called when a conversation begins
+  3. update_from_response() called after each API response with usage data
+  4. should_compress() checked after each turn
+  5. compress() called when should_compress() returns True
+  6. on_session_end() called at real session boundaries (CLI exit, /reset,
+     gateway session expiry) — NOT per-turn
 """
 
 from abc import ABC, abstractmethod
@@ -29,18 +30,18 @@ from typing import Any, Dict, List
 
 
 class ContextEngine(ABC):
-    """すべてのコンテキストエンジンが実装しなければならない基底クラス。"""
+    """Base class all context engines must implement."""
 
-    # -- アイデンティティ --------------------------------------------------
+    # -- Identity ----------------------------------------------------------
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """短い識別子（例: 'compressor', 'lcm'）。"""
+        """Short identifier (e.g. 'compressor', 'lcm')."""
 
-    # -- トークン状態（run_agent.py が表示/ログ用に読み取る） --------------
+    # -- Token state (read by run_agent.py for display/logging) ------------
     #
-    # エンジンはこれらを維持しなければならない。run_agent.py が直接読み取る。
+    # Engines MUST maintain these. run_agent.py reads them directly.
 
     last_prompt_tokens: int = 0
     last_completion_tokens: int = 0
@@ -49,27 +50,28 @@ class ContextEngine(ABC):
     context_length: int = 0
     compression_count: int = 0
 
-    # -- コンパクションパラメーター（run_agent.py がプリフライト用に読み取る） --
+    # -- Compaction parameters (read by run_agent.py for preflight) --------
     #
-    # プリフライト圧縮チェックを制御する。サブクラスは __init__ またはプロパティで
-    # オーバーライドできる。ほとんどのエンジンに対してデフォルト値は妥当である。
+    # These control the preflight compression check.  Subclasses may
+    # override via __init__ or property; defaults are sensible for most
+    # engines.
 
     threshold_percent: float = 0.75
     protect_first_n: int = 3
     protect_last_n: int = 6
 
-    # -- コアインターフェース -----------------------------------------------
+    # -- Core interface ----------------------------------------------------
 
     @abstractmethod
     def update_from_response(self, usage: Dict[str, Any]) -> None:
-        """API レスポンスからトークン使用量の追跡値を更新する。
+        """Update tracked token usage from an API response.
 
-        すべての LLM 呼び出し後に、レスポンスの usage 辞書とともに呼び出される。
+        Called after every LLM call with the usage dict from the response.
         """
 
     @abstractmethod
     def should_compress(self, prompt_tokens: int = None) -> bool:
-        """このターンでコンパクションを実行すべき場合に True を返す。"""
+        """Return True if compaction should fire this turn."""
 
     @abstractmethod
     def compress(
@@ -78,98 +80,100 @@ class ContextEngine(ABC):
         current_tokens: int = None,
         focus_topic: str = None,
     ) -> List[Dict[str, Any]]:
-        """メッセージリストをコンパクトして新しいメッセージリストを返す。
+        """Compact the message list and return the new message list.
 
-        これがメインのエントリーポイントである。エンジンは完全なメッセージリストを
-        受け取り、コンテキスト予算内に収まる（おそらく短い）リストを返す。
-        実装は要約・DAG 構築・その他を自由に行えるが、返されるリストは有効な
-        OpenAI 形式のメッセージシーケンスでなければならない。
+        This is the main entry point. The engine receives the full message
+        list and returns a (possibly shorter) list that fits within the
+        context budget. The implementation is free to summarize, build a
+        DAG, or do anything else — as long as the returned list is a valid
+        OpenAI-format message sequence.
 
         Args:
-            focus_topic: 手動 ``/compress <focus>`` からのオプションのトピック文字列。
-                ガイド付き圧縮をサポートするエンジンはこのトピックに関連する情報の
-                保持を優先すること。サポートしないエンジンはこの引数を無視してよい。
+            focus_topic: Optional topic string from manual ``/compress <focus>``.
+                Engines that support guided compression should prioritise
+                preserving information related to this topic.  Engines that
+                don't support it may simply ignore this argument.
         """
 
-    # -- オプション: プリフライトチェック -----------------------------------
+    # -- Optional: pre-flight check ----------------------------------------
 
     def should_compress_preflight(self, messages: List[Dict[str, Any]]) -> bool:
-        """API 呼び出し前の簡易チェック（実際のトークン数未取得）。
+        """Quick rough check before the API call (no real token count yet).
 
-        デフォルトは False を返す（プリフライトをスキップ）。エンジンが
-        安価な見積もりを行える場合はオーバーライドする。
+        Default returns False (skip pre-flight). Override if your engine
+        can do a cheap estimate.
         """
         return False
 
-    # -- オプション: 手動 /compress プリフライト ---------------------------
+    # -- Optional: manual /compress preflight ------------------------------
 
     def has_content_to_compress(self, messages: List[Dict[str, Any]]) -> bool:
-        """クイックチェック: ``messages`` にコンパクト可能なものがあるか?
+        """Quick check: is there anything in ``messages`` that can be compacted?
 
-        ゲートウェイの ``/compress`` コマンドでプリフライトガードとして使用される。
-        False を返すことで、LLM 呼び出しをせずに "nothing to compress yet" を
-        ゲートウェイが報告できるようにする。
+        Used by the gateway ``/compress`` command as a preflight guard —
+        returning False lets the gateway report "nothing to compress yet"
+        without making an LLM call.
 
-        デフォルトは True を返す（常に試行）。自分のヘッド/テール境界を安価に
-        検査できるエンジンは、トランスクリプトが完全に保護されている場合に
-        False を返すようオーバーライドすること。
+        Default returns True (always attempt).  Engines with a cheap way
+        to introspect their own head/tail boundaries should override this
+        to return False when the transcript is still entirely protected.
         """
         return True
 
-    # -- オプション: セッションライフサイクル ------------------------------
+    # -- Optional: session lifecycle ---------------------------------------
 
     def on_session_start(self, session_id: str, **kwargs) -> None:
-        """新しい会話セッション開始時に呼ばれる。
+        """Called when a new conversation session begins.
 
-        セッションの永続化された状態（DAG・ストア）を読み込むために使用する。
-        kwargs には hermes_home・platform・model などが含まれる場合がある。
+        Use this to load persisted state (DAG, store) for the session.
+        kwargs may include hermes_home, platform, model, etc.
         """
 
     def on_session_end(self, session_id: str, messages: List[Dict[str, Any]]) -> None:
-        """実際のセッション境界（CLI 終了・/reset・ゲートウェイ有効期限）で呼ばれる。
+        """Called at real session boundaries (CLI exit, /reset, gateway expiry).
 
-        状態のフラッシュ・DB 接続のクローズなどに使用する。
-        ターンごとではなく、セッションが本当に終了したときのみ呼ばれる。
+        Use this to flush state, close DB connections, etc.
+        NOT called per-turn — only when the session truly ends.
         """
 
     def on_session_reset(self) -> None:
-        """/new または /reset 時に呼ばれる。セッションごとの状態をリセットする。
+        """Called on /new or /reset. Reset per-session state.
 
-        デフォルトは compression_count とトークン追跡をリセットする。
+        Default resets compression_count and token tracking.
         """
         self.last_prompt_tokens = 0
         self.last_completion_tokens = 0
         self.last_total_tokens = 0
         self.compression_count = 0
 
-    # -- オプション: ツール -----------------------------------------------
+    # -- Optional: tools ---------------------------------------------------
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        """このエンジンがエージェントに提供するツールスキーマを返す。
+        """Return tool schemas this engine provides to the agent.
 
-        デフォルトは空リストを返す（ツールなし）。LCM は lcm_grep・
-        lcm_describe・lcm_expand のスキーマをここで返す。
+        Default returns empty list (no tools). LCM would return schemas
+        for lcm_grep, lcm_describe, lcm_expand here.
         """
         return []
 
     def handle_tool_call(self, name: str, args: Dict[str, Any], **kwargs) -> str:
-        """エージェントからのツール呼び出しを処理する。
+        """Handle a tool call from the agent.
 
-        get_tool_schemas() が返すツール名に対してのみ呼ばれる。
-        JSON 文字列を返さなければならない。
+        Only called for tool names returned by get_tool_schemas().
+        Must return a JSON string.
 
-        kwargs に含まれる可能性があるもの:
-          messages: 現在のインメモリメッセージリスト（ライブ取り込み用）
+        kwargs may include:
+          messages: the current in-memory message list (for live ingestion)
         """
         import json
         return json.dumps({"error": f"Unknown context engine tool: {name}"})
 
-    # -- オプション: ステータス / 表示 -----------------------------------
+    # -- Optional: status / display ----------------------------------------
 
     def get_status(self) -> Dict[str, Any]:
-        """表示/ログ用のステータス辞書を返す。
+        """Return status dict for display/logging.
 
-        デフォルトは run_agent.py が期待する標準フィールドを返す。
+        Default returns the standard fields run_agent.py expects.
         """
         return {
             "last_prompt_tokens": self.last_prompt_tokens,
@@ -182,7 +186,7 @@ class ContextEngine(ABC):
             "compression_count": self.compression_count,
         }
 
-    # -- オプション: モデル切り替えサポート -------------------------------
+    # -- Optional: model switch support ------------------------------------
 
     def update_model(
         self,
@@ -192,11 +196,11 @@ class ContextEngine(ABC):
         api_key: str = "",
         provider: str = "",
     ) -> None:
-        """ユーザーがモデルを切り替えたときまたはフォールバック有効化時に呼ばれる。
+        """Called when the user switches models or on fallback activation.
 
-        デフォルトは context_length を更新し、threshold_percent から
-        threshold_tokens を再計算する。エンジンがそれ以上必要な場合はオーバーライドする
-        （例: DAG 予算の再計算・要約モデルの切り替え）。
+        Default updates context_length and recalculates threshold_tokens
+        from threshold_percent. Override if your engine needs more
+        (e.g. recalculate DAG budgets, switch summary models).
         """
         self.context_length = context_length
         self.threshold_tokens = int(context_length * self.threshold_percent)

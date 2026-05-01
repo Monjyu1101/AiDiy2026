@@ -51,7 +51,7 @@ class conf_json:
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image-preview',
         'CHAT_FREEAI_MODEL': 'gemini-3.1-flash-image-preview',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image-preview',
-        'CHAT_OLLAMA_MODEL': 'deepseek-v4-flash:cloud',
+        'CHAT_OLLAMA_MODEL': 'mistral-large-3:675b:cloud',
 
         # LiveAI設定
         'LIVE_AI_NAME': 'freeai_live',

@@ -30,10 +30,10 @@ from concurrent.futures import (
 )
 from typing import Any, Dict, List, Optional
 
-from base.toolsets import TOOLSETS
+from toolsets import TOOLSETS
 from tools import file_state
 from tools.terminal_tool import set_approval_callback as _set_subagent_approval_cb
-from base.utils import base_url_hostname, is_truthy_value
+from utils import base_url_hostname, is_truthy_value
 
 
 # Tools that children must never have access to
@@ -801,7 +801,7 @@ def _build_child_progress_callback(
                 if preview and len(preview) > 35
                 else (preview or "")
             )
-            from core.display import get_tool_emoji
+            from agent.display import get_tool_emoji
 
             emoji = get_tool_emoji(tool_name or "")
             line = f" {prefix}├─ {emoji} {tool_name}"
@@ -862,7 +862,7 @@ def _build_child_agent(
     routing subagents to a different provider:model pair (e.g. cheap/fast
     model on OpenRouter while the parent runs on Nous Portal).
     """
-    from core.run_agent import AIAgent
+    from run_agent import AIAgent
     import uuid as _uuid
 
     # ── Role resolution ─────────────────────────────────────────────────
@@ -896,7 +896,7 @@ def _build_child_agent(
         parent_toolsets = set(parent_enabled)
     elif parent_agent and hasattr(parent_agent, "valid_tool_names"):
         # enabled_toolsets is None (all tools) — derive from loaded tool names
-        from base import model_tools
+        import model_tools
 
         parent_toolsets = {
             ts
@@ -1013,7 +1013,7 @@ def _build_child_agent(
     try:
         delegation_effort = str(delegation_cfg.get("reasoning_effort") or "").strip()
         if delegation_effort:
-            from base.hermes_constants import parse_reasoning_effort
+            from hermes_constants import parse_reasoning_effort
 
             parsed = parse_reasoning_effort(delegation_effort)
             if parsed is not None:
@@ -1042,17 +1042,17 @@ def _build_child_agent(
         quiet_mode=True,
         ephemeral_system_prompt=child_prompt,
         log_prefix=f"[subagent-{task_index}]",
-        platform=getattr(parent_agent, "platform", "cli"),
+        platform=parent_agent.platform,
         skip_context_files=True,
         skip_memory=True,
         clarify_callback=None,
         thinking_callback=child_thinking_cb,
         session_db=getattr(parent_agent, "_session_db", None),
         parent_session_id=getattr(parent_agent, "session_id", None),
-        providers_allowed=getattr(parent_agent, "providers_allowed", []),
-        providers_ignored=getattr(parent_agent, "providers_ignored", []),
-        providers_order=getattr(parent_agent, "providers_order", []),
-        provider_sort=getattr(parent_agent, "provider_sort", None),
+        providers_allowed=parent_agent.providers_allowed,
+        providers_ignored=parent_agent.providers_ignored,
+        providers_order=parent_agent.providers_order,
+        provider_sort=parent_agent.provider_sort,
         tool_progress_callback=child_progress_cb,
         iteration_budget=None,  # fresh budget per subagent
     )
@@ -1116,7 +1116,7 @@ def _dump_subagent_timeout_diagnostic(
     Returns the absolute path to the diagnostic file, or None on failure.
     """
     try:
-        from base.hermes_constants import get_hermes_home
+        from hermes_constants import get_hermes_home
         import datetime as _dt
         import sys as _sys
         import traceback as _traceback
@@ -1257,7 +1257,7 @@ def _run_single_child(
 
     # Restore parent tool names using the value saved before child construction
     # mutated the global. This is the correct parent toolset, not the child's.
-    from base import model_tools
+    import model_tools
 
     _saved_tool_names = getattr(
         child, "_delegate_saved_tool_names", list(model_tools._last_resolved_tool_names)
@@ -1779,7 +1779,7 @@ def _run_single_child(
 
         # Restore the parent's tool names so the process-global is correct
         # for any subsequent execute_code calls or other consumers.
-        from base import model_tools
+        import model_tools
 
         saved_tool_names = getattr(child, "_delegate_saved_tool_names", None)
         if isinstance(saved_tool_names, list):
@@ -1928,7 +1928,7 @@ def delegate_task(
     # Save parent tool names BEFORE any child construction mutates the global.
     # _build_child_agent() calls AIAgent() which calls get_tool_definitions(),
     # which overwrites model_tools._last_resolved_tool_names with child's toolset.
-    import base.model_tools as _model_tools
+    import model_tools as _model_tools
 
     _parent_tool_names = list(_model_tools._last_resolved_tool_names)
 
@@ -2212,7 +2212,7 @@ def _resolve_child_credential_pool(effective_provider: Optional[str], parent_age
         return parent_pool
 
     try:
-        from core.credential_pool import load_pool
+        from agent.credential_pool import load_pool
 
         pool = load_pool(effective_provider)
         if pool is not None and pool.has_credentials():
@@ -2309,7 +2309,7 @@ def _resolve_delegation_credentials(cfg: dict, parent_agent) -> dict:
         )
 
     return {
-        "model": configured_model,
+        "model": configured_model or runtime.get("model") or None,
         "provider": runtime.get("provider"),
         "base_url": runtime.get("base_url"),
         "api_key": api_key,
@@ -2322,10 +2322,19 @@ def _resolve_delegation_credentials(cfg: dict, parent_agent) -> dict:
 def _load_config() -> dict:
     """Load delegation config from CLI_CONFIG or persistent config.
 
-    Reads the persistent config (hermes_cli/config.py load_config()) so that
+    Checks the runtime config (cli.py CLI_CONFIG) first, then falls back
+    to the persistent config (hermes_cli/config.py load_config()) so that
     ``delegation.model`` / ``delegation.provider`` are picked up regardless
     of the entry point (CLI, gateway, cron).
     """
+    try:
+        from cli import CLI_CONFIG
+
+        cfg = CLI_CONFIG.get("delegation", {})
+        if cfg:
+            return cfg
+    except Exception:
+        pass
     try:
         from hermes_cli.config import load_config
 

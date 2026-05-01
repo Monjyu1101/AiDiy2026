@@ -19,7 +19,7 @@ import shlex
 from pathlib import Path
 from typing import Dict, Any, Optional, Set
 
-from core.prompt_builder import _scan_context_content
+from agent.prompt_builder import _scan_context_content
 
 logger = logging.getLogger(__name__)
 

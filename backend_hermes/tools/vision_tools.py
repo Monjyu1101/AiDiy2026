@@ -37,7 +37,8 @@ from pathlib import Path
 from typing import Any, Awaitable, Dict, Optional
 from urllib.parse import urlparse
 import httpx
-from core.auxiliary_client import async_call_llm, extract_content_or_reasoning
+from agent.auxiliary_client import async_call_llm, extract_content_or_reasoning
+from hermes_constants import get_hermes_dir
 from tools.debug_helpers import DebugSession
 from tools.website_policy import check_website_access
 
@@ -56,9 +57,9 @@ def _resolve_download_timeout() -> float:
         except ValueError:
             pass
     try:
-        from hermes_cli.config import load_config
+        from hermes_cli.config import cfg_get, load_config
         cfg = load_config()
-        val = cfg.get("auxiliary", {}).get("vision", {}).get("download_timeout")
+        val = cfg_get(cfg, "auxiliary", "vision", "download_timeout")
         if val is not None:
             return float(val)
     except Exception:
@@ -435,7 +436,7 @@ async def vision_analyze_tool(
         Exception: If download fails, analysis fails, or API key is not set
         
     Note:
-        - For URLs, temporary images are stored in ./temp_vision_images/ and cleaned up
+        - For URLs, temporary images are stored under $HERMES_HOME/cache/vision/ and cleaned up
         - For local file paths, the file is used directly and NOT deleted
         - Supports common image formats (JPEG, PNG, GIF, WebP, etc.)
     """
@@ -483,7 +484,7 @@ async def vision_analyze_tool(
             if blocked:
                 raise PermissionError(blocked["message"])
             logger.info("Downloading image from URL...")
-            temp_dir = Path("./temp_vision_images")
+            temp_dir = get_hermes_dir("cache/vision", "temp_vision_images")
             temp_image_path = temp_dir / f"temp_image_{uuid.uuid4()}.jpg"
             await _download_image(image_url, temp_image_path)
             should_cleanup = True
@@ -555,9 +556,9 @@ async def vision_analyze_tool(
         vision_timeout = 120.0
         vision_temperature = 0.1
         try:
-            from hermes_cli.config import load_config
+            from hermes_cli.config import cfg_get, load_config
             _cfg = load_config()
-            _vision_cfg = _cfg.get("auxiliary", {}).get("vision", {})
+            _vision_cfg = cfg_get(_cfg, "auxiliary", "vision", default={})
             _vt = _vision_cfg.get("timeout")
             if _vt is not None:
                 vision_timeout = float(_vt)
@@ -686,7 +687,7 @@ async def vision_analyze_tool(
 def check_vision_requirements() -> bool:
     """Check if the configured runtime vision path can resolve a client."""
     try:
-        from core.auxiliary_client import resolve_vision_provider_client
+        from agent.auxiliary_client import resolve_vision_provider_client
 
         _provider, client, _model = resolve_vision_provider_client()
         return client is not None
@@ -748,8 +749,9 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------------------
-# Legacy direct-use schema
+# Registry
 # ---------------------------------------------------------------------------
+from tools.registry import registry, tool_error
 
 VISION_ANALYZE_SCHEMA = {
     "name": "vision_analyze",
@@ -790,6 +792,12 @@ def _handle_vision_analyze(args: Dict[str, Any], **kw: Any) -> Awaitable[str]:
     return vision_analyze_tool(image_url, full_prompt, model)
 
 
-# AiDiy Hermes uses vision_tool.py as the registry-facing vision_analyze
-# implementation because it reads AiDiy_key.json. This module remains for
-# browser_tool helpers and legacy direct imports.
+registry.register(
+    name="vision_analyze",
+    toolset="vision",
+    schema=VISION_ANALYZE_SCHEMA,
+    handler=_handle_vision_analyze,
+    check_fn=check_vision_requirements,
+    is_async=True,
+    emoji="👁️",
+)

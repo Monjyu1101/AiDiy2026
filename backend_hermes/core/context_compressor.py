@@ -1,20 +1,20 @@
-"""長い会話のコンテキストウィンドウを自動圧縮するモジュール。
+"""Automatic context window compression for long conversations.
 
-要約用に独自の OpenAI クライアントを持つ自己完結型クラス。
-ヘッドとテールのコンテキストを保護しながら、補助モデル（安価・高速）で
-中間ターンを要約する。
+Self-contained class with its own OpenAI client for summarization.
+Uses auxiliary model (cheap/fast) to summarize middle turns while
+protecting head and tail context.
 
-v2 からの改善点:
-  - 解決済み/未解決の質問追跡を含む構造化要約テンプレート
-  - 要約者プリアンブル: "質問に回答しないこと"（OpenCode から）
-  - ハンドオフの枠組み: "別のアシスタント"（Codex から）による分離
-  - "残作業"が"次のステップ"に替わり、能動的な指示として読まれることを回避
-  - 要約がテールメッセージにマージされる際の明確なセパレーター
-  - 反復的な要約更新（複数の圧縮をまたいで情報を保持）
-  - 固定メッセージ数の代わりにトークン予算によるテール保護
-  - LLM 要約前のツール出力のプルーニング（安価なプリパス）
-  - スケーリングされた要約予算（圧縮コンテンツに比例）
-  - 要約者入力にツール呼び出し/結果の詳細情報を追加
+Improvements over v2:
+  - Structured summary template with Resolved/Pending question tracking
+  - Summarizer preamble: "Do not respond to any questions" (from OpenCode)
+  - Handoff framing: "different assistant" (from Codex) to create separation
+  - "Remaining Work" replaces "Next Steps" to avoid reading as active instructions
+  - Clear separator when summary merges into tail message
+  - Iterative summary updates (preserves info across multiple compactions)
+  - Token-budget tail protection instead of fixed message count
+  - Tool output pruning before LLM summarization (cheap pre-pass)
+  - Scaled summary budget (proportional to compressed content)
+  - Richer tool call/result detail in summarizer input
 """
 
 import hashlib
@@ -24,14 +24,14 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-from core.auxiliary_client import call_llm
-from core.context_engine import ContextEngine
-from core.model_metadata import (
+from agent.auxiliary_client import call_llm
+from agent.context_engine import ContextEngine
+from agent.model_metadata import (
     MINIMUM_CONTEXT_LENGTH,
     get_model_context_length,
     estimate_messages_tokens_rough,
 )
-from core.redact import redact_sensitive_text
+from agent.redact import redact_sensitive_text
 
 logger = logging.getLogger(__name__)
 
@@ -49,38 +49,39 @@ SUMMARY_PREFIX = (
 )
 LEGACY_SUMMARY_PREFIX = "[CONTEXT SUMMARY]:"
 
-# 要約出力の最小トークン数
+# Minimum tokens for the summary output
 _MIN_SUMMARY_TOKENS = 2000
-# 要約に割り当てる圧縮コンテンツの割合
+# Proportion of compressed content to allocate for summary
 _SUMMARY_RATIO = 0.20
-# 要約トークンの絶対上限（非常に大きなコンテキストウィンドウでも適用）
+# Absolute ceiling for summary tokens (even on very large context windows)
 _SUMMARY_TOKENS_CEILING = 12_000
 
-# 古いツール結果をプルーニングする際のプレースホルダー
+# Placeholder used when pruning old tool results
 _PRUNED_TOOL_PLACEHOLDER = "[Old tool output cleared to save context space]"
 
-# 1 トークンあたりの文字数（概算）
+# Chars per token rough estimate
 _CHARS_PER_TOKEN = 4
-# 添付画像 1 枚あたりのフラットトークンコスト。
-# 実コストはプロバイダーと画像サイズによって異なる（Anthropic ≈ width×height/750、
-# GPT-4o はハイディテール 2048×2048 で最大 ~1700、Gemini は 258/タイル）が、
-# 1600 はマルチ画像会話の圧縮予算を誠実に保つための現実的な上限値。
-# Claude Code の IMAGE_TOKEN_ESTIMATE 定数と一致する。
+# Flat token cost per attached image part.  Real cost varies by provider and
+# dimensions (Anthropic ≈ width×height/750, GPT-4o up to ~1700 for
+# high-detail 2048×2048, Gemini 258/tile), but 1600 is a realistic ceiling
+# that keeps compression budgeting honest for multi-image conversations.
+# Matches Claude Code's IMAGE_TOKEN_ESTIMATE constant.
 _IMAGE_TOKEN_ESTIMATE = 1600
-# コンプレッサーが使用する文字予算単位に換算した同じ値。
-# テールカット判断における "コンテンツ長" の累積に使用する。
+# Same figure expressed in the char-budget currency the rest of the
+# compressor speaks in.  Used when accumulating message "content length"
+# for tail-cut decisions.
 _IMAGE_CHAR_EQUIVALENT = _IMAGE_TOKEN_ESTIMATE * _CHARS_PER_TOKEN
 _SUMMARY_FAILURE_COOLDOWN_SECONDS = 600
 
 
 def _content_length_for_budget(raw_content: Any) -> int:
-    """トークン予算計算用にメッセージコンテンツの有効文字数を返す。
+    """Return the effective char-length of a message's content for token budgeting.
 
-    プレーン文字列: ``len(content)``。マルチモーダルリスト: テキスト部分の
-    ``len(text)`` の合計に、画像部分（``image_url`` / ``input_image`` /
-    Anthropic 形式の ``image``）ごとにフラットな ``_IMAGE_CHAR_EQUIVALENT``
-    を加算する。これにより、テキスト部分が空でも 5 枚の添付画像を持つ
-    ターンをほぼゼロトークンとして扱うことを防ぐ。
+    Plain strings: ``len(content)``. Multimodal lists: sum of text-part
+    ``len(text)`` plus a flat ``_IMAGE_CHAR_EQUIVALENT`` per image part
+    (``image_url`` / ``input_image`` / Anthropic-style ``image``). This
+    keeps the compressor from treating a turn with 5 attached images as
+    near-zero tokens just because the text part is empty.
     """
     if isinstance(raw_content, str):
         return len(raw_content)
@@ -107,10 +108,10 @@ def _content_length_for_budget(raw_content: Any) -> int:
 
 
 def _content_text_for_contains(content: Any) -> str:
-    """メッセージコンテンツのベストエフォートなテキストビューを返す。
+    """Return a best-effort text view of message content.
 
-    メッセージにノートを既に追加済みかどうかをサブストリング検査する際のみ使用する。
-    他の箇所ではマルチモーダルリストをそのまま保持する。
+    Used only for substring checks when we need to know whether we've already
+    appended a note to a message. Keeps multimodal lists intact elsewhere.
     """
     if content is None:
         return ""
@@ -130,11 +131,11 @@ def _content_text_for_contains(content: Any) -> str:
 
 
 def _append_text_to_content(content: Any, text: str, *, prepend: bool = False) -> Any:
-    """プレーンテキストをメッセージコンテンツに安全に追記または前置する。
+    """Append or prepend plain text to message content safely.
 
-    圧縮処理でノートを追加したり、要約を既存メッセージにマージする必要がある場合に使用する。
-    メッセージコンテンツはプレーンテキストまたはマルチモーダルなブロックのリストである可能性があるため、
-    直接の文字列連結は常に安全とは限らない。
+    Compression sometimes needs to add a note or merge a summary into an
+    existing message. Message content may be plain text or a multimodal list of
+    blocks, so direct string concatenation is not always safe.
     """
     if content is None:
         return text
@@ -148,25 +149,29 @@ def _append_text_to_content(content: Any, text: str, *, prepend: bool = False) -
 
 
 def _truncate_tool_call_args_json(args: str, head_chars: int = 200) -> str:
-    """ツール呼び出し引数 JSON 内の長い文字列値を JSON の有効性を保ちながら縮小する。
+    """Shrink long string values inside a tool-call arguments JSON blob while
+    preserving JSON validity.
 
-    ツール呼び出しの ``function.arguments`` フィールドは LLM プロバイダーに渡される
-    JSON エンコード済み文字列であり、ダウンストリームプロバイダーは厳格に検証して
-    不正な形式の場合は非リトライ可能な 400 を返す。
-    以前の実装は固定バイトオフセットで生 JSON を切り取って ``...[truncated]`` を追加していたが、
-    これは以下のような不正な文字列を生成することがあった::
+    The ``function.arguments`` field on a tool call is a JSON-encoded string
+    passed through to the LLM provider; downstream providers strictly
+    validate it and return a non-retryable 400 when it is not well-formed.
+    An earlier implementation sliced the raw JSON at a fixed byte offset and
+    appended ``...[truncated]`` — which routinely produced strings like::
 
         {"path": "/foo/bar", "content": "# long markdown
         ...[truncated]
 
-    つまり、未終端の文字列と欠落した閉じブレースである。MiniMax などはこれを
-    ``invalid function arguments json string`` として拒否し、
-    同じ壊れた履歴を毎ターン再送し続けるループに陥る（issue #11762 を参照）。
+    i.e. an unterminated string and a missing closing brace. MiniMax, for
+    example, rejects this with ``invalid function arguments json string``
+    and the session gets stuck re-sending the same broken history on every
+    turn. See issue #11762 for the observed loop.
 
-    このヘルパーは引数をパースし、解析済み構造内の長い文字列葉を縮小して再シリアライズする。
-    非文字列値（パス、整数、ブーリアン）はそのまま保持する。
-    引数が最初から有効な JSON でない場合（モデルバックエンドによっては非 JSON ツール引数を使用する）、
-    元の文字列をそのまま返し、解析不能な値に置き換えない。
+    This helper parses the arguments, shrinks long string leaves inside the
+    parsed structure, and re-serialises. Non-string values (paths, ints,
+    booleans) are preserved intact. If the arguments are not valid JSON
+    to begin with — some model backends use non-JSON tool arguments — the
+    original string is returned unchanged rather than replaced with
+    something neither we nor the backend can parse.
     """
     try:
         parsed = json.loads(args)
@@ -190,12 +195,13 @@ def _truncate_tool_call_args_json(args: str, head_chars: int = 200) -> str:
 
 
 def _summarize_tool_result(tool_name: str, tool_args: str, tool_content: str) -> str:
-    """ツール呼び出しと結果を 1 行にまとめた有益な要約を作成する。
+    """Create an informative 1-line summary of a tool call + result.
 
-    圧縮前のプルーニングパスで、大きなツール出力を情報ゼロの汎用プレースホルダーではなく、
-    ツールが何をしたかの短くて有用な説明に置き換えるために使用する。
+    Used during the pre-compression pruning pass to replace large tool
+    outputs with a short but useful description of what the tool did,
+    rather than a generic placeholder that carries zero information.
 
-    以下のような文字列を返す::
+    Returns strings like::
 
         [terminal] ran `npm test` -> exit 0, 47 lines output
         [read_file] read config.py from line 1 (1,200 chars)
@@ -311,14 +317,14 @@ def _summarize_tool_result(tool_name: str, tool_args: str, tool_content: str) ->
 
 
 class ContextCompressor(ContextEngine):
-    """デフォルトのコンテキストエンジン — 損失のある要約で会話コンテキストを圧縮する。
+    """Default context engine — compresses conversation context via lossy summarization.
 
-    アルゴリズム:
-      1. 古いツール結果をプルーニング（安価、LLM 呼び出しなし）
-      2. ヘッドメッセージを保護（システムプロンプト + 最初のやり取り）
-      3. トークン予算でテールメッセージを保護（最新の約 20K トークン）
-      4. 構造化 LLM プロンプトで中間ターンを要約
-      5. 再圧縮時は前の要約を反復的に更新
+    Algorithm:
+      1. Prune old tool results (cheap, no LLM call)
+      2. Protect head messages (system prompt + first exchange)
+      3. Protect tail messages by token budget (most recent ~20K tokens)
+      4. Summarize middle turns with structured LLM prompt
+      5. On subsequent compactions, iteratively update the previous summary
     """
 
     @property
@@ -326,7 +332,7 @@ class ContextCompressor(ContextEngine):
         return "compressor"
 
     def on_session_reset(self) -> None:
-        """/new または /reset 時のセッションごとの状態をリセットする。"""
+        """Reset all per-session state for /new or /reset."""
         super().on_session_reset()
         self._context_probed = False
         self._context_probe_persistable = False
@@ -348,7 +354,7 @@ class ContextCompressor(ContextEngine):
         provider: str = "",
         api_mode: str = "",
     ) -> None:
-        """モデルの切り替えまたはフォールバック有効化後にモデル情報を更新する。"""
+        """Update model info after a model switch or fallback activation."""
         self.model = model
         self.base_url = base_url
         self.api_key = api_key
@@ -452,16 +458,16 @@ class ContextCompressor(ContextEngine):
         self._last_aux_model_failure_model: Optional[str] = None
 
     def update_from_response(self, usage: Dict[str, Any]):
-        """API レスポンスからトークン使用量の追跡値を更新する。"""
+        """Update tracked token usage from API response."""
         self.last_prompt_tokens = usage.get("prompt_tokens", 0)
         self.last_completion_tokens = usage.get("completion_tokens", 0)
 
     def should_compress(self, prompt_tokens: int = None) -> bool:
-        """コンテキストが圧縮閾値を超えているか確認する。
+        """Check if context exceeds the compression threshold.
 
-        アンチスラッシング保護を含む: 直近 2 回の圧縮がそれぞれ 10% 未満の
-        削減しかしなかった場合、1〜2 メッセージしか削除されない無限ループを
-        避けるため圧縮をスキップする。
+        Includes anti-thrashing protection: if the last two compressions
+        each saved less than 10%, skip compression to avoid infinite loops
+        where each pass removes only 1-2 messages.
         """
         tokens = prompt_tokens if prompt_tokens is not None else self.last_prompt_tokens
         if tokens < self.threshold_tokens:
@@ -486,21 +492,24 @@ class ContextCompressor(ContextEngine):
         self, messages: List[Dict[str, Any]], protect_tail_count: int,
         protect_tail_tokens: int | None = None,
     ) -> tuple[List[Dict[str, Any]], int]:
-        """古いツール結果の内容を有益な 1 行要約に置き換える。
+        """Replace old tool result contents with informative 1-line summaries.
 
-        汎用プレースホルダーの代わりに、以下のような要約を生成する::
+        Instead of a generic placeholder, generates a summary like::
 
             [terminal] ran `npm test` -> exit 0, 47 lines output
             [read_file] read config.py from line 1 (3,400 chars)
 
-        また、同一のツール結果の重複を排除し（例: 同じファイルを 5 回読む場合は最新の完全なコピーのみ保持）、
-        保護されたテール外のアシスタントメッセージの大きなツール呼び出し引数を切り詰める。
+        Also deduplicates identical tool results (e.g. reading the same file
+        5x keeps only the newest full copy) and truncates large tool_call
+        arguments in assistant messages outside the protected tail.
 
-        末尾から後ろ向きに走査し、``protect_tail_tokens`` が指定されている場合は
-        その範囲内、または後方互換デフォルトとして最後の ``protect_tail_count`` メッセージを保護する。
-        両方が指定された場合、トークン予算が優先され、メッセージ数は最低限の床として機能する。
+        Walks backward from the end, protecting the most recent messages that
+        fall within ``protect_tail_tokens`` (when provided) OR the last
+        ``protect_tail_count`` messages (backward-compatible default).
+        When both are given, the token budget takes priority and the message
+        count acts as a hard minimum floor.
 
-        (pruned_messages, pruned_count) を返す。
+        Returns (pruned_messages, pruned_count).
         """
         if not messages:
             return messages, 0
@@ -529,7 +538,7 @@ class ContextCompressor(ContextEngine):
             # Token-budget approach: walk backward accumulating tokens
             accumulated = 0
             boundary = len(result)
-            min_protect = min(protect_tail_count, len(result) - 1)
+            min_protect = min(protect_tail_count, len(result))
             for i in range(len(result) - 1, -1, -1):
                 msg = result[i]
                 raw_content = msg.get("content") or ""
@@ -625,33 +634,35 @@ class ContextCompressor(ContextEngine):
     # ------------------------------------------------------------------
 
     def _compute_summary_budget(self, turns_to_summarize: List[Dict[str, Any]]) -> int:
-        """圧縮されるコンテンツ量に応じて要約トークン予算をスケールする。
+        """Scale summary token budget with the amount of content being compressed.
 
-        上限はモデルのコンテキストウィンドウに比例（コンテキストの 5%、
-        ``_SUMMARY_TOKENS_CEILING`` で上限設定）するため、大規模コンテキストモデルは
-        8K トークン固定ではなく、より豊富な要約を得られる。
+        The maximum scales with the model's context window (5% of context,
+        capped at ``_SUMMARY_TOKENS_CEILING``) so large-context models get
+        richer summaries instead of being hard-capped at 8K tokens.
         """
         content_tokens = estimate_messages_tokens_rough(turns_to_summarize)
         budget = int(content_tokens * _SUMMARY_RATIO)
         return max(_MIN_SUMMARY_TOKENS, min(budget, self.max_summary_tokens))
 
-    # 要約者入力の切り詰め上限。各メッセージを要約モデルが見る量を制限する。
-    # 予算はメインモデルではなく*要約*モデルのコンテキストウィンドウである。
-    _CONTENT_MAX = 6000       # メッセージ本体の合計文字数
-    _CONTENT_HEAD = 4000      # 先頭から保持する文字数
-    _CONTENT_TAIL = 1500      # 末尾から保持する文字数
-    _TOOL_ARGS_MAX = 1500     # ツール呼び出し引数の文字数
-    _TOOL_ARGS_HEAD = 1200    # ツール引数の先頭から保持する文字数
+    # Truncation limits for the summarizer input.  These bound how much of
+    # each message the summary model sees — the budget is the *summary*
+    # model's context window, not the main model's.
+    _CONTENT_MAX = 6000       # total chars per message body
+    _CONTENT_HEAD = 4000      # chars kept from the start
+    _CONTENT_TAIL = 1500      # chars kept from the end
+    _TOOL_ARGS_MAX = 1500     # tool call argument chars
+    _TOOL_ARGS_HEAD = 1200    # kept from the start of tool args
 
     def _serialize_for_summary(self, turns: List[Dict[str, Any]]) -> str:
-        """会話ターンを要約者向けのラベル付きテキストにシリアライズする。
+        """Serialize conversation turns into labeled text for the summarizer.
 
-        ツール呼び出し引数と結果コンテンツ（メッセージごとに最大 ``_CONTENT_MAX`` 文字）を含み、
-        ファイルパス・コマンド・出力などの具体的な詳細を要約者が保持できるようにする。
+        Includes tool call arguments and result content (up to
+        ``_CONTENT_MAX`` chars per message) so the summarizer can preserve
+        specific details like file paths, commands, and outputs.
 
-        補助モデルに送られて圧縮をまたいで永続化される要約にシークレット（API キー・
-        トークン・パスワード）が漏洩しないよう、シリアライズ前にすべてのコンテンツを
-        リダクトする。
+        All content is redacted before serialization to prevent secrets
+        (API keys, tokens, passwords) from leaking into the summary that
+        gets sent to the auxiliary model and persisted across compactions.
         """
         parts = []
         for msg in turns:
@@ -698,19 +709,22 @@ class ContextCompressor(ContextEngine):
         return "\n\n".join(parts)
 
     def _generate_summary(self, turns_to_summarize: List[Dict[str, Any]], focus_topic: str = None) -> Optional[str]:
-        """会話ターンの構造化要約を生成する。
+        """Generate a structured summary of conversation turns.
 
-        目標・進捗・決定・解決済み/未解決の質問・ファイル・残作業を含む構造化テンプレートと、
-        要約者に質問へ回答しないよう明示するプリアンブルを使用する。
-        以前の要約が存在する場合、最初から要約するのではなく反復的な更新を生成する。
+        Uses a structured template (Goal, Progress, Decisions, Resolved/Pending
+        Questions, Files, Remaining Work) with explicit preamble telling the
+        summarizer not to answer questions.  When a previous summary exists,
+        generates an iterative update instead of summarizing from scratch.
 
         Args:
-            focus_topic: ガイド付き圧縮のオプションのフォーカス文字列。指定された場合、
-                要約者はこのトピックに関連する情報の保持を優先し、それ以外をより
-                積極的に圧縮する。Claude Code の ``/compact`` にインスパイアされた機能。
+            focus_topic: Optional focus string for guided compression.  When
+                provided, the summariser prioritises preserving information
+                related to this topic and is more aggressive about compressing
+                everything else.  Inspired by Claude Code's ``/compact``.
 
-        すべての試みが失敗した場合は None を返す — 呼び出し元は役に立たないプレースホルダーを
-        注入するのではなく、要約なしで中間ターンを削除すること。
+        Returns None if all attempts fail — the caller should drop
+        the middle turns without a summary rather than inject a useless
+        placeholder.
         """
         now = time.monotonic()
         if now < self._summary_failure_cooldown_until:
@@ -962,7 +976,7 @@ The user has requested that this compaction PRIORITISE preserving all informatio
 
     @staticmethod
     def _with_summary_prefix(summary: str) -> str:
-        """要約テキストを現在の圧縮ハンドオフ形式に正規化する。"""
+        """Normalize summary text to the current compaction handoff format."""
         text = (summary or "").strip()
         for prefix in (LEGACY_SUMMARY_PREFIX, SUMMARY_PREFIX):
             if text.startswith(prefix):
@@ -976,24 +990,24 @@ The user has requested that this compaction PRIORITISE preserving all informatio
 
     @staticmethod
     def _get_tool_call_id(tc) -> str:
-        """tool_call エントリ（dict または SimpleNamespace）から呼び出し ID を取得する。"""
+        """Extract the call ID from a tool_call entry (dict or SimpleNamespace)."""
         if isinstance(tc, dict):
-            return tc.get("id", "")
-        return getattr(tc, "id", "") or ""
+            return tc.get("call_id", "") or tc.get("id", "") or ""
+        return getattr(tc, "call_id", "") or getattr(tc, "id", "") or ""
 
     def _sanitize_tool_pairs(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """圧縮後の孤立した tool_call / tool_result ペアを修正する。
+        """Fix orphaned tool_call / tool_result pairs after compression.
 
-        2 つの失敗モード:
-        1. ツール*結果*が、削除（要約/切り詰め）されたアシスタントの tool_call の
-           call_id を参照している。API は "No tool call found for function call
-           output with call_id ..." としてこれを拒否する。
-        2. アシスタントメッセージの tool_calls の結果が削除されている。
-           API はすべての tool_call に対して一致する call_id を持つツール結果が
-           後続することを要求するため、これを拒否する。
+        Two failure modes:
+        1. A tool *result* references a call_id whose assistant tool_call was
+           removed (summarized/truncated).  The API rejects this with
+           "No tool call found for function call output with call_id ...".
+        2. An assistant message has tool_calls whose results were dropped.
+           The API rejects this because every tool_call must be followed by
+           a tool result with the matching call_id.
 
-        このメソッドは孤立した結果を削除し、孤立した呼び出しにスタブ結果を挿入して
-        メッセージリストが常に整形式であるようにする。
+        This method removes orphaned results and inserts stub results for
+        orphaned calls so the message list is always well-formed.
         """
         surviving_call_ids: set = set()
         for msg in messages:
@@ -1042,24 +1056,26 @@ The user has requested that this compaction PRIORITISE preserving all informatio
         return messages
 
     def _align_boundary_forward(self, messages: List[Dict[str, Any]], idx: int) -> int:
-        """圧縮開始境界を孤立したツール結果を越えて前方にずらす。
+        """Push a compress-start boundary forward past any orphan tool results.
 
-        ``messages[idx]`` がツール結果の場合、グループの途中から要約領域を
-        開始しないよう、非ツールメッセージに達するまで前方にスライドする。
+        If ``messages[idx]`` is a tool result, slide forward until we hit a
+        non-tool message so we don't start the summarised region mid-group.
         """
         while idx < len(messages) and messages[idx].get("role") == "tool":
             idx += 1
         return idx
 
     def _align_boundary_backward(self, messages: List[Dict[str, Any]], idx: int) -> int:
-        """tool_call / 結果グループの分割を避けるために圧縮終了境界を後方に引く。
+        """Pull a compress-end boundary backward to avoid splitting a
+        tool_call / result group.
 
-        境界がツール結果グループの途中（つまり ``idx`` の前に連続したツール
-        メッセージがある）に落ちた場合、親のアシスタントメッセージを見つけるまで
-        後方に走査する。見つかった場合、アシスタントの前に境界を移動して、
-        アシスタント + ツール結果グループ全体が要約領域に含まれるようにする
-        （分割すると ``_sanitize_tool_pairs`` が孤立したテール結果を削除して
-        サイレントなデータ損失が生じる）。
+        If the boundary falls in the middle of a tool-result group (i.e.
+        there are consecutive tool messages before ``idx``), walk backward
+        past all of them to find the parent assistant message.  If found,
+        move the boundary before the assistant so the entire
+        assistant + tool_results group is included in the summarised region
+        rather than being split (which causes silent data loss when
+        ``_sanitize_tool_pairs`` removes the orphaned tail results).
         """
         if idx <= 0 or idx >= len(messages):
             return idx
@@ -1080,7 +1096,7 @@ The user has requested that this compaction PRIORITISE preserving all informatio
     def _find_last_user_message_idx(
         self, messages: List[Dict[str, Any]], head_end: int
     ) -> int:
-        """*head_end* 以降の最後の user ロールメッセージのインデックス、なければ -1 を返す。"""
+        """Return the index of the last user-role message at or after *head_end*, or -1."""
         for i in range(len(messages) - 1, head_end - 1, -1):
             if messages[i].get("role") == "user":
                 return i
@@ -1092,20 +1108,21 @@ The user has requested that this compaction PRIORITISE preserving all informatio
         cut_idx: int,
         head_end: int,
     ) -> int:
-        """最新のユーザーメッセージが保護されたテールに含まれることを保証する。
+        """Guarantee the most recent user message is in the protected tail.
 
-        コンテキストコンプレッサーのバグ（#10896）: ``_align_boundary_backward`` が
-        tool_call/結果グループをまとめようとするとき、``cut_idx`` をユーザーメッセージを
-        越えて引いてしまうことがある。最後のユーザーメッセージが*圧縮された*中間領域に
-        入ると、LLM 要約者はそれを "Pending User Asks" に書き込むが、
-        ``SUMMARY_PREFIX`` は次のモデルに要約の*後*のユーザーメッセージのみに
-        回答するよう指示するため、タスクがアクティブコンテキストから実質的に消えてしまい、
-        エージェントが停止・完了済み作業の繰り返し・ユーザーの最新リクエストのサイレント
-        ドロップを引き起こす。
+        Context compressor bug (#10896): ``_align_boundary_backward`` can pull
+        ``cut_idx`` past a user message when it tries to keep tool_call/result
+        groups together.  If the last user message ends up in the *compressed*
+        middle region the LLM summariser writes it into "Pending User Asks",
+        but ``SUMMARY_PREFIX`` tells the next model to respond only to user
+        messages *after* the summary — so the task effectively disappears from
+        the active context, causing the agent to stall, repeat completed work,
+        or silently drop the user's latest request.
 
-        修正: 最後の user ロールメッセージが既にテール（``messages[cut_idx:]``）に
-        なければ、``cut_idx`` を後方にずらして含める。その後、ユーザーメッセージの
-        直前の tool_call/結果グループを分割しないよう、再度後方に整列する。
+        Fix: if the last user-role message is not already in the tail
+        (``messages[cut_idx:]``), walk ``cut_idx`` back to include it.  We
+        then re-align backward one more time to avoid splitting any
+        tool_call/result group that immediately precedes the user message.
         """
         last_user_idx = self._find_last_user_message_idx(messages, head_end)
         if last_user_idx < 0:
@@ -1136,22 +1153,21 @@ The user has requested that this compaction PRIORITISE preserving all informatio
         self, messages: List[Dict[str, Any]], head_end: int,
         token_budget: int | None = None,
     ) -> int:
-        """メッセージの末尾から後ろ向きに走査してトークン予算に達するまで累積する。
-        テールが開始するインデックスを返す。
+        """Walk backward from the end of messages, accumulating tokens until
+        the budget is reached. Returns the index where the tail starts.
 
-        ``token_budget`` のデフォルトは ``self.tail_token_budget`` で、
-        ``summary_target_ratio * context_length`` から導出されるため、
-        モデルのコンテキストウィンドウに合わせて自動的にスケールする。
+        ``token_budget`` defaults to ``self.tail_token_budget`` which is
+        derived from ``summary_target_ratio * context_length``, so it
+        scales automatically with the model's context window.
 
-        トークン予算が主基準。最低 3 メッセージは常に保護されるが、
-        大きすぎるメッセージ（ツール出力・ファイル読み込みなど）の途中での
-        切断を避けるため、予算の 1.5 倍まで超過することを許容する。
-        最低 3 メッセージでも予算の 1.5 倍を超える場合、圧縮が実行されるよう
-        ヘッドの直後にカットを配置する。
+        Token budget is the primary criterion.  A hard minimum of 3 messages
+        is always protected, but the budget is allowed to exceed by up to
+        1.5x to avoid cutting inside an oversized message (tool output, file
+        read, etc.).  If even the minimum 3 messages exceed 1.5x the budget
+        the cut is placed right after the head so compression still runs.
 
-        tool_call/結果グループの途中では切断しない。
-        最新のユーザーメッセージが常にテールにあることを保証する
-        （``_ensure_last_user_message_in_tail`` を参照）。
+        Never cuts inside a tool_call/result group.  Always ensures the most
+        recent user message is in the tail (see ``_ensure_last_user_message_in_tail``).
         """
         if token_budget is None:
             token_budget = self.tail_token_budget
@@ -1202,11 +1218,11 @@ The user has requested that this compaction PRIORITISE preserving all informatio
     # ------------------------------------------------------------------
 
     def has_content_to_compress(self, messages: List[Dict[str, Any]]) -> bool:
-        """コンパクトできる空でない中間領域がある場合に True を返す。
+        """Return True if there is a non-empty middle region to compact.
 
-        ABC のデフォルトをオーバーライドして、トランスクリプトが保護された
-        ヘッド/テール内に完全に収まっている場合に、ゲートウェイの ``/compress``
-        ガードが LLM 呼び出しをスキップできるようにする。
+        Overrides the ABC default so the gateway ``/compress`` guard can
+        skip the LLM call when the transcript is still entirely inside
+        the protected head/tail.
         """
         compress_start = self._align_boundary_forward(messages, self.protect_first_n)
         compress_end = self._find_tail_cut_by_tokens(messages, compress_start)
@@ -1217,22 +1233,23 @@ The user has requested that this compaction PRIORITISE preserving all informatio
     # ------------------------------------------------------------------
 
     def compress(self, messages: List[Dict[str, Any]], current_tokens: int = None, focus_topic: str = None) -> List[Dict[str, Any]]:
-        """中間ターンを要約することで会話メッセージを圧縮する。
+        """Compress conversation messages by summarizing middle turns.
 
-        アルゴリズム:
-          1. 古いツール結果をプルーニング（安価なプリパス、LLM 呼び出しなし）
-          2. ヘッドメッセージを保護（システムプロンプト + 最初のやり取り）
-          3. トークン予算でテール境界を特定（最新コンテキストの約 20K トークン）
-          4. 構造化 LLM プロンプトで中間ターンを要約
-          5. 再圧縮時は前の要約を反復的に更新
+        Algorithm:
+          1. Prune old tool results (cheap pre-pass, no LLM call)
+          2. Protect head messages (system prompt + first exchange)
+          3. Find tail boundary by token budget (~20K tokens of recent context)
+          4. Summarize middle turns with structured LLM prompt
+          5. On re-compression, iteratively update the previous summary
 
-        圧縮後、孤立した tool_call / tool_result ペアをクリーンアップして
-        API に不一致の ID が送られないようにする。
+        After compression, orphaned tool_call / tool_result pairs are cleaned
+        up so the API never receives mismatched IDs.
 
         Args:
-            focus_topic: ガイド付き圧縮のオプションのフォーカス文字列。指定された場合、
-                要約者はこのトピックに関連する情報の保持を優先し、それ以外をより
-                積極的に圧縮する。Claude Code の ``/compact`` にインスパイアされた機能。
+            focus_topic: Optional focus string for guided compression.  When
+                provided, the summariser will prioritise preserving information
+                related to this topic and be more aggressive about compressing
+                everything else.  Inspired by Claude Code's ``/compact``.
         """
         # Reset per-call summary failure state — callers inspect these fields
         # after compress() returns to decide whether to surface a warning.

@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Set
 
 
 from hermes_cli.config import (
+    cfg_get,
     load_config, save_config, get_env_value, save_env_value,
 )
 from hermes_cli.colors import Colors, color
@@ -26,7 +27,7 @@ from hermes_cli.nous_subscription import (
     get_nous_subscription_features,
 )
 from tools.tool_backend_helpers import fal_key_is_configured, managed_nous_tools_enabled
-from base.utils import base_url_hostname, is_truthy_value
+from utils import base_url_hostname, is_truthy_value
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +226,14 @@ TOOL_CATEGORIES = {
                 "env_vars": [],
                 "tts_provider": "kittentts",
                 "post_setup": "kittentts",
+            },
+            {
+                "name": "Piper",
+                "badge": "local · free",
+                "tag": "Local neural TTS, 44 languages (voices ~20-90MB)",
+                "env_vars": [],
+                "tts_provider": "piper",
+                "post_setup": "piper",
             },
         ],
     },
@@ -480,7 +489,7 @@ def _run_post_setup(post_setup_key: str):
             if result.returncode == 0:
                 _print_success("    Node.js dependencies installed")
             else:
-                from base.hermes_constants import display_hermes_home
+                from hermes_constants import display_hermes_home
                 _print_warning(f"    npm install failed - run manually: cd {display_hermes_home()}/hermes-agent && npm install")
                 if result.stderr:
                     _print_info(f"      {result.stderr.strip()[:200]}")
@@ -622,6 +631,33 @@ def _run_post_setup(post_setup_key: str):
         except subprocess.TimeoutExpired:
             _print_warning("    kittentts install timed out (>5min)")
             _print_info(f"    Run manually: python -m pip install -U '{wheel_url}' soundfile")
+
+    elif post_setup_key == "piper":
+        try:
+            __import__("piper")
+            _print_success("    piper-tts is already installed")
+        except ImportError:
+            import subprocess
+            _print_info("    Installing piper-tts (~14MB wheel, voices downloaded on first use)...")
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-U", "piper-tts", "--quiet"],
+                    capture_output=True, text=True, timeout=300,
+                )
+                if result.returncode == 0:
+                    _print_success("    piper-tts installed")
+                else:
+                    _print_warning("    piper-tts install failed:")
+                    _print_info(f"      {result.stderr.strip()[:300]}")
+                    _print_info("    Run manually: python -m pip install -U piper-tts")
+                    return
+            except subprocess.TimeoutExpired:
+                _print_warning("    piper-tts install timed out (>5min)")
+                _print_info("    Run manually: python -m pip install -U piper-tts")
+                return
+        _print_info("    Default voice: en_US-lessac-medium (downloaded on first TTS call)")
+        _print_info("    Full voice list: https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/VOICES.md")
+        _print_info("    Switch voices by setting tts.piper.voice in ~/.hermes/config.yaml")
 
     elif post_setup_key == "spotify":
         # Run the full `hermes auth spotify` flow — if the user has no
@@ -774,13 +810,18 @@ def _get_platform_tools(
     include_default_mcp_servers: bool = True,
 ) -> Set[str]:
     """Resolve which individual toolset names are enabled for a platform."""
-    from base.toolsets import resolve_toolset, TOOLSETS
+    from toolsets import resolve_toolset, TOOLSETS
 
     platform_toolsets = config.get("platform_toolsets") or {}
     toolset_names = platform_toolsets.get(platform)
 
     if toolset_names is None or not isinstance(toolset_names, list):
-        default_ts = PLATFORMS[platform]["default_toolset"]
+        plat_info = PLATFORMS.get(platform)
+        if plat_info:
+            default_ts = plat_info["default_toolset"]
+        else:
+            # Plugin platform — derive toolset name from platform key
+            default_ts = f"hermes-{platform}"
         toolset_names = [default_ts]
 
     # YAML may parse bare numeric names (e.g. ``12306:``) as int.
@@ -843,7 +884,9 @@ def _get_platform_tools(
     # checklist or in a user-saved config.  Must run in BOTH branches —
     # otherwise saving via `hermes tools` (which flips has_explicit_config
     # to True) silently drops them.
-    platform_tool_universe = set(resolve_toolset(PLATFORMS[platform]["default_toolset"]))
+    _plat_info = PLATFORMS.get(platform)
+    _default_ts = _plat_info["default_toolset"] if _plat_info else f"hermes-{platform}"
+    platform_tool_universe = set(resolve_toolset(_default_ts))
     configurable_tool_universe = set()
     for ck in configurable_keys:
         configurable_tool_universe.update(resolve_toolset(ck))
@@ -965,7 +1008,7 @@ def _save_platform_tools(config: dict, platform: str, enabled_toolset_keys: Set[
     platform_default_keys = {p["default_toolset"] for p in PLATFORMS.values()}
 
     # Get existing toolsets for this platform
-    existing_toolsets = config.get("platform_toolsets", {}).get(platform, [])
+    existing_toolsets = cfg_get(config, "platform_toolsets", platform, default=[])
     if not isinstance(existing_toolsets, list):
         existing_toolsets = []
     existing_toolsets = [str(ts) for ts in existing_toolsets]
@@ -1001,7 +1044,7 @@ def _toolset_has_keys(ts_key: str, config: dict = None) -> bool:
 
     if ts_key == "vision":
         try:
-            from core.auxiliary_client import resolve_vision_provider_client
+            from agent.auxiliary_client import resolve_vision_provider_client
 
             _provider, client, _model = resolve_vision_provider_client()
             return client is not None
@@ -1069,7 +1112,7 @@ def _estimate_tool_tokens() -> Dict[str, int]:
 
     try:
         # Trigger full tool discovery (imports all tool modules).
-        import base.model_tools  # noqa: F401
+        import model_tools  # noqa: F401
         from tools.registry import registry
     except Exception:
         logger.debug("Tool registry unavailable; skipping token estimation")
@@ -1091,7 +1134,7 @@ def _estimate_tool_tokens() -> Dict[str, int]:
 def _prompt_toolset_checklist(platform_label: str, enabled: Set[str], platform: str = "cli") -> Set[str]:
     """Multi-select checklist of toolsets. Returns set of selected toolset keys."""
     from hermes_cli.curses_ui import curses_checklist
-    from base.toolsets import resolve_toolset
+    from toolsets import resolve_toolset
 
     # Pre-compute per-tool token counts (cached after first call).
     tool_tokens = _estimate_tool_tokens()
@@ -1171,7 +1214,7 @@ def _plugin_image_gen_providers() -> list[dict]:
     function surfaces it alongside OpenAI automatically.
     """
     try:
-        from core.image_gen_registry import list_providers
+        from agent.image_gen_registry import list_providers
         from hermes_cli.plugins import _ensure_plugins_discovered
 
         _ensure_plugins_discovered()
@@ -1242,7 +1285,7 @@ def _toolset_needs_configuration_prompt(ts_key: str, config: dict) -> bool:
         if fal_key_is_configured():
             return False
         try:
-            from core.image_gen_registry import list_providers
+            from agent.image_gen_registry import list_providers
             from hermes_cli.plugins import _ensure_plugins_discovered
 
             _ensure_plugins_discovered()
@@ -1352,23 +1395,23 @@ def _is_provider_active(provider: dict, config: dict) -> bool:
         if provider.get("tts_provider"):
             return (
                 feature.managed_by_nous
-                and config.get("tts", {}).get("provider") == provider["tts_provider"]
+                and cfg_get(config, "tts", "provider") == provider["tts_provider"]
             )
         if "browser_provider" in provider:
-            current = config.get("browser", {}).get("cloud_provider")
+            current = cfg_get(config, "browser", "cloud_provider")
             return feature.managed_by_nous and provider["browser_provider"] == current
         if provider.get("web_backend"):
-            current = config.get("web", {}).get("backend")
+            current = cfg_get(config, "web", "backend")
             return feature.managed_by_nous and current == provider["web_backend"]
         return feature.managed_by_nous
 
     if provider.get("tts_provider"):
-        return config.get("tts", {}).get("provider") == provider["tts_provider"]
+        return cfg_get(config, "tts", "provider") == provider["tts_provider"]
     if "browser_provider" in provider:
-        current = config.get("browser", {}).get("cloud_provider")
+        current = cfg_get(config, "browser", "cloud_provider")
         return provider["browser_provider"] == current
     if provider.get("web_backend"):
-        current = config.get("web", {}).get("backend")
+        current = cfg_get(config, "web", "backend")
         return current == provider["web_backend"]
     if provider.get("imagegen_backend"):
         image_cfg = config.get("image_gen", {})
@@ -1504,7 +1547,7 @@ def _plugin_image_gen_catalog(plugin_name: str):
     ``({}, None)`` if the provider isn't registered or has no models.
     """
     try:
-        from core.image_gen_registry import get_provider
+        from agent.image_gen_registry import get_provider
         from hermes_cli.plugins import _ensure_plugins_discovered
 
         _ensure_plugins_discovered()
@@ -2194,7 +2237,7 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
         platform_choices[idx] = f"Configure {pinfo['label']}  ({new_count}/{total} enabled)"
 
     print()
-    from base.hermes_constants import display_hermes_home
+    from hermes_constants import display_hermes_home
     print(color(f"  Tool configuration saved to {display_hermes_home()}/config.yaml", Colors.DIM))
     print(color("  Changes take effect on next 'hermes' or gateway restart.", Colors.DIM))
     print()

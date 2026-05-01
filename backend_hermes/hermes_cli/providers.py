@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from base.utils import base_url_host_matches, base_url_hostname
+from utils import base_url_host_matches, base_url_hostname
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,11 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
     "minimax": HermesOverlay(
         transport="anthropic_messages",
         base_url_env_var="MINIMAX_BASE_URL",
+    ),
+    "minimax-oauth": HermesOverlay(
+        transport="anthropic_messages",
+        auth_type="oauth_external",
+        base_url_override="https://api.minimax.io/anthropic",
     ),
     "minimax-cn": HermesOverlay(
         transport="anthropic_messages",
@@ -399,7 +404,7 @@ def get_provider(name: str) -> Optional[ProviderDef]:
 
     # Try to get models.dev data
     try:
-        from core.models_dev import get_provider_info as _mdev_provider
+        from agent.models_dev import get_provider_info as _mdev_provider
         mdev_info = _mdev_provider(canonical)
     except Exception:
         mdev_info = None
@@ -580,6 +585,12 @@ def resolve_custom_provider(
     if not requested:
         return None
 
+    # If the stored provider is the bare string "custom" (corrupt state
+    # from a prior model-switch bug), fall back to the first custom
+    # provider entry so existing configs self-heal.  (GH #17478)
+    bare_custom_fallback = requested == "custom"
+    first_valid = None
+
     for entry in custom_providers:
         if not isinstance(entry, dict):
             continue
@@ -594,6 +605,10 @@ def resolve_custom_provider(
         if not display_name or not api_url:
             continue
 
+        # Stash the first valid entry for bare-"custom" fallback
+        if first_valid is None:
+            first_valid = (display_name, api_url)
+
         slug = custom_provider_slug(display_name)
         if requested not in {display_name.lower(), slug}:
             continue
@@ -604,6 +619,21 @@ def resolve_custom_provider(
             transport="openai_chat",
             api_key_env_vars=(),
             base_url=api_url,
+            is_aggregator=False,
+            auth_type="api_key",
+            source="user-config",
+        )
+
+    # Self-heal: bare "custom" matched nothing — return first valid entry
+    if bare_custom_fallback and first_valid:
+        dname, aurl = first_valid
+        slug = custom_provider_slug(dname)
+        return ProviderDef(
+            id=slug,
+            name=dname,
+            transport="openai_chat",
+            api_key_env_vars=(),
+            base_url=aurl,
             is_aggregator=False,
             auth_type="api_key",
             source="user-config",
@@ -654,7 +684,7 @@ def resolve_provider_full(
 
     # 3. Try models.dev directly (for providers not in our ALIASES)
     try:
-        from core.models_dev import get_provider_info as _mdev_provider
+        from agent.models_dev import get_provider_info as _mdev_provider
         mdev_info = _mdev_provider(canonical)
         if mdev_info is not None:
             return ProviderDef(

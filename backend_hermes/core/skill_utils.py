@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from base.hermes_constants import get_config_path, get_skills_dir
+from hermes_constants import get_config_path, get_skills_dir
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ PLATFORM_MAP = {
     "windows": "win32",
 }
 
-EXCLUDED_SKILL_DIRS = frozenset((".git", ".github", ".hub"))
+EXCLUDED_SKILL_DIRS = frozenset((".git", ".github", ".hub", ".archive"))
 
 # ── Lazy YAML loader ─────────────────────────────────────────────────────
 
@@ -145,7 +145,7 @@ def get_disabled_skill_names(platform: str | None = None) -> Set[str]:
     if not isinstance(skills_cfg, dict):
         return set()
 
-#     from gateway.session_context import get_session_env  # removed: not in aidiy
+    from gateway.session_context import get_session_env
     resolved_platform = (
         platform
         or os.getenv("HERMES_PLATFORM")
@@ -200,6 +200,9 @@ def get_external_skills_dirs() -> List[Path]:
     if not isinstance(raw_dirs, list):
         return []
 
+    from hermes_constants import get_hermes_home
+
+    hermes_home = get_hermes_home()
     local_skills = get_skills_dir().resolve()
     seen: Set[Path] = set()
     result: List[Path] = []
@@ -210,7 +213,12 @@ def get_external_skills_dirs() -> List[Path]:
             continue
         # Expand ~ and environment variables
         expanded = os.path.expanduser(os.path.expandvars(entry))
-        p = Path(expanded).resolve()
+        p = Path(expanded)
+        # Resolve relative paths against HERMES_HOME, not cwd
+        if not p.is_absolute():
+            p = (hermes_home / p).resolve()
+        else:
+            p = p.resolve()
         if p == local_skills:
             continue
         if p in seen:
@@ -432,7 +440,7 @@ def extract_skill_description(frontmatter: Dict[str, Any]) -> str:
 def iter_skill_index_files(skills_dir: Path, filename: str):
     """Walk skills_dir yielding sorted paths matching *filename*.
 
-    Excludes ``.git``, ``.github``, ``.hub`` directories.
+    Excludes ``.git``, ``.github``, ``.hub``, ``.archive`` directories.
     """
     matches = []
     for root, dirs, files in os.walk(skills_dir, followlinks=True):

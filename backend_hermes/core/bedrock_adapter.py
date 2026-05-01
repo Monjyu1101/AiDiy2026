@@ -1,30 +1,30 @@
-"""AWS Bedrock Converse API アダプター（Hermes Agent 用）。
+"""AWS Bedrock Converse API adapter for Hermes Agent.
 
-Converse API を使用して Amazon Bedrock とネイティブ統合を提供し、
-OpenAI 互換エンドポイントの代わりに直接 AWS SDK 呼び出しを行う。
-これにより Bedrock エコシステムへの完全なアクセスが可能になる:
+Provides native integration with Amazon Bedrock using the Converse API,
+bypassing the OpenAI-compatible endpoint in favor of direct AWS SDK calls.
+This enables full access to the Bedrock ecosystem:
 
-  - **ネイティブ Converse API**: ストリーミングサポート付きすべての Bedrock モデル
-    （Claude, Nova, Llama, Mistral 等）への統一インターフェース。
-  - **AWS 資格情報チェーン**: IAM ロール、SSO プロファイル、環境変数、
-    インスタンスメタデータ — AWS ネイティブ環境での API キー管理ゼロ。
-  - **動的モデル発見**: Bedrock コントロールプレーンを通じて利用可能な
-    ファンデーションモデルとクロスリージョン推論プロファイルを自動発見。
-  - **ガードレールサポート**: コンテンツフィルタリングとセーフティポリシー向けの
-    オプション Bedrock Guardrails 設定。
-  - **推論プロファイル**: より高いキャパシティと自動フェイルオーバーのための
-    クロスリージョン推論プロファイル
-    (us.anthropic.claude-*, global.anthropic.claude-*) をサポート。
+  - **Native Converse API**: Unified interface for all Bedrock models
+    (Claude, Nova, Llama, Mistral, etc.) with streaming support.
+  - **AWS credential chain**: IAM roles, SSO profiles, environment variables,
+    instance metadata — zero API key management for AWS-native environments.
+  - **Dynamic model discovery**: Auto-discovers available foundation models
+    and cross-region inference profiles via the Bedrock control plane.
+  - **Guardrails support**: Optional Bedrock Guardrails configuration for
+    content filtering and safety policies.
+  - **Inference profiles**: Supports cross-region inference profiles
+    (us.anthropic.claude-*, global.anthropic.claude-*) for better capacity
+    and automatic failover.
 
-アーキテクチャは ``anthropic_adapter.py`` と同じパターンに従う:
-  - Bedrock 固有のロジックをこのモジュールに集約。
-  - メッセージ/ツールを OpenAI 形式と Converse 形式の間で変換。
-  - レスポンスをエージェントループ向けに OpenAI 互換オブジェクトに正規化。
+Architecture follows the same pattern as ``anthropic_adapter.py``:
+  - All Bedrock-specific logic is isolated in this module.
+  - Messages/tools are converted between OpenAI format and Converse format.
+  - Responses are normalized back to OpenAI-compatible objects for the agent loop.
 
-参照: OpenClaw の ``extensions/amazon-bedrock/`` プラグイン。TypeScript で
-``@aws-sdk/client-bedrock`` を通じて同じ Converse API 統合を実装している。
+Reference: OpenClaw's ``extensions/amazon-bedrock/`` plugin, which implements
+the same Converse API integration in TypeScript via ``@aws-sdk/client-bedrock``.
 
-依存: ``boto3``（オプション — Bedrock プロバイダー使用時のみ必要）。
+Requires: ``boto3`` (optional dependency — only needed when using the Bedrock provider).
 """
 
 import json
@@ -37,8 +37,8 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# boto3 の遅延インポート — Bedrock プロバイダーが実際に使用される時のみ読み込む。
-# Bedrock を使用しないユーザーの起動を高速に保つ。
+# Lazy boto3 import — only loaded when the Bedrock provider is actually used.
+# This keeps startup fast for users who don't use Bedrock.
 # ---------------------------------------------------------------------------
 
 _bedrock_runtime_client_cache: Dict[str, Any] = {}
@@ -46,7 +46,7 @@ _bedrock_control_client_cache: Dict[str, Any] = {}
 
 
 def _require_boto3():
-    """boto3 をインポートし、未インストールの場合は明確なエラーを発生させる。"""
+    """Import boto3, raising a clear error if not installed."""
     try:
         import boto3
         return boto3
@@ -59,9 +59,9 @@ def _require_boto3():
 
 
 def _get_bedrock_runtime_client(region: str):
-    """指定リージョン用のキャッシュ済み ``bedrock-runtime`` クライアントを取得または作成する。
+    """Get or create a cached ``bedrock-runtime`` client for the given region.
 
-    デフォルトの AWS 資格情報チェーン（環境変数 → プロファイル → インスタンスロール）を使用する。
+    Uses the default AWS credential chain (env vars → profile → instance role).
     """
     if region not in _bedrock_runtime_client_cache:
         boto3 = _require_boto3()
@@ -72,7 +72,7 @@ def _get_bedrock_runtime_client(region: str):
 
 
 def _get_bedrock_control_client(region: str):
-    """モデル発見用のキャッシュ済み ``bedrock`` コントロールプレーンクライアントを取得または作成する。"""
+    """Get or create a cached ``bedrock`` control-plane client for model discovery."""
     if region not in _bedrock_control_client_cache:
         boto3 = _require_boto3()
         _bedrock_control_client_cache[region] = boto3.client(

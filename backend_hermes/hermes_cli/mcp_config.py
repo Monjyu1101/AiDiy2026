@@ -16,6 +16,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from hermes_cli.config import (
+    cfg_get,
     load_config,
     save_config,
     get_env_value,
@@ -23,7 +24,7 @@ from hermes_cli.config import (
     get_hermes_home,  # noqa: F401 — used by test mocks
 )
 from hermes_cli.colors import Colors, color
-from base.hermes_constants import display_hermes_home
+from hermes_constants import display_hermes_home
 
 logger = logging.getLogger(__name__)
 
@@ -716,7 +717,7 @@ def cmd_mcp_configure(args):
 
     # Update config
     config = load_config()
-    server_entry = config.get("mcp_servers", {}).get(name, {})
+    server_entry = cfg_get(config, "mcp_servers", name, default={})
 
     if len(chosen) == total:
         # All selected → remove include/exclude (register all)

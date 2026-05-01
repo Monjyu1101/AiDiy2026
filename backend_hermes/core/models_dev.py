@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from base.utils import atomic_json_write
+from utils import atomic_json_write
 
 import requests
 
@@ -149,6 +149,7 @@ PROVIDER_TO_MODELS_DEV: Dict[str, str] = {
     "stepfun": "stepfun",
     "kimi-coding-cn": "kimi-for-coding",
     "minimax": "minimax",
+    "minimax-oauth": "minimax",
     "minimax-cn": "minimax-cn",
     "deepseek": "deepseek",
     "alibaba": "alibaba",
@@ -180,7 +181,7 @@ _MODELS_DEV_TO_PROVIDER: Optional[Dict[str, str]] = None
 
 def _get_cache_path() -> Path:
     """Return path to disk cache file."""
-    from base.hermes_constants import get_hermes_home
+    from hermes_constants import get_hermes_home
     return get_hermes_home() / "models_dev_cache.json"
 
 

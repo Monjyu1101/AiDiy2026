@@ -401,16 +401,13 @@ class ProcessRegistry:
 
     @staticmethod
     def _is_host_pid_alive(pid: Optional[int]) -> bool:
-        """Best-effort liveness check for host-visible PIDs.
-        Windows では os.kill(pid, 0) が OSError を投げる可能性があるため捕捉。
-        """
+        """Best-effort liveness check for host-visible PIDs."""
         if not pid:
             return False
         try:
             os.kill(pid, 0)
             return True
-        except (ProcessLookupError, PermissionError, OSError):
-            # Windows では os.kill(pid, 0) が OSError: [WinError 87] を投げることがある
+        except (ProcessLookupError, PermissionError):
             return False
 
     def _refresh_detached_session(self, session: Optional[ProcessSession]) -> Optional[ProcessSession]:
@@ -803,6 +800,78 @@ class ProcessRegistry:
             session = self._running.get(session_id) or self._finished.get(session_id)
         return self._refresh_detached_session(session)
 
+    def _reconcile_local_exit(self, session: "ProcessSession") -> None:
+        """Reconcile session.exited against the real child process state.
+
+        The reader thread (`_reader_loop`) sets `session.exited = True` only
+        in its `finally` block, which runs when `stdout.read()` returns EOF.
+        If the direct `Popen` child has exited but a descendant process (e.g.
+        a daemon spawned by `hermes update` restarting the gateway) is still
+        holding the stdout pipe open, the reader blocks forever and poll()
+        keeps returning "running" indefinitely (issue #17327 — 74 polls over
+        7 minutes on Feishu).
+
+        This helper closes that window: when `session.exited` is still False
+        but the direct child's `Popen.poll()` reports an exit code, drain any
+        readable bytes non-blocking and flip `session.exited`. The orphaned
+        reader thread remains stuck on its blocking `read()` but is a daemon
+        thread and will be reaped with the process.
+
+        Safe no-op on sessions without a local `Popen` (env/PTY), already-
+        exited sessions, and detached-recovered sessions.
+        """
+        if session is None or session.exited:
+            return
+        proc = getattr(session, "process", None)
+        if proc is None:
+            return
+        try:
+            rc = proc.poll()
+        except Exception:
+            return
+        if rc is None:
+            return  # Direct child still running — reader block is legitimate.
+
+        # Direct child exited. Try to drain any bytes the reader hasn't
+        # consumed yet. This is best-effort: if the pipe is held open by a
+        # descendant, the non-blocking read returns what's immediately
+        # available and we stop.
+        drained = ""
+        stdout = getattr(proc, "stdout", None)
+        if stdout is not None and not _IS_WINDOWS:
+            try:
+                import fcntl
+                fd = stdout.fileno()
+                flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                try:
+                    chunk = stdout.read()
+                    if chunk:
+                        drained = chunk if isinstance(chunk, str) else chunk.decode("utf-8", errors="replace")
+                except (BlockingIOError, OSError, ValueError):
+                    pass
+                finally:
+                    try:
+                        fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.debug("Non-blocking drain failed for %s: %s", session.id, e)
+
+        with session._lock:
+            if drained:
+                session.output_buffer += drained
+                if len(session.output_buffer) > session.max_output_chars:
+                    session.output_buffer = session.output_buffer[-session.max_output_chars:]
+            session.exited = True
+            session.exit_code = rc
+        logger.info(
+            "Reconciled session %s: direct child exited with code %s but reader "
+            "was still blocked (orphaned pipe). Flipped to exited.",
+            session.id, rc,
+        )
+        self._move_to_finished(session)
+
     def poll(self, session_id: str) -> dict:
         """Check status and get new output for a background process."""
         from tools.ansi_strip import strip_ansi
@@ -810,6 +879,10 @@ class ProcessRegistry:
         session = self.get(session_id)
         if session is None:
             return {"status": "not_found", "error": f"No process with ID {session_id}"}
+
+        # Reconcile against real child state before reading session.exited.
+        # Guards against orphaned-pipe reader hangs (issue #17327).
+        self._reconcile_local_exit(session)
 
         with session._lock:
             output_preview = strip_ansi(session.output_buffer[-1000:]) if session.output_buffer else ""
@@ -901,6 +974,10 @@ class ProcessRegistry:
 
         while time.monotonic() < deadline:
             session = self._refresh_detached_session(session)
+            # Reconcile against real child state — guards against orphaned-
+            # pipe reader hangs where the reader is blocked but the direct
+            # child has already exited (issue #17327).
+            self._reconcile_local_exit(session)
             if session.exited:
                 self._completion_consumed.add(session_id)
                 result = {
@@ -1180,7 +1257,7 @@ class ProcessRegistry:
                         })
             
             # Atomic write to avoid corruption on crash
-            from base.utils import atomic_json_write
+            from utils import atomic_json_write
             atomic_json_write(CHECKPOINT_PATH, entries)
         except Exception as e:
             logger.debug("Failed to write checkpoint file: %s", e, exc_info=True)
@@ -1348,5 +1425,10 @@ def _handle_process(args, **kw):
     return tool_error(f"Unknown process action: {action}. Use: list, poll, log, wait, kill, write, submit, close")
 
 
-# AiDiy Hermes uses process_tool.py as the registry-facing process tool.
-# process_registry remains available for environment/tool_context direct use.
+registry.register(
+    name="process",
+    toolset="terminal",
+    schema=PROCESS_SCHEMA,
+    handler=_handle_process,
+    emoji="⚙️",
+)

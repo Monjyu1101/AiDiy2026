@@ -1,4 +1,4 @@
-"""Browser Use クラウドブラウザプロバイダ。"""
+"""Browser Use cloud browser provider."""
 
 import logging
 import os
@@ -61,7 +61,7 @@ def _should_preserve_pending_create_key(response: requests.Response) -> bool:
 
 
 class BrowserUseProvider(CloudBrowserProvider):
-    """Browser Use (https://browser-use.com) クラウドブラウザバックエンド。"""
+    """Browser Use (https://browser-use.com) cloud browser backend."""
 
     def provider_name(self) -> str:
         return "Browser Use"
@@ -70,7 +70,7 @@ class BrowserUseProvider(CloudBrowserProvider):
         return self._get_config_or_none() is not None
 
     # ------------------------------------------------------------------
-    # 設定解決（直接 API キー、または Managed Nous gateway）
+    # Config resolution (direct API key OR managed Nous gateway)
     # ------------------------------------------------------------------
 
     def _get_config_or_none(self) -> Optional[Dict[str, Any]]:
@@ -107,7 +107,7 @@ class BrowserUseProvider(CloudBrowserProvider):
         return config
 
     # ------------------------------------------------------------------
-    # セッションライフサイクル
+    # Session lifecycle
     # ------------------------------------------------------------------
 
     def _headers(self, config: Dict[str, Any]) -> Dict[str, str]:
@@ -125,9 +125,9 @@ class BrowserUseProvider(CloudBrowserProvider):
         if managed_mode:
             headers["X-Idempotency-Key"] = _get_or_create_pending_create_key(task_id)
 
-        # gateway 経由のセッションは短めにする。Hermes が必要とするのは
-        # タスク単位の一時ブラウザなので、Browser Use 側の長い既定タイムアウトで
-        # 課金承認が膨らまないようにする。
+        # Keep gateway-backed sessions short so billing authorization does not
+        # default to a long Browser-Use timeout when Hermes only needs a task-
+        # scoped ephemeral browser.
         payload = (
             {
                 "timeout": _DEFAULT_MANAGED_TIMEOUT_MINUTES,

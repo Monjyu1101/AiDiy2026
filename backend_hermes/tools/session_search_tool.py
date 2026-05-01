@@ -22,7 +22,7 @@ import logging
 import re
 from typing import Dict, Any, List, Optional, Union
 
-from core.auxiliary_client import async_call_llm, extract_content_or_reasoning
+from agent.auxiliary_client import async_call_llm, extract_content_or_reasoning
 MAX_SESSION_CHARS = 100_000
 MAX_SUMMARY_TOKENS = 10000
 
@@ -266,7 +266,11 @@ _HIDDEN_SESSION_SOURCES = ("tool",)
 def _list_recent_sessions(db, limit: int, current_session_id: str = None) -> str:
     """Return metadata for the most recent sessions (no LLM calls)."""
     try:
-        sessions = db.list_sessions_rich(limit=limit + 5, exclude_sources=list(_HIDDEN_SESSION_SOURCES))  # fetch extra to skip current
+        sessions = db.list_sessions_rich(
+            limit=limit + 5,
+            exclude_sources=list(_HIDDEN_SESSION_SOURCES),
+            order_by_last_active=True,
+        )  # fetch extra to skip current
 
         # Resolve current session lineage to exclude it
         current_root = None
@@ -466,7 +470,7 @@ def session_search(
             # disposable event loop that conflicted with cached
             # AsyncOpenAI/httpx clients bound to a different loop,
             # causing deadlocks in gateway mode (#2681).
-            from base.model_tools import _run_async
+            from model_tools import _run_async
             results = _run_async(_summarize_all())
         except concurrent.futures.TimeoutError:
             logging.warning(
@@ -520,7 +524,7 @@ def session_search(
 def check_session_search_requirements() -> bool:
     """Requires SQLite state database and an auxiliary text model."""
     try:
-        from base.hermes_state import DEFAULT_DB_PATH
+        from hermes_state import DEFAULT_DB_PATH
         return DEFAULT_DB_PATH.parent.exists()
     except ImportError:
         return False

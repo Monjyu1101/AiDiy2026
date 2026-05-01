@@ -9,7 +9,7 @@ from typing import Dict, Iterable, Optional, Set
 from hermes_cli.auth import get_nous_auth_status
 from hermes_cli.config import get_env_value, load_config
 from tools.managed_tool_gateway import is_managed_tool_gateway_ready
-from base.utils import is_truthy_value
+from utils import is_truthy_value
 from tools.tool_backend_helpers import (
     fal_key_is_configured,
     has_direct_modal_credentials,
@@ -90,7 +90,7 @@ def _model_config_dict(config: Dict[str, object]) -> Dict[str, object]:
 
 
 def _toolset_enabled(config: Dict[str, object], toolset_key: str) -> bool:
-    from base.toolsets import resolve_toolset
+    from toolsets import resolve_toolset
 
     platform_toolsets = config.get("platform_toolsets")
     if not isinstance(platform_toolsets, dict) or not platform_toolsets:

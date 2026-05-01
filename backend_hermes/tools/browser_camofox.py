@@ -32,7 +32,7 @@ from typing import Any, Dict, Optional
 
 import requests
 
-from hermes_cli.config import load_config
+from hermes_cli.config import cfg_get, load_config
 from tools.browser_camofox_state import get_camofox_identity
 from tools.registry import tool_error
 
@@ -505,7 +505,7 @@ def camofox_vision(question: str, annotate: bool = False,
         )
 
         # Save screenshot to cache
-        from base.hermes_constants import get_hermes_home
+        from hermes_constants import get_hermes_home
         screenshots_dir = get_hermes_home() / "browser_screenshots"
         screenshots_dir.mkdir(parents=True, exist_ok=True)
         screenshot_path = str(screenshots_dir / f"browser_screenshot_{uuid.uuid4().hex[:8]}.png")
@@ -531,11 +531,11 @@ def camofox_vision(question: str, annotate: bool = False,
         # Redact secrets from annotation context before sending to vision LLM.
         # The screenshot image itself cannot be redacted, but at least the
         # text-based accessibility tree snippet won't leak secret values.
-        from core.redact import redact_sensitive_text
+        from agent.redact import redact_sensitive_text
         annotation_context = redact_sensitive_text(annotation_context)
 
         # Send to vision LLM
-        from core.auxiliary_client import call_llm
+        from agent.auxiliary_client import call_llm
 
         vision_prompt = (
             f"Analyze this browser screenshot and answer: {question}"
@@ -544,7 +544,7 @@ def camofox_vision(question: str, annotate: bool = False,
 
         try:
             _cfg = load_config()
-            _vision_cfg = _cfg.get("auxiliary", {}).get("vision", {})
+            _vision_cfg = cfg_get(_cfg, "auxiliary", "vision", default={})
             _vision_timeout = float(_vision_cfg.get("timeout", 120))
             _vision_temperature = float(_vision_cfg.get("temperature", 0.1))
         except Exception:
@@ -571,7 +571,7 @@ def camofox_vision(question: str, annotate: bool = False,
         analysis = (response.choices[0].message.content or "").strip() if response.choices else ""
 
         # Redact secrets the vision LLM may have read from the screenshot.
-        from core.redact import redact_sensitive_text
+        from agent.redact import redact_sensitive_text
         analysis = redact_sensitive_text(analysis)
 
         return json.dumps({

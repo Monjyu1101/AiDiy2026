@@ -53,7 +53,7 @@ class ChatAI:
     """
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
-                 AI_NAME: str = "ollama", AI_MODEL: str = "deepseek-v4-flash:cloud",
+                 AI_NAME: str = "ollama", AI_MODEL: str = "mistral-large-3:675b:cloud",
                  api_key: str = None, system_instruction: str = None):
         """初期化"""
 

@@ -25,6 +25,7 @@ import os
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Dict, List
+from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ _config_files: List[Dict[str, str]] | None = None
 
 
 def _resolve_hermes_home() -> Path:
-    from base.hermes_constants import get_hermes_home
+    from hermes_constants import get_hermes_home
     return get_hermes_home()
 
 
@@ -138,7 +139,7 @@ def _load_config_files() -> List[Dict[str, str]]:
         from hermes_cli.config import read_raw_config
         hermes_home = _resolve_hermes_home()
         cfg = read_raw_config()
-        cred_files = cfg.get("terminal", {}).get("credential_files")
+        cred_files = cfg_get(cfg, "terminal", "credential_files")
         if isinstance(cred_files, list):
             from tools.path_security import validate_within_dir
 
@@ -229,7 +230,7 @@ def get_skills_directory_mount(
 
     # Mount external skill dirs
     try:
-        from core.skill_utils import get_external_skills_dirs
+        from agent.skill_utils import get_external_skills_dirs
         for idx, ext_dir in enumerate(get_external_skills_dirs()):
             if ext_dir.is_dir():
                 host_path = _safe_skills_path(ext_dir)
@@ -316,7 +317,7 @@ def iter_skills_files(
 
     # Include external skill dirs
     try:
-        from core.skill_utils import get_external_skills_dirs
+        from agent.skill_utils import get_external_skills_dirs
         for idx, ext_dir in enumerate(get_external_skills_dirs()):
             if not ext_dir.is_dir():
                 continue
@@ -358,7 +359,7 @@ def get_cache_directory_mounts(
     ``container_path`` keys.  The host path is resolved via
     ``get_hermes_dir()`` for backward compatibility with old directory layouts.
     """
-    from base.hermes_constants import get_hermes_dir
+    from hermes_constants import get_hermes_dir
 
     mounts: List[Dict[str, str]] = []
     for new_subpath, old_name in _CACHE_DIRS:
@@ -381,7 +382,7 @@ def iter_cache_files(
     Used by Modal to upload files individually and resync before each command.
     Skips symlinks.  The container paths use the new ``cache/<subdir>`` layout.
     """
-    from base.hermes_constants import get_hermes_dir
+    from hermes_constants import get_hermes_dir
 
     result: List[Dict[str, str]] = []
     for new_subpath, old_name in _CACHE_DIRS:

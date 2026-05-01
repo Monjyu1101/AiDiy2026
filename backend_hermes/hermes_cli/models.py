@@ -40,6 +40,7 @@ OPENROUTER_MODELS: list[tuple[str, str]] = [
     ("anthropic/claude-sonnet-4.5",     ""),
     ("anthropic/claude-haiku-4.5",      ""),
     ("openrouter/elephant-alpha",       "free"),
+    ("openrouter/owl-alpha",            "free"),
     ("openai/gpt-5.5",                  ""),
     ("openai/gpt-5.4-mini",             ""),
     ("xiaomi/mimo-v2.5-pro",             ""),
@@ -137,7 +138,7 @@ def _xai_curated_models() -> list[str]:
     Mirrors ``_codex_curated_models()``'s role for openai-codex.
     """
     try:
-        from core.models_dev import _load_disk_cache
+        from agent.models_dev import _load_disk_cache
         data = _load_disk_cache()
         xai = data.get("xai") if isinstance(data, dict) else None
         models = xai.get("models") if isinstance(xai, dict) else None
@@ -287,6 +288,10 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "MiniMax-M2.5",
         "MiniMax-M2.1",
         "MiniMax-M2",
+    ],
+    "minimax-oauth": [
+        "MiniMax-M2.7",
+        "MiniMax-M2.7-highspeed",
     ],
     "minimax-cn": [
         "MiniMax-M2.7",
@@ -769,7 +774,6 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("nous",           "Nous Portal",              "Nous Portal (Nous Research subscription)"),
     ProviderEntry("openrouter",     "OpenRouter",               "OpenRouter (100+ models, pay-per-use)"),
     ProviderEntry("lmstudio",       "LM Studio",                "LM Studio (local desktop app with built-in model server)"),
-    ProviderEntry("ai-gateway",     "Vercel AI Gateway",        "Vercel AI Gateway (200+ models, $5 free credit, no markup)"),
     ProviderEntry("anthropic",      "Anthropic",                "Anthropic (Claude models — API key or Claude Code)"),
     ProviderEntry("openai-codex",   "OpenAI Codex",             "OpenAI Codex"),
     ProviderEntry("xiaomi",         "Xiaomi MiMo",              "Xiaomi MiMo (MiMo-V2.5 and V2 models — pro, omni, flash)"),
@@ -788,6 +792,7 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("kimi-coding-cn", "Kimi / Moonshot (China)",  "Kimi / Moonshot China (Moonshot CN direct API)"),
     ProviderEntry("stepfun",        "StepFun Step Plan",       "StepFun Step Plan (agent/coding models via Step Plan API)"),
     ProviderEntry("minimax",        "MiniMax",                  "MiniMax (global direct API)"),
+    ProviderEntry("minimax-oauth",  "MiniMax (OAuth)",          "MiniMax via OAuth browser login (Coding Plan, minimax.io)"),
     ProviderEntry("minimax-cn",     "MiniMax (China)",          "MiniMax China (domestic direct API)"),
     ProviderEntry("alibaba",        "Alibaba Cloud (DashScope)","Alibaba Cloud / DashScope Coding (Qwen + multi-provider)"),
     ProviderEntry("ollama-cloud",   "Ollama Cloud",             "Ollama Cloud (cloud-hosted open models — ollama.com)"),
@@ -798,6 +803,7 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("opencode-go",    "OpenCode Go",              "OpenCode Go (open models, $10/month subscription)"),
     ProviderEntry("bedrock",        "AWS Bedrock",              "AWS Bedrock (Claude, Nova, Llama, DeepSeek — IAM or API key)"),
     ProviderEntry("azure-foundry",  "Azure Foundry",            "Azure Foundry (OpenAI-style or Anthropic-style endpoint — your Azure AI deployment)"),
+    ProviderEntry("ai-gateway",     "Vercel AI Gateway",        "Vercel AI Gateway"),
 ]
 
 # Derived dicts — used throughout the codebase
@@ -831,6 +837,9 @@ _PROVIDER_ALIASES = {
     "gmicloud": "gmi",
     "minimax-china": "minimax-cn",
     "minimax_cn": "minimax-cn",
+    "minimax-portal": "minimax-oauth",
+    "minimax-global": "minimax-oauth",
+    "minimax_oauth": "minimax-oauth",
     "claude": "anthropic",
     "claude-code": "anthropic",
     "deep-seek": "deepseek",
@@ -1040,7 +1049,7 @@ def fetch_ai_gateway_models(
     if _ai_gateway_catalog_cache is not None and not force_refresh:
         return list(_ai_gateway_catalog_cache)
 
-    from base.hermes_constants import AI_GATEWAY_BASE_URL
+    from hermes_constants import AI_GATEWAY_BASE_URL
 
     fallback = list(VERCEL_AI_GATEWAY_MODELS)
     preferred_ids = [mid for mid, _ in fallback]
@@ -1264,7 +1273,7 @@ def fetch_ai_gateway_pricing(
     ``prompt`` / ``completion``. This translates. Cache read/write field names
     already match.
     """
-    from base.hermes_constants import AI_GATEWAY_BASE_URL
+    from hermes_constants import AI_GATEWAY_BASE_URL
 
     cache_key = AI_GATEWAY_BASE_URL.rstrip("/")
     if not force_refresh and cache_key in _pricing_cache:
@@ -1857,7 +1866,7 @@ def _merge_with_models_dev(provider: str, curated: list[str]) -> list[str]:
     returned unchanged — this is the offline/CI fallback path.
     """
     try:
-        from core.models_dev import list_agentic_models
+        from agent.models_dev import list_agentic_models
         mdev = list_agentic_models(provider)
     except Exception:
         mdev = []
@@ -1998,7 +2007,7 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
     # below — bedrock is not expected to appear in that table.
     if normalized == "bedrock":
         try:
-            from core.bedrock_adapter import bedrock_model_ids_or_none
+            from agent.bedrock_adapter import bedrock_model_ids_or_none
             ids = bedrock_model_ids_or_none()
             if ids is not None:
                 return ids
@@ -2017,7 +2026,7 @@ def _fetch_anthropic_models(timeout: float = 5.0) -> Optional[list[str]]:
     Claude Code auto-discovery).  Returns sorted model IDs or None.
     """
     try:
-        from core.anthropic_adapter import resolve_anthropic_token, _is_oauth_token
+        from agent.anthropic_adapter import resolve_anthropic_token, _is_oauth_token
     except ImportError:
         return None
 
@@ -2026,28 +2035,56 @@ def _fetch_anthropic_models(timeout: float = 5.0) -> Optional[list[str]]:
         return None
 
     headers: dict[str, str] = {"anthropic-version": "2023-06-01"}
-    if _is_oauth_token(token):
+    is_oauth = _is_oauth_token(token)
+    if is_oauth:
         headers["Authorization"] = f"Bearer {token}"
-        from core.anthropic_adapter import _COMMON_BETAS, _OAUTH_ONLY_BETAS
+        from agent.anthropic_adapter import _COMMON_BETAS, _OAUTH_ONLY_BETAS, _CONTEXT_1M_BETA
         headers["anthropic-beta"] = ",".join(_COMMON_BETAS + _OAUTH_ONLY_BETAS)
     else:
         headers["x-api-key"] = token
 
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/models",
-        headers=headers,
-    )
-    try:
+    def _do_request(h: dict[str, str]):
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/models",
+            headers=h,
+        )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode())
-            models = [m["id"] for m in data.get("data", []) if m.get("id")]
-            # Sort: latest/largest first (opus > sonnet > haiku, higher version first)
-            return sorted(models, key=lambda m: (
-                "opus" not in m,      # opus first
-                "sonnet" not in m,    # then sonnet
-                "haiku" not in m,     # then haiku
-                m,                    # alphabetical within tier
-            ))
+            return json.loads(resp.read().decode())
+
+    try:
+        try:
+            data = _do_request(headers)
+        except urllib.error.HTTPError as http_err:
+            # Reactive recovery for OAuth subscriptions that reject the 1M
+            # context beta with 400 "long context beta is not yet available
+            # for this subscription". Retry once without the beta; re-raise
+            # anything else so the outer except logs it.
+            if (
+                is_oauth
+                and http_err.code == 400
+            ):
+                try:
+                    body_text = http_err.read().decode(errors="ignore").lower()
+                except Exception:
+                    body_text = ""
+                if "long context beta" in body_text and "not yet available" in body_text:
+                    headers["anthropic-beta"] = ",".join(
+                        [b for b in _COMMON_BETAS if b != _CONTEXT_1M_BETA]
+                        + list(_OAUTH_ONLY_BETAS)
+                    )
+                    data = _do_request(headers)
+                else:
+                    raise
+            else:
+                raise
+        models = [m["id"] for m in data.get("data", []) if m.get("id")]
+        # Sort: latest/largest first (opus > sonnet > haiku, higher version first)
+        return sorted(models, key=lambda m: (
+            "opus" not in m,      # opus first
+            "sonnet" not in m,    # then sonnet
+            "haiku" not in m,     # then haiku
+            m,                    # alphabetical within tier
+        ))
     except Exception as e:
         import logging
         logging.getLogger(__name__).debug("Failed to fetch Anthropic models: %s", e)
@@ -2813,7 +2850,7 @@ def _fetch_ai_gateway_models(timeout: float = 5.0) -> Optional[list[str]]:
         return None
     base_url = os.getenv("AI_GATEWAY_BASE_URL", "").strip()
     if not base_url:
-        from base.hermes_constants import AI_GATEWAY_BASE_URL
+        from hermes_constants import AI_GATEWAY_BASE_URL
         base_url = AI_GATEWAY_BASE_URL
 
     url = base_url.rstrip("/") + "/models"
@@ -2861,7 +2898,7 @@ _OLLAMA_CLOUD_CACHE_TTL = 3600  # 1 hour
 
 def _ollama_cloud_cache_path() -> Path:
     """Return the path for the Ollama Cloud model cache."""
-    from base.hermes_constants import get_hermes_home
+    from hermes_constants import get_hermes_home
     return get_hermes_home() / "ollama_cloud_models_cache.json"
 
 
@@ -2895,7 +2932,7 @@ def _load_ollama_cloud_cache(*, ignore_ttl: bool = False) -> Optional[dict]:
 def _save_ollama_cloud_cache(models: list[str]) -> None:
     """Persist the merged Ollama Cloud model list to disk."""
     try:
-        from base.utils import atomic_json_write
+        from utils import atomic_json_write
         cache_path = _ollama_cloud_cache_path()
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         atomic_json_write(cache_path, {"models": models, "cached_at": time.time()}, indent=None)
@@ -2940,7 +2977,7 @@ def fetch_ollama_cloud_models(
     # 3. models.dev registry
     mdev_models: list[str] = []
     try:
-        from core.models_dev import list_agentic_models
+        from agent.models_dev import list_agentic_models
         mdev_models = list_agentic_models("ollama-cloud")
     except Exception:
         pass
@@ -3344,7 +3381,7 @@ def validate_requested_model(
     # AWS SDK control plane (ListFoundationModels + ListInferenceProfiles).
     if normalized == "bedrock":
         try:
-            from core.bedrock_adapter import discover_bedrock_models, resolve_bedrock_region
+            from agent.bedrock_adapter import discover_bedrock_models, resolve_bedrock_region
             region = resolve_bedrock_region()
             discovered = discover_bedrock_models(region)
             discovered_ids = {m["id"] for m in discovered}

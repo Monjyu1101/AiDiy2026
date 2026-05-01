@@ -20,7 +20,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from base.hermes_constants import get_hermes_home
+from hermes_constants import get_hermes_home
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -108,6 +108,17 @@ def _parse_context_tokens(host_val, root_val) -> int | None:
             except (ValueError, TypeError):
                 pass
     return None
+
+
+def _parse_int_config(host_val, root_val, default: int) -> int:
+    """Parse an integer config: host wins, then root, then default."""
+    for val in (host_val, root_val):
+        if val is not None:
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                pass
+    return default
 
 
 def _parse_dialectic_depth(host_val, root_val) -> int:
@@ -463,10 +474,10 @@ class HonchoClientConfig:
                 raw.get("dialecticDynamic"),
                 default=True,
             ),
-            dialectic_max_chars=int(
-                host_block.get("dialecticMaxChars")
-                or raw.get("dialecticMaxChars")
-                or 600
+            dialectic_max_chars=_parse_int_config(
+                host_block.get("dialecticMaxChars"),
+                raw.get("dialecticMaxChars"),
+                default=600,
             ),
             dialectic_depth=_parse_dialectic_depth(
                 host_block.get("dialecticDepth"),
@@ -487,15 +498,15 @@ class HonchoClientConfig:
                 or raw.get("reasoningLevelCap")
                 or "high"
             ),
-            message_max_chars=int(
-                host_block.get("messageMaxChars")
-                or raw.get("messageMaxChars")
-                or 25000
+            message_max_chars=_parse_int_config(
+                host_block.get("messageMaxChars"),
+                raw.get("messageMaxChars"),
+                default=25000,
             ),
-            dialectic_max_input_chars=int(
-                host_block.get("dialecticMaxInputChars")
-                or raw.get("dialecticMaxInputChars")
-                or 10000
+            dialectic_max_input_chars=_parse_int_config(
+                host_block.get("dialecticMaxInputChars"),
+                raw.get("dialecticMaxInputChars"),
+                default=10000,
             ),
             recall_mode=_normalize_recall_mode(
                 host_block.get("recallMode")

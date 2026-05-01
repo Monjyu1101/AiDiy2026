@@ -6,8 +6,8 @@ This transport owns format conversion and normalization — NOT client lifecycle
 
 from typing import Any, Dict, List, Optional
 
-from core.transports.base import ProviderTransport
-from core.transports.types import NormalizedResponse
+from agent.transports.base import ProviderTransport
+from agent.transports.types import NormalizedResponse
 
 
 class AnthropicTransport(ProviderTransport):
@@ -27,14 +27,14 @@ class AnthropicTransport(ProviderTransport):
         kwargs:
             base_url: Optional[str] — affects thinking signature handling.
         """
-        from core.anthropic_adapter import convert_messages_to_anthropic
+        from agent.anthropic_adapter import convert_messages_to_anthropic
 
         base_url = kwargs.get("base_url")
         return convert_messages_to_anthropic(messages, base_url=base_url)
 
     def convert_tools(self, tools: List[Dict[str, Any]]) -> Any:
         """Convert OpenAI tool schemas to Anthropic input_schema format."""
-        from core.anthropic_adapter import convert_tools_to_anthropic
+        from agent.anthropic_adapter import convert_tools_to_anthropic
 
         return convert_tools_to_anthropic(tools)
 
@@ -58,8 +58,9 @@ class AnthropicTransport(ProviderTransport):
             context_length: int | None
             base_url: str | None
             fast_mode: bool
+            drop_context_1m_beta: bool
         """
-        from core.anthropic_adapter import build_anthropic_kwargs
+        from agent.anthropic_adapter import build_anthropic_kwargs
 
         return build_anthropic_kwargs(
             model=model,
@@ -73,6 +74,7 @@ class AnthropicTransport(ProviderTransport):
             context_length=params.get("context_length"),
             base_url=params.get("base_url"),
             fast_mode=params.get("fast_mode", False),
+            drop_context_1m_beta=params.get("drop_context_1m_beta", False),
         )
 
     def normalize_response(self, response: Any, **kwargs) -> NormalizedResponse:
@@ -82,8 +84,11 @@ class AnthropicTransport(ProviderTransport):
         to OpenAI finish_reason, and collects reasoning_details in provider_data.
         """
         import json
-        from core.anthropic_adapter import _to_plain_data
-        from core.transports.types import ToolCall
+        from agent.anthropic_adapter import _to_plain_data
+        from agent.transports.types import ToolCall
+
+        strip_tool_prefix = kwargs.get("strip_tool_prefix", False)
+        _MCP_PREFIX = "mcp_"
 
         text_parts = []
         reasoning_parts = []
@@ -99,10 +104,13 @@ class AnthropicTransport(ProviderTransport):
                 if isinstance(block_dict, dict):
                     reasoning_details.append(block_dict)
             elif block.type == "tool_use":
+                name = block.name
+                if strip_tool_prefix and name.startswith(_MCP_PREFIX):
+                    name = name[len(_MCP_PREFIX):]
                 tool_calls.append(
                     ToolCall(
                         id=block.id,
-                        name=block.name,
+                        name=name,
                         arguments=json.dumps(block.input),
                     )
                 )
@@ -166,6 +174,6 @@ class AnthropicTransport(ProviderTransport):
 
 
 # Auto-register on import
-from core.transports import register_transport  # noqa: E402
+from agent.transports import register_transport  # noqa: E402
 
 register_transport("anthropic_messages", AnthropicTransport)

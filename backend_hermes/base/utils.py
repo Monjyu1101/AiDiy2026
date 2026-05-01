@@ -1,7 +1,4 @@
-"""hermes-agent 共通ユーティリティ関数。
-
-yaml, json, os に依存。hermes_constants より下位、他のモジュールより上位。
-"""
+"""Shared utility functions for hermes-agent."""
 
 import json
 import logging
@@ -21,15 +18,7 @@ TRUTHY_STRINGS = frozenset({"1", "true", "yes", "on"})
 
 
 def is_truthy_value(value: Any, default: bool = False) -> bool:
-    """真偽値っぽい値をプロジェクト共通の truthy 文字列セットで真偽値に変換する。
-
-    Args:
-        value: 変換する値（None, bool, str, その他）。
-        default: value が None の場合のデフォルト値。
-
-    Returns:
-        真偽値に変換された値。
-    """
+    """Coerce bool-ish values using the project's shared truthy string set."""
     if value is None:
         return default
     if isinstance(value, bool):
@@ -40,27 +29,12 @@ def is_truthy_value(value: Any, default: bool = False) -> bool:
 
 
 def env_var_enabled(name: str, default: str = "") -> bool:
-    """環境変数が truthy な値に設定されている場合に True を返す。
-
-    Args:
-        name: 環境変数名。
-        default: 環境変数が未設定の場合のデフォルト値（文字列）。
-
-    Returns:
-        環境変数が truthy なら True。
-    """
+    """Return True when an environment variable is set to a truthy value."""
     return is_truthy_value(os.getenv(name, default), default=False)
 
 
 def _preserve_file_mode(path: Path) -> "int | None":
-    """*path* が存在すればパーミッションビットを取得し、存在しなければ ``None`` を返す。
-
-    Args:
-        path: パーミッションを保存するファイルパス。
-
-    Returns:
-        パーミッションビット、または None。
-    """
+    """Capture the permission bits of *path* if it exists, else ``None``."""
     try:
         return stat.S_IMODE(path.stat().st_mode) if path.exists() else None
     except OSError:
@@ -68,49 +42,39 @@ def _preserve_file_mode(path: Path) -> "int | None":
 
 
 def _restore_file_mode(path: Path, mode: "int | None") -> None:
-    """アトミック置換後に *path* に *mode* を再適用する。
+    """Re-apply *mode* to *path* after an atomic replace.
 
-    ``tempfile.mkstemp`` は 0o600（所有者のみ）でファイルを作成する。
-    ``os.replace`` でテンポラリファイルを所定の位置に置き換えると、
-    ターゲットファイルがその制限的なパーミッションを継承してしまい、
-    Docker や NAS のボリュームマウントが壊れる可能性がある。
-    この関数を ``os.replace`` の直後に呼び出すことで元のパーミッションを復元する。
-
-    Args:
-        path: パーミッションを復元するファイルパス。
-        mode: 復元するパーミッションビット（None の場合は何もしない）。
+    ``tempfile.mkstemp`` creates files with 0o600 (owner-only).  After
+    ``os.replace`` swaps the temp file into place the target inherits
+    those restrictive permissions, breaking Docker / NAS volume mounts
+    that rely on broader permissions set by the user.  Calling this
+    right after ``os.replace`` restores the original permissions.
     """
     if mode is None:
         return
     try:
         os.chmod(path, mode)
     except OSError:
-        # Windows ではこの操作は無視される
         pass
 
 
 def atomic_replace(tmp_path: Union[str, Path], target: Union[str, Path]) -> str:
-    """*tmp_path* を *target* にアトミックに移動し、シンボリックリンクを維持する。
+    """Atomically move *tmp_path* onto *target*, preserving symlinks.
 
-    ``os.replace(tmp, target)`` は ``tmp`` を ``target`` にアトミックに置き換える。
-    しかし *target* がシンボリックリンクの場合、リンク自体が通常ファイルに置き換えられてしまい、
-    ``config.yaml`` / ``SOUL.md`` / ``auth.json`` などを
-    ``~/.hermes/`` から git 管理のプロファイルパッケージや dotfiles リポジトリに
-    シンボリックリンクしている管理デプロイメントが静かに切り離されてしまう（GitHub #16743）。
+    ``os.replace(tmp, target)`` atomically swaps ``tmp`` into place at
+    ``target``.  When ``target`` is a symlink, the symlink itself is
+    replaced with a regular file — silently detaching managed deployments
+    that symlink ``config.yaml`` / ``SOUL.md`` / ``auth.json`` etc. from
+    ``~/.hermes/`` to a git-tracked profile package or dotfiles repo
+    (GitHub #16743).
 
-    このヘルパーは先にシンボリックリンクを解決するため、``os.replace`` は
-    実体のファイルに in-place で書き込み、シンボリックリンクは維持される。
-    非シンボリックリンクおよび存在しないパスでは、単純な ``os.replace`` と同様に動作する。
+    This helper resolves the symlink first so ``os.replace`` writes to
+    the real file in-place while the symlink survives.  For non-symlink
+    and non-existent paths the behavior is identical to a plain
+    ``os.replace`` call.
 
-    置換に使用された実際の解決済みパスを返すので、呼び出し側が
-    パーミッションを再適用する際にシンボリックリンクではなく実体パスを対象にできる。
-
-    Args:
-        tmp_path: テンポラリファイルのパス。
-        target: 置き換え先のターゲットパス。
-
-    Returns:
-        置換に使用された解決済みの実パス。
+    Returns the resolved real path used for the replace, so callers that
+    need to re-apply permissions can target it instead of the symlink.
     """
     target_str = str(target)
     real_path = os.path.realpath(target_str) if os.path.islink(target_str) else target_str
@@ -125,17 +89,18 @@ def atomic_json_write(
     indent: int = 2,
     **dump_kwargs: Any,
 ) -> None:
-    """JSON データをファイルにアトミックに書き込む。
+    """Write JSON data to a file atomically.
 
-    テンポラリファイル + fsync + os.replace を使用して、ターゲットファイルが
-    中途半端に書き込まれた状態になることがないようにする。
-    書き込み中にプロセスがクラッシュしても、以前のバージョンのファイルはそのまま残る。
+    Uses temp file + fsync + os.replace to ensure the target file is never
+    left in a partially-written state. If the process crashes mid-write,
+    the previous version of the file remains intact.
 
     Args:
-        path: ターゲットファイルパス（存在しなければ作成、存在すれば上書き）。
-        data: JSON シリアライズ可能なデータ。
-        indent: JSON のインデント（デフォルト 2）。
-        **dump_kwargs: json.dump() に渡す追加のキーワード引数（例: default=str）。
+        path: Target file path (will be created or overwritten).
+        data: JSON-serializable data to write.
+        indent: JSON indentation (default 2).
+        **dump_kwargs: Additional keyword args forwarded to json.dump(), such
+            as default=str for non-native types.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -158,12 +123,12 @@ def atomic_json_write(
             )
             f.flush()
             os.fsync(f.fileno())
-        # シンボリックリンクを維持 — 実体ファイルに in-place で書き込む（GitHub #16743）
+        # Preserve symlinks — swap in-place on the real file (GitHub #16743).
         real_path = atomic_replace(tmp_path, path)
         _restore_file_mode(real_path, original_mode)
     except BaseException:
-        # 意図的に BaseException をキャッチし、KeyboardInterrupt/SystemExit が
-        # 発生してもテンポラリファイルのクリーンアップを実行してから再送出する。
+        # Intentionally catch BaseException so temp-file cleanup still runs for
+        # KeyboardInterrupt/SystemExit before re-raising the original signal.
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -179,19 +144,19 @@ def atomic_yaml_write(
     sort_keys: bool = False,
     extra_content: str | None = None,
 ) -> None:
-    """YAML データをファイルにアトミックに書き込む。
+    """Write YAML data to a file atomically.
 
-    テンポラリファイル + fsync + os.replace を使用して、ターゲットファイルが
-    中途半端に書き込まれた状態になることがないようにする。
-    書き込み中にプロセスがクラッシュしても、以前のバージョンのファイルはそのまま残る。
+    Uses temp file + fsync + os.replace to ensure the target file is never
+    left in a partially-written state.  If the process crashes mid-write,
+    the previous version of the file remains intact.
 
     Args:
-        path: ターゲットファイルパス（存在しなければ作成、存在すれば上書き）。
-        data: YAML シリアライズ可能なデータ。
-        default_flow_style: YAML フロースタイル（デフォルト False）。
-        sort_keys: 辞書のキーをソートするかどうか（デフォルト False）。
-        extra_content: YAML ダンプの後に追加するオプションの文字列
-            （例: ユーザー参照用のコメントアウトされたセクション）。
+        path: Target file path (will be created or overwritten).
+        data: YAML-serializable data to write.
+        default_flow_style: YAML flow style (default False).
+        sort_keys: Whether to sort dict keys (default False).
+        extra_content: Optional string to append after the YAML dump
+            (e.g. commented-out sections for user reference).
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -210,12 +175,12 @@ def atomic_yaml_write(
                 f.write(extra_content)
             f.flush()
             os.fsync(f.fileno())
-        # シンボリックリンクを維持 — 実体ファイルに in-place で書き込む（GitHub #16743）
+        # Preserve symlinks — swap in-place on the real file (GitHub #16743).
         real_path = atomic_replace(tmp_path, path)
         _restore_file_mode(real_path, original_mode)
     except BaseException:
-        # atomic_json_write と同様に、プロセスレベルの割り込みでも
-        # クリーンアップを実行してから再送出する。
+        # Match atomic_json_write: cleanup must also happen for process-level
+        # interruptions before we re-raise them.
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -223,21 +188,15 @@ def atomic_yaml_write(
         raise
 
 
-# ─── JSON ヘルパー ─────────────────────────────────────────────────────────────
+# ─── JSON Helpers ─────────────────────────────────────────────────────────────
 
 
 def safe_json_loads(text: str, default: Any = None) -> Any:
-    """JSON をパースし、パースエラー時は *default* を返す。
+    """Parse JSON, returning *default* on any parse error.
 
-    display.py, anthropic_adapter.py, auxiliary_client.py などで重複している
-    ``try: json.loads(x) except (JSONDecodeError, TypeError)`` パターンを置き換える。
-
-    Args:
-        text: JSON 文字列。
-        default: パースエラー時のデフォルト値。
-
-    Returns:
-        パースされたオブジェクト、またはデフォルト値。
+    Replaces the ``try: json.loads(x) except (JSONDecodeError, TypeError)``
+    pattern duplicated across display.py, anthropic_adapter.py,
+    auxiliary_client.py, and others.
     """
     try:
         return json.loads(text)
@@ -245,19 +204,11 @@ def safe_json_loads(text: str, default: Any = None) -> Any:
         return default
 
 
-# ─── 環境変数ヘルパー ─────────────────────────────────────────────────────────
+# ─── Environment Variable Helpers ─────────────────────────────────────────────
 
 
 def env_int(key: str, default: int = 0) -> int:
-    """環境変数を整数として読み込む。フォールバック値付き。
-
-    Args:
-        key: 環境変数名。
-        default: パース失敗時または未設定時のデフォルト値。
-
-    Returns:
-        整数値、またはデフォルト値。
-    """
+    """Read an environment variable as an integer, with fallback."""
     raw = os.getenv(key, "").strip()
     if not raw:
         return default
@@ -268,19 +219,11 @@ def env_int(key: str, default: int = 0) -> int:
 
 
 def env_bool(key: str, default: bool = False) -> bool:
-    """環境変数を真偽値として読み込む。
-
-    Args:
-        key: 環境変数名。
-        default: 未設定時またはパース失敗時のデフォルト値。
-
-    Returns:
-        真偽値。
-    """
+    """Read an environment variable as a boolean."""
     return is_truthy_value(os.getenv(key, ""), default=default)
 
 
-# ─── プロキシヘルパー ──────────────────────────────────────────────────────────
+# ─── Proxy Helpers ────────────────────────────────────────────────────────────
 
 
 _PROXY_ENV_KEYS = (
@@ -290,17 +233,11 @@ _PROXY_ENV_KEYS = (
 
 
 def normalize_proxy_url(proxy_url: str | None) -> str | None:
-    """プロキシ URL を httpx/aiohttp 互換に正規化する。
+    """Normalize proxy URLs for httpx/aiohttp compatibility.
 
-    WSL/Clash 環境では SOCKS プロキシを ``socks://127.0.0.1:PORT`` として
-    エクスポートすることがよくある。httpx はそのエイリアスを拒否し、
-    明示的な ``socks5://`` スキームを期待する。
-
-    Args:
-        proxy_url: 正規化するプロキシ URL。
-
-    Returns:
-        正規化されたプロキシ URL、または None。
+    WSL/Clash-style environments often export SOCKS proxies as
+    ``socks://127.0.0.1:PORT``. httpx rejects that alias and expects the
+    explicit ``socks5://`` scheme instead.
     """
     candidate = str(proxy_url or "").strip()
     if not candidate:
@@ -311,7 +248,7 @@ def normalize_proxy_url(proxy_url: str | None) -> str | None:
 
 
 def normalize_proxy_env_vars() -> None:
-    """サポートされているプロキシ環境変数を正規化された URL 形式に in-place で書き換える。"""
+    """Rewrite supported proxy env vars to canonical URL forms in-place."""
     for key in _PROXY_ENV_KEYS:
         value = os.getenv(key, "")
         normalized = normalize_proxy_url(value)
@@ -319,24 +256,18 @@ def normalize_proxy_env_vars() -> None:
             os.environ[key] = normalized
 
 
-# ─── URL パースヘルパー ──────────────────────────────────────────────────────
+# ─── URL Parsing Helpers ──────────────────────────────────────────────────────
 
 
 def base_url_hostname(base_url: str) -> str:
-    """ベース URL から小文字のホスト名を返す。存在しない場合は ``""`` を返す。
+    """Return the lowercased hostname for a base URL, or ``""`` if absent.
 
-    既知のプロバイダホスト（``api.openai.com``、``api.x.ai``、``api.anthropic.com``）
-    との比較には、ホスト名の完全一致を使用する。生の URL に対する部分文字列マッチは
-    使用しない。部分文字列チェックは、攻撃者またはプロキシが制御するパス/ホスト
-    （``https://api.openai.com.example/v1`` や ``https://proxy.test/api.openai.com/v1`` など）
-    をネイティブエンドポイントとして誤認識し、api_mode / 認証ルーティングが
-    誤ったものになる原因となる。
-
-    Args:
-        base_url: ベース URL。
-
-    Returns:
-        小文字のホスト名、または空文字列。
+    Use exact-hostname comparisons against known provider hosts
+    (``api.openai.com``, ``api.x.ai``, ``api.anthropic.com``) instead of
+    substring matches on the raw URL. Substring checks treat attacker- or
+    proxy-controlled paths/hosts like ``https://api.openai.com.example/v1``
+    or ``https://proxy.test/api.openai.com/v1`` as native endpoints, which
+    leads to wrong api_mode / auth routing.
     """
     raw = (base_url or "").strip()
     if not raw:
@@ -346,25 +277,16 @@ def base_url_hostname(base_url: str) -> str:
 
 
 def base_url_host_matches(base_url: str, domain: str) -> bool:
-    """ベース URL のホスト名が *domain* またはそのサブドメインの場合に True を返す。
+    """Return True when the base URL's hostname is ``domain`` or a subdomain.
 
-    ``domain in base_url`` の部分文字列マッチよりも安全な代替手段。
-    部分文字列マッチは ``base_url_hostname`` で文書化されている偽陽性クラスに該当する。
-    ベアホスト、完全な URL、パス付き URL に対応。
-
-    使用例::
+    Safer counterpart to ``domain in base_url``, which is the substring
+    false-positive class documented on ``base_url_hostname``. Accepts bare
+    hosts, full URLs, and URLs with paths.
 
         base_url_host_matches("https://api.moonshot.ai/v1", "moonshot.ai") == True
         base_url_host_matches("https://moonshot.ai", "moonshot.ai")        == True
         base_url_host_matches("https://evil.com/moonshot.ai/v1", "moonshot.ai") == False
         base_url_host_matches("https://moonshot.ai.evil/v1", "moonshot.ai")     == False
-
-    Args:
-        base_url: ベース URL。
-        domain: 比較するドメイン。
-
-    Returns:
-        ホスト名がドメインまたはそのサブドメインであれば True。
     """
     hostname = base_url_hostname(base_url)
     if not hostname:

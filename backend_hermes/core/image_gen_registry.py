@@ -1,21 +1,21 @@
 """
-画像生成プロバイダーレジストリ
-================================
+Image Generation Provider Registry
+==================================
 
-登録済みプロバイダーの中央マップ。プラグインがインポート時に
-``PluginContext.register_image_gen_provider()`` で登録し、
-``image_generate`` ツールが各呼び出しをアクティブなバックエンドに
-ディスパッチするために使用する。
+Central map of registered providers. Populated by plugins at import-time via
+``PluginContext.register_image_gen_provider()``; consumed by the
+``image_generate`` tool to dispatch each call to the active backend.
 
-アクティブ選択
---------------
-アクティブなプロバイダーは ``config.yaml`` の ``image_gen.provider`` で選択される。
-未設定の場合、:func:`get_active_provider` は以下のフォールバックロジックを適用する:
+Active selection
+----------------
+The active provider is chosen by ``image_gen.provider`` in ``config.yaml``.
+If unset, :func:`get_active_provider` applies fallback logic:
 
-1. ちょうど1つのプロバイダーが登録されている場合、それを使用する。
-2. そうでなく ``fal`` という名前のプロバイダーが登録されている場合、それを使用する
-   （レガシーデフォルト — プラグイン導入前の動作に一致）。
-3. それ以外は ``None`` を返す（ツールがユーザーを ``hermes tools`` に誘導するエラーを表示）。
+1. If exactly one provider is registered, use it.
+2. Otherwise if a provider named ``fal`` is registered, use it (legacy
+   default — matches pre-plugin behavior).
+3. Otherwise return ``None`` (the tool surfaces a helpful error pointing
+   the user at ``hermes tools``).
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import logging
 import threading
 from typing import Dict, List, Optional
 
-from core.image_gen_provider import ImageGenProvider
+from agent.image_gen_provider import ImageGenProvider
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +34,11 @@ _lock = threading.Lock()
 
 
 def register_provider(provider: ImageGenProvider) -> None:
-    """画像生成プロバイダーを登録する。
+    """Register an image generation provider.
 
-    再登録（同じ ``name``）は前のエントリを上書きしてデバッグメッセージを
-    ログに記録する — ホットリロードシナリオ（テスト、開発ループ）で
-    予測可能な動作をする。
+    Re-registration (same ``name``) overwrites the previous entry and logs
+    a debug message — this makes hot-reload scenarios (tests, dev loops)
+    behave predictably.
     """
     if not isinstance(provider, ImageGenProvider):
         raise TypeError(
@@ -58,14 +58,14 @@ def register_provider(provider: ImageGenProvider) -> None:
 
 
 def list_providers() -> List[ImageGenProvider]:
-    """全ての登録済みプロバイダーを名前順にソートして返す。"""
+    """Return all registered providers, sorted by name."""
     with _lock:
         items = list(_providers.values())
     return sorted(items, key=lambda p: p.name)
 
 
 def get_provider(name: str) -> Optional[ImageGenProvider]:
-    """*name* で登録されたプロバイダーを返す。存在しない場合は None を返す。"""
+    """Return the provider registered under *name*, or None."""
     if not isinstance(name, str):
         return None
     with _lock:
@@ -73,10 +73,10 @@ def get_provider(name: str) -> Optional[ImageGenProvider]:
 
 
 def get_active_provider() -> Optional[ImageGenProvider]:
-    """現在アクティブなプロバイダーを解決する。
+    """Resolve the currently-active provider.
 
-    config.yaml から ``image_gen.provider`` を読み取り、モジュール docstring
-    に従ってフォールバックする。
+    Reads ``image_gen.provider`` from config.yaml; falls back per the
+    module docstring.
     """
     configured: Optional[str] = None
     try:
@@ -115,6 +115,6 @@ def get_active_provider() -> Optional[ImageGenProvider]:
 
 
 def _reset_for_tests() -> None:
-    """レジストリをクリアする。**テスト専用。**"""
+    """Clear the registry. **Test-only.**"""
     with _lock:
         _providers.clear()

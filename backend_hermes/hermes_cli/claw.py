@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from hermes_cli.config import get_hermes_home, get_config_path, load_config, save_config
-from base.hermes_constants import get_optional_skills_dir
+from hermes_constants import get_optional_skills_dir
 from hermes_cli.setup import (
     Colors,
     color,
@@ -155,7 +155,7 @@ def _warn_if_gateway_running(auto_yes: bool) -> None:
     (e.g. Telegram 409 "terminated by other getUpdates request"). Warn the
     user and let them decide whether to continue.
     """
-#     from gateway.status import get_running_pid, read_runtime_status  # removed: not in aidiy
+    from gateway.status import get_running_pid, read_runtime_status
 
     if not get_running_pid():
         return

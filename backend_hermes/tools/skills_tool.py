@@ -69,7 +69,7 @@ Usage:
 import json
 import logging
 
-from base.hermes_constants import get_hermes_home, display_hermes_home
+from hermes_constants import get_hermes_home, display_hermes_home
 import os
 import re
 from enum import Enum
@@ -77,6 +77,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple
 
 from tools.registry import registry, tool_error
+from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
 
@@ -99,8 +100,10 @@ _PLATFORM_MAP = {
     "windows": "win32",
 }
 _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_EXCLUDED_SKILL_DIRS = frozenset((".git", ".github", ".hub"))
-_REMOTE_ENV_BACKENDS = frozenset({"docker", "singularity", "modal", "ssh", "daytona"})
+_EXCLUDED_SKILL_DIRS = frozenset((".git", ".github", ".hub", ".archive"))
+_REMOTE_ENV_BACKENDS = frozenset(
+    {"docker", "singularity", "modal", "ssh", "daytona", "vercel_sandbox"}
+)
 _secret_capture_callback = None
 
 
@@ -151,7 +154,7 @@ def skill_matches_platform(frontmatter: Dict[str, Any]) -> bool:
     Delegates to ``agent.skill_utils.skill_matches_platform`` — kept here
     as a public re-export so existing callers don't need updating.
     """
-    from core.skill_utils import skill_matches_platform as _impl
+    from agent.skill_utils import skill_matches_platform as _impl
     return _impl(frontmatter)
 
 
@@ -364,7 +367,7 @@ def _capture_required_environment_variables(
 def _is_gateway_surface() -> bool:
     if os.getenv("HERMES_GATEWAY_SESSION"):
         return True
-#     from gateway.session_context import get_session_env  # removed: not in aidiy
+    from gateway.session_context import get_session_env
     return bool(get_session_env("HERMES_SESSION_PLATFORM"))
 
 
@@ -404,7 +407,7 @@ def _remaining_required_environment_names(
 
 def _gateway_setup_hint() -> str:
     try:
-#         from gateway.platforms.base import GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE  # removed: not in aidiy
+        from gateway.platforms.base import GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE
 
         return GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE
     except Exception:
@@ -436,7 +439,7 @@ def _parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
     Delegates to ``agent.skill_utils.parse_frontmatter`` — kept here
     as a public re-export so existing callers don't need updating.
     """
-    from core.skill_utils import parse_frontmatter
+    from agent.skill_utils import parse_frontmatter
     return parse_frontmatter(content)
 
 
@@ -451,7 +454,7 @@ def _get_category_from_path(skill_path: Path) -> Optional[str]:
     # then fall back to external dirs from config.
     dirs_to_check = [SKILLS_DIR]
     try:
-        from core.skill_utils import get_external_skills_dirs
+        from agent.skill_utils import get_external_skills_dirs
         dirs_to_check.extend(get_external_skills_dirs())
     except Exception:
         pass
@@ -503,7 +506,7 @@ def _get_disabled_skill_names() -> Set[str]:
     Delegates to ``agent.skill_utils.get_disabled_skill_names`` — kept here
     as a public re-export so existing callers don't need updating.
     """
-    from core.skill_utils import get_disabled_skill_names
+    from agent.skill_utils import get_disabled_skill_names
     return get_disabled_skill_names()
 
 
@@ -515,7 +518,7 @@ def _get_session_platform() -> str:
     ``_is_skill_disabled`` respects ``HERMES_SESSION_PLATFORM``.
     """
     try:
-#         from gateway.session_context import get_session_env  # removed: not in aidiy
+        from gateway.session_context import get_session_env
         return get_session_env("HERMES_SESSION_PLATFORM") or ""
     except Exception:
         return ""
@@ -535,7 +538,7 @@ def _is_skill_disabled(name: str, platform: str = None) -> bool:
         skills_cfg = config.get("skills", {})
         resolved_platform = platform or os.getenv("HERMES_PLATFORM") or _get_session_platform()
         if resolved_platform:
-            platform_disabled = skills_cfg.get("platform_disabled", {}).get(resolved_platform)
+            platform_disabled = cfg_get(skills_cfg, "platform_disabled", resolved_platform)
             if platform_disabled is not None:
                 return name in platform_disabled
         return name in skills_cfg.get("disabled", [])
@@ -554,7 +557,7 @@ def _find_all_skills(*, skip_disabled: bool = False) -> List[Dict[str, Any]]:
     Returns:
         List of skill metadata dicts (name, description, category).
     """
-    from core.skill_utils import get_external_skills_dirs, iter_skill_index_files
+    from agent.skill_utils import get_external_skills_dirs, iter_skill_index_files
 
     skills = []
     seen_names: set = set()
@@ -818,7 +821,7 @@ def _serve_plugin_skill(
     rendered_content = content
     if preprocess:
         try:
-            from core.skill_preprocessing import preprocess_skill_content
+            from agent.skill_preprocessing import preprocess_skill_content
 
             rendered_content = preprocess_skill_content(
                 content,
@@ -869,7 +872,7 @@ def skill_view(
         # Names containing ':' are routed to the plugin skill registry.
         # Bare names fall through to the existing flat-tree scan below.
         if ":" in name:
-            from core.skill_utils import is_valid_namespace, parse_qualified_name
+            from agent.skill_utils import is_valid_namespace, parse_qualified_name
             from hermes_cli.plugins import discover_plugins, get_plugin_manager
 
             namespace, bare = parse_qualified_name(name)
@@ -928,7 +931,7 @@ def skill_view(
             # Plugin itself not found — fall through to flat-tree scan
             # which will return a normal "not found" with suggestions.
 
-        from core.skill_utils import get_external_skills_dirs
+        from agent.skill_utils import get_external_skills_dirs
 
         # Build list of all skill directories to search
         all_dirs = []
@@ -963,7 +966,7 @@ def skill_view(
         # Search by directory name across all dirs
         if not skill_md:
             for search_dir in all_dirs:
-                from core.skill_utils import iter_skill_index_files
+                from agent.skill_utils import iter_skill_index_files
 
                 for found_skill_md in iter_skill_index_files(search_dir, "SKILL.md"):
                     if found_skill_md.parent.name == name:
@@ -1315,7 +1318,7 @@ def skill_view(
         rendered_content = content
         if preprocess:
             try:
-                from core.skill_preprocessing import preprocess_skill_content
+                from agent.skill_preprocessing import preprocess_skill_content
 
                 rendered_content = preprocess_skill_content(
                     content,
@@ -1480,13 +1483,37 @@ registry.register(
     check_fn=check_skills_requirements,
     emoji="📚",
 )
+def _skill_view_with_bump(args, **kw):
+    """Invoke skill_view, then bump view_count on success. Best-effort: a
+    telemetry failure never breaks the tool call."""
+    name = args.get("name", "")
+    result = skill_view(
+        name, file_path=args.get("file_path"), task_id=kw.get("task_id")
+    )
+    try:
+        parsed = json.loads(result)
+        if isinstance(parsed, dict) and parsed.get("success"):
+            # Use the resolved skill name from the payload when present —
+            # qualified forms ("plugin:skill") return with the canonical name.
+            resolved = parsed.get("name") or name
+            if resolved:
+                from tools.skill_usage import bump_use, bump_view
+                bump_view(str(resolved))
+                # A skill_view tool call is the agent actively loading the skill
+                # to act on it — that counts as use, not just a browse/view.
+                # Curator's stale timer keys off last_used_at (see agent/curator.py).
+                bump_use(str(resolved))
+    except Exception:
+        pass
+    return result
+
+
 registry.register(
     name="skill_view",
     toolset="skills",
     schema=SKILL_VIEW_SCHEMA,
-    handler=lambda args, **kw: skill_view(
-        args.get("name", ""), file_path=args.get("file_path"), task_id=kw.get("task_id")
-    ),
+    handler=_skill_view_with_bump,
     check_fn=check_skills_requirements,
     emoji="📚",
 )
+

@@ -1,57 +1,59 @@
-"""クラウドブラウザプロバイダの抽象基底クラス。"""
+"""Abstract base class for cloud browser providers."""
 
 from abc import ABC, abstractmethod
 from typing import Dict
 
 
 class CloudBrowserProvider(ABC):
-    """クラウドブラウザバックエンド共通インターフェース。
+    """Interface for cloud browser backends (Browserbase, Steel, etc.).
 
-    実装は同階層モジュールに置き、``browser_tool._PROVIDER_REGISTRY`` に登録する。
-    ユーザーは ``hermes setup`` / ``hermes tools`` でプロバイダを選択し、
-    選択値は ``config["browser"]["cloud_provider"]`` に保存される。
+    Implementations live in sibling modules and are registered in
+    ``browser_tool._PROVIDER_REGISTRY``.  The user selects a provider via
+    ``hermes setup`` / ``hermes tools``; the choice is persisted as
+    ``config["browser"]["cloud_provider"]``.
     """
 
     @abstractmethod
     def provider_name(self) -> str:
-        """ログや診断表示に出す短い表示名。"""
+        """Short, human-readable name shown in logs and diagnostics."""
 
     @abstractmethod
     def is_configured(self) -> bool:
-        """必要な環境変数・認証情報が揃っている場合に True を返す。
+        """Return True when all required env vars / credentials are present.
 
-        ツール登録時（``check_browser_requirements``）に利用可否判定として呼ばれる。
-        ネットワークアクセスを行わず、軽量に終わる必要がある。
+        Called at tool-registration time (``check_browser_requirements``) to
+        gate availability.  Must be cheap — no network calls.
         """
 
     @abstractmethod
     def create_session(self, task_id: str) -> Dict[str, object]:
-        """クラウドブラウザセッションを作成し、メタデータを返す。
+        """Create a cloud browser session and return session metadata.
 
-        少なくとも次の dict を返すこと::
+        Must return a dict with at least::
 
             {
-                "session_name": str,   # agent-browser --session 用の一意名
-                "bb_session_id": str,  # close/cleanup 用プロバイダセッションID
+                "session_name": str,   # unique name for agent-browser --session
+                "bb_session_id": str,  # provider session ID (for close/cleanup)
                 "cdp_url": str,        # CDP websocket URL
-                "features": dict,      # 有効化された機能フラグ
+                "features": dict,      # feature flags that were enabled
             }
 
-        ``bb_session_id`` は browser_tool.py 側との後方互換のための旧キー名。
-        実際にはどのプロバイダでも、そのプロバイダのセッションIDを保持する。
+        ``bb_session_id`` is a legacy key name kept for backward compat with
+        the rest of browser_tool.py — it holds the provider's session ID
+        regardless of which provider is in use.
         """
 
     @abstractmethod
     def close_session(self, session_id: str) -> bool:
-        """プロバイダのセッションIDでクラウドセッションを解放・終了する。
+        """Release / terminate a cloud session by its provider session ID.
 
-        成功時 True、失敗時 False。例外は外へ投げない。
+        Returns True on success, False on failure.  Should not raise.
         """
 
     @abstractmethod
     def emergency_cleanup(self, session_id: str) -> None:
-        """プロセス終了時のベストエフォートなセッション後始末。
+        """Best-effort session teardown during process exit.
 
-        atexit / signal handler から呼ばれる。認証情報不足やネットワークエラーを
-        許容し、ログだけ残して処理を続ける。
+        Called from atexit / signal handlers.  Must tolerate missing
+        credentials, network errors, etc. — log and move on.
         """

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from hermes_cli.auth import get_auth_status
-from .client import (
+from plugins.spotify.client import (
     SpotifyAPIError,
     SpotifyAuthRequiredError,
     SpotifyClient,

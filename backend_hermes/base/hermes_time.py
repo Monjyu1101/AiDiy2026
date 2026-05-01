@@ -1,22 +1,22 @@
 """
-Hermes 用タイムゾーン対応クロック。
+Timezone-aware clock for Hermes.
 
-ユーザーの設定した IANA タイムゾーン（例: ``Asia/Tokyo``）に基づいて
-タイムゾーン対応 datetime を返す ``now()`` ヘルパーを提供します。
+Provides a single ``now()`` helper that returns a timezone-aware datetime
+based on the user's configured IANA timezone (e.g. ``Asia/Kolkata``).
 
-解決順序:
-  1. ``HERMES_TIMEZONE`` 環境変数
-  2. ``~/.hermes/config.yaml`` の ``timezone`` キー
-  3. フォールバック: サーバーのローカル時刻 (``datetime.now().astimezone()``)
+Resolution order:
+  1. ``HERMES_TIMEZONE`` environment variable
+  2. ``timezone`` key in ``~/.hermes/config.yaml``
+  3. Falls back to the server's local time (``datetime.now().astimezone()``)
 
-不正なタイムゾーン値は警告をログに出力し、安全にフォールバックします。
-Hermes が不正なタイムゾーン文字列でクラッシュすることはありません。
+Invalid timezone values log a warning and fall back safely — Hermes never
+crashes due to a bad timezone string.
 """
 
 import logging
 import os
 from datetime import datetime
-from base.hermes_constants import get_config_path
+from hermes_constants import get_config_path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -24,28 +24,28 @@ logger = logging.getLogger(__name__)
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
-    # Python 3.8 以前向けフォールバック（Hermes は 3.9+ 必須だが念のため）
+    # Python 3.8 fallback (shouldn't be needed — Hermes requires 3.9+)
     from backports.zoneinfo import ZoneInfo  # type: ignore[no-redef]
 
-# キャッシュ — 一度解決したら以後は再利用する。
-# reset_cache() を呼ぶと強制的に再解決する（設定変更後など）。
+# Cached state — resolved once, reused on every call.
+# Call reset_cache() to force re-resolution (e.g. after config changes).
 _cached_tz: Optional[ZoneInfo] = None
 _cached_tz_name: Optional[str] = None
 _cache_resolved: bool = False
 
 
 def _resolve_timezone_name() -> str:
-    """設定された IANA タイムゾーン文字列を読み取る（見つからなければ空文字列）。
+    """Read the configured IANA timezone string (or empty string).
 
-    この関数は config.yaml の読み取りでファイル I/O を行う可能性があるため、
-    呼び出し側は結果をキャッシュし、``now()`` のたびに呼ばないこと。
+    This does file I/O when falling through to config.yaml, so callers
+    should cache the result rather than calling on every ``now()``.
     """
-    # 1. 環境変数（最優先 — Supervisor などから設定）
+    # 1. Environment variable (highest priority — set by Supervisor, etc.)
     tz_env = os.getenv("HERMES_TIMEZONE", "").strip()
     if tz_env:
         return tz_env
 
-    # 2. config.yaml の ``timezone`` キー
+    # 2. config.yaml ``timezone`` key
     try:
         import yaml
         config_path = get_config_path()
@@ -62,7 +62,7 @@ def _resolve_timezone_name() -> str:
 
 
 def _get_zoneinfo(name: str) -> Optional[ZoneInfo]:
-    """ZoneInfo を検証して返す。不正な名前なら None。"""
+    """Validate and return a ZoneInfo, or None if invalid."""
     if not name:
         return None
     try:
@@ -76,10 +76,9 @@ def _get_zoneinfo(name: str) -> Optional[ZoneInfo]:
 
 
 def get_timezone() -> Optional[ZoneInfo]:
-    """ユーザーの設定した ZoneInfo を返す。設定なしなら None（サーバーローカル）。
+    """Return the user's configured ZoneInfo, or None (meaning server-local).
 
-    初回呼び出し時に解決され、以後キャッシュされる。
-    設定変更後は ``reset_cache()`` を呼ぶこと。
+    Resolved once and cached. Call ``reset_cache()`` after config changes.
     """
     global _cached_tz, _cached_tz_name, _cache_resolved
     if not _cache_resolved:
@@ -91,19 +90,15 @@ def get_timezone() -> Optional[ZoneInfo]:
 
 def now() -> datetime:
     """
-    現在時刻をタイムゾーン対応 datetime で返す。
+    Return the current time as a timezone-aware datetime.
 
-    有効なタイムゾーンが設定されている場合はそのタイムゾーンの壁時計時刻。
-    それ以外の場合はサーバーのローカル時刻（``astimezone()``）を返す。
+    If a valid timezone is configured, returns wall-clock time in that zone.
+    Otherwise returns the server's local time (via ``astimezone()``).
     """
     tz = get_timezone()
     if tz is not None:
         return datetime.now(tz)
-    # タイムゾーン未設定 → サーバーローカル（タイムゾーン情報は付く）
+    # No timezone configured — use server-local (still tz-aware)
     return datetime.now().astimezone()
 
 
-def reset_cache() -> None:
-    """次回 ``get_timezone()`` 呼び出し時にタイムゾーンを再解決させる。"""
-    global _cache_resolved
-    _cache_resolved = False

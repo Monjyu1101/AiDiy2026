@@ -22,10 +22,11 @@ import logging
 import re
 from typing import Any, Dict, List
 
-from core.memory_provider import MemoryProvider
+from agent.memory_provider import MemoryProvider
 from tools.registry import tool_error
 from .store import MemoryStore
 from .retrieval import FactRetriever
+from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ FACT_FEEDBACK_SCHEMA = {
 # ---------------------------------------------------------------------------
 
 def _load_plugin_config() -> dict:
-    from base.hermes_constants import get_hermes_home
+    from hermes_constants import get_hermes_home
     config_path = get_hermes_home() / "config.yaml"
     if not config_path.exists():
         return {}
@@ -102,7 +103,7 @@ def _load_plugin_config() -> dict:
         import yaml
         with open(config_path) as f:
             all_config = yaml.safe_load(f) or {}
-        return all_config.get("plugins", {}).get("hermes-memory-store", {}) or {}
+        return cfg_get(all_config, "plugins", "hermes-memory-store", default={}) or {}
     except Exception:
         return {}
 
@@ -145,7 +146,7 @@ class HolographicMemoryProvider(MemoryProvider):
             pass
 
     def get_config_schema(self):
-        from base.hermes_constants import display_hermes_home
+        from hermes_constants import display_hermes_home
         _default_db = f"{display_hermes_home()}/memory_store.db"
         return [
             {"key": "db_path", "description": "SQLite database path", "default": _default_db},
@@ -155,7 +156,7 @@ class HolographicMemoryProvider(MemoryProvider):
         ]
 
     def initialize(self, session_id: str, **kwargs) -> None:
-        from base.hermes_constants import get_hermes_home
+        from hermes_constants import get_hermes_home
         _hermes_home = str(get_hermes_home())
         _default_db = _hermes_home + "/memory_store.db"
         db_path = self._config.get("db_path", _default_db)

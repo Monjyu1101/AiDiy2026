@@ -86,7 +86,7 @@ class HermesSweEnv(HermesAgentBaseEnv):
             disabled_toolsets=None,
             distribution=None,
             # Agent settings -- SWE tasks need more turns
-            max_agent_turns=99,
+            max_agent_turns=30,
             max_token_length=4096,
             agent_temperature=1.0,
             system_prompt=(

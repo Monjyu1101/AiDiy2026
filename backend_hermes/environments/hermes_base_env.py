@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 # Ensure the hermes-agent repo root is on sys.path so that imports like
-# `from base.model_tools import ...` and `from environments.X import ...` work
+# `from model_tools import ...` and `from environments.X import ...` work
 # regardless of where the script is invoked from.
 _repo_root = Path(__file__).resolve().parent.parent
 if str(_repo_root) not in sys.path:
@@ -69,7 +69,7 @@ from tools.budget_config import (
 )
 
 # Import hermes-agent toolset infrastructure
-from base.model_tools import get_tool_definitions
+from model_tools import get_tool_definitions
 from toolset_distributions import sample_toolsets_from_distribution
 
 logger = logging.getLogger(__name__)

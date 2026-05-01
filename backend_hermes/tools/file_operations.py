@@ -34,7 +34,7 @@ from typing import Optional, List, Dict, Any
 from pathlib import Path
 from tools.binary_extensions import BINARY_EXTENSIONS
 
-from core.file_safety import (
+from agent.file_safety import (
     build_write_denied_paths,
     build_write_denied_prefixes,
     get_safe_write_root as _shared_get_safe_write_root,

@@ -11,7 +11,7 @@ zero migration needed.
 Usage::
 
     hermes profile create coder          # fresh profile + bundled skills
-    hermes profile create coder --clone  # also copy config, .env, SOUL.md
+    hermes profile create coder --clone  # also copy config, .env, SOUL.md, skills
     hermes profile create coder --clone-all  # full copy of source profile
     coder chat                           # use via wrapper alias
     hermes -p coder chat                 # or via flag
@@ -70,6 +70,29 @@ _CLONE_ALL_STRIP = [
     "gateway_state.json",
     "processes.json",
 ]
+
+
+def _clone_all_copytree_ignore(source_dir: Path):
+    """Ignore ``profiles/`` at the root of *source_dir* only.
+
+    ``~/.hermes`` contains ``profiles/<name>/`` for sibling named profiles.
+    ``shutil.copytree`` would otherwise duplicate that entire tree inside the
+    new profile (recursive ``.../profiles/.../profiles/...``). Export already
+    excludes ``profiles`` via ``_DEFAULT_EXPORT_EXCLUDE_ROOT`` — match that
+    behavior for ``--clone-all``.
+    """
+    source_resolved = source_dir.resolve()
+
+    def _ignore(directory: str, names: List[str]) -> List[str]:
+        try:
+            if Path(directory).resolve() == source_resolved:
+                return [n for n in names if n == "profiles"]
+        except (OSError, ValueError):
+            pass
+        return []
+
+    return _ignore
+
 
 # Directories/files to exclude when exporting the default (~/.hermes) profile.
 # The default profile contains infrastructure (repo checkout, worktrees, DBs,
@@ -138,7 +161,7 @@ def _get_default_hermes_home() -> Path:
     In Docker/custom deployments where HERMES_HOME is outside ``~/.hermes``
     (e.g. ``/opt/data``), returns HERMES_HOME directly.
     """
-    from base.hermes_constants import get_default_hermes_root
+    from hermes_constants import get_default_hermes_root
     return get_default_hermes_root()
 
 
@@ -301,7 +324,7 @@ def _read_config_model(profile_dir: Path) -> tuple:
 def _check_gateway_running(profile_dir: Path) -> bool:
     """Check if a gateway is running for a given profile directory."""
     try:
-#         from gateway.status import get_running_pid  # removed: not in aidiy
+        from gateway.status import get_running_pid
         return get_running_pid(profile_dir / "gateway.pid", cleanup_stale=False) is not None
     except Exception:
         return False
@@ -388,7 +411,8 @@ def create_profile(
     clone_all:
         If True, do a full copytree of the source (all state).
     clone_config:
-        If True, copy only config files (config.yaml, .env, SOUL.md).
+        If True, copy config files (config.yaml, .env, SOUL.md), installed
+        skills, and selected profile identity files from the source profile.
     no_alias:
         If True, skip wrapper script creation.
 
@@ -413,7 +437,7 @@ def create_profile(
     if clone_from is not None or clone_all or clone_config:
         if clone_from is None:
             # Default: clone from active profile
-            from base.hermes_constants import get_hermes_home
+            from hermes_constants import get_hermes_home
             source_dir = get_hermes_home()
         else:
             validate_profile_name(clone_from)
@@ -424,8 +448,12 @@ def create_profile(
             )
 
     if clone_all and source_dir:
-        # Full copy of source profile
-        shutil.copytree(source_dir, profile_dir)
+        # Full copy of source profile (exclude sibling ~/.hermes/profiles/)
+        shutil.copytree(
+            source_dir,
+            profile_dir,
+            ignore=_clone_all_copytree_ignore(source_dir),
+        )
         # Strip runtime files
         for stale in _CLONE_ALL_STRIP:
             (profile_dir / stale).unlink(missing_ok=True)
@@ -441,6 +469,14 @@ def create_profile(
                 src = source_dir / filename
                 if src.exists():
                     shutil.copy2(src, profile_dir / filename)
+
+            # Clone installed skills from the source profile. The dashboard's
+            # "clone from default" flow is expected to preserve both bundled
+            # and user-installed skills so the new profile immediately has the
+            # same agent capabilities as the source profile.
+            source_skills = source_dir / "skills"
+            if source_skills.is_dir():
+                shutil.copytree(source_skills, profile_dir / "skills", dirs_exist_ok=True)
 
             # Clone memory and other subdirectory files
             for relpath in _CLONE_SUBDIR_FILES:
@@ -720,7 +756,7 @@ def get_active_profile_name() -> str:
     Returns the profile name if HERMES_HOME points into ``~/.hermes/profiles/<name>``.
     Returns ``"custom"`` if HERMES_HOME is set to an unrecognized path.
     """
-    from base.hermes_constants import get_hermes_home
+    from hermes_constants import get_hermes_home
     hermes_home = get_hermes_home()
     resolved = hermes_home.resolve()
 

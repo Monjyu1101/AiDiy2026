@@ -263,8 +263,15 @@ TODO_SCHEMA = {
 }
 
 
-from tools.registry import tool_error
+# --- Registry ---
+from tools.registry import registry, tool_error
 
-# Registry registration is intentionally handled by planning_tools.py in
-# AiDiy Hermes. This module remains for direct TodoStore/todo_tool imports
-# used by the legacy environment loop.
+registry.register(
+    name="todo",
+    toolset="todo",
+    schema=TODO_SCHEMA,
+    handler=lambda args, **kw: todo_tool(
+        todos=args.get("todos"), merge=args.get("merge", False), store=kw.get("store")),
+    check_fn=check_todo_requirements,
+    emoji="📋",
+)

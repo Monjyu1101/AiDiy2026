@@ -9,7 +9,7 @@
 
 env:
   enabled_toolsets: ["terminal", "file", "web"]
-  max_agent_turns: 99
+  max_agent_turns: 30
   max_token_length: 4096
   group_size: 4
   terminal_backend: "modal"

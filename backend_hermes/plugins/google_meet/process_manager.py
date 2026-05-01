@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from base.hermes_constants import get_hermes_home
+from hermes_constants import get_hermes_home
 
 # File + directory layout (under $HERMES_HOME):
 #
@@ -106,7 +106,7 @@ def start(
 
     Returns a dict summarizing the started bot.
     """
-    from .meet_bot import _is_safe_meet_url, _meeting_id_from_url
+    from plugins.google_meet.meet_bot import _is_safe_meet_url, _meeting_id_from_url
 
     if not _is_safe_meet_url(url):
         return {

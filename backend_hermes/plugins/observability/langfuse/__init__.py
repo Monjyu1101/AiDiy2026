@@ -388,7 +388,7 @@ def _usage_and_cost(response: Any, *, provider: str, api_mode: str, model: str, 
         return usage_details, cost_details
 
     try:
-        from core.usage_pricing import estimate_usage_cost, normalize_usage
+        from agent.usage_pricing import estimate_usage_cost, normalize_usage
 
         canonical = normalize_usage(raw_usage, provider=provider, api_mode=api_mode)
         # Langfuse usage_details keys follow a naming convention:
@@ -419,7 +419,7 @@ def _usage_and_cost(response: Any, *, provider: str, api_mode: str, model: str, 
             # Langfuse cost_details keys must match usage_details keys.
             # Provide per-type breakdown so dashboard can show cost by type.
             try:
-                from core.usage_pricing import get_pricing_entry
+                from agent.usage_pricing import get_pricing_entry
                 from decimal import Decimal
                 _ONE_M = Decimal("1000000")
                 entry = get_pricing_entry(model, provider=provider, base_url=base_url)
@@ -759,7 +759,7 @@ def on_post_llm_call(*, task_id: str = "", session_id: str = "", provider: str =
         cost_details = {}
         # Estimate per-type cost from the summary if possible
         try:
-            from core.usage_pricing import CanonicalUsage, estimate_usage_cost, get_pricing_entry
+            from agent.usage_pricing import CanonicalUsage, estimate_usage_cost, get_pricing_entry
             from decimal import Decimal
             _ONE_M = Decimal("1000000")
             _cu = CanonicalUsage(

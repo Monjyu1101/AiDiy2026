@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from hermes_cli.config import get_hermes_home, get_env_path, get_project_root, load_config
-from base.hermes_constants import display_hermes_home
+from hermes_constants import display_hermes_home
 
 
 def _get_git_commit(project_root: Path) -> str:
@@ -33,12 +33,14 @@ def _get_git_commit(project_root: Path) -> str:
 
 
 def _redact(value: str) -> str:
-    """Redact all but first 4 and last 4 chars."""
-    if not value:
-        return ""
-    if len(value) < 12:
-        return "***"
-    return value[:4] + "..." + value[-4:]
+    """Redact all but first 4 and last 4 chars.
+
+    Thin wrapper over :func:`agent.redact.mask_secret`. Returns ``""`` for
+    an empty value (matches the historical behavior of this helper —
+    ``hermes dump`` formats empty values as blank, not as ``"(not set)"``).
+    """
+    from agent.redact import mask_secret
+    return mask_secret(value)
 
 
 def _gateway_status() -> str:

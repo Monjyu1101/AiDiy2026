@@ -34,7 +34,7 @@ import threading
 import time
 import urllib.request
 
-from base.hermes_constants import get_hermes_home
+from hermes_constants import get_hermes_home
 
 logger = logging.getLogger(__name__)
 

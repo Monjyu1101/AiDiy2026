@@ -1,32 +1,35 @@
-"""ユーザーが添付した画像のインバウンドルーティングヘルパー。
+"""Routing helpers for inbound user-attached images.
 
-2つのモード:
+Two modes:
 
-  native  — ユーザーターンで OpenAI スタイルの ``image_url`` コンテンツパーツとして
-            画像を添付する。プロバイダーアダプター（Anthropic、Gemini、Bedrock、
-            Codex、OpenAI chat.completions）がベンダー固有のマルチモーダル形式に変換する。
+  native  — attach images as OpenAI-style ``image_url`` content parts on the
+            user turn. Provider adapters (Anthropic, Gemini, Bedrock, Codex,
+            OpenAI chat.completions) already translate these into their
+            vendor-specific multimodal formats.
 
-  text    — 各画像に事前に ``vision_analyze`` を実行し、説明をユーザーテキストの
-            先頭に追加する。モデルはピクセルを直接見ず、損失のあるテキスト要約のみ
-            見る。これは従来の動作であり、非ビジョンモデルには今でも適切な選択。
+  text    — run ``vision_analyze`` on each image up-front and prepend the
+            description to the user's text. The model never sees the pixels;
+            it only sees a lossy text summary. This is the pre-existing
+            behaviour and still the right choice for non-vision models.
 
-決定は :func:`decide_image_input_mode` がメッセージターンごとに1回行う。
-config.yaml の ``agent.image_input_mode``（``auto`` | ``native`` | ``text``、
-デフォルト ``auto``）とアクティブモデルの機能メタデータを読み取る。
+The decision is made once per message turn by :func:`decide_image_input_mode`.
+It reads ``agent.image_input_mode`` from config.yaml (``auto`` | ``native``
+| ``text``, default ``auto``) and the active model's capability metadata.
 
-``auto`` モードで:
-  - ユーザーが ``auxiliary.vision.provider`` を明示的に設定している場合
-    （``auto`` でなく空でもない）、メインモデルに関わらずテキストパイプラインを
-    希望していると仮定する — 特定のビジョンバックエンドを理由（コスト、品質、
-    ローカル専用等）でオプトインしている。
-  - そうでなく、アクティブモデルが models.dev メタデータで ``supports_vision=True``
-    を報告している場合、ネイティブに添付する。
-  - それ以外（非ビジョンモデル、明示的な上書きなし）はテキストにフォールバックする。
+In ``auto`` mode:
+  - If the user has explicitly configured ``auxiliary.vision.provider``
+    (i.e. not ``auto`` and not empty), we assume they want the text pipeline
+    regardless of the main model — they've opted in to a specific vision
+    backend for a reason (cost, quality, local-only, etc.).
+  - Otherwise, if the active model reports ``supports_vision=True`` in its
+    models.dev metadata, we attach natively.
+  - Otherwise (non-vision model, no explicit override), we fall back to text.
 
-これにより ``vision_analyze`` はすべてのセッションでツールとして公開し続ける —
-それを連鎖するスキルとエージェントフロー（ブラウザのスクリーンショット、
-URL 参照画像の詳細検査、スタイルゲートループ）が引き続き機能する。
-ルーティングは *現在のターンのユーザー添付画像* のメインモデルへの提示方法にのみ影響する。
+This keeps ``vision_analyze`` surfaced as a tool in every session — skills
+and agent flows that chain it (browser screenshots, deeper inspection of
+URL-referenced images, style-gating loops) keep working. The routing only
+affects *how user-attached images on the current turn* are presented to the
+main model.
 """
 
 from __future__ import annotations
@@ -44,7 +47,7 @@ _VALID_MODES = frozenset({"auto", "native", "text"})
 
 
 def _coerce_mode(raw: Any) -> str:
-    """設定値を有効なモードのいずれかに正規化する。"""
+    """Normalize a config value into one of the valid modes."""
     if not isinstance(raw, str):
         return "auto"
     val = raw.strip().lower()
@@ -54,10 +57,10 @@ def _coerce_mode(raw: Any) -> str:
 
 
 def _explicit_aux_vision_override(cfg: Optional[Dict[str, Any]]) -> bool:
-    """ユーザーが特定の補助ビジョンバックエンドを設定している場合に True を返す。
+    """True when the user configured a specific auxiliary vision backend.
 
-    明示的な上書きはユーザーがテキストパイプラインを *望んでいる* ことを意味する
-    （専用ビジョンモデルを使用している）ため、暗黙にバイパスしない。
+    An explicit override means the user *wants* the text pipeline (they're
+    paying for a dedicated vision model), so we don't silently bypass it.
     """
     if not isinstance(cfg, dict):
         return False
@@ -79,11 +82,11 @@ def _explicit_aux_vision_override(cfg: Optional[Dict[str, Any]]) -> bool:
 
 
 def _lookup_supports_vision(provider: str, model: str) -> Optional[bool]:
-    """機能が解決できれば True/False を返す。不明な場合は None を返す。"""
+    """Return True/False if we can resolve caps, None if unknown."""
     if not provider or not model:
         return None
     try:
-        from core.models_dev import get_model_capabilities
+        from agent.models_dev import get_model_capabilities
         caps = get_model_capabilities(provider, model)
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("image_routing: caps lookup failed for %s:%s — %s", provider, model, exc)

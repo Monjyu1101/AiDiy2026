@@ -20,7 +20,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from base.model_tools import handle_function_call
+from model_tools import handle_function_call
 from tools.terminal_tool import get_active_env
 from tools.tool_result_storage import maybe_persist_tool_result, enforce_turn_budget
 
@@ -135,7 +135,7 @@ class HermesAgentLoop:
         server,
         tool_schemas: List[Dict[str, Any]],
         valid_tool_names: Set[str],
-        max_turns: int = 99,
+        max_turns: int = 30,
         task_id: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,

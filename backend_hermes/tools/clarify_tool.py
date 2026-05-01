@@ -125,8 +125,17 @@ CLARIFY_SCHEMA = {
 }
 
 
-from tools.registry import tool_error
+# --- Registry ---
+from tools.registry import registry, tool_error
 
-# Registry registration is intentionally handled by planning_tools.py in
-# AiDiy Hermes. This module remains for direct clarify_tool imports used by
-# legacy code paths that provide their own callback.
+registry.register(
+    name="clarify",
+    toolset="clarify",
+    schema=CLARIFY_SCHEMA,
+    handler=lambda args, **kw: clarify_tool(
+        question=args.get("question", ""),
+        choices=args.get("choices"),
+        callback=kw.get("callback")),
+    check_fn=check_clarify_requirements,
+    emoji="❓",
+)

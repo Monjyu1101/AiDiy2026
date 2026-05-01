@@ -1,15 +1,17 @@
-"""Hermes Harness の全ツールのための中央レジストリ。
+"""Central registry for all hermes-agent tools.
 
-各ツールファイルはモジュールレベルで ``registry.register()`` を呼び出し、
-スキーマ・ハンドラ・ツールセット所属・利用可否チェックを宣言します。
-``model_tools.py`` は独自の並列データ構造を持たず、このレジストリに問い合わせます。
+Each tool file calls ``registry.register()`` at module level to declare its
+schema, handler, toolset membership, and availability check.  ``model_tools.py``
+queries the registry instead of maintaining its own parallel data structures.
 
-インポートの循環依存を回避するためのチェーン:
-    tools/registry.py  (model_tools や各ツールファイルからのインポートなし)
+Import chain (circular-import safe):
+    tools/registry.py  (no imports from model_tools or tool files)
            ^
-    tools/*.py  (モジュールレベルで tools.registry からインポート)
+    tools/*.py  (import from tools.registry at module level)
            ^
-    model_tools.py  (tools.registry + 全ツールモジュールをインポート)
+    model_tools.py  (imports tools.registry + all tool modules)
+           ^
+    run_agent.py, cli.py, batch_runner.py, etc.
 """
 
 import ast
@@ -17,6 +19,7 @@ import importlib
 import json
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
@@ -24,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_registry_register_call(node: ast.AST) -> bool:
-    """``registry.register(...)`` 呼び出し式の場合に True を返す。"""
+    """Return True when *node* is a ``registry.register(...)`` call expression."""
     if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
         return False
     func = node.value.func
@@ -37,10 +40,10 @@ def _is_registry_register_call(node: ast.AST) -> bool:
 
 
 def _module_registers_tools(module_path: Path) -> bool:
-    """モジュールのトップレベルで ``registry.register(...)`` 呼び出しがある場合に True を返す。
+    """Return True when the module contains a top-level ``registry.register(...)`` call.
 
-    モジュール本文の文のみを検査するため、関数内で偶然 ``registry.register()``
-    を呼び出すヘルパーモジュールが誤って検出されることはありません。
+    Only inspects module-body statements so that helper modules which happen
+    to call ``registry.register()`` inside a function are not picked up.
     """
     try:
         source = module_path.read_text(encoding="utf-8")
@@ -52,13 +55,10 @@ def _module_registers_tools(module_path: Path) -> bool:
 
 
 def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
-    """組み込みの自己登録ツールモジュールをインポートし、モジュール名のリストを返す。"""
+    """Import built-in self-registering tool modules and return their module names."""
     tools_path = Path(tools_dir) if tools_dir is not None else Path(__file__).resolve().parent
-    # importlib 用の完全パッケージプレフィックスを決定する
-    # __package__ は例えば "aidiy_hermes.tools" や "src.aidiy_hermes.tools"
-    pkg = __package__ or "tools"
     module_names = [
-        f"{pkg}.{path.stem}"
+        f"tools.{path.stem}"
         for path in sorted(tools_path.glob("*.py"))
         if path.name not in {"__init__.py", "registry.py", "mcp_tool.py"}
         and _module_registers_tools(path)
@@ -70,12 +70,12 @@ def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
             importlib.import_module(mod_name)
             imported.append(mod_name)
         except Exception as e:
-            logger.warning("ツールモジュール %s のインポートに失敗しました: %s", mod_name, e)
+            logger.warning("Could not import tool module %s: %s", mod_name, e)
     return imported
 
 
 class ToolEntry:
-    """登録された単一ツールのメタデータ。"""
+    """Metadata for a single registered tool."""
 
     __slots__ = (
         "name", "toolset", "schema", "handler", "check_fn",
@@ -98,80 +98,129 @@ class ToolEntry:
         self.max_result_size_chars = max_result_size_chars
 
 
+# ---------------------------------------------------------------------------
+# check_fn TTL cache
+#
+# check_fn callables like tools/terminal_tool.check_terminal_requirements
+# probe external state (Docker daemon, Modal SDK install, playwright binary
+# availability). For a long-lived CLI or gateway process, calling them on
+# every get_definitions() is pure waste — external state changes on human
+# timescales. Cache results for ~30 s so env-var flips via ``hermes tools``
+# or live credential file changes propagate within a turn or two without
+# requiring any explicit invalidation.
+# ---------------------------------------------------------------------------
+
+_CHECK_FN_TTL_SECONDS = 30.0
+_check_fn_cache: Dict[Callable, tuple[float, bool]] = {}
+_check_fn_cache_lock = threading.Lock()
+
+
+def _check_fn_cached(fn: Callable) -> bool:
+    """Return bool(fn()), TTL-cached across calls. Swallows exceptions as False."""
+    now = time.monotonic()
+    with _check_fn_cache_lock:
+        cached = _check_fn_cache.get(fn)
+        if cached is not None:
+            ts, value = cached
+            if now - ts < _CHECK_FN_TTL_SECONDS:
+                return value
+    try:
+        value = bool(fn())
+    except Exception:
+        value = False
+    with _check_fn_cache_lock:
+        _check_fn_cache[fn] = (now, value)
+    return value
+
+
+def invalidate_check_fn_cache() -> None:
+    """Drop all cached ``check_fn`` results. Call after config changes that
+    affect tool availability (e.g. ``hermes tools enable``)."""
+    with _check_fn_cache_lock:
+        _check_fn_cache.clear()
+
+
 class ToolRegistry:
-    """ツールファイルからスキーマ＋ハンドラを収集するシングルトンレジストリ。"""
+    """Singleton registry that collects tool schemas + handlers from tool files."""
 
     def __init__(self):
         self._tools: Dict[str, ToolEntry] = {}
         self._toolset_checks: Dict[str, Callable] = {}
         self._toolset_aliases: Dict[str, str] = {}
-        # MCP 動的リフレッシュは他スレッドがツールメタデータを読んでいる間に
-        # レジストリを変更する可能性があるため、変更を直列化し、読み取りは
-        # 安定したスナップショットに対して行う。
+        # MCP dynamic refresh can mutate the registry while other threads are
+        # reading tool metadata, so keep mutations serialized and readers on
+        # stable snapshots.
         self._lock = threading.RLock()
+        # Monotonically-increasing generation counter. Bumped on every
+        # mutation (register / deregister / register_toolset_alias / MCP
+        # refresh). External callers (e.g. get_tool_definitions) can memoize
+        # against it: a cache entry keyed on the generation is valid for as
+        # long as the generation hasn't changed.
+        self._generation: int = 0
 
     def _snapshot_state(self) -> tuple[List[ToolEntry], Dict[str, Callable]]:
-        """レジストリエントリとツールセットチェックの一貫性のあるスナップショットを返す。"""
+        """Return a coherent snapshot of registry entries and toolset checks."""
         with self._lock:
             return list(self._tools.values()), dict(self._toolset_checks)
 
     def _snapshot_entries(self) -> List[ToolEntry]:
-        """登録済みツールエントリの安定したスナップショットを返す。"""
+        """Return a stable snapshot of registered tool entries."""
         return self._snapshot_state()[0]
 
     def _snapshot_toolset_checks(self) -> Dict[str, Callable]:
-        """ツールセット利用可否チェックの安定したスナップショットを返す。"""
+        """Return a stable snapshot of toolset availability checks."""
         return self._snapshot_state()[1]
 
     def _evaluate_toolset_check(self, toolset: str, check: Callable | None) -> bool:
-        """ツールセットチェックを実行し、チェックがない場合や失敗した場合は適切に扱う。"""
+        """Run a toolset check, treating missing or failing checks as unavailable/available."""
         if not check:
             return True
         try:
             return bool(check())
         except Exception:
-            logger.debug("ツールセット %s のチェックで例外が発生したため、利用不可として扱います", toolset)
+            logger.debug("Toolset %s check raised; marking unavailable", toolset)
             return False
 
     def get_entry(self, name: str) -> Optional[ToolEntry]:
-        """名前で登録済みツールエントリを返す。存在しない場合は None。"""
+        """Return a registered tool entry by name, or None."""
         with self._lock:
             return self._tools.get(name)
 
     def get_registered_toolset_names(self) -> List[str]:
-        """レジストリに存在するユニークなツールセット名のソート済みリストを返す。"""
+        """Return sorted unique toolset names present in the registry."""
         return sorted({entry.toolset for entry in self._snapshot_entries()})
 
     def get_tool_names_for_toolset(self, toolset: str) -> List[str]:
-        """指定されたツールセットに登録されているツール名のソート済みリストを返す。"""
+        """Return sorted tool names registered under a given toolset."""
         return sorted(
             entry.name for entry in self._snapshot_entries()
             if entry.toolset == toolset
         )
 
     def register_toolset_alias(self, alias: str, toolset: str) -> None:
-        """正規ツールセット名に対する明示的なエイリアスを登録する。"""
+        """Register an explicit alias for a canonical toolset name."""
         with self._lock:
             existing = self._toolset_aliases.get(alias)
             if existing and existing != toolset:
                 logger.warning(
-                    "ツールセットエイリアスの衝突: '%s' (%s) が %s によって上書きされました",
+                    "Toolset alias collision: '%s' (%s) overwritten by %s",
                     alias, existing, toolset,
                 )
             self._toolset_aliases[alias] = toolset
+            self._generation += 1
 
     def get_registered_toolset_aliases(self) -> Dict[str, str]:
-        """``{alias: 正規ツールセット名}`` マッピングのスナップショットを返す。"""
+        """Return a snapshot of ``{alias: canonical_toolset}`` mappings."""
         with self._lock:
             return dict(self._toolset_aliases)
 
     def get_toolset_alias_target(self, alias: str) -> Optional[str]:
-        """エイリアスの正規ツールセット名を返す。存在しない場合は None。"""
+        """Return the canonical toolset name for an alias, or None."""
         with self._lock:
             return self._toolset_aliases.get(alias)
 
     # ------------------------------------------------------------------
-    # 登録
+    # Registration
     # ------------------------------------------------------------------
 
     def register(
@@ -187,28 +236,28 @@ class ToolRegistry:
         emoji: str = "",
         max_result_size_chars: int | float | None = None,
     ):
-        """ツールを登録する。各ツールファイルのモジュールインポート時に呼び出される。"""
+        """Register a tool.  Called at module-import time by each tool file."""
         with self._lock:
             existing = self._tools.get(name)
             if existing and existing.toolset != toolset:
-                # MCP間の上書きは許可（正当なケース: サーバーリフレッシュ、
-                # またはツール名が重複した2つのMCPサーバー）
+                # Allow MCP-to-MCP overwrites (legitimate: server refresh,
+                # or two MCP servers with overlapping tool names).
                 both_mcp = (
                     existing.toolset.startswith("mcp-")
                     and toolset.startswith("mcp-")
                 )
                 if both_mcp:
                     logger.debug(
-                        "ツール '%s': MCPツールセット '%s' が MCPツールセット '%s' を上書き",
+                        "Tool '%s': MCP toolset '%s' overwriting MCP toolset '%s'",
                         name, toolset, existing.toolset,
                     )
                 else:
-                    # シャドウイングを拒否 — プラグイン/MCPが組み込みツールを
-                    # 上書きしたり、その逆を防ぐ
+                    # Reject shadowing — prevent plugins/MCP from overwriting
+                    # built-in tools or vice versa.
                     logger.error(
-                        "ツール登録が拒否されました: '%s' (ツールセット '%s') は"
-                        "既存ツール (ツールセット '%s') をシャドウします。"
-                        "意図的である場合は先に既存ツールを登録解除してください。",
+                        "Tool registration REJECTED: '%s' (toolset '%s') would "
+                        "shadow existing tool from toolset '%s'. Deregister the "
+                        "existing tool first if this is intentional.",
                         name, toolset, existing.toolset,
                     )
                     return
@@ -226,21 +275,21 @@ class ToolRegistry:
             )
             if check_fn and toolset not in self._toolset_checks:
                 self._toolset_checks[toolset] = check_fn
+            self._generation += 1
 
     def deregister(self, name: str) -> None:
-        """レジストリからツールを削除する。
+        """Remove a tool from the registry.
 
-        同じツールセットに他のツールが残っていない場合、ツールセットチェックも
-        クリーンアップする。MCP 動的ツールディスカバリがサーバーから
-        ``notifications/tools/list_changed`` を受信した際の
-        全削除＆再構築（nuke-and-repave）に使用される。
+        Also cleans up the toolset check if no other tools remain in the
+        same toolset.  Used by MCP dynamic tool discovery to nuke-and-repave
+        when a server sends ``notifications/tools/list_changed``.
         """
         with self._lock:
             entry = self._tools.pop(name, None)
             if entry is None:
                 return
-            # このツールセットの最後のツールであれば、ツールセットチェックと
-            # エイリアスを削除する
+            # Drop the toolset check and aliases if this was the last tool in
+            # that toolset.
             toolset_still_exists = any(
                 e.toolset == entry.toolset for e in self._tools.values()
             )
@@ -251,19 +300,28 @@ class ToolRegistry:
                     for alias, target in self._toolset_aliases.items()
                     if target != entry.toolset
                 }
-        logger.debug("ツール登録解除: %s", name)
+            self._generation += 1
+        logger.debug("Deregistered tool: %s", name)
 
     # ------------------------------------------------------------------
-    # スキーマ取得
+    # Schema retrieval
     # ------------------------------------------------------------------
 
     def get_definitions(self, tool_names: Set[str], quiet: bool = False) -> List[dict]:
-        """要求されたツール名に対する OpenAI 形式のツールスキーマを返す。
+        """Return OpenAI-format tool schemas for the requested tool names.
 
-        ``check_fn()`` が True を返す（または check_fn が設定されていない）
-        ツールのみが含まれる。
+        Only tools whose ``check_fn()`` returns True (or have no check_fn)
+        are included. ``check_fn()`` results are cached for ~30 s via
+        :func:`_check_fn_cached` to amortize repeat probes (check_terminal_
+        requirements probes modal/docker, browser checks probe playwright,
+        etc.); TTL chosen so env-var changes (``hermes tools enable foo``)
+        still take effect in near-real-time without forcing a full cache
+        flush on every call.
         """
         result = []
+        # Per-call cache on top of the 30 s TTL — handles repeat probes of the
+        # same check_fn within one definitions pass without re-reading the
+        # TTL clock.
         check_results: Dict[Callable, bool] = {}
         entries_by_name = {entry.name: entry for entry in self._snapshot_entries()}
         for name in sorted(tool_names):
@@ -272,95 +330,92 @@ class ToolRegistry:
                 continue
             if entry.check_fn:
                 if entry.check_fn not in check_results:
-                    try:
-                        check_results[entry.check_fn] = bool(entry.check_fn())
-                    except Exception:
-                        check_results[entry.check_fn] = False
-                        if not quiet:
-                            logger.debug("ツール %s のチェックで例外が発生したためスキップ", name)
+                    check_results[entry.check_fn] = _check_fn_cached(entry.check_fn)
                 if not check_results[entry.check_fn]:
                     if not quiet:
-                        logger.debug("ツール %s は利用不可（チェック失敗）", name)
+                        logger.debug("Tool %s unavailable (check failed)", name)
                     continue
-            # スキーマに常に "name" フィールドがあることを保証 — フォールバックとして entry.name を使用
+            # Ensure schema always has a "name" field — use entry.name as fallback
             schema_with_name = {**entry.schema, "name": entry.name}
             result.append({"type": "function", "function": schema_with_name})
         return result
 
     # ------------------------------------------------------------------
-    # ディスパッチ
+    # Dispatch
     # ------------------------------------------------------------------
 
     def dispatch(self, name: str, args: dict, **kwargs) -> str:
-        """ツールハンドラを名前で実行する。
+        """Execute a tool handler by name.
 
-        * 非同期ハンドラは ``_run_async()`` を介して自動的にブリッジされる。
-        * すべての例外は捕捉され、一貫したエラー形式で ``{"error": "..."}`` として返される。
+        * Async handlers are bridged automatically via ``_run_async()``.
+        * All exceptions are caught and returned as ``{"error": "..."}``
+          for consistent error format.
         """
         entry = self.get_entry(name)
         if not entry:
-            return json.dumps({"error": f"不明なツール: {name}"})
+            return json.dumps({"error": f"Unknown tool: {name}"})
         try:
             if entry.is_async:
-                from base.model_tools import _run_async
+                from model_tools import _run_async
                 return _run_async(entry.handler(args, **kwargs))
             return entry.handler(args, **kwargs)
         except Exception as e:
-            logger.exception("ツール %s のディスパッチエラー: %s", name, e)
-            return json.dumps({"error": f"ツール実行に失敗しました: {type(e).__name__}: {e}"})
+            logger.exception("Tool %s dispatch error: %s", name, e)
+            return json.dumps({"error": f"Tool execution failed: {type(e).__name__}: {e}"})
 
     # ------------------------------------------------------------------
-    # クエリヘルパー（model_tools.py の重複データ構造を置き換え）
+    # Query helpers  (replace redundant dicts in model_tools.py)
     # ------------------------------------------------------------------
 
     def get_max_result_size(self, name: str, default: int | float | None = None) -> int | float:
-        """ツールごとの最大結果サイズ、または *default*（またはグローバルデフォルト）を返す。"""
+        """Return per-tool max result size, or *default* (or global default)."""
         entry = self.get_entry(name)
         if entry and entry.max_result_size_chars is not None:
             return entry.max_result_size_chars
         if default is not None:
             return default
-        return 100000
+        from tools.budget_config import DEFAULT_RESULT_SIZE_CHARS
+        return DEFAULT_RESULT_SIZE_CHARS
 
     def get_all_tool_names(self) -> List[str]:
-        """登録済みの全ツール名のソート済みリストを返す。"""
+        """Return sorted list of all registered tool names."""
         return sorted(entry.name for entry in self._snapshot_entries())
 
     def get_schema(self, name: str) -> Optional[dict]:
-        """ツールの生のスキーマ辞書を check_fn フィルタリングを経ずに返す。
+        """Return a tool's raw schema dict, bypassing check_fn filtering.
 
-        トークン推定や内省において、利用可否は関係なくスキーマの内容だけが
-        必要な場合に有用。
+        Useful for token estimation and introspection where availability
+        doesn't matter — only the schema content does.
         """
         entry = self.get_entry(name)
         return entry.schema if entry else None
 
     def get_toolset_for_tool(self, name: str) -> Optional[str]:
-        """ツールが所属するツールセットを返す。存在しない場合は None。"""
+        """Return the toolset a tool belongs to, or None."""
         entry = self.get_entry(name)
         return entry.toolset if entry else None
 
     def get_emoji(self, name: str, default: str = "⚡") -> str:
-        """ツールの絵文字を返す。未設定の場合は *default* を返す。"""
+        """Return the emoji for a tool, or *default* if unset."""
         entry = self.get_entry(name)
         return (entry.emoji if entry and entry.emoji else default)
 
     def get_tool_to_toolset_map(self) -> Dict[str, str]:
-        """登録済み全ツールの ``{ツール名: ツールセット名}`` マップを返す。"""
+        """Return ``{tool_name: toolset_name}`` for every registered tool."""
         return {entry.name: entry.toolset for entry in self._snapshot_entries()}
 
     def is_toolset_available(self, toolset: str) -> bool:
-        """ツールセットの要件が満たされているか確認する。
+        """Check if a toolset's requirements are met.
 
-        チェック関数が予期しない例外（ネットワークエラー、インポート欠落、
-        設定ミスなど）を発生させた場合も、False を返す（クラッシュしない）。
+        Returns False (rather than crashing) when the check function raises
+        an unexpected exception (e.g. network error, missing import, bad config).
         """
         with self._lock:
             check = self._toolset_checks.get(toolset)
         return self._evaluate_toolset_check(toolset, check)
 
     def check_toolset_requirements(self) -> Dict[str, bool]:
-        """全ツールセットの ``{ツールセット名: 利用可否}`` 辞書を返す。"""
+        """Return ``{toolset: available_bool}`` for every toolset."""
         entries, toolset_checks = self._snapshot_state()
         toolsets = sorted({entry.toolset for entry in entries})
         return {
@@ -369,7 +424,7 @@ class ToolRegistry:
         }
 
     def get_available_toolsets(self) -> Dict[str, dict]:
-        """UI表示用のツールセットメタデータを返す。"""
+        """Return toolset metadata for UI display."""
         toolsets: Dict[str, dict] = {}
         entries, toolset_checks = self._snapshot_state()
         for entry in entries:
@@ -391,7 +446,7 @@ class ToolRegistry:
         return toolsets
 
     def get_toolset_requirements(self) -> Dict[str, dict]:
-        """後方互換のための TOOLSET_REQUIREMENTS 互換辞書を構築する。"""
+        """Build a TOOLSET_REQUIREMENTS-compatible dict for backward compat."""
         result: Dict[str, dict] = {}
         entries, toolset_checks = self._snapshot_state()
         for entry in entries:
@@ -412,7 +467,7 @@ class ToolRegistry:
         return result
 
     def check_tool_availability(self, quiet: bool = False):
-        """従来の関数と同様に (available_toolsets, unavailable_info) を返す。"""
+        """Return (available_toolsets, unavailable_info) like the old function."""
         available = []
         unavailable = []
         seen = set()
@@ -433,28 +488,28 @@ class ToolRegistry:
         return available, unavailable
 
 
-# モジュールレベルのシングルトン
+# Module-level singleton
 registry = ToolRegistry()
 
 
 # ---------------------------------------------------------------------------
-# ツール応答シリアライゼーション用ヘルパー
+# Helpers for tool response serialization
 # ---------------------------------------------------------------------------
-# 全てのツールハンドラは JSON 文字列を返さなければなりません。
-# これらのヘルパーは、ツールファイル全体で何百回も出現する
-# ``json.dumps({"error": msg}, ensure_ascii=False)`` というボイラープレートを排除します。
+# Every tool handler must return a JSON string.  These helpers eliminate the
+# boilerplate ``json.dumps({"error": msg}, ensure_ascii=False)`` that appears
+# hundreds of times across tool files.
 #
-# 使用例:
+# Usage:
 #   from tools.registry import registry, tool_error, tool_result
 #
 #   return tool_error("something went wrong")
 #   return tool_error("not found", code=404)
 #   return tool_result(success=True, data=payload)
-#   return tool_result(items)            # 辞書を直接渡す
+#   return tool_result(items)            # pass a dict directly
 
 
 def tool_error(message, **extra) -> str:
-    """ツールハンドラ用の JSON エラー文字列を返す。
+    """Return a JSON error string for tool handlers.
 
     >>> tool_error("file not found")
     '{"error": "file not found"}'
@@ -468,9 +523,9 @@ def tool_error(message, **extra) -> str:
 
 
 def tool_result(data=None, **kwargs) -> str:
-    """ツールハンドラ用の JSON 結果文字列を返す。
+    """Return a JSON result string for tool handlers.
 
-    位置引数の辞書 *または* キーワード引数（両方不可）を受け付けます:
+    Accepts a dict positional arg *or* keyword arguments (not both):
 
     >>> tool_result(success=True, count=42)
     '{"success": true, "count": 42}'

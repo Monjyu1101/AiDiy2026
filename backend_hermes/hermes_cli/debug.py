@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from base.hermes_constants import get_hermes_home
-from base.utils import atomic_replace
+from hermes_constants import get_hermes_home
+from utils import atomic_replace
 
 
 # ---------------------------------------------------------------------------

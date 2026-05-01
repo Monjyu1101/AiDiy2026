@@ -279,7 +279,7 @@ def lookup_context_length(model: str, base_url: str, api_key: str) -> Optional[i
     fire, so the wizard can distinguish "we actually know this" from
     "we guessed."""
     try:
-        from core.model_metadata import (
+        from agent.model_metadata import (
             DEFAULT_FALLBACK_CONTEXT,
             get_model_context_length,
         )

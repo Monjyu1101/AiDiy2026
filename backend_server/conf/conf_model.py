@@ -423,7 +423,7 @@ class conf_models:
         except Exception as e:
             logger.info(f"ollama list エラー: {e}")
         # フォールバック
-        fallback: Dict[str, str] = {"deepseek-v4-flash:cloud": "yyyy/mm/dd - deepseek-v4-flash:cloud"}
+        fallback: Dict[str, str] = {"mistral-large-3:675b:cloud": "yyyy/mm/dd - mistral-large-3:675b:cloud"}
         self.ollama_models = fallback
         return fallback
 
@@ -704,7 +704,7 @@ class conf_models:
     def get_chat_models(self) -> Dict[str, Dict[str, str]]:
         """チャットAIモデル一覧を取得（日付情報付き）"""
         # Ollamaモデル：取得済みがあれば使用、なければデフォルトを表示
-        ollama_dict = self.ollama_models if self.ollama_models else {"deepseek-v4-flash:cloud": "yyyy/mm/dd - deepseek-v4-flash:cloud"}
+        ollama_dict = self.ollama_models if self.ollama_models else {"mistral-large-3:675b:cloud": "yyyy/mm/dd - mistral-large-3:675b:cloud"}
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"

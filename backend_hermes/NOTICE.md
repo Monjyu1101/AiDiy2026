@@ -11,4 +11,3 @@ This module (`backend_hermes`) is based on **hermes-agent** by Nous Research.
 The MIT License permits use, copying, modification, and distribution with
 attribution. The original source has been modified for integration with the
 AiDiy2026 project.
-

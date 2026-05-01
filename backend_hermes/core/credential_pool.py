@@ -1,4 +1,4 @@
-"""同一プロバイダーのフェイルオーバー用、永続マルチ認証情報プール。"""
+"""Persistent multi-credential pool for same-provider failover."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from dataclasses import dataclass, fields, replace
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from base.hermes_constants import OPENROUTER_BASE_URL
+from hermes_constants import OPENROUTER_BASE_URL
 from hermes_cli.config import get_env_value
 import hermes_cli.auth as auth_mod
 from hermes_cli.auth import (
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_config_safe() -> Optional[dict]:
-    """config.yaml を読み込む。エラー時は None を返す。"""
+    """Load config.yaml, returning None on any error."""
     try:
         from hermes_cli.config import load_config
 
@@ -45,7 +45,7 @@ def _load_config_safe() -> Optional[dict]:
         return None
 
 
-# --- ステータスおよび種別定数 ---
+# --- Status and type constants ---
 
 STATUS_OK = "ok"
 STATUS_EXHAUSTED = "exhausted"
@@ -66,19 +66,19 @@ SUPPORTED_POOL_STRATEGIES = {
     STRATEGY_LEAST_USED,
 }
 
-# 枯渇した認証情報を再試行するまでのクールダウン時間。
-# 429 (レート制限) および 402 (課金/クォータ) はいずれも 1 時間後にクールダウン。
-# プロバイダーから提供された reset_at タイムスタンプがある場合はそちらが優先される。
-EXHAUSTED_TTL_429_SECONDS = 60 * 60          # 1時間
-EXHAUSTED_TTL_DEFAULT_SECONDS = 60 * 60      # 1時間
+# Cooldown before retrying an exhausted credential.
+# 429 (rate-limited) and 402 (billing/quota) both cool down after 1 hour.
+# Provider-supplied reset_at timestamps override these defaults.
+EXHAUSTED_TTL_429_SECONDS = 60 * 60          # 1 hour
+EXHAUSTED_TTL_DEFAULT_SECONDS = 60 * 60      # 1 hour
 
-# カスタム OpenAI 互換エンドポイント用プールキーのプレフィックス。
-# カスタムエンドポイントは provider='custom' を共有するが、
-# custom_providers 名でキー付けされる: 'custom:<正規化名>'。
+# Pool key prefix for custom OpenAI-compatible endpoints.
+# Custom endpoints all share provider='custom' but are keyed by their
+# custom_providers name: 'custom:<normalized_name>'.
 CUSTOM_POOL_PREFIX = "custom:"
 
 
-# JSON のラウンドトリップにのみ使用されるフィールド — 属性としてロジックには使用しない。
+# Fields that are only round-tripped through JSON — never used for logic as attributes.
 _EXTRA_KEYS = frozenset({
     "token_type", "scope", "client_id", "portal_base_url", "obtained_at",
     "expires_in", "agent_key_id", "agent_key_expires_in", "agent_key_reused",
@@ -188,17 +188,17 @@ def _is_manual_source(source: str) -> bool:
 
 
 def _exhausted_ttl(error_code: Optional[int]) -> int:
-    """枯渇の原因となった HTTP ステータスコードに基づいてクールダウン秒数を返す。"""
+    """Return cooldown seconds based on the HTTP status that caused exhaustion."""
     if error_code == 429:
         return EXHAUSTED_TTL_429_SECONDS
     return EXHAUSTED_TTL_DEFAULT_SECONDS
 
 
 def _parse_absolute_timestamp(value: Any) -> Optional[float]:
-    """プロバイダーのリセットタイムスタンプをベストエフォートで解析する。
+    """Best-effort parse for provider reset timestamps.
 
-    エポック秒、エポックミリ秒、ISO-8601 文字列を受け付ける。
-    エポックからの秒数を返す。
+    Accepts epoch seconds, epoch milliseconds, and ISO-8601 strings.
+    Returns seconds since epoch.
     """
     if value is None or value == "":
         return None
@@ -274,12 +274,12 @@ def _exhausted_until(entry: PooledCredential) -> Optional[float]:
 
 
 def _normalize_custom_pool_name(name: str) -> str:
-    """カスタムプロバイダー名をプールキーのサフィックスとして使用できるよう正規化する。"""
+    """Normalize a custom provider name for use as a pool key suffix."""
     return name.strip().lower().replace(" ", "-")
 
 
 def _iter_custom_providers(config: Optional[dict] = None):
-    """有効な custom_providers エントリごとに (正規化名, entry_dict) を yield する。"""
+    """Yield (normalized_name, entry_dict) for each valid custom_providers entry."""
     if config is None:
         config = _load_config_safe()
     if config is None:
@@ -305,9 +305,9 @@ def _iter_custom_providers(config: Optional[dict] = None):
 
 
 def get_custom_provider_pool_key(base_url: str) -> Optional[str]:
-    """config.yaml の custom_providers リストを参照し、base_url に一致する場合に 'custom:<name>' を返す。
+    """Look up the custom_providers list in config.yaml and return 'custom:<name>' for a matching base_url.
 
-    一致しない場合は None を返す。
+    Returns None if no match is found.
     """
     if not base_url:
         return None
@@ -320,7 +320,7 @@ def get_custom_provider_pool_key(base_url: str) -> Optional[str]:
 
 
 def list_custom_pool_providers() -> List[str]:
-    """auth.json にエントリが存在する 'custom:*' プールキーを全て返す。"""
+    """Return all 'custom:*' pool keys that have entries in auth.json."""
     pool_data = read_credential_pool(None)
     return sorted(
         key for key in pool_data
@@ -331,7 +331,7 @@ def list_custom_pool_providers() -> List[str]:
 
 
 def _get_custom_provider_config(pool_key: str) -> Optional[Dict[str, Any]]:
-    """'custom:together.ai' のようなプールキーに対応する custom_providers 設定エントリを返す。"""
+    """Return the custom_providers config entry matching a pool key like 'custom:together.ai'."""
     if not pool_key.startswith(CUSTOM_POOL_PREFIX):
         return None
     suffix = pool_key[len(CUSTOM_POOL_PREFIX):]
@@ -342,7 +342,7 @@ def _get_custom_provider_config(pool_key: str) -> Optional[Dict[str, Any]]:
 
 
 def get_pool_strategy(provider: str) -> str:
-    """プロバイダーに設定された選択ストラテジーを返す。"""
+    """Return the configured selection strategy for a provider."""
     config = _load_config_safe()
     if config is None:
         return STRATEGY_FILL_FIRST
@@ -374,7 +374,7 @@ class CredentialPool:
         return bool(self._entries)
 
     def has_available(self) -> bool:
-        """枯渇クールダウン中でないエントリが少なくとも1つある場合に True を返す。"""
+        """True if at least one entry is not currently in exhaustion cooldown."""
         return bool(self._available_entries())
 
     def entries(self) -> List[PooledCredential]:
@@ -386,7 +386,7 @@ class CredentialPool:
         return next((entry for entry in self._entries if entry.id == self._current_id), None)
 
     def _replace_entry(self, old: PooledCredential, new: PooledCredential) -> None:
-        """id を使ってエントリをインプレースで入れ替え、ソート順を維持する。"""
+        """Swap an entry in-place by id, preserving sort order."""
         for idx, entry in enumerate(self._entries):
             if entry.id == old.id:
                 self._entries[idx] = new
@@ -419,17 +419,17 @@ class CredentialPool:
         return updated
 
     def _sync_anthropic_entry_from_credentials_file(self, entry: PooledCredential) -> PooledCredential:
-        """トークンが異なる場合、~/.claude/.credentials.json から claude_code プールエントリを同期する。
+        """Sync a claude_code pool entry from ~/.claude/.credentials.json if tokens differ.
 
-        OAuth リフレッシュトークンは単回使用。外部の何か（Claude Code CLI や
-        別プロファイルのプール等）がトークンを更新すると、新しいペアが
-        ~/.claude/.credentials.json に書き込まれる。プールエントリの
-        リフレッシュトークンが古くなるため、このメソッドで検出・同期する。
+        OAuth refresh tokens are single-use. When something external (e.g.
+        Claude Code CLI, or another profile's pool) refreshes the token, it
+        writes the new pair to ~/.claude/.credentials.json. The pool entry's
+        refresh token becomes stale. This method detects that and syncs.
         """
         if self.provider != "anthropic" or entry.source != "claude_code":
             return entry
         try:
-            from core.anthropic_adapter import read_claude_code_credentials
+            from agent.anthropic_adapter import read_claude_code_credentials
             creds = read_claude_code_credentials()
             if not creds:
                 return entry
@@ -456,20 +456,21 @@ class CredentialPool:
         return entry
 
     def _sync_codex_entry_from_auth_store(self, entry: PooledCredential) -> PooledCredential:
-        """トークンが異なる場合、auth.json から Codex device_code プールエントリを同期する。
+        """Sync a Codex device_code pool entry from auth.json if tokens differ.
 
-        Codex OAuth アクセストークンが期限切れになった場合（または ChatGPT アカウントが
-        週5時間クォータに達した場合）、プールエントリは ``STATUS_EXHAUSTED`` に
-        マークされ、``last_error_reset_at`` が数時間先の未来になることがある。
-        その間にユーザーが ``hermes model`` / ``hermes auth`` を実行して
-        新たなデバイスコードログインを行い、``_auth_store_lock`` 下で
-        auth.json に新しいトークンが書き込まれる可能性がある。
-        この同期がないと、ディスクに新鮮な認証情報があるにもかかわらず
-        ``last_error_reset_at`` が経過するまでプールエントリがフリーズし、
-        すべてのリクエストが失敗する。
+        When a Codex OAuth access token expires (or the ChatGPT account hits
+        its 5h/weekly quota), the pool entry gets marked ``STATUS_EXHAUSTED``
+        with a ``last_error_reset_at`` that can be many hours in the future.
+        Meanwhile the user may run ``hermes model`` / ``hermes auth`` which
+        performs a fresh device-code login and writes new tokens to
+        ``auth.json`` under ``_auth_store_lock``.  Without this sync the pool
+        entry stays frozen until ``last_error_reset_at`` elapses — even
+        though fresh credentials are sitting on disk — and every request
+        fails with "no available entries (all exhausted or empty)".
 
-        Nous/Anthropic の再同期パスと同様。device_code ソースのエントリのみに適用。
-        env/API キーソースのエントリには auth.json のシャドウがない。
+        Mirrors the Nous/Anthropic resync paths above.  Only applies to
+        device_code-sourced entries; env/API-key-sourced entries have no
+        auth.json shadow to sync from.
         """
         if self.provider != "openai-codex" or entry.source != "device_code":
             return entry
@@ -519,13 +520,14 @@ class CredentialPool:
         return entry
 
     def _sync_nous_entry_from_auth_store(self, entry: PooledCredential) -> PooledCredential:
-        """トークンが異なる場合、auth.json から Nous プールエントリを同期する。
+        """Sync a Nous pool entry from auth.json if tokens differ.
 
-        Nous OAuth リフレッシュトークンは単回使用。別プロセス（並行 cron 等）が
-        ``resolve_nous_runtime_credentials`` でトークンを更新すると、
-        ``_auth_store_lock`` 下で auth.json に新しいトークンが書き込まれる。
-        プールエントリのトークンが古くなるため、このメソッドで検出・採用し、
-        Nous ポータルでの「リフレッシュトークン再利用」による失効を防ぐ。
+        Nous OAuth refresh tokens are single-use.  When another process
+        (e.g. a concurrent cron) refreshes the token via
+        ``resolve_nous_runtime_credentials``, it writes fresh tokens to
+        auth.json under ``_auth_store_lock``.  The pool entry's tokens
+        become stale.  This method detects that and adopts the newer pair,
+        avoiding a "refresh token reuse" revocation on the Nous Portal.
         """
         if self.provider != "nous" or entry.source != "device_code":
             return entry
@@ -573,16 +575,16 @@ class CredentialPool:
         return entry
 
     def _sync_device_code_entry_to_auth_store(self, entry: PooledCredential) -> None:
-        """更新されたプールエントリのトークンを auth.json の providers に書き戻す。
+        """Write refreshed pool entry tokens back to auth.json providers.
 
-        プールレベルの更新後、プールエントリには新しいトークンがあるが、
-        auth.json の ``providers.<id>`` はリフレッシュ前の状態を保持している。
-        次の ``load_pool()`` 呼び出し時に ``_seed_from_singletons()`` がその
-        古い状態を読み込み、新鮮なプールエントリを上書きする可能性がある。
-        消費済みの単回使用リフレッシュトークンを再シードする恐れがある。
+        After a pool-level refresh, the pool entry has fresh tokens but
+        auth.json's ``providers.<id>`` still holds the pre-refresh state.
+        On the next ``load_pool()``, ``_seed_from_singletons()`` reads that
+        stale state and can overwrite the fresh pool entry — potentially
+        re-seeding a consumed single-use refresh token.
 
-        auth.json にシングルトンが存在する OAuth プロバイダーに適用
-        （現在は Nous と OpenAI Codex）。
+        Applies to any OAuth provider whose singleton lives in auth.json
+        (currently Nous and OpenAI Codex).
         """
         if entry.source != "device_code":
             return
@@ -641,7 +643,7 @@ class CredentialPool:
 
         try:
             if self.provider == "anthropic":
-                from core.anthropic_adapter import refresh_anthropic_oauth_pure
+                from agent.anthropic_adapter import refresh_anthropic_oauth_pure
 
                 refreshed = refresh_anthropic_oauth_pure(
                     entry.refresh_token,
@@ -658,7 +660,7 @@ class CredentialPool:
                 # see the latest tokens.
                 if entry.source == "claude_code":
                     try:
-                        from core.anthropic_adapter import _write_claude_code_credentials
+                        from agent.anthropic_adapter import _write_claude_code_credentials
                         _write_claude_code_credentials(
                             refreshed["access_token"],
                             refreshed["refresh_token"],
@@ -723,7 +725,7 @@ class CredentialPool:
                 if synced.refresh_token != entry.refresh_token:
                     logger.debug("Retrying refresh with synced token from credentials file")
                     try:
-                        from core.anthropic_adapter import refresh_anthropic_oauth_pure
+                        from agent.anthropic_adapter import refresh_anthropic_oauth_pure
                         refreshed = refresh_anthropic_oauth_pure(
                             synced.refresh_token,
                             use_json=synced.source.endswith("hermes_pkce"),
@@ -740,7 +742,7 @@ class CredentialPool:
                         self._replace_entry(synced, updated)
                         self._persist()
                         try:
-                            from core.anthropic_adapter import _write_claude_code_credentials
+                            from agent.anthropic_adapter import _write_claude_code_credentials
                             _write_claude_code_credentials(
                                 refreshed["access_token"],
                                 refreshed["refresh_token"],
@@ -819,11 +821,11 @@ class CredentialPool:
             return self._select_unlocked()
 
     def _available_entries(self, *, clear_expired: bool = False, refresh: bool = False) -> List[PooledCredential]:
-        """枯渇クールダウン中でないエントリを返す。
+        """Return entries not currently in exhaustion cooldown.
 
-        *clear_expired* が True の場合、クールダウンが経過したエントリを
-        STATUS_OK にリセットして永続化する。*refresh* が True の場合、
-        トークン更新が必要なエントリを更新する（失敗時はスキップ）。
+        When *clear_expired* is True, entries whose cooldown has elapsed are
+        reset to STATUS_OK and persisted.  When *refresh* is True, entries
+        that need a token refresh are refreshed (skipped on failure).
         """
         now = time.time()
         cleared_any = False
@@ -952,12 +954,12 @@ class CredentialPool:
             return next_entry
 
     def acquire_lease(self, credential_id: Optional[str] = None) -> Optional[str]:
-        """認証情報のソフトリースを取得する。
+        """Acquire a soft lease on a credential.
 
-        特定の credential_id が指定された場合はそのエントリを直接リースする。
-        指定がない場合は、優先度を安定したタイブレーカーとして最もリース数の少ない
-        利用可能な認証情報を選択する。全ての認証情報がソフトキャップに達していても、
-        ブロックせずに最もリース数の少ないものを返す。
+        If a specific credential_id is provided, lease that entry directly.
+        Otherwise prefer the least-leased available credential, using priority as
+        a stable tie-breaker. When every credential is already at the soft cap,
+        still return the least-leased one instead of blocking.
         """
         with self._lock:
             if credential_id:
@@ -983,7 +985,7 @@ class CredentialPool:
             return chosen.id
 
     def release_lease(self, credential_id: str) -> None:
-        """以前に取得した認証情報リースを解放する。"""
+        """Release a previously acquired credential lease."""
         with self._lock:
             count = self._active_leases.get(credential_id, 0)
             if count <= 1:
@@ -1169,7 +1171,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
         except ImportError:
             pass
 
-        from core.anthropic_adapter import read_claude_code_credentials, read_hermes_oauth_credentials
+        from agent.anthropic_adapter import read_claude_code_credentials, read_hermes_oauth_credentials
 
         for source_name, creds in (
             ("hermes_pkce", read_hermes_oauth_credentials()),
@@ -1296,6 +1298,48 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
                     )
         except Exception as exc:
             logger.debug("Qwen OAuth token seed failed: %s", exc)
+
+    elif provider == "minimax-oauth":
+        # MiniMax OAuth tokens live in ~/.hermes/auth.json providers.minimax-oauth.
+        # Seed the pool so `/auth list` reflects the logged-in state and the
+        # standard `hermes auth remove minimax-oauth <N>` flow works.
+        # Use refresh_if_expiring=False equivalent: resolve_minimax_oauth_runtime_credentials
+        # always refreshes on expiry, so instead read raw state here to avoid
+        # surprise network calls during provider discovery.
+        try:
+            from hermes_cli.auth import get_provider_auth_state
+            state = get_provider_auth_state("minimax-oauth")
+            if state and state.get("access_token"):
+                source_name = "oauth"
+                if not _is_suppressed(provider, source_name):
+                    active_sources.add(source_name)
+                    expires_at_ms = None
+                    try:
+                        from datetime import datetime as _dt
+                        raw = state.get("expires_at", "")
+                        if raw:
+                            expires_at_ms = int(_dt.fromisoformat(raw).timestamp() * 1000)
+                    except Exception:
+                        expires_at_ms = None
+                    base_url = str(state.get("inference_base_url", "") or "").rstrip("/")
+                    changed |= _upsert_entry(
+                        entries,
+                        provider,
+                        source_name,
+                        {
+                            "source": source_name,
+                            "auth_type": AUTH_TYPE_OAUTH,
+                            "access_token": state["access_token"],
+                            "refresh_token": state.get("refresh_token"),
+                            "expires_at_ms": expires_at_ms,
+                            "base_url": base_url,
+                            "label": state.get("label", "") or label_from_token(
+                                state.get("access_token", ""), source_name
+                            ),
+                        },
+                    )
+        except Exception as exc:
+            logger.debug("MiniMax OAuth token seed failed: %s", exc)
 
     elif provider == "openai-codex":
         # Respect user suppression — `hermes auth remove openai-codex` marks
@@ -1432,7 +1476,7 @@ def _prune_stale_seeded_entries(entries: List[PooledCredential], active_sources:
 
 
 def _seed_custom_pool(pool_key: str, entries: List[PooledCredential]) -> Tuple[bool, Set[str]]:
-    """custom_providers 設定とモデル設定からカスタムエンドポイントプールをシードする。"""
+    """Seed a custom endpoint pool from custom_providers config and model config."""
     changed = False
     active_sources: Set[str] = set()
 

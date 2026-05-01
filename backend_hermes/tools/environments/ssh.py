@@ -178,15 +178,15 @@ class SSHEnvironment(BaseEnvironment):
             for host_path, remote_path in files:
                 staged = os.path.join(staging, remote_path.lstrip("/"))
                 os.makedirs(os.path.dirname(staged), exist_ok=True)
-                try:
-                    os.symlink(os.path.abspath(host_path), staged)
-                except OSError:
-                    # Windows では管理者権限がないとシンボリックリンクに失敗する → コピーで代用
-                    shutil.copy2(host_path, staged)
+                os.symlink(os.path.abspath(host_path), staged)
 
             tar_cmd = ["tar", "-chf", "-", "-C", staging, "."]
             ssh_cmd = self._build_ssh_command()
-            ssh_cmd.append("tar xf - -C /")
+            # --no-overwrite-dir prevents tar from overwriting the mode of
+            # existing directories (e.g. /home/<user>) with the staging
+            # directory's mode.  Without this, a umask 002 produces 0775
+            # dirs which breaks sshd StrictModes (refuses authorized_keys).
+            ssh_cmd.append("tar xf - --no-overwrite-dir -C /")
 
             tar_proc = subprocess.Popen(
                 tar_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE

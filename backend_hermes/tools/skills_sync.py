@@ -26,9 +26,9 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from base.hermes_constants import get_hermes_home
+from hermes_constants import get_hermes_home
 from typing import Dict, List, Tuple
-from base.utils import atomic_replace
+from utils import atomic_replace
 
 logger = logging.getLogger(__name__)
 

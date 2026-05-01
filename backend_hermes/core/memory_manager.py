@@ -1,27 +1,27 @@
-"""MemoryManager — 組み込みメモリプロバイダーと最大 1 つの外部プラグイン
-メモリプロバイダーを統括する。
+"""MemoryManager — orchestrates the built-in memory provider plus at most
+ONE external plugin memory provider.
 
-run_agent.py の単一統合ポイント。分散していたバックエンドごとのコードを、
-登録されたプロバイダーに委譲する 1 つのマネージャーに置き換える。
+Single integration point in run_agent.py. Replaces scattered per-backend
+code with one manager that delegates to registered providers.
 
-BuiltinMemoryProvider は常に最初に登録され、削除できない。
-外部（非組み込み）プロバイダーは同時に 1 つのみ許可される。
-2 番目の外部プロバイダーを登録しようとすると警告付きで拒否される。
-これによりツールスキーマの肥大化と競合するメモリバックエンドを防ぐ。
+The BuiltinMemoryProvider is always registered first and cannot be removed.
+Only ONE external (non-builtin) provider is allowed at a time — attempting
+to register a second external provider is rejected with a warning.  This
+prevents tool schema bloat and conflicting memory backends.
 
-run_agent.py での使用例:
+Usage in run_agent.py:
     self._memory_manager = MemoryManager()
     self._memory_manager.add_provider(BuiltinMemoryProvider(...))
-    # 以下のいずれか 1 つのみ:
+    # Only ONE of these:
     self._memory_manager.add_provider(plugin_provider)
 
-    # システムプロンプト
+    # System prompt
     prompt_parts.append(self._memory_manager.build_system_prompt())
 
-    # ターン前
+    # Pre-turn
     context = self._memory_manager.prefetch_all(user_message)
 
-    # ターン後
+    # Post-turn
     self._memory_manager.sync_all(user_msg, assistant_response)
     self._memory_manager.queue_prefetch_all(user_msg)
 """
@@ -33,7 +33,7 @@ import re
 import inspect
 from typing import Any, Dict, List, Optional
 
-from core.memory_provider import MemoryProvider
+from agent.memory_provider import MemoryProvider
 from tools.registry import tool_error
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ _INTERNAL_NOTE_RE = re.compile(
 
 
 def sanitize_context(text: str) -> str:
-    """プロバイダーの出力からフェンスタグ・注入されたコンテキストブロック・システムノートを取り除く。"""
+    """Strip fence tags, injected context blocks, and system notes from provider output."""
     text = _INTERNAL_CONTEXT_RE.sub('', text)
     text = _INTERNAL_NOTE_RE.sub('', text)
     text = _FENCE_TAG_RE.sub('', text)
@@ -63,29 +63,29 @@ def sanitize_context(text: str) -> str:
 
 
 class StreamingContextScrubber:
-    """分割された memory-context スパンを含む可能性があるストリーミングテキストのステートフルスクラバー。
+    """Stateful scrubber for streaming text that may contain split memory-context spans.
 
-    ワンショットの ``sanitize_context`` 正規表現はチャンク境界を越えられない:
-    あるデルタで開かれた ``<memory-context>`` が後のデルタで閉じられると、
-    非グリーディなブロック正規表現が 1 つの文字列内に両タグを必要とするため、
-    ペイロードが UI に漏洩する。このスクラバーはデルタをまたいで小さな
-    ステートマシンを実行し、部分的なタグの末尾を保留してスパン内のすべてを
-    （システムノート行を含めて）破棄する。
+    The one-shot ``sanitize_context`` regex cannot survive chunk boundaries:
+    a ``<memory-context>`` opened in one delta and closed in a later delta
+    leaks its payload to the UI because the non-greedy block regex needs
+    both tags in one string.  This scrubber runs a small state machine
+    across deltas, holding back partial-tag tails and discarding
+    everything inside a span (including the system-note line).
 
-    使用例::
+    Usage::
 
         scrubber = StreamingContextScrubber()
         for delta in stream:
             visible = scrubber.feed(delta)
             if visible:
                 emit(visible)
-        trailing = scrubber.flush()  # ストリーム終端で
+        trailing = scrubber.flush()  # at end of stream
         if trailing:
             emit(trailing)
 
-    スクラバーはエージェントインスタンスごとに再入可能である。
-    新しいトップレベルレスポンス（新しいターン）を構築する呼び出し元は、
-    新しいスクラバーを作成するか ``reset()`` を呼び出すこと。
+    The scrubber is re-entrant per agent instance.  Callers building new
+    top-level responses (new turn) should create a fresh scrubber or call
+    ``reset()``.
     """
 
     _OPEN_TAG = "<memory-context>"
@@ -100,11 +100,11 @@ class StreamingContextScrubber:
         self._buf = ""
 
     def feed(self, text: str) -> str:
-        """スクラビング後の ``text`` の可視部分を返す。
+        """Return the visible portion of ``text`` after scrubbing.
 
-        開き/閉じタグの開始となり得る末尾のフラグメントは内部バッファーに
-        保留され、次の ``feed()`` 呼び出しで表示されるか ``flush()`` で
-        破棄/発行される。
+        Any trailing fragment that could be the start of an open/close tag
+        is held back in the internal buffer and surfaced on the next
+        ``feed()`` call or discarded/emitted by ``flush()``.
         """
         if not text:
             return ""
@@ -143,12 +143,12 @@ class StreamingContextScrubber:
         return "".join(out)
 
     def flush(self) -> str:
-        """ストリーム終端で保留中のバッファーを発行する。
+        """Emit any held-back buffer at end-of-stream.
 
-        未終端のスパン内にある場合、残りのコンテンツは破棄される
-        （安全策: 部分的なメモリコンテキストの漏洩は切り詰められた回答より悪い）。
-        そうでなければ、保留されていた部分タグの末尾をそのまま発行する
-        （実際のタグではなかったことが判明した）。
+        If we're still inside an unterminated span the remaining content is
+        discarded (safer: leaking partial memory context is worse than a
+        truncated answer).  Otherwise the held-back partial-tag tail is
+        emitted verbatim (it turned out not to be a real tag).
         """
         if self._in_span:
             self._buf = ""
@@ -160,9 +160,9 @@ class StreamingContextScrubber:
 
     @staticmethod
     def _max_partial_suffix(buf: str, tag: str) -> int:
-        """タグのプレフィックスとなる最長の buf サフィックスの長さを返す。
+        """Return the length of the longest buf-suffix that is a tag-prefix.
 
-        大文字小文字を区別しない。どのサフィックスもタグを開始できない場合は 0 を返す。
+        Case-insensitive.  Returns 0 if no suffix could start the tag.
         """
         tag_lower = tag.lower()
         buf_lower = buf.lower()
@@ -402,6 +402,41 @@ class MemoryManager:
                     provider.name, e,
                 )
 
+    def on_session_switch(
+        self,
+        new_session_id: str,
+        *,
+        parent_session_id: str = "",
+        reset: bool = False,
+        **kwargs,
+    ) -> None:
+        """Notify all providers that the agent's session_id has rotated.
+
+        Fires on ``/resume``, ``/branch``, ``/reset``, ``/new``, and
+        context compression — any path that reassigns
+        ``AIAgent.session_id`` without tearing the provider down.
+
+        Providers keep running; they only need to refresh cached
+        per-session state so subsequent writes land in the correct
+        session's record. See ``MemoryProvider.on_session_switch`` for
+        the full contract.
+        """
+        if not new_session_id:
+            return
+        for provider in self._providers:
+            try:
+                provider.on_session_switch(
+                    new_session_id,
+                    parent_session_id=parent_session_id,
+                    reset=reset,
+                    **kwargs,
+                )
+            except Exception as e:
+                logger.debug(
+                    "Memory provider '%s' on_session_switch failed: %s",
+                    provider.name, e,
+                )
+
     def on_pre_compress(self, messages: List[Dict[str, Any]]) -> str:
         """Notify all providers before context compression.
 
@@ -510,7 +545,7 @@ class MemoryManager:
         ``get_hermes_home()`` themselves.
         """
         if "hermes_home" not in kwargs:
-            from base.hermes_constants import get_hermes_home
+            from hermes_constants import get_hermes_home
             kwargs["hermes_home"] = str(get_hermes_home())
         for provider in self._providers:
             try:

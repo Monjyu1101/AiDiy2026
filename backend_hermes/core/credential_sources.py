@@ -1,43 +1,46 @@
-"""Hermes が読み取るすべての認証情報ソースに対する統一された削除契約。
+"""Unified removal contract for every credential source Hermes reads from.
 
-Hermes は認証情報プールを多くの場所からシードする:
+Hermes seeds its credential pool from many places:
 
     env:<VAR>     — os.environ / ~/.hermes/.env
     claude_code   — ~/.claude/.credentials.json
     hermes_pkce   — ~/.hermes/.anthropic_oauth.json
-    device_code   — auth.json providers.<provider> (nous, openai-codex 等)
+    device_code   — auth.json providers.<provider> (nous, openai-codex, ...)
     qwen-cli      — ~/.qwen/oauth_creds.json
     gh_cli        — gh auth token
-    config:<name> — custom_providers 設定エントリ
-    model_config  — model.provider == "custom" のときの model.api_key
-    manual        — ユーザーが `hermes auth add` を実行
+    config:<name> — custom_providers config entry
+    model_config  — model.api_key when model.provider == "custom"
+    manual        — user ran `hermes auth add`
 
-各ソースには ``agent.credential_pool._seed_from_*`` に独自のリーダーがある
-（既存の形状を維持 — 再構成はしない）。ここで統一するのは **削除** のみ:
+Each source has its own reader inside ``agent.credential_pool._seed_from_*``
+(which keep their existing shape — we haven't restructured them).  What we
+unify here is **removal**:
 
-    ``hermes auth remove <provider> <N>`` はプールエントリを永続的に消去しなければならない。
+    ``hermes auth remove <provider> <N>`` must make the pool entry stay gone.
 
-このモジュール以前は、各ソースが ``auth_remove_command`` に ad-hoc な削除ブランチを持ち、
-いくつかのソースにはブランチがなかった。そのため ``auth remove`` は次の
-``load_pool()`` 呼び出しで qwen-cli、nous device_code（部分的）、
-hermes_pkce、copilot gh_cli、custom-config ソースについて暗黙に元に戻っていた。
+Before this module, every source had an ad-hoc removal branch in
+``auth_remove_command``, and several sources had no branch at all — so
+``auth remove`` silently reverted on the next ``load_pool()`` call for
+qwen-cli, nous device_code (partial), hermes_pkce, copilot gh_cli, and
+custom-config sources.
 
-今や全ソースが ``RemovalStep`` を登録し、同一形状で3つのことを行う:
+Now every source registers a ``RemovalStep`` that does exactly three things
+in the same shape:
 
-    1. ソースが読み取る外部読み取り可能な状態をクリーンアップする
-       (.env 行、auth.json ブロック、OAuth ファイル等)
-    2. 対応する ``_seed_from_*`` ブランチが再ロード時に upsert をスキップするよう
-       auth.json の ``(provider, source_id)`` を抑制する
-    3. クリーンアップ内容とユーザーが確認すべき診断ヒントを
-       ``RemovalResult`` で返す（シェルエクスポートされた環境変数、
-       意図的に削除しない外部認証情報ファイル等）
+    1. Clean up whatever externally-readable state the source reads from
+       (.env line, auth.json block, OAuth file, etc.)
+    2. Suppress the ``(provider, source_id)`` in auth.json so the
+       corresponding ``_seed_from_*`` branch skips the upsert on re-load
+    3. Return ``RemovalResult`` describing what was cleaned and any
+       diagnostic hints the user should see (shell-exported env vars,
+       external credential files we deliberately don't delete, etc.)
 
-新しい認証情報ソースの追加:
-    - ``_seed_from_*`` にリーダーブランチを接続（既存パターン）
-    - そのリーダーを ``is_source_suppressed(provider, source_id)`` でガード
-    - ここに ``RemovalStep`` を登録
+Adding a new credential source is:
+    - wire up a reader branch in ``_seed_from_*`` (existing pattern)
+    - gate that reader behind ``is_source_suppressed(provider, source_id)``
+    - register a ``RemovalStep`` here
 
-``auth_remove_command`` のソースごとの if/elif チェーンは不要になった。
+No more per-source if/elif chain in ``auth_remove_command``.
 """
 
 from __future__ import annotations
@@ -49,21 +52,22 @@ from typing import Callable, List, Optional
 
 @dataclass
 class RemovalResult:
-    """認証情報ソース削除の結果。
+    """Outcome of removing a credential source.
 
     Attributes:
-        cleaned: 実際に変更された外部状態を説明する短い文字列リスト
-            （例: ``"Cleared XAI_API_KEY from .env"``,
-            ``"Cleared openai-codex OAuth tokens from auth store"``）。
-            ユーザーへのプレーンテキスト行として表示される。
-        hints: ユーザーが自分でクリーンアップする必要があるか、
-            意図的にそのまま残している状態に関する診断行
-            （シェルエクスポートされた環境変数、削除しない Claude Code
-            認証情報ファイル等）。常に非破壊的。
-        suppress: クリーンアップ後に ``suppress_credential_source`` を呼び出して
-            将来の ``load_pool`` 呼び出しがこのソースをスキップするようにするかどうか。
-            デフォルト True — ほぼ全てのソースで粘着性を維持するために必要。
-            唯一の正当な False は ``manual`` エントリ（外部からシードされない）。
+        cleaned: Short strings describing external state that was actually
+            mutated (``"Cleared XAI_API_KEY from .env"``,
+            ``"Cleared openai-codex OAuth tokens from auth store"``).
+            Printed as plain lines to the user.
+        hints: Diagnostic lines ABOUT state the user may need to clean up
+            themselves or is deliberately left intact (shell-exported env
+            var, Claude Code credential file we don't delete, etc.).
+            Printed as plain lines to the user.  Always non-destructive.
+        suppress: Whether to call ``suppress_credential_source`` after
+            cleanup so future ``load_pool`` calls skip this source.
+            Default True — almost every source needs this to stay sticky.
+            The only legitimate False is ``manual`` entries, which aren't
+            seeded from anywhere external.
     """
 
     cleaned: List[str] = field(default_factory=list)
@@ -73,22 +77,22 @@ class RemovalResult:
 
 @dataclass
 class RemovalStep:
-    """特定の認証情報ソースをクリーンに削除する方法。
+    """How to remove one specific credential source cleanly.
 
     Attributes:
-        provider: プロバイダープールキー（``"xai"``、``"anthropic"``、``"nous"`` 等）。
-            特殊値 ``"*"`` は「任意のプロバイダーに一致」を意味する。
-            ``manual`` のようなプロバイダー非特異的なソースに使用。
-        source_id: ``PooledCredential.source`` に現れるソース識別子。
-            リテラル（``"claude_code"``）または ``match_fn`` でマッチする
-            プレフィックスパターンのいずれか。
-        match_fn: リテラルの ``source_id`` マッチングを上書きするオプション述語。
-            削除されたエントリのソース文字列を受け取る。``env:*``（任意の
-            env シードキー）、``config:*``（任意のカスタムプール）、
-            ``manual:*``（任意の手動ソースバリアント）に使用。
-        remove_fn: ``(provider, removed_entry) -> RemovalResult``。実際の
-            クリーンアップを行い、ユーザーへの結果を返す。
-        description: ドキュメント / テスト用の一行人間可読説明。
+        provider: Provider pool key (``"xai"``, ``"anthropic"``, ``"nous"``, ...).
+            Special value ``"*"`` means "matches any provider" — used for
+            sources like ``manual`` that aren't provider-specific.
+        source_id: Source identifier as it appears in
+            ``PooledCredential.source``.  May be a literal (``"claude_code"``)
+            or a prefix pattern matched via ``match_fn``.
+        match_fn: Optional predicate overriding literal ``source_id``
+            matching.  Gets the removed entry's source string.  Used for
+            ``env:*`` (any env-seeded key), ``config:*`` (any custom
+            pool), and ``manual:*`` (any manual-source variant).
+        remove_fn: ``(provider, removed_entry) -> RemovalResult``.  Does the
+            actual cleanup and returns what happened for the user.
+        description: One-line human-readable description for docs / tests.
     """
 
     provider: str
@@ -114,12 +118,13 @@ def register(step: RemovalStep) -> RemovalStep:
 
 
 def find_removal_step(provider: str, source: str) -> Optional[RemovalStep]:
-    """最初に一致する RemovalStep を返す。未登録の場合は None を返す。
+    """Return the first matching RemovalStep, or None if unregistered.
 
-    未登録のソースは ``auth_remove_command`` のデフォルト削除パスにフォールスルーする:
-    プールエントリはすでに消去済み（ディスパッチ前に行われる）、外部クリーンアップなし、
-    抑制なし。これは ``manual`` エントリの正しい動作 — プールにのみ保存されており、
-    外部にクリーンアップするものがない。
+    Unregistered sources fall through to the default remove path in
+    ``auth_remove_command``: the pool entry is already gone (that happens
+    before dispatch), no external cleanup, no suppression.  This is the
+    correct behaviour for ``manual`` entries — they were only ever stored
+    in the pool, nothing external to clean up.
     """
     for step in _REGISTRY:
         if step.matches(provider, source):
@@ -128,20 +133,21 @@ def find_removal_step(provider: str, source: str) -> Optional[RemovalStep]:
 
 
 # ---------------------------------------------------------------------------
-# ソースごとの RemovalStep 実装 — 1ソース1エントリ。
+# Individual RemovalStep implementations — one per source.
 # ---------------------------------------------------------------------------
-# 各 remove_fn は意図的に小さく単一目的にしている。新しい認証情報ソースを
-# 追加するにはここに1エントリ追加するだけ — auth_remove_command の変更は不要。
+# Each remove_fn is intentionally small and single-purpose.  Adding a new
+# credential source means adding ONE entry here — no other changes to
+# auth_remove_command.
 
 
 def _remove_env_source(provider: str, removed) -> RemovalResult:
-    """env:<VAR> — 最も一般的なケース。
+    """env:<VAR> — the most common case.
 
-    3つのユーザー状況を処理する:
-      1. 変数が ~/.hermes/.env にのみ存在する → クリアする
-      2. 変数がユーザーのシェルにのみ存在する（シェルプロファイル、systemd
-         EnvironmentFile、launchd plist）→ どこでアンセットするかをヒント
-      3. 両方に存在する → .env からクリアし、シェルについてヒント
+    Handles three user situations:
+      1. Var lives only in ~/.hermes/.env  → clear it
+      2. Var lives only in the user's shell (shell profile, systemd
+         EnvironmentFile, launchd plist) → hint them where to unset it
+      3. Var lives in both → clear from .env, hint about shell
     """
     from hermes_cli.config import get_env_path, remove_env_value
 
@@ -186,10 +192,10 @@ def _remove_env_source(provider: str, removed) -> RemovalResult:
 
 
 def _remove_claude_code(provider: str, removed) -> RemovalResult:
-    """~/.claude/.credentials.json は Claude Code 自体が所有する。
+    """~/.claude/.credentials.json is owned by Claude Code itself.
 
-    削除しない — ユーザーの Claude Code インストールはまだ機能する必要がある。
-    Hermes が読み取らないよう抑制するだけ。
+    We don't delete it — the user's Claude Code install still needs to
+    work.  We just suppress it so Hermes stops reading it.
     """
     return RemovalResult(hints=[
         "Suppressed claude_code credential — it will not be re-seeded.",
@@ -199,8 +205,8 @@ def _remove_claude_code(provider: str, removed) -> RemovalResult:
 
 
 def _remove_hermes_pkce(provider: str, removed) -> RemovalResult:
-    """~/.hermes/.anthropic_oauth.json は Hermes が所有 — 完全に削除する。"""
-    from base.hermes_constants import get_hermes_home
+    """~/.hermes/.anthropic_oauth.json is ours — delete it outright."""
+    from hermes_constants import get_hermes_home
 
     result = RemovalResult()
     oauth_file = get_hermes_home() / ".anthropic_oauth.json"
@@ -214,7 +220,7 @@ def _remove_hermes_pkce(provider: str, removed) -> RemovalResult:
 
 
 def _clear_auth_store_provider(provider: str) -> bool:
-    """auth_store.providers[provider] を削除する。削除した場合は True を返す。"""
+    """Delete auth_store.providers[provider].  Returns True if deleted."""
     from hermes_cli.auth import (
         _auth_store_lock,
         _load_auth_store,
@@ -232,12 +238,26 @@ def _clear_auth_store_provider(provider: str) -> bool:
 
 
 def _remove_nous_device_code(provider: str, removed) -> RemovalResult:
-    """Nous OAuth は auth.json providers.nous に存在 — クリアして抑制する。
+    """Nous OAuth lives in auth.json providers.nous — clear it and suppress.
 
-    クリアに加えて抑制するのは、次の `hermes login` 実行が決定前に
-    providers.nous を再書き込みするのを防ぐほかに手段がないから。
-    抑制により再有効化に `hermes auth add nous` を経由させ、
-    ドキュメントに記載された再追加パスで抑制をアトミックにクリアする。
+    We suppress in addition to clearing because nothing else stops the
+    user's next `hermes login` run from writing providers.nous again
+    before they decide to.  Suppression forces them to go through
+    `hermes auth add nous` to re-engage, which is the documented re-add
+    path and clears the suppression atomically.
+    """
+    result = RemovalResult()
+    if _clear_auth_store_provider(provider):
+        result.cleaned.append(f"Cleared {provider} OAuth tokens from auth store")
+    return result
+
+
+def _remove_minimax_oauth(provider: str, removed) -> RemovalResult:
+    """MiniMax OAuth lives in auth.json providers.minimax-oauth — clear it.
+
+    Same pattern as Nous: single-source OAuth state with refresh tokens.
+    Suppression of the `oauth` source ensures the pool reseed path
+    (_seed_from_singletons) doesn't instantly undo the removal.
     """
     result = RemovalResult()
     if _clear_auth_store_provider(provider):
@@ -246,18 +266,21 @@ def _remove_nous_device_code(provider: str, removed) -> RemovalResult:
 
 
 def _remove_codex_device_code(provider: str, removed) -> RemovalResult:
-    """Codex トークンは2か所に存在: Hermes の auth ストアと ~/.codex/auth.json。
+    """Codex tokens live in TWO places: our auth store AND ~/.codex/auth.json.
 
-    refresh_codex_oauth_pure() は毎回両方に書き込むため、Hermes の auth ストアのみを
-    クリアするだけでは不十分 — _seed_from_singletons() が次の load_pool() 呼び出しで
-    ~/.codex/auth.json から再インポートし、削除が即座に元に戻る。
-    Codex CLI のファイルを削除せず抑制することで、Codex CLI 自体は引き続き動作する。
+    refresh_codex_oauth_pure() writes both every time, so clearing only
+    the Hermes auth store is not enough — _seed_from_singletons() would
+    re-import from ~/.codex/auth.json on the next load_pool() call and
+    the removal would be instantly undone.  We suppress instead of
+    deleting Codex CLI's file, so the Codex CLI itself keeps working.
 
-    ``_seed_from_singletons`` での正規のソース名は ``"device_code"``（プレフィックスなし）。
-    エントリはプールに ``"device_code"``（シード済み）または ``"manual:device_code"``
-    （``hermes auth add openai-codex`` で追加）として現れるが、いずれも再シードゲートは
-    ``"device_code"`` 抑制キーにある。ここで正規キーを抑制し、中央ディスパッチャーも
-    ``removed.source`` を抑制する — 多重防衛、べき等。
+    The canonical source name in ``_seed_from_singletons`` is
+    ``"device_code"`` (no prefix).  Entries may show up in the pool as
+    either ``"device_code"`` (seeded) or ``"manual:device_code"`` (added
+    via ``hermes auth add openai-codex``), but in both cases the re-seed
+    gate lives at the ``"device_code"`` suppression key.  We suppress
+    that canonical key here; the central dispatcher also suppresses
+    ``removed.source`` which is fine — belt-and-suspenders, idempotent.
     """
     from hermes_cli.auth import suppress_credential_source
 
@@ -277,10 +300,10 @@ def _remove_codex_device_code(provider: str, removed) -> RemovalResult:
 
 
 def _remove_qwen_cli(provider: str, removed) -> RemovalResult:
-    """~/.qwen/oauth_creds.json は Qwen CLI が所有する。
+    """~/.qwen/oauth_creds.json is owned by the Qwen CLI.
 
-    claude_code と同じパターン — 削除せず抑制する。
-    ユーザーの Qwen CLI インストールはそのファイルを引き続き読み取る。
+    Same pattern as claude_code — suppress, don't delete.  The user's
+    Qwen CLI install still reads from that file.
     """
     return RemovalResult(hints=[
         "Suppressed qwen-cli credential — it will not be re-seeded.",
@@ -290,15 +313,17 @@ def _remove_qwen_cli(provider: str, removed) -> RemovalResult:
 
 
 def _remove_copilot_gh(provider: str, removed) -> RemovalResult:
-    """Copilot トークンは `gh auth token` または COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN から取得。
+    """Copilot token comes from `gh auth token` or COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN.
 
-    Copilot は特殊: 同一トークンが複数のソースエントリとしてシードされる
-    （``_seed_from_singletons`` の gh_cli と ``_seed_from_env`` の env:<VAR>）。
-    一つのエントリを他を抑制せずに削除すると重複が復活する。
-    ユーザーがどのエントリをクリックしても削除が安定するよう、
-    既知の copilot ソースをすべて抑制する。
+    Copilot is special: the same token can be seeded as multiple source
+    entries (gh_cli from ``_seed_from_singletons`` plus env:<VAR> from
+    ``_seed_from_env``), so removing one entry without suppressing the
+    others lets the duplicates resurrect.  We suppress ALL known copilot
+    sources here so removal is stable regardless of which entry the
+    user clicked.
 
-    ユーザーの gh CLI やシェル状態には触れない — Hermes がトークンを拾わないよう抑制するだけ。
+    We don't touch the user's gh CLI or shell state — just suppress so
+    Hermes stops picking the token up.
     """
     # Suppress ALL copilot source variants up-front so no path resurrects
     # the pool entry.  The central dispatcher in auth_remove_command will
@@ -317,9 +342,10 @@ def _remove_copilot_gh(provider: str, removed) -> RemovalResult:
 
 
 def _remove_custom_config(provider: str, removed) -> RemovalResult:
-    """カスタムプロバイダープールは custom_providers 設定または model.api_key からシードされる。
-    両方とも config.yaml にある — ここから変更するのは抑制より侵襲的。
-    抑制する; ディスクからキーを完全に削除したい場合はユーザーが config.yaml を直接編集する。
+    """Custom provider pools are seeded from custom_providers config or
+    model.api_key.  Both are in config.yaml — modifying that from here
+    is more invasive than suppression.  We suppress; the user can edit
+    config.yaml if they want to remove the key from disk entirely.
     """
     source_label = removed.source
     return RemovalResult(hints=[
@@ -330,12 +356,13 @@ def _remove_custom_config(provider: str, removed) -> RemovalResult:
 
 
 def _register_all_sources() -> None:
-    """モジュールインポート時に一度だけ呼び出される。
+    """Called once on module import.
 
-    順序が重要 — ``find_removal_step`` は最初の一致を返す。
-    copilot の ``env:GH_TOKEN`` がシェルに触れない copilot 削除を経由し、
-    .env をクリアしようとする汎用環境変数削除を経由しないよう、
-    プロバイダー固有のステップを汎用 ``env:*`` ステップの前に置く。
+    ORDER MATTERS — ``find_removal_step`` returns the first match.  Put
+    provider-specific steps before the generic ``env:*`` step so that e.g.
+    copilot's ``env:GH_TOKEN`` goes through the copilot removal (which
+    doesn't touch the user's shell), not the generic env-var removal
+    (which would try to clear .env).
     """
     register(RemovalStep(
         provider="copilot", source_id="gh_cli",
@@ -374,6 +401,11 @@ def _register_all_sources() -> None:
         provider="qwen-oauth", source_id="qwen-cli",
         remove_fn=_remove_qwen_cli,
         description="~/.qwen/oauth_creds.json",
+    ))
+    register(RemovalStep(
+        provider="minimax-oauth", source_id="oauth",
+        remove_fn=_remove_minimax_oauth,
+        description="auth.json providers.minimax-oauth",
     ))
     register(RemovalStep(
         provider="*", source_id="config:",

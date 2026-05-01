@@ -26,13 +26,12 @@ logger = logging.getLogger(__name__)
 
 
 def _get_active_adapter():
-    """AiDiy 版では gateway を持たないため、常に未接続として扱う。"""
-    return None
-
-
-def _gateway_disabled(message: str = "Yuanbao gateway is disabled in AiDiy Hermes") -> dict:
-    """チャンネル系ツールを誤って呼んだ場合の統一レスポンス。"""
-    return {"success": False, "error": message}
+    """Lazy import to avoid ImportError when gateway.platforms.yuanbao is unavailable."""
+    try:
+        from gateway.platforms.yuanbao import get_active_adapter
+        return get_active_adapter()
+    except ImportError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +176,33 @@ async def search_sticker(query: str = "", limit: int = 10) -> dict:
     返回每条候选的 sticker_id / name / description / package_id，
     供 LLM 选择后传给 send_sticker。空 query 时返回前 N 条。
     """
-    return _gateway_disabled()
+    from gateway.platforms.yuanbao_sticker import search_stickers
+
+    try:
+        safe_limit = max(1, min(50, int(limit) if limit else 10))
+    except (TypeError, ValueError):
+        safe_limit = 10
+
+    try:
+        matches = search_stickers(query or "", limit=safe_limit)
+    except Exception as exc:
+        logger.exception("[yuanbao_tools] search_sticker error")
+        return {"success": False, "error": str(exc)}
+
+    return {
+        "success": True,
+        "query": query or "",
+        "count": len(matches),
+        "results": [
+            {
+                "sticker_id": s.get("sticker_id", ""),
+                "name": s.get("name", ""),
+                "description": s.get("description", ""),
+                "package_id": s.get("package_id", ""),
+            }
+            for s in matches
+        ],
+    }
 
 
 async def send_sticker(
@@ -196,15 +221,40 @@ async def send_sticker(
 
     Returns: ``{"success": bool, ...}``
     """
-    target = (chat_id or "").strip()
+    from gateway.session_context import get_session_env
+    from gateway.platforms.yuanbao_sticker import (
+        get_sticker_by_id,
+        get_sticker_by_name,
+        get_random_sticker,
+    )
+
+    target = (chat_id or "").strip() or get_session_env("HERMES_SESSION_CHAT_ID", "")
     if not target:
-        return _gateway_disabled("chat_id is required because Yuanbao gateway session context is disabled")
+        return {
+            "success": False,
+            "error": "chat_id is required (no active yuanbao session detected)",
+        }
 
     adapter = _get_active_adapter()
     if adapter is None:
         return {"success": False, "error": "Yuanbao adapter is not connected"}
 
-    sticker_obj = {"name": (sticker or "").strip(), "sticker_id": (sticker or "").strip()}
+    raw = (sticker or "").strip()
+    sticker_obj: Optional[dict] = None
+    if not raw:
+        sticker_obj = get_random_sticker()
+    else:
+        if raw.isdigit():
+            sticker_obj = get_sticker_by_id(raw)
+        if sticker_obj is None:
+            sticker_obj = get_sticker_by_name(raw)
+
+    if sticker_obj is None:
+        return {
+            "success": False,
+            "error": f"Sticker not found: {raw!r}. "
+                     f"Use search_sticker first to discover available stickers.",
+        }
 
     try:
         result = await adapter.send_sticker(
@@ -368,8 +418,14 @@ from tools.registry import registry, tool_result  # noqa: E402
 
 
 def _check_yuanbao():
-    """gateway を削除した AiDiy 版では Yuanbao ツールセットを無効化する。"""
-    return False
+    """Toolset availability check — True when running in a yuanbao gateway session."""
+    try:
+        from gateway.session_context import get_session_env
+        if get_session_env("HERMES_SESSION_PLATFORM", "") == "yuanbao":
+            return True
+    except Exception:
+        pass
+    return _get_active_adapter() is not None
 
 
 async def _handle_yb_query_group_info(args, **kw):
@@ -391,7 +447,14 @@ async def _handle_yb_send_dm(args, **kw):
     # Resolve group_code: prefer explicit arg, fallback to session context.
     group_code = args.get("group_code", "")
     if not group_code:
-        group_code = ""
+        try:
+            from gateway.session_context import get_session_env
+            chat_id = get_session_env("HERMES_SESSION_CHAT_ID", "")
+            # chat_id format: "group:<code>" → extract the code part
+            if chat_id.startswith("group:"):
+                group_code = chat_id.split(":", 1)[1]
+        except Exception:
+            pass
 
     # Parse media_files: list of {{"path": str, "is_voice": bool}} → List[Tuple[str, bool]]
     raw_media = args.get("media_files") or []
@@ -402,8 +465,13 @@ async def _handle_yb_send_dm(args, **kw):
         elif isinstance(item, (list, tuple)) and len(item) >= 2:
             media_files.append((str(item[0]), bool(item[1])))
 
-    # メッセージ内 MEDIA:<path> 抽出は gateway 基底クラス依存のため AiDiy 版では行わない。
+    # Extract MEDIA:<path> tags embedded in the message text (LLM often puts
+    # file paths there instead of using the media_files parameter).
     message = args.get("message", "")
+    from gateway.platforms.base import BasePlatformAdapter
+    embedded_media, message = BasePlatformAdapter.extract_media(message)
+    if embedded_media:
+        media_files.extend(embedded_media)
 
     return tool_result(await send_dm(
         group_code=group_code,        name=args.get("name", ""),

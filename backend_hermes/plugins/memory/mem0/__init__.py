@@ -22,7 +22,7 @@ import threading
 import time
 from typing import Any, Dict, List
 
-from core.memory_provider import MemoryProvider
+from agent.memory_provider import MemoryProvider
 from tools.registry import tool_error
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def _load_config() -> dict:
     individual keys.  This avoids a silent failure when the JSON file exists
     but is missing fields like ``api_key`` that the user set in ``.env``.
     """
-    from base.hermes_constants import get_hermes_home
+    from hermes_constants import get_hermes_home
 
     config = {
         "api_key": os.environ.get("MEM0_API_KEY", ""),
