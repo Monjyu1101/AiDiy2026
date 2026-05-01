@@ -45,4 +45,6 @@ export interface ModelSettings {
   CODE_AI2_NAME: string;
   CODE_AI3_NAME: string;
   CODE_AI4_NAME: string;
+  CODE_AI5_NAME: string;
+  CODE_AI6_NAME: string;
 }

@@ -9,7 +9,7 @@ const shouldOpenDevTools = process.env.VITE_OPEN_DEVTOOLS === '1'
 const APP_USER_MODEL_ID = 'AiDiy.frontend_avatar'
 
 type WindowMode = 'login' | 'core'
-type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
+type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 type WindowRole = WindowMode | PanelKey | 'settings'
 type WindowBounds = { x: number; y: number; width: number; height: number }
 type WindowPointerSnapshot = {
@@ -45,6 +45,8 @@ const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   code2: CHAT_BASE_BOUNDS,
   code3: CHAT_BASE_BOUNDS,
   code4: CHAT_BASE_BOUNDS,
+  code5: CHAT_BASE_BOUNDS,
+  code6: CHAT_BASE_BOUNDS,
 }
 
 const panelStates: Record<PanelKey, boolean> = {
@@ -55,6 +57,8 @@ const panelStates: Record<PanelKey, boolean> = {
   code2: false,
   code3: false,
   code4: false,
+  code5: false,
+  code6: false,
 }
 
 let loginWindow: BrowserWindow | null = null
@@ -143,6 +147,8 @@ function getPanelInitialPosition(panel: PanelKey, width: number, height: number)
     code2: 2,
     code3: 3,
     code4: 4,
+    code5: 5,
+    code6: 6,
   }
   const step = 48
   const order = orderMap[panel as Exclude<PanelKey, 'image' | 'chat'>] ?? 0

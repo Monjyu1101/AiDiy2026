@@ -183,8 +183,8 @@
 - Vue Router guard で未認証時は `/ログイン` へリダイレクト
 
 **12. AIコア マルチパネルUI:**
-- 6つの独立パネル（チャット、イメージ、エージェント1-4）
-- 動的グリッドレイアウト（1-6パネル対応）
+- 9つの独立パネル（チャット、ファイル、イメージ、エージェント1-6）
+- 動的グリッドレイアウト（1-9パネル対応、5枚以上は `layout-multi`）
 - ポートレート/ランドスケープ対応
 - フローティングコントロール（マイク、スピーカー、カメラ、コンポーネント選択）
 - WebSocketリアルタイム通信
@@ -978,7 +978,7 @@ The **AIコア** (Core AI) is a multi-panel AI interface system with flexible gr
 
 **Key features:**
 - **Session persistence**: Uses URL-based session IDs to persist component visibility and control states across page reloads
-- **Dynamic grid layouts**: Automatically adjusts layout based on the number of visible panels (1-6 components)
+- **Dynamic grid layouts**: Automatically adjusts layout based on the number of visible panels (1-9 components)
 - **Component types**: Chat (terminal-style), Image capture (with source selection), Code panel (Monaco Editor), File management (Monaco Editor), Agent panels
 - **Floating controls**: Microphone, speaker, camera, and component selection toggle
 - **Responsive design**: Adapts layouts for portrait/landscape orientations
@@ -993,7 +993,7 @@ The **AIコア** (Core AI) is a multi-panel AI interface system with flexible gr
 
 **Main container** (`AiDiy.vue`):
 - Manages session ID in URL query parameter `?セッションID=<uuid>`
-- Tracks visibility state for 6 components (チャット, イメージ, エージェント1-4)
+- Tracks visibility state for 9 components (チャット, ファイル, イメージ, エージェント1-6)
 - Controls audio/video buttons (マイク, スピーカー, カメラ)
 - Provides dynamic CSS Grid layouts based on panel count
 
@@ -1013,7 +1013,7 @@ The **AIコア** (Core AI) is a multi-panel AI interface system with flexible gr
 - 2 panels: Side-by-side with 10% outer padding + 10% center gap (portrait: stacked vertically)
 - 3 panels: Horizontal split (portrait: vertical stack)
 - 4 panels: 2×2 grid
-- 5-6 panels: 3×2 grid
+- 5+ panels: `layout-multi`（通常は3列グリッド、狭幅では2列/1列へレスポンシブ変化）
 
 **Access:**
 - URL: http://localhost:8090/AiDiy (opens in new tab from top menu)

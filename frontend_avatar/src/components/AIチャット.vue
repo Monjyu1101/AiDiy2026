@@ -17,7 +17,7 @@ import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import apiClient from '@/api/client'
 import ファイル内容表示ダイアログ from '@/components/ファイル内容表示.vue'
 
-type チャットモード = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'
+type チャットモード = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 
 // props（messages/チャット接続済み/モデル設定 はdeprecated扱い）
 const プロパティ = defineProps<{
@@ -831,32 +831,38 @@ defineExpose({
       </div>
 
       <div class="mode-panel">
-        <div class="mode-selector">
+        <div class="mode-grid">
           <label class="mode-option">
             <input type="radio" v-model="選択モード" value="chat" name="avatar-chat-mode" />
             <span>Chat</span>
-          </label>
-          <label class="mode-option">
-            <input type="radio" v-model="選択モード" value="live" name="avatar-chat-mode" />
-            <span>Live</span>
-          </label>
-          <label class="mode-option">
-            <input type="radio" v-model="選択モード" value="code1" name="avatar-chat-mode" />
-            <span>Code1</span>
-          </label>
-        </div>
-        <div class="code-selector">
-          <label class="mode-option">
-            <input type="radio" v-model="選択モード" value="code2" name="avatar-chat-mode" />
-            <span>Code2</span>
           </label>
           <label class="mode-option">
             <input type="radio" v-model="選択モード" value="code3" name="avatar-chat-mode" />
             <span>Code3</span>
           </label>
           <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="live" name="avatar-chat-mode" />
+            <span>Live</span>
+          </label>
+          <label class="mode-option">
             <input type="radio" v-model="選択モード" value="code4" name="avatar-chat-mode" />
             <span>Code4</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code1" name="avatar-chat-mode" />
+            <span>Code1</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code5" name="avatar-chat-mode" />
+            <span>Code5</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code2" name="avatar-chat-mode" />
+            <span>Code2</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code6" name="avatar-chat-mode" />
+            <span>Code6</span>
           </label>
         </div>
       </div>
@@ -1111,47 +1117,44 @@ defineExpose({
 
 .mode-panel {
   display: flex;
-  flex-direction: row;
-  gap: 8px;
-  padding-bottom: 16px;
   justify-content: center;
+  padding-bottom: 12px;
   margin-top: -4px;
 }
 
-.mode-selector,
-.code-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 16px;
 }
 
 .mode-option {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: #e0e0e0;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   user-select: none;
-  line-height: 1.1;
+  line-height: 1;
   padding: 0;
 }
 
 .mode-option input[type="radio"] {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
   cursor: pointer;
   accent-color: #667eea;
   margin: 0;
   position: relative;
-  top: -8px;
+  top: -6px;
 }
 
 .mode-option span {
   font-family: "Courier New", monospace;
   font-weight: normal;
   position: relative;
-  top: -4px;
+  top: -3px;
 }
 
 .chat-send-btn {

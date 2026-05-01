@@ -23,7 +23,7 @@ import { AudioController } from '@/components/AIコア_音声処理'
 import { AI_WS_ENDPOINT } from '@/api/config'
 import { AIWebSocket } from '@/api/websocket'
 
-type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
+type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 
 const props = defineProps<{
   sessionId: string;
@@ -638,6 +638,26 @@ defineExpose({ 字幕追加 })
           @click="パネル切替要求('code4')"
         >
           4
+        </button>
+        <button
+          class="floating-icon agent-icon"
+          :class="{ inactive: !panelVisibility.code5, active: panelVisibility.code5 }"
+          :disabled="!inputConnected"
+          type="button"
+          title="コード5"
+          @click="パネル切替要求('code5')"
+        >
+          5
+        </button>
+        <button
+          class="floating-icon agent-icon"
+          :class="{ inactive: !panelVisibility.code6, active: panelVisibility.code6 }"
+          :disabled="!inputConnected"
+          type="button"
+          title="コード6"
+          @click="パネル切替要求('code6')"
+        >
+          6
         </button>
         <button
           class="floating-icon config-icon"

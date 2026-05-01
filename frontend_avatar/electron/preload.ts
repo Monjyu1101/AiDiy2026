@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
+type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 type WindowMode = 'login' | 'core'
 type WindowRole = WindowMode | PanelKey | 'settings'
 type WindowBounds = { x: number; y: number; width: number; height: number }

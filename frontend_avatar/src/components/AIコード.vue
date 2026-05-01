@@ -18,7 +18,7 @@ import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import AIコードファイル内容表示 from '@/dialog/ファイル内容表示.vue'
 import AIコード更新ファイル一覧 from '@/dialog/更新ファイル一覧.vue'
 
-type コードチャンネル = '1' | '2' | '3' | '4'
+type コードチャンネル = '1' | '2' | '3' | '4' | '5' | '6'
 type 行種別 =
   | 'input_text'
   | 'input_request'

@@ -126,8 +126,8 @@ class CodeAgentRequestTool(ToolInterface):
             チャンネル = parameters.get("channel", 1)
             要求内容 = parameters.get("request", "")
             
-            if チャンネル not in [1, 2, 3, 4]:
-                return f"エラー: チャンネル番号は1-4の範囲で指定してください（指定値: {チャンネル}）"
+            if チャンネル not in [1, 2, 3, 4, 5, 6]:
+                return f"エラー: チャンネル番号は1-6の範囲で指定してください（指定値: {チャンネル}）"
             
             if not 要求内容:
                 return "エラー: 処理依頼内容が空です"

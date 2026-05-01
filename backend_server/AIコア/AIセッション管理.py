@@ -68,6 +68,10 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_AI3_MODEL": app_conf.json.get("CODE_AI3_MODEL", "auto"),
         "CODE_AI4_NAME": app_conf.json.get("CODE_AI4_NAME", "auto"),
         "CODE_AI4_MODEL": app_conf.json.get("CODE_AI4_MODEL", "auto"),
+        "CODE_AI5_NAME": app_conf.json.get("CODE_AI5_NAME", "auto"),
+        "CODE_AI5_MODEL": app_conf.json.get("CODE_AI5_MODEL", "auto"),
+        "CODE_AI6_NAME": app_conf.json.get("CODE_AI6_NAME", "auto"),
+        "CODE_AI6_MODEL": app_conf.json.get("CODE_AI6_MODEL", "auto"),
         "CODE_CLAUDE_SDK_MODEL": app_conf.json.get("CODE_CLAUDE_SDK_MODEL", "auto"),
         "CODE_CLAUDE_CLI_MODEL": app_conf.json.get("CODE_CLAUDE_CLI_MODEL", "auto"),
         "CODE_COPILOT_CLI_MODEL": app_conf.json.get("CODE_COPILOT_CLI_MODEL", "auto"),
@@ -97,7 +101,7 @@ def モデル設定正規化(設定: Optional[dict]) -> dict:
     if "CODE_AIDIY_HERMES_MODEL" not in 正規化後 and 旧hermesモデル is not None:
         正規化後["CODE_AIDIY_HERMES_MODEL"] = 旧hermesモデル
 
-    for i in range(1, 5):
+    for i in range(1, 7):
         ai_key = f"CODE_AI{i}_NAME"
         if 正規化後.get(ai_key) == "hermes_cli":
             正規化後[ai_key] = "aidiy_hermes"

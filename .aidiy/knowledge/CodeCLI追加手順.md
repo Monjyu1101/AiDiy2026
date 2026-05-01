@@ -68,9 +68,9 @@
 - `frontend_avatar/src/dialog/AI設定再起動.vue`
 
 対応内容:
-- `CODE_AI1_NAME`〜`CODE_AI4_NAME` は `PANEL_TITLES` の表示名にも使われるため、設定変更後に code1〜code4 のウィンドウタイトルが更新されるか確認する
-- Web モードでは code1〜code4 は別ウィンドウではなくタブなので、`webTabs` と `PANEL_KEYS` は CLI 種別ではなくパネル数を表す。新CLI追加だけなら増やさない
-- 各 `AIコード.vue` は `チャンネル`（code1〜code4）単位で WebSocket 接続する。CLI 名をチャンネル名として増やす設計にしない
+- `CODE_AI1_NAME`〜`CODE_AI6_NAME` は `PANEL_TITLES` の表示名にも使われるため、設定変更後に code1〜code6 のウィンドウタイトルが更新されるか確認する
+- Web モードでは code1〜code6 は別ウィンドウではなくタブなので、`webTabs` と `PANEL_KEYS` は CLI 種別ではなくパネル数を表す。新CLI追加だけなら増やさない
+- 各 `AIコード.vue` は `チャンネル`（code1〜code6）単位で WebSocket 接続する。CLI 名をチャンネル名として増やす設計にしない
 
 ## 実装時の注意点
 - backend の `available_models.code_models` に出ない限り、frontend へ項目を足しても選択できない
@@ -84,7 +84,7 @@
 - CLI ごとに専用の `AiDiy_code_*.json` が必要とは限らない。`aidiy_hermes` は Ollama モデル一覧を流用して `conf_model.py` で動的生成している
 - `_setup.py` / `_cleanup.py` に統合しても、常駐起動が不要な CLI は `_start.py` に足さない方が運用が分かりやすい
 - backend 側の `CODE_MODEL_KEYS` と `conf_json.DEFAULT_CONFIG` のキー名は揃える（例: `CODE_AIDIY_HERMES_MODEL`）
-- `aidiy_hermes --version` は cold start や code1〜code4 の同時接続時に 10 秒を超えることがある。未インストール扱いの誤判定を避けるため、`backend_server/AIコア/AIコード_cli.py` のバージョン確認は `aidiy_hermes` だけ長めに待ち、チャンネル間で結果をキャッシュする。
+- `aidiy_hermes --version` は cold start や code1〜code6 の同時接続時に 10 秒を超えることがある。未インストール扱いの誤判定を避けるため、`backend_server/AIコア/AIコード_cli.py` のバージョン確認は `aidiy_hermes` だけ長めに待ち、チャンネル間で結果をキャッシュする。
 
 ## 最低限の確認項目
 - AI設定再起動ダイアログで新CLIを選択できる
@@ -94,7 +94,7 @@
 - バージョン確認が通る
 - 新規会話コマンドが組める
 - 継続会話コマンドが組める
-- code1〜code4 のどのスロットに割り当てても、WebSocket チャンネルは `code1`〜`code4` のまま動く
+- code1〜code6 のどのスロットに割り当てても、WebSocket チャンネルは `code1`〜`code6` のまま動く
 - OS依存条件がある場合、その環境で実行確認できる
 
 新しい CLI を追加したら、Hermes セクションと同じ観点（OS 依存の起動方法、パス変換、モデル選択の差異）をこのファイルの末尾に追記する。

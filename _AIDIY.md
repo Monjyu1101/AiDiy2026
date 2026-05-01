@@ -30,8 +30,8 @@
   - WebSocket ベースの AI コア
   - 音声、画像、コード支援パネル
 - マルチ Code CLI 対応
-  - `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `aidiy_hermes`
-  - 複数のコードエージェントを同時並走（code1〜code4 パネル）
+  - `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `opencode_cli`, `aidiy_hermes`
+  - 複数のコードエージェントを同時並走（code1〜code6 パネル）
 - AIブラウザ自動操作・デスクトップキャプチャ・自己検証 MCP
   - `backend_mcp/mcp_main.py`（port 8095）が 8 MCP サーバーを SSE で提供
     - `aidiy_chrome_devtools` — CDP でブラウザ操作

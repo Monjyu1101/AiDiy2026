@@ -129,7 +129,7 @@ class StreamingProcessor:
             await self._process_image_ai()
 
         # エージェントAI処理
-        for i in range(1, 5):
+        for i in range(1, 7):
             if ボタン状態.get(f"エージェント{i}", False):
                 await self._process_agent_ai(i)
 

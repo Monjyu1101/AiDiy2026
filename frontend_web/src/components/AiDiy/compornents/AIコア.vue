@@ -3,7 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { AIWebSocket, createWebSocketUrl, type IWebSocketClient } from '@/api/websocket';
 import { AudioController } from './AIコア_音声処理';
 
-type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4';
+type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6';
 
 const props = defineProps<{
   sessionId: string;
@@ -388,6 +388,24 @@ onBeforeUnmount(() => {
       @click="パネル切替要求('code4')"
     >
       4
+    </button>
+    <button
+      class="floating-icon agent-icon"
+      :class="{ inactive: !props.panelVisibility.code5, active: props.panelVisibility.code5 }"
+      :disabled="!props.inputConnected"
+      title="コード5"
+      @click="パネル切替要求('code5')"
+    >
+      5
+    </button>
+    <button
+      class="floating-icon agent-icon"
+      :class="{ inactive: !props.panelVisibility.code6, active: props.panelVisibility.code6 }"
+      :disabled="!props.inputConnected"
+      title="コード6"
+      @click="パネル切替要求('code6')"
+    >
+      6
     </button>
     <button
       class="floating-icon config-icon"

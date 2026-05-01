@@ -41,6 +41,10 @@
 - `backend_hermes` は `_setup.py` / `_cleanup.py` へ統合済みだが、`_start.py` の常駐起動対象ではない。
 - Code AI 名の現行値は `hermes_cli` ではなく `aidiy_hermes`。
 - `aidiy_hermes` のモデル一覧は `AiDiy_code_*.json` ではなく `conf_model.py` が Ollama モデル一覧から動的生成する。
+- コードAIパネルは現行 6 枠。
+  - backend: `コードチャンネル一覧 = ["1", ..., "6"]`、`code_agent_processors` 長さ 6、`CODE_AI1_NAME`〜`CODE_AI6_NAME`
+  - frontend_web / frontend_avatar: `PanelKey` は `code1`〜`code6`、ボタン状態は `エージェント1`〜`エージェント6`
+  - Markdown で旧4枠表記（code 1〜4、CODE_AI 1〜4、エージェント 1〜4）が残っていたら更新する。
 - Docker 構成は `backend_mcp` を含まない。MCP 検証手順ではローカル起動を前提にする。
 - `npm run build` は明示依頼時のみ。通常の検証記述は `npm run type-check` を優先する。
 

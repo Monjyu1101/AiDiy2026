@@ -62,6 +62,7 @@
 | [`HermesCLI_TUI調整手順.md`](./HermesCLI_TUI調整手順.md) | backend_hermes の TUI・起動ロゴ・スラッシュコマンドを調整したい | 旧Hermes TUI骨格の移植、`/` 補完、履歴、provider/model picker、軽量バナーの実装観点 |
 | [`MCP活用手順.md`](./MCP活用手順.md) | Claude Agent SDK から MCP ツールを使いたい | `AiDiy_mcp.json` の設定形式・8 MCP サーバーの用途・接続確認 |
 | [`AIモデル設定変更手順.md`](./AIモデル設定変更手順.md) | 使用する AI モデルを変更したい | 命名規則（`_chat`/`_live`/`_sdk`/`_cli`）・`AiDiy_key.json` 編集・設定 UI の取得フロー |
+| [`AIコードパネル拡張手順.md`](./AIコードパネル拡張手順.md) | コードAIパネルの数を 4→6 に増やしたい | backend 設定・セッション管理・許可キー・エージェントプロセッサ数・フロントパネル/ボタン/モード選択・Electron ウィンドウ管理の全連動修正箇所 |
 | [`AIコアWebSocket仕様.md`](./AIコアWebSocket仕様.md) | WebSocket 接続フロー・メッセージ形式を把握したい | 2 本ソケット構成・`init` メッセージ・トークン延長ルール |
 
 ---

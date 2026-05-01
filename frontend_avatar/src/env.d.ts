@@ -16,7 +16,7 @@ interface ImportMetaEnv {
 }
 
 declare global {
-  type AvatarPanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4'
+  type AvatarPanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
   type AvatarWindowMode = 'login' | 'core'
   type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey | 'settings'
   type AvatarWindowBounds = { x: number; y: number; width: number; height: number }

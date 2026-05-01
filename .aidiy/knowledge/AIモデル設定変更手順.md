@@ -18,7 +18,7 @@
 |------|-----------|---------|---------|
 | `CHAT_AI_NAME` | `_chat` | `gemini_chat`, `openrt_chat`, `freeai_chat` | `gemini`, `claude_chat_v2` |
 | `LIVE_AI_NAME` | `_live` | `gemini_live`, `openai_live` | `gemini` |
-| `CODE_AI1_NAME`〜`CODE_AI4_NAME` | `_sdk` または `_cli` | `claude_sdk`, `copilot_cli`, `codex_cli` | `claude`, `claude_code` |
+| `CODE_AI1_NAME`〜`CODE_AI6_NAME` | `_sdk` または `_cli`（例外: `aidiy_hermes`） | `claude_sdk`, `copilot_cli`, `codex_cli`, `gemini_cli`, `opencode_cli`, `aidiy_hermes` | `claude`, `claude_code` |
 
 **比較は完全一致のみ**（`startswith` 等の前方一致は使用禁止）。
 
@@ -36,7 +36,9 @@
   "CODE_AI1_NAME": "claude_sdk",
   "CODE_AI2_NAME": "copilot_cli",
   "CODE_AI3_NAME": "codex_cli",
-  "CODE_AI4_NAME": "gemini_cli"
+  "CODE_AI4_NAME": "gemini_cli",
+  "CODE_AI5_NAME": "opencode_cli",
+  "CODE_AI6_NAME": "aidiy_hermes"
 }
 ```
 

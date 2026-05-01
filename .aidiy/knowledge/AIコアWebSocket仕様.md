@@ -37,7 +37,7 @@ ws://<host>/core/ws/AIコア
 | `'0'` | `AiDiy.vue` | core 出力受信、状態制御 |
 | `'1'` | `AiDiy.vue` | テキスト・画像・ファイルなどの入力 |
 | `'audio'` | `AIコア.vue` | `input_audio` 送信、`output_audio` / `cancel_audio` 受信 |
-| `chat` / `file` / `code1`〜`code4` | 各パネルコンポーネント | パネル別の出力受信 |
+| `chat` / `file` / `code1`〜`code6` | 各パネルコンポーネント | パネル別の出力受信 |
 
 ### 接続シーケンス
 

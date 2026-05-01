@@ -21,10 +21,10 @@ import AIコアイメージ from './compornents/AIイメージ.vue';
 import AIコアコード from './compornents/AIコード.vue';
 import AIコアファイル from './compornents/AIファイル.vue';
 
-type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4';
-type チャットモード型 = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4';
+type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6';
+type チャットモード型 = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6';
 
-const PANEL_KEYS: PanelKey[] = ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4'];
+const PANEL_KEYS: PanelKey[] = ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4', 'code5', 'code6'];
 
 function パネル状態生成(): Record<PanelKey, boolean> {
   return {
@@ -35,6 +35,8 @@ function パネル状態生成(): Record<PanelKey, boolean> {
     code2: false,
     code3: false,
     code4: false,
+    code5: false,
+    code6: false,
   };
 }
 
@@ -51,7 +53,9 @@ const モデル設定 = ref({
   CODE_AI1_NAME: '',
   CODE_AI2_NAME: '',
   CODE_AI3_NAME: '',
-  CODE_AI4_NAME: ''
+  CODE_AI4_NAME: '',
+  CODE_AI5_NAME: '',
+  CODE_AI6_NAME: ''
 });
 
 const チャットモード = ref<チャットモード型>('live');
@@ -103,14 +107,16 @@ function コア状態リセット() {
   初期スピーカー有効.value = true;
   音声状態シード.value = 0;
   チャットモード.value = 'live';
-  モデル設定.value = {
-    CHAT_AI_NAME: '',
-    LIVE_AI_NAME: '',
-    CODE_AI1_NAME: '',
-    CODE_AI2_NAME: '',
-    CODE_AI3_NAME: '',
-    CODE_AI4_NAME: ''
-  };
+   モデル設定.value = {
+     CHAT_AI_NAME: '',
+     LIVE_AI_NAME: '',
+     CODE_AI1_NAME: '',
+     CODE_AI2_NAME: '',
+     CODE_AI3_NAME: '',
+     CODE_AI4_NAME: '',
+     CODE_AI5_NAME: '',
+     CODE_AI6_NAME: ''
+   };
   パネルボタン状態.value = パネル状態生成();
   パネル表示中.value = パネル状態生成();
   パネルレイアウト中.value = パネル状態生成();
@@ -152,7 +158,9 @@ function パネル状態反映(ボタン?: Record<string, any>) {
     code1: Boolean(ボタン?.エージェント1),
     code2: Boolean(ボタン?.エージェント2),
     code3: Boolean(ボタン?.エージェント3),
-    code4: Boolean(ボタン?.エージェント4)
+    code4: Boolean(ボタン?.エージェント4),
+    code5: Boolean(ボタン?.エージェント5),
+    code6: Boolean(ボタン?.エージェント6)
   };
 
   PANEL_KEYS.forEach((panel) => {
@@ -175,7 +183,9 @@ function 初期化処理(message: Record<string, any>) {
     CODE_AI1_NAME: settings.CODE_AI1_NAME || '',
     CODE_AI2_NAME: settings.CODE_AI2_NAME || '',
     CODE_AI3_NAME: settings.CODE_AI3_NAME || '',
-    CODE_AI4_NAME: settings.CODE_AI4_NAME || ''
+    CODE_AI4_NAME: settings.CODE_AI4_NAME || '',
+    CODE_AI5_NAME: settings.CODE_AI5_NAME || '',
+    CODE_AI6_NAME: settings.CODE_AI6_NAME || ''
   };
 
   初期マイク有効.value = Boolean(buttons.マイク);
@@ -547,6 +557,38 @@ onBeforeUnmount(() => {
           :input-connected="入力接続済み"
           @activate="パネル有効化('code4')"
           @close="パネル閉じる('code4')"
+        />
+      </div>
+      </Transition>
+
+      <!-- エージェント5 -->
+      <Transition name="panel-expand" @after-leave="パネル退場後('code5')">
+      <div v-show="パネル表示中.code5" class="component-panel">
+        <AIコアコード
+          key="code-5"
+          :セッションID="セッションID"
+          チャンネル="5"
+          :code-ai="モデル設定.CODE_AI5_NAME"
+          :input-ws-client="入力ソケット"
+          :input-connected="入力接続済み"
+          @activate="パネル有効化('code5')"
+          @close="パネル閉じる('code5')"
+        />
+      </div>
+      </Transition>
+
+      <!-- エージェント6 -->
+      <Transition name="panel-expand" @after-leave="パネル退場後('code6')">
+      <div v-show="パネル表示中.code6" class="component-panel">
+        <AIコアコード
+          key="code-6"
+          :セッションID="セッションID"
+          チャンネル="6"
+          :code-ai="モデル設定.CODE_AI6_NAME"
+          :input-ws-client="入力ソケット"
+          :input-connected="入力接続済み"
+          @activate="パネル有効化('code6')"
+          @close="パネル閉じる('code6')"
         />
       </div>
       </Transition>

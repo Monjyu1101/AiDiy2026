@@ -22,7 +22,7 @@ const プロパティ = defineProps<{
   チャンネル?: string;
   chatAi?: string;
   liveAi?: string;
-  chatMode?: 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4';
+  chatMode?: 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6';
   inputWsClient?: IWebSocketClient | null;
   inputConnected?: boolean;
 }>();
@@ -30,7 +30,7 @@ const プロパティ = defineProps<{
 // Emits
 const 通知 = defineEmits<{
   close: [];
-  'mode-change': ['chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'];
+  'mode-change': ['chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'];
   activate: [];
 }>();
 
@@ -56,7 +56,7 @@ interface メッセージ {
 
 const メッセージ一覧 = ref<メッセージ[]>([]);
 const 入力テキスト = ref('');
-const 選択モード = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4'>(プロパティ.chatMode || 'live');
+const 選択モード = ref<'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'>(プロパティ.chatMode || 'live');
 
 const 送信モードラベル = computed(() => {
   const m = 選択モード.value;
@@ -949,35 +949,40 @@ const キー入力処理 = (_event: KeyboardEvent) => {
         </div>
       </div>
 
-      <!-- モード選択（縦並び） -->
+      <!-- モード選択（2列4行） -->
       <div class="mode-panel">
-        <div class="mode-selector">
+        <div class="mode-grid">
           <label class="mode-option">
             <input type="radio" v-model="選択モード" value="chat" name="mode" />
             <span>Chat</span>
-          </label>
-          <label class="mode-option">
-            <input type="radio" v-model="選択モード" value="live" name="mode" />
-            <span>Live</span>
-          </label>
-          <label class="mode-option">
-            <input type="radio" v-model="選択モード" value="code1" name="mode" />
-            <span>Code1</span>
-          </label>
-        </div>
-
-        <div class="code-selector">
-          <label class="mode-option">
-            <input type="radio" v-model="選択モード" value="code2" name="mode" />
-            <span>Code2</span>
           </label>
           <label class="mode-option">
             <input type="radio" v-model="選択モード" value="code3" name="mode" />
             <span>Code3</span>
           </label>
           <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="live" name="mode" />
+            <span>Live</span>
+          </label>
+          <label class="mode-option">
             <input type="radio" v-model="選択モード" value="code4" name="mode" />
             <span>Code4</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code1" name="mode" />
+            <span>Code1</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code5" name="mode" />
+            <span>Code5</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code2" name="mode" />
+            <span>Code2</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" v-model="選択モード" value="code6" name="mode" />
+            <span>Code6</span>
           </label>
         </div>
       </div>
@@ -1367,47 +1372,44 @@ const キー入力処理 = (_event: KeyboardEvent) => {
 
 .mode-panel {
   display: flex;
-  flex-direction: row;
-  gap: 8px;
-  padding-bottom: 16px;
   justify-content: center;
+  padding-bottom: 12px;
   margin-top: -4px;
 }
 
-.mode-selector,
-.code-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 16px;
 }
 
 .mode-option {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: #e0e0e0;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   user-select: none;
-  line-height: 1.1;
+  line-height: 1;
   padding: 0;
 }
 
 .mode-option input[type="radio"] {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
   cursor: pointer;
   accent-color: #667eea;
   margin: 0;
   position: relative;
-  top: -8px;
+  top: -6px;
 }
 
 .mode-option span {
   font-family: 'Courier New', monospace;
   font-weight: normal;
   position: relative;
-  top: -4px;
+  top: -3px;
 }
 
 .text-input-area {

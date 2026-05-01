@@ -72,6 +72,10 @@ class conf_json:
         'CODE_AI3_MODEL': 'auto',
         'CODE_AI4_NAME': 'gemini_cli',
         'CODE_AI4_MODEL': 'auto',
+        'CODE_AI5_NAME': 'auto',
+        'CODE_AI5_MODEL': 'auto',
+        'CODE_AI6_NAME': 'auto',
+        'CODE_AI6_MODEL': 'auto',
         'CODE_CLAUDE_SDK_MODEL': 'auto',
         'CODE_CLAUDE_CLI_MODEL': 'auto',
         'CODE_COPILOT_CLI_MODEL': 'auto',
@@ -126,7 +130,7 @@ class conf_json:
         if self._apply_default_keys():
             保存要否 = True
 
-        # CODE_AI2_NAME～4_NAMEが"auto"の場合、CODE_AI1_NAMEの値をコピー
+        # CODE_AI2_NAME～6_NAMEが"auto"の場合、CODE_AI1_NAMEの値をコピー
         if self._apply_code_ai_auto():
             保存要否 = True
 
@@ -169,15 +173,15 @@ class conf_json:
 
 
     def _apply_code_ai_auto(self) -> bool:
-        """CODE_AI2_NAME～4_NAMEが'auto'の場合、CODE_AI1_NAMEの値をコピー"""
+        """CODE_AI2_NAME～6_NAMEが'auto'の場合、CODE_AI1_NAMEの値をコピー"""
         config_data = object.__getattribute__(self, '_config_data')
         変更あり = False
         
         code_ai1 = config_data.get('CODE_AI1_NAME', 'auto')
         code_ai1_model = config_data.get('CODE_AI1_MODEL', 'auto')
         
-        # CODE_AI2_NAME～4_NAMEをチェック
-        for i in range(2, 5):
+        # CODE_AI2_NAME～6_NAMEをチェック
+        for i in range(2, 7):
             code_ai_key = f'CODE_AI{i}_NAME'
             code_model_key = f'CODE_AI{i}_MODEL'
             
