@@ -1,127 +1,116 @@
 # アバター表示とVRMA再生
 
-アバターの表示サイズ、向き、およびアニメーション再生の挙動を調整した際の知見を整理する。
-
 ## このメモを使う場面
-- アバターが画面に対して大きすぎる（または小さすぎる）場合の調整
-- アバターが初期状態で背中を向けている場合の修正
-- VRMA アニメーションが 1 回で止まってしまい、連続して再生されない場合の対応
+- アバターの表示サイズ、向き、カメラ距離を調整する
+- VRMA が 1 回で止まる、切り替わりで姿勢が跳ねる問題を直す
+- `AIコア.vue` の表示選択やアバター内オプション UI を変更する
+- xeyes / xneko / 時計 / カレンダーなどの表示選択を調整する
 
 ## 関連ファイル
-- `frontend_avatar/src/components/AIコア.vue`（表示選択、アバターへの `controls-visible` 受け渡し）
-- `frontend_avatar/src/components/AIコア_xeyes.vue`（Electron では OS カーソル位置、Web では画面内 pointermove を追う目線表示。CPU 使用率で血走り演出も行う）
-- `frontend_avatar/src/components/AIコア_アバター.vue`（Electron/Web アバターコンポーネント、実験的制御設定 UI）
-- `frontend_avatar/src/components/AIコア_アナログ時計.vue`（表示選択用のアナログ時計）
-- `frontend_avatar/src/components/AIコア_デジタル時計.vue`（表示選択用のデジタル時計）
-- `frontend_avatar/src/components/AIコア_カレンダー.vue`（表示選択用のカレンダー）
-- `frontend_avatar/electron/main.ts` / `frontend_avatar/electron/preload.ts` / `frontend_avatar/src/env.d.ts`（ウィンドウ role とカーソル位置、CPU 使用率を返す IPC）
-- `frontend_web/public/X自己紹介/index.html`（静的HTMLページ内埋め込みアバター）
+- `frontend_avatar/src/components/AIコア.vue` — 表示選択、`controls-visible` の受け渡し
+- `frontend_avatar/src/components/AIコア_アバター.vue` — Three.js / VRM / VRMA / 口パク / アバター内設定 UI
+- `frontend_avatar/src/components/AIコア_自立身体制御.ts` — 身体揺れなどの自律制御
+- `frontend_avatar/src/components/AIコア_自動カメラワーク.ts` — 自動カメラ制御
+- `frontend_avatar/src/components/AIコア_xeyes.vue` — 目線追従、CPU 連動演出
+- `frontend_avatar/src/components/AIコア_xneko.vue` — スプライトアニメーション
+- `frontend_avatar/electron/main.ts` / `preload.ts` / `src/env.d.ts` — カーソル位置、CPU 使用率などの IPC
+- `frontend_web/public/X自己紹介/index.html` — 静的HTML内に VRM を埋め込む場合の参考
 
-## 実装の結論
+## アバター表示サイズ
 
-### 1. アバターの表示サイズ（カメラ距離）
-アバターのサイズ自体を小さくするのではなく、カメラの引き距離（distance）を調整することで、相対的な表示サイズを制御します。
-- **箇所**: `fitCamera` 関数内の `distance` 計算。
-- **結論**: 距離倍率を `0.54` から `1.08` へ変更（倍増）することで、アバターの表示を約半分のサイズ（全身が見える程度）に調整。
-- **コード例**:
-  ```typescript
-  const distance = Math.max(distanceForHeight, distanceForWidth) * padding * 1.08
-  ```
+サイズはモデル自体の scale より、カメラの引き距離で調整する。
 
-### 2. アバターの向き（初期回転）
-VRM モデルが読み込まれた際の初期の向きを調整します。
-- **箇所**: `initScene` 内の `container.rotation.y`。
-- **結論**: `Math.PI`（180度）になっていたものを `0` に変更し、正面を向くように修正。
-- **コード例**:
-  ```typescript
-  const container = new THREE.Group()
-  container.rotation.y = 0 // 正面向き
-  ```
+```typescript
+const distance = Math.max(distanceForHeight, distanceForWidth) * padding * 1.08
+```
 
-### 3. アニメーションの連続再生（ループ）
-VRMA が終了した後に次のモーションへ移行、または繰り返す挙動を保証します。
-- **仕様**: 単一ファイルのループ再生（`THREE.LoopRepeat`）ではなく、`finished` イベントをフックして次のモーションを選択・再生する方式を採用。
-- **箇所**: `モーション終了時処理` および `VRMA再生実行`。
-- **結論**: `vrma連続再生有効` が true の場合、終了イベントで再度 `VRMA再生開始` を呼び出し、キューから次のモーションを取得して再生を継続する。
-- **注意**: 前回の作業ログでは `THREE.LoopRepeat` への変更が言及されていたが、最終的な実装は `finished` イベント経由の連続再生（巡回再生）となっている。これにより、待機モーションが固定されず、多様な動きをループさせることが可能。
+- 調整箇所は `AIコア_アバター.vue` の `fitCamera`。
+- `fitCamera` の距離は自動カメラワークの基準にもなる。極端な倍率変更は回転半径やフレーミングに影響する。
+- モデル差で頭や足が切れる場合は、bounding box、padding、カメラ target の高さを合わせて見る。
 
-### 4. 実験的アバター設定 UI
-`不完全な自立身体制御` と `不完全な自動カメラワーク` は、`AIコア_アバター.vue` の内部 UI として右下へ配置する。
-- **結論**: `表示選択` は `AIコア.vue` の左下、実験的制御設定は `AIコア_アバター.vue` の右下。
-- **表示選択**: `アバター` / `xneko(猫)` / `無し` の select で切り替える。
-- **表示選択の拡張**: `アナログ時計` / `デジタル時計` / `カレンダー` は、`AIコア.vue` で import し、`表示選択型` と select option と表示用 computed を合わせて追加する。
-- **xeyes の追加**: `xeyes(目)` も同じ表示選択パターンで追加する。Electron 実行中は renderer だけではウィンドウ外のマウス位置を取れないため、`window:get-pointer-snapshot` IPC で `role` / `bounds` / `mouse` / `insideWindow` を返し、`bounds + stageRect` からローカル座標へ変換する。
-- **CPU 血走り演出**: Electron main process 側で `os.cpus()` の前回差分から CPU 使用率を返す `system:get-cpu-usage` IPC を用意し、`AIコア_xeyes.vue` 側で 1 秒ごとに取得する。直近 10 サンプル平均を使い、20% 以下は白、80% 以上は最大血走り、間は `(平均 - 20) / 60` で線色と白目の赤みを連続変化させる。
-- **CPU グラフ**: `controls-visible` が true のときだけ、目の下に直近 10 秒分の CPU 使用率棒グラフと平均値を表示する。
-- **表示条件**: `表示選択` が `アバター` 以外の場合は `AIコア_アバター.vue` 自体を表示しないため、実験的制御設定も表示しない。
-- **ボタン非表示時**: `AIコア.vue` から `controls-visible` を渡し、false の間は `AIコア_アバター.vue` 内の設定 UI・字幕・発光を隠してアバター本体だけにする。
-- **注意**: ネコ表示中や `無し` 選択中にアバター固有設定が見えると UI 上の意味が曖昧になるため、アバターコンポーネント内へ閉じ込める。
+## 初期向き
 
-### 5. xeyes オプションパネル（2026-04-26 追記）
+VRM が背中を向く場合は、モデルコンテナの初期回転を確認する。
 
-右下に `controls-visible=true` のときのみ表示される半透明パネルを追加。
+```typescript
+const container = new THREE.Group()
+container.rotation.y = 0
+```
 
-- **デザイン切替**（通常 / シンプル）: `designMode` ref で管理。シンプルモードは透明背景＋20px白輪郭線＋白瞳のプレーンな目。血走りラインと通常のグラデ・ハイライトは `<template v-if="designMode==='normal'">` で出し分け（`v-if`+`v-for` を同一要素に書かず `<template v-if>` でラップする点に注意）。
-- **CPU使用率色変化**（チェックボックス）: `cpuColorEnabled` ref で管理。オフ時は `effectiveCpuColorLevel` / `effectiveBloodshotLineLevel` が常に 0 を返し、目の色変化と血走りを無効化。
-- **シンプルモードの色変化**: CSS カスタムプロパティ `--cpu-color-level`（`.xeyes-wrap` に設定済み）を子要素で継承し、`rgb(255, calc(255-(255*var(--cpu-color-level))), calc(255-(255*var(--cpu-color-level))))` で白→赤に変化。
+- `Math.PI` にすると 180 度回転するため、モデルによっては背面表示になる。
+- 静的HTML埋め込みでは、無理に container を回すよりカメラ位置を `frontend_avatar` 側に寄せる方が差異が出にくい。
 
-### 6. xneko デザイン切替（2026-04-26 追記）
+## VRMA 連続再生
 
-右下オプションパネルに oneko / 茶トラ / 三毛 のラジオボタンを追加。
+現行方針は単一クリップの `THREE.LoopRepeat` ではなく、`finished` イベントで次の VRMA を選択して再生する巡回方式。
 
-- **状態**: `nekoDesign` ref（`'oneko' | 'chatora' | 'mike'`）
-- **画像切替**: `nekoImageUrl` computed が GIF パスを返し、`.neko-sprite` の `background-image` に `:style` でバインド。CSS の静的 `background-image: url('/oneko.gif')` は削除済み。
-- **GIF ファイル生成**: `public/xneko_chatora.gif` / `public/xneko_mike.gif` は元画像（PNG・白背景）を Python + Pillow で変換。白背景は四隅フラッドフィルで除去し、1024×512 → 256×128 にリサイズ後、パレットインデックス 255 を透過色として GIF 保存。三毛猫は白い毛を持つため単純な閾値除去ではなくフラッドフィル方式を採用した。
+- `モーション終了時処理` で終了イベントを受け、`vrma連続再生有効` が true なら次の `VRMA再生開始` を呼ぶ。
+- 次クリップへ切り替えるときは `action.crossFadeFrom` を使い、姿勢が瞬時に初期化されるガクつきを避ける。
+- 1 本しかない場合も終了後に同じモーションを再開できるようにする。
+- VRMA 追加時は `.aidiy/knowledge/VRM_VRMA追加手順.md` も確認する。
 
-## 再発しやすい注意点
-- **カメラワークとの干渉**: `fitCamera` で計算した距離は、自動カメラワーク（`AIコア_自動カメラワーク.ts`）の基準値として利用されるため、ここを極端に変えると回転半径などにも影響する。
-- **モーション補間**: 連続再生時、`action.crossFadeFrom` を適切に設定しないと、モーションの切り替わりでモデルが瞬時に初期姿勢に戻る（ガクつく）現象が発生する。
-- **BOM付きファイル**: `VRMA` ファイルや設定 JSON が BOM 付き UTF-8 だと、一部の環境で読み込みエラーになる可能性がある。
-- **Electron の目線制御**: `mousemove` は BrowserWindow 内に入ったときしか取れない。常駐ウィンドウ外のカーソルを追う表示は、Electron main process 側で `screen.getCursorScreenPoint()` と対象 `BrowserWindow.getBounds()` を返す IPC を追加する。
-- **CPU 使用率の初回値**: `os.cpus()` は前回サンプルとの差分で使用率を出すため、初回は 0% になり得る。1 秒後以降の値を直近 10 秒平均に入れて演出する。
+## 表示選択 UI
 
-## 静的HTMLページ（X自己紹介/index.html）での調整
+`AIコア.vue` の `表示選択` は左下、アバター固有の実験設定は `AIコア_アバター.vue` の右下に置く。
 
-静的HTMLページ内に Three.js + VRM を直接埋め込む場合は、Vue コンポーネントとは別の調整箇所がある。
+- 表示選択候補は `アバター` / `xneko(猫)` / `xeyes(目)` / `アナログ時計` / `デジタル時計` / `カレンダー` / `無し` など。
+- 新しい表示を追加する場合は、表示選択型、import、select option、表示 computed / `v-if` をセットで更新する。
+- `表示選択 !== 'アバター'` の場合は `AIコア_アバター.vue` 自体を表示しない。アバター固有設定も表示しない。
+- `controls-visible=false` のときは、設定 UI、字幕、発光などの補助表示を隠し、表示本体だけにする。
 
-### サイズ調整
-- **箇所**: CSS の `#avatar-container` の `width` / `height` と、`getStageSize()` → `renderer.setSize(..., false)` によるキャンバス追従
-- **結論**: CSS コンテナを `200px × 340px` へ半減し、レンダラーは `clientWidth/clientHeight` を読む方式にして見た目と描画サイズをずらさない。必要ならモバイル用 media query も合わせて入れる。
+## xeyes の要点
+- Electron では `window:get-pointer-snapshot` IPC で `role` / `bounds` / `mouse` / `insideWindow` を取得し、`bounds + stageRect` からローカル座標へ変換する。
+- Web ではステージ内の `pointermove` に追従する。
+- CPU 使用率は `system:get-cpu-usage` IPC で取得する。最新サンプル群の平均を使い、低負荷は白、高負荷は赤みと血走りを増やす。
+- CPU グラフやオプションパネルは `controls-visible` が true のときだけ表示する。
+- デザイン切替などで `v-if` と `v-for` が必要な場合は、同一要素に書かず `<template v-if>` で分ける。
 
-### 向き調整
-- **箇所**: `camera.position.set(...)` と `camera.lookAt(...)`
-- **結論**: `frontend_avatar` と同じく、カメラを `-Z` 側に置いて正面を見る構成に寄せる。静的HTML側で無理に `container.rotation.y` を回して合わせるより、カメラ位置を本体実装に合わせた方が向きの差異が出にくい。
+## xneko の要点
+- デザイン選択は state（例: `'oneko' | 'chatora' | 'mike'`）と画像 URL computed で切り替える。
+- `.neko-sprite` の `background-image` は `:style` でバインドし、固定 CSS の URL と二重管理しない。
+- GIF は `256x128`、32px タイル 8 x 4、透過インデックス付きのスプライトシートを前提にする。
+- 白背景画像から作る場合は四隅フラッドフィルで背景を除去し、白い毛を消さない。
 
-### ループ再生
-- **箇所**: `playNext()` / `setTimeout()` / `action.crossFadeFrom(...)`
-- **結論**: 静的HTML側では `LoopOnce` で 1 本ずつ再生し、`clip.duration - XFADE` を基準に次クリップを予約して巡回再生させる。これで 1 本目の終了後に止まらず、複数 VRMA を切り替え続けられる。
+## 静的HTMLに VRM を埋め込む場合
 
-### コード例（静的HTML向け）
+`frontend_web/public/X自己紹介/index.html` のような静的HTMLは Vue コンポーネントと調整箇所が違う。
+
+- CSS の `#avatar-container` の `width` / `height` と `renderer.setSize(..., false)` を一致させる。
+- `getStageSize()` で `clientWidth/clientHeight` を読み、CSS と canvas の見た目をずらさない。
+- カメラは `-Z` 側に置き、`camera.lookAt()` で正面を見る構成に寄せる。
+- VRMA は `LoopOnce` で 1 本ずつ再生し、`clip.duration - XFADE` を基準に `setTimeout` で次クリップを予約する。
+
 ```javascript
 const getStageSize = () => ({
   width: Math.max(1, avatarContainer?.clientWidth || 200),
   height: Math.max(1, avatarContainer?.clientHeight || 340),
-});
-renderer.setSize(getStageSize().width, getStageSize().height, false);
+})
 
-camera.position.set(0, h * 0.78, -h * 1.05);
-camera.lookAt(0, h * 0.78, 0);
+renderer.setSize(getStageSize().width, getStageSize().height, false)
+camera.position.set(0, h * 0.78, -h * 1.05)
+camera.lookAt(0, h * 0.78, 0)
 
-const action = mixer.clipAction(clip);
-action.reset();
-action.setLoop(THREE.LoopOnce, 1);
-action.clampWhenFinished = false;
-action.play();
-nextClipTimer = window.setTimeout(playNext, Math.max(250, (clip.duration - XFADE) * 1000));
+const action = mixer.clipAction(clip)
+action.reset()
+action.setLoop(THREE.LoopOnce, 1)
+action.clampWhenFinished = false
+action.play()
+nextClipTimer = window.setTimeout(playNext, Math.max(250, (clip.duration - XFADE) * 1000))
 ```
 
-## 最低限の確認方法
-1. アバター起動時に全身が適切に収まっているか（大きすぎないか）を確認。
-2. アバターが最初からこちら（カメラ）を向いているかを確認。
-3. モーションが終了した際、止まらずに次のモーション（または同じモーションの再開）が始まるかを確認。
-4. `表示選択` を `xneko(猫)` または `無し` にしたとき、実験的制御設定が表示されないかを確認。
-5. ボタン非表示時に `AIコア_アバター.vue` 内の設定 UI・字幕・発光が消え、アバター本体だけになるかを確認。
-6. `表示選択` で `アナログ時計` / `デジタル時計` / `カレンダー` を選び、各表示が画面中央に出るかを確認。
-7. `表示選択` で `xeyes(目)` を選び、Electron ではウィンドウ外のマウスにも目線が追従し、Web では画面内の pointermove に追従するかを確認。
-8. Electron で `xeyes(目)` 選択中、CPU 平均が上がると目が徐々に赤くなり、ボタン表示中だけ目の下に CPU グラフが出るか確認。
-9. 静的HTMLの場合は、ブラウザのリロードで即時反映されるか確認。
+## 注意点
+- `fitCamera` の倍率変更は自動カメラワークにも影響する。
+- `action.crossFadeFrom` を設定しないと、モーション切替時に初期姿勢へ戻って見えることがある。
+- VRMA や設定 JSON は UTF-8 BOM なしを優先する。
+- Electron の `mousemove` は BrowserWindow 内に入ったときしか取れない。ウィンドウ外カーソル追従には main process IPC が必要。
+- CPU 使用率は直前サンプルとの差分で出すため、初回値は 0 になり得る。
+- `requestAnimationFrame` や `setTimeout` はコンポーネント破棄時に解除する。
+
+## 確認方法
+1. アバター起動時に全身が適切に収まっているか確認する。
+2. 初期表示で正面を向いているか確認する。
+3. VRMA 終了後に停止せず、次のモーションまたは同じモーションが始まるか確認する。
+4. `表示選択` を切り替え、アバター以外の表示中にアバター固有設定が出ないことを確認する。
+5. `controls-visible=false` で設定 UI、字幕、補助発光が消えることを確認する。
+6. xeyes は Electron でウィンドウ外カーソル、Web で画面内 pointermove に追従することを確認する。
+7. 静的HTMLではリロード後に canvas サイズ、向き、VRMA 巡回再生が崩れないことを確認する。

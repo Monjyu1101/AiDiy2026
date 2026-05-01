@@ -1,100 +1,75 @@
 # Code CLI 追加手順
 
 ## このメモを使う場面
-- `codex_cli` のような code CLI を新規追加するとき
-- backend だけ直しても UI に出ない問題を避けたいとき
-- 追加対象 CLI の実行方法が OS 依存かどうかを整理したいとき
+- `codex_cli` や `aidiy_hermes` のような Code CLI を追加する
+- backend には追加したが設定 UI に出ない問題を避ける
+- CLI 名、モデルキー、Code AI 6枠の関係を確認する
 
-## 先に押さえる結論
-- 新しい CLI 追加は、backend 実行ランタイム、モデル定義、設定JSON、frontend 設定UIを一式で揃える
-- frontend 側だけ、または backend 側だけの片側修正では完成しない
-- 起動中サーバーへは自動反映されないため、必要に応じて再起動を行う
+## 基本方針
+- 新しい CLI は backend 実行処理、モデル定義、設定 JSON、frontend 設定 UI を一式で揃える
+- `CODE_AI1_NAME`〜`CODE_AI6_NAME` は「どのスロットでどの CLI 種別を使うか」を表す
+- `CODE_AI1_MODEL`〜`CODE_AI6_MODEL` は「そのスロットで使うモデル」を表す
+- `CODE_<CLI名>_MODEL` のようなキーは CLI 種別ごとのデフォルトや候補管理に使う。スロットキーと混同しない
+- Code AI パネルは現行 `code1`〜`code6`。新CLI追加だけならパネル数は増やさない
 
-## 変更が必要な場所
+## 関連ファイル
 
-### 1. backend の CLI 実行処理
-対象:
-- `backend_server/AIコア/AIコード_cli.py`
-
-対応内容:
-- `_コマンドパス取得()` に新CLI名を追加する
-- `バージョン確認()` に `--version` 相当の確認処理を追加する
-- `_コマンド構築()` に新規会話・継続会話のコマンド生成を追加する
-- OS依存の起動条件がある場合は分岐を追加する
-
-### 2. CodeAgent 側の文言
-対象:
-- `backend_server/AIコア/AIコード.py`
-
-対応内容:
-- welcome 文言へ新CLI名を追加する
-- 未インストール時の案内へ新CLI名を追加する
-- 必要なら説明文や候補一覧も更新する
-
-### 3. モデル定義
-対象:
+### backend_server
+- `backend_server/core_router/AIコア/AIコード_cli.py`
+- `backend_server/core_router/AIコア/AIコード.py`
 - `backend_server/conf/conf_model.py`
-
-対応内容:
-- `CODE_<CLI名>_MODELS` を追加する
-- 固定モデル一覧やローカル上書きが必要な場合は `_sync_local_model_configs()` に `AiDiy_code_<cli名>.json` を追加する
-- `get_code_models()` の返却対象へ新CLIを追加する
-- 既存 provider のモデル一覧を流用する場合は、`aidiy_hermes` のように `get_code_models()` 側で動的生成してよい
-
-### 4. 設定JSON
-対象:
 - `backend_server/conf/conf_json.py`
 - `backend_server/_config/AiDiy_key.json`
-- `backend_server/_config/AiDiy_code_<cli名>.json`（必要な場合）
+- `backend_server/_config/AiDiy_code_<cli名>.json`（固定モデル一覧を持つ場合）
 
-対応内容:
-- `conf_json.DEFAULT_CONFIG` に `CODE_<CLI名>_MODEL` を追加する
-- `AiDiy_key.json` に同じキーを追加する
-- 固定モデル一覧を持つなら `AiDiy_code_<cli名>.json` を作成し、最低でも `auto` を定義する
-
-### 5. frontend の設定UI
-対象:
+### frontend
 - `frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue`
 - `frontend_avatar/src/dialog/AI設定再起動.vue`
-
-対応内容:
-- `CODE_MODEL_KEYS` に新CLI用キーを追加する
-- `availableModels.code_models` に新CLIが来たとき選択肢へ表示されることを確認する
-
-### 6. frontend_avatar の表示・接続連動
-対象:
 - `frontend_avatar/src/AiDiy.vue`
 - `frontend_avatar/src/components/AIコード.vue`
-- `frontend_avatar/src/dialog/AI設定再起動.vue`
 
-対応内容:
-- `CODE_AI1_NAME`〜`CODE_AI6_NAME` は `PANEL_TITLES` の表示名にも使われるため、設定変更後に code1〜code6 のウィンドウタイトルが更新されるか確認する
-- Web モードでは code1〜code6 は別ウィンドウではなくタブなので、`webTabs` と `PANEL_KEYS` は CLI 種別ではなくパネル数を表す。新CLI追加だけなら増やさない
-- 各 `AIコード.vue` は `チャンネル`（code1〜code6）単位で WebSocket 接続する。CLI 名をチャンネル名として増やす設計にしない
+## 追加手順
 
-## 実装時の注意点
-- backend の `available_models.code_models` に出ない限り、frontend へ項目を足しても選択できない
-- 設定JSONを追加しても、モデル定義や UI 側のキー追加が漏れると画面で扱えない
-- `CODE_AI*_NAME` の値は `claude_sdk` / `codex_cli` のような AI 種別名。`CODE_AI*_MODEL` はそのスロットで使うモデル名。追加時にこの 2 つを取り違えない
-- 設定 UI の選択肢は backend の `available_models.code_models` から作られるため、frontend に固定 option を直書きしない
-- Windows で WSL 経由実行が必要な CLI は、作業ディレクトリとパス形式の差異を吸収する必要がある
+1. `AIコード_cli.py` の `_コマンドパス取得()` に CLI 名を追加する
+2. `バージョン確認()` に確認コマンドと timeout を追加する
+3. `_コマンド構築()` に初回会話と継続会話のコマンド生成を追加する
+4. OS 依存の起動条件やパス変換が必要なら同ファイル内で分岐する
+5. `AIコード.py` の welcome 文言、候補一覧、未インストール案内を更新する
+6. `conf_model.py` に `CODE_<CLI名>_MODELS` または動的生成ロジックを追加し、`get_code_models()` の返却対象へ入れる
+7. 固定モデル一覧を持つ場合は `_config/AiDiy_code_<cli名>.json` を作り、最低でも `auto` を定義する
+8. `conf_json.DEFAULT_CONFIG` と `AiDiy_key.json` に必要な `CODE_<CLI名>_MODEL` を追加する
+9. frontend の `CODE_MODEL_KEYS` に CLI 名と保存キーの対応を追加する
+10. 設定 UI で `availableModels.code_models` から新CLIが選べることを確認する
 
-## AiDiy Hermes を統合したときの再利用知見
-- Code AI 名は実行フォルダ名や内部 package 名ではなく、**frontend / backend / 設定JSONで完全一致する公開名** を使う（現行値は `aidiy_hermes`）
-- CLI ごとに専用の `AiDiy_code_*.json` が必要とは限らない。`aidiy_hermes` は Ollama モデル一覧を流用して `conf_model.py` で動的生成している
-- `_setup.py` / `_cleanup.py` に統合しても、常駐起動が不要な CLI は `_start.py` に足さない方が運用が分かりやすい
-- backend 側の `CODE_MODEL_KEYS` と `conf_json.DEFAULT_CONFIG` のキー名は揃える（例: `CODE_AIDIY_HERMES_MODEL`）
-- `aidiy_hermes --version` は cold start や code1〜code6 の同時接続時に 10 秒を超えることがある。未インストール扱いの誤判定を避けるため、`backend_server/AIコア/AIコード_cli.py` のバージョン確認は `aidiy_hermes` だけ長めに待ち、チャンネル間で結果をキャッシュする。
+## Hermes 統合時の判断基準
 
-## 最低限の確認項目
-- AI設定再起動ダイアログで新CLIを選択できる
-- frontend_avatar の Electron 設定ウィンドウと Web 設定モーダルの両方で新CLIを選択できる
-- `AiDiy_key.json` に新CLI用キーがある
-- 固定モデル一覧を持つ方式なら `_config/AiDiy_code_<cli名>.json` がある
-- バージョン確認が通る
-- 新規会話コマンドが組める
-- 継続会話コマンドが組める
-- code1〜code6 のどのスロットに割り当てても、WebSocket チャンネルは `code1`〜`code6` のまま動く
-- OS依存条件がある場合、その環境で実行確認できる
+- 公開名は frontend / backend / 設定 JSON で完全一致させる。現行値は `aidiy_hermes`
+- CLI ごとに専用 `AiDiy_code_*.json` が必須とは限らない。`aidiy_hermes` のように既存モデル一覧を流用してもよい
+- `_setup.py` / `_cleanup.py` に統合しても、常駐起動が不要な CLI は `_start.py` に追加しない
+- `aidiy_hermes --version` は cold start や `code1`〜`code6` 同時接続で遅くなることがある。未インストール誤判定を避けるため、長めの timeout と結果キャッシュを検討する
 
-新しい CLI を追加したら、Hermes セクションと同じ観点（OS 依存の起動方法、パス変換、モデル選択の差異）をこのファイルの末尾に追記する。
+## 注意点
+
+- backend の `available_models.code_models` に出ない限り、frontend に項目を足しても選択できない
+- frontend の設定 option は backend 返却値から生成し、CLI 名を固定直書きしない
+- `code1`〜`code6` は WebSocket チャンネル/パネル名。CLI 名をチャンネル名として増やさない
+- Windows で WSL 経由実行が必要な CLI は、作業ディレクトリとパス形式の差異を吸収する
+- 設定変更は起動中サーバーへ自動反映されない。必要に応じて core server を再起動する
+
+## 確認方法
+
+- `AiDiy_key.json` に新CLI用の設定キーがある
+- 固定モデル方式なら `_config/AiDiy_code_<cli名>.json` がある
+- `/core/AIコア/モデル情報/取得` の `available_models.code_models` に新CLIが出る
+- Web / Avatar の設定ダイアログで新CLIを選択できる
+- バージョン確認、新規会話、継続会話のコマンドが組める
+- `code1`〜`code6` のどのスロットに割り当てても WebSocket チャンネルは `code1`〜`code6` のまま動く
+
+```powershell
+backend_server\.venv\Scripts\python.exe -m py_compile backend_server\core_router\AIコア\AIコード_cli.py
+backend_server\.venv\Scripts\python.exe -m py_compile backend_server\conf\conf_model.py
+cd frontend_avatar
+npm run type-check
+cd ..\frontend_web
+npm run type-check
+```

@@ -287,6 +287,14 @@ def get_vscode_mcp_path() -> Path:
         return Path.home() / "Library" / "Application Support" / "Code" / "User" / "mcp.json"
     return Path.home() / ".config" / "Code" / "User" / "mcp.json"
 
+
+def get_opencode_config_path() -> Path:
+    """OpenCode 公式ドキュメント準拠のグローバル設定パスを返す。"""
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    if xdg_config_home:
+        return Path(xdg_config_home) / "opencode" / "opencode.json"
+    return Path.home() / ".config" / "opencode" / "opencode.json"
+
 def remove_toml_table(content: str, table_header: str) -> str:
     lines = content.splitlines()
     table_index = None
@@ -956,19 +964,40 @@ def setup_backend_hermes() -> bool:
             print_error(f"{label}: 仮想環境の作成に失敗しました。")
             return False
 
-    if not run_command(["uv", "pip", "install", "-r", "requirements.txt"], cwd=BACKEND_HERMES_DIR):
-        print_error(f"{label}: pip install に失敗しました。")
-        return False
+    # 既にパッケージインストール済みか確認
+    pip_list_result = subprocess.run(
+        ["uv", "pip", "list", "--no-header"],
+        cwd=BACKEND_HERMES_DIR,
+        capture_output=True, text=True
+    )
+    packages_installed = pip_list_result.returncode == 0 and bool(pip_list_result.stdout.strip())
 
-    print_info(f"{label}: aidiy_hermes コマンドをグローバルインストールします...")
-    if not run_command(["uv", "tool", "install", "--force", "--editable", "."], cwd=BACKEND_HERMES_DIR):
-        print_warning(f"{label}: uv tool install に失敗しました。")
-        print_warning("  aidiy_hermes コマンドは使えませんが、直接実行は可能です:")
-        print_warning(f"  {BACKEND_HERMES_DIR / BACKEND_HERMES_ENV / 'Scripts' / 'python.exe'} cli_main.py")
+    if packages_installed:
+        print_info(f"{label}: requirements.txt のパッケージは既にインストール済みのためスキップします")
     else:
-        print_success(f"{label}: aidiy_hermes コマンドがグローバルに登録されました。")
-        print_info("  uv の tool bin が PATH に入っていない場合は次を実行してください:")
-        print_info("    uv tool update-shell")
+        if not run_command(["uv", "pip", "install", "-r", "requirements.txt"], cwd=BACKEND_HERMES_DIR):
+            print_error(f"{label}: pip install に失敗しました。")
+            return False
+
+    # aidiy_hermes が既に uv tool に登録済みか確認
+    tool_list_result = subprocess.run(
+        ["uv", "tool", "list"],
+        capture_output=True, text=True
+    )
+    hermes_installed = tool_list_result.returncode == 0 and "aidiy_hermes" in tool_list_result.stdout
+
+    if hermes_installed:
+        print_info(f"{label}: aidiy_hermes は既にグローバル登録済みのためスキップします")
+    else:
+        print_info(f"{label}: aidiy_hermes コマンドをグローバルインストールします...")
+        if not run_command(["uv", "tool", "install", "--editable", "."], cwd=BACKEND_HERMES_DIR):
+            print_warning(f"{label}: uv tool install に失敗しました。")
+            print_warning("  aidiy_hermes コマンドは使えませんが、直接実行は可能です:")
+            print_warning(f"  {BACKEND_HERMES_DIR / BACKEND_HERMES_ENV / 'Scripts' / 'python.exe'} cli_main.py")
+        else:
+            print_success(f"{label}: aidiy_hermes コマンドがグローバルに登録されました。")
+            print_info("  uv の tool bin が PATH に入っていない場合は次を実行してください:")
+            print_info("    uv tool update-shell")
 
     # editable install が生成した *.egg-info を削除（残骸のため）
     import glob as _glob
@@ -994,11 +1023,13 @@ def show_current_mcp_config(module: dict) -> None:
 
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
     vscode_mcp   = get_vscode_mcp_path()
+    opencode_mcp = get_opencode_config_path()
 
     targets = [
         ("グローバル ~/.claude.json (Claude Code)",               Path.home() / ".claude.json",            "mcpServers"),
         ("グローバル ~/.gemini/settings.json (Gemini CLI)",        Path.home() / ".gemini" / "settings.json", "mcpServers"),
         ("グローバル ~/.copilot/mcp-config.json (Copilot CLI)",    copilot_home / "mcp-config.json",        "mcpServers"),
+        ("グローバル ~/.config/opencode/opencode.json (OpenCode)", opencode_mcp,                            "mcp"),
         ("グローバル ~/.codex/config.toml (Codex CLI)",            Path.home() / ".codex" / "config.toml",  "mcpServers"),
         ("グローバル Code/User/mcp.json (VS Code)",                vscode_mcp,                              "servers"),
     ]
@@ -1042,7 +1073,7 @@ def configure_backend_mcp_clients(module: dict) -> bool:
     """
     label = f"{module['name']} MCP 設定"
     print_header(label)
-    print_info("Claude / Gemini / GitHub Copilot / Codex / VS Code 用のグローバル設定ファイルを書き込みます。")
+    print_info("Claude / Gemini / GitHub Copilot / OpenCode / Codex / VS Code 用のグローバル設定ファイルを書き込みます。")
     print_info("Codex CLI は stdio の mcp_stdio.py を起動し、その先で backend_mcp の SSE へ接続します。")
 
     # 書き込み対象サーバーリスト: メイン + extra_servers
@@ -1103,14 +1134,23 @@ def configure_backend_mcp_clients(module: dict) -> bool:
         [(sn, {"type": "sse", "url": url}) for sn, url in servers],
     )
 
-    # 5) Codex CLI (TOML, stdio ブリッジ)
+    # 5) OpenCode (mcp)
+    opencode_global = get_opencode_config_path()
+    print_info(f"[OpenCode]    {opencode_global}")
+    all_ok &= upsert_json_mcp_servers(
+        opencode_global,
+        [(sn, {"type": "remote", "url": url, "enabled": True}) for sn, url in servers],
+        top_key="mcp",
+    )
+
+    # 6) Codex CLI (TOML, stdio ブリッジ)
     codex_path = Path.home() / ".codex" / "config.toml"
     print_info(f"[Codex CLI]   {codex_path}")
     for sn, url in servers:
         codex_module = {**module, "server_name": sn, "sse_url": url}
         all_ok &= upsert_codex_backend_mcp_config(codex_module)
 
-    # 6) VS Code (servers)
+    # 7) VS Code (servers)
     vscode_mcp = get_vscode_mcp_path()
     print_info(f"[VS Code]     {vscode_mcp}")
     all_ok &= upsert_json_mcp_servers(

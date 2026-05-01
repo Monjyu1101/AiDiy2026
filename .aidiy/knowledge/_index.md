@@ -1,116 +1,141 @@
 # .aidiy/knowledge インデックス
 
-このフォルダは、AiDiy2026 専用の修正知見を蓄積する場所です。
-アプリ本体の仕様はソースコードへ、`.aidiy/knowledge` には次回の修正で再利用できる判断基準と注意点だけを残します。
+このフォルダは AiDiy2026 専用の再利用ナレッジ置き場です。
+残す内容は、次回の修正で使える HowTo、判断基準、注意点、確認方法だけにします。
 
-## 参照順序
-1. まずこの `_index.md` を確認する
-2. 直近の流れは `_最終変更.md` を確認する
-3. 似た修正テーマがあれば対応ファイルを確認する
-4. 修正完了後は知見を既存ファイルへ統合する
+## 使い方
 
----
+1. 目的に近いカテゴリから該当ファイルを開く。
+2. 使う前に、関連ファイルとして書かれているソースを確認して現行実装との差を埋める。
+3. 迷う場合は、下の「迷ったときの入口」から最初に見るファイルを決める。
+4. 知見を追記するときは、作業履歴ではなく次回使える手順へ圧縮して既存ファイルへ統合する。
 
-## 状態管理
+## 最優先ルール
 
-| ファイル | 内容 |
-|---------|------|
-| [`_最終変更.md`](./_最終変更.md) | 直近修正の要約。再修正依頼時の最優先参照先 |
-| [`Markdown現状追従チェック.md`](./Markdown現状追従チェック.md) | `.md` 全体を現行実装へ追従させるときの確認観点 |
+| 目的 | 参照ファイル |
+|------|--------------|
+| `AGENTS.md` / `_AIDIY.md` / `CLAUDE.md` を整理する | [`AGENTS整理手順.md`](./AGENTS整理手順.md) |
 
----
+## 迷ったときの入口
 
-## Backend — データ・スキーマ
+| 症状・依頼 | 最初に見るファイル |
+|-----------|------------------|
+| AGENTS / CLAUDE / _AIDIY の役割分担整理 | [`AGENTS整理手順.md`](./AGENTS整理手順.md) |
+| DB スキーマ差分、起動時のカラム不足 | [`スキーマ変更手順.md`](./スキーマ変更手順.md) |
+| M / T / V / S 系の追加、登録漏れ | [`M系マスタ追加手順.md`](./M系マスタ追加手順.md)、[`T系トランザクション追加手順.md`](./T系トランザクション追加手順.md)、[`V系エンドポイント追加手順.md`](./V系エンドポイント追加手順.md)、[`S系スケジューラ追加手順.md`](./S系スケジューラ追加手順.md) |
+| 採番、監査フィールド、初期データ | [`C採番と監査フィールド.md`](./C採番と監査フィールド.md) |
+| backend の層構造、実装パターン、落とし穴 | [`backend実装パターン.md`](./backend実装パターン.md) |
+| ログイン、401、トークン延長、パスワード | [`JWT認証フロー.md`](./JWT認証フロー.md)、[`認証延長ルール.md`](./認証延長ルール.md)、[`C利用者パスワード運用.md`](./C利用者パスワード運用.md) |
+| backend / MCP 起動、ポート残留 | [`バックエンド起動.md`](./バックエンド起動.md)、[`backendMCP構成.md`](./backendMCP構成.md) |
+| AI モデル、WebSocket、code1〜code6 | [`AIモデル設定変更手順.md`](./AIモデル設定変更手順.md)、[`AIコアWebSocket仕様.md`](./AIコアWebSocket仕様.md)、[`AIコードパネル拡張手順.md`](./AIコードパネル拡張手順.md) |
+| Code CLI 追加、CLI 出力、MCP 設定 | [`CodeCLI追加手順.md`](./CodeCLI追加手順.md)、[`CodeCLI表示ANSI制御コード対処.md`](./CodeCLI表示ANSI制御コード対処.md)、[`CodeCLI_MCP設定.md`](./CodeCLI_MCP設定.md) |
+| frontend_web 画面、X系、proxy | [`frontendWeb画面追加手順.md`](./frontendWeb画面追加手順.md)、[`X系静的画面追加.md`](./X系静的画面追加.md)、[`Viteプロキシ設定.md`](./Viteプロキシ設定.md) |
+| frontend_web の UI ルール、qTubler、明細型編集 | [`frontendWeb実装パターン.md`](./frontendWeb実装パターン.md) |
+| frontend_avatar、Electron、VRM / VRMA、音声 | [`frontendAvatar変更チェック.md`](./frontendAvatar変更チェック.md)、[`ElectronIPC追加手順.md`](./ElectronIPC追加手順.md)、[`VRM_VRMA追加手順.md`](./VRM_VRMA追加手順.md)、[`アバター表示とVRMA.md`](./アバター表示とVRMA.md)、[`AI音声処理.md`](./AI音声処理.md) |
+| backend_hermes の CLI 起動・確認 | [`backendHermes運用手順.md`](./backendHermes運用手順.md) |
+| backend_mcp の起動・SSE・環境変数 | [`backendMCP運用手順.md`](./backendMCP運用手順.md) |
+| Markdown、BOM、ナレッジ整理 | [`Markdown現状追従チェック.md`](./Markdown現状追従チェック.md)、[`UTF8BOM問題対処.md`](./UTF8BOM問題対処.md)、[`ナレッジ更新手順.md`](./ナレッジ更新手順.md) |
+| 開発環境操作、DB、Swagger、よくある問題 | [`開発環境運用手順.md`](./開発環境運用手順.md) |
+| GitHub issue の確認・close | [`GitHubIssue運用手順.md`](./GitHubIssue運用手順.md) |
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`スキーマ変更手順.md`](./スキーマ変更手順.md) | カラム追加・削除・型変更・テーブル削除をしたい | `apply_schema_migrations()` への `ALTER TABLE` / テーブル再作成パターン |
-| [`C採番と監査フィールド.md`](./C採番と監査フィールド.md) | 新規レコードに ID 発番と監査フィールドを付けたい | `C採番` API 呼び出し、`create/update_audit_fields()` 関数 |
-| [`C利用者パスワード運用.md`](./C利用者パスワード運用.md) | C利用者のパスワード運用ルールを確認したい | 平文保存の現状仕様・初期データ・認証互換の運用方針 |
+既存の運用で `_最終変更.md` を参照する場合は、履歴ではなく [`再修正時の確認入口`](./_最終変更.md) として扱います。
 
----
+## Backend データ・スキーマ
 
-## Backend — エンドポイント追加
+| 目的 | 参照ファイル |
+|------|--------------|
+| SQLite スキーマ差分を既存 DB へ反映する | [`スキーマ変更手順.md`](./スキーマ変更手順.md) |
+| C採番と監査フィールドを使う | [`C採番と監査フィールド.md`](./C採番と監査フィールド.md) |
+| backend の Model / Schema / CRUD / Router パターンを確認する | [`backend実装パターン.md`](./backend実装パターン.md) |
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`M系マスタ追加手順.md`](./M系マスタ追加手順.md) | M系マスタを backend + frontend 一式で追加したい | Model / Schema / CRUD / Router / V系 / init 登録の全チェックリスト |
-| [`T系トランザクション追加手順.md`](./T系トランザクション追加手順.md) | T系トランザクション（明細型含む）を追加したい | 明細 SEQ=0 ヘッダー設計・一括削除再作成パターン |
-| [`V系エンドポイント追加手順.md`](./V系エンドポイント追加手順.md) | JOIN 集計の一覧表示エンドポイントを追加したい | 生 SQL + LEFT JOIN + dict 化・動的条件の組み立て |
-| [`S系スケジューラ追加手順.md`](./S系スケジューラ追加手順.md) | 週/日カレンダー＋ドラッグ&リサイズ画面を追加したい | エンドポイント群（一覧・データ・ドラッグ更新・リサイズ更新・最終更新日時） |
+## Backend 認証
 
----
+| 目的 | 参照ファイル |
+|------|--------------|
+| JWT ログインから 401 ハンドリングまで確認する | [`JWT認証フロー.md`](./JWT認証フロー.md) |
+| どの操作でトークンを延長するか確認する | [`認証延長ルール.md`](./認証延長ルール.md) |
+| C利用者のパスワード保存・照合方針を確認する | [`C利用者パスワード運用.md`](./C利用者パスワード運用.md) |
 
-## Backend — 起動・インフラ
+## Backend API 追加
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`バックエンド起動.md`](./バックエンド起動.md) | サーバーを起動・再起動したい / ポートが残留している | `_start.py` vs 個別起動・reboot ファイル・ポート解放コマンド |
-| [`backendMCP構成.md`](./backendMCP構成.md) | `mcp_main.py` と `mcp_proc/` の役割を把握したい | 8 MCP サーバーの構成と SSE エンドポイント一覧 |
-| [`Docker構成.md`](./Docker構成.md) | HTTPS 付き Nginx プロキシで本番デプロイしたい | `docker_1build.bat` → `docker_2start.bat` の手順と注意点 |
+| 目的 | 参照ファイル |
+|------|--------------|
+| M系マスタを追加する | [`M系マスタ追加手順.md`](./M系マスタ追加手順.md) |
+| T系トランザクションを追加する | [`T系トランザクション追加手順.md`](./T系トランザクション追加手順.md) |
+| V系 JOIN / 集計エンドポイントを追加する | [`V系エンドポイント追加手順.md`](./V系エンドポイント追加手順.md) |
+| S系スケジューラを追加する | [`S系スケジューラ追加手順.md`](./S系スケジューラ追加手順.md) |
 
----
+## Backend 起動・運用
 
-## AI・コードエージェント
+| 目的 | 参照ファイル |
+|------|--------------|
+| backend_server / backend_mcp を起動・再起動する | [`バックエンド起動.md`](./バックエンド起動.md) |
+| 開発環境の起動、依存関係、DB、API確認、問題切り分けを行う | [`開発環境運用手順.md`](./開発環境運用手順.md) |
+| Docker / Nginx 構成で起動する | [`Docker構成.md`](./Docker構成.md) |
+| MCP サーバー構成を確認する | [`backendMCP構成.md`](./backendMCP構成.md) |
+| backend_mcp の起動、stdio bridge、環境変数を確認する | [`backendMCP運用手順.md`](./backendMCP運用手順.md) |
+| MCP ツールをコードエージェントから使う | [`MCP活用手順.md`](./MCP活用手順.md) |
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`CodeCLI追加手順.md`](./CodeCLI追加手順.md) | 新しい code CLI を AiDiy に追加したい | backend 実装・設定 JSON・設定 UI の標準チェックリスト |
-| [`CodeCLIプロンプト整形.md`](./CodeCLIプロンプト整形.md) | CLI の system prompt と送信テキストの整形責務を分けたい | 1行化タイミングの判断基準・履歴可読性の保ち方 |
-| [`CodeCLI表示ANSI制御コード対処.md`](./CodeCLI表示ANSI制御コード対処.md) | CLI回答に `?[36m` などの色記号が出る | subprocess出力とフロント表示直前のANSI除去 |
-| [`CodeCLI_MCP設定.md`](./CodeCLI_MCP設定.md) | `claude` / `gemini` / `codex` に同じ MCP を使わせたい | CLI ごとの設定場所の違い |
-| [`HermesCLI_TUI調整手順.md`](./HermesCLI_TUI調整手順.md) | backend_hermes の TUI・起動ロゴ・スラッシュコマンドを調整したい | 旧Hermes TUI骨格の移植、`/` 補完、履歴、provider/model picker、軽量バナーの実装観点 |
-| [`MCP活用手順.md`](./MCP活用手順.md) | Claude Agent SDK から MCP ツールを使いたい | `AiDiy_mcp.json` の設定形式・8 MCP サーバーの用途・接続確認 |
-| [`AIモデル設定変更手順.md`](./AIモデル設定変更手順.md) | 使用する AI モデルを変更したい | 命名規則（`_chat`/`_live`/`_sdk`/`_cli`）・`AiDiy_key.json` 編集・設定 UI の取得フロー |
-| [`AIコードパネル拡張手順.md`](./AIコードパネル拡張手順.md) | コードAIパネルの数を 4→6 に増やしたい | backend 設定・セッション管理・許可キー・エージェントプロセッサ数・フロントパネル/ボタン/モード選択・Electron ウィンドウ管理の全連動修正箇所 |
-| [`AIコアWebSocket仕様.md`](./AIコアWebSocket仕様.md) | WebSocket 接続フロー・メッセージ形式を把握したい | 2 本ソケット構成・`init` メッセージ・トークン延長ルール |
+## Frontend 共通
 
----
+| 目的 | 参照ファイル |
+|------|--------------|
+| Vite proxy / CORS / ポートを調整する | [`Viteプロキシ設定.md`](./Viteプロキシ設定.md) |
 
 ## Frontend Web
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`frontendWeb画面追加手順.md`](./frontendWeb画面追加手順.md) | Vue 3 で新しい業務画面（一覧＋編集）を追加したい | ファイル構成・UI ルール・qTublerFrame の使い方 |
-| [`X系静的画面追加.md`](./X系静的画面追加.md) | Xその他配下にゲーム・デモ等の静的 HTML 画面を追加したい | Vue iframe ラッパー・public/ 配置・router/Xその他.vue の登録 |
-| [`Viteプロキシ設定.md`](./Viteプロキシ設定.md) | CORS エラーが出る / ポートを変更したい | CORS 許可リスト更新・Vite Proxy の仕組み・本番 Nginx との違い |
+| 目的 | 参照ファイル |
+|------|--------------|
+| Vue 3 の業務画面を追加する | [`frontendWeb画面追加手順.md`](./frontendWeb画面追加手順.md) |
+| qTubler、UI ルール、明細型編集を既存パターンへ合わせる | [`frontendWeb実装パターン.md`](./frontendWeb実装パターン.md) |
+| X系の静的画面・ゲーム・デモを追加する | [`X系静的画面追加.md`](./X系静的画面追加.md) |
 
----
+## Frontend Avatar / Electron
 
-## Frontend Avatar（Electron / Web デュアルモード）
+| 目的 | 参照ファイル |
+|------|--------------|
+| Electron IPC を追加する | [`ElectronIPC追加手順.md`](./ElectronIPC追加手順.md) |
+| Electron / Web 両モードの変更チェックを行う | [`frontendAvatar変更チェック.md`](./frontendAvatar変更チェック.md) |
+| VRM モデル・VRMA モーションを追加する | [`VRM_VRMA追加手順.md`](./VRM_VRMA追加手順.md) |
+| アバター表示・VRMA 連続再生・表示選択 UI を調整する | [`アバター表示とVRMA.md`](./アバター表示とVRMA.md) |
+| xneko / xeyes 系ウィジェットを追加する | [`xneko_xeyesウィジェット追加手順.md`](./xneko_xeyesウィジェット追加手順.md) |
+| マイク入力・音声再生を調整する | [`AI音声処理.md`](./AI音声処理.md) |
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`アバター表示とVRMA.md`](./アバター表示とVRMA.md) | アバターサイズ・向き・VRMA ループ・表示選択 UI を調整したい | カメラ距離・初期回転・finished イベント連続再生・xeyes/xneko オプションパネル実装知見 |
-| [`xneko_xeyesウィジェット追加手順.md`](./xneko_xeyesウィジェット追加手順.md) | `表示選択` に新しいウィジェットを追加したい | `AIコア.vue` の型・import・option・表示 computed の更新手順とコンポーネントテンプレート |
-| [`ElectronIPC追加手順.md`](./ElectronIPC追加手順.md) | Renderer から OS 機能を呼び出したい | main.ts / preload.ts / env.d.ts の 3 点セットのコード例 |
-| [`VRM_VRMA追加手順.md`](./VRM_VRMA追加手順.md) | VRM モデル・VRMA モーションを追加したい | public/ 配置・config.ts 更新・listVrmaFiles IPC |
-| [`AI音声処理.md`](./AI音声処理.md) | マイク/スピーカーの動作を変更したい / 音声が出ない | AudioController の仕様・よくある問題と対処 |
+## AI コア
 
----
+| 目的 | 参照ファイル |
+|------|--------------|
+| AIコア WebSocket の接続・パケット形式を確認する | [`AIコアWebSocket仕様.md`](./AIコアWebSocket仕様.md) |
+| AI モデル設定を変更する | [`AIモデル設定変更手順.md`](./AIモデル設定変更手順.md) |
+| code1〜code6 のコード AI パネルを調整する | [`AIコードパネル拡張手順.md`](./AIコードパネル拡張手順.md) |
 
-## 認証
+## Code CLI
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`JWT認証フロー.md`](./JWT認証フロー.md) | 認証フロー全体を把握したい / 401 エラーが出る | ログイン→トークン保存→延長→401 ハンドリングの全フロー |
-| [`認証延長ルール.md`](./認証延長ルール.md) | どの操作でトークンを延長するか確認したい | AI 入力・AIファイル・C/M/T/V 操作での延長対象と対象外の一覧 |
+| 目的 | 参照ファイル |
+|------|--------------|
+| Code CLI を追加する | [`CodeCLI追加手順.md`](./CodeCLI追加手順.md) |
+| Code CLI の MCP 設定を確認する | [`CodeCLI_MCP設定.md`](./CodeCLI_MCP設定.md) |
+| Code CLI のプロンプト整形責務を確認する | [`CodeCLIプロンプト整形.md`](./CodeCLIプロンプト整形.md) |
+| CLI 出力の ANSI 制御コードを除去する | [`CodeCLI表示ANSI制御コード対処.md`](./CodeCLI表示ANSI制御コード対処.md) |
+| Hermes CLI の TUI を調整する | [`HermesCLI_TUI調整手順.md`](./HermesCLI_TUI調整手順.md) |
+| backend_hermes を単体 CLI として起動・確認する | [`backendHermes運用手順.md`](./backendHermes運用手順.md) |
 
----
+## ドキュメント・共通
 
-## 共通
+| 目的 | 参照ファイル |
+|------|--------------|
+| Markdown を現行実装へ追従させる | [`Markdown現状追従チェック.md`](./Markdown現状追従チェック.md) |
+| `AGENTS.md` 系ドキュメントを概要と HowTo に分離する | [`AGENTS整理手順.md`](./AGENTS整理手順.md) |
+| `.aidiy/knowledge` を更新する | [`ナレッジ更新手順.md`](./ナレッジ更新手順.md) |
+| UTF-8 BOM を検出・除去する | [`UTF8BOM問題対処.md`](./UTF8BOM問題対処.md) |
+| 一時ファイル・バックアップを整理する | [`クリーンアップ手順.md`](./クリーンアップ手順.md) |
+| GitHub issue を確認・close する | [`GitHubIssue運用手順.md`](./GitHubIssue運用手順.md) |
 
-| ファイル | 要件 | 実装方法 |
-|---------|------|---------|
-| [`ナレッジ更新手順.md`](./ナレッジ更新手順.md) | `.aidiy/knowledge` を更新・加筆したい | サブエージェント分担、索引統合、編集後検証、MCPバックアップ失敗時の扱い |
-| [`UTF8BOM問題対処.md`](./UTF8BOM問題対処.md) | BOM 混入ファイルを検出・除去したい | `bom_anomaly_list.py` / `remove_bom.py` の使い方 |
-| [`クリーンアップ手順.md`](./クリーンアップ手順.md) | `_cleanup.py` の削除対象や temp / backup 整理方針を確認したい | `temp` はフォルダごと削除、ルート `backup/` は選択項目に含める |
+## 記録ルール
 
----
-
-## 更新ルール
-- ファイル名: 機能名＋`追加手順` / `仕様` / `構成` / `設定` / `問題対処` のいずれかで終わる
-- `チェック` `パターン` `整理` は使わない（`手順` に統一）
-- スペース・単独の `_` はファイル名に使わない（`VRM_VRMA` のような技術用語の `_` は許容）
-- 未整理項目が残るファイルは、実際に作業したときに結論を追記する
-- 同テーマの知見は新規ファイル乱立ではなく既存ファイルへ統合する
+- ファイル名は内容が分かる日本語名にする。
+- 同じテーマの知見は既存ファイルへ統合する。
+- 残すのは HowTo、判断基準、注意点、確認方法だけにする。
+- 日付つき履歴、担当者メモ、経緯説明、完了報告、編集対象の列挙だけの記録は残さない。
+- 現行実装と同期が必要な値は、同期元のファイルパスを併記する。
+- `.aidiy/knowledge` 更新とアプリ本体の仕様変更は混同しない。

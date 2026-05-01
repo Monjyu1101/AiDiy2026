@@ -1,74 +1,24 @@
-# AiDiy について
+# AiDiy
 
-## 本書について
+## 本書の役割
 
-このファイルは、AiDiy の概要だけを短く把握するためのメモです。
+このファイルは、AI エージェントが AiDiy の入口だけを短く把握するための最小メモです。
+ここに手順、詳細仕様、個別の実装メモを追記しないでください。
 
----
+詳しい情報は [AGENTS.md](./AGENTS.md) を参照してください。
 
-## プロジェクト概要
+## システム概要
 
-**AiDiy** は、**日本語を第一言語とするフルスタック業務システム開発テンプレート** です。
+AiDiy は、日本語を第一言語とするフルスタック業務システム開発テンプレートです。
 
-### 特徴
+- Backend: FastAPI + SQLAlchemy + SQLite。
+- Backend Hermes: `aidiy_hermes` コード支援 CLI。
+- Backend MCP: Chrome / Desktop / DB / Logs / Code Check / Backup 系 MCP。
+- Frontend Web: Vue 3 + Vite + TypeScript。
+- Frontend Avatar: Electron / Web デュアルモードの AI Avatar UI。
+- AI コア: チャット、音声、画像、ファイル、code1〜code6 のコード支援パネル。
 
-- 日本語ネイティブ設計
-  - テーブル名、カラム名、API、JSON キー、Vue ファイル名が日本語中心
-- フルスタック構成
-  - バックエンド: FastAPI + SQLAlchemy + SQLite
-  - バックエンド Hermes: `backend_hermes` / `aidiy_hermes`（コード支援用 CLI 基盤）
-  - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
-  - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
-- マルチバックエンド
-  - `core_main.py` : `8091`
-  - `apps_main.py` : `8092`
-  - `backend_mcp/mcp_main.py` : `8095`（8 つの MCP サーバーを同居）
-- 実用サンプルを同梱
-  - C系, M系, T系, V系, S系, A系, X系（Xテトリス, Xインベーダー, Xリバーシ, X立体リバーシ, X世界の絶景, X自己紹介）
-- AI 統合
-  - Claude / OpenAI / Gemini
-  - WebSocket ベースの AI コア
-  - 音声、画像、コード支援パネル
-- マルチ Code CLI 対応
-  - `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `opencode_cli`, `aidiy_hermes`
-  - 複数のコードエージェントを同時並走（code1〜code6 パネル）
-- AIブラウザ自動操作・デスクトップキャプチャ・自己検証 MCP
-  - `backend_mcp/mcp_main.py`（port 8095）が 8 MCP サーバーを SSE で提供
-    - `aidiy_chrome_devtools` — CDP でブラウザ操作
-    - `aidiy_desktop_capture` — スクリーンショット取得
-    - `aidiy_sqlite`          — AiDiy DB の read-only 中心クエリ
-    - `aidiy_postgres`        — 外部 PostgreSQL の read-only 中心クエリ
-    - `aidiy_logs`            — バックエンドログの tail・エラー抽出
-    - `aidiy_code_check`      — py_compile / ruff / TypeScript 型チェック
-    - `aidiy_backup_check`    — 変更前/変更後ソース抽出
-    - `aidiy_backup_save`     — AiDiy 差分バックアップ実行
-  - `backend_server/_config/AiDiy_mcp.json` で使う MCP を選んで定義
-  - Claude Agent SDK（claude_sdk）が MCP 経由でブラウザ操作・画面キャプチャ・自己検証可能
-- 自己改善機構
-  - コードエージェントが修正完了後、`.aidiy/knowledge/` フォルダへ知見を自動整理
-  - 使うほど類似修正の精度が上がる「育つシステム」
+業務システム機能追加の手順は `docs/` を参照してください。
+コアシステム機能調整の手順は [`.aidiy/knowledge/_index.md`](./.aidiy/knowledge/_index.md) を参照してください。
 
----
-
-## 実装メモ
-
-- 起動は `python _start.py`
-  - 起動時に backend(mcp) / backend(core,apps) / web / avatar を対話形式で選択
-- Web フロント: `http://localhost:8090`
-- MCP SSE (port 8095): `/aidiy_chrome_devtools/sse` / `/aidiy_desktop_capture/sse` / `/aidiy_sqlite/sse` / `/aidiy_postgres/sse` / `/aidiy_logs/sse` / `/aidiy_code_check/sse` / `/aidiy_backup_check/sse` / `/aidiy_backup_save/sse`
-- Avatar Web モード: `http://localhost:8099`
-- SQLite DB: `backend_server/_data/AiDiy/database.db`
-- 初期ログイン: `admin / ********`
-- CRUD は原則 POST
-- M商品構成 / T生産 は明細型パターン
-- `frontend_avatar` は Electron では `localStorage`、Web では `sessionStorage`
-- AI 名の規約
-  - `CHAT_AI_NAME`: `*_chat`
-  - `LIVE_AI_NAME`: `*_live`
-  - `CODE_AI*_NAME`: 原則 `*_sdk` または `*_cli`（例外: `aidiy_hermes`）
-
----
-
-## 詳細
-
-詳細は [AGENTS.md](./AGENTS.md) を参照してください。
+詳細な概要、サブシステム構成、文書インデックスは [AGENTS.md](./AGENTS.md) を参照してください。

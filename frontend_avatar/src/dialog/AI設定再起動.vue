@@ -3,7 +3,7 @@
 
   -------------------------------------------------------------------------
   COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Licensed under "AiDiy 公開利用ライセンス v1.1".
   Commercial use requires prior written consent from all copyright holders.
   See LICENSE for full terms. Thank you for keeping the rules.
   https://github.com/monjyu1101/AiDiy2026
@@ -14,7 +14,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import apiClient from '@/api/client'
 import RebootDialog from '@/dialog/再起動カウントダウン.vue'
-import { qConfirm } from '@/utils/qAlert'
+import { qAlert, qConfirm } from '@/utils/qAlert'
 
 const props = defineProps<{
   isOpen: boolean
@@ -245,7 +245,7 @@ function buildNextSettings() {
   return nextSettings
 }
 
-async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds = 15) {
+async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds = 15, save = false) {
   loading.value = true
   errorMessage.value = ''
 
@@ -259,6 +259,7 @@ async function submitSettings(再起動要求: { reboot_core: boolean; reboot_ap
       セッションID: props.sessionId,
       モデル設定: buildNextSettings(),
       再起動要求,
+      save,
     })
 
     if (response?.data?.status !== 'OK') {
@@ -276,6 +277,32 @@ async function submitSettings(再起動要求: { reboot_core: boolean; reboot_ap
 
 function handleSave() {
   void submitSettings({ reboot_core: false, reboot_apps: true, reboot_mcp: true })
+}
+
+async function handleSaveOnly() {
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    if (!props.sessionId) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。'
+      return
+    }
+    const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
+      セッションID: props.sessionId,
+      モデル設定: buildNextSettings(),
+      再起動要求: { reboot_core: false, reboot_apps: false, reboot_mcp: false },
+      save: true,
+    })
+    if (response?.data?.status !== 'OK') {
+      errorMessage.value = response?.data?.message || '保存に失敗しました'
+      return
+    }
+    void qAlert('モデル情報を保存しました')
+  } catch (error: any) {
+    errorMessage.value = `保存エラー: ${error?.response?.data?.message || error?.message || error}`
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleResetReboot() {
@@ -601,7 +628,9 @@ onMounted(() => {
         </div>
       </div>
       <div class="config-panel-actions">
-        <div class="config-panel-actions-edge" aria-hidden="true"></div>
+        <div class="config-panel-actions-edge">
+          <button type="button" class="save" :disabled="loading" @click="handleSaveOnly">保存(json書換)</button>
+        </div>
         <div class="config-panel-actions-center">
           <button type="button" @click="handleCancel">キャンセル</button>
           <button type="button" class="primary" :disabled="loading" @click="handleSave">設定/再起動</button>
@@ -637,6 +666,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   border: 1px solid #e2e8f0;
+  min-width: 0;
 }
 
 .config-panel-header {
@@ -705,6 +735,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
 }
 
 .config-panel-section {
@@ -715,6 +746,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 0;
   background: #eef2f7;
+  min-width: 0;
 }
 
 .config-panel-section-header {
@@ -742,7 +774,7 @@ onMounted(() => {
 
 .config-panel-field {
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 25% 1fr;
   gap: 4px;
   align-items: center;
   padding: 0;
@@ -750,6 +782,7 @@ onMounted(() => {
   background: transparent;
   border: none;
   border-radius: 0;
+  min-width: 0;
 }
 
 .config-panel-label {
@@ -764,6 +797,7 @@ onMounted(() => {
   width: 100%;
   margin: 0;
   padding: 0;
+  min-width: 0;
 }
 
 .config-panel-control-stack {
@@ -774,6 +808,7 @@ onMounted(() => {
 
 .config-panel-select {
   width: 100%;
+  min-width: 0;
   height: 22px;
   border: 1px solid #cbd5f5;
   border-radius: 3px;
@@ -781,6 +816,7 @@ onMounted(() => {
   font-size: 11px;
   background: #ffffff;
   color: #0f172a;
+  box-sizing: border-box;
 }
 
 .config-panel-code-base-field {
@@ -808,6 +844,7 @@ onMounted(() => {
   background: #ffffff;
   color: #0f172a;
   margin: 0;
+  box-sizing: border-box;
 }
 
 .config-panel-browse {
@@ -837,7 +874,7 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 500px) {
   .config-panel-field {
     grid-template-columns: 1fr;
   }
@@ -903,6 +940,16 @@ onMounted(() => {
 
 .config-panel-actions button.danger:hover:not(:disabled) {
   background: #b91c1c;
+}
+
+.config-panel-actions button.save {
+  background: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+}
+
+.config-panel-actions button.save:hover:not(:disabled) {
+  background: #ea580c;
 }
 
 .config-panel-actions button:disabled {

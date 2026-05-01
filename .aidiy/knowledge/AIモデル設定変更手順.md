@@ -1,126 +1,100 @@
 # AIモデル設定変更手順
 
 ## このメモを使う場面
-- 使用する AI モデル（Claude / Gemini / OpenAI など）を変更したい
-- `AiDiy_key.json` に新しい API キーを設定したい
-- 設定 UI から AI モデルを切り替えたい
+- Chat / Live / Code AI のモデルや API キーを変更する
+- `AiDiy_key.json` と設定 UI の整合を確認する
+- 新しい AI 種別や Code CLI を追加した後、設定として選べるようにする
 
 ## 関連ファイル
-- `backend_server/_config/AiDiy_key.json` — API キーと現在の AI モデル設定（**正マスタ**）
-- `backend_server/conf/conf_json.py` — JSON 読み書き、不足キーの自動補完
-- `frontend_avatar/src/api/config.ts` — `defaultModelSettings()`（backend 取得前のフォールバック）
-- `frontend_avatar/src/dialog/AI設定再起動.vue` — 設定変更 UI（モデル選択 + 再起動トリガー）
-- `backend_server/core_router/AIコア/AIセッション管理.py` — モデル設定の初期化
+- `backend_server/_config/AiDiy_key.json` — APIキーと現在設定の正マスタ
+- `backend_server/conf/conf_json.py` — 設定 JSON の読込、デフォルト、auto 補完
+- `backend_server/conf/conf_model.py` — 利用可能モデル一覧
+- `backend_server/core_router/AIコア.py` — モデル情報取得/更新 API
+- `backend_server/core_router/AIコア/AIセッション管理.py` — セッション用モデル設定
+- `frontend_avatar/src/api/config.ts` — backend 取得前のフォールバック
+- `frontend_avatar/src/dialog/AI設定再起動.vue` — Avatar 設定 UI
+- `frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue` — Web 設定 UI
 
-## AI モデル命名規則（必須）
+## AI 種別名のルール
 
-| キー | 末尾ルール | 正しい例 | 誤りの例 |
-|------|-----------|---------|---------|
-| `CHAT_AI_NAME` | `_chat` | `gemini_chat`, `openrt_chat`, `freeai_chat` | `gemini`, `claude_chat_v2` |
-| `LIVE_AI_NAME` | `_live` | `gemini_live`, `openai_live` | `gemini` |
-| `CODE_AI1_NAME`〜`CODE_AI6_NAME` | `_sdk` または `_cli`（例外: `aidiy_hermes`） | `claude_sdk`, `copilot_cli`, `codex_cli`, `gemini_cli`, `opencode_cli`, `aidiy_hermes` | `claude`, `claude_code` |
+| キー | 末尾ルール | 例 |
+|------|-----------|----|
+| `CHAT_AI_NAME` | `_chat` | `gemini_chat`, `openrt_chat`, `freeai_chat`, `ollama_chat` |
+| `LIVE_AI_NAME` | `_live` | `gemini_live`, `openai_live` |
+| `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `opencode_cli`, `aidiy_hermes` |
 
-**比較は完全一致のみ**（`startswith` 等の前方一致は使用禁止）。
+判定は完全一致を前提にする。`startswith()` などの前方一致へ変えない。
 
-## 設定変更の手順
+## 設定変更手順
 
-### AiDiy_key.json を直接編集する場合
+### JSON を直接編集する場合
+
+`backend_server/_config/AiDiy_key.json` を編集し、Chat / Live / Code 6枠のキーを揃える。
 
 ```json
 {
-  "CLAUDE_KEY": "sk-ant-...",
-  "GEMINI_KEY": "AIza...",
-  "OPENAI_KEY": "sk-...",
   "CHAT_AI_NAME": "gemini_chat",
   "LIVE_AI_NAME": "gemini_live",
   "CODE_AI1_NAME": "claude_sdk",
+  "CODE_AI1_MODEL": "auto",
   "CODE_AI2_NAME": "copilot_cli",
+  "CODE_AI2_MODEL": "auto",
   "CODE_AI3_NAME": "codex_cli",
+  "CODE_AI3_MODEL": "auto",
   "CODE_AI4_NAME": "gemini_cli",
+  "CODE_AI4_MODEL": "auto",
   "CODE_AI5_NAME": "opencode_cli",
-  "CODE_AI6_NAME": "aidiy_hermes"
+  "CODE_AI5_MODEL": "auto",
+  "CODE_AI6_NAME": "aidiy_hermes",
+  "CODE_AI6_MODEL": "auto"
 }
 ```
 
-変更後はバックエンドを再起動する（`echo. > backend_server/temp/reboot_core.txt`）。
+変更後は `backend_server/temp/reboot_core.txt` を作成するか、core server を再起動する。
 
 ### 設定 UI から変更する場合
 
-`frontend_avatar` の設定ダイアログ（`AI設定再起動.vue`）から変更すると、  
-`POST /core/AIコア/モデル設定/更新` API 経由で `AiDiy_key.json` が書き換えられ自動再起動される。
+`AI設定再起動.vue` から保存すると、`POST /core/AIコア/モデル設定/更新` が `AiDiy_key.json` を更新し、Reboot 機構で core server を再起動する。
 
-### 設定ダイアログの呼び出し経路
+Electron では settings 専用ウィンドウ、Web では同じコンポーネントのモーダル表示を使う。`AI設定再起動.vue` に `window.desktopApi` 前提の処理を直接入れない。
 
-- Electron: core ウィンドウから `window.desktopApi.openSettingsWindow(sessionId)` を呼び、`settings:open` IPC で専用 `settings` ウィンドウを開く
-- Web: `AiDiy.vue` 内で `AI設定再起動.vue` をモーダル表示する
-- settings ウィンドウは `onSettingsPrepare()` で sessionId を受け取るため、sessionId が空の状態で開かないようにする
+## available_models の流れ
 
-Electron 専用ウィンドウとして設定画面を直す場合でも、Web モードのモーダル表示が同じコンポーネントを使う。`window.desktopApi` 前提の処理を `AI設定再起動.vue` に直接入れない。
+1. frontend が `/core/AIコア/モデル情報/取得` を呼ぶ
+2. backend が現在設定と `available_models` を返す
+3. 設定 UI が `chat_models` / `live_models` / `code_models` から選択肢を作る
+4. 保存時に `/core/AIコア/モデル設定/更新` へ送る
+5. 再起動後の再接続で新設定を確認する
 
-## デフォルト設定との整合
+新しい AI 種別を追加する場合は、backend が返す `available_models` のキー、frontend の `CHAT_MODEL_KEYS` / `LIVE_MODEL_KEYS` / `LIVE_VOICE_KEYS` / `CODE_MODEL_KEYS`、`conf_json.DEFAULT_CONFIG` を合わせる。
 
-`config.ts` の `defaultModelSettings()` は backend から設定を取得する前のフォールバック値。  
-ここの `CODE_AI*_NAME` の値が `_sdk`/`_cli` サフィックスになっていないとバックエンド側ハンドラと不一致になる。  
-→ `conf_json.py` のデフォルト値と完全一致させること。
-
-## available_models の取得フロー
-
-1. frontend が `/core/AIコア/モデル情報/取得` を呼び出す
-2. backend が現在設定と利用可能モデル一覧を返す
-3. `AI設定再起動.vue` が `availableModels` を更新し、チャット・ライブ・コード用の選択肢を生成する
-4. 保存時に `/core/AIコア/モデル設定/更新` へ送信し、`AiDiy_key.json` を更新する
-5. 更新後は Reboot 機構で core server を再起動し、次回接続から新設定を使う
-
-### 選択肢の生成ルール
-
-- チャット AI 選択肢: `available_models.chat_models` のキー
-- ライブ AI 選択肢: `available_models.live_models` のキー
-- ライブ voice 選択肢: `available_models.live_voices[選択中LIVE_AI_NAME]`
-- コード AI 選択肢: `available_models.code_models` のキー
-- 各モデル選択肢: 選択中 AI 名に対応するモデル辞書
-
-frontend の `CHAT_MODEL_KEYS` / `LIVE_MODEL_KEYS` / `LIVE_VOICE_KEYS` / `CODE_MODEL_KEYS` は、選択中 AI 名から保存キーへ変換する辞書。新しい AI 名を追加するときは、backend が返す `available_models` のキー名と、この辞書のキー名を完全一致させる。
-
-`CODE_AI1_MODEL`〜`CODE_AI4_MODEL` は選択スロットごとの現在モデルとして保存される。一方で `CODE_CODEX_CLI_MODEL` のような CLI 種別別モデルキーもあるため、追加時は「スロット設定」と「CLI 種別別デフォルト」を混同しない。
-
-## Ollama Chat のローカル / Cloud 切替
+## Ollama Chat の local / Cloud 切替
 
 対象:
-- `backend_server/AIコア/AIチャット_ollama.py`
+- `backend_server/core_router/AIコア/AIチャット_ollama.py`
 - `backend_server/conf/conf_model.py`
-- `backend_server/AIコア/AIチャット.py`
+- `backend_server/core_router/AIコア/AIチャット.py`
 
 判断基準:
-- `ollama_key_id` が `<` で始まるプレースホルダーの場合は、従来どおりローカル Ollama を使う
-  - 実行時 base URL: `ollama_host + "/v1"`（既定 `http://localhost:11434/v1`）
-  - モデル一覧: `ollama list`
-  - OpenAI SDK へ渡す API キーはダミーの `ollama`
-- `ollama_key_id` が `<` で始まらない場合は、Ollama Cloud を直接使う
-  - 実行時 base URL: `https://ollama.com/v1`
-  - モデル一覧: `GET https://ollama.com/v1/models`
-  - `Authorization: Bearer <ollama_key_id>` を付ける
+- `ollama_key_id` が `<` で始まる場合は local Ollama を使う
+- 有効なキーがある場合は Ollama Cloud `https://ollama.com/v1` を使う
+- local は `ollama_host + "/v1"`、既定は `http://localhost:11434/v1`
+- Cloud 直叩き時はモデル名から `:cloud` と入力揺れの `:clude` を外して API に渡す
 
-モデル名の注意:
-- ローカル経由では `deepseek-v4-flash:cloud` のようなサフィックス付きモデル名をそのまま維持する
-- Cloud 直叩き時は `:cloud` と、入力揺れ対策の `:clude` を外して API に渡す
-- `AiDiy_key.json` 読込時点で `ollama_key_id` が有効なら、`CHAT_OLLAMA_MODEL`（存在する場合は `OLLAMA_MODEL` も）の読取値だけ `conf_json.py` で `replace(":cloud", "")` する
-- `AiDiy_key.json` は正マスタなので、読み取り時の正規化だけを理由にファイルへ保存しない
-- 設定 UI に返す Cloud モデル一覧もサフィックス除去後のキーにする
-- `available_models.chat_models.ollama_chat` の表示値は、他のチャットモデルと同じ `yyyy/mm/dd - model` 形式に揃える
-  - Cloud は `/v1/models` の `created` timestamp を `YYYY/MM/DD` へ変換し、8か月以内（240日）に絞って新しい順で返す
-  - ローカル `ollama list` は安定した作成日が取れないため `yyyy/mm/dd` を使う
+注意:
+- `AiDiy_key.json` は正マスタ。読込時の正規化だけを理由に保存し直さない
+- `ollama_chat` は local 実行が正常系なので、キーがプレースホルダーでも welcome 事前チェックで無効扱いにしない
+- Cloud のモデル一覧は日付表示形式を他の chat model と揃える
 
-welcome 判定の注意:
-- `ollama_chat` は `ollama_key_id` がプレースホルダーでもローカル実行が正しいため、`AIチャット.py` の welcome 事前チェックで API キー無効扱いにしない
-- 実際の疎通失敗は `AIチャット_ollama.py` 側の実行時エラーとして扱う
+## 注意点
 
-## 実装の結論
-
-- `AiDiy_key.json` を正マスタとし、frontend の `defaultModelSettings()` は取得前フォールバックとして扱う
-- AI 種別名は完全一致で判定するため、`_chat` / `_live` / `_sdk` / `_cli` のサフィックスを崩さない
-- Code CLI を増やした場合は、backend のモデル定義、設定 JSON、frontend の `CODE_MODEL_KEYS` を合わせて更新する
-- 設定変更後は既存 WebSocket セッションに即時完全反映される前提にしない。Reboot 後の再接続で新設定を確認する
+- `frontend_avatar/src/api/config.ts` の `defaultModelSettings()` は backend 取得前のフォールバック。`conf_json.py` のデフォルトとずれると初期表示が混乱する
+- `CODE_AI<N>_MODEL` はスロットごとの現在モデル、`CODE_CODEX_CLI_MODEL` のようなキーは CLI 種別ごとのデフォルト。混同しない
+- 設定変更は既存 WebSocket セッションへ即時完全反映される前提にしない。再起動後の再接続で確認する
+- Code AI は現行6枠。枠数確認は `backend_server/core_router/AIコア.py` と frontend の `PanelKey` を見る
 
 ## 確認方法
 
-`GET http://localhost:8091/core/AIコア/モデル情報/取得`（要認証）で現在の設定と利用可能モデル一覧を確認する。
+- `GET http://localhost:8091/core/AIコア/モデル情報/取得` で現在設定と利用可能モデル一覧を確認する（要認証）
+- 設定 UI で Chat / Live / Code1〜Code6 の選択肢が出ることを確認する
+- 保存後に `AiDiy_key.json` が更新され、core server が再起動することを確認する

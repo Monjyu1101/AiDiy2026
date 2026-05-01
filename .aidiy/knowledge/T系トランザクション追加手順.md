@@ -1,65 +1,71 @@
 # T系トランザクション追加手順
 
 ## このメモを使う場面
-- T配車・T生産のような業務トランザクションテーブルを新たに追加したい
-- 明細型（ヘッダー行＋明細行を単一テーブルで管理）のパターンも含む
+- T配車・T生産のような業務トランザクションテーブルを追加する
+- 明細型（ヘッダー行＋明細行を単一テーブルで管理）を実装する
+- T系一覧用の V系エンドポイントを追加する
 
 ## 関連ファイル
-- M系追加と共通: `apps_models/__init__.py`, `apps_crud/__init__.py`, `apps_main.py`, `apps_crud/init.py`
-- T系固有: `apps_router/T*.py`, `apps_router/V*.py`（T系一覧表示用の V系も必要）
+- `backend_server/apps_models/`
+- `backend_server/apps_schema/`
+- `backend_server/apps_crud/`
+- `backend_server/apps_router/T*.py`
+- `backend_server/apps_router/V*.py`
+- `backend_server/apps_main.py`
+- `backend_server/apps_crud/init.py`
+- `backend_server/core_crud/C採番.py`
 
 ## 実装手順
 
-### Backend
+### 1. Model
 
-- [ ] `apps_models/T<名称>.py` — SQLAlchemy Model 作成
-- [ ] `apps_models/__init__.py` — `from apps_models.T<名称> import *` 追加（テーブル生成に必須）
-- [ ] `apps_crud/T<名称>.py` — CRUD 関数作成
-- [ ] **`apps_crud/__init__.py` — CRUD 関数を import して `__all__` に追加（最も忘れやすい）**
-- [ ] `apps_router/T<名称>.py` — Router 作成（POST のみ）
-- [ ] `apps_router/V<名称>.py` — 一覧表示用 V系 Router 作成（JOIN + 生 SQL）
-- [ ] `apps_main.py` — 両 Router を `include_router` で登録
-- [ ] `apps_crud/init.py` — 初期データが必要なら `init_db_data()` に追記
-- [ ] `apps_crud/init.py` — カラム追加があれば `apply_schema_migrations()` に追記
-- [ ] `C採番` テーブルに新テーブルのエントリを追加（初期データとして）
+- `apps_models/T<名称>.py` に SQLAlchemy Model を作る。
+- `apps_models/__init__.py` に import を追加する。ここが漏れると `create_all()` の対象にならない。
+- `apps_main.py` の `create_all(tables=[...])` に新 Model の `.__table__` を追加する。
+- 監査8項目と `有効` を含める。
+- 日付は既存実装に合わせ、原則 `YYYY-MM-DD` 文字列で保存する。
 
-### Frontend（frontend_web）
+### 2. Schema / CRUD
 
-- [ ] `src/types/<名称>型.ts` — TypeScript 型定義
-- [ ] `src/api/<名称>Api.ts` — API 呼び出し関数
-- [ ] `src/components/T<カテゴリ>/<テーブル名>/一覧.vue` — 一覧画面
-- [ ] `src/components/T<カテゴリ>/<テーブル名>/編集.vue` — 編集画面
-- [ ] `src/components/T<カテゴリ>/<テーブル名>/components/一覧テーブル.vue` — qTublerFrame ラッパー
-- [ ] `src/router/index.ts` — ルート追加
-- [ ] メニューコンポーネントへのリンク追加
+- `apps_schema/T<名称>.py` に request / response schema を作る。
+- `apps_schema/__init__.py` に import を追加する。
+- `apps_crud/T<名称>.py` に get / list / create / update / delete 関数を作る。
+- `apps_crud/__init__.py` に CRUD 関数を import し、`__all__` に追加する。
+- 登録時は `create_audit_fields()`、更新時は `update_audit_fields()` を使う。
 
-## 明細型パターン（ヘッダー+明細を単一テーブルで管理）
+### 3. Router
+
+- `apps_router/T<名称>.py` に Router を作る。CRUD エンドポイントは POST で統一する。
+- `apps_router/V<名称>.py` に一覧表示用 V系 Router を作る。JOIN は DB VIEW ではなく生SQLで実装する。
+- `apps_main.py` に T系 / V系 Router の import と `include_router` を追加する。
+
+### 4. 初期データ・採番
+
+- 初期データが必要なら `apps_crud/init.py` の `init_db_data()` に追記する。
+- カラム追加がある場合は `apply_schema_migrations()` に追記する。
+- 伝票IDやシステム生成IDを使う場合は `C採番` に対象 `採番ID` を追加する。
+
+## 明細型パターン
 
 T生産・M商品構成が参考実装。
 
 ```python
-# 明細SEQ=0: ヘッダー行、明細SEQ>=1: 明細行
 class T生産(Base):
     __tablename__ = "T生産"
     生産ID    = Column(String, primary_key=True)
-    明細SEQ   = Column(Integer, primary_key=True)  # 0=ヘッダ
-    生産日付  = Column(String)  # ヘッダ項目
-    商品ID    = Column(String)  # 明細項目（ヘッダ行はNULL）
+    明細SEQ   = Column(Integer, primary_key=True)
+    生産日付  = Column(String)
+    商品ID    = Column(String)
     数量      = Column(Integer)
-    ...監査フィールド...
 ```
 
-CRUD の方針:
-- `get_ヘッダ(db, 生産ID)`: `明細SEQ=0` の1行を取得
-- `get_明細一覧(db, 生産ID)`: `明細SEQ>=1` の一覧を取得
-- `create/update` は全明細を一括削除→再作成（楽観ロック不要）
-
-## 明細型 CRUD の実装基準
-
+- `明細SEQ=0` をヘッダー行、`明細SEQ>=1` を明細行にする。
 - 主キーは `伝票ID + 明細SEQ` の複合PKにする。
+- `get_ヘッダ(db, ID)` は `明細SEQ=0` の1行を取得する。
+- `get_明細一覧(db, ID)` は `明細SEQ>=1` の一覧を取得する。
 - 登録時はヘッダー行を `明細SEQ=0` として先に作り、明細配列を 1 始まりで追加する。
 - 更新時は対象伝票IDの既存行を全削除してから、ヘッダーと明細を再作成する。削除前に存在確認を行い、対象なしなら `NG` を返す。
-- 削除は物理削除ではなく `有効=False` を標準にする。ただし既存実装が全行削除方式の場合は、その機能の既存パターンに合わせる。
+- 削除は既存機能の方針に合わせる。論理削除なら対象伝票IDの全行を `有効=False` にする。
 - V系やスケジューラでヘッダーだけを扱うときは必ず `明細SEQ = 0` を条件に入れる。明細行まで混ざると件数や予定表示が二重になる。
 - 明細だけを集計する V 系では `明細SEQ > 0` を条件に入れる。
 
@@ -71,14 +77,20 @@ CRUD の方針:
 
 ## 注意点
 
-- **`apps_crud/__init__.py` への登録が最も忘れやすい** — 漏れると `ImportError` でサーバー起動失敗
-- T系一覧画面のフロントは M系と同様に V系エンドポイントを使う。T系の直接 `/apps/T*/一覧` は補助用
-- 明細型の `create/update` で「明細行だけ更新」は実装しない — 全明細を削除・再作成が標準
-- 採番は `C採番` テーブルを経由する（AUTOINCREMENT 禁止）
-- 日付は `YYYY-MM-DD` 文字列で保存（SQLite の DATE 型は使わない）
+- `apps_crud/__init__.py` への登録が漏れると Router から CRUD 関数を参照できない。
+- 呼び出し側が V系一覧を使う前提の場合、T系の直接 `/apps/T*/一覧` は補助用として扱う。
+- 明細型の `create/update` で「明細行だけ更新」は標準にしない。全明細を削除・再作成する。
+- 採番対象は `C採番` を経由する。AUTOINCREMENT は使わない。
+- 日時項目を使う場合は、保存形式と比較方法を現行実装に合わせる。
 
 ## 確認方法
 
-1. `http://localhost:8092/docs` で POST エンドポイントが表示されることを確認
-2. 作成→一覧取得→更新→削除の一通りを Swagger で実行
-3. `npm run type-check` でフロント型エラーがないことを確認
+```powershell
+cd backend_server
+.venv\Scripts\python.exe -m py_compile apps_models\T<名称>.py apps_schema\T<名称>.py apps_crud\T<名称>.py apps_router\T<名称>.py apps_router\V<名称>.py
+.venv\Scripts\python.exe -c "import apps_main"
+```
+
+- Swagger `http://localhost:8092/docs` で POST エンドポイントを確認する。
+- 作成、一覧取得、更新、削除を実行する。
+- 明細型はヘッダー行だけの取得、明細行だけの取得、V系集計条件を確認する。

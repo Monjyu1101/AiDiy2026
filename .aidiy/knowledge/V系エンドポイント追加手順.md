@@ -1,22 +1,23 @@
 # V系エンドポイント追加手順
 
 ## このメモを使う場面
-- M系テーブルや T系テーブルを JOIN して一覧表示するエンドポイントを追加したい
-- DB VIEW を使わずに生 SQL で JOIN 集計をしたい
+- M系 / T系テーブルを JOIN して一覧表示するエンドポイントを追加する
+- DB VIEW を使わずに生 SQL で JOIN / 集計する
+- 一覧件数制限、有効フィルター、最終更新日時をそろえる
 
 ## 関連ファイル
-- `backend_server/apps_router/V*.py` — V系ルーター群（既存を参照して作る）
-- `backend_server/apps_main.py` — Router 登録
-- `backend_server/apps_crud/__init__.py` — 必要なら CRUD 関数を登録
+- `backend_server/apps_router/V*.py`
+- `backend_server/apps_main.py`
+- `backend_server/apps_schema/common.py`
+- `backend_server/list_controls.py`
 
 ## 実装手順
 
-### V系エンドポイントの基本構造
+### 1. Router を作る
 
-V系はすべて **POST メソッド**。DB VIEW オブジェクトは使わず、生 SQL（`text()`）で実装する。
+V系は POST メソッドで統一する。DB VIEW オブジェクトは作らず、生 SQL（`text()`）で実装する。
 
 ```python
-# backend_server/apps_router/V商品一覧.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -24,48 +25,52 @@ from typing import Optional
 import apps_schema as schemas, deps, apps_models as models
 from list_controls import append_active_condition, get_limit_clause
 
-router = APIRouter(prefix="/apps/V商品一覧", tags=["V商品一覧"])
+router = APIRouter(prefix="/apps/V商品", tags=["V商品"])
 
 @router.post("/一覧", response_model=schemas.ResponseBase)
 def 商品一覧(request: Optional[schemas.ListRequest] = None,
              db: Session = Depends(deps.get_db),
              現在利用者: models.C利用者 = Depends(deps.get_現在利用者)):
-    sql = text("""
+    conditions = []
+    params = {}
+    append_active_condition(conditions, request, "M.有効")
+    if request and getattr(request, "商品名", None):
+        conditions.append("M.商品名 LIKE :商品名")
+        params["商品名"] = f"%{request.商品名}%"
+
+    limit_sql, limit_value = get_limit_clause(request)
+    if limit_value is not None:
+        params["limit"] = limit_value
+
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    sql = f"""
         SELECT
-            m.商品ID,
-            m.商品名,
-            c.分類名
-        FROM M商品 m
-        LEFT JOIN M商品分類 c ON m.分類ID = c.分類ID
-        WHERE 1=1
-        -- 条件を動的に追加する場合は params dict を使う
-    """)
-    rows = db.execute(sql).fetchall()
+            M.商品ID,
+            M.商品名,
+            C.分類名
+        FROM M商品 M
+        LEFT JOIN M商品分類 C ON M.分類ID = C.分類ID
+        {where_sql}
+        ORDER BY M.商品ID
+        {limit_sql}
+    """
+    rows = db.execute(text(sql), params).fetchall()
     items = [dict(row._mapping) for row in rows]
     return {"status": "OK", "data": {"items": items, "total": len(items)}}
 ```
 
-### 動的条件の追加
+### 2. `apps_main.py` に登録する
 
 ```python
-conditions = ["1=1"]
-params = {}
-if request.商品名:
-    conditions.append("m.商品名 LIKE :商品名")
-    params["商品名"] = f"%{request.商品名}%"
-
-sql = text(f"SELECT ... FROM M商品 m WHERE {' AND '.join(conditions)}")
-rows = db.execute(sql, params).fetchall()
+from apps_router import V商品
+app.include_router(V商品.router)
 ```
 
-### 件数制限・有効フィルターの標準形
+### 3. 件数制限・有効フィルターを入れる
 
-V系の一覧は `list_controls.py` を使う。`request=None` でも既定で「件数制限あり・有効のみ」になる。
-
-`list_controls.py` の場所: `backend_server/list_controls.py`（`apps_crud/` 配下ではなく `backend_server/` 直下）
+V系の一覧は `backend_server/list_controls.py` を使う。`request=None` でも既定で「件数制限あり・有効のみ」になる。
 
 ```python
-# backend_server/ を cwd にして uvicorn を起動するため、パスプレフィックスなしで import できる
 from list_controls import append_active_condition, get_limit_clause
 
 conditions = []
@@ -89,22 +94,16 @@ total = db.execute(text(f"SELECT count(*) FROM M商品 M {where_sql}"), params).
 
 `conditions` を後から追加した場合は `where_sql` を作り直す。`V商品.py` の分類絞り込みが参考になる。
 
-### 最終更新日時エンドポイント（監視用）
+### 4. 最終更新日時エンドポイントを作る
 
-フロントが変更を検知するために使う軽量エンドポイント。
+一覧元テーブルの更新監視用に軽量エンドポイントを作る。
 
 ```python
-@router.post("/apps/V商品一覧/最終更新日時")
-def 最終更新日時(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+@router.post("/最終更新日時")
+def 最終更新日時(db: Session = Depends(deps.get_db),
+            現在利用者: models.C利用者 = Depends(deps.get_現在利用者)):
     row = db.execute(text("SELECT MAX(更新日時) as 最終更新日時 FROM M商品")).fetchone()
     return {"status": "OK", "data": {"最終更新日時": row[0]}}
-```
-
-### apps_main.py への登録
-
-```python
-from apps_router import V商品一覧
-app.include_router(V商品一覧.router)
 ```
 
 ## list_controls の関数シグネチャ
@@ -127,11 +126,11 @@ def apply_active_filter(query, model, request):
 
 ## 注意点
 
-- M系テーブルを追加したときは V系エンドポイントも**必ず**作成する（フロントの一覧画面は V系を使うため、M系エンドポイントだけでは画面が動かない）
-- `dict(row._mapping)` で行を辞書化すること（`row._asdict()` は非推奨）
-- 生 SQL のカラム名は DB のカラム名と完全一致が必要（日本語カラム名もそのまま使う）
-- LIMIT は `get_limit_clause()` を使い、値は `params["limit"]` に渡す（SQL インジェクション防止）
-- f-string は固定SQL断片（`where_sql` / `limit_sql` など）の組み立てに限定し、ユーザー入力値は直接埋め込まない
+- 呼び出し側が V系一覧を使う前提の場合、M系 / T系エンドポイントだけでは一覧取得が動かない。
+- `dict(row._mapping)` で行を辞書化する。`row._asdict()` は使わない。
+- 生 SQL のカラム名は DB のカラム名と完全一致させる。
+- LIMIT は `get_limit_clause()` を使い、値は `params["limit"]` に渡す。
+- f-string は固定SQL断片（`where_sql` / `limit_sql` など）の組み立てに限定する。
 - テーブル名・カラム名のような識別子は bind parameter にできない。動的にする必要がある場合は、許可リストで選んだ固定文字列だけを SQL に埋め込む。
 - `WHERE` 条件の値は必ず `params` に入れる。ユーザー入力を f-string で直接結合しない。
 - 集計系 V（例: 商品推移表）は必ずしも生SQLだけに寄せなくてよい。期間前在庫や同日イベント優先度など、SQLだけだと読みにくい業務計算は Python 側で整形してよい。
@@ -139,4 +138,13 @@ def apply_active_filter(query, model, request):
 
 ## 確認方法
 
-FastAPI Swagger UI `http://localhost:8092/docs` でエンドポイントを実行して確認。
+```powershell
+cd backend_server
+.venv\Scripts\python.exe -m py_compile apps_router\V<名称>.py
+.venv\Scripts\python.exe -c "import apps_main"
+```
+
+- Swagger `http://localhost:8092/docs` で `/一覧` と `/最終更新日時` を実行する。
+- `無効も表示=False` で有効データのみ返ることを確認する。
+- `件数制限=True` で LIMIT が効くことを確認する。
+- 検索条件や分類条件がある場合、params 経由で絞り込まれることを確認する。

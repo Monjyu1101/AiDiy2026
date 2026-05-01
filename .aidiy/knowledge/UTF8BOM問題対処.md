@@ -1,69 +1,63 @@
 # UTF-8 BOM 問題対処
 
 ## このメモを使う場面
-- ファイルの先頭に BOM が混入してサーバーや Python が誤動作する
-- エディタや OS が自動的に UTF-8 BOM を付与してしまった
-- BOM が混入しているファイルを一括検出・除去したい
+- ファイル先頭の BOM による Python / FastAPI / Vue / JSON の不具合を疑う
+- BOM 混入ファイルを検出・除去する
+- Windows 環境で UTF-8 without BOM を維持する
 
 ## 関連ファイル
 - `scripts/bom_anomaly_list.py` — BOM 混入ファイルの検出
 - `scripts/remove_bom.py` — BOM の一括除去
 
-## 対処手順
-
-### 検出
+## 検出手順
 
 ```powershell
 python scripts/bom_anomaly_list.py
-# BOM が混入しているファイルの一覧が表示される
 ```
 
-対象を限定して確認したい場合は、PowerShell で先頭3バイトを見る。
+担当ファイルだけ確認する場合:
 
 ```powershell
-$files = @(".aidiy/knowledge/JWT認証フロー.md", ".aidiy/knowledge/MCP活用手順.md")
+$files = @(
+  ".aidiy/knowledge/JWT認証フロー.md",
+  ".aidiy/knowledge/Markdown現状追従チェック.md"
+)
+
 foreach ($file in $files) {
   $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $file))
   if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { $file }
 }
 ```
 
-### 除去
+## 除去手順
 
 ```powershell
 python scripts/remove_bom.py          # プロジェクトルートから再帰的に除去
 python scripts/remove_bom.py src/     # 指定フォルダ以下のみ除去
 ```
 
-並列作業中に担当ファイルだけを直す場合は、一括除去の前に差分対象を確認する。担当外ファイルにBOMが見つかっても、許可されていない場合は最終報告で伝えるだけにする。
+並列作業中は一括除去の前に差分対象を確認する。担当外ファイルに BOM が見つかった場合、許可がなければ編集せず最終報告で伝える。
 
-### BOM が問題になる主なケース
+## 判断基準
 
-| 現象 | 原因 |
-|------|------|
-| Python `import` エラー（`SyntaxError: invalid character`） | `.py` ファイルの先頭に BOM |
-| FastAPI 起動失敗 | `__init__.py` や `main.py` に BOM |
-| Vue コンポーネントが壊れる | `.vue` / `.ts` ファイルに BOM |
-| JSON パースエラー | `.json` ファイルに BOM |
+| 現象 | 確認対象 |
+|------|----------|
+| Python `SyntaxError: invalid character` | `.py` 先頭の BOM |
+| FastAPI 起動失敗 | `__init__.py`, `main.py`, router 周辺の BOM |
+| Vue / TypeScript のビルド失敗 | `.vue`, `.ts` 先頭の BOM |
+| JSON パースエラー | `.json` 先頭の BOM と JSON 構文 |
 
-### BOM を付与しないエディタ設定
+## 再発防止
 
-- **VS Code**: `files.encoding: "utf8"` を設定（`utf8bom` は使わない）
-- **Windows メモ帳**: 「UTF-8 BOM あり」ではなく「UTF-8」で保存
-- **PyCharm**: File Encoding を `UTF-8` に統一
-
-## 再発しやすい注意点
-
-- Windows 環境では OS やツールが自動で BOM を付けることがある
-- `git diff` で BOM 差分が見えにくいため、コミット前に `bom_anomaly_list.py` で確認する習慣をつける
-- CI/CD に `bom_anomaly_list.py` を組み込むとより確実
-- PowerShell でファイル内容を確認するときは `Get-Content -Encoding UTF8` を使う
-- docs のコーディングルールでは Python ファイル先頭に `# -*- coding: utf-8 -*-` を置く方針だが、これはBOM付与を意味しない
-- JSON 設定ファイルは UTF-8 without BOM に加えて構文エラーも起動失敗原因になるため、編集後はJSONとして読めるか確認する
+- VS Code は `files.encoding: "utf8"` にする。`utf8bom` は使わない。
+- Windows メモ帳では「UTF-8 BOM あり」ではなく「UTF-8」で保存する。
+- PowerShell で内容確認するときは `Get-Content -Encoding UTF8` を使う。
+- docs の Python 先頭コメント `# -*- coding: utf-8 -*-` は BOM 付与を意味しない。
+- コミット前や一括 Markdown 整理後は `python scripts/bom_anomaly_list.py` を実行する。
 
 ## 確認方法
 
 ```powershell
 python scripts/bom_anomaly_list.py
-# → 出力が空なら BOM なし
+# 出力が空なら BOM なし
 ```

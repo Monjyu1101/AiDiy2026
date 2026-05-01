@@ -287,6 +287,14 @@ def get_vscode_mcp_path() -> Path:
     return Path.home() / ".config" / "Code" / "User" / "mcp.json"
 
 
+def get_opencode_config_path() -> Path:
+    """OpenCode 公式ドキュメント準拠のグローバル設定パスを返す。"""
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    if xdg_config_home:
+        return Path(xdg_config_home) / "opencode" / "opencode.json"
+    return Path.home() / ".config" / "opencode" / "opencode.json"
+
+
 def remove_toml_table(content: str, table_header: str) -> str:
     lines = content.splitlines()
     table_index = None
@@ -355,11 +363,12 @@ def cleanup_global_mcp_configs(prefix: str):
     print_header("グローバルMCP設定の解除")
 
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
-    # (path, top_key) の組。VS Code のみ top-level キーが "servers"。
+    # (path, top_key) の組。CLI ごとに top-level キーが異なる。
     targets = [
         (Path.home() / ".claude.json",            "mcpServers"),
         (Path.home() / ".gemini" / "settings.json","mcpServers"),
         (copilot_home / "mcp-config.json",        "mcpServers"),
+        (get_opencode_config_path(),              "mcp"),
         (get_vscode_mcp_path(),                   "servers"),
     ]
 

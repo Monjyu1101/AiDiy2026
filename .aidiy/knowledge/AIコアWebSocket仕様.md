@@ -1,168 +1,117 @@
-# AIコア WebSocket 接続仕様
+# AIコア WebSocket 仕様
 
 ## このメモを使う場面
-- AIコアへの WebSocket 接続が繋がらない / 切れる
-- 新しいメッセージタイプを送受信したい
-- WebSocket 周りを修正するときに挙動を把握したい
+- AIコアの WebSocket 接続、再接続、セッション復元を調査する
+- `input_text`、`input_audio` などの送受信形式を確認する
+- Electron 補助ウィンドウや Web モードでセッション状態が同期されない原因を切り分ける
 
 ## 関連ファイル
-- `frontend_avatar/src/api/websocket.ts` — WebSocket クライアント実装
-- `frontend_avatar/src/AiDiy.vue` — コアソケット / 入力ソケットの接続管理
-- `backend_server/core_router/AIコア.py` — サーバー側 WebSocket エンドポイント
-- `backend_server/core_router/AIコア/AIセッション管理.py` — セッション管理
+- `frontend_avatar/src/api/websocket.ts` — WebSocket クライアント
+- `frontend_avatar/src/AiDiy.vue` — コア/入力ソケット、BroadcastChannel、パネル状態
+- `frontend_avatar/src/components/AIコア.vue` — 音声ソケット生成
+- `backend_server/core_router/AIコア.py` — WebSocket エンドポイント
+- `backend_server/core_router/AIコア/AIセッション管理.py` — セッションとモデル設定
+- `frontend_avatar/src/api/config.ts` — `AI_WS_ENDPOINT`
 
 ## 接続仕様
 
-### エンドポイント
-
-```
-ws://<host>/core/ws/AIコア
-```
-
-`src/api/config.ts` の `AI_WS_ENDPOINT` で定義。Vite 開発時は `window.location.host` から動的生成。
-
-### ソケット構成
-
-`AiDiy.vue` は 2 本の WebSocket を管理する。
-
-| ソケット | 用途 |
-|---------|------|
-| コアソケット（ソケット番号=`'0'`） | AI 出力受信・各種制御メッセージ |
-| 入力ソケット（ソケット番号=`'1'`） | テキスト入力・画像・ファイルなどの送信 |
-
-音声処理用の `audioSocket` は `AIコア.vue` で `new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, 'audio')` として生成し、`AudioController` へ渡す。メインの入力ソケットとは別接続にする。
+エンドポイントは `ws://<host>/core/ws/AIコア`。Vite 開発時は frontend の host から生成され、Proxy 経由で backend `8091` へ転送される。
 
 | ソケット番号 | 主な生成箇所 | 用途 |
 |-------------|-------------|------|
-| `'0'` | `AiDiy.vue` | core 出力受信、状態制御 |
-| `'1'` | `AiDiy.vue` | テキスト・画像・ファイルなどの入力 |
-| `'audio'` | `AIコア.vue` | `input_audio` 送信、`output_audio` / `cancel_audio` 受信 |
-| `chat` / `file` / `code1`〜`code6` | 各パネルコンポーネント | パネル別の出力受信 |
+| `0` | `AiDiy.vue` | AI出力受信、状態制御 |
+| `1` | `AiDiy.vue` | テキスト、画像、ファイルなどの入力 |
+| `audio` | `AIコア.vue` | `input_audio` 送信、`output_audio` / `cancel_audio` 受信 |
+| `chat` / `file` / `code1`〜`code6` | 各パネル | パネル別の出力受信 |
 
-### 接続シーケンス
+接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号 }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
 
-1. `connect()` 呼び出し
-2. WebSocket open 後、`{ type: 'connect', セッションID, ソケット番号 }` を送信
-3. サーバーから `{ メッセージ識別: 'init', セッションID: <確定ID> }` を受信
-4. `connect()` の Promise が resolve（セッション ID が確定）
-
-再接続は最大 5 回、3 秒間隔で自動実施。タイムアウトは 30 秒。
-
-### セッション ID と Storage
-
-- Electron は `localStorage`、Web は `sessionStorage` に `token` / `user` / `avatar_session_id` を保持する
-- Web モードは URL の `?セッションID=` も読む。`/AiDiy?セッションID=<id>` に同期してリロード復帰しやすくしている
-- Electron の補助ウィンドウは URL ではなく BroadcastChannel `avatar-desktop-sync` の snapshot で sessionId と状態を受け取る
-- 401 時は `apiClient` 側で認証情報を削除し、`auth-expired` イベント経由でログインへ戻す
-
-`avatar_session_id` の保存先は `AiDiy.vue` の `認証Storage` に依存する。調査時は Electron なら DevTools の `localStorage`、Web なら `sessionStorage` を見る。
-
-### 主要メッセージ形式
+## 主要メッセージ形式
 
 ```typescript
-// 送信（テキスト入力）
+// テキスト入力
 {
-  メッセージ識別: 'input_text',
-  メッセージ内容: 'ユーザーの入力テキスト',
-  出力先チャンネル: '0',
-  セッションID: '<id>',
+  メッセージ識別: "input_text",
+  メッセージ内容: "ユーザー入力",
+  出力先チャンネル: "0",
+  セッションID: "<id>",
 }
 
-// 受信（AI 出力）
+// AI出力
 {
-  メッセージ識別: 'output',
-  チャンネル: '0',
-  メッセージ内容: 'AI の返答テキスト',
+  メッセージ識別: "output",
+  チャンネル: "0",
+  メッセージ内容: "AIの返答",
 }
 
-// 受信（処理完了）
+// 出力完了
 {
-  メッセージ識別: 'output_end',
-  チャンネル: '0',
+  メッセージ識別: "output_end",
+  チャンネル: "0",
 }
 ```
 
-### 音声メッセージ形式
+音声は `audio` チャンネル専用に扱う。
 
 ```typescript
-// 送信（マイク PCM）
+// マイクPCM送信
 {
-  チャンネル: 'audio',
-  メッセージ識別: 'input_audio',
-  メッセージ内容: 'audio/pcm',
-  ファイル名: '<base64 PCM>',
+  チャンネル: "audio",
+  メッセージ識別: "input_audio",
+  メッセージ内容: "audio/pcm",
+  ファイル名: "<base64 PCM>",
   サムネイル画像: null,
 }
 
-// 受信（AI 音声）
+// AI音声受信
 {
-  メッセージ識別: 'output_audio',
-  チャンネル: 'audio',
-  メッセージ内容: 'audio/pcm',
-  ファイル名: '<base64 PCM>',
+  メッセージ識別: "output_audio",
+  チャンネル: "audio",
+  メッセージ内容: "audio/pcm",
+  ファイル名: "<base64 PCM>",
 }
 
-// 受信または送信（音声停止）
+// 音声停止
 {
-  メッセージ識別: 'cancel_audio',
-  チャンネル: 'audio',
+  メッセージ識別: "cancel_audio",
+  チャンネル: "audio",
 }
 ```
 
-`input_audio` は高頻度送信のためトークン延長対象外。音声停止は `AudioController.cancelOutput()` でローカルキューを止め、必要な場合だけ `cancel_audio` をサーバーへ通知する。
+## セッションと状態共有
 
-## BroadcastChannel snapshot の使い分け
+- Electron は `localStorage`、Web は `sessionStorage` に `token` / `user` / `avatar_session_id` を保持する
+- Web モードは URL の `?セッションID=` も参照し、リロード復帰しやすくする
+- Electron 補助ウィンドウは BroadcastChannel `avatar-desktop-sync` の snapshot で sessionId と状態を受け取る
+- 401 時は `apiClient` が認証情報を削除し、`auth-expired` イベント経由でログインへ戻す
 
-Electron の補助パネルは別 BrowserWindow なので、Vue の親子 props だけでは状態共有できない。`AiDiy.vue` が `SharedSnapshot` を作り、BroadcastChannel `avatar-desktop-sync` で次を配信する。
-
-- 認証状態、利用者ラベル
-- セッション ID
-- メッセージ一覧、チャットモード
-- モデル設定
-- 入力 / チャット接続状態
-- パネル表示状態
-- 処理中 / エラー状態
-
-Web モードでは単一タブ内の状態で完結するが、同じ `AiDiy.vue` を使うため snapshot 更新の副作用を完全には無視しない。パネル用状態を追加するときは `SharedSnapshot` 型、`buildSnapshot()`、受信側反映処理をセットで見る。
-
-### メッセージハンドラーの登録
-
-```typescript
-const ws = new AiWebSocket(endpoint, sessionId)
-await ws.connect()
-
-// 特定種別のみ受信
-ws.on('output', (msg) => { /* ... */ })
-ws.on('output_end', (msg) => { /* ... */ })
-
-// チャンネルつき受信（'output_0' のように種別_チャンネルでも登録可）
-ws.on('output_0', (msg) => { /* channel 0 のみ */ })
-
-// 全メッセージ受信
-ws.on('*', (msg) => { console.log(msg) })
-```
+パネル状態を追加する場合は、`SharedSnapshot` 型、`buildSnapshot()`、受信側反映処理、Electron の `WindowRole` / `PanelKey` をセットで確認する。
 
 ## トークン延長ルール
 
-AI 入力送信前に `/core/auth/トークン更新` を呼ぶ対象：
-- `input_text`, `input_file`, `input_image`, `input_request`
+送信前に `/core/auth/トークン更新` を呼ぶ対象:
+- `input_text`
+- `input_file`
+- `input_image`
+- `input_request`
 - AIファイル `files_temp`
 
 延長しない対象:
-- `input_audio`（音声は高頻度送信のため除外）
-- `operations`, `cancel_run`, `cancel_audio`
+- `input_audio`（高頻度送信のため）
+- `operations`
+- `cancel_run`
+- `cancel_audio`
 
-## 再発しやすい注意点
+## 注意点
 
-- `connect()` を await せずに `send()` を呼ぶとメッセージが無視される
-- セッション ID は `init` メッセージ受信後に確定する — それ以前の値は暫定
-- BroadcastChannel の snapshot 経由で補助ウィンドウにセッション ID を渡す — 直接 API 呼び出しは不要
-- Web モードは `sessionStorage` のため、タブを閉じると認証情報が消える。Electron の `localStorage` 前提で調査しない
-- `AI_WS_ENDPOINT` は開発時に `window.location.host` から作るため、Network では `8099/core/ws/AIコア` に見えることがある。Vite Proxy で backend `8091` へ流れる
-- `disconnect()` を呼ぶと自動再接続が止まる — 明示的に切断したい場合のみ使う
-- Vite 開発時は Proxy を経由するため `ws://localhost:8099/core/ws/...` → `ws://localhost:8091/core/ws/...` に内部変換される
+- sessionId は `init` 受信後に確定する
+- 明示的に `disconnect()` すると自動再接続は止まる
+- Electron と Web で Storage が違うため、調査時は実行モードを先に確認する
+- Vite 開発時の Network では `8099/core/ws/...` に見えても、実体は Proxy 先の `8091` で処理される
+- Code AI パネルは現行 `code1`〜`code6` 前提。実装確認は `frontend_avatar/src/AiDiy.vue`、`frontend_web/src/components/AiDiy/AiDiy.vue`、`backend_server/core_router/AIコア.py` を見る
 
 ## 確認方法
 
-ブラウザ DevTools の Network タブで WebSocket フレームを確認。  
-接続済みなら `{ type: 'connect', ... }` と `{ メッセージ識別: 'init', ... }` の往復が見える。
+- ブラウザ DevTools の Network で WebSocket frames を確認する
+- 接続直後に `connect` 送信と `init` 受信が見えることを確認する
+- 音声調査では `audio` チャンネルに `input_audio` / `output_audio` / `cancel_audio` が流れることを確認する

@@ -1,52 +1,63 @@
-# xeyes・xneko ウィジェット追加手順
+# xneko・xeyes ウィジェット追加手順
 
 ## このメモを使う場面
-- `AIコア.vue` の `表示選択` に新しいウィジェット（時計・ゲーム・マスコット等）を追加したい
-- xeyes・xneko のようなインタラクティブウィジェットを新規作成したい
+- `AIコア.vue` の `表示選択` に新しいウィジェットを追加する
+- xneko / xeyes のような Electron / Web 両対応ウィジェットを作る
+- OS カーソル位置、CPU 使用率、スプライトアニメーションを扱う
 
 ## 関連ファイル
-- `frontend_avatar/src/components/AIコア.vue` — `表示選択` の管理
-- `frontend_avatar/src/components/AIコア_xneko.vue` — スプライトアニメーションの参考実装
-- `frontend_avatar/src/components/AIコア_xeyes.vue` — CPU 連動演出・オプションパネルの参考実装
+- `frontend_avatar/src/components/AIコア.vue` — `表示選択` の型、option、表示切替
+- `frontend_avatar/src/components/AIコア_xneko.vue` — スプライトアニメーションの参考
+- `frontend_avatar/src/components/AIコア_xeyes.vue` — CPU 連動、目線追従、オプションパネルの参考
 - `frontend_avatar/public/oneko.gif` / `xneko_chatora.gif` / `xneko_mike.gif` — スプライトシート
+- `.aidiy/knowledge/ElectronIPC追加手順.md` — OS カーソル位置や CPU 使用率 IPC の追加手順
 
-## 表示選択への追加手順（AIコア.vue）
+## 表示選択への追加手順
 
 ```typescript
 // 1. 型に追加
-type 表示選択型 = 'アバター' | 'カレンダーα' | 'xneko(猫)' | 'xeyes(目)' |
-                 'アナログ時計' | 'デジタル時計' | 'カレンダー' | '無し' | '新ウィジェット名'
+type 表示選択型 =
+  | 'アバター'
+  | 'カレンダーα'
+  | 'xneko(猫)'
+  | 'xeyes(目)'
+  | 'アナログ時計'
+  | 'デジタル時計'
+  | 'カレンダー'
+  | '無し'
+  | '新ウィジェット名'
 
 // 2. import 追加
 import NewWidget from './AIコア_新ウィジェット.vue'
-
-// 3. select の option 追加
-<option value="新ウィジェット名">新ウィジェット名</option>
-
-// 4. 表示 computed または v-if 追加
-<component :is="NewWidget" v-if="表示選択 === '新ウィジェット名'"
-           :controls-visible="controlsVisible" />
 ```
 
-## ウィジェットコンポーネントの基本構造
+```vue
+<!-- 3. select option 追加 -->
+<option value="新ウィジェット名">新ウィジェット名</option>
+
+<!-- 4. 表示切替へ追加 -->
+<component
+  :is="NewWidget"
+  v-if="表示選択 === '新ウィジェット名'"
+  :controls-visible="controlsVisible"
+/>
+```
+
+## ウィジェットコンポーネントの基本形
 
 ```vue
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 
-const props = withDefaults(defineProps<{ controlsVisible?: boolean }>(), { controlsVisible: true })
-// controlsVisible=false のときはオプションパネルや補助 UI を隠す
+const props = withDefaults(defineProps<{ controlsVisible?: boolean }>(), {
+  controlsVisible: true,
+})
 </script>
 
 <template>
   <div class="widget-stage">
-    <!-- メイン表示領域 -->
     <div class="widget-main">...</div>
-
-    <!-- オプションパネル（controlsVisible=true のときのみ表示） -->
-    <div v-if="props.controlsVisible" class="widget-options">
-      <!-- ラジオ・チェックボックスなどのオプション -->
-    </div>
+    <div v-if="props.controlsVisible" class="widget-options">...</div>
   </div>
 </template>
 
@@ -58,51 +69,53 @@ const props = withDefaults(defineProps<{ controlsVisible?: boolean }>(), { contr
   overflow: hidden;
   background: transparent;
 }
-/* オプションパネルは右下固定 */
+
 .widget-options {
   position: absolute;
   right: 8px;
   bottom: 8px;
   z-index: 4;
-  padding: 5px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(4, 8, 14, 0.50);
-  backdrop-filter: blur(6px);
-  color: #ffffff;
-  font-size: 10px;
   pointer-events: all;
   user-select: none;
 }
 </style>
 ```
 
-## xneko スプライトシートの追加
+- `controlsVisible=false` のときはオプションパネル、補助UI、デバッグ表示を隠す。
+- 表示本体は絶対配置のステージに収め、親の avatar/core レイアウトを押し広げない。
 
-新しい猫デザインを追加する場合は PNG（白背景）から Python + Pillow で変換する。
+## Electron / Web 両対応の判断
 
-```python
-# 白背景フラッドフィル除去 → 256×128 にリサイズ → GIF 変換
-# 詳細は アバター表示とVRMA.md の「xneko デザイン切替」を参照
-```
+| 機能 | Electron | Web |
+|------|----------|-----|
+| OS カーソル位置 | `window.desktopApi?.getWindowPointerSnapshot?.(role)` | `stageRef.value?.addEventListener('pointermove', ...)` |
+| CPU 使用率 | `window.desktopApi?.getSystemCpuUsage?.()` | 0 扱い、または UI 非表示 |
+| ファイル一覧 | IPC で実ファイル列挙 | `config.ts` などの固定配列 |
 
-スプライトシートの仕様: `256×128 px`、8列×4行の 32px グリッド、パレット GIF、透過インデックス=255
+IPC を呼ぶ箇所は optional chaining にし、戻り値がない場合の Web フォールバックを同じ関数内で処理する。
 
-## Electron / Web デュアルモード対応
+## xeyes 実装の要点
+- Electron では renderer だけでウィンドウ外カーソルを追えないため、main process 側で `screen.getCursorScreenPoint()` と対象 `BrowserWindow.getBounds()` を返す。
+- Web ではステージ内の `pointermove` を使う。画面外は追えない前提にする。
+- CPU 使用率は `os.cpus()` の直前サンプルとの差分から計算するため、初回値は 0 になり得る。
+- 色変化やグラフは `controlsVisible` が true のときだけ出す。表示本体の目線追従とは分離する。
+- `v-if` と `v-for` を同一要素に書かず、必要なら `<template v-if>` でラップする。
 
-OS カーソル位置が必要な場合（xeyes のような）:
-- **Electron**: `window.desktopApi?.getWindowPointerSnapshot(role)` IPC で OS カーソル位置を取得
-- **Web**: `stageRef.value?.addEventListener('pointermove', ...)` で画面内座標を追う
+## xneko スプライト追加の要点
+- スプライトシートは `256x128px`、32px タイル 8列 x 4行、透過 GIF を前提にする。
+- 既存 `AIコア_xneko.vue` の `background-position` と合うよう、輪郭・透明部分を保つ。
+- 白背景画像から作る場合は、白い毛を消さないため単純な閾値除去ではなく四隅フラッドフィルで背景を除去する。
+- 新しい画像を追加したら、選択 state、画像 URL computed、オプションパネルのラジオを合わせて追加する。
 
-CPU 使用率が必要な場合:
-- **Electron**: `window.desktopApi?.getSystemCpuUsage()` IPC
-- **Web**: ブラウザには対応 API がないため `0` を返す（または非表示にする）
+## 注意点
+- `requestAnimationFrame` は `onBeforeUnmount` で `cancelAnimationFrame` する。
+- `setInterval` / `setTimeout` は `onBeforeUnmount` で解除する。
+- オプションパネルに `pointer-events: all` を付けないとクリックが透過する。
+- アバター以外の表示選択中にアバター固有 UI が見えないよう、設定 UI は各コンポーネント内へ閉じ込める。
 
-どちらも `window.desktopApi?.xxx` の optional chaining で分岐を自動処理できる。
-
-## 再発しやすい注意点
-
-- `v-if` と `v-for` を**同一要素に書かない** — `<template v-if>` でラップする（Vue 3 の警告対象）
-- アニメーションフレームは `onBeforeUnmount` で必ず `cancelAnimationFrame` する
-- `setInterval` は `onBeforeUnmount` で `clearInterval` する
-- オプションパネルの `pointer-events: all` を忘れるとクリックが透過して操作できない
-- `controlsVisible=false` のときにオプションパネルが消えることを確認する（ボタン非表示モード時）
+## 確認方法
+1. `cd frontend_avatar && npm run type-check`
+2. `表示選択` で追加ウィジェットを選び、表示が切り替わることを確認する。
+3. `controlsVisible=false` でオプションパネルが消えることを確認する。
+4. Electron と Web の両方で、IPC 不在時に Console エラーが出ないことを確認する。
+5. アニメーションや interval が画面切替後に残らないことを DevTools で確認する。

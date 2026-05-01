@@ -3,7 +3,7 @@
 
   -------------------------------------------------------------------------
   COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-  Licensed under "AiDiy 公開利用ライセンス（非商用） v1.0".
+  Licensed under "AiDiy 公開利用ライセンス v1.1".
   Commercial use requires prior written consent from all copyright holders.
   See LICENSE for full terms. Thank you for keeping the rules.
   https://github.com/monjyu1101/AiDiy2026
@@ -13,7 +13,7 @@
 <script setup lang="ts">
 import { ref, watch, reactive, computed, nextTick, onMounted } from 'vue';
 import apiClient from '@/api/client';
-import { qConfirm } from '@/utils/qAlert';
+import { qConfirm, qMessage } from '@/utils/qAlert';
 import RebootDialog from './再起動カウントダウン.vue';
 
 const props = defineProps<{
@@ -278,7 +278,7 @@ const buildNextSettings = () => {
     return nextSettings;
 };
 
-const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds: number = 15) => {
+const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds: number = 15, save: boolean = false) => {
   loading.value = true;
   errorMessage.value = '';
   try {
@@ -291,7 +291,8 @@ const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_ap
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: buildNextSettings(),
-      再起動要求
+      再起動要求,
+      save
     });
 
     if (response?.data?.status === 'OK') {
@@ -309,6 +310,33 @@ const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_ap
 };
 
 const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true, reboot_mcp: true });
+
+const handleSaveOnly = async () => {
+  loading.value = true;
+  errorMessage.value = '';
+  try {
+    if (!props.sessionId) {
+      errorMessage.value = 'セッションIDが見つかりません。画面をリロードしてください。';
+      loading.value = false;
+      return;
+    }
+    const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
+      セッションID: props.sessionId,
+      モデル設定: buildNextSettings(),
+      再起動要求: { reboot_core: false, reboot_apps: false, reboot_mcp: false },
+      save: true
+    });
+    if (response?.data?.status === 'OK') {
+      void qMessage('モデル情報を保存しました', 'success', 3000);
+    } else {
+      errorMessage.value = response?.data?.message || '保存に失敗しました';
+    }
+  } catch (error: any) {
+    errorMessage.value = `保存エラー: ${error?.response?.data?.message || error?.message || error}`;
+  } finally {
+    loading.value = false;
+  }
+};
 
 const handleResetReboot = async () => {
   const confirmed = await qConfirm('現在のAI設定をすべてリセットし、システムを再起動します。よろしいですか？');
@@ -686,7 +714,9 @@ onMounted(() => {
         </div>
       </div>
       <div class="config-panel-actions">
-        <div class="config-panel-actions-edge" aria-hidden="true"></div>
+        <div class="config-panel-actions-edge">
+          <button type="button" class="save" :disabled="loading" @click="handleSaveOnly">保存(json書換)</button>
+        </div>
         <div class="config-panel-actions-center">
           <button type="button" @click="handleCancel">キャンセル</button>
           <button type="button" class="primary" :disabled="loading" @click="handleSave">設定/再起動</button>
@@ -833,7 +863,7 @@ onMounted(() => {
 
 .config-panel-field {
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 25% 1fr;
   gap: 4px;
   align-items: center;
   padding: 0;
@@ -855,6 +885,7 @@ onMounted(() => {
   width: 100%;
   margin: 0;
   padding: 0;
+  min-width: 0;
 }
 
 .config-panel-select {
@@ -980,6 +1011,16 @@ onMounted(() => {
 
 .config-panel-actions button.danger:hover:not(:disabled) {
   background: #b91c1c;
+}
+
+.config-panel-actions button.save {
+  background: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+}
+
+.config-panel-actions button.save:hover:not(:disabled) {
+  background: #ea580c;
 }
 
 .config-panel-actions button.primary:disabled,

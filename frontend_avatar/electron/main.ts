@@ -36,7 +36,7 @@ type BoundsPreset = {
 const LOGIN_BOUNDS: BoundsPreset = { width: 320, height: 240, minWidth: 320, minHeight: 240 }
 const CORE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const CHAT_BASE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
-const SETTINGS_BOUNDS: BoundsPreset = { width: 760, height: 700, minWidth: 600, minHeight: 400 }
+const SETTINGS_BOUNDS: BoundsPreset = { width: 720, height: 580, minWidth: 580, minHeight: 400 }
 const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   chat: CHAT_BASE_BOUNDS,
   file: CHAT_BASE_BOUNDS,
