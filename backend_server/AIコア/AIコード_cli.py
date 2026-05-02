@@ -105,10 +105,12 @@ class CodeAI:
             return custom_cmd
         if self.code_ai == "aidiy_hermes":
             if os.name == 'nt':
-                userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
-                candidate = os.path.join(userprofile, '.local', 'bin', 'aidiy_hermes.exe')
-                if os.path.isfile(candidate):
-                    return candidate
+                candidates = [
+                    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'aidiy_hermes.cmd'),
+                ]
+                for candidate in candidates:
+                    if os.path.isfile(candidate):
+                        return candidate
             return "aidiy_hermes"
         if self.code_ai == "opencode_cli":
             if os.name == 'nt':

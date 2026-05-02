@@ -979,36 +979,32 @@ def setup_backend_hermes() -> bool:
             print_error(f"{label}: pip install に失敗しました。")
             return False
 
-    # aidiy_hermes が既に uv tool に登録済みか確認
-    tool_list_result = subprocess.run(
-        ["uv", "tool", "list"],
-        capture_output=True, text=True
+    cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
+    py_path = BACKEND_HERMES_DIR / BACKEND_HERMES_ENV / "Scripts" / "python.exe"
+    cli_path = BACKEND_HERMES_DIR / "cli_main.py"
+    cmd_content = (
+        "@echo off\r\n"
+        "chcp 65001 >nul\r\n"
+        "setlocal\r\n"
+        "\r\n"
+        f'set "PY={py_path}"\r\n'
+        f'set "CLI={cli_path}"\r\n'
+        "\r\n"
+        'if not exist "%PY%" (\r\n'
+        '  echo Python virtual environment was not found:\r\n'
+        '  echo   %PY%\r\n'
+        '  pause\r\n'
+        '  exit /b 1\r\n'
+        ')\r\n'
+        "\r\n"
+        '"%PY%" "%CLI%" %*\r\n'
     )
-    hermes_installed = tool_list_result.returncode == 0 and "aidiy_hermes" in tool_list_result.stdout
-
-    if hermes_installed:
-        print_info(f"{label}: aidiy_hermes は既にグローバル登録済みのためスキップします")
-    else:
-        print_info(f"{label}: aidiy_hermes コマンドをグローバルインストールします...")
-        if not run_command(["uv", "tool", "install", "--editable", "."], cwd=BACKEND_HERMES_DIR):
-            print_warning(f"{label}: uv tool install に失敗しました。")
-            print_warning("  aidiy_hermes コマンドは使えませんが、直接実行は可能です:")
-            print_warning(f"  {BACKEND_HERMES_DIR / BACKEND_HERMES_ENV / 'Scripts' / 'python.exe'} cli_main.py")
-        else:
-            print_success(f"{label}: aidiy_hermes コマンドがグローバルに登録されました。")
-            print_info("  uv の tool bin が PATH に入っていない場合は次を実行してください:")
-            print_info("    uv tool update-shell")
-
-    # editable install が生成した *.egg-info を削除（残骸のため）
-    import glob as _glob
-    for egg_info in BACKEND_HERMES_DIR.rglob("*.egg-info"):
-        if egg_info.is_dir():
-            try:
-                import shutil as _shutil
-                _shutil.rmtree(egg_info)
-                print_info(f"{label}: 削除: {egg_info.relative_to(BACKEND_HERMES_DIR)}")
-            except Exception:
-                pass
+    try:
+        cmd_file.parent.mkdir(parents=True, exist_ok=True)
+        cmd_file.write_text(cmd_content, encoding="ascii")
+        print_success(f"{label}: aidiy_hermes.cmd を作成しました: {cmd_file}")
+    except Exception as e:
+        print_warning(f"{label}: aidiy_hermes.cmd の作成に失敗しました: {e}")
 
     print_success(f"{label}: セットアップが完了しました。")
     return True
@@ -1325,7 +1321,7 @@ def main():
     print_info("    MCP起動  : cd backend_mcp && uv run uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095")
     print_info("    Core起動 : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port 8091")
     print_info("    Apps起動 : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092")
-    print_info("    Hermes起動: aidiy_hermes または cd backend_hermes && .venv/Scripts/python.exe cli_main.py")
+    print_info("    Hermes起動: aidiy_hermes.cmd または cd backend_hermes && .venv/Scripts/python.exe cli_main.py")
     print_info("    Web開発  : cd frontend_web && npm run dev")
     print_info("    Avatar   : cd frontend_avatar && npm run dev")
     print_info("セットアップは正常終了しました。5秒後に終了します...")

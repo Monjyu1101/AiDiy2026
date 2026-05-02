@@ -90,6 +90,7 @@
 | backend の層構造、実装パターン、落とし穴 | [`backend_server,実装パターン.md`](./backend_server,実装パターン.md) |
 | ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 | backend / MCP 起動、ポート残留 | [`backend_server,backend_hermes,backend_mcp,バックエンド起動.md`](./backend_server,backend_hermes,backend_mcp,バックエンド起動.md)、[`backend_mcp,構成.md`](./backend_mcp,構成.md) |
+| aidiy_hermes で MCP が `failed` / ツール未認識 | [`backend_hermes,backend_mcp,MCP_SSE接続.md`](./backend_hermes,backend_mcp,MCP_SSE接続.md) |
 | AI モデル、WebSocket、code1〜code6 | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md)、[`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
 | Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`backend_hermes,backend_mcp,CodeCLI_MCP設定.md`](./backend_hermes,backend_mcp,CodeCLI_MCP設定.md) |
 | frontend_web 画面、X系、proxy | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md)、[`frontend_web,X系静的画面追加.md`](./frontend_web,X系静的画面追加.md)、[`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
@@ -178,6 +179,7 @@
 |------|--------------|
 | Code CLI を追加する | [`backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
 | Code CLI の MCP 設定を確認する | [`backend_hermes,backend_mcp,CodeCLI_MCP設定.md`](./backend_hermes,backend_mcp,CodeCLI_MCP設定.md) |
+| aidiy_hermes の MCP SSE 接続を修復・確認する | [`backend_hermes,backend_mcp,MCP_SSE接続.md`](./backend_hermes,backend_mcp,MCP_SSE接続.md) |
 | Code CLI のプロンプト整形責務を確認する | [`backend_server,CodeCLIプロンプト整形.md`](./backend_server,CodeCLIプロンプト整形.md) |
 | CLI 出力の ANSI 制御コードを除去する | [`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
 | Hermes CLI の TUI を調整する | [`backend_hermes,TUI調整手順.md`](./backend_hermes,TUI調整手順.md) |

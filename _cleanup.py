@@ -400,12 +400,6 @@ def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
 
-    print_info(f"{label}: *.egg-info フォルダを検索中...")
-    for egg_info in target_dir.rglob("*.egg-info"):
-        if egg_info.is_dir():
-            if remove_directory(egg_info, f".egg-info ({label})"):
-                deleted_count += 1
-
     return deleted_count
 
 
@@ -550,6 +544,10 @@ def cleanup_backend_hermes(base_dir: Path, choices: dict):
                 deleted_count += 1
         elif choices.get("hermes_temp") is False:
             print_info(f"  {BACKEND_HERMES_PATH}/temp はそのまま残します")
+
+    cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
+    if remove_file(cmd_file, f"aidiy_hermes.cmd ({label})"):
+        deleted_count += 1
 
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")

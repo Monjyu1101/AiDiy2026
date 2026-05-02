@@ -35,8 +35,21 @@
 python _setup.py
 ```
 
-`_setup.py` の Hermes セットアップは、`backend_hermes/requirements.txt` を同期したうえで `uv tool install --force --refresh --editable .` により `aidiy_hermes` / `text-hermes` を再登録する。
-`--refresh` を付けないと、editable install の古いメタデータが残り、追加した依存関係がグローバル tool 環境へ反映されないことがある。
+`_setup.py` の Hermes セットアップは、`backend_hermes/requirements.txt` を同期したうえで `~/.local/bin/aidiy_hermes.cmd` を生成する。
+`uv tool install` は使わない（セキュリティ警告の原因になるため）。
+
+生成される `.cmd` の内容（ASCII エンコード）:
+
+```bat
+@echo off
+chcp 65001 >nul
+setlocal
+set "PY=<repo>\backend_hermes\.venv\Scripts\python.exe"
+set "CLI=<repo>\backend_hermes\cli_main.py"
+"%PY%" "%CLI%" %*
+```
+
+`C:\Users\admin\.local\bin` が `PATH` に入っていれば `aidiy_hermes` としてそのまま呼べる。
 
 手動で確認する場合:
 
@@ -44,12 +57,21 @@ python _setup.py
 Set-Location backend_hermes
 uv venv .venv
 uv pip install -r requirements.txt
-uv tool install --force --refresh --editable .
+# .cmd の手動生成は _setup.py に任せる
+python ..\_setup.py
 aidiy_hermes --version
 ```
 
 `backend_hermes/setup.py` は `requirements.txt` を `install_requires` として読む。
-provider SDK を追加したときは `requirements.txt`、`setup.py` 経由の metadata、`uv tool install --refresh` の3点を確認する。
+provider SDK を追加したときは `requirements.txt` と `setup.py` を確認してから `_setup.py` を再実行する。
+
+## クリーンアップ
+
+```powershell
+python _cleanup.py
+```
+
+`_cleanup.py` は `~/.local/bin/aidiy_hermes.cmd` を削除する。
 
 主な provider 依存:
 
@@ -127,14 +149,14 @@ AiDiy の Code AI 連携では、タイトルやバナーを出さないため `
 
 ```powershell
 Set-Location backend_hermes
-.venv/Scripts/python.exe -m py_compile cli_main.py
-.venv/Scripts/python.exe cli_main.py --version
-.venv/Scripts/python.exe cli_main.py --help
-.venv/Scripts/python.exe cli_main.py --list-tools
-uv tool install --force --refresh --editable .
+.venv\Scripts\python.exe -m py_compile cli_main.py
+.venv\Scripts\python.exe cli_main.py --version
+.venv\Scripts\python.exe cli_main.py --help
+.venv\Scripts\python.exe cli_main.py --list-tools
+python ..\_setup.py          # .cmd を再生成
 aidiy_hermes -z -Q "おはよう"
 aidiy_hermes -z --provider ollama --model "deepseek-v4-flash:cloud" -Q "おはよう"
-uv tool run --from aidiy-hermes python -c "import openai; import anthropic; import google.genai; print('provider sdks ok')"
+.venv\Scripts\python.exe -c "import openai; import anthropic; import google.genai; print('provider sdks ok')"
 ```
 
 TUI / slash command の詳細調整は `HermesCLI_TUI調整手順.md` を使う。

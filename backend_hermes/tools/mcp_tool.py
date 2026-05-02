@@ -164,6 +164,7 @@ def _write_stderr_log_header(server_name: str) -> None:
 
 _MCP_AVAILABLE = False
 _MCP_HTTP_AVAILABLE = False
+_MCP_SSE_AVAILABLE = False
 _MCP_SAMPLING_TYPES = False
 _MCP_NOTIFICATION_TYPES = False
 _MCP_MESSAGE_HANDLER_SUPPORTED = False
@@ -180,6 +181,11 @@ try:
         _MCP_HTTP_AVAILABLE = True
     except ImportError:
         _MCP_HTTP_AVAILABLE = False
+    try:
+        from mcp.client.sse import sse_client  # noqa: F401
+        _MCP_SSE_AVAILABLE = True
+    except ImportError:
+        _MCP_SSE_AVAILABLE = False
     # Prefer the non-deprecated API (mcp >= 1.24.0); fall back to the
     # deprecated wrapper for older SDK versions.
     try:
@@ -900,9 +906,13 @@ class MCPServerTask:
         self._rpc_lock = asyncio.Lock()
         self._pending_refresh_tasks: set[asyncio.Task] = set()
 
+    def _is_sse(self) -> bool:
+        """Check if this server uses SSE transport (type: sse)."""
+        return "url" in self._config and str(self._config.get("type", "")).lower() == "sse"
+
     def _is_http(self) -> bool:
-        """Check if this server uses HTTP transport."""
-        return "url" in self._config
+        """Check if this server uses HTTP/StreamableHTTP transport."""
+        return "url" in self._config and not self._is_sse()
 
     # ----- Dynamic tool discovery (notifications/tools/list_changed) -----
 
@@ -1140,6 +1150,35 @@ class MCPServerTask:
                             continue  # process already exited — nothing to do
                         _orphan_stdio_pids.add(pid)
 
+    async def _run_sse(self, config: dict):
+        """Run the server using SSE transport (AiDiy MCP servers)."""
+        if not _MCP_SSE_AVAILABLE:
+            raise ImportError(
+                f"MCP server '{self.name}' requires SSE transport but "
+                "mcp.client.sse is not available. "
+                "Install or upgrade the mcp package."
+            )
+        from mcp.client.sse import sse_client
+
+        url = config["url"]
+        headers = dict(config.get("headers") or {})
+        sampling_kwargs = self._sampling.session_kwargs() if self._sampling else {}
+        if _MCP_NOTIFICATION_TYPES and _MCP_MESSAGE_HANDLER_SUPPORTED:
+            sampling_kwargs["message_handler"] = self._make_message_handler()
+
+        async with sse_client(url, headers=headers) as (read, write):
+            async with ClientSession(read, write, **sampling_kwargs) as session:
+                await session.initialize()
+                self.session = session
+                await self._discover_tools()
+                self._ready.set()
+                reason = await self._wait_for_lifecycle_event()
+                if reason == "reconnect":
+                    logger.info(
+                        "MCP server '%s': reconnect requested — "
+                        "tearing down SSE session", self.name,
+                    )
+
     async def _run_http(self, config: dict):
         """Run the server using HTTP/StreamableHTTP transport."""
         if not _MCP_HTTP_AVAILABLE:
@@ -1293,7 +1332,9 @@ class MCPServerTask:
 
         while True:
             try:
-                if self._is_http():
+                if self._is_sse():
+                    await self._run_sse(config)
+                elif self._is_http():
                     await self._run_http(config)
                 else:
                     await self._run_stdio(config)
@@ -1914,10 +1955,35 @@ def _interpolate_env_vars(value):
     return value
 
 
+def _load_aidiy_mcp_servers() -> Dict[str, dict]:
+    """AiDiy_mcp.json の mcpServers を SSE エントリとして返す。"""
+    try:
+        from pathlib import Path
+        import json as _json
+        candidates = [
+            Path(__file__).resolve().parents[2] / "backend_server" / "_config" / "AiDiy_mcp.json",
+        ]
+        for path in candidates:
+            if path.exists():
+                data = _json.loads(path.read_text(encoding="utf-8-sig"))
+                raw = data.get("mcpServers") or {}
+                result = {}
+                for name, cfg in raw.items():
+                    if isinstance(cfg, dict) and cfg.get("url"):
+                        entry = dict(cfg)
+                        entry.setdefault("type", "sse")
+                        result[name] = entry
+                return result
+    except Exception as exc:
+        logger.debug("Failed to load AiDiy_mcp.json: %s", exc)
+    return {}
+
+
 def _load_mcp_config() -> Dict[str, dict]:
-    """Read ``mcp_servers`` from the Hermes config file.
+    """Read ``mcp_servers`` from the Hermes config file and AiDiy_mcp.json.
 
     Returns a dict of ``{server_name: server_config}`` or empty dict.
+    AiDiy MCP servers (SSE) are merged in automatically.
     Server config can contain either ``command``/``args``/``env`` for stdio
     transport or ``url``/``headers`` for HTTP transport, plus optional
     ``timeout``, ``connect_timeout``, and ``auth`` overrides.
@@ -1925,22 +1991,31 @@ def _load_mcp_config() -> Dict[str, dict]:
     ``${ENV_VAR}`` placeholders in string values are resolved from
     ``os.environ`` (which includes ``~/.hermes/.env`` loaded at startup).
     """
+    servers: Dict[str, dict] = {}
+
+    try:
+        aidiy_servers = _load_aidiy_mcp_servers()
+        servers.update(aidiy_servers)
+        if aidiy_servers:
+            logger.debug("Loaded %d AiDiy MCP server(s) from AiDiy_mcp.json", len(aidiy_servers))
+    except Exception as exc:
+        logger.debug("Failed to load AiDiy MCP servers: %s", exc)
+
     try:
         from hermes_cli.config import load_config
         config = load_config()
-        servers = config.get("mcp_servers")
-        if not servers or not isinstance(servers, dict):
-            return {}
-        # Ensure .env vars are available for interpolation
-        try:
-            from hermes_cli.env_loader import load_hermes_dotenv
-            load_hermes_dotenv()
-        except Exception:
-            pass
-        return {name: _interpolate_env_vars(cfg) for name, cfg in servers.items()}
+        hermes_servers = config.get("mcp_servers")
+        if hermes_servers and isinstance(hermes_servers, dict):
+            try:
+                from hermes_cli.env_loader import load_hermes_dotenv
+                load_hermes_dotenv()
+            except Exception:
+                pass
+            servers.update({name: _interpolate_env_vars(cfg) for name, cfg in hermes_servers.items()})
     except Exception as exc:
         logger.debug("Failed to load MCP config: %s", exc)
-        return {}
+
+    return servers
 
 
 # ---------------------------------------------------------------------------
@@ -2779,7 +2854,8 @@ async def _discover_and_register_server(name: str, config: dict) -> List[str]:
     registered_names = _register_server_tools(name, server, config)
     server._registered_tool_names = list(registered_names)
 
-    transport_type = "HTTP" if "url" in config else "stdio"
+    transport_type = ("SSE" if str(config.get("type", "")).lower() == "sse"
+                      else "HTTP" if "url" in config else "stdio")
     logger.info(
         "MCP server '%s' (%s): registered %d tool(s): %s",
         name, transport_type, len(registered_names),
@@ -2935,7 +3011,8 @@ def get_mcp_status() -> List[dict]:
         active_servers = dict(_servers)
 
     for name, cfg in configured.items():
-        transport = "http" if "url" in cfg else "stdio"
+        transport = ("sse" if str(cfg.get("type", "")).lower() == "sse"
+                     else "http" if "url" in cfg else "stdio")
         server = active_servers.get(name)
         if server and server.session is not None:
             entry = {
