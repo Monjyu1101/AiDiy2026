@@ -940,7 +940,7 @@ def setup_backend_hermes() -> bool:
     label = "バックエンド(hermes)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {BACKEND_HERMES_DIR}")
-    print_info("対象: Hermes CLI / requirements.txt / uv")
+    print_info("対象: Hermes CLI / pyproject.toml / uv")
 
     if not BACKEND_HERMES_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {BACKEND_HERMES_DIR}")
@@ -952,9 +952,9 @@ def setup_backend_hermes() -> bool:
         print_info("  または: pip install uv")
         return False
 
-    req_file = BACKEND_HERMES_DIR / "requirements.txt"
+    req_file = BACKEND_HERMES_DIR / "pyproject.toml"
     if not req_file.exists():
-        print_error(f"{label}: requirements.txt が見つかりません: {req_file}")
+        print_error(f"{label}: pyproject.toml が見つかりません: {req_file}")
         return False
 
     venv_dir = BACKEND_HERMES_DIR / BACKEND_HERMES_ENV
@@ -964,20 +964,10 @@ def setup_backend_hermes() -> bool:
             print_error(f"{label}: 仮想環境の作成に失敗しました。")
             return False
 
-    # 既にパッケージインストール済みか確認
-    pip_list_result = subprocess.run(
-        ["uv", "pip", "list", "--no-header"],
-        cwd=BACKEND_HERMES_DIR,
-        capture_output=True, text=True
-    )
-    packages_installed = pip_list_result.returncode == 0 and bool(pip_list_result.stdout.strip())
-
-    if packages_installed:
-        print_info(f"{label}: requirements.txt のパッケージは既にインストール済みのためスキップします")
-    else:
-        if not run_command(["uv", "pip", "install", "-r", "requirements.txt"], cwd=BACKEND_HERMES_DIR):
-            print_error(f"{label}: pip install に失敗しました。")
-            return False
+    # uv sync で依存関係をインストール（uv.lock 更新済みなら高速スキップ）
+    if not run_command(["uv", "sync"], cwd=BACKEND_HERMES_DIR):
+        print_error(f"{label}: uv sync に失敗しました。")
+        return False
 
     cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
     py_path = BACKEND_HERMES_DIR / BACKEND_HERMES_ENV / "Scripts" / "python.exe"

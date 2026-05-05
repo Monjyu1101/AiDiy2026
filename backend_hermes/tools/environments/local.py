@@ -339,6 +339,12 @@ class LocalEnvironment(BaseEnvironment):
         if candidate.startswith("/"):
             return candidate.rstrip("/") or "/"
 
+        # Windows: return the system temp dir as a POSIX-style path so Git
+        # Bash can use it in shell commands (e.g. C:\Users\…\Temp → /tmp
+        # is mapped by Git Bash; use the raw Windows path via forward slashes).
+        if _IS_WINDOWS:
+            return candidate.replace("\\", "/").rstrip("/") or "/tmp"
+
         return "/tmp"
 
     def _run_bash(self, cmd_string: str, *, login: bool = False,

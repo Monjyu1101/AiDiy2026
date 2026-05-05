@@ -86,11 +86,13 @@
 | AGENTS / CLAUDE / _AIDIY の役割分担整理 | [`共通,AGENTS整理手順.md`](./共通,AGENTS整理手順.md) |
 | DB スキーマ差分、起動時のカラム不足 | [`backend_server,スキーマ変更手順.md`](./backend_server,スキーマ変更手順.md) |
 | M / T / V / S 系の追加、登録漏れ | [`backend_server,M系マスタ追加手順.md`](./backend_server,M系マスタ追加手順.md)、[`backend_server,T系トランザクション追加手順.md`](./backend_server,T系トランザクション追加手順.md)、[`backend_server,V系エンドポイント追加手順.md`](./backend_server,V系エンドポイント追加手順.md)、[`backend_server,S系スケジューラ追加手順.md`](./backend_server,S系スケジューラ追加手順.md) |
+| M系マスタへのカラム追加 | [`backend_server,M系マスタカラム追加手順.md`](./backend_server,M系マスタカラム追加手順.md) |
 | 採番、監査フィールド、初期データ | [`backend_server,C採番と監査フィールド.md`](./backend_server,C採番と監査フィールド.md) |
 | backend の層構造、実装パターン、落とし穴 | [`backend_server,実装パターン.md`](./backend_server,実装パターン.md) |
 | ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 | backend / MCP 起動、ポート残留 | [`backend_server,backend_hermes,backend_mcp,バックエンド起動.md`](./backend_server,backend_hermes,backend_mcp,バックエンド起動.md)、[`backend_mcp,構成.md`](./backend_mcp,構成.md) |
 | aidiy_hermes で MCP が `failed` / ツール未認識 | [`backend_hermes,backend_mcp,MCP_SSE接続.md`](./backend_hermes,backend_mcp,MCP_SSE接続.md) |
+| hermes を MCP サーバーとして Code CLI から使う | [`backend_hermes,MCP_サーバー起動.md`](./backend_hermes,MCP_サーバー起動.md) |
 | AI モデル、WebSocket、code1〜code6 | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md)、[`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
 | Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`backend_hermes,backend_mcp,CodeCLI_MCP設定.md`](./backend_hermes,backend_mcp,CodeCLI_MCP設定.md) |
 | frontend_web 画面、X系、proxy | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md)、[`frontend_web,X系静的画面追加.md`](./frontend_web,X系静的画面追加.md)、[`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
@@ -125,6 +127,7 @@
 | 目的 | 参照ファイル |
 |------|--------------|
 | M系マスタを追加する | [`backend_server,M系マスタ追加手順.md`](./backend_server,M系マスタ追加手順.md) |
+| M系マスタにカラムを追加する | [`backend_server,M系マスタカラム追加手順.md`](./backend_server,M系マスタカラム追加手順.md) |
 | T系トランザクションを追加する | [`backend_server,T系トランザクション追加手順.md`](./backend_server,T系トランザクション追加手順.md) |
 | V系 JOIN / 集計エンドポイントを追加する | [`backend_server,V系エンドポイント追加手順.md`](./backend_server,V系エンドポイント追加手順.md) |
 | S系スケジューラを追加する | [`backend_server,S系スケジューラ追加手順.md`](./backend_server,S系スケジューラ追加手順.md) |
@@ -184,6 +187,8 @@
 | CLI 出力の ANSI 制御コードを除去する | [`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
 | Hermes CLI の TUI を調整する | [`backend_hermes,TUI調整手順.md`](./backend_hermes,TUI調整手順.md) |
 | backend_hermes を単体 CLI として起動・確認する | [`backend_hermes,backend_server,運用手順.md`](./backend_hermes,backend_server,運用手順.md) |
+| hermes を MCP サーバーとして起動・Code CLI から接続する | [`backend_hermes,MCP_サーバー起動.md`](./backend_hermes,MCP_サーバー起動.md) |
+| hermes-agent 新バージョンへ追従・移行する | [`backend_hermes,Upstream移行手順.md`](./backend_hermes,Upstream移行手順.md) |
 
 ## ドキュメント・共通
 

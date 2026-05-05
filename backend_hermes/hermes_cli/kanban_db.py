@@ -1758,11 +1758,20 @@ def enforce_max_runtime(
                     break
                 time.sleep(0.5)
             if _pid_alive(pid):
-                try:
-                    kill(pid, signal.SIGKILL)
-                    killed = True
-                except (ProcessLookupError, OSError):
-                    pass
+                _sigkill = getattr(signal, "SIGKILL", None)
+                if _sigkill is not None:
+                    try:
+                        kill(pid, _sigkill)
+                        killed = True
+                    except (ProcessLookupError, OSError):
+                        pass
+                else:
+                    # Windows: SIGKILL is unavailable; fall back to SIGTERM
+                    try:
+                        kill(pid, signal.SIGTERM)
+                        killed = True
+                    except (ProcessLookupError, OSError):
+                        pass
 
         with write_txn(conn):
             cur = conn.execute(

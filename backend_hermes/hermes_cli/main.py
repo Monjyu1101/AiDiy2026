@@ -5522,7 +5522,14 @@ def _kill_stale_dashboard_processes(
         # SIGKILL any survivors.
         for pid in pending:
             try:
-                os.kill(pid, _signal.SIGKILL)
+                if os.name == "nt":
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(pid)],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        timeout=5,
+                    )
+                else:
+                    os.kill(pid, _signal.SIGKILL)
                 killed.append(pid)
             except ProcessLookupError:
                 killed.append(pid)

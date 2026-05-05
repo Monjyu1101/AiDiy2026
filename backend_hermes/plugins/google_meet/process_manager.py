@@ -313,7 +313,13 @@ def stop(*, reason: str = "requested") -> Dict[str, Any]:
             time.sleep(0.5)
         if _pid_alive(pid):
             try:
-                os.kill(pid, signal.SIGKILL)
+                if os.name == "nt":
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(pid)],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    )
+                else:
+                    os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
 
