@@ -148,6 +148,9 @@
 | 目的 | 参照ファイル |
 |------|--------------|
 | Vite proxy / CORS / ポートを調整する | [`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
+| Axios API クライアントのパターン・token 付与・401 ハンドリングを確認する | [`frontend_web,frontend_avatar,共通APIクライアントパターン.md`](./frontend_web,frontend_avatar,共通APIクライアントパターン.md) |
+| Monaco Editor / qAlert / qConfirm など共通ユーティリティを修正する | [`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) |
+| 両プロジェクトの package.json / tsconfig / vite.config の差異と同期ルールを確認する | [`frontend_web,frontend_avatar,プロジェクト設定と依存関係.md`](./frontend_web,frontend_avatar,プロジェクト設定と依存関係.md) |
 
 ## Frontend Web
 
@@ -167,14 +170,27 @@
 | アバター表示・VRMA 連続再生・表示選択 UI を調整する | [`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md) |
 | xneko / xeyes 系ウィジェットを追加する | [`frontend_avatar,xneko_xeyesウィジェット追加手順.md`](./frontend_avatar,xneko_xeyesウィジェット追加手順.md) |
 | マイク入力・音声再生を調整する | [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
+| AiDiy.vue の全体構成・状態・初期化フローを確認する | [`frontend_avatar,AiDiy.vue全体構成と状態管理.md`](./frontend_avatar,AiDiy.vue全体構成と状態管理.md) |
+| Electron ウィンドウの位置・サイズ・IPC・ライフサイクルを変更する | [`frontend_avatar,Electronウィンドウ管理.md`](./frontend_avatar,Electronウィンドウ管理.md) |
+| AudioController の音声入出力パイプライン・エコー抑制を調整する | [`frontend_avatar,AIコア_音声処理.md`](./frontend_avatar,AIコア_音声処理.md) |
+| 3D アバター描画・VRMA 再生・視線補助・カメラワークを調整する | [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](./frontend_avatar,3Dアバター制御(Three.js VRM).md) |
 
 ## AI コア
 
 | 目的 | 参照ファイル |
 |------|--------------|
 | AIコア WebSocket の接続・パケット形式を確認する | [`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
+| AIWebSocket クライアントの実装・再接続ポリシー・両フロントエンドの差分を確認する | [`frontend_web,frontend_avatar,共通WebSocketクライアント.md`](./frontend_web,frontend_avatar,共通WebSocketクライアント.md) |
 | AI モデル設定を変更する | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
 | code1〜code6 のコード AI パネルを調整する | [`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
+| backend_server の設定管理（conf_json / conf_model / conf_path）を変更する | [`backend_server,設定管理(conf).md`](./backend_server,設定管理(conf).md) |
+
+## Frontend Web ルーター・状態管理
+
+| 目的 | 参照ファイル |
+|------|--------------|
+| Pinia store のパターン・auth store の動作を確認する | [`frontend_web,Pinia Storeパターン.md`](./frontend_web,Pinia Storeパターン.md) |
+| Vue Router の3ファイル分割・認証ガード・ルート追加手順を確認する | [`frontend_web,Vue Routerパターン.md`](./frontend_web,Vue Routerパターン.md) |
 
 ## Code CLI
 
@@ -186,6 +202,8 @@
 | Code CLI のプロンプト整形責務を確認する | [`backend_server,CodeCLIプロンプト整形.md`](./backend_server,CodeCLIプロンプト整形.md) |
 | CLI 出力の ANSI 制御コードを除去する | [`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
 | Hermes CLI の TUI を調整する | [`backend_hermes,TUI調整手順.md`](./backend_hermes,TUI調整手順.md) |
+| Hermes CLI の Provider 一覧・選択ロジックを確認する | [`backend_hermes,Provider一覧と選択ロジック.md`](./backend_hermes,Provider一覧と選択ロジック.md) |
+| Hermes CLI の Slash Command 一覧・追加手順を確認する | [`backend_hermes,Slash Command一覧.md`](./backend_hermes,Slash Command一覧.md) |
 | backend_hermes を単体 CLI として起動・確認する | [`backend_hermes,backend_server,運用手順.md`](./backend_hermes,backend_server,運用手順.md) |
 | hermes を MCP サーバーとして起動・Code CLI から接続する | [`backend_hermes,MCP_サーバー起動.md`](./backend_hermes,MCP_サーバー起動.md) |
 | hermes-agent 新バージョンへ追従・移行する | [`backend_hermes,Upstream移行手順.md`](./backend_hermes,Upstream移行手順.md) |
