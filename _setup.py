@@ -55,7 +55,7 @@ OLLAMA_INSTALL_COMMAND = (
     "curl -fsSL https://ollama.com/install.sh | sh"
 )
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = BASE_DIR / BACKEND_PATH
 BACKEND_VENV_DIR = BACKEND_DIR / BACKEND_ENV
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
@@ -970,29 +970,32 @@ def setup_backend_hermes() -> bool:
         return False
 
     cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
-    py_path = BACKEND_HERMES_DIR / BACKEND_HERMES_ENV / "Scripts" / "python.exe"
-    cli_path = BACKEND_HERMES_DIR / "cli_main.py"
+    hermes_dir = BACKEND_HERMES_DIR.resolve()
+    py_path = hermes_dir / BACKEND_HERMES_ENV / "Scripts" / "python.exe"
+    cli_path = hermes_dir / "cli_main.py"
     cmd_content = (
-        "@echo off\r\n"
-        "chcp 65001 >nul\r\n"
-        "setlocal\r\n"
-        "\r\n"
-        f'set "PY={py_path}"\r\n'
-        f'set "CLI={cli_path}"\r\n'
-        "\r\n"
-        'if not exist "%PY%" (\r\n'
-        '  echo Python virtual environment was not found:\r\n'
-        '  echo   %PY%\r\n'
-        '  pause\r\n'
-        '  exit /b 1\r\n'
-        ')\r\n'
-        "\r\n"
-        '"%PY%" "%CLI%" %*\r\n'
+        "@echo off\n"
+        "chcp 65001 >nul\n"
+        "setlocal\n"
+        "\n"
+        f'set "PY={py_path}"\n'
+        f'set "CLI={cli_path}"\n'
+        "\n"
+        'if not exist "%PY%" (\n'
+        '  echo Python virtual environment was not found:\n'
+        '  echo   %PY%\n'
+        '  pause\n'
+        '  exit /b 1\n'
+        ')\n'
+        "\n"
+        '"%PY%" "%CLI%" %*\n'
     )
     try:
         cmd_file.parent.mkdir(parents=True, exist_ok=True)
         cmd_file.write_text(cmd_content, encoding="ascii")
         print_success(f"{label}: aidiy_hermes.cmd を作成しました: {cmd_file}")
+        print_info(f"  Python: {py_path}")
+        print_info(f"  CLI   : {cli_path}")
     except Exception as e:
         print_warning(f"{label}: aidiy_hermes.cmd の作成に失敗しました: {e}")
 

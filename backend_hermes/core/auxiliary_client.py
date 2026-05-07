@@ -1474,32 +1474,45 @@ def _build_codex_client(model: str) -> Tuple[Optional[Any], Optional[str]]:
     return CodexAuxiliaryClient(real_client, model), model
 
 
-def _try_anthropic() -> Tuple[Optional[Any], Optional[str]]:
+def _try_anthropic(
+    api_key: str = None,
+    base_url: str = None,
+) -> Tuple[Optional[Any], Optional[str]]:
     try:
         from agent.anthropic_adapter import build_anthropic_client, resolve_anthropic_token
     except ImportError:
         return None, None
 
-    pool_present, entry = _select_pool_entry("anthropic")
-    if pool_present:
-        if entry is None:
-            return None, None
-        token = _pool_runtime_api_key(entry)
-    else:
+    explicit_token = str(api_key or "").strip()
+    explicit_base_url = str(base_url or "").strip().rstrip("/")
+    if explicit_token:
+        pool_present = False
         entry = None
-        token = resolve_anthropic_token()
+        token = explicit_token
+    else:
+        pool_present, entry = _select_pool_entry("anthropic")
+        if pool_present:
+            if entry is None:
+                return None, None
+            token = _pool_runtime_api_key(entry)
+        else:
+            entry = None
+            token = resolve_anthropic_token()
     if not token:
         return None, None
 
     # Allow base URL override from config.yaml model.base_url, but only
     # when the configured provider is anthropic — otherwise a non-Anthropic
     # base_url (e.g. Codex endpoint) would leak into Anthropic requests.
-    base_url = _pool_runtime_base_url(entry, _ANTHROPIC_DEFAULT_BASE_URL) if pool_present else _ANTHROPIC_DEFAULT_BASE_URL
+    base_url = (
+        explicit_base_url
+        or (_pool_runtime_base_url(entry, _ANTHROPIC_DEFAULT_BASE_URL) if pool_present else _ANTHROPIC_DEFAULT_BASE_URL)
+    )
     try:
         from hermes_cli.config import load_config
         cfg = load_config()
         model_cfg = cfg.get("model")
-        if isinstance(model_cfg, dict):
+        if isinstance(model_cfg, dict) and not explicit_base_url:
             cfg_provider = str(model_cfg.get("provider") or "").strip().lower()
             if cfg_provider == "anthropic":
                 cfg_base_url = (model_cfg.get("base_url") or "").strip().rstrip("/")
@@ -1834,6 +1847,9 @@ def _resolve_auto(main_runtime: Optional[Dict[str, Any]] = None) -> Tuple[Option
         if runtime_base_url and (main_provider == "custom" or main_provider.startswith("custom:")):
             resolved_provider = "custom"
             explicit_base_url = runtime_base_url
+            explicit_api_key = runtime_api_key or None
+        elif main_provider == "anthropic":
+            explicit_base_url = runtime_base_url or None
             explicit_api_key = runtime_api_key or None
         client, resolved = resolve_provider_client(
             resolved_provider,
@@ -2281,7 +2297,10 @@ def resolve_provider_client(
 
     if pconfig.auth_type == "api_key":
         if provider == "anthropic":
-            client, default_model = _try_anthropic()
+            client, default_model = _try_anthropic(
+                api_key=explicit_api_key,
+                base_url=explicit_base_url,
+            )
             if client is None:
                 logger.warning("resolve_provider_client: anthropic requested but no Anthropic credentials found")
                 return None, None

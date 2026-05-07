@@ -60,7 +60,7 @@
 | `_load_aidiy_hermes_defaults()` (L12609) | `AiDiy_key.json` から provider/model 既定値を動的読込 |
 | `_resolve_aidiy_ollama_model()` (L12633) | 起動中のOllamaに `GET /api/tags` してモデル名解決 |
 | `_aidiy_provider_slugs()` / `_handle_aidiy_model_command()` (L5655-5925) | `/model` コマンドをAiDiy provider pickerに置換 |
-| 6 provider: ollama(local+cloud), openai, openrt, gemini/freeai, claude | すべて `AiDiy_key.json` で管理 |
+| 6 provider: ollama(local+cloud), openai, openrt, gemini/freeai, anthropic | すべて `AiDiy_key.json` で管理 |
 | quiet/oneshot 出力分離 (L12485-12543) | 運用出力をstderrにredirect、stdout=正式回答に固定 |
 | cron import fallback (L685-690) | `cron` 欠落時は `get_job` を None返却で代替 |
 
@@ -189,7 +189,7 @@
 - `openai`: `https://api.openai.com/v1`
 - `openrt`: `https://openrouter.ai/api/v1`
 - `gemini` / `freeai`: `https://generativelanguage.googleapis.com/v1beta/openai`
-- `claude`: `https://api.anthropic.com`
+- `anthropic`: `https://api.anthropic.com`
 
 ## 旧機能を戻す判断基準
 

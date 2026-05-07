@@ -111,7 +111,17 @@ class ResponsesApiTransport(ProviderTransport):
                 if github_reasoning is not None:
                     kwargs["reasoning"] = github_reasoning
             else:
-                kwargs["reasoning"] = {"effort": reasoning_effort, "summary": "auto"}
+                # ``summary: "auto"`` is gated behind OpenAI's organization
+                # Verification on api.openai.com — unverified orgs hit a 400
+                # (``param: reasoning.summary, code: unsupported_value``).
+                # Only request a summary on the Codex backend (chatgpt.com),
+                # which serves ChatGPT subscription users without that gate.
+                # Reasoning itself still works everywhere; verified orgs that
+                # want summaries can opt in via reasoning_config.
+                reasoning_kwargs: Dict[str, Any] = {"effort": reasoning_effort}
+                if is_codex_backend:
+                    reasoning_kwargs["summary"] = "auto"
+                kwargs["reasoning"] = reasoning_kwargs
                 kwargs["include"] = ["reasoning.encrypted_content"]
         elif not is_github_responses and not is_xai_responses:
             kwargs["include"] = []

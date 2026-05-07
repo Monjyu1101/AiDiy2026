@@ -63,7 +63,7 @@
 - `aidiy_hermes` の Code AI 呼び出しでは `-z -Q "本文"` の順にする。`-Q -z "本文"` だと TUI 側のタイトルやバナーが出る場合がある
 - `aidiy_hermes` のワンショットでは、stdout は正式回答専用、stderr は thinking / step / tool 進捗 / 警告 / `session_id` 用に分ける
 - `CODE_AIDIY_HERMES_MODEL` が `auto` 以外のときは、`--provider ollama --model <model>` を渡す。AiDiy の設定画面で扱う `aidiy_hermes` モデル候補は Ollama 系を前提にする
-- TUI の `/model` では `AiDiy_key.json` を使い、`ollama` / `openai` / `openrt` / `gemini` / `freeai` / `claude` を選べるようにする。Code AI 経由のモデル指定とは役割を分ける
+- TUI の `/model` では `AiDiy_key.json` を使い、`ollama` / `openai` / `openrt` / `gemini` / `freeai` / `anthropic` を選べるようにする。Code AI 経由のモデル指定とは役割を分ける
 - OpenAI / Claude / Google 系 provider を有効にする場合、`backend_hermes/requirements.txt` に `openai` / `anthropic` / `google-genai` を明示する
 
 ## 確認方法

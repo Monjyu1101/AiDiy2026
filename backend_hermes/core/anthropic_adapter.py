@@ -17,6 +17,7 @@ import os
 import platform
 import subprocess
 from pathlib import Path
+from urllib.parse import urlparse
 
 from hermes_constants import get_hermes_home
 from typing import Any, Dict, List, Optional, Tuple
@@ -461,6 +462,15 @@ def _requires_bearer_auth(base_url: str | None) -> bool:
     return normalized.startswith(("https://api.minimax.io/anthropic", "https://api.minimaxi.com/anthropic"))
 
 
+def _is_native_anthropic_endpoint(base_url: str | None) -> bool:
+    """Return True for Anthropic's first-party API endpoint."""
+    normalized = _normalize_base_url_text(base_url)
+    if not normalized:
+        return True
+    parsed = urlparse(normalized)
+    return parsed.netloc.lower() == "api.anthropic.com"
+
+
 def _common_betas_for_base_url(
     base_url: str | None,
     *,
@@ -491,6 +501,18 @@ def _common_betas_for_base_url(
     if drop_context_1m_beta:
         return [b for b in _COMMON_BETAS if b != _CONTEXT_1M_BETA]
     return _COMMON_BETAS
+
+
+def _api_key_betas_for_base_url(
+    base_url: str | None,
+    *,
+    drop_context_1m_beta: bool = False,
+) -> list[str]:
+    """Return beta headers safe for x-api-key authentication."""
+    return _common_betas_for_base_url(
+        base_url,
+        drop_context_1m_beta=drop_context_1m_beta or _is_native_anthropic_endpoint(base_url),
+    )
 
 
 def build_anthropic_client(
@@ -587,10 +609,17 @@ def build_anthropic_client(
             "x-app": "cli",
         }
     else:
-        # Regular API key → x-api-key header + common betas
+        # Regular API key → x-api-key header + API-key-safe betas.
+        # Native Anthropic rejects the long-context beta with x-api-key auth
+        # ("authentication style is incompatible"). OAuth/Claude Code and
+        # some third-party endpoints still handle their own beta policy above.
         kwargs["api_key"] = api_key
-        if common_betas:
-            kwargs["default_headers"] = {"anthropic-beta": ",".join(common_betas)}
+        api_key_betas = _api_key_betas_for_base_url(
+            normalized_base_url,
+            drop_context_1m_beta=drop_context_1m_beta,
+        )
+        if api_key_betas:
+            kwargs["default_headers"] = {"anthropic-beta": ",".join(api_key_betas)}
 
     return _anthropic_sdk.Anthropic(**kwargs)
 
@@ -1907,10 +1936,16 @@ def build_anthropic_kwargs(
         kwargs.setdefault("extra_body", {})["speed"] = "fast"
         # Build extra_headers with ALL applicable betas (the per-request
         # extra_headers override the client-level anthropic-beta header).
-        betas = list(_common_betas_for_base_url(
-            base_url,
-            drop_context_1m_beta=drop_context_1m_beta,
-        ))
+        if is_oauth:
+            betas = list(_common_betas_for_base_url(
+                base_url,
+                drop_context_1m_beta=drop_context_1m_beta,
+            ))
+        else:
+            betas = list(_api_key_betas_for_base_url(
+                base_url,
+                drop_context_1m_beta=drop_context_1m_beta,
+            ))
         if is_oauth:
             betas.extend(_OAUTH_ONLY_BETAS)
         betas.append(_FAST_MODE_BETA)

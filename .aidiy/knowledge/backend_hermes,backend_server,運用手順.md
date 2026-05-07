@@ -119,7 +119,7 @@ AiDiy の Code AI 連携では、タイトルやバナーを出さないため `
 
 ## 対応 provider
 
-- API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `claude`
+- API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `anthropic`
 - CLI bridge: `claude_cli`, `codex_cli`, `gemini_cli`, `copilot_cli`
 
 既定 provider は `ollama`。

@@ -514,12 +514,21 @@ def cleanup_backend_hermes(base_dir: Path, choices: dict):
     label = "バックエンド(hermes)"
     print_header(f"{label} のクリーンアップ")
 
+    deleted_count = 0
+    cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
+    if remove_file(cmd_file, f"aidiy_hermes.cmd ({label})"):
+        deleted_count += 1
+
     hermes_dir = base_dir / BACKEND_HERMES_PATH
     if not hermes_dir.exists():
         print_warning(f"{label} のフォルダが見つかりません")
+        if deleted_count > 0:
+            print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
+        else:
+            print_info(f"{label}: 削除対象はありませんでした")
         return
 
-    deleted_count = cleanup_common_python_caches(hermes_dir, label)
+    deleted_count += cleanup_common_python_caches(hermes_dir, label)
 
     hermes_envs = choices.get("hermes_envs", {})
     for env_name in BACKEND_HERMES_ENV_LIST:
@@ -544,10 +553,6 @@ def cleanup_backend_hermes(base_dir: Path, choices: dict):
                 deleted_count += 1
         elif choices.get("hermes_temp") is False:
             print_info(f"  {BACKEND_HERMES_PATH}/temp はそのまま残します")
-
-    cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
-    if remove_file(cmd_file, f"aidiy_hermes.cmd ({label})"):
-        deleted_count += 1
 
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
@@ -765,7 +770,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
 def main():
     print_header("プロジェクト クリーンアップ")
 
-    base_dir = Path(__file__).parent
+    base_dir = Path(__file__).resolve().parent
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
     print_info("  1. backup フォルダ")

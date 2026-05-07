@@ -1206,6 +1206,18 @@ class AIAgent:
         
         # Model response configuration
         self.max_tokens = max_tokens  # None = use model default
+        if (
+            self.max_tokens is None
+            and self.api_mode == "anthropic_messages"
+            and self.provider == "anthropic"
+        ):
+            try:
+                from agent.anthropic_adapter import _is_oauth_token
+
+                if not _is_oauth_token(api_key or ""):
+                    self.max_tokens = 8192
+            except Exception:
+                self.max_tokens = 8192
         self.reasoning_config = reasoning_config  # None = use default (medium for OpenRouter)
         self.service_tier = service_tier
         self.request_overrides = dict(request_overrides or {})
@@ -6087,8 +6099,14 @@ class AIAgent:
             return False
 
         try:
-            from agent.anthropic_adapter import resolve_anthropic_token, build_anthropic_client
+            from agent.anthropic_adapter import (
+                _is_oauth_token,
+                resolve_anthropic_token,
+                build_anthropic_client,
+            )
 
+            if not _is_oauth_token(getattr(self, "_anthropic_api_key", "") or ""):
+                return False
             new_token = resolve_anthropic_token()
         except Exception as exc:
             logger.debug("Anthropic credential refresh failed: %s", exc)
@@ -6120,7 +6138,6 @@ class AIAgent:
         # Only treat as OAuth on native Anthropic; third-party endpoints using
         # the Anthropic protocol must not trip OAuth paths (#1739 & third-party
         # identity-injection guard).
-        from agent.anthropic_adapter import _is_oauth_token
         self._is_anthropic_oauth = _is_oauth_token(new_token) if self.provider == "anthropic" else False
         return True
 
@@ -12198,6 +12215,39 @@ class AIAgent:
                                 f"{self.log_prefix}⚠️  Anthropic long-context tier "
                                 f"requires extra usage — reducing context: "
                                 f"{old_ctx:,} → {_reduced_ctx:,} tokens",
+                                force=True,
+                            )
+
+                        # Anthropic still treats the request as long-context
+                        # (and re-raises 429) as long as the
+                        # ``context-1m-2025-08-07`` beta header is present,
+                        # even after we reduce the parameter to 200K. Drop the
+                        # beta for the rest of the session and rebuild the
+                        # client so subsequent attempts don't keep tripping
+                        # the same gate. Mirrors the OAuth recovery branch
+                        # below, but applies to direct API-key users too.
+                        if (
+                            self.api_mode == "anthropic_messages"
+                            and not getattr(self, "_oauth_1m_beta_disabled", False)
+                        ):
+                            self._oauth_1m_beta_disabled = True
+                            try:
+                                if getattr(self, "_anthropic_client", None) is not None:
+                                    self._anthropic_client.close()
+                            except Exception:
+                                pass
+                            try:
+                                self._rebuild_anthropic_client()
+                            except Exception as _rebuild_exc:
+                                logging.debug(
+                                    "anthropic client rebuild after long-context "
+                                    "tier failure failed: %s",
+                                    _rebuild_exc,
+                                )
+                            self._vprint(
+                                f"{self.log_prefix}🔕 Dropping the 1M-context "
+                                f"beta header for this session — your account "
+                                f"isn't on the long-context tier.",
                                 force=True,
                             )
 

@@ -1797,11 +1797,15 @@ class ChatConsole:
             highlight=False,
         )
 
+    @property
+    def width(self) -> int:
+        return shutil.get_terminal_size((80, 24)).columns
+
     def print(self, *args, **kwargs):
         self._buffer.seek(0)
         self._buffer.truncate()
         # Read terminal width at render time so panels adapt to current size
-        self._inner.width = shutil.get_terminal_size((80, 24)).columns
+        self._inner.width = self.width
         self._inner.print(*args, **kwargs)
         output = self._buffer.getvalue()
         for line in output.rstrip("\n").split("\n"):
@@ -1927,10 +1931,143 @@ _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 _GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 _CLAUDE_BASE_URL = "https://api.anthropic.com"
 
+# External CLI providers — no API key from AiDiy_key.json; auth is handled by each CLI's own credentials.
+_AIDIY_CLI_PROVIDERS = [
+    {
+        "slug": "claude-code",
+        "name": "Claude Code (CLI)",
+        "runtime_provider": "anthropic",
+        "api_mode": "anthropic_messages",
+        "is_cli": True,
+    },
+    {
+        "slug": "gemini-cli",
+        "name": "Gemini CLI",
+        "runtime_provider": "google-gemini-cli",
+        "api_mode": "chat_completions",
+        "is_cli": True,
+    },
+    {
+        "slug": "codex-cli",
+        "name": "Codex CLI",
+        "runtime_provider": "openai-codex",
+        "api_mode": "codex_responses",
+        "is_cli": True,
+    },
+    {
+        "slug": "copilot-cli",
+        "name": "Copilot CLI",
+        "runtime_provider": "copilot-acp",
+        "api_mode": "chat_completions",
+        "is_cli": True,
+    },
+    {
+        "slug": "opencode",
+        "name": "OpenCode",
+        "runtime_provider": "opencode-zen",
+        "api_mode": "chat_completions",
+        "is_cli": True,
+    },
+]
+
 
 def _is_valid_key(api_key: str) -> bool:
     """Return True when AiDiy_key.json contains a real key, not a placeholder."""
     return isinstance(api_key, str) and bool(api_key.strip()) and not api_key.strip().startswith("<")
+
+
+def provider_entry_is_cli(slug: str) -> bool:
+    """Return True when the given slug refers to an external CLI provider."""
+    return any(p["slug"] == (slug or "").lower() for p in _AIDIY_CLI_PROVIDERS)
+
+
+def _aidiy_cli_command_path(cli_slug: str) -> str:
+    # Mirrors backend_server/AIコア/AIコード_cli.py::_コマンドパス取得 so that
+    # backend_hermes can spawn the same external CLIs (claude / copilot /
+    # gemini / codex / opencode) when the user picks one via /model.
+    env_var = f"{cli_slug.upper().replace('-', '_')}_CLI_PATH"
+    custom = os.environ.get(env_var)
+    if custom:
+        return custom
+    if cli_slug == "opencode":
+        if os.name == "nt":
+            userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+            for cand in (
+                os.path.join(userprofile, ".local", "bin", "opencode.exe"),
+                os.path.join(userprofile, "AppData", "Roaming", "npm", "opencode.cmd"),
+            ):
+                if os.path.isfile(cand):
+                    return cand
+        return "opencode"
+    if os.name == "nt":
+        userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+        npm_bin = os.path.join(userprofile, "AppData", "Roaming", "npm")
+        names_nt = {
+            "claude-code": "claude.cmd",
+            "copilot-cli": "copilot.cmd",
+            "gemini-cli": "gemini.cmd",
+            "codex-cli": "codex.cmd",
+        }
+        return os.path.join(npm_bin, names_nt.get(cli_slug, "claude.cmd"))
+    names = {
+        "claude-code": "claude",
+        "copilot-cli": "copilot",
+        "gemini-cli": "gemini",
+        "codex-cli": "codex",
+    }
+    return names.get(cli_slug, "claude")
+
+
+def _aidiy_cli_normalize_prompt(text: str) -> str:
+    if text is None:
+        return ""
+    return str(text).replace("\n", " ").replace("\r", " ").strip()
+
+
+def _aidiy_cli_build_command(
+    cli_slug: str,
+    prompt: str,
+    is_initial: bool,
+    repo_path: Optional[str] = None,
+) -> list:
+    # Mirrors backend_server/AIコア/AIコード_cli.py::_コマンド構築. Model is
+    # never passed (CLI provider in /model picker is locked to ``auto`` so the
+    # CLI uses its own default).
+    cmd_path = _aidiy_cli_command_path(cli_slug)
+    one_line = _aidiy_cli_normalize_prompt(prompt)
+
+    if cli_slug == "claude-code":
+        common = [cmd_path, "--allow-dangerously-skip-permissions",
+                  "--permission-mode", "bypassPermissions"]
+        if repo_path:
+            common.extend(["--add-dir", repo_path])
+        if is_initial:
+            return common + ["-p", one_line]
+        return common + ["--continue", "-p", one_line]
+
+    if cli_slug == "copilot-cli":
+        common = [cmd_path, "--allow-all-tools"]
+        if repo_path:
+            common.extend(["--add-dir", repo_path])
+        if is_initial:
+            return common + ["-p", one_line]
+        return common + ["--continue", "-p", one_line]
+
+    if cli_slug == "gemini-cli":
+        return [cmd_path, "--yolo", "--prompt", one_line]
+
+    if cli_slug == "codex-cli":
+        return [cmd_path, "exec", "--skip-git-repo-check",
+                "--dangerously-bypass-approvals-and-sandbox", one_line]
+
+    if cli_slug == "opencode":
+        cmd_args = [cmd_path, "run"]
+        cmd_args.append(one_line)
+        if not is_initial:
+            cmd_args.append("-c")
+        return cmd_args
+
+    return []
 
 
 def _strip_cloud_suffix(model: str) -> str:
@@ -3056,12 +3193,16 @@ class HermesCLI:
 
     def _print_user_message_preview(self, user_input: str) -> None:
         """Render a user message using the normal chat scrollback style."""
-        ChatConsole().print(f"[{_accent_hex()}]{'─' * 40}[/]")
+        w = shutil.get_terminal_size().columns
+        _user_label = "User"
+        _user_fill = max(0, w - 4 - len(_user_label))
+        ChatConsole().print(f"[{_accent_hex()}]── {_user_label} {'─' * _user_fill}[/]")
         text = str(user_input or "")
         if "\n" in text:
             ChatConsole().print(self._format_submitted_user_message_preview(text))
         else:
             ChatConsole().print(f"[bold {_accent_hex()}]●[/] [bold]{_escape(text)}[/]")
+        ChatConsole().print(f"[{_accent_hex()}]{'─' * w}[/]")
 
     def _stream_reasoning_delta(self, text: str) -> None:
         """Stream reasoning/thinking tokens into a dim box above the response.
@@ -3279,16 +3420,15 @@ class HermesCLI:
             if not text:
                 return
             self._stream_box_opened = True
+            label = "AiDiy,Hermes"
             try:
                 from hermes_cli.skin_engine import get_active_skin
                 _skin = get_active_skin()
-                label = _skin.get_branding("response_label", "⚕ Hermes")
                 _text_hex = _skin.get_color("banner_text", "#FFF8DC")
             except Exception:
-                label = "⚕ Hermes"
                 _text_hex = "#FFF8DC"
             # Build a true-color ANSI escape for the response text color
-            # so streamed content matches the Rich Panel appearance.
+            # so streamed content matches the section header appearance.
             try:
                 _r = int(_text_hex[1:3], 16)
                 _g = int(_text_hex[3:5], 16)
@@ -3297,8 +3437,8 @@ class HermesCLI:
             except (ValueError, IndexError):
                 self._stream_text_ansi = ""
             w = shutil.get_terminal_size().columns
-            fill = w - 2 - len(label)
-            _cprint(f"\n{_ACCENT}╭─{label}{'─' * max(fill - 1, 0)}╮{_RST}")
+            fill = max(0, w - 4 - len(label))
+            _cprint(f"\n{_ACCENT}── {label} {'─' * fill}{_RST}")
 
         self._stream_buf += text
 
@@ -3329,10 +3469,10 @@ class HermesCLI:
             _cprint(f"{_STREAM_PAD}{_tc}{line}{_RST}" if _tc else f"{_STREAM_PAD}{line}")
             self._stream_buf = ""
 
-        # Close the response box
+        # Close the response section
         if self._stream_box_opened:
             w = shutil.get_terminal_size().columns
-            _cprint(f"{_ACCENT}╰{'─' * (w - 2)}╯{_RST}")
+            _cprint(f"{_ACCENT}{'─' * w}{_RST}")
 
     def _reset_stream_state(self) -> None:
         """Reset streaming state before each agent invocation."""
@@ -5676,7 +5816,10 @@ class HermesCLI:
 
     @staticmethod
     def _aidiy_provider_slugs() -> set:
-        return {"ollama", "openai", "openrt", "openrouter", "gemini", "freeai", "claude", "anthropic"}
+        return {
+            "ollama", "openai", "openrt", "openrouter", "gemini", "freeai", "anthropic",
+            "claude-code", "gemini-cli", "codex-cli", "copilot-cli", "opencode",
+        }
 
     @staticmethod
     def _aidiy_runtime_provider(slug: str) -> str:
@@ -5685,8 +5828,16 @@ class HermesCLI:
             return slug
         if slug == "openrt":
             return "openrouter"
-        if slug in {"claude", "anthropic"}:
+        if slug in {"anthropic", "claude-code"}:
             return "anthropic"
+        if slug == "gemini-cli":
+            return "google-gemini-cli"
+        if slug == "codex-cli":
+            return "openai-codex"
+        if slug == "copilot-cli":
+            return "copilot-acp"
+        if slug == "opencode":
+            return "opencode-zen"
         return "custom"
 
     def _current_aidiy_provider_slug(self) -> str:
@@ -5697,8 +5848,8 @@ class HermesCLI:
         if provider == "openrouter":
             return "openrt"
         if provider == "anthropic":
-            return "claude"
-        if provider in {"ollama", "openai", "openrt", "gemini", "freeai", "claude"}:
+            return "anthropic"
+        if provider in {"ollama", "openai", "openrt", "gemini", "freeai"}:
             return provider
         base_url = (self.base_url or "").strip().lower()
         if "openrouter.ai" in base_url:
@@ -5708,7 +5859,7 @@ class HermesCLI:
         if "generativelanguage.googleapis.com" in base_url:
             return "gemini"
         if "api.anthropic.com" in base_url:
-            return "claude"
+            return "anthropic"
         if "ollama.com" in base_url or "localhost:11434" in base_url or "127.0.0.1:11434" in base_url:
             return "ollama"
         return provider
@@ -5724,7 +5875,7 @@ class HermesCLI:
             return cfg.get("CHAT_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
         if provider == "freeai":
             return cfg.get("CHAT_FREEAI_MODEL") or cfg.get("CHAT_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
-        if provider in ("claude", "anthropic"):
+        if provider == "anthropic":
             return cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-4-6"
         return cfg.get("CODE_AIDIY_HERMES_MODEL") or cfg.get("CHAT_OLLAMA_MODEL") or "deepseek-v4-flash:cloud"
 
@@ -5732,8 +5883,6 @@ class HermesCLI:
         provider = (provider or "ollama").strip().lower()
         if provider == "openrouter":
             provider = "openrt"
-        if provider == "anthropic":
-            provider = "claude"
         cfg = self._aidiy_config or {}
 
         if provider == "ollama":
@@ -5791,20 +5940,36 @@ class HermesCLI:
                 "api_mode": "chat_completions",
                 "default_model": self._aidiy_provider_default_model(provider),
             }
-        elif provider == "claude":
+        elif provider == "anthropic":
             api_key = str(cfg.get("claude_key_id", "") or "")
             if not _is_valid_key(api_key):
                 return None
             entry = {
-                "slug": "claude",
-                "name": "Claude",
+                "slug": "anthropic",
+                "name": "Anthropic",
                 "runtime_provider": "anthropic",
                 "base_url": _CLAUDE_BASE_URL,
                 "api_key": api_key.strip(),
                 "api_mode": "anthropic_messages",
-                "default_model": self._aidiy_provider_default_model("claude"),
+                "default_model": self._aidiy_provider_default_model("anthropic"),
             }
         else:
+            # Check CLI providers
+            cli_def = next((p for p in _AIDIY_CLI_PROVIDERS if p["slug"] == provider), None)
+            if cli_def:
+                entry = {
+                    "slug": cli_def["slug"],
+                    "name": cli_def["name"],
+                    "runtime_provider": cli_def["runtime_provider"],
+                    "base_url": "",
+                    "api_key": "",
+                    "api_mode": cli_def["api_mode"],
+                    "default_model": "auto",
+                    "is_cli": True,
+                    "models": [("auto", "auto")],
+                    "total_models": 1,
+                }
+                return entry
             return None
 
         if include_models:
@@ -5818,19 +5983,131 @@ class HermesCLI:
     def _list_aidiy_provider_entries(self, include_models: bool = False) -> List[Dict[str, Any]]:
         current = self._current_aidiy_provider_slug()
         providers: List[Dict[str, Any]] = []
-        for slug in ("ollama", "openai", "openrt", "gemini", "freeai", "claude"):
+        for slug in ("ollama", "openai", "openrt", "gemini", "freeai", "anthropic"):
             entry = self._get_aidiy_provider_entry(slug, include_models=include_models)
             if entry:
                 entry["is_current"] = entry["slug"] == current
                 if "total_models" not in entry:
                     entry["total_models"] = len(entry.get("models", [])) or 1
                 providers.append(entry)
+        # Always include external CLI providers
+        for cli_def in _AIDIY_CLI_PROVIDERS:
+            entry = self._get_aidiy_provider_entry(cli_def["slug"], include_models=False)
+            if entry:
+                entry["is_current"] = entry["slug"] == current
+                entry.setdefault("total_models", 1)
+                providers.append(entry)
         return providers
 
+    def _dispatch_aidiy_cli_subprocess(self, message, images: list = None) -> Optional[str]:
+        # CLI providers (claude-code / copilot-cli / gemini-cli / codex-cli /
+        # opencode) are handled by spawning the external CLI binary directly,
+        # rather than by routing through the Hermes agent loop. Mirrors the
+        # dispatch pattern used by backend_server/AIコア/AIコード_cli.py.
+        import subprocess as _subprocess
+
+        cli_slug = (getattr(self, "_aidiy_provider_slug", "") or "").lower()
+        if not cli_slug:
+            return None
+
+        if isinstance(message, list):
+            try:
+                text_parts = [
+                    p.get("text", "") for p in message
+                    if isinstance(p, dict) and p.get("type") == "text"
+                ]
+                message_text = "\n".join(text_parts).strip()
+            except Exception:
+                message_text = str(message)
+        else:
+            message_text = str(message or "")
+
+        if not message_text.strip():
+            return None
+
+        if not hasattr(self, "_aidiy_cli_session_started"):
+            self._aidiy_cli_session_started = {}
+        is_initial = not self._aidiy_cli_session_started.get(cli_slug, False)
+
+        repo_path = os.getcwd()
+        cmd = _aidiy_cli_build_command(
+            cli_slug=cli_slug,
+            prompt=message_text,
+            is_initial=is_initial,
+            repo_path=repo_path,
+        )
+        if not cmd:
+            _cprint(f"  CLI dispatch is not implemented for provider: {cli_slug}")
+            return None
+
+        # Persist the user message before spawning so /history shows it even if
+        # the subprocess fails midway through.
+        self.conversation_history.append({"role": "user", "content": message_text})
+
+        _cprint(f"  {_DIM}→ Spawning {cli_slug}: {os.path.basename(cmd[0])}{_RST}")
+
+        try:
+            proc = _subprocess.Popen(
+                cmd,
+                stdout=_subprocess.PIPE,
+                stderr=_subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=repo_path,
+                env=os.environ.copy(),
+            )
+        except FileNotFoundError:
+            err = f"CLI binary not found: {cmd[0]}"
+            _cprint(f"  {err}")
+            self.conversation_history.append({"role": "assistant", "content": err})
+            return err
+        except Exception as exc:
+            err = f"CLI spawn failed: {exc}"
+            _cprint(f"  {err}")
+            self.conversation_history.append({"role": "assistant", "content": err})
+            return err
+
+        output_lines: list[str] = []
+        try:
+            if proc.stdout is not None:
+                for line in proc.stdout:
+                    text = line.rstrip("\r\n")
+                    output_lines.append(text)
+                    _cprint(text)
+        except Exception as exc:
+            logging.warning("CLI stdout read error: %s", exc)
+
+        try:
+            proc.wait()
+        except Exception:
+            pass
+
+        stderr_text = ""
+        try:
+            if proc.stderr is not None:
+                stderr_text = proc.stderr.read() or ""
+        except Exception:
+            pass
+        if stderr_text.strip():
+            _cprint(f"  {_DIM}[stderr]{_RST}")
+            for line in stderr_text.splitlines():
+                _cprint(f"  {_DIM}{line}{_RST}")
+
+        self._aidiy_cli_session_started[cli_slug] = True
+
+        final = "\n".join(output_lines).strip() or "(no output)"
+        self.conversation_history.append({"role": "assistant", "content": final})
+        return final
+
     def _apply_aidiy_provider_model(self, provider_entry: Dict[str, Any], model_name: str) -> None:
-        model_name = _model_from_display_label(model_name) or provider_entry.get("default_model") or self.model
-        if provider_entry.get("slug") == "ollama" and provider_entry.get("base_url", "").rstrip("/") == _OLLAMA_CLOUD_BASE_URL:
-            model_name = _strip_cloud_suffix(model_name)
+        is_cli = provider_entry.get("is_cli", False)
+        if is_cli:
+            model_name = "auto"
+        else:
+            model_name = _model_from_display_label(model_name) or provider_entry.get("default_model") or self.model
+            if provider_entry.get("slug") == "ollama" and provider_entry.get("base_url", "").rstrip("/") == _OLLAMA_CLOUD_BASE_URL:
+                model_name = _strip_cloud_suffix(model_name)
 
         old_provider = getattr(self, "_aidiy_provider_slug", None) or self.provider
         old_model = self.model
@@ -5839,13 +6116,25 @@ class HermesCLI:
         self.requested_provider = runtime_provider
         self.provider = runtime_provider
         self.api_mode = provider_entry.get("api_mode") or "chat_completions"
-        self.base_url = provider_entry.get("base_url") or self.base_url
-        self.api_key = provider_entry.get("api_key") or self.api_key
+        if is_cli:
+            # CLI providers resolve their own base_url and api_key via runtime auth
+            self.base_url = ""
+            self.api_key = ""
+            self._explicit_base_url = None
+            self._explicit_api_key = None
+        else:
+            self.base_url = provider_entry.get("base_url") or self.base_url
+            self.api_key = provider_entry.get("api_key") or self.api_key
+            self._explicit_base_url = self.base_url
+            self._explicit_api_key = self.api_key
         self.model = model_name
-        self._explicit_base_url = self.base_url
-        self._explicit_api_key = self.api_key
         self.agent = None
         self._active_agent_route_signature = None
+        # CLI provider switch resets the per-CLI session-started tracker so the
+        # next message uses the initial-prompt form (e.g. ``claude -p`` rather
+        # than ``claude --continue -p``).
+        if is_cli:
+            self._aidiy_cli_session_started = {}
         self._pending_model_switch_note = (
             f"[Note: model was just switched from {old_provider}/{old_model} "
             f"to {provider_entry.get('slug')}/{self.model}. Adjust your self-identification accordingly.]"
@@ -5856,13 +6145,23 @@ class HermesCLI:
     def _show_aidiy_model_picker_fallback(self) -> None:
         current = self._current_aidiy_provider_slug() or self.provider
         _cprint(f"  Current: {current} / {self.model}")
-        _cprint("  Providers from AiDiy_key.json:")
-        for entry in self._list_aidiy_provider_entries(include_models=False):
-            marker = "*" if entry.get("is_current") else " "
-            _cprint(f"   {marker} {entry['slug']:<8} {entry['name']}")
+        all_entries = self._list_aidiy_provider_entries(include_models=False)
+        api_entries = [e for e in all_entries if not e.get("is_cli")]
+        cli_entries = [e for e in all_entries if e.get("is_cli")]
+        if api_entries:
+            _cprint("  API Providers (AiDiy_key.json):")
+            for entry in api_entries:
+                marker = "*" if entry.get("is_current") else " "
+                _cprint(f"   {marker} {entry['slug']:<12} {entry['name']}")
+        if cli_entries:
+            _cprint("  CLI Providers (external, auto model):")
+            for entry in cli_entries:
+                marker = "*" if entry.get("is_current") else " "
+                _cprint(f"   {marker} {entry['slug']:<12} {entry['name']}")
         _cprint("  Usage:")
         _cprint("    /model --provider openai")
         _cprint("    /model gpt-5.2 --provider openai")
+        _cprint("    /model --provider claude-code")
         _cprint("    /model openrt:anthropic/claude-sonnet-4.5")
 
     def _open_aidiy_model_picker(self) -> None:
@@ -5898,9 +6197,12 @@ class HermesCLI:
             return False
 
         if explicit_provider and not model_input:
-            provider_entry = self._get_aidiy_provider_entry(explicit_provider, include_models=True)
+            provider_entry = self._get_aidiy_provider_entry(explicit_provider, include_models=not provider_entry_is_cli(explicit_provider))
             if not provider_entry:
-                _cprint(f"  Provider is not available in AiDiy_key.json: {explicit_provider}")
+                _cprint(f"  Provider is not available: {explicit_provider}")
+                return True
+            if provider_entry.get("is_cli"):
+                self._apply_aidiy_provider_model(provider_entry, "auto")
                 return True
             models = provider_entry.get("models") or []
             if not models:
@@ -5967,34 +6269,10 @@ class HermesCLI:
 
     def _fetch_aidiy_claude_model_labels(self, provider_entry: Dict[str, Any], limit: int = 12) -> List[Tuple[str, str]]:
         try:
-            req = urllib.request.Request(
-                provider_entry["base_url"].rstrip("/") + "/v1/models",
-                headers={
-                    "x-api-key": provider_entry["api_key"],
-                    "anthropic-version": "2023-06-01",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=10) as res:
-                payload = json.loads(res.read().decode("utf-8"))
-            rows: List[Tuple[int, str, str]] = []
-            cutoff = datetime.now() - timedelta(days=_CLOUD_MODEL_MAX_AGE_DAYS)
-            for item in payload.get("data", []) or []:
-                if not isinstance(item, dict):
-                    continue
-                model_id = str(item.get("id", "")).strip()
-                if not model_id:
-                    continue
-                created_ts = _parse_date_to_timestamp(item.get("created_at") or item.get("created"))
-                if created_ts > 0:
-                    created_dt = datetime.fromtimestamp(created_ts)
-                    if created_dt < cutoff:
-                        continue
-                    label = f"{created_dt.strftime('%Y/%m/%d')} - {model_id.lstrip('~')}"
-                else:
-                    label = f"yyyy/mm/dd - {model_id.lstrip('~')}"
-                rows.append((created_ts, label, model_id))
-            rows.sort(key=lambda row: row[0], reverse=True)
-            return [(label, model_id) for _created, label, model_id in rows[:limit]]
+            from hermes_cli.models import provider_model_ids
+
+            model_ids = provider_model_ids("anthropic")
+            return [(model_id, model_id) for model_id in model_ids[:limit]]
         except Exception:
             return []
 
@@ -6011,6 +6289,11 @@ class HermesCLI:
                     self._close_model_picker()
                     return
                 provider_data = providers[selected]
+                # CLI providers use "auto" model — skip model selection stage
+                if provider_data.get("is_cli"):
+                    self._close_model_picker()
+                    self._apply_aidiy_provider_model(provider_data, "auto")
+                    return
                 state["stage"] = "model"
                 state["provider_data"] = provider_data
                 state["model_list"] = provider_data.get("models") or []
@@ -7282,27 +7565,30 @@ class HermesCLI:
                 _cprint(f"  Prompt: \"{prompt[:60]}{'...' if len(prompt) > 60 else ''}\"")
                 ChatConsole().print(f"[{_accent_hex()}]{'─' * 40}[/]")
                 if response:
+                    label = "AiDiy,Hermes"
                     try:
                         from hermes_cli.skin_engine import get_active_skin
                         _skin = get_active_skin()
-                        label = _skin.get_branding("response_label", "⚕ Hermes")
                         _resp_color = _skin.get_color("response_border", "#CD7F32")
                         _resp_text = _skin.get_color("banner_text", "#FFF8DC")
                     except Exception:
-                        label = "⚕ Hermes"
                         _resp_color = "#CD7F32"
                         _resp_text = "#FFF8DC"
 
                     _chat_console = ChatConsole()
-                    _chat_console.print(Panel(
-                        _render_final_assistant_content(response, mode=self.final_response_markdown),
-                        title=f"[{_resp_color} bold]{label} (background #{task_num})[/]",
-                        title_align="left",
-                        border_style=_resp_color,
+                    _bg_label = f"{label} (background #{task_num})"
+                    _bg_w = _chat_console.width
+                    _bg_fill = max(0, _bg_w - 4 - len(_bg_label))
+                    _cprint(f"\n{_ACCENT}── {_bg_label} {'─' * _bg_fill}{_RST}")
+                    from rich.padding import Padding
+                    _chat_console.print(
+                        Padding(
+                            _render_final_assistant_content(response, mode=self.final_response_markdown),
+                            pad=(1, 4),
+                        ),
                         style=_resp_text,
-                        box=rich_box.HORIZONTALS,
-                        padding=(1, 4),
-                    ))
+                    )
+                    _cprint(f"{_ACCENT}{'─' * _bg_w}{_RST}")
                 else:
                     _cprint("  (No response generated)")
 
@@ -9532,6 +9818,13 @@ class HermesCLI:
         # register secure secret capture here as well.
         set_secret_capture_callback(self._secret_capture_callback)
 
+        # CLI provider dispatch — bypass the Hermes agent loop entirely and
+        # forward the user message to the selected external CLI subprocess
+        # (claude / copilot / gemini / codex / opencode). Mirrors how
+        # backend_server/AIコア/AIコード_cli.py runs these CLIs from AiDiy.
+        if provider_entry_is_cli(getattr(self, "_aidiy_provider_slug", "") or ""):
+            return self._dispatch_aidiy_cli_subprocess(message, images=images)
+
         # Refresh provider credentials if needed (handles key rotation transparently)
         if not self._ensure_runtime_credentials():
             return None
@@ -9640,7 +9933,6 @@ class HermesCLI:
         # Add user message to history
         self.conversation_history.append({"role": "user", "content": message})
 
-        ChatConsole().print(f"[{_accent_hex()}]{'─' * 40}[/]")
         print(flush=True)
         
         try:
@@ -9695,9 +9987,9 @@ class HermesCLI:
                     if not _streaming_box_opened:
                         _streaming_box_opened = True
                         w = self.console.width
-                        label = " ⚕ Hermes "
-                        fill = w - 2 - len(label)
-                        _cprint(f"\n{_ACCENT}╭─{label}{'─' * max(fill - 1, 0)}╮{_RST}")
+                        label = "AiDiy,Hermes"
+                        fill = max(0, w - 4 - len(label))
+                        _cprint(f"\n{_ACCENT}── {label} {'─' * fill}{_RST}")
                     _cprint(f"{_STREAM_PAD}{sentence.rstrip()}")
 
                 tts_thread = threading.Thread(
@@ -9988,39 +10280,41 @@ class HermesCLI:
                     _cprint(f"\n{r_top}\n{_DIM}{display_reasoning}{_RST}\n{r_bot}")
 
             if response and not response_previewed:
-                # Use skin engine for label/color with fallback
+                # Always use AiDiy,Hermes label regardless of skin
+                label = "AiDiy,Hermes"
                 try:
                     from hermes_cli.skin_engine import get_active_skin
                     _skin = get_active_skin()
-                    label = _skin.get_branding("response_label", "⚕ Hermes")
                     _resp_color = _skin.get_color("response_border", "#CD7F32")
                     _resp_text = _skin.get_color("banner_text", "#FFF8DC")
                 except Exception:
-                    label = "⚕ Hermes"
                     _resp_color = "#CD7F32"
                     _resp_text = "#FFF8DC"
 
                 is_error_response = result and (result.get("failed") or result.get("partial"))
                 already_streamed = self._stream_started and self._stream_box_opened and not is_error_response
                 if use_streaming_tts and _streaming_box_opened and not is_error_response:
-                    # Text was already printed sentence-by-sentence; just close the box
+                    # Text was already printed sentence-by-sentence; just close the section
                     w = shutil.get_terminal_size().columns
-                    _cprint(f"\n{_ACCENT}╰{'─' * (w - 2)}╯{_RST}")
+                    _cprint(f"\n{_ACCENT}{'─' * w}{_RST}")
                 elif already_streamed:
-                    # Response was already streamed token-by-token with box framing;
-                    # _flush_stream() already closed the box. Skip Rich Panel.
+                    # Response was already streamed token-by-token with section framing;
+                    # _flush_stream() already closed the section. Skip Rich Panel.
                     pass
                 else:
                     _chat_console = ChatConsole()
-                    _chat_console.print(Panel(
-                        _render_final_assistant_content(response, mode=self.final_response_markdown),
-                        title=f"[{_resp_color} bold]{label}[/]",
-                        title_align="left",
-                        border_style=_resp_color,
+                    _resp_w = _chat_console.width
+                    _resp_fill = max(0, _resp_w - 4 - len(label))
+                    _cprint(f"\n{_ACCENT}── {label} {'─' * _resp_fill}{_RST}")
+                    from rich.padding import Padding
+                    _chat_console.print(
+                        Padding(
+                            _render_final_assistant_content(response, mode=self.final_response_markdown),
+                            pad=(1, 4),
+                        ),
                         style=_resp_text,
-                        box=rich_box.HORIZONTALS,
-                        padding=(1, 4),
-                    ))
+                    )
+                    _cprint(f"{_ACCENT}{'─' * _resp_w}{_RST}")
 
 
             # Play terminal bell when agent finishes (if enabled).
@@ -11682,8 +11976,11 @@ class HermesCLI:
                 choices = []
                 _providers = state.get("providers")
                 for p in _providers if isinstance(_providers, list) else []:
-                    count = p.get("total_models", len(p.get("models", [])))
-                    label = f"{p['name']} ({count} model{'s' if count != 1 else ''})"
+                    if p.get("is_cli"):
+                        label = f"{p['name']} [CLI / auto]"
+                    else:
+                        count = p.get("total_models", len(p.get("models", [])))
+                        label = f"{p['name']} ({count} model{'s' if count != 1 else ''})"
                     if p.get("is_current"):
                         label += "  ← current"
                     choices.append(label)
@@ -12630,6 +12927,33 @@ def _load_aidiy_hermes_defaults() -> dict[str, str]:
     }
 
 
+def _load_aidiy_hermes_provider_defaults(provider: str | None) -> dict[str, str]:
+    provider_slug = (provider or "").strip().lower()
+    if not provider_slug:
+        return {}
+
+    config_path = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        return {}
+
+    if provider_slug == "anthropic":
+        api_key = str(cfg.get("claude_key_id") or "").strip()
+        model = str(cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-4-6").strip()
+        defaults = {
+            "provider": "anthropic",
+            "base_url": _CLAUDE_BASE_URL,
+            "model": model,
+        }
+        if _is_valid_key(api_key):
+            defaults["api_key"] = api_key
+        return defaults
+
+    return {}
+
+
 def _resolve_aidiy_ollama_model(host: str, configured_model: str) -> str:
     model = (configured_model or "").strip()
     if not host or not model:
@@ -12677,7 +13001,7 @@ def cli_entry(argv: list[str] | None = None) -> int:
 
     query = args.oneshot or args.query or (" ".join(args.prompt) if args.prompt else None)
     quiet = bool(args.quiet or args.oneshot)
-    defaults = _load_aidiy_hermes_defaults()
+    defaults = _load_aidiy_hermes_provider_defaults(args.provider) if args.provider else _load_aidiy_hermes_defaults()
     provider = args.provider or defaults.get("provider")
     base_url = args.base_url or defaults.get("base_url")
     api_key = args.api_key or defaults.get("api_key")
