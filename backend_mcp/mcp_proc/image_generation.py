@@ -11,7 +11,7 @@
 """
 画像生成モジュール
 
-OpenAI API（DALL-E 3 / GPT Image 2）を使って画像を生成する。
+OpenAI API（DALL-E 3 / GPT Image 2）、Gemini / FreeAI（Google Gemini API）を使って画像を生成する。
 """
 
 import base64
@@ -35,13 +35,18 @@ class ImageGeneration:
     画像生成クラス
 
     provider パラメータ:
-        "auto"   — OpenAI を自動選択（デフォルト）
+        "auto"   — FreeAI を自動選択（デフォルト）
+        "gemini" — Google Gemini API（gemini_key_id が必要）
+        "freeai" — FreeAI API（freeai_key_id が必要、実装は Gemini 共通）
         "openai" — OpenAI DALL-E / GPT Image API
     """
 
     DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
 
-    # API モデルカタログ
+    # ================================================================== #
+    # OpenAI モデルカタログ
+    # ================================================================== #
+
     _MODELS = {
         "gpt-image-2": {
             "display": "GPT Image 2",
@@ -66,27 +71,50 @@ class ImageGeneration:
         },
     }
 
-    DEFAULT_MODEL = "gpt-image-2"
-    DEFAULT_SIZE = "1024x1024"
+    OPENAI_DEFAULT_MODEL = "gpt-image-2"
+    OPENAI_DEFAULT_SIZE = "1024x1024"
 
+    # ================================================================== #
+    # Gemini モデルカタログ
+    # ================================================================== #
+
+    _GEMINI_MODELS = {
+        "gemini-3.1-flash-image-preview": {
+            "display": "Gemini 3.1 Flash Image (Nano Banana 2)",
+        },
+        "gemini-3-pro-image-preview": {
+            "display": "Gemini 3 Pro Image (Nano Banana Pro)",
+        },
+        "gemini-2.5-flash-image": {
+            "display": "Gemini 2.5 Flash Image (Nano Banana)",
+        },
+    }
+
+    GEMINI_DEFAULT_MODEL = "gemini-3.1-flash-image-preview"
+    GEMINI_DEFAULT_SIZE = "1024x1024"
+    FREEAI_DEFAULT_SIZE = "512x512"
+
+    # Gemini サイズ → aspect_ratio / image_size マッピング
+    _GEMINI_SIZE_MAP = {
+        "512x512":   {"aspect_ratio": "1:1",  "image_size": "512"},
+        "1024x1024": {"aspect_ratio": "1:1",  "image_size": "1K"},
+        "1920x1080": {"aspect_ratio": "16:9", "image_size": "2K"},
+        "1080x1920": {"aspect_ratio": "9:16", "image_size": "2K"},
+    }
+
+    # ================================================================== #
     # AiDiy_key.json へのパス（backend_mcp 起点）
+    # ================================================================== #
+
     _KEY_CONFIG_REL = "../backend_server/_config/AiDiy_key.json"
 
     # ------------------------------------------------------------------ #
-    # API キー解決
+    # API キー解決（共通）
     # ------------------------------------------------------------------ #
 
     @staticmethod
     def _is_valid_key(key: str) -> bool:
         return bool(key) and not key.startswith("<")
-
-    def _get_api_key(self) -> str:
-        """AiDiy_key.json から OpenAI API キーを取得する"""
-        key = self._read_key_from_config("openai_key_id")
-        if self._is_valid_key(key):
-            return key
-        return ""
-
 
     def _read_key_from_config(self, key_name: str) -> str:
         config_path = Path(__file__).resolve().parent.parent / self._KEY_CONFIG_REL
@@ -100,60 +128,53 @@ class ImageGeneration:
         except (json.JSONDecodeError, OSError):
             return ""
 
+    def _get_openai_api_key(self) -> str:
+        key = self._read_key_from_config("openai_key_id")
+        return key if self._is_valid_key(key) else ""
+
+    def _get_gemini_api_key(self) -> str:
+        key = self._read_key_from_config("gemini_key_id")
+        return key if self._is_valid_key(key) else ""
+
+    def _get_freeai_api_key(self) -> str:
+        key = self._read_key_from_config("freeai_key_id")
+        return key if self._is_valid_key(key) else ""
+
     # ------------------------------------------------------------------ #
     # モデル解決
     # ------------------------------------------------------------------ #
 
-    def _resolve_model(self, model_id: Optional[str] = None):
-        mid = (model_id or self.DEFAULT_MODEL).strip()
+    def _resolve_openai_model(self, model_id: Optional[str] = None):
+        mid = (model_id or self.OPENAI_DEFAULT_MODEL).strip()
         if mid in self._MODELS:
             return mid, self._MODELS[mid]
-        return self.DEFAULT_MODEL, self._MODELS[self.DEFAULT_MODEL]
+        return self.OPENAI_DEFAULT_MODEL, self._MODELS[self.OPENAI_DEFAULT_MODEL]
+
+    def _resolve_gemini_model(self, model_id: Optional[str] = None):
+        mid = (model_id or self.GEMINI_DEFAULT_MODEL).strip()
+        if mid in self._GEMINI_MODELS:
+            return mid, self._GEMINI_MODELS[mid]
+        return self.GEMINI_DEFAULT_MODEL, self._GEMINI_MODELS[self.GEMINI_DEFAULT_MODEL]
+
+    def _resolve_gemini_size(self, size: str):
+        size = size.strip()
+        if size in self._GEMINI_SIZE_MAP:
+            return self._GEMINI_SIZE_MAP[size]
+        return self._GEMINI_SIZE_MAP[self.GEMINI_DEFAULT_SIZE]
 
     # ------------------------------------------------------------------ #
-    # 画像生成
+    # 画像生成（OpenAI）
     # ------------------------------------------------------------------ #
 
-    def generate(
+    def _generate_openai(
         self,
         prompt: str,
-        provider: str = "auto",
-        original_path: Optional[str] = None,
-        model: str = "auto",
-        size: str = "auto",
-        quality: str = "auto",
+        original_path: Optional[str],
+        model: str,
+        size: str,
+        quality: str,
     ) -> tuple[Image.Image, dict]:
-        """
-        プロンプトから画像を生成する。
-
-        Args:
-            prompt: 生成プロンプト
-            provider: "auto" または "openai"
-            original_path: 参照画像のパス（省略可）
-            model: "auto" / "gpt-image-2" / "dall-e-3"
-            size: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" /
-                        "1792x1024" / "1024x1792"
-            quality: "auto"（モデル既定値） /
-                           gpt-image-2: "low" / "medium" / "high"
-                           dall-e-3: "standard" / "hd"
-
-        Returns:
-            (image, info_dict)
-            info_dict: provider, model, prompt, width, height, engine_note
-        """
-        if not prompt or not prompt.strip():
-            raise ImageGenerationError("prompt は必須です")
-
-        provider = provider.strip().lower()
-        if provider not in ("auto", "openai"):
-            raise ImageGenerationError(
-                f"未対応の provider です: '{provider}'（auto / openai のみ）"
-            )
-
-        if original_path and not os.path.isfile(original_path):
-            raise ImageGenerationError(f"参照画像が見つかりません: '{original_path}'")
-
-        api_key = self._get_api_key()
+        api_key = self._get_openai_api_key()
         if not api_key:
             raise ImageGenerationError(
                 "OpenAI API キーが設定されていません。"
@@ -168,16 +189,14 @@ class ImageGeneration:
                 "pip install openai で導入してください。"
             )
 
-        model_id, model_meta = self._resolve_model(
+        model_id, model_meta = self._resolve_openai_model(
             model if model != "auto" else None
         )
 
         if size == "auto":
-            size = self.DEFAULT_SIZE
-        elif size in model_meta["valid_sizes"]:
-            size = size
-        else:
-            size = self.DEFAULT_SIZE
+            size = self.OPENAI_DEFAULT_SIZE
+        elif size not in model_meta["valid_sizes"]:
+            size = self.OPENAI_DEFAULT_SIZE
 
         if quality == "auto":
             quality = model_meta["default_quality"]
@@ -192,14 +211,9 @@ class ImageGeneration:
                 "n": 1,
             }
             if original_path:
-                # 参照画像がある → 編集API
                 with open(original_path, "rb") as f:
-                    response = client.images.edit(
-                        image=f,
-                        **payload,
-                    )
+                    response = client.images.edit(image=f, **payload)
             else:
-                # 新規生成API
                 if model_id == "dall-e-3":
                     payload["response_format"] = "b64_json"
                 response = client.images.generate(**payload)
@@ -222,9 +236,7 @@ class ImageGeneration:
             import requests as _r
             raw = _r.get(url, timeout=60).content
         else:
-            raise ImageGenerationError(
-                "OpenAI が画像データを返しませんでした"
-            )
+            raise ImageGenerationError("OpenAI が画像データを返しませんでした")
 
         img = Image.open(io.BytesIO(raw))
 
@@ -240,6 +252,146 @@ class ImageGeneration:
             "engine_note": f"OpenAI {model_meta['display']}",
         }
         return img, info
+
+    # ------------------------------------------------------------------ #
+    # 画像生成（Gemini / FreeAI）
+    # ------------------------------------------------------------------ #
+
+    def _generate_gemini(
+        self,
+        prompt: str,
+        original_path: Optional[str],
+        model: str,
+        size: str,
+        provider: str,
+    ) -> tuple[Image.Image, dict]:
+        if provider == "freeai":
+            api_key = self._get_freeai_api_key()
+            provider_label = "freeai"
+            default_size = self.FREEAI_DEFAULT_SIZE
+        else:
+            api_key = self._get_gemini_api_key()
+            provider_label = "gemini"
+            default_size = self.GEMINI_DEFAULT_SIZE
+
+        if not api_key:
+            raise ImageGenerationError(
+                f"{provider_label.upper()} API キーが設定されていません。"
+                f"AiDiy_key.json の {provider_label}_key_id を設定してください。"
+            )
+
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError:
+            raise ImageGenerationError(
+                "google-genai パッケージがインストールされていません。"
+                "pip install google-genai で導入してください。"
+            )
+
+        model_id, model_meta = self._resolve_gemini_model(
+            model if model != "auto" else None
+        )
+        size_conf = self._resolve_gemini_size(size if size != "auto" else default_size)
+
+        client = genai.Client(api_key=api_key)
+
+        contents = [prompt.strip()]
+        if original_path:
+            contents.append(Image.open(original_path))
+
+        image_config = types.ImageConfig(
+            aspect_ratio=size_conf["aspect_ratio"],
+            image_size=size_conf["image_size"],
+        )
+
+        config = types.GenerateContentConfig(
+            response_modalities=["TEXT", "IMAGE"],
+            image_config=image_config,
+        )
+
+        response = client.models.generate_content(
+            model=model_id,
+            contents=contents,
+            config=config,
+        )
+
+        img = None
+        for part in response.parts:
+            if part.inline_data is not None:
+                img = part.as_image()._pil_image
+                break
+
+        if img is None:
+            raise ImageGenerationError("Gemini が画像データを返しませんでした")
+
+        info = {
+            "provider": provider_label,
+            "model": model_id,
+            "prompt": prompt.strip(),
+            "original_path": original_path,
+            "width": img.width,
+            "height": img.height,
+            "size": size,
+            "aspect_ratio": size_conf["aspect_ratio"],
+            "image_size": size_conf["image_size"],
+            "engine_note": f"Gemini {model_meta['display']} ({provider_label})",
+        }
+        return img, info
+
+    # ------------------------------------------------------------------ #
+    # 画像生成（統合入口）
+    # ------------------------------------------------------------------ #
+
+    def generate(
+        self,
+        prompt: str,
+        provider: str = "auto",
+        original_path: Optional[str] = None,
+        model: str = "auto",
+        size: str = "auto",
+        quality: str = "auto",
+    ) -> tuple[Image.Image, dict]:
+        """
+        プロンプトから画像を生成する。
+
+        Args:
+            prompt: 生成プロンプト
+            provider: "auto" / "openai" / "gemini" / "freeai"
+            original_path: 参照画像のパス（省略可）
+            model:
+              OpenAI: "auto"=gpt-image-2 / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
+              Gemini/FreeAI: "auto"=gemini-3.1-flash-image-preview
+            size:
+              OpenAI: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" / ...
+              Gemini/FreeAI: "auto"=1024x1024 / "512x512" / "1024x1024" / "1920x1080" / "1080x1920"
+            quality:
+              OpenAI only: "auto"（モデル既定値） / gpt-image-2: "low","medium","high" / dall-e-3: "standard","hd"
+
+        Returns:
+            (image, info_dict)
+            info_dict: provider, model, prompt, width, height, engine_note
+        """
+        if not prompt or not prompt.strip():
+            raise ImageGenerationError("prompt は必須です")
+
+        provider = provider.strip().lower()
+        if provider not in ("auto", "openai", "gemini", "freeai"):
+            raise ImageGenerationError(
+                f"未対応の provider です: '{provider}'（auto / openai / gemini / freeai のみ）"
+            )
+
+        if original_path and not os.path.isfile(original_path):
+            raise ImageGenerationError(f"参照画像が見つかりません: '{original_path}'")
+
+        # auto → freeai にフォールバック
+        if provider == "auto":
+            provider = "freeai"
+
+        if provider == "openai":
+            return self._generate_openai(prompt, original_path, model, size, quality)
+        else:
+            return self._generate_gemini(prompt, original_path, model, size, provider)
 
     # ------------------------------------------------------------------ #
     # 出力

@@ -21,7 +21,9 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\('mcp_main.py', 'r', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(python -c \"from mcp_proc.image_generation import ImageGeneration, ImageGenerationError; ig = ImageGeneration\\(\\); print\\(f'Models: {list\\(ig._MODELS.keys\\(\\)\\)}'\\); print\\(f'Default: {ig.DEFAULT_MODEL}'\\)\")",
       "Bash(.venv/Scripts/python -c \"from mcp_proc.image_generation import ImageGeneration, ImageGenerationError; ig = ImageGeneration\\(\\); print\\(f'Models: {list\\(ig._MODELS.keys\\(\\)\\)}'\\); print\\(f'Default: {ig.DEFAULT_MODEL}'\\)\")",
-      "Bash(.venv/Scripts/python test_image.py)"
+      "Bash(.venv/Scripts/python test_image.py)",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(uv sync *)"
     ]
   }
 }

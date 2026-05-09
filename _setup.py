@@ -887,8 +887,7 @@ MCP_MODULES = [
 
 def setup_mcp_module(module: dict) -> bool:
     """(mcp) モジュールを汎用的にセットアップする (uv sync + npm install)"""
-    name  = module["name"]
-    label = f"(mcp) {name}"
+    label = "バックエンド(mcp)"
     mcp_dir = BASE_DIR / module["dir"]
 
     print_header(f"{label} セットアップ")

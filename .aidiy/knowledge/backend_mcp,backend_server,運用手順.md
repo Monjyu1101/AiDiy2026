@@ -67,6 +67,9 @@ Node.js / `package.json` / `node_modules` は不要。
 | Code Check | `http://localhost:8095/aidiy_code_check/sse` |
 | Backup Check | `http://localhost:8095/aidiy_backup_check/sse` |
 | Backup Save | `http://localhost:8095/aidiy_backup_save/sse` |
+| Image Generation | `http://localhost:8095/aidiy_image_generation/sse` |
+| Speech-to-Text | `http://localhost:8095/aidiy_speech_to_text/sse` |
+| Text-to-Speech | `http://localhost:8095/aidiy_text_to_speech/sse` |
 
 アクセスは localhost 限定。外部接続は 403。
 

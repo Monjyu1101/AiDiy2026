@@ -12,7 +12,7 @@
 - Codex など stdio クライアント向けの SSE 変換入口は `backend_mcp/mcp_stdio.py`
 - 再利用ロジックは `backend_mcp/mcp_proc/` に置く
 - `mcp_main.py` からは `mcp_proc.<module>` として import する
-- `mcp_main.py` は 8 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す
+- `mcp_main.py` は 11 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す
 
 ## 関連ファイル
 - `backend_mcp/mcp_main.py`
@@ -25,6 +25,9 @@
 - `backend_mcp/mcp_proc/code_checker.py`
 - `backend_mcp/mcp_proc/backup_check.py`
 - `backend_mcp/mcp_proc/backup_save.py`
+- `backend_mcp/mcp_proc/image_generation.py`
+- `backend_mcp/mcp_proc/speech_to_text.py`
+- `backend_mcp/mcp_proc/text_to_speech.py`
 - `backend_server/_config/AiDiy_mcp.json`
 - `_start.py`
 
@@ -40,15 +43,43 @@
 | `aidiy_code_check` | Python 構文、ruff、TypeScript 型チェック | `http://localhost:8095/aidiy_code_check/sse` |
 | `aidiy_backup_check` | 差分バックアップ確認 | `http://localhost:8095/aidiy_backup_check/sse` |
 | `aidiy_backup_save` | AiDiy 差分バックアップ実行 | `http://localhost:8095/aidiy_backup_save/sse` |
+| `aidiy_image_generation` | AI 画像生成（OpenAI / Gemini / FreeAI） | `http://localhost:8095/aidiy_image_generation/sse` |
+| `aidiy_speech_to_text` | 音声認識（speech_recognition / Whisper） | `http://localhost:8095/aidiy_speech_to_text/sse` |
+| `aidiy_text_to_speech` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） | `http://localhost:8095/aidiy_text_to_speech/sse` |
 
 ## 新規 MCP サーバー追加手順
 
-1. `backend_mcp/mcp_proc/<サーバー名>.py` に処理を実装する
-2. `backend_mcp/mcp_main.py` に `FastMCP("aidiy_<name>", ...)` を追加し、`@mcp_xxx.tool()` でツール登録する
-3. Starlette の `Mount` に `/aidiy_<name>` を追加する
-4. `backend_server/_config/AiDiy_mcp.json` に必要なサーバーだけ URL を追加する
-5. stdio クライアントから使う場合は `mcp_stdio.py --sse-url http://localhost:8095/aidiy_<name>/sse` で中継できることを確認する
-6. `backend_mcp/AGENTS.md` と `MCP活用手順.md` のサーバー一覧を更新する
+### コード変更
+1. `backend_mcp/mcp_proc/<サーバー名>.py` に処理を実装する（`<XxxError>` 例外クラスもセットで定義）
+2. `backend_mcp/mcp_main.py` に以下を追加する
+   - `from mcp_proc.<サーバー名> import ...` の import
+   - `MOUNT_<略号> = os.environ.get("MCP_<略号>_MOUNT_PATH", "/aidiy_<name>")`
+   - インスタンス生成（例: `xx = ImageGeneration()`）
+   - `mcp_<略号> = FastMCP("aidiy_<name>", host="0.0.0.0", port=MCP_PORT, sse_path=..., message_path=..., warn_on_duplicate_tools=False)`
+   - `@mcp_<略号>.tool()` でツール登録
+   - Starlette `routes` に `*mcp_<略号>.sse_app().routes` を追加
+   - 起動ログに `logger.info(f"... SSE : http://localhost:{MCP_PORT}{MOUNT_<略号>}/sse")` を追加
+3. `backend_server/_config/AiDiy_mcp.json` の `mcpServers` に `"aidiy_<name>": {"type": "sse", "url": "..."}` を追加する
+4. stdio クライアントから使う場合は `mcp_stdio.py --sse-url http://localhost:8095/aidiy_<name>/sse` で中継できることを確認する
+
+### ドキュメント更新（漏れやすいので必ず全部見る）
+5. **本ファイル** (`backend_mcp,構成.md`) の「提供 MCP」テーブルと「関連ファイル」リストに新規エントリを追加する
+6. `backend_mcp/AGENTS.md` の「提供 MCP」「ファイル構成」テーブル、概要文の「N 個の MCP サーバー」を更新する
+7. ルート `AGENTS.md` の「ディレクトリ概要」と「MCP 概要」テーブル、「N つの MCP サーバー」を更新する
+8. ルート `CLAUDE.md` の「**Backend MCP**: N 個の MCP サーバー」記載と内訳を更新する
+9. `.aidiy/knowledge/backend_server,backend_mcp,MCP活用手順.md` の「MCP サーバー一覧」「ツール選択基準」テーブル、`mcp_main.py` の N 個記載を更新する
+10. `.aidiy/knowledge/backend_mcp,backend_server,運用手順.md` の「SSE エンドポイント」テーブルを更新する
+11. `frontend_web/public/X自己紹介/index.html`（人間向け紹介ページ）の以下を更新する:
+    - hero タグ行の `MCP Hub ×N` 表記
+    - Feature Overview の `MCP Hub × N + Multi CLI` カード説明
+    - Current Numbers の `data-count="N"` と stat-sub 内訳
+    - Architecture Stack の `🔌 MCP サーバー (統合)` 説明と `SSE × N` バッジ
+    - `<!-- 7. MCP Hub × N + Multi CLI -->` セクションのタイトル / サブタイトル / 各 architecture-item カード（新規 MCP 分を追加）
+    - Self-Verification Loop の `MCP N サーバーの連携` 表記
+
+### 確認
+12. `backend_mcp` 再起動後 `curl http://localhost:8095/aidiy_<name>/sse` が `text/event-stream` を返すか確認
+13. Hermes / Claude CLI で `mcp list` 相当を実行し、新規サーバーが `ok` 表示になることを確認
 
 ## 再起動ウォッチャー
 

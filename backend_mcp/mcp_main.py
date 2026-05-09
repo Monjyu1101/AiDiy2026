@@ -1201,13 +1201,19 @@ async def generate_image(
 
     Args:
         prompt: 生成プロンプト（例: "かわいい猫の画像"）
-        provider: "auto"（自動選択）または "openai"
-        model: "auto" / "gpt-image-2" / "dall-e-3"（デフォルト "auto"=gpt-image-2）
-        size: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" /
-                    "1792x1024" / "1024x1792"
-        quality: "auto"（モデル既定値） /
-                       gpt-image-2: "low" / "medium" / "high"
-                       dall-e-3: "standard" / "hd"
+        provider: "auto"=freeai / "gemini"（gemini_key_id が必要） /
+                  "freeai"（freeai_key_id が必要） / "openai"
+        model:
+          OpenAI: "auto"=gpt-image-2 / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
+          Gemini/FreeAI: "auto"=gemini-3.1-flash-image-preview /
+                         "gemini-3.1-flash-image-preview" / "gemini-3-pro-image-preview" /
+                         "gemini-2.5-flash-image"
+        size:
+          OpenAI: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" / ...
+          Gemini/FreeAI: "auto"=1024x1024 / "512x512" / "1024x1024" / "1920x1080" / "1080x1920"
+        quality: OpenAI only — "auto"（モデル既定値） /
+                 gpt-image-2: "low" / "medium" / "high" /
+                 dall-e-3: "standard" / "hd"
         original_path: 参照画像のパス（省略可）
         save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
                    ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
