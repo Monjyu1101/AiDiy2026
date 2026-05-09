@@ -880,6 +880,18 @@ MCP_MODULES = [
                 "server_name": "aidiy_backup_save",
                 "sse_url":     "http://localhost:8095/aidiy_backup_save/sse",
             },
+            {
+                "server_name": "aidiy_image_generation",
+                "sse_url":     "http://localhost:8095/aidiy_image_generation/sse",
+            },
+            {
+                "server_name": "aidiy_speech_to_text",
+                "sse_url":     "http://localhost:8095/aidiy_speech_to_text/sse",
+            },
+            {
+                "server_name": "aidiy_text_to_speech",
+                "sse_url":     "http://localhost:8095/aidiy_text_to_speech/sse",
+            },
         ],
     },
 ]

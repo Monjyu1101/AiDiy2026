@@ -78,6 +78,12 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'X世界の絶景' }
     },
     {
+        path: '/Xその他/X太陽系/表示',
+        name: 'X太陽系',
+        component: () => import('../components/Xその他/X太陽系.vue'),
+        meta: { requiresAuth: true, title: 'X太陽系' }
+    },
+    {
         path: '/Xその他/X動画再生BGM/再生',
         name: 'X動画再生BGM',
         component: () => import('../components/Xその他/X動画再生BGM.vue'),

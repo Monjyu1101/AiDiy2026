@@ -17,6 +17,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 const baseUrl = import.meta.env.BASE_URL || '/';
 const worldSceneryUrl = `${baseUrl}X世界の絶景/index.html`;
+const solarSystemUrl = `${baseUrl}X太陽系/index.html`;
 const bgmUrl = `${baseUrl}X動画再生BGM/index.html`;
 const AUTO_JUMP_MS = 60000;
 const AUTO_JUMP_PATH = '/Xその他/X自己紹介/表示';
@@ -122,6 +123,19 @@ onBeforeUnmount(() => {
               動画ランダム交互再生・A/Bクロスフェード・連続BGM
             </div>
             <a :href="bgmUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X太</span>
+              X太陽系
+            </div>
+            <div class="menu-card-description">
+              太陽系シミュレーション・年月日スライダー表示
+            </div>
+            <a :href="solarSystemUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>
