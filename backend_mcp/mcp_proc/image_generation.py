@@ -1,0 +1,298 @@
+# -*- coding: utf-8 -*-
+
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
+"""
+画像生成モジュール
+
+OpenAI API（DALL-E 3 / GPT Image 2）を使って画像を生成する。
+"""
+
+import base64
+import io
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from PIL import Image
+
+
+class ImageGenerationError(Exception):
+    """画像生成エラー"""
+    pass
+
+
+class ImageGeneration:
+    """
+    画像生成クラス
+
+    provider パラメータ:
+        "auto"   — OpenAI を自動選択（デフォルト）
+        "openai" — OpenAI DALL-E / GPT Image API
+    """
+
+    DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
+
+    # API モデルカタログ
+    _MODELS = {
+        "gpt-image-2": {
+            "display": "GPT Image 2",
+            "api_model": "gpt-image-2",
+            "qualities": ["low", "medium", "high"],
+            "default_quality": "medium",
+            "valid_sizes": {"1024x1024", "1536x1024", "1024x1536"},
+        },
+        "gpt-image-1": {
+            "display": "GPT Image 1",
+            "api_model": "gpt-image-1",
+            "qualities": ["low", "medium", "high"],
+            "default_quality": "medium",
+            "valid_sizes": {"1024x1024", "1536x1024", "1024x1536"},
+        },
+        "dall-e-3": {
+            "display": "DALL-E 3",
+            "api_model": "dall-e-3",
+            "qualities": ["standard", "hd"],
+            "default_quality": "standard",
+            "valid_sizes": {"1024x1024", "1792x1024", "1024x1792"},
+        },
+    }
+
+    DEFAULT_MODEL = "gpt-image-2"
+    DEFAULT_SIZE = "1024x1024"
+
+    # AiDiy_key.json へのパス（backend_mcp 起点）
+    _KEY_CONFIG_REL = "../backend_server/_config/AiDiy_key.json"
+
+    # ------------------------------------------------------------------ #
+    # API キー解決
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _is_valid_key(key: str) -> bool:
+        return bool(key) and not key.startswith("<")
+
+    def _get_api_key(self) -> str:
+        """AiDiy_key.json から OpenAI API キーを取得する"""
+        key = self._read_key_from_config("openai_key_id")
+        if self._is_valid_key(key):
+            return key
+        return ""
+
+
+    def _read_key_from_config(self, key_name: str) -> str:
+        config_path = Path(__file__).resolve().parent.parent / self._KEY_CONFIG_REL
+        try:
+            if not config_path.exists():
+                return ""
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            value = data.get(key_name, "")
+            return value.strip() if isinstance(value, str) else ""
+        except (json.JSONDecodeError, OSError):
+            return ""
+
+    # ------------------------------------------------------------------ #
+    # モデル解決
+    # ------------------------------------------------------------------ #
+
+    def _resolve_model(self, model_id: Optional[str] = None):
+        mid = (model_id or self.DEFAULT_MODEL).strip()
+        if mid in self._MODELS:
+            return mid, self._MODELS[mid]
+        return self.DEFAULT_MODEL, self._MODELS[self.DEFAULT_MODEL]
+
+    # ------------------------------------------------------------------ #
+    # 画像生成
+    # ------------------------------------------------------------------ #
+
+    def generate(
+        self,
+        prompt: str,
+        provider: str = "auto",
+        original_path: Optional[str] = None,
+        model: str = "auto",
+        size: str = "auto",
+        quality: str = "auto",
+    ) -> tuple[Image.Image, dict]:
+        """
+        プロンプトから画像を生成する。
+
+        Args:
+            prompt: 生成プロンプト
+            provider: "auto" または "openai"
+            original_path: 参照画像のパス（省略可）
+            model: "auto" / "gpt-image-2" / "dall-e-3"
+            size: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" /
+                        "1792x1024" / "1024x1792"
+            quality: "auto"（モデル既定値） /
+                           gpt-image-2: "low" / "medium" / "high"
+                           dall-e-3: "standard" / "hd"
+
+        Returns:
+            (image, info_dict)
+            info_dict: provider, model, prompt, width, height, engine_note
+        """
+        if not prompt or not prompt.strip():
+            raise ImageGenerationError("prompt は必須です")
+
+        provider = provider.strip().lower()
+        if provider not in ("auto", "openai"):
+            raise ImageGenerationError(
+                f"未対応の provider です: '{provider}'（auto / openai のみ）"
+            )
+
+        if original_path and not os.path.isfile(original_path):
+            raise ImageGenerationError(f"参照画像が見つかりません: '{original_path}'")
+
+        api_key = self._get_api_key()
+        if not api_key:
+            raise ImageGenerationError(
+                "OpenAI API キーが設定されていません。"
+                "AiDiy_key.json の openai_key_id を設定してください。"
+            )
+
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise ImageGenerationError(
+                "openai パッケージがインストールされていません。"
+                "pip install openai で導入してください。"
+            )
+
+        model_id, model_meta = self._resolve_model(
+            model if model != "auto" else None
+        )
+
+        if size == "auto":
+            size = self.DEFAULT_SIZE
+        elif size in model_meta["valid_sizes"]:
+            size = size
+        else:
+            size = self.DEFAULT_SIZE
+
+        if quality == "auto":
+            quality = model_meta["default_quality"]
+
+        client = OpenAI(api_key=api_key)
+        try:
+            payload = {
+                "model": model_meta["api_model"],
+                "prompt": prompt.strip(),
+                "size": size,
+                "quality": quality,
+                "n": 1,
+            }
+            if original_path:
+                # 参照画像がある → 編集API
+                with open(original_path, "rb") as f:
+                    response = client.images.edit(
+                        image=f,
+                        **payload,
+                    )
+            else:
+                # 新規生成API
+                if model_id == "dall-e-3":
+                    payload["response_format"] = "b64_json"
+                response = client.images.generate(**payload)
+        finally:
+            close = getattr(client, "close", None)
+            if callable(close):
+                close()
+
+        data = getattr(response, "data", None) or []
+        if not data:
+            raise ImageGenerationError("OpenAI が画像データを返しませんでした")
+
+        first = data[0]
+        b64 = getattr(first, "b64_json", None)
+        url = getattr(first, "url", None)
+
+        if b64:
+            raw = base64.b64decode(b64)
+        elif url:
+            import requests as _r
+            raw = _r.get(url, timeout=60).content
+        else:
+            raise ImageGenerationError(
+                "OpenAI が画像データを返しませんでした"
+            )
+
+        img = Image.open(io.BytesIO(raw))
+
+        info = {
+            "provider": "openai",
+            "model": model_id,
+            "prompt": prompt.strip(),
+            "original_path": original_path,
+            "width": img.width,
+            "height": img.height,
+            "size": size,
+            "quality": quality,
+            "engine_note": f"OpenAI {model_meta['display']}",
+        }
+        return img, info
+
+    # ------------------------------------------------------------------ #
+    # 出力
+    # ------------------------------------------------------------------ #
+
+    def to_base64(
+        self,
+        img: Image.Image,
+        fmt: str = "png",
+        quality: int = 85,
+        save_path: Optional[str] = None,
+    ) -> str:
+        """PIL Image を Base64 文字列で返す（desktop_capture と同形式）。
+
+        Args:
+            fmt: "png" または "jpeg"
+            quality: JPEG 品質 (1-100)
+            save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
+                       ファイル指定なら指定ファイルに上書き保存（拡張子に合わせて変換）。
+                       省略時は保存しない。
+        """
+        buf = io.BytesIO()
+        fmt_upper = fmt.upper()
+        if fmt_upper in ("JPEG", "JPG"):
+            img = img.convert("RGB")
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+        else:
+            img.save(buf, format="PNG", optimize=True)
+        data = buf.getvalue()
+
+        if save_path:
+            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
+                os.makedirs(save_path, exist_ok=True)
+                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
+                dest = os.path.join(save_path, fname)
+                file_buf = io.BytesIO()
+                img.save(file_buf, format="PNG", optimize=True)
+                file_data = file_buf.getvalue()
+            else:
+                dest = save_path
+                parent = os.path.dirname(os.path.abspath(dest))
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+                ext = os.path.splitext(save_path)[1].lower()
+                if ext in (".jpg", ".jpeg"):
+                    file_buf = io.BytesIO()
+                    img.convert("RGB").save(file_buf, format="JPEG", quality=quality, optimize=True)
+                    file_data = file_buf.getvalue()
+                else:
+                    file_buf = io.BytesIO()
+                    img.save(file_buf, format="PNG", optimize=True)
+                    file_data = file_buf.getvalue()
+            with open(dest, "wb") as f:
+                f.write(file_data)
+
+        return base64.b64encode(data).decode("ascii")

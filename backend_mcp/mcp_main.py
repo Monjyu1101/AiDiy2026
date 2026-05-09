@@ -61,6 +61,9 @@ from mcp_proc.log_tailer import LogTailer, LogTailError
 from mcp_proc.code_checker import CodeChecker, CodeCheckError
 from mcp_proc.backup_check import BackupCheck, BackupCheckError
 from mcp_proc.backup_save import BackupSave, BackupSaveError
+from mcp_proc.image_generation import ImageGeneration, ImageGenerationError
+from mcp_proc.speech_to_text import SpeechToText, SpeechToTextError
+from mcp_proc.text_to_speech import TextToSpeech, TextToSpeechError
 
 setup_logging()
 logger = get_logger(__name__)
@@ -79,6 +82,9 @@ MOUNT_LG     = os.environ.get("MCP_LG_MOUNT_PATH", "/aidiy_logs")
 MOUNT_CC     = os.environ.get("MCP_CC_MOUNT_PATH", "/aidiy_code_check")
 MOUNT_BC     = os.environ.get("MCP_BC_MOUNT_PATH", "/aidiy_backup_check")
 MOUNT_BS     = os.environ.get("MCP_BS_MOUNT_PATH", "/aidiy_backup_save")
+MOUNT_IG     = os.environ.get("MCP_IG_MOUNT_PATH", "/aidiy_image_generation")
+MOUNT_ST     = os.environ.get("MCP_ST_MOUNT_PATH", "/aidiy_speech_to_text")
+MOUNT_TS     = os.environ.get("MCP_TS_MOUNT_PATH", "/aidiy_text_to_speech")
 
 chrome   = ChromeManager(debug_port=CHROME_PORT)
 cdp      = CDPClient(port=CHROME_PORT)
@@ -88,6 +94,12 @@ log_t    = LogTailer()
 checker  = CodeChecker()
 bchk     = BackupCheck()
 bsave    = BackupSave()
+
+ig       = ImageGeneration()
+
+stt      = SpeechToText()
+
+tts      = TextToSpeech()
 
 # PostgreSQL は psycopg 未導入環境でもサーバー起動を阻害しないよう遅延初期化
 _pg_q: Optional[PgQuery] = None
@@ -218,6 +230,33 @@ mcp_bs = FastMCP(
     port=MCP_PORT,
     sse_path=f"{MOUNT_BS}/sse",
     message_path=f"{MOUNT_BS}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_ig = FastMCP(
+    "aidiy_image_generation",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_IG}/sse",
+    message_path=f"{MOUNT_IG}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_st = FastMCP(
+    "aidiy_speech_to_text",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_ST}/sse",
+    message_path=f"{MOUNT_ST}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_ts = FastMCP(
+    "aidiy_text_to_speech",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_TS}/sse",
+    message_path=f"{MOUNT_TS}/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -690,7 +729,7 @@ async def screenshot(
         crosshair: True でカーソル位置に赤い十字線を描画（size モード時）
         label: True で座標・サイズのラベルを右下に追記
         save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
-                   ファイル指定なら指定ファイルに保存。省略時は保存しない。
+                   ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
     """
     if delay > 0:
         await asyncio.sleep(delay)
@@ -725,6 +764,13 @@ async def screenshot(
 
         if crosshair_pos or label_text:
             img = await asyncio.to_thread(capture.annotate, img, crosshair_pos, label_text)
+
+        # save_path 省略時は backend_server/temp/output/ に自動保存
+        if not save_path:
+            save_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "backend_server", "temp", "output",
+            )
 
         data = await asyncio.to_thread(capture.to_base64, img, format, quality, save_path)
         mime = "image/jpeg" if format.lower() in ("jpeg", "jpg") else "image/png"
@@ -1137,6 +1183,178 @@ async def backup_diff_scan() -> str:
 
 
 # ================================================================== #
+# aidiy_image_generation ツール（AI 画像生成）
+# ================================================================== #
+
+@mcp_ig.tool()
+async def generate_image(
+    prompt: str,
+    provider: str = "auto",
+    model: str = "auto",
+    size: str = "auto",
+    quality: str = "auto",
+    original_path: Optional[str] = None,
+    save_path: Optional[str] = None,
+) -> list:
+    """
+    AI で画像を生成する。
+
+    Args:
+        prompt: 生成プロンプト（例: "かわいい猫の画像"）
+        provider: "auto"（自動選択）または "openai"
+        model: "auto" / "gpt-image-2" / "dall-e-3"（デフォルト "auto"=gpt-image-2）
+        size: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" /
+                    "1792x1024" / "1024x1792"
+        quality: "auto"（モデル既定値） /
+                       gpt-image-2: "low" / "medium" / "high"
+                       dall-e-3: "standard" / "hd"
+        original_path: 参照画像のパス（省略可）
+        save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
+                   ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
+    """
+    try:
+        img, info = await asyncio.to_thread(
+            ig.generate, prompt, provider, original_path,
+            model=model, size=size, quality=quality,
+        )
+
+        # save_path 省略時は backend_server/temp/output/ に自動保存
+        resolved_save = save_path
+        if not resolved_save:
+            resolved_save = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                ig.DEFAULT_OUTPUT_DIR,
+            )
+
+        data = await asyncio.to_thread(ig.to_base64, img, "png", 85, resolved_save)
+        mime = "image/png"
+
+        logger.info(
+            f"generate_image: provider={info['provider']}  "
+            f"model={info.get('model', '?')}  "
+            f"size={img.size}  prompt={info['prompt'][:60]}"
+        )
+        if resolved_save:
+            logger.info(f"generate_image saved: {resolved_save}")
+
+        return [ImageContent(type="image", data=data, mimeType=mime)]
+
+    except ImageGenerationError as e:
+        raise ValueError(str(e)) from e
+
+
+# ================================================================== #
+# aidiy_speech_to_text ツール（音声認識）
+# ================================================================== #
+
+@mcp_st.tool()
+async def recognize_speech(
+    base64_wav16k: Optional[str] = None,
+    file_path: Optional[str] = None,
+    provider: str = "auto",
+    model: str = "auto",
+) -> str:
+    """
+    音声データ（base64 WAV またはファイルパス）をテキストに変換する。
+
+    Args:
+        base64_wav16k: 16kHz モノラル WAV の base64 文字列（file_path と排他）
+        file_path: WAV ファイルのパス（base64_wav16k と排他）
+        provider: "auto"（speech_recognition、デフォルト） /
+                  "openai"（AiDiy_key.json の openai_key_id が必要）
+        model: "auto" のみ（デフォルト、openai 時は whisper-1）
+    """
+    try:
+        result = await asyncio.to_thread(
+            stt.recognize, base64_wav16k, file_path, provider, model
+        )
+        logger.info(
+            f"recognize_speech: provider={result['provider']}  "
+            f"model={result['model']}  "
+            f"source={result.get('source', '?')}  "
+            f"bytes={result['audio_bytes_length']}"
+        )
+        return json.dumps(result, ensure_ascii=False)
+
+    except SpeechToTextError as e:
+        raise ValueError(str(e)) from e
+
+
+# ================================================================== #
+# aidiy_text_to_speech ツール（テキスト音声合成）
+# ================================================================== #
+
+@mcp_ts.tool()
+async def synthesize_speech(
+    speech_text: str,
+    language: str = "ja",
+    provider: str = "auto",
+    model: str = "auto",
+    voice: str = "auto",
+    save_path: Optional[str] = None,
+    local_play: bool = False,
+    local_rate: float = 1.2,
+) -> str:
+    """
+    テキストを音声（MP3）に変換する。
+
+    Args:
+        speech_text: 合成するテキスト
+        language: 言語コード（デフォルト "ja"）
+        provider: "auto"=edge / "edge"（無料） / "gemini"（GEMINI_API_KEY） /
+                  "freeai"（FREEAI_API_KEY） / "openai"（OPENAI_API_KEY）
+        model: "auto"（自動選択、デフォルト）
+        voice: "auto"（自動選択、デフォルト）
+        save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.mp3 で保存。
+                   ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
+        local_play: True でローカル再生を試行（デフォルト False）
+        local_rate: ローカル再生の速度倍率（デフォルト 1.2、ファイル保存は等倍）
+    """
+    try:
+        mp3_bytes, info = await asyncio.to_thread(
+            tts.synthesize, speech_text, language, provider, model, voice
+        )
+
+        # save_path 省略時は backend_server/temp/output/ に自動保存
+        resolved_save = save_path
+        if not resolved_save:
+            resolved_save = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                tts.DEFAULT_OUTPUT_DIR,
+            )
+
+        base64_mp3 = await asyncio.to_thread(tts.to_base64, mp3_bytes, resolved_save)
+
+        if local_play and mp3_bytes:
+            play_ok = await asyncio.to_thread(tts.play_mp3, mp3_bytes, local_rate)
+            info["local_play_executed"] = play_ok
+            info["local_rate"] = local_rate
+
+        logger.info(
+            f"synthesize_speech: requested={info['requested_provider']}  "
+            f"used={info['used_provider']}  "
+            f"language={info['language']}  "
+            f"text_length={len(speech_text)}  "
+            f"mp3_bytes={info['mp3_bytes_length']}"
+        )
+
+        return json.dumps({
+            **info,
+            "base64_mp3": base64_mp3,
+            "local_play": local_play,
+        }, ensure_ascii=False)
+
+    except TextToSpeechError as e:
+        raise ValueError(str(e)) from e
+
+
+# ------------------------------------------------------------------ #
+# description 動的生成（API キー状況に応じて利用可能 provider を明示）
+# ------------------------------------------------------------------ #
+
+mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_description()
+
+# ================================================================== #
 # アプリ（複数 MCP サーバーを 1 ポートで統合）
 # ================================================================== #
 
@@ -1153,6 +1371,9 @@ app = Starlette(routes=[
     *mcp_cc.sse_app().routes,
     *mcp_bc.sse_app().routes,
     *mcp_bs.sse_app().routes,
+    *mcp_ig.sse_app().routes,
+    *mcp_st.sse_app().routes,
+    *mcp_ts.sse_app().routes,
 ])
 
 if __name__ == "__main__":
@@ -1165,4 +1386,7 @@ if __name__ == "__main__":
     logger.info(f"CodeCheck SSE      : http://localhost:{MCP_PORT}{MOUNT_CC}/sse")
     logger.info(f"BackupCheck SSE    : http://localhost:{MCP_PORT}{MOUNT_BC}/sse")
     logger.info(f"BackupSave SSE     : http://localhost:{MCP_PORT}{MOUNT_BS}/sse")
+    logger.info(f"ImageGeneration SSE: http://localhost:{MCP_PORT}{MOUNT_IG}/sse")
+    logger.info(f"SpeechToText SSE   : http://localhost:{MCP_PORT}{MOUNT_ST}/sse")
+    logger.info(f"TextToSpeech SSE   : http://localhost:{MCP_PORT}{MOUNT_TS}/sse")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")
