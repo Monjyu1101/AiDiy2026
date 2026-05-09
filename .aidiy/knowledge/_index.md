@@ -73,6 +73,14 @@
 3. 迷う場合は、下の「迷ったときの入口」から最初に見るファイルを決める。
 4. 知見を追記するときは、作業履歴ではなく次回使える手順へ圧縮して既存ファイルへ統合する。
 
+## 重複しやすい話題の使い分け
+
+| 話題 | 使い分け |
+|------|----------|
+| 音声処理 | `AudioController` 単体、マイク、再生、エコー抑制、音声 WebSocket は [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) に集約する。 |
+| VRM / VRMA | モデルやモーションファイルを追加する場合は [`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、表示サイズ・向き・表示選択 UI は [`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、描画内部やカメラワークは [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) を使う。 |
+| MCP / 起動 | backend 常駐サーバーの起動は [`backend_server,backend_hermes,backend_mcp,バックエンド起動.md`](./backend_server,backend_hermes,backend_mcp,バックエンド起動.md)、MCP サーバー構成は [`backend_mcp,構成.md`](./backend_mcp,構成.md)、Code CLI への MCP 登録は [`backend_hermes,backend_mcp,CodeCLI_MCP設定.md`](./backend_hermes,backend_mcp,CodeCLI_MCP設定.md) を使う。 |
+
 ## 最優先ルール
 
 | 目的 | 参照ファイル |
@@ -142,6 +150,7 @@
 | MCP サーバー構成を確認する | [`backend_mcp,構成.md`](./backend_mcp,構成.md) |
 | backend_mcp の起動、stdio bridge、環境変数を確認する | [`backend_mcp,backend_server,運用手順.md`](./backend_mcp,backend_server,運用手順.md) |
 | MCP ツールをコードエージェントから使う | [`backend_server,backend_mcp,MCP活用手順.md`](./backend_server,backend_mcp,MCP活用手順.md) |
+| MCP バックアップツールでファイル検証・差分確認をする | [`backend_hermes,共通,MCPバックアップ検証手順.md`](./backend_hermes,共通,MCPバックアップ検証手順.md) |
 
 ## Frontend 共通
 
@@ -169,11 +178,10 @@
 | VRM モデル・VRMA モーションを追加する | [`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md) |
 | アバター表示・VRMA 連続再生・表示選択 UI を調整する | [`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md) |
 | xneko / xeyes 系ウィジェットを追加する | [`frontend_avatar,xneko_xeyesウィジェット追加手順.md`](./frontend_avatar,xneko_xeyesウィジェット追加手順.md) |
-| マイク入力・音声再生を調整する | [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
+| マイク入力・音声再生・エコー抑制を調整する | [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
 | AiDiy.vue の全体構成・状態・初期化フローを確認する | [`frontend_avatar,AiDiy.vue全体構成と状態管理.md`](./frontend_avatar,AiDiy.vue全体構成と状態管理.md) |
 | Electron ウィンドウの位置・サイズ・IPC・ライフサイクルを変更する | [`frontend_avatar,Electronウィンドウ管理.md`](./frontend_avatar,Electronウィンドウ管理.md) |
-| AudioController の音声入出力パイプライン・エコー抑制を調整する | [`frontend_avatar,AIコア_音声処理.md`](./frontend_avatar,AIコア_音声処理.md) |
-| 3D アバター描画・VRMA 再生・視線補助・カメラワークを調整する | [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](./frontend_avatar,3Dアバター制御(Three.js VRM).md) |
+| 3D アバター描画・VRMA 再生・視線補助・カメラワークを調整する | [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) |
 
 ## AI コア
 
@@ -183,7 +191,7 @@
 | AIWebSocket クライアントの実装・再接続ポリシー・両フロントエンドの差分を確認する | [`frontend_web,frontend_avatar,共通WebSocketクライアント.md`](./frontend_web,frontend_avatar,共通WebSocketクライアント.md) |
 | AI モデル設定を変更する | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
 | code1〜code6 のコード AI パネルを調整する | [`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
-| backend_server の設定管理（conf_json / conf_model / conf_path）を変更する | [`backend_server,設定管理(conf).md`](./backend_server,設定管理(conf).md) |
+| backend_server の設定管理（conf_json / conf_model / conf_path）を変更する | [`backend_server,設定管理(conf).md`](<./backend_server,設定管理(conf).md>) |
 
 ## Frontend Web ルーター・状態管理
 

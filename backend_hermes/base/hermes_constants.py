@@ -190,6 +190,22 @@ def is_wsl() -> bool:
     return _wsl_detected
 
 
+_windows_native_detected: bool | None = None
+
+
+def is_windows_native() -> bool:
+    """Return True when running on a native Windows host (not WSL).
+
+    The terminal/file tools use the local Windows shell in this case. Git Bash
+    is preferred when available, but PowerShell fallback is supported.
+    """
+    global _windows_native_detected
+    if _windows_native_detected is not None:
+        return _windows_native_detected
+    _windows_native_detected = (os.name == "nt")
+    return _windows_native_detected
+
+
 _container_detected: bool | None = None
 
 

@@ -11,13 +11,19 @@
 - `frontend_avatar/src/components/AIコア_音声処理.ts` — `AudioController`
 - `frontend_avatar/src/AiDiy.vue` — `AudioController` の生成と lifecycle
 - `frontend_avatar/src/components/AIコア.vue` — マイク / スピーカー UI、audio socket 接続
+- `frontend_avatar/src/components/AIコア_アバター.vue` — 出力レベルを使う口パク、ビジュアライザー連携
 - `backend_server` 側の AIコア WebSocket 実装 — `input_audio` / `output_audio` / `cancel_audio`
+
+## 位置づけ
+
+音声処理のナレッジはこのファイルに集約する。
+`AudioController` 単体の入力、出力、エコー抑制、ビジュアライザー調整もここを入口にし、WebSocket パケット形式や backend 側 Live AI 初期化との接続まで同時に確認する。
 
 ## 主な仕様
 
 | 項目 | 値 |
 |------|-----|
-| 入力サンプルレート | 16kHz（`inputSampleRate = 16000`） |
+| 入力サンプルレート | 通常 16kHz（`inputSampleRate = 16000`）。モデル名に `openai` を含む場合は 24kHz |
 | 出力サンプルレート | 24kHz（`outputSampleRate = 24000`） |
 | ビジュアライザーバンド数 | 32（`VISUALIZER_BAR_COUNT = 32`） |
 | 音声送信チャンネル | `input_audio`（`audioSocket` 経由） |
@@ -34,14 +40,26 @@
 ## マイク入力
 - `getUserMedia({ audio: { echoCancellation, noiseSuppression, autoGainControl } })` を使う。
 - `AudioContext({ sampleRate: 16000 })` と `ScriptProcessorNode(1024, 1, 1)` で入力を受ける。
+- スピーカー出力中は `currentSpeakerLevel` を使ってエコー抑制をかける。
 - Float32 を 16bit PCM に変換し、Base64 化して送信する。
 - 送信 payload は `メッセージ内容: 'audio/pcm'`, `チャンネル: 'audio'`, `ファイル名: <base64>` の形式に合わせる。
+
+入力処理の順序は `getUserMedia` → `AudioContext` → `ScriptProcessorNode` → エコー抑制 → PCM16 変換 → `input_audio` 送信と見る。
+順序を変える場合は、音量レベル、payload 互換性、マイク入力遅延を同時に確認する。
 
 ## AI 音声出力
 - `output_audio` の Base64 音声をキューに積む。
 - PCM の場合は `createPcmAudioBuffer()`、それ以外は `decodeAudioData()` を試す。
 - `nextPlaybackTime` でチャンクを連続再生し、チャンク間の途切れを抑える。
 - スピーカー OFF でもビジュアライザー用の再生系を残す設計があるため、実音と視覚演出を分けて確認する。
+- キャンセル後に古いチャンクを再生しないよう、キュー世代管理を確認する。
+
+## エコー抑制とビジュアライザー
+- エコー抑制は `currentSpeakerLevel` が閾値を超える場合だけ適用する。
+- 抑制係数を強くすると AI 音声の回り込みは減るが、人の発話も削れやすい。
+- 入力スペクトラムは `inputAnalyser.getByteFrequencyData()`、出力スペクトラムは `visualizerAnalyser.getByteFrequencyData()` を使う。
+- `onInputLevel` / `onOutputLevel` / `onInputSpectrum` / `onOutputSpectrum` の連携先を変更する場合は、`AIコア.vue` と `AIコア_アバター.vue` をセットで確認する。
+- 口パクは出力レベルを使うため、音を止める修正と視覚演出を止める修正を混同しない。
 
 ## キャンセル処理
 

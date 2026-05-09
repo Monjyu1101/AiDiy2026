@@ -12,7 +12,7 @@ import threading
 from collections import OrderedDict
 from pathlib import Path
 
-from hermes_constants import get_hermes_home, get_skills_dir, is_wsl
+from hermes_constants import get_hermes_home, get_skills_dir, is_wsl, is_windows_native
 from typing import Optional
 
 from agent.skill_utils import (
@@ -533,15 +533,29 @@ WSL_ENVIRONMENT_HINT = (
 )
 
 
+WINDOWS_NATIVE_SHELL_HINT = (
+    "Host OS is Windows. The `terminal` tool prefers Git Bash when present, "
+    "but falls back to PowerShell when Git Bash is unavailable. Use portable "
+    "commands that Hermes supports on both paths: `pwd`, `ls -la <path>`, "
+    "`test -e path && echo yes`, `git`, `python`, `npm`, etc. Prefer "
+    "`read_file`, `search_files`, `write_file`, and `patch` for file work. "
+    "Use forward slashes in Windows paths (`D:/OneDrive/...`) to avoid "
+    "escaping issues across shells."
+)
+
+
 def build_environment_hints() -> str:
     """Return environment-specific guidance for the system prompt.
 
-    Detects WSL, and can be extended for Termux, Docker, etc.
-    Returns an empty string when no special environment is detected.
+    Detects WSL, native Windows, and can be extended for Termux,
+    Docker, etc. Returns an empty string when no special environment is
+    detected.
     """
     hints: list[str] = []
     if is_wsl():
         hints.append(WSL_ENVIRONMENT_HINT)
+    elif is_windows_native():
+        hints.append(WINDOWS_NATIVE_SHELL_HINT)
     return "\n\n".join(hints)
 
 
@@ -968,8 +982,6 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
         "browser_press",
         "browser_get_images",
         "browser_vision",
-        "image_generate",
-        "text_to_speech",
         "terminal",
         "process",
         "execute_code",
@@ -994,13 +1006,13 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
 
     lines = [
         "# Nous Subscription",
-        "Nous subscription includes managed web tools (Firecrawl), image generation (FAL), OpenAI TTS, and browser automation (Browser Use) by default. Modal execution is optional.",
+        "Nous subscription includes managed web tools (Firecrawl) and browser automation (Browser Use) by default. Modal execution is optional.",
         "Current capability status:",
     ]
     lines.extend(_status_line(feature) for feature in features.items())
     lines.extend(
         [
-            "When a Nous-managed feature is active, do not ask the user for Firecrawl, FAL, OpenAI TTS, or Browser-Use API keys.",
+            "When a Nous-managed feature is active, do not ask the user for Firecrawl or Browser-Use API keys.",
             "If the user is not subscribed and asks for a capability that Nous subscription would unlock or simplify, suggest Nous subscription as one option alongside direct setup or local alternatives.",
             "Do not mention subscription unless the user asks about it or it directly solves the current missing capability.",
             "Useful commands: hermes setup, hermes setup tools, hermes setup terminal, hermes status.",

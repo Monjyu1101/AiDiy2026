@@ -1801,14 +1801,6 @@ OPTIONAL_ENV_VARS = {
         "password": False,
         "category": "tool",
     },
-    "FAL_KEY": {
-        "description": "FAL API key for image generation",
-        "prompt": "FAL API key",
-        "url": "https://fal.ai/",
-        "tools": ["image_generate"],
-        "password": True,
-        "category": "tool",
-    },
     "TINKER_API_KEY": {
         "description": "Tinker API key for RL training",
         "prompt": "Tinker API key",

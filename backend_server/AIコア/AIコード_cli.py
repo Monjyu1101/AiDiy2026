@@ -91,12 +91,80 @@ class CodeAI:
         self.バージョン: str = ""
 
     def _CLI送信用テキスト正規化(self, text: Optional[str]) -> str:
-        """CLIへ渡す文字列は改行・復帰を空白へ変換して1行化する"""
+        """CLIへ渡す文字列は改行・連続空白を空白1つへ変換して1行化する"""
         if text is None:
             return ""
         if not isinstance(text, str):
             raise TypeError(f"CLI送信用テキストは文字列である必要があります: {type(text).__name__}")
-        return text.replace('\n', ' ').replace('\r', ' ').strip()
+        return " ".join(text.split())
+
+    def _hermes直接実行コマンド(self) -> Optional[list]:
+        """Windows で aidiy_hermes.cmd 経由を避けるため、Python と cli_main.py を直接呼ぶコマンドを返す。
+        cmd.exe の 8191 文字制限を回避するために必要。見つからなければ None。"""
+        if os.name != 'nt':
+            return None
+        プロジェクトルート = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        venv_py = os.path.join(プロジェクトルート, 'backend_hermes', '.venv', 'Scripts', 'python.exe')
+        cli_main = os.path.join(プロジェクトルート, 'backend_hermes', 'cli_main.py')
+        if os.path.isfile(venv_py) and os.path.isfile(cli_main):
+            return [venv_py, cli_main]
+        return None
+
+    def _npmシム直接実行に解決(self, cmd_path: str) -> Optional[list]:
+        """npm が生成する .cmd シム（claude/copilot/gemini/codex）を解析し、
+        cmd.exe を経由しない実行コマンド list を返す。失敗時は None。
+
+        cmd.exe 経由だとコマンドラインが 8191 文字に制限されるが、
+        node.exe / .exe を直接 CreateProcess すれば ~32767 文字まで使える。
+
+        対応パターン:
+          - `"<...>\\xxx.exe"  %*`              → [xxx.exe]
+          - `"%_prog%"  "<...>\\xxx.js" %*`     → [node.exe, xxx.js]
+        """
+        if os.name != 'nt' or not cmd_path or not cmd_path.lower().endswith('.cmd'):
+            return None
+        try:
+            with open(cmd_path, 'r', encoding='utf-8', errors='replace') as f:
+                内容 = f.read()
+        except Exception:
+            return None
+
+        import re
+        dp0 = os.path.dirname(os.path.abspath(cmd_path))
+
+        def 展開(p: str) -> str:
+            return os.path.normpath(p.replace('%dp0%', dp0).replace('%~dp0', dp0))
+
+        # パターン2: node 経由 (copilot/gemini/codex/opencode)
+        # npm 慣習で末尾が .js のことも、shebang 付き拡張子なしファイルのこともある
+        m = re.search(r'"%_prog%"\s+"([^"]+)"\s+%\*', 内容, re.IGNORECASE)
+        if m:
+            js_path = 展開(m.group(1))
+            if os.path.isfile(js_path):
+                node_exe = os.path.join(dp0, 'node.exe')
+                if not os.path.isfile(node_exe):
+                    node_exe = 'node'
+                return [node_exe, js_path]
+
+        # パターン1: .exe 直接呼び出し (claude)
+        m = re.search(r'"([^"]+\.exe)"\s+%\*', 内容, re.IGNORECASE)
+        if m:
+            exe_path = 展開(m.group(1))
+            if os.path.isfile(exe_path):
+                return [exe_path]
+
+        return None
+
+    def _CLI起動コマンド先頭(self, cmd_str: str, custom: bool) -> tuple:
+        """CLI の起動コマンド先頭部分を返す。
+        Returns: (base_list, cmd.exe 経由フラグ)
+        custom=True（環境変数指定）の場合はユーザー指定を尊重して解決しない。"""
+        if custom:
+            return [cmd_str], cmd_str.lower().endswith('.cmd') if cmd_str else False
+        direct = self._npmシム直接実行に解決(cmd_str)
+        if direct is not None:
+            return direct, False
+        return [cmd_str], (cmd_str or '').lower().endswith('.cmd')
 
     def _コマンドパス取得(self) -> str:
         """code_ai に対応するCLIコマンドパスを返す"""
@@ -105,8 +173,10 @@ class CodeAI:
             return custom_cmd
         if self.code_ai == "aidiy_hermes":
             if os.name == 'nt':
+                userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
                 candidates = [
                     os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'aidiy_hermes.cmd'),
+                    os.path.join(userprofile, '.local', 'bin', 'aidiy_hermes.cmd'),
                 ]
                 for candidate in candidates:
                     if os.path.isfile(candidate):
@@ -200,21 +270,30 @@ class CodeAI:
         Returns:
             コマンド配列
         """
-        # プロンプトから改行・復帰を除去してCLIへ渡す
-        プロンプト = self._CLI送信用テキスト正規化(プロンプト)
-
         # 環境変数からカスタムコマンドパスを取得（オプション）
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
 
         if self.code_ai == "aidiy_hermes":
-            cmd = custom_cmd or self._コマンドパス取得()
+            # hermes は Python の argparse で受けるので改行をそのまま渡す（正規化しない）。
+            # cmd.exe の 8191 文字制限を避けるため、Windows では .cmd シムを経由せず
+            # Python と cli_main.py を直接起動する。
+            base = self._hermes直接実行コマンド() if not custom_cmd else None
+            if base is None:
+                base = [custom_cmd or self._コマンドパス取得()]
             model_args = ["--model", self.code_model] if self.code_model and self.code_model.lower() != "auto" else []
-            return [cmd, "-Q"] + model_args + ["-z", プロンプト]
+            return base + ["-Q"] + model_args + ["-z", プロンプト]
+
+        # 以降の CLI（claude/copilot/gemini/codex/opencode）は npm の .cmd シムを直接実行に
+        # 解決して cmd.exe を回避する。cmd.exe を経由する場合のみ argv 長制限のため
+        # プロンプトを 1 行化する。
+        cmd_str = custom_cmd or self._コマンドパス取得()
+        base, cmd_exe経由 = self._CLI起動コマンド先頭(cmd_str, custom=bool(custom_cmd))
+        if cmd_exe経由:
+            プロンプト = self._CLI送信用テキスト正規化(プロンプト)
 
         if self.code_ai == "opencode_cli":
-            cmd = custom_cmd or self._コマンドパス取得()
             model_args = ["--model", self.code_model] if self.code_model and self.code_model.lower() != "auto" else []
-            cmd_args = [cmd, "run"]
+            cmd_args = base + ["run"]
             cmd_args += model_args + [プロンプト]
             if not 初回:
                 cmd_args.append("-c")
@@ -222,19 +301,7 @@ class CodeAI:
 
         if self.code_ai == "copilot_cli":
             # GitHub Copilot CLI
-            if custom_cmd:
-                cmd = custom_cmd
-            else:
-                if os.name == 'nt':
-                    # Windows: %USERPROFILE%\AppData\Roaming\npm\copilot.cmd
-                    userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
-                    cmd = os.path.join(userprofile, 'AppData', 'Roaming', 'npm', 'copilot.cmd')
-                else:
-                    # Linux/Mac: PATH経由でコマンド直接実行
-                    cmd = 'copilot'
-
-            # copilot
-            common = [cmd, "--allow-all-tools"]
+            common = base + ["--allow-all-tools"]
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 common.extend(["--model", self.code_model])
@@ -247,19 +314,7 @@ class CodeAI:
 
         elif self.code_ai == "gemini_cli":
             # Google Gemini CLI
-            if custom_cmd:
-                cmd = custom_cmd
-            else:
-                if os.name == 'nt':
-                    # Windows: %USERPROFILE%\AppData\Roaming\npm\gemini.cmd
-                    userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
-                    cmd = os.path.join(userprofile, 'AppData', 'Roaming', 'npm', 'gemini.cmd')
-                else:
-                    # Linux/Mac: PATH経由でコマンド直接実行
-                    cmd = 'gemini'
-
-            # gemini
-            base_args = [cmd, "--yolo"]
+            base_args = base + ["--yolo"]
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 base_args.extend(["--model", self.code_model])
@@ -268,25 +323,13 @@ class CodeAI:
 
         elif self.code_ai == "codex_cli":
             # OpenAI Codex CLI
-            if custom_cmd:
-                cmd = custom_cmd
-            else:
-                if os.name == 'nt':
-                    # Windows: %USERPROFILE%\AppData\Roaming\npm\codex.cmd
-                    userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
-                    cmd = os.path.join(userprofile, 'AppData', 'Roaming', 'npm', 'codex.cmd')
-                else:
-                    # Linux/Mac: PATH経由でコマンド直接実行
-                    cmd = 'codex'
-
-            # openai codex
             # 注意:
             #   --sandbox danger-full-access が環境によって read-only に固定されることがあるため、
             #   書込モードでは bypass フラグを優先する。
             if 読取専用:
-                base_args = [cmd, "exec", "--skip-git-repo-check", "--sandbox", "read-only"]
+                base_args = base + ["exec", "--skip-git-repo-check", "--sandbox", "read-only"]
             else:
-                base_args = [cmd, "exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]
+                base_args = base + ["exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 base_args.extend(["--model", self.code_model])
@@ -300,19 +343,7 @@ class CodeAI:
 
         else:
             # デフォルト claude_cli
-            if custom_cmd:
-                cmd = custom_cmd
-            else:
-                if os.name == 'nt':
-                    # Windows: %USERPROFILE%\AppData\Roaming\npm\claude.cmd
-                    userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
-                    cmd = os.path.join(userprofile, 'AppData', 'Roaming', 'npm', 'claude.cmd')
-                else:
-                    # Linux/Mac: PATH経由でコマンド直接実行
-                    cmd = 'claude'
-
-            # claude
-            common = [cmd, "--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions", "--chrome"]
+            common = base + ["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions", "--chrome"]
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 common.extend(["--model", self.code_model])

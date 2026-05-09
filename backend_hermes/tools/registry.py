@@ -51,7 +51,17 @@ def _module_registers_tools(module_path: Path) -> bool:
     except (OSError, SyntaxError):
         return False
 
-    return any(_is_registry_register_call(stmt) for stmt in tree.body)
+    for stmt in tree.body:
+        if _is_registry_register_call(stmt):
+            return True
+        if (
+            isinstance(stmt, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "PLATFORM_TOOL_WRAPPER" for target in stmt.targets)
+            and isinstance(stmt.value, ast.Constant)
+            and stmt.value.value is True
+        ):
+            return True
+    return False
 
 
 def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
@@ -61,6 +71,7 @@ def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
         f"tools.{path.stem}"
         for path in sorted(tools_path.glob("*.py"))
         if path.name not in {"__init__.py", "registry.py", "mcp_tool.py"}
+        and not path.stem.endswith(("_linux", "_win"))
         and _module_registers_tools(path)
     ]
 

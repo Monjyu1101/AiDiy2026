@@ -117,7 +117,7 @@ WebSocket packet は `AIコアWebSocket仕様.md` を確認する。
 - `cancel_audio`
 - AudioContext resume。
 
-詳細は `AI音声処理.md` を使う。
+詳細は [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) を使う。
 
 ## よくある問題
 

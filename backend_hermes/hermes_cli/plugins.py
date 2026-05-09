@@ -440,33 +440,6 @@ class PluginContext:
             self.manifest.name, engine.name,
         )
 
-    # -- image gen provider registration ------------------------------------
-
-    def register_image_gen_provider(self, provider) -> None:
-        """Register an image generation backend.
-
-        ``provider`` must be an instance of
-        :class:`agent.image_gen_provider.ImageGenProvider`. The
-        ``provider.name`` attribute is what ``image_gen.provider`` in
-        ``config.yaml`` matches against when routing ``image_generate``
-        tool calls.
-        """
-        from agent.image_gen_provider import ImageGenProvider
-        from agent.image_gen_registry import register_provider
-
-        if not isinstance(provider, ImageGenProvider):
-            logger.warning(
-                "Plugin '%s' tried to register an image_gen provider that does "
-                "not inherit from ImageGenProvider. Ignoring.",
-                self.manifest.name,
-            )
-            return
-        register_provider(provider)
-        logger.info(
-            "Plugin '%s' registered image_gen provider: %s",
-            self.manifest.name, provider.name,
-        )
-
     # -- platform adapter registration ---------------------------------------
 
     def register_platform(

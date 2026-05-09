@@ -335,40 +335,60 @@ class BaseEnvironment(ABC):
         ``_snapshot_ready = True`` so subsequent commands source the snapshot
         instead of running with ``bash -l``.
         """
-        # Full capture: env vars, functions (filtered), aliases, shell options.
-        # Restore configured cwd after login shell profile scripts, which may
-        # change the working directory (e.g. bashrc `cd ~`).  Without this,
-        # pwd -P captures the profile's directory, not terminal.cwd.
-        _quoted_cwd = shlex.quote(self.cwd)
-        bootstrap = (
-            f"export -p > {self._snapshot_path}\n"
-            f"declare -f | grep -vE '^_[^_]' >> {self._snapshot_path}\n"
-            f"alias -p >> {self._snapshot_path}\n"
-            f"echo 'shopt -s expand_aliases' >> {self._snapshot_path}\n"
-            f"echo 'set +e' >> {self._snapshot_path}\n"
-            f"echo 'set +u' >> {self._snapshot_path}\n"
-            f"builtin cd {_quoted_cwd} 2>/dev/null || true\n"
-            f"pwd -P > {self._cwd_file} 2>/dev/null || true\n"
-            f"printf '\\n{self._cwd_marker}%s{self._cwd_marker}\\n' \"$(pwd -P)\"\n"
-        )
-        try:
-            proc = self._run_bash(bootstrap, login=True, timeout=self._snapshot_timeout)
-            result = self._wait_for_process(proc, timeout=self._snapshot_timeout)
-            self._snapshot_ready = True
-            self._update_cwd(result)
-            logger.info(
-                "Session snapshot created (session=%s, cwd=%s)",
-                self._session_id,
-                self.cwd,
+        winnt_local = os.name == 'nt' and getattr(self, "_winnt_native_local", False)
+        if not winnt_local:
+            # Full capture: env vars, functions (filtered), aliases, shell options.
+            # Restore configured cwd after login shell profile scripts, which may
+            # change the working directory (e.g. bashrc `cd ~`).  Without this,
+            # pwd -P captures the profile's directory, not terminal.cwd.
+            _quoted_cwd = shlex.quote(self.cwd)
+            bootstrap = (
+                f"export -p > {self._snapshot_path}\n"
+                f"declare -f | grep -vE '^_[^_]' >> {self._snapshot_path}\n"
+                f"alias -p >> {self._snapshot_path}\n"
+                f"echo 'shopt -s expand_aliases' >> {self._snapshot_path}\n"
+                f"echo 'set +e' >> {self._snapshot_path}\n"
+                f"echo 'set +u' >> {self._snapshot_path}\n"
+                f"builtin cd {_quoted_cwd} 2>/dev/null || true\n"
+                f"pwd -P > {self._cwd_file} 2>/dev/null || true\n"
+                f"printf '\\n{self._cwd_marker}%s{self._cwd_marker}\\n' \"$(pwd -P)\"\n"
             )
-        except Exception as exc:
-            logger.warning(
-                "init_session failed (session=%s): %s — "
-                "falling back to bash -l per command",
-                self._session_id,
-                exc,
-            )
+            try:
+                proc = self._run_bash(bootstrap, login=True, timeout=self._snapshot_timeout)
+                result = self._wait_for_process(proc, timeout=self._snapshot_timeout)
+                self._snapshot_ready = True
+                self._update_cwd(result)
+                logger.info(
+                    "Session snapshot created (session=%s, cwd=%s)",
+                    self._session_id,
+                    self.cwd,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "init_session failed (session=%s): %s — "
+                    "falling back to bash -l per command",
+                    self._session_id,
+                    exc,
+                )
+                self._snapshot_ready = False
+        else:
+            try:
+                cwd = os.path.abspath(os.path.expanduser(self.cwd))
+                if not os.path.isdir(cwd):
+                    raise FileNotFoundError(f"cwd does not exist: {cwd}")
+                self.cwd = cwd.replace("\\", "/")
+            except Exception as exc:
+                fallback = os.getcwd().replace("\\", "/")
+                logger.warning(
+                    "[winnt] init_session cwd validation failed (session=%s, cwd=%s): %s; using %s",
+                    self._session_id,
+                    self.cwd,
+                    exc,
+                    fallback,
+                )
+                self.cwd = fallback
             self._snapshot_ready = False
+            logger.info("[winnt] init_session: snapshot disabled, fresh-bash mode")
 
     # ------------------------------------------------------------------
     # Command wrapping
@@ -398,7 +418,8 @@ class BaseEnvironment(ABC):
         # can emit the declarations to stdout, leaking ~60 lines of env
         # vars into every tool response (issue #15459).  Linux bash is
         # silent here, but the redirect is harmless.
-        if self._snapshot_ready:
+        winnt_local = os.name == 'nt' and getattr(self, "_winnt_native_local", False)
+        if self._snapshot_ready and not winnt_local:
             parts.append(
                 f"source {self._snapshot_path} >/dev/null 2>&1 || true"
             )
@@ -413,11 +434,16 @@ class BaseEnvironment(ABC):
         parts.append("__hermes_ec=$?")
 
         # Re-dump env vars to snapshot (last-writer-wins for concurrent calls)
-        if self._snapshot_ready:
+        if self._snapshot_ready and not winnt_local:
             parts.append(f"export -p > {self._snapshot_path} 2>/dev/null || true")
 
         # Write CWD to file (local reads this) and stdout marker (remote parses this)
-        parts.append(f"pwd -P > {self._cwd_file} 2>/dev/null || true")
+        cwd_file = self._cwd_file
+        if winnt_local:
+            cwd_file = cwd_file.replace("\\", "/")
+            if len(cwd_file) >= 2 and cwd_file[1] == ":":
+                cwd_file = f"/{cwd_file[0].lower()}{cwd_file[2:]}"
+        parts.append(f"pwd -P > {shlex.quote(cwd_file)} 2>/dev/null || true")
         # Use a distinct line for the marker. The leading \n ensures
         # the marker starts on its own line even if the command doesn't
         # end with a newline (e.g. printf 'exact'). We'll strip this
@@ -459,6 +485,54 @@ class BaseEnvironment(ABC):
         an orphan with ``PPID=1`` when python is shut down mid-tool — the
         ``sleep 300``-survives-30-min bug Physikal and I both hit.
         """
+        winnt_local = os.name == 'nt' and getattr(self, "_winnt_native_local", False)
+        if winnt_local and hasattr(proc, "communicate"):
+            _now = time.monotonic()
+            _activity_state = {
+                "last_touch": _now,
+                "start": _now,
+            }
+            try:
+                while proc.poll() is None:
+                    if is_interrupted():
+                        self._kill_process(proc)
+                        try:
+                            stdout, _ = proc.communicate(timeout=2)
+                        except Exception:
+                            stdout = ""
+                        return {
+                            "output": (stdout or "") + "\n[Command interrupted]",
+                            "returncode": 130,
+                        }
+                    remaining = timeout - (time.monotonic() - _activity_state["start"])
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(
+                            getattr(proc, "args", None), timeout
+                        )
+                    touch_activity_if_due(_activity_state, "terminal command running")
+                    try:
+                        stdout, _ = proc.communicate(timeout=min(remaining, 0.2))
+                        return {
+                            "output": stdout or "",
+                            "returncode": proc.returncode,
+                        }
+                    except subprocess.TimeoutExpired:
+                        continue
+            except subprocess.TimeoutExpired:
+                self._kill_process(proc)
+                try:
+                    proc.communicate(timeout=2)
+                except Exception:
+                    pass
+                return {"output": "", "returncode": 124}
+            except (KeyboardInterrupt, SystemExit):
+                try:
+                    self._kill_process(proc)
+                    proc.communicate(timeout=2)
+                except Exception:
+                    pass
+                raise
+
         output_chunks: list[str] = []
 
         # Non-blocking drain via select().

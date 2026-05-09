@@ -35,8 +35,8 @@ _HERMES_CORE_TOOLS = [
     "terminal", "process",
     # File manipulation
     "read_file", "write_file", "patch", "search_files",
-    # Vision + image generation
-    "vision_analyze", "image_generate",
+    # Vision
+    "vision_analyze",
     # Skills
     "skills_list", "skill_view", "skill_manage",
     # Browser automation
@@ -44,8 +44,6 @@ _HERMES_CORE_TOOLS = [
     "browser_type", "browser_scroll", "browser_back",
     "browser_press", "browser_get_images",
     "browser_vision", "browser_console", "browser_cdp", "browser_dialog",
-    # Text-to-speech
-    "text_to_speech",
     # Planning & memory
     "todo", "memory",
     # Session history search
@@ -87,12 +85,6 @@ TOOLSETS = {
     "vision": {
         "description": "Image analysis and vision tools",
         "tools": ["vision_analyze"],
-        "includes": []
-    },
-    
-    "image_gen": {
-        "description": "Creative generation tools (images)",
-        "tools": ["image_generate"],
         "includes": []
     },
     
@@ -153,12 +145,6 @@ TOOLSETS = {
     "file": {
         "description": "File manipulation tools: read, write, patch (with fuzzy matching), and search (content + files)",
         "tools": ["read_file", "write_file", "patch", "search_files"],
-        "includes": []
-    },
-    
-    "tts": {
-        "description": "Text-to-speech: convert text to audio with Edge TTS (free), ElevenLabs, OpenAI, or xAI",
-        "tools": ["text_to_speech"],
         "includes": []
     },
     
@@ -285,7 +271,7 @@ TOOLSETS = {
     "safe": {
         "description": "Safe toolkit without terminal access",
         "tools": [],
-        "includes": ["web", "vision", "image_gen"]
+        "includes": ["web", "vision"]
     },
     
     # ==========================================================================
@@ -323,8 +309,8 @@ TOOLSETS = {
             "terminal", "process",
             # File manipulation
             "read_file", "write_file", "patch", "search_files",
-            # Vision + image generation
-            "vision_analyze", "image_generate",
+            # Vision
+            "vision_analyze",
             # Skills
             "skills_list", "skill_view", "skill_manage",
             # Browser automation

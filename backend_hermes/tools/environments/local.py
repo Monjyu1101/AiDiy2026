@@ -2,6 +2,7 @@
 
 import os
 import platform
+import re
 import shutil
 import signal
 import subprocess
@@ -144,7 +145,7 @@ def _sanitize_subprocess_env(base_env: dict | None, extra_env: dict | None = Non
 
 
 def _find_bash() -> str:
-    """Find bash for command execution."""
+    """Find bash on POSIX, or the selected local shell path on Windows."""
     if not _IS_WINDOWS:
         return (
             shutil.which("bash")
@@ -154,31 +155,175 @@ def _find_bash() -> str:
             or "/bin/sh"
         )
 
+    kind, path = _find_windows_shell()
+    return path
+
+
+def _find_windows_shell() -> tuple[str, str]:
+    """Find the best local shell on Windows.
+
+    Prefer bash when available for compatibility with the existing POSIX
+    wrapper, but fall back to PowerShell so Git for Windows is not required.
+    """
+    if not _IS_WINDOWS:
+        return ("bash", _find_bash())
+
     custom = os.environ.get("HERMES_GIT_BASH_PATH")
     if custom and os.path.isfile(custom):
-        return custom
+        return ("bash", custom)
 
-    found = shutil.which("bash")
-    if found:
-        return found
-
+    # Prefer Git for Windows bash over System32\bash.exe (WSL). WSL's bash
+    # cannot execute POSIX commands against Windows host paths (D:/... is
+    # invisible without /mnt/d/...) and its cold-start latency trips the
+    # tool's 30s I/O timeout, producing silent [error] returns for read /
+    # find / cd. Git Bash handles Windows paths via MSYS translation and
+    # spawns instantly.
     for candidate in (
         os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Git", "bin", "bash.exe"),
         os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), "Git", "bin", "bash.exe"),
         os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Git", "bin", "bash.exe"),
     ):
         if candidate and os.path.isfile(candidate):
-            return candidate
+            return ("bash", candidate)
+
+    found = shutil.which("bash")
+    if found and "\\system32\\" not in found.lower():
+        return ("bash", found)
+
+    for name in ("pwsh", "powershell"):
+        found = shutil.which(name)
+        if found:
+            return ("powershell", found)
+
+    for candidate in (
+        os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+    ):
+        if candidate and os.path.isfile(candidate):
+            return ("powershell", candidate)
 
     raise RuntimeError(
-        "Git Bash not found. Hermes Agent requires Git for Windows on Windows.\n"
-        "Install it from: https://git-scm.com/download/win\n"
-        "Or set HERMES_GIT_BASH_PATH to your bash.exe location."
+        "No usable shell found. Hermes Agent requires either Git Bash, PowerShell 7 (pwsh), "
+        "or Windows PowerShell on Windows."
     )
 
 
 # Backward compat — process_registry.py imports this name
 _find_shell = _find_bash
+
+
+if os.name == 'nt':
+    def _to_msys_path(path: str) -> str:
+        """Convert 'D:\\foo\\bar' or 'D:/foo/bar' to '/d/foo/bar' for Git Bash."""
+        if not path:
+            return path
+        normalized = path.replace("\\", "/")
+        if len(normalized) >= 2 and normalized[1] == ":":
+            return f"/{normalized[0].lower()}{normalized[2:]}"
+        return normalized
+
+
+    def _from_msys_path(path: str) -> str:
+        """Convert '/d/foo/bar' from Git Bash back to 'D:/foo/bar'."""
+        if not path:
+            return path
+        normalized = path.replace("\\", "/")
+        if (
+            len(normalized) >= 3
+            and normalized[0] == "/"
+            and normalized[1].isalpha()
+            and normalized[2] == "/"
+        ):
+            return f"{normalized[1].upper()}:{normalized[2:]}"
+        return normalized
+
+
+    def _ps_quote(value: str) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+
+
+    def _strip_shell_quotes(value: str) -> str:
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            return value[1:-1]
+        return value
+
+
+    def _normalize_win_literal_path(value: str) -> str:
+        value = _strip_shell_quotes(value)
+        value = _from_msys_path(value)
+        return value.replace("\\", "/")
+
+
+    def _translate_posixish_to_powershell(command: str) -> str:
+        """Translate the small POSIX-ish command subset Hermes commonly emits.
+
+        Unknown commands are still executed as PowerShell scriptblocks, which
+        keeps native commands like git/npm/python working without Git Bash.
+        """
+        parts = [part.strip() for part in command.split("&&")]
+        script_parts = ["$__hermes_ec = 0"]
+        for idx, part in enumerate(parts):
+            if not part:
+                continue
+            translated = _translate_single_posixish_part(part)
+            if idx == 0:
+                script_parts.append(translated)
+            else:
+                script_parts.append(f"if ($__hermes_ec -eq 0) {{\n{translated}\n}}")
+        return "\n".join(script_parts)
+
+
+    def _translate_single_posixish_part(command: str) -> str:
+        command = command.strip()
+        if command == "pwd":
+            return "(Get-Location).ProviderPath\n$__hermes_ec = 0"
+
+        m = re.fullmatch(
+            r"ls(?:\s+-(?P<flags>[A-Za-z]+))?"
+            r"(?:\s+(?P<path>[^|]+?))?"
+            r"(?:\s*\|\s*head\s+-(?P<head>\d+))?",
+            command,
+        )
+        if m:
+            flags = m.group("flags") or ""
+            raw_path = _normalize_win_literal_path(m.group("path") or ".")
+            force = " -Force" if "a" in flags.lower() else ""
+            head = m.group("head")
+            head_pipe = f" | Select-Object -First {int(head)}" if head else ""
+            return (
+                f"Get-ChildItem{force} -LiteralPath {_ps_quote(raw_path)}{head_pipe} | Format-Table -AutoSize\n"
+                "$__hermes_ec = if ($?) { 0 } else { 1 }"
+            )
+
+        m = re.fullmatch(r"test\s+-(?P<kind>[efd])\s+(?P<path>.+)", command)
+        if not m:
+            m = re.fullmatch(r"\[\s+-(?P<kind>[efd])\s+(?P<path>.+?)\s+\]", command)
+        if m:
+            kind = m.group("kind")
+            raw_path = _normalize_win_literal_path(m.group("path"))
+            test_path = f"Test-Path -LiteralPath {_ps_quote(raw_path)}"
+            if kind == "f":
+                test_path = f"({test_path} -PathType Leaf)"
+            elif kind == "d":
+                test_path = f"({test_path} -PathType Container)"
+            return f"if ({test_path}) {{ $__hermes_ec = 0 }} else {{ $__hermes_ec = 1 }}"
+
+        m = re.fullmatch(r"echo(?:\s+(?P<text>.*))?", command)
+        if m:
+            return f"Write-Output {_ps_quote(_strip_shell_quotes(m.group('text') or ''))}\n$__hermes_ec = 0"
+
+        m = re.fullmatch(r"cd\s+(?P<path>.+)", command)
+        if m:
+            raw_path = _normalize_win_literal_path(m.group("path"))
+            return (
+                f"Set-Location -LiteralPath {_ps_quote(raw_path)}\n"
+                "$__hermes_ec = if ($?) { 0 } else { 1 }"
+            )
+
+        return (
+            f"& ([scriptblock]::Create({_ps_quote(command)}))\n"
+            "$__hermes_ec = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }"
+        )
 
 
 # Standard PATH entries for environments with minimal PATH.
@@ -309,11 +454,19 @@ class LocalEnvironment(BaseEnvironment):
     CWD persists via file-based read after each command.
     """
 
+    _winnt_native_local = True
+
     def __init__(self, cwd: str = "", timeout: int = 60, env: dict = None):
+        self._winnt_shell: tuple[str, str] | None = None
         if cwd:
             cwd = os.path.expanduser(cwd)
         super().__init__(cwd=cwd or os.getcwd(), timeout=timeout, env=env)
         self.init_session()
+
+    def _get_windows_shell(self) -> tuple[str, str]:
+        if self._winnt_shell is None:
+            self._winnt_shell = _find_windows_shell()
+        return self._winnt_shell
 
     def get_temp_dir(self) -> str:
         """Return a shell-safe writable temp dir for local execution.
@@ -339,48 +492,105 @@ class LocalEnvironment(BaseEnvironment):
         if candidate.startswith("/"):
             return candidate.rstrip("/") or "/"
 
-        # Windows: return the system temp dir as a POSIX-style path so Git
-        # Bash can use it in shell commands (e.g. C:\Users\…\Temp → /tmp
-        # is mapped by Git Bash; use the raw Windows path via forward slashes).
+        # Windows: return the system temp dir with forward slashes so both
+        # Git Bash and PowerShell can use it in generated wrapper scripts.
         if _IS_WINDOWS:
             return candidate.replace("\\", "/").rstrip("/") or "/tmp"
 
         return "/tmp"
 
+    def _wrap_command(self, command: str, cwd: str) -> str:
+        if os.name != 'nt':
+            return super()._wrap_command(command, cwd)
+
+        shell_kind, _shell_path = self._get_windows_shell()
+        if shell_kind == "bash":
+            return super()._wrap_command(command, cwd)
+
+        escaped_cwd = _normalize_win_literal_path(cwd)
+        cwd_file = _normalize_win_literal_path(self._cwd_file)
+        marker = self._cwd_marker
+        translated_command = _translate_posixish_to_powershell(command)
+        return "\n".join([
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+            "$OutputEncoding = [System.Text.Encoding]::UTF8",
+            "$ErrorActionPreference = 'Continue'",
+            "$__hermes_ec = 0",
+            f"Set-Location -LiteralPath {_ps_quote(escaped_cwd)}",
+            "if (-not $?) { exit 126 }",
+            translated_command,
+            "$__hermes_final_ec = $__hermes_ec",
+            "$__hermes_cwd = (Get-Location).ProviderPath",
+            f"Set-Content -LiteralPath {_ps_quote(cwd_file)} -Value $__hermes_cwd -Encoding UTF8",
+            f"Write-Output \"`n{marker}$($__hermes_cwd){marker}\"",
+            "exit $__hermes_final_ec",
+        ])
+
     def _run_bash(self, cmd_string: str, *, login: bool = False,
                   timeout: int = 120,
                   stdin_data: str | None = None) -> subprocess.Popen:
-        bash = _find_bash()
-        # For login-shell invocations (used by init_session to build the
-        # environment snapshot), prepend sources for the user's bashrc /
-        # custom init files so tools registered outside bash_profile
-        # (nvm, asdf, pyenv, …) end up on PATH in the captured snapshot.
-        # Non-login invocations are already sourcing the snapshot and
-        # don't need this.
-        if login:
-            init_files = _resolve_shell_init_files()
-            if init_files:
-                cmd_string = _prepend_shell_init(cmd_string, init_files)
-        args = [bash, "-l", "-c", cmd_string] if login else [bash, "-c", cmd_string]
-        run_env = _make_run_env(self.env)
+        if os.name != 'nt':
+            bash = _find_bash()
+            # For login-shell invocations (used by init_session to build the
+            # environment snapshot), prepend sources for the user's bashrc /
+            # custom init files so tools registered outside bash_profile
+            # (nvm, asdf, pyenv, …) end up on PATH in the captured snapshot.
+            # Non-login invocations are already sourcing the snapshot and
+            # don't need this.
+            if login:
+                init_files = _resolve_shell_init_files()
+                if init_files:
+                    cmd_string = _prepend_shell_init(cmd_string, init_files)
+            args = [bash, "-l", "-c", cmd_string] if login else [bash, "-c", cmd_string]
+            run_env = _make_run_env(self.env)
 
-        proc = subprocess.Popen(
-            args,
-            text=True,
-            env=run_env,
-            encoding="utf-8",
-            errors="replace",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
-            preexec_fn=None if _IS_WINDOWS else os.setsid,
-            cwd=self.cwd,
-        )
-        if not _IS_WINDOWS:
+            proc = subprocess.Popen(
+                args,
+                text=True,
+                env=run_env,
+                encoding="utf-8",
+                errors="replace",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
+                preexec_fn=None if _IS_WINDOWS else os.setsid,
+                cwd=self.cwd,
+            )
             try:
                 proc._hermes_pgid = os.getpgid(proc.pid)
             except ProcessLookupError:
                 pass
+        else:
+            shell_kind, shell_path = self._get_windows_shell()
+            if shell_kind == "bash":
+                args = [shell_path, "-c", cmd_string]
+            else:
+                args = [
+                    shell_path,
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    cmd_string,
+                ]
+            run_env = _make_run_env(self.env)
+            cwd = _from_msys_path(self.cwd).replace("\\", "/")
+            if not os.path.isdir(cwd):
+                cwd = os.getcwd()
+            proc = subprocess.Popen(
+                args,
+                text=True,
+                env=run_env,
+                encoding="utf-8",
+                errors="replace",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
+                cwd=cwd,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
 
         if stdin_data is not None:
             _pipe_stdin(proc, stdin_data)
@@ -422,6 +632,19 @@ class LocalEnvironment(BaseEnvironment):
         try:
             if _IS_WINDOWS:
                 proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        pass
+                if getattr(proc, "returncode", None) is None:
+                    try:
+                        proc.returncode = -9
+                    except Exception:
+                        pass
             else:
                 try:
                     pgid = os.getpgid(proc.pid)
@@ -460,15 +683,19 @@ class LocalEnvironment(BaseEnvironment):
     def _update_cwd(self, result: dict):
         """Read CWD from temp file (local-only, no round-trip needed)."""
         try:
-            with open(self._cwd_file) as f:
+            with open(self._cwd_file, encoding="utf-8-sig", errors="replace") as f:
                 cwd_path = f.read().strip()
             if cwd_path:
+                if os.name == 'nt':
+                    cwd_path = _from_msys_path(cwd_path).replace("\\", "/")
                 self.cwd = cwd_path
         except (OSError, FileNotFoundError):
             pass
 
         # Still strip the marker from output so it's not visible
         self._extract_cwd_from_output(result)
+        if os.name == 'nt' and self.cwd:
+            self.cwd = _from_msys_path(self.cwd).replace("\\", "/")
 
     def cleanup(self):
         """Clean up temp files."""

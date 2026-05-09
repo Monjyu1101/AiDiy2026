@@ -104,13 +104,15 @@ class CodeAgentRequestTool(ToolInterface):
 エージェント2: 通称バックエンド君。バックエンドに精通しており実装も得意。
 エージェント3: 通称フロント、フロントエンド君。フロントエンドに精通しており実装も得意。
 エージェント4: 通称検査、検証君。検査、検証が得意。
+エージェント5: 通称コーダー君。コード実装、修正が得意。
+エージェント6: 通称エルメス君。aidiy_hermes による汎用支援、雑多な作業をこなします。
 """,
             "parameters": {
                 "type": "object",
                 "properties": {
                     "channel": {
                         "type": "integer",
-                        "description": "依頼先のコードエージェント番号（1-4の範囲）。迷ったら1を指定。"
+                        "description": "依頼先のコードエージェント番号（1-6の範囲）。迷ったら1を指定。"
                     },
                     "request": {
                         "type": "string",

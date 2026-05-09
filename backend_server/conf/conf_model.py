@@ -70,7 +70,7 @@ class conf_models:
         }
         self.LIVE_OPENAI_MODELS = {
             "gpt-realtime-mini": "yyyy/mm/dd - gpt-realtime-mini",
-            "gpt-realtime": "yyyy/mm/dd - gpt-realtime"
+            "gpt-realtime-1.5": "yyyy/mm/dd - gpt-realtime-1.5"
         }
 
         # ライブAIボイス一覧
