@@ -2024,6 +2024,17 @@ def _aidiy_cli_normalize_prompt(text: str) -> str:
     return " ".join(str(text).split())
 
 
+def _aidiy_cli_code_permissions() -> str:
+    config_path = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
+    try:
+        with config_path.open("r", encoding="utf-8-sig") as f:
+            cfg = json.load(f)
+    except Exception:
+        return "auto"
+    permissions = str(cfg.get("CODE_PERMISSIONS") or "auto").strip().lower()
+    return permissions if permissions in {"auto", "full", "none"} else "auto"
+
+
 def _aidiy_cli_build_command(
     cli_slug: str,
     prompt: str,
@@ -2035,10 +2046,13 @@ def _aidiy_cli_build_command(
     # CLI uses its own default).
     cmd_path = _aidiy_cli_command_path(cli_slug)
     one_line = _aidiy_cli_normalize_prompt(prompt)
+    permissions = _aidiy_cli_code_permissions()
 
     if cli_slug == "claude-code":
-        common = [cmd_path, "--allow-dangerously-skip-permissions",
-                  "--permission-mode", "bypassPermissions"]
+        common = [cmd_path]
+        if permissions != "none":
+            common.extend(["--allow-dangerously-skip-permissions",
+                           "--permission-mode", "bypassPermissions"])
         if repo_path:
             common.extend(["--add-dir", repo_path])
         if is_initial:
@@ -2046,7 +2060,9 @@ def _aidiy_cli_build_command(
         return common + ["--continue", "-p", one_line]
 
     if cli_slug == "copilot-cli":
-        common = [cmd_path, "--allow-all-tools"]
+        common = [cmd_path]
+        if permissions != "none":
+            common.append("--allow-all-tools")
         if repo_path:
             common.extend(["--add-dir", repo_path])
         if is_initial:
@@ -2054,7 +2070,10 @@ def _aidiy_cli_build_command(
         return common + ["--continue", "-p", one_line]
 
     if cli_slug == "gemini-cli":
-        return [cmd_path, "--yolo", "--prompt", one_line]
+        common = [cmd_path]
+        if permissions != "none":
+            common.append("--yolo")
+        return common + ["--prompt", one_line]
 
     if cli_slug == "codex-cli":
         return [cmd_path, "exec", "--skip-git-repo-check",

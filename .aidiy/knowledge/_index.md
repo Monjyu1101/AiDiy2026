@@ -100,6 +100,7 @@
 | ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 | backend / MCP 起動、ポート残留 | [`backend_server,backend_hermes,backend_mcp,バックエンド起動.md`](./backend_server,backend_hermes,backend_mcp,バックエンド起動.md)、[`backend_mcp,構成.md`](./backend_mcp,構成.md) |
 | aidiy_hermes で MCP が `failed` / ツール未認識 | [`backend_hermes,backend_mcp,MCP_SSE接続.md`](./backend_hermes,backend_mcp,MCP_SSE接続.md) |
+| Windows ネイティブで terminal / file 操作が落ちる、OS 分岐を入れたい | [`backend_hermes,Windows対応規則.md`](./backend_hermes,Windows対応規則.md) |
 | hermes を MCP サーバーとして Code CLI から使う | [`backend_hermes,MCP_サーバー起動.md`](./backend_hermes,MCP_サーバー起動.md) |
 | AI モデル、WebSocket、code1〜code6 | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md)、[`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
 | Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`backend_hermes,backend_mcp,CodeCLI_MCP設定.md`](./backend_hermes,backend_mcp,CodeCLI_MCP設定.md) |
@@ -111,6 +112,7 @@
 | Markdown、BOM、ナレッジ整理 | [`共通,Markdown現状追従チェック.md`](./共通,Markdown現状追従チェック.md)、[`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md)、[`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
 | 開発環境操作、DB、Swagger、よくある問題 | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | GitHub issue の確認・close | [`共通,GitHubIssue運用手順.md`](./共通,GitHubIssue運用手順.md) |
+| MCP（TTS / OBS / ffmpeg / Chrome devtools）で紹介動画を自動生成する | [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) |
 
 既存の運用で `_最終変更.md` を参照する場合は、履歴ではなく [`再修正時の確認入口`](./_最終変更.md) として扱います。
 
@@ -215,6 +217,13 @@
 | backend_hermes を単体 CLI として起動・確認する | [`backend_hermes,backend_server,運用手順.md`](./backend_hermes,backend_server,運用手順.md) |
 | hermes を MCP サーバーとして起動・Code CLI から接続する | [`backend_hermes,MCP_サーバー起動.md`](./backend_hermes,MCP_サーバー起動.md) |
 | hermes-agent 新バージョンへ追従・移行する | [`backend_hermes,Upstream移行手順.md`](./backend_hermes,Upstream移行手順.md) |
+| Windows ネイティブ実行の OS 分岐規則・落とし穴を確認する | [`backend_hermes,Windows対応規則.md`](./backend_hermes,Windows対応規則.md) |
+
+## メディア生成
+
+| 目的 | 参照ファイル |
+|------|--------------|
+| MCP（TTS / OBS / ffmpeg / Chrome devtools）で紹介動画を自動生成する | [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) |
 
 ## ドキュメント・共通
 

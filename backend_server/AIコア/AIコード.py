@@ -339,6 +339,11 @@ class CodeAgent:
                 AI_NAME=self.AI_NAME,
                 AI_MODEL=self.AI_MODEL,
                 絶対パス=self.絶対パス or None,
+                code_permissions=(
+                    (self.接続.モデル設定 or {}).get("CODE_PERMISSIONS", "auto")
+                    if self.接続 and hasattr(self.接続, "モデル設定")
+                    else "auto"
+                ),
                 system_instruction=self.システム指示,
             )
             開始成功 = await self.AIインスタンス.開始()

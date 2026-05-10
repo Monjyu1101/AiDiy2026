@@ -64,6 +64,8 @@ from mcp_proc.backup_save import BackupSave, BackupSaveError
 from mcp_proc.image_generation import ImageGeneration, ImageGenerationError
 from mcp_proc.speech_to_text import SpeechToText, SpeechToTextError
 from mcp_proc.text_to_speech import TextToSpeech, TextToSpeechError
+from mcp_proc.obs_studio_control import ObsStudioControl, ObsStudioControlError
+from mcp_proc.ffmpeg_control import FfmpegControl, FfmpegControlError
 
 setup_logging()
 logger = get_logger(__name__)
@@ -85,6 +87,8 @@ MOUNT_BS     = os.environ.get("MCP_BS_MOUNT_PATH", "/aidiy_backup_save")
 MOUNT_IG     = os.environ.get("MCP_IG_MOUNT_PATH", "/aidiy_image_generation")
 MOUNT_ST     = os.environ.get("MCP_ST_MOUNT_PATH", "/aidiy_speech_to_text")
 MOUNT_TS     = os.environ.get("MCP_TS_MOUNT_PATH", "/aidiy_text_to_speech")
+MOUNT_OB     = os.environ.get("MCP_OB_MOUNT_PATH", "/aidiy_obs_studio_control")
+MOUNT_FF     = os.environ.get("MCP_FF_MOUNT_PATH", "/aidiy_ffmpeg_control")
 
 chrome   = ChromeManager(debug_port=CHROME_PORT)
 cdp      = CDPClient(port=CHROME_PORT)
@@ -100,6 +104,10 @@ ig       = ImageGeneration()
 stt      = SpeechToText()
 
 tts      = TextToSpeech()
+
+obs      = ObsStudioControl()
+
+ffmpeg_c = FfmpegControl()
 
 # PostgreSQL は psycopg 未導入環境でもサーバー起動を阻害しないよう遅延初期化
 _pg_q: Optional[PgQuery] = None
@@ -257,6 +265,24 @@ mcp_ts = FastMCP(
     port=MCP_PORT,
     sse_path=f"{MOUNT_TS}/sse",
     message_path=f"{MOUNT_TS}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_ob = FastMCP(
+    "aidiy_obs_studio_control",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_OB}/sse",
+    message_path=f"{MOUNT_OB}/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_ff = FastMCP(
+    "aidiy_ffmpeg_control",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    sse_path=f"{MOUNT_FF}/sse",
+    message_path=f"{MOUNT_FF}/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -1354,6 +1380,230 @@ async def synthesize_speech(
         raise ValueError(str(e)) from e
 
 
+# ================================================================== #
+# aidiy_obs_studio_control ツール（OBS Studio WebSocket 制御）
+# ================================================================== #
+# OBS Studio は使用時に立ち上げられる前提のため、ツールは常時公開する。
+# 起動時チェックは診断ログ目的のみで、各ツールは呼び出し時に都度接続を試みる。
+# 接続情報は backend_server/_config/aidiy_obs_studio_control.json で管理。
+
+@mcp_ob.tool()
+async def obs_startup_status() -> str:
+    """
+    MCP 起動時に確認した OBS WebSocket 接続/認証の結果（スナップショット）を返す。
+    実際の接続可否は呼び出し時に判定されるため、現在の状態を見たい場合は
+    obs_connection_info を使うこと。
+    """
+    return json.dumps(obs.get_startup_status(), ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_connection_info(
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+) -> str:
+    """
+    OBS Studio WebSocket へ接続し、バージョン情報を返す。
+
+    省略時は backend_server/_config/aidiy_obs_studio_control.json の値を使う。
+    """
+    try:
+        info = await obs.connection_info(host, port)
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_status() -> str:
+    """OBS Studio のバージョン、統計、配信、録画、現在シーンを返す。"""
+    try:
+        info = await obs.status()
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_request(
+    request_type: str,
+    request_data: Optional[str] = None,
+) -> str:
+    """
+    OBS WebSocket v5 の任意リクエストを実行する。
+
+    Args:
+        request_type: 例: GetVersion, GetSceneList, SetCurrentProgramScene
+        request_data: JSON オブジェクト文字列。例: {"sceneName":"Scene"}
+    """
+    try:
+        data = obs.parse_request_data(request_data)
+        result = await obs.request(request_type, data)
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_list_scenes() -> str:
+    """OBS Studio のシーン一覧と現在シーンを返す。"""
+    try:
+        result = await obs.scene_list()
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_set_current_scene(scene_name: str) -> str:
+    """OBS Studio の現在シーンを切り替える。"""
+    try:
+        result = await obs.set_current_scene(scene_name)
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_stream(action: str = "toggle") -> str:
+    """配信を制御する。action: start / stop / toggle"""
+    try:
+        result = await obs.stream_control(action)
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_record(action: str = "toggle") -> str:
+    """録画を制御する。action: start / stop / toggle / pause / resume"""
+    try:
+        result = await obs.record_control(action)
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_set_source_visible(
+    scene_name: str,
+    source_name: str,
+    visible: bool,
+) -> str:
+    """指定シーン内のソース表示/非表示を切り替える。"""
+    try:
+        result = await obs.set_scene_item_enabled(scene_name, source_name, visible)
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp_ob.tool()
+async def obs_set_input_mute(input_name: str, muted: bool) -> str:
+    """音声入力をミュート/ミュート解除する。"""
+    try:
+        result = await obs.set_input_mute(input_name, muted)
+    except ObsStudioControlError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(result, ensure_ascii=False)
+
+
+# ================================================================== #
+# aidiy_ffmpeg_control ツール（ffmpeg / ffprobe / ffplay）
+# ================================================================== #
+# 各ツールは args_str に ffmpeg 等の引数文字列を直接渡す。
+# 実行ファイルパスや既定タイムアウトは
+# backend_server/_config/aidiy_ffmpeg_control.json で管理する。
+# 起動時の -version 確認に成功したバイナリのみツールを公開する。
+
+@mcp_ff.tool()
+async def ffmpeg_versions() -> str:
+    """
+    ffmpeg / ffprobe / ffplay の実行ファイルパスと起動時 -version 確認結果を返す。
+    PATH 解決やバイナリ未配置の切り分けに使う。常時公開される診断ツール。
+    """
+    return json.dumps(ffmpeg_c.get_versions(), ensure_ascii=False)
+
+
+if ffmpeg_c.version_info.get("ffmpeg", {}).get("ok"):
+    @mcp_ff.tool()
+    async def ffmpeg_run(args_str: str, timeout_sec: Optional[int] = None) -> str:
+        """
+        ffmpeg を実行する。args_str に ffmpeg の引数を文字列で渡す。
+
+        Args:
+            args_str: 例: '-y -i in.mp4 -c:v libx264 -c:a aac out.mp4'
+                      '-i image.png -i narration.mp3 -t 10 -shortest out.mp4'
+                      字幕焼き込み: '-i in.mp4 -vf subtitles=subs.srt out.mp4'
+                      オーバーレイ: '-i base.mp4 -i logo.png -filter_complex overlay=10:10 out.mp4'
+                      リサイズ: '-i in.mp4 -vf scale=1280:720 out.mp4'
+            timeout_sec: タイムアウト秒。省略時は設定ファイルの default_timeout_sec を使う。
+
+        Returns:
+            {"command": [...], "returncode": int, "stdout": "...", "stderr": "...", "timeout_sec": ...}
+        """
+        try:
+            result = await ffmpeg_c.run_ffmpeg(args_str, timeout_sec)
+        except FfmpegControlError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+
+if ffmpeg_c.version_info.get("ffprobe", {}).get("ok"):
+    @mcp_ff.tool()
+    async def ffprobe_run(args_str: str, timeout_sec: Optional[int] = None) -> str:
+        """
+        ffprobe を実行する。args_str に ffprobe の引数を文字列で渡す。
+
+        Args:
+            args_str: 例: '-v error -print_format json -show_format -show_streams in.mp4'
+                      '-i in.mp4'  （標準的な情報表示）
+            timeout_sec: タイムアウト秒。省略時は設定ファイルの default_timeout_sec を使う。
+        """
+        try:
+            result = await ffmpeg_c.run_ffprobe(args_str, timeout_sec)
+        except FfmpegControlError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+
+if ffmpeg_c.version_info.get("ffplay", {}).get("ok"):
+    @mcp_ff.tool()
+    async def ffplay_run(args_str: str, timeout_sec: Optional[int] = None) -> str:
+        """
+        ffplay を実行する。args_str に ffplay の引数を文字列で渡す。
+
+        プレイモード（プレビュー再生）。ffplay はウィンドウを開く対話アプリのため、
+        呼び出し側で `-autoexit` と `-t <秒>` を付けて自然終了させること。
+        そうしない場合は timeout_sec で強制終了される。
+
+        Args:
+            args_str: 例: '-autoexit -t 10 in.mp4'
+                      '-autoexit -nodisp narration.mp3'  （音声のみ）
+                      '-autoexit -window_title preview -x 640 -y 360 in.mp4'
+            timeout_sec: タイムアウト秒。省略時は設定ファイルの default_play_timeout_sec を使う。
+        """
+        try:
+            result = await ffmpeg_c.run_ffplay(args_str, timeout_sec)
+        except FfmpegControlError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+
+# 公開ツール一覧をログに残す
+_ff_exposed = sorted(mcp_ff._tool_manager._tools.keys())
+_ff_skipped = [
+    label for label in ("ffmpeg", "ffprobe", "ffplay")
+    if not ffmpeg_c.version_info.get(label, {}).get("ok")
+]
+logger.info(f"aidiy_ffmpeg_control 公開ツール: {_ff_exposed}")
+if _ff_skipped:
+    logger.warning(
+        f"aidiy_ffmpeg_control 非公開（-version 失敗）: {_ff_skipped} — "
+        f"backend_server/_config/aidiy_ffmpeg_control.json のパスを確認してください"
+    )
+
+
 # ------------------------------------------------------------------ #
 # description 動的生成（API キー状況に応じて利用可能 provider を明示）
 # ------------------------------------------------------------------ #
@@ -1380,6 +1630,8 @@ app = Starlette(routes=[
     *mcp_ig.sse_app().routes,
     *mcp_st.sse_app().routes,
     *mcp_ts.sse_app().routes,
+    *mcp_ob.sse_app().routes,
+    *mcp_ff.sse_app().routes,
 ])
 
 if __name__ == "__main__":
@@ -1395,4 +1647,6 @@ if __name__ == "__main__":
     logger.info(f"ImageGeneration SSE: http://localhost:{MCP_PORT}{MOUNT_IG}/sse")
     logger.info(f"SpeechToText SSE   : http://localhost:{MCP_PORT}{MOUNT_ST}/sse")
     logger.info(f"TextToSpeech SSE   : http://localhost:{MCP_PORT}{MOUNT_TS}/sse")
+    logger.info(f"ObsStudioControl SSE: http://localhost:{MCP_PORT}{MOUNT_OB}/sse")
+    logger.info(f"FfmpegControl SSE  : http://localhost:{MCP_PORT}{MOUNT_FF}/sse")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")

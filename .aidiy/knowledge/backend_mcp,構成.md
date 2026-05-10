@@ -12,7 +12,7 @@
 - Codex など stdio クライアント向けの SSE 変換入口は `backend_mcp/mcp_stdio.py`
 - 再利用ロジックは `backend_mcp/mcp_proc/` に置く
 - `mcp_main.py` からは `mcp_proc.<module>` として import する
-- `mcp_main.py` は 11 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す
+- `mcp_main.py` は 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す
 
 ## 関連ファイル
 - `backend_mcp/mcp_main.py`
@@ -28,6 +28,8 @@
 - `backend_mcp/mcp_proc/image_generation.py`
 - `backend_mcp/mcp_proc/speech_to_text.py`
 - `backend_mcp/mcp_proc/text_to_speech.py`
+- `backend_mcp/mcp_proc/obs_studio_control.py`
+- `backend_mcp/mcp_proc/ffmpeg_control.py`
 - `backend_server/_config/AiDiy_mcp.json`
 - `_start.py`
 
@@ -46,6 +48,8 @@
 | `aidiy_image_generation` | AI 画像生成（OpenAI / Gemini / FreeAI） | `http://localhost:8095/aidiy_image_generation/sse` |
 | `aidiy_speech_to_text` | 音声認識（speech_recognition / Whisper） | `http://localhost:8095/aidiy_speech_to_text/sse` |
 | `aidiy_text_to_speech` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） | `http://localhost:8095/aidiy_text_to_speech/sse` |
+| `aidiy_obs_studio_control` | OBS Studio WebSocket 制御 | `http://localhost:8095/aidiy_obs_studio_control/sse` |
+| `aidiy_ffmpeg_control` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） | `http://localhost:8095/aidiy_ffmpeg_control/sse` |
 
 ## 新規 MCP サーバー追加手順
 

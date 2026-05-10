@@ -19,6 +19,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -76,6 +77,49 @@ class TextToSpeech:
 
     # AiDiy_key.json へのパス（backend_mcp 起点）
     _KEY_CONFIG_REL = "../backend_server/_config/AiDiy_key.json"
+    _TTS_CONFIG_REL = "../backend_server/_config/aidiy_text_to_speech.json"
+
+    # 読み上げ用の用語変換辞書。
+    # 入力テキスト自体は変えず、音声合成へ渡す直前だけ適用する。
+    DEFAULT_PRONUNCIATION_DICTIONARY = [
+        ("AiDiy", "アイディー"),
+        ("aidiy", "アイディー"),
+        ("横展開", "よこてんかい"),
+        ("FastAPI", "ファスト エーピーアイ"),
+        ("PostgreSQL", "ポストグレス キューエル"),
+        ("OpenAI", "オープン エーアイ"),
+        ("OpenCode", "オープンコード"),
+        ("Code CLI", "コード シーエルアイ"),
+        ("WebSocket", "ウェブソケット"),
+        ("GitHub", "ギットハブ"),
+        ("SQLite", "エスキューライト"),
+        ("Claude", "クロード"),
+        ("Copilot", "コパイロット"),
+        ("Codex", "コーデックス"),
+        ("Gemini", "ジェミニ"),
+        ("Hermes", "ヘルメス"),
+        ("Electron", "エレクトロン"),
+        ("backend", "バックエンド"),
+        ("frontend", "フロントエンド"),
+        ("Vite", "ヴィート"),
+        ("Vue", "ビュー"),
+        ("JWT", "ジェイ ダブリュー ティー"),
+        ("JSON", "ジェイソン"),
+        ("HTML", "エイチティーエムエル"),
+        ("HTTP", "エイチティーティーピー"),
+        ("URL", "ユーアールエル"),
+        ("API", "エーピーアイ"),
+        ("CLI", "シーエルアイ"),
+        ("MCP", "エムシーピー"),
+        ("TTS", "ティーティーエス"),
+        ("STT", "エスティーティー"),
+        ("MP3", "エムピースリー"),
+        ("DB", "データベース"),
+        ("UI", "ユーアイ"),
+        ("AI", "エーアイ"),
+        ("VRMA", "ブイアールエムエー"),
+        ("VRM", "ブイアールエム"),
+    ]
 
     # ------------------------------------------------------------------ #
     # API キー解決
@@ -110,6 +154,76 @@ class TextToSpeech:
             return ""
 
     # ------------------------------------------------------------------ #
+    # TTS 設定ファイル
+    # ------------------------------------------------------------------ #
+
+    def _tts_config_path(self) -> Path:
+        return Path(__file__).resolve().parent.parent / self._TTS_CONFIG_REL
+
+    def _default_pronunciation_config(self) -> dict:
+        return {
+            "version": 1,
+            "description": (
+                "aidiy_text_to_speech の読み上げ用変換辞書。"
+                " speech_text の原文は変えず、音声合成へ渡す直前だけ from を to に変換する。"
+            ),
+            "pronunciation_dictionary": [
+                {"from": source, "to": target}
+                for source, target in self.DEFAULT_PRONUNCIATION_DICTIONARY
+            ],
+        }
+
+    def _write_default_tts_config(self, config_path: Path) -> None:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(self._default_pronunciation_config(), f, ensure_ascii=False, indent=2)
+            f.write("\n")
+
+    def _load_pronunciation_dictionary(self) -> list[tuple[str, str]]:
+        """設定ファイルがあればそれを使い、なければデフォルトを書き出して使う"""
+        config_path = self._tts_config_path()
+        if not config_path.exists():
+            self._write_default_tts_config(config_path)
+            return list(self.DEFAULT_PRONUNCIATION_DICTIONARY)
+
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            raise TextToSpeechError(
+                f"TTS 設定ファイルの読み込みに失敗しました: {config_path} ({e})"
+            ) from e
+
+        raw_items = data.get("pronunciation_dictionary", [])
+        if not isinstance(raw_items, list):
+            raise TextToSpeechError(
+                f"TTS 設定ファイルの pronunciation_dictionary は配列で指定してください: {config_path}"
+            )
+
+        dictionary: list[tuple[str, str]] = []
+        for index, item in enumerate(raw_items, 1):
+            if isinstance(item, dict):
+                source = item.get("from", "")
+                target = item.get("to", "")
+            elif isinstance(item, (list, tuple)) and len(item) == 2:
+                source, target = item
+            else:
+                raise TextToSpeechError(
+                    f"TTS 変換辞書の {index} 件目は {{\"from\": ..., \"to\": ...}} 形式で指定してください"
+                )
+
+            if not isinstance(source, str) or not isinstance(target, str):
+                raise TextToSpeechError(
+                    f"TTS 変換辞書の {index} 件目は文字列で指定してください"
+                )
+            source = source.strip()
+            target = target.strip()
+            if source and target:
+                dictionary.append((source, target))
+
+        return dictionary
+
+    # ------------------------------------------------------------------ #
     # description 動的生成
     # ------------------------------------------------------------------ #
 
@@ -126,7 +240,37 @@ class TextToSpeech:
         desc = f"テキストを音声（MP3）に変換する。利用可能: {', '.join(available)}。"
         if unavailable:
             desc += f" 利用不可: {', '.join(unavailable)}（API キー未設定）。"
+        desc += " AiDiy、DB、API、MCP などのシステム用語は backend_server/config/aidiy_text_to_speech.json の読み上げ用辞書で自動変換する。"
         return desc
+
+    # ------------------------------------------------------------------ #
+    # 読み上げテキスト正規化
+    # ------------------------------------------------------------------ #
+
+    def normalize_for_speech(self, text: str) -> tuple[str, list[dict]]:
+        """TTS に渡す直前の読み上げ用テキストへ変換する"""
+        normalized = text
+        applied: list[dict] = []
+
+        for source, target in self._load_pronunciation_dictionary():
+            if re.search(r"^[A-Za-z0-9 +._-]+$", source):
+                pattern = re.compile(
+                    rf"(?<![A-Za-z0-9_]){re.escape(source)}(?![A-Za-z0-9_])"
+                )
+                normalized, count = pattern.subn(target, normalized)
+            else:
+                count = normalized.count(source)
+                if count:
+                    normalized = normalized.replace(source, target)
+
+            if count:
+                applied.append({
+                    "from": source,
+                    "to": target,
+                    "count": count,
+                })
+
+        return normalized, applied
     # ------------------------------------------------------------------ #
     # 音声合成（dispatch）
     # ------------------------------------------------------------------ #
@@ -149,6 +293,7 @@ class TextToSpeech:
         if not speech_text or not speech_text.strip():
             raise TextToSpeechError("speech_text は必須です")
 
+        normalized_text, replacements = self.normalize_for_speech(speech_text)
         requested = self._normalize_provider(provider)
         model = model.strip().lower()
         language = language.strip().lower()
@@ -163,13 +308,13 @@ class TextToSpeech:
 
         try:
             if used == "edge":
-                mp3_bytes = self._synthesize_edge(speech_text, voice)
+                mp3_bytes = self._synthesize_edge(normalized_text, voice)
             elif used == "gemini":
-                mp3_bytes = self._synthesize_gemini(speech_text, voice, model, used)
+                mp3_bytes = self._synthesize_gemini(normalized_text, voice, model, used)
             elif used == "freeai":
-                mp3_bytes = self._synthesize_gemini(speech_text, voice, model, used)
+                mp3_bytes = self._synthesize_gemini(normalized_text, voice, model, used)
             elif used == "openai":
-                mp3_bytes = self._synthesize_openai(speech_text, voice, model)
+                mp3_bytes = self._synthesize_openai(normalized_text, voice, model)
             else:
                 raise TextToSpeechError(f"未対応の provider です: '{used}'")
         except Exception:
@@ -177,7 +322,7 @@ class TextToSpeech:
                 raise
             used = "edge"
             voice = self._resolve_voice("auto", used)
-            mp3_bytes = self._synthesize_edge(speech_text, voice)
+            mp3_bytes = self._synthesize_edge(normalized_text, voice)
 
         info = {
             "requested_provider": requested,
@@ -185,7 +330,9 @@ class TextToSpeech:
             "model": model if model != "auto" else self._default_model(used),
             "voice": voice,
             "language": language,
-            "speech_text": speech_text,
+            "speech_text": normalized_text,
+            "original_speech_text": speech_text,
+            "pronunciation_replacements": replacements,
             "mp3_bytes_length": len(mp3_bytes),
         }
         return mp3_bytes, info

@@ -55,7 +55,8 @@ const モデル設定 = ref({
   CODE_AI3_NAME: '',
   CODE_AI4_NAME: '',
   CODE_AI5_NAME: '',
-  CODE_AI6_NAME: ''
+  CODE_AI6_NAME: '',
+  CODE_PERMISSIONS: 'auto'
 });
 
 const チャットモード = ref<チャットモード型>('live');
@@ -115,7 +116,8 @@ function コア状態リセット() {
      CODE_AI3_NAME: '',
      CODE_AI4_NAME: '',
      CODE_AI5_NAME: '',
-     CODE_AI6_NAME: ''
+     CODE_AI6_NAME: '',
+     CODE_PERMISSIONS: 'auto'
    };
   パネルボタン状態.value = パネル状態生成();
   パネル表示中.value = パネル状態生成();
@@ -185,7 +187,8 @@ function 初期化処理(message: Record<string, any>) {
     CODE_AI3_NAME: settings.CODE_AI3_NAME || '',
     CODE_AI4_NAME: settings.CODE_AI4_NAME || '',
     CODE_AI5_NAME: settings.CODE_AI5_NAME || '',
-    CODE_AI6_NAME: settings.CODE_AI6_NAME || ''
+    CODE_AI6_NAME: settings.CODE_AI6_NAME || '',
+    CODE_PERMISSIONS: settings.CODE_PERMISSIONS || 'auto'
   };
 
   初期マイク有効.value = Boolean(buttons.マイク);

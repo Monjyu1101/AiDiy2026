@@ -67,5 +67,6 @@ export function defaultModelSettings(): ModelSettings {
     CODE_AI4_NAME: 'gemini_cli',
     CODE_AI5_NAME: 'opencode_cli',
     CODE_AI6_NAME: 'aidiy_hermes',
+    CODE_PERMISSIONS: 'auto',
   }
 }

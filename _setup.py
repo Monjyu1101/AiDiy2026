@@ -892,6 +892,14 @@ MCP_MODULES = [
                 "server_name": "aidiy_text_to_speech",
                 "sse_url":     "http://localhost:8095/aidiy_text_to_speech/sse",
             },
+            {
+                "server_name": "aidiy_obs_studio_control",
+                "sse_url":     "http://localhost:8095/aidiy_obs_studio_control/sse",
+            },
+            {
+                "server_name": "aidiy_ffmpeg_control",
+                "sse_url":     "http://localhost:8095/aidiy_ffmpeg_control/sse",
+            },
         ],
     },
 ]

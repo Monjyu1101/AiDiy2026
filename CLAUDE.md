@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Backend**: FastAPI + SQLAlchemy + SQLite（2 サーバー構成）
 - **Backend Hermes**: `aidiy_hermes` コード支援 CLI（常駐なし）
-- **Backend MCP**: 11 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup Check, Backup Save, Image Generation, Speech-to-Text, Text-to-Speech）
+- **Backend MCP**: 13 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup Check, Backup Save, Image Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control）
 - **Frontend Web**: Vue 3 + Vite + TypeScript（qTubler, Pinia, Vue Router）
 - **Frontend Avatar**: Electron/Web デュアルモード AI Avatar（Three.js, VRM）
 

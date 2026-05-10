@@ -56,7 +56,8 @@ class CodeAI:
     
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "claude", AI_MODEL: str = "sonnet", max_turns: int = 999,
-                 code_plan: str = "auto", code_verify: str = "auto", system_instruction: str = None):
+                 code_plan: str = "auto", code_verify: str = "auto", code_permissions: str = "auto",
+                 system_instruction: str = None):
         """初期化"""
 
         # セッションID・チャンネル
@@ -73,6 +74,7 @@ class CodeAI:
         self.max_turns = max_turns
         self.code_plan = code_plan
         self.code_verify = code_verify
+        self.code_permissions = code_permissions if code_permissions in ("auto", "full", "none") else "auto"
         self.system_instruction = system_instruction if isinstance(system_instruction, str) and system_instruction else None
         
         # apiキー設定（Claude Agent SDK用）
@@ -100,9 +102,9 @@ class CodeAI:
             "max_turns": max_turns,
             "system_prompt": system_prompt,
             "cwd": cwd_str,
-            # 通常時は制限なし（全ツール利用可能）
+            # 通常時は許可ツールを実行時に指定する
             # "allowed_tools": 指定なし = 全ツール利用可能
-            # "permission_mode": 指定なし = デフォルト（制限なし）
+            # "permission_mode": CODE_PERMISSIONS=none の場合は指定しない
         }
         
         # 履歴管理システム(ローカル保管)
@@ -420,30 +422,34 @@ class CodeAI:
                         cwd = cwd_posix
 
                     logger.info(f"ClaudeSDK実行パス: {cwd}")
-                    perm_mode = "bypassPermissions"
+                    perm_mode = None if self.code_permissions == "none" else "bypassPermissions"
                     if not self.AIセッションID:
                         # 初回：新規セッション作成
-                        options = ClaudeAgentOptions(
-                            max_turns=self.base_options["max_turns"],
-                            system_prompt=self.base_options["system_prompt"],
-                            cwd=Path(cwd),
-                            allowed_tools=allowed_tools_list,
-                            permission_mode=perm_mode,
-                            continue_conversation=False,
-                            mcp_servers=self.mcp_servers if self.mcp_servers else {},
-                        )
+                        options_kwargs = {
+                            "max_turns": self.base_options["max_turns"],
+                            "system_prompt": self.base_options["system_prompt"],
+                            "cwd": Path(cwd),
+                            "allowed_tools": allowed_tools_list,
+                            "continue_conversation": False,
+                            "mcp_servers": self.mcp_servers if self.mcp_servers else {},
+                        }
+                        if perm_mode:
+                            options_kwargs["permission_mode"] = perm_mode
+                        options = ClaudeAgentOptions(**options_kwargs)
                     else:
                         # 継続会話：読取専用パラメータに応じてallowed_toolsを設定
-                        options = ClaudeAgentOptions(
-                            max_turns=self.base_options["max_turns"],
-                            system_prompt=self.base_options["system_prompt"],
-                            cwd=Path(cwd),
-                            allowed_tools=allowed_tools_list,  # 毎回正しく設定
-                            permission_mode=perm_mode,
-                            continue_conversation=True,
-                            resume=self.AIセッションID,
-                            mcp_servers=self.mcp_servers if self.mcp_servers else {},
-                        )
+                        options_kwargs = {
+                            "max_turns": self.base_options["max_turns"],
+                            "system_prompt": self.base_options["system_prompt"],
+                            "cwd": Path(cwd),
+                            "allowed_tools": allowed_tools_list,  # 毎回正しく設定
+                            "continue_conversation": True,
+                            "resume": self.AIセッションID,
+                            "mcp_servers": self.mcp_servers if self.mcp_servers else {},
+                        }
+                        if perm_mode:
+                            options_kwargs["permission_mode"] = perm_mode
+                        options = ClaudeAgentOptions(**options_kwargs)
                      
                     # テスト用：初回のみ system_prompt、毎回「今回の依頼」（送信用）を標準出力に表示（平文）
                     try:

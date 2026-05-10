@@ -70,6 +70,8 @@ Node.js / `package.json` / `node_modules` は不要。
 | Image Generation | `http://localhost:8095/aidiy_image_generation/sse` |
 | Speech-to-Text | `http://localhost:8095/aidiy_speech_to_text/sse` |
 | Text-to-Speech | `http://localhost:8095/aidiy_text_to_speech/sse` |
+| OBS Studio Control | `http://localhost:8095/aidiy_obs_studio_control/sse` |
+| FFmpeg Control | `http://localhost:8095/aidiy_ffmpeg_control/sse` |
 
 アクセスは localhost 限定。外部接続は 403。
 
@@ -84,6 +86,18 @@ Node.js / `package.json` / `node_modules` は不要。
 | `AIDIY_PG_HOST` など | 未設定 | PostgreSQL 個別接続情報 |
 
 mount path 系の環境変数を使う場合は `mcp_main.py` の現行実装を確認する。
+
+## OBS Studio 接続設定
+
+`aidiy_obs_studio_control` の接続情報は `backend_server/_config/aidiy_obs_studio_control.json` で管理する。
+ファイルが無ければ初回起動時にデフォルト値（`host=localhost`, `port=4455`, `password=aidiy4455`, `timeout=10`）が自動書き込まれる。
+OBS Studio 側の `ツール → WebSocketサーバー設定` と一致させる。
+
+## ffmpeg / ffprobe / ffplay 実行設定
+
+`aidiy_ffmpeg_control` の実行ファイルパスと既定タイムアウトは `backend_server/_config/aidiy_ffmpeg_control.json` で管理する。
+ファイルが無ければ初回起動時にデフォルト値（PATH 上の `ffmpeg` / `ffprobe` / `ffplay`、タイムアウト 600 秒）が自動書き込まれる。
+PATH 上にない環境ではフルパスへ書き換える。MCP ツールは args_str 一本で各サブコマンドの引数を直接渡す薄いランナーで、ffplay 利用時は `-autoexit` と `-t <秒>` を付けて自然終了させること。
 
 ## Reboot
 

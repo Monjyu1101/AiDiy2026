@@ -86,6 +86,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
         "CODE_BASE_PATH": code_base_path_raw,
+        "CODE_PERMISSIONS": app_conf.json.get("CODE_PERMISSIONS", "auto"),
     }
     return モデル設定正規化(設定)
 

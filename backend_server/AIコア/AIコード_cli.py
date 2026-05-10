@@ -34,7 +34,8 @@ class CodeAI:
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "claude_cli", AI_MODEL: str = "auto", max_turns: int = 999,
-                 code_plan: str = "auto", code_verify: str = "auto", system_instruction: str = None):
+                 code_plan: str = "auto", code_verify: str = "auto", code_permissions: str = "auto",
+                 system_instruction: str = None):
         """初期化"""
 
         # セッションID・チャンネル
@@ -51,6 +52,7 @@ class CodeAI:
         self.max_turns = max_turns
         self.code_plan = code_plan
         self.code_verify = code_verify
+        self.code_permissions = code_permissions if code_permissions in ("auto", "full", "none") else "auto"
         self.system_instruction = system_instruction if isinstance(system_instruction, str) and system_instruction else None
 
         # 作業ディレクトリ設定
@@ -301,7 +303,9 @@ class CodeAI:
 
         if self.code_ai == "copilot_cli":
             # GitHub Copilot CLI
-            common = base + ["--allow-all-tools"]
+            common = list(base)
+            if self.code_permissions != "none":
+                common.append("--allow-all-tools")
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 common.extend(["--model", self.code_model])
@@ -314,7 +318,9 @@ class CodeAI:
 
         elif self.code_ai == "gemini_cli":
             # Google Gemini CLI
-            base_args = base + ["--yolo"]
+            base_args = list(base)
+            if self.code_permissions != "none":
+                base_args.append("--yolo")
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 base_args.extend(["--model", self.code_model])
@@ -323,13 +329,8 @@ class CodeAI:
 
         elif self.code_ai == "codex_cli":
             # OpenAI Codex CLI
-            # 注意:
-            #   --sandbox danger-full-access が環境によって read-only に固定されることがあるため、
-            #   書込モードでは bypass フラグを優先する。
-            if 読取専用:
-                base_args = base + ["exec", "--skip-git-repo-check", "--sandbox", "read-only"]
-            else:
-                base_args = base + ["exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]
+            # Codex はサンドボックス無視を常に有効にする。
+            base_args = base + ["exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 base_args.extend(["--model", self.code_model])
@@ -343,7 +344,10 @@ class CodeAI:
 
         else:
             # デフォルト claude_cli
-            common = base + ["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions", "--chrome"]
+            common = list(base)
+            if self.code_permissions != "none":
+                common.extend(["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions"])
+            common.append("--chrome")
             # モデルがautoの場合はモデル指定を省略
             if self.code_model and self.code_model.lower() != "auto":
                 common.extend(["--model", self.code_model])

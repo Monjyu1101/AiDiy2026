@@ -56,6 +56,7 @@ const selections = reactive({
   codeAi6: '',
   codeModel6: '',
   codeBasePath: '',
+  codePermissions: 'auto',
 })
 
 const CHAT_MODEL_KEYS: Record<string, string> = {
@@ -91,6 +92,7 @@ const chatAiOptions = computed(() => Object.keys(availableModels.value?.chat_mod
 const liveAiOptions = computed(() => Object.keys(availableModels.value?.live_models || {}))
 const codeAiOptions = computed(() => Object.keys(availableModels.value?.code_models || {}))
 const codeBaseOptionsList = computed(() => Object.entries(codeBaseOptions.value || {}).map(([value, label]) => ({ value, label })))
+const codePermissionOptions = ['auto', 'full', 'none']
 
 const chatModelOptions = computed(() => {
   const models = availableModels.value?.chat_models?.[selections.chatAi] || {}
@@ -183,6 +185,7 @@ async function loadConfig() {
     selections.codeAi5 = currentSettings.value.CODE_AI5_NAME || codeAiOptions.value[0] || ''
     selections.codeAi6 = currentSettings.value.CODE_AI6_NAME || codeAiOptions.value[0] || ''
     selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || ''
+    selections.codePermissions = currentSettings.value.CODE_PERMISSIONS || 'auto'
 
     const chatKey = CHAT_MODEL_KEYS[selections.chatAi]
     const liveKey = LIVE_MODEL_KEYS[selections.liveAi]
@@ -233,6 +236,7 @@ function buildNextSettings() {
   if (normalizedCodeBasePath) {
     nextSettings.CODE_BASE_PATH = normalizedCodeBasePath
   }
+  nextSettings.CODE_PERMISSIONS = selections.codePermissions || 'auto'
 
   const chatKey = CHAT_MODEL_KEYS[selections.chatAi]
   const liveKey = LIVE_MODEL_KEYS[selections.liveAi]
@@ -493,6 +497,20 @@ onMounted(() => {
                     >
                       <option value="">候補から選択してください</option>
                       <option v-for="opt in codeBaseOptionsList" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="config-panel-field">
+                  <label class="config-panel-label" for="config-code-permissions">CODE_PERMISSIONS:</label>
+                  <div class="config-panel-control">
+                    <select
+                      id="config-code-permissions"
+                      v-model="selections.codePermissions"
+                      class="config-panel-select"
+                    >
+                      <option v-for="permission in codePermissionOptions" :key="permission" :value="permission">
+                        {{ permission }}
+                      </option>
                     </select>
                   </div>
                 </div>
