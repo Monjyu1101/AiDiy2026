@@ -66,6 +66,8 @@ BACKEND_HERMES_DIR = BASE_DIR / BACKEND_HERMES_PATH
 BACKEND_HERMES_ENV = ".venv"
 POSTGRES_DIR = BASE_DIR / POSTGRES_PATH
 BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
+SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
+SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 
 
 class Colors:
@@ -214,6 +216,57 @@ def write_json_file(path: Path, data: dict) -> bool:
     except Exception as e:
         print_error(f"設定ファイル書き込みエラー: {path} ({e})")
         return False
+
+
+def _remove_marked_block(content: str, begin_marker: str, end_marker: str) -> str:
+    lines = content.splitlines()
+    result: list[str] = []
+    skipping = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped == begin_marker:
+            skipping = True
+            continue
+        if skipping and stripped == end_marker:
+            skipping = False
+            continue
+        if not skipping:
+            result.append(line)
+    while result and result[-1].strip() == "":
+        result.pop()
+    return "\n".join(result).rstrip() + ("\n" if result else "")
+
+
+def get_shell_profile_paths() -> list[Path]:
+    if sys.platform == "win32":
+        return []
+    home = Path.home()
+    if sys.platform == "darwin":
+        return [home / ".zprofile", home / ".zshrc", home / ".bash_profile"]
+    return [home / ".profile", home / ".bashrc"]
+
+
+def ensure_shell_path_entry(bin_dir: Path, label: str) -> bool:
+    if sys.platform == "win32":
+        return True
+
+    export_line = f'export PATH="{bin_dir}:$PATH"'
+    block = "\n".join([SHELL_PATH_MARKER_BEGIN, export_line, SHELL_PATH_MARKER_END]) + "\n"
+    updated_any = False
+
+    for profile_path in get_shell_profile_paths():
+        try:
+            original = profile_path.read_text(encoding="utf-8") if profile_path.exists() else ""
+            cleaned = _remove_marked_block(original, SHELL_PATH_MARKER_BEGIN, SHELL_PATH_MARKER_END).rstrip()
+            updated = (cleaned + "\n\n" if cleaned else "") + block
+            profile_path.parent.mkdir(parents=True, exist_ok=True)
+            profile_path.write_text(updated, encoding="utf-8")
+            print_success(f"{label}: PATH 設定を書き込みました: {profile_path}")
+            updated_any = True
+        except Exception as e:
+            print_warning(f"{label}: PATH 設定の書き込みに失敗しました: {profile_path} ({e})")
+
+    return updated_any
 
 
 def ensure_gitignore_entries(entries: list[str], path: Path | None = None) -> bool:
@@ -988,35 +1041,59 @@ def setup_backend_hermes() -> bool:
         print_error(f"{label}: uv sync に失敗しました。")
         return False
 
-    cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
     hermes_dir = BACKEND_HERMES_DIR.resolve()
-    py_path = hermes_dir / BACKEND_HERMES_ENV / "Scripts" / "python.exe"
     cli_path = hermes_dir / "cli_main.py"
-    cmd_content = (
-        "@echo off\n"
-        "chcp 65001 >nul\n"
-        "setlocal\n"
-        "\n"
-        f'set "PY={py_path}"\n'
-        f'set "CLI={cli_path}"\n'
-        "\n"
-        'if not exist "%PY%" (\n'
-        '  echo Python virtual environment was not found:\n'
-        '  echo   %PY%\n'
-        '  pause\n'
-        '  exit /b 1\n'
-        ')\n'
-        "\n"
-        '"%PY%" "%CLI%" %*\n'
-    )
+    launcher_dir = Path.home() / ".local" / "bin"
+    launcher_dir.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "win32":
+        launcher_path = launcher_dir / "aidiy_hermes.cmd"
+        py_path = hermes_dir / BACKEND_HERMES_ENV / "Scripts" / "python.exe"
+        launcher_content = (
+            "@echo off\n"
+            "chcp 65001 >nul\n"
+            "setlocal\n"
+            "\n"
+            f'set "PY={py_path}"\n'
+            f'set "CLI={cli_path}"\n'
+            "\n"
+            'if not exist "%PY%" (\n'
+            '  echo Python virtual environment was not found:\n'
+            '  echo   %PY%\n'
+            '  pause\n'
+            '  exit /b 1\n'
+            ')\n'
+            "\n"
+            '"%PY%" "%CLI%" %*\n'
+        )
+    else:
+        launcher_path = launcher_dir / "aidiy_hermes"
+        py_path = hermes_dir / BACKEND_HERMES_ENV / "bin" / "python"
+        launcher_content = (
+            "#!/usr/bin/env sh\n"
+            f'PY="{py_path}"\n'
+            f'CLI="{cli_path}"\n'
+            'if [ ! -x "$PY" ]; then\n'
+            '  echo "Python virtual environment was not found:"\n'
+            '  echo "  $PY"\n'
+            '  exit 1\n'
+            'fi\n'
+            'exec "$PY" "$CLI" "$@"\n'
+        )
     try:
-        cmd_file.parent.mkdir(parents=True, exist_ok=True)
-        cmd_file.write_text(cmd_content, encoding="ascii")
-        print_success(f"{label}: aidiy_hermes.cmd を作成しました: {cmd_file}")
+        launcher_path.write_text(launcher_content, encoding="utf-8")
+        if sys.platform != "win32":
+            launcher_path.chmod(0o755)
+        print_success(f"{label}: {launcher_path.name} を作成しました: {launcher_path}")
         print_info(f"  Python: {py_path}")
         print_info(f"  CLI   : {cli_path}")
+        if sys.platform != "win32" and str(launcher_dir) not in os.environ.get("PATH", "").split(os.pathsep):
+            print_warning(f"{label}: {launcher_dir} が PATH に見つかりません。")
+            if ensure_shell_path_entry(launcher_dir, label):
+                print_info("  シェル設定へ PATH を追記しました。ターミナル再起動後に有効です。")
+            else:
+                print_info(f"  例: export PATH=\"{launcher_dir}:$PATH\"")
     except Exception as e:
-        print_warning(f"{label}: aidiy_hermes.cmd の作成に失敗しました: {e}")
+        print_warning(f"{label}: {launcher_path.name} の作成に失敗しました: {e}")
 
     print_success(f"{label}: セットアップが完了しました。")
     return True
@@ -1333,7 +1410,10 @@ def main():
     print_info("    MCP起動  : cd backend_mcp && uv run uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095")
     print_info("    Core起動 : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port 8091")
     print_info("    Apps起動 : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092")
-    print_info("    Hermes起動: aidiy_hermes.cmd または cd backend_hermes && .venv/Scripts/python.exe cli_main.py")
+    if sys.platform == "win32":
+        print_info("    Hermes起動: aidiy_hermes.cmd または cd backend_hermes && .venv/Scripts/python.exe cli_main.py")
+    else:
+        print_info("    Hermes起動: aidiy_hermes または cd backend_hermes && .venv/bin/python cli_main.py")
     print_info("    Web開発  : cd frontend_web && npm run dev")
     print_info("    Avatar   : cd frontend_avatar && npm run dev")
     print_info("セットアップは正常終了しました。5秒後に終了します...")

@@ -53,6 +53,8 @@ SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
 
 AUTO_MODE = False
 BACKEND_MCP_SERVER_PREFIX = "aidiy_"
+SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
+SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 
 NPM_PACKAGES = [
     "@anthropic-ai/claude-code",
@@ -232,6 +234,55 @@ def write_json_file(path: Path, data: dict) -> bool:
     except Exception as e:
         print_error(f"設定ファイル書き込みエラー: {path} ({e})")
         return False
+
+
+def _remove_marked_block(content: str, begin_marker: str, end_marker: str) -> str:
+    lines = content.splitlines()
+    result: list[str] = []
+    skipping = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped == begin_marker:
+            skipping = True
+            continue
+        if skipping and stripped == end_marker:
+            skipping = False
+            continue
+        if not skipping:
+            result.append(line)
+    while result and result[-1].strip() == "":
+        result.pop()
+    return "\n".join(result).rstrip() + ("\n" if result else "")
+
+
+def get_shell_profile_paths() -> list[Path]:
+    if sys.platform == "win32":
+        return []
+    home = Path.home()
+    if sys.platform == "darwin":
+        return [home / ".zprofile", home / ".zshrc", home / ".bash_profile"]
+    return [home / ".profile", home / ".bashrc"]
+
+
+def cleanup_shell_path_entries(label: str) -> int:
+    if sys.platform == "win32":
+        return 0
+
+    removed_count = 0
+    for profile_path in get_shell_profile_paths():
+        if not profile_path.exists():
+            continue
+        try:
+            original = profile_path.read_text(encoding="utf-8")
+            updated = _remove_marked_block(original, SHELL_PATH_MARKER_BEGIN, SHELL_PATH_MARKER_END)
+            if updated == original:
+                continue
+            profile_path.write_text(updated, encoding="utf-8")
+            print_success(f"{label}: PATH 設定を解除しました: {profile_path}")
+            removed_count += 1
+        except Exception as e:
+            print_warning(f"{label}: PATH 設定の解除に失敗しました: {profile_path} ({e})")
+    return removed_count
 
 
 def remove_json_mcp_servers_by_prefix(path: Path, prefix: str, top_key: str = "mcpServers") -> bool:
@@ -515,9 +566,12 @@ def cleanup_backend_hermes(base_dir: Path, choices: dict):
     print_header(f"{label} のクリーンアップ")
 
     deleted_count = 0
-    cmd_file = Path.home() / ".local" / "bin" / "aidiy_hermes.cmd"
-    if remove_file(cmd_file, f"aidiy_hermes.cmd ({label})"):
-        deleted_count += 1
+    launcher_dir = Path.home() / ".local" / "bin"
+    launcher_paths = [launcher_dir / "aidiy_hermes.cmd", launcher_dir / "aidiy_hermes"]
+    for launcher_path in launcher_paths:
+        if remove_file(launcher_path, f"{launcher_path.name} ({label})"):
+            deleted_count += 1
+    deleted_count += cleanup_shell_path_entries(label)
 
     hermes_dir = base_dir / BACKEND_HERMES_PATH
     if not hermes_dir.exists():

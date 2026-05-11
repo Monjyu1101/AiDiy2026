@@ -1924,7 +1924,7 @@ def _looks_like_slash_command(text: str) -> bool:
 _AIDIY_KEY_JSON = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
 _DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 _OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1"
-_OLLAMA_CLOUD_SUFFIXES = (":cloud", ":clude")
+_OLLAMA_CLOUD_SUFFIXES = (":cloud", ":cloude", ":clude")
 _CLOUD_MODEL_MAX_AGE_DAYS = 240
 _OPENAI_BASE_URL = "https://api.openai.com/v1"
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -2098,6 +2098,13 @@ def _strip_cloud_suffix(model: str) -> str:
         if lower.endswith(suffix):
             return name[: -len(suffix)]
     return name
+
+
+def _uses_ollama_cloud_model(model: str) -> bool:
+    if not isinstance(model, str):
+        return False
+    lower = model.strip().lower()
+    return any(lower.endswith(suffix) for suffix in _OLLAMA_CLOUD_SUFFIXES)
 
 
 def _model_from_display_label(label: str) -> str:
@@ -12255,7 +12262,7 @@ def _flatten_skills(skills: list[str] | None) -> str | None:
     return ",".join(skills)
 
 
-def _load_aidiy_hermes_defaults() -> dict[str, str]:
+def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str, str]:
     config_path = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
     try:
         with config_path.open("r", encoding="utf-8") as f:
@@ -12265,12 +12272,20 @@ def _load_aidiy_hermes_defaults() -> dict[str, str]:
 
     host = str(cfg.get("ollama_host") or "http://localhost:11434").strip().rstrip("/")
     model = str(
-        cfg.get("CODE_AIDIY_HERMES_MODEL")
+        requested_model
+        or cfg.get("CODE_AIDIY_HERMES_MODEL")
         or cfg.get("CHAT_OLLAMA_MODEL")
         or ""
     ).strip()
     if not model or model.lower() == "auto":
         model = str(cfg.get("CHAT_OLLAMA_MODEL") or "deepseek-v4-flash:cloud").strip()
+    if _uses_ollama_cloud_model(model):
+        return {
+            "provider": "custom",
+            "base_url": _OLLAMA_CLOUD_BASE_URL,
+            "api_key": str(cfg.get("ollama_key_id") or "no-key-required").strip() or "no-key-required",
+            "model": _strip_cloud_suffix(model),
+        }
     return {
         "provider": "custom",
         "base_url": host if host.endswith("/v1") else f"{host}/v1",
@@ -12353,7 +12368,7 @@ def cli_entry(argv: list[str] | None = None) -> int:
 
     query = args.oneshot or args.query or (" ".join(args.prompt) if args.prompt else None)
     quiet = bool(args.quiet or args.oneshot)
-    defaults = _load_aidiy_hermes_provider_defaults(args.provider) if args.provider else _load_aidiy_hermes_defaults()
+    defaults = _load_aidiy_hermes_provider_defaults(args.provider) if args.provider else _load_aidiy_hermes_defaults(args.model)
     provider = args.provider or defaults.get("provider")
     base_url = args.base_url or defaults.get("base_url")
     api_key = args.api_key or defaults.get("api_key")

@@ -24,7 +24,13 @@ import time
 from datetime import datetime
 from typing import Optional
 
-import pyautogui
+_PYAUTOGUI_IMPORT_ERROR: Optional[Exception] = None
+try:
+    import pyautogui
+except Exception as exc:
+    pyautogui = None
+    _PYAUTOGUI_IMPORT_ERROR = exc
+
 import screeninfo
 from PIL import Image, ImageDraw, ImageFont, ImageGrab
 
@@ -50,8 +56,17 @@ class DesktopCapture:
     # カーソル・モニター情報
     # ------------------------------------------------------------------ #
 
+    def _ensure_gui_backend(self) -> None:
+        if pyautogui is None:
+            reason = str(_PYAUTOGUI_IMPORT_ERROR) if _PYAUTOGUI_IMPORT_ERROR else "unknown"
+            raise DesktopCaptureError(
+                "デスクトップキャプチャは現在の環境で利用できません。"
+                f" GUI 初期化に失敗しました: {reason}"
+            )
+
     def cursor_pos(self) -> tuple[int, int]:
         """現在のマウスカーソル座標を返す"""
+        self._ensure_gui_backend()
         pos = pyautogui.position()
         return int(pos.x), int(pos.y)
 
@@ -107,6 +122,7 @@ class DesktopCapture:
 
         if not mons:
             # fallback: pyautogui
+            self._ensure_gui_backend()
             img = pyautogui.screenshot()
             return img, {
                 "x": 0, "y": 0,
