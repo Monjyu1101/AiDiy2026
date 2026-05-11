@@ -791,22 +791,15 @@ async def screenshot(
         if crosshair_pos or label_text:
             img = await asyncio.to_thread(capture.annotate, img, crosshair_pos, label_text)
 
-        # save_path 省略時は backend_server/temp/output/ に自動保存
-        if not save_path:
-            save_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "backend_server", "temp", "output",
-            )
-
+        # 保存先は capture.to_base64 が解決（save_path=None → DEFAULT_OUTPUT_DIR）
         data = await asyncio.to_thread(capture.to_base64, img, format, quality, save_path)
         mime = "image/jpeg" if format.lower() in ("jpeg", "jpg") else "image/png"
 
         logger.info(
             f"screenshot: mode={'window' if window_title else 'region' if x is not None else 'cursor' if size else 'screen'}"
             f"  size={img.size}  format={format}"
+            f"  save_path={save_path or '(default)'}"
         )
-        if save_path:
-            logger.info(f"screenshot saved: {save_path}")
 
         return [ImageContent(type="image", data=data, mimeType=mime)]
 
@@ -1250,24 +1243,16 @@ async def generate_image(
             model=model, size=size, quality=quality,
         )
 
-        # save_path 省略時は backend_server/temp/output/ に自動保存
-        resolved_save = save_path
-        if not resolved_save:
-            resolved_save = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                ig.DEFAULT_OUTPUT_DIR,
-            )
-
-        data = await asyncio.to_thread(ig.to_base64, img, "png", 85, resolved_save)
+        # 保存先は ig.to_base64 が解決（save_path=None → DEFAULT_OUTPUT_DIR）
+        data = await asyncio.to_thread(ig.to_base64, img, "png", 85, save_path)
         mime = "image/png"
 
         logger.info(
             f"generate_image: provider={info['provider']}  "
             f"model={info.get('model', '?')}  "
-            f"size={img.size}  prompt={info['prompt'][:60]}"
+            f"size={img.size}  prompt={info['prompt'][:60]}  "
+            f"save_path={save_path or '(default)'}"
         )
-        if resolved_save:
-            logger.info(f"generate_image saved: {resolved_save}")
 
         return [ImageContent(type="image", data=data, mimeType=mime)]
 
@@ -1323,56 +1308,72 @@ async def synthesize_speech(
     provider: str = "auto",
     model: str = "auto",
     voice: str = "auto",
+    ratio: Optional[float] = None,
     save_path: Optional[str] = None,
     local_play: bool = False,
-    local_rate: float = 1.2,
 ) -> str:
     """
-    テキストを音声（MP3）に変換する。
+    テキストを音声（MP3/WAV）に変換する。
 
     Args:
         speech_text: 合成するテキスト
         language: 言語コード（デフォルト "ja"）
-        provider: "auto"=edge / "edge"（無料） / "gemini"（GEMINI_API_KEY） /
+        provider: "auto"=freeai（キー未設定時は edge に自動フォールバック） /
+                  "edge"（無料） / "gemini"（GEMINI_API_KEY） /
                   "freeai"（FREEAI_API_KEY） / "openai"（OPENAI_API_KEY）
         model: "auto"（自動選択、デフォルト）
-        voice: "auto"（自動選択、デフォルト）
-        save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.mp3 で保存。
-                   ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
-        local_play: True でローカル再生を試行（デフォルト False）
-        local_rate: ローカル再生の速度倍率（デフォルト 1.2、ファイル保存は等倍）
+        voice: "auto"（= "female" として扱う）。"female" / "male" の指定も可:
+               openai: female=marin / male=echo に内部変換。
+                       直接指定 → alloy / ash / ballad / coral / echo / fable / nova /
+                       onyx / sage / shimmer / verse / marin（既定） / cedar
+               edge:   female / male を language に応じて
+                       ja-JP-NanamiNeural / ja-JP-KeitaNeural などへ内部変換。
+                       直接 ja-JP-NanamiNeural などの Microsoft Edge ニューラル音声名でも可。
+               gemini/freeai: female=Zephyr（既定） / male=Charon に内部変換。
+                       直接指定可能な voice（出典: Gemini TTS docs）:
+                       female系 → Achernar / Aoede / Autonoe / Callirrhoe / Despina /
+                                  Erinome / Gacrux / Kore / Laomedeia / Leda /
+                                  Pulcherrima / Sulafat / Vindemiatrix / Zephyr
+                       male系  → Achird / Algenib / Algieba / Alnilam / Charon /
+                                  Enceladus / Fenrir / Iapetus / Orus / Puck /
+                                  Rasalgethi / Sadachbia / Sadaltager / Schedar /
+                                  Umbriel / Zubenelgenubi
+        ratio: 話速倍率。None は既定値 1.2 として扱う。0 / 1 は速度調整なし。1.2 なら 20% 増し。
+               有効レンジは 0.5..2.0 に clamp（範囲外は端で丸める）。
+               edge は rate 文字列、openai は speed 引数、gemini/freeai は ffmpeg atempo で適用。
+        save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.<mp3|wav> で保存。
+                   ファイル指定なら可能な限りその拡張子形式で出力（mp3↔wav は ffmpeg 自動変換）。
+                   変換できない場合は実データの拡張子に差し替えて保存。
+                   省略時は backend_server/temp/output/ に保存。
+        local_play: True でローカル再生を試行（デフォルト False、速度は ratio 反映済み）
     """
     try:
-        mp3_bytes, info = await asyncio.to_thread(
-            tts.synthesize, speech_text, language, provider, model, voice
+        audio_bytes, info = await asyncio.to_thread(
+            tts.synthesize, speech_text, language, provider, model, voice, ratio
         )
 
-        # save_path 省略時は backend_server/temp/output/ に自動保存
-        resolved_save = save_path
-        if not resolved_save:
-            resolved_save = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                tts.DEFAULT_OUTPUT_DIR,
-            )
+        # 保存先は tts.to_base64 が解決（save_path=None → DEFAULT_OUTPUT_DIR）
+        base64_audio = await asyncio.to_thread(tts.to_base64, audio_bytes, save_path)
 
-        base64_mp3 = await asyncio.to_thread(tts.to_base64, mp3_bytes, resolved_save)
-
-        if local_play and mp3_bytes:
-            play_ok = await asyncio.to_thread(tts.play_mp3, mp3_bytes, local_rate)
+        if local_play and audio_bytes:
+            play_ok = await asyncio.to_thread(tts.play_mp3, audio_bytes)
             info["local_play_executed"] = play_ok
-            info["local_rate"] = local_rate
 
         logger.info(
             f"synthesize_speech: requested={info['requested_provider']}  "
             f"used={info['used_provider']}  "
             f"language={info['language']}  "
+            f"ratio={info['ratio']}  "
             f"text_length={len(speech_text)}  "
-            f"mp3_bytes={info['mp3_bytes_length']}"
+            f"audio_format={info['audio_format']}  "
+            f"audio_bytes={info['audio_bytes_length']}  "
+            f"save_path={save_path or '(default)'}"
         )
 
         return json.dumps({
             **info,
-            "base64_mp3": base64_mp3,
+            "base64_audio": base64_audio,
+            "base64_mp3": base64_audio,  # backward compat
             "local_play": local_play,
         }, ensure_ascii=False)
 

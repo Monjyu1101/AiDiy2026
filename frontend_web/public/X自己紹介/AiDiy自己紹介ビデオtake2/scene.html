@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AiDiy 自己紹介 - シーン</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      color: #eff8ff;
+      font-family: "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+      overflow: hidden;
+    }
+
+    .stage {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr 36%;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .visual {
+      position: relative;
+      min-width: 0;
+      border: 1px solid rgba(139, 225, 255, 0.25);
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        rgba(4, 12, 24, 0.72);
+      background-size: 34px 34px;
+      overflow: hidden;
+    }
+
+    .visual::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 25%, rgba(0, 255, 255, 0.18), transparent 28%),
+        radial-gradient(circle at 78% 70%, rgba(255, 0, 200, 0.14), transparent 30%);
+      pointer-events: none;
+    }
+
+    .visual-inner {
+      position: relative;
+      height: 100%;
+      padding: 30px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 22px;
+    }
+
+    .scene-kicker {
+      color: #77dfff;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .scene-main {
+      display: grid;
+      place-items: center;
+      text-align: center;
+      min-height: 0;
+    }
+
+    .screen-text {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+      justify-content: center;
+      max-width: 900px;
+      font-weight: 900;
+      color: #f6fbff;
+      text-shadow: 0 0 26px rgba(41, 216, 255, 0.32);
+    }
+
+    .screen-text .line-primary {
+      font-size: 52px;
+      line-height: 1.08;
+    }
+
+    .screen-text .line-secondary {
+      font-size: 26px;
+      line-height: 1.3;
+      color: #c5d7e8;
+    }
+
+    .diagram {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .node {
+      min-width: 110px;
+      padding: 11px 14px;
+      border: 1px solid rgba(155, 236, 255, 0.4);
+      border-radius: 8px;
+      background: rgba(8, 24, 42, 0.86);
+      color: #bff4ff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .side {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(5, 12, 22, 0.76);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .scene-title {
+      font-size: 28px;
+      font-weight: 900;
+      line-height: 1.22;
+      margin: 0 0 12px;
+      color: #ffffff;
+    }
+
+    .source-hint {
+      color: #8ea8ba;
+      font-size: 13px;
+      line-height: 1.7;
+      border-left: 3px solid #29d8ff;
+      padding-left: 12px;
+      margin-bottom: 16px;
+    }
+
+    .narration-label {
+      color: #ffe35c;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .narration {
+      color: #dbe9f4;
+      font-size: 17px;
+      line-height: 1.85;
+      margin: 0;
+    }
+
+    .fade-enter {
+      animation: fadeIn 420ms ease both;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 960px) {
+      .stage {
+        grid-template-columns: 1fr;
+        padding: 0;
+        gap: 0;
+        overflow-y: auto;
+      }
+      .visual { min-height: 200px; }
+      .screen-text .line-primary { font-size: 34px; }
+      .screen-text .line-secondary { font-size: 20px; }
+      .scene-title { font-size: 24px; }
+      .narration { font-size: 15px; line-height: 1.6; }
+    }
+  </style>
+  <script src="scenario.js"></script>
+</head>
+<body>
+  <div class="stage fade-enter">
+    <section class="visual">
+      <div class="visual-inner">
+        <div id="sceneKicker" class="scene-kicker"></div>
+        <div class="scene-main">
+          <div>
+            <div id="screenText" class="screen-text"></div>
+            <div id="diagram" class="diagram"></div>
+          </div>
+        </div>
+        <div id="visualType" class="scene-kicker"></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <h1 id="sceneTitle" class="scene-title"></h1>
+      <div id="sourceHint" class="source-hint"></div>
+      <div class="narration-label">Narration</div>
+      <p id="narration" class="narration"></p>
+    </aside>
+  </div>
+
+  <script>
+    (function () {
+      const scenario = window.SCENARIO;
+      const nodeMap = window.SCENARIO_DIAGRAM_NODES || {};
+      const params = new URLSearchParams(window.location.search);
+      const requested = Number.parseInt(params.get("n") || "1", 10);
+      const idx = Number.isFinite(requested)
+        ? Math.min(Math.max(requested - 1, 0), scenario.scenes.length - 1)
+        : 0;
+      const scene = scenario.scenes[idx];
+
+      document.getElementById("sceneTitle").textContent = scene.title;
+      document.getElementById("sceneKicker").textContent =
+        `${scene.id} / ${scenario.title}`;
+      document.getElementById("visualType").textContent = scene.visual_type;
+      document.getElementById("sourceHint").textContent = scene.source_hint;
+      document.getElementById("narration").textContent = scene.narration;
+
+      const screenText = document.getElementById("screenText");
+      screenText.innerHTML = "";
+      String(scene.screen_text || "").split("\n").forEach((line, i) => {
+        const div = document.createElement("div");
+        div.className = i === 0 ? "line-primary" : "line-secondary";
+        div.textContent = line;
+        screenText.appendChild(div);
+      });
+
+      const diagram = document.getElementById("diagram");
+      diagram.innerHTML = "";
+      for (const label of nodeMap[scene.visual_type] || []) {
+        const node = document.createElement("div");
+        node.className = "node";
+        node.textContent = label;
+        diagram.appendChild(node);
+      }
+    })();
+  </script>
+</body>
+</html>

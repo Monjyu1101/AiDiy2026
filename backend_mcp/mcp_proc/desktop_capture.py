@@ -22,6 +22,7 @@ import io
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 _PYAUTOGUI_IMPORT_ERROR: Optional[Exception] = None
@@ -51,6 +52,8 @@ class DesktopCapture:
         "1"    — モニター番号 1
         ...
     """
+
+    DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
 
     # ------------------------------------------------------------------ #
     # カーソル・モニター情報
@@ -354,6 +357,26 @@ class DesktopCapture:
     # 出力
     # ------------------------------------------------------------------ #
 
+    def _resolve_default_output_dir(self) -> str:
+        """プロジェクトルート起点で DEFAULT_OUTPUT_DIR を絶対パス化する"""
+        project_root = Path(__file__).resolve().parent.parent.parent
+        return str(project_root / self.DEFAULT_OUTPUT_DIR)
+
+    @staticmethod
+    def _is_directory_path(path: str) -> bool:
+        """save_path をフォルダ扱いとするか判定する。
+           - 既存ディレクトリ
+           - 末尾が / または \\
+           - 拡張子なし
+        """
+        if os.path.isdir(path):
+            return True
+        if path.endswith(("/", "\\")):
+            return True
+        if not os.path.splitext(path)[1]:
+            return True
+        return False
+
     def to_base64(
         self,
         img: Image.Image,
@@ -366,9 +389,11 @@ class DesktopCapture:
         Args:
             fmt: "png" または "jpeg"
             quality: JPEG 品質 (1-100)
-            save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
-                       ファイル指定なら指定ファイルに上書き保存（拡張子に合わせて変換）。
-                       省略時は保存しない。
+            save_path: 保存先。
+                       フォルダ指定（既存ディレクトリ / 末尾 / または \\ / 拡張子なし）なら
+                       そのフォルダに yyyymmdd.hhmmss.png で保存（常に PNG）。
+                       ファイル指定（拡張子あり）なら指定ファイルに上書き保存（拡張子に合わせて変換）。
+                       None なら DEFAULT_OUTPUT_DIR にデフォルト保存。
         """
         buf = io.BytesIO()
         fmt_upper = fmt.upper()
@@ -379,32 +404,34 @@ class DesktopCapture:
             img.save(buf, format="PNG", optimize=True)
         data = buf.getvalue()
 
-        if save_path:
-            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
-                # フォルダ指定 → yyyymmdd.hhmmss.png で保存（常に PNG）
-                os.makedirs(save_path, exist_ok=True)
-                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
-                dest = os.path.join(save_path, fname)
+        if save_path is None:
+            save_path = self._resolve_default_output_dir()
+
+        if self._is_directory_path(save_path):
+            # フォルダ指定 → yyyymmdd.hhmmss.png で保存（常に PNG）
+            os.makedirs(save_path, exist_ok=True)
+            fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
+            dest = os.path.join(save_path, fname)
+            file_buf = io.BytesIO()
+            img.save(file_buf, format="PNG", optimize=True)
+            file_data = file_buf.getvalue()
+        else:
+            # ファイル指定 → 拡張子に合わせて変換して上書き保存
+            dest = save_path
+            parent = os.path.dirname(os.path.abspath(dest))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            ext = os.path.splitext(save_path)[1].lower()
+            if ext in (".jpg", ".jpeg"):
+                file_buf = io.BytesIO()
+                img.convert("RGB").save(file_buf, format="JPEG", quality=quality, optimize=True)
+                file_data = file_buf.getvalue()
+            else:
+                # .png その他 → PNG で保存
                 file_buf = io.BytesIO()
                 img.save(file_buf, format="PNG", optimize=True)
                 file_data = file_buf.getvalue()
-            else:
-                # ファイル指定 → 拡張子に合わせて変換して上書き保存
-                dest = save_path
-                parent = os.path.dirname(os.path.abspath(dest))
-                if parent:
-                    os.makedirs(parent, exist_ok=True)
-                ext = os.path.splitext(save_path)[1].lower()
-                if ext in (".jpg", ".jpeg"):
-                    file_buf = io.BytesIO()
-                    img.convert("RGB").save(file_buf, format="JPEG", quality=quality, optimize=True)
-                    file_data = file_buf.getvalue()
-                else:
-                    # .png その他 → PNG で保存
-                    file_buf = io.BytesIO()
-                    img.save(file_buf, format="PNG", optimize=True)
-                    file_data = file_buf.getvalue()
-            with open(dest, "wb") as f:
-                f.write(file_data)
+        with open(dest, "wb") as f:
+            f.write(file_data)
 
         return base64.b64encode(data).decode("ascii")

@@ -394,7 +394,9 @@ export class AudioController {
       }
 
       analyser.getByteFrequencyData(data)
-      this.updateSpeakerLevel(this.computeLevel(data))
+      const level = this.computeLevel(data)
+      this.updateSpeakerLevel(level)
+      this.options.onOutputLevel?.(level)
       this.options.onOutputSpectrum?.(this.buildSpectrum(data))
 
       if (this.speakerSources.size > 0 || this.visualizerSources.size > 0) {

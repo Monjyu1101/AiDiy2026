@@ -17,6 +17,7 @@ from contextlib import AsyncExitStack
 from typing import Any
 
 import anyio
+import httpx
 
 import mcp.types as types
 from mcp import ClientSession
@@ -53,6 +54,24 @@ def _mcp_model_to_dict(value: Any) -> dict[str, Any] | None:
 def build_default_sse_url(host: str, port: int, mount_path: str) -> str:
     normalized_path = mount_path if mount_path.startswith("/") else f"/{mount_path}"
     return f"http://{host}:{port}{normalized_path}"
+
+
+def create_local_http_client(
+    headers: dict[str, str] | None = None,
+    timeout: httpx.Timeout | None = None,
+    auth: httpx.Auth | None = None,
+) -> httpx.AsyncClient:
+    """localhost SSE への接続で環境由来の proxy 設定を踏まない。"""
+    kwargs: dict[str, Any] = {
+        "follow_redirects": True,
+        "trust_env": False,
+        "timeout": timeout or httpx.Timeout(30.0, read=300.0),
+    }
+    if headers is not None:
+        kwargs["headers"] = headers
+    if auth is not None:
+        kwargs["auth"] = auth
+    return httpx.AsyncClient(**kwargs)
 
 
 def parse_args() -> argparse.Namespace:
@@ -128,6 +147,7 @@ class BackendMcpBridge:
                     self.sse_url,
                     timeout=self.http_timeout,
                     sse_read_timeout=self.sse_read_timeout,
+                    httpx_client_factory=create_local_http_client,
                 )
             )
             session = await self._stack.enter_async_context(ClientSession(read_stream, write_stream))

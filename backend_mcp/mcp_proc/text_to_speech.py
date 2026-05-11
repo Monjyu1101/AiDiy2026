@@ -28,7 +28,11 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+from log_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class TextToSpeechError(Exception):
@@ -41,7 +45,7 @@ class TextToSpeech:
     テキスト音声合成クラス
 
     provider:
-        "auto"   — edge（デフォルト、無料・API キー不要）
+        "auto"   — freeai（デフォルト。キー未設定時は edge に自動フォールバック）
         "edge"   — Microsoft Edge ニューラル TTS
         "gemini" — Google Gemini TTS（GEMINI_API_KEY が必要）
         "freeai" — FreeAI TTS（FREEAI_API_KEY が必要、実体は Gemini）
@@ -57,6 +61,40 @@ class TextToSpeech:
         "gemini": "Zephyr",
         "freeai": "Zephyr",
     }
+
+    # Edge: voice="female" / "male" を実音声名へ変換するためのエイリアス。
+    # 言語コード（小文字、ハイフン前まで）で引く。未登録言語は "ja" にフォールバック。
+    EDGE_GENDER_VOICES = {
+        "ja": {"female": "ja-JP-NanamiNeural", "male": "ja-JP-KeitaNeural"},
+        "en": {"female": "en-US-AvaNeural",    "male": "en-US-AndrewNeural"},
+        "zh": {"female": "zh-CN-XiaoxiaoNeural", "male": "zh-CN-YunxiNeural"},
+        "ko": {"female": "ko-KR-SunHiNeural", "male": "ko-KR-InJoonNeural"},
+    }
+
+    # OpenAI: voice="female" / "male" の実音声名（言語非依存）
+    OPENAI_GENDER_VOICES = {
+        "female": "marin",
+        "male":   "echo",
+    }
+
+    # Gemini / FreeAI: voice="female" / "male" の実音声名（言語非依存）
+    # 出典: https://docs.cloud.google.com/text-to-speech/docs/gemini-tts
+    GEMINI_GENDER_VOICES = {
+        "female": "Zephyr",
+        "male":   "Charon",
+    }
+
+    # Gemini 利用可能 voice 一覧（参考用）
+    GEMINI_FEMALE_VOICES = [
+        "Achernar", "Aoede", "Autonoe", "Callirrhoe", "Despina", "Erinome",
+        "Gacrux", "Kore", "Laomedeia", "Leda", "Pulcherrima", "Sulafat",
+        "Vindemiatrix", "Zephyr",
+    ]
+    GEMINI_MALE_VOICES = [
+        "Achird", "Algenib", "Algieba", "Alnilam", "Charon", "Enceladus",
+        "Fenrir", "Iapetus", "Orus", "Puck", "Rasalgethi", "Sadachbia",
+        "Sadaltager", "Schedar", "Umbriel", "Zubenelgenubi",
+    ]
 
     # OpenAI デフォルト
     DEFAULT_OPENAI_MODEL = "gpt-4o-mini-tts"
@@ -78,6 +116,58 @@ class TextToSpeech:
     # AiDiy_key.json へのパス（backend_mcp 起点）
     _KEY_CONFIG_REL = "../backend_server/_config/AiDiy_key.json"
     _TTS_CONFIG_REL = "../backend_server/_config/aidiy_text_to_speech.json"
+
+    # ------------------------------------------------------------------ #
+    # 起動時 ffmpeg プローブ
+    # ------------------------------------------------------------------ #
+
+    def __init__(self) -> None:
+        # 起動時に ffmpeg -version で利用可否を確認し、結果をキャッシュする。
+        # 不在時は self.ffmpeg_path = None となり、mp3↔wav 変換 / atempo は黙ってスキップされる。
+        self.ffmpeg_info: dict[str, Any] = self._probe_ffmpeg()
+        self.ffmpeg_path: Optional[str] = (
+            self.ffmpeg_info.get("resolved") if self.ffmpeg_info.get("ok") else None
+        )
+
+    @staticmethod
+    def _probe_ffmpeg() -> dict[str, Any]:
+        """ffmpeg -version を起動時に確認する（ffmpeg_control._probe_versions と同手順）"""
+        exe = "ffmpeg"
+        resolved = shutil.which(exe)
+        if not resolved:
+            logger.warning(f"{exe} を解決できません: PATH 上に見つかりません。mp3↔wav 変換は無効化されます")
+            return {"ok": False, "configured": exe, "error": "not found in PATH"}
+        try:
+            proc = subprocess.run(
+                [resolved, "-version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=10,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning(f"{exe} -version タイムアウト: {resolved}")
+            return {"ok": False, "configured": exe, "resolved": resolved, "error": "timeout"}
+        except OSError as e:
+            logger.warning(f"{exe} -version 起動失敗: {e}")
+            return {"ok": False, "configured": exe, "resolved": resolved, "error": str(e)}
+
+        stdout_text = (proc.stdout or b"").decode("utf-8", errors="replace")
+        first_line = stdout_text.splitlines()[0] if stdout_text else ""
+        ok = proc.returncode == 0 and bool(first_line)
+        if ok:
+            logger.info(f"{exe} OK: {first_line}")
+        else:
+            logger.warning(
+                f"{exe} -version 失敗 (rc={proc.returncode}): {resolved}"
+            )
+        return {
+            "ok": ok,
+            "configured": exe,
+            "resolved": resolved,
+            "returncode": proc.returncode,
+            "version": first_line,
+        }
 
     # 読み上げ用の用語変換辞書。
     # 入力テキスト自体は変えず、音声合成へ渡す直前だけ適用する。
@@ -275,6 +365,46 @@ class TextToSpeech:
     # 音声合成（dispatch）
     # ------------------------------------------------------------------ #
 
+    DEFAULT_RATIO_WHEN_NONE = 1.2
+    RATIO_MIN = 0.5
+    RATIO_MAX = 2.0
+
+    @classmethod
+    def _normalize_ratio(cls, ratio: Optional[float]) -> float:
+        """ratio を正規化する。
+           - None → DEFAULT_RATIO_WHEN_NONE（1.2）
+           - 0 / 1 / 不正値 → 1.0（速度調整なし）
+           - それ以外 → RATIO_MIN..RATIO_MAX（0.5..2.0）に clamp
+             （openai speed と ffmpeg atempo の共通可動域に揃え、edge も含めて全 provider 統一）
+        """
+        if ratio is None:
+            return cls.DEFAULT_RATIO_WHEN_NONE
+        try:
+            value = float(ratio)
+        except (TypeError, ValueError):
+            return 1.0
+        if value == 0 or value == 1:
+            return 1.0
+        if value < cls.RATIO_MIN:
+            return cls.RATIO_MIN
+        if value > cls.RATIO_MAX:
+            return cls.RATIO_MAX
+        return value
+
+    @staticmethod
+    def _edge_rate_str(ratio: float) -> str:
+        """edge_tts の rate 文字列（例: 1.2 → '+20%'、0.8 → '-20%'）"""
+        pct = int(round((ratio - 1.0) * 100))
+        sign = "+" if pct >= 0 else ""
+        return f"{sign}{pct}%"
+
+    @staticmethod
+    def _detect_audio_format(audio_bytes: bytes) -> str:
+        """先頭バイトから wav / mp3 を判定する"""
+        if len(audio_bytes) >= 12 and audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE":
+            return "wav"
+        return "mp3"
+
     def synthesize(
         self,
         speech_text: str,
@@ -282,17 +412,24 @@ class TextToSpeech:
         provider: str = "auto",
         model: str = "auto",
         voice: str = "auto",
+        ratio: Optional[float] = None,
     ) -> tuple[bytes, dict]:
         """
         テキストから音声を合成する。
         指定 provider のキーが無効な場合は自動で edge にフォールバックする。
 
+        Args:
+            ratio: 話速倍率。None は既定値 1.2 として扱う。0 / 1 は速度調整なし。
+                   有効レンジは 0.5..2.0 に clamp。範囲外は端で丸める。
+                   edge は rate 文字列、openai は speed 引数、gemini/freeai は ffmpeg atempo で適用。
+
         Returns:
-            (mp3_bytes, info_dict)
+            (audio_bytes, info_dict)
         """
         if not speech_text or not speech_text.strip():
             raise TextToSpeechError("speech_text は必須です")
 
+        effective_ratio = self._normalize_ratio(ratio)
         normalized_text, replacements = self.normalize_for_speech(speech_text)
         requested = self._normalize_provider(provider)
         model = model.strip().lower()
@@ -304,25 +441,27 @@ class TextToSpeech:
             if self._get_api_key(requested) is None:
                 used = "edge"
 
-        voice = self._resolve_voice(voice, used)
+        voice = self._resolve_voice(voice, used, language)
 
         try:
             if used == "edge":
-                mp3_bytes = self._synthesize_edge(normalized_text, voice)
+                audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
             elif used == "gemini":
-                mp3_bytes = self._synthesize_gemini(normalized_text, voice, model, used)
+                audio_bytes = self._synthesize_gemini(normalized_text, voice, model, used, effective_ratio)
             elif used == "freeai":
-                mp3_bytes = self._synthesize_gemini(normalized_text, voice, model, used)
+                audio_bytes = self._synthesize_gemini(normalized_text, voice, model, used, effective_ratio)
             elif used == "openai":
-                mp3_bytes = self._synthesize_openai(normalized_text, voice, model)
+                audio_bytes = self._synthesize_openai(normalized_text, voice, model, effective_ratio)
             else:
                 raise TextToSpeechError(f"未対応の provider です: '{used}'")
         except Exception:
             if used == "edge":
                 raise
             used = "edge"
-            voice = self._resolve_voice("auto", used)
-            mp3_bytes = self._synthesize_edge(normalized_text, voice)
+            voice = self._resolve_voice("auto", used, language)
+            audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
+
+        audio_format = self._detect_audio_format(audio_bytes)
 
         info = {
             "requested_provider": requested,
@@ -330,20 +469,24 @@ class TextToSpeech:
             "model": model if model != "auto" else self._default_model(used),
             "voice": voice,
             "language": language,
+            "ratio": effective_ratio,
             "speech_text": normalized_text,
             "original_speech_text": speech_text,
             "pronunciation_replacements": replacements,
-            "mp3_bytes_length": len(mp3_bytes),
+            "audio_format": audio_format,
+            "audio_bytes_length": len(audio_bytes),
+            "mp3_bytes_length": len(audio_bytes),  # backward compat
         }
-        return mp3_bytes, info
+        return audio_bytes, info
 
     # ------------------------------------------------------------------ #
     # Edge TTS
     # ------------------------------------------------------------------ #
 
-    def _synthesize_edge(self, text: str, voice: str) -> bytes:
+    def _synthesize_edge(self, text: str, voice: str, ratio: float = 1.0) -> bytes:
         import edge_tts
-        communicate = edge_tts.Communicate(text, voice)
+        rate_str = self._edge_rate_str(ratio)
+        communicate = edge_tts.Communicate(text, voice, rate=rate_str)
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
             tmp_path = tmp.name
         try:
@@ -360,7 +503,7 @@ class TextToSpeech:
     # OpenAI TTS
     # ------------------------------------------------------------------ #
 
-    def _synthesize_openai(self, text: str, voice: str, model: str) -> bytes:
+    def _synthesize_openai(self, text: str, voice: str, model: str, ratio: float = 1.0) -> bytes:
         try:
             from openai import OpenAI
         except ImportError:
@@ -381,6 +524,7 @@ class TextToSpeech:
                 voice=voice,
                 input=text,
                 response_format="mp3",
+                speed=ratio,
                 extra_headers={"x-idempotency-key": str(uuid.uuid4())},
             )
             response.stream_to_file(tmp_path)
@@ -399,7 +543,7 @@ class TextToSpeech:
     # Gemini / FreeAI TTS
     # ------------------------------------------------------------------ #
 
-    def _synthesize_gemini(self, text: str, voice: str, model: str, provider: str) -> bytes:
+    def _synthesize_gemini(self, text: str, voice: str, model: str, provider: str, ratio: float = 1.0) -> bytes:
         import requests
         api_key = self._get_api_key(provider) or ""
 
@@ -469,8 +613,11 @@ class TextToSpeech:
 
         pcm_bytes = base64.b64decode(audio_b64)
         wav_bytes = self._pcm_to_wav(pcm_bytes)
+        audio_bytes = self._wav_to_mp3(wav_bytes)
 
-        return self._wav_to_mp3(wav_bytes)
+        if ratio != 1.0:
+            audio_bytes = self._apply_atempo(audio_bytes, ratio)
+        return audio_bytes
 
     # ------------------------------------------------------------------ #
     # PCM / WAV / MP3 変換
@@ -503,24 +650,81 @@ class TextToSpeech:
 
     def _wav_to_mp3(self, wav_bytes: bytes) -> bytes:
         """ffmpeg で WAV → MP3 変換。ffmpeg 不在時は WAV のまま返す"""
-        ffmpeg = shutil.which("ffmpeg")
+        if not self.ffmpeg_path:
+            return wav_bytes
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp.write(wav_bytes)
             wav_path = tmp.name
         mp3_path = wav_path.rsplit(".", 1)[0] + ".mp3"
         try:
-            if ffmpeg:
-                subprocess.run(
-                    [ffmpeg, "-i", wav_path, "-y", "-loglevel", "error", mp3_path],
-                    check=True, timeout=30,
-                )
-                if os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0:
-                    with open(mp3_path, "rb") as f:
-                        return f.read()
-            # ffmpeg 不在 → WAV のまま返す
+            subprocess.run(
+                [self.ffmpeg_path, "-i", wav_path, "-y", "-loglevel", "error", mp3_path],
+                check=True, timeout=30,
+            )
+            if os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0:
+                with open(mp3_path, "rb") as f:
+                    return f.read()
             return wav_bytes
         finally:
             for p in (wav_path, mp3_path):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
+    def _apply_atempo(self, audio_bytes: bytes, ratio: float) -> bytes:
+        """ffmpeg atempo で速度調整。ffmpeg 不在/失敗時は元のバイトを返す"""
+        if not self.ffmpeg_path:
+            return audio_bytes
+        ext = "." + self._detect_audio_format(audio_bytes)
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_in:
+            tmp_in.write(audio_bytes)
+            in_path = tmp_in.name
+        out_path = in_path.rsplit(".", 1)[0] + "_t" + ext
+        try:
+            result = subprocess.run(
+                [self.ffmpeg_path, "-i", in_path, "-af", f"atempo={ratio}",
+                 "-y", "-loglevel", "error", out_path],
+                timeout=30,
+            )
+            if result.returncode == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                with open(out_path, "rb") as f:
+                    return f.read()
+            return audio_bytes
+        except (subprocess.SubprocessError, OSError):
+            return audio_bytes
+        finally:
+            for p in (in_path, out_path):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
+    def _convert_audio(self, audio_bytes: bytes, src: str, dst: str) -> Optional[bytes]:
+        """mp3 ↔ wav 変換を試みる。同形式ならそのまま、ffmpeg 不在/失敗/未対応拡張子なら None"""
+        if src == dst:
+            return audio_bytes
+        if {src, dst} != {"mp3", "wav"}:
+            return None
+        if not self.ffmpeg_path:
+            return None
+        with tempfile.NamedTemporaryFile(suffix=f".{src}", delete=False) as tmp_in:
+            tmp_in.write(audio_bytes)
+            in_path = tmp_in.name
+        out_path = in_path.rsplit(".", 1)[0] + f".{dst}"
+        try:
+            result = subprocess.run(
+                [self.ffmpeg_path, "-i", in_path, "-y", "-loglevel", "error", out_path],
+                timeout=30,
+            )
+            if result.returncode == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                with open(out_path, "rb") as f:
+                    return f.read()
+            return None
+        except (subprocess.SubprocessError, OSError):
+            return None
+        finally:
+            for p in (in_path, out_path):
                 try:
                     os.remove(p)
                 except OSError:
@@ -530,38 +734,26 @@ class TextToSpeech:
     # ローカル再生
     # ------------------------------------------------------------------ #
 
-    def play_mp3(self, mp3_bytes: bytes, speed: float = 1.0) -> bool:
-        if not mp3_bytes:
+    def play_mp3(self, audio_bytes: bytes) -> bool:
+        """合成済みバイトをそのままローカル再生する（速度補正なし）"""
+        if not audio_bytes:
             return False
-        mp3_path = None
+        ext = "." + self._detect_audio_format(audio_bytes)
+        tmp_path = None
         try:
-            fd, mp3_path = tempfile.mkstemp(suffix=".mp3")
-            os.write(fd, mp3_bytes)
+            fd, tmp_path = tempfile.mkstemp(suffix=ext)
+            os.write(fd, audio_bytes)
             os.close(fd)
-
-            if speed != 1.0 and shutil.which("ffmpeg"):
-                mp3_path = self._tempo_mp3(mp3_path, speed)
-
-            self._playsound(mp3_path)
+            self._playsound(tmp_path)
             return True
         except Exception:
             return False
         finally:
-            if mp3_path:
+            if tmp_path:
                 try:
-                    os.remove(mp3_path)
+                    os.remove(tmp_path)
                 except OSError:
                     pass
-
-    def _tempo_mp3(self, path: str, speed: float) -> str:
-        """ffmpeg atempo で速度調整した一時ファイルを作ってパスを返す"""
-        out_path = path.rsplit(".", 1)[0] + "_t.mp3"
-        subprocess.run(
-            [shutil.which("ffmpeg"), "-i", path, "-af", f"atempo={speed}",
-             "-y", "-loglevel", "error", out_path],
-            check=True, timeout=30,
-        )
-        return out_path
 
     @staticmethod
     def _playsound(path: str) -> None:
@@ -570,8 +762,10 @@ class TextToSpeech:
         pf = platform.system()
         if pf == "Windows":
             import ctypes
+            ext = os.path.splitext(path)[1].lower()
+            mci_type = "waveaudio" if ext == ".wav" else "mpegvideo"
             ctypes.windll.winmm.mciSendStringW(
-                f'open "{path}" type mpegvideo alias _tts', None, 0, None)
+                f'open "{path}" type {mci_type} alias _tts', None, 0, None)
             ctypes.windll.winmm.mciSendStringW(
                 'play _tts wait', None, 0, None)
             ctypes.windll.winmm.mciSendStringW(
@@ -586,32 +780,77 @@ class TextToSpeech:
     # 出力
     # ------------------------------------------------------------------ #
 
+    def _resolve_default_output_dir(self) -> str:
+        """プロジェクトルート起点で DEFAULT_OUTPUT_DIR を絶対パス化する"""
+        project_root = Path(__file__).resolve().parent.parent.parent
+        return str(project_root / self.DEFAULT_OUTPUT_DIR)
+
+    @staticmethod
+    def _is_directory_path(path: str) -> bool:
+        """save_path をフォルダ扱いとするか判定する。
+           - 既存ディレクトリ
+           - 末尾が / または \\
+           - 拡張子なし
+        """
+        if os.path.isdir(path):
+            return True
+        if path.endswith(("/", "\\")):
+            return True
+        if not os.path.splitext(path)[1]:
+            return True
+        return False
+
     def to_base64(
         self,
-        mp3_bytes: bytes,
+        audio_bytes: bytes,
         save_path: Optional[str] = None,
     ) -> str:
-        """MP3 バイト列を Base64 文字列で返す。
+        """音声バイト列を Base64 文字列で返す。
 
         Args:
-            mp3_bytes: MP3 バイナリデータ
-            save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.mp3 で保存。
-                       ファイル指定なら指定ファイルに上書き保存。省略時は保存しない。
+            audio_bytes: 音声バイナリ（MP3 / WAV）
+            save_path: 保存先。
+                       フォルダ指定（既存ディレクトリ / 末尾 / または \\ / 拡張子なし）なら
+                       そのフォルダに yyyymmdd.hhmmss.<実フォーマット> で保存。
+                       ファイル指定（拡張子あり）なら可能な限り指定拡張子の形式で出力。
+                       mp3 ↔ wav 変換は ffmpeg があれば自動。
+                       変換できない場合は実データの拡張子に差し替えて保存。
+                       None なら DEFAULT_OUTPUT_DIR にデフォルト保存。
         """
-        if save_path:
-            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
-                os.makedirs(save_path, exist_ok=True)
-                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".mp3"
-                dest = os.path.join(save_path, fname)
-            else:
-                dest = save_path
-                parent = os.path.dirname(os.path.abspath(dest))
-                if parent:
-                    os.makedirs(parent, exist_ok=True)
-            with open(dest, "wb") as f:
-                f.write(mp3_bytes)
+        source_format = self._detect_audio_format(audio_bytes)
 
-        return base64.b64encode(mp3_bytes).decode("ascii")
+        if save_path is None:
+            save_path = self._resolve_default_output_dir()
+
+        if self._is_directory_path(save_path):
+            os.makedirs(save_path, exist_ok=True)
+            fname = datetime.now().strftime("%Y%m%d.%H%M%S") + f".{source_format}"
+            dest = os.path.join(save_path, fname)
+            out_bytes = audio_bytes
+        else:
+            parent = os.path.dirname(os.path.abspath(save_path))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+
+            requested = os.path.splitext(save_path)[1].lower().lstrip(".")
+            if requested == source_format:
+                dest = save_path
+                out_bytes = audio_bytes
+            else:
+                converted = self._convert_audio(audio_bytes, source_format, requested)
+                if converted is not None:
+                    dest = save_path
+                    out_bytes = converted
+                else:
+                    # 変換できない → 拡張子だけ差し替え
+                    base, _ = os.path.splitext(save_path)
+                    dest = f"{base}.{source_format}"
+                    out_bytes = audio_bytes
+
+        with open(dest, "wb") as f:
+            f.write(out_bytes)
+
+        return base64.b64encode(out_bytes).decode("ascii")
 
     # ------------------------------------------------------------------ #
     # 内部ヘルパー
@@ -620,16 +859,30 @@ class TextToSpeech:
     def _normalize_provider(self, provider: str) -> str:
         p = provider.strip().lower()
         if p == "auto":
-            return "edge"
+            return "freeai"
         if p in ("edge", "openai", "gemini", "freeai"):
             return p
         raise TextToSpeechError(
             f"未対応の provider です: '{provider}'（edge / openai / gemini / freeai）"
         )
 
-    def _resolve_voice(self, voice: str, provider: str) -> str:
+    def _resolve_voice(self, voice: str, provider: str, language: str = "ja") -> str:
         v = voice.strip()
-        if v.lower() == "auto":
+        v_lower = v.lower()
+        # "auto" は "female" 既定として扱う（provider 別の female マッピングへ）
+        if v_lower == "auto":
+            v_lower = "female"
+        # "female" / "male" を provider 別の実音声名に変換
+        if v_lower in ("female", "male"):
+            if provider == "edge":
+                lang_key = (language or "ja").split("-")[0].lower() or "ja"
+                mapping = self.EDGE_GENDER_VOICES.get(lang_key) or self.EDGE_GENDER_VOICES["ja"]
+                return mapping[v_lower]
+            if provider == "openai":
+                return self.OPENAI_GENDER_VOICES[v_lower]
+            if provider in ("gemini", "freeai"):
+                return self.GEMINI_GENDER_VOICES[v_lower]
+            # 未対応 provider のフォールバック
             return self.DEFAULT_VOICES.get(provider, self.DEFAULT_VOICES["edge"])
         return v
 

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AiDiy 自己紹介 - document_to_html 試作</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0b1020;
+      color: #eff8ff;
+      font-family: "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+    }
+    .app {
+      display: grid;
+      grid-template-rows: 56px 1fr 56px;
+      width: 100%; height: 100%;
+      overflow: hidden;
+    }
+    /* ---- header ---- */
+    .topbar {
+      display: flex; align-items: center;
+      padding: 0 28px;
+      background: rgba(4,10,18,0.72); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(160,220,255,0.22);
+    }
+    .brand { font-size:18px; font-weight:800; color:#9fe8ff; }
+    /* ---- stage ---- */
+    .stage {
+      position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden;
+      background: rgba(4,10,18,0.55);
+    }
+    .scene-frame-wrap {
+      width: 100%; height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .scene-frame {
+      width: 100%; height: 100%;
+      border: 0; display: block; background: transparent;
+      overflow: hidden;
+    }
+    .subtitle-overlay {
+      position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%);
+      max-width: 90%; padding: 18px 32px; border-radius: 12px;
+      background: rgba(0,0,0,0.62); color: #fff;
+      font-size: 22px; font-weight: 700; line-height: 1.65; text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.10);
+      backdrop-filter: blur(12px);
+      z-index: 10; pointer-events: none;
+    }
+    /* ---- footer ---- */
+    .controls {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px;
+      background: rgba(4,10,18,0.84);
+      border-top: 1px solid rgba(160,220,255,0.22);
+      position: relative; /* progress bar の基準点 */
+    }
+    .controls-left { display: flex; align-items: center; gap: 6px; }
+    .progress {
+      width: 240px; height: 6px; border-radius: 999px; overflow: hidden;
+      background: rgba(255,255,255,0.13);
+      position: absolute; left: 50%; transform: translateX(-50%);
+    }
+    .progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #29d8ff, #ff4ad8, #ffe35c);
+      transition: width 320ms ease;
+    }
+    .meta { color:#a7b8c8; font-size:13px; white-space:nowrap; }
+    .timer { color:#a8bac9; font-size:14px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    button {
+      height: 34px; width: 34px; padding: 0;
+      border: 1px solid rgba(158,232,255,0.38); border-radius: 6px;
+      background: rgba(12,32,52,0.88); color: #eff8ff;
+      font-size: 16px; font-weight: 800; cursor: pointer;
+    }
+    button:hover { border-color:#29d8ff; background:rgba(18,54,82,0.94); }
+    /* ---- avatar ---- */
+    #avatar-container {
+      position: fixed; right: 0; bottom: 56px;
+      width: 45vh; height: 75vh; max-height: calc(100vh - 112px);
+      pointer-events: none; z-index: 100000;
+    }
+    #avatarCanvas {
+      width: 100%; height: 100%; display: block;
+      opacity: 0; transition: opacity 600ms ease;
+    }
+    #avatarCanvas.ready { opacity: 1; }
+    /* ---- narrow ---- */
+    @media (max-width: 960px) {
+      .topbar, .controls { padding: 0 14px; }
+      .controls-left { gap: 4px; }
+      .progress { width: 120px; }
+      button { width: 30px; height: 30px; font-size: 13px; }
+      .subtitle-overlay { font-size: 17px; padding: 14px 22px; bottom: 16px; }
+      .timer { font-size: 12px; }
+      #avatar-container {
+        width: 32vh; height: 52vh; max-height: calc(100vh - 112px);
+      }
+    }
+  </style>
+  <script src="scenario.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.179.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.0/examples/jsm/",
+        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.4.2/lib/three-vrm.module.js",
+        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.4.2/lib/three-vrm-animation.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">AiDiy 自己紹介</div>
+    </header>
+
+    <main class="stage">
+      <section class="scene-frame-wrap">
+        <iframe id="sceneFrame" class="scene-frame" title="シーン表示"></iframe>
+        <div id="subtitle" class="subtitle-overlay"></div>
+      </section>
+    </main>
+
+    <footer class="controls">
+      <div class="controls-left">
+        <button id="prevBtn" type="button" title="前へ">◁</button>
+        <button id="playBtn" type="button" title="再生">▶</button>
+        <button id="nextBtn" type="button" title="次へ">▷</button>
+        <div id="timer" class="timer">00:00 / 01:45</div>
+      </div>
+      <div class="progress" aria-label="progress"><div id="progressFill" class="progress-fill"></div></div>
+      <div id="meta" class="meta">scene 1 / 10</div>
+    </footer>
+  </div>
+
+  <!-- アバターは .app の外、枠外フローティング -->
+  <div id="avatar-container">
+    <canvas id="avatarCanvas"></canvas>
+  </div>
+
+  <script>
+    // -------------------- ベースフォーム制御 --------------------
+    const scenario = window.SCENARIO;
+    const meta = document.getElementById("meta");
+    const subtitle = document.getElementById("subtitle");
+    const timer = document.getElementById("timer");
+    const progressFill = document.getElementById("progressFill");
+    const sceneFrame = document.getElementById("sceneFrame");
+    const playBtn = document.getElementById("playBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    function initialSceneIndex() {
+      const sceneParam = new URLSearchParams(window.location.search).get("scene");
+      const requested = Number.parseInt(sceneParam || "1", 10);
+      if (!Number.isFinite(requested)) return 0;
+      return Math.min(Math.max(requested - 1, 0), scenario.scenes.length - 1);
+    }
+
+    let sceneIndex = initialSceneIndex();
+    let playing = false;
+    let timerId = null;
+    let advanceTimerId = null;
+    let sceneStartedAt = 0;
+    const audioPlayer = new Audio();
+    audioPlayer.preload = "auto";
+    // モジュールスクリプトからリップシンク用に audioPlayer を参照できるよう公開
+    window.__getAudioPlayer = () => audioPlayer;
+
+    function formatTime(sec) {
+      const s = Math.max(0, Math.round(sec));
+      const mm = String(Math.floor(s / 60)).padStart(2, "0");
+      const ss = String(s % 60).padStart(2, "0");
+      return `${mm}:${ss}`;
+    }
+
+    function currentScene() {
+      return scenario.scenes[sceneIndex];
+    }
+
+    function renderBaseForScene() {
+      const scene = currentScene();
+      subtitle.textContent = scene.subtitle;
+      meta.textContent = `scene ${sceneIndex + 1} / ${scenario.scenes.length}`;
+      progressFill.style.width =
+        `${(sceneIndex / Math.max(1, scenario.scenes.length - 1)) * 100}%`;
+      timer.textContent = `${formatTime(scene.start_sec)} / ${formatTime(scenario.duration_sec)}`;
+      sceneFrame.src = `scene.html?n=${sceneIndex + 1}`;
+      window.__avatarSetExpression?.("neutral");
+    }
+
+    function audioPath(scene) {
+      return `audio/${scene.id}.mp3`;
+    }
+
+    function stopAudio() {
+      audioPlayer.pause();
+      audioPlayer.currentTime = 0;
+      window.__avatarOnAudioStop?.();
+    }
+
+    function clearPlaybackTimers() {
+      clearInterval(timerId);
+      clearTimeout(advanceTimerId);
+      timerId = null;
+      advanceTimerId = null;
+    }
+
+    function advanceFromScene(expectedSceneIndex) {
+      if (!playing || sceneIndex !== expectedSceneIndex) return;
+      nextScene(true);
+    }
+
+    function playSceneAudio(scene) {
+      audioPlayer.src = `${audioPath(scene)}?v=freeai-female`;
+      audioPlayer.currentTime = 0;
+      audioPlayer.play().then(() => {
+        window.__avatarOnAudioStart?.();
+      }).catch((error) => {
+        console.error("audio playback failed", error);
+        pause();
+      });
+    }
+
+    function startScenePlayback() {
+      const scene = currentScene();
+      const expectedSceneIndex = sceneIndex;
+      sceneStartedAt = Date.now();
+      clearPlaybackTimers();
+      timerId = setInterval(() => {
+        const elapsed = Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
+          ? audioPlayer.currentTime
+          : (Date.now() - sceneStartedAt) / 1000;
+        timer.textContent =
+          `${formatTime(scene.start_sec + elapsed)} / ${formatTime(scenario.duration_sec)}`;
+      }, 250);
+      advanceTimerId = setTimeout(() => {
+        advanceFromScene(expectedSceneIndex);
+      }, Math.ceil((scene.duration_sec + 0.8) * 1000));
+      playSceneAudio(scene);
+    }
+
+    function play() {
+      playing = true;
+      playBtn.textContent = "⏸";
+      window.__avatarResumeAudioContext?.();
+      startScenePlayback();
+    }
+
+    function pause() {
+      playing = false;
+      playBtn.textContent = "▶";
+      clearPlaybackTimers();
+      stopAudio();
+    }
+
+    function nextScene(fromAuto = false) {
+      clearPlaybackTimers();
+      if (!fromAuto) stopAudio();
+      if (sceneIndex < scenario.scenes.length - 1) {
+        sceneIndex += 1;
+        renderBaseForScene();
+        if (playing) startScenePlayback();
+      } else {
+        pause();
+        progressFill.style.width = "100%";
+      }
+    }
+
+    function prevScene() {
+      pause();
+      sceneIndex = Math.max(0, sceneIndex - 1);
+      renderBaseForScene();
+    }
+
+    audioPlayer.addEventListener("ended", () => {
+      clearTimeout(advanceTimerId);
+      advanceTimerId = null;
+      window.__avatarOnAudioStop?.();
+      if (playing) nextScene(true);
+    });
+    audioPlayer.addEventListener("error", () => {
+      console.error("audio file load failed", audioPlayer.src);
+      pause();
+    });
+    audioPlayer.addEventListener("pause", () => {
+      window.__avatarOnAudioStop?.();
+    });
+
+    prevBtn.addEventListener("click", prevScene);
+    playBtn.addEventListener("click", () => {
+      if (playing) pause(); else play();
+    });
+    nextBtn.addEventListener("click", () => nextScene(false));
+
+    window.addEventListener("beforeunload", pause);
+    renderBaseForScene();
+    if (new URLSearchParams(window.location.search).get("autoplay") === "1") {
+      setTimeout(play, 600);
+    }
+  </script>
+
+  <script type="module">
+    // -------------------- VRM アバタービューア --------------------
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+
+    const canvas = document.getElementById('avatarCanvas');
+    const pane = canvas.parentElement;
+
+    const getStageSize = () => ({
+      width: Math.max(1, pane.clientWidth || 200),
+      height: Math.max(1, pane.clientHeight || 340),
+    });
+    let { width, height } = getStageSize();
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(width, height, false);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(28, width / height, 0.01, 40);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const key = new THREE.DirectionalLight(0xffffff, 1.0);
+    key.position.set(1.2, 1.5, 1.1);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xdde8ff, 0.8);
+    rim.position.set(-1.3, 0.7, 1.3);
+    scene.add(rim);
+
+    const container = new THREE.Group();
+    container.rotation.y = Math.PI;
+    scene.add(container);
+
+    const modelLoader = new GLTFLoader();
+    modelLoader.register(p => new VRMLoaderPlugin(p));
+    const loadWith = (loader, url) =>
+      new Promise((res, rej) => loader.load(url, res, undefined, rej));
+
+    // ---------- T ポーズ→アイドル姿勢 ----------
+    // VRMA を使わず、上腕などを手動で下ろして自然な立ち姿に固定する。
+    // try ブロック内で呼ぶため、TDZ を避けるよう先に宣言しておく。
+    const IDLE_BONE_ROT = {
+      leftUpperArm:  { z: -1.25 },
+      rightUpperArm: { z:  1.25 },
+      leftLowerArm:  { y:  0.10 },
+      rightLowerArm: { y: -0.10 },
+      leftShoulder:  { z: -0.05 },
+      rightShoulder: { z:  0.05 },
+    };
+    function applyIdlePose(vrmObj) {
+      const humanoid = vrmObj?.humanoid;
+      if (!humanoid) return;
+      for (const [name, rot] of Object.entries(IDLE_BONE_ROT)) {
+        const node = humanoid.getNormalizedBoneNode?.(name);
+        if (!node) continue;
+        node.rotation.set(rot.x || 0, rot.y || 0, rot.z || 0);
+      }
+    }
+    // 微小な呼吸・ゆらぎモーション（毎フレーム上書き）
+    function updateIdleSway(vrmObj, elapsed) {
+      const humanoid = vrmObj?.humanoid;
+      if (!humanoid) return;
+      const chest = humanoid.getNormalizedBoneNode?.('chest');
+      const head  = humanoid.getNormalizedBoneNode?.('head');
+      if (chest) {
+        // 振幅と速度を少し上げる
+        chest.rotation.x = Math.sin(elapsed * 1.5) * 0.035;
+      }
+      if (head) {
+        head.rotation.y = Math.sin(elapsed * 0.6) * 0.12;
+        head.rotation.x = Math.sin(elapsed * 1.0 + 1.2) * 0.045;
+      }
+    }
+
+    let vrm = null;
+    try {
+      const gltf = await loadWith(modelLoader, './AiDiy_Sample_M.vrm');
+      vrm = gltf.userData?.vrm;
+      if (!vrm) throw new Error('VRM not found in userData');
+
+      try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch {}
+      try { VRMUtils.removeUnnecessaryJoints(gltf.scene);   } catch {}
+      vrm.scene.traverse(obj => { obj.frustumCulled = false; });
+
+      const box = new THREE.Box3().setFromObject(vrm.scene);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      vrm.scene.position.x -= center.x;
+      vrm.scene.position.y -= box.min.y;
+      vrm.scene.position.z -= center.z;
+      container.add(vrm.scene);
+
+      const h = Math.max(0.1, size.y);
+      camera.position.set(0, h * 0.90, -h * 1.15);
+      camera.lookAt(0, h * 0.88, 0);
+
+      // T ポーズを脱して自然な静止姿勢にする。
+      // VRM 1.0 では normalized bone の回転を反映するために vrm.update() が必要。
+      // 反映前のフレームを描画すると T ポーズが一瞬見えるため、
+      // 1) ポーズ適用 → 2) vrm.update(0) で skeleton に伝搬 → 3) 1 フレーム描画
+      // を済ませてから canvas を visible にする。
+      applyIdlePose(vrm);
+      vrm.update(0);
+      renderer.render(scene, camera);
+    } catch (e) {
+      console.error('Avatar load error:', e);
+    } finally {
+      // 読み込み成否に関わらずキャンバスを表示状態にする（失敗時は空の背景になるが固まるのを防ぐ）
+      canvas.classList.add('ready');
+    }
+
+    // ---------- リップシンク（Web Audio Analyser） ----------
+    let audioCtx = null;
+    let analyser = null;
+    let analyserData = null;
+    let lipsyncActive = false;
+    let mouthSmooth = 0;
+
+    const ensureAudioGraph = () => {
+      if (audioCtx) return;
+      // index.html の audioPlayer を取りに行く
+      const player = window.__getAudioPlayer ? window.__getAudioPlayer() : null;
+      if (!player) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = ctx.createMediaElementSource(player);
+        const an = ctx.createAnalyser();
+        an.fftSize = 512;
+        an.smoothingTimeConstant = 0.6;
+        source.connect(an);
+        an.connect(ctx.destination);
+        audioCtx = ctx;
+        analyser = an;
+        analyserData = new Uint8Array(an.frequencyBinCount);
+      } catch (e) {
+        console.warn('lipsync audio graph failed', e);
+      }
+    };
+
+    window.__avatarResumeAudioContext = () => {
+      ensureAudioGraph();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+    };
+    window.__avatarOnAudioStart = () => {
+      ensureAudioGraph();
+      lipsyncActive = true;
+    };
+    window.__avatarOnAudioStop = () => {
+      lipsyncActive = false;
+    };
+
+    const getMouthTarget = () => {
+      if (!lipsyncActive || !analyser || !analyserData) return 0;
+      analyser.getByteFrequencyData(analyserData);
+      // 音声帯 (約 200Hz〜3kHz) を中心に平均化
+      const start = Math.floor(analyserData.length * 0.05);
+      const end = Math.floor(analyserData.length * 0.30);
+      let sum = 0;
+      for (let i = start; i < end; i++) sum += analyserData[i];
+      const avg = sum / Math.max(1, end - start);
+      // 0..1 に正規化（avg 12 で口開ききらない程度）
+      return Math.min(1, Math.max(0, (avg - 12) / 80));
+    };
+
+    // ---------- 表情切替 ----------
+    const EXPRESSION_KEYS = ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'neutral'];
+    let currentExpression = 'neutral';
+    let expressionTarget = 'neutral';
+    let expressionValue = 0; // 0..1
+
+    window.__avatarSetExpression = (name) => {
+      const key = EXPRESSION_KEYS.includes(name) ? name : 'neutral';
+      expressionTarget = key;
+    };
+
+    const updateExpression = (dt) => {
+      if (!vrm?.expressionManager) return;
+      // 一度全てフェードアウト方向に進ませてから target だけ持ち上げる
+      const lerpRate = 1 - Math.pow(0.001, dt); // 約 0.06 / 60fps
+      if (currentExpression !== expressionTarget) {
+        expressionValue = Math.max(0, expressionValue - dt * 4);
+        if (expressionValue <= 0.01) {
+          // 古い表情を 0 にして切り替え
+          try { vrm.expressionManager.setValue(currentExpression, 0); } catch {}
+          currentExpression = expressionTarget;
+        }
+      } else {
+        const targetVal = currentExpression === 'neutral' ? 0 : 0.6;
+        expressionValue += (targetVal - expressionValue) * lerpRate;
+      }
+      for (const key of EXPRESSION_KEYS) {
+        if (key === 'neutral') continue;
+        try {
+          vrm.expressionManager.setValue(
+            key,
+            key === currentExpression ? expressionValue : 0,
+          );
+        } catch {}
+      }
+    };
+
+    // ---------- 瞬き ----------
+    let blinkTimer = 0;
+    let blinkCooldown = 2 + Math.random() * 3;
+    const BLINK_DURATION = 0.15;
+    const updateBlink = (dt) => {
+      if (!vrm?.expressionManager) return;
+      blinkTimer += dt;
+      if (blinkTimer < blinkCooldown) {
+        vrm.expressionManager.setValue('blink', 0);
+      } else if (blinkTimer < blinkCooldown + BLINK_DURATION) {
+        const t = (blinkTimer - blinkCooldown) / BLINK_DURATION;
+        vrm.expressionManager.setValue('blink', Math.sin(t * Math.PI));
+      } else {
+        vrm.expressionManager.setValue('blink', 0);
+        blinkTimer = 0;
+        blinkCooldown = 2 + Math.random() * 3;
+      }
+    };
+
+    // ---------- 描画ループ ----------
+    const clock = new THREE.Clock();
+    const resizeRenderer = () => {
+      const sz = getStageSize();
+      if (sz.width < 1 || sz.height < 1) return;
+      renderer.setSize(sz.width, sz.height, false);
+      camera.aspect = sz.width / sz.height;
+      camera.updateProjectionMatrix();
+    };
+    window.addEventListener('resize', resizeRenderer, { passive: true });
+
+    const tick = () => {
+      const dt = clock.getDelta();
+      const elapsed = clock.elapsedTime;
+      updateBlink(dt);
+      updateExpression(dt);
+      if (vrm) updateIdleSway(vrm, elapsed);
+      // リップシンク反映
+      if (vrm?.expressionManager) {
+        const target = getMouthTarget();
+        // 追従性を上げる。上昇は早く(Attack)、下降は少しゆっくり(Decay)
+        if (target > mouthSmooth) {
+          mouthSmooth = mouthSmooth * 0.1 + target * 0.9;
+        } else {
+          mouthSmooth = mouthSmooth * 0.6 + target * 0.4;
+        }
+        try { vrm.expressionManager.setValue('aa', mouthSmooth); } catch {}
+      }
+      if (vrm) vrm.update(dt);
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    };
+
+    resizeRenderer();
+    requestAnimationFrame(tick);
+
+    window.__avatarSetExpression('neutral');
+  </script>
+
+</body>
+</html>
