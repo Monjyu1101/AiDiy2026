@@ -788,16 +788,7 @@ function initScene() {
       )
 
       currentVrm.expressionManager?.setValue('blink', blink)
-
-      // リップシンク：追従性を上げる。上昇は早く(Attack)、下降は少しゆっくり(Decay)
-      const mouthTarget = Math.min(1, props.speakerLevel)
-      if (mouthTarget > lipCurrent) {
-        lipCurrent = lipCurrent * 0.1 + mouthTarget * 0.9
-      } else {
-        lipCurrent = lipCurrent * 0.6 + mouthTarget * 0.4
-      }
-      currentVrm.expressionManager?.setValue('aa', lipCurrent)
-
+      currentVrm.expressionManager?.setValue('aa', Math.min(1, props.speakerLevel))
       currentVrm.scene.rotation.y = bodyState.rotationY
       currentVrm.scene.position.y = bodyState.positionY
       const 追従入力 = 自動カメラ追従入力取得()

@@ -48,10 +48,10 @@ function 腕制御作成(node: THREE.Object3D | null | undefined, 回転差分: 
 export function 自立身体制御初期化(vrm: any, _modelSize: THREE.Vector3): 自立身体制御設定 {
   const humanoid = vrm?.humanoid
   return {
-    回転振幅: 0.14,
-    回転速度: 0.35,
-    上下振幅: 0.015,
-    上下速度: 1.0,
+    回転振幅: 0.08,
+    回転速度: 0.28,
+    上下振幅: 0.01,
+    上下速度: 0.9,
     腕補間率: 0.035,
     左上腕: 腕制御作成(humanoid?.getNormalizedBoneNode?.('leftUpperArm') ?? null, new THREE.Euler(0.04, 0, -0.16)),
     右上腕: 腕制御作成(humanoid?.getNormalizedBoneNode?.('rightUpperArm') ?? null, new THREE.Euler(0.04, 0, 0.16)),
