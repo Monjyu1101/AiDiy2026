@@ -1568,6 +1568,88 @@ if ffmpeg_c.version_info.get("ffprobe", {}).get("ok"):
         return json.dumps(result, ensure_ascii=False)
 
 
+if ffmpeg_c.version_info.get("ffmpeg", {}).get("ok"):
+    @mcp_ff.tool()
+    async def ffmpeg_analyze_audio_timerange(
+        input_path: str,
+        threshold_db: float = -40.0,
+        window_ms: float = 100.0,
+        sample_rate: int = 8000,
+        padding_sec: float = 2.0,
+        timeout_sec: Optional[int] = None,
+    ) -> str:
+        """
+        入力ファイル（動画/音声）を 16bit mono PCM (WAV 相当) に変換し、
+        RMS 信号強度で「最初の発話開始秒（audio_start_sec）」と
+        「最後の発話終了秒（audio_end_sec）」を検出する。
+        前後 padding_sec の余白を付けた推奨トリム値（trim_start_sec / trim_end_sec）も返すので、
+        その値を ffmpeg_trim にそのまま渡せば自動で余白付きトリムができる。
+
+        Args:
+            input_path: 解析対象ファイルの絶対パス。
+            threshold_db: dBFS 閾値。これを超えるウィンドウを発話ありと判定（既定 -40 dB）。
+            window_ms: RMS 計算のウィンドウ長（既定 100 ms）。
+            sample_rate: 解析用サンプリングレート Hz（既定 8000）。
+            padding_sec: 検出位置の前後に付ける余白秒（既定 2.0 秒）。
+            timeout_sec: ffmpeg のタイムアウト秒。
+
+        Returns:
+            duration_sec / audio_start_sec / audio_end_sec /
+            trim_start_sec / trim_end_sec / max_rms_db ほか。
+            発話が検出できなかった場合は audio_start_sec / audio_end_sec が null。
+        """
+        try:
+            result = await ffmpeg_c.analyze_audio_timerange(
+                input_path,
+                threshold_db=threshold_db,
+                window_ms=window_ms,
+                sample_rate=sample_rate,
+                padding_sec=padding_sec,
+                timeout_sec=timeout_sec,
+            )
+        except FfmpegControlError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+
+    @mcp_ff.tool()
+    async def video_trimming(
+        input_path: str,
+        start_sec: float,
+        end_sec: float,
+        output_path: str,
+        timeout_sec: Optional[int] = None,
+    ) -> str:
+        """
+        input_path の [start_sec, end_sec] 区間を output_path に再エンコードで切り出す。
+        H.264 (libx264 CRF 20) + AAC 192kbps + +faststart の Web 配信向け既定値を使う。
+        ffmpeg_analyze_audio_timerange の戻り値 trim_start_sec / trim_end_sec を
+        そのまま渡せば、余白付き自動トリムが完了する。
+
+        Args:
+            input_path: 入力ファイルの絶対パス。
+            start_sec: 切り出し開始秒（0 以上）。
+            end_sec: 切り出し終了秒（start_sec より大）。
+            output_path: 出力ファイルの絶対パス。親ディレクトリは自動作成。
+            timeout_sec: ffmpeg のタイムアウト秒。
+
+        Returns:
+            input_path / output_path / start_sec / end_sec / duration_sec /
+            returncode / command / output_size_bytes。
+        """
+        try:
+            result = await ffmpeg_c.video_trimming(
+                input_path,
+                start_sec,
+                end_sec,
+                output_path,
+                timeout_sec=timeout_sec,
+            )
+        except FfmpegControlError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+
 if ffmpeg_c.version_info.get("ffplay", {}).get("ok"):
     @mcp_ff.tool()
     async def ffplay_run(args_str: str, timeout_sec: Optional[int] = None) -> str:

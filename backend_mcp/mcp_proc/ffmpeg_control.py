@@ -17,13 +17,22 @@ ffmpeg / ffprobe / ffplay 制御モジュール
 
 from __future__ import annotations
 
+import array
 import asyncio
 import json
+import math
 import shlex
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Optional
+
+try:
+    import audioop  # type: ignore[import-not-found]
+    _HAS_AUDIOOP = True
+except ImportError:  # Python 3.13+ で stdlib から削除されている環境向けフォールバック
+    audioop = None  # type: ignore[assignment]
+    _HAS_AUDIOOP = False
 
 from log_config import get_logger
 
@@ -263,6 +272,339 @@ class FfmpegControl:
             effective_timeout,
             capture_output=True,
         )
+
+    # ------------------------------------------------------------------ #
+    # 作業ディレクトリ（必要時に backend_server/temp/work/ 配下を確保する）
+    # ------------------------------------------------------------------ #
+
+    _WORK_DIR_REL = "../backend_server/temp/work"
+
+    def _allocate_work_dir(self) -> Path:
+        """`backend_server/temp/work/YYYYMMDD.HHMMSS.<microsec3>` を作成して返す。"""
+        from datetime import datetime
+        now = datetime.now()
+        slug = now.strftime("%Y%m%d.%H%M%S.") + f"{now.microsecond // 1000:03d}"
+        base = (Path(__file__).resolve().parent.parent / self._WORK_DIR_REL).resolve()
+        work_dir = base / slug
+        work_dir.mkdir(parents=True, exist_ok=True)
+        return work_dir
+
+    # ------------------------------------------------------------------ #
+    # 音声強度解析（無音区間検出 → トリム秒数推定）
+    # ------------------------------------------------------------------ #
+
+    async def _extract_pcm(
+        self,
+        input_path: str,
+        sample_rate: int,
+        timeout_sec: float,
+    ) -> tuple[bytes, str]:
+        """ffmpeg で 16bit mono PCM を抽出して bytes で返す。stderr は文字列で返す。"""
+        ffmpeg_exe = self._resolve_executable(self.ffmpeg_path, "ffmpeg")
+        argv = [
+            ffmpeg_exe,
+            "-v", "error",
+            "-i", str(input_path),
+            "-vn",
+            "-ac", "1",
+            "-ar", str(int(sample_rate)),
+            "-f", "s16le",
+            "-",
+        ]
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as e:
+            raise FfmpegControlError(f"ffmpeg の起動に失敗しました: {e}") from e
+
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(), timeout=timeout_sec
+            )
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+            raise FfmpegControlError(
+                f"ffmpeg (PCM 抽出) がタイムアウトしました（{timeout_sec:g} 秒）"
+            )
+
+        stderr_text = self._decode_bytes(stderr_b or b"", self.DEFAULT_OUTPUT_BYTES)
+        if proc.returncode != 0:
+            raise FfmpegControlError(
+                f"ffmpeg PCM 抽出失敗 (rc={proc.returncode}): {stderr_text[:500]}"
+            )
+        return stdout_b or b"", stderr_text
+
+    @staticmethod
+    def _window_rms(pcm: bytes, start_byte: int, end_byte: int, sample_width: int) -> float:
+        """1 ウィンドウ分の PCM bytes から RMS（線形値、s16 なら 0〜32767 相当）を返す。"""
+        chunk = pcm[start_byte:end_byte]
+        if not chunk:
+            return 0.0
+        if _HAS_AUDIOOP:
+            return float(audioop.rms(chunk, sample_width))  # type: ignore[union-attr]
+        # フォールバック: int16 として読み出して RMS を計算
+        if sample_width != 2:
+            raise FfmpegControlError(
+                "audioop が利用できない環境では sample_width=2 (s16le) のみ対応"
+            )
+        samples = array.array("h")
+        samples.frombytes(chunk)
+        if not samples:
+            return 0.0
+        ssum = 0
+        for v in samples:
+            ssum += v * v
+        return math.sqrt(ssum / len(samples))
+
+    async def analyze_audio_timerange(
+        self,
+        input_path: str,
+        *,
+        threshold_db: float = -40.0,
+        window_ms: float = 100.0,
+        sample_rate: int = 8000,
+        padding_sec: float = 2.0,
+        timeout_sec: Optional[float] = None,
+    ) -> dict[str, Any]:
+        """
+        入力ファイルから音声を PCM s16le mono に変換し、RMS 信号強度で
+        最初の発話開始位置と最後の発話終了位置を検出する。
+        前後余白付きの推奨トリム開始/終了秒（`trim_start_sec` / `trim_end_sec`）も返す。
+        返り値の `trim_start_sec` / `trim_end_sec` を `trim()` の引数にそのまま渡せる。
+
+        Args:
+            input_path: 解析対象ファイル（動画 or 音声）。
+            threshold_db: dBFS 閾値。これを超えるウィンドウを「発話あり」と判定。既定 -40 dB。
+            window_ms: 解析ウィンドウ長（ミリ秒）。既定 100 ms。
+            sample_rate: 解析用サンプリングレート（Hz）。既定 8000。音声検出には十分。
+            padding_sec: 検出位置の前後に付ける余白秒。既定 2.0 秒。
+            timeout_sec: ffmpeg のタイムアウト秒。
+
+        Returns:
+            duration_sec / audio_start_sec / audio_end_sec /
+            trim_start_sec / trim_end_sec / max_rms_db など。
+        """
+        input_p = Path(input_path)
+        if not input_p.is_file():
+            raise FfmpegControlError(f"入力ファイルが見つかりません: {input_path}")
+        if sample_rate <= 0:
+            raise FfmpegControlError("sample_rate は正の整数で指定してください")
+        if window_ms <= 0:
+            raise FfmpegControlError("window_ms は正の数値で指定してください")
+        if padding_sec < 0:
+            raise FfmpegControlError("padding_sec は 0 以上で指定してください")
+
+        effective_timeout = (
+            float(timeout_sec) if timeout_sec is not None else self.default_timeout_sec
+        )
+
+        pcm_bytes, _stderr = await self._extract_pcm(
+            str(input_p), sample_rate, effective_timeout
+        )
+
+        sample_width = 2  # s16le
+        total_samples = len(pcm_bytes) // sample_width
+        duration_sec = total_samples / float(sample_rate) if total_samples else 0.0
+
+        window_samples = max(1, int(round(sample_rate * window_ms / 1000.0)))
+        window_bytes = window_samples * sample_width
+        num_windows = total_samples // window_samples
+
+        if num_windows == 0:
+            return {
+                "input_path": str(input_p),
+                "duration_sec": round(duration_sec, 3),
+                "audio_start_sec": None,
+                "audio_end_sec": None,
+                "trim_start_sec": 0.0,
+                "trim_end_sec": round(duration_sec, 3),
+                "padding_sec": padding_sec,
+                "threshold_db": threshold_db,
+                "window_ms": window_ms,
+                "sample_rate": sample_rate,
+                "samples_analyzed": total_samples,
+                "windows": 0,
+                "max_rms_db": None,
+                "audioop_available": _HAS_AUDIOOP,
+            }
+
+        # int16 の dB 基準は 32767（フルスケール）。
+        # rms_linear → dB = 20 * log10(rms / 32767)
+        full_scale = 32767.0
+        threshold_linear = (10 ** (threshold_db / 20.0)) * full_scale
+
+        first_idx: Optional[int] = None
+        last_idx: Optional[int] = None
+        max_rms = 0.0
+        for w in range(num_windows):
+            start_b = w * window_bytes
+            end_b = start_b + window_bytes
+            rms = self._window_rms(pcm_bytes, start_b, end_b, sample_width)
+            if rms > max_rms:
+                max_rms = rms
+            if rms >= threshold_linear:
+                if first_idx is None:
+                    first_idx = w
+                last_idx = w
+
+        if max_rms > 0.0:
+            max_rms_db: Optional[float] = round(
+                20.0 * math.log10(max_rms / full_scale), 2
+            )
+        else:
+            max_rms_db = None
+
+        if first_idx is None or last_idx is None:
+            return {
+                "input_path": str(input_p),
+                "duration_sec": round(duration_sec, 3),
+                "audio_start_sec": None,
+                "audio_end_sec": None,
+                "trim_start_sec": 0.0,
+                "trim_end_sec": round(duration_sec, 3),
+                "padding_sec": padding_sec,
+                "threshold_db": threshold_db,
+                "window_ms": window_ms,
+                "sample_rate": sample_rate,
+                "samples_analyzed": total_samples,
+                "windows": num_windows,
+                "max_rms_db": max_rms_db,
+                "audioop_available": _HAS_AUDIOOP,
+            }
+
+        window_sec = window_ms / 1000.0
+        audio_start_sec = first_idx * window_sec
+        audio_end_sec = (last_idx + 1) * window_sec  # ウィンドウ終端を採用
+        trim_start = max(0.0, audio_start_sec - padding_sec)
+        trim_end = min(duration_sec, audio_end_sec + padding_sec)
+
+        return {
+            "input_path": str(input_p),
+            "duration_sec": round(duration_sec, 3),
+            "audio_start_sec": round(audio_start_sec, 3),
+            "audio_end_sec": round(audio_end_sec, 3),
+            "trim_start_sec": round(trim_start, 3),
+            "trim_end_sec": round(trim_end, 3),
+            "padding_sec": padding_sec,
+            "threshold_db": threshold_db,
+            "window_ms": window_ms,
+            "sample_rate": sample_rate,
+            "samples_analyzed": total_samples,
+            "windows": num_windows,
+            "max_rms_db": max_rms_db,
+            "audioop_available": _HAS_AUDIOOP,
+        }
+
+    # ------------------------------------------------------------------ #
+    # 動画トリミング（start_sec, end_sec 指定で再エンコード切り出し）
+    # ------------------------------------------------------------------ #
+
+    async def video_trimming(
+        self,
+        input_path: str,
+        start_sec: float,
+        end_sec: float,
+        output_path: str,
+        *,
+        timeout_sec: Optional[float] = None,
+    ) -> dict[str, Any]:
+        """
+        input_path の [start_sec, end_sec] 区間を output_path に再エンコードで切り出す。
+        H.264 (libx264 CRF 20) + AAC 192kbps + +faststart の Web 配信向け既定値を使う。
+        `analyze_audio_timerange` の戻り値 `trim_start_sec` / `trim_end_sec` をそのまま渡せる。
+
+        Args:
+            input_path: 入力ファイルの絶対パス。
+            start_sec: 切り出し開始秒（0 以上）。
+            end_sec: 切り出し終了秒（start_sec より大）。
+            output_path: 出力ファイルの絶対パス。親ディレクトリは自動作成。
+            timeout_sec: ffmpeg のタイムアウト秒。
+
+        Returns:
+            input_path / output_path / start_sec / end_sec / duration_sec /
+            returncode / command / output_size_bytes。
+        """
+        input_p = Path(input_path)
+        if not input_p.is_file():
+            raise FfmpegControlError(f"入力ファイルが見つかりません: {input_path}")
+        if start_sec < 0:
+            raise FfmpegControlError(f"start_sec は 0 以上で指定してください: {start_sec}")
+        if end_sec <= start_sec:
+            raise FfmpegControlError(
+                f"end_sec は start_sec より大きい値で指定してください: "
+                f"start_sec={start_sec}, end_sec={end_sec}"
+            )
+
+        output_p = Path(output_path)
+        output_p.parent.mkdir(parents=True, exist_ok=True)
+        duration = float(end_sec) - float(start_sec)
+
+        ffmpeg_exe = self._resolve_executable(self.ffmpeg_path, "ffmpeg")
+        argv = [
+            ffmpeg_exe,
+            "-y",
+            "-ss", f"{float(start_sec):.3f}",
+            "-i", str(input_p),
+            "-t", f"{duration:.3f}",
+            "-c:v", "libx264",
+            "-crf", "20",
+            "-preset", "medium",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            str(output_p),
+        ]
+        effective_timeout = (
+            float(timeout_sec) if timeout_sec is not None else self.default_timeout_sec
+        )
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as e:
+            raise FfmpegControlError(f"ffmpeg の起動に失敗しました: {e}") from e
+
+        try:
+            _stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(), timeout=effective_timeout
+            )
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+            raise FfmpegControlError(
+                f"ffmpeg (video_trimming) がタイムアウトしました（{effective_timeout:g} 秒）"
+            )
+
+        stderr_text = self._decode_bytes(stderr_b or b"", self.DEFAULT_OUTPUT_BYTES)
+        if proc.returncode != 0:
+            raise FfmpegControlError(
+                f"ffmpeg video_trimming 失敗 (rc={proc.returncode}): {stderr_text[-500:]}"
+            )
+
+        output_size = output_p.stat().st_size if output_p.is_file() else 0
+
+        return {
+            "input_path": str(input_p),
+            "output_path": str(output_p),
+            "start_sec": round(float(start_sec), 3),
+            "end_sec": round(float(end_sec), 3),
+            "duration_sec": round(duration, 3),
+            "returncode": proc.returncode,
+            "command": argv,
+            "output_size_bytes": output_size,
+            "timeout_sec": effective_timeout,
+        }
 
     def _probe_versions(self) -> dict[str, Any]:
         """各実行ファイルに -version を投げて使用可能か確認し、結果をログに残す。"""

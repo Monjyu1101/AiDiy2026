@@ -1,0 +1,131 @@
+{
+  "project_name": "AiDiy自己紹介",
+  "status": "images_generated",
+  "policy": {
+    "image_generation": "pending",
+    "audio_generation": "generated",
+    "html_audio_mode": "mp3_files",
+    "html_output": "backend_server/temp/output/AiDiy自己紹介/index.html",
+    "audio_provider": "freeai",
+    "audio_voice": "Zephyr",
+    "pronunciation_dictionary": "backend_server/_config/aidiy_text_to_speech.json"
+  },
+  "images": [
+    {
+      "scene_id": "scene_001",
+      "status": "generated",
+      "path": "images/scene_001.png",
+      "provider": "openai",
+      "model": "gpt-image-2",
+      "size": "1792x1024",
+      "quality": "medium",
+      "bytes": 1148287
+    },
+    {
+      "scene_id": "scene_002",
+      "status": "generated",
+      "path": "images/scene_002.png",
+      "provider": "openai",
+      "model": "gpt-image-2",
+      "size": "1792x1024",
+      "quality": "medium",
+      "bytes": 1003812
+    },
+    {
+      "scene_id": "scene_003",
+      "status": "generated",
+      "path": "images/scene_003.png",
+      "provider": "openai",
+      "model": "gpt-image-2",
+      "size": "1792x1024",
+      "quality": "medium",
+      "bytes": 1296256
+    },
+    {
+      "scene_id": "scene_004",
+      "status": "generated",
+      "path": "images/scene_004.png",
+      "provider": "openai",
+      "model": "gpt-image-2",
+      "size": "1792x1024",
+      "quality": "medium",
+      "bytes": 973608
+    },
+    {
+      "scene_id": "scene_005",
+      "status": "generated",
+      "path": "images/scene_005.png",
+      "provider": "openai",
+      "model": "gpt-image-2",
+      "size": "1792x1024",
+      "quality": "medium",
+      "bytes": 1110603
+    },
+    {
+      "scene_id": "scene_006",
+      "status": "generated",
+      "path": "images/scene_006.png",
+      "provider": "openai",
+      "model": "gpt-image-2",
+      "size": "1792x1024",
+      "quality": "medium",
+      "bytes": 1088559
+    }
+  ],
+  "audio": [
+    {
+      "scene_id": "scene_001",
+      "status": "generated",
+      "path": "audio/scene_001.mp3",
+      "provider": "freeai",
+      "voice": "Zephyr",
+      "bytes": 24716,
+      "duration_sec": 6.12
+    },
+    {
+      "scene_id": "scene_002",
+      "status": "generated",
+      "path": "audio/scene_002.mp3",
+      "provider": "freeai",
+      "voice": "Zephyr",
+      "bytes": 33356,
+      "duration_sec": 8.28
+    },
+    {
+      "scene_id": "scene_003",
+      "status": "generated",
+      "path": "audio/scene_003.mp3",
+      "provider": "freeai",
+      "voice": "Zephyr",
+      "bytes": 36812,
+      "duration_sec": 9.144
+    },
+    {
+      "scene_id": "scene_004",
+      "status": "generated",
+      "path": "audio/scene_004.mp3",
+      "provider": "freeai",
+      "voice": "Zephyr",
+      "bytes": 40748,
+      "duration_sec": 10.128
+    },
+    {
+      "scene_id": "scene_005",
+      "status": "generated",
+      "path": "audio/scene_005.mp3",
+      "provider": "freeai",
+      "voice": "Zephyr",
+      "bytes": 40556,
+      "duration_sec": 10.08
+    },
+    {
+      "scene_id": "scene_006",
+      "status": "generated",
+      "path": "audio/scene_006.mp3",
+      "provider": "freeai",
+      "voice": "Zephyr",
+      "bytes": 42284,
+      "duration_sec": 10.512
+    }
+  ]
+}

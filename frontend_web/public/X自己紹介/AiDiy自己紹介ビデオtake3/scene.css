@@ -1,0 +1,47 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; width: 100%; height: 100%;
+  background: transparent;
+  color: #eff8ff;
+  font-family: "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+  overflow: hidden;
+}
+.stage {
+  width: 100%; height: 100%;
+  position: relative;
+}
+.visual {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #060c16;
+}
+.bg-img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  opacity: 0; transition: opacity 400ms ease;
+  display: block;
+}
+.bg-img.loaded { opacity: 1; }
+.overlay {
+  position: absolute;
+  left: 50%; bottom: 40px;
+  transform: translateX(-50%);
+  width: 82%;
+  padding: 20px 28px;
+  border-radius: 12px;
+  background: rgba(4,10,20,0.72);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(160,220,255,0.2);
+}
+.overlay-title {
+  font-size: 22px; font-weight: 900;
+  color: #9fe8ff; margin: 0 0 8px;
+  line-height: 1.3;
+}
+.overlay-narration {
+  font-size: 18px; line-height: 1.8;
+  color: #dbe9f4; margin: 0;
+}
+.fade-in { animation: fadeIn 420ms ease both; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }

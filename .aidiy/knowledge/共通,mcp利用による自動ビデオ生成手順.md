@@ -56,6 +56,126 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 
 `?scene=N` クエリで任意シーンから検証起動できるようにしておく（狭いビューポート時の表示崩れを 1 シーンずつ確認できる）。
 
+### HTML の分割構成（iframe 方式）
+
+シーンが増えると `index.html` 1 ファイルに全シーン HTML を埋め込むと肥大化するため、**iframe 分割**を推奨する。
+
+```
+takex/
+├── index.html          # プレイヤー本体。シーン切替で iframe の src を差し替える
+├── scenario.js         # scenario.json をJSとして export（index.html から参照）
+├── scene.css           # 全シーン共通スタイル
+├── scene_001.html      # 各シーン個別 HTML（シンプルに保つ）
+├── scene_002.html
+├── ...
+├── audio/scene_001.mp3 〜
+└── images/scene_001.png 〜
+```
+
+`index.html` 側のシーン切替:
+
+```js
+sceneFrame.src = `scene_${String(sceneIndex + 1).padStart(3, "0")}.html`;
+```
+
+各 `scene_NNN.html` のひな型（共通 CSS を link するだけ）:
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>シーンタイトル</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div class="stage fade-in">
+    <section class="visual">
+      <img class="bg-img" src="images/scene_NNN.png" alt=""
+           onload="this.classList.add('loaded')">
+    </section>
+    <div class="overlay">
+      <p class="overlay-title">シーンタイトル</p>
+      <p class="overlay-narration">ナレーション本文</p>
+    </div>
+  </div>
+</body>
+</html>
+```
+
+Python で一括生成するのが効率的:
+
+```python
+import os, json
+
+base = r"D:/.../takex"
+with open(f"{base}/scenario.json", encoding="utf-8") as f:
+    sc = json.load(f)
+
+TMPL = """<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>{title}</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div class="stage fade-in">
+    <section class="visual">
+      <img class="bg-img" src="{image}" alt="" onload="this.classList.add('loaded')">
+    </section>
+    <div class="overlay">
+      <p class="overlay-title">{title}</p>
+      <p class="overlay-narration">{narration}</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+for scene in sc["scenes"]:
+    html = TMPL.format(
+        title=scene["title"],
+        image=scene.get("image", f'images/{scene["id"]}.png'),
+        narration=scene.get("narration", ""),
+    )
+    with open(f"{base}/{scene['id']}.html", "w", encoding="utf-8") as f:
+        f.write(html)
+```
+
+### scene.css レイアウトパターン
+
+**フルスクリーン画像 + フローティングテキストパネル** が基本レイアウト。
+
+```css
+.stage  { position: relative; width: 100%; height: 100%; }
+.visual { width: 100%; height: 100%; overflow: hidden; background: #060c16; }
+.bg-img {
+  width: 100%; height: 100%;
+  object-fit: contain;          /* ← contain で見切れ防止。左右に黒余白が入る */
+  object-position: center center;
+  opacity: 0; transition: opacity 400ms ease; display: block;
+}
+.bg-img.loaded { opacity: 1; }
+.overlay {
+  position: absolute; left: 32px; bottom: 32px; max-width: 60%;
+  padding: 16px 22px; border-radius: 10px;
+  background: rgba(4,10,20,0.72); backdrop-filter: blur(10px);
+  border: 1px solid rgba(160,220,255,0.2);
+}
+.overlay-title   { font-size: 18px; font-weight: 900; color: #9fe8ff; margin: 0 0 6px; }
+.overlay-narration { font-size: 15px; line-height: 1.75; color: #dbe9f4; margin: 0; }
+```
+
+**`object-fit` の選び方:**
+
+| 設定 | 効果 | 推奨ケース |
+|------|------|------------|
+| `contain` | 縦横比を保ち全体を表示。余白は背景色で埋まる | 生成画像（余白が出ても画像全体を見せたい） |
+| `cover` | 枠全体を埋める。端が切れる | 写真・風景など切れてもよいもの |
+
+生成画像 (1792×1024) を動画プレイヤー枠 (≒ 16:9) に表示するときは **`contain` 推奨**（`cover` だと左右が大きく見切れる）。
+
 ## 2. ナレーション生成（aidiy_text_to_speech）
 
 ```
@@ -84,6 +204,92 @@ mcp__aidiy_ffmpeg_control__ffprobe_run
 - **`args_str` の引用符**: 内部で空白スプリットされるため、Windows パスを `"…"` で囲むと `ffprobe` 側に `"…"` ごと渡って `Invalid argument` になる。**スペースを含まないパスにし、引用符は付けない**。スペース必須なら一時ファイル名にコピー (`aidiy_intro_take1.mp4` など) してから渡す。
 
 `start_sec` は累積で再計算し、ルートの `duration_sec` も合計値で更新する。
+
+
+## 目標尺の設定と尺調整ループ
+
+### 目標尺の決め方
+
+動画全体の目標秒数を最初に決め、シーンごとの配分も大まかに決めておく。
+
+| 動画用途 | 推奨目標尺 |
+|----------|------------|
+| SNS / X 動画 | 60 秒以下（**余裕をもって 55 秒以下を目安**） |
+| YouTube ショート | 60 秒以下 |
+| 一般紹介動画 | 90〜120 秒 |
+
+**余裕を 5 秒程度持たせる**（映像余白・録画前後のトリム誤差を吸収するため）。
+例: 目標 60 秒 → ナレーション合計 55 秒以下を目指す。
+
+### 尺調整ループ
+
+音声合成後に合計尺が目標を超えた場合、以下の手順で調整する。
+
+1. ffprobe で全シーンの実尺を取得し合計する
+2. 目標秒数との差分を確認する
+3. 長いシーン（差分が大きいもの）のナレーションを短縮して再合成する
+4. 再び ffprobe で合計を確認する
+5. 目標内に収まるまで繰り返す
+
+**短縮のコツ:**
+
+- 「でも中身は本格設計です」→「本格設計です」のように末尾の言い換えを削る
+- 「〜に〜、〜に〜、〜に〜」の列挙を 2〜3 項目に絞る
+- 「〜することができます」→「〜できます」などの短縮形を使う
+- 1 シーンで 2〜3 秒削れば複数シーン不要になることが多い
+
+**scenario.json の narration も同時に更新する**（音声ファイルとの乖離防止）。
+
+### 尺確定後の一括更新
+
+全シーンの尺が確定したら Python でまとめて反映する。
+
+```python
+durations = [6.12, 8.28, 9.14, ...]  # ffprobe の実測値
+starts = []
+s = 0.0
+for d in durations:
+    starts.append(round(s, 3))
+    s += d
+total = round(s, 3)  # 合計が目標以下か確認
+
+# scenario.json の start_sec / duration_sec / narration を更新
+# assets.json の audio[].duration_sec / bytes を更新
+```
+
+
+## 画像生成（aidiy_image_generation）
+
+各シーンの `image_prompt` をもとに PNG を生成する。
+
+### 推奨設定
+
+| 設定 | 推奨値 | 備考 |
+|------|--------|------|
+| provider | openai | 品質・安定性のバランスが良い |
+| model | gpt-image-2 | 現時点の最新 |
+| size | 1792x1024 | 16:9 横長（動画向け） |
+| quality | medium | コスト削減しつつ十分な品質 |
+| save_path | images/scene_001.png〜 | PNG 拡張子で自動保存 |
+
+### ツール呼び出し例
+
+```
+mcp__aidiy_image_generation__generate_image
+  prompt: <image_prompt の内容>
+  provider: openai
+  model: gpt-image-2
+  size: 1792x1024
+  quality: medium
+  save_path: D:/path/to/images/scene_001.png
+```
+
+### 注意点
+
+- `save_path` 先が存在しない場合はエラーになるため、事前に `os.makedirs()` で作成する
+- 1 枚あたり 10〜30 秒かかるため、シーン数が多い場合は **逐次実行**（並列不可）
+- `save_path` に既存ファイルがあると上書きされる
+- 生成完了後に `assets.json` の `images[].status` を `"generated"` に更新する
 
 ## 4. ブラウザ自動再生（autoplay 回避）
 
@@ -183,18 +389,29 @@ mcp__aidiy_ffmpeg_control__ffmpeg_run
 
 1. `aidiy_text_to_speech` で全シーン MP3 を生成・尺反映
 2. `chrome_devtools.navigate` で HTML を Chrome タブにロード
-3. `aidiy_text_to_speech.synthesize_speech` を `local_play:true` で **「Chrome を最前面にしてください」を肉声案内**
-4. `obs_record action=start` → `GetRecordStatus.outputActive=true` を確認
-5. `python scripts/cdp_user_gesture.py <tab_id> "play()"` で再生開始
-6. `eval_js` で `playing=true` を一度確認
-7. `Bash run_in_background` で `sleep 145` 程度（合計尺 + 余白）。完了通知で復帰
-8. `obs_record action=stop` → `outputActive=false` を確認、最新 mp4 を取得
-9. `ffmpeg_run` で前後トリム、必要なら別フォルダへコピーして納品
+3. `aidiy_text_to_speech.synthesize_speech` を `local_play:true` で **「Chrome を最前面にしてください。準備ができたらチャットに合図を」を肉声案内**
+4. 人間から合図（「準備完了」など）を受け取る
+5. `aidiy_text_to_speech.synthesize_speech` を `local_play:true` で **「10秒後に録画と再生を開始します」を読み上げ**
+6. **10秒待機**（`Start-Sleep -Seconds 10` 等）— 人間が Chrome を最前面・OBS を確認する猶予
+7. `obs_record action=start` → `GetRecordStatus.outputActive=true` を確認
+8. `python scripts/cdp_user_gesture.py <tab_id> "sceneIndex=0; renderBaseForScene(); play()"` で先頭から再生開始
+9. `eval_js` で `playing=true` / `audioPaused=false` を確認
+10. 合計尺 + 余白（例: 合計54秒なら60秒）待機
+11. `obs_record action=stop` → `outputActive=false` を確認、最新 mp4 を取得
+12. `ffmpeg_run` で前後トリム、必要なら別フォルダへコピーして納品
+
+> **ステップ 5〜6 は省略禁止。** 合図を受けてすぐ録画・再生を始めると、  
+> 人間が画面を切り替えている最中に録画が走り「操作中の画面」が映り込む。  
+> 「10秒後に開始します」のアナウンスを必ず挟み、人間に構える時間を与えること。
+>
+> **実際の失敗例（take3 一回目）:** 「開始」の合図を受けた直後に OBS 録画と CDP 再生を  
+> 実行したため、ブラウザが scene 2 に進んでいる状態から録画が始まり撮り直しになった。  
+> 必ず「10秒後」アナウンス → `Start-Sleep -Seconds 10` → 録画開始 → CDP 再生 の順を守る。
 
 ## 注意点
 
 - TTS の発音辞書を変えたら **シーン全体を再生成**し、`scenario.json` / `assets.json` / HTML 内シナリオの `start_sec` / `duration_sec` / `pronunciation_dictionary` 参照を一度に更新する。シーン 1 つだけ取り直すと尺がずれて最終シーンが切れる。
-- ブラウザでの再生は **常に CDP `userGesture:true`** で起動する。`mcp__aidiy_chrome_devtools__click` は user activation 扱いにならない（Chrome のバージョン依存）。
+- ブラウザでの再生は **常に CDP `userGesture:true`** で起動する。`mcp__aidiy_chrome_devtools__click` は user activation 扱いにならない（Chrome のバージョン依存）。再生コマンドは `play()` 単体ではなく **`sceneIndex=0; renderBaseForScene(); play()`** にして先頭リセットを確実に行う。
 - OBS の手動操作（録画開始ボタンを GUI で押す）に切り替える場合は、`local_play:true` の音声案内で **「OBS の録画開始ボタンを押し、Chrome を最前面に」→ 完了したらチャットに合図** という対話パターンに揃える。手動と自動の混在を想定して MP3 を全シーン揃えておけば、いつ録画開始しても損失は前後トリムで吸収できる。
 - ファイルパスにスペースが入ると `ffprobe_run` / `ffmpeg_run` の `args_str` 経由で破綻する。**OBS 出力 `2026-... .mp4` は必ずスペースなし名にコピー**してから扱う。
 - レスポンスがトークン上限超でエラー扱いになっても、`save_path` 指定の TTS と `returncode==0` の ffmpeg は成功している。本文を読み返さず、**ファイルシステム側で結果確認**する。
