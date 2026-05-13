@@ -182,6 +182,8 @@ class TextToSpeech:
         ("Code CLI", "コード シーエルアイ"),
         ("WebSocket", "ウェブソケット"),
         ("GitHub", "ギットハブ"),
+        ("Knowledge", "ナレッジ"),
+        ("knowledge", "ナレッジ"),
         ("SQLite", "エスキューライト"),
         ("Claude", "クロード"),
         ("Copilot", "コパイロット"),

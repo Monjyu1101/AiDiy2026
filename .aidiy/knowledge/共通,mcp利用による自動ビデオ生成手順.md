@@ -56,6 +56,59 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 
 `?scene=N` クエリで任意シーンから検証起動できるようにしておく（狭いビューポート時の表示崩れを 1 シーンずつ確認できる）。
 
+### アバター表情の既定値
+
+アバターを重ねる動画では、**シーン側に明示指定がない限り表情はナチュラル（`neutral`）で統一する**。`happy`、`relaxed` などは見た目に意図しない感情が乗りやすいため、演出理由が明確なシーンだけで使う。
+
+- 既定値: `expression: "neutral"`
+- `scenario.json` に `expression` を持たせる場合も、特に指定がなければ `neutral` を入れる
+- 非 `neutral` を使うときは「驚き」「緊張」「喜び」など、シーンの演出意図を先に文章で確定してから入れる
+
+### 画像生成の前提: ソースが明確な情報から作る
+
+画像は **シーンタイトルやふんわりした雰囲気だけで作らず、出典が明確な情報を元に生成する**。AiDiy 紹介動画なら、`AGENTS.md`、各サブプロジェクトの `AGENTS.md`、`.aidiy/knowledge`、既存 UI / 実装ファイル、実際のスクリーンショットなど、**どの情報を根拠にしたか追跡できる状態**で進める。
+
+- NG: 「AIっぽい開発画面」「MCP っぽいハブ図」のような抽象語だけで投げる
+- OK: `backend_mcp/AGENTS.md` の 13 MCP 一覧、`frontend_avatar/AGENTS.md` の Electron/Web 差分、`AGENTS.md` のポート一覧や命名規則、既存 UI の画面構成などを抜粋して渡す
+
+### 画像生成のためにシーンへ持たせる情報
+
+`image_prompt` だけでは足りない。少なくとも次の情報を **画像生成前にシーンデータへ持たせ、その要点をプロンプトへ渡す**。
+
+| 項目 | 用途 |
+|------|------|
+| `source_documents` | どの文書 / 実装を根拠にしたか。例: `AGENTS.md`, `backend_mcp/AGENTS.md` |
+| `source_summary` | そのシーンで表現すべき事実の短い要約 |
+| `factual_bullets` | 画像に反映すべき具体要素。例: `13 MCP`, `port 8095`, `Web/Electron 両対応` |
+| `forbidden_elements` | 入れてはいけない誤情報。例: `未実装の製品ロゴ`, `実態にない画面構成` |
+
+例:
+
+```json
+{
+  "title": "MCP Hub × 13",
+  "source_documents": [
+    "AGENTS.md",
+    "backend_mcp/AGENTS.md"
+  ],
+  "source_summary": "backend_mcp は port 8095 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーション。",
+  "factual_bullets": [
+    "Chrome DevTools",
+    "desktop_capture",
+    "sqlite / postgres / logs",
+    "code_check / backup",
+    "image_generation / speech_to_text / text_to_speech / obs / ffmpeg"
+  ],
+  "forbidden_elements": [
+    "13個以外のMCP数",
+    "実装にない外部サービス構成"
+  ],
+  "image_prompt": "上記の factual_bullets を反映した 2:3 構図の技術ポスター ..."
+}
+```
+
+`image_prompt` は自由記述でもよいが、**元情報の抜粋 (`source_summary`, `factual_bullets`) をプロンプト生成時に必ず一緒に渡す**。これを省くと、見た目は派手でも実態に合わない画像になりやすい。
+
 ### HTML の分割構成（iframe 方式）
 
 シーンが増えると `index.html` 1 ファイルに全シーン HTML を埋め込むと肥大化するため、**iframe 分割**を推奨する。
@@ -260,7 +313,7 @@ total = round(s, 3)  # 合計が目標以下か確認
 
 ## 画像生成（aidiy_image_generation）
 
-各シーンの `image_prompt` をもとに PNG を生成する。
+各シーンの `image_prompt` をもとに PNG を生成する。ただし、`image_prompt` は **根拠文書から抜いた `source_summary` / `factual_bullets` を踏まえて作る**。先にソースを確認し、画像生成ツールには「何を描くか」だけでなく「何を根拠に描くか」も渡す。
 
 ### 推奨設定
 
@@ -276,7 +329,7 @@ total = round(s, 3)  # 合計が目標以下か確認
 
 ```
 mcp__aidiy_image_generation__generate_image
-  prompt: <image_prompt の内容>
+  prompt: <image_prompt の内容。source_summary と factual_bullets の要点を含める>
   provider: openai
   model: gpt-image-2
   size: 1792x1024
@@ -286,6 +339,9 @@ mcp__aidiy_image_generation__generate_image
 
 ### 注意点
 
+- `title` や `subtitle` だけで画像生成しない。**必ず根拠文書の要点 (`source_summary`, `factual_bullets`) を先に整理し、それを prompt へ埋め込む**
+- `source_documents` を `scenario.json` や `assets.json` に残し、あとで「この画像はどの情報を元にしたか」を追跡できるようにする
+- AGENTS.md や既存 UI と食い違う要素（未実装の製品ロゴ、存在しない画面構成、MCP 数違いなど）は `forbidden_elements` として先に明記する
 - `save_path` 先が存在しない場合はエラーになるため、事前に `os.makedirs()` で作成する
 - 1 枚あたり 10〜30 秒かかるため、シーン数が多い場合は **逐次実行**（並列不可）
 - `save_path` に既存ファイルがあると上書きされる
@@ -364,13 +420,26 @@ JSON.stringify({sceneIndex, playing, audioPaused: audioPlayer.paused, playBtnTex
 | OBS 録画開始 | `obs_record action=start` で自動 | `outputActive=false` 固定の時は手動 |
 | Chrome ウィンドウ最前面 | `chrome_devtools.activate_tab` を試行 | エラー時は音声ガイドで手動最前面 |
 | 録画後の確認・採否判断 | 不可 | 必ず人間が視聴して判断 |
-| トリム秒数決定 | 不可 | 人間が「先頭18秒、末尾5秒」と指定 |
+| トリム秒数決定 | `aidiy_ffmpeg_control` で無音抽出し開始・終了候補を出せる | 最終判断は人間が視聴して微調整 |
 
 「人間が必要な操作」は **採否判断・微調整・GUI 必須操作** に絞り、その他は MCP 自動化に寄せる。判断が要らない単純作業をいちいち音声で頼まない。
 
 ## 7. ffmpeg トリム（aidiy_ffmpeg_control）
 
 OBS 録画は前後に「録画開始 → 再生クリックまでの数秒」「ナレーション後 → 停止までの数秒」が含まれる。再エンコードして CRF で品質固定する。
+
+先頭・末尾の余白秒数が分からないときは、**ローカル shell に落とさず `aidiy_ffmpeg_control` のまま無音抽出まで進めてよい**。`silencedetect` を使うと、録画 MP4 から「先頭の無音が終わる位置」「最後の無音が始まる位置」を候補として拾える。
+
+```
+mcp__aidiy_ffmpeg_control__ffmpeg_run
+  args_str: -hide_banner -nostats -i C:/Users/admin/Videos/aidiy_intro_take4.mp4 \
+            -af silencedetect=noise=-35dB:d=0.5 -f null NUL
+```
+
+- stderr に `silence_start` / `silence_end` が出る。**先頭側は最初の `silence_end` を開始候補、末尾側は最後の `silence_start` を終了候補**として読むと分かりやすい。
+- 録画ファイルが `C:\Users\admin\Videos\2026-... .mp4` のようにスペースを含む場合は、**必ずスペースなし名へコピーしてから** `args_str` に渡す。
+- ナレーション中の短い間まで拾いすぎる場合は `d=0.8` へ伸ばす、環境ノイズを拾う場合は `noise=-30dB` 付近へ上げる、の順で調整する。
+- 無音抽出は **トリム秒数の初期候補を出すための補助**。最終的な採否は必ず人間が視聴して決める。
 
 ```
 mcp__aidiy_ffmpeg_control__ffmpeg_run
@@ -411,6 +480,7 @@ mcp__aidiy_ffmpeg_control__ffmpeg_run
 ## 注意点
 
 - TTS の発音辞書を変えたら **シーン全体を再生成**し、`scenario.json` / `assets.json` / HTML 内シナリオの `start_sec` / `duration_sec` / `pronunciation_dictionary` 参照を一度に更新する。シーン 1 つだけ取り直すと尺がずれて最終シーンが切れる。
+- 画像を作り直すときは `image_prompt` だけで再生成せず、**元にした `source_documents` / `source_summary` / `factual_bullets` も見直してから**再生成する。誤った根拠のまま prompt だけ調整すると、見た目だけ直って内容がずれたまま残る。
 - ブラウザでの再生は **常に CDP `userGesture:true`** で起動する。`mcp__aidiy_chrome_devtools__click` は user activation 扱いにならない（Chrome のバージョン依存）。再生コマンドは `play()` 単体ではなく **`sceneIndex=0; renderBaseForScene(); play()`** にして先頭リセットを確実に行う。
 - OBS の手動操作（録画開始ボタンを GUI で押す）に切り替える場合は、`local_play:true` の音声案内で **「OBS の録画開始ボタンを押し、Chrome を最前面に」→ 完了したらチャットに合図** という対話パターンに揃える。手動と自動の混在を想定して MP3 を全シーン揃えておけば、いつ録画開始しても損失は前後トリムで吸収できる。
 - ファイルパスにスペースが入ると `ffprobe_run` / `ffmpeg_run` の `args_str` 経由で破綻する。**OBS 出力 `2026-... .mp4` は必ずスペースなし名にコピー**してから扱う。
