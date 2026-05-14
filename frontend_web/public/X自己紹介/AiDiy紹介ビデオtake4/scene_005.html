@@ -2,93 +2,65 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>AIコアとアバター</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AiDiy 自己紹介 scene_005</title>
   <link rel="stylesheet" href="scene.css">
+  <script src="scenario.js"></script>
+  <script src="scene_core.js"></script>
 </head>
 <body>
-  <div id="stage" class="stage fade-enter" style="--accent:#7b8cff;--accent-soft:rgba(123,140,255,0.18);">
+  <div id="stage" class="stage fade-enter">
     <section class="visual-panel">
       <div class="visual-meta">
-        <div class="kicker">AI CORE + AVATAR</div>
-        <div class="scene-id">scene_005 / 6 of 10</div>
+        <div id="kicker" class="kicker"></div>
+        <div id="sceneId" class="scene-id"></div>
       </div>
+
       <div class="image-shell">
-        <img class="scene-image" src="images/scene_005.png" alt="AIコアとアバター" onload="this.classList.add('loaded')">
-        <div class="image-placeholder">画像を読み込み中...</div>
+        <div id="backgroundWord" class="background-word"></div>
+        <img id="sceneImage" class="scene-image" alt="">
+        <div id="imagePlaceholder" class="image-placeholder">画像を読み込み中...</div>
         <div class="image-overlay">
           <div class="image-overlay-copy">
-            <div class="image-title">AIコアとアバター</div>
-            <p class="image-subtitle">AIコアの多パネル体験を、VRM アバターまで含めて運用できる。</p>
+            <div id="imageKicker" class="image-kicker"></div>
+            <h2 id="imageTitle" class="image-title"></h2>
+            <div id="imageHeadline" class="image-headline"></div>
+            <p id="imageSubtitle" class="image-subtitle"></p>
+            <p id="imageLead" class="image-lead"></p>
           </div>
         </div>
       </div>
     </section>
-    <section class="content-panel">
+
+    <section id="contentPanel" class="content-panel">
       <div class="content-scroll">
-        <div class="header-row"><div class="header-main">
-          <h1 class="scene-title">AIコアとアバター</h1>
-          <div class="headline">
-            <span class="headline-line">チャット、音声、画像、コード支援を</span>
-            <span class="headline-line">アバター体験までつなぐ</span>
+        <div class="header-row">
+          <div class="header-main">
+            <h1 id="sceneTitle" class="scene-title"></h1>
+            <div id="headline" class="headline"></div>
+            <p id="lead" class="lead"></p>
           </div>
-          <p class="lead">AiDiy の AI コアは多パネル UI で、frontend_avatar は Electron と Web の両方に対応します。</p>
-        </div></div>
-        <div class="chip-row">
-          <div class="chip">CHAT_AI_NAME</div>
-          <div class="chip">LIVE_AI_NAME</div>
-          <div class="chip">CODE_AI1〜6</div>
-          <div class="chip">VRM / VRMA</div>
         </div>
-        <div class="metric-row">
-          <div class="metric-card"><div class="metric-label">Code パネル</div><div class="metric-value">6</div></div>
-          <div class="metric-card"><div class="metric-label">UI モード</div><div class="metric-value">2</div></div>
-          <div class="metric-card"><div class="metric-label">同期</div><div class="metric-value" style="font-size:14px;">Broadcast<br>Channel</div></div>
-        </div>
-        <div class="card-grid">
-          <section class="fact-card">
-            <h3 class="fact-card-title">AIコア</h3>
-            <ul class="fact-card-list">
-              <li>テキスト、音声、画像、ファイル、コード支援を統合</li><li>`CHAT_AI_NAME` / `LIVE_AI_NAME`</li><li>`CODE_AI1_NAME`〜`CODE_AI6_NAME`</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">Avatar Web</h3>
-            <ul class="fact-card-list">
-              <li>左アバター + 右タブ</li><li>Web モードは `sessionStorage`</li><li>role / query で画面を表現</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">Avatar Electron</h3>
-            <ul class="fact-card-list">
-              <li>複数 BrowserWindow</li><li>Electron モードは `localStorage`</li><li>`window.desktopApi` で判定</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">3D / 同期</h3>
-            <ul class="fact-card-list">
-              <li>Three.js + `@pixiv/three-vrm`</li><li>`public/vrm/` と `public/vrma/`</li><li>`avatar-desktop-sync` で状態同期</li>
-            </ul>
-          </section>
-        </div>
+
+        <div id="chips" class="chip-row"></div>
+        <div id="metrics" class="metric-row"></div>
+        <div id="cards" class="card-grid"></div>
+
         <div class="detail-grid">
           <section class="detail-panel">
             <h3 class="panel-title">確認ポイント</h3>
-            <div class="fact-list">
-              <div class="fact-item"><p class="fact-text">AIコアは WebSocket + マルチベンダー AI + Code CLI パネルを統合する。</p></div>
-              <div class="fact-item"><p class="fact-text">frontend_avatar は Electron デスクトップアプリと通常 Web ブラウザの両方で動作する。</p></div>
-              <div class="fact-item"><p class="fact-text">Electron / Web 間の状態同期は BroadcastChannel `avatar-desktop-sync` を使う。</p></div>
-            </div>
+            <div id="facts" class="fact-list"></div>
           </section>
+
           <section class="detail-panel">
             <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
-            <div class="evidence-list">
-              <div class="evidence-item"><div class="evidence-source">AGENTS.md</div><p class="evidence-text">AIコアは、テキスト、音声、画像、ファイル、コード支援を統合する多パネル UI です。</p></div>
-              <div class="evidence-item"><div class="evidence-source">frontend_avatar/AGENTS.md</div><p class="evidence-text">`frontend_avatar` は AIコア専用の Avatar クライアントで、Electron と Web の両対応です。</p></div>
-            </div>
+            <div id="evidence" class="evidence-list"></div>
           </section>
         </div>
       </div>
     </section>
   </div>
+
+  <script>renderScenePage(5);</script>
 </body>
 </html>

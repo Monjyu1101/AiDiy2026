@@ -2,81 +2,65 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>位置づけと起動方式</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AiDiy Hermes 紹介 scene_001</title>
   <link rel="stylesheet" href="scene.css">
+  <script src="scenario.js"></script>
+  <script src="scene_core.js"></script>
 </head>
 <body>
-  <div id="stage" class="stage fade-enter" style="--accent:#29d8ff;--accent-soft:rgba(41,216,255,0.18);">
+  <div id="stage" class="stage fade-enter">
     <section class="visual-panel">
       <div class="visual-meta">
-        <div class="kicker">AGENT CLI</div>
-        <div class="scene-id">scene_001 / 2 of 7</div>
+        <div id="kicker" class="kicker"></div>
+        <div id="sceneId" class="scene-id"></div>
       </div>
+
       <div class="image-shell">
-        <img class="scene-image" src="images/scene_001.png" alt="位置づけと起動方式" onload="this.classList.add('loaded')">
-        <div class="image-placeholder">画像を読み込み中...</div>
+        <div id="backgroundWord" class="background-word"></div>
+        <img id="sceneImage" class="scene-image" alt="">
+        <div id="imagePlaceholder" class="image-placeholder">画像を読み込み中...</div>
         <div class="image-overlay">
           <div class="image-overlay-copy">
-            <div class="image-title">位置づけと起動方式</div>
-            <p class="image-subtitle">常駐しない。コードパネルから subprocess で起動される on-demand CLI。</p>
+            <div id="imageKicker" class="image-kicker"></div>
+            <h2 id="imageTitle" class="image-title"></h2>
+            <div id="imageHeadline" class="image-headline"></div>
+            <p id="imageSubtitle" class="image-subtitle"></p>
+            <p id="imageLead" class="image-lead"></p>
           </div>
         </div>
       </div>
     </section>
-    <section class="content-panel">
+
+    <section id="contentPanel" class="content-panel">
       <div class="content-scroll">
-        <div class="header-row"><div class="header-main">
-          <h1 class="scene-title">位置づけと起動方式</h1>
-          <div class="headline">
-            <span class="headline-line">常駐しない、</span>
-            <span class="headline-line">呼ばれたとき動くエージェント</span>
+        <div class="header-row">
+          <div class="header-main">
+            <h1 id="sceneTitle" class="scene-title"></h1>
+            <div id="headline" class="headline"></div>
+            <p id="lead" class="lead"></p>
           </div>
-          <p class="lead">aidiy_hermes は HTTP サーバーとして常駐せず、AiDiy のコードパネルから subprocess で呼び出される on-demand な実行体です。</p>
-        </div></div>
-        <div class="chip-row">
-          <div class="chip">on-demand</div>
-          <div class="chip">subprocess 起動</div>
-          <div class="chip">_start.py 非対象</div>
-          <div class="chip">_setup.py 対象</div>
         </div>
-        <div class="metric-row">
-          <div class="metric-card"><div class="metric-label">常駐</div><div class="metric-value" style="font-size:14px;">なし</div></div>
-          <div class="metric-card"><div class="metric-label">実行名</div><div class="metric-value" style="font-size:14px;">aidiy_hermes</div></div>
-          <div class="metric-card"><div class="metric-label">起動元</div><div class="metric-value" style="font-size:12px;">AIコード_cli.py</div></div>
-        </div>
-        <div class="card-grid">
-          <section class="fact-card">
-            <h3 class="fact-card-title">位置づけ</h3>
-            <ul class="fact-card-list">
-              <li>常駐 HTTP サーバーではない</li><li>`_start.py` の常駐起動対象ではない</li><li>`_setup.py` / `_cleanup.py` の対象</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">起動方式</h3>
-            <ul class="fact-card-list">
-              <li>AiDiy コードパネル → subprocess</li><li>`CODE_AI*_NAME = "aidiy_hermes"` で呼び出し</li><li>単体 CLI としても直接実行可能</li>
-            </ul>
-          </section>
-        </div>
+
+        <div id="chips" class="chip-row"></div>
+        <div id="metrics" class="metric-row"></div>
+        <div id="cards" class="card-grid"></div>
+
         <div class="detail-grid">
           <section class="detail-panel">
             <h3 class="panel-title">確認ポイント</h3>
-            <div class="fact-list">
-              <div class="fact-item"><p class="fact-text">`backend_hermes` は常駐 HTTP サーバーではない。</p></div>
-              <div class="fact-item"><p class="fact-text">`_start.py` の常駐起動対象ではない。</p></div>
-              <div class="fact-item"><p class="fact-text">`backend_server/AIコア/AIコード_cli.py` から subprocess で起動される。</p></div>
-            </div>
+            <div id="facts" class="fact-list"></div>
           </section>
+
           <section class="detail-panel">
             <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
-            <div class="evidence-list">
-              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。常駐 HTTP サーバーではない。</p></div>
-              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">`_start.py` の常駐起動対象ではない。`_setup.py` / `_cleanup.py` の対象。</p></div>
-            </div>
+            <div id="evidence" class="evidence-list"></div>
           </section>
         </div>
       </div>
     </section>
   </div>
+
+  <script>renderScenePage(1);</script>
 </body>
 </html>

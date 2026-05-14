@@ -2,92 +2,65 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>日本語ファースト設計</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AiDiy 自己紹介 scene_002</title>
   <link rel="stylesheet" href="scene.css">
+  <script src="scenario.js"></script>
+  <script src="scene_core.js"></script>
 </head>
 <body>
-  <div id="stage" class="stage fade-enter" style="--accent:#7dffb3;--accent-soft:rgba(125,255,179,0.18);">
+  <div id="stage" class="stage fade-enter">
     <section class="visual-panel">
       <div class="visual-meta">
-        <div class="kicker">JAPANESE FIRST</div>
-        <div class="scene-id">scene_002 / 3 of 10</div>
+        <div id="kicker" class="kicker"></div>
+        <div id="sceneId" class="scene-id"></div>
       </div>
+
       <div class="image-shell">
-        <img class="scene-image" src="images/scene_002.png" alt="日本語ファースト設計" onload="this.classList.add('loaded')">
-        <div class="image-placeholder">画像を読み込み中...</div>
+        <div id="backgroundWord" class="background-word"></div>
+        <img id="sceneImage" class="scene-image" alt="">
+        <div id="imagePlaceholder" class="image-placeholder">画像を読み込み中...</div>
         <div class="image-overlay">
           <div class="image-overlay-copy">
-            <div class="image-title">日本語ファースト設計</div>
-            <p class="image-subtitle">業務語彙と実装名を揃え、読めるまま保守できる構成。</p>
+            <div id="imageKicker" class="image-kicker"></div>
+            <h2 id="imageTitle" class="image-title"></h2>
+            <div id="imageHeadline" class="image-headline"></div>
+            <p id="imageSubtitle" class="image-subtitle"></p>
+            <p id="imageLead" class="image-lead"></p>
           </div>
         </div>
       </div>
     </section>
-    <section class="content-panel">
+
+    <section id="contentPanel" class="content-panel">
       <div class="content-scroll">
-        <div class="header-row"><div class="header-main">
-          <h1 class="scene-title">日本語ファースト設計</h1>
-          <div class="headline">
-            <span class="headline-line">DB / API / UI / Code を</span>
-            <span class="headline-line">日本語で一直線につなぐ</span>
+        <div class="header-row">
+          <div class="header-main">
+            <h1 id="sceneTitle" class="scene-title"></h1>
+            <div id="headline" class="headline"></div>
+            <p id="lead" class="lead"></p>
           </div>
-          <p class="lead">AiDiy では業務語彙と実装名をできるだけ一致させ、日本語話者がコードと画面を直接対応づけられるようにしています。</p>
-        </div></div>
-        <div class="chip-row">
-          <div class="chip">UTF-8 固定</div>
-          <div class="chip">URL も日本語</div>
-          <div class="chip">JSON キーも日本語</div>
-          <div class="chip">一般名 request/query は英字可</div>
         </div>
-        <div class="metric-row">
-          <div class="metric-card"><div class="metric-label">例レイヤー</div><div class="metric-value">4</div></div>
-          <div class="metric-card"><div class="metric-label">原則</div><div class="metric-value" style="font-size:18px;">一致重視</div></div>
-        </div>
-        <div class="card-grid">
-          <section class="fact-card">
-            <h3 class="fact-card-title">Database</h3>
-            <ul class="fact-card-list">
-              <li>テーブル名 `C権限`</li><li>カラム名 `利用者ID`</li><li>監査フィールド標準</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">API / JSON</h3>
-            <ul class="fact-card-list">
-              <li>`/core/利用者/一覧`</li><li>`{"利用者名": "admin"}`</li><li>POST 中心の統一レスポンス</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">Frontend</h3>
-            <ul class="fact-card-list">
-              <li>`C利用者一覧.vue`</li><li>`/C管理/C利用者/一覧`</li><li>Vue Router / Pinia 運用</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">Code</h3>
-            <ul class="fact-card-list">
-              <li>`利用者名`</li><li>`配車日付`</li><li>`商品名`</li>
-            </ul>
-          </section>
-        </div>
+
+        <div id="chips" class="chip-row"></div>
+        <div id="metrics" class="metric-row"></div>
+        <div id="cards" class="card-grid"></div>
+
         <div class="detail-grid">
           <section class="detail-panel">
             <h3 class="panel-title">確認ポイント</h3>
-            <div class="fact-list">
-              <div class="fact-item"><p class="fact-text">画面、URL、JSON キー、識別子は日本語を原則とする。</p></div>
-              <div class="fact-item"><p class="fact-text">DB 項目名、API 項目名、フロントエンド変数名はできるだけ一致させる。</p></div>
-              <div class="fact-item"><p class="fact-text">HowTo や検証手順は AGENTS.md ではなく .aidiy/knowledge に置く。</p></div>
-            </div>
+            <div id="facts" class="fact-list"></div>
           </section>
+
           <section class="detail-panel">
             <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
-            <div class="evidence-list">
-              <div class="evidence-item"><div class="evidence-source">AGENTS.md</div><p class="evidence-text">全レイヤーで日本語識別子を使います。Database / API / Frontend / Code の例が明示されています。</p></div>
-              <div class="evidence-item"><div class="evidence-source">frontend_web/AGENTS.md</div><p class="evidence-text">日本語ファイル名、日本語 route、日本語 JSON key を使う。template の component tag は ASCII にする。</p></div>
-            </div>
+            <div id="evidence" class="evidence-list"></div>
           </section>
         </div>
       </div>
     </section>
   </div>
+
+  <script>renderScenePage(2);</script>
 </body>
 </html>

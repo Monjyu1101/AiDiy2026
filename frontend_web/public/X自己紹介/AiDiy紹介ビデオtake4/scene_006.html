@@ -2,90 +2,65 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Code CLI と Hermes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AiDiy 自己紹介 scene_006</title>
   <link rel="stylesheet" href="scene.css">
+  <script src="scenario.js"></script>
+  <script src="scene_core.js"></script>
 </head>
 <body>
-  <div id="stage" class="stage fade-enter" style="--accent:#ff8a6b;--accent-soft:rgba(255,138,107,0.18);">
+  <div id="stage" class="stage fade-enter">
     <section class="visual-panel">
       <div class="visual-meta">
-        <div class="kicker">MULTI CODE CLI</div>
-        <div class="scene-id">scene_006 / 7 of 10</div>
+        <div id="kicker" class="kicker"></div>
+        <div id="sceneId" class="scene-id"></div>
       </div>
+
       <div class="image-shell">
-        <img class="scene-image" src="images/scene_006.png" alt="Code CLI と Hermes" onload="this.classList.add('loaded')">
-        <div class="image-placeholder">画像を読み込み中...</div>
+        <div id="backgroundWord" class="background-word"></div>
+        <img id="sceneImage" class="scene-image" alt="">
+        <div id="imagePlaceholder" class="image-placeholder">画像を読み込み中...</div>
         <div class="image-overlay">
           <div class="image-overlay-copy">
-            <div class="image-title">Code CLI と Hermes</div>
-            <p class="image-subtitle">複数 CLI を使い分ける設計そのものが、AiDiy の実態。</p>
+            <div id="imageKicker" class="image-kicker"></div>
+            <h2 id="imageTitle" class="image-title"></h2>
+            <div id="imageHeadline" class="image-headline"></div>
+            <p id="imageSubtitle" class="image-subtitle"></p>
+            <p id="imageLead" class="image-lead"></p>
           </div>
         </div>
       </div>
     </section>
-    <section class="content-panel">
+
+    <section id="contentPanel" class="content-panel">
       <div class="content-scroll">
-        <div class="header-row"><div class="header-main">
-          <h1 class="scene-title">Code CLI と Hermes</h1>
-          <div class="headline">
-            <span class="headline-line">ひとつの AI に固定せず、</span>
-            <span class="headline-line">用途ごとに相棒を切り替える</span>
+        <div class="header-row">
+          <div class="header-main">
+            <h1 id="sceneTitle" class="scene-title"></h1>
+            <div id="headline" class="headline"></div>
+            <p id="lead" class="lead"></p>
           </div>
-          <p class="lead">AiDiy は code1〜code6 パネルへ複数の Code AI を流し込み、独自 CLI の aidiy_hermes まで含めて運用します。</p>
-        </div></div>
-        <div class="chip-row">
-          <div class="chip">claude_sdk</div>
-          <div class="chip">claude_cli</div>
-          <div class="chip">copilot_cli</div>
-          <div class="chip">codex_cli</div>
-          <div class="chip">gemini_cli</div>
-          <div class="chip">opencode_cli</div>
-          <div class="chip">aidiy_hermes</div>
         </div>
-        <div class="metric-row">
-          <div class="metric-card"><div class="metric-label">有効値</div><div class="metric-value">7</div></div>
-          <div class="metric-card"><div class="metric-label">code パネル</div><div class="metric-value">6</div></div>
-          <div class="metric-card"><div class="metric-label">provider overlay</div><div class="metric-value">31+</div></div>
-        </div>
-        <div class="card-grid">
-          <section class="fact-card">
-            <h3 class="fact-card-title">Code AI 候補</h3>
-            <ul class="fact-card-list">
-              <li>root AGENTS に 7 つの有効値</li><li>code1〜code6 に割当</li><li>用途別に切替</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">aidiy_hermes</h3>
-            <ul class="fact-card-list">
-              <li>on-demand のコードエージェント CLI</li><li>常駐 HTTP サーバーではない</li><li>`backend_server` から subprocess 呼び出し</li>
-            </ul>
-          </section>
-          <section class="fact-card">
-            <h3 class="fact-card-title">Hermes の幅</h3>
-            <ul class="fact-card-list">
-              <li>31 の provider overlay</li><li>50 以上のエイリアス</li><li>`prompt_toolkit` ベース TUI</li>
-            </ul>
-          </section>
-        </div>
+
+        <div id="chips" class="chip-row"></div>
+        <div id="metrics" class="metric-row"></div>
+        <div id="cards" class="card-grid"></div>
+
         <div class="detail-grid">
           <section class="detail-panel">
             <h3 class="panel-title">確認ポイント</h3>
-            <div class="fact-list">
-              <div class="fact-item"><p class="fact-text">Code AI の有効値として `claude_sdk`〜`aidiy_hermes` が想定されている。</p></div>
-              <div class="fact-item"><p class="fact-text">`backend_hermes` は `_start.py` の常駐起動対象ではない。</p></div>
-              <div class="fact-item"><p class="fact-text">`aidiy_hermes` は `backend_server/AIコア/AIコード_cli.py` から subprocess で起動される。</p></div>
-            </div>
+            <div id="facts" class="fact-list"></div>
           </section>
+
           <section class="detail-panel">
             <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
-            <div class="evidence-list">
-              <div class="evidence-item"><div class="evidence-source">AGENTS.md</div><p class="evidence-text">Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` を想定します。</p></div>
-              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">`aidiy_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。</p></div>
-            </div>
+            <div id="evidence" class="evidence-list"></div>
           </section>
         </div>
       </div>
     </section>
   </div>
+
+  <script>renderScenePage(6);</script>
 </body>
 </html>

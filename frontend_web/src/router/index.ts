@@ -15,6 +15,26 @@ import ログイン from '../components/ログイン.vue'
 import { coreRoutes } from './coreRouter'
 import { appsRoutes } from './appsRouter'
 
+const buildStaticRedirectUrl = (targetPath: string): string => {
+    const baseUrl = import.meta.env.BASE_URL || '/'
+    const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
+    return new URL(targetPath.replace(/^\/+/, ''), new URL(normalizedBaseUrl, window.location.origin)).toString()
+}
+
+const createStaticAliasRoute = (
+    aliasPath: string,
+    targetPath: string,
+    title: string,
+): RouteRecordRaw => ({
+    path: aliasPath,
+    component: { render: () => null },
+    beforeEnter: () => {
+        window.location.replace(buildStaticRedirectUrl(targetPath))
+        return false
+    },
+    meta: { title },
+})
+
 // ベースルート (認証, リンク, X系)
 const baseRoutes: RouteRecordRaw[] = [
     {
@@ -95,6 +115,26 @@ const baseRoutes: RouteRecordRaw[] = [
         component: () => import('../components/Xその他/X自己紹介.vue'),
         meta: { requiresAuth: true, title: 'X自己紹介' }
     },
+    createStaticAliasRoute(
+        '/X自己紹介/aidiy紹介ビデオtake4/index.html',
+        'X自己紹介/AiDiy紹介ビデオtake4/index.html',
+        'X自己紹介'
+    ),
+    createStaticAliasRoute(
+        '/X自己紹介/AiDiy自己紹介ビデオtake4/index.html',
+        'X自己紹介/AiDiy紹介ビデオtake4/index.html',
+        'X自己紹介'
+    ),
+    createStaticAliasRoute(
+        '/X自己紹介/aidiy紹介アバター/index.html',
+        'X自己紹介/AiDiy紹介アバター/index.html',
+        'X自己紹介'
+    ),
+    createStaticAliasRoute(
+        '/X自己紹介/aidiy紹介hermes/index.html',
+        'X自己紹介/AiDiy紹介hermes/index.html',
+        'X自己紹介'
+    ),
 ]
 
 const router = createRouter({
