@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>業務サンプルと命名規則</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div id="stage" class="stage fade-enter" style="--accent:#ffbf47;--accent-soft:rgba(255,191,71,0.18);">
+    <section class="visual-panel">
+      <div class="visual-meta">
+        <div class="kicker">BUSINESS PATTERNS</div>
+        <div class="scene-id">scene_004 / 5 of 7</div>
+      </div>
+      <div class="image-shell">
+        <img class="scene-image" src="images/scene_004.png" alt="業務サンプルと命名規則"
+          onload="this.classList.add('loaded')">
+        <div class="image-placeholder">画像を読み込み中...</div>
+        <div class="image-overlay">
+          <div class="image-overlay-copy">
+            <div class="image-title">業務サンプルと命名規則</div>
+            <p class="image-subtitle">サンプル名と実装パターンが一致しているので、横展開しやすい。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-panel">
+      <div class="content-scroll">
+        <div class="header-row">
+          <div class="header-main">
+            <h1 class="scene-title">業務サンプルと命名規則</h1>
+            <div class="headline">
+              <span class="headline-line">配車・生産・在庫を</span>
+              <span class="headline-line">実装パターンごと持っている</span>
+            </div>
+            <p class="lead">AiDiy は見た目だけのデモではなく、業務サンプルと命名規則をセットで持つテンプレートです。</p>
+          </div>
+        </div>
+
+        <div class="chip-row">
+          <div class="chip">C / M / T / V / S / A / X</div>
+          <div class="chip">明細型パターン</div>
+          <div class="chip">JOIN / 集計 V系</div>
+          <div class="chip">Scheduler 付き</div>
+        </div>
+
+        <div class="metric-row">
+          <div class="metric-card">
+            <div class="metric-label">接頭辞</div>
+            <div class="metric-value">7</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">業務例</div>
+            <div class="metric-value">3</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">明細型</div>
+            <div class="metric-value" style="font-size:18px;">単一表</div>
+          </div>
+        </div>
+
+        <div class="card-grid">
+          <section class="fact-card">
+            <h3 class="fact-card-title">接頭辞</h3>
+            <ul class="fact-card-list">
+              <li>C=Core / Common</li>
+              <li>M=Master, T=Transaction</li>
+              <li>V=View endpoint, S=Scheduler</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">業務サンプル</h3>
+            <ul class="fact-card-list">
+              <li>配車管理</li>
+              <li>生産管理</li>
+              <li>資材在庫管理</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">明細型</h3>
+            <ul class="fact-card-list">
+              <li>`明細SEQ=0` がヘッダー</li>
+              <li>`明細SEQ>=1` が明細</li>
+              <li>`M商品構成` と `T生産` が代表例</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">V系の実態</h3>
+            <ul class="fact-card-list">
+              <li>DB VIEW ではない</li>
+              <li>Router 内の生 SQL JOIN / 集計</li>
+              <li>`V商品推移表` など</li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="detail-grid">
+          <section class="detail-panel">
+            <h3 class="panel-title">確認ポイント</h3>
+            <div class="fact-list">
+              <div class="fact-item"><p class="fact-text">配車管理は `M配車区分`、`M車両`、`T配車`、`V配車`、`S配車_*` で構成される。</p></div>
+              <div class="fact-item"><p class="fact-text">生産管理は `M商品構成` と `T生産` を含み、明細型パターンの実例になっている。</p></div>
+              <div class="fact-item"><p class="fact-text">V系は DB VIEW オブジェクトではなく、生 SQL による JOIN / 集計エンドポイント。</p></div>
+            </div>
+          </section>
+          <section class="detail-panel">
+            <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
+            <div class="evidence-list">
+              <div class="evidence-item">
+                <div class="evidence-source">AGENTS.md</div>
+                <p class="evidence-text">テーブル命名規則として C / M / T / V / S / A / X が定義されています。</p>
+              </div>
+              <div class="evidence-item">
+                <div class="evidence-source">AGENTS.md</div>
+                <p class="evidence-text">業務サンプル概要として、配車管理、生産管理、資材在庫管理が明示されています。</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

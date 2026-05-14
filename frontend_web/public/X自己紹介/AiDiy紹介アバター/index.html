@@ -3,14 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AiDiy 自己紹介</title>
+  <title>AiDiy 自己紹介 - アバター版</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
-    html,
-    body {
+    html, body {
       margin: 0;
       width: 100%;
       height: 100%;
@@ -28,8 +25,8 @@
       position: fixed;
       inset: 0;
       background:
-        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
       background-size: 30px 30px;
       opacity: 0.18;
       pointer-events: none;
@@ -38,72 +35,92 @@
     .app {
       position: relative;
       display: grid;
-      grid-template-rows: 64px 1fr 82px;
+      grid-template-rows: 58px 1fr 78px;
       width: 100%;
       height: 100%;
       overflow: hidden;
     }
 
-    .topbar,
-    .controls {
+    /* ── TOPBAR ── */
+    .topbar {
       display: flex;
       align-items: center;
-      padding: 0 24px;
-      backdrop-filter: blur(16px);
-      background: rgba(5, 12, 22, 0.78);
-      border-color: rgba(255, 255, 255, 0.08);
-      border-style: solid;
-    }
-
-    .topbar {
       justify-content: space-between;
       gap: 20px;
-      border-width: 0 0 1px;
+      padding: 0 24px;
+      backdrop-filter: blur(16px);
+      background: rgba(5,12,22,0.78);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-
-    .brand-wrap {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-
-    .brand {
-      font-size: 20px;
-      font-weight: 900;
-      color: #8fe8ff;
-      letter-spacing: 0.02em;
-    }
-
-    .brand-sub {
-      color: #9eb2c6;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
+    .brand-wrap { display: flex; align-items: baseline; gap: 12px; }
+    .brand { font-size: 20px; font-weight: 900; color: #8fe8ff; letter-spacing: 0.02em; }
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(196,155,255,0.38);
+      background: rgba(196,155,255,0.1);
+      color: #c49bff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
     }
+    .top-note { color: #d7e4ee; font-size: 12px; line-height: 1.6; text-align: right; }
 
-    .top-note {
-      color: #d7e4ee;
-      font-size: 13px;
-      line-height: 1.7;
-      text-align: right;
-    }
-
+    /* ── STAGE ── */
     .stage {
       position: relative;
+      display: grid;
+      grid-template-columns: 38% 1fr;
+      gap: 14px;
+      padding: 14px;
       min-height: 0;
-      padding: 16px;
     }
 
-    .frame-wrap {
+    /* ── AVATAR PANEL (left) ── */
+    .avatar-panel {
       position: relative;
-      width: 100%;
-      height: 100%;
-      border-radius: 28px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #avatarCanvas {
+      flex: 1;
+      width: 100%;
+      display: block;
+      opacity: 0;
+      transition: opacity 600ms ease;
+    }
+    #avatarCanvas.ready { opacity: 1; }
+
+    .avatar-subtitle {
+      position: absolute;
+      left: 14px; right: 14px; bottom: 14px;
+      padding: 11px 16px;
+      border-radius: 16px;
+      background: rgba(4,10,18,0.72);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #f7fbff;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.65;
+      pointer-events: none;
+    }
+
+    /* ── SCENE FRAME (right) ── */
+    .scene-panel {
+      position: relative;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(7,18,34,0.88);
+      overflow: hidden;
     }
 
     .scene-frame {
@@ -114,53 +131,28 @@
       background: transparent;
     }
 
-    .subtitle {
-      position: absolute;
-      left: 24px;
-      right: 24px;
-      bottom: 24px;
-      padding: 14px 18px;
-      border-radius: 18px;
-      background: rgba(4, 10, 18, 0.7);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #f7fbff;
-      font-size: 18px;
-      font-weight: 700;
-      line-height: 1.7;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
-      pointer-events: none;
-    }
-
+    /* ── CONTROLS ── */
     .controls {
-      justify-content: space-between;
-      gap: 18px;
-      border-width: 1px 0 0;
-    }
-
-    .controls-left,
-    .controls-right {
       display: flex;
       align-items: center;
-      gap: 10px;
-      min-width: 0;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 24px;
+      backdrop-filter: blur(16px);
+      background: rgba(5,12,22,0.78);
+      border-top: 1px solid rgba(255,255,255,0.08);
     }
-
-    .controls-center {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-    }
+    .controls-left, .controls-right { display: flex; align-items: center; gap: 10px; }
+    .controls-center { flex: 1; display: flex; justify-content: center; }
 
     .progress {
-      width: min(440px, 100%);
-      height: 8px;
+      width: min(420px, 100%);
+      height: 7px;
       border-radius: 999px;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.08);
     }
-
     .progress-fill {
       height: 100%;
       width: 0%;
@@ -169,112 +161,34 @@
     }
 
     button {
-      height: 40px;
-      min-width: 40px;
-      padding: 0 14px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.05);
+      height: 38px;
+      min-width: 38px;
+      padding: 0 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 11px;
+      background: rgba(255,255,255,0.05);
       color: #f5fbff;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 800;
       cursor: pointer;
     }
-
     button:hover {
-      border-color: rgba(41, 216, 255, 0.58);
-      background: rgba(41, 216, 255, 0.12);
+      border-color: rgba(41,216,255,0.58);
+      background: rgba(41,216,255,0.12);
     }
+    .ghost-btn { color: #9eb2c6; font-weight: 700; }
+    .meta, .timer { color: #d5e1eb; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .timer { font-variant-numeric: tabular-nums; }
 
-    .ghost-btn {
-      color: #9eb2c6;
-      font-weight: 700;
+    /* responsive */
+    @media (max-width: 960px) {
+      .stage { grid-template-columns: 1fr; grid-template-rows: 40vh 1fr; }
+      .controls { flex-wrap: wrap; padding: 8px 14px; }
+      .controls-center { order: 3; width: 100%; }
     }
-
-    .meta,
-    .timer {
-      color: #d5e1eb;
-      font-size: 13px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .timer {
-      font-variant-numeric: tabular-nums;
-    }
-
-    #avatar-container {
-      position: fixed;
-      right: 8vw;
-      bottom: 56px;
-      width: 45vh;
-      height: 75vh;
-      max-height: calc(100vh - 112px);
-      pointer-events: none;
-      z-index: 10;
-    }
-
-    #avatarCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-      opacity: 0;
-      transition: opacity 600ms ease;
-    }
-
-    #avatarCanvas.ready {
-      opacity: 1;
-    }
-
-    @media (max-width: 980px) {
-      .app {
-        grid-template-rows: 72px 1fr 110px;
-      }
-
-      .topbar,
-      .controls {
-        padding: 0 14px;
-      }
-
-      .topbar {
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: center;
-        gap: 4px;
-        padding-top: 8px;
-        padding-bottom: 8px;
-      }
-
-      .top-note {
-        text-align: left;
-      }
-
-      .controls {
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        gap: 12px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-      }
-
-      .controls-center {
-        order: 3;
-        width: 100%;
-      }
-
-      .subtitle {
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
-        padding: 12px 14px;
-        font-size: 14px;
-      }
-
-      #avatar-container {
-        right: 4vw;
-        width: 32vh;
-        height: 52vh;
-      }
+    @media (max-width: 600px) {
+      .topbar { flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 8px 14px; }
+      .top-note { text-align: left; font-size: 11px; }
     }
   </style>
   <script src="scenario.js"></script>
@@ -292,15 +206,22 @@
   <div class="app">
     <header class="topbar">
       <div class="brand-wrap">
-        <div class="brand">AiDiy紹介</div>
+        <div class="brand">AiDiy 自己紹介</div>
+        <span class="brand-badge">AVATAR</span>
       </div>
-      <div class="top-note">実装実態ベースの図解に、各シーン生成画像と生成音声を重ねた紹介ページです。</div>
+      <div class="top-note">VRM アバターがプレゼンターとして AiDiy を紹介します。実装実態ベースの構成、生成画像と生成音声つき。</div>
     </header>
 
     <main class="stage">
-      <section class="frame-wrap">
-        <iframe id="sceneFrame" class="scene-frame" title="AiDiy自己紹介 scene"></iframe>
-        <div id="subtitle" class="subtitle"></div>
+      <!-- Left: Avatar Panel -->
+      <section class="avatar-panel">
+        <canvas id="avatarCanvas"></canvas>
+        <div id="avatarSubtitle" class="avatar-subtitle"></div>
+      </section>
+
+      <!-- Right: Scene iframe -->
+      <section class="scene-panel">
+        <iframe id="sceneFrame" class="scene-frame" title="AiDiy 紹介シーン"></iframe>
       </section>
     </main>
 
@@ -311,28 +232,23 @@
         <button id="nextBtn" type="button" aria-label="次へ">▷</button>
         <button id="restartBtn" type="button" class="ghost-btn">最初から</button>
       </div>
-
       <div class="controls-center">
         <div class="progress" aria-label="progress">
           <div id="progressFill" class="progress-fill"></div>
         </div>
       </div>
-
       <div class="controls-right">
-        <div id="timer" class="timer">00:00 / 01:08</div>
-        <div id="meta" class="meta">scene 1 / 8</div>
+        <div id="timer" class="timer">00:00 / 01:30</div>
+        <div id="meta" class="meta">scene 1 / 7</div>
       </div>
     </footer>
   </div>
 
-  <div id="avatar-container">
-    <canvas id="avatarCanvas"></canvas>
-  </div>
-
+  <!-- ===================== SCENARIO PLAYER ===================== -->
   <script>
     const scenario = window.SCENARIO;
     const sceneFrame = document.getElementById("sceneFrame");
-    const subtitle = document.getElementById("subtitle");
+    const avatarSubtitle = document.getElementById("avatarSubtitle");
     const timer = document.getElementById("timer");
     const meta = document.getElementById("meta");
     const progressFill = document.getElementById("progressFill");
@@ -342,16 +258,14 @@
     const restartBtn = document.getElementById("restartBtn");
 
     function getInitialSceneIndex() {
-      const value = Number.parseInt(new URLSearchParams(window.location.search).get("scene") || "1", 10);
-      if (!Number.isFinite(value)) return 0;
-      return Math.min(Math.max(value - 1, 0), scenario.scenes.length - 1);
+      const v = Number.parseInt(new URLSearchParams(window.location.search).get("scene") || "1", 10);
+      if (!Number.isFinite(v)) return 0;
+      return Math.min(Math.max(v - 1, 0), scenario.scenes.length - 1);
     }
 
     function formatTime(sec) {
-      const safe = Math.max(0, Math.round(sec));
-      const mm = String(Math.floor(safe / 60)).padStart(2, "0");
-      const ss = String(safe % 60).padStart(2, "0");
-      return `${mm}:${ss}`;
+      const s = Math.max(0, Math.round(sec));
+      return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
     }
 
     let sceneIndex = getInitialSceneIndex();
@@ -362,30 +276,25 @@
     let sceneEndTimer = null;
     let playbackToken = 0;
     const audioPlayer = new Audio();
-    window.audioPlayer = audioPlayer; // リップシンク用にグローバル化
+    window.audioPlayer = audioPlayer;
     audioPlayer.preload = "auto";
 
-    function currentScene() {
-      return scenario.scenes[sceneIndex];
-    }
+    function currentScene() { return scenario.scenes[sceneIndex]; }
 
     function clearTimers() {
-      clearInterval(tickTimer);
-      clearTimeout(sceneEndTimer);
-      tickTimer = null;
-      sceneEndTimer = null;
+      clearInterval(tickTimer); clearTimeout(sceneEndTimer);
+      tickTimer = null; sceneEndTimer = null;
     }
 
     function currentTimelineSec() {
-      const scene = currentScene();
-      return scene.start_sec + sceneElapsedMs / 1000;
+      return currentScene().start_sec + sceneElapsedMs / 1000;
     }
 
     function updateTimerAndProgress() {
       const total = scenario.duration_sec || 1;
       const current = currentTimelineSec();
-      timer.textContent = `${formatTime(current)} / ${formatTime(total)}`;
-      progressFill.style.width = `${Math.min(100, (current / total) * 100)}%`;
+      timer.textContent = formatTime(current) + " / " + formatTime(total);
+      progressFill.style.width = Math.min(100, (current / total) * 100) + "%";
     }
 
     function armSceneEndTimer(remainingMs, token) {
@@ -398,9 +307,9 @@
 
     function renderScene() {
       const scene = currentScene();
-      sceneFrame.src = `scene.html?n=${sceneIndex + 1}`;
-      subtitle.textContent = scene.subtitle || scene.lead || "";
-      meta.textContent = `scene ${sceneIndex + 1} / ${scenario.scenes.length}`;
+      sceneFrame.src = scene.id + ".html";
+      avatarSubtitle.textContent = scene.subtitle || scene.lead || "";
+      meta.textContent = "scene " + (sceneIndex + 1) + " / " + scenario.scenes.length;
       updateTimerAndProgress();
       window.__avatarSetExpression?.(scene.expression || "neutral");
     }
@@ -420,6 +329,7 @@
         }
         updateTimerAndProgress();
       }, 100);
+
       const audioPath = typeof scene.audio === "string" && scene.audio ? scene.audio : "";
       if (!audioPath) {
         audioPlayer.removeAttribute("src");
@@ -431,12 +341,11 @@
       const handlePlaying = () => {
         if (token !== playbackToken) return;
         const currentMs = Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
-          ? audioPlayer.currentTime * 1000
-          : sceneElapsedMs;
+          ? audioPlayer.currentTime * 1000 : sceneElapsedMs;
         armSceneEndTimer(scene.duration_sec * 1000 - currentMs + 1200, token);
       };
       audioPlayer.addEventListener("playing", handlePlaying, { once: true });
-      audioPlayer.src = `${audioPath}?v=${encodeURIComponent(scene.duration_sec)}`;
+      audioPlayer.src = audioPath + "?v=" + encodeURIComponent(scene.duration_sec);
       audioPlayer.currentTime = Math.min(sceneElapsedMs / 1000, Math.max(0, scene.duration_sec - 0.05));
       audioPlayer.play().then(() => {
         handlePlaying();
@@ -448,9 +357,7 @@
 
     function play() {
       if (playing) return;
-      if (sceneElapsedMs >= currentScene().duration_sec * 1000 - 80) {
-        sceneElapsedMs = 0;
-      }
+      if (sceneElapsedMs >= currentScene().duration_sec * 1000 - 80) sceneElapsedMs = 0;
       playing = true;
       playBtn.textContent = "⏸";
       window.__avatarResumeAudioContext?.();
@@ -477,12 +384,10 @@
       sceneIndex = Math.min(Math.max(index, 0), scenario.scenes.length - 1);
       sceneElapsedMs = 0;
       renderScene();
-      if (playing) {
-        beginPlayback();
-      }
+      if (playing) beginPlayback();
     }
 
-    function nextScene(fromAuto) {
+    function nextScene() {
       if (sceneIndex < scenario.scenes.length - 1) {
         moveToScene(sceneIndex + 1);
       } else {
@@ -497,63 +402,31 @@
       }
     }
 
-    function prevScene() {
-      moveToScene(sceneIndex - 1);
-    }
+    function prevScene() { moveToScene(sceneIndex - 1); }
 
-    prevBtn.addEventListener("click", () => {
-      pause();
-      prevScene();
-    });
-    nextBtn.addEventListener("click", () => {
-      pause();
-      nextScene(false);
-    });
-    playBtn.addEventListener("click", () => {
-      if (playing) {
-        pause();
-      } else {
-        play();
-      }
-    });
-    restartBtn.addEventListener("click", () => {
-      pause();
-      moveToScene(0);
-    });
+    prevBtn.addEventListener("click", () => { pause(); prevScene(); });
+    nextBtn.addEventListener("click", () => { pause(); nextScene(); });
+    playBtn.addEventListener("click", () => { if (playing) pause(); else play(); });
+    restartBtn.addEventListener("click", () => { pause(); moveToScene(0); });
 
-    window.addEventListener("keydown", (event) => {
-      if (event.key === " " || event.key === "Spacebar") {
-        event.preventDefault();
-        if (playing) pause(); else play();
-      }
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-        pause();
-        nextScene(false);
-      }
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        pause();
-        prevScene();
-      }
+    window.addEventListener("keydown", (e) => {
+      if (e.key === " " || e.key === "Spacebar") { e.preventDefault(); if (playing) pause(); else play(); }
+      if (e.key === "ArrowRight") { e.preventDefault(); pause(); nextScene(); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); pause(); prevScene(); }
     });
 
     audioPlayer.addEventListener("ended", () => {
       window.__avatarOnAudioStop?.();
       if (!playing) return;
       clearTimers();
-      nextScene(true);
+      nextScene();
     });
     audioPlayer.addEventListener("error", () => {
       window.__avatarOnAudioStop?.();
       console.warn("audio load failed", audioPlayer.src);
     });
-    audioPlayer.addEventListener("play", () => {
-      window.__avatarOnAudioStart?.();
-    });
-    audioPlayer.addEventListener("pause", () => {
-      window.__avatarOnAudioStop?.();
-    });
+    audioPlayer.addEventListener("play", () => { window.__avatarOnAudioStart?.(); });
+    audioPlayer.addEventListener("pause", () => { window.__avatarOnAudioStop?.(); });
 
     renderScene();
     if (new URLSearchParams(window.location.search).get("autoplay") === "1") {
@@ -561,6 +434,7 @@
     }
   </script>
 
+  <!-- ===================== VRM AVATAR ===================== -->
   <script type="module">
     import * as THREE from "three";
     import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -569,12 +443,12 @@
     const canvas = document.getElementById("avatarCanvas");
     const pane = canvas.parentElement;
 
-    const getStageSize = () => ({
-      width: Math.max(1, pane.clientWidth || 240),
-      height: Math.max(1, pane.clientHeight || 360)
+    const getSize = () => ({
+      width: Math.max(1, pane.clientWidth || 320),
+      height: Math.max(1, pane.clientHeight || 480)
     });
 
-    let { width, height } = getStageSize();
+    let { width, height } = getSize();
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -582,8 +456,9 @@
     renderer.setSize(width, height, false);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(28, width / height, 0.01, 40);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.15));
+    const camera = new THREE.PerspectiveCamera(26, width / height, 0.01, 40);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
     keyLight.position.set(1.1, 1.5, 1.0);
     scene.add(keyLight);
@@ -592,12 +467,12 @@
     scene.add(rimLight);
 
     const container = new THREE.Group();
-    const BODY_BASE_YAW = Math.PI - Math.PI / 6;
-    const BODY_SWAY_RANGE = Math.PI / 48;
-    const CAMERA_BASE_X = -0.06;
-    const CAMERA_SWAY_X = 0.035;
-    const HEAD_BASE_YAW = Math.PI / 12;
-    container.rotation.y = BODY_BASE_YAW; // 少しだけ画面中央側へ向ける
+    const BODY_BASE_YAW = Math.PI - Math.PI / 8;
+    const BODY_SWAY_RANGE = Math.PI / 52;
+    const CAMERA_BASE_X = -0.04;
+    const CAMERA_SWAY_X = 0.03;
+    const HEAD_BASE_YAW = Math.PI / 14;
+    container.rotation.y = BODY_BASE_YAW;
     scene.add(container);
 
     const loader = new GLTFLoader();
@@ -633,12 +508,8 @@
       if (!humanoid) return;
       const chest = humanoid.getNormalizedBoneNode?.("chest");
       const head = humanoid.getNormalizedBoneNode?.("head");
-
-      if (chest) {
-        chest.rotation.x = Math.sin(elapsed * 1.4) * 0.02;
-      }
+      if (chest) chest.rotation.x = Math.sin(elapsed * 1.4) * 0.02;
       if (head) {
-        // 体は少し内側へ向け、頭は正面寄りへ戻して視線を外へ逃がさない
         const lookAtSway = camera.position.x * 0.6;
         head.rotation.y = HEAD_BASE_YAW + lookAtSway + Math.sin(elapsed * 0.7) * 0.02;
         head.rotation.x = Math.sin(elapsed * 1.0 + 1.2) * 0.03;
@@ -659,7 +530,6 @@
       targetExpression = EXPRESSION_KEYS.includes(name) ? name : "neutral";
     };
 
-    // ---------- リップシンク (take3 相当) ----------
     let audioCtx = null;
     let analyser = null;
     let analyserData = null;
@@ -696,16 +566,12 @@
 
     window.__avatarResumeAudioContext = () => {
       ensureAudioGraph();
-      if (audioCtx && audioCtx.state === "suspended") {
-        audioCtx.resume().catch(() => {});
-      }
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
     };
-
     window.__avatarOnAudioStart = () => {
       lipsyncActive = true;
       window.__avatarResumeAudioContext?.();
     };
-
     window.__avatarOnAudioStop = () => {
       lipsyncActive = false;
       mouthSmooth = 0;
@@ -729,25 +595,23 @@
 
         const box = new THREE.Box3().setFromObject(vrm.scene);
         const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
+        const sizeVec = box.getSize(new THREE.Vector3());
         vrm.scene.position.x -= center.x;
         vrm.scene.position.y -= box.min.y;
         vrm.scene.position.z -= center.z;
         container.add(vrm.scene);
 
-        avatarHeadHeight = Math.max(0.1, size.y) * 0.88;
-        camera.position.set(CAMERA_BASE_X, Math.max(0.1, size.y) * 0.9, -Math.max(0.1, size.y) * 1.15);
+        avatarHeadHeight = Math.max(0.1, sizeVec.y) * 0.88;
+        camera.position.set(CAMERA_BASE_X, Math.max(0.1, sizeVec.y) * 0.88, -Math.max(0.1, sizeVec.y) * 1.1);
         camera.lookAt(0, avatarHeadHeight, 0);
 
-        // 自動カメラ目線 (瞳・頭)
         vrm.lookAt.target = camera;
-
         applyIdlePose(vrm);
         vrm.update(0);
         renderer.render(scene, camera);
       }
-    } catch (error) {
-      console.error("Avatar load error:", error);
+    } catch (err) {
+      console.error("Avatar load error:", err);
     } finally {
       canvas.classList.add("ready");
     }
@@ -767,9 +631,7 @@
       }
       EXPRESSION_KEYS.forEach((key) => {
         if (key === "neutral") return;
-        try {
-          vrm.expressionManager.setValue(key, key === currentExpression ? expressionValue : 0);
-        } catch {}
+        try { vrm.expressionManager.setValue(key, key === currentExpression ? expressionValue : 0); } catch {}
       });
     }
 
@@ -789,10 +651,11 @@
     }
 
     const clock = new THREE.Clock();
+
     function resizeRenderer() {
-      const size = getStageSize();
-      renderer.setSize(size.width, size.height, false);
-      camera.aspect = size.width / size.height;
+      const s = getSize();
+      renderer.setSize(s.width, s.height, false);
+      camera.aspect = s.width / s.height;
       camera.updateProjectionMatrix();
     }
 
@@ -804,23 +667,17 @@
       updateBlink(dt);
       updateExpression(dt);
 
-      // カメラは少し内側寄りを基準にして、外向きに見えない範囲でだけ揺らす
       camera.position.x = CAMERA_BASE_X + Math.sin(elapsed * 0.45) * CAMERA_SWAY_X;
-      // 常にアバターの顔を捉え続ける
       camera.lookAt(0, avatarHeadHeight, 0);
 
       if (vrm) {
-        // 体の向きは常に画面中央側へ寄せる
         container.rotation.y = BODY_BASE_YAW + Math.sin(elapsed * 0.35) * BODY_SWAY_RANGE;
-
-        // リップシンク反映
         if (vrm.expressionManager) {
           ensureAudioGraph();
           const target = getMouthTarget();
           mouthSmooth += (target - mouthSmooth) * (target > mouthSmooth ? 0.82 : 0.48);
           try { vrm.expressionManager.setValue("aa", mouthSmooth); } catch {}
         }
-
         updateIdleSway(vrm, elapsed);
         vrm.update(dt);
       }

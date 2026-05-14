@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>3常駐サーバー + マルチCLI</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div id="stage" class="stage fade-enter" style="--accent:#ff6bd6;--accent-soft:rgba(255,107,214,0.18);">
+    <section class="visual-panel">
+      <div class="visual-meta">
+        <div class="kicker">ARCHITECTURE</div>
+        <div class="scene-id">scene_003 / 4 of 10</div>
+      </div>
+      <div class="image-shell">
+        <img class="scene-image" src="images/scene_003.png" alt="3常駐サーバー + マルチCLI" onload="this.classList.add('loaded')">
+        <div class="image-placeholder">画像を読み込み中...</div>
+        <div class="image-overlay">
+          <div class="image-overlay-copy">
+            <div class="image-title">3常駐サーバー + マルチCLI</div>
+            <p class="image-subtitle">Code AI はひとつではなく、複数CLI + 独自実装 Hermes を切り替える。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="content-panel">
+      <div class="content-scroll">
+        <div class="header-row"><div class="header-main">
+          <h1 class="scene-title">3常駐サーバー + マルチCLI</h1>
+          <div class="headline">
+            <span class="headline-line">複数の CLI を並べて使い、</span>
+            <span class="headline-line">Hermes は独自エンジンでつなぐ</span>
+          </div>
+          <p class="lead">AiDiy は Core / Apps / MCP を常駐分離しつつ、AIコアの Code AI では複数 CLI を切り替えられます。backend_hermes はその中でも AiDiy 専用に組み込まれた独自実装です。</p>
+        </div></div>
+        <div class="chip-row">
+          <div class="chip">3常駐サーバー</div>
+          <div class="chip">Code AI 候補 7</div>
+          <div class="chip">aidiy_hermes 独自実装</div>
+          <div class="chip">subprocess 起動</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-card"><div class="metric-label">常駐</div><div class="metric-value">3</div></div>
+          <div class="metric-card"><div class="metric-label">Code AI</div><div class="metric-value">7</div></div>
+          <div class="metric-card"><div class="metric-label">Hermes overlay</div><div class="metric-value">31</div></div>
+        </div>
+        <div class="card-grid">
+          <section class="fact-card">
+            <h3 class="fact-card-title">常駐サーバー</h3>
+            <ul class="fact-card-list">
+              <li>`core_main.py` 8091</li><li>`apps_main.py` 8092</li><li>`backend_mcp/mcp_main.py` 8095</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">マルチCLI</h3>
+            <ul class="fact-card-list">
+              <li>`claude_sdk` / `claude_cli`</li><li>`copilot_cli` / `codex_cli` / `gemini_cli` / `opencode_cli`</li><li>`aidiy_hermes`</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">Hermes engine</h3>
+            <ul class="fact-card-list">
+              <li>on-demand のコードエージェント CLI</li><li>常駐 HTTP サーバーではない</li><li>AI コードパネルから subprocess 起動</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">独自実装ポイント</h3>
+            <ul class="fact-card-list">
+              <li>`cli_main.py` が API provider と CLI bridge の両方を扱う</li><li>31 の provider overlay と 50 以上の alias</li><li>Windows 差分を `*_win.py` へ分離</li>
+            </ul>
+          </section>
+        </div>
+        <div class="detail-grid">
+          <section class="detail-panel">
+            <h3 class="panel-title">確認ポイント</h3>
+            <div class="fact-list">
+              <div class="fact-item"><p class="fact-text">Code AI の有効値には `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` が含まれる。</p></div>
+              <div class="fact-item"><p class="fact-text">`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI で、常駐 HTTP サーバーではない。</p></div>
+              <div class="fact-item"><p class="fact-text">`cli_main.py` の provider は API provider と CLI bridge の両方を扱い、31 の provider overlay と 50 以上の alias を持つ。</p></div>
+            </div>
+          </section>
+          <section class="detail-panel">
+            <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
+            <div class="evidence-list">
+              <div class="evidence-item"><div class="evidence-source">AGENTS.md</div><p class="evidence-text">Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` を想定します。</p></div>
+              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。`cli_main.py` の provider は API provider と CLI bridge の両方を扱います。</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

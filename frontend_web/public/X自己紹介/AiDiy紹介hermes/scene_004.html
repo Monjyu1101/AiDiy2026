@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>60 Slash Commands</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div id="stage" class="stage fade-enter" style="--accent:#7b8cff;--accent-soft:rgba(123,140,255,0.18);">
+    <section class="visual-panel">
+      <div class="visual-meta">
+        <div class="kicker">TUI COMMANDS</div>
+        <div class="scene-id">scene_004 / 5 of 7</div>
+      </div>
+      <div class="image-shell">
+        <img class="scene-image" src="images/scene_004.png" alt="60 Slash Commands" onload="this.classList.add('loaded')">
+        <div class="image-placeholder">画像を読み込み中...</div>
+        <div class="image-overlay">
+          <div class="image-overlay-copy">
+            <div class="image-title">60 Slash Commands</div>
+            <p class="image-subtitle">60 slash commands。/ 補完で一覧が出る。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="content-panel">
+      <div class="content-scroll">
+        <div class="header-row"><div class="header-main">
+          <h1 class="scene-title">60 Slash Commands</h1>
+          <div class="headline">
+            <span class="headline-line">/model から /kanban まで</span>
+            <span class="headline-line">5 カテゴリ 60 コマンド</span>
+          </div>
+          <p class="lead">セッション管理 23・設定変更 13・ツール操作 11・情報表示 12・終了 1。`/` を入力すると TUI 補完が起動します。</p>
+        </div></div>
+        <div class="chip-row">
+          <div class="chip">Session 23</div>
+          <div class="chip">Configuration 13</div>
+          <div class="chip">Tools &amp; Skills 11</div>
+          <div class="chip">Info 12</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-card"><div class="metric-label">Slash Command</div><div class="metric-value">60</div></div>
+          <div class="metric-card"><div class="metric-label">カテゴリ</div><div class="metric-value">5</div></div>
+          <div class="metric-card"><div class="metric-label">/model picker</div><div class="metric-value" style="font-size:14px;">2段階</div></div>
+        </div>
+        <div class="card-grid">
+          <section class="fact-card">
+            <h3 class="fact-card-title">Session (23)</h3>
+            <ul class="fact-card-list">
+              <li>`/new`, `/retry`, `/undo`, `/rollback`</li><li>`/snapshot`, `/compress`, `/branch`</li><li>`/goal`, `/agents`, `/background`</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">Configuration (13)</h3>
+            <ul class="fact-card-list">
+              <li>`/model` — provider + model 切替</li><li>`/yolo` — YOLO モード</li><li>`/personality`, `/skin`, `/verbose`</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">Tools &amp; Skills (11)</h3>
+            <ul class="fact-card-list">
+              <li>`/tools`, `/toolsets`, `/skills`</li><li>`/cron`, `/kanban`, `/browser`</li><li>`/reload-mcp`, `/plugins`</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">Info / Exit</h3>
+            <ul class="fact-card-list">
+              <li>`/commands`, `/help`, `/usage`</li><li>`/insights`, `/debug`, `/profile`</li><li>`/quit` (`exit`) — 終了</li>
+            </ul>
+          </section>
+        </div>
+        <div class="detail-grid">
+          <section class="detail-panel">
+            <h3 class="panel-title">確認ポイント</h3>
+            <div class="fact-list">
+              <div class="fact-item"><p class="fact-text">`COMMAND_REGISTRY` に 60 の slash command が登録されている（Session 23、Configuration 13、Tools &amp; Skills 11、Info 12、Exit 1）。</p></div>
+              <div class="fact-item"><p class="fact-text">`/model` を引数なしで実行すると 2 段階の interactive picker が起動する。</p></div>
+              <div class="fact-item"><p class="fact-text">コマンドは正規名 + alias で検索され、`cli_main.py` の `process_command()` で分岐処理される。</p></div>
+            </div>
+          </section>
+          <section class="detail-panel">
+            <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
+            <div class="evidence-list">
+              <div class="evidence-item"><div class="evidence-source">.aidiy/knowledge/Slash Command一覧</div><p class="evidence-text">Session 23 コマンド、Configuration 13 コマンド、Tools &amp; Skills 11 コマンド、Info 12 コマンド、Exit 1 コマンド。</p></div>
+              <div class="evidence-item"><div class="evidence-source">.aidiy/knowledge/Slash Command一覧</div><p class="evidence-text">`COMMAND_REGISTRY` は `CommandDef` dataclass のリストです。正規名 + alias で検索します。</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>AiDiy システム連携</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div id="stage" class="stage fade-enter" style="--accent:#7dffb3;--accent-soft:rgba(125,255,179,0.18);">
+    <section class="visual-panel">
+      <div class="visual-meta">
+        <div class="kicker">INTEGRATION</div>
+        <div class="scene-id">scene_005 / 6 of 7</div>
+      </div>
+      <div class="image-shell">
+        <img class="scene-image" src="images/scene_005.png" alt="AiDiy システム連携" onload="this.classList.add('loaded')">
+        <div class="image-placeholder">画像を読み込み中...</div>
+        <div class="image-overlay">
+          <div class="image-overlay-copy">
+            <div class="image-title">AiDiy システム連携</div>
+            <p class="image-subtitle">CODE_AI*_NAME = aidiy_hermes で AI コードパネルと連携。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="content-panel">
+      <div class="content-scroll">
+        <div class="header-row"><div class="header-main">
+          <h1 class="scene-title">AiDiy システム連携</h1>
+          <div class="headline">
+            <span class="headline-line">backend_server が subprocess で起動し、</span>
+            <span class="headline-line">conf_model.py がモデル一覧を動的生成</span>
+          </div>
+          <p class="lead">CODE_AI*_NAME = "aidiy_hermes" を設定すると、AI コードパネルが AIコード_cli.py 経由で Hermes を起動します。</p>
+        </div></div>
+        <div class="chip-row">
+          <div class="chip">CODE_AI*_NAME</div>
+          <div class="chip">subprocess 起動</div>
+          <div class="chip">conf_model.py 動的生成</div>
+          <div class="chip">CODE_AIDIY_HERMES_MODEL</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-card"><div class="metric-label">起動元</div><div class="metric-value" style="font-size:12px;">AIコード_cli.py</div></div>
+          <div class="metric-card"><div class="metric-label">設定キー</div><div class="metric-value" style="font-size:11px;">CODE_AI*_NAME</div></div>
+          <div class="metric-card"><div class="metric-label">モデル設定</div><div class="metric-value" style="font-size:12px;">conf_model.py</div></div>
+        </div>
+        <div class="card-grid">
+          <section class="fact-card">
+            <h3 class="fact-card-title">呼び出し経路</h3>
+            <ul class="fact-card-list">
+              <li>`CODE_AI*_NAME = "aidiy_hermes"` を設定</li><li>`backend_server/AIコア/AIコード_cli.py` が subprocess 起動</li><li>標準入出力でコードパネルと通信</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">設定ファイル</h3>
+            <ul class="fact-card-list">
+              <li>`backend_server/conf/conf_json.py`</li><li>`backend_server/conf/conf_model.py` — モデル一覧動的生成</li><li>`CODE_AIDIY_HERMES_MODEL` でモデル指定</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">Windows 対応</h3>
+            <ul class="fact-card-list">
+              <li>`*_win.py` / `*_linux.py` で OS 分岐</li><li>file_operations / terminal_tool がセレクタ</li><li>POSIX コマンド非依存の実装</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">Upstream</h3>
+            <ul class="fact-card-list">
+              <li>Nous Research hermes-agent v0.12.0 (MIT)</li><li>`cli.py` → `cli_main.py` に改変</li><li>`cron/`, `web/`, `ui-tui/` など削除</li>
+            </ul>
+          </section>
+        </div>
+        <div class="detail-grid">
+          <section class="detail-panel">
+            <h3 class="panel-title">確認ポイント</h3>
+            <div class="fact-list">
+              <div class="fact-item"><p class="fact-text">`aidiy_hermes` は `backend_server/AIコア/AIコード_cli.py` から subprocess で起動される。</p></div>
+              <div class="fact-item"><p class="fact-text">モデル設定は `CODE_AIDIY_HERMES_MODEL` を使い、`conf_model.py` 側で動的生成する。</p></div>
+              <div class="fact-item"><p class="fact-text">Windows では `*_win.py`、非 Windows では `*_linux.py` を import するプラットフォームセレクタ構造。</p></div>
+            </div>
+          </section>
+          <section class="detail-panel">
+            <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
+            <div class="evidence-list">
+              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">`aidiy_hermes` は `backend_server/AIコア/AIコード_cli.py` から subprocess で起動されます。モデル設定は `CODE_AIDIY_HERMES_MODEL` を使います。</p></div>
+              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">Windows では対応する `*_win.py`、非 Windows では `*_linux.py` のどちらか一方だけを import します。</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

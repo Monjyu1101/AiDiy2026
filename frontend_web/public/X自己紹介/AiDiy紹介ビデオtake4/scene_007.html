@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>MCP Hub × 13</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div id="stage" class="stage fade-enter" style="--accent:#00e0b8;--accent-soft:rgba(0,224,184,0.18);">
+    <section class="visual-panel">
+      <div class="visual-meta">
+        <div class="kicker">MCP HUB</div>
+        <div class="scene-id">scene_007 / 8 of 10</div>
+      </div>
+      <div class="image-shell">
+        <img class="scene-image" src="images/scene_007.png" alt="MCP Hub × 13" onload="this.classList.add('loaded')">
+        <div class="image-placeholder">画像を読み込み中...</div>
+        <div class="image-overlay">
+          <div class="image-overlay-copy">
+            <div class="image-title">MCP Hub × 13</div>
+            <p class="image-subtitle">観測・生成・検証を AI エージェントの手足にする。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="content-panel">
+      <div class="content-scroll">
+        <div class="header-row"><div class="header-main">
+          <h1 class="scene-title">MCP Hub × 13</h1>
+          <div class="headline">
+            <span class="headline-line">観測・生成・検証を</span>
+            <span class="headline-line">AI エージェントの手足にする</span>
+          </div>
+          <p class="lead">AiDiy の MCP サーバーはポート 8095 に集約され、Chrome / Desktop / SQLite / PostgreSQL / Logs / Code Check / Backup / 画像生成 / 音声 / OBS / FFmpeg など 13 ツールを提供します。</p>
+        </div></div>
+        <div class="chip-row">
+          <div class="chip">FastMCP</div>
+          <div class="chip">port 8095</div>
+          <div class="chip">localhost 限定</div>
+          <div class="chip">read-only 中心</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-card"><div class="metric-label">MCP サーバー</div><div class="metric-value">13</div></div>
+          <div class="metric-card"><div class="metric-label">カテゴリ</div><div class="metric-value">3</div></div>
+          <div class="metric-card"><div class="metric-label">Chrome CDP</div><div class="metric-value" style="font-size:14px;">Python<br>実装</div></div>
+        </div>
+        <div class="card-grid">
+          <section class="fact-card">
+            <h3 class="fact-card-title">観測</h3>
+            <ul class="fact-card-list">
+              <li>Chrome DevTools (CDP)</li><li>Desktop Capture</li><li>Logs tail / recent_errors</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">検証・保全</h3>
+            <ul class="fact-card-list">
+              <li>Code Check (Python / TypeScript)</li><li>Backup Check / Backup Save</li><li>SQLite / PostgreSQL query</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">生成・制御</h3>
+            <ul class="fact-card-list">
+              <li>Image Generation</li><li>Speech-to-Text / Text-to-Speech</li><li>OBS Studio Control / FFmpeg Control</li>
+            </ul>
+          </section>
+        </div>
+        <div class="detail-grid">
+          <section class="detail-panel">
+            <h3 class="panel-title">確認ポイント</h3>
+            <div class="fact-list">
+              <div class="fact-item"><p class="fact-text">MCP サーバーは `backend_mcp/mcp_main.py` にまとめて定義され、ポート 8095 で常駐する。</p></div>
+              <div class="fact-item"><p class="fact-text">Chrome DevTools MCP は Python 実装で CDP を直接操作し、スクリーンショット・DOM 取得・操作が可能。</p></div>
+              <div class="fact-item"><p class="fact-text">MCP ツールはすべて localhost 限定で、セキュリティ境界を明確に保つ設計。</p></div>
+            </div>
+          </section>
+          <section class="detail-panel">
+            <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
+            <div class="evidence-list">
+              <div class="evidence-item"><div class="evidence-source">CLAUDE.md</div><p class="evidence-text">Backend MCP: 13 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup Check, Backup Save, Image Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control）</p></div>
+              <div class="evidence-item"><div class="evidence-source">backend_mcp/AGENTS.md</div><p class="evidence-text">MCP Hub は `backend_mcp/mcp_main.py` で FastMCP を使い、ポート 8095 に集約されます。</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

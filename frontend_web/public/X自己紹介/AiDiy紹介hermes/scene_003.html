@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>31 Provider Overlay</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div id="stage" class="stage fade-enter" style="--accent:#ff8a6b;--accent-soft:rgba(255,138,107,0.18);">
+    <section class="visual-panel">
+      <div class="visual-meta">
+        <div class="kicker">MULTI PROVIDER</div>
+        <div class="scene-id">scene_003 / 4 of 7</div>
+      </div>
+      <div class="image-shell">
+        <img class="scene-image" src="images/scene_003.png" alt="31 Provider Overlay" onload="this.classList.add('loaded')">
+        <div class="image-placeholder">画像を読み込み中...</div>
+        <div class="image-overlay">
+          <div class="image-overlay-copy">
+            <div class="image-title">31 Provider Overlay</div>
+            <p class="image-subtitle">31 overlays、50+ aliases。auto 検出または --provider で解決。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="content-panel">
+      <div class="content-scroll">
+        <div class="header-row"><div class="header-main">
+          <h1 class="scene-title">31 Provider Overlay</h1>
+          <div class="headline">
+            <span class="headline-line">31 の provider overlay と</span>
+            <span class="headline-line">50 以上のエイリアス</span>
+          </div>
+          <p class="lead">OpenRouter、Anthropic、Google、Microsoft、DeepSeek など幅広い AI プロバイダーに対応。`--provider` フラグまたは config / 環境変数で切り替えます。</p>
+        </div></div>
+        <div class="chip-row">
+          <div class="chip">31 provider overlay</div>
+          <div class="chip">50+ aliases</div>
+          <div class="chip">auto 検出</div>
+          <div class="chip">--provider フラグ</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-card"><div class="metric-label">provider overlay</div><div class="metric-value">31</div></div>
+          <div class="metric-card"><div class="metric-label">alias</div><div class="metric-value">50+</div></div>
+          <div class="metric-card"><div class="metric-label">選択優先順位</div><div class="metric-value" style="font-size:14px;">4段階</div></div>
+        </div>
+        <div class="card-grid">
+          <section class="fact-card">
+            <h3 class="fact-card-title">Provider カテゴリ</h3>
+            <ul class="fact-card-list">
+              <li>汎用 API: `openrouter`, `openai-codex`, `nous`</li><li>Anthropic / Google / Microsoft</li><li>中国系: `deepseek`, `qwen`, `minimax`, `alibaba` など</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">選択優先順位</h3>
+            <ul class="fact-card-list">
+              <li>1. `--provider` CLI フラグ</li><li>2. config.yaml の model.provider</li><li>3. `HERMES_INFERENCE_PROVIDER` 環境変数</li><li>4. `auto`（runtime 自動検出）</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">Interactive Picker</h3>
+            <ul class="fact-card-list">
+              <li>`/model` を引数なしで起動</li><li>Step 1: 認証済み provider 選択</li><li>Step 2: curated model 一覧から選択</li>
+            </ul>
+          </section>
+        </div>
+        <div class="detail-grid">
+          <section class="detail-panel">
+            <h3 class="panel-title">確認ポイント</h3>
+            <div class="fact-list">
+              <div class="fact-item"><p class="fact-text">`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されている。</p></div>
+              <div class="fact-item"><p class="fact-text">50 以上のエイリアスが `ALIASES` 辞書に定義されている。</p></div>
+              <div class="fact-item"><p class="fact-text">Provider 解決優先順位: `--provider` > config.yaml > `HERMES_INFERENCE_PROVIDER` > `auto`。</p></div>
+            </div>
+          </section>
+          <section class="detail-panel">
+            <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
+            <div class="evidence-list">
+              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">31 の provider overlay と 50 以上のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。</p></div>
+              <div class="evidence-item"><div class="evidence-source">.aidiy/knowledge/Provider一覧と選択ロジック</div><p class="evidence-text">`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されています。</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

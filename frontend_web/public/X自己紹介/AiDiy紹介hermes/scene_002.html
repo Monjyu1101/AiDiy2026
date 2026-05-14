@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>技術スタックと構成</title>
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <div id="stage" class="stage fade-enter" style="--accent:#00e0b8;--accent-soft:rgba(0,224,184,0.18);">
+    <section class="visual-panel">
+      <div class="visual-meta">
+        <div class="kicker">TECH STACK</div>
+        <div class="scene-id">scene_002 / 3 of 7</div>
+      </div>
+      <div class="image-shell">
+        <img class="scene-image" src="images/scene_002.png" alt="技術スタックと構成" onload="this.classList.add('loaded')">
+        <div class="image-placeholder">画像を読み込み中...</div>
+        <div class="image-overlay">
+          <div class="image-overlay-copy">
+            <div class="image-title">技術スタックと構成</div>
+            <p class="image-subtitle">cli_main.py が起点。5 層構成で provider・TUI・tools を分担。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="content-panel">
+      <div class="content-scroll">
+        <div class="header-row"><div class="header-main">
+          <h1 class="scene-title">技術スタックと構成</h1>
+          <div class="headline">
+            <span class="headline-line">Python + prompt_toolkit で</span>
+            <span class="headline-line">作られた TUI エージェント</span>
+          </div>
+          <p class="lead">cli_main.py を起点に、core/ ・ base/ ・ hermes_cli/ ・ tools/ ・ skills/ の5層で構成されます。</p>
+        </div></div>
+        <div class="chip-row">
+          <div class="chip">Python</div>
+          <div class="chip">prompt_toolkit</div>
+          <div class="chip">requests / httpx</div>
+          <div class="chip">OpenAI 互換 / Claude API</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-card"><div class="metric-label">エントリ</div><div class="metric-value" style="font-size:14px;">cli_main.py</div></div>
+          <div class="metric-card"><div class="metric-label">通信</div><div class="metric-value" style="font-size:14px;">4 クライアント</div></div>
+          <div class="metric-card"><div class="metric-label">実行方式</div><div class="metric-value" style="font-size:12px;">CLI / subprocess</div></div>
+        </div>
+        <div class="card-grid">
+          <section class="fact-card">
+            <h3 class="fact-card-title">TUI 基盤</h3>
+            <ul class="fact-card-list">
+              <li>`prompt_toolkit` ベース</li><li>slash command 補完</li><li>spinner / 色表示対応</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">ディレクトリ構成</h3>
+            <ul class="fact-card-list">
+              <li>`cli_main.py` — CLI エントリ、provider/model picker</li><li>`core/` — agent loop、display、retry</li><li>`base/` — 定数、utils、toolsets</li>
+            </ul>
+          </section>
+          <section class="fact-card">
+            <h3 class="fact-card-title">tools / skills</h3>
+            <ul class="fact-card-list">
+              <li>`tools/` — file / terminal / web / media / planning</li><li>`hermes_cli/` — slash command、TUI 補助</li><li>`skills/` / `optional-skills/` — skill 資産</li>
+            </ul>
+          </section>
+        </div>
+        <div class="detail-grid">
+          <section class="detail-panel">
+            <h3 class="panel-title">確認ポイント</h3>
+            <div class="fact-list">
+              <div class="fact-item"><p class="fact-text">TUI は `prompt_toolkit` で実装されている。</p></div>
+              <div class="fact-item"><p class="fact-text">通信は `requests`、`httpx`、OpenAI 互換 client、Claude API 連携の4種。</p></div>
+              <div class="fact-item"><p class="fact-text">ディレクトリは `cli_main.py`, `core/`, `base/`, `hermes_cli/`, `tools/`, `skills/` で構成される。</p></div>
+            </div>
+          </section>
+          <section class="detail-panel">
+            <h3 class="panel-title">AGENTS / knowledge 抜粋</h3>
+            <div class="evidence-list">
+              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">TUI: `prompt_toolkit`。通信: `requests`、`httpx`、OpenAI 互換 client、Claude API 連携。</p></div>
+              <div class="evidence-item"><div class="evidence-source">backend_hermes/AGENTS.md</div><p class="evidence-text">`cli_main.py` — CLI エントリ、provider/model picker、slash command 処理。</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
