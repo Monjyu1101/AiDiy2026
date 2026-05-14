@@ -15,7 +15,7 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const baseUrl = import.meta.env.BASE_URL || '/';
-const frameSrc = `${baseUrl}X自己紹介/AiDiy自己紹介ビデオtake4/index.html`;
+const frameSrc = `${baseUrl}X自己紹介/index.html`;
 const route = useRoute();
 const router = useRouter();
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>

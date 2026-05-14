@@ -68,6 +68,12 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'その他' }
     },
     {
+        path: '/Xビデオ',
+        name: 'Xビデオ',
+        component: () => import('../components/Xビデオ.vue'),
+        meta: { requiresAuth: true, title: 'Xビデオ' }
+    },
+    {
         path: '/Xその他/Xテトリス/ゲーム',
         name: 'Xテトリス',
         component: () => import('../components/Xその他/Xテトリス.vue'),
@@ -134,6 +140,21 @@ const baseRoutes: RouteRecordRaw[] = [
         '/X自己紹介/aidiy紹介hermes/index.html',
         'X自己紹介/AiDiy紹介hermes/index.html',
         'X自己紹介'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介__all',
+        'Xビデオ/AiDiy紹介__all/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_avatar',
+        'Xビデオ/AiDiy紹介_avatar/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_hermes',
+        'Xビデオ/AiDiy紹介_hermes/index.html',
+        'Xビデオ'
     ),
 ]
 

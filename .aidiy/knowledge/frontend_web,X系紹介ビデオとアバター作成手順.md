@@ -1,45 +1,93 @@
 # X系紹介ビデオとアバター作成手順
 
-> 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/X自己紹介/AiDiy紹介ビデオtake4/`, `frontend_web/public/X自己紹介/AiDiy紹介アバター/`
+> 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all/`, `frontend_web/public/Xビデオ/AiDiy紹介_avatar/`, `frontend_web/public/Xビデオ/AiDiy紹介_hermes/`
 
 ## このメモを使う場面
 
-- 新しい紹介ビデオ（take N）を作成するとき
+- 新しい紹介ビデオ（`AiDiy紹介_<テーマ>`）を作成するとき
 - アバター版プレゼンターを新しく作成・改版するとき
 - シーンの追加・修正をするとき
 - index.html の `sceneFrame.src` 参照方式を確認したとき
 
 ---
 
+## シーン構成の基本ルール
+
+すべての紹介ビデオは以下の枠組みで作る。
+
+| シーン | 役割 | 内容 |
+|--------|------|------|
+| `scene_000` | 冒頭説明 | このビデオで「何を紹介するか」を 10〜15 秒で示す導入。ヒーロー構造（`stage-hero stage-hero-focus`）。 |
+| `scene_001` 〜 `scene_NNN` | 本編 | 通常シーン構造（左ビジュアル + 右コンテンツ）。テーマごとに章立て。 |
+| `scene_999` | 謝辞とまとめ | 「ご視聴ありがとうございました」+ 全体まとめ + **次につながる言葉**（視聴者の行動・次の挑戦を促す問いかけ）でしめる。ヒーロー構造。 |
+
+「次につながる言葉」の例（`AiDiy紹介__all/scene_999`）:
+
+```text
+ご視聴ありがとうございました。
+あなたなら AiDiy でなにを創りますか？
+```
+
+`AiDiy紹介__all` は全テーマを通す総合版で、**新規ビデオ作成時の手本（reference）として参照する**。
+専門テーマ版（`_avatar`、`_hermes` など）を作る場合も、scene_000 と scene_999 の構造とトーンは `__all` に揃える。
+
+---
+
+## ナレーション音声
+
+ナレーションは **`freeai:female` を基準**とする（`__all/scenario.js` の `assets_policy.tts_provider: "freeai:female"`）。
+専門テーマ版（`_avatar`、`_hermes` など）も特段の理由がない限り同じプロバイダ・声で揃える。
+
+- 生成は `aidiy_text_to_speech` MCP を使う
+- 発音辞書は `backend_server/_config/aidiy_text_to_speech.json` が単一の正本
+- `scenario.js` の `narration` を変更したら、必ず同じテキストで音声を再生成して `audio/scene_NNN.mp3` を更新する（表示テキストと音声の乖離防止）
+- 詳細手順は [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) を参照
+
+---
+
 ## ディレクトリ構造
 
-### 紹介ビデオ（take）
+各ビデオは `frontend_web/public/Xビデオ/AiDiy紹介_<テーマ>/` 直下に配置する。
+`__all` は総合版（手本）、`_<テーマ>` はテーマ特化版。
+
+**1 ビデオ = 1 自己完結フォルダ**を原則とする。VRM、画像、音声は各ビデオフォルダ内に持つ（外部参照禁止）。
+これによりフォルダ単位でコピー・配布・移植・削除ができる（他フォルダへ影響しない）。
+
+### 総合版（`__all`）
 
 ```
-X自己紹介/AiDiy紹介ビデオtakeN/
-  index.html        プレイヤー（iframe + 音声制御）
+Xビデオ/AiDiy紹介__all/
+  index.html        プレイヤー（iframe + VRM アバター + 音声制御）
   scenario.js       window.SCENARIO 定義（scenes 配列）
   scene.css         全シーン共通スタイル
-  scene.html        旧クエリパラメータ方式の残骸（使用しない）
-  scene_000.html    ヒーローシーン（個別ページ）
-  scene_001.html    …
-  scene_NNN.html    各シーン（個別ページ）
-  scene_999.html    エンディングヒーロー（個別ページ）
+  scene_000.html    冒頭説明（ヒーロー）
+  scene_001.html 〜 scene_NNN.html  本編
+  scene_999.html    謝辞・まとめ・次につながる言葉（ヒーロー）
+  vrm/              VRM モデル（AiDiy_Sample_M.vrm）
   images/           MCP 画像生成で作成した scene_NNN.png
   audio/            MCP TTS で作成した scene_NNN.mp3
 ```
 
-### アバター版
+### テーマ特化版（`_avatar` / `_hermes` など）
 
 ```
-X自己紹介/AiDiy紹介アバター/
-  index.html        プレイヤー（VRM アバター左 38% + iframe 右 62%）
-  scenario.js       take4 の音声・画像を ../AiDiy紹介ビデオtake4/ で参照
-  scene.css         take4 から流用（変更なし）
-  scene_000.html    …
-  scene_NNN.html    各シーン（個別ページ）
-  aidiy_sozai/      アバター関連素材のみ（下記ルール参照）
+Xビデオ/AiDiy紹介_<テーマ>/
+  index.html        プレイヤー（VRM アバター + iframe）
+  scenario.js       テーマ特化シーン定義
+  scene.css         __all から流用
+  scene_000.html    冒頭説明（ヒーロー）
+  scene_NNN.html    本編
+  scene_999.html    謝辞・まとめ・次につながる言葉（ヒーロー）
+  vrm/              VRM モデル（AiDiy_Sample_M.vrm）
+  images/           テーマ特化画像
+  audio/            テーマ特化音声
 ```
+
+### VRM 参照パス（自己完結のルール）
+
+- `index.html`、`scenario.js`、`scenario.json`、`assets.json` 内の VRM パスは **`vrm/AiDiy_Sample_M.vrm`**（フォルダ相対）にする
+- `../AiDiy_Sample_M.vrm` のような親フォルダ参照は **禁止**（他ビデオへ依存してしまうため）
+- ストレージ節約より移植性を優先する。3 ビデオで同じ VRM ファイル（≈18MB × 3）を複製してでも自己完結を保つ
 
 ---
 

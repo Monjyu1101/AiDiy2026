@@ -128,6 +128,14 @@ class TextToSpeech:
         self.ffmpeg_path: Optional[str] = (
             self.ffmpeg_info.get("resolved") if self.ffmpeg_info.get("ok") else None
         )
+        # 発音辞書 JSON が削除されていたら起動時に再生成する。
+        config_path = self._tts_config_path()
+        if not config_path.exists():
+            try:
+                self._write_default_tts_config(config_path)
+                logger.info(f"TTS 発音辞書が見つからなかったので既定値で再生成: {config_path}")
+            except OSError as e:
+                logger.warning(f"TTS 発音辞書の再生成に失敗: {config_path} ({e})")
 
     @staticmethod
     def _probe_ffmpeg() -> dict[str, Any]:
@@ -171,9 +179,14 @@ class TextToSpeech:
 
     # 読み上げ用の用語変換辞書。
     # 入力テキスト自体は変えず、音声合成へ渡す直前だけ適用する。
+    # from には文字列、または同じ読みを共有する複数表記をリストで渡せる
+    # （例: (["AiDiy", "aidiy", "AIDIY"], "アイディ")）。ロード時に flatten する。
+    # "_" / "-" のような区切り記号は先頭に置き、識別子分解の前処理として効かせる。
     DEFAULT_PRONUNCIATION_DICTIONARY = [
-        ("AiDiy", "アイディー"),
-        ("aidiy", "アイディー"),
+        ("_", " "),
+        ("-", " "),
+        (["AiDiy", "aidiy", "AIDIY"], "アイディ"),
+        ("subprocess", "サブプロセス"),
         ("横展開", "よこてんかい"),
         ("FastAPI", "ファスト エーピーアイ"),
         ("PostgreSQL", "ポストグレス キューエル"),
@@ -182,14 +195,13 @@ class TextToSpeech:
         ("Code CLI", "コード シーエルアイ"),
         ("WebSocket", "ウェブソケット"),
         ("GitHub", "ギットハブ"),
-        ("Knowledge", "ナレッジ"),
-        ("knowledge", "ナレッジ"),
+        (["Knowledge", "knowledge"], "ナレッジ"),
         ("SQLite", "エスキューライト"),
         ("Claude", "クロード"),
         ("Copilot", "コパイロット"),
         ("Codex", "コーデックス"),
         ("Gemini", "ジェミニ"),
-        ("Hermes", "ヘルメス"),
+        (["Hermes", "hermes", "HERMES"], "エルメス"),
         ("Electron", "エレクトロン"),
         ("backend", "バックエンド"),
         ("frontend", "フロントエンド"),
@@ -271,12 +283,45 @@ class TextToSpeech:
             json.dump(self._default_pronunciation_config(), f, ensure_ascii=False, indent=2)
             f.write("\n")
 
+    @staticmethod
+    def _expand_entry(sources, target) -> list[tuple[str, str]]:
+        """from が単一文字列でもリストでも、(source, target) のリストへ展開する。
+           target は空白も意味を持つ（"_" → " " など）。改行・タブのみ除去する。"""
+        if isinstance(sources, str):
+            sources_list = [sources]
+        elif isinstance(sources, (list, tuple)):
+            sources_list = list(sources)
+        else:
+            raise TextToSpeechError(
+                "from は文字列または文字列リストで指定してください"
+            )
+
+        if not isinstance(target, str):
+            raise TextToSpeechError("to は文字列で指定してください")
+
+        target = target.strip("\r\n\t")
+        pairs: list[tuple[str, str]] = []
+        for s in sources_list:
+            if not isinstance(s, str):
+                raise TextToSpeechError("from の要素は文字列で指定してください")
+            s = s.strip()
+            if s and target:
+                pairs.append((s, target))
+        return pairs
+
+    def _flatten_default_dictionary(self) -> list[tuple[str, str]]:
+        """DEFAULT_PRONUNCIATION_DICTIONARY を flat な (source, target) リストへ展開する。"""
+        flat: list[tuple[str, str]] = []
+        for sources, target in self.DEFAULT_PRONUNCIATION_DICTIONARY:
+            flat.extend(self._expand_entry(sources, target))
+        return flat
+
     def _load_pronunciation_dictionary(self) -> list[tuple[str, str]]:
         """設定ファイルがあればそれを使い、なければデフォルトを書き出して使う"""
         config_path = self._tts_config_path()
         if not config_path.exists():
             self._write_default_tts_config(config_path)
-            return list(self.DEFAULT_PRONUNCIATION_DICTIONARY)
+            return self._flatten_default_dictionary()
 
         try:
             with open(config_path, "r", encoding="utf-8") as f:
@@ -295,23 +340,21 @@ class TextToSpeech:
         dictionary: list[tuple[str, str]] = []
         for index, item in enumerate(raw_items, 1):
             if isinstance(item, dict):
-                source = item.get("from", "")
+                sources = item.get("from", "")
                 target = item.get("to", "")
             elif isinstance(item, (list, tuple)) and len(item) == 2:
-                source, target = item
+                sources, target = item
             else:
                 raise TextToSpeechError(
                     f"TTS 変換辞書の {index} 件目は {{\"from\": ..., \"to\": ...}} 形式で指定してください"
                 )
 
-            if not isinstance(source, str) or not isinstance(target, str):
+            try:
+                dictionary.extend(self._expand_entry(sources, target))
+            except TextToSpeechError as e:
                 raise TextToSpeechError(
-                    f"TTS 変換辞書の {index} 件目は文字列で指定してください"
-                )
-            source = source.strip()
-            target = target.strip()
-            if source and target:
-                dictionary.append((source, target))
+                    f"TTS 変換辞書の {index} 件目: {e}"
+                ) from e
 
         return dictionary
 
@@ -345,7 +388,9 @@ class TextToSpeech:
         applied: list[dict] = []
 
         for source, target in self._load_pronunciation_dictionary():
-            if re.search(r"^[A-Za-z0-9 +._-]+$", source):
+            ascii_like = bool(re.search(r"^[A-Za-z0-9 +._-]+$", source))
+            has_alnum = bool(re.search(r"[A-Za-z0-9]", source))
+            if ascii_like and has_alnum:
                 pattern = re.compile(
                     rf"(?<![A-Za-z0-9_]){re.escape(source)}(?![A-Za-z0-9_])"
                 )

@@ -45,7 +45,7 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 | 4. ブラウザ自動再生 | `aidiy_chrome_devtools` + `scripts/cdp_user_gesture.py` | HTML を開き、ユーザー操作扱いで `play()` 起動 |
 | 5. 録画 | `aidiy_obs_studio_control` | OBS で画面 + システム音声を一括録画 |
 | 6. 撮影中の人間ガイド | `aidiy_text_to_speech` (`local_play:true`) | 最前面化・手動録画開始など GUI 操作を音声で依頼、合図ワードで同期 |
-| 7. トリム / 整形 | `aidiy_ffmpeg_control` (`ffmpeg_run`) | 前後の余白カット、再エンコード |
+| 7. トリム / 整形 | `aidiy_ffmpeg_control` (`ffmpeg_analyze_audio_timerange` / `video_trimming`) | 音声起点・終点の検出、前後余白つきカット、再エンコード |
 
 ## 1. シナリオと HTML の構造
 
@@ -428,7 +428,32 @@ JSON.stringify({sceneIndex, playing, audioPaused: audioPlayer.paused, playBtnTex
 
 OBS 録画は前後に「録画開始 → 再生クリックまでの数秒」「ナレーション後 → 停止までの数秒」が含まれる。再エンコードして CRF で品質固定する。
 
-先頭・末尾の余白秒数が分からないときは、**ローカル shell に落とさず `aidiy_ffmpeg_control` のまま無音抽出まで進めてよい**。`silencedetect` を使うと、録画 MP4 から「先頭の無音が終わる位置」「最後の無音が始まる位置」を候補として拾える。
+先頭・末尾の余白秒数が分からないときは、**ローカル shell に落とさず `aidiy_ffmpeg_control` MCP のまま範囲検出からトリムまで進める**。基本は `ffmpeg_analyze_audio_timerange` で「最初の発話開始秒」と「最後の発話終了秒」を検出し、前後 `padding_sec: 2.0` 秒の余白を付けた `trim_start_sec` / `trim_end_sec` を `video_trimming` に渡す。
+
+```
+mcp__aidiy_ffmpeg_control__ffmpeg_analyze_audio_timerange
+  input_path   : C:\Users\admin\Videos\2026-05-14 22-01-31.mp4
+  padding_sec  : 2.0
+  threshold_db : -40
+  window_ms    : 100
+  sample_rate  : 8000
+```
+
+- `audio_start_sec` / `audio_end_sec` は音声起点・終点の検出結果。
+- `trim_start_sec` / `trim_end_sec` は前後 2 秒の余白込みの推奨トリム範囲。
+- 通常はこの戻り値を人間が秒数に直さず、そのまま `video_trimming` に渡す。
+
+```
+mcp__aidiy_ffmpeg_control__video_trimming
+  input_path  : C:\Users\admin\Videos\2026-05-14 22-01-31.mp4
+  start_sec   : <trim_start_sec>
+  end_sec     : <trim_end_sec>
+  output_path : C:\Users\admin\Videos\aidiy_recording_trim.mp4
+```
+
+`video_trimming` は H.264 (libx264 CRF 20) + AAC 192kbps + `+faststart` の既定値で再エンコードする。録画ファイル名にスペースが含まれていても、`input_path` 引数で渡す場合はコピー不要。`args_str` を直接使う `ffmpeg_run` / `ffprobe_run` ではスペース入りパスを避ける。
+
+`ffmpeg_analyze_audio_timerange` が使えない場合だけ、`ffmpeg_run` + `silencedetect` で候補を拾う。
 
 ```
 mcp__aidiy_ffmpeg_control__ffmpeg_run
