@@ -42,10 +42,14 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_000.mp3",
-      "short_narration": "AI の 4 モードを紹介します。",
+      "short_narration": "AiDiy の AI コアは 4 つのモードで構成されています。チャット・ライブ・コード支援・音声処理を紹介します。",
       "long_narration": "この動画では、AiDiy の AI コア機能を紹介します。チャット、ライブ、コード支援、音声処理の 4 つのモード、WebSocket 通信プロトコル、複数の AI Provider への対応、会話履歴の永続化、そして Claude Agent SDK と MCP の連携まで、実装に沿って順番に見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
-      "long_audio": "audio/long_scene_000.mp3"
+      "long_audio": "audio/long_scene_000.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 8.16,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 22.08
     },
     {
       "id": "scene_001",
@@ -123,10 +127,14 @@ window.SCENARIO = {
           "text": "AIコア変更は `core_router/AIコア.py` と `AIコア/` を起点に見る。"
         }
       ],
-      "short_narration": "WebSocket が AI の通信口です。",
+      "short_narration": "AI との通信はすべて WebSocket で行います。接続・送受信・切断のプロトコルが統一されています。",
       "long_narration": "AI の通信口は WebSocket です。core_router/AIコア.py が /core/ws/AIコア エンドポイントを提供し、AIコア/ ディレクトリに配置された 14 以上のモジュールが Provider ごとの処理を担当します。AIセッション管理.py がセッションとモデル設定を保持し、AIストリーミング処理.py がリアルタイムの出力転送を担います。担当サーバーは core_main の 8091 番ポートです。",
       "short_audio": "audio/short_scene_001.mp3",
-      "long_audio": "audio/long_scene_001.mp3"
+      "long_audio": "audio/long_scene_001.mp3",
+      "short_start_sec": 8.16,
+      "short_duration_sec": 6.84,
+      "long_start_sec": 22.08,
+      "long_duration_sec": 30.864
     },
     {
       "id": "scene_002",
@@ -205,10 +213,14 @@ window.SCENARIO = {
           "text": "設定管理: `conf_json`: `AiDiy_key.json` の読み書き、不足キー補完、即時保存。`conf_models`: AI モデル一覧管理、provider API からの取得とキャッシュ。"
         }
       ],
-      "short_narration": "チャット、ライブ、コード、音声の 4 モードがあります。",
+      "short_narration": "チャット・ライブ・コード支援・音声処理の 4 つのモードが、ひとつの AI コアで動きます。",
       "long_narration": "AI の名前には命名規則があります。チャットモードに使う AI 名は _chat で終わる名前、ライブモードは _live で終わる名前、コード支援は _sdk または _cli で終わる名前を使います。例外として aidiy_hermes も有効です。コード支援は code1 から code6 の 6 スロットに異なる CLI を割り当てられます。設定はすべて backend_server/_config/AiDiy_key.json で一元管理し、AI 名の比較は前方一致ではなく完全一致を前提にします。",
       "short_audio": "audio/short_scene_002.mp3",
-      "long_audio": "audio/long_scene_002.mp3"
+      "long_audio": "audio/long_scene_002.mp3",
+      "short_start_sec": 15.0,
+      "short_duration_sec": 7.032,
+      "long_start_sec": 52.944,
+      "long_duration_sec": 37.824
     },
     {
       "id": "scene_003",
@@ -286,10 +298,14 @@ window.SCENARIO = {
           "text": "トークン延長対象外: `input_audio`（高頻度送信のため）、`operations`、`cancel_run`、`cancel_audio`。"
         }
       ],
-      "short_narration": "connect 送信で init を受け取り、セッションが確立します。",
+      "short_narration": "connect を送信すると init が返り、セッション ID が確立されて会話が始まります。",
       "long_narration": "AI との通信は WebSocket を使います。接続後にまず、type が connect、セッションID、ソケット番号を含むオブジェクトを送信し、サーバーから メッセージ識別が init のオブジェクトが返ってきてセッション ID が確定します。送信できるメッセージは input_text、input_file、input_image、input_audio の 4 種類です。受信側は output と output_end でテキスト、output_audio で音声 PCM を返します。出力はチャット、code1 から code6、audio のチャンネルに分配されます。なお input_audio は高頻度送信のためトークン延長の対象外です。",
       "short_audio": "audio/short_scene_003.mp3",
-      "long_audio": "audio/long_scene_003.mp3"
+      "long_audio": "audio/long_scene_003.mp3",
+      "short_start_sec": 22.032,
+      "short_duration_sec": 6.36,
+      "long_start_sec": 90.768,
+      "long_duration_sec": 37.08
     },
     {
       "id": "scene_004",
@@ -368,10 +384,14 @@ window.SCENARIO = {
           "text": "Electron は `localStorage`、Web は `sessionStorage` に `token` / `user` / `avatar_session_id` を保持する。Web モードは URL の `?セッションID=` も参照し、リロード復帰しやすくする。"
         }
       ],
-      "short_narration": "会話はセッション ID でデータベースに保存されます。",
+      "short_narration": "会話はセッション ID に紐づいてデータベースに保存され、履歴を引き継いで続けられます。",
       "long_narration": "会話の内容はデータベースに保存されます。A会話履歴テーブルが SQLite にセッション ID をキーにして会話を永続化します。A の接頭辞は AI 系を意味し、core_main が担当します。ページをリロードしたり再接続したりするときに既存のセッション ID を渡せば、サーバーが A会話履歴から過去の文脈を復元して続きから話せます。セッション ID のストレージは frontend_web が localStorage、frontend_avatar の Web モードが sessionStorage、Electron モードが localStorage です。",
       "short_audio": "audio/short_scene_004.mp3",
-      "long_audio": "audio/long_scene_004.mp3"
+      "long_audio": "audio/long_scene_004.mp3",
+      "short_start_sec": 28.392,
+      "short_duration_sec": 6.672,
+      "long_start_sec": 127.848,
+      "long_duration_sec": 40.8
     },
     {
       "id": "scene_005",
@@ -449,10 +469,14 @@ window.SCENARIO = {
           "text": "MCP 接続定義は `backend_server/_config/AiDiy_mcp.json` に集約する。`AIコード_claude.py` 側で `conf.models.mcp_servers` を Claude Agent SDK に渡す。"
         }
       ],
-      "short_narration": "Claude SDK で 13 の MCP ツールを AI が使えます。",
+      "short_narration": "Claude SDK を経由して 13 の MCP ツールを AI が自律的に使えます。",
       "long_narration": "AIコード_claude.py は Claude Agent SDK を使ってコード支援を行います。_config/AiDiy_mcp.json で定義した 13 個の MCP サーバーをエージェントに渡すことで、Claude がブラウザ操作、データベース確認、コードチェック、画像生成、音声合成を自動で使い分けます。CODE_AI の NAME を _sdk で終わる名前に設定したとき、この AIコード_claude.py が起動します。一方 _cli で終わる名前の場合は subprocess 経由で Code CLI を起動する AIコード_cli.py が担当します。",
       "short_audio": "audio/short_scene_005.mp3",
-      "long_audio": "audio/long_scene_005.mp3"
+      "long_audio": "audio/long_scene_005.mp3",
+      "short_start_sec": 35.064,
+      "short_duration_sec": 6.24,
+      "long_start_sec": 168.648,
+      "long_duration_sec": 36.72
     },
     {
       "id": "scene_006",
@@ -531,10 +555,14 @@ window.SCENARIO = {
           "text": "Code AI は `code1`〜`code6` / `CODE_AI1_NAME`〜`CODE_AI6_NAME` を前提にします。"
         }
       ],
-      "short_narration": "Claude、Gemini など複数の AI サービスに対応しています。",
+      "short_narration": "Claude・Gemini・OpenAI など複数の AI サービスを画面から切り替えて使えます。",
       "long_narration": "AI Provider は用途によって異なります。チャットモードは Claude、Gemini、FreeAI、OpenRouter、Ollama の 5 種類以上に対応しています。Ollama を使えばローカル LLM でチャットできます。ライブモードは Gemini Live と OpenAI Realtime の 2 Provider でリアルタイム音声通信を行います。コード支援は CODE_AI の NAME の設定で 6 スロットにそれぞれ異なる CLI を割り当てられるため、用途に応じて使い分けられます。",
       "short_audio": "audio/short_scene_006.mp3",
-      "long_audio": "audio/long_scene_006.mp3"
+      "long_audio": "audio/long_scene_006.mp3",
+      "short_start_sec": 41.304,
+      "short_duration_sec": 6.312,
+      "long_start_sec": 205.368,
+      "long_duration_sec": 30.552
     },
     {
       "id": "scene_999",
@@ -558,11 +586,17 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_999.mp3",
-      "short_narration": "多様な AI を業務に組み込んでみてください。",
+      "short_narration": "4 モード・WebSocket・MCP ツール連携で業務に深く組み込める AI コアです。多様な AI を活用してみてください。",
       "long_narration": "ご視聴ありがとうございました。4 モード、WebSocket セッション、A会話履歴による永続化、Claude Agent SDK と MCP の連携、そして複数の AI Provider への対応。AiDiy の AI コアは、テキスト、音声、画像、ファイル、コード支援を統合した WebSocket 中心の設計になっています。多様な AI をあなたの業務に組み込んでみてください。",
       "short_audio": "audio/short_scene_999.mp3",
-      "long_audio": "audio/long_scene_999.mp3"
+      "long_audio": "audio/long_scene_999.mp3",
+      "short_start_sec": 47.616,
+      "short_duration_sec": 9.552,
+      "long_start_sec": 235.92,
+      "long_duration_sec": 25.032
     }
   ],
-  "duration_sec": 112.0
-}
+  "duration_sec": 112.0,
+  "short_duration_sec": 57.168,
+  "long_duration_sec": 260.952
+};

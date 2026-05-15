@@ -42,10 +42,14 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_000.mp3",
-      "short_narration": "frontend_avatar の仕組みを紹介します。",
+      "short_narration": "frontend_avatar は AI コア専用クライアントです。Electron デスクトップとブラウザの両対応で動作します。",
       "long_narration": "この動画では、frontend_avatar の位置づけと仕組みを紹介します。AIコア専用クライアントとしての役割、Electron デスクトップアプリと Web ブラウザの両対応、VRM アバターの描画、7 種類の表示選択、Electron と Web の間の状態同期まで、実装に沿って見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
-      "long_audio": "audio/long_scene_000.mp3"
+      "long_audio": "audio/long_scene_000.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 7.824,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 20.304
     },
     {
       "id": "scene_001",
@@ -111,10 +115,14 @@ window.SCENARIO = {
           "text": "frontend_avatar は AIコア専用の Avatar クライアントです。Electron デスクトップアプリと通常 Web ブラウザの両方で動作します。"
         }
       ],
-      "short_narration": "Electron と Web 両対応の AI 専用クライアントです。",
+      "short_narration": "Electron デスクトップアプリと Web ブラウザの両方で動く AI 専用クライアントです。実行環境の判定は window.desktopApi の有無で行います。",
       "long_narration": "frontend_avatar は AIコア専用のアバタークライアントです。通常の Web ブラウザでも動きますし、Electron でデスクトップアプリとしても動作します。実行環境の判定は window.desktopApi が存在するかどうかで行います。認証情報のストレージは Electron が localStorage、Web が sessionStorage と、環境ごとに切り替わります。",
       "short_audio": "audio/short_scene_001.mp3",
-      "long_audio": "audio/long_scene_001.mp3"
+      "long_audio": "audio/long_scene_001.mp3",
+      "short_start_sec": 7.824,
+      "short_duration_sec": 10.632,
+      "long_start_sec": 20.304,
+      "long_duration_sec": 22.152
     },
     {
       "id": "scene_002",
@@ -192,10 +200,14 @@ window.SCENARIO = {
           "text": "技術スタックは Vue 3 + Vite + TypeScript、Electron、Three.js、@pixiv/three-vrm、@pixiv/three-vrm-animation、WebSocket、BroadcastChannel、Monaco Editor。"
         }
       ],
-      "short_narration": "Vue 3、Three.js、VRM で動くアバターアプリです。",
+      "short_narration": "Vue 3・TypeScript・Three.js・VRM で構築された、アバター付きアプリケーションです。",
       "long_narration": "技術スタックは Vue 3、Vite、TypeScript で renderer を構築し、Three.js と @pixiv/three-vrm シリーズで VRM モデルを描画します。AI との通信は WebSocket、Electron の複数ウィンドウ間の状態同期は BroadcastChannel を使います。Vue Router と Pinia 中心の構成ではなく、AiDiy.vue が状態を持つ設計になっています。TypeScript は strict mode が有効で、frontend_web との差異のひとつになっています。",
       "short_audio": "audio/short_scene_002.mp3",
-      "long_audio": "audio/long_scene_002.mp3"
+      "long_audio": "audio/long_scene_002.mp3",
+      "short_start_sec": 18.456,
+      "short_duration_sec": 8.712,
+      "long_start_sec": 42.456,
+      "long_duration_sec": 32.832
     },
     {
       "id": "scene_003",
@@ -273,10 +285,14 @@ window.SCENARIO = {
           "text": "全ウィンドウは transparent: true, frame: false, hasShadow: false の透過フレームレスウィンドウです。"
         }
       ],
-      "short_narration": "役割別 BrowserWindow を透過フレームレスで管理します。",
+      "short_narration": "役割別に複数の BrowserWindow を持ち、透過・フレームレスで画面に溶け込みます。",
       "long_narration": "Electron 版は login、core、chat、file、image、code1 から code6、settings の役割別 BrowserWindow を持ちます。全ウィンドウは transparent:true、frame:false、hasShadow:false の透過フレームレスで作られており、_WindowShell がタイトルバーの代わりとなる操作領域を提供します。パネルの切り替えはウィンドウを破棄せず show と hide で行います。Web モードでは同じ役割をタブで表現します。",
       "short_audio": "audio/short_scene_003.mp3",
-      "long_audio": "audio/long_scene_003.mp3"
+      "long_audio": "audio/long_scene_003.mp3",
+      "short_start_sec": 27.168,
+      "short_duration_sec": 6.072,
+      "long_start_sec": 75.288,
+      "long_duration_sec": 32.304
     },
     {
       "id": "scene_004",
@@ -357,10 +373,14 @@ window.SCENARIO = {
           "text": "現行方針は単一クリップの THREE.LoopRepeat ではなく、finished イベントで次の VRMA を選択して再生する巡回方式。"
         }
       ],
-      "short_narration": "VRM モデルと VRMA モーションで表情と動きを制御します。",
+      "short_narration": "VRM モデルにモーションと表情を適用し、音声のリップシンクと連動して動かします。クリップ切り替えは crossFadeFrom で吸収します。",
       "long_narration": "VRM モデルのファイルは public/vrm/ フォルダに、VRMA モーションファイルは public/vrma/サンプル と public/vrma/標準 に置きます。モーションの再生は LoopRepeat で無限ループするのではなく、finished イベントで次の VRMA クリップを選び直す巡回再生方式です。クリップの切り替えによる姿勢のガクつきは crossFadeFrom で吸収します。Web モードでは config.ts の配列がファイル一覧を返し、Electron モードでは desktop:list-vrma-files の IPC がリアルファイルを返します。",
       "short_audio": "audio/short_scene_004.mp3",
-      "long_audio": "audio/long_scene_004.mp3"
+      "long_audio": "audio/long_scene_004.mp3",
+      "short_start_sec": 33.24,
+      "short_duration_sec": 9.672,
+      "long_start_sec": 107.592,
+      "long_duration_sec": 45.12
     },
     {
       "id": "scene_005",
@@ -441,10 +461,14 @@ window.SCENARIO = {
           "text": "Electron / Web 間の状態同期は BroadcastChannel avatar-desktop-sync を使います。"
         }
       ],
-      "short_narration": "アバターを含む 7 種の表示を BroadcastChannel で同期します。",
+      "short_narration": "アバター・xneko・xeyes など 7 種の表示から選べます。Electron と Web は BroadcastChannel でリアルタイム同期します。",
       "long_narration": "表示モードはアバター、xneko、xeyes、アナログ時計、デジタル時計、カレンダー、表示無しの 7 種類から選べます。xeyes の CPU 使用率は system:get-cpu-usage の IPC から取得します。Electron と Web の間のパネル表示とセッション状態の同期には BroadcastChannel の avatar-desktop-sync チャンネルを使います。",
       "short_audio": "audio/short_scene_005.mp3",
-      "long_audio": "audio/long_scene_005.mp3"
+      "long_audio": "audio/long_scene_005.mp3",
+      "short_start_sec": 42.912,
+      "short_duration_sec": 8.904,
+      "long_start_sec": 152.712,
+      "long_duration_sec": 25.392
     },
     {
       "id": "scene_999",
@@ -468,11 +492,17 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_999.mp3",
-      "short_narration": "VRM アバター、両対応、状態同期をひとつに束ねています。",
+      "short_narration": "Electron と Web の両対応、VRM アバター、BroadcastChannel 同期。すべてをひとつのクライアントに束ねています。",
       "long_narration": "ご視聴ありがとうございました。frontend_avatar は VRM アバター、7 種類の表示選択、Electron と Web の両対応、BroadcastChannel による状態同期を、AIコア専用クライアントとして束ねています。デスクトップとブラウザの両方でシームレスに動くアバター体験を、あなたの環境でぜひ試してみてください。",
       "short_audio": "audio/short_scene_999.mp3",
-      "long_audio": "audio/long_scene_999.mp3"
+      "long_audio": "audio/long_scene_999.mp3",
+      "short_start_sec": 51.816,
+      "short_duration_sec": 8.952,
+      "long_start_sec": 178.104,
+      "long_duration_sec": 22.56
     }
   ],
-  "duration_sec": 121.632
-}
+  "duration_sec": 121.632,
+  "short_duration_sec": 60.768,
+  "long_duration_sec": 200.664
+};

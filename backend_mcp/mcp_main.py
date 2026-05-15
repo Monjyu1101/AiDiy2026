@@ -1568,6 +1568,30 @@ if ffmpeg_c.version_info.get("ffprobe", {}).get("ok"):
         return json.dumps(result, ensure_ascii=False)
 
 
+if ffmpeg_c.version_info.get("ffprobe", {}).get("ok"):
+    @mcp_ff.tool()
+    async def get_media_duration(
+        input_path: str,
+        timeout_sec: Optional[int] = None,
+    ) -> str:
+        """
+        メディアファイル（MP3 / MP4 / WAV など）の再生時間を ffprobe で取得する。
+        ナレーション音声の実尺確認や scenario.js の duration_sec 更新に使う。
+
+        Args:
+            input_path: 対象ファイルの絶対パス。
+            timeout_sec: ffprobe のタイムアウト秒。省略時は設定ファイルの値を使う。
+
+        Returns:
+            {"input_path": str, "duration_sec": float, "size_bytes": int}
+        """
+        try:
+            result = await ffmpeg_c.get_media_duration(input_path, timeout_sec=timeout_sec)
+        except FfmpegControlError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+
 if ffmpeg_c.version_info.get("ffmpeg", {}).get("ok"):
     @mcp_ff.tool()
     async def ffmpeg_analyze_audio_timerange(

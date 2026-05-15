@@ -234,18 +234,26 @@ for scene in sc["scenes"]:
 ```
 mcp__aidiy_text_to_speech__synthesize_speech
   speech_text  : シーンのナレーション原文
-  provider     : "edge"
-  voice        : "ja-JP-NanamiNeural"
+  provider     : "freeai"      ← 紹介ビデオ標準。edge も可
+  voice        : "female"
   save_path    : 絶対パス（例: D:/.../audio/scene_001.mp3）
 ```
 
+- **紹介ビデオのナレーション音声は必ず MP3 で生成・保存する**。WAV ファイルをそのまま使うと duration 計算が狂う（WAV の byte_rate ÷ ファイルサイズ ≠ MP3 の実尺）。
+- `freeai` プロバイダは Google Gemini TTS を使い、内部で PCM → WAV → MP3 変換を行う。MP3 変換には ffmpeg（優先）または `lameenc`（フォールバック）を使う。
+- `lameenc` は `backend_mcp` の依存に含まれている（`uv add lameenc` で追加済み）。ffmpeg がない環境でも MP3 出力できる。
+- **フォールバックチェーン**: `freeai` 失敗 → `gemini`（Google TTS、キーあり時）→ `edge`（Microsoft Edge TTS）の順で自動フォールバックする。
+- **MP3 直接出力の試み**: Gemini TTS は `generationConfig.audioConfig.audioEncoding: "MP3"` で MP3 直接出力をリクエストする。現行の `generateContent` エンドポイントが非対応（HTTP 400）の場合は自動的に PCM モードで再試行し、ffmpeg で MP3 変換する。将来 API が対応すれば変換不要になる。
+- `_wav_to_mp3` バグ修正済み: ffmpeg 導入後に `None` を返す問題（else ブランチ欠落）を修正。ffmpeg 優先、失敗時は lameenc にフォールバック。
 - 発音辞書は **`backend_server/_config/aidiy_text_to_speech.json`** が単一の正本。`AiDiy → アイディー`, `MCP → エムシーピー`, `横展開 → よこてんかい` など。辞書を更新したら **必ず全シーンを取り直す**（シーン尺も変わる可能性あり）。
 - レスポンスには base64 audio が含まれ、トークン上限を超えてエラー扱いに見えることがあるが、`save_path` を指定していればファイルは正常保存されている。`save_path` 指定時はレスポンス本文を読み返す必要はなく、**ファイルサイズと尺だけ確認**する。
 - `local_play: true` を使えば、生成と同時に **MCP ホスト側のスピーカーで読み上げ**ができる。人間オペレーター向け案内（「Chrome を最前面にしてください」等）に使う。
 
-## 3. 尺の確定（ffprobe）
+## 3. 尺の確定（ffprobe または Python）
 
-`save_path` で固まった MP3 の実尺を `ffprobe_run` で取り、`scenario.json` / `assets.json` / `index.html` 内のシナリオに反映する。
+`save_path` で固まった MP3 の実尺を取得し、`scenario.json` / `assets.json` / `index.html` 内のシナリオに反映する。
+
+### ffprobe が使える環境
 
 ```
 mcp__aidiy_ffmpeg_control__ffprobe_run
@@ -255,6 +263,20 @@ mcp__aidiy_ffmpeg_control__ffprobe_run
 落とし穴:
 
 - **`args_str` の引用符**: 内部で空白スプリットされるため、Windows パスを `"…"` で囲むと `ffprobe` 側に `"…"` ごと渡って `Invalid argument` になる。**スペースを含まないパスにし、引用符は付けない**。スペース必須なら一時ファイル名にコピー (`aidiy_intro_take1.mp4` など) してから渡す。
+
+### ffprobe がない環境（Linux codespace 等）
+
+TTS 生成時に返ってくる `duration_sec` を使うか、`mutagen` ライブラリを使う:
+
+```python
+# mutagen がある場合
+from mutagen.mp3 import MP3
+duration = MP3("audio/scene_001.mp3").info.length
+
+# mutagen もない場合は TTS 呼び出し結果の duration_sec をそのまま利用
+```
+
+`freeai` プロバイダは生成時に実測 `duration_sec` を返すため、**生成ログの秒数を直接 scenario.js に書き込む**のが最も確実（ファイルの再読み不要）。
 
 `start_sec` は累積で再計算し、ルートの `duration_sec` も合計値で更新する。
 

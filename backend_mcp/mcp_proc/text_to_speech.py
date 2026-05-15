@@ -504,9 +504,23 @@ class TextToSpeech:
         except Exception:
             if used == "edge":
                 raise
-            used = "edge"
-            voice = self._resolve_voice("auto", used, language)
-            audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
+            # freeai 失敗 → gemini にフォールバック、gemini も失敗 → edge
+            if used == "freeai" and self._get_api_key("gemini") is not None:
+                try:
+                    used = "gemini"
+                    voice = self._resolve_voice("auto", used, language)
+                    audio_bytes = self._synthesize_gemini(normalized_text, voice, model, used, effective_ratio)
+                    logger.info("freeai 失敗 → gemini にフォールバックしました")
+                except Exception:
+                    used = "edge"
+                    voice = self._resolve_voice("auto", used, language)
+                    audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
+                    logger.info("freeai/gemini 失敗 → edge にフォールバックしました")
+            else:
+                used = "edge"
+                voice = self._resolve_voice("auto", used, language)
+                audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
+                logger.info(f"{requested} 失敗 → edge にフォールバックしました")
 
         audio_format = self._detect_audio_format(audio_bytes)
 
@@ -611,26 +625,37 @@ class TextToSpeech:
             f"Just speak this text naturally: {text}"
         )
 
-        payload = {
-            "contents": [{"parts": [{"text": tts_prompt}]}],
-            "generationConfig": {
-                "responseModalities": ["AUDIO"],
-                "speechConfig": {
-                    "voiceConfig": {
-                        "prebuiltVoiceConfig": {"voiceName": voice},
-                    },
+        base_gen_config = {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {
+                "voiceConfig": {
+                    "prebuiltVoiceConfig": {"voiceName": voice},
                 },
             },
         }
-
         endpoint = f"{base_url}/models/{model}:generateContent"
-        resp = requests.post(
-            endpoint,
-            params={"key": api_key},
-            headers={"Content-Type": "application/json"},
-            json=payload,
-            timeout=60,
-        )
+
+        # MP3 直接出力を試みる。API が非対応なら audioConfig なしで再試行
+        for attempt_mp3 in (True, False):
+            gen_config = dict(base_gen_config)
+            if attempt_mp3:
+                gen_config["audioConfig"] = {"audioEncoding": "MP3"}
+            payload = {
+                "contents": [{"parts": [{"text": tts_prompt}]}],
+                "generationConfig": gen_config,
+            }
+            resp = requests.post(
+                endpoint,
+                params={"key": api_key},
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=60,
+            )
+            if resp.status_code == 400 and attempt_mp3:
+                # audioConfig 非対応 → PCM モードで再試行
+                logger.info("Gemini TTS: audioConfig 非対応、PCM モードで再試行")
+                continue
+            break
 
         if resp.status_code != 200:
             try:
@@ -652,15 +677,22 @@ class TextToSpeech:
                 raise TextToSpeechError("Gemini レスポンスに音声データが含まれていません")
             inline = audio_part.get("inlineData") or audio_part.get("inline_data") or {}
             audio_b64 = inline.get("data", "")
+            mime_type = inline.get("mimeType", "")
         except (KeyError, IndexError, TypeError) as e:
             raise TextToSpeechError(f"Gemini レスポンスの解析に失敗: {e}")
 
         if not audio_b64:
             raise TextToSpeechError("Gemini が空の音声データを返しました")
 
-        pcm_bytes = base64.b64decode(audio_b64)
-        wav_bytes = self._pcm_to_wav(pcm_bytes)
-        audio_bytes = self._wav_to_mp3(wav_bytes)
+        raw_bytes = base64.b64decode(audio_b64)
+
+        # mimeType が MP3 系なら変換不要、それ以外は PCM→WAV→MP3 変換
+        if mime_type.lower() in ("audio/mp3", "audio/mpeg", "audio/mpeg3"):
+            logger.info(f"Gemini TTS: MP3 直接出力 ({mime_type})")
+            audio_bytes = raw_bytes
+        else:
+            wav_bytes = self._pcm_to_wav(raw_bytes)
+            audio_bytes = self._wav_to_mp3(wav_bytes)
 
         if ratio != 1.0:
             audio_bytes = self._apply_atempo(audio_bytes, ratio)
@@ -696,9 +728,9 @@ class TextToSpeech:
         return riff_header + fmt_chunk + data_header + pcm_bytes
 
     def _wav_to_mp3(self, wav_bytes: bytes) -> bytes:
-        """ffmpeg で WAV → MP3 変換。ffmpeg 不在時は WAV のまま返す"""
+        """WAV → MP3 変換。ffmpeg 優先、不在時は lameenc にフォールバック。"""
         if not self.ffmpeg_path:
-            return wav_bytes
+            return self._wav_to_mp3_lameenc(wav_bytes)
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp.write(wav_bytes)
             wav_path = tmp.name
@@ -712,12 +744,40 @@ class TextToSpeech:
                 with open(mp3_path, "rb") as f:
                     return f.read()
             return wav_bytes
+        except Exception:
+            return self._wav_to_mp3_lameenc(wav_bytes)
         finally:
             for p in (wav_path, mp3_path):
                 try:
                     os.remove(p)
                 except OSError:
                     pass
+
+    @staticmethod
+    def _wav_to_mp3_lameenc(wav_bytes: bytes) -> bytes:
+        """lameenc を使った純 Python WAV → MP3 変換（ffmpeg 不在時のフォールバック）。"""
+        try:
+            import lameenc
+            import wave
+            import io
+            with wave.open(io.BytesIO(wav_bytes)) as wf:
+                channels = wf.getnchannels()
+                sample_rate = wf.getframerate()
+                sample_width = wf.getsampwidth()
+                n_frames = wf.getnframes()
+                pcm_data = wf.readframes(n_frames)
+            if sample_width != 2:
+                return wav_bytes
+            encoder = lameenc.Encoder()
+            encoder.set_bit_rate(128)
+            encoder.set_in_sample_rate(sample_rate)
+            encoder.set_channels(channels)
+            encoder.set_quality(2)
+            mp3_bytes = encoder.encode(pcm_data)
+            mp3_bytes += encoder.flush()
+            return mp3_bytes if mp3_bytes else wav_bytes
+        except Exception:
+            return wav_bytes
 
     def _apply_atempo(self, audio_bytes: bytes, ratio: float) -> bytes:
         """ffmpeg atempo で速度調整。ffmpeg 不在/失敗時は元のバイトを返す"""

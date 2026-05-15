@@ -42,10 +42,14 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_000.mp3",
-      "short_narration": "backend_server の構成とルールを紹介します。",
+      "short_narration": "AiDiy の backend_server はポート 2 本で動く FastAPI アプリです。設計ルールと構成を紹介します。",
       "long_narration": "この動画では、AiDiy の backend_server を紹介します。2 サーバー構成、4 層アーキテクチャ、日本語ファースト命名、C採番による ID 管理、監査フィールド、そして V 系の生 SQL まで、実装に沿って見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
-      "long_audio": "audio/long_scene_000.mp3"
+      "long_audio": "audio/long_scene_000.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 7.44,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 18.24
     },
     {
       "id": "scene_001",
@@ -123,10 +127,14 @@ window.SCENARIO = {
           "text": "DB ファイルは `backend_server/_data/AiDiy/database.db` です。`core_main.py` と `apps_main.py` は同じ SQLite DB を共有します。"
         }
       ],
-      "short_narration": "Core が 8091、Apps が 8092 の 2 サーバー構成です。",
+      "short_narration": "Core サーバーがポート 8091、Apps サーバーがポート 8092 を担う 2 本構成です。",
       "long_narration": "バックエンドは 2 台のサーバーで構成されています。core_main がポート 8091 で C 系の共通機能、A 系の AI コア、認証を担当し、apps_main がポート 8092 で M 系マスタ、T 系トランザクション、V 系ビュー、S 系スケジューラを担当します。両サーバーは backend_server/_data/AiDiy/database.db の同一 SQLite ファイルを共有します。技術スタックは Python 3.13、FastAPI、SQLAlchemy、Pydantic、JWT です。",
       "short_audio": "audio/short_scene_001.mp3",
-      "long_audio": "audio/long_scene_001.mp3"
+      "long_audio": "audio/long_scene_001.mp3",
+      "short_start_sec": 7.44,
+      "short_duration_sec": 6.504,
+      "long_start_sec": 18.24,
+      "long_duration_sec": 36.912
     },
     {
       "id": "scene_002",
@@ -207,10 +215,14 @@ window.SCENARIO = {
           "text": "システム用語（`request`、`query`、`items`、`total`、`limit`）や英字ライブラリ名はそのまま使用します。"
         }
       ],
-      "short_narration": "テーブル名も API パスも日本語で書きます。",
+      "short_narration": "テーブル名も API パスも変数名もすべて日本語で書く、日本語ファースト設計です。",
       "long_narration": "テーブル名も API パスも日本語で書くのが AiDiy の原則です。接頭辞 C と A は core_main が担当し、M、T、V、S は apps_main が担当します。テーブルのカラム名も利用者ID、配車日付のように日本語で定義します。API パスは /core/利用者/一覧、JSON のキーは 利用者名といった形で全レイヤーで統一します。request、query、items などのシステム用語と英字ライブラリ名は例外として英語のままにします。",
       "short_audio": "audio/short_scene_002.mp3",
-      "long_audio": "audio/long_scene_002.mp3"
+      "long_audio": "audio/long_scene_002.mp3",
+      "short_start_sec": 13.944,
+      "short_duration_sec": 6.264,
+      "long_start_sec": 55.152,
+      "long_duration_sec": 34.32
     },
     {
       "id": "scene_003",
@@ -290,10 +302,14 @@ window.SCENARIO = {
           "text": "よくある落とし穴: `apps_crud/__init__.py` の import / `__all__` 追加漏れ。`apps_models/__init__.py` の import 追加漏れにより `create_all()` 対象外になる。"
         }
       ],
-      "short_narration": "Model、Schema、CRUD、Router の 4 ファイルで機能を作ります。",
+      "short_narration": "Model・Schema・CRUD・Router の 4 ファイルを作れば、ひとつの機能が完成します。",
       "long_narration": "新機能を追加するときは 4 つのファイルを作ります。SQLAlchemy モデルの Model、Pydantic スキーマの Schema、DB アクセスロジックの CRUD、FastAPI エンドポイントの Router です。最後に apps_main.py への router 登録と各 __init__.py への import 追加が必要です。この import を忘れると create_all() の対象から漏れます。エンドポイントは POST 中心で統一し、レスポンスは status、message、data の形式に揃えます。",
       "short_audio": "audio/short_scene_003.mp3",
-      "long_audio": "audio/long_scene_003.mp3"
+      "long_audio": "audio/long_scene_003.mp3",
+      "short_start_sec": 20.208,
+      "short_duration_sec": 5.88,
+      "long_start_sec": 89.472,
+      "long_duration_sec": 34.08
     },
     {
       "id": "scene_004",
@@ -372,10 +388,14 @@ window.SCENARIO = {
           "text": "全テーブルに 8 フィールド: 登録日時・登録利用者ID・登録利用者名・登録端末ID・更新日時・更新利用者ID・更新利用者名・更新端末ID。"
         }
       ],
-      "short_narration": "ID は C採番で管理、全テーブルに監査 8 フィールド必須です。",
+      "short_narration": "ID は C採番テーブルで管理し、全テーブルに登録・更新の監査 8 フィールドが必須です。",
       "long_narration": "ID の採番は AUTOINCREMENT を使わず、C採番テーブルで一元管理します。新しいテーブルを追加するときは C採番にそのテーブル名のエントリを追加します。また全テーブルに監査フィールドが必須です。登録日時、登録利用者ID、登録利用者名、登録端末ID、更新日時、更新利用者ID、更新利用者名、更新端末IDの 8 フィールドで、登録時は create_audit_fields、更新時は update_audit_fields のヘルパーを使います。",
       "short_audio": "audio/short_scene_004.mp3",
-      "long_audio": "audio/long_scene_004.mp3"
+      "long_audio": "audio/long_scene_004.mp3",
+      "short_start_sec": 26.088,
+      "short_duration_sec": 7.32,
+      "long_start_sec": 123.552,
+      "long_duration_sec": 35.592
     },
     {
       "id": "scene_005",
@@ -455,10 +475,14 @@ window.SCENARIO = {
           "text": "DB VIEW オブジェクトは作らず、V系 Router の生 SQL で JOIN / 集計する。"
         }
       ],
-      "short_narration": "V 系は Router に SQL を直書きして結合一覧を返します。",
+      "short_narration": "V 系エンドポイントは Router に SQL を直接書いて結合一覧を返す専用パターンです。",
       "long_narration": "V 系は複数テーブルを結合して一覧と件数を返す API です。データベースの VIEW オブジェクトは作らず、Router ファイルに生 SQL を直接書きます。Model 層と CRUD 層は持ちません。SELECT と COUNT(*) は同じ FROM、JOIN、WHERE 条件を使い、SQL への値は bind params で渡して直結はしません。ページングと並び替えに対応した実装パターンが既存コードに揃っています。",
       "short_audio": "audio/short_scene_005.mp3",
-      "long_audio": "audio/long_scene_005.mp3"
+      "long_audio": "audio/long_scene_005.mp3",
+      "short_start_sec": 33.408,
+      "short_duration_sec": 7.392,
+      "long_start_sec": 159.144,
+      "long_duration_sec": 27.552
     },
     {
       "id": "scene_006",
@@ -536,10 +560,14 @@ window.SCENARIO = {
           "text": "明細型: `明細SEQ=0` をヘッダー行に予約する。`(親ID, 明細SEQ)` の複合主キーを使う。更新時は対象親IDの既存行を全削除して、ヘッダー + 明細を再作成する。"
         }
       ],
-      "short_narration": "M 系 9、T 系 5 の業務サンプルが参考になります。",
+      "short_narration": "M 系 9 テーブル・T 系 5 テーブルの業務サンプルが実装の参考になります。",
       "long_narration": "業務サンプルとして M 系 9 テーブル、T 系 5 テーブル、S 系 4 エンドポイントが実装済みです。配車管理は M配車区分、M車両、T配車、V配車、S配車で構成され、生産管理は M商品構成と T生産を含む明細型パターンの実例になっています。S 系スケジューラは S配車_日表示、S配車_週表示、S生産_日表示、S生産_週表示の 4 エンドポイントで週次・日次の集計を提供します。明細型は 明細SEQ=0 をヘッダー予約、親IDと明細SEQの複合主キーで管理します。",
       "short_audio": "audio/short_scene_006.mp3",
-      "long_audio": "audio/long_scene_006.mp3"
+      "long_audio": "audio/long_scene_006.mp3",
+      "short_start_sec": 40.8,
+      "short_duration_sec": 5.352,
+      "long_start_sec": 186.696,
+      "long_duration_sec": 44.472
     },
     {
       "id": "scene_999",
@@ -563,11 +591,17 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_999.mp3",
-      "short_narration": "4 層、日本語設計、採番。サンプルを参考に追加してください。",
+      "short_narration": "4 層構造・日本語設計・C採番・監査フィールド。サンプルを参考に業務機能を追加してください。",
       "long_narration": "ご視聴ありがとうございました。2 サーバー構成、4 層アーキテクチャ、日本語ファースト設計、C採番、8 フィールドの監査情報、V 系の生 SQL。豊富な業務サンプルを参考に、あなたの業務テーブルを追加してみてください。",
       "short_audio": "audio/short_scene_999.mp3",
-      "long_audio": "audio/long_scene_999.mp3"
+      "long_audio": "audio/long_scene_999.mp3",
+      "short_start_sec": 46.152,
+      "short_duration_sec": 7.8,
+      "long_start_sec": 231.168,
+      "long_duration_sec": 16.104
     }
   ],
-  "duration_sec": 112.0
-}
+  "duration_sec": 112.0,
+  "short_duration_sec": 53.952,
+  "long_duration_sec": 247.272
+};

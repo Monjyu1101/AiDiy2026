@@ -42,10 +42,14 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_000.mp3",
-      "short_narration": "AiDiy 専用コードエージェント CLI を紹介します。",
+      "short_narration": "aidiy_hermes は AiDiy 専用のコードエージェント CLI です。必要なときだけ起動する on-demand 型です。",
       "long_narration": "この動画では、AiDiy 専用のコードエージェント CLI、aidiy_hermes を紹介します。HTTP サーバーとして常駐しない独自の位置づけ、技術スタック、31 の AI Provider 対応、60 の Slash Command、そして AiDiy システムとの連携まで、見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
-      "long_audio": "audio/long_scene_000.mp3"
+      "long_audio": "audio/long_scene_000.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 8.784,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 18.96
     },
     {
       "id": "scene_001",
@@ -115,10 +119,14 @@ window.SCENARIO = {
           "text": "`_start.py` の常駐起動対象ではない。`_setup.py` / `_cleanup.py` の対象。"
         }
       ],
-      "short_narration": "on-demand で呼ばれる、常駐しない CLI エージェントです。",
+      "short_narration": "HTTP サーバーとして常駐しない on-demand 型の CLI エージェントです。_start.py の起動対象にはなりません。",
       "long_narration": "aidiy_hermes は HTTP サーバーとして常駐しません。_start.py の起動対象でもありません。AiDiy の AI コードパネルが必要なときだけ、backend_server の AIコード_cli.py が subprocess として呼び出す、on-demand なコードエージェント CLI です。単体で cli_main.py を直接起動してコマンドラインから動かすこともできます。",
       "short_audio": "audio/short_scene_001.mp3",
-      "long_audio": "audio/long_scene_001.mp3"
+      "long_audio": "audio/long_scene_001.mp3",
+      "short_start_sec": 8.784,
+      "short_duration_sec": 8.904,
+      "long_start_sec": 18.96,
+      "long_duration_sec": 25.344
     },
     {
       "id": "scene_002",
@@ -196,10 +204,14 @@ window.SCENARIO = {
           "text": "`cli_main.py` — CLI エントリ、provider/model picker、slash command 処理。"
         }
       ],
-      "short_narration": "Python の TUI アプリ、5 層構成で実装されています。",
+      "short_narration": "Python の TUI アプリとして実装された 5 層構成の CLI エージェントです。cli_main.py がエントリポイントで、prompt_toolkit を UI に使います。",
       "long_narration": "aidiy_hermes は Python で実装された TUI アプリケーションです。ユーザーインターフェースには prompt_toolkit を使います。cli_main.py がエントリポイントで、core、base、hermes_cli、tools、skills の 5 層で役割を分担します。AI サービスとの通信は requests、httpx、OpenAI 互換クライアント、Claude API 連携の 4 種類の方法に対応しています。",
       "short_audio": "audio/short_scene_002.mp3",
-      "long_audio": "audio/long_scene_002.mp3"
+      "long_audio": "audio/long_scene_002.mp3",
+      "short_start_sec": 17.688,
+      "short_duration_sec": 12.312,
+      "long_start_sec": 44.304,
+      "long_duration_sec": 27.792
     },
     {
       "id": "scene_003",
@@ -278,10 +290,14 @@ window.SCENARIO = {
           "text": "`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されています。"
         }
       ],
-      "short_narration": "31 の Provider と 50 以上のエイリアスに対応します。",
+      "short_narration": "31 の AI プロバイダーと 50 以上のエイリアスを providers.py の HERMES_OVERLAYS で管理しています。",
       "long_narration": "hermes_cli/providers.py の HERMES_OVERLAYS に 31 の AI Provider が定義されています。OpenRouter、Anthropic、Google、Microsoft、DeepSeek など幅広いサービスをカバーし、ALIASES 辞書に 50 以上のフレンドリ名から canonical ID へのマッピングが定義されています。Provider の解決優先順位は --provider フラグ、config.yaml、HERMES_INFERENCE_PROVIDER 環境変数、auto の順です。",
       "short_audio": "audio/short_scene_003.mp3",
-      "long_audio": "audio/long_scene_003.mp3"
+      "long_audio": "audio/long_scene_003.mp3",
+      "short_start_sec": 30.0,
+      "short_duration_sec": 8.592,
+      "long_start_sec": 72.096,
+      "long_duration_sec": 28.272
     },
     {
       "id": "scene_004",
@@ -359,10 +375,14 @@ window.SCENARIO = {
           "text": "`COMMAND_REGISTRY` は `CommandDef` dataclass のリストです。正規名 + alias で検索します。"
         }
       ],
-      "short_narration": "60 の Slash Command で対話的に操作できます。",
+      "short_narration": "60 の Slash Command を COMMAND_REGISTRY に登録し対話的に操作できます。/model コマンドで provider と model を 2 段階で選べます。",
       "long_narration": "hermes_cli/commands.py の COMMAND_REGISTRY に 60 の slash command が登録されています。セッション管理 23、設定変更 13、ツール操作 11、情報表示 12、終了 1 の 5 カテゴリに分かれています。スラッシュを入力すると TUI の補完が起動してコマンド一覧が表示されます。/model を引数なしで実行すると provider と model を対話的に選べる 2 段階の interactive picker が起動します。",
       "short_audio": "audio/short_scene_004.mp3",
-      "long_audio": "audio/long_scene_004.mp3"
+      "long_audio": "audio/long_scene_004.mp3",
+      "short_start_sec": 38.592,
+      "short_duration_sec": 10.872,
+      "long_start_sec": 100.368,
+      "long_duration_sec": 35.184
     },
     {
       "id": "scene_005",
@@ -440,10 +460,14 @@ window.SCENARIO = {
           "text": "Windows では対応する `*_win.py`、非 Windows では `*_linux.py` のどちらか一方だけを import します。"
         }
       ],
-      "short_narration": "AI コードパネルから subprocess で起動できます。",
+      "short_narration": "AI コードパネルで NAME を aidiy_hermes に設定すると、subprocess で起動して使えます。",
       "long_narration": "AI コードパネルで CODE_AI の NAME を aidiy_hermes に設定すると、backend_server の AIコード_cli.py が Hermes を subprocess で起動します。モデルの設定は CODE_AIDIY_HERMES_MODEL を使い、conf_model.py が動的に一覧を生成します。Windows では _win.py、非 Windows では _linux.py を import するプラットフォームセレクタ構造になっており、OS の差異を吸収しています。",
       "short_audio": "audio/short_scene_005.mp3",
-      "long_audio": "audio/long_scene_005.mp3"
+      "long_audio": "audio/long_scene_005.mp3",
+      "short_start_sec": 49.464,
+      "short_duration_sec": 6.672,
+      "long_start_sec": 135.552,
+      "long_duration_sec": 29.304
     },
     {
       "id": "scene_999",
@@ -467,11 +491,17 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_999.mp3",
-      "short_narration": "31 Provider、60 コマンド。コードをエージェントに任せてください。",
+      "short_narration": "31 プロバイダー・60 コマンド・5 層構成のコードエージェントです。AiDiy の業務開発にぜひ活かしてください。",
       "long_narration": "ご視聴ありがとうございました。aidiy_hermes は on-demand なコードエージェントとして、31 の AI Provider と 60 の Slash Command を持ちます。AiDiy のコードパネルからも、単体の CLI としても動作します。コードを書く作業、調べる作業を AI エージェントに任せてみてください。",
       "short_audio": "audio/short_scene_999.mp3",
-      "long_audio": "audio/long_scene_999.mp3"
+      "long_audio": "audio/long_scene_999.mp3",
+      "short_start_sec": 56.136,
+      "short_duration_sec": 7.944,
+      "long_start_sec": 164.856,
+      "long_duration_sec": 21.792
     }
   ],
-  "duration_sec": 95.52
-}
+  "duration_sec": 95.52,
+  "short_duration_sec": 64.08,
+  "long_duration_sec": 186.648
+};

@@ -39,9 +39,76 @@
 専門テーマ版（`_avatar`、`_hermes` など）も特段の理由がない限り同じプロバイダ・声で揃える。
 
 - 生成は `aidiy_text_to_speech` MCP を使う
+- **出力形式は必ず MP3**（WAV は禁止）。freeai は内部で PCM → WAV → MP3 変換（ffmpeg 優先、lameenc フォールバック）する
+- **フォールバックチェーン**: `freeai` 失敗 → `gemini`（Google TTS）→ `edge`（Microsoft Edge TTS）の順で自動切替
 - 発音辞書は `backend_server/_config/aidiy_text_to_speech.json` が単一の正本
 - `scenario.js` の `narration` を変更したら、必ず同じテキストで音声を再生成して `audio/scene_NNN.mp3` を更新する（表示テキストと音声の乖離防止）
 - 詳細手順は [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) を参照
+
+---
+
+## short / long モード（プレイヤー機能）
+
+`index.html` のプレイヤーは **ショート／ロング 2 段階の再生モード**に対応している。
+
+### scenario.js への追加フィールド
+
+各シーンに 4 フィールドを追加する:
+
+| フィールド | 説明 |
+|-----------|------|
+| `short_narration` | ショートモード用ナレーションテキスト（1〜3 文程度） |
+| `long_narration` | ロングモード用ナレーションテキスト（詳しい説明） |
+| `short_audio` | ショート音声ファイルパス（例: `"audio/short_scene_001.mp3"`） |
+| `long_audio` | ロング音声ファイルパス（例: `"audio/long_scene_001.mp3"`） |
+| `short_duration_sec` | ショート音声の実尺（秒） |
+| `short_start_sec` | ショートモードでの累積開始時刻（秒） |
+| `long_duration_sec` | ロング音声の実尺（秒） |
+| `long_start_sec` | ロングモードでの累積開始時刻（秒） |
+
+シナリオルートにも合計値を追加する:
+
+```javascript
+window.SCENARIO = {
+  // ...
+  "short_duration_sec": 19.516,   // ショートモード合計尺
+  "long_duration_sec": 261.817,   // ロングモード合計尺
+  "duration_sec": 122.736,        // 通常モード合計尺
+  "scenes": [ ... ]
+};
+```
+
+### 音声ファイル命名規則
+
+```
+audio/
+  short_scene_000.mp3   ← ショートモード用
+  long_scene_000.mp3    ← ロングモード用
+  scene_000.mp3         ← 通常モード用（既存）
+```
+
+### プレイヤー（index.html）の動作
+
+- コントロールバー: `◁ 前頁` | `[ショート/ロング]ボタン` | `▶ 再生` | `次頁 ▷` | `最初から`
+- モードボタンクリックで `audioMode`（`"short"` / `"long"`）をトグル
+- グローバルタイムライン（プログレスバー）はモードに合わせた合計尺を使う
+- `short_start_sec` / `long_start_sec` がシーンの全体タイムライン上の位置を決める
+- モード切替時はプレイヤーが現在シーンを再レンダリングして切替後の音声・尺に合わせる
+
+### 音声生成後の尺更新手順
+
+TTS で音声を生成したら Python で duration を再計算し `scenario.js` を更新する:
+
+```python
+# 各シーンの実測 duration を埋め込み、short/long の累積 start_sec を計算
+short_cumulative = 0.0
+for scene in scenarios["scenes"]:
+    dur = get_mp3_duration(f"audio/short_{scene['id']}.mp3")
+    scene["short_start_sec"] = short_cumulative
+    scene["short_duration_sec"] = dur
+    short_cumulative += dur
+scenario["short_duration_sec"] = short_cumulative
+```
 
 ---
 

@@ -606,6 +606,55 @@ class FfmpegControl:
             "timeout_sec": effective_timeout,
         }
 
+    # ------------------------------------------------------------------ #
+    # メディア再生時間取得（ffprobe）
+    # ------------------------------------------------------------------ #
+
+    async def get_media_duration(
+        self,
+        input_path: str,
+        *,
+        timeout_sec: Optional[float] = None,
+    ) -> dict[str, Any]:
+        """
+        ffprobe でメディアファイルの再生時間を取得する。
+
+        Args:
+            input_path: 対象ファイルの絶対パス（MP3 / MP4 / WAV など）。
+            timeout_sec: ffprobe のタイムアウト秒。
+
+        Returns:
+            {"input_path": str, "duration_sec": float, "size_bytes": int}
+        """
+        input_p = Path(input_path)
+        if not input_p.is_file():
+            raise FfmpegControlError(f"入力ファイルが見つかりません: {input_path}")
+
+        args_str = (
+            f"-v error -show_entries format=duration "
+            f"-of default=noprint_wrappers=1:nokey=1 {input_p}"
+        )
+        result = await self.run_ffprobe(args_str, timeout_sec)
+
+        if result["returncode"] != 0:
+            raise FfmpegControlError(
+                f"ffprobe 失敗 (rc={result['returncode']}): {result['stderr'][:300]}"
+            )
+
+        raw = result["stdout"].strip()
+        try:
+            duration_sec = float(raw)
+        except ValueError:
+            raise FfmpegControlError(
+                f"ffprobe の出力を数値に変換できませんでした: {repr(raw)}"
+            )
+
+        return {
+            "input_path": str(input_p),
+            "duration_sec": round(duration_sec, 3),
+            "size_bytes": input_p.stat().st_size,
+        }
+
     def _probe_versions(self) -> dict[str, Any]:
         """各実行ファイルに -version を投げて使用可能か確認し、結果をログに残す。"""
         results: dict[str, Any] = {}
