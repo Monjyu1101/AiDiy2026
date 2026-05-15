@@ -24,6 +24,8 @@ body {
     linear-gradient(135deg, #040814 0%, #091525 38%, #070d19 100%);
   color: var(--text-main);
   font-family: "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+  display: flex;
+  flex-direction: column;
 }
 
 body::before {
@@ -43,7 +45,8 @@ body::before {
   grid-template-columns: minmax(260px, 30%) minmax(0, 70%);
   gap: 18px;
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   padding: 18px;
 }
 
@@ -788,5 +791,79 @@ body::before {
 
   .stage-hero .image-subtitle {
     font-size: 16px;
+  }
+}
+
+/* ── Footer ── */
+.scene-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 18px;
+  background: rgba(4, 10, 22, 0.92);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.footer-select {
+  flex-shrink: 0;
+  appearance: none;
+  height: 32px;
+  padding: 0 28px 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238fa8bc' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.footer-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.footer-narration {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footer-audio {
+  flex-shrink: 0;
+  height: 32px;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .scene-footer {
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .footer-narration {
+    white-space: normal;
+    order: 3;
+    width: 100%;
+  }
+
+  .footer-audio {
+    width: 100%;
+    order: 4;
   }
 }

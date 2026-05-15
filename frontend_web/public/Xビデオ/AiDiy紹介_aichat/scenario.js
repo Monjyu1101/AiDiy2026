@@ -41,7 +41,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_000.mp3"
+      "audio": "audio/scene_000.mp3",
+      "short_narration": "AI の 4 モードを紹介します。",
+      "long_narration": "この動画では、AiDiy の AI コア機能を紹介します。チャット、ライブ、コード支援、音声処理の 4 つのモード、WebSocket 通信プロトコル、複数の AI Provider への対応、会話履歴の永続化、そして Claude Agent SDK と MCP の連携まで、実装に沿って順番に見ていきます。",
+      "short_audio": "audio/short_scene_000.mp3",
+      "long_audio": "audio/long_scene_000.mp3"
     },
     {
       "id": "scene_001",
@@ -58,11 +62,25 @@ window.SCENARIO = {
       "narration": "AI の入口は WebSocket サーバーです。モードごとのモジュールが AI Provider と通信して結果を返します。",
       "image": "images/scene_001.png",
       "audio": "audio/scene_001.mp3",
-      "chips": ["core_router/AIコア.py", "AIセッション管理", "AIストリーミング処理", "AIコア/配下モジュール"],
+      "chips": [
+        "core_router/AIコア.py",
+        "AIセッション管理",
+        "AIストリーミング処理",
+        "AIコア/配下モジュール"
+      ],
       "metrics": [
-        { "label": "WebSocket エンドポイント", "value": "/core/ws/AIコア" },
-        { "label": "モジュール数", "value": "14+" },
-        { "label": "担当サーバー", "value": "core_main:8091" }
+        {
+          "label": "WebSocket エンドポイント",
+          "value": "/core/ws/AIコア"
+        },
+        {
+          "label": "モジュール数",
+          "value": "14+"
+        },
+        {
+          "label": "担当サーバー",
+          "value": "core_main:8091"
+        }
       ],
       "cards": [
         {
@@ -96,9 +114,19 @@ window.SCENARIO = {
         "`AIセッション管理.py` がセッションとモデル設定を管理する。"
       ],
       "evidence": [
-        { "source": "backend_server/AGENTS.md", "text": "AIコアは、テキスト、音声、画像、ファイル、コード支援を統合する WebSocket 中心の機能です。主な領域: AIセッション管理、AIストリーミング処理、AI音声処理、AIチャット*、AIコード*、AIコード_cli.py、AIコード_claude.py。" },
-        { "source": "backend_server/AGENTS.md", "text": "AIコア変更は `core_router/AIコア.py` と `AIコア/` を起点に見る。" }
-      ]
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "AIコアは、テキスト、音声、画像、ファイル、コード支援を統合する WebSocket 中心の機能です。主な領域: AIセッション管理、AIストリーミング処理、AI音声処理、AIチャット*、AIコード*、AIコード_cli.py、AIコード_claude.py。"
+        },
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "AIコア変更は `core_router/AIコア.py` と `AIコア/` を起点に見る。"
+        }
+      ],
+      "short_narration": "WebSocket が AI の通信口です。",
+      "long_narration": "AI の通信口は WebSocket です。core_router/AIコア.py が /core/ws/AIコア エンドポイントを提供し、AIコア/ ディレクトリに配置された 14 以上のモジュールが Provider ごとの処理を担当します。AIセッション管理.py がセッションとモデル設定を保持し、AIストリーミング処理.py がリアルタイムの出力転送を担います。担当サーバーは core_main の 8091 番ポートです。",
+      "short_audio": "audio/short_scene_001.mp3",
+      "long_audio": "audio/long_scene_001.mp3"
     },
     {
       "id": "scene_002",
@@ -115,11 +143,25 @@ window.SCENARIO = {
       "narration": "AI の名前にはルールがあります。チャットは _chat、ライブは _live で終わる名前にします。コード支援は 6 スロットに割り当てられます。",
       "image": "images/scene_002.png",
       "audio": "audio/scene_002.mp3",
-      "chips": ["CHAT_AI_NAME", "LIVE_AI_NAME", "CODE_AI1〜6_NAME", "AiDiy_key.json"],
+      "chips": [
+        "CHAT_AI_NAME",
+        "LIVE_AI_NAME",
+        "CODE_AI1〜6_NAME",
+        "AiDiy_key.json"
+      ],
       "metrics": [
-        { "label": "チャット", "value": "1スロット" },
-        { "label": "ライブ", "value": "1スロット" },
-        { "label": "コード支援", "value": "6スロット (code1〜6)" }
+        {
+          "label": "チャット",
+          "value": "1スロット"
+        },
+        {
+          "label": "ライブ",
+          "value": "1スロット"
+        },
+        {
+          "label": "コード支援",
+          "value": "6スロット (code1〜6)"
+        }
       ],
       "cards": [
         {
@@ -154,9 +196,19 @@ window.SCENARIO = {
         "設定は `backend_server/_config/AiDiy_key.json` で一元管理する。"
       ],
       "evidence": [
-        { "source": "backend_server/AGENTS.md", "text": "AI 名の規約: `CHAT_AI_NAME` — `_chat` で終わる。`LIVE_AI_NAME` — `_live` で終わる。`CODE_AI1_NAME`〜`CODE_AI6_NAME` — 原則 `_sdk` または `_cli`、例外として `aidiy_hermes`。比較は完全一致を前提にし、前方一致へ寄せない。" },
-        { "source": "backend_server/AGENTS.md", "text": "設定管理: `conf_json`: `AiDiy_key.json` の読み書き、不足キー補完、即時保存。`conf_models`: AI モデル一覧管理、provider API からの取得とキャッシュ。" }
-      ]
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "AI 名の規約: `CHAT_AI_NAME` — `_chat` で終わる。`LIVE_AI_NAME` — `_live` で終わる。`CODE_AI1_NAME`〜`CODE_AI6_NAME` — 原則 `_sdk` または `_cli`、例外として `aidiy_hermes`。比較は完全一致を前提にし、前方一致へ寄せない。"
+        },
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "設定管理: `conf_json`: `AiDiy_key.json` の読み書き、不足キー補完、即時保存。`conf_models`: AI モデル一覧管理、provider API からの取得とキャッシュ。"
+        }
+      ],
+      "short_narration": "チャット、ライブ、コード、音声の 4 モードがあります。",
+      "long_narration": "AI の名前には命名規則があります。チャットモードに使う AI 名は _chat で終わる名前、ライブモードは _live で終わる名前、コード支援は _sdk または _cli で終わる名前を使います。例外として aidiy_hermes も有効です。コード支援は code1 から code6 の 6 スロットに異なる CLI を割り当てられます。設定はすべて backend_server/_config/AiDiy_key.json で一元管理し、AI 名の比較は前方一致ではなく完全一致を前提にします。",
+      "short_audio": "audio/short_scene_002.mp3",
+      "long_audio": "audio/long_scene_002.mp3"
     },
     {
       "id": "scene_003",
@@ -173,11 +225,25 @@ window.SCENARIO = {
       "narration": "AI と通信するとき WebSocket を使います。接続後に connect を送ると、サーバーから init が返ってセッション ID が決まります。",
       "image": "images/scene_003.png",
       "audio": "audio/scene_003.mp3",
-      "chips": ["connect→init", "input_text/file/audio", "output→チャンネル分配", "output_end"],
+      "chips": [
+        "connect→init",
+        "input_text/file/audio",
+        "output→チャンネル分配",
+        "output_end"
+      ],
       "metrics": [
-        { "label": "コードチャンネル", "value": "code1〜code6" },
-        { "label": "音声チャンネル", "value": "audio 専用" },
-        { "label": "接続確立", "value": "init 受信後" }
+        {
+          "label": "コードチャンネル",
+          "value": "code1〜code6"
+        },
+        {
+          "label": "音声チャンネル",
+          "value": "audio 専用"
+        },
+        {
+          "label": "接続確立",
+          "value": "init 受信後"
+        }
       ],
       "cards": [
         {
@@ -211,9 +277,19 @@ window.SCENARIO = {
         "出力は `chat` / `code1〜code6` / `audio` チャンネルに分配される。"
       ],
       "evidence": [
-        { "source": "backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md", "text": "接続時は WebSocket open 後に `{ type: \"connect\", セッションID, ソケット番号 }` を送信し、サーバーから `{ メッセージ識別: \"init\", セッションID: \"<確定ID>\" }` を受けて sessionId が確定する。" },
-        { "source": "backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md", "text": "トークン延長対象外: `input_audio`（高頻度送信のため）、`operations`、`cancel_run`、`cancel_audio`。" }
-      ]
+        {
+          "source": "backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md",
+          "text": "接続時は WebSocket open 後に `{ type: \"connect\", セッションID, ソケット番号 }` を送信し、サーバーから `{ メッセージ識別: \"init\", セッションID: \"<確定ID>\" }` を受けて sessionId が確定する。"
+        },
+        {
+          "source": "backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md",
+          "text": "トークン延長対象外: `input_audio`（高頻度送信のため）、`operations`、`cancel_run`、`cancel_audio`。"
+        }
+      ],
+      "short_narration": "connect 送信で init を受け取り、セッションが確立します。",
+      "long_narration": "AI との通信は WebSocket を使います。接続後にまず、type が connect、セッションID、ソケット番号を含むオブジェクトを送信し、サーバーから メッセージ識別が init のオブジェクトが返ってきてセッション ID が確定します。送信できるメッセージは input_text、input_file、input_image、input_audio の 4 種類です。受信側は output と output_end でテキスト、output_audio で音声 PCM を返します。出力はチャット、code1 から code6、audio のチャンネルに分配されます。なお input_audio は高頻度送信のためトークン延長の対象外です。",
+      "short_audio": "audio/short_scene_003.mp3",
+      "long_audio": "audio/long_scene_003.mp3"
     },
     {
       "id": "scene_004",
@@ -230,11 +306,25 @@ window.SCENARIO = {
       "narration": "会話の内容はデータベースに保存します。セッション ID で管理するので、ページを再読み込みしても続きから話せます。",
       "image": "images/scene_004.png",
       "audio": "audio/scene_004.mp3",
-      "chips": ["A会話履歴テーブル", "セッションID", "SQLite 永続化", "セッション復元"],
+      "chips": [
+        "A会話履歴テーブル",
+        "セッションID",
+        "SQLite 永続化",
+        "セッション復元"
+      ],
       "metrics": [
-        { "label": "担当サーバー", "value": "core_main:8091" },
-        { "label": "テーブル接頭辞", "value": "A (AI系)" },
-        { "label": "ストレージ", "value": "SQLite 共有DB" }
+        {
+          "label": "担当サーバー",
+          "value": "core_main:8091"
+        },
+        {
+          "label": "テーブル接頭辞",
+          "value": "A (AI系)"
+        },
+        {
+          "label": "ストレージ",
+          "value": "SQLite 共有DB"
+        }
       ],
       "cards": [
         {
@@ -269,9 +359,19 @@ window.SCENARIO = {
         "ストレージは frontend_web が localStorage、avatar Web モードが sessionStorage。"
       ],
       "evidence": [
-        { "source": "backend_server/AGENTS.md", "text": "Core: `A会話履歴`。AI コアは、テキスト、音声、画像、ファイル、コード支援を統合する WebSocket 中心の機能です。" },
-        { "source": "backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md", "text": "Electron は `localStorage`、Web は `sessionStorage` に `token` / `user` / `avatar_session_id` を保持する。Web モードは URL の `?セッションID=` も参照し、リロード復帰しやすくする。" }
-      ]
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "Core: `A会話履歴`。AI コアは、テキスト、音声、画像、ファイル、コード支援を統合する WebSocket 中心の機能です。"
+        },
+        {
+          "source": "backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md",
+          "text": "Electron は `localStorage`、Web は `sessionStorage` に `token` / `user` / `avatar_session_id` を保持する。Web モードは URL の `?セッションID=` も参照し、リロード復帰しやすくする。"
+        }
+      ],
+      "short_narration": "会話はセッション ID でデータベースに保存されます。",
+      "long_narration": "会話の内容はデータベースに保存されます。A会話履歴テーブルが SQLite にセッション ID をキーにして会話を永続化します。A の接頭辞は AI 系を意味し、core_main が担当します。ページをリロードしたり再接続したりするときに既存のセッション ID を渡せば、サーバーが A会話履歴から過去の文脈を復元して続きから話せます。セッション ID のストレージは frontend_web が localStorage、frontend_avatar の Web モードが sessionStorage、Electron モードが localStorage です。",
+      "short_audio": "audio/short_scene_004.mp3",
+      "long_audio": "audio/long_scene_004.mp3"
     },
     {
       "id": "scene_005",
@@ -288,11 +388,25 @@ window.SCENARIO = {
       "narration": "AIコード_claude.py は Claude Agent SDK を使います。13 個の MCP ツールを AI に渡すことで、ブラウザ操作や DB 確認も AI が自動実行します。",
       "image": "images/scene_005.png",
       "audio": "audio/scene_005.mp3",
-      "chips": ["Claude Agent SDK", "AiDiy_mcp.json", "MCP 13サーバー", "CODE_AI*_NAME=*_sdk"],
+      "chips": [
+        "Claude Agent SDK",
+        "AiDiy_mcp.json",
+        "MCP 13サーバー",
+        "CODE_AI*_NAME=*_sdk"
+      ],
       "metrics": [
-        { "label": "SDKファイル", "value": "AIコード_claude.py" },
-        { "label": "MCP 接続定義", "value": "AiDiy_mcp.json" },
-        { "label": "MCP サーバー数", "value": "13" }
+        {
+          "label": "SDKファイル",
+          "value": "AIコード_claude.py"
+        },
+        {
+          "label": "MCP 接続定義",
+          "value": "AiDiy_mcp.json"
+        },
+        {
+          "label": "MCP サーバー数",
+          "value": "13"
+        }
       ],
       "cards": [
         {
@@ -326,9 +440,19 @@ window.SCENARIO = {
         "`CODE_AI*_NAME = \"*_sdk\"` で `AIコード_claude.py` が起動する。"
       ],
       "evidence": [
-        { "source": "backend_server/AGENTS.md", "text": "MCP サーバー本体は `backend_mcp` にあります。`backend_server` では `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。" },
-        { "source": "backend_server,backend_mcp,MCP活用手順.md", "text": "MCP 接続定義は `backend_server/_config/AiDiy_mcp.json` に集約する。`AIコード_claude.py` 側で `conf.models.mcp_servers` を Claude Agent SDK に渡す。" }
-      ]
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "MCP サーバー本体は `backend_mcp` にあります。`backend_server` では `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。"
+        },
+        {
+          "source": "backend_server,backend_mcp,MCP活用手順.md",
+          "text": "MCP 接続定義は `backend_server/_config/AiDiy_mcp.json` に集約する。`AIコード_claude.py` 側で `conf.models.mcp_servers` を Claude Agent SDK に渡す。"
+        }
+      ],
+      "short_narration": "Claude SDK で 13 の MCP ツールを AI が使えます。",
+      "long_narration": "AIコード_claude.py は Claude Agent SDK を使ってコード支援を行います。_config/AiDiy_mcp.json で定義した 13 個の MCP サーバーをエージェントに渡すことで、Claude がブラウザ操作、データベース確認、コードチェック、画像生成、音声合成を自動で使い分けます。CODE_AI の NAME を _sdk で終わる名前に設定したとき、この AIコード_claude.py が起動します。一方 _cli で終わる名前の場合は subprocess 経由で Code CLI を起動する AIコード_cli.py が担当します。",
+      "short_audio": "audio/short_scene_005.mp3",
+      "long_audio": "audio/long_scene_005.mp3"
     },
     {
       "id": "scene_006",
@@ -345,11 +469,25 @@ window.SCENARIO = {
       "narration": "チャットは Claude、Gemini、OpenRouter など複数の AI サービスに対応しています。設定ファイルで切り替えられます。",
       "image": "images/scene_006.png",
       "audio": "audio/scene_006.mp3",
-      "chips": ["Claude / Gemini / OpenRouter", "Gemini Live / OpenAI Realtime", "Code CLI 各種", "Ollama (ローカル)"],
+      "chips": [
+        "Claude / Gemini / OpenRouter",
+        "Gemini Live / OpenAI Realtime",
+        "Code CLI 各種",
+        "Ollama (ローカル)"
+      ],
       "metrics": [
-        { "label": "チャット Provider", "value": "5種+" },
-        { "label": "ライブ Provider", "value": "2種" },
-        { "label": "コード CLI", "value": "7種+" }
+        {
+          "label": "チャット Provider",
+          "value": "5種+"
+        },
+        {
+          "label": "ライブ Provider",
+          "value": "2種"
+        },
+        {
+          "label": "コード CLI",
+          "value": "7種+"
+        }
       ],
       "cards": [
         {
@@ -384,9 +522,19 @@ window.SCENARIO = {
         "Ollama でローカル LLM をチャットに使える。"
       ],
       "evidence": [
-        { "source": "backend_server/AGENTS.md", "text": "AI SDKs: Anthropic / OpenAI / Google Gemini / Claude Agent SDK など。" },
-        { "source": "backend_server/AGENTS.md", "text": "Code AI は `code1`〜`code6` / `CODE_AI1_NAME`〜`CODE_AI6_NAME` を前提にします。" }
-      ]
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "AI SDKs: Anthropic / OpenAI / Google Gemini / Claude Agent SDK など。"
+        },
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "Code AI は `code1`〜`code6` / `CODE_AI1_NAME`〜`CODE_AI6_NAME` を前提にします。"
+        }
+      ],
+      "short_narration": "Claude、Gemini など複数の AI サービスに対応しています。",
+      "long_narration": "AI Provider は用途によって異なります。チャットモードは Claude、Gemini、FreeAI、OpenRouter、Ollama の 5 種類以上に対応しています。Ollama を使えばローカル LLM でチャットできます。ライブモードは Gemini Live と OpenAI Realtime の 2 Provider でリアルタイム音声通信を行います。コード支援は CODE_AI の NAME の設定で 6 スロットにそれぞれ異なる CLI を割り当てられるため、用途に応じて使い分けられます。",
+      "short_audio": "audio/short_scene_006.mp3",
+      "long_audio": "audio/long_scene_006.mp3"
     },
     {
       "id": "scene_999",
@@ -409,7 +557,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_999.mp3"
+      "audio": "audio/scene_999.mp3",
+      "short_narration": "多様な AI を業務に組み込んでみてください。",
+      "long_narration": "ご視聴ありがとうございました。4 モード、WebSocket セッション、A会話履歴による永続化、Claude Agent SDK と MCP の連携、そして複数の AI Provider への対応。AiDiy の AI コアは、テキスト、音声、画像、ファイル、コード支援を統合した WebSocket 中心の設計になっています。多様な AI をあなたの業務に組み込んでみてください。",
+      "short_audio": "audio/short_scene_999.mp3",
+      "long_audio": "audio/long_scene_999.mp3"
     }
   ],
   "duration_sec": 112.0

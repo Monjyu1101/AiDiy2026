@@ -88,19 +88,6 @@ onBeforeUnmount(() => {
         <div class="menu-row">
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
-              <span class="icon">Xビ</span>
-              Xビデオ
-            </div>
-            <div class="menu-card-description">
-              AiDiy 紹介ビデオ・プレゼンテーション一覧
-            </div>
-            <router-link to="/Xビデオ?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
-
-          <div class="menu-card menu-card-fixed">
-            <div class="menu-card-title">
               <span class="icon">X自</span>
               X自己紹介
             </div>
@@ -108,6 +95,19 @@ onBeforeUnmount(() => {
               システム自己紹介・プロフィール表示
             </div>
             <router-link to="/Xその他/X自己紹介/表示?戻URL=/Xその他" class="menu-card-link">
+              開く →
+            </router-link>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">Xビ</span>
+              Xビデオ
+            </div>
+            <div class="menu-card-description">
+              AiDiy 紹介ビデオ・プレゼンテーション一覧
+            </div>
+            <router-link to="/Xビデオ?戻URL=/Xその他" class="menu-card-link">
               開く →
             </router-link>
           </div>

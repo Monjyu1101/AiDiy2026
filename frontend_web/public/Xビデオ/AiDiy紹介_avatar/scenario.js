@@ -41,7 +41,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_000.mp3"
+      "audio": "audio/scene_000.mp3",
+      "short_narration": "frontend_avatar の仕組みを紹介します。",
+      "long_narration": "この動画では、frontend_avatar の位置づけと仕組みを紹介します。AIコア専用クライアントとしての役割、Electron デスクトップアプリと Web ブラウザの両対応、VRM アバターの描画、7 種類の表示選択、Electron と Web の間の状態同期まで、実装に沿って見ていきます。",
+      "short_audio": "audio/short_scene_000.mp3",
+      "long_audio": "audio/long_scene_000.mp3"
     },
     {
       "id": "scene_001",
@@ -58,11 +62,25 @@ window.SCENARIO = {
       "narration": "frontend_avatar は AIコア専用の Avatar クライアントです。Electron デスクトップアプリと通常 Web ブラウザの両方で動作し、判定は window の desktopApi が在るかどうかで行います。認証 storage は Electron が localStorage、Web が sessionStorage です。",
       "image": "images/scene_001.png",
       "audio": "audio/scene_001.mp3",
-      "chips": ["AIコア専用", "Electron", "Web ブラウザ", "window.desktopApi で判定"],
+      "chips": [
+        "AIコア専用",
+        "Electron",
+        "Web ブラウザ",
+        "window.desktopApi で判定"
+      ],
       "metrics": [
-        { "label": "対応モード", "value": "2" },
-        { "label": "判定", "value": "desktopApi" },
-        { "label": "認証 storage", "value": "local / session" }
+        {
+          "label": "対応モード",
+          "value": "2"
+        },
+        {
+          "label": "判定",
+          "value": "desktopApi"
+        },
+        {
+          "label": "認証 storage",
+          "value": "local / session"
+        }
       ],
       "cards": [
         {
@@ -92,7 +110,11 @@ window.SCENARIO = {
           "source": "frontend_avatar/AGENTS.md",
           "text": "frontend_avatar は AIコア専用の Avatar クライアントです。Electron デスクトップアプリと通常 Web ブラウザの両方で動作します。"
         }
-      ]
+      ],
+      "short_narration": "Electron と Web 両対応の AI 専用クライアントです。",
+      "long_narration": "frontend_avatar は AIコア専用のアバタークライアントです。通常の Web ブラウザでも動きますし、Electron でデスクトップアプリとしても動作します。実行環境の判定は window.desktopApi が存在するかどうかで行います。認証情報のストレージは Electron が localStorage、Web が sessionStorage と、環境ごとに切り替わります。",
+      "short_audio": "audio/short_scene_001.mp3",
+      "long_audio": "audio/long_scene_001.mp3"
     },
     {
       "id": "scene_002",
@@ -120,9 +142,18 @@ window.SCENARIO = {
         "Monaco Editor"
       ],
       "metrics": [
-        { "label": "Renderer", "value": "Vue 3" },
-        { "label": "3D", "value": "Three.js + VRM" },
-        { "label": "通信", "value": "REST + WS" }
+        {
+          "label": "Renderer",
+          "value": "Vue 3"
+        },
+        {
+          "label": "3D",
+          "value": "Three.js + VRM"
+        },
+        {
+          "label": "通信",
+          "value": "REST + WS"
+        }
       ],
       "cards": [
         {
@@ -160,7 +191,11 @@ window.SCENARIO = {
           "source": "frontend_avatar/AGENTS.md",
           "text": "技術スタックは Vue 3 + Vite + TypeScript、Electron、Three.js、@pixiv/three-vrm、@pixiv/three-vrm-animation、WebSocket、BroadcastChannel、Monaco Editor。"
         }
-      ]
+      ],
+      "short_narration": "Vue 3、Three.js、VRM で動くアバターアプリです。",
+      "long_narration": "技術スタックは Vue 3、Vite、TypeScript で renderer を構築し、Three.js と @pixiv/three-vrm シリーズで VRM モデルを描画します。AI との通信は WebSocket、Electron の複数ウィンドウ間の状態同期は BroadcastChannel を使います。Vue Router と Pinia 中心の構成ではなく、AiDiy.vue が状態を持つ設計になっています。TypeScript は strict mode が有効で、frontend_web との差異のひとつになっています。",
+      "short_audio": "audio/short_scene_002.mp3",
+      "long_audio": "audio/long_scene_002.mp3"
     },
     {
       "id": "scene_003",
@@ -177,11 +212,29 @@ window.SCENARIO = {
       "narration": "Electron 版は ログイン、コア、チャット、ファイル、イメージ、コード 1 から 6、セッティング、合計 10 種類の役割別 BrowserWindow を持ちます。すべて transparent: true、frame: false、hasShadow: false の透過フレームレスで、_WindowShell がタイトル代わりの操作領域を提供します。Web 版は同じ役割を単一ページのタブで扱います。",
       "image": "images/scene_003.png",
       "audio": "audio/scene_003.mp3",
-      "chips": ["login", "core", "chat", "file", "image", "code1〜code6", "settings", "透過フレームレス"],
+      "chips": [
+        "login",
+        "core",
+        "chat",
+        "file",
+        "image",
+        "code1〜code6",
+        "settings",
+        "透過フレームレス"
+      ],
       "metrics": [
-        { "label": "WindowRole", "value": "10" },
-        { "label": "frame", "value": "なし" },
-        { "label": "transparent", "value": "true" }
+        {
+          "label": "WindowRole",
+          "value": "10"
+        },
+        {
+          "label": "frame",
+          "value": "なし"
+        },
+        {
+          "label": "transparent",
+          "value": "true"
+        }
       ],
       "cards": [
         {
@@ -219,7 +272,11 @@ window.SCENARIO = {
           "source": ".aidiy/knowledge/frontend_avatar,Electronウィンドウ管理.md",
           "text": "全ウィンドウは transparent: true, frame: false, hasShadow: false の透過フレームレスウィンドウです。"
         }
-      ]
+      ],
+      "short_narration": "役割別 BrowserWindow を透過フレームレスで管理します。",
+      "long_narration": "Electron 版は login、core、chat、file、image、code1 から code6、settings の役割別 BrowserWindow を持ちます。全ウィンドウは transparent:true、frame:false、hasShadow:false の透過フレームレスで作られており、_WindowShell がタイトルバーの代わりとなる操作領域を提供します。パネルの切り替えはウィンドウを破棄せず show と hide で行います。Web モードでは同じ役割をタブで表現します。",
+      "short_audio": "audio/short_scene_003.mp3",
+      "long_audio": "audio/long_scene_003.mp3"
     },
     {
       "id": "scene_004",
@@ -246,9 +303,18 @@ window.SCENARIO = {
         "口パク BlendShape"
       ],
       "metrics": [
-        { "label": "既定モデル", "value": "AiDiy_Sample_M.vrm" },
-        { "label": "VRMA フォルダ", "value": "サンプル / 標準" },
-        { "label": "再生方式", "value": "巡回" }
+        {
+          "label": "既定モデル",
+          "value": "AiDiy_Sample_M.vrm"
+        },
+        {
+          "label": "VRMA フォルダ",
+          "value": "サンプル / 標準"
+        },
+        {
+          "label": "再生方式",
+          "value": "巡回"
+        }
       ],
       "cards": [
         {
@@ -290,7 +356,11 @@ window.SCENARIO = {
           "source": ".aidiy/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md",
           "text": "現行方針は単一クリップの THREE.LoopRepeat ではなく、finished イベントで次の VRMA を選択して再生する巡回方式。"
         }
-      ]
+      ],
+      "short_narration": "VRM モデルと VRMA モーションで表情と動きを制御します。",
+      "long_narration": "VRM モデルのファイルは public/vrm/ フォルダに、VRMA モーションファイルは public/vrma/サンプル と public/vrma/標準 に置きます。モーションの再生は LoopRepeat で無限ループするのではなく、finished イベントで次の VRMA クリップを選び直す巡回再生方式です。クリップの切り替えによる姿勢のガクつきは crossFadeFrom で吸収します。Web モードでは config.ts の配列がファイル一覧を返し、Electron モードでは desktop:list-vrma-files の IPC がリアルファイルを返します。",
+      "short_audio": "audio/short_scene_004.mp3",
+      "long_audio": "audio/long_scene_004.mp3"
     },
     {
       "id": "scene_005",
@@ -307,11 +377,28 @@ window.SCENARIO = {
       "narration": "表示はアバター以外に、 xneko、 xeyes、アナログ時計、デジタル時計、カレンダー、表示無し、合わせて 7 種類から選べます。Electron と Web の間のパネル表示やセッションは、BroadcastChannel の avatar-desktop-sync を使ってつなぎます。",
       "image": "images/scene_005.png",
       "audio": "audio/scene_005.mp3",
-      "chips": ["アバター", "xneko", "xeyes", "アナログ時計", "デジタル時計", "カレンダー", "無し"],
+      "chips": [
+        "アバター",
+        "xneko",
+        "xeyes",
+        "アナログ時計",
+        "デジタル時計",
+        "カレンダー",
+        "無し"
+      ],
       "metrics": [
-        { "label": "表示候補", "value": "7" },
-        { "label": "同期チャンネル", "value": "avatar-desktop-sync" },
-        { "label": "controls-visible", "value": "UI トグル" }
+        {
+          "label": "表示候補",
+          "value": "7"
+        },
+        {
+          "label": "同期チャンネル",
+          "value": "avatar-desktop-sync"
+        },
+        {
+          "label": "controls-visible",
+          "value": "UI トグル"
+        }
       ],
       "cards": [
         {
@@ -353,7 +440,11 @@ window.SCENARIO = {
           "source": "frontend_avatar/AGENTS.md",
           "text": "Electron / Web 間の状態同期は BroadcastChannel avatar-desktop-sync を使います。"
         }
-      ]
+      ],
+      "short_narration": "アバターを含む 7 種の表示を BroadcastChannel で同期します。",
+      "long_narration": "表示モードはアバター、xneko、xeyes、アナログ時計、デジタル時計、カレンダー、表示無しの 7 種類から選べます。xeyes の CPU 使用率は system:get-cpu-usage の IPC から取得します。Electron と Web の間のパネル表示とセッション状態の同期には BroadcastChannel の avatar-desktop-sync チャンネルを使います。",
+      "short_audio": "audio/short_scene_005.mp3",
+      "long_audio": "audio/long_scene_005.mp3"
     },
     {
       "id": "scene_999",
@@ -376,7 +467,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_999.mp3"
+      "audio": "audio/scene_999.mp3",
+      "short_narration": "VRM アバター、両対応、状態同期をひとつに束ねています。",
+      "long_narration": "ご視聴ありがとうございました。frontend_avatar は VRM アバター、7 種類の表示選択、Electron と Web の両対応、BroadcastChannel による状態同期を、AIコア専用クライアントとして束ねています。デスクトップとブラウザの両方でシームレスに動くアバター体験を、あなたの環境でぜひ試してみてください。",
+      "short_audio": "audio/short_scene_999.mp3",
+      "long_audio": "audio/long_scene_999.mp3"
     }
   ],
   "duration_sec": 121.632

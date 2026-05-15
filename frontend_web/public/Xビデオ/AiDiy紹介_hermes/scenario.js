@@ -41,7 +41,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_000.mp3"
+      "audio": "audio/scene_000.mp3",
+      "short_narration": "AiDiy 専用コードエージェント CLI を紹介します。",
+      "long_narration": "この動画では、AiDiy 専用のコードエージェント CLI、aidiy_hermes を紹介します。HTTP サーバーとして常駐しない独自の位置づけ、技術スタック、31 の AI Provider 対応、60 の Slash Command、そして AiDiy システムとの連携まで、見ていきます。",
+      "short_audio": "audio/short_scene_000.mp3",
+      "long_audio": "audio/long_scene_000.mp3"
     },
     {
       "id": "scene_001",
@@ -58,11 +62,25 @@ window.SCENARIO = {
       "narration": "aidiy_hermes は常駐 HTTP サーバーではありません。_start.py の起動対象でもない。AiDiy の AI コードパネルが必要なときだけ subprocess で呼び出す、on-demand なコードエージェント CLI です。",
       "image": "images/scene_001.png",
       "audio": "audio/scene_001.mp3",
-      "chips": ["on-demand", "subprocess 起動", "_start.py 非対象", "_setup.py 対象"],
+      "chips": [
+        "on-demand",
+        "subprocess 起動",
+        "_start.py 非対象",
+        "_setup.py 対象"
+      ],
       "metrics": [
-        { "label": "常駐", "value": "なし" },
-        { "label": "実行名", "value": "aidiy_hermes" },
-        { "label": "起動元", "value": "AIコード_cli.py" }
+        {
+          "label": "常駐",
+          "value": "なし"
+        },
+        {
+          "label": "実行名",
+          "value": "aidiy_hermes"
+        },
+        {
+          "label": "起動元",
+          "value": "AIコード_cli.py"
+        }
       ],
       "cards": [
         {
@@ -88,9 +106,19 @@ window.SCENARIO = {
         "`backend_server/AIコア/AIコード_cli.py` から subprocess で起動される。"
       ],
       "evidence": [
-        { "source": "backend_hermes/AGENTS.md", "text": "`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。常駐 HTTP サーバーではない。" },
-        { "source": "backend_hermes/AGENTS.md", "text": "`_start.py` の常駐起動対象ではない。`_setup.py` / `_cleanup.py` の対象。" }
-      ]
+        {
+          "source": "backend_hermes/AGENTS.md",
+          "text": "`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。常駐 HTTP サーバーではない。"
+        },
+        {
+          "source": "backend_hermes/AGENTS.md",
+          "text": "`_start.py` の常駐起動対象ではない。`_setup.py` / `_cleanup.py` の対象。"
+        }
+      ],
+      "short_narration": "on-demand で呼ばれる、常駐しない CLI エージェントです。",
+      "long_narration": "aidiy_hermes は HTTP サーバーとして常駐しません。_start.py の起動対象でもありません。AiDiy の AI コードパネルが必要なときだけ、backend_server の AIコード_cli.py が subprocess として呼び出す、on-demand なコードエージェント CLI です。単体で cli_main.py を直接起動してコマンドラインから動かすこともできます。",
+      "short_audio": "audio/short_scene_001.mp3",
+      "long_audio": "audio/long_scene_001.mp3"
     },
     {
       "id": "scene_002",
@@ -107,11 +135,25 @@ window.SCENARIO = {
       "narration": "aidiy_hermes は Python で実装されており、TUI には prompt_toolkit を使います。cli_main.py がエントリで、core、base、hermes_cli、tools、skills の5層で役割を分担します。",
       "image": "images/scene_002.png",
       "audio": "audio/scene_002.mp3",
-      "chips": ["Python", "prompt_toolkit", "requests / httpx", "OpenAI 互換 / Claude API"],
+      "chips": [
+        "Python",
+        "prompt_toolkit",
+        "requests / httpx",
+        "OpenAI 互換 / Claude API"
+      ],
       "metrics": [
-        { "label": "エントリ", "value": "cli_main.py" },
-        { "label": "通信", "value": "4 クライアント" },
-        { "label": "実行方式", "value": "CLI / subprocess" }
+        {
+          "label": "エントリ",
+          "value": "cli_main.py"
+        },
+        {
+          "label": "通信",
+          "value": "4 クライアント"
+        },
+        {
+          "label": "実行方式",
+          "value": "CLI / subprocess"
+        }
       ],
       "cards": [
         {
@@ -145,9 +187,19 @@ window.SCENARIO = {
         "ディレクトリ構成は `cli_main.py`, `core/`, `base/`, `hermes_cli/`, `tools/`, `skills/` 。"
       ],
       "evidence": [
-        { "source": "backend_hermes/AGENTS.md", "text": "TUI: `prompt_toolkit`。通信: `requests`、`httpx`、OpenAI 互換 client、Claude API 連携。" },
-        { "source": "backend_hermes/AGENTS.md", "text": "`cli_main.py` — CLI エントリ、provider/model picker、slash command 処理。" }
-      ]
+        {
+          "source": "backend_hermes/AGENTS.md",
+          "text": "TUI: `prompt_toolkit`。通信: `requests`、`httpx`、OpenAI 互換 client、Claude API 連携。"
+        },
+        {
+          "source": "backend_hermes/AGENTS.md",
+          "text": "`cli_main.py` — CLI エントリ、provider/model picker、slash command 処理。"
+        }
+      ],
+      "short_narration": "Python の TUI アプリ、5 層構成で実装されています。",
+      "long_narration": "aidiy_hermes は Python で実装された TUI アプリケーションです。ユーザーインターフェースには prompt_toolkit を使います。cli_main.py がエントリポイントで、core、base、hermes_cli、tools、skills の 5 層で役割を分担します。AI サービスとの通信は requests、httpx、OpenAI 互換クライアント、Claude API 連携の 4 種類の方法に対応しています。",
+      "short_audio": "audio/short_scene_002.mp3",
+      "long_audio": "audio/long_scene_002.mp3"
     },
     {
       "id": "scene_003",
@@ -164,11 +216,25 @@ window.SCENARIO = {
       "narration": "hermes_cli/providers.py の HERMES_OVERLAYS に 31 の provider が定義されており、50 以上のエイリアスでフレンドリ名から canonical ID へマッピングします。優先順位は --provider フラグ、config.yaml、環境変数、auto の順です。",
       "image": "images/scene_003.png",
       "audio": "audio/scene_003.mp3",
-      "chips": ["31 provider overlay", "50+ aliases", "auto 検出", "--provider フラグ"],
+      "chips": [
+        "31 provider overlay",
+        "50+ aliases",
+        "auto 検出",
+        "--provider フラグ"
+      ],
       "metrics": [
-        { "label": "provider overlay", "value": "31" },
-        { "label": "alias", "value": "50+" },
-        { "label": "選択優先順位", "value": "4段階" }
+        {
+          "label": "provider overlay",
+          "value": "31"
+        },
+        {
+          "label": "alias",
+          "value": "50+"
+        },
+        {
+          "label": "選択優先順位",
+          "value": "4段階"
+        }
       ],
       "cards": [
         {
@@ -203,9 +269,19 @@ window.SCENARIO = {
         "Provider 解決優先順位: `--provider` > config.yaml > `HERMES_INFERENCE_PROVIDER` > `auto`。"
       ],
       "evidence": [
-        { "source": "backend_hermes/AGENTS.md", "text": "31 の provider overlay と 50 以上のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。" },
-        { "source": ".aidiy/knowledge/backend_hermes,Provider一覧と選択ロジック.md", "text": "`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されています。" }
-      ]
+        {
+          "source": "backend_hermes/AGENTS.md",
+          "text": "31 の provider overlay と 50 以上のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。"
+        },
+        {
+          "source": ".aidiy/knowledge/backend_hermes,Provider一覧と選択ロジック.md",
+          "text": "`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されています。"
+        }
+      ],
+      "short_narration": "31 の Provider と 50 以上のエイリアスに対応します。",
+      "long_narration": "hermes_cli/providers.py の HERMES_OVERLAYS に 31 の AI Provider が定義されています。OpenRouter、Anthropic、Google、Microsoft、DeepSeek など幅広いサービスをカバーし、ALIASES 辞書に 50 以上のフレンドリ名から canonical ID へのマッピングが定義されています。Provider の解決優先順位は --provider フラグ、config.yaml、HERMES_INFERENCE_PROVIDER 環境変数、auto の順です。",
+      "short_audio": "audio/short_scene_003.mp3",
+      "long_audio": "audio/long_scene_003.mp3"
     },
     {
       "id": "scene_004",
@@ -222,11 +298,25 @@ window.SCENARIO = {
       "narration": "hermes_cli/commands.py の COMMAND_REGISTRY に 60 の slash command が登録されています。Session、Configuration、Tools and Skills、Info、Exit の5カテゴリに分かれ、/model で provider と model を interactive に切り替えられます。",
       "image": "images/scene_004.png",
       "audio": "audio/scene_004.mp3",
-      "chips": ["Session 23", "Configuration 13", "Tools & Skills 11", "Info 12"],
+      "chips": [
+        "Session 23",
+        "Configuration 13",
+        "Tools & Skills 11",
+        "Info 12"
+      ],
       "metrics": [
-        { "label": "Slash Command", "value": "60" },
-        { "label": "カテゴリ", "value": "5" },
-        { "label": "/model picker", "value": "2段階" }
+        {
+          "label": "Slash Command",
+          "value": "60"
+        },
+        {
+          "label": "カテゴリ",
+          "value": "5"
+        },
+        {
+          "label": "/model picker",
+          "value": "2段階"
+        }
       ],
       "cards": [
         {
@@ -260,9 +350,19 @@ window.SCENARIO = {
         "`/` 入力で TUI 補完が起動し、コマンド一覧が表示される。"
       ],
       "evidence": [
-        { "source": ".aidiy/knowledge/backend_hermes,Slash Command一覧.md", "text": "Session 23 コマンド、Configuration 13 コマンド、Tools & Skills 11 コマンド、Info 12 コマンド、Exit 1 コマンド。" },
-        { "source": ".aidiy/knowledge/backend_hermes,Slash Command一覧.md", "text": "`COMMAND_REGISTRY` は `CommandDef` dataclass のリストです。正規名 + alias で検索します。" }
-      ]
+        {
+          "source": ".aidiy/knowledge/backend_hermes,Slash Command一覧.md",
+          "text": "Session 23 コマンド、Configuration 13 コマンド、Tools & Skills 11 コマンド、Info 12 コマンド、Exit 1 コマンド。"
+        },
+        {
+          "source": ".aidiy/knowledge/backend_hermes,Slash Command一覧.md",
+          "text": "`COMMAND_REGISTRY` は `CommandDef` dataclass のリストです。正規名 + alias で検索します。"
+        }
+      ],
+      "short_narration": "60 の Slash Command で対話的に操作できます。",
+      "long_narration": "hermes_cli/commands.py の COMMAND_REGISTRY に 60 の slash command が登録されています。セッション管理 23、設定変更 13、ツール操作 11、情報表示 12、終了 1 の 5 カテゴリに分かれています。スラッシュを入力すると TUI の補完が起動してコマンド一覧が表示されます。/model を引数なしで実行すると provider と model を対話的に選べる 2 段階の interactive picker が起動します。",
+      "short_audio": "audio/short_scene_004.mp3",
+      "long_audio": "audio/long_scene_004.mp3"
     },
     {
       "id": "scene_005",
@@ -279,11 +379,25 @@ window.SCENARIO = {
       "narration": "AI コードパネルで CODE_AI アスタリスク NAME を aidiy_hermes に設定すると、backend_server の AIコード_cli.py が Hermes を subprocess で起動します。モデル一覧は conf_model.py が動的生成し、モデル設定は CODE_AIDIY_HERMES_MODEL を使います。",
       "image": "images/scene_005.png",
       "audio": "audio/scene_005.mp3",
-      "chips": ["CODE_AI*_NAME", "subprocess 起動", "conf_model.py 動的生成", "CODE_AIDIY_HERMES_MODEL"],
+      "chips": [
+        "CODE_AI*_NAME",
+        "subprocess 起動",
+        "conf_model.py 動的生成",
+        "CODE_AIDIY_HERMES_MODEL"
+      ],
       "metrics": [
-        { "label": "起動元", "value": "AIコード_cli.py" },
-        { "label": "設定キー", "value": "CODE_AI*_NAME" },
-        { "label": "モデル設定", "value": "conf_model.py" }
+        {
+          "label": "起動元",
+          "value": "AIコード_cli.py"
+        },
+        {
+          "label": "設定キー",
+          "value": "CODE_AI*_NAME"
+        },
+        {
+          "label": "モデル設定",
+          "value": "conf_model.py"
+        }
       ],
       "cards": [
         {
@@ -317,9 +431,19 @@ window.SCENARIO = {
         "Windows では `*_win.py`、非 Windows では `*_linux.py` を import するプラットフォームセレクタ構造。"
       ],
       "evidence": [
-        { "source": "backend_hermes/AGENTS.md", "text": "`aidiy_hermes` は `backend_server/AIコア/AIコード_cli.py` から subprocess で起動されます。モデル設定は `CODE_AIDIY_HERMES_MODEL` を使います。" },
-        { "source": "backend_hermes/AGENTS.md", "text": "Windows では対応する `*_win.py`、非 Windows では `*_linux.py` のどちらか一方だけを import します。" }
-      ]
+        {
+          "source": "backend_hermes/AGENTS.md",
+          "text": "`aidiy_hermes` は `backend_server/AIコア/AIコード_cli.py` から subprocess で起動されます。モデル設定は `CODE_AIDIY_HERMES_MODEL` を使います。"
+        },
+        {
+          "source": "backend_hermes/AGENTS.md",
+          "text": "Windows では対応する `*_win.py`、非 Windows では `*_linux.py` のどちらか一方だけを import します。"
+        }
+      ],
+      "short_narration": "AI コードパネルから subprocess で起動できます。",
+      "long_narration": "AI コードパネルで CODE_AI の NAME を aidiy_hermes に設定すると、backend_server の AIコード_cli.py が Hermes を subprocess で起動します。モデルの設定は CODE_AIDIY_HERMES_MODEL を使い、conf_model.py が動的に一覧を生成します。Windows では _win.py、非 Windows では _linux.py を import するプラットフォームセレクタ構造になっており、OS の差異を吸収しています。",
+      "short_audio": "audio/short_scene_005.mp3",
+      "long_audio": "audio/long_scene_005.mp3"
     },
     {
       "id": "scene_999",
@@ -342,7 +466,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_999.mp3"
+      "audio": "audio/scene_999.mp3",
+      "short_narration": "31 Provider、60 コマンド。コードをエージェントに任せてください。",
+      "long_narration": "ご視聴ありがとうございました。aidiy_hermes は on-demand なコードエージェントとして、31 の AI Provider と 60 の Slash Command を持ちます。AiDiy のコードパネルからも、単体の CLI としても動作します。コードを書く作業、調べる作業を AI エージェントに任せてみてください。",
+      "short_audio": "audio/short_scene_999.mp3",
+      "long_audio": "audio/long_scene_999.mp3"
     }
   ],
   "duration_sec": 95.52

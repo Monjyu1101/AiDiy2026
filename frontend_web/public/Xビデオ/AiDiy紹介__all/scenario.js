@@ -45,7 +45,11 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "audio": "audio/scene_000.mp3",
-      "image_prompt": "Square 1:1 hero poster for AiDiy. Make the word AiDiy itself the coolest central visual, with premium futuristic typography, strong cyan and electric blue glow, elegant Japanese enterprise AI platform mood, dark background, clean composition, high readability, polished technology branding aesthetic, no clutter, no extra fake logos, no dense paragraphs. Keep the stylish upper feeling from the reference image but simplify it into a bold square cover image."
+      "image_prompt": "Square 1:1 hero poster for AiDiy. Make the word AiDiy itself the coolest central visual, with premium futuristic typography, strong cyan and electric blue glow, elegant Japanese enterprise AI platform mood, dark background, clean composition, high readability, polished technology branding aesthetic, no clutter, no extra fake logos, no dense paragraphs. Keep the stylish upper feeling from the reference image but simplify it into a bold square cover image.",
+      "short_narration": "AiDiy の全体設計と特徴を短く紹介します。",
+      "long_narration": "この動画では、AiDiy の全体像と設計の考え方を紹介します。日本語ファースト設計から始まり、3 つの常駐サーバーと複数の AI CLI、業務サンプル、AI コア、MCP ハブ、そしてナレッジシステムの入口まで、実装に沿って順番に見ていきます。",
+      "short_audio": "audio/short_scene_000.mp3",
+      "long_audio": "audio/long_scene_000.mp3"
     },
     {
       "id": "scene_001",
@@ -115,7 +119,11 @@ window.SCENARIO = {
           "source": "AGENTS.md",
           "text": "FastAPI + SQLite + Vue 3 による実用的な業務管理テンプレートを提供する。"
         }
-      ]
+      ],
+      "short_narration": "日本語ファーストのフルスタック業務テンプレートです。",
+      "long_narration": "AiDiy は、日本語を第一言語として設計されたフルスタック業務管理テンプレートです。FastAPI と SQLite と Vue 3 を中核に、権限管理、マスタ管理、トランザクション、スケジューラ、在庫管理などの業務サンプルを実装済みで含んでいます。さらに AI チャット、音声、画像、コード支援、MCP ハブを統合した実験基盤でもあります。バックエンドは core_main と apps_main の 2 サーバー構成で、フロントエンドは Web と Electron 対応のアバターアプリ、そして 13 個の MCP ツールサーバーで全体が構成されています。",
+      "short_audio": "audio/short_scene_001.mp3",
+      "long_audio": "audio/long_scene_001.mp3"
     },
     {
       "id": "scene_002",
@@ -197,7 +205,11 @@ window.SCENARIO = {
           "source": "frontend_web/AGENTS.md",
           "text": "日本語ファイル名、日本語 route、日本語 JSON key を使う。template の component tag は ASCII にする。"
         }
-      ]
+      ],
+      "short_narration": "画面、URL、コードまで日本語で統一します。",
+      "long_narration": "AiDiy の最大の特徴は日本語ファースト設計です。データベースのテーブル名は C権限や T配車、API パスは /core/利用者/一覧、JSON キーは 利用者名や配車日付、Vue コンポーネントのファイル名まで、すべてのレイヤーで日本語識別子を使います。これにより業務語彙とコードの識別子が直接対応し、日本語話者が設計意図を保守の場面でもそのまま読み取れるようになっています。ただし request、query、items といったシステム用語や英字ライブラリ名はそのまま英語で使います。",
+      "short_audio": "audio/short_scene_002.mp3",
+      "long_audio": "audio/long_scene_002.mp3"
     },
     {
       "id": "scene_003",
@@ -283,7 +295,11 @@ window.SCENARIO = {
           "source": "backend_hermes/AGENTS.md",
           "text": "`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。`cli_main.py` の provider は API provider と CLI bridge の両方を扱います。"
         }
-      ]
+      ],
+      "short_narration": "Core と Apps の 2 サーバー、複数 AI CLI 対応です。",
+      "long_narration": "AiDiy は core_main が 8091 番ポート、apps_main が 8092 番ポート、backend_mcp が 8095 番ポートで常駐する 3 サーバー構成です。AI コードパネルでは claude_sdk、claude_cli、copilot_cli、codex_cli、gemini_cli、opencode_cli、そして aidiy_hermes まで、複数の Code CLI を 6 スロットに割り当てて使い分けられます。backend_hermes は HTTP サーバーとして常駐せず、AI コードパネルから必要なときだけ subprocess で呼び出される on-demand なコードエージェントです。31 の provider overlay と 50 以上のエイリアスを持つ AiDiy 専用の CLI エンジンになっています。",
+      "short_audio": "audio/short_scene_003.mp3",
+      "long_audio": "audio/long_scene_003.mp3"
     },
     {
       "id": "scene_004",
@@ -369,7 +385,11 @@ window.SCENARIO = {
           "source": "AGENTS.md",
           "text": "業務サンプル概要として、配車管理、生産管理、資材在庫管理が明示されています。"
         }
-      ]
+      ],
+      "short_narration": "C、M、T など接頭辞で機能を分類します。",
+      "long_narration": "AiDiy の業務サンプルは、配車管理、生産管理、在庫管理など実務に近い内容で構成されています。テーブルには C、M、T、V、S、A、X の接頭辞があり、それぞれ共通、マスタ、トランザクション、ビュー、スケジューラ、AI 系、実験系を表します。M 系 9 テーブル、T 系 5 テーブル、S 系 4 エンドポイントが実装済みで、明細型パターンも最初から実例付きです。V 系はデータベースの VIEW オブジェクトではなく、Router ファイルに直接書く生 SQL による JOIN エンドポイントです。この命名規則に沿えば、新機能を既存パターンへ横展開しやすくなっています。",
+      "short_audio": "audio/short_scene_004.mp3",
+      "long_audio": "audio/long_scene_004.mp3"
     },
     {
       "id": "scene_005",
@@ -455,7 +475,11 @@ window.SCENARIO = {
           "source": "frontend_avatar/AGENTS.md",
           "text": "`frontend_avatar` は AIコア専用の Avatar クライアントで、Electron と Web の両対応です。"
         }
-      ]
+      ],
+      "short_narration": "AI チャットと VRM アバターが統合されています。",
+      "long_narration": "AI コアはチャット、ライブ、コード支援、音声処理の 4 モードを WebSocket で統合しています。frontend_avatar は Electron デスクトップアプリと通常の Web ブラウザの両方で動作する AI アバタークライアントです。VRM モデルと VRMA モーションで表情と動きを制御し、アバター、xneko、xeyes、アナログ時計、デジタル時計、カレンダー、表示無しの 7 種類の表示を選択できます。Electron と Web の間のパネル表示やセッション状態は BroadcastChannel の avatar-desktop-sync で同期します。",
+      "short_audio": "audio/short_scene_005.mp3",
+      "long_audio": "audio/long_scene_005.mp3"
     },
     {
       "id": "scene_006",
@@ -536,7 +560,11 @@ window.SCENARIO = {
           "source": "backend_hermes/AGENTS.md",
           "text": "`aidiy_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。"
         }
-      ]
+      ],
+      "short_narration": "複数の Code CLI を目的別に切り替えられます。",
+      "long_narration": "Code AI は code1 から code6 の 6 スロットに異なる CLI を割り当てられます。有効な設定値は claude_sdk、claude_cli、copilot_cli、codex_cli、gemini_cli、opencode_cli、そして aidiy_hermes です。backend_hermes は _start.py の常駐起動対象ではなく、backend_server の AIコード_cli.py から必要なときだけ subprocess で起動される on-demand なエージェントです。31 の provider と 60 の slash command を持ち、/model コマンドで対話的に AI を切り替えられます。",
+      "short_audio": "audio/short_scene_006.mp3",
+      "long_audio": "audio/long_scene_006.mp3"
     },
     {
       "id": "scene_007",
@@ -614,7 +642,11 @@ window.SCENARIO = {
           "source": "backend_mcp/AGENTS.md",
           "text": "ブラウザ操作、DB確認、ログ確認、コードチェック、画像生成、音声認識/合成、OBS / ffmpeg 制御を AI エージェントから利用できます。"
         }
-      ]
+      ],
+      "short_narration": "13 個の MCP ツールが AI の手足になります。",
+      "long_narration": "backend_mcp はポート 8095 に 13 個の MCP サーバーを同居させた FastMCP アプリケーションです。ブラウザ操作、デスクトップキャプチャ、SQLite と PostgreSQL のデータベース参照、ログ観測、コードチェック、バックアップ管理、画像生成、音声認識、音声合成、OBS Studio 制御、FFmpeg 制御と、幅広いツールを AI エージェントに提供します。SSE エンドポイントは http://localhost:8095/{name}/sse の形式で、Claude Agent SDK や Claude Code CLI から接続できます。Chrome DevTools は Node.js ではなく Python 純正の CDP クライアントで実装されています。",
+      "short_audio": "audio/short_scene_007.mp3",
+      "long_audio": "audio/long_scene_007.mp3"
     },
     {
       "id": "scene_008",
@@ -692,7 +724,11 @@ window.SCENARIO = {
           "source": ".aidiy/knowledge/_index.md",
           "text": "残す内容は、次回の修正で使える HowTo、判断基準、注意点、確認方法だけにします。"
         }
-      ]
+      ],
+      "short_narration": "AGENTS.md がすべての実装の入口です。",
+      "long_narration": "AiDiy の実装を始める前に必ず確認すべき入口が 2 つあります。AGENTS.md は全体のアーキテクチャと設計方針を記述したファイルで、.aidiy/knowledge/_index.md は全 HowTo の入口です。新機能を追加するときも、バグを修正するときも、まずこの 2 つを確認することがルールとして明文化されています。HowTo や検証手順、失敗の対処法は AGENTS.md ではなく .aidiy/knowledge/ に置くという分担も決まっています。",
+      "short_audio": "audio/short_scene_008.mp3",
+      "long_audio": "audio/long_scene_008.mp3"
     },
     {
       "id": "scene_999",
@@ -717,7 +753,11 @@ window.SCENARIO = {
       "evidence": [],
       "image": "images/scene_999.png",
       "audio": "audio/scene_999.mp3",
-      "image_prompt": "Square 1:1 ending visual for AiDiy based on the reference image. Keep the composition very simple and elegant. Main content should be only beautiful typography reading 'Thank you for Watching' in a refined luxury tech style, dark blue gradient background, subtle violet glow, clean centered layout, premium and readable, no extra UI, no character, no clutter. Use the reference image's mood and typographic feeling, but regenerate as a polished square closing card suitable for a product introduction ending."
+      "image_prompt": "Square 1:1 ending visual for AiDiy based on the reference image. Keep the composition very simple and elegant. Main content should be only beautiful typography reading 'Thank you for Watching' in a refined luxury tech style, dark blue gradient background, subtle violet glow, clean centered layout, premium and readable, no extra UI, no character, no clutter. Use the reference image's mood and typographic feeling, but regenerate as a polished square closing card suitable for a product introduction ending.",
+      "short_narration": "AiDiy で、なにを創りますか。",
+      "long_narration": "ご視聴ありがとうございました。AiDiy には Web UI、アバタークライアント、バックエンド、MCP ハブ、独自 CLI エージェントまで、業務システムと AI 実験基盤をひとつにまとめた部品がそろっています。日本語ファースト設計と豊富な業務サンプルを足がかりに、あなたの業務に合わせてカスタマイズしてみてください。あなたなら AiDiy で、なにを創りますか。",
+      "short_audio": "audio/short_scene_999.mp3",
+      "long_audio": "audio/long_scene_999.mp3"
     }
   ],
   "duration_sec": 122.736

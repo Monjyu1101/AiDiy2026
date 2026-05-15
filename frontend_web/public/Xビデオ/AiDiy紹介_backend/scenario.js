@@ -41,7 +41,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_000.mp3"
+      "audio": "audio/scene_000.mp3",
+      "short_narration": "backend_server の構成とルールを紹介します。",
+      "long_narration": "この動画では、AiDiy の backend_server を紹介します。2 サーバー構成、4 層アーキテクチャ、日本語ファースト命名、C採番による ID 管理、監査フィールド、そして V 系の生 SQL まで、実装に沿って見ていきます。",
+      "short_audio": "audio/short_scene_000.mp3",
+      "long_audio": "audio/long_scene_000.mp3"
     },
     {
       "id": "scene_001",
@@ -58,11 +62,25 @@ window.SCENARIO = {
       "narration": "サーバーは 2 台構成です。core_main がポート 8091、apps_main がポート 8092 で動きます。両サーバーは同じデータベースを共有します。",
       "image": "images/scene_001.png",
       "audio": "audio/scene_001.mp3",
-      "chips": ["core_main:8091", "apps_main:8092", "SQLite 共有", "FastAPI"],
+      "chips": [
+        "core_main:8091",
+        "apps_main:8092",
+        "SQLite 共有",
+        "FastAPI"
+      ],
       "metrics": [
-        { "label": "サーバー数", "value": "2" },
-        { "label": "DB", "value": "SQLite 共有" },
-        { "label": "フレームワーク", "value": "FastAPI" }
+        {
+          "label": "サーバー数",
+          "value": "2"
+        },
+        {
+          "label": "DB",
+          "value": "SQLite 共有"
+        },
+        {
+          "label": "フレームワーク",
+          "value": "FastAPI"
+        }
       ],
       "cards": [
         {
@@ -96,9 +114,19 @@ window.SCENARIO = {
         "技術スタック: Python 3.13、FastAPI、SQLAlchemy、SQLite、uv、Pydantic、JWT。"
       ],
       "evidence": [
-        { "source": "backend_server/AGENTS.md", "text": "`core_main.py`：C系、A系、認証、files、AIコア（ポート 8091）。`apps_main.py`：M系、T系、V系、S系（ポート 8092）。" },
-        { "source": "backend_server/AGENTS.md", "text": "DB ファイルは `backend_server/_data/AiDiy/database.db` です。`core_main.py` と `apps_main.py` は同じ SQLite DB を共有します。" }
-      ]
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "`core_main.py`：C系、A系、認証、files、AIコア（ポート 8091）。`apps_main.py`：M系、T系、V系、S系（ポート 8092）。"
+        },
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "DB ファイルは `backend_server/_data/AiDiy/database.db` です。`core_main.py` と `apps_main.py` は同じ SQLite DB を共有します。"
+        }
+      ],
+      "short_narration": "Core が 8091、Apps が 8092 の 2 サーバー構成です。",
+      "long_narration": "バックエンドは 2 台のサーバーで構成されています。core_main がポート 8091 で C 系の共通機能、A 系の AI コア、認証を担当し、apps_main がポート 8092 で M 系マスタ、T 系トランザクション、V 系ビュー、S 系スケジューラを担当します。両サーバーは backend_server/_data/AiDiy/database.db の同一 SQLite ファイルを共有します。技術スタックは Python 3.13、FastAPI、SQLAlchemy、Pydantic、JWT です。",
+      "short_audio": "audio/short_scene_001.mp3",
+      "long_audio": "audio/long_scene_001.mp3"
     },
     {
       "id": "scene_002",
@@ -115,11 +143,27 @@ window.SCENARIO = {
       "narration": "テーブル名も API パスも日本語で書きます。接頭辞 C は共通、M はマスタ、T はトランザクション、V はビューを表します。",
       "image": "images/scene_002.png",
       "audio": "audio/scene_002.mp3",
-      "chips": ["C: Core", "M: Master", "T: Transaction", "V: View", "S: Scheduler", "A: AI"],
+      "chips": [
+        "C: Core",
+        "M: Master",
+        "T: Transaction",
+        "V: View",
+        "S: Scheduler",
+        "A: AI"
+      ],
       "metrics": [
-        { "label": "命名レイヤー", "value": "全レイヤー" },
-        { "label": "接頭辞種別", "value": "7種" },
-        { "label": "例外", "value": "英字ライブラリ名" }
+        {
+          "label": "命名レイヤー",
+          "value": "全レイヤー"
+        },
+        {
+          "label": "接頭辞種別",
+          "value": "7種"
+        },
+        {
+          "label": "例外",
+          "value": "英字ライブラリ名"
+        }
       ],
       "cards": [
         {
@@ -154,9 +198,19 @@ window.SCENARIO = {
         "`request`・`query`・`items`・`total`・`limit` などシステム用語と英字ライブラリ名は英字のまま。"
       ],
       "evidence": [
-        { "source": "CLAUDE.md", "text": "全レイヤーで日本語識別子を使います。テーブル名: `C権限`、`T配車`、`M商品構成`。カラム名: `利用者ID`、`配車日付`、`商品名`。API パス: `/core/利用者/一覧`、`/apps/配車/検索`。" },
-        { "source": "CLAUDE.md", "text": "システム用語（`request`、`query`、`items`、`total`、`limit`）や英字ライブラリ名はそのまま使用します。" }
-      ]
+        {
+          "source": "CLAUDE.md",
+          "text": "全レイヤーで日本語識別子を使います。テーブル名: `C権限`、`T配車`、`M商品構成`。カラム名: `利用者ID`、`配車日付`、`商品名`。API パス: `/core/利用者/一覧`、`/apps/配車/検索`。"
+        },
+        {
+          "source": "CLAUDE.md",
+          "text": "システム用語（`request`、`query`、`items`、`total`、`limit`）や英字ライブラリ名はそのまま使用します。"
+        }
+      ],
+      "short_narration": "テーブル名も API パスも日本語で書きます。",
+      "long_narration": "テーブル名も API パスも日本語で書くのが AiDiy の原則です。接頭辞 C と A は core_main が担当し、M、T、V、S は apps_main が担当します。テーブルのカラム名も利用者ID、配車日付のように日本語で定義します。API パスは /core/利用者/一覧、JSON のキーは 利用者名といった形で全レイヤーで統一します。request、query、items などのシステム用語と英字ライブラリ名は例外として英語のままにします。",
+      "short_audio": "audio/short_scene_002.mp3",
+      "long_audio": "audio/long_scene_002.mp3"
     },
     {
       "id": "scene_003",
@@ -173,11 +227,25 @@ window.SCENARIO = {
       "narration": "新機能を作るときは Model、Schema、CRUD、Router の 4 ファイルを順に作ります。最後に apps_main.py への登録が必要です。",
       "image": "images/scene_003.png",
       "audio": "audio/scene_003.mp3",
-      "chips": ["SQLAlchemy Model", "Pydantic Schema", "CRUD", "FastAPI Router"],
+      "chips": [
+        "SQLAlchemy Model",
+        "Pydantic Schema",
+        "CRUD",
+        "FastAPI Router"
+      ],
       "metrics": [
-        { "label": "層数", "value": "4 (+1登録)" },
-        { "label": "CRUD メソッド", "value": "POST 統一" },
-        { "label": "レスポンス形式", "value": "統一形式" }
+        {
+          "label": "層数",
+          "value": "4 (+1登録)"
+        },
+        {
+          "label": "CRUD メソッド",
+          "value": "POST 統一"
+        },
+        {
+          "label": "レスポンス形式",
+          "value": "統一形式"
+        }
       ],
       "cards": [
         {
@@ -213,9 +281,19 @@ window.SCENARIO = {
         "認証は `deps.get_現在利用者` を Router dependency として使う。"
       ],
       "evidence": [
-        { "source": "backend_server,実装パターン.md", "text": "新規テーブルや機能は、原則として Model / Schema / CRUD / Router / Main の層を揃える。" },
-        { "source": "backend_server,実装パターン.md", "text": "よくある落とし穴: `apps_crud/__init__.py` の import / `__all__` 追加漏れ。`apps_models/__init__.py` の import 追加漏れにより `create_all()` 対象外になる。" }
-      ]
+        {
+          "source": "backend_server,実装パターン.md",
+          "text": "新規テーブルや機能は、原則として Model / Schema / CRUD / Router / Main の層を揃える。"
+        },
+        {
+          "source": "backend_server,実装パターン.md",
+          "text": "よくある落とし穴: `apps_crud/__init__.py` の import / `__all__` 追加漏れ。`apps_models/__init__.py` の import 追加漏れにより `create_all()` 対象外になる。"
+        }
+      ],
+      "short_narration": "Model、Schema、CRUD、Router の 4 ファイルで機能を作ります。",
+      "long_narration": "新機能を追加するときは 4 つのファイルを作ります。SQLAlchemy モデルの Model、Pydantic スキーマの Schema、DB アクセスロジックの CRUD、FastAPI エンドポイントの Router です。最後に apps_main.py への router 登録と各 __init__.py への import 追加が必要です。この import を忘れると create_all() の対象から漏れます。エンドポイントは POST 中心で統一し、レスポンスは status、message、data の形式に揃えます。",
+      "short_audio": "audio/short_scene_003.mp3",
+      "long_audio": "audio/long_scene_003.mp3"
     },
     {
       "id": "scene_004",
@@ -232,11 +310,25 @@ window.SCENARIO = {
       "narration": "ID は C採番テーブルで管理します。全テーブルに登録者・更新者などの情報を記録する 8 つのフィールドが必要です。",
       "image": "images/scene_004.png",
       "audio": "audio/scene_004.mp3",
-      "chips": ["C採番テーブル", "get_next_id()", "create_audit_fields()", "update_audit_fields()"],
+      "chips": [
+        "C採番テーブル",
+        "get_next_id()",
+        "create_audit_fields()",
+        "update_audit_fields()"
+      ],
       "metrics": [
-        { "label": "監査フィールド数", "value": "8" },
-        { "label": "採番方式", "value": "C採番 (非AUTOINCREMENT)" },
-        { "label": "ヘルパー関数", "value": "2種" }
+        {
+          "label": "監査フィールド数",
+          "value": "8"
+        },
+        {
+          "label": "採番方式",
+          "value": "C採番 (非AUTOINCREMENT)"
+        },
+        {
+          "label": "ヘルパー関数",
+          "value": "2種"
+        }
       ],
       "cards": [
         {
@@ -271,9 +363,19 @@ window.SCENARIO = {
         "新規テーブル追加時は `C採番` に対象テーブル名のエントリを追加する。"
       ],
       "evidence": [
-        { "source": "backend_server,C採番と監査フィールド.md", "text": "AUTOINCREMENT を前提にしない。採番が必要なテーブルは `C採番` に初期値を追加する。" },
-        { "source": "backend_server,C採番と監査フィールド.md", "text": "全テーブルに 8 フィールド: 登録日時・登録利用者ID・登録利用者名・登録端末ID・更新日時・更新利用者ID・更新利用者名・更新端末ID。" }
-      ]
+        {
+          "source": "backend_server,C採番と監査フィールド.md",
+          "text": "AUTOINCREMENT を前提にしない。採番が必要なテーブルは `C採番` に初期値を追加する。"
+        },
+        {
+          "source": "backend_server,C採番と監査フィールド.md",
+          "text": "全テーブルに 8 フィールド: 登録日時・登録利用者ID・登録利用者名・登録端末ID・更新日時・更新利用者ID・更新利用者名・更新端末ID。"
+        }
+      ],
+      "short_narration": "ID は C採番で管理、全テーブルに監査 8 フィールド必須です。",
+      "long_narration": "ID の採番は AUTOINCREMENT を使わず、C採番テーブルで一元管理します。新しいテーブルを追加するときは C採番にそのテーブル名のエントリを追加します。また全テーブルに監査フィールドが必須です。登録日時、登録利用者ID、登録利用者名、登録端末ID、更新日時、更新利用者ID、更新利用者名、更新端末IDの 8 フィールドで、登録時は create_audit_fields、更新時は update_audit_fields のヘルパーを使います。",
+      "short_audio": "audio/short_scene_004.mp3",
+      "long_audio": "audio/long_scene_004.mp3"
     },
     {
       "id": "scene_005",
@@ -290,11 +392,25 @@ window.SCENARIO = {
       "narration": "V 系は複数テーブルを結合して一覧を返す API です。データベースの VIEW は作らず、Router ファイルに SQL を直書きします。",
       "image": "images/scene_005.png",
       "audio": "audio/scene_005.mp3",
-      "chips": ["生 SQL JOIN", "bind params", "items + total", "dict(row._mapping)"],
+      "chips": [
+        "生 SQL JOIN",
+        "bind params",
+        "items + total",
+        "dict(row._mapping)"
+      ],
       "metrics": [
-        { "label": "作成ファイル", "value": "Router のみ" },
-        { "label": "DB VIEW", "value": "なし" },
-        { "label": "担当", "value": "core/apps 双方" }
+        {
+          "label": "作成ファイル",
+          "value": "Router のみ"
+        },
+        {
+          "label": "DB VIEW",
+          "value": "なし"
+        },
+        {
+          "label": "担当",
+          "value": "core/apps 双方"
+        }
       ],
       "cards": [
         {
@@ -330,9 +446,19 @@ window.SCENARIO = {
         "SQLAlchemy Row は `dict(row._mapping)` で辞書化する。"
       ],
       "evidence": [
-        { "source": "backend_server,実装パターン.md", "text": "DB VIEW オブジェクトは作らない。`core_router/V*.py` または `apps_router/V*.py` に生 SQL を書く。`SELECT` と `COUNT(*)` は同じ FROM / JOIN / WHERE 条件を使う。SQL へ値を直結せず、bind params を使う。" },
-        { "source": "backend_server/AGENTS.md", "text": "DB VIEW オブジェクトは作らず、V系 Router の生 SQL で JOIN / 集計する。" }
-      ]
+        {
+          "source": "backend_server,実装パターン.md",
+          "text": "DB VIEW オブジェクトは作らない。`core_router/V*.py` または `apps_router/V*.py` に生 SQL を書く。`SELECT` と `COUNT(*)` は同じ FROM / JOIN / WHERE 条件を使う。SQL へ値を直結せず、bind params を使う。"
+        },
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "DB VIEW オブジェクトは作らず、V系 Router の生 SQL で JOIN / 集計する。"
+        }
+      ],
+      "short_narration": "V 系は Router に SQL を直書きして結合一覧を返します。",
+      "long_narration": "V 系は複数テーブルを結合して一覧と件数を返す API です。データベースの VIEW オブジェクトは作らず、Router ファイルに生 SQL を直接書きます。Model 層と CRUD 層は持ちません。SELECT と COUNT(*) は同じ FROM、JOIN、WHERE 条件を使い、SQL への値は bind params で渡して直結はしません。ページングと並び替えに対応した実装パターンが既存コードに揃っています。",
+      "short_audio": "audio/short_scene_005.mp3",
+      "long_audio": "audio/long_scene_005.mp3"
     },
     {
       "id": "scene_006",
@@ -349,11 +475,25 @@ window.SCENARIO = {
       "narration": "業務サンプルとして M 系 9 テーブル、T 系 5 テーブルが実装済みです。これを参考に機能を追加できます。",
       "image": "images/scene_006.png",
       "audio": "audio/scene_006.mp3",
-      "chips": ["M系 ×9", "T系 ×5", "S系 ×4", "明細型パターン"],
+      "chips": [
+        "M系 ×9",
+        "T系 ×5",
+        "S系 ×4",
+        "明細型パターン"
+      ],
       "metrics": [
-        { "label": "M系テーブル", "value": "9" },
-        { "label": "T系テーブル", "value": "5" },
-        { "label": "S系エンドポイント", "value": "4" }
+        {
+          "label": "M系テーブル",
+          "value": "9"
+        },
+        {
+          "label": "T系テーブル",
+          "value": "5"
+        },
+        {
+          "label": "S系エンドポイント",
+          "value": "4"
+        }
       ],
       "cards": [
         {
@@ -387,9 +527,19 @@ window.SCENARIO = {
         "更新時は対象親IDの既存行を全削除してヘッダー＋明細を再作成する。"
       ],
       "evidence": [
-        { "source": "backend_server/AGENTS.md", "text": "Apps: M配車区分・M車両・M商品・M商品分類・M取引先分類・M取引先・M生産区分・M生産工程・M商品構成。T配車・T生産・T商品入庫・T商品出庫・T商品棚卸。S配車_*・S生産_*。" },
-        { "source": "backend_server,実装パターン.md", "text": "明細型: `明細SEQ=0` をヘッダー行に予約する。`(親ID, 明細SEQ)` の複合主キーを使う。更新時は対象親IDの既存行を全削除して、ヘッダー + 明細を再作成する。" }
-      ]
+        {
+          "source": "backend_server/AGENTS.md",
+          "text": "Apps: M配車区分・M車両・M商品・M商品分類・M取引先分類・M取引先・M生産区分・M生産工程・M商品構成。T配車・T生産・T商品入庫・T商品出庫・T商品棚卸。S配車_*・S生産_*。"
+        },
+        {
+          "source": "backend_server,実装パターン.md",
+          "text": "明細型: `明細SEQ=0` をヘッダー行に予約する。`(親ID, 明細SEQ)` の複合主キーを使う。更新時は対象親IDの既存行を全削除して、ヘッダー + 明細を再作成する。"
+        }
+      ],
+      "short_narration": "M 系 9、T 系 5 の業務サンプルが参考になります。",
+      "long_narration": "業務サンプルとして M 系 9 テーブル、T 系 5 テーブル、S 系 4 エンドポイントが実装済みです。配車管理は M配車区分、M車両、T配車、V配車、S配車で構成され、生産管理は M商品構成と T生産を含む明細型パターンの実例になっています。S 系スケジューラは S配車_日表示、S配車_週表示、S生産_日表示、S生産_週表示の 4 エンドポイントで週次・日次の集計を提供します。明細型は 明細SEQ=0 をヘッダー予約、親IDと明細SEQの複合主キーで管理します。",
+      "short_audio": "audio/short_scene_006.mp3",
+      "long_audio": "audio/long_scene_006.mp3"
     },
     {
       "id": "scene_999",
@@ -412,7 +562,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_999.mp3"
+      "audio": "audio/scene_999.mp3",
+      "short_narration": "4 層、日本語設計、採番。サンプルを参考に追加してください。",
+      "long_narration": "ご視聴ありがとうございました。2 サーバー構成、4 層アーキテクチャ、日本語ファースト設計、C採番、8 フィールドの監査情報、V 系の生 SQL。豊富な業務サンプルを参考に、あなたの業務テーブルを追加してみてください。",
+      "short_audio": "audio/short_scene_999.mp3",
+      "long_audio": "audio/long_scene_999.mp3"
     }
   ],
   "duration_sec": 112.0

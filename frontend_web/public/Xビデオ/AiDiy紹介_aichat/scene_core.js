@@ -1,3 +1,40 @@
+function renderFooter(scene) {
+  let footer = document.getElementById("scene-footer");
+  if (!footer) {
+    footer = document.createElement("footer");
+    footer.id = "scene-footer";
+    footer.className = "scene-footer";
+    footer.innerHTML = `
+      <select class="footer-select" id="narratorSelect">
+        <option value="short">Short</option>
+        <option value="long">Long</option>
+      </select>
+      <div class="footer-narration" id="footerNarration"></div>
+      <audio id="footerAudio" class="footer-audio" controls preload="none"></audio>
+    `;
+    document.body.appendChild(footer);
+  }
+
+  const select = document.getElementById("narratorSelect");
+  const narrationEl = document.getElementById("footerNarration");
+  const audioEl = document.getElementById("footerAudio");
+
+  function apply() {
+    const type = select.value;
+    narrationEl.textContent = scene[type + "_narration"] || scene.narration || "";
+    const src = scene[type + "_audio"] || scene.audio || "";
+    if (src) { audioEl.src = src; }
+  }
+
+  select.onchange = function () {
+    localStorage.setItem("narratorType", this.value);
+    apply();
+  };
+
+  select.value = localStorage.getItem("narratorType") || "short";
+  apply();
+}
+
 function renderScenePage(forcedIndex) {
   const scenario = window.SCENARIO;
   let index;
@@ -166,4 +203,6 @@ function renderScenePage(forcedIndex) {
     wrapper.appendChild(text);
     evidence.appendChild(wrapper);
   });
+
+  renderFooter(scene);
 }

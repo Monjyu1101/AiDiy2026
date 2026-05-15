@@ -41,7 +41,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_000.mp3"
+      "audio": "audio/scene_000.mp3",
+      "short_narration": "AI が使える 13 種類の MCP ツールを紹介します。",
+      "long_narration": "この動画では、AiDiy の MCP ハブを紹介します。ポート 8095 に同居する 13 個の MCP サーバー、SSE による接続方法、各グループのツールの役割を順番に見ていきます。",
+      "short_audio": "audio/short_scene_000.mp3",
+      "long_audio": "audio/long_scene_000.mp3"
     },
     {
       "id": "scene_001",
@@ -58,11 +62,25 @@ window.SCENARIO = {
       "narration": "backend_mcp は 13 個のツールサーバーをまとめて提供します。AI エージェントは SSE という方式で接続し、ツールを呼び出します。",
       "image": "images/scene_001.png",
       "audio": "audio/scene_001.mp3",
-      "chips": ["FastMCP × 13", "Starlette Mount", "SSE transport", "stdio bridge"],
+      "chips": [
+        "FastMCP × 13",
+        "Starlette Mount",
+        "SSE transport",
+        "stdio bridge"
+      ],
       "metrics": [
-        { "label": "ポート", "value": "8095" },
-        { "label": "MCP 数", "value": "13" },
-        { "label": "フレームワーク", "value": "FastMCP" }
+        {
+          "label": "ポート",
+          "value": "8095"
+        },
+        {
+          "label": "MCP 数",
+          "value": "13"
+        },
+        {
+          "label": "フレームワーク",
+          "value": "FastMCP"
+        }
       ],
       "cards": [
         {
@@ -97,9 +115,19 @@ window.SCENARIO = {
         "再起動ウォッチャーは `backend_mcp/temp/reboot_mcp.txt` を監視する。"
       ],
       "evidence": [
-        { "source": "backend_mcp/AGENTS.md", "text": "`backend_mcp` はポート `8095` 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーションです。" },
-        { "source": "backend_mcp,構成.md", "text": "`mcp_main.py` は 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す。" }
-      ]
+        {
+          "source": "backend_mcp/AGENTS.md",
+          "text": "`backend_mcp` はポート `8095` 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
+        },
+        {
+          "source": "backend_mcp,構成.md",
+          "text": "`mcp_main.py` は 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す。"
+        }
+      ],
+      "short_narration": "backend_mcp が SSE で 13 のツールを提供します。",
+      "long_narration": "backend_mcp は mcp_main.py が FastAPI と Starlette 上に 13 個の FastMCP インスタンスを Mount して提供するアプリケーションです。ポート 8095 で uvicorn が起動します。SSE エンドポイントは http://localhost:8095/{name}/sse の形式で、Claude Agent SDK や Claude Code CLI から接続できます。stdio クライアントは mcp_stdio.py を経由して接続します。再起動ウォッチャーは backend_mcp/temp/reboot_mcp.txt の変更を監視します。",
+      "short_audio": "audio/short_scene_001.mp3",
+      "long_audio": "audio/long_scene_001.mp3"
     },
     {
       "id": "scene_002",
@@ -116,11 +144,27 @@ window.SCENARIO = {
       "narration": "13 のツールは役割で 6 つのグループに分かれています。ブラウザ操作、データベース確認、観測、バックアップ、メディア生成、動画制作です。",
       "image": "images/scene_002.png",
       "audio": "audio/scene_002.mp3",
-      "chips": ["ブラウザ系 ×2", "DB系 ×2", "観測系 ×2", "バックアップ系 ×2", "メディア系 ×3", "制作系 ×2"],
+      "chips": [
+        "ブラウザ系 ×2",
+        "DB系 ×2",
+        "観測系 ×2",
+        "バックアップ系 ×2",
+        "メディア系 ×3",
+        "制作系 ×2"
+      ],
       "metrics": [
-        { "label": "合計 MCP", "value": "13" },
-        { "label": "カテゴリ", "value": "6" },
-        { "label": "アクセス", "value": "localhost 限定" }
+        {
+          "label": "合計 MCP",
+          "value": "13"
+        },
+        {
+          "label": "カテゴリ",
+          "value": "6"
+        },
+        {
+          "label": "アクセス",
+          "value": "localhost 限定"
+        }
       ],
       "cards": [
         {
@@ -153,9 +197,19 @@ window.SCENARIO = {
         "SQLite / PostgreSQL は read-only 中心で扱う。"
       ],
       "evidence": [
-        { "source": "backend_mcp/AGENTS.md", "text": "ブラウザ操作、デスクトップキャプチャ、DB確認、ログ確認、コードチェック、バックアップ確認、画像生成、音声認識/合成、OBS / ffmpeg 制御を AI エージェントから利用できるようにします。" },
-        { "source": "backend_mcp,構成.md", "text": "アクセスは localhost 限定です。SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場合もまずアプリ API で再現できないか確認します。" }
-      ]
+        {
+          "source": "backend_mcp/AGENTS.md",
+          "text": "ブラウザ操作、デスクトップキャプチャ、DB確認、ログ確認、コードチェック、バックアップ確認、画像生成、音声認識/合成、OBS / ffmpeg 制御を AI エージェントから利用できるようにします。"
+        },
+        {
+          "source": "backend_mcp,構成.md",
+          "text": "アクセスは localhost 限定です。SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場合もまずアプリ API で再現できないか確認します。"
+        }
+      ],
+      "short_narration": "ブラウザ、DB、バックアップ、メディア、動画の 6 グループです。",
+      "long_narration": "13 個の MCP サーバーは役割で 6 グループに分かれています。ブラウザ操作の chrome_devtools、デスクトップキャプチャ、データベース参照の sqlite と postgres、ログ観測とコードチェック、バックアップ管理 2 本、画像生成・音声認識・音声合成のメディア生成 3 本、OBS Studio 制御と FFmpeg 制御の動画制作 2 本です。全サーバーは localhost 限定アクセスで、SQLite と PostgreSQL は read-only 中心の運用です。",
+      "short_audio": "audio/short_scene_002.mp3",
+      "long_audio": "audio/long_scene_002.mp3"
     },
     {
       "id": "scene_003",
@@ -172,11 +226,25 @@ window.SCENARIO = {
       "narration": "Chrome ブラウザを Python から直接操作できます。画面のスクリーンショットも取れます。Node.js は不要です。",
       "image": "images/scene_003.png",
       "audio": "audio/scene_003.mp3",
-      "chips": ["Python CDP 実装", "ChromeManager", "port 9222", "OS スクリーンショット"],
+      "chips": [
+        "Python CDP 実装",
+        "ChromeManager",
+        "port 9222",
+        "OS スクリーンショット"
+      ],
       "metrics": [
-        { "label": "Chrome 管理", "value": "単一 subprocess" },
-        { "label": "デバッグポート", "value": "9222" },
-        { "label": "実装言語", "value": "Python 純正" }
+        {
+          "label": "Chrome 管理",
+          "value": "単一 subprocess"
+        },
+        {
+          "label": "デバッグポート",
+          "value": "9222"
+        },
+        {
+          "label": "実装言語",
+          "value": "Python 純正"
+        }
       ],
       "cards": [
         {
@@ -211,9 +279,19 @@ window.SCENARIO = {
         "ブラウザ外の画面確認は `aidiy_desktop_capture` を使う。"
       ],
       "evidence": [
-        { "source": "backend_mcp/AGENTS.md", "text": "Chrome DevTools は Node.js 版ではなく Python 実装の CDP client を使います。Chrome は `ChromeManager` が単一 subprocess として管理し、必要時に `--remote-debugging-port=9222` で起動します。" },
-        { "source": "backend_mcp,構成.md", "text": "Chrome DevTools MCP は Python CDP 実装。Node.js 版 `chrome-devtools-mcp` 前提で復旧しない。" }
-      ]
+        {
+          "source": "backend_mcp/AGENTS.md",
+          "text": "Chrome DevTools は Node.js 版ではなく Python 実装の CDP client を使います。Chrome は `ChromeManager` が単一 subprocess として管理し、必要時に `--remote-debugging-port=9222` で起動します。"
+        },
+        {
+          "source": "backend_mcp,構成.md",
+          "text": "Chrome DevTools MCP は Python CDP 実装。Node.js 版 `chrome-devtools-mcp` 前提で復旧しない。"
+        }
+      ],
+      "short_narration": "Python だけで Chrome を直接操作できます。",
+      "long_narration": "aidiy_chrome_devtools は Node.js 版ではなく Python 純正の CDP クライアントで実装されています。ChromeManager が --remote-debugging-port=9222 で Chrome を単一 subprocess として管理します。_start.py も起動時に Chrome を先行起動します。ブラウザ外の画面確認には aidiy_desktop_capture を使います。Python だけでブラウザを直接操作できるため、Node.js の追加インストールが不要です。",
+      "short_audio": "audio/short_scene_003.mp3",
+      "long_audio": "audio/long_scene_003.mp3"
     },
     {
       "id": "scene_004",
@@ -230,11 +308,25 @@ window.SCENARIO = {
       "narration": "データベースの中身を確認したり、ログのエラーを探したり、コードの問題を自動チェックする 4 つのツールです。",
       "image": "images/scene_004.png",
       "audio": "audio/scene_004.mp3",
-      "chips": ["SQLite read-only", "PostgreSQL 遅延初期化", "ログ tail/ERROR抽出", "ruff / tsc"],
+      "chips": [
+        "SQLite read-only",
+        "PostgreSQL 遅延初期化",
+        "ログ tail/ERROR抽出",
+        "ruff / tsc"
+      ],
       "metrics": [
-        { "label": "DB MCP", "value": "2" },
-        { "label": "ログ / チェック MCP", "value": "2" },
-        { "label": "Postgres 依存", "value": "遅延初期化" }
+        {
+          "label": "DB MCP",
+          "value": "2"
+        },
+        {
+          "label": "ログ / チェック MCP",
+          "value": "2"
+        },
+        {
+          "label": "Postgres 依存",
+          "value": "遅延初期化"
+        }
       ],
       "cards": [
         {
@@ -269,9 +361,19 @@ window.SCENARIO = {
         "`aidiy_code_check` は Python 構文チェック、ruff、TypeScript 型チェックに対応。"
       ],
       "evidence": [
-        { "source": "backend_mcp/AGENTS.md", "text": "`aidiy_postgres` は `psycopg` 未導入や DSN 未設定でも他 MCP の起動を妨げない。起動時の `PgQuery()` 例外を保存し、PostgreSQL ツール呼び出し時にだけ `_get_pg()` でエラー化する。" },
-        { "source": "backend_mcp,構成.md", "text": "SQLite / PostgreSQL は既定 read-only。検証は SELECT / describe / count を優先する。" }
-      ]
+        {
+          "source": "backend_mcp/AGENTS.md",
+          "text": "`aidiy_postgres` は `psycopg` 未導入や DSN 未設定でも他 MCP の起動を妨げない。起動時の `PgQuery()` 例外を保存し、PostgreSQL ツール呼び出し時にだけ `_get_pg()` でエラー化する。"
+        },
+        {
+          "source": "backend_mcp,構成.md",
+          "text": "SQLite / PostgreSQL は既定 read-only。検証は SELECT / describe / count を優先する。"
+        }
+      ],
+      "short_narration": "DB 確認、ログ検索、コードチェックを自動化できます。",
+      "long_narration": "DB 系ツールは 4 本です。aidiy_sqlite は AiDiy の SQLite データベースを read-only 中心で参照します。aidiy_postgres は psycopg が未導入の場合や DSN が未設定でも遅延初期化により他 MCP の起動を妨げない設計です。aidiy_logs は backend_server と backend_mcp のログを tail して ERROR を抽出します。aidiy_code_check は Python 構文チェック、ruff、TypeScript の型チェックに対応しています。",
+      "short_audio": "audio/short_scene_004.mp3",
+      "long_audio": "audio/long_scene_004.mp3"
     },
     {
       "id": "scene_005",
@@ -288,11 +390,25 @@ window.SCENARIO = {
       "narration": "画像生成、音声認識、音声合成の 3 つのツールです。OpenAI や Gemini など複数の AI サービスに対応しています。",
       "image": "images/scene_005.png",
       "audio": "audio/scene_005.mp3",
-      "chips": ["差分バックアップ", "OpenAI / Gemini / FreeAI", "Whisper STT", "Edge TTS / MP3出力"],
+      "chips": [
+        "差分バックアップ",
+        "OpenAI / Gemini / FreeAI",
+        "Whisper STT",
+        "Edge TTS / MP3出力"
+      ],
       "metrics": [
-        { "label": "バックアップ MCP", "value": "2" },
-        { "label": "メディア MCP", "value": "3" },
-        { "label": "画像プロバイダー", "value": "3種" }
+        {
+          "label": "バックアップ MCP",
+          "value": "2"
+        },
+        {
+          "label": "メディア MCP",
+          "value": "3"
+        },
+        {
+          "label": "画像プロバイダー",
+          "value": "3種"
+        }
       ],
       "cards": [
         {
@@ -327,9 +443,19 @@ window.SCENARIO = {
         "バックアップ系 MCP はツール不調時も対象ファイルと検索結果で変更範囲を説明できる補助として機能する。"
       ],
       "evidence": [
-        { "source": "backend_mcp/AGENTS.md", "text": "`aidiy_image_generation`: AI 画像生成（OpenAI gpt-image / DALL-E、Gemini、FreeAI）。`aidiy_speech_to_text`: 音声認識（speech_recognition、OpenAI Whisper）。`aidiy_text_to_speech`: テキスト音声合成（Edge / OpenAI / Gemini / FreeAI、MP3 出力）。" },
-        { "source": "backend_mcp,MCP活用手順.md", "text": "バックアップ保存/確認系 MCP は自己検証の補助。ツール不調時も、対象ファイル、実行コマンド、検索結果で変更範囲を説明できる状態にする。" }
-      ]
+        {
+          "source": "backend_mcp/AGENTS.md",
+          "text": "`aidiy_image_generation`: AI 画像生成（OpenAI gpt-image / DALL-E、Gemini、FreeAI）。`aidiy_speech_to_text`: 音声認識（speech_recognition、OpenAI Whisper）。`aidiy_text_to_speech`: テキスト音声合成（Edge / OpenAI / Gemini / FreeAI、MP3 出力）。"
+        },
+        {
+          "source": "backend_mcp,MCP活用手順.md",
+          "text": "バックアップ保存/確認系 MCP は自己検証の補助。ツール不調時も、対象ファイル、実行コマンド、検索結果で変更範囲を説明できる状態にする。"
+        }
+      ],
+      "short_narration": "画像生成、音声認識、音声合成が複数 AI に対応しています。",
+      "long_narration": "バックアップ系の aidiy_backup_check が変更前後のソースを抽出し、aidiy_backup_save が AiDiy ネイティブの差分バックアップを実行します。メディア系では aidiy_image_generation が OpenAI gpt-image、DALL-E、Gemini、FreeAI に対応した画像生成を行います。aidiy_speech_to_text は speech_recognition と OpenAI Whisper で音声をテキスト化します。aidiy_text_to_speech は Edge、OpenAI、Gemini、FreeAI で MP3 を出力します。",
+      "short_audio": "audio/short_scene_005.mp3",
+      "long_audio": "audio/long_scene_005.mp3"
     },
     {
       "id": "scene_006",
@@ -346,11 +472,25 @@ window.SCENARIO = {
       "narration": "OBS Studio での録画や ffmpeg での動画変換を AI から操作できます。動画制作の自動化に使えます。",
       "image": "images/scene_006.png",
       "audio": "audio/scene_006.mp3",
-      "chips": ["OBS WebSocket", "配信/録画/シーン制御", "ffmpeg / ffprobe / ffplay", "動画合成・字幕焼き込み"],
+      "chips": [
+        "OBS WebSocket",
+        "配信/録画/シーン制御",
+        "ffmpeg / ffprobe / ffplay",
+        "動画合成・字幕焼き込み"
+      ],
       "metrics": [
-        { "label": "OBS 制御項目", "value": "配信/録画/シーン/ソース/音声" },
-        { "label": "ffmpeg ツール", "value": "3種" },
-        { "label": "制作系 MCP", "value": "2" }
+        {
+          "label": "OBS 制御項目",
+          "value": "配信/録画/シーン/ソース/音声"
+        },
+        {
+          "label": "ffmpeg ツール",
+          "value": "3種"
+        },
+        {
+          "label": "制作系 MCP",
+          "value": "2"
+        }
       ],
       "cards": [
         {
@@ -383,9 +523,19 @@ window.SCENARIO = {
         "`aidiy_ffmpeg_control` は ffmpeg / ffprobe / ffplay の薄いランナー。動画合成、字幕焼き込み、プレビュー再生に使う。"
       ],
       "evidence": [
-        { "source": "backend_mcp/AGENTS.md", "text": "`aidiy_obs_studio_control`: OBS Studio WebSocket 制御（配信、録画、シーン、ソース、音声）。`aidiy_ffmpeg_control`: ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生）。" },
-        { "source": "backend_mcp,構成.md", "text": "`mcp_proc/obs_studio_control.py` — OBS Studio WebSocket 制御。`mcp_proc/ffmpeg_control.py` — ffmpeg / ffprobe / ffplay の薄いランナー。" }
-      ]
+        {
+          "source": "backend_mcp/AGENTS.md",
+          "text": "`aidiy_obs_studio_control`: OBS Studio WebSocket 制御（配信、録画、シーン、ソース、音声）。`aidiy_ffmpeg_control`: ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生）。"
+        },
+        {
+          "source": "backend_mcp,構成.md",
+          "text": "`mcp_proc/obs_studio_control.py` — OBS Studio WebSocket 制御。`mcp_proc/ffmpeg_control.py` — ffmpeg / ffprobe / ffplay の薄いランナー。"
+        }
+      ],
+      "short_narration": "OBS と FFmpeg を AI から操作できます。",
+      "long_narration": "aidiy_obs_studio_control は OBS Studio の WebSocket を通じて配信、録画、シーン切り替え、ソース管理、音声制御を AI から操作できます。aidiy_ffmpeg_control は ffmpeg、ffprobe、ffplay の薄いランナーとして動作し、動画合成、字幕の焼き込み、プレビュー再生を担当します。動画制作ワークフローの自動化に使えます。",
+      "short_audio": "audio/short_scene_006.mp3",
+      "long_audio": "audio/long_scene_006.mp3"
     },
     {
       "id": "scene_999",
@@ -408,7 +558,11 @@ window.SCENARIO = {
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_999.mp3"
+      "audio": "audio/scene_999.mp3",
+      "short_narration": "13 ツールを AI が自動で使い分けます。",
+      "long_narration": "ご視聴ありがとうございました。13 個の MCP サーバーがポート 8095 の SSE に集約され、ブラウザ操作から動画制作まで AI エージェントが使えるツールとして公開されています。Claude Agent SDK や Claude Code CLI から接続して、AI に手足を与えてみてください。",
+      "short_audio": "audio/short_scene_999.mp3",
+      "long_audio": "audio/long_scene_999.mp3"
     }
   ],
   "duration_sec": 110.0
