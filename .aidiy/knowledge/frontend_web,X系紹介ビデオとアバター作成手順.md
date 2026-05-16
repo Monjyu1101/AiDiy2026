@@ -35,12 +35,12 @@
 
 ## ナレーション音声
 
-ナレーションは **`freeai:female` を基準**とする（`__all/scenario.js` の `assets_policy.tts_provider: "freeai:female"`）。
+ナレーションは **`edge:female` を基準**とする（`scenario.js` の `assets_policy.tts_provider: "edge:female"`）。`edge` は Microsoft Edge TTS で、API キー不要・常時利用可・レスポンスがコンパクトなので紹介ビデオの標準として扱う。
 専門テーマ版（`_avatar`、`_hermes` など）も特段の理由がない限り同じプロバイダ・声で揃える。
 
 - 生成は `aidiy_text_to_speech` MCP を使う
-- **出力形式は必ず MP3**（WAV は禁止）。freeai は内部で PCM → WAV → MP3 変換（ffmpeg 優先、lameenc フォールバック）する
-- **フォールバックチェーン**: `freeai` 失敗 → `gemini`（Google TTS）→ `edge`（Microsoft Edge TTS）の順で自動切替
+- **出力形式は必ず MP3**（WAV は禁止）。各プロバイダは内部で PCM → WAV → MP3 変換（ffmpeg 優先、lameenc フォールバック）する
+- **フォールバック**は `backend_mcp/mcp_proc/text_to_speech.py` 側に実装で持つ（ここには書かない）。
 - 発音辞書は `backend_server/_config/aidiy_text_to_speech.json` が単一の正本
 - `scenario.js` の `narration` を変更したら、必ず同じテキストで音声を再生成して `audio/scene_NNN.mp3` を更新する（表示テキストと音声の乖離防止）
 - 詳細手順は [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) を参照
@@ -54,6 +54,15 @@
 ### scenario.js への追加フィールド
 
 各シーンに 4 フィールドを追加する:
+
+### ナレーション文章の作り方
+
+| モード | 目安 | 注意 |
+|--------|------|------|
+| `short_narration` | 全シーン合計 **1 分以内**（60 秒以下） | まず普通に書いて音声生成・計測した後、長ければ 1 割程度削る。削りすぎず内容は残す |
+| `long_narration` | 制限なし（1 シーン 40〜60 秒程度が目安） | 詳しく丁寧に説明する。削る必要はない |
+
+**ショート作成の流れ**: ① 全シーン分を書く → ② 音声生成・実尺計測 → ③ 合計が 60 秒超えなら各シーンを 1 割程度削る（削りすぎない）
 
 | フィールド | 説明 |
 |-----------|------|

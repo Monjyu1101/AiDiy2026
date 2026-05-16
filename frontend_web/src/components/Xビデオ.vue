@@ -15,9 +15,13 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const baseUrl = import.meta.env.BASE_URL || '/';
-const allUrl = `${baseUrl}Xビデオ/AiDiy紹介__all/index.html`;
-const avatarUrl = `${baseUrl}Xビデオ/AiDiy紹介_avatar/index.html`;
-const hermesUrl = `${baseUrl}Xビデオ/AiDiy紹介_hermes/index.html`;
+const allUrl      = `${baseUrl}Xビデオ/AiDiy紹介__all/index.html`;
+const backendUrl  = `${baseUrl}Xビデオ/AiDiy紹介_backend/index.html`;
+const frontendUrl = `${baseUrl}Xビデオ/AiDiy紹介_frontend/index.html`;
+const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア/index.html`;
+const mcpUrl      = `${baseUrl}Xビデオ/AiDiy紹介_mcp/index.html`;
+const hermesUrl   = `${baseUrl}Xビデオ/AiDiy紹介_hermes/index.html`;
+const avatarUrl   = `${baseUrl}Xビデオ/AiDiy紹介_avatar/index.html`;
 
 const route = useRoute();
 const router = useRouter();
@@ -61,13 +65,52 @@ const handleReturn = () => {
 
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
-              <span class="icon">Xア</span>
-              AiDiy紹介 (avatar)
+              <span class="icon">X後</span>
+              AiDiy紹介 (backend)
             </div>
             <div class="menu-card-description">
-              Avatar 機能にフォーカスした紹介ビデオ
+              バックエンド構成にフォーカスした紹介ビデオ
             </div>
-            <a :href="avatarUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+            <a :href="backendUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X前</span>
+              AiDiy紹介 (frontend)
+            </div>
+            <div class="menu-card-description">
+              フロントエンド構成にフォーカスした紹介ビデオ
+            </div>
+            <a :href="frontendUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">XAI</span>
+              AiDiy紹介 (AIコア)
+            </div>
+            <div class="menu-card-description">
+              AIコア機能にフォーカスした紹介ビデオ
+            </div>
+            <a :href="aiコアUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">XMC</span>
+              AiDiy紹介 (mcp)
+            </div>
+            <div class="menu-card-description">
+              MCP ツール群にフォーカスした紹介ビデオ
+            </div>
+            <a :href="mcpUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>
@@ -81,6 +124,19 @@ const handleReturn = () => {
               Hermes CLI 機能にフォーカスした紹介ビデオ
             </div>
             <a :href="hermesUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">Xア</span>
+              AiDiy紹介 (avatar)
+            </div>
+            <div class="menu-card-description">
+              Avatar 機能にフォーカスした紹介ビデオ
+            </div>
+            <a :href="avatarUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>

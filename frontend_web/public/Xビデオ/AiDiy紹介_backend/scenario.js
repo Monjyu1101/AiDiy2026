@@ -8,7 +8,6 @@ window.SCENARIO = {
   },
   "target": {
     "language": "ja-JP",
-    "duration_sec": 112.0,
     "format": "html_css_scene_player_with_media",
     "tone": "事実ベース、簡潔、根拠付き",
     "goal": "backend_server の 2 サーバー構成・4 層アーキテクチャ・テーブル命名規則・採番・監査フィールド・V系を正確に伝える。"
@@ -23,8 +22,6 @@ window.SCENARIO = {
     {
       "id": "scene_000",
       "title": "この動画で紹介すること",
-      "start_sec": 0.0,
-      "duration_sec": 12.0,
       "expression": "neutral",
       "accent": "#29d8ff",
       "accent_soft": "rgba(41,216,255,0.2)",
@@ -34,28 +31,24 @@ window.SCENARIO = {
       "headline": "この動画では、AiDiy backend_server の\n設計と実装パターンを紹介します",
       "lead": "2 サーバー構成・4 層アーキテクチャ・日本語ファースト命名・採番・監査フィールド・V系まで、実装に沿って見ていきます。",
       "subtitle": "backend_server の 2 サーバー構成、4 層アーキテクチャ、命名規則、採番、V系を紹介します。",
-      "narration": "AiDiy の backend_server を紹介します。API サーバーの構成と実装ルールを見ていきます。",
       "image": "images/scene_000.png",
       "chips": [],
       "metrics": [],
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_000.mp3",
-      "short_narration": "AiDiy の backend_server はポート 2 本で動く FastAPI アプリです。設計ルールと構成を紹介します。",
-      "long_narration": "この動画では、AiDiy の backend_server を紹介します。2 サーバー構成、4 層アーキテクチャ、日本語ファースト命名、C採番による ID 管理、監査フィールド、そして V 系の生 SQL まで、実装に沿って見ていきます。",
+      "short_narration": "AiDiy のバックエンドは Python 製ウェブサーバー 2 本構成です。設計ルールと実装パターンを紹介します。",
+      "long_narration": "この動画では、AiDiy のバックエンドサーバーを詳しく紹介します。バックエンドとは、画面の裏側でデータを保存したり計算したりするプログラムのことです。AiDiy のバックエンドは Python という言語と FastAPI という最新フレームワークで動いています。コードの書き方がパターン化されているため、「配送管理の機能を追加して」と AI に指示するだけで、データベースの設計から API まで一気に作れます。業務の言葉をそのままコードの名前に使うシンプルなルール、ID の自動管理、更新履歴の自動保存、複数テーブルを組み合わせた検索 API まで、実装に沿って順番に見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 7.44,
+      "short_duration_sec": 7.776,
       "long_start_sec": 0.0,
-      "long_duration_sec": 18.24
+      "long_duration_sec": 40.104
     },
     {
       "id": "scene_001",
       "title": "2 サーバー構成",
-      "start_sec": 12.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#29d8ff",
       "accent_soft": "rgba(41,216,255,0.18)",
@@ -63,9 +56,7 @@ window.SCENARIO = {
       "headline": "core_main (8091) と apps_main (8092) が\n同じ SQLite DB を共有",
       "lead": "Core は C系・A系・認証・AIコアを担当し、Apps は M系・T系・V系・S系を担当します。DB ファイルは `backend_server/_data/AiDiy/database.db` の1ファイルを両サーバーで共有します。",
       "subtitle": "core_main:8091 と apps_main:8092 が同一 SQLite DB を共有する 2 サーバー構成。",
-      "narration": "サーバーは 2 台構成です。core_main がポート 8091、apps_main がポート 8092 で動きます。両サーバーは同じデータベースを共有します。",
       "image": "images/scene_001.png",
-      "audio": "audio/scene_001.mp3",
       "chips": [
         "core_main:8091",
         "apps_main:8092",
@@ -127,20 +118,18 @@ window.SCENARIO = {
           "text": "DB ファイルは `backend_server/_data/AiDiy/database.db` です。`core_main.py` と `apps_main.py` は同じ SQLite DB を共有します。"
         }
       ],
-      "short_narration": "Core サーバーがポート 8091、Apps サーバーがポート 8092 を担う 2 本構成です。",
-      "long_narration": "バックエンドは 2 台のサーバーで構成されています。core_main がポート 8091 で C 系の共通機能、A 系の AI コア、認証を担当し、apps_main がポート 8092 で M 系マスタ、T 系トランザクション、V 系ビュー、S 系スケジューラを担当します。両サーバーは backend_server/_data/AiDiy/database.db の同一 SQLite ファイルを共有します。技術スタックは Python 3.13、FastAPI、SQLAlchemy、Pydantic、JWT です。",
+      "short_narration": "Core（認証・AI）と Apps（業務機能）の 2 本構成で、データベースを共有します。",
+      "long_narration": "バックエンドは 2 本のサーバーで動いています。1 本目は Core サーバー（ポート 8091）で、ログイン認証・利用者管理・AI 機能を担当します。2 本目は Apps サーバー（ポート 8092）で、配車・生産・在庫などの業務機能を担当します。2 本は同じデータベースを共有しているため、データは 1 か所にまとまります。言語は Python 3.13、Web API の仕組みは FastAPI という最新フレームワークを使っています。FastAPI は速く動き、API の仕様書（Swagger）を自動で作成してくれるのが特徴です。Swagger 画面をブラウザで開けば、フロントエンドなしで直接 API の動作確認ができます。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 7.44,
-      "short_duration_sec": 6.504,
-      "long_start_sec": 18.24,
-      "long_duration_sec": 36.912
+      "short_start_sec": 7.776,
+      "short_duration_sec": 6.6,
+      "long_start_sec": 40.104,
+      "long_duration_sec": 45.288
     },
     {
       "id": "scene_002",
       "title": "テーブル命名と日本語ファースト",
-      "start_sec": 26.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#ff8a6b",
       "accent_soft": "rgba(255,138,107,0.18)",
@@ -148,9 +137,7 @@ window.SCENARIO = {
       "headline": "テーブル名・カラム名・API パスまで\nすべて日本語識別子",
       "lead": "接頭辞 C / A / M / T / V / S / X で種別と担当サーバーを区別。API パスは `/core/利用者/一覧`、JSON キーは `{\"利用者名\": \"admin\"}` など、全レイヤーで日本語を統一します。",
       "subtitle": "全レイヤー日本語識別子。接頭辞 C/A/M/T/V/S/X で種別を区別。",
-      "narration": "テーブル名も API パスも日本語で書きます。接頭辞 C は共通、M はマスタ、T はトランザクション、V はビューを表します。",
       "image": "images/scene_002.png",
-      "audio": "audio/scene_002.mp3",
       "chips": [
         "C: Core",
         "M: Master",
@@ -215,20 +202,18 @@ window.SCENARIO = {
           "text": "システム用語（`request`、`query`、`items`、`total`、`limit`）や英字ライブラリ名はそのまま使用します。"
         }
       ],
-      "short_narration": "テーブル名も API パスも変数名もすべて日本語で書く、日本語ファースト設計です。",
-      "long_narration": "テーブル名も API パスも日本語で書くのが AiDiy の原則です。接頭辞 C と A は core_main が担当し、M、T、V、S は apps_main が担当します。テーブルのカラム名も利用者ID、配車日付のように日本語で定義します。API パスは /core/利用者/一覧、JSON のキーは 利用者名といった形で全レイヤーで統一します。request、query、items などのシステム用語と英字ライブラリ名は例外として英語のままにします。",
+      "short_narration": "テーブル名・API パス・変数名はすべて日本語です。業務用語とコードを直結させます。",
+      "long_narration": "AiDiy のユニークなルールは、テーブル名・列名・API のパス・変数名をすべて日本語で書くことです。たとえばテーブル名は「T配車」、API のパスは「/apps/配車/登録」、列名は「配車日付」のように書きます。このルールのおかげで AI への指示がとてもシンプルになります。「T配車テーブルに配車先住所の列を追加して API を作って」という日本語の指示が、そのままコードの名前として使われるからです。設計書の業務用語とプログラムの名前が一致しているので、AI もコードの意図を正確に理解できます。ただし request・query・items などのシステム用語や FastAPI などのライブラリ名は英語のまま使います。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 13.944,
-      "short_duration_sec": 6.264,
-      "long_start_sec": 55.152,
-      "long_duration_sec": 34.32
+      "short_start_sec": 14.376,
+      "short_duration_sec": 7.68,
+      "long_start_sec": 85.392,
+      "long_duration_sec": 44.28
     },
     {
       "id": "scene_003",
       "title": "4層アーキテクチャ",
-      "start_sec": 40.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#c49bff",
       "accent_soft": "rgba(196,155,255,0.18)",
@@ -236,9 +221,7 @@ window.SCENARIO = {
       "headline": "Model → Schema → CRUD → Router の\n4 層で新機能を実装",
       "lead": "新規 M/T/C 機能はすべてこの 4 層で実装します。加えて `apps_main.py` への router 登録と `__init__.py` への import 追加が必要です。",
       "subtitle": "Model / Schema / CRUD / Router + Main登録の5ステップ。落とし穴は __init__.py 追加漏れ。",
-      "narration": "新機能を作るときは Model、Schema、CRUD、Router の 4 ファイルを順に作ります。最後に apps_main.py への登録が必要です。",
       "image": "images/scene_003.png",
-      "audio": "audio/scene_003.mp3",
       "chips": [
         "SQLAlchemy Model",
         "Pydantic Schema",
@@ -302,20 +285,18 @@ window.SCENARIO = {
           "text": "よくある落とし穴: `apps_crud/__init__.py` の import / `__all__` 追加漏れ。`apps_models/__init__.py` の import 追加漏れにより `create_all()` 対象外になる。"
         }
       ],
-      "short_narration": "Model・Schema・CRUD・Router の 4 ファイルを作れば、ひとつの機能が完成します。",
-      "long_narration": "新機能を追加するときは 4 つのファイルを作ります。SQLAlchemy モデルの Model、Pydantic スキーマの Schema、DB アクセスロジックの CRUD、FastAPI エンドポイントの Router です。最後に apps_main.py への router 登録と各 __init__.py への import 追加が必要です。この import を忘れると create_all() の対象から漏れます。エンドポイントは POST 中心で統一し、レスポンスは status、message、data の形式に揃えます。",
+      "short_narration": "新機能は Model・Schema・CRUD・Router の 4 ファイルで追加します。統一パターンで迷いません。",
+      "long_narration": "新しい機能を追加するとき、バックエンドでは 4 種類のファイルを作ります。データベースの構造を決める Model、入出力の形を決める Schema、データの取得・保存を書く CRUD、API の窓口となる Router です。このパターンが全機能で統一されているので、AI への指示がシンプルです。「M商品と同じ 4 層パターンで、M顧客マスタを追加して」の一言で、Model から Router まで 4 ファイルを一気に生成します。できたら起動ファイルに Router を 1 行登録するだけで API が動き出します。サンプルコードがお手本になるので、AI は細かいルールを指示しなくても AiDiy の書き方に沿ったコードを作れます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 20.208,
-      "short_duration_sec": 5.88,
-      "long_start_sec": 89.472,
-      "long_duration_sec": 34.08
+      "short_start_sec": 22.056,
+      "short_duration_sec": 7.608,
+      "long_start_sec": 129.672,
+      "long_duration_sec": 41.952
     },
     {
       "id": "scene_004",
       "title": "採番と監査フィールド",
-      "start_sec": 54.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#00e0b8",
       "accent_soft": "rgba(0,224,184,0.18)",
@@ -323,9 +304,7 @@ window.SCENARIO = {
       "headline": "AUTOINCREMENT 非依存の C採番と\n全テーブル共通 8 監査フィールド",
       "lead": "`C採番` テーブルで採番を一元管理し、AUTOINCREMENT に依存しません。全テーブルに登録/更新 × 日時/利用者ID/利用者名/端末ID の 8 フィールドが必須です。",
       "subtitle": "採番は get_next_id()、監査は create_audit_fields() / update_audit_fields() で統一。",
-      "narration": "ID は C採番テーブルで管理します。全テーブルに登録者・更新者などの情報を記録する 8 つのフィールドが必要です。",
       "image": "images/scene_004.png",
-      "audio": "audio/scene_004.mp3",
       "chips": [
         "C採番テーブル",
         "get_next_id()",
@@ -388,20 +367,18 @@ window.SCENARIO = {
           "text": "全テーブルに 8 フィールド: 登録日時・登録利用者ID・登録利用者名・登録端末ID・更新日時・更新利用者ID・更新利用者名・更新端末ID。"
         }
       ],
-      "short_narration": "ID は C採番テーブルで管理し、全テーブルに登録・更新の監査 8 フィールドが必須です。",
-      "long_narration": "ID の採番は AUTOINCREMENT を使わず、C採番テーブルで一元管理します。新しいテーブルを追加するときは C採番にそのテーブル名のエントリを追加します。また全テーブルに監査フィールドが必須です。登録日時、登録利用者ID、登録利用者名、登録端末ID、更新日時、更新利用者ID、更新利用者名、更新端末IDの 8 フィールドで、登録時は create_audit_fields、更新時は update_audit_fields のヘルパーを使います。",
+      "short_narration": "ID は C採番テーブルで管理します。全テーブルに 8 項目の監査フィールドが必須です。",
+      "long_narration": "AiDiy には 2 つの便利な仕組みが標準で入っています。1 つは C採番テーブルによる ID の自動発行です。テーブルごとに連番を管理するので、複数のテーブルで ID が重ならない設計が簡単にできます。2 つ目は全テーブルに必須の 8 つの更新記録項目です。登録した日時・利用者名・端末 ID と、更新した日時・利用者名・端末 ID が自動でセットされます。この仕組みが標準で入っていることで、AI が機能を生成するとき ID 発行と更新記録の処理をゼロから考えなくて済みます。誰がいつ変更したかをあとから必ず追跡できるため、業務システムとしての信頼性も高まります。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 26.088,
-      "short_duration_sec": 7.32,
-      "long_start_sec": 123.552,
-      "long_duration_sec": 35.592
+      "short_start_sec": 29.664,
+      "short_duration_sec": 6.912,
+      "long_start_sec": 171.624,
+      "long_duration_sec": 44.136
     },
     {
       "id": "scene_005",
       "title": "V系ビュー（生 SQL JOIN）",
-      "start_sec": 68.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#ffd166",
       "accent_soft": "rgba(255,209,102,0.18)",
@@ -409,9 +386,7 @@ window.SCENARIO = {
       "headline": "DB VIEW を作らず、V系 Router に\n生 SQL で JOIN・集計",
       "lead": "V系は Model / CRUD 層を持たず、Router 内に生 SQL を直接書きます。`SELECT` と `COUNT(*)` は同じ FROM / JOIN / WHERE を使い、SQL には bind params を使います。",
       "subtitle": "DB VIEW オブジェクトなし。V系 Router に生 SQL。一覧の items と total は同一条件で取得。",
-      "narration": "V 系は複数テーブルを結合して一覧を返す API です。データベースの VIEW は作らず、Router ファイルに SQL を直書きします。",
       "image": "images/scene_005.png",
-      "audio": "audio/scene_005.mp3",
       "chips": [
         "生 SQL JOIN",
         "bind params",
@@ -475,20 +450,18 @@ window.SCENARIO = {
           "text": "DB VIEW オブジェクトは作らず、V系 Router の生 SQL で JOIN / 集計する。"
         }
       ],
-      "short_narration": "V 系エンドポイントは Router に SQL を直接書いて結合一覧を返す専用パターンです。",
-      "long_narration": "V 系は複数テーブルを結合して一覧と件数を返す API です。データベースの VIEW オブジェクトは作らず、Router ファイルに生 SQL を直接書きます。Model 層と CRUD 層は持ちません。SELECT と COUNT(*) は同じ FROM、JOIN、WHERE 条件を使い、SQL への値は bind params で渡して直結はしません。ページングと並び替えに対応した実装パターンが既存コードに揃っています。",
+      "short_narration": "複数テーブルを集約して返す V 系は、SQL を Router に直接書くシンプルなパターンです。",
+      "long_narration": "V 系は、複数のテーブルを組み合わせて一覧データを返す API のグループです。データベースに VIEW という仕組みを作る代わりに、Router ファイルに SQL を直接書くシンプルな作りにしています。たとえば「取引先と取引先分類を結合して一覧を返す」という処理は、Router に SQL を書いてパラメータを渡すだけです。AI への指示は「V系パターンで商品在庫一覧の API を作って」の一言で済みます。AI はサンプルの V 系コードを見て、検索条件・ページング・件数取得まで揃ったコードを同じパターンで生成します。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 33.408,
-      "short_duration_sec": 7.392,
-      "long_start_sec": 159.144,
-      "long_duration_sec": 27.552
+      "short_start_sec": 36.576,
+      "short_duration_sec": 6.672,
+      "long_start_sec": 215.76,
+      "long_duration_sec": 37.8
     },
     {
       "id": "scene_006",
       "title": "業務サンプルと S系スケジューラ",
-      "start_sec": 82.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#7dffb3",
       "accent_soft": "rgba(125,255,179,0.18)",
@@ -496,9 +469,7 @@ window.SCENARIO = {
       "headline": "配車・生産・商品管理など\n実装済みの業務サンプル",
       "lead": "M系 9 テーブル・T系 5 テーブル・S系 4 エンドポイントの業務サンプルが実装済み。明細型は `明細SEQ=0` をヘッダー予約、複合主キーで管理します。",
       "subtitle": "M系9・T系5・S系4の業務サンプル実装済み。明細型パターンは M商品構成・T生産が代表実装。",
-      "narration": "業務サンプルとして M 系 9 テーブル、T 系 5 テーブルが実装済みです。これを参考に機能を追加できます。",
       "image": "images/scene_006.png",
-      "audio": "audio/scene_006.mp3",
       "chips": [
         "M系 ×9",
         "T系 ×5",
@@ -560,20 +531,18 @@ window.SCENARIO = {
           "text": "明細型: `明細SEQ=0` をヘッダー行に予約する。`(親ID, 明細SEQ)` の複合主キーを使う。更新時は対象親IDの既存行を全削除して、ヘッダー + 明細を再作成する。"
         }
       ],
-      "short_narration": "M 系 9 テーブル・T 系 5 テーブルの業務サンプルが実装の参考になります。",
-      "long_narration": "業務サンプルとして M 系 9 テーブル、T 系 5 テーブル、S 系 4 エンドポイントが実装済みです。配車管理は M配車区分、M車両、T配車、V配車、S配車で構成され、生産管理は M商品構成と T生産を含む明細型パターンの実例になっています。S 系スケジューラは S配車_日表示、S配車_週表示、S生産_日表示、S生産_週表示の 4 エンドポイントで週次・日次の集計を提供します。明細型は 明細SEQ=0 をヘッダー予約、親IDと明細SEQの複合主キーで管理します。",
+      "short_narration": "M 系 9・T 系 5 のサンプルが実装済みです。AI のお手本になり、すぐ新機能を追加できます。",
+      "long_narration": "AiDiy の業務サンプルは「学習教材」というより「AI がコードを生成するときのお手本」として設計されています。マスタ系 9 テーブル・トランザクション系 5 テーブル・スケジューラ 4 種類が、4 層パターンで統一された形で実装されています。AI への指示はシンプルです。「M商品構成と同じパターンで M顧客マスタを追加して」と言えば、Model から Router まで 4 層を一気に生成します。明細行を持つ T生産のパターンを見せれば、親レコードと明細行を同時に扱う機能も作れます。スケジューラ S配車のお手本があれば、定期実行の集計機能も同じように作れます。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_start_sec": 40.8,
-      "short_duration_sec": 5.352,
-      "long_start_sec": 186.696,
-      "long_duration_sec": 44.472
+      "short_start_sec": 43.248,
+      "short_duration_sec": 7.752,
+      "long_start_sec": 253.56,
+      "long_duration_sec": 40.536
     },
     {
       "id": "scene_999",
       "title": "ご視聴ありがとうございました",
-      "start_sec": 96.0,
-      "duration_sec": 16.0,
       "expression": "neutral",
       "accent": "#29d8ff",
       "accent_soft": "rgba(41,216,255,0.2)",
@@ -583,25 +552,22 @@ window.SCENARIO = {
       "headline": "ご視聴ありがとうございました。\nどのテーブルから実装しますか？",
       "lead": "2 サーバー・4 層・日本語ファースト・C採番・8 監査フィールド・V系生 SQL。業務サンプルを参考に、あなたの業務テーブルを追加してみてください。",
       "subtitle": "backend_server — 2 サーバー構成、4 層アーキテクチャ、日本語ファースト、C採番、V系生 SQL。",
-      "narration": "2 サーバー、4 層、日本語設計、採番、監査フィールド、V 系 SQL。サンプルを参考に追加してみてください。",
       "image": "images/scene_999.png",
       "chips": [],
       "metrics": [],
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_999.mp3",
-      "short_narration": "4 層構造・日本語設計・C採番・監査フィールド。サンプルを参考に業務機能を追加してください。",
-      "long_narration": "ご視聴ありがとうございました。2 サーバー構成、4 層アーキテクチャ、日本語ファースト設計、C採番、8 フィールドの監査情報、V 系の生 SQL。豊富な業務サンプルを参考に、あなたの業務テーブルを追加してみてください。",
+      "short_narration": "AI の指示一つで API から画面まで一気に作れます。AiDiy で業務システムを作ってみませんか。",
+      "long_narration": "AiDiy の AI コーディング機能を使えば、バックエンドとフロントエンドを一気通貫で生成できます。「配送管理の一覧・登録・編集機能を追加して」と AI に指示するだけで、サーバー側の API とフロントエンドの画面が同時に出来上がります。サンプルコードが AI のお手本になるので、4 層パターン・日本語ルール・テーブル設計を細かく指示しなくても、AiDiy のルールに沿ったコードを生成します。開発環境を立ち上げ、AI に機能を頼み、動作確認する。このサイクルで業務システムをどんどん育てていけます。今日から使える業務システムを、AiDiy で作ってみませんか。",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 46.152,
-      "short_duration_sec": 7.8,
-      "long_start_sec": 231.168,
-      "long_duration_sec": 16.104
+      "short_start_sec": 51.0,
+      "short_duration_sec": 7.536,
+      "long_start_sec": 294.096,
+      "long_duration_sec": 39.672
     }
   ],
-  "duration_sec": 112.0,
-  "short_duration_sec": 53.952,
-  "long_duration_sec": 247.272
+  "short_duration_sec": 58.536,
+  "long_duration_sec": 333.768
 };

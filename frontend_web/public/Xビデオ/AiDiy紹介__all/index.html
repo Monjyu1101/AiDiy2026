@@ -336,8 +336,8 @@
       </div>
 
       <div class="controls-right">
-        <div id="timer" class="timer">00:00 / 01:08</div>
-        <div id="meta" class="meta">scene 1 / 8</div>
+        <div id="timer" class="timer">00:00 / 00:50</div>
+        <div id="meta" class="meta">scene 1 / 10</div>
       </div>
     </footer>
   </div>
@@ -363,27 +363,19 @@
     let effectiveSceneDuration = 0;
 
     function getSceneAudio(scene) {
-      if (audioMode === "short" && scene.short_audio) return scene.short_audio;
-      if (audioMode === "long" && scene.long_audio) return scene.long_audio;
-      return typeof scene.audio === "string" && scene.audio ? scene.audio : "";
+      return audioMode === "long" ? (scene.long_audio || "") : (scene.short_audio || "");
     }
 
     function getSceneDurationSec(scene) {
-      if (audioMode === "short" && scene.short_duration_sec != null) return scene.short_duration_sec;
-      if (audioMode === "long" && scene.long_duration_sec != null) return scene.long_duration_sec;
-      return scene.duration_sec;
+      return audioMode === "long" ? (scene.long_duration_sec || 0) : (scene.short_duration_sec || 0);
     }
 
     function getSceneStartSec(scene) {
-      if (audioMode === "short" && scene.short_start_sec != null) return scene.short_start_sec;
-      if (audioMode === "long" && scene.long_start_sec != null) return scene.long_start_sec;
-      return scene.start_sec;
+      return audioMode === "long" ? (scene.long_start_sec || 0) : (scene.short_start_sec || 0);
     }
 
     function getTotalDurationSec() {
-      if (audioMode === "short" && scenario.short_duration_sec != null) return scenario.short_duration_sec;
-      if (audioMode === "long" && scenario.long_duration_sec != null) return scenario.long_duration_sec;
-      return scenario.duration_sec || scenario.target?.duration_sec || 1;
+      return audioMode === "long" ? (scenario.long_duration_sec || 1) : (scenario.short_duration_sec || 1);
     }
 
     function updateModeBtn() {

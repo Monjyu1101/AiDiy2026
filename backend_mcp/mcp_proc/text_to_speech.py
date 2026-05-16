@@ -45,12 +45,32 @@ class TextToSpeech:
     テキスト音声合成クラス
 
     provider:
-        "auto"   — freeai（デフォルト。キー未設定時は edge に自動フォールバック）
+        "auto"   — 即 edge を使う（キー不要・常時利用可の既定経路）
         "edge"   — Microsoft Edge ニューラル TTS
         "gemini" — Google Gemini TTS（GEMINI_API_KEY が必要）
         "freeai" — FreeAI TTS（FREEAI_API_KEY が必要、実体は Gemini）
         "openai" — OpenAI TTS（OPENAI_API_KEY が必要）
+
+    自動フォールバックチェーン（FALLBACK_CHAIN）:
+        auto   → edge
+        freeai → gemini → edge
+        gemini → edge
+        openai → edge
+        edge   → (フォールバックなし。最終手段)
+
+    どの provider を指定しても最終的に edge まで到達するため、ネットワーク
+    断や API キー不備があっても合成自体は通る前提。キー無効の候補は事前に
+    スキップし、合成失敗時もチェーンに沿って次の候補へ進む。
     """
+
+    # 自動フォールバック順（左から順に試す）。
+    FALLBACK_CHAIN: dict[str, list[str]] = {
+        "auto":   ["edge"],
+        "edge":   ["edge"],
+        "openai": ["openai", "edge"],
+        "gemini": ["gemini", "edge"],
+        "freeai": ["freeai", "gemini", "edge"],
+    }
 
     DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
 
@@ -463,7 +483,14 @@ class TextToSpeech:
     ) -> tuple[bytes, dict]:
         """
         テキストから音声を合成する。
-        指定 provider のキーが無効な場合は自動で edge にフォールバックする。
+
+        フォールバックは FALLBACK_CHAIN（クラス定数）に従う:
+            auto   → edge
+            freeai → gemini → edge
+            gemini → edge
+            openai → edge
+            edge   → (フォールバックなし)
+        キー無効の候補は事前にスキップし、合成例外発生時も次の候補へ進む。
 
         Args:
             ratio: 話速倍率。None は既定値 1.2 として扱う。0 / 1 は速度調整なし。
@@ -481,47 +508,51 @@ class TextToSpeech:
         requested = self._normalize_provider(provider)
         model = model.strip().lower()
         language = language.strip().lower()
+        voice_input = voice
 
-        # キーが必要な provider でキーが無効 → edge にフォールバック
-        used = requested
-        if requested in ("openai", "gemini", "freeai"):
-            if self._get_api_key(requested) is None:
-                used = "edge"
+        # FALLBACK_CHAIN に沿って候補を順に試す。
+        # キー無効はスキップ、合成例外は次の候補へ、最終候補で失敗したら raise。
+        chain = self.FALLBACK_CHAIN[requested]
+        used: Optional[str] = None
+        used_voice: Optional[str] = None
+        audio_bytes: Optional[bytes] = None
+        last_error: Optional[Exception] = None
 
-        voice = self._resolve_voice(voice, used, language)
+        for candidate in chain:
+            # キーが必要な候補で、キーが無ければスキップして次へ
+            if candidate in ("openai", "gemini", "freeai"):
+                if self._get_api_key(candidate) is None:
+                    logger.info(f"{candidate} は API キー未設定のためスキップ")
+                    continue
 
-        try:
-            if used == "edge":
-                audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
-            elif used == "gemini":
-                audio_bytes = self._synthesize_gemini(normalized_text, voice, model, used, effective_ratio)
-            elif used == "freeai":
-                audio_bytes = self._synthesize_gemini(normalized_text, voice, model, used, effective_ratio)
-            elif used == "openai":
-                audio_bytes = self._synthesize_openai(normalized_text, voice, model, effective_ratio)
-            else:
-                raise TextToSpeechError(f"未対応の provider です: '{used}'")
-        except Exception:
-            if used == "edge":
-                raise
-            # freeai 失敗 → gemini にフォールバック、gemini も失敗 → edge
-            if used == "freeai" and self._get_api_key("gemini") is not None:
-                try:
-                    used = "gemini"
-                    voice = self._resolve_voice("auto", used, language)
-                    audio_bytes = self._synthesize_gemini(normalized_text, voice, model, used, effective_ratio)
-                    logger.info("freeai 失敗 → gemini にフォールバックしました")
-                except Exception:
-                    used = "edge"
-                    voice = self._resolve_voice("auto", used, language)
-                    audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
-                    logger.info("freeai/gemini 失敗 → edge にフォールバックしました")
-            else:
-                used = "edge"
-                voice = self._resolve_voice("auto", used, language)
-                audio_bytes = self._synthesize_edge(normalized_text, voice, effective_ratio)
-                logger.info(f"{requested} 失敗 → edge にフォールバックしました")
+            # 候補ごとに voice を解決し直す（provider 別に female/male マッピングが違うため）
+            resolved_voice = self._resolve_voice(voice_input, candidate, language)
+            try:
+                if candidate == "edge":
+                    audio_bytes = self._synthesize_edge(normalized_text, resolved_voice, effective_ratio)
+                elif candidate == "openai":
+                    audio_bytes = self._synthesize_openai(normalized_text, resolved_voice, model, effective_ratio)
+                elif candidate in ("gemini", "freeai"):
+                    audio_bytes = self._synthesize_gemini(normalized_text, resolved_voice, model, candidate, effective_ratio)
+                else:
+                    raise TextToSpeechError(f"未対応の provider です: '{candidate}'")
+                used = candidate
+                used_voice = resolved_voice
+                if candidate != requested:
+                    logger.info(f"{requested} → {candidate} にフォールバックしました")
+                break
+            except Exception as e:
+                last_error = e
+                logger.info(f"{candidate} 合成失敗: {e}")
+                continue
 
+        if audio_bytes is None or used is None:
+            # チェーン全滅。最後のエラーを添えて raise（基本起こり得ない：edge は鍵不要）
+            raise TextToSpeechError(
+                f"全フォールバック候補で合成に失敗しました（requested={requested}, chain={chain}）: {last_error}"
+            )
+
+        voice = used_voice or voice_input
         audio_format = self._detect_audio_format(audio_bytes)
 
         info = {
@@ -964,13 +995,13 @@ class TextToSpeech:
     # ------------------------------------------------------------------ #
 
     def _normalize_provider(self, provider: str) -> str:
+        """provider 文字列を正規化する。'auto' はそのまま 'auto' で返し、
+        FALLBACK_CHAIN["auto"] = ["edge"] によって実合成は edge で行う。"""
         p = provider.strip().lower()
-        if p == "auto":
-            return "freeai"
-        if p in ("edge", "openai", "gemini", "freeai"):
+        if p in self.FALLBACK_CHAIN:
             return p
         raise TextToSpeechError(
-            f"未対応の provider です: '{provider}'（edge / openai / gemini / freeai）"
+            f"未対応の provider です: '{provider}'（auto / edge / openai / gemini / freeai）"
         )
 
     def _resolve_voice(self, voice: str, provider: str, language: str = "ja") -> str:

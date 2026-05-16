@@ -8,7 +8,6 @@ window.SCENARIO = {
   },
   "target": {
     "language": "ja-JP",
-    "duration_sec": 110.0,
     "format": "html_css_scene_player_with_media",
     "tone": "事実ベース、簡潔、根拠付き",
     "goal": "frontend_web の技術スタック・コンポーネント配置・qTubler・認証・Vite proxy・AIコア連携を正確に伝える。"
@@ -23,8 +22,6 @@ window.SCENARIO = {
     {
       "id": "scene_000",
       "title": "この動画で紹介すること",
-      "start_sec": 0.0,
-      "duration_sec": 12.0,
       "expression": "neutral",
       "accent": "#7b8cff",
       "accent_soft": "rgba(123,140,255,0.2)",
@@ -34,28 +31,24 @@ window.SCENARIO = {
       "headline": "この動画では、AiDiy frontend_web の\n設計と実装パターンを紹介します",
       "lead": "Vue 3・Vite・qTubler・Vue Router・Pinia・Axios・認証・Vite proxy・AIコア連携まで、実装に沿って見ていきます。",
       "subtitle": "frontend_web の技術スタック、コンポーネント配置、qTubler、認証、AIコア連携を紹介します。",
-      "narration": "AiDiy の Web 画面、frontend_web を紹介します。Vue 3 と Vite で作られた Web アプリです。",
       "image": "images/scene_000.png",
       "chips": [],
       "metrics": [],
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_000.mp3",
-      "short_narration": "AiDiy の Web フロントエンド、frontend_web を紹介します。Vue 3・Vite・TypeScript で構築されています。",
-      "long_narration": "この動画では、AiDiy の Web フロントエンド、frontend_web を紹介します。Vue 3 と Vite、独自グリッドの qTubler、Vue Router と Pinia、Axios 認証、Vite Proxy、AI コアとの WebSocket 連携まで、実装に沿って見ていきます。",
+      "short_narration": "AiDiy の Web 画面は Vue 3 で作られています。画面の仕組みと構成を紹介します。",
+      "long_narration": "この動画では、AiDiy の Web 画面フロントエンドを詳しく紹介します。フロントエンドとは、ブラウザに表示される画面のことです。AiDiy の Web 画面は Vue 3 という最新の JavaScript フレームワークで作られています。Vue 3 は画面を部品（コンポーネント）の組み合わせで作る仕組みで、コードの構成がパターン化されているため、AI に「この画面と同じ形で商品管理画面を追加して」と指示するだけで、API 連携まで含めた画面を生成できます。Vite・TypeScript・Vue Router・Pinia と、今のフロントエンド開発の標準ツールを組み合わせた構成です。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 8.4,
+      "short_duration_sec": 6.36,
       "long_start_sec": 0.0,
-      "long_duration_sec": 17.76
+      "long_duration_sec": 38.208
     },
     {
       "id": "scene_001",
       "title": "技術スタックと基本方針",
-      "start_sec": 12.0,
-      "duration_sec": 13.0,
       "expression": "neutral",
       "accent": "#7b8cff",
       "accent_soft": "rgba(123,140,255,0.18)",
@@ -63,9 +56,7 @@ window.SCENARIO = {
       "headline": "Vue 3 + Vite + TypeScript で\nポート 8090 から提供",
       "lead": "Composition API・`<script setup lang=\"ts\">`・Vue Router・Pinia を使います。UI framework は使わず、既存 CSS と共有コンポーネントへ合わせます。TypeScript は strict mode 無効で運用します。",
       "subtitle": "Vue 3 Composition API、Vite:8090、strict mode 無効 TypeScript、独自 CSS。",
-      "narration": "ポート 8090 で動く Vue 3 アプリです。画面遷移は Vue Router、状態管理は Pinia を使います。",
       "image": "images/scene_001.png",
-      "audio": "audio/scene_001.mp3",
       "chips": [
         "Vue 3 Composition API",
         "Vite:8090",
@@ -127,20 +118,18 @@ window.SCENARIO = {
           "text": "Vue 3 Composition API と `<script setup lang=\"ts\">` を使う。UI framework / CSS framework は使わず、既存 CSS と共有コンポーネントへ合わせる。TypeScript は strict mode 無効の設定で運用しているが、不要な `any` の拡大は避ける。"
         }
       ],
-      "short_narration": "ポート 8090 の Vue 3 アプリです。Vue Router でページを管理し、Pinia で状態を共有します。",
-      "long_narration": "frontend_web はポート 8090 で動く Vue 3 アプリです。Composition API と script setup lang ts を基本とし、画面遷移は Vue Router、状態管理は Pinia を使います。UI フレームワークは使わず、既存の CSS とコンポーネントに合わせます。TypeScript は strict mode を無効にした設定で運用します。これは frontend_avatar の strict mode 有効設定と異なる点です。",
+      "short_narration": "ポート 8090 で動く Vue 3 アプリです。画面切り替えは Vue Router、データ共有は Pinia で管理します。",
+      "long_narration": "Web 画面はポート 8090 番で動く Vue 3 アプリです。ビルドには高速な Vite、言語は TypeScript を使っています。ページの切り替えには Vue Router を使い、URL と画面コンポーネントを対応づけます。アプリ全体で共有するデータの管理には Pinia を使い、ログイン中の利用者情報など複数の画面をまたぐデータをここで管理します。Vue 3・Vite・TypeScript・Vue Router・Pinia は、今のフロントエンド開発で世界標準となっているツールの組み合わせです。AI の学習データも豊富なので、コード生成の精度が高く、エラーの解決もしやすいのが特徴です。外部 UI フレームワークは使わず、既存スタイルに合わせた統一した見た目を保っています。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 8.4,
-      "short_duration_sec": 7.992,
-      "long_start_sec": 17.76,
-      "long_duration_sec": 28.704
+      "short_start_sec": 6.36,
+      "short_duration_sec": 8.04,
+      "long_start_sec": 38.208,
+      "long_duration_sec": 45.936
     },
     {
       "id": "scene_002",
       "title": "コンポーネント配置と Router",
-      "start_sec": 25.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#ff8a6b",
       "accent_soft": "rgba(255,138,107,0.18)",
@@ -148,9 +137,7 @@ window.SCENARIO = {
       "headline": "接頭辞別にフォルダ分け、\nRouter は 3 ファイル構成",
       "lead": "C系は C管理、M系は Mマスタ、T系は Tトラン、V系は Vビュー、S系は Sスケジューラー、X系は Xその他。Router は index.ts / coreRouter.ts / appsRouter.ts の 3 ファイルで分担します。",
       "subtitle": "コンポーネントは接頭辞別フォルダ。Router は index.ts / coreRouter.ts / appsRouter.ts の 3 分割。",
-      "narration": "画面ファイルは接頭辞ごとにフォルダを分けます。Router は 3 つのファイルに分割されています。日本語名コンポーネントは component コロン is で呼び出します。",
       "image": "images/scene_002.png",
-      "audio": "audio/scene_002.mp3",
       "chips": [
         "C管理/Mマスタ/Tトラン/Vビュー",
         "Sスケジューラー/Xその他",
@@ -212,20 +199,18 @@ window.SCENARIO = {
           "text": "よくある落とし穴: `<C利用者一覧 />` のような日本語タグを書くとブラウザで無効扱いになる。"
         }
       ],
-      "short_narration": "C 系・M 系・T 系など接頭辞別フォルダで画面コンポーネントを整理して管理します。",
-      "long_narration": "コンポーネントは接頭辞別のフォルダに配置します。C 系は C管理、M 系は Mマスタ、T 系は Tトラン、V 系は Vビュー、S 系は Sスケジューラー、X 系は Xその他フォルダです。Router は index.ts、coreRouter.ts、appsRouter.ts の 3 ファイルに分割して管理します。日本語名のコンポーネントは Vue テンプレート内でタグとして直接書けないため、component コロン is の形式で呼び出します。",
+      "short_narration": "画面コンポーネントは C 系・M 系・T 系など、接頭辞別のフォルダに整理して配置します。",
+      "long_narration": "コンポーネントは接頭辞ごとのフォルダに整理されています。C 系は C管理、M 系は Mマスタ、T 系は Tトラン、V 系は Vビュー、X 系は Xその他フォルダです。このフォルダ構成を AI に教えることで、「M系のマスタ画面として Mマスタ フォルダに追加して」という指示だけで、正しい場所に正しい形のファイルを作れます。Router は 3 ファイル（index.ts・coreRouter.ts・appsRouter.ts）に分かれており、AI が追加するファイルをどの Router に登録するかも自動で判断します。日本語のファイル名で作ったコンポーネントは component タグの is 属性で呼び出す書き方が必要ですが、サンプルコードがあれば AI がそのまま踏襲します。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 16.392,
-      "short_duration_sec": 6.384,
-      "long_start_sec": 46.464,
-      "long_duration_sec": 31.584
+      "short_start_sec": 14.4,
+      "short_duration_sec": 7.056,
+      "long_start_sec": 84.144,
+      "long_duration_sec": 45.696
     },
     {
       "id": "scene_003",
       "title": "qTubler — 独自グリッドコンポーネント",
-      "start_sec": 39.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#00e0b8",
       "accent_soft": "rgba(0,224,184,0.18)",
@@ -233,9 +218,7 @@ window.SCENARIO = {
       "headline": "ソート・ページング・行選択を持つ\n独自テーブル qTubler",
       "lead": "`_share/qTublerFrame.vue` が主要グリッドです。外部 UI framework に置き換えない方針で、`columns`・`rows`・`totalCount`・`currentPage`・`sortKey` などを props で渡し、sort/page イベントで再取得します。",
       "subtitle": "qTublerFrame.vue が標準一覧テーブル。sort/page イベントで V系 API を再取得する。",
-      "narration": "qTubler は AiDiy 独自の一覧テーブルです。列定義と行データを渡すとページングとソートが使えます。",
       "image": "images/scene_003.png",
-      "audio": "audio/scene_003.mp3",
       "chips": [
         "qTublerFrame.vue",
         "columns / rows / totalCount",
@@ -298,20 +281,18 @@ window.SCENARIO = {
           "text": "`columns` は `types/qTubler.ts` の型に合わせる。`rows`、`rowKey`、`totalCount`、`totalAll`、`currentPage`、`totalPages`、`sortKey`、`sortOrder` を渡す。sort / page イベントで再取得する。"
         }
       ],
-      "short_narration": "qTubler は列定義を渡すだけで一覧・検索・ページングが揃う独自テーブルコンポーネントです。",
-      "long_narration": "qTubler は AiDiy 独自の一覧テーブルコンポーネントです。_share/qTublerFrame.vue が実体で、columns と rows と totalCount を渡すだけでページングとソートが使えます。sort イベントや page イベントで V 系 API を再取得するパターンが標準です。数値入力は内部値をカンマなし文字列で持ち、フォーカスが外れたときだけ 3 桁区切りで表示します。外部 UI フレームワークへの置き換えは行わない方針です。",
+      "short_narration": "qTubler は列定義を渡すだけで、一覧・検索・ページングが揃う AiDiy 独自のテーブル部品です。",
+      "long_narration": "qTubler は AiDiy 独自の一覧テーブル部品です。列の定義・データ・件数の 3 つを渡すだけで、ページングとソートが動くテーブルが完成します。外部 UI ライブラリに依存しない独自部品なので、AiDiy のルールを学習した AI なら qTubler を使ったコードを自動で生成できます。「qTubler を使って商品在庫一覧画面を追加して」の一言で、検索フォーム・ページング・ソートが揃った画面が出来上がります。数値はカンマなしで受け取って表示時に桁区切りを付ける仕組みも自動で含まれます。AiDiy 全体で統一された見た目を保ちながら、新しい一覧画面を素早く追加できます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 22.776,
-      "short_duration_sec": 7.392,
-      "long_start_sec": 78.048,
-      "long_duration_sec": 27.624
+      "short_start_sec": 21.456,
+      "short_duration_sec": 7.104,
+      "long_start_sec": 129.84,
+      "long_duration_sec": 40.32
     },
     {
       "id": "scene_004",
       "title": "認証と Vite Proxy",
-      "start_sec": 53.0,
-      "duration_sec": 13.0,
       "expression": "neutral",
       "accent": "#c49bff",
       "accent_soft": "rgba(196,155,255,0.18)",
@@ -319,9 +300,7 @@ window.SCENARIO = {
       "headline": "JWT を localStorage に保存し、\n401 は interceptor でログアウト",
       "lead": "token と user を `localStorage` に保存します。401 は Axios response interceptor でログアウト処理へ流れます。API は `/core/*` → 8091、`/apps/*` → 8092 に Vite proxy 経由で転送します。",
       "subtitle": "localStorage + Axios interceptor。Vite proxy で /core→8091、/apps→8092 に転送。",
-      "narration": "ログイン後のトークンは localStorage に保存します。API の /core と /apps は自動的に backend に振り分けられます。",
       "image": "images/scene_004.png",
-      "audio": "audio/scene_004.mp3",
       "chips": [
         "JWT localStorage",
         "Axios interceptor",
@@ -384,20 +363,18 @@ window.SCENARIO = {
           "text": "よくある落とし穴: Vite proxy を使わず `http://localhost:8091` へ直叩きして CORS 条件が変わる。"
         }
       ],
-      "short_narration": "トークンは localStorage に保存し、API リクエストは Vite Proxy で Core と Apps に振り分けます。",
-      "long_narration": "認証トークンと利用者情報は localStorage の token と user キーに保存します。401 エラーは client.ts の Axios response interceptor が自動的にキャッチして、ログアウト処理へ流します。API の baseURL はスラッシュのみとし、Vite proxy 設定で /core は 8091、/apps は 8092 に転送します。localhost:8091 を直接叩くと CORS 条件が変わるため、必ず proxy 経由でアクセスします。",
+      "short_narration": "ログイン情報はブラウザに保存し、API リクエストは Vite Proxy で Core と Apps に自動で振り分けます。",
+      "long_narration": "ログイン後のトークンと利用者情報はブラウザの localStorage に保存します。API のエラーは Axios のインターセプターが自動でキャッチして、ログアウト画面に誘導します。サーバーとの通信はすべて Vite の Proxy 設定を経由します。/core で始まるパスは Core サーバー（ポート 8091）に、/apps で始まるパスは Apps サーバー（ポート 8092）に自動で振り分けられます。この仕組みのおかげで、フロントエンドのコードにサーバーのアドレスを直書きしなくて済みます。AI がコードを生成するときも「/apps/商品/一覧を呼ぶ」と書けば、Proxy が自動で転送先を解決します。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 30.168,
-      "short_duration_sec": 6.84,
-      "long_start_sec": 105.672,
-      "long_duration_sec": 30.432
+      "short_start_sec": 28.56,
+      "short_duration_sec": 7.848,
+      "long_start_sec": 170.16,
+      "long_duration_sec": 40.464
     },
     {
       "id": "scene_005",
       "title": "AIコア画面連携",
-      "start_sec": 66.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#ffd166",
       "accent_soft": "rgba(255,209,102,0.18)",
@@ -405,9 +382,7 @@ window.SCENARIO = {
       "headline": "WebSocket で backend AIコアと接続し、\ncode1〜code6・チャット・音声を統合",
       "lead": "`ws://…/core/ws/AIコア` に WebSocket 接続し、テキスト・ファイル・画像・コード支援・音声を統合するパネルを提供します。AIWebSocket は再接続ポリシーとメッセージディスパッチを持ちます。",
       "subtitle": "WebSocket でAIコアと通信。code1〜code6 パネル、チャット、ファイル、音声を統合。",
-      "narration": "AI 画面は WebSocket で backend と繋がります。接続後にセッション ID が決まり、テキストや音声を送受信できます。",
       "image": "images/scene_005.png",
-      "audio": "audio/scene_005.mp3",
       "chips": [
         "AIWebSocket 再接続",
         "code1〜code6",
@@ -470,20 +445,18 @@ window.SCENARIO = {
           "text": "`frontend_web` 版 AI コアは backend の `/core/AIコア` と WebSocket で接続します。code1〜code6、ファイル、画像、チャット、設定ダイアログを扱います。"
         }
       ],
-      "short_narration": "AI 画面は WebSocket で接続し、セッション ID を確立してリアルタイム通信を行います。",
-      "long_narration": "AI 画面は WebSocket で backend と繋がります。エンドポイントに接続後、connect を送信して init を受け取るとセッション ID が確定します。テキスト、ファイル、画像、音声の各 input 型と、チャット出力、code1 から code6 のコード出力、音声出力チャンネルを持ちます。AIWebSocket クラスが再接続ポリシーとメッセージのディスパッチを管理します。input_audio は高頻度送信のためトークン延長の対象外です。",
+      "short_narration": "AI 画面は WebSocket で接続し、テキスト・画像・音声・コードをリアルタイムでやり取りします。",
+      "long_narration": "AI 画面はサーバーと WebSocket でリアルタイムに繋がっています。普通の API は「送ったら返ってくる」一方通行ですが、WebSocket は繋いだまま双方向にデータを流せます。AI の返答が少しずつリアルタイムで表示されるのは、この WebSocket のおかげです。送れるのはテキスト・ファイル・画像・音声で、受け取れるのはチャットの返答・生成コード・音声データです。コード支援パネルは code1 から code6 まで 6 つ同時に使えるため、複数の AI に並行して相談できます。AIWebSocket クラスが接続管理・再接続・メッセージの振り分けを担当するので、画面側は受け取ったデータを表示するだけで済みます。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 37.008,
-      "short_duration_sec": 7.32,
-      "long_start_sec": 136.104,
-      "long_duration_sec": 30.48
+      "short_start_sec": 36.408,
+      "short_duration_sec": 7.416,
+      "long_start_sec": 210.624,
+      "long_duration_sec": 43.248
     },
     {
       "id": "scene_006",
       "title": "X系と Monaco Editor",
-      "start_sec": 80.0,
-      "duration_sec": 14.0,
       "expression": "neutral",
       "accent": "#7dffb3",
       "accent_soft": "rgba(125,255,179,0.18)",
@@ -491,9 +464,7 @@ window.SCENARIO = {
       "headline": "X系でゲーム・デモ・静的ページを追加し、\nMonaco Editor でコード編集",
       "lead": "X系はルーター登録で動く通常コンポーネントと、`public/` に直置きする静的 HTML ページの 2 パターンがあります。Monaco Editor は言語マッピング `モナコ言語推定()` と Worker 構成を共通化しています。",
       "subtitle": "X系は Vue コンポーネントと public/ 静的 HTML の 2 パターン。Monaco は Worker 共通化。",
-      "narration": "X 系はゲームやデモなど実験的な機能の置き場所です。Vue コンポーネントか HTML 直置きの 2 通りで追加できます。",
       "image": "images/scene_006.png",
-      "audio": "audio/scene_006.mp3",
       "chips": [
         "Xテトリス",
         "X世界の絶景",
@@ -556,20 +527,18 @@ window.SCENARIO = {
           "text": "共通項目: Monaco Editor 設定 — Worker 構成、拡張子→言語マッピング（`モナコ言語推定()`）。qAlert / qConfirm / qColorPicker — シングルトンダイアログパターン。"
         }
       ],
-      "short_narration": "X 系フォルダは動画プレイヤーやゲームなど、実験的な機能を置く自由な領域です。",
-      "long_narration": "X 系には 2 つの実装パターンがあります。Vue コンポーネントとして実装して index.ts にルートを登録するパターンと、public/ フォルダに静的 HTML を直置きするパターンです。この紹介ビデオ自体も public/Xビデオ/ の静的 HTML として配信されています。Monaco Editor は Worker 構成とモナコ言語推定関数を frontend_web と frontend_avatar で共通化しています。qAlert、qConfirm、qColorPicker はシングルトンダイアログパターンで提供されます。",
+      "short_narration": "X 系は自由に実験できる領域です。Vue コンポーネントか静的 HTML で追加できます。",
+      "long_narration": "X 系は自由に追加できる実験領域です。Vue コンポーネントとして作って Router に登録する方法と、HTML ファイルを public フォルダに置く方法の 2 つがあります。この紹介ビデオ自体も public/Xビデオ フォルダの静的 HTML として配信されています。Monaco Editor（VSCode と同じエディタ部品）や qAlert・qConfirm のダイアログ部品も共通で使えます。AI に「X系にゲーム画面を追加して」と指示するだけで、ファイルの作成から Router の登録まで一緒にやってもらえます。業務機能とは独立しているため、失敗を恐れず自由に試せる場所です。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_start_sec": 44.328,
-      "short_duration_sec": 6.024,
-      "long_start_sec": 166.584,
-      "long_duration_sec": 37.56
+      "short_start_sec": 43.824,
+      "short_duration_sec": 7.536,
+      "long_start_sec": 253.872,
+      "long_duration_sec": 40.536
     },
     {
       "id": "scene_999",
       "title": "ご視聴ありがとうございました",
-      "start_sec": 94.0,
-      "duration_sec": 16.0,
       "expression": "neutral",
       "accent": "#7b8cff",
       "accent_soft": "rgba(123,140,255,0.2)",
@@ -579,25 +548,22 @@ window.SCENARIO = {
       "headline": "ご視聴ありがとうございました。\nどの画面から実装しますか？",
       "lead": "Vue 3・qTubler・接頭辞別コンポーネント・Router 3分割・Vite proxy・JWT interceptor・AIコア WebSocket。業務画面は既存パターンを参考にどうぞ。",
       "subtitle": "frontend_web — Vue 3、qTubler、接頭辞別コンポーネント、Vite proxy、AIコア WebSocket。",
-      "narration": "Vue 3、qTubler、Vite proxy、JWT 認証、AI 連携。既存画面を参考に作ってみてください。",
       "image": "images/scene_999.png",
       "chips": [],
       "metrics": [],
       "cards": [],
       "facts": [],
       "evidence": [],
-      "audio": "audio/scene_999.mp3",
-      "short_narration": "qTubler・Pinia・WebSocket 連携を活かして、新しい画面を追加してみてください。",
-      "long_narration": "ご視聴ありがとうございました。Vue 3、qTubler、接頭辞別コンポーネント、Router 3 ファイル分割、Vite Proxy、JWT インターセプター、AIコア WebSocket 連携。既存の業務画面を参考にして、あなたの画面を作ってみてください。",
+      "short_narration": "AI への指示一つで API から画面まで一気に作れます。AiDiy で業務システムを作ってみませんか。",
+      "long_narration": "AiDiy の AI コーディング機能を使えば、フロントエンドの画面とバックエンドの API を一気通貫で生成できます。「取引先マスタの一覧・登録・編集画面を追加して」と AI に指示するだけで、サーバー側の CRUD・API・画面コンポーネント・Router 登録まで、AiDiy のルールに沿ったコードがそろいます。サンプルコードが AI のお手本になるので、qTubler の使い方・日本語ルール・Vite Proxy の設定を細かく指示しなくても正しい形で生成します。開発環境を立ち上げ、AI に機能を頼み、ブラウザで確認する。このサイクルで業務システムをどんどん育てていけます。今日から使える業務システムを、AiDiy で作ってみませんか。",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 50.352,
-      "short_duration_sec": 6.6,
-      "long_start_sec": 204.144,
-      "long_duration_sec": 19.32
+      "short_start_sec": 51.36,
+      "short_duration_sec": 7.656,
+      "long_start_sec": 294.408,
+      "long_duration_sec": 44.784
     }
   ],
-  "duration_sec": 110.0,
-  "short_duration_sec": 56.952,
-  "long_duration_sec": 223.464
+  "short_duration_sec": 59.016,
+  "long_duration_sec": 339.192
 };
