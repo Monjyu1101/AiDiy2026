@@ -158,27 +158,27 @@ const baseRoutes: RouteRecordRaw[] = [
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_配車管理',
-        'Xビデオ/AiDiy紹介_配車管理/index.html',
+        'Xビデオ/実装例_配車管理/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_生産管理',
-        'Xビデオ/AiDiy紹介_生産管理/index.html',
+        'Xビデオ/実装例_生産管理/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_在庫管理',
-        'Xビデオ/AiDiy紹介_在庫管理/index.html',
+        'Xビデオ/実装例_在庫管理/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_webAiDiy',
-        'Xビデオ/AiDiy紹介_webAiDiy/index.html',
+        'Xビデオ/AiDiy実装_web版/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_avatarAiDiy',
-        'Xビデオ/AiDiy紹介_avatarAiDiy/index.html',
+        'Xビデオ/AiDiy実装_avatar版/index.html',
         'Xビデオ'
     ),
 ]

@@ -22,11 +22,11 @@ const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア/index.html`;
 const mcpUrl      = `${baseUrl}Xビデオ/AiDiy紹介_mcp/index.html`;
 const hermesUrl   = `${baseUrl}Xビデオ/AiDiy紹介_hermes/index.html`;
 const avatarUrl   = `${baseUrl}Xビデオ/AiDiy紹介_avatar/index.html`;
-const 配車管理Url  = `${baseUrl}Xビデオ/AiDiy紹介_配車管理/index.html`;
-const 生産管理Url  = `${baseUrl}Xビデオ/AiDiy紹介_生産管理/index.html`;
-const 在庫管理Url  = `${baseUrl}Xビデオ/AiDiy紹介_在庫管理/index.html`;
-const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy紹介_webAiDiy/index.html`;
-const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy紹介_avatarAiDiy/index.html`;
+const 配車管理Url  = `${baseUrl}Xビデオ/実装例_配車管理/index.html`;
+const 生産管理Url  = `${baseUrl}Xビデオ/実装例_生産管理/index.html`;
+const 在庫管理Url  = `${baseUrl}Xビデオ/実装例_在庫管理/index.html`;
+const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_web版/index.html`;
+const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar版/index.html`;
 
 const route = useRoute();
 const router = useRouter();
@@ -54,6 +54,8 @@ const handleReturn = () => {
       <p>AiDiy 紹介ビデオ・プレゼンテーションへのアクセスリンクです。下記から選択してください。</p>
 
       <div class="video-menu-sections">
+        <div class="section-label">紹介</div>
+
         <div class="menu-row">
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
@@ -147,52 +149,13 @@ const handleReturn = () => {
           </div>
         </div>
 
-        <div class="section-label">業務システム紹介</div>
+        <div class="section-label">実装</div>
 
         <div class="menu-row">
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
-              <span class="icon">X配</span>
-              AiDiy紹介 (配車管理)
-            </div>
-            <div class="menu-card-description">
-              配車区分・車両マスタと配車指示・スケジュール管理の紹介ビデオ
-            </div>
-            <a :href="配車管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
-
-          <div class="menu-card menu-card-fixed">
-            <div class="menu-card-title">
-              <span class="icon">X生</span>
-              AiDiy紹介 (生産管理)
-            </div>
-            <div class="menu-card-description">
-              商品構成マスタ・生産指示・スケジュール管理の紹介ビデオ
-            </div>
-            <a :href="生産管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
-
-          <div class="menu-card menu-card-fixed">
-            <div class="menu-card-title">
-              <span class="icon">X在</span>
-              AiDiy紹介 (在庫管理)
-            </div>
-            <div class="menu-card-description">
-              入庫・出庫・棚卸トランザクションと商品推移表の紹介ビデオ
-            </div>
-            <a :href="在庫管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
-
-          <div class="menu-card menu-card-fixed">
-            <div class="menu-card-title">
               <span class="icon">XWb</span>
-              AiDiy紹介 (webAiDiy)
+              AiDiy実装 (web版)
             </div>
             <div class="menu-card-description">
               Vue 3 + TypeScript Web UI・qTubler・AI コアの紹介ビデオ
@@ -205,12 +168,55 @@ const handleReturn = () => {
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">XAv</span>
-              AiDiy紹介 (avatarAiDiy)
+              AiDiy実装 (avatar版)
             </div>
             <div class="menu-card-description">
               Electron/Web デュアルモード VRM アバター + AI コアの紹介ビデオ
             </div>
             <a :href="avatarAiDiyUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+        </div>
+
+        <div class="section-label">実装例</div>
+
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X配</span>
+              実装例 (配車管理)
+            </div>
+            <div class="menu-card-description">
+              配車区分・車両マスタと配車指示・スケジュール管理の紹介ビデオ
+            </div>
+            <a :href="配車管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X生</span>
+              実装例 (生産管理)
+            </div>
+            <div class="menu-card-description">
+              商品構成マスタ・生産指示・スケジュール管理の紹介ビデオ
+            </div>
+            <a :href="生産管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">X在</span>
+              実装例 (在庫管理)
+            </div>
+            <div class="menu-card-description">
+              入庫・出庫・棚卸トランザクションと商品推移表の紹介ビデオ
+            </div>
+            <a :href="在庫管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>
