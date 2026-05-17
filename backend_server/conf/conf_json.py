@@ -79,9 +79,11 @@ class conf_json:
         'CODE_AI6_MODEL': 'auto',
         'CODE_CLAUDE_SDK_MODEL': 'auto',
         'CODE_CLAUDE_CLI_MODEL': 'auto',
+        'CODE_CLAUDE_OLLAMA_MODEL': 'auto',
         'CODE_COPILOT_CLI_MODEL': 'auto',
         'CODE_GEMINI_CLI_MODEL': 'auto',
         'CODE_CODEX_CLI_MODEL': 'auto',
+        'CODE_CODEX_OLLAMA_MODEL': 'auto',
         'CODE_AIDIY_HERMES_MODEL': 'auto',
         'CODE_OPENCODE_CLI_MODEL': 'auto',
         'CODE_MAX_TURNS': 999,
@@ -160,17 +162,8 @@ class conf_json:
         return 変更あり
 
     def _normalize_ollama_cloud_model_value(self, key: str, value: Any) -> Any:
-        """Ollama Cloud利用時は読取値だけ :cloud を除去する（設定ファイルは変更しない）"""
-        if key not in ('CHAT_OLLAMA_MODEL', 'OLLAMA_MODEL'):
-            return value
-        if not isinstance(value, str) or ':cloud' not in value:
-            return value
-
-        config_data = object.__getattribute__(self, '_config_data')
-        key_id = config_data.get('ollama_key_id', '')
-        if not isinstance(key_id, str) or not key_id.strip() or key_id.strip().startswith('<'):
-            return value
-        return value.replace(':cloud', '')
+        """ローカル ollama daemon が :cloud ルーティングを処理するため除去不要"""
+        return value
 
 
     def _apply_code_ai_auto(self) -> bool:

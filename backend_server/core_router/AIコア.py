@@ -615,6 +615,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "CODE_CLAUDE_SDK_MODEL", "CODE_CLAUDE_CLI_MODEL",
             "CODE_COPILOT_CLI_MODEL", "CODE_GEMINI_CLI_MODEL", "CODE_CODEX_CLI_MODEL", "CODE_AIDIY_HERMES_MODEL",
             "CODE_OPENCODE_CLI_MODEL",
+            "CODE_CLAUDE_OLLAMA_MODEL", "CODE_CODEX_OLLAMA_MODEL",
             "CODE_BASE_PATH",
             "CODE_MAX_TURNS", "CODE_PLAN", "CODE_VERIFY", "CODE_PERMISSIONS",
         }
@@ -1050,6 +1051,10 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         provider_key = "CODE_AIDIY_HERMES_MODEL"
                     elif ai_name == "opencode_cli":
                         provider_key = "CODE_OPENCODE_CLI_MODEL"
+                    elif ai_name == "claude_ollama":
+                        provider_key = "CODE_CLAUDE_OLLAMA_MODEL"
+                    elif ai_name == "codex_ollama":
+                        provider_key = "CODE_CODEX_OLLAMA_MODEL"
                     if provider_key:
                         ai_model = セッション.モデル設定.get(provider_key, "")
 

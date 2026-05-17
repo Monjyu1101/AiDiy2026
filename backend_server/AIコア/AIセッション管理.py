@@ -82,6 +82,8 @@ def 初期モデル設定生成(app_conf) -> dict:
             app_conf.json.get("CODE_HERMES_CLI_MODEL", "auto"),
         ),
         "CODE_OPENCODE_CLI_MODEL": app_conf.json.get("CODE_OPENCODE_CLI_MODEL", "auto"),
+        "CODE_CLAUDE_OLLAMA_MODEL": app_conf.json.get("CODE_CLAUDE_OLLAMA_MODEL", "auto"),
+        "CODE_CODEX_OLLAMA_MODEL": app_conf.json.get("CODE_CODEX_OLLAMA_MODEL", "auto"),
         "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
         "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),

@@ -195,6 +195,8 @@ class CodeAI:
                 if os.path.isfile(candidate2):
                     return candidate2
             return "opencode"
+        if self.code_ai in ("claude_ollama", "codex_ollama"):
+            return "ollama"
         if os.name == 'nt':
             userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
             npm_bin = os.path.join(userprofile, 'AppData', 'Roaming', 'npm')
@@ -211,8 +213,51 @@ class CodeAI:
         }
         return names.get(self.code_ai, "claude")
 
+    @staticmethod
+    def _ollama_cloud_suffix除去(model: str) -> str:
+        """aidiy_hermes/opencode_cli 用: ollama cloud suffix（-cloud/:cloud/:clude）を除去する"""
+        if not isinstance(model, str):
+            return model
+        for suffix in ("-cloud", ":cloud"):
+            if model.lower().endswith(suffix):
+                return model[: -len(suffix)]
+        return model
+
+    def _ollama起動モデル取得(self, provider_key: str) -> str:
+        """claude_ollama/codex_ollama 用のモデルを解決する"""
+        model = self.code_model if self.code_model and self.code_model.lower() != "auto" else ""
+        if not model and self.parent_manager:
+            _ms = (getattr(self.parent_manager, 'モデル設定', None)
+                   or getattr(getattr(self.parent_manager, '接続', None), 'モデル設定', None)
+                   or {})
+            model = _ms.get(provider_key, "")
+            if not model or model.lower() == "auto":
+                model = _ms.get("CHAT_OLLAMA_MODEL", "")
+        return model
+
     async def バージョン確認(self) -> str:
         """CLIツールの --version を実行してバージョン文字列を返す。失敗時は空文字。"""
+        if self.code_ai in ("claude_ollama", "codex_ollama"):
+            app = "claude" if self.code_ai == "claude_ollama" else "codex"
+            provider_key = "CODE_CLAUDE_OLLAMA_MODEL" if self.code_ai == "claude_ollama" else "CODE_CODEX_OLLAMA_MODEL"
+            model = self._ollama起動モデル取得(provider_key)
+            version_args = ["ollama", "launch", app]
+            if model:
+                version_args.extend(["--model", model])
+            version_args.extend(["--", "--version"])
+            cache_key = f"{self.code_ai}:{model}"
+            if cache_key in self._バージョンキャッシュ:
+                return self._バージョンキャッシュ[cache_key]
+            if CodeAI._バージョン確認ロック is None:
+                CodeAI._バージョン確認ロック = asyncio.Lock()
+            async with CodeAI._バージョン確認ロック:
+                if cache_key in self._バージョンキャッシュ:
+                    return self._バージョンキャッシュ[cache_key]
+                バージョン = await self._バージョン確認実行(version_args)
+                if バージョン:
+                    self._バージョンキャッシュ[cache_key] = バージョン
+                return バージョン
+
         cmd = self._コマンドパス取得()
         cache_key = f"{self.code_ai}:{cmd}"
         if cache_key in self._バージョンキャッシュ:
@@ -227,35 +272,43 @@ class CodeAI:
                 self._バージョンキャッシュ[cache_key] = バージョン
             return バージョン
 
-    async def _バージョン確認実行(self, cmd: str) -> str:
-        """CLIツールの --version を実行する。aidiy_hermes は初回起動が重いため長めに待つ。"""
+    async def _バージョン確認実行(self, cmd) -> str:
+        """CLIツールの --version を実行する。cmd は str またはリスト。"""
         try:
-            version_args = [cmd, "--version"]
+            if isinstance(cmd, list):
+                version_args = cmd
+                cmd_label = " ".join(cmd[:3])
+                timeout_sec = 60.0
+            else:
+                version_args = [cmd, "--version"]
+                cmd_label = cmd
+                timeout_sec = 30.0 if self.code_ai == "aidiy_hermes" else 10.0
             proc = await asyncio.create_subprocess_exec(
                 *version_args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             try:
-                timeout_sec = 30.0 if self.code_ai == "aidiy_hermes" else 10.0
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
             except asyncio.TimeoutError:
                 proc.kill()
                 await proc.communicate()
-                logger.warning(f"[CodeAI] --version タイムアウト: {cmd}")
+                logger.warning(f"[CodeAI] --version タイムアウト: {cmd_label}")
                 return ""
             output = (stdout or b"").decode("utf-8", errors="replace").strip()
             if not output:
                 output = (stderr or b"").decode("utf-8", errors="replace").strip()
-            # 最初の1行だけ使用
             first_line = output.splitlines()[0].strip() if output else ""
-            logger.info(f"[CodeAI] {cmd} --version => {first_line}")
+            if first_line.startswith("Error:"):
+                logger.warning(f"[CodeAI] --version エラー応答: {first_line}")
+                return ""
+            logger.info(f"[CodeAI] {cmd_label} --version => {first_line}")
             return first_line
         except FileNotFoundError:
-            logger.warning(f"[CodeAI] コマンドが見つかりません: {cmd}")
+            logger.warning(f"[CodeAI] コマンドが見つかりません: {cmd_label if isinstance(cmd, list) else cmd}")
             return ""
         except subprocess.TimeoutExpired:
-            logger.warning(f"[CodeAI] --version タイムアウト: {cmd}")
+            logger.warning(f"[CodeAI] --version タイムアウト: {cmd_label if isinstance(cmd, list) else cmd}")
             return ""
         except Exception as e:
             logger.warning(f"[CodeAI] --version 実行エラー: {cmd} {e}")
@@ -282,7 +335,8 @@ class CodeAI:
             base = self._hermes直接実行コマンド() if not custom_cmd else None
             if base is None:
                 base = [custom_cmd or self._コマンドパス取得()]
-            model_args = ["--model", self.code_model] if self.code_model and self.code_model.lower() != "auto" else []
+            _model = self._ollama_cloud_suffix除去(self.code_model)
+            model_args = ["--model", _model] if _model and _model.lower() != "auto" else []
             return base + ["-Q"] + model_args + ["-z", プロンプト]
 
         # 以降の CLI（claude/copilot/gemini/codex/opencode）は npm の .cmd シムを直接実行に
@@ -294,7 +348,8 @@ class CodeAI:
             プロンプト = self._CLI送信用テキスト正規化(プロンプト)
 
         if self.code_ai == "opencode_cli":
-            model_args = ["--model", self.code_model] if self.code_model and self.code_model.lower() != "auto" else []
+            _model = self._ollama_cloud_suffix除去(self.code_model)
+            model_args = ["--model", _model] if _model and _model.lower() != "auto" else []
             cmd_args = base + ["run"]
             cmd_args += model_args + [プロンプト]
             if not 初回:
@@ -342,13 +397,62 @@ class CodeAI:
             base_args.append(プロンプト)
             return base_args
 
-        else:
+        elif self.code_ai == "codex_ollama":
+            # ollama launch codex --model <model> -- <codex args>
+            model = self._ollama起動モデル取得("CODE_CODEX_OLLAMA_MODEL")
+            cmd_args = ["ollama", "launch", "codex"]
+            if model:
+                cmd_args.extend(["--model", model])
+            cmd_args.append("--")
+            cmd_args.extend(["exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"])
+
+            # 継続の場合は resume <session-id> を追加
+            if not 初回 and self.codex_セッションID:
+                cmd_args.extend(["resume", self.codex_セッションID])
+
+            cmd_args.append(プロンプト)
+            return cmd_args
+
+        elif self.code_ai == "claude_cli":
             # デフォルト claude_cli
             common = list(base)
             if self.code_permissions != "none":
                 common.extend(["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions"])
             common.append("--chrome")
             # モデルがautoの場合はモデル指定を省略
+            if self.code_model and self.code_model.lower() != "auto":
+                common.extend(["--model", self.code_model])
+            if repo_path:
+                common.extend(["--add-dir", repo_path])
+            if 初回:
+                return common + ["-p", プロンプト]
+            else:
+                return common + ["--continue", "-p", プロンプト]
+
+        elif self.code_ai == "claude_ollama":
+            # ollama launch claude --model <model> -- <claude args>
+            model = self._ollama起動モデル取得("CODE_CLAUDE_OLLAMA_MODEL")
+            cmd_args = ["ollama", "launch", "claude"]
+            if model:
+                cmd_args.extend(["--model", model])
+            cmd_args.append("--")
+            if self.code_permissions != "none":
+                cmd_args.extend(["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions"])
+            cmd_args.append("--chrome")
+            if repo_path:
+                cmd_args.extend(["--add-dir", repo_path])
+            if 初回:
+                cmd_args.extend(["-p", プロンプト])
+            else:
+                cmd_args.extend(["--continue", "-p", プロンプト])
+            return cmd_args
+
+        else:
+            # フォールバック
+            common = list(base)
+            if self.code_permissions != "none":
+                common.extend(["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions"])
+            common.append("--chrome")
             if self.code_model and self.code_model.lower() != "auto":
                 common.extend(["--model", self.code_model])
             if repo_path:
@@ -709,7 +813,21 @@ class CodeAI:
 
             # 完全なプロンプト構築（プロバイダー別）
             if self.code_ai in ["claude_cli", "copilot_cli", "gemini_cli", "codex_cli", "opencode_cli"]:
-                # copilot: 履歴送信不要。ただし初回のみ system_prompt（base_prompt）を付与して方針を伝える
+                # 履歴送信不要。初回のみ system_prompt を付与して方針を伝える
+                if 初回送信:
+                    完全プロンプト = f"{self.system_prompt}\n\n{送信用要求テキスト}"
+                    self.session_started = True
+                else:
+                    完全プロンプト = 送信用要求テキスト
+            elif self.code_ai == "claude_ollama":
+                # claude_ollama（claude_cli のコピー）
+                if 初回送信:
+                    完全プロンプト = f"{self.system_prompt}\n\n{送信用要求テキスト}"
+                    self.session_started = True
+                else:
+                    完全プロンプト = 送信用要求テキスト
+            elif self.code_ai == "codex_ollama":
+                # codex_ollama（codex_cli のコピー）
                 if 初回送信:
                     完全プロンプト = f"{self.system_prompt}\n\n{送信用要求テキスト}"
                     self.session_started = True
@@ -758,6 +876,11 @@ class CodeAI:
 
             # codexの場合、セッションIDを抽出して保存（stderr から抽出）
             if self.code_ai == "codex_cli":
+                セッションID = self._codexセッションID抽出(self.last_stderr_output)
+                if セッションID:
+                    self.codex_セッションID = セッションID
+                    logger.info(f"codexセッションID保存: {セッションID}")
+            elif self.code_ai == "codex_ollama":
                 セッションID = self._codexセッションID抽出(self.last_stderr_output)
                 if セッションID:
                     self.codex_セッションID = セッションID

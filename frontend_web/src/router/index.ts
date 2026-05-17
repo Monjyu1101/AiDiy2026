@@ -156,6 +156,31 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ/AiDiy紹介_hermes/index.html',
         'Xビデオ'
     ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_配車管理',
+        'Xビデオ/AiDiy紹介_配車管理/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_生産管理',
+        'Xビデオ/AiDiy紹介_生産管理/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_在庫管理',
+        'Xビデオ/AiDiy紹介_在庫管理/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_webAiDiy',
+        'Xビデオ/AiDiy紹介_webAiDiy/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_avatarAiDiy',
+        'Xビデオ/AiDiy紹介_avatarAiDiy/index.html',
+        'Xビデオ'
+    ),
 ]
 
 const router = createRouter({

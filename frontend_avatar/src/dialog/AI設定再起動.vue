@@ -86,6 +86,8 @@ const CODE_MODEL_KEYS: Record<string, string> = {
   codex_cli: 'CODE_CODEX_CLI_MODEL',
   opencode_cli: 'CODE_OPENCODE_CLI_MODEL',
   aidiy_hermes: 'CODE_AIDIY_HERMES_MODEL',
+  claude_ollama: 'CODE_CLAUDE_OLLAMA_MODEL',
+  codex_ollama: 'CODE_CODEX_OLLAMA_MODEL',
 }
 
 const chatAiOptions = computed(() => Object.keys(availableModels.value?.chat_models || {}))
