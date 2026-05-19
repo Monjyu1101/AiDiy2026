@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "vrm/AiDiy_Sample_M.vrm"
+    "avatar": "../vrm/VRM_AiDiy.vrm"
   },
   "scenes": [
     {
@@ -300,7 +300,7 @@ window.SCENARIO = {
       "metrics": [
         {
           "label": "既定モデル",
-          "value": "AiDiy_Sample_M.vrm"
+          "value": "VRM_AiDiy.vrm"
         },
         {
           "label": "VRMA フォルダ",
@@ -338,7 +338,7 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "DEFAULT_VRM_MODEL_URL は /vrm/AiDiy_Sample_M.vrm。",
+        "DEFAULT_VRM_MODEL_URL は /vrm/VRM_AiDiy.vrm。",
         "VRMA フォルダ名は サンプル と 標準。",
         "Web は config.ts の配列、Electron は desktop:list-vrma-files IPC が一覧を返す。"
       ],

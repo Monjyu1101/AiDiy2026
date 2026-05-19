@@ -1,4 +1,4 @@
-# 3D アバター制御 (Three.js VRM)
+﻿# 3D アバター制御 (Three.js VRM)
 
 > 文書: `frontend_avatar,3Dアバター制御(Three.js VRM).md` | 実装: `frontend_avatar/src/components/AIコア_アバター.vue`, `frontend_avatar/src/components/AIコア_自立身体制御.ts`, `frontend_avatar/src/components/AIコア_自動カメラワーク.ts`
 
@@ -37,7 +37,7 @@ motionLoader.register((parser) => new VRMAnimationLoaderPlugin(parser))
 
 | 項目 | 値 |
 |------|-----|
-| モデルURL | `/vrm/AiDiy_Sample_M.vrm`（`DEFAULT_VRM_MODEL_URL`） |
+| モデルURL | `/vrm/VRM_AiDiy.vrm`（`DEFAULT_VRM_MODEL_URL`） |
 | レンダラー | `WebGLRenderer`（`antialias: true`, `alpha: true`） |
 | 背景色 | 透明（`setClearColor(0x000000, 0)`） |
 | FOV | 28° |

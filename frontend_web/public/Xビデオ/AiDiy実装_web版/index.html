@@ -423,7 +423,7 @@
     window.__avatarOnAudioStop = () => { lipsyncActive = false; mouthSmooth = 0; try { vrm?.expressionManager?.setValue("aa", 0); } catch {} };
     const getMouthTarget = () => { const player = window.audioPlayer; if (!lipsyncActive || !player || player.paused || !analyser || !analyserData) return 0; analyser.getByteFrequencyData(analyserData); return computeMouthLevel(analyserData); };
     try {
-      const gltf = await loadWith(loader, "vrm/AiDiy_Sample_M.vrm");
+      const gltf = await loadWith(loader, "../vrm/VRM_AiDiy.vrm");
       vrm = gltf.userData?.vrm || null;
       if (vrm) {
         try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch {}
@@ -439,7 +439,7 @@
         vrm.lookAt.target = camera;
         applyIdlePose(vrm); vrm.update(0); renderer.render(scene, camera);
       }
-    } catch (e) { console.error("Avatar load error:", e); } finally { canvas.classList.add("ready"); }
+    } catch (e) {} finally { canvas.classList.add("ready"); }
     function updateExpression(dt) { if (!vrm?.expressionManager) return; const lr = 1 - Math.pow(0.001, dt); if (currentExpression !== targetExpression) { expressionValue = Math.max(0, expressionValue - dt * 4); if (expressionValue <= 0.01) { try { vrm.expressionManager.setValue(currentExpression, 0); } catch {} currentExpression = targetExpression; } } else { const goal = currentExpression === "neutral" ? 0 : 0.6; expressionValue += (goal - expressionValue) * lr; } EXPRESSION_KEYS.forEach((key) => { if (key === "neutral") return; try { vrm.expressionManager.setValue(key, key === currentExpression ? expressionValue : 0); } catch {} }); }
     function updateBlink(dt) { if (!vrm?.expressionManager) return; blinkTimer += dt; if (blinkTimer < blinkCooldown) { vrm.expressionManager.setValue("blink", 0); } else if (blinkTimer < blinkCooldown + BLINK_DURATION) { vrm.expressionManager.setValue("blink", Math.sin((blinkTimer - blinkCooldown) / BLINK_DURATION * Math.PI)); } else { vrm.expressionManager.setValue("blink", 0); blinkTimer = 0; blinkCooldown = 2 + Math.random() * 3; } }
     const clock = new THREE.Clock();

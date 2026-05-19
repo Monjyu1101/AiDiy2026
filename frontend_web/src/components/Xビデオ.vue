@@ -22,11 +22,12 @@ const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア/index.html`;
 const mcpUrl      = `${baseUrl}Xビデオ/AiDiy紹介_mcp/index.html`;
 const hermesUrl   = `${baseUrl}Xビデオ/AiDiy紹介_hermes/index.html`;
 const avatarUrl   = `${baseUrl}Xビデオ/AiDiy紹介_avatar/index.html`;
-const 配車管理Url  = `${baseUrl}Xビデオ/実装例_配車管理/index.html`;
-const 生産管理Url  = `${baseUrl}Xビデオ/実装例_生産管理/index.html`;
-const 在庫管理Url  = `${baseUrl}Xビデオ/実装例_在庫管理/index.html`;
+const 配車管理Url  = `${baseUrl}Xビデオ/AiDiy実装_配車管理/index.html`;
+const 生産管理Url  = `${baseUrl}Xビデオ/AiDiy実装_生産管理/index.html`;
+const 在庫管理Url  = `${baseUrl}Xビデオ/AiDiy実装_在庫管理/index.html`;
 const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_web版/index.html`;
 const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar版/index.html`;
+const ニュースUrl     = `${baseUrl}Xビデオ/ニュース_20260519_anthropic2026前半/index.html`;
 
 const route = useRoute();
 const router = useRouter();
@@ -217,6 +218,23 @@ const handleReturn = () => {
               入庫・出庫・棚卸トランザクションと商品推移表の紹介ビデオ
             </div>
             <a :href="在庫管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+        </div>
+
+        <div class="section-label">テスト</div>
+
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">Xニュ</span>
+              ニュース (Anthropic)
+            </div>
+            <div class="menu-card-description">
+              Anthropic 2026年ニュース解説ビデオ
+            </div>
+            <a :href="ニュースUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>

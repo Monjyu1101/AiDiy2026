@@ -1,4 +1,4 @@
-# X系紹介ビデオとアバター作成手順
+﻿# X系紹介ビデオとアバター作成手順
 
 > 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all/`, `frontend_web/public/Xビデオ/AiDiy紹介_aichat/`, `frontend_web/public/Xビデオ/AiDiy紹介_avatar/`, `frontend_web/public/Xビデオ/AiDiy紹介_backend/`, `frontend_web/public/Xビデオ/AiDiy紹介_frontend/`, `frontend_web/public/Xビデオ/AiDiy紹介_hermes/`, `frontend_web/public/Xビデオ/AiDiy紹介_mcp/`
 
@@ -39,6 +39,8 @@
 専門テーマ版（`_avatar`、`_hermes` など）も特段の理由がない限り同じプロバイダ・声で揃える。
 
 - 生成は `aidiy_text_to_speech` MCP を使う
+- 紹介ビデオの再生スピードは `ratio` 指定なし、または `ratio=None` で収録する。現時点の標準速度は 1.2 倍
+- `aidiy_text_to_speech` は `ratio=None`（未指定）を既定の 1.2 倍として扱う。`ratio=0` / `ratio=1` は速度調整なしになるため、通常収録では指定しない
 - **出力形式は必ず MP3**（WAV は禁止）。各プロバイダは内部で PCM → WAV → MP3 変換（ffmpeg 優先、lameenc フォールバック）する
 - **フォールバック**は `backend_mcp/mcp_proc/text_to_speech.py` 側に実装で持つ（ここには書かない）。
 - 発音辞書は `backend_server/_config/aidiy_text_to_speech.json` が単一の正本
@@ -139,7 +141,7 @@ Xビデオ/AiDiy紹介__all/
   scene_000.html    冒頭説明（ヒーロー）
   scene_001.html 〜 scene_NNN.html  本編
   scene_999.html    謝辞・まとめ・次につながる言葉（ヒーロー）
-  vrm/              VRM モデル（AiDiy_Sample_M.vrm）
+  vrm/              VRM モデル（VRM_AiDiy.vrm）
   images/           MCP 画像生成で作成した scene_NNN.png
   audio/            MCP TTS で作成した scene_NNN.mp3
 ```
@@ -165,18 +167,18 @@ Xビデオ/AiDiy紹介_<テーマ>/
   scene_000.html    冒頭説明（ヒーロー）
   scene_NNN.html    本編
   scene_999.html    謝辞・まとめ・次につながる言葉（ヒーロー）
-  vrm/              VRM モデル（AiDiy_Sample_M.vrm）← 各フォルダに配置（自己完結）
+  vrm/              VRM モデル（VRM_AiDiy.vrm）← 各フォルダに配置（自己完結）
   images/           テーマ特化画像
   audio/            テーマ特化音声
 ```
 
 ### VRM 参照パス（自己完結のルール）
 
-- `index.html`、`scenario.js`、`scenario.json`、`assets.json` 内の VRM パスは **`vrm/AiDiy_Sample_M.vrm`**（フォルダ相対）にする
-- `../AiDiy_Sample_M.vrm` のような親フォルダ参照は **禁止**（他ビデオへ依存してしまうため）
+- `index.html`、`scenario.js`、`scenario.json`、`assets.json` 内の VRM パスは **`vrm/VRM_AiDiy.vrm`**（フォルダ相対）にする
+- `../VRM_AiDiy.vrm` のような親フォルダ参照は **禁止**（他ビデオへ依存してしまうため）
 - ストレージ節約より移植性を優先する。各ビデオで同じ VRM ファイルを複製してでも自己完結を保つ
-- `Xビデオ/vrm/AiDiy_Sample_M.vrm`（共通フォルダ）は参照せず、必ず各ビデオフォルダ内の `vrm/` を使う
-- 新しいビデオフォルダを作成するときは `vrm/AiDiy_Sample_M.vrm` を先にコピーしてから作業開始する
+- `Xビデオ/vrm/VRM_AiDiy.vrm`（共通フォルダ）は参照せず、必ず各ビデオフォルダ内の `vrm/` を使う
+- 新しいビデオフォルダを作成するときは `vrm/VRM_AiDiy.vrm` を先にコピーしてから作業開始する
 
 ---
 
@@ -207,7 +209,7 @@ window.SCENARIO = {
   "assets_policy": {
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "vrm/AiDiy_Sample_M.vrm"  // 各フォルダ内 vrm/ への相対パス（親フォルダ参照禁止）
+    "avatar": "vrm/VRM_AiDiy.vrm"  // 各フォルダ内 vrm/ への相対パス（親フォルダ参照禁止）
   },
   "scenes": [
     {
@@ -287,7 +289,7 @@ window.SCENARIO = {
 ### VRM アバター統合
 
 - `index.html` の左パネル（38%）に Three.js + `@pixiv/three-vrm` でレンダリング
-- VRM ファイル: `vrm/AiDiy_Sample_M.vrm`（各フォルダ内の `vrm/` サブフォルダ — フォルダ相対パス）
+- VRM ファイル: `vrm/VRM_AiDiy.vrm`（各フォルダ内の `vrm/` サブフォルダ — フォルダ相対パス）
 - リップシンク: `window.audioPlayer`（`<audio>` タグ）の AudioContext + AnalyserNode で `aa` 表情を駆動
 - `window.__avatarSetExpression?.(scene.expression || "neutral")` でシーン切替時に表情を設定
 
@@ -343,5 +345,5 @@ window.SCENARIO = {
 | アバター版で全シーンに aidiy_sozai 画像を使う | アバター関連（アイディ、web/desktop モード）のみ使い、他は take の images を使う |
 | 通常シーンに `stage-hero` を付ける | `stage-hero` / `stage-hero-focus` はヒーローシーン（000, 999）のみ |
 | アバター版で音声を独自生成しようとする | 既存 take の `audio/` を相対パスで参照する |
-| `../AiDiy_Sample_M.vrm` で VRM を参照する | `vrm/AiDiy_Sample_M.vrm`（フォルダ内相対）のみ使用する |
-| 複数ビデオが共通 VRM を共有する（`Xビデオ/vrm/`） | 各フォルダ内 `vrm/AiDiy_Sample_M.vrm` に複製する（自己完結優先） |
+| `../VRM_AiDiy.vrm` で VRM を参照する | `vrm/VRM_AiDiy.vrm`（フォルダ内相対）のみ使用する |
+| 複数ビデオが共通 VRM を共有する（`Xビデオ/vrm/`） | 各フォルダ内 `vrm/VRM_AiDiy.vrm` に複製する（自己完結優先） |

@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "vrm/AiDiy_Sample_M.vrm"
+    "avatar": "../vrm/VRM_AiDiy.vrm"
   },
   "scenes": [
     {

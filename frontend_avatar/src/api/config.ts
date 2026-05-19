@@ -37,7 +37,7 @@ function resolveWebSocketEndpoint(): string {
 
 export const CORE_BASE_URL = resolveHttpBaseUrl()
 export const AI_WS_ENDPOINT = resolveWebSocketEndpoint()
-export const DEFAULT_VRM_MODEL_URL = '/vrm/AiDiy_Sample_M.vrm'
+export const DEFAULT_VRM_MODEL_URL = '/vrm/VRM_AiDiy.vrm'
 export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'
 export const STANDARD_VRMA_FOLDER_NAME = '標準'
 export const SAMPLE_VRMA_FILES = [

@@ -17,7 +17,7 @@
     "visual_style": "left_image_30_right_explanation_70",
     "image_output_dir": "frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake4/images",
     "audio_output_dir": "frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake4/audio",
-    "avatar": "vrm/AiDiy_Sample_M.vrm",
+    "avatar": "../vrm/VRM_AiDiy.vrm",
     "image_provider": "openai:gpt-image-2",
     "tts_provider": "freeai:female"
   },

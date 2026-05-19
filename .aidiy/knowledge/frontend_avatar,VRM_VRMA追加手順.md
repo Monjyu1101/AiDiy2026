@@ -1,4 +1,4 @@
-# VRM・VRMA 追加手順
+﻿# VRM・VRMA 追加手順
 
 > 文書: `frontend_avatar,VRM_VRMA追加手順.md` | 実装: `frontend_avatar/public/vrm/`, `frontend_avatar/public/vrma/`, `frontend_avatar/src/components/Avatar.vue`
 
@@ -25,7 +25,7 @@
 ## config.ts の確認箇所
 
 ```typescript
-export const DEFAULT_VRM_MODEL_URL = '/vrm/AiDiy_Sample_M.vrm'
+export const DEFAULT_VRM_MODEL_URL = '/vrm/VRM_AiDiy.vrm'
 export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'
 export const STANDARD_VRMA_FOLDER_NAME = '標準'
 

@@ -114,6 +114,7 @@
 | GitHub issue の確認・close | [`共通,GitHubIssue運用手順.md`](./共通,GitHubIssue運用手順.md) |
 | MCP（TTS / OBS / ffmpeg / Chrome devtools）で紹介動画を自動生成する | [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) |
 | 紹介ビデオ（take）またはアバター版プレゼンターを新規作成・改版する | [`frontend_web,X系紹介ビデオとアバター作成手順.md`](./frontend_web,X系紹介ビデオとアバター作成手順.md) |
+| ニュース型掛け合いビデオ（female+male 2アバター・1ページ複数ターン）を作成・改版する | [`frontend_web,X系ニュース型掛け合いビデオ.md`](./frontend_web,X系ニュース型掛け合いビデオ.md) |
 
 既存の運用で `_最終変更.md` を参照する場合は、履歴ではなく [`再修正時の確認入口`](./_最終変更.md) として扱います。
 
@@ -226,6 +227,7 @@
 |------|--------------|
 | MCP（TTS / OBS / ffmpeg / Chrome devtools）で紹介動画を自動生成する | [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) |
 | 紹介ビデオ（take）またはアバター版プレゼンターを新規作成・改版する | [`frontend_web,X系紹介ビデオとアバター作成手順.md`](./frontend_web,X系紹介ビデオとアバター作成手順.md) |
+| ニュース型掛け合いビデオ（female+male 2アバター・1ページ複数ターン）を作成・改版する | [`frontend_web,X系ニュース型掛け合いビデオ.md`](./frontend_web,X系ニュース型掛け合いビデオ.md) |
 
 ## ドキュメント・共通
 

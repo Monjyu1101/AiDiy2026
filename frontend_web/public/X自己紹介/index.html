@@ -1747,7 +1747,7 @@ Key:   利用者名</pre>
 
         // ---------- VRM 読み込み ----------
         try {
-            const gltf = await loadWith(loader, './vrm/AiDiy_Sample_M.vrm');
+            const gltf = await loadWith(loader, './vrm/VRM_AiDiy.vrm');
             vrm = gltf.userData?.vrm || null;
             if (vrm) {
                 try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch {}

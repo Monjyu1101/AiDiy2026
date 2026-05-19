@@ -785,7 +785,7 @@
     };
 
     try {
-      const gltf = await loadWith(loader, "vrm/AiDiy_Sample_M.vrm");
+      const gltf = await loadWith(loader, "../vrm/VRM_AiDiy.vrm");
       vrm = gltf.userData?.vrm || null;
       if (vrm) {
         try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch {}
@@ -810,9 +810,7 @@
         vrm.update(0);
         renderer.render(scene, camera);
       }
-    } catch (error) {
-      console.error("Avatar load error:", error);
-    } finally {
+    } catch (error) {} finally {
       canvas.classList.add("ready");
     }
 

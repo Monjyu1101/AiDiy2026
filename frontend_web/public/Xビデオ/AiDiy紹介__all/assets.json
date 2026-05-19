@@ -6,7 +6,7 @@
     "visual_generation": "openai_gpt-image-2",
     "audio_generation": "freeai_female",
     "layout": "left_image_30_right_explanation_70",
-    "avatar_model": "vrm/AiDiy_Sample_M.vrm",
+    "avatar_model": "../vrm/VRM_AiDiy.vrm",
     "evidence_source": [
       "AGENTS.md",
       "frontend_web/AGENTS.md",
