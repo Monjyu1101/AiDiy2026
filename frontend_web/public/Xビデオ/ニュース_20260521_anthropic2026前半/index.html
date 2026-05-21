@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Google 2026年 ニュース解説</title>
+  <title>Anthropic 2026年 ニュース解説</title>
   <style>
     * { box-sizing: border-box; margin: 0; }
     html, body {
       width: 100%; height: 100%; overflow: hidden;
       background:
-        radial-gradient(circle at 20% 15%, rgba(66, 133, 244, 0.14), transparent 26%),
-        radial-gradient(circle at 85% 78%, rgba(52, 168, 83, 0.14), transparent 28%),
-        linear-gradient(135deg, #040814 0%, #081420 46%, #081118 100%);
+        radial-gradient(circle at 20% 15%, rgba(255, 107, 53, 0.16), transparent 26%),
+        radial-gradient(circle at 85% 78%, rgba(78, 205, 196, 0.16), transparent 28%),
+        linear-gradient(135deg, #040814 0%, #091425 46%, #0a1120 100%);
       color: #f5fbff;
       font-family: "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
     }
@@ -33,16 +33,12 @@
     /* ── Topbar ── */
     .topbar, .controls {
       display: flex; align-items: center; padding: 0 24px;
-      backdrop-filter: blur(16px); background: rgba(4,12,20,0.82);
+      backdrop-filter: blur(16px); background: rgba(5,12,22,0.82);
       border-color: rgba(255,255,255,0.08); border-style: solid; position: relative; z-index: 20;
     }
     .topbar { justify-content: space-between; gap: 20px; border-width: 0 0 1px; }
     .brand-wrap { display: flex; flex-direction: column; min-width: 0; }
-    .brand { font-size: 20px; font-weight: 900; letter-spacing: 0.02em; }
-    .brand .g-blue  { color: #4285F4; }
-    .brand .g-red   { color: #EA4335; }
-    .brand .g-yellow{ color: #FBBC04; }
-    .brand .g-green { color: #34A853; }
+    .brand { font-size: 20px; font-weight: 900; color: #ff8a65; letter-spacing: 0.02em; }
     .brand-sub { color: #9eb2c6; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
     .top-note { color: #d7e4ee; font-size: 13px; line-height: 1.7; text-align: right; }
 
@@ -63,7 +59,7 @@
       position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
       z-index: 5;
       padding: 8px 28px; border-radius: 999px;
-      background: var(--accent, #4285F4);
+      background: var(--accent, #4ecdc4);
       color: #040814; font-size: 22px; font-weight: 900;
       letter-spacing: 0.18em; text-transform: uppercase;
       white-space: nowrap;
@@ -106,11 +102,7 @@
       position: absolute;
       left: 24px; right: 24px; bottom: 8px;
       height: 2px; border-radius: 999px;
-      background: linear-gradient(90deg,
-        rgba(66,133,244,0),
-        rgba(66,133,244,0.85),
-        rgba(52,168,83,0.85),
-        rgba(52,168,83,0));
+      background: linear-gradient(90deg, rgba(100,216,255,0), rgba(100,216,255,0.85), rgba(255,143,206,0.85), rgba(255,143,206,0));
       opacity: 0;
       transform: scaleX(0.15);
       transform-origin: center;
@@ -159,7 +151,7 @@
     }
     .progress-fill {
       height: 100%; width: 0%;
-      background: linear-gradient(90deg, #4285F4, #34A853, #FBBC04, #EA4335);
+      background: linear-gradient(90deg, #ff6b35, #4ecdc4, #7b68ee);
       transition: width 120ms linear;
     }
     button {
@@ -168,7 +160,7 @@
       background: rgba(255,255,255,0.05); color: #f5fbff;
       font-size: 14px; font-weight: 800; cursor: pointer;
     }
-    button:hover { border-color: rgba(66,133,244,0.58); background: rgba(66,133,244,0.12); }
+    button:hover { border-color: rgba(255,107,53,0.58); background: rgba(255,107,53,0.12); }
     .ghost-btn { color: #9eb2c6; font-weight: 700; }
     .meta, .timer { color: #d5e1eb; font-size: 13px; font-weight: 700; white-space: nowrap; }
     .timer { font-variant-numeric: tabular-nums; }
@@ -237,12 +229,10 @@
   <div class="app">
     <header class="topbar">
       <div class="brand-wrap">
-        <div class="brand">
-          <span class="g-blue">G</span><span class="g-red">o</span><span class="g-yellow">o</span><span class="g-blue">g</span><span class="g-green">l</span><span class="g-red">e</span>&nbsp;2026年ニュース
-        </div>
+        <div class="brand">Anthropic 2026年ニュース</div>
         <div class="brand-sub">掛け合いニュース解説</div>
       </div>
-      <div class="top-note">2026年前半のGoogleの主要ニュースをGoogle I/O 2026も含めて、掛け合いで解説します。</div>
+      <div class="top-note">2026年前半のAnthropicの主要ニュースを、掛け合いで解説します。</div>
     </header>
 
     <main class="stage">
@@ -276,7 +266,7 @@
   <script>
     const scenario = window.SCENARIO;
     const scenes = scenario.scenes;
-    const totalDurationSec = scenario.total_duration_sec || 910.0;
+    const totalDurationSec = scenario.total_duration_sec || 341.5;
 
     // Pre-compute cumulative start time (sec) for each scene
     const sceneStartSecs = [];
@@ -413,8 +403,8 @@
     }
 
     function renderSceneContent(scene) {
-      const accent     = scene.accent      || "#4285F4";
-      const accentSoft = scene.accent_soft || "rgba(66,133,244,0.18)";
+      const accent     = scene.accent      || "#4ecdc4";
+      const accentSoft = scene.accent_soft || "rgba(78,205,196,0.18)";
 
       let html = `<div class="sc-inner" style="--accent:${accent}">`;
       if (scene.image)   html += `<img class="sc-image" src="${scene.image}" alt="" loading="eager">`;
@@ -854,7 +844,7 @@
               const target = getMouthTarget();
               mouthSmooth += (target - mouthSmooth) * (target > mouthSmooth ? 0.82 : 0.48);
             } else {
-              mouthSmooth = 0;
+              mouthSmooth = 0;  // 音停止時は即時クローズ
             }
             try { vrm.expressionManager.setValue("aa", mouthSmooth); } catch {}
           }
