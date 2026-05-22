@@ -25,6 +25,11 @@ export default defineConfig({
         target: 'http://127.0.0.1:8092',
         changeOrigin: true,
         ws: true,  // WebSocketサポートを有効化
+      },
+      '/mcp': {
+        target: 'http://127.0.0.1:8095',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/mcp/, ''),
       }
     }
   }

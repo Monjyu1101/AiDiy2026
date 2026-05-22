@@ -1724,8 +1724,58 @@ mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_descripti
 async def _handle_root(request: Request) -> Response:
     return Response('{"message": "MCP Server is running"}', media_type="application/json")
 
+
+async def _handle_tts(request: Request) -> Response:
+    """
+    REST HTTP エンドポイント: POST /tts
+    ブラウザから直接 TTS を呼び出すためのシンプルな HTTP API。
+    Body: {"text": "...", "language": "ja", "provider": "edge", "voice": "female", "ratio": null}
+    Response: audio/mpeg バイナリ
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    text = body.get("text", "")
+    language = body.get("language", "ja")
+    provider = body.get("provider", "edge")
+    model = body.get("model", "auto")
+    voice = body.get("voice", "female")
+    ratio = body.get("ratio", None)
+
+    if not text:
+        return Response(
+            json.dumps({"error": "text is required"}, ensure_ascii=False),
+            status_code=400,
+            media_type="application/json",
+        )
+
+    try:
+        audio_bytes, info = await asyncio.to_thread(
+            tts.synthesize, text, language, provider, model, voice, ratio
+        )
+        logger.info(
+            f"_handle_tts: provider={info.get('used_provider')} voice={info.get('voice')} "
+            f"bytes={info.get('audio_bytes_length')} text_len={len(text)}"
+        )
+        return Response(
+            audio_bytes,
+            media_type="audio/mpeg",
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
+    except Exception as e:
+        logger.warning(f"_handle_tts error: {e}")
+        return Response(
+            json.dumps({"error": str(e)}, ensure_ascii=False),
+            status_code=500,
+            media_type="application/json",
+        )
+
+
 app = Starlette(routes=[
     Route("/", _handle_root, methods=["GET"]),
+    Route("/tts", _handle_tts, methods=["POST"]),
     *mcp.sse_app().routes,
     *mcp_dc.sse_app().routes,
     *mcp_sq.sse_app().routes,
