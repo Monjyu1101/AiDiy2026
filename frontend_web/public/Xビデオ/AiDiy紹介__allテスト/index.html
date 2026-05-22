@@ -416,12 +416,11 @@
     window.audioPlayer = audioPlayer;
     audioPlayer.preload = "auto";
 
-    let currentTtsBlobUrl = null;
-    function revokeTtsBlob() {
-      if (currentTtsBlobUrl) {
-        URL.revokeObjectURL(currentTtsBlobUrl);
-        currentTtsBlobUrl = null;
-      }
+    const ttsAudioCache = new Map();
+    const audioExistsCache = new Map();
+    function revokeTtsBlobs() {
+      ttsAudioCache.forEach((blobUrl) => URL.revokeObjectURL(blobUrl));
+      ttsAudioCache.clear();
     }
 
     function currentScene() {
@@ -454,6 +453,152 @@
       }, Math.max(0, Math.ceil(remainingMs)));
     }
 
+    function startSceneClock(token) {
+      clearInterval(tickTimer);
+      sceneStartedAt = Date.now() - sceneElapsedMs;
+      tickTimer = setInterval(() => {
+        if (token !== playbackToken || !playing) return;
+        if (Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0) {
+          sceneElapsedMs = audioPlayer.currentTime * 1000;
+        } else {
+          sceneElapsedMs = Date.now() - sceneStartedAt;
+        }
+        updateTimerAndProgress();
+      }, 100);
+    }
+
+    function getTtsConfig() {
+      const policy = scenario.assets_policy || {};
+      const ttsSpec = (policy.tts_provider || "edge:female").split(":");
+      return {
+        provider: ttsSpec[0] || "edge",
+        voice: ttsSpec[1] || "female",
+        model: policy.tts_model || "auto",
+        ratio: policy.tts_ratio ?? null,
+      };
+    }
+
+    function getTtsCacheKey(scene) {
+      return `${audioMode}:${scene.id}`;
+    }
+
+    function getVersionedAudioSrc(audioPath) {
+      return `${audioPath}?v=${encodeURIComponent(audioMode)}`;
+    }
+
+    async function audioFileExists(audioPath) {
+      const audioSrc = getVersionedAudioSrc(audioPath);
+      if (audioExistsCache.has(audioSrc)) return audioExistsCache.get(audioSrc);
+
+      try {
+        const response = await fetch(audioSrc, { method: "HEAD", cache: "no-store" });
+        const exists = response.ok;
+        audioExistsCache.set(audioSrc, exists);
+        return exists;
+      } catch (error) {
+        console.warn("音声ファイル存在確認に失敗したため、通常再生で確認します", error);
+        return true;
+      }
+    }
+
+    async function fetchTtsBlob(body) {
+      const endpoints = ["/mcp/tts", "http://127.0.0.1:8095/tts", "http://localhost:8095/tts"];
+      let lastError = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (response.ok) return response.blob();
+          const errorText = await response.text().catch(() => "");
+          lastError = new Error(`${endpoint} HTTP ${response.status}${errorText ? `: ${errorText}` : ""}`);
+          if (response.status === 400 || response.status >= 500) break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error("MCP TTS endpoint unavailable");
+    }
+
+    async function getTtsBlobUrl(scene, token) {
+      const cacheKey = getTtsCacheKey(scene);
+      const cachedUrl = ttsAudioCache.get(cacheKey);
+      if (cachedUrl) return cachedUrl;
+
+      const narration = getSceneNarration(scene);
+      if (!narration) return "";
+
+      const { provider, voice, model, ratio } = getTtsConfig();
+      meta.textContent = `scene ${sceneIndex + 1} / ${scenario.scenes.length} / TTS合成中`;
+      const blob = await fetchTtsBlob({
+        text: narration,
+        speech_text: narration,
+        provider,
+        model,
+        voice,
+        ratio,
+        language: "ja",
+        mcp_tool: "aidiy_text_to_speech.synthesize_speech",
+      });
+      if (token !== playbackToken) return "";
+
+      const blobUrl = URL.createObjectURL(blob);
+      ttsAudioCache.set(cacheKey, blobUrl);
+      return blobUrl;
+    }
+
+    async function playSceneTts(scene, token, reason) {
+      if (!playing || token !== playbackToken) return;
+      const resumeMs = sceneElapsedMs;
+      clearTimers();
+      sceneElapsedMs = resumeMs;
+      updateTimerAndProgress();
+      window.__avatarOnAudioStop?.();
+
+      try {
+        console.warn(`${reason}; MCP aidiy_text_to_speech で音声合成します`);
+        const blobUrl = await getTtsBlobUrl(scene, token);
+        if (!blobUrl || token !== playbackToken || !playing) return;
+
+        audioPlayer.src = blobUrl;
+        const duration = effectiveSceneDuration > 0 ? effectiveSceneDuration : getSceneDurationSec(scene);
+        audioPlayer.currentTime = Math.min(resumeMs / 1000, Math.max(0, duration - 0.05));
+        audioPlayer.addEventListener("loadedmetadata", () => {
+          if (token !== playbackToken) return;
+          if (Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0) {
+            effectiveSceneDuration = audioPlayer.duration;
+          }
+        }, { once: true });
+        audioPlayer.addEventListener("playing", () => {
+          if (token !== playbackToken) return;
+          const currentMs = Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
+            ? audioPlayer.currentTime * 1000
+            : sceneElapsedMs;
+          const dur = Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0
+            ? audioPlayer.duration
+            : (effectiveSceneDuration || getSceneDurationSec(scene));
+          effectiveSceneDuration = dur;
+          armSceneEndTimer(dur * 1000 - currentMs + 1200, token);
+        }, { once: true });
+        startSceneClock(token);
+        await audioPlayer.play();
+        window.__avatarOnAudioStart?.();
+      } catch (e) {
+        if (token !== playbackToken) return;
+        console.warn("MCP TTS 合成または再生に失敗", e);
+        startSceneClock(token);
+        armSceneEndTimer(effectiveSceneDuration * 1000 - sceneElapsedMs + 1200, token);
+      } finally {
+        if (token === playbackToken) {
+          meta.textContent = `scene ${sceneIndex + 1} / ${scenario.scenes.length}`;
+        }
+      }
+    }
+
     function renderScene() {
       const scene = currentScene();
       sceneFrame.src = `${scenario.scenes[sceneIndex].id}.html`;
@@ -463,7 +608,7 @@
       window.__avatarSetExpression?.(scene.expression || "neutral");
     }
 
-    function beginPlayback() {
+    async function beginPlayback() {
       const scene = currentScene();
       const token = ++playbackToken;
       clearTimers();
@@ -471,20 +616,20 @@
       sceneStartedAt = Date.now() - sceneElapsedMs;
       audioPlayer.pause();
       audioPlayer.currentTime = 0;
-      tickTimer = setInterval(() => {
-        if (Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0) {
-          sceneElapsedMs = audioPlayer.currentTime * 1000;
-        } else {
-          sceneElapsedMs = Date.now() - sceneStartedAt;
-        }
-        updateTimerAndProgress();
-      }, 100);
+      startSceneClock(token);
       const audioPath = getSceneAudio(scene);
       if (!audioPath) {
         audioPlayer.removeAttribute("src");
         audioPlayer.load();
-        window.__avatarOnAudioStop?.();
-        armSceneEndTimer(effectiveSceneDuration * 1000 - sceneElapsedMs + 200, token);
+        playSceneTts(scene, token, "音声ファイル指定なし");
+        return;
+      }
+      const exists = await audioFileExists(audioPath);
+      if (token !== playbackToken || !playing) return;
+      if (!exists) {
+        audioPlayer.removeAttribute("src");
+        audioPlayer.load();
+        playSceneTts(scene, token, `音声ファイルなし: ${audioPath}`);
         return;
       }
       audioPlayer.addEventListener("loadedmetadata", () => {
@@ -501,7 +646,7 @@
         armSceneEndTimer(effectiveSceneDuration * 1000 - currentMs + 1200, token);
       };
       audioPlayer.addEventListener("playing", handlePlaying, { once: true });
-      audioPlayer.src = `${audioPath}?v=${encodeURIComponent(audioMode)}`;
+      audioPlayer.src = getVersionedAudioSrc(audioPath);
       audioPlayer.currentTime = Math.min(sceneElapsedMs / 1000, Math.max(0, effectiveSceneDuration - 0.05));
       audioPlayer.play().then(() => {
         handlePlaying();
@@ -630,49 +775,8 @@
         console.warn("TTS audio error", audioPlayer.src);
         return;
       }
-      console.warn("audio load failed, TTS 合成を試みます...", audioPlayer.src);
       if (!playing) return;
-      const scene = currentScene();
-      const narration = getSceneNarration(scene);
-      if (!narration) return;
-      const token = playbackToken;
-      clearTimers();
-      const policy = scenario.assets_policy || {};
-      const ttsSpec = (policy.tts_provider || "edge:female").split(":");
-      const provider = ttsSpec[0] || "edge";
-      const voice = ttsSpec[1] || "female";
-      fetch("/mcp/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: narration, provider, voice, language: "ja" }),
-      }).then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.blob();
-      }).then(blob => {
-        if (token !== playbackToken || !playing) return;
-        revokeTtsBlob();
-        currentTtsBlobUrl = URL.createObjectURL(blob);
-        sceneElapsedMs = 0;
-        sceneStartedAt = Date.now();
-        audioPlayer.src = currentTtsBlobUrl;
-        audioPlayer.currentTime = 0;
-        audioPlayer.play().then(() => {
-          if (token !== playbackToken) return;
-          window.__avatarOnAudioStart?.();
-          const dur = Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0
-            ? audioPlayer.duration
-            : effectiveSceneDuration;
-          effectiveSceneDuration = dur;
-          armSceneEndTimer(dur * 1000 + 500, token);
-        }).catch(e2 => {
-          console.warn("TTS 再生失敗", e2);
-          armSceneEndTimer(effectiveSceneDuration * 1000 + 200, token);
-        });
-      }).catch(e => {
-        if (token !== playbackToken) return;
-        console.warn("TTS 合成失敗", e);
-        armSceneEndTimer(effectiveSceneDuration * 1000 + 200, token);
-      });
+      playSceneTts(currentScene(), playbackToken, `音声ファイル読込失敗: ${audioPlayer.src}`);
     });
     audioPlayer.addEventListener("play", () => {
       window.__avatarOnAudioStart?.();
@@ -686,6 +790,7 @@
     if (new URLSearchParams(window.location.search).get("autoplay") === "1") {
       setTimeout(() => play(), 400);
     }
+    window.addEventListener("beforeunload", revokeTtsBlobs);
   </script>
 
   <script type="module">

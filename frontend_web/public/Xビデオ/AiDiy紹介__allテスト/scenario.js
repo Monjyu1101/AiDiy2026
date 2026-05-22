@@ -18,7 +18,7 @@ window.SCENARIO = {
     "audio_output_dir": "frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake4/audio",
     "avatar": "../vrm/VRM_AiDiy.vrm",
     "image_provider": "openai:gpt-image-2",
-    "tts_provider": "edge:female"
+    "tts_provider": "openai:female"
   },
   "scenes": [
     {

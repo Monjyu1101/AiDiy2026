@@ -667,6 +667,9 @@ class TextToSpeech:
         endpoint = f"{base_url}/models/{model}:generateContent"
 
         # MP3 直接出力を試みる。API が非対応なら audioConfig なしで再試行
+        # 5xx エラーや接続失敗は最大 3 回まで指数バックオフでリトライ
+        RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+        MAX_RETRIES = 3
         for attempt_mp3 in (True, False):
             gen_config = dict(base_gen_config)
             if attempt_mp3:
@@ -675,14 +678,36 @@ class TextToSpeech:
                 "contents": [{"parts": [{"text": tts_prompt}]}],
                 "generationConfig": gen_config,
             }
-            resp = requests.post(
-                endpoint,
-                params={"key": api_key},
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=60,
-            )
-            if resp.status_code == 400 and attempt_mp3:
+            resp = None
+            for retry in range(MAX_RETRIES):
+                try:
+                    resp = requests.post(
+                        endpoint,
+                        params={"key": api_key},
+                        headers={"Content-Type": "application/json"},
+                        json=payload,
+                        timeout=60,
+                    )
+                    if resp.status_code in RETRYABLE_STATUS and retry < MAX_RETRIES - 1:
+                        wait_sec = 1.5 * (2 ** retry)
+                        logger.info(
+                            f"Gemini TTS: HTTP {resp.status_code}、{wait_sec:.1f}s 後にリトライ "
+                            f"({retry + 1}/{MAX_RETRIES - 1})"
+                        )
+                        time.sleep(wait_sec)
+                        continue
+                    break
+                except requests.RequestException as e:
+                    if retry < MAX_RETRIES - 1:
+                        wait_sec = 1.5 * (2 ** retry)
+                        logger.info(
+                            f"Gemini TTS: 接続失敗 ({e})、{wait_sec:.1f}s 後にリトライ "
+                            f"({retry + 1}/{MAX_RETRIES - 1})"
+                        )
+                        time.sleep(wait_sec)
+                        continue
+                    raise
+            if resp is not None and resp.status_code == 400 and attempt_mp3:
                 # audioConfig 非対応 → PCM モードで再試行
                 logger.info("Gemini TTS: audioConfig 非対応、PCM モードで再試行")
                 continue
@@ -806,6 +831,7 @@ class TextToSpeech:
             encoder.set_quality(2)
             mp3_bytes = encoder.encode(pcm_data)
             mp3_bytes += encoder.flush()
+            mp3_bytes = bytes(mp3_bytes) if not isinstance(mp3_bytes, bytes) else mp3_bytes
             return mp3_bytes if mp3_bytes else wav_bytes
         except Exception:
             return wav_bytes

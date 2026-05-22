@@ -1728,16 +1728,27 @@ async def _handle_root(request: Request) -> Response:
 async def _handle_tts(request: Request) -> Response:
     """
     REST HTTP エンドポイント: POST /tts
-    ブラウザから直接 TTS を呼び出すためのシンプルな HTTP API。
-    Body: {"text": "...", "language": "ja", "provider": "edge", "voice": "female", "ratio": null}
+    ブラウザから aidiy_text_to_speech 相当の TTS を呼び出すためのシンプルな HTTP API。
+    Body: {"text": "...", "speech_text": "...", "language": "ja", "provider": "edge", "voice": "female", "ratio": null}
     Response: audio/mpeg バイナリ
     """
+    if request.method == "OPTIONS":
+        return Response(
+            "",
+            status_code=204,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            },
+        )
+
     try:
         body = await request.json()
     except Exception:
         body = {}
 
-    text = body.get("text", "")
+    text = body.get("text") or body.get("speech_text", "")
     language = body.get("language", "ja")
     provider = body.get("provider", "edge")
     model = body.get("model", "auto")
@@ -1759,10 +1770,16 @@ async def _handle_tts(request: Request) -> Response:
             f"_handle_tts: provider={info.get('used_provider')} voice={info.get('voice')} "
             f"bytes={info.get('audio_bytes_length')} text_len={len(text)}"
         )
+        # Starlette Response は bytearray を受け付けないため bytes に正規化
+        if isinstance(audio_bytes, (bytearray, memoryview)):
+            audio_bytes = bytes(audio_bytes)
         return Response(
             audio_bytes,
             media_type="audio/mpeg",
-            headers={"Access-Control-Allow-Origin": "*"},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "X-AiDiy-MCP-Tool": "aidiy_text_to_speech.synthesize_speech",
+            },
         )
     except Exception as e:
         logger.warning(f"_handle_tts error: {e}")
@@ -1775,7 +1792,7 @@ async def _handle_tts(request: Request) -> Response:
 
 app = Starlette(routes=[
     Route("/", _handle_root, methods=["GET"]),
-    Route("/tts", _handle_tts, methods=["POST"]),
+    Route("/tts", _handle_tts, methods=["POST", "OPTIONS"]),
     *mcp.sse_app().routes,
     *mcp_dc.sse_app().routes,
     *mcp_sq.sse_app().routes,
