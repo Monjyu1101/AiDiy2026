@@ -44,9 +44,15 @@ class ChromeManager:
     ensure_running() を呼ぶだけで自動起動まで完了する。
     """
 
-    def __init__(self, debug_port: int = 9222, profile_dir: str = _PROFILE_DIR):
+    def __init__(
+        self,
+        debug_port: int = 9222,
+        profile_dir: str = _PROFILE_DIR,
+        show_automation_banner: bool = True,
+    ):
         self.debug_port = debug_port
         self.profile_dir = profile_dir
+        self.show_automation_banner = show_automation_banner
         self._process: subprocess.Popen | None = None
 
     # ------------------------------------------------------------------ #
@@ -92,12 +98,43 @@ class ChromeManager:
 
         return None
 
-    def launch(self, wait_timeout: float = 30.0) -> str:
+    def _build_launch_args(
+        self,
+        chrome_path: str,
+        show_automation_banner: bool | None = None,
+    ) -> list[str]:
+        """Chrome 起動引数を組み立てる"""
+        should_show_banner = (
+            self.show_automation_banner
+            if show_automation_banner is None
+            else bool(show_automation_banner)
+        )
+
+        args = [
+            chrome_path,
+            f"--remote-debugging-port={self.debug_port}",
+            f"--user-data-dir={self.profile_dir}",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-default-apps",
+            "--autoplay-policy=no-user-gesture-required",
+        ]
+        if should_show_banner:
+            args.append("--enable-automation")
+        return args
+
+    def launch(
+        self,
+        wait_timeout: float = 30.0,
+        show_automation_banner: bool | None = None,
+    ) -> str:
         """
         Chrome をリモートデバッグモードで起動する。
 
         Args:
             wait_timeout: 起動完了待ちのタイムアウト秒数
+            show_automation_banner: True で「自動操作中」の帯表示あり。
+                                    None の場合は現在の既定値を使う。
 
         Returns:
             "already_running" | "launched" | "launch_failed"
@@ -116,15 +153,7 @@ class ChromeManager:
                 "Chrome をインストールしてください。"
             )
 
-        args = [
-            chrome_path,
-            f"--remote-debugging-port={self.debug_port}",
-            f"--user-data-dir={self.profile_dir}",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-default-apps",
-            "--enable-automation",   # 「自動制御されています」バナーを表示
-        ]
+        args = self._build_launch_args(chrome_path, show_automation_banner)
 
         logger.info(f"起動: {chrome_path}")
         self._process = subprocess.Popen(
@@ -144,7 +173,7 @@ class ChromeManager:
         logger.warning(f"起動タイムアウト ({wait_timeout}秒経過) — Chrome プロセスは起動しましたがデバッグポートが応答しませんでした")
         return "launch_failed"
 
-    def ensure_running(self) -> str:
+    def ensure_running(self, show_automation_banner: bool | None = None) -> str:
         """
         Chrome が起動していなければ自動起動する。
 
@@ -156,4 +185,4 @@ class ChromeManager:
         """
         if self.is_running():
             return "already_running"
-        return self.launch()
+        return self.launch(show_automation_banner=show_automation_banner)

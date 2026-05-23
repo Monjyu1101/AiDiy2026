@@ -80,6 +80,7 @@ BACKEND_MCP_PORT = 8095
 BACKEND_MCP_APP = "mcp_main:app"
 BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
 BACKEND_MCP_CHROME_DEBUG_PORT = 9222
+BACKEND_MCP_SHOW_AUTOMATION_BANNER = False
 
 FRONTEND_WEB_PATH = "frontend_web"
 FRONTEND_WEB_PORT = 8090
@@ -537,7 +538,7 @@ def ensure_mcp_browser_ready() -> bool:
         command = [
             str(backend_mcp_python),
             "-c",
-            "from mcp_proc.chrome_manager import ChromeManager; print(ChromeManager().ensure_running())",
+            f"from mcp_proc.chrome_manager import ChromeManager; print(ChromeManager().ensure_running(show_automation_banner={BACKEND_MCP_SHOW_AUTOMATION_BANNER}))",
         ]
     else:
         command = [
@@ -545,7 +546,7 @@ def ensure_mcp_browser_ready() -> bool:
             "run",
             "python",
             "-c",
-            "from mcp_proc.chrome_manager import ChromeManager; print(ChromeManager().ensure_running())",
+            f"from mcp_proc.chrome_manager import ChromeManager; print(ChromeManager().ensure_running(show_automation_banner={BACKEND_MCP_SHOW_AUTOMATION_BANNER}))",
         ]
 
     print_info(f"(mcp) Chrome 起動コマンド: {' '.join(str(c) for c in command)}")
@@ -597,6 +598,15 @@ def open_browser_via_mcp(port: int) -> bool:
     print_header("ブラウザページ表示")
     url = f"http://localhost:{port}"
 
+    if not is_mcp_browser_running():
+        if not ensure_mcp_browser_ready():
+            print_warning("(mcp) Chrome の事前起動に失敗したため通常ブラウザへフォールバックします")
+            try:
+                webbrowser.open(url)
+            except Exception as exc:
+                print_warning(f"ブラウザを開けませんでした: {exc}")
+            return False
+
     # MCP SSE サーバー経由で新規ページを開く
     backend_mcp_python = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
     if backend_mcp_python is not None:
@@ -622,7 +632,7 @@ def open_browser_via_mcp(port: int) -> bool:
             "    async with sse_client(sse_url, timeout=10, sse_read_timeout=60) as (read, write):\n"
             "        async with ClientSession(read, write) as session:\n"
             "            await session.initialize()\n"
-            "            # Step1: タブ一覧確認（Chrome 未起動なら起動も兼ねる）\n"
+            "            # Step1: タブ一覧確認（Chrome は事前起動済み前提）\n"
             "            r = await session.call_tool('list_tabs', {})\n"
             "            text = _content_text(r)\n"
             "            if getattr(r, 'isError', False):\n"
@@ -641,7 +651,7 @@ def open_browser_via_mcp(port: int) -> bool:
             "                    return 1\n"
             "            else:\n"
             "                # Step2: 新規タブで開く（Chrome は Step1 で起動済み）\n"
-            "                created = await session.call_tool('new_page', {'url': target_url})\n"
+            f"                created = await session.call_tool('new_page', {{'url': target_url, 'show_automation_banner': {BACKEND_MCP_SHOW_AUTOMATION_BANNER}}})\n"
             "                if getattr(created, 'isError', False):\n"
             "                    print(_content_text(created) or 'new_page failed', file=sys.stderr)\n"
             "                    return 1\n"

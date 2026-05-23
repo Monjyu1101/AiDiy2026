@@ -45,30 +45,28 @@ class TextToSpeech:
     テキスト音声合成クラス
 
     provider:
-        "auto"   — 即 edge を使う（キー不要・常時利用可の既定経路）
+        "auto"   — まず edge を使い、失敗時は freeai へフォールバック
         "edge"   — Microsoft Edge ニューラル TTS
         "gemini" — Google Gemini TTS（GEMINI_API_KEY が必要）
         "freeai" — FreeAI TTS（FREEAI_API_KEY が必要、実体は Gemini）
         "openai" — OpenAI TTS（OPENAI_API_KEY が必要）
 
     自動フォールバックチェーン（FALLBACK_CHAIN）:
-        auto   → edge
+        auto   → edge → freeai
+        edge   → edge → freeai
         freeai → gemini → edge
-        gemini → edge
+        gemini → freeai → edge
         openai → edge
-        edge   → (フォールバックなし。最終手段)
 
-    どの provider を指定しても最終的に edge まで到達するため、ネットワーク
-    断や API キー不備があっても合成自体は通る前提。キー無効の候補は事前に
-    スキップし、合成失敗時もチェーンに沿って次の候補へ進む。
+    キー無効の候補は事前にスキップし、合成失敗時もチェーンに沿って次の候補へ進む。
     """
 
     # 自動フォールバック順（左から順に試す）。
     FALLBACK_CHAIN: dict[str, list[str]] = {
-        "auto":   ["edge"],
-        "edge":   ["edge"],
+        "auto":   ["edge", "freeai"],
+        "edge":   ["edge", "freeai"],
         "openai": ["openai", "edge"],
-        "gemini": ["gemini", "edge"],
+        "gemini": ["gemini", "freeai", "edge"],
         "freeai": ["freeai", "gemini", "edge"],
     }
 
@@ -485,11 +483,11 @@ class TextToSpeech:
         テキストから音声を合成する。
 
         フォールバックは FALLBACK_CHAIN（クラス定数）に従う:
-            auto   → edge
+            auto   → edge → freeai
+            edge   → edge → freeai
             freeai → gemini → edge
-            gemini → edge
+            gemini → freeai → edge
             openai → edge
-            edge   → (フォールバックなし)
         キー無効の候補は事前にスキップし、合成例外発生時も次の候補へ進む。
 
         Args:
@@ -1022,7 +1020,7 @@ class TextToSpeech:
 
     def _normalize_provider(self, provider: str) -> str:
         """provider 文字列を正規化する。'auto' はそのまま 'auto' で返し、
-        FALLBACK_CHAIN["auto"] = ["edge"] によって実合成は edge で行う。"""
+        FALLBACK_CHAIN によって実際の試行順を決める。"""
         p = provider.strip().lower()
         if p in self.FALLBACK_CHAIN:
             return p

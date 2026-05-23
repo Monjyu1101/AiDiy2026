@@ -192,6 +192,7 @@
       color: #9eb2c6;
       font-weight: 700;
     }
+
     .mode-btn {
       background: rgba(41, 216, 255, 0.08);
       border-color: rgba(41, 216, 255, 0.45);
@@ -216,6 +217,28 @@
 
     .timer {
       font-variant-numeric: tabular-nums;
+    }
+
+    .tts-status {
+      position: absolute;
+      left: 24px;
+      bottom: 94px;
+      z-index: 21;
+      color: #ff6b6b;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      text-shadow: 0 0 14px rgba(255, 72, 72, 0.45);
+      opacity: 0;
+      transform: translateY(2px);
+      transition: opacity 160ms ease, transform 160ms ease;
+      pointer-events: none;
+    }
+
+    .tts-status.active {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     #avatar-container {
@@ -285,6 +308,12 @@
         font-size: 14px;
       }
 
+      .tts-status {
+        left: 14px;
+        bottom: 122px;
+        font-size: 15px;
+      }
+
       #avatar-container {
         right: 4vw;
         width: 32vh;
@@ -308,17 +337,18 @@
     <header class="topbar">
       <div class="brand-wrap">
         <div class="brand">AiDiy MCP Hub 紹介</div>
-        <div class="brand-sub">MCP HUB</div>
       </div>
       <div class="top-note">backend_mcp/AGENTS.md と .aidiy/knowledge をもとに、13 MCP サーバーの実装実態を正確に紹介します。</div>
     </header>
 
     <main class="stage">
       <section class="frame-wrap">
-        <iframe id="sceneFrame" class="scene-frame" title="AiDiy MCP Hub 紹介 scene"></iframe>
+        <iframe id="sceneFrame" class="scene-frame" title="AiDiy自己紹介 scene"></iframe>
         <div id="subtitle" class="subtitle"></div>
       </section>
     </main>
+
+    <div id="ttsStatus" class="tts-status" aria-live="polite"></div>
 
     <footer class="controls">
       <div class="controls-left">
@@ -336,8 +366,8 @@
       </div>
 
       <div class="controls-right">
-        <div id="timer" class="timer">00:00 / 01:50</div>
-        <div id="meta" class="meta">scene 1 / 8</div>
+        <div id="timer" class="timer">00:00 / 00:50</div>
+        <div id="meta" class="meta">scene 1 / 10</div>
       </div>
     </footer>
   </div>
@@ -358,12 +388,23 @@
     const nextBtn = document.getElementById("nextBtn");
     const restartBtn = document.getElementById("restartBtn");
     const modeBtn = document.getElementById("modeBtn");
+    const ttsStatus = document.getElementById("ttsStatus");
+    const searchParams = new URLSearchParams(window.location.search);
+    const autoParam = (searchParams.get("auto") || "").toLowerCase();
+    const requestedAutoMode = ["short", "long", "loop"].includes(autoParam) ? autoParam : "";
+    const autoPlayRequested = requestedAutoMode !== "" || searchParams.get("autoplay") === "1";
 
-    let audioMode = "short"; // "short" | "long"
+    let audioMode = requestedAutoMode === "short"
+      ? "short"
+      : (requestedAutoMode === "long" || requestedAutoMode === "loop" ? "long" : "short");
     let effectiveSceneDuration = 0;
 
     function getSceneAudio(scene) {
       return audioMode === "long" ? (scene.long_audio || "") : (scene.short_audio || "");
+    }
+
+    function getSceneNarration(scene) {
+      return audioMode === "long" ? (scene.long_narration || "") : (scene.short_narration || "");
     }
 
     function getSceneDurationSec(scene) {
@@ -389,9 +430,13 @@
     }
 
     function getInitialSceneIndex() {
-      const value = Number.parseInt(new URLSearchParams(window.location.search).get("scene") || "1", 10);
+      const value = Number.parseInt(searchParams.get("scene") || "1", 10);
       if (!Number.isFinite(value)) return 0;
       return Math.min(Math.max(value - 1, 0), scenario.scenes.length - 1);
+    }
+
+    function isLoopPlayback() {
+      return requestedAutoMode === "loop" && audioMode === "long";
     }
 
     function formatTime(sec) {
@@ -408,9 +453,21 @@
     let tickTimer = null;
     let sceneEndTimer = null;
     let playbackToken = 0;
+    let pendingGesturePlayback = false;
+    let requestedPlaybackStarted = false;
+    let autoplayFallbackTimer = null;
     const audioPlayer = new Audio();
     window.audioPlayer = audioPlayer;
     audioPlayer.preload = "auto";
+
+    const ttsAudioCache = new Map();
+    const ttsPendingCache = new Map();
+    const audioExistsCache = new Map();
+    function revokeTtsBlobs() {
+      ttsAudioCache.forEach((blobUrl) => URL.revokeObjectURL(blobUrl));
+      ttsAudioCache.clear();
+      ttsPendingCache.clear();
+    }
 
     function currentScene() {
       return scenario.scenes[sceneIndex];
@@ -442,24 +499,11 @@
       }, Math.max(0, Math.ceil(remainingMs)));
     }
 
-    function renderScene() {
-      const scene = currentScene();
-      sceneFrame.src = `${scenario.scenes[sceneIndex].id}.html`;
-      subtitle.textContent = scene.subtitle || scene.lead || "";
-      meta.textContent = `scene ${sceneIndex + 1} / ${scenario.scenes.length}`;
-      updateTimerAndProgress();
-      window.__avatarSetExpression?.(scene.expression || "neutral");
-    }
-
-    function beginPlayback() {
-      const scene = currentScene();
-      const token = ++playbackToken;
-      clearTimers();
-      effectiveSceneDuration = getSceneDurationSec(scene);
+    function startSceneClock(token) {
+      clearInterval(tickTimer);
       sceneStartedAt = Date.now() - sceneElapsedMs;
-      audioPlayer.pause();
-      audioPlayer.currentTime = 0;
       tickTimer = setInterval(() => {
+        if (token !== playbackToken || !playing) return;
         if (Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0) {
           sceneElapsedMs = audioPlayer.currentTime * 1000;
         } else {
@@ -467,12 +511,278 @@
         }
         updateTimerAndProgress();
       }, 100);
+    }
+
+    function getTtsConfig() {
+      const policy = scenario.assets_policy || {};
+      const ttsSpec = (policy.tts_provider || "freeai:female").split(":");
+      return {
+        provider: ttsSpec[0] || "freeai",
+        voice: ttsSpec[1] || "female",
+        model: policy.tts_model || "auto",
+        ratio: policy.tts_ratio ?? null,
+      };
+    }
+
+    function getTtsCacheKey(scene) {
+      return `${audioMode}:${scene.id}`;
+    }
+
+    function getVersionedAudioSrc(audioPath) {
+      return `${audioPath}?v=${encodeURIComponent(audioMode)}`;
+    }
+
+    function setTtsStatus(text) {
+      if (!ttsStatus) return;
+      ttsStatus.textContent = text || "";
+      ttsStatus.classList.toggle("active", Boolean(text));
+    }
+
+    function handleAutoplayBlocked(error, token) {
+      const message = String(error?.message || "");
+      const blocked = error?.name === "NotAllowedError"
+        || /gesture|interact|allowed/i.test(message);
+      if (!blocked || token !== playbackToken) return false;
+
+      playing = false;
+      pendingGesturePlayback = true;
+      clearTimers();
+      audioPlayer.pause();
+      window.__avatarOnAudioStop?.();
+      playBtn.textContent = "▶";
+      sceneElapsedMs = 0;
+      effectiveSceneDuration = 0;
+      updateTimerAndProgress();
+      setTtsStatus("自動再生待機中（クリックで開始）");
+      return true;
+    }
+
+    function tryResumePendingPlayback() {
+      if (!pendingGesturePlayback || playing) return;
+      pendingGesturePlayback = false;
+      setTtsStatus("");
+      play();
+    }
+
+    function triggerRequestedPlayback() {
+      if (!autoPlayRequested || requestedPlaybackStarted) return;
+      requestedPlaybackStarted = true;
+      clearTimeout(autoplayFallbackTimer);
+      autoplayFallbackTimer = null;
+      setTtsStatus("");
+      if (requestedAutoMode) {
+        play();
+        return;
+      }
+      setTimeout(() => play(), 400);
+    }
+
+    function scheduleRequestedPlayback() {
+      if (!autoPlayRequested || requestedPlaybackStarted) return;
+      const waitMs = requestedAutoMode ? 2800 : 1200;
+      if (requestedAutoMode) {
+        setTtsStatus("再生準備中...");
+      }
+      autoplayFallbackTimer = setTimeout(() => {
+        triggerRequestedPlayback();
+      }, waitMs);
+    }
+    window.triggerRequestedPlayback = triggerRequestedPlayback;
+
+    async function audioFileExists(audioPath) {
+      const audioSrc = getVersionedAudioSrc(audioPath);
+      if (audioExistsCache.has(audioSrc)) return audioExistsCache.get(audioSrc);
+
+      try {
+        const response = await fetch(audioSrc, { method: "HEAD", cache: "no-store" });
+        const contentType = (response.headers.get("content-type") || "").toLowerCase();
+        const exists = response.ok
+          && !contentType.startsWith("text/html")
+          && (!contentType || contentType.startsWith("audio/") || contentType.includes("octet-stream"));
+        audioExistsCache.set(audioSrc, exists);
+        return exists;
+      } catch (error) {
+        console.warn("音声ファイル存在確認に失敗したため、通常再生で確認します", error);
+        return true;
+      }
+    }
+
+    async function fetchTtsBlob(body) {
+      const endpoints = ["/mcp/tts", "http://127.0.0.1:8095/tts", "http://localhost:8095/tts"];
+      let lastError = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (response.ok) return response.blob();
+          const errorText = await response.text().catch(() => "");
+          lastError = new Error(`${endpoint} HTTP ${response.status}${errorText ? `: ${errorText}` : ""}`);
+          if (response.status === 400 || response.status >= 500) break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error("MCP TTS endpoint unavailable");
+    }
+
+    async function getTtsBlobUrl(scene) {
+      const cacheKey = getTtsCacheKey(scene);
+      const cachedUrl = ttsAudioCache.get(cacheKey);
+      if (cachedUrl) return cachedUrl;
+      const pendingPromise = ttsPendingCache.get(cacheKey);
+      if (pendingPromise) return pendingPromise;
+
+      const narration = getSceneNarration(scene);
+      if (!narration) return "";
+
+      const { provider, voice, model, ratio } = getTtsConfig();
+      const promise = (async () => {
+        const blob = await fetchTtsBlob({
+          text: narration,
+          speech_text: narration,
+          provider,
+          model,
+          voice,
+          ratio,
+          language: "ja",
+          mcp_tool: "aidiy_text_to_speech.synthesize_speech",
+        });
+        const blobUrl = URL.createObjectURL(blob);
+        ttsAudioCache.set(cacheKey, blobUrl);
+        return blobUrl;
+      })();
+      ttsPendingCache.set(cacheKey, promise);
+      try {
+        return await promise;
+      } finally {
+        if (ttsPendingCache.get(cacheKey) === promise) {
+          ttsPendingCache.delete(cacheKey);
+        }
+      }
+    }
+
+    async function prefetchSceneAudio(scene) {
+      if (!scene) return;
+
+      const audioPath = getSceneAudio(scene);
+      if (audioPath) {
+        const exists = await audioFileExists(audioPath);
+        if (exists) return;
+      }
+
+      if (!getSceneNarration(scene)) return;
+
+      try {
+        await getTtsBlobUrl(scene);
+      } catch (error) {
+        console.warn("TTS 先読み失敗", error);
+      }
+    }
+
+    async function playSceneTts(scene, token, reason) {
+      if (!playing || token !== playbackToken) return;
+      const resumeMs = sceneElapsedMs;
+      sceneElapsedMs = resumeMs;
+      sceneStartedAt = Date.now() - resumeMs;
+      updateTimerAndProgress();
+      window.__avatarOnAudioStop?.();
+      const provisionalDuration = effectiveSceneDuration > 0 ? effectiveSceneDuration : getSceneDurationSec(scene);
+      armSceneEndTimer(provisionalDuration * 1000 - resumeMs + 200, token);
+
+      try {
+        console.warn(`${reason}; MCP aidiy_text_to_speech で音声合成します`);
+        setTtsStatus(pendingGesturePlayback ? "自動再生待機中（クリックで開始）" : "TTS合成中");
+        const blobUrl = await getTtsBlobUrl(scene);
+        if (!blobUrl || token !== playbackToken || !playing) return;
+
+        const resumeSec = Math.max(0, resumeMs / 1000);
+        const syncResumePosition = () => {
+          if (token !== playbackToken) return;
+          const duration = Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0
+            ? audioPlayer.duration
+            : (effectiveSceneDuration || getSceneDurationSec(scene));
+          effectiveSceneDuration = duration;
+          if (resumeSec <= 0) return;
+          try {
+            audioPlayer.currentTime = Math.min(resumeSec, Math.max(0, duration - 0.05));
+          } catch (error) {
+            console.warn("TTS 音声のシークに失敗", error);
+          }
+        };
+        audioPlayer.addEventListener("loadedmetadata", syncResumePosition, { once: true });
+        audioPlayer.src = blobUrl;
+        audioPlayer.addEventListener("loadedmetadata", () => {
+          if (token !== playbackToken) return;
+          if (Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0) {
+            effectiveSceneDuration = audioPlayer.duration;
+          }
+        }, { once: true });
+        audioPlayer.addEventListener("playing", () => {
+          if (token !== playbackToken) return;
+          const currentMs = Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
+            ? audioPlayer.currentTime * 1000
+            : sceneElapsedMs;
+          const dur = Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0
+            ? audioPlayer.duration
+            : (effectiveSceneDuration || getSceneDurationSec(scene));
+          effectiveSceneDuration = dur;
+          armSceneEndTimer(dur * 1000 - currentMs + 1200, token);
+        }, { once: true });
+        if (audioPlayer.readyState >= 1) {
+          syncResumePosition();
+        }
+        await audioPlayer.play();
+        window.__avatarOnAudioStart?.();
+      } catch (e) {
+        if (token !== playbackToken) return;
+        if (handleAutoplayBlocked(e, token)) return;
+        console.warn("MCP TTS 合成または再生に失敗", e);
+      } finally {
+        if (token === playbackToken && !pendingGesturePlayback) {
+          setTtsStatus("");
+        }
+      }
+    }
+
+    function renderScene() {
+      const scene = currentScene();
+      sceneFrame.src = `${scenario.scenes[sceneIndex].id}.html`;
+      subtitle.textContent = scene.subtitle || scene.lead || "";
+      meta.textContent = `scene ${sceneIndex + 1} / ${scenario.scenes.length}`;
+      setTtsStatus("");
+      updateTimerAndProgress();
+      window.__avatarSetExpression?.(scene.expression || "neutral");
+      prefetchSceneAudio(scene);
+      prefetchSceneAudio(scenario.scenes[sceneIndex + 1]);
+    }
+
+    async function beginPlayback() {
+      const scene = currentScene();
+      const token = ++playbackToken;
+      clearTimers();
+      effectiveSceneDuration = getSceneDurationSec(scene);
+      sceneStartedAt = Date.now() - sceneElapsedMs;
+      audioPlayer.pause();
+      audioPlayer.currentTime = 0;
+      startSceneClock(token);
       const audioPath = getSceneAudio(scene);
       if (!audioPath) {
         audioPlayer.removeAttribute("src");
         audioPlayer.load();
-        window.__avatarOnAudioStop?.();
-        armSceneEndTimer(effectiveSceneDuration * 1000 - sceneElapsedMs + 200, token);
+        playSceneTts(scene, token, "音声ファイル指定なし");
+        return;
+      }
+      const exists = await audioFileExists(audioPath);
+      if (token !== playbackToken || !playing) return;
+      if (!exists) {
+        audioPlayer.removeAttribute("src");
+        audioPlayer.load();
+        playSceneTts(scene, token, `音声ファイルなし: ${audioPath}`);
         return;
       }
       audioPlayer.addEventListener("loadedmetadata", () => {
@@ -489,11 +799,12 @@
         armSceneEndTimer(effectiveSceneDuration * 1000 - currentMs + 1200, token);
       };
       audioPlayer.addEventListener("playing", handlePlaying, { once: true });
-      audioPlayer.src = `${audioPath}?v=${encodeURIComponent(audioMode)}`;
+      audioPlayer.src = getVersionedAudioSrc(audioPath);
       audioPlayer.currentTime = Math.min(sceneElapsedMs / 1000, Math.max(0, effectiveSceneDuration - 0.05));
       audioPlayer.play().then(() => {
         handlePlaying();
-      }).catch(() => {
+      }).catch((error) => {
+        if (handleAutoplayBlocked(error, token)) return;
         sceneStartedAt = Date.now() - sceneElapsedMs;
         armSceneEndTimer(effectiveSceneDuration * 1000 - sceneElapsedMs + 1200, token);
       });
@@ -515,11 +826,12 @@
       if (!playing) return;
       playing = false;
       playBtn.textContent = "▶";
+      const pauseDur = effectiveSceneDuration > 0 ? effectiveSceneDuration : getSceneDurationSec(currentScene());
       sceneElapsedMs = Math.min(
         Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
           ? audioPlayer.currentTime * 1000
           : Math.max(0, Date.now() - sceneStartedAt),
-        (effectiveSceneDuration > 0 ? effectiveSceneDuration : getSceneDurationSec(currentScene())) * 1000
+        pauseDur * 1000
       );
       audioPlayer.pause();
       window.__avatarOnAudioStop?.();
@@ -540,6 +852,8 @@
     function nextScene(fromAuto) {
       if (sceneIndex < scenario.scenes.length - 1) {
         moveToScene(sceneIndex + 1);
+      } else if (fromAuto && isLoopPlayback()) {
+        moveToScene(0);
       } else {
         clearTimers();
         sceneElapsedMs = (effectiveSceneDuration > 0 ? effectiveSceneDuration : getSceneDurationSec(currentScene())) * 1000;
@@ -612,7 +926,13 @@
     });
     audioPlayer.addEventListener("error", () => {
       window.__avatarOnAudioStop?.();
-      console.warn("audio load failed", audioPlayer.src);
+      // TTS blob URL の再生失敗はタイマーで継続
+      if (audioPlayer.src.startsWith("blob:")) {
+        console.warn("TTS audio error", audioPlayer.src);
+        return;
+      }
+      if (!playing) return;
+      playSceneTts(currentScene(), playbackToken, `音声ファイル読込失敗: ${audioPlayer.src}`);
     });
     audioPlayer.addEventListener("play", () => {
       window.__avatarOnAudioStart?.();
@@ -623,9 +943,10 @@
 
     updateModeBtn();
     renderScene();
-    if (new URLSearchParams(window.location.search).get("autoplay") === "1") {
-      setTimeout(() => play(), 400);
-    }
+    scheduleRequestedPlayback();
+    window.addEventListener("pointerdown", tryResumePendingPlayback, true);
+    window.addEventListener("keydown", tryResumePendingPlayback, true);
+    window.addEventListener("beforeunload", revokeTtsBlobs);
   </script>
 
   <script type="module">
@@ -812,6 +1133,7 @@
       }
     } catch (error) {} finally {
       canvas.classList.add("ready");
+      window.triggerRequestedPlayback?.();
     }
 
     function updateExpression(dt) {

@@ -160,10 +160,13 @@ _setup_reboot_watcher()
 # Chrome 保証ヘルパー
 # ------------------------------------------------------------------ #
 
-async def _ensure_chrome():
+async def _ensure_chrome(show_automation_banner: Optional[bool] = None):
     """Chrome が起動していなければ自動起動する"""
     if not chrome.is_running():
-        await asyncio.to_thread(chrome.ensure_running)
+        await asyncio.to_thread(
+            chrome.ensure_running,
+            show_automation_banner=show_automation_banner,
+        )
 
 # ------------------------------------------------------------------ #
 # MCP サーバー & ツール定義
@@ -290,9 +293,19 @@ mcp_ff = FastMCP(
 # ナビゲーション
 
 @mcp.tool()
-async def navigate(url: str, tab_id: Optional[str] = None) -> str:
-    """指定URLへ移動する"""
-    await _ensure_chrome()
+async def navigate(
+    url: str,
+    tab_id: Optional[str] = None,
+    show_automation_banner: bool = True,
+) -> str:
+    """
+    指定URLへ移動する。
+
+    Args:
+        show_automation_banner: Chrome 未起動時の自動起動で「自動操作中」の帯を表示する。
+                                省略時は True。
+    """
+    await _ensure_chrome(show_automation_banner=show_automation_banner)
     return await cdp.navigate(url, tab_id)
 
 @mcp.tool()
@@ -397,9 +410,18 @@ async def list_tabs() -> str:
     return json.dumps(tabs, ensure_ascii=False)
 
 @mcp.tool()
-async def new_tab(url: str = "about:blank") -> str:
-    """新規タブを開く"""
-    await _ensure_chrome()
+async def new_tab(
+    url: str = "about:blank",
+    show_automation_banner: bool = True,
+) -> str:
+    """
+    新規タブを開く。
+
+    Args:
+        show_automation_banner: Chrome 未起動時の自動起動で「自動操作中」の帯を表示する。
+                                省略時は True。
+    """
+    await _ensure_chrome(show_automation_banner=show_automation_banner)
     # Target.createTarget でタブ作成と URL 指定を一括実行（より確実）
     browser_ws = await asyncio.to_thread(cdp.get_browser_ws_url)
     result = await cdp.send_command(browser_ws, "Target.createTarget", {"url": url})
@@ -677,9 +699,12 @@ async def js_get_dialog_state(tab_id: Optional[str] = None) -> str:
 # ------------------------------------------------------------------ #
 
 @mcp.tool()
-async def new_page(url: str = "about:blank") -> str:
+async def new_page(
+    url: str = "about:blank",
+    show_automation_banner: bool = True,
+) -> str:
     """新規タブを開く（new_tab の別名）"""
-    return await new_tab(url)
+    return await new_tab(url, show_automation_banner)
 
 @mcp.tool()
 async def close_page(tab_id: str) -> str:
@@ -1318,9 +1343,11 @@ async def synthesize_speech(
     Args:
         speech_text: 合成するテキスト
         language: 言語コード（デフォルト "ja"）
-        provider: "auto"=freeai（キー未設定時は edge に自動フォールバック） /
+        provider: "auto"=edge→freeai /
                   "edge"（無料） / "gemini"（GEMINI_API_KEY） /
                   "freeai"（FREEAI_API_KEY） / "openai"（OPENAI_API_KEY）
+                  フォールバック順: auto→edge→freeai / edge→freeai /
+                  freeai→gemini→edge / gemini→freeai→edge / openai→edge
         model: "auto"（自動選択、デフォルト）
         voice: "auto"（= "female" として扱う）。"female" / "male" の指定も可:
                openai: female=marin / male=echo に内部変換。
