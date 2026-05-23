@@ -239,6 +239,15 @@ mcp__aidiy_text_to_speech__synthesize_speech
   save_path    : 絶対パス（例: D:/.../audio/scene_001.mp3）
 ```
 
+> **HTTP POST でも同等の処理を呼び出せる。** MCP クライアントを使わず、スクリプトから直接叩く場合に便利。
+> ```
+> POST http://localhost:8095/tts
+> Content-Type: application/json
+> Body: { "text": "ナレーション本文", "provider": "edge", "voice": "female",
+>         "save_path": "D:/.../audio/scene_001.mp3", "local_play": false }
+> Response: audio/mpeg バイナリ（save_path 指定時はファイルにも同時保存）
+> ```
+
 - **紹介ビデオのナレーション音声は必ず MP3 で生成・保存する**。WAV ファイルをそのまま使うと duration 計算が狂う（WAV の byte_rate ÷ ファイルサイズ ≠ MP3 の実尺）。
 - `freeai` プロバイダは Google Gemini TTS を使い、内部で PCM → WAV → MP3 変換を行う。MP3 変換には ffmpeg（優先）または `lameenc`（フォールバック）を使う。
 - `lameenc` は `backend_mcp` の依存に含まれている（`uv add lameenc` で追加済み）。ffmpeg がない環境でも MP3 出力できる。
@@ -358,6 +367,16 @@ mcp__aidiy_image_generation__generate_image
   quality: medium
   save_path: D:/path/to/images/scene_001.png
 ```
+
+> **HTTP POST でも同等の処理を呼び出せる。**
+> ```
+> POST http://localhost:8095/imgGen
+> Content-Type: application/json
+> Body: { "prompt": "...", "provider": "openai", "model": "gpt-image-2",
+>         "size": "1792x1024", "quality": "medium",
+>         "save_path": "D:/path/to/images/scene_001.png" }
+> Response: image/png バイナリ（save_path 指定時はファイルにも同時保存）
+> ```
 
 ### 注意点
 

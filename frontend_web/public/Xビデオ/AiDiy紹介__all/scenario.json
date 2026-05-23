@@ -214,7 +214,7 @@
       "narration": "AiDiy の Code AI は、Claude や Copilot や Codex や Gemini や OpenCode など複数の CLI を切り替えて使えます。その上で backend_hermes は、AiDiy 専用に組み込まれた on-demand の独自コードエージェントで、AI コードパネルから subprocess で起動されます。",
       "image": "images/scene_003.png",
       "audio": "audio/scene_003.mp3",
-      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy as a multi-CLI coding platform, not a single CLI. Show three resident backend blocks for core 8091, apps 8092, mcp 8095 feeding one AI core panel, and from that panel branch multiple command lanes labeled Claude CLI, Copilot CLI, Codex CLI, Gemini CLI, OpenCode CLI, and aidiy_hermes. Emphasize aidiy_hermes as a custom Python engine with TUI, provider overlay, and subprocess integration, distinct from the external CLIs. Dark enterprise blueprint style, magenta accent, clear system diagram, no mascots, no fake products.",
+      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy as a multi-CLI coding platform, not a single CLI. Show three resident backend blocks for core 8091, apps 8092, mcp 8095 feeding one AI core panel, and from that panel branch multiple command lanes labeled Claude CLI, Copilot CLI, Codex CLI, Antigravity CLI, OpenCode CLI, and aidiy_hermes. Emphasize aidiy_hermes as a custom Python engine with TUI, provider overlay, and subprocess integration, distinct from the external CLIs. Dark enterprise blueprint style, magenta accent, clear system diagram, no mascots, no fake products.",
       "chips": [
         "3常駐サーバー",
         "Code AI 候補 7",
@@ -248,7 +248,7 @@
           "title": "マルチCLI",
           "lines": [
             "`claude_sdk` / `claude_cli`",
-            "`copilot_cli` / `codex_cli` / `gemini_cli` / `opencode_cli`",
+            "`copilot_cli` / `codex_cli` / `antigravity_cli` / `opencode_cli`",
             "`aidiy_hermes`"
           ]
         },
@@ -270,14 +270,14 @@
         }
       ],
       "facts": [
-        "Code AI の有効値には `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` が含まれる。",
+        "Code AI の有効値には `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` が含まれる。",
         "`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI で、常駐 HTTP サーバーではない。",
         "`cli_main.py` の provider は API provider と CLI bridge の両方を扱い、31 の provider overlay と 50 以上の alias を持つ。"
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
+          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
         },
         {
           "source": "backend_hermes/AGENTS.md",
@@ -478,7 +478,7 @@
         "claude_cli",
         "copilot_cli",
         "codex_cli",
-        "gemini_cli",
+        "antigravity_cli",
         "opencode_cli",
         "aidiy_hermes"
       ],
@@ -530,7 +530,7 @@
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
+          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
         },
         {
           "source": "backend_hermes/AGENTS.md",

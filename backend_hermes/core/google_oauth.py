@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 # OAuth client credential resolution.
 #
 # Resolution order:
-#   1. HERMES_GEMINI_CLIENT_ID / HERMES_GEMINI_CLIENT_SECRET env vars (power users)
+#   1. HERMES_ANTIGRAVITY_CLIENT_ID / HERMES_ANTIGRAVITY_CLIENT_SECRET env vars (power users)
 #   2. Shipped defaults — Google's public gemini-cli desktop OAuth client
 #      (baked into every copy of Google's open-source gemini-cli; NOT
 #      confidential — desktop OAuth clients use PKCE, not client_secret, for
@@ -78,8 +78,8 @@ logger = logging.getLogger(__name__)
 #   4. Fail with a helpful error.
 # =============================================================================
 
-ENV_CLIENT_ID = "HERMES_GEMINI_CLIENT_ID"
-ENV_CLIENT_SECRET = "HERMES_GEMINI_CLIENT_SECRET"
+ENV_CLIENT_ID = "HERMES_ANTIGRAVITY_CLIENT_ID"
+ENV_CLIENT_SECRET = "HERMES_ANTIGRAVITY_CLIENT_SECRET"
 
 # Public gemini-cli desktop OAuth client (shipped in Google's open-source
 # gemini-cli MIT repo). Composed piecewise to keep the constants readable and
@@ -249,21 +249,21 @@ def _credentials_lock(timeout_seconds: float = LOCK_TIMEOUT_SECONDS):
 _scraped_creds_cache: Dict[str, str] = {}
 
 
-def _locate_gemini_cli_oauth_js() -> Optional[Path]:
-    """Walk the user's gemini binary install to find its oauth2.js.
+def _locate_antigravity_cli_oauth_js() -> Optional[Path]:
+    """Walk the user's antigravity binary install to find its oauth2.js.
 
-    Returns None if gemini isn't installed. Supports both the npm install
-    (``node_modules/@google/gemini-cli-core/dist/**/code_assist/oauth2.js``)
+    Returns None if antigravity isn't installed. Supports both the npm install
+    (``node_modules/@google/antigravity-cli-core/dist/**/code_assist/oauth2.js``)
     and the Homebrew ``bundle/`` layout.
     """
     import shutil
 
-    gemini = shutil.which("gemini")
-    if not gemini:
+    antigravity = shutil.which("antigravity")
+    if not antigravity:
         return None
 
     try:
-        real = Path(gemini).resolve()
+        real = Path(antigravity).resolve()
     except OSError:
         return None
 
@@ -273,7 +273,7 @@ def _locate_gemini_cli_oauth_js() -> Optional[Path]:
     for _ in range(8):  # don't walk too far
         search_dirs.append(cur)
         if (cur / "node_modules").exists():
-            search_dirs.append(cur / "node_modules" / "@google" / "gemini-cli-core")
+            search_dirs.append(cur / "node_modules" / "@google" / "antigravity-cli-core")
             break
         if cur.parent == cur:
             break
@@ -306,7 +306,7 @@ def _scrape_client_credentials() -> Tuple[str, str]:
     if _scraped_creds_cache.get("resolved"):
         return _scraped_creds_cache.get("client_id", ""), _scraped_creds_cache.get("client_secret", "")
 
-    oauth_js = _locate_gemini_cli_oauth_js()
+    oauth_js = _locate_antigravity_cli_oauth_js()
     if oauth_js is None:
         _scraped_creds_cache["resolved"] = "1"  # Don't retry on every call
         return "", ""
@@ -360,10 +360,11 @@ def _require_client_id() -> str:
     if not cid:
         raise GoogleOAuthError(
             "Google OAuth client ID is not available.\n"
-            "Hermes looks for a locally installed gemini-cli to source the OAuth client. "
+            "Hermes looks for a locally installed antigravity CLI to source the OAuth client. "
             "Either:\n"
-            "  1. Install it: npm install -g @google/gemini-cli  (or brew install gemini-cli)\n"
-            "  2. Set HERMES_GEMINI_CLIENT_ID and HERMES_GEMINI_CLIENT_SECRET in ~/.hermes/.env\n"
+            "  1. Install it from https://antigravity.google/cli/install.cmd (Windows) "
+            "or https://antigravity.google/cli/install.sh (Unix)\n"
+            "  2. Set HERMES_ANTIGRAVITY_CLIENT_ID and HERMES_ANTIGRAVITY_CLIENT_SECRET in ~/.hermes/.env\n"
             "\n"
             "Register a Desktop OAuth client at:\n"
             "  https://console.cloud.google.com/apis/credentials\n"
@@ -1038,7 +1039,7 @@ def run_gemini_oauth_login_pure() -> Dict[str, Any]:
 def resolve_project_id_from_env() -> str:
     """Return a GCP project ID from env vars, in priority order."""
     for var in (
-        "HERMES_GEMINI_PROJECT_ID",
+        "HERMES_ANTIGRAVITY_PROJECT_ID",
         "GOOGLE_CLOUD_PROJECT",
         "GOOGLE_CLOUD_PROJECT_ID",
     ):

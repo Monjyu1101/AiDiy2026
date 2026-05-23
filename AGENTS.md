@@ -222,7 +222,7 @@ AIコアは、テキスト、音声、画像、ファイル、コード支援を
 | `LIVE_AI_NAME` | 音声リアルタイム対話 |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | code1〜code6 のコード支援 |
 
-Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` を想定します。
+Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` を想定します。
 
 ## frontend_web 概要
 

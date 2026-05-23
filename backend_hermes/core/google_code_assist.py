@@ -59,7 +59,7 @@ STANDARD_TIER_ID = "standard-tier"
 
 # Default HTTP headers matching gemini-cli's fingerprint.
 # Google may reject unrecognized User-Agents on these internal endpoints.
-_GEMINI_CLI_USER_AGENT = "google-api-nodejs-client/9.15.1 (gzip)"
+_ANTIGRAVITY_CLI_USER_AGENT = "google-api-nodejs-client/9.15.1 (gzip)"
 _X_GOOG_API_CLIENT = "gl-node/24.0.0"
 _DEFAULT_REQUEST_TIMEOUT = 30.0
 _ONBOARDING_POLL_ATTEMPTS = 12
@@ -118,7 +118,7 @@ class ProjectIdRequiredError(CodeAssistError):
 # =============================================================================
 
 def _build_headers(access_token: str, *, user_agent_model: str = "") -> Dict[str, str]:
-    ua = _GEMINI_CLI_USER_AGENT
+    ua = _ANTIGRAVITY_CLI_USER_AGENT
     if user_agent_model:
         ua = f"{ua} model/{user_agent_model}"
     return {
@@ -301,7 +301,7 @@ def onboard_user(
     if tier_id != FREE_TIER_ID and tier_id != LEGACY_TIER_ID and not project_id:
         raise ProjectIdRequiredError(
             f"Tier {tier_id!r} requires a GCP project id. "
-            "Set HERMES_GEMINI_PROJECT_ID or GOOGLE_CLOUD_PROJECT."
+            "Set HERMES_ANTIGRAVITY_PROJECT_ID or GOOGLE_CLOUD_PROJECT."
         )
 
     body: Dict[str, Any] = {

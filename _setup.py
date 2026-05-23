@@ -47,12 +47,18 @@ DATABASE_TYPE = "sqlite"
 POSTGRES_PATH = "backend_server/postgres"
 
 AUTO_MODE = False
-GLOBAL_NPM_INSTALL_PROCESSES = []
+GLOBAL_CLI_INSTALL_PROCESSES = []
 HERMES_AGENT_INSTALL_COMMAND = (
     "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
 )
 OLLAMA_INSTALL_COMMAND = (
     "curl -fsSL https://ollama.com/install.sh | sh"
+)
+ANTIGRAVITY_INSTALL_COMMAND_WINDOWS = (
+    "curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd"
+)
+ANTIGRAVITY_INSTALL_COMMAND_UNIX = (
+    "curl -fsSL https://antigravity.google/cli/install.sh | bash"
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -218,6 +224,20 @@ def write_json_file(path: Path, data: dict) -> bool:
         return False
 
 
+def load_json_dict_file(path: Path) -> dict:
+    if not path.exists():
+        return {}
+
+    raw = path.read_text(encoding="utf-8-sig")
+    if raw.strip() == "":
+        return {}
+
+    loaded = json.loads(raw)
+    if isinstance(loaded, dict):
+        return loaded
+    return {}
+
+
 def _remove_marked_block(content: str, begin_marker: str, end_marker: str) -> str:
     lines = content.splitlines()
     result: list[str] = []
@@ -297,12 +317,7 @@ def ensure_gitignore_entries(entries: list[str], path: Path | None = None) -> bo
 def upsert_json_mcp_servers(path: Path, entries: list[tuple[str, dict]], top_key: str = "mcpServers") -> bool:
     """複数サーバーをまとめて 1 つの JSON ファイルへ書き込む（読み書き各 1 回）。"""
     try:
-        data = {}
-        if path.exists():
-            with open(path, encoding="utf-8-sig") as f:
-                loaded = json.load(f)
-            if isinstance(loaded, dict):
-                data = loaded
+        data = load_json_dict_file(path)
 
         servers = data.get(top_key)
         if not isinstance(servers, dict):
@@ -347,6 +362,11 @@ def get_opencode_config_path() -> Path:
     if xdg_config_home:
         return Path(xdg_config_home) / "opencode" / "opencode.json"
     return Path.home() / ".config" / "opencode" / "opencode.json"
+
+
+def get_antigravity_mcp_config_path() -> Path:
+    """Antigravity CLI のグローバル MCP 設定パスを返す。"""
+    return Path.home() / ".gemini" / "antigravity-cli" / "mcp_config.json"
 
 def remove_toml_table(content: str, table_header: str) -> str:
     lines = content.splitlines()
@@ -619,46 +639,94 @@ def check_npm_installed():
     return shutil.which(npm_command()) is not None or shutil.which(FRONTEND_COMMAND) is not None
 
 
+def get_antigravity_install_command() -> str:
+    return ANTIGRAVITY_INSTALL_COMMAND_WINDOWS if sys.platform == "win32" else ANTIGRAVITY_INSTALL_COMMAND_UNIX
+
+
+def prepare_antigravity_installer() -> tuple[list[str] | None, Path | None]:
+    install_url = (
+        "https://antigravity.google/cli/install.cmd"
+        if sys.platform == "win32"
+        else "https://antigravity.google/cli/install.sh"
+    )
+    suffix = ".cmd" if sys.platform == "win32" else ".sh"
+    try:
+        with urllib.request.urlopen(install_url) as response:
+            installer_bytes = response.read()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, prefix="antigravity_install_") as tmp:
+            tmp.write(installer_bytes)
+            installer_path = Path(tmp.name)
+
+        if sys.platform != "win32":
+            installer_path.chmod(0o700)
+
+        if sys.platform == "win32":
+            return ["cmd", "/c", str(installer_path)], installer_path
+        return ["/bin/bash", str(installer_path)], installer_path
+    except Exception as exc:
+        print_error(f"antigravity インストーラーの準備に失敗しました: {exc}")
+        return None, None
+
+
+def cleanup_temp_file(path: Path | None) -> None:
+    if path is None:
+        return
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
+
+
 def print_ai_cli_manual_setup():
-    cmd = npm_command()
     print_info("共通: AI CLI ツールは個別にセットアップできます。")
     print_info("  個別セットアップ例:")
-    print_info(f"    Claude Code : {cmd} install -g @anthropic-ai/claude-code")
-    print_info(f"    GitHub Copilot: {cmd} install -g @github/copilot")
-    print_info(f"    OpenAI Codex : {cmd} install -g @openai/codex")
-    print_info(f"    Gemini CLI : {cmd} install -g @google/gemini-cli")
-    print_info(f"    OpenCode   : {cmd} install -g opencode-ai")
+    if check_npm_installed():
+        cmd = npm_command()
+        print_info(f"    Claude Code : {cmd} install -g @anthropic-ai/claude-code")
+        print_info(f"    GitHub Copilot: {cmd} install -g @github/copilot")
+        print_info(f"    OpenAI Codex : {cmd} install -g @openai/codex")
+        print_info(f"    OpenCode   : {cmd} install -g opencode-ai")
+    else:
+        print_info("    npm 系 CLI : Node.js / npm を導入後に個別セットアップしてください")
+        print_info("      https://nodejs.org/")
+    print_info(f"    Antigravity: {get_antigravity_install_command()}")
     print_info(f"    Hermes Agent: {HERMES_AGENT_INSTALL_COMMAND}")
     print_info(f"    Ollama     : {OLLAMA_INSTALL_COMMAND}")
 
 
-def start_global_npm_tools_install():
-    print_header("共通セットアップ: npm ツール投入")
-    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / Gemini CLI / OpenCode")
+def start_global_cli_tools_install():
+    print_header("共通セットアップ: AI CLI ツール投入")
+    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / OpenCode / Antigravity")
     print_info("参考: Hermes Agent は npm ではなく、次の bash installer で導入します。")
     print_info(f"      {HERMES_AGENT_INSTALL_COMMAND}")
     print_info("参考: Ollama は次のコマンドで導入できます。")
     print_info(f"      {OLLAMA_INSTALL_COMMAND}")
     print_info("AI CLI ツールを並列で投入します。完了確認は最後にまとめて行います。")
 
-    if not check_npm_installed():
-        print_error("共通: npm がインストールされていません。")
+    targets: list[tuple[str, list[str], str, Path | None]] = []
+    if check_npm_installed():
+        cmd = npm_command()
+        for package in [
+            "@anthropic-ai/claude-code",
+            "@github/copilot",
+            "@openai/codex",
+            "opencode-ai",
+        ]:
+            command = [cmd, "install", "-g", package]
+            targets.append((package, command, " ".join(command), None))
+    else:
+        print_warning("共通: npm がインストールされていないため、npm 系 CLI はスキップします。")
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
-        return False
 
-    cmd = npm_command()
-    packages = [
-        "@anthropic-ai/claude-code",
-        "@github/copilot",
-        "@openai/codex",
-        "@google/gemini-cli",
-        "opencode-ai",
-    ]
+    antigravity_command, antigravity_temp_path = prepare_antigravity_installer()
+    if antigravity_command:
+        targets.append(("antigravity", antigravity_command, get_antigravity_install_command(), antigravity_temp_path))
 
-    GLOBAL_NPM_INSTALL_PROCESSES.clear()
-    for i, package in enumerate(packages, 1):
-        command = [cmd, "install", "-g", package]
-        print_info(f"  [{i}/{len(packages)}] 投入: {' '.join(command)}")
+    GLOBAL_CLI_INSTALL_PROCESSES.clear()
+    for i, (label, command, display_command, temp_path) in enumerate(targets, 1):
+        print_info(f"  [{i}/{len(targets)}] 投入: {display_command}")
         try:
             process = subprocess.Popen(
                 command,
@@ -667,12 +735,13 @@ def start_global_npm_tools_install():
                 text=True,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
             )
-            GLOBAL_NPM_INSTALL_PROCESSES.append((package, process))
-            print_success(f"  [{i}/{len(packages)}] {package}: 投入完了")
+            GLOBAL_CLI_INSTALL_PROCESSES.append((label, process, temp_path))
+            print_success(f"  [{i}/{len(targets)}] {label}: 投入完了")
         except Exception as exc:
-            print_error(f"  [{i}/{len(packages)}] {package}: 投入失敗 - {exc}")
+            print_error(f"  [{i}/{len(targets)}] {label}: 投入失敗 - {exc}")
+            cleanup_temp_file(temp_path)
 
-    if not GLOBAL_NPM_INSTALL_PROCESSES:
+    if not GLOBAL_CLI_INSTALL_PROCESSES:
         print_warning("共通: AI CLI ツールの投入対象がありませんでした。")
         return False
 
@@ -680,37 +749,39 @@ def start_global_npm_tools_install():
     return True
 
 
-def wait_global_npm_tools_install() -> list[str]:
-    if not GLOBAL_NPM_INSTALL_PROCESSES:
+def wait_global_cli_tools_install() -> list[str]:
+    if not GLOBAL_CLI_INSTALL_PROCESSES:
         return []
 
-    print_header("共通セットアップ: npm ツール完了確認")
+    print_header("共通セットアップ: AI CLI ツール完了確認")
     print_info("並列投入した AI CLI ツールの導入結果を確認します...")
 
     failed_packages = []
-    for i, (package, process) in enumerate(GLOBAL_NPM_INSTALL_PROCESSES, 1):
+    for i, (package, process, temp_path) in enumerate(GLOBAL_CLI_INSTALL_PROCESSES, 1):
         try:
             stdout, stderr = process.communicate(timeout=300)
             if process.returncode == 0:
-                print_success(f"  [{i}/{len(GLOBAL_NPM_INSTALL_PROCESSES)}] {package}: 導入完了")
+                print_success(f"  [{i}/{len(GLOBAL_CLI_INSTALL_PROCESSES)}] {package}: 導入完了")
             else:
-                print_error(f"  [{i}/{len(GLOBAL_NPM_INSTALL_PROCESSES)}] {package}: 導入失敗 (終了コード: {process.returncode})")
+                print_error(f"  [{i}/{len(GLOBAL_CLI_INSTALL_PROCESSES)}] {package}: 導入失敗 (終了コード: {process.returncode})")
                 detail = (stderr or stdout or "").strip()
                 if detail:
                     print_error(f"      エラー内容: {detail[:200]}")
                 failed_packages.append(package)
         except subprocess.TimeoutExpired:
             process.kill()
-            print_error(f"  [{i}/{len(GLOBAL_NPM_INSTALL_PROCESSES)}] {package}: タイムアウト")
+            print_error(f"  [{i}/{len(GLOBAL_CLI_INSTALL_PROCESSES)}] {package}: タイムアウト")
             failed_packages.append(package)
         except Exception as exc:
-            print_error(f"  [{i}/{len(GLOBAL_NPM_INSTALL_PROCESSES)}] {package}: エラー - {exc}")
+            print_error(f"  [{i}/{len(GLOBAL_CLI_INSTALL_PROCESSES)}] {package}: エラー - {exc}")
             failed_packages.append(package)
+        finally:
+            cleanup_temp_file(temp_path)
 
-    GLOBAL_NPM_INSTALL_PROCESSES.clear()
+    GLOBAL_CLI_INSTALL_PROCESSES.clear()
 
     if failed_packages:
-        print_warning(f"共通: 一部 npm ツールの導入に失敗しました: {', '.join(failed_packages)}")
+        print_warning(f"共通: 一部 AI CLI ツールの導入に失敗しました: {', '.join(failed_packages)}")
         return failed_packages
 
     print_success("共通: AI CLI ツールの導入確認が完了しました。")
@@ -745,9 +816,9 @@ def setup_common_global_tools(choices: dict) -> list[str]:
         print_warning("共通: Python ツールのアップグレードをスキップしました。")
 
     if choices.get("common_npm_install"):
-        start_global_npm_tools_install()
+        start_global_cli_tools_install()
     else:
-        print_warning("共通: npm ツールのインストールをスキップしました。")
+        print_warning("共通: AI CLI ツールのインストールをスキップしました。")
         print_ai_cli_manual_setup()
 
     return error_locations
@@ -1109,11 +1180,12 @@ def show_current_mcp_config(module: dict) -> None:
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
     vscode_mcp   = get_vscode_mcp_path()
     opencode_mcp = get_opencode_config_path()
+    antigravity_mcp = get_antigravity_mcp_config_path()
 
     targets = [
         ("グローバル ~/.claude.json (Claude Code)",               Path.home() / ".claude.json",            "mcpServers"),
-        ("グローバル ~/.gemini/settings.json (Gemini CLI)",        Path.home() / ".gemini" / "settings.json", "mcpServers"),
         ("グローバル ~/.copilot/mcp-config.json (Copilot CLI)",    copilot_home / "mcp-config.json",        "mcpServers"),
+        ("グローバル ~/.gemini/antigravity-cli/mcp_config.json (Antigravity)", antigravity_mcp,               "mcpServers"),
         ("グローバル ~/.config/opencode/opencode.json (OpenCode)", opencode_mcp,                            "mcp"),
         ("グローバル ~/.codex/config.toml (Codex CLI)",            Path.home() / ".codex" / "config.toml",  "mcpServers"),
         ("グローバル Code/User/mcp.json (VS Code)",                vscode_mcp,                              "servers"),
@@ -1132,11 +1204,12 @@ def show_current_mcp_config(module: dict) -> None:
                         else:
                             print_warning(f"  [{label}] ファイルあり、{sn} エントリなし")
                 else:
-                    data = json.loads(path.read_text(encoding="utf-8-sig"))
+                    data = load_json_dict_file(path)
                     servers = data.get(top_key, {})
                     for sn in server_names:
                         if sn in servers:
-                            url = servers[sn].get("url", "(url なし)")
+                            entry = servers[sn] if isinstance(servers[sn], dict) else {}
+                            url = entry.get("url") or entry.get("serverUrl") or "(url なし)"
                             print_success(f"  [{label}] {sn}: {url}")
                         else:
                             keys = list(servers.keys()) if servers else []
@@ -1158,7 +1231,7 @@ def configure_backend_mcp_clients(module: dict) -> bool:
     """
     label = f"{module['name']} MCP 設定"
     print_header(label)
-    print_info("Claude / Gemini / GitHub Copilot / OpenCode / Codex / VS Code 用のグローバル設定ファイルを書き込みます。")
+    print_info("Claude / GitHub Copilot / Antigravity / OpenCode / Codex / VS Code 用のグローバル設定ファイルを書き込みます。")
     print_info("Codex CLI は stdio の mcp_stdio.py を起動し、その先で backend_mcp の SSE へ接続します。")
 
     # 書き込み対象サーバーリスト: メイン + extra_servers
@@ -1202,15 +1275,7 @@ def configure_backend_mcp_clients(module: dict) -> bool:
         [(sn, {"type": "sse", "url": url}) for sn, url in servers],
     )
 
-    # 3) Gemini CLI (mcpServers)
-    gemini_global = Path.home() / ".gemini" / "settings.json"
-    print_info(f"[Gemini CLI]  {gemini_global}")
-    all_ok &= upsert_json_mcp_servers(
-        gemini_global,
-        [(sn, {"url": url, "type": "sse"}) for sn, url in servers],
-    )
-
-    # 4) GitHub Copilot CLI (mcpServers)
+    # 3) GitHub Copilot CLI (mcpServers)
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
     copilot_global = copilot_home / "mcp-config.json"
     print_info(f"[Copilot CLI] {copilot_global}")
@@ -1218,6 +1283,44 @@ def configure_backend_mcp_clients(module: dict) -> bool:
         copilot_global,
         [(sn, {"type": "sse", "url": url}) for sn, url in servers],
     )
+
+    # 4) Antigravity (mcpServers - stdio型)
+    antigravity_mcp = get_antigravity_mcp_config_path()
+    print_info(f"[Antigravity] {antigravity_mcp}")
+
+    python_path = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
+    script_path = BACKEND_MCP_DIR / "mcp_stdio.py"
+
+    if python_path is None or not script_path.exists():
+        print_error("Antigravity 設定用の Python 仮想環境または mcp_stdio.py が見つかりません。")
+        all_ok = False
+    else:
+        # 古い serverUrl 設定などをクリアするために、いったん mcp_config.json の serverUrl キーを削除する
+        try:
+            if antigravity_mcp.exists():
+                data = load_json_dict_file(antigravity_mcp)
+                servers_dict = data.get("mcpServers", {})
+                if isinstance(servers_dict, dict):
+                    for sn, _ in servers:
+                        if sn in servers_dict and isinstance(servers_dict[sn], dict):
+                            servers_dict[sn].pop("serverUrl", None)
+                    data["mcpServers"] = servers_dict
+                    write_json_file(antigravity_mcp, data)
+        except Exception as e:
+            print_warning(f"Antigravity の旧 serverUrl 設定削除中にエラーが発生しました: {e}")
+
+        antigravity_entries = []
+        for sn, url in servers:
+            config = {
+                "command": str(python_path),
+                "args": [
+                    str(script_path),
+                    "--sse-url",
+                    url
+                ]
+            }
+            antigravity_entries.append((sn, config))
+        all_ok &= upsert_json_mcp_servers(antigravity_mcp, antigravity_entries)
 
     # 5) OpenCode (mcp)
     opencode_global = get_opencode_config_path()
@@ -1284,7 +1387,7 @@ def collect_setup_choices() -> dict | None:
     choices["common"] = ask_yes_no("共通セットアップを実行しますか？", default="y")
     if choices["common"]:
         choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
-        choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の npm ツール(AI CLI)をインストール/アップデートしますか？", default="y")
+        choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の AI CLI ツール(npm + Antigravity)をインストール/アップデートしますか？", default="y")
 
     choices["hermes"] = ask_yes_no("バックエンド(hermes)のセットアップを実行しますか？", default="y")
 
@@ -1330,11 +1433,11 @@ def main():
     print()
     if choices["common"]:
         error_locations.extend(setup_common_global_tools(choices))
-        if GLOBAL_NPM_INSTALL_PROCESSES:
+        if GLOBAL_CLI_INSTALL_PROCESSES:
             print()
-            failed_packages = wait_global_npm_tools_install()
+            failed_packages = wait_global_cli_tools_install()
             error_locations.extend(
-                [f"共通: npm ツール導入 ({package})" for package in failed_packages]
+                [f"共通: AI CLI ツール導入 ({package})" for package in failed_packages]
             )
     else:
         print_warning("共通セットアップをスキップしました。")

@@ -126,6 +126,13 @@ DIALOGUES = [
 - `aidiy_text_to_speech` は `ratio=None`（未指定）を既定の 1.2 倍として扱う。`ratio=0` / `ratio=1` は速度調整なしになるため、ニュース版の通常収録では指定しない
 - `voice="female"` → NanamiNeural、`voice="male"` → KeitaNeural
 - システム Python では `edge_tts` モジュールがないため、**必ず `backend_mcp/.venv` の Python を使う**
+- MCP クライアントが不要な場合は HTTP POST でも同等の処理を呼び出せる。
+  ```
+  POST http://localhost:8095/tts
+  Body: { "text": "読み上げテキスト", "provider": "edge", "voice": "female",
+          "save_path": "D:/.../audio/dlg_001_01_female.mp3" }
+  Response: audio/mpeg バイナリ（save_path 指定時はファイルにも同時保存）
+  ```
 
 ---
 

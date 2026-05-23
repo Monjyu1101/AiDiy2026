@@ -82,7 +82,7 @@ const CODE_MODEL_KEYS: Record<string, string> = {
   claude_sdk: 'CODE_CLAUDE_SDK_MODEL',
   claude_cli: 'CODE_CLAUDE_CLI_MODEL',
   copilot_cli: 'CODE_COPILOT_CLI_MODEL',
-  gemini_cli: 'CODE_GEMINI_CLI_MODEL',
+  antigravity_cli: 'CODE_ANTIGRAVITY_CLI_MODEL',
   codex_cli: 'CODE_CODEX_CLI_MODEL',
   opencode_cli: 'CODE_OPENCODE_CLI_MODEL',
   aidiy_hermes: 'CODE_AIDIY_HERMES_MODEL',

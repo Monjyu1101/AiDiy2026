@@ -355,7 +355,7 @@ def uninstall_global_npm_tools():
  "@anthropic-ai/claude-code",
  "@github/copilot",
  "@openai/codex",
- "@google/gemini-cli",
+ "opencode-ai",
  ]
 
  uninstalled_count = 0

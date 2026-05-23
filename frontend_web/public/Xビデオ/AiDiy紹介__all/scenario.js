@@ -221,7 +221,7 @@ window.SCENARIO = {
       "lead": "AiDiy は Core / Apps / MCP を常駐分離しつつ、AIコアの Code AI では複数 CLI を切り替えられます。backend_hermes はその中でも AiDiy 専用に組み込まれた独自実装です。",
       "subtitle": "Code AI はひとつではなく、複数CLI + 独自実装 Hermes を切り替える。",
       "image": "images/scene_003.png",
-      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy as a multi-CLI coding platform, not a single CLI. Show three resident backend blocks for core 8091, apps 8092, mcp 8095 feeding one AI core panel, and from that panel branch multiple command lanes labeled Claude CLI, Copilot CLI, Codex CLI, Gemini CLI, OpenCode CLI, and aidiy_hermes. Emphasize aidiy_hermes as a custom Python engine with TUI, provider overlay, and subprocess integration, distinct from the external CLIs. Dark enterprise blueprint style, magenta accent, clear system diagram, no mascots, no fake products.",
+      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy as a multi-CLI coding platform, not a single CLI. Show three resident backend blocks for core 8091, apps 8092, mcp 8095 feeding one AI core panel, and from that panel branch multiple command lanes labeled Claude CLI, Copilot CLI, Codex CLI, Antigravity CLI, OpenCode CLI, and aidiy_hermes. Emphasize aidiy_hermes as a custom Python engine with TUI, provider overlay, and subprocess integration, distinct from the external CLIs. Dark enterprise blueprint style, magenta accent, clear system diagram, no mascots, no fake products.",
       "chips": [
         "3常駐サーバー",
         "Code AI 候補 7",
@@ -255,7 +255,7 @@ window.SCENARIO = {
           "title": "マルチCLI",
           "lines": [
             "`claude_sdk` / `claude_cli`",
-            "`copilot_cli` / `codex_cli` / `gemini_cli` / `opencode_cli`",
+            "`copilot_cli` / `codex_cli` / `antigravity_cli` / `opencode_cli`",
             "`aidiy_hermes`"
           ]
         },
@@ -277,14 +277,14 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "Code AI の有効値には `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` が含まれる。",
+        "Code AI の有効値には `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` が含まれる。",
         "`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI で、常駐 HTTP サーバーではない。",
         "`cli_main.py` の provider は API provider と CLI bridge の両方を扱い、31 の provider overlay と 50 以上の alias を持つ。"
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
+          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
         },
         {
           "source": "backend_hermes/AGENTS.md",
@@ -292,7 +292,7 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "3 サーバーと Code CLI で AI を使います。",
-      "long_narration": "AiDiy は core_main が 8091 番ポート、apps_main が 8092 番ポート、backend_mcp が 8095 番ポートで常駐する 3 サーバー構成です。AI コードパネルでは claude_sdk、claude_cli、copilot_cli、codex_cli、gemini_cli、opencode_cli、そして aidiy_hermes まで、複数の Code CLI を 6 スロットに割り当てて使い分けられます。backend_hermes は HTTP サーバーとして常駐せず、AI コードパネルから必要なときだけ subprocess で呼び出される on-demand なコードエージェントです。31 の provider overlay と 50 以上のエイリアスを持つ AiDiy 専用の CLI エンジンになっています。",
+      "long_narration": "AiDiy は core_main が 8091 番ポート、apps_main が 8092 番ポート、backend_mcp が 8095 番ポートで常駐する 3 サーバー構成です。AI コードパネルでは claude_sdk、claude_cli、copilot_cli、codex_cli、antigravity_cli、opencode_cli、そして aidiy_hermes まで、複数の Code CLI を 6 スロットに割り当てて使い分けられます。backend_hermes は HTTP サーバーとして常駐せず、AI コードパネルから必要なときだけ subprocess で呼び出される on-demand なコードエージェントです。31 の provider overlay と 50 以上のエイリアスを持つ AiDiy 専用の CLI エンジンになっています。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 14.976,
@@ -497,7 +497,7 @@ window.SCENARIO = {
         "claude_cli",
         "copilot_cli",
         "codex_cli",
-        "gemini_cli",
+        "antigravity_cli",
         "opencode_cli",
         "aidiy_hermes"
       ],
@@ -549,7 +549,7 @@ window.SCENARIO = {
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`gemini_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
+          "text": "Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` を想定します。"
         },
         {
           "source": "backend_hermes/AGENTS.md",
@@ -557,7 +557,7 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "Claude、Copilot、Codex などを目的別に切り替えます。",
-      "long_narration": "Code AI は code1 から code6 の 6 スロットに異なる CLI を割り当てられます。有効な設定値は claude_sdk、claude_cli、copilot_cli、codex_cli、gemini_cli、opencode_cli、そして aidiy_hermes です。backend_hermes は _start.py の常駐起動対象ではなく、backend_server の AIコード_cli.py から必要なときだけ subprocess で起動される on-demand なエージェントです。31 の provider と多くのスラッシュコマンドを持ち、/model コマンドで対話的に AI を切り替えられます。",
+      "long_narration": "Code AI は code1 から code6 の 6 スロットに異なる CLI を割り当てられます。有効な設定値は claude_sdk、claude_cli、copilot_cli、codex_cli、antigravity_cli、opencode_cli、そして aidiy_hermes です。backend_hermes は _start.py の常駐起動対象ではなく、backend_server の AIコード_cli.py から必要なときだけ subprocess で起動される on-demand なエージェントです。31 の provider と多くのスラッシュコマンドを持ち、/model コマンドで対話的に AI を切り替えられます。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
       "short_start_sec": 29.04,

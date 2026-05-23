@@ -69,7 +69,7 @@ TASKS = [
             "Vertical 2:3 architecture poster for AiDiy multi-server and multi-CLI system. "
             "Three resident server blocks: core 8091, apps 8092, mcp 8095, all feeding one AI core panel. "
             "From the AI core panel, branch out seven code lanes labeled: Claude CLI, Copilot CLI, Codex CLI, "
-            "Gemini CLI, OpenCode CLI, claude_sdk, aidiy_hermes. "
+            "Antigravity CLI, OpenCode CLI, claude_sdk, aidiy_hermes. "
             "Highlight aidiy_hermes as a distinct Python subprocess engine. "
             "Dark enterprise blueprint, magenta accent, clean system diagram, no mascots."
         ),

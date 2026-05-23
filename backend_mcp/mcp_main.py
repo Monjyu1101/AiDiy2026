@@ -1261,6 +1261,21 @@ async def generate_image(
         original_path: 参照画像のパス（省略可）
         save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
                    ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
+
+    Note:
+        MCP ツール経由のほか、HTTP POST でも同等の処理を呼び出せる。
+        POST http://localhost:8095/imgGen
+        Content-Type: application/json
+        Body: {
+            "prompt": "かわいい猫の画像",
+            "provider": "auto",   # auto / openai / gemini / freeai
+            "model": "auto",
+            "size": "auto",       # 1024x1024 / 1920x1080 など
+            "quality": "auto",    # OpenAI only: low / medium / high / standard / hd
+            "original_path": null,
+            "save_path": null
+        }
+        Response: image/png バイナリ
     """
     try:
         img, info = await asyncio.to_thread(
@@ -1373,6 +1388,22 @@ async def synthesize_speech(
                    変換できない場合は実データの拡張子に差し替えて保存。
                    省略時は backend_server/temp/output/ に保存。
         local_play: True でローカル再生を試行（デフォルト False、速度は ratio 反映済み）
+
+    Note:
+        MCP ツール経由のほか、HTTP POST でも同等の処理を呼び出せる。
+        POST http://localhost:8095/tts
+        Content-Type: application/json
+        Body: {
+            "text": "...",        # speech_text に相当
+            "language": "ja",
+            "provider": "edge",
+            "model": "auto",
+            "voice": "female",
+            "ratio": null,
+            "save_path": null,    # 保存先（省略時は backend_server/temp/output/）
+            "local_play": false   # True でサーバー側ローカル再生
+        }
+        Response: audio/mpeg バイナリ
     """
     try:
         audio_bytes, info = await asyncio.to_thread(
@@ -1752,11 +1783,82 @@ async def _handle_root(request: Request) -> Response:
     return Response('{"message": "MCP Server is running"}', media_type="application/json")
 
 
+async def _handle_img_gen(request: Request) -> Response:
+    """
+    REST HTTP エンドポイント: POST /imgGen
+    ブラウザから aidiy_image_generation 相当の画像生成を呼び出すためのシンプルな HTTP API。
+    Body: {"prompt": "...", "provider": "auto", "model": "auto", "size": "auto", "quality": "auto",
+           "original_path": null, "save_path": null}
+    Response: image/png バイナリ
+    """
+    if request.method == "OPTIONS":
+        return Response(
+            "",
+            status_code=204,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            },
+        )
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    prompt = body.get("prompt", "").strip()
+    if not prompt:
+        return Response(
+            json.dumps({"error": "prompt is required"}, ensure_ascii=False),
+            status_code=400,
+            media_type="application/json",
+        )
+
+    provider     = body.get("provider", "auto")
+    model        = body.get("model", "auto")
+    size         = body.get("size", "auto")
+    quality      = body.get("quality", "auto")
+    original_path = body.get("original_path", None)
+    save_path    = body.get("save_path", None)
+
+    try:
+        img, info = await asyncio.to_thread(
+            ig.generate, prompt, provider, original_path,
+            model=model, size=size, quality=quality,
+        )
+        base64_data = await asyncio.to_thread(ig.to_base64, img, "png", 85, save_path)
+        import base64 as _b64
+        png_bytes = _b64.b64decode(base64_data)
+        logger.info(
+            f"_handle_img_gen: provider={info['provider']} model={info.get('model','?')} "
+            f"size={img.size} prompt={info['prompt'][:60]}"
+        )
+        return Response(
+            png_bytes,
+            media_type="image/png",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "X-AiDiy-MCP-Tool": "aidiy_image_generation.generate_image",
+                "X-AiDiy-Provider": info.get("provider", ""),
+                "X-AiDiy-Model": info.get("model", ""),
+            },
+        )
+    except Exception as e:
+        logger.warning(f"_handle_img_gen error: {e}")
+        return Response(
+            json.dumps({"error": str(e)}, ensure_ascii=False),
+            status_code=500,
+            media_type="application/json",
+        )
+
+
 async def _handle_tts(request: Request) -> Response:
     """
     REST HTTP エンドポイント: POST /tts
     ブラウザから aidiy_text_to_speech 相当の TTS を呼び出すためのシンプルな HTTP API。
-    Body: {"text": "...", "speech_text": "...", "language": "ja", "provider": "edge", "voice": "female", "ratio": null}
+    Body: {"text": "...", "speech_text": "...", "language": "ja", "provider": "edge", "voice": "female",
+           "ratio": null, "save_path": null, "local_play": false}
     Response: audio/mpeg バイナリ
     """
     if request.method == "OPTIONS":
@@ -1780,7 +1882,9 @@ async def _handle_tts(request: Request) -> Response:
     provider = body.get("provider", "edge")
     model = body.get("model", "auto")
     voice = body.get("voice", "female")
-    ratio = body.get("ratio", None)
+    ratio      = body.get("ratio", None)
+    save_path  = body.get("save_path", None)
+    local_play = bool(body.get("local_play", False))
 
     if not text:
         return Response(
@@ -1793,10 +1897,17 @@ async def _handle_tts(request: Request) -> Response:
         audio_bytes, info = await asyncio.to_thread(
             tts.synthesize, text, language, provider, model, voice, ratio
         )
+        # 保存先は tts.to_base64 が解決（save_path=None → DEFAULT_OUTPUT_DIR）
+        await asyncio.to_thread(tts.to_base64, audio_bytes, save_path)
         logger.info(
             f"_handle_tts: provider={info.get('used_provider')} voice={info.get('voice')} "
-            f"bytes={info.get('audio_bytes_length')} text_len={len(text)}"
+            f"bytes={info.get('audio_bytes_length')} text_len={len(text)} "
+            f"save_path={save_path or '(default)'}"
         )
+        if local_play and audio_bytes:
+            play_ok = await asyncio.to_thread(tts.play_mp3, audio_bytes)
+            info["local_play_executed"] = play_ok
+
         # Starlette Response は bytearray を受け付けないため bytes に正規化
         if isinstance(audio_bytes, (bytearray, memoryview)):
             audio_bytes = bytes(audio_bytes)
@@ -1819,6 +1930,7 @@ async def _handle_tts(request: Request) -> Response:
 
 app = Starlette(routes=[
     Route("/", _handle_root, methods=["GET"]),
+    Route("/imgGen", _handle_img_gen, methods=["POST", "OPTIONS"]),
     Route("/tts", _handle_tts, methods=["POST", "OPTIONS"]),
     *mcp.sse_app().routes,
     *mcp_dc.sse_app().routes,
@@ -1846,6 +1958,7 @@ if __name__ == "__main__":
     logger.info(f"BackupCheck SSE    : http://localhost:{MCP_PORT}{MOUNT_BC}/sse")
     logger.info(f"BackupSave SSE     : http://localhost:{MCP_PORT}{MOUNT_BS}/sse")
     logger.info(f"ImageGeneration SSE: http://localhost:{MCP_PORT}{MOUNT_IG}/sse")
+    logger.info(f"ImageGeneration HTTP: http://localhost:{MCP_PORT}/imgGen  [POST]")
     logger.info(f"SpeechToText SSE   : http://localhost:{MCP_PORT}{MOUNT_ST}/sse")
     logger.info(f"TextToSpeech SSE   : http://localhost:{MCP_PORT}{MOUNT_TS}/sse")
     logger.info(f"ObsStudioControl SSE: http://localhost:{MCP_PORT}{MOUNT_OB}/sse")

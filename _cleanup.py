@@ -60,7 +60,7 @@ NPM_PACKAGES = [
     "@anthropic-ai/claude-code",
     "@github/copilot",
     "@openai/codex",
-    "@google/gemini-cli",
+    "opencode-ai",
 ]
 
 
@@ -236,6 +236,20 @@ def write_json_file(path: Path, data: dict) -> bool:
         return False
 
 
+def load_json_dict_file(path: Path) -> dict:
+    if not path.exists():
+        return {}
+
+    raw = path.read_text(encoding="utf-8-sig")
+    if raw.strip() == "":
+        return {}
+
+    loaded = json.loads(raw)
+    if isinstance(loaded, dict):
+        return loaded
+    return {}
+
+
 def _remove_marked_block(content: str, begin_marker: str, end_marker: str) -> str:
     lines = content.splitlines()
     result: list[str] = []
@@ -291,11 +305,7 @@ def remove_json_mcp_servers_by_prefix(path: Path, prefix: str, top_key: str = "m
             print_info(f"MCP 設定ファイルなし: {path}")
             return True
 
-        with open(path, encoding="utf-8-sig") as f:
-            loaded = json.load(f)
-        if not isinstance(loaded, dict):
-            print_warning(f"MCP 設定の形式が不正です。削除をスキップしました: {path}")
-            return False
+        loaded = load_json_dict_file(path)
 
         servers = loaded.get(top_key)
         if not isinstance(servers, dict):
@@ -344,6 +354,11 @@ def get_opencode_config_path() -> Path:
     if xdg_config_home:
         return Path(xdg_config_home) / "opencode" / "opencode.json"
     return Path.home() / ".config" / "opencode" / "opencode.json"
+
+
+def get_antigravity_mcp_config_path() -> Path:
+    """Antigravity CLI のグローバル MCP 設定パスを返す。"""
+    return Path.home() / ".gemini" / "antigravity-cli" / "mcp_config.json"
 
 
 def remove_toml_table(content: str, table_header: str) -> str:
@@ -417,8 +432,8 @@ def cleanup_global_mcp_configs(prefix: str):
     # (path, top_key) の組。CLI ごとに top-level キーが異なる。
     targets = [
         (Path.home() / ".claude.json",            "mcpServers"),
-        (Path.home() / ".gemini" / "settings.json","mcpServers"),
         (copilot_home / "mcp-config.json",        "mcpServers"),
+        (get_antigravity_mcp_config_path(),       "mcpServers"),
         (get_opencode_config_path(),              "mcp"),
         (get_vscode_mcp_path(),                   "servers"),
     ]

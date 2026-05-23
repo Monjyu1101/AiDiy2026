@@ -399,8 +399,8 @@ class CodeAgent:
                         tool = "claude code"
                     elif ai_name == "copilot_cli":
                         tool = "copilot"
-                    elif ai_name == "gemini_cli":
-                        tool = "gemini"
+                    elif ai_name == "antigravity_cli":
+                        tool = "antigravity"
                     elif ai_name == "codex_cli":
                         tool = "codex"
                     elif ai_name == "aidiy_hermes":
@@ -412,7 +412,9 @@ class CodeAgent:
                     メッセージ = f"{ai_label}{tool}が利用できません。（{tool}未インストール?)"
                 else:
                     メッセージ = f"{ai_label}初期化に失敗しました。"
-        except Exception:
+
+        except Exception as e:
+            logger.error(f"[CodeAgent] 接続時welcome送信エラー: {e}")
             メッセージ = f"{ai_label}初期化に失敗しました。"
 
         if self.接続:

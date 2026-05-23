@@ -330,7 +330,7 @@ def check_npm_installed():
 
 def start_global_npm_tools_install():
     print_header("共通セットアップ: npm ツール投入")
-    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / Gemini CLI")
+    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / OpenCode / Antigravity CLI")
     print_info("AI CLI ツールを並列で投入します。完了確認は最後にまとめて行います。")
 
     if not check_npm_installed():
@@ -343,7 +343,7 @@ def start_global_npm_tools_install():
         "@anthropic-ai/claude-code",
         "@github/copilot",
         "@openai/codex",
-        "@google/gemini-cli",
+        "opencode-ai",
     ]
 
     GLOBAL_NPM_INSTALL_PROCESSES.clear()
@@ -362,6 +362,25 @@ def start_global_npm_tools_install():
             print_success(f"  [{i}/{len(packages)}] {package}: 投入完了")
         except Exception as exc:
             print_error(f"  [{i}/{len(packages)}] {package}: 投入失敗 - {exc}")
+
+    antigravity_command = (
+        "curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd"
+        if sys.platform == "win32"
+        else "curl -fsSL https://antigravity.google/cli/install.sh | bash"
+    )
+    try:
+        process = subprocess.Popen(
+            antigravity_command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+        )
+        GLOBAL_NPM_INSTALL_PROCESSES.append(("antigravity", process))
+        print_success("  Antigravity CLI: 投入完了")
+    except Exception as exc:
+        print_error(f"  Antigravity CLI: 投入失敗 - {exc}")
 
     if not GLOBAL_NPM_INSTALL_PROCESSES:
         print_warning("共通: AI CLI ツールの投入対象がありませんでした。")

@@ -1555,25 +1555,25 @@ OPTIONAL_ENV_VARS = {
         "category": "provider",
         "advanced": True,
     },
-    "HERMES_GEMINI_CLIENT_ID": {
-        "description": "Google OAuth client ID for google-gemini-cli (optional; defaults to Google's public gemini-cli client)",
+    "HERMES_ANTIGRAVITY_CLIENT_ID": {
+        "description": "Google OAuth client ID for Antigravity CLI OAuth (optional; defaults to Google's public client)",
         "prompt": "Google OAuth client ID (optional — leave empty to use the public default)",
         "url": "https://console.cloud.google.com/apis/credentials",
         "password": False,
         "category": "provider",
         "advanced": True,
     },
-    "HERMES_GEMINI_CLIENT_SECRET": {
-        "description": "Google OAuth client secret for google-gemini-cli (optional)",
+    "HERMES_ANTIGRAVITY_CLIENT_SECRET": {
+        "description": "Google OAuth client secret for Antigravity CLI OAuth (optional)",
         "prompt": "Google OAuth client secret (optional)",
         "url": "https://console.cloud.google.com/apis/credentials",
         "password": True,
         "category": "provider",
         "advanced": True,
     },
-    "HERMES_GEMINI_PROJECT_ID": {
+    "HERMES_ANTIGRAVITY_PROJECT_ID": {
         "description": "GCP project ID for paid Gemini tiers (free tier auto-provisions)",
-        "prompt": "GCP project ID for Gemini OAuth (leave empty for free tier)",
+        "prompt": "GCP project ID for Antigravity OAuth (leave empty for free tier)",
         "url": None,
         "password": False,
         "category": "provider",

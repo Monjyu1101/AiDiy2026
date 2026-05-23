@@ -24,7 +24,7 @@ X自己紹介ページの「Powered by」バッジや関連技術の装飾画像
 | 5 | **ChatGPT / GPT** | AI製品 | GPT チャット / Realtime API | `https://chatgpt.com` | ✅ | `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg` |
 | 6 | **Codex CLI** | AI製品（CLI） | OpenAI Codex CLI | `https://openai.com/index/codex-cli` | ✅ | `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg` |
 | 7 | **Google** | AI企業 | Gemini 開発元 | `https://google.com` | ✅ | `https://cdn.simpleicons.org/google` |
-| 8 | **Gemini** | AI製品 | Gemini Live / Gemini CLI | `https://gemini.google.com` | ✅ | `https://cdn.simpleicons.org/googlegemini` |
+| 8 | **Gemini** | AI製品 | Gemini Live / Gemini API | `https://gemini.google.com` | ✅ | `https://cdn.simpleicons.org/googlegemini` |
 | 9 | **Ollama** | オープンモデル基盤 | ローカル・クラウド両対応 | `https://ollama.com` | ✅ | `https://cdn.simpleicons.org/ollama` |
 | 10 | **OpenRouter** | マルチプロバイダAPI | 複数モデルルーティング | `https://openrouter.ai` | ✅ | `https://cdn.simpleicons.org/openrouter` |
 | 11 | **Microsoft** | AI企業 | GitHub / Copilot | `https://microsoft.com` | ✅ | `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/microsoft.svg` |

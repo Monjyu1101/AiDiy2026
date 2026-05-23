@@ -1,4 +1,4 @@
-﻿# X系紹介ビデオとアバター作成手順
+# X系紹介ビデオとアバター作成手順
 
 > 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all/`, `frontend_web/public/Xビデオ/AiDiy紹介_aichat/`, `frontend_web/public/Xビデオ/AiDiy紹介_avatar/`, `frontend_web/public/Xビデオ/AiDiy紹介_backend/`, `frontend_web/public/Xビデオ/AiDiy紹介_frontend/`, `frontend_web/public/Xビデオ/AiDiy紹介_hermes/`, `frontend_web/public/Xビデオ/AiDiy紹介_mcp/`
 
@@ -38,7 +38,13 @@
 ナレーションは **`freeai:female` を基準**とする（`scenario.js` の `assets_policy.tts_provider: "freeai:female"`）。AiDiy 関係の全ビデオ（紹介・実装・実例など `Xビデオ/AiDiy*`）は特段の理由がない限り `freeai:female` で統一する。
 専門テーマ版（`_avatar`、`_hermes` など）も同じプロバイダ・声で揃える。
 
-- 生成は `aidiy_text_to_speech` MCP を使う
+- 生成は `aidiy_text_to_speech` MCP を使う。MCP クライアントが不要な場合は以下の HTTP POST でも同等の処理を呼び出せる。
+  ```
+  POST http://localhost:8095/tts
+  Body: { "text": "ナレーション本文", "provider": "freeai", "voice": "female",
+          "save_path": "D:/.../audio/scene_NNN.mp3" }
+  Response: audio/mpeg バイナリ（save_path 指定時はファイルにも同時保存）
+  ```
 - 紹介ビデオの再生スピードは `ratio` 指定なし、または `ratio=None` で収録する。現時点の標準速度は 1.2 倍
 - `aidiy_text_to_speech` は `ratio=None`（未指定）を既定の 1.2 倍として扱う。`ratio=0` / `ratio=1` は速度調整なしになるため、通常収録では指定しない
 - **出力形式は必ず MP3**（WAV は禁止）。各プロバイダは内部で PCM → WAV → MP3 変換（ffmpeg 優先、lameenc フォールバック）する

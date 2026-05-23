@@ -462,7 +462,7 @@ window.SCENARIO = {
       "accent_soft": "rgba(123,140,255,0.18)",
       "kicker": "AI PROVIDERS",
       "headline": "チャット・ライブ・コードで\n異なる AI Provider を切り替え",
-      "lead": "チャットは Claude / Gemini / OpenRouter / Ollama / FreeAI に対応。ライブは Gemini Live / OpenAI Realtime。コードは Claude SDK / Claude CLI / Gemini CLI / aidiy_hermes / Codex など。",
+      "lead": "チャットは Claude / Gemini / OpenRouter / Ollama / FreeAI に対応。ライブは Gemini Live / OpenAI Realtime。コードは Claude SDK / Claude CLI / Antigravity CLI / aidiy_hermes / Codex など。",
       "subtitle": "チャット・ライブ・コードそれぞれに対応 Provider が異なる。AiDiy_key.json で設定。",
       "image": "images/scene_006.png",
       "chips": [
@@ -506,7 +506,7 @@ window.SCENARIO = {
           "title": "コード支援 CLI",
           "lines": [
             "Claude CLI / Claude SDK (`*_claude.py`)",
-            "aidiy_hermes / Gemini CLI / Codex / OpenCode",
+            "aidiy_hermes / Antigravity CLI / Codex / OpenCode",
             "Copilot CLI — `CODE_AI*_NAME` で指定"
           ]
         }

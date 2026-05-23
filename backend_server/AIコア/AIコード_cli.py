@@ -195,6 +195,13 @@ class CodeAI:
                 if os.path.isfile(candidate2):
                     return candidate2
             return "opencode"
+        if self.code_ai == "antigravity_cli":
+            if os.name == 'nt':
+                userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
+                candidate = os.path.join(userprofile, 'AppData', 'Local', 'agy', 'bin', 'agy.exe')
+                if os.path.isfile(candidate):
+                    return candidate
+            return "agy"
         if self.code_ai in ("claude_ollama", "codex_ollama"):
             return "ollama"
         if os.name == 'nt':
@@ -202,13 +209,11 @@ class CodeAI:
             npm_bin = os.path.join(userprofile, 'AppData', 'Roaming', 'npm')
             names = {
                 "copilot_cli": "copilot.cmd",
-                "gemini_cli": "gemini.cmd",
                 "codex_cli": "codex.cmd",
             }
             return os.path.join(npm_bin, names.get(self.code_ai, "claude.cmd"))
         names = {
             "copilot_cli": "copilot",
-            "gemini_cli": "gemini",
             "codex_cli": "codex",
         }
         return names.get(self.code_ai, "claude")
@@ -371,16 +376,20 @@ class CodeAI:
             else:
                 return common + ["--continue", "-p", プロンプト]
 
-        elif self.code_ai == "gemini_cli":
-            # Google Gemini CLI
-            base_args = list(base)
+        elif self.code_ai == "antigravity_cli":
+            # Antigravity CLI (agy) — claude 互換インターフェース
+            common = list(base)
             if self.code_permissions != "none":
-                base_args.append("--yolo")
-            # モデルがautoの場合はモデル指定を省略
-            if self.code_model and self.code_model.lower() != "auto":
-                base_args.extend(["--model", self.code_model])
-            base_args.extend(["--prompt", プロンプト])
-            return base_args
+                common.append("--dangerously-skip-permissions")
+            if repo_path:
+                common.extend(["--add-dir", repo_path])
+            # --print-timeout: デフォルト5分を20分に延長
+            common.extend(["--print-timeout", "20m"])
+            if 初回:
+                return common + ["-p", プロンプト]
+            else:
+                # -c (--continue) は -p の後ろに付ける（opencode_cli と同様）
+                return common + ["-p", プロンプト, "-c"]
 
         elif self.code_ai == "codex_cli":
             # OpenAI Codex CLI
@@ -812,7 +821,7 @@ class CodeAI:
             初回送信 = not resume or not self.session_started
 
             # 完全なプロンプト構築（プロバイダー別）
-            if self.code_ai in ["claude_cli", "copilot_cli", "gemini_cli", "codex_cli", "opencode_cli"]:
+            if self.code_ai in ["claude_cli", "copilot_cli", "antigravity_cli", "codex_cli", "opencode_cli"]:
                 # 履歴送信不要。初回のみ system_prompt を付与して方針を伝える
                 if 初回送信:
                     完全プロンプト = f"{self.system_prompt}\n\n{送信用要求テキスト}"
@@ -867,12 +876,19 @@ class CodeAI:
             except Exception:
                 pass
 
-            # subprocess実行
-            result_text = await self._subprocess実行(
-                command=command,
-                cwd=作業ディレクトリ,
-                timeout=タイムアウト秒数
-            )
+            # subprocess実行（antigravity_cli は DETACHED_PROCESS 専用メソッド）
+            if self.code_ai == "antigravity_cli":
+                result_text = await self._antigravity実行(
+                    command=command,
+                    cwd=作業ディレクトリ,
+                    timeout=タイムアウト秒数
+                )
+            else:
+                result_text = await self._subprocess実行(
+                    command=command,
+                    cwd=作業ディレクトリ,
+                    timeout=タイムアウト秒数
+                )
 
             # codexの場合、セッションIDを抽出して保存（stderr から抽出）
             if self.code_ai == "codex_cli":
@@ -919,6 +935,7 @@ class CodeAI:
             # プロセス起動
             process = await asyncio.create_subprocess_exec(
                 *command,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,
@@ -1028,20 +1045,43 @@ class CodeAI:
             stdout_task = asyncio.create_task(stdout_reader())
             stderr_task = asyncio.create_task(stderr_reader())
             monitor_task = asyncio.create_task(timeout_monitor())
+            process_task = asyncio.create_task(process.wait())
 
-            # プロセス完了待機（タイムアウト監視付き）
+            # 最初の完了を待つ
             done, pending = await asyncio.wait(
-                [stdout_task, stderr_task, monitor_task, asyncio.create_task(process.wait())],
+                [stdout_task, stderr_task, monitor_task, process_task],
                 return_when=asyncio.FIRST_COMPLETED
             )
 
-            # 未完了タスクをキャンセル
-            for task in pending:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+            if monitor_task in done:
+                # タイムアウト or 強制停止 → 全タスクをキャンセル
+                for task in [stdout_task, stderr_task, process_task]:
+                    if not task.done():
+                        task.cancel()
+                        try:
+                            await task
+                        except (asyncio.CancelledError, Exception):
+                            pass
+            else:
+                # プロセス終了（または stdout/stderr 完了）→ monitor をキャンセルし
+                # stdout/stderr/process の残りを最大30秒待つ（バッファ読み切り）
+                if not monitor_task.done():
+                    monitor_task.cancel()
+                    try:
+                        await monitor_task
+                    except asyncio.CancelledError:
+                        pass
+                remaining = [t for t in [stdout_task, stderr_task, process_task] if not t.done()]
+                if remaining:
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(*remaining, return_exceptions=True),
+                            timeout=30
+                        )
+                    except asyncio.TimeoutError:
+                        for task in remaining:
+                            if not task.done():
+                                task.cancel()
 
             # プロセスが生きていればキル
             if process.returncode is None:
@@ -1051,16 +1091,30 @@ class CodeAI:
             # プロセス参照をクリア
             self.current_process = None
 
-            # 結果を結合（stdout全体をそのまま返す - 抽出処理は行わない）
+            # 結果を結合
             full_output = "\n".join(result_lines)
+            stderr_output = "\n".join(stderr_lines)
 
             # stderr を保存（セッションID抽出用）
-            self.last_stderr_output = "\n".join(stderr_lines)
+            self.last_stderr_output = stderr_output
 
-            # stdout全体を結果として返す（フィルタリングなし）
+            # stdout/stderr の行数と先頭内容を記録
+            logger.info(f"[CodeAI] subprocess完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行, ai={self.code_ai}")
+            if result_lines:
+                logger.info(f"[CodeAI] stdout先頭: {repr(result_lines[0][:80])}")
+                logger.info(f"[CodeAI] stdout末尾: {repr(result_lines[-1][:80])}")
+            if stderr_lines:
+                logger.info(f"[CodeAI] stderr先頭: {repr(stderr_lines[0][:80])}")
+
             if self._停止マーカー送信済み:
                 return "!"
-            return full_output.strip() if full_output.strip() else "（応答なし）"
+
+            result = full_output.strip()
+            # 非TTY環境でstderrに応答を出力するCLI（agy等）のフォールバック
+            if not result and stderr_output.strip():
+                logger.info(f"[CodeAI] stdout空のためstderrを戻り値に使用: ai={self.code_ai}")
+                result = stderr_output.strip()
+            return result if result else "（応答なし）"
 
         except asyncio.TimeoutError as e:
             logger.warning(f"subprocess タイムアウト: {e}")
@@ -1068,6 +1122,176 @@ class CodeAI:
 
         except Exception as e:
             logger.error(f"subprocess実行エラー (command={command}, cwd={cwd}): {e}")
+            return f"subprocess実行エラー: {str(e)}"
+
+    async def _antigravity実行(self, command: list, cwd: str, timeout: int) -> str:
+        """
+        antigravity_cli (agy.exe) 専用実行メソッド。
+        DETACHED_PROCESS フラグで起動し、Go バイナリが親コンソールを
+        直接書き込む CONOUT$ バイパスを防ぐ。stdout/stderr は PIPE 経由で取得。
+        """
+        try:
+            self._停止マーカー送信済み = False
+
+            # DETACHED_PROCESS: 親コンソールから切り離して起動
+            # → WriteConsole(CONOUT$) が使えなくなり stdout PIPE に出力される
+            create_flags = subprocess.DETACHED_PROCESS if hasattr(subprocess, 'DETACHED_PROCESS') else 0
+
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd,
+                env=os.environ.copy(),
+                creationflags=create_flags
+            )
+            self.current_process = process
+
+            result_lines = []
+            stderr_lines = []
+            last_output_time = time.time()
+
+            async def stdout_reader():
+                nonlocal last_output_time
+                try:
+                    while True:
+                        if self._強制停止要求あり():
+                            logger.info("[antigravity] 強制停止要求検出、stdout読み取り中断")
+                            await self._停止マーカー送信()
+                            break
+                        line = await process.stdout.readline()
+                        if not line:
+                            break
+                        last_output_time = time.time()
+                        line_text = line.decode('utf-8', errors='replace').rstrip()
+                        result_lines.append(line_text)
+                        if self._強制停止要求あり():
+                            await self._停止マーカー送信()
+                            break
+                        if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                            try:
+                                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                                    "セッションID": self.セッションID,
+                                    "チャンネル": self.チャンネル,
+                                    "メッセージ識別": "output_stream",
+                                    "メッセージ内容": line_text,
+                                    "ファイル名": None,
+                                    "サムネイル画像": None
+                                })
+                            except Exception as e:
+                                logger.error(f"[antigravity] output_stream送信エラー(stdout): {e}")
+                except Exception as e:
+                    logger.error(f"[antigravity] stdout読み取りエラー: {e}")
+
+            async def stderr_reader():
+                nonlocal last_output_time
+                try:
+                    while True:
+                        if self._強制停止要求あり():
+                            await self._停止マーカー送信()
+                            break
+                        line = await process.stderr.readline()
+                        if not line:
+                            break
+                        last_output_time = time.time()
+                        line_text = line.decode('utf-8', errors='replace').rstrip()
+                        stderr_lines.append(line_text)
+                        if self._強制停止要求あり():
+                            await self._停止マーカー送信()
+                            break
+                        if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                            try:
+                                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                                    "セッションID": self.セッションID,
+                                    "チャンネル": self.チャンネル,
+                                    "メッセージ識別": "output_stream",
+                                    "メッセージ内容": line_text,
+                                    "ファイル名": None,
+                                    "サムネイル画像": None
+                                })
+                            except Exception as e:
+                                logger.error(f"[antigravity] output_stream送信エラー(stderr): {e}")
+                except Exception as e:
+                    logger.error(f"[antigravity] stderr読み取りエラー: {e}")
+
+            async def timeout_monitor():
+                while True:
+                    await asyncio.sleep(1)
+                    if self._強制停止要求あり():
+                        logger.info("[antigravity] 強制停止要求検出（monitor）")
+                        await self._停止マーカー送信()
+                        return
+                    if time.time() - last_output_time > timeout:
+                        raise asyncio.TimeoutError(f"タイムアウト({timeout}秒)")
+
+            stdout_task = asyncio.create_task(stdout_reader())
+            stderr_task = asyncio.create_task(stderr_reader())
+            monitor_task = asyncio.create_task(timeout_monitor())
+            process_task = asyncio.create_task(process.wait())
+
+            done, _ = await asyncio.wait(
+                [stdout_task, stderr_task, monitor_task, process_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            if monitor_task in done:
+                for task in [stdout_task, stderr_task, process_task]:
+                    if not task.done():
+                        task.cancel()
+                        try:
+                            await task
+                        except (asyncio.CancelledError, Exception):
+                            pass
+            else:
+                if not monitor_task.done():
+                    monitor_task.cancel()
+                    try:
+                        await monitor_task
+                    except asyncio.CancelledError:
+                        pass
+                remaining = [t for t in [stdout_task, stderr_task, process_task] if not t.done()]
+                if remaining:
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(*remaining, return_exceptions=True),
+                            timeout=30
+                        )
+                    except asyncio.TimeoutError:
+                        for task in remaining:
+                            if not task.done():
+                                task.cancel()
+
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+            self.current_process = None
+
+            full_output = "\n".join(result_lines)
+            stderr_output = "\n".join(stderr_lines)
+            self.last_stderr_output = stderr_output
+
+            logger.info(f"[antigravity] 完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行")
+            if result_lines:
+                logger.info(f"[antigravity] stdout先頭: {repr(result_lines[0][:80])}")
+            if stderr_lines:
+                logger.info(f"[antigravity] stderr先頭: {repr(stderr_lines[0][:80])}")
+
+            if self._停止マーカー送信済み:
+                return "!"
+
+            result = full_output.strip()
+            if not result and stderr_output.strip():
+                logger.info("[antigravity] stdout空のためstderrを戻り値に使用")
+                result = stderr_output.strip()
+            return result if result else "（応答なし）"
+
+        except asyncio.TimeoutError as e:
+            logger.warning(f"[antigravity] タイムアウト: {e}")
+            return f"処理タイムアウト({timeout}秒)が発生しました。"
+
+        except Exception as e:
+            logger.error(f"[antigravity] 実行エラー (command={command}, cwd={cwd}): {e}")
             return f"subprocess実行エラー: {str(e)}"
 
 
@@ -1197,7 +1421,7 @@ if __name__ == "__main__":
     # プロバイダーとモデルの設定
     #AI_NAME, AI_MODEL = "claude_cli", "auto"
     #AI_NAME, AI_MODEL = "copilot_cli", "auto"
-    #AI_NAME, AI_MODEL = "gemini_cli", "auto"
+    #AI_NAME, AI_MODEL = "antigravity_cli", "auto"
     AI_NAME, AI_MODEL = "codex_cli", "auto"
 
     print("履歴テスト")

@@ -23,7 +23,7 @@
 |------|-----------|----|
 | `CHAT_AI_NAME` | `_chat` | `gemini_chat`, `openrt_chat`, `freeai_chat`, `ollama_chat` |
 | `LIVE_AI_NAME` | `_live` | `gemini_live`, `openai_live` |
-| `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `gemini_cli`, `opencode_cli`, `aidiy_hermes` |
+| `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `antigravity_cli`, `opencode_cli`, `aidiy_hermes` |
 
 判定は完全一致を前提にする。`startswith()` などの前方一致へ変えない。
 
@@ -44,7 +44,7 @@
   "CODE_AI2_MODEL": "auto",
   "CODE_AI3_NAME": "codex_cli",
   "CODE_AI3_MODEL": "auto",
-  "CODE_AI4_NAME": "gemini_cli",
+  "CODE_AI4_NAME": "antigravity_cli",
   "CODE_AI4_MODEL": "auto",
   "CODE_AI5_NAME": "opencode_cli",
   "CODE_AI5_MODEL": "auto",
@@ -71,7 +71,7 @@ Electron では settings 専用ウィンドウ、Web では同じコンポーネ
 
 新しい AI 種別を追加する場合は、backend が返す `available_models` のキー、frontend の `CHAT_MODEL_KEYS` / `LIVE_MODEL_KEYS` / `LIVE_VOICE_KEYS` / `CODE_MODEL_KEYS`、`conf_json.DEFAULT_CONFIG` を合わせる。
 
-Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI では `auto` / `full` / `none` を選択でき、保存時は `AiDiy_key.json` へ書き込まれる。`none` の場合、Claude / Gemini / Copilot 系の bypass、yolo、自動全ツール許可オプションは付与しない。ただし `codex_cli` はサンドボックス無視を常に有効にするため、`--dangerously-bypass-approvals-and-sandbox` を付与する。CLI 実行時の具体的な反映処理は `AIコード_cli.py` / `AIコード_claude.py` / `backend_hermes` 側の実装に合わせて確認する。
+Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI では `auto` / `full` / `none` を選択でき、保存時は `AiDiy_key.json` へ書き込まれる。`none` の場合、Claude / Antigravity / Copilot 系の bypass、yolo、自動全ツール許可オプションは付与しない。ただし `codex_cli` はサンドボックス無視を常に有効にするため、`--dangerously-bypass-approvals-and-sandbox` を付与する。CLI 実行時の具体的な反映処理は `AIコード_cli.py` / `AIコード_claude.py` / `backend_hermes` 側の実装に合わせて確認する。
 
 ## Ollama Chat の local / Cloud 切替
 

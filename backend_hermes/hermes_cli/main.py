@@ -1818,7 +1818,7 @@ def select_provider_and_model(args=None):
     elif selected_provider == "minimax-oauth":
         _model_flow_minimax_oauth(config, current_model, args=args)
     elif selected_provider == "google-gemini-cli":
-        _model_flow_google_gemini_cli(config, current_model)
+        _model_flow_google_antigravity_cli(config, current_model)
     elif selected_provider == "copilot-acp":
         _model_flow_copilot_acp(config, current_model)
     elif selected_provider == "copilot":
@@ -2753,7 +2753,7 @@ def _model_flow_minimax_oauth(config, current_model="", args=None):
     print(f"\u2713 Using MiniMax model: {selected}")
 
 
-def _model_flow_google_gemini_cli(_config, current_model=""):
+def _model_flow_google_antigravity_cli(_config, current_model=""):
     """Google Gemini OAuth (PKCE) via Cloud Code Assist — supports free AND paid tiers.
 
     Flow:

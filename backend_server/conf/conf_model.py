@@ -131,7 +131,7 @@ class conf_models:
             "claude-sonnet-4.5": "yyyy/mm/dd - claude-sonnet-4.5",
             "claude-haiku-4.5": "yyyy/mm/dd - claude-haiku-4.5",
         }
-        self.CODE_GEMINI_CLI_MODELS = {
+        self.CODE_ANTIGRAVITY_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
             "gemini-2.5-flash": "yyyy/mm/dd - gemini-2.5-flash",
             "gemini-3-pro-preview": "yyyy/mm/dd - gemini-3-pro-preview",
@@ -281,9 +281,9 @@ class conf_models:
             "AiDiy_code_copilot_cli.json",
             self.CODE_COPILOT_CLI_MODELS,
         )
-        self.CODE_GEMINI_CLI_MODELS = self._load_or_create_code_config(
-            "AiDiy_code_gemini_cli.json",
-            self.CODE_GEMINI_CLI_MODELS,
+        self.CODE_ANTIGRAVITY_CLI_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_antigravity_cli.json",
+            self.CODE_ANTIGRAVITY_CLI_MODELS,
         )
         self.CODE_CODEX_CLI_MODELS = self._load_or_create_code_config(
             "AiDiy_code_codex_cli.json",
@@ -746,7 +746,7 @@ class conf_models:
             "claude_sdk": self.CODE_CLAUDE_SDK_MODELS,
             "claude_cli": self.CODE_CLAUDE_CLI_MODELS,
             "copilot_cli": self.CODE_COPILOT_CLI_MODELS,
-            "gemini_cli": self.CODE_GEMINI_CLI_MODELS,
+            "antigravity_cli": self.CODE_ANTIGRAVITY_CLI_MODELS,
             "codex_cli": self.CODE_CODEX_CLI_MODELS,
             "opencode_cli": self._get_opencode_cli_models(),
             "aidiy_hermes": self._get_aidiy_hermes_models(),

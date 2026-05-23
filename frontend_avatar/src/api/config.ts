@@ -64,7 +64,7 @@ export function defaultModelSettings(): ModelSettings {
     CODE_AI1_NAME: 'claude_sdk',
     CODE_AI2_NAME: 'copilot_cli',
     CODE_AI3_NAME: 'codex_cli',
-    CODE_AI4_NAME: 'gemini_cli',
+    CODE_AI4_NAME: 'antigravity_cli',
     CODE_AI5_NAME: 'opencode_cli',
     CODE_AI6_NAME: 'aidiy_hermes',
     CODE_PERMISSIONS: 'auto',

@@ -75,7 +75,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_CLAUDE_SDK_MODEL": app_conf.json.get("CODE_CLAUDE_SDK_MODEL", "auto"),
         "CODE_CLAUDE_CLI_MODEL": app_conf.json.get("CODE_CLAUDE_CLI_MODEL", "auto"),
         "CODE_COPILOT_CLI_MODEL": app_conf.json.get("CODE_COPILOT_CLI_MODEL", "auto"),
-        "CODE_GEMINI_CLI_MODEL": app_conf.json.get("CODE_GEMINI_CLI_MODEL", "auto"),
+        "CODE_ANTIGRAVITY_CLI_MODEL": app_conf.json.get("CODE_ANTIGRAVITY_CLI_MODEL", "auto"),
         "CODE_CODEX_CLI_MODEL": app_conf.json.get("CODE_CODEX_CLI_MODEL", "auto"),
         "CODE_AIDIY_HERMES_MODEL": app_conf.json.get(
             "CODE_AIDIY_HERMES_MODEL",
