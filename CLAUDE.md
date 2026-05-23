@@ -55,6 +55,8 @@ cd backend_hermes && .venv/Scripts/python cli_main.py
 
 ### 型チェック・ビルド
 
+`npm run build` は原則として日常的な確認では実行しません。配布物作成、ビルド成果物確認、利用者明示依頼など、実行理由が明確な場合だけ使ってください。
+
 ```bash
 # Frontend Web
 cd frontend_web && npm run type-check    # vue-tsc --noEmit

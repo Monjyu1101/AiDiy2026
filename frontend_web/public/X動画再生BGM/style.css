@@ -28,6 +28,7 @@ html, body {
 /* ===== 2プレイヤー並列 ===== */
 .players-container {
   display: flex;
+  flex-direction: row;
   gap: 8px;
   flex: 0 0 auto;
   height: calc(100% - 190px);
@@ -36,6 +37,7 @@ html, body {
 
 .player-box {
   flex: 1;
+  min-height: 0;
   position: relative;
   border-radius: 6px;
   overflow: hidden;
@@ -449,11 +451,13 @@ html, body {
 }
 
 /* ===== レスポンシブ ===== */
-@media (max-width: 640px) {
+@media (orientation: portrait) {
   .players-container {
     flex-direction: column;
-    height: calc(100% - 210px);
   }
+}
+
+@media (max-width: 640px) {
   .info-right {
     display: none;
   }

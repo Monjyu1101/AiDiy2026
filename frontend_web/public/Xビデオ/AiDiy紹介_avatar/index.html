@@ -38,7 +38,7 @@
     .app {
       position: relative;
       display: grid;
-      grid-template-rows: 64px 1fr 82px;
+      grid-template-rows: 64px 1fr 44px;
       width: 100%;
       height: 100%;
       overflow: hidden;
@@ -140,13 +140,8 @@
       border-width: 1px 0 0;
     }
 
-    .controls-left,
-    .controls-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-    }
+    .controls-left { display: flex; align-items: center; gap: 6px; }
+    .controls-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
     .controls-center {
       flex: 1;
@@ -220,34 +215,33 @@
     }
 
     .tts-status {
-      position: absolute;
-      left: 24px;
-      bottom: 94px;
-      z-index: 21;
-      color: #ff6b6b;
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      white-space: nowrap;
-      text-shadow: 0 0 14px rgba(255, 72, 72, 0.45);
-      opacity: 0;
-      transform: translateY(2px);
-      transition: opacity 160ms ease, transform 160ms ease;
+      position: fixed;
+      right: 24px;
+      bottom: 52px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 8px;
+      display: none;
+      z-index: 25;
       pointer-events: none;
+      white-space: nowrap;
+      background: rgba(210, 60, 130, 0.92);
+      border: 1px solid rgba(255, 140, 200, 0.55);
     }
 
     .tts-status.active {
-      opacity: 1;
-      transform: translateY(0);
+      display: block;
     }
 
     #avatar-container {
       position: fixed;
       right: 8vw;
-      bottom: 56px;
+      bottom: 44px;
       width: 45vh;
       height: 75vh;
-      max-height: calc(100vh - 112px);
+      max-height: calc(100vh - 108px);
       pointer-events: none;
       z-index: 10;
     }
@@ -266,7 +260,7 @@
 
     @media (max-width: 980px) {
       .app {
-        grid-template-rows: 72px 1fr 110px;
+        grid-template-rows: 72px 1fr 56px;
       }
 
       .topbar,
@@ -287,18 +281,7 @@
         text-align: left;
       }
 
-      .controls {
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        gap: 12px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-      }
-
-      .controls-center {
-        order: 3;
-        width: 100%;
-      }
+      .controls { flex-wrap: nowrap; gap: 8px; }
 
       .subtitle {
         left: 12px;
@@ -308,16 +291,13 @@
         font-size: 14px;
       }
 
-      .tts-status {
-        left: 14px;
-        bottom: 122px;
-        font-size: 15px;
-      }
+      .tts-status { bottom: 61px; }
 
       #avatar-container {
         right: 4vw;
         width: 32vh;
         height: 52vh;
+        bottom: 56px;
       }
     }
   </style>
@@ -352,11 +332,12 @@
 
     <footer class="controls">
       <div class="controls-left">
-        <button id="prevBtn" type="button" aria-label="前へ">◁ 前頁</button>
+        <button id="restartBtn" type="button" aria-label="最初から">|◁</button>
+        <button id="prevBtn" type="button" aria-label="前へ">◁</button>
         <button id="modeBtn" type="button" class="mode-btn">ショート</button>
         <button id="playBtn" type="button" aria-label="再生">▶</button>
-        <button id="nextBtn" type="button" aria-label="次へ">次頁 ▷</button>
-        <button id="restartBtn" type="button" class="ghost-btn">最初から</button>
+        <button id="nextBtn" type="button" aria-label="次へ">▷</button>
+        <button id="lastBtn" type="button" aria-label="最後のシーンへ">▷|</button>
       </div>
 
       <div class="controls-center">
@@ -367,7 +348,6 @@
 
       <div class="controls-right">
         <div id="timer" class="timer">00:00 / 00:50</div>
-        <div id="meta" class="meta">scene 1 / 10</div>
       </div>
     </footer>
   </div>
@@ -381,12 +361,12 @@
     const sceneFrame = document.getElementById("sceneFrame");
     const subtitle = document.getElementById("subtitle");
     const timer = document.getElementById("timer");
-    const meta = document.getElementById("meta");
     const progressFill = document.getElementById("progressFill");
     const playBtn = document.getElementById("playBtn");
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const restartBtn = document.getElementById("restartBtn");
+    const lastBtn = document.getElementById("lastBtn");
     const modeBtn = document.getElementById("modeBtn");
     const ttsStatus = document.getElementById("ttsStatus");
     const searchParams = new URLSearchParams(window.location.search);
@@ -456,6 +436,8 @@
     let pendingGesturePlayback = false;
     let requestedPlaybackStarted = false;
     let autoplayFallbackTimer = null;
+    let audioEndedHandler = null;
+    let bgPrefetchCount = 0;
     const audioPlayer = new Audio();
     window.audioPlayer = audioPlayer;
     audioPlayer.preload = "auto";
@@ -478,16 +460,33 @@
       clearTimeout(sceneEndTimer);
       tickTimer = null;
       sceneEndTimer = null;
+      if (audioEndedHandler) {
+        audioPlayer.removeEventListener("ended", audioEndedHandler);
+        audioEndedHandler = null;
+      }
     }
 
     function currentTimelineSec() {
       return getSceneStartSec(currentScene()) + sceneElapsedMs / 1000;
     }
 
+    function getSceneScheduledEndSec(scene = currentScene()) {
+      return Math.min(
+        getSceneStartSec(scene) + getSceneDurationSec(scene),
+        getTotalDurationSec()
+      );
+    }
+
+    function snapTimerToSceneScheduledEnd(scene = currentScene()) {
+      sceneElapsedMs = Math.max(0, (getSceneScheduledEndSec(scene) - getSceneStartSec(scene)) * 1000);
+      updateTimerAndProgress();
+    }
+
     function updateTimerAndProgress() {
       const total = getTotalDurationSec();
       const current = currentTimelineSec();
-      timer.textContent = `${formatTime(current)} / ${formatTime(total)}`;
+      const sceneId = (scenario.scenes[sceneIndex]?.id ?? `scene_${String(sceneIndex).padStart(3,"0")}`).replace("scene_", "Scene_");
+      timer.textContent = `${formatTime(current)} / ${formatTime(total)}  ${sceneId} (${sceneIndex + 1}/${scenario.scenes.length})`;
       progressFill.style.width = `${Math.min(100, (current / Math.max(0.1, total)) * 100)}%`;
     }
 
@@ -497,6 +496,19 @@
         if (token !== playbackToken) return;
         nextScene(true);
       }, Math.max(0, Math.ceil(remainingMs)));
+    }
+
+    function armAudioEndedHook(token) {
+      if (audioEndedHandler) {
+        audioPlayer.removeEventListener("ended", audioEndedHandler);
+      }
+      audioEndedHandler = () => {
+        audioEndedHandler = null;
+        if (token !== playbackToken || !playing) return;
+        clearTimeout(sceneEndTimer);
+        nextScene(true);
+      };
+      audioPlayer.addEventListener("ended", audioEndedHandler, { once: true });
     }
 
     function startSceneClock(token) {
@@ -677,10 +689,17 @@
 
       if (!getSceneNarration(scene)) return;
 
+      bgPrefetchCount++;
+      if (!ttsStatus?.textContent) setTtsStatus("TTS");
       try {
         await getTtsBlobUrl(scene);
       } catch (error) {
         console.warn("TTS 先読み失敗", error);
+      } finally {
+        bgPrefetchCount = Math.max(0, bgPrefetchCount - 1);
+        if (bgPrefetchCount === 0 && ttsStatus?.textContent === "TTS") {
+          setTtsStatus("");
+        }
       }
     }
 
@@ -696,7 +715,7 @@
 
       try {
         console.warn(`${reason}; MCP aidiy_text_to_speech で音声合成します`);
-        setTtsStatus(pendingGesturePlayback ? "自動再生待機中（クリックで開始）" : "TTS合成中");
+        setTtsStatus(pendingGesturePlayback ? "自動再生待機中（クリックで開始）" : "TTS");
         const blobUrl = await getTtsBlobUrl(scene);
         if (!blobUrl || token !== playbackToken || !playing) return;
 
@@ -731,7 +750,9 @@
             ? audioPlayer.duration
             : (effectiveSceneDuration || getSceneDurationSec(scene));
           effectiveSceneDuration = dur;
-          armSceneEndTimer(dur * 1000 - currentMs + 1200, token);
+          armAudioEndedHook(token);
+          armSceneEndTimer(dur * 1000 - currentMs + 5000, token);
+          prefetchSceneAudio(scenario.scenes[sceneIndex + 2]);
         }, { once: true });
         if (audioPlayer.readyState >= 1) {
           syncResumePosition();
@@ -753,7 +774,6 @@
       const scene = currentScene();
       sceneFrame.src = `${scenario.scenes[sceneIndex].id}.html`;
       subtitle.textContent = scene.subtitle || scene.lead || "";
-      meta.textContent = `scene ${sceneIndex + 1} / ${scenario.scenes.length}`;
       setTtsStatus("");
       updateTimerAndProgress();
       window.__avatarSetExpression?.(scene.expression || "neutral");
@@ -796,7 +816,9 @@
         const currentMs = Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
           ? audioPlayer.currentTime * 1000
           : sceneElapsedMs;
-        armSceneEndTimer(effectiveSceneDuration * 1000 - currentMs + 1200, token);
+        armAudioEndedHook(token);
+        armSceneEndTimer(effectiveSceneDuration * 1000 - currentMs + 5000, token);
+        prefetchSceneAudio(scenario.scenes[sceneIndex + 2]);
       };
       audioPlayer.addEventListener("playing", handlePlaying, { once: true });
       audioPlayer.src = getVersionedAudioSrc(audioPath);
@@ -806,7 +828,7 @@
       }).catch((error) => {
         if (handleAutoplayBlocked(error, token)) return;
         sceneStartedAt = Date.now() - sceneElapsedMs;
-        armSceneEndTimer(effectiveSceneDuration * 1000 - sceneElapsedMs + 1200, token);
+        armSceneEndTimer(effectiveSceneDuration * 1000 - sceneElapsedMs + 5000, token);
       });
     }
 
@@ -856,10 +878,9 @@
         moveToScene(0);
       } else {
         clearTimers();
-        sceneElapsedMs = (effectiveSceneDuration > 0 ? effectiveSceneDuration : getSceneDurationSec(currentScene())) * 1000;
         audioPlayer.pause();
         window.__avatarOnAudioStop?.();
-        updateTimerAndProgress();
+        snapTimerToSceneScheduledEnd();
         progressFill.style.width = "100%";
         playing = false;
         playBtn.textContent = "▶";
@@ -870,25 +891,11 @@
       moveToScene(sceneIndex - 1);
     }
 
-    prevBtn.addEventListener("click", () => {
-      pause();
-      prevScene();
-    });
-    nextBtn.addEventListener("click", () => {
-      pause();
-      nextScene(false);
-    });
-    playBtn.addEventListener("click", () => {
-      if (playing) {
-        pause();
-      } else {
-        play();
-      }
-    });
-    restartBtn.addEventListener("click", () => {
-      pause();
-      moveToScene(0);
-    });
+    restartBtn.addEventListener("click", () => { pause(); moveToScene(0); });
+    prevBtn.addEventListener("click", () => { pause(); prevScene(); });
+    playBtn.addEventListener("click", () => { if (playing) pause(); else play(); });
+    nextBtn.addEventListener("click", () => { pause(); nextScene(false); });
+    lastBtn.addEventListener("click", () => { pause(); moveToScene(scenario.scenes.length - 1); });
 
     modeBtn.addEventListener("click", () => {
       const wasPlaying = playing;

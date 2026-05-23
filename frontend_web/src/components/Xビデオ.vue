@@ -30,7 +30,6 @@ const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar版/index.html`;
 const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半/index.html`;
 const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半/index.html`;
 const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半/index.html`;
-const allテストUrl       = `${baseUrl}Xビデオ/AiDiy紹介__allテスト/index.html`;
 
 const route = useRoute();
 const router = useRouter();
@@ -226,7 +225,7 @@ const handleReturn = () => {
           </div>
         </div>
 
-        <div class="section-label">テスト</div>
+        <div class="section-label">ニュース</div>
 
         <div class="menu-row">
           <div class="menu-card menu-card-fixed">
@@ -268,18 +267,6 @@ const handleReturn = () => {
             </a>
           </div>
 
-          <div class="menu-card menu-card-fixed" style="border: 1px solid #555; background: rgba(255,255,200,0.04);">
-            <div class="menu-card-title">
-              <span class="icon">X🧪</span>
-              AiDiy紹介 (allテスト)
-            </div>
-            <div class="menu-card-description">
-              audio 不在時に MCP TTS で音声合成再生するテスト版
-            </div>
-            <a :href="allテストUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
         </div>
       </div>
     </div>

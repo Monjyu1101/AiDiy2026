@@ -35,8 +35,8 @@
 
 ## ナレーション音声
 
-ナレーションは **`edge:female` を基準**とする（`scenario.js` の `assets_policy.tts_provider: "edge:female"`）。`edge` は Microsoft Edge TTS で、API キー不要・常時利用可・レスポンスがコンパクトなので紹介ビデオの標準として扱う。
-専門テーマ版（`_avatar`、`_hermes` など）も特段の理由がない限り同じプロバイダ・声で揃える。
+ナレーションは **`freeai:female` を基準**とする（`scenario.js` の `assets_policy.tts_provider: "freeai:female"`）。AiDiy 関係の全ビデオ（紹介・実装・実例など `Xビデオ/AiDiy*`）は特段の理由がない限り `freeai:female` で統一する。
+専門テーマ版（`_avatar`、`_hermes` など）も同じプロバイダ・声で揃える。
 
 - 生成は `aidiy_text_to_speech` MCP を使う
 - 紹介ビデオの再生スピードは `ratio` 指定なし、または `ratio=None` で収録する。現時点の標準速度は 1.2 倍

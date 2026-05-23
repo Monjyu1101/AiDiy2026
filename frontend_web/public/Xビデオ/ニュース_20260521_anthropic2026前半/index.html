@@ -26,7 +26,7 @@
     /* ── Layout ── */
     .app {
       position: relative; z-index: 1;
-      display: grid; grid-template-rows: 64px 1fr 82px;
+      display: grid; grid-template-rows: 64px 1fr 44px;
       width: 100%; height: 100%; overflow: hidden;
     }
 
@@ -68,7 +68,7 @@
     .sc-text-overlay {
       position: relative; z-index: 2;
       text-align: center;
-      padding: 0 calc(36vh + 24px);
+      padding: 0 calc(min(36vh, 30vw) + 24px);
       display: flex; flex-direction: column; align-items: center; gap: 14px;
     }
     .sc-headline {
@@ -79,8 +79,8 @@
 
     /* ── Subtitle ── */
     .subtitle {
-      position: absolute; bottom: 18px;
-      left: calc(36vh + 10px); right: calc(36vh + 10px);
+      position: absolute; bottom: 20px;
+      left: calc(min(36vh, 30vw) + 10px); right: calc(min(36vh, 30vw) + 10px);
       padding: 20px 24px; border-radius: 18px;
       background: rgba(4,10,18,0.76); backdrop-filter: blur(10px);
       border: 1px solid rgba(255,255,255,0.08);
@@ -143,7 +143,8 @@
 
     /* ── Controls ── */
     .controls { justify-content: space-between; gap: 18px; border-width: 1px 0 0; }
-    .controls-left, .controls-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .controls-left { display: flex; align-items: center; gap: 6px; }
+    .controls-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .controls-center { flex: 1; display: flex; justify-content: center; }
     .progress {
       width: min(480px, 100%); height: 8px; border-radius: 999px; overflow: hidden;
@@ -167,8 +168,8 @@
 
     /* ── Dual Avatar Containers (fixed, outside .app) ── */
     #avatar-left, #avatar-right {
-      position: fixed; bottom: 82px;
-      width: 36vh; height: 75vh; max-height: calc(100vh - 146px);
+      position: fixed; bottom: 44px;
+      width: min(36vh, 30vw); height: 75vh; max-height: calc(100vh - 108px);
       pointer-events: none; z-index: 10;
     }
     #avatar-left { left: 0; }
@@ -190,14 +191,71 @@
 
     /* ── Responsive ── */
     @media (max-width: 920px) {
-      .app { grid-template-rows: 72px 1fr 110px; }
+      .app { grid-template-rows: 72px 1fr 56px; }
       .topbar { flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding-top: 8px; padding-bottom: 8px; }
       .top-note { text-align: left; }
-      .controls { flex-wrap: wrap; justify-content: flex-start; gap: 12px; padding-top: 10px; padding-bottom: 10px; }
-      .controls-center { order: 3; width: 100%; }
-      #avatar-left, #avatar-right { width: 28vh; bottom: 110px; height: 52vh; }
-      .sc-text-overlay { padding: 0 calc(28vh + 12px); }
-      .subtitle { left: calc(28vh + 4px); right: calc(28vh + 4px); font-size: 28px; }
+      .controls { flex-wrap: nowrap; gap: 8px; }
+      #avatar-left, #avatar-right { width: min(28vh, 26vw); bottom: 56px; height: 52vh; }
+      .sc-text-overlay { padding: 0 calc(min(28vh, 26vw) + 12px); }
+      .subtitle { left: calc(min(28vh, 26vw) + 4px); right: calc(min(28vh, 26vw) + 4px); font-size: 28px; }
+    }
+    /* ── Portrait (縦表示: スマートフォン/タブレット縦向き) ── */
+    @media (orientation: portrait) and (max-width: 640px) {
+      #avatar-left, #avatar-right { display: none; }
+      .sc-text-overlay { padding: 0 16px; }
+      .subtitle {
+        left: 8px; right: 8px;
+        font-size: clamp(14px, 3.5vw, 24px);
+        padding: 14px 16px;
+      }
+      .subtitle-speaker { font-size: clamp(18px, 4.5vw, 30px); }
+    }
+    /* ── Portrait tablet 641–920px: subtitle overlay, avatars wider to show hands ── */
+    @media (max-width: 920px) and (min-width: 641px) and (orientation: portrait) {
+      .app { z-index: auto; }
+      #avatar-left, #avatar-right { width: 40vw; }
+      .sc-inner { justify-content: flex-start; padding-top: 30%; }
+      .sc-text-overlay { padding: 0 16px; }
+      .subtitle {
+        position: fixed;
+        z-index: 20;
+        left: 8px;
+        right: 8px;
+        bottom: 95px;
+      }
+    }
+    .tts-status {
+      position: fixed;
+      bottom: 52px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 8px;
+      display: none;
+      z-index: 25;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .tts-status.male {
+      left: 24px;
+      background: rgba(30, 110, 220, 0.92);
+      border: 1px solid rgba(100, 180, 255, 0.55);
+    }
+    .tts-status.female {
+      right: 24px;
+      background: rgba(210, 60, 130, 0.92);
+      border: 1px solid rgba(255, 140, 200, 0.55);
+    }
+    .tts-status.neutral {
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(4, 12, 20, 0.88);
+      border: 1px solid rgba(100, 216, 255, 0.45);
+    }
+    /* 縦表示: フッター(56px)と字幕(104px)の中央 */
+    @media (max-width: 920px) {
+      .tts-status { bottom: 61px; }
     }
   </style>
   <script src="scenario.js"></script>
@@ -245,10 +303,11 @@
 
     <footer class="controls">
       <div class="controls-left">
-        <button id="prevBtn" type="button" aria-label="前のシーンへ">◁ 前へ</button>
+        <button id="restartBtn" type="button" aria-label="最初から">|◁</button>
+        <button id="prevBtn" type="button" aria-label="前のシーンへ">◁</button>
         <button id="playBtn" type="button" aria-label="再生/一時停止">▶</button>
-        <button id="nextBtn" type="button" aria-label="次のシーンへ">次へ ▷</button>
-        <button id="restartBtn" type="button" class="ghost-btn">最初から</button>
+        <button id="nextBtn" type="button" aria-label="次のシーンへ">▷</button>
+        <button id="lastBtn" type="button" aria-label="最後のシーンへ">▷|</button>
       </div>
       <div class="controls-center">
         <div class="progress" aria-label="再生位置">
@@ -257,10 +316,10 @@
       </div>
       <div class="controls-right">
         <div id="timer" class="timer">00:00 / 00:00</div>
-        <div id="meta" class="meta">scene 1 / 8</div>
       </div>
     </footer>
   </div>
+  <div id="ttsStatus" class="tts-status"></div>
 
   <!-- ── Main player script ── -->
   <script>
@@ -281,12 +340,12 @@
     const speakerLabel  = document.getElementById("speakerLabel");
     const subtitleText  = document.getElementById("subtitleText");
     const timerEl       = document.getElementById("timer");
-    const metaEl        = document.getElementById("meta");
     const progressFill  = document.getElementById("progressFill");
     const playBtn       = document.getElementById("playBtn");
     const prevBtn       = document.getElementById("prevBtn");
     const nextBtn       = document.getElementById("nextBtn");
     const restartBtn    = document.getElementById("restartBtn");
+    const lastBtn       = document.getElementById("lastBtn");
     const sceneContent  = document.getElementById("sceneContent");
     const wrapMale      = document.getElementById("wrapMale");
     const wrapFemale    = document.getElementById("wrapFemale");
@@ -303,6 +362,9 @@
     let playbackToken = 0;
     const SUBTITLE_SHOW_DELAY_MS = 120;
     const SUBTITLE_EXIT_MS = 300;
+    const _qp = new URLSearchParams(window.location.search);
+    const _autoPlay = _qp.get("auto") === "yes";
+    const _loopPlay = _qp.get("auto") === "loop";
 
     const audioPlayer = new Audio();
     audioPlayer.preload = "auto";
@@ -360,9 +422,20 @@
       return sceneStartSecs[sceneIndex] + sceneElapsed;
     }
 
+    function snapTimerToScheduledEnd() {
+      const scene = currentScene();
+      if (!scene) return;
+      let elapsedBeforeCurrentTurn = 0;
+      const dlg = scene.dialogue || [];
+      for (let i = 0; i < turnIndex; i++) elapsedBeforeCurrentTurn += (dlg[i]?.duration_sec || 0);
+      turnElapsedMs = Math.max(0, (totalDurationSec - sceneStartSecs[sceneIndex] - elapsedBeforeCurrentTurn) * 1000);
+      updateTimerAndProgress();
+    }
+
     function updateTimerAndProgress() {
       const elapsed = getElapsedSec();
-      timerEl.textContent = `${formatTime(elapsed)} / ${formatTime(totalDurationSec)}`;
+      const sceneId = (currentScene()?.id ?? `scene_${String(sceneIndex).padStart(3,"0")}`).replace("scene_", "Scene_");
+      timerEl.textContent = `${formatTime(elapsed)} / ${formatTime(totalDurationSec)}  ${sceneId} (${sceneIndex + 1}/${scenes.length})`;
       progressFill.style.width = `${Math.min(100, (elapsed / Math.max(0.1, totalDurationSec)) * 100)}%`;
     }
 
@@ -413,8 +486,7 @@
       html += `</div>`;
       sceneContent.innerHTML = html;
 
-      const kicker = currentScene()?.kicker || "";
-      metaEl.textContent = kicker ? `${kicker}  (${sceneIndex + 1}/${scenes.length})` : `${sceneIndex + 1}/${scenes.length}`;
+      updateTimerAndProgress();
     }
 
     function showSubtitle() {
@@ -489,18 +561,121 @@
           if (playing) beginTurnPlayback();
         } else if (sceneIndex < scenes.length - 1) {
           moveToScene(sceneIndex + 1, 0);
+        } else if (_loopPlay) {
+          moveToScene(0, 0);
         } else {
           // End of presentation
           clearTimers();
-          turnElapsedMs = (currentTurn()?.duration_sec || 5) * 1000;
           audioPlayer.pause();
           stopAllSpeakers();
-          updateTimerAndProgress();
+          snapTimerToScheduledEnd();
           progressFill.style.width = "100%";
           playing = false;
           playBtn.textContent = "▶";
         }
       }, SUBTITLE_EXIT_MS);
+    }
+
+    // ── TTS helpers ──
+    const ttsAudioCache = new Map();
+    const ttsPendingCache = new Map();
+    const audioExistsCache = new Map();
+
+    let _ttsHideTimer = null;
+    function setTtsStatus(text, delayMs, speaker) {
+      clearTimeout(_ttsHideTimer);
+      _ttsHideTimer = null;
+      const el = document.getElementById("ttsStatus");
+      if (!el) return;
+      if (text) {
+        el.textContent = text;
+        el.className = "tts-status " + (speaker === "male" ? "male" : speaker === "female" ? "female" : "neutral");
+        el.style.display = "block";
+      } else if (delayMs > 0) {
+        _ttsHideTimer = setTimeout(() => { el.style.display = "none"; el.textContent = ""; }, delayMs);
+      } else {
+        el.style.display = "none";
+        el.textContent = "";
+      }
+    }
+
+    function _getTurnTtsConfig(turn) {
+      const policy = scenario.assets_policy || {};
+      const spec = turn.speaker === "male"
+        ? (policy.tts_male || "edge:male")
+        : (policy.tts_female || "edge:female");
+      const p = spec.split(":");
+      return { provider: p[0] || "edge", voice: p[1] || (turn.speaker || "female") };
+    }
+
+    async function audioFileExists(path) {
+      if (audioExistsCache.has(path)) return audioExistsCache.get(path);
+      try {
+        const r = await fetch(path, { method: "HEAD", cache: "no-store" });
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        const ok = r.ok && !ct.startsWith("text/html");
+        audioExistsCache.set(path, ok);
+        return ok;
+      } catch { return false; }
+    }
+
+    async function _fetchTtsBlob(text, provider, voice) {
+      const endpoints = ["/mcp/tts", "http://127.0.0.1:8095/tts", "http://localhost:8095/tts"];
+      let lastErr;
+      for (const url of endpoints) {
+        try {
+          const r = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, speech_text: text, provider, voice, language: "ja",
+                                   mcp_tool: "aidiy_text_to_speech.synthesize_speech" }),
+          });
+          if (r.ok) return r.blob();
+          lastErr = new Error(`HTTP ${r.status}`);
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error("TTS unavailable");
+    }
+
+    async function getTtsBlobUrl(si, ti) {
+      const key = `${si}:${ti}`;
+      if (ttsAudioCache.has(key)) return ttsAudioCache.get(key);
+      const pend = ttsPendingCache.get(key);
+      if (pend) return pend;
+      const turn = scenario.scenes[si]?.dialogue?.[ti];
+      if (!turn) return "";
+      const text = turn.naration_text || turn.telop_text || turn.text || "";
+      if (!text) return "";
+      const { provider, voice } = _getTurnTtsConfig(turn);
+      const promise = (async () => {
+        const blob = await _fetchTtsBlob(text, provider, voice);
+        const blobUrl = URL.createObjectURL(blob);
+        ttsAudioCache.set(key, blobUrl);
+        return blobUrl;
+      })();
+      ttsPendingCache.set(key, promise);
+      try { return await promise; }
+      finally { if (ttsPendingCache.get(key) === promise) ttsPendingCache.delete(key); }
+    }
+
+    function prefetchUpcoming(count) {
+      let si = sceneIndex, ti = turnIndex + 1, fetched = 0;
+      while (fetched < count) {
+        const sc = scenario.scenes[si];
+        if (!sc) break;
+        const dlg = sc.dialogue || [];
+        if (ti >= dlg.length) { si++; ti = 0; continue; }
+        const capSi = si, capTi = ti;
+        const turn = dlg[capTi];
+        if (turn?.audio) {
+          audioFileExists(turn.audio).then(exists => {
+            if (!exists) getTtsBlobUrl(capSi, capTi).catch(() => {});
+          });
+        } else {
+          getTtsBlobUrl(capSi, capTi).catch(() => {});
+        }
+        ti++; fetched++;
+      }
     }
 
     function beginTurnPlayback() {
@@ -523,13 +698,47 @@
 
       audioPlayer.pause();
       audioPlayer.currentTime = 0;
+      _playTurnAudio(turn, token, effectiveDuration);
+    }
+
+    async function _playTurnAudio(turn, token, effectiveDuration) {
+      const resumeMs = turnElapsedMs;  // await 前にキャプチャ — tick で増えた値を使わない
+      prefetchUpcoming(2);
 
       const audioPath = turn.audio;
-      if (!audioPath) {
-        stopAllSpeakers();
-        armTurnEndTimer(effectiveDuration * 1000 - turnElapsedMs + 200, token);
-        return;
+      let audioSrc = null;
+
+      if (audioPath) {
+        const exists = await audioFileExists(audioPath);
+        if (token !== playbackToken || !playing) return;
+        if (exists) audioSrc = audioPath;
       }
+
+      if (!audioSrc) {
+        const si = sceneIndex, ti = turnIndex;
+        setTtsStatus("TTS", 0, turn.speaker);
+        try {
+          const blobUrl = await getTtsBlobUrl(si, ti);
+          if (token !== playbackToken || !playing) { setTtsStatus(""); return; }
+          if (!blobUrl) {
+            setTtsStatus("");
+            stopAllSpeakers();
+            armTurnEndTimer(effectiveDuration * 1000 - resumeMs + 200, token);
+            return;
+          }
+          audioSrc = blobUrl;
+        } catch (e) {
+          console.warn("TTS合成失敗", e);
+          setTtsStatus("");
+          stopAllSpeakers();
+          armTurnEndTimer(effectiveDuration * 1000 - resumeMs + 200, token);
+          return;
+        }
+        setTtsStatus("", 1500);  // 合成完了後 1.5 秒表示を維持
+      }
+
+      turnElapsedMs = resumeMs;
+      turnStartedAt = Date.now() - resumeMs;
 
       audioPlayer.addEventListener("playing", () => {
         if (token !== playbackToken) return;
@@ -539,6 +748,7 @@
           setActiveSpeaker(turn.speaker || "female");
           showSubtitle();
         }, SUBTITLE_SHOW_DELAY_MS);
+        prefetchUpcoming(3);
       }, { once: true });
 
       audioPlayer.addEventListener("loadedmetadata", () => {
@@ -548,8 +758,8 @@
         }
       }, { once: true });
 
-      audioPlayer.src = audioPath;
-      audioPlayer.currentTime = Math.min(turnElapsedMs / 1000, Math.max(0, effectiveDuration - 0.05));
+      audioPlayer.src = audioSrc;
+      audioPlayer.currentTime = Math.min(resumeMs / 1000, Math.max(0, effectiveDuration - 0.05));
       audioPlayer.play()
         .then(() => {
           if (token !== playbackToken) return;
@@ -559,7 +769,7 @@
         .catch(() => {
           stopAllSpeakers();
           hideSubtitle();
-          armTurnEndTimer(effectiveDuration * 1000 - turnElapsedMs + 1200, token);
+          armTurnEndTimer(effectiveDuration * 1000 - resumeMs + 1200, token);
         });
     }
 
@@ -605,10 +815,11 @@
     }
 
     // Controls
-    prevBtn.addEventListener("click",    () => { pause(); moveToScene(sceneIndex - 1, 0); });
-    nextBtn.addEventListener("click",    () => { pause(); moveToScene(sceneIndex + 1, 0); });
-    playBtn.addEventListener("click",    () => { if (playing) pause(); else play(); });
     restartBtn.addEventListener("click", () => { pause(); moveToScene(0, 0); });
+    prevBtn.addEventListener("click",    () => { pause(); moveToScene(sceneIndex - 1, 0); });
+    playBtn.addEventListener("click",    () => { if (playing) pause(); else play(); });
+    nextBtn.addEventListener("click",    () => { pause(); moveToScene(sceneIndex + 1, 0); });
+    lastBtn.addEventListener("click",    () => { pause(); moveToScene(scenes.length - 1, 0); });
 
     window.addEventListener("keydown", (e) => {
       if (e.key === " " || e.key === "Spacebar") { e.preventDefault(); if (playing) pause(); else play(); }
@@ -636,8 +847,19 @@
     })();
     moveToScene(_initialScene, 0);
 
-    if (new URLSearchParams(window.location.search).get("autoplay") === "1") {
-      setTimeout(() => play(), 400);
+    let _playbackStarted = false;
+    let _autoplayFallbackTimer = null;
+    function _triggerPlay() {
+      if (_playbackStarted || !(_autoPlay || _loopPlay)) return;
+      _playbackStarted = true;
+      clearTimeout(_autoplayFallbackTimer);
+      _autoplayFallbackTimer = null;
+      resumeAudioContext();
+      play();
+    }
+    window._triggerPlay = _triggerPlay;
+    if (_autoPlay || _loopPlay) {
+      _autoplayFallbackTimer = setTimeout(_triggerPlay, 5000);
     }
   </script>
 
@@ -649,7 +871,7 @@
 
     const EXPRESSION_KEYS = ["happy", "angry", "sad", "relaxed", "surprised", "neutral"];
 
-    function createAvatar(canvasId, vrmUrl, bodyYaw, cameraOffsetX, hooksBag) {
+    function createAvatar(canvasId, vrmUrl, bodyYaw, cameraOffsetX, hooksBag, onReady) {
       const canvas = document.getElementById(canvasId);
       if (!canvas) return;
       const pane = canvas.parentElement;
@@ -784,6 +1006,7 @@
           }
         } catch {}
         canvas.classList.add("ready");
+        onReady?.();
       })();
 
       function updateExpression(dt) {
@@ -860,19 +1083,24 @@
     }
 
     // ── Instantiate both avatars ──
+    let _avatarReadyCount = 0;
+    function _onAvatarReady() {
+      if (++_avatarReadyCount >= 2) window._triggerPlay?.();
+    }
+
     // Male: left canvas — π+π/6 で内側（右方向）へ30°
     const maleHooks = {};
     createAvatar("canvasMale",   "../vrm/VRM_male.vrm",
                  Math.PI + Math.PI / 6,  // 30° inward (right) for left-side avatar
                   0.06,                  // camera slightly right
-                  maleHooks);
+                  maleHooks, _onAvatarReady);
 
     // Female: right canvas — π-π/6 で内側（左方向）へ30°
     const femaleHooks = {};
     createAvatar("canvasFemale", "../vrm/VRM_female.vrm",
                  Math.PI - Math.PI / 6,  // 30° inward (left) for right-side avatar
                  -0.06,                  // camera slightly left
-                  femaleHooks);
+                  femaleHooks, _onAvatarReady);
 
     // ── Expose global hooks ──
     window.__maleSetExpression   = (n) => maleHooks.setExpression?.(n);

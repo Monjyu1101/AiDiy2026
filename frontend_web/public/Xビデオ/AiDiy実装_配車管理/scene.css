@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --accent: #29d8ff;
   --accent-soft: rgba(41, 216, 255, 0.18);
   --panel-bg: rgba(7, 18, 34, 0.88);
@@ -740,7 +740,7 @@ body::before {
   }
 
   .stage:not(.stage-splash):not(.stage-hero) .scene-image {
-    height: auto;
+    height: 100%;
   }
 
   .stage:not(.stage-splash):not(.stage-hero) .image-overlay {
