@@ -44,12 +44,13 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ImageContent
-from starlette.applications import Starlette
-from starlette.requests import Request
-from starlette.responses import Response
-from starlette.routing import Route
+from pydantic import BaseModel
+from fastapi import Response
+from fastapi.requests import Request
 
 from log_config import setup_logging, get_logger
 from mcp_proc.chrome_manager import ChromeManager
@@ -62,10 +63,12 @@ from mcp_proc.code_checker import CodeChecker, CodeCheckError
 from mcp_proc.backup_check import BackupCheck, BackupCheckError
 from mcp_proc.backup_save import BackupSave, BackupSaveError
 from mcp_proc.image_generation import ImageGeneration, ImageGenerationError
+from mcp_proc.movie_generation import MovieGeneration, MovieGenerationError
 from mcp_proc.speech_to_text import SpeechToText, SpeechToTextError
 from mcp_proc.text_to_speech import TextToSpeech, TextToSpeechError
 from mcp_proc.obs_studio_control import ObsStudioControl, ObsStudioControlError
 from mcp_proc.ffmpeg_control import FfmpegControl, FfmpegControlError
+from mcp_proc.code_agents import CodeAgents, CodeAgentsError
 
 setup_logging()
 logger = get_logger(__name__)
@@ -85,10 +88,12 @@ MOUNT_CC     = os.environ.get("MCP_CC_MOUNT_PATH", "/aidiy_code_check")
 MOUNT_BC     = os.environ.get("MCP_BC_MOUNT_PATH", "/aidiy_backup_check")
 MOUNT_BS     = os.environ.get("MCP_BS_MOUNT_PATH", "/aidiy_backup_save")
 MOUNT_IG     = os.environ.get("MCP_IG_MOUNT_PATH", "/aidiy_image_generation")
+MOUNT_MG     = os.environ.get("MCP_MG_MOUNT_PATH", "/aidiy_movie_generation")
 MOUNT_ST     = os.environ.get("MCP_ST_MOUNT_PATH", "/aidiy_speech_to_text")
 MOUNT_TS     = os.environ.get("MCP_TS_MOUNT_PATH", "/aidiy_text_to_speech")
 MOUNT_OB     = os.environ.get("MCP_OB_MOUNT_PATH", "/aidiy_obs_studio_control")
 MOUNT_FF     = os.environ.get("MCP_FF_MOUNT_PATH", "/aidiy_ffmpeg_control")
+MOUNT_CA     = os.environ.get("MCP_CA_MOUNT_PATH", "/aidiy_code_agents")
 
 chrome   = ChromeManager(debug_port=CHROME_PORT)
 cdp      = CDPClient(port=CHROME_PORT)
@@ -101,6 +106,8 @@ bsave    = BackupSave()
 
 ig       = ImageGeneration()
 
+mg       = MovieGeneration()
+
 stt      = SpeechToText()
 
 tts      = TextToSpeech()
@@ -108,6 +115,9 @@ tts      = TextToSpeech()
 obs      = ObsStudioControl()
 
 ffmpeg_c = FfmpegControl()
+
+code_agents = CodeAgents()
+code_agents.version_info = code_agents._check_ai_versions()
 
 # PostgreSQL は psycopg 未導入環境でもサーバー起動を阻害しないよう遅延初期化
 _pg_q: Optional[PgQuery] = None
@@ -176,8 +186,9 @@ mcp = FastMCP(
     "aidiy_chrome_devtools",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT}/sse",
-    message_path=f"{MOUNT}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -185,8 +196,9 @@ mcp_dc = FastMCP(
     "aidiy_desktop_capture",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_DC}/sse",
-    message_path=f"{MOUNT_DC}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -194,8 +206,9 @@ mcp_sq = FastMCP(
     "aidiy_sqlite",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_SQ}/sse",
-    message_path=f"{MOUNT_SQ}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -203,8 +216,9 @@ mcp_pg = FastMCP(
     "aidiy_postgres",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_PG}/sse",
-    message_path=f"{MOUNT_PG}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -212,8 +226,9 @@ mcp_lg = FastMCP(
     "aidiy_logs",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_LG}/sse",
-    message_path=f"{MOUNT_LG}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -221,8 +236,9 @@ mcp_cc = FastMCP(
     "aidiy_code_check",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_CC}/sse",
-    message_path=f"{MOUNT_CC}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -230,8 +246,9 @@ mcp_bc = FastMCP(
     "aidiy_backup_check",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_BC}/sse",
-    message_path=f"{MOUNT_BC}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -239,8 +256,9 @@ mcp_bs = FastMCP(
     "aidiy_backup_save",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_BS}/sse",
-    message_path=f"{MOUNT_BS}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -248,8 +266,19 @@ mcp_ig = FastMCP(
     "aidiy_image_generation",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_IG}/sse",
-    message_path=f"{MOUNT_IG}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_mg = FastMCP(
+    "aidiy_movie_generation",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -257,8 +286,9 @@ mcp_st = FastMCP(
     "aidiy_speech_to_text",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_ST}/sse",
-    message_path=f"{MOUNT_ST}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -266,8 +296,9 @@ mcp_ts = FastMCP(
     "aidiy_text_to_speech",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_TS}/sse",
-    message_path=f"{MOUNT_TS}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -275,8 +306,9 @@ mcp_ob = FastMCP(
     "aidiy_obs_studio_control",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_OB}/sse",
-    message_path=f"{MOUNT_OB}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -284,8 +316,19 @@ mcp_ff = FastMCP(
     "aidiy_ffmpeg_control",
     host="0.0.0.0",
     port=MCP_PORT,
-    sse_path=f"{MOUNT_FF}/sse",
-    message_path=f"{MOUNT_FF}/messages/",
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
+    warn_on_duplicate_tools=False,
+)
+
+mcp_ca = FastMCP(
+    "aidiy_code_agents",
+    host="0.0.0.0",
+    port=MCP_PORT,
+    mount_path="/",
+    sse_path="/sse",
+    message_path="/messages/",
     warn_on_duplicate_tools=False,
 )
 
@@ -1264,7 +1307,7 @@ async def generate_image(
 
     Note:
         MCP ツール経由のほか、HTTP POST でも同等の処理を呼び出せる。
-        POST http://localhost:8095/imgGen
+        POST http://localhost:8095/imageGen
         Content-Type: application/json
         Body: {
             "prompt": "かわいい猫の画像",
@@ -1297,6 +1340,92 @@ async def generate_image(
         return [ImageContent(type="image", data=data, mimeType=mime)]
 
     except ImageGenerationError as e:
+        raise ValueError(str(e)) from e
+
+
+# ================================================================== #
+# aidiy_movie_generation ツール（AI 動画生成）
+# ================================================================== #
+
+@mcp_mg.tool()
+async def generate_movie(
+    prompt: str,
+    provider: str = "auto",
+    model: str = "auto",
+    duration_seconds: int = 8,
+    aspect_ratio: str = "auto",
+    resolution: str = "auto",
+    negative_prompt: Optional[str] = None,
+    enhance_prompt: bool = False,
+    reference_image_path: Optional[str] = None,
+    save_path: Optional[str] = None,
+) -> str:
+    """
+    AI で動画を生成する（Google Gemini Veo）。
+
+    動画生成は数分かかる場合があります（ポーリング最大 10 分）。
+
+    Args:
+        prompt: 生成プロンプト（英語推奨。例: "A cat walking in a sunny park"）
+        provider: "auto"=freeai / "gemini"（gemini_key_id が必要） / "freeai"（freeai_key_id が必要）
+        model:
+          "auto"=veo-3.1-generate-preview /
+          "veo-3.1-generate-preview"（最新） /
+          "veo-2.0-generate-001"（安定版） /
+          "veo-2.0-generate-exp"（実験版）
+        duration_seconds: 動画の長さ（4〜8秒、デフォルト 8）
+        aspect_ratio: "auto"=16:9 / "16:9"（横） / "9:16"（縦）
+        resolution: "auto" / "720p" / "1080p"
+        negative_prompt: 含めたくない要素（省略可）
+        enhance_prompt: True でプロンプトを自動改善（デフォルト False）
+        reference_image_path: 参照画像のパス（image-to-video、省略可）
+        save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.mp4 で保存。
+                   ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
+
+    Note:
+        MCP ツール経由のほか、HTTP POST でも同等の処理を呼び出せる。
+        POST http://localhost:8095/movieGen
+        Content-Type: application/json
+        Body: {
+            "prompt": "A cat walking in a sunny park",
+            "provider": "auto",
+            "model": "auto",
+            "duration_seconds": 8,
+            "aspect_ratio": "auto",
+            "resolution": "auto",
+            "negative_prompt": null,
+            "enhance_prompt": false,
+            "reference_image_path": null,
+            "save_path": null
+        }
+        Response: {"type":"video","mimeType":"video/mp4","save_path":"...","info":{...}}
+    """
+    try:
+        video_bytes, info = await asyncio.to_thread(
+            mg.generate, prompt, provider, model, duration_seconds, aspect_ratio,
+            resolution, negative_prompt, enhance_prompt, reference_image_path,
+        )
+
+        # 保存先は mg.save が解決（save_path=None → DEFAULT_OUTPUT_DIR）
+        saved = await asyncio.to_thread(mg.save, video_bytes, save_path)
+
+        logger.info(
+            f"generate_movie: provider={info['provider']}  "
+            f"model={info.get('model', '?')}  "
+            f"duration={info['duration_seconds']}s  "
+            f"bytes={info['video_bytes_length']}  "
+            f"prompt={info['prompt'][:60]}  "
+            f"saved={saved}"
+        )
+
+        return json.dumps({
+            "type": "video",
+            "mimeType": "video/mp4",
+            "save_path": saved,
+            "info": info,
+        }, ensure_ascii=False)
+
+    except MovieGenerationError as e:
         raise ValueError(str(e)) from e
 
 
@@ -1431,7 +1560,6 @@ async def synthesize_speech(
         return json.dumps({
             **info,
             "base64_audio": base64_audio,
-            "base64_mp3": base64_audio,  # backward compat
             "local_play": local_play,
         }, ensure_ascii=False)
 
@@ -1755,6 +1883,63 @@ if ffmpeg_c.version_info.get("ffplay", {}).get("ok"):
         return json.dumps(result, ensure_ascii=False)
 
 
+# ================================================================== #
+# aidiy_code_agents ツール（AIコード_cli.CodeAI を MCP 経由で起動）
+# ================================================================== #
+
+@mcp_ca.tool()
+async def code_agents_config(project_path: Optional[str] = None) -> str:
+    """
+    Code Agents の設定情報（解決済みプロジェクトパス・key.json の CODE_* 設定）を返す。
+
+    Args:
+        project_path: 作業ディレクトリの絶対パス。
+                      省略時は AiDiy_key.json の CODE_BASE_PATH を使用。
+    """
+    try:
+        info = await asyncio.to_thread(code_agents.get_config, project_path)
+    except CodeAgentsError as e:
+        raise ValueError(str(e)) from e
+    return json.dumps(info, ensure_ascii=False)
+
+
+_ca_available = [k for k, v in code_agents.version_info.items() if v.get("ok")]
+
+if _ca_available:
+    @mcp_ca.tool()
+    async def code_agents_run(
+        prompt: str,
+        project_path: Optional[str] = None,
+        ai_name: str = "auto",
+        ai_model: str = "auto",
+        max_turns: int = 999,
+        code_plan: str = "auto",
+        code_verify: str = "auto",
+        code_permissions: str = "auto",
+        system_instruction: Optional[str] = None,
+        resume: bool = True,
+        timeout_sec: int = 1200,
+    ) -> str:
+        """AIコード.py の CodeAgent を実行する（起動時に description が動的更新される）"""
+        try:
+            result = await code_agents.run_async(
+                prompt,
+                project_path,
+                ai_name,
+                ai_model,
+                max_turns,
+                code_plan,
+                code_verify,
+                code_permissions,
+                system_instruction,
+                resume,
+                timeout_sec,
+            )
+        except CodeAgentsError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+
 # 公開ツール一覧をログに残す
 _ff_exposed = sorted(mcp_ff._tool_manager._tools.keys())
 _ff_skipped = [
@@ -1775,179 +1960,251 @@ if _ff_skipped:
 
 mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_description()
 
+if _ca_available and "code_agents_run" in mcp_ca._tool_manager._tools:
+    mcp_ca._tool_manager._tools["code_agents_run"].description = code_agents.get_description()
+
+_ca_skipped = [k for k, v in code_agents.version_info.items() if not v.get("ok")]
+logger.info(f"aidiy_code_agents 利用可能: {_ca_available}")
+if _ca_skipped:
+    logger.warning(
+        f"aidiy_code_agents 利用不可: {_ca_skipped} — "
+        f"対象ツールをインストールしてください"
+    )
+if not _ca_available:
+    logger.warning(
+        "aidiy_code_agents: 全ての AI が利用不可のため code_agents_run を非公開にしました"
+    )
+
 # ================================================================== #
 # アプリ（複数 MCP サーバーを 1 ポートで統合）
 # ================================================================== #
 
-async def _handle_root(request: Request) -> Response:
+# ------------------------------------------------------------------ #
+# Pydantic リクエストモデル
+# ------------------------------------------------------------------ #
+
+class ImgGenRequest(BaseModel):
+    prompt: str
+    provider: str = "auto"
+    model: str = "auto"
+    size: str = "auto"
+    quality: str = "auto"
+    original_path: Optional[str] = None
+    save_path: Optional[str] = None
+
+
+class TtsRequest(BaseModel):
+    speech_text: str = ""
+    language: str = "ja"
+    provider: str = "edge"
+    model: str = "auto"
+    voice: str = "female"
+    ratio: Optional[float] = None
+    save_path: Optional[str] = None
+    local_play: bool = False
+    play: bool = False
+
+
+class MovieGenRequest(BaseModel):
+    prompt: str
+    provider: str = "auto"
+    model: str = "auto"
+    duration_seconds: int = 8
+    aspect_ratio: str = "auto"
+    resolution: str = "auto"
+    negative_prompt: Optional[str] = None
+    enhance_prompt: bool = False
+    reference_image_path: Optional[str] = None
+    save_path: Optional[str] = None
+
+
+class AgentsRequest(BaseModel):
+    prompt: str
+    project_path: Optional[str] = None
+    ai_name: str = "auto"
+    ai_model: str = "auto"
+    max_turns: int = 999
+    code_plan: str = "auto"
+    code_verify: str = "auto"
+    code_permissions: str = "auto"
+    system_instruction: Optional[str] = None
+    resume: bool = True
+    timeout_sec: int = 1200
+
+
+class BackupRequest(BaseModel):
+    dry_run: bool = False
+
+
+# ------------------------------------------------------------------ #
+# FastAPI アプリ
+# ------------------------------------------------------------------ #
+
+app = FastAPI(
+    title="AiDiy MCP Server",
+    docs_url="/docs",
+    openapi_url="/openapi.json",
+    redoc_url=None,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> Response:
     return Response('{"message": "MCP Server is running"}', media_type="application/json")
 
 
-async def _handle_img_gen(request: Request) -> Response:
-    """
-    REST HTTP エンドポイント: POST /imgGen
-    ブラウザから aidiy_image_generation 相当の画像生成を呼び出すためのシンプルな HTTP API。
-    Body: {"prompt": "...", "provider": "auto", "model": "auto", "size": "auto", "quality": "auto",
-           "original_path": null, "save_path": null}
-    Response: image/png バイナリ
-    """
-    if request.method == "OPTIONS":
-        return Response(
-            "",
-            status_code=204,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-            },
-        )
-
+@app.post("/backup", tags=["HTTP API"], summary="差分バックアップ")
+async def http_backup(req: BackupRequest = BackupRequest()) -> dict:
+    """aidiy_backup_save 相当の差分バックアップ。dry_run=true なら差分スキャンのみ。"""
     try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    prompt = body.get("prompt", "").strip()
-    if not prompt:
-        return Response(
-            json.dumps({"error": "prompt is required"}, ensure_ascii=False),
-            status_code=400,
-            media_type="application/json",
+        if req.dry_run:
+            result = await asyncio.to_thread(bsave.diff_scan)
+        else:
+            result = await asyncio.to_thread(bsave.run)
+        logger.info(
+            f"http_backup: dry_run={req.dry_run} "
+            f"count={result.get('count', result.get('バックアップ件数', 0))}"
         )
+        return result
+    except BackupSaveError as e:
+        logger.warning(f"http_backup error: {e}")
+        return {"error": str(e)}
 
-    provider     = body.get("provider", "auto")
-    model        = body.get("model", "auto")
-    size         = body.get("size", "auto")
-    quality      = body.get("quality", "auto")
-    original_path = body.get("original_path", None)
-    save_path    = body.get("save_path", None)
 
+@app.post("/imageGen", tags=["HTTP API"], summary="画像生成")
+async def http_img_gen(req: ImgGenRequest) -> dict:
+    """aidiy_image_generation 相当の画像生成。Response は MCP と同形式の JSON。"""
+    prompt = req.prompt.strip()
+    if not prompt:
+        return {"error": "prompt is required"}
     try:
         img, info = await asyncio.to_thread(
-            ig.generate, prompt, provider, original_path,
-            model=model, size=size, quality=quality,
+            ig.generate, prompt, req.provider, req.original_path,
+            model=req.model, size=req.size, quality=req.quality,
         )
-        base64_data = await asyncio.to_thread(ig.to_base64, img, "png", 85, save_path)
-        import base64 as _b64
-        png_bytes = _b64.b64decode(base64_data)
+        auto_path = req.save_path
+        if not auto_path:
+            out_dir = os.path.join(os.path.dirname(__file__), "..", "temp", "output")
+            os.makedirs(out_dir, exist_ok=True)
+            auto_path = os.path.join(out_dir, datetime.now().strftime("%Y%m%d.%H%M%S") + ".png")
+        base64_data = await asyncio.to_thread(ig.to_base64, img, "png", 85, auto_path)
         logger.info(
-            f"_handle_img_gen: provider={info['provider']} model={info.get('model','?')} "
+            f"http_img_gen: provider={info['provider']} model={info.get('model','?')} "
             f"size={img.size} prompt={info['prompt'][:60]}"
         )
-        return Response(
-            png_bytes,
-            media_type="image/png",
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "X-AiDiy-MCP-Tool": "aidiy_image_generation.generate_image",
-                "X-AiDiy-Provider": info.get("provider", ""),
-                "X-AiDiy-Model": info.get("model", ""),
-            },
-        )
+        if req.save_path:
+            return [{"type": "image", "save_path": req.save_path, "mimeType": "image/png"}]
+        return [{"type": "image", "data": base64_data, "save_path": auto_path, "mimeType": "image/png"}]
     except Exception as e:
-        logger.warning(f"_handle_img_gen error: {e}")
-        return Response(
-            json.dumps({"error": str(e)}, ensure_ascii=False),
-            status_code=500,
-            media_type="application/json",
-        )
+        logger.warning(f"http_img_gen error: {e}")
+        return {"error": str(e)}
 
 
-async def _handle_tts(request: Request) -> Response:
-    """
-    REST HTTP エンドポイント: POST /tts
-    ブラウザから aidiy_text_to_speech 相当の TTS を呼び出すためのシンプルな HTTP API。
-    Body: {"text": "...", "speech_text": "...", "language": "ja", "provider": "edge", "voice": "female",
-           "ratio": null, "save_path": null, "local_play": false}
-    Response: audio/mpeg バイナリ
-    """
-    if request.method == "OPTIONS":
-        return Response(
-            "",
-            status_code=204,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-            },
-        )
-
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    text = body.get("text") or body.get("speech_text", "")
-    language = body.get("language", "ja")
-    provider = body.get("provider", "edge")
-    model = body.get("model", "auto")
-    voice = body.get("voice", "female")
-    ratio      = body.get("ratio", None)
-    save_path  = body.get("save_path", None)
-    local_play = bool(body.get("local_play", False))
-
-    if not text:
-        return Response(
-            json.dumps({"error": "text is required"}, ensure_ascii=False),
-            status_code=400,
-            media_type="application/json",
-        )
-
+@app.post("/tts", tags=["HTTP API"], summary="音声合成（TTS）")
+async def http_tts(req: TtsRequest) -> dict:
+    """aidiy_text_to_speech 相当の TTS。Response は MCP と同形式の JSON。"""
+    if not req.speech_text:
+        return {"error": "speech_text is required"}
     try:
         audio_bytes, info = await asyncio.to_thread(
-            tts.synthesize, text, language, provider, model, voice, ratio
+            tts.synthesize, req.speech_text, req.language, req.provider, req.model, req.voice, req.ratio
         )
-        # 保存先は tts.to_base64 が解決（save_path=None → DEFAULT_OUTPUT_DIR）
-        await asyncio.to_thread(tts.to_base64, audio_bytes, save_path)
+        auto_path = req.save_path
+        if not auto_path:
+            out_dir = os.path.join(os.path.dirname(__file__), "..", "temp", "output")
+            os.makedirs(out_dir, exist_ok=True)
+            auto_path = os.path.join(out_dir, datetime.now().strftime("%Y%m%d.%H%M%S") + ".mp3")
+        base64_audio = await asyncio.to_thread(tts.to_base64, audio_bytes, auto_path)
         logger.info(
-            f"_handle_tts: provider={info.get('used_provider')} voice={info.get('voice')} "
-            f"bytes={info.get('audio_bytes_length')} text_len={len(text)} "
-            f"save_path={save_path or '(default)'}"
+            f"http_tts: provider={info.get('used_provider')} voice={info.get('voice')} "
+            f"bytes={info.get('audio_bytes_length')} text_len={len(req.speech_text)} "
+            f"save_path={auto_path}"
         )
-        if local_play and audio_bytes:
+        play_requested = req.local_play or req.play
+        if play_requested and audio_bytes:
             play_ok = await asyncio.to_thread(tts.play_mp3, audio_bytes)
             info["local_play_executed"] = play_ok
 
-        # Starlette Response は bytearray を受け付けないため bytes に正規化
-        if isinstance(audio_bytes, (bytearray, memoryview)):
-            audio_bytes = bytes(audio_bytes)
-        return Response(
-            audio_bytes,
-            media_type="audio/mpeg",
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "X-AiDiy-MCP-Tool": "aidiy_text_to_speech.synthesize_speech",
-            },
-        )
+        result = {**info, "local_play": play_requested, "play": play_requested}
+        if req.save_path:
+            result["save_path"] = req.save_path
+        else:
+            result["base64_audio"] = base64_audio
+            result["save_path"] = auto_path
+        return result
     except Exception as e:
-        logger.warning(f"_handle_tts error: {e}")
-        return Response(
-            json.dumps({"error": str(e)}, ensure_ascii=False),
-            status_code=500,
-            media_type="application/json",
+        logger.warning(f"http_tts error: {e}")
+        return {"error": str(e)}
+
+
+@app.post("/movieGen", tags=["HTTP API"], summary="動画生成")
+async def http_movie_gen(req: MovieGenRequest) -> dict:
+    """aidiy_movie_generation 相当の動画生成。Response は JSON。"""
+    prompt = req.prompt.strip()
+    if not prompt:
+        return {"error": "prompt is required"}
+    try:
+        video_bytes, info = await asyncio.to_thread(
+            mg.generate, prompt, req.provider, req.model, req.duration_seconds,
+            req.aspect_ratio, req.resolution, req.negative_prompt,
+            req.enhance_prompt, req.reference_image_path,
         )
+        saved = await asyncio.to_thread(mg.save, video_bytes, req.save_path)
+        logger.info(
+            f"http_movie_gen: provider={info['provider']} model={info.get('model','?')} "
+            f"duration={info['duration_seconds']}s bytes={info['video_bytes_length']} "
+            f"prompt={info['prompt'][:60]} saved={saved}"
+        )
+        return {"type": "video", "save_path": saved, "mimeType": "video/mp4", "info": info}
+    except Exception as e:
+        logger.warning(f"http_movie_gen error: {e}")
+        return {"error": str(e)}
 
 
-app = Starlette(routes=[
-    Route("/", _handle_root, methods=["GET"]),
-    Route("/imgGen", _handle_img_gen, methods=["POST", "OPTIONS"]),
-    Route("/tts", _handle_tts, methods=["POST", "OPTIONS"]),
-    *mcp.sse_app().routes,
-    *mcp_dc.sse_app().routes,
-    *mcp_sq.sse_app().routes,
-    *mcp_pg.sse_app().routes,
-    *mcp_lg.sse_app().routes,
-    *mcp_cc.sse_app().routes,
-    *mcp_bc.sse_app().routes,
-    *mcp_bs.sse_app().routes,
-    *mcp_ig.sse_app().routes,
-    *mcp_st.sse_app().routes,
-    *mcp_ts.sse_app().routes,
-    *mcp_ob.sse_app().routes,
-    *mcp_ff.sse_app().routes,
-])
+@app.post("/agents", tags=["HTTP API"], summary="コードエージェント実行")
+async def http_agents(req: AgentsRequest) -> dict:
+    """aidiy_code_agents 相当のコードエージェント実行。Response は JSON。"""
+    result = await code_agents.run_async(
+        prompt=req.prompt,
+        project_path=req.project_path,
+        ai_name=req.ai_name,
+        ai_model=req.ai_model,
+        max_turns=req.max_turns,
+        code_plan=req.code_plan,
+        code_verify=req.code_verify,
+        code_permissions=req.code_permissions,
+        system_instruction=req.system_instruction,
+        resume=req.resume,
+        timeout_sec=req.timeout_sec,
+    )
+    return result
+
+
+# MCP SSE サーバーをサブパスにマウント
+app.mount(MOUNT,    mcp.sse_app())
+app.mount(MOUNT_DC, mcp_dc.sse_app())
+app.mount(MOUNT_SQ, mcp_sq.sse_app())
+app.mount(MOUNT_PG, mcp_pg.sse_app())
+app.mount(MOUNT_LG, mcp_lg.sse_app())
+app.mount(MOUNT_CC, mcp_cc.sse_app())
+app.mount(MOUNT_BC, mcp_bc.sse_app())
+app.mount(MOUNT_BS, mcp_bs.sse_app())
+app.mount(MOUNT_IG, mcp_ig.sse_app())
+app.mount(MOUNT_MG, mcp_mg.sse_app())
+app.mount(MOUNT_ST, mcp_st.sse_app())
+app.mount(MOUNT_TS, mcp_ts.sse_app())
+app.mount(MOUNT_OB, mcp_ob.sse_app())
+app.mount(MOUNT_FF, mcp_ff.sse_app())
+app.mount(MOUNT_CA, mcp_ca.sse_app())
 
 if __name__ == "__main__":
+    logger.info(f"Swagger UI         : http://localhost:{MCP_PORT}/docs  [backup / tts / imageGen / movieGen / agents]")
     logger.info(f"Chrome SSE         : http://localhost:{MCP_PORT}{MOUNT}/sse")
     logger.info(f"DesktopCapture SSE : http://localhost:{MCP_PORT}{MOUNT_DC}/sse")
     logger.info(f"Sqlite SSE         : http://localhost:{MCP_PORT}{MOUNT_SQ}/sse")
@@ -1957,10 +2214,14 @@ if __name__ == "__main__":
     logger.info(f"CodeCheck SSE      : http://localhost:{MCP_PORT}{MOUNT_CC}/sse")
     logger.info(f"BackupCheck SSE    : http://localhost:{MCP_PORT}{MOUNT_BC}/sse")
     logger.info(f"BackupSave SSE     : http://localhost:{MCP_PORT}{MOUNT_BS}/sse")
+    logger.info(f"BackupSave HTTP    : http://localhost:{MCP_PORT}/backup  [POST]")
     logger.info(f"ImageGeneration SSE: http://localhost:{MCP_PORT}{MOUNT_IG}/sse")
-    logger.info(f"ImageGeneration HTTP: http://localhost:{MCP_PORT}/imgGen  [POST]")
+    logger.info(f"ImageGeneration HTTP: http://localhost:{MCP_PORT}/imageGen  [POST]")
+    logger.info(f"MovieGeneration SSE : http://localhost:{MCP_PORT}{MOUNT_MG}/sse")
+    logger.info(f"MovieGeneration HTTP: http://localhost:{MCP_PORT}/movieGen  [POST]")
     logger.info(f"SpeechToText SSE   : http://localhost:{MCP_PORT}{MOUNT_ST}/sse")
     logger.info(f"TextToSpeech SSE   : http://localhost:{MCP_PORT}{MOUNT_TS}/sse")
     logger.info(f"ObsStudioControl SSE: http://localhost:{MCP_PORT}{MOUNT_OB}/sse")
     logger.info(f"FfmpegControl SSE  : http://localhost:{MCP_PORT}{MOUNT_FF}/sse")
+    logger.info(f"CodeAgents SSE     : http://localhost:{MCP_PORT}{MOUNT_CA}/sse")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")

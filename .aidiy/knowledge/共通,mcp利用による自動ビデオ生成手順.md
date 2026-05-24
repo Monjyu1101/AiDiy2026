@@ -1,11 +1,12 @@
 # MCP 利用による自動ビデオ生成手順
 
-> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_mcp/mcp_proc/text_to_speech.py`, `backend_mcp/mcp_proc/ffmpeg_control.py`, `backend_mcp/mcp_proc/obs_studio_control.py`, `backend_mcp/mcp_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `backend_server/_config/aidiy_text_to_speech.json`
+> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_mcp/aidiy_automations/video_generation.py`, `backend_mcp/mcp_proc/text_to_speech.py`, `backend_mcp/mcp_proc/ffmpeg_control.py`, `backend_mcp/mcp_proc/obs_studio_control.py`, `backend_mcp/mcp_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `backend_server/_config/aidiy_text_to_speech.json`
 
 ## このメモを使う場面
 
 - AiDiy 自身に紹介・解説動画を自動生成させたい
 - 「シナリオ JSON → 音声付き HTML → 画面録画 → MP4 トリム」までを既存 MCP だけで通したい
+- 既存の自動化スクリプト `backend_mcp/aidiy_automations/video_generation.py` を入口にして再利用したい
 - ブラウザの autoplay ポリシーで `Audio.play()` が拒否される、OBS の `StartRecord` が反映されないなど、本手順で踏んだ落とし穴を再発させたくない
 
 ## 生成サンプル（実例）
@@ -23,6 +24,14 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 ```
 
 元 OBS 録画は `C:/Users/admin/Videos/<日時>.mp4`、トリム済み MP4 は同じ Videos フォルダか上記サンプルフォルダに置く。
+
+## 実装済みの自動化スクリプト
+
+この手順を毎回手作業でなぞらなくても、**`backend_mcp/aidiy_automations/video_generation.py` が実装済み**です。
+
+- ニュース型 Xビデオ向けに、フォルダ作成、シナリオ作成、HTML修正、画像生成、中間確認、音声生成、再生時間更新、最終確認、完成案内までを段階実行できます
+- `AIDIY_VIDEO_GEN_START_STEP` / `AIDIY_VIDEO_GEN_STOP_STEP` で途中再開・部分実行ができます
+- 手順を更新したときは、まずこのスクリプトへ反映されているか確認します
 
 ## 全体フロー
 
@@ -370,7 +379,7 @@ mcp__aidiy_image_generation__generate_image
 
 > **HTTP POST でも同等の処理を呼び出せる。**
 > ```
-> POST http://localhost:8095/imgGen
+> POST http://localhost:8095/imageGen
 > Content-Type: application/json
 > Body: { "prompt": "...", "provider": "openai", "model": "gpt-image-2",
 >         "size": "1792x1024", "quality": "medium",
@@ -387,6 +396,60 @@ mcp__aidiy_image_generation__generate_image
 - 1 枚あたり 10〜30 秒かかるため、シーン数が多い場合は **逐次実行**（並列不可）
 - `save_path` に既存ファイルがあると上書きされる
 - 生成完了後に `assets.json` の `images[].status` を `"generated"` に更新する
+
+## 動画素材生成（aidiy_movie_generation）
+
+シーン画像の代わりに、あるいはシーン画像を重ねる下地として、**AI 生成動画クリップ**を素材として使える。
+MCP ツール `mcp__aidiy_movie_generation__generate_movie` または HTTP POST `/movieGen` から Gemini Veo を呼び出す。
+
+> **動画生成は数分かかる**（ポーリング最大 10 分）。複数シーンを並列で投げず、1 本ずつ順番に生成する。
+
+### 推奨設定
+
+| 設定 | 推奨値 | 備考 |
+|------|--------|------|
+| provider | freeai / gemini | freeai_key_id または gemini_key_id が必要 |
+| model | auto（= veo-3.1-generate-preview） | 最新 Veo 3.1 |
+| duration_seconds | 6〜8 | シーンの尺に合わせる |
+| aspect_ratio | 16:9 | 横型動画標準。縦型は 9:16 |
+| resolution | auto | 指定しなければモデルのデフォルト |
+
+### MCP ツール呼び出し例
+
+```
+mcp__aidiy_movie_generation__generate_movie
+  prompt: A soft cherry blossom garden with petals drifting in the breeze, cinematic 4K
+  provider: freeai
+  duration_seconds: 8
+  aspect_ratio: 16:9
+  save_path: D:/path/to/images/scene_001_bg.mp4
+```
+
+### HTTP POST
+
+```
+POST http://localhost:8095/movieGen
+Content-Type: application/json
+Body: {
+  "prompt": "A soft cherry blossom garden with petals drifting in the breeze, cinematic 4K",
+  "provider": "freeai",
+  "model": "auto",
+  "duration_seconds": 8,
+  "aspect_ratio": "16:9",
+  "resolution": "auto",
+  "negative_prompt": null,
+  "enhance_prompt": false,
+  "save_path": "D:/path/to/images/scene_001_bg.mp4"
+}
+Response: { "type":"video", "mimeType":"video/mp4", "save_path":"<絶対パス>", "info":{...} }
+```
+
+### 注意点
+
+- プロンプトは**英語推奨**（日本語でも動くが品質が落ちる場合がある）
+- レスポンスに base64 データは含まれない。`save_path` に保存された MP4 をそのまま利用する
+- `negative_prompt` で「人物」「テキスト」「ロゴ」などを除外すると背景素材として使いやすい
+- 生成した MP4 は ffmpeg でシーン画像の代わりに背景動画として合成できる（`-stream_loop -1` でループ）
 
 ## 4. ブラウザ自動再生（autoplay 回避）
 

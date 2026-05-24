@@ -16,7 +16,7 @@ SSE エンドポイント: http://localhost:8095/aidiy_desktop_capture/sse
 
 実行:
     cd backend_mcp
-    .venv/Scripts/python.exe mcp_test_ss.py
+    .venv/Scripts/python.exe tests/test_capture.py
 """
 
 import asyncio

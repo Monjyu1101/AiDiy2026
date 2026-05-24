@@ -11,7 +11,8 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.dirname(__file__))
+import tempfile
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PIL import Image as PILImage
 from mcp_proc.image_generation import ImageGeneration, ImageGenerationError
@@ -33,9 +34,6 @@ def main():
     if not freeai_key or not openai_key:
         return
 
-    out_dir = os.path.join(os.path.dirname(__file__), "temp", "output")
-    os.makedirs(out_dir, exist_ok=True)
-
     # ------------------------------------------------------------------ #
     # Test 1: FreeAI で生成
     # ------------------------------------------------------------------ #
@@ -48,8 +46,7 @@ def main():
         provider="freeai",
         size="auto",
     )
-    save1 = os.path.join(out_dir, "test_freeai_wolf.png")
-    b64_1 = ig.to_base64(img1, "png", 85, save1)
+    b64_1 = ig.to_base64(img1, "png", 85)
 
     print(f"  provider= {info1['provider']}")
     print(f"  model   = {info1['model']}")
@@ -58,7 +55,6 @@ def main():
     print(f"  img_size= {info1['image_size']}")
     print(f"  engine  = {info1['engine_note']}")
     print(f"  base64  = {len(b64_1)} chars")
-    print(f"  saved   = {save1}")
 
     # ------------------------------------------------------------------ #
     # Test 2: 512x512 → 1024x1024 にリサイズ
@@ -69,12 +65,17 @@ def main():
     print("=" * 60)
 
     img1_resized = img1.resize((1024, 1024), PILImage.LANCZOS)
-    save1_resized = os.path.join(out_dir, "test_freeai_wolf_1024.png")
-    b64_1r = ig.to_base64(img1_resized, "png", 85, save1_resized)
+    b64_1r = ig.to_base64(img1_resized, "png", 85)
+
+    # Test 3 への橋渡し用一時ファイル
+    tmp_resized = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    tmp_resized_path = tmp_resized.name
+    tmp_resized.close()
+    img1_resized.save(tmp_resized_path, format="PNG")
 
     print(f"  before  = {img1.width}x{img1.height}")
     print(f"  after   = {img1_resized.width}x{img1_resized.height}")
-    print(f"  saved   = {save1_resized}")
+    print(f"  base64  = {len(b64_1r)} chars")
 
     # ------------------------------------------------------------------ #
     # Test 3: OpenAI で調整（リサイズ後画像を元に）
@@ -90,10 +91,15 @@ def main():
         model="gpt-image-2",
         size="auto",
         quality="auto",
-        original_path=save1_resized,
+        original_path=tmp_resized_path,
     )
-    save2 = os.path.join(out_dir, "test_openai_kitten.png")
-    b64_2 = ig.to_base64(img2, "png", 85, save2)
+    b64_2 = ig.to_base64(img2, "png", 85)
+
+    # Test 4 への橋渡し用一時ファイル
+    tmp_kitten = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    tmp_kitten_path = tmp_kitten.name
+    tmp_kitten.close()
+    img2.save(tmp_kitten_path, format="PNG")
 
     print(f"  provider= {info2['provider']}")
     print(f"  model   = {info2['model']}")
@@ -101,7 +107,6 @@ def main():
     print(f"  quality = {info2['quality']}")
     print(f"  engine  = {info2['engine_note']}")
     print(f"  base64  = {len(b64_2)} chars")
-    print(f"  saved   = {save2}")
 
     # ------------------------------------------------------------------ #
     # Test 4: Gemini で背景変更（猫はそのまま、背景→住宅地）
@@ -115,10 +120,9 @@ def main():
         prompt="猫は変えずに、背景を住宅地に変更してください",
         provider="gemini",
         size="1024x1024",
-        original_path=save2,
+        original_path=tmp_kitten_path,
     )
-    save3 = os.path.join(out_dir, "test_gemini_kitten_residential.png")
-    b64_3 = ig.to_base64(img3, "png", 85, save3)
+    b64_3 = ig.to_base64(img3, "png", 85)
 
     print(f"  provider= {info3['provider']}")
     print(f"  model   = {info3['model']}")
@@ -127,7 +131,10 @@ def main():
     print(f"  img_size= {info3['image_size']}")
     print(f"  engine  = {info3['engine_note']}")
     print(f"  base64  = {len(b64_3)} chars")
-    print(f"  saved   = {save3}")
+
+    # 一時ファイルを削除
+    os.unlink(tmp_resized_path)
+    os.unlink(tmp_kitten_path)
 
     # ------------------------------------------------------------------ #
     # 結果
@@ -136,10 +143,10 @@ def main():
     print("=" * 60)
     print("結果")
     print("=" * 60)
-    print(f"  [1] FreeAI 生成  (512x512)   : {save1}")
-    print(f"  [2] リサイズ (1024x1024) : {save1_resized}")
-    print(f"  [3] OpenAI 調整 (1024x1024) : {save2}")
-    print(f"  [4] Gemini 背景変更 (住宅地) : {save3}")
+    print(f"  [1] FreeAI 生成  (512x512)   : base64 {len(b64_1)} chars")
+    print(f"  [2] リサイズ (1024x1024)     : base64 {len(b64_1r)} chars")
+    print(f"  [3] OpenAI 調整 (1024x1024)  : base64 {len(b64_2)} chars")
+    print(f"  [4] Gemini 背景変更 (住宅地) : base64 {len(b64_3)} chars")
     print()
     print("OK")
 

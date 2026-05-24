@@ -446,7 +446,7 @@ def upsert_codex_backend_mcp_config(module: dict) -> bool:
         '    "--sse-url",',
         f'    "{toml_escape_string(sse_url)}",',
         "]",
-        "startup_timeout_ms = 20000",
+        "startup_timeout_sec = 60",
     ]
 
     if not upsert_toml_table(config_path, table_header, body_lines):
@@ -997,6 +997,10 @@ MCP_MODULES = [
                 "sse_url":     "http://localhost:8095/aidiy_code_check/sse",
             },
             {
+                "server_name": "aidiy_code_agents",
+                "sse_url":     "http://localhost:8095/aidiy_code_agents/sse",
+            },
+            {
                 "server_name": "aidiy_backup_check",
                 "sse_url":     "http://localhost:8095/aidiy_backup_check/sse",
             },
@@ -1007,6 +1011,10 @@ MCP_MODULES = [
             {
                 "server_name": "aidiy_image_generation",
                 "sse_url":     "http://localhost:8095/aidiy_image_generation/sse",
+            },
+            {
+                "server_name": "aidiy_movie_generation",
+                "sse_url":     "http://localhost:8095/aidiy_movie_generation/sse",
             },
             {
                 "server_name": "aidiy_speech_to_text",

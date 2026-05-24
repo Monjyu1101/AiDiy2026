@@ -16,7 +16,7 @@ mcp_stdio.py をサブプロセスとして起動し、stdio MCP クライアン
 
 実行:
     cd backend_mcp
-    .venv/Scripts/python.exe mcp_test.py
+    .venv/Scripts/python.exe tests/test_chrome.py
 """
 
 import asyncio
@@ -30,14 +30,16 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
+BACKEND_MCP_DIR = Path(__file__).resolve().parent.parent
+
 # backend_mcp をパスに追加
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(BACKEND_MCP_DIR))
 
 from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
-PYTHON     = str(Path(__file__).parent / ".venv" / "Scripts" / "python.exe")
-STDIO_SCRIPT = str(Path(__file__).parent / "mcp_stdio.py")
+PYTHON     = str(BACKEND_MCP_DIR / ".venv" / "Scripts" / "python.exe")
+STDIO_SCRIPT = str(BACKEND_MCP_DIR / "mcp_stdio.py")
 SCREENSHOT_PATH = Path(__file__).parent / "temp" / "screenshot_news.png"
 
 

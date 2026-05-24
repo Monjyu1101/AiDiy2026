@@ -43,6 +43,7 @@ args = [
   "--sse-url",
   "http://localhost:8095/aidiy_chrome_devtools/sse",
 ]
+startup_timeout_sec = 60
 ```
 
 ### Antigravity の設定例 (mcp_config.json)
@@ -93,4 +94,4 @@ python _setup.py
 python _cleanup.py
 ```
 
-`_setup.py` 実行後は `.gitignore` に `.claude/` と `.gemini/` が含まれること、Codex/Antigravity 設定では `mcp_stdio.py --sse-url ...` 形式になっていることを確認する。
+`_setup.py` 実行後は `.gitignore` に `.claude/` と `.gemini/` が含まれること、Codex/Antigravity 設定では `mcp_stdio.py --sse-url ...` 形式になっていることを確認する。Codex は `startup_timeout_sec` を使うため、古い `startup_timeout_ms` が残っている場合は秒指定へ更新する。
