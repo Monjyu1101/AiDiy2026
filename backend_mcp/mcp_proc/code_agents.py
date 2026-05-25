@@ -149,13 +149,9 @@ class CodeAgents:
             info: dict = {"ok": False, "version": "", "cmd": ""}
 
             # 各 AI が必要とするキーのチェック
+            # copilot_cli は gh auth で認証するため API キー不要
             key_ok = True
-            if ai_name == "copilot_cli":
-                copilot_key = key.get("copilot_key_id", "").strip()
-                if not copilot_key or copilot_key.startswith("<"):
-                    info = {"ok": False, "version": "copilot_key_id 未設定", "cmd": ""}
-                    key_ok = False
-            elif ai_name == "antigravity_cli":
+            if ai_name == "antigravity_cli":
                 claude_key = key.get("claude_key_id", "").strip()
                 if not claude_key or claude_key.startswith("<"):
                     info = {"ok": False, "version": "claude_key_id 未設定", "cmd": ""}

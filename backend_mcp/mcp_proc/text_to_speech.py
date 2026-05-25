@@ -133,7 +133,8 @@ class TextToSpeech:
 
     # AiDiy_key.json へのパス（backend_mcp 起点）
     _KEY_CONFIG_REL = "../backend_server/_config/AiDiy_key.json"
-    _TTS_CONFIG_REL = "../backend_server/_config/aidiy_text_to_speech.json"
+    _TTS_CONFIG_REL = "../backend_server/_config/mcp_text_to_speech.json"
+    _LEGACY_TTS_CONFIG_REL = "../backend_server/_config/aidiy_text_to_speech.json"
 
     # ------------------------------------------------------------------ #
     # 起動時 ffmpeg プローブ
@@ -282,11 +283,14 @@ class TextToSpeech:
     def _tts_config_path(self) -> Path:
         return Path(__file__).resolve().parent.parent / self._TTS_CONFIG_REL
 
+    def _legacy_tts_config_path(self) -> Path:
+        return Path(__file__).resolve().parent.parent / self._LEGACY_TTS_CONFIG_REL
+
     def _default_pronunciation_config(self) -> dict:
         return {
             "version": 1,
             "description": (
-                "aidiy_text_to_speech の読み上げ用変換辞書。"
+                "mcp_text_to_speech の読み上げ用変換辞書。"
                 " speech_text の原文は変えず、音声合成へ渡す直前だけ from を to に変換する。"
             ),
             "pronunciation_dictionary": [
@@ -300,6 +304,19 @@ class TextToSpeech:
         with open(config_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(self._default_pronunciation_config(), f, ensure_ascii=False, indent=2)
             f.write("\n")
+
+    def _migrate_legacy_tts_config(self, config_path: Path) -> bool:
+        legacy_path = self._legacy_tts_config_path()
+        if config_path.exists() or not legacy_path.exists():
+            return False
+        try:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            legacy_path.replace(config_path)
+            logger.info(f"TTS 発音辞書を旧ファイル名から移行: {legacy_path} -> {config_path}")
+            return True
+        except OSError as e:
+            logger.warning(f"TTS 発音辞書の移行に失敗: {legacy_path} -> {config_path} ({e})")
+            return False
 
     @staticmethod
     def _expand_entry(sources, target) -> list[tuple[str, str]]:
@@ -337,6 +354,7 @@ class TextToSpeech:
     def _load_pronunciation_dictionary(self) -> list[tuple[str, str]]:
         """設定ファイルがあればそれを使い、なければデフォルトを書き出して使う"""
         config_path = self._tts_config_path()
+        self._migrate_legacy_tts_config(config_path)
         if not config_path.exists():
             self._write_default_tts_config(config_path)
             return self._flatten_default_dictionary()
@@ -393,7 +411,7 @@ class TextToSpeech:
         desc = f"テキストを音声（MP3）に変換する。利用可能: {', '.join(available)}。"
         if unavailable:
             desc += f" 利用不可: {', '.join(unavailable)}（API キー未設定）。"
-        desc += " AiDiy、DB、API、MCP などのシステム用語は backend_server/config/aidiy_text_to_speech.json の読み上げ用辞書で自動変換する。"
+        desc += " AiDiy、DB、API、MCP などのシステム用語は backend_server/_config/mcp_text_to_speech.json の読み上げ用辞書で自動変換する。"
         return desc
 
     # ------------------------------------------------------------------ #
