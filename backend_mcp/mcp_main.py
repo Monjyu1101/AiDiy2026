@@ -1307,7 +1307,7 @@ async def generate_image(
 
     Note:
         MCP ツール経由のほか、HTTP POST でも同等の処理を呼び出せる。
-        POST http://localhost:8095/imageGen
+        POST http://localhost:8095/aidiy_image_generation/generate
         Content-Type: application/json
         Body: {
             "prompt": "かわいい猫の画像",
@@ -1384,7 +1384,7 @@ async def generate_movie(
 
     Note:
         MCP ツール経由のほか、HTTP POST でも同等の処理を呼び出せる。
-        POST http://localhost:8095/movieGen
+        POST http://localhost:8095/aidiy_movie_generation/generate
         Content-Type: application/json
         Body: {
             "prompt": "A cat walking in a sunny park",
@@ -1520,7 +1520,7 @@ async def synthesize_speech(
 
     Note:
         MCP ツール経由のほか、HTTP POST でも同等の処理を呼び出せる。
-        POST http://localhost:8095/tts
+        POST http://localhost:8095/aidiy_text_to_speech/synthesize
         Content-Type: application/json
         Body: {
             "text": "...",        # speech_text に相当
@@ -2032,8 +2032,39 @@ class AgentsRequest(BaseModel):
     timeout_sec: int = 1200
 
 
-class BackupRequest(BaseModel):
-    dry_run: bool = False
+class ChromeDevToolsRequest(BaseModel):
+    """POST /aidiy_chrome_devtools/{method} 共通リクエストモデル"""
+    tab_id: Optional[str] = None
+    url: Optional[str] = None
+    show_automation_banner: bool = True
+    # screenshot
+    full_page: bool = False
+    save_path: Optional[str] = None
+    # eval_js / evaluate
+    expression: Optional[str] = None
+    await_promise: bool = False
+    # click / find_elements / scroll_to_element
+    selector: Optional[str] = None
+    limit: int = 50
+    # type_text / fill
+    text: Optional[str] = None
+    value: Optional[str] = None
+    clear_first: bool = True
+    # scroll
+    delta_x: int = 0
+    delta_y: int = 0
+    # set_viewport
+    width: Optional[int] = None
+    height: Optional[int] = None
+    # wait_for_load / get_console_logs
+    timeout: float = 10.0
+    level: Optional[str] = None
+    # cdp_command
+    cdp_method: Optional[str] = None
+    params: Optional[str] = None
+    # js_confirm_result / js_alert_result
+    accept: bool = True
+    dialog_wait: float = 0.0
 
 
 # ------------------------------------------------------------------ #
@@ -2059,27 +2090,96 @@ async def root() -> Response:
     return Response('{"message": "MCP Server is running"}', media_type="application/json")
 
 
-@app.post("/backup", tags=["HTTP API"], summary="差分バックアップ")
-async def http_backup(req: BackupRequest = BackupRequest()) -> dict:
-    """aidiy_backup_save 相当の差分バックアップ。dry_run=true なら差分スキャンのみ。"""
+# ------------------------------------------------------------------ #
+# /backup
+# ------------------------------------------------------------------ #
+
+_BACKUP_METHODS = [
+    {
+        "name": "scan",
+        "description": "差分スキャンのみ実行する（ファイルコピーは行わない）",
+        "parameters": {},
+    },
+    {
+        "name": "run",
+        "description": "差分バックアップを実行する（変更ファイルを backup/ へコピー）",
+        "parameters": {},
+    },
+]
+
+@app.post("/aidiy_backup_save", tags=["aidiy_backup_save"], summary="aidiy_backup_save メソッド一覧")
+@app.get("/aidiy_backup_save", tags=["aidiy_backup_save"], summary="aidiy_backup_save メソッド一覧")
+async def http_backup_list() -> dict:
+    """利用可能な aidiy_backup_save メソッド一覧とパラメータ情報を返す。POST /aidiy_backup_save/{method_name} で各機能を呼び出せる。"""
+    return {
+        "endpoint": "POST /aidiy_backup_save/{method_name}",
+        "tool_count": len(_BACKUP_METHODS),
+        "tools": _BACKUP_METHODS,
+    }
+
+@app.post("/aidiy_backup_save/{method_name}", tags=["aidiy_backup_save"], summary="差分バックアップ")
+async def http_backup(method_name: str) -> dict:
+    """
+    | method_name | 説明 |
+    |---|---|
+    | scan | 差分スキャンのみ（コピーなし） |
+    | run | 差分バックアップ実行 |
+    """
     try:
-        if req.dry_run:
+        if method_name == "scan":
             result = await asyncio.to_thread(bsave.diff_scan)
-        else:
+            logger.info(f"http_backup scan: count={result.get('count', result.get('バックアップ件数', 0))}")
+            return result
+        elif method_name == "run":
             result = await asyncio.to_thread(bsave.run)
-        logger.info(
-            f"http_backup: dry_run={req.dry_run} "
-            f"count={result.get('count', result.get('バックアップ件数', 0))}"
-        )
-        return result
+            logger.info(f"http_backup run: count={result.get('count', result.get('バックアップ件数', 0))}")
+            return result
+        else:
+            return {"error": f"未知のメソッド: {method_name}"}
     except BackupSaveError as e:
-        logger.warning(f"http_backup error: {e}")
+        logger.warning(f"http_backup [{method_name}] error: {e}")
         return {"error": str(e)}
 
 
-@app.post("/imageGen", tags=["HTTP API"], summary="画像生成")
-async def http_img_gen(req: ImgGenRequest) -> dict:
-    """aidiy_image_generation 相当の画像生成。Response は MCP と同形式の JSON。"""
+# ------------------------------------------------------------------ #
+# /imageGen
+# ------------------------------------------------------------------ #
+
+_IMAGE_GEN_METHODS = [
+    {
+        "name": "generate",
+        "description": "AI 画像を生成する。レスポンスの data フィールドに PNG の base64 文字列が入る",
+        "parameters": {
+            "prompt": {"type": "string", "required": True, "description": "生成プロンプト"},
+            "provider": {"type": "string", "required": False, "default": "auto", "description": "openai / gemini / freeai / auto"},
+            "model": {"type": "string", "required": False, "default": "auto"},
+            "size": {"type": "string", "required": False, "default": "auto", "description": "例: 1024x1024"},
+            "quality": {"type": "string", "required": False, "default": "auto", "description": "standard / hd / auto"},
+            "original_path": {"type": "string", "required": False, "description": "編集元画像パス"},
+            "save_path": {"type": "string", "required": False, "description": "保存先パス（省略時は temp/output/ に自動保存）"},
+        },
+    },
+]
+
+@app.post("/aidiy_image_generation", tags=["aidiy_image_generation"], summary="aidiy_image_generation メソッド一覧")
+@app.get("/aidiy_image_generation", tags=["aidiy_image_generation"], summary="aidiy_image_generation メソッド一覧")
+async def http_image_gen_list() -> dict:
+    """利用可能な aidiy_image_generation メソッド一覧とパラメータ情報を返す。POST /aidiy_image_generation/{method_name} で各機能を呼び出せる。"""
+    return {
+        "endpoint": "POST /aidiy_image_generation/{method_name}",
+        "tool_count": len(_IMAGE_GEN_METHODS),
+        "tools": _IMAGE_GEN_METHODS,
+    }
+
+@app.post("/aidiy_image_generation/{method_name}", tags=["aidiy_image_generation"], summary="画像生成")
+async def http_img_gen(method_name: str, req: ImgGenRequest) -> dict:
+    """
+    | method_name | 説明 |
+    |---|---|
+    | generate | AI 画像生成（base64 返却） |
+    """
+    if method_name != "generate":
+        return {"error": f"未知のメソッド: {method_name}"}
     prompt = req.prompt.strip()
     if not prompt:
         return {"error": "prompt is required"}
@@ -2106,9 +2206,47 @@ async def http_img_gen(req: ImgGenRequest) -> dict:
         return {"error": str(e)}
 
 
-@app.post("/tts", tags=["HTTP API"], summary="音声合成（TTS）")
-async def http_tts(req: TtsRequest) -> dict:
-    """aidiy_text_to_speech 相当の TTS。Response は MCP と同形式の JSON。"""
+# ------------------------------------------------------------------ #
+# /tts
+# ------------------------------------------------------------------ #
+
+_TTS_METHODS = [
+    {
+        "name": "synthesize",
+        "description": "テキストを音声合成する。レスポンスの base64_audio フィールドに MP3 の base64 文字列が入る",
+        "parameters": {
+            "speech_text": {"type": "string", "required": True, "description": "読み上げテキスト"},
+            "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（ja / en など）"},
+            "provider": {"type": "string", "required": False, "default": "edge", "description": "edge / openai / gemini / freeai"},
+            "model": {"type": "string", "required": False, "default": "auto"},
+            "voice": {"type": "string", "required": False, "default": "female", "description": "female / male またはプロバイダ固有の音声名"},
+            "ratio": {"type": "number", "required": False, "description": "読み上げ速度倍率"},
+            "save_path": {"type": "string", "required": False, "description": "保存先パス（省略時は temp/output/ に自動保存）"},
+            "local_play": {"type": "boolean", "required": False, "default": False, "description": "サーバー側でローカル再生する"},
+            "play": {"type": "boolean", "required": False, "default": False, "description": "local_play の別名"},
+        },
+    },
+]
+
+@app.post("/aidiy_text_to_speech", tags=["aidiy_text_to_speech"], summary="aidiy_text_to_speech メソッド一覧")
+@app.get("/aidiy_text_to_speech", tags=["aidiy_text_to_speech"], summary="aidiy_text_to_speech メソッド一覧")
+async def http_tts_list() -> dict:
+    """利用可能な aidiy_text_to_speech メソッド一覧とパラメータ情報を返す。POST /aidiy_text_to_speech/{method_name} で各機能を呼び出せる。"""
+    return {
+        "endpoint": "POST /aidiy_text_to_speech/{method_name}",
+        "tool_count": len(_TTS_METHODS),
+        "tools": _TTS_METHODS,
+    }
+
+@app.post("/aidiy_text_to_speech/{method_name}", tags=["aidiy_text_to_speech"], summary="音声合成（TTS）")
+async def http_tts(method_name: str, req: TtsRequest) -> dict:
+    """
+    | method_name | 説明 |
+    |---|---|
+    | synthesize | テキスト音声合成（base64_audio 返却） |
+    """
+    if method_name != "synthesize":
+        return {"error": f"未知のメソッド: {method_name}"}
     if not req.speech_text:
         return {"error": "speech_text is required"}
     try:
@@ -2130,7 +2268,6 @@ async def http_tts(req: TtsRequest) -> dict:
         if play_requested and audio_bytes:
             play_ok = await asyncio.to_thread(tts.play_mp3, audio_bytes)
             info["local_play_executed"] = play_ok
-
         result = {**info, "local_play": play_requested, "play": play_requested}
         if req.save_path:
             result["save_path"] = req.save_path
@@ -2143,9 +2280,48 @@ async def http_tts(req: TtsRequest) -> dict:
         return {"error": str(e)}
 
 
-@app.post("/movieGen", tags=["HTTP API"], summary="動画生成")
-async def http_movie_gen(req: MovieGenRequest) -> dict:
-    """aidiy_movie_generation 相当の動画生成。Response は JSON。"""
+# ------------------------------------------------------------------ #
+# /movieGen
+# ------------------------------------------------------------------ #
+
+_MOVIE_GEN_METHODS = [
+    {
+        "name": "generate",
+        "description": "AI 動画を生成して MP4 として保存する（base64 返却なし）",
+        "parameters": {
+            "prompt": {"type": "string", "required": True, "description": "生成プロンプト"},
+            "provider": {"type": "string", "required": False, "default": "auto", "description": "gemini / auto"},
+            "model": {"type": "string", "required": False, "default": "auto"},
+            "duration_seconds": {"type": "integer", "required": False, "default": 8, "description": "動画長さ（秒）"},
+            "aspect_ratio": {"type": "string", "required": False, "default": "auto", "description": "16:9 / 9:16 / 1:1 / auto"},
+            "resolution": {"type": "string", "required": False, "default": "auto"},
+            "negative_prompt": {"type": "string", "required": False},
+            "enhance_prompt": {"type": "boolean", "required": False, "default": False},
+            "reference_image_path": {"type": "string", "required": False, "description": "参照画像パス"},
+            "save_path": {"type": "string", "required": False, "description": "保存先パス（省略時は temp/output/ に自動保存）"},
+        },
+    },
+]
+
+@app.post("/aidiy_movie_generation", tags=["aidiy_movie_generation"], summary="aidiy_movie_generation メソッド一覧")
+@app.get("/aidiy_movie_generation", tags=["aidiy_movie_generation"], summary="aidiy_movie_generation メソッド一覧")
+async def http_movie_gen_list() -> dict:
+    """利用可能な aidiy_movie_generation メソッド一覧とパラメータ情報を返す。POST /aidiy_movie_generation/{method_name} で各機能を呼び出せる。"""
+    return {
+        "endpoint": "POST /aidiy_movie_generation/{method_name}",
+        "tool_count": len(_MOVIE_GEN_METHODS),
+        "tools": _MOVIE_GEN_METHODS,
+    }
+
+@app.post("/aidiy_movie_generation/{method_name}", tags=["aidiy_movie_generation"], summary="動画生成")
+async def http_movie_gen(method_name: str, req: MovieGenRequest) -> dict:
+    """
+    | method_name | 説明 |
+    |---|---|
+    | generate | AI 動画生成（MP4 保存） |
+    """
+    if method_name != "generate":
+        return {"error": f"未知のメソッド: {method_name}"}
     prompt = req.prompt.strip()
     if not prompt:
         return {"error": "prompt is required"}
@@ -2167,23 +2343,625 @@ async def http_movie_gen(req: MovieGenRequest) -> dict:
         return {"error": str(e)}
 
 
-@app.post("/agents", tags=["HTTP API"], summary="コードエージェント実行")
-async def http_agents(req: AgentsRequest) -> dict:
-    """aidiy_code_agents 相当のコードエージェント実行。Response は JSON。"""
-    result = await code_agents.run_async(
-        prompt=req.prompt,
-        project_path=req.project_path,
-        ai_name=req.ai_name,
-        ai_model=req.ai_model,
-        max_turns=req.max_turns,
-        code_plan=req.code_plan,
-        code_verify=req.code_verify,
-        code_permissions=req.code_permissions,
-        system_instruction=req.system_instruction,
-        resume=req.resume,
-        timeout_sec=req.timeout_sec,
-    )
-    return result
+# ------------------------------------------------------------------ #
+# /agents
+# ------------------------------------------------------------------ #
+
+_AGENTS_METHODS = [
+    {
+        "name": "config",
+        "description": "Code Agents の設定情報（解決済みプロジェクトパス・key.json の CODE_* 設定）を返す",
+        "parameters": {
+            "project_path": {"type": "string", "required": False, "description": "作業ディレクトリ（省略時は AiDiy_key.json の CODE_BASE_PATH）"},
+        },
+    },
+    {
+        "name": "run",
+        "description": "AI コードエージェントを実行する",
+        "parameters": {
+            "prompt": {"type": "string", "required": True, "description": "エージェントへの指示"},
+            "project_path": {"type": "string", "required": False, "description": "作業ディレクトリの絶対パス"},
+            "ai_name": {"type": "string", "required": False, "default": "auto", "description": "claude_sdk / claude_cli / copilot_cli / codex_cli / auto など"},
+            "ai_model": {"type": "string", "required": False, "default": "auto"},
+            "max_turns": {"type": "integer", "required": False, "default": 999},
+            "code_plan": {"type": "string", "required": False, "default": "auto"},
+            "code_verify": {"type": "string", "required": False, "default": "auto"},
+            "code_permissions": {"type": "string", "required": False, "default": "auto"},
+            "system_instruction": {"type": "string", "required": False},
+            "resume": {"type": "boolean", "required": False, "default": True},
+            "timeout_sec": {"type": "integer", "required": False, "default": 1200},
+        },
+    },
+]
+
+@app.post("/aidiy_code_agents", tags=["aidiy_code_agents"], summary="aidiy_code_agents メソッド一覧")
+@app.get("/aidiy_code_agents", tags=["aidiy_code_agents"], summary="aidiy_code_agents メソッド一覧")
+async def http_agents_list() -> dict:
+    """利用可能な aidiy_code_agents メソッド一覧とパラメータ情報を返す。POST /aidiy_code_agents/{method_name} で各機能を呼び出せる。"""
+    return {
+        "endpoint": "POST /aidiy_code_agents/{method_name}",
+        "tool_count": len(_AGENTS_METHODS),
+        "tools": _AGENTS_METHODS,
+    }
+
+@app.post("/aidiy_code_agents/{method_name}", tags=["aidiy_code_agents"], summary="コードエージェント実行")
+async def http_agents(method_name: str, req: AgentsRequest = AgentsRequest()) -> dict:
+    """
+    | method_name | 説明 |
+    |---|---|
+    | config | Code Agents の設定情報を返す |
+    | run | AI コードエージェントを実行する |
+    """
+    try:
+        if method_name == "config":
+            info = await asyncio.to_thread(code_agents.get_config, req.project_path)
+            return info if isinstance(info, dict) else {"result": info}
+        elif method_name == "run":
+            result = await code_agents.run_async(
+                prompt=req.prompt,
+                project_path=req.project_path,
+                ai_name=req.ai_name,
+                ai_model=req.ai_model,
+                max_turns=req.max_turns,
+                code_plan=req.code_plan,
+                code_verify=req.code_verify,
+                code_permissions=req.code_permissions,
+                system_instruction=req.system_instruction,
+                resume=req.resume,
+                timeout_sec=req.timeout_sec,
+            )
+            return result
+        else:
+            return {"error": f"未知のメソッド: {method_name}"}
+    except Exception as e:
+        logger.warning(f"http_agents [{method_name}] error: {e}")
+        return {"error": str(e)}
+
+
+_CHROME_DEVTOOLS_METHODS = [
+    {
+        "name": "navigate",
+        "description": "指定 URL へ移動する",
+        "parameters": {
+            "url": {"type": "string", "required": True, "description": "移動先 URL"},
+            "tab_id": {"type": "string", "required": False, "description": "対象タブ ID（省略時は最初のタブ）"},
+            "show_automation_banner": {"type": "boolean", "required": False, "default": True},
+        },
+    },
+    {
+        "name": "reload",
+        "description": "現在のページをリロードする",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "go_back",
+        "description": "ブラウザの戻るボタン相当",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "go_forward",
+        "description": "ブラウザの進むボタン相当",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "screenshot",
+        "description": "スクリーンショットを撮る。レスポンスの data フィールドに PNG の base64 文字列が入る",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+            "full_page": {"type": "boolean", "required": False, "default": False},
+            "save_path": {"type": "string", "required": False, "description": "保存先パス（省略時は保存しない）"},
+        },
+    },
+    {
+        "name": "get_page_info",
+        "description": "ページの URL・タイトル・readyState などを取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_html",
+        "description": "ページ全体の HTML を取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_text",
+        "description": "ページのテキストコンテンツを取得する",
+        "aliases": ["get_page_content"],
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "eval_js",
+        "description": "JavaScript を実行して結果を返す",
+        "aliases": ["evaluate"],
+        "parameters": {
+            "expression": {"type": "string", "required": True, "description": "実行する JavaScript 式"},
+            "tab_id": {"type": "string", "required": False},
+            "await_promise": {"type": "boolean", "required": False, "default": False},
+        },
+    },
+    {
+        "name": "click",
+        "description": "CSS セレクターで要素をクリックする",
+        "aliases": ["click_element"],
+        "parameters": {
+            "selector": {"type": "string", "required": True, "description": "CSS セレクター"},
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "type_text",
+        "description": "CSS セレクターで要素にテキストを入力する",
+        "aliases": ["fill"],
+        "parameters": {
+            "selector": {"type": "string", "required": True},
+            "text": {"type": "string", "required": True, "description": "fill の場合は value も可"},
+            "tab_id": {"type": "string", "required": False},
+            "clear_first": {"type": "boolean", "required": False, "default": True},
+        },
+    },
+    {
+        "name": "scroll",
+        "description": "ページまたは要素をスクロールする",
+        "parameters": {
+            "delta_x": {"type": "integer", "required": False, "default": 0},
+            "delta_y": {"type": "integer", "required": False, "default": 0},
+            "tab_id": {"type": "string", "required": False},
+            "selector": {"type": "string", "required": False, "description": "指定要素でスクロール"},
+        },
+    },
+    {
+        "name": "scroll_to_element",
+        "description": "要素が見えるようにスクロールする",
+        "parameters": {
+            "selector": {"type": "string", "required": True},
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "find_elements",
+        "description": "CSS セレクターで要素を検索してプロパティ一覧を返す",
+        "parameters": {
+            "selector": {"type": "string", "required": True},
+            "tab_id": {"type": "string", "required": False},
+            "limit": {"type": "integer", "required": False, "default": 50},
+        },
+    },
+    {
+        "name": "list_tabs",
+        "description": "開いているタブ一覧を取得する",
+        "aliases": ["list_pages"],
+        "parameters": {},
+    },
+    {
+        "name": "new_tab",
+        "description": "新規タブを開く",
+        "aliases": ["new_page"],
+        "parameters": {
+            "url": {"type": "string", "required": False, "default": "about:blank"},
+            "show_automation_banner": {"type": "boolean", "required": False, "default": True},
+        },
+    },
+    {
+        "name": "close_tab",
+        "description": "指定タブを閉じる",
+        "aliases": ["close_page"],
+        "parameters": {
+            "tab_id": {"type": "string", "required": True},
+        },
+    },
+    {
+        "name": "activate_tab",
+        "description": "指定タブをアクティブにする",
+        "parameters": {
+            "tab_id": {"type": "string", "required": True},
+        },
+    },
+    {
+        "name": "set_viewport",
+        "description": "ビューポートサイズを設定する",
+        "parameters": {
+            "width": {"type": "integer", "required": True},
+            "height": {"type": "integer", "required": True},
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "wait_for_load",
+        "description": "ページのロード完了を待つ",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+            "timeout": {"type": "number", "required": False, "default": 10.0, "description": "タイムアウト秒数"},
+        },
+    },
+    {
+        "name": "install_console_capture",
+        "description": "コンソールログのキャプチャをページに設置する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_console_logs",
+        "description": "キャプチャされたコンソールログを取得する（事前に install_console_capture が必要）",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+            "level": {"type": "string", "required": False, "description": "log / warn / error などでフィルタ"},
+            "limit": {"type": "integer", "required": False, "default": 50},
+        },
+    },
+    {
+        "name": "clear_console_logs",
+        "description": "キャプチャされたコンソールログをクリアする",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "install_network_capture",
+        "description": "XHR/fetch リクエストのキャプチャをページに設置する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_network_logs",
+        "description": "キャプチャされたネットワークリクエストを取得する（事前に install_network_capture が必要）",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+            "limit": {"type": "integer", "required": False, "default": 50},
+        },
+    },
+    {
+        "name": "clear_network_logs",
+        "description": "キャプチャされたネットワークログをクリアする",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_cookies",
+        "description": "ページの Cookie を取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_local_storage",
+        "description": "localStorage の内容を取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_session_storage",
+        "description": "sessionStorage の内容を取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_current_url",
+        "description": "現在の URL を取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_title",
+        "description": "ページタイトルを取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "get_resource_timing",
+        "description": "Performance API からリソースタイミング情報を取得する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+            "limit": {"type": "integer", "required": False, "default": 50},
+        },
+    },
+    {
+        "name": "get_version",
+        "description": "Chrome のバージョンと UserAgent 情報を取得する",
+        "parameters": {},
+    },
+    {
+        "name": "cdp_command",
+        "description": "Chrome DevTools Protocol (CDP) コマンドを直接送信する",
+        "parameters": {
+            "cdp_method": {"type": "string", "required": True, "description": "CDP メソッド名（例: Page.printToPDF）"},
+            "params": {"type": "string", "required": False, "description": "JSON 文字列形式のパラメータ（例: '{\"landscape\": true}'）"},
+            "tab_id": {"type": "string", "required": False, "description": "\"browser\" でブラウザレベル WebSocket を使用"},
+        },
+    },
+    {
+        "name": "js_confirm_result",
+        "description": "表示中の confirm ダイアログを CDP 経由で操作する",
+        "parameters": {
+            "accept": {"type": "boolean", "required": False, "default": True, "description": "True=OK、False=キャンセル"},
+            "dialog_wait": {"type": "number", "required": False, "default": 0.0, "description": "ダイアログ表示待機秒数"},
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "js_alert_result",
+        "description": "表示中の alert ダイアログを CDP 経由で閉じる",
+        "parameters": {
+            "dialog_wait": {"type": "number", "required": False, "default": 0.0},
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "js_install_dialog_override",
+        "description": "window.confirm/alert/prompt をオーバーライドしネイティブダイアログをブロックしない形に変更する",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "js_set_confirm_result",
+        "description": "次の confirm() が返す値を事前設定する（js_install_dialog_override が必要）",
+        "parameters": {
+            "accept": {"type": "boolean", "required": False, "default": True},
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+    {
+        "name": "js_get_dialog_state",
+        "description": "最後に呼ばれたダイアログの情報を取得する（js_install_dialog_override が必要）",
+        "parameters": {
+            "tab_id": {"type": "string", "required": False},
+        },
+    },
+]
+
+@app.post("/aidiy_chrome_devtools", tags=["aidiy_chrome_devtools"], summary="aidiy_chrome_devtools メソッド一覧")
+@app.get("/aidiy_chrome_devtools", tags=["aidiy_chrome_devtools"], summary="aidiy_chrome_devtools メソッド一覧")
+async def http_chrome_devtools_list() -> dict:
+    """
+    利用可能な aidiy_chrome_devtools メソッド一覧とパラメータ情報を返す。
+    POST /aidiy_chrome_devtools/{method_name} で各機能を呼び出せる。
+    """
+    return {
+        "endpoint": "POST /aidiy_chrome_devtools/{method_name}",
+        "tool_count": len(_CHROME_DEVTOOLS_METHODS),
+        "tools": _CHROME_DEVTOOLS_METHODS,
+    }
+
+
+@app.post("/aidiy_chrome_devtools/{method_name}", tags=["aidiy_chrome_devtools"], summary="Chrome DevTools 全機能 HTTP API")
+async def http_chrome_devtools(method_name: str, req: ChromeDevToolsRequest = ChromeDevToolsRequest()) -> dict:
+    """
+    aidiy_chrome_devtools の全機能を HTTP POST で呼び出す。
+
+    | method_name | 主なパラメータ |
+    |---|---|
+    | navigate | url, tab_id, show_automation_banner |
+    | reload / go_back / go_forward | tab_id |
+    | screenshot | tab_id, full_page, save_path |
+    | get_page_info / get_html / get_text / get_page_content | tab_id |
+    | eval_js / evaluate | expression, tab_id, await_promise |
+    | click / click_element | selector, tab_id |
+    | type_text / fill | selector, text (or value), tab_id, clear_first |
+    | scroll | delta_x, delta_y, tab_id, selector |
+    | scroll_to_element | selector, tab_id |
+    | find_elements | selector, tab_id, limit |
+    | list_tabs / list_pages | (なし) |
+    | new_tab / new_page | url, show_automation_banner |
+    | close_tab / close_page | tab_id |
+    | activate_tab | tab_id |
+    | set_viewport | width, height, tab_id |
+    | wait_for_load | tab_id, timeout |
+    | install_console_capture / clear_console_logs | tab_id |
+    | get_console_logs | tab_id, level, limit |
+    | install_network_capture / clear_network_logs | tab_id |
+    | get_network_logs | tab_id, limit |
+    | get_cookies | tab_id |
+    | get_local_storage / get_session_storage | tab_id |
+    | get_current_url / get_title | tab_id |
+    | get_resource_timing | tab_id, limit |
+    | get_version | (なし) |
+    | cdp_command | cdp_method, params (JSON 文字列), tab_id |
+    | js_confirm_result | accept, dialog_wait, tab_id |
+    | js_alert_result | dialog_wait, tab_id |
+    | js_install_dialog_override | tab_id |
+    | js_set_confirm_result | accept, tab_id |
+    | js_get_dialog_state | tab_id |
+    """
+    try:
+        if method_name in ("navigate", "new_tab", "new_page"):
+            await _ensure_chrome(show_automation_banner=req.show_automation_banner)
+        else:
+            await _ensure_chrome()
+
+        if method_name == "navigate":
+            result = await cdp.navigate(req.url or "about:blank", req.tab_id)
+            return {"result": result}
+
+        elif method_name == "reload":
+            result = await cdp.reload(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "go_back":
+            result = await cdp.go_back(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "go_forward":
+            result = await cdp.go_forward(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "screenshot":
+            data = await cdp.screenshot(tab_id=req.tab_id, full_page=req.full_page, save_path=req.save_path)
+            return {"data": data, "mimeType": "image/png"}
+
+        elif method_name == "get_page_info":
+            info = await cdp.get_page_info(req.tab_id)
+            return info if isinstance(info, dict) else {"result": info}
+
+        elif method_name == "get_html":
+            result = await cdp.get_html(req.tab_id)
+            return {"result": result}
+
+        elif method_name in ("get_text", "get_page_content"):
+            result = await cdp.get_text(req.tab_id)
+            return {"result": result}
+
+        elif method_name in ("eval_js", "evaluate"):
+            result = await cdp.eval_js(req.expression or "", req.tab_id, req.await_promise)
+            return result if isinstance(result, dict) else {"result": result}
+
+        elif method_name in ("click", "click_element"):
+            result = await cdp.click(req.selector or "", req.tab_id)
+            return {"result": result}
+
+        elif method_name in ("type_text", "fill"):
+            result = await cdp.type_text(req.selector or "", req.text or req.value or "", req.tab_id, req.clear_first)
+            return {"result": result}
+
+        elif method_name == "scroll":
+            result = await cdp.scroll(req.delta_x, req.delta_y, req.tab_id, req.selector)
+            return {"result": result}
+
+        elif method_name == "scroll_to_element":
+            result = await cdp.scroll_to_element(req.selector or "", req.tab_id)
+            return {"result": result}
+
+        elif method_name == "find_elements":
+            result = await cdp.find_elements(req.selector or "", req.tab_id, req.limit)
+            return {"elements": result} if isinstance(result, list) else (result if isinstance(result, dict) else {"result": result})
+
+        elif method_name in ("list_tabs", "list_pages"):
+            tabs = await asyncio.to_thread(cdp.list_tabs)
+            return {"tabs": tabs}
+
+        elif method_name in ("new_tab", "new_page"):
+            browser_ws = await asyncio.to_thread(cdp.get_browser_ws_url)
+            result = await cdp.send_command(browser_ws, "Target.createTarget", {"url": req.url or "about:blank"})
+            return result if isinstance(result, dict) else {"result": result}
+
+        elif method_name in ("close_tab", "close_page"):
+            ok = await asyncio.to_thread(cdp.close_tab_sync, req.tab_id or "")
+            return {"result": "閉じました" if ok else "失敗しました"}
+
+        elif method_name == "activate_tab":
+            ok = await asyncio.to_thread(cdp.activate_tab_sync, req.tab_id or "")
+            return {"result": "アクティブにしました" if ok else "失敗しました"}
+
+        elif method_name == "set_viewport":
+            result = await cdp.set_viewport(req.width or 1280, req.height or 720, req.tab_id)
+            return {"result": result}
+
+        elif method_name == "wait_for_load":
+            result = await cdp.wait_for_load(req.tab_id, req.timeout)
+            return {"result": result}
+
+        elif method_name == "install_console_capture":
+            result = await cdp.install_console_capture(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "get_console_logs":
+            logs = await cdp.get_console_logs(req.tab_id, req.level, req.limit)
+            return {"logs": logs}
+
+        elif method_name == "clear_console_logs":
+            result = await cdp.clear_console_logs(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "install_network_capture":
+            result = await cdp.install_network_capture(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "get_network_logs":
+            logs = await cdp.get_network_logs(req.tab_id, req.limit)
+            return {"logs": logs}
+
+        elif method_name == "clear_network_logs":
+            result = await cdp.clear_network_logs(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "get_cookies":
+            cookies = await cdp.get_cookies(req.tab_id)
+            return {"cookies": cookies}
+
+        elif method_name == "get_local_storage":
+            data = await cdp.get_local_storage(req.tab_id)
+            return data if isinstance(data, dict) else {"result": data}
+
+        elif method_name == "get_session_storage":
+            data = await cdp.get_session_storage(req.tab_id)
+            return data if isinstance(data, dict) else {"result": data}
+
+        elif method_name == "get_current_url":
+            result = await cdp.get_current_url(req.tab_id)
+            return {"url": result}
+
+        elif method_name == "get_title":
+            result = await cdp.get_title(req.tab_id)
+            return {"title": result}
+
+        elif method_name == "get_resource_timing":
+            data = await cdp.get_resource_timing(req.tab_id, req.limit)
+            return {"timing": data}
+
+        elif method_name == "get_version":
+            data = await asyncio.to_thread(cdp.get_version)
+            return data if isinstance(data, dict) else {"result": data}
+
+        elif method_name == "cdp_command":
+            cdp_method_name = req.cdp_method or ""
+            parsed_params: dict = {}
+            if req.params:
+                stripped = req.params.strip()
+                if stripped:
+                    loaded = json.loads(stripped)
+                    if isinstance(loaded, dict):
+                        parsed_params = loaded
+            if req.tab_id == "browser":
+                ws_url = await asyncio.to_thread(cdp.get_browser_ws_url)
+            else:
+                tab = await asyncio.to_thread(cdp.resolve_tab, req.tab_id)
+                ws_url = cdp.get_ws_url(tab)
+            result = await cdp.send_command(ws_url, cdp_method_name, parsed_params)
+            return result if isinstance(result, dict) else {"result": result}
+
+        elif method_name == "js_confirm_result":
+            result = await cdp.handle_dialog(req.accept, "", req.tab_id, req.dialog_wait)
+            return {"result": result}
+
+        elif method_name == "js_alert_result":
+            result = await cdp.handle_dialog(True, "", req.tab_id, req.dialog_wait)
+            return {"result": result}
+
+        elif method_name == "js_install_dialog_override":
+            result = await cdp.install_dialog_override(req.tab_id)
+            return {"result": result}
+
+        elif method_name == "js_set_confirm_result":
+            result = await cdp.set_confirm_result(req.accept, req.tab_id)
+            return {"result": result}
+
+        elif method_name == "js_get_dialog_state":
+            state = await cdp.get_dialog_state(req.tab_id)
+            return state if isinstance(state, dict) else {"result": state}
+
+        else:
+            return {"error": f"未知のメソッド: {method_name}"}
+
+    except Exception as e:
+        logger.warning(f"http_chrome_devtools [{method_name}] error: {e}")
+        return {"error": str(e)}
 
 
 # MCP SSE サーバーをサブパスにマウント
@@ -2214,14 +2992,17 @@ if __name__ == "__main__":
     logger.info(f"CodeCheck SSE      : http://localhost:{MCP_PORT}{MOUNT_CC}/sse")
     logger.info(f"BackupCheck SSE    : http://localhost:{MCP_PORT}{MOUNT_BC}/sse")
     logger.info(f"BackupSave SSE     : http://localhost:{MCP_PORT}{MOUNT_BS}/sse")
-    logger.info(f"BackupSave HTTP    : http://localhost:{MCP_PORT}/backup  [POST]")
+    logger.info(f"BackupSave HTTP    : http://localhost:{MCP_PORT}/aidiy_backup_save/{{method}}  [POST]  (scan / run)")
+    logger.info(f"Chrome HTTP        : http://localhost:{MCP_PORT}/aidiy_chrome_devtools/{{method}}  [POST]")
     logger.info(f"ImageGeneration SSE: http://localhost:{MCP_PORT}{MOUNT_IG}/sse")
-    logger.info(f"ImageGeneration HTTP: http://localhost:{MCP_PORT}/imageGen  [POST]")
+    logger.info(f"ImageGeneration HTTP: http://localhost:{MCP_PORT}/aidiy_image_generation/{{method}}  [POST]  (generate)")
     logger.info(f"MovieGeneration SSE : http://localhost:{MCP_PORT}{MOUNT_MG}/sse")
-    logger.info(f"MovieGeneration HTTP: http://localhost:{MCP_PORT}/movieGen  [POST]")
+    logger.info(f"MovieGeneration HTTP: http://localhost:{MCP_PORT}/aidiy_movie_generation/{{method}}  [POST]  (generate)")
     logger.info(f"SpeechToText SSE   : http://localhost:{MCP_PORT}{MOUNT_ST}/sse")
     logger.info(f"TextToSpeech SSE   : http://localhost:{MCP_PORT}{MOUNT_TS}/sse")
+    logger.info(f"TextToSpeech HTTP  : http://localhost:{MCP_PORT}/aidiy_text_to_speech/{{method}}  [POST]  (synthesize)")
     logger.info(f"ObsStudioControl SSE: http://localhost:{MCP_PORT}{MOUNT_OB}/sse")
     logger.info(f"FfmpegControl SSE  : http://localhost:{MCP_PORT}{MOUNT_FF}/sse")
     logger.info(f"CodeAgents SSE     : http://localhost:{MCP_PORT}{MOUNT_CA}/sse")
+    logger.info(f"CodeAgents HTTP    : http://localhost:{MCP_PORT}/aidiy_code_agents/{{method}}  [POST]  (config / run)")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")
