@@ -203,8 +203,8 @@ mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_descripti
 
 app = FastAPI(
     title="AiDiy MCP Server",
-    docs_url="/docs",
-    openapi_url="/openapi.json",
+    docs_url=None,
+    openapi_url=None,
     redoc_url=None,
 )
 app.add_middleware(
@@ -214,10 +214,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ------------------------------------------------------------------ #
+# MCP_MAP: initialize / list / ping 共通エンドポイント用
+# ------------------------------------------------------------------ #
 
-@app.get("/", include_in_schema=False)
+MCP_MAP: dict = {}  # mcp_name -> FastMCP instance (下部で設定)
+
+
+@app.get("/")
 async def root() -> Response:
-    return Response('{"message": "MCP Server is running"}', media_type="application/json")
+    import json
+    return Response(
+        json.dumps({"mcps": list(MCP_MAP.keys())}, ensure_ascii=False),
+        media_type="application/json",
+    )
+
+
+def _register_mcp_http_meta(mcp_name: str, mcp_instance) -> None:
+    """initialize / list / ping の3エンドポイントを登録"""
+
+    @app.post(f"/{mcp_name}/initialize", tags=[mcp_name])
+    async def _initialize(mcp_name=mcp_name):
+        return {
+            "protocolVersion": "2024-11-05",
+            "serverInfo": {"name": mcp_name, "version": "1.0"},
+            "capabilities": {"tools": {}},
+        }
+
+    @app.get(f"/{mcp_name}/list", tags=[mcp_name])
+    async def _list(mcp_name=mcp_name, mcp_instance=mcp_instance):
+        tools = [
+            {
+                "name": name,
+                "description": tool.description or "",
+                "inputSchema": tool.parameters if hasattr(tool, "parameters") else {},
+            }
+            for name, tool in mcp_instance._tool_manager._tools.items()
+        ]
+        return {"tools": tools}
+
+    @app.get(f"/{mcp_name}/ping", tags=[mcp_name])
+    async def _ping(mcp_name=mcp_name):
+        return {"status": "ok", "name": mcp_name}
 
 
 # ------------------------------------------------------------------ #
@@ -235,6 +273,29 @@ app.include_router(tools_media.create_router(ig, mg, stt, tts))
 app.include_router(tools_obs.create_router(obs))
 app.include_router(tools_ffmpeg.create_router(ffmpeg_c))
 app.include_router(tools_agents.create_router(code_agents))
+
+# ------------------------------------------------------------------ #
+# initialize / list / ping エンドポイントを全 MCP に登録
+# ------------------------------------------------------------------ #
+
+MCP_MAP.update({
+    "aidiy_chrome_devtools":    mcp,
+    "aidiy_desktop_capture":    mcp_dc,
+    "aidiy_sqlite":             mcp_sq,
+    "aidiy_postgres":           mcp_pg,
+    "aidiy_logs":               mcp_lg,
+    "aidiy_code_check":         mcp_cc,
+    "aidiy_backup":             mcp_bk,
+    "aidiy_image_generation":   mcp_ig,
+    "aidiy_movie_generation":   mcp_mg,
+    "aidiy_speech_to_text":     mcp_st,
+    "aidiy_text_to_speech":     mcp_ts,
+    "aidiy_obs_studio_control": mcp_ob,
+    "aidiy_ffmpeg_control":     mcp_ff,
+    "aidiy_code_agents":        mcp_ca,
+})
+for _mcp_name, _mcp_instance in MCP_MAP.items():
+    _register_mcp_http_meta(_mcp_name, _mcp_instance)
 
 # ------------------------------------------------------------------ #
 # MCP SSE サーバーをサブパスにマウント
@@ -260,35 +321,22 @@ app.mount(MOUNT_CA, mcp_ca.sse_app())
 # ------------------------------------------------------------------ #
 
 if __name__ == "__main__":
-    logger.info(f"Swagger UI           : http://localhost:{MCP_PORT}/docs")
-    logger.info(f"Chrome SSE           : http://localhost:{MCP_PORT}{MOUNT}/sse")
-    logger.info(f"Chrome HTTP          : http://localhost:{MCP_PORT}/aidiy_chrome_devtools/{{method}}  [POST]")
-    logger.info(f"DesktopCapture SSE   : http://localhost:{MCP_PORT}{MOUNT_DC}/sse")
-    logger.info(f"DesktopCapture HTTP  : http://localhost:{MCP_PORT}/aidiy_desktop_capture/{{method}}  [POST]  (screenshot / cursor_pos / screen_info / list_windows)")
-    logger.info(f"Sqlite SSE           : http://localhost:{MCP_PORT}{MOUNT_SQ}/sse")
-    logger.info(f"Sqlite HTTP          : http://localhost:{MCP_PORT}/aidiy_sqlite/{{method}}  [POST]  (list_tables / describe_table / count / query / audit_summary)")
-    logger.info(f"Postgres SSE         : http://localhost:{MCP_PORT}{MOUNT_PG}/sse"
+    base = f"http://localhost:{MCP_PORT}"
+    logger.info(f"MCP Index            : {base}/")
+    logger.info(f"--- initialize[POST] / list[GET] / ping[GET] / {{method}}[POST] ---")
+    logger.info(f"Chrome               : {base}/aidiy_chrome_devtools/  SSE:{MOUNT}/sse")
+    logger.info(f"DesktopCapture       : {base}/aidiy_desktop_capture/  SSE:{MOUNT_DC}/sse")
+    logger.info(f"Sqlite               : {base}/aidiy_sqlite/  SSE:{MOUNT_SQ}/sse")
+    logger.info(f"Postgres             : {base}/aidiy_postgres/  SSE:{MOUNT_PG}/sse"
                 + (" [psycopg 未導入]" if _pg_init_error else ""))
-    logger.info(f"Postgres HTTP        : http://localhost:{MCP_PORT}/aidiy_postgres/{{method}}  [POST]  (server_info / list_databases / list_schemas / list_tables / describe_table / count / query)")
-    logger.info(f"Logs SSE             : http://localhost:{MCP_PORT}{MOUNT_LG}/sse")
-    logger.info(f"Logs HTTP            : http://localhost:{MCP_PORT}/aidiy_logs/{{method}}  [POST]  (list / tail / recent_errors)")
-    logger.info(f"CodeCheck SSE        : http://localhost:{MCP_PORT}{MOUNT_CC}/sse")
-    logger.info(f"CodeCheck HTTP       : http://localhost:{MCP_PORT}/aidiy_code_check/{{method}}  [POST]  (list_targets / python_syntax / python_ruff / typescript)")
-    logger.info(f"Backup SSE           : http://localhost:{MCP_PORT}{MOUNT_BK}/sse")
-    logger.info(f"Backup HTTP (save)   : http://localhost:{MCP_PORT}/aidiy_backup/save/{{method}}  [POST]  (scan / run)")
-    logger.info(f"Backup HTTP (check)  : http://localhost:{MCP_PORT}/aidiy_backup/check/{{method}}  [POST]  (info / before_after / versions / changed / diff_stats)")
-    logger.info(f"ImageGeneration SSE  : http://localhost:{MCP_PORT}{MOUNT_IG}/sse")
-    logger.info(f"ImageGeneration HTTP : http://localhost:{MCP_PORT}/aidiy_image_generation/{{method}}  [POST]  (generate)")
-    logger.info(f"MovieGeneration SSE  : http://localhost:{MCP_PORT}{MOUNT_MG}/sse")
-    logger.info(f"MovieGeneration HTTP : http://localhost:{MCP_PORT}/aidiy_movie_generation/{{method}}  [POST]  (generate)")
-    logger.info(f"SpeechToText SSE     : http://localhost:{MCP_PORT}{MOUNT_ST}/sse")
-    logger.info(f"SpeechToText HTTP    : http://localhost:{MCP_PORT}/aidiy_speech_to_text/{{method}}  [POST]  (recognize)")
-    logger.info(f"TextToSpeech SSE     : http://localhost:{MCP_PORT}{MOUNT_TS}/sse")
-    logger.info(f"TextToSpeech HTTP    : http://localhost:{MCP_PORT}/aidiy_text_to_speech/{{method}}  [POST]  (synthesize)")
-    logger.info(f"ObsStudioControl SSE : http://localhost:{MCP_PORT}{MOUNT_OB}/sse")
-    logger.info(f"ObsStudioControl HTTP: http://localhost:{MCP_PORT}/aidiy_obs_studio_control/{{method}}  [POST]  (startup_status / connection_info / status / request / ...)")
-    logger.info(f"FfmpegControl SSE    : http://localhost:{MCP_PORT}{MOUNT_FF}/sse")
-    logger.info(f"FfmpegControl HTTP   : http://localhost:{MCP_PORT}/aidiy_ffmpeg_control/{{method}}  [POST]  (versions / ffmpeg_run / ffprobe_run / media_duration / analyze_audio / video_trimming / ffplay_run)")
-    logger.info(f"CodeAgents SSE       : http://localhost:{MCP_PORT}{MOUNT_CA}/sse")
-    logger.info(f"CodeAgents HTTP      : http://localhost:{MCP_PORT}/aidiy_code_agents/{{method}}  [POST]  (config / run)")
+    logger.info(f"Logs                 : {base}/aidiy_logs/  SSE:{MOUNT_LG}/sse")
+    logger.info(f"CodeCheck            : {base}/aidiy_code_check/  SSE:{MOUNT_CC}/sse")
+    logger.info(f"Backup               : {base}/aidiy_backup/  SSE:{MOUNT_BK}/sse")
+    logger.info(f"ImageGeneration      : {base}/aidiy_image_generation/  SSE:{MOUNT_IG}/sse")
+    logger.info(f"MovieGeneration      : {base}/aidiy_movie_generation/  SSE:{MOUNT_MG}/sse")
+    logger.info(f"SpeechToText         : {base}/aidiy_speech_to_text/  SSE:{MOUNT_ST}/sse")
+    logger.info(f"TextToSpeech         : {base}/aidiy_text_to_speech/  SSE:{MOUNT_TS}/sse")
+    logger.info(f"ObsStudioControl     : {base}/aidiy_obs_studio_control/  SSE:{MOUNT_OB}/sse")
+    logger.info(f"FfmpegControl        : {base}/aidiy_ffmpeg_control/  SSE:{MOUNT_FF}/sse")
+    logger.info(f"CodeAgents           : {base}/aidiy_code_agents/  SSE:{MOUNT_CA}/sse")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")
