@@ -113,7 +113,7 @@ res = requests.post("http://localhost:8095/aidiy_chrome_devtools/navigate",
 print(res.json())
 ```
 
-Swagger UI (`http://localhost:8095/docs`) で全エンドポイントを確認・試行できる。
+ツール一覧は `GET http://localhost:8095/{mcp_name}/list` で確認できる（例: `http://localhost:8095/aidiy_sqlite/list`）。
 
 ## Claude Agent SDK から使う場合
 

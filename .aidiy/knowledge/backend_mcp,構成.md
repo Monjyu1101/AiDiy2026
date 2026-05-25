@@ -44,8 +44,10 @@
 | **stdio gateway** | `mcp_stdio.py --sse-url .../sse` | Codex など stdio 専用の Code CLI が経由 |
 | **HTTP POST（FastAPI）** | `POST http://localhost:8095/{mcp_name}/{method_name}` | Python / curl / 自動化スクリプトが直接呼び出し |
 
-Swagger UI: `http://localhost:8095/docs` — 全エンドポイントをブラウザで試行できる。  
-ツール仕様 JSON: `GET http://localhost:8095/{mcp_name}/docs` — 引数・返値定義を JSON で取得。
+MCP一覧: `GET http://localhost:8095/` — 全 MCP 名を返す。  
+ツール一覧: `GET http://localhost:8095/{mcp_name}/list` — ツール名・説明・引数スキーマを JSON で返す。  
+死活確認: `GET http://localhost:8095/{mcp_name}/ping` — `{"status":"ok"}` を返す。  
+初期化: `POST http://localhost:8095/{mcp_name}/initialize` — capabilities を返す。
 
 HTTP POST は SSE とまったく同じロジックを呼ぶ。AI エージェント経由でなくても Python スクリプトや `backend_mcp/aidiy_automations/` から直接利用できる。
 
