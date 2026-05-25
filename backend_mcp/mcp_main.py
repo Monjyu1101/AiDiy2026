@@ -32,6 +32,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.requests import Request
 from fastapi import Response
+from fastapi.routing import APIRoute
 from mcp.server.fastmcp import FastMCP
 
 from log_config import setup_logging, get_logger
@@ -201,11 +202,22 @@ mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_descripti
 # FastAPI アプリ
 # ------------------------------------------------------------------ #
 
+def _unique_op_id(route: APIRoute) -> str:
+    """タグ + 関数名でユニークな operationId を生成する"""
+    tag = route.tags[0] if route.tags else "root"
+    return f"{tag}_{route.name}"
+
 app = FastAPI(
     title="AiDiy MCP Server",
-    docs_url=None,
-    openapi_url=None,
-    redoc_url=None,
+    description=(
+        "AiDiy MCP サーバー — Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / "
+        "Logs / Code Check / Backup / Image Generation / Movie Generation / "
+        "Speech-to-Text / Text-to-Speech / OBS Studio / FFmpeg / Code Agents の "
+        "14 MCP ツールを HTTP POST で直接呼び出せます。\n\n"
+        "各 MCP の詳細は `GET /{mcp_name}/docs` を参照してください。"
+    ),
+    version="1.0.0",
+    generate_unique_id_function=_unique_op_id,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -233,7 +245,9 @@ async def root() -> Response:
 def _register_mcp_http_meta(mcp_name: str, mcp_instance) -> None:
     """initialize / list / ping の3エンドポイントを登録"""
 
-    @app.post(f"/{mcp_name}/initialize", tags=[mcp_name])
+    @app.post(f"/{mcp_name}/initialize", tags=[mcp_name],
+              summary=f"{mcp_name} — MCP 初期化",
+              operation_id=f"{mcp_name}_initialize")
     async def _initialize(mcp_name=mcp_name):
         return {
             "protocolVersion": "2024-11-05",
@@ -241,7 +255,9 @@ def _register_mcp_http_meta(mcp_name: str, mcp_instance) -> None:
             "capabilities": {"tools": {}},
         }
 
-    @app.get(f"/{mcp_name}/list", tags=[mcp_name])
+    @app.get(f"/{mcp_name}/list", tags=[mcp_name],
+             summary=f"{mcp_name} — ツール一覧",
+             operation_id=f"{mcp_name}_list")
     async def _list(mcp_name=mcp_name, mcp_instance=mcp_instance):
         tools = [
             {
@@ -253,7 +269,9 @@ def _register_mcp_http_meta(mcp_name: str, mcp_instance) -> None:
         ]
         return {"tools": tools}
 
-    @app.get(f"/{mcp_name}/ping", tags=[mcp_name])
+    @app.get(f"/{mcp_name}/ping", tags=[mcp_name],
+             summary=f"{mcp_name} — 疎通確認",
+             operation_id=f"{mcp_name}_ping")
     async def _ping(mcp_name=mcp_name):
         return {"status": "ok", "name": mcp_name}
 

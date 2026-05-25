@@ -875,7 +875,9 @@ def main() -> None:
 
             print_header("起動完了")
             if "バックエンド(mcp)" in processes:
-                print_success(f"バックエンド(mcp): localhost:{BACKEND_MCP_PORT} で起動中")
+                print_success(f"バックエンド(mcp) Swagger UI : http://localhost:{BACKEND_MCP_PORT}/docs")
+                print_info   (f"  MCP ツール一覧(例)        : http://localhost:{BACKEND_MCP_PORT}/aidiy_text_to_speech/list")
+                print_info   (f"  利用可能 MCP 一覧         : http://localhost:{BACKEND_MCP_PORT}/")
             if "バックエンド(core)" in processes:
                 print_success(f"バックエンド(core): http://localhost:{BACKEND_CORE_PORT}/docs")
             if "バックエンド(apps)" in processes:
