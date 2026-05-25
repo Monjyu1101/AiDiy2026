@@ -38,11 +38,11 @@
 
 各 MCP は **3 つのインターフェース**を同一ポート（8095）で同時提供する。
 
-| インターフェース | アクセス方法 | 用途 |
+| トランスポート | アクセス方法 | 用途 |
 |----------------|-------------|------|
-| **SSE（MCP標準）** | `http://localhost:8095/{mcp_name}/sse` | AI エージェント・MCP クライアントが接続 |
+| **SSE Transport** | `http://localhost:8095/{mcp_name}/sse` | AI エージェント・MCP クライアントが接続 |
+| **Streamable HTTP Transport** | `POST http://localhost:8095/{mcp_name}/{method_name}` | Python / curl / 自動化スクリプトが直接呼び出し |
 | **stdio gateway** | `mcp_stdio.py --sse-url .../sse` | Codex など stdio 専用の Code CLI が経由 |
-| **HTTP POST（FastAPI）** | `POST http://localhost:8095/{mcp_name}/{method_name}` | Python / curl / 自動化スクリプトが直接呼び出し |
 
 MCP一覧: `GET http://localhost:8095/` — 全 MCP 名を返す。  
 ツール一覧: `GET http://localhost:8095/{mcp_name}/list` — ツール名・説明・引数スキーマを JSON で返す。  

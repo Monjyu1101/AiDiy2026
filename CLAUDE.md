@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Backend**: FastAPI + SQLAlchemy + SQLite（2 サーバー構成）
 - **Backend Hermes**: `aidiy_hermes` コード支援 CLI（常駐なし）
-- **Backend MCP**: 14 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Code Agents）— SSE（MCP標準）/ stdio gateway（`mcp_stdio.py`）/ HTTP POST の 3 インターフェースを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。
+- **Backend MCP**: 14 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Code Agents）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。
 - **Frontend Web**: Vue 3 + Vite + TypeScript（qTubler, Pinia, Vue Router）
 - **Frontend Avatar**: Electron/Web デュアルモード AI Avatar（Three.js, VRM）
 
