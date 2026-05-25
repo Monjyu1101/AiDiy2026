@@ -335,6 +335,51 @@ app.mount(MOUNT_FF, mcp_ff.sse_app())
 app.mount(MOUNT_CA, mcp_ca.sse_app())
 
 # ------------------------------------------------------------------ #
+# OpenAPI パス順序カスタマイズ
+# 各 MCP を docs → initialize → list → ping → {method_name} の順に統一
+# ------------------------------------------------------------------ #
+
+def _build_custom_openapi():
+    from fastapi.openapi.utils import get_openapi
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    paths = schema.get("paths", {})
+    ordered: dict = {}
+
+    if "/" in paths:
+        ordered["/"] = paths["/"]
+
+    _PRIORITY = ["docs", "initialize", "list", "ping"]
+    for mcp_name in MCP_MAP:
+        for suffix in _PRIORITY:
+            key = f"/{mcp_name}/{suffix}"
+            if key in paths:
+                ordered[key] = paths[key]
+        # その他（save/{method_name}, check/{method_name} など）
+        for key in paths:
+            if key.startswith(f"/{mcp_name}/") and key not in ordered:
+                ordered[key] = paths[key]
+
+    for key, val in paths.items():
+        if key not in ordered:
+            ordered[key] = val
+
+    schema["paths"] = ordered
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _build_custom_openapi
+
+# ------------------------------------------------------------------ #
 # エントリポイント
 # ------------------------------------------------------------------ #
 
