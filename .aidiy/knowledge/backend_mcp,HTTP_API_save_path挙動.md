@@ -4,14 +4,16 @@
 
 ## このメモを使う場面
 
-- `/tts` `/imageGen` `/movieGen` エンドポイントのレスポンス仕様を確認する
+- `/aidiy_backup` `/tts` `/imageGen` `/movieGen` エンドポイントのレスポンス仕様を確認する
 - save_path の有無でレスポンス内容が変わる仕様を再実装・修正するとき
 
 ## HTTP API 一覧
 
 | エンドポイント | MCP サーバー | 出力形式 | 備考 |
 |--------------|-------------|---------|------|
-| `POST /backup` | aidiy_backup_save | JSON | 差分バックアップ実行、`dry_run=true` で差分スキャンのみ |
+| `POST /aidiy_backup/save/scan` | aidiy_backup | JSON | 差分スキャンのみ |
+| `POST /aidiy_backup/save/run` | aidiy_backup | JSON | 差分バックアップ実行 |
+| `POST /aidiy_backup/check/{method}` | aidiy_backup | JSON | バックアップ内容確認。`info`, `before_after`, `versions`, `changed`, `diff_stats` |
 | `POST /tts` | aidiy_text_to_speech | MP3 音声 | `speech_text` フィールド必須 |
 | `POST /imageGen` | aidiy_image_generation | PNG 画像 | Gemini / OpenAI |
 | `POST /movieGen` | aidiy_movie_generation | MP4 動画 | Gemini Veo、数分かかる |

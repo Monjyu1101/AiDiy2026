@@ -40,7 +40,7 @@
 
 - 生成は `aidiy_text_to_speech` MCP を使う。MCP クライアントが不要な場合は以下の HTTP POST でも同等の処理を呼び出せる。
   ```
-  POST http://localhost:8095/tts
+  POST http://localhost:8095/aidiy_text_to_speech/synthesize
   Body: { "text": "ナレーション本文", "provider": "freeai", "voice": "female",
           "save_path": "D:/.../audio/scene_NNN.mp3" }
   Response: audio/mpeg バイナリ（save_path 指定時はファイルにも同時保存）

@@ -104,7 +104,8 @@ async def main() -> None:
             # -------------------------------------------------- #
             print("\n=== [2] モニター情報取得 ===")
             r = await call_text(session, "get_screen_info")
-            mons = json.loads(r)
+            info = json.loads(r)
+            mons = info.get("monitors", info if isinstance(info, list) else [])
             for m in mons:
                 primary = " [primary]" if m.get("primary") else ""
                 print(f"  [{m['index']}] {m['width']}x{m['height']}  ({m['x']},{m['y']}){primary}")
@@ -115,7 +116,8 @@ async def main() -> None:
             print("\n=== [3] ウィンドウ一覧 ===")
             try:
                 r = await call_text(session, "list_windows")
-                wins = json.loads(r)
+                info = json.loads(r)
+                wins = info.get("windows", info if isinstance(info, list) else [])
                 for w in wins[:10]:
                     title = w.get("title", "")[:50]
                     print(f"  [{w['hwnd']}] {title}  ({w['width']}x{w['height']})")

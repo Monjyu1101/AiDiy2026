@@ -7,15 +7,138 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""image_generation テスト — freeai で生成 → openai で調整"""
+"""image_generation テスト — 直接実行 + HTTP POST API"""
 
+import base64
+import json
 import os
 import sys
 import tempfile
+import time
+from pathlib import Path
+from urllib import error, request
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PIL import Image as PILImage
 from mcp_proc.image_generation import ImageGeneration, ImageGenerationError
+
+
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+HTTP_TIMEOUT = float(os.environ.get("AIDIY_MCP_EXTERNAL_TIMEOUT", "1200"))
+POST_SAVE_DIR = Path(__file__).resolve().parent / "temp" / "post_image"
+
+
+def _post_json(path: str, payload: dict, timeout: float | None = None) -> dict:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = request.Request(
+        f"{BASE_URL}{path}",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    with request.urlopen(req, timeout=timeout or HTTP_TIMEOUT) as res:
+        return json.loads(res.read().decode("utf-8", errors="replace"))
+
+
+def _assert_no_error(label: str, result: dict) -> None:
+    if "error" in result:
+        raise AssertionError(f"{label}: {result['error']}")
+
+
+def _post_json_retry(label: str, path: str, payload: dict, attempts: int = 3) -> dict:
+    result = {}
+    for i in range(1, attempts + 1):
+        result = _post_json(path, payload)
+        error_text = str(result.get("error", ""))
+        if not error_text:
+            return result
+        if not any(s in error_text for s in ("503", "UNAVAILABLE", "high demand")):
+            return result
+        if i < attempts:
+            wait_sec = 30 * i
+            print(f"  RETRY {label}: {error_text[:120]}... wait {wait_sec}s")
+            time.sleep(wait_sec)
+    return result
+
+
+def _write_base64(path: Path, data: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(base64.b64decode(data))
+
+
+def test_post_api() -> None:
+    """HTTP POST API で直接実行と同じ画像生成/編集フローを確認する。"""
+    POST_SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    freeai_path = POST_SAVE_DIR / "image_freeai.png"
+    resized_path = POST_SAVE_DIR / "image_freeai_1024.png"
+    openai_path = POST_SAVE_DIR / "image_openai_edit.png"
+    gemini_path = POST_SAVE_DIR / "image_gemini_edit.png"
+
+    print()
+    print("=" * 60)
+    print("HTTP POST Test 1: FreeAI で画像生成")
+    print("=" * 60)
+
+    img1 = _post_json_retry(
+        "POST image freeai",
+        "/aidiy_image_generation/generate",
+        {
+            "prompt": "森でたたずむオオカミ",
+            "provider": "freeai",
+            "size": "auto",
+            "save_path": str(freeai_path),
+        },
+    )
+    _assert_no_error("POST image freeai", img1)
+    _write_base64(freeai_path, img1["data"])
+    with PILImage.open(freeai_path) as image:
+        image.resize((1024, 1024), PILImage.LANCZOS).save(resized_path, format="PNG")
+    print(f"  saved  = {freeai_path}")
+    print(f"  base64 = {len(img1['data'])} chars")
+
+    print()
+    print("=" * 60)
+    print("HTTP POST Test 2: OpenAI で調整")
+    print("=" * 60)
+
+    img2 = _post_json_retry(
+        "POST image openai edit",
+        "/aidiy_image_generation/generate",
+        {
+            "prompt": "背景は変えずに、オオカミを子猫に変更してください",
+            "provider": "openai",
+            "model": "gpt-image-2",
+            "size": "auto",
+            "quality": "auto",
+            "original_path": str(resized_path),
+            "save_path": str(openai_path),
+        },
+    )
+    _assert_no_error("POST image openai edit", img2)
+    _write_base64(openai_path, img2["data"])
+    print(f"  saved  = {openai_path}")
+    print(f"  base64 = {len(img2['data'])} chars")
+
+    print()
+    print("=" * 60)
+    print("HTTP POST Test 3: Gemini で背景変更")
+    print("=" * 60)
+
+    img3 = _post_json_retry(
+        "POST image gemini edit",
+        "/aidiy_image_generation/generate",
+        {
+            "prompt": "猫は変えずに、背景を住宅地に変更してください",
+            "provider": "gemini",
+            "size": "1024x1024",
+            "original_path": str(openai_path),
+            "save_path": str(gemini_path),
+        },
+    )
+    _assert_no_error("POST image gemini edit", img3)
+    _write_base64(gemini_path, img3["data"])
+    print(f"  saved  = {gemini_path}")
+    print(f"  base64 = {len(img3['data'])} chars")
 
 
 def main():
@@ -147,6 +270,9 @@ def main():
     print(f"  [2] リサイズ (1024x1024)     : base64 {len(b64_1r)} chars")
     print(f"  [3] OpenAI 調整 (1024x1024)  : base64 {len(b64_2)} chars")
     print(f"  [4] Gemini 背景変更 (住宅地) : base64 {len(b64_3)} chars")
+
+    test_post_api()
+
     print()
     print("OK")
 

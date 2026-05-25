@@ -9,26 +9,24 @@
 # -------------------------------------------------------------------------
 
 """
-バックアップ照合モジュール
+バックアップ処理モジュール
 
-AiDiy のバックアップフォルダ（差分バックアップ）から、
-指定ソースの「変更前」版を抽出し、現行ソース（変更後）と併せて返す。
-CLI/AIエージェントの差分検証を支援する。
-
-バックアップ構造:
-    <project_root>/backup/YYYYMMDD/HHMMSS[.all|.コメント]/<相対パス>
-    - HHMMSS.all : 初回全件スナップショット
-    - HHMMSS     : 差分（最終バックアップ+1秒以降の変更ファイル）
-
-差分バックアップのため、「変更前」抽出は日時フォルダを降順で走査し、
-最初にヒットしたファイル（= 最も新しい過去バージョン）を採用する。
+`aidiy_backup` MCP が使う差分バックアップ実行とバックアップ照合を提供する。
+バックアップ作成は backend_server のネイティブ実装を動的ロードして流用し、
+バックアップ参照は MCP 側でバックアップフォルダを横断照合する。
 """
 
 import difflib
+import importlib.util
 import os
 import re
 from datetime import datetime
 from typing import Optional
+
+
+class BackupSaveError(Exception):
+    """バックアップ実行エラー"""
+    pass
 
 
 class BackupCheckError(Exception):
@@ -36,11 +34,109 @@ class BackupCheckError(Exception):
     pass
 
 
+def _load_native_module(project_root: str):
+    """backend_server/AIコア/AIバックアップ.py を動的にロードする"""
+    native_path = os.path.join(
+        project_root, "backend_server", "AIコア", "AIバックアップ.py"
+    )
+    if not os.path.isfile(native_path):
+        raise BackupSaveError(
+            f"ネイティブバックアップモジュールが見つかりません: {native_path}"
+        )
+    spec = importlib.util.spec_from_file_location(
+        "aidiy_ai_backup_native", native_path
+    )
+    if spec is None or spec.loader is None:
+        raise BackupSaveError(f"ネイティブモジュール読み込み失敗: {native_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class BackupSave:
+    """AiDiy ネイティブのバックアップ機能を MCP から実行するラッパー"""
+
+    def __init__(self, project_root: Optional[str] = None):
+        if project_root:
+            self.root = os.path.abspath(project_root)
+        else:
+            here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.root = os.path.dirname(here)
+        self.backend_dir = os.path.join(self.root, "backend_server")
+        self._native = None
+
+    def _get_native(self):
+        if self._native is None:
+            self._native = _load_native_module(self.root)
+        return self._native
+
+    def run(self) -> dict:
+        """ネイティブ `バックアップ実行` を呼び出して差分バックアップを作成する。"""
+        native = self._get_native()
+        try:
+            result = native.バックアップ実行(
+                アプリ設定=None,
+                backend_dir=self.backend_dir,
+                セッション設定=None,
+                ログ出力=False,
+            )
+        except Exception as e:
+            raise BackupSaveError(f"バックアップ実行中に例外: {e}") from e
+
+        if result is None:
+            return {
+                "ok": False,
+                "最終時刻": "",
+                "全件数": 0,
+                "バックアップ件数": 0,
+                "全件フラグ": False,
+                "バックアップ先": "",
+                "差分なし": False,
+            }
+
+        最終時刻, all_files, changed_files, 全件フラグ, target_dir = result
+        changed = changed_files or []
+        return {
+            "ok": True,
+            "最終時刻": 最終時刻,
+            "全件数": len(all_files or []),
+            "バックアップ件数": len(changed),
+            "全件フラグ": bool(全件フラグ),
+            "バックアップ先": (target_dir or "").replace("\\", "/"),
+            "差分なし": (len(changed) == 0) and (not 全件フラグ),
+        }
+
+    def diff_scan(self) -> dict:
+        """バックアップは実行せず、現時点の差分対象ファイル一覧のみ返す。"""
+        native = self._get_native()
+        try:
+            result = native.差分ファイル取得(
+                アプリ設定=None,
+                backend_dir=self.backend_dir,
+            )
+        except Exception as e:
+            raise BackupSaveError(f"差分スキャン中に例外: {e}") from e
+
+        if result is None:
+            return {
+                "最終バックアップ日時": "",
+                "差分ファイル": [],
+                "count": 0,
+            }
+        最終日時, files = result
+        files = files or []
+        return {
+            "最終バックアップ日時": 最終日時,
+            "差分ファイル": files,
+            "count": len(files),
+        }
+
+
 class BackupCheck:
     """AiDiy バックアップフォルダの横断照合を提供"""
 
     BACKUP_DIR_NAME = "backup"
-    MAX_CONTENT_BYTES = 512 * 1024  # 1 ファイルあたり最大 512KB 返却
+    MAX_CONTENT_BYTES = 512 * 1024
 
     _DATE_RE = re.compile(r"^\d{8}$")
     _TIME_RE = re.compile(r"^(\d{6})")
@@ -52,10 +148,6 @@ class BackupCheck:
             here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             self.root = os.path.dirname(here)
         self.backup_root = os.path.join(self.root, self.BACKUP_DIR_NAME)
-
-    # ------------------------------------------------------------------ #
-    # 内部ヘルパ
-    # ------------------------------------------------------------------ #
 
     def _normalize_rel(self, path: str) -> str:
         """入力パスをプロジェクトルート相対・POSIX 区切りに正規化"""
@@ -72,7 +164,7 @@ class BackupCheck:
         return p
 
     def _timestamp(self, date_dir: str, time_dir: str) -> Optional[str]:
-        """YYYYMMDD と HHMMSS[.xxx] から 'YYYYMMDD_HHMMSS' を作る（並べ替え可能な文字列）"""
+        """YYYYMMDD と HHMMSS[.xxx] から 'YYYYMMDD_HHMMSS' を作る"""
         if not self._DATE_RE.match(date_dir):
             return None
         m = self._TIME_RE.match(time_dir)
@@ -81,9 +173,7 @@ class BackupCheck:
         return f"{date_dir}_{m.group(1)}"
 
     def _iter_backup_folders_desc(self) -> list[tuple[str, str, str, str]]:
-        """
-        バックアップ下のフォルダ (timestamp, date_dir, time_dir, abs_folder) を降順で返す
-        """
+        """バックアップ下のフォルダを降順で返す"""
         if not os.path.isdir(self.backup_root):
             return []
         entries: list[tuple[str, str, str, str]] = []
@@ -103,10 +193,7 @@ class BackupCheck:
         return entries
 
     def _read_file(self, abs_path: str) -> tuple[str, int, bool]:
-        """
-        ファイルを UTF-8 で読む。上限超過時は末尾を切り捨て truncated を立てる。
-        戻り値: (content, size_bytes, truncated)
-        """
+        """ファイルを UTF-8 で読む。上限超過時は truncated を立てる。"""
         size = os.path.getsize(abs_path)
         with open(abs_path, "rb") as f:
             raw = f.read(self.MAX_CONTENT_BYTES + 1)
@@ -118,10 +205,6 @@ class BackupCheck:
         except UnicodeDecodeError:
             text = raw.decode("utf-8", errors="replace")
         return text, size, truncated
-
-    # ------------------------------------------------------------------ #
-    # 公開メソッド
-    # ------------------------------------------------------------------ #
 
     def backup_root_path(self) -> dict:
         """バックアップルートの絶対パスと存在フラグを返す"""
@@ -138,7 +221,7 @@ class BackupCheck:
     ) -> dict:
         """
         現行（after）と、直前のバックアップ版（before）を同時に返す。
-        base_ts ('YYYYMMDD_HHMMSS') を与えた場合、その日時以前のバックアップから before を探す。
+        base_ts 指定時はその日時以前のバックアップから before を探す。
         """
         rel = self._normalize_rel(path)
         abs_live = os.path.join(self.root, rel.replace("/", os.sep))
@@ -199,14 +282,11 @@ class BackupCheck:
         from_ts: str,
         to_ts: Optional[str] = None,
     ) -> dict:
-        """
-        指定期間（from_ts ≦ ts ≦ to_ts）のバックアップに含まれる相対パス一覧を返す。
-        差分バックアップゆえ、ここに挙がるパスはその期間に変更されたファイル。
-        """
+        """指定期間のバックアップに含まれる相対パス一覧を返す。"""
         if not from_ts:
             raise BackupCheckError("from_ts は必須です（例: '20260418_000000'）")
         changed: dict[str, list[str]] = {}
-        for ts, date_dir, time_dir, folder in self._iter_backup_folders_desc():
+        for ts, _, _, folder in self._iter_backup_folders_desc():
             if ts < from_ts:
                 continue
             if to_ts and ts > to_ts:
@@ -229,10 +309,7 @@ class BackupCheck:
         }
 
     def diff_stats(self, path: str, base_ts: Optional[str] = None) -> dict:
-        """
-        指定ファイルの before/after の追加・削除行数を返す軽量サマリ。
-        base_ts 指定時はその日時以前を before とする。
-        """
+        """指定ファイルの before/after の追加・削除行数を返す軽量サマリ。"""
         pair = self.get_before_after(path, base_ts=base_ts)
         before = pair.get("before")
         after = pair.get("after")

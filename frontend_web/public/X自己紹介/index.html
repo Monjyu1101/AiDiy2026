@@ -985,7 +985,7 @@
             <span>Electron + VRM + 音声AI</span>
             <span>🧠 自己改善機構 — 使うほど育つ</span>
             <span>claude / copilot / codex / gemini / opencode / hermes CLI</span>
-            <span>🔌 MCP Hub ×13 — browser / capture / sqlite / postgres / logs / check / backup×2 / image / stt / tts / obs / ffmpeg</span>
+            <span>🔌 MCP Hub ×14 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / agents</span>
         </div>
         <div class="typing-text" id="typing-text"></div>
     </section>
@@ -1042,10 +1042,10 @@
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🔌</span>
-                <h3 class="feature-title">MCP Hub × 13 + Multi CLI</h3>
+                <h3 class="feature-title">MCP Hub × 14 + Multi CLI</h3>
                 <p class="feature-description">
                     browser / capture / sqlite / postgres / logs / check /<br>
-                    backup×2 / image / stt / tts / obs / ffmpeg の 13 MCP サーバー同居。<br>
+                    backup / image / movie / stt / tts / obs / ffmpeg / agents の 14 MCP サーバー同居。<br>
                     6 種の Code CLI を並走可能。
                 </p>
             </div>
@@ -1093,9 +1093,9 @@
                 <span class="stat-sub">Electron / Web</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="13">0</span>
+                <span class="stat-number" data-count="14">0</span>
                 <span class="stat-label">MCP サーバー</span>
-                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup / image / stt / tts / obs / ffmpeg</span>
+                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / agents</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="60">0</span>
@@ -1184,8 +1184,8 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔌 MCP サーバー (統合)</h3>
-                <p>backend_server に統合され、FastAPI + SSE で 13 個の MCP サーバーを同一ポートに同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像生成・音声認識/合成・OBS 制御・ffmpeg 実行を一手に提供。詳細は下の MCP Hub セクションへ。</p>
-                <div class="meta-tags"><span>mcp_main.py:8095</span><span>SSE × 13</span><span>Self-Verify</span></div>
+                <p>FastAPI + SSE で 14 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・コードエージェント実行を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
+                <div class="meta-tags"><span>mcp_main.py:8095</span><span>SSE × 14</span><span>HTTP POST</span><span>stdio gateway</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 frontend_web</h3>
@@ -1425,10 +1425,10 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 7. MCP Hub × 13 + Multi CLI -->
+    <!-- 7. MCP Hub × 14 + Multi CLI -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 13 + Multi CLI — 実装詳細</h2>
-        <p class="section-subtitle animate-on-scroll">ポート 8095 に 13 個の MCP サーバーを同居。人の手数を減らし、AI の自己検証を増やす。</p>
+        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 14 + Multi CLI — 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">ポート 8095 に 14 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 aidiy_chrome_devtools</h3>
@@ -1461,19 +1461,19 @@ Key:   利用者名</pre>
                 <div class="meta-tags"><span>py_compile</span><span>ruff</span><span>tsc</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">📦 aidiy_backup_check</h3>
-                <p>差分バックアップから変更前/変更後ソースを抽出。指定ファイルの追加・削除行数を軽量サマリで返す。dry-run スキャンで現時点の差分対象一覧も取得可能。</p>
-                <div class="meta-tags"><span>diff stats</span><span>dry-run</span><span>before/after</span></div>
-            </div>
-            <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">💾 aidiy_backup_save</h3>
-                <p>AiDiy ネイティブの差分バックアップを実行。初回は全件スナップショット、以降は差分のみを保存。コード修正前の安全なセーブポイントとして機能。</p>
-                <div class="meta-tags"><span>snapshot</span><span>incremental</span><span>savepoint</span></div>
+                <h3 class="architecture-title">📦 aidiy_backup</h3>
+                <p>AiDiy ネイティブの差分バックアップを保存・確認。初回は全件スナップショット、以降は差分のみを保存。変更前/変更後ソースの抽出や dry-run スキャンによる差分対象一覧も取得可能。</p>
+                <div class="meta-tags"><span>snapshot</span><span>diff stats</span><span>before/after</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🎨 aidiy_image_generation</h3>
                 <p>OpenAI（gpt-image / DALL-E 3）と Google Gemini / FreeAI を切替可能な AI 画像生成。プロンプトから PNG を取得し、temp/output へ自動保存。参照画像によるバリエーションも対応。</p>
                 <div class="meta-tags"><span>OpenAI</span><span>Gemini</span><span>FreeAI</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎬 aidiy_movie_generation</h3>
+                <p>Google Gemini Veo でテキスト/画像から動画クリップを生成。MP4 をローカル保存し、base64 返却なしの軽量インターフェースで大容量動画に対応。</p>
+                <div class="meta-tags"><span>Gemini Veo</span><span>MP4</span><span>text-to-video</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🎤 aidiy_speech_to_text</h3>
@@ -1491,9 +1491,14 @@ Key:   利用者名</pre>
                 <div class="meta-tags"><span>OBS WebSocket</span><span>port 4455</span><span>scene control</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">🎬 aidiy_ffmpeg_control</h3>
+                <h3 class="architecture-title">🎞️ aidiy_ffmpeg_control</h3>
                 <p>ffmpeg / ffprobe / ffplay の薄いランナー。args_str に直接コマンド文字列を渡し、動画合成・字幕焼き込み・オーバーレイ・リサイズ・プレビュー再生を AI が自由に組み立て。</p>
                 <div class="meta-tags"><span>ffmpeg</span><span>ffprobe</span><span>ffplay</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🤖 aidiy_code_agents</h3>
+                <p>Claude / Copilot / Codex / Gemini / opencode / hermes など複数の CodeAI CLI をエージェントとして呼び出し。コード生成・修正・レビューを AI が直接 CLI 経由で実行。</p>
+                <div class="meta-tags"><span>CodeAI CLI</span><span>multi-agent</span><span>subprocess</span></div>
             </div>
         </div>
         <div class="advanced-grid" style="margin-top:30px;">
@@ -1507,8 +1512,9 @@ Key:   利用者名</pre>
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     edit → observe → verify → backup<br>
-                    MCP 13 サーバーの連携で、修正の影響範囲を<br>
+                    MCP 14 サーバーの連携で、修正の影響範囲を<br>
                     <strong>AI が自分で確認</strong>してから報告します。<br>
+                    SSE / stdio / HTTP POST の 3 経路でどの CLI からでも利用可。<br>
                     バックアップ保存→チェックのサイクルも内蔵。
                 </div>
             </div>

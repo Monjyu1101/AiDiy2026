@@ -100,7 +100,7 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
     "AGENTS.md",
     "backend_mcp/AGENTS.md"
   ],
-  "source_summary": "backend_mcp は port 8095 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーション。",
+  "source_summary": "backend_mcp は port 8095 上で 14 個の MCP サーバーを同居させる FastMCP アプリケーション。",
   "factual_bullets": [
     "Chrome DevTools",
     "desktop_capture",
@@ -250,7 +250,7 @@ mcp__aidiy_text_to_speech__synthesize_speech
 
 > **HTTP POST でも同等の処理を呼び出せる。** MCP クライアントを使わず、スクリプトから直接叩く場合に便利。
 > ```
-> POST http://localhost:8095/tts
+> POST http://localhost:8095/aidiy_text_to_speech/synthesize
 > Content-Type: application/json
 > Body: { "text": "ナレーション本文", "provider": "edge", "voice": "female",
 >         "save_path": "D:/.../audio/scene_001.mp3", "local_play": false }
@@ -379,7 +379,7 @@ mcp__aidiy_image_generation__generate_image
 
 > **HTTP POST でも同等の処理を呼び出せる。**
 > ```
-> POST http://localhost:8095/imageGen
+> POST http://localhost:8095/aidiy_image_generation/generate
 > Content-Type: application/json
 > Body: { "prompt": "...", "provider": "openai", "model": "gpt-image-2",
 >         "size": "1792x1024", "quality": "medium",
@@ -428,7 +428,7 @@ mcp__aidiy_movie_generation__generate_movie
 ### HTTP POST
 
 ```
-POST http://localhost:8095/movieGen
+POST http://localhost:8095/aidiy_movie_generation/generate
 Content-Type: application/json
 Body: {
   "prompt": "A soft cherry blossom garden with petals drifting in the breeze, cinematic 4K",

@@ -126,7 +126,7 @@ class CodeAgents:
         key.json の CODE_AI1_NAME ... CODE_AI9_NAME に対して CLI --version を
         同期実行し、各 AI の利用可否を返す。
 
-        claude_sdk は anthropic パッケージと claude_key_id の存在で確認。
+        claude_sdk は claude_agent_sdk パッケージと claude_key_id の存在で確認。
         CLI ベースは subprocess.run で --version を実行。
         また、必要な API キーが未設定の場合は利用不可とする。
         """
@@ -168,16 +168,17 @@ class CodeAgents:
 
             try:
                 if ai_name == "claude_sdk":
-                    # SDK ベース: anthropic インポート + APIキー確認
+                    # SDK ベース: 実行モジュールが使う claude_agent_sdk + APIキー確認
                     try:
-                        import anthropic  # noqa: F401, PLC0415
+                        import claude_agent_sdk  # noqa: F401, PLC0415
                         api_key = key.get("claude_key_id", "").strip()
                         if api_key and not api_key.startswith("<"):
-                            info = {"ok": True, "version": "anthropic SDK", "cmd": "anthropic"}
+                            version = getattr(claude_agent_sdk, "__version__", "claude_agent_sdk")
+                            info = {"ok": True, "version": version, "cmd": "claude_agent_sdk"}
                         else:
-                            info = {"ok": False, "version": "claude_key_id 未設定", "cmd": "anthropic"}
+                            info = {"ok": False, "version": "claude_key_id 未設定", "cmd": "claude_agent_sdk"}
                     except ImportError:
-                        info = {"ok": False, "version": "anthropic 未インストール", "cmd": "anthropic"}
+                        info = {"ok": False, "version": "claude_agent_sdk 未インストール", "cmd": "claude_agent_sdk"}
 
                 else:
                     from AIコア.AIコード_cli import CodeAI  # noqa: PLC0415

@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -79,7 +80,6 @@ BACKEND_MCP_PATH = "backend_mcp"
 BACKEND_MCP_PORT = 8095
 BACKEND_MCP_APP = "mcp_main:app"
 BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
-BACKEND_MCP_CHROME_DEBUG_PORT = 9222
 BACKEND_MCP_SHOW_AUTOMATION_BANNER = False
 
 FRONTEND_WEB_PATH = "frontend_web"
@@ -518,179 +518,38 @@ def open_browser(port: int) -> None:
         print_warning(f"ブラウザを開けませんでした: {exc}")
 
 
-def is_mcp_browser_running() -> bool:
-    try:
-        with urllib.request.urlopen(
-            f"http://localhost:{BACKEND_MCP_CHROME_DEBUG_PORT}/json/version",
-            timeout=2,
-        ) as response:
-            return response.status == 200
-    except Exception:
-        return False
 
-
-def ensure_mcp_browser_ready() -> bool:
-    if is_mcp_browser_running():
-        return True
-
-    backend_mcp_python = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
-    if backend_mcp_python is not None:
-        command = [
-            str(backend_mcp_python),
-            "-c",
-            f"from mcp_proc.chrome_manager import ChromeManager; print(ChromeManager().ensure_running(show_automation_banner={BACKEND_MCP_SHOW_AUTOMATION_BANNER}))",
-        ]
-    else:
-        command = [
-            "uv",
-            "run",
-            "python",
-            "-c",
-            f"from mcp_proc.chrome_manager import ChromeManager; print(ChromeManager().ensure_running(show_automation_banner={BACKEND_MCP_SHOW_AUTOMATION_BANNER}))",
-        ]
-
-    print_info(f"(mcp) Chrome 起動コマンド: {' '.join(str(c) for c in command)}")
-
-    try:
-        result = subprocess.run(
-            command,
-            cwd=str(BACKEND_MCP_DIR),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=45,
-        )
-        stdout = (result.stdout or "").strip()
-        stderr = (result.stderr or "").strip()
-        if result.returncode != 0:
-            print_warning(f"(mcp) ブラウザ起動に失敗しました (returncode={result.returncode})")
-            if stdout:
-                print_warning(f"(mcp) stdout: {stdout}")
-            if stderr:
-                print_warning(f"(mcp) stderr: {stderr}")
-            return False
-        if stdout:
-            print_info(f"(mcp) Chrome: {stdout}")
-        if stderr:
-            print_info(f"(mcp) Chrome stderr: {stderr}")
-    except subprocess.TimeoutExpired as exc:
-        print_warning(f"(mcp) ブラウザ起動コマンドがタイムアウトしました ({exc.timeout}秒)")
-        return False
-    except Exception as exc:
-        print_warning(f"(mcp) ブラウザ起動でエラーが発生しました: {exc}")
-        return False
-
-    deadline = time.time() + 15
-    while time.time() < deadline:
-        if is_mcp_browser_running():
-            return True
-        time.sleep(0.3)
-
-    print_warning("(mcp) ブラウザの起動待機がタイムアウトしました")
-    return False
-
-
-BACKEND_MCP_SSE_URL = f"http://localhost:{BACKEND_MCP_PORT}/aidiy_chrome_devtools/sse"
+def _mcp_post(path: str, body: dict, timeout: int = 30) -> dict:
+    """backend_mcp の HTTP POST インターフェースを呼ぶ (urllib のみ使用)"""
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        f"http://localhost:{BACKEND_MCP_PORT}{path}",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def open_browser_via_mcp(port: int) -> bool:
     print_header("ブラウザページ表示")
     url = f"http://localhost:{port}"
-
-    if not is_mcp_browser_running():
-        if not ensure_mcp_browser_ready():
-            print_warning("(mcp) Chrome の事前起動に失敗したため通常ブラウザへフォールバックします")
-            try:
-                webbrowser.open(url)
-            except Exception as exc:
-                print_warning(f"ブラウザを開けませんでした: {exc}")
-            return False
-
-    # MCP SSE サーバー経由で新規ページを開く
-    backend_mcp_python = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
-    if backend_mcp_python is not None:
-        print_info(f"(mcp) MCP接続: {BACKEND_MCP_SSE_URL}")
-        print_info(f"(mcp) {url} 表示指示")
-        script = (
-            "import asyncio, os, json, sys\n"
-            # プロキシ経由でlocalhostへ接続しないよう NO_PROXY を設定
-            "os.environ['NO_PROXY'] = 'localhost,127.0.0.1'\n"
-            "os.environ['no_proxy'] = 'localhost,127.0.0.1'\n"
-            "from mcp.client.sse import sse_client\n"
-            "from mcp import ClientSession\n"
-            "def _content_text(result):\n"
-            "    parts = []\n"
-            "    for item in getattr(result, 'content', []) or []:\n"
-            "        text = getattr(item, 'text', None)\n"
-            "        if isinstance(text, str) and text:\n"
-            "            parts.append(text)\n"
-            "    return '\\n'.join(parts).strip()\n"
-            "async def main():\n"
-            f"    sse_url = '{BACKEND_MCP_SSE_URL}'\n"
-            f"    target_url = '{url}'\n"
-            "    async with sse_client(sse_url, timeout=10, sse_read_timeout=60) as (read, write):\n"
-            "        async with ClientSession(read, write) as session:\n"
-            "            await session.initialize()\n"
-            "            # Step1: タブ一覧確認（Chrome は事前起動済み前提）\n"
-            "            r = await session.call_tool('list_tabs', {})\n"
-            "            text = _content_text(r)\n"
-            "            if getattr(r, 'isError', False):\n"
-            "                print(text or 'list_tabs failed', file=sys.stderr)\n"
-            "                return 1\n"
-            "            if not text:\n"
-            "                print('list_tabs returned empty content', file=sys.stderr)\n"
-            "                return 1\n"
-            "            tabs = json.loads(text)\n"
-            "            found = next((t for t in tabs if target_url in t.get('url', '')), None)\n"
-            "            if found:\n"
-            "                # 既に開いているタブをアクティブにする\n"
-            "                activated = await session.call_tool('activate_tab', {'tab_id': found['id']})\n"
-            "                if getattr(activated, 'isError', False):\n"
-            "                    print(_content_text(activated) or 'activate_tab failed', file=sys.stderr)\n"
-            "                    return 1\n"
-            "            else:\n"
-            "                # Step2: 新規タブで開く（Chrome は Step1 で起動済み）\n"
-            f"                created = await session.call_tool('new_page', {{'url': target_url, 'show_automation_banner': {BACKEND_MCP_SHOW_AUTOMATION_BANNER}}})\n"
-            "                if getattr(created, 'isError', False):\n"
-            "                    print(_content_text(created) or 'new_page failed', file=sys.stderr)\n"
-            "                    return 1\n"
-            "            print('OK')\n"
-            "            return 0\n"
-            "raise SystemExit(asyncio.run(main()))\n"
-        )
-        try:
-            result = subprocess.run(
-                [str(backend_mcp_python), "-c", script],
-                cwd=str(BACKEND_MCP_DIR),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=60,
-            )
-            if result.returncode == 0 and "OK" in result.stdout:
-                print_info(f"(mcp) MCP切断")
-                return True
-            stderr = result.stderr.strip()
-            stdout = result.stdout.strip()
-            print_warning(f"(mcp) MCP経由で開けませんでした (rc={result.returncode})")
-            if stderr:
-                print_warning(f"(mcp) stderr: {stderr}")
-            if stdout:
-                print_info(f"(mcp) stdout: {stdout}")
-        except subprocess.TimeoutExpired:
-            print_warning("(mcp) MCP経由のページ表示がタイムアウトしました")
-        except Exception as exc:
-            print_warning(f"(mcp) MCP経由でエラーが発生しました: {exc}")
-
-    # フォールバック: 通常ブラウザ
-    print_warning(f"(mcp) 通常ブラウザで開きます: {url}")
     try:
-        webbrowser.open(url)
+        _mcp_post(
+            "/aidiy_chrome_devtools/new_page",
+            {"url": url, "show_automation_banner": BACKEND_MCP_SHOW_AUTOMATION_BANNER},
+            timeout=60,
+        )
+        print_success(f"(mcp) Chrome でページを開きました: {url}")
+        return True
     except Exception as exc:
-        print_warning(f"ブラウザを開けませんでした: {exc}")
-    return False
+        print_warning(f"(mcp) HTTP POST 経由でページを開けませんでした: {exc}")
+        try:
+            webbrowser.open(url)
+        except Exception as exc2:
+            print_warning(f"ブラウザを開けませんでした: {exc2}")
+        return False
 
 
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:

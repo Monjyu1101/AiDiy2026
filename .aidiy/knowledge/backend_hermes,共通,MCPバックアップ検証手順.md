@@ -1,6 +1,6 @@
 # MCP バックアップツールを使ったファイル検証手順
 
-> 文書: `backend_hermes,共通,MCPバックアップ検証手順.md` | 実装: `backend_mcp/` (aidiy_backup_check)
+> 文書: `backend_hermes,共通,MCPバックアップ検証手順.md` | 実装: `backend_mcp/` (aidiy_backup)
 
 ## このメモを使う場面
 
@@ -12,17 +12,17 @@
 
 | MCP ツール | 用途 |
 |-----------|------|
-| `aidiy_backup_check_backup_get_before_after` | 指定ファイルのバックアップ版(before)と現行版(after)を同時取得 |
-| `aidiy_backup_check_backup_diff_stats` | before/after の追加・削除行数を軽量サマリで返す |
-| `aidiy_backup_check_backup_list_versions` | 指定ファイルがバックアップに出現する全日時一覧 |
-| `aidiy_backup_check_backup_find_changed` | 指定期間の変更ファイル一覧 |
+| `aidiy_backup_backup_get_before_after` | 指定ファイルのバックアップ版(before)と現行版(after)を同時取得 |
+| `aidiy_backup_backup_diff_stats` | before/after の追加・削除行数を軽量サマリで返す |
+| `aidiy_backup_backup_list_versions` | 指定ファイルがバックアップに出現する全日時一覧 |
+| `aidiy_backup_backup_find_changed` | 指定期間の変更ファイル一覧 |
 
 ## 検証手順
 
 ### 1. バックアップと現行ファイルの内容比較
 
 ```python
-# aidiy_backup_check_backup_get_before_after を呼び出す
+# aidiy_backup_backup_get_before_after を呼び出す
 # path: プロジェクトルート相対パス
 # base_ts: 省略時は直前のバックアップが自動選択される
 ```
@@ -39,7 +39,7 @@
 ### 2. 差分行数の確認
 
 ```python
-# aidiy_backup_check_backup_diff_stats を呼び出す
+# aidiy_backup_backup_diff_stats を呼び出す
 # path: プロジェクトルート相対パス
 # base_ts: 省略可
 ```

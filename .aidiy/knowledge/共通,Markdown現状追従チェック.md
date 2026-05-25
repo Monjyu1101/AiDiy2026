@@ -23,7 +23,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 
 - [ ] MCP は 8 サーバー構成として記載している。
   - 同期元: `backend_mcp/mcp_main.py`, `backend_mcp/mcp_proc/`
-  - 含める: `aidiy_backup_check`, `aidiy_backup_save`
+  - 含める: `aidiy_backup`
 - [ ] Docker 構成に `backend_mcp` を含めていない。
   - MCP 検証はローカル起動を前提に書く。
 - [ ] `backend_hermes` は `_setup.py` / `_cleanup.py` に統合済み、`_start.py` の常駐起動対象外として書く。
@@ -71,7 +71,7 @@ $files = rg --files -g '*.md' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**
 
 rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|openai_chat' $files
 rg -n 'hermes_cli|aidiy_hermes|3サーバー構成|_start\.py.*backend_hermes|AiDiy_code_hermes_cli' $files
-rg -n 'aidiy_backup_check|aidiy_backup_save|M取引先|V取引先|トークン更新|files_temp|reboot_mcp' $files
+rg -n 'aidiy_backup|M取引先|V取引先|トークン更新|files_temp|reboot_mcp' $files
 rg -n 'includeInactive|無効も検索|router/index\.ts へのルート追加|商品コードが重複|get_商品_by_code|DELETE文でデータを完全に削除' docs
 rg -n 'start\.py|_stop\.py|8095.*Docker|npm run build' $files
 ```

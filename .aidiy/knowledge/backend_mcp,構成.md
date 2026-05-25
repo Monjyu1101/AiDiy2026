@@ -12,7 +12,7 @@
 - Codex など stdio クライアント向けの SSE 変換入口は `backend_mcp/mcp_stdio.py`
 - 再利用ロジックは `backend_mcp/mcp_proc/` に置く
 - `mcp_main.py` からは `mcp_proc.<module>` として import する
-- `mcp_main.py` は 15 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す
+- `mcp_main.py` は 14 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す
 
 ## 関連ファイル
 - `backend_mcp/mcp_main.py`
@@ -23,8 +23,7 @@
 - `backend_mcp/mcp_proc/postgres_query.py`
 - `backend_mcp/mcp_proc/log_tailer.py`
 - `backend_mcp/mcp_proc/code_checker.py`
-- `backend_mcp/mcp_proc/backup_check.py`
-- `backend_mcp/mcp_proc/backup_save.py`
+- `backend_mcp/mcp_proc/backup.py`
 - `backend_mcp/mcp_proc/image_generation.py`
 - `backend_mcp/mcp_proc/movie_generation.py`
 - `backend_mcp/mcp_proc/speech_to_text.py`
@@ -34,6 +33,33 @@
 - `backend_mcp/mcp_proc/code_agents.py`
 - `backend_server/_config/AiDiy_mcp.json`
 - `_start.py`
+
+## アクセスインターフェース
+
+各 MCP は **3 つのインターフェース**を同一ポート（8095）で同時提供する。
+
+| インターフェース | アクセス方法 | 用途 |
+|----------------|-------------|------|
+| **SSE（MCP標準）** | `http://localhost:8095/{mcp_name}/sse` | AI エージェント・MCP クライアントが接続 |
+| **stdio gateway** | `mcp_stdio.py --sse-url .../sse` | Codex など stdio 専用の Code CLI が経由 |
+| **HTTP POST（FastAPI）** | `POST http://localhost:8095/{mcp_name}/{method_name}` | Python / curl / 自動化スクリプトが直接呼び出し |
+
+Swagger UI: `http://localhost:8095/docs` — 全エンドポイントをブラウザで試行できる。  
+ツール仕様 JSON: `GET http://localhost:8095/{mcp_name}/docs` — 引数・返値定義を JSON で取得。
+
+HTTP POST は SSE とまったく同じロジックを呼ぶ。AI エージェント経由でなくても Python スクリプトや `backend_mcp/aidiy_automations/` から直接利用できる。
+
+```python
+import requests
+# SQLite のテーブル一覧を取得する例
+res = requests.post("http://localhost:8095/aidiy_sqlite/list_tables", json={})
+print(res.json())
+
+# TTS でテキストを読み上げる例（サーバー側ローカル再生）
+res = requests.post("http://localhost:8095/aidiy_text_to_speech/synthesize",
+                    json={"speech_text": "処理が完了しました", "play": True})
+print(res.json())  # {"save_path": "..."}
+```
 
 ## 提供 MCP
 
@@ -45,8 +71,7 @@
 | `aidiy_postgres` | 外部 PostgreSQL の確認 | `http://localhost:8095/aidiy_postgres/sse` |
 | `aidiy_logs` | backend_server / backend_mcp のログ確認 | `http://localhost:8095/aidiy_logs/sse` |
 | `aidiy_code_check` | Python 構文、ruff、TypeScript 型チェック | `http://localhost:8095/aidiy_code_check/sse` |
-| `aidiy_backup_check` | 差分バックアップ確認 | `http://localhost:8095/aidiy_backup_check/sse` |
-| `aidiy_backup_save` | AiDiy 差分バックアップ実行 | `http://localhost:8095/aidiy_backup_save/sse` |
+| `aidiy_backup` | 差分バックアップ保存 / 確認。HTTP は `save` / `check` に分岐 | `http://localhost:8095/aidiy_backup/sse` |
 | `aidiy_image_generation` | AI 画像生成（OpenAI / Gemini / FreeAI） | `http://localhost:8095/aidiy_image_generation/sse` |
 | `aidiy_speech_to_text` | 音声認識（speech_recognition / Whisper） | `http://localhost:8095/aidiy_speech_to_text/sse` |
 | `aidiy_text_to_speech` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） | `http://localhost:8095/aidiy_text_to_speech/sse` |
@@ -123,7 +148,7 @@ Chrome DevTools 系ツールは `_ensure_chrome()` で Chrome の起動状態を
 - stdio と SSE の transport 変換は `mcp_stdio.py` に閉じ込める
 - SQLite / PostgreSQL は既定 read-only。検証は SELECT / describe / count を優先する
 - Chrome DevTools MCP は Python CDP 実装。Node.js 版 `chrome-devtools-mcp` 前提で復旧しない
-- `aidiy_backup_save` の path 問題は、まず `backend_mcp` 直下で `BackupSave().diff_scan()` を直接実行して root / backend_dir を確認する
+- `aidiy_backup` の path 問題は、まず `backend_mcp` 直下で `BackupSave().diff_scan()` を直接実行して root / backend_dir を確認する
 
 ## 確認方法
 

@@ -14,11 +14,14 @@ code_agents テスト
   Test 1: バージョン確認・設定表示
   Test 2: auto AI で簡単なプロンプト実行
   Test 3: 利用可能な AI を個別指定して実行（version_info に基づく）
+  Test 4: 同じ内容を HTTP POST API 経由で実行
 """
 
 import asyncio
+import json
 import os
 import sys
+from urllib import request
 
 # UTF-8 出力強制（Windows cp932 文字化け対策）
 if sys.platform == "win32":
@@ -31,6 +34,8 @@ from mcp_proc.code_agents import CodeAgents, CodeAgentsError
 
 
 TEST_PROMPT = "1+1の計算結果だけを数字で答えてください。余計な説明は不要です。"
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+HTTP_TIMEOUT = float(os.environ.get("AIDIY_MCP_EXTERNAL_TIMEOUT", "1200"))
 
 
 # ------------------------------------------------------------------ #
@@ -127,6 +132,60 @@ async def test_run_each(ca: CodeAgents, available: list) -> None:
 
 
 # ------------------------------------------------------------------ #
+# Test 4: HTTP POST API 経由で実行
+# ------------------------------------------------------------------ #
+
+def _post_json(path: str, payload: dict, timeout: float | None = None) -> dict:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = request.Request(
+        f"{BASE_URL}{path}",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    with request.urlopen(req, timeout=timeout or HTTP_TIMEOUT) as res:
+        return json.loads(res.read().decode("utf-8", errors="replace"))
+
+
+def test_post_api() -> None:
+    print()
+    print("=" * 60)
+    print("Test 4: HTTP POST API で code_agents 実行")
+    print("=" * 60)
+
+    config = _post_json("/aidiy_code_agents/config", {})
+    if "error" in config:
+        raise AssertionError(f"POST config error: {config['error']}")
+
+    version_info = config.get("version_info", {})
+    available = [name for name, info in version_info.items() if info.get("ok")]
+    print(f"  利用可能 AI: {available if available else '（なし）'}")
+    if not available:
+        print("  SKIP: 利用可能な AI がありません")
+        return
+
+    targets = ["auto"] + available
+    for ai_name in targets:
+        result = _post_json(
+            "/aidiy_code_agents/run",
+            {
+                "prompt": TEST_PROMPT,
+                "ai_name": ai_name,
+                "ai_model": "auto",
+                "max_turns": 3,
+                "code_plan": "off",
+                "code_verify": "off",
+                "timeout_sec": 120,
+            },
+            timeout=180,
+        )
+        if "error" in result:
+            raise AssertionError(f"POST run error ({ai_name}): {result['error']}")
+        print(f"  {ai_name:20s} status={result.get('status')} ai={result.get('ai_name')}")
+        print(f"    result={str(result.get('result', ''))[:200]}")
+
+
+# ------------------------------------------------------------------ #
 # main
 # ------------------------------------------------------------------ #
 
@@ -138,6 +197,8 @@ async def main() -> None:
     await test_run_auto(ca, available)
 
     await test_run_each(ca, available)
+
+    test_post_api()
 
     print()
     print("=" * 60)

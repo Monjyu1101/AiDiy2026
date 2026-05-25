@@ -55,6 +55,33 @@ uv sync
 
 Node.js / `package.json` / `node_modules` は不要。
 
+## アクセスインターフェース（3種類）
+
+`backend_mcp` は 1 ポート（8095）で 3 つのインターフェースを同時提供する。
+
+| インターフェース | 説明 | 代表 URL / コマンド |
+|----------------|------|-------------------|
+| **SSE（MCP標準）** | AI エージェント・MCP クライアントが使う標準トランスポート | `http://localhost:8095/{mcp_name}/sse` |
+| **stdio gateway** | `mcp_stdio.py` が SSE を stdin/stdout に変換。Codex 等の stdio 専用 CLI が使う | `mcp_stdio.py --sse-url .../sse` |
+| **HTTP POST（FastAPI）** | REST API として直接呼び出せる。Swagger UI (`/docs`) で試行可能。Python から最も簡単に利用できる | `POST http://localhost:8095/{mcp_name}/{method_name}` |
+
+各 MCP の引数仕様は `GET http://localhost:8095/{mcp_name}/docs` で JSON 取得できる。
+
+### Python から利用する例
+
+```python
+import requests
+
+# コードチェック
+res = requests.post("http://localhost:8095/aidiy_code_check/check_python_ruff",
+                    json={"file_path": "backend_server/core_main.py", "venv_project": "backend_server"})
+print(res.json())
+
+# バックアップ実行
+res = requests.post("http://localhost:8095/aidiy_backup/save/run", json={})
+print(res.json())
+```
+
 ## SSE エンドポイント
 
 | MCP | SSE |
@@ -65,13 +92,14 @@ Node.js / `package.json` / `node_modules` は不要。
 | PostgreSQL | `http://localhost:8095/aidiy_postgres/sse` |
 | Logs | `http://localhost:8095/aidiy_logs/sse` |
 | Code Check | `http://localhost:8095/aidiy_code_check/sse` |
-| Backup Check | `http://localhost:8095/aidiy_backup_check/sse` |
-| Backup Save | `http://localhost:8095/aidiy_backup_save/sse` |
+| Backup | `http://localhost:8095/aidiy_backup/sse` |
 | Image Generation | `http://localhost:8095/aidiy_image_generation/sse` |
 | Speech-to-Text | `http://localhost:8095/aidiy_speech_to_text/sse` |
 | Text-to-Speech | `http://localhost:8095/aidiy_text_to_speech/sse` |
+| Movie Generation | `http://localhost:8095/aidiy_movie_generation/sse` |
 | OBS Studio Control | `http://localhost:8095/aidiy_obs_studio_control/sse` |
 | FFmpeg Control | `http://localhost:8095/aidiy_ffmpeg_control/sse` |
+| Code Agents | `http://localhost:8095/aidiy_code_agents/sse` |
 
 アクセスは localhost 限定。外部接続は 403。
 

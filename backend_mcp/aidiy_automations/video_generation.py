@@ -31,7 +31,7 @@ video_generation.py — 自動ビデオ生成スクリプト
     - ファイル作成や内容更新などの具体的な作業は CodeAgents に依頼する。
     - この Python 本体は「手順の指示」「存在確認」「リトライ制御」を担当する。
     - 各ステップは再実行可能にし、既に成果物がある場合も内容検証して必要なら修正する。
-    - 各 CodeAgents 実行後は検証を挟み、POST /backup で差分バックアップを保存する。
+    - 各 CodeAgents 実行後は検証を挟み、POST /aidiy_backup/save/run で差分バックアップを保存する。
     - 差分バックアップ後に差分がなくなるまで、同じステップの検証を継続する。
     - 重要な区切りでは POST /tts play=true で音声案内を挟み、実行状況を知らせる。
     - 完成.txt が出力されたら、動画素材一式が完成した合図として処理を終了する。
@@ -138,8 +138,8 @@ CONFIG: AutomationConfig | None = None
 # 既存のステップ関数から参照する実行時値。configure_runtime() で上書きされる。
 TEMPLATE_DIR = DEFAULT_TEMPLATE_DIR
 VIDEO_BASE_DIR = DEFAULT_VIDEO_BASE_DIR
-BACKUP_API_URL = "http://localhost:8095/backup"
-TTS_API_URL = "http://localhost:8095/tts"
+BACKUP_API_URL = "http://localhost:8095/aidiy_backup/save"
+TTS_API_URL = "http://localhost:8095/aidiy_text_to_speech/synthesize"
 TTS_GUIDE = True
 MAX_RETRIES = 3
 RETRY_WAIT_SEC = 5
@@ -209,8 +209,8 @@ def build_config(argv: list[str]) -> AutomationConfig:
         stop_step=stop_step,
         template_dir=os.environ.get("AIDIY_VIDEO_GEN_TEMPLATE_DIR", DEFAULT_TEMPLATE_DIR),
         video_base_dir=os.environ.get("AIDIY_VIDEO_GEN_BASE_DIR", DEFAULT_VIDEO_BASE_DIR),
-        backup_api_url=os.environ.get("AIDIY_BACKUP_API_URL", "http://localhost:8095/backup"),
-        tts_api_url=os.environ.get("AIDIY_TTS_API_URL", "http://localhost:8095/tts"),
+        backup_api_url=os.environ.get("AIDIY_BACKUP_API_URL", "http://localhost:8095/aidiy_backup/save"),
+        tts_api_url=os.environ.get("AIDIY_TTS_API_URL", "http://localhost:8095/aidiy_text_to_speech/synthesize"),
         tts_guide=env_bool("AIDIY_VIDEO_GEN_TTS", True),
         frontend_base_url=os.environ.get("AIDIY_VIDEO_GEN_FRONTEND_URL", DEFAULT_FRONTEND_BASE_URL),
         browser_preview=env_bool("AIDIY_VIDEO_GEN_BROWSER", True),
@@ -290,7 +290,7 @@ def print_automation_flow(config: AutomationConfig) -> None:
     print("  07. 再生時間更新")
     print("  08. 最終確認・完成.txt 作成")
     print("  99. 完成案内")
-    print("  ※ 各 CodeAgents 実行後に検証と POST /backup の差分ゼロ確認を行う")
+    print("  ※ 各 CodeAgents 実行後に検証と POST /aidiy_backup/save/run の差分ゼロ確認を行う")
     print()
     print(f"フォルダ名     : {config.folder_name}")
     print(f"トピック       : {config.topic}")
@@ -937,7 +937,7 @@ def post_json(url: str, payload: dict, timeout_sec: int = 120) -> dict:
 
 def guide_tts(message: str, *, voice: str = "female") -> None:
     """
-    localhost:8095/tts で実行状況を読み上げる。
+    aidiy_text_to_speech API で実行状況を読み上げる。
 
     TTS サーバー未起動や音声再生失敗で自動化全体を止めない。
     """
@@ -1039,15 +1039,19 @@ async def agent_verify_step(
 
 
 def post_backup_api(backup_url: str, dry_run: bool) -> dict:
-    """localhost:8095/backup へ POST し、差分スキャンまたは差分バックアップを実行する。"""
+    """aidiy_backup API へ POST し、差分スキャンまたは差分バックアップを実行する。
+    dry_run=True → /save/scan（コピーなし）、dry_run=False → /save/run（差分コピー）
+    """
+    method = "scan" if dry_run else "run"
+    url = f"{backup_url}/{method}"
     try:
-        return post_json(backup_url, {"dry_run": dry_run}, timeout_sec=120)
+        return post_json(url, {}, timeout_sec=120)
     except RuntimeError as e:
         raise RuntimeError(str(e).replace("HTTP API", "backup API")) from e
 
 
 def backup_diff_count(backup_url: str) -> int:
-    """POST /backup の dry_run で、現時点の差分バックアップ対象ファイル数を返す。"""
+    """POST /aidiy_backup/save/scan で、現時点の差分バックアップ対象ファイル数を返す。"""
     result = post_backup_api(backup_url, dry_run=True)
     count = int(result.get("count", 0))
     files = result.get("差分ファイル", []) or []
@@ -1061,7 +1065,7 @@ def backup_diff_count(backup_url: str) -> int:
 
 
 def backup_save_once(backup_url: str) -> bool:
-    """POST /backup で差分バックアップを 1 回実行し、成功可否を返す。"""
+    """POST /aidiy_backup/save/run で差分バックアップを 1 回実行し、成功可否を返す。"""
     result = post_backup_api(backup_url, dry_run=False)
     ok = bool(result.get("ok"))
     print(
@@ -1086,8 +1090,8 @@ async def verify_and_backup_until_stable(
 
     1. 検証専用の CodeAgents 実行で内容を確認・必要なら修正する。
     2. Python 側の機械的チェックを通す。
-    3. POST /backup の dry_run で差分を確認する。
-    4. 差分があれば POST /backup で差分バックアップを保存する。
+    3. POST /aidiy_backup/save/scan で差分を確認する。
+    4. 差分があれば POST /aidiy_backup/save/run で差分バックアップを保存する。
     5. バックアップ保存後はもう一度検証へ戻り、差分がゼロになるまで続ける。
     """
     for round_no in range(1, MAX_BACKUP_STABILIZE + 1):
@@ -1112,7 +1116,7 @@ async def verify_and_backup_until_stable(
             guide_tts(f"{step_name} の差分はありません。次のステップへ進みます。")
             return True
 
-        print("  [backup] 差分あり。POST /backup で保存して同ステップを再確認します")
+        print("  [backup] 差分あり。POST /aidiy_backup/save/run で保存して同ステップを再確認します")
         guide_tts(f"{step_name} で差分が {diff_count} 件あります。差分バックアップを保存して、もう一度確認します。", voice="male")
         if not backup_save_once(backup_url):
             guide_tts(f"{step_name} の差分バックアップに失敗しました。", voice="male")
@@ -2131,7 +2135,7 @@ async def run_automation(config: AutomationConfig) -> None:
     print(f"利用可能 AI  : {available}")
 
     # ── 差分バックアップ API ──
-    # 各 CodeAgents 実行後に、検証と POST /backup による差分バックアップ保存を挟む。
+    # 各 CodeAgents 実行後に、検証と POST /aidiy_backup/save/run による差分バックアップ保存を挟む。
     backup_url = config.backup_api_url
     print(f"バックアップAPI: {backup_url}")
 

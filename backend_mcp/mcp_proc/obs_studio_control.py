@@ -21,6 +21,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Optional
@@ -389,7 +390,26 @@ class ObsStudioControl:
     def _check_startup_sync(self) -> dict[str, Any]:
         """同期コンテキストから接続/認証を確認する。失敗しても例外は出さない。"""
         try:
-            return asyncio.run(self._check_startup_async())
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return asyncio.run(self._check_startup_async())
+
+            result: dict[str, Any] = {}
+            error: list[BaseException] = []
+
+            def runner() -> None:
+                try:
+                    result.update(asyncio.run(self._check_startup_async()))
+                except BaseException as exc:
+                    error.append(exc)
+
+            thread = threading.Thread(target=runner, daemon=True)
+            thread.start()
+            thread.join()
+            if error:
+                raise error[0]
+            return result
         except Exception as e:
             msg = f"起動時接続確認で予期せぬ例外: {e}"
             logger.warning(f"OBS WebSocket: {msg} ({self.host}:{self.port})")

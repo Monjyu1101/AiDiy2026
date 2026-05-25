@@ -424,6 +424,39 @@ def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None
     return None
 
 
+def ensure_python_module_attribute(
+    python_path: Path,
+    module_name: str,
+    attr_name: str,
+    repair_command: list[str],
+    cwd: Path,
+    label: str,
+) -> bool:
+    """仮想環境内の依存パッケージが壊れていないか軽く確認し、必要なら修復する。"""
+    check_code = (
+        "import importlib, sys; "
+        "m = importlib.import_module(sys.argv[1]); "
+        "raise SystemExit(0 if hasattr(m, sys.argv[2]) else 1)"
+    )
+    check_command = [str(python_path), "-c", check_code, module_name, attr_name]
+
+    result = subprocess.run(check_command, cwd=cwd, capture_output=True, text=True)
+    if result.returncode == 0:
+        return True
+
+    print_warning(f"{label}: {module_name}.{attr_name} が見つかりません。依存関係を修復します。")
+    if not run_command(repair_command, cwd=cwd):
+        return False
+
+    result = subprocess.run(check_command, cwd=cwd, capture_output=True, text=True)
+    if result.returncode == 0:
+        print_success(f"{label}: {module_name} の修復が完了しました。")
+        return True
+
+    print_error(f"{label}: {module_name}.{attr_name} の確認に失敗しました。")
+    return False
+
+
 def upsert_codex_backend_mcp_config(module: dict) -> bool:
     config_path = Path.home() / ".codex" / "config.toml"
     server_name = module.get("server_name", module["name"])
@@ -1001,12 +1034,8 @@ MCP_MODULES = [
                 "sse_url":     "http://localhost:8095/aidiy_code_agents/sse",
             },
             {
-                "server_name": "aidiy_backup_check",
-                "sse_url":     "http://localhost:8095/aidiy_backup_check/sse",
-            },
-            {
-                "server_name": "aidiy_backup_save",
-                "sse_url":     "http://localhost:8095/aidiy_backup_save/sse",
+                "server_name": "aidiy_backup",
+                "sse_url":     "http://localhost:8095/aidiy_backup/sse",
             },
             {
                 "server_name": "aidiy_image_generation",
@@ -1057,6 +1086,19 @@ def setup_mcp_module(module: dict) -> bool:
             return False
         if not run_command(["uv", "sync", "--no-install-project"], cwd=mcp_dir):
             print_error(f"{label}: uv sync に失敗しました。")
+            return False
+        python_path = find_python_in_env(mcp_dir, BACKEND_MCP_ENV_CANDIDATES)
+        if python_path is None:
+            print_error(f"{label}: Python 仮想環境が見つかりません: {mcp_dir}")
+            return False
+        if not ensure_python_module_attribute(
+            python_path,
+            "click",
+            "Choice",
+            ["uv", "sync", "--no-install-project", "--reinstall-package", "click"],
+            mcp_dir,
+            label,
+        ):
             return False
         print_success(f"{label}: Python 依存関係のインストールが完了しました。")
 

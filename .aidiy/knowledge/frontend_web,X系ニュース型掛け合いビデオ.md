@@ -128,7 +128,7 @@ DIALOGUES = [
 - システム Python では `edge_tts` モジュールがないため、**必ず `backend_mcp/.venv` の Python を使う**
 - MCP クライアントが不要な場合は HTTP POST でも同等の処理を呼び出せる。
   ```
-  POST http://localhost:8095/tts
+  POST http://localhost:8095/aidiy_text_to_speech/synthesize
   Body: { "text": "読み上げテキスト", "provider": "edge", "voice": "female",
           "save_path": "D:/.../audio/dlg_001_01_female.mp3" }
   Response: audio/mpeg バイナリ（save_path 指定時はファイルにも同時保存）
