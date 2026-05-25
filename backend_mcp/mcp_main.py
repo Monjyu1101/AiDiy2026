@@ -2019,7 +2019,7 @@ class MovieGenRequest(BaseModel):
 
 
 class AgentsRequest(BaseModel):
-    prompt: str
+    prompt: str = ""
     project_path: Optional[str] = None
     ai_name: str = "auto"
     ai_model: str = "auto"
