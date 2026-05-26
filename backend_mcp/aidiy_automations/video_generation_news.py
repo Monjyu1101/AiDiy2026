@@ -8,7 +8,7 @@
 # -------------------------------------------------------------------------
 
 """
-video_generation.py — 自動ビデオ生成スクリプト
+video_generation_news.py — 自動ニュース型ビデオ生成スクリプト
 
 このスクリプトの目的:
     AiDiy の Xビデオ用テンプレートをもとに、ニュース型の掛け合い動画素材を
@@ -1210,8 +1210,15 @@ async def step_create_folder(
 
     # ── 既完了チェック ──
     # フォルダ作成済みで主要ファイルが揃っている場合は、再実行時に上書きしない。
-    if os.path.isdir(new_dir) and os.path.isfile(index_path) and os.path.isfile(md_path):
-        print("  [既存] フォルダは存在します。内容検証を行い、問題があれば修正します")
+    folder_already_exists = (
+        os.path.isdir(new_dir)
+        and os.path.isfile(index_path)
+        and os.path.isfile(os.path.join(new_dir, "scenario.js"))
+    )
+    if folder_already_exists:
+        print("  [既存] コピー先に index.html / scenario.js が存在。テンプレートからの再コピーはスキップします")
+    else:
+        print("  [新規] フォルダを作成します")
 
     images_dir = os.path.join(new_dir, "images")
     audio_dir = os.path.join(new_dir, "audio")
@@ -1238,11 +1245,18 @@ async def step_create_folder(
         "【参考ナレッジ】\n"
         f'  - "{NEWS_VIDEO_KNOWLEDGE_PATH}"\n'
         f'  - "{AUTO_VIDEO_KNOWLEDGE_PATH}"\n\n'
-        "【手順 1】テンプレートフォルダをコピー\n"
-        f'  robocopy "{TEMPLATE_DIR}" "{new_dir}" /E /XD audio /XD images /XD __pycache__ /NP /NDL\n'
-        "  ※ robocopy は成功時に終了コード 1〜7 を返す（エラーは 8 以上）。\n"
-        "  ※ images/ は各動画で生成するため除外する。\n\n"
-        "【手順 2】images / audio フォルダを確認・作成\n"
+        + (
+            "【手順 1】テンプレートフォルダをコピー\n"
+            f'  robocopy "{TEMPLATE_DIR}" "{new_dir}" /E /XD audio /XD images /XD __pycache__ /NP /NDL\n'
+            "  ※ robocopy は成功時に終了コード 1〜7 を返す（エラーは 8 以上）。\n"
+            "  ※ images/ は各動画で生成するため除外する。\n\n"
+            if not folder_already_exists else
+            "【手順 1】テンプレートフォルダのコピー — スキップ\n"
+            f'  コピー先 "{new_dir}" に index.html と scenario.js が存在するため\n'
+            "  テンプレートからの再コピーは絶対に行わないでください。\n"
+            "  既存ファイルの上書き・削除も禁止です。\n\n"
+        )
+        + "【手順 2】images / audio フォルダを確認・作成\n"
         f'  フォルダが存在しなければ作成: "{images_dir}"\n\n'
         f'  フォルダが存在しなければ作成: "{audio_dir}"\n\n'
         "【手順 3】進捗管理ファイルを作成\n"

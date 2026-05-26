@@ -37,7 +37,7 @@ from mcp_proc.image_generation import ImageGeneration
 
 
 
-OUTPUT_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\活用事例_video_generation紹介\\images'
+OUTPUT_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\AiDiy紹介_mcp改\\images'
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
