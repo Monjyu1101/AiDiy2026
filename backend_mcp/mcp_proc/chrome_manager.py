@@ -118,10 +118,87 @@ class ChromeManager:
             "--no-default-browser-check",
             "--disable-default-apps",
             "--autoplay-policy=no-user-gesture-required",
+            # パスワード保存・変更提案・漏洩検知ダイアログをすべて抑制
+            "--disable-features=PasswordManagerOnboarding,AutofillEnableAccountWalletStorage,PasswordLeakDetection,PasswordCheck",
         ]
         if should_show_banner:
             args.append("--enable-automation")
         return args
+
+    def _kill_on_debug_port(self) -> bool:
+        """デバッグポートを使用している Chrome プロセスだけを停止する"""
+        try:
+            result = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True, text=True, timeout=5,
+            )
+            pid = None
+            for line in result.stdout.splitlines():
+                if f":{self.debug_port}" in line and "LISTENING" in line:
+                    parts = line.strip().split()
+                    if parts:
+                        pid = int(parts[-1])
+                        break
+            if pid:
+                subprocess.run(
+                    ["taskkill", "/PID", str(pid), "/F"],
+                    capture_output=True, timeout=5,
+                )
+                logger.info(f"Chrome プロセス (PID={pid}, port={self.debug_port}) を停止しました")
+                time.sleep(1.5)
+                return True
+        except Exception as e:
+            logger.warning(f"Chrome 停止に失敗: {e}")
+        return False
+
+    def _setup_profile(self) -> None:
+        """Chrome プロファイルのパスワード関連設定を初期化する"""
+        import json
+
+        prefs_dir = Path(self.profile_dir) / "Default"
+        prefs_dir.mkdir(parents=True, exist_ok=True)
+
+        # 保存済みパスワード DB を削除（漏洩検知警告の原因）
+        # Chrome 起動中はファイルがロックされるので、必要なら先に止める
+        for db_file in ("Login Data", "Login Data-journal"):
+            db_path = prefs_dir / db_file
+            if db_path.exists():
+                try:
+                    db_path.unlink()
+                    logger.info(f"Chrome: {db_file} を削除しました（保存パスワードをクリア）")
+                except Exception:
+                    # ロック中 → Chrome を止めてから再試行
+                    logger.info(f"Chrome: {db_file} がロック中 — Chrome を停止して再試行します")
+                    self._kill_on_debug_port()
+                    try:
+                        db_path.unlink()
+                        logger.info(f"Chrome: {db_file} を削除しました（再試行成功）")
+                    except Exception as e2:
+                        logger.warning(f"Chrome: {db_file} の削除に失敗: {e2}")
+
+        # Preferences でパスワードマネージャー・漏洩検知を無効化
+        prefs_path = prefs_dir / "Preferences"
+        existing: dict = {}
+        if prefs_path.exists():
+            try:
+                existing = json.loads(prefs_path.read_text(encoding="utf-8"))
+            except Exception:
+                existing = {}
+
+        existing.setdefault("profile", {})
+        existing["credentials_enable_service"] = False
+        existing["profile"]["password_manager_enabled"] = False
+        existing.setdefault("safebrowsing", {})
+        existing["safebrowsing"]["password_protection_warning_trigger"] = 0
+        existing["password_manager"] = {
+            "leak_detection_enabled": False,
+        }
+
+        prefs_path.write_text(
+            json.dumps(existing, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        logger.info("Chrome Preferences: パスワードマネージャー無効設定を書き込みました")
 
     def launch(
         self,
@@ -154,6 +231,7 @@ class ChromeManager:
             )
 
         args = self._build_launch_args(chrome_path, show_automation_banner)
+        self._setup_profile()
 
         logger.info(f"起動: {chrome_path}")
         self._process = subprocess.Popen(
@@ -183,6 +261,7 @@ class ChromeManager:
         Raises:
             FileNotFoundError: Chrome が見つからない場合
         """
+        self._setup_profile()
         if self.is_running():
             return "already_running"
         return self.launch(show_automation_banner=show_automation_banner)
