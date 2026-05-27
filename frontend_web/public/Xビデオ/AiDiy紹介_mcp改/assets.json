@@ -1,0 +1,41 @@
+{
+  "project_name": "AiDiy紹介_mcp改",
+  "version": "take1",
+  "status": "pending",
+  "policy": {
+    "visual_generation": "openai_gpt-image-2",
+    "audio_generation": "freeai_female",
+    "layout": "left_image_30_right_explanation_70",
+    "avatar_model": "vrm/VRM_AiDiy.vrm",
+    "evidence_source": [
+      "AGENTS.md",
+      "backend_mcp/AGENTS.md",
+      ".aidiy/knowledge/_index.md"
+    ]
+  },
+  "images": [
+    { "scene_id": "scene_000", "status": "pending", "path": "images/scene_000.png" },
+    { "scene_id": "scene_001", "status": "pending", "path": "images/scene_001.png" },
+    { "scene_id": "scene_002", "status": "pending", "path": "images/scene_002.png" },
+    { "scene_id": "scene_003", "status": "pending", "path": "images/scene_003.png" },
+    { "scene_id": "scene_004", "status": "pending", "path": "images/scene_004.png" },
+    { "scene_id": "scene_005", "status": "pending", "path": "images/scene_005.png" },
+    { "scene_id": "scene_006", "status": "pending", "path": "images/scene_006.png" },
+    { "scene_id": "scene_007", "status": "pending", "path": "images/scene_007.png" },
+    { "scene_id": "scene_008", "status": "pending", "path": "images/scene_008.png" },
+    { "scene_id": "scene_999", "status": "pending", "path": "images/scene_999.png" }
+  ],
+  "audio": [
+    { "scene_id": "scene_000", "status": "pending", "path": "audio/scene_000.mp3" },
+    { "scene_id": "scene_001", "status": "pending", "path": "audio/scene_001.mp3" },
+    { "scene_id": "scene_002", "status": "pending", "path": "audio/scene_002.mp3" },
+    { "scene_id": "scene_003", "status": "pending", "path": "audio/scene_003.mp3" },
+    { "scene_id": "scene_004", "status": "pending", "path": "audio/scene_004.mp3" },
+    { "scene_id": "scene_005", "status": "pending", "path": "audio/scene_005.mp3" },
+    { "scene_id": "scene_006", "status": "pending", "path": "audio/scene_006.mp3" },
+    { "scene_id": "scene_007", "status": "pending", "path": "audio/scene_007.mp3" },
+    { "scene_id": "scene_008", "status": "pending", "path": "audio/scene_008.mp3" },
+    { "scene_id": "scene_999", "status": "pending", "path": "audio/scene_999.mp3" }
+  ],
+  "duration_sec": 0
+}

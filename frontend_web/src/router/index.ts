@@ -181,6 +181,11 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ/AiDiy実装_avatar版/index.html',
         'Xビデオ'
     ),
+    createStaticAliasRoute(
+        '/Xビデオ/活用事例_video_generation解説',
+        'Xビデオ/活用事例_video_generation解説/index.html',
+        'Xビデオ'
+    ),
 ]
 
 const router = createRouter({

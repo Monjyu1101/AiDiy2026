@@ -27,6 +27,7 @@ const 生産管理Url  = `${baseUrl}Xビデオ/AiDiy実装_生産管理/index.ht
 const 在庫管理Url  = `${baseUrl}Xビデオ/AiDiy実装_在庫管理/index.html`;
 const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_web版/index.html`;
 const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar版/index.html`;
+const videoGeneration解説Url = `${baseUrl}Xビデオ/活用事例_video_generation解説/index.html`;
 const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半/index.html`;
 const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半/index.html`;
 const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半/index.html`;
@@ -220,6 +221,23 @@ const handleReturn = () => {
               入庫・出庫・棚卸トランザクションと商品推移表の紹介ビデオ
             </div>
             <a :href="在庫管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+              別タブで開く →
+            </a>
+          </div>
+        </div>
+
+        <div class="section-label">活用事例</div>
+
+        <div class="menu-row">
+          <div class="menu-card menu-card-fixed">
+            <div class="menu-card-title">
+              <span class="icon">XVG</span>
+              活用事例 (video_generation解説)
+            </div>
+            <div class="menu-card-description">
+              MCP と CodeAgents を使った video_generation ワークフロー解説ビデオ
+            </div>
+            <a :href="videoGeneration解説Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>

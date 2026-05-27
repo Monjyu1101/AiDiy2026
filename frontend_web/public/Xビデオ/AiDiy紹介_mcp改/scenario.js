@@ -1,570 +1,619 @@
 window.SCENARIO = {
   "project_name": "AiDiy紹介_mcp改",
-  "version": "duo-v2",
-  "title": "AiDiy MCP Hub - FastAPI + HTTP Transport で広がるエージェント連携",
+  "version": "mcp",
+  "title": "AiDiy MCP Hub - HTTP Transportで応用範囲が広がる14サーバー紹介",
+  "source": {
+    "type": "agents_and_knowledge",
+    "summary": "FastAPI と HTTP Transport を合わせた MCP ハブインターフェースを中心に、14 個の MCP サーバーを紹介する。Web や Python からの agent 実行にも対応し、応用範囲が劇的に広がった点を強調する。"
+  },
+  "target": {
+    "language": "ja-JP",
+    "format": "html_css_scene_player_with_media",
+    "tone": "親しみやすく前向き、事実ベース、根拠付き",
+    "goal": "AiDiy の MCP ハブへの HTTP Transport 追加と 14 個の MCP サーバーの実態を、応用範囲の広がりとともに正確に伝える。"
+  },
   "assets_policy": {
-    "male_avatar": "../vrm/VRM_male.vrm",
-    "female_avatar": "../vrm/VRM_female.vrm",
-    "tts_male": "edge:male",
-    "tts_female": "edge:female",
-    "audio_output_dir": "frontend_web/public/Xビデオ/AiDiy紹介_mcp改/audio"
+    "visual_style": "left_avatar_38_right_content_62",
+    "audio_dir": "audio",
+    "image_dir": "images",
+    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "tts_provider": "freeai:female"
   },
   "scenes": [
     {
       "id": "scene_000",
       "title": "この動画で紹介すること",
+      "expression": "neutral",
       "accent": "#29d8ff",
-      "accent_soft": "rgba(41,216,255,0.18)",
+      "accent_soft": "rgba(41, 216, 255, 0.2)",
       "layout": "hero",
+      "hero_image_focus": true,
+      "background_word": "",
       "kicker": "INTRODUCTION",
-      "headline": "AiDiy MCP Hub\nHTTP Transport で広がる可能性",
+      "headline": "MCP ハブが HTTP Transport を加え\n応用範囲が劇的に広がりました",
+      "lead": "FastAPI と HTTP Transport を組み合わせた新インターフェースにより、Web ブラウザや Python から直接 MCP ツールを呼べるようになりました。14 のサーバーとともに紹介します。",
+      "subtitle": "HTTP Transport 追加で Web・Python から直接 MCP ツールを呼べる。14 サーバーの役割を順に見ていきます。",
       "image": "images/scene_000.png",
-      "source_documents": [
-        "backend_mcp/AGENTS.md",
-        ".aidiy/knowledge/backend_server,backend_mcp,MCP活用手順.md"
-      ],
-      "source_summary": "AiDiy MCPハブはポート8095で動くFastAPIアプリ。14のFastMCPサーバーを同居させ、SSE・HTTP Transport・stdioの3トランスポートを提供。HTTP Transport追加によりWeb・Pythonから直接ツールを呼べるようになった。",
-      "factual_bullets": [
-        "ポート8095でFastAPIが稼働",
-        "14種類のFastMCPサーバーを同居",
-        "SSE / HTTP Transport / stdio の3トランスポート対応",
-        "HTTP Transport追加で応用範囲が拡大",
-        "このビデオはAiDiyのビデオ生成機能で作成"
-      ],
-      "forbidden_elements": [
-        "MCPサーバーの数を14以外で言及すること",
-        "HTTP Transportが旧来の全機能を完全に置き換えるという誤解",
-        "AiDiyが商用製品として販売されているという誤情報"
-      ],
-      "image_prompt": "Futuristic AI hub control panel with 14 glowing server nodes connected by neon-blue data streams. Central FastAPI logo surrounded by MCP server icons. Dark background with cyan accent colors. Professional and clean design.",
-      "dialogue": [
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "AiDiy MCPハブにHTTP Transportが加わり応用範囲が劇的拡大！この動画はAiDiyのビデオ生成機能で作られています。",
-          "naration_text": "こんにちは！本日はAiDiyのMCPハブに新しく加わったHTTP Transportと、14種類のMCPサーバーをまとめて紹介します。MCPとはAIエージェントが外部の道具を呼び出すための共通ルールで、AiDiyにはブラウザ操作から動画制作まで14種類の強力なツールが揃っています。なお、この動画はAiDiyのビデオ生成機能を使って自動的に作られています。AIが台本を書き、音声を合成し、画像を生成して動画に仕上げました。",
-          "audio": "audio/dlg_000_01_female.mp3",
-          "duration_sec": 32.28
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "HTTP Transport追加でPythonやブラウザから直接MCPを呼べるようになり、活用の幅が大きく広がりましたね。",
-          "naration_text": "そうなんです！従来はSSEというストリーミング接続が主流でしたが、HTTP Transportが加わったことで普通のHTTPリクエストでMCPツールを呼び出せるようになりました。PythonのrequestsライブラリやJavaScriptのfetchで直接エージェントを動かせる点が革新的で、既存のシステムへのAI機能組み込みが格段に楽になっています。",
-          "audio": "audio/dlg_000_02_male.mp3",
-          "duration_sec": 20.64
-        },
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "14のMCPサーバーはブラウザ操作からDB確認、音声処理、画像・動画生成まで多彩なカバー範囲を持ちます！",
-          "naration_text": "AiDiyのMCPハブには、ブラウザの自動操作・デスクトップのスクリーンショット・データベースへのアクセス・コードの品質チェック・差分バックアップ・AI画像生成・AI動画生成・音声認識・音声合成・OBS制御・FFmpeg操作まで、実に多彩な14種類のツールが揃っています。組み合わせることで強力な自動化パイプラインが実現します。",
-          "audio": "audio/dlg_000_03_female.mp3",
-          "duration_sec": 25.008
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "MCPの基本からHTTP Transportの革新、各サーバーの役割まで順番に見ていきましょう！",
-          "naration_text": "それでは早速、MCPとは何かという基本から始めて、HTTP Transportが何を変えたか、そして14のMCPサーバーそれぞれの役割まで、グループ別に順番に見ていきます。実際の使い方の例も交えながら解説しますので、AiDiyを初めて知る方にも分かりやすくお届けします。",
-          "audio": "audio/dlg_000_04_male.mp3",
-          "duration_sec": 18.456
-        }
-      ],
-      "duration_sec": 96.384,
+      "chips": [],
+      "metrics": [],
+      "cards": [],
+      "facts": [],
+      "evidence": [],
+      "image_prompt": "Square 1:1 hero poster for AiDiy MCP Hub upgrade. Central visual is a glowing hub node labeled 'MCP HUB 8095' connected to 14 satellite nodes. Prominent labels 'HTTP TRANSPORT' and 'FastAPI' on connecting lines. Cyan and electric blue palette, dark background, premium futuristic enterprise AI style, strong typography, clean composition, no clutter.",
+      "short_narration": "AiDiy の MCP ハブが FastAPI と HTTP Transport で進化しました。Web や Python からも AI ツールを直接呼べます。14 サーバーを紹介します。",
+      "long_narration": "この動画は AiDiy の video_generation 機能で自動生成されました。AiDiy の MCP ハブに FastAPI と Streamable HTTP Transport を合わせた新インターフェースが追加されました。従来の SSE に加えて HTTP Transport が加わることで、Web ブラウザや Python の requests から MCP ツールを直接呼べるようになっています。AI エージェントの応用範囲が劇的に広がったこの仕組みと、ブラウザ操作からコードエージェント実行まで幅広い 14 のツールを順番に紹介します。",
       "short_audio": "audio/short_scene_000.mp3",
-      "long_audio": "audio/long_scene_000.mp3"
+      "long_audio": "audio/long_scene_000.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 9.864,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 29.328
     },
     {
       "id": "scene_001",
-      "title": "MCP とは何か / 位置づけ",
-      "accent": "#7b8cff",
-      "accent_soft": "rgba(123,140,255,0.18)",
-      "kicker": "WHAT IS MCP",
-      "headline": "Model Context Protocol\nAI が道具を呼び出す標準規格",
+      "title": "MCP Hub × 14 全体像",
+      "expression": "neutral",
+      "accent": "#00e0b8",
+      "accent_soft": "rgba(0, 224, 184, 0.18)",
+      "kicker": "MCP HUB OVERVIEW",
+      "headline": "14 個の MCP サーバーが\nAI の目と手と声になる",
+      "lead": "AiDiy の backend_mcp はポート 8095 に 14 個の MCP サーバーを同居させています。観測・生成・制御の 3 カテゴリで AI エージェントが現実世界を操作できます。",
+      "subtitle": "ブラウザ操作からコードエージェント実行まで、14 のツールが AI の能力を広げる。",
       "image": "images/scene_001.png",
-      "source_documents": [
-        "backend_mcp/AGENTS.md",
-        "AGENTS.md（プロジェクト全体）"
+      "image_prompt": "Vertical 2:3 MCP hub infographic poster. Central AI agent node labeled 'MCP HUB port 8095' connected to 14 labeled satellite nodes arranged in a circle: chrome_devtools, desktop_capture, sqlite, postgres, logs, code_check, backup, image_generation, movie_generation, speech_to_text, text_to_speech, obs_studio_control, ffmpeg_control, code_agents. Green-cyan enterprise network diagram, modern technical style, dark background, clean layout.",
+      "chips": [
+        "port 8095",
+        "14サーバー同居",
+        "観測・生成・制御",
+        "FastMCP 実装"
       ],
-      "source_summary": "MCPはModel Context Protocolの略で、AIエージェントが外部ツールやデータを呼び出すための標準規格。AiDiyではmcp_main.pyが14のFastMCPインスタンスをStarletteでマウントしポート8095で提供する。",
-      "factual_bullets": [
-        "MCP = Model Context Protocol（Anthropic提案の標準規格）",
-        "mcp_main.py が FastAPI / Starlette 上で動作",
-        "14個のFastMCPインスタンスをマウント",
-        "ポート8095で統一提供",
-        "AiDiy_mcp.json 一つで全ツールを有効化"
-      ],
-      "forbidden_elements": [
-        "MCPがOpenAI独自規格であるという誤情報",
-        "AiDiyが唯一のMCP実装であるという誤解",
-        "設定なしで自動的に使えるという誇張"
-      ],
-      "image_prompt": "Architecture diagram showing FastAPI server on port 8095 with 14 MCP nodes arranged in a hub pattern. Glowing blue connections between AI agent (Claude Code) and MCP tools. Clean technical illustration. Dark theme with purple accents.",
-      "dialogue": [
+      "metrics": [
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "MCPは難しそうに聞こえますが、要はAIエージェントが外部の道具を使うための共通ルールです。",
-          "naration_text": "MCPは『Model Context Protocol』の略で、AIエージェントが外部のツールやデータを利用するための標準規格です。難しく聞こえますが、要は『AIが使える道具箱の共通ルール』です。たとえばブラウザを操作したり、データベースを確認したりという作業を、AIが自分の判断で呼び出せるようにします。Anthropicが提案してClaudeを通じて広まったこの規格は、今やAI開発の重要な標準になっています。",
-          "audio": "audio/dlg_001_01_female.mp3",
-          "duration_sec": 28.92
+          "label": "MCP数",
+          "value": "14"
         },
         {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "AiDiyではポート8095の1本のサーバーに14種類のMCPツールをすべてまとめています。",
-          "naration_text": "AiDiyでは、mcp_main.pyという1本のFastAPIアプリが14個のFastMCPインスタンスをStarletteのMountで合成してポート8095番で動いています。外部からはURLひとつでアクセスでき、AiDiy_mcp.jsonという設定ファイルにURLを書くだけで、Claude CodeやAIエージェントがすべての道具を使えるようになります。この一カ所にまとめる設計のおかげで管理がシンプルです。",
-          "audio": "audio/dlg_001_02_male.mp3",
-          "duration_sec": 24.168
+          "label": "カテゴリ",
+          "value": "3"
         },
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "SSE・HTTP Transport・stdioの3接続方式を同じポートで使い分けられるのが便利ですよね！",
-          "naration_text": "AiDiyのMCPハブは同じポート8095で3つの接続方式に対応しています。SSEはClaude Codeなど従来のAI開発ツールが使う方式です。Streamable HTTP Transportは普通のHTTPリクエストでMCPツールを呼べる新方式で、今回の目玉機能です。stdioはコマンドラインからMCPを使うための標準入出力方式です。用途に合わせて最適な方式を選べます。",
-          "audio": "audio/dlg_001_03_female.mp3",
-          "duration_sec": 30.048
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "Claude Code など AI 開発ツールからは設定ファイル一つで14種類のツールが全部使えます。",
-          "naration_text": "Claude Codeなどのエージェント開発環境では、AiDiy_mcp.jsonという設定ファイルにMCPサーバーのURLを記述するだけで、14種類のツールがすべて使えるようになります。エージェントは必要なときに適切なツールを自動的に選んで呼び出せます。これがMCPの大きな魅力で、開発者はツールを個別に統合する手間なく、AIの能力を大幅に拡張できるわけです。",
-          "audio": "audio/dlg_001_04_male.mp3",
-          "duration_sec": 23.04
+          "label": "ポート",
+          "value": "8095"
         }
       ],
-      "duration_sec": 106.176,
+      "cards": [
+        {
+          "title": "観測 (5)",
+          "lines": [
+            "Chrome DevTools / Desktop Capture",
+            "SQLite / PostgreSQL",
+            "Logs"
+          ]
+        },
+        {
+          "title": "生成・合成 (4)",
+          "lines": [
+            "Image Generation / Movie Generation",
+            "Text-to-Speech / Speech-to-Text"
+          ]
+        },
+        {
+          "title": "制御・検証 (5)",
+          "lines": [
+            "Code Check / Backup",
+            "OBS Studio Control / FFmpeg",
+            "Code Agents"
+          ]
+        }
+      ],
+      "facts": [
+        "backend_mcp はポート 8095 に 14 個の MCP サーバーを同居させた FastMCP アプリケーション。",
+        "各 MCP は SSE / Streamable HTTP / stdio の 3 トランスポートを同一ポートで提供する。",
+        "Claude Agent SDK、Python requests、stdio ホストのいずれからでも接続できる。"
+      ],
+      "evidence": [
+        {
+          "source": "backend_mcp/AGENTS.md",
+          "text": "backend_mcp はポート 8095 上で 14 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
+        },
+        {
+          "source": "CLAUDE.md",
+          "text": "各 MCP は SSE Transport、Streamable HTTP Transport、stdio gateway の 3 トランスポートを同一ポートで提供。Python の requests でそのまま呼び出せる。"
+        }
+      ],
+      "short_narration": "ポート 8095 に 14 の MCP サーバーが同居し、観測・生成・制御の 3 分野で AI をサポートします。",
+      "long_narration": "AiDiy の backend_mcp はポート 8095 に 14 個の MCP サーバーを集約した FastMCP アプリケーションです。役割は大きく 3 つに分かれます。まず観測系は Chrome ブラウザの自動操作、デスクトップキャプチャ、SQLite と PostgreSQL のデータ確認、ログ監視の 5 ツール。次に生成・合成系は画像生成、動画生成、音声認識、音声合成の 4 ツール。そして制御・検証系はコード構文チェック、差分バックアップ、OBS Studio 録画制御、FFmpeg 動画処理、コードエージェント実行の 5 ツールです。これらすべてを AI エージェントが呼び出せるため、観察して判断して実行するという一連の流れを自動化できます。",
       "short_audio": "audio/short_scene_001.mp3",
-      "long_audio": "audio/long_scene_001.mp3"
+      "long_audio": "audio/long_scene_001.mp3",
+      "short_start_sec": 9.864,
+      "short_duration_sec": 7.512,
+      "long_start_sec": 29.328,
+      "long_duration_sec": 38.736
     },
     {
       "id": "scene_002",
-      "title": "HTTP Transport が変えたこと",
-      "accent": "#ff7043",
-      "accent_soft": "rgba(255,112,67,0.18)",
-      "kicker": "HTTP TRANSPORT",
-      "headline": "FastAPI × HTTP Transport\nWeb・Python から直接エージェント実行",
+      "title": "HTTP Transport の追加",
+      "expression": "neutral",
+      "accent": "#29d8ff",
+      "accent_soft": "rgba(41, 216, 255, 0.18)",
+      "kicker": "NEW INTERFACE",
+      "headline": "SSE・HTTP・stdio を\n同一ポートで同時提供",
+      "lead": "FastAPI に Streamable HTTP Transport を加えたことで、MCP ハブは 3 つのアクセス方法を 1 つのポートで提供できるようになりました。",
+      "subtitle": "SSE + HTTP + stdio の 3 モードが 8095 番ポートひとつで動く。",
       "image": "images/scene_002.png",
-      "source_documents": [
-        "backend_mcp/AGENTS.md",
-        ".aidiy/knowledge/backend_server,backend_mcp,MCP活用手順.md"
+      "image_prompt": "Vertical 2:3 architecture diagram showing 3 transport lanes converging into one FastAPI port 8095. Three labeled arrows: SSE (Server-Sent Events), Streamable HTTP (HTTP Transport), stdio (gateway mcp_stdio.py). Professional blueprint style, cyan accent, dark background, clean technical diagram, no mascots, no brand logos.",
+      "chips": [
+        "SSE Transport",
+        "Streamable HTTP",
+        "stdio gateway",
+        "FastAPI + FastMCP"
       ],
-      "source_summary": "Streamable HTTP Transportの追加により、Python requestsやJavaScript fetchなどの通常HTTPクライアントからMCPツールを呼び出せるようになった。GET /list でツール一覧も取得可能。",
-      "factual_bullets": [
-        "requests.post('http://localhost:8095/aidiy_sqlite/query') でSQLite呼び出し可能",
-        "GET http://localhost:8095/{mcp_name}/list でツール一覧をJSON取得",
-        "SSE・HTTP Transport・stdio が同一ポート8095で動作",
-        "バックエンドルーターやPythonスクリプトからも直接利用可能",
-        "AI専用ツール不要でMCP機能にアクセス可能"
-      ],
-      "forbidden_elements": [
-        "HTTP TransportがSSEより高性能であるという根拠のない断定",
-        "セキュリティ設定なしで外部公開しても安全だという誤解",
-        "全MCPツールがHTTP Transportで完全に動作するという過度な断定"
-      ],
-      "image_prompt": "Split diagram showing Python script and web browser on left, connected via HTTP arrows to AiDiy MCP Hub on right. Code snippet showing requests.post example. Glowing connection lines in orange-red. Modern dark UI style with code annotations.",
-      "dialogue": [
+      "metrics": [
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "HTTP Transport追加で、AI開発ツールなしでも普通のHTTPリクエストだけでMCPが使えます！",
-          "naration_text": "今回の最大のポイントです。Streamable HTTP Transportが追加されたことで、Claude CodeなどのAI専用開発ツールを使わなくても、普通のHTTPリクエストだけでMCPのツールを呼び出せるようになりました。これは開発の幅を大きく広げるアップデートで、PythonのrequestsライブラリやJavaScriptのfetchで直接MCP機能にアクセスできます。",
-          "audio": "audio/dlg_002_01_female.mp3",
-          "duration_sec": 24.72
+          "label": "トランスポート",
+          "value": "3"
         },
         {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "requests.post でMCPを直接呼べるので、既存のPythonスクリプトへのAI機能追加が格段に楽になります。",
-          "naration_text": "まさにそこが革新的なところです。requests.post('http://localhost:8095/aidiy_sqlite/query')のようなシンプルなコードで、AiDiyのSQLiteデータベースにアクセスしたり、画像を生成したり、音声を合成したりできます。既存のPythonスクリプトや業務システムに数行追加するだけでAIツールが使えるようになるので、エージェントのフル実装なしに強力な機能を活用できます。",
-          "audio": "audio/dlg_002_02_male.mp3",
-          "duration_sec": 26.112
+          "label": "ポート",
+          "value": "1"
         },
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "WebブラウザのfetchからもMCPツールが叩けるので、フロントエンドから直接AI機能が呼べますね！",
-          "naration_text": "ブラウザのJavaScriptからもfetch APIで直接MCPツールを呼び出せます。VueやReactで作ったWebアプリから直接AiDiyの画像生成や音声合成を呼べるということです。バックエンドを経由せずにフロントエンドから直接AI機能にアクセスできるので、プロトタイピングのスピードも大幅に上がります。",
-          "audio": "audio/dlg_002_03_female.mp3",
-          "duration_sec": 20.904
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "GET /list でツール一覧が動的に取得できるので、プログラムが使える機能を自分で発見できます。",
-          "naration_text": "http://localhost:8095/aidiy_chrome_devtools/listへのGETリクエストで、そのMCPサーバーが持つツール一覧をJSON形式で取得できます。自動化スクリプトが利用可能なツールを動的に発見して使うことができるわけです。この自己記述的な仕組みのおかげで、ドキュメントを事前に調べなくてもプログラムが賢く動いてくれます。",
-          "audio": "audio/dlg_002_04_male.mp3",
-          "duration_sec": 21.96
-        },
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "SSE・HTTP・stdioが同一ポートで共存する設計は管理コストを最小化するスマートな選択です！",
-          "naration_text": "3つのトランスポートが同じポート8095で動いている点は、運用上とても重要です。ファイアウォールで開けるポートは一つで済み、管理が楽になります。AIエージェントはSSEで、PythonスクリプトはHTTP Transportで、コマンドラインツールはstdioで、それぞれが最適な方式を選べます。この柔軟性こそがAiDiy MCPハブの強みのひとつです。",
-          "audio": "audio/dlg_002_05_female.mp3",
-          "duration_sec": 25.464
+          "label": "実装",
+          "value": "FastMCP"
         }
       ],
-      "duration_sec": 119.16,
+      "cards": [
+        {
+          "title": "SSE Transport",
+          "lines": [
+            "`/{mcp_name}/sse` エンドポイント",
+            "Claude Agent SDK から接続",
+            "従来からのアクセス方法"
+          ]
+        },
+        {
+          "title": "Streamable HTTP",
+          "lines": [
+            "`/{mcp_name}/{method}` エンドポイント",
+            "requests.post() で直接呼べる",
+            "Web フロントやスクリプトからも利用可"
+          ]
+        },
+        {
+          "title": "stdio gateway",
+          "lines": [
+            "`mcp_stdio.py` 経由",
+            "Claude Code / MCP Host から接続",
+            "標準入出力ブリッジ方式"
+          ]
+        }
+      ],
+      "facts": [
+        "各 MCP は SSE Transport、Streamable HTTP Transport、stdio gateway の 3 トランスポートを同一ポートで提供する。",
+        "ツール一覧は `GET http://localhost:8095/{mcp_name}/list` で取得できる。",
+        "Python から `requests.post('http://localhost:8095/{mcp_name}/{method}')` で直接呼び出せる。"
+      ],
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "text": "各 MCP は SSE Transport、Streamable HTTP Transport、stdio gateway（mcp_stdio.py）の 3 トランスポートを同一ポートで提供。Python の requests でそのまま呼び出せる。"
+        },
+        {
+          "source": "CLAUDE.md",
+          "text": "curl http://localhost:8095/aidiy_code_check/list でツール一覧確認、curl -X POST ... でツール実行"
+        }
+      ],
+      "short_narration": "SSE・Streamable HTTP・stdio の 3 つのアクセス方法が 8095 番ポートひとつで使えます。",
+      "long_narration": "AiDiy の MCP ハブに Streamable HTTP Transport が追加され、3 つのアクセス方法が 1 つのポートで提供されるようになりました。ひとつ目の SSE Transport は /{mcp_name}/sse エンドポイントで Claude Agent SDK などから接続する従来方式です。ふたつ目の Streamable HTTP は /{mcp_name}/{method} のパスに requests.post を送るだけで、Python スクリプトや自動化処理から直接 MCP ツールを呼べます。みっつ目の stdio gateway は mcp_stdio.py を経由して Claude Code や MCP ホストアプリと標準入出力でやり取りする方式です。この 3 モードを 8095 番ポートひとつで同時に提供しているのが、このアーキテクチャの最大の特徴です。",
       "short_audio": "audio/short_scene_002.mp3",
-      "long_audio": "audio/long_scene_002.mp3"
+      "long_audio": "audio/long_scene_002.mp3",
+      "short_start_sec": 17.376,
+      "short_duration_sec": 6.744,
+      "long_start_sec": 68.064,
+      "long_duration_sec": 43.848
     },
     {
       "id": "scene_003",
-      "title": "14 MCP サーバー全体俯瞰",
-      "accent": "#4caf50",
-      "accent_soft": "rgba(76,175,80,0.18)",
-      "kicker": "14 MCP SERVERS",
-      "headline": "14 の MCP サーバー\nブラウザ操作から動画制作まで",
+      "title": "Web・Python からの直接呼び出し",
+      "expression": "neutral",
+      "accent": "#7dffb3",
+      "accent_soft": "rgba(125, 255, 179, 0.18)",
+      "kicker": "OPEN ACCESS",
+      "headline": "ブラウザや Python から\nMCP ツールを直接呼べる",
+      "lead": "Streamable HTTP Transport の追加により、Web フロントや Python スクリプトが MCP ツールを SDK なしで直接呼べるようになり、応用範囲が劇的に広がりました。",
+      "subtitle": "SDK 不要。requests.post ひとつで AI ツールが動く時代へ。",
       "image": "images/scene_003.png",
-      "source_documents": [
-        "backend_mcp/AGENTS.md",
-        "AGENTS.md（プロジェクト全体）"
+      "image_prompt": "Vertical 2:3 developer workflow diagram. Three source boxes (Web Browser, Python Script, Automation) send HTTP POST arrows directly to a central 'MCP HUB port 8095' node. Green accent, dark blueprint style, 'requests.post()' code label visible, 'No SDK Required' badge, clean technical illustration.",
+      "chips": [
+        "SDK 不要",
+        "requests.post 直接呼び出し",
+        "Web フロントからも可",
+        "自動化スクリプト対応"
       ],
-      "source_summary": "AiDiyのMCPハブは14のサーバーを4カテゴリに分類できる。①ブラウザ・デスクトップ系2つ、②データ確認・開発補助系4つ、③コード支援・バックアップ・音声系4つ、④メディア生成・制作系4つ。",
-      "factual_bullets": [
-        "ブラウザ系: chrome_devtools, desktop_capture（2台）",
-        "データ系: sqlite, postgres, logs, code_check（4台）",
-        "音声・保全系: backup, speech_to_text, text_to_speech（3台）",
-        "メディア系: image_generation, movie_generation, obs_studio_control, ffmpeg_control（4台）",
-        "合計14台"
-      ],
-      "forbidden_elements": [
-        "各サーバーの機能範囲を誇張した記述",
-        "無料プロバイダーのみで全機能が使えるという誤解",
-        "サーバー数を14以外で表記すること"
-      ],
-      "image_prompt": "Visual map of 14 MCP servers organized in 4 color-coded groups. Each server shown as an icon with Japanese label. Connected to central AiDiy MCP Hub with glowing lines. Groups: Browser/Desktop (cyan), Data/Dev (blue), Audio/Backup (purple), Media (orange). Clean infographic style.",
-      "dialogue": [
+      "metrics": [
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "14のMCPサーバーを機能別に分けると大きく4カテゴリになります！",
-          "naration_text": "AiDiyのMCPハブには合計14種類のサーバーが揃っています。機能別に分けると、ブラウザ・デスクトップ操作系、データ確認・開発補助系、バックアップ・音声処理系、メディア生成・制作系という4カテゴリになります。それぞれが異なるニーズに対応しており、組み合わせると強力な自動化パイプラインが作れます。",
-          "audio": "audio/dlg_003_01_female.mp3",
-          "duration_sec": 22.824
+          "label": "必要なもの",
+          "value": "requests のみ"
         },
         {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "ブラウザ・デスクトップ系は2つ。Chromeの自動操作と画面キャプチャです。",
-          "naration_text": "まずブラウザ・デスクトップ系は2サーバーです。aidiy_chrome_devtoolsはChrome DevTools Protocolを使ってブラウザを自在に操作できるサーバーです。URLへの移動・クリック・フォーム入力・スクリーンショットなどが使えます。aidiy_desktop_captureはPCの画面全体や特定ウィンドウをキャプチャするサーバーです。Chromeに限らずあらゆるアプリの画面を取得できます。",
-          "audio": "audio/dlg_003_02_male.mp3",
-          "duration_sec": 22.752
+          "label": "パス形式",
+          "value": "/{name}/{method}"
         },
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "データ確認・開発補助系は4つ。SQLite・PostgreSQL・ログ確認・コードチェックが揃います。",
-          "naration_text": "データ確認・開発補助系には4サーバーがあります。aidiy_sqliteはAiDiyのSQLiteデータベースを読み書きできます。aidiy_postgresは外部PostgreSQLへの接続・確認ができます。aidiy_logsはバックエンドサーバーのログをリアルタイムで確認できます。aidiy_code_checkはPythonのruffリントとTypeScriptの型チェックを実行できます。",
-          "audio": "audio/dlg_003_03_female.mp3",
-          "duration_sec": 23.688
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "コード支援・バックアップ・音声処理系は4つ。コードエージェント・差分バックアップ・音声認識・音声合成が揃います。",
-          "naration_text": "コード支援・バックアップ・音声処理系には4つのサーバーがあります。aidiy_code_agentsがAIコードエージェントをCLI経由で実行します。aidiy_backupが差分バックアップを自動保存し、aidiy_speech_to_textが音声をテキストに変換、aidiy_text_to_speechがテキストを音声に合成します。",
-          "audio": "audio/dlg_003_04_male.mp3",
-          "duration_sec": 18.288
-        },
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "メディア生成・制作系は4つ。画像・動画生成にOBS・FFmpegが加わりAIが動画を丸ごと作れます！",
-          "naration_text": "最後のカテゴリはメディア生成・制作系で4サーバーあります。aidiy_image_generationでAIが画像を生成、aidiy_movie_generationでAI動画を生成、aidiy_obs_studio_controlでOBS Studioの録画・配信・シーン切り替えを制御、aidiy_ffmpeg_controlで動画編集・変換・字幕付加を行えます。この4つを組み合わせるとAIが台本から完成動画まで自動で作れる強力なパイプラインが実現します。",
-          "audio": "audio/dlg_003_05_female.mp3",
-          "duration_sec": 29.16
+          "label": "応用範囲",
+          "value": "劇的に拡大"
         }
       ],
-      "duration_sec": 116.712,
+      "cards": [
+        {
+          "title": "Python から呼ぶ",
+          "lines": [
+            "`import requests`",
+            "`requests.post('http://localhost:8095/aidiy_sqlite/query', json={...})`",
+            "SDK ライブラリ不要"
+          ]
+        },
+        {
+          "title": "curl / Web から呼ぶ",
+          "lines": [
+            "`curl -X POST http://localhost:8095/aidiy_logs/tail`",
+            "Vite proxy 経由でフロントからも利用可",
+            "ブラウザの fetch() でも呼び出せる"
+          ]
+        },
+        {
+          "title": "ツール一覧の確認",
+          "lines": [
+            "`GET /aidiy_code_check/list`",
+            "curl でもブラウザでも確認可",
+            "利用可能なメソッド一覧を返す"
+          ]
+        }
+      ],
+      "facts": [
+        "Python の requests.post で `http://localhost:8095/{mcp_name}/{method}` を呼ぶだけで MCP ツールが使える。",
+        "ツール一覧は `GET http://localhost:8095/{mcp_name}/list` で取得できる。",
+        "自動化スクリプトやバックエンドルーターから直接利用できる。"
+      ],
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "text": "Python の requests でそのまま呼び出せるため、自動化スクリプトやバックエンドルーターからも利用できます。"
+        },
+        {
+          "source": "CLAUDE.md",
+          "text": "curl -X POST http://localhost:8095/aidiy_code_check/check -H 'Content-Type: application/json' -d '{\"path\": \"...\"}'"
+        }
+      ],
+      "short_narration": "requests.post ひとつで MCP ツールが動きます。SDK 不要で応用範囲が劇的に広がりました。",
+      "long_narration": "HTTP Transport の最大の恩恵は、MCP ツールを SDK なしで呼び出せるようになったことです。Python なら requests.post を 1 行書くだけで、データベースを照会したり、ログを取得したり、画像を生成したりできます。エンドポイントのパスは /{mcp_name}/{method} という形式で統一されており、ツール一覧は GET /list で確認できます。Web フロントエンドからも fetch や axios を使って Vite プロキシ経由で呼び出せます。Claude Agent SDK が入っていない環境でも、あるいはバックエンドの自動化スクリプトからでも、MCP ツールをフル活用できるようになりました。AI エージェントの応用範囲が劇的に広がったと言えます。",
       "short_audio": "audio/short_scene_003.mp3",
-      "long_audio": "audio/long_scene_003.mp3"
+      "long_audio": "audio/long_scene_003.mp3",
+      "short_start_sec": 24.12,
+      "short_duration_sec": 6.0,
+      "long_start_sec": 111.912,
+      "long_duration_sec": 41.088
     },
     {
       "id": "scene_004",
-      "title": "ブラウザ・デスクトップ・DB・ログ系",
-      "accent": "#2196f3",
-      "accent_soft": "rgba(33,150,243,0.18)",
-      "kicker": "BROWSER & DATA",
-      "headline": "ブラウザ操作・画面取得・DB 確認\nAI がデータを自在に扱う",
+      "title": "観測・監視系 MCP 5ツール",
+      "expression": "neutral",
+      "accent": "#29d8ff",
+      "accent_soft": "rgba(41, 216, 255, 0.18)",
+      "kicker": "OBSERVE & MONITOR",
+      "headline": "ブラウザ・デスクトップ・DB・ログを\nAI が直接見られる",
+      "lead": "Chrome の自動操作、デスクトップキャプチャ、SQLite / PostgreSQL のデータ確認、ログ監視の 5 ツールが AI の観測能力を担います。",
+      "subtitle": "Chrome を操れる。画面を見られる。DB とログをリアルタイムに読める。",
       "image": "images/scene_004.png",
-      "source_documents": [
-        "backend_mcp/mcp_proc/各ファイル",
-        "backend_mcp/AGENTS.md"
+      "image_prompt": "Vertical 2:3 monitoring tools collage. Five distinct panels arranged in a grid: Chrome DevTools automation window, desktop screenshot capture panel, SQLite database table viewer, PostgreSQL schema view, and log tail ERROR output. Cyan accent, dark professional enterprise dashboard style, realistic monitoring tools aesthetic, clean layout.",
+      "chips": [
+        "Chrome DevTools",
+        "Desktop Capture",
+        "SQLite / PostgreSQL",
+        "Logs",
+        "Python CDP 実装"
       ],
-      "source_summary": "chrome_devtoolsはCDPでChromeを完全制御。desktop_captureはOS全体の画面キャプチャ。sqliteはAiDiy DB読み書き（allow_write要明示）、postgresは外部PostgreSQL確認、logsはbackend_serverとbackend_mcpのログ末尾・エラー抽出に対応。",
-      "factual_bullets": [
-        "chrome_devtools: CDP経由でのクリック・入力・スクリーンショット・コンソール・ネットワーク監視",
-        "desktop_capture: 全モニター / ウィンドウタイトル / カーソル周辺 / 領域指定のキャプチャモード",
-        "sqlite: allow_write=True のときのみ書き込み許可",
-        "postgres: 外部DSN指定可能",
-        "logs: grep正規表現でのフィルタ・最新エラーのTraceback付き抽出"
-      ],
-      "forbidden_elements": [
-        "chrome_devtoolsがFirefoxなど他ブラウザにも対応するという誤情報",
-        "sqliteが本番環境での大容量処理に最適という過大評価",
-        "postgresが任意の外部サービスにデフォルトで接続できるという誤解"
-      ],
-      "image_prompt": "Four panels showing: Chrome browser being controlled by code (DevTools), desktop screenshot tool with multi-monitor display, SQLite and PostgreSQL database icons with query results, server log terminal with highlighted error lines. Blue tech theme with dark background.",
-      "dialogue": [
+      "metrics": [
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "aidiy_chrome_devtoolsはChromeをAIが直接操作するサーバー。クリックから音声取得まで何でもできます！",
-          "naration_text": "aidiy_chrome_devtoolsは、Chrome DevTools Protocolを通じてブラウザをプログラムから完全制御できるMCPサーバーです。URLへのアクセス・要素のクリック・テキスト入力・スクリーンショット撮影・コンソールログの取得・ネットワークリクエストの監視など、ブラウザでできることのほとんどをAIから実行できます。Webアプリのテスト自動化や、サイトからの情報収集に特に有効です。",
-          "audio": "audio/dlg_004_01_female.mp3",
-          "duration_sec": 26.904
+          "label": "観測ツール",
+          "value": "5"
         },
         {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "aidiy_desktop_captureはChromeに限らず画面全体や特定ウィンドウを高精度でキャプチャできる強みがあります。",
-          "naration_text": "aidiy_desktop_captureは、OSレベルのスクリーンショット機能を提供するMCPサーバーです。全モニター・特定モニター・カーソル周辺の矩形領域・特定ウィンドウタイトルによる絞り込みなど、柔軟なキャプチャモードを持っています。AIが自分の目で現在の画面状態を確認したいときに使います。Chromeに限らずあらゆるアプリの画面をキャプチャできる点がchrome_devtoolsとの大きな違いです。",
-          "audio": "audio/dlg_004_02_male.mp3",
-          "duration_sec": 23.568
+          "label": "Chrome 実装",
+          "value": "Python CDP"
         },
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "aidiy_sqliteとaidiy_postgresはDBの確認ツール。書き込み時は明示的な許可フラグが必要で安全設計です。",
-          "naration_text": "aidiy_sqliteはAiDiyが使うSQLiteデータベースへのアクセスを提供します。テーブル一覧・列情報・外部キー・SELECTクエリの実行などができます。書き込みはallow_write=Trueを明示したときだけ許可される安全な設計です。aidiy_postgresは外部のPostgreSQLサーバーへのアクセスに使います。DSN文字列で接続先を指定でき、本番データベースの内容確認やデバッグに活用できます。",
-          "audio": "audio/dlg_004_03_female.mp3",
-          "duration_sec": 28.272
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "aidiy_logsはサーバーのログをリアルタイム確認でき、AIが自律的にデバッグを進められます。",
-          "naration_text": "aidiy_logsは、backend_serverとbackend_mcpのログファイルをリアルタイムで取得できるMCPサーバーです。最新のエラーをTraceback付きで抽出する機能や、正規表現でログを絞り込む機能があります。AIエージェントがコードを変更した後に自分でログを確認してエラーの原因を特定し、デバッグ作業をAIが自律的に進める際に非常に役立ちます。",
-          "audio": "audio/dlg_004_04_male.mp3",
-          "duration_sec": 21.96
+          "label": "DB",
+          "value": "SQLite + PG"
         }
       ],
-      "duration_sec": 100.704,
+      "cards": [
+        {
+          "title": "aidiy_chrome_devtools",
+          "lines": [
+            "Chrome ブラウザの自動操作",
+            "クリック・入力・スクリーンショット・JS 実行",
+            "Python 実装の CDP クライアント"
+          ]
+        },
+        {
+          "title": "aidiy_desktop_capture",
+          "lines": [
+            "OS 全体の静止画取得",
+            "マルチモニター・ウィンドウ指定対応",
+            "クロスヘア・ラベルのアノテーション付き"
+          ]
+        },
+        {
+          "title": "aidiy_sqlite / aidiy_postgres",
+          "lines": [
+            "AiDiy の SQLite DB を参照",
+            "外部 PostgreSQL も接続可",
+            "テーブル一覧・スキーマ・SQL クエリ実行"
+          ]
+        },
+        {
+          "title": "aidiy_logs",
+          "lines": [
+            "backend_server / backend_mcp のログ確認",
+            "ERROR / Traceback を自動抽出",
+            "tail / grep でリアルタイムデバッグ"
+          ]
+        }
+      ],
+      "facts": [
+        "aidiy_chrome_devtools は Node.js 版ではなく Python 純正の CDP クライアントで実装されている。",
+        "aidiy_desktop_capture はマルチモニター対応で、ウィンドウタイトル指定キャプチャも可能。",
+        "aidiy_sqlite / aidiy_postgres は read-only 中心で扱い、アクセスは localhost 限定。",
+        "aidiy_logs は ERROR/Traceback を自動抽出し、前後 2 行のコンテキスト付きで返す。"
+      ],
+      "evidence": [
+        {
+          "source": "backend_mcp,MCP活用手順.md",
+          "text": "aidiy_chrome_devtools: ブラウザ操作、DOM 取得、ナビゲーション。Python 実装 CDP クライアント。"
+        },
+        {
+          "source": "AGENTS.md",
+          "text": "aidiy_sqlite: AiDiy SQLite DB 確認。aidiy_logs: backend_server / backend_mcp ログ確認。"
+        }
+      ],
+      "short_narration": "ブラウザを操って、画面を撮って、DB とログを読む。5 ツールが AI の観測力を支えます。",
+      "long_narration": "観測・監視系の 5 ツールは AI エージェントの目と耳の役割を果たします。aidiy_chrome_devtools は Python 実装の Chrome DevTools Protocol クライアントで、ブラウザのクリック、テキスト入力、スクリーンショット、JavaScript 実行まで自動操作できます。aidiy_desktop_capture は OS 全体の画面をキャプチャし、マルチモニターやウィンドウ指定にも対応します。aidiy_sqlite と aidiy_postgres は AiDiy の SQLite データベースと外部 PostgreSQL を参照でき、テーブル一覧からスキーマ確認、SQL クエリ実行まで行えます。aidiy_logs はバックエンドのログファイルを監視し、ERROR や Traceback を自動抽出してコンテキスト付きで返します。これら 5 ツールが連携することで、AI はブラウザ画面を見て判断し、データを確認し、エラーを発見するという人間と同じような観測と診断ができるようになります。",
       "short_audio": "audio/short_scene_004.mp3",
-      "long_audio": "audio/long_scene_004.mp3"
+      "long_audio": "audio/long_scene_004.mp3",
+      "short_start_sec": 30.12,
+      "short_duration_sec": 7.008,
+      "long_start_sec": 153.0,
+      "long_duration_sec": 47.472
     },
     {
       "id": "scene_005",
-      "title": "コード支援・バックアップ・音声系",
-      "accent": "#9c27b0",
-      "accent_soft": "rgba(156,39,176,0.18)",
-      "kicker": "CODE & AUDIO",
-      "headline": "品質確認・バックアップ・音声処理\n開発を支える縁の下の力持ち",
+      "title": "生成・合成系 MCP 4ツール",
+      "expression": "neutral",
+      "accent": "#ff6bd6",
+      "accent_soft": "rgba(255, 107, 214, 0.18)",
+      "kicker": "GENERATE & SYNTHESIZE",
+      "headline": "画像・動画・音声・音声認識を\nMCP ひとつで AI に生成させる",
+      "lead": "画像生成、動画生成、音声合成、音声認識の 4 ツールが AI エージェントに豊かな生成能力を与えます。この紹介ビデオの素材も実際に生成系 MCP で作られています。",
+      "subtitle": "画像・動画・音声生成をひとつの MCP 呼び出しで実現。",
       "image": "images/scene_005.png",
-      "source_documents": [
-        "backend_mcp/mcp_proc/各ファイル",
-        "backend_mcp/AGENTS.md"
+      "image_prompt": "Vertical 2:3 creative generation tools collage. Four panels: colorful AI-generated image with generation prompt overlay, video frame from Veo generation with play button, audio waveform visualization for text-to-speech, microphone icon with speech recognition text output. Magenta and violet accent, modern AI creative tools style, dark background, exciting creative mood.",
+      "chips": [
+        "Image Generation",
+        "Movie Generation",
+        "Text-to-Speech",
+        "Speech-to-Text"
       ],
-      "source_summary": "aidiy_code_check(ruff/TypeScript型チェック)、aidiy_code_agents(コードエージェント実行)、aidiy_backup(差分バックアップ)、aidiy_speech_to_text(音声認識)、aidiy_text_to_speech(音声合成)の5サーバー。",
-      "factual_bullets": [
-        "aidiy_code_check: ruff / TypeScript 型チェックでコード品質を即時確認",
-        "aidiy_code_agents: copilot_cli / codex_cli 等の CLI 経由でエージェント実行",
-        "aidiy_backup: 差分バックアップ方式で変更ファイルを日時付き自動保存",
-        "aidiy_speech_to_text: speech_recognition / OpenAI Whisper で音声認識",
-        "aidiy_text_to_speech: Edge / OpenAI / Gemini / FreeAI で音声合成"
-      ],
-      "forbidden_elements": [
-        "code_checkがすべてのプログラミング言語に対応するという誇張",
-        "backupが完全なGit版管理を提供するという誤解",
-        "speech_to_textの認識精度に関する保証的な表現"
-      ],
-      "image_prompt": "Four tool panels: Python code with ruff lint check marks, file backup timeline with diff statistics, waveform audio input converted to text, text synthesized to sound wave. Purple accent theme. Clean developer tool aesthetic.",
-      "dialogue": [
+      "metrics": [
         {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "aidiy_code_agentsはCLI経由でAIコードエージェントを実行できる、AiDiy独自の強力なサーバーです！",
-          "naration_text": "aidiy_code_agentsは、copilot_cli・codex_cli・antigravity_cli・opencode_cliなど複数のコードエージェントCLIをMCP経由で呼び出せるサーバーです。プロジェクトパスや最大ターン数・使用モデルを指定して実行でき、AIがコードを自律的に書き・確認・修正するエージェントループをMCPツールとして完結できます。",
-          "audio": "audio/dlg_005_01_male.mp3",
-          "duration_sec": 19.152
+          "label": "生成系ツール",
+          "value": "4"
         },
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "aidiy_code_checkはAIが書いたコードをすぐチェックできるサーバー。まるで自動校正機能ですね！",
-          "naration_text": "aidiy_code_checkは、PythonとTypeScriptのコード品質チェックを実行できるMCPサーバーです。Pythonはpy_compileによる構文チェックとruffによるリントチェックの2種類があります。TypeScriptはvue-tscを使った型チェックが実行できます。AIがコードを書いた直後に自動でチェックをかけ、問題があれば修正するサイクルが自律的に回せます。コード品質を人間が確認する前にAIが自分で担保できます。",
-          "audio": "audio/dlg_005_02_female.mp3",
-          "duration_sec": 28.848
+          "label": "画像プロバイダ",
+          "value": "3"
         },
         {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "aidiy_backupは差分バックアップ方式で、AIが変更したファイルを日時付きで自動保存していきます。",
-          "naration_text": "aidiy_backupは、AiDiyプロジェクトの差分バックアップを管理するMCPサーバーです。初回は全件スナップショットを取り、以降は変更があったファイルだけを日時フォルダに保存します。どのファイルが変更されたかの一覧取得・特定期間の変更確認・ファイルのビフォーアフター比較・変更行数の統計取得などの機能があります。AIコードエージェントが複数ファイルを変更した前後で何が変わったかを追跡するのに役立ちます。",
-          "audio": "audio/dlg_005_03_male.mp3",
-          "duration_sec": 25.584
-        },
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "aidiy_speech_to_textとaidiy_text_to_speechはセットで使うことが多い音声処理の2兄弟ですね！",
-          "naration_text": "aidiy_speech_to_textは音声ファイルやマイク入力をテキストに変換するMCPサーバーです。Python標準のspeech_recognitionとOpenAI Whisperの2プロバイダーに対応し、WAVファイルパスまたはbase64エンコードで渡せます。一方aidiy_text_to_speechはテキストを音声MP3ファイルに変換します。Edge TTS・OpenAI・Google Gemini・FreeAIの4プロバイダーから選べ、声の種類・言語・速度も指定できます。",
-          "audio": "audio/dlg_005_04_female.mp3",
-          "duration_sec": 32.064
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "この2つを組み合わせると、音声入力を処理して音声で返すボイスアシスタントが手軽に実現できますね。",
-          "naration_text": "aidiy_speech_to_textとaidiy_text_to_speechを組み合わせると、マイクで話しかけた内容をテキスト化し、AIが処理して音声で回答するボイスアシスタントのフローが、シンプルなHTTP呼び出しだけで構築できます。AiDiyのアバター機能やAIコア機能とも連携しており、テキスト・音声・画像が統合された豊かなインタラクションを実現しています。",
-          "audio": "audio/dlg_005_05_male.mp3",
-          "duration_sec": 19.752
+          "label": "TTS プロバイダ",
+          "value": "4"
         }
       ],
-      "duration_sec": 125.4,
+      "cards": [
+        {
+          "title": "aidiy_image_generation",
+          "lines": [
+            "OpenAI / Gemini / FreeAI で画像生成",
+            "プロンプト → PNG ファイル保存",
+            "参照画像あり/なし両対応"
+          ]
+        },
+        {
+          "title": "aidiy_movie_generation",
+          "lines": [
+            "Google Gemini Veo による動画生成",
+            "4〜8 秒 MP4、16:9 / 9:16 対応",
+            "参照画像から image-to-video も可"
+          ]
+        },
+        {
+          "title": "aidiy_text_to_speech",
+          "lines": [
+            "Edge / OpenAI / Gemini / FreeAI",
+            "発音辞書で AiDiy 等を自動補正",
+            "このビデオのナレーションも生成済み"
+          ]
+        },
+        {
+          "title": "aidiy_speech_to_text",
+          "lines": [
+            "WAV ファイル / base64 WAV 入力",
+            "speech_recognition / OpenAI Whisper",
+            "音声をテキストに変換"
+          ]
+        }
+      ],
+      "facts": [
+        "aidiy_image_generation は OpenAI gpt-image-2、Gemini gemini-3.1-flash-image-preview、FreeAI に対応する。",
+        "aidiy_movie_generation は Google Gemini Veo を使い、4〜8 秒の MP4 動画を生成する。",
+        "aidiy_text_to_speech は Edge / OpenAI / Gemini / FreeAI の 4 プロバイダに対応し、発音辞書で AiDiy 等の読み上げを補正する。",
+        "aidiy_speech_to_text は speech_recognition と OpenAI Whisper の 2 エンジンを切り替えられる。"
+      ],
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "text": "aidiy_image_generation: AI 画像生成（OpenAI / Gemini / FreeAI）。aidiy_movie_generation: AI 動画生成（Google Gemini Veo）。"
+        },
+        {
+          "source": "AGENTS.md",
+          "text": "aidiy_text_to_speech: テキスト音声合成（Edge / OpenAI / Gemini / FreeAI）。AiDiy、DB、API、MCP などのシステム用語は発音辞書で自動変換する。"
+        }
+      ],
+      "short_narration": "AI が画像・動画・音声・音声認識を担います。このビデオの素材も生成系 MCP で作られています。",
+      "long_narration": "生成・合成系の 4 ツールは AI に豊かな表現力を与えます。aidiy_image_generation は OpenAI の gpt-image-2、Google の Gemini、FreeAI の 3 プロバイダに対応し、テキストプロンプトや参照画像から PNG を生成して保存します。aidiy_movie_generation は Google Gemini Veo を使い、4 から 8 秒の MP4 動画を生成します。参照画像から動画を作る image-to-video にも対応しています。aidiy_text_to_speech は Edge、OpenAI、Gemini、FreeAI の 4 プロバイダに対応した音声合成ツールで、AiDiy などのシステム用語を発音辞書で自動補正する機能も持っています。aidiy_speech_to_text は WAV ファイルや base64 音声データを speech_recognition または OpenAI Whisper でテキストに変換します。この紹介ビデオのナレーション音声も、実際に TTS MCP を使って生成されています。",
       "short_audio": "audio/short_scene_005.mp3",
-      "long_audio": "audio/long_scene_005.mp3"
+      "long_audio": "audio/long_scene_005.mp3",
+      "short_start_sec": 37.128,
+      "short_duration_sec": 6.768,
+      "long_start_sec": 200.472,
+      "long_duration_sec": 51.936
     },
     {
       "id": "scene_006",
-      "title": "メディア生成・OBS・FFmpeg 系",
-      "accent": "#ff5722",
-      "accent_soft": "rgba(255,87,34,0.18)",
-      "kicker": "MEDIA CREATION",
-      "headline": "AI 画像・動画生成・OBS・FFmpeg\n創作の可能性が無限に広がる",
+      "title": "制御・検証系 MCP 5ツール",
+      "expression": "neutral",
+      "accent": "#ffbf47",
+      "accent_soft": "rgba(255, 191, 71, 0.18)",
+      "kicker": "CONTROL & VERIFY",
+      "headline": "コード検証・バックアップ・録画・\n動画編集・エージェント実行まで AI が担う",
+      "lead": "コードチェック、差分バックアップ、OBS Studio 制御、FFmpeg による動画処理、コードエージェント実行の 5 ツールが AI ワークフローを完結させます。",
+      "subtitle": "品質保証から動画制作・エージェント実行まで、5 ツールが AI の作業を締めくくる。",
       "image": "images/scene_006.png",
-      "source_documents": [
-        "backend_mcp/mcp_proc/各ファイル",
-        "backend_mcp/AGENTS.md"
+      "image_prompt": "Vertical 2:3 control and verification tools collage. Four panels: Python ruff linting terminal output showing code issues, file backup diff comparison view, OBS Studio recording interface with scene panel, FFmpeg waveform analysis with trim markers. Amber and orange accent, dark professional automation workflow poster, realistic developer operations style.",
+      "chips": [
+        "Code Check (ruff / tsc)",
+        "Backup (差分方式)",
+        "OBS Studio",
+        "FFmpeg",
+        "Code Agents"
       ],
-      "source_summary": "image_generationはOpenAI/Gemini/FreeAI対応の画像生成。movie_generationはGoogle Gemini Veo対応の動画生成（4〜8秒）。obs_studio_controlはWebSocket APIでOBS Studio制御。ffmpeg_controlはffmpeg/ffprobe/ffplayをMCPから呼び出し可能。",
-      "factual_bullets": [
-        "image_generation: OpenAI gpt-image-2/DALL-E 3・Gemini・FreeAI対応",
-        "movie_generation: Veo 3.1 / Veo 2.0対応・4〜8秒・720p/1080p",
-        "obs_studio_control: 録画・配信・シーン切り替え・ソース表示/非表示・音声ミュート",
-        "ffmpeg_control: 動画切り出し・字幕焼き込み・発話区間自動検出・プレビュー再生",
-        "動画生成はポーリング最大10分で完了待機"
-      ],
-      "forbidden_elements": [
-        "動画生成が秒単位で完了するという誇張",
-        "OBS制御がOBS以外の配信ソフトにも対応するという誤情報",
-        "FFmpegが商用コンテンツを制限なく利用できるという誤解"
-      ],
-      "image_prompt": "Four creative panels: AI generating colorful scene image from prompt, short video clip being created by AI, OBS Studio interface with scene switching, FFmpeg command line video editing. Warm orange-red theme. Dynamic and creative visual style.",
-      "dialogue": [
+      "metrics": [
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "aidiy_image_generationはプロンプトを送るだけでAIが画像を自動生成してくれます！",
-          "naration_text": "aidiy_image_generationは、テキストプロンプトからAIが画像を生成するMCPサーバーです。OpenAI（gpt-image-2やDALL-E 3）・Google Gemini・FreeAIの3プロバイダーに対応しています。サイズや品質の指定もでき、参照画像を渡して似た画像を作る機能もあります。この動画の各シーンの背景画像も、aidiy_image_generationで自動生成されています。",
-          "audio": "audio/dlg_006_01_female.mp3",
-          "duration_sec": 25.896
+          "label": "制御・検証ツール",
+          "value": "5"
         },
         {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "aidiy_movie_generationはGoogle Gemini VeoでAIが動画を自動生成できる最先端ツールです！",
-          "naration_text": "aidiy_movie_generationは、Google Gemini Veoを使ってテキストプロンプトから動画を生成するMCPサーバーです。4〜8秒の短尺動画を16:9や9:16のアスペクト比で生成できます。720pや1080pの解像度に対応し、参照画像から動画を作るimage-to-video機能もあります。動画生成には数分かかりますが、AIが自律的に待機してポーリングを行うため人間が待つ必要がありません。",
-          "audio": "audio/dlg_006_02_male.mp3",
-          "duration_sec": 26.352
+          "label": "コードチェック",
+          "value": "ruff + vue-tsc"
         },
         {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "aidiy_obs_studio_controlはOBS Studioを外部から制御できるサーバーで配信・録画の自動化に最適！",
-          "naration_text": "aidiy_obs_studio_controlは、OBS Studio WebSocket APIを通じてOBSを外部からコントロールできるMCPサーバーです。録画の開始・停止・配信のオン・オフ・シーンの切り替え・ソースの表示・非表示・音声ミュートの制御などができます。AIが動画の台本に従って自動的にシーンを切り替えながら録画するといった高度な自動化が実現できます。",
-          "audio": "audio/dlg_006_03_female.mp3",
-          "duration_sec": 26.232
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "aidiy_ffmpeg_controlはffmpegをAIから直接呼べるので、動画切り出し・変換・字幕付加が自在にできます。",
-          "naration_text": "aidiy_ffmpeg_controlは、ffmpeg・ffprobe・ffplayをMCPから直接呼び出せるサーバーです。動画の特定区間の切り出し・形式変換・字幕の焼き込み・画像と音声の合成・音声の波形解析による発話区間の自動検出など、動画編集のあらゆる操作をAIが自律的に実行できます。この動画自体も、aidiy_ffmpeg_controlを使ってシーン動画と音声を合成して完成させています。",
-          "audio": "audio/dlg_006_04_male.mp3",
-          "duration_sec": 24.0
-        },
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "画像・音声・動画生成にOBS・FFmpegが揃い、AIが動画を完全自動で作れる環境が完成しました！",
-          "naration_text": "image_generation・text_to_speech・movie_generation・obs_studio_control・ffmpeg_controlの5つを組み合わせると、AIが台本を受け取りシーンごとに画像を生成し、ナレーション音声を合成し、ffmpegで映像と音声を組み合わせて最終的な動画ファイルを出力するという完全自動の動画制作パイプラインが実現します。まさにAIクリエイターの誕生です。",
-          "audio": "audio/dlg_006_05_female.mp3",
-          "duration_sec": 25.152
+          "label": "バックアップ",
+          "value": "差分方式"
         }
       ],
-      "duration_sec": 127.632,
+      "cards": [
+        {
+          "title": "aidiy_code_check",
+          "lines": [
+            "Python: py_compile + ruff",
+            "TypeScript: vue-tsc",
+            "MCP 経由でコード品質を自動確認"
+          ]
+        },
+        {
+          "title": "aidiy_backup",
+          "lines": [
+            "差分バックアップを自動保存",
+            "before/after の差分比較",
+            "変更ファイル一覧の履歴確認も可"
+          ]
+        },
+        {
+          "title": "aidiy_obs_studio_control",
+          "lines": [
+            "OBS WebSocket v5 で制御",
+            "録画 Start/Stop、シーン切替",
+            "このビデオの録画もここから制御"
+          ]
+        },
+        {
+          "title": "aidiy_ffmpeg_control",
+          "lines": [
+            "ffmpeg / ffprobe / ffplay を実行",
+            "音声 RMS 検出による自動トリム",
+            "字幕焼き込み・オーバーレイ対応"
+          ]
+        },
+        {
+          "title": "aidiy_code_agents",
+          "lines": [
+            "copilot_cli / codex_cli / aidiy_hermes など複数 CLI 対応",
+            "MCP 経由でコードエージェントをキック",
+            "プロジェクトパス・プロンプトを指定して実行"
+          ]
+        }
+      ],
+      "facts": [
+        "aidiy_code_check は Python の py_compile/ruff と TypeScript の vue-tsc を MCP 経由で実行する。",
+        "aidiy_backup は差分バックアップ方式で、初回全件スナップショット後は差分のみ保存する。",
+        "aidiy_obs_studio_control は OBS WebSocket v5 を使い、録画・配信・シーン・ソース・音声ミュートを制御する。",
+        "aidiy_ffmpeg_control は音声起点・終点の RMS 検出から余白付きトリムまで自動化できる。",
+        "aidiy_code_agents は copilot_cli / codex_cli / aidiy_hermes など複数の AI コード CLI を MCP 経由で実行する。"
+      ],
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "text": "aidiy_code_check: Python 構文 / ruff / TypeScript 型チェック。aidiy_backup: 差分バックアップ保存 / 確認。"
+        },
+        {
+          "source": "AGENTS.md",
+          "text": "aidiy_obs_studio_control: OBS Studio WebSocket 制御（配信、録画、シーン、ソース、音声）。aidiy_ffmpeg_control: ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生）。"
+        },
+        {
+          "source": "AGENTS.md",
+          "text": "aidiy_code_agents: AI コードエージェント実行（CodeAI CLI 経由）。copilot_cli / codex_cli / antigravity_cli / opencode_cli / aidiy_hermes に対応。"
+        }
+      ],
+      "short_narration": "コード検証からバックアップ、OBS 録画、FFmpeg 編集、コードエージェント実行まで、5 ツールがワークフローを締めくくります。",
+      "long_narration": "制御・検証系の 5 ツールは AI エージェントの作業を完結させます。aidiy_code_check は Python の ruff と vue-tsc を MCP 経由で実行し、構文エラーや型エラーをコード変更直後に自動確認できます。aidiy_backup は差分バックアップ方式を採用し、変更ファイルの保存と before/after の比較を MCP ひとつで行えます。aidiy_obs_studio_control は OBS WebSocket v5 でシーン切替や録画の Start/Stop を AI が直接制御します。aidiy_ffmpeg_control は音声の RMS レベルから発話の開始と終了を自動検出し、前後に余白をつけた状態でトリムまで完結します。そして aidiy_code_agents は copilot_cli や codex_cli、aidiy_hermes といった AI コード CLI を MCP 経由でキックできるツールです。コーディング作業をエージェントに委ねながら、観測から検証・実行まで一気通貫の自動化ループを回せます。",
       "short_audio": "audio/short_scene_006.mp3",
-      "long_audio": "audio/long_scene_006.mp3"
+      "long_audio": "audio/long_scene_006.mp3",
+      "short_start_sec": 43.896,
+      "short_duration_sec": 9.456,
+      "long_start_sec": 252.408,
+      "long_duration_sec": 51.912
     },
     {
       "id": "scene_999",
-      "title": "まとめ",
-      "accent": "#29d8ff",
-      "accent_soft": "rgba(41,216,255,0.18)",
+      "title": "ご視聴ありがとうございました",
+      "expression": "neutral",
+      "accent": "#c49bff",
+      "accent_soft": "rgba(196, 155, 255, 0.2)",
       "layout": "hero",
-      "kicker": "SUMMARY",
-      "headline": "AiDiy MCP Hub\n14 のツールで AI 開発を加速",
+      "hero_image_focus": true,
+      "background_word": "",
+      "kicker": "THANK YOU",
+      "headline": "ご視聴ありがとうございました。\nあなたなら MCP で何を作りますか？",
+      "lead": "14 の MCP ツールと HTTP Transport を組み合わせれば、観測・生成・制御の自動化ループがあなたの手元でも動き始めます。",
+      "subtitle": "AiDiy で、あなたの AI エージェントワークフローを育ててみませんか？",
+      "chips": [],
+      "metrics": [],
+      "cards": [],
+      "facts": [],
+      "evidence": [],
       "image": "images/scene_999.png",
-      "source_documents": [
-        "backend_mcp/AGENTS.md",
-        ".aidiy/knowledge/backend_server,backend_mcp,MCP活用手順.md"
-      ],
-      "source_summary": "AiDiy MCPハブは14のFastMCPサーバーとFastAPI+HTTP Transportによる3トランスポート対応で、AIエージェントからPythonスクリプト・Webアプリまで幅広い活用が可能。",
-      "factual_bullets": [
-        "14サーバーを4カテゴリに整理（ブラウザ・データ・音声・メディア）",
-        "HTTP Transport追加でPython/Webから直接MCPを呼び出し可能",
-        "このビデオはAiDiyのビデオ生成機能で自動生成",
-        "AiDiyはオープンソースプロジェクト"
-      ],
-      "forbidden_elements": [
-        "AiDiyが有償サービスであるという誤情報",
-        "将来機能を確定事項として断定すること",
-        "チャンネル登録数や利用者数に関する根拠のない数値"
-      ],
-      "image_prompt": "Summary scene with AiDiy MCP Hub at center, 14 glowing server nodes arranged in circular orbit pattern. Background shows completed video creation pipeline with all tools connected. Cyan blue glow. Celebratory and forward-looking atmosphere.",
-      "dialogue": [
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "今回はAiDiy MCPハブの14サーバーとHTTP Transport追加による革新をご紹介しました！",
-          "naration_text": "本日はAiDiyのMCPハブについて詳しくご紹介しました。Model Context Protocolの基本から始まり、FastAPIとHTTP Transportを組み合わせた新しいインターフェースの追加、そしてブラウザ操作・データベース確認・コードチェック・バックアップ・音声処理・AI画像生成・動画生成・OBS制御・FFmpeg操作まで、14種類のMCPサーバーそれぞれの役割を解説しました。",
-          "audio": "audio/dlg_999_01_female.mp3",
-          "duration_sec": 27.648
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "HTTP Transport追加が大きな転換点でした。AI専用ツール不要で普通のHTTPからMCPが使えるようになった。",
-          "naration_text": "今回の最大のポイントを改めて強調したいと思います。Streamable HTTP Transportの追加により、Claude CodeなどのAI専用開発ツールがなくても、PythonのrequestsやJavaScriptのfetchという普通のHTTPクライアントだけでMCPツールを呼び出せるようになりました。これは既存のWebアプリや業務システムへのAI機能の組み込みを劇的に簡単にするアップデートです。",
-          "audio": "audio/dlg_999_02_male.mp3",
-          "duration_sec": 22.08
-        },
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "14のサーバーを組み合わせると、ブラウザ操作から完全自動動画制作まで本当に幅広いことができますね！",
-          "naration_text": "AiDiyのMCPハブが持つ14のサーバーを組み合わせれば、AIエージェントがブラウザを操作しながらデータを収集し、データベースに保存して、コードを書いてチェックし、結果を画像・音声・動画にまとめて自動配信するというエンドツーエンドの自動化パイプラインが実現できます。個々のツールの力もさることながら、組み合わせることで生まれるシナジーが本当の強みです。",
-          "audio": "audio/dlg_999_03_female.mp3",
-          "duration_sec": 23.928
-        },
-        {
-          "speaker": "male",
-          "expression": "neutral",
-          "telop_text": "まるでAIに14人のスペシャリストがいる感覚ですね！しかも24時間休まず働いてくれます。",
-          "naration_text": "そうですね！ブラウザ操作の専門家・データベースの専門家・コード品質の番人・バックアップ担当者・音声処理エンジニア・画像クリエイター・動画制作スタッフ・放送技術担当者と、それぞれの分野のスペシャリストが14人集まって、AIの指示に従って動いてくれるようなイメージです。しかも全員が24時間365日休まず働いてくれます！",
-          "audio": "audio/dlg_999_04_male.mp3",
-          "duration_sec": 20.568
-        },
-        {
-          "speaker": "female",
-          "expression": "neutral",
-          "telop_text": "この動画もAiDiyが全部作りました！チャンネル登録して、あなたもAiDiyを試してみませんか？",
-          "naration_text": "実はこの動画、全部AiDiyが作っています！台本はAIが書き、各シーンの画像はaidiy_image_generationが生成し、ナレーション音声はaidiy_text_to_speechが合成し、映像はaidiy_ffmpeg_controlが編集しました。14のMCPサーバーが連携して生まれた作品です。気に入っていただけたらチャンネル登録をお願いします！AiDiyはオープンソースプロジェクトですので、あなたも今すぐ試せます。ブラウザ操作から動画制作まで、AIと一緒に何でも作れる体験をぜひご自身で味わってみてください。ワクワクしませんか？AiDiyで、あなたの創造力を解き放ちましょう！",
-          "audio": "audio/dlg_999_05_female.mp3",
-          "duration_sec": 40.968
-        }
-      ],
-      "duration_sec": 135.192,
+      "image_prompt": "Square 1:1 ending visual for AiDiy MCP Hub video. Elegant typography reading 'Thank you for Watching' in refined luxury tech style. Subtle violet glow with cyan network node accents. Dark blue gradient background, clean centered layout, premium and readable, no extra UI, no character, no clutter. Polished closing card for a product introduction video.",
+      "short_narration": "ご視聴ありがとうございました。AiDiy の MCP ハブで、あなただけの AI エージェントワークフローを育ててみてください。",
+      "long_narration": "最後までご視聴いただきありがとうございました。この動画は AiDiy の video_generation 機能を使い、シナリオ作成・音声生成・画面録画・動画トリムまでを AI と MCP で自動化して作りました。FastAPI と HTTP Transport の組み合わせが、AI エージェントの応用範囲をどれだけ広げるか、少しでも伝わったら嬉しいです。AiDiy の 14 の MCP ツールを組み合わせれば、ブラウザ操作、画像生成、音声合成、動画処理、コード検証、コードエージェント実行を連携させた自分だけの AI エージェントワークフローが作れます。Python の requests.post ひとつから始められます。ぜひ AiDiy を試して、あなただけのエージェントワークフローを育ててみてください。あなたなら MCP で、いったい何を作りますか？",
       "short_audio": "audio/short_scene_999.mp3",
-      "long_audio": "audio/long_scene_999.mp3"
+      "long_audio": "audio/long_scene_999.mp3",
+      "short_start_sec": 53.352,
+      "short_duration_sec": 6.216,
+      "long_start_sec": 304.32,
+      "long_duration_sec": 39.192
     }
   ],
-  "total_duration_sec": 927.36,
-  "short_duration_sec": 0.0,
-  "long_duration_sec": 0.0
+  "short_duration_sec": 59.568,
+  "long_duration_sec": 343.512,
+  "total_short_duration_sec": 59.568,
+  "total_long_duration_sec": 343.512
 };

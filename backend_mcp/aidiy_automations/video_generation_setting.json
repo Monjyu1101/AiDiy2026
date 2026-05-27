@@ -1,0 +1,39 @@
+{
+  "_comment": [
+    "ビデオ生成共通設定ファイル。",
+    "topic を書いて、紹介／解説それぞれの folder_name を決めてから実行してください。",
+    "優先度: CLI引数 > このファイル。OS環境変数は使用しません。"
+  ],
+
+  "topic": "FastAPIとHTTP Transportを合わせたインターフェースをMCPハブに追加。これによりWebやpythonからのagent実行にも対応で、応用範囲が劇的に広がった点を強調した、13のMCPサーバー紹介ビデオ",
+
+  "紹介": {
+    "_comment": "video_generation_紹介.py が使う設定（一人アバター 形式）",
+    "template_dir": "D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\AiDiy紹介__all",
+    "folder_name": "AiDiy紹介_mcp改"
+  },
+
+  "解説": {
+    "_comment": "video_generation_解説.py が使う設定（二人アバター 形式）",
+    "template_dir": "D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\活用事例_video_generation解説",
+    "folder_name": "解説_AiDiy_mcp改"
+  },
+
+  "shared": {
+    "_comment": "両スクリプト共通設定。通常は変更不要。",
+    "video_base_dir": "D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ",
+    "frontend_base_url": "http://localhost:8090",
+    "backup_api_url": "http://localhost:8095/aidiy_backup/save",
+    "tts_api_url": "http://localhost:8095/aidiy_text_to_speech/synthesize",
+    "image_gen_api_url": "http://localhost:8095/aidiy_image_generation/generate",
+    "code_agents_api_url": "http://localhost:8095/aidiy_code_agents",
+    "chrome_api_url": "http://localhost:8095/aidiy_chrome_devtools",
+    "ffmpeg_api_url": "http://localhost:8095/aidiy_ffmpeg_control",
+    "tts_guide": true,
+    "browser_preview": true,
+    "chrome_debug_port": 9222,
+    "max_retries": 3,
+    "retry_wait_sec": 5,
+    "max_backup_stabilize": 5
+  }
+}
