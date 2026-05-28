@@ -1,4 +1,4 @@
-# AiDiy - README
+﻿# AiDiy - README
 
 ## 本書の目的
 
@@ -9,7 +9,7 @@
 - [AGENTS.md](./AGENTS.md)
 - [backend_server/AGENTS.md](./backend_server/AGENTS.md)
 - [backend_hermes/AGENTS.md](./backend_hermes/AGENTS.md)
-- [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
+- [backend_tools/AGENTS.md](./backend_tools/AGENTS.md)
 - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 - [docs/](./docs/)
@@ -75,8 +75,8 @@ python _setup.py
 
 1. 共通の Python / npm ツール確認
 2. `backend_hermes` の `.venv` 作成 / `uv pip install -r requirements.txt` / `aidiy_hermes` 登録試行
-3. `backend_mcp` の `uv sync` / `npm install`
-4. 必要に応じて `backend_mcp` 用の MCP 設定ファイル書き込み（Claude / Gemini 向け）
+3. `backend_tools` の `uv sync` / `npm install`
+4. 必要に応じて `backend_tools` 用の MCP 設定ファイル書き込み（Claude / Gemini 向け）
 5. `backend_server` の `uv sync`
 6. `frontend_web` の `npm install`
 7. `frontend_avatar` の `npm install`
@@ -114,7 +114,7 @@ python _start.py
 
 ```bash
 # バックエンド MCP
-cd backend_mcp
+cd backend_tools
 .venv/Scripts/python.exe -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
 
 # バックエンド Core
@@ -228,7 +228,7 @@ python _cleanup.py
 ## 5. よくある注意点
 
 - `_start.py` は **CLI 引数で backend/web/avatar を切り替える方式ではありません**。起動時の対話で選びます。
-- Claude 系のブラウザ自動操作を使う場合は `backend_mcp` も起動してください。
+- Claude 系のブラウザ自動操作を使う場合は `backend_tools` も起動してください。
 - `_start.py` 起動時のバックエンドは `uvicorn --reload` なしです。コード変更を即反映したい場合は個別起動か reboot 機構を使います。
 - `backend_hermes` は `_start.py` では起動しません。`python _setup.py` で導入し、`aidiy_hermes` または `backend_hermes\cli_main.py` を必要時に実行します。
 - Web フロントの AI 画面ルートは **`/AiDiy`** です。
@@ -242,7 +242,7 @@ python _cleanup.py
 1. [AGENTS.md](./AGENTS.md)
 2. [backend_server/AGENTS.md](./backend_server/AGENTS.md)
 3. [backend_hermes/AGENTS.md](./backend_hermes/AGENTS.md)
-4. [backend_mcp/AGENTS.md](./backend_mcp/AGENTS.md)
+4. [backend_tools/AGENTS.md](./backend_tools/AGENTS.md)
 5. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 6. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 7. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

@@ -1,6 +1,6 @@
-# MCP バックアップツールを使ったファイル検証手順
+﻿# MCP バックアップツールを使ったファイル検証手順
 
-> 文書: `backend_hermes,共通,MCPバックアップ検証手順.md` | 実装: `backend_mcp/` (aidiy_backup)
+> 文書: `backend_hermes,共通,MCPバックアップ検証手順.md` | 実装: `backend_tools/` (aidiy_backup)
 
 ## このメモを使う場面
 

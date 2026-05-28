@@ -1,4 +1,4 @@
-"""
+﻿"""
 全コミットの diff 内容から 1日毎の要約文を生成。
 git -c core.quotepath=false で日本語ファイル名を正しく扱う。
 """
@@ -84,7 +84,7 @@ def day_summary_and_changes(date_key, day_commits):
                 if re.match(r'^[CMTVSX]', part):
                     feature_names.add(part)
                 if part == "AIコア": feature_names.add("AIコア")
-        elif top == "backend_mcp":
+        elif top == "backend_tools":
             cat_count["MCP"] += 1
             for part in parts:
                 if part.startswith("mcp_"): feature_names.add(part)

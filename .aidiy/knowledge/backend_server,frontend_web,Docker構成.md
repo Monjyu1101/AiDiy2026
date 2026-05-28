@@ -1,4 +1,4 @@
-# Docker 構成と起動手順
+﻿# Docker 構成と起動手順
 
 > 文書: `backend_server,frontend_web,Docker構成.md` | 実装: `docker/`, `docker/README.md`
 
@@ -24,7 +24,7 @@ Nginx (HTTPS :443 / HTTP :80)
   -> backend apps (:8092)
 ```
 
-- `backend_mcp` (`:8095`) は Docker 構成に含めない。MCP 検証が必要な場合はローカルで別途起動する。
+- `backend_tools` (`:8095`) は Docker 構成に含めない。MCP 検証が必要な場合はローカルで別途起動する。
 - `docker-compose.yml` は core/apps の `8091` / `8092` も直接公開する。
 - 通常の画面確認は `https://localhost/`、Swagger 確認は `http://localhost:8091/docs` / `http://localhost:8092/docs` を使う。
 - コンテナ名は `aidiy2026`。ログ確認は `docker logs aidiy2026`。
@@ -55,7 +55,7 @@ cd docker
 
 - 音声機能やマイク権限を確認する場合は HTTPS の `https://localhost/` を使う。
 - API の単体確認や Swagger は `8091` / `8092` を直接使ってよい。
-- MCP を含む疎通確認は Docker だけで完結しない。`backend_mcp` をローカル起動する。
+- MCP を含む疎通確認は Docker だけで完結しない。`backend_tools` をローカル起動する。
 - HTTPS は自己署名証明書のため、ブラウザ警告は開発・検証用として扱う。
 - Docker 仕様や証明書まわりで迷った場合は `docker/README.md` を優先する。
 

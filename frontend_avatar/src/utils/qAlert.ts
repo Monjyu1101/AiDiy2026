@@ -8,55 +8,82 @@
 // https://github.com/monjyu1101/AiDiy2026
 // -------------------------------------------------------------------------
 
-// ダイアログコンポーネントのインスタンス型定義
-interface AlertDialogInstance {
-  show: (message: string) => Promise<void>
-}
+// qAlert / qConfirm は createApp で DOM に直接マウントするため AiDiy.vue 登録不要。
+// qColorPicker のみインスタンスパターンを維持する。
 
-interface ConfirmDialogInstance {
-  showConfirm: (message: string) => Promise<boolean>
-}
+import { createApp } from 'vue'
+import QAlertComponent from '@/_share/qAlert.vue'
+
+// -- ColorPicker: インスタンスパターン --
 
 interface ColorPickerDialogInstance {
   show: (initialColor: string, title: string) => Promise<string | null>
 }
 
-let alertInstance: AlertDialogInstance | null = null
-let confirmInstance: ConfirmDialogInstance | null = null
 let colorPickerInstance: ColorPickerDialogInstance | null = null
-
-export function setAlertInstance(instance: AlertDialogInstance): void {
-  alertInstance = instance
-}
-
-export function setConfirmInstance(instance: ConfirmDialogInstance): void {
-  confirmInstance = instance
-}
 
 export function setColorPickerInstance(instance: ColorPickerDialogInstance): void {
   colorPickerInstance = instance
 }
 
-export async function qAlert(message: string): Promise<void> {
-  if (!alertInstance) {
-    console.error('qAlertDialog not initialized. Please add qAlertDialog to your App.vue')
-    alert(message) // フォールバック
-    return
-  }
-  await alertInstance.show(message)
+// -- Alert: 重複表示を防ぐ --
+
+let activeAlert = false
+
+export function qAlert(message: string): Promise<void> {
+  if (activeAlert) return Promise.resolve()
+  activeAlert = true
+  return new Promise((resolve) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    let closed = false
+    const close = () => {
+      if (closed) return
+      closed = true
+      activeAlert = false
+      app.unmount()
+      container.remove()
+      resolve()
+    }
+    const app = createApp(QAlertComponent, { message: String(message ?? ''), onOk: close })
+    app.mount(container)
+  })
 }
 
-export async function qConfirm(message: string): Promise<boolean> {
-  if (!confirmInstance) {
-    console.error('qConfirm not initialized. Please map confirm handler in App.vue')
-    return confirm(message) // フォールバック
-  }
-  return await confirmInstance.showConfirm(message)
+// -- Confirm: 重複表示を防ぐ --
+
+let activeConfirm = false
+
+export function qConfirm(message: string): Promise<boolean> {
+  if (activeConfirm) return Promise.resolve(false)
+  activeConfirm = true
+  return new Promise((resolve) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    let closed = false
+    const close = (result: boolean) => {
+      if (closed) return
+      closed = true
+      activeConfirm = false
+      app.unmount()
+      container.remove()
+      resolve(result)
+    }
+    const app = createApp(QAlertComponent, {
+      message: String(message ?? ''),
+      showCancel: true,
+      onOk: () => close(true),
+      onCancel: () => close(false),
+    })
+    app.mount(container)
+  })
 }
+
+// -- ColorPicker --
 
 export async function qColorPicker(initialColor = '#000000', title = '色選択'): Promise<string | null> {
   if (!colorPickerInstance) {
-    console.error('qColorPickerDialog not initialized. Please add qColorPickerDialog to your App.vue')
+    console.error('qColorPicker not initialized. Please add qColorPickerDialog to your AiDiy.vue')
     return null
   }
   return await colorPickerInstance.show(initialColor, title)

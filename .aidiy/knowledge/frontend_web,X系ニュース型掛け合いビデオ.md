@@ -1,4 +1,4 @@
-# X系ニュース型掛け合いビデオ
+﻿# X系ニュース型掛け合いビデオ
 
 > 文書: `frontend_web,X系ニュース型掛け合いビデオ.md` | 実装: `frontend_web/public/Xビデオ/ニュース_20260519_anthropic2026前半/index.html`, `frontend_web/public/Xビデオ/ニュース_20260519_anthropic2026前半/scenario.js`, `frontend_web/public/Xビデオ/ニュース_20260519_anthropic2026前半/_gen_dialogue_audio.py`
 
@@ -116,16 +116,16 @@ DIALOGUES = [
     ...
 ]
 
-# 実行（backend_mcp の .venv を使う）
-# & "D:\OneDrive\_sandbox\AiDiy2026\backend_mcp\.venv\Scripts\python.exe" "_gen_dialogue_audio.py"
+# 実行（backend_tools の .venv を使う）
+# & "D:\OneDrive\_sandbox\AiDiy2026\backend_tools\.venv\Scripts\python.exe" "_gen_dialogue_audio.py"
 ```
 
-- `sys.path.insert(0, r"D:\...\backend_mcp")` して `mcp_proc.text_to_speech.TextToSpeech` を使用
+- `sys.path.insert(0, r"D:\...\backend_tools")` して `mcp_proc.text_to_speech.TextToSpeech` を使用
 - `tts.synthesize(speech_text=text, language="ja", provider="edge", voice=speaker)` のように `ratio` は省略する
 - ニュース版の再生スピードは `ratio` 指定なし、または `ratio=None` で収録する。現時点の標準速度は 1.2 倍。
 - `aidiy_text_to_speech` は `ratio=None`（未指定）を既定の 1.2 倍として扱う。`ratio=0` / `ratio=1` は速度調整なしになるため、ニュース版の通常収録では指定しない
 - `voice="female"` → NanamiNeural、`voice="male"` → KeitaNeural
-- システム Python では `edge_tts` モジュールがないため、**必ず `backend_mcp/.venv` の Python を使う**
+- システム Python では `edge_tts` モジュールがないため、**必ず `backend_tools/.venv` の Python を使う**
 - MCP クライアントが不要な場合は HTTP POST でも同等の処理を呼び出せる。
   ```
   POST http://localhost:8095/aidiy_text_to_speech/synthesize
@@ -208,7 +208,7 @@ subtitleText.textContent = turn.subtitle || turn.text || "";
    - `_gen_dialogue_audio.py` — DIALOGUES リストを書き直す
 3. `images/` フォルダを作成し、各シーンの背景画像を配置
 4. `audio/` フォルダを作成
-5. `backend_mcp/.venv` の Python で `_gen_dialogue_audio.py` を実行して音声生成
+5. `backend_tools/.venv` の Python で `_gen_dialogue_audio.py` を実行して音声生成
 6. `Xビデオ.vue` にメニューカードを追加
 7. ブラウザで動作確認（字幕・口パク・暗転切替・ステレオパン）
 
@@ -218,7 +218,7 @@ subtitleText.textContent = turn.subtitle || turn.text || "";
 
 | 間違い | 正しい対処 |
 |--------|-----------|
-| システム Python で `_gen_dialogue_audio.py` を実行する | `backend_mcp/.venv/Scripts/python.exe` を使う（`edge_tts` がここにある） |
+| システム Python で `_gen_dialogue_audio.py` を実行する | `backend_tools/.venv/Scripts/python.exe` を使う（`edge_tts` がここにある） |
 | `text` と `subtitle` を同じにする | `subtitle` は短い要約（表示用）、`text` は全文（音声用）で分ける |
 | 非話者アバターを `opacity` で透かす | `filter: brightness(0.58) saturate(0.45)` のみ使う（opacity は変えない） |
 | VRM の向きが外側を向く | left アバターは `Math.PI + Math.PI/6`、right は `Math.PI - Math.PI/6` が内向き |

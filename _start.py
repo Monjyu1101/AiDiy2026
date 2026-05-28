@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 """開発環境起動スクリプト
 
-バックエンド(mcp)・バックエンド(core,apps)・フロントエンド(Web)・
+バックエンド(tools)・バックエンド(core,apps)・フロントエンド(Web)・
 フロントエンド(Avatar) を統一手順で起動します。
 
 標準の起動順:
-1. バックエンド(mcp)
+1. バックエンド(tools)
 2. バックエンド(core)
 3. バックエンド(apps)
 4. フロントエンド(Web)
@@ -76,11 +76,11 @@ BACKEND_CORE_APP = "core_main:app"
 BACKEND_APPS_APP = "apps_main:app"
 BACKEND_ENV_CANDIDATES = [".venv", "venv"]
 
-BACKEND_MCP_PATH = "backend_mcp"
-BACKEND_MCP_PORT = 8095
-BACKEND_MCP_APP = "mcp_main:app"
-BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
-BACKEND_MCP_SHOW_AUTOMATION_BANNER = False
+BACKEND_TOOLS_PATH = "backend_tools"
+BACKEND_TOOLS_PORT = 8095
+BACKEND_TOOLS_APP = "mcp_main:app"
+BACKEND_TOOLS_ENV_CANDIDATES = [".venv", "venv"]
+BACKEND_TOOLS_SHOW_AUTOMATION_BANNER = False
 
 FRONTEND_WEB_PATH = "frontend_web"
 FRONTEND_WEB_PORT = 8090
@@ -95,7 +95,7 @@ RESTART_WAIT_SECONDS = 15
 
 BASE_DIR = Path(__file__).parent
 BACKEND_DIR = BASE_DIR / BACKEND_PATH
-BACKEND_MCP_DIR = BASE_DIR / BACKEND_MCP_PATH
+BACKEND_TOOLS_DIR = BASE_DIR / BACKEND_TOOLS_PATH
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
 def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
@@ -131,11 +131,11 @@ def get_backend_command(app_module: str, port: int) -> list[str]:
     return ["uv", "run", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port)]
 
 
-def get_backend_mcp_command() -> list[str]:
-    backend_mcp_python = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
-    if backend_mcp_python is not None:
-        return [str(backend_mcp_python), "-m", "uvicorn", BACKEND_MCP_APP, "--host", "0.0.0.0", "--port", str(BACKEND_MCP_PORT)]
-    return ["uv", "run", "uvicorn", BACKEND_MCP_APP, "--host", "0.0.0.0", "--port", str(BACKEND_MCP_PORT)]
+def get_backend_tools_command() -> list[str]:
+    backend_tools_python = find_python_in_env(BACKEND_TOOLS_DIR, BACKEND_TOOLS_ENV_CANDIDATES)
+    if backend_tools_python is not None:
+        return [str(backend_tools_python), "-m", "uvicorn", BACKEND_TOOLS_APP, "--host", "0.0.0.0", "--port", str(BACKEND_TOOLS_PORT)]
+    return ["uv", "run", "uvicorn", BACKEND_TOOLS_APP, "--host", "0.0.0.0", "--port", str(BACKEND_TOOLS_PORT)]
 
 
 
@@ -152,22 +152,22 @@ def check_backend_environment() -> tuple[bool, str]:
     return False, f"Python 仮想環境 ({' / '.join(BACKEND_ENV_CANDIDATES)}) または uv が見つかりません"
 
 
-def check_backend_mcp_environment() -> tuple[bool, str]:
-    if not BACKEND_MCP_DIR.exists():
-        return False, f"フォルダが見つかりません: {BACKEND_MCP_DIR}"
-    if not (BACKEND_MCP_DIR / "pyproject.toml").exists():
-        return False, f"pyproject.toml が見つかりません: {BACKEND_MCP_DIR / 'pyproject.toml'}"
+def check_backend_tools_environment() -> tuple[bool, str]:
+    if not BACKEND_TOOLS_DIR.exists():
+        return False, f"フォルダが見つかりません: {BACKEND_TOOLS_DIR}"
+    if not (BACKEND_TOOLS_DIR / "pyproject.toml").exists():
+        return False, f"pyproject.toml が見つかりません: {BACKEND_TOOLS_DIR / 'pyproject.toml'}"
 
-    backend_mcp_python = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
-    if backend_mcp_python is None and not check_command_exists("uv"):
-        return False, f"Python 仮想環境 ({' / '.join(BACKEND_MCP_ENV_CANDIDATES)}) または uv が見つかりません"
+    backend_tools_python = find_python_in_env(BACKEND_TOOLS_DIR, BACKEND_TOOLS_ENV_CANDIDATES)
+    if backend_tools_python is None and not check_command_exists("uv"):
+        return False, f"Python 仮想環境 ({' / '.join(BACKEND_TOOLS_ENV_CANDIDATES)}) または uv が見つかりません"
 
-    if (BACKEND_MCP_DIR / "package.json").exists():
-        ok, detail = check_npm_project_environment(BACKEND_MCP_DIR)
+    if (BACKEND_TOOLS_DIR / "package.json").exists():
+        ok, detail = check_npm_project_environment(BACKEND_TOOLS_DIR)
         if not ok:
             return False, detail
 
-    return True, str(backend_mcp_python) if backend_mcp_python is not None else "uv"
+    return True, str(backend_tools_python) if backend_tools_python is not None else "uv"
 
 
 
@@ -386,8 +386,8 @@ def start_backend_apps() -> subprocess.Popen[bytes]:
     return launch_process("バックエンド(apps)", get_backend_command(BACKEND_APPS_APP, BACKEND_APPS_PORT), BACKEND_DIR)
 
 
-def start_backend_mcp() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(mcp)", get_backend_mcp_command(), BACKEND_MCP_DIR)
+def start_backend_tools() -> subprocess.Popen[bytes]:
+    return launch_process("バックエンド(tools)", get_backend_tools_command(), BACKEND_TOOLS_DIR)
 
 
 
@@ -501,11 +501,11 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
 
 def collect_startup_choices() -> tuple[bool, bool, bool, bool]:
     print_header("起動条件の確認")
-    backend_mcp_enabled = prompt_choice("バックエンド(mcp)       起動しますか?", default_yes=True)
+    backend_tools_enabled = prompt_choice("バックエンド(tools)     起動しますか?", default_yes=True)
     backend_enabled     = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
     web_enabled         = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
     avatar_enabled      = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
-    return backend_mcp_enabled, backend_enabled, web_enabled, avatar_enabled
+    return backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled
 
 
 def open_browser(port: int) -> None:
@@ -519,11 +519,11 @@ def open_browser(port: int) -> None:
 
 
 
-def _mcp_post(path: str, body: dict, timeout: int = 30) -> dict:
-    """backend_mcp の HTTP POST インターフェースを呼ぶ (urllib のみ使用)"""
+def _tools_post(path: str, body: dict, timeout: int = 30) -> dict:
+    """backend_tools の HTTP POST インターフェースを呼ぶ (urllib のみ使用)"""
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
-        f"http://localhost:{BACKEND_MCP_PORT}{path}",
+        f"http://localhost:{BACKEND_TOOLS_PORT}{path}",
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -532,19 +532,19 @@ def _mcp_post(path: str, body: dict, timeout: int = 30) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def open_browser_via_mcp(port: int) -> bool:
+def open_browser_via_tools(port: int) -> bool:
     print_header("ブラウザページ表示")
     url = f"http://localhost:{port}"
     try:
-        _mcp_post(
+        _tools_post(
             "/aidiy_chrome_devtools/new_page",
-            {"url": url, "show_automation_banner": BACKEND_MCP_SHOW_AUTOMATION_BANNER},
+            {"url": url, "show_automation_banner": BACKEND_TOOLS_SHOW_AUTOMATION_BANNER},
             timeout=60,
         )
-        print_success(f"(mcp) Chrome でページを開きました: {url}")
+        print_success(f"(tools) Chrome でページを開きました: {url}")
         return True
     except Exception as exc:
-        print_warning(f"(mcp) HTTP POST 経由でページを開けませんでした: {exc}")
+        print_warning(f"(tools) HTTP POST 経由でページを開けませんでした: {exc}")
         try:
             webbrowser.open(url)
         except Exception as exc2:
@@ -594,7 +594,7 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
 
 
 def validate_initial_environment(
-    backend_mcp_enabled: bool,
+    backend_tools_enabled: bool,
     backend_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
@@ -603,13 +603,13 @@ def validate_initial_environment(
     has_error = False
     npm_command = get_npm_command()
 
-    if backend_mcp_enabled:
-        ok, detail = check_backend_mcp_environment()
+    if backend_tools_enabled:
+        ok, detail = check_backend_tools_environment()
         if ok:
-            print_success(f"バックエンド(mcp): OK ({detail})")
+            print_success(f"バックエンド(tools): OK ({detail})")
         else:
-            print_error(f"バックエンド(mcp): 未準備 ({detail})")
-            print_info(f"  対応例: cd {BACKEND_MCP_PATH} && uv sync")
+            print_error(f"バックエンド(tools): 未準備 ({detail})")
+            print_info(f"  対応例: cd {BACKEND_TOOLS_PATH} && uv sync")
             has_error = True
 
     if backend_enabled:
@@ -671,8 +671,8 @@ def start_service(
     npm_command: str | None,
     ) -> bool:
     try:
-        if name == "バックエンド(mcp)":
-            process = start_backend_mcp()
+        if name == "バックエンド(tools)":
+            process = start_backend_tools()
         elif name == "バックエンド(core)":
             process = start_backend_core()
         elif name == "バックエンド(apps)":
@@ -700,14 +700,14 @@ def start_service(
 
 
 def maybe_kill_initial_ports(
-    backend_mcp_enabled: bool,
+    backend_tools_enabled: bool,
     backend_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
 ) -> None:
     print_header("既存プロセス整理")
-    if backend_mcp_enabled:
-        kill_process_on_port(BACKEND_MCP_PORT)
+    if backend_tools_enabled:
+        kill_process_on_port(BACKEND_TOOLS_PORT)
     if backend_enabled:
         kill_process_on_port(BACKEND_CORE_PORT)
         kill_process_on_port(BACKEND_APPS_PORT)
@@ -722,7 +722,7 @@ def maybe_kill_initial_ports(
 
 
 def start_initial_services(
-    start_backend_mcp_enabled: bool,
+    start_backend_tools_enabled: bool,
     start_backend_enabled: bool,
     avatar_enabled: bool,
     web_enabled: bool,
@@ -731,7 +731,7 @@ def start_initial_services(
     npm_command: str | None,
 ) -> dict[str, bool]:
     selected_flags = {
-        "バックエンド(mcp)": start_backend_mcp_enabled,
+        "バックエンド(tools)": start_backend_tools_enabled,
         "バックエンド(core)": start_backend_enabled,
         "バックエンド(apps)": start_backend_enabled,
         "フロントエンド(Web)": web_enabled,
@@ -739,16 +739,16 @@ def start_initial_services(
     }
 
     maybe_kill_initial_ports(
-        backend_mcp_enabled=start_backend_mcp_enabled,
+        backend_tools_enabled=start_backend_tools_enabled,
         backend_enabled=start_backend_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
     )
 
-    if start_backend_mcp_enabled:
-        print_header("バックエンド(mcp) 起動")
-        start_service("バックエンド(mcp)", processes, last_output_times, npm_command)
-        wait_for_services_quiet(last_output_times, ["バックエンド(mcp)"], label="バックエンド(mcp)")
+    if start_backend_tools_enabled:
+        print_header("バックエンド(tools) 起動")
+        start_service("バックエンド(tools)", processes, last_output_times, npm_command)
+        wait_for_services_quiet(last_output_times, ["バックエンド(tools)"], label="バックエンド(tools)")
 
     if start_backend_enabled:
         print_header("バックエンド(core) 起動")
@@ -772,11 +772,11 @@ def start_initial_services(
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
 
     if web_enabled and "フロントエンド(Web)" in processes:
-        if not (start_backend_mcp_enabled and "バックエンド(mcp)" in processes and open_browser_via_mcp(FRONTEND_WEB_PORT)):
+        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(FRONTEND_WEB_PORT)):
             open_browser(FRONTEND_WEB_PORT)
 
     if avatar_enabled and "フロントエンド(Avatar)" in processes:
-        if not (start_backend_mcp_enabled and "バックエンド(mcp)" in processes and open_browser_via_mcp(FRONTEND_AVATAR_PORT)):
+        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(FRONTEND_AVATAR_PORT)):
             open_browser(FRONTEND_AVATAR_PORT)
 
     return selected_flags
@@ -795,7 +795,7 @@ def monitor_and_restart(
 
     process_crash_time: dict[str, float] = {}
     port_map = {
-        "バックエンド(mcp)": BACKEND_MCP_PORT,
+        "バックエンド(tools)": BACKEND_TOOLS_PORT,
         "バックエンド(core)": BACKEND_CORE_PORT,
         "バックエンド(apps)": BACKEND_APPS_PORT,
         "フロントエンド(Web)": FRONTEND_WEB_PORT,
@@ -842,10 +842,10 @@ def monitor_and_restart(
 
 
 def main() -> None:
-    backend_mcp_enabled, backend_enabled, web_enabled, avatar_enabled = collect_startup_choices()
+    backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled = collect_startup_choices()
 
     is_ready, npm_command = validate_initial_environment(
-        backend_mcp_enabled=backend_mcp_enabled,
+        backend_tools_enabled=backend_tools_enabled,
         backend_enabled=backend_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
@@ -864,7 +864,7 @@ def main() -> None:
 
         try:
             selected_services = start_initial_services(
-                start_backend_mcp_enabled=backend_mcp_enabled,
+                start_backend_tools_enabled=backend_tools_enabled,
                 start_backend_enabled=backend_enabled,
                 avatar_enabled=avatar_enabled,
                 web_enabled=web_enabled,
@@ -874,10 +874,10 @@ def main() -> None:
             )
 
             print_header("起動完了")
-            if "バックエンド(mcp)" in processes:
-                print_success(f"バックエンド(mcp) Swagger UI : http://localhost:{BACKEND_MCP_PORT}/docs")
-                print_info   (f"  MCP ツール一覧(例)        : http://localhost:{BACKEND_MCP_PORT}/aidiy_text_to_speech/list")
-                print_info   (f"  利用可能 MCP 一覧         : http://localhost:{BACKEND_MCP_PORT}/")
+            if "バックエンド(tools)" in processes:
+                print_success(f"バックエンド(tools) Swagger UI : http://localhost:{BACKEND_TOOLS_PORT}/docs")
+                print_info   (f"  ツール一覧(例)            : http://localhost:{BACKEND_TOOLS_PORT}/aidiy_text_to_speech/list")
+                print_info   (f"  利用可能 ツール 一覧      : http://localhost:{BACKEND_TOOLS_PORT}/")
             if "バックエンド(core)" in processes:
                 print_success(f"バックエンド(core): http://localhost:{BACKEND_CORE_PORT}/docs")
             if "バックエンド(apps)" in processes:

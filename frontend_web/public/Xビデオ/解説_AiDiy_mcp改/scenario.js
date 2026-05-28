@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "解説_AiDiy_mcp改",
   "version": "duo-v2",
   "title": "AiDiy MCP ハブ解説 — FastAPI + HTTP Transport で広がる 14 MCP の応用範囲",
@@ -21,7 +21,7 @@ window.SCENARIO = {
       "image": "images/scene_000.png",
       "source_summary": "AiDiy MCPハブにFastAPI + Streamable HTTP Transportが追加。14のMCPサーバーをWebやPythonから直接呼び出せるようになった。この動画自体もAiDiyのvideo_generation機能で自動生成されている。",
       "factual_bullets": [
-        "AiDiy MCPハブ: backend_mcp、ポート 8095",
+        "AiDiy MCPハブ: backend_tools、ポート 8095",
         "14のMCPサーバーが同一ポートで提供",
         "3トランスポート: stdio gateway / SSE / Streamable HTTP Transport",
         "この動画はAiDiyのvideo_generation機能で自動生成"
@@ -85,7 +85,7 @@ window.SCENARIO = {
       "image": "images/scene_001.png",
       "source_summary": "AiDiy MCPハブはstdio gateway・SSE Transport・Streamable HTTP Transportの3種を同一ポート8095で提供。FastAPI上で実装。mcp_main.pyがエントリポイント。",
       "factual_bullets": [
-        "backend_mcp/mcp_main.py がエントリポイント",
+        "backend_tools/mcp_main.py がエントリポイント",
         "ポート: 8095",
         "stdio gateway (mcp_stdio.py): Claude Desktopなどのstdio MCPクライアント向け",
         "SSE Transport: Server-Sent Events によるリアルタイム接続",
@@ -100,7 +100,7 @@ window.SCENARIO = {
           "speaker": "female",
           "expression": "neutral",
           "telop_text": "AiDiy の MCP ハブは FastAPI で実装され、ポート 8095 で動作しています。",
-          "naration_text": "AiDiy の MCP ハブは、Python の FastAPI フレームワークを使って実装されています。backend_mcp フォルダにある mcp_main.py がエントリポイントで、ポート 8095 で起動します。ここに 14 種類の MCP サーバーがすべて集約されており、接続方式に応じた 3 種類のトランスポートが利用できます。",
+          "naration_text": "AiDiy の MCP ハブは、Python の FastAPI フレームワークを使って実装されています。backend_tools フォルダにある mcp_main.py がエントリポイントで、ポート 8095 で起動します。ここに 14 種類の MCP サーバーがすべて集約されており、接続方式に応じた 3 種類のトランスポートが利用できます。",
           "audio": "audio/dlg_001_01_female.mp3",
           "duration_sec": 21.936
         },
@@ -255,7 +255,7 @@ window.SCENARIO = {
       "factual_bullets": [
         "aidiy_sqlite: AiDiy DBのテーブル確認・クエリ実行（読み取りデフォルト、書き込みはallow_write=True）",
         "aidiy_postgres: 外部PostgreSQL接続・任意SQLクエリ実行",
-        "aidiy_logs: backend_server / backend_mcp のログ末尾取得・ERROR/Traceback抽出",
+        "aidiy_logs: backend_server / backend_tools のログ末尾取得・ERROR/Traceback抽出",
         "aidiy_code_check: Python構文・ruff lint・TypeScript型チェック（npm run type-check）",
         "aidiy_backup: 差分バックアップ保存（初回は全件スナップショット）・変更ファイル検出・before/after比較"
       ],
@@ -277,7 +277,7 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "aidiy_logs はサーバーのログから ERROR と Traceback をピンポイントで抽出します。",
-          "naration_text": "aidiy_logs は、backend_server と backend_mcp のログファイルを監視して、末尾の取得やエラー抽出ができる MCP です。ERROR や Traceback を前後の文脈付きで取り出してくれるので、AI エージェントがバグの原因を特定するときに素早く動けます。コードを書いて動かしてエラーを確認して直す、というサイクルがスムーズになります。",
+          "naration_text": "aidiy_logs は、backend_server と backend_tools のログファイルを監視して、末尾の取得やエラー抽出ができる MCP です。ERROR や Traceback を前後の文脈付きで取り出してくれるので、AI エージェントがバグの原因を特定するときに素早く動けます。コードを書いて動かしてエラーを確認して直す、というサイクルがスムーズになります。",
           "audio": "audio/dlg_004_02_male.mp3",
           "duration_sec": 20.544
         },

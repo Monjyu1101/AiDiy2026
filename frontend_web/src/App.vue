@@ -14,10 +14,8 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import Layout from './components/_Layout.vue';
-import qAlertDialog from './components/_share/qAlertDialog.vue';
-import qMessageDialog from './components/_share/qMessageDialog.vue';
 import qColorPickerDialog from './components/_share/qColorPickerDialog.vue';
-import { setAlertInstance, setConfirmInstance, setMessageInstance, setColorPickerInstance } from './utils/qAlert';
+import { setColorPickerInstance } from './utils/qAlert';
 
 const route = useRoute();
 
@@ -30,17 +28,6 @@ const AIコアパス判定 = (path: string): boolean => {
   }
 };
 
-type AlertDialogInstance = {
-  show: (message: string) => Promise<void>;
-  showConfirm: (message: string) => Promise<boolean>;
-};
-
-type MessageDialogInstance = {
-  show: (message: string, type?: string, durationMs?: number) => Promise<void>;
-};
-
-const alertRef = ref<AlertDialogInstance | null>(null);
-const messageRef = ref<MessageDialogInstance | null>(null);
 const colorPickerRef = ref(null);
 
 // ログイン画面以外はレイアウトを適用
@@ -50,13 +37,6 @@ const isAIコア = computed(() => {
 });
 
 onMounted(() => {
-  if (alertRef.value) {
-    setAlertInstance(alertRef.value);
-    setConfirmInstance({ show: alertRef.value.showConfirm });
-  }
-  if (messageRef.value) {
-    setMessageInstance(messageRef.value);
-  }
   if (colorPickerRef.value) {
     setColorPickerInstance(colorPickerRef.value);
   }
@@ -77,8 +57,6 @@ onMounted(() => {
       </Suspense>
     </RouterView>
   </Layout>
-  <qAlertDialog ref="alertRef" />
-  <qMessageDialog ref="messageRef" />
   <qColorPickerDialog ref="colorPickerRef" />
 </template>
 

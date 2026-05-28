@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介aichat",
   "version": "aichat",
   "title": "AiDiy AIコア - チャット・ライブ・コード支援・WebSocket",
@@ -438,10 +438,10 @@ window.SCENARIO = {
       "evidence": [
         {
           "source": "backend_server/AGENTS.md",
-          "text": "MCP サーバー本体は `backend_mcp` にあります。`backend_server` では `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。"
+          "text": "MCP サーバー本体は `backend_tools` にあります。`backend_server` では `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。"
         },
         {
-          "source": "backend_server,backend_mcp,MCP活用手順.md",
+          "source": "backend_server,backend_tools,MCP活用手順.md",
           "text": "MCP 接続定義は `backend_server/_config/AiDiy_mcp.json` に集約する。`AIコード_claude.py` 側で `conf.models.mcp_servers` を Claude Agent SDK に渡す。"
         }
       ],

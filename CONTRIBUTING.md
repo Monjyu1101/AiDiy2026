@@ -1,4 +1,4 @@
-# Contributing
+﻿# Contributing
 
 本プロジェクトへの貢献ありがとうございます。
 
@@ -11,7 +11,7 @@
   - `AGENTS.md`
   - `docs/` フォルダ（コーディングルール、実装例など）
   - `backend_server/AGENTS.md`
-  - `backend_mcp/AGENTS.md`
+  - `backend_tools/AGENTS.md`
   - `frontend_web/AGENTS.md`
   - `frontend_avatar/AGENTS.md`
 
@@ -32,7 +32,7 @@
 
 - API: http://localhost:8091/docs / http://localhost:8092/docs
 - UI: http://localhost:8090
-- MCP 連携変更時: `backend_mcp` の 8 SSE（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup_check` / `aidiy_backup_save`、いずれも `http://localhost:8095/<name>/sse`）も確認
+- MCP 連携変更時: `backend_tools` の 8 SSE（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup_check` / `aidiy_backup_save`、いずれも `http://localhost:8095/<name>/sse`）も確認
 
 ## セキュリティ
 

@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -90,8 +90,8 @@ logs/
 temp/
 backend_server/temp/
 backend_server/temp/**
-backend_mcp/temp/
-backend_mcp/temp/**
+backend_tools/temp/
+backend_tools/temp/**
 _work/
 _log/
 

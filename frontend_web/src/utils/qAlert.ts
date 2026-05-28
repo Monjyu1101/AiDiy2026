@@ -8,81 +8,112 @@
 // https://github.com/monjyu1101/AiDiy2026
 // -------------------------------------------------------------------------
 
-// ダイアログコンポーネントのインスタンス型定義
-interface AlertDialogInstance {
-  show: (message: string) => Promise<void>
-}
+// qAlert / qConfirm / qMessage は createApp で DOM に直接マウントするため App.vue 登録不要。
+// qColorPicker のみインスタンスパターンを維持する。
 
-interface ConfirmDialogInstance {
-  show: (message: string) => Promise<boolean>
-}
+import { createApp } from 'vue'
+import QAlertComponent from '@/components/_share/qAlert.vue'
+import QMessageComponent from '@/components/_share/qMessage.vue'
 
-interface MessageDialogInstance {
-  show: (message: string, type?: string, durationMs?: number) => Promise<void>
-}
+// -- ColorPicker: インスタンスパターン --
 
 interface ColorPickerDialogInstance {
   show: (initialColor: string, title: string) => Promise<string | null>
 }
 
-let alertInstance: AlertDialogInstance | null = null
-let confirmInstance: ConfirmDialogInstance | null = null
-let messageInstance: MessageDialogInstance | null = null
 let colorPickerInstance: ColorPickerDialogInstance | null = null
-
-export function setAlertInstance(instance: AlertDialogInstance): void {
-  alertInstance = instance
-}
-
-export function setConfirmInstance(instance: ConfirmDialogInstance): void {
-  confirmInstance = instance
-}
-
-export function setMessageInstance(instance: MessageDialogInstance): void {
-  messageInstance = instance
-}
 
 export function setColorPickerInstance(instance: ColorPickerDialogInstance): void {
   colorPickerInstance = instance
 }
 
-export async function qAlert(message: string): Promise<void> {
-  if (!alertInstance) {
-    console.error('qAlertDialog not initialized. Please add qAlertDialog to your App.vue')
-    alert(message) // フォールバック
-    return
-  }
-  await alertInstance.show(message)
-}
+// -- Alert: 重複表示を防ぐ --
 
-export async function qConfirm(message: string): Promise<boolean> {
-  if (!confirmInstance) {
-    console.error('qConfirm not initialized. Please map confirm handler in App.vue')
-    return confirm(message) // フォールバック
-  }
-  return await confirmInstance.show(message)
-}
+let activeAlert = false
 
-export async function qMessage(
-  message: string,
-  type = 'success',
-  durationMs = 3000
-): Promise<void> {
-  if (!messageInstance) {
-    console.error('qMessageDialog not initialized. Please add qMessageDialog to your App.vue')
-    if (type === 'error') {
-      console.error(message)
-    } else {
-      console.log(message)
+export function qAlert(message: string): Promise<void> {
+  if (activeAlert) return Promise.resolve()
+  activeAlert = true
+  return new Promise((resolve) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    let closed = false
+    const close = () => {
+      if (closed) return
+      closed = true
+      activeAlert = false
+      app.unmount()
+      container.remove()
+      resolve()
     }
-    return
-  }
-  await messageInstance.show(message, type, durationMs)
+    const app = createApp(QAlertComponent, { message: String(message ?? ''), onOk: close })
+    app.mount(container)
+  })
 }
+
+// -- Confirm: 重複表示を防ぐ --
+
+let activeConfirm = false
+
+export function qConfirm(message: string): Promise<boolean> {
+  if (activeConfirm) return Promise.resolve(false)
+  activeConfirm = true
+  return new Promise((resolve) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    let closed = false
+    const close = (result: boolean) => {
+      if (closed) return
+      closed = true
+      activeConfirm = false
+      app.unmount()
+      container.remove()
+      resolve(result)
+    }
+    const app = createApp(QAlertComponent, {
+      message: String(message ?? ''),
+      showCancel: true,
+      onOk: () => close(true),
+      onCancel: () => close(false),
+    })
+    app.mount(container)
+  })
+}
+
+// -- Message: 前のメッセージを置き換える --
+
+let activeMessageClose: (() => void) | null = null
+
+export function qMessage(message: string, type = 'success', durationMs = 3000): Promise<void> {
+  return new Promise((resolve) => {
+    activeMessageClose?.()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    let closed = false
+    const close = () => {
+      if (closed) return
+      closed = true
+      if (activeMessageClose === close) activeMessageClose = null
+      app.unmount()
+      container.remove()
+      resolve()
+    }
+    activeMessageClose = close
+    const app = createApp(QMessageComponent, {
+      message: String(message ?? ''),
+      type,
+      durationMs,
+      onClose: close,
+    })
+    app.mount(container)
+  })
+}
+
+// -- ColorPicker --
 
 export async function qColorPicker(initialColor = '#000000', title = '色選択'): Promise<string | null> {
   if (!colorPickerInstance) {
-    console.error('qColorPickerDialog not initialized. Please add qColorPickerDialog to your App.vue')
+    console.error('qColorPicker not initialized. Please add qColorPickerDialog to your App.vue')
     return null
   }
   return await colorPickerInstance.show(initialColor, title)

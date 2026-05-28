@@ -1,4 +1,4 @@
-# backend_hermes MCP サーバー起動
+﻿# backend_hermes MCP サーバー起動
 
 > 文書: `backend_hermes,MCP_サーバー起動.md` | 実装: `backend_hermes/base/mcp_serve.py`, `backend_hermes/hermes_cli/mcp_config.py`
 
@@ -123,4 +123,4 @@ print('Tools:', [t.name for t in tools])
 - `FastMCP` は `mcp.server.fastmcp` から import する（バージョンによって `mcp.server.fastmcp` → `fastmcp` にパスが変わることがある）。
 - `hermes mcp serve` は stdio サーバーなので Code CLI が子プロセスとして起動する。プロセスが落ちると接続も切れる。
 - `EventBridge` は `SessionDB` が起動時に利用可能でないとポーリングを無効化してメッセージイベントが届かなくなる。Hermes 本体が動いている状態で接続すること。
-- `hermes mcp serve` は Hermes が **クライアントとして** AiDiy MCP に接続するフロー（`mcp_tool.py`）とは別の独立した機能。混同しないこと（→ SSE 接続は [`backend_hermes,backend_mcp,MCP_SSE接続.md`](./backend_hermes,backend_mcp,MCP_SSE接続.md) 参照）。
+- `hermes mcp serve` は Hermes が **クライアントとして** AiDiy MCP に接続するフロー（`mcp_tool.py`）とは別の独立した機能。混同しないこと（→ SSE 接続は [`backend_hermes,backend_tools,MCP_SSE接続.md`](./backend_hermes,backend_tools,MCP_SSE接続.md) 参照）。

@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -41,7 +41,7 @@ cd backend_server && .venv/Scripts/python -m uvicorn core_main:app --reload --ho
 cd backend_server && .venv/Scripts/python -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
 # Backend MCP — ポート 8095
-cd backend_mcp && .venv/Scripts/python -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
+cd backend_tools && .venv/Scripts/python -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
 
 # Frontend Web — ポート 8090
 cd frontend_web && npm run dev
@@ -72,7 +72,7 @@ cd frontend_avatar && npm run build      # renderer + electron build
 ```bash
 # Backend
 cd backend_server && uv sync
-cd backend_mcp && uv sync
+cd backend_tools && uv sync
 cd backend_hermes && uv sync
 
 # Frontend
@@ -89,7 +89,7 @@ python _cleanup.py          # 対話形式: .venv / node_modules / DB / キャ�
 ### コードチェック（MCP）
 
 ```bash
-# backend_mcp 起動後、Python 構文 / ruff / TypeScript 型チェックを MCP 経由で実行
+# backend_tools 起動後、Python 構文 / ruff / TypeScript 型チェックを MCP 経由で実行
 # GET でツール一覧確認、POST でツール実行
 curl http://localhost:8095/aidiy_code_check/list
 curl -X POST http://localhost:8095/aidiy_code_check/check \
@@ -102,7 +102,7 @@ curl -X POST http://localhost:8095/aidiy_code_check/check \
 `aidiy_chrome_devtools`（MCP Chrome Tools）を使って E2E 自動テストを実行します。
 
 ```bash
-# backend_mcp が起動している状態で Chrome 操作 MCP ツールを使用
+# backend_tools が起動している状態で Chrome 操作 MCP ツールを使用
 curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
   -H "Content-Type: application/json" \
   -d '{"url": "http://localhost:8090"}'
@@ -267,7 +267,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 - `backend_server/AGENTS.md` — Backend 実装パターン
 - `frontend_web/AGENTS.md` — Web UI 実装パターン
 - `frontend_avatar/AGENTS.md` — Avatar / Electron 実装パターン
-- `backend_mcp/AGENTS.md` — MCP 実装パターン
+- `backend_tools/AGENTS.md` — MCP 実装パターン
 - `backend_hermes/AGENTS.md` — Hermes CLI 実装パターン
 - `docs/` — 開発ガイド (HTML)
 

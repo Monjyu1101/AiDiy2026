@@ -1,16 +1,16 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介mcp",
   "version": "mcp",
   "title": "AiDiy MCP Hub - 13 サーバー紹介",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "backend_mcp/AGENTS.md、mcp_main.py、mcp_proc/ 各ファイル、.aidiy/knowledge から実装実態を抜粋して構成。"
+    "summary": "backend_tools/AGENTS.md、mcp_main.py、mcp_proc/ 各ファイル、.aidiy/knowledge から実装実態を抜粋して構成。"
   },
   "target": {
     "language": "ja-JP",
     "format": "html_css_scene_player_with_media",
     "tone": "事実ベース、簡潔、根拠付き",
-    "goal": "backend_mcp の位置づけ・13 MCP サーバーの役割・接続方式を正確に伝える。"
+    "goal": "backend_tools の位置づけ・13 MCP サーバーの役割・接続方式を正確に伝える。"
   },
   "assets_policy": {
     "visual_style": "left_avatar_38_right_content_62",
@@ -31,7 +31,7 @@ window.SCENARIO = {
       "kicker": "INTRODUCTION",
       "headline": "この動画では、AiDiy MCP Hub の\n13 サーバーを紹介します",
       "lead": "ポート 8095 に同居する 13 個の MCP サーバー、SSE 接続、stdio bridge、各ツールの役割を順に見ていきます。",
-      "subtitle": "この動画では、backend_mcp の位置づけ、13 MCP サーバーの役割、接続方式を紹介します。",
+      "subtitle": "この動画では、backend_tools の位置づけ、13 MCP サーバーの役割、接続方式を紹介します。",
       "image": "images/scene_000.png",
       "chips": [],
       "metrics": [],
@@ -108,20 +108,20 @@ window.SCENARIO = {
         "`mcp_main.py` が 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成する。",
         "SSE エンドポイントは `http://localhost:8095/{name}/sse` の形式。",
         "stdio クライアントは `mcp_stdio.py --sse-url` を経由して接続する。",
-        "再起動ウォッチャーは `backend_mcp/temp/reboot_mcp.txt` を監視する。"
+        "再起動ウォッチャーは `backend_tools/temp/reboot_mcp.txt` を監視する。"
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
-          "text": "`backend_mcp` はポート `8095` 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
+          "source": "backend_tools/AGENTS.md",
+          "text": "`backend_tools` はポート `8095` 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
         },
         {
-          "source": "backend_mcp,構成.md",
+          "source": "backend_tools,構成.md",
           "text": "`mcp_main.py` は 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す。"
         }
       ],
       "short_narration": "13 のツールは 1 本のサーバーにまとまっていて、Claude や AI エージェントからまとめて使えます。",
-      "long_narration": "13 のツールは、mcp_main.py という 1 本のサーバーで管理されています。Python の FastMCP というフレームワークを使い、13 個の MCP インスタンスを Starlette の Mount という仕組みで 1 つのアプリに合成しています。uvicorn というサーバーでポート 8095 番に起動します。AI からツールを呼び出すときは、SSE という方式でこのサーバーに接続します。接続先の URL は http://localhost:8095/ツール名/sse の形式です。Claude Agent SDK や Claude Code CLI は設定ファイル AiDiy_mcp.json にこの URL を書いておくだけで自動的に接続します。stdio クライアントは mcp_stdio.py を経由して接続します。サーバーを更新したとき、backend_mcp/temp フォルダに特定のファイルを置くと自動で再起動する仕組みも備わっています。",
+      "long_narration": "13 のツールは、mcp_main.py という 1 本のサーバーで管理されています。Python の FastMCP というフレームワークを使い、13 個の MCP インスタンスを Starlette の Mount という仕組みで 1 つのアプリに合成しています。uvicorn というサーバーでポート 8095 番に起動します。AI からツールを呼び出すときは、SSE という方式でこのサーバーに接続します。接続先の URL は http://localhost:8095/ツール名/sse の形式です。Claude Agent SDK や Claude Code CLI は設定ファイル AiDiy_mcp.json にこの URL を書いておくだけで自動的に接続します。stdio クライアントは mcp_stdio.py を経由して接続します。サーバーを更新したとき、backend_tools/temp フォルダに特定のファイルを置くと自動で再起動する仕組みも備わっています。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_start_sec": 7.464,
@@ -194,11 +194,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
+          "source": "backend_tools/AGENTS.md",
           "text": "ブラウザ操作、デスクトップキャプチャ、DB確認、ログ確認、コードチェック、バックアップ確認、画像生成、音声認識/合成、OBS / ffmpeg 制御を AI エージェントから利用できるようにします。"
         },
         {
-          "source": "backend_mcp,構成.md",
+          "source": "backend_tools,構成.md",
           "text": "アクセスは localhost 限定です。SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場合もまずアプリ API で再現できないか確認します。"
         }
       ],
@@ -276,11 +276,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
+          "source": "backend_tools/AGENTS.md",
           "text": "Chrome DevTools は Node.js 版ではなく Python 実装の CDP client を使います。Chrome は `ChromeManager` が単一 subprocess として管理し、必要時に `--remote-debugging-port=9222` で起動します。"
         },
         {
-          "source": "backend_mcp,構成.md",
+          "source": "backend_tools,構成.md",
           "text": "Chrome DevTools MCP は Python CDP 実装。Node.js 版 `chrome-devtools-mcp` 前提で復旧しない。"
         }
       ],
@@ -344,7 +344,7 @@ window.SCENARIO = {
         {
           "title": "aidiy_logs / aidiy_code_check",
           "lines": [
-            "`logs`: backend_server / backend_mcp のログ tail・ERROR 抽出",
+            "`logs`: backend_server / backend_tools のログ tail・ERROR 抽出",
             "`code_check`: Python 構文チェック・ruff・TypeScript 型チェック",
             "コードチェックは MCP 経由でパス指定して実行"
           ]
@@ -353,16 +353,16 @@ window.SCENARIO = {
       "facts": [
         "`aidiy_sqlite` は AiDiy SQLite DB を read-only 中心で参照する。",
         "`aidiy_postgres` は `psycopg` 未導入や DSN 未設定でも他 MCP の起動を妨げない遅延初期化を採用。",
-        "`aidiy_logs` は backend_server / backend_mcp のログ tail と ERROR 抽出を行う。",
+        "`aidiy_logs` は backend_server / backend_tools のログ tail と ERROR 抽出を行う。",
         "`aidiy_code_check` は Python 構文チェック、ruff、TypeScript 型チェックに対応。"
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
+          "source": "backend_tools/AGENTS.md",
           "text": "`aidiy_postgres` は `psycopg` 未導入や DSN 未設定でも他 MCP の起動を妨げない。起動時の `PgQuery()` 例外を保存し、PostgreSQL ツール呼び出し時にだけ `_get_pg()` でエラー化する。"
         },
         {
-          "source": "backend_mcp,構成.md",
+          "source": "backend_tools,構成.md",
           "text": "SQLite / PostgreSQL は既定 read-only。検証は SELECT / describe / count を優先する。"
         }
       ],
@@ -440,11 +440,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
+          "source": "backend_tools/AGENTS.md",
           "text": "`aidiy_image_generation`: AI 画像生成（OpenAI gpt-image / DALL-E、Gemini、FreeAI）。`aidiy_speech_to_text`: 音声認識（speech_recognition、OpenAI Whisper）。`aidiy_text_to_speech`: テキスト音声合成（Edge / OpenAI / Gemini / FreeAI、MP3 出力）。"
         },
         {
-          "source": "backend_mcp,MCP活用手順.md",
+          "source": "backend_tools,MCP活用手順.md",
           "text": "バックアップ保存/確認系 MCP は自己検証の補助。ツール不調時も、対象ファイル、実行コマンド、検索結果で変更範囲を説明できる状態にする。"
         }
       ],
@@ -520,11 +520,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
+          "source": "backend_tools/AGENTS.md",
           "text": "`aidiy_obs_studio_control`: OBS Studio WebSocket 制御（配信、録画、シーン、ソース、音声）。`aidiy_ffmpeg_control`: ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生）。"
         },
         {
-          "source": "backend_mcp,構成.md",
+          "source": "backend_tools,構成.md",
           "text": "`mcp_proc/obs_studio_control.py` — OBS Studio WebSocket 制御。`mcp_proc/ffmpeg_control.py` — ffmpeg / ffprobe / ffplay の薄いランナー。"
         }
       ],

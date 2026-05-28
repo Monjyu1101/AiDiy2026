@@ -1,4 +1,4 @@
-{
+﻿{
   "project_name": "AiDiy自己紹介",
   "version": "take4",
   "status": "media_generated",
@@ -11,7 +11,7 @@
       "AGENTS.md",
       "frontend_web/AGENTS.md",
       "frontend_avatar/AGENTS.md",
-      "backend_mcp/AGENTS.md",
+      "backend_tools/AGENTS.md",
       "backend_hermes/AGENTS.md",
       ".aidiy/knowledge/_index.md"
     ]

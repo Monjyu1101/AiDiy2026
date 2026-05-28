@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 掛け合い音声生成スクリプト
 
@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-_MCP_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\backend_mcp'
+_MCP_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\backend_tools'
 if _MCP_DIR not in sys.path:
     sys.path.insert(0, _MCP_DIR)
 

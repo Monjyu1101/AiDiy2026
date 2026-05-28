@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介_mcp改",
   "version": "mcp",
   "title": "AiDiy MCP Hub - HTTP Transportで応用範囲が広がる14サーバー紹介",
@@ -57,7 +57,7 @@ window.SCENARIO = {
       "accent_soft": "rgba(0, 224, 184, 0.18)",
       "kicker": "MCP HUB OVERVIEW",
       "headline": "14 個の MCP サーバーが\nAI の目と手と声になる",
-      "lead": "AiDiy の backend_mcp はポート 8095 に 14 個の MCP サーバーを同居させています。観測・生成・制御の 3 カテゴリで AI エージェントが現実世界を操作できます。",
+      "lead": "AiDiy の backend_tools はポート 8095 に 14 個の MCP サーバーを同居させています。観測・生成・制御の 3 カテゴリで AI エージェントが現実世界を操作できます。",
       "subtitle": "ブラウザ操作からコードエージェント実行まで、14 のツールが AI の能力を広げる。",
       "image": "images/scene_001.png",
       "image_prompt": "Vertical 2:3 MCP hub infographic poster. Central AI agent node labeled 'MCP HUB port 8095' connected to 14 labeled satellite nodes arranged in a circle: chrome_devtools, desktop_capture, sqlite, postgres, logs, code_check, backup, image_generation, movie_generation, speech_to_text, text_to_speech, obs_studio_control, ffmpeg_control, code_agents. Green-cyan enterprise network diagram, modern technical style, dark background, clean layout.",
@@ -107,14 +107,14 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "backend_mcp はポート 8095 に 14 個の MCP サーバーを同居させた FastMCP アプリケーション。",
+        "backend_tools はポート 8095 に 14 個の MCP サーバーを同居させた FastMCP アプリケーション。",
         "各 MCP は SSE / Streamable HTTP / stdio の 3 トランスポートを同一ポートで提供する。",
         "Claude Agent SDK、Python requests、stdio ホストのいずれからでも接続できる。"
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
-          "text": "backend_mcp はポート 8095 上で 14 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
+          "source": "backend_tools/AGENTS.md",
+          "text": "backend_tools はポート 8095 上で 14 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
         },
         {
           "source": "CLAUDE.md",
@@ -122,7 +122,7 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "ポート 8095 に 14 の MCP サーバーが同居し、観測・生成・制御の 3 分野で AI をサポートします。",
-      "long_narration": "AiDiy の backend_mcp はポート 8095 に 14 個の MCP サーバーを集約した FastMCP アプリケーションです。役割は大きく 3 つに分かれます。まず観測系は Chrome ブラウザの自動操作、デスクトップキャプチャ、SQLite と PostgreSQL のデータ確認、ログ監視の 5 ツール。次に生成・合成系は画像生成、動画生成、音声認識、音声合成の 4 ツール。そして制御・検証系はコード構文チェック、差分バックアップ、OBS Studio 録画制御、FFmpeg 動画処理、コードエージェント実行の 5 ツールです。これらすべてを AI エージェントが呼び出せるため、観察して判断して実行するという一連の流れを自動化できます。",
+      "long_narration": "AiDiy の backend_tools はポート 8095 に 14 個の MCP サーバーを集約した FastMCP アプリケーションです。役割は大きく 3 つに分かれます。まず観測系は Chrome ブラウザの自動操作、デスクトップキャプチャ、SQLite と PostgreSQL のデータ確認、ログ監視の 5 ツール。次に生成・合成系は画像生成、動画生成、音声認識、音声合成の 4 ツール。そして制御・検証系はコード構文チェック、差分バックアップ、OBS Studio 録画制御、FFmpeg 動画処理、コードエージェント実行の 5 ツールです。これらすべてを AI エージェントが呼び出せるため、観察して判断して実行するという一連の流れを自動化できます。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_start_sec": 9.864,
@@ -355,7 +355,7 @@ window.SCENARIO = {
         {
           "title": "aidiy_logs",
           "lines": [
-            "backend_server / backend_mcp のログ確認",
+            "backend_server / backend_tools のログ確認",
             "ERROR / Traceback を自動抽出",
             "tail / grep でリアルタイムデバッグ"
           ]
@@ -369,12 +369,12 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_mcp,MCP活用手順.md",
+          "source": "backend_tools,MCP活用手順.md",
           "text": "aidiy_chrome_devtools: ブラウザ操作、DOM 取得、ナビゲーション。Python 実装 CDP クライアント。"
         },
         {
           "source": "AGENTS.md",
-          "text": "aidiy_sqlite: AiDiy SQLite DB 確認。aidiy_logs: backend_server / backend_mcp ログ確認。"
+          "text": "aidiy_sqlite: AiDiy SQLite DB 確認。aidiy_logs: backend_server / backend_tools ログ確認。"
         }
       ],
       "short_narration": "ブラウザを操って、画面を撮って、DB とログを読む。5 ツールが AI の観測力を支えます。",

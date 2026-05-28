@@ -1,13 +1,13 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Google 2026年ニュース解説 - 音声生成スクリプト
-backend_mcp/.venv の Python で実行してください。
+backend_tools/.venv の Python で実行してください。
 
 実行方法（Linux/Codespace）:
-  /workspaces/AiDiy2026/backend_mcp/.venv/bin/python _gen_dialogue_audio.py
+  /workspaces/AiDiy2026/backend_tools/.venv/bin/python _gen_dialogue_audio.py
 
 実行方法（Windows）:
-  & "D:\OneDrive\_sandbox\AiDiy2026\backend_mcp\.venv\Scripts\python.exe" "_gen_dialogue_audio.py"
+  & "D:\OneDrive\_sandbox\AiDiy2026\backend_tools\.venv\Scripts\python.exe" "_gen_dialogue_audio.py"
 
 既存の音声ファイル（500 bytes 超）は自動スキップします。
 """
@@ -15,9 +15,9 @@ backend_mcp/.venv の Python で実行してください。
 import os
 import sys
 
-# backend_mcp のパスを追加
+# backend_tools のパスを追加
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_MCP_DIR  = os.path.normpath(os.path.join(_THIS_DIR, "../../../../backend_mcp"))
+_MCP_DIR  = os.path.normpath(os.path.join(_THIS_DIR, "../../../../backend_tools"))
 if _MCP_DIR not in sys.path:
     sys.path.insert(0, _MCP_DIR)
 

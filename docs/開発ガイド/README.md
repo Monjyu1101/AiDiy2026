@@ -1,4 +1,4 @@
-# このプロジェクトの歩き方
+﻿# このプロジェクトの歩き方
 
 このガイドは、**現在の AiDiy2026 実装** を前提に、最初に何を読めばよいかを整理するための案内です。
 
@@ -32,7 +32,7 @@ AiDiy2026/
 ├── _setup.py
 ├── _start.py
 ├── _cleanup.py
-├── backend_mcp/
+├── backend_tools/
 │   ├── mcp_main.py
 │   ├── mcp_proc/
 │   └── AGENTS.md
@@ -91,7 +91,7 @@ python _start.py
 
 ```powershell
 # backend mcp
-cd backend_mcp
+cd backend_tools
 .venv/Scripts/python.exe -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
 
 # backend core
@@ -162,7 +162,7 @@ npm run dev
 - `apps_crud/__init__.py` 追加漏れに注意
 - M 系一覧は通常 V 系エンドポイントを使う
 - パスワードは現状平文比較
-- Claude のブラウザ自動操作は `backend_mcp` と `backend_server/_config/AiDiy_mcp.json` を併用する
+- Claude のブラウザ自動操作は `backend_tools` と `backend_server/_config/AiDiy_mcp.json` を併用する
 
 ---
 
@@ -243,7 +243,7 @@ echo. > backend_server/temp/reboot_apps.txt
 1. [README.md](../../README.md)
 2. [AGENTS.md](../../AGENTS.md)
 3. [backend_server/AGENTS.md](../../backend_server/AGENTS.md)
-4. [backend_mcp/AGENTS.md](../../backend_mcp/AGENTS.md)
+4. [backend_tools/AGENTS.md](../../backend_tools/AGENTS.md)
 5. [frontend_web/AGENTS.md](../../frontend_web/AGENTS.md)
 6. [frontend_avatar/AGENTS.md](../../frontend_avatar/AGENTS.md)
 

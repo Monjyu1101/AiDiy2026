@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 """プロジェクトクリーンアップスクリプト
 
@@ -8,7 +8,7 @@
 対象:
 - バックアップ: `backup`
 - バックエンド(hermes): `backend_hermes`
-- バックエンド(mcp): `backend_mcp`
+- バックエンド(tools): `backend_tools`
 - バックエンド(core,apps): `backend_server`
 - フロントエンド(Web): `frontend_web`
 - フロントエンド(Avatar): `frontend_avatar`
@@ -35,8 +35,8 @@ if sys.platform == "win32":
 BACKEND_PATH = "backend_server"
 BACKEND_ENV_LIST = [".venv", "venv"]
 
-BACKEND_MCP_PATH = "backend_mcp"
-BACKEND_MCP_ENV_LIST = [".venv", "venv"]
+BACKEND_TOOLS_PATH = "backend_tools"
+BACKEND_TOOLS_ENV_LIST = [".venv", "venv"]
 
 BACKEND_HERMES_PATH = "backend_hermes"
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
@@ -52,7 +52,7 @@ DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
 
 AUTO_MODE = False
-BACKEND_MCP_SERVER_PREFIX = "aidiy_"
+BACKEND_TOOLS_SERVER_PREFIX = "aidiy_"
 SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
 SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 
@@ -527,48 +527,48 @@ def cleanup_backend(base_dir: Path, choices: dict):
         print_info(f"{label}: 削除対象はありませんでした")
 
 
-def cleanup_backend_mcp(base_dir: Path, choices: dict):
-    label = "バックエンド(mcp)"
+def cleanup_backend_tools(base_dir: Path, choices: dict):
+    label = "バックエンド(tools)"
     print_header(f"{label} のクリーンアップ")
 
-    backend_mcp_dir = base_dir / BACKEND_MCP_PATH
-    if not backend_mcp_dir.exists():
+    backend_tools_dir = base_dir / BACKEND_TOOLS_PATH
+    if not backend_tools_dir.exists():
         print_warning(f"{label} のフォルダが見つかりません")
         return
 
-    deleted_count = cleanup_common_python_caches(backend_mcp_dir, label)
+    deleted_count = cleanup_common_python_caches(backend_tools_dir, label)
 
-    mcp_envs = choices.get("mcp_envs", {})
-    for env_name in BACKEND_MCP_ENV_LIST:
-        env_dir = backend_mcp_dir / env_name
+    tools_envs = choices.get("tools_envs", {})
+    for env_name in BACKEND_TOOLS_ENV_LIST:
+        env_dir = backend_tools_dir / env_name
         if not env_dir.exists():
             continue
-        if mcp_envs.get(env_name):
+        if tools_envs.get(env_name):
             if remove_directory(env_dir, f"{env_name} ({label})"):
                 deleted_count += 1
             else:
                 print_error(
-                    f"  {BACKEND_MCP_PATH}/{env_name} 削除失敗。"
+                    f"  {BACKEND_TOOLS_PATH}/{env_name} 削除失敗。"
                     f"手動で削除してください: {env_dir}"
                 )
-        elif env_name in mcp_envs:
-            print_info(f"  {BACKEND_MCP_PATH}/{env_name} はそのまま残します")
+        elif env_name in tools_envs:
+            print_info(f"  {BACKEND_TOOLS_PATH}/{env_name} はそのまま残します")
 
-    node_modules_dir = backend_mcp_dir / "node_modules"
+    node_modules_dir = backend_tools_dir / "node_modules"
     if node_modules_dir.exists():
-        if choices.get("mcp_node_modules") is True:
+        if choices.get("tools_node_modules") is True:
             if remove_directory(node_modules_dir, f"node_modules ({label})"):
                 deleted_count += 1
-        elif choices.get("mcp_node_modules") is False:
-            print_info(f"  {BACKEND_MCP_PATH}/node_modules はそのまま残します")
+        elif choices.get("tools_node_modules") is False:
+            print_info(f"  {BACKEND_TOOLS_PATH}/node_modules はそのまま残します")
 
-    temp_dir = backend_mcp_dir / "temp"
+    temp_dir = backend_tools_dir / "temp"
     if temp_dir.exists():
-        if choices.get("mcp_temp") is True:
+        if choices.get("tools_temp") is True:
             if remove_directory(temp_dir, f"temp ({label})"):
                 deleted_count += 1
-        elif choices.get("mcp_temp") is False:
-            print_info(f"  {BACKEND_MCP_PATH}/temp はそのまま残します")
+        elif choices.get("tools_temp") is False:
+            print_info(f"  {BACKEND_TOOLS_PATH}/temp はそのまま残します")
 
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
@@ -744,10 +744,10 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     choices: dict = {
         "npm_uninstall":  False,
         "backup":         None,
-        "mcp":            False,
-        "mcp_envs":       {},
-        "mcp_node_modules": None,
-        "mcp_temp":       None,
+        "tools":            False,
+        "tools_envs":       {},
+        "tools_node_modules": None,
+        "tools_temp":       None,
         "backend":        False,
         "backend_envs":   {},
         "backend_logs":   None,
@@ -784,19 +784,19 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     default="y",
                 )
 
-    choices["mcp"] = ask_yes_no("バックエンド(mcp) をクリーンアップしますか？", default="y")
-    if choices["mcp"]:
-        backend_mcp_dir = base_dir / BACKEND_MCP_PATH
-        if backend_mcp_dir.exists():
-            for env_name in BACKEND_MCP_ENV_LIST:
-                if (backend_mcp_dir / env_name).exists():
-                    choices["mcp_envs"][env_name] = ask_yes_no(
-                        f"  {BACKEND_MCP_PATH}/{env_name} を削除しますか？",
+    choices["tools"] = ask_yes_no("バックエンド(tools) をクリーンアップしますか？", default="y")
+    if choices["tools"]:
+        backend_tools_dir = base_dir / BACKEND_TOOLS_PATH
+        if backend_tools_dir.exists():
+            for env_name in BACKEND_TOOLS_ENV_LIST:
+                if (backend_tools_dir / env_name).exists():
+                    choices["tools_envs"][env_name] = ask_yes_no(
+                        f"  {BACKEND_TOOLS_PATH}/{env_name} を削除しますか？",
                         default="y",
                     )
-            if (backend_mcp_dir / "temp").exists():
-                choices["mcp_temp"] = ask_yes_no(
-                    f"  {BACKEND_MCP_PATH}/temp フォルダを削除しますか？",
+            if (backend_tools_dir / "temp").exists():
+                choices["tools_temp"] = ask_yes_no(
+                    f"  {BACKEND_TOOLS_PATH}/temp フォルダを削除しますか？",
                     default="y",
                 )
 
@@ -844,7 +844,7 @@ def main():
     print_info("クリーンアップ対象:")
     print_info("  1. backup フォルダ")
     print_info("  2. バックエンド(hermes)")
-    print_info("  3. バックエンド(mcp)")
+    print_info("  3. バックエンド(tools)")
     print_info("  4. バックエンド(core,apps)")
     print_info("  5. フロントエンド(Web)")
     print_info("  6. フロントエンド(Avatar)")
@@ -872,12 +872,12 @@ def main():
         print_info("バックエンド(hermes) のクリーンアップをスキップしました")
 
     print()
-    if choices["mcp"]:
-        cleanup_backend_mcp(base_dir, choices)
+    if choices["tools"]:
+        cleanup_backend_tools(base_dir, choices)
         print()
-        cleanup_global_mcp_configs(BACKEND_MCP_SERVER_PREFIX)
+        cleanup_global_mcp_configs(BACKEND_TOOLS_SERVER_PREFIX)
     else:
-        print_info("バックエンド(mcp) のクリーンアップをスキップしました")
+        print_info("バックエンド(tools) のクリーンアップをスキップしました")
 
     print()
     if choices["backend"]:

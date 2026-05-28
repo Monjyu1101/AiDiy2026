@@ -1,4 +1,4 @@
-{
+﻿{
   "project_name": "AiDiy紹介_mcp改",
   "version": "take1",
   "status": "pending",
@@ -9,7 +9,7 @@
     "avatar_model": "vrm/VRM_AiDiy.vrm",
     "evidence_source": [
       "AGENTS.md",
-      "backend_mcp/AGENTS.md",
+      "backend_tools/AGENTS.md",
       ".aidiy/knowledge/_index.md"
     ]
   },

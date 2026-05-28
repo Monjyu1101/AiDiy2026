@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 """プロジェクト セットアップスクリプト
 
@@ -7,7 +7,7 @@
 対象:
 - 共通
 - バックエンド(core,apps): `backend_server`
-- バックエンド(mcp)      : `backend_mcp`
+- バックエンド(mcp)      : `backend_tools`
 - フロントエンド(Web)    : `frontend_web`
 - フロントエンド(Avatar) : `frontend_avatar`
 
@@ -40,7 +40,7 @@ BACKEND_ENV = ".venv"
 
 FRONTEND_WEB_PATH = "frontend_web"
 FRONTEND_AVATAR_PATH = "frontend_avatar"
-BACKEND_MCP_PATH = "backend_mcp"
+backend_tools_PATH = "backend_tools"
 
 FRONTEND_COMMAND = "npm"
 DATABASE_TYPE = "sqlite"
@@ -66,12 +66,12 @@ BACKEND_DIR = BASE_DIR / BACKEND_PATH
 BACKEND_VENV_DIR = BACKEND_DIR / BACKEND_ENV
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
-BACKEND_MCP_DIR = BASE_DIR / BACKEND_MCP_PATH
+backend_tools_DIR = BASE_DIR / backend_tools_PATH
 BACKEND_HERMES_PATH = "backend_hermes"
 BACKEND_HERMES_DIR = BASE_DIR / BACKEND_HERMES_PATH
 BACKEND_HERMES_ENV = ".venv"
 POSTGRES_DIR = BASE_DIR / POSTGRES_PATH
-BACKEND_MCP_ENV_CANDIDATES = [".venv", "venv"]
+backend_tools_ENV_CANDIDATES = [".venv", "venv"]
 SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
 SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 
@@ -457,17 +457,17 @@ def ensure_python_module_attribute(
     return False
 
 
-def upsert_codex_backend_mcp_config(module: dict) -> bool:
+def upsert_codex_backend_tools_config(module: dict) -> bool:
     config_path = Path.home() / ".codex" / "config.toml"
     server_name = module.get("server_name", module["name"])
     sse_url = module.get("sse_url", "").strip()
     table_header = f"[mcp_servers.{server_name}]"
-    python_path = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
+    python_path = find_python_in_env(backend_tools_DIR, backend_tools_ENV_CANDIDATES)
     if python_path is None:
-        print_error(f"Codex 設定用の Python 仮想環境が見つかりません: {BACKEND_MCP_DIR}")
+        print_error(f"Codex 設定用の Python 仮想環境が見つかりません: {backend_tools_DIR}")
         return False
 
-    script_path = BACKEND_MCP_DIR / "mcp_stdio.py"
+    script_path = backend_tools_DIR / "mcp_stdio.py"
     if not script_path.exists():
         print_error(f"Codex 設定用のスクリプトが見つかりません: {script_path}")
         return False
@@ -1001,9 +1001,9 @@ def setup_frontend_avatar():
 # ============================================================
 MCP_MODULES = [
     {
-        "name":        "backend_mcp",
+        "name":        "backend_tools",
         "server_name": "aidiy_chrome_devtools",   # MCP 設定ファイル上のサーバーキー名
-        "dir":         "backend_mcp",
+        "dir":         "backend_tools",
         "desc":        "Python (uv) — Chrome DevTools Protocol + Desktop Capture",
         "start":       "uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095",
         "sse_url":     "http://localhost:8095/aidiy_chrome_devtools/sse",
@@ -1087,7 +1087,7 @@ def setup_mcp_module(module: dict) -> bool:
         if not run_command(["uv", "sync", "--no-install-project"], cwd=mcp_dir):
             print_error(f"{label}: uv sync に失敗しました。")
             return False
-        python_path = find_python_in_env(mcp_dir, BACKEND_MCP_ENV_CANDIDATES)
+        python_path = find_python_in_env(mcp_dir, backend_tools_ENV_CANDIDATES)
         if python_path is None:
             print_error(f"{label}: Python 仮想環境が見つかりません: {mcp_dir}")
             return False
@@ -1119,7 +1119,7 @@ def setup_mcp_module(module: dict) -> bool:
     return True
 
 
-def setup_backend_mcp() -> bool:
+def setup_backend_tools() -> bool:
     """登録済みの (mcp) モジュールを順番にセットアップする"""
     all_ok = True
     for module in MCP_MODULES:
@@ -1274,15 +1274,15 @@ def show_current_mcp_config(module: dict) -> None:
     print()
 
 
-def configure_backend_mcp_clients(module: dict) -> bool:
-    """backend_mcp を各 CLI から使うための設定ファイルを書き込む（extra_servers も含む）。
+def configure_backend_tools_clients(module: dict) -> bool:
+    """backend_tools を各 CLI から使うための設定ファイルを書き込む（extra_servers も含む）。
 
     設定先ごとに全サーバーをまとめて 1 回だけ書き込む方式。
     """
     label = f"{module['name']} MCP 設定"
     print_header(label)
     print_info("Claude / GitHub Copilot / Antigravity / OpenCode / Codex / VS Code 用のグローバル設定ファイルを書き込みます。")
-    print_info("Codex CLI は stdio の mcp_stdio.py を起動し、その先で backend_mcp の SSE へ接続します。")
+    print_info("Codex CLI は stdio の mcp_stdio.py を起動し、その先で backend_tools の SSE へ接続します。")
 
     # 書き込み対象サーバーリスト: メイン + extra_servers
     servers: list[tuple[str, str]] = []
@@ -1338,8 +1338,8 @@ def configure_backend_mcp_clients(module: dict) -> bool:
     antigravity_mcp = get_antigravity_mcp_config_path()
     print_info(f"[Antigravity] {antigravity_mcp}")
 
-    python_path = find_python_in_env(BACKEND_MCP_DIR, BACKEND_MCP_ENV_CANDIDATES)
-    script_path = BACKEND_MCP_DIR / "mcp_stdio.py"
+    python_path = find_python_in_env(backend_tools_DIR, backend_tools_ENV_CANDIDATES)
+    script_path = backend_tools_DIR / "mcp_stdio.py"
 
     if python_path is None or not script_path.exists():
         print_error("Antigravity 設定用の Python 仮想環境または mcp_stdio.py が見つかりません。")
@@ -1386,7 +1386,7 @@ def configure_backend_mcp_clients(module: dict) -> bool:
     print_info(f"[Codex CLI]   {codex_path}")
     for sn, url in servers:
         codex_module = {**module, "server_name": sn, "sse_url": url}
-        all_ok &= upsert_codex_backend_mcp_config(codex_module)
+        all_ok &= upsert_codex_backend_tools_config(codex_module)
 
     # 7) VS Code (servers)
     vscode_mcp = get_vscode_mcp_path()
@@ -1443,7 +1443,7 @@ def collect_setup_choices() -> dict | None:
 
     choices["mcp"] = ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y")
     if choices["mcp"]:
-        choices["mcp_config"] = ask_yes_no("バックエンド(mcp): backend_mcp の mcp機能を使えるよう構成しますか？", default="y")
+        choices["mcp_config"] = ask_yes_no("バックエンド(mcp): backend_tools の mcp機能を使えるよう構成しますか？", default="y")
 
     choices["backend"] = ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y")
     if choices["backend"] and DATABASE_TYPE.lower() == "postgresql":
@@ -1504,25 +1504,25 @@ def main():
 
     print()
     if choices["mcp"]:
-        if not setup_backend_mcp():
+        if not setup_backend_tools():
             error_locations.append("バックエンド(mcp)")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
-        backend_mcp_module = next((module for module in MCP_MODULES if module.get("name") == "backend_mcp"), None)
-        if backend_mcp_module:
+        backend_tools_module = next((module for module in MCP_MODULES if module.get("name") == "backend_tools"), None)
+        if backend_tools_module:
             print()
-            show_current_mcp_config(backend_mcp_module)
+            show_current_mcp_config(backend_tools_module)
             if choices["mcp_config"]:
-                if not configure_backend_mcp_clients(backend_mcp_module):
+                if not configure_backend_tools_clients(backend_tools_module):
                     error_locations.append("バックエンド(mcp): MCP 設定ファイル書き込み")
                     if not continue_on_error:
                         print_setup_summary(error_locations)
                         sys.exit(1)
             else:
-                print_warning("backend_mcp の MCP 設定ファイル書き込みをスキップしました。")
+                print_warning("backend_tools の MCP 設定ファイル書き込みをスキップしました。")
         else:
-            print_warning("backend_mcp モジュール定義が見つからないため、MCP 設定をスキップしました。")
+            print_warning("backend_tools モジュール定義が見つからないため、MCP 設定をスキップしました。")
     else:
         print_warning("バックエンド(mcp) のセットアップをスキップしました。")
 
@@ -1560,7 +1560,7 @@ def main():
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
     print_info("  個別起動:")
-    print_info("    MCP起動  : cd backend_mcp && uv run uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095")
+    print_info("    MCP起動  : cd backend_tools && uv run uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095")
     print_info("    Core起動 : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port 8091")
     print_info("    Apps起動 : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092")
     if sys.platform == "win32":

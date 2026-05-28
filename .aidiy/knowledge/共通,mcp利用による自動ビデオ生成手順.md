@@ -1,12 +1,12 @@
-# MCP 利用による自動ビデオ生成手順
+﻿# MCP 利用による自動ビデオ生成手順
 
-> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_mcp/aidiy_automations/video_generation.py`, `backend_mcp/mcp_proc/text_to_speech.py`, `backend_mcp/mcp_proc/ffmpeg_control.py`, `backend_mcp/mcp_proc/obs_studio_control.py`, `backend_mcp/mcp_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `backend_server/_config/aidiy_text_to_speech.json`
+> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_tools/aidiy_automations/video_generation.py`, `backend_tools/mcp_proc/text_to_speech.py`, `backend_tools/mcp_proc/ffmpeg_control.py`, `backend_tools/mcp_proc/obs_studio_control.py`, `backend_tools/mcp_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `backend_server/_config/aidiy_text_to_speech.json`
 
 ## このメモを使う場面
 
 - AiDiy 自身に紹介・解説動画を自動生成させたい
 - 「シナリオ JSON → 音声付き HTML → 画面録画 → MP4 トリム」までを既存 MCP だけで通したい
-- 既存の自動化スクリプト `backend_mcp/aidiy_automations/video_generation.py` を入口にして再利用したい
+- 既存の自動化スクリプト `backend_tools/aidiy_automations/video_generation.py` を入口にして再利用したい
 - ブラウザの autoplay ポリシーで `Audio.play()` が拒否される、OBS の `StartRecord` が反映されないなど、本手順で踏んだ落とし穴を再発させたくない
 
 ## 生成サンプル（実例）
@@ -27,7 +27,7 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 
 ## 実装済みの自動化スクリプト
 
-この手順を毎回手作業でなぞらなくても、**`backend_mcp/aidiy_automations/video_generation.py` が実装済み**です。
+この手順を毎回手作業でなぞらなくても、**`backend_tools/aidiy_automations/video_generation.py` が実装済み**です。
 
 - ニュース型 Xビデオ向けに、フォルダ作成、シナリオ作成、HTML修正、画像生成、中間確認、音声生成、再生時間更新、最終確認、完成案内までを段階実行できます
 - `AIDIY_VIDEO_GEN_START_STEP` / `AIDIY_VIDEO_GEN_STOP_STEP` で途中再開・部分実行ができます
@@ -78,7 +78,7 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 画像は **シーンタイトルやふんわりした雰囲気だけで作らず、出典が明確な情報を元に生成する**。AiDiy 紹介動画なら、`AGENTS.md`、各サブプロジェクトの `AGENTS.md`、`.aidiy/knowledge`、既存 UI / 実装ファイル、実際のスクリーンショットなど、**どの情報を根拠にしたか追跡できる状態**で進める。
 
 - NG: 「AIっぽい開発画面」「MCP っぽいハブ図」のような抽象語だけで投げる
-- OK: `backend_mcp/AGENTS.md` の 13 MCP 一覧、`frontend_avatar/AGENTS.md` の Electron/Web 差分、`AGENTS.md` のポート一覧や命名規則、既存 UI の画面構成などを抜粋して渡す
+- OK: `backend_tools/AGENTS.md` の 13 MCP 一覧、`frontend_avatar/AGENTS.md` の Electron/Web 差分、`AGENTS.md` のポート一覧や命名規則、既存 UI の画面構成などを抜粋して渡す
 
 ### 画像生成のためにシーンへ持たせる情報
 
@@ -86,7 +86,7 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 
 | 項目 | 用途 |
 |------|------|
-| `source_documents` | どの文書 / 実装を根拠にしたか。例: `AGENTS.md`, `backend_mcp/AGENTS.md` |
+| `source_documents` | どの文書 / 実装を根拠にしたか。例: `AGENTS.md`, `backend_tools/AGENTS.md` |
 | `source_summary` | そのシーンで表現すべき事実の短い要約 |
 | `factual_bullets` | 画像に反映すべき具体要素。例: `13 MCP`, `port 8095`, `Web/Electron 両対応` |
 | `forbidden_elements` | 入れてはいけない誤情報。例: `未実装の製品ロゴ`, `実態にない画面構成` |
@@ -98,9 +98,9 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
   "title": "MCP Hub × 13",
   "source_documents": [
     "AGENTS.md",
-    "backend_mcp/AGENTS.md"
+    "backend_tools/AGENTS.md"
   ],
-  "source_summary": "backend_mcp は port 8095 上で 14 個の MCP サーバーを同居させる FastMCP アプリケーション。",
+  "source_summary": "backend_tools は port 8095 上で 14 個の MCP サーバーを同居させる FastMCP アプリケーション。",
   "factual_bullets": [
     "Chrome DevTools",
     "desktop_capture",
@@ -259,8 +259,8 @@ mcp__aidiy_text_to_speech__synthesize_speech
 
 - **紹介ビデオのナレーション音声は必ず MP3 で生成・保存する**。WAV ファイルをそのまま使うと duration 計算が狂う（WAV の byte_rate ÷ ファイルサイズ ≠ MP3 の実尺）。
 - `freeai` プロバイダは Google Gemini TTS を使い、内部で PCM → WAV → MP3 変換を行う。MP3 変換には ffmpeg（優先）または `lameenc`（フォールバック）を使う。
-- `lameenc` は `backend_mcp` の依存に含まれている（`uv add lameenc` で追加済み）。ffmpeg がない環境でも MP3 出力できる。
-- **フォールバック**は `backend_mcp/mcp_proc/text_to_speech.py` 側に実装で持つ（ここには書かない）。
+- `lameenc` は `backend_tools` の依存に含まれている（`uv add lameenc` で追加済み）。ffmpeg がない環境でも MP3 出力できる。
+- **フォールバック**は `backend_tools/mcp_proc/text_to_speech.py` 側に実装で持つ（ここには書かない）。
 - **MP3 直接出力の試み**: Gemini TTS は `generationConfig.audioConfig.audioEncoding: "MP3"` で MP3 直接出力をリクエストする。現行の `generateContent` エンドポイントが非対応（HTTP 400）の場合は自動的に PCM モードで再試行し、ffmpeg で MP3 変換する。将来 API が対応すれば変換不要になる。
 - `_wav_to_mp3` バグ修正済み: ffmpeg 導入後に `None` を返す問題（else ブランチ欠落）を修正。ffmpeg 優先、失敗時は lameenc にフォールバック。
 - 発音辞書は **`backend_server/_config/aidiy_text_to_speech.json`** が単一の正本。`AiDiy → アイディー`, `MCP → エムシーピー`, `横展開 → よこてんかい` など。辞書を更新したら **必ず全シーンを取り直す**（シーン尺も変わる可能性あり）。
@@ -458,12 +458,12 @@ Response: { "type":"video", "mimeType":"video/mp4", "save_path":"<絶対パス>"
 **対処**: CDP `Runtime.evaluate` を **`userGesture: true`** で投げる。MCP の `cdp_command` は `params` を JSON 文字列で受け付けず（pydantic が dict に自動パースしてしまう）この経路は使えないので、付属スクリプトで直接 WebSocket を叩く。
 
 ```bash
-D:/OneDrive/_sandbox/AiDiy2026/backend_mcp/.venv/Scripts/python.exe ^
+D:/OneDrive/_sandbox/AiDiy2026/backend_tools/.venv/Scripts/python.exe ^
   D:/OneDrive/_sandbox/AiDiy2026/scripts/cdp_user_gesture.py ^
   <tab_id> "play()"
 ```
 
-スクリプトは `http://localhost:9222/json` から `webSocketDebuggerUrl` を引き、`Runtime.evaluate` を `userGesture:true, awaitPromise:false, returnByValue:true` で送る。`websockets` ライブラリは `backend_mcp/.venv` に入っている（システム Python には無い）。
+スクリプトは `http://localhost:9222/json` から `webSocketDebuggerUrl` を引き、`Runtime.evaluate` を `userGesture:true, awaitPromise:false, returnByValue:true` で送る。`websockets` ライブラリは `backend_tools/.venv` に入っている（システム Python には無い）。
 
 確認は `eval_js` で次の状態が取れていれば成功:
 

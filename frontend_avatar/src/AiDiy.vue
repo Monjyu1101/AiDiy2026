@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import AIコアチャット from '@/components/AIチャット.vue'
 import AIコアコントロール from '@/components/AIコア.vue'
 import AIコアコード from '@/components/AIコード.vue'
@@ -21,11 +21,9 @@ import ログイン from '@/components/ログイン.vue'
 import AI設定再起動 from '@/dialog/AI設定再起動.vue'
 import 再起動カウントダウン from '@/dialog/再起動カウントダウン.vue'
 import WindowShell from '@/components/_WindowShell.vue'
-import qAlertDialogComp from '@/_share/qAlertDialog.vue'
 import apiClient from '@/api/client'
 import { defaultModelSettings } from '@/api/config'
 import { AIWebSocket, createWebSocketUrl } from '@/api/websocket'
-import { setAlertInstance, setConfirmInstance } from '@/utils/qAlert'
 import type { AuthUser, ChatMessage, MessageKind, ModelSettings } from '@/types'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
@@ -191,7 +189,6 @@ const コード6Ref = ref<コードパネル参照型 | null>(null)
 const 自動選択表示 = ref(true)
 const 認証エラーメッセージKey = 'avatar_auth_error'
 const コアViewRef = ref<{ 字幕追加: (text: string) => void } | null>(null)
-const qAlertDialogRef = ref<{ show: (msg: string) => Promise<void>; showConfirm: (msg: string) => Promise<boolean> } | null>(null)
 
 const versions = window.desktopApi?.versions
 
@@ -1174,12 +1171,6 @@ watch(
   { deep: true },
 )
 
-watchEffect(() => {
-  if (qAlertDialogRef.value) {
-    setAlertInstance(qAlertDialogRef.value)
-    setConfirmInstance(qAlertDialogRef.value)
-  }
-})
 
 onMounted(async () => {
   window.addEventListener('auth-expired', 認証期限切れ処理)
@@ -1691,8 +1682,6 @@ onBeforeUnmount(() => {
       :wait-seconds="再起動待機秒数"
       @end="再起動後再接続"
     />
-
-    <component :is="qAlertDialogComp" ref="qAlertDialogRef" />
 
     <!-- Web モード 設定ダイアログ（position:fixed オーバーレイ） -->
     <component

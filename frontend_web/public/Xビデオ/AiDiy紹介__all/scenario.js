@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy自己紹介",
   "version": "take4",
   "title": "AiDiy - 実態ベース自己紹介",
@@ -61,7 +61,7 @@ window.SCENARIO = {
       "lead": "FastAPI + SQLite + Vue 3 を軸に、業務システム実装例と AI 実験基盤をひとつにまとめたのが AiDiy です。",
       "subtitle": "日本語識別子と業務サンプルを土台に、AI / 音声 / MCP まで一体化した基盤。",
       "image": "images/scene_001.png",
-      "image_prompt": "Vertical 2:3 key visual for a Japanese enterprise AI development platform, accurate architecture mood, modular blocks suggesting backend_server, backend_mcp, frontend_web, frontend_avatar, dark blueprint background, clean cyan and magenta lighting, no brand logos, realistic software diagram poster, high clarity, professional not playful",
+      "image_prompt": "Vertical 2:3 key visual for a Japanese enterprise AI development platform, accurate architecture mood, modular blocks suggesting backend_server, backend_tools, frontend_web, frontend_avatar, dark blueprint background, clean cyan and magenta lighting, no brand logos, realistic software diagram poster, high clarity, professional not playful",
       "chips": [
         "日本語識別子",
         "FastAPI + SQLite + Vue 3",
@@ -94,7 +94,7 @@ window.SCENARIO = {
         {
           "title": "中核スタック",
           "lines": [
-            "backend_server / backend_mcp / frontend_web / frontend_avatar",
+            "backend_server / backend_tools / frontend_web / frontend_avatar",
             "SQLite 共有 DB",
             "Vue 3 + Vite + TypeScript"
           ]
@@ -248,7 +248,7 @@ window.SCENARIO = {
           "lines": [
             "`core_main.py` 8091",
             "`apps_main.py` 8092",
-            "`backend_mcp/mcp_main.py` 8095"
+            "`backend_tools/mcp_main.py` 8095"
           ]
         },
         {
@@ -292,7 +292,7 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "3 サーバーと Code CLI で AI を使います。",
-      "long_narration": "AiDiy は core_main が 8091 番ポート、apps_main が 8092 番ポート、backend_mcp が 8095 番ポートで常駐する 3 サーバー構成です。AI コードパネルでは claude_sdk、claude_cli、copilot_cli、codex_cli、antigravity_cli、opencode_cli、そして aidiy_hermes まで、複数の Code CLI を 6 スロットに割り当てて使い分けられます。backend_hermes は HTTP サーバーとして常駐せず、AI コードパネルから必要なときだけ subprocess で呼び出される on-demand なコードエージェントです。31 の provider overlay と 50 以上のエイリアスを持つ AiDiy 専用の CLI エンジンになっています。",
+      "long_narration": "AiDiy は core_main が 8091 番ポート、apps_main が 8092 番ポート、backend_tools が 8095 番ポートで常駐する 3 サーバー構成です。AI コードパネルでは claude_sdk、claude_cli、copilot_cli、codex_cli、antigravity_cli、opencode_cli、そして aidiy_hermes まで、複数の Code CLI を 6 スロットに割り当てて使い分けられます。backend_hermes は HTTP サーバーとして常駐せず、AI コードパネルから必要なときだけ subprocess で呼び出される on-demand なコードエージェントです。31 の provider overlay と 50 以上のエイリアスを持つ AiDiy 専用の CLI エンジンになっています。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 14.976,
@@ -573,7 +573,7 @@ window.SCENARIO = {
       "accent_soft": "rgba(0, 224, 184, 0.18)",
       "kicker": "MCP HUB",
       "headline": "観測・生成・検証を\nAI エージェントの手足にする",
-      "lead": "backend_mcp は port 8095 上に 13 個の MCP を同居させ、ブラウザ操作から音声合成、OBS、ffmpeg まで扱います。",
+      "lead": "backend_tools は port 8095 上に 13 個の MCP を同居させ、ブラウザ操作から音声合成、OBS、ffmpeg まで扱います。",
       "subtitle": "MCP は飾りではなく、AI の観測・生成・検証を支える実働ツール群。",
       "image": "images/scene_007.png",
       "image_prompt": "Vertical 2:3 MCP hub infographic poster, center AI agent node with thirteen connected utility nodes for browser, desktop, sqlite, postgres, logs, code check, backup, image, speech, OBS, ffmpeg, clean green-cyan enterprise network diagram, modern technical style",
@@ -624,22 +624,22 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "`backend_mcp` は 13 個の MCP サーバーを同居させる FastMCP アプリケーション。",
+        "`backend_tools` は 13 個の MCP サーバーを同居させる FastMCP アプリケーション。",
         "Chrome DevTools は Node.js 版ではなく Python 実装の CDP client を使う。",
         "SQLite / PostgreSQL は read-only 中心で扱い、アクセスは localhost 限定。"
       ],
       "evidence": [
         {
-          "source": "backend_mcp/AGENTS.md",
-          "text": "`backend_mcp` はポート 8095 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
+          "source": "backend_tools/AGENTS.md",
+          "text": "`backend_tools` はポート 8095 上で 13 個の MCP サーバーを同居させる FastMCP アプリケーションです。"
         },
         {
-          "source": "backend_mcp/AGENTS.md",
+          "source": "backend_tools/AGENTS.md",
           "text": "ブラウザ操作、DB確認、ログ確認、コードチェック、画像生成、音声認識/合成、OBS / ffmpeg 制御を AI エージェントから利用できます。"
         }
       ],
       "short_narration": "13 個の MCP が支援し、この動画も AI と MCP で自動生成しています。",
-      "long_narration": "backend_mcp はポート 8095 に 13 個の MCP サーバーを同居させた FastMCP アプリケーションです。ブラウザ操作、デスクトップキャプチャ、SQLite と PostgreSQL のデータベース参照、ログ観測、コードチェック、バックアップ管理、画像生成、音声認識、音声合成、OBS Studio 制御、FFmpeg 制御と、幅広いツールを AI エージェントに提供します。この紹介ビデオ自体も、台本調整、TTS 音声合成、尺計測、素材確認を AI と MCP で自動生成しています。SSE エンドポイントは http://localhost:8095/{name}/sse の形式で、Claude Agent SDK や Claude Code CLI から接続できます。Chrome DevTools は Node.js ではなく Python 純正の CDP クライアントで実装されています。",
+      "long_narration": "backend_tools はポート 8095 に 13 個の MCP サーバーを同居させた FastMCP アプリケーションです。ブラウザ操作、デスクトップキャプチャ、SQLite と PostgreSQL のデータベース参照、ログ観測、コードチェック、バックアップ管理、画像生成、音声認識、音声合成、OBS Studio 制御、FFmpeg 制御と、幅広いツールを AI エージェントに提供します。この紹介ビデオ自体も、台本調整、TTS 音声合成、尺計測、素材確認を AI と MCP で自動生成しています。SSE エンドポイントは http://localhost:8095/{name}/sse の形式で、Claude Agent SDK や Claude Code CLI から接続できます。Chrome DevTools は Node.js ではなく Python 純正の CDP クライアントで実装されています。",
       "short_audio": "audio/short_scene_007.mp3",
       "long_audio": "audio/long_scene_007.mp3",
       "short_start_sec": 33.864,

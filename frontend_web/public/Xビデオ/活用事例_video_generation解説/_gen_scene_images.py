@@ -1,4 +1,4 @@
-
+﻿
 # -*- coding: utf-8 -*-
 
 """
@@ -25,7 +25,7 @@ import time
 
 
 
-_MCP_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\backend_mcp'
+_MCP_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\backend_tools'
 
 if _MCP_DIR not in sys.path:
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """avatar / hermes 紹介ビデオ用画像一括生成スクリプト"""
 
@@ -47,7 +47,7 @@ TASKS = [
         "size": "1024x1536",
         "prompt": (
             "Vertical 2:3 key visual for AiDiy — a Japanese-first fullstack business management platform. "
-            "Architectural diagram showing four modular blocks: backend_server, backend_mcp, frontend_web, frontend_avatar "
+            "Architectural diagram showing four modular blocks: backend_server, backend_tools, frontend_web, frontend_avatar "
             "connected by clean data-flow arrows, dark blueprint background, cyan and magenta accent lighting. "
             "Enterprise software poster style, no logos, realistic diagram aesthetic, high clarity."
         ),
