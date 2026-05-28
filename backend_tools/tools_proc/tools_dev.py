@@ -18,8 +18,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from log_config import get_logger
-from mcp_proc.log_tailer import LogTailError
-from mcp_proc.code_checker import CodeCheckError
+from tools_proc.log_tailer import LogTailError
+from tools_proc.code_checker import CodeCheckError
 
 logger = get_logger(__name__)
 

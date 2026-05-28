@@ -22,10 +22,10 @@ from mcp.types import ImageContent
 from pydantic import BaseModel
 
 from log_config import get_logger
-from mcp_proc.image_generation import ImageGenerationError
-from mcp_proc.movie_generation import MovieGenerationError
-from mcp_proc.speech_to_text import SpeechToTextError
-from mcp_proc.text_to_speech import TextToSpeechError
+from tools_proc.image_generation import ImageGenerationError
+from tools_proc.movie_generation import MovieGenerationError
+from tools_proc.speech_to_text import SpeechToTextError
+from tools_proc.text_to_speech import TextToSpeechError
 
 logger = get_logger(__name__)
 

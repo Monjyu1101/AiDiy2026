@@ -1,6 +1,6 @@
 ﻿# Code CLI の MCP 設定
 
-> 文書: `backend_hermes,backend_tools,CodeCLI_MCP設定.md` | 実装: `backend_hermes/`, `backend_tools/mcp_main.py`
+> 文書: `backend_hermes,backend_tools,CodeCLI_MCP設定.md` | 実装: `backend_hermes/`, `backend_tools/tools_main.py`
 
 ## このメモを使う場面
 - Claude / Gemini / Codex / Antigravity などの Code CLI から AiDiy MCP を使わせる

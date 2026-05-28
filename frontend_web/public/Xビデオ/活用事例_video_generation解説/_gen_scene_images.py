@@ -33,7 +33,7 @@ if _MCP_DIR not in sys.path:
 
 
 
-from mcp_proc.image_generation import ImageGeneration
+from tools_proc.image_generation import ImageGeneration
 
 
 

@@ -11,7 +11,7 @@
 - バックエンドは **3 サーバー**
   - `core_main.py` : `8091`
   - `apps_main.py` : `8092`
-  - `mcp_main.py` : `8095`
+  - `tools_main.py` : `8095`
 - Web フロントは `frontend_web`、ポート `8090`
 - Avatar フロントは `frontend_avatar`、ポート `8099`
 - DB は **SQLite**
@@ -33,8 +33,8 @@ AiDiy2026/
 ├── _start.py
 ├── _cleanup.py
 ├── backend_tools/
-│   ├── mcp_main.py
-│   ├── mcp_proc/
+│   ├── tools_main.py
+│   ├── tools_proc/
 │   └── AGENTS.md
 ├── backend_server/
 │   ├── core_main.py
@@ -82,7 +82,7 @@ python _start.py
 
 `_start.py` は**対話形式**です。起動時に以下を選択します。
 
-- バックエンド(mcp)
+- tools
 - バックエンド(core/apps)
 - フロントエンド(Web)
 - フロントエンド(Avatar)
@@ -92,7 +92,7 @@ python _start.py
 ```powershell
 # backend mcp
 cd backend_tools
-.venv/Scripts/python.exe -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
+.venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
 
 # backend core
 cd backend_server

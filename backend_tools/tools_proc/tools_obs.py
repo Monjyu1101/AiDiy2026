@@ -17,7 +17,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from log_config import get_logger
-from mcp_proc.obs_studio_control import ObsStudioControlError
+from tools_proc.obs_studio_control import ObsStudioControlError
 
 logger = get_logger(__name__)
 

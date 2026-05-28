@@ -12,7 +12,7 @@
 AiDiy MCP サーバー エントリポイント
 
 SSE + HTTP POST インターフェースを 1 ポート (8095) で提供する。
-MCP ツールの実装は mcp_proc/tools_*.py に分割してある。
+MCP ツールの実装は tools_proc/tools_*.py に分割してある。
 """
 
 import os
@@ -36,24 +36,24 @@ from fastapi.routing import APIRoute
 from mcp.server.fastmcp import FastMCP
 
 from log_config import setup_logging, get_logger
-from mcp_proc.chrome_manager import ChromeManager
-from mcp_proc.chrome_devtools import CDPClient
-from mcp_proc.desktop_capture import DesktopCapture
-from mcp_proc.sqlite_query import SqliteQuery
-from mcp_proc.postgres_query import PgQuery, PgQueryError
-from mcp_proc.log_tailer import LogTailer
-from mcp_proc.code_checker import CodeChecker
-from mcp_proc.backup import BackupCheck, BackupSave
-from mcp_proc.image_generation import ImageGeneration
-from mcp_proc.movie_generation import MovieGeneration
-from mcp_proc.speech_to_text import SpeechToText
-from mcp_proc.text_to_speech import TextToSpeech
-from mcp_proc.obs_studio_control import ObsStudioControl
-from mcp_proc.ffmpeg_control import FfmpegControl
-from mcp_proc.code_agents import CodeAgents
+from tools_proc.chrome_manager import ChromeManager
+from tools_proc.chrome_devtools import CDPClient
+from tools_proc.desktop_capture import DesktopCapture
+from tools_proc.sqlite_query import SqliteQuery
+from tools_proc.postgres_query import PgQuery, PgQueryError
+from tools_proc.log_tailer import LogTailer
+from tools_proc.code_checker import CodeChecker
+from tools_proc.backup import BackupCheck, BackupSave
+from tools_proc.image_generation import ImageGeneration
+from tools_proc.movie_generation import MovieGeneration
+from tools_proc.speech_to_text import SpeechToText
+from tools_proc.text_to_speech import TextToSpeech
+from tools_proc.obs_studio_control import ObsStudioControl
+from tools_proc.ffmpeg_control import FfmpegControl
+from tools_proc.code_agents import CodeAgents
 
-from mcp_proc import tools_chrome, tools_desktop, tools_db, tools_dev
-from mcp_proc import tools_backup, tools_media, tools_obs, tools_ffmpeg, tools_agents
+from tools_proc import tools_chrome, tools_desktop, tools_db, tools_dev
+from tools_proc import tools_backup, tools_media, tools_obs, tools_ffmpeg, tools_agents
 
 setup_logging()
 logger = get_logger(__name__)

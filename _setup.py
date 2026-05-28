@@ -7,7 +7,7 @@
 対象:
 - 共通
 - バックエンド(core,apps): `backend_server`
-- バックエンド(mcp)      : `backend_tools`
+- tools                 : `backend_tools`
 - フロントエンド(Web)    : `frontend_web`
 - フロントエンド(Avatar) : `frontend_avatar`
 
@@ -996,8 +996,8 @@ def setup_frontend_avatar():
 
 
 # ============================================================
-# (mcp) モジュール定義
-# 新しい (mcp) を追加するときはここにエントリを追加するだけ
+# tools モジュール定義
+# 新しい tools を追加するときはここにエントリを追加するだけ
 # ============================================================
 MCP_MODULES = [
     {
@@ -1005,7 +1005,7 @@ MCP_MODULES = [
         "server_name": "aidiy_chrome_devtools",   # MCP 設定ファイル上のサーバーキー名
         "dir":         "backend_tools",
         "desc":        "Python (uv) — Chrome DevTools Protocol + Desktop Capture",
-        "start":       "uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095",
+        "start":       "uv run uvicorn tools_main:app --host 0.0.0.0 --port 8095",
         "sse_url":     "http://localhost:8095/aidiy_chrome_devtools/sse",
         # 同一プロセスで追加公開するサーバー（uv sync は不要、設定書き込みのみ）
         "extra_servers": [
@@ -1067,8 +1067,8 @@ MCP_MODULES = [
 
 
 def setup_mcp_module(module: dict) -> bool:
-    """(mcp) モジュールを汎用的にセットアップする (uv sync + npm install)"""
-    label = "バックエンド(mcp)"
+    """tools モジュールを汎用的にセットアップする (uv sync + npm install)"""
+    label = "tools"
     mcp_dir = BASE_DIR / module["dir"]
 
     print_header(f"{label} セットアップ")
@@ -1113,14 +1113,14 @@ def setup_mcp_module(module: dict) -> bool:
         print_success(f"{label}: npm パッケージのインストールが完了しました。")
 
     print_success(f"{label}: セットアップが完了しました。")
-    print_info(f"  起動方法: cd {module['dir']} && {module.get('start', 'uv run mcp_main.py')}")
+    print_info(f"  起動方法: cd {module['dir']} && {module.get('start', 'uv run tools_main.py')}")
     if "sse_url" in module:
         print_info(f"  SSE URL : {module['sse_url']}")
     return True
 
 
 def setup_backend_tools() -> bool:
-    """登録済みの (mcp) モジュールを順番にセットアップする"""
+    """登録済みの tools モジュールを順番にセットアップする"""
     all_ok = True
     for module in MCP_MODULES:
         if not setup_mcp_module(module):
@@ -1372,7 +1372,7 @@ def configure_backend_tools_clients(module: dict) -> bool:
             antigravity_entries.append((sn, config))
         all_ok &= upsert_json_mcp_servers(antigravity_mcp, antigravity_entries)
 
-    # 5) OpenCode (mcp)
+    # 5) OpenCode (tools)
     opencode_global = get_opencode_config_path()
     print_info(f"[OpenCode]    {opencode_global}")
     all_ok &= upsert_json_mcp_servers(
@@ -1441,9 +1441,9 @@ def collect_setup_choices() -> dict | None:
 
     choices["hermes"] = ask_yes_no("バックエンド(hermes)のセットアップを実行しますか？", default="y")
 
-    choices["mcp"] = ask_yes_no("バックエンド(mcp) のセットアップを実行しますか？", default="y")
+    choices["mcp"] = ask_yes_no("tools のセットアップを実行しますか？", default="y")
     if choices["mcp"]:
-        choices["mcp_config"] = ask_yes_no("バックエンド(mcp): backend_tools の mcp機能を使えるよう構成しますか？", default="y")
+        choices["mcp_config"] = ask_yes_no("tools: backend_tools の MCP 機能を使えるよう構成しますか？", default="y")
 
     choices["backend"] = ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y")
     if choices["backend"] and DATABASE_TYPE.lower() == "postgresql":
@@ -1465,7 +1465,7 @@ def main():
     print_info("セットアップ対象:")
     print_info("  1. 共通")
     print_info("  2. バックエンド(hermes)")
-    print_info("  3. バックエンド(mcp)")
+    print_info("  3. tools")
     print_info("  4. バックエンド(core,apps)")
     print_info("  5. フロントエンド(Web)")
     print_info("  6. フロントエンド(Avatar)")
@@ -1505,7 +1505,7 @@ def main():
     print()
     if choices["mcp"]:
         if not setup_backend_tools():
-            error_locations.append("バックエンド(mcp)")
+            error_locations.append("tools")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
@@ -1515,7 +1515,7 @@ def main():
             show_current_mcp_config(backend_tools_module)
             if choices["mcp_config"]:
                 if not configure_backend_tools_clients(backend_tools_module):
-                    error_locations.append("バックエンド(mcp): MCP 設定ファイル書き込み")
+                    error_locations.append("tools: MCP 設定ファイル書き込み")
                     if not continue_on_error:
                         print_setup_summary(error_locations)
                         sys.exit(1)
@@ -1524,7 +1524,7 @@ def main():
         else:
             print_warning("backend_tools モジュール定義が見つからないため、MCP 設定をスキップしました。")
     else:
-        print_warning("バックエンド(mcp) のセットアップをスキップしました。")
+        print_warning("tools のセットアップをスキップしました。")
 
     print()
     if choices["backend"]:
@@ -1560,7 +1560,7 @@ def main():
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
     print_info("  個別起動:")
-    print_info("    MCP起動  : cd backend_tools && uv run uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095")
+    print_info("    MCP起動  : cd backend_tools && uv run uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095")
     print_info("    Core起動 : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port 8091")
     print_info("    Apps起動 : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092")
     if sys.platform == "win32":

@@ -20,7 +20,7 @@ from urllib import error, request
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PIL import Image as PILImage
-from mcp_proc.image_generation import ImageGeneration, ImageGenerationError
+from tools_proc.image_generation import ImageGeneration, ImageGenerationError
 
 
 BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")

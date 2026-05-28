@@ -28,7 +28,7 @@
 - 常駐バックエンドは **3 サーバー構成**
   - `core_main.py` : `8091`
   - `apps_main.py` : `8092`
-  - `mcp_main.py` : `8095`
+  - `tools_main.py` : `8095`
 - 補助 CLI として `backend_hermes` を統合
   - `aidiy_hermes` : on-demand 実行のコードエージェント CLI
 - Web フロントは `8090`
@@ -101,7 +101,7 @@ python _start.py
 
 `_start.py` は**対話形式**です。起動時に以下を確認します。
 
-- バックエンド(mcp) を起動するか
+- tools を起動するか
 - バックエンド(core, apps) を起動するか
 - フロントエンド(Web) を起動するか
 - フロントエンド(Avatar) を起動するか
@@ -115,7 +115,7 @@ python _start.py
 ```bash
 # バックエンド MCP
 cd backend_tools
-.venv/Scripts/python.exe -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
+.venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
 
 # バックエンド Core
 cd backend_server

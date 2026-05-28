@@ -30,7 +30,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mcp_proc.code_agents import CodeAgents, CodeAgentsError
+from tools_proc.code_agents import CodeAgents, CodeAgentsError
 
 
 TEST_PROMPT = "1+1の計算結果だけを数字で答えてください。余計な説明は不要です。"

@@ -48,7 +48,7 @@
 - 紹介ビデオの再生スピードは `ratio` 指定なし、または `ratio=None` で収録する。現時点の標準速度は 1.2 倍
 - `aidiy_text_to_speech` は `ratio=None`（未指定）を既定の 1.2 倍として扱う。`ratio=0` / `ratio=1` は速度調整なしになるため、通常収録では指定しない
 - **出力形式は必ず MP3**（WAV は禁止）。各プロバイダは内部で PCM → WAV → MP3 変換（ffmpeg 優先、lameenc フォールバック）する
-- **フォールバック**は `backend_tools/mcp_proc/text_to_speech.py` 側に実装で持つ（ここには書かない）。
+- **フォールバック**は `backend_tools/tools_proc/text_to_speech.py` 側に実装で持つ（ここには書かない）。
 - 発音辞書は `backend_server/_config/aidiy_text_to_speech.json` が単一の正本
 - `scenario.js` の `narration` を変更したら、必ず同じテキストで音声を再生成して `audio/scene_NNN.mp3` を更新する（表示テキストと音声の乖離防止）
 - 詳細手順は [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) を参照

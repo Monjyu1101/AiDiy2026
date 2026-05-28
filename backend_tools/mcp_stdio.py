@@ -15,7 +15,7 @@
 """Codex 向け stdio <-> SSE MCP ブリッジ。
 
 Codex からは local stdio MCP server として見せつつ、
-実体の MCP サーバーは backend_tools/mcp_main.py が提供する
+実体の MCP サーバーは backend_tools/tools_main.py が提供する
 SSE エンドポイントへ接続して中継する。
 """
 

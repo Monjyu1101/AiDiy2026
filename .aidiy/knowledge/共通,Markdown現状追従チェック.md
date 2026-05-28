@@ -12,7 +12,7 @@
 1. 実装ファイルを最優先する。
    - 認証: `backend_server/auth.py`, `backend_server/core_router/auth.py`, `frontend_web/src/api/client.ts`, `frontend_web/src/stores/auth.ts`, `frontend_avatar/src/api/client.ts`
    - Hermes: `backend_hermes/cli_main.py`, `backend_server/AIコア/AIコード_cli.py`, `backend_server/conf/conf_model.py`, `backend_server/conf/conf_json.py`
-   - MCP: `backend_tools/mcp_main.py`, `backend_tools/mcp_stdio.py`, `backend_tools/mcp_proc/`
+   - MCP: `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`, `backend_tools/tools_proc/`
    - 起動・環境: `_setup.py`, `_start.py`, `CLAUDE.md`, 各 `AGENTS.md`
 2. 方針は `AGENTS.md` / `CLAUDE.md` を確認する。
 3. `docs/開発ガイド/` は HTML が主。検索は `rg -n '<語句>' docs/開発ガイド -g '*.html'` を使う。
@@ -22,7 +22,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 ## 実装追従チェックリスト
 
 - [ ] MCP は 8 サーバー構成として記載している。
-  - 同期元: `backend_tools/mcp_main.py`, `backend_tools/mcp_proc/`
+  - 同期元: `backend_tools/tools_main.py`, `backend_tools/tools_proc/`
   - 含める: `aidiy_backup`
 - [ ] Docker 構成に `backend_tools` を含めていない。
   - MCP 検証はローカル起動を前提に書く。

@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib import request
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mcp_proc.movie_generation import MovieGeneration, MovieGenerationError
+from tools_proc.movie_generation import MovieGeneration, MovieGenerationError
 
 
 BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")

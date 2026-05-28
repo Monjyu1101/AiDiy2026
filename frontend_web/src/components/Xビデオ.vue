@@ -116,7 +116,7 @@ const handleReturn = () => {
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">XMC</span>
-              AiDiy紹介 (mcp)
+              AiDiy紹介 (tools)
             </div>
             <div class="menu-card-description">
               MCP ツール群にフォーカスした紹介ビデオ

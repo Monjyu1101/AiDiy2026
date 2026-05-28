@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mcp_proc.chrome_manager import ChromeManager
+from tools_proc.chrome_manager import ChromeManager
 
 
 class ChromeManagerLaunchOptionTests(unittest.TestCase):

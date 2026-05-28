@@ -1,6 +1,6 @@
 ﻿# backend_tools 運用手順
 
-> 文書: `backend_tools,backend_server,運用手順.md` | 実装: `backend_tools/mcp_main.py`, `backend_tools/mcp_stdio.py`
+> 文書: `backend_tools,backend_server,運用手順.md` | 実装: `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`
 
 ## このメモを使う場面
 
@@ -10,9 +10,9 @@
 
 ## 関連ファイル
 
-- `backend_tools/mcp_main.py`
+- `backend_tools/tools_main.py`
 - `backend_tools/mcp_stdio.py`
-- `backend_tools/mcp_proc/`
+- `backend_tools/tools_proc/`
 - `backend_server/_config/AiDiy_mcp.json`
 - `backend_server/conf/conf_model.py`
 - `backend_server/AIコア/AIコード_claude.py`
@@ -29,14 +29,14 @@ python _start.py
 
 ```powershell
 Set-Location backend_tools
-.venv/Scripts/python.exe -m uvicorn mcp_main:app --host 0.0.0.0 --port 8095
+.venv/Scripts/python.exe -m uvicorn tools_main:app --host 0.0.0.0 --port 8095
 ```
 
 uv 経由:
 
 ```powershell
 Set-Location backend_tools
-uv run uvicorn mcp_main:app --host 0.0.0.0 --port 8095
+uv run uvicorn tools_main:app --host 0.0.0.0 --port 8095
 ```
 
 Codex など stdio クライアントから使う場合:
@@ -113,7 +113,7 @@ print(res.json())
 | `AIDIY_PG_DSN` | 未設定 | PostgreSQL DSN |
 | `AIDIY_PG_HOST` など | 未設定 | PostgreSQL 個別接続情報 |
 
-mount path 系の環境変数を使う場合は `mcp_main.py` の現行実装を確認する。
+mount path 系の環境変数を使う場合は `tools_main.py` の現行実装を確認する。
 
 ## OBS Studio 接続設定
 
@@ -129,7 +129,7 @@ PATH 上にない環境ではフルパスへ書き換える。MCP ツールは a
 
 ## Reboot
 
-`backend_tools/temp/reboot_mcp.txt` を作成すると `mcp_main.py` が自身を終了し、`_start.py` 起動中なら自動再起動される。
+`backend_tools/temp/reboot_mcp.txt` を作成すると `tools_main.py` が自身を終了し、`_start.py` 起動中なら自動再起動される。
 
 ## ログ
 

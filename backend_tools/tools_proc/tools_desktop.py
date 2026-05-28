@@ -19,7 +19,7 @@ from mcp.types import ImageContent
 from pydantic import BaseModel
 
 from log_config import get_logger
-from mcp_proc.desktop_capture import DesktopCaptureError
+from tools_proc.desktop_capture import DesktopCaptureError
 
 logger = get_logger(__name__)
 

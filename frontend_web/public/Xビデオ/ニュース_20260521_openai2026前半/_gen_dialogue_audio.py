@@ -21,7 +21,7 @@ _MCP_DIR  = os.path.normpath(os.path.join(_THIS_DIR, "../../../../backend_tools"
 if _MCP_DIR not in sys.path:
     sys.path.insert(0, _MCP_DIR)
 
-from mcp_proc.text_to_speech import TextToSpeech
+from tools_proc.text_to_speech import TextToSpeech
 
 OUTPUT_DIR = os.path.join(_THIS_DIR, "audio")
 os.makedirs(OUTPUT_DIR, exist_ok=True)

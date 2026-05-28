@@ -163,7 +163,7 @@ def main() -> None:
 
     syntax = post(
         "/aidiy_code_check/python_syntax",
-        {"file_path": "backend_tools/mcp_main.py", "venv_project": "backend_tools"},
+        {"file_path": "backend_tools/tools_main.py", "venv_project": "backend_tools"},
     )
     assert_no_error("code_check python_syntax", syntax)
     if syntax.get("ok") is not True:
@@ -177,7 +177,7 @@ def main() -> None:
     backup_scan = post("/aidiy_backup/save/scan")
     assert_no_error("backup scan", backup_scan)
 
-    versions = post("/aidiy_backup/check/versions", {"path": "backend_tools/mcp_main.py"})
+    versions = post("/aidiy_backup/check/versions", {"path": "backend_tools/tools_main.py"})
     assert isinstance(versions, dict)
     print("  OK backup")
 

@@ -83,9 +83,9 @@
       "kicker": "MCP TRANSPORT",
       "headline": "stdio / SSE / HTTP Transport\n3 種類のトランスポートを同一ポートで提供",
       "image": "images/scene_001.png",
-      "source_summary": "AiDiy MCPハブはstdio gateway・SSE Transport・Streamable HTTP Transportの3種を同一ポート8095で提供。FastAPI上で実装。mcp_main.pyがエントリポイント。",
+      "source_summary": "AiDiy MCPハブはstdio gateway・SSE Transport・Streamable HTTP Transportの3種を同一ポート8095で提供。FastAPI上で実装。tools_main.pyがエントリポイント。",
       "factual_bullets": [
-        "backend_tools/mcp_main.py がエントリポイント",
+        "backend_tools/tools_main.py がエントリポイント",
         "ポート: 8095",
         "stdio gateway (mcp_stdio.py): Claude Desktopなどのstdio MCPクライアント向け",
         "SSE Transport: Server-Sent Events によるリアルタイム接続",
@@ -94,13 +94,13 @@
       "forbidden_elements": [
         "stdioとSSEとHTTPが別々のポートで動いているような誤解を招く表現"
       ],
-      "image_prompt": "Technical architecture diagram showing three transport layers (stdio, SSE, HTTP) converging into a single FastAPI server node at port 8095. Clean network topology visualization with blue and green data flow lines on dark background. Shows mcp_main.py as central hub.",
+      "image_prompt": "Technical architecture diagram showing three transport layers (stdio, SSE, HTTP) converging into a single FastAPI server node at port 8095. Clean network topology visualization with blue and green data flow lines on dark background. Shows tools_main.py as central hub.",
       "dialogue": [
         {
           "speaker": "female",
           "expression": "neutral",
           "telop_text": "AiDiy の MCP ハブは FastAPI で実装され、ポート 8095 で動作しています。",
-          "naration_text": "AiDiy の MCP ハブは、Python の FastAPI フレームワークを使って実装されています。backend_tools フォルダにある mcp_main.py がエントリポイントで、ポート 8095 で起動します。ここに 14 種類の MCP サーバーがすべて集約されており、接続方式に応じた 3 種類のトランスポートが利用できます。",
+          "naration_text": "AiDiy の MCP ハブは、Python の FastAPI フレームワークを使って実装されています。backend_tools フォルダにある tools_main.py がエントリポイントで、ポート 8095 で起動します。ここに 14 種類の MCP サーバーがすべて集約されており、接続方式に応じた 3 種類のトランスポートが利用できます。",
           "audio": "audio/dlg_001_01_female.mp3",
           "duration_sec": 21.936
         },

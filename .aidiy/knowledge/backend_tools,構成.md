@@ -1,6 +1,6 @@
 ﻿# backend_tools 構成
 
-> 文書: `backend_tools,構成.md` | 実装: `backend_tools/mcp_main.py`, `backend_tools/mcp_stdio.py`
+> 文書: `backend_tools,構成.md` | 実装: `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`
 
 ## このメモを使う場面
 - `backend_tools` の入口、SSE サーバー、stdio bridge の役割を確認する
@@ -8,29 +8,29 @@
 - Codex など stdio クライアントから AiDiy MCP を使う経路を調査する
 
 ## 構成方針
-- 常駐入口は `backend_tools/mcp_main.py`
+- 常駐入口は `backend_tools/tools_main.py`
 - Codex など stdio クライアント向けの SSE 変換入口は `backend_tools/mcp_stdio.py`
-- 再利用ロジックは `backend_tools/mcp_proc/` に置く
-- `mcp_main.py` からは `mcp_proc.<module>` として import する
-- `mcp_main.py` は 14 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す
+- 再利用ロジックは `backend_tools/tools_proc/` に置く
+- `tools_main.py` からは `tools_proc.<module>` として import する
+- `tools_main.py` は 14 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す
 
 ## 関連ファイル
-- `backend_tools/mcp_main.py`
+- `backend_tools/tools_main.py`
 - `backend_tools/mcp_stdio.py`
-- `backend_tools/mcp_proc/chrome_manager.py`
-- `backend_tools/mcp_proc/chrome_devtools.py`
-- `backend_tools/mcp_proc/sqlite_query.py`
-- `backend_tools/mcp_proc/postgres_query.py`
-- `backend_tools/mcp_proc/log_tailer.py`
-- `backend_tools/mcp_proc/code_checker.py`
-- `backend_tools/mcp_proc/backup.py`
-- `backend_tools/mcp_proc/image_generation.py`
-- `backend_tools/mcp_proc/movie_generation.py`
-- `backend_tools/mcp_proc/speech_to_text.py`
-- `backend_tools/mcp_proc/text_to_speech.py`
-- `backend_tools/mcp_proc/obs_studio_control.py`
-- `backend_tools/mcp_proc/ffmpeg_control.py`
-- `backend_tools/mcp_proc/code_agents.py`
+- `backend_tools/tools_proc/chrome_manager.py`
+- `backend_tools/tools_proc/chrome_devtools.py`
+- `backend_tools/tools_proc/sqlite_query.py`
+- `backend_tools/tools_proc/postgres_query.py`
+- `backend_tools/tools_proc/log_tailer.py`
+- `backend_tools/tools_proc/code_checker.py`
+- `backend_tools/tools_proc/backup.py`
+- `backend_tools/tools_proc/image_generation.py`
+- `backend_tools/tools_proc/movie_generation.py`
+- `backend_tools/tools_proc/speech_to_text.py`
+- `backend_tools/tools_proc/text_to_speech.py`
+- `backend_tools/tools_proc/obs_studio_control.py`
+- `backend_tools/tools_proc/ffmpeg_control.py`
+- `backend_tools/tools_proc/code_agents.py`
 - `backend_server/_config/AiDiy_mcp.json`
 - `_start.py`
 
@@ -85,9 +85,9 @@ print(res.json())  # {"save_path": "..."}
 ## 新規 MCP サーバー追加手順
 
 ### コード変更
-1. `backend_tools/mcp_proc/<サーバー名>.py` に処理を実装する（`<XxxError>` 例外クラスもセットで定義）
-2. `backend_tools/mcp_main.py` に以下を追加する
-   - `from mcp_proc.<サーバー名> import ...` の import
+1. `backend_tools/tools_proc/<サーバー名>.py` に処理を実装する（`<XxxError>` 例外クラスもセットで定義）
+2. `backend_tools/tools_main.py` に以下を追加する
+   - `from tools_proc.<サーバー名> import ...` の import
    - `MOUNT_<略号> = os.environ.get("MCP_<略号>_MOUNT_PATH", "/aidiy_<name>")`
    - インスタンス生成（例: `xx = ImageGeneration()`）
    - `mcp_<略号> = FastMCP("aidiy_<name>", host="0.0.0.0", port=MCP_PORT, sse_path=..., message_path=..., warn_on_duplicate_tools=False)`
@@ -102,7 +102,7 @@ print(res.json())  # {"save_path": "..."}
 6. `backend_tools/AGENTS.md` の「提供 MCP」「ファイル構成」テーブル、概要文の「N 個の MCP サーバー」を更新する
 7. ルート `AGENTS.md` の「ディレクトリ概要」と「MCP 概要」テーブル、「N つの MCP サーバー」を更新する
 8. ルート `CLAUDE.md` の「**Backend MCP**: N 個の MCP サーバー」記載と内訳を更新する
-9. `.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md` の「MCP サーバー一覧」「ツール選択基準」テーブル、`mcp_main.py` の N 個記載を更新する
+9. `.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md` の「MCP サーバー一覧」「ツール選択基準」テーブル、`tools_main.py` の N 個記載を更新する
 10. `.aidiy/knowledge/backend_tools,backend_server,運用手順.md` の「SSE エンドポイント」テーブルを更新する
 11. `frontend_web/public/X自己紹介/index.html`（人間向け紹介ページ）の以下を更新する:
     - hero タグ行の `MCP Hub ×N` 表記
@@ -118,7 +118,7 @@ print(res.json())  # {"save_path": "..."}
 
 ## 再起動ウォッチャー
 
-`mcp_main.py` の `_setup_reboot_watcher()` が `backend_tools/temp/reboot_mcp.txt` を監視する。ファイル検知後に削除して `os._exit(0)` し、`_start.py` が子プロセス終了を検知して再起動する。
+`tools_main.py` の `_setup_reboot_watcher()` が `backend_tools/temp/reboot_mcp.txt` を監視する。ファイル検知後に削除して `os._exit(0)` し、`_start.py` が子プロセス終了を検知して再起動する。
 
 手動で再起動したい場合:
 
@@ -146,7 +146,7 @@ Chrome DevTools 系ツールは `_ensure_chrome()` で Chrome の起動状態を
 
 ## 注意点
 
-- `mcp_main.py` は入口として残し、`mcp_proc` へ入れない
+- `tools_main.py` は入口として残し、`tools_proc` へ入れない
 - stdio と SSE の transport 変換は `mcp_stdio.py` に閉じ込める
 - SQLite / PostgreSQL は既定 read-only。検証は SELECT / describe / count を優先する
 - Chrome DevTools MCP は Python CDP 実装。Node.js 版 `chrome-devtools-mcp` 前提で復旧しない
@@ -156,7 +156,7 @@ Chrome DevTools 系ツールは `_ensure_chrome()` で Chrome の起動状態を
 
 ```powershell
 cd backend_tools
-.venv\Scripts\python.exe -c "import mcp_main"
+.venv\Scripts\python.exe -c "import tools_main"
 .venv\Scripts\python.exe mcp_stdio.py --help
 curl http://localhost:8095/aidiy_sqlite/sse
 curl http://localhost:9222/json

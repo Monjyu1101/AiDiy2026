@@ -74,7 +74,7 @@ SERVERS = [
     {
         "name": "aidiy_code_check",
         "expected": {"check_list_targets", "check_python_syntax"},
-        "call": ("check_python_syntax", {"file_path": "backend_tools/mcp_main.py", "venv_project": "backend_tools"}),
+        "call": ("check_python_syntax", {"file_path": "backend_tools/tools_main.py", "venv_project": "backend_tools"}),
     },
     {
         "name": "aidiy_backup",

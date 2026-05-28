@@ -18,8 +18,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from log_config import get_logger
-from mcp_proc.sqlite_query import SqliteQueryError
-from mcp_proc.postgres_query import PgQueryError
+from tools_proc.sqlite_query import SqliteQueryError
+from tools_proc.postgres_query import PgQueryError
 
 logger = get_logger(__name__)
 

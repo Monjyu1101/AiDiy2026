@@ -41,7 +41,7 @@ cd backend_server && .venv/Scripts/python -m uvicorn core_main:app --reload --ho
 cd backend_server && .venv/Scripts/python -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
 # Backend MCP — ポート 8095
-cd backend_tools && .venv/Scripts/python -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
+cd backend_tools && .venv/Scripts/python -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
 
 # Frontend Web — ポート 8090
 cd frontend_web && npm run dev
@@ -120,7 +120,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | 8090 | Frontend Web (Vite) |
 | 8091 | Backend Core (`core_main.py`) |
 | 8092 | Backend Apps (`apps_main.py`) |
-| 8095 | Backend MCP (`mcp_main.py`) |
+| 8095 | Backend MCP (`tools_main.py`) |
 | 8099 | Frontend Avatar (Vite) |
 
 **注意**: フロントエンドのポートを変える場合は `core_main.py` / `apps_main.py` の CORS 許可リストも合わせて更新してください。

@@ -14,7 +14,7 @@ _MCP_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\backend_tools'
 if _MCP_DIR not in sys.path:
     sys.path.insert(0, _MCP_DIR)
 
-from mcp_proc.text_to_speech import TextToSpeech
+from tools_proc.text_to_speech import TextToSpeech
 
 OUTPUT_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\活用事例_video_generation解説\\audio'
 os.makedirs(OUTPUT_DIR, exist_ok=True)

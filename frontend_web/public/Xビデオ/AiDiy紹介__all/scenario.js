@@ -248,7 +248,7 @@
           "lines": [
             "`core_main.py` 8091",
             "`apps_main.py` 8092",
-            "`backend_tools/mcp_main.py` 8095"
+            "`backend_tools/tools_main.py` 8095"
           ]
         },
         {

@@ -120,7 +120,7 @@ DIALOGUES = [
 # & "D:\OneDrive\_sandbox\AiDiy2026\backend_tools\.venv\Scripts\python.exe" "_gen_dialogue_audio.py"
 ```
 
-- `sys.path.insert(0, r"D:\...\backend_tools")` して `mcp_proc.text_to_speech.TextToSpeech` を使用
+- `sys.path.insert(0, r"D:\...\backend_tools")` して `tools_proc.text_to_speech.TextToSpeech` を使用
 - `tts.synthesize(speech_text=text, language="ja", provider="edge", voice=speaker)` のように `ratio` は省略する
 - ニュース版の再生スピードは `ratio` 指定なし、または `ratio=None` で収録する。現時点の標準速度は 1.2 倍。
 - `aidiy_text_to_speech` は `ratio=None`（未指定）を既定の 1.2 倍として扱う。`ratio=0` / `ratio=1` は速度調整なしになるため、ニュース版の通常収録では指定しない

@@ -26,7 +26,7 @@ cd backend_server
 .\.venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
 
 cd ..\backend_tools
-.\.venv\Scripts\python.exe -m uvicorn mcp_main:app --reload --host 0.0.0.0 --port 8095
+.\.venv\Scripts\python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
 
 # Hermes は on-demand CLI
 cd ..\backend_hermes
@@ -39,7 +39,7 @@ cd ..\backend_hermes
 
 | プロンプト | デフォルト | 内容 |
 |------------|------------|------|
-| `バックエンド(mcp) 起動しますか?` | Yes | port 8095 |
+| `tools 起動しますか?` | Yes | port 8095 |
 | `バックエンド(core,apps) 起動しますか?` | Yes | port 8091 / 8092 |
 | `フロントエンド(Web) 起動しますか?` | Yes | port 8090 |
 | `フロントエンド(Avatar) 起動しますか?` | No | port 8099 |

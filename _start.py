@@ -78,7 +78,7 @@ BACKEND_ENV_CANDIDATES = [".venv", "venv"]
 
 BACKEND_TOOLS_PATH = "backend_tools"
 BACKEND_TOOLS_PORT = 8095
-BACKEND_TOOLS_APP = "mcp_main:app"
+BACKEND_TOOLS_APP = "tools_main:app"
 BACKEND_TOOLS_ENV_CANDIDATES = [".venv", "venv"]
 BACKEND_TOOLS_SHOW_AUTOMATION_BANNER = False
 

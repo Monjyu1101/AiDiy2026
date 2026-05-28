@@ -17,7 +17,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from log_config import get_logger
-from mcp_proc.ffmpeg_control import FfmpegControlError
+from tools_proc.ffmpeg_control import FfmpegControlError
 
 logger = get_logger(__name__)
 

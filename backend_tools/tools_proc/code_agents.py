@@ -49,11 +49,11 @@ class CodeAgents:
         if project_root:
             self.root = os.path.abspath(project_root)
         else:
-            # backend_tools/mcp_proc/ から 2 つ上がプロジェクトルート
+            # backend_tools/tools_proc/ から 2 つ上がプロジェクトルート
             here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             self.root = os.path.dirname(here)
 
-        # 起動時バージョン確認結果（mcp_main.py から _check_ai_versions() で設定）
+        # 起動時バージョン確認結果（tools_main.py から _check_ai_versions() で設定）
         self.version_info: dict[str, dict] = {}
 
     # ------------------------------------------------------------------ #

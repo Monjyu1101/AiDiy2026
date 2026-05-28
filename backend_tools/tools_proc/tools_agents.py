@@ -18,7 +18,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from log_config import get_logger
-from mcp_proc.code_agents import CodeAgentsError
+from tools_proc.code_agents import CodeAgentsError
 
 logger = get_logger(__name__)
 

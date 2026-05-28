@@ -4,7 +4,7 @@
   "title": "AiDiy MCP Hub - 13 サーバー紹介",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "backend_tools/AGENTS.md、mcp_main.py、mcp_proc/ 各ファイル、.aidiy/knowledge から実装実態を抜粋して構成。"
+    "summary": "backend_tools/AGENTS.md、tools_main.py、tools_proc/ 各ファイル、.aidiy/knowledge から実装実態を抜粋して構成。"
   },
   "target": {
     "language": "ja-JP",
@@ -55,7 +55,7 @@
       "accent_soft": "rgba(123,140,255,0.18)",
       "kicker": "ARCHITECTURE",
       "headline": "ポート 8095 に 13 FastMCP を\nStarlette Mount で合成",
-      "lead": "mcp_main.py が FastAPI/Starlette 上に 13 個の FastMCP インスタンスを Mount し、uvicorn で起動します。Claude Code CLI や Claude Agent SDK が SSE で接続します。",
+      "lead": "tools_main.py が FastAPI/Starlette 上に 13 個の FastMCP インスタンスを Mount し、uvicorn で起動します。Claude Code CLI や Claude Agent SDK が SSE で接続します。",
       "subtitle": "FastMCP × 13 を Starlette でマウント。SSE transport と stdio bridge の二経路。",
       "image": "images/scene_001.png",
       "chips": [
@@ -82,8 +82,8 @@
         {
           "title": "起動構成",
           "lines": [
-            "`mcp_main.py` が 13 FastMCP を Mount",
-            "`uvicorn mcp_main:app --port 8095`",
+            "`tools_main.py` が 13 FastMCP を Mount",
+            "`uvicorn tools_main:app --port 8095`",
             "`_start.py` 経由で起動・管理"
           ]
         },
@@ -105,7 +105,7 @@
         }
       ],
       "facts": [
-        "`mcp_main.py` が 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成する。",
+        "`tools_main.py` が 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成する。",
         "SSE エンドポイントは `http://localhost:8095/{name}/sse` の形式。",
         "stdio クライアントは `mcp_stdio.py --sse-url` を経由して接続する。",
         "再起動ウォッチャーは `backend_tools/temp/reboot_mcp.txt` を監視する。"
@@ -117,11 +117,11 @@
         },
         {
           "source": "backend_tools,構成.md",
-          "text": "`mcp_main.py` は 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`mcp_main:app` として uvicorn に渡す。"
+          "text": "`tools_main.py` は 13 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す。"
         }
       ],
       "short_narration": "13 のツールは 1 本のサーバーにまとまっていて、Claude や AI エージェントからまとめて使えます。",
-      "long_narration": "13 のツールは、mcp_main.py という 1 本のサーバーで管理されています。Python の FastMCP というフレームワークを使い、13 個の MCP インスタンスを Starlette の Mount という仕組みで 1 つのアプリに合成しています。uvicorn というサーバーでポート 8095 番に起動します。AI からツールを呼び出すときは、SSE という方式でこのサーバーに接続します。接続先の URL は http://localhost:8095/ツール名/sse の形式です。Claude Agent SDK や Claude Code CLI は設定ファイル AiDiy_mcp.json にこの URL を書いておくだけで自動的に接続します。stdio クライアントは mcp_stdio.py を経由して接続します。サーバーを更新したとき、backend_tools/temp フォルダに特定のファイルを置くと自動で再起動する仕組みも備わっています。",
+      "long_narration": "13 のツールは、tools_main.py という 1 本のサーバーで管理されています。Python の FastMCP というフレームワークを使い、13 個の MCP インスタンスを Starlette の Mount という仕組みで 1 つのアプリに合成しています。uvicorn というサーバーでポート 8095 番に起動します。AI からツールを呼び出すときは、SSE という方式でこのサーバーに接続します。接続先の URL は http://localhost:8095/ツール名/sse の形式です。Claude Agent SDK や Claude Code CLI は設定ファイル AiDiy_mcp.json にこの URL を書いておくだけで自動的に接続します。stdio クライアントは mcp_stdio.py を経由して接続します。サーバーを更新したとき、backend_tools/temp フォルダに特定のファイルを置くと自動で再起動する仕組みも備わっています。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_start_sec": 7.464,
@@ -525,7 +525,7 @@
         },
         {
           "source": "backend_tools,構成.md",
-          "text": "`mcp_proc/obs_studio_control.py` — OBS Studio WebSocket 制御。`mcp_proc/ffmpeg_control.py` — ffmpeg / ffprobe / ffplay の薄いランナー。"
+          "text": "`tools_proc/obs_studio_control.py` — OBS Studio WebSocket 制御。`tools_proc/ffmpeg_control.py` — ffmpeg / ffprobe / ffplay の薄いランナー。"
         }
       ],
       "short_narration": "OBS Studio の録画操作と ffmpeg の動画変換を、AI からコマンド一本で動かせます。",

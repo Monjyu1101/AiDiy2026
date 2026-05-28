@@ -32,8 +32,8 @@ if sys.platform == "win32":
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mcp_proc.text_to_speech import TextToSpeech, TextToSpeechError
-from mcp_proc.speech_to_text import SpeechToText, SpeechToTextError
+from tools_proc.text_to_speech import TextToSpeech, TextToSpeechError
+from tools_proc.speech_to_text import SpeechToText, SpeechToTextError
 
 
 TEST_TEXT = "本日は晴天なり。音声合成と音声認識のテストです。"

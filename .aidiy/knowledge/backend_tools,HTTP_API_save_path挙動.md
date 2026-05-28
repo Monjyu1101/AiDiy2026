@@ -1,6 +1,6 @@
 ﻿# backend_tools HTTP API の save_path 挙動
 
-> 文書: `backend_tools,HTTP_API_save_path挙動.md` | 実装: `backend_tools/mcp_main.py`
+> 文書: `backend_tools,HTTP_API_save_path挙動.md` | 実装: `backend_tools/tools_main.py`
 
 ## このメモを使う場面
 
@@ -29,7 +29,7 @@
 - `/tts` の拡張子: `.mp3`
 - `/imageGen` の拡張子: `.png`
 - `/movieGen` の拡張子: `.mp4`（base64 返却なし、常に `save_path` のみ返す）
-- `../temp/output/` は `backend_tools/mcp_main.py` からの相対パス（= プロジェクトルートの `temp/output/`）
+- `../temp/output/` は `backend_tools/tools_main.py` からの相対パス（= プロジェクトルートの `temp/output/`）
 
 ## TtsRequest フィールド仕様
 
