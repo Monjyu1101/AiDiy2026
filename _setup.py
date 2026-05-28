@@ -7,7 +7,7 @@
 対象:
 - 共通
 - バックエンド(core,apps): `backend_server`
-- tools                 : `backend_tools`
+- バックエンド(tools)    : `backend_tools`
 - フロントエンド(Web)    : `frontend_web`
 - フロントエンド(Avatar) : `frontend_avatar`
 
@@ -1068,7 +1068,7 @@ MCP_MODULES = [
 
 def setup_mcp_module(module: dict) -> bool:
     """tools モジュールを汎用的にセットアップする (uv sync + npm install)"""
-    label = "tools"
+    label = "バックエンド(tools)"
     mcp_dir = BASE_DIR / module["dir"]
 
     print_header(f"{label} セットアップ")
@@ -1441,9 +1441,9 @@ def collect_setup_choices() -> dict | None:
 
     choices["hermes"] = ask_yes_no("バックエンド(hermes)のセットアップを実行しますか？", default="y")
 
-    choices["mcp"] = ask_yes_no("tools のセットアップを実行しますか？", default="y")
+    choices["mcp"] = ask_yes_no("バックエンド(tools) のセットアップを実行しますか？", default="y")
     if choices["mcp"]:
-        choices["mcp_config"] = ask_yes_no("tools: backend_tools の MCP 機能を使えるよう構成しますか？", default="y")
+        choices["mcp_config"] = ask_yes_no("バックエンド(tools): backend_tools の MCP 機能を使えるよう構成しますか？", default="y")
 
     choices["backend"] = ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y")
     if choices["backend"] and DATABASE_TYPE.lower() == "postgresql":
@@ -1465,7 +1465,7 @@ def main():
     print_info("セットアップ対象:")
     print_info("  1. 共通")
     print_info("  2. バックエンド(hermes)")
-    print_info("  3. tools")
+    print_info("  3. バックエンド(tools)")
     print_info("  4. バックエンド(core,apps)")
     print_info("  5. フロントエンド(Web)")
     print_info("  6. フロントエンド(Avatar)")
@@ -1505,7 +1505,7 @@ def main():
     print()
     if choices["mcp"]:
         if not setup_backend_tools():
-            error_locations.append("tools")
+            error_locations.append("バックエンド(tools)")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
@@ -1524,7 +1524,7 @@ def main():
         else:
             print_warning("backend_tools モジュール定義が見つからないため、MCP 設定をスキップしました。")
     else:
-        print_warning("tools のセットアップをスキップしました。")
+        print_warning("バックエンド(tools) のセットアップをスキップしました。")
 
     print()
     if choices["backend"]:

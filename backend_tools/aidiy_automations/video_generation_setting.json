@@ -5,18 +5,18 @@
     "優先度: CLI引数 > このファイル。OS環境変数は使用しません。"
   ],
 
-  "topic": "FastAPIとHTTP Transportを合わせたインターフェースをMCPハブに追加。これによりWebやpythonからのagent実行にも対応で、応用範囲が劇的に広がった点を強調した、13のMCPサーバー紹介ビデオ",
+  "topic": "backend_tools が AiDiy のツール基盤（AiDiy TOOL HUB）として整備され、MCP（SSE / Streamable HTTP / stdio の 3 トランスポート）に加えて HTTP API からも直接利用できるように進化した。14 の MCP サーバー（Chrome DevTools・デスクトップキャプチャ・SQLite・PostgreSQL・ログ管理・コードチェック・バックアップ・画像生成・動画生成・音声認識・音声合成・OBS制御・FFmpeg制御・コードエージェント）が、Web・Python・AIエージェントいずれからも統一的に呼び出せる点を解説・紹介するビデオ",
 
   "紹介": {
     "_comment": "video_generation_紹介.py が使う設定（一人アバター 形式）",
     "template_dir": "D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\AiDiy紹介__all",
-    "folder_name": "AiDiy紹介_mcp改"
+    "folder_name": "AiDiy紹介_ToolHub"
   },
 
   "解説": {
     "_comment": "video_generation_解説.py が使う設定（二人アバター 形式）",
     "template_dir": "D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\活用事例_video_generation解説",
-    "folder_name": "解説_AiDiy_mcp改"
+    "folder_name": "解説_AiDiy_ToolHub"
   },
 
   "shared": {

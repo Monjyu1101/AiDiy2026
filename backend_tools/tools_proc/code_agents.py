@@ -195,7 +195,7 @@ class CodeAgents:
                     else:
                         direct = dummy._npmシム直接実行に解決(cmd_path)
                         cmd = (direct if direct else [cmd_path]) + ["--version"]
-                        timeout = 10
+                        timeout = 30
 
                     result = subprocess.run(
                         cmd,
