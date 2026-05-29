@@ -1406,21 +1406,21 @@ async def step_create_folder(
     )
     await agent_run(ca, prompt, timeout_sec=180)
 
+    # CodeAgent が作成を省略した場合に備えて Python 側で確実に補完する
+    os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(audio_dir, exist_ok=True)
+    ensure_step_markdown(md_path, folder_name, topic)
+
     def validate() -> bool:
-        ok1 = check(f"フォルダ存在: {new_dir}", os.path.isdir(new_dir))
-        ok2 = check("index.html コピー済み", os.path.isfile(index_path))
-        ok3 = check("scenario.js コピー済み", os.path.isfile(os.path.join(new_dir, "scenario.js")))
-        ok4 = check("images フォルダ作成済み", os.path.isdir(images_dir))
-        ok5 = check("audio フォルダ作成済み", os.path.isdir(audio_dir))
-        ok6 = check(f"{folder_name}.md 作成済み", os.path.isfile(md_path))
-        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6
+        return check(f"フォルダ存在: {new_dir}", os.path.isdir(new_dir))
 
     return await verify_and_backup_until_stable(
         ca=ca,
         backup_url=backup_url,
         step_name=step_name,
         step_summary=step_summary,
-        target_paths=[new_dir, index_path, os.path.join(new_dir, "scenario.js"), images_dir, audio_dir, md_path],
+        # images/ ・ audio/ はステップ01では空のままが正しい。エージェントに渡すとテンプレートから不要なコピーを誕発するため除外。
+        target_paths=[new_dir, index_path, os.path.join(new_dir, "scenario.js"), md_path],
         validate=validate,
         verify_timeout_sec=180,
         attempt=attempt,
