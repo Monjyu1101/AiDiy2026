@@ -1,12 +1,12 @@
 ﻿# MCP 利用による自動ビデオ生成手順
 
-> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_tools/aidiy_automations/video_generation.py`, `backend_tools/tools_proc/text_to_speech.py`, `backend_tools/tools_proc/ffmpeg_control.py`, `backend_tools/tools_proc/obs_studio_control.py`, `backend_tools/tools_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `backend_server/_config/aidiy_text_to_speech.json`
+> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_tools/aidiy_automations/ビデオページ生成_紹介.py`, `backend_tools/aidiy_automations/ビデオページ生成_解説.py`, `backend_tools/aidiy_automations/ビデオページ生成__設定.json`, `backend_tools/aidiy_automations/ビデオページ生成__状況.json`, `backend_tools/tools_proc/text_to_speech.py`, `backend_tools/tools_proc/ffmpeg_control.py`, `backend_tools/tools_proc/obs_studio_control.py`, `backend_tools/tools_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `backend_server/_config/aidiy_text_to_speech.json`
 
 ## このメモを使う場面
 
 - AiDiy 自身に紹介・解説動画を自動生成させたい
 - 「シナリオ JSON → 音声付き HTML → 画面録画 → MP4 トリム」までを既存 MCP だけで通したい
-- 既存の自動化スクリプト `backend_tools/aidiy_automations/video_generation.py` を入口にして再利用したい
+- 既存の自動化スクリプト `backend_tools/aidiy_automations/ビデオページ生成_紹介.py` または `backend_tools/aidiy_automations/ビデオページ生成_解説.py` を入口にして再利用したい
 - ブラウザの autoplay ポリシーで `Audio.play()` が拒否される、OBS の `StartRecord` が反映されないなど、本手順で踏んだ落とし穴を再発させたくない
 
 ## 生成サンプル（実例）
@@ -27,10 +27,10 @@ frontend_web/public/X自己紹介/AiDiy自己紹介ビデオtake1/
 
 ## 実装済みの自動化スクリプト
 
-この手順を毎回手作業でなぞらなくても、**`backend_tools/aidiy_automations/video_generation.py` が実装済み**です。
+この手順を毎回手作業でなぞらなくても、**`backend_tools/aidiy_automations/ビデオページ生成_紹介.py` / `backend_tools/aidiy_automations/ビデオページ生成_解説.py` が実装済み**です。
 
-- ニュース型 Xビデオ向けに、フォルダ作成、シナリオ作成、HTML修正、画像生成、中間確認、音声生成、再生時間更新、最終確認、完成案内までを段階実行できます
-- `AIDIY_VIDEO_GEN_START_STEP` / `AIDIY_VIDEO_GEN_STOP_STEP` で途中再開・部分実行ができます
+- 紹介型 / 解説型の Xビデオ向けに、フォルダ作成、シナリオ作成、HTML修正、画像生成、中間確認、音声生成、再生時間更新、最終確認、完成案内までを段階実行できます
+- `ビデオページ生成__設定.json` / `ビデオページ生成__状況.json` と実行ステップ番号指定で途中再開・部分実行ができます
 - 手順を更新したときは、まずこのスクリプトへ反映されているか確認します
 
 ## 全体フロー

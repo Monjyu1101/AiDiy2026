@@ -143,47 +143,197 @@ const baseRoutes: RouteRecordRaw[] = [
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介__all',
-        'Xビデオ/AiDiy紹介__all/index.html',
+        'Xビデオ/AiDiy紹介__all_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介__all_ja',
+        'Xビデオ/AiDiy紹介__all_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_AIコア',
+        'Xビデオ/AiDiy紹介_AIコア_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_AIコア_ja',
+        'Xビデオ/AiDiy紹介_AIコア_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_backend',
+        'Xビデオ/AiDiy紹介_backend_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_backend_ja',
+        'Xビデオ/AiDiy紹介_backend_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_frontend',
+        'Xビデオ/AiDiy紹介_frontend_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_frontend_ja',
+        'Xビデオ/AiDiy紹介_frontend_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_avatar',
-        'Xビデオ/AiDiy紹介_avatar/index.html',
+        'Xビデオ/AiDiy紹介_avatar_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_avatar_ja',
+        'Xビデオ/AiDiy紹介_avatar_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_hermes',
-        'Xビデオ/AiDiy紹介_hermes/index.html',
+        'Xビデオ/AiDiy紹介_hermes_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_hermes_ja',
+        'Xビデオ/AiDiy紹介_hermes_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_tools',
+        'Xビデオ/AiDiy紹介_tools_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_tools_ja',
+        'Xビデオ/AiDiy紹介_tools_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_mcp',
+        'Xビデオ/AiDiy紹介_tools_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_配車管理',
-        'Xビデオ/実装例_配車管理/index.html',
+        'Xビデオ/AiDiy実装_配車管理_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_配車管理',
+        'Xビデオ/AiDiy実装_配車管理_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_配車管理_ja',
+        'Xビデオ/AiDiy実装_配車管理_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_生産管理',
-        'Xビデオ/実装例_生産管理/index.html',
+        'Xビデオ/AiDiy実装_生産管理_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_生産管理',
+        'Xビデオ/AiDiy実装_生産管理_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_生産管理_ja',
+        'Xビデオ/AiDiy実装_生産管理_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_在庫管理',
-        'Xビデオ/実装例_在庫管理/index.html',
+        'Xビデオ/AiDiy実装_在庫管理_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_在庫管理',
+        'Xビデオ/AiDiy実装_在庫管理_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_在庫管理_ja',
+        'Xビデオ/AiDiy実装_在庫管理_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_webAiDiy',
-        'Xビデオ/AiDiy実装_web版/index.html',
+        'Xビデオ/AiDiy実装_web_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介_avatarAiDiy',
-        'Xビデオ/AiDiy実装_avatar版/index.html',
+        'Xビデオ/AiDiy実装_avatar_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_web版',
+        'Xビデオ/AiDiy実装_web_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_web_ja',
+        'Xビデオ/AiDiy実装_web_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_avatar版',
+        'Xビデオ/AiDiy実装_avatar_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_avatar_ja',
+        'Xビデオ/AiDiy実装_avatar_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260521_anthropic2026前半',
+        'Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260521_anthropic2026前半_ja',
+        'Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260521_google2026前半',
+        'Xビデオ/ニュース_20260521_google2026前半_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260521_google2026前半_ja',
+        'Xビデオ/ニュース_20260521_google2026前半_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260521_openai2026前半',
+        'Xビデオ/ニュース_20260521_openai2026前半_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260521_openai2026前半_ja',
+        'Xビデオ/ニュース_20260521_openai2026前半_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/活用事例_video_generation解説',
-        'Xビデオ/活用事例_video_generation解説/index.html',
+        'Xビデオ/解説_ビデオページ生成_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/活用事例_ビデオページ生成解説_ja',
+        'Xビデオ/解説_ビデオページ生成_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/解説_ビデオページ生成_ja',
+        'Xビデオ/解説_ビデオページ生成_ja/index.html',
         'Xビデオ'
     ),
 ]

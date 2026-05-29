@@ -15,22 +15,22 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const baseUrl = import.meta.env.BASE_URL || '/';
-const allUrl      = `${baseUrl}Xビデオ/AiDiy紹介__all/index.html`;
-const backendUrl  = `${baseUrl}Xビデオ/AiDiy紹介_backend/index.html`;
-const frontendUrl = `${baseUrl}Xビデオ/AiDiy紹介_frontend/index.html`;
-const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア/index.html`;
-const mcpUrl      = `${baseUrl}Xビデオ/AiDiy紹介_mcp/index.html`;
-const hermesUrl   = `${baseUrl}Xビデオ/AiDiy紹介_hermes/index.html`;
-const avatarUrl   = `${baseUrl}Xビデオ/AiDiy紹介_avatar/index.html`;
-const 配車管理Url  = `${baseUrl}Xビデオ/AiDiy実装_配車管理/index.html`;
-const 生産管理Url  = `${baseUrl}Xビデオ/AiDiy実装_生産管理/index.html`;
-const 在庫管理Url  = `${baseUrl}Xビデオ/AiDiy実装_在庫管理/index.html`;
-const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_web版/index.html`;
-const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar版/index.html`;
-const videoGeneration解説Url = `${baseUrl}Xビデオ/活用事例_video_generation解説/index.html`;
-const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半/index.html`;
-const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半/index.html`;
-const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半/index.html`;
+const allUrl      = `${baseUrl}Xビデオ/AiDiy紹介__all_ja/index.html`;
+const backendUrl  = `${baseUrl}Xビデオ/AiDiy紹介_backend_ja/index.html`;
+const frontendUrl = `${baseUrl}Xビデオ/AiDiy紹介_frontend_ja/index.html`;
+const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア_ja/index.html`;
+const toolsUrl    = `${baseUrl}Xビデオ/AiDiy紹介_tools_ja/index.html`;
+const hermesUrl   = `${baseUrl}Xビデオ/AiDiy紹介_hermes_ja/index.html`;
+const avatarUrl   = `${baseUrl}Xビデオ/AiDiy紹介_avatar_ja/index.html`;
+const 配車管理Url  = `${baseUrl}Xビデオ/AiDiy実装_配車管理_ja/index.html`;
+const 生産管理Url  = `${baseUrl}Xビデオ/AiDiy実装_生産管理_ja/index.html`;
+const 在庫管理Url  = `${baseUrl}Xビデオ/AiDiy実装_在庫管理_ja/index.html`;
+const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_web_ja/index.html`;
+const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar_ja/index.html`;
+const ビデオページ生成解説Url = `${baseUrl}Xビデオ/解説_ビデオページ生成_ja/index.html`;
+const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html`;
+const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
+const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
 
 const route = useRoute();
 const router = useRouter();
@@ -121,7 +121,7 @@ const handleReturn = () => {
             <div class="menu-card-description">
               MCP ツール群にフォーカスした紹介ビデオ
             </div>
-            <a :href="mcpUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+            <a :href="toolsUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>
@@ -159,7 +159,7 @@ const handleReturn = () => {
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">XWb</span>
-              AiDiy実装 (web版)
+              AiDiy実装 (web)
             </div>
             <div class="menu-card-description">
               Vue 3 + TypeScript Web UI・qTubler・AI コアの紹介ビデオ
@@ -172,7 +172,7 @@ const handleReturn = () => {
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">XAv</span>
-              AiDiy実装 (avatar版)
+              AiDiy実装 (avatar)
             </div>
             <div class="menu-card-description">
               Electron/Web デュアルモード VRM アバター + AI コアの紹介ビデオ
@@ -232,12 +232,12 @@ const handleReturn = () => {
           <div class="menu-card menu-card-fixed">
             <div class="menu-card-title">
               <span class="icon">XVG</span>
-              活用事例 (video_generation解説)
+              活用事例 (ビデオページ生成解説)
             </div>
             <div class="menu-card-description">
-              MCP と CodeAgents を使った video_generation ワークフロー解説ビデオ
+              MCP と CodeAgents でビデオページを作る流れを日本語で解説
             </div>
-            <a :href="videoGeneration解説Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
+            <a :href="ビデオページ生成解説Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
               別タブで開く →
             </a>
           </div>

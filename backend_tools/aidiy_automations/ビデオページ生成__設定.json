@@ -1,0 +1,39 @@
+{
+  "_comment": [
+    "ビデオ生成共通設定ファイル。",
+    "topic を書いて、紹介／解説それぞれの folder_name を決めてから実行してください。",
+    "優先度: CLI引数 > このファイル。OS環境変数は使用しません。"
+  ],
+
+  "topic": "OpenAI が2026年4月に公開した GPT-5.5 は、GPT-5.4 と同等のレイテンシを維持しながらフロンティア性能を大幅に向上させた最新モデルである。主な特徴として、エージェント型コーディング（Terminal-Bench 2.0: 82.7%、SWE-Bench Pro: 58.6%、Expert-SWE: 73.1%）、ナレッジワーク（GDPval: 84.9%、OSWorld-Verified: 78.7%、Tau2-bench Telecom: 98.0%）、科学研究（GeneBench: 25.0%、BixBench: 80.5%）、長文コンテキスト（1M トークン対応）、サイバーセキュリティ（CyberGym: 81.8%）、抽象的推論（ARC-AGI-2: 85.0%）での高い性能が挙げられる。ChatGPT および Codex（Plus/Pro/Business/Enterprise）で提供開始。API 料金は入力 $5/1M トークン、出力 $30/1M トークン。本解説では、GPT-5.5 の主な機能と、AiDiy の AIコア / Code AI に gpt-4.1 / gpt-5.5 を組み込んだ活用シナリオをわかりやすく解説する。",
+
+  "紹介": {
+    "_comment": "ビデオページ生成_紹介.py が使う設定（一人アバター 形式）",
+    "template_dir": "/workspaces/AiDiy2026/frontend_web/public/Xビデオ/AiDiy紹介__all_ja",
+    "folder_name": "紹介_GPT5-5"
+  },
+
+  "解説": {
+    "_comment": "ビデオページ生成_解説.py が使う設定（二人アバター 形式）",
+    "template_dir": "/workspaces/AiDiy2026/frontend_web/public/Xビデオ/解説_ビデオページ生成_ja",
+    "folder_name": "解説_GPT5-5"
+  },
+
+  "shared": {
+    "_comment": "両スクリプト共通設定。通常は変更不要。",
+    "video_base_dir": "/workspaces/AiDiy2026/frontend_web/public/Xビデオ",
+    "frontend_base_url": "http://localhost:8090",
+    "backup_api_url": "http://localhost:8095/aidiy_backup/save",
+    "tts_api_url": "http://localhost:8095/aidiy_text_to_speech/synthesize",
+    "image_gen_api_url": "http://localhost:8095/aidiy_image_generation/generate",
+    "code_agents_api_url": "http://localhost:8095/aidiy_code_agents",
+    "chrome_api_url": "http://localhost:8095/aidiy_chrome_devtools",
+    "ffmpeg_api_url": "http://localhost:8095/aidiy_ffmpeg_control",
+    "tts_guide": false,
+    "browser_preview": false,
+    "chrome_debug_port": 9222,
+    "max_retries": 3,
+    "retry_wait_sec": 5,
+    "max_backup_stabilize": 5
+  }
+}

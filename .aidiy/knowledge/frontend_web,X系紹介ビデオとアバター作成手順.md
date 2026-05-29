@@ -1,10 +1,10 @@
 ﻿# X系紹介ビデオとアバター作成手順
 
-> 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all/`, `frontend_web/public/Xビデオ/AiDiy紹介_aichat/`, `frontend_web/public/Xビデオ/AiDiy紹介_avatar/`, `frontend_web/public/Xビデオ/AiDiy紹介_backend/`, `frontend_web/public/Xビデオ/AiDiy紹介_frontend/`, `frontend_web/public/Xビデオ/AiDiy紹介_hermes/`, `frontend_web/public/Xビデオ/AiDiy紹介_mcp/`
+> 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_AIコア_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_avatar_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_backend_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_frontend_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_hermes_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_tools_ja/`
 
 ## このメモを使う場面
 
-- 新しい紹介ビデオ（`AiDiy紹介_<テーマ>`）を作成するとき
+- 新しい紹介ビデオ（`AiDiy紹介_<テーマ>_ja`）を作成するとき
 - アバター版プレゼンターを新しく作成・改版するとき
 - シーンの追加・修正をするとき
 - index.html の `sceneFrame.src` 参照方式を確認したとき
@@ -21,22 +21,22 @@
 | `scene_001` 〜 `scene_NNN` | 本編 | 通常シーン構造（左ビジュアル + 右コンテンツ）。テーマごとに章立て。 |
 | `scene_999` | 謝辞とまとめ | 「ご視聴ありがとうございました」+ 全体まとめ + **次につながる言葉**（視聴者の行動・次の挑戦を促す問いかけ）でしめる。ヒーロー構造。 |
 
-「次につながる言葉」の例（`AiDiy紹介__all/scene_999`）:
+「次につながる言葉」の例（`AiDiy紹介__all_ja/scene_999`）:
 
 ```text
 ご視聴ありがとうございました。
 あなたなら AiDiy でなにを創りますか？
 ```
 
-`AiDiy紹介__all` は全テーマを通す総合版で、**新規ビデオ作成時の手本（reference）として参照する**。
-専門テーマ版（`_avatar`、`_hermes` など）を作る場合も、scene_000 と scene_999 の構造とトーンは `__all` に揃える。
+`AiDiy紹介__all_ja` は全テーマを通す総合版で、**新規ビデオ作成時の手本（reference）として参照する**。
+専門テーマ版（`_avatar_ja`、`_hermes_ja` など）を作る場合も、scene_000 と scene_999 の構造とトーンは `__all_ja` に揃える。
 
 ---
 
 ## ナレーション音声
 
 ナレーションは **`freeai:female` を基準**とする（`scenario.js` の `assets_policy.tts_provider: "freeai:female"`）。AiDiy 関係の全ビデオ（紹介・実装・実例など `Xビデオ/AiDiy*`）は特段の理由がない限り `freeai:female` で統一する。
-専門テーマ版（`_avatar`、`_hermes` など）も同じプロバイダ・声で揃える。
+専門テーマ版（`_avatar_ja`、`_hermes_ja` など）も同じプロバイダ・声で揃える。
 
 - 生成は `aidiy_text_to_speech` MCP を使う。MCP クライアントが不要な場合は以下の HTTP POST でも同等の処理を呼び出せる。
   ```
@@ -131,16 +131,16 @@ scenario["short_duration_sec"] = short_cumulative
 
 ## ディレクトリ構造
 
-各ビデオは `frontend_web/public/Xビデオ/AiDiy紹介_<テーマ>/` 直下に配置する。
-`__all` は総合版（手本）、`_<テーマ>` はテーマ特化版。
+各ビデオは `frontend_web/public/Xビデオ/AiDiy紹介_<テーマ>_ja/` 直下に配置する。
+`__all_ja` は総合版（手本）、`_<テーマ>_ja` はテーマ特化版。
 
 **1 ビデオ = 1 自己完結フォルダ**を原則とする。VRM、画像、音声は各ビデオフォルダ内に持つ（外部参照禁止）。
 これによりフォルダ単位でコピー・配布・移植・削除ができる（他フォルダへ影響しない）。
 
-### 総合版（`__all`）
+### 総合版（`__all_ja`）
 
 ```
-Xビデオ/AiDiy紹介__all/
+Xビデオ/AiDiy紹介__all_ja/
   index.html        プレイヤー（iframe + VRM アバター + 音声制御）
   scenario.js       window.SCENARIO 定義（scenes 配列）
   scene.css         全シーン共通スタイル
@@ -152,24 +152,24 @@ Xビデオ/AiDiy紹介__all/
   audio/            MCP TTS で作成した scene_NNN.mp3
 ```
 
-### テーマ特化版（`_aichat` / `_avatar` / `_backend` / `_frontend` / `_hermes` / `_mcp`）
+### テーマ特化版（`_AIコア_ja` / `_avatar_ja` / `_backend_ja` / `_frontend_ja` / `_hermes_ja` / `_tools_ja`）
 
 現在の全テーマ特化フォルダ:
 
 | フォルダ | テーマ |
 |---------|-------|
-| `AiDiy紹介_aichat/` | AIコア（AIチャット・音声・Code AI） |
-| `AiDiy紹介_avatar/` | frontend_avatar（Electron/Web デュアルモード） |
-| `AiDiy紹介_backend/` | backend_server（FastAPI・SQLite・4層構造） |
-| `AiDiy紹介_frontend/` | frontend_web（Vue 3・Vite・TypeScript） |
-| `AiDiy紹介_hermes/` | backend_hermes（aidiy_hermes CLI） |
-| `AiDiy紹介_mcp/` | backend_tools（MCP サーバー群） |
+| `AiDiy紹介_AIコア_ja/` | AIコア（AIチャット・音声・Code AI） |
+| `AiDiy紹介_avatar_ja/` | frontend_avatar（Electron/Web デュアルモード） |
+| `AiDiy紹介_backend_ja/` | backend_server（FastAPI・SQLite・4層構造） |
+| `AiDiy紹介_frontend_ja/` | frontend_web（Vue 3・Vite・TypeScript） |
+| `AiDiy紹介_hermes_ja/` | backend_hermes（aidiy_hermes CLI） |
+| `AiDiy紹介_tools_ja/` | backend_tools（MCP サーバー群） |
 
 ```
-Xビデオ/AiDiy紹介_<テーマ>/
+Xビデオ/AiDiy紹介_<テーマ>_ja/
   index.html        プレイヤー（VRM アバター + iframe）
   scenario.js       テーマ特化シーン定義
-  scene.css         __all から流用
+  scene.css         __all_ja から流用
   scene_000.html    冒頭説明（ヒーロー）
   scene_NNN.html    本編
   scene_999.html    謝辞・まとめ・次につながる言葉（ヒーロー）
