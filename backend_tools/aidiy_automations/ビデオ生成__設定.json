@@ -5,18 +5,18 @@
     "優先度: CLI引数 > このファイル。OS環境変数は使用しません。"
   ],
 
-  "topic": "Anthropic が2026年5月に公開した Claude Opus 4.8 は、Opus 4.7 を引き継ぎ各種ベンチマークで改善を果たした最新フラッグシップモデルである。主な特徴として、大規模タスクを並列サブエージェントで処理する Dynamic Workflows（Claude Code）、思考の深さを段階選択できる Effort Control（low / high / extra / max）、2.5倍の速度と前世代比3倍のコスト効率を実現した Fast Mode、コードの欠陥を見逃す確率を前世代比4分の1に抑えた誠実性強化などが挙げられる。本解説では、Claude Opus 4.8 の主な機能と、AiDiy の AIコア / Code AI に claude-opus-4-8 を組み込んだ活用シナリオをわかりやすく解説する。",
+  "topic": "OpenAI が2026年4月に公開した GPT-5.5 は、GPT-5.4 と同等のレイテンシを維持しながらフロンティア性能を大幅に向上させた最新モデルである。主な特徴として、エージェント型コーディング（Terminal-Bench 2.0: 82.7%、SWE-Bench Pro: 58.6%、Expert-SWE: 73.1%）、ナレッジワーク（GDPval: 84.9%、OSWorld-Verified: 78.7%、Tau2-bench Telecom: 98.0%）、科学研究（GeneBench: 25.0%、BixBench: 80.5%）、長文コンテキスト（1M トークン対応）、サイバーセキュリティ（CyberGym: 81.8%）、抽象的推論（ARC-AGI-2: 85.0%）での高い性能が挙げられる。ChatGPT および Codex（Plus/Pro/Business/Enterprise）で提供開始。API 料金は入力 $5/1M トークン、出力 $30/1M トークン。本解説では、GPT-5.5 の主な機能と、AiDiy の AIコア / Code AI に gpt-4.1 / gpt-5.5 を組み込んだ活用シナリオをわかりやすく解説する。",
 
   "紹介": {
     "_comment": "video_generation_紹介.py が使う設定（一人アバター 形式）",
     "template_dir": "/workspaces/AiDiy2026/frontend_web/public/Xビデオ/AiDiy紹介__all",
-    "folder_name": "紹介_Claude_Opus4-8"
+    "folder_name": "紹介_GPT5-5"
   },
 
   "解説": {
     "_comment": "video_generation_解説.py が使う設定（二人アバター 形式）",
     "template_dir": "/workspaces/AiDiy2026/frontend_web/public/Xビデオ/活用事例_video_generation解説",
-    "folder_name": "解説_Claude_Opus4-8"
+    "folder_name": "解説_GPT5-5"
   },
 
   "shared": {
