@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介hermes",
   "version": "hermes",
   "title": "AiDiy Hermes - コードエージェント CLI 紹介",
@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "avatar": "../_vrm/VRM_AiDiy.vrm",
     "tts_provider": "freeai:female"
   },
   "scenes": [
@@ -42,9 +42,7 @@ window.SCENARIO = {
       "long_narration": "この動画では、AiDiy 専用のコードエージェント、aidiy_hermes を紹介します。aidiy_hermes は本家 hermes-agent の CLI 機能を切り出し、AiDiy 専用に再設計した AI エージェントです。常時起動するサーバーではなく、必要なときだけ呼び出す使い切り型のツールです。Claude や ChatGPT・Gemini など主要な AI サービスに対応し、スラッシュコマンドで操作を制御できます。Windows にもネイティブ対応しています。AiDiy の AI コードパネルと連携して、コードの相談・自動修正・ファイル操作ができます。使い切り型の位置づけ、技術の仕組み、AI への接続、Windows 対応、AiDiy との連携まで順に見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 11.304,
-      "long_start_sec": 0.0,
       "long_duration_sec": 43.464
     },
     {
@@ -115,9 +113,7 @@ window.SCENARIO = {
       "long_narration": "aidiy_hermes は HTTP サーバーとして常時起動しません。AiDiy のシステム全体を起動したとき、hermes は自動では立ち上がらず、AI コードパネルで必要になった瞬間だけ、バックエンドが内部で subprocess として呼び出す使い切り型のコードエージェントです。この設計のおかげで、使わないときは一切リソースを消費しません。ターミナルから直接 python cli_main.py と入力して、対話モードで手動で動かすこともできます。Windows では Git Bash があれば優先して使い、ない場合は PowerShell でフォールバックします。Linux・Mac ではネイティブシェルを自動で使い分けます。ファイル操作・コマンド実行・ウェブ検索・コード編集など、コード開発に必要な道具が一式揃った状態で起動します。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 11.304,
       "short_duration_sec": 7.848,
-      "long_start_sec": 43.464,
       "long_duration_sec": 47.664
     },
     {
@@ -196,9 +192,7 @@ window.SCENARIO = {
       "long_narration": "aidiy_hermes は Python で作られたターミナルアプリです。エントリポイントは cli_main.py で、ここから全体の処理が始まります。コードは役割ごとに 5 つのフォルダに整理されています。エージェントのループや推論・リトライを担う core、共通の定数やユーティリティをまとめた base、スラッシュコマンドや TUI 補助の hermes_cli、ファイル・ターミナル・ウェブ・メディアなどのツールをまとめた tools、そして skill 資産の skills です。画面の入力補助には prompt_toolkit というライブラリを使い、コマンドの入力候補や補完が TUI 上でリアルタイムに表示されます。AI サービスとの通信は Claude API・OpenAI 互換クライアント・HTTP リクエストなど複数の方法に対応しています。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 19.152,
       "short_duration_sec": 7.848,
-      "long_start_sec": 91.128,
       "long_duration_sec": 47.376
     },
     {
@@ -278,9 +272,7 @@ window.SCENARIO = {
       "long_narration": "hermes にはさまざまな AI サービスを切り替えて使う仕組みがあります。Claude・ChatGPT・Gemini・DeepSeek のような主要な AI に対応しています。どの AI サービスを使うかは優先順位で決まります。まず起動時の --provider オプション、次に設定ファイルの指定、次に環境変数、そして auto モードによる自動検出の順番です。auto モードでは、API キーが設定済みの provider を自動的に検出して使える状態にします。API キーのある AI だけが選択肢として表示されるため、使えない AI を誤って選ぶことがありません。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 27.0,
       "short_duration_sec": 9.168,
-      "long_start_sec": 138.504,
       "long_duration_sec": 37.392
     },
     {
@@ -359,9 +351,7 @@ window.SCENARIO = {
       "long_narration": "hermes にはスラッシュで始まるコマンドが用意されています。セッションのリセットや保存、モデルの切り替えや設定変更などを対話的に操作できます。スラッシュキーを入力すると候補が自動で表示され、タブで補完できます。/model コマンドでは AI サービスとモデルを 2 段階で対話的に選べます。/goal コマンドで目標を設定すると、その目標が達成されるまで処理を続ける自律的な動作モードになります。全てのコマンドを AiDiy 環境でテストしているわけではありませんが、基本的な操作は問題なく使えます。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 36.168,
       "short_duration_sec": 6.072,
-      "long_start_sec": 175.896,
       "long_duration_sec": 34.464
     },
     {
@@ -440,9 +430,7 @@ window.SCENARIO = {
       "long_narration": "aidiy_hermes は Windows にネイティブ対応しています。Windows 用の実装（*_win.py）と Mac/Linux 用の実装（*_linux.py）を分けて持ち、OS を自動判定して適切な方で動きます。POSIX コマンドに依存しない設計なので、Windows 環境でも違和感なく動作します。AI コードパネルの設定で aidiy_hermes を選ぶと、バックエンドの AIコード_cli.py が hermes を自動起動します。コードパネルには 6 つのスロットがあり、それぞれに異なる AI を割り当てられます。使わせる AI モデルは設定ファイルか AI 設定画面からいつでも変更できます。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 42.24,
       "short_duration_sec": 7.272,
-      "long_start_sec": 210.36,
       "long_duration_sec": 40.464
     },
     {
@@ -467,9 +455,7 @@ window.SCENARIO = {
       "long_narration": "aidiy_hermes は、AI に相談しながらコードを書くという体験を、AiDiy のなかに直接持ち込むツールです。本家 hermes-agent の CLI 機能を切り出し、AiDiy 専用に再設計したツールとして、ファイルの読み書きや端末操作、AiDiy のコードパネルとのシームレスな連携ができます。コードを書く、ファイルを調べる、エラーを直す、テストを実行する、そのすべてを AI と一緒に進められます。Claude Code のような AI コーディングツールを AiDiy 環境の中で動かすイメージです。難しい設定は不要で、コードパネルの設定から hermes を選ぶだけですぐ試せます。AI とペアプログラミングする体験を、AiDiy でやってみませんか。",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 49.512,
       "short_duration_sec": 8.304,
-      "long_start_sec": 250.824,
       "long_duration_sec": 42.264
     }
   ],

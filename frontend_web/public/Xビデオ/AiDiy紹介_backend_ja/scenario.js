@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介backend",
   "version": "backend",
   "title": "AiDiy backend_server - 4層構造と日本語ファースト設計",
@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "avatar": "../_vrm/VRM_AiDiy.vrm",
     "tts_provider": "freeai:female"
   },
   "scenes": [
@@ -42,9 +42,7 @@ window.SCENARIO = {
       "long_narration": "この動画では、AiDiy のバックエンドサーバーを詳しく紹介します。バックエンドとは、画面の裏側でデータを保存したり計算したりするプログラムのことです。AiDiy のバックエンドは Python という言語と FastAPI という最新フレームワークで動いています。コードの書き方がパターン化されているため、「配送管理の機能を追加して」と AI に指示するだけで、データベースの設計から API まで一気に作れます。業務の言葉をそのままコードの名前に使うシンプルなルール、ID の自動管理、更新履歴の自動保存、複数テーブルを組み合わせた検索 API まで、実装に沿って順番に見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 7.776,
-      "long_start_sec": 0.0,
       "long_duration_sec": 40.104
     },
     {
@@ -123,9 +121,7 @@ window.SCENARIO = {
       "long_narration": "バックエンドは 2 本のサーバーで動いています。1 本目は Core サーバー（ポート 8091）で、ログイン認証・利用者管理・AI 機能を担当します。2 本目は Apps サーバー（ポート 8092）で、配車・生産・在庫などの業務機能を担当します。2 本は同じデータベースを共有しているため、データは 1 か所にまとまります。言語は Python 3.13、Web API の仕組みは FastAPI という最新フレームワークを使っています。FastAPI は速く動き、API の仕様書（Swagger）を自動で作成してくれるのが特徴です。Swagger 画面をブラウザで開けば、フロントエンドなしで直接 API の動作確認ができます。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 7.776,
       "short_duration_sec": 6.6,
-      "long_start_sec": 40.104,
       "long_duration_sec": 45.288
     },
     {
@@ -207,9 +203,7 @@ window.SCENARIO = {
       "long_narration": "AiDiy のユニークなルールは、テーブル名・列名・API のパス・変数名をすべて日本語で書くことです。たとえばテーブル名は「T配車」、API のパスは「/apps/配車/登録」、列名は「配車日付」のように書きます。このルールのおかげで AI への指示がとてもシンプルになります。「T配車テーブルに配車先住所の列を追加して API を作って」という日本語の指示が、そのままコードの名前として使われるからです。設計書の業務用語とプログラムの名前が一致しているので、AI もコードの意図を正確に理解できます。ただし request・query・items などのシステム用語や FastAPI などのライブラリ名は英語のまま使います。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 14.376,
       "short_duration_sec": 7.68,
-      "long_start_sec": 85.392,
       "long_duration_sec": 44.28
     },
     {
@@ -290,9 +284,7 @@ window.SCENARIO = {
       "long_narration": "新しい機能を追加するとき、バックエンドでは 4 種類のファイルを作ります。データベースの構造を決める Model、入出力の形を決める Schema、データの取得・保存を書く CRUD、API の窓口となる Router です。このパターンが全機能で統一されているので、AI への指示がシンプルです。「M商品と同じ 4 層パターンで、M顧客マスタを追加して」の一言で、Model から Router まで 4 ファイルを一気に生成します。できたら起動ファイルに Router を 1 行登録するだけで API が動き出します。サンプルコードがお手本になるので、AI は細かいルールを指示しなくても AiDiy の書き方に沿ったコードを作れます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 22.056,
       "short_duration_sec": 7.608,
-      "long_start_sec": 129.672,
       "long_duration_sec": 41.952
     },
     {
@@ -372,9 +364,7 @@ window.SCENARIO = {
       "long_narration": "AiDiy には 2 つの便利な仕組みが標準で入っています。1 つは C採番テーブルによる ID の自動発行です。テーブルごとに連番を管理するので、複数のテーブルで ID が重ならない設計が簡単にできます。2 つ目は全テーブルに必須の 8 つの更新記録項目です。登録した日時・利用者名・端末 ID と、更新した日時・利用者名・端末 ID が自動でセットされます。この仕組みが標準で入っていることで、AI が機能を生成するとき ID 発行と更新記録の処理をゼロから考えなくて済みます。誰がいつ変更したかをあとから必ず追跡できるため、業務システムとしての信頼性も高まります。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 29.664,
       "short_duration_sec": 6.912,
-      "long_start_sec": 171.624,
       "long_duration_sec": 44.136
     },
     {
@@ -455,9 +445,7 @@ window.SCENARIO = {
       "long_narration": "V 系は、複数のテーブルを組み合わせて一覧データを返す API のグループです。データベースに VIEW という仕組みを作る代わりに、Router ファイルに SQL を直接書くシンプルな作りにしています。たとえば「取引先と取引先分類を結合して一覧を返す」という処理は、Router に SQL を書いてパラメータを渡すだけです。AI への指示は「V系パターンで商品在庫一覧の API を作って」の一言で済みます。AI はサンプルの V 系コードを見て、検索条件・ページング・件数取得まで揃ったコードを同じパターンで生成します。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 36.576,
       "short_duration_sec": 6.672,
-      "long_start_sec": 215.76,
       "long_duration_sec": 37.8
     },
     {
@@ -536,9 +524,7 @@ window.SCENARIO = {
       "long_narration": "AiDiy の業務サンプルは「学習教材」というより「AI がコードを生成するときのお手本」として設計されています。マスタ系 9 テーブル・トランザクション系 5 テーブル・スケジューラ 4 種類が、4 層パターンで統一された形で実装されています。AI への指示はシンプルです。「M商品構成と同じパターンで M顧客マスタを追加して」と言えば、Model から Router まで 4 層を一気に生成します。明細行を持つ T生産のパターンを見せれば、親レコードと明細行を同時に扱う機能も作れます。スケジューラ S配車のお手本があれば、定期実行の集計機能も同じように作れます。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_start_sec": 43.248,
       "short_duration_sec": 7.752,
-      "long_start_sec": 253.56,
       "long_duration_sec": 40.536
     },
     {
@@ -563,9 +549,7 @@ window.SCENARIO = {
       "long_narration": "AiDiy の AI コーディング機能を使えば、バックエンドとフロントエンドを一気通貫で生成できます。「配送管理の一覧・登録・編集機能を追加して」と AI に指示するだけで、サーバー側の API とフロントエンドの画面が同時に出来上がります。サンプルコードが AI のお手本になるので、4 層パターン・日本語ルール・テーブル設計を細かく指示しなくても、AiDiy のルールに沿ったコードを生成します。開発環境を立ち上げ、AI に機能を頼み、動作確認する。このサイクルで業務システムをどんどん育てていけます。今日から使える業務システムを、AiDiy で作ってみませんか。",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 51.0,
       "short_duration_sec": 7.536,
-      "long_start_sec": 294.096,
       "long_duration_sec": 39.672
     }
   ],

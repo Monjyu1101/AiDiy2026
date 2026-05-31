@@ -24,64 +24,52 @@ import { RouterLink } from 'vue-router';
       <div class="schedule-menu-sections">
         <div class="menu-row">
           <!-- S配車_週表示カード -->
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S配車_週表示?戻URL=/Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S週</span>
               S配車_週表示
             </div>
             <div class="menu-card-description">
-              配車スケジュール週表示・週単位の配車管理・スケジュール調整
+              週単位カレンダーで配車の割り当て・調整・ステータスを一覧確認
             </div>
-            <RouterLink class="menu-card-link" to="/Sスケジュール/S配車_週表示?戻URL=/Sスケジュール">
-              画面を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
 
           <!-- S配車_日表示カード -->
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S配車_日表示?戻URL=/Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S日</span>
               S配車_日表示
             </div>
             <div class="menu-card-description">
-              配車スケジュール日表示・日単位の配車管理・詳細スケジュール
+              日単位タイムラインで配車の時間帯・担当・積荷を詳細管理
             </div>
-            <RouterLink class="menu-card-link" to="/Sスケジュール/S配車_日表示?戻URL=/Sスケジュール">
-              画面を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
         </div>
 
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
           <!-- S生産_週表示カード -->
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S生産_週表示?戻URL=/Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S生週</span>
               S生産_週表示
             </div>
             <div class="menu-card-description">
-              生産スケジュール週表示・週単位の生産管理・スケジュール調整
+              週単位カレンダーで生産計画の割り当て・進捗・調整を確認
             </div>
-            <RouterLink class="menu-card-link" to="/Sスケジュール/S生産_週表示?戻URL=/Sスケジュール">
-              画面を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
 
           <!-- S生産_日表示カード -->
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S生産_日表示?戻URL=/Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S生日</span>
               S生産_日表示
             </div>
             <div class="menu-card-description">
-              生産スケジュール日表示・日単位の生産管理・詳細スケジュール
+              日単位タイムラインで生産工程・数量・担当ラインを詳細管理
             </div>
-            <RouterLink class="menu-card-link" to="/Sスケジュール/S生産_日表示?戻URL=/Sスケジュール">
-              画面を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
         </div>
       </div>
     </div>
@@ -101,19 +89,6 @@ import { RouterLink } from 'vue-router';
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-}
-
-.menu-card-fixed {
-  width: 320px;
-  min-width: 320px;
-  height: 158px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-card-fixed .menu-card-description {
-  flex: 1;
 }
 
 .menu-hairline {

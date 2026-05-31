@@ -47,6 +47,7 @@ FRONTEND_AVATAR_PATH = "frontend_avatar"
 FRONTEND_AVATAR_BUILD_DIRS = ["dist", "dist-electron"]
 
 BACKUP_PATH = "backup"
+ROOT_TEMP_PATH = "temp"
 
 DATABASE_TYPE = "sqlite"
 SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
@@ -765,6 +766,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         default="n",
     )
 
+
     if (base_dir / BACKUP_PATH).exists():
         choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
 
@@ -842,12 +844,13 @@ def main():
     base_dir = Path(__file__).resolve().parent
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  1. backup フォルダ")
-    print_info("  2. バックエンド(hermes)")
-    print_info("  3. バックエンド(tools)")
-    print_info("  4. バックエンド(core,apps)")
-    print_info("  5. フロントエンド(Web)")
-    print_info("  6. フロントエンド(Avatar)")
+    print_info("  1. ルート temp フォルダ")
+    print_info("  2. backup フォルダ")
+    print_info("  3. バックエンド(hermes)")
+    print_info("  4. バックエンド(tools)")
+    print_info("  5. バックエンド(core,apps)")
+    print_info("  6. フロントエンド(Web)")
+    print_info("  7. フロントエンド(Avatar)")
     print()
 
     choices = collect_cleanup_choices(base_dir)
@@ -861,6 +864,12 @@ def main():
         uninstall_global_npm_tools()
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
+
+    print()
+    root_temp_dir = base_dir / ROOT_TEMP_PATH
+    if root_temp_dir.exists():
+        print_header("ルート temp フォルダのクリーンアップ")
+        remove_directory(root_temp_dir, "ルート temp")
 
     print()
     cleanup_backup(base_dir, choices)

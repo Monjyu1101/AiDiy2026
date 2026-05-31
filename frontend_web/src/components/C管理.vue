@@ -19,61 +19,49 @@
 
       <div class="manage-menu-sections">
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" href="/AiDiy" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">AI</span>
               AiDiy
             </div>
             <div class="menu-card-description">
-              AI対話機能・音声認識・画像生成・コードエージェント
+              マルチAI対話・WebSocket音声認識・画像生成・CodeAgentsによるコード支援
             </div>
-            <a href="/AiDiy" target="_blank" class="menu-card-link">
-              開く →
-            </a>
-          </div>
+          </a>
         </div>
 
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/C管理/C権限/一覧?戻URL=/C管理">
             <div class="menu-card-title">
               <span class="icon">C権</span>
               C権限
             </div>
             <div class="menu-card-description">
-              権限管理・ユーザー権限設定・アクセス制御
+              ロール・機能別アクセス制御の管理と利用者への権限割り当て
             </div>
-            <router-link to="/C管理/C権限/一覧?戻URL=/C管理" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/C管理/C利用者/一覧?戻URL=/C管理">
             <div class="menu-card-title">
               <span class="icon">C利</span>
               C利用者
             </div>
             <div class="menu-card-description">
-              利用者管理・ユーザー情報管理・アカウント設定
+              利用者ID・パスワード・権限・端末情報の登録・編集・一覧管理
             </div>
-            <router-link to="/C管理/C利用者/一覧?戻URL=/C管理" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/C管理/C採番/一覧?戻URL=/C管理">
             <div class="menu-card-title">
               <span class="icon">C採</span>
               C採番
             </div>
             <div class="menu-card-description">
-              採番管理・ID自動生成機能・シーケンス管理
+              テーブルごとの採番レンジ・現在値・増分を管理するシーケンス台帳
             </div>
-            <router-link to="/C管理/C採番/一覧?戻URL=/C管理" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
         </div>
       </div>
     </div>
@@ -93,19 +81,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-}
-
-.menu-card-fixed {
-  width: 320px;
-  min-width: 320px;
-  height: 158px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-card-fixed .menu-card-description {
-  flex: 1;
 }
 
 .menu-hairline {

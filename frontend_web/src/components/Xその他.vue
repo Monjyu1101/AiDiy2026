@@ -86,128 +86,101 @@ onBeforeUnmount(() => {
 
       <div class="other-menu-sections">
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/X自己紹介/表示?戻URL=/Xその他">
             <div class="menu-card-title">
               <span class="icon">X自</span>
               X自己紹介
             </div>
             <div class="menu-card-description">
-              システム自己紹介・プロフィール表示
+              AiDiy のバージョン・システム構成・ライセンス情報のプロフィール表示
             </div>
-            <router-link to="/Xその他/X自己紹介/表示?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Xビデオ?戻URL=/Xその他">
             <div class="menu-card-title">
               <span class="icon">Xビ</span>
               Xビデオ
             </div>
             <div class="menu-card-description">
-              AiDiy 紹介ビデオ・プレゼンテーション一覧
+              AiDiy の機能紹介・実装解説・時事ニュース解説ビデオの一覧
             </div>
-            <router-link to="/Xビデオ?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
         </div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="worldSceneryUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X世</span>
               X世界の絶景
             </div>
             <div class="menu-card-description">
-              世界の絶景ランダム巡回・全画面地図ビュー
+              世界各地の絶景スポットをランダムに巡回する全画面スライドショー
             </div>
-            <a :href="worldSceneryUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="bgmUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X音</span>
               X動画再生BGM
             </div>
             <div class="menu-card-description">
-              動画ランダム交互再生・A/Bクロスフェード・連続BGM
+              2つのビデオソースをクロスフェードで交互再生するBGMプレイヤー
             </div>
-            <a :href="bgmUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="solarSystemUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X太</span>
               X太陽系
             </div>
             <div class="menu-card-description">
-              太陽系シミュレーション・年月日スライダー表示
+              年月日スライダーで任意の日時の惑星配置を3Dシミュレーション
             </div>
-            <a :href="solarSystemUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
         </div>
 
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xインベーダー/ゲーム?戻URL=/Xその他">
             <div class="menu-card-title">
               <span class="icon">X侵</span>
               Xインベーダー
             </div>
             <div class="menu-card-description">
-              クラシックインベーダーゲーム・レトロゲーム体験
+              スペースインベーダー風レトロシューティングゲーム
             </div>
-            <router-link to="/Xその他/Xインベーダー/ゲーム?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xテトリス/ゲーム?戻URL=/Xその他">
             <div class="menu-card-title">
               <span class="icon">Xテ</span>
               Xテトリス
             </div>
             <div class="menu-card-description">
-              テトリスゲーム・パズルゲーム体験
+              キーボード・タッチ操作対応のテトリスパズルゲーム
             </div>
-            <router-link to="/Xその他/Xテトリス/ゲーム?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xリバーシ/ゲーム?戻URL=/Xその他">
             <div class="menu-card-title">
               <span class="icon">Xリ</span>
               Xリバーシ
             </div>
             <div class="menu-card-description">
-              リバーシ（オセロ）ゲーム・対戦ゲーム体験
+              CPU対戦・二人対戦モード対応のリバーシ（オセロ）ゲーム
             </div>
-            <router-link to="/Xその他/Xリバーシ/ゲーム?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/X立体リバーシ/ゲーム?戻URL=/Xその他">
             <div class="menu-card-title">
               <span class="icon">X立</span>
               X立体リバーシ
             </div>
             <div class="menu-card-description">
-              6面立方体リバーシ・CPU対戦・チャレンジモード
+              立方体6面を使った3D空間でのリバーシ・CPU対戦モード搭載
             </div>
-            <router-link to="/Xその他/X立体リバーシ/ゲーム?戻URL=/Xその他" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
         </div>
       </div>
@@ -228,19 +201,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-}
-
-.menu-card-fixed {
-  width: 320px;
-  min-width: 320px;
-  height: 158px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-card-fixed .menu-card-description {
-  flex: 1;
 }
 
 .menu-hairline {

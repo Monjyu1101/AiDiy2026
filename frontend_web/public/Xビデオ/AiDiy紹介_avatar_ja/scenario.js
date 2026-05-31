@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介avatar",
   "version": "avatar",
   "title": "AiDiy - frontend_avatar 紹介",
@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "avatar": "../_vrm/VRM_AiDiy.vrm",
     "tts_provider": "freeai:female"
   },
   "scenes": [
@@ -42,9 +42,7 @@ window.SCENARIO = {
       "long_narration": "この動画では、AiDiy のアバターを、使う人の目線で紹介します。むずかしい仕組みよりも、AI と話すときにキャラクターがそばにいる楽しさ、ブラウザでもデスクトップでも使える便利さ、自分好みに表示を変えられるところを見ていきます。アバターは VRM 形式の 3D モデルで、表情・モーション・リップシンクすべてをリアルタイムに動かします。Electron と Web の両モードを一枚の renderer で共有しているので、どちらでも同じアバターが迎えてくれます。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 8.304,
-      "long_start_sec": 0.0,
       "long_duration_sec": 30.168
     },
     {
@@ -111,9 +109,7 @@ window.SCENARIO = {
       "long_narration": "このアバター画面は、AI と話すための入り口です。ブラウザで開いても、デスクトップアプリとして起動しても使えます。たとえば調べものをしながら質問したり、アイデア出しの横に置いたりできます。どのモードでも、AI が画面の中の相棒として近くにいる感じを目指しています。モードの切り替えは window.desktopApi の有無だけで自動判定され、認証情報の保存先も Electron なら localStorage、Web なら sessionStorage に自動で切り替わります。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 8.304,
       "short_duration_sec": 7.296,
-      "long_start_sec": 30.168,
       "long_duration_sec": 31.248
     },
     {
@@ -192,9 +188,7 @@ window.SCENARIO = {
       "long_narration": "アバターの裏側では、Web アプリ、3D 表示、音声、AI 通信が組み合わさっています。でも使うときに大事なのは、技術名を覚えることではありません。キャラクターが画面に出て、話しかけたり、動いたり、コードや文章づくりを手伝ったりすることです。ゲームや配信ツールに近い感覚で、AI をもっと身近にできます。内部では Vue 3 と Three.js が連携し、@pixiv/three-vrm が VRM モデルを描画します。AI との通信は WebSocket、ウィンドウ間の状態同期は BroadcastChannel が担っています。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 15.6,
       "short_duration_sec": 8.208,
-      "long_start_sec": 61.416,
       "long_duration_sec": 37.872
     },
     {
@@ -273,9 +267,7 @@ window.SCENARIO = {
       "long_narration": "デスクトップ版では、AI チャット、画像、ファイル、コード支援などの画面を、必要なときに開いたり隠したりできます。いつも全部を出すのではなく、今使いたい道具だけを机の上に置くイメージです。透明なウィンドウで重ねられるので、作業画面の横にアバターを置いて、話しながら進める使い方ができます。ウィンドウは login、core、chat、file、image、code1 から code6、settings の役割ごとに独立しており、表示と非表示は破棄せず show / hide で切り替えるので、切り替え速度も速いです。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 23.808,
       "short_duration_sec": 8.64,
-      "long_start_sec": 99.288,
       "long_duration_sec": 35.16
     },
     {
@@ -357,9 +349,7 @@ window.SCENARIO = {
       "long_narration": "VRM モデルとモーションを使うことで、アバターは表情を変えたり、体を動かしたりできます。音声に合わせたリップシンクもあるので、ただ文字が返ってくるよりも、相手が話している感じが出ます。勉強の相談、作品づくり、プログラミングの質問など、ひとりで作業している時間にちょっとした付き添い役を作れます。モーションは finished イベントで次のクリップを選ぶ巡回方式で、crossFadeFrom を使って姿勢のつながりを自然に保ちます。VRM や VRMA ファイルを差し替えるだけで、好みのキャラクターに入れ替えられます。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 32.448,
       "short_duration_sec": 8.616,
-      "long_start_sec": 134.448,
       "long_duration_sec": 35.376
     },
     {
@@ -441,9 +431,7 @@ window.SCENARIO = {
       "long_narration": "表示はアバターだけではありません。目の表示、時計、カレンダー、何も出さないモードなど、作業のじゃまになりにくい形へ切り替えられます。ブラウザとデスクトップで状態がそろうので、場所を変えても使い心地がつながります。今日は楽しく話したい、今は時間だけ見たい、という気分に合わせられるのが楽しいところです。xeyes は画面外のカーソルも追いかけ、xneko はスプライトアニメーションで動き回ります。Electron と Web の状態は BroadcastChannel avatar-desktop-sync で常にそろっているので、どちらで設定を変えても即座に反映されます。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 41.064,
       "short_duration_sec": 8.184,
-      "long_start_sec": 169.824,
       "long_duration_sec": 37.296
     },
     {
@@ -468,9 +456,7 @@ window.SCENARIO = {
       "long_narration": "AiDiy には、アバター、音声チャット、コード支援、画像生成まで、AI を使った開発体験をそのまま試せる部品がそろっています。マイクに向かって話しかけると、アバターがリアルタイムに応答し、コードの相談にも乗ってくれます。AiDiy で、AI と音声会話しながら開発する体験、ぜひやってみませんか。あなたが声をかければ、アバターはすぐそこにいます。",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 49.248,
       "short_duration_sec": 7.944,
-      "long_start_sec": 207.12,
       "long_duration_sec": 25.008
     }
   ],

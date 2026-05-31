@@ -16,6 +16,9 @@ import { useRoute, useRouter } from 'vue-router';
 
 const baseUrl = import.meta.env.BASE_URL || '/';
 const allUrl      = `${baseUrl}Xビデオ/AiDiy紹介__all_ja/index.html`;
+const allEnUrl    = `${baseUrl}Xビデオ/AiDiy紹介__all_en/index.html`;
+const 紹介ビデオ生成Url = `${baseUrl}Xビデオ/AiDiy紹介_ビデオ生成_ja/index.html`;
+const 解説ビデオ生成Url = `${baseUrl}Xビデオ/AiDiy解説_ビデオ生成_ja/index.html`;
 const backendUrl  = `${baseUrl}Xビデオ/AiDiy紹介_backend_ja/index.html`;
 const frontendUrl = `${baseUrl}Xビデオ/AiDiy紹介_frontend_ja/index.html`;
 const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア_ja/index.html`;
@@ -27,7 +30,10 @@ const 生産管理Url  = `${baseUrl}Xビデオ/AiDiy実装_生産管理_ja/index
 const 在庫管理Url  = `${baseUrl}Xビデオ/AiDiy実装_在庫管理_ja/index.html`;
 const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_web_ja/index.html`;
 const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar_ja/index.html`;
-const ビデオページ生成解説Url = `${baseUrl}Xビデオ/解説_ビデオページ生成_ja/index.html`;
+const 解説AllUrl          = `${baseUrl}Xビデオ/AiDiy解説__all_ja/index.html`;
+const 解説AllEnUrl        = `${baseUrl}Xビデオ/AiDiy解説__all_en/index.html`;
+const 解説toolsUrl        = `${baseUrl}Xビデオ/AiDiy解説_tools_ja/index.html`;
+const ビデオページ生成解説Url = `${baseUrl}Xビデオ/AiDiy解説_ビデオページ生成_ja/index.html`;
 const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html`;
 const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
 const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
@@ -58,232 +64,241 @@ const handleReturn = () => {
       <p>AiDiy 紹介ビデオ・プレゼンテーションへのアクセスリンクです。下記から選択してください。</p>
 
       <div class="video-menu-sections">
-        <div class="section-label">紹介</div>
+        <div class="section-label">AiDiy紹介</div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="allUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X全</span>
               AiDiy紹介 (all)
             </div>
             <div class="menu-card-description">
-              全シーンを通しで再生する総合プレゼン
+              backend・frontend・AIコア・tools・hermes・avatar の全テーマを通しで再生する総合プレゼンビデオ
             </div>
-            <a :href="allUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="allEnUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">X全</span>
+              AiDiy紹介 (all EN)
+            </div>
+            <div class="menu-card-description">
+              English version — full AiDiy introduction covering all themes in one presentation
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="backendUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X後</span>
               AiDiy紹介 (backend)
             </div>
             <div class="menu-card-description">
-              バックエンド構成にフォーカスした紹介ビデオ
+              FastAPI + SQLAlchemy の 2 サーバー構成・4 層アーキテクチャ・日本語 API 設計を紹介
             </div>
-            <a :href="backendUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="frontendUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X前</span>
               AiDiy紹介 (frontend)
             </div>
             <div class="menu-card-description">
-              フロントエンド構成にフォーカスした紹介ビデオ
+              Vue 3 + Vite + TypeScript・qTubler グリッド・Pinia / Vue Router の構成を紹介
             </div>
-            <a :href="frontendUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="aiコアUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">XAI</span>
               AiDiy紹介 (AIコア)
             </div>
             <div class="menu-card-description">
-              AIコア機能にフォーカスした紹介ビデオ
+              マルチ AI 対話・WebSocket ストリーミング・Code AI エージェント連携を紹介
             </div>
-            <a :href="aiコアUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="toolsUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">XMC</span>
               AiDiy紹介 (tools)
             </div>
             <div class="menu-card-description">
-              MCP ツール群にフォーカスした紹介ビデオ
+              14 の MCP サーバー・3 トランスポート対応の AiDiy TOOL HUB 全体像を紹介
             </div>
-            <a :href="toolsUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="hermesUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">Xヘ</span>
               AiDiy紹介 (hermes)
             </div>
             <div class="menu-card-description">
-              Hermes CLI 機能にフォーカスした紹介ビデオ
+              コード支援 CLI aidiy_hermes の設計・複数 AI 切り替え・session 管理を紹介
             </div>
-            <a :href="hermesUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="avatarUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">Xア</span>
               AiDiy紹介 (avatar)
             </div>
             <div class="menu-card-description">
-              Avatar 機能にフォーカスした紹介ビデオ
+              Electron/Web デュアルモード・VRM アバター・Three.js + AI 音声連携を紹介
             </div>
-            <a :href="avatarUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="紹介ビデオ生成Url" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">XVi</span>
+              AiDiy紹介 (ビデオ生成)
+            </div>
+            <div class="menu-card-description">
+              AiDiy のビデオ生成機能を一人アバターで紹介・9 ステップ全自動化を解説
+            </div>
+          </a>
         </div>
 
-        <div class="section-label">実装</div>
+        <div class="section-label">AiDiy実装・解説</div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="解説AllUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">X全</span>
+              AiDiy解説 (all)
+            </div>
+            <div class="menu-card-description">
+              AiDiy の全体構成・日本語ファースト設計・AI コア・MCP・ビデオページ生成までを二人掛け合いで解説
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="解説AllEnUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">X全</span>
+              AiDiy解説 (all EN)
+            </div>
+            <div class="menu-card-description">
+              English version — full AiDiy commentary covering architecture, AI core, MCP, and video generation
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="webAiDiyUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">XWb</span>
               AiDiy実装 (web)
             </div>
             <div class="menu-card-description">
-              Vue 3 + TypeScript Web UI・qTubler・AI コアの紹介ビデオ
+              Vue 3 + TypeScript・qTubler グリッド・Axios/WebSocket・AI コア画面の実装を詳しく紹介
             </div>
-            <a :href="webAiDiyUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="avatarAiDiyUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">XAv</span>
               AiDiy実装 (avatar)
             </div>
             <div class="menu-card-description">
-              Electron/Web デュアルモード VRM アバター + AI コアの紹介ビデオ
+              Electron IPC・Three.js VRM・音声同期・AI 対話の実装フローを詳しく紹介
             </div>
-            <a :href="avatarAiDiyUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="解説toolsUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">XMC</span>
+              AiDiy解説 (tools)
+            </div>
+            <div class="menu-card-description">
+              14 の MCP サーバー・SSE/HTTP/stdio の 3 トランスポート・HTTP API 直接利用を二人掛け合いで解説
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="ビデオページ生成解説Url" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">XVG</span>
+              AiDiy解説 (ビデオページ生成)
+            </div>
+            <div class="menu-card-description">
+              シナリオ作成・画像生成・音声合成・HTML 組み立てを MCP と CodeAgents で全自動化する流れを解説
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="解説ビデオ生成Url" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">XVd</span>
+              AiDiy解説 (ビデオ生成)
+            </div>
+            <div class="menu-card-description">
+              AiDiy のビデオ生成機能を二人掛け合いで解説・utils モジュール設計・step ごとの仕組みを紹介
+            </div>
+          </a>
         </div>
 
-        <div class="section-label">実装例</div>
+        <div class="section-label">AiDiy実装例</div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="配車管理Url" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X配</span>
               実装例 (配車管理)
             </div>
             <div class="menu-card-description">
-              配車区分・車両マスタと配車指示・スケジュール管理の紹介ビデオ
+              配車区分・車両マスタ（M系）と配車指示・スケジュール（T系）の実装例
             </div>
-            <a :href="配車管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="生産管理Url" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X生</span>
               実装例 (生産管理)
             </div>
             <div class="menu-card-description">
-              商品構成マスタ・生産指示・スケジュール管理の紹介ビデオ
+              商品構成マスタ（M系）と生産指示・スケジュール（T系）の実装例
             </div>
-            <a :href="生産管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="在庫管理Url" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">X在</span>
               実装例 (在庫管理)
             </div>
             <div class="menu-card-description">
-              入庫・出庫・棚卸トランザクションと商品推移表の紹介ビデオ
+              入庫・出庫・棚卸（T系）と商品推移表（V系 生 SQL）の実装例
             </div>
-            <a :href="在庫管理Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
+
         </div>
 
-        <div class="section-label">活用事例</div>
+        <div class="section-label">時事ニュース・解説</div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
-            <div class="menu-card-title">
-              <span class="icon">XVG</span>
-              活用事例 (ビデオページ生成解説)
-            </div>
-            <div class="menu-card-description">
-              MCP と CodeAgents でビデオページを作る流れを日本語で解説
-            </div>
-            <a :href="ビデオページ生成解説Url" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
-        </div>
-
-        <div class="section-label">ニュース</div>
-
-        <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="ニュースUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">Xニュ</span>
               ニュース (Anthropic)
             </div>
             <div class="menu-card-description">
-              Anthropic 2026年ニュース解説ビデオ
+              Claude 4 / Claude Code / MCP 標準化など Anthropic 2026年前半のトピックを二人掛け合いで解説
             </div>
-            <a :href="ニュースUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="ニュースGoogleUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">XGo</span>
               ニュース (Google)
             </div>
             <div class="menu-card-description">
-              Google 2026年ニュース解説ビデオ
+              Gemini 2.5 / Google I/O など Google 2026年前半のトピックを二人掛け合いで解説
             </div>
-            <a :href="ニュースGoogleUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
-          <div class="menu-card menu-card-fixed">
+          <a class="menu-card menu-card-fixed" :href="ニュースOpenAIUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">XOA</span>
               ニュース (OpenAI)
             </div>
             <div class="menu-card-description">
-              OpenAI 2026年ニュース解説ビデオ
+              GPT-5 / o3 / Codex など OpenAI 2026年前半のトピックを二人掛け合いで解説
             </div>
-            <a :href="ニュースOpenAIUrl" target="_blank" rel="noopener noreferrer" class="menu-card-link">
-              別タブで開く →
-            </a>
-          </div>
+          </a>
 
         </div>
       </div>
@@ -331,25 +346,12 @@ const handleReturn = () => {
   gap: 20px;
 }
 
-.menu-card-fixed {
-  width: 320px;
-  min-width: 320px;
-  height: 158px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-card-fixed .menu-card-description {
-  flex: 1;
-}
-
 .section-label {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: #888;
-  text-transform: uppercase;
+  text-transform: none;
   border-bottom: 1px solid #333;
   padding-bottom: 4px;
   margin-top: 4px;

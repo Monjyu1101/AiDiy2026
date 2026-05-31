@@ -81,13 +81,35 @@ class TextToSpeech:
     }
 
     # Edge: voice="female" / "male" を実音声名へ変換するためのエイリアス。
-    # 言語コード（小文字、ハイフン前まで）で引く。未登録言語は "ja" にフォールバック。
+    # full locale（例: en-us）→ base language（例: en）の順で引く。
+    # 未登録言語は "ja" にフォールバック。
     EDGE_GENDER_VOICES = {
-        "ja": {"female": "ja-JP-NanamiNeural", "male": "ja-JP-KeitaNeural"},
-        "en": {"female": "en-US-AvaNeural",    "male": "en-US-AndrewNeural"},
-        "zh": {"female": "zh-CN-XiaoxiaoNeural", "male": "zh-CN-YunxiNeural"},
-        "ko": {"female": "ko-KR-SunHiNeural", "male": "ko-KR-InJoonNeural"},
+        "ja":    {"female": "ja-JP-NanamiNeural",   "male": "ja-JP-KeitaNeural"},
+        "ja-jp": {"female": "ja-JP-NanamiNeural",   "male": "ja-JP-KeitaNeural"},
+        "en":    {"female": "en-US-AvaNeural",      "male": "en-US-AndrewNeural"},
+        "en-us": {"female": "en-US-AvaNeural",      "male": "en-US-AndrewNeural"},
+        "fr":    {"female": "fr-FR-DeniseNeural",   "male": "fr-FR-HenriNeural"},
+        "fr-fr": {"female": "fr-FR-DeniseNeural",   "male": "fr-FR-HenriNeural"},
+        "de":    {"female": "de-DE-KatjaNeural",    "male": "de-DE-ConradNeural"},
+        "de-de": {"female": "de-DE-KatjaNeural",    "male": "de-DE-ConradNeural"},
+        "es":    {"female": "es-ES-XimenaNeural",   "male": "es-ES-AlvaroNeural"},
+        "es-es": {"female": "es-ES-XimenaNeural",   "male": "es-ES-AlvaroNeural"},
+        "pt":    {"female": "pt-BR-FranciscaNeural","male": "pt-BR-AntonioNeural"},
+        "pt-br": {"female": "pt-BR-FranciscaNeural","male": "pt-BR-AntonioNeural"},
+        "it":    {"female": "it-IT-IsabellaNeural", "male": "it-IT-DiegoNeural"},
+        "it-it": {"female": "it-IT-IsabellaNeural", "male": "it-IT-DiegoNeural"},
+        "ru":    {"female": "ru-RU-SvetlanaNeural", "male": "ru-RU-DmitryNeural"},
+        "ru-ru": {"female": "ru-RU-SvetlanaNeural", "male": "ru-RU-DmitryNeural"},
+        "nl":    {"female": "nl-NL-ColetteNeural",  "male": "nl-NL-MaartenNeural"},
+        "nl-nl": {"female": "nl-NL-ColetteNeural",  "male": "nl-NL-MaartenNeural"},
+        "zh":    {"female": "zh-CN-XiaoxiaoNeural", "male": "zh-CN-YunxiNeural"},
+        "zh-cn": {"female": "zh-CN-XiaoxiaoNeural", "male": "zh-CN-YunxiNeural"},
+        "ko":    {"female": "ko-KR-SunHiNeural",    "male": "ko-KR-InJoonNeural"},
+        "ko-kr": {"female": "ko-KR-SunHiNeural",    "male": "ko-KR-InJoonNeural"},
+        "ar":    {"female": "ar-EG-SalmaNeural",    "male": "ar-EG-ShakirNeural"},
+        "ar-eg": {"female": "ar-EG-SalmaNeural",    "male": "ar-EG-ShakirNeural"},
     }
+    EDGE_SUPPORTED_LANGUAGE_CODES = ("en", "fr", "de", "es", "pt", "it", "ru", "nl", "zh", "ko", "ar", "ja")
 
     # OpenAI: voice="female" / "male" の実音声名（言語非依存）
     OPENAI_GENDER_VOICES = {
@@ -411,15 +433,26 @@ class TextToSpeech:
         desc = f"テキストを音声（MP3）に変換する。利用可能: {', '.join(available)}。"
         if unavailable:
             desc += f" 利用不可: {', '.join(unavailable)}（API キー未設定）。"
-        desc += " AiDiy、DB、API、MCP などのシステム用語は backend_server/_config/mcp_text_to_speech.json の読み上げ用辞書で自動変換する。"
+        desc += (
+            f" Edge の female/male 自動解決は {', '.join(self.EDGE_SUPPORTED_LANGUAGE_CODES)} "
+            "に対応。language=ja の場合、AiDiy、DB、API、MCP などのシステム用語は "
+            "backend_server/_config/mcp_text_to_speech.json の読み上げ用辞書で自動変換する。"
+        )
         return desc
 
     # ------------------------------------------------------------------ #
     # 読み上げテキスト正規化
     # ------------------------------------------------------------------ #
 
-    def normalize_for_speech(self, text: str) -> tuple[str, list[dict]]:
-        """TTS に渡す直前の読み上げ用テキストへ変換する"""
+    def normalize_for_speech(self, text: str, language: str = "ja") -> tuple[str, list[dict]]:
+        """TTS に渡す直前の読み上げ用テキストへ変換する。
+
+        現在の読み上げ辞書は日本語音声向けなので、英語など他言語では適用しない。
+        """
+        lang_key = (language or "ja").split("-")[0].lower() or "ja"
+        if lang_key != "ja":
+            return text, []
+
         normalized = text
         applied: list[dict] = []
 
@@ -448,25 +481,40 @@ class TextToSpeech:
     # 音声合成（dispatch）
     # ------------------------------------------------------------------ #
 
-    DEFAULT_RATIO_WHEN_NONE = 1.2
+    # ratio の None / 0 / "auto" は入口では確定せず、実際に使用する
+    # provider ごとの既定値として解釈する。
+    DEFAULT_RATIO_AUTO_BY_PROVIDER = {
+        "edge": 1.2,
+        "openai": 1.2,
+        "gemini": 1.1,
+        "freeai": 1.1,
+    }
     RATIO_MIN = 0.5
     RATIO_MAX = 2.0
 
     @classmethod
-    def _normalize_ratio(cls, ratio: Optional[float]) -> float:
-        """ratio を正規化する。
-           - None → DEFAULT_RATIO_WHEN_NONE（1.2）
-           - 0 / 1 / 不正値 → 1.0（速度調整なし）
-           - それ以外 → RATIO_MIN..RATIO_MAX（0.5..2.0）に clamp
-             （openai speed と ffmpeg atempo の共通可動域に揃え、edge も含めて全 provider 統一）
+    def _resolve_ratio_for_provider(cls, ratio: Any, provider: str) -> float:
+        """ratio を provider ごとの意味で解釈する。
+
+           - None / 0 / "auto" は provider ごとの既定値
+             edge/openai=1.2、gemini/freeai=1.1
+           - 1 は速度調整なし
+           - それ以外は RATIO_MIN..RATIO_MAX（0.5..2.0）に clamp
         """
         if ratio is None:
-            return cls.DEFAULT_RATIO_WHEN_NONE
+            return cls.DEFAULT_RATIO_AUTO_BY_PROVIDER.get(provider, 1.0)
+        if isinstance(ratio, str):
+            raw = ratio.strip().lower()
+            if raw in ("", "auto"):
+                return cls.DEFAULT_RATIO_AUTO_BY_PROVIDER.get(provider, 1.0)
+            ratio = raw
         try:
             value = float(ratio)
         except (TypeError, ValueError):
-            return 1.0
-        if value == 0 or value == 1:
+            return cls.DEFAULT_RATIO_AUTO_BY_PROVIDER.get(provider, 1.0)
+        if value == 0:
+            return cls.DEFAULT_RATIO_AUTO_BY_PROVIDER.get(provider, 1.0)
+        if value == 1:
             return 1.0
         if value < cls.RATIO_MIN:
             return cls.RATIO_MIN
@@ -495,7 +543,7 @@ class TextToSpeech:
         provider: str = "auto",
         model: str = "auto",
         voice: str = "auto",
-        ratio: Optional[float] = None,
+        ratio: Any = None,
     ) -> tuple[bytes, dict]:
         """
         テキストから音声を合成する。
@@ -509,7 +557,8 @@ class TextToSpeech:
         キー無効の候補は事前にスキップし、合成例外発生時も次の候補へ進む。
 
         Args:
-            ratio: 話速倍率。None は既定値 1.2 として扱う。0 / 1 は速度調整なし。
+            ratio: 話速倍率。None / 0 / "auto" は provider ごとの既定値として扱う。
+                   edge/openai は 1.2、gemini/freeai は 1.1。1 は速度調整なし。
                    有効レンジは 0.5..2.0 に clamp。範囲外は端で丸める。
                    edge は rate 文字列、openai は speed 引数、gemini/freeai は ffmpeg atempo で適用。
 
@@ -519,11 +568,10 @@ class TextToSpeech:
         if not speech_text or not speech_text.strip():
             raise TextToSpeechError("speech_text は必須です")
 
-        effective_ratio = self._normalize_ratio(ratio)
-        normalized_text, replacements = self.normalize_for_speech(speech_text)
         requested = self._normalize_provider(provider)
         model = model.strip().lower()
         language = language.strip().lower()
+        normalized_text, replacements = self.normalize_for_speech(speech_text, language)
         voice_input = voice
 
         # FALLBACK_CHAIN に沿って候補を順に試す。
@@ -543,6 +591,7 @@ class TextToSpeech:
 
             # 候補ごとに voice を解決し直す（provider 別に female/male マッピングが違うため）
             resolved_voice = self._resolve_voice(voice_input, candidate, language)
+            effective_ratio = self._resolve_ratio_for_provider(ratio, candidate)
             try:
                 if candidate == "edge":
                     audio_bytes = self._synthesize_edge(normalized_text, resolved_voice, effective_ratio)
@@ -577,7 +626,8 @@ class TextToSpeech:
             "model": model if model != "auto" else self._default_model(used),
             "voice": voice,
             "language": language,
-            "ratio": effective_ratio,
+            "ratio": self._resolve_ratio_for_provider(ratio, used),
+            "requested_ratio": ratio,
             "speech_text": normalized_text,
             "original_speech_text": speech_text,
             "pronunciation_replacements": replacements,
@@ -1055,8 +1105,13 @@ class TextToSpeech:
         # "female" / "male" を provider 別の実音声名に変換
         if v_lower in ("female", "male"):
             if provider == "edge":
-                lang_key = (language or "ja").split("-")[0].lower() or "ja"
-                mapping = self.EDGE_GENDER_VOICES.get(lang_key) or self.EDGE_GENDER_VOICES["ja"]
+                raw_language = (language or "ja").strip().lower().replace("_", "-")
+                base_language = raw_language.split("-", 1)[0] or "ja"
+                mapping = (
+                    self.EDGE_GENDER_VOICES.get(raw_language)
+                    or self.EDGE_GENDER_VOICES.get(base_language)
+                    or self.EDGE_GENDER_VOICES["ja"]
+                )
                 return mapping[v_lower]
             if provider == "openai":
                 return self.OPENAI_GENDER_VOICES[v_lower]

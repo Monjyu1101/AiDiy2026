@@ -227,9 +227,9 @@
   padding: 8px 12px;
   text-decoration: none;
   color: #5a4a3a;
-  background: linear-gradient(135deg, #faf7f2 0%, #f5f1e8 100%);
+  background: linear-gradient(135deg, #ece5d6 0%, #e2d9c8 100%);
   border-radius: 5px;
-  border: 1px solid #e6d5b7;
+  border: 1px solid #d4c4a8;
   transition: all 0.2s ease;
   font-size: 14px;
 }

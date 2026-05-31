@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AiDiy 自己紹介</title>
+  <title>AiDiy紹介__all_ja | AiDiy - 日本語ファーストのフルスタック業務管理テンプレート完全紹介</title>
   <style>
     * {
       box-sizing: border-box;
@@ -316,14 +316,14 @@
   <div class="app">
     <header class="topbar">
       <div class="brand-wrap">
-        <div class="brand">AiDiy紹介</div>
+        <div class="brand">AiDiy 完全紹介</div>
       </div>
-      <div class="top-note">実装実態ベースの図解に、各シーン生成画像と生成音声を重ねた紹介ページです。</div>
+      <div class="top-note">日本語ファースト設計・サービス構成・業務サンプル・AI コア・MCP TOOL HUB・ビデオ自動生成まで、AiDiy の全体像を 6 つのシーンで紹介します。</div>
     </header>
 
     <main class="stage">
       <section class="frame-wrap">
-        <iframe id="sceneFrame" class="scene-frame" title="AiDiy自己紹介 scene"></iframe>
+        <iframe id="sceneFrame" class="scene-frame" title="AiDiy 完全紹介 scene"></iframe>
         <div id="subtitle" class="subtitle"></div>
       </section>
     </main>
@@ -347,7 +347,7 @@
       </div>
 
       <div class="controls-right">
-        <div id="timer" class="timer">00:00 / 00:50</div>
+        <div id="timer" class="timer">00:00 / 00:51</div>
       </div>
     </footer>
   </div>
@@ -373,6 +373,9 @@
     const autoParam = (searchParams.get("auto") || "").toLowerCase();
     const requestedAutoMode = ["short", "long", "loop"].includes(autoParam) ? autoParam : "";
     const autoPlayRequested = requestedAutoMode !== "" || searchParams.get("autoplay") === "1";
+    const previewMinSceneSec = requestedAutoMode
+      ? Math.max(0, Number.parseFloat(searchParams.get("preview_min_sec") || "0") || 0)
+      : 0;
 
     let audioMode = requestedAutoMode === "short"
       ? "short"
@@ -388,15 +391,30 @@
     }
 
     function getSceneDurationSec(scene) {
-      return audioMode === "long" ? (scene.long_duration_sec || 0) : (scene.short_duration_sec || 0);
+      const raw = audioMode === "long" ? (scene.long_duration_sec || 0) : (scene.short_duration_sec || 0);
+      return raw || previewMinSceneSec;
     }
 
+    const _shortStartSecs = [];
+    const _longStartSecs = [];
+    (function() {
+      let sa = 0, la = 0;
+      for (const sc of scenario.scenes) {
+        _shortStartSecs.push(sa); sa += (sc.short_duration_sec || previewMinSceneSec || 0);
+        _longStartSecs.push(la);  la += (sc.long_duration_sec  || previewMinSceneSec || 0);
+      }
+    })();
+
     function getSceneStartSec(scene) {
-      return audioMode === "long" ? (scene.long_start_sec || 0) : (scene.short_start_sec || 0);
+      const idx = scenario.scenes.indexOf(scene);
+      return idx < 0 ? 0 : (audioMode === "long" ? _longStartSecs[idx] : _shortStartSecs[idx]);
     }
 
     function getTotalDurationSec() {
-      return audioMode === "long" ? (scenario.long_duration_sec || 1) : (scenario.short_duration_sec || 1);
+      const raw = audioMode === "long" ? (scenario.long_duration_sec || 0) : (scenario.short_duration_sec || 0);
+      if (raw > 0) return raw;
+      const fallbackTotal = (scenario.scenes || []).reduce((sum, scene) => sum + getSceneDurationSec(scene), 0);
+      return fallbackTotal || 1;
     }
 
     function updateModeBtn() {
@@ -630,7 +648,18 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
-          if (response.ok) return response.blob();
+          if (response.ok) {
+            const ct = response.headers.get("content-type") || "";
+            if (ct.startsWith("audio/")) return response.blob();
+            const json = await response.json();
+            if (json.base64_audio) {
+              const bin = atob(json.base64_audio);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              const fmt = json.audio_format || "mp3";
+              return new Blob([bytes], { type: fmt === "mp3" ? "audio/mpeg" : "audio/" + fmt });
+            }
+          }
           const errorText = await response.text().catch(() => "");
           lastError = new Error(`${endpoint} HTTP ${response.status}${errorText ? `: ${errorText}` : ""}`);
           if (response.status === 400 || response.status >= 500) break;
@@ -1113,7 +1142,7 @@
     };
 
     try {
-      const gltf = await loadWith(loader, "../vrm/VRM_AiDiy.vrm");
+      const gltf = await loadWith(loader, "../_vrm/VRM_AiDiy.vrm");
       vrm = gltf.userData?.vrm || null;
       if (vrm) {
         try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch {}

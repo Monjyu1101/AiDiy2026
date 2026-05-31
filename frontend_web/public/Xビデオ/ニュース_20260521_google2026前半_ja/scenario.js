@@ -1,10 +1,10 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "Google 2026年ニュース解説 (掛け合い版)",
   "version": "duo-v2",
   "title": "Google 2026年 主要ニュース",
   "assets_policy": {
-    "male_avatar": "../vrm/VRM_male.vrm",
-    "female_avatar": "../vrm/VRM_female.vrm",
+    "male_avatar": "../_vrm/VRM_male.vrm",
+    "female_avatar": "../_vrm/VRM_female.vrm",
     "tts_male": "edge:male",
     "tts_female": "edge:female",
     "audio_output_dir": "frontend_web/public/Xビデオ/ニュース_20260521_google2026前半_ja/audio"

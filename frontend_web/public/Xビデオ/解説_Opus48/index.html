@@ -54,9 +54,19 @@
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
     }
-    .sc-image {
+    .sc-backdrop, .sc-image {
       position: absolute; inset: 0;
-      width: 100%; height: 100%; object-fit: cover;
+      width: 100%; height: 100%;
+    }
+    .sc-backdrop {
+      object-fit: cover;
+      filter: blur(18px) saturate(1.14) brightness(0.62);
+      transform: scale(1.06);
+      opacity: 0.9;
+    }
+    .sc-image {
+      object-fit: contain;
+      z-index: 1;
     }
     /* 月バッジ：ステージ上部中央に固定 */
     .sc-month-badge {
@@ -77,13 +87,16 @@
     }
     .sc-headline {
       font-size: clamp(32px, 5.5vh, 68px); font-weight: 900; line-height: 1.25;
-      color: #f0f8ff;
-      text-shadow: 0 2px 20px rgba(0,0,0,1), 0 0 60px rgba(0,0,0,0.9);
+      color: #3318c8;
+      text-shadow:
+        0 0 15px rgba(255,255,255,0.98),
+        0 0 40px rgba(255,255,255,0.82),
+        0 0 80px rgba(255,255,255,0.58);
     }
 
     /* ── Subtitle ── */
     .subtitle {
-      position: absolute; bottom: 20px;
+      position: absolute; bottom: 20px; z-index: 9999;
       left: calc(min(36vh, 30vw) + 10px); right: calc(min(36vh, 30vw) + 10px);
       padding: 20px 24px; border-radius: 18px;
       background: rgba(4,10,18,0.76); backdrop-filter: blur(10px);
@@ -206,6 +219,10 @@
       #avatar-left, #avatar-right { width: min(28vh, 26vw); bottom: 56px; height: 52vh; }
       .sc-text-overlay { padding: 0 calc(min(28vh, 26vw) + 12px); }
       .subtitle { left: calc(min(28vh, 26vw) + 4px); right: calc(min(28vh, 26vw) + 4px); font-size: 28px; }
+    }
+    /* ── Landscape (横表示) ── */
+    @media (orientation: landscape) {
+      .sc-text-overlay { position: absolute; top: 30%; left: 0; right: 0; }
     }
     /* ── Portrait (縦表示: スマートフォン/タブレット縦向き) ── */
     @media (orientation: portrait) and (max-width: 640px) {
@@ -490,7 +507,7 @@
       const accentSoft = scene.accent_soft || "rgba(66,133,244,0.18)";
 
       let html = `<div class="sc-inner" style="--accent:${accent}">`;
-      if (scene.image)   html += `<img class="sc-image" src="${scene.image}" alt="" loading="eager">`;
+      if (scene.image)   html += `<img class="sc-backdrop" src="${scene.image}" alt="" loading="eager" aria-hidden="true"><img class="sc-image" src="${scene.image}" alt="" loading="eager">`;
       if (scene.kicker)  html += `<div class="sc-month-badge">${scene.kicker}</div>`;
       if (scene.headline) html += `<div class="sc-text-overlay"><div class="sc-headline">${scene.headline.replace(/\n/g, "<br>")}</div></div>`;
       html += `</div>`;
@@ -640,7 +657,19 @@
             body: JSON.stringify({ text, speech_text: text, provider, voice, language: "ja",
                                    mcp_tool: "aidiy_text_to_speech.synthesize_speech" }),
           });
-          if (r.ok) return r.blob();
+          if (r.ok) {
+            const ct = r.headers.get("content-type") || "";
+            if (ct.startsWith("audio/")) return r.blob();
+            const json = await r.json();
+            if (json.base64_audio) {
+              const bin = atob(json.base64_audio);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              const fmt = json.audio_format || "mp3";
+              return new Blob([bytes], { type: fmt === "mp3" ? "audio/mpeg" : "audio/" + fmt });
+            }
+            lastErr = new Error("no audio in response"); continue;
+          }
           lastErr = new Error(`HTTP ${r.status}`);
         } catch (e) { lastErr = e; }
       }
@@ -1100,14 +1129,14 @@
 
     // Male: left canvas — π+π/6 で内側（右方向）へ30°
     const maleHooks = {};
-    createAvatar("canvasMale",   "../vrm/VRM_male.vrm",
+    createAvatar("canvasMale",   "../_vrm/VRM_male.vrm",
                  Math.PI + Math.PI / 6,  // 30° inward (right) for left-side avatar
                   0.06,                  // camera slightly right
                   maleHooks, _onAvatarReady);
 
     // Female: right canvas — π-π/6 で内側（左方向）へ30°
     const femaleHooks = {};
-    createAvatar("canvasFemale", "../vrm/VRM_female.vrm",
+    createAvatar("canvasFemale", "../_vrm/VRM_female.vrm",
                  Math.PI - Math.PI / 6,  // 30° inward (left) for right-side avatar
                  -0.06,                  // camera slightly left
                   femaleHooks, _onAvatarReady);

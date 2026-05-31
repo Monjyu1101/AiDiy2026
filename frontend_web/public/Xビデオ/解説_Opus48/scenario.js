@@ -1,10 +1,10 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "Claude Opus 4.8 解説 (掛け合い版)",
   "version": "duo-v2",
   "title": "Claude Opus 4.8 — Anthropic 最新フラッグシップモデル解説",
   "assets_policy": {
-    "male_avatar": "../vrm/VRM_male.vrm",
-    "female_avatar": "../vrm/VRM_female.vrm",
+    "male_avatar": "../_vrm/VRM_male.vrm",
+    "female_avatar": "../_vrm/VRM_female.vrm",
     "tts_male": "edge:male",
     "tts_female": "edge:female",
     "audio_output_dir": "frontend_web/public/Xビデオ/解説_Claude_Opus4-8/audio"

@@ -391,8 +391,19 @@
       return audioMode === "long" ? (scene.long_duration_sec || 0) : (scene.short_duration_sec || 0);
     }
 
+    const _shortStartSecs = [];
+    const _longStartSecs = [];
+    (function() {
+      let sa = 0, la = 0;
+      for (const sc of scenario.scenes) {
+        _shortStartSecs.push(sa); sa += (sc.short_duration_sec || 0);
+        _longStartSecs.push(la);  la += (sc.long_duration_sec  || 0);
+      }
+    })();
+
     function getSceneStartSec(scene) {
-      return audioMode === "long" ? (scene.long_start_sec || 0) : (scene.short_start_sec || 0);
+      const idx = scenario.scenes.indexOf(scene);
+      return idx < 0 ? 0 : (audioMode === "long" ? _longStartSecs[idx] : _shortStartSecs[idx]);
     }
 
     function getTotalDurationSec() {
@@ -630,7 +641,18 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
-          if (response.ok) return response.blob();
+          if (response.ok) {
+            const ct = response.headers.get("content-type") || "";
+            if (ct.startsWith("audio/")) return response.blob();
+            const json = await response.json();
+            if (json.base64_audio) {
+              const bin = atob(json.base64_audio);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              const fmt = json.audio_format || "mp3";
+              return new Blob([bytes], { type: fmt === "mp3" ? "audio/mpeg" : "audio/" + fmt });
+            }
+          }
           const errorText = await response.text().catch(() => "");
           lastError = new Error(`${endpoint} HTTP ${response.status}${errorText ? `: ${errorText}` : ""}`);
           if (response.status === 400 || response.status >= 500) break;
@@ -1113,7 +1135,7 @@
     };
 
     try {
-      const gltf = await loadWith(loader, "../vrm/VRM_AiDiy.vrm");
+      const gltf = await loadWith(loader, "../_vrm/VRM_AiDiy.vrm");
       vrm = gltf.userData?.vrm || null;
       if (vrm) {
         try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch {}

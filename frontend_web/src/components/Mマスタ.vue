@@ -19,131 +19,104 @@
 
       <div class="master-menu-sections">
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M車両/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M車</span>
               M車両
             </div>
             <div class="menu-card-description">
-              車両マスター管理・車両情報登録・車両設定
+              車番・車種・最大積載量・担当ドライバーなど車両情報の登録・編集
             </div>
-            <router-link to="/Mマスタ/M車両/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M配車区分/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M配</span>
               M配車区分
             </div>
             <div class="menu-card-description">
-              配車区分マスター・配車カテゴリ管理・色設定
+              配車カテゴリの名称・色コードを管理するマスタ
             </div>
-            <router-link to="/Mマスタ/M配車区分/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
         </div>
 
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品分類/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M分</span>
               M商品分類
             </div>
             <div class="menu-card-description">
-              商品分類マスター・牛飼料系から原材料他までの分類管理
+              牛飼料系・原材料など商品カテゴリの階層管理
             </div>
-            <router-link to="/Mマスタ/M商品分類/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M商</span>
               M商品
             </div>
             <div class="menu-card-description">
-              商品マスター管理・商品情報登録・在庫設定
+              品番・品名・単位・分類・在庫設定を一元管理する商品台帳
             </div>
-            <router-link to="/Mマスタ/M商品/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M取引先分類/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M取分</span>
               M取引先分類
             </div>
             <div class="menu-card-description">
-              仕入先・得意先・委託先などの取引先分類管理
+              仕入先・得意先・委託先などの取引先カテゴリ管理
             </div>
-            <router-link to="/Mマスタ/M取引先分類/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M取引先/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M取</span>
               M取引先
             </div>
             <div class="menu-card-description">
-              取引先マスター管理・住所・電話番号・メールアドレス登録
+              会社名・住所・連絡先・取引先分類の登録・編集・一覧
             </div>
-            <router-link to="/Mマスタ/M取引先/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品構成/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M構</span>
               M商品構成
             </div>
             <div class="menu-card-description">
-              生産ロット単位の構成商品マスター・構成比率と構成数量の管理
+              製品1ロットあたりの構成原料・比率・数量を定義するBOM台帳
             </div>
-            <router-link to="/Mマスタ/M商品構成/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
         </div>
 
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M生産区分/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M生</span>
               M生産区分
             </div>
             <div class="menu-card-description">
-              生産区分マスター・牛飼料からその他までの区分管理・色設定
+              生産カテゴリの名称・色コードを管理するマスタ
             </div>
-            <router-link to="/Mマスタ/M生産区分/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
 
-          <div class="menu-card menu-card-fixed">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M生産工程/一覧?戻URL=/Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M工</span>
               M生産工程
             </div>
             <div class="menu-card-description">
-              生産工程マスター管理・ライン１からライン７までの生産工程登録
+              ライン名・順序・設備情報を登録する生産工程台帳
             </div>
-            <router-link to="/Mマスタ/M生産工程/一覧?戻URL=/Mマスタ" class="menu-card-link">
-              開く →
-            </router-link>
-          </div>
+          </router-link>
         </div>
       </div>
     </div>
@@ -163,19 +136,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-}
-
-.menu-card-fixed {
-  width: 320px;
-  min-width: 320px;
-  height: 158px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-card-fixed .menu-card-description {
-  flex: 1;
 }
 
 .menu-hairline {

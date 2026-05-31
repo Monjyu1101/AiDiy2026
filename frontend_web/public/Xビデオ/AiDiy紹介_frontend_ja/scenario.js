@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介frontend",
   "version": "frontend",
   "title": "AiDiy frontend_web - Vue 3 + qTubler + 日本語ファースト UI",
@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "avatar": "../_vrm/VRM_AiDiy.vrm",
     "tts_provider": "freeai:female"
   },
   "scenes": [
@@ -42,9 +42,7 @@ window.SCENARIO = {
       "long_narration": "この動画では、AiDiy の Web 画面フロントエンドを詳しく紹介します。フロントエンドとは、ブラウザに表示される画面のことです。AiDiy の Web 画面は Vue 3 という最新の JavaScript フレームワークで作られています。Vue 3 は画面を部品（コンポーネント）の組み合わせで作る仕組みで、コードの構成がパターン化されているため、AI に「この画面と同じ形で商品管理画面を追加して」と指示するだけで、API 連携まで含めた画面を生成できます。Vite・TypeScript・Vue Router・Pinia と、今のフロントエンド開発の標準ツールを組み合わせた構成です。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 6.36,
-      "long_start_sec": 0.0,
       "long_duration_sec": 38.208
     },
     {
@@ -123,9 +121,7 @@ window.SCENARIO = {
       "long_narration": "Web 画面はポート 8090 番で動く Vue 3 アプリです。ビルドには高速な Vite、言語は TypeScript を使っています。ページの切り替えには Vue Router を使い、URL と画面コンポーネントを対応づけます。アプリ全体で共有するデータの管理には Pinia を使い、ログイン中の利用者情報など複数の画面をまたぐデータをここで管理します。Vue 3・Vite・TypeScript・Vue Router・Pinia は、今のフロントエンド開発で世界標準となっているツールの組み合わせです。AI の学習データも豊富なので、コード生成の精度が高く、エラーの解決もしやすいのが特徴です。外部 UI フレームワークは使わず、既存スタイルに合わせた統一した見た目を保っています。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 6.36,
       "short_duration_sec": 8.04,
-      "long_start_sec": 38.208,
       "long_duration_sec": 45.936
     },
     {
@@ -204,9 +200,7 @@ window.SCENARIO = {
       "long_narration": "コンポーネントは接頭辞ごとのフォルダに整理されています。C 系は C管理、M 系は Mマスタ、T 系は Tトラン、V 系は Vビュー、X 系は Xその他フォルダです。このフォルダ構成を AI に教えることで、「M系のマスタ画面として Mマスタ フォルダに追加して」という指示だけで、正しい場所に正しい形のファイルを作れます。Router は 3 ファイル（index.ts・coreRouter.ts・appsRouter.ts）に分かれており、AI が追加するファイルをどの Router に登録するかも自動で判断します。日本語のファイル名で作ったコンポーネントは component タグの is 属性で呼び出す書き方が必要ですが、サンプルコードがあれば AI がそのまま踏襲します。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 14.4,
       "short_duration_sec": 7.056,
-      "long_start_sec": 84.144,
       "long_duration_sec": 45.696
     },
     {
@@ -286,9 +280,7 @@ window.SCENARIO = {
       "long_narration": "qTubler は AiDiy 独自の一覧テーブル部品です。列の定義・データ・件数の 3 つを渡すだけで、ページングとソートが動くテーブルが完成します。外部 UI ライブラリに依存しない独自部品なので、AiDiy のルールを学習した AI なら qTubler を使ったコードを自動で生成できます。「qTubler を使って商品在庫一覧画面を追加して」の一言で、検索フォーム・ページング・ソートが揃った画面が出来上がります。数値はカンマなしで受け取って表示時に桁区切りを付ける仕組みも自動で含まれます。AiDiy 全体で統一された見た目を保ちながら、新しい一覧画面を素早く追加できます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 21.456,
       "short_duration_sec": 7.104,
-      "long_start_sec": 129.84,
       "long_duration_sec": 40.32
     },
     {
@@ -368,9 +360,7 @@ window.SCENARIO = {
       "long_narration": "ログイン後のトークンと利用者情報はブラウザの localStorage に保存します。API のエラーは Axios のインターセプターが自動でキャッチして、ログアウト画面に誘導します。サーバーとの通信はすべて Vite の Proxy 設定を経由します。/core で始まるパスは Core サーバー（ポート 8091）に、/apps で始まるパスは Apps サーバー（ポート 8092）に自動で振り分けられます。この仕組みのおかげで、フロントエンドのコードにサーバーのアドレスを直書きしなくて済みます。AI がコードを生成するときも「/apps/商品/一覧を呼ぶ」と書けば、Proxy が自動で転送先を解決します。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 28.56,
       "short_duration_sec": 7.848,
-      "long_start_sec": 170.16,
       "long_duration_sec": 40.464
     },
     {
@@ -450,9 +440,7 @@ window.SCENARIO = {
       "long_narration": "AI 画面はサーバーと WebSocket でリアルタイムに繋がっています。普通の API は「送ったら返ってくる」一方通行ですが、WebSocket は繋いだまま双方向にデータを流せます。AI の返答が少しずつリアルタイムで表示されるのは、この WebSocket のおかげです。送れるのはテキスト・ファイル・画像・音声で、受け取れるのはチャットの返答・生成コード・音声データです。コード支援パネルは code1 から code6 まで 6 つ同時に使えるため、複数の AI に並行して相談できます。AIWebSocket クラスが接続管理・再接続・メッセージの振り分けを担当するので、画面側は受け取ったデータを表示するだけで済みます。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 36.408,
       "short_duration_sec": 7.416,
-      "long_start_sec": 210.624,
       "long_duration_sec": 43.248
     },
     {
@@ -532,9 +520,7 @@ window.SCENARIO = {
       "long_narration": "X 系は自由に追加できる実験領域です。Vue コンポーネントとして作って Router に登録する方法と、HTML ファイルを public フォルダに置く方法の 2 つがあります。この紹介ビデオ自体も public/Xビデオ フォルダの静的 HTML として配信されています。Monaco Editor（VSCode と同じエディタ部品）や qAlert・qConfirm のダイアログ部品も共通で使えます。AI に「X系にゲーム画面を追加して」と指示するだけで、ファイルの作成から Router の登録まで一緒にやってもらえます。業務機能とは独立しているため、失敗を恐れず自由に試せる場所です。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_start_sec": 43.824,
       "short_duration_sec": 7.536,
-      "long_start_sec": 253.872,
       "long_duration_sec": 40.536
     },
     {
@@ -559,9 +545,7 @@ window.SCENARIO = {
       "long_narration": "AiDiy の AI コーディング機能を使えば、フロントエンドの画面とバックエンドの API を一気通貫で生成できます。「取引先マスタの一覧・登録・編集画面を追加して」と AI に指示するだけで、サーバー側の CRUD・API・画面コンポーネント・Router 登録まで、AiDiy のルールに沿ったコードがそろいます。サンプルコードが AI のお手本になるので、qTubler の使い方・日本語ルール・Vite Proxy の設定を細かく指示しなくても正しい形で生成します。開発環境を立ち上げ、AI に機能を頼み、ブラウザで確認する。このサイクルで業務システムをどんどん育てていけます。今日から使える業務システムを、AiDiy で作ってみませんか。",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 51.36,
       "short_duration_sec": 7.656,
-      "long_start_sec": 294.408,
       "long_duration_sec": 44.784
     }
   ],

@@ -323,17 +323,17 @@ const baseRoutes: RouteRecordRaw[] = [
     ),
     createStaticAliasRoute(
         '/Xビデオ/活用事例_video_generation解説',
-        'Xビデオ/解説_ビデオページ生成_ja/index.html',
+        'Xビデオ/AiDiy解説_ビデオページ生成_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/活用事例_ビデオページ生成解説_ja',
-        'Xビデオ/解説_ビデオページ生成_ja/index.html',
+        'Xビデオ/AiDiy解説_ビデオページ生成_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
-        '/Xビデオ/解説_ビデオページ生成_ja',
-        'Xビデオ/解説_ビデオページ生成_ja/index.html',
+        '/Xビデオ/AiDiy解説_ビデオページ生成_ja',
+        'Xビデオ/AiDiy解説_ビデオページ生成_ja/index.html',
         'Xビデオ'
     ),
 ]

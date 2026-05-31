@@ -23,90 +23,72 @@ import { RouterLink } from 'vue-router';
 
       <div class="transaction-menu-sections">
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T配車/一覧?戻URL=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T配</span>
               T配車
             </div>
             <div class="menu-card-description">
-              配車データ管理・配車情報登録・スケジュール管理
+              配車日・車両・担当・積荷情報の登録・編集・ステータス管理
             </div>
-            <RouterLink to="/Tトラン/T配車/一覧?戻URL=/Tトラン" class="menu-card-link">
-              一覧を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
         </div>
 
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品入庫/一覧?戻URL=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T入</span>
               T商品入庫
             </div>
             <div class="menu-card-description">
-              商品入庫データ管理・入庫情報登録
+              入庫日・仕入先・商品・数量・ロットの登録と在庫反映
             </div>
-            <RouterLink to="/Tトラン/T商品入庫/一覧?戻URL=/Tトラン" class="menu-card-link">
-              一覧を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
 
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品出庫/一覧?戻URL=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T出</span>
               T商品出庫
             </div>
             <div class="menu-card-description">
-              商品出庫データ管理・出庫情報登録
+              出庫日・得意先・商品・数量の登録と在庫引き当て
             </div>
-            <RouterLink to="/Tトラン/T商品出庫/一覧?戻URL=/Tトラン" class="menu-card-link">
-              一覧を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
 
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品棚卸/一覧?戻URL=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T棚</span>
               T商品棚卸
             </div>
             <div class="menu-card-description">
-              商品棚卸データ管理・棚卸情報登録
+              棚卸日・商品・理論在庫と実在庫の差異登録・調整
             </div>
-            <RouterLink to="/Tトラン/T商品棚卸/一覧?戻URL=/Tトラン" class="menu-card-link">
-              一覧を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
         </div>
 
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <div class="menu-card menu-card-fixed">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T生産/一覧?戻URL=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T生</span>
               T生産
             </div>
             <div class="menu-card-description">
-              生産データ管理・生産情報登録・スケジュール管理
+              生産日・工程・製品・数量・ステータスの登録と進捗管理
             </div>
-            <RouterLink to="/Tトラン/T生産/一覧?戻URL=/Tトラン" class="menu-card-link">
-              一覧を開く
-            </RouterLink>
-          </div>
-          <div class="menu-card menu-card-fixed">
+          </RouterLink>
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T生産払出/一覧?戻URL=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T払</span>
               T生産払出
             </div>
             <div class="menu-card-description">
-              生産払出一覧・払出商品・原材料確認
+              生産に使用した原材料の払出数量・在庫控除の一覧確認
             </div>
-            <RouterLink to="/Tトラン/T生産払出/一覧?戻URL=/Tトラン" class="menu-card-link">
-              一覧を開く
-            </RouterLink>
-          </div>
+          </RouterLink>
         </div>
       </div>
     </div>
@@ -126,19 +108,6 @@ import { RouterLink } from 'vue-router';
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-}
-
-.menu-card-fixed {
-  width: 320px;
-  min-width: 320px;
-  height: 158px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-card-fixed .menu-card-description {
-  flex: 1;
 }
 
 .menu-hairline {

@@ -1,4 +1,4 @@
-﻿# backend_tools aidiy_automations
+# backend_tools aidiy_automations
 
 `backend_tools` の MCP / HTTP API を組み合わせて実行する自動化スクリプトを置くフォルダです。
 
@@ -13,30 +13,62 @@
 - MCP サーバー本体の機能は `../tools_proc/` に実装します。
 - ここには、複数の MCP 機能を組み合わせる「利用側」の処理を置きます。
 - 長時間実行、外部サービス利用、ファイル大量生成を伴う場合は、冒頭に入力、出力、再実行条件を書きます。
+- OS 環境変数は使用しません。設定はすべて専用の JSON ファイルで管理します。
 
-## ビデオページ生成_紹介.py / ビデオページ生成_解説.py
+## ビデオページ生成/
 
-AiDiy の自動化ソリューションとして、Xビデオ素材生成を 8 ステップで実行します。
+Xビデオ素材生成を 9 ステップで自動実行するスクリプト群です。
 
-主な設定は環境変数で指定できます。
+```
+ビデオページ生成/
+  ビデオページ生成_紹介.py        一人アバター（紹介・ガイド型）動画の生成
+  ビデオページ生成_解説.py        二人アバター（解説・ニュース型）動画の生成
+  _ビデオページ生成_紹介_設定.json  紹介スクリプト専用設定
+  _ビデオページ生成_紹介_状況.json  紹介スクリプトの実行完了ステップ管理
+  _ビデオページ生成_解説_設定.json  解説スクリプト専用設定
+  _ビデオページ生成_解説_状況.json  解説スクリプトの実行完了ステップ管理
+```
 
-- `AIDIY_VIDEO_GEN_FOLDER_NAME`: 出力フォルダ名。
-- `AIDIY_VIDEO_GEN_TOPIC`: 題材、動画テーマ。
-- `AIDIY_VIDEO_GEN_BASE_DIR`: 生成先ルートフォルダ。
-- `AIDIY_VIDEO_GEN_TEMPLATE_DIR`: コピー元テンプレート。
-- `AIDIY_VIDEO_GEN_START_STEP`: 再開するステップ番号（`00`, `01`〜`07`, `99`）。
-- `AIDIY_VIDEO_GEN_STOP_STEP`: 検証時に停止するステップ番号（1ステップずつ実行するときに使う）。
-- `AIDIY_VIDEO_GEN_TTS`: `0` で音声案内を無効化。
-- `AIDIY_VIDEO_GEN_BROWSER`: `0` で Chrome 再描写を無効化。
-- `AIDIY_VIDEO_GEN_FRONTEND_URL`: 表示に使う frontend_web のベース URL。
+### 設定ファイルの主なキー
 
-`__main__` では、設定読み込み、流れの表示、CodeAgents 初期化、各ステップ実行の順に大枠を追える構成にしています。
+各スクリプトの `_*_設定.json` を編集して使います。
 
-ステップ番号は他の自動化にも流用しやすいように、以下の規則にしています。
+| キー | 説明 |
+|------|------|
+| `topic` | 動画テーマ（題材の説明文） |
+| `folder_name` | 出力フォルダ名 |
+| `template_dir` | コピー元テンプレートフォルダ |
+| `language` | 生成言語（`"ja"` または `"en"`） |
+| `shared.video_base_dir` | 生成先ルートフォルダ |
+| `shared.tts_guide` | 音声案内 ON/OFF |
+| `shared.browser_preview` | Chrome 再描写 ON/OFF |
+| `shared.*_api_url` | 各 localhost:8095 HTTP API |
 
-- `00`: 最初に確認すること（設定、API、テンプレート、AI 利用可否）。
-- `01`〜`nn`: 各ステップの実行と検証。
-- `99`: 最後の処理、完了判定、完了ファイル作成。
+### 実行方法
 
-`01`〜`99` の各ステップ完了後は、`aidiy_chrome_devtools` と同じ CDP 実装で
-`<frontend>/Xビデオ/<フォルダ名>/index.html?auto=loop` を表示し直します。
+```bash
+cd backend_tools
+.venv/Scripts/python aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py
+.venv/Scripts/python aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py
+
+# ステップ指定で再実行
+.venv/Scripts/python aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py 04
+```
+
+### ステップ構成
+
+| ステップ | 内容 |
+|---------|------|
+| `00` | 初期確認（設定・テンプレート・API・CodeAgents） |
+| `01` | フォルダ作成（テンプレートコピー、images/・audio/ 準備） |
+| `02` | シナリオ作成（scenario.js 生成） |
+| `03` | HTML 修正（index.html をテーマに合わせて更新） |
+| `04` | 画像生成（images/scene_*.png） |
+| `05` | 中間確認（シナリオ・HTML・画像の内容検証） |
+| `06` | 音声生成（audio/*.mp3） |
+| `07` | 再生時間更新（scenario.js の duration_sec を実測値で更新） |
+| `08` | 最終確認（必須ファイル・画像数・音声数の検証） |
+| `99` | 完成案内 |
+
+各ステップ完了後は `_*_状況.json` にステップ番号が記録されます。
+引数省略時は次の未実行ステップから自動で再開します。

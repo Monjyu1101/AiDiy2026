@@ -16,7 +16,7 @@
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "avatar": "../_vrm/VRM_AiDiy.vrm",
     "tts_provider": "freeai:female"
   },
   "scenes": [
@@ -42,9 +42,7 @@
       "long_narration": "この動画では、AiDiy の AI コアを、技術名よりも使い方に寄せて紹介します。文字で相談するチャット、声でやり取りするライブ会話、コード作成の手伝い、そして音声の認識や読み上げ。この 4 つをひとつの仕組みとして動かすのが、AiDiy の AI コアです。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_start_sec": 0,
       "short_duration_sec": 6.576,
-      "long_start_sec": 0,
       "long_duration_sec": 18.384
     },
     {
@@ -123,9 +121,7 @@
       "long_narration": "AI コアは、画面と AI のあいだに入る交通整理役です。ユーザーが文章、音声、画像、ファイルを送ると、AI コアが内容に合った AI サービスへ渡します。返事は一度にまとめて返すだけではなく、作られている途中から画面へ流せます。だから、長い回答でも待ち時間を感じにくくなります。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 6.576,
       "short_duration_sec": 8.328,
-      "long_start_sec": 18.384,
       "long_duration_sec": 21.744
     },
     {
@@ -205,9 +201,7 @@
       "long_narration": "AI とひとことで言っても、使い方は一つではありません。文章で質問したいときはチャット、声で自然に話したいときはライブ会話、プログラム作りを手伝ってほしいときはコード支援を使います。さらに、音声を文字にしたり、文章を読み上げたりする音声処理もあります。AiDiy はこの違いを、ひとつの AI コアの中で整理しています。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 14.904,
       "short_duration_sec": 7.368,
-      "long_start_sec": 40.128,
       "long_duration_sec": 23.4
     },
     {
@@ -286,9 +280,7 @@
       "long_narration": "ここで大事なのは、ボタンを押して結果を待つだけの仕組みではない、という点です。画面と AI コアはつながったままになり、文章、ファイル、画像、音声を送れます。AI からの返事も、文章なら少しずつ表示でき、音声なら再生へつなげられます。チャット、コード支援、音声の結果が混ざらないように、AI コアが行き先を分けて扱います。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 22.272,
       "short_duration_sec": 7.608,
-      "long_start_sec": 63.528,
       "long_duration_sec": 24.888
     },
     {
@@ -368,9 +360,7 @@
       "long_narration": "AI に相談していると、前に何を話したかが大切になる場面があります。AiDiy は会話の履歴を保存し、あとから同じ話題を続けられるようにします。たとえば、途中まで相談した内容をページを開き直したあとも使えます。業務の相談やコード作成では、前の流れを引き継げることがとても重要です。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 29.88,
       "short_duration_sec": 5.088,
-      "long_start_sec": 88.416,
       "long_duration_sec": 21.792
     },
     {
@@ -449,9 +439,7 @@
       "long_narration": "MCP は、AI に渡す道具セットのようなものです。人間が毎回手で確認しなくても、AI がブラウザを見たり、データを確認したり、コードのチェックをしたりできます。つまり、AI は文章を返すだけではなく、作業の途中で必要な確認もできます。AiDiy では、この道具をコード支援に組み込み、実際の開発作業に近い形で AI を使えるようにしています。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 34.968,
       "short_duration_sec": 6.768,
-      "long_start_sec": 110.208,
       "long_duration_sec": 25.584
     },
     {
@@ -531,9 +519,7 @@
       "long_narration": "AI サービスには、それぞれ得意なことがあります。文章で相談する、声で会話する、コードを書く、ローカル環境で試す。目的が変われば、向いている AI も変わります。AiDiy は、複数の AI サービスを切り替えて使えるようにして、ひとつの AI だけに依存しない作りにしています。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_start_sec": 41.736,
       "short_duration_sec": 6.768,
-      "long_start_sec": 135.792,
       "long_duration_sec": 20.448
     },
     {
@@ -558,9 +544,7 @@
       "long_narration": "ご視聴ありがとうございました。AiDiy の AI コアは、AI と話すだけの機能ではありません。文字の相談、声の会話、コード支援、会話履歴の保存、そして MCP による道具連携をまとめています。AI に質問するだけで終わらせず、実際の確認や作業へつなげるための土台です。あなたの業務でも、この AI コアを使いこなしてみませんか。",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 48.504,
       "short_duration_sec": 8.712,
-      "long_start_sec": 156.24,
       "long_duration_sec": 24.816
     }
   ],

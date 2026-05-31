@@ -15,7 +15,7 @@ import asyncio
 import json
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter
 from mcp.types import ImageContent
@@ -70,7 +70,7 @@ class TtsRequest(BaseModel):
     provider: str = "edge"
     model: str = "auto"
     voice: str = "female"
-    ratio: Optional[float] = None
+    ratio: Optional[Union[float, str]] = None
     save_path: Optional[str] = None
     local_play: bool = False
     play: bool = False
@@ -117,11 +117,11 @@ _TTS_METHODS = [
         "description": "テキストを音声合成する。レスポンスの base64_audio フィールドに MP3 の base64 文字列が入る",
         "parameters": {
             "speech_text": {"type": "string", "required": True, "description": "読み上げテキスト"},
-            "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（ja / en など）"},
+            "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（Edge の female/male 自動解決: en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja）"},
             "provider": {"type": "string", "required": False, "default": "edge", "description": "edge / openai / gemini / freeai"},
             "model": {"type": "string", "required": False, "default": "auto"},
             "voice": {"type": "string", "required": False, "default": "female", "description": "female / male またはプロバイダ固有の音声名"},
-            "ratio": {"type": "number", "required": False, "description": "読み上げ速度倍率"},
+            "ratio": {"type": "number|string", "required": False, "description": "読み上げ速度倍率。0 / auto は provider ごとの既定値"},
             "save_path": {"type": "string", "required": False, "description": "保存先パス（省略時は temp/output/ に自動保存）"},
             "local_play": {"type": "boolean", "required": False, "default": False, "description": "サーバー側でローカル再生する"},
             "play": {"type": "boolean", "required": False, "default": False, "description": "local_play の別名"},
@@ -314,7 +314,7 @@ def register_tts_tools(mcp_ts, tts):
         provider: str = "auto",
         model: str = "auto",
         voice: str = "auto",
-        ratio: Optional[float] = None,
+        ratio: Optional[Union[float, str]] = None,
         save_path: Optional[str] = None,
         local_play: bool = False,
     ) -> str:
@@ -323,13 +323,15 @@ def register_tts_tools(mcp_ts, tts):
 
         Args:
             speech_text: 合成するテキスト
-            language: 言語コード（デフォルト "ja"）
+            language: 言語コード（デフォルト "ja"）。Edge の female/male 自動解決は
+                      en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja に対応
             provider: "auto"=edge→freeai /
                       "edge"（無料） / "gemini"（GEMINI_API_KEY） /
                       "freeai"（FREEAI_API_KEY） / "openai"（OPENAI_API_KEY）
             model: "auto"（自動選択、デフォルト）
             voice: "auto"（= "female" として扱う）。"female" / "male" の指定も可。
-            ratio: 話速倍率。None は既定値 1.2 として扱う。0 / 1 は速度調整なし。
+            ratio: 話速倍率。None / 0 / "auto" は provider ごとの既定値。
+                   edge/openai は 1.2、gemini/freeai は 1.1。1 は速度調整なし。
             save_path: 保存先。省略時は backend_server/temp/output/ に保存。
             local_play: True でローカル再生を試行（デフォルト False）
         """
@@ -565,16 +567,16 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                     "description": "speech_text を音声合成して base64_audio（MP3）で返す。同時に save_path へ自動保存。",
                     "parameters": {
                         "speech_text": {"type": "string", "required": True, "description": "読み上げるテキスト"},
-                        "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（ja / en など）"},
+                        "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（Edge の female/male 自動解決: en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja）"},
                         "provider": {"type": "string", "required": False, "default": "edge", "values": ["edge", "gemini", "freeai", "openai"], "description": "音声合成プロバイダ。edge は無料・高速"},
                         "model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。auto でプロバイダ既定値"},
                         "voice": {"type": "string", "required": False, "default": "female", "description": "'female' / 'male' またはプロバイダ固有音声名（例: ja-JP-NanamiNeural, Zephyr）"},
-                        "ratio": {"type": "number", "required": False, "default": 1.2, "description": "話速倍率（0.5〜2.0）。None で既定値 1.2。0 または 1 で速度調整なし"},
+                        "ratio": {"type": "number|string", "required": False, "default": 0, "description": "話速倍率（0.5〜2.0）。None / 0 / 'auto' は provider ごとの既定値。edge/openai は 1.2、gemini/freeai は 1.1。1 は速度調整なし"},
                         "save_path": {"type": "string", "required": False, "description": "保存先。省略時は temp/output/ に yyyymmdd.HHMMSS.mp3 で自動保存"},
                         "local_play": {"type": "boolean", "required": False, "default": False, "description": "True でサーバー側スピーカーから即時再生"},
                         "play": {"type": "boolean", "required": False, "default": False, "description": "local_play の別名"},
                     },
-                    "example_request": {"speech_text": "AiDiy のデモ動画へようこそ。", "provider": "edge", "voice": "female", "ratio": 1.2},
+                    "example_request": {"speech_text": "AiDiy のデモ動画へようこそ。", "provider": "freeai", "voice": "female", "ratio": 0},
                     "response_fields": {
                         "used_provider": "実際に使用したプロバイダ",
                         "audio_format": "mp3 または wav",

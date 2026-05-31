@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy紹介_ToolHub",
   "version": "mcp",
   "title": "AiDiy TOOL HUB - 14 の MCP が繋がるツール基盤",
@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_avatar_38_right_content_62",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "avatar": "../_vrm/VRM_AiDiy.vrm",
     "tts_provider": "freeai:female"
   },
   "scenes": [
@@ -57,9 +57,7 @@ window.SCENARIO = {
       "long_narration": "この動画は AiDiy の video_generation 機能によって自動生成されました。今回は AiDiy のツール基盤である backend_tools、つまり「AiDiy TOOL HUB」を紹介します。ポート 8095 に 14 個の MCP サーバーが同居しており、ブラウザ操作からデータ確認、AI による画像・動画・音声の生成、コードエージェントまで、あらゆる自動化ツールが一カ所にまとまっています。Web、Python、AI エージェントのどこからでも同じ方法で呼び出せる点が TOOL HUB の大きな特徴です。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 4.68,
-      "long_start_sec": 0.0,
       "long_duration_sec": 28.584
     },
     {
@@ -138,9 +136,7 @@ window.SCENARIO = {
       "long_narration": "backend_tools には 14 個の MCP サーバーが搭載されています。ブラウザを Chrome DevTools Protocol で直接操作する chrome_devtools、OS のスクリーンショットを取る desktop_capture、SQLite や PostgreSQL でデータを確認する sqlite と postgres、ログを監視する logs、Python の構文チェックや TypeScript の型チェックを行う code_check、差分バックアップを管理する backup、AI で画像や動画を生成する image_generation と movie_generation、音声認識と音声合成を担う speech_to_text と text_to_speech、OBS Studio を制御する obs_studio_control、動画を編集する ffmpeg_control、そして AI コードエージェントを起動する code_agents です。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 5.232,
-      "long_start_sec": 0.0,
       "long_duration_sec": 37.56
     },
     {
@@ -212,9 +208,7 @@ window.SCENARIO = {
       "long_narration": "backend_tools の特徴のひとつは、すべての MCP が 3 種類のトランスポートに対応していることです。1 つ目は SSE Transport で、AI エージェントや Claude Code などの MCP クライアントが接続するエンドポイントです。2 つ目は Streamable HTTP で、Python の requests ライブラリや curl から POST リクエストとして直接呼び出せます。3 つ目は stdio gateway で、Codex のように stdio しか使えない Code CLI 向けに mcp_stdio.py が橋渡し役を担います。どのルートを選んでも、同じポート 8095 の同じ MCP に繋がるため、用途に応じて使い分けられます。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 4.968,
-      "long_start_sec": 0.0,
       "long_duration_sec": 32.448
     },
     {
@@ -280,9 +274,7 @@ window.SCENARIO = {
       "long_narration": "aidiy_chrome_devtools は Chrome DevTools Protocol を使ってブラウザを Python から直接操作する MCP です。Node.js に依存せず、Python だけで動きます。Chrome は ChromeManager がプロセスを一元管理し、デバッグポート 9222 で起動します。ナビゲーション、クリック、テキスト入力、JavaScript の実行、コンソールログ取得、ネットワークキャプチャなど、E2E テストや画面自動化に必要な操作がそろっています。aidiy_desktop_capture は OS レベルのスクリーンショットを撮るツールで、モニター番号や座標指定、ウィンドウタイトルによるキャプチャが可能です。この 2 つを組み合わせると、ブラウザ内外を問わず画面操作と確認を自動化できます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 3.648,
-      "long_start_sec": 0.0,
       "long_duration_sec": 35.016
     },
     {
@@ -363,9 +355,7 @@ window.SCENARIO = {
       "long_narration": "データと品質管理に関する MCP も充実しています。aidiy_sqlite は AiDiy の SQLite データベースをクエリで確認でき、aidiy_postgres は外部の PostgreSQL にも接続できます。aidiy_logs はバックエンドサーバーのログを末尾から取得したり、エラーと例外を自動で抽出したりします。aidiy_code_check は Python ファイルの構文チェック、ruff による linting、TypeScript の型チェックの 3 種類に対応しています。aidiy_backup は差分バックアップで変更ファイルだけを保存し、バージョン履歴の確認や前後の差分表示もできます。これらを AI エージェントから組み合わせることで、コーディングと品質確認を自動化できます。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 4.776,
-      "long_start_sec": 0.0,
       "long_duration_sec": 36.576
     },
     {
@@ -448,9 +438,7 @@ window.SCENARIO = {
       "long_narration": "AI によるメディア生成も TOOL HUB に統合されています。aidiy_image_generation は OpenAI の gpt-image や DALL-E-3、Gemini、FreeAI の 3 プロバイダを切り替えて使えます。aidiy_movie_generation は Google の Gemini Veo を使って 4 秒〜8 秒の動画を MP4 として生成します。音声合成の aidiy_text_to_speech は Edge TTS、OpenAI、Gemini、FreeAI の 4 プロバイダに対応し、MP3 ファイルとして出力できるほか、local_play オプションでその場で再生することもできます。発音辞書による自動読み替えも搭載済みです。音声認識の aidiy_speech_to_text はオフラインで動く speech_recognition と高精度な OpenAI Whisper の両方に対応しています。実はこの動画の音声ナレーションも TTS MCP によって生成されています。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 3.48,
-      "long_start_sec": 0.0,
       "long_duration_sec": 43.944
     },
     {
@@ -528,9 +516,7 @@ window.SCENARIO = {
       "long_narration": "TOOL HUB には外部ツールの制御系 MCP も揃っています。aidiy_obs_studio_control は OBS Studio の WebSocket v5 を通じて、配信・録画の開始停止、シーンの切り替え、ソースの表示非表示、音声ミュートを AI から操作できます。aidiy_ffmpeg_control は ffmpeg、ffprobe、ffplay の薄いラッパーで、動画の合成や字幕焼き込み、指定区間のトリム、音声区間の自動検出、プレビュー再生に対応しています。そして aidiy_code_agents は claude_sdk、copilot_cli、codex_cli など 7 種類の AI コードエージェント CLI を subprocess として起動し、プロジェクトパスやモデル、最大ターン数を指定して実行できます。これら 3 つを組み合わせることで、コード生成から動画制作までを一連のワークフローとして自動化できます。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 5.232,
-      "long_start_sec": 0.0,
       "long_duration_sec": 46.92
     },
     {
@@ -596,9 +582,7 @@ window.SCENARIO = {
       "long_narration": "今回は AiDiy の TOOL HUB、つまり backend_tools が提供する 14 個の MCP サーバーを紹介しました。ブラウザ自動化からデータ確認、AI 画像・動画・音声生成、OBS や FFmpeg の制御、そして AI コードエージェントまで、すべてがポート 8095 ひとつに集まっています。SSE、HTTP、stdio の 3 つのトランスポートに対応しているので、Python スクリプトからでも AI エージェントからでも、同じツールを同じ感覚で呼び出せます。そしてこの動画自体が、AiDiy の video_generation 機能と TTS MCP を使って自動生成された成果物です。自分のプロジェクトでも試してみたいと思ったら、ぜひ AiDiy を手元で起動してみてください。きっと「あ、これ自分でもできる」という発見が待っています。参考になったらチャンネル登録と高評価をよろしくお願いします。次の動画でまた新しい AiDiy の機能をお届けします！",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 3.648,
-      "long_start_sec": 0.0,
       "long_duration_sec": 78.552
     }
   ],

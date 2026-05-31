@@ -1,5 +1,32 @@
 /* メニュー画面共通スタイル */
 
+/* カード登場アニメーション */
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menu-card-fixed {
+  animation: cardAppear 0.38s ease both;
+}
+
+.menu-row .menu-card-fixed:nth-child(1)  { animation-delay:   0ms; }
+.menu-row .menu-card-fixed:nth-child(2)  { animation-delay:  80ms; }
+.menu-row .menu-card-fixed:nth-child(3)  { animation-delay: 160ms; }
+.menu-row .menu-card-fixed:nth-child(4)  { animation-delay: 240ms; }
+.menu-row .menu-card-fixed:nth-child(5)  { animation-delay: 320ms; }
+.menu-row .menu-card-fixed:nth-child(6)  { animation-delay: 400ms; }
+.menu-row .menu-card-fixed:nth-child(7)  { animation-delay: 480ms; }
+.menu-row .menu-card-fixed:nth-child(8)  { animation-delay: 560ms; }
+.menu-row .menu-card-fixed:nth-child(9)  { animation-delay: 640ms; }
+.menu-row .menu-card-fixed:nth-child(10) { animation-delay: 720ms; }
+
 /* 全体のスタイル */
 .menu-view {
   background: linear-gradient(135deg, #faf7f2 0%, #f5f1e8 50%, #f0ebe0 100%);
@@ -35,12 +62,44 @@
 
 /* メニューカード */
 .menu-card {
-  background: #fff;
+  position: relative;
+  background: linear-gradient(150deg, #ece5d6 0%, #e0d5c0 55%, #d6c9b0 100%);
   border-radius: 10px;
   padding: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #d8d0c4;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.menu-card-fixed {
+  width: 224px;
+  min-width: 224px;
+  height: 111px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-card-fixed .menu-card-description {
+  flex: 1;
+}
+
+.menu-card-fixed .menu-card-title {
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.menu-card-fixed .menu-card-description {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.menu-card-fixed.menu-card {
+  padding: 14px;
 }
 
 .menu-card:hover {
@@ -62,35 +121,6 @@
   font-size: 14px;
   margin-bottom: 15px;
   line-height: 1.4;
-}
-
-.menu-card-link {
-  display: inline-block;
-  background: linear-gradient(135deg, #e6d5b7 0%, #dcc8a6 50%, #d2bb95 100%);
-  color: #5a4a3a;
-  padding: 8px 16px;
-  text-decoration: none;
-  border-radius: 5px;
-  font-weight: bold;
-  transition: background 0.2s ease;
-}
-
-.menu-card-link:hover {
-  background: linear-gradient(135deg, #d2bb95 0%, #c89660 50%, #b8824c 100%);
-  color: white;
-}
-
-.menu-card-link-disabled {
-  background: #f0f0f0;
-  color: #999;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.menu-card-link-disabled:hover {
-  background: #f0f0f0;
-  color: #999;
-  transform: none;
 }
 
 .icon {

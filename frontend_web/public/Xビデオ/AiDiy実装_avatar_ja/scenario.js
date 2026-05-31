@@ -1,4 +1,4 @@
-window.SCENARIO = {
+﻿window.SCENARIO = {
   "project_name": "AiDiy avatar版実装例",
   "version": "take3",
   "title": "avatar版 AiDiy 実装例",
@@ -16,7 +16,7 @@ window.SCENARIO = {
     "visual_style": "left_image_30_right_explanation_70",
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "../vrm/VRM_AiDiy.vrm",
+    "avatar": "../_vrm/VRM_AiDiy.vrm",
     "tts_provider": "freeai:female"
   },
   "scenes": [
@@ -42,9 +42,7 @@ window.SCENARIO = {
       "long_narration": "この動画では、AiDiy の Avatar実装を紹介します。Avatar実装は、AI チャットやコード支援の画面に、VRM アバター表示を組み合わせたクライアントです。Electron のデスクトップアプリとしても動き、ブラウザから 8099 番ポートへアクセスして使うこともできます。画面にはアバター、チャット、コード、ファイル、ライブキャプチャ、設定などが登場します。アバターはただ横に置いてあるだけではなく、音声出力に合わせて口を動かしたり、表示モードを切り替えたりできます。最初に全体像を確認し、ログイン、AI コア画面、表示切替、コード作業、画面共有、設定、Web 表示の順に見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_start_sec": 0.0,
       "short_duration_sec": 5.568,
-      "long_start_sec": 0.0,
       "long_duration_sec": 43.032
     },
     {
@@ -108,9 +106,7 @@ window.SCENARIO = {
       "long_narration": "概要画面では、AiDiy の Avatar実装の技術構成を整理しています。画面には Electron と Web のデュアルモード、VRM アバター、ポート 8099、Vue 3、TypeScript、Three.js などが示されています。Electron モードではデスクトップアプリとして常駐し、複数ウィンドウや透明ウィンドウなど、デスクトップ向けの動きが使えます。Web モードではブラウザからアクセスできるので、インストールせずに試せます。モードの判定には window.desktopApi の有無を使い、認証情報の保存先も切り替えます。Electron では localStorage、Web では sessionStorage を使います。アバター描画は Three.js と VRM ライブラリで行い、音声に合わせた口パク、まばたき、ゆるい体の動きも入ります。つまり Avatar実装は、AI と会話する画面を、より見える形、聞こえる形にするためのクライアントです。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_start_sec": 5.568,
       "short_duration_sec": 6.048,
-      "long_start_sec": 43.032,
       "long_duration_sec": 57.024
     },
     {
@@ -169,9 +165,7 @@ window.SCENARIO = {
       "long_narration": "ここは AiDiy Avatar のログイン画面です。背景の上に小さなログインカードがあり、利用者 ID とパスワードを入力します。ログインに成功すると JWT トークンが発行され、以後の API 呼び出しに使われます。Avatar実装の特徴は、Electron モードと Web モードで保存先を分けていることです。Electron モードでは localStorage に保存し、デスクトップアプリとして続けて使いやすくします。Web モードでは sessionStorage に保存し、ブラウザのタブを閉じるとセッションが終わる形にします。同じ画面に見えても、実行環境に合わせて安全性と使い勝手を変えています。ログイン後は、アバター表示と AI コアの各パネルを使える状態になります。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_start_sec": 11.616,
       "short_duration_sec": 6.192,
-      "long_start_sec": 100.056,
       "long_duration_sec": 45.024
     },
     {
@@ -229,9 +223,7 @@ window.SCENARIO = {
       "long_narration": "このシーンでは、AI チャット画面とアバター表示が同時に出ています。左側には AI との会話パネルがあり、右側にはアバター表示のウィンドウがあります。チャットでは文字で質問できますし、LIVE_AI を使うと音声でリアルタイムに対話できます。音声が再生されると、アバターの口が音量に合わせて動きます。これは、音声プレイヤーの音を AudioContext と AnalyserNode で読み取り、VRM の表情値に反映しているためです。単に音が流れるだけではなく、画面上のキャラクターが話しているように見えるので、長い説明でも状態が分かりやすくなります。右側の操作パネルでは、表示するアバターやモードを選べます。AI コアの機能とアバター演出が、別々の飾りではなく同じ作業画面の中でつながっています。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_start_sec": 17.808,
       "short_duration_sec": 5.16,
-      "long_start_sec": 145.08,
       "long_duration_sec": 50.544
     },
     {
@@ -293,9 +285,7 @@ window.SCENARIO = {
       "long_narration": "Avatar実装のアバターエリアは、VRM キャラクターだけに固定されていません。画像にあるように、カレンダーやデジタル時計のような実用表示にも切り替えられます。表示種別には、アバター、xneko、xeyes、アナログ時計、デジタル時計、カレンダー、表示無しがあります。作業に集中したいときは小さな時計やカレンダー、対話している感じを出したいときは VRM アバター、軽いデスクトップウィジェットとして使いたいときは xneko や xeyes、というように選べます。表示無しも用意されているので、必要ないときは消して画面を広く使えます。これは見た目の遊びだけではなく、デスクトップ上で AI 支援を邪魔にならない形に変えるための機能です。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_start_sec": 22.968,
       "short_duration_sec": 6.024,
-      "long_start_sec": 195.624,
       "long_duration_sec": 44.04
     },
     {
@@ -353,9 +343,7 @@ window.SCENARIO = {
       "long_narration": "この画面では、複数のコード用ウィンドウとアバターが同時に表示されています。CODE_AI は最大 6 パネルまで開け、それぞれが独立した会話を持ちます。一つのパネルではフロントエンドの修正、別のパネルではバックエンド API、さらに別のパネルではテストや調査、というように役割を分けられます。ウィンドウが重なって表示されているのは、デスクトップアプリとして複数の作業窓を持てることを示しています。アバターは右側に残り、AI の音声応答や状態を視覚的に伝えます。文字だけのチャットでは、どの作業をどの AI に頼んだのか分かりにくくなることがあります。Avatar実装では、作業ごとに窓を分け、アバター表示も合わせて使うことで、複数の作業を整理しながら進められます。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_start_sec": 28.992,
       "short_duration_sec": 5.496,
-      "long_start_sec": 239.664,
       "long_duration_sec": 48.12
     },
     {
@@ -413,9 +401,7 @@ window.SCENARIO = {
       "long_narration": "このシーンでは、ファイル画面、コード画面、ライブキャプチャ、アバター表示が同時に出ています。左上のファイル画面では、プロジェクト内のファイルやフォルダを確認できます。中央にはコード用の AI パネル、左下にはライブキャプチャがあります。ライブキャプチャは、今見ている画面を AI に渡して、文字だけでは説明しにくい状況を共有するためのものです。たとえば、画面のどこにエラーが出ているか、ボタンがどの位置にあるか、レイアウトが崩れているか、といった情報は、画像として見せた方が伝わりやすくなります。右側のアバターは対話の相手として表示され、音声応答がある場合は口の動きも反映されます。ファイルを見て、画面を共有し、コードを直し、アバターから反応を受け取る。この一連の作業を、ひとつのデスクトップ環境で進められるのが Avatar実装の強みです。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_start_sec": 34.488,
       "short_duration_sec": 4.8,
-      "long_start_sec": 287.784,
       "long_duration_sec": 53.544
     },
     {
@@ -473,9 +459,7 @@ window.SCENARIO = {
       "long_narration": "設定画面では、Avatar実装から使う AI の種類やモデルをまとめて選べます。画面には CHAT_AI、LIVE_AI、CODE_AI などの項目があり、チャット用、音声対話用、コード支援用を別々に設定できます。たとえば、文字で相談する AI、声で話す AI、コードを書く AI を同じものにする必要はありません。用途に合うものを選べます。下部には規定値保存、設定再起動、リセット再起動などの操作があります。設定を変えたあと、必要なサービスへ反映するためのボタンです。デスクトップアプリでは、AI モデルや接続先を試しながら作業する場面が多くなります。そのため、設定ファイルを探して直接編集するだけでなく、画面から確認し、保存し、反映できることが大切です。画像に映っているように、多くの設定項目を一画面で見渡せるので、今どの AI を使う状態なのかを確認しやすくなっています。",
       "short_audio": "audio/short_scene_007.mp3",
       "long_audio": "audio/long_scene_007.mp3",
-      "short_start_sec": 39.288,
       "short_duration_sec": 5.688,
-      "long_start_sec": 341.328,
       "long_duration_sec": 59.376
     },
     {
@@ -534,9 +518,7 @@ window.SCENARIO = {
       "long_narration": "Web モードでは、ブラウザで localhost 8099 にアクセスするだけで AiDiy の Avatar実装を開けます。画像では、上部にタブが並び、左側にアバター、右側にチャットやコードなどのパネルが表示されています。Electron をインストールしなくても使えるので、まず試したい人や、チーム内で画面を共有したい場合に便利です。Electron モードでは複数ウィンドウを活かしたデスクトップ体験になりますが、Web モードではブラウザの一画面に整理されます。アバターを表示しながら、チャット、コード、ファイル、設定などをタブで切り替えるため、画面構成が分かりやすくなります。認証情報は sessionStorage に保存され、タブを閉じるとセッションが切れる設計です。デスクトップアプリの機能を、ブラウザでも確認できる入口として使えます。",
       "short_audio": "audio/short_scene_008.mp3",
       "long_audio": "audio/long_scene_008.mp3",
-      "short_start_sec": 44.976,
       "short_duration_sec": 5.952,
-      "long_start_sec": 400.704,
       "long_duration_sec": 49.488
     },
     {
@@ -561,9 +543,7 @@ window.SCENARIO = {
       "long_narration": "ここまで AiDiy の Avatar実装を見てきました。ログインして、AI と会話し、アバターを表示し、必要に応じて時計やカレンダーなどへ切り替え、コード作業やファイル確認、ライブキャプチャも同じ環境で扱えます。Electron モードではデスクトップアプリとして複数ウィンドウを使い、Web モードではブラウザから一画面で使えます。VRM アバターは音声に合わせて口を動かし、AI の返答をただの文字ではなく、見える反応として受け取れるようにします。AI 支援は便利ですが、長い作業では画面のどこで何が起きているかを見失いやすくなります。Avatar実装は、AI とのやり取りをもっと分かりやすく、作業のそばに置くための形です。自分の作業に合わせて、アバター、コード、ファイル、画面共有を組み合わせて使ってください。あなたもAiDiyとシステムづくりしてみませんか？",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_start_sec": 50.928,
       "short_duration_sec": 5.496,
-      "long_start_sec": 450.192,
       "long_duration_sec": 52.8
     }
   ],
