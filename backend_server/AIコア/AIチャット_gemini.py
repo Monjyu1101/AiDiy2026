@@ -117,6 +117,7 @@ class ChatAI:
         self.履歴最終時刻 = time.time()
         self.履歴辞書 = {}
         self.last_output_files = []
+        self.last_tool_calls = []
 
         # 生存状態管理
         self.is_alive = False
@@ -220,7 +221,8 @@ class ChatAI:
         return "\n\n".join(messages)
 
     async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 120,
-                   システムプロンプト: str = None, file_path: str = None) -> str:
+                   システムプロンプト: str = None, file_path: str = None,
+                   completions_tools: dict = None) -> str:
         """
         Gemini Chat api実行
 
@@ -230,12 +232,21 @@ class ChatAI:
             タイムアウト秒数: タイムアウト時間
             システムプロンプト: システムプロンプト
             file_path: 添付ファイルの絶対パス（オプション）
+            completions_tools: OpenAI completions 形式の tools 追加パラメータ
+                               （例: {"tools": [...], "tool_choice": ..., "messages": [...]}）。
+                               tools を含む場合は Gemini function calling に変換して実行する。
+                               空 or None のときは従来のテキスト生成（挙動は不変）。
         """
         try:
             # 生存状態チェック
             if not self.is_alive:
                 logger.warning("ChatAI実行:ChatAIが開始されていません")
                 return "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
+
+            # tools 指定時は function calling 経路へ（従来のテキスト生成には影響しない）
+            self.last_tool_calls = []
+            if completions_tools and completions_tools.get("tools"):
+                return await self._実行_function_calling(completions_tools, タイムアウト秒数)
 
             # デフォルトシステムプロンプト
             if not システムプロンプト:
@@ -455,6 +466,215 @@ class ChatAI:
                 テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理エラー !!!", "json": json.dumps(data, ensure_ascii=False)})
 
             return エラーメッセージ
+
+    # ------------------------------------------------------------------ #
+    # Function calling（OpenAI completions tools → Gemini 変換）
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _content_text_images(content) -> tuple:
+        """OpenAI content（文字列 or パーツ配列）から (テキスト, [画像URL]) を抽出する"""
+        if content is None:
+            return "", []
+        if isinstance(content, str):
+            return content, []
+        if not isinstance(content, list):
+            return str(content), []
+        texts, images = [], []
+        for part in content:
+            if isinstance(part, dict):
+                ptype = part.get("type")
+                if ptype in (None, "text") and "text" in part:
+                    texts.append(str(part.get("text", "")))
+                elif ptype == "image_url":
+                    iu = part.get("image_url")
+                    url = iu.get("url") if isinstance(iu, dict) else iu
+                    if url:
+                        images.append(str(url))
+            else:
+                texts.append(str(part))
+        return "\n".join(t for t in texts if t), images
+
+    @staticmethod
+    def _decode_image_bytes(url: str):
+        """data: URL を (bytes, mime_type) に変換する。data: 以外は None。"""
+        import base64  # noqa: PLC0415
+        try:
+            if isinstance(url, str) and url.startswith("data:"):
+                header, b64 = url.split(",", 1)
+                mime = header[5:].split(";")[0].strip() or "image/png"
+                return base64.b64decode(b64), mime
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _as_response_dict(text: str) -> dict:
+        """tool 結果テキストを Gemini function_response 用の dict に整える"""
+        try:
+            v = json.loads(text)
+            return v if isinstance(v, dict) else {"result": v}
+        except Exception:
+            return {"result": text}
+
+    def _tool_choice_to_config(self, tool_choice):
+        """OpenAI tool_choice を Gemini ToolConfig に変換する"""
+        Mode = types.FunctionCallingConfigMode
+        mode, allowed = Mode.AUTO, None
+        if tool_choice in (None, "auto"):
+            mode = Mode.AUTO
+        elif tool_choice == "required":
+            mode = Mode.ANY
+        elif tool_choice == "none":
+            mode = Mode.NONE
+        elif isinstance(tool_choice, dict):
+            name = (tool_choice.get("function") or {}).get("name")
+            mode = Mode.ANY
+            allowed = [name] if name else None
+        fcc = types.FunctionCallingConfig(mode=mode, allowed_function_names=allowed)
+        return types.ToolConfig(function_calling_config=fcc)
+
+    def _messages_to_gemini_contents(self, msgs: list) -> tuple:
+        """OpenAI messages を (system_instruction, [types.Content]) に変換する。
+        assistant.tool_calls / tool 結果（function_response）のリンクを保持する。"""
+        # tool_call_id -> function name の対応表（tool 結果に名前を与えるため）
+        id2name = {}
+        for m in msgs:
+            if isinstance(m, dict) and m.get("role") == "assistant":
+                for tc in (m.get("tool_calls") or []):
+                    fn = tc.get("function") or {}
+                    if tc.get("id") and fn.get("name"):
+                        id2name[tc["id"]] = fn["name"]
+
+        system_parts = []
+        contents = []
+        for m in msgs:
+            if not isinstance(m, dict):
+                continue
+            role = m.get("role", "user")
+            content = m.get("content")
+
+            if role == "system":
+                txt, _ = self._content_text_images(content)
+                if txt:
+                    system_parts.append(txt)
+                continue
+
+            if role == "tool":
+                name = id2name.get(m.get("tool_call_id")) or m.get("name") or "tool"
+                txt, _ = self._content_text_images(content)
+                contents.append(types.Content(
+                    role="user",
+                    parts=[types.Part.from_function_response(name=name, response=self._as_response_dict(txt))],
+                ))
+                continue
+
+            gemini_role = "model" if role in ("assistant", "model") else "user"
+            parts = []
+            txt, images = self._content_text_images(content)
+            if txt:
+                parts.append(types.Part.from_text(text=txt))
+            for img in images:
+                decoded = self._decode_image_bytes(img)
+                if decoded:
+                    parts.append(types.Part.from_bytes(data=decoded[0], mime_type=decoded[1]))
+            if role in ("assistant", "model"):
+                for tc in (m.get("tool_calls") or []):
+                    fn = tc.get("function") or {}
+                    try:
+                        args = json.loads(fn.get("arguments") or "{}")
+                    except Exception:
+                        args = {}
+                    if not isinstance(args, dict):
+                        args = {}
+                    parts.append(types.Part.from_function_call(name=fn.get("name", ""), args=args))
+            if parts:
+                contents.append(types.Content(role=gemini_role, parts=parts))
+
+        return "\n".join(system_parts), contents
+
+    async def _実行_function_calling(self, completions_tools: dict, タイムアウト秒数: int) -> str:
+        """OpenAI tools を Gemini function calling に変換して実行し、tool_calls を捕捉する"""
+        import uuid  # noqa: PLC0415
+
+        openai_tools = completions_tools.get("tools") or []
+        tool_choice = completions_tools.get("tool_choice")
+        msgs = completions_tools.get("messages") or []
+
+        # 1) tools 変換（OpenAI function → Gemini FunctionDeclaration）
+        decls = []
+        for t in openai_tools:
+            fn = t.get("function") if isinstance(t, dict) else None
+            if not fn or not fn.get("name"):
+                continue
+            decls.append(types.FunctionDeclaration(
+                name=fn["name"],
+                description=fn.get("description", ""),
+                parameters_json_schema=fn.get("parameters") or {"type": "object", "properties": {}},
+            ))
+        gemini_tools = [types.Tool(function_declarations=decls)] if decls else None
+
+        # 2) messages → contents + system_instruction
+        system_text, contents = self._messages_to_gemini_contents(msgs)
+
+        # 3) config（tools / tool_config / 自動実行は無効化して function_call を受け取る）
+        config = types.GenerateContentConfig(
+            temperature=float(self.temperature),
+            max_output_tokens=8192,
+            tools=gemini_tools,
+            tool_config=self._tool_choice_to_config(tool_choice),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            system_instruction=system_text or None,
+        )
+
+        # 4) 実行（スレッドプール + タイムアウト）
+        def _sync():
+            return self.client.models.generate_content(
+                model=self.chat_model,
+                contents=contents,
+                config=config,
+            )
+
+        try:
+            response = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, _sync),
+                timeout=タイムアウト秒数,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"ChatAI(gemini) function calling タイムアウト ({タイムアウト秒数}秒)")
+            return f"処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
+        except Exception as e:
+            logger.exception(f"ChatAI(gemini) function calling エラー: {e}")
+            return f"api実行エラー: {str(e)}"
+
+        # 5) レスポンス解析（text と function_call を分離）
+        result_text = ""
+        tool_calls = []
+        candidates = getattr(response, "candidates", None) or []
+        if candidates:
+            content = getattr(candidates[0], "content", None)
+            parts = getattr(content, "parts", None) or [] if content else []
+            for part in parts:
+                text = getattr(part, "text", None)
+                if text:
+                    result_text += text
+                fc = getattr(part, "function_call", None)
+                if fc is not None:
+                    args = dict(getattr(fc, "args", None) or {})
+                    tool_calls.append({
+                        "id": getattr(fc, "id", None) or ("call_" + uuid.uuid4().hex[:24]),
+                        "type": "function",
+                        "function": {
+                            "name": getattr(fc, "name", ""),
+                            "arguments": json.dumps(args, ensure_ascii=False),
+                        },
+                    })
+
+        self.last_tool_calls = tool_calls
+        result_text = result_text.strip()
+        if tool_calls:
+            return result_text  # tool_calls のみのときは空文字（ChatLLM 側で正規化）
+        return result_text if result_text else "!"
 
 
 if __name__ == "__main__":

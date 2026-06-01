@@ -111,6 +111,7 @@ class ChatAI:
         self.履歴最終時刻 = time.time()
         self.履歴辞書 = {}
         self.last_output_files = []
+        self.last_tool_calls = []
 
         # 生存状態管理
         self.is_alive = False
@@ -149,9 +150,13 @@ class ChatAI:
             return False
 
     async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 120,
-                   システムプロンプト: str = None, file_path: str = None) -> str:
+                   システムプロンプト: str = None, file_path: str = None,
+                   completions_tools: dict = None) -> str:
         """
         ChatAI実行（Ollama経由でテキスト生成）
+
+        completions_tools: OpenAI completions の追加パラメータ（例: {"tools": [...], "tool_choice": "auto"}）。
+                           空 or None のときは何も付与せず、従来挙動と完全に同一。
         """
         try:
             if not self.is_alive:
@@ -175,6 +180,7 @@ class ChatAI:
 
             output_files = []
             self.last_output_files = output_files
+            self.last_tool_calls = []
 
             タイムアウトフラグ = asyncio.Event()
 
@@ -199,6 +205,7 @@ class ChatAI:
                         テキスト受信処理Ｑ=テキスト受信処理Ｑ,
                         タイムアウトフラグ=タイムアウトフラグ,
                         output_files=output_files,
+                        completions_tools=completions_tools,
                     ),
                 )
 
@@ -240,7 +247,8 @@ class ChatAI:
     def _同期実行(self, メッセージ履歴: list,
                    テキスト受信処理Ｑ: queue.Queue = None,
                    タイムアウトフラグ: asyncio.Event = None,
-                   output_files: list = None) -> str:
+                   output_files: list = None,
+                   completions_tools: dict = None) -> str:
         """同期API実行（スレッドプールで実行）"""
         try:
             parm_kwargs = {
@@ -251,11 +259,30 @@ class ChatAI:
                 "stream": False,
             }
 
+            # completions_tools が指定された場合のみ tools などの追加パラメータをマージ
+            # （空 or None のときは何もしないため従来挙動と同一）
+            if completions_tools:
+                parm_kwargs.update(completions_tools)
+
             response = self.client.chat.completions.create(**parm_kwargs)
 
             応答テキスト = ""
             if response and response.choices:
                 message = response.choices[0].message
+                # tool_calls を捕捉（completions_tools 指定時のみ発生。空なら従来通り）
+                tc = getattr(message, "tool_calls", None)
+                if tc:
+                    self.last_tool_calls = [
+                        {
+                            "id": getattr(c, "id", None),
+                            "type": getattr(c, "type", "function") or "function",
+                            "function": {
+                                "name": c.function.name,
+                                "arguments": c.function.arguments,
+                            },
+                        }
+                        for c in tc
+                    ]
                 message_content = message.content
                 if isinstance(message_content, list):
                     for part in message_content:

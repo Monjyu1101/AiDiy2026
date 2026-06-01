@@ -121,6 +121,11 @@ SERVERS = [
         "expected": {"code_agents_config"},
         "call": ("code_agents_config", {}),
     },
+    {
+        "name": "aidiy_chat_llms",
+        "expected": {"chat_llms_config"},
+        "call": ("chat_llms_config", {}),
+    },
 ]
 
 

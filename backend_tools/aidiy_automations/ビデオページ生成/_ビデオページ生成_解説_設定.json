@@ -7,25 +7,31 @@
   ],
 
   "topic": [
-    "AiDiy のビデオページ生成機能を二人掛け合いで解説する。",
-    "ビデオページ生成_紹介.py（ひとりアバター）と ビデオページ生成_解説.py（二人掛け合い）の 2 スクリプトで、topic から scenario.js 生成 → 画像生成 → 音声合成 → HTML 組み立てまでを 9 ステップで全自動化する。",
-    "設定は _ビデオページ生成_*_設定.json（topic / folder_name / template_dir / language / shared API URL 等）で管理。状況は _ビデオページ生成_*_状況.json でステップ番号を記録し、途中再開・特定ステップ再実行が可能。",
-    "Step 00: 初期確認（設定・テンプレート・API・CodeAgents の疎通）。",
-    "Step 01: テンプレートフォルダをコピーして出力フォルダを作成。",
-    "Step 02: CodeAgents が scenario.js を生成（scenes 配列・dialogue・画像パス・音声パス）。",
-    "Step 03: CodeAgents が index.html の表示文言をテーマに合わせて更新。",
-    "Step 04: aidiy_image_generation MCP で各シーン画像を自動生成（image_prompt を活用）。",
-    "Step 05: 中間確認（シナリオ・HTML・画像の内容を検証し問題があれば修正）。",
-    "Step 06: aidiy_text_to_speech MCP で dialogue の naration_text から音声を生成（edge TTS、male/female 交互）。",
-    "Step 07: 生成音声の実再生時間を ffmpeg で計測し scenario.js の duration_sec を更新。",
-    "Step 08: 必須ファイル・画像数・音声数の最終確認。",
-    "Step 99: 完成案内。",
-    "utils/ フォルダに VideoGenCtx / runner / steps / generation / infra の 5 モジュールを配置し、3 スクリプト共通ロジックを集約。各メインスクリプトは固有プロンプト（Step02/03/04/05）と main() のみ 600〜800 行に収まる設計。",
-    "シーン構成は最小構成で生成: scene_000（イントロ）、scene_001〜scene_005（各機能・ステップ解説）、scene_999（まとめ）の計 7 シーンのみ作成すること。scene_006 以降は作成しない。"
+    "テーマ: NVIDIA Spark（RTX Spark / DGX Spark）— GB10 Grace Blackwell スーパーチップが切り拓く、ローカルで動く高性能 AI マシンの新時代を二人掛け合いで解説する。Windows PC を再定義する RTX Spark スーパーチップから、デスクトップ型パーソナル AI スーパーコンピューター DGX Spark までを整理し、AiDiy をローカル AI 実行基盤として活用するシナリオに着地させる。",
+
+    "【出典 URL（実行 AI はこの3記事の内容のみを根拠に scenario.js を生成すること）】",
+    "URL1（Microsoft News / RTX Spark 搭載 Windows PC）: https://news.microsoft.com/source/asia/features/introducing-a-powerful-new-chapter-for-windows-pcs-accelerated-by-nvidia-rtx-spark/?lang=ja",
+    "URL2（NVIDIA 製品ページ / RTX Spark スーパーチップ）: https://www.nvidia.com/ja-jp/products/rtx-spark/",
+    "URL3（Arm 事例 / NVIDIA DGX Spark）: https://www.arm.com/ja/company/success-library/arm-designs/nvidia-dgx-spark",
+
+    "【URL1 の要点 — RTX Spark 搭載 Windows PC】Microsoft と NVIDIA が史上最もパワフルで効率的な薄型軽量 Windows PC を発表。RTX Spark は 1 ペタフロップの AI 性能と業界最高クラスの電力効率を実現。スペック: Blackwell RTX コア最大6,144基 / Arm 系 CPU 最大20コア（高効率）/ 統合メモリ最大128GB / AI 性能1ペタフロップ。Workload Profile Scheduling(WPS) で20コアに効率配分、Microsoft Power and Thermal Framework(MPTF) で電力・温度管理。Prism エミュレータ強化で x86 互換向上、WSL 経由で Linux AI エコシステムに接続。Blender / DaVinci Resolve / Photoshop / Premiere が Arm 上でネイティブ動作。Windows ML 経由で TensorRT 利用可。NVIDIA OpenShell 統合でエージェント実行時の安全性確保。搭載 PC は秋発売予定: Surface Laptop Ultra, ASUS ProArt P16/P14, Dell XPS 16 Creator Edition, HP OmniBook Ultra 16 / OmniBook X 14, Lenovo Yoga Pro 9n, MSI Prestige N16 Flip AI+。後半に DGX Station for Windows（GB300 搭載）も発表予定。",
+
+    "【URL2 の要点 — NVIDIA RTX Spark スーパーチップ製品ページ】AI と RTX グラフィックスを1つのチップに統合し Windows PC を再定義。最大1ペタフロップス(FP4) / 統合メモリ最大128GB / Blackwell RTX GPU 最大6,144コア / 超高効率 CPU 最大20コア。最も薄型のノート PC と小型・超効率なデスクトップ PC を実現。CUDA ネイティブ対応で同じ開発環境のまま実装可能。クリエイター（リアルタイム3Dレンダリング、4:2:2 ハードウェアエンコード、AV1）/ 開発者（最新モデルのローカルプロトタイプ作成・ファインチューニング・推論）/ ゲーマー（レイトレーシング、DLSS、Reflex、G-SYNC）。ノート PC は ASUS/Dell/HP/Lenovo/Microsoft/MSI から、デスクトップ PC はコンパクト設計で24時間稼働可能。",
+
+    "【URL3 の要点 — NVIDIA DGX Spark（Arm）】AI 研究者・データサイエンティスト向けの高性能パーソナル AI スーパーコンピューター。中核は NVIDIA GB10 Grace Blackwell スーパーチップ（高性能 Arm Cortex-X925 ×10 + 汎用 Cortex-A725 ×10）。最大2,000億パラメータのモデルの学習・推論を実行でき、言語・ビジョン・マルチモーダルに対応。デスクトップでエンタープライズレベルの AI 開発が可能になり、個人研究者や学生にも最先端 AI 開発へのアクセスを広げる。",
+
+    "【整理方針・事実の扱い（実行 AI への指示）】3記事の共通軸は『GB10 Grace Blackwell をベースとした Spark 系の、ローカルで動く高性能 AI マシン』である。RTX Spark（薄型軽量 Windows PC / スーパーチップ）と DGX Spark（デスクトップ型パーソナル AI スパコン）は同じ Spark ファミリーの異なる製品形態として区別して扱い、混同させないこと。数値・製品名は上記要点に書かれた範囲だけを使い、記事にない仕様・価格・発売日を創作しないこと。誇大表現（完全な AGI、人間の完全代替など）は forbidden_elements に入れること。",
+
+    "【AiDiy 連携軸（解説型は末尾で AiDiy 活用に着地する）】RTX Spark / DGX Spark を『AiDiy をローカルで動かす AI 実行基盤』として位置づける。128GB 統合メモリと1ペタフロップ級の性能により、クラウドに依存せずローカル LLM（Ollama 等）と AiDiy（2サーバー + 15 MCP + Avatar）を1台で動かし、AI コア / Code AI を低レイテンシ・データを外に出さずに利用できる、という活用シナリオに着地させる。設定キー（CHAT_AI_NAME / LIVE_AI_NAME / CODE_AI1_NAME〜CODE_AI6_NAME）にローカルモデルを指定する流れに触れてよいが、AiDiy 側の事実は CLAUDE.md / AGENTS.md の範囲にとどめること。",
+
+    "【シーン構成】最小構成 7 シーンで生成すること。scene_000（イントロ: Spark とは＝ローカル AI マシンの新時代、この動画は AiDiy の video_generation 機能で自動生成された旨を冒頭で明言）、scene_001（RTX Spark スーパーチップのスペック: 1PFLOP・6,144 Blackwell コア・20 Arm コア・128GB 統合メモリ）、scene_002（Windows PC の再定義: 薄型軽量・Surface Laptop Ultra ほか各社秋発売・Prism/Arm 互換・WSL・OpenShell）、scene_003（DGX Spark: GB10 Grace Blackwell・Cortex-X925/A725・最大2,000億パラメータ・デスクトップ AI スパコン）、scene_004（用途別の価値: クリエイター/開発者/ゲーマー、ローカルでの推論・ファインチューニング、CUDA ネイティブ）、scene_005（AiDiy 活用シナリオ: Spark 上で AiDiy ＋ ローカル LLM をクラウド非依存で動かす）、scene_999（まとめ）。scene_006 以降は作成しない。",
+    "【scene_999 の締め必須3要素】(1) この動画は AiDiy の video_generation 機能で自動生成された旨の明言、(2) チャンネル登録の誘導、(3) 『自分でも作れる/使ってみたくなる』誘導。締めの発話は female にすること。",
+
+    "【パイプライン仕様メモ（変更しないこと）】ビデオページ生成_解説.py（二人掛け合い）が topic から scenario.js 生成 → 画像生成 → 音声合成 → HTML 組み立てまでを 9 ステップで全自動化する。Step00 初期確認 / Step01 テンプレコピーで出力フォルダ作成 / Step02 CodeAgents が scenario.js 生成 / Step03 index.html 文言更新 / Step04 aidiy_image_generation で画像生成 / Step05 中間確認 / Step06 aidiy_text_to_speech で naration_text から音声生成（edge TTS、male/female 交互）/ Step07 ffmpeg で実尺計測し duration_sec 更新 / Step08 最終確認 / Step99 完成案内。状況は _ビデオページ生成_解説_状況.json に記録され途中再開・特定ステップ再実行が可能。"
   ],
 
   "template_dir": "D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ/AiDiy解説__all_ja",
-  "folder_name": "テスト解説_ビデオページ生成_ja",
+  "folder_name": "解説_NVIDIA_Spark_ja",
   "language": "ja",
 
   "shared": {

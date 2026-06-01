@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AiDiy解説_tools_ja — AiDiy TOOL HUB 解説 | 14 MCP サーバーを Web・Python・AI エージェントから統一的に呼び出す</title>
+  <title>解説_NVIDIA_Spark_ja — NVIDIA Spark: GB10 Grace Blackwell が切り拓くローカル AI マシンの新時代</title>
   <style>
     * { box-sizing: border-box; margin: 0; }
     html, body {
@@ -313,11 +313,11 @@
     <header class="topbar">
       <div class="brand-wrap">
         <div class="brand">
-          <span class="g-blue">A</span><span class="g-red">i</span><span class="g-yellow">D</span><span class="g-green">i</span><span class="g-blue">y</span>&nbsp;TOOL HUB 解説
+          <span style="color:#76b900">NVIDIA Spark</span>&nbsp;解説
         </div>
-        <div class="brand-sub">AIDIY TOOL HUB</div>
+        <div class="brand-sub">RTX SPARK × DGX SPARK — GB10 GRACE BLACKWELL</div>
       </div>
-      <div class="top-note">backend_tools が AiDiy TOOL HUB として進化。14 の MCP サーバーを SSE / HTTP / stdio の 3 トランスポートで提供し、Web・Python・AI エージェントから統一的に呼び出せます。</div>
+      <div class="top-note">RTX Spark と DGX Spark — GB10 Grace Blackwell が切り拓く、ローカルで動く高性能 AI マシンの新時代を二人掛け合いで解説します。<br>AiDiy の video_generation 機能で自動生成されたビデオです。</div>
     </header>
 
     <main class="stage">
@@ -392,6 +392,10 @@
     const _qp = new URLSearchParams(window.location.search);
     const _autoPlay = _qp.get("auto") === "yes";
     const _loopPlay = _qp.get("auto") === "loop";
+    const _previewMinSceneSec = (() => {
+      const n = Number(_qp.get("preview_min_sec"));
+      return Number.isFinite(n) && n > 0 ? n : 5;
+    })();
 
     const audioPlayer = new Audio();
     audioPlayer.preload = "auto";
@@ -719,11 +723,15 @@
 
     function beginTurnPlayback() {
       const turn  = currentTurn();
-      if (!turn) return;
       const token = ++playbackToken;
       clearTimers();
+      if (!turn) {
+        turnStartedAt = Date.now();
+        armTurnEndTimer((_previewMinSceneSec || 5) * 1000, token);
+        return;
+      }
 
-      let effectiveDuration = turn.duration_sec || 5;
+      let effectiveDuration = turn.duration_sec || _previewMinSceneSec || 5;
       turnStartedAt = Date.now() - turnElapsedMs;
 
       tickTimer = setInterval(() => {
@@ -814,7 +822,7 @@
 
     function play() {
       if (playing) return;
-      const dur = (currentTurn()?.duration_sec || 5) * 1000;
+      const dur = (currentTurn()?.duration_sec || _previewMinSceneSec || 5) * 1000;
       if (turnElapsedMs >= dur - 80) turnElapsedMs = 0;
       playing = true;
       playBtn.textContent = "⏸";
@@ -828,7 +836,7 @@
       playbackToken++;
       playing = false;
       playBtn.textContent = "▶";
-      const dur = (currentTurn()?.duration_sec || 5) * 1000;
+      const dur = (currentTurn()?.duration_sec || _previewMinSceneSec || 5) * 1000;
       turnElapsedMs = Math.min(
         Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
           ? audioPlayer.currentTime * 1000

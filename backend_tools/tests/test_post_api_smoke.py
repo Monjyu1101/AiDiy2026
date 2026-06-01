@@ -93,6 +93,8 @@ def main() -> None:
         "/aidiy_obs_studio_control/docs",
         "/aidiy_ffmpeg_control/docs",
         "/aidiy_code_agents/docs",
+        "/aidiy_chat_llms/docs",
+        "/aidiy_chat_completions/docs",
     ]
     for path in docs_paths:
         doc = get(path)
@@ -230,6 +232,16 @@ def main() -> None:
     if "version_info" not in config and "ai_versions" not in config:
         raise AssertionError(f"agents config: unexpected keys {sorted(config.keys())}")
     print("  OK code_agents")
+
+    # Chat LLM は config のみ。run / completions は実 API 呼び出しのため別途明示して実行する。
+    chat_config = post("/aidiy_chat_llms/config")
+    assert_no_error("chat_llm config", chat_config)
+    if "version_info" not in chat_config:
+        raise AssertionError(f"chat_llm config: unexpected keys {sorted(chat_config.keys())}")
+    models = get("/aidiy_chat_completions/v1/models")
+    if not isinstance(models, dict) or models.get("object") != "list":
+        raise AssertionError(f"chat_completions models: unexpected {models}")
+    print("  OK chat_llm / chat_completions")
 
     print("\nOK")
 

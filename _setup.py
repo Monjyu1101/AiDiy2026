@@ -75,6 +75,12 @@ backend_tools_ENV_CANDIDATES = [".venv", "venv"]
 SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
 SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 
+# VS Code チャットモデル (chatLanguageModels.json) 用設定
+# OpenAI / Ollama 互換の aidiy_chat_completions エンドポイントを Custom Endpoint として登録する
+CHAT_COMPLETIONS_PROVIDER_NAME = "aidiy_chat_completions"
+CHAT_COMPLETIONS_URL = "http://localhost:8095/aidiy_chat_completions/v1/chat/completions"
+CHAT_COMPLETIONS_MODEL_IDS = ["freeai_chat", "openrt_chat", "gemini_chat", "ollama_chat"]
+
 
 class Colors:
     HEADER = '\033[97m'
@@ -354,6 +360,95 @@ def get_vscode_mcp_path() -> Path:
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Code" / "User" / "mcp.json"
     return Path.home() / ".config" / "Code" / "User" / "mcp.json"
+
+
+def get_vscode_chat_models_path() -> Path:
+    """VS Code ユーザー設定フォルダ配下の chatLanguageModels.json パスを返す。"""
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+        return base / "Code" / "User" / "chatLanguageModels.json"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Code" / "User" / "chatLanguageModels.json"
+    return Path.home() / ".config" / "Code" / "User" / "chatLanguageModels.json"
+
+
+def load_json_list_file(path: Path) -> list:
+    if not path.exists():
+        return []
+    raw = path.read_text(encoding="utf-8-sig")
+    if raw.strip() == "":
+        return []
+    loaded = json.loads(raw)
+    return loaded if isinstance(loaded, list) else []
+
+
+def write_json_list_file(path: Path, data: list) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return True
+    except Exception as e:
+        print_error(f"設定ファイル書き込みエラー: {path} ({e})")
+        return False
+
+
+def _build_chat_completions_provider() -> dict:
+    """aidiy_chat_completions の Custom Endpoint プロバイダ定義を組み立てる。"""
+    models = [
+        {
+            "id": ai_name,
+            "name": ai_name,
+            "url": CHAT_COMPLETIONS_URL,
+            "toolCalling": True,
+            "vision": True,
+            "maxInputTokens": 128000,
+            "maxOutputTokens": 16000,
+        }
+        for ai_name in CHAT_COMPLETIONS_MODEL_IDS
+    ]
+    return {
+        "name": CHAT_COMPLETIONS_PROVIDER_NAME,
+        "vendor": "customendpoint",
+        "apiType": "chat-completions",
+        "apiKey": "aidiy",
+        "models": models,
+    }
+
+
+def upsert_vscode_chat_completions(path: Path) -> bool:
+    """VS Code chatLanguageModels.json に aidiy_chat_completions プロバイダを書き込む。
+
+    既存の他プロバイダ (Ollama など) は温存し、同名エントリのみ置き換える。
+    ファイルが無い場合は VS Code 既定の Ollama テンプレートも併せて新規作成する。
+    """
+    try:
+        providers = load_json_list_file(path)
+        if not providers:
+            providers = [{"name": "Ollama", "vendor": "ollama", "url": "http://localhost:11434"}]
+
+        provider = _build_chat_completions_provider()
+        replaced = False
+        for i, entry in enumerate(providers):
+            if isinstance(entry, dict) and entry.get("name") == CHAT_COMPLETIONS_PROVIDER_NAME:
+                providers[i] = provider
+                replaced = True
+                break
+        if not replaced:
+            providers.append(provider)
+
+        if not write_json_list_file(path, providers):
+            return False
+        print_success(f"VS Code チャットモデル設定を書き込みました: {path} ({CHAT_COMPLETIONS_PROVIDER_NAME})")
+        return True
+    except json.JSONDecodeError as e:
+        print_error(f"JSON解析エラー: {path} ({e})")
+        return False
+    except Exception as e:
+        print_error(f"VS Code チャットモデル設定更新エラー: {path} ({e})")
+        return False
 
 
 def get_opencode_config_path() -> Path:
@@ -1396,6 +1491,12 @@ def configure_backend_tools_clients(module: dict) -> bool:
         [(sn, {"type": "sse", "url": url}) for sn, url in servers],
         top_key="servers",
     )
+
+    # 8) VS Code チャットモデル (aidiy_chat_completions / OpenAI 互換 chat-completions)
+    #    MCP ではなく chatLanguageModels.json への Custom Endpoint 登録
+    vscode_chat = get_vscode_chat_models_path()
+    print_info(f"[VS Code Chat] {vscode_chat}")
+    all_ok &= upsert_vscode_chat_completions(vscode_chat)
 
     if all_ok:
         print_success(f"{label}: 設定ファイルの書き込みが完了しました。")

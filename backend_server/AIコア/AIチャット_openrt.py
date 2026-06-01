@@ -86,6 +86,7 @@ class ChatAI:
         self.履歴最終時刻 = time.time()
         self.履歴辞書 = {}
         self.last_output_files = []
+        self.last_tool_calls = []
 
         # 生存状態管理
         self.is_alive = False
@@ -134,7 +135,8 @@ class ChatAI:
             return False
 
     async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 120,
-                   システムプロンプト: str = None, file_path: str = None) -> str:
+                   システムプロンプト: str = None, file_path: str = None,
+                   completions_tools: dict = None) -> str:
         """
         ChatAI実行（OpenRouter経由でテキスト生成）
 
@@ -144,6 +146,8 @@ class ChatAI:
             タイムアウト秒数: タイムアウト時間
             システムプロンプト: システムプロンプト
             file_path: 添付ファイルの絶対パス（オプション）
+            completions_tools: OpenAI completions の追加パラメータ（例: {"tools": [...], "tool_choice": "auto"}）。
+                               空 or None のときは何も付与せず、従来挙動と完全に同一。
 
         Returns:
             生成されたテキスト
@@ -185,6 +189,7 @@ class ChatAI:
             # 出力ファイルリスト（OpenRouterは画像生成非対応のため常に空）
             output_files = []
             self.last_output_files = output_files
+            self.last_tool_calls = []
 
             # タイムアウト監視タスク作成
             タイムアウトフラグ = asyncio.Event()
@@ -215,7 +220,8 @@ class ChatAI:
                         メッセージ履歴=メッセージ履歴,
                         テキスト受信処理Ｑ=テキスト受信処理Ｑ,
                         タイムアウトフラグ=タイムアウトフラグ,
-                        output_files=output_files
+                        output_files=output_files,
+                        completions_tools=completions_tools
                     )
                 )
 
@@ -274,7 +280,8 @@ class ChatAI:
     def _同期実行(self, メッセージ履歴: list,
                    テキスト受信処理Ｑ: queue.Queue = None,
                    タイムアウトフラグ: asyncio.Event = None,
-                   output_files: list = None) -> str:
+                   output_files: list = None,
+                   completions_tools: dict = None) -> str:
         """
         同期api実行（スレッドプールで実行、画像生成対応）
         """
@@ -291,6 +298,11 @@ class ChatAI:
             # 画像生成モデルの場合はmodalitiesを指定（OpenRouterサンプル準拠）
             if "image" in str(self.chat_model):
                 parm_kwargs["extra_body"] = {"modalities": ["image", "text"]}
+
+            # completions_tools が指定された場合のみ tools などの追加パラメータをマージ
+            # （空 or None のときは何もしないため従来挙動と同一）
+            if completions_tools:
+                parm_kwargs.update(completions_tools)
 
             # api実行
             response = self.client.chat.completions.create(**parm_kwargs)
@@ -344,6 +356,20 @@ class ChatAI:
             画像保存済み = False  # 最初の1つだけ保存するフラグ
             if response and response.choices:
                 message = response.choices[0].message
+                # tool_calls を捕捉（completions_tools 指定時のみ発生。空なら従来通り）
+                tc = getattr(message, "tool_calls", None)
+                if tc:
+                    self.last_tool_calls = [
+                        {
+                            "id": getattr(c, "id", None),
+                            "type": getattr(c, "type", "function") or "function",
+                            "function": {
+                                "name": c.function.name,
+                                "arguments": c.function.arguments,
+                            },
+                        }
+                        for c in tc
+                    ]
                 message_content = message.content
 
                 # contentがリスト形式の場合（画像生成モデルの可能性）
