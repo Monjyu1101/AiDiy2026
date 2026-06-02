@@ -305,7 +305,20 @@ class ChatAI:
                 parm_kwargs.update(completions_tools)
 
             # api実行
-            response = self.client.chat.completions.create(**parm_kwargs)
+            has_tools = bool(completions_tools and completions_tools.get("tools"))
+            try:
+                response = self.client.chat.completions.create(**parm_kwargs)
+            except Exception as api_e:
+                api_err_str = str(api_e)
+                if has_tools and "tool" in api_err_str.lower():
+                    # ツール非対応モデル向けフォールバック: tools/messages を除去して再実行
+                    logger.warning(f"ChatAI: tool use 非対応のためフォールバック実行: {api_e}")
+                    for k in ("tools", "tool_choice", "messages"):
+                        parm_kwargs.pop(k, None)
+                    parm_kwargs["messages"] = メッセージ履歴
+                    response = self.client.chat.completions.create(**parm_kwargs)
+                else:
+                    raise
 
             # デバッグログ簡略化（ファイル送受信に関係するもののみ）
             if response and response.choices:
