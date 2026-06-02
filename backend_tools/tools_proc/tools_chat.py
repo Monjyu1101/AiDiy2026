@@ -45,6 +45,9 @@ class ChatLLMRequest(BaseModel):
     temperature: Optional[float] = None
     timeout_sec: int = 120
     file_path: Optional[str] = None
+    # 自前 MCP 群をツールとして渡し、tool_calls をサーバー側で自律実行する
+    use_tools: bool = True
+    max_turns: int = 8
 
 
 class ChatMessage(BaseModel):
@@ -108,8 +111,13 @@ def register_tools(mcp_cl, chat_llm):
             temperature: Optional[float] = None,
             timeout_sec: int = 120,
             file_path: Optional[str] = None,
+            use_tools: bool = True,
+            max_turns: int = 8,
         ) -> str:
-            """AIチャット.py 系の ChatAI を実行する（起動時に description が動的更新される）"""
+            """AIチャット.py 系の ChatAI を実行する（起動時に description が動的更新される）。
+
+            use_tools=True のときは自前 MCP 群をツールとして LLM に渡し、tool_calls を
+            サーバー側で実行しながら応答が確定するまで最大 max_turns 回ループする。"""
             try:
                 result = await chat_llm.run_async(
                     prompt,
@@ -122,6 +130,8 @@ def register_tools(mcp_cl, chat_llm):
                     temperature,
                     timeout_sec,
                     file_path,
+                    use_tools,
+                    max_turns,
                 )
             except ChatLLMError as e:
                 raise ValueError(str(e)) from e
@@ -158,7 +168,7 @@ def create_router(chat_llm) -> APIRouter:
         """aidiy_chat_llms の詳細 API ドキュメント（AI 向け）"""
         return {
             "service": "aidiy_chat_llms",
-            "description": "AIチャット.py 系の ChatAI（OpenRouter / Gemini / FreeAI / Ollama）を MCP 経由で起動し、テキスト応答を生成する。OpenAI / Ollama 互換の標準インターフェースは aidiy_chat_completions を参照。",
+            "description": "AIチャット.py 系の ChatAI（OpenRouter / Gemini / FreeAI / Ollama）を MCP 経由で起動し、テキスト応答を生成する。use_tools=True で自前 MCP 群をツールとして渡し tool_calls をサーバー側で自律実行（エージェント駆動）する。tool_calls を返すだけのローレベル／OpenAI・Ollama 互換の標準インターフェースは aidiy_chat_completions を参照。",
             "endpoint": "POST /aidiy_chat_llms/{method_name}",
             "content_type": "application/json",
             "methods": {
@@ -171,8 +181,8 @@ def create_router(chat_llm) -> APIRouter:
                     "example_request": {},
                 },
                 "run": {
-                    "summary": "AIチャット実行",
-                    "description": "指定プロンプトを ChatAI に渡してテキスト応答を生成する。",
+                    "summary": "AIチャット実行（ツール自律実行対応）",
+                    "description": "指定プロンプトを ChatAI に渡してテキスト応答を生成する。use_tools=True のときは自前 MCP 群（aidiy_sqlite / aidiy_logs / aidiy_code_check 等）をツールとして LLM に渡し、LLM が返した tool_calls をサーバー側で self-call 実行し、結果を戻して応答が確定するまで最大 max_turns 回ループする（aidiy_chat_llms / aidiy_code_agents 自身はツールから除外）。tool_calls を返すだけのローレベル動作が必要なら aidiy_chat_completions を使う。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "AI への入力テキスト（日本語可）"},
                         "project_path": {"type": "string", "required": False, "description": "出力ファイル保存先の絶対パス。省略時は CODE_BASE_PATH"},
@@ -182,11 +192,13 @@ def create_router(chat_llm) -> APIRouter:
                         "session_id": {"type": "string", "required": False, "default": "mcp_default", "description": "会話履歴のキー（resume=True 時に継続）"},
                         "resume": {"type": "boolean", "required": False, "default": True, "description": "True で session_id の会話履歴を継続"},
                         "temperature": {"type": "number", "required": False, "description": "生成温度"},
-                        "timeout_sec": {"type": "integer", "required": False, "default": 120, "description": "タイムアウト秒"},
+                        "timeout_sec": {"type": "integer", "required": False, "default": 120, "description": "タイムアウト秒（ツール 1 回あたりにも適用）"},
                         "file_path": {"type": "string", "required": False, "description": "添付画像ファイルの絶対パス（vision 対応モデルのみ）"},
+                        "use_tools": {"type": "boolean", "required": False, "default": True, "description": "True で自前 MCP 群をツールとして渡し tool_calls を自律実行する。False で従来の 1 回素応答"},
+                        "max_turns": {"type": "integer", "required": False, "default": 8, "description": "ツール実行ループの最大ターン数"},
                     },
                     "example_request": {
-                        "prompt": "日本の四季について俳句を1つ作ってください",
+                        "prompt": "DBの C利用者 テーブルの件数を調べて",
                         "ai_name": "auto",
                     },
                     "response_fields": {
@@ -195,6 +207,9 @@ def create_router(chat_llm) -> APIRouter:
                         "ai_name": "実際に使用した AI",
                         "ai_model": "実際に使用したモデル",
                         "output_files": "生成された出力ファイル（画像生成モデルの場合）",
+                        "tool_trace": "実行したツールの履歴 [{mcp, method, arguments, ok}, ...]",
+                        "turns": "実行したループのターン数",
+                        "tool_stopped": "True=max_turns 到達で打ち切り",
                     },
                 },
             },
@@ -223,6 +238,8 @@ def create_router(chat_llm) -> APIRouter:
                     temperature=req.temperature,
                     timeout_sec=req.timeout_sec,
                     file_path=req.file_path,
+                    use_tools=req.use_tools,
+                    max_turns=req.max_turns,
                 )
             else:
                 return {"error": f"未知のメソッド: {method_name}"}

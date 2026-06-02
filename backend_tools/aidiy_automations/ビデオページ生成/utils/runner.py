@@ -139,8 +139,8 @@ class VideoGenRunner:
 
         completed_step = get_completed_step(ctx)
         if completed_step == "99" and not ctx.step_specified:
-            print(f"\n{ctx.steps_json_name} は {ctx.script_type}=99 です。完了済みとして終了します。")
-            print(f"再実行する場合は {ctx.script_type} を \"\" にしてください: {ctx.steps_json_path}")
+            print(f"\n{ctx.steps_json_name} は complete_steps=99 です。完了済みとして終了します。")
+            print(f"再実行する場合は complete_steps を \"\" にしてください: {ctx.steps_json_path}")
             guide_tts(ctx, f"{ctx.script_type} は既に完了しています。")
             return
 

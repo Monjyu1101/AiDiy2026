@@ -506,33 +506,22 @@ def render_scene_image_script(
         "        raise RuntimeError(result['error'])\n"
         "    return result\n\n\n"
         "def generate_one(prompt, out_path, original_path=None):\n"
-        "    attempts = [\n"
-        '        ("openai", "gpt-image-2", "1536x1024", "medium"),\n'
-        '        ("freeai", "auto", "1920x1080", "auto"),\n'
-        '        ("auto", "auto", "1024x1024", "auto"),\n'
-        "    ]\n"
-        "    last_error = None\n"
-        "    for provider, model, size, quality in attempts:\n"
-        "        try:\n"
-        "            payload = {\n"
-        '                "prompt": prompt,\n'
-        '                "provider": provider,\n'
-        '                "model": model,\n'
-        '                "size": size,\n'
-        '                "quality": quality,\n'
-        '                "save_path": out_path,\n'
-        "            }\n"
-        "            if original_path:\n"
-        '                payload["original_path"] = original_path\n'
-        "            result = post_json(IMAGE_GEN_API_URL, payload)\n"
-        "            return {\n"
-        '                "provider": provider,\n'
-        '                "model": model,\n'
-        '                "save_path": result.get("save_path", out_path),\n'
-        "            }\n"
-        "        except Exception as e:\n"
-        '            last_error = f"{provider}/{model}/{size}: {e}"\n'
-        '    raise RuntimeError(last_error or "image generation failed")\n\n\n'
+        "    payload = {\n"
+        '        "prompt": prompt,\n'
+        '        "provider": "auto",\n'
+        '        "model": "auto",\n'
+        '        "size": "auto",\n'
+        '        "quality": "auto",\n'
+        '        "save_path": out_path,\n'
+        "    }\n"
+        "    if original_path:\n"
+        '        payload["original_path"] = original_path\n'
+        "    result = post_json(IMAGE_GEN_API_URL, payload)\n"
+        "    return {\n"
+        '        "provider": result.get("provider", "auto"),\n'
+        '        "model": result.get("model", "auto"),\n'
+        '        "save_path": result.get("save_path", out_path),\n'
+        "    }\n\n\n"
         "def main():\n"
         "    scenes = load_scenes()\n"
         "    total = len(scenes)\n"

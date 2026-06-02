@@ -162,8 +162,11 @@ def _save_steps_json(steps_json_path: str, data: dict) -> None:
         f.write("\n")
 
 
-def ensure_steps_json(steps_json_path: str, steps_json_name: str, required_keys: tuple) -> dict:
-    """実行完了ステップ JSON を初期化し、required_keys を必ず持つ dict を返す。"""
+STEPS_JSON_KEY = "complete_steps"
+
+
+def ensure_steps_json(steps_json_path: str, steps_json_name: str, required_keys: tuple = ()) -> dict:
+    """実行完了ステップ JSON を初期化し、complete_steps を必ず持つ dict を返す。"""
     data: dict = {}
     if os.path.isfile(steps_json_path):
         try:
@@ -175,9 +178,17 @@ def ensure_steps_json(steps_json_path: str, steps_json_name: str, required_keys:
             print(f"WARNING: {steps_json_name} の読み込みに失敗しました。初期化します: {e}")
 
     changed = False
+    if STEPS_JSON_KEY not in data or not isinstance(data.get(STEPS_JSON_KEY), str):
+        migrated_value = ""
+        for key in required_keys:
+            if isinstance(data.get(key), str) and data.get(key):
+                migrated_value = data.get(key, "")
+                break
+        data[STEPS_JSON_KEY] = migrated_value
+        changed = True
     for key in required_keys:
-        if key not in data or not isinstance(data.get(key), str):
-            data[key] = ""
+        if key in data:
+            del data[key]
             changed = True
     if changed or not os.path.isfile(steps_json_path):
         _save_steps_json(steps_json_path, data)
@@ -215,16 +226,16 @@ def next_step_after(value: str) -> int:
 def get_completed_step(ctx: "VideoGenCtx") -> str:
     """ctx から現在の完了ステップ文字列を返す。"""
     data = ensure_steps_json(ctx.steps_json_path, ctx.steps_json_name, (ctx.script_type,))
-    return str(data.get(ctx.script_type, "") or "")
+    return str(data.get(STEPS_JSON_KEY, "") or "")
 
 
 def set_completed_step(ctx: "VideoGenCtx", step_no: int) -> None:
     """ctx の完了ステップを更新して保存する。"""
     data = ensure_steps_json(ctx.steps_json_path, ctx.steps_json_name, (ctx.script_type,))
     value = step_no_to_value(step_no)
-    data[ctx.script_type] = value
+    data[STEPS_JSON_KEY] = value
     _save_steps_json(ctx.steps_json_path, data)
-    print(f"  [steps] {ctx.script_type} 実行完了ステップ = {value}")
+    print(f"  [steps] complete_steps = {value}")
 
 
 # ================================================================== #
@@ -762,7 +773,7 @@ def build_ctx(
             sys.exit(1)
     else:
         data = ensure_steps_json(steps_json_path, steps_json_name, steps_keys)
-        completed = str(data.get(script_type, "") or "")
+        completed = str(data.get(STEPS_JSON_KEY, "") or "")
         start_step = next_step_after(completed)
     stop_step = start_step
 

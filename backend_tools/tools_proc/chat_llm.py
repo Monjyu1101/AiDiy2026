@@ -346,12 +346,20 @@ Args:
         temperature: Optional[float] = None,
         timeout_sec: int = 120,
         file_path: Optional[str] = None,
+        use_tools: bool = True,
+        max_turns: int = 8,
     ) -> dict:
         """
         AIチャット.py 系の ChatAI を使ってテキスト応答を生成する。
 
+        use_tools=True かつ画像添付が無い場合は、ChatAI 自身に自前 MCP 群をツールとして
+        使わせ、tool_calls をサーバー側で実行しながら応答が確定するまで自己ループする
+        （AIコア/AIチャット_xxxx.py の 実行(自己ループ=True) に委譲）。MCP が収集できない
+        ／use_tools=False ／画像添付ありの場合は 1 回の素応答を返す（_run_plain）。
+
         Returns:
-            {"status": "OK"/"NG", "result": "...", "ai_name": ..., "ai_model": ..., ...}
+            {"status": "OK"/"NG", "result": "...", "ai_name": ..., "ai_model": ...,
+             "tool_trace": [...], "turns": ..., ...}
         """
         self._setup_sys_path()
 
@@ -370,6 +378,34 @@ Args:
                 "prompt_length": len(prompt or ""),
             }
 
+        # ツール対応（自己ループ）: ChatAI 自身に MCP ツールを使わせる。
+        # file_path（画像）指定時はツール経路が未対応のため素実行にフォールバック。
+        if use_tools and not file_path:
+            return await self._run_with_self_loop(
+                prompt, resolved_path, ai_name, ai_model, system_instruction,
+                timeout_sec, max_turns, temperature,
+            )
+
+        # 素実行（tools 無し）
+        return await self._run_plain(
+            prompt, resolved_path, ai_name, ai_model, system_instruction,
+            session_id, resume, temperature, timeout_sec, file_path,
+        )
+
+    async def _run_plain(
+        self,
+        prompt: str,
+        resolved_path: str,
+        ai_name: str,
+        ai_model: str,
+        system_instruction: Optional[str],
+        session_id: str,
+        resume: bool,
+        temperature: Optional[float],
+        timeout_sec: int,
+        file_path: Optional[str],
+    ) -> dict:
+        """従来挙動: ChatAI を 1 回だけ実行して素応答を返す（session_id で履歴継続）。"""
         cache_key = f"{session_id}::{ai_name}::{ai_model}"
         instance = self._sessions.get(cache_key) if resume else None
 
@@ -416,6 +452,70 @@ Args:
             "ai_name": ai_name,
             "ai_model": ai_model,
             "output_files": output_files,
+            "tool_trace": [],
+            "turns": 1,
+            "prompt_length": len(prompt or ""),
+        }
+
+    async def _run_with_self_loop(
+        self,
+        prompt: str,
+        resolved_path: str,
+        ai_name: str,
+        ai_model: str,
+        system_instruction: Optional[str],
+        timeout_sec: int,
+        max_turns: int,
+        temperature: Optional[float],
+    ) -> dict:
+        """ChatAI 自身の 実行(自己ループ=True) に委譲して MCP ツールを使わせる。
+
+        ツール収集・実行・ループ制御は AIコア/AI内部ツール.py（MCPツールブリッジ /
+        自己ループ実行）と各 AIチャット_xxxx.py 側にある。本メソッドは ChatAI を起動して
+        委譲し、結果と tool_trace を回収するだけの薄いラッパー。
+        MCP が未収集（8095 未起動等）の場合は ChatAI 側が素応答にフォールバックする。
+        会話履歴は ChatAI 内部で完結するため毎回新インスタンスで実行する。"""
+        instance = await self._build_instance(
+            ai_name, ai_model, system_instruction, resolved_path, temperature
+        )
+        if instance is None:
+            return {
+                "status": "NG",
+                "result": f"AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
+                "project_path": resolved_path,
+                "ai_name": ai_name,
+                "ai_model": ai_model,
+                "prompt_length": len(prompt or ""),
+            }
+
+        try:
+            result_text = await instance.実行(
+                要求テキスト=prompt,
+                タイムアウト秒数=timeout_sec,
+                システムプロンプト=system_instruction,
+                自己ループ=True,
+                max_turns=max_turns,
+            )
+            output_files = list(getattr(instance, "last_output_files", []) or [])
+            tool_trace = list(getattr(instance, "last_tool_trace", []) or [])
+            turns = int(getattr(instance, "last_tool_turns", 0) or 0)
+            stopped = bool(getattr(instance, "last_tool_stopped", False))
+        finally:
+            try:
+                await instance.終了()
+            except Exception:
+                pass
+
+        return {
+            "status": "OK",
+            "result": result_text or "（応答なし）",
+            "project_path": resolved_path,
+            "ai_name": ai_name,
+            "ai_model": ai_model,
+            "output_files": output_files,
+            "tool_trace": tool_trace,
+            "turns": turns,
+            "tool_stopped": stopped,
             "prompt_length": len(prompt or ""),
         }
 

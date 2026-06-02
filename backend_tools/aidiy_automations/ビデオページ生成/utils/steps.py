@@ -457,7 +457,7 @@ async def run_automation_loop(
         print(f"\n{'=' * 60}")
         print("  ビデオ生成完了!")
         print(f"  フォルダ  : {new_dir}")
-        print(f"  ステップ  : {ctx.script_type}={completed_step}")
+        print(f"  ステップ  : complete_steps={completed_step}")
         print(f"  管理JSON  : {ctx.steps_json_path}")
         print(f"{'=' * 60}")
     else:

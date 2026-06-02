@@ -331,9 +331,12 @@ class Chat:
                     logger.info(
                         f"[Chat] AI実行開始: AI={self.AI_NAME} モデル={self.AI_MODEL} チャンネル={self.チャンネル}"
                     )
+                    # file_path（画像添付）が無いときは自己ループを有効にし、
+                    # AI が自前 MCP 群を使って tool_calls を実行しながら応答できるようにする。
                     出力メッセージ内容 = await ai_instance.実行(
                         要求テキスト=メッセージ内容,
                         file_path=file_path,
+                        自己ループ=(not file_path),
                     )
                     logger.info(
                         f"[Chat] AI実行結果: 文字数={len(出力メッセージ内容) if 出力メッセージ内容 is not None else 'None'}"

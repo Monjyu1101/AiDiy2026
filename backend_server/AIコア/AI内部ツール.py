@@ -14,6 +14,9 @@ logger = get_logger(__name__)
 
 import json
 import asyncio
+import re
+import urllib.error
+import urllib.request
 from typing import Dict, Any, List
 from abc import ABC, abstractmethod
 
@@ -262,12 +265,210 @@ class Tools:
             呼出データ = json.loads(json_str)
             ツール名 = 呼出データ.get("function_name", "")
             パラメータ = 呼出データ.get("parameters", {})
-            
+
             if ツール名 == "echoTest":
                 メッセージ = パラメータ.get("message", "")
                 return json.dumps({'result': f"エコーテスト: {メッセージ}"}, ensure_ascii=False)
             return json.dumps({'error': f"未知のツール: {ツール名}"}, ensure_ascii=False)
-            
+
         except Exception as e:
             return json.dumps({'error': f"実行エラー: {str(e)}"}, ensure_ascii=False)
+
+
+# ============================================================
+# 5. 外部 MCP ブリッジ（aidiy MCP 群を OpenAI tools 化して self-call 実行）
+# ============================================================
+
+class MCPツールブリッジ:
+    """自前 aidiy MCP 群（backend_tools / 既定 8095）を OpenAI tools として動的収集し、
+    self-call（HTTP）で実行する共通ブリッジ。
+
+      - 一覧: GET  {base_url}/               -> {"mcps": [...]}
+      - 定義: GET  {base_url}/{mcp}/list     -> {"tools": [{name, description, inputSchema}]}
+      - 実行: POST {base_url}/{mcp}/{method} -> 任意 JSON
+
+    self-call は localhost HTTP のため標準ライブラリ urllib のみを使う（requests 非依存）。
+    aidiy_chat_llms / aidiy_code_agents 自身は無限再帰防止のため既定で除外する。
+    """
+
+    既定除外 = {"aidiy_chat_llms", "aidiy_code_agents"}
+
+    def __init__(self, base_url: str = "http://localhost:8095", exclude=None):
+        self.base_url = base_url.rstrip("/")
+        self.exclude = set(exclude) if exclude is not None else set(self.既定除外)
+        self._tools_cache = None  # (tools, name_map)
+
+    # ---- 収集 ----
+
+    def list_mcps(self) -> List[str]:
+        """8095 のインデックスから露出対象 MCP 名一覧を取得（除外を適用）。"""
+        try:
+            with urllib.request.urlopen(f"{self.base_url}/", timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            names = data.get("mcps", []) if isinstance(data, dict) else []
+        except Exception as e:
+            logger.warning(f"MCPツールブリッジ: MCP一覧取得失敗: {e}")
+            names = []
+        return [n for n in names if n not in self.exclude]
+
+    @staticmethod
+    def safe_tool_name(mcp: str, method: str, used: Dict[str, Any]) -> str:
+        """OpenAI function name 制約 ^[a-zA-Z0-9_-]{1,64}$ に収め、衝突を回避する。"""
+        raw = re.sub(r"[^a-zA-Z0-9_-]", "_", f"{mcp}__{method}")
+        safe = raw[:64]
+        if safe not in used:
+            return safe
+        i = 1
+        while True:
+            suffix = f"_{i}"
+            cand = safe[: 64 - len(suffix)] + suffix
+            if cand not in used:
+                return cand
+            i += 1
+
+    def collect_tools(self, refresh: bool = False):
+        """各 MCP の /list を集約し (OpenAI tools, name_map) を返す。結果はキャッシュ。
+
+        name_map: safe_name -> (mcp_name, method_name)
+        """
+        if self._tools_cache is not None and not refresh:
+            return self._tools_cache
+
+        tools: List[Dict[str, Any]] = []
+        name_map: Dict[str, Any] = {}
+        for mcp in self.list_mcps():
+            try:
+                with urllib.request.urlopen(f"{self.base_url}/{mcp}/list", timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+            except Exception:
+                continue
+            for t in data.get("tools", []):
+                method = t.get("name")
+                if not method:
+                    continue
+                safe = self.safe_tool_name(mcp, method, name_map)
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": safe,
+                        "description": (t.get("description") or "")[:1024],
+                        "parameters": t.get("inputSchema") or {"type": "object", "properties": {}},
+                    },
+                })
+                name_map[safe] = (mcp, method)
+
+        self._tools_cache = (tools, name_map)
+        return self._tools_cache
+
+    # ---- 実行 ----
+
+    async def call_tool(self, safe_name: str, name_map: Dict[str, Any],
+                        arguments: Dict[str, Any], timeout: int = 120) -> Any:
+        """safe_name を (mcp, method) に逆引きして self-call 実行。例外は dict で返す。"""
+        mapping = name_map.get(safe_name)
+        if mapping is None:
+            return {"error": f"unknown tool: {safe_name}"}
+        mcp, method = mapping
+        url = f"{self.base_url}/{mcp}/{method}"
+
+        def _post() -> Any:
+            body = json.dumps(arguments or {}, ensure_ascii=False).encode("utf-8")
+            req = urllib.request.Request(
+                url, data=body, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    raw = resp.read().decode("utf-8")
+                try:
+                    return json.loads(raw)
+                except Exception:
+                    return {"text": raw}
+            except urllib.error.HTTPError as e:
+                try:
+                    return json.loads(e.read().decode("utf-8"))
+                except Exception:
+                    return {"error": f"HTTP {e.code}"}
+            except Exception as e:
+                return {"error": f"{type(e).__name__}: {e}"}
+
+        return await asyncio.to_thread(_post)
+
+
+# ============================================================
+# 6. 自己ループ実行（ChatAI を tool_calls 実行しながら回す共通ループ）
+# ============================================================
+
+async def 自己ループ実行(ai_instance, messages: List[Dict[str, Any]], ブリッジ: "MCPツールブリッジ",
+                        tools: List[Dict[str, Any]], name_map: Dict[str, Any],
+                        max_turns: int = 8, timeout: int = 120) -> Dict[str, Any]:
+    """ChatAI 実装の 実行(自己ループ=False, completions_tools=...) を繰り返し、
+    tool_calls をブリッジで実行しながら応答が確定するまでループする。
+
+    各 ChatAI は completions_tools={tools, tool_choice, messages} を渡すと、その messages で
+    1 回実行し last_tool_calls を捕捉して返す共通契約を持つ（openrt/gemini/ollama 共通）。
+
+    Returns:
+        {"content", "tool_trace":[{mcp,method,arguments,ok}], "turns", "stopped"}
+    """
+    tool_trace: List[Dict[str, Any]] = []
+    content = ""
+    completed = False
+    turn = -1
+
+    for turn in range(max_turns):
+        completions_tools = {"tools": tools, "tool_choice": "auto", "messages": messages}
+        result_text = await ai_instance.実行(
+            要求テキスト="",
+            タイムアウト秒数=timeout,
+            completions_tools=completions_tools,
+            自己ループ=False,
+        )
+        content = (result_text or "").strip()
+        if content == "!":
+            content = ""
+        tool_calls = list(getattr(ai_instance, "last_tool_calls", []) or [])
+
+        if not tool_calls:
+            completed = True
+            messages.append({"role": "assistant", "content": content})
+            break
+
+        # assistant の tool_calls を履歴へ
+        messages.append({"role": "assistant", "content": content or None, "tool_calls": tool_calls})
+
+        # 各 tool_call を実行して tool 結果を履歴へ
+        for tc in tool_calls:
+            fn = tc.get("function", {}) or {}
+            safe = fn.get("name", "")
+            args_raw = fn.get("arguments", "") or "{}"
+            try:
+                args = json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
+            except Exception:
+                args = {}
+            if not isinstance(args, dict):
+                args = {}
+
+            out = await ブリッジ.call_tool(safe, name_map, args, timeout)
+            ok = not (isinstance(out, dict) and "error" in out)
+            out_str = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+            messages.append({"role": "tool", "tool_call_id": tc.get("id"), "content": out_str})
+
+            mapping = name_map.get(safe)
+            tool_trace.append({
+                "mcp": mapping[0] if mapping else None,
+                "method": mapping[1] if mapping else safe,
+                "arguments": args,
+                "ok": ok,
+            })
+
+    if not completed and content:
+        messages.append({"role": "assistant", "content": content})
+
+    return {
+        "content": content,
+        "tool_trace": tool_trace,
+        "turns": turn + 1,
+        "stopped": not completed,
+    }
 

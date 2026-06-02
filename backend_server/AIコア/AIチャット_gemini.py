@@ -222,7 +222,8 @@ class ChatAI:
 
     async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 120,
                    システムプロンプト: str = None, file_path: str = None,
-                   completions_tools: dict = None) -> str:
+                   completions_tools: dict = None, 自己ループ: bool = False,
+                   max_turns: int = 8) -> str:
         """
         Gemini Chat api実行
 
@@ -242,6 +243,31 @@ class ChatAI:
             if not self.is_alive:
                 logger.warning("ChatAI実行:ChatAIが開始されていません")
                 return "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
+
+            # 自己ループ（aidiy_chat_llms）: 自前 MCP 群をツールとして使い、
+            # tool_calls をサーバー側で実行しながら応答が確定するまで回す。
+            # completions（自己ループ=False）はここを通らずシングルアクションのまま。
+            if 自己ループ:
+                try:
+                    from AIコア.AI内部ツール import MCPツールブリッジ, 自己ループ実行
+                except ImportError:
+                    from AI内部ツール import MCPツールブリッジ, 自己ループ実行
+                ブリッジ = MCPツールブリッジ()
+                tools, name_map = ブリッジ.collect_tools()
+                if tools:
+                    msgs = []
+                    sys_text = システムプロンプト or getattr(self, "system_instruction", None)
+                    if sys_text:
+                        msgs.append({"role": "system", "content": sys_text})
+                    msgs.append({"role": "user", "content": 要求テキスト})
+                    結果 = await 自己ループ実行(
+                        self, msgs, ブリッジ, tools, name_map, max_turns, タイムアウト秒数
+                    )
+                    self.last_tool_trace = 結果["tool_trace"]
+                    self.last_tool_turns = 結果["turns"]
+                    self.last_tool_stopped = 結果["stopped"]
+                    return 結果["content"] or "!"
+                # tools 無し（8095 未起動等）→ 通常処理にフォールバック
 
             # tools 指定時は function calling 経路へ（従来のテキスト生成には影響しない）
             self.last_tool_calls = []
