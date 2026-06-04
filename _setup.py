@@ -80,6 +80,20 @@ SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 CHAT_COMPLETIONS_PROVIDER_NAME = "aidiy_chat_completions"
 CHAT_COMPLETIONS_URL = "http://localhost:8095/aidiy_chat_completions/v1/chat/completions"
 CHAT_COMPLETIONS_MODEL_IDS = ["freeai_chat", "openrt_chat", "gemini_chat", "ollama_chat"]
+VSCODE_CHAT_MODEL_MAX_INPUT_TOKENS = 256000
+VSCODE_CHAT_MODEL_MAX_OUTPUT_TOKENS = 16000
+
+# VS Code チャットモデル (chatLanguageModels.json) 用設定 — Ollama Cloud
+OLLAMA_CLOUD_PROVIDER_NAME = "aidiy_ollama_cloud"
+OLLAMA_CLOUD_URL = "https://ollama.com/v1/chat/completions"
+OLLAMA_CLOUD_MODEL_IDS = [
+    "gpt-oss:120b",
+    "gemma4:31b",
+    "qwen3.5:397b",
+    "mistral-large-3:675b",
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
+]
 
 
 class Colors:
@@ -404,8 +418,8 @@ def _build_chat_completions_provider() -> dict:
             "url": CHAT_COMPLETIONS_URL,
             "toolCalling": True,
             "vision": True,
-            "maxInputTokens": 128000,
-            "maxOutputTokens": 16000,
+            "maxInputTokens": VSCODE_CHAT_MODEL_MAX_INPUT_TOKENS,
+            "maxOutputTokens": VSCODE_CHAT_MODEL_MAX_OUTPUT_TOKENS,
         }
         for ai_name in CHAT_COMPLETIONS_MODEL_IDS
     ]
@@ -418,8 +432,57 @@ def _build_chat_completions_provider() -> dict:
     }
 
 
+def _load_aidiy_key_value(key: str) -> str:
+    """backend_server/_config/AiDiy_key.json から指定キーの値を返す。読めない場合は空文字。"""
+    key_path = BASE_DIR / "backend_server" / "_config" / "AiDiy_key.json"
+    try:
+        data = load_json_dict_file(key_path)
+        return str(data.get(key, ""))
+    except Exception:
+        return ""
+
+
+def _is_valid_api_key(value: str) -> bool:
+    """空文字・'<' 始まりを無効とする。"""
+    return bool(value) and not value.startswith("<")
+
+
+def _build_ollama_cloud_provider(api_key: str) -> dict:
+    """aidiy_ollama_cloud の Custom Endpoint プロバイダ定義を組み立てる。"""
+    models = [
+        {
+            "id": model_id,
+            "name": model_id,
+            "url": OLLAMA_CLOUD_URL,
+            "toolCalling": True,
+            "vision": True,
+            "maxInputTokens": VSCODE_CHAT_MODEL_MAX_INPUT_TOKENS,
+            "maxOutputTokens": VSCODE_CHAT_MODEL_MAX_OUTPUT_TOKENS,
+        }
+        for model_id in OLLAMA_CLOUD_MODEL_IDS
+    ]
+    return {
+        "name": OLLAMA_CLOUD_PROVIDER_NAME,
+        "vendor": "customendpoint",
+        "apiType": "chat-completions",
+        "apiKey": api_key,
+        "models": models,
+    }
+
+
+def _upsert_provider(providers: list, provider: dict) -> list:
+    """providers リスト内の同名エントリを置き換え、なければ末尾へ追加する。"""
+    name = provider["name"]
+    for i, entry in enumerate(providers):
+        if isinstance(entry, dict) and entry.get("name") == name:
+            providers[i] = provider
+            return providers
+    providers.append(provider)
+    return providers
+
+
 def upsert_vscode_chat_completions(path: Path) -> bool:
-    """VS Code chatLanguageModels.json に aidiy_chat_completions プロバイダを書き込む。
+    """VS Code chatLanguageModels.json に aidiy_chat_completions / aidiy_ollama_cloud プロバイダを書き込む。
 
     既存の他プロバイダ (Ollama など) は温存し、同名エントリのみ置き換える。
     ファイルが無い場合は VS Code 既定の Ollama テンプレートも併せて新規作成する。
@@ -429,19 +492,19 @@ def upsert_vscode_chat_completions(path: Path) -> bool:
         if not providers:
             providers = [{"name": "Ollama", "vendor": "ollama", "url": "http://localhost:11434"}]
 
-        provider = _build_chat_completions_provider()
-        replaced = False
-        for i, entry in enumerate(providers):
-            if isinstance(entry, dict) and entry.get("name") == CHAT_COMPLETIONS_PROVIDER_NAME:
-                providers[i] = provider
-                replaced = True
-                break
-        if not replaced:
-            providers.append(provider)
+        providers = _upsert_provider(providers, _build_chat_completions_provider())
+
+        ollama_key = _load_aidiy_key_value("ollama_key_id")
+        if _is_valid_api_key(ollama_key):
+            providers = _upsert_provider(providers, _build_ollama_cloud_provider(ollama_key))
+            cloud_msg = f", {OLLAMA_CLOUD_PROVIDER_NAME}"
+        else:
+            print_warning(f"ollama_key_id が未設定のため {OLLAMA_CLOUD_PROVIDER_NAME} はスキップしました。")
+            cloud_msg = ""
 
         if not write_json_list_file(path, providers):
             return False
-        print_success(f"VS Code チャットモデル設定を書き込みました: {path} ({CHAT_COMPLETIONS_PROVIDER_NAME})")
+        print_success(f"VS Code チャットモデル設定を書き込みました: {path} ({CHAT_COMPLETIONS_PROVIDER_NAME}{cloud_msg})")
         return True
     except json.JSONDecodeError as e:
         print_error(f"JSON解析エラー: {path} ({e})")

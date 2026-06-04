@@ -57,8 +57,8 @@ BACKEND_TOOLS_SERVER_PREFIX = "aidiy_"
 SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
 SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 
-# VS Code チャットモデル (chatLanguageModels.json) から解除する Custom Endpoint 名
-CHAT_COMPLETIONS_PROVIDER_NAME = "aidiy_chat_completions"
+# VS Code チャットモデル (chatLanguageModels.json) から解除する AiDiy Provider 名 prefix
+VSCODE_CHAT_PROVIDER_PREFIX = "aidiy_"
 
 NPM_PACKAGES = [
     "@anthropic-ai/claude-code",
@@ -385,8 +385,8 @@ def write_json_list_file(path: Path, data: list) -> bool:
         return False
 
 
-def remove_vscode_chat_completions(path: Path) -> bool:
-    """chatLanguageModels.json から aidiy_chat_completions プロバイダのみ削除する。
+def remove_vscode_aidiy_chat_models(path: Path) -> bool:
+    """chatLanguageModels.json から aidiy_* プロバイダを削除する。
     他のプロバイダ (Ollama など) は温存する。"""
     try:
         if not path.exists():
@@ -395,21 +395,32 @@ def remove_vscode_chat_completions(path: Path) -> bool:
 
         providers = load_json_list_file(path)
         if not providers:
-            print_info(f"{CHAT_COMPLETIONS_PROVIDER_NAME} は未設定です: {path}")
+            print_info(f"{VSCODE_CHAT_PROVIDER_PREFIX}* は未設定です: {path}")
             return True
 
+        removed_names = [
+            entry.get("name")
+            for entry in providers
+            if isinstance(entry, dict)
+            and isinstance(entry.get("name"), str)
+            and entry.get("name").startswith(VSCODE_CHAT_PROVIDER_PREFIX)
+        ]
         remaining = [
             entry for entry in providers
-            if not (isinstance(entry, dict) and entry.get("name") == CHAT_COMPLETIONS_PROVIDER_NAME)
+            if not (
+                isinstance(entry, dict)
+                and isinstance(entry.get("name"), str)
+                and entry.get("name").startswith(VSCODE_CHAT_PROVIDER_PREFIX)
+            )
         ]
         if len(remaining) == len(providers):
-            print_info(f"{CHAT_COMPLETIONS_PROVIDER_NAME} は未設定です: {path}")
+            print_info(f"{VSCODE_CHAT_PROVIDER_PREFIX}* は未設定です: {path}")
             return True
 
         if not write_json_list_file(path, remaining):
             return False
 
-        print_success(f"{CHAT_COMPLETIONS_PROVIDER_NAME} の VS Code チャットモデル設定を削除しました: {path}")
+        print_success(f"{', '.join(removed_names)} の VS Code チャットモデル設定を削除しました: {path}")
         return True
     except json.JSONDecodeError as e:
         print_error(f"JSON解析エラー: {path} ({e})")
@@ -518,10 +529,10 @@ def cleanup_global_mcp_configs(prefix: str):
     if remove_codex_mcp_servers_by_prefix(prefix):
         updated_count += 1
 
-    # VS Code チャットモデル (chatLanguageModels.json) の aidiy_chat_completions も解除
+    # VS Code チャットモデル (chatLanguageModels.json) の aidiy_* provider も解除
     vscode_chat = get_vscode_chat_models_path()
     print_info(f"VS Code チャットモデル設定も解除対象です: {vscode_chat}")
-    if remove_vscode_chat_completions(vscode_chat):
+    if remove_vscode_aidiy_chat_models(vscode_chat):
         updated_count += 1
 
     if updated_count > 0:

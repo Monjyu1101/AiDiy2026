@@ -1,0 +1,12 @@
+# 解説_Ollama統合_AiDiy_ja
+テーマ: テーマ: AiDiy における Ollama 統合の解説。ローカル LLM を AiDiy の AI コアや Code AI 枠でどのように利用し、プライバシー確保とコスト削減を両立させるかを解説する。二人掛け合いで、『クラウド AI の利便性』と『ローカル LLM (Ollama) の安心感・自由度』を整理する。 【出典 URL / 根拠資料】 URL1（Ollama 公式）: https://ollama.com/ URL2（Ollama Library）: https://ollama.com/library URL3（AiDiy 現行仕様）: D:/OneDrive/_sandbox/AiDiy2026/AGENTS.md, D:/OneDrive/_sandbox/AiDiy2026/CLAUDE.md URL4（backend_server 設定）: backend_server/_config/AiDiy_mcp.json 等の AI 設定 【Ollama の要点】ローカル環境で LLM (Llama 3, Mistral, Phi-3 等) を簡単に動作させるツール。API サーバー機能を持っており、OpenAI 互換 API を提供するため、既存の AI アプリケーションに組み込みやすい。強みは完全オフライン動作による機密情報の保護、API コストのゼロ化、モデルの自由な選択とカスタマイズ。注意点は GPU リソース（VRAM）への依存度が高く、モデルサイズによって推論速度が大きく変動すること。 【AiDiy への統合ポイント】AiDiy はマルチベンダー AI 構成となっており、AI コアのバックエンドとして Ollama を指定可能。具体的には、AI コアの WebSocket 通信先や、Code AI のプロバイダー設定に Ollama の API エンドポイントを組み込むことで、機密性の高いコードベースの解析や、定型的なドキュメント生成をローカル LLM で完結させることができる。また、MCP サーバー群と組み合わせることで、ローカル LLM がローカルファイルや DB を操作する『完全ローカル AI エージェント』環境を構築できる。 【メリットの整理】1. セキュリティ: コードや社内データを外部に送信せず、ローカルで完結。2. コスト: トークン課金なしで、大量のコンテキストを読み込ませたり、試行錯誤的な生成が可能。3. 低遅延: ネットワーク遅延がなく、高速なモデルを選択すればレスポンスが速い。4. 実験性: 様々なオープンソースモデルを切り替えて、タスクごとの最適モデルを検証できる。 【表現方針】『クラウド AI を捨てる』のではなく、『クラウド AI とローカル LLM を使い分けるハイブリッド戦略』として提示する。機密性の高い作業は Ollama、高度な推論や広範な知識が必要な作業は Claude/GPT-4o といった使い分けを推奨する。技術的なハードル（GPU 搭載の必要性など）についても正直に触れ、現実的な導入プランを提示する。 【シーン構成】最小構成 7 シーンで生成すること。scene_000（イントロ: AiDiy で Ollama を使うメリットと、ハイブリッド AI 構成の概要。この動画は AiDiy の video_generation 機能で自動生成された旨を冒頭で明言）、scene_001（Ollama とは: ローカル LLM の簡単導入と OpenAI 互換 API の解説）、scene_002（AiDiy 統合: AI コア / Code AI への Ollama 接続設定）、scene_003（プライバシーとコスト: 外部送信ゼロの安心感と API 料金無料の衝撃）、scene_004（活用例: ローカルコード解析 × MCP による完全自律エージェント）、scene_005（使い分け表: クラウド AI vs ローカル LLM の適材適所）、scene_999（まとめ: Ollama で AI 開発を自由にする誘導）。scene_006 以降は作成しない。 【scene_999 の締め必須3要素】(1) この動画は AiDiy の video_generation 機能で自動生成された旨の明言、(2) チャンネル登録の誘導、(3) 『自分でも AiDiy で Ollama 統合を試してビデオを作ってみて』誘導。締めの発話は female にすること。 【パイプライン仕様メモ（変更しないこと）】ビデオページ生成_解説.py（二人掛け合い）が topic から scenario.js 生成 → 画像生成 → 音声合成 → HTML 組み立てまでを 9 ステップで全自動化する。Step00 初期確認 / Step01 テンプレコピーで出力フォルダ作成 / Step02 CodeAgents が scenario.js 生成 / Step03 index.html 文言更新 / Step04 aidiy_image_generation で画像生成 / Step05 中間確認 / Step06 aidiy_text_to_speech で naration_text から音声生成（edge TTS、male/female 交互） / Step07 ffmpeg で実尺計測し duration_sec 更新 / Step08 最終確認 / Step99 完成案内。状況は _ビデオページ生成_解説_状況.json に記録され途中再開・特定ステップ再実行が可能。
+
+## 進捗
+- [x] フォルダ作成
+- [ ] シナリオ作成
+- [ ] HTML修正
+- [ ] 画像生成
+- [ ] 中間確認
+- [ ] 音声生成
+- [ ] 再生時間更新
+- [ ] 完成
