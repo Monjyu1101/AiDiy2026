@@ -82,16 +82,24 @@ SERVERS = [
         "call": ("backup_info", {}),
     },
     {
+        # 実生成は重いので、prompt 省略でバリデーションエラー経路だけ呼ぶ
         "name": "aidiy_image_generation",
         "expected": {"generate_image"},
+        "call": ("generate_image", {}),
+        "allow_error": True,
     },
     {
         "name": "aidiy_movie_generation",
         "expected": {"generate_movie"},
+        "call": ("generate_movie", {}),
+        "allow_error": True,
     },
     {
+        # 入力なしで「いずれかが必要」エラーになる安全な呼び出し
         "name": "aidiy_speech_to_text",
         "expected": {"recognize_speech"},
+        "call": ("recognize_speech", {}),
+        "allow_error": True,
     },
     {
         "name": "aidiy_text_to_speech",

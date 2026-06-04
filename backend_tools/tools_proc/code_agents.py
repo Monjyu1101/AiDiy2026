@@ -23,8 +23,15 @@ import json
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Optional
+
+# 起動時バージョン確認の CLI --version タイムアウト秒。
+# 並列実行と組み合わせるため、ハング時の打ち切りを早める一方、
+# コールド起動（node / uv の初回立ち上げ）の実測値（warm で hermes ~5s）に
+# 余裕を持たせた値にしている。
+_VERSION_CHECK_TIMEOUT = 10
 
 
 class CodeAgentsError(Exception):
@@ -143,82 +150,90 @@ class CodeAgents:
         if not candidates:
             candidates = ["claude_cli"]
 
+        # 各候補の CLI --version は I/O 待ちが支配的なので並列実行する。
+        # 逐次だと最悪「候補数 × timeout」秒かかり、8095 起動（uvicorn）全体を
+        # ブロックして VS Code からの全 MCP 接続が待たされるため。
         results: dict[str, dict] = {}
+        with ThreadPoolExecutor(max_workers=len(candidates)) as executor:
+            future_map = {
+                executor.submit(self._probe_ai_version, ai_name, key): ai_name
+                for ai_name in candidates
+            }
+            for future, ai_name in future_map.items():
+                try:
+                    results[ai_name] = future.result()
+                except Exception as e:
+                    results[ai_name] = {"ok": False, "version": str(e)[:80], "cmd": ""}
 
-        for ai_name in candidates:
-            info: dict = {"ok": False, "version": "", "cmd": ""}
+        # candidates の登録順を維持して返す
+        return {ai_name: results[ai_name] for ai_name in candidates}
 
-            # 各 AI が必要とするキーのチェック
-            # copilot_cli は gh auth で認証するため API キー不要
-            key_ok = True
-            if ai_name == "antigravity_cli":
-                claude_key = key.get("claude_key_id", "").strip()
-                if not claude_key or claude_key.startswith("<"):
-                    info = {"ok": False, "version": "claude_key_id 未設定", "cmd": ""}
-                    key_ok = False
-            elif ai_name == "codex_cli":
-                openai_key = key.get("openai_key_id", "").strip()
-                if not openai_key or openai_key.startswith("<"):
-                    info = {"ok": False, "version": "openai_key_id 未設定", "cmd": ""}
-                    key_ok = False
+    def _probe_ai_version(self, ai_name: str, key: dict) -> dict:
+        """単一の ai_name についてキー確認 + CLI --version を実行し info dict を返す。
 
-            if not key_ok:
-                results[ai_name] = info
-                continue
+        _check_ai_versions から ThreadPoolExecutor で並列に呼ばれる。"""
+        info: dict = {"ok": False, "version": "", "cmd": ""}
 
-            try:
-                if ai_name == "claude_sdk":
-                    # SDK ベース: 実行モジュールが使う claude_agent_sdk + APIキー確認
-                    try:
-                        import claude_agent_sdk  # noqa: F401, PLC0415
-                        api_key = key.get("claude_key_id", "").strip()
-                        if api_key and not api_key.startswith("<"):
-                            version = getattr(claude_agent_sdk, "__version__", "claude_agent_sdk")
-                            info = {"ok": True, "version": version, "cmd": "claude_agent_sdk"}
-                        else:
-                            info = {"ok": False, "version": "claude_key_id 未設定", "cmd": "claude_agent_sdk"}
-                    except ImportError:
-                        info = {"ok": False, "version": "claude_agent_sdk 未インストール", "cmd": "claude_agent_sdk"}
+        # 各 AI が必要とするキーのチェック
+        # copilot_cli は gh auth で認証するため API キー不要
+        if ai_name == "antigravity_cli":
+            claude_key = key.get("claude_key_id", "").strip()
+            if not claude_key or claude_key.startswith("<"):
+                return {"ok": False, "version": "claude_key_id 未設定", "cmd": ""}
+        elif ai_name == "codex_cli":
+            openai_key = key.get("openai_key_id", "").strip()
+            if not openai_key or openai_key.startswith("<"):
+                return {"ok": False, "version": "openai_key_id 未設定", "cmd": ""}
 
-                else:
-                    from AIコア.AIコード_cli import CodeAI  # noqa: PLC0415
-                    dummy = CodeAI(AI_NAME=ai_name, AI_MODEL="auto")
-                    cmd_path = dummy._コマンドパス取得()
-                    info["cmd"] = cmd_path
-
-                    if ai_name == "aidiy_hermes":
-                        base = dummy._hermes直接実行コマンド()
-                        if None is base:
-                            base = [cmd_path]
-                        cmd = base + ["--version"]
-                        timeout = 30
+        try:
+            if ai_name == "claude_sdk":
+                # SDK ベース: 実行モジュールが使う claude_agent_sdk + APIキー確認
+                try:
+                    import claude_agent_sdk  # noqa: F401, PLC0415
+                    api_key = key.get("claude_key_id", "").strip()
+                    if api_key and not api_key.startswith("<"):
+                        version = getattr(claude_agent_sdk, "__version__", "claude_agent_sdk")
+                        info = {"ok": True, "version": version, "cmd": "claude_agent_sdk"}
                     else:
-                        direct = dummy._npmシム直接実行に解決(cmd_path)
-                        cmd = (direct if direct else [cmd_path]) + ["--version"]
-                        timeout = 30
+                        info = {"ok": False, "version": "claude_key_id 未設定", "cmd": "claude_agent_sdk"}
+                except ImportError:
+                    info = {"ok": False, "version": "claude_agent_sdk 未インストール", "cmd": "claude_agent_sdk"}
 
-                    result = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        timeout=timeout,
-                    )
-                    stdout = (result.stdout or b"").decode("utf-8", errors="replace").strip()
-                    stderr = (result.stderr or b"").decode("utf-8", errors="replace").strip()
-                    lines = (stdout or stderr).splitlines()
-                    first_line = lines[0].strip() if lines else ""
-                    ok = bool(first_line) and not first_line.startswith("Error:")
-                    info = {"ok": ok, "version": first_line, "cmd": cmd_path}
+            else:
+                from AIコア.AIコード_cli import CodeAI  # noqa: PLC0415
+                dummy = CodeAI(AI_NAME=ai_name, AI_MODEL="auto")
+                cmd_path = dummy._コマンドパス取得()
+                info["cmd"] = cmd_path
 
-            except FileNotFoundError:
-                info["version"] = "コマンドが見つかりません"
-            except subprocess.TimeoutExpired:
-                info["version"] = "timeout"
-            except Exception as e:
-                info["version"] = str(e)[:80]
+                if ai_name == "aidiy_hermes":
+                    base = dummy._hermes直接実行コマンド()
+                    if None is base:
+                        base = [cmd_path]
+                    cmd = base + ["--version"]
+                else:
+                    direct = dummy._npmシム直接実行に解決(cmd_path)
+                    cmd = (direct if direct else [cmd_path]) + ["--version"]
 
-            results[ai_name] = info
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    timeout=_VERSION_CHECK_TIMEOUT,
+                )
+                stdout = (result.stdout or b"").decode("utf-8", errors="replace").strip()
+                stderr = (result.stderr or b"").decode("utf-8", errors="replace").strip()
+                lines = (stdout or stderr).splitlines()
+                first_line = lines[0].strip() if lines else ""
+                ok = bool(first_line) and not first_line.startswith("Error:")
+                info = {"ok": ok, "version": first_line, "cmd": cmd_path}
 
-        return results
+        except FileNotFoundError:
+            info["version"] = "コマンドが見つかりません"
+        except subprocess.TimeoutExpired:
+            info["version"] = "timeout"
+        except Exception as e:
+            info["version"] = str(e)[:80]
+
+        return info
 
     # ------------------------------------------------------------------ #
     # 情報取得

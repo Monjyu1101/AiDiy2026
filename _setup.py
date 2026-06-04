@@ -1188,14 +1188,6 @@ MCP_MODULES = [
                 "sse_url":     "http://localhost:8095/aidiy_code_check/sse",
             },
             {
-                "server_name": "aidiy_code_agents",
-                "sse_url":     "http://localhost:8095/aidiy_code_agents/sse",
-            },
-            {
-                "server_name": "aidiy_chat_llms",
-                "sse_url":     "http://localhost:8095/aidiy_chat_llms/sse",
-            },
-            {
                 "server_name": "aidiy_backup",
                 "sse_url":     "http://localhost:8095/aidiy_backup/sse",
             },
@@ -1222,6 +1214,16 @@ MCP_MODULES = [
             {
                 "server_name": "aidiy_ffmpeg_control",
                 "sse_url":     "http://localhost:8095/aidiy_ffmpeg_control/sse",
+            },
+            # aidiy_code_agents / aidiy_chat_llms は自前 MCP 群をツールとして利用する
+            # （他サーバーが出そろってから接続したい）ため、必ず末尾に並べる。
+            {
+                "server_name": "aidiy_code_agents",
+                "sse_url":     "http://localhost:8095/aidiy_code_agents/sse",
+            },
+            {
+                "server_name": "aidiy_chat_llms",
+                "sse_url":     "http://localhost:8095/aidiy_chat_llms/sse",
             },
         ],
     },
@@ -1551,11 +1553,33 @@ def configure_backend_tools_clients(module: dict) -> bool:
         all_ok &= upsert_codex_backend_tools_config(codex_module)
 
     # 7) VS Code (servers)
+    #    VS Code だけは aidiy_code_agents / aidiy_chat_llms を流し込まない。
+    #    （他クライアントと挙動が異なるため除外。SSE 自体は 8095 で常時提供される）
+    VSCODE_EXCLUDE = {"aidiy_code_agents", "aidiy_chat_llms"}
+    vscode_servers = [(sn, url) for sn, url in servers if sn not in VSCODE_EXCLUDE]
     vscode_mcp = get_vscode_mcp_path()
     print_info(f"[VS Code]     {vscode_mcp}")
+    print_info(f"  VS Code 除外: {', '.join(sorted(VSCODE_EXCLUDE))}")
+
+    # upsert は追加・更新のみで削除しないため、過去に書き込まれた除外対象は明示的に消す。
+    try:
+        if vscode_mcp.exists():
+            vscode_data = load_json_dict_file(vscode_mcp)
+            vscode_dict = vscode_data.get("servers")
+            if isinstance(vscode_dict, dict):
+                removed = [sn for sn in VSCODE_EXCLUDE if sn in vscode_dict]
+                if removed:
+                    for sn in removed:
+                        vscode_dict.pop(sn, None)
+                    vscode_data["servers"] = vscode_dict
+                    write_json_file(vscode_mcp, vscode_data)
+                    print_info(f"  VS Code 既存設定から削除: {', '.join(sorted(removed))}")
+    except Exception as e:
+        print_warning(f"VS Code の除外対象削除中にエラーが発生しました: {e}")
+
     all_ok &= upsert_json_mcp_servers(
         vscode_mcp,
-        [(sn, {"type": "sse", "url": url}) for sn, url in servers],
+        [(sn, {"type": "sse", "url": url}) for sn, url in vscode_servers],
         top_key="servers",
     )
 

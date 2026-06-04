@@ -75,8 +75,10 @@ def main() -> None:
     print(f"BASE_URL: {BASE_URL}")
 
     root = get("/")
-    assert root.get("message") == "MCP Server is running", root
-    print("  OK root")
+    mcps = root.get("mcps")
+    if not isinstance(mcps, list) or "aidiy_sqlite" not in mcps:
+        raise AssertionError(f"root: mcps 一覧が不正です {root}")
+    print(f"  OK root ({len(mcps)} mcps)")
 
     docs_paths = [
         "/aidiy_chrome_devtools/docs",
@@ -216,8 +218,12 @@ def main() -> None:
     print("  OK tts/stt")
 
     # OBS / ffmpeg
+    # startup_status は MCP 起動時点のスナップショット。OBS 未起動でも ok:false を
+    # 返すのが正常なので、ルート疎通と構造（ok キー）だけ確認する。
     obs = post("/aidiy_obs_studio_control/startup_status")
-    assert_no_error("obs startup_status", obs)
+    if "ok" not in obs:
+        raise AssertionError(f"obs startup_status: unexpected {obs}")
+    print("  OK obs startup_status" + (" (connected)" if obs.get("ok") else " (not connected at boot)"))
 
     ffmpeg = post("/aidiy_ffmpeg_control/versions")
     assert_no_error("ffmpeg versions", ffmpeg)

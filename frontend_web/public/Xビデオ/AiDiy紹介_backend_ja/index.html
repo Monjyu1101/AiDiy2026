@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -631,7 +631,7 @@
     }
 
     async function fetchTtsBlob(body) {
-      const endpoints = ["/mcp/aidiy_text_to_speech/synthesize", "http://127.0.0.1:8095/aidiy_text_to_speech/synthesize", "http://localhost:8095/aidiy_text_to_speech/synthesize"];
+      const endpoints = ["http://localhost:8095/aidiy_text_to_speech/synthesize"];
       let lastError = null;
 
       for (const endpoint of endpoints) {
