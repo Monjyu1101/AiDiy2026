@@ -1215,6 +1215,10 @@ MCP_MODULES = [
                 "server_name": "aidiy_ffmpeg_control",
                 "sse_url":     "http://localhost:8095/aidiy_ffmpeg_control/sse",
             },
+            {
+                "server_name": "aidiy_notification_sounds",
+                "sse_url":     "http://localhost:8095/aidiy_notification_sounds/sse",
+            },
             # aidiy_code_agents / aidiy_chat_llms は自前 MCP 群をツールとして利用する
             # （他サーバーが出そろってから接続したい）ため、必ず末尾に並べる。
             {
