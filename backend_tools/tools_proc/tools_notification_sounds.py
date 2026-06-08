@@ -47,7 +47,8 @@ def register_tools(mcp_ns, ns):
         通知音をローカル再生する。
 
         Args:
-            notification_type: "準備/開始/終了/完了/注意/承認"（plane・legacy 共通）
+            notification_type: "準備/開始/終了/完了/注意/承認"（plane・legacy 共通。
+                "ready/up/down/ok/ng/accept" の英語エイリアスも可）
             scene: "auto"（= "plane"）/ "plane"（機内 SeatBeltSign）/ "legacy"（旧来の効果音）
         """
         try:
@@ -92,21 +93,15 @@ def create_router(ns) -> APIRouter:
                 "play": "POST /aidiy_notification_sounds/play",
                 "list": "POST /aidiy_notification_sounds/list",
             },
-            "scenes": {
-                "auto": "plane のエイリアス（デフォルト）",
-                "plane": "機内シーン — SeatBeltSign1/2/3.mp3",
-                "legacy": "旧来効果音 — ready / ok / ng.mp3",
-            },
-            "notification_types": {
-                "plane (auto)": "準備 / 開始 / 終了 / 完了 / 注意 / 承認",
-                "legacy": "準備 / 開始 / 終了 / 完了 / 注意 / 承認",
-                "準備": "準備完了 → plane:SeatBeltSign3 / legacy:ready",
-                "開始": "開始・上昇 → plane:SeatBeltSign1 / legacy:up",
-                "終了": "終了・下降 → plane:SeatBeltSign2 / legacy:down",
-                "完了": "完了・成功 → plane:SeatBeltSign1 / legacy:ok",
-                "注意": "警告・エラー → plane:SeatBeltSign2 / legacy:ng",
-                "承認": "承認・受理 → plane:SeatBeltSign1 / legacy:accept",
-            },
+            "notification_scene": "auto,plane,legacy",
+            "notification_play": [
+                ["ready", "準備"],
+                ["up", "開始"],
+                ["down", "終了"],
+                ["ok", "完了"],
+                ["ng", "注意"],
+                ["accept", "承認"],
+            ],
         }
 
     @router.post("/aidiy_notification_sounds/play", summary="通知音再生")

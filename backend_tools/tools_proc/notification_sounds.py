@@ -36,7 +36,7 @@ _SCENE_MAP: dict[str, dict[str, str]] = {
         "開始": "_sound_SeatBeltSign1.mp3",
         "終了": "_sound_SeatBeltSign2.mp3",
         "完了": "_sound_SeatBeltSign1.mp3",
-        "注意": "_sound_SeatBeltSign2.mp3",
+        "注意": "_sound_SeatBeltSign2fast.mp3",
         "承認": "_sound_SeatBeltSign1.mp3",
     },
     "legacy": {
@@ -52,6 +52,16 @@ _SCENE_MAP: dict[str, dict[str, str]] = {
 # "auto" は "plane" にマップ
 _SCENE_ALIAS: dict[str, str] = {
     "auto": "plane",
+}
+
+# 通知種別の英語エイリアス（legacy 名）→ 日本語キーへの変換
+_TYPE_ALIAS: dict[str, str] = {
+    "ready":  "準備",   # ready  = 準備完了
+    "up":     "開始",   # up     = 開始・上昇
+    "down":   "終了",   # down   = 終了・下降
+    "ok":     "完了",   # ok     = 完了・成功
+    "ng":     "注意",   # ng     = 警告・エラー
+    "accept": "承認",   # accept = 承認・受理
 }
 
 VALID_SCENES = ["auto", "plane", "legacy"]
@@ -78,11 +88,17 @@ class NotificationSounds:
             )
         return s
 
+    def resolve_notification_type(self, notification_type: str) -> str:
+        """通知種別を正規化（英語エイリアス（ready/up/down/ok/ng/accept）を日本語キーへ変換）"""
+        t = (notification_type or "").strip()
+        return _TYPE_ALIAS.get(t.lower(), t)
+
     def resolve_sound_path(self, notification_type: str, scene: str) -> Path:
         """通知種別と scene からサウンドファイルの絶対パスを返す"""
         actual_scene = self.resolve_scene(scene)
+        actual_type = self.resolve_notification_type(notification_type)
         scene_sounds = _SCENE_MAP[actual_scene]
-        filename = scene_sounds.get(notification_type)
+        filename = scene_sounds.get(actual_type)
         if filename is None:
             raise NotificationSoundsError(
                 f"未対応の通知種別です: '{notification_type}'（開始 / 終了 / 注意）"
@@ -99,7 +115,7 @@ class NotificationSounds:
         通知音を再生する。
 
         Args:
-            notification_type: "開始" / "終了" / "注意"
+            notification_type: "開始" / "終了" / "注意"（"up" / "down" / "ng" 等の英語エイリアスも可）
             scene: "auto" / "plane" / "legacy"
 
         Returns:
@@ -107,8 +123,9 @@ class NotificationSounds:
         """
         path = self.resolve_sound_path(notification_type, scene)
         actual_scene = self.resolve_scene(scene)
+        actual_type = self.resolve_notification_type(notification_type)
 
-        logger.info(f"通知音再生: type={notification_type} scene={actual_scene} file={path.name}")
+        logger.info(f"通知音再生: type={actual_type} scene={actual_scene} file={path.name}")
         try:
             self._playsound(str(path))
         except Exception as e:
@@ -117,7 +134,7 @@ class NotificationSounds:
         return {
             "status": "ok",
             "scene": actual_scene,
-            "notification_type": notification_type,
+            "notification_type": actual_type,
             "file": path.name,
         }
 
