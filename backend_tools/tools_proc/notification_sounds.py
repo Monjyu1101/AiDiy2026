@@ -18,8 +18,6 @@ scene:
     "legacy"         — 旧来の効果音 (ready / ok / ng)
 """
 
-import os
-import subprocess
 from pathlib import Path
 
 from log_config import get_logger
@@ -140,27 +138,21 @@ class NotificationSounds:
 
     @staticmethod
     def _playsound(path: str) -> None:
-        """プラットフォーム別最小サウンド再生。Windows: winmm、macOS: afplay、Linux: gst"""
-        import platform
-        pf = platform.system()
-        if pf == "Windows":
-            import ctypes
-            ext = os.path.splitext(path)[1].lower()
-            mci_type = "waveaudio" if ext == ".wav" else "mpegvideo"
-            ctypes.windll.winmm.mciSendStringW(
-                f'open "{path}" type {mci_type} alias _ns', None, 0, None)
-            ctypes.windll.winmm.mciSendStringW(
-                'play _ns wait', None, 0, None)
-            ctypes.windll.winmm.mciSendStringW(
-                'close _ns', None, 0, None)
-        elif pf == "Darwin":
-            subprocess.run(["afplay", path], timeout=30, check=False)
-        else:
-            subprocess.run(
-                ["gst-launch-1.0", "playbin", f"uri=file://{path}"],
-                timeout=30, check=False,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
+        """pygame.mixer によるクロスプラットフォーム再生（mp3/wav 対応・再生完了まで待機）"""
+        # pygame の import 時歓迎メッセージを抑制（MCP 標準出力を汚さないため）
+        import os
+        os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+        import pygame
+
+        # mixer は未初期化なら初期化（多重 init は無害だが念のためガード）
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+
+        pygame.mixer.music.load(path)
+        pygame.mixer.music.play()
+        # 再生が終わるまで待機（同期再生）
+        while pygame.mixer.music.get_busy():
+            pygame.time.wait(50)
 
     def list_sounds(self, scene: str = "auto") -> dict:
         """指定 scene のサウンドマッピング一覧を返す"""

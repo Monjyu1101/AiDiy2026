@@ -32,7 +32,10 @@ _OLLAMA_CLOUD_SUFFIXES = (":cloud", ":clude")
 
 def _is_cloud_key(api_key: str) -> bool:
     """Ollama Cloud用APIキーが設定されているか判定する。"""
-    return isinstance(api_key, str) and bool(api_key.strip()) and not api_key.strip().startswith("<")
+    if not isinstance(api_key, str):
+        return False
+    s = api_key.strip()
+    return bool(s) and not s.startswith("<") and s.lower() != "ollama"
 
 
 def _strip_cloud_suffix(model: str) -> str:

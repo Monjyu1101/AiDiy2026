@@ -209,7 +209,7 @@ class ChatLLM:
 
             if ai_name == "ollama_chat":
                 cloud_key = (key.get("ollama_key_id", "") or "").strip()
-                cloud = bool(cloud_key) and not cloud_key.startswith("<")
+                cloud = bool(cloud_key) and not cloud_key.startswith("<") and cloud_key.lower() != "ollama"
                 results[ai_name] = {
                     "ok": True,
                     "version": "ollama cloud" if cloud else "ollama local",
