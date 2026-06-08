@@ -161,6 +161,13 @@ async def main() -> None:
             await save_image(session, "screenshot", "ss_delay1.png",
                              delay=1.0, label=True)
 
+            # -------------------------------------------------- #
+            # [9] シャッター音付きスクリーンショット（Windows のみ）
+            # -------------------------------------------------- #
+            print("\n=== [9] screenshot  shutter_sounds='auto' ===")
+            await save_image(session, "screenshot", "ss_shutter.png",
+                             shutter_sounds="auto")
+
     print("\n=== テスト完了 ===")
     print(f"  保存先: {SAVE_DIR}")
 

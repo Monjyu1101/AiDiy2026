@@ -112,7 +112,47 @@ class DesktopCapture:
     # スクリーンショット取得
     # ------------------------------------------------------------------ #
 
-    def grab_screen(self, screen_number: str = "auto") -> tuple[Image.Image, dict]:
+    @staticmethod
+    def _play_shutter_sound() -> None:
+        """シャッター音を再生する。"""
+        sound_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "sounds", "_sound_shutter.mp3",
+        )
+        sound_path = os.path.abspath(sound_path)
+        if not os.path.isfile(sound_path):
+            return
+        try:
+            DesktopCapture._playsound(sound_path)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _playsound(path: str) -> None:
+        """プラットフォーム別最小サウンド再生。Windows: winmm、macOS: afplay、Linux: gst"""
+        import platform
+        import subprocess
+        pf = platform.system()
+        if pf == "Windows":
+            import ctypes
+            ext = os.path.splitext(path)[1].lower()
+            mci_type = "waveaudio" if ext == ".wav" else "mpegvideo"
+            ctypes.windll.winmm.mciSendStringW(
+                f'open "{path}" type {mci_type} alias _dc', None, 0, None)
+            ctypes.windll.winmm.mciSendStringW(
+                'play _dc wait', None, 0, None)
+            ctypes.windll.winmm.mciSendStringW(
+                'close _dc', None, 0, None)
+        elif pf == "Darwin":
+            subprocess.run(["afplay", path], timeout=30, check=False)
+        else:
+            subprocess.run(
+                ["gst-launch-1.0", "playbin", f"uri=file://{path}"],
+                timeout=30, check=False,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+
+    def grab_screen(self, screen_number: str = "auto", shutter_sounds: str = "none") -> tuple[Image.Image, dict]:
         """
         モニター単位でスクリーンショットを取得する。
 
@@ -120,6 +160,9 @@ class DesktopCapture:
             (image, info_dict)
             info_dict: x, y, width, height, cursor_x, cursor_y
         """
+        if shutter_sounds == "auto":
+            self._play_shutter_sound()
+
         mons = screeninfo.get_monitors()
         cursor_x, cursor_y = self.cursor_pos()
 
@@ -169,7 +212,7 @@ class DesktopCapture:
             "cursor_x": cursor_x, "cursor_y": cursor_y,
         }
 
-    def grab_cursor_region(self, size: int, screen_number: str = "auto") -> tuple[Image.Image, dict]:
+    def grab_cursor_region(self, size: int, screen_number: str = "auto", shutter_sounds: str = "none") -> tuple[Image.Image, dict]:
         """
         カーソル中心に size×size px の領域を切り出す。
 
@@ -180,7 +223,7 @@ class DesktopCapture:
             info_dict: screen_x, screen_y, screen_width, screen_height,
                        cursor_x, cursor_y, crop_rel_x, crop_rel_y
         """
-        screen_img, info = self.grab_screen(screen_number)
+        screen_img, info = self.grab_screen(screen_number, shutter_sounds=shutter_sounds)
         cx, cy = info["cursor_x"], info["cursor_y"]
 
         # スクリーン相対座標に変換
@@ -202,15 +245,17 @@ class DesktopCapture:
             "crop_height": bottom - top,
         }
 
-    def grab_region(self, x: int, y: int, width: int, height: int) -> Image.Image:
+    def grab_region(self, x: int, y: int, width: int, height: int, shutter_sounds: str = "none") -> Image.Image:
         """絶対座標で領域を切り出す"""
+        if shutter_sounds == "auto":
+            self._play_shutter_sound()
         min_x, min_y = self._monitor_offsets()
         all_img = self._grab_all()
         left = x - min_x
         top  = y - min_y
         return all_img.crop((left, top, left + width, top + height))
 
-    def grab_window(self, title: str) -> tuple[Image.Image, dict]:
+    def grab_window(self, title: str, shutter_sounds: str = "none") -> tuple[Image.Image, dict]:
         """
         ウィンドウタイトル（部分一致）でウィンドウをキャプチャする。
         Windows 専用（ctypes 使用、pywin32 不要）。
@@ -218,6 +263,9 @@ class DesktopCapture:
         Returns:
             (image, info_dict)  info_dict: hwnd, title, x, y, width, height
         """
+        if shutter_sounds == "auto":
+            self._play_shutter_sound()
+
         if os.name != "nt":
             raise DesktopCaptureError("ウィンドウキャプチャは Windows のみ対応しています")
 

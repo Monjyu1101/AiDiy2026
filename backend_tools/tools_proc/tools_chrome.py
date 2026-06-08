@@ -34,6 +34,7 @@ class ChromeDevToolsRequest(BaseModel):
     show_automation_banner: bool = True
     full_page: bool = False
     save_path: Optional[str] = None
+    shutter_sounds: str = "none"
     expression: Optional[str] = None
     await_promise: bool = False
     selector: Optional[str] = None
@@ -60,7 +61,7 @@ _CHROME_DEVTOOLS_METHODS = [
     {"name": "go_back", "description": "ブラウザの戻るボタン相当", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "go_forward", "description": "ブラウザの進むボタン相当", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "screenshot", "description": "スクリーンショットを撮る",
-     "parameters": {"tab_id": {"type": "string", "required": False}, "full_page": {"type": "boolean", "required": False, "default": False}, "save_path": {"type": "string", "required": False}}},
+     "parameters": {"tab_id": {"type": "string", "required": False}, "full_page": {"type": "boolean", "required": False, "default": False}, "save_path": {"type": "string", "required": False}, "shutter_sounds": {"type": "string", "required": False, "default": "none", "values": ["auto", "none"], "description": "'auto' でシャッター音を再生"}}},
     {"name": "get_page_info", "description": "ページの URL・タイトル・readyState などを取得する", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "get_html", "description": "ページ全体の HTML を取得する", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "get_text", "description": "ページのテキストコンテンツを取得する", "aliases": ["get_page_content"], "parameters": {"tab_id": {"type": "string", "required": False}}},
@@ -176,6 +177,7 @@ def register_tools(mcp, chrome, cdp):
         tab_id: Optional[str] = None,
         full_page: bool = False,
         save_path: Optional[str] = None,
+        shutter_sounds: str = "none",
     ) -> list:
         """
         スクリーンショットを撮る（PNG画像）。
@@ -183,9 +185,10 @@ def register_tools(mcp, chrome, cdp):
         Args:
             save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
                        ファイル指定なら指定ファイルに保存。省略時は保存しない。
+            shutter_sounds: "auto" でシャッター音を再生（Windows のみ）。デフォルト "none"
         """
         await _ensure_chrome()
-        data = await cdp.screenshot(tab_id=tab_id, full_page=full_page, save_path=save_path)
+        data = await cdp.screenshot(tab_id=tab_id, full_page=full_page, save_path=save_path, shutter_sounds=shutter_sounds)
         if save_path and data:
             logger.info(f"screenshot saved: {save_path}")
         return [ImageContent(type="image", data=data, mimeType="image/png")]
@@ -594,7 +597,7 @@ def create_router(cdp, _ensure_chrome) -> APIRouter:
                 "navigate": {"url": "http://localhost:8090"},
                 "reload": {},
                 "go_back": {},
-                "screenshot": {"full_page": False},
+                "screenshot": {"full_page": False, "shutter_sounds": "none"},
                 "get_page_info": {},
                 "get_html": {},
                 "get_text": {},
@@ -682,7 +685,7 @@ def create_router(cdp, _ensure_chrome) -> APIRouter:
                 result = await cdp.go_forward(req.tab_id)
                 return {"result": result}
             elif method_name == "screenshot":
-                data = await cdp.screenshot(tab_id=req.tab_id, full_page=req.full_page, save_path=req.save_path)
+                data = await cdp.screenshot(tab_id=req.tab_id, full_page=req.full_page, save_path=req.save_path, shutter_sounds=req.shutter_sounds)
                 return {"type": "image", "data": data, "mimeType": "image/png"}
             elif method_name == "get_page_info":
                 info = await cdp.get_page_info(req.tab_id)

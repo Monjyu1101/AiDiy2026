@@ -38,6 +38,7 @@ class ScreenshotRequest(BaseModel):
     crosshair: bool = False
     label: bool = False
     save_path: Optional[str] = None
+    shutter_sounds: str = "none"
 
 
 def register_tools(mcp_dc, capture):
@@ -58,6 +59,7 @@ def register_tools(mcp_dc, capture):
         crosshair: bool = False,
         label: bool = False,
         save_path: Optional[str] = None,
+        shutter_sounds: str = "none",
     ) -> list:
         """
         OS のスクリーンショットを撮る（PNG/JPEG 画像）。
@@ -84,6 +86,7 @@ def register_tools(mcp_dc, capture):
             label: True で座標・サイズのラベルを右下に追記
             save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
                        ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
+            shutter_sounds: "auto" でシャッター音を再生（Windows のみ）。デフォルト "none"
         """
         if delay > 0:
             await asyncio.sleep(delay)
@@ -94,18 +97,18 @@ def register_tools(mcp_dc, capture):
             crosshair_pos = None
 
             if window_title:
-                img, info = await asyncio.to_thread(capture.grab_window, window_title)
+                img, info = await asyncio.to_thread(capture.grab_window, window_title, shutter_sounds)
             elif x is not None and y is not None and width is not None and height is not None:
-                img = await asyncio.to_thread(capture.grab_region, x, y, width, height)
+                img = await asyncio.to_thread(capture.grab_region, x, y, width, height, shutter_sounds)
                 info = {"x": x, "y": y, "width": width, "height": height}
             elif size is not None:
-                img, info = await asyncio.to_thread(capture.grab_cursor_region, size, screen_number)
+                img, info = await asyncio.to_thread(capture.grab_cursor_region, size, screen_number, shutter_sounds)
                 if crosshair:
                     cx = info["cursor_x"] - info["x"] - info.get("crop_rel_x", 0)
                     cy = info["cursor_y"] - info["y"] - info.get("crop_rel_y", 0)
                     crosshair_pos = (cx, cy)
             else:
-                img, info = await asyncio.to_thread(capture.grab_screen, screen_number)
+                img, info = await asyncio.to_thread(capture.grab_screen, screen_number, shutter_sounds)
 
             label_text = None
             if label:
@@ -202,6 +205,7 @@ def create_router(capture) -> APIRouter:
                         "crosshair": {"type": "boolean", "required": False, "default": False, "description": "True でカーソル位置に赤い十字線を描画（size モード時）"},
                         "label": {"type": "boolean", "required": False, "default": False, "description": "True で座標・サイズのラベルを右下に追記"},
                         "save_path": {"type": "string", "required": False, "description": "保存先パス。省略時は temp/output/ に yyyymmdd.HHMMSS.png で自動保存"},
+                        "shutter_sounds": {"type": "string", "required": False, "default": "none", "values": ["auto", "none"], "description": "'auto' でシャッター音を再生（Windows のみ）"},
                     },
                     "example_request": {"screen_number": "auto", "format": "png"},
                     "example_request_window": {"window_title": "Chrome", "format": "jpeg", "quality": 80},
@@ -253,18 +257,18 @@ def create_router(capture) -> APIRouter:
                 info = {}
                 crosshair_pos = None
                 if req.window_title:
-                    img, info = await asyncio.to_thread(capture.grab_window, req.window_title)
+                    img, info = await asyncio.to_thread(capture.grab_window, req.window_title, req.shutter_sounds)
                 elif req.x is not None and req.y is not None and req.width is not None and req.height is not None:
-                    img = await asyncio.to_thread(capture.grab_region, req.x, req.y, req.width, req.height)
+                    img = await asyncio.to_thread(capture.grab_region, req.x, req.y, req.width, req.height, req.shutter_sounds)
                     info = {"x": req.x, "y": req.y, "width": req.width, "height": req.height}
                 elif req.size is not None:
-                    img, info = await asyncio.to_thread(capture.grab_cursor_region, req.size, req.screen_number)
+                    img, info = await asyncio.to_thread(capture.grab_cursor_region, req.size, req.screen_number, req.shutter_sounds)
                     if req.crosshair:
                         cx = info["cursor_x"] - info["x"] - info.get("crop_rel_x", 0)
                         cy = info["cursor_y"] - info["y"] - info.get("crop_rel_y", 0)
                         crosshair_pos = (cx, cy)
                 else:
-                    img, info = await asyncio.to_thread(capture.grab_screen, req.screen_number)
+                    img, info = await asyncio.to_thread(capture.grab_screen, req.screen_number, req.shutter_sounds)
                 label_text = None
                 if req.label:
                     cx, cy = info.get("cursor_x", 0), info.get("cursor_y", 0)

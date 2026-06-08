@@ -32,6 +32,8 @@ from typing import Any, Optional
 from PIL import Image as _PILImage
 import websockets
 
+from tools_proc.desktop_capture import DesktopCapture
+
 
 class ChromeDevToolsError(Exception):
     """CDP 接続・操作エラー"""
@@ -319,6 +321,7 @@ class CDPClient:
         quality: int = 80,
         full_page: bool = False,
         save_path: Optional[str] = None,
+        shutter_sounds: str = "none",
     ) -> str:
         """
         スクリーンショットを Base64 文字列で返す
@@ -330,10 +333,14 @@ class CDPClient:
             save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
                        ファイル指定なら指定ファイルに上書き保存（拡張子に合わせて変換）。
                        省略時は保存しない。
+            shutter_sounds: "auto" でシャッター音を再生。デフォルト "none"
 
         Returns:
             Base64 エンコードされた画像データ
         """
+        if shutter_sounds == "auto":
+            DesktopCapture._play_shutter_sound()
+
         tab = self.resolve_tab(tab_id)
         ws = self.get_ws_url(tab)
 
