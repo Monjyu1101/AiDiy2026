@@ -385,10 +385,11 @@ def guide_tts(
 PREVIEW_MIN_SCENE_SEC = 5.0
 
 
-def _preview_url(frontend_base_url: str, folder_name: str) -> str:
+def _preview_url(frontend_base_url: str, folder_name: str, *, speaker_enabled: bool = True) -> str:
     base = frontend_base_url.rstrip("/")
     folder = urllib.parse.quote(folder_name.replace("\\", "/"), safe="")
-    return f"{base}/Xビデオ/{folder}/index.html?auto=loop&preview_min_sec={PREVIEW_MIN_SCENE_SEC:g}"
+    speaker_query = "" if speaker_enabled else "&speaker=false"
+    return f"{base}/Xビデオ/{folder}/index.html?auto=loop&preview_min_sec={PREVIEW_MIN_SCENE_SEC:g}{speaker_query}"
 
 
 def ensure_preview_minimum_duration_mcp(index_path: str) -> None:
@@ -514,6 +515,7 @@ async def refresh_browser_preview(
     *,
     ensure_fn=None,
     require_existing_index: bool = True,
+    speaker_enabled: bool = True,
 ) -> None:
     """
     aidiy_chrome_devtools HTTP API で、生成中ビデオを ?auto=loop 表示する。
@@ -525,6 +527,8 @@ async def refresh_browser_preview(
     ensure_fn : callable or None
         index.html にパッチを当てる関数
     require_existing_index : bool
+    speaker_enabled : bool
+        False の場合は ?speaker=false を付けてプレビュー音声を無効化する
     """
     if not ctx.browser_preview:
         return
@@ -535,7 +539,7 @@ async def refresh_browser_preview(
 
     if ensure_fn is not None:
         ensure_fn(index_path)
-    url = _preview_url(ctx.frontend_base_url, ctx.folder_name)
+    url = _preview_url(ctx.frontend_base_url, ctx.folder_name, speaker_enabled=speaker_enabled)
     try:
         result = await asyncio.to_thread(
             post_mcp_method,

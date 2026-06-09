@@ -422,7 +422,12 @@ async def run_automation_loop(
                 _logger.info("Step %02d [%s] 完了", step_no, step_name)
                 set_completed_step(ctx, step_no)
                 if 1 <= step_no <= 8:
-                    await refresh_browser_preview(ctx, f"Step {step_no:02d}: {step_name}", ensure_fn=ensure_fn)
+                    await refresh_browser_preview(
+                        ctx,
+                        f"Step {step_no:02d}: {step_name}",
+                        ensure_fn=ensure_fn,
+                        speaker_enabled=step_no >= 8,
+                    )
                 break
             else:
                 if attempt < ctx.max_retries:

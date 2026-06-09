@@ -366,6 +366,36 @@ def upsert_json_mcp_servers(path: Path, entries: list[tuple[str, dict]], top_key
         return False
 
 
+def remove_json_mcp_servers(path: Path, server_names: set[str], top_key: str = "mcpServers") -> bool:
+    """JSON MCP 設定から指定サーバーを削除する。存在しない場合は成功扱い。"""
+    try:
+        if not path.exists():
+            return True
+
+        data = load_json_dict_file(path)
+        servers = data.get(top_key)
+        if not isinstance(servers, dict):
+            return True
+
+        removed = [sn for sn in sorted(server_names) if sn in servers]
+        if not removed:
+            return True
+
+        for sn in removed:
+            servers.pop(sn, None)
+        data[top_key] = servers
+        if not write_json_file(path, data):
+            return False
+        print_info(f"MCP設定から削除しました: {path} ({', '.join(removed)})")
+        return True
+    except json.JSONDecodeError as e:
+        print_error(f"JSON解析エラー: {path} ({e})")
+        return False
+    except Exception as e:
+        print_error(f"MCP設定削除エラー: {path} ({e})")
+        return False
+
+
 def get_vscode_mcp_path() -> Path:
     """VS Code ユーザー設定フォルダ配下の mcp.json パスを返す。"""
     if sys.platform == "win32":
@@ -568,6 +598,34 @@ def upsert_toml_table(path: Path, table_header: str, body_lines: list[str]) -> b
         return True
     except Exception as e:
         print_error(f"TOML設定更新エラー: {path} ({e})")
+        return False
+
+
+def remove_codex_mcp_servers(server_names: set[str]) -> bool:
+    """Codex CLI の config.toml から指定 MCP サーバー設定を削除する。"""
+    config_path = Path.home() / ".codex" / "config.toml"
+    try:
+        if not config_path.exists():
+            return True
+
+        original = config_path.read_text(encoding="utf-8")
+        updated = original
+        removed: list[str] = []
+        for server_name in sorted(server_names):
+            table_header = f"[mcp_servers.{server_name}]"
+            next_updated = remove_toml_table(updated, table_header)
+            if next_updated != updated:
+                removed.append(server_name)
+                updated = next_updated
+
+        if not removed:
+            return True
+
+        config_path.write_text(updated, encoding="utf-8")
+        print_info(f"Codex MCP設定から削除しました: {config_path} ({', '.join(removed)})")
+        return True
+    except Exception as e:
+        print_error(f"Codex MCP設定削除エラー: {config_path} ({e})")
         return False
 
 
@@ -1233,6 +1291,10 @@ MCP_MODULES = [
     },
 ]
 
+CODE_CLI_MCP_EXCLUDE = {
+    "aidiy_image_generation",
+}
+
 
 def setup_mcp_module(module: dict) -> bool:
     """tools モジュールを汎用的にセットアップする (uv sync + npm install)"""
@@ -1502,9 +1564,15 @@ def configure_backend_tools_clients(module: dict) -> bool:
         [(sn, {"type": "sse", "url": url}) for sn, url in servers],
     )
 
+    code_cli_servers = [(sn, url) for sn, url in servers if sn not in CODE_CLI_MCP_EXCLUDE]
+    code_cli_excluded = sorted(sn for sn, _ in servers if sn in CODE_CLI_MCP_EXCLUDE)
+
     # 4) Antigravity (mcpServers - stdio型)
     antigravity_mcp = get_antigravity_mcp_config_path()
     print_info(f"[Antigravity] {antigravity_mcp}")
+    if code_cli_excluded:
+        print_info(f"  Codex/Antigravity 除外: {', '.join(code_cli_excluded)}")
+    all_ok &= remove_json_mcp_servers(antigravity_mcp, CODE_CLI_MCP_EXCLUDE)
 
     python_path = find_python_in_env(backend_tools_DIR, backend_tools_ENV_CANDIDATES)
     script_path = backend_tools_DIR / "mcp_stdio.py"
@@ -1519,7 +1587,7 @@ def configure_backend_tools_clients(module: dict) -> bool:
                 data = load_json_dict_file(antigravity_mcp)
                 servers_dict = data.get("mcpServers", {})
                 if isinstance(servers_dict, dict):
-                    for sn, _ in servers:
+                    for sn, _ in code_cli_servers:
                         if sn in servers_dict and isinstance(servers_dict[sn], dict):
                             servers_dict[sn].pop("serverUrl", None)
                     data["mcpServers"] = servers_dict
@@ -1528,7 +1596,7 @@ def configure_backend_tools_clients(module: dict) -> bool:
             print_warning(f"Antigravity の旧 serverUrl 設定削除中にエラーが発生しました: {e}")
 
         antigravity_entries = []
-        for sn, url in servers:
+        for sn, url in code_cli_servers:
             config = {
                 "command": str(python_path),
                 "args": [
@@ -1552,7 +1620,8 @@ def configure_backend_tools_clients(module: dict) -> bool:
     # 6) Codex CLI (TOML, stdio ブリッジ)
     codex_path = Path.home() / ".codex" / "config.toml"
     print_info(f"[Codex CLI]   {codex_path}")
-    for sn, url in servers:
+    all_ok &= remove_codex_mcp_servers(CODE_CLI_MCP_EXCLUDE)
+    for sn, url in code_cli_servers:
         codex_module = {**module, "server_name": sn, "sse_url": url}
         all_ok &= upsert_codex_backend_tools_config(codex_module)
 

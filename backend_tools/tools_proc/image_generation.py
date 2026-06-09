@@ -11,13 +11,17 @@
 """
 画像生成モジュール
 
-OpenAI API（DALL-E 3 / GPT Image 2）、Gemini / FreeAI（Google Gemini API）を使って画像を生成する。
+OpenAI API（DALL-E 3 / GPT Image 2）、Gemini / FreeAI（Google Gemini API）、
+Codex CLI / Antigravity CLI を使って画像を生成する。
 """
 
 import base64
 import io
 import json
 import os
+import re
+import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -35,13 +39,25 @@ class ImageGeneration:
     画像生成クラス
 
     provider パラメータ:
-        "auto"   — FreeAI を自動選択（デフォルト）
+        "auto"   — codex → antigravity → openai → freeai → gemini
         "gemini" — Google Gemini API（gemini_key_id が必要）
         "freeai" — FreeAI API（freeai_key_id が必要、実装は Gemini 共通）
         "openai" — OpenAI DALL-E / GPT Image API
+        "codex"  — Codex CLI（model は無視。antigravity → openai → freeai → gemini にフォールバック）
+        "antigravity" — Antigravity CLI（model は無視。codex → freeai → gemini にフォールバック）
     """
 
     DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
+    CODEX_TIMEOUT_SECONDS = int(os.environ.get("AIDIY_IMAGE_CODEX_TIMEOUT", "1200"))
+    ANTIGRAVITY_TIMEOUT_SECONDS = int(os.environ.get("AIDIY_IMAGE_ANTIGRAVITY_TIMEOUT", "1200"))
+    _FALLBACK_CHAINS = {
+        "auto": ["codex", "antigravity", "openai", "freeai", "gemini"],
+        "codex": ["codex", "antigravity", "openai", "freeai", "gemini"],
+        "openai": ["openai", "freeai", "gemini"],
+        "freeai": ["freeai", "gemini"],
+        "gemini": ["gemini", "openai"],
+        "antigravity": ["antigravity", "codex", "freeai", "gemini"],
+    }
 
     # ================================================================== #
     # OpenAI モデルカタログ
@@ -161,6 +177,302 @@ class ImageGeneration:
         if size in self._GEMINI_SIZE_MAP:
             return self._GEMINI_SIZE_MAP[size]
         return self._GEMINI_SIZE_MAP[self.GEMINI_DEFAULT_SIZE]
+
+    # ------------------------------------------------------------------ #
+    # Code CLI 起動
+    # ------------------------------------------------------------------ #
+
+    def _npm_shim_to_direct_command(self, cmd_path: str) -> Optional[list[str]]:
+        """npm の .cmd シムを node.exe 直接起動へ解決する。"""
+        if os.name != "nt" or not cmd_path or not cmd_path.lower().endswith(".cmd"):
+            return None
+        try:
+            with open(cmd_path, "r", encoding="utf-8", errors="replace") as f:
+                body = f.read()
+        except OSError:
+            return None
+
+        dp0 = os.path.dirname(os.path.abspath(cmd_path))
+
+        def expand(path: str) -> str:
+            return os.path.normpath(path.replace("%dp0%", dp0).replace("%~dp0", dp0))
+
+        match = re.search(r'"%_prog%"\s+"([^"]+)"\s+%\*', body, re.IGNORECASE)
+        if match:
+            js_path = expand(match.group(1))
+            if os.path.isfile(js_path):
+                node_exe = os.path.join(dp0, "node.exe")
+                if not os.path.isfile(node_exe):
+                    node_exe = "node"
+                return [node_exe, js_path]
+
+        match = re.search(r'"([^"]+\.exe)"\s+%\*', body, re.IGNORECASE)
+        if match:
+            exe_path = expand(match.group(1))
+            if os.path.isfile(exe_path):
+                return [exe_path]
+
+        return None
+
+    def _codex_command_base(self) -> list[str]:
+        custom_cmd = (
+            os.environ.get("CODEX_CLI_PATH")
+            or os.environ.get("CODEX_CLI_CLI_PATH")
+            or os.environ.get("AIDIY_CODEX_CLI_PATH")
+        )
+        if custom_cmd:
+            direct = self._npm_shim_to_direct_command(custom_cmd)
+            return direct if direct is not None else [custom_cmd]
+
+        if os.name == "nt":
+            userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+            candidate = os.path.join(userprofile, "AppData", "Roaming", "npm", "codex.cmd")
+            if os.path.isfile(candidate):
+                direct = self._npm_shim_to_direct_command(candidate)
+                return direct if direct is not None else [candidate]
+
+        return ["codex"]
+
+    def _antigravity_command_base(self) -> list[str]:
+        custom_cmd = (
+            os.environ.get("ANTIGRAVITY_CLI_PATH")
+            or os.environ.get("ANTIGRAVITY_CLI_CLI_PATH")
+            or os.environ.get("AIDIY_ANTIGRAVITY_CLI_PATH")
+        )
+        if custom_cmd:
+            return [custom_cmd]
+
+        if os.name == "nt":
+            userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+            candidate = os.path.join(userprofile, "AppData", "Local", "agy", "bin", "agy.exe")
+            if os.path.isfile(candidate):
+                return [candidate]
+
+        return ["agy"]
+
+    def _codex_output_path(self) -> Path:
+        out_dir = Path(self._resolve_default_output_dir())
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir / (datetime.now().strftime("%Y%m%d.%H%M%S") + ".png")
+
+    @staticmethod
+    def _save_png_file(img: Image.Image, output_path: Path) -> None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        img.save(output_path, format="PNG", optimize=True)
+
+    def copy_generated_file(self, generated_path: str, save_path: str) -> str:
+        """生成済み PNG をユーザー指定先へコピーし、実際のコピー先を返す。"""
+        src = Path(generated_path)
+        if not src.is_file():
+            raise ImageGenerationError(f"生成済み画像が見つかりません: {generated_path}")
+
+        if self._is_directory_path(save_path):
+            dest = Path(save_path) / src.name
+        else:
+            dest = Path(save_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        if src.resolve() != dest.resolve():
+            shutil.copyfile(src, dest)
+        return str(dest)
+
+    @staticmethod
+    def file_to_base64(path: str) -> str:
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("ascii")
+
+    def _build_cli_image_prompt(
+        self,
+        cli_label: str,
+        prompt: str,
+        output_path: Path,
+        original_path: Optional[str],
+        size: str,
+        quality: str,
+    ) -> str:
+        size_note = "" if not size or size == "auto" else f"\n- 希望サイズ: {size}"
+        quality_note = "" if not quality or quality == "auto" else f"\n- 希望品質: {quality}"
+        original_note = ""
+        if original_path:
+            original_abs_path = Path(original_path).resolve().as_posix()
+            original_note = (
+                f"\n- 参照画像: {original_abs_path}"
+                f"\n\n添付ファイル: `{original_abs_path}`"
+            )
+
+        return (
+            f"あなたは AiDiy の画像生成担当です。{cli_label} で以下の内容の画像を1枚生成し、"
+            "必ず指定された PNG ファイルだけを成果物として保存してください。\n\n"
+            f"- 保存先: {output_path.resolve().as_posix()}\n"
+            f"- 画像プロンプト: {prompt.strip()}"
+            f"{original_note}"
+            f"{size_note}"
+            f"{quality_note}\n\n"
+            "重要:\n"
+            "- 保存先ディレクトリがなければ作成してください。\n"
+            "- ファイル形式は PNG とし、指定パスとファイル名を変更しないでください。\n"
+            "- モデル指定は無視してください。\n"
+            "- 完了後は短く報告してください。"
+        )
+
+    def _build_codex_prompt(
+        self,
+        prompt: str,
+        output_path: Path,
+        original_path: Optional[str],
+        size: str,
+        quality: str,
+    ) -> str:
+        return self._build_cli_image_prompt("Codex CLI", prompt, output_path, original_path, size, quality)
+
+    def _build_antigravity_prompt(
+        self,
+        prompt: str,
+        output_path: Path,
+        original_path: Optional[str],
+        size: str,
+        quality: str,
+    ) -> str:
+        return self._build_cli_image_prompt("Antigravity CLI", prompt, output_path, original_path, size, quality)
+
+    def _generate_codex(
+        self,
+        prompt: str,
+        original_path: Optional[str],
+        size: str,
+        quality: str,
+    ) -> tuple[Image.Image, dict]:
+        output_path = self._codex_output_path()
+        if output_path.exists():
+            output_path.unlink()
+
+        command = self._codex_command_base() + [
+            "exec",
+            "--skip-git-repo-check",
+            "--dangerously-bypass-approvals-and-sandbox",
+            self._build_codex_prompt(prompt, output_path, original_path, size, quality),
+        ]
+        cwd = Path(__file__).resolve().parent.parent.parent
+
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=str(cwd),
+                env=os.environ.copy(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=self.CODEX_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except FileNotFoundError as e:
+            raise ImageGenerationError("codex CLI が見つかりません") from e
+        except subprocess.TimeoutExpired as e:
+            raise ImageGenerationError(
+                f"codex CLI がタイムアウトしました({self.CODEX_TIMEOUT_SECONDS}秒)"
+            ) from e
+
+        if proc.returncode != 0:
+            stderr = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+            stdout = (proc.stdout or b"").decode("utf-8", errors="replace").strip()
+            detail = stderr or stdout or f"returncode={proc.returncode}"
+            raise ImageGenerationError(f"codex CLI 実行に失敗しました: {detail[:500]}")
+
+        if not output_path.is_file():
+            raise ImageGenerationError(f"codex CLI が画像ファイルを作成しませんでした: {output_path}")
+
+        try:
+            with Image.open(output_path) as src:
+                img = src.copy()
+        except Exception as e:
+            raise ImageGenerationError(f"codex CLI の出力を画像として読めません: {output_path}") from e
+
+        info = {
+            "provider": "codex",
+            "model": "ignored",
+            "prompt": prompt.strip(),
+            "original_path": original_path,
+            "width": img.width,
+            "height": img.height,
+            "size": size,
+            "quality": quality,
+            "generated_path": str(output_path),
+            "engine_note": "Codex CLI",
+        }
+        return img, info
+
+    def _generate_antigravity(
+        self,
+        prompt: str,
+        original_path: Optional[str],
+        size: str,
+        quality: str,
+    ) -> tuple[Image.Image, dict]:
+        output_path = self._codex_output_path()
+        if output_path.exists():
+            output_path.unlink()
+
+        command = self._antigravity_command_base() + [
+            "--dangerously-skip-permissions",
+            "--print-timeout",
+            "20m",
+            "-p",
+            self._build_antigravity_prompt(prompt, output_path, original_path, size, quality),
+        ]
+        cwd = Path(__file__).resolve().parent.parent.parent
+        creationflags = (
+            subprocess.DETACHED_PROCESS
+            if os.name == "nt" and hasattr(subprocess, "DETACHED_PROCESS")
+            else 0
+        )
+
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=str(cwd),
+                env=os.environ.copy(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=self.ANTIGRAVITY_TIMEOUT_SECONDS,
+                check=False,
+                creationflags=creationflags,
+            )
+        except FileNotFoundError as e:
+            raise ImageGenerationError("antigravity CLI (agy) が見つかりません") from e
+        except subprocess.TimeoutExpired as e:
+            raise ImageGenerationError(
+                f"antigravity CLI がタイムアウトしました({self.ANTIGRAVITY_TIMEOUT_SECONDS}秒)"
+            ) from e
+
+        if proc.returncode != 0:
+            stderr = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+            stdout = (proc.stdout or b"").decode("utf-8", errors="replace").strip()
+            detail = stderr or stdout or f"returncode={proc.returncode}"
+            raise ImageGenerationError(f"antigravity CLI 実行に失敗しました: {detail[:500]}")
+
+        if not output_path.is_file():
+            raise ImageGenerationError(f"antigravity CLI が画像ファイルを作成しませんでした: {output_path}")
+
+        try:
+            with Image.open(output_path) as src:
+                img = src.copy()
+        except Exception as e:
+            raise ImageGenerationError(f"antigravity CLI の出力を画像として読めません: {output_path}") from e
+
+        info = {
+            "provider": "antigravity",
+            "model": "ignored",
+            "prompt": prompt.strip(),
+            "original_path": original_path,
+            "width": img.width,
+            "height": img.height,
+            "size": size,
+            "quality": quality,
+            "generated_path": str(output_path),
+            "engine_note": "Antigravity CLI",
+        }
+        return img, info
 
     # ------------------------------------------------------------------ #
     # 画像生成（OpenAI）
@@ -339,6 +651,25 @@ class ImageGeneration:
         }
         return img, info
 
+    def _generate_provider(
+        self,
+        provider: str,
+        prompt: str,
+        original_path: Optional[str],
+        model: str,
+        size: str,
+        quality: str,
+    ) -> tuple[Image.Image, dict]:
+        if provider == "codex":
+            return self._generate_codex(prompt, original_path, size, quality)
+        if provider == "antigravity":
+            return self._generate_antigravity(prompt, original_path, size, quality)
+        if provider == "openai":
+            return self._generate_openai(prompt, original_path, model, size, quality)
+        if provider in ("freeai", "gemini"):
+            return self._generate_gemini(prompt, original_path, model, size, provider)
+        raise ImageGenerationError(f"未対応の provider です: '{provider}'")
+
     # ------------------------------------------------------------------ #
     # 画像生成（統合入口）
     # ------------------------------------------------------------------ #
@@ -357,11 +688,12 @@ class ImageGeneration:
 
         Args:
             prompt: 生成プロンプト
-            provider: "auto" / "openai" / "gemini" / "freeai"
+            provider: "auto" / "openai" / "gemini" / "freeai" / "codex" / "antigravity"
             original_path: 参照画像のパス（省略可）
             model:
               OpenAI: "auto"=gpt-image-2 / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
               Gemini/FreeAI: "auto"=gemini-3.1-flash-image-preview
+              Auto/Codex/Antigravity: 指定値は無視
             size:
               OpenAI: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" / ...
               Gemini/FreeAI: "auto"=1024x1024 / "512x512" / "1024x1024" / "1920x1080" / "1080x1920"
@@ -376,22 +708,47 @@ class ImageGeneration:
             raise ImageGenerationError("prompt は必須です")
 
         provider = provider.strip().lower()
-        if provider not in ("auto", "openai", "gemini", "freeai"):
+        if provider not in ("auto", "openai", "gemini", "freeai", "codex", "antigravity"):
             raise ImageGenerationError(
-                f"未対応の provider です: '{provider}'（auto / openai / gemini / freeai のみ）"
+                f"未対応の provider です: '{provider}'（auto / openai / gemini / freeai / codex / antigravity のみ）"
             )
 
         if original_path and not os.path.isfile(original_path):
             raise ImageGenerationError(f"参照画像が見つかりません: '{original_path}'")
 
-        # auto → freeai にフォールバック
-        if provider == "auto":
-            provider = "freeai"
+        chain = self._FALLBACK_CHAINS[provider]
+        effective_model = "auto" if provider in ("auto", "codex", "antigravity") else model
+        errors: list[str] = []
+        for index, candidate in enumerate(chain):
+            try:
+                img, info = self._generate_provider(
+                    candidate, prompt, original_path, effective_model, size, quality
+                )
+            except ImageGenerationError as e:
+                errors.append(f"{candidate}: {e}")
+                continue
 
-        if provider == "openai":
-            return self._generate_openai(prompt, original_path, model, size, quality)
-        else:
-            return self._generate_gemini(prompt, original_path, model, size, provider)
+            info = dict(info)
+            info["requested_provider"] = provider
+            info["fallback_chain"] = chain
+            if index > 0:
+                info["fallback_from"] = provider
+                info["fallback_errors"] = errors
+                info["engine_note"] = f"{info.get('engine_note', candidate)} ({provider} fallback)"
+
+            if provider in ("auto", "codex", "antigravity") and not info.get("generated_path"):
+                output_path = self._codex_output_path()
+                try:
+                    self._save_png_file(img, output_path)
+                except Exception as e:
+                    raise ImageGenerationError(
+                        f"{candidate} フォールバック画像を保存できませんでした: {output_path}"
+                    ) from e
+                info["generated_path"] = str(output_path)
+
+            return img, info
+
+        raise ImageGenerationError("画像生成に失敗しました: " + " / ".join(errors))
 
     # ------------------------------------------------------------------ #
     # 出力

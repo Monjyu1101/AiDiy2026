@@ -112,9 +112,9 @@ class CodeAgents:
         key = self._load_key_json()
         if ai_name == "auto":
             available = [k for k, v in self.version_info.items() if v.get("ok")]
-            # copilot_cli が利用可能なら優先、なければ key.json の並び順で最初に利用可能な AI
-            if "copilot_cli" in available:
-                ai_name = "copilot_cli"
+            # codex_cli が利用可能なら優先、なければ key.json の並び順で最初に利用可能な AI
+            if "codex_cli" in available:
+                ai_name = "codex_cli"
             elif available:
                 ai_name = available[0]
             else:
@@ -174,28 +174,17 @@ class CodeAgents:
         _check_ai_versions から ThreadPoolExecutor で並列に呼ばれる。"""
         info: dict = {"ok": False, "version": "", "cmd": ""}
 
-        # 各 AI が必要とするキーのチェック
-        # copilot_cli は gh auth で認証するため API キー不要
-        if ai_name == "antigravity_cli":
-            claude_key = key.get("claude_key_id", "").strip()
-            if not claude_key or claude_key.startswith("<"):
-                return {"ok": False, "version": "claude_key_id 未設定", "cmd": ""}
-        elif ai_name == "codex_cli":
-            openai_key = key.get("openai_key_id", "").strip()
-            if not openai_key or openai_key.startswith("<"):
-                return {"ok": False, "version": "openai_key_id 未設定", "cmd": ""}
+        # 各 AI はサブスク認証（CLI 系）または内部 CLI 経由で動作するため API キーは不要。
+        # 利用可否は CLI --version の実行結果（claude_sdk はパッケージ存在）で判定する。
 
         try:
             if ai_name == "claude_sdk":
-                # SDK ベース: 実行モジュールが使う claude_agent_sdk + APIキー確認
+                # SDK ベース: 実行モジュールが使う claude_agent_sdk の存在のみ確認。
+                # 内部的に claude_cli 経由で動くため API キーは不要。
                 try:
                     import claude_agent_sdk  # noqa: F401, PLC0415
-                    api_key = key.get("claude_key_id", "").strip()
-                    if api_key and not api_key.startswith("<"):
-                        version = getattr(claude_agent_sdk, "__version__", "claude_agent_sdk")
-                        info = {"ok": True, "version": version, "cmd": "claude_agent_sdk"}
-                    else:
-                        info = {"ok": False, "version": "claude_key_id 未設定", "cmd": "claude_agent_sdk"}
+                    version = getattr(claude_agent_sdk, "__version__", "claude_agent_sdk")
+                    info = {"ok": True, "version": version, "cmd": "claude_agent_sdk"}
                 except ImportError:
                     info = {"ok": False, "version": "claude_agent_sdk 未インストール", "cmd": "claude_agent_sdk"}
 
@@ -274,7 +263,7 @@ class CodeAgents:
 Args:
     prompt: エージェントへの依頼テキスト
     project_path: 作業ディレクトリの絶対パス（省略時は AiDiy_key.json の CODE_BASE_PATH）
-    ai_name: 使用 AI（上記の利用可能な ai_name から指定。"auto" は copilot_cli 優先で自動選択）
+    ai_name: 使用 AI（上記の利用可能な ai_name から指定。"auto" は codex_cli 優先で自動選択）
     ai_model: モデル名（"auto" で key.json の設定を使用）
     max_turns: 最大ターン数（default: 999）
     code_plan: プラン設定（auto / on / off）
@@ -312,7 +301,7 @@ Args:
             project_path: 作業ディレクトリの絶対パス。
                           省略時は AiDiy_key.json の CODE_BASE_PATH を使用。
             ai_name: 使用 AI（例: claude_cli / copilot_cli / aidiy_hermes）。
-                     "auto" は利用可能な最初の AI にフォールバック。
+                     "auto" は codex_cli を優先し、なければ利用可能な最初の AI にフォールバック。
             ai_model: モデル名。"auto" は key.json の対応モデルにフォールバック。
             max_turns: 最大ターン数（default: 999）
             code_plan: プラン設定（auto / on / off）

@@ -30,6 +30,20 @@ from tools_proc.text_to_speech import TextToSpeechError
 logger = get_logger(__name__)
 
 
+def _image_base64_and_paths(ig, img, info: dict, save_path: Optional[str]) -> tuple[str, str, Optional[str]]:
+    """画像返却用 base64 と保存パスを作る。
+
+    CLI 系は generated_path の PNG を正とし、ユーザー指定 save_path があればそこへコピーする。
+    """
+    generated_path = info.get("generated_path")
+    if generated_path and os.path.isfile(generated_path):
+        copied_path = ig.copy_generated_file(generated_path, save_path) if save_path else None
+        return ig.file_to_base64(generated_path), copied_path or generated_path, generated_path
+
+    output_path = save_path or ig._resolve_default_output_dir()
+    return ig.to_base64(img, "png", 85, output_path), output_path, None
+
+
 # ------------------------------------------------------------------ #
 # HTTP リクエストモデル
 # ------------------------------------------------------------------ #
@@ -82,8 +96,8 @@ _IMAGE_GEN_METHODS = [
         "description": "AI 画像を生成する。レスポンスの data フィールドに PNG の base64 文字列が入る",
         "parameters": {
             "prompt": {"type": "string", "required": True, "description": "生成プロンプト"},
-            "provider": {"type": "string", "required": False, "default": "auto", "description": "openai / gemini / freeai / auto"},
-            "model": {"type": "string", "required": False, "default": "auto"},
+            "provider": {"type": "string", "required": False, "default": "auto", "description": "auto / codex / antigravity / openai / freeai / gemini"},
+            "model": {"type": "string", "required": False, "default": "auto", "description": "auto / codex / antigravity 指定時は無視"},
             "size": {"type": "string", "required": False, "default": "auto", "description": "例: 1024x1024"},
             "quality": {"type": "string", "required": False, "default": "auto", "description": "standard / hd / auto"},
             "original_path": {"type": "string", "required": False, "description": "編集元画像パス"},
@@ -152,13 +166,15 @@ def register_image_gen_tools(mcp_ig, ig):
 
         Args:
             prompt: 生成プロンプト（例: "かわいい猫の画像"）
-            provider: "auto"=freeai / "gemini"（gemini_key_id が必要） /
-                      "freeai"（freeai_key_id が必要） / "openai"
+            provider: "auto"=codex→antigravity→openai→freeai→gemini /
+                      "gemini"（gemini_key_id が必要） /
+                      "freeai"（freeai_key_id が必要） / "openai" / "codex" / "antigravity"
             model:
               OpenAI: "auto"=gpt-image-2 / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
               Gemini/FreeAI: "auto"=gemini-3.1-flash-image-preview /
                              "gemini-3.1-flash-image-preview" / "gemini-3-pro-image-preview" /
                              "gemini-2.5-flash-image"
+              Auto/Codex/Antigravity: 指定値は無視
             size:
               OpenAI: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" / ...
               Gemini/FreeAI: "auto"=1024x1024 / "512x512" / "1024x1024" / "1920x1080" / "1080x1920"
@@ -168,20 +184,24 @@ def register_image_gen_tools(mcp_ig, ig):
             original_path: 参照画像のパス（省略可）
             save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
                        ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
+                       Auto/Codex/Antigravity は backend_server/temp/output/yyyymmdd.hhmmss.png を必ず残し、
+                       指定がある場合はその PNG を save_path にもコピーする。
         """
         try:
             img, info = await asyncio.to_thread(
                 ig.generate, prompt, provider, original_path,
                 model=model, size=size, quality=quality,
             )
-            data = await asyncio.to_thread(ig.to_base64, img, "png", 85, save_path)
+            data, output_path, generated_path = await asyncio.to_thread(
+                _image_base64_and_paths, ig, img, info, save_path
+            )
             mime = "image/png"
 
             logger.info(
                 f"generate_image: provider={info['provider']}  "
                 f"model={info.get('model', '?')}  "
                 f"size={img.size}  prompt={info['prompt'][:60]}  "
-                f"save_path={save_path or '(default)'}"
+                f"save_path={output_path}  generated_path={generated_path or '-'}"
             )
 
             return [ImageContent(type="image", data=data, mimeType=mime)]
@@ -394,18 +414,18 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
             "methods": {
                 "generate": {
                     "summary": "AI 画像生成",
-                    "description": "プロンプトから画像を生成して base64 PNG で返す。同時に save_path へ自動保存。",
+                    "description": "プロンプトから画像を生成して base64 PNG で返す。auto/codex/antigravity は backend_server/temp/output/yyyymmdd.hhmmss.png を必ず残し、save_path 指定時は同じ PNG を追加コピーする。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "生成プロンプト（例: 'かわいい猫の画像'）"},
-                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openai", "gemini", "freeai"], "description": "画像生成プロバイダ。auto は freeai を優先"},
-                        "model": {"type": "string", "required": False, "default": "auto", "description": "OpenAI: gpt-image-2 / dall-e-3。Gemini/FreeAI: gemini-3.1-flash-image-preview など"},
+                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openai", "gemini", "freeai", "codex", "antigravity"], "description": "画像生成プロバイダ。auto=codex→antigravity→openai→freeai→gemini。codex=codex→antigravity→openai→freeai→gemini。openai=openai→freeai→gemini。freeai=freeai→gemini。gemini=gemini→openai。antigravity=antigravity→codex→freeai→gemini"},
+                        "model": {"type": "string", "required": False, "default": "auto", "description": "OpenAI: gpt-image-2 / dall-e-3。Gemini/FreeAI: gemini-3.1-flash-image-preview など。auto / codex / antigravity では無視"},
                         "size": {"type": "string", "required": False, "default": "auto", "description": "解像度。例: '1024x1024' / '1920x1080' / '1080x1920'"},
                         "quality": {"type": "string", "required": False, "default": "auto", "description": "OpenAI only: low / medium / high / standard / hd"},
                         "original_path": {"type": "string", "required": False, "description": "編集元画像の絶対パス（image-to-image 時）"},
-                        "save_path": {"type": "string", "required": False, "description": "保存先。省略時は temp/output/ に yyyymmdd.HHMMSS.png で自動保存"},
+                        "save_path": {"type": "string", "required": False, "description": "保存先。省略時は temp/output/ に yyyymmdd.hhmmss.png で自動保存。auto / codex / antigravity では timestamp PNG からコピー"},
                     },
                     "example_request": {"prompt": "富士山と桜の夕景、写実的", "provider": "auto", "size": "1920x1080"},
-                    "response_fields": {"type": "image", "data": "PNG base64 文字列", "save_path": "保存先パス", "mimeType": "image/png"},
+                    "response_fields": {"type": "image", "data": "PNG base64 文字列", "save_path": "保存先パス", "generated_path": "CLI 系の timestamp PNG パス", "mimeType": "image/png"},
                 },
             },
         }
@@ -427,17 +447,21 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                 ig.generate, prompt, req.provider, req.original_path,
                 model=req.model, size=req.size, quality=req.quality,
             )
-            auto_path = req.save_path
-            if not auto_path:
-                out_dir = os.path.join(os.path.dirname(__file__), "..", "..", "temp", "output")
-                os.makedirs(out_dir, exist_ok=True)
-                auto_path = os.path.join(out_dir, datetime.now().strftime("%Y%m%d.%H%M%S") + ".png")
-            base64_data = await asyncio.to_thread(ig.to_base64, img, "png", 85, auto_path)
+            base64_data, auto_path, generated_path = await asyncio.to_thread(
+                _image_base64_and_paths, ig, img, info, req.save_path
+            )
             logger.info(
                 f"http_img_gen: provider={info['provider']} model={info.get('model','?')} "
-                f"size={img.size} prompt={info['prompt'][:60]}"
+                f"size={img.size} prompt={info['prompt'][:60]} "
+                f"save_path={auto_path} generated_path={generated_path or '-'}"
             )
-            return {"type": "image", "data": base64_data, "save_path": auto_path, "mimeType": "image/png"}
+            return {
+                "type": "image",
+                "data": base64_data,
+                "save_path": auto_path,
+                "generated_path": generated_path,
+                "mimeType": "image/png",
+            }
         except Exception as e:
             logger.warning(f"http_img_gen error: {e}")
             return {"error": str(e)}

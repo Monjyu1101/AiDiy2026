@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -300,6 +300,45 @@
         bottom: 56px;
       }
     }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .top-actions .top-note {
+      flex: 1 1 auto;
+    }
+
+    .speaker-btn {
+      width: 40px;
+      height: 40px;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #eaf6ff;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .speaker-btn:hover {
+      background: rgba(143, 232, 255, 0.18);
+      border-color: rgba(143, 232, 255, 0.48);
+      transform: translateY(-1px);
+    }
+
+    .speaker-btn[aria-pressed="true"] {
+      background: rgba(255, 255, 255, 0.04);
+      color: #9eb2c6;
+    }
   </style>
   <script src="scenario.js"></script>
   <script type="importmap">
@@ -318,7 +357,10 @@
       <div class="brand-wrap">
         <div class="brand">AiDiy frontend 紹介</div>
       </div>
-      <div class="top-note">frontend_web/AGENTS.md と .aidiy/knowledge をもとに、Vue 3・qTubler・認証・Vite proxy・AIコア連携の実装実態を正確に紹介します。</div>
+      <div class="top-actions">
+        <div class="top-note">frontend_web/AGENTS.md と .aidiy/knowledge をもとに、Vue 3・qTubler・認証・Vite proxy・AIコア連携の実装実態を正確に紹介します。</div>
+        <button id="speakerBtn" class="speaker-btn" type="button" aria-label="スピーカー オン" aria-pressed="false" title="スピーカー オン">🔊</button>
+      </div>
     </header>
 
     <main class="stage">
@@ -366,10 +408,12 @@
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const restartBtn = document.getElementById("restartBtn");
-    const lastBtn = document.getElementById("lastBtn");
+    const lastBtn = document.getElementById("lastBtn");
+    const speakerBtn    = document.getElementById("speakerBtn");
     const modeBtn = document.getElementById("modeBtn");
     const ttsStatus = document.getElementById("ttsStatus");
     const searchParams = new URLSearchParams(window.location.search);
+    let speakerEnabled = (searchParams.get("speaker") || "").toLowerCase() !== "false";
     const autoParam = (searchParams.get("auto") || "").toLowerCase();
     const requestedAutoMode = ["short", "long", "loop"].includes(autoParam) ? autoParam : "";
     const autoPlayRequested = requestedAutoMode !== "" || searchParams.get("autoplay") === "1";
@@ -452,6 +496,16 @@
     const audioPlayer = new Audio();
     window.audioPlayer = audioPlayer;
     audioPlayer.preload = "auto";
+    function applySpeakerState() {
+      audioPlayer.volume = speakerEnabled ? 1 : 0;
+      if (speakerBtn) {
+        speakerBtn.textContent = speakerEnabled ? "🔊" : "🔇";
+        speakerBtn.setAttribute("aria-label", speakerEnabled ? "スピーカー オン" : "スピーカー オフ");
+        speakerBtn.setAttribute("aria-pressed", speakerEnabled ? "false" : "true");
+        speakerBtn.title = speakerEnabled ? "スピーカー オン" : "スピーカー オフ";
+      }
+    }
+    applySpeakerState();
 
     const ttsAudioCache = new Map();
     const ttsPendingCache = new Map();
@@ -918,7 +972,8 @@
     playBtn.addEventListener("click", () => { if (playing) pause(); else play(); });
     nextBtn.addEventListener("click", () => { pause(); nextScene(false); });
     lastBtn.addEventListener("click", () => { pause(); moveToScene(scenario.scenes.length - 1); });
-
+
+    speakerBtn?.addEventListener("click", () => { speakerEnabled = !speakerEnabled; applySpeakerState(); });
     modeBtn.addEventListener("click", () => {
       const wasPlaying = playing;
       if (wasPlaying) pause();
