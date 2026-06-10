@@ -61,6 +61,17 @@ from tools_proc import tools_notification_sounds, tools_agents, tools_chat
 setup_logging()
 logger = get_logger(__name__)
 
+# 呼び出されたツール名をログに出力する（"Processing request of type CallToolRequest" の代替）
+_original_fastmcp_call_tool = FastMCP.call_tool
+
+
+async def _logged_call_tool(self: FastMCP, name: str, arguments: dict):
+    logger.info("ツール呼び出し: %s / %s %s", self.name, name, arguments)
+    return await _original_fastmcp_call_tool(self, name, arguments)
+
+
+FastMCP.call_tool = _logged_call_tool
+
 # ------------------------------------------------------------------ #
 # 設定
 # ------------------------------------------------------------------ #

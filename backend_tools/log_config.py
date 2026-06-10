@@ -121,6 +121,8 @@ def setup_logging(instance_name: str = "mcp_main"):
     logging.getLogger('uvicorn').setLevel(logging.WARNING)
     logging.getLogger('uvicorn.error').setLevel(logging.WARNING)
     logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
+    # MCP の "Processing request of type ..." ログ（ListTools/ListResources等）を抑制
+    logging.getLogger('mcp.server.lowlevel.server').setLevel(logging.WARNING)
 
     # Uvicornログを共通フォーマットに統一（Uvicorn独自ハンドラを除去してrootへ伝播）
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
