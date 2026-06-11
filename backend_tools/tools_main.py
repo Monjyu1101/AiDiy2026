@@ -65,8 +65,30 @@ logger = get_logger(__name__)
 _original_fastmcp_call_tool = FastMCP.call_tool
 
 
+_LOG_PARAM_MAX_LEN = 50
+
+
+def _summarize_arguments(arguments: dict, max_keys: int = 3) -> str:
+    """ログ表示用に主要パラメータのみを短縮して文字列化する。"""
+    if not arguments:
+        return ""
+
+    parts = []
+    for key, value in list(arguments.items())[:max_keys]:
+        text = str(value)
+        if len(text) > _LOG_PARAM_MAX_LEN:
+            text = text[:_LOG_PARAM_MAX_LEN] + "..."
+        parts.append(f"{key}={text}")
+
+    omitted = len(arguments) - max_keys
+    if omitted > 0:
+        parts.append(f"...(他{omitted}件)")
+
+    return ", ".join(parts)
+
+
 async def _logged_call_tool(self: FastMCP, name: str, arguments: dict):
-    logger.info("ツール呼び出し: %s / %s %s", self.name, name, arguments)
+    logger.info("ツール呼び出し: %s / %s (%s)", self.name, name, _summarize_arguments(arguments))
     return await _original_fastmcp_call_tool(self, name, arguments)
 
 
