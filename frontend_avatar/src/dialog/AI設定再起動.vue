@@ -64,6 +64,7 @@ const CHAT_MODEL_KEYS: Record<string, string> = {
   freeai_chat: 'CHAT_FREEAI_MODEL',
   openrt_chat: 'CHAT_OPENRT_MODEL',
   ollama_chat: 'CHAT_OLLAMA_MODEL',
+  local_chat: 'CHAT_LOCAL_MODEL',
 }
 
 const LIVE_MODEL_KEYS: Record<string, string> = {

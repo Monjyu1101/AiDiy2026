@@ -46,12 +46,17 @@ class conf_json:
         'ollama_key_id': '< your ollama api key >',
         'ollama_host': 'http://localhost:11434',
 
+        # HuggingFaceの基本設定（ローカルLLM / モデルダウンロード）
+        'huggingface_key_read': '< your huggingface read key >',
+        'huggingface_key_write': '< your huggingface write key >',
+
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image-preview',
         'CHAT_FREEAI_MODEL': 'gemini-3.1-flash-image-preview',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image-preview',
         'CHAT_OLLAMA_MODEL': 'mistral-large-3:675b:cloud',
+        'CHAT_LOCAL_MODEL': 'google/gemma-4-E2B-it',
 
         # LiveAI設定
         'LIVE_AI_NAME': 'freeai_live',

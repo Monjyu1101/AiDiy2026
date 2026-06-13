@@ -115,6 +115,8 @@ class Chat:
             module_name = "AIコア.AIチャット_gemini"
         elif self.AI_NAME == "ollama_chat":
             module_name = "AIコア.AIチャット_ollama"
+        elif self.AI_NAME == "local_chat":
+            module_name = "AIコア.AIチャット_local"
         try:
             return importlib.import_module(module_name)
         except Exception as e:
@@ -138,6 +140,8 @@ class Chat:
                             api_key = conf_json.json.get("freeai_key_id", "") or api_key
                     elif self.AI_NAME == "ollama_chat":
                         api_key = conf_json.json.get("ollama_key_id", "ollama")
+                    elif self.AI_NAME == "local_chat":
+                        api_key = "local"  # backend_local は認証なし（ダミーキー）
                     else:
                         api_key = conf_json.json.get("openrt_key_id", "")
             except Exception:
@@ -195,7 +199,9 @@ class Chat:
 
         # APIキーの事前チェック
         api_key = ""
-        if self.AI_NAME == "ollama_chat":
+        if self.AI_NAME == "local_chat":
+            api_key = "local"  # backend_local は認証なし（ダミーキー）
+        elif self.AI_NAME == "ollama_chat":
             try:
                 conf_json = getattr(self.親, "conf", None)
                 if conf_json and hasattr(conf_json, "json"):
@@ -215,7 +221,7 @@ class Chat:
             except Exception:
                 api_key = ""
 
-        if self.AI_NAME == "ollama_chat":
+        if self.AI_NAME in ("ollama_chat", "local_chat"):
             キー有効 = True
         else:
             キー有効 = bool(api_key) and api_key[:1] != '<'

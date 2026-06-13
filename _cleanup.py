@@ -7,6 +7,7 @@
 
 対象:
 - バックアップ: `backup`
+- バックエンド(local): `backend_local`
 - バックエンド(hermes): `backend_hermes`
 - バックエンド(tools): `backend_tools`
 - バックエンド(core,apps): `backend_server`
@@ -40,6 +41,9 @@ BACKEND_TOOLS_ENV_LIST = [".venv", "venv"]
 
 BACKEND_HERMES_PATH = "backend_hermes"
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
+
+BACKEND_LOCAL_PATH = "backend_local"
+BACKEND_LOCAL_ENV_LIST = [".venv", "venv"]
 
 FRONTEND_WEB_PATH = "frontend_web"
 
@@ -717,6 +721,48 @@ def cleanup_backend_hermes(base_dir: Path, choices: dict):
         print_info(f"{label}: 削除対象はありませんでした")
 
 
+def cleanup_backend_local(base_dir: Path, choices: dict):
+    label = "バックエンド(local)"
+    print_header(f"{label} のクリーンアップ")
+
+    backend_local_dir = base_dir / BACKEND_LOCAL_PATH
+    if not backend_local_dir.exists():
+        print_warning(f"{label} のフォルダが見つかりません")
+        return
+
+    deleted_count = cleanup_common_python_caches(backend_local_dir, label)
+
+    local_envs = choices.get("local_envs", {})
+    for env_name in BACKEND_LOCAL_ENV_LIST:
+        env_dir = backend_local_dir / env_name
+        if not env_dir.exists():
+            continue
+        if local_envs.get(env_name):
+            if remove_directory(env_dir, f"{env_name} ({label})"):
+                deleted_count += 1
+            else:
+                print_error(
+                    f"  {BACKEND_LOCAL_PATH}/{env_name} 削除失敗。"
+                    f"手動で削除してください: {env_dir}"
+                )
+        elif env_name in local_envs:
+            print_info(f"  {BACKEND_LOCAL_PATH}/{env_name} はそのまま残します")
+
+    # temp 配下にダウンロード済みモデル (大容量) を含む
+    temp_dir = backend_local_dir / "temp"
+    if temp_dir.exists():
+        if choices.get("local_temp") is True:
+            if remove_directory(temp_dir, f"temp ({label})"):
+                deleted_count += 1
+        elif choices.get("local_temp") is False:
+            print_info(f"  {BACKEND_LOCAL_PATH}/temp はそのまま残します")
+
+    if deleted_count > 0:
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
+    else:
+        print_info(f"{label}: 削除対象はありませんでした")
+
+
 def cleanup_backup(base_dir: Path, choices: dict):
     backup_dir = base_dir / BACKUP_PATH
     if not backup_dir.exists():
@@ -844,6 +890,9 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "hermes":         False,
         "hermes_envs":    {},
         "hermes_temp":    None,
+        "local":          False,
+        "local_envs":     {},
+        "local_temp":     None,
         "web":            False,
         "avatar":         False,
     }
@@ -856,6 +905,22 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
 
     if (base_dir / BACKUP_PATH).exists():
         choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
+
+    choices["local"] = ask_yes_no("バックエンド(local) をクリーンアップしますか？", default="y")
+    if choices["local"]:
+        backend_local_dir = base_dir / BACKEND_LOCAL_PATH
+        if backend_local_dir.exists():
+            for env_name in BACKEND_LOCAL_ENV_LIST:
+                if (backend_local_dir / env_name).exists():
+                    choices["local_envs"][env_name] = ask_yes_no(
+                        f"  {BACKEND_LOCAL_PATH}/{env_name} を削除しますか？",
+                        default="y",
+                    )
+            if (backend_local_dir / "temp").exists():
+                choices["local_temp"] = ask_yes_no(
+                    f"  {BACKEND_LOCAL_PATH}/temp フォルダ(ダウンロード済みモデル含む)を削除しますか？",
+                    default="y",
+                )
 
     choices["hermes"] = ask_yes_no("バックエンド(hermes)をクリーンアップしますか？", default="y")
     if choices["hermes"]:
@@ -932,12 +997,13 @@ def main():
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
     print_info("  1. ルート temp フォルダ")
-    print_info("  2. backup フォルダ")
-    print_info("  3. バックエンド(hermes)")
-    print_info("  4. バックエンド(tools)")
-    print_info("  5. バックエンド(core,apps)")
-    print_info("  6. フロントエンド(Web)")
-    print_info("  7. フロントエンド(Avatar)")
+    print_info("  2. ルート backup フォルダ")
+    print_info("  3. バックエンド(local)")
+    print_info("  4. バックエンド(hermes)")
+    print_info("  5. バックエンド(tools)")
+    print_info("  6. バックエンド(core,apps)")
+    print_info("  7. フロントエンド(Web)")
+    print_info("  8. フロントエンド(Avatar)")
     print()
 
     choices = collect_cleanup_choices(base_dir)
@@ -960,6 +1026,12 @@ def main():
 
     print()
     cleanup_backup(base_dir, choices)
+
+    print()
+    if choices["local"]:
+        cleanup_backend_local(base_dir, choices)
+    else:
+        print_info("バックエンド(local) のクリーンアップをスキップしました")
 
     print()
     if choices["hermes"]:

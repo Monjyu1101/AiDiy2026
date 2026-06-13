@@ -145,6 +145,13 @@ class conf_models:
             "gpt-5.1": "yyyy/mm/dd - gpt-5.1",
         }
 
+        # ローカル LLM（backend_local）チャットモデル一覧の既定値
+        self.CHAT_LOCAL_MODELS = {
+            "google/gemma-4-E2B-it": "google/gemma-4-E2B-it / 約10GB bf16 / 速い (default)",
+            "google/gemma-4-E2B-it-qat-mobile-transformers": "google/gemma-4-E2B-it-qat-mobile-transformers / 約2.5GB / 省メモリ・中速",
+            "google/gemma-4-E4B-it-qat-mobile-transformers": "google/gemma-4-E4B-it-qat-mobile-transformers / 約3.5GB / 省メモリ・低速",
+        }
+
         # _config 下の設定JSONと同期（無ければ作成、あれば読込）
         self._sync_local_model_configs()
 
@@ -288,6 +295,10 @@ class conf_models:
         self.CODE_CODEX_CLI_MODELS = self._load_or_create_code_config(
             "AiDiy_code_codex_cli.json",
             self.CODE_CODEX_CLI_MODELS,
+        )
+        self.CHAT_LOCAL_MODELS = self._load_or_create_code_config(
+            "AiDiy_chat_local.json",
+            self.CHAT_LOCAL_MODELS,
         )
         self.mcp_servers = self._load_mcp_config("AiDiy_mcp.json")
 
@@ -694,6 +705,8 @@ class conf_models:
         }
         if self.ollama_models:
             models["ollama_chat"] = self.ollama_models
+        if self.CHAT_LOCAL_MODELS:
+            models["local_chat"] = self.CHAT_LOCAL_MODELS
         return models
 
     def get_live_models(self) -> Dict[str, Dict[str, str]]:
@@ -713,10 +726,12 @@ class conf_models:
         }
 
     def _get_aidiy_hermes_models(self) -> Dict[str, str]:
-        """aidiy_hermes のモデル一覧を Ollama モデル一覧から動的生成する。"""
+        """aidiy_hermes のモデル一覧を生成する（auto + Ollama + ローカル LLM）。"""
         result = {"auto": "yyyy/mm/dd - auto (default)"}
         if self.ollama_models:
             result.update(self.ollama_models)
+        # backend_local（localhost:8096）経由のローカル LLM も選べるようにする
+        result["local_chat"] = "backend_local (localhost:8096) 経由のローカル LLM"
         return result
 
     def _get_opencode_cli_models(self) -> Dict[str, str]:

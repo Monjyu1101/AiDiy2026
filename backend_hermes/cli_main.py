@@ -5823,6 +5823,7 @@ class HermesCLI:
     def _aidiy_provider_slugs() -> set:
         return {
             "ollama", "openai", "openrt", "openrouter", "gemini", "freeai", "anthropic",
+            "local_chat",
             "claude-code", "gemini-cli", "codex-cli", "copilot-cli", "opencode",
         }
 
@@ -5867,6 +5868,8 @@ class HermesCLI:
             return "anthropic"
         if "ollama.com" in base_url or "localhost:11434" in base_url or "127.0.0.1:11434" in base_url:
             return "ollama"
+        if "localhost:8096" in base_url or "127.0.0.1:8096" in base_url:
+            return "local_chat"
         return provider
 
     def _aidiy_provider_default_model(self, provider: str) -> str:
@@ -5882,6 +5885,8 @@ class HermesCLI:
             return cfg.get("CHAT_FREEAI_MODEL") or cfg.get("CHAT_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
         if provider == "anthropic":
             return cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-4-6"
+        if provider == "local_chat":
+            return cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it"
         return cfg.get("CODE_AIDIY_HERMES_MODEL") or cfg.get("CHAT_OLLAMA_MODEL") or "deepseek-v4-flash:cloud"
 
     def _get_aidiy_provider_entry(self, provider: str, include_models: bool = False) -> Optional[Dict[str, Any]]:
@@ -5958,6 +5963,18 @@ class HermesCLI:
                 "api_mode": "anthropic_messages",
                 "default_model": self._aidiy_provider_default_model("anthropic"),
             }
+        elif provider == "local_chat":
+            # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
+            port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
+            entry = {
+                "slug": "local_chat",
+                "name": "Local Chat (backend_local)",
+                "runtime_provider": "custom",
+                "base_url": f"http://localhost:{port}/v1",
+                "api_key": "no-key-required",
+                "api_mode": "chat_completions",
+                "default_model": self._aidiy_provider_default_model("local_chat"),
+            }
         else:
             # Check CLI providers
             cli_def = next((p for p in _AIDIY_CLI_PROVIDERS if p["slug"] == provider), None)
@@ -5988,7 +6005,7 @@ class HermesCLI:
     def _list_aidiy_provider_entries(self, include_models: bool = False) -> List[Dict[str, Any]]:
         current = self._current_aidiy_provider_slug()
         providers: List[Dict[str, Any]] = []
-        for slug in ("ollama", "openai", "openrt", "gemini", "freeai", "anthropic"):
+        for slug in ("ollama", "openai", "openrt", "gemini", "freeai", "anthropic", "local_chat"):
             entry = self._get_aidiy_provider_entry(slug, include_models=include_models)
             if entry:
                 entry["is_current"] = entry["slug"] == current
@@ -12318,6 +12335,17 @@ def _load_aidiy_hermes_provider_defaults(provider: str | None) -> dict[str, str]
             defaults["api_key"] = api_key
         return defaults
 
+    if provider_slug == "local_chat":
+        # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
+        port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
+        model = str(cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it").strip()
+        return {
+            "provider": "custom",
+            "base_url": f"http://localhost:{port}/v1",
+            "api_key": "no-key-required",
+            "model": model,
+        }
+
     return {}
 
 
@@ -12369,7 +12397,9 @@ def cli_entry(argv: list[str] | None = None) -> int:
     query = args.oneshot or args.query or (" ".join(args.prompt) if args.prompt else None)
     quiet = bool(args.quiet or args.oneshot)
     defaults = _load_aidiy_hermes_provider_defaults(args.provider) if args.provider else _load_aidiy_hermes_defaults(args.model)
-    provider = args.provider or defaults.get("provider")
+    # AiDiy 解決済みの runtime provider を優先（例: local_chat → "custom"）。
+    # defaults に provider が無い未知プロバイダのみ args.provider をそのまま使う。
+    provider = defaults.get("provider") or args.provider
     base_url = args.base_url or defaults.get("base_url")
     api_key = args.api_key or defaults.get("api_key")
     model = args.model or defaults.get("model")

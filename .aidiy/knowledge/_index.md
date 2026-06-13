@@ -20,6 +20,7 @@
 | `backend_server` | FastAPI サーバー（core_main / apps_main） |
 | `backend_hermes` | `aidiy_hermes` CLI 基盤 |
 | `backend_tools` | MCP サーバー群 |
+| `backend_local` | ローカル LLM サーバー（OpenAI 互換 Gemma 推論） |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
 

@@ -340,6 +340,19 @@ class CodeAI:
             base = self._hermes直接実行コマンド() if not custom_cmd else None
             if base is None:
                 base = [custom_cmd or self._コマンドパス取得()]
+
+            # model="local_chat" のときは backend_local(8096) の OpenAI 互換 API へ
+            # 疎結合接続する（hermes 標準の OpenAI 互換 provider に base-url を指定するだけ）。
+            # backend_local は req.model を無視し、AiDiy_key.json の CHAT_LOCAL_MODEL を使う。
+            if (self.code_model or "").lower() == "local_chat":
+                local_args = [
+                    "--provider", "lmstudio",
+                    "--base-url", "http://localhost:8096/v1",
+                    "--api-key", "local",
+                    "--model", "local_chat",
+                ]
+                return base + ["-Q"] + local_args + ["-z", プロンプト]
+
             _model = self._ollama_cloud_suffix除去(self.code_model)
             model_args = ["--model", _model] if _model and _model.lower() != "auto" else []
             return base + ["-Q"] + model_args + ["-z", プロンプト]

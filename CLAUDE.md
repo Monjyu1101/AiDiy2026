@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend**: FastAPI + SQLAlchemy + SQLite（Python 3.13、uv 管理、2 サーバー構成）
 - **Backend Hermes**: `aidiy_hermes` コード支援 CLI（**常駐なし**、`_start.py` の起動対象外）
 - **Backend MCP**: 15 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Code Agents, Chat LLM）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供。
+- **Backend Local**: `backend_local` ローカル LLM サーバー（ポート 8096）。HuggingFace の **Gemma** を `transformers` + `torch` でローカル推論し、**OpenAI 互換**の Chat Completions API（`POST http://localhost:8096/v1/chat/completions`、`stream` / `tools` 対応）として提供。モデルは `temp/models/<safe_name>` に配置し遅延ロード。設定は `backend_server/_config/AiDiy_key.json`（環境変数は使わない）。
 - **Frontend Web**: Vue 3 + Vite + TypeScript（qTubler, Pinia, Vue Router）
 - **Frontend Avatar**: Electron/Web デュアルモード AI Avatar（Three.js, VRM）
 
@@ -42,6 +43,9 @@ cd backend_server && .venv/Scripts/python -m uvicorn apps_main:app --reload --ho
 
 # Backend MCP — ポート 8095
 cd backend_tools && .venv/Scripts/python -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
+
+# Backend Local (ローカル LLM, Gemma) — ポート 8096
+cd backend_local && .venv/Scripts/python -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
 
 # Frontend Web — ポート 8090
 cd frontend_web && npm run dev
@@ -74,6 +78,7 @@ cd frontend_avatar && npm run build      # renderer + electron build
 cd backend_server && uv sync
 cd backend_tools && uv sync
 cd backend_hermes && uv sync
+cd backend_local && uv sync
 
 # Frontend
 cd frontend_web && npm install
@@ -121,6 +126,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | 8091 | Backend Core (`core_main.py`) |
 | 8092 | Backend Apps (`apps_main.py`) |
 | 8095 | Backend MCP (`tools_main.py`) |
+| 8096 | Backend Local (`local_main.py`) — OpenAI 互換 Gemma サーバー |
 | 8099 | Frontend Avatar (Vite) |
 
 **注意**: フロントエンドのポートを変える場合は `core_main.py` / `apps_main.py` の CORS 許可リストも合わせて更新してください。
@@ -269,6 +275,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 - `frontend_avatar/AGENTS.md` — Avatar / Electron 実装パターン
 - `backend_tools/AGENTS.md` — MCP 実装パターン
 - `backend_hermes/AGENTS.md` — Hermes CLI 実装パターン
+- `backend_local/AGENTS.md` — ローカル LLM（OpenAI 互換 Gemma）実装パターン
 - `docs/` — 開発ガイド (HTML)
 
 ### frontend 共通ナレッジ（新規）

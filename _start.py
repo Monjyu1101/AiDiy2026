@@ -82,6 +82,11 @@ BACKEND_TOOLS_APP = "tools_main:app"
 BACKEND_TOOLS_ENV_CANDIDATES = [".venv", "venv"]
 BACKEND_TOOLS_SHOW_AUTOMATION_BANNER = False
 
+BACKEND_LOCAL_PATH = "backend_local"
+BACKEND_LOCAL_PORT = 8096
+BACKEND_LOCAL_APP = "local_main:app"
+BACKEND_LOCAL_ENV_CANDIDATES = [".venv", "venv"]
+
 FRONTEND_WEB_PATH = "frontend_web"
 FRONTEND_WEB_PORT = 8090
 
@@ -96,6 +101,7 @@ RESTART_WAIT_SECONDS = 15
 BASE_DIR = Path(__file__).parent
 BACKEND_DIR = BASE_DIR / BACKEND_PATH
 BACKEND_TOOLS_DIR = BASE_DIR / BACKEND_TOOLS_PATH
+BACKEND_LOCAL_DIR = BASE_DIR / BACKEND_LOCAL_PATH
 FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
 FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
 def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
@@ -138,6 +144,13 @@ def get_backend_tools_command() -> list[str]:
     return ["uv", "run", "uvicorn", BACKEND_TOOLS_APP, "--host", "0.0.0.0", "--port", str(BACKEND_TOOLS_PORT)]
 
 
+def get_backend_local_command() -> list[str]:
+    backend_local_python = find_python_in_env(BACKEND_LOCAL_DIR, BACKEND_LOCAL_ENV_CANDIDATES)
+    if backend_local_python is not None:
+        return [str(backend_local_python), "-m", "uvicorn", BACKEND_LOCAL_APP, "--host", "0.0.0.0", "--port", str(BACKEND_LOCAL_PORT)]
+    return ["uv", "run", "uvicorn", BACKEND_LOCAL_APP, "--host", "0.0.0.0", "--port", str(BACKEND_LOCAL_PORT)]
+
+
 
 def check_backend_environment() -> tuple[bool, str]:
     if not BACKEND_DIR.exists():
@@ -168,6 +181,19 @@ def check_backend_tools_environment() -> tuple[bool, str]:
             return False, detail
 
     return True, str(backend_tools_python) if backend_tools_python is not None else "uv"
+
+
+def check_backend_local_environment() -> tuple[bool, str]:
+    if not BACKEND_LOCAL_DIR.exists():
+        return False, f"フォルダが見つかりません: {BACKEND_LOCAL_DIR}"
+    if not (BACKEND_LOCAL_DIR / "pyproject.toml").exists():
+        return False, f"pyproject.toml が見つかりません: {BACKEND_LOCAL_DIR / 'pyproject.toml'}"
+    backend_local_python = find_python_in_env(BACKEND_LOCAL_DIR, BACKEND_LOCAL_ENV_CANDIDATES)
+    if backend_local_python is not None:
+        return True, str(backend_local_python)
+    if check_command_exists("uv"):
+        return True, "uv"
+    return False, f"Python 仮想環境 ({' / '.join(BACKEND_LOCAL_ENV_CANDIDATES)}) または uv が見つかりません"
 
 
 
@@ -390,6 +416,11 @@ def start_backend_tools() -> subprocess.Popen[bytes]:
     return launch_process("バックエンド(tools)", get_backend_tools_command(), BACKEND_TOOLS_DIR)
 
 
+def start_backend_local() -> subprocess.Popen[bytes]:
+    # モデルは起動時にはロードせず、利用時（最初のリクエスト）に遅延ロードされる
+    return launch_process("バックエンド(local)", get_backend_local_command(), BACKEND_LOCAL_DIR)
+
+
 
 def start_frontend_web(npm_command: str) -> subprocess.Popen[bytes]:
     return launch_process(
@@ -499,13 +530,14 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
     return default_yes
 
 
-def collect_startup_choices() -> tuple[bool, bool, bool, bool]:
+def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool]:
     print_header("起動条件の確認")
+    local_enabled       = prompt_choice("バックエンド(local)     起動しますか?", default_yes=True)
     backend_tools_enabled = prompt_choice("バックエンド(tools)     起動しますか?", default_yes=True)
     backend_enabled     = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
     web_enabled         = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
     avatar_enabled      = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
-    return backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled
+    return local_enabled, backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled
 
 
 def open_browser(port: int) -> None:
@@ -594,6 +626,7 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
 
 
 def validate_initial_environment(
+    local_enabled: bool,
     backend_tools_enabled: bool,
     backend_enabled: bool,
     web_enabled: bool,
@@ -602,6 +635,15 @@ def validate_initial_environment(
     print_header("環境確認")
     has_error = False
     npm_command = get_npm_command()
+
+    if local_enabled:
+        ok, detail = check_backend_local_environment()
+        if ok:
+            print_success(f"バックエンド(local): OK ({detail})")
+        else:
+            print_error(f"バックエンド(local): 未準備 ({detail})")
+            print_info(f"  対応例: cd {BACKEND_LOCAL_PATH} && uv sync")
+            has_error = True
 
     if backend_tools_enabled:
         ok, detail = check_backend_tools_environment()
@@ -673,6 +715,8 @@ def start_service(
     try:
         if name == "バックエンド(tools)":
             process = start_backend_tools()
+        elif name == "バックエンド(local)":
+            process = start_backend_local()
         elif name == "バックエンド(core)":
             process = start_backend_core()
         elif name == "バックエンド(apps)":
@@ -700,12 +744,15 @@ def start_service(
 
 
 def maybe_kill_initial_ports(
+    local_enabled: bool,
     backend_tools_enabled: bool,
     backend_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
 ) -> None:
     print_header("既存プロセス整理")
+    if local_enabled:
+        kill_process_on_port(BACKEND_LOCAL_PORT)
     if backend_tools_enabled:
         kill_process_on_port(BACKEND_TOOLS_PORT)
     if backend_enabled:
@@ -722,6 +769,7 @@ def maybe_kill_initial_ports(
 
 
 def start_initial_services(
+    start_backend_local_enabled: bool,
     start_backend_tools_enabled: bool,
     start_backend_enabled: bool,
     avatar_enabled: bool,
@@ -731,6 +779,7 @@ def start_initial_services(
     npm_command: str | None,
 ) -> dict[str, bool]:
     selected_flags = {
+        "バックエンド(local)": start_backend_local_enabled,
         "バックエンド(tools)": start_backend_tools_enabled,
         "バックエンド(core)": start_backend_enabled,
         "バックエンド(apps)": start_backend_enabled,
@@ -739,11 +788,18 @@ def start_initial_services(
     }
 
     maybe_kill_initial_ports(
+        local_enabled=start_backend_local_enabled,
         backend_tools_enabled=start_backend_tools_enabled,
         backend_enabled=start_backend_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
     )
+
+    if start_backend_local_enabled:
+        print_header("バックエンド(local) 起動")
+        # モデルは起動時にロードせず、利用時に遅延ロードされる
+        start_service("バックエンド(local)", processes, last_output_times, npm_command)
+        wait_for_services_quiet(last_output_times, ["バックエンド(local)"], label="バックエンド(local)")
 
     if start_backend_tools_enabled:
         print_header("バックエンド(tools) 起動")
@@ -842,9 +898,10 @@ def monitor_and_restart(
 
 
 def main() -> None:
-    backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled = collect_startup_choices()
+    local_enabled, backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled = collect_startup_choices()
 
     is_ready, npm_command = validate_initial_environment(
+        local_enabled=local_enabled,
         backend_tools_enabled=backend_tools_enabled,
         backend_enabled=backend_enabled,
         web_enabled=web_enabled,
@@ -864,6 +921,7 @@ def main() -> None:
 
         try:
             selected_services = start_initial_services(
+                start_backend_local_enabled=local_enabled,
                 start_backend_tools_enabled=backend_tools_enabled,
                 start_backend_enabled=backend_enabled,
                 avatar_enabled=avatar_enabled,
@@ -874,6 +932,9 @@ def main() -> None:
             )
 
             print_header("起動完了")
+            if "バックエンド(local)" in processes:
+                print_success(f"バックエンド(local): http://localhost:{BACKEND_LOCAL_PORT}/docs")
+                print_info   (f"  OpenAI互換 (利用時にモデルロード): http://localhost:{BACKEND_LOCAL_PORT}/v1/chat/completions")
             if "バックエンド(tools)" in processes:
                 print_success(f"バックエンド(tools) Swagger UI : http://localhost:{BACKEND_TOOLS_PORT}/docs")
                 print_info   (f"  ツール一覧(例)            : http://localhost:{BACKEND_TOOLS_PORT}/aidiy_text_to_speech/list")

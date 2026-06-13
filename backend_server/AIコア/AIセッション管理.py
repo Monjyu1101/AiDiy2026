@@ -51,6 +51,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CHAT_FREEAI_MODEL": app_conf.json.get("CHAT_FREEAI_MODEL", "gemini-2.5-flash"),
         "CHAT_OPENRT_MODEL": app_conf.json.get("CHAT_OPENRT_MODEL", "google/gemini-3-pro-image-preview"),
         "CHAT_OLLAMA_MODEL": app_conf.json.get("CHAT_OLLAMA_MODEL", "mistral-large-3:675b:cloud"),
+        "CHAT_LOCAL_MODEL": app_conf.json.get("CHAT_LOCAL_MODEL", "google/gemma-4-E2B-it"),
         # LiveAI設定
         "LIVE_AI_NAME": app_conf.json.get("LIVE_AI_NAME", "freeai_live"),
         "LIVE_GEMINI_MODEL": app_conf.json.get("LIVE_GEMINI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
