@@ -1,4 +1,4 @@
-﻿# frontend_avatar
+# frontend_avatar
 
 `frontend_avatar` は、**Electron デスクトップアプリ** と **通常ブラウザ** の両方で動く AI コア専用クライアントです。
 

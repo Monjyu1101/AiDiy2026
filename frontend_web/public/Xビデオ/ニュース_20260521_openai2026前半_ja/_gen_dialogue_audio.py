@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 OpenAI 2026年ニュース解説 - 音声生成スクリプト
 backend_tools/.venv の Python で実行してください。

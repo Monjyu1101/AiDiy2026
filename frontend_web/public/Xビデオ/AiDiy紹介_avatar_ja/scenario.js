@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy紹介avatar",
   "version": "avatar",
   "title": "AiDiy - frontend_avatar 紹介",

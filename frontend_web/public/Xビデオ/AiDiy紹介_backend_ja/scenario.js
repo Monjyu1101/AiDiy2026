@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy紹介backend",
   "version": "backend",
   "title": "AiDiy backend_server - 4層構造と日本語ファースト設計",

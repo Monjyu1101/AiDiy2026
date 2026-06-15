@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy紹介aichat",
   "version": "aichat",
   "title": "AiDiy AIコア - チャット・ライブ・コード支援・WebSocket",

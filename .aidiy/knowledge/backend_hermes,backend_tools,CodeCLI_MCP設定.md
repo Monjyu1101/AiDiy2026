@@ -1,4 +1,4 @@
-﻿# Code CLI の MCP 設定
+# Code CLI の MCP 設定
 
 > 文書: `backend_hermes,backend_tools,CodeCLI_MCP設定.md` | 実装: `backend_hermes/`, `backend_tools/tools_main.py`
 

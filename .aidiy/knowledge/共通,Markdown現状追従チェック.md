@@ -1,4 +1,4 @@
-﻿# Markdown 現状追従チェック
+# Markdown 現状追従チェック
 
 > 文書: `共通,Markdown現状追従チェック.md` | 実装: `.aidiy/knowledge/`, `docs/`
 

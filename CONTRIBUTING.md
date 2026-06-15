@@ -1,4 +1,4 @@
-﻿# Contributing
+# Contributing
 
 本プロジェクトへの貢献ありがとうございます。
 

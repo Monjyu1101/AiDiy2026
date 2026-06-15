@@ -1,4 +1,4 @@
-﻿# バックエンドの起動と再起動
+# バックエンドの起動と再起動
 
 > 文書: `backend_server,backend_hermes,backend_tools,バックエンド起動.md` | 実装: `_start.py`, `backend_server/temp/reboot_core.txt`
 

@@ -1,4 +1,4 @@
-﻿# AGENTS.md 整理手順
+# AGENTS.md 整理手順
 
 > 文書: `共通,AGENTS整理手順.md` | 実装: `AGENTS.md`, `CLAUDE.md`, `backend_server/AGENTS.md`, `frontend_web/AGENTS.md`
 

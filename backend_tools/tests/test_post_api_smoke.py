@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # -------------------------------------------------------------------------
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.

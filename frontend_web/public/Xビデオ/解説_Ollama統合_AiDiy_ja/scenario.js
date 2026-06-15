@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "解説_Ollama統合_AiDiy_ja",
   "version": "duo-v2",
   "title": "AiDiy における Ollama 統合の解説 — ローカル LLM でプライバシーとコスト削減を両立するハイブリッド AI 戦略",

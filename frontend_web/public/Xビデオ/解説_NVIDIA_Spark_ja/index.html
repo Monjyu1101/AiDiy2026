@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -414,7 +414,7 @@
     const prevBtn       = document.getElementById("prevBtn");
     const nextBtn       = document.getElementById("nextBtn");
     const restartBtn    = document.getElementById("restartBtn");
-    const lastBtn       = document.getElementById("lastBtn");
+    const lastBtn       = document.getElementById("lastBtn");
     const speakerBtn    = document.getElementById("speakerBtn");
     const sceneContent  = document.getElementById("sceneContent");
     const wrapMale      = document.getElementById("wrapMale");
@@ -921,7 +921,7 @@
     playBtn.addEventListener("click",    () => { if (playing) pause(); else play(); });
     nextBtn.addEventListener("click",    () => { pause(); moveToScene(sceneIndex + 1, 0); });
     lastBtn.addEventListener("click",    () => { pause(); moveToScene(scenes.length - 1, 0); });
-
+
     speakerBtn?.addEventListener("click", () => { speakerEnabled = !speakerEnabled; applySpeakerState(); });
     window.addEventListener("keydown", (e) => {
       if (e.key === " " || e.key === "Spacebar") { e.preventDefault(); if (playing) pause(); else play(); }

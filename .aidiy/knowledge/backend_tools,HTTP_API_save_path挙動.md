@@ -1,4 +1,4 @@
-﻿# backend_tools HTTP API の save_path 挙動
+# backend_tools HTTP API の save_path 挙動
 
 > 文書: `backend_tools,HTTP_API_save_path挙動.md` | 実装: `backend_tools/tools_main.py`
 

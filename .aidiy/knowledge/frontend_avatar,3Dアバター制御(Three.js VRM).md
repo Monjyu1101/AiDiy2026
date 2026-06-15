@@ -1,4 +1,4 @@
-﻿# 3D アバター制御 (Three.js VRM)
+# 3D アバター制御 (Three.js VRM)
 
 > 文書: `frontend_avatar,3Dアバター制御(Three.js VRM).md` | 実装: `frontend_avatar/src/components/AIコア_アバター.vue`, `frontend_avatar/src/components/AIコア_自立身体制御.ts`, `frontend_avatar/src/components/AIコア_自動カメラワーク.ts`
 

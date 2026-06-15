@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy紹介_ToolHub",
   "version": "mcp",
   "title": "AiDiy TOOL HUB - 14 の MCP が繋がるツール基盤",

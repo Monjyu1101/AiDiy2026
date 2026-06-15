@@ -1,4 +1,4 @@
-﻿# AiDiy - README
+# AiDiy - README
 
 ## 本書の目的
 

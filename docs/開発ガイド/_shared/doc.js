@@ -1,4 +1,4 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
   const blocks = document.querySelectorAll('pre[data-src]');
   blocks.forEach(async (block) => {
     const src = block.getAttribute('data-src');

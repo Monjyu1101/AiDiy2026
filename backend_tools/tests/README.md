@@ -1,4 +1,4 @@
-﻿# backend_tools tests
+# backend_tools tests
 
 `backend_tools` のテスト、動作確認スクリプト、手元検証用コードを置くフォルダです。
 

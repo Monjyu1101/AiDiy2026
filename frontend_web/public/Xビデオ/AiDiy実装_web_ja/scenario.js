@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy web版実装例",
   "version": "take3",
   "title": "web版 AiDiy 実装例",

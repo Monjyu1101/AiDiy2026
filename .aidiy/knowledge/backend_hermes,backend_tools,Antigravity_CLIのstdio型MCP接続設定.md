@@ -1,4 +1,4 @@
-﻿# Antigravity CLI の stdio 型 MCP 接続設定
+# Antigravity CLI の stdio 型 MCP 接続設定
 
 > 文書: `backend_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md` | 実装: `_setup.py`, `_cleanup.py`
 

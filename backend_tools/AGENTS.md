@@ -1,4 +1,4 @@
-﻿# backend_tools 実装概要
+# backend_tools 実装概要
 
 ## 本書の目的
 

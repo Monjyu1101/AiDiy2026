@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy紹介hermes",
   "version": "hermes",
   "title": "AiDiy Hermes - コードエージェント CLI 紹介",

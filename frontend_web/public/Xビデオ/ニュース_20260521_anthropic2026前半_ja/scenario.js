@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "Anthropic 2026年ニュース解説 (掛け合い版)",
   "version": "duo-v3",
   "title": "Anthropic 2026年 主要ニュース",

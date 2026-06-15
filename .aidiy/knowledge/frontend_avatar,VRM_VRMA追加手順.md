@@ -1,4 +1,4 @@
-﻿# VRM・VRMA 追加手順
+# VRM・VRMA 追加手順
 
 > 文書: `frontend_avatar,VRM_VRMA追加手順.md` | 実装: `frontend_avatar/public/vrm/`, `frontend_avatar/public/vrma/`, `frontend_avatar/src/components/Avatar.vue`
 

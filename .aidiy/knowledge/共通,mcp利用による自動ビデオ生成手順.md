@@ -1,4 +1,4 @@
-﻿# MCP 利用による自動ビデオ生成手順
+# MCP 利用による自動ビデオ生成手順
 
 > 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_tools/aidiy_automations/ビデオページ生成_紹介.py`, `backend_tools/aidiy_automations/ビデオページ生成_解説.py`, `backend_tools/aidiy_automations/ビデオページ生成__設定.json`, `backend_tools/aidiy_automations/ビデオページ生成__状況.json`, `backend_tools/tools_proc/text_to_speech.py`, `backend_tools/tools_proc/ffmpeg_control.py`, `backend_tools/tools_proc/obs_studio_control.py`, `backend_tools/tools_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `backend_server/_config/aidiy_text_to_speech.json`
 

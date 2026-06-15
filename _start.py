@@ -1,34 +1,42 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
-"""開発環境起動スクリプト
+"""開発環境起動スクリプト（まとめ役）
 
-バックエンド(tools)・バックエンド(core,apps)・フロントエンド(Web)・
-フロントエンド(Avatar) を統一手順で起動します。
+各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps)・
+フロントエンド(Web/Avatar) を統一手順で起動します。各サービスの環境確認・
+起動コマンドはフォルダ側に委譲し、このスクリプトは起動順序・出力集約・
+ブラウザ表示・自動再起動監視・一括停止を一元管理します。
+
+フォルダ別スクリプト:
+- backend_local/_start.py    PORT / check_environment / start / kill_ports
+- backend_tools/_start.py    PORT / check_environment / start / kill_ports
+- backend_server/_start.py   CORE_PORT / APPS_PORT / check_environment / start_core / start_apps
+- frontend_web/_start.py     PORT / check_environment / start / kill_ports
+- frontend_avatar/_start.py  PORT / check_environment / start / kill_electron_processes
 
 標準の起動順:
-1. バックエンド(tools)
-2. バックエンド(core)
-3. バックエンド(apps)
-4. フロントエンド(Web)
-5. フロントエンド(Avatar)
-6. Web ページ表示
-7. Avatar ページ表示
+1. バックエンド(local)
+2. バックエンド(tools)
+3. バックエンド(core)
+4. バックエンド(apps)
+5. フロントエンド(Web)
+6. フロントエンド(Avatar)
+7. ページ表示
 8. 自動再起動監視
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
-import shutil
 import signal
 import subprocess
 import sys
 import threading
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -69,54 +77,38 @@ def print_info(message: str) -> None:
     print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
 
 
-BACKEND_PATH = "backend_server"
-BACKEND_CORE_PORT = 8091
-BACKEND_APPS_PORT = 8092
-BACKEND_CORE_APP = "core_main:app"
-BACKEND_APPS_APP = "apps_main:app"
-BACKEND_ENV_CANDIDATES = [".venv", "venv"]
-
-BACKEND_TOOLS_PATH = "backend_tools"
-BACKEND_TOOLS_PORT = 8095
-BACKEND_TOOLS_APP = "tools_main:app"
-BACKEND_TOOLS_ENV_CANDIDATES = [".venv", "venv"]
-BACKEND_TOOLS_SHOW_AUTOMATION_BANNER = False
-
-BACKEND_LOCAL_PATH = "backend_local"
-BACKEND_LOCAL_PORT = 8096
-BACKEND_LOCAL_APP = "local_main:app"
-BACKEND_LOCAL_ENV_CANDIDATES = [".venv", "venv"]
-
-FRONTEND_WEB_PATH = "frontend_web"
-FRONTEND_WEB_PORT = 8090
-
-FRONTEND_AVATAR_PATH = "frontend_avatar"
-FRONTEND_AVATAR_PORT = 8099
+# ============================================================
+# 設定
+# ============================================================
+BASE_DIR = Path(__file__).resolve().parent
 
 FRONTEND_COMMAND = "npm"
 QUIET_WAIT_SECONDS = 20
 QUIET_MAX_WAIT_SECONDS = 60
 RESTART_WAIT_SECONDS = 15
+BACKEND_TOOLS_SHOW_AUTOMATION_BANNER = False
 
-BASE_DIR = Path(__file__).parent
-BACKEND_DIR = BASE_DIR / BACKEND_PATH
-BACKEND_TOOLS_DIR = BASE_DIR / BACKEND_TOOLS_PATH
-BACKEND_LOCAL_DIR = BASE_DIR / BACKEND_LOCAL_PATH
-FRONTEND_WEB_DIR = BASE_DIR / FRONTEND_WEB_PATH
-FRONTEND_AVATAR_DIR = BASE_DIR / FRONTEND_AVATAR_PATH
-def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
-    for env_name in env_candidates:
-        if sys.platform == "win32":
-            python_path = base_dir / env_name / "Scripts" / "python.exe"
-        else:
-            python_path = base_dir / env_name / "bin" / "python"
-        if python_path.exists():
-            return python_path
-    return None
+# フォルダ別 _start.py モジュール（_init_modules で設定）
+LOCAL = TOOLS = SERVER = WEB = AVATAR = None
 
 
-def check_command_exists(command: str) -> bool:
-    return shutil.which(command) is not None
+def _load_folder_module(folder: str):
+    name = f"aidiy_{folder}_start"
+    path = BASE_DIR / folder / "_start.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _init_modules() -> None:
+    global LOCAL, TOOLS, SERVER, WEB, AVATAR
+    LOCAL = _load_folder_module("backend_local")
+    TOOLS = _load_folder_module("backend_tools")
+    SERVER = _load_folder_module("backend_server")
+    WEB = _load_folder_module("frontend_web")
+    AVATAR = _load_folder_module("frontend_avatar")
 
 
 def get_npm_command() -> str | None:
@@ -130,100 +122,13 @@ def get_npm_command() -> str | None:
     return None
 
 
-def get_backend_command(app_module: str, port: int) -> list[str]:
-    backend_python = find_python_in_env(BACKEND_DIR, BACKEND_ENV_CANDIDATES)
-    if backend_python is not None:
-        return [str(backend_python), "-m", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port)]
-    return ["uv", "run", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port)]
-
-
-def get_backend_tools_command() -> list[str]:
-    backend_tools_python = find_python_in_env(BACKEND_TOOLS_DIR, BACKEND_TOOLS_ENV_CANDIDATES)
-    if backend_tools_python is not None:
-        return [str(backend_tools_python), "-m", "uvicorn", BACKEND_TOOLS_APP, "--host", "0.0.0.0", "--port", str(BACKEND_TOOLS_PORT)]
-    return ["uv", "run", "uvicorn", BACKEND_TOOLS_APP, "--host", "0.0.0.0", "--port", str(BACKEND_TOOLS_PORT)]
-
-
-def get_backend_local_command() -> list[str]:
-    backend_local_python = find_python_in_env(BACKEND_LOCAL_DIR, BACKEND_LOCAL_ENV_CANDIDATES)
-    if backend_local_python is not None:
-        return [str(backend_local_python), "-m", "uvicorn", BACKEND_LOCAL_APP, "--host", "0.0.0.0", "--port", str(BACKEND_LOCAL_PORT)]
-    return ["uv", "run", "uvicorn", BACKEND_LOCAL_APP, "--host", "0.0.0.0", "--port", str(BACKEND_LOCAL_PORT)]
-
-
-
-def check_backend_environment() -> tuple[bool, str]:
-    if not BACKEND_DIR.exists():
-        return False, f"フォルダが見つかりません: {BACKEND_DIR}"
-    if not (BACKEND_DIR / "pyproject.toml").exists():
-        return False, f"pyproject.toml が見つかりません: {BACKEND_DIR / 'pyproject.toml'}"
-    backend_python = find_python_in_env(BACKEND_DIR, BACKEND_ENV_CANDIDATES)
-    if backend_python is not None:
-        return True, str(backend_python)
-    if check_command_exists("uv"):
-        return True, "uv"
-    return False, f"Python 仮想環境 ({' / '.join(BACKEND_ENV_CANDIDATES)}) または uv が見つかりません"
-
-
-def check_backend_tools_environment() -> tuple[bool, str]:
-    if not BACKEND_TOOLS_DIR.exists():
-        return False, f"フォルダが見つかりません: {BACKEND_TOOLS_DIR}"
-    if not (BACKEND_TOOLS_DIR / "pyproject.toml").exists():
-        return False, f"pyproject.toml が見つかりません: {BACKEND_TOOLS_DIR / 'pyproject.toml'}"
-
-    backend_tools_python = find_python_in_env(BACKEND_TOOLS_DIR, BACKEND_TOOLS_ENV_CANDIDATES)
-    if backend_tools_python is None and not check_command_exists("uv"):
-        return False, f"Python 仮想環境 ({' / '.join(BACKEND_TOOLS_ENV_CANDIDATES)}) または uv が見つかりません"
-
-    if (BACKEND_TOOLS_DIR / "package.json").exists():
-        ok, detail = check_npm_project_environment(BACKEND_TOOLS_DIR)
-        if not ok:
-            return False, detail
-
-    return True, str(backend_tools_python) if backend_tools_python is not None else "uv"
-
-
-def check_backend_local_environment() -> tuple[bool, str]:
-    if not BACKEND_LOCAL_DIR.exists():
-        return False, f"フォルダが見つかりません: {BACKEND_LOCAL_DIR}"
-    if not (BACKEND_LOCAL_DIR / "pyproject.toml").exists():
-        return False, f"pyproject.toml が見つかりません: {BACKEND_LOCAL_DIR / 'pyproject.toml'}"
-    backend_local_python = find_python_in_env(BACKEND_LOCAL_DIR, BACKEND_LOCAL_ENV_CANDIDATES)
-    if backend_local_python is not None:
-        return True, str(backend_local_python)
-    if check_command_exists("uv"):
-        return True, "uv"
-    return False, f"Python 仮想環境 ({' / '.join(BACKEND_LOCAL_ENV_CANDIDATES)}) または uv が見つかりません"
-
-
-
-def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
-    package_json = project_dir / "package.json"
-    if not project_dir.exists():
-        return False, f"フォルダが見つかりません: {project_dir}"
-    if not package_json.exists():
-        return False, f"package.json が見つかりません: {package_json}"
-    node_modules = project_dir / "node_modules"
-    if not node_modules.exists() or not node_modules.is_dir():
-        return False, f"node_modules が見つかりません: {node_modules}"
-    try:
-        if not any(node_modules.iterdir()):
-            return False, f"node_modules が空です: {node_modules}"
-    except Exception as exc:
-        return False, f"node_modules の確認でエラー: {exc}"
-    return True, str(node_modules)
-
-
+# ============================================================
+# ポート整理（監視・初期整理用）
+# ============================================================
 def _listening_pids_windows(port: int) -> list[str]:
-    result = subprocess.run(
-        ["netstat", "-ano", "-p", "tcp"],
-        capture_output=True,
-        text=True,
-        timeout=5,
-    )
+    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, timeout=5)
     if result.returncode != 0:
         return []
-
     pids = set()
     for line in result.stdout.splitlines():
         parts = line.split()
@@ -246,22 +151,16 @@ def _listening_pids_linux(port: int) -> list[str]:
     try:
         result = subprocess.run(
             ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
-            capture_output=True,
-            text=True,
-            timeout=5,
+            capture_output=True, text=True, timeout=5,
         )
         if result.returncode in (0, 1):
             pids = {pid.strip() for pid in result.stdout.splitlines() if pid.strip().isdigit()}
             return sorted(pids, key=int)
     except FileNotFoundError:
         pass
-
     try:
         result = subprocess.run(
-            ["ss", "-ltnp", f"sport = :{port}"],
-            capture_output=True,
-            text=True,
-            timeout=5,
+            ["ss", "-ltnp", f"sport = :{port}"], capture_output=True, text=True, timeout=5,
         )
         if result.returncode != 0:
             return []
@@ -276,20 +175,10 @@ def kill_process_on_port(port: int) -> bool:
     try:
         if sys.platform == "win32":
             finder = _listening_pids_windows
-            killer = lambda pid: subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", pid],
-                capture_output=True,
-                text=True,
-                timeout=8,
-            )
+            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, text=True, timeout=8)
         else:
             finder = _listening_pids_linux
-            killer = lambda pid: subprocess.run(
-                ["kill", "-9", pid],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
+            killer = lambda pid: subprocess.run(["kill", "-9", pid], capture_output=True, text=True, timeout=5)
 
         killed = False
         for _ in range(8):
@@ -300,7 +189,6 @@ def kill_process_on_port(port: int) -> bool:
                 else:
                     print_info(f"[ポート {port}] 使用中プロセスはありません")
                 return killed
-
             for pid in pids:
                 print_info(f"[ポート {port}] PID={pid} を停止します")
                 result = killer(pid)
@@ -321,119 +209,9 @@ def kill_process_on_port(port: int) -> bool:
         return False
 
 
-def kill_electron_processes() -> None:
-    """このプロジェクトの Electron / electronmon プロセスを強制終了する。
-
-    npm プロセスツリーを taskkill /T で終了しても、electronmon が spawn した
-    electron.exe は別プロセスグループに属して残留することがある。
-    起動前・停止後に呼ぶことで残留プロセスを確実に排除する。
-    """
-    electron_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / "electron.exe"
-    electron_path_str = str(electron_exe).lower()
-
-    if sys.platform == "win32":
-        # wmic は Windows 11 新ビルドで削除されたため PowerShell の Get-CimInstance を使用
-        try:
-            result = subprocess.run(
-                [
-                    "powershell", "-NoProfile", "-Command",
-                    "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId),$($_.ExecutablePath)\" }",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            killed_pids = []
-            for line in result.stdout.splitlines():
-                lower = line.lower()
-                if "electron" not in lower:
-                    continue
-                parts = line.strip().split(",", 1)
-                if len(parts) >= 2:
-                    pid = parts[0].strip()
-                    exe_path = parts[1].lower()
-                    if electron_path_str in exe_path and pid.isdigit():
-                        subprocess.run(
-                            ["taskkill", "/F", "/T", "/PID", pid],
-                            capture_output=True,
-                            timeout=5,
-                        )
-                        killed_pids.append(pid)
-            if killed_pids:
-                print_success(f"[Electron] 残留プロセスを停止しました: PID={','.join(killed_pids)}")
-            else:
-                print_info("[Electron] 残留プロセスはありません")
-        except Exception as exc:
-            print_warning(f"[Electron] プロセス確認でエラー: {exc}")
-    else:
-        # Linux/Mac: electronmon と electron を pkill
-        for proc_name in ("electronmon", "electron"):
-            try:
-                subprocess.run(
-                    ["pkill", "-9", "-f", f"frontend_avatar.*{proc_name}"],
-                    capture_output=True,
-                    timeout=5,
-                )
-            except Exception:
-                pass
-        print_info("[Electron] 残留プロセスの停止を試みました")
-
-
-def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen[bytes]:
-    print_info(f"[{name}] 作業ディレクトリ: {cwd}")
-    print_info(f"[{name}] コマンド: {' '.join(command)}")
-    if sys.platform == "win32":
-        process = subprocess.Popen(
-            command,
-            cwd=str(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=0,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-        )
-    else:
-        process = subprocess.Popen(
-            command,
-            cwd=str(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=0,
-            preexec_fn=os.setpgrp,
-        )
-    print_success(f"[{name}] 起動しました")
-    return process
-
-
-def start_backend_core() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(core)", get_backend_command(BACKEND_CORE_APP, BACKEND_CORE_PORT), BACKEND_DIR)
-
-
-def start_backend_apps() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(apps)", get_backend_command(BACKEND_APPS_APP, BACKEND_APPS_PORT), BACKEND_DIR)
-
-
-def start_backend_tools() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(tools)", get_backend_tools_command(), BACKEND_TOOLS_DIR)
-
-
-def start_backend_local() -> subprocess.Popen[bytes]:
-    # モデルは起動時にはロードせず、利用時（最初のリクエスト）に遅延ロードされる
-    return launch_process("バックエンド(local)", get_backend_local_command(), BACKEND_LOCAL_DIR)
-
-
-
-def start_frontend_web(npm_command: str) -> subprocess.Popen[bytes]:
-    return launch_process(
-        "フロントエンド(Web)",
-        [npm_command, "run", "dev", "--", "--port", str(FRONTEND_WEB_PORT)],
-        FRONTEND_WEB_DIR,
-    )
-
-
-def start_frontend_avatar(npm_command: str) -> subprocess.Popen[bytes]:
-    return launch_process("フロントエンド(Avatar)", [npm_command, "run", "dev"], FRONTEND_AVATAR_DIR)
-
-
+# ============================================================
+# 出力集約 / 安定待機
+# ============================================================
 def stream_output(name: str, stream, last_output_times: dict[str, float]) -> None:
     if stream is None:
         return
@@ -488,6 +266,9 @@ def wait_for_services_quiet(
         time.sleep(0.5)
 
 
+# ============================================================
+# キー入力
+# ============================================================
 def clear_keyboard_buffer() -> None:
     if sys.platform != "win32":
         return
@@ -532,14 +313,17 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
 
 def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool]:
     print_header("起動条件の確認")
-    local_enabled       = prompt_choice("バックエンド(local)     起動しますか?", default_yes=True)
+    local_enabled         = prompt_choice("バックエンド(local)     起動しますか?", default_yes=True)
     backend_tools_enabled = prompt_choice("バックエンド(tools)     起動しますか?", default_yes=True)
-    backend_enabled     = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
-    web_enabled         = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
-    avatar_enabled      = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
+    backend_enabled       = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
+    web_enabled           = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
+    avatar_enabled        = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
     return local_enabled, backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled
 
 
+# ============================================================
+# ブラウザ表示
+# ============================================================
 def open_browser(port: int) -> None:
     print_header("ページ表示")
     url = f"http://localhost:{port}"
@@ -550,12 +334,11 @@ def open_browser(port: int) -> None:
         print_warning(f"ブラウザを開けませんでした: {exc}")
 
 
-
 def _tools_post(path: str, body: dict, timeout: int = 30) -> dict:
     """backend_tools の HTTP POST インターフェースを呼ぶ (urllib のみ使用)"""
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
-        f"http://localhost:{BACKEND_TOOLS_PORT}{path}",
+        f"http://localhost:{TOOLS.PORT}{path}",
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -584,17 +367,16 @@ def open_browser_via_tools(port: int) -> bool:
         return False
 
 
+# ============================================================
+# プロセス停止
+# ============================================================
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
     avatar_was_running = "フロントエンド(Avatar)" in processes
     for name, process in list(processes.items()):
         try:
             print_info(f"[{name}] 停止しています")
             if sys.platform == "win32":
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(process.pid)],
-                    capture_output=True,
-                    timeout=5,
-                )
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True, timeout=5)
             else:
                 try:
                     os.killpg(os.getpgid(process.pid), signal.SIGTERM)
@@ -619,12 +401,13 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
             processes.pop(name, None)
 
     # Avatar を起動していた場合は残留 Electron プロセスも終了する
-    # (electronmon が spawn した electron.exe は別プロセスグループで残留するため)
-    if avatar_was_running:
-        kill_electron_processes()
+    if avatar_was_running and AVATAR is not None:
+        AVATAR.kill_electron_processes()
 
 
-
+# ============================================================
+# 環境確認 / サービス起動
+# ============================================================
 def validate_initial_environment(
     local_enabled: bool,
     backend_tools_enabled: bool,
@@ -637,30 +420,30 @@ def validate_initial_environment(
     npm_command = get_npm_command()
 
     if local_enabled:
-        ok, detail = check_backend_local_environment()
+        ok, detail = LOCAL.check_environment()
         if ok:
             print_success(f"バックエンド(local): OK ({detail})")
         else:
             print_error(f"バックエンド(local): 未準備 ({detail})")
-            print_info(f"  対応例: cd {BACKEND_LOCAL_PATH} && uv sync")
+            print_info("  対応例: cd backend_local && uv sync")
             has_error = True
 
     if backend_tools_enabled:
-        ok, detail = check_backend_tools_environment()
+        ok, detail = TOOLS.check_environment()
         if ok:
             print_success(f"バックエンド(tools): OK ({detail})")
         else:
             print_error(f"バックエンド(tools): 未準備 ({detail})")
-            print_info(f"  対応例: cd {BACKEND_TOOLS_PATH} && uv sync")
+            print_info("  対応例: cd backend_tools && uv sync")
             has_error = True
 
     if backend_enabled:
-        ok, detail = check_backend_environment()
+        ok, detail = SERVER.check_environment()
         if ok:
             print_success(f"バックエンド(core,apps): OK ({detail})")
         else:
             print_error(f"バックエンド(core,apps): 未準備 ({detail})")
-            print_info(f"  対応例: cd {BACKEND_PATH} && uv sync")
+            print_info("  対応例: cd backend_server && uv sync")
             has_error = True
 
     if web_enabled or avatar_enabled:
@@ -671,21 +454,21 @@ def validate_initial_environment(
             print_success(f"npm: OK ({npm_command})")
 
     if web_enabled:
-        ok, detail = check_npm_project_environment(FRONTEND_WEB_DIR)
+        ok, detail = WEB.check_environment()
         if ok:
-            print_success(f"フロントエンド(Web): OK")
+            print_success("フロントエンド(Web): OK")
         else:
             print_error(f"フロントエンド(Web): 未準備 ({detail})")
-            print_info(f"  対応例: cd {FRONTEND_WEB_PATH} && {(npm_command or FRONTEND_COMMAND)} install")
+            print_info(f"  対応例: cd frontend_web && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
 
     if avatar_enabled:
-        ok, detail = check_npm_project_environment(FRONTEND_AVATAR_DIR)
+        ok, detail = AVATAR.check_environment()
         if ok:
-            print_success(f"フロントエンド(Avatar): OK")
+            print_success("フロントエンド(Avatar): OK")
         else:
             print_error(f"フロントエンド(Avatar): 未準備 ({detail})")
-            print_info(f"  対応例: cd {FRONTEND_AVATAR_PATH} && {(npm_command or FRONTEND_COMMAND)} install")
+            print_info(f"  対応例: cd frontend_avatar && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
 
     return (not has_error), npm_command
@@ -696,14 +479,25 @@ def ensure_optional_service_ready(name: str, npm_command: str | None) -> bool:
         print_warning(f"{name}: npm コマンドが見つからないため起動をスキップします")
         print_info("  対応例: Node.js をインストールしてください")
         return False
-    ok, detail = check_npm_project_environment(FRONTEND_AVATAR_DIR)
+    ok, detail = AVATAR.check_environment()
     if ok:
         print_success(f"{name}: OK ({detail})")
         return True
     print_warning(f"{name}: 未準備のため起動をスキップします ({detail})")
-    print_info(f"  対応例: cd {FRONTEND_AVATAR_PATH}")
-    print_info(f"  対応例: {get_npm_command() or FRONTEND_COMMAND} install")
+    print_info("  対応例: cd frontend_avatar")
+    print_info(f"  対応例: {npm_command or FRONTEND_COMMAND} install")
     return False
+
+
+def _port_for(name: str) -> int | None:
+    return {
+        "バックエンド(local)": LOCAL.PORT,
+        "バックエンド(tools)": TOOLS.PORT,
+        "バックエンド(core)": SERVER.CORE_PORT,
+        "バックエンド(apps)": SERVER.APPS_PORT,
+        "フロントエンド(Web)": WEB.PORT,
+        "フロントエンド(Avatar)": AVATAR.PORT,
+    }.get(name)
 
 
 def start_service(
@@ -711,26 +505,26 @@ def start_service(
     processes: dict[str, subprocess.Popen[bytes]],
     last_output_times: dict[str, float],
     npm_command: str | None,
-    ) -> bool:
+) -> bool:
     try:
         if name == "バックエンド(tools)":
-            process = start_backend_tools()
+            process = TOOLS.start()
         elif name == "バックエンド(local)":
-            process = start_backend_local()
+            process = LOCAL.start()
         elif name == "バックエンド(core)":
-            process = start_backend_core()
+            process = SERVER.start_core()
         elif name == "バックエンド(apps)":
-            process = start_backend_apps()
+            process = SERVER.start_apps()
         elif name == "フロントエンド(Web)":
             if npm_command is None:
                 print_error("フロントエンド(Web): npm コマンドが見つかりません")
                 return False
-            process = start_frontend_web(npm_command)
+            process = WEB.start(npm_command)
         elif name == "フロントエンド(Avatar)":
             if npm_command is None:
                 print_error("フロントエンド(Avatar): npm コマンドが見つかりません")
                 return False
-            process = start_frontend_avatar(npm_command)
+            process = AVATAR.start(npm_command)
         else:
             print_error(f"未対応のサービスです: {name}")
             return False
@@ -752,19 +546,18 @@ def maybe_kill_initial_ports(
 ) -> None:
     print_header("既存プロセス整理")
     if local_enabled:
-        kill_process_on_port(BACKEND_LOCAL_PORT)
+        kill_process_on_port(LOCAL.PORT)
     if backend_tools_enabled:
-        kill_process_on_port(BACKEND_TOOLS_PORT)
+        kill_process_on_port(TOOLS.PORT)
     if backend_enabled:
-        kill_process_on_port(BACKEND_CORE_PORT)
-        kill_process_on_port(BACKEND_APPS_PORT)
+        kill_process_on_port(SERVER.CORE_PORT)
+        kill_process_on_port(SERVER.APPS_PORT)
     if web_enabled:
-        kill_process_on_port(FRONTEND_WEB_PORT)
+        kill_process_on_port(WEB.PORT)
     if avatar_enabled:
-        kill_process_on_port(FRONTEND_AVATAR_PORT)
+        kill_process_on_port(AVATAR.PORT)
         # electronmon が spawn した electron.exe は別プロセスグループで残留する場合があるため
-        # ポートkillだけでなく、プロセス名でも明示的に停止する
-        kill_electron_processes()
+        AVATAR.kill_electron_processes()
     time.sleep(1)
 
 
@@ -797,7 +590,6 @@ def start_initial_services(
 
     if start_backend_local_enabled:
         print_header("バックエンド(local) 起動")
-        # モデルは起動時にロードせず、利用時に遅延ロードされる
         start_service("バックエンド(local)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["バックエンド(local)"], label="バックエンド(local)")
 
@@ -822,18 +614,18 @@ def start_initial_services(
 
     if avatar_enabled and ensure_optional_service_ready("フロントエンド(Avatar)", npm_command):
         selected_flags["フロントエンド(Avatar)"] = True
-        kill_process_on_port(FRONTEND_AVATAR_PORT)
+        kill_process_on_port(AVATAR.PORT)
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
 
     if web_enabled and "フロントエンド(Web)" in processes:
-        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(FRONTEND_WEB_PORT)):
-            open_browser(FRONTEND_WEB_PORT)
+        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(WEB.PORT)):
+            open_browser(WEB.PORT)
 
     if avatar_enabled and "フロントエンド(Avatar)" in processes:
-        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(FRONTEND_AVATAR_PORT)):
-            open_browser(FRONTEND_AVATAR_PORT)
+        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(AVATAR.PORT)):
+            open_browser(AVATAR.PORT)
 
     return selected_flags
 
@@ -850,13 +642,6 @@ def monitor_and_restart(
     print_info("Ctrl+C で停止します")
 
     process_crash_time: dict[str, float] = {}
-    port_map = {
-        "バックエンド(tools)": BACKEND_TOOLS_PORT,
-        "バックエンド(core)": BACKEND_CORE_PORT,
-        "バックエンド(apps)": BACKEND_APPS_PORT,
-        "フロントエンド(Web)": FRONTEND_WEB_PORT,
-        "フロントエンド(Avatar)": FRONTEND_AVATAR_PORT,
-    }
 
     while True:
         current_time = time.time()
@@ -882,7 +667,7 @@ def monitor_and_restart(
                 continue
 
             print_info(f"[{name}] 再起動を試みます")
-            port = port_map.get(name)
+            port = _port_for(name)
             if port is not None:
                 kill_process_on_port(port)
                 time.sleep(1)
@@ -898,6 +683,8 @@ def monitor_and_restart(
 
 
 def main() -> None:
+    _init_modules()
+
     local_enabled, backend_tools_enabled, backend_enabled, web_enabled, avatar_enabled = collect_startup_choices()
 
     is_ready, npm_command = validate_initial_environment(
@@ -933,20 +720,20 @@ def main() -> None:
 
             print_header("起動完了")
             if "バックエンド(local)" in processes:
-                print_success(f"バックエンド(local): http://localhost:{BACKEND_LOCAL_PORT}/docs")
-                print_info   (f"  OpenAI互換 (利用時にモデルロード): http://localhost:{BACKEND_LOCAL_PORT}/v1/chat/completions")
+                print_success(f"バックエンド(local): http://localhost:{LOCAL.PORT}/docs")
+                print_info   (f"  OpenAI互換 (利用時にモデルロード): http://localhost:{LOCAL.PORT}/v1/chat/completions")
             if "バックエンド(tools)" in processes:
-                print_success(f"バックエンド(tools) Swagger UI : http://localhost:{BACKEND_TOOLS_PORT}/docs")
-                print_info   (f"  ツール一覧(例)            : http://localhost:{BACKEND_TOOLS_PORT}/aidiy_text_to_speech/list")
-                print_info   (f"  利用可能 ツール 一覧      : http://localhost:{BACKEND_TOOLS_PORT}/")
+                print_success(f"バックエンド(tools) Swagger UI : http://localhost:{TOOLS.PORT}/docs")
+                print_info   (f"  ツール一覧(例)            : http://localhost:{TOOLS.PORT}/aidiy_text_to_speech/list")
+                print_info   (f"  利用可能 ツール 一覧      : http://localhost:{TOOLS.PORT}/")
             if "バックエンド(core)" in processes:
-                print_success(f"バックエンド(core): http://localhost:{BACKEND_CORE_PORT}/docs")
+                print_success(f"バックエンド(core): http://localhost:{SERVER.CORE_PORT}/docs")
             if "バックエンド(apps)" in processes:
-                print_success(f"バックエンド(apps): http://localhost:{BACKEND_APPS_PORT}/docs")
+                print_success(f"バックエンド(apps): http://localhost:{SERVER.APPS_PORT}/docs")
             if "フロントエンド(Web)" in processes:
-                print_success(f"フロントエンド(Web): http://localhost:{FRONTEND_WEB_PORT}/")
+                print_success(f"フロントエンド(Web): http://localhost:{WEB.PORT}/")
             if "フロントエンド(Avatar)" in processes:
-                print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{FRONTEND_AVATAR_PORT}")
+                print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{AVATAR.PORT}")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)
 
         except KeyboardInterrupt:

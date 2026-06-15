@@ -1,4 +1,4 @@
-﻿# backend_hermes の MCP SSE 接続
+# backend_hermes の MCP SSE 接続
 
 > 文書: `backend_hermes,backend_tools,MCP_SSE接続.md` | 実装: `backend_hermes/tools/mcp_tool.py`, `backend_hermes/cli_main.py`
 

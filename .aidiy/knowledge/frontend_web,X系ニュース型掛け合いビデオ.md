@@ -1,4 +1,4 @@
-﻿# X系ニュース型掛け合いビデオ
+# X系ニュース型掛け合いビデオ
 
 > 文書: `frontend_web,X系ニュース型掛け合いビデオ.md` | 実装: `frontend_web/public/Xビデオ/ニュース_20260519_anthropic2026前半/index.html`, `frontend_web/public/Xビデオ/ニュース_20260519_anthropic2026前半/scenario.js`, `frontend_web/public/Xビデオ/ニュース_20260519_anthropic2026前半/_gen_dialogue_audio.py`
 

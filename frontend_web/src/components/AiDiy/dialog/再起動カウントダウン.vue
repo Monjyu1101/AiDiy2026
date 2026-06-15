@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div v-if="isVisible" class="reboot-overlay">
     <div class="reboot-dialog">
       <div class="reboot-title">

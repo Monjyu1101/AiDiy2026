@@ -1,4 +1,4 @@
-﻿# backend_server 実装概要
+# backend_server 実装概要
 
 ## 本書の目的
 

@@ -1,4 +1,4 @@
-﻿# backend_hermes MCP サーバー起動
+# backend_hermes MCP サーバー起動
 
 > 文書: `backend_hermes,MCP_サーバー起動.md` | 実装: `backend_hermes/base/mcp_serve.py`, `backend_hermes/hermes_cli/mcp_config.py`
 

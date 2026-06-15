@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -408,7 +408,7 @@
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const restartBtn = document.getElementById("restartBtn");
-    const lastBtn = document.getElementById("lastBtn");
+    const lastBtn = document.getElementById("lastBtn");
     const speakerBtn    = document.getElementById("speakerBtn");
     const modeBtn = document.getElementById("modeBtn");
     const ttsStatus = document.getElementById("ttsStatus");
@@ -972,7 +972,7 @@
     playBtn.addEventListener("click", () => { if (playing) pause(); else play(); });
     nextBtn.addEventListener("click", () => { pause(); nextScene(false); });
     lastBtn.addEventListener("click", () => { pause(); moveToScene(scenario.scenes.length - 1); });
-
+
     speakerBtn?.addEventListener("click", () => { speakerEnabled = !speakerEnabled; applySpeakerState(); });
     modeBtn.addEventListener("click", () => {
       const wasPlaying = playing;

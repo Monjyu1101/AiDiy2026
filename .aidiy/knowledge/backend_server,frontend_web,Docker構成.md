@@ -1,4 +1,4 @@
-﻿# Docker 構成と起動手順
+# Docker 構成と起動手順
 
 > 文書: `backend_server,frontend_web,Docker構成.md` | 実装: `docker/`, `docker/README.md`
 

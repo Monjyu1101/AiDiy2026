@@ -1,4 +1,4 @@
-﻿# MCP 活用手順
+# MCP 活用手順
 
 > 文書: `backend_server,backend_tools,MCP活用手順.md` | 実装: `backend_server/_config/AiDiy_mcp.json`, `backend_server/core_router/AIコア/AIコード_claude.py`
 

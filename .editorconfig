@@ -1,0 +1,17 @@
+# EditorConfig — https://editorconfig.org
+# このプロジェクトのソースは「BOM なし UTF-8 / LF」を標準とする。
+# charset = utf-8（utf-8-bom ではない）により、対応エディタは保存時に
+# 先頭 BOM を付けずに UTF-8 で書き出す。
+
+root = true
+
+[*]
+charset = utf-8
+
+# ソース + MD 関係は LF に統一する
+[*.{py,js,mjs,cjs,ts,tsx,jsx,vue,css,scss,html,json,md}]
+end_of_line = lf
+
+# Windows バッチは CRLF を維持する
+[*.{bat,cmd}]
+end_of_line = crlf

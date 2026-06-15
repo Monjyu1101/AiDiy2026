@@ -1,4 +1,4 @@
-﻿# backend_tools 構成
+# backend_tools 構成
 
 > 文書: `backend_tools,構成.md` | 実装: `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`
 

@@ -1,4 +1,4 @@
-﻿# X系紹介ビデオとアバター作成手順
+# X系紹介ビデオとアバター作成手順
 
 > 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_AIコア_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_avatar_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_backend_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_frontend_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_hermes_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_tools_ja/`
 

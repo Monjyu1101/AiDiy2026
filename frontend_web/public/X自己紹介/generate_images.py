@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """avatar / hermes 紹介ビデオ用画像一括生成スクリプト"""
 

@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy解説_ビデオ生成_ja",
   "version": "duo-v2",
   "title": "AiDiy ビデオページ生成機能 解説 — topic からビデオ完成まで全自動化の 9 ステップ",

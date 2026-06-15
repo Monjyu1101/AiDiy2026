@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "AiDiy紹介frontend",
   "version": "frontend",
   "title": "AiDiy frontend_web - Vue 3 + qTubler + 日本語ファースト UI",

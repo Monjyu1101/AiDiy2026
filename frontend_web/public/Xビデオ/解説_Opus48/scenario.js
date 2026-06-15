@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "Claude Opus 4.8 解説 (掛け合い版)",
   "version": "duo-v2",
   "title": "Claude Opus 4.8 — Anthropic 最新フラッグシップモデル解説",

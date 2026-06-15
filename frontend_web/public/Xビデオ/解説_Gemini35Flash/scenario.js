@@ -1,4 +1,4 @@
-﻿window.SCENARIO = {
+window.SCENARIO = {
   "project_name": "Gemini 3.5 Flash 解説 (掛け合い版)",
   "version": "duo-v2",
   "title": "Gemini 3.5 Flash — Google DeepMind 最新モデル解説",
