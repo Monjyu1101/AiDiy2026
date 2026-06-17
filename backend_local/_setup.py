@@ -12,6 +12,8 @@
     launch_model_download(choices=None) -> bool    # 別プロセスで非ブロッキング投入
 """
 
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -27,9 +29,22 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_LOCAL_DIR = THIS_DIR
 PROJECT_ROOT = THIS_DIR.parent
+BACKEND_SERVER_DIR = PROJECT_ROOT / "backend_server"
 BACKEND_LOCAL_ENV = ".venv"
 
 AUTO_MODE = False
+
+# VS Code chatLanguageModels.json 用設定 — aidiy_local (backend_local)
+LOCAL_CHAT_PROVIDER_NAME = "aidiy_local"
+LOCAL_CHAT_URL = "http://127.0.0.1:8096/v1/chat/completions"
+LOCAL_CHAT_MODEL_IDS_FALLBACK = [
+    "google/gemma-4-E2B-it",
+    "google/gemma-4-E4B-it",
+    "google/gemma-4-E2B-it-qat-mobile-transformers",
+    "google/gemma-4-E4B-it-qat-mobile-transformers",
+]
+VSCODE_LOCAL_MAX_INPUT_TOKENS = 128000
+VSCODE_LOCAL_MAX_OUTPUT_TOKENS = 16000
 
 
 class Colors:
@@ -136,6 +151,105 @@ def ask_download_mode(prompt, default="n"):
     if key in (b"y", b"Y"):
         return "one"
     return "no"
+
+
+# ============================================================
+# VS Code chatLanguageModels.json ヘルパー
+# ============================================================
+def get_vscode_chat_models_path() -> Path:
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+        return base / "Code" / "User" / "chatLanguageModels.json"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Code" / "User" / "chatLanguageModels.json"
+    return Path.home() / ".config" / "Code" / "User" / "chatLanguageModels.json"
+
+
+def _load_json_list_file(path: Path) -> list:
+    if not path.exists():
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _write_json_list_file(path: Path, data: list) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        return True
+    except Exception as e:
+        print_error(f"JSON書き込みエラー: {path} ({e})")
+        return False
+
+
+def _load_local_chat_model_ids() -> list:
+    local_path = BACKEND_SERVER_DIR / "_config" / "AiDiy_chat_local.json"
+    try:
+        with open(local_path, encoding="utf-8") as f:
+            data = json.load(f)
+        models = data.get("models")
+        if isinstance(models, dict) and models:
+            return list(models.keys())
+    except Exception:
+        pass
+    return list(LOCAL_CHAT_MODEL_IDS_FALLBACK)
+
+
+def _build_local_chat_provider() -> dict:
+    models = [
+        {
+            "id": model_id,
+            "name": model_id,
+            "url": LOCAL_CHAT_URL,
+            "toolCalling": True,
+            "vision": True,
+            "maxInputTokens": VSCODE_LOCAL_MAX_INPUT_TOKENS,
+            "maxOutputTokens": VSCODE_LOCAL_MAX_OUTPUT_TOKENS,
+        }
+        for model_id in _load_local_chat_model_ids()
+    ]
+    return {
+        "name": LOCAL_CHAT_PROVIDER_NAME,
+        "vendor": "customendpoint",
+        "apiType": "chat-completions",
+        "apiKey": "local",
+        "models": models,
+    }
+
+
+def _upsert_provider(providers: list, provider: dict) -> list:
+    name = provider["name"]
+    for i, entry in enumerate(providers):
+        if isinstance(entry, dict) and entry.get("name") == name:
+            providers[i] = provider
+            return providers
+    providers.append(provider)
+    return providers
+
+
+def upsert_vscode_local_chat() -> bool:
+    path = get_vscode_chat_models_path()
+    try:
+        providers = _load_json_list_file(path)
+        if not providers:
+            providers = [{"name": "Ollama", "vendor": "ollama", "url": "http://localhost:11434"}]
+        providers = _upsert_provider(providers, _build_local_chat_provider())
+        if not _write_json_list_file(path, providers):
+            return False
+        print_success(f"VS Code チャットモデル設定を書き込みました: {path} ({LOCAL_CHAT_PROVIDER_NAME})")
+        return True
+    except json.JSONDecodeError as e:
+        print_error(f"JSON解析エラー: {path} ({e})")
+        return False
+    except Exception as e:
+        print_error(f"VS Code チャットモデル設定更新エラー: {path} ({e})")
+        return False
 
 
 def run_command(command, cwd=None, shell=False, env=None):
@@ -312,6 +426,8 @@ def setup(choices: dict | None = None) -> bool:
     print_info("  モデルがゲート対象の場合は、HuggingFace でライセンス同意のうえ、")
     print_info("  AiDiy_key.json の huggingface_key_read にアクセストークンを設定してください。")
     print_info(f"{label}: モデル事前ダウンロードはセットアップ処理の最後に実行します。")
+
+    upsert_vscode_local_chat()
 
     return True
 
