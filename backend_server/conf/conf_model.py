@@ -148,6 +148,7 @@ class conf_models:
         # ローカル LLM（backend_local）チャットモデル一覧の既定値
         self.CHAT_LOCAL_MODELS = {
             "google/gemma-4-E2B-it": "google/gemma-4-E2B-it / 約10GB bf16 / 速い (default)",
+            "google/gemma-4-E4B-it": "google/gemma-4-E4B-it / 約16GB bf16 / やや遅い・高品質",
             "google/gemma-4-E2B-it-qat-mobile-transformers": "google/gemma-4-E2B-it-qat-mobile-transformers / 約2.5GB / 省メモリ・中速",
             "google/gemma-4-E4B-it-qat-mobile-transformers": "google/gemma-4-E4B-it-qat-mobile-transformers / 約3.5GB / 省メモリ・低速",
         }

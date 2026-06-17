@@ -70,11 +70,13 @@ class GemmaEngine:
         device: str = "auto",
         dtype: str = "auto",
         hf_token: Optional[str] = None,
-        max_new_tokens: int = 1024,
+        max_new_tokens: int = 128000,
         models_dir: Optional[str] = None,
         offline: bool = False,
     ):
         self.model_id = model_id
+        # device 未指定 / "auto" のときは GPU 失敗時に CPU へ自動フォールバックする
+        self._device_auto = (not device) or (device == "auto")
         self.device = _resolve_device(device)
         self.dtype_name = dtype
         self.hf_token = hf_token or None
@@ -218,7 +220,24 @@ class GemmaEngine:
                     f"モデルロード失敗: CausalLM={last_err} / ImageTextToText={e2}"
                 ) from e2
 
-        model = model.to(self.device)
+        # デバイス配置。auto 解決で cuda を選んだが GPU 配置に失敗（OOM/ドライバ等）した
+        # 場合は CPU へフォールバックする（明示 cuda 指定時はフォールバックせず raise）。
+        try:
+            model = model.to(self.device)
+        except Exception as e:  # noqa: BLE001
+            if self._device_auto and self.device == "cuda":
+                import torch
+                logger.warning("GPU 配置に失敗したため CPU にフォールバックします: %s", e)
+                try:
+                    torch.cuda.empty_cache()
+                except Exception:
+                    pass
+                self.device = "cpu"
+                # CPU では半精度が遅く不安定なため float32 へ変換して配置する
+                model = model.to(device="cpu", dtype=torch.float32)
+            else:
+                raise
+
         model.eval()
         self._model = model
 

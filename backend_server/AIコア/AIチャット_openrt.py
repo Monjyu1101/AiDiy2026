@@ -325,13 +325,13 @@ class ChatAI:
             if "image" in str(self.chat_model):
                 parm_kwargs["extra_body"] = {"modalities": ["image", "text"]}
 
-            # completions_tools が指定された場合のみ tools などの追加パラメータをマージ
-            # （空 or None のときは何もしないため従来挙動と同一）
-            if completions_tools:
+            # tools が実際に指定（非空）されているときのみ tools などの追加パラメータをマージ。
+            # tools=[] / {} / None は「渡されていない」扱いで通常生成（従来挙動と同一・gemini と整合）。
+            has_tools = bool(completions_tools and completions_tools.get("tools"))
+            if has_tools:
                 parm_kwargs.update(completions_tools)
 
             # api実行
-            has_tools = bool(completions_tools and completions_tools.get("tools"))
             try:
                 response = self.client.chat.completions.create(**parm_kwargs)
             except Exception as api_e:

@@ -97,7 +97,7 @@ class ChatAI:
 
         # 生成パラメータ
         self.temperature = 0.8
-        self.max_wait_sec = 120
+        self.max_wait_sec = 300
 
         # 履歴管理システム(ローカル保管)
         self.履歴最終番号 = 0
@@ -159,9 +159,9 @@ class ChatAI:
             # 自己ループ（aidiy_chat_llms）: 自前 MCP 群をツールとして使い、
             # tool_calls をサーバー側で実行しながら応答が確定するまで回す。
             # ただしローカル LLM（E2B 等・CPU 推論）では全 MCP ツールの prefill が重く
-            # 応答が返らないため、ロジックは残しつつ `if False:` で常に無効化する。
-            # （高速な環境で使いたくなったら `if 自己ループ:` に戻すだけ）
-            if False:  # 遅すぎるため無効化（self-loop ロジックは温存）
+            # 応答が返らない／遅すぎるため、現状は無効化している。
+            # 復活させたいときは下の `False and ` を削除して `if 自己ループ:` に戻すだけ。
+            if False and 自己ループ:  # 遅すぎるため無効化（self-loop ロジックは温存）
                 try:
                     from AIコア.AI内部ツール import MCPツールブリッジ, 自己ループ実行
                 except ImportError:
@@ -279,12 +279,27 @@ class ChatAI:
                 "stream": False,
             }
 
-            # completions_tools が指定された場合のみ tools などの追加パラメータをマージ
-            # （空 or None のときは何もしないため従来挙動と同一）
-            if completions_tools:
+            # tools が実際に指定（非空）されているときのみ tools などの追加パラメータをマージ。
+            # tools=[] / {} / None は「渡されていない」扱いで通常生成（従来挙動と同一・gemini と整合）。
+            if completions_tools and completions_tools.get("tools"):
                 parm_kwargs.update(completions_tools)
 
-            response = self.client.chat.completions.create(**parm_kwargs)
+            # backend_local は単一生成スロット。生成中は 503 を返すため、
+            # タイムアウト範囲内で少し待って再試行する（即エラーにしない）。
+            deadline = time.time() + float(self.max_wait_sec)
+            response = None
+            while True:
+                try:
+                    response = self.client.chat.completions.create(**parm_kwargs)
+                    break
+                except Exception as api_e:
+                    status = getattr(api_e, "status_code", None)
+                    is_busy = (status == 503) or ("503" in str(api_e))
+                    タイムアウト済み = bool(タイムアウトフラグ is not None and タイムアウトフラグ.is_set())
+                    if is_busy and not タイムアウト済み and time.time() < deadline:
+                        time.sleep(1.0)
+                        continue
+                    raise
 
             応答テキスト = ""
             if response and response.choices:

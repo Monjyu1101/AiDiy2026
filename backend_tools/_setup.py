@@ -41,11 +41,27 @@ FRONTEND_COMMAND = "npm"
 AUTO_MODE = False
 
 # VS Code チャットモデル (chatLanguageModels.json) 用設定
+# 注意: URL は 127.0.0.1 を使う（localhost は ::1=IPv6 に先に解決され、サーバーが
+#       IPv4 0.0.0.0 のみ待受の場合 VS Code/Electron から ERR_CONNECTION_REFUSED になる）。
 CHAT_COMPLETIONS_PROVIDER_NAME = "aidiy_chat_completions"
-CHAT_COMPLETIONS_URL = "http://localhost:8095/aidiy_chat_completions/v1/chat/completions"
+CHAT_COMPLETIONS_URL = "http://127.0.0.1:8095/aidiy_chat_completions/v1/chat/completions"
 CHAT_COMPLETIONS_MODEL_IDS = ["freeai_chat", "openrt_chat", "gemini_chat", "ollama_chat"]
 VSCODE_CHAT_MODEL_MAX_INPUT_TOKENS = 256000
 VSCODE_CHAT_MODEL_MAX_OUTPUT_TOKENS = 16000
+
+# VS Code チャットモデル (chatLanguageModels.json) 用設定 — backend_local（ローカル LLM / OpenAI 互換）
+LOCAL_CHAT_PROVIDER_NAME = "aidiy_local"
+LOCAL_CHAT_URL = "http://127.0.0.1:8096/v1/chat/completions"
+# backend_local の既定フォールバック（AiDiy_chat_local.json が読めない場合のみ使用）
+LOCAL_CHAT_MODEL_IDS_FALLBACK = [
+    "google/gemma-4-E2B-it",
+    "google/gemma-4-E4B-it",
+    "google/gemma-4-E2B-it-qat-mobile-transformers",
+    "google/gemma-4-E4B-it-qat-mobile-transformers",
+]
+# Gemma 4 は 128K コンテキスト。生成上限は backend_local の CHAT_LOCAL_MAX_TOKENS に従う。
+VSCODE_LOCAL_MAX_INPUT_TOKENS = 128000
+VSCODE_LOCAL_MAX_OUTPUT_TOKENS = 16000
 
 # VS Code チャットモデル (chatLanguageModels.json) 用設定 — Ollama Cloud
 OLLAMA_CLOUD_PROVIDER_NAME = "aidiy_ollama_cloud"
@@ -337,6 +353,44 @@ def _build_chat_completions_provider() -> dict:
     }
 
 
+def _load_local_chat_model_ids() -> list:
+    """backend_local の利用可能モデル ID を AiDiy_chat_local.json から取得する。
+
+    読めない／空の場合は LOCAL_CHAT_MODEL_IDS_FALLBACK を使う。
+    """
+    local_path = BACKEND_DIR / "_config" / "AiDiy_chat_local.json"
+    try:
+        data = load_json_dict_file(local_path)
+        models = data.get("models")
+        if isinstance(models, dict) and models:
+            return list(models.keys())
+    except Exception:
+        pass
+    return list(LOCAL_CHAT_MODEL_IDS_FALLBACK)
+
+
+def _build_local_chat_provider() -> dict:
+    models = [
+        {
+            "id": model_id,
+            "name": model_id,
+            "url": LOCAL_CHAT_URL,
+            "toolCalling": True,
+            "vision": True,
+            "maxInputTokens": VSCODE_LOCAL_MAX_INPUT_TOKENS,
+            "maxOutputTokens": VSCODE_LOCAL_MAX_OUTPUT_TOKENS,
+        }
+        for model_id in _load_local_chat_model_ids()
+    ]
+    return {
+        "name": LOCAL_CHAT_PROVIDER_NAME,
+        "vendor": "customendpoint",
+        "apiType": "chat-completions",
+        "apiKey": "local",
+        "models": models,
+    }
+
+
 def _load_aidiy_key_value(key: str) -> str:
     key_path = BACKEND_DIR / "_config" / "AiDiy_key.json"
     try:
@@ -389,6 +443,7 @@ def upsert_vscode_chat_completions(path: Path) -> bool:
             providers = [{"name": "Ollama", "vendor": "ollama", "url": "http://localhost:11434"}]
 
         providers = _upsert_provider(providers, _build_chat_completions_provider())
+        providers = _upsert_provider(providers, _build_local_chat_provider())
 
         ollama_key = _load_aidiy_key_value("ollama_key_id")
         if _is_valid_api_key(ollama_key):
@@ -400,7 +455,7 @@ def upsert_vscode_chat_completions(path: Path) -> bool:
 
         if not write_json_list_file(path, providers):
             return False
-        print_success(f"VS Code チャットモデル設定を書き込みました: {path} ({CHAT_COMPLETIONS_PROVIDER_NAME}{cloud_msg})")
+        print_success(f"VS Code チャットモデル設定を書き込みました: {path} ({CHAT_COMPLETIONS_PROVIDER_NAME}, {LOCAL_CHAT_PROVIDER_NAME}{cloud_msg})")
         return True
     except json.JSONDecodeError as e:
         print_error(f"JSON解析エラー: {path} ({e})")

@@ -96,7 +96,7 @@ cd backend_local && uv run python local_main.py
 | HF トークン（読み取り） | `huggingface_key_read` | （なし） |
 | デバイス | `CHAT_LOCAL_DEVICE` | `auto` |
 | dtype | `CHAT_LOCAL_DTYPE` | `auto` |
-| 最大生成トークン | `CHAT_LOCAL_MAX_TOKENS` | `1024` |
+| 最大生成トークン | `CHAT_LOCAL_MAX_TOKENS` | `128000` |
 | モデル配置先 | `CHAT_LOCAL_MODELS_DIR` | `temp/models` |
 | オフライン強制 | `CHAT_LOCAL_OFFLINE` | `0` |
 

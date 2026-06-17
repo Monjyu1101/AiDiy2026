@@ -162,6 +162,12 @@ class ChatAI:
             logger.error(f"ChatAI終了:エラー {e}")
             self.is_alive = False
 
+    def 履歴クリア(self):
+        """履歴をクリア"""
+        self.履歴辞書 = {}
+        self.履歴最終番号 = 0
+        self.履歴最終時刻 = time.time()
+
     def _履歴追加(self, text: str, type: str):
         """履歴に項目を追加"""
         self.履歴最終番号 += 1

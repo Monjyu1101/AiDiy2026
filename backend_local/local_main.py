@@ -30,7 +30,7 @@ HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API として
 | HF トークン | huggingface_key_read | （なし） |
 | デバイス | CHAT_LOCAL_DEVICE | auto |
 | dtype | CHAT_LOCAL_DTYPE | auto |
-| 最大生成トークン | CHAT_LOCAL_MAX_TOKENS | 1024 |
+| 最大生成トークン | CHAT_LOCAL_MAX_TOKENS | 128000 |
 | モデル配置先 | CHAT_LOCAL_MODELS_DIR | temp/models |
 | オフライン強制 | CHAT_LOCAL_OFFLINE | 0 |
 
@@ -74,7 +74,7 @@ LOCAL_PORT = _cfg.get_int("LOCAL_BASE", 8096)
 LOCAL_MODEL = _cfg.get_str("CHAT_LOCAL_MODEL", "google/gemma-4-E2B-it")
 LOCAL_DEVICE = _cfg.get_str("CHAT_LOCAL_DEVICE", "auto")
 LOCAL_DTYPE = _cfg.get_str("CHAT_LOCAL_DTYPE", "auto")
-LOCAL_MAX_TOKENS = _cfg.get_int("CHAT_LOCAL_MAX_TOKENS", 1024)
+LOCAL_MAX_TOKENS = _cfg.get_int("CHAT_LOCAL_MAX_TOKENS", 128000)
 LOCAL_MODELS_DIR = _cfg.get_str("CHAT_LOCAL_MODELS_DIR", None)
 LOCAL_OFFLINE = _cfg.get_bool("CHAT_LOCAL_OFFLINE", False)
 # HF トークン（読み取り用）。AiDiy_key.json の huggingface_key_read のみ参照

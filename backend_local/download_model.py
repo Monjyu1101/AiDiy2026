@@ -56,6 +56,7 @@ DEFAULT_TOKEN = _cfg.get_str("huggingface_key_read", None)
 # 通常は AiDiy_chat_local.json の models を取得対象にする。
 LOCAL_MODEL_CANDIDATES = [
     "google/gemma-4-E2B-it",
+    "google/gemma-4-E4B-it",
     "google/gemma-4-E2B-it-qat-mobile-transformers",
     "google/gemma-4-E4B-it-qat-mobile-transformers",
 ]

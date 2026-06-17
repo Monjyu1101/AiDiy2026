@@ -288,9 +288,9 @@ class ChatAI:
                 "stream": False,
             }
 
-            # completions_tools が指定された場合のみ tools などの追加パラメータをマージ
-            # （空 or None のときは何もしないため従来挙動と同一）
-            if completions_tools:
+            # tools が実際に指定（非空）されているときのみ tools などの追加パラメータをマージ。
+            # tools=[] / {} / None は「渡されていない」扱いで通常生成（従来挙動と同一・gemini と整合）。
+            if completions_tools and completions_tools.get("tools"):
                 parm_kwargs.update(completions_tools)
 
             response = self.client.chat.completions.create(**parm_kwargs)
