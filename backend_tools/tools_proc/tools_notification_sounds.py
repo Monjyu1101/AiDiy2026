@@ -48,8 +48,11 @@ def register_tools(mcp_ns, ns):
 
         Args:
             notification_type: "準備/開始/終了/完了/注意/承認"（plane・legacy 共通。
-                "ready/up/down/ok/ng/accept" の英語エイリアスも可）
-            scene: "auto"（= "plane"）/ "plane"（機内 SeatBeltSign）/ "legacy"（旧来の効果音）
+                "ready/up/down/ok/ng/accept" の英語エイリアスも可）。
+                scene="tts" のときは、定義済み種別なら対応フレーズを、未定義なら
+                この文字列をそのまま自由発声する（任意のテキストを渡してよい）。
+            scene: "auto"（= "plane"）/ "plane"（機内 SeatBeltSign）/ "legacy"（旧来の効果音）/
+                "tts"（読み上げフレーズ／任意テキストを text_to_speech エンジンで合成・再生）
         """
         try:
             result = await asyncio.to_thread(ns.play, notification_type, scene)
@@ -63,7 +66,7 @@ def register_tools(mcp_ns, ns):
         指定 scene のサウンドマッピング一覧を返す。
 
         Args:
-            scene: "auto" / "plane" / "legacy"
+            scene: "auto" / "plane" / "legacy" / "tts"
         """
         try:
             result = await asyncio.to_thread(ns.list_sounds, scene)
@@ -86,14 +89,15 @@ def create_router(ns) -> APIRouter:
             "service": "aidiy_notification_sounds",
             "description": (
                 "scene に応じた通知音（開始・終了・注意）をローカル再生する。 "
-                "scene=auto/plane は機内 SeatBeltSign 音、legacy は旧来の効果音を使用する。"
+                "scene=auto/plane は機内 SeatBeltSign 音、legacy は旧来の効果音、 "
+                "tts は通知種別の読み上げフレーズを text_to_speech エンジンで合成・再生する。"
             ),
             "content_type": "application/json",
             "endpoints": {
                 "play": "POST /aidiy_notification_sounds/play",
                 "list": "POST /aidiy_notification_sounds/list",
             },
-            "notification_scene": "auto,plane,legacy",
+            "notification_scene": "auto,plane,legacy,tts",
             "notification_play": [
                 ["ready", "準備"],
                 ["up", "開始"],
@@ -109,14 +113,14 @@ def create_router(ns) -> APIRouter:
         """
         通知音を再生する。
 
-        | notification_type | scene=plane (auto) | scene=legacy |
-        |---|---|---|
-        | 準備 | SeatBeltSign3.mp3 | ready.mp3 |
-        | 開始 | SeatBeltSign1.mp3 | up.mp3 |
-        | 終了 | SeatBeltSign2.mp3 | down.mp3 |
-        | 完了 | SeatBeltSign1.mp3 | ok.mp3 |
-        | 注意 | SeatBeltSign2.mp3 | ng.mp3 |
-        | 承認 | SeatBeltSign1.mp3 | accept.mp3 |
+        | notification_type | scene=plane (auto) | scene=legacy | scene=tts（読み上げ） |
+        |---|---|---|---|
+        | 準備 | SeatBeltSign3.mp3 | ready.mp3 | 準備ができました |
+        | 開始 | SeatBeltSign1.mp3 | up.mp3 | 開始します |
+        | 終了 | SeatBeltSign2.mp3 | down.mp3 | 終了しました |
+        | 完了 | SeatBeltSign1.mp3 | ok.mp3 | 完了しました |
+        | 注意 | SeatBeltSign2.mp3 | ng.mp3 | ご注意ください |
+        | 承認 | SeatBeltSign1.mp3 | accept.mp3 | 承認しました |
         """
         try:
             result = await asyncio.to_thread(ns.play, req.notification_type, req.scene)

@@ -1,0 +1,47 @@
+{
+  "_comment": [
+    "小説小話.py 専用設定。",
+    "女性アバター（VRM_female）一人語りによる『実話の小話』エンタメ動画の生成設定です。",
+    "AiDiy の機能紹介ではなく、物語の語り手として読み聞かせる動画を作ります。",
+    "AiDiy への言及は scene_000 冒頭の自動生成クレジットと scene_999 のまとめだけに限定します。",
+    "ナレーション音声は edge / female。アバターは ../_vrm/VRM_female.vrm に差し替えます。",
+    "topic と folder_name を書いてから実行してください。",
+    "優先度: CLI引数 > このファイル。OS環境変数は使用しません。"
+  ],
+
+  "topic": [
+    "実話の小話『神戸ルミナリエ・ほっこり事件簿 〜3歳の娘がその場の空気を救った話〜』を、女性アバターひとりが語り手として面白おかしく読み聞かせるエンタメ動画を作る。",
+    "元になる小話（参考シナリオ）の流れ: （1）冬の神戸、家族で神戸ルミナリエに出かけた。（2）主役は3歳になったばかりの長女。1歳でしゃべり始めた、ちょっと大人びた賢い女の子。（3）元町駅前は交通規制で車が来ないのに、みんな律儀に赤信号で待っていた（この『誰も渡らない赤信号』が伏線）。（4）道の向こうから、見るからに危なそうなお兄ちゃん達が数人、堂々と歩いてきた。（5）ガヤガヤしていた群衆が一瞬で静まりかえり、張り詰めた沈黙が走った。（6）オチ: その沈黙を破ったのは長女のひとこと『あかんなぁ、お兄ちゃんら、信号赤なのに。なぁお父さん』。無邪気な正論で、緊張した空気がふわっとほどけて笑いが戻った。",
+    "語り口は明るくテンポよく、お父さん視点のエピソードを女性ナレーターが温かく語る形にする。緊張→静寂→無邪気なオチの落差でクスッと笑える構成にすること。個人名は出さず役割語（長女・お父さんなど）のみで描く。",
+    "オチの一言『あかんなぁ、お兄ちゃんら、信号赤なのに。なぁお父さん』は必ずそのまま使い、最大の見せ場として強調すること。",
+    "ストーリーの流れに沿ってシーンを割り当てる: scene_000（イントロ: ほっこり事件簿のつかみ）、scene_001（主役の3歳の長女紹介）、scene_002（誰も渡らない赤信号の伏線）、scene_003（危なそうなお兄ちゃん達が登場）、scene_004（群衆が静まりかえる緊張）、scene_005（長女の無邪気な正論＝クライマックス）、scene_999（まとめ・オチの余韻）の計 7 シーン。scene_006 以降は作成しない。",
+    "scene_000 や本編（scene_001〜scene_005）では AiDiy に一切触れず、物語の語りに徹すること。",
+    "AiDiy への言及は scene_999 の最後にひとことだけ軽く添える程度に留めること（長々と宣伝しない）。",
+    "scene_999 のまとめは、まず小話のオチの余韻で楽しく前向きにまとめ、チャンネル登録のお願いを添え、最後にひとことだけ『この動画は AiDiy のビデオページ生成で作りました』程度に軽く触れて締めること。",
+    "表情は基本 neutral（普通の顔）にし、にやけ顔になる happy は使わない。驚き・衝撃の場面のみ surprised を使う。",
+    "アバターは女性モデル ../_vrm/VRM_female.vrm を使用し、ナレーション音声は edge / female にすること。",
+    "（参考: 生成パイプライン）topic から scenario.js 生成 → 画像生成 → 音声合成 → duration 計測まで全自動。Step 02: scenario.js 生成、Step 03: index.html 更新（VRM 差し替え含む）、Step 04: 画像生成、Step 06: TTS 音声合成、Step 07: duration 計測。"
+  ],
+
+  "template_dir": "D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ/AiDiy紹介__all_ja",
+  "folder_name": "小話_ルミナリエ_ja",
+  "language": "ja",
+
+  "shared": {
+    "_comment": "両スクリプト共通設定。通常は変更不要。",
+    "video_base_dir": "D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ",
+    "frontend_base_url": "http://localhost:8090",
+    "backup_api_url": "http://localhost:8095/aidiy_backup/save",
+    "tts_api_url": "http://localhost:8095/aidiy_text_to_speech/synthesize",
+    "image_gen_api_url": "http://localhost:8095/aidiy_image_generation/generate",
+    "code_agents_api_url": "http://localhost:8095/aidiy_code_agents",
+    "chrome_api_url": "http://localhost:8095/aidiy_chrome_devtools",
+    "ffmpeg_api_url": "http://localhost:8095/aidiy_ffmpeg_control",
+    "tts_guide": true,
+    "browser_preview": true,
+    "chrome_debug_port": 9222,
+    "max_retries": 3,
+    "retry_wait_sec": 5,
+    "max_backup_stabilize": 5
+  }
+}
