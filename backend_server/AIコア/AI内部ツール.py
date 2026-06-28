@@ -297,6 +297,7 @@ class MCPツールブリッジ:
         self.base_url = base_url.rstrip("/")
         self.exclude = set(exclude) if exclude is not None else set(self.既定除外)
         self._tools_cache = None  # (tools, name_map)
+        self._http_methods_cache: Dict[str, set[str]] = {}
 
     # ---- 収集 ----
 
@@ -369,9 +370,9 @@ class MCPツールブリッジ:
         if mapping is None:
             return {"error": f"unknown tool: {safe_name}"}
         mcp, method = mapping
-        url = f"{self.base_url}/{mcp}/{method}"
 
-        def _post() -> Any:
+        def _post(method_name: str) -> Any:
+            url = f"{self.base_url}/{mcp}/{method_name}"
             body = json.dumps(arguments or {}, ensure_ascii=False).encode("utf-8")
             req = urllib.request.Request(
                 url, data=body, method="POST",
@@ -392,7 +393,61 @@ class MCPツールブリッジ:
             except Exception as e:
                 return {"error": f"{type(e).__name__}: {e}"}
 
-        return await asyncio.to_thread(_post)
+        last_result: Any = None
+        for method_name in self._method_candidates(mcp, method):
+            last_result = await asyncio.to_thread(_post, method_name)
+            if not self._is_unknown_method_error(last_result):
+                return last_result
+        return last_result
+
+    def _method_candidates(self, mcp: str, method: str) -> List[str]:
+        """MCP ツール名と HTTP POST メソッド名の揺れを吸収する候補を返す。
+
+        FastMCP の `/list` は `sqlite_list_tables` のような MCP ツール名を返す一方、
+        HTTP 直呼びエンドポイントは `list_tables` を受ける MCP がある。
+        `/docs` の methods と suffix 一致する名前を優先フォールバックにする。
+        """
+        candidates: List[str] = []
+
+        def add(name: str) -> None:
+            if name and name not in candidates:
+                candidates.append(name)
+
+        add(method)
+
+        docs_methods = self._http_method_names(mcp)
+        for http_method in docs_methods:
+            if method == http_method or method.endswith(f"_{http_method}"):
+                add(http_method)
+
+        prefix = mcp[len("aidiy_"):] if mcp.startswith("aidiy_") else mcp
+        if method.startswith(f"{prefix}_"):
+            add(method[len(prefix) + 1:])
+        if "_" in method:
+            add(method.split("_", 1)[1])
+
+        return candidates
+
+    def _http_method_names(self, mcp: str) -> set[str]:
+        if mcp in self._http_methods_cache:
+            return self._http_methods_cache[mcp]
+        methods: set[str] = set()
+        try:
+            with urllib.request.urlopen(f"{self.base_url}/{mcp}/docs", timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("methods"), dict):
+                methods = set(data["methods"].keys())
+        except Exception:
+            methods = set()
+        self._http_methods_cache[mcp] = methods
+        return methods
+
+    @staticmethod
+    def _is_unknown_method_error(result: Any) -> bool:
+        if not isinstance(result, dict):
+            return False
+        error = result.get("error")
+        return isinstance(error, str) and "未知のメソッド" in error
 
 
 # ============================================================
@@ -471,4 +526,3 @@ async def 自己ループ実行(ai_instance, messages: List[Dict[str, Any]], ブ
         "turns": turn + 1,
         "stopped": not completed,
     }
-

@@ -64,7 +64,7 @@ class PgQuery:
         if not _PSYCOPG_AVAILABLE:
             raise PgQueryError(
                 "psycopg が未インストールです。"
-                "backend_tools で `uv sync` を再実行してください。"
+                "backend_tools で `uv sync --upgrade` を再実行してください。"
                 f"（import エラー: {_PSYCOPG_IMPORT_ERROR}）"
             )
         self._default_dsn = dsn or self._env_dsn()

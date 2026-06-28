@@ -49,7 +49,7 @@
 
 | ソフトウェア | 目安 |
 |---|---|
-| Python | 3.13 系 |
+| Python | 3.13 以上 |
 | Node.js | 22 系 |
 | Git | 最新版推奨 |
 | uv | Python パッケージ管理に使用 |
@@ -74,10 +74,10 @@ python _setup.py
 `_setup.py` は対話形式で以下を実施します。
 
 1. 共通の Python / npm ツール確認
-2. `backend_hermes` の `.venv` 作成 / `uv pip install -r requirements.txt` / `aidiy_hermes` 登録試行
-3. `backend_tools` の `uv sync` / `npm install`
+2. `backend_hermes` の `.venv` 作成 / `uv sync --upgrade` / `aidiy_hermes` 登録試行
+3. `backend_tools` の `uv sync --upgrade` / `npm install`
 4. 必要に応じて `backend_tools` 用の MCP 設定ファイル書き込み（Claude / Gemini 向け）
-5. `backend_server` の `uv sync`
+5. `backend_server` の `uv sync --upgrade`
 6. `frontend_web` の `npm install`
 7. `frontend_avatar` の `npm install`
 8. 必要に応じて Electron バイナリの補完

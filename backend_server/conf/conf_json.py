@@ -89,7 +89,7 @@ class conf_json:
         'CODE_ANTIGRAVITY_CLI_MODEL': 'auto',
         'CODE_CODEX_CLI_MODEL': 'auto',
         'CODE_CODEX_OLLAMA_MODEL': 'auto',
-        'CODE_AIDIY_HERMES_MODEL': 'auto',
+        'CODE_AIDIY_HERMES_MODEL': 'freeai',
         'CODE_OPENCODE_CLI_MODEL': 'auto',
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',

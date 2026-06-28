@@ -217,9 +217,9 @@ def setup(choices: dict | None = None) -> bool:
             print_error(f"{label}: 仮想環境の作成に失敗しました。")
             return False
 
-    # uv sync で依存関係をインストール（uv.lock 更新済みなら高速スキップ）
-    if not run_command(["uv", "sync"], cwd=BACKEND_HERMES_DIR):
-        print_error(f"{label}: uv sync に失敗しました。")
+    # uv sync --upgrade で依存関係を最新解決する
+    if not run_command(["uv", "sync", "--upgrade"], cwd=BACKEND_HERMES_DIR):
+        print_error(f"{label}: uv sync --upgrade に失敗しました。")
         return False
 
     hermes_dir = BACKEND_HERMES_DIR.resolve()

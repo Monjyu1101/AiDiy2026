@@ -28,6 +28,7 @@ import openai
 # backend_local（ローカル LLM サーバー）の既定接続先
 _DEFAULT_LOCAL_HOST = "http://localhost"
 _DEFAULT_LOCAL_PORT = "8096"
+_LOCAL_SELF_LOOP_KEYS = ("CHAT_LOCAL_SELF_LOOP", "LOCAL_CHAT_SELF_LOOP")
 
 
 def _build_base_url(host: str, port: str) -> str:
@@ -37,6 +38,19 @@ def _build_base_url(host: str, port: str) -> str:
         h = "http://" + h
     p = str(port or _DEFAULT_LOCAL_PORT).strip()
     return f"{h}:{p}/v1"
+
+
+def _bool設定値(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ("1", "true", "yes", "on", "有効", "はい"):
+        return True
+    if text in ("0", "false", "no", "off", "無効", "いいえ"):
+        return False
+    return default
 
 
 class ChatAI:
@@ -64,6 +78,7 @@ class ChatAI:
         # backend_local 接続先（host / port）を conf から取得
         self.local_host = _DEFAULT_LOCAL_HOST
         self.local_port = _DEFAULT_LOCAL_PORT
+        self.self_loop_enabled = False
         try:
             if 親 and hasattr(親, "conf") and 親.conf and hasattr(親.conf, "json"):
                 host = 親.conf.json.get("LOCAL_HOST", "")
@@ -72,6 +87,10 @@ class ChatAI:
                 port = 親.conf.json.get("LOCAL_BASE", "")
                 if port and not str(port).startswith("<"):
                     self.local_port = str(port).strip()
+                for key in _LOCAL_SELF_LOOP_KEYS:
+                    if key in 親.conf.json:
+                        self.self_loop_enabled = _bool設定値(親.conf.json.get(key), default=False)
+                        break
         except Exception:
             pass
 
@@ -158,10 +177,8 @@ class ChatAI:
 
             # 自己ループ（aidiy_chat_llms）: 自前 MCP 群をツールとして使い、
             # tool_calls をサーバー側で実行しながら応答が確定するまで回す。
-            # ただしローカル LLM（E2B 等・CPU 推論）では全 MCP ツールの prefill が重く
-            # 応答が返らない／遅すぎるため、現状は無効化している。
-            # 復活させたいときは下の `False and ` を削除して `if 自己ループ:` に戻すだけ。
-            if False and 自己ループ:  # 遅すぎるため無効化（self-loop ロジックは温存）
+            # completions（自己ループ=False）はここを通らずシングルアクションのまま。
+            if 自己ループ and self.self_loop_enabled:
                 try:
                     from AIコア.AI内部ツール import MCPツールブリッジ, 自己ループ実行
                 except ImportError:
@@ -182,6 +199,8 @@ class ChatAI:
                     self.last_tool_stopped = 結果["stopped"]
                     return 結果["content"] or "!"
                 # tools 無し（8095 未起動等）→ 通常処理にフォールバック
+            elif 自己ループ:
+                logger.info("ChatAI(Local): 自己ループ要求を通常生成へフォールバックしました")
 
             # ファイル添付処理（画像のみ対応、vision対応モデルの場合）
             image_data = None

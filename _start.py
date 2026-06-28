@@ -425,7 +425,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(local): OK ({detail})")
         else:
             print_error(f"バックエンド(local): 未準備 ({detail})")
-            print_info("  対応例: cd backend_local && uv sync")
+            print_info("  対応例: cd backend_local && uv sync --upgrade")
             has_error = True
 
     if backend_tools_enabled:
@@ -434,7 +434,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(tools): OK ({detail})")
         else:
             print_error(f"バックエンド(tools): 未準備 ({detail})")
-            print_info("  対応例: cd backend_tools && uv sync")
+            print_info("  対応例: cd backend_tools && uv sync --upgrade")
             has_error = True
 
     if backend_enabled:
@@ -443,7 +443,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(core,apps): OK ({detail})")
         else:
             print_error(f"バックエンド(core,apps): 未準備 ({detail})")
-            print_info("  対応例: cd backend_server && uv sync")
+            print_info("  対応例: cd backend_server && uv sync --upgrade")
             has_error = True
 
     if web_enabled or avatar_enabled:

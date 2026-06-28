@@ -1,6 +1,6 @@
 # Multi-stage build for AiDiy2026
 # Stage 1: Backend dependencies
-FROM python:3.13-slim AS backend-builder
+FROM python:3-slim AS backend-builder
 
 WORKDIR /app
 
@@ -35,7 +35,7 @@ COPY frontend_web/ ./
 RUN npm run build
 
 # Stage 3: Final runtime image
-FROM python:3.13-slim
+FROM python:3-slim
 
 WORKDIR /app
 
@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder
-COPY --from=backend-builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=backend-builder /usr/local/lib /usr/local/lib
 COPY --from=backend-builder /usr/local/bin /usr/local/bin
 
 # Copy backend application

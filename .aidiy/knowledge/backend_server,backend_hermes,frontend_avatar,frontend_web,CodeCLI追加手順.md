@@ -50,8 +50,8 @@
 - `_setup.py` / `_cleanup.py` に統合しても、常駐起動が不要な CLI は `_start.py` に追加しない
 - `aidiy_hermes --version` は cold start や `code1`〜`code6` 同時接続で遅くなることがある。未インストール誤判定を避けるため、長めの timeout と結果キャッシュを検討する
 - `backend_hermes` を新実装へ差し替えた後も公開コマンド名は `aidiy_hermes` のままにする。旧実装を残す場合は `backend_hermes_old` のように別名へ退避し、AiDiy 本体からは参照しない
-- `backend_hermes/setup.py` は `aidiy_hermes` と `text-hermes` の console script を持ち、`requirements.txt` を `install_requires` に反映する
-- `_setup.py` では `uv tool install --force --refresh --editable .` を使い、既存登録済みでも必ず再登録する
+- `backend_hermes/pyproject.toml` の dependencies で CLI 依存を管理する
+- `_setup.py` では `uv sync --upgrade` 後に `~/.local/bin/aidiy_hermes.cmd` を生成し、既存登録済みでもランチャを再生成する
 
 ## 注意点
 
@@ -64,7 +64,7 @@
 - `aidiy_hermes` のワンショットでは、stdout は正式回答専用、stderr は thinking / step / tool 進捗 / 警告 / `session_id` 用に分ける
 - `CODE_AIDIY_HERMES_MODEL` が `auto` 以外のときは、`--provider ollama --model <model>` を渡す。AiDiy の設定画面で扱う `aidiy_hermes` モデル候補は Ollama 系を前提にする
 - TUI の `/model` では `AiDiy_key.json` を使い、`ollama` / `openai` / `openrt` / `gemini` / `freeai` / `anthropic` を選べるようにする。Code AI 経由のモデル指定とは役割を分ける
-- OpenAI / Claude / Google 系 provider を有効にする場合、`backend_hermes/requirements.txt` に `openai` / `anthropic` / `google-genai` を明示する
+- OpenAI / Claude / Google 系 provider を有効にする場合、`backend_hermes/pyproject.toml` に `openai` / `anthropic` / `google-genai` を明示する
 
 ## 確認方法
 
@@ -82,7 +82,8 @@
 backend_server\.venv\Scripts\python.exe -m py_compile backend_server\core_router\AIコア\AIコード_cli.py
 backend_server\.venv\Scripts\python.exe -m py_compile backend_server\conf\conf_model.py
 cd backend_hermes
-uv tool install --force --refresh --editable .
+uv sync --upgrade
+python ..\_setup.py
 aidiy_hermes --version
 aidiy_hermes -z -Q "おはよう"
 cd frontend_avatar

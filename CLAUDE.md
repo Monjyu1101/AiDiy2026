@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 日本語識別子を前提としたフルスタック業務システム開発テンプレート。
 
-- **Backend**: FastAPI + SQLAlchemy + SQLite（Python 3.13、uv 管理、2 サーバー構成）
+- **Backend**: FastAPI + SQLAlchemy + SQLite（Python 3.13 以上、uv 管理、2 サーバー構成）
 - **Backend Hermes**: `aidiy_hermes` コード支援 CLI（**常駐なし**、`_start.py` の起動対象外）
 - **Backend MCP**: 15 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Code Agents, Chat LLM）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供。
 - **Backend Local**: `backend_local` ローカル LLM サーバー（ポート 8096）。HuggingFace の **Gemma** を `transformers` + `torch` でローカル推論し、**OpenAI 互換**の Chat Completions API（`POST http://localhost:8096/v1/chat/completions`、`stream` / `tools` 対応）として提供。モデルは `temp/models/<safe_name>` に配置し遅延ロード。設定は `backend_server/_config/AiDiy_key.json`（環境変数は使わない）。
@@ -75,10 +75,10 @@ cd frontend_avatar && npm run build      # renderer + electron build
 
 ```bash
 # Backend
-cd backend_server && uv sync
-cd backend_tools && uv sync
-cd backend_hermes && uv sync
-cd backend_local && uv sync
+cd backend_server && uv sync --upgrade
+cd backend_tools && uv sync --upgrade
+cd backend_hermes && uv sync --upgrade
+cd backend_local && uv sync --upgrade
 
 # Frontend
 cd frontend_web && npm install

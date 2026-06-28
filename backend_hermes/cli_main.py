@@ -2263,6 +2263,7 @@ class HermesCLI:
         api_key: str = None,
         base_url: str = None,
         max_turns: int = None,
+        max_tokens: int = None,
         verbose: bool = False,
         compact: bool = False,
         resume: str = None,
@@ -2414,6 +2415,7 @@ class HermesCLI:
             self.max_turns = int(os.getenv("HERMES_MAX_ITERATIONS"))
         else:
             self.max_turns = 90
+        self.max_tokens = max_tokens
         
         # Parse and validate toolsets
         self.enabled_toolsets = toolsets
@@ -3850,6 +3852,7 @@ class HermesCLI:
                 acp_args=runtime.get("args"),
                 credential_pool=runtime.get("credential_pool"),
                 max_iterations=self.max_turns,
+                max_tokens=self.max_tokens,
                 enabled_toolsets=self.enabled_toolsets,
                 disabled_toolsets=self.disabled_toolsets,
                 verbose_logging=self.verbose,
@@ -11946,6 +11949,7 @@ def main(
     api_key: str = None,
     base_url: str = None,
     max_turns: int = None,
+    max_tokens: int = None,
     verbose: bool = False,
     quiet: bool = False,
     compact: bool = False,
@@ -11974,6 +11978,7 @@ def main(
         api_key: API key for authentication
         base_url: Base URL for the API
         max_turns: Maximum tool-calling iterations (default: 60)
+        max_tokens: Maximum output tokens for each model response
         verbose: Enable verbose logging
         compact: Use compact display mode
         list_tools: List available tools and exit
@@ -12033,6 +12038,16 @@ def main(
     
     # Handle query shorthand
     query = query or q
+
+    # MCP toolsets are registered dynamically from AiDiy_mcp.json.  Single-query
+    # and list modes also need discovery before toolset parsing/validation;
+    # otherwise `-t aidiy_notification_sounds` is treated as unknown and the
+    # model receives either no MCP tools or the unfiltered default set.
+    try:
+        from tools.mcp_tool import discover_mcp_tools
+        discover_mcp_tools()
+    except Exception:
+        logger.debug("MCP tool discovery failed before CLI startup", exc_info=True)
     
     # Parse toolsets - handle both string and tuple/list inputs
     # Default to hermes-cli toolset which includes cronjob management tools
@@ -12063,6 +12078,7 @@ def main(
         api_key=api_key,
         base_url=base_url,
         max_turns=max_turns,
+        max_tokens=max_tokens,
         verbose=verbose,
         compact=compact,
         resume=resume,
@@ -12224,12 +12240,6 @@ def main(
             cli._print_exit_summary()
         return
     
-    # Run interactive mode
-    try:
-        from tools.mcp_tool import discover_mcp_tools
-        discover_mcp_tools()
-    except Exception:
-        logger.debug("MCP tool discovery failed at CLI startup", exc_info=True)
     cli.run()
 
 
@@ -12251,6 +12261,7 @@ def _build_arg_parser():
     parser.add_argument("-t", "--toolsets", default=None)
     parser.add_argument("-s", "--skills", action="append", default=None)
     parser.add_argument("--max-turns", type=int, default=None)
+    parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--resume", "-r", default=None)
     parser.add_argument("--worktree", "-w", action="store_true", default=False)
     parser.add_argument("--checkpoints", action="store_true", default=False)
@@ -12279,6 +12290,58 @@ def _flatten_skills(skills: list[str] | None) -> str | None:
     return ",".join(skills)
 
 
+def _local_chat_model_from_value(value: str) -> str | None:
+    model = (value or "").strip()
+    lower_model = model.lower()
+    for prefix in ("local_chat/", "local_chat:"):
+        if lower_model.startswith(prefix):
+            return model[len(prefix):].strip() or ""
+    if lower_model == "local_chat":
+        return ""
+    return None
+
+
+def _freeai_model_from_value(value: str) -> str | None:
+    model = (value or "").strip()
+    lower_model = model.lower()
+    for prefix in ("freeai/", "freeai:"):
+        if lower_model.startswith(prefix):
+            return model[len(prefix):].strip() or ""
+    if lower_model == "freeai":
+        return ""
+    return None
+
+
+def _load_local_chat_defaults(cfg: dict[str, Any], model_override: str | None = None) -> dict[str, str]:
+    # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
+    port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
+    model = str(model_override or cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it").strip()
+    return {
+        "provider": "custom",
+        "base_url": f"http://localhost:{port}/v1",
+        "api_key": "no-key-required",
+        "model": model,
+    }
+
+
+def _load_freeai_defaults(cfg: dict[str, Any], model_override: str | None = None) -> dict[str, str]:
+    model = str(
+        model_override
+        or cfg.get("CHAT_FREEAI_MODEL")
+        or cfg.get("CHAT_GEMINI_MODEL")
+        or "gemini-3.1-flash-image-preview"
+    ).strip()
+    api_key = str(cfg.get("freeai_key_id") or "").strip()
+    defaults = {
+        "provider": "custom",
+        "base_url": _GEMINI_OPENAI_BASE_URL,
+        "model": model,
+    }
+    if api_key:
+        defaults["api_key"] = api_key
+    return defaults
+
+
 def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str, str]:
     config_path = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
     try:
@@ -12296,6 +12359,12 @@ def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str,
     ).strip()
     if not model or model.lower() == "auto":
         model = str(cfg.get("CHAT_OLLAMA_MODEL") or "deepseek-v4-flash:cloud").strip()
+    local_chat_model = _local_chat_model_from_value(model)
+    if local_chat_model is not None:
+        return _load_local_chat_defaults(cfg, local_chat_model or None)
+    freeai_model = _freeai_model_from_value(model)
+    if freeai_model is not None:
+        return _load_freeai_defaults(cfg, freeai_model or None)
     if _uses_ollama_cloud_model(model):
         return {
             "provider": "custom",
@@ -12336,15 +12405,10 @@ def _load_aidiy_hermes_provider_defaults(provider: str | None) -> dict[str, str]
         return defaults
 
     if provider_slug == "local_chat":
-        # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
-        port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
-        model = str(cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it").strip()
-        return {
-            "provider": "custom",
-            "base_url": f"http://localhost:{port}/v1",
-            "api_key": "no-key-required",
-            "model": model,
-        }
+        return _load_local_chat_defaults(cfg)
+
+    if provider_slug == "freeai":
+        return _load_freeai_defaults(cfg)
 
     return {}
 
@@ -12402,7 +12466,7 @@ def cli_entry(argv: list[str] | None = None) -> int:
     provider = defaults.get("provider") or args.provider
     base_url = args.base_url or defaults.get("base_url")
     api_key = args.api_key or defaults.get("api_key")
-    model = args.model or defaults.get("model")
+    model = args.model if args.provider and args.model else (defaults.get("model") or args.model)
 
     try:
         main(
@@ -12415,6 +12479,7 @@ def cli_entry(argv: list[str] | None = None) -> int:
             api_key=api_key,
             base_url=base_url,
             max_turns=args.max_turns,
+            max_tokens=args.max_tokens,
             verbose=args.verbose,
             quiet=quiet,
             compact=args.compact,

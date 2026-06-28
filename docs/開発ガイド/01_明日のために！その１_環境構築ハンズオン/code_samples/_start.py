@@ -529,7 +529,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(core,apps): OK ({detail})")
         else:
             print_error(f"バックエンド(core,apps): 未準備 ({detail})")
-            print_info(f"  対応例: cd {BACKEND_PATH} && uv sync")
+            print_info(f"  対応例: cd {BACKEND_PATH} && uv sync --upgrade")
             has_error = True
 
     if web_enabled or avatar_enabled:

@@ -2,7 +2,7 @@
 
 """バックエンド(local) セットアップスクリプト
 
-ローカル LLM (OpenAI 互換 Gemma サーバー) の依存関係 (uv sync) を導入します。
+ローカル LLM (OpenAI 互換 Gemma サーバー) の依存関係 (uv sync --upgrade) を導入します。
 モデルの事前ダウンロードは時間がかかるため、`run_model_download(choices)` として
 分離しており、ルートからは全体処理の最後に呼び出されます。
 
@@ -417,9 +417,9 @@ def setup(choices: dict | None = None) -> bool:
     if venv_dir.exists():
         print_success(f"{label}: 既存の仮想環境を検出しました: {venv_dir}")
 
-    print_info(f"{label}: uv sync を実行します（torch を含むため初回は時間がかかります）...")
-    if not run_command(["uv", "sync"], cwd=BACKEND_LOCAL_DIR):
-        print_error(f"{label}: uv sync に失敗しました。")
+    print_info(f"{label}: uv sync --upgrade を実行します（torch を含むため初回は時間がかかります）...")
+    if not run_command(["uv", "sync", "--upgrade"], cwd=BACKEND_LOCAL_DIR):
+        print_error(f"{label}: uv sync --upgrade に失敗しました。")
         return False
 
     print_success(f"{label}: 依存関係のセットアップが完了しました。")

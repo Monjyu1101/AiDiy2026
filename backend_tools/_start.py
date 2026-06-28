@@ -281,7 +281,7 @@ def main() -> None:
     ok, detail = check_environment()
     if not ok:
         print_error(f"環境が準備されていません: {detail}")
-        print_info("  対応例: uv sync")
+        print_info("  対応例: uv sync --upgrade")
         sys.exit(1)
     print_success(f"環境確認: OK ({detail})")
 

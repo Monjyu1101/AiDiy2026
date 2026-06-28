@@ -50,7 +50,7 @@ Set-Location backend_tools
 
 ```powershell
 Set-Location backend_tools
-uv sync
+uv sync --upgrade
 ```
 
 Node.js / `package.json` / `node_modules` は不要。

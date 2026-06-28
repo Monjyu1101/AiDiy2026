@@ -187,10 +187,10 @@ def setup(choices: dict | None = None) -> bool:
     if BACKEND_VENV_DIR.exists():
         print_success(f"{label}: 既存の仮想環境を検出しました: {BACKEND_VENV_DIR}")
 
-    if run_command(["uv", "sync"], cwd=BACKEND_DIR):
+    if run_command(["uv", "sync", "--upgrade"], cwd=BACKEND_DIR):
         print_success(f"{label}: セットアップが完了しました。")
     else:
-        print_error(f"{label}: セットアップに失敗しました。")
+        print_error(f"{label}: uv sync --upgrade に失敗しました。")
         return False
 
     if DATABASE_TYPE.lower() == "postgresql":

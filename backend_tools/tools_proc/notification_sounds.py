@@ -205,21 +205,35 @@ class NotificationSounds:
 
     @staticmethod
     def _playsound(path: str) -> None:
-        """pygame.mixer によるクロスプラットフォーム再生（mp3/wav 対応・再生完了まで待機）"""
-        # pygame の import 時歓迎メッセージを抑制（MCP 標準出力を汚さないため）
         import os
-        os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-        import pygame
+        import platform
+        import subprocess
 
-        # mixer は未初期化なら初期化（多重 init は無害だが念のためガード）
-        if not pygame.mixer.get_init():
-            pygame.mixer.init()
+        pf = platform.system()
+        if pf == "Windows":
+            import ctypes
 
-        pygame.mixer.music.load(path)
-        pygame.mixer.music.play()
-        # 再生が終わるまで待機（同期再生）
-        while pygame.mixer.music.get_busy():
-            pygame.time.wait(50)
+            alias = "_notification_sounds"
+            ext = os.path.splitext(path)[1].lower()
+            mci_type = "waveaudio" if ext == ".wav" else "mpegvideo"
+            ctypes.windll.winmm.mciSendStringW(f"close {alias}", None, 0, None)
+            ctypes.windll.winmm.mciSendStringW(
+                f'open "{path}" type {mci_type} alias {alias}', None, 0, None
+            )
+            try:
+                ctypes.windll.winmm.mciSendStringW(f"play {alias} wait", None, 0, None)
+            finally:
+                ctypes.windll.winmm.mciSendStringW(f"close {alias}", None, 0, None)
+        elif pf == "Darwin":
+            subprocess.run(["afplay", path], timeout=30, check=False)
+        else:
+            subprocess.run(
+                ["gst-launch-1.0", "playbin", f"uri=file://{path}"],
+                timeout=30,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
     def list_sounds(self, scene: str = "auto") -> dict:
         """指定 scene のサウンドマッピング一覧を返す"""

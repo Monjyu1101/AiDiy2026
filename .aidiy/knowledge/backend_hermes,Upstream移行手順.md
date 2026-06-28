@@ -13,7 +13,7 @@
 - upstream: https://github.com/nousresearch/hermes-agent
 - 現行ベース: v0.12.0 (`__version__ = "0.12.0"`, `__release_date__ = "2026.4.30"`)
 - AiDiy 側は `backend_hermes/` としてフォーク管理
-- upstream は `pyproject.toml` ベース、AiDiy は `requirements.txt` ベース
+- upstream / AiDiy ともに `pyproject.toml` ベース
 
 ---
 
@@ -46,12 +46,12 @@ upstream v0.12.0 と AiDiy の全ファイルを6分類しています。
 | ファイル | 状態 | 移行時の扱い |
 |----------|------|-------------|
 | `cli_main.py` | **M** | upstream `cli.py` をベースに AiDiy パッチを再適用 |
-| `requirements.txt` | **A** | 新バージョンの依存を調査して更新 |
+| `pyproject.toml` | **M** | 新バージョンの依存を調査し、必要な AiDiy 依存だけ残す |
 | `AGENTS.md` | **A** | そのまま維持 |
 | `NOTICE.md` | **A** | そのまま維持（バージョン表記を更新） |
 | `AIDIY-HERMESロゴ.txt` | **A** | そのまま維持 |
 | `tui画面出す.bat` | **A** | そのまま維持 |
-| `setup.py` | **A** | そのまま維持 |
+| `_setup.py` | **A** | そのまま維持（`uv sync --upgrade` + ランチャ生成） |
 
 ### 2.2 `core/`（upstream `agent/`）
 

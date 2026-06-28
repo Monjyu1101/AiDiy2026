@@ -35,7 +35,7 @@
 python _setup.py
 ```
 
-`_setup.py` の Hermes セットアップは、`backend_hermes/requirements.txt` を同期したうえで `~/.local/bin/aidiy_hermes.cmd` を生成する。
+`_setup.py` の Hermes セットアップは、`backend_hermes/pyproject.toml` を `uv sync --upgrade` で同期したうえで `~/.local/bin/aidiy_hermes.cmd` を生成する。
 `uv tool install` は使わない（セキュリティ警告の原因になるため）。
 
 生成される `.cmd` の内容（ASCII エンコード）:
@@ -55,15 +55,13 @@ set "CLI=<repo>\backend_hermes\cli_main.py"
 
 ```powershell
 Set-Location backend_hermes
-uv venv .venv
-uv pip install -r requirements.txt
+uv sync --upgrade
 # .cmd の手動生成は _setup.py に任せる
 python ..\_setup.py
 aidiy_hermes --version
 ```
 
-`backend_hermes/setup.py` は `requirements.txt` を `install_requires` として読む。
-provider SDK を追加したときは `requirements.txt` と `setup.py` を確認してから `_setup.py` を再実行する。
+provider SDK を追加したときは `backend_hermes/pyproject.toml` の dependencies を確認してから `_setup.py` を再実行する。
 
 ## クリーンアップ
 
@@ -75,7 +73,7 @@ python _cleanup.py
 
 主な provider 依存:
 
-| 用途 | requirements |
+| 用途 | dependency |
 |------|--------------|
 | OpenAI / OpenAI互換 | `openai` |
 | Claude | `anthropic` |

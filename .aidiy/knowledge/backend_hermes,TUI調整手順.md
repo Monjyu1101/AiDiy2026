@@ -32,7 +32,7 @@
 | CLI エントリ | `cli.py` (12,275行) | `cli_main.py` (12,714行) — `argparse` + `cli_entry()` 追加 |
 | パッケージ名 | `agent/` ディレクトリ | `core/` にリネーム。`sys.modules["agent"] = core` 互換alias |
 | ルートスクリプト群 | 14ファイルがルート直置き | `base/` ディレクトリに移動（内容は同一） |
-| 依存管理 | `pyproject.toml` (extras多数) | `requirements.txt` (必要最小限15パッケージ) |
+| 依存管理 | `pyproject.toml` (extras多数) | `pyproject.toml` (必要最小限の dependencies) |
 | `run_agent.py` | ルート | `base/run_agent.py` (内容はupstreamと同一) |
 
 ### 削除されたディレクトリ/ファイル
@@ -47,7 +47,7 @@
 | `acp_adapter/`, `acp_registry/` | ACP プロトコル (108KB) | 不要なプロトコルアダプタ |
 | `gateway/` | 50+ファイル (全platform) | `__init__.py` + `session_context.py` のみの互換スタブに縮退 |
 | `docs/`, `tests/`, `scripts/`, `packaging/`, `nix/`, `docker/` | 全ファイル | プロジェクトルートで一元管理 |
-| `pyproject.toml`, `uv.lock` | ビルド設定 | `requirements.txt` で代替 |
+| `pyproject.toml`, `uv.lock` | ビルド設定 | `pyproject.toml` を AiDiy 用に維持。`uv.lock` は固定せず再生成対象 |
 | `cli-config.yaml.example` | 55KBの設定例 | AiDiy_key.json方式のため不要 |
 | `setup-hermes.sh`, `hermes` | シェルランチャ | Windows `.cmd` ラッパーで代替 |
 | `cli.py` → `cli_main.py` | リネーム + 大幅改変 | AiDiy provider/oneshot 統合 |
@@ -109,7 +109,7 @@
 |---------|------|
 | `NOTICE.md` | MITライセンス帰属表示 |
 | `AGENTS.md` | AiDiy backend_hermes 実装概要・HowTo参照マップ |
-| `requirements.txt` | 依存パッケージ一覧 (pyproject.tomlの代替) |
+| `pyproject.toml` | 依存パッケージ一覧 |
 | `AIDIY-HERMESロゴ.txt` | ASCII art ブランドロゴ |
 | `tui画面出す.bat` | Windows TUI 起動バッチ |
 
@@ -217,10 +217,10 @@
 - 共通モジュールは `backend_hermes/base/` に一本化する
 - 旧版由来の `from hermes_constants import ...` や `from utils import ...` は `from base.hermes_constants import ...` / `from base.utils import ...` へ置換する
 - `model_tools` を参照する箇所は `from base import model_tools` にする
-- `requirements.txt` と `pyproject.toml` の dependencies を揃える
+- 依存追加は `backend_hermes/pyproject.toml` の dependencies へ追加する
 - `.venv` がない環境では、全 Python 構文確認と `tomllib` による `pyproject.toml` 検証を先に行う
-- console script 登録が必要な場合は `backend_hermes/setup.py` に `aidiy_hermes=cli_main:cli_entry` と `text-hermes=cli_main:text_main` を定義する
-- `setup.py` は `requirements.txt` を `install_requires` として読む。依存追加後は `uv tool install --force --refresh --editable .` で再登録する
+- console script ランチャは `_setup.py` が `~/.local/bin/aidiy_hermes.cmd` として生成する
+- 依存追加後は `uv sync --upgrade` と `python ..\_setup.py` で同期・ランチャ再生成を行う
 - provider SDK は `openai`、`anthropic`、`google-genai` を明示する
 
 ## Windows / 非TTY の注意点
