@@ -42,6 +42,10 @@ HERMES_AGENT_INSTALL_COMMAND = (
     "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
 )
 OLLAMA_INSTALL_COMMAND = "curl -fsSL https://ollama.com/install.sh | sh"
+GIT_INSTALL_COMMAND_WINDOWS = ["winget", "install", "--id", "Git.Git", "-e", "--source", "winget"]
+NODE_INSTALL_COMMAND_WINDOWS = ["winget", "install", "--id", "OpenJS.NodeJS.LTS", "-e", "--source", "winget"]
+GIT_DOWNLOAD_URL = "https://git-scm.com/downloads"
+NODE_DOWNLOAD_URL = "https://nodejs.org/"
 ANTIGRAVITY_INSTALL_COMMAND_WINDOWS = (
     "curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd"
 )
@@ -220,9 +224,121 @@ def npm_command():
     return f"{FRONTEND_COMMAND}.cmd" if sys.platform == "win32" else FRONTEND_COMMAND
 
 
-def check_npm_installed():
+def _command_version(executable, version_arg="--version"):
+    """コマンドを実際に実行し、バージョン文字列を返す。動かなければ None。
+
+    `shutil.which` による PATH 存在チェックだけでは、Node を一度アンインストール
+    した後も `%APPDATA%\\npm` に残る `npm.cmd` / `npx.cmd` 等のシムを拾ってしまい、
+    node 本体が無いのに「導入済み」と誤判定する。実行して終了コードまで確認し、
+    あわせてバージョン表示用の文字列を取得する。
+    """
     import shutil
-    return shutil.which(npm_command()) is not None or shutil.which(FRONTEND_COMMAND) is not None
+    path = shutil.which(executable)
+    if path is None:
+        return None
+    try:
+        result = subprocess.run(
+            [path, version_arg],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=20,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode != 0:
+            return None
+        text = (result.stdout or "").strip()
+        return text.splitlines()[0] if text else "(バージョン不明)"
+    except Exception:
+        return None
+
+
+def get_git_version():
+    return _command_version("git")
+
+
+def get_node_version():
+    return _command_version("node")
+
+
+def get_npm_version():
+    return _command_version(npm_command()) or _command_version(FRONTEND_COMMAND)
+
+
+def get_node_toolchain_version():
+    """Node.js 本体（と判明すれば npm）のバージョン文字列を返す。未導入は None。"""
+    node_v = get_node_version()
+    if node_v is None:
+        return None
+    npm_v = get_npm_version()
+    return f"{node_v} / npm {npm_v}" if npm_v else node_v
+
+
+def check_npm_installed():
+    return get_npm_version() is not None
+
+
+def check_git_installed():
+    return get_git_version() is not None
+
+
+def check_node_installed():
+    return get_node_version() is not None
+
+
+def install_prerequisite(name, win_command, download_url) -> bool:
+    """前提ツール(git/node)を導入する。Windows は winget を使う。"""
+    if sys.platform != "win32":
+        print_warning(f"{name}: 自動導入は Windows のみ対応です。手動で導入してください: {download_url}")
+        return False
+    import shutil
+    if shutil.which("winget") is None:
+        print_error(f"{name}: winget が見つからないため自動導入できません。手動で導入してください: {download_url}")
+        return False
+    return run_command(win_command)
+
+
+def ensure_prerequisites() -> bool:
+    """git / Node.js の導入確認。未導入なら [y]/n で導入を促す。
+
+    通常の導入ステップは git / Node.js が導入済みであることを前提とする。
+    両方とも導入済み（または導入成功）なら True を返す。
+    """
+    print_header("前提ツール確認: Git / Node.js")
+    print_info("通常のセットアップは Git と Node.js が導入済みであることを前提とします。")
+
+    all_ok = True
+
+    for name, version_getter, win_command, url in (
+        ("Git", get_git_version, GIT_INSTALL_COMMAND_WINDOWS, GIT_DOWNLOAD_URL),
+        ("Node.js", get_node_toolchain_version, NODE_INSTALL_COMMAND_WINDOWS, NODE_DOWNLOAD_URL),
+    ):
+        version = version_getter()
+        if version is not None:
+            print_success(f"{name} は導入済みです。（{version}）")
+            continue
+
+        print_warning(f"{name} が見つかりません。")
+        if ask_yes_no(f"{name} を導入しますか？", default="y"):
+            installed = install_prerequisite(name, win_command, url)
+            new_version = version_getter()
+            if installed and new_version is not None:
+                print_success(f"{name} を導入しました。（{new_version}）")
+            else:
+                print_warning(
+                    f"{name} の導入を現在のシェルで確認できませんでした。"
+                    " PATH 反映のためターミナルの再起動が必要な場合があります。"
+                )
+                all_ok = False
+        else:
+            print_warning(f"{name} の導入をスキップしました。手動で導入してください: {url}")
+            all_ok = False
+
+    if not all_ok:
+        print_warning("Git / Node.js が未導入のままです。一部のセットアップが失敗する可能性があります。")
+
+    return all_ok
 
 
 def get_antigravity_install_command() -> str:
@@ -481,6 +597,8 @@ def main():
     print_info("  6. フロントエンド(Web)")
     print_info("  7. フロントエンド(Avatar)")
     print()
+
+    ensure_prerequisites()
 
     choices = collect_setup_choices()
     if choices is None:
