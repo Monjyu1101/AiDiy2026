@@ -162,7 +162,7 @@ Xビデオ/AiDiy紹介__all_ja/
 | `AiDiy紹介_avatar_ja/` | frontend_avatar（Electron/Web デュアルモード） |
 | `AiDiy紹介_backend_ja/` | backend_server（FastAPI・SQLite・4層構造） |
 | `AiDiy紹介_frontend_ja/` | frontend_web（Vue 3・Vite・TypeScript） |
-| `AiDiy紹介_hermes_ja/` | backend_hermes（aidiy_hermes CLI） |
+| `AiDiy紹介_hermes_ja/` | command_hermes（aidiy_hermes CLI） |
 | `AiDiy紹介_tools_ja/` | backend_tools（MCP サーバー群） |
 
 ```

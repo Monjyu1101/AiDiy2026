@@ -75,7 +75,7 @@ window.SCENARIO = {
         },
         {
           "label": "Apps API",
-          "value": "port 8092"
+          "value": "port 9098"
         }
       ],
       "cards": [
@@ -98,12 +98,12 @@ window.SCENARIO = {
       ],
       "facts": [
         "テーブル名・カラム名・API パス・JSON キー・ファイル名・Python 変数まで日本語で統一。",
-        "C系は core_main (port 8091)、M/T/V/S系は apps_main (port 8092) が担当。",
+        "C系は core_main (port 8091)、M/T/V/S系は apps_main (port 9098) が担当。",
         "AI コアは CHAT_AI・LIVE_AI・CODE_AI を統合した多パネル UI。"
       ],
       "evidence": [],
       "short_narration": "Vue 3 と FastAPI を組み合わせた、日本語中心の業務システムです。構成も見ます。",
-      "long_narration": "この概要画面では、AiDiy がどんな部品でできているかを整理しています。左側にはフロントエンドとして Vue 3、Vite、TypeScript、独自テーブル部品 qTubler、Vue Router、Pinia が並びます。右側にはバックエンドとして FastAPI、SQLAlchemy、SQLite があり、認証や AI コアを担当する C 系と、マスタやトランザクションを担当する M 系、T 系が分かれています。重要なのは、日本語で業務を考え、そのままコードにも近い名前を付けていることです。たとえばテーブル名、カラム名、API パス、JSON キー、画面ファイル名が日本語でそろいます。英語の略語を覚えなくても、業務で使う言葉と画面やデータが対応します。web UI は 8090 番ポート、Core API は 8091 番、Apps API は 8092 番で動き、Vite のプロキシが振り分けます。画面上の小さなチップは、FastAPI、SQLite、AI コア、MCP Tools まで含む構成を示しています。",
+      "long_narration": "この概要画面では、AiDiy がどんな部品でできているかを整理しています。左側にはフロントエンドとして Vue 3、Vite、TypeScript、独自テーブル部品 qTubler、Vue Router、Pinia が並びます。右側にはバックエンドとして FastAPI、SQLAlchemy、SQLite があり、認証や AI コアを担当する C 系と、マスタやトランザクションを担当する M 系、T 系が分かれています。重要なのは、日本語で業務を考え、そのままコードにも近い名前を付けていることです。たとえばテーブル名、カラム名、API パス、JSON キー、画面ファイル名が日本語でそろいます。英語の略語を覚えなくても、業務で使う言葉と画面やデータが対応します。web UI は 8090 番ポート、Core API は 8091 番、Apps API は 9098 番で動き、Vite のプロキシが振り分けます。画面上の小さなチップは、FastAPI、SQLite、AI コア、MCP Tools まで含む構成を示しています。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_duration_sec": 7.056,

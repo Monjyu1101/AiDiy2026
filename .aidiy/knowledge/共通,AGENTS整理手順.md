@@ -40,7 +40,7 @@
 | `CLAUDE.md` | `_AIDIY.md` と同一内容にする。 |
 | `AGENTS.md` | 全体概要、サブシステム概要、文書インデックス、人間向け紹介資料の案内。 |
 | `backend_server/AGENTS.md` | backend_server の概要、構成、実装入口。 |
-| `backend_hermes/AGENTS.md` | backend_hermes の概要、構成、実装入口。 |
+| `command_hermes/AGENTS.md` | command_hermes の概要、構成、実装入口。 |
 | `backend_tools/AGENTS.md` | backend_tools の概要、構成、実装入口。 |
 | `frontend_web/AGENTS.md` | frontend_web の概要、構成、実装入口。 |
 | `frontend_avatar/AGENTS.md` | frontend_avatar の概要、構成、実装入口。 |
@@ -54,7 +54,7 @@
 1. `_AIDIY.md` / `CLAUDE.md` — 最小限の入口（両ファイルは同一内容）
 2. `AGENTS.md` — 全体概要、サブシステム概要、文書インデックス
 3. `backend_server/AGENTS.md` — Backend 実装詳細
-4. `backend_hermes/AGENTS.md` — Hermes CLI 実装詳細
+4. `command_hermes/AGENTS.md` — Hermes CLI 実装詳細
 5. `backend_tools/AGENTS.md` — MCP 実装詳細
 6. `frontend_web/AGENTS.md` — Web UI 実装詳細
 7. `frontend_avatar/AGENTS.md` — Avatar UI 実装詳細

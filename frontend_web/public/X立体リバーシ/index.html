@@ -32,7 +32,7 @@
         </div>
         <div class="score-card empty">
           <span>空き</span>
-          <strong id="empty-score">192</strong>
+          <strong id="empty-score">72</strong>
         </div>
       </div>
 
@@ -48,8 +48,13 @@
           <input id="cpu-toggle" type="checkbox" checked>
           <span>赤をCPUにする</span>
         </label>
+        <label class="switch-row">
+          <input id="sound-toggle" type="checkbox" checked>
+          <span>効果音を鳴らす</span>
+        </label>
         <div class="button-row">
           <button id="reset-btn" type="button">新規対局</button>
+          <button id="undo-btn" type="button">待った</button>
           <button id="hint-btn" type="button">置ける場所</button>
         </div>
         <div class="legend">
@@ -70,7 +75,7 @@
           <li>青赤どちらも通常モードで置けなくなると、チャレンジモードへ入ります。</li>
           <li>チャレンジモード開始時、全6面の中央4マス、合計24マスを空にします。</li>
           <li>チャレンジモードでは中央24マスだけに置けます。反転の判定は通常モードと同じです。</li>
-          <li>すべての空きマスが埋まった時点で終了し、石が多い色の勝ちです。</li>
+          <li>チャレンジモードで置ける場所がなくなった時点で終了し、石が多い色の勝ちです。</li>
         </ul>
         <p class="copyright">&copy; 2026 Mitsuo KONDOU. All rights reserved.</p>
       </section>

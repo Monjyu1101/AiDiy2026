@@ -11,8 +11,9 @@
 
 1. 実装ファイルを最優先する。
    - 認証: `backend_server/auth.py`, `backend_server/core_router/auth.py`, `frontend_web/src/api/client.ts`, `frontend_web/src/stores/auth.ts`, `frontend_avatar/src/api/client.ts`
-   - Hermes: `backend_hermes/cli_main.py`, `backend_server/AIコア/AIコード_cli.py`, `backend_server/conf/conf_model.py`, `backend_server/conf/conf_json.py`
+   - Hermes: `command_hermes/cli_main.py`, `backend_server/AIコア/AIコード_cli.py`, `backend_server/conf/conf_model.py`, `backend_server/conf/conf_json.py`
    - MCP: `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`, `backend_tools/tools_proc/`
+   - Task: `backend_task/task_main.py`, `backend_task/_start.py`
    - 起動・環境: `_setup.py`, `_start.py`, `CLAUDE.md`, 各 `AGENTS.md`
 2. 方針は `AGENTS.md` / `CLAUDE.md` を確認する。
 3. `docs/開発ガイド/` は HTML が主。検索は `rg -n '<語句>' docs/開発ガイド -g '*.html'` を使う。
@@ -21,12 +22,16 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 
 ## 実装追従チェックリスト
 
-- [ ] MCP は 8 サーバー構成として記載している。
+- [ ] MCP は 16 サーバー構成として記載している。
   - 同期元: `backend_tools/tools_main.py`, `backend_tools/tools_proc/`
-  - 含める: `aidiy_backup`
+  - 含める: `aidiy_backup`（旧表現: `aidiy_backup_check` / `aidiy_backup_save`）
+- [ ] 常駐バックエンドは 5 サーバー構成（core 8091 / apps 9098 / tools 8095 / local 8094 / task 8093）として記載している。
+- [ ] Vite proxy は `/core` → 8091、`/apps` → 9098、`/task` → 8093 の 3 経路で記載している。
+- [ ] `backend_task` は「AIタスク実行 + 定期タスク」として記載している（旧表現: 定期タスクのみ）。
+  - 同期元: `backend_task/task_proc/tasks_api.py`, `backend_task/task_proc/tasks_watcher.py`
 - [ ] Docker 構成に `backend_tools` を含めていない。
   - MCP 検証はローカル起動を前提に書く。
-- [ ] `backend_hermes` は `_setup.py` / `_cleanup.py` に統合済み、`_start.py` の常駐起動対象外として書く。
+- [ ] `command_hermes` は `_setup.py` / `_cleanup.py` に統合済み、`_start.py` の常駐起動対象外として書く。
 - [ ] Code AI 名は `aidiy_hermes` として書く。
   - 旧表現: `hermes_cli`
 - [ ] Code AI パネルは 6 枠として書く。
@@ -70,8 +75,8 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 $files = rg --files -g '*.md' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**/dist/**' -g '!**/backup/**'
 
 rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|openai_chat' $files
-rg -n 'hermes_cli|aidiy_hermes|3サーバー構成|_start\.py.*backend_hermes|AiDiy_code_hermes_cli' $files
-rg -n 'aidiy_backup|M取引先|V取引先|トークン更新|files_temp|reboot_mcp' $files
+rg -n 'hermes_cli|aidiy_hermes|3サーバー構成|_start\.py.*command_hermes|AiDiy_code_hermes_cli' $files
+rg -n 'aidiy_backup|M取引先|V取引先|トークン更新|files_temp|reboot_tools|backend_task|8093' $files
 rg -n 'includeInactive|無効も検索|router/index\.ts へのルート追加|商品コードが重複|get_商品_by_code|DELETE文でデータを完全に削除' docs
 rg -n 'start\.py|_stop\.py|8095.*Docker|npm run build' $files
 ```

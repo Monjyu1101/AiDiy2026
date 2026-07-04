@@ -155,15 +155,15 @@ python _start.py</code></pre>
  <ul>
  <li>バックエンド(core/apps) を起動するか確認</li>
  <li>フロントエンド(Web 8090) を起動するか確認</li>
- <li>フロントエンド(Avatar 8099) を起動するか確認</li>
+ <li>フロントエンド(Avatar 8092) を起動するか確認</li>
  <li>選択したサービスだけを順番に起動し、起動完了を待機</li>
  </ul>
 
  <div>
  <strong>_start.py の動作詳細</strong>
  <ul>
- <li>選択したポート 8090/8091/8092/8099 を使用中のプロセスを自動で停止</li>
- <li>Web は <code>http://localhost:8090</code>、Avatar は <code>http://127.0.0.1:8099</code> を自動で開く</li>
+ <li>選択したポート 8090/8091/9098/8092 を使用中のプロセスを自動で停止</li>
+ <li>Web は <code>http://localhost:8090</code>、Avatar は <code>http://127.0.0.1:8092</code> を自動で開く</li>
  <li>サーバーがクラッシュした場合、15秒後に自動再起動</li>
  <li>Ctrl+C で全サーバーを一括停止</li>
  </ul>
@@ -173,14 +173,14 @@ python _start.py</code></pre>
  <strong>起動成功時の表示</strong>
  <p>以下のようなメッセージが表示されれば正常に起動しています。</p>
  <pre><code>バックエンド(core): http://localhost:8091/docs
-バックエンド(apps): http://localhost:8092/docs
+バックエンド(apps): http://localhost:9098/docs
 フロントエンド(Web): http://localhost:8090/
-フロントエンド(Avatar): renderer http://127.0.0.1:8099</code></pre>
+フロントエンド(Avatar): renderer http://127.0.0.1:8092</code></pre>
  </div>
 
  <div>
  <strong>ポートが使用中の場合</strong>
- <p>ポート8090/8091/8092/8099が既に使用されている場合はエラーになります。<br>
+ <p>ポート8090/8091/9098/8092が既に使用されている場合はエラーになります。<br>
  その場合は <code>python.exe</code> や <code>node.exe</code> のプロセスを終了してから再起動してください。</p>
  </div>
  </section>
@@ -195,7 +195,7 @@ python _start.py</code></pre>
 
  <h3>Apps サーバー</h3>
  <pre><code>cd workspace/AiDiy2026/backend_server
-.venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092</code></pre>
+.venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098</code></pre>
 
  <h3>フロントエンド</h3>
  <pre><code>cd workspace/AiDiy2026/frontend_web
@@ -281,7 +281,7 @@ python _start.py
  <p>以下のURLからSwagger UIでAPIの動作を確認できます。</p>
  <ul>
  <li><strong>Core API</strong>: <a href="http://localhost:8091/docs" target="_blank">http://localhost:8091/docs</a> (C系・A系のAPI)</li>
- <li><strong>Apps API</strong>: <a href="http://localhost:8092/docs" target="_blank">http://localhost:8092/docs</a> (M系・T系・V系・S系のAPI)</li>
+ <li><strong>Apps API</strong>: <a href="http://localhost:9098/docs" target="_blank">http://localhost:9098/docs</a> (M系・T系・V系・S系のAPI)</li>
  </ul>
  </section>
 
@@ -295,7 +295,7 @@ python _start.py
   <ul>
   <li>localhost:8090 が表示される</li>
   <li>localhost:8091/docs が表示される</li>
-  <li>localhost:8092/docs が表示される</li>
+  <li>localhost:9098/docs が表示される</li>
   <li>admin でログインに成功する</li>
   <li>/core/サーバー状態 が応答を返す</li>
   </ul>
@@ -313,7 +313,7 @@ python _start.py
  </thead>
  <tbody>
  <tr>
- <td><strong>ポート8090/8091/8092が使用中</strong></td>
+ <td><strong>ポート8090/8091/9098が使用中</strong></td>
  <td>
  既存のプロセスを終了してから再起動してください。<br>
  <code>taskkill /F /IM python.exe</code><br>

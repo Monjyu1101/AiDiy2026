@@ -26,6 +26,11 @@ const apiClient = axios.create({
 | baseURL | `/` 固定 | `CORE_BASE_URL`（config.ts 解決） |
 | 解決順 | — | 1. `VITE_CORE_BASE_URL` 環境変数 → 2. 開発時 `/` → 3. `http://127.0.0.1:8091` |
 
+### backend_task 用クライアント（AIタスク）
+
+- `frontend_web` は `apiClient` のまま `/task/...` を呼ぶ（Vite proxy が 8093 へ転送）。
+- `frontend_avatar` は `taskClient`（`createApiClient(TASK_BASE_URL)`）を使う。`TASK_BASE_URL` の解決順は 1. `VITE_TASK_BASE_URL` → 2. 開発時 `/` → 3. `http://127.0.0.1:8093`（Electron 本番の直結）。
+
 ## 共通構成
 
 ### リクエストインターセプター: Bearer token 付与

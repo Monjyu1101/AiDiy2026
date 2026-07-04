@@ -142,7 +142,7 @@ class CodeChecker:
             "python_venvs": {},
             "ts_projects": {},
         }
-        for p in ("backend_server", "backend_tools"):
+        for p in ("backend_server", "backend_tools", "command_hermes"):
             python = self._resolve_python(p)
             info["python_venvs"][p] = {
                 "python": python,

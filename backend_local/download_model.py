@@ -176,7 +176,7 @@ def main() -> int:
     rc = _download_one(args.model, args.models_dir, args.token, args.force)
     if rc == 0:
         print("起動時はこのフォルダから自動的にロードされます。")
-        print("  例: uv run uvicorn local_main:app --reload --host 0.0.0.0 --port 8096")
+        print("  例: uv run uvicorn local_main:app --reload --host 0.0.0.0 --port 8094")
     return rc
 
 

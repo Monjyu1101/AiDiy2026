@@ -4,7 +4,7 @@ window.SCENARIO = {
   "title": "AiDiy Hermes - コードエージェント CLI 紹介",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "backend_hermes/AGENTS.md と .aidiy/knowledge から実装実態を抜粋して構成。"
+    "summary": "command_hermes/AGENTS.md と .aidiy/knowledge から実装実態を抜粋して構成。"
   },
   "target": {
     "language": "ja-JP",
@@ -95,17 +95,17 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "`backend_hermes` は常駐 HTTP サーバーではない。",
+        "`command_hermes` は常駐 HTTP サーバーではない。",
         "`_start.py` の常駐起動対象ではない。",
         "`backend_server/AIコア/AIコード_cli.py` から subprocess で起動される。"
       ],
       "evidence": [
         {
-          "source": "backend_hermes/AGENTS.md",
-          "text": "`backend_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。常駐 HTTP サーバーではない。"
+          "source": "command_hermes/AGENTS.md",
+          "text": "`command_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。常駐 HTTP サーバーではない。"
         },
         {
-          "source": "backend_hermes/AGENTS.md",
+          "source": "command_hermes/AGENTS.md",
           "text": "`_start.py` の常駐起動対象ではない。`_setup.py` / `_cleanup.py` の対象。"
         }
       ],
@@ -180,11 +180,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_hermes/AGENTS.md",
+          "source": "command_hermes/AGENTS.md",
           "text": "TUI: `prompt_toolkit`。通信: `requests`、`httpx`、OpenAI 互換 client、Claude API 連携。"
         },
         {
-          "source": "backend_hermes/AGENTS.md",
+          "source": "command_hermes/AGENTS.md",
           "text": "`cli_main.py` — CLI エントリ、provider/model picker、slash command 処理。"
         }
       ],
@@ -260,11 +260,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_hermes/AGENTS.md",
+          "source": "command_hermes/AGENTS.md",
           "text": "31 の provider overlay と 50 以上のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。"
         },
         {
-          "source": ".aidiy/knowledge/backend_hermes,Provider一覧と選択ロジック.md",
+          "source": ".aidiy/knowledge/command_hermes,Provider一覧と選択ロジック.md",
           "text": "`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されています。"
         }
       ],
@@ -339,11 +339,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": ".aidiy/knowledge/backend_hermes,Slash Command一覧.md",
+          "source": ".aidiy/knowledge/command_hermes,Slash Command一覧.md",
           "text": "Session 23 コマンド、Configuration 13 コマンド、Tools & Skills 11 コマンド、Info 12 コマンド、Exit 1 コマンド。"
         },
         {
-          "source": ".aidiy/knowledge/backend_hermes,Slash Command一覧.md",
+          "source": ".aidiy/knowledge/command_hermes,Slash Command一覧.md",
           "text": "`COMMAND_REGISTRY` は `CommandDef` dataclass のリストです。正規名 + alias で検索します。"
         }
       ],
@@ -418,11 +418,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": "backend_hermes/AGENTS.md",
+          "source": "command_hermes/AGENTS.md",
           "text": "`aidiy_hermes` は `backend_server/AIコア/AIコード_cli.py` から subprocess で起動されます。モデル設定は `CODE_AIDIY_HERMES_MODEL` を使います。"
         },
         {
-          "source": "backend_hermes/AGENTS.md",
+          "source": "command_hermes/AGENTS.md",
           "text": "Windows では対応する `*_win.py`、非 Windows では `*_linux.py` のどちらか一方だけを import します。"
         }
       ],

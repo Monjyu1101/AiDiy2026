@@ -38,6 +38,15 @@ export interface ChatMessage {
   isCollapsed?: boolean;
 }
 
+// qTublerFrame の列定義（frontend_web の types/qTubler.ts と同じ）
+export interface Column {
+  key: string;
+  label: string;
+  width?: string;
+  align?: 'left' | 'right' | 'center';
+  sortable?: boolean;
+}
+
 export interface ModelSettings {
   CHAT_AI_NAME: string;
   LIVE_AI_NAME: string;
@@ -48,4 +57,6 @@ export interface ModelSettings {
   CODE_AI5_NAME: string;
   CODE_AI6_NAME: string;
   CODE_PERMISSIONS: string;
+  TASK_AI_NAME: string;
+  TASK_AI_MODEL: string;
 }

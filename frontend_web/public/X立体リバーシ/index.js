@@ -72,6 +72,59 @@ const PIECE_DEFS = {
   },
 };
 
+// WebAudio による効果音（音源ファイル不要のシンセ音）
+class SoundFX {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+  }
+
+  _ctx() {
+    if (!this.enabled) return null;
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      this.ctx = new AC();
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  }
+
+  tone({ freq = 440, freqEnd = null, dur = 0.12, type = 'sine', gain = 0.12, delay = 0 }) {
+    const ctx = this._ctx();
+    if (!ctx) return;
+    const t0 = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const amp = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + dur);
+    amp.gain.setValueAtTime(0, t0);
+    amp.gain.linearRampToValueAtTime(gain, t0 + 0.008);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(amp).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  }
+
+  place() { this.tone({ freq: 520, freqEnd: 780, dur: 0.14, type: 'triangle', gain: 0.16 }); }
+  flip(index = 0) { this.tone({ freq: 620 + Math.min(index, 10) * 60, dur: 0.09, type: 'square', gain: 0.06 }); }
+  clearPop(index = 0) { this.tone({ freq: 940 - Math.min(index, 20) * 16, freqEnd: 280, dur: 0.11, type: 'sine', gain: 0.08 }); }
+  pass() { this.tone({ freq: 300, freqEnd: 210, dur: 0.22, type: 'sine', gain: 0.10 }); }
+  challenge() {
+    [440, 554, 659, 880].forEach((f, i) => this.tone({ freq: f, dur: 0.24, type: 'sawtooth', gain: 0.09, delay: i * 0.13 }));
+  }
+  win() {
+    [523, 659, 784, 1047].forEach((f, i) => this.tone({ freq: f, dur: 0.32, type: 'triangle', gain: 0.14, delay: i * 0.15 }));
+  }
+  lose() {
+    [392, 330, 262, 196].forEach((f, i) => this.tone({ freq: f, dur: 0.32, type: 'triangle', gain: 0.11, delay: i * 0.16 }));
+  }
+  draw() {
+    [440, 440].forEach((f, i) => this.tone({ freq: f, dur: 0.26, type: 'sine', gain: 0.10, delay: i * 0.22 }));
+  }
+}
+
 class CubeReversi {
   constructor() {
     this.board = {};
@@ -84,6 +137,9 @@ class CubeReversi {
     this.challengeTransitioning = false;
     this.challengeTimer = null;
     this.postMoveTimer = null;
+    this.cpuTimer = null;
+    this.history = [];
+    this.sfx = new SoundFX();
     this.lastMove = null;
     this.lastChangedKeys = new Set();
     this.alwaysShowMoves = true;
@@ -119,7 +175,9 @@ class CubeReversi {
     this.battleLog = document.getElementById('battle-log');
     this.blackCpuToggle = document.getElementById('black-cpu-toggle');
     this.cpuToggle = document.getElementById('cpu-toggle');
+    this.soundToggle = document.getElementById('sound-toggle');
     this.canvas3d = document.getElementById('cube-3d-canvas');
+    this.cubePanel = document.querySelector('.cube-3d-panel');
     this.challengeBanner = document.createElement('div');
     this.challengeBanner.className = 'challenge-banner';
     this.challengeBanner.innerHTML = `
@@ -128,11 +186,15 @@ class CubeReversi {
         <strong>チャレンジモード突入</strong>
       </div>
     `;
-    document.querySelector('.cube-3d-panel')?.appendChild(this.challengeBanner);
+    this.cubePanel?.appendChild(this.challengeBanner);
+    this.resultBanner = document.createElement('div');
+    this.resultBanner.className = 'result-banner';
+    this.cubePanel?.appendChild(this.resultBanner);
   }
 
   bindEvents() {
     document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+    document.getElementById('undo-btn').addEventListener('click', () => this.undo());
     document.getElementById('hint-btn').addEventListener('click', () => {
       this.alwaysShowMoves = !this.alwaysShowMoves;
       this.render();
@@ -148,6 +210,15 @@ class CubeReversi {
       this.addLog(this.blackCpuEnabled ? '青CPUを有効にしました。' : '青CPUを無効にしました。');
       this.maybeCpuTurn();
     });
+    if (this.soundToggle) {
+      this.sfx.enabled = this.soundToggle.checked;
+      this.soundToggle.addEventListener('change', () => {
+        this.sfx.enabled = this.soundToggle.checked;
+        if (this.sfx.enabled) this.sfx.place();
+      });
+    }
+    // 自動再生制限対策: 最初のユーザー操作で AudioContext を起こす
+    window.addEventListener('pointerdown', () => this.sfx._ctx(), { once: true });
   }
 
   reset() {
@@ -172,18 +243,76 @@ class CubeReversi {
       window.clearTimeout(this.postMoveTimer);
       this.postMoveTimer = null;
     }
+    if (this.cpuTimer) {
+      window.clearTimeout(this.cpuTimer);
+      this.cpuTimer = null;
+    }
     this.lastMove = null;
     this.lastChangedKeys = new Set();
     this.logItems = [];
+    this.history = [];
     this.flipAnimations = [];
     this.cameraQueue = [];
+    this.cameraMotion = null;
     this.blackCpuEnabled = this.blackCpuToggle.checked;
     this.cpuEnabled = this.cpuToggle.checked;
     this.showChallengeBanner(false);
+    this.hideResultBanner();
+    // アニメーション途中のコマの姿勢が残らないよう全コマ作り直し
+    [...this.pieceMeshes.keys()].forEach((key) => this.remove3dPiece(key));
     this.addLog('新しい 6 面対局を開始しました。');
     this.setMessage('青の手番です。光る〇のマスに置けます。');
     this.render();
     this.sync3dBoard();
+    this.maybeCpuTurn(700);
+  }
+
+  pushHistory() {
+    this.history.push({
+      board: this.cloneBoard(),
+      currentPlayer: this.currentPlayer,
+      mode: this.mode,
+      lastMove: this.lastMove,
+    });
+    if (this.history.length > 300) this.history.shift();
+  }
+
+  undo() {
+    if (this.challengeTransitioning) return;
+    if (this.history.length === 0) {
+      this.setMessage('戻せる手がありません。');
+      return;
+    }
+    let snap = this.history.pop();
+    // CPU の手番の局面はスキップして、人間が指せる局面まで戻す
+    const anyHuman = !this.blackCpuEnabled || !this.cpuEnabled;
+    while (anyHuman && this.history.length > 0 && this.isCpuControlled(snap.currentPlayer)) {
+      snap = this.history.pop();
+    }
+    if (this.postMoveTimer) {
+      window.clearTimeout(this.postMoveTimer);
+      this.postMoveTimer = null;
+    }
+    if (this.cpuTimer) {
+      window.clearTimeout(this.cpuTimer);
+      this.cpuTimer = null;
+    }
+    this.flipAnimations = [];
+    this.cameraQueue = [];
+    this.cameraMotion = null;
+    this.cpuThinking = false;
+    this.gameOver = false;
+    this.board = snap.board;
+    this.currentPlayer = snap.currentPlayer;
+    this.mode = snap.mode;
+    this.lastMove = snap.lastMove;
+    this.lastChangedKeys = new Set();
+    this.showChallengeBanner(false);
+    this.hideResultBanner();
+    [...this.pieceMeshes.keys()].forEach((key) => this.remove3dPiece(key));
+    this.addLog('待った! 局面を1手戻しました。');
+    this.setMessage(`${PLAYERS[this.currentPlayer].label}の手番です。`);
+    this.render();
     this.maybeCpuTurn(700);
   }
 
@@ -237,12 +366,12 @@ class CubeReversi {
 
   updateStatus() {
     const score = this.countPieces();
-    this.blackScore.textContent = String(score.black);
-    this.whiteScore.textContent = String(score.white);
+    this.bumpScore(this.blackScore, score.black);
+    this.bumpScore(this.whiteScore, score.white);
     this.emptyScore.textContent = String(score.empty);
     this.modeLabel.textContent = this.mode === 'challenge' ? 'チャレンジモード' : '通常モード';
     if (this.gameOver) {
-      const result = score.black === score.white ? '引き分け' : `${score.black > score.white ? '黒' : '白'}の勝ち`;
+      const result = score.black === score.white ? '引き分け' : `${score.black > score.white ? '青' : '赤'}の勝ち`;
       this.turnLabel.textContent = result;
     } else if (this.challengeTransitioning) {
       this.modeLabel.textContent = 'チャレンジモード';
@@ -252,6 +381,42 @@ class CubeReversi {
     } else {
       this.turnLabel.textContent = `${PLAYERS[this.currentPlayer].label}の手番`;
     }
+  }
+
+  bumpScore(el, value) {
+    const text = String(value);
+    if (el.textContent === text) return;
+    el.textContent = text;
+    el.classList.remove('bump');
+    void el.offsetWidth; // アニメーション再トリガー
+    el.classList.add('bump');
+  }
+
+  showFlipPopup(count, player) {
+    if (!this.cubePanel || count <= 0) return;
+    const el = document.createElement('div');
+    el.className = `flip-popup ${player}${count >= 6 ? ' big' : ''}`;
+    el.textContent = count >= 6 ? `+${count} 大量反転!!` : `+${count} 反転!`;
+    this.cubePanel.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  showResultBanner(winner, score) {
+    if (!this.resultBanner) return;
+    const label = winner === null ? '引き分け' : `${PLAYERS[winner].label}の勝ち!`;
+    this.resultBanner.className = `result-banner ${winner ?? 'draw'}`;
+    this.resultBanner.innerHTML = `
+      <div class="result-banner__text">
+        <span>GAME OVER</span>
+        <strong>${label}</strong>
+        <small>青 ${score.black} - 赤 ${score.white}</small>
+      </div>
+    `;
+    window.requestAnimationFrame(() => this.resultBanner.classList.add('visible'));
+  }
+
+  hideResultBanner() {
+    this.resultBanner?.classList.remove('visible');
   }
 
   renderLog() {
@@ -277,8 +442,11 @@ class CubeReversi {
       return false;
     }
 
+    this.pushHistory();
     const flips = selected.flips ?? [];
     const player = this.currentPlayer;
+    this.sfx.place();
+    this.showFlipPopup(flips.length, player);
     this.board[move.face][move.row][move.col] = player;
     flips.forEach((cell) => {
       this.board[cell.face][cell.row][cell.col] = player;
@@ -315,9 +483,11 @@ class CubeReversi {
         }
         if (currentLegal.length === 0) {
           this.addLog(`${PLAYERS[this.currentPlayer].label} は置けないためパスしました。`);
+          this.sfx.pass();
           this.currentPlayer = PLAYERS[this.currentPlayer].next;
         }
-      } else if (this.countPieces().empty === 0) {
+      } else if (this.countPieces().empty === 0 || this.getLegalMoves(this.currentPlayer).length === 0) {
+        // チャレンジモードは中央24マスが埋まると打てる場所がなくなるので終局
         this.finishGame();
         return;
       }
@@ -342,13 +512,14 @@ class CubeReversi {
     this.setMessage('チャレンジモード突入準備中。中央24枚を消去します。');
     this.updateStatus();
     this.showChallengeBanner(true);
+    this.sfx.challenge();
 
     if (!this.three) {
       this.completeChallengeModeEntry();
       return;
     }
 
-    this.cameraQueue = this.cameraQueue.filter((item) => item.time <= performance.now());
+    this.cameraQueue = [];
     this.challengeTimer = window.setTimeout(() => {
       this.challengeTimer = null;
       this.focus3dCamera('front');
@@ -383,7 +554,7 @@ class CubeReversi {
 
     this.cameraQueue.push({ time: now, face: 'front' });
 
-    cells.forEach((cell) => {
+    cells.forEach((cell, index) => {
       const key = this.key(cell);
       const piece = this.pieceMeshes.get(key);
       const needsCamera = !this.isFaceVisible(cell.face, plannedRotation);
@@ -401,6 +572,7 @@ class CubeReversi {
           duration: clearDur,
           type: 'clear',
           player: piece.userData.player,
+          soundIndex: index,
         });
       }
       stepTime += clearDur + gap;
@@ -429,18 +601,32 @@ class CubeReversi {
   finishGame() {
     this.gameOver = true;
     const score = this.countPieces();
-    const result = score.black === score.white ? '引き分けです。' : `${score.black > score.white ? '青' : '赤'}の勝ちです。`;
+    const winner = score.black === score.white ? null : (score.black > score.white ? 'black' : 'white');
+    const result = winner === null ? '引き分けです。' : `${PLAYERS[winner].label}の勝ちです。`;
     this.addLog(`終局: 青 ${score.black} / 赤 ${score.white}。${result}`);
     this.setMessage(`終局: ${result}`);
+    this.showResultBanner(winner, score);
+    if (winner === null) {
+      this.sfx.draw();
+    } else if (this.isCpuControlled(winner) && !this.isCpuControlled(PLAYERS[winner].next)) {
+      this.sfx.lose(); // 人間側が CPU に負けたときだけ敗北音
+    } else {
+      this.sfx.win();
+    }
     this.render();
   }
 
   maybeCpuTurn(delay = 500) {
+    if (this.cpuTimer) {
+      window.clearTimeout(this.cpuTimer);
+      this.cpuTimer = null;
+    }
     if (!this.isCpuControlled(this.currentPlayer) || this.gameOver || this.challengeTransitioning) return;
     const player = this.currentPlayer;
     this.cpuThinking = true;
     this.updateStatus();
-    window.setTimeout(() => {
+    this.cpuTimer = window.setTimeout(() => {
+      this.cpuTimer = null;
       if (!this.isCpuControlled(player) || this.gameOver || this.challengeTransitioning || this.currentPlayer !== player) {
         this.cpuThinking = false;
         this.render();
@@ -448,7 +634,11 @@ class CubeReversi {
       }
       const move = this.chooseCpuMove(player);
       this.cpuThinking = false;
-      if (move) this.playMove(move, 'cpu');
+      if (move) {
+        this.playMove(move, 'cpu');
+      } else {
+        this.render();
+      }
     }, delay);
   }
 
@@ -600,8 +790,8 @@ class CubeReversi {
       bottom: {
         N: { face: 'front', row: last, col, dir: 'N' },
         S: { face: 'back', row: last, col: last - col, dir: 'N' },
-        E: { face: 'right', row: last, col, dir: 'N' },
-        W: { face: 'left', row: last, col: last - col, dir: 'N' },
+        E: { face: 'right', row: last, col: row, dir: 'N' },
+        W: { face: 'left', row: last, col: last - row, dir: 'N' },
       },
     };
     return map[face][dir] ?? null;
@@ -915,6 +1105,7 @@ class CubeReversi {
         this.flipAnimations.push({
           mesh: piece, start: flipStart, duration: flipDur,
           type: 'flip', player, fromPlayer: opponent,
+          soundIndex: index - 1,
         });
 
         stepTime += flipDur;
@@ -1109,6 +1300,10 @@ class CubeReversi {
           anim.mesh.scale.setScalar(1);
         }
       } else if (anim.type === 'clear') {
+        if (!anim.sounded) {
+          anim.sounded = true;
+          this.sfx.clearPop(anim.soundIndex ?? 0);
+        }
         const def = PIECE_DEFS[anim.player] ?? PIECE_DEFS.black;
         const blink = 0.5 + 0.5 * Math.sin(elapsed * 0.052);
         const eased = 1 - Math.pow(1 - t, 3);
@@ -1121,6 +1316,11 @@ class CubeReversi {
           this.remove3dPiece(anim.key);
         }
       } else {
+        // フリップの折り返し（見た目の反転瞬間）でチック音
+        if (!anim.sounded && t >= 0.45) {
+          anim.sounded = true;
+          this.sfx.flip(anim.soundIndex ?? 0);
+        }
         const spin = Math.sin(t * Math.PI);
         anim.mesh.rotation.x = Math.PI / 2 + spin * Math.PI;
         anim.mesh.scale.setScalar(1 + spin * 0.28);

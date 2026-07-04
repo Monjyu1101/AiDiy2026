@@ -23,7 +23,7 @@ window.SCENARIO = {
       "source_summary": "AiDiy は日本語ファーストのフルスタック業務管理テンプレート。5 サービス構成（backend_server/backend_tools/frontend_web/frontend_avatar）で業務管理・AI コア・TOOL HUB・3D アバターを統合。この動画は ビデオページ生成機能で自動生成。",
       "factual_bullets": [
         "FastAPI + SQLAlchemy + SQLite (Python 3.13) + Vue 3 + Vite + TypeScript の構成",
-        "5 サービス: backend_server (8091/8092), backend_tools (8095), frontend_web (8090), frontend_avatar (8099)",
+        "5 サービス: backend_server (8091/9098), backend_tools (8095), frontend_web (8090), frontend_avatar (8092)",
         "日本語ファースト設計: テーブル名・API パス・変数名すべて日本語",
         "業務サンプル（C/M/T/V/S系）・AI コア・14 MCP・Electron アバター を統合",
         "この動画は AiDiy のビデオページ生成機能で自動生成"
@@ -78,25 +78,25 @@ window.SCENARIO = {
       "headline": "5 サービスが連携する\nフルスタック構成",
       "lead": "backend_server・backend_tools・frontend_web・frontend_avatar の 4 サービスが各ポートで連携します。",
       "image": "images/scene_001.png",
-      "source_summary": "AiDiy の 5 サービス構成: backend_server (core_main 8091 / apps_main 8092)、backend_tools (8095)、frontend_web (8090)、frontend_avatar (8099)。FastAPI + SQLAlchemy + SQLite + Vue 3 + Vite + TypeScript の技術スタック。",
+      "source_summary": "AiDiy の 5 サービス構成: backend_server (core_main 8091 / apps_main 9098)、backend_tools (8095)、frontend_web (8090)、frontend_avatar (8092)。FastAPI + SQLAlchemy + SQLite + Vue 3 + Vite + TypeScript の技術スタック。",
       "factual_bullets": [
         "core_main.py (8091): 認証・C系・A系・AI コア WebSocket",
-        "apps_main.py (8092): M系マスタ・T系トランザクション・V系・S系スケジューラ",
+        "apps_main.py (9098): M系マスタ・T系トランザクション・V系・S系スケジューラ",
         "tools_main.py (8095): 14 MCP サーバーを 3 トランスポートで提供",
-        "frontend_web (8090): Vue 3 + Vite、Vite proxy で /core → 8091, /apps → 8092",
-        "frontend_avatar (8099): Electron/Web デュアルモード、Three.js + VRM"
+        "frontend_web (8090): Vue 3 + Vite、Vite proxy で /core → 8091, /apps → 9098",
+        "frontend_avatar (8092): Electron/Web デュアルモード、Three.js + VRM"
       ],
       "forbidden_elements": [
         "ポート番号が変更不可であるかのような断言",
         "SQLite の性能限界についての誇張"
       ],
-      "image_prompt": "A clean architectural diagram of AiDiy's five services: four rectangular service blocks (backend_server with two sub-blocks at ports 8091/8092, backend_tools at 8095, frontend_web at 8090, frontend_avatar at 8099) connected by arrows showing API proxy and WebSocket flows. Blue tech color scheme, port numbers prominently labeled, dark background.",
+      "image_prompt": "A clean architectural diagram of AiDiy's five services: four rectangular service blocks (backend_server with two sub-blocks at ports 8091/9098, backend_tools at 8095, frontend_web at 8090, frontend_avatar at 8092) connected by arrows showing API proxy and WebSocket flows. Blue tech color scheme, port numbers prominently labeled, dark background.",
       "dialogue": [
         {
           "speaker": "female",
           "expression": "neutral",
           "telop_text": "backend_server は FastAPI + SQLAlchemy + SQLite で動くバックエンドです。",
-          "naration_text": "AiDiy のバックエンドは backend_server として FastAPI と SQLAlchemy と SQLite を組み合わせて構築されています。2 本の uvicorn プロセスに分かれており、認証・利用者・AI コアを担う core_main.py がポート 8091 で動き、マスタ・トランザクション・スケジューラを担う apps_main.py がポート 8092 で動きます。両サーバーは同じ SQLite データベースファイルを共有しているため、データの一貫性を保ちながら役割ごとに分離できています。",
+          "naration_text": "AiDiy のバックエンドは backend_server として FastAPI と SQLAlchemy と SQLite を組み合わせて構築されています。2 本の uvicorn プロセスに分かれており、認証・利用者・AI コアを担う core_main.py がポート 8091 で動き、マスタ・トランザクション・スケジューラを担う apps_main.py がポート 9098 で動きます。両サーバーは同じ SQLite データベースファイルを共有しているため、データの一貫性を保ちながら役割ごとに分離できています。",
           "audio": "audio/dlg_001_01_female.mp3",
           "duration_sec": 32.616
         },
@@ -104,7 +104,7 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "frontend_web は Vue 3 + Vite + TypeScript で作られた Web UI です。",
-          "naration_text": "フロントエンドは frontend_web として Vue 3 と Vite と TypeScript で構成されています。ポート 8090 で動き、Vite の開発用プロキシが /core/* のリクエストをポート 8091 に、/apps/* のリクエストをポート 8092 に転送します。Vue Router と Pinia によるルーティングと状態管理、qTubler という独自テーブルコンポーネントを使ったリッチな業務 UI が特徴です。WebSocket 通信も内蔵しており、AI コアとのリアルタイム対話ができます。",
+          "naration_text": "フロントエンドは frontend_web として Vue 3 と Vite と TypeScript で構成されています。ポート 8090 で動き、Vite の開発用プロキシが /core/* のリクエストをポート 8091 に、/apps/* のリクエストをポート 9098 に転送します。Vue Router と Pinia によるルーティングと状態管理、qTubler という独自テーブルコンポーネントを使ったリッチな業務 UI が特徴です。WebSocket 通信も内蔵しており、AI コアとのリアルタイム対話ができます。",
           "audio": "audio/dlg_001_02_male.mp3",
           "duration_sec": 27.576
         },
@@ -112,7 +112,7 @@ window.SCENARIO = {
           "speaker": "female",
           "expression": "neutral",
           "telop_text": "frontend_avatar は Electron と Web の両方で動く 3D アバター UI です。",
-          "naration_text": "frontend_avatar はポート 8099 で動く Electron 兼 Web の 3D アバターインターフェースです。Electron で起動した場合は複数ウィンドウを使ったデスクトップアプリとして動き、通常のブラウザで開いた場合は左右にアバターを配置した Web UI として動きます。Three.js と @pixiv/three-vrm を使った VRM モデルの表示と口パク同期が実装されており、AI との音声対話を視覚的に楽しめます。",
+          "naration_text": "frontend_avatar はポート 8092 で動く Electron 兼 Web の 3D アバターインターフェースです。Electron で起動した場合は複数ウィンドウを使ったデスクトップアプリとして動き、通常のブラウザで開いた場合は左右にアバターを配置した Web UI として動きます。Three.js と @pixiv/three-vrm を使った VRM モデルの表示と口パク同期が実装されており、AI との音声対話を視覚的に楽しめます。",
           "audio": "audio/dlg_001_03_female.mp3",
           "duration_sec": 28.92
         },
@@ -336,7 +336,7 @@ window.SCENARIO = {
           "speaker": "female",
           "expression": "neutral",
           "telop_text": "frontend_avatar は Electron デスクトップアプリと Web ブラウザ両対応の AI アバター UI です。",
-          "naration_text": "frontend_avatar は、Electron デスクトップアプリと通常のブラウザの両方で動く AI アバター UI です。ポート 8099 にアクセスし、window.desktopApi が存在する場合は Electron モード、存在しない場合は Web ブラウザモードとして動作します。Electron モードでは複数のウィンドウを使ったリッチなデスクトップ体験が、Web モードでは左アバターと右タブ UI を組み合わせた画面が使えます。",
+          "naration_text": "frontend_avatar は、Electron デスクトップアプリと通常のブラウザの両方で動く AI アバター UI です。ポート 8092 にアクセスし、window.desktopApi が存在する場合は Electron モード、存在しない場合は Web ブラウザモードとして動作します。Electron モードでは複数のウィンドウを使ったリッチなデスクトップ体験が、Web モードでは左アバターと右タブ UI を組み合わせた画面が使えます。",
           "audio": "audio/dlg_005_01_female.mp3",
           "duration_sec": 26.928
         },
@@ -360,7 +360,7 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "認証は Electron が localStorage、Web が sessionStorage と自動で切り替わります。",
-          "naration_text": "Electron モードと Web モードでは認証のストレージも異なります。Electron では localStorage を使い、Web では sessionStorage を使うため、モードに応じた安全な認証管理が自動で行われます。tsconfig は strict mode が有効になっており、型安全な実装が保証されています。Vite proxy の設定は frontend_web と共通で、/core/* を 8091、/apps/* を 8092 に転送する構成です。デスクトップアプリと Web で同じコードベースが動く、デュアルモード設計が技術的な面白さです。",
+          "naration_text": "Electron モードと Web モードでは認証のストレージも異なります。Electron では localStorage を使い、Web では sessionStorage を使うため、モードに応じた安全な認証管理が自動で行われます。tsconfig は strict mode が有効になっており、型安全な実装が保証されています。Vite proxy の設定は frontend_web と共通で、/core/* を 8091、/apps/* を 9098 に転送する構成です。デスクトップアプリと Web で同じコードベースが動く、デュアルモード設計が技術的な面白さです。",
           "audio": "audio/dlg_005_04_male.mp3",
           "duration_sec": 31.32
         }

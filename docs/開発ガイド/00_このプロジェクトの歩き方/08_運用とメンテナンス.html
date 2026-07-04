@@ -148,10 +148,10 @@ python _start.py</code></pre>
  <div>ステップ3: ポート競合の解消</div>
  <pre><code><span># 1. サーバーを停止する</span>
 
-<span># 2. ポート 8090/8091/8092 の使用状況を確認</span>
+<span># 2. ポート 8090/8091/9098 の使用状況を確認</span>
 netstat -ano | findstr :8090
 netstat -ano | findstr :8091
-netstat -ano | findstr :8092
+netstat -ano | findstr :9098
 
 <span># 3. プロセスを強制終了</span>
 taskkill /F /IM python.exe

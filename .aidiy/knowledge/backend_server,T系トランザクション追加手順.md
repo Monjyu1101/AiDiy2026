@@ -93,6 +93,6 @@ cd backend_server
 .venv\Scripts\python.exe -c "import apps_main"
 ```
 
-- Swagger `http://localhost:8092/docs` で POST エンドポイントを確認する。
+- Swagger `http://localhost:9098/docs` で POST エンドポイントを確認する。
 - 作成、一覧取得、更新、削除を実行する。
 - 明細型はヘッダー行だけの取得、明細行だけの取得、V系集計条件を確認する。

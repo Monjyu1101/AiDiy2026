@@ -72,7 +72,7 @@
  </tr>
  <tr>
  <td><strong>Webサーバー</strong></td>
- <td>localhost:8090/8091/8092（開発サーバー）</td>
+ <td>localhost:8090/8091/9098（開発サーバー）</td>
  <td>Nginx（リバースプロキシ）</td>
  </tr>
  </tbody>
@@ -197,7 +197,7 @@ server {
 
  # Apps API
  location /apps/ {
- proxy_pass http://localhost:8092/apps/;
+ proxy_pass http://localhost:9098/apps/;
  proxy_set_header Host $host;
  proxy_set_header X-Real-IP $remote_addr;
  }
@@ -229,7 +229,7 @@ After=network.target
 User=aidiyuser
 WorkingDirectory=/var/www/AiDiy2026/backend_server
 Environment="PATH=/var/www/AiDiy2026/backend_server/.venv/bin"
-ExecStart=/var/www/AiDiy2026/backend_server/.venv/bin/uvicorn apps_main:app --host 0.0.0.0 --port 8092
+ExecStart=/var/www/AiDiy2026/backend_server/.venv/bin/uvicorn apps_main:app --host 0.0.0.0 --port 9098
 
 [Install]
 WantedBy=multi-user.target</code></pre>
@@ -274,7 +274,7 @@ services:
    command: uvicorn core_main:app --host 0.0.0.0 --port 8091
  apps:
    build: ./backend_server
-   command: uvicorn apps_main:app --host 0.0.0.0 --port 8092</code></pre>
+   command: uvicorn apps_main:app --host 0.0.0.0 --port 9098</code></pre>
 
  <div>
  <strong>注意 </strong>

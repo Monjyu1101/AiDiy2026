@@ -62,6 +62,9 @@ const spriteSets: Record<SpriteName, readonly SpritePoint[]> = {
 
 let animationId = 0
 let lastFrameTimestamp = 0
+let lastSnapshotTimestamp = 0
+let snapshotLoading = false
+let windowRole: AvatarWindowRole = 'core'
 let frameCount = 0
 let idleTime = 0
 let idleAnimation: SpriteName | null = null
@@ -74,6 +77,7 @@ let mousePosY = 160
 let noMouseFrames = 0  // マウス未操作フレーム数
 
 const NO_MOUSE_IDLE = 150  // 15秒後にマウスをネコ頭上へ
+const SNAPSHOT_INTERVAL_MS = 33
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
 
@@ -224,8 +228,30 @@ const frame = () => {
   applyPosition()
 }
 
+const updateElectronPointerTarget = async () => {
+  if (snapshotLoading || !window.desktopApi?.getWindowPointerSnapshot) return
+  const stageRect = stageRef.value?.getBoundingClientRect()
+  if (!stageRect) return
+
+  snapshotLoading = true
+  try {
+    const snapshot = await window.desktopApi.getWindowPointerSnapshot(windowRole)
+    mousePosX = snapshot.mouse.x - (snapshot.bounds.x + stageRect.left)
+    mousePosY = snapshot.mouse.y - (snapshot.bounds.y + stageRect.top)
+    noMouseFrames = 0
+  } catch {
+    // 取得失敗時は Web 用 pointermove で最後に得た位置を使い続ける。
+  } finally {
+    snapshotLoading = false
+  }
+}
+
 const onAnimationFrame = (timestamp: number) => {
   if (!stageRef.value || !nekoRef.value) return
+  if (window.desktopApi?.getWindowPointerSnapshot && timestamp - lastSnapshotTimestamp >= SNAPSHOT_INTERVAL_MS) {
+    lastSnapshotTimestamp = timestamp
+    void updateElectronPointerTarget()
+  }
   if (!lastFrameTimestamp) lastFrameTimestamp = timestamp
   if (timestamp - lastFrameTimestamp > 100) {
     lastFrameTimestamp = timestamp
@@ -270,11 +296,11 @@ const resetToStage = () => {
   setSprite('idle', 0)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  windowRole = await window.desktopApi?.getWindowRole?.() ?? 'core'
   resetToStage()
   const stageEl = stageRef.value
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (!stageEl || reducedMotion) return
+  if (!stageEl) return
   stageEl.addEventListener('pointermove', handlePointerMove)
   stageEl.addEventListener('pointerdown', handlePointerMove)
   window.addEventListener('resize', handleResize)

@@ -9,37 +9,46 @@
 // -------------------------------------------------------------------------
 
 import axios from 'axios'
-import type { InternalAxiosRequestConfig } from 'axios'
-import { CORE_BASE_URL } from '@/api/config'
-
-const apiClient = axios.create({
-  baseURL: CORE_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
+import { CORE_BASE_URL, TASK_BASE_URL } from '@/api/config'
 
 const authStorage = window.desktopApi ? localStorage : sessionStorage
 
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = authStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
+function createApiClient(baseURL: string): AxiosInstance {
+  const client = axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error?.response?.status === 401) {
-      authStorage.removeItem('token')
-      authStorage.removeItem('user')
-      authStorage.removeItem('avatar_session_id')
-      window.dispatchEvent(new Event('auth-expired'))
+  client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+    const token = authStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
     }
-    return Promise.reject(error)
-  },
-)
+    return config
+  })
+
+  client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error?.response?.status === 401) {
+        authStorage.removeItem('token')
+        authStorage.removeItem('user')
+        authStorage.removeItem('avatar_session_id')
+        window.dispatchEvent(new Event('auth-expired'))
+      }
+      return Promise.reject(error)
+    },
+  )
+
+  return client
+}
+
+const apiClient = createApiClient(CORE_BASE_URL)
+
+// backend_task (8093) 用クライアント（dev は Vite proxy 経由、Electron 本番は直接接続）
+export const taskClient = createApiClient(TASK_BASE_URL)
 
 export default apiClient

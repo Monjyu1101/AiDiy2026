@@ -164,13 +164,13 @@ def _get_pg() -> PgQuery:
 def _setup_reboot_watcher():
     temp_dir = os.path.join(os.path.dirname(__file__), "temp")
     os.makedirs(temp_dir, exist_ok=True)
-    reboot_path = os.path.join(temp_dir, "reboot_mcp.txt")
+    reboot_path = os.path.join(temp_dir, "reboot_tools.txt")
     if os.path.isfile(reboot_path):
         try:
             os.remove(reboot_path)
         except Exception:
             pass
-        raise SystemExit("reboot_mcp.txt detected")
+        raise SystemExit("reboot_tools.txt detected")
     def watcher():
         while True:
             try:

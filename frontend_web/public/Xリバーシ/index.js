@@ -185,15 +185,24 @@ class ReversiGame {
     }
     
     showValidMoves() {
-        $('.cell').removeClass('valid-move');
-        
+        $('.cell').removeClass('valid-move valid-move-human valid-move-ai');
+        $('.cell .flip-count').remove();
+
         if (this.gameOver || this.isThinking) return;
-        
+
+        // 手番の色に合わせてハイライトを色分け（HUMAN=シアン / A.I.=マゼンタ）
+        const turnClass = this.currentPlayer === 'black' ? 'valid-move-human' : 'valid-move-ai';
         const validMoves = this.getValidMoves(this.currentPlayer);
         validMoves.forEach(([row, col]) => {
-            $(`.cell[data-row="${row}"][data-col="${col}"]`).addClass('valid-move');
+            const cell = $(`.cell[data-row="${row}"][data-col="${col}"]`);
+            cell.addClass(`valid-move ${turnClass}`);
+
+            // 人間の手番なら「裏返せる枚数」をバッジ表示（戦略の楽しさアップ）
+            if (this.currentPlayer === 'black') {
+                const count = this.evaluateMove(row, col, 'black');
+                cell.append($(`<span class="flip-count">${count}</span>`));
+            }
         });
-        
     }
     
     getValidMoves(player) {
@@ -241,6 +250,10 @@ class ReversiGame {
             return;
         }
         
+        // バッジとハイライトは手を打った瞬間に消す
+        $('.cell').removeClass('valid-move valid-move-human valid-move-ai');
+        $('.cell .flip-count').remove();
+
         this.placePiece(row, col, this.currentPlayer);
         this.flipPieces(row, col, this.currentPlayer);
         this.addPieceWithAnimation(row, col, this.currentPlayer);
@@ -286,10 +299,14 @@ class ReversiGame {
             }
         }
         
-        // アニメーション付きでピースを裏返す
+        // 盤面データは即時更新（スコア計算・合法手判定・CPU思考を正しくするため）
+        toFlip.forEach(([r, c]) => {
+            this.board[r][c] = player;
+        });
+
+        // 見た目だけ順番にアニメーションさせる
         toFlip.forEach(([r, c], index) => {
             setTimeout(() => {
-                this.board[r][c] = player;
                 this.animateFlip(r, c, player);
             }, index * 100);
         });
@@ -352,6 +369,8 @@ class ReversiGame {
     }
     
     checkForPass() {
+        if (this.gameOver) return;
+
         // まず64手完了（盤面埋まり）をチェック
         if (this.isBoardFull()) {
             this.endGame();
@@ -380,21 +399,30 @@ class ReversiGame {
     }
     
     handlePass() {
+        if (this.gameOver) return;
+
         if (this.lastMoveWasPass) {
             // 両者連続パス → ゲーム終了
             setTimeout(() => this.endGame(), 1000);
             return;
         }
-        
+
         // パス表示
         this.showPassMessage();
         this.lastMoveWasPass = true;
-        
+
         // 1秒後にターン交代
         setTimeout(() => {
             this.currentPlayer = this.currentPlayer === 'black' ? 'white' : 'black';
             this.updateTurnDisplay();
             this.checkForPass();
+
+            // パス後に CPU の手番なら思考を開始する（人間パス時のフリーズ対策）
+            if (!this.gameOver && !this.isThinking
+                && this.currentPlayer === 'white'
+                && this.getValidMoves('white').length > 0) {
+                setTimeout(() => this.cpuMove(), 500);
+            }
         }, 1500);
     }
     
@@ -461,16 +489,25 @@ class ReversiGame {
         
         for (const [row, col] of validMoves) {
             let score = this.evaluateMove(row, col, 'white');
-            
-            // 角の重み付け
-            if ((row === 0 || row === 7) && (col === 0 || col === 7)) {
+
+            const isCorner = (row === 0 || row === 7) && (col === 0 || col === 7);
+            if (isCorner) {
+                // 角の重み付け
                 score += 100;
+            } else {
+                // 辺の重み付け
+                if (row === 0 || row === 7 || col === 0 || col === 7) {
+                    score += 10;
+                }
+                // 空いている角の周囲（X打ち・C打ち）は角を献上しやすいので減点
+                for (const [cr, cc] of [[0, 0], [0, 7], [7, 0], [7, 7]]) {
+                    if (Math.abs(row - cr) <= 1 && Math.abs(col - cc) <= 1 && this.board[cr][cc] === null) {
+                        score -= (row !== cr && col !== cc) ? 60 : 30; // X打ちは特に重く減点
+                        break;
+                    }
+                }
             }
-            // 辺の重み付け
-            else if (row === 0 || row === 7 || col === 0 || col === 7) {
-                score += 10;
-            }
-            
+
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = [row, col];
@@ -521,11 +558,21 @@ class ReversiGame {
     }
     
     endGame() {
+        if (this.gameOver && $('#game-message').hasClass('winner')) return; // 二重終了ガード
         this.gameOver = true;
-        $('.cell').removeClass('valid-move');
-        
-        const blackScore = parseInt($('#black-score').text());
-        const whiteScore = parseInt($('#white-score').text());
+        $('.cell').removeClass('valid-move valid-move-human valid-move-ai');
+        $('.cell .flip-count').remove();
+
+        // スコアは DOM ではなく盤面から直接カウントする
+        let blackScore = 0;
+        let whiteScore = 0;
+        for (let row = 0; row < this.BOARD_SIZE; row++) {
+            for (let col = 0; col < this.BOARD_SIZE; col++) {
+                if (this.board[row][col] === 'black') blackScore++;
+                else if (this.board[row][col] === 'white') whiteScore++;
+            }
+        }
+        this.updateScore();
         
         let message;
         if (blackScore > whiteScore) {
@@ -565,19 +612,19 @@ class ReversiGame {
     
     showHint() {
         if (this.gameOver || this.currentPlayer !== 'black') return;
-        
-        $('.cell').removeClass('valid-move');
-        
+
+        $('.cell').removeClass('valid-move valid-move-human valid-move-ai');
+
         const validMoves = this.getValidMoves('black');
         if (validMoves.length === 0) {
             this.showMessage('NO VALID MOVES DETECTED', 'info');
             return;
         }
-        
+
         const bestMove = this.getBestMove(validMoves);
         const cell = $(`.cell[data-row="${bestMove[0]}"][data-col="${bestMove[1]}"]`);
-        
-        cell.addClass('valid-move');
+
+        cell.addClass('valid-move valid-move-human');
         cell.css({
             'animation': 'pulse 0.5s ease-in-out 3',
             'background': '#f39c12'
@@ -610,7 +657,8 @@ class ReversiGame {
     }
     
     hideMessage() {
-        $('#game-message').removeClass('show');
+        // winner クラスも外さないと、リセット後も勝利バナーが画面に残り続ける
+        $('#game-message').removeClass('show winner');
     }
     
     resetGame() {

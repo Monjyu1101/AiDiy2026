@@ -19,7 +19,7 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
-    port: 8099,
+    port: 8092,
     strictPort: true,
     proxy: {
       '/core': {
@@ -28,9 +28,13 @@ export default defineConfig({
         ws: true,
       },
       '/apps': {
-        target: 'http://127.0.0.1:8092',
+        target: 'http://127.0.0.1:9098',
         changeOrigin: true,
         ws: true,
+      },
+      '/task': {
+        target: 'http://127.0.0.1:8093',
+        changeOrigin: true,
       },
     },
   },

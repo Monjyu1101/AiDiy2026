@@ -13,6 +13,7 @@
 
 import { createApp } from 'vue'
 import QAlertComponent from '@/_share/qAlert.vue'
+import QMessageComponent from '@/_share/qMessage.vue'
 
 // -- ColorPicker: インスタンスパターン --
 
@@ -74,6 +75,35 @@ export function qConfirm(message: string): Promise<boolean> {
       showCancel: true,
       onOk: () => close(true),
       onCancel: () => close(false),
+    })
+    app.mount(container)
+  })
+}
+
+// -- Message: 前のメッセージを置き換える --
+
+let activeMessageClose: (() => void) | null = null
+
+export function qMessage(message: string, type = 'success', durationMs = 3000): Promise<void> {
+  return new Promise((resolve) => {
+    activeMessageClose?.()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    let closed = false
+    const close = () => {
+      if (closed) return
+      closed = true
+      if (activeMessageClose === close) activeMessageClose = null
+      app.unmount()
+      container.remove()
+      resolve()
+    }
+    activeMessageClose = close
+    const app = createApp(QMessageComponent, {
+      message: String(message ?? ''),
+      type,
+      durationMs,
+      onClose: close,
     })
     app.mount(container)
   })

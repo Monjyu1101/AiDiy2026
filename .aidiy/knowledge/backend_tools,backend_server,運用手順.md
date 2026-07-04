@@ -129,7 +129,7 @@ PATH 上にない環境ではフルパスへ書き換える。MCP ツールは a
 
 ## Reboot
 
-`backend_tools/temp/reboot_mcp.txt` を作成すると `tools_main.py` が自身を終了し、`_start.py` 起動中なら自動再起動される。
+`backend_tools/temp/reboot_tools.txt` を作成すると `tools_main.py` が自身を終了し、`_start.py` 起動中なら自動再起動される。
 
 ## ログ
 

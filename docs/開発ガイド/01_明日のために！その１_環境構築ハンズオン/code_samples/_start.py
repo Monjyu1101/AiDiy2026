@@ -66,7 +66,7 @@ def print_info(message: str) -> None:
 
 BACKEND_PATH = "backend_server"
 BACKEND_CORE_PORT = 8091
-BACKEND_APPS_PORT = 8092
+BACKEND_APPS_PORT = 9098
 BACKEND_CORE_APP = "core_main:app"
 BACKEND_APPS_APP = "apps_main:app"
 BACKEND_ENV_CANDIDATES = [".venv", "venv"]
@@ -75,7 +75,7 @@ FRONTEND_WEB_PATH = "frontend_web"
 FRONTEND_WEB_PORT = 8090
 
 FRONTEND_AVATAR_PATH = "frontend_avatar"
-FRONTEND_AVATAR_PORT = 8099
+FRONTEND_AVATAR_PORT = 8092
 
 FRONTEND_COMMAND = "npm"
 QUIET_WAIT_SECONDS = 20

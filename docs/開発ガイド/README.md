@@ -8,12 +8,14 @@
 
 ## 1. まず押さえること
 
-- バックエンドは **3 サーバー**
+- バックエンドは **5 サーバー**
   - `core_main.py` : `8091`
-  - `apps_main.py` : `8092`
+  - `apps_main.py` : `9098`
   - `tools_main.py` : `8095`
+  - `local_main.py` : `8094`（`_start.py` のデフォルトは起動しない）
+  - `task_main.py` : `8093`（AIタスク実行 + 定期タスク）
 - Web フロントは `frontend_web`、ポート `8090`
-- Avatar フロントは `frontend_avatar`、ポート `8099`
+- Avatar フロントは `frontend_avatar`、ポート `8092`
 - DB は **SQLite**
   - `backend_server/_data/AiDiy/database.db`
 - スキーマ変更は **Alembic なし**
@@ -35,6 +37,9 @@ AiDiy2026/
 ├── backend_tools/
 │   ├── tools_main.py
 │   ├── tools_proc/
+│   └── AGENTS.md
+├── backend_task/
+│   ├── task_main.py
 │   └── AGENTS.md
 ├── backend_server/
 │   ├── core_main.py
@@ -82,14 +87,20 @@ python _start.py
 
 `_start.py` は**対話形式**です。起動時に以下を選択します。
 
+- バックエンド(local)（デフォルト No）
 - tools
 - バックエンド(core/apps)
+- バックエンド(task)
 - フロントエンド(Web)
 - フロントエンド(Avatar)
 
 ### 個別起動
 
 ```powershell
+# backend local（OpenAI 互換 Gemma、必要時のみ）
+cd backend_local
+.venv/Scripts/python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8094
+
 # backend mcp
 cd backend_tools
 .venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
@@ -100,7 +111,11 @@ cd backend_server
 
 # backend apps
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
+.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098
+
+# backend task
+cd backend_task
+.venv/Scripts/python.exe -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093
 
 # frontend web
 cd frontend_web
@@ -119,16 +134,13 @@ npm run dev
 |------|-----|
 | Web フロント | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
-| Apps API Docs | http://localhost:8092/docs |
-| Backend MCP Chrome DevTools (SSE) | http://localhost:8095/aidiy_chrome_devtools/sse |
-| Backend MCP Desktop Capture (SSE) | http://localhost:8095/aidiy_desktop_capture/sse |
-| Backend MCP SQLite (SSE)          | http://localhost:8095/aidiy_sqlite/sse |
-| Backend MCP PostgreSQL (SSE)      | http://localhost:8095/aidiy_postgres/sse |
-| Backend MCP Logs (SSE)            | http://localhost:8095/aidiy_logs/sse |
-| Backend MCP Code Check (SSE)      | http://localhost:8095/aidiy_code_check/sse |
-| Backend MCP Backup Check (SSE)    | http://localhost:8095/aidiy_backup_check/sse |
-| Backend MCP Backup Save (SSE)     | http://localhost:8095/aidiy_backup_save/sse |
-| Avatar Web モード | http://localhost:8099 |
+| Apps API Docs | http://localhost:9098/docs |
+| Task API Docs | http://localhost:8093/docs |
+| Local API Docs | http://localhost:8094/docs |
+| Backend MCP 一覧（16 サーバー） | http://localhost:8095/ |
+| Backend MCP ツール一覧 | http://localhost:8095/{mcp_name}/list |
+| Backend MCP SSE 接続 | http://localhost:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
+| Avatar Web モード | http://localhost:8092 |
 
 初期ユーザー:
 
@@ -198,7 +210,7 @@ npm run dev
   - 複数ウィンドウ
 - Web
   - `sessionStorage`
-  - `http://localhost:8099`
+  - `http://localhost:8092`
   - 単一タブ + 左右分割
 
 ---

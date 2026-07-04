@@ -1,7 +1,7 @@
 ■ M商品を再現する実行順
 
 Step 0. 前提確認
-- backend: 8091(core) / 8092(apps)
+- backend: 8091(core) / 9098(apps)
 - frontend: 8090
 - ログイン可能
 

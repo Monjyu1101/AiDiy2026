@@ -114,7 +114,8 @@ class CyberTetris {
         };
         
         this.pieceTypes = Object.keys(this.pieces);
-        
+        this.pieceBag = []; // 7種1巡のバッグ方式用
+
         this.initializeGame();
         this.setupEventListeners();
     }
@@ -134,7 +135,9 @@ class CyberTetris {
         this.currentX = 0;
         this.currentY = 0;
         this.pieceLocked = false;
-        
+        this.dropSpeed = 1000;
+        this.pieceBag = [];
+
         // 次のピースを生成
         this.nextPiece = this.generateRandomPiece();
         
@@ -164,7 +167,15 @@ class CyberTetris {
     }
     
     generateRandomPiece() {
-        const randomType = this.pieceTypes[Math.floor(Math.random() * this.pieceTypes.length)];
+        // 7種1巡のバッグ方式（同じピースばかり続く偏りを防ぐ）
+        if (this.pieceBag.length === 0) {
+            this.pieceBag = [...this.pieceTypes];
+            for (let i = this.pieceBag.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [this.pieceBag[i], this.pieceBag[j]] = [this.pieceBag[j], this.pieceBag[i]];
+            }
+        }
+        const randomType = this.pieceBag.pop();
         return {
             type: randomType,
             rotation: 0,
@@ -275,7 +286,7 @@ class CyberTetris {
                 break;
             case 'ArrowDown':
                 e.preventDefault();
-                this.movePieceDown();
+                this.movePieceDown(true);
                 break;
             case 'ArrowUp':
                 e.preventDefault();
@@ -335,20 +346,30 @@ class CyberTetris {
         }
     }
     
-    movePieceDown() {
+    movePieceDown(isSoftDrop = false) {
         if (!this.currentPiece || this.pieceLocked) return;
         if (this.canPlacePiece(this.currentX, this.currentY + 1, this.currentPiece)) {
             this.currentY++;
+            if (isSoftDrop) {
+                this.score += 1; // ソフトドロップボーナス（1点/マス）
+                this.updateUI();
+            }
             this.renderBoard();
         } else {
             this.placePiece();
         }
     }
-    
+
     hardDrop() {
         if (!this.currentPiece || this.pieceLocked) return;
+        let dropCells = 0;
         while (this.canPlacePiece(this.currentX, this.currentY + 1, this.currentPiece)) {
             this.currentY++;
+            dropCells++;
+        }
+        if (dropCells > 0) {
+            this.score += dropCells * 2; // ハードドロップボーナス（2点/マス）
+            this.updateUI();
         }
         this.renderBoard();
         this.placePiece();
@@ -579,12 +600,39 @@ class CyberTetris {
             }
         }
         
-        // 現在のピースを描画
+        // 現在のピースを描画（ゴースト → 本体の順）
         if (this.currentPiece) {
+            this.renderGhostPiece();
             this.renderCurrentPiece();
         }
     }
-    
+
+    renderGhostPiece() {
+        // 落下予測位置（ゴーストピース）を描画
+        let ghostY = this.currentY;
+        while (this.canPlacePiece(this.currentX, ghostY + 1, this.currentPiece)) {
+            ghostY++;
+        }
+        if (ghostY === this.currentY) return;
+
+        const shape = this.currentPiece.shape;
+        const color = this.currentPiece.color;
+
+        for (let row = 0; row < shape.length; row++) {
+            for (let col = 0; col < shape[row].length; col++) {
+                if (shape[row][col] === 1) {
+                    const boardX = this.currentX + col;
+                    const boardY = ghostY + row;
+
+                    if (boardY >= 0 && boardX >= 0 && boardX < this.BOARD_WIDTH && boardY < this.BOARD_HEIGHT) {
+                        const cellIndex = boardY * this.BOARD_WIDTH + boardX;
+                        $(`.tetris-cell:eq(${cellIndex})`).addClass('ghost').addClass(color);
+                    }
+                }
+            }
+        }
+    }
+
     renderCurrentPiece() {
         const shape = this.currentPiece.shape;
         const color = this.currentPiece.color;
@@ -598,7 +646,7 @@ class CyberTetris {
                     if (boardY >= 0 && boardX >= 0 && boardX < this.BOARD_WIDTH && boardY < this.BOARD_HEIGHT) {
                         const cellIndex = boardY * this.BOARD_WIDTH + boardX;
                         const cell = $(`.tetris-cell:eq(${cellIndex})`);
-                        cell.addClass('filled').addClass(color);
+                        cell.removeClass('ghost').addClass('filled').addClass(color);
                     }
                 }
             }

@@ -9,45 +9,54 @@
 
 ## 関連ファイル
 - `frontend_web/vite.config.ts` — Web 用 Vite Proxy（port 8090）
-- `frontend_avatar/vite.config.ts` — Avatar 用 Vite Proxy（port 8099）
+- `frontend_avatar/vite.config.ts` — Avatar 用 Vite Proxy（port 8092）
 - `frontend_web/src/api/client.ts` — `baseURL: '/'` 前提の Axios クライアント
-- `frontend_avatar/src/api/config.ts` — `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` の解決
+- `frontend_avatar/src/api/config.ts` — `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` / `VITE_TASK_BASE_URL` の解決
+- `frontend_avatar/src/api/client.ts` — `apiClient`（core）と `taskClient`（backend_task）
 - `backend_server/core_main.py` — CORS 許可リスト
 - `backend_server/apps_main.py` — CORS 許可リスト
+- `backend_task/task_proc/app.py` — CORS ミドルウェアなし（`/task` はプロキシ経由前提）
 
 ## 開発時の経路
 
 ```text
-ブラウザ → Vite dev server (8090/8099)
+ブラウザ → Vite dev server (8090/8092)
         → /core/* → backend core (8091)
-        → /apps/* → backend apps (8092)
+        → /apps/* → backend apps (9098)
+        → /task/* → backend task (8093)
 ```
 
-- 画面側では `/core/...` または `/apps/...` の相対URLだけを書く。
-- backend の `http://127.0.0.1:8091` / `8092` をコンポーネントへ直書きしない。
-- 本番では Vite dev server がいないため、Nginx 等で同等の `/core` / `/apps` プロキシを用意する。
+- 画面側では `/core/...`、`/apps/...`、`/task/...` の相対URLだけを書く。
+- backend の `http://127.0.0.1:8091` / `9098` / `8093` をコンポーネントへ直書きしない。
+- 本番では Vite dev server がいないため、Nginx 等で同等の `/core` / `/apps` / `/task` プロキシを用意する。
 
 ## proxy 設定の基準
 
 ```typescript
 proxy: {
   '/core': { target: 'http://127.0.0.1:8091', changeOrigin: true, ws: true },
-  '/apps': { target: 'http://127.0.0.1:8092', changeOrigin: true, ws: true },
+  '/apps': { target: 'http://127.0.0.1:9098', changeOrigin: true, ws: true },
+  '/task': { target: 'http://127.0.0.1:8093', changeOrigin: true },
 }
 ```
 
 - `ws: true` は WebSocket 転送に必要。AIコアの `ws://localhost:8090/core/ws/AIコア` も backend core へ転送される。
 - `/core` / `/apps` の prefix は backend 側エンドポイントでも使うため、rewrite で削らない。
-- `frontend_avatar` は `strictPort: true`。WebSocket URL を host から動的生成するため 8099 固定が前提。
+- `frontend_avatar` は `strictPort: true`。WebSocket URL を host から動的生成するため 8092 固定が前提。
 
 ## 現行ポート
 
 | 対象 | ポート |
 |------|--------|
 | `frontend_web` | 8090 |
-| `frontend_avatar` | 8099 |
+| `frontend_avatar` | 8092 |
 | `backend_server/core_main.py` | 8091 |
-| `backend_server/apps_main.py` | 8092 |
+| `backend_server/apps_main.py` | 9098 |
+| `backend_task/task_main.py` | 8093 |
+| `backend_local/local_main.py` | 8094 |
+| `backend_tools/tools_main.py` | 8095 |
+
+`backend_task` には CORS ミドルウェアがないため、ブラウザからの `/task` 呼び出しは必ず Vite proxy（または Nginx 等のリバースプロキシ）経由にする。`frontend_avatar` の Electron 本番のみ `TASK_BASE_URL`（`http://127.0.0.1:8093`）へ直結する。
 
 ## ポート変更時の手順
 1. `frontend_web/vite.config.ts` または `frontend_avatar/vite.config.ts` の `server.port` を更新する。
@@ -59,7 +68,7 @@ proxy: {
 ```python
 origins = [
     "http://localhost:8090",
-    "http://localhost:8099",
+    "http://localhost:8092",
     "http://localhost:5173",
 ]
 ```

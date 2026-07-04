@@ -2,7 +2,7 @@
 
 """バックエンド(local) 起動スクリプト
 
-ローカル LLM (OpenAI 互換 Gemma サーバー、ポート 8096) を起動します。
+ローカル LLM (OpenAI 互換 Gemma サーバー、ポート 8094) を起動します。
 モデルは起動時にはロードせず、利用時（最初のリクエスト）に遅延ロードされます。
 
 公開 API:
@@ -62,7 +62,7 @@ def print_info(message: str) -> None:
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_LOCAL_DIR = THIS_DIR
-PORT = 8096
+PORT = 8094
 APP = "local_main:app"
 ENV_CANDIDATES = [".venv", "venv"]
 

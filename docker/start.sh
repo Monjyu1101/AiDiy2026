@@ -17,8 +17,8 @@ CORE_PID=$!
 sleep 2
 
 # Start Backend Apps API (apps_main) in background
-echo "[2/3] Starting Backend Apps API (port 8092)..."
-python -m uvicorn apps_main:app --host 0.0.0.0 --port 8092 --log-level info &
+echo "[2/3] Starting Backend Apps API (port 9098)..."
+python -m uvicorn apps_main:app --host 0.0.0.0 --port 9098 --log-level info &
 APPS_PID=$!
 sleep 2
 
@@ -36,7 +36,7 @@ echo ""
 echo "Services:"
 echo "  - Frontend:    http://localhost:8090"
 echo "  - Core API:    http://localhost:8091/docs"
-echo "  - Apps API:    http://localhost:8092/docs"
+echo "  - Apps API:    http://localhost:9098/docs"
 echo ""
 echo "Default Login:"
 echo "  - Username: admin"

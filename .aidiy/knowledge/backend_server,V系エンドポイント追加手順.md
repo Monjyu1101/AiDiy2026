@@ -146,7 +146,7 @@ cd backend_server
 .venv\Scripts\python.exe -c "import apps_main"
 ```
 
-- Swagger `http://localhost:8092/docs` で `/一覧` と `/最終更新日時` を実行する。
+- Swagger `http://localhost:9098/docs` で `/一覧` と `/最終更新日時` を実行する。
 - `無効も表示=False` で有効データのみ返ることを確認する。
 - `件数制限=True` で LIMIT が効くことを確認する。
 - 検索条件や分類条件がある場合、params 経由で絞り込まれることを確認する。

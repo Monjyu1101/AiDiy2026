@@ -221,13 +221,13 @@ window.SCENARIO = {
       "lead": "backend_server が 2 本、backend_tools の MCP ハブ、frontend_web と frontend_avatar の 5 サービス構成です。",
       "subtitle": "3 常駐バックエンド + 2 フロントエンドで、ひとつの SQLite DB を共有します。",
       "image": "images/scene_003.png",
-      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 8092, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8099, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
+      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 9098, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8092, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
       "chips": [
         "core_main port 8091",
-        "apps_main port 8092",
+        "apps_main port 9098",
         "backend_tools port 8095",
         "frontend_web port 8090",
-        "frontend_avatar port 8099"
+        "frontend_avatar port 8092"
       ],
       "metrics": [
         {
@@ -248,7 +248,7 @@ window.SCENARIO = {
           "title": "backend_server",
           "lines": [
             "core_main: 8091 (C系・認証・AIコア)",
-            "apps_main: 8092 (M系・T系・V系・S系)",
+            "apps_main: 9098 (M系・T系・V系・S系)",
             "SQLite DB を共有"
           ]
         },
@@ -264,36 +264,36 @@ window.SCENARIO = {
           "title": "frontend_web",
           "lines": [
             "8090: Vue 3 + Vite + TypeScript",
-            "/core → 8091, /apps → 8092 にプロキシ",
+            "/core → 8091, /apps → 9098 にプロキシ",
             "qTubler + Pinia + Vue Router"
           ]
         },
         {
           "title": "frontend_avatar",
           "lines": [
-            "8099: Electron / Web デュアルモード",
+            "8092: Electron / Web デュアルモード",
             "Three.js + @pixiv/three-vrm",
             "AI アバタークライアント"
           ]
         }
       ],
       "facts": [
-        "backend_server は core_main (8091) と apps_main (8092) の 2 サーバー構成で同じ SQLite DB を共有する。",
+        "backend_server は core_main (8091) と apps_main (9098) の 2 サーバー構成で同じ SQLite DB を共有する。",
         "backend_tools (8095) は 14 個の MCP サーバーを同居させ SSE / Streamable HTTP / stdio を提供する。",
-        "frontend_web の Vite プロキシは /core を 8091、/apps を 8092 に振り分ける。"
+        "frontend_web の Vite プロキシは /core を 8091、/apps を 9098 に振り分ける。"
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "core_main.py と apps_main.py は同じ SQLite DB を共有します。フロントエンドは Vite proxy で /core/* を 8091、/apps/* を 8092 へ振り分けます。"
+          "text": "core_main.py と apps_main.py は同じ SQLite DB を共有します。フロントエンドは Vite proxy で /core/* を 8091、/apps/* を 9098 へ振り分けます。"
         },
         {
           "source": "CLAUDE.md",
-          "text": "backend_server core 8091 / apps 8092, backend_tools 8095, frontend_web 8090, frontend_avatar 8099。"
+          "text": "backend_server core 8091 / apps 9098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092。"
         }
       ],
       "short_narration": "AiDiy は 5 本のサービスで動きます。2 つのバックエンド、MCP ハブ、Web と Avatar フロントエンドです。",
-      "long_narration": "AiDiy のサービス構成は 5 本です。backend_server の core_main が 8091 番ポートで認証・権限・AI コアを担当し、apps_main が 8092 番ポートで業務系 API を扱います。backend_tools は 8095 番ポートで 14 個の MCP ツールを提供するハブです。frontend_web は 8090 番ポートで Vue 3 の Web UI を提供し、Vite プロキシで /core を 8091 に、/apps を 8092 に振り分けます。frontend_avatar は 8099 番ポートで Electron とブラウザの両方に対応する AI アバタークライアントです。2 つのバックエンドは同じ SQLite DB ファイルを共有しています。",
+      "long_narration": "AiDiy のサービス構成は 5 本です。backend_server の core_main が 8091 番ポートで認証・権限・AI コアを担当し、apps_main が 9098 番ポートで業務系 API を扱います。backend_tools は 8095 番ポートで 14 個の MCP ツールを提供するハブです。frontend_web は 8090 番ポートで Vue 3 の Web UI を提供し、Vite プロキシで /core を 8091 に、/apps を 9098 に振り分けます。frontend_avatar は 8092 番ポートで Electron とブラウザの両方に対応する AI アバタークライアントです。2 つのバックエンドは同じ SQLite DB ファイルを共有しています。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 0.0,

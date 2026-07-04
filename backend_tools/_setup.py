@@ -51,7 +51,7 @@ VSCODE_CHAT_MODEL_MAX_OUTPUT_TOKENS = 16000
 
 # VS Code チャットモデル (chatLanguageModels.json) 用設定 — backend_local（ローカル LLM / OpenAI 互換）
 LOCAL_CHAT_PROVIDER_NAME = "aidiy_local"
-LOCAL_CHAT_URL = "http://127.0.0.1:8096/v1/chat/completions"
+LOCAL_CHAT_URL = "http://127.0.0.1:8094/v1/chat/completions"
 # backend_local の既定フォールバック（AiDiy_chat_local.json が読めない場合のみ使用）
 LOCAL_CHAT_MODEL_IDS_FALLBACK = [
     "google/gemma-4-E2B-it",

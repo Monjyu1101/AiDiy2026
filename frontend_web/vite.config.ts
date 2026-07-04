@@ -22,7 +22,7 @@ export default defineConfig({
         ws: true,  // WebSocketサポートを有効化
       },
       '/apps': {
-        target: 'http://127.0.0.1:8092',
+        target: 'http://127.0.0.1:9098',
         changeOrigin: true,
         ws: true,  // WebSocketサポートを有効化
       },
@@ -30,6 +30,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8095',
         changeOrigin: true,
         rewrite: (path: string) => path.replace(/^\/mcp/, ''),
+      },
+      '/task': {
+        target: 'http://127.0.0.1:8093',
+        changeOrigin: true,
       }
     }
   }

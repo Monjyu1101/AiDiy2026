@@ -56,14 +56,14 @@
   host: '0.0.0.0',
   proxy: {
     '/core': { target: 'http://localhost:8091', changeOrigin: true },
-    '/apps': { target: 'http://localhost:8092', changeOrigin: true }
+    '/apps': { target: 'http://localhost:9098', changeOrigin: true }
   }
 }</code></pre>
 
   <h3>Proxy を使う理由</h3>
   <ul>
     <li>フロントエンドは同一オリジン（8090）として API を呼べる</li>
-    <li>バックエンドの実ポート（8091/8092）を画面側から意識しなくてよい</li>
+    <li>バックエンドの実ポート（8091/9098）を画面側から意識しなくてよい</li>
     <li>CORS 周りのトラブルを減らせる</li>
   </ul>
 

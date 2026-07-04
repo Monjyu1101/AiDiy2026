@@ -57,6 +57,8 @@ const selections = reactive({
   codeModel6: '',
   codeBasePath: '',
   codePermissions: 'auto',
+  taskAi: '',
+  taskModel: '',
 })
 
 const CHAT_MODEL_KEYS: Record<string, string> = {
@@ -118,10 +120,16 @@ const codeModelOptions3 = computed(() => buildCodeModelOptions(selections.codeAi
 const codeModelOptions4 = computed(() => buildCodeModelOptions(selections.codeAi4))
 const codeModelOptions5 = computed(() => buildCodeModelOptions(selections.codeAi5))
 const codeModelOptions6 = computed(() => buildCodeModelOptions(selections.codeAi6))
+const taskModelOptions = computed(() => buildCodeModelOptions(selections.taskAi))
 
 function buildCodeModelOptions(aiName: string) {
   const models = availableModels.value?.code_models?.[aiName] || {}
   return Object.entries(models).map(([value, label]) => ({ value, label: label || value }))
+}
+
+function chooseAvailable(current: any, candidates: string[]) {
+  const value = String(current || '')
+  return value && candidates.includes(value) ? value : candidates[0] || ''
 }
 
 function normalizeCodeBasePath(path: string) {
@@ -179,30 +187,32 @@ async function loadConfig() {
 
     isInitializing.value = true
 
-    selections.chatAi = currentSettings.value.CHAT_AI_NAME || chatAiOptions.value[0] || ''
-    selections.liveAi = currentSettings.value.LIVE_AI_NAME || liveAiOptions.value[0] || ''
-    selections.codeAi1 = currentSettings.value.CODE_AI1_NAME || codeAiOptions.value[0] || ''
-    selections.codeAi2 = currentSettings.value.CODE_AI2_NAME || codeAiOptions.value[0] || ''
-    selections.codeAi3 = currentSettings.value.CODE_AI3_NAME || codeAiOptions.value[0] || ''
-    selections.codeAi4 = currentSettings.value.CODE_AI4_NAME || codeAiOptions.value[0] || ''
-    selections.codeAi5 = currentSettings.value.CODE_AI5_NAME || codeAiOptions.value[0] || ''
-    selections.codeAi6 = currentSettings.value.CODE_AI6_NAME || codeAiOptions.value[0] || ''
+    selections.chatAi = chooseAvailable(currentSettings.value.CHAT_AI_NAME, chatAiOptions.value)
+    selections.liveAi = chooseAvailable(currentSettings.value.LIVE_AI_NAME, liveAiOptions.value)
+    selections.codeAi1 = chooseAvailable(currentSettings.value.CODE_AI1_NAME, codeAiOptions.value)
+    selections.codeAi2 = chooseAvailable(currentSettings.value.CODE_AI2_NAME, codeAiOptions.value)
+    selections.codeAi3 = chooseAvailable(currentSettings.value.CODE_AI3_NAME, codeAiOptions.value)
+    selections.codeAi4 = chooseAvailable(currentSettings.value.CODE_AI4_NAME, codeAiOptions.value)
+    selections.codeAi5 = chooseAvailable(currentSettings.value.CODE_AI5_NAME, codeAiOptions.value)
+    selections.codeAi6 = chooseAvailable(currentSettings.value.CODE_AI6_NAME, codeAiOptions.value)
     selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || ''
     selections.codePermissions = currentSettings.value.CODE_PERMISSIONS || 'auto'
+    selections.taskAi = chooseAvailable(currentSettings.value.TASK_AI_NAME || 'claude_cli', codeAiOptions.value)
 
     const chatKey = CHAT_MODEL_KEYS[selections.chatAi]
     const liveKey = LIVE_MODEL_KEYS[selections.liveAi]
     const voiceKey = LIVE_VOICE_KEYS[selections.liveAi]
 
-    selections.chatModel = (chatKey && currentSettings.value[chatKey]) || Object.keys(availableModels.value?.chat_models?.[selections.chatAi] || {})[0] || ''
-    selections.liveModel = (liveKey && currentSettings.value[liveKey]) || Object.keys(availableModels.value?.live_models?.[selections.liveAi] || {})[0] || ''
-    selections.liveVoice = (voiceKey && currentSettings.value[voiceKey]) || Object.keys(availableModels.value?.live_voices?.[selections.liveAi] || {})[0] || ''
-    selections.codeModel1 = currentSettings.value.CODE_AI1_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi1] || {})[0] || ''
-    selections.codeModel2 = currentSettings.value.CODE_AI2_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi2] || {})[0] || ''
-    selections.codeModel3 = currentSettings.value.CODE_AI3_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi3] || {})[0] || ''
-    selections.codeModel4 = currentSettings.value.CODE_AI4_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi4] || {})[0] || ''
-    selections.codeModel5 = currentSettings.value.CODE_AI5_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi5] || {})[0] || ''
-    selections.codeModel6 = currentSettings.value.CODE_AI6_MODEL || Object.keys(availableModels.value?.code_models?.[selections.codeAi6] || {})[0] || ''
+    selections.chatModel = chooseAvailable(chatKey && currentSettings.value[chatKey], Object.keys(availableModels.value?.chat_models?.[selections.chatAi] || {}))
+    selections.liveModel = chooseAvailable(liveKey && currentSettings.value[liveKey], Object.keys(availableModels.value?.live_models?.[selections.liveAi] || {}))
+    selections.liveVoice = chooseAvailable(voiceKey && currentSettings.value[voiceKey], Object.keys(availableModels.value?.live_voices?.[selections.liveAi] || {}))
+    selections.codeModel1 = chooseAvailable(currentSettings.value.CODE_AI1_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi1] || {}))
+    selections.codeModel2 = chooseAvailable(currentSettings.value.CODE_AI2_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi2] || {}))
+    selections.codeModel3 = chooseAvailable(currentSettings.value.CODE_AI3_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi3] || {}))
+    selections.codeModel4 = chooseAvailable(currentSettings.value.CODE_AI4_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi4] || {}))
+    selections.codeModel5 = chooseAvailable(currentSettings.value.CODE_AI5_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi5] || {}))
+    selections.codeModel6 = chooseAvailable(currentSettings.value.CODE_AI6_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi6] || {}))
+    selections.taskModel = chooseAvailable(currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[selections.taskAi] || {}))
 
     await nextTick()
     hasLoadedConfig.value = true
@@ -234,6 +244,8 @@ function buildNextSettings() {
   nextSettings.CODE_AI5_MODEL = selections.codeModel5
   nextSettings.CODE_AI6_NAME = selections.codeAi6
   nextSettings.CODE_AI6_MODEL = selections.codeModel6
+  nextSettings.TASK_AI_NAME = selections.taskAi
+  nextSettings.TASK_AI_MODEL = selections.taskModel
 
   const normalizedCodeBasePath = normalizeCodeBasePath(selections.codeBasePath)
   if (normalizedCodeBasePath) {
@@ -252,7 +264,11 @@ function buildNextSettings() {
   return nextSettings
 }
 
-async function submitSettings(再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds = 15, save = false) {
+async function submitSettings(
+  再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_tools?: boolean; reboot_local?: boolean; reboot_task?: boolean },
+  waitSeconds = 15,
+  save = false,
+) {
   loading.value = true
   errorMessage.value = ''
 
@@ -283,7 +299,7 @@ async function submitSettings(再起動要求: { reboot_core: boolean; reboot_ap
 }
 
 function handleSave() {
-  void submitSettings({ reboot_core: false, reboot_apps: true, reboot_mcp: true })
+  void submitSettings({ reboot_core: false, reboot_apps: true, reboot_tools: true, reboot_local: false, reboot_task: false })
 }
 
 async function handleSaveOnly() {
@@ -297,7 +313,7 @@ async function handleSaveOnly() {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: buildNextSettings(),
-      再起動要求: { reboot_core: false, reboot_apps: false, reboot_mcp: false },
+      再起動要求: { reboot_core: false, reboot_apps: false, reboot_tools: false, reboot_local: false, reboot_task: false },
       save: true,
     })
     if (response?.data?.status !== 'OK') {
@@ -328,7 +344,8 @@ async function handleResetReboot() {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: {},
-      再起動要求: { reboot_core: true, reboot_apps: true, reboot_mcp: true },
+      再起動要求: { reboot_core: true, reboot_apps: true, reboot_tools: true, reboot_local: true, reboot_task: true },
+      リセット: true,
     })
 
     if (response?.data?.status !== 'OK') {
@@ -402,6 +419,13 @@ watch(() => selections.codeAi3, (newValue) => syncCodeModel('codeModel3', newVal
 watch(() => selections.codeAi4, (newValue) => syncCodeModel('codeModel4', newValue))
 watch(() => selections.codeAi5, (newValue) => syncCodeModel('codeModel5', newValue))
 watch(() => selections.codeAi6, (newValue) => syncCodeModel('codeModel6', newValue))
+watch(() => selections.taskAi, (newValue) => {
+  if (isInitializing.value) return
+  const models = Object.keys(availableModels.value?.code_models?.[newValue] || {})
+  if (models.length > 0 && !models.includes(selections.taskModel)) {
+    selections.taskModel = models[0]!
+  }
+})
 
 function syncCodeModel(targetKey: 'codeModel2' | 'codeModel3' | 'codeModel4' | 'codeModel5' | 'codeModel6', aiName: string) {
   if (isInitializing.value) return
@@ -642,6 +666,26 @@ onMounted(() => {
                       </select>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="config-panel-section">
+              <div class="config-panel-section-header">Task AI Model</div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-task-ai-select">TASK_AI_NAME:</label>
+                <div class="config-panel-control">
+                  <select id="config-task-ai-select" v-model="selections.taskAi" class="config-panel-select">
+                    <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-task-model-select">TASK_AI_MODEL:</label>
+                <div class="config-panel-control">
+                  <select id="config-task-model-select" v-model="selections.taskModel" class="config-panel-select">
+                    <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
                 </div>
               </div>
             </div>

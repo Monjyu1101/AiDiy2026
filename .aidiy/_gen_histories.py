@@ -88,7 +88,7 @@ def day_summary_and_changes(date_key, day_commits):
             cat_count["MCP"] += 1
             for part in parts:
                 if part.startswith("mcp_"): feature_names.add(part)
-        elif top == "backend_hermes":
+        elif top == "command_hermes":
             cat_count["Hermes"] += 1
         elif top == "frontend_web":
             cat_count["Frontend Web"] += 1

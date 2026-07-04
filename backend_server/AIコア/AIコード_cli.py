@@ -106,8 +106,8 @@ class CodeAI:
         if os.name != 'nt':
             return None
         プロジェクトルート = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        venv_py = os.path.join(プロジェクトルート, 'backend_hermes', '.venv', 'Scripts', 'python.exe')
-        cli_main = os.path.join(プロジェクトルート, 'backend_hermes', 'cli_main.py')
+        venv_py = os.path.join(プロジェクトルート, 'command_hermes', '.venv', 'Scripts', 'python.exe')
+        cli_main = os.path.join(プロジェクトルート, 'command_hermes', 'cli_main.py')
         if os.path.isfile(venv_py) and os.path.isfile(cli_main):
             return [venv_py, cli_main]
         return None
@@ -341,13 +341,13 @@ class CodeAI:
             if base is None:
                 base = [custom_cmd or self._コマンドパス取得()]
 
-            # model="local_chat" のときは backend_local(8096) の OpenAI 互換 API へ
+            # model="local_chat" のときは backend_local(8094) の OpenAI 互換 API へ
             # 疎結合接続する（hermes 標準の OpenAI 互換 provider に base-url を指定するだけ）。
             # backend_local は req.model を無視し、AiDiy_key.json の CHAT_LOCAL_MODEL を使う。
             if (self.code_model or "").lower() == "local_chat":
                 local_args = [
                     "--provider", "lmstudio",
-                    "--base-url", "http://localhost:8096/v1",
+                    "--base-url", "http://localhost:8094/v1",
                     "--api-key", "local",
                     "--model", "local_chat",
                 ]

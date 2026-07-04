@@ -23,6 +23,11 @@ class conf_json:
         # WebUI設定
         'WEB_BASE': '8090',
         'CORE_BASE': '8091',
+        'AVATAR_BASE': '8092',
+        'TASK_BASE': '8093',
+        'LOCAL_BASE': '8094',
+        'TOOLS_BASE': '8095',
+        'APPS_BASE': '8098',
         'WEBUI_FIRST_PAGE': 'メニュー',
 
         # APIキー
@@ -57,6 +62,7 @@ class conf_json:
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image',
         'CHAT_OLLAMA_MODEL': 'deepseek-v4-flash:cloud',
         'CHAT_LOCAL_MODEL': 'google/gemma-4-E2B-it',
+        'CHAT_LOCAL_DTYPE': 'bfloat16',
 
         # LiveAI設定
         'LIVE_AI_NAME': 'freeai_live',
@@ -94,6 +100,10 @@ class conf_json:
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',
         'CODE_VERIFY': 'auto',
+
+        # TaskAI設定
+        'TASK_AI_NAME': 'claude_cli',
+        'TASK_AI_MODEL': 'auto',
     }
 
     def __init__(self, json: str = None):

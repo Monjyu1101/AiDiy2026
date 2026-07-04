@@ -71,5 +71,5 @@ cd backend_server
 ```
 
 - SQLite で新テーブルの存在、件数、必要カラムを確認する。
-- Swagger `http://localhost:8092/docs` で M系 / V系エンドポイントを確認する。
+- Swagger `http://localhost:9098/docs` で M系 / V系エンドポイントを確認する。
 - V系一覧で有効フィルター、件数制限、分類条件が効くことを確認する。

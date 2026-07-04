@@ -31,16 +31,16 @@
    - DB種別が postgresql のときのみ追加処理
 
 2. python _start.py
-   - 8090 / 8091 / 8092 の既存プロセス確認と停止
+   - 8090 / 8091 / 9098 の既存プロセス確認と停止
    - core_main:app を 8091 で起動
-   - apps_main:app を 8092 で起動
+   - apps_main:app を 9098 で起動
    - vite を 8090 で起動
    - 出力監視、異常終了時は15秒後に再起動
 
 3. ブラウザで動作確認
    - Frontend: http://localhost:8090
    - Core API docs: http://localhost:8091/docs
-   - Apps API docs: http://localhost:8092/docs</code></pre>
+   - Apps API docs: http://localhost:9098/docs</code></pre>
 
   <h2>構成の見取り図</h2>
   <table>

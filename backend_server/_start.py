@@ -68,7 +68,7 @@ def print_info(message: str) -> None:
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = THIS_DIR
 CORE_PORT = 8091
-APPS_PORT = 8092
+APPS_PORT = 9098
 CORE_APP = "core_main:app"
 APPS_APP = "apps_main:app"
 ENV_CANDIDATES = [".venv", "venv"]

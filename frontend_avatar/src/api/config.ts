@@ -35,7 +35,21 @@ function resolveWebSocketEndpoint(): string {
   return 'ws://127.0.0.1:8091/core/ws/AIコア'
 }
 
+function resolveTaskBaseUrl(): string {
+  if (import.meta.env.VITE_TASK_BASE_URL) {
+    return import.meta.env.VITE_TASK_BASE_URL
+  }
+
+  // dev は Vite proxy（/task → 8093）、Electron 本番は backend_task へ直接接続
+  if (import.meta.env.DEV) {
+    return '/'
+  }
+
+  return 'http://127.0.0.1:8093'
+}
+
 export const CORE_BASE_URL = resolveHttpBaseUrl()
+export const TASK_BASE_URL = resolveTaskBaseUrl()
 export const AI_WS_ENDPOINT = resolveWebSocketEndpoint()
 export const DEFAULT_VRM_MODEL_URL = '/vrm/VRM_AiDiy.vrm'
 export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'
@@ -68,5 +82,7 @@ export function defaultModelSettings(): ModelSettings {
     CODE_AI5_NAME: 'opencode_cli',
     CODE_AI6_NAME: 'aidiy_hermes',
     CODE_PERMISSIONS: 'auto',
+    TASK_AI_NAME: 'claude_cli',
+    TASK_AI_MODEL: 'auto',
   }
 }

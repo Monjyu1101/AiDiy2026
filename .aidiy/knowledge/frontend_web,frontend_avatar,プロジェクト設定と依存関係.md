@@ -77,11 +77,12 @@ frontend_avatar の型を frontend_web で使うとき:
 
 | 項目 | frontend_web | frontend_avatar |
 |------|-------------|-----------------|
-| port | 8090 | 8099 |
+| port | 8090 | 8092 |
 | host | 未指定（localhost） | 127.0.0.1 |
 | strictPort | 未指定（false） | true |
 | proxy (/core) | 8091 ws:true | 8091 ws:true（同一） |
-| proxy (/apps) | 8092 ws:true | 8092 ws:true（同一） |
+| proxy (/apps) | 9098 ws:true | 9098 ws:true（同一） |
+| proxy (/task) | 8093 | 8093（同一） |
 | optimizeDeps.include | monaco-editor | monaco-editor, three, @pixiv/three-vrm, @pixiv/three-vrm-animation |
 | resolve.alias | @ → ./src | @ → ./src（同一） |
 

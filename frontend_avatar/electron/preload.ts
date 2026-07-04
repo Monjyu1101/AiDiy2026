@@ -1,8 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
+type TaskKey = 'task1' | 'task2' | 'task3'
 type WindowMode = 'login' | 'core'
-type WindowRole = WindowMode | PanelKey | 'settings'
+type WindowRole = WindowMode | PanelKey | TaskKey | 'settings' | 'taskDialog'
 type WindowBounds = { x: number; y: number; width: number; height: number }
 type WindowMetrics = WindowBounds & { minWidth: number; minHeight: number }
 type WindowPointerSnapshot = {
@@ -36,6 +37,9 @@ const api = {
   closeCurrentWindow: () => ipcRenderer.invoke('window:close-self'),
   minimizeCurrentWindow: () => ipcRenderer.invoke('window:minimize-self'),
   togglePanel: (panel: PanelKey) => ipcRenderer.invoke('panel:toggle', panel),
+  toggleTaskWindows: () => ipcRenderer.invoke('task:toggle-all') as Promise<boolean>,
+  openTaskDialogWindow: (payload: Record<string, any>) => ipcRenderer.invoke('task-dialog:open', payload),
+  getTaskDialogPayload: () => ipcRenderer.invoke('task-dialog:get-payload') as Promise<Record<string, any> | null>,
   applyPanelStates: (states: Record<PanelKey, boolean>) => ipcRenderer.invoke('panel:apply-states', states) as Promise<Record<PanelKey, boolean>>,
   getPanelStates: () => ipcRenderer.invoke('panel:get-states') as Promise<Record<PanelKey, boolean>>,
   listDisplaySources: () => ipcRenderer.invoke('desktop:list-sources') as Promise<DisplaySourceInfo[]>,
@@ -61,6 +65,13 @@ const api = {
     ipcRenderer.on('window:shown', handler)
     return () => {
       ipcRenderer.removeListener('window:shown', handler)
+    }
+  },
+  onTaskDialogPayload: (callback: (payload: Record<string, any>) => void) => {
+    const handler = (_event: unknown, payload: Record<string, any>) => callback(payload)
+    ipcRenderer.on('task-dialog:payload', handler)
+    return () => {
+      ipcRenderer.removeListener('task-dialog:payload', handler)
     }
   },
 }

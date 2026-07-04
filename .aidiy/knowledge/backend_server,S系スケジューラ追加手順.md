@@ -94,7 +94,7 @@ cd backend_server
 .venv\Scripts\python.exe -c "import apps_main"
 ```
 
-- Swagger `http://localhost:8092/docs` で各エンドポイントを実行する。
+- Swagger `http://localhost:9098/docs` で各エンドポイントを実行する。
 - データ取得で表示範囲内の予定だけが返ることを確認する。
 - ドラッグ更新後に再取得して位置が保存されていることを確認する。
 - 既存予定と重なる更新で `NG` が返ることを確認する。

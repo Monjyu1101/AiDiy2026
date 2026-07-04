@@ -14,13 +14,14 @@ class AiDiyIntroduction {
         this.typewriterTexts = [
             "FastAPI Dual Server → Ready",
             "Vue 3 + Vite + TypeScript → Active",
-            "4 Parallel Code Agents → Running",
+            "6 Parallel Code Agents → Running",
             "Gemini Live API → Connected",
             "Claude SDK → Integrated",
             "Ollama Chat → Local & Cloud Models",
             "opencode → CLI Integrated",
             "aidiy_hermes → Custom Agent Engine",
-            "MCP Hub ×8 → browser / capture / sqlite / postgres / logs / check / backup",
+            "MCP Hub ×16 → browser / db / logs / check / backup / media / voice / obs / ffmpeg / agents / chat",
+            "AI Task Runner → Free-Flow DAG × Critical Path",
             "Context Compression → 20% summary ratio",
             "60+ Tools → Composable Toolsets",
             "Japanese-First Design → Complete",
@@ -232,7 +233,9 @@ class AiDiyIntroduction {
     }
 
     animateCounters() {
-        document.querySelectorAll('.stat-number').forEach(counter => {
+        const counters = document.querySelectorAll('.stat-number');
+        let remaining = counters.length;
+        counters.forEach(counter => {
             const target = parseInt(counter.dataset.count, 10);
             const duration = 1800;
             const startTime = performance.now();
@@ -247,6 +250,16 @@ class AiDiyIntroduction {
                 } else {
                     counter.textContent = target;
                     counter.classList.add('counted');
+                    // 全カウント完了で一度だけ紙吹雪を上げる
+                    remaining--;
+                    if (remaining === 0 && !this.statsCelebrated) {
+                        this.statsCelebrated = true;
+                        const grid = document.querySelector('.tech-stats');
+                        if (grid) {
+                            const r = grid.getBoundingClientRect();
+                            confettiBurst(r.left + r.width / 2, Math.max(60, r.top + 40), 130, Math.PI * 0.9);
+                        }
+                    }
                 }
             };
             requestAnimationFrame(update);
@@ -558,6 +571,82 @@ function setupClickRipple() {
 }
 
 // --------------------------------------------------------------------
+// 紙吹雪（canvas 1 枚を遅延生成し、粒が無くなったら rAF を止める）
+// --------------------------------------------------------------------
+const CONFETTI_COLORS = ['#00ffff', '#ff00ff', '#ffff00', '#ffffff', '#ffd700', '#7cf7a0'];
+let confettiCanvas = null;
+let confettiCtx = null;
+let confettiPieces = [];
+let confettiRaf = 0;
+
+function confettiBurst(x, y, count = 90, spread = Math.PI) {
+    if (prefersReducedMotion) return;
+    if (!confettiCanvas) {
+        confettiCanvas = document.createElement('canvas');
+        confettiCanvas.id = 'fx-confetti';
+        document.body.appendChild(confettiCanvas);
+        confettiCtx = confettiCanvas.getContext('2d');
+    }
+    confettiCanvas.width = window.innerWidth;
+    confettiCanvas.height = window.innerHeight;
+    for (let i = 0; i < count; i++) {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * spread;
+        const speed = 4 + Math.random() * 8;
+        confettiPieces.push({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            w: 4 + Math.random() * 5,
+            h: 6 + Math.random() * 7,
+            rot: Math.random() * Math.PI * 2,
+            vr: (Math.random() - 0.5) * 0.3,
+            color: CONFETTI_COLORS[(Math.random() * CONFETTI_COLORS.length) | 0],
+            life: 0,
+            ttl: 90 + Math.random() * 50,
+        });
+    }
+    if (!confettiRaf) confettiRaf = requestAnimationFrame(confettiStep);
+}
+
+function confettiStep() {
+    const ctx = confettiCtx;
+    ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    confettiPieces = confettiPieces.filter(p => p.life < p.ttl && p.y < confettiCanvas.height + 24);
+    if (confettiPieces.length === 0) {
+        confettiRaf = 0;
+        return;
+    }
+    for (const p of confettiPieces) {
+        p.life++;
+        p.vy += 0.16;      // 重力
+        p.vx *= 0.985;     // 空気抵抗
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vr;
+        const fade = Math.max(0, Math.min(1, (1 - p.life / p.ttl) * 1.4));
+        ctx.save();
+        ctx.globalAlpha = fade;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        // 高さを揺らして「ひらひら」感を出す
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * (0.4 + Math.abs(Math.sin(p.life * 0.15)) * 0.6));
+        ctx.restore();
+    }
+    confettiRaf = requestAnimationFrame(confettiStep);
+}
+
+// CTA ボタンクリックでも小さくお祝い
+function setupConfettiTriggers() {
+    if (prefersReducedMotion) return;
+    document.querySelectorAll('.cyber-button, .cyber-button-ghost').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            confettiBurst(e.clientX, e.clientY, 45, Math.PI * 2);
+        }, { passive: true });
+    });
+}
+
+// --------------------------------------------------------------------
 // 初期化
 // --------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -574,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupScrollProgress();
     setupCardTilt();
     setupClickRipple();
+    setupConfettiTriggers();
 
     window.addEventListener('beforeunload', () => {
         intro.destroy();

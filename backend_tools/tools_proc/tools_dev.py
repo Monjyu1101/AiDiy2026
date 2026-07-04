@@ -228,7 +228,7 @@ def create_code_check_router(checker) -> APIRouter:
             "venv_project_values": {
                 "backend_server": "backend_server/.venv を使用（デフォルト）",
                 "backend_tools": "backend_tools/.venv を使用",
-                "backend_hermes": "backend_hermes/.venv を使用",
+                "command_hermes": "command_hermes/.venv を使用",
             },
             "methods": {
                 "list_targets": {
@@ -243,7 +243,7 @@ def create_code_check_router(checker) -> APIRouter:
                     "description": "py_compile を使って指定 Python ファイルの構文エラーを検出する。相対パスはプロジェクトルート基準で解釈される。ファイル保存直後の即時チェックに最適。",
                     "parameters": {
                         "file_path": {"type": "string", "required": True, "description": "チェック対象ファイルパス（絶対パスまたはプロジェクトルート相対パス）。例: 'backend_server/core_main.py'"},
-                        "venv_project": {"type": "string", "required": False, "default": "backend_server", "values": ["backend_server", "backend_tools", "backend_hermes"], "description": "使用する Python venv のプロジェクト名"},
+                        "venv_project": {"type": "string", "required": False, "default": "backend_server", "values": ["backend_server", "backend_tools", "command_hermes"], "description": "使用する Python venv のプロジェクト名"},
                     },
                     "example_request": {"file_path": "backend_server/core_main.py", "venv_project": "backend_server"},
                     "response_fields": {"ok": "True=構文エラーなし", "file_path": "チェックしたパス", "error": "エラー内容（ok=False 時）"},
@@ -253,7 +253,7 @@ def create_code_check_router(checker) -> APIRouter:
                     "description": "ruff check を実行して lint エラーを検出する。ディレクトリを指定するとその配下を再帰的にチェックする。ruff が未インストールの venv ではエラーを返す。",
                     "parameters": {
                         "path": {"type": "string", "required": False, "default": "backend_server", "description": "チェック対象パス（ファイルまたはディレクトリ）。例: 'backend_server' / 'backend_server/core_main.py'"},
-                        "venv_project": {"type": "string", "required": False, "default": "backend_server", "values": ["backend_server", "backend_tools", "backend_hermes"]},
+                        "venv_project": {"type": "string", "required": False, "default": "backend_server", "values": ["backend_server", "backend_tools", "command_hermes"]},
                     },
                     "example_request": {"path": "backend_server", "venv_project": "backend_server"},
                     "response_fields": {"ok": "True=lint エラーなし", "violations": "違反一覧", "count": "違反件数"},

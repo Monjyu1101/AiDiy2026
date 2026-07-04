@@ -37,7 +37,7 @@
 
 
  Core サーバー    Apps サーバー
- localhost:8091   localhost:8092
+ localhost:8091   localhost:9098
 
  FastAPI + JWT認証   FastAPI + JWT認証
 
@@ -61,7 +61,7 @@
  <p>
  <strong>バックエンドは2つのサーバーで構成されます</strong><br>
  • <strong>Core API (8091)</strong>: C系（共通管理）とA系（AI機能）を担当<br>
- • <strong>Apps API (8092)</strong>: M系（マスタ）、T系（トランザクション）、V系（ビュー）、S系（スケジューラー）を担当
+ • <strong>Apps API (9098)</strong>: M系（マスタ）、T系（トランザクション）、V系（ビュー）、S系（スケジューラー）を担当
  </p>
  </div>
  </section>
@@ -205,7 +205,7 @@
 
  backend_server/ # バックエンドサーバー
   core_main.py # Core APIエントリポイント (ポート8091)
-  apps_main.py # Apps APIエントリポイント (ポート8092)
+  apps_main.py # Apps APIエントリポイント (ポート9098)
   database.py # DB接続設定
   auth.py, deps.py # JWT認証・依存性注入
 
@@ -243,7 +243,7 @@
 
  frontend_avatar/ # AIアバタークライアント
   src/ # Vue 3 + TypeScript
-  vite.config.ts # Avatar Webモード (8099)
+  vite.config.ts # Avatar Webモード (8092)
   AGENTS.md
 
  docs/開発ガイド/
@@ -302,7 +302,7 @@
  </tr>
  <tr>
  <td><strong>Avatar Webモード</strong></td>
- <td><a href="http://127.0.0.1:8099/" target="_blank">http://127.0.0.1:8099/</a></td>
+ <td><a href="http://127.0.0.1:8092/" target="_blank">http://127.0.0.1:8092/</a></td>
  <td><code>frontend_avatar</code> のVite開発サーバー</td>
  </tr>
  <tr>
@@ -312,7 +312,7 @@
  </tr>
  <tr>
  <td><strong>Swagger Apps API</strong></td>
- <td><a href="http://localhost:8092/docs" target="_blank">http://localhost:8092/docs</a></td>
+ <td><a href="http://localhost:9098/docs" target="_blank">http://localhost:9098/docs</a></td>
  <td>Swagger UIでM系・T系・V系・S系・X系のAPIを確認・テスト</td>
  </tr>
  </tbody>
@@ -323,7 +323,7 @@
  <p>フロントエンドからのAPIリクエストはプロキシ経由で転送されます。</p>
  <ul>
  <li>パスが <code>/core/*</code> なら Core、<code>/apps/*</code> なら Apps へ転送</li>
- <li>Viteの設定で <code>localhost:8091</code> と <code>localhost:8092</code> に振り分け</li>
+ <li>Viteの設定で <code>localhost:8091</code> と <code>localhost:9098</code> に振り分け</li>
  <li>全てのAPI操作は<strong>POST</strong>メソッドを使用</li>
  </ul>
  <p>詳細は <code>frontend_web/vite.config.ts</code> を参照してください。</p>
@@ -417,7 +417,7 @@
    </tr>
    <tr>
    <td><strong>Apps</strong></td>
-   <td>8092</td>
+   <td>9098</td>
    <td><code>/apps/*</code></td>
    <td>M系 (M商品, M車両, M配車区分) / T系 (T配車, T商品入庫等) / V系 / S系</td>
    </tr>

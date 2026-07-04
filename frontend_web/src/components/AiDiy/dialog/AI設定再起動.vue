@@ -56,7 +56,9 @@ const selections = reactive({
   codeAi6: '',
   codeModel6: '',
   codeBasePath: '',
-  codePermissions: 'auto'
+  codePermissions: 'auto',
+  taskAi: '',
+  taskModel: ''
 });
 
 const CHAT_MODEL_KEYS: Record<string, string> = {
@@ -140,10 +142,20 @@ const codeModelOptions6 = computed(() => {
   return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
 });
 
+const taskModelOptions = computed(() => {
+  const models = availableModels.value?.code_models?.[selections.taskAi] || {};
+  return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
+});
+
 const codeBaseOptionsList = computed(() =>
   Object.entries(codeBaseOptions.value || {}).map(([value, label]) => ({ value, label }))
 );
 const codePermissionOptions = ['auto', 'full', 'none'];
+
+const chooseAvailable = (current: any, candidates: string[]) => {
+  const value = String(current || '');
+  return value && candidates.includes(value) ? value : candidates[0] || '';
+};
 
 const normalizeCodeBasePath = (path: string) => path.trim().replace(/\\/g, '/');
 
@@ -195,32 +207,34 @@ const loadConfig = async () => {
       const liveVoices = availableModels.value.live_voices || {};
       const codeModels = availableModels.value.code_models || {};
 
-      selections.chatAi = currentSettings.value.CHAT_AI_NAME || chatAiOptions.value[0] || '';
-      selections.liveAi = currentSettings.value.LIVE_AI_NAME || liveAiOptions.value[0] || '';
-      selections.codeAi1 = currentSettings.value.CODE_AI1_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi2 = currentSettings.value.CODE_AI2_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi3 = currentSettings.value.CODE_AI3_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi4 = currentSettings.value.CODE_AI4_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi5 = currentSettings.value.CODE_AI5_NAME || codeAiOptions.value[0] || '';
-      selections.codeAi6 = currentSettings.value.CODE_AI6_NAME || codeAiOptions.value[0] || '';
+      selections.chatAi = chooseAvailable(currentSettings.value.CHAT_AI_NAME, chatAiOptions.value);
+      selections.liveAi = chooseAvailable(currentSettings.value.LIVE_AI_NAME, liveAiOptions.value);
+      selections.codeAi1 = chooseAvailable(currentSettings.value.CODE_AI1_NAME, codeAiOptions.value);
+      selections.codeAi2 = chooseAvailable(currentSettings.value.CODE_AI2_NAME, codeAiOptions.value);
+      selections.codeAi3 = chooseAvailable(currentSettings.value.CODE_AI3_NAME, codeAiOptions.value);
+      selections.codeAi4 = chooseAvailable(currentSettings.value.CODE_AI4_NAME, codeAiOptions.value);
+      selections.codeAi5 = chooseAvailable(currentSettings.value.CODE_AI5_NAME, codeAiOptions.value);
+      selections.codeAi6 = chooseAvailable(currentSettings.value.CODE_AI6_NAME, codeAiOptions.value);
       selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || '';
       selections.codePermissions = currentSettings.value.CODE_PERMISSIONS || 'auto';
+      selections.taskAi = chooseAvailable(currentSettings.value.TASK_AI_NAME || 'claude_cli', codeAiOptions.value);
 
       const chatKey = CHAT_MODEL_KEYS[selections.chatAi];
-      selections.chatModel = (chatKey && currentSettings.value[chatKey]) || Object.keys(chatModels?.[selections.chatAi] || {})[0] || '';
+      selections.chatModel = chooseAvailable(chatKey && currentSettings.value[chatKey], Object.keys(chatModels?.[selections.chatAi] || {}));
 
       const liveKey = LIVE_MODEL_KEYS[selections.liveAi];
-      selections.liveModel = (liveKey && currentSettings.value[liveKey]) || Object.keys(liveModels?.[selections.liveAi] || {})[0] || '';
+      selections.liveModel = chooseAvailable(liveKey && currentSettings.value[liveKey], Object.keys(liveModels?.[selections.liveAi] || {}));
 
       const voiceKey = LIVE_VOICE_KEYS[selections.liveAi];
-      selections.liveVoice = (voiceKey && currentSettings.value[voiceKey]) || Object.keys(liveVoices?.[selections.liveAi] || {})[0] || '';
+      selections.liveVoice = chooseAvailable(voiceKey && currentSettings.value[voiceKey], Object.keys(liveVoices?.[selections.liveAi] || {}));
 
-      selections.codeModel1 = currentSettings.value.CODE_AI1_MODEL || Object.keys(codeModels?.[selections.codeAi1] || {})[0] || '';
-      selections.codeModel2 = currentSettings.value.CODE_AI2_MODEL || Object.keys(codeModels?.[selections.codeAi2] || {})[0] || '';
-      selections.codeModel3 = currentSettings.value.CODE_AI3_MODEL || Object.keys(codeModels?.[selections.codeAi3] || {})[0] || '';
-      selections.codeModel4 = currentSettings.value.CODE_AI4_MODEL || Object.keys(codeModels?.[selections.codeAi4] || {})[0] || '';
-      selections.codeModel5 = currentSettings.value.CODE_AI5_MODEL || Object.keys(codeModels?.[selections.codeAi5] || {})[0] || '';
-      selections.codeModel6 = currentSettings.value.CODE_AI6_MODEL || Object.keys(codeModels?.[selections.codeAi6] || {})[0] || '';
+      selections.codeModel1 = chooseAvailable(currentSettings.value.CODE_AI1_MODEL, Object.keys(codeModels?.[selections.codeAi1] || {}));
+      selections.codeModel2 = chooseAvailable(currentSettings.value.CODE_AI2_MODEL, Object.keys(codeModels?.[selections.codeAi2] || {}));
+      selections.codeModel3 = chooseAvailable(currentSettings.value.CODE_AI3_MODEL, Object.keys(codeModels?.[selections.codeAi3] || {}));
+      selections.codeModel4 = chooseAvailable(currentSettings.value.CODE_AI4_MODEL, Object.keys(codeModels?.[selections.codeAi4] || {}));
+      selections.codeModel5 = chooseAvailable(currentSettings.value.CODE_AI5_MODEL, Object.keys(codeModels?.[selections.codeAi5] || {}));
+      selections.codeModel6 = chooseAvailable(currentSettings.value.CODE_AI6_MODEL, Object.keys(codeModels?.[selections.codeAi6] || {}));
+      selections.taskModel = chooseAvailable(currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(codeModels?.[selections.taskAi] || {}));
       await nextTick();
       isInitializing.value = false;
       hasLoadedConfig.value = true;
@@ -262,6 +276,8 @@ const buildNextSettings = () => {
     nextSettings.CODE_AI5_MODEL = selections.codeModel5;
     nextSettings.CODE_AI6_NAME = selections.codeAi6;
     nextSettings.CODE_AI6_MODEL = selections.codeModel6;
+    nextSettings.TASK_AI_NAME = selections.taskAi;
+    nextSettings.TASK_AI_MODEL = selections.taskModel;
     const normalizedCodeBasePath = normalizeCodeBasePath(selections.codeBasePath);
     if (normalizedCodeBasePath) {
       nextSettings.CODE_BASE_PATH = normalizedCodeBasePath;
@@ -285,7 +301,11 @@ const buildNextSettings = () => {
     return nextSettings;
 };
 
-const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_mcp?: boolean }, waitSeconds: number = 15, save: boolean = false) => {
+const submitSettings = async (
+  再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_tools?: boolean; reboot_local?: boolean; reboot_task?: boolean },
+  waitSeconds: number = 15,
+  save: boolean = false,
+) => {
   loading.value = true;
   errorMessage.value = '';
   try {
@@ -316,7 +336,7 @@ const submitSettings = async (再起動要求: { reboot_core: boolean; reboot_ap
   }
 };
 
-const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true, reboot_mcp: true });
+const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true, reboot_tools: true, reboot_local: false, reboot_task: false });
 
 const handleSaveOnly = async () => {
   loading.value = true;
@@ -330,7 +350,7 @@ const handleSaveOnly = async () => {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: buildNextSettings(),
-      再起動要求: { reboot_core: false, reboot_apps: false, reboot_mcp: false },
+      再起動要求: { reboot_core: false, reboot_apps: false, reboot_tools: false, reboot_local: false, reboot_task: false },
       save: true
     });
     if (response?.data?.status === 'OK') {
@@ -359,7 +379,8 @@ const handleResetReboot = async () => {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: {},
-      再起動要求: { reboot_core: true, reboot_apps: true, reboot_mcp: true }
+      再起動要求: { reboot_core: true, reboot_apps: true, reboot_tools: true, reboot_local: true, reboot_task: true },
+      リセット: true
     });
     if (response?.data?.status === 'OK') {
       rebootWaitSeconds.value = 60;
@@ -470,6 +491,18 @@ watch(
     const models = Object.keys(availableModels.value.code_models[newValue]);
     if (models.length > 0 && !models.includes(selections.codeModel4)) {
       selections.codeModel4 = models[0];
+    }
+  }
+);
+
+watch(
+  () => selections.taskAi,
+  (newValue) => {
+    if (isInitializing.value) return;
+    if (!availableModels.value?.code_models?.[newValue]) return;
+    const models = Object.keys(availableModels.value.code_models[newValue]);
+    if (models.length > 0 && !models.includes(selections.taskModel)) {
+      selections.taskModel = models[0];
     }
   }
 );
@@ -728,6 +761,26 @@ onMounted(() => {
                       </select>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="config-panel-section">
+              <div class="config-panel-section-header">Task AI Model</div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-task-ai-select">TASK_AI_NAME:</label>
+                <div class="config-panel-control">
+                  <select id="config-task-ai-select" v-model="selections.taskAi" class="config-panel-select">
+                    <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-task-model-select">TASK_AI_MODEL:</label>
+                <div class="config-panel-control">
+                  <select id="config-task-model-select" v-model="selections.taskModel" class="config-panel-select">
+                    <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
                 </div>
               </div>
             </div>

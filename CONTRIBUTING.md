@@ -12,6 +12,9 @@
   - `docs/` フォルダ（コーディングルール、実装例など）
   - `backend_server/AGENTS.md`
   - `backend_tools/AGENTS.md`
+  - `backend_local/AGENTS.md`
+  - `backend_task/AGENTS.md`
+  - `command_hermes/AGENTS.md`
   - `frontend_web/AGENTS.md`
   - `frontend_avatar/AGENTS.md`
 
@@ -28,11 +31,19 @@
 
 ## テスト
 
-自動テストは未整備のため、手動テストで確認してください。
+`backend_tools` にはスモークテストがあります（`backend_tools` 起動後に実行）。
 
-- API: http://localhost:8091/docs / http://localhost:8092/docs
+```powershell
+cd backend_tools
+.venv\Scripts\python.exe tests\test_mcp_smoke.py
+.venv\Scripts\python.exe tests\test_post_api_smoke.py
+```
+
+そのほかは手動テストで確認してください。
+
+- API: http://localhost:8091/docs / http://localhost:9098/docs / http://localhost:8093/docs
 - UI: http://localhost:8090
-- MCP 連携変更時: `backend_tools` の 8 SSE（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup_check` / `aidiy_backup_save`、いずれも `http://localhost:8095/<name>/sse`）も確認
+- MCP 連携変更時: `backend_tools` の 16 MCP サーバー（一覧は `GET http://localhost:8095/`、SSE は `http://localhost:8095/<mcp_name>/sse`）も確認
 
 ## セキュリティ
 

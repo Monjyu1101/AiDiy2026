@@ -339,7 +339,7 @@ window.SCENARIO = {
       "image": "images/scene_005.png",
       "source_summary": "AiDiy + Spark 活用シナリオ: 128GB 統合メモリと1ペタフロップ級の性能で、Ollama 等のローカル LLM と AiDiy（backend_server 2サーバー + backend_tools 15 MCP + frontend_web + frontend_avatar）を1台で稼働。CHAT_AI_NAME/LIVE_AI_NAME/CODE_AI1_NAME〜CODE_AI6_NAME にローカルモデルを設定。データをクラウドに出さずに AIコア・Code AI を低レイテンシで利用可能。",
       "factual_bullets": [
-        "AiDiy: FastAPI + SQLAlchemy + SQLite (Python 3.13) + Vue 3 + Vite の 2サーバー構成（8091/8092）",
+        "AiDiy: FastAPI + SQLAlchemy + SQLite (Python 3.13) + Vue 3 + Vite の 2サーバー構成（8091/9098）",
         "backend_tools: 15 MCP サーバーを集約（コードエージェント・画像生成・TTS など）",
         "CHAT_AI_NAME / LIVE_AI_NAME / CODE_AI1〜6_NAME にローカルモデルを指定可能",
         "Ollama 等でローカル LLM を稼働させ AiDiy AI コアと連携",

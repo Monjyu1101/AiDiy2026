@@ -23,17 +23,17 @@
     <tr><td>npm</td><td>Node.js のパッケージ管理ツール</td><td><code>npm install</code> で <code>package.json</code> の依存関係を取得</td></tr>
     <tr><td>venv</td><td>Python の仮想環境</td><td>本プロジェクトは通常 <code>backend_server/.venv</code> を利用</td></tr>
     <tr><td>Vite</td><td>フロントエンド開発サーバー兼ビルドツール</td><td>開発時のポートは 8090</td></tr>
-    <tr><td>Uvicorn</td><td>FastAPI を動かす ASGI サーバー</td><td>core:8091 / apps:8092</td></tr>
+    <tr><td>Uvicorn</td><td>FastAPI を動かす ASGI サーバー</td><td>core:8091 / apps:9098</td></tr>
   </table>
 
   <h2>ネットワークとAPI</h2>
   <table>
     <tr><th>用語</th><th>意味</th><th>補足</th></tr>
-    <tr><td>ポート</td><td>通信先を識別する番号</td><td>このプロジェクトは 8090 / 8091 / 8092 を使用</td></tr>
+    <tr><td>ポート</td><td>通信先を識別する番号</td><td>このプロジェクトは 8090 / 8091 / 9098 を使用</td></tr>
     <tr><td>localhost</td><td>自分自身のPCを指すホスト名</td><td><code>127.0.0.1</code> と同義</td></tr>
     <tr><td>Proxy</td><td>リクエストを別サーバーに転送する仕組み</td><td>Vite が <code>/core</code> と <code>/apps</code> を振り分ける</td></tr>
     <tr><td>CORS</td><td>異なるオリジン間通信を制御する仕組み</td><td>許可設定が不足すると API がブラウザで失敗する</td></tr>
-    <tr><td>Swagger UI</td><td>API をブラウザで試せる画面</td><td><code>http://localhost:8091/docs</code> と <code>http://localhost:8092/docs</code></td></tr>
+    <tr><td>Swagger UI</td><td>API をブラウザで試せる画面</td><td><code>http://localhost:8091/docs</code> と <code>http://localhost:9098/docs</code></td></tr>
   </table>
 
   <h2>OSとプロセス</h2>
@@ -75,7 +75,7 @@
   <section>
     <h2>確認ポイント</h2>
     <ul>
-      <li>ポート番号は 8090 / 8091 / 8092 で統一されているか</li>
+      <li>ポート番号は 8090 / 8091 / 9098 で統一されているか</li>
       <li>パスは <code>workspace/AiDiy2026</code> 基準で読めているか</li>
       <li>「なぜこのツールを使うか」を説明できるか</li>
     </ul>

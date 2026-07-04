@@ -240,6 +240,7 @@
             box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
         }
 
+        /* 置ける場所: HUMAN=シアン系背景 / A.I.=グレー系背景、置かれる石の色（白/黒）はゴーストで見分ける */
         .cell.valid-move {
             background: linear-gradient(135deg, #004d4d, #006666);
             border-color: #00ffff;
@@ -247,15 +248,72 @@
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
         }
 
+        .cell.valid-move.valid-move-ai {
+            background: linear-gradient(135deg, #3a3a3a, #555555);
+            border-color: #c0c0c0;
+            animation: validMovePulseAi 1.5s infinite;
+            box-shadow: 0 0 20px rgba(200, 200, 200, 0.35);
+        }
+
+        /* 置かれる石のゴースト表示（どちらの色の石が置かれるか一目で分かる） */
+        .cell.valid-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 62%;
+            height: 62%;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .cell.valid-move.valid-move-human::after {
+            background: linear-gradient(135deg, #000, #333);
+            border: 2px solid rgba(255, 255, 255, 0.40);
+            opacity: 0.65;
+        }
+
+        .cell.valid-move.valid-move-ai::after {
+            background: linear-gradient(135deg, #fff, #ddd);
+            border: 2px solid rgba(0, 0, 0, 0.30);
+            opacity: 0.80;
+        }
+
         @keyframes validMovePulse {
-            0%, 100% { 
+            0%, 100% {
                 transform: scale(1);
                 box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
             }
-            50% { 
+            50% {
                 transform: scale(1.1);
                 box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
             }
+        }
+
+        @keyframes validMovePulseAi {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 20px rgba(200, 200, 200, 0.35);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 30px rgba(230, 230, 230, 0.55);
+            }
+        }
+
+        /* 裏返せる枚数バッジ */
+        .cell .flip-count {
+            position: absolute;
+            bottom: 4%;
+            right: 8%;
+            font-size: clamp(0.55em, 1.6vh, 0.9em);
+            font-weight: bold;
+            color: rgba(0, 255, 255, 0.95);
+            text-shadow: 0 0 6px rgba(0, 255, 255, 0.8);
+            pointer-events: none;
+            z-index: 2;
         }
 
         .piece {
@@ -449,6 +507,7 @@
             z-index: 2000;
             animation: winnerAppear 0.8s ease-out forwards;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
         }
 
         @keyframes winnerAppear {

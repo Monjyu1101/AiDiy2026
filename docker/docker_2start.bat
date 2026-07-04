@@ -47,7 +47,7 @@ if %errorlevel% == 0 (
     echo.
     echo Backend API Documentation ^(Direct only^):
     echo   - Core API ^(Direct^): http://kondou-envy:8091/docs
-    echo   - Apps API ^(Direct^): http://kondou-envy:8092/docs
+    echo   - Apps API ^(Direct^): http://kondou-envy:9098/docs
     echo.
     echo Default Login:
     echo   - Username: admin

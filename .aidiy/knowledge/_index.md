@@ -18,9 +18,10 @@
 |-------------|------|
 | `共通` | プロジェクト全体、横断的な話題 |
 | `backend_server` | FastAPI サーバー（core_main / apps_main） |
-| `backend_hermes` | `aidiy_hermes` CLI 基盤 |
+| `command_hermes` | `aidiy_hermes` CLI 基盤 |
 | `backend_tools` | MCP サーバー群 |
 | `backend_local` | ローカル LLM サーバー（OpenAI 互換 Gemma 推論） |
+| `backend_task` | AIタスク実行 + 定期タスク FastAPI サーバー |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
 
@@ -80,7 +81,7 @@
 |------|----------|
 | 音声処理 | `AudioController` 単体、マイク、再生、エコー抑制、音声 WebSocket は [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) に集約する。 |
 | VRM / VRMA | モデルやモーションファイルを追加する場合は [`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、表示サイズ・向き・表示選択 UI は [`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、描画内部やカメラワークは [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) を使う。 |
-| MCP / 起動 | backend 常駐サーバーの起動は [`backend_server,backend_hermes,backend_tools,バックエンド起動.md`](./backend_server,backend_hermes,backend_tools,バックエンド起動.md)、MCP サーバー構成は [`backend_tools,構成.md`](./backend_tools,構成.md)、Code CLI への MCP 登録は [`backend_hermes,backend_tools,CodeCLI_MCP設定.md`](./backend_hermes,backend_tools,CodeCLI_MCP設定.md) を使う。 |
+| MCP / 起動 | backend 常駐サーバーの起動は [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、MCP サーバー構成は [`backend_tools,構成.md`](./backend_tools,構成.md)、Code CLI への MCP 登録は [`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) を使う。 |
 
 ## 最優先ルール
 
@@ -99,16 +100,16 @@
 | 採番、監査フィールド、初期データ | [`backend_server,C採番と監査フィールド.md`](./backend_server,C採番と監査フィールド.md) |
 | backend の層構造、実装パターン、落とし穴 | [`backend_server,実装パターン.md`](./backend_server,実装パターン.md) |
 | ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
-| backend / MCP 起動、ポート残留 | [`backend_server,backend_hermes,backend_tools,バックエンド起動.md`](./backend_server,backend_hermes,backend_tools,バックエンド起動.md)、[`backend_tools,構成.md`](./backend_tools,構成.md) |
-| aidiy_hermes で MCP が `failed` / ツール未認識 | [`backend_hermes,backend_tools,MCP_SSE接続.md`](./backend_hermes,backend_tools,MCP_SSE接続.md) |
-| Windows ネイティブで terminal / file 操作が落ちる、OS 分岐を入れたい | [`backend_hermes,Windows対応規則.md`](./backend_hermes,Windows対応規則.md) |
-| hermes を MCP サーバーとして Code CLI から使う | [`backend_hermes,MCP_サーバー起動.md`](./backend_hermes,MCP_サーバー起動.md) |
+| backend / MCP / task 起動、ポート残留 | [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、[`backend_tools,構成.md`](./backend_tools,構成.md) |
+| aidiy_hermes で MCP が `failed` / ツール未認識 | [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) |
+| Windows ネイティブで terminal / file 操作が落ちる、OS 分岐を入れたい | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |
+| hermes を MCP サーバーとして Code CLI から使う | [`command_hermes,MCP_サーバー起動.md`](./command_hermes,MCP_サーバー起動.md) |
 | AI モデル、WebSocket、code1〜code6 | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md)、[`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
-| Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`backend_hermes,backend_tools,CodeCLI_MCP設定.md`](./backend_hermes,backend_tools,CodeCLI_MCP設定.md)、[`backend_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md`](./backend_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md) |
+| Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md)、[`command_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md`](./command_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md) |
 | frontend_web 画面、X系、proxy | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md)、[`frontend_web,X系静的画面追加.md`](./frontend_web,X系静的画面追加.md)、[`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
 | frontend_web の UI ルール、qTubler、明細型編集 | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md) |
 | frontend_avatar、Electron、VRM / VRMA、音声 | [`frontend_avatar,変更チェック.md`](./frontend_avatar,変更チェック.md)、[`frontend_avatar,ElectronIPC追加手順.md`](./frontend_avatar,ElectronIPC追加手順.md)、[`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、[`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、[`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
-| backend_hermes の CLI 起動・確認 | [`backend_hermes,backend_server,運用手順.md`](./backend_hermes,backend_server,運用手順.md) |
+| command_hermes の CLI 起動・確認 | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
 | backend_tools の起動・SSE・環境変数 | [`backend_tools,backend_server,運用手順.md`](./backend_tools,backend_server,運用手順.md) |
 | backend_tools の `/tts` `/imageGen` `/movieGen` HTTP API、save_path 挙動、SSE マウント方法 | [`backend_tools,HTTP_API_save_path挙動.md`](./backend_tools,HTTP_API_save_path挙動.md) |
 | Markdown、BOM、ナレッジ整理 | [`共通,Markdown現状追従チェック.md`](./共通,Markdown現状追従チェック.md)、[`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md)、[`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
@@ -150,13 +151,13 @@
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| backend_server / backend_tools を起動・再起動する | [`backend_server,backend_hermes,backend_tools,バックエンド起動.md`](./backend_server,backend_hermes,backend_tools,バックエンド起動.md) |
+| backend_server / backend_tools / backend_task を起動・再起動する | [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md) |
 | 開発環境の起動、依存関係、DB、API確認、問題切り分けを行う | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | Docker / Nginx 構成で起動する | [`backend_server,frontend_web,Docker構成.md`](./backend_server,frontend_web,Docker構成.md) |
 | MCP サーバー構成を確認する | [`backend_tools,構成.md`](./backend_tools,構成.md) |
 | backend_tools の起動、stdio bridge、環境変数を確認する | [`backend_tools,backend_server,運用手順.md`](./backend_tools,backend_server,運用手順.md) |
 | MCP ツールをコードエージェントから使う | [`backend_server,backend_tools,MCP活用手順.md`](./backend_server,backend_tools,MCP活用手順.md) |
-| MCP バックアップツールでファイル検証・差分確認をする | [`backend_hermes,共通,MCPバックアップ検証手順.md`](./backend_hermes,共通,MCPバックアップ検証手順.md) |
+| MCP バックアップツールでファイル検証・差分確認をする | [`command_hermes,共通,MCPバックアップ検証手順.md`](./command_hermes,共通,MCPバックアップ検証手順.md) |
 
 ## Frontend 共通
 
@@ -210,21 +211,21 @@
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| Code CLI を追加する | [`backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,backend_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
-| Code CLI の MCP 設定を確認する | [`backend_hermes,backend_tools,CodeCLI_MCP設定.md`](./backend_hermes,backend_tools,CodeCLI_MCP設定.md) |
-| Antigravity CLI の stdio 型 MCP 設定を確認・更新する | [`backend_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md`](./backend_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md) |
-| aidiy_hermes の MCP SSE 接続を修復・確認する | [`backend_hermes,backend_tools,MCP_SSE接続.md`](./backend_hermes,backend_tools,MCP_SSE接続.md) |
+| Code CLI を追加する | [`backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
+| Code CLI の MCP 設定を確認する | [`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) |
+| Antigravity CLI の stdio 型 MCP 設定を確認・更新する | [`command_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md`](./command_hermes,backend_tools,Antigravity_CLIのstdio型MCP接続設定.md) |
+| aidiy_hermes の MCP SSE 接続を修復・確認する | [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) |
 | Code CLI のプロンプト整形責務を確認する | [`backend_server,CodeCLIプロンプト整形.md`](./backend_server,CodeCLIプロンプト整形.md) |
-| CLI 出力の ANSI 制御コードを除去する | [`backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,backend_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
-| Hermes CLI の TUI を調整する | [`backend_hermes,TUI調整手順.md`](./backend_hermes,TUI調整手順.md) |
-| Hermes CLI の Provider 一覧・選択ロジックを確認する | [`backend_hermes,Provider一覧と選択ロジック.md`](./backend_hermes,Provider一覧と選択ロジック.md) |
-| Hermes CLI の Slash Command 一覧・追加手順を確認する | [`backend_hermes,Slash Command一覧.md`](./backend_hermes,Slash Command一覧.md) |
-| backend_hermes を単体 CLI として起動・確認する | [`backend_hermes,backend_server,運用手順.md`](./backend_hermes,backend_server,運用手順.md) |
-| hermes を MCP サーバーとして起動・Code CLI から接続する | [`backend_hermes,MCP_サーバー起動.md`](./backend_hermes,MCP_サーバー起動.md) |
-| hermes-agent 新バージョンへ追従・移行する | [`backend_hermes,Upstream移行手順.md`](./backend_hermes,Upstream移行手順.md) |
+| CLI 出力の ANSI 制御コードを除去する | [`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
+| Hermes CLI の TUI を調整する | [`command_hermes,TUI調整手順.md`](./command_hermes,TUI調整手順.md) |
+| Hermes CLI の Provider 一覧・選択ロジックを確認する | [`command_hermes,Provider一覧と選択ロジック.md`](./command_hermes,Provider一覧と選択ロジック.md) |
+| Hermes CLI の Slash Command 一覧・追加手順を確認する | [`command_hermes,Slash Command一覧.md`](./command_hermes,Slash Command一覧.md) |
+| command_hermes を単体 CLI として起動・確認する | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
+| hermes を MCP サーバーとして起動・Code CLI から接続する | [`command_hermes,MCP_サーバー起動.md`](./command_hermes,MCP_サーバー起動.md) |
+| hermes-agent 新バージョンへ追従・移行する | [`command_hermes,Upstream移行手順.md`](./command_hermes,Upstream移行手順.md) |
 | opencode_cli 追加（パス解決・コマンド構築・suffix除去）のパターンを確認する | [`backend_server,opencode_cli追加と実行パターン.md`](./backend_server,opencode_cli追加と実行パターン.md) |
 | antigravity_cli のタイムアウト延長・継続フラグの調整パターンを確認する | [`backend_server,antigravity_cliタイムアウトと継続オプション.md`](./backend_server,antigravity_cliタイムアウトと継続オプション.md) |
-| Windows ネイティブ実行の OS 分岐規則・落とし穴を確認する | [`backend_hermes,Windows対応規則.md`](./backend_hermes,Windows対応規則.md) |
+| Windows ネイティブ実行の OS 分岐規則・落とし穴を確認する | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |
 
 ## メディア生成
 

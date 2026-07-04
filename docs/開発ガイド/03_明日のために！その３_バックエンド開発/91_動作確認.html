@@ -23,14 +23,14 @@ python _start.py</code></pre>
 
   <ul>
     <li>Core API: <a href="http://localhost:8091/docs" target="_blank">http://localhost:8091/docs</a></li>
-    <li>Apps API: <a href="http://localhost:8092/docs" target="_blank">http://localhost:8092/docs</a></li>
+    <li>Apps API: <a href="http://localhost:9098/docs" target="_blank">http://localhost:9098/docs</a></li>
   </ul>
 
   <h2>認証トークン取得</h2>
   <ol>
     <li>8091のSwaggerで <code>POST /core/auth/ログイン</code> を実行</li>
     <li>レスポンスの <code>access_token</code> を取得</li>
-    <li>8092のSwaggerでも Authorize に同じトークンを設定</li>
+    <li>9098のSwaggerでも Authorize に同じトークンを設定</li>
   </ol>
 
   <h2>初期データ確認（必須）</h2>
@@ -54,7 +54,7 @@ python _start.py</code></pre>
   -H "Content-Type: application/json" \
   -d "{\"利用者ID\":\"admin\",\"パスワード\":\"********\"}"
 
-curl -X POST http://localhost:8092/apps/M商品/登録 \
+curl -X POST http://localhost:9098/apps/M商品/登録 \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"商品ID\":\"TEST001\",\"商品名\":\"テスト商品\",\"単位\":\"個\",\"商品備考\":\"テスト\"}"</code></pre>

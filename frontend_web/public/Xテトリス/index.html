@@ -186,6 +186,13 @@
             100% { opacity: 0; transform: scale(0.8); }
         }
 
+        /* ゴーストピース（落下予測位置） */
+        .tetris-cell.ghost {
+            filter: brightness(0.4) saturate(0.6);
+            border: 1px dashed rgba(255, 255, 255, 0.45);
+            box-shadow: none;
+        }
+
         .side-panel {
             width: 200px;
             flex-shrink: 0;

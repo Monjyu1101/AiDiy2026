@@ -811,6 +811,164 @@
             50%      { background-position: 100% 50%; }
         }
 
+        /* ===== わくわく追加レイヤー ===== */
+
+        /* ヒーローのオーロラ光彩（CSS のみ・transform 合成） */
+        .hero-section::before,
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            width: 60vmax;
+            height: 60vmax;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.3;
+            mix-blend-mode: screen;
+            pointer-events: none;
+        }
+        .hero-section::before {
+            background: radial-gradient(circle, rgba(0, 255, 255, 0.55), transparent 60%);
+            top: -20vmax;
+            left: -15vmax;
+            animation: auroraDrift1 22s ease-in-out infinite alternate;
+        }
+        .hero-section::after {
+            background: radial-gradient(circle, rgba(255, 0, 255, 0.5), transparent 60%);
+            bottom: -22vmax;
+            right: -12vmax;
+            animation: auroraDrift2 26s ease-in-out infinite alternate;
+        }
+        @keyframes auroraDrift1 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(10vmax, 6vmax) scale(1.25); }
+        }
+        @keyframes auroraDrift2 {
+            0%   { transform: translate(0, 0) scale(1.15); }
+            100% { transform: translate(-8vmax, -7vmax) scale(0.9); }
+        }
+
+        /* ヒーロータグの順次ポップイン + ホバーグロー */
+        .hero-tags span {
+            opacity: 0;
+            animation: tagPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease, color 0.25s ease;
+        }
+        .hero-tags span:nth-child(1)  { animation-delay: 3.25s; }
+        .hero-tags span:nth-child(2)  { animation-delay: 3.37s; }
+        .hero-tags span:nth-child(3)  { animation-delay: 3.49s; }
+        .hero-tags span:nth-child(4)  { animation-delay: 3.61s; }
+        .hero-tags span:nth-child(5)  { animation-delay: 3.73s; }
+        .hero-tags span:nth-child(6)  { animation-delay: 3.85s; }
+        .hero-tags span:nth-child(7)  { animation-delay: 3.97s; }
+        .hero-tags span:nth-child(8)  { animation-delay: 4.09s; }
+        .hero-tags span:nth-child(9)  { animation-delay: 4.21s; }
+        .hero-tags span:nth-child(10) { animation-delay: 4.33s; }
+        @keyframes tagPop {
+            from { opacity: 0; transform: scale(0.6) translateY(12px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .hero-tags span:hover {
+            border-color: rgba(0, 255, 255, 0.9);
+            background: rgba(0, 255, 255, 0.14);
+            color: #ffffff;
+            box-shadow: 0 0 16px rgba(0, 255, 255, 0.45);
+        }
+
+        /* NEW バッジ（新機能の強調） */
+        .fx-new-badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 9px;
+            font-size: 0.62em;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            vertical-align: middle;
+            border-radius: 999px;
+            color: #1a1a2e;
+            -webkit-text-fill-color: #1a1a2e;
+            background: linear-gradient(90deg, #ffd700, #ff7ad9, #00ffee, #ffd700);
+            background-size: 250% 100%;
+            animation: badgeShine 2.4s linear infinite, badgePulse 1.8s ease-in-out infinite;
+        }
+        @keyframes badgeShine {
+            0%   { background-position: 0% 0; }
+            100% { background-position: 250% 0; }
+        }
+        @keyframes badgePulse {
+            0%, 100% { box-shadow: 0 0 6px rgba(255, 215, 0, 0.5); }
+            50%      { box-shadow: 0 0 16px rgba(255, 122, 217, 0.9); }
+        }
+
+        /* 特徴アイコンがホバーで跳ねる */
+        .feature-icon {
+            display: inline-block;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .feature-card:hover .feature-icon {
+            transform: scale(1.2);
+            animation: iconWiggle 0.7s ease;
+        }
+        @keyframes iconWiggle {
+            0%   { transform: scale(1)    rotate(0); }
+            30%  { transform: scale(1.35) rotate(-12deg); }
+            55%  { transform: scale(1.15) rotate(9deg); }
+            75%  { transform: scale(1.25) rotate(-4deg); }
+            100% { transform: scale(1.2)  rotate(0); }
+        }
+
+        /* セクション見出し下線: 表示時に伸びて虹シマー */
+        .section-title.animate-on-scroll::after {
+            width: 0;
+            opacity: 0;
+        }
+        .section-title.animate-on-scroll.animated::after {
+            background: linear-gradient(90deg, #00ffff, #ff00ff, #ffff00, #00ffff);
+            background-size: 250% 100%;
+            animation:
+                underlineGrow 0.7s 0.15s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+                underlineShimmer 3.5s 1s linear infinite;
+        }
+        @keyframes underlineGrow {
+            from { width: 0;     opacity: 0; }
+            to   { width: 100px; opacity: 1; }
+        }
+        @keyframes underlineShimmer {
+            0%   { background-position: 0% 0; }
+            100% { background-position: 250% 0; }
+        }
+
+        /* タイピングカーソルの点滅 */
+        .typing-text {
+            animation: caretBlink 0.85s step-end infinite;
+        }
+        @keyframes caretBlink {
+            0%, 100% { border-right-color: #ffff00; }
+            50%      { border-right-color: transparent; }
+        }
+
+        /* 紙吹雪キャンバス */
+        #fx-confetti {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10000;
+        }
+
+        /* reduced motion では追加演出を止める */
+        @media (prefers-reduced-motion: reduce) {
+            .hero-section::before,
+            .hero-section::after,
+            .fx-new-badge,
+            .typing-text,
+            .feature-card:hover .feature-icon,
+            .section-title.animate-on-scroll.animated::after {
+                animation: none !important;
+            }
+            .hero-tags span { animation: none; opacity: 1; transform: none; }
+            .section-title.animate-on-scroll::after,
+            .section-title.animate-on-scroll.animated::after { width: 100px; opacity: 1; }
+        }
+
         /* 通知トースト */
         .auto-scroll-notification {
             position: fixed;
@@ -980,12 +1138,13 @@
         </div>
         <div class="hero-tags">
             <span>日本語テーブル名 / API / JSON / 画面</span>
-            <span>FastAPI 8091 + 8092</span>
+            <span>FastAPI 8091 + 9098</span>
             <span>Vue 3 + Vite + TypeScript</span>
             <span>Electron + VRM + 音声AI</span>
             <span>🧠 自己改善機構 — 使うほど育つ</span>
-            <span>claude / copilot / codex / gemini / opencode / hermes CLI</span>
-            <span>🔌 MCP Hub ×14 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / agents</span>
+            <span>claude / copilot / codex / antigravity / opencode / hermes CLI</span>
+            <span>🔌 MCP Hub ×16 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat</span>
+            <span>🤖 AIタスク自動実行 — AI分解 × 自由なタスクフロー × クリティカルパス実行</span>
         </div>
         <div class="typing-text" id="typing-text"></div>
     </section>
@@ -993,7 +1152,7 @@
     <!-- Feature Overview（特徴概要） -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">Feature Overview</h2>
-        <p class="section-subtitle animate-on-scroll">AiDiy を支える 6 つの特徴。</p>
+        <p class="section-subtitle animate-on-scroll">AiDiy を支える 7 つの特徴。</p>
         <div class="core-features">
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🇯🇵</span>
@@ -1008,9 +1167,9 @@
                 <span class="feature-icon">🖥️</span>
                 <h3 class="feature-title">マルチサーバー構成</h3>
                 <p class="feature-description">
-                    core 8091 / apps 8092 / mcp 8095 を分離。<br>
-                    AI 系・業務系・自己検証系を切り分け、<br>
-                    Vite Proxy で透過的にまとめます。
+                    core 8091 / apps 9098 / mcp 8095 /<br>
+                    local 8094 / task 8093 の 5 サーバーを分離。<br>
+                    AI 系・業務系・自己検証系を Vite Proxy で透過的にまとめます。
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
@@ -1026,7 +1185,7 @@
                 <span class="feature-icon">🤖</span>
                 <h3 class="feature-title">AI + 音声 + アバター</h3>
                 <p class="feature-description">
-                    チャット・画像・音声・4 画面コード支援を<br>
+                    チャット・画像・音声・6 画面コード支援を<br>
                     WebSocket で一体化。<br>
                     Claude / OpenAI / Gemini マルチベンダー対応。
                 </p>
@@ -1041,12 +1200,21 @@
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
-                <span class="feature-icon">🔌</span>
-                <h3 class="feature-title">MCP Hub × 14 + Multi CLI</h3>
+                <span class="feature-icon">🔀</span>
+                <h3 class="feature-title">AIタスク自動実行 — 自由なタスクフロー<span class="fx-new-badge">NEW</span></h3>
                 <p class="feature-description">
-                    browser / capture / sqlite / postgres / logs / check /<br>
-                    backup / image / movie / stt / tts / obs / ffmpeg / agents の 14 MCP サーバー同居。<br>
-                    6 種の Code CLI を並走可能。
+                    要求を AI が明細タスクへ自動分解。<br>
+                    カンバンでも垂直流れ作業だけでもない、水平並行分岐を<br>
+                    先行SEQ で自由に定義し、クリティカルパスのフロー図で可視化・実行。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🔌</span>
+                <h3 class="feature-title">MCP Hub × 16 + Multi CLI</h3>
+                <p class="feature-description">
+                    browser / capture / sqlite / postgres / logs / check / backup /<br>
+                    image / movie / stt / tts / obs / ffmpeg / notify / agents / chat の 16 MCP サーバー同居。<br>
+                    7 種の Code CLI を code1〜code6 パネルで並走可能。
                 </p>
             </div>
         </div>
@@ -1058,9 +1226,9 @@
         <p class="section-subtitle animate-on-scroll">数値で見る AiDiy — AGENTS.md の実構成をそのまま可視化。</p>
         <div class="tech-stats">
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="2">0</span>
-                <span class="stat-label">API サーバー</span>
-                <span class="stat-sub">core 8091 / apps 8092</span>
+                <span class="stat-number" data-count="5">0</span>
+                <span class="stat-label">常駐サーバー</span>
+                <span class="stat-sub">core 8091 / apps 9098 / tools 8095 / local 8094 / task 8093</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="3">0</span>
@@ -1073,14 +1241,14 @@
                 <span class="stat-sub">C / M / T / V / S / A / X</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="4">0</span>
+                <span class="stat-number" data-count="6">0</span>
                 <span class="stat-label">コードパネル</span>
-                <span class="stat-sub">code1 から code4</span>
+                <span class="stat-sub">code1 から code6</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="7">0</span>
                 <span class="stat-label">Code CLI 種</span>
-                <span class="stat-sub">sdk / claude / copilot / codex / gemini / opencode / hermes</span>
+                <span class="stat-sub">claude_sdk / claude / copilot / codex / antigravity / opencode / hermes</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="1">0</span>
@@ -1093,9 +1261,9 @@
                 <span class="stat-sub">Electron / Web</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="14">0</span>
+                <span class="stat-number" data-count="16">0</span>
                 <span class="stat-label">MCP サーバー</span>
-                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / agents</span>
+                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="60">0</span>
@@ -1180,12 +1348,22 @@ Key:   利用者名</pre>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🗄️ backend_server</h3>
                 <p>FastAPI + SQLAlchemy + SQLite。POST 中心 API、統一レスポンス形式、C採番、監査フィールド、Reboot 機構を標準装備。Alembic 不使用。</p>
-                <div class="meta-tags"><span>core_main.py:8091</span><span>apps_main.py:8092</span><span>No Alembic</span></div>
+                <div class="meta-tags"><span>core_main.py:8091</span><span>apps_main.py:9098</span><span>No Alembic</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔌 MCP サーバー (統合)</h3>
-                <p>FastAPI + SSE で 14 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・コードエージェント実行を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
-                <div class="meta-tags"><span>tools_main.py:8095</span><span>SSE × 14</span><span>HTTP POST</span><span>stdio gateway</span></div>
+                <p>FastAPI + SSE で 16 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・通知音再生・コードエージェント実行・チャット LLM 実行を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
+                <div class="meta-tags"><span>tools_main.py:8095</span><span>SSE × 16</span><span>HTTP POST</span><span>stdio gateway</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🤖 backend_task (AIタスク)<span class="fx-new-badge">NEW</span></h3>
+                <p>タスク要求を登録すると AI が明細タスクへ自動分解し、Code CLI（TASK_AI_NAME）で実行。カンバン方式でも垂直の流れ作業だけでもなく、先行SEQ（複数指定可）で水平の並行分岐を含む自由なタスクフローを定義。依存が満たされた明細から自動実行し、クリティカルパス基準のフロー図で進行を可視化。5 秒間隔の監視ループ、実行回数上限つき。Web / Avatar の AIタスク画面（要求一覧・フロー図・明細一覧）から操作。</p>
+                <div class="meta-tags"><span>task_main.py:8093</span><span>自由なタスクフロー</span><span>クリティカルパス実行</span><span>Code CLI 実行</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🧠 backend_local (ローカル LLM)</h3>
+                <p>HuggingFace Gemma を transformers + torch でローカル推論し、OpenAI 互換 Chat Completions API として提供。stream / tools 対応。クラウド API なしでもチャット AI を利用可能。</p>
+                <div class="meta-tags"><span>local_main.py:8094</span><span>OpenAI 互換</span><span>Gemma</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 frontend_web</h3>
@@ -1322,9 +1500,9 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 5. backend_hermes 独自エージェント基盤 -->
+    <!-- 5. command_hermes 独自エージェント基盤 -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">🧰 backend_hermes — 独自エージェント基盤</h2>
+        <h2 class="section-title animate-on-scroll">🧰 command_hermes — 独自エージェント基盤</h2>
         <p class="section-subtitle animate-on-scroll">AiDiy に統合された on-demand コードエージェント CLI。TUI・ツール・コンテキスト圧縮を内蔵。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
@@ -1425,10 +1603,10 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 7. MCP Hub × 14 + Multi CLI -->
+    <!-- 7. MCP Hub × 16 + Multi CLI -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 14 + Multi CLI — 実装詳細</h2>
-        <p class="section-subtitle animate-on-scroll">ポート 8095 に 14 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
+        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 16 + Multi CLI — 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">ポート 8095 に 16 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 aidiy_chrome_devtools</h3>
@@ -1497,8 +1675,18 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🤖 aidiy_code_agents</h3>
-                <p>Claude / Copilot / Codex / Gemini / opencode / hermes など複数の CodeAI CLI をエージェントとして呼び出し。コード生成・修正・レビューを AI が直接 CLI 経由で実行。</p>
+                <p>Claude / Copilot / Codex / Antigravity / opencode / hermes など複数の CodeAI CLI をエージェントとして呼び出し。コード生成・修正・レビューを AI が直接 CLI 経由で実行。</p>
                 <div class="meta-tags"><span>CodeAI CLI</span><span>multi-agent</span><span>subprocess</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔔 aidiy_notification_sounds</h3>
+                <p>scene 別（開始 / 終了 / 注意など）の通知音をローカル再生。tts シーンでは text_to_speech と連携してメッセージを読み上げ。長時間処理の進行を音で通知。</p>
+                <div class="meta-tags"><span>scene 別再生</span><span>tts 連携</span><span>local playback</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">💬 aidiy_chat_llms</h3>
+                <p>AIチャットの ChatAI を MCP ツールとして公開。OpenAI / Ollama 互換の aidiy_chat_completions エンドポイント（/v1/chat/completions）の実体で、外部クライアントからも標準 IF で利用可能。</p>
+                <div class="meta-tags"><span>OpenAI 互換</span><span>Ollama 互換</span><span>ChatAI</span></div>
             </div>
         </div>
         <div class="advanced-grid" style="margin-top:30px;">
@@ -1512,7 +1700,7 @@ Key:   利用者名</pre>
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     edit → observe → verify → backup<br>
-                    MCP 14 サーバーの連携で、修正の影響範囲を<br>
+                    MCP 16 サーバーの連携で、修正の影響範囲を<br>
                     <strong>AI が自分で確認</strong>してから報告します。<br>
                     SSE / stdio / HTTP POST の 3 経路でどの CLI からでも利用可。<br>
                     バックアップ保存→チェックのサイクルも内蔵。
@@ -1522,13 +1710,13 @@ Key:   利用者名</pre>
                 <span class="feature-icon">🔧</span>
                 <h3 class="feature-title">マルチ Code CLI 対応</h3>
                 <p class="feature-description">
-                    7 種の Code CLI を code1〜code4 パネルへ<br>
+                    7 種の Code CLI を code1〜code6 パネルへ<br>
                     自由に割り当てて並走できます。<br>
                     新しいツールも手順に沿って追加可能。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     claude_sdk &nbsp;/&nbsp; claude_cli &nbsp;/&nbsp; copilot_cli<br>
-                    codex_cli &nbsp;/&nbsp; antigravity_cli &nbsp;/&nbsp; opencode_cli &nbsp;/&nbsp; hermes_cli
+                    codex_cli &nbsp;/&nbsp; antigravity_cli &nbsp;/&nbsp; opencode_cli &nbsp;/&nbsp; aidiy_hermes
                 </div>
             </div>
         </div>
@@ -1549,7 +1737,7 @@ Key:   利用者名</pre>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🤖 CLI エコシステム</h4>
-                <p>claude / copilot / codex / gemini / opencode / hermes に続く新 Code CLI も <code style="color:#00ffff">_sdk</code> / <code style="color:#00ffff">_cli</code> 命名規約で追加可能。</p>
+                <p>claude / copilot / codex / antigravity / opencode / hermes に続く新 Code CLI も <code style="color:#00ffff">_sdk</code> / <code style="color:#00ffff">_cli</code> 命名規約で追加可能。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🧰 hermes 独自エージェント進化</h4>

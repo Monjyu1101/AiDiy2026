@@ -4,7 +4,8 @@
 
 ## 前提
 
-- `backend_server`（`8091` / `8092`）が起動していること
+- `backend_server`（`8091` / `9098`）が起動していること
+- AIタスク画面（TASK ボタン / task ウィンドウ）を使う場合は `backend_task`（`8093`）も起動していること
 - Claude 系のブラウザ自動操作まで使う場合は `backend_tools`（`8095`）も起動していること
 
 ## 開発起動
@@ -17,7 +18,7 @@ npm run dev
 
 `npm run dev` で次が起動します。
 
-- Vite 開発サーバー: `http://127.0.0.1:8099`
+- Vite 開発サーバー: `http://127.0.0.1:8092`
 - Electron メインプロセス
 - Electron アプリ本体
 
@@ -26,7 +27,7 @@ npm run dev
 ブラウザからは次で確認できます。
 
 ```text
-http://localhost:8099
+http://localhost:8092
 ```
 
 ## 主な構成
@@ -41,15 +42,9 @@ http://localhost:8099
 ## 接続先
 
 - Core API / WebSocket: `http://localhost:8091` / `ws://localhost:8091/core/ws/AIコア`
-- Apps API: `http://localhost:8092`
-- Backend MCP Chrome DevTools (SSE): `http://localhost:8095/aidiy_chrome_devtools/sse`
-- Backend MCP Desktop Capture (SSE): `http://localhost:8095/aidiy_desktop_capture/sse`
-- Backend MCP SQLite (SSE):          `http://localhost:8095/aidiy_sqlite/sse`
-- Backend MCP PostgreSQL (SSE):      `http://localhost:8095/aidiy_postgres/sse`
-- Backend MCP Logs (SSE):            `http://localhost:8095/aidiy_logs/sse`
-- Backend MCP Code Check (SSE):      `http://localhost:8095/aidiy_code_check/sse`
-- Backend MCP Backup Check (SSE):    `http://localhost:8095/aidiy_backup_check/sse`
-- Backend MCP Backup Save (SSE):     `http://localhost:8095/aidiy_backup_save/sse`
+- Apps API: `http://localhost:9098`
+- Task API（AIタスク）: `http://localhost:8093`（開発時は Vite proxy `/task` 経由、Electron 本番は直結）
+- Backend MCP（16 サーバー同居）: `http://localhost:8095/`（一覧）、`http://localhost:8095/{mcp_name}/sse`（SSE 接続）
 
 ## 補足コマンド
 

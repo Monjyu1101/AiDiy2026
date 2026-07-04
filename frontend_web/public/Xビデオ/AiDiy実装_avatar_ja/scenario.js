@@ -39,7 +39,7 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "short_narration": "AiDiy の Avatar実装は、AI 画面にアバター表示を組み合わせたクライアントです。",
-      "long_narration": "この動画では、AiDiy の Avatar実装を紹介します。Avatar実装は、AI チャットやコード支援の画面に、VRM アバター表示を組み合わせたクライアントです。Electron のデスクトップアプリとしても動き、ブラウザから 8099 番ポートへアクセスして使うこともできます。画面にはアバター、チャット、コード、ファイル、ライブキャプチャ、設定などが登場します。アバターはただ横に置いてあるだけではなく、音声出力に合わせて口を動かしたり、表示モードを切り替えたりできます。最初に全体像を確認し、ログイン、AI コア画面、表示切替、コード作業、画面共有、設定、Web 表示の順に見ていきます。",
+      "long_narration": "この動画では、AiDiy の Avatar実装を紹介します。Avatar実装は、AI チャットやコード支援の画面に、VRM アバター表示を組み合わせたクライアントです。Electron のデスクトップアプリとしても動き、ブラウザから 8092 番ポートへアクセスして使うこともできます。画面にはアバター、チャット、コード、ファイル、ライブキャプチャ、設定などが登場します。アバターはただ横に置いてあるだけではなく、音声出力に合わせて口を動かしたり、表示モードを切り替えたりできます。最初に全体像を確認し、ログイン、AI コア画面、表示切替、コード作業、画面共有、設定、Web 表示の順に見ていきます。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
       "short_duration_sec": 5.568,
@@ -67,7 +67,7 @@ window.SCENARIO = {
       "metrics": [
         {
           "label": "Avatar Web",
-          "value": "port 8099"
+          "value": "port 8092"
         },
         {
           "label": "Core API",
@@ -75,7 +75,7 @@ window.SCENARIO = {
         },
         {
           "label": "Apps API",
-          "value": "port 8092"
+          "value": "port 9098"
         }
       ],
       "cards": [
@@ -103,7 +103,7 @@ window.SCENARIO = {
       ],
       "evidence": [],
       "short_narration": "Electron と Web の両方で動き、VRM 表示と AI コアをまとめて扱います。",
-      "long_narration": "概要画面では、AiDiy の Avatar実装の技術構成を整理しています。画面には Electron と Web のデュアルモード、VRM アバター、ポート 8099、Vue 3、TypeScript、Three.js などが示されています。Electron モードではデスクトップアプリとして常駐し、複数ウィンドウや透明ウィンドウなど、デスクトップ向けの動きが使えます。Web モードではブラウザからアクセスできるので、インストールせずに試せます。モードの判定には window.desktopApi の有無を使い、認証情報の保存先も切り替えます。Electron では localStorage、Web では sessionStorage を使います。アバター描画は Three.js と VRM ライブラリで行い、音声に合わせた口パク、まばたき、ゆるい体の動きも入ります。つまり Avatar実装は、AI と会話する画面を、より見える形、聞こえる形にするためのクライアントです。",
+      "long_narration": "概要画面では、AiDiy の Avatar実装の技術構成を整理しています。画面には Electron と Web のデュアルモード、VRM アバター、ポート 8092、Vue 3、TypeScript、Three.js などが示されています。Electron モードではデスクトップアプリとして常駐し、複数ウィンドウや透明ウィンドウなど、デスクトップ向けの動きが使えます。Web モードではブラウザからアクセスできるので、インストールせずに試せます。モードの判定には window.desktopApi の有無を使い、認証情報の保存先も切り替えます。Electron では localStorage、Web では sessionStorage を使います。アバター描画は Three.js と VRM ライブラリで行い、音声に合わせた口パク、まばたき、ゆるい体の動きも入ります。つまり Avatar実装は、AI と会話する画面を、より見える形、聞こえる形にするためのクライアントです。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_duration_sec": 6.048,
@@ -464,17 +464,17 @@ window.SCENARIO = {
     },
     {
       "id": "scene_008",
-      "title": "Web 表示（port 8099）",
+      "title": "Web 表示（port 8092）",
       "expression": "neutral",
       "accent": "#00e0b8",
       "accent_soft": "rgba(0, 224, 184, 0.18)",
       "kicker": "WEB MODE",
       "headline": "左右 2 画面をタブで切り替える\nシンプルな Web インターフェース",
-      "lead": "ブラウザで localhost:8099 にアクセスするだけで起動します。左のアバター画面と右のチャット・コード画面をタブで切り替えるシンプルな構成です。",
+      "lead": "ブラウザで localhost:8092 にアクセスするだけで起動します。左のアバター画面と右のチャット・コード画面をタブで切り替えるシンプルな構成です。",
       "subtitle": "左アバター画面と右タブ画面をワンクリックで切り替えられます。",
       "image": "images/scene_008.png",
       "chips": [
-        "port 8099",
+        "port 8092",
         "左アバター画面",
         "右タブ画面",
         "タブ切り替え",
@@ -483,7 +483,7 @@ window.SCENARIO = {
       "metrics": [
         {
           "label": "アクセス",
-          "value": "localhost:8099"
+          "value": "localhost:8092"
         },
         {
           "label": "画面構成",
@@ -509,13 +509,13 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "ブラウザで localhost:8099 にアクセスするだけで avatar版 AiDiy が起動する。",
+        "ブラウザで localhost:8092 にアクセスするだけで avatar版 AiDiy が起動する。",
         "左のアバター画面と右のタブ画面をタブで切り替えるシンプルな 2 画面構成。",
         "Electron をインストールせずとも全機能を利用できる。"
       ],
       "evidence": [],
-      "short_narration": "Web モードは localhost 8099 を開き、タブで各パネルを切り替えます。",
-      "long_narration": "Web モードでは、ブラウザで localhost 8099 にアクセスするだけで AiDiy の Avatar実装を開けます。画像では、上部にタブが並び、左側にアバター、右側にチャットやコードなどのパネルが表示されています。Electron をインストールしなくても使えるので、まず試したい人や、チーム内で画面を共有したい場合に便利です。Electron モードでは複数ウィンドウを活かしたデスクトップ体験になりますが、Web モードではブラウザの一画面に整理されます。アバターを表示しながら、チャット、コード、ファイル、設定などをタブで切り替えるため、画面構成が分かりやすくなります。認証情報は sessionStorage に保存され、タブを閉じるとセッションが切れる設計です。デスクトップアプリの機能を、ブラウザでも確認できる入口として使えます。",
+      "short_narration": "Web モードは localhost 8092 を開き、タブで各パネルを切り替えます。",
+      "long_narration": "Web モードでは、ブラウザで localhost 8092 にアクセスするだけで AiDiy の Avatar実装を開けます。画像では、上部にタブが並び、左側にアバター、右側にチャットやコードなどのパネルが表示されています。Electron をインストールしなくても使えるので、まず試したい人や、チーム内で画面を共有したい場合に便利です。Electron モードでは複数ウィンドウを活かしたデスクトップ体験になりますが、Web モードではブラウザの一画面に整理されます。アバターを表示しながら、チャット、コード、ファイル、設定などをタブで切り替えるため、画面構成が分かりやすくなります。認証情報は sessionStorage に保存され、タブを閉じるとセッションが切れる設計です。デスクトップアプリの機能を、ブラウザでも確認できる入口として使えます。",
       "short_audio": "audio/short_scene_008.mp3",
       "long_audio": "audio/long_scene_008.mp3",
       "short_duration_sec": 5.952,

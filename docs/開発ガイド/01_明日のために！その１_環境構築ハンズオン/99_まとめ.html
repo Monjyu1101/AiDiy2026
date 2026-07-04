@@ -21,7 +21,7 @@
     <li><code>_setup.py</code> は「環境の準備」担当</li>
     <li><code>_start.py</code> は「起動・監視・停止」担当</li>
     <li>設定ファイルは <code>backend_server/conf/</code> と <code>frontend_web/vite.config.ts</code> を最初に確認</li>
-    <li>開発ポートは 8090 / 8091 / 8092 をセットで理解する</li>
+    <li>開発ポートは 8090 / 8091 / 9098 をセットで理解する</li>
   </ol>
 
   <h2>最小手順（再確認）</h2>
@@ -34,7 +34,7 @@ http://localhost:8090
 
 # API docs
 http://localhost:8091/docs
-http://localhost:8092/docs</code></pre>
+http://localhost:9098/docs</code></pre>
 
   <h2>チェックリスト</h2>
   <table>
@@ -42,7 +42,7 @@ http://localhost:8092/docs</code></pre>
     <tr><td>依存関係</td><td><code>uv sync</code> と <code>npm install</code> が成功している</td></tr>
     <tr><td>起動</td><td><code>python _start.py</code> で 3 サービスが起動する</td></tr>
     <tr><td>画面</td><td><code>http://localhost:8090</code> が表示される</td></tr>
-    <tr><td>API</td><td><code>/docs</code> 画面が 8091 と 8092 の両方で開く</td></tr>
+    <tr><td>API</td><td><code>/docs</code> 画面が 8091 と 9098 の両方で開く</td></tr>
     <tr><td>DB</td><td><code>workspace/AiDiy2026/backend_server/_data/AiDiy/database.db</code> を確認できる</td></tr>
   </table>
 
@@ -51,7 +51,7 @@ http://localhost:8092/docs</code></pre>
     <tr><th>症状</th><th>まず確認</th><th>次に実行</th></tr>
     <tr><td><code>uv</code> が見つからない</td><td>uv インストール済みか</td><td><code>cd backend_server &amp;&amp; uv sync</code></td></tr>
     <tr><td><code>npm</code> が見つからない</td><td>Node.js インストール済みか</td><td><code>cd frontend_web &amp;&amp; npm install</code></td></tr>
-    <tr><td>ポート競合</td><td>8090/8091/8092 が使用中か</td><td><code>python _start.py</code> を再実行（必要なら手動停止）</td></tr>
+    <tr><td>ポート競合</td><td>8090/8091/9098 が使用中か</td><td><code>python _start.py</code> を再実行（必要なら手動停止）</td></tr>
     <tr><td>API 404</td><td><code>vite.config.ts</code> proxy 設定</td><td><code>/core</code>, <code>/apps</code> の転送先を見直す</td></tr>
   </table>
 

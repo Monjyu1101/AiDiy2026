@@ -92,6 +92,8 @@ origins = [
     "http://localhost:5173", # Vite default
     "http://localhost:3000",
     "http://localhost:8090", # New Port
+    "http://localhost:8092", # Avatar Port
+    "http://127.0.0.1:8092", # Avatar Port
     "https://localhost",     # Docker Nginx HTTPS
     "http://localhost",      # Docker Nginx HTTP
 ]

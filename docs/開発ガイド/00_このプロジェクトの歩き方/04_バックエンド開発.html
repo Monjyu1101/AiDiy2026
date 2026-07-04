@@ -50,7 +50,7 @@
   <h2>API実装の確認方法</h2>
   <p>実装したAPIの動作確認手順です。</p>
   <ol>
-  <li><strong>Swagger UI</strong> (<code>:8091/docs</code> または <code>:8092/docs</code>) でAPI一覧とURLを確認</li>
+  <li><strong>Swagger UI</strong> (<code>:8091/docs</code> または <code>:9098/docs</code>) でAPI一覧とURLを確認</li>
   <li><strong>Router</strong> ファイルでURLとメソッドの対応を確認</li>
   <li><strong>CRUD</strong> → <strong>Model</strong> でDB操作とテーブル定義を確認。Serviceがあればビジネスロジックも確認</li>
   </ol>
@@ -71,12 +71,12 @@
   <p>テーブル名の先頭文字で、役割とサーバーが決まります。</p>
   <ul>
    <li><strong>C (Core/Common)</strong>: C権限, C利用者, C採番 &#x2014; Core API (8091)</li>
-   <li><strong>M (Master)</strong>: M配車区分, M車両, M商品 &#x2014; Apps API (8092)</li>
-   <li><strong>T (Transaction)</strong>: T配車, T商品入庫, T商品出庫, T商品棚卸 &#x2014; Apps API (8092)</li>
-   <li><strong>V (View)</strong>: 生SQLのJOINクエリ。DB VIEWは使わない &#x2014; Apps API (8092)</li>
-   <li><strong>S (Scheduler)</strong>: S配車_週表示, S配車_日表示 &#x2014; Apps API (8092)</li>
+   <li><strong>M (Master)</strong>: M配車区分, M車両, M商品 &#x2014; Apps API (9098)</li>
+   <li><strong>T (Transaction)</strong>: T配車, T商品入庫, T商品出庫, T商品棚卸 &#x2014; Apps API (9098)</li>
+   <li><strong>V (View)</strong>: 生SQLのJOINクエリ。DB VIEWは使わない &#x2014; Apps API (9098)</li>
+   <li><strong>S (Scheduler)</strong>: S配車_週表示, S配車_日表示 &#x2014; Apps API (9098)</li>
    <li><strong>A (AI)</strong>: AIコア, A会話履歴 &#x2014; Core API (8091)</li>
-   <li><strong>X (Experimental)</strong>: Xテトリス, Xインベーダー, Xリバーシ &#x2014; Apps API (8092)</li>
+   <li><strong>X (Experimental)</strong>: Xテトリス, Xインベーダー, Xリバーシ &#x2014; Apps API (9098)</li>
   </ul>
   </div>
  </section>

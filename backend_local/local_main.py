@@ -12,7 +12,7 @@
 AiDiy Local LLM サーバー エントリポイント
 
 HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API として
-1 ポート (8096) で提供する。
+1 ポート (8094) で提供する。
 
 主要エンドポイント:
 - POST /v1/chat/completions  OpenAI 標準チャット補完
@@ -25,7 +25,7 @@ HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API として
 
 | 設定 | AiDiy_key.json キー | 既定 |
 |------|---------------------|------|
-| 待受ポート | LOCAL_BASE | 8096 |
+| 待受ポート | LOCAL_BASE | 8094 |
 | モデル ID | CHAT_LOCAL_MODEL | google/gemma-4-E2B-it |
 | HF トークン | huggingface_key_read | （なし） |
 | デバイス | CHAT_LOCAL_DEVICE | auto |
@@ -41,6 +41,8 @@ HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API として
 
 import os
 import sys
+import threading
+import time
 
 # UTF-8出力を強制（Windows文字化け対策）
 if sys.platform == "win32":
@@ -70,7 +72,7 @@ from local_proc.aidiy_config import AiDiyConfig
 _cfg = AiDiyConfig()
 logger.info("設定ソース: %s (%s)", _cfg.path, "読込OK" if _cfg.loaded else "見つからず→デフォルト使用")
 
-LOCAL_PORT = _cfg.get_int("LOCAL_BASE", 8096)
+LOCAL_PORT = _cfg.get_int("LOCAL_BASE", 8094)
 LOCAL_MODEL = _cfg.get_str("CHAT_LOCAL_MODEL", "google/gemma-4-E2B-it")
 LOCAL_DEVICE = _cfg.get_str("CHAT_LOCAL_DEVICE", "auto")
 LOCAL_DTYPE = _cfg.get_str("CHAT_LOCAL_DTYPE", "auto")
@@ -104,7 +106,7 @@ app = FastAPI(
     title="AiDiy Local LLM Server",
     description=(
         "HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API で提供するローカル推論サーバー。\n\n"
-        "OpenAI SDK の `base_url` に `http://localhost:8096/v1` を指定して利用できます。\n\n"
+        "OpenAI SDK の `base_url` に `http://localhost:8094/v1` を指定して利用できます。\n\n"
         "- `POST /v1/chat/completions` — チャット補完（OpenAI 標準）\n"
         "- `GET /v1/models` — モデル一覧"
     ),
@@ -118,6 +120,37 @@ app.add_middleware(
 )
 
 app.include_router(create_router(engine))
+
+
+def _setup_reboot_watcher() -> None:
+    temp_dir = os.path.join(os.path.dirname(__file__), "temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    reboot_path = os.path.join(temp_dir, "reboot_local.txt")
+
+    if os.path.isfile(reboot_path):
+        try:
+            os.remove(reboot_path)
+        except Exception:
+            pass
+        raise SystemExit("reboot_local.txt detected")
+
+    def watcher() -> None:
+        while True:
+            try:
+                if os.path.isfile(reboot_path):
+                    try:
+                        os.remove(reboot_path)
+                    except Exception:
+                        pass
+                    os._exit(0)
+            except Exception:
+                pass
+            time.sleep(1)
+
+    threading.Thread(target=watcher, daemon=True).start()
+
+
+_setup_reboot_watcher()
 
 
 @app.get("/", summary="稼働状況")

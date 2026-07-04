@@ -24,9 +24,9 @@
   <table>
     <tr><th>対象</th><th>ポート</th><th>URL</th></tr>
     <tr><td>バックエンド core_main</td><td>8091</td><td><code>http://localhost:8091</code></td></tr>
-    <tr><td>バックエンド apps_main</td><td>8092</td><td><code>http://localhost:8092</code></td></tr>
+    <tr><td>バックエンド apps_main</td><td>9098</td><td><code>http://localhost:9098</code></td></tr>
     <tr><td>フロントエンド Web</td><td>8090</td><td><code>http://localhost:8090</code></td></tr>
-    <tr><td>フロントエンド Avatar</td><td>8099</td><td><code>http://127.0.0.1:8099</code></td></tr>
+    <tr><td>フロントエンド Avatar</td><td>8092</td><td><code>http://127.0.0.1:8092</code></td></tr>
   </table>
 
   <h2>起動前チェック</h2>
@@ -43,11 +43,11 @@
 
   <h2>自動起動の流れ</h2>
   <pre><code>1. 既存ポートの解放
-   - 選択した 8090 / 8091 / 8092 / 8099 の LISTEN プロセスを停止
+   - 選択した 8090 / 8091 / 9098 / 8092 の LISTEN プロセスを停止
 
 2. バックエンド起動
    - core_main:app (8091)
-   - apps_main:app (8092)
+   - apps_main:app (9098)
 
 3. フロントエンド起動
    - frontend_web: npm run dev
@@ -58,7 +58,7 @@
 
 5. ブラウザを自動起動
    - http://localhost:8090
-   - http://127.0.0.1:8099 (Avatar選択時)
+   - http://127.0.0.1:8092 (Avatar選択時)
 
 6. 異常終了を検知したら15秒後に再起動</code></pre>
 

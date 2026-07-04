@@ -157,6 +157,17 @@ input {
   font-weight: 700;
 }
 
+@keyframes score-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.40); }
+  100% { transform: scale(1); }
+}
+
+.score-card strong.bump {
+  display: inline-block;
+  animation: score-bump 0.35s ease;
+}
+
 /* 青石（先手） = ブルー系 */
 .score-card.black {
   border-left: 3px solid #0066ff;
@@ -262,7 +273,7 @@ input {
 
 .button-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-top: 8px;
 }
@@ -491,6 +502,124 @@ input {
     0 0 32px rgba(255, 130, 0, 0.60);
 }
 
+/* ─── 反転数ポップアップ ─────────────────────── */
+
+@keyframes flip-popup-float {
+  0%   { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.10); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -170%) scale(1); }
+}
+
+.flip-popup {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 5;
+  pointer-events: none;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.10em;
+  white-space: nowrap;
+  animation: flip-popup-float 1.15s ease-out forwards;
+}
+
+.flip-popup.black {
+  color: #66bbff;
+  text-shadow: 0 0 12px rgba(0, 120, 255, 0.90), 0 0 30px rgba(0, 100, 255, 0.50);
+}
+
+.flip-popup.white {
+  color: #ff6644;
+  text-shadow: 0 0 12px rgba(255, 60, 0, 0.90), 0 0 30px rgba(255, 40, 0, 0.50);
+}
+
+.flip-popup.big {
+  font-size: 46px;
+}
+
+/* ─── 勝敗リザルトバナー ─────────────────────── */
+
+.result-banner {
+  position: absolute;
+  inset: 26px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  transform: scale(0.88);
+  transition: opacity 0.32s ease, transform 0.32s ease;
+}
+
+.result-banner.visible {
+  opacity: 0.92;
+  transform: scale(1);
+}
+
+.result-banner__text {
+  min-width: min(560px, 84%);
+  padding: 26px 34px;
+  background: rgba(2, 8, 18, 0.42);
+  text-align: center;
+  border: 1px solid rgba(120, 200, 255, 0.60);
+  box-shadow: 0 0 26px rgba(0, 160, 255, 0.35), inset 0 0 30px rgba(0, 160, 255, 0.08);
+}
+
+.result-banner__text span {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.30em;
+  color: #9adcff;
+  text-shadow: 0 0 10px rgba(0, 200, 255, 0.80);
+}
+
+.result-banner__text strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 44px;
+  line-height: 1.12;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #eaf8ff;
+  text-shadow: 0 0 14px rgba(0, 200, 255, 0.85), 0 0 36px rgba(0, 140, 255, 0.50);
+}
+
+.result-banner__text small {
+  display: block;
+  margin-top: 10px;
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  color: #7ab8d8;
+}
+
+.result-banner.black .result-banner__text {
+  border-color: rgba(70, 140, 255, 0.80);
+  box-shadow: 0 0 26px rgba(0, 100, 255, 0.45), inset 0 0 30px rgba(0, 100, 255, 0.10);
+}
+
+.result-banner.black .result-banner__text strong {
+  color: #bcd8ff;
+  text-shadow: 0 0 14px rgba(40, 120, 255, 0.95), 0 0 40px rgba(0, 90, 255, 0.55);
+}
+
+.result-banner.white .result-banner__text {
+  border-color: rgba(255, 90, 40, 0.80);
+  box-shadow: 0 0 26px rgba(255, 60, 0, 0.40), inset 0 0 30px rgba(255, 60, 0, 0.10);
+}
+
+.result-banner.white .result-banner__text span {
+  color: #ffb09a;
+  text-shadow: 0 0 10px rgba(255, 100, 40, 0.80);
+}
+
+.result-banner.white .result-banner__text strong {
+  color: #ffd4c4;
+  text-shadow: 0 0 14px rgba(255, 80, 20, 0.95), 0 0 40px rgba(255, 50, 0, 0.55);
+}
+
 /* ─── 2D展開図（参照用定義保持） ────────────── */
 
 .face {
@@ -601,4 +730,7 @@ input {
   .cube-3d-panel { min-height: 480px; }
   .legend { gap: 10px; }
   .challenge-banner__text strong { font-size: 30px; }
+  .result-banner__text strong { font-size: 30px; }
+  .flip-popup { font-size: 24px; }
+  .flip-popup.big { font-size: 34px; }
 }

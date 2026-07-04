@@ -149,7 +149,7 @@ WebSocket packet は `AIコアWebSocket仕様.md` を確認する。
 ## 最小確認
 
 - Electron で login / core / chat / file / image / code1〜code6 / settings を開ける。
-- Web で `http://localhost:8099` を開ける。
+- Web で `http://localhost:8092` を開ける。
 - Electron と Web で storage の使い分けが崩れていない。
 - WebSocket 接続、チャット送信、コード送信が通る。
 - DevTools Console に `desktopApi` 未定義エラーがない。

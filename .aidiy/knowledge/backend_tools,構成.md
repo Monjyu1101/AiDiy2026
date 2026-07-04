@@ -118,12 +118,12 @@ print(res.json())  # {"save_path": "..."}
 
 ## 再起動ウォッチャー
 
-`tools_main.py` の `_setup_reboot_watcher()` が `backend_tools/temp/reboot_mcp.txt` を監視する。ファイル検知後に削除して `os._exit(0)` し、`_start.py` が子プロセス終了を検知して再起動する。
+`tools_main.py` の `_setup_reboot_watcher()` が `backend_tools/temp/reboot_tools.txt` を監視する。ファイル検知後に削除して `os._exit(0)` し、`_start.py` が子プロセス終了を検知して再起動する。
 
 手動で再起動したい場合:
 
 ```powershell
-New-Item -ItemType File backend_tools\temp\reboot_mcp.txt -Force
+New-Item -ItemType File backend_tools\temp\reboot_tools.txt -Force
 ```
 
 ## Chrome 自動起動

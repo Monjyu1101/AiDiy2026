@@ -2,7 +2,7 @@
 
 """フロントエンド(Avatar) 起動スクリプト
 
-Electron/Web デュアルモードの Avatar (renderer ポート 8099) を起動します。
+Electron/Web デュアルモードの Avatar (renderer ポート 8092) を起動します。
 electronmon が spawn した electron.exe は別プロセスグループで残留することがあるため、
 起動前・停止後に kill_electron_processes() で残留プロセスを排除します。
 
@@ -64,7 +64,7 @@ def print_info(message: str) -> None:
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_AVATAR_DIR = THIS_DIR
-PORT = 8099
+PORT = 8092
 FRONTEND_COMMAND = "npm"
 
 

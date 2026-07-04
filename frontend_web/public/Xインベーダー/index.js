@@ -54,6 +54,10 @@ class RetroInvadersGame {
         this.powerups = [];
         this.ufos = [];
         this.particles = [];
+        this.floatTexts = [];   // スコアポップアップ
+        this.tripleShot = false;
+        this.tripleTimer = null;
+        this.audioCtx = null;   // 効果音（初回操作時に生成）
         this.ufoSpeed = 1.2;
         this.ufoSpawnTimer = 0;
         this.ufoSpawnInterval = 15000;
@@ -135,6 +139,33 @@ class RetroInvadersGame {
             clearTimeout(this.rapidFireTimer);
             this.rapidFireTimer = null;
         }
+        if (this.tripleTimer) {
+            clearTimeout(this.tripleTimer);
+            this.tripleTimer = null;
+        }
+    }
+
+    // レトロ効果音（WebAudio、外部ファイル不要）
+    sfx(freq, duration = 0.08, type = 'square', volume = 0.04, slide = 0) {
+        try {
+            if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = this.audioCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            if (slide) osc.frequency.linearRampToValueAtTime(Math.max(30, freq + slide), ctx.currentTime + duration);
+            gain.gain.setValueAtTime(volume, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) { /* 音が出せない環境では無視 */ }
+    }
+
+    addFloatText(x, y, text, color = '#fff') {
+        this.floatTexts.push({ x, y, text, color, ttl: 900 });
     }
 
     resetGame() {
@@ -149,6 +180,8 @@ class RetroInvadersGame {
         this.powerups = [];
         this.ufos = [];
         this.particles = [];
+        this.floatTexts = [];
+        this.tripleShot = false;
         this.playerX = (this.gameWidth - this.playerWidth) / 2;
         this.invaderSpeed = 0.6;
         this.invaderDirection = 1;
@@ -223,9 +256,11 @@ class RetroInvadersGame {
         if (this.keys['ArrowRight'] || this.keys['KeyD']) this.playerX += this.playerSpeed * step;
         this.playerX = Math.max(0, Math.min(this.gameWidth - this.playerWidth, this.playerX));
 
-        // 自弾
+        // 自弾（トリプルショットは横方向にも移動）
         this.bullets = this.bullets.filter(b => {
-            b.y -= this.bulletSpeed * step; return b.y > -20;
+            b.y -= this.bulletSpeed * step;
+            b.x += (b.vx || 0) * step;
+            return b.y > -20 && b.x > -10 && b.x < this.gameWidth + 10;
         });
 
         // 敵弾
@@ -272,6 +307,9 @@ class RetroInvadersGame {
 
         // パーティクル
         this.particles = this.particles.filter(p => { p.ttl -= dt; p.x += p.vx * step; p.y += p.vy * step; return p.ttl > 0; });
+
+        // スコアポップアップ
+        this.floatTexts = this.floatTexts.filter(t => { t.ttl -= dt; t.y -= 0.4 * step; return t.ttl > 0; });
         if (this.playerInvincibleTimer > 0) this.playerInvincibleTimer = Math.max(0, this.playerInvincibleTimer - dt);
 
         // 衝突
@@ -281,13 +319,20 @@ class RetroInvadersGame {
 
     shoot() {
         if (!this.gameRunning || this.gamePaused || !this.canShoot) return;
-        this.bullets.push({ x: this.playerX + Math.floor(this.playerWidth/2) - 1, y: this.playerY - 6, w: 2, h: 6 });
+        const cx = this.playerX + Math.floor(this.playerWidth/2);
+        this.bullets.push({ x: cx - 1, y: this.playerY - 6, w: 2, h: 6 });
+        if (this.tripleShot) {
+            // 3方向ショット（左右に開く）
+            this.bullets.push({ x: cx - 1, y: this.playerY - 4, w: 2, h: 6, vx: -0.8 });
+            this.bullets.push({ x: cx - 1, y: this.playerY - 4, w: 2, h: 6, vx: 0.8 });
+        }
         this.canShoot = false;
         this.shootTimer = setTimeout(() => {
             this.shootTimer = null;
             this.canShoot = true;
         }, this.shootCooldown);
-        this.muzzle(this.playerX + Math.floor(this.playerWidth/2), this.playerY - 6);
+        this.sfx(880, 0.06, 'square', 0.03, -400);
+        this.muzzle(cx, this.playerY - 6);
     }
 
     enemyShoot() {
@@ -308,17 +353,32 @@ class RetroInvadersGame {
     }
 
     createPowerup(x, y) {
-        this.powerups.push({ x, y, w: 8, h: 8, type: 'rapid' });
+        const type = Math.random() < 0.5 ? 'rapid' : 'triple';
+        this.powerups.push({ x, y, w: 8, h: 8, type });
     }
 
     collectPowerup(p) {
         this.addScore(50);
-        this.shootCooldown = 50;
-        if (this.rapidFireTimer) clearTimeout(this.rapidFireTimer);
-        this.rapidFireTimer = setTimeout(() => {
-            this.rapidFireTimer = null;
-            this.shootCooldown = 150;
-        }, 5000);
+        if (p.type === 'triple') {
+            // 3方向ショット（5秒間）
+            this.tripleShot = true;
+            if (this.tripleTimer) clearTimeout(this.tripleTimer);
+            this.tripleTimer = setTimeout(() => {
+                this.tripleTimer = null;
+                this.tripleShot = false;
+            }, 5000);
+            this.addFloatText(p.x, p.y - 10, 'TRIPLE SHOT!', '#00ffff');
+        } else {
+            // 連射（5秒間）
+            this.shootCooldown = 50;
+            if (this.rapidFireTimer) clearTimeout(this.rapidFireTimer);
+            this.rapidFireTimer = setTimeout(() => {
+                this.rapidFireTimer = null;
+                this.shootCooldown = 150;
+            }, 5000);
+            this.addFloatText(p.x, p.y - 10, 'RAPID FIRE!', '#ffee00');
+        }
+        this.sfx(660, 0.18, 'triangle', 0.05, 440);
         this.explode(p.x, p.y, true);
     }
 
@@ -367,6 +427,8 @@ class RetroInvadersGame {
                 if (this.aabb(b, inv)) {
                     this.explode(inv.x + inv.w/2, inv.y + inv.h/2);
                     const pts = inv.type * 10; this.addScore(pts);
+                    this.addFloatText(inv.x + inv.w/2, inv.y - 2, `+${pts}`, '#ffa500');
+                    this.sfx(220, 0.12, 'sawtooth', 0.04, -150);
                     if (Math.random() < 0.10) this.createPowerup(inv.x + inv.w/2, inv.y + inv.h/2);
                     this.bullets.splice(i, 1); this.invaders.splice(j, 1); break;
                 }
@@ -381,6 +443,8 @@ class RetroInvadersGame {
                 if (this.aabb(b, u)) {
                     const bonus = [50,100,150,200,300][Math.floor(Math.random()*5)];
                     this.addScore(bonus); this.explode(u.x + u.w/2, u.y + u.h/2, true);
+                    this.addFloatText(u.x + u.w/2, u.y - 4, `+${bonus}`, '#ff66ff');
+                    this.sfx(1200, 0.25, 'sawtooth', 0.05, -900);
                     this.bullets.splice(i, 1); this.ufos.splice(j, 1); break;
                 }
             }
@@ -423,6 +487,22 @@ class RetroInvadersGame {
             if (this.aabb(this.powerups[i], playerBox)) { this.collectPowerup(this.powerups[i]); this.powerups.splice(i, 1); }
         }
 
+        // 敵がバンカーに接触したら侵食する（素通り防止）
+        for (const bunker of this.bunkers) {
+            const box = { x: bunker.x, y: bunker.y, w: bunker.cols * bunker.px, h: bunker.rows * bunker.px };
+            for (const inv of this.invaders) {
+                if (this.aabb(inv, box)) {
+                    const c0 = Math.max(0, Math.floor((inv.x - bunker.x) / bunker.px));
+                    const c1 = Math.min(bunker.cols - 1, Math.floor((inv.x + inv.w - bunker.x) / bunker.px));
+                    const r0 = Math.max(0, Math.floor((inv.y - bunker.y) / bunker.px));
+                    const r1 = Math.min(bunker.rows - 1, Math.floor((inv.y + inv.h - bunker.y) / bunker.px));
+                    for (let r = r0; r <= r1; r++) {
+                        for (let cc = c0; cc <= c1; cc++) bunker.cells[r][cc] = false;
+                    }
+                }
+            }
+        }
+
         // 敵が下まで到達
         for (const inv of this.invaders) if (inv.y + inv.h > this.gameHeight - 56) { this.gameOver(); break; }
     }
@@ -433,6 +513,11 @@ class RetroInvadersGame {
 
     nextWave() {
         this.waveTransitioning = true;
+        // Wave クリアボーナス
+        const bonus = this.wave * 50;
+        this.addScore(bonus);
+        this.addFloatText(this.gameWidth / 2, this.gameHeight / 2, `WAVE CLEAR! +${bonus}`, '#39ff14');
+        this.sfx(523, 0.3, 'triangle', 0.05, 523);
         this.wave++; this.invaderSpeed += 0.3; this.updateDisplay();
         this.bullets = [];
         this.enemyBullets = [];
@@ -449,6 +534,7 @@ class RetroInvadersGame {
     addScore(p) { this.score += p; this.updateDisplay(); }
     loseLife() {
         this.lives--;
+        this.sfx(150, 0.4, 'sawtooth', 0.06, -100);
         this.playerInvincibleTimer = 1200;
         this.enemyBullets = [];
         this.playerX = (this.gameWidth - this.playerWidth) / 2;
@@ -543,9 +629,31 @@ class RetroInvadersGame {
             }
         }
     }
-    drawPowerup(p) { const c = this.ctx; c.fillStyle = '#ffee00'; c.fillRect((p.x-4)|0, (p.y-4)|0, 8, 8); }
+    drawPowerup(p) {
+        const c = this.ctx;
+        c.fillStyle = p.type === 'triple' ? '#00ffff' : '#ffee00';
+        c.fillRect((p.x-4)|0, (p.y-4)|0, 8, 8);
+        // 種別が分かるように中央へ文字を描画
+        c.fillStyle = '#000';
+        c.font = 'bold 7px monospace';
+        c.textAlign = 'center';
+        c.fillText(p.type === 'triple' ? '3' : 'R', p.x|0, (p.y+2.5)|0);
+        c.textAlign = 'left';
+    }
     drawParticles() {
         const c = this.ctx; for (const p of this.particles) { c.fillStyle = p.c || '#fff'; c.fillRect(p.x|0, p.y|0, p.s||1, p.s||1); }
+    }
+    drawFloatTexts() {
+        const c = this.ctx;
+        c.font = 'bold 10px monospace';
+        c.textAlign = 'center';
+        for (const t of this.floatTexts) {
+            c.globalAlpha = Math.max(0, Math.min(1, t.ttl / 400));
+            c.fillStyle = t.color;
+            c.fillText(t.text, t.x|0, t.y|0);
+        }
+        c.globalAlpha = 1;
+        c.textAlign = 'left';
     }
 
     // バンカー作成・描画・破壊
@@ -611,7 +719,22 @@ class RetroInvadersGame {
         for (const u of this.ufos) this.drawUfo(u);
         for (const p of this.powerups) this.drawPowerup(p);
         this.drawParticles();
+        this.drawFloatTexts();
         this.drawPlayer();
+
+        // ポーズ中の表示
+        if (this.gamePaused) {
+            const c = this.ctx;
+            c.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            c.fillRect(0, 0, this.gameWidth, this.gameHeight);
+            c.textAlign = 'center';
+            c.fillStyle = '#00d4ff';
+            c.font = 'bold 24px monospace';
+            c.fillText('PAUSED', this.gameWidth / 2, this.gameHeight / 2);
+            c.font = '12px monospace';
+            c.fillText('PRESS P TO RESUME', this.gameWidth / 2, this.gameHeight / 2 + 24);
+            c.textAlign = 'left';
+        }
     }
 }
 

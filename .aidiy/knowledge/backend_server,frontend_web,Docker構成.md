@@ -21,12 +21,12 @@
 Nginx (HTTPS :443 / HTTP :80)
   -> frontend_web 静的ファイル
   -> backend core (:8091)
-  -> backend apps (:8092)
+  -> backend apps (:9098)
 ```
 
 - `backend_tools` (`:8095`) は Docker 構成に含めない。MCP 検証が必要な場合はローカルで別途起動する。
-- `docker-compose.yml` は core/apps の `8091` / `8092` も直接公開する。
-- 通常の画面確認は `https://localhost/`、Swagger 確認は `http://localhost:8091/docs` / `http://localhost:8092/docs` を使う。
+- `docker-compose.yml` は core/apps の `8091` / `9098` も直接公開する。
+- 通常の画面確認は `https://localhost/`、Swagger 確認は `http://localhost:8091/docs` / `http://localhost:9098/docs` を使う。
 - コンテナ名は `aidiy2026`。ログ確認は `docker logs aidiy2026`。
 
 ## 起動手順
@@ -54,7 +54,7 @@ cd docker
 ## 判断基準
 
 - 音声機能やマイク権限を確認する場合は HTTPS の `https://localhost/` を使う。
-- API の単体確認や Swagger は `8091` / `8092` を直接使ってよい。
+- API の単体確認や Swagger は `8091` / `9098` を直接使ってよい。
 - MCP を含む疎通確認は Docker だけで完結しない。`backend_tools` をローカル起動する。
 - HTTPS は自己署名証明書のため、ブラウザ警告は開発・検証用として扱う。
 - Docker 仕様や証明書まわりで迷った場合は `docker/README.md` を優先する。
@@ -64,7 +64,7 @@ cd docker
 ```powershell
 curl.exe -k https://localhost/
 curl.exe http://localhost:8091/docs
-curl.exe http://localhost:8092/docs
+curl.exe http://localhost:9098/docs
 docker logs aidiy2026
 ```
 

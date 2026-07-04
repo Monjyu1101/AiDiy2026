@@ -66,8 +66,8 @@ RUN mkdir -p /app/temp /app/_data
 # Expose ports
 # 8090: Frontend
 # 8091: Backend Core API (core_main)
-# 8092: Backend Apps API (apps_main)
-EXPOSE 8090 8091 8092
+# 9098: Backend Apps API (apps_main)
+EXPOSE 8090 8091 9098
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

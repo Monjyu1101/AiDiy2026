@@ -109,7 +109,7 @@
 - sessionId は `init` 受信後に確定する
 - 明示的に `disconnect()` すると自動再接続は止まる
 - Electron と Web で Storage が違うため、調査時は実行モードを先に確認する
-- Vite 開発時の Network では `8099/core/ws/...` に見えても、実体は Proxy 先の `8091` で処理される
+- Vite 開発時の Network では `8092/core/ws/...` に見えても、実体は Proxy 先の `8091` で処理される
 - Code AI パネルは現行 `code1`〜`code6` 前提。実装確認は `frontend_avatar/src/AiDiy.vue`、`frontend_web/src/components/AiDiy/AiDiy.vue`、`backend_server/core_router/AIコア.py` を見る
 
 ## 確認方法

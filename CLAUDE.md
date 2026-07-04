@@ -12,9 +12,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 日本語識別子を前提としたフルスタック業務システム開発テンプレート。
 
 - **Backend**: FastAPI + SQLAlchemy + SQLite（Python 3.13 以上、uv 管理、2 サーバー構成）
-- **Backend Hermes**: `aidiy_hermes` コード支援 CLI（**常駐なし**、`_start.py` の起動対象外）
-- **Backend MCP**: 15 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Code Agents, Chat LLM）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供。
-- **Backend Local**: `backend_local` ローカル LLM サーバー（ポート 8096）。HuggingFace の **Gemma** を `transformers` + `torch` でローカル推論し、**OpenAI 互換**の Chat Completions API（`POST http://localhost:8096/v1/chat/completions`、`stream` / `tools` 対応）として提供。モデルは `temp/models/<safe_name>` に配置し遅延ロード。設定は `backend_server/_config/AiDiy_key.json`（環境変数は使わない）。
+- **Command Hermes**: `aidiy_hermes` コード支援 CLI（**常駐なし**、`_start.py` の起動対象外）
+- **Backend MCP**: 16 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Notification Sounds, Code Agents, Chat LLM）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供。
+- **Backend Local**: `backend_local` ローカル LLM サーバー（ポート 8094）。HuggingFace の **Gemma** を `transformers` + `torch` でローカル推論し、**OpenAI 互換**の Chat Completions API（`POST http://localhost:8094/v1/chat/completions`、`stream` / `tools` 対応）として提供。モデルは `temp/models/<safe_name>` に配置し遅延ロード。設定は `backend_server/_config/AiDiy_key.json`（環境変数は使わない）。
+- **Backend Task**: `backend_task` AIタスク実行 + 定期タスク FastAPI サーバー（ポート 8093）。`_start.py` では Apps 起動後に起動。`/task/タスク要求/*`・`/task/タスク明細/*` API を提供し、監視ループ（5 秒間隔）が要求を AI で明細タスクへ分解して Code CLI（`TASK_AI_NAME`）で実行する。明細は `先行SEQ`（カンマ区切りで複数指定可）による DAG で、垂直の直列だけでなく水平の並行分岐も自由に定義でき、先行が全て完了した明細から実行（フロー図はクリティカルパス基準で表示）。DB は `backend_server/_data/AiDiy/database.db` を共有（`AIタスク要求` / `AIタスク明細` テーブル）。
 - **Frontend Web**: Vue 3 + Vite + TypeScript（qTubler, Pinia, Vue Router）
 - **Frontend Avatar**: Electron/Web デュアルモード AI Avatar（Three.js, VRM）
 
@@ -38,23 +39,29 @@ python _start.py            # 対話形式: 起動するサービスを選択
 # Backend Core (C系, A系, 認証, AIコア) — ポート 8091
 cd backend_server && .venv/Scripts/python -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
 
-# Backend Apps (M系, T系, V系, S系) — ポート 8092
-cd backend_server && .venv/Scripts/python -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8092
+# Backend Apps (M系, T系, V系, S系) — ポート 9098
+cd backend_server && .venv/Scripts/python -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098
 
 # Backend MCP — ポート 8095
 cd backend_tools && .venv/Scripts/python -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
 
-# Backend Local (ローカル LLM, Gemma) — ポート 8096
-cd backend_local && .venv/Scripts/python -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
+# Backend Local (ローカル LLM, Gemma) — ポート 8094
+cd backend_local && .venv/Scripts/python -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8094
+
+# Backend Task (AIタスク実行 + 定期タスク) — ポート 8093
+cd backend_task && .venv/Scripts/python -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093
 
 # Frontend Web — ポート 8090
 cd frontend_web && npm run dev
 
-# Frontend Avatar (Electron + Web) — ポート 8099
+# Frontend Avatar (Electron + Web) — ポート 8092
 cd frontend_avatar && npm run dev
 
+# Frontend Avatar (Web モードのみ、Electron を起動しない)
+cd frontend_avatar && npm run dev:renderer
+
 # Hermes CLI（常駐しない、必要時に手動起動）
-cd backend_hermes && .venv/Scripts/python cli_main.py
+cd command_hermes && .venv/Scripts/python cli_main.py
 ```
 
 ### 型チェック・ビルド
@@ -77,8 +84,9 @@ cd frontend_avatar && npm run build      # renderer + electron build
 # Backend
 cd backend_server && uv sync --upgrade
 cd backend_tools && uv sync --upgrade
-cd backend_hermes && uv sync --upgrade
+cd command_hermes && uv sync --upgrade
 cd backend_local && uv sync --upgrade
+cd backend_task && uv sync --upgrade
 
 # Frontend
 cd frontend_web && npm install
@@ -90,6 +98,18 @@ cd frontend_avatar && npm install
 ```bash
 python _cleanup.py          # 対話形式: .venv / node_modules / DB / キャッシュ削除
 ```
+
+### Docker 起動（HTTPS）
+
+音声機能（マイク入力）は HTTPS 必須のため、Docker 構成では nginx + 自己署名証明書で `https://localhost/` を提供します。
+
+```bash
+cd docker
+docker_1build.bat    # 初回のみビルド
+docker_2start.bat    # 起動 → https://localhost/
+```
+
+詳細は `.aidiy/knowledge/backend_server,frontend_web,Docker構成.md` を参照。
 
 ### コードチェック（MCP）
 
@@ -104,7 +124,17 @@ curl -X POST http://localhost:8095/aidiy_code_check/check \
 
 ### 自動テスト
 
-`aidiy_chrome_devtools`（MCP Chrome Tools）を使って E2E 自動テストを実行します。
+backend_tools のスモークテスト（backend_tools 起動後に実行）:
+
+```powershell
+cd backend_tools
+.venv\Scripts\python.exe tests\test_mcp_smoke.py       # 各 MCP の SSE 接続 / list_tools / 最低 1 メソッド呼び出し
+.venv\Scripts\python.exe tests\test_post_api_smoke.py  # HTTP docs / POST API（重い生成系は実行しない）
+```
+
+個別機能の検証スクリプト（`tests/test_agents.py`、`test_chrome.py`、`test_image.py`、`test_movie.py`、`test_tts_stt.py` など）は同様に単体で直接実行します。外部 API キー、Chrome、OBS、ffmpeg などの前提条件は各ファイル先頭コメントと `tests/README.md` を確認してください。
+
+E2E テストは `aidiy_chrome_devtools`（MCP Chrome Tools）を使って実行します。
 
 ```bash
 # backend_tools が起動している状態で Chrome 操作 MCP ツールを使用
@@ -114,9 +144,9 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 ```
 
 手動確認が必要な場合:
-- API: http://localhost:8091/docs / http://localhost:8092/docs
+- API: http://localhost:8091/docs / http://localhost:9098/docs
 - Web UI: http://localhost:8090
-- Avatar Web: http://localhost:8099
+- Avatar Web: http://localhost:8092
 
 ## ポート一覧
 
@@ -124,10 +154,11 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 |--------|----------|
 | 8090 | Frontend Web (Vite) |
 | 8091 | Backend Core (`core_main.py`) |
-| 8092 | Backend Apps (`apps_main.py`) |
+| 9098 | Backend Apps (`apps_main.py`) |
 | 8095 | Backend MCP (`tools_main.py`) |
-| 8096 | Backend Local (`local_main.py`) — OpenAI 互換 Gemma サーバー |
-| 8099 | Frontend Avatar (Vite) |
+| 8094 | Backend Local (`local_main.py`) — OpenAI 互換 Gemma サーバー |
+| 8093 | Backend Task (`task_main.py`) — AIタスク実行 + 定期タスクサーバー |
+| 8092 | Frontend Avatar (Vite) |
 
 **注意**: フロントエンドのポートを変える場合は `core_main.py` / `apps_main.py` の CORS 許可リストも合わせて更新してください。
 
@@ -135,7 +166,8 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 
 - Web UI: http://localhost:8090
 - Core API Swagger: http://localhost:8091/docs
-- Apps API Swagger: http://localhost:8092/docs
+- Apps API Swagger: http://localhost:9098/docs
+- Task API Swagger: http://localhost:8093/docs
 - AI 画面: http://localhost:8090/AiDiy
 
 ## データベース
@@ -151,7 +183,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | 接頭辞 | 種別 | 担当サーバー |
 |--------|------|-------------|
 | C | Core / Common (`C権限`, `C利用者`, `C採番`) | core_main |
-| A | AI / Advanced (`A会話履歴`, `AIコア`) | core_main |
+| A | AI / Advanced (`A会話履歴`, `AIコア`)。`AIタスク要求` / `AIタスク明細` は backend_task が管理 | core_main / backend_task |
 | M | Master (`M商品`, `M取引先`) | apps_main |
 | T | Transaction (`T配車`, `T生産`) | apps_main |
 | V | View endpoint (生 SQL JOIN) | apps_main |
@@ -173,6 +205,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | Python 変数 | `利用者名`、`配車日付`、`商品名` |
 
 システム用語（`request`、`query`、`items`、`total`、`limit`）や英字ライブラリ名はそのまま使用します。
+文字コードは **UTF-8 固定**（BOM なし）。ファイル読み込みは UTF-8 指定で行います。
 
 ## Backend 実装パターン（4層構造）
 
@@ -197,6 +230,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | `CHAT_AI_NAME` | `_chat` で終わる |
 | `LIVE_AI_NAME` | `_live` で終わる |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | `_sdk` または `_cli`（例外: `aidiy_hermes`） |
+| `TASK_AI_NAME` | `_sdk` または `_cli`（例外: `aidiy_hermes`）。backend_task の AIタスク実行に使用 |
 
 比較は完全一致で行い、前方一致を使わない。MCP 設定は `backend_server/_config/AiDiy_mcp.json`。
 
@@ -212,6 +246,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | V系一覧画面 | `components/Vビュー/` |
 | S系スケジュール画面 | `components/Sスケジュール/` |
 | X系画面 | `components/Xその他/` |
+| AIタスク画面 | `components/AIタスク/`（route `/AIタスク`、API は `/task/*` → backend_task） |
 
 ### Vue テンプレートの制約
 
@@ -230,7 +265,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 
 ### Vite Proxy
 
-`/core/*` → `http://127.0.0.1:8091`、`/apps/*` → `http://127.0.0.1:8092` にプロキシ。WebSocket 対応済み。
+`/core/*` → `http://127.0.0.1:8091`、`/apps/*` → `http://127.0.0.1:9098`（共に WebSocket 対応）、`/task/*` → `http://127.0.0.1:8093` にプロキシ。
 
 ### UI 補足
 
@@ -248,7 +283,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | WebSocket クライアント (`AIWebSocket`) | 再接続ポリシー、メッセージディスパッチ、`createWebSocketUrl()` |
 | Monaco Editor 設定 | Worker 構成、拡張子→言語マッピング (`モナコ言語推定()`) |
 | qAlert / qConfirm / qColorPicker | シングルトンダイアログパターン |
-| Vite proxy | `/core` → 8091、`/apps` → 8092（共に WebSocket 対応） |
+| Vite proxy | `/core` → 8091、`/apps` → 9098（共に WebSocket 対応）、`/task` → 8093 |
 
 **主要な差異:**
 - **状態管理**: web は Pinia + Vue Router、avatar は BroadcastChannel + コンポーネント状態
@@ -266,19 +301,26 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 - `guest / guest`
 - `other / other`
 
+## 補助ディレクトリ
+
+- `backend_tools/aidiy_automations/` — MCP / HTTP API（`localhost:8095`）を組み合わせて実行する自動化スクリプト置き場。MCP サーバー本体の実装は `backend_tools/tools_proc/` に置き、ここには「利用側」の処理だけを置く。
+- `scripts/` — 補助スクリプト（BOM 除去、画像変換、起動 / 停止 bat など）。
+- `docker/` — Docker + nginx（HTTPS）構成一式。
+
 ## 参照すべきドキュメント
 
 - [AGENTS.md](./AGENTS.md) — 全体アーキテクチャ・設計方針
-- [`.aidiy/knowledge/_index.md`](./.aidiy/knowledge/_index.md) — 全 HowTo の入口（実装手順は必ずここを確認）
+- [`.aidiy/knowledge/_index.md`](./.aidiy/knowledge/_index.md) — 全 HowTo の入口（実装手順は必ずここを確認）。作業ログ置き場ではなく、再利用できる HowTo / 判断基準 / 注意点だけを残す
 - `backend_server/AGENTS.md` — Backend 実装パターン
 - `frontend_web/AGENTS.md` — Web UI 実装パターン
 - `frontend_avatar/AGENTS.md` — Avatar / Electron 実装パターン
 - `backend_tools/AGENTS.md` — MCP 実装パターン
-- `backend_hermes/AGENTS.md` — Hermes CLI 実装パターン
+- `command_hermes/AGENTS.md` — Hermes CLI 実装パターン
 - `backend_local/AGENTS.md` — ローカル LLM（OpenAI 互換 Gemma）実装パターン
+- `backend_task/AGENTS.md` — AIタスク実行 + 定期タスク FastAPI 実装パターン
 - `docs/` — 開発ガイド (HTML)
 
-### frontend 共通ナレッジ（新規）
+### frontend 共通ナレッジ
 
 - [共通APIクライアントパターン](.aidiy/knowledge/frontend_web,frontend_avatar,共通APIクライアントパターン.md) — Axios client / token / 401
 - [共通WebSocketクライアント](.aidiy/knowledge/frontend_web,frontend_avatar,共通WebSocketクライアント.md) — AIWebSocket / 再接続 / パケット
