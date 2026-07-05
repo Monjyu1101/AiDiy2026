@@ -39,10 +39,10 @@
  ──────────────────
  テーブル定義（SQLAlchemyモデル）
 
- Schema (core_schema.py または apps_schema.py)
+ Schema (core_schema/ または apps_schema/)
  ──────────────────
  API入出力の型定義（Pydanticモデル）
- ※ ファイルは1つ（フォルダではない）
+ ※ Model/CRUD/Routerと同様、テーブルごとに1ファイル
 </code></pre>
  </section>
 
@@ -135,7 +135,7 @@ def list_items(
   <li>監査項目 (登録日時、更新日時等) の定義</li>
   </ul>
 
-  <h3>Schema (core_schema.py / apps_schema.py)</h3>
+  <h3>Schema (core_schema/ / apps_schema/)</h3>
   <p><strong>役割</strong>: API入出力の型定義</p>
   <ul>
   <li>リクエストボディの検証</li>
@@ -146,8 +146,8 @@ def list_items(
   <div>
   <strong>補足: Schemaファイルの構成</strong>
   <p>
-  Schemaはフォルダではなく<strong>単一ファイル</strong>です。<br>
-  <code>core_schema.py</code>（Core API用）と <code>apps_schema.py</code>（Apps API用）の2ファイルに全Schemaが定義されています。
+  Schemaは Model / CRUD / Router と同様に<strong>フォルダ</strong>です。<br>
+  <code>core_schema/</code>（C系・A系、例: <code>core_schema/C利用者.py</code>）と <code>apps_schema/</code>（M系・T系・V系・S系、例: <code>apps_schema/T配車.py</code>）にテーブルごとの定義があり、共通の型は各フォルダの <code>common.py</code> にまとめられています。
   </p>
   </div>
  </section>
@@ -217,7 +217,7 @@ for key, value in 監査項目.items():
   <strong>注意</strong>
   <ul>
    <li>JWTトークンの有効期限は60分です。期限切れ時は再ログインが必要</li>
-   <li>パスワードは平文で保存されています (bcryptは未使用)</li>
+   <li>初期投入アカウント（admin等）は平文で保存されます。API経由で新規作成した利用者はbcryptでハッシュ化されます（<code>core_crud/C利用者.py</code> の <code>hash_パスワード</code>/<code>verify_パスワード</code>）</li>
    <li>権限IDは文字列型です。<code>'1'</code> で比較してください (数値の <code>1</code> ではない)</li>
   </ul>
   </div>

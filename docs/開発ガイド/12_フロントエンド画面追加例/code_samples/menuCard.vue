@@ -1,14 +1,11 @@
 <!-- Mマスタ.vue にある M商品カード（実装例） -->
 
-<div class="menu-card menu-card-fixed">
+<router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品/一覧?戻URL=/Mマスタ">
   <div class="menu-card-title">
     <span class="icon">M商</span>
     M商品
   </div>
   <div class="menu-card-description">
-    商品マスター管理・商品情報登録・在庫設定
+    品番・品名・単位・分類・在庫設定を一元管理する商品台帳
   </div>
-  <router-link to="/Mマスタ/M商品/一覧?戻URL=/Mマスタ" class="menu-card-link">
-    開く →
-  </router-link>
-</div>
+</router-link>

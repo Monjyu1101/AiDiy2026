@@ -18,9 +18,11 @@ T系（Transaction）:
  components/Tトラン/T商品入庫/
 
 S系（Scheduler）:
- components/Sスケジューラー/<テーブル名>/
- 例: components/Sスケジューラー/S配車_週表示/
+ components/Sスケジューラー/ 直下に画面.vue、components/ に表示テーブルをまとめて配置
+ 例: components/Sスケジューラー/S配車_週表示.vue
+     components/Sスケジューラー/components/S配車_週表示テーブル.vue
 
 V系（View）:
- components/Vビュー/<ビュー名>/
- 例: components/Vビュー/V商品推移表/
+ components/Vビュー/ 直下に画面.vue、components/ に表示テーブルをまとめて配置
+ 例: components/Vビュー/V商品推移表.vue
+     components/Vビュー/components/V商品推移表テーブル.vue

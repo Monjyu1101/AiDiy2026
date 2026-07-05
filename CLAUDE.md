@@ -301,6 +301,10 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 - `guest / guest`
 - `other / other`
 
+## ライセンス
+
+本プロジェクトは **非商用利用のみ許可**（詳細は `LICENSE`）。商用利用には全著作権者の書面承諾が必要。
+
 ## 補助ディレクトリ
 
 - `backend_tools/aidiy_automations/` — MCP / HTTP API（`localhost:8095`）を組み合わせて実行する自動化スクリプト置き場。MCP サーバー本体の実装は `backend_tools/tools_proc/` に置き、ここには「利用側」の処理だけを置く。

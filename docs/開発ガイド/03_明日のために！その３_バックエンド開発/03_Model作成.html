@@ -23,6 +23,7 @@
     <tr><td>商品ID</td><td>Text</td><td>PRIMARY KEY</td></tr>
     <tr><td>商品名</td><td>Text</td><td>NOT NULL</td></tr>
     <tr><td>単位</td><td>Text</td><td>NOT NULL</td></tr>
+    <tr><td>商品分類ID</td><td>Text</td><td>NOT NULL（M商品分類.商品分類IDを参照）</td></tr>
     <tr><td>商品備考</td><td>Text</td><td>NULL可</td></tr>
     <tr><td>監査8項目</td><td>Text</td><td>登録/更新のID・日時・利用者名・端末ID</td></tr>
   </table>

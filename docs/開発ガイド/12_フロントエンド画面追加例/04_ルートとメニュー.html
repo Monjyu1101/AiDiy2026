@@ -115,7 +115,7 @@ router.beforeEach((to, from, next) => {
   <code>M商品</code> を <code>M&lt;テーブル名&gt;</code> に置き換える。
  </p>
  <pre><code>&lt;!-- Mマスタ.vue に追加するカード（M&lt;テーブル名&gt; 用） --&gt;
-&lt;div class="menu-card"&gt;
+&lt;router-link class="menu-card menu-card-fixed" to="/Mマスタ/M&lt;テーブル名&gt;/一覧?戻URL=/Mマスタ"&gt;
   &lt;div class="menu-card-title"&gt;
     &lt;span class="icon"&gt;M名&lt;/span&gt;
     M&lt;テーブル名&gt;
@@ -123,10 +123,7 @@ router.beforeEach((to, from, next) => {
   &lt;div class="menu-card-description"&gt;
     &lt;テーブルの説明文・ビジネスドメインに合わせて記載&gt;
   &lt;/div&gt;
-  &lt;router-link to="/Mマスタ/M&lt;テーブル名&gt;/一覧" class="menu-card-link"&gt;
-    開く →
-  &lt;/router-link&gt;
-&lt;/div&gt;</code></pre>
+&lt;/router-link&gt;</code></pre>
  <p>
   <strong>注意：</strong> Vue コンポーネントのタグ名は ASCII のみ有効。
   日本語ファイル名のコンポーネントを動的に使う場合は

@@ -26,8 +26,6 @@ const columns: Column[] = [
   { key: '明細SEQ', label: 'SEQ', width: '50px', sortable: false, align: 'center' },
   { key: 'タイトル', label: 'タイトル', width: '150px', sortable: false },
   { key: '先行SEQ', label: '先行SEQ', width: '80px', sortable: false, align: 'center' },
-  { key: 'TASK_AI_NAME', label: 'TASK_AI_NAME', width: '120px', sortable: false },
-  { key: 'TASK_AI_MODEL', label: 'TASK_AI_MODEL', width: '130px', sortable: false },
   { key: '有効', label: '有効', width: '60px', sortable: false, align: 'center' },
   { key: '状態', label: '状態', width: '90px', sortable: false, align: 'center' },
   { key: 'PID', label: 'PID', width: '60px', sortable: false, align: 'center' },

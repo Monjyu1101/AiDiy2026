@@ -15,18 +15,24 @@
   </nav>
 
   <h1>04_DB再作成と反映</h1>
-  <p>このプロジェクトの標準運用は SQLite + <code>create_all()</code> です。Alembicを使わず、DB再作成で反映します。</p>
+  <p>このプロジェクトの標準運用は SQLite + <code>create_all()</code> です。Alembicのようなマイグレーションツールは使いません。</p>
 
-  <h2>手順</h2>
+  <h2>新規テーブル追加時の手順（M商品のようなケース）</h2>
+  <p><code>M商品</code> は新規テーブルなので、既存DBを削除しなくても <code>create_all()</code> だけでテーブルが追加されます。</p>
   <ol>
-    <li>サーバー停止</li>
-    <li><code>database.db</code> を削除</li>
-    <li><code>python _start.py</code> で再起動</li>
+    <li><code>backend_server/apps_models/__init__.py</code> に <code>M商品</code> のimportを追加する</li>
+    <li><code>backend_server/apps_main.py</code> の <code>database.Base.metadata.create_all(bind=database.engine, tables=[...])</code> のリストへ <code>apps_models.M商品.__table__</code> を追加する</li>
+    <li>サーバーを再起動する（<code>python _start.py</code> または個別に <code>uvicorn</code> 起動）</li>
   </ol>
 
   <pre><code>cd workspace/AiDiy2026
-del backend_server\_data\AiDiy\database.db
 python _start.py</code></pre>
+
+  <p><strong>注意:</strong> <code>create_all()</code> は「まだ存在しないテーブル」だけを作成し、既存テーブルのデータは変更しません。新規テーブル追加のためだけに <code>database.db</code> を削除する必要はありません。</p>
+
+  <h2>既存テーブルのカラム追加・削除・型変更が必要な場合</h2>
+  <p><code>create_all()</code> は既存テーブルへのカラム追加・削除・型変更には効きません。この場合は手動SQL（<code>ALTER TABLE</code> やテーブル再作成）が必要です。手順は <code>.aidiy/knowledge/backend_server,スキーマ変更手順.md</code> を参照してください。</p>
+  <p>開発環境で「既存データを残す必要がない」場合に限り、<code>database.db</code> を削除して全テーブルを作り直す方法も選択肢になります。ただし実データがある環境では行わないでください。</p>
 
   <h2>生成確認</h2>
   <ul>
@@ -37,8 +43,8 @@ python _start.py</code></pre>
   <h2>よくあるつまずき</h2>
   <table>
     <tr><th>症状</th><th>原因</th><th>対処</th></tr>
-    <tr><td>テーブルが作成されない</td><td>Model import漏れ</td><td><code>apps_models/__init__.py</code> のimport確認</td></tr>
-    <tr><td>旧定義のまま</td><td>古いDBを参照</td><td><code>database.db</code> 削除後に再起動</td></tr>
+    <tr><td>テーブルが作成されない</td><td>Model import漏れ、または <code>create_all(tables=[...])</code> への追加漏れ</td><td><code>apps_models/__init__.py</code> と <code>apps_main.py</code> の <code>create_all(tables=[...])</code> を確認</td></tr>
+    <tr><td>既存テーブルのカラムが増えない</td><td><code>create_all()</code> は既存テーブルの変更に対応しない</td><td>スキーマ変更手順に従い手動SQLで対応</td></tr>
     <tr><td>起動時エラー</td><td>型定義不整合</td><td>Model/Schema/Routerの項目名整合を再確認</td></tr>
   </table>
 

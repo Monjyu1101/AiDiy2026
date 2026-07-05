@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """backend_task の定期処理と再起動監視。"""
 
 from __future__ import annotations
@@ -15,18 +23,11 @@ from typing import AsyncIterator, Callable
 
 from fastapi import FastAPI
 
-TASK_INTERVAL_SECONDS = 60
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def now_hms() -> str:
     return datetime.now().strftime("%H:%M:%S")
-
-
-async def _task_loop(logger: logging.Logger) -> None:
-    while True:
-        logger.info("task done !, %s", now_hms())
-        await asyncio.sleep(TASK_INTERVAL_SECONDS)
 
 
 def setup_reboot_watcher(logger: logging.Logger) -> None:
@@ -67,18 +68,16 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
         from . import tasks_watcher
         await asyncio.to_thread(tasks_watcher.起動時クリーンアップ, logger)
 
-        worker = asyncio.create_task(_task_loop(logger), name="backend_task_loop")
         watcher = asyncio.create_task(tasks_watcher.監視ループ(logger), name="backend_task_ai_watcher")
-        logger.info("backend_task を開始しました (interval=%ss)", TASK_INTERVAL_SECONDS)
+        logger.info("backend_task を開始しました (interval=%ss)", tasks_watcher.監視間隔秒)
         try:
             yield
         finally:
-            for task in (worker, watcher):
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+            watcher.cancel()
+            try:
+                await watcher
+            except asyncio.CancelledError:
+                pass
             logger.info("backend_task を停止しました")
 
     return lifespan

@@ -67,6 +67,15 @@
     <tr><td>DBは <code>_setup.py</code> で完全作成される</td><td>SQLite運用では主にサーバー起動時にテーブル作成される</td></tr>
   </table>
 
+  <h2>補足: 実際のルートスクリプトとの違い</h2>
+  <p>
+  現在のルート <code>_setup.py</code> / <code>_start.py</code> は、本ハンズオンの簡略サンプルに加えて
+  バックエンド(tools/local/task)と <code>command_hermes</code> のセットアップ・起動確認も行います
+  （MCPサーバー群 8095、ローカルLLM 8094、AIタスク 8093。詳細は
+  <a href="../00_このプロジェクトの歩き方/02_技術スタックと構成.html">00_このプロジェクトの歩き方/02_技術スタックと構成</a> を参照）。<br>
+  ここでは考え方を掴むため、まず core/apps/Web/Avatar だけの単純化した流れで理解します。
+  </p>
+
   <h2>次ページで読む内容</h2>
   <p>次の <a href="02_setup.py解説.html">02_setup.py解説</a> では、実際のコード（<code>code_samples/_setup.py</code>）を読みながら処理順と分岐条件を確認します。</p>
 

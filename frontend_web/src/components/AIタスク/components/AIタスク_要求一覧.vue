@@ -32,7 +32,9 @@ const columns: Column[] = [
   { key: 'PID', label: 'PID', width: '60px', sortable: false, align: 'center' },
   { key: '開始日時', label: '開始日時', width: '140px', sortable: true, align: 'center' },
   { key: '終了日時', label: '終了日時', width: '140px', sortable: true, align: 'center' },
-  { key: '実行回数', label: '実行回数', width: '70px', sortable: false, align: 'right' }
+  { key: '実行回数', label: '実行回数', width: '70px', sortable: false, align: 'right' },
+  { key: '応答タイトル', label: '応答タイトル', width: '110px', sortable: false },
+  { key: '応答内容', label: '応答内容', width: '240px', sortable: false }
 ];
 
 const totalCount = computed(() => rows.value.length);

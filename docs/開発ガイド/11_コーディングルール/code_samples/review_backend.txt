@@ -10,4 +10,4 @@
 [ ] C採番の初期値追加（新規テーブル時）
 [ ] models/__init__.py へのエクスポート追加
 [ ] core_main.py または apps_main.py への router 登録
-[ ] core_schema.py / apps_schema.py への Pydantic モデル追加
+[ ] core_schema/ / apps_schema/ 配下の該当エンティティファイルへの Pydantic モデル追加

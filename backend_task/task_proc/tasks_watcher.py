@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """AIタスクの監視ループとプロセス管理。
 
 - 5 秒間隔でタスク要求を確認し、PID 未設定の仮登録（準備中）を見つけたら
@@ -22,6 +30,7 @@ from . import tasks_db
 
 監視間隔秒 = 5
 実行回数上限 = 3
+実行タイムアウト分 = 30
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SUB_INITパス = os.path.join(_BASE_DIR, "sub_init.py")
@@ -137,6 +146,24 @@ def _軽量並行明細か(行: dict) -> bool:
 
 
 def _監視1回(logger: logging.Logger) -> None:
+    # --- 開始日時だけが入ったまま実行タイムアウト分以上経過 → 状態=エラー・有効=0 ---
+    try:
+        タイムアウト対象 = tasks_db.タイムアウト対象一覧(実行タイムアウト分)
+        for 行 in タイムアウト対象:
+            pid = str(行.get("PID", "")).strip()
+            logger.warning(
+                f"実行タイムアウト({実行タイムアウト分}分)のためキャンセルします: "
+                f"{行['テーブル']} {行.get('利用者ID', '')}/{行.get('タスクID', '')} "
+                f"SEQ={行.get('明細SEQ', '')} 開始日時={行.get('開始日時', '')} PID={pid}"
+            )
+            if pid.isdigit():
+                _プロセス強制停止(int(pid), logger)
+        if タイムアウト対象:
+            更新件数 = tasks_db.タイムアウト対象エラー化(タイムアウト対象)
+            logger.warning(f"実行タイムアウト対象をエラーにしました: {更新件数} 件")
+    except Exception:
+        logger.exception("実行タイムアウト処理でエラーが発生しました")
+
     # --- 仮登録（準備中・PID なし）→ sub_init.py で AI タスク分解 ---
     for 行 in tasks_db.実行待ち一覧():
         利用者ID = str(行["利用者ID"])

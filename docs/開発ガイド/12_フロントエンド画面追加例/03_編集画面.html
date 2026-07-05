@@ -183,7 +183,7 @@ const saveData = async () => {
  <h2>5. 論理削除の実装パターン</h2>
  <p>
   削除は物理削除ではなく<strong>論理削除</strong>（バックエンドが <code>有効=False</code> にセット）。
-  APIレスポンスの <code>message</code> は <code>"M車両「V001」の有効をオフにしました"</code> 形式になる。
+  APIレスポンスの <code>message</code> は <code>"車両の有効をオフにしました"</code> 形式になる（IDは含まれない）。
   削除前に <code>qConfirm</code> で確認ダイアログを表示すること（<strong>native confirm は使用禁止</strong>）。
  </p>
  <pre><code>import { qConfirm, qMessage } from '../../../utils/qAlert';
@@ -200,7 +200,7 @@ const deleteData = async () => {
   try {
     const res = await apiClient.post('/apps/M車両/削除', { 車両ID: form.車両ID });
     if (res.data.status === 'OK') {
-      // res.data.message = "M車両「V001」の有効をオフにしました"
+      // res.data.message = "車両の有効をオフにしました"（IDは含まれない）
       handleSuccess(res.data.message);
     } else {
       void qMessage(res.data.message || '削除に失敗しました。', 'error');

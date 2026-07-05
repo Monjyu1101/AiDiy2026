@@ -53,6 +53,10 @@ append_active_condition(conditions, request, 's."有効"')
 
 # LIMIT 句と値を取得して SQL に組み込む
 limit_sql, limit_value = get_limit_clause(request)
+params = {}
+if limit_value is not None:
+    params["limit"] = limit_value
+
 sql = f"""
     SELECT ...
     FROM ...
@@ -60,7 +64,7 @@ sql = f"""
     ORDER BY s."商品ID"
     {limit_sql}
 """
-result = db.execute(text(sql), {**params, **limit_value}).fetchall()
+result = db.execute(text(sql), params).fetchall()
 </code></pre>
 
  <h3>M系・C系：MAX_ITEMS 定数を Router 上部に定義して使う</h3>

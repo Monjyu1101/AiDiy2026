@@ -2,10 +2,9 @@
  絶対ダメ（本番環境）
 パスワード = "********" # 平文保存
 
- 本番ではハッシュ化必須
-from passlib.context import CryptContext
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-パスワードハッシュ = pwd_context.hash(パスワード)
+ 本番ではハッシュ化必須（実装は bcrypt を直接使用）
+import bcrypt
+パスワードハッシュ = bcrypt.hashpw(パスワード.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 ■ 2. 日本語コンポーネントタグ
  絶対ダメ（無効なHTML）

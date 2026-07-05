@@ -59,9 +59,24 @@
  <div>
  <strong>ポイント: デュアルサーバー構成</strong>
  <p>
- <strong>バックエンドは2つのサーバーで構成されます</strong><br>
+ <strong>業務画面(C/M/T/V/S/A系)のバックエンドは2つのサーバーで構成されます</strong><br>
  • <strong>Core API (8091)</strong>: C系（共通管理）とA系（AI機能）を担当<br>
  • <strong>Apps API (9098)</strong>: M系（マスタ）、T系（トランザクション）、V系（ビュー）、S系（スケジューラー）を担当
+ </p>
+ </div>
+
+ <div>
+ <strong>補足: 実際の常駐サーバーは5つ</strong>
+ <p>
+ このガイドはCore/Apps/Web/Avatarを中心に解説しますが、現行リポジトリには次のサーバーも存在します。
+ </p>
+ <ul>
+ <li><strong>backend_tools/tools_main.py (8095)</strong> — MCPサーバー群（Chrome操作、SQLite確認、コードチェック等、16個）</li>
+ <li><strong>backend_task/task_main.py (8093)</strong> — AIタスク要求をAIが明細タスクへ分解し、Code CLIで実行</li>
+ <li><strong>backend_local/local_main.py (8094)</strong> — OpenAI互換のローカルLLM(Gemma)推論。<code>_start.py</code>の既定では起動しない</li>
+ </ul>
+ <p>
+ また <code>command_hermes</code>(<code>aidiy_hermes</code>)というコード支援CLIもあるが、常駐サーバーではなく<code>_start.py</code>の起動対象外。詳細は各フォルダの <code>AGENTS.md</code> を参照してください。
  </p>
  </div>
  </section>
@@ -215,8 +230,8 @@
   apps_crud/ # M系・T系・V系・S系のDB操作
   core_router/ # C系・A系のAPIエンドポイント
   apps_router/ # M系・T系・V系・S系のAPIエンドポイント
-  core_schema.py # Core用 Pydantic models
-  apps_schema.py # Apps用 Pydantic models
+  core_schema/ # C系・A系の Pydantic models（テーブルごとに1ファイル）
+  apps_schema/ # M系・T系・V系・S系の Pydantic models（テーブルごとに1ファイル）
 
   _data/AiDiy/
    database.db # SQLiteデータベースファイル
@@ -245,6 +260,11 @@
   src/ # Vue 3 + TypeScript
   vite.config.ts # Avatar Webモード (8092)
   AGENTS.md
+
+ backend_tools/ # MCPサーバー群 (ポート8095、16個)
+ backend_local/ # ローカルLLM(Gemma)サーバー (ポート8094)
+ backend_task/ # AIタスク実行+定期タスクサーバー (ポート8093)
+ command_hermes/ # aidiy_hermes コード支援CLI (常駐なし)
 
  docs/開発ガイド/
   00_このプロジェクトの歩き方/</code></pre>
@@ -314,6 +334,11 @@
  <td><strong>Swagger Apps API</strong></td>
  <td><a href="http://localhost:9098/docs" target="_blank">http://localhost:9098/docs</a></td>
  <td>Swagger UIでM系・T系・V系・S系・X系のAPIを確認・テスト</td>
+ </tr>
+ <tr>
+ <td><strong>Backend MCP 一覧</strong></td>
+ <td><a href="http://localhost:8095/" target="_blank">http://localhost:8095/</a></td>
+ <td>backend_tools が提供する16個のMCPサーバー一覧（例: <code>/aidiy_chrome_devtools/list</code>）</td>
  </tr>
  </tbody>
  </table>

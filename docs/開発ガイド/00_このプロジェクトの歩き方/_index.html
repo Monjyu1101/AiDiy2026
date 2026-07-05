@@ -23,6 +23,8 @@
   <strong>AiDiy 2026年版について</strong>
   <ul>
   <li>フロント: <code>8090</code> / バックエンド: <code>8091</code>(Core) / <code>9098</code>(Apps)</li>
+  <li>実際の常駐バックエンドはこれに加えて <code>8095</code>(MCPツール群 backend_tools) / <code>8093</code>(AIタスク backend_task) / <code>8094</code>(ローカルLLM backend_local、既定では未起動) を含む5サーバー構成。補助として常駐しないCLI <code>command_hermes</code>(aidiy_hermes) もある</li>
+  <li>本ガイドは業務画面(C/M/T/V/S/A系)を中心にCore・Apps・Web・Avatarの流れを解説する。MCP/ローカルLLM/AIタスクの詳細は各サブプロジェクトの <code>AGENTS.md</code> を参照</li>
   <li>DB: SQLiteファイル <code>backend_server/_data/AiDiy/database.db</code></li>
   <li>マイグレーションツール(Alembic)は使わず、DB削除で再構築</li>
   </ul>

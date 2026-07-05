@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """AIタスクの HTTP API ルーター。
 
 フロントエンドの AIタスク画面から Vite proxy 経由（/task/*）で呼ばれる。
@@ -35,6 +43,11 @@ class タスク要求登録リクエスト(BaseModel):
 
 class タスク要求一覧リクエスト(BaseModel):
     利用者ID: str
+
+
+class タスク要求取得リクエスト(BaseModel):
+    利用者ID: str
+    タスクID: str
 
 
 class タスク明細一覧リクエスト(BaseModel):
@@ -115,6 +128,20 @@ class タスク明細完了リクエスト(BaseModel):
     応答内容: str = ""
 
 
+class タスク明細開始完了リクエスト(BaseModel):
+    利用者ID: str
+    タスクID: str
+    明細SEQ: int
+    応答内容: str = ""
+
+
+class タスク明細終了完了リクエスト(BaseModel):
+    利用者ID: str
+    タスクID: str
+    明細SEQ: int
+    応答内容: str = ""
+
+
 class タスク明細失敗リクエスト(BaseModel):
     利用者ID: str
     タスクID: str
@@ -176,6 +203,22 @@ async def タスク要求一覧(request: タスク要求一覧リクエスト) -
     except Exception as e:
         logger.error(f"タスク要求一覧の取得に失敗: {e}")
         return _NG(f"タスク要求一覧の取得に失敗しました: {e}")
+
+
+@router.post("/タスク要求/取得", tags=["タスク要求"])
+async def タスク要求取得(request: タスク要求取得リクエスト) -> dict:
+    try:
+        利用者ID = request.利用者ID.strip()
+        タスクID = request.タスクID.strip()
+        if not 利用者ID or not タスクID:
+            return _NG("利用者IDとタスクIDを指定してください。")
+        item = tasks_db.タスク要求取得(利用者ID, タスクID)
+        if not item:
+            return _NG(f"タスク {タスクID} が見つかりません。")
+        return _OK({"item": item})
+    except Exception as e:
+        logger.error(f"タスク要求の取得に失敗: {e}")
+        return _NG(f"タスク要求の取得に失敗しました: {e}")
 
 
 @router.post("/タスク要求/最大更新日時", tags=["タスク要求"])
@@ -494,6 +537,36 @@ async def タスク明細完了(request: タスク明細完了リクエスト) -
     except Exception as e:
         logger.error(f"タスク明細の完了登録に失敗: {e}")
         return _NG(f"タスク明細の完了登録に失敗しました: {e}")
+
+
+@router.post("/タスク明細/開始完了", tags=["タスク明細"])
+async def タスク明細開始完了(request: タスク明細開始完了リクエスト) -> dict:
+    """開始明細を完了し、AIタスク要求を処理中にする（sub_start.py 用）。"""
+    try:
+        利用者ID = request.利用者ID.strip()
+        if not 利用者ID:
+            return _NG("利用者IDを指定してください。")
+        応答内容 = request.応答内容 or "開始処理を完了しました。"
+        item = tasks_db.開始明細完了(利用者ID, request.タスクID, request.明細SEQ, 応答内容)
+        return _OK({"item": item}, f"タスク {request.タスクID} SEQ{request.明細SEQ} の開始処理を完了しました。")
+    except Exception as e:
+        logger.error(f"タスク明細の開始完了登録に失敗: {e}")
+        return _NG(f"タスク明細の開始完了登録に失敗しました: {e}")
+
+
+@router.post("/タスク明細/終了完了", tags=["タスク明細"])
+async def タスク明細終了完了(request: タスク明細終了完了リクエスト) -> dict:
+    """終了明細を完了し、AIタスク要求を完了にする（sub_terminate.py 用）。"""
+    try:
+        利用者ID = request.利用者ID.strip()
+        if not 利用者ID:
+            return _NG("利用者IDを指定してください。")
+        応答内容 = request.応答内容 or "終了処理を完了しました。"
+        item = tasks_db.終了明細完了(利用者ID, request.タスクID, request.明細SEQ, 応答内容)
+        return _OK({"item": item}, f"タスク {request.タスクID} SEQ{request.明細SEQ} の終了処理を完了しました。")
+    except Exception as e:
+        logger.error(f"タスク明細の終了完了登録に失敗: {e}")
+        return _NG(f"タスク明細の終了完了登録に失敗しました: {e}")
 
 
 @router.post("/タスク明細/失敗", tags=["タスク明細"])

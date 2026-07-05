@@ -65,8 +65,8 @@
   <div class="checklist-title">データ取得</div>
   <div class="checklist-group">
   <label><input type="checkbox" /> <code>POST /apps/V&lt;テーブル名&gt;/一覧</code> を呼んでいる</label>
-  <label><input type="checkbox" /> <code>件数制限</code> が true のとき <code>limit</code> パラメータを渡している</label>
-  <label><input type="checkbox" /> <code>無効も表示</code> が false のとき <code>有効=true</code> フィルタを渡している</label>
+  <label><input type="checkbox" /> リクエストボディに <code>件数制限: props.件数制限</code>（boolean）を渡している（true のときサーバー側で上限1000件のLIMITが適用される）</label>
+  <label><input type="checkbox" /> リクエストボディに <code>無効も表示: props.無効も表示</code>（boolean）を渡している（false のときサーバー側で有効レコードのみに絞られる）</label>
   </div>
   <div class="checklist-title">公開インターフェース</div>
   <div class="checklist-group">

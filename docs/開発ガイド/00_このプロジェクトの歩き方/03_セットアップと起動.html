@@ -91,13 +91,23 @@ cd workspace/AiDiy2026
 python _setup.py</code></pre>
 
  <h3>_setup.py が行うこと</h3>
- <p>このスクリプトは<strong>対話形式</strong>で以下の処理を実行します。</p>
+ <p>このスクリプトは<strong>対話形式</strong>で、項目ごとに実行するか確認しながら以下を一括処理します。</p>
  <ol>
- <li><strong>Python依存パッケージのインストール</strong> — <code>uv sync</code> でバックエンド依存関係を解決
+ <li><strong>共通</strong> — pip/wheel/setuptools/uv のアップグレード、AI CLIツール(Claude Code, Copilot, Codex, OpenCode, Antigravity)の導入
   <br><small>要件: uv がインストールされていること。未導入の場合: <code>irm https://astral.sh/uv/install.ps1 | iex</code> (PowerShell)</small></li>
- <li><strong>Node.js依存パッケージのインストール</strong> — <code>npm install</code> でVue関連パッケージをインストール</li>
- <li><strong>PostgreSQL関連処理</strong> — <code>DATABASE_TYPE="sqlite"</code> のため、PostgreSQLユーザー確認・初期データ復元などの分岐は<strong>通常スキップ</strong>されます</li>
+ <li><strong>バックエンド(local)</strong> — <code>backend_local</code> の <code>uv sync --upgrade</code>（ローカルLLMサーバー、任意でモデル事前ダウンロード）</li>
+ <li><strong>バックエンド(tools)</strong> — <code>backend_tools</code> の <code>uv sync --upgrade</code> とMCP設定ファイルの書き込み（Claude / Gemini向け）</li>
+ <li><strong>バックエンド(core,apps)</strong> — <code>backend_server</code> の <code>uv sync --upgrade</code></li>
+ <li><strong>バックエンド(task)</strong> — <code>backend_task</code> の <code>uv sync --upgrade</code></li>
+ <li><strong>フロントエンド(Web)</strong> — <code>frontend_web</code> の <code>npm install</code></li>
+ <li><strong>フロントエンド(Avatar)</strong> — <code>frontend_avatar</code> の <code>npm install</code>（必要に応じてElectronバイナリの補完）</li>
+ <li><strong>コマンド(hermes)</strong> — <code>command_hermes</code> の <code>.venv</code> 作成 / <code>uv sync --upgrade</code> / <code>aidiy_hermes</code> 登録試行</li>
  </ol>
+
+ <div>
+ <strong>補足: PostgreSQL関連処理</strong>
+ <p><code>DATABASE_TYPE="sqlite"</code> が既定値のため、PostgreSQLユーザー確認・初期データ復元・<code>alembic upgrade head</code> の分岐は<strong>通常スキップ</strong>されます。</p>
+ </div>
 
  <div>
  <strong>補足: データベースとログイン</strong>
@@ -152,17 +162,21 @@ cd workspace/AiDiy2026
 python _start.py</code></pre>
 
  <h3>_start.py が行うこと</h3>
+ <p>起動時に次の6項目を順に確認します（既定値は( )内の通り）。</p>
  <ul>
- <li>バックエンド(core/apps) を起動するか確認</li>
- <li>フロントエンド(Web 8090) を起動するか確認</li>
- <li>フロントエンド(Avatar 8092) を起動するか確認</li>
- <li>選択したサービスだけを順番に起動し、起動完了を待機</li>
+ <li>バックエンド(local) を起動するか（既定: No、ポート8094、ローカルLLM）</li>
+ <li>バックエンド(tools) を起動するか（既定: Yes、ポート8095、MCPサーバー群）</li>
+ <li>バックエンド(core,apps) を起動するか（既定: Yes、ポート8091/9098）</li>
+ <li>バックエンド(task) を起動するか（既定: Yes、ポート8093）</li>
+ <li>フロントエンド(Web) を起動するか（既定: Yes、ポート8090）</li>
+ <li>フロントエンド(Avatar) を起動するか（既定: No、ポート8092）</li>
  </ul>
+ <p>選択したサービスだけを順番に起動し、起動完了を待機します。<code>command_hermes</code> は常駐サーバーではないため、この対話には含まれません。</p>
 
  <div>
  <strong>_start.py の動作詳細</strong>
  <ul>
- <li>選択したポート 8090/8091/9098/8092 を使用中のプロセスを自動で停止</li>
+ <li>選択したサービスのポート（8090/8091/9098/8092/8093/8094/8095）を使用中のプロセスを自動で停止</li>
  <li>Web は <code>http://localhost:8090</code>、Avatar は <code>http://127.0.0.1:8092</code> を自動で開く</li>
  <li>サーバーがクラッシュした場合、15秒後に自動再起動</li>
  <li>Ctrl+C で全サーバーを一括停止</li>
@@ -171,16 +185,18 @@ python _start.py</code></pre>
 
  <div>
  <strong>起動成功時の表示</strong>
- <p>以下のようなメッセージが表示されれば正常に起動しています。</p>
- <pre><code>バックエンド(core): http://localhost:8091/docs
+ <p>選択したサービスに応じて、以下のようなメッセージが表示されれば正常に起動しています。</p>
+ <pre><code>バックエンド(tools) Swagger UI : http://localhost:8095/docs
+バックエンド(core): http://localhost:8091/docs
 バックエンド(apps): http://localhost:9098/docs
+バックエンド(task): http://localhost:8093/docs
 フロントエンド(Web): http://localhost:8090/
 フロントエンド(Avatar): renderer http://127.0.0.1:8092</code></pre>
  </div>
 
  <div>
  <strong>ポートが使用中の場合</strong>
- <p>ポート8090/8091/9098/8092が既に使用されている場合はエラーになります。<br>
+ <p>選択したサービスのポート（8090/8091/9098/8092/8093/8094/8095）が既に使用されている場合はエラーになります。<br>
  その場合は <code>python.exe</code> や <code>node.exe</code> のプロセスを終了してから再起動してください。</p>
  </div>
  </section>
@@ -196,6 +212,22 @@ python _start.py</code></pre>
  <h3>Apps サーバー</h3>
  <pre><code>cd workspace/AiDiy2026/backend_server
 .venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098</code></pre>
+
+ <h3>MCP サーバー (backend_tools)</h3>
+ <pre><code>cd workspace/AiDiy2026/backend_tools
+.venv\Scripts\python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095</code></pre>
+
+ <h3>AIタスク サーバー (backend_task)</h3>
+ <pre><code>cd workspace/AiDiy2026/backend_task
+.venv\Scripts\python.exe -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093</code></pre>
+
+ <h3>ローカルLLM サーバー (backend_local、必要時のみ)</h3>
+ <pre><code>cd workspace/AiDiy2026/backend_local
+.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8094</code></pre>
+
+ <h3>Command Hermes (常駐しないCLI)</h3>
+ <pre><code>cd workspace/AiDiy2026/command_hermes
+.venv\Scripts\python.exe cli_main.py</code></pre>
 
  <h3>フロントエンド</h3>
  <pre><code>cd workspace/AiDiy2026/frontend_web
@@ -227,12 +259,15 @@ npm run dev</code></pre>
  <pre><code>cd workspace/AiDiy2026
 python _start.py
 
+バックエンド(local)     起動しますか? y/[n]
+バックエンド(tools)     起動しますか? [y]/n
 バックエンド(core,apps) 起動しますか? [y]/n
-フロントエンド(Web)      起動しますか? [y]/n
-フロントエンド(Avatar)   起動しますか? y/[n]</code></pre>
+バックエンド(task)      起動しますか? [y]/n
+フロントエンド(Web)     起動しますか? [y]/n
+フロントエンド(Avatar)  起動しますか? y/[n]</code></pre>
 
  <p>
- 例: バックエンドだけ動かしたい場合は 1問目だけ <code>y</code>、残りを <code>n</code> にします。<br>
+ 例: コア業務API(core,apps)だけ動かしたい場合は該当の質問だけ <code>y</code>、残りを <code>n</code> にします。<br>
  停止は起動中のターミナルで <code>Ctrl+C</code> を使用します。
  </p>
  </section>

@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """タスク明細の 1 ステップ実行サブプロセス。
 
 監視ループが `python sub_proc.py <temp/output/利用者ID.タスクID.json> <SEQ>` で起動する。
@@ -8,8 +16,10 @@
 処理の流れ:
 1. 出力 JSON（AI 生成のタスク分解結果）から対象 SEQ のステップを特定する
 2. temp/input/<タスクID>.json からプロジェクトパスを引き継ぐ（あれば）
-3. aidiy_code_agents MCP へ「このステップだけ実行」を依頼する
-4. 正常時は /task/タスク明細/完了、エラー時は /task/タスク明細/失敗 を呼ぶ
+3. /task/タスク明細/一覧 から完了済み明細の応答内容を取得する
+   （ステップ0 開始 の応答内容は処理目標、実行済ステップの応答内容は作業記録として渡す）
+4. aidiy_code_agents MCP へ、指定プロジェクトフォルダ・指定 AI で「このステップだけ実行」を依頼する
+5. 正常時は /task/タスク明細/完了、エラー時は /task/タスク明細/失敗 を呼ぶ
 """
 
 from __future__ import annotations
@@ -66,21 +76,44 @@ def 明細行整形(行: dict) -> dict:
     }
 
 
-def プロンプト生成(データ: dict, 対象: dict) -> str:
+def 完了明細一覧取得() -> list[dict]:
+    """完了済みの AIタスク明細（応答内容つき）を明細SEQ順で返す。"""
+    res = POST送信(f"{TASK_API}/タスク明細/一覧", {
+        "利用者ID": 利用者ID,
+        "タスクID": タスクID,
+    }, timeout=60)
+    if res.get("status") != "OK":
+        raise RuntimeError(f"タスク明細一覧の取得に失敗しました: {res.get('message')}")
+    items = res.get("data", {}).get("items", [])
+    return [行 for 行 in items if str(行.get("状態", "")).strip() == "完了"]
+
+
+def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict]) -> str:
     全ステップ = "\n".join(
         f"  {int(行['明細SEQ'])}. {str(行['タイトル']).strip()}（先行SEQ: {str(行['先行SEQ']).strip() or 'なし'}）"
         for 行 in データ["明細"]
     )
+    実行済: list[str] = []
+    for 行 in sorted(完了明細, key=lambda 行: int(行["明細SEQ"])):
+        seq = int(行["明細SEQ"])
+        タイトル = str(行.get("タイトル", "")).strip()
+        応答内容 = str(行.get("応答内容", "")).strip()
+        見出し = f"ステップ{seq} {タイトル} " + ("処理目標" if seq == 0 else "実行済")
+        実行済.append(f"``` {見出し}\n{応答内容}\n```")
+    実行済ブロック = "\n".join(実行済) if 実行済 else "（実行済ステップはまだありません）"
     return f"""あなたはタスクの 1 ステップを実行する担当です。今回のステップの作業だけを実行してください。
 
 タスク全体のタイトル: {str(データ.get('タイトル', '')).strip()}
-タスク全体の要求内容: {str(データ.get('要求内容', '')).strip()}
 
 全ステップ:
 {全ステップ}
 
-今回実行するステップ: {対象['明細SEQ']}. {対象['タイトル']}
-要求内容: {対象['要求内容']}
+実行済ステップの記録（ステップ0 開始 の応答内容が処理目標です）:
+{実行済ブロック}
+
+【今回のステップ】※この処理だけ実行してください。
+ステップ{対象['明細SEQ']} {対象['タイトル']}
+{対象['要求内容']}
 
 注意:
 - 今回のステップの作業のみを行い、先行・後続ステップの作業は行わないでください。
@@ -190,20 +223,24 @@ def main() -> int:
             ログ("ステップ完了")
             return 0
 
-        # 4. code_agents へステップ実行を依頼
+        # 4. 完了済み明細の応答内容を取得（ステップ0 の処理目標と実行済ステップの記録）
+        完了明細 = 完了明細一覧取得()
+        ログ(f"完了明細取得: {len(完了明細)} 件")
+
+        # 5. code_agents へステップ実行を依頼（指定プロジェクトフォルダ・指定 AI）
         task_ai_name = 対象.get("TASK_AI_NAME") or TASK_AI_NAME既定
         task_ai_model = 対象.get("TASK_AI_MODEL") or TASK_AI_MODEL既定
         ログ(f"code_agents run 呼び出し (タイトル={対象['タイトル']}, ai={task_ai_name}, model={task_ai_model}, project_path={プロジェクト})")
-        payload = {"prompt": プロンプト生成(データ, 対象), "ai_name": task_ai_name, "ai_model": task_ai_model}
+        payload = {"prompt": プロンプト生成(データ, 対象, 完了明細), "ai_name": task_ai_name, "ai_model": task_ai_model}
         if プロジェクト:
             payload["project_path"] = プロジェクト
         res = POST送信(MCP_URL, payload)
         ログ(f"code_agents run 応答: {json.dumps(res, ensure_ascii=False)[:500]}")
-        if res.get("error") or res.get("ok") is False:
-            raise RuntimeError(f"code_agents の実行に失敗しました: {res.get('error') or res.get('output')}")
+        if res.get("error") or res.get("status") != "OK":
+            raise RuntimeError(f"code_agents の実行に失敗しました: {res.get('error') or res.get('result')}")
 
-        # 5. 完了報告
-        応答内容 = str(res.get("output") or res.get("message") or json.dumps(res, ensure_ascii=False))
+        # 6. 完了報告
+        応答内容 = str(res.get("result") or json.dumps(res, ensure_ascii=False))
         完了報告(応答内容)
         ログ("ステップ完了")
         return 0

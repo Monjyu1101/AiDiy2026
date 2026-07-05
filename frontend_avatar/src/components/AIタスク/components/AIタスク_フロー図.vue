@@ -108,7 +108,7 @@ const クリティカルパス表示 = computed(() => {
   return names.join(' → ');
 });
 
-// mermaid 図テキストを生成する（direction はパネルの縦横比で LR / TD を切り替える）
+// mermaid 図テキストを生成する（標準は上から下の TD）
 function マーメイド生成(rows: Record<string, any>[], direction: string): string {
   const { 経路SEQ } = クリティカルパス.value;
   const critNodes = new Set(経路SEQ);
@@ -126,7 +126,7 @@ function マーメイド生成(rows: Record<string, any>[], direction: string): 
     const preds = String(row.先行SEQ || '')
       .split(',')
       .map((s) => Number(s.trim()))
-      .filter((n) => !Number.isNaN(n) && n >= 0);
+      .filter((n) => !Number.isNaN(n) && n >= 0 && n !== seq);
     predsMap.set(seq, preds);
     const タイトル = String(row.タイトル || '').replace(/["\[\]<>]/g, '');
     if (seq === 0 || seq === 9999) {
@@ -180,12 +180,11 @@ async function 図描画() {
   renderSeq += 1;
   const seq = renderSeq;
   try {
-    // マーメイド記号の指定があれば優先し、なければパネルの縦横比で自動判定
-    // （縦長パネルでは上から下 TD、横長パネルでは左から右 LR）
+    // 標準は縦表示 TD。明示的な縦方向指定だけ反映する
     const 指定 = props.マーメイド記号.trim().toUpperCase();
-    const direction = ['LR', 'TD', 'TB', 'RL', 'BT'].includes(指定)
+    const direction = ['TD', 'TB'].includes(指定)
       ? 指定
-      : (host.clientHeight > host.clientWidth ? 'TD' : 'LR');
+      : 'TD';
     const code = マーメイド生成(props.明細, direction);
     const { svg } = await mermaid.render(`taskflow${seq}`, code);
     if (seq !== renderSeq) return; // 後発の描画が始まっていたら古い結果は捨てる

@@ -47,8 +47,8 @@
  </tr>
  <tr>
  <td><strong>パスワード</strong></td>
- <td>平文（<code>C利用者.パスワード</code>）</td>
- <td>bcryptでハッシュ化</td>
+ <td>初期投入アカウントは平文、API作成の利用者はbcryptハッシュ（<code>C利用者.パスワード</code>）</td>
+ <td>全アカウントをbcryptでハッシュ化（初期投入分も再設定）</td>
  </tr>
  <tr>
  <td><strong>データベース</strong></td>

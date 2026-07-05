@@ -123,7 +123,7 @@ def list_V商品(
   </ul>
 
   <h2>実装例（参照）</h2>
-  <p>以下は <code>code_samples/V商品_router.py</code> の内容です（旧実装パターン）。</p>
+  <p>以下は <code>code_samples/V商品_router.py</code> の内容です。実際の <code>backend_server/apps_router/V商品.py</code>、および他の全 V系 Router（<code>V取引先.py</code>、<code>V生産.py</code> など）も同じく、列を明示的に列挙して辞書化するこのスタイルで実装されています。上記の <code>dict(row._mapping)</code> 版は今後の実装で使ってよい簡潔な代替パターンですが、現時点のコードベースはこちらの明示列挙スタイルで統一されています。</p>
   <pre data-src="code_samples/V商品_router.py"><code>読み込み中...</code></pre>
 
   <h2>M系との使い分け</h2>
