@@ -90,6 +90,9 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
         "CODE_BASE_PATH": code_base_path_raw,
         "CODE_PERMISSIONS": app_conf.json.get("CODE_PERMISSIONS", "auto"),
+        # TaskAI設定
+        "TASK_AI_NAME": app_conf.json.get("TASK_AI_NAME", "claude_cli"),
+        "TASK_AI_MODEL": app_conf.json.get("TASK_AI_MODEL", "auto"),
     }
     return モデル設定正規化(設定)
 

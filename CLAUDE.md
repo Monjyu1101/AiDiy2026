@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend**: FastAPI + SQLAlchemy + SQLite（Python 3.13 以上、uv 管理、2 サーバー構成）
 - **Command Hermes**: `aidiy_hermes` コード支援 CLI（**常駐なし**、`_start.py` の起動対象外）
 - **Backend MCP**: 16 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Notification Sounds, Code Agents, Chat LLM）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供。
-- **Backend Local**: `backend_local` ローカル LLM サーバー（ポート 8094）。HuggingFace の **Gemma** を `transformers` + `torch` でローカル推論し、**OpenAI 互換**の Chat Completions API（`POST http://localhost:8094/v1/chat/completions`、`stream` / `tools` 対応）として提供。モデルは `temp/models/<safe_name>` に配置し遅延ロード。設定は `backend_server/_config/AiDiy_key.json`（環境変数は使わない）。
+- **Backend Local**: `backend_local` ローカル LLM サーバー（ポート 8094、`_start.py` ではデフォルト起動しない）。HuggingFace の **Gemma** を `transformers` + `torch` でローカル推論し、**OpenAI 互換**の Chat Completions API（`POST http://localhost:8094/v1/chat/completions`、`stream` / `tools` 対応）として提供。モデルは `temp/models/<safe_name>` に配置し遅延ロード。設定は `backend_server/_config/AiDiy_key.json`（環境変数は使わない）。
 - **Backend Task**: `backend_task` AIタスク実行 + 定期タスク FastAPI サーバー（ポート 8093）。`_start.py` では Apps 起動後に起動。`/task/タスク要求/*`・`/task/タスク明細/*` API を提供し、監視ループ（5 秒間隔）が要求を AI で明細タスクへ分解して Code CLI（`TASK_AI_NAME`）で実行する。明細は `先行SEQ`（カンマ区切りで複数指定可）による DAG で、垂直の直列だけでなく水平の並行分岐も自由に定義でき、先行が全て完了した明細から実行（フロー図はクリティカルパス基準で表示）。DB は `backend_server/_data/AiDiy/database.db` を共有（`AIタスク要求` / `AIタスク明細` テーブル）。
 - **Frontend Web**: Vue 3 + Vite + TypeScript（qTubler, Pinia, Vue Router）
 - **Frontend Avatar**: Electron/Web デュアルモード AI Avatar（Three.js, VRM）
@@ -244,7 +244,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | M系マスタ画面 | `components/Mマスタ/` |
 | T系トランザクション画面 | `components/Tトラン/` |
 | V系一覧画面 | `components/Vビュー/` |
-| S系スケジュール画面 | `components/Sスケジュール/` |
+| S系スケジュール画面 | `components/Sスケジューラー/`（route path は `/Sスケジュール/*`。ディレクトリ名と route が一致しない点に注意） |
 | X系画面 | `components/Xその他/` |
 | AIタスク画面 | `components/AIタスク/`（route `/AIタスク`、API は `/task/*` → backend_task） |
 
@@ -309,6 +309,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 
 - `backend_tools/aidiy_automations/` — MCP / HTTP API（`localhost:8095`）を組み合わせて実行する自動化スクリプト置き場。MCP サーバー本体の実装は `backend_tools/tools_proc/` に置き、ここには「利用側」の処理だけを置く。
 - `scripts/` — 補助スクリプト（BOM 除去、画像変換、起動 / 停止 bat など）。
+- `backup/` — `aidiy_backup` MCP の差分バックアップ出力先（日付フォルダ）。ソースではないため編集・参照対象にしない。
 - `docker/` — Docker + nginx（HTTPS）構成一式。
 
 ## 参照すべきドキュメント

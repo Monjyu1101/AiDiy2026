@@ -336,7 +336,7 @@ const submitSettings = async (
   }
 };
 
-const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true, reboot_tools: true, reboot_local: false, reboot_task: false });
+const handleSave = () => submitSettings({ reboot_core: false, reboot_apps: true, reboot_tools: true, reboot_local: false, reboot_task: false }, 15, true);
 
 const handleSaveOnly = async () => {
   loading.value = true;

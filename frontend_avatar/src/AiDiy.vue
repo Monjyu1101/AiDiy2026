@@ -23,6 +23,7 @@ import AIタスクフローウィンドウ from '@/components/AIタスク/window
 import AIタスク明細ウィンドウ from '@/components/AIタスク/windows/AIタスク_明細ウィンドウ.vue'
 import AIタスク要求編集 from '@/components/AIタスク/dialog/AIタスク_要求編集.vue'
 import AIタスク明細編集 from '@/components/AIタスク/dialog/AIタスク_明細編集.vue'
+import AIタスク応答内容 from '@/components/AIタスク/dialog/AIタスク_応答内容.vue'
 import ログイン from '@/components/ログイン.vue'
 import AI設定再起動 from '@/dialog/AI設定再起動.vue'
 import 再起動カウントダウン from '@/dialog/再起動カウントダウン.vue'
@@ -1652,7 +1653,7 @@ onBeforeUnmount(() => {
     <div v-else-if="タスク編集ウィンドウ" class="task-dialog-window-root">
       <component
         :is="WindowShell"
-        :title="タスク編集Payload?.kind === 'detail' ? 'AiDiy AI Task (タスク明細 修正)' : `AiDiy AI Task (タスク要求 ${タスク編集Payload?.編集タスク ? '修正' : '新規'})`"
+        :title="タスク編集Payload?.kind === 'detail' ? 'AiDiy AI Task (タスク明細 修正)' : タスク編集Payload?.kind === 'response' ? (タスク編集Payload?.タイトル || '応答内容') : `AiDiy AI Task (タスク要求 ${タスク編集Payload?.編集タスク ? '修正' : '新規'})`"
         theme="purple"
         close-mode="event"
         @close="タスク編集ウィンドウを閉じる"
@@ -1669,6 +1670,14 @@ onBeforeUnmount(() => {
           :編集明細="タスク編集Payload?.編集明細 || null"
           @close="タスク編集ウィンドウを閉じる"
           @registered="タスク編集登録完了"
+        />
+        <component
+          :is="AIタスク応答内容"
+          v-else-if="タスク編集Payload.kind === 'response'"
+          :is-open="true"
+          :タイトル="タスク編集Payload?.タイトル || '応答内容'"
+          :内容="タスク編集Payload?.内容 || ''"
+          @close="タスク編集ウィンドウを閉じる"
         />
         <component
           :is="AIタスク要求編集"

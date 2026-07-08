@@ -107,7 +107,7 @@ AI packet やモデル設定の詳細は `.aidiy/knowledge` の AI コア関連 
 
 - 業務 CRUD 画面は `components/C管理/`、`components/Mマスタ/`、`components/Tトラン/` を見る。
 - V系一覧は `components/Vビュー/` を見る。
-- S系は `components/Sスケジュール/` を見る。
+- S系は `components/Sスケジューラー/` を見る（route path は `/Sスケジュール/*`）。
 - X系は `components/Xその他/` と `public/` を見る。
 - AIタスク画面は `components/AIタスク/`（要求一覧 / フロー図 / 明細一覧 + 編集ダイアログ、API は backend_task の `/task/*`）を見る。
 - API client や認証は `src/api/client.ts` と `src/stores/auth.ts` を見る。

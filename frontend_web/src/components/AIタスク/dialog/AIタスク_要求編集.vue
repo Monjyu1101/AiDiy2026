@@ -10,7 +10,8 @@ import { useAuthStore } from '../../../stores/auth';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
-  編集タスク: { type: Object as PropType<Record<string, any> | null>, default: null }
+  編集タスク: { type: Object as PropType<Record<string, any> | null>, default: null },
+  最終タスク: { type: Object as PropType<Record<string, any> | null>, default: null }
 });
 const emit = defineEmits(['close', 'registered']);
 
@@ -49,8 +50,6 @@ const taskModelOptions = computed(() => {
 
 const 修正モード = computed(() => !!props.編集タスク);
 const タスクID表示 = computed(() => 修正モード.value ? String(props.編集タスク?.タスクID ?? '') : '(新規)');
-const 最終TASK_AI_NAMEキー = 'ai_task_last_TASK_AI_NAME';
-const 最終TASK_AI_MODELキー = 'ai_task_last_TASK_AI_MODEL';
 
 function chooseAvailable(current: any, candidates: string[]) {
   const value = String(current || '');
@@ -100,15 +99,15 @@ watch(() => props.isOpen, (open) => {
         入力TASK_AI_NAME.value = chooseAvailable(props.編集タスク.TASK_AI_NAME || 'claude_cli', ai候補) || 'claude_cli';
         入力TASK_AI_MODEL.value = chooseAvailable(props.編集タスク.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
       } else {
-        const lastAi = localStorage.getItem(最終TASK_AI_NAMEキー) || currentSettings.value.TASK_AI_NAME || 'claude_cli';
-        const lastModel = localStorage.getItem(最終TASK_AI_MODELキー) || currentSettings.value.TASK_AI_MODEL || 'auto';
+        const lastAi = props.最終タスク?.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'claude_cli';
+        const lastModel = props.最終タスク?.TASK_AI_MODEL || currentSettings.value.TASK_AI_MODEL || 'auto';
         入力TASK_AI_NAME.value = chooseAvailable(lastAi, ai候補) || 'claude_cli';
         入力TASK_AI_MODEL.value = chooseAvailable(lastModel, Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
       }
     });
     const 編集 = props.編集タスク;
     選択プロジェクト.value = '';
-    入力プロジェクト.value = 編集 ? String(編集.プロジェクト ?? '') : '';
+    入力プロジェクト.value = 編集 ? String(編集.プロジェクト ?? '') : String(props.最終タスク?.プロジェクト ?? '');
     入力要求内容.value = 編集 ? String(編集.要求内容 ?? '') : '';
     入力有効.value = 編集 ? Boolean(編集.有効) : true;
     入力状況.value = '準備開始';
@@ -174,8 +173,6 @@ const 登録 = async () => {
           有効: 入力有効.value
         });
     if (res.data.status === 'OK') {
-      localStorage.setItem(最終TASK_AI_NAMEキー, 入力TASK_AI_NAME.value.trim() || 'claude_cli');
-      localStorage.setItem(最終TASK_AI_MODELキー, 入力TASK_AI_MODEL.value.trim() || 'auto');
       void qMessage(res.data.message || 'タスクを準備中として登録しました。');
       emit('registered', res.data.data?.item ?? null);
       emit('close');

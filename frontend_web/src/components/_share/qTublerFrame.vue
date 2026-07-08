@@ -75,7 +75,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['sort', 'page', 'row-click']);
+const emit = defineEmits(['sort', 'page', 'row-click', 'row-dblclick']);
 
 const changePage = (page: number) => {
   if (page < 1 || page > props.totalPages) return;
@@ -110,6 +110,12 @@ const handleRowClick = (row: Record<string, any>, event: MouseEvent) => {
   const target = event.target as HTMLElement | null;
   if (target?.closest('a, button, input, select, textarea, label')) return;
   emit('row-click', row);
+};
+
+const handleRowDblClick = (row: Record<string, any>, event: MouseEvent) => {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest('button, input, select, textarea, label')) return;
+  emit('row-dblclick', row);
 };
 
 watch(
@@ -158,6 +164,7 @@ watch(
               v-for="(row, index) in rows"
               :key="resolveRowKey(row, index)"
               @click="handleRowClick(row, $event)"
+              @dblclick="handleRowDblClick(row, $event)"
             >
               <td v-for="column in columns" :key="column.key" :style="columnStyle(column)">
                 <slot name="cell" :row="row" :column="column" :value="row[column.key]">

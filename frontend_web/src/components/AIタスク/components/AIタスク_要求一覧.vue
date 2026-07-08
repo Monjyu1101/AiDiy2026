@@ -9,6 +9,7 @@ import qBooleanCheckbox from '../../_share/qBooleanCheckbox.vue';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
 import { useAuthStore } from '../../../stores/auth';
 import AIタスク_要求編集 from '../dialog/AIタスク_要求編集.vue';
+import AIタスク_応答内容 from '../dialog/AIタスク_応答内容.vue';
 
 const props = defineProps({
   選択タスクID: { type: String, default: '' }
@@ -187,6 +188,25 @@ const 登録完了 = async (item: Record<string, any> | null) => {
   if (item) selectRow(item);
 };
 
+// ==================================================
+// 応答内容表示ダイアログ
+// ==================================================
+const 応答内容ダイアログ表示 = ref(false);
+const 応答内容タイトル = ref('');
+const 応答内容表示値 = ref('');
+
+const 応答内容を開く = (row: Record<string, any>) => {
+  const 内容 = String(row.応答内容 ?? '');
+  if (!内容.trim()) return;
+  応答内容タイトル.value = `応答内容 - ${row.タスクID}${row.応答タイトル ? ' / ' + row.応答タイトル : ''}`;
+  応答内容表示値.value = 内容;
+  応答内容ダイアログ表示.value = true;
+};
+
+const handleRowDblClick = (row: Record<string, any>) => {
+  応答内容を開く(row);
+};
+
 onMounted(async () => {
   await loadData();
   自動更新開始();
@@ -220,6 +240,7 @@ defineExpose({ loadData });
         @sort="handleSort"
         @page="goToPage"
         @row-click="selectRow"
+        @row-dblclick="handleRowDblClick"
       >
         <template #cell="{ row, column, value }">
           <template v-if="column.key === '選択'">
@@ -242,12 +263,7 @@ defineExpose({ loadData });
             >{{ value ?? '' }}</a>
           </template>
           <template v-else-if="column.key === 'タイトル'">
-            <a
-              href="#"
-              class="id-link"
-              :class="{ 'selected-link': row.タスクID === props.選択タスクID }"
-              @click.prevent="selectRow(row)"
-            >{{ value ?? '' }}</a>
+            {{ value ?? '' }}
           </template>
           <template v-else-if="column.key === '有効'">
             <button
@@ -258,6 +274,15 @@ defineExpose({ loadData });
             >
               <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
             </button>
+          </template>
+          <template v-else-if="column.key === '応答内容'">
+            <a
+              v-if="String(value ?? '').trim()"
+              href="#"
+              class="id-link"
+              @click.prevent="応答内容を開く(row)"
+            >{{ value }}</a>
+            <template v-else>{{ value ?? '' }}</template>
           </template>
           <template v-else>
             {{ value ?? '' }}
@@ -270,8 +295,16 @@ defineExpose({ loadData });
       :is="AIタスク_要求編集"
       :is-open="dialogOpen"
       :編集タスク="編集タスク"
+      :最終タスク="rows[0] ?? null"
       @close="dialogOpen = false"
       @registered="登録完了"
+    />
+
+    <AIタスク_応答内容
+      :is-open="応答内容ダイアログ表示"
+      :タイトル="応答内容タイトル"
+      :内容="応答内容表示値"
+      @close="応答内容ダイアログ表示 = false"
     />
   </div>
 </template>

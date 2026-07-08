@@ -10,6 +10,7 @@ import { useAuthStore } from '../../../stores/auth';
 import qTublerFrame from '../../_share/qTublerFrame.vue';
 import qBooleanCheckbox from '../../_share/qBooleanCheckbox.vue';
 import AIタスク_明細編集 from '../dialog/AIタスク_明細編集.vue';
+import AIタスク_応答内容 from '../dialog/AIタスク_応答内容.vue';
 
 const props = defineProps({
   タスクID: { type: String, default: '' },
@@ -131,6 +132,25 @@ const 登録完了 = () => {
   emit('reload');
 };
 
+// ==================================================
+// 応答内容表示ダイアログ
+// ==================================================
+const 応答内容ダイアログ表示 = ref(false);
+const 応答内容タイトル = ref('');
+const 応答内容表示値 = ref('');
+
+const 応答内容を開く = (row: Record<string, any>) => {
+  const 内容 = String(row.応答内容 ?? '');
+  if (!内容.trim()) return;
+  応答内容タイトル.value = `応答内容 - ${props.タスクID}/${row.明細SEQ}${row.タイトル ? ' ' + row.タイトル : ''}`;
+  応答内容表示値.value = 内容;
+  応答内容ダイアログ表示.value = true;
+};
+
+const handleRowDblClick = (row: Record<string, any>) => {
+  応答内容を開く(row);
+};
+
 watch(() => props.タスクID, async () => {
   currentPage.value = 1;
   await 更新基準初期化();
@@ -166,6 +186,7 @@ onBeforeUnmount(() => {
         :currentPage="currentPage"
         :totalPages="totalPages"
         @page="goToPage"
+        @row-dblclick="handleRowDblClick"
       >
         <template #cell="{ row, column, value }">
           <template v-if="column.key === '明細SEQ'">
@@ -185,6 +206,15 @@ onBeforeUnmount(() => {
               <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="有効状態" />
             </button>
           </template>
+          <template v-else-if="column.key === '応答内容'">
+            <a
+              v-if="String(value ?? '').trim()"
+              href="#"
+              class="seq-link"
+              @click.prevent="応答内容を開く(row)"
+            >{{ value }}</a>
+            <template v-else>{{ value ?? '' }}</template>
+          </template>
           <template v-else>
             {{ value ?? '' }}
           </template>
@@ -198,6 +228,13 @@ onBeforeUnmount(() => {
       :編集明細="編集明細"
       @close="dialogOpen = false"
       @registered="登録完了"
+    />
+
+    <AIタスク_応答内容
+      :is-open="応答内容ダイアログ表示"
+      :タイトル="応答内容タイトル"
+      :内容="応答内容表示値"
+      @close="応答内容ダイアログ表示 = false"
     />
   </div>
 </template>
