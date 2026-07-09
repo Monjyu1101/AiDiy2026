@@ -20,9 +20,11 @@ const 入力要求内容 = ref('');
 const 入力先行SEQ = ref('');
 const 入力TASK_AI_NAME = ref('claude_cli');
 const 入力TASK_AI_MODEL = ref('auto');
-const 入力有効 = ref(true);
+const 入力実行有効 = ref(true);
 const 入力状態 = ref('待機');
-const 状態選択肢 = ['待機', '完了', '失敗'];
+const 状態選択肢 = ['待機', '中止'];
+// 状態欄には遷移し得る全状態を表示し、選択可能なのは 状態選択肢 の2つだけに絞る
+const 状態表示リスト = ['待機', '実行中', 'エラー', '完了', '中止'];
 const 登録中 = ref(false);
 const TASK_CODE_MODELS既定 = {
   claude_sdk: { auto: 'auto' },
@@ -79,9 +81,8 @@ watch(() => props.isOpen, (open) => {
     入力TASK_AI_NAME.value = chooseAvailable(編集.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'claude_cli', taskAiOptions.value) || 'claude_cli';
     入力TASK_AI_MODEL.value = chooseAvailable(編集.TASK_AI_MODEL || currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
   });
-  入力有効.value = Boolean(編集.有効);
-  const 状態 = String(編集.状態 ?? '待機');
-  入力状態.value = 状態選択肢.includes(状態) ? 状態 : '待機';
+  入力実行有効.value = Boolean(編集.実行有効);
+  入力状態.value = String(編集.状態 ?? '待機') || '待機';
 });
 
 watch(入力TASK_AI_NAME, (newValue) => {
@@ -108,7 +109,7 @@ const 登録 = async () => {
       先行SEQ: 入力先行SEQ.value.trim(),
       TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
       TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
-      有効: 入力有効.value,
+      実行有効: 入力実行有効.value,
       状態: 入力状態.value
     });
     if (res.data.status === 'OK') {
@@ -157,7 +158,7 @@ const 登録 = async () => {
             />
           </div>
         </div>
-        <div class="detail-row">
+        <div class="detail-row textarea-row">
           <div class="detail-label">要求内容</div>
           <div class="detail-value">
             <textarea
@@ -196,16 +197,16 @@ const 登録 = async () => {
           </div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">有効</div>
+          <div class="detail-label">実行有効</div>
           <div class="detail-value">
             <label class="valid-checkbox-label">
               <input
-                v-model="入力有効"
+                v-model="入力実行有効"
                 type="checkbox"
                 class="valid-checkbox"
-                aria-label="有効の切り替え"
+                aria-label="実行有効の切り替え"
               />
-              <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !入力有効 }">{{ 入力有効 ? '✅' : '☐' }}</span>
+              <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !入力実行有効 }">{{ 入力実行有効 ? '✅' : '☐' }}</span>
             </label>
           </div>
         </div>
@@ -213,14 +214,19 @@ const 登録 = async () => {
           <div class="detail-label">状態</div>
           <div class="detail-value">
             <div class="status-segment">
-              <button
-                v-for="状態 in 状態選択肢"
-                :key="状態"
-                type="button"
-                class="segment-btn"
-                :class="{ active: 入力状態 === 状態 }"
-                @click="入力状態 = 状態"
-              >{{ 状態 }}</button>
+              <template v-for="(状態, i) in 状態表示リスト" :key="状態">
+                <span v-if="i > 0" class="segment-sep">/</span>
+                <button
+                  type="button"
+                  class="segment-btn"
+                  :class="{
+                    active: 状態選択肢.includes(状態) && 入力状態 === 状態,
+                    current: !状態選択肢.includes(状態) && props.編集明細?.状態 === 状態
+                  }"
+                  :disabled="!状態選択肢.includes(状態)"
+                  @click="入力状態 = 状態"
+                >{{ 状態 }}</button>
+              </template>
             </div>
           </div>
         </div>
@@ -249,9 +255,10 @@ const 登録 = async () => {
 .dialog-content {
   background: #07080c;
   color: #e5e7eb;
-  width: 640px;
-  max-width: 92%;
-  max-height: 92vh;
+  width: 1000px;
+  max-width: 94vw;
+  height: 90vh;
+  max-height: 90vh;
   border: 1px solid rgba(143, 104, 221, 0.75);
   border-radius: 4px;
   box-shadow: 0 0 24px rgba(60, 42, 128, 0.65);
@@ -301,6 +308,17 @@ const 登録 = async () => {
   gap: 0;
   background: #07080c;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.detail-row.textarea-row {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.textarea-row .detail-value {
+  align-items: stretch;
 }
 
 .detail-row {
@@ -402,8 +420,9 @@ const 登録 = async () => {
 
 .detail-textarea {
   margin: 3px 0;
+  flex: 1;
   min-height: 92px;
-  max-height: 180px;
+  height: 100%;
   resize: vertical;
 }
 
@@ -464,7 +483,15 @@ const 登録 = async () => {
 
 .status-segment {
   display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
+}
+
+.segment-sep {
+  color: #4b5563;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .segment-btn {
@@ -472,8 +499,9 @@ const 登録 = async () => {
   color: #cbd5e1;
   border: 1px solid #4b5563;
   border-radius: 4px;
-  padding: 4px 14px;
+  padding: 4px 10px;
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -483,6 +511,19 @@ const 登録 = async () => {
   border-color: #8f68dd;
   background: rgba(108, 78, 196, 0.85);
   font-weight: 600;
+}
+
+.segment-btn.current {
+  border-color: #16a34a;
+  color: #86efac;
+}
+
+.segment-btn:disabled {
+  cursor: default;
+}
+
+.segment-btn:disabled:not(.active):not(.current) {
+  opacity: 0.4;
 }
 
 .dialog-footer {

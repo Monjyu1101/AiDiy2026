@@ -39,7 +39,7 @@ const columns: Column[] = [
   { key: '明細SEQ', label: 'SEQ', width: '50px', sortable: false, align: 'center' },
   { key: 'タイトル', label: 'タイトル', width: '150px', sortable: false },
   { key: '先行SEQ', label: '先行SEQ', width: '80px', sortable: false, align: 'center' },
-  { key: '有効', label: '有効', width: '60px', sortable: false, align: 'center' },
+  { key: '実行有効', label: '実行有効', width: '60px', sortable: false, align: 'center' },
   { key: '状態', label: '状態', width: '90px', sortable: false, align: 'center' },
   { key: 'PID', label: 'PID', width: '60px', sortable: false, align: 'center' },
   { key: '開始日時', label: '開始日時', width: '140px', sortable: false, align: 'center' },
@@ -107,26 +107,26 @@ const 自動更新開始 = () => {
   refreshTimer = setInterval(() => void 更新確認(), 5000);
 };
 
-// 有効欄クリック: 確認のうえタスク明細 1 行の有効フラグを切り替える
-const 有効切替 = async (row: Record<string, any>) => {
-  const 新有効 = !row.有効;
-  const confirmed = await qConfirm(`タスク明細を ${新有効 ? '有効' : '無効'} に変更しますか？`);
+// 実行有効欄クリック: 確認のうえタスク明細 1 行の実行有効フラグを切り替える
+const 実行有効切替 = async (row: Record<string, any>) => {
+  const 新実行有効 = !row.実行有効;
+  const confirmed = await qConfirm(`タスク明細を${新実行有効 ? '有効化' : '無効化'}しますか？`);
   if (!confirmed) return;
   try {
-    const res = await taskClient.post('/task/タスク明細/有効切替', {
+    const res = await taskClient.post('/task/タスク明細/実行有効切替', {
       利用者ID: 利用者ID取得(),
       タスクID: props.タスクID,
       明細SEQ: Number(row.明細SEQ ?? 0),
-      有効: 新有効
+      実行有効: 新実行有効
     });
     if (res.data.status === 'OK') {
-      void qMessage(res.data.message || '有効フラグを変更しました。');
+      void qMessage(res.data.message || (新実行有効 ? 'タスク明細を有効化しました。' : 'タスク明細を無効化しました。'));
       emit('reload');
     } else {
-      void qMessage(res.data.message || '有効フラグの変更に失敗しました。', 'error');
+      void qMessage(res.data.message || '実行有効フラグの変更に失敗しました。', 'error');
     }
   } catch (e) {
-    void qMessage('有効フラグの変更でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
+    void qMessage('実行有効フラグの変更でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
   }
 };
 
@@ -237,14 +237,14 @@ onBeforeUnmount(() => {
               @click.prevent="修正ダイアログ表示(row)"
             >{{ value ?? '' }}</a>
           </template>
-          <template v-else-if="column.key === '有効'">
+          <template v-else-if="column.key === '実行有効'">
             <button
               type="button"
               class="valid-toggle"
-              title="有効/無効を切り替え"
-              @click="有効切替(row)"
+              title="有効化/無効化を切り替え"
+              @click="実行有効切替(row)"
             >
-              <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="有効状態" />
+              <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="実行有効状態" />
             </button>
           </template>
           <template v-else-if="column.key === '応答内容'">

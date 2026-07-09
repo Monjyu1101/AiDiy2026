@@ -52,9 +52,10 @@ const 表示内容 = computed(() => {
 .dialog-content {
   background: #07080c;
   color: #e5e7eb;
-  width: 720px;
-  max-width: 92%;
-  max-height: 84vh;
+  width: 1200px;
+  max-width: 94vw;
+  height: 90vh;
+  max-height: 90vh;
   border: 1px solid rgba(143, 104, 221, 0.75);
   border-radius: 4px;
   box-shadow: 0 0 24px rgba(60, 42, 128, 0.65);

@@ -24,9 +24,11 @@ const 入力プロジェクト = ref('');
 const 入力要求内容 = ref('');
 const 入力TASK_AI_NAME = ref('claude_cli');
 const 入力TASK_AI_MODEL = ref('auto');
-const 入力有効 = ref(true);
+const 入力実行有効 = ref(true);
 const 入力状況 = ref('準備開始');
 const 状況選択肢 = ['準備開始', '中止'];
+// 状況欄には遷移し得る全状態を表示し、選択可能なのは 状況選択肢 の2つだけに絞る
+const 状況表示リスト = ['準備開始', '準備中', '準備完了', '実行中', 'エラー', '完了', '中止'];
 // 新規時は準備開始で固定、修正時は切替可能
 const 状況変更可 = ref(false);
 const 登録中 = ref(false);
@@ -109,8 +111,9 @@ watch(() => props.isOpen, (open) => {
     選択プロジェクト.value = '';
     入力プロジェクト.value = 編集 ? String(編集.プロジェクト ?? '') : String(props.最終タスク?.プロジェクト ?? '');
     入力要求内容.value = 編集 ? String(編集.要求内容 ?? '') : '';
-    入力有効.value = 編集 ? Boolean(編集.有効) : true;
-    入力状況.value = '準備開始';
+    入力実行有効.value = 編集 ? Boolean(編集.実行有効) : true;
+    // 中止中のタスクは中止のまま保持し、何も触らず登録しても誤って再開させない
+    入力状況.value = 編集?.状態 === '中止' ? '中止' : '準備開始';
     状況変更可.value = !!編集;
     void 選択肢読込();
   }
@@ -161,7 +164,7 @@ const 登録 = async () => {
           要求内容: 入力要求内容.value.trim(),
           TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
           TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
-          有効: 入力有効.value,
+          実行有効: 入力実行有効.value,
           状況: 入力状況.value
         })
       : await apiClient.post('/task/タスク要求/AI登録', {
@@ -170,7 +173,7 @@ const 登録 = async () => {
           要求内容: 入力要求内容.value.trim(),
           TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
           TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
-          有効: 入力有効.value
+          実行有効: 入力実行有効.value
         });
     if (res.data.status === 'OK') {
       void qMessage(res.data.message || 'タスクを準備中として登録しました。');
@@ -226,7 +229,7 @@ const 登録 = async () => {
             </div>
           </div>
         </div>
-        <div class="detail-row">
+        <div class="detail-row textarea-row">
           <div class="detail-label">要求内容<span class="required-mark">*</span></div>
           <div class="detail-value">
             <textarea
@@ -254,16 +257,16 @@ const 登録 = async () => {
           </div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">有効</div>
+          <div class="detail-label">実行有効</div>
           <div class="detail-value">
             <label class="valid-checkbox-label">
               <input
-                v-model="入力有効"
+                v-model="入力実行有効"
                 type="checkbox"
                 class="valid-checkbox"
-                aria-label="有効の切り替え"
+                aria-label="実行有効の切り替え"
               />
-              <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !入力有効 }">{{ 入力有効 ? '✅' : '☐' }}</span>
+              <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !入力実行有効 }">{{ 入力実行有効 ? '✅' : '☐' }}</span>
             </label>
           </div>
         </div>
@@ -271,15 +274,19 @@ const 登録 = async () => {
           <div class="detail-label">状況</div>
           <div class="detail-value">
             <div class="status-segment">
-              <button
-                v-for="状況 in 状況選択肢"
-                :key="状況"
-                type="button"
-                class="segment-btn"
-                :class="{ active: 入力状況 === 状況 }"
-                :disabled="!状況変更可"
-                @click="入力状況 = 状況"
-              >{{ 状況 }}</button>
+              <template v-for="(状況, i) in 状況表示リスト" :key="状況">
+                <span v-if="i > 0" class="segment-sep">/</span>
+                <button
+                  type="button"
+                  class="segment-btn"
+                  :class="{
+                    active: 入力状況 === 状況,
+                    current: !状況選択肢.includes(状況) && props.編集タスク?.状態 === 状況
+                  }"
+                  :disabled="!状況選択肢.includes(状況) || !状況変更可"
+                  @click="入力状況 = 状況"
+                >{{ 状況 }}</button>
+              </template>
             </div>
           </div>
         </div>
@@ -308,9 +315,10 @@ const 登録 = async () => {
 .dialog-content {
   background: #07080c;
   color: #e5e7eb;
-  width: 560px;
-  max-width: 92%;
-  max-height: 92vh;
+  width: 1000px;
+  max-width: 94vw;
+  height: 90vh;
+  max-height: 90vh;
   border: 1px solid rgba(143, 104, 221, 0.75);
   border-radius: 4px;
   box-shadow: 0 0 24px rgba(60, 42, 128, 0.65);
@@ -360,6 +368,17 @@ const 登録 = async () => {
   gap: 0;
   background: #07080c;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.detail-row.textarea-row {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.textarea-row .detail-value {
+  align-items: stretch;
 }
 
 /* マスタ保守と同じラベル / 内容の行レイアウト */
@@ -472,8 +491,9 @@ const 登録 = async () => {
 
 .detail-textarea {
   margin: 3px 0;
+  flex: 1;
   min-height: 92px;
-  max-height: 180px;
+  height: 100%;
   resize: vertical;
 }
 
@@ -485,7 +505,7 @@ const 登録 = async () => {
   box-shadow: inset 0 0 0 1px rgba(143, 104, 221, 0.35);
 }
 
-/* マスタ保守と同じ有効欄（入力欄風ボックス + 中央の ✅/☐） */
+/* マスタ保守と同じ実行有効欄（入力欄風ボックス + 中央の ✅/☐） */
 .valid-checkbox-label {
   width: 320px;
   height: 26px;
@@ -535,7 +555,15 @@ const 登録 = async () => {
 
 .status-segment {
   display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
+}
+
+.segment-sep {
+  color: #4b5563;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .segment-btn {
@@ -543,8 +571,9 @@ const 登録 = async () => {
   color: #cbd5e1;
   border: 1px solid #4b5563;
   border-radius: 4px;
-  padding: 4px 14px;
+  padding: 4px 10px;
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -556,11 +585,16 @@ const 登録 = async () => {
   font-weight: 600;
 }
 
+.segment-btn.current {
+  border-color: #16a34a;
+  color: #86efac;
+}
+
 .segment-btn:disabled {
   cursor: default;
 }
 
-.segment-btn:disabled:not(.active) {
+.segment-btn:disabled:not(.active):not(.current) {
   opacity: 0.4;
 }
 

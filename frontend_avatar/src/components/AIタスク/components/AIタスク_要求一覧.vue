@@ -40,7 +40,7 @@ const columns: Column[] = [
   { key: '選択', label: '選', width: '46px', sortable: false, align: 'center' },
   { key: 'タスクID', label: 'タスクID', width: '150px', sortable: true, align: 'center' },
   { key: 'タイトル', label: 'タイトル', width: '170px', sortable: true },
-  { key: '有効', label: '有効', width: '60px', sortable: true, align: 'center' },
+  { key: '実行有効', label: '実行有効', width: '60px', sortable: true, align: 'center' },
   { key: '状態', label: '状態', width: '90px', sortable: true, align: 'center' },
   { key: 'PID', label: 'PID', width: '60px', sortable: false, align: 'center' },
   { key: '開始日時', label: '開始日時', width: '140px', sortable: true, align: 'center' },
@@ -153,29 +153,29 @@ const selectRow = (row: Record<string, any>) => {
   emit('select', row);
 };
 
-// 有効欄クリック: 確認のうえタスク要求・タスク明細の有効フラグをまとめて切り替える
-const 有効切替 = async (row: Record<string, any>) => {
-  const 新有効 = !row.有効;
-  const confirmed = await qConfirm(`タスクを ${新有効 ? '有効' : '無効'} に変更しますか？`);
+// 実行有効欄クリック: 確認のうえタスク要求・タスク明細の実行有効フラグをまとめて切り替える
+const 実行有効切替 = async (row: Record<string, any>) => {
+  const 新実行有効 = !row.実行有効;
+  const confirmed = await qConfirm(`タスクを${新実行有効 ? '有効化' : '無効化'}しますか？`);
   if (!confirmed) return;
   try {
-    const res = await taskClient.post('/task/タスク要求/有効切替', {
+    const res = await taskClient.post('/task/タスク要求/実行有効切替', {
       利用者ID: 利用者ID取得(),
       タスクID: String(row.タスクID ?? ''),
-      有効: 新有効
+      実行有効: 新実行有効
     });
     if (res.data.status === 'OK') {
-      void qMessage(res.data.message || '有効フラグを変更しました。');
+      void qMessage(res.data.message || (新実行有効 ? 'タスクを有効化しました。' : 'タスクを無効化しました。'));
       await loadData();
       if (row.タスクID === props.選択タスクID) {
         const 選択行 = rows.value.find((r) => r.タスクID === row.タスクID);
         if (選択行) emit('select', 選択行);
       }
     } else {
-      void qMessage(res.data.message || '有効フラグの変更に失敗しました。', 'error');
+      void qMessage(res.data.message || '実行有効フラグの変更に失敗しました。', 'error');
     }
   } catch (e) {
-    void qMessage('有効フラグの変更でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
+    void qMessage('実行有効フラグの変更でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
   }
 };
 
@@ -314,14 +314,14 @@ defineExpose({ loadData, 新規ダイアログ表示 });
           <template v-else-if="column.key === 'タイトル'">
             {{ value ?? '' }}
           </template>
-          <template v-else-if="column.key === '有効'">
+          <template v-else-if="column.key === '実行有効'">
             <button
               type="button"
               class="valid-toggle"
-              title="有効/無効を切り替え"
-              @click="有効切替(row)"
+              title="有効化/無効化を切り替え"
+              @click="実行有効切替(row)"
             >
-              <qBooleanCheckbox :checked="Boolean(row.有効)" ariaLabel="有効状態" />
+              <qBooleanCheckbox :checked="Boolean(row.実行有効)" ariaLabel="実行有効状態" />
             </button>
           </template>
           <template v-else-if="column.key === '応答内容'">

@@ -183,7 +183,7 @@ curl -X POST http://localhost:8095/aidiy_chrome_devtools/navigate \
 | 接頭辞 | 種別 | 担当サーバー |
 |--------|------|-------------|
 | C | Core / Common (`C権限`, `C利用者`, `C採番`) | core_main |
-| A | AI / Advanced (`A会話履歴`, `AIコア`)。`AIタスク要求` / `AIタスク明細` は backend_task が管理 | core_main / backend_task |
+| A | AI / Advanced (`A会話履歴`, `AIコア`)。`Aタスク要求` / `Aタスク明細` は backend_task が管理 | core_main / backend_task |
 | M | Master (`M商品`, `M取引先`) | apps_main |
 | T | Transaction (`T配車`, `T生産`) | apps_main |
 | V | View endpoint (生 SQL JOIN) | apps_main |
