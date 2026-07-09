@@ -32,6 +32,7 @@
 | `aidiy_obs_studio_control` | `http://localhost:8095/aidiy_obs_studio_control/sse` | OBS Studio 制御（配信、録画、シーン、ソース、音声） |
 | `aidiy_ffmpeg_control` | `http://localhost:8095/aidiy_ffmpeg_control/sse` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） |
 | `aidiy_code_agents` | `http://localhost:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
+| `aidiy_task_agents` | `http://localhost:8095/aidiy_task_agents/sse` | backend_task API への AIタスク非同期投入、要求/明細状態取得 |
 
 ## AiDiy_mcp.json の形式
 
@@ -70,6 +71,7 @@
 | OBS Studio の配信、録画、シーン、ソース、音声制御 | `aidiy_obs_studio_control` |
 | ffmpeg / ffprobe による動画合成・字幕焼き込み、ffplay でプレビュー再生 | `aidiy_ffmpeg_control` |
 | AI コードエージェント実行（CodeAI CLI 経由） | `aidiy_code_agents` |
+| AIタスクへ依頼を投入して非同期実行させる | `aidiy_task_agents` |
 
 SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まずアプリ API や既存初期化処理で再現できないか確認する。
 

@@ -134,6 +134,16 @@ SERVERS = [
         "expected": {"chat_llms_config"},
         "call": ("chat_llms_config", {}),
     },
+    {
+        "name": "aidiy_task_agents",
+        "expected": {
+            "task_agents_config",
+            "task_agents_submit",
+            "task_agents_get_request_status",
+            "task_agents_get_detail_status",
+        },
+        "call": ("task_agents_config", {}),
+    },
 ]
 
 

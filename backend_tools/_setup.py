@@ -637,6 +637,7 @@ MCP_MODULES = [
             # （他サーバーが出そろってから接続したい）ため、必ず末尾に並べる。
             {"server_name": "aidiy_code_agents",       "sse_url": "http://localhost:8095/aidiy_code_agents/sse"},
             {"server_name": "aidiy_chat_llms",         "sse_url": "http://localhost:8095/aidiy_chat_llms/sse"},
+            {"server_name": "aidiy_task_agents",       "sse_url": "http://localhost:8095/aidiy_task_agents/sse"},
         ],
     },
 ]

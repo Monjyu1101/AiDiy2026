@@ -96,6 +96,7 @@ def main() -> None:
         "/aidiy_ffmpeg_control/docs",
         "/aidiy_code_agents/docs",
         "/aidiy_chat_llms/docs",
+        "/aidiy_task_agents/docs",
         "/aidiy_chat_completions/docs",
     ]
     for path in docs_paths:
@@ -248,6 +249,13 @@ def main() -> None:
     if not isinstance(models, dict) or models.get("object") != "list":
         raise AssertionError(f"chat_completions models: unexpected {models}")
     print("  OK chat_llm / chat_completions")
+
+    # Task agents は config のみ。submit / run はタスク投入が発生するため別途明示して実行する。
+    task_config = post("/aidiy_task_agents/config")
+    assert_no_error("task_agents config", task_config)
+    if "task_api_base" not in task_config:
+        raise AssertionError(f"task_agents config: unexpected keys {sorted(task_config.keys())}")
+    print("  OK task_agents")
 
     print("\nOK")
 

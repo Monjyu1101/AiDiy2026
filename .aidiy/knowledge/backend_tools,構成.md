@@ -81,6 +81,7 @@ print(res.json())  # {"save_path": "..."}
 | `aidiy_ffmpeg_control` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） | `http://localhost:8095/aidiy_ffmpeg_control/sse` |
 | `aidiy_movie_generation` | AI 動画生成（Google Gemini Veo、MP4 保存、base64 返却なし） | `http://localhost:8095/aidiy_movie_generation/sse` |
 | `aidiy_code_agents` | AI コードエージェント実行（CodeAI CLI 経由） | `http://localhost:8095/aidiy_code_agents/sse` |
+| `aidiy_task_agents` | backend_task API への AIタスク非同期投入、要求/明細状態取得 | `http://localhost:8095/aidiy_task_agents/sse` |
 
 ## 新規 MCP サーバー追加手順
 

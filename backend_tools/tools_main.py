@@ -53,10 +53,12 @@ from tools_proc.ffmpeg_control import FfmpegControl
 from tools_proc.notification_sounds import NotificationSounds
 from tools_proc.code_agents import CodeAgents
 from tools_proc.chat_llm import ChatLLM
+from tools_proc.task_agents import TaskAgents
 
 from tools_proc import tools_chrome, tools_desktop, tools_db, tools_dev
 from tools_proc import tools_backup, tools_media, tools_obs, tools_ffmpeg
 from tools_proc import tools_notification_sounds, tools_agents, tools_chat
+from tools_proc import tools_task_agents
 
 setup_logging()
 logger = get_logger(__name__)
@@ -116,6 +118,7 @@ MOUNT_FF    = os.environ.get("MCP_FF_MOUNT_PATH", "/aidiy_ffmpeg_control")
 MOUNT_NS    = os.environ.get("MCP_NS_MOUNT_PATH", "/aidiy_notification_sounds")
 MOUNT_CA    = os.environ.get("MCP_CA_MOUNT_PATH", "/aidiy_code_agents")
 MOUNT_CL    = os.environ.get("MCP_CL_MOUNT_PATH", "/aidiy_chat_llms")
+MOUNT_TA    = os.environ.get("MCP_TA_MOUNT_PATH", "/aidiy_task_agents")
 
 # ------------------------------------------------------------------ #
 # サービスインスタンス生成
@@ -140,6 +143,7 @@ code_agents = CodeAgents()
 code_agents.version_info = code_agents._check_ai_versions()
 chat_llm    = ChatLLM()
 chat_llm.version_info = chat_llm._check_ai_versions()
+task_agents = TaskAgents()
 
 # PostgreSQL は psycopg 未導入環境でもサーバー起動を阻害しないよう遅延初期化
 _pg_q: Optional[PgQuery] = None
@@ -218,6 +222,7 @@ mcp_ff = _make_mcp("aidiy_ffmpeg_control")
 mcp_ns = _make_mcp("aidiy_notification_sounds")
 mcp_ca = _make_mcp("aidiy_code_agents")
 mcp_cl = _make_mcp("aidiy_chat_llms")
+mcp_ta = _make_mcp("aidiy_task_agents")
 
 # ------------------------------------------------------------------ #
 # MCP ツール登録
@@ -239,6 +244,7 @@ tools_ffmpeg.register_tools(mcp_ff, ffmpeg_c)
 tools_notification_sounds.register_tools(mcp_ns, ns)
 tools_agents.register_tools(mcp_ca, code_agents)
 tools_chat.register_tools(mcp_cl, chat_llm)
+tools_task_agents.register_tools(mcp_ta, task_agents)
 
 # TTS description を API キー状況に応じて動的設定
 mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_description()
@@ -258,8 +264,8 @@ app = FastAPI(
         "AiDiy MCP サーバー — Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / "
         "Logs / Code Check / Backup / Image Generation / Movie Generation / "
         "Speech-to-Text / Text-to-Speech / OBS Studio / FFmpeg / Code Agents / Chat LLM / "
-        "Notification Sounds の "
-        "16 MCP ツールを HTTP POST で直接呼び出せます。\n\n"
+        "Task Agents / Notification Sounds の "
+        "17 MCP ツールを HTTP POST で直接呼び出せます。\n\n"
         "加えて OpenAI / Ollama 互換の標準チャットインターフェース "
         "`POST /aidiy_chat_completions/v1/chat/completions` を提供します。\n\n"
         "各 MCP の詳細は `GET /{mcp_name}/docs` を参照してください。"
@@ -341,6 +347,7 @@ app.include_router(tools_ffmpeg.create_router(ffmpeg_c))
 app.include_router(tools_notification_sounds.create_router(ns))
 app.include_router(tools_agents.create_router(code_agents))
 app.include_router(tools_chat.create_router(chat_llm))
+app.include_router(tools_task_agents.create_router(task_agents))
 app.include_router(tools_chat.create_completions_router(chat_llm))
 
 # ------------------------------------------------------------------ #
@@ -364,6 +371,7 @@ MCP_MAP.update({
     "aidiy_notification_sounds":    mcp_ns,
     "aidiy_code_agents":            mcp_ca,
     "aidiy_chat_llms":              mcp_cl,
+    "aidiy_task_agents":            mcp_ta,
 })
 for _mcp_name, _mcp_instance in MCP_MAP.items():
     _register_mcp_http_meta(_mcp_name, _mcp_instance)
@@ -388,6 +396,7 @@ app.mount(MOUNT_FF, mcp_ff.sse_app())
 app.mount(MOUNT_NS, mcp_ns.sse_app())
 app.mount(MOUNT_CA, mcp_ca.sse_app())
 app.mount(MOUNT_CL, mcp_cl.sse_app())
+app.mount(MOUNT_TA, mcp_ta.sse_app())
 
 # ------------------------------------------------------------------ #
 # OpenAPI パス順序カスタマイズ
@@ -459,5 +468,6 @@ if __name__ == "__main__":
     logger.info(f"NotificationSounds   : {base}/aidiy_notification_sounds/  SSE:{MOUNT_NS}/sse")
     logger.info(f"CodeAgents           : {base}/aidiy_code_agents/  SSE:{MOUNT_CA}/sse")
     logger.info(f"ChatLLM              : {base}/aidiy_chat_llms/  SSE:{MOUNT_CL}/sse")
+    logger.info(f"TaskAgents           : {base}/aidiy_task_agents/  SSE:{MOUNT_TA}/sse")
     logger.info(f"ChatCompletions      : {base}/aidiy_chat_completions/v1/chat/completions [OpenAI/Ollama 互換]")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")
