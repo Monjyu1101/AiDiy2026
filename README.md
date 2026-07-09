@@ -24,7 +24,7 @@
 
 - バックエンド: FastAPI + SQLAlchemy + SQLite
 - Command Hermes: `command_hermes` / `aidiy_hermes`（コード支援用 CLI 基盤、常駐サーバーではない）
-- バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**16 サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM）
+- バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**17 サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents）
 - バックエンド Local: `backend_local`（ポート 8094、OpenAI 互換の Gemma ローカル推論サーバー）
 - バックエンド Task: `backend_task`（ポート 8093、AIタスク実行 + 定期タスク FastAPI）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
@@ -173,7 +173,7 @@ npm run dev
 | Avatar Web モード | http://localhost:8092 |
 | Avatar Electron モード | `npm run dev` で Electron アプリ起動 |
 
-MCP は 16 サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup` / `aidiy_image_generation` / `aidiy_movie_generation` / `aidiy_speech_to_text` / `aidiy_text_to_speech` / `aidiy_obs_studio_control` / `aidiy_ffmpeg_control` / `aidiy_notification_sounds` / `aidiy_code_agents` / `aidiy_chat_llms`）です。詳細は [backend_tools/AGENTS.md](./backend_tools/AGENTS.md) を参照してください。
+MCP は 17 サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup` / `aidiy_image_generation` / `aidiy_movie_generation` / `aidiy_speech_to_text` / `aidiy_text_to_speech` / `aidiy_obs_studio_control` / `aidiy_ffmpeg_control` / `aidiy_notification_sounds` / `aidiy_code_agents` / `aidiy_chat_llms` / `aidiy_task_agents`）です。詳細は [backend_tools/AGENTS.md](./backend_tools/AGENTS.md) を参照してください。
 
 ### 初期ログイン
 

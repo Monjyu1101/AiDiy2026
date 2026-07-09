@@ -44,7 +44,7 @@ http://localhost:8092
 - Core API / WebSocket: `http://localhost:8091` / `ws://localhost:8091/core/ws/AIコア`
 - Apps API: `http://localhost:9098`
 - Task API（AIタスク）: `http://localhost:8093`（開発時は Vite proxy `/task` 経由、Electron 本番は直結）
-- Backend MCP（16 サーバー同居）: `http://localhost:8095/`（一覧）、`http://localhost:8095/{mcp_name}/sse`（SSE 接続）
+- Backend MCP（17 サーバー同居）: `http://localhost:8095/`（一覧）、`http://localhost:8095/{mcp_name}/sse`（SSE 接続）
 
 ## 補足コマンド
 

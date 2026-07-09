@@ -137,7 +137,7 @@ npm run dev
 | Apps API Docs | http://localhost:9098/docs |
 | Task API Docs | http://localhost:8093/docs |
 | Local API Docs | http://localhost:8094/docs |
-| Backend MCP 一覧（16 サーバー） | http://localhost:8095/ |
+| Backend MCP 一覧（17 サーバー） | http://localhost:8095/ |
 | Backend MCP ツール一覧 | http://localhost:8095/{mcp_name}/list |
 | Backend MCP SSE 接続 | http://localhost:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
 | Avatar Web モード | http://localhost:8092 |

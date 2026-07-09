@@ -22,9 +22,9 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 
 ## 実装追従チェックリスト
 
-- [ ] MCP は 16 サーバー構成として記載している。
+- [ ] MCP は 17 サーバー構成として記載している。
   - 同期元: `backend_tools/tools_main.py`, `backend_tools/tools_proc/`
-  - 含める: `aidiy_backup`（旧表現: `aidiy_backup_check` / `aidiy_backup_save`）
+  - 含める: `aidiy_backup`（旧表現: `aidiy_backup_check` / `aidiy_backup_save`）、`aidiy_task_agents`
 - [ ] 常駐バックエンドは 5 サーバー構成（core 8091 / apps 9098 / tools 8095 / local 8094 / task 8093）として記載している。
 - [ ] Vite proxy は `/core` → 8091、`/apps` → 9098、`/task` → 8093 の 3 経路で記載している。
 - [ ] `backend_task` は「AIタスク実行 + 定期タスク」として記載している（旧表現: 定期タスクのみ）。
@@ -74,7 +74,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 ```powershell
 $files = rg --files -g '*.md' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**/dist/**' -g '!**/backup/**'
 
-rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|openai_chat' $files
+rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|openai_chat|16 サーバー|16 個の MCP' $files
 rg -n 'hermes_cli|aidiy_hermes|3サーバー構成|_start\.py.*command_hermes|AiDiy_code_hermes_cli' $files
 rg -n 'aidiy_backup|M取引先|V取引先|トークン更新|files_temp|reboot_tools|backend_task|8093' $files
 rg -n 'includeInactive|無効も検索|router/index\.ts へのルート追加|商品コードが重複|get_商品_by_code|DELETE文でデータを完全に削除' docs
