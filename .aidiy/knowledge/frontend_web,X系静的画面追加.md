@@ -58,7 +58,10 @@
 - `requestAnimationFrame` とタイマーは `pagehide` で停止し、タブ非表示時は一時停止する。キーボード、ポインター、画面ボタンの状態は同じゲーム状態へ集約する。
 - 無操作デモと通常プレイを同じ `startGame()` から開始できるようにし、自動確認用の読み取り API は `window.XPinballSol` にまとめる。
 - `Xピンボールsol` のギミックは装飾だけにせず、SOL CORE の重力場、ECLIPSE MOON の重力反転、UMBRA / AURORA の空間転移、PHOTON SAIL の可動衝突判定のように、描画・物理・得点・効果音を一つの状態へ接続する。
+- ORBIT LOOM は直前のボール軌跡を `wovenRails` の物理レールへ変換する。描画だけの軌跡にせず、線分衝突、寿命、得点、記憶率 UI を同じ rail 状態から更新する。左右同時押しは押下中の連続発火を `dualFlipLatched` で防ぐ。
+- 落球軌跡を残す MEMORY SCAR は盤内座標へ絞り、次球を救える位置に物理レールとして残す。手動レールと区別できる色、ラベル、反発、得点を持たせる。
 - 発射レーン付近の装飾線や障害物は、待機球から盤面進入までの経路を横切らない。見た目の確認だけでなく `window.XPinballSol.launch()` 後に `entered: true` になることを確認する。
+- 自動描画確認は `index.html?demo=1`、状態確認は `window.XPinballSol.getState()` を使う。軌道織りの狙い撃ち確認は `probeWeave()`、失敗記憶は `probeFailureMemory()` を使い、`wovenRails[].hits` と `scar` を確認する。
 
 ### X立体リバーシ
 - 本体は `public/X立体リバーシ/`、iframe ラッパーは `components/Xその他/X立体リバーシ.vue`。

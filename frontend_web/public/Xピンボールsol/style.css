@@ -57,6 +57,22 @@ canvas { display: block; max-width: 100vw; max-height: 100vh; }
 #combo.active { opacity: 1; }
 #controls { position: fixed; z-index: 8; left: 0; right: 0; bottom: 8px; text-align: center; color: rgba(255, 215, 178, .7); font: 700 9px Consolas, monospace; letter-spacing: .08em; pointer-events: none; }
 
+#loom-status {
+  position: fixed; z-index: 10; left: clamp(12px, 3vw, 34px); top: 92px; width: clamp(132px, 18vw, 208px);
+  padding: 10px 12px 11px; border-left: 2px solid #40efff;
+  background: linear-gradient(90deg, rgba(7,20,36,.88), rgba(9,4,24,.22));
+  clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 0 100%);
+  pointer-events: none; transition: filter .2s, transform .2s;
+}
+#loom-status span { display: block; color: #5cf7ff; font: 900 9px Consolas, monospace; letter-spacing: .22em; }
+#loom-status strong { display: block; margin-top: 2px; color: #f4fdff; font: italic 900 24px/1 Consolas, monospace; text-shadow: 0 0 14px #36eaff; }
+#loom-status em { display: block; margin-top: 5px; color: rgba(143,238,255,.7); font: 700 7px Consolas, monospace; letter-spacing: .12em; }
+.loom-track { height: 3px; margin-top: 7px; background: rgba(74,220,255,.15); overflow: hidden; }
+.loom-track i { display: block; width: 0; height: 100%; background: linear-gradient(90deg,#31e5ff,#fff4a2,#ff3b87); box-shadow: 0 0 10px #5ff8ff; transition: width .14s; }
+#loom-status.ready { filter: brightness(1.5); transform: translateX(4px); animation: loom-ready .7s ease-in-out infinite alternate; }
+#loom-status.ready strong, #loom-status.ready em { color: #fff3a2; text-shadow: 0 0 15px #ff7b3e; }
+@keyframes loom-ready { to { filter: brightness(2); } }
+
 #launch {
   position: fixed; z-index: 14; right: clamp(13px, 4vw, 48px); bottom: 34px; display: none;
   width: 84px; height: 84px; border-radius: 50%; border: 2px solid #ffae4a;
@@ -67,6 +83,17 @@ canvas { display: block; max-width: 100vw; max-height: 100vh; }
 #launch span { display: block; margin-bottom: 6px; color: #ffb380; font-size: 7px; }
 #launch.visible { display: block; animation: ignite 1s ease-in-out infinite alternate; }
 @keyframes ignite { to { transform: scale(1.05); box-shadow: 0 0 20px #fff29d, 0 0 52px #ff275d, inset 0 0 30px #ff8538; } }
+#weave {
+  position: fixed; z-index: 14; left: clamp(13px, 4vw, 48px); bottom: 34px; width: 82px; height: 82px;
+  border-radius: 50%; border: 2px solid #54efff; opacity: .28;
+  background: radial-gradient(circle at 35% 28%, #19627a, #17103d 58%, #070515 78%);
+  color: #dffcff; font: 900 11px/1 "Arial Narrow", sans-serif; letter-spacing: .1em; cursor: pointer;
+  box-shadow: 0 0 12px rgba(54,238,255,.45), inset 0 0 22px rgba(48,198,255,.45); transition: opacity .2s, transform .2s;
+}
+#weave span { display: block; margin-bottom: 6px; color: #74dce9; font-size: 7px; }
+#weave:disabled { cursor: not-allowed; }
+#weave.ready { opacity: 1; animation: weave-ready .7s ease-in-out infinite alternate; }
+@keyframes weave-ready { to { transform: scale(1.07) rotate(-2deg); box-shadow: 0 0 22px #fff5a8, 0 0 52px #32eaff, inset 0 0 28px #ff3f88; } }
 #sound { position: fixed; z-index: 13; right: 12px; top: 83px; border: 1px solid rgba(255, 132, 68, .5); background: rgba(30, 5, 22, .72); color: #ffb27e; font: 700 8px Consolas, monospace; padding: 6px 8px; cursor: pointer; }
 
 .overlay { position: fixed; z-index: 30; inset: 0; display: none; place-items: center; padding: 24px; text-align: center; background: radial-gradient(circle, rgba(57, 8, 41, .68), rgba(2, 1, 9, .94)); backdrop-filter: blur(6px); }
@@ -102,14 +129,26 @@ canvas { display: block; max-width: 100vw; max-height: 100vh; }
 #flash { z-index: 19; opacity: 0; background: #fff8c6; mix-blend-mode: screen; }
 
 @media (max-width: 700px) {
+  .overlay { padding: 14px 10px; overflow: hidden; }
+  .overlay h1 { font-size: clamp(34px, 10.5vw, 44px); letter-spacing: -.09em; white-space: nowrap; }
+  .overlay h2 { margin-top: 12px; font-size: clamp(18px, 6vw, 27px); letter-spacing: .42em; }
+  .eyebrow { max-width: 92vw; margin-inline: auto; font-size: 6px; line-height: 1.6; letter-spacing: .2em; }
+  .tagline { margin: 15px 0 20px; font-size: 7px; letter-spacing: .19em; }
+  .title-actions { flex-direction: column; align-items: center; gap: 8px; }
+  .overlay button { min-width: 190px; padding: 10px 18px; font-size: 10px; }
+  .rules { max-width: 94vw; margin: 16px auto 0; font-size: 7px; line-height: 1.75; }
+  .sun-logo { width: 72px; height: 72px; margin-bottom: 18px; }
+  .sun-logo b { font-size: 49px; }
   #hud { grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 10px; }
   .hud-center { position: fixed; top: 61px; left: 50%; width: 58vw; transform: translateX(-50%); }
   #mode-badge { font-size: 7px; letter-spacing: .08em; white-space: nowrap; }
   #combo { top: 151px; left: 0; right: 0; text-align: center; font-size: 10px; }
+  #loom-status { top: 116px; left: 8px; width: 124px; padding: 7px 9px; }
+  #loom-status strong { font-size: 18px; }
   #score, #high-score { font-size: 20px; }
   #controls { display: none; }
   #sound { top: 68px; }
-  .rules { font-size: 8px; }
+  #weave { width: 68px; height: 68px; bottom: 22px; font-size: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

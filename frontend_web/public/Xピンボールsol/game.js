@@ -10,6 +10,7 @@
     score: el('#score'), high: el('#high-score'), multiplier: el('#multiplier'),
     heatBar: el('#heat-bar'), heatValue: el('#heat-value'), balls: el('#balls'),
     announcer: el('#announcer'), combo: el('#combo'), launch: el('#launch'), sound: el('#sound'), modeBadge: el('#mode-badge'),
+    loom: el('#loom-status'), loomBar: el('#loom-bar'), loomValue: el('#loom-value'), loomHint: el('#loom-hint'), weave: el('#weave'),
     title: el('#title-screen'), pause: el('#pause-screen'), gameover: el('#gameover-screen'),
     final: el('#final-score'), flash: el('#flash')
   }
@@ -86,6 +87,11 @@
   let noiseBuffer = null
   let announcementTimer = 0
   let launchPointerId = null
+  let loomEnergy = 0
+  let wovenRails = []
+  let lastLostTrail = []
+  let dualFlipLatched = false
+  let weaveSerial = 0
 
   function random(min, max) { return min + Math.random() * (max - min) }
   function clamp(value, min, max) { return Math.max(min, Math.min(max, value)) }
@@ -187,6 +193,13 @@
     ui.heatValue.textContent = overdrive > 0 ? `BLOOM ${overdrive.toFixed(1)}s` : `${Math.round(heat)}%`
     ui.modeBadge.textContent = `${demoMode ? 'AUTOPILOT' : 'PILOT'} // ${phase}`
     ui.modeBadge.classList.toggle('demo', demoMode || gravityPolarity < 0)
+    const loomReady = loomEnergy >= 100
+    ui.loomBar.style.width = `${loomEnergy}%`
+    ui.loomValue.textContent = `${Math.round(loomEnergy)}%`
+    ui.loomHint.textContent = loomReady ? 'DUAL FLIP // WRITE THE BOARD' : 'HIT TO REMEMBER'
+    ui.loom.classList.toggle('ready', loomReady)
+    ui.weave.classList.toggle('ready', loomReady)
+    ui.weave.disabled = !loomReady
     ui.balls.replaceChildren(...Array.from({ length: 3 }, (_, i) => {
       const node = document.createElement('i')
       if (i >= lives) node.className = 'lost'
@@ -197,7 +210,7 @@
   }
 
   function makeBall(x = 584, y = 904, lane = true, vx = 0, vy = 0) {
-    return { x, y, vx, vy, r: 13, lane, entered: !lane, alive: true, born: time, trail: [], riftCooldown: 0, sailCooldown: 0, hue: Math.random() > .5 ? '#ffdd75' : '#5cf8ff' }
+    return { x, y, vx, vy, r: 13, lane, entered: !lane, alive: true, born: time, trail: [], riftCooldown: 0, sailCooldown: 0, loomCooldown: 0, hue: Math.random() > .5 ? '#ffdd75' : '#5cf8ff' }
   }
 
   function resetRound() {
@@ -213,6 +226,7 @@
     demoElapsed = 0
     demoRestartAt = 0
     mode = 'play'; score = 0; lives = 3; heat = 0; multiplier = 1; combo = 0; comboTimer = 0; overdrive = 0
+    loomEnergy = 0; wovenRails = []; lastLostTrail = []; dualFlipLatched = false; weaveSerial = 0
     gravityPolarity = 1; polarityTimer = 0; phase = 'ORBITAL DAWN'; riftTransfers = 0; moon.angle = -1.2; moon.cooldown = 0; photonSail.cooldown = 0
     particles = []; shockwaves = []; popups = []; sparks = []
     targets.forEach((target) => { target.on = false; target.cooldown = 0 })
@@ -240,7 +254,50 @@
       localStorage.setItem('x-pinball-sol-high', String(highScore))
     }
     popups.push({ x, y, text: label || `+${gained}`, color, life: 1, max: 1 })
+    const wasReady = loomEnergy >= 100
+    loomEnergy = clamp(loomEnergy + 3.5 + Math.min(9, points / 240), 0, 100)
+    if (!wasReady && loomEnergy >= 100) {
+      announce('ORBIT MEMORY READY')
+      tone(330, .18, 'sine', .04, 2.4)
+    }
     updateHud()
+  }
+
+  function weaveOrbit(force = false) {
+    if (mode !== 'play' || (!force && loomEnergy < 100)) return false
+    const source = balls.filter((ball) => ball.alive && ball.entered && ball.trail.length >= 10)
+      .sort((a, b) => b.trail.length - a.trail.length)[0]
+    if (!source) {
+      if (!demoMode) announce('NO ORBIT IN MEMORY')
+      return false
+    }
+    const raw = source.trail.slice(-30)
+    const points = raw.filter((_, index) => index % 2 === 0).map((point) => [point.x, point.y])
+    if (points.length < 5) return false
+    wovenRails = wovenRails.filter((rail) => rail.scar || rail.life > 2.5)
+    wovenRails.push({ id: ++weaveSerial, points, life: 11, max: 11, arm: .2, scar: false, hits: 0 })
+    loomEnergy = 0
+    source.loomCooldown = .35
+    source.vx *= 1.08; source.vy -= 110
+    announce('YOU WROTE THE BOARD')
+    burst(source.x, source.y, '#64f8ff', 68, 440)
+    points.filter((_, index) => index % 3 === 0).forEach(([x, y]) => shockwaves.push({ x, y, r: 3, life: .5, max: .5, color: '#5af7ff' }))
+    flash = .45; shake = 10; chroma = 1
+    tone(110, .42, 'sawtooth', .055, 5.5)
+    updateHud()
+    return true
+  }
+
+  function preserveFailure() {
+    if (lastLostTrail.length < 8) return
+    const points = lastLostTrail.slice(-34)
+      .filter((point, index) => index % 2 === 0 && point.x > 70 && point.x < 650 && point.y > 280 && point.y < 1025)
+      .map((point) => [point.x, point.y])
+    if (points.length < 5) return
+    wovenRails = wovenRails.filter((rail) => !rail.scar)
+    wovenRails.push({ id: ++weaveSerial, points, life: 999, max: 999, arm: 0, scar: true, hits: 0 })
+    announce('DEATH BECOMES ARCHITECTURE')
+    points.filter((_, index) => index % 4 === 0).forEach(([x, y]) => burst(x, y, '#ff4d8d', 4, 80))
   }
 
   function addHeat(amount) {
@@ -384,6 +441,7 @@
     }
     ball.riftCooldown = Math.max(0, ball.riftCooldown - dt)
     ball.sailCooldown = Math.max(0, ball.sailCooldown - dt)
+    ball.loomCooldown = Math.max(0, ball.loomCooldown - dt)
     applyCoreGravity(ball, dt)
     const speed = Math.hypot(ball.vx, ball.vy)
     if (speed > 1220) { ball.vx *= 1220 / speed; ball.vy *= 1220 / speed }
@@ -392,6 +450,24 @@
     ball.vx *= Math.pow(.9985, dt * 60); ball.vy *= Math.pow(.999, dt * 60)
 
     walls.forEach((wall) => segmentCollision(ball, wall[0], wall[1], 0, .9))
+    if (ball.loomCooldown <= 0) {
+      for (const rail of wovenRails) {
+        if (rail.arm > 0) continue
+        let collided = false
+        for (let index = 1; index < rail.points.length; index++) {
+          if (segmentCollision(ball, rail.points[index - 1], rail.points[index], rail.scar ? 3 : 5, rail.scar ? 1.02 : 1.12)) {
+            collided = true
+            break
+          }
+        }
+        if (!collided) continue
+        ball.loomCooldown = .16; ball.vy -= rail.scar ? 95 : 145; rail.hits++
+        const color = rail.scar ? '#ff4f92' : '#5cf8ff'
+        impact(ball.x, ball.y, color, rail.scar ? .7 : 1.15)
+        addScore(rail.scar ? 160 : 420 + rail.hits * 35, rail.scar ? 'FAILURE REMEMBERS' : 'SELF AUTHORED HIT', ball.x, ball.y - 18, color)
+        break
+      }
+    }
     flippers.forEach((flipper) => updateFlipper(ball, flipper))
     updatePhotonSail(ball)
     updateMoonCollision(ball)
@@ -443,7 +519,10 @@
 
     ball.trail.push({ x: ball.x, y: ball.y, life: 1 })
     if (ball.trail.length > (overdrive > 0 ? 34 : 20)) ball.trail.shift()
-    if (ball.y > 1055 || ball.x < 35 || ball.x > 685) ball.alive = false
+    if (ball.y > 1055 || ball.x < 35 || ball.x > 685) {
+      lastLostTrail = ball.trail.slice()
+      ball.alive = false
+    }
   }
 
   let coreCooldown = 0
@@ -474,6 +553,7 @@
         addHeat(4)
       }
       if (demoElapsed >= 3 && demoElapsed < 3.5 && overdrive <= 0) activateOverdrive()
+      if (loomEnergy >= 100) weaveOrbit(true)
     }
     if (charging) charge = clamp(charge + dt * .72, 0, 1)
     coreCooldown = Math.max(0, coreCooldown - dt)
@@ -483,6 +563,13 @@
       const target = keys[flipper.side] ? flipper.active : flipper.rest
       flipper.angle += (target - flipper.angle) * Math.min(1, dt * 28)
     })
+    if (keys.left && keys.right) {
+      if (!dualFlipLatched) weaveOrbit()
+      dualFlipLatched = true
+    } else dualFlipLatched = false
+
+    wovenRails.forEach((rail) => { rail.arm = Math.max(0, rail.arm - dt); if (!rail.scar) rail.life -= dt })
+    wovenRails = wovenRails.filter((rail) => rail.scar || rail.life > 0)
 
     const steps = 3
     for (let i = 0; i < steps; i++) balls.forEach((ball) => updateBall(ball, dt / steps))
@@ -512,7 +599,7 @@
       if (demoMode) demoRestartAt = time + 2.2
       return
     }
-    announce('BALL LOST'); resetRound()
+    preserveFailure(); resetRound()
   }
 
   function updateEffects(dt) {
@@ -696,6 +783,33 @@
     })
   }
 
+  function drawWovenRails() {
+    wovenRails.forEach((rail) => {
+      if (rail.points.length < 2) return
+      const alpha = rail.scar ? .54 + Math.sin(time * 2.2) * .08 : clamp(rail.life / 2, 0, 1)
+      const first = rail.points[0]; const lastPoint = rail.points[rail.points.length - 1]
+      const gradient = ctx.createLinearGradient(first[0], first[1], lastPoint[0], lastPoint[1])
+      if (rail.scar) {
+        gradient.addColorStop(0, `rgba(255,44,111,${alpha})`)
+        gradient.addColorStop(1, `rgba(255,180,108,${alpha})`)
+      } else {
+        gradient.addColorStop(0, `rgba(55,238,255,${alpha})`)
+        gradient.addColorStop(.52, `rgba(255,249,185,${alpha})`)
+        gradient.addColorStop(1, `rgba(255,62,142,${alpha})`)
+      }
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+      ctx.shadowColor = rail.scar ? '#ff326f' : '#4df5ff'; ctx.shadowBlur = rail.scar ? 15 : 25
+      ctx.strokeStyle = gradient; ctx.lineWidth = rail.scar ? 5 : 9; path(rail.points); ctx.stroke()
+      ctx.globalAlpha = alpha; ctx.strokeStyle = '#fffbd2'; ctx.lineWidth = 1.4
+      ctx.setLineDash(rail.scar ? [2, 12] : [10, 7]); ctx.lineDashOffset = time * (rail.scar ? 18 : -45)
+      path(rail.points); ctx.stroke(); ctx.setLineDash([]); ctx.restore()
+      ctx.save(); ctx.globalAlpha = Math.min(1, alpha + .2); ctx.fillStyle = rail.scar ? '#ff74a8' : '#8cfcff'
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10; ctx.textAlign = 'center'; ctx.font = '800 7px Consolas'
+      ctx.fillText(rail.scar ? 'MEMORY SCAR // FAILURE PERSISTS' : `AUTHORED RAIL ${String(rail.id).padStart(2, '0')}`, lastPoint[0], lastPoint[1] - 12)
+      ctx.restore()
+    })
+  }
+
   function drawFlippers() {
     flippers.forEach((flipper) => {
       const endX = flipper.x + Math.cos(flipper.angle) * flipper.length; const endY = flipper.y + Math.sin(flipper.angle) * flipper.length
@@ -751,7 +865,7 @@
       ctx.save(); ctx.globalAlpha = chroma * .12; ctx.translate(-chroma * 7, 0); drawBoard(); ctx.restore()
       ctx.save(); ctx.globalAlpha = chroma * .09; ctx.translate(chroma * 7, 0); drawBoard(); ctx.restore()
     }
-    drawBoard(); drawSpaceWeather(); drawRifts(); drawCore(); drawMoon(); drawBumpers(); drawTargets(); drawPhotonSail(); drawFlippers(); drawBalls(); drawEffects(); drawCharge()
+    drawBoard(); drawSpaceWeather(); drawRifts(); drawCore(); drawMoon(); drawBumpers(); drawTargets(); drawPhotonSail(); drawWovenRails(); drawFlippers(); drawBalls(); drawEffects(); drawCharge()
     ctx.restore()
   }
 
@@ -816,6 +930,7 @@
     launchPointerId = null; charging = false; charge = 0
   })
   ui.launch.addEventListener('click', () => launchBall(.45))
+  ui.weave.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); ensureAudio(); weaveOrbit() })
   el('#start').addEventListener('click', () => startGame(false))
   el('#demo-start').addEventListener('click', () => startGame(true))
   el('#restart').addEventListener('click', () => startGame(false))
@@ -826,7 +941,8 @@
   })
   window.XPinballSol = Object.freeze({
     getState: () => ({
-      mode, demoMode, demoElapsed, score, highScore, lives, heat, multiplier, overdrive, charging, charge, phase, gravityPolarity, polarityTimer, riftTransfers,
+      mode, demoMode, demoElapsed, score, highScore, lives, heat, multiplier, overdrive, charging, charge, phase, gravityPolarity, polarityTimer, riftTransfers, loomEnergy,
+      wovenRails: wovenRails.map((rail) => ({ id: rail.id, scar: rail.scar, life: rail.life, hits: rail.hits, points: rail.points.length })),
       moon: getMoonPosition(), photonSail: getPhotonSail(),
       balls: balls.map((ball) => ({ x: Math.round(ball.x), y: Math.round(ball.y), vx: Math.round(ball.vx), vy: Math.round(ball.vy), lane: ball.lane, entered: ball.entered, alive: ball.alive }))
     }),
@@ -835,6 +951,24 @@
     launch: () => launchBall(1),
     triggerEclipse: () => { gravityPolarity = -1; polarityTimer = 4.5; updatePhase() },
     triggerBloom: () => activateOverdrive(),
+    chargeLoom: () => { loomEnergy = 100; updateHud() },
+    weave: () => weaveOrbit(true),
+    probeWeave: () => {
+      loomEnergy = 100
+      if (!weaveOrbit(true)) return false
+      const rail = wovenRails[wovenRails.length - 1]
+      const ball = balls.find((item) => item.alive && item.entered)
+      if (!rail || !ball) return false
+      const point = rail.points[Math.floor(rail.points.length / 2)]
+      Object.assign(ball, { x: point[0], y: point[1], vx: 180, vy: 420, loomCooldown: 0, lane: false, entered: true })
+      rail.arm = 0
+      return true
+    },
+    probeFailureMemory: () => {
+      lastLostTrail = Array.from({ length: 24 }, (_, index) => ({ x: 215 + index * 12, y: 910 - Math.sin(index / 23 * Math.PI) * 125 }))
+      preserveFailure()
+      return true
+    },
     probeRift: () => {
       if (mode !== 'play') startGame(false)
       const ball = balls.find((item) => item.alive) || makeBall()
@@ -851,7 +985,9 @@
       moon.cooldown = 0; updateMoonCollision(ball)
     }
   })
-  addEventListener('pagehide', () => { cancelAnimationFrame(raf); clearTimeout(announcementTimer); if (audio) audio.close() }, { once: true })
+  let autoDemoTimer = 0
+  addEventListener('pagehide', () => { cancelAnimationFrame(raf); clearTimeout(announcementTimer); clearTimeout(autoDemoTimer); if (audio) audio.close() }, { once: true })
 
   resize(); initStars(); updateHud(); raf = requestAnimationFrame(frame)
+  if (new URLSearchParams(location.search).get('demo') === '1') autoDemoTimer = setTimeout(() => startGame(true), 120)
 })()

@@ -36,21 +36,27 @@
 
   <div id="announcer" role="status"></div>
   <div id="combo"></div>
-  <div id="controls">A / ← LEFT FLIP　　D / → RIGHT FLIP　　SPACE / ↓ PLUNGER　　P PAUSE</div>
+  <aside id="loom-status" aria-label="軌道織り状態">
+    <span>ORBIT LOOM</span><strong id="loom-value">0%</strong>
+    <div class="loom-track"><i id="loom-bar"></i></div>
+    <em id="loom-hint">HIT TO REMEMBER</em>
+  </aside>
+  <div id="controls">A / ← LEFT　　D / → RIGHT　　BOTH = WEAVE YOUR TRAIL　　SPACE / ↓ LAUNCH　　P PAUSE</div>
   <button id="launch" type="button" aria-label="ボールを発射"><span>HOLD</span>IGNITE</button>
+  <button id="weave" type="button" aria-label="直前の軌道をレールに変換"><span>DUAL FLIP</span>WEAVE</button>
   <button id="sound" type="button" aria-label="サウンド切り替え">SOUND ON</button>
 
   <div id="title-screen" class="overlay visible">
     <div class="sun-logo"><i></i><i></i><i></i><b>☼</b></div>
-    <div class="eyebrow">A GRAVITY INSTRUMENT // PLAY THE IMPOSSIBLE</div>
-    <h1 data-text="SOL//RIFT">SOL//RIFT</h1>
+    <div class="eyebrow">THE TABLE REMEMBERS EVERYTHING // INCLUDING FAILURE</div>
+    <h1 data-text="SOL//LOOM">SOL//LOOM</h1>
     <h2>X PINBALL</h2>
-    <p class="tagline">NO FLOOR. NO UP. ONLY ORBIT.</p>
+    <p class="tagline">DON'T PLAY THE BOARD. WRITE IT.</p>
     <div class="title-actions">
       <button id="start" type="button">INITIALIZE CORE</button>
       <button id="demo-start" class="button-secondary" type="button">AUTOPILOT DEMO</button>
     </div>
-    <p class="rules">CORE の重力で軌道を曲げろ ・ ECLIPSE MOON で重力反転<br>UMBRA ⇄ AURORA を光速転移 ・ PHOTON SAIL を鳴らせ</p>
+    <p class="rules">ヒットで軌道記憶を満たせ ・ 左右同時押しで直前の軌跡を物理レールへ変換<br>落球の軌跡すら次の球を救う「記憶の傷」になる</p>
   </div>
 
   <div id="pause-screen" class="overlay"><div><h3>TIME DILATION</h3><p>PAUSED</p><button id="resume" type="button">RESUME</button></div></div>
