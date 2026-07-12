@@ -100,6 +100,7 @@ print(res.json())
 | OBS Studio Control | `http://localhost:8095/aidiy_obs_studio_control/sse` |
 | FFmpeg Control | `http://localhost:8095/aidiy_ffmpeg_control/sse` |
 | Code Agents | `http://localhost:8095/aidiy_code_agents/sse` |
+| Windows Control | `http://localhost:8095/aidiy_windows_control/sse` |
 
 アクセスは localhost 限定。外部接続は 403。
 

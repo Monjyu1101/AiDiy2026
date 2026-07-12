@@ -1143,7 +1143,7 @@
             <span>Electron + VRM + 音声AI</span>
             <span>🧠 自己改善機構 — 使うほど育つ</span>
             <span>claude / copilot / codex / antigravity / opencode / hermes CLI</span>
-            <span>🔌 MCP Hub ×17 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task</span>
+            <span>🔌 MCP Hub ×18 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task / windows</span>
             <span>🤖 AIタスク自動実行 — AI分解 × 自由なタスクフロー × クリティカルパス実行</span>
         </div>
         <div class="typing-text" id="typing-text"></div>
@@ -1210,10 +1210,10 @@
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🔌</span>
-                <h3 class="feature-title">MCP Hub × 17 + Multi CLI</h3>
+                <h3 class="feature-title">MCP Hub × 18 + Multi CLI</h3>
                 <p class="feature-description">
                     browser / capture / sqlite / postgres / logs / check / backup /<br>
-                    image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task の 17 MCP サーバー同居。<br>
+                    image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task / windows の 18 MCP サーバー同居。<br>
                     7 種の Code CLI を code1〜code6 パネルで並走可能。
                 </p>
             </div>
@@ -1261,9 +1261,9 @@
                 <span class="stat-sub">Electron / Web</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="17">0</span>
+                <span class="stat-number" data-count="18">0</span>
                 <span class="stat-label">MCP サーバー</span>
-                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task</span>
+                <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task / windows</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="60">0</span>
@@ -1352,8 +1352,8 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔌 MCP サーバー (統合)</h3>
-                <p>FastAPI + SSE で 17 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・通知音再生・コードエージェント実行・チャット LLM 実行・AIタスク非同期投入を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
-                <div class="meta-tags"><span>tools_main.py:8095</span><span>SSE × 17</span><span>HTTP POST</span><span>stdio gateway</span></div>
+                <p>FastAPI + SSE で 18 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・通知音再生・コードエージェント実行・チャット LLM 実行・AIタスク非同期投入・Windows デスクトップ操作制御を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
+                <div class="meta-tags"><span>tools_main.py:8095</span><span>SSE × 18</span><span>HTTP POST</span><span>stdio gateway</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🤖 backend_task (AIタスク)<span class="fx-new-badge">NEW</span></h3>
@@ -1603,10 +1603,10 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 7. MCP Hub × 17 + Multi CLI -->
+    <!-- 7. MCP Hub × 18 + Multi CLI -->
     <section class="section">
-        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 17 + Multi CLI — 実装詳細</h2>
-        <p class="section-subtitle animate-on-scroll">ポート 8095 に 17 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
+        <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 18 + Multi CLI — 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">ポート 8095 に 18 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 aidiy_chrome_devtools</h3>
@@ -1693,6 +1693,11 @@ Key:   利用者名</pre>
                 <p>backend_task の AIタスク要求へ非同期でタスクを投入。登録のみを行いタスク分解や実行完了は待たず、進捗は別ツールで確認する非ブロッキング設計。AI エージェントから AIタスク自動実行を起動する入口。</p>
                 <div class="meta-tags"><span>submit</span><span>get_request_status</span><span>非同期投入</span></div>
             </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🖱️ aidiy_windows_control<span class="fx-new-badge">NEW</span></h3>
+                <p>Windows デスクトップを直接操作。マウス/キーボード、ウィンドウ制御、プロセス管理、クリップボードに加え、UI Automation で要素 ID ベースのクリック・入力も可能。</p>
+                <div class="meta-tags"><span>UI Automation</span><span>ctypes</span><span>win32</span></div>
+            </div>
         </div>
         <div class="advanced-grid" style="margin-top:30px;">
             <div class="feature-card animate-on-scroll">
@@ -1705,7 +1710,7 @@ Key:   利用者名</pre>
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     edit → observe → verify → backup<br>
-                    MCP 17 サーバーの連携で、修正の影響範囲を<br>
+                    MCP 18 サーバーの連携で、修正の影響範囲を<br>
                     <strong>AI が自分で確認</strong>してから報告します。<br>
                     SSE / stdio / HTTP POST の 3 経路でどの CLI からでも利用可。<br>
                     バックアップ保存→チェックのサイクルも内蔵。

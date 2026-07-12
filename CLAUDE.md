@@ -13,9 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Backend**: FastAPI + SQLAlchemy + SQLite（Python 3.13 以上、uv 管理、2 サーバー構成）
 - **Command Hermes**: `aidiy_hermes` コード支援 CLI（**常駐なし**、`_start.py` の起動対象外）
-- **Backend MCP**: 17 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Notification Sounds, Code Agents, Chat LLM, Task Agents）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供。`aidiy_task_agents` は backend_task の AIタスク要求へ非同期投入する専用 MCP（`submit` で登録、`get_request_status` / `get_detail_status` で進捗確認）。
+- **Backend MCP**: 18 個の MCP サーバー（Chrome, Desktop, SQLite, PostgreSQL, Logs, Code Check, Backup, Image Generation, Movie Generation, Speech-to-Text, Text-to-Speech, OBS Studio Control, FFmpeg Control, Notification Sounds, Code Agents, Chat LLM, Task Agents, Windows Control）— **SSE Transport** / **Streamable HTTP Transport** / **stdio gateway**（`mcp_stdio.py`）の 3 トランスポートを同一ポートで提供。ツール一覧は `GET http://localhost:8095/{mcp_name}/list`、Python からは `requests.post("http://localhost:8095/{mcp_name}/{method}")` で直接利用可能。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供。`aidiy_task_agents` は backend_task の AIタスク要求へ非同期投入する専用 MCP（`submit` で登録、`get_request_status` / `get_detail_status` で進捗確認）。
 - **Backend Local**: `backend_local` ローカル LLM サーバー（ポート 8094、`_start.py` ではデフォルト起動しない）。HuggingFace の **Gemma** を `transformers` + `torch` でローカル推論し、**OpenAI 互換**の Chat Completions API（`POST http://localhost:8094/v1/chat/completions`、`stream` / `tools` 対応）として提供。モデルは `temp/models/<safe_name>` に配置し遅延ロード。設定は `backend_server/_config/AiDiy_key.json`（環境変数は使わない）。
-- **Backend Task**: `backend_task` AIタスク実行 + 定期タスク FastAPI サーバー（ポート 8093）。`_start.py` では Apps 起動後に起動。`/task/タスク要求/*`・`/task/タスク明細/*` API を提供し、監視ループ（5 秒間隔）が要求を AI で明細タスクへ分解して Code CLI（`TASK_AI_NAME`）で実行する。明細は `先行SEQ`（カンマ区切りで複数指定可）による DAG で、垂直の直列だけでなく水平の並行分岐も自由に定義でき、先行が全て完了した明細から実行（フロー図はクリティカルパス基準で表示）。DB は `backend_server/_data/AiDiy/database.db` を共有（`AIタスク要求` / `AIタスク明細` テーブル）。
+- **Backend Task**: `backend_task` AIタスク実行 + 定期タスク FastAPI サーバー（ポート 8093）。`_start.py` では Apps 起動後に起動。`/task/タスク要求/*`・`/task/タスク明細/*` API を提供し、監視ループ（5 秒間隔）が要求を AI で明細タスクへ分解して Code CLI（`TASK_AI_NAME`）で実行する。明細は `先行SEQ`（カンマ区切りで複数指定可）による DAG で、垂直の直列だけでなく水平の並行分岐も自由に定義でき、先行が全て完了した明細から実行（フロー図はクリティカルパス基準で表示）。DB は `backend_server/_data/AiDiy/database.db` を共有（`Aタスク要求` / `Aタスク明細` テーブル）。
 - **Frontend Web**: Vue 3 + Vite + TypeScript（qTubler, Pinia, Vue Router）
 - **Frontend Avatar**: Electron/Web デュアルモード AI Avatar（Three.js, VRM）
 
@@ -134,11 +134,11 @@ docker_2start.bat    # 起動 → https://localhost/
 
 ```bash
 # backend_tools 起動後、Python 構文 / ruff / TypeScript 型チェックを MCP 経由で実行
-# GET でツール一覧確認、POST でツール実行
+# GET でツール一覧確認、POST でツール実行（メソッド: python_syntax / python_ruff / typescript / list_targets）
 curl http://localhost:8095/aidiy_code_check/list
-curl -X POST http://localhost:8095/aidiy_code_check/check \
+curl -X POST http://localhost:8095/aidiy_code_check/python_syntax \
   -H "Content-Type: application/json" \
-  -d '{"path": "backend_server/AIコア/AIコード_cli.py"}'
+  -d '{"file_path": "backend_server/AIコア/AIコード_cli.py"}'
 ```
 
 ### 自動テスト

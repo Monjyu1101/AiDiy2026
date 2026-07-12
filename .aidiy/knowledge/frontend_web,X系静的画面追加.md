@@ -52,6 +52,14 @@
 
 ## 既存 X画面別の注意点
 
+### Xピンボール
+- ピンボール系デモで見習うべき実装は `public/Xピンボールsol/` に集約する。類似実装を増やさず、ゲームループ、入力、デモ動作、停止処理、デバッグ方法を改善するときは `Xピンボールsol` を更新する。
+- 本体は `index.html`、`style.css`、`game.js` に分離し、Vue 側は `components/Xその他/Xピンボールsol.vue` の iframe ラッパーに留める。
+- `requestAnimationFrame` とタイマーは `pagehide` で停止し、タブ非表示時は一時停止する。キーボード、ポインター、画面ボタンの状態は同じゲーム状態へ集約する。
+- 無操作デモと通常プレイを同じ `startGame()` から開始できるようにし、自動確認用の読み取り API は `window.XPinballSol` にまとめる。
+- `Xピンボールsol` のギミックは装飾だけにせず、SOL CORE の重力場、ECLIPSE MOON の重力反転、UMBRA / AURORA の空間転移、PHOTON SAIL の可動衝突判定のように、描画・物理・得点・効果音を一つの状態へ接続する。
+- 発射レーン付近の装飾線や障害物は、待機球から盤面進入までの経路を横切らない。見た目の確認だけでなく `window.XPinballSol.launch()` 後に `entered: true` になることを確認する。
+
 ### X立体リバーシ
 - 本体は `public/X立体リバーシ/`、iframe ラッパーは `components/Xその他/X立体リバーシ.vue`。
 - ルートは `/Xその他/X立体リバーシ/ゲーム`。

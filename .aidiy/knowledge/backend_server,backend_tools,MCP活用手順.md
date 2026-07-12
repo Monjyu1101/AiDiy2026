@@ -10,7 +10,7 @@
 ## 関連ファイル
 - `backend_server/_config/AiDiy_mcp.json` — Claude Agent SDK に渡す MCP 接続定義
 - `backend_server/core_router/AIコア/AIコード_claude.py` — Claude Agent SDK で MCP を使う処理
-- `backend_tools/tools_main.py` — 14個の SSE MCP サーバー入口
+- `backend_tools/tools_main.py` — 18個の SSE MCP サーバー入口
 - `backend_tools/mcp_stdio.py` — SSE を stdio client へ中継
 - `backend_tools/tools_proc/` — 各 MCP のロジック
 
@@ -33,6 +33,7 @@
 | `aidiy_ffmpeg_control` | `http://localhost:8095/aidiy_ffmpeg_control/sse` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） |
 | `aidiy_code_agents` | `http://localhost:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
 | `aidiy_task_agents` | `http://localhost:8095/aidiy_task_agents/sse` | backend_task API への AIタスク非同期投入、要求/明細状態取得 |
+| `aidiy_windows_control` | `http://localhost:8095/aidiy_windows_control/sse` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
 
 ## AiDiy_mcp.json の形式
 
@@ -72,6 +73,7 @@
 | ffmpeg / ffprobe による動画合成・字幕焼き込み、ffplay でプレビュー再生 | `aidiy_ffmpeg_control` |
 | AI コードエージェント実行（CodeAI CLI 経由） | `aidiy_code_agents` |
 | AIタスクへ依頼を投入して非同期実行させる | `aidiy_task_agents` |
+| マウス/キーボード操作、ウィンドウ制御、プロセス管理 | `aidiy_windows_control` |
 
 SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まずアプリ API や既存初期化処理で再現できないか確認する。
 

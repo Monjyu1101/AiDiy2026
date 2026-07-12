@@ -21,6 +21,7 @@ dependencies = [
     "requests",
     "speechrecognition",
     "lameenc",
+    "uiautomation",
 ]
 
 [tool.hatch.build.targets.wheel]

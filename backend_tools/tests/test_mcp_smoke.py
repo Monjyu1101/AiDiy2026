@@ -15,7 +15,7 @@ backend_tools MCP/SSE スモークテスト
   backend_tools (port 8095) が起動済みであること。
 
 方針:
-  14 MCP の SSE 接続、list_tools、代表的な副作用の少ない tool call を確認する。
+  各 MCP の SSE 接続、list_tools、代表的な副作用の少ない tool call を確認する。
   外部 AI 生成、AI agent 実行、書き込み系 backup run は行わない。
 
 実行:
@@ -143,6 +143,17 @@ SERVERS = [
             "task_agents_get_detail_status",
         },
         "call": ("task_agents_config", {}),
+    },
+    {
+        "name": "aidiy_windows_control",
+        "expected": {
+            "mouse_click", "keyboard_type", "keyboard_shortcut",
+            "list_windows", "focus_window", "set_window_state",
+            "launch_app", "list_processes", "kill_process",
+            "get_clipboard_text", "set_clipboard_text",
+            "ui_snapshot", "ui_click", "ui_type",
+        },
+        "call": ("list_windows", {}),
     },
 ]
 

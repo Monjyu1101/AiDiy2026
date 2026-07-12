@@ -97,6 +97,7 @@ def main() -> None:
         "/aidiy_code_agents/docs",
         "/aidiy_chat_llms/docs",
         "/aidiy_task_agents/docs",
+        "/aidiy_windows_control/docs",
         "/aidiy_chat_completions/docs",
     ]
     for path in docs_paths:
@@ -256,6 +257,17 @@ def main() -> None:
     if "task_api_base" not in task_config:
         raise AssertionError(f"task_agents config: unexpected keys {sorted(task_config.keys())}")
     print("  OK task_agents")
+
+    # Windows Control は読み取り系のみ（マウス/キーボード操作・アプリ起動は行わない）
+    windows = post("/aidiy_windows_control/list_windows")
+    assert_no_error("windows_control list_windows", windows)
+    if not isinstance(windows.get("windows"), list):
+        raise AssertionError(f"windows_control list_windows: unexpected {windows}")
+    processes = post("/aidiy_windows_control/list_processes")
+    assert_no_error("windows_control list_processes", processes)
+    if not isinstance(processes.get("processes"), list) or not processes["processes"]:
+        raise AssertionError("windows_control list_processes: processes が空です")
+    print("  OK windows_control")
 
     print("\nOK")
 

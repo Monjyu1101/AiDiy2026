@@ -39,6 +39,7 @@ from log_config import setup_logging, get_logger
 from tools_proc.chrome_manager import ChromeManager
 from tools_proc.chrome_devtools import CDPClient
 from tools_proc.desktop_capture import DesktopCapture
+from tools_proc.windows_control import WindowsControl
 from tools_proc.sqlite_query import SqliteQuery
 from tools_proc.postgres_query import PgQuery, PgQueryError
 from tools_proc.log_tailer import LogTailer
@@ -58,7 +59,7 @@ from tools_proc.task_agents import TaskAgents
 from tools_proc import tools_chrome, tools_desktop, tools_db, tools_dev
 from tools_proc import tools_backup, tools_media, tools_obs, tools_ffmpeg
 from tools_proc import tools_notification_sounds, tools_agents, tools_chat
-from tools_proc import tools_task_agents
+from tools_proc import tools_task_agents, tools_windows_control
 
 setup_logging()
 logger = get_logger(__name__)
@@ -119,6 +120,7 @@ MOUNT_NS    = os.environ.get("MCP_NS_MOUNT_PATH", "/aidiy_notification_sounds")
 MOUNT_CA    = os.environ.get("MCP_CA_MOUNT_PATH", "/aidiy_code_agents")
 MOUNT_CL    = os.environ.get("MCP_CL_MOUNT_PATH", "/aidiy_chat_llms")
 MOUNT_TA    = os.environ.get("MCP_TA_MOUNT_PATH", "/aidiy_task_agents")
+MOUNT_WC    = os.environ.get("MCP_WC_MOUNT_PATH", "/aidiy_windows_control")
 
 # ------------------------------------------------------------------ #
 # サービスインスタンス生成
@@ -127,6 +129,7 @@ MOUNT_TA    = os.environ.get("MCP_TA_MOUNT_PATH", "/aidiy_task_agents")
 chrome      = ChromeManager(debug_port=CHROME_PORT)
 cdp         = CDPClient(port=CHROME_PORT)
 capture     = DesktopCapture()
+winctl      = WindowsControl()
 sqlite_q    = SqliteQuery()
 log_t       = LogTailer()
 checker     = CodeChecker()
@@ -223,6 +226,7 @@ mcp_ns = _make_mcp("aidiy_notification_sounds")
 mcp_ca = _make_mcp("aidiy_code_agents")
 mcp_cl = _make_mcp("aidiy_chat_llms")
 mcp_ta = _make_mcp("aidiy_task_agents")
+mcp_wc = _make_mcp("aidiy_windows_control")
 
 # ------------------------------------------------------------------ #
 # MCP ツール登録
@@ -245,6 +249,7 @@ tools_notification_sounds.register_tools(mcp_ns, ns)
 tools_agents.register_tools(mcp_ca, code_agents)
 tools_chat.register_tools(mcp_cl, chat_llm)
 tools_task_agents.register_tools(mcp_ta, task_agents)
+tools_windows_control.register_tools(mcp_wc, winctl)
 
 # TTS description を API キー状況に応じて動的設定
 mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_description()
@@ -264,8 +269,8 @@ app = FastAPI(
         "AiDiy MCP サーバー — Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / "
         "Logs / Code Check / Backup / Image Generation / Movie Generation / "
         "Speech-to-Text / Text-to-Speech / OBS Studio / FFmpeg / Code Agents / Chat LLM / "
-        "Task Agents / Notification Sounds の "
-        "17 MCP ツールを HTTP POST で直接呼び出せます。\n\n"
+        "Task Agents / Notification Sounds / Windows Control の "
+        "18 MCP ツールを HTTP POST で直接呼び出せます。\n\n"
         "加えて OpenAI / Ollama 互換の標準チャットインターフェース "
         "`POST /aidiy_chat_completions/v1/chat/completions` を提供します。\n\n"
         "各 MCP の詳細は `GET /{mcp_name}/docs` を参照してください。"
@@ -348,6 +353,7 @@ app.include_router(tools_notification_sounds.create_router(ns))
 app.include_router(tools_agents.create_router(code_agents))
 app.include_router(tools_chat.create_router(chat_llm))
 app.include_router(tools_task_agents.create_router(task_agents))
+app.include_router(tools_windows_control.create_router(winctl))
 app.include_router(tools_chat.create_completions_router(chat_llm))
 
 # ------------------------------------------------------------------ #
@@ -372,6 +378,7 @@ MCP_MAP.update({
     "aidiy_code_agents":            mcp_ca,
     "aidiy_chat_llms":              mcp_cl,
     "aidiy_task_agents":            mcp_ta,
+    "aidiy_windows_control":        mcp_wc,
 })
 for _mcp_name, _mcp_instance in MCP_MAP.items():
     _register_mcp_http_meta(_mcp_name, _mcp_instance)
@@ -397,6 +404,7 @@ app.mount(MOUNT_NS, mcp_ns.sse_app())
 app.mount(MOUNT_CA, mcp_ca.sse_app())
 app.mount(MOUNT_CL, mcp_cl.sse_app())
 app.mount(MOUNT_TA, mcp_ta.sse_app())
+app.mount(MOUNT_WC, mcp_wc.sse_app())
 
 # ------------------------------------------------------------------ #
 # OpenAPI パス順序カスタマイズ
@@ -469,5 +477,6 @@ if __name__ == "__main__":
     logger.info(f"CodeAgents           : {base}/aidiy_code_agents/  SSE:{MOUNT_CA}/sse")
     logger.info(f"ChatLLM              : {base}/aidiy_chat_llms/  SSE:{MOUNT_CL}/sse")
     logger.info(f"TaskAgents           : {base}/aidiy_task_agents/  SSE:{MOUNT_TA}/sse")
+    logger.info(f"WindowsControl       : {base}/aidiy_windows_control/  SSE:{MOUNT_WC}/sse")
     logger.info(f"ChatCompletions      : {base}/aidiy_chat_completions/v1/chat/completions [OpenAI/Ollama 互換]")
     uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")
