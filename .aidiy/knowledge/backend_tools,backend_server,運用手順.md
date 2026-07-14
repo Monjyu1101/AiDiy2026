@@ -149,5 +149,5 @@ PATH 上にない環境ではフルパスへ書き換える。MCP ツールは a
 
 ## 使い分け
 
-MCP の選択基準は `MCP活用手順.md` を使う。
-サーバー構成や新規 MCP 追加は `backendMCP構成.md` を使う。
+MCP の選択基準は `backend_server,backend_tools,MCP活用手順.md` を使う。
+サーバー構成や新規 MCP 追加は `backend_tools,構成.md` を使う。

@@ -24,5 +24,5 @@ cd backend_tools
 .venv\Scripts\python.exe tests\test_post_api_smoke.py
 ```
 
-- `test_mcp_smoke.py`: 15 MCP の SSE 接続、`list_tools`、各 MCP につき最低 1 メソッドの呼び出し（重い生成系は prompt 省略のバリデーションエラー経路）を確認します。
-- `test_post_api_smoke.py`: 15 MCP + `aidiy_chat_completions` の HTTP docs / POST API を確認します。画像生成、動画生成、AI agent 実行などの重い外部処理は実行しません。
+- `test_mcp_smoke.py`: 17 MCP（`aidiy_notification_sounds` を除く）の SSE 接続、`list_tools`、各 MCP につき最低 1 メソッドの呼び出し（重い生成系は prompt 省略のバリデーションエラー経路）を確認します。
+- `test_post_api_smoke.py`: 17 MCP（`aidiy_notification_sounds` を除く）+ `aidiy_chat_completions` の HTTP docs / POST API を確認します。画像生成、動画生成、AI agent 実行などの重い外部処理は実行しません。

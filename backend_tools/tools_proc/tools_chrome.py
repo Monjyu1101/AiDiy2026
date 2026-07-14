@@ -29,6 +29,8 @@ logger = get_logger(__name__)
 
 class ChromeDevToolsRequest(BaseModel):
     """POST /aidiy_chrome_devtools/{method} 共通リクエストモデル"""
+    session: str = "default"
+    headless: Optional[bool] = None
     tab_id: Optional[str] = None
     url: Optional[str] = None
     show_automation_banner: bool = True
@@ -114,26 +116,54 @@ _CHROME_DEVTOOLS_METHODS = [
     {"name": "js_get_dialog_state", "description": "最後に呼ばれたダイアログの情報を取得する", "parameters": {"tab_id": {"type": "string", "required": False}}},
 ]
 
+# 全メソッド共通: session パラメータ（セッションごとに独立した Chrome を使う）
+_SESSION_PARAM = {
+    "type": "string", "required": False, "default": "default",
+    "description": "Chrome セッション名（自由な文字列）。セッションごとに独立した Chrome（ポート・プロファイル）を使う。標準は 'default' で通常は指定不要。指定時は Chrome が複数メモリ常駐となるため、使用後は close_session で破棄を忘れずに行うこと",
+}
+for _m in _CHROME_DEVTOOLS_METHODS:
+    _m["parameters"] = {"session": _SESSION_PARAM, **_m["parameters"]}
+
+# セッション管理メソッド
+_CHROME_DEVTOOLS_METHODS += [
+    {"name": "open_session", "description": "セッションの Chrome を起動する（未登録なら新規割り当て。headless 指定可）",
+     "parameters": {"session": _SESSION_PARAM, "headless": {"type": "boolean", "required": False, "default": False, "description": "True で画面なし起動（--headless=new, 1920x1080）。稼働中の Chrome には次回起動から反映"}, "show_automation_banner": {"type": "boolean", "required": False, "default": True}}},
+    {"name": "list_sessions", "description": "登録済み Chrome セッションの一覧（稼働状態付き）を取得する", "parameters": {}},
+    {"name": "close_session", "description": "セッションの Chrome を停止する（対応表・プロファイルは残るため同名で再開できる）",
+     "parameters": {"session": _SESSION_PARAM}},
+    {"name": "delete_session", "description": "セッションを削除する（Chrome 停止 + 対応表から除去。プロファイルは残る）",
+     "parameters": {"session": {"type": "string", "required": True, "description": "削除するセッション名"}}},
+]
+
 
 # ------------------------------------------------------------------ #
 # MCP ツール登録
 # ------------------------------------------------------------------ #
 
-def register_tools(mcp, chrome, cdp):
+def register_tools(mcp, registry):
     """aidiy_chrome_devtools MCP ツールを mcp インスタンスに登録する。
     HTTP ルートでも使える _ensure_chrome コルーチンを返す。"""
 
-    async def _ensure_chrome(show_automation_banner: Optional[bool] = None):
+    async def _ensure_chrome(
+        show_automation_banner: Optional[bool] = None,
+        session: str = "default",
+        headless: Optional[bool] = None,
+    ):
+        """セッションの Chrome を確保して CDPClient を返す（未起動なら起動）"""
+        chrome, cdp = registry.get(session, headless=headless)
         if not chrome.is_running():
             await asyncio.to_thread(
                 chrome.ensure_running,
                 show_automation_banner=show_automation_banner,
             )
+        return cdp
 
     # ナビゲーション
 
     @mcp.tool()
     async def navigate(
+        session: str = "default",
+        *,
         url: str,
         tab_id: Optional[str] = None,
         show_automation_banner: bool = True,
@@ -145,28 +175,28 @@ def register_tools(mcp, chrome, cdp):
             show_automation_banner: Chrome 未起動時の自動起動で「自動操作中」の帯を表示する。
                                     省略時は True。
         """
-        await _ensure_chrome(show_automation_banner=show_automation_banner)
+        cdp = await _ensure_chrome(show_automation_banner=show_automation_banner, session=session)
         result = await cdp.navigate(url, tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def reload(tab_id: Optional[str] = None) -> str:
+    async def reload(session: str = "default", tab_id: Optional[str] = None) -> str:
         """現在のページをリロードする"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.reload(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def go_back(tab_id: Optional[str] = None) -> str:
+    async def go_back(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ブラウザの戻るボタン相当"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.go_back(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def go_forward(tab_id: Optional[str] = None) -> str:
+    async def go_forward(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ブラウザの進むボタン相当"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.go_forward(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
@@ -174,6 +204,7 @@ def register_tools(mcp, chrome, cdp):
 
     @mcp.tool()
     async def screenshot(
+        session: str = "default",
         tab_id: Optional[str] = None,
         full_page: bool = False,
         save_path: Optional[str] = None,
@@ -187,69 +218,69 @@ def register_tools(mcp, chrome, cdp):
                        ファイル指定なら指定ファイルに保存。省略時は保存しない。
             shutter_sounds: "auto" でシャッター音を再生（Windows のみ）。デフォルト "none"
         """
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         data = await cdp.screenshot(tab_id=tab_id, full_page=full_page, save_path=save_path, shutter_sounds=shutter_sounds)
         if save_path and data:
             logger.info(f"screenshot saved: {save_path}")
         return [ImageContent(type="image", data=data, mimeType="image/png")]
 
     @mcp.tool()
-    async def get_page_info(tab_id: Optional[str] = None) -> str:
+    async def get_page_info(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ページのURL・タイトル・readyState などを取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         info = await cdp.get_page_info(tab_id)
         return json.dumps(info, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_html(tab_id: Optional[str] = None) -> str:
+    async def get_html(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ページ全体のHTMLを取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.get_html(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_text(tab_id: Optional[str] = None) -> str:
+    async def get_text(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ページのテキストコンテンツを取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.get_text(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     # JavaScript・DOM操作
 
     @mcp.tool()
-    async def eval_js(expression: str, tab_id: Optional[str] = None, await_promise: bool = False) -> str:
+    async def eval_js(session: str = "default", *, expression: str, tab_id: Optional[str] = None, await_promise: bool = False) -> str:
         """JavaScriptを実行して結果を返す"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.eval_js(expression, tab_id, await_promise)
         if isinstance(result, dict):
             return json.dumps(result, ensure_ascii=False)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def click(selector: str, tab_id: Optional[str] = None) -> str:
+    async def click(session: str = "default", *, selector: str, tab_id: Optional[str] = None) -> str:
         """CSSセレクターで要素をクリックする"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.click(selector, tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def type_text(selector: str, text: str, tab_id: Optional[str] = None, clear_first: bool = True) -> str:
+    async def type_text(session: str = "default", *, selector: str, text: str, tab_id: Optional[str] = None, clear_first: bool = True) -> str:
         """CSSセレクターで要素にテキストを入力する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.type_text(selector, text, tab_id, clear_first)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def scroll(delta_x: int = 0, delta_y: int = 0, tab_id: Optional[str] = None, selector: Optional[str] = None) -> str:
+    async def scroll(session: str = "default", delta_x: int = 0, delta_y: int = 0, tab_id: Optional[str] = None, selector: Optional[str] = None) -> str:
         """ページまたは要素をスクロールする"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.scroll(delta_x, delta_y, tab_id, selector)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def find_elements(selector: str, tab_id: Optional[str] = None, limit: int = 20) -> str:
+    async def find_elements(session: str = "default", *, selector: str, tab_id: Optional[str] = None, limit: int = 20) -> str:
         """CSSセレクターで要素を検索してプロパティ一覧を返す"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.find_elements(selector, tab_id, limit)
         if isinstance(result, list):
             return json.dumps({"elements": result}, ensure_ascii=False)
@@ -258,14 +289,15 @@ def register_tools(mcp, chrome, cdp):
     # タブ管理
 
     @mcp.tool()
-    async def list_tabs() -> str:
+    async def list_tabs(session: str = "default") -> str:
         """開いているタブ一覧を取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         tabs = await asyncio.to_thread(cdp.list_tabs)
         return json.dumps({"tabs": tabs}, ensure_ascii=False)
 
     @mcp.tool()
     async def new_tab(
+        session: str = "default",
         url: str = "about:blank",
         show_automation_banner: bool = True,
     ) -> str:
@@ -276,146 +308,146 @@ def register_tools(mcp, chrome, cdp):
             show_automation_banner: Chrome 未起動時の自動起動で「自動操作中」の帯を表示する。
                                     省略時は True。
         """
-        await _ensure_chrome(show_automation_banner=show_automation_banner)
+        cdp = await _ensure_chrome(show_automation_banner=show_automation_banner, session=session)
         browser_ws = await asyncio.to_thread(cdp.get_browser_ws_url)
         result = await cdp.send_command(browser_ws, "Target.createTarget", {"url": url})
         target_id = result.get("targetId", "")
         return json.dumps({"id": target_id, "url": url}, ensure_ascii=False)
 
     @mcp.tool()
-    async def close_tab(tab_id: str) -> str:
+    async def close_tab(session: str = "default", *, tab_id: str) -> str:
         """指定タブを閉じる"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         ok = await asyncio.to_thread(cdp.close_tab_sync, tab_id)
         return json.dumps({"result": "閉じました" if ok else "失敗しました"}, ensure_ascii=False)
 
     @mcp.tool()
-    async def activate_tab(tab_id: str) -> str:
+    async def activate_tab(session: str = "default", *, tab_id: str) -> str:
         """指定タブをアクティブにする"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         ok = await asyncio.to_thread(cdp.activate_tab_sync, tab_id)
         return json.dumps({"result": "アクティブにしました" if ok else "失敗しました"}, ensure_ascii=False)
 
     # ビューポート・ロード待機
 
     @mcp.tool()
-    async def set_viewport(width: int, height: int, tab_id: Optional[str] = None) -> str:
+    async def set_viewport(session: str = "default", *, width: int, height: int, tab_id: Optional[str] = None) -> str:
         """ビューポートサイズを設定する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.set_viewport(width, height, tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def wait_for_load(tab_id: Optional[str] = None, timeout: float = 10.0) -> str:
+    async def wait_for_load(session: str = "default", tab_id: Optional[str] = None, timeout: float = 10.0) -> str:
         """ページのロード完了を待つ（最大timeout秒）"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.wait_for_load(tab_id, timeout)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     # コンソール・ネットワークキャプチャ
 
     @mcp.tool()
-    async def install_console_capture(tab_id: Optional[str] = None) -> str:
+    async def install_console_capture(session: str = "default", tab_id: Optional[str] = None) -> str:
         """コンソールログのキャプチャをページに設置する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.install_console_capture(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_console_logs(tab_id: Optional[str] = None, level: Optional[str] = None, limit: int = 50) -> str:
+    async def get_console_logs(session: str = "default", tab_id: Optional[str] = None, level: Optional[str] = None, limit: int = 50) -> str:
         """キャプチャされたコンソールログを取得する（事前にinstall_console_captureが必要）"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         logs = await cdp.get_console_logs(tab_id, level, limit)
         return json.dumps({"logs": logs}, ensure_ascii=False)
 
     @mcp.tool()
-    async def install_network_capture(tab_id: Optional[str] = None) -> str:
+    async def install_network_capture(session: str = "default", tab_id: Optional[str] = None) -> str:
         """XHR/fetchリクエストのキャプチャをページに設置する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.install_network_capture(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_network_logs(tab_id: Optional[str] = None, limit: int = 50) -> str:
+    async def get_network_logs(session: str = "default", tab_id: Optional[str] = None, limit: int = 50) -> str:
         """キャプチャされたネットワークリクエストを取得する（事前にinstall_network_captureが必要）"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         logs = await cdp.get_network_logs(tab_id, limit)
         return json.dumps({"logs": logs}, ensure_ascii=False)
 
     # ストレージ・Cookie
 
     @mcp.tool()
-    async def get_cookies(tab_id: Optional[str] = None) -> str:
+    async def get_cookies(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ページのCookieを取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         cookies = await cdp.get_cookies(tab_id)
         return json.dumps({"cookies": cookies}, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_local_storage(tab_id: Optional[str] = None) -> str:
+    async def get_local_storage(session: str = "default", tab_id: Optional[str] = None) -> str:
         """localStorageの内容を取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         data = await cdp.get_local_storage(tab_id)
         return json.dumps(data, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_session_storage(tab_id: Optional[str] = None) -> str:
+    async def get_session_storage(session: str = "default", tab_id: Optional[str] = None) -> str:
         """sessionStorageの内容を取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         data = await cdp.get_session_storage(tab_id)
         return json.dumps(data, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_current_url(tab_id: Optional[str] = None) -> str:
+    async def get_current_url(session: str = "default", tab_id: Optional[str] = None) -> str:
         """現在のURLを取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         url = await cdp.get_current_url(tab_id)
         return json.dumps({"url": url}, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_title(tab_id: Optional[str] = None) -> str:
+    async def get_title(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ページタイトルを取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         title = await cdp.get_title(tab_id)
         return json.dumps({"title": title}, ensure_ascii=False)
 
     @mcp.tool()
-    async def scroll_to_element(selector: str, tab_id: Optional[str] = None) -> str:
+    async def scroll_to_element(session: str = "default", *, selector: str, tab_id: Optional[str] = None) -> str:
         """要素が見えるようにスクロールする"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.scroll_to_element(selector, tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def clear_console_logs(tab_id: Optional[str] = None) -> str:
+    async def clear_console_logs(session: str = "default", tab_id: Optional[str] = None) -> str:
         """キャプチャされたコンソールログをクリアする"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.clear_console_logs(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def clear_network_logs(tab_id: Optional[str] = None) -> str:
+    async def clear_network_logs(session: str = "default", tab_id: Optional[str] = None) -> str:
         """キャプチャされたネットワークログをクリアする"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.clear_network_logs(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_resource_timing(tab_id: Optional[str] = None, limit: int = 30) -> str:
+    async def get_resource_timing(session: str = "default", tab_id: Optional[str] = None, limit: int = 30) -> str:
         """Performance APIからリソースタイミング情報を取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         data = await cdp.get_resource_timing(tab_id, limit)
         return json.dumps({"timing": data}, ensure_ascii=False)
 
     @mcp.tool()
-    async def get_version() -> str:
+    async def get_version(session: str = "default") -> str:
         """ChromeのバージョンとUserAgent情報を取得する"""
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         data = await asyncio.to_thread(cdp.get_version)
         return json.dumps(data, ensure_ascii=False)
 
     @mcp.tool()
-    async def cdp_command(method: str, params: Optional[str] = None, tab_id: Optional[str] = None) -> str:
+    async def cdp_command(session: str = "default", *, method: str, params: Optional[str] = None, tab_id: Optional[str] = None) -> str:
         """
         Chrome DevTools Protocol (CDP) コマンドを直接送信する。
         既存ツールでカバーされない高度な操作に使用する。
@@ -427,7 +459,7 @@ def register_tools(mcp, chrome, cdp):
                     "browser" を指定するとブラウザレベルの WebSocket を使用する
                     (Browser.* / Target.* / SystemInfo.* 等のコマンドに必要)。
         """
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         parsed_params: dict = {}
         if params:
             if isinstance(params, dict):
@@ -453,6 +485,7 @@ def register_tools(mcp, chrome, cdp):
 
     @mcp.tool()
     async def js_confirm_result(
+        session: str = "default",
         accept: bool = True,
         dialog_wait: float = 0.0,
         tab_id: Optional[str] = None,
@@ -465,12 +498,13 @@ def register_tools(mcp, chrome, cdp):
             dialog_wait: ダイアログが表示されるまで待機する最大秒数（デフォルト0=即時応答）。
             tab_id: 対象タブID（省略時は最初のタブ）
         """
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.handle_dialog(accept, "", tab_id, dialog_wait)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
     async def js_alert_result(
+        session: str = "default",
         dialog_wait: float = 0.0,
         tab_id: Optional[str] = None,
     ) -> str:
@@ -481,24 +515,24 @@ def register_tools(mcp, chrome, cdp):
             dialog_wait: ダイアログが表示されるまで待機する最大秒数（デフォルト0=即時応答）。
             tab_id: 対象タブID（省略時は最初のタブ）
         """
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.handle_dialog(True, "", tab_id, dialog_wait)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def js_install_dialog_override(tab_id: Optional[str] = None) -> str:
+    async def js_install_dialog_override(session: str = "default", tab_id: Optional[str] = None) -> str:
         """
         window.confirm/alert/prompt をオーバーライドし、ネイティブダイアログの表示をブロックしない形に変更する。
 
         Args:
             tab_id: 対象タブID（省略時は最初のタブ）
         """
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.install_dialog_override(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def js_set_confirm_result(accept: bool = True, tab_id: Optional[str] = None) -> str:
+    async def js_set_confirm_result(session: str = "default", accept: bool = True, tab_id: Optional[str] = None) -> str:
         """
         次の confirm() 呼び出しが返す値を設定する（js_install_dialog_override が必要）。
 
@@ -506,58 +540,102 @@ def register_tools(mcp, chrome, cdp):
             accept: True=OK（確認）、False=キャンセル
             tab_id: 対象タブID（省略時は最初のタブ）
         """
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         result = await cdp.set_confirm_result(accept, tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
 
     @mcp.tool()
-    async def js_get_dialog_state(tab_id: Optional[str] = None) -> str:
+    async def js_get_dialog_state(session: str = "default", tab_id: Optional[str] = None) -> str:
         """
         最後に呼ばれたダイアログの情報を取得する（js_install_dialog_override が必要）。
 
         Args:
             tab_id: 対象タブID（省略時は最初のタブ）
         """
-        await _ensure_chrome()
+        cdp = await _ensure_chrome(session=session)
         state = await cdp.get_dialog_state(tab_id)
         return json.dumps(state, ensure_ascii=False)
+
+    # セッション管理
+
+    @mcp.tool()
+    async def open_session(
+        session: str = "default",
+        headless: bool = False,
+        show_automation_banner: bool = True,
+    ) -> str:
+        """
+        セッションの Chrome を起動する（未登録なら新規割り当て）。
+
+        Args:
+            session: セッション名（自由な文字列。プロジェクト名・プログラム名など）
+            headless: True で画面なし起動（--headless=new, 1920x1080）。
+                      稼働中の Chrome には次回起動から反映。
+            show_automation_banner: 「自動操作中」の帯を表示する。省略時は True。
+        """
+        await _ensure_chrome(
+            show_automation_banner=show_automation_banner,
+            session=session,
+            headless=headless,
+        )
+        sessions = await asyncio.to_thread(registry.list)
+        info = next((s for s in sessions if s["session"] == session), None)
+        return json.dumps({"result": "起動しました", "session": info}, ensure_ascii=False)
+
+    @mcp.tool()
+    async def list_sessions() -> str:
+        """登録済み Chrome セッションの一覧（稼働状態付き）を取得する"""
+        sessions = await asyncio.to_thread(registry.list)
+        return json.dumps({"sessions": sessions}, ensure_ascii=False)
+
+    @mcp.tool()
+    async def close_session(session: str = "default") -> str:
+        """セッションの Chrome を停止する（対応表・プロファイルは残るため同名で再開できる）"""
+        ok = await asyncio.to_thread(registry.close, session)
+        return json.dumps({"result": "停止しました" if ok else "稼働していません"}, ensure_ascii=False)
+
+    @mcp.tool()
+    async def delete_session(session: str) -> str:
+        """セッションを削除する（Chrome 停止 + 対応表から除去。プロファイルは残る）"""
+        ok = await asyncio.to_thread(registry.delete, session)
+        return json.dumps({"result": "削除しました" if ok else "見つかりません"}, ensure_ascii=False)
 
     # 旧 chrome-devtools-mcp (Node.js版) との互換エイリアス
 
     @mcp.tool()
-    async def new_page(url: str = "about:blank", show_automation_banner: bool = True) -> str:
+    async def new_page(session: str = "default", url: str = "about:blank", show_automation_banner: bool = True) -> str:
         """新規タブを開く（new_tab の別名）"""
-        return await new_tab(url, show_automation_banner)
+        return await new_tab(session=session, url=url, show_automation_banner=show_automation_banner)
 
     @mcp.tool()
-    async def close_page(tab_id: str) -> str:
+    async def close_page(session: str = "default", *, tab_id: str) -> str:
         """指定タブを閉じる（close_tab の別名）"""
-        return await close_tab(tab_id)
+        return await close_tab(session=session, tab_id=tab_id)
 
     @mcp.tool()
-    async def list_pages() -> str:
+    async def list_pages(session: str = "default") -> str:
         """開いているタブ一覧を取得する（list_tabs の別名）"""
-        return await list_tabs()
+        return await list_tabs(session)
 
     @mcp.tool()
-    async def click_element(selector: str, tab_id: Optional[str] = None) -> str:
+    async def click_element(session: str = "default", *, selector: str, tab_id: Optional[str] = None) -> str:
         """CSSセレクターで要素をクリックする（click の別名）"""
-        return await click(selector, tab_id)
+        return await click(session=session, selector=selector, tab_id=tab_id)
 
     @mcp.tool()
-    async def fill(selector: str, value: str, tab_id: Optional[str] = None) -> str:
+    async def fill(session: str = "default", *, selector: str, value: str, tab_id: Optional[str] = None) -> str:
         """CSSセレクターで要素にテキストを入力する（type_text の別名）"""
-        return await type_text(selector, value, tab_id)
+        return await type_text(session=session, selector=selector, text=value, tab_id=tab_id)
 
     @mcp.tool()
-    async def evaluate(expression: str, tab_id: Optional[str] = None) -> str:
+    async def evaluate(session: str = "default", *, expression: str, tab_id: Optional[str] = None) -> str:
         """JavaScriptを実行して結果を返す（eval_js の別名）"""
-        return await eval_js(expression, tab_id)
+        return await eval_js(session=session, expression=expression, tab_id=tab_id)
 
     @mcp.tool()
-    async def get_page_content(tab_id: Optional[str] = None) -> str:
+    async def get_page_content(session: str = "default", tab_id: Optional[str] = None) -> str:
         """ページのテキストコンテンツを取得する（get_text の別名）"""
-        return await get_text(tab_id)
+        return await get_text(session=session, tab_id=tab_id)
 
     return _ensure_chrome
 
@@ -566,7 +644,7 @@ def register_tools(mcp, chrome, cdp):
 # HTTP ルート
 # ------------------------------------------------------------------ #
 
-def create_router(cdp, _ensure_chrome) -> APIRouter:
+def create_router(registry, _ensure_chrome) -> APIRouter:
     """Chrome DevTools HTTP APIRouter を作成して返す"""
     router = APIRouter(tags=["aidiy_chrome_devtools"])
 
@@ -578,7 +656,13 @@ def create_router(cdp, _ensure_chrome) -> APIRouter:
             "description": "Chrome DevTools Protocol (CDP) を使い Chrome ブラウザを遠隔操作する。Chrome 未起動時は自動起動する。",
             "endpoint": "POST /aidiy_chrome_devtools/{method_name}",
             "content_type": "application/json",
-            "how_to_call": "method_name を URL パスに指定し、JSON body に各メソッドのパラメータをフラットに渡す。tab_id を省略すると最初のタブを使用する。",
+            "how_to_call": "method_name を URL パスに指定し、JSON body に各メソッドのパラメータをフラットに渡す。tab_id を省略すると最初のタブを使用する。session を省略すると 'default' セッション（従来の Chrome）を使用する。",
+            "sessions": {
+                "description": "session パラメータ（自由な文字列）ごとに独立した Chrome（ポート・プロファイル）を起動・管理する。並行実行（自動テスト等）は session を分けることで互いに干渉しない。",
+                "default": "標準は 'default' で通常は指定不要（省略時はポート 9222 + 従来プロファイルで後方互換）",
+                "caution": "session を指定すると Chrome セッションが複数メモリ常駐となる。使い終わったら close_session で破棄を忘れずに行うこと。",
+                "management": "open_session（headless 指定可）/ list_sessions / close_session / delete_session",
+            },
             "aliases": {
                 "new_page": "new_tab と同義",
                 "close_page": "close_tab と同義",
@@ -595,6 +679,11 @@ def create_router(cdp, _ensure_chrome) -> APIRouter:
             "example_requests": {
                 "list_tabs": {},
                 "navigate": {"url": "http://localhost:8090"},
+                "navigate (別セッション)": {"url": "http://localhost:8090", "session": "自動テストA"},
+                "open_session": {"session": "自動テストA", "headless": True},
+                "list_sessions": {},
+                "close_session": {"session": "自動テストA"},
+                "delete_session": {"session": "自動テストA"},
                 "reload": {},
                 "go_back": {},
                 "screenshot": {"full_page": False, "shutter_sounds": "none"},
@@ -660,6 +749,9 @@ def create_router(cdp, _ensure_chrome) -> APIRouter:
                 "js_confirm_result / js_alert_result / js_install_dialog_override / js_set_confirm_result": {"result": "成功メッセージ"},
                 "js_get_dialog_state": {"type": "alert / confirm / prompt / none", "message": "ダイアログメッセージ"},
                 "cdp_command": "CDP から返ってくる JSON dict（コマンドにより異なる）",
+                "open_session": {"result": "成功メッセージ", "session": "{session, key, port, headless, running, profile_dir}"},
+                "list_sessions": {"sessions": "配列 [{session, key, port, headless, running, profile_dir}, ...]"},
+                "close_session / delete_session": {"result": "成功メッセージ"},
             },
         }
 
@@ -667,12 +759,31 @@ def create_router(cdp, _ensure_chrome) -> APIRouter:
     async def http_chrome_devtools(method_name: str, req: ChromeDevToolsRequest = ChromeDevToolsRequest()) -> dict:
         """aidiy_chrome_devtools の全機能を HTTP POST で呼び出す。"""
         try:
-            if method_name in ("navigate", "new_tab", "new_page"):
-                await _ensure_chrome(show_automation_banner=req.show_automation_banner)
-            else:
-                await _ensure_chrome()
+            # セッション管理メソッドは Chrome を起動せずに処理する
+            if method_name == "list_sessions":
+                sessions = await asyncio.to_thread(registry.list)
+                return {"sessions": sessions}
+            elif method_name == "close_session":
+                ok = await asyncio.to_thread(registry.close, req.session)
+                return {"result": "停止しました" if ok else "稼働していません"}
+            elif method_name == "delete_session":
+                ok = await asyncio.to_thread(registry.delete, req.session)
+                return {"result": "削除しました" if ok else "見つかりません"}
 
-            if method_name == "navigate":
+            if method_name in ("navigate", "new_tab", "new_page", "open_session"):
+                cdp = await _ensure_chrome(
+                    show_automation_banner=req.show_automation_banner,
+                    session=req.session,
+                    headless=req.headless,
+                )
+            else:
+                cdp = await _ensure_chrome(session=req.session)
+
+            if method_name == "open_session":
+                sessions = await asyncio.to_thread(registry.list)
+                info = next((s for s in sessions if s["session"] == req.session), None)
+                return {"result": "起動しました", "session": info}
+            elif method_name == "navigate":
                 result = await cdp.navigate(req.url or "about:blank", req.tab_id)
                 return {"result": result}
             elif method_name == "reload":

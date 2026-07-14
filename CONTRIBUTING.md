@@ -43,7 +43,7 @@ cd backend_tools
 
 - API: http://localhost:8091/docs / http://localhost:9098/docs / http://localhost:8093/docs
 - UI: http://localhost:8090
-- MCP 連携変更時: `backend_tools` の 16 MCP サーバー（一覧は `GET http://localhost:8095/`、SSE は `http://localhost:8095/<mcp_name>/sse`）も確認
+- MCP 連携変更時: `backend_tools` の 18 MCP サーバー（一覧は `GET http://localhost:8095/`、SSE は `http://localhost:8095/<mcp_name>/sse`）も確認
 
 ## セキュリティ
 

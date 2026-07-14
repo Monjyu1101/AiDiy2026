@@ -36,8 +36,7 @@ from fastapi.routing import APIRoute
 from mcp.server.fastmcp import FastMCP
 
 from log_config import setup_logging, get_logger
-from tools_proc.chrome_manager import ChromeManager
-from tools_proc.chrome_devtools import CDPClient
+from tools_proc.chrome_sessions import ChromeSessionRegistry
 from tools_proc.desktop_capture import DesktopCapture
 from tools_proc.windows_control import WindowsControl
 from tools_proc.sqlite_query import SqliteQuery
@@ -126,8 +125,7 @@ MOUNT_WC    = os.environ.get("MCP_WC_MOUNT_PATH", "/aidiy_windows_control")
 # サービスインスタンス生成
 # ------------------------------------------------------------------ #
 
-chrome      = ChromeManager(debug_port=CHROME_PORT)
-cdp         = CDPClient(port=CHROME_PORT)
+chrome_sessions = ChromeSessionRegistry(default_port=CHROME_PORT)
 capture     = DesktopCapture()
 winctl      = WindowsControl()
 sqlite_q    = SqliteQuery()
@@ -232,7 +230,7 @@ mcp_wc = _make_mcp("aidiy_windows_control")
 # MCP ツール登録
 # ------------------------------------------------------------------ #
 
-_ensure_chrome = tools_chrome.register_tools(mcp, chrome, cdp)
+_ensure_chrome = tools_chrome.register_tools(mcp, chrome_sessions)
 tools_desktop.register_tools(mcp_dc, capture)
 tools_db.register_sqlite_tools(mcp_sq, sqlite_q)
 tools_db.register_postgres_tools(mcp_pg, _get_pg)
@@ -339,7 +337,7 @@ def _register_mcp_http_meta(mcp_name: str, mcp_instance) -> None:
 # HTTP ルート登録
 # ------------------------------------------------------------------ #
 
-app.include_router(tools_chrome.create_router(cdp, _ensure_chrome))
+app.include_router(tools_chrome.create_router(chrome_sessions, _ensure_chrome))
 app.include_router(tools_desktop.create_router(capture))
 app.include_router(tools_db.create_sqlite_router(sqlite_q))
 app.include_router(tools_db.create_postgres_router(_get_pg))

@@ -18,7 +18,7 @@
 
 | サーバー名 | SSE URL | 主な用途 |
 |-----------|---------|---------|
-| `aidiy_chrome_devtools` | `http://localhost:8095/aidiy_chrome_devtools/sse` | ブラウザ操作、DOM取得、ナビゲーション |
+| `aidiy_chrome_devtools` | `http://localhost:8095/aidiy_chrome_devtools/sse` | ブラウザ操作、DOM取得、ナビゲーション。`session` パラメータ（省略時 `default`）で複数 Chrome を並行セッション管理でき、自動テストの並行実行が可能。使用後は `close_session` で破棄 |
 | `aidiy_desktop_capture` | `http://localhost:8095/aidiy_desktop_capture/sse` | デスクトップのスクリーンショット、クリック、キー入力 |
 | `aidiy_sqlite` | `http://localhost:8095/aidiy_sqlite/sse` | SQLite DB 参照、テーブル/件数確認 |
 | `aidiy_postgres` | `http://localhost:8095/aidiy_postgres/sse` | PostgreSQL 参照、スキーマ/件数確認 |
@@ -59,6 +59,7 @@
 | やりたいこと | 優先 MCP |
 |-------------|----------|
 | Web 画面の DOM、URL、クリック、スクリーンショット確認 | `aidiy_chrome_devtools` |
+| 複数 Chrome でのシステムテスト自動実行・並行実行 | `aidiy_chrome_devtools`（`session` 指定。終了後 `close_session`） |
 | Electron やブラウザ外を含む画面確認 | `aidiy_desktop_capture` |
 | AiDiy SQLite のテーブル、件数、監査項目確認 | `aidiy_sqlite` |
 | 外部 PostgreSQL のスキーマ、件数確認 | `aidiy_postgres` |

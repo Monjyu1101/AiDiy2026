@@ -58,10 +58,12 @@ class ChromeManager:
         debug_port: int = 9222,
         profile_dir: str = _PROFILE_DIR,
         show_automation_banner: bool = True,
+        headless: bool = False,
     ):
         self.debug_port = debug_port
         self.profile_dir = profile_dir
         self.show_automation_banner = show_automation_banner
+        self.headless = headless
         self._process: subprocess.Popen | None = None
 
     # ------------------------------------------------------------------ #
@@ -132,6 +134,9 @@ class ChromeManager:
         ]
         if should_show_banner:
             args.append("--enable-automation")
+        if self.headless:
+            args.append("--headless=new")
+            args.append("--window-size=1920,1080")
         return args
 
     def _kill_on_debug_port(self) -> bool:

@@ -155,7 +155,7 @@ AI 名の規約:
 MCP サーバー本体は `backend_tools` にあります。
 `backend_server` では `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。
 
-MCP の構成と使い分けは `backendMCP構成.md` と `MCP活用手順.md` を参照してください。
+MCP の構成と使い分けは `.aidiy/knowledge/backend_tools,構成.md` と `.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md` を参照してください。
 
 ## 実装時の入口
 

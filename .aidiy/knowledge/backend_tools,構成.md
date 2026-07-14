@@ -18,6 +18,7 @@
 - `backend_tools/tools_main.py`
 - `backend_tools/mcp_stdio.py`
 - `backend_tools/tools_proc/chrome_manager.py`
+- `backend_tools/tools_proc/chrome_sessions.py`（セッション名 → ポート/プロファイルの辞書管理、`temp/_chrome_sessions.json` に永続化）
 - `backend_tools/tools_proc/chrome_devtools.py`
 - `backend_tools/tools_proc/sqlite_query.py`
 - `backend_tools/tools_proc/postgres_query.py`
@@ -68,7 +69,7 @@ print(res.json())  # {"save_path": "..."}
 
 | MCP | 用途 | SSE URL |
 |-----|------|---------|
-| `aidiy_chrome_devtools` | Chrome CDP で画面検証 | `http://localhost:8095/aidiy_chrome_devtools/sse` |
+| `aidiy_chrome_devtools` | Chrome CDP で画面検証（`session` パラメータで複数 Chrome 並行セッション。自動テストの並行実行可。使用後は `close_session` で破棄） | `http://localhost:8095/aidiy_chrome_devtools/sse` |
 | `aidiy_desktop_capture` | デスクトップ/ウィンドウのスクリーンショット | `http://localhost:8095/aidiy_desktop_capture/sse` |
 | `aidiy_sqlite` | AiDiy SQLite DB の確認 | `http://localhost:8095/aidiy_sqlite/sse` |
 | `aidiy_postgres` | 外部 PostgreSQL の確認 | `http://localhost:8095/aidiy_postgres/sse` |
