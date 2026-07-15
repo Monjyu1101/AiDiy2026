@@ -45,6 +45,9 @@ const taskModelOptions = computed(() => {
 
 const タスクID表示 = computed(() => String(props.編集明細?.タスクID ?? ''));
 const 明細SEQ表示 = computed(() => String(props.編集明細?.明細SEQ ?? ''));
+// 押せるのは 状態選択肢 と更新前の状態。更新前の状態を選ぶと状態を変えずに内容だけ更新する
+const 現状態 = computed(() => String(props.編集明細?.状態 ?? ''));
+const 状態選択可 = (状態: string) => 状態選択肢.includes(状態) || 状態 === 現状態.value;
 
 function chooseAvailable(current: any, candidates: string[]) {
   const value = String(current || '');
@@ -219,11 +222,8 @@ const 登録 = async () => {
                 <button
                   type="button"
                   class="segment-btn"
-                  :class="{
-                    active: 状態選択肢.includes(状態) && 入力状態 === 状態,
-                    current: !状態選択肢.includes(状態) && props.編集明細?.状態 === 状態
-                  }"
-                  :disabled="!状態選択肢.includes(状態)"
+                  :class="{ active: 入力状態 === 状態 }"
+                  :disabled="!状態選択可(状態)"
                   @click="入力状態 = 状態"
                 >{{ 状態 }}</button>
               </template>
@@ -506,23 +506,22 @@ const 登録 = async () => {
   transition: all 0.2s ease;
 }
 
-.segment-btn.active {
-  color: #fff;
-  border-color: #8f68dd;
-  background: rgba(108, 78, 196, 0.85);
-  font-weight: 600;
+/* 押せるボタンは緑枠、選択中の値は緑文字で区別する */
+.segment-btn:not(:disabled) {
+  border-color: #16a34a;
 }
 
-.segment-btn.current {
-  border-color: #16a34a;
-  color: #86efac;
+.segment-btn.active {
+  color: #22c55e;
+  background: rgba(22, 163, 74, 0.16);
+  font-weight: 700;
 }
 
 .segment-btn:disabled {
   cursor: default;
 }
 
-.segment-btn:disabled:not(.active):not(.current) {
+.segment-btn:disabled:not(.active) {
   opacity: 0.4;
 }
 

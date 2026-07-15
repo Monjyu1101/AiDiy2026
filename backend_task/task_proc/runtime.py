@@ -67,17 +67,27 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
         # システム開始時（再起動含む）: 残存 PID のプロセスを強制停止してクリア
         from . import tasks_watcher
         await asyncio.to_thread(tasks_watcher.起動時クリーンアップ, logger)
+        # タイマー起動前: 停止中に期限が到来した実行条件は発火させず次周期へ更新する
+        await asyncio.to_thread(tasks_watcher.起動時実行条件初期化, logger)
 
         watcher = asyncio.create_task(tasks_watcher.監視ループ(logger), name="backend_task_ai_watcher")
-        logger.info("backend_task を開始しました (interval=%ss)", tasks_watcher.監視間隔秒)
+        条件watcher = asyncio.create_task(
+            tasks_watcher.実行条件監視ループ(logger), name="backend_task_condition_watcher"
+        )
+        logger.info(
+            "backend_task を開始しました (明細起動=%ss, 実行条件確認=%ss)",
+            tasks_watcher.監視間隔秒, tasks_watcher.実行条件監視間隔秒,
+        )
         try:
             yield
         finally:
-            watcher.cancel()
-            try:
-                await watcher
-            except asyncio.CancelledError:
-                pass
+            for task in (watcher, 条件watcher):
+                task.cancel()
+            for task in (watcher, 条件watcher):
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
             logger.info("backend_task を停止しました")
 
     return lifespan

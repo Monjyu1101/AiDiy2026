@@ -28,7 +28,7 @@ const 入力実行有効 = ref(true);
 const 入力状況 = ref('準備開始');
 const 状況選択肢 = ['準備開始', '中止'];
 // 状況欄には遷移し得る全状態を表示し、選択可能なのは 状況選択肢 の2つだけに絞る
-const 状況表示リスト = ['準備開始', '準備中', '準備完了', '実行中', 'エラー', '完了', '中止'];
+const 状況表示リスト = ['準備開始', '準備中', '準備完了', '待機', '実行中', 'エラー', '完了', '中止'];
 // 新規時は準備開始で固定、修正時は切替可能
 const 状況変更可 = ref(false);
 const 登録中 = ref(false);
@@ -52,6 +52,101 @@ const taskModelOptions = computed(() => {
 
 const 修正モード = computed(() => !!props.編集タスク);
 const タスクID表示 = computed(() => 修正モード.value ? String(props.編集タスク?.タスクID ?? '') : '(新規)');
+// 押せるのは 状況選択肢 と更新前の状態。更新前の状態を選ぶと状態を変えずに内容だけ更新する
+const 現状態 = computed(() => String(props.編集タスク?.状態 ?? ''));
+const 状況選択可 = (状況: string) => 状況選択肢.includes(状況) || 状況 === 現状態.value;
+
+// 実行開始条件（右側パネル）。現状は登録のみ対応で、実行は即時のまま
+const 実行区分選択肢 = ['即時', '時間指定', '間隔実行', '定時実行'];
+const 間隔区分選択肢 = ['分', '時', '日'];
+const 定時区分選択肢 = ['毎日', '毎週', '毎月'];
+const 曜日選択肢 = ['日', '月', '火', '水', '木', '金', '土'];
+const 実行条件選択肢 = ['無し', 'フォルダ変化'];
+const 間隔上限: Record<string, number> = { 分: 600, 時: 24, 日: 7 };
+const 入力実行区分 = ref('即時');
+const 入力間隔区分 = ref('分');
+const 入力間隔値 = ref(10);
+const 入力定時区分 = ref('毎日');
+const 入力実行曜日 = ref('月');
+const 入力実行日 = ref(1);
+const 入力開始時刻 = ref('09:00');
+const 入力実行条件 = ref('無し');
+const 入力監視フォルダ = ref('');
+const 監視参照中 = ref(false);
+
+const 間隔値上限 = computed(() => 間隔上限[入力間隔区分.value] ?? 600);
+const 開始時刻要 = computed(() =>
+  入力実行区分.value === '時間指定'
+  || (入力実行区分.value === '間隔実行' && 入力間隔区分.value === '日')
+  || 入力実行区分.value === '定時実行');
+
+const 実行条件初期化 = () => {
+  入力実行区分.value = '即時';
+  入力間隔区分.value = '分';
+  入力間隔値.value = 10;
+  入力定時区分.value = '毎日';
+  入力実行曜日.value = '月';
+  入力実行日.value = 1;
+  入力開始時刻.value = '09:00';
+  入力実行条件.value = '無し';
+  入力監視フォルダ.value = '';
+};
+
+const 実行条件読込 = async () => {
+  if (!props.編集タスク) return;
+  try {
+    const res = await apiClient.post('/task/タスク実行条件/取得', {
+      利用者ID: 利用者ID.value,
+      タスクID: String(props.編集タスク?.タスクID ?? '')
+    });
+    const item = res.data.status === 'OK' ? res.data.data?.item : null;
+    if (item && item.実行区分) {
+      入力実行区分.value = 実行区分選択肢.includes(item.実行区分) ? String(item.実行区分) : '即時';
+      if (間隔区分選択肢.includes(item.間隔区分)) 入力間隔区分.value = String(item.間隔区分);
+      if (Number(item.間隔値) >= 1) 入力間隔値.value = Number(item.間隔値);
+      if (定時区分選択肢.includes(item.定時区分)) 入力定時区分.value = String(item.定時区分);
+      if (曜日選択肢.includes(item.実行曜日)) 入力実行曜日.value = String(item.実行曜日);
+      if (Number(item.実行日) >= 1) 入力実行日.value = Number(item.実行日);
+      if (item.開始時刻) 入力開始時刻.value = String(item.開始時刻);
+      if (実行条件選択肢.includes(item.実行条件)) 入力実行条件.value = String(item.実行条件);
+      入力監視フォルダ.value = String(item.監視フォルダ ?? '');
+    }
+  } catch (e) {
+    // 未設定・サーバー未対応時は既定値（即時）のまま開く
+  }
+};
+
+const 実行条件ペイロード = () => ({
+  実行区分: 入力実行区分.value,
+  間隔区分: 入力実行区分.value === '間隔実行' ? 入力間隔区分.value : '',
+  間隔値: 入力実行区分.value === '間隔実行' ? Number(入力間隔値.value) || 0 : 0,
+  定時区分: 入力実行区分.value === '定時実行' ? 入力定時区分.value : '',
+  実行曜日: 入力実行区分.value === '定時実行' && 入力定時区分.value === '毎週' ? 入力実行曜日.value : '',
+  実行日: 入力実行区分.value === '定時実行' && 入力定時区分.value === '毎月' ? Number(入力実行日.value) || 0 : 0,
+  開始時刻: 開始時刻要.value ? 入力開始時刻.value : '',
+  実行条件: 入力実行条件.value,
+  監視フォルダ: 入力実行条件.value === 'フォルダ変化' ? 入力監視フォルダ.value.trim() : ''
+});
+
+const 実行条件検証 = (): string => {
+  if (開始時刻要.value && !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(入力開始時刻.value)) {
+    return '開始時刻を HH:MM 形式で入力してください。';
+  }
+  if (入力実行区分.value === '間隔実行') {
+    const v = Number(入力間隔値.value);
+    if (!(v >= 1 && v <= 間隔値上限.value)) {
+      return `間隔値（${入力間隔区分.value}）は 1〜${間隔値上限.value} で入力してください。`;
+    }
+  }
+  if (入力実行区分.value === '定時実行' && 入力定時区分.value === '毎月') {
+    const d = Number(入力実行日.value);
+    if (!(d >= 1 && d <= 31)) return '毎月の実行日は 1〜31 で入力してください。';
+  }
+  if (入力実行条件.value === 'フォルダ変化' && !入力監視フォルダ.value.trim()) {
+    return '監視フォルダを指定してください。';
+  }
+  return '';
+};
 
 function chooseAvailable(current: any, candidates: string[]) {
   const value = String(current || '');
@@ -112,9 +207,12 @@ watch(() => props.isOpen, (open) => {
     入力プロジェクト.value = 編集 ? String(編集.プロジェクト ?? '') : String(props.最終タスク?.プロジェクト ?? '');
     入力要求内容.value = 編集 ? String(編集.要求内容 ?? '') : '';
     入力実行有効.value = 編集 ? Boolean(編集.実行有効) : true;
-    // 中止中のタスクは中止のまま保持し、何も触らず登録しても誤って再開させない
-    入力状況.value = 編集?.状態 === '中止' ? '中止' : '準備開始';
+    // 修正時は更新前の状態を初期選択にする（何も触らず登録しても状態を変えない）
+    const 編集状態 = String(編集?.状態 ?? '');
+    入力状況.value = 編集 && 状況表示リスト.includes(編集状態) ? 編集状態 : '準備開始';
     状況変更可.value = !!編集;
+    実行条件初期化();
+    if (編集) void 実行条件読込();
     void 選択肢読込();
   }
 });
@@ -149,9 +247,33 @@ const フォルダ参照 = async () => {
   }
 };
 
+const 監視フォルダ参照 = async () => {
+  監視参照中.value = true;
+  try {
+    const res = await apiClient.post('/core/AIコア/フォルダ参照', {
+      初期パス: 入力監視フォルダ.value || ''
+    });
+    if (res.data.status === 'OK') {
+      const 選択パス = String(res.data.data?.選択パス ?? '').replace(/\\/g, '/');
+      if (選択パス) 入力監視フォルダ.value = 選択パス;
+    } else {
+      void qMessage(res.data.message || 'フォルダ参照に失敗しました。', 'error');
+    }
+  } catch (e) {
+    void qMessage('フォルダ参照でエラーが発生しました。', 'error');
+  } finally {
+    監視参照中.value = false;
+  }
+};
+
 const 登録 = async () => {
   if (!入力要求内容.value.trim()) {
     void qMessage('要求内容を入力してください。', 'error');
+    return;
+  }
+  const 条件エラー = 実行条件検証();
+  if (条件エラー) {
+    void qMessage(条件エラー, 'error');
     return;
   }
   登録中.value = true;
@@ -165,7 +287,8 @@ const 登録 = async () => {
           TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
           TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
           実行有効: 入力実行有効.value,
-          状況: 入力状況.value
+          状況: 入力状況.value,
+          実行条件: 実行条件ペイロード()
         })
       : await apiClient.post('/task/タスク要求/AI登録', {
           利用者ID: 利用者ID.value,
@@ -173,7 +296,8 @@ const 登録 = async () => {
           要求内容: 入力要求内容.value.trim(),
           TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
           TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
-          実行有効: 入力実行有効.value
+          実行有効: 入力実行有効.value,
+          実行条件: 実行条件ペイロード()
         });
     if (res.data.status === 'OK') {
       void qMessage(res.data.message || 'タスクを準備中として登録しました。');
@@ -198,6 +322,7 @@ const 登録 = async () => {
         <button class="dialog-close" @click="emit('close')">×</button>
       </header>
       <div class="dialog-body">
+        <div class="dialog-left">
         <div class="detail-row">
           <div class="detail-label">タスクID</div>
           <div class="detail-value">
@@ -279,16 +404,136 @@ const 登録 = async () => {
                 <button
                   type="button"
                   class="segment-btn"
-                  :class="{
-                    active: 入力状況 === 状況,
-                    current: !状況選択肢.includes(状況) && props.編集タスク?.状態 === 状況
-                  }"
-                  :disabled="!状況選択肢.includes(状況) || !状況変更可"
+                  :class="{ active: 入力状況 === 状況 }"
+                  :disabled="!状況選択可(状況) || !状況変更可"
                   @click="入力状況 = 状況"
                 >{{ 状況 }}</button>
               </template>
             </div>
           </div>
+        </div>
+        </div>
+        <div class="dialog-right">
+          <div class="panel-title">実行開始条件</div>
+          <div class="detail-row">
+            <div class="detail-label">実行区分</div>
+            <div class="detail-value">
+              <div class="status-segment wrap-segment">
+                <button
+                  v-for="区分 in 実行区分選択肢"
+                  :key="区分"
+                  type="button"
+                  class="segment-btn"
+                  :class="{ active: 入力実行区分 === 区分 }"
+                  @click="入力実行区分 = 区分"
+                >{{ 区分 }}</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="入力実行区分 === '間隔実行'" class="detail-row">
+            <div class="detail-label">間隔単位</div>
+            <div class="detail-value">
+              <div class="status-segment">
+                <button
+                  v-for="単位 in 間隔区分選択肢"
+                  :key="単位"
+                  type="button"
+                  class="segment-btn"
+                  :class="{ active: 入力間隔区分 === 単位 }"
+                  @click="入力間隔区分 = 単位"
+                >{{ 単位 }}</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="入力実行区分 === '間隔実行'" class="detail-row">
+            <div class="detail-label">間隔値</div>
+            <div class="detail-value">
+              <div class="value-inline">
+                <input
+                  v-model.number="入力間隔値"
+                  type="number"
+                  class="detail-input number-input"
+                  :min="1"
+                  :max="間隔値上限"
+                />
+                <span class="unit-text">{{ 入力間隔区分 }}（1〜{{ 間隔値上限 }}）</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="入力実行区分 === '定時実行'" class="detail-row">
+            <div class="detail-label">定時区分</div>
+            <div class="detail-value">
+              <div class="status-segment">
+                <button
+                  v-for="区分 in 定時区分選択肢"
+                  :key="区分"
+                  type="button"
+                  class="segment-btn"
+                  :class="{ active: 入力定時区分 === 区分 }"
+                  @click="入力定時区分 = 区分"
+                >{{ 区分 }}</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="入力実行区分 === '定時実行' && 入力定時区分 === '毎週'" class="detail-row">
+            <div class="detail-label">実行曜日</div>
+            <div class="detail-value">
+              <select v-model="入力実行曜日" class="detail-select">
+                <option v-for="曜 in 曜日選択肢" :key="曜" :value="曜">{{ 曜 }}曜日</option>
+              </select>
+            </div>
+          </div>
+          <div v-if="入力実行区分 === '定時実行' && 入力定時区分 === '毎月'" class="detail-row">
+            <div class="detail-label">実行日</div>
+            <div class="detail-value">
+              <div class="value-inline">
+                <input
+                  v-model.number="入力実行日"
+                  type="number"
+                  class="detail-input number-input"
+                  min="1"
+                  max="31"
+                />
+                <span class="unit-text">日（1〜31）</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="開始時刻要" class="detail-row">
+            <div class="detail-label">開始時刻</div>
+            <div class="detail-value">
+              <input v-model="入力開始時刻" type="time" class="detail-input time-input" />
+            </div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">実行条件</div>
+            <div class="detail-value">
+              <div class="status-segment">
+                <button
+                  v-for="条件 in 実行条件選択肢"
+                  :key="条件"
+                  type="button"
+                  class="segment-btn"
+                  :class="{ active: 入力実行条件 === 条件 }"
+                  @click="入力実行条件 = 条件"
+                >{{ 条件 }}</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="入力実行条件 === 'フォルダ変化'" class="detail-row">
+            <div class="detail-label">監視フォルダ</div>
+            <div class="detail-value">
+              <div class="value-inline">
+                <input
+                  v-model.trim="入力監視フォルダ"
+                  type="text"
+                  class="detail-input"
+                  placeholder="C:/watch/folder/"
+                />
+                <button class="dialog-button" :disabled="監視参照中" @click="監視フォルダ参照">参照</button>
+              </div>
+            </div>
+          </div>
+          <div class="condition-note">※ 条件は毎分確認し、成立すると明細と要求を待機に戻して実行します（実行途中は開始しません）。</div>
         </div>
       </div>
       <footer class="dialog-footer">
@@ -315,8 +560,8 @@ const 登録 = async () => {
 .dialog-content {
   background: #07080c;
   color: #e5e7eb;
-  width: 1000px;
-  max-width: 94vw;
+  width: 1280px;
+  max-width: 96vw;
   height: 90vh;
   max-height: 90vh;
   border: 1px solid rgba(143, 104, 221, 0.75);
@@ -364,12 +609,74 @@ const 登録 = async () => {
 .dialog-body {
   padding: 10px 12px;
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  flex-direction: row;
+  gap: 10px;
   background: #07080c;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+}
+
+/* 左: タスク要求本体 / 右: 実行開始条件パネル */
+.dialog-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.dialog-right {
+  width: 400px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-self: flex-start;
+}
+
+.panel-title {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(93, 68, 168, 0.85);
+  background: linear-gradient(135deg, rgba(108, 78, 196, 0.9), rgba(70, 104, 205, 0.74));
+  box-sizing: border-box;
+}
+
+.dialog-right .detail-row {
+  margin-top: -1px;
+}
+
+.dialog-right .detail-label {
+  width: 96px;
+}
+
+.wrap-segment {
+  flex-wrap: wrap;
+}
+
+.number-input {
+  width: 90px;
+  flex: 0 0 auto;
+}
+
+.time-input {
+  width: 120px;
+}
+
+.unit-text {
+  font-size: 13px;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.condition-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .detail-row.textarea-row {
@@ -556,7 +863,7 @@ const 登録 = async () => {
 .status-segment {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -578,23 +885,22 @@ const 登録 = async () => {
   transition: all 0.2s ease;
 }
 
-.segment-btn.active {
-  color: #fff;
-  border-color: #8f68dd;
-  background: rgba(108, 78, 196, 0.85);
-  font-weight: 600;
+/* 押せるボタンは緑枠、選択中の値は緑文字で区別する */
+.segment-btn:not(:disabled) {
+  border-color: #16a34a;
 }
 
-.segment-btn.current {
-  border-color: #16a34a;
-  color: #86efac;
+.segment-btn.active {
+  color: #22c55e;
+  background: rgba(22, 163, 74, 0.16);
+  font-weight: 700;
 }
 
 .segment-btn:disabled {
   cursor: default;
 }
 
-.segment-btn:disabled:not(.active):not(.current) {
+.segment-btn:disabled:not(.active) {
   opacity: 0.4;
 }
 

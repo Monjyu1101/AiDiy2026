@@ -20,17 +20,24 @@
 from __future__ import annotations
 
 import asyncio
+import calendar
 import json
 import logging
 import os
 import subprocess
 import sys
+from datetime import datetime, timedelta
 
 from . import tasks_db
 
 監視間隔秒 = 5
+実行条件監視間隔秒 = 10
 実行回数上限 = 3
 実行タイムアウト分 = 30
+
+# 実行開始条件は hh:mm が変わった確認回だけ処理する（毎分 1 回）
+_前回確認分 = ""
+_曜日番号 = {"月": 0, "火": 1, "水": 2, "木": 3, "金": 4, "土": 5, "日": 6}
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SUB_INITパス = os.path.join(_BASE_DIR, "sub_init.py")
@@ -145,6 +152,213 @@ def _軽量並行明細か(行: dict) -> bool:
     return "通知音" in タイトル
 
 
+def _時刻適用(基準日: datetime, 時刻: str) -> datetime | None:
+    """datetime に 'HH:MM' を適用する。形式不正は None。"""
+    try:
+        h, m = 時刻.split(":")
+        return 基準日.replace(hour=int(h), minute=int(m), second=0, microsecond=0)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _次回実行日時計算(条件: dict, 基準: datetime) -> str:
+    """実行開始条件から基準より後の次回実行日時を求める（計算不能は空文字）。"""
+    区分 = str(条件.get("実行区分", ""))
+    開始時刻 = str(条件.get("開始時刻", ""))
+    try:
+        if 区分 == "時間指定":
+            候補 = _時刻適用(基準, 開始時刻)
+            if 候補 is None:
+                return ""
+            if 候補 <= 基準:
+                候補 += timedelta(days=1)
+            return 候補.strftime("%Y-%m-%d %H:%M:%S")
+        if 区分 == "間隔実行":
+            値 = max(1, int(条件.get("間隔値", 0) or 0))
+            単位 = str(条件.get("間隔区分", ""))
+            if 単位 == "分":
+                候補 = 基準 + timedelta(minutes=値)
+            elif 単位 == "時":
+                候補 = 基準 + timedelta(hours=値)
+            elif 単位 == "日":
+                日候補 = _時刻適用(基準 + timedelta(days=値), 開始時刻)
+                if 日候補 is None:
+                    return ""
+                候補 = 日候補
+            else:
+                return ""
+            return 候補.replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+        if 区分 == "定時実行":
+            定時 = str(条件.get("定時区分", ""))
+            if 定時 == "毎日":
+                候補 = _時刻適用(基準, 開始時刻)
+                if 候補 is None:
+                    return ""
+                if 候補 <= 基準:
+                    候補 += timedelta(days=1)
+            elif 定時 == "毎週":
+                番号 = _曜日番号.get(str(条件.get("実行曜日", "")))
+                候補 = _時刻適用(基準, 開始時刻)
+                if 番号 is None or 候補 is None:
+                    return ""
+                候補 += timedelta(days=(番号 - 候補.weekday()) % 7)
+                if 候補 <= 基準:
+                    候補 += timedelta(days=7)
+            elif 定時 == "毎月":
+                日 = int(条件.get("実行日", 0) or 0)
+                if not (1 <= 日 <= 31):
+                    return ""
+
+                def 月内(y: int, m: int) -> datetime | None:
+                    末日 = calendar.monthrange(y, m)[1]
+                    return _時刻適用(datetime(y, m, min(日, 末日)), 開始時刻)
+
+                月候補 = 月内(基準.year, 基準.month)
+                if 月候補 is None:
+                    return ""
+                if 月候補 <= 基準:
+                    y, m = (基準.year + 1, 1) if 基準.month == 12 else (基準.year, 基準.month + 1)
+                    月候補 = 月内(y, m)
+                    if 月候補 is None:
+                        return ""
+                候補 = 月候補
+            else:
+                return ""
+            return 候補.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ""
+    return ""
+
+
+def _次回繰り越し(条件: dict, 基準: datetime) -> str:
+    """発火せずに次周期へ送るときの次回実行日時（時間指定は一回限りなので空にする）。"""
+    if str(条件.get("実行区分", "")) == "時間指定":
+        return ""
+    return _次回実行日時計算(条件, 基準)
+
+
+def 起動時実行条件初期化(logger: logging.Logger) -> None:
+    """PG 起動時（タイマー起動前）の実行条件初期化。
+
+    停止中に期限が到来した条件（次回実行日時 <= now）は発火させずに次周期へ更新し、
+    起動直後のまとめて発火を防ぐ。未計算（空）の時間駆動条件はここで初回計算する。
+    """
+    now = datetime.now()
+    now文字 = now.strftime("%Y-%m-%d %H:%M:%S")
+    for 条件 in tasks_db.実行条件監視一覧():
+        利用者ID = str(条件["利用者ID"])
+        タスクID = str(条件["タスクID"])
+        try:
+            if str(条件.get("実行区分", "")) not in ("時間指定", "間隔実行", "定時実行"):
+                continue
+            次回 = str(条件.get("次回実行日時", ""))
+            if 次回 == "":
+                初回 = _次回実行日時計算(条件, now)
+                if 初回:
+                    tasks_db.次回実行日時更新(利用者ID, タスクID, 初回)
+                continue
+            if 次回 <= now文字:
+                新次回 = _次回繰り越し(条件, now)
+                tasks_db.次回実行日時更新(利用者ID, タスクID, 新次回)
+                logger.info(
+                    f"起動時に期限切れの次回実行日時を更新しました: {利用者ID}/{タスクID} {次回} -> {新次回 or 'なし'}"
+                )
+        except Exception:
+            logger.exception(f"起動時実行条件初期化でエラーが発生しました: {利用者ID}/{タスクID}")
+
+
+def _フォルダ状態取得(パス: str) -> tuple[int, str] | None:
+    """監視フォルダ直下のファイル数と最新更新日時を返す。参照不能は None。"""
+    try:
+        件数 = 0
+        最終 = 0.0
+        with os.scandir(パス) as it:
+            for entry in it:
+                if entry.is_file():
+                    件数 += 1
+                    最終 = max(最終, entry.stat().st_mtime)
+        最終日時 = datetime.fromtimestamp(最終).strftime("%Y-%m-%d %H:%M:%S") if 件数 else ""
+        return 件数, 最終日時
+    except OSError:
+        return None
+
+
+def _実行条件確認(logger: logging.Logger) -> None:
+    """hh:mm が変わった監視回だけ、次回実行日時と実行条件を確認して発火する。
+
+    発火条件: 要求が 準備完了 / 完了 かつ実行有効で、明細が全件待機または全件完了。
+    実行途中などで発火できない回は実行せず、次回実行日時だけ次周期へ更新する（スキップ）。
+    発火時は 明細 → 要求 の順で 待機 に戻し、次回実行日時を更新する。
+    """
+    global _前回確認分
+    now = datetime.now()
+    現在分 = now.strftime("%Y-%m-%d %H:%M")
+    if 現在分 == _前回確認分:
+        return
+    _前回確認分 = 現在分
+    now文字 = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    for 条件 in tasks_db.実行条件監視一覧():
+        利用者ID = str(条件["利用者ID"])
+        タスクID = str(条件["タスクID"])
+        try:
+            区分 = str(条件.get("実行区分", ""))
+            時間駆動 = 区分 in ("時間指定", "間隔実行", "定時実行")
+
+            def 次回送り() -> None:
+                """発火せずに次周期へ進める（時間指定は一回限りなので空にする）。"""
+                if 時間駆動:
+                    tasks_db.次回実行日時更新(利用者ID, タスクID, _次回繰り越し(条件, now))
+
+            if 時間駆動:
+                次回 = str(条件.get("次回実行日時", ""))
+                if 次回 == "":
+                    # 初回は次回実行日時の計算だけ行う
+                    初回次回 = _次回実行日時計算(条件, now)
+                    if 初回次回:
+                        tasks_db.次回実行日時更新(利用者ID, タスクID, 初回次回)
+                    continue
+                if 次回 > now文字:
+                    continue
+
+            # フォルダ変化条件の確認（実行区分=即時 + フォルダ変化 は毎分確認）
+            スナップショット: tuple[int, str] | None = None
+            if str(条件.get("実行条件", "")) == "フォルダ変化":
+                スナップショット = _フォルダ状態取得(str(条件.get("監視フォルダ", "")))
+                if スナップショット is None:
+                    logger.warning(
+                        f"監視フォルダを確認できません: {利用者ID}/{タスクID} {条件.get('監視フォルダ', '')}"
+                    )
+                    次回送り()
+                    continue
+                try:
+                    保存ファイル数 = int(条件.get("フォルダ内ファイル数"))
+                except (TypeError, ValueError):
+                    保存ファイル数 = -1
+                if 保存ファイル数 < 0:
+                    # 初回はスナップショット取得のみ（登録直後の誤発火防止）
+                    tasks_db.フォルダ状態記録(利用者ID, タスクID, スナップショット[0], スナップショット[1])
+                    次回送り()
+                    continue
+                if スナップショット == (保存ファイル数, str(条件.get("フォルダ内最終日時", ""))):
+                    次回送り()  # 変化なし: 発火せず次周期へ
+                    continue
+
+            if not tasks_db.タスク発火(利用者ID, タスクID):
+                次回送り()  # 実行途中・エラー・中止など: 実行せず次回実行日時だけ更新（この回はスキップ）
+                continue
+
+            if スナップショット is not None:
+                tasks_db.フォルダ状態記録(利用者ID, タスクID, スナップショット[0], スナップショット[1])
+            次回 = _次回実行日時計算(条件, now) if 時間駆動 and 区分 != "時間指定" else ""
+            tasks_db.次回実行日時更新(利用者ID, タスクID, 次回, 前回実行日時=now文字)
+            logger.info(
+                f"実行開始条件により再実行します: {利用者ID}/{タスクID} 区分={区分} 次回={次回 or 'なし'}"
+            )
+        except Exception:
+            logger.exception(f"実行条件確認でエラーが発生しました: {利用者ID}/{タスクID}")
+
+
 def _監視1回(logger: logging.Logger) -> None:
     # --- 開始日時だけが入ったまま実行タイムアウト分以上経過 → 状態=エラー・実行有効=0 ---
     try:
@@ -218,3 +432,18 @@ async def 監視ループ(logger: logging.Logger) -> None:
         except Exception:
             logger.exception("AIタスク監視ループでエラーが発生しました")
         await asyncio.sleep(監視間隔秒)
+
+
+async def 実行条件監視ループ(logger: logging.Logger) -> None:
+    """実行開始条件の確認ループ。
+
+    明細起動（5 秒間隔の 監視ループ）とは分離して 10 秒間隔で回し、フォルダ走査などで
+    時間がかかっても明細起動を遅らせない。実際の発火確認は hh:mm 変化時（毎分 1 回）。
+    """
+    logger.info(f"実行開始条件の監視ループを開始しました (interval={実行条件監視間隔秒}s)")
+    while True:
+        try:
+            await asyncio.to_thread(_実行条件確認, logger)
+        except Exception:
+            logger.exception("実行開始条件の監視ループでエラーが発生しました")
+        await asyncio.sleep(実行条件監視間隔秒)

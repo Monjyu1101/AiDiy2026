@@ -29,6 +29,7 @@ _初期化済み = False
 
 AIタスク要求テーブル = "Aタスク要求"
 AIタスク明細テーブル = "Aタスク明細"
+AIタスク実行条件テーブル = "Aタスク実行条件"
 TASK_AI_NAME既定 = "claude_cli"
 TASK_AI_MODEL既定 = "auto"
 要求PKカラム = ["利用者ID", "タスクID"]
@@ -84,6 +85,67 @@ TASK_AI_MODEL既定 = "auto"
     "更新利用者名",
     "更新端末ID",
 ]
+実行条件PKカラム = ["利用者ID", "タスクID"]
+実行条件カラム順 = [
+    "利用者ID",
+    "タスクID",
+    "実行区分",
+    "間隔区分",
+    "間隔値",
+    "定時区分",
+    "実行曜日",
+    "実行日",
+    "開始時刻",
+    "実行条件",
+    "監視フォルダ",
+    "フォルダ内ファイル数",
+    "フォルダ内最終日時",
+    "前回実行日時",
+    "次回実行日時",
+    "登録日時",
+    "登録利用者ID",
+    "登録利用者名",
+    "登録端末ID",
+    "更新日時",
+    "更新利用者ID",
+    "更新利用者名",
+    "更新端末ID",
+]
+
+# 実行条件の区分は文字値で保持する（状態と同じ日本語ファースト方針）
+実行区分値 = ("即時", "時間指定", "間隔実行", "定時実行")
+間隔区分値 = ("分", "時", "日")
+定時区分値 = ("毎日", "毎週", "毎月")
+実行曜日値 = ("日", "月", "火", "水", "木", "金", "土")
+実行条件値 = ("無し", "フォルダ変化")
+
+# ダイアログから登録する入力カラム（残りはウォッチャーが管理するサーバー項目）
+実行条件入力カラム = [
+    "実行区分",
+    "間隔区分",
+    "間隔値",
+    "定時区分",
+    "実行曜日",
+    "実行日",
+    "開始時刻",
+    "実行条件",
+    "監視フォルダ",
+]
+実行条件既定値: dict[str, object] = {
+    "実行区分": "即時",
+    "間隔区分": "",
+    "間隔値": 0,
+    "定時区分": "",
+    "実行曜日": "",
+    "実行日": 0,
+    "開始時刻": "",
+    "実行条件": "無し",
+    "監視フォルダ": "",
+    "フォルダ内ファイル数": -1,
+    "フォルダ内最終日時": "",
+    "前回実行日時": "",
+    "次回実行日時": "",
+}
 
 
 def _TASK_AI設定() -> tuple[str, str]:
@@ -212,6 +274,30 @@ def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _AIタスク実行条件テーブル作成(conn: sqlite3.Connection) -> None:
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {AIタスク実行条件テーブル} (
+            利用者ID TEXT NOT NULL,
+            タスクID TEXT NOT NULL,
+            実行区分 TEXT NOT NULL DEFAULT '即時',
+            間隔区分 TEXT NOT NULL DEFAULT '',
+            間隔値 INTEGER NOT NULL DEFAULT 0,
+            定時区分 TEXT NOT NULL DEFAULT '',
+            実行曜日 TEXT NOT NULL DEFAULT '',
+            実行日 INTEGER NOT NULL DEFAULT 0,
+            開始時刻 TEXT NOT NULL DEFAULT '',
+            実行条件 TEXT NOT NULL DEFAULT '無し',
+            監視フォルダ TEXT NOT NULL DEFAULT '',
+            フォルダ内ファイル数 INTEGER NOT NULL DEFAULT -1,
+            フォルダ内最終日時 TEXT NOT NULL DEFAULT '',
+            前回実行日時 TEXT NOT NULL DEFAULT '',
+            次回実行日時 TEXT NOT NULL DEFAULT '',
+            {_監査カラムDDL},
+            PRIMARY KEY (利用者ID, タスクID)
+        )
+    """)
+
+
 def _AIタスク要求群再作成(conn: sqlite3.Connection) -> None:
     if _テーブル存在(conn, AIタスク要求テーブル):
         旧テーブル = f"{AIタスク要求テーブル}_old"
@@ -282,6 +368,33 @@ def _AIタスク明細テーブル再作成(conn: sqlite3.Connection) -> None:
     _AIタスク明細テーブル作成(conn)
 
 
+def _AIタスク実行条件テーブル再作成(conn: sqlite3.Connection) -> None:
+    if _テーブル存在(conn, AIタスク実行条件テーブル):
+        旧テーブル = f"{AIタスク実行条件テーブル}_old"
+        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
+        conn.execute(f"ALTER TABLE {_識別子(AIタスク実行条件テーブル)} RENAME TO {_識別子(旧テーブル)}")
+        _AIタスク実行条件テーブル作成(conn)
+        旧カラム = set(_カラム名一覧(conn, 旧テーブル))
+        select_exprs: list[str] = []
+        params: list[object] = []
+        for カラム in 実行条件カラム順:
+            if カラム in 旧カラム:
+                select_exprs.append(_識別子(カラム))
+            elif カラム in 実行条件既定値:
+                select_exprs.append("?")
+                params.append(実行条件既定値[カラム])
+            else:
+                select_exprs.append("''")
+        conn.execute(
+            f"INSERT INTO {_識別子(AIタスク実行条件テーブル)} ({', '.join(_識別子(c) for c in 実行条件カラム順)}) "
+            f"SELECT {', '.join(select_exprs)} FROM {_識別子(旧テーブル)}",
+            params,
+        )
+        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
+        return
+    _AIタスク実行条件テーブル作成(conn)
+
+
 # 手動登録 API 用の標準明細テンプレート（明細SEQ, タイトル, 先行SEQ）
 _標準明細テンプレート: list[tuple[int, str, str]] = [
     (0, "開始", ""),
@@ -303,6 +416,7 @@ def 初期化() -> None:
     try:
         _AIタスク要求テーブル作成(conn)
         _AIタスク明細テーブル作成(conn)
+        _AIタスク実行条件テーブル作成(conn)
         conn.commit()
 
         if (
@@ -316,6 +430,12 @@ def 初期化() -> None:
             or _カラム名一覧(conn, AIタスク明細テーブル) != 明細カラム順
         ):
             _AIタスク明細テーブル再作成(conn)
+            conn.commit()
+        if (
+            _PKカラム一覧(conn, AIタスク実行条件テーブル) != 実行条件PKカラム
+            or _カラム名一覧(conn, AIタスク実行条件テーブル) != 実行条件カラム順
+        ):
+            _AIタスク実行条件テーブル再作成(conn)
             conn.commit()
 
         _初期化済み = True
@@ -411,11 +531,14 @@ def タスク要求一覧(利用者ID: str) -> list[dict]:
         if _要求応答補完(conn, 利用者ID):
             conn.commit()
         rows = conn.execute(
-            "SELECT 利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, マーメイド記号, "
-            f"PID, 開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, 更新日時 FROM {AIタスク要求テーブル} "
-            "WHERE 利用者ID = ? "
-            "ORDER BY CASE WHEN タスクID GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].*' THEN 1 ELSE 0 END DESC, "
-            "タスクID DESC",
+            "SELECT r.利用者ID, r.タスクID, r.プロジェクト, r.タイトル, r.要求内容, r.TASK_AI_NAME, r.TASK_AI_MODEL, r.実行有効, r.状態, r.マーメイド記号, "
+            "r.PID, r.開始日時, r.終了日時, r.実行回数, r.応答タイトル, r.応答内容, r.更新日時, "
+            "COALESCE(j.次回実行日時, '') AS 次回実行日時 "
+            f"FROM {AIタスク要求テーブル} r "
+            f"LEFT JOIN {AIタスク実行条件テーブル} j ON j.利用者ID = r.利用者ID AND j.タスクID = r.タスクID "
+            "WHERE r.利用者ID = ? "
+            "ORDER BY CASE WHEN r.タスクID GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].*' THEN 1 ELSE 0 END DESC, "
+            "r.タスクID DESC",
             [利用者ID],
         ).fetchall()
         return [dict(row) for row in rows]
@@ -429,9 +552,12 @@ def タスク要求最大更新日時(利用者ID: str) -> str:
     try:
         if _要求応答補完(conn, 利用者ID):
             conn.commit()
+        # 実行条件（次回実行日時など）の更新も一覧の再取得対象にする
         row = conn.execute(
-            f"SELECT MAX(更新日時) AS 最大更新日時 FROM {AIタスク要求テーブル} WHERE 利用者ID = ?",
-            [利用者ID],
+            "SELECT MAX(m) AS 最大更新日時 FROM ("
+            f"SELECT MAX(更新日時) AS m FROM {AIタスク要求テーブル} WHERE 利用者ID = ? "
+            f"UNION ALL SELECT MAX(更新日時) FROM {AIタスク実行条件テーブル} WHERE 利用者ID = ?)",
+            [利用者ID, 利用者ID],
         ).fetchone()
         return str(row["最大更新日時"] or "") if row else ""
     finally:
@@ -487,7 +613,7 @@ def タスク要求登録(利用者ID: str, タイトル: str, 要求内容: str
     初期化()
     conn = 接続取得()
     try:
-        タスクID = _タスク登録(conn, 利用者ID, タイトル, 要求内容, "準備完了", _標準明細テンプレート)
+        タスクID = _タスク登録(conn, 利用者ID, タイトル, 要求内容, "待機", _標準明細テンプレート)
         conn.commit()
         return _タスク要求取得(conn, 利用者ID, タスクID)
     finally:
@@ -512,6 +638,166 @@ def タスク要求取得(利用者ID: str, タスクID: str) -> dict:
         if _要求応答補完(conn, 利用者ID, タスクID):
             conn.commit()
         return _タスク要求取得(conn, 利用者ID, タスクID)
+    finally:
+        conn.close()
+
+
+def _実行条件取得(conn: sqlite3.Connection, 利用者ID: str, タスクID: str) -> dict:
+    row = conn.execute(
+        "SELECT 利用者ID, タスクID, 実行区分, 間隔区分, 間隔値, 定時区分, 実行曜日, 実行日, 開始時刻, "
+        "実行条件, 監視フォルダ, フォルダ内ファイル数, フォルダ内最終日時, 前回実行日時, 次回実行日時, 更新日時 "
+        f"FROM {AIタスク実行条件テーブル} WHERE 利用者ID = ? AND タスクID = ?",
+        [利用者ID, タスクID],
+    ).fetchone()
+    return dict(row) if row else {}
+
+
+def 実行条件取得(利用者ID: str, タスクID: str) -> dict:
+    """AIタスク実行条件 1 件を取得する。行が無ければ空 dict（即時扱い）。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        return _実行条件取得(conn, 利用者ID, タスクID)
+    finally:
+        conn.close()
+
+
+def 実行条件監視一覧() -> list[dict]:
+    """毎分の発火確認対象（時間駆動またはフォルダ変化条件）を親要求の状態つきで返す。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        rows = conn.execute(
+            "SELECT j.利用者ID, j.タスクID, j.実行区分, j.間隔区分, j.間隔値, j.定時区分, j.実行曜日, j.実行日, j.開始時刻, "
+            "j.実行条件, j.監視フォルダ, j.フォルダ内ファイル数, j.フォルダ内最終日時, j.前回実行日時, j.次回実行日時, "
+            "r.状態 AS 要求状態, r.実行有効 AS 要求実行有効 "
+            f"FROM {AIタスク実行条件テーブル} j JOIN {AIタスク要求テーブル} r "
+            "ON r.利用者ID = j.利用者ID AND r.タスクID = j.タスクID "
+            "WHERE j.実行区分 IN ('時間指定', '間隔実行', '定時実行') OR j.実行条件 = 'フォルダ変化' "
+            "ORDER BY j.タスクID"
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def 次回実行日時更新(利用者ID: str, タスクID: str, 次回実行日時: str, 前回実行日時: str | None = None) -> None:
+    """実行条件の次回実行日時（発火時は前回実行日時も）を更新する。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        now = _現在日時()
+        if 前回実行日時 is None:
+            conn.execute(
+                f"UPDATE {AIタスク実行条件テーブル} SET 次回実行日時 = ?, 更新日時 = ? "
+                "WHERE 利用者ID = ? AND タスクID = ?",
+                [次回実行日時, now, 利用者ID, タスクID],
+            )
+        else:
+            conn.execute(
+                f"UPDATE {AIタスク実行条件テーブル} SET 次回実行日時 = ?, 前回実行日時 = ?, 更新日時 = ? "
+                "WHERE 利用者ID = ? AND タスクID = ?",
+                [次回実行日時, 前回実行日時, now, 利用者ID, タスクID],
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def フォルダ状態記録(利用者ID: str, タスクID: str, ファイル数: int, 最終日時: str) -> None:
+    """フォルダ変化判定用のスナップショット（ファイル数・最終更新日時）を保存する。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        conn.execute(
+            f"UPDATE {AIタスク実行条件テーブル} SET フォルダ内ファイル数 = ?, フォルダ内最終日時 = ?, 更新日時 = ? "
+            "WHERE 利用者ID = ? AND タスクID = ?",
+            [ファイル数, 最終日時, _現在日時(), 利用者ID, タスクID],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def タスク発火(利用者ID: str, タスクID: str) -> bool:
+    """実行開始条件の成立時: 明細 → 要求の順で 待機 に戻し、再実行対象にする。
+
+    要求が 準備完了 / 完了 かつ実行有効、明細が全件待機または全件完了のときだけ発火する
+    （実行途中・エラー・中止のタスクは開始させない）。
+    明細は PID・開始日時・終了日時・実行回数もリセットする（応答内容は次回実行で上書き）。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        req = conn.execute(
+            f"SELECT 状態, 実行有効 FROM {AIタスク要求テーブル} WHERE 利用者ID = ? AND タスクID = ?",
+            [利用者ID, タスクID],
+        ).fetchone()
+        if req is None or str(req["状態"]) not in ("準備完了", "完了") or int(req["実行有効"] or 0) != 1:
+            return False
+        明細状態 = {
+            str(row[0])
+            for row in conn.execute(
+                f"SELECT DISTINCT 状態 FROM {AIタスク明細テーブル} WHERE 利用者ID = ? AND タスクID = ?",
+                [利用者ID, タスクID],
+            )
+        }
+        if 明細状態 not in ({"待機"}, {"完了"}):
+            return False
+        now = _現在日時()
+        conn.execute(
+            f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', 終了日時 = '', "
+            "実行回数 = 0, 更新日時 = ? WHERE 利用者ID = ? AND タスクID = ?",
+            [now, 利用者ID, タスクID],
+        )
+        conn.execute(
+            f"UPDATE {AIタスク要求テーブル} SET 状態 = '待機', PID = '', 更新日時 = ? "
+            "WHERE 利用者ID = ? AND タスクID = ?",
+            [now, 利用者ID, タスクID],
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def 実行条件登録(利用者ID: str, タスクID: str, 条件: dict) -> dict:
+    """ダイアログ入力の実行条件を UPSERT する。
+
+    入力カラムだけを書き込み、ウォッチャー管理のサーバー項目
+    （フォルダスナップショット・前回/次回実行日時）は既存値を保持する。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        値: dict[str, object] = {k: 実行条件既定値[k] for k in 実行条件入力カラム}
+        for k in 実行条件入力カラム:
+            if k in 条件 and 条件[k] is not None:
+                値[k] = 条件[k]
+        now = _現在日時()
+        既存 = conn.execute(
+            f"SELECT 1 FROM {AIタスク実行条件テーブル} WHERE 利用者ID = ? AND タスクID = ?",
+            [利用者ID, タスクID],
+        ).fetchone()
+        if 既存:
+            conn.execute(
+                f"UPDATE {AIタスク実行条件テーブル} SET "
+                + ", ".join(f"{_識別子(k)} = ?" for k in 実行条件入力カラム)
+                + ", 更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ? "
+                "WHERE 利用者ID = ? AND タスクID = ?",
+                [*[値[k] for k in 実行条件入力カラム], now, 利用者ID, 利用者ID, "backend_task", 利用者ID, タスクID],
+            )
+        else:
+            監査 = _監査項目(利用者ID, 利用者ID)
+            conn.execute(
+                f"INSERT INTO {AIタスク実行条件テーブル} (利用者ID, タスクID, "
+                + ", ".join(_識別子(k) for k in 実行条件入力カラム)
+                + f", {', '.join(監査.keys())}) "
+                f"VALUES (?, ?, {', '.join('?' * len(実行条件入力カラム))}, {', '.join('?' * len(監査))})",
+                [利用者ID, タスクID, *[値[k] for k in 実行条件入力カラム], *監査.values()],
+            )
+        conn.commit()
+        return _実行条件取得(conn, 利用者ID, タスクID)
     finally:
         conn.close()
 
@@ -577,8 +863,8 @@ def 実行開始記録(利用者ID: str, タスクID: str, pid: int) -> None:
 def 実行待ち明細一覧() -> list[dict]:
     """実行可能な AIタスク明細（実行有効・待機・PID なし・先行 SEQ が全て完了）を返す。
 
-    親の AIタスク要求が 準備完了 / 実行中 のものだけを対象とする
-    （準備中・失敗・完了のタスクは実行しない）。
+    親の AIタスク要求が 待機 / 実行中 のものだけを対象とする
+    （準備中・準備完了・失敗・完了のタスクは実行しない。準備完了は実行開始条件の充足待ちに使う）。
     明細の 実行有効 = 0 は実行対象にしない（明細作成は実行有効フラグに関係なく行う）。
     """
     初期化()
@@ -588,7 +874,7 @@ def 実行待ち明細一覧() -> list[dict]:
             "SELECT m.利用者ID, m.タスクID, m.明細SEQ, m.タイトル, m.先行SEQ, m.TASK_AI_NAME, m.TASK_AI_MODEL, m.実行回数 "
             f"FROM {AIタスク明細テーブル} m JOIN {AIタスク要求テーブル} r "
             "ON r.利用者ID = m.利用者ID AND r.タスクID = m.タスクID "
-            "WHERE m.実行有効 = 1 AND m.状態 = '待機' AND m.PID = '' AND r.状態 IN ('準備完了', '実行中') "
+            "WHERE m.実行有効 = 1 AND m.状態 = '待機' AND m.PID = '' AND r.状態 IN ('待機', '実行中') "
             "ORDER BY m.タスクID, m.明細SEQ"
         ).fetchall()
         候補 = [dict(row) for row in rows]
@@ -662,7 +948,7 @@ def 明細実行開始記録(利用者ID: str, タスクID: str, 明細SEQ: int,
             [str(pid), now, now, 利用者ID, タスクID, 明細SEQ],
         )
         conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET 状態 = CASE WHEN 状態 = '準備完了' THEN '実行中' ELSE 状態 END, "
+            f"UPDATE {AIタスク要求テーブル} SET 状態 = CASE WHEN 状態 = '待機' THEN '実行中' ELSE 状態 END, "
             "更新日時 = ? WHERE 利用者ID = ? AND タスクID = ?",
             [now, 利用者ID, タスクID],
         )
@@ -870,12 +1156,20 @@ def タスク要求更新登録(
                 "WHERE 利用者ID = ? AND タスクID = ?",
                 [プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, 利用者ID, タスクID],
             )
-        else:
+        elif 状態 == "中止":
             conn.execute(
                 f"UPDATE {AIタスク要求テーブル} SET プロジェクト = ?, タイトル = ?, 要求内容 = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 終了日時 = ?, 更新日時 = ? "
                 "WHERE 利用者ID = ? AND タスクID = ?",
                 [プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, now, 利用者ID, タスクID],
+            )
+        else:
+            # 更新前の状態を保持する更新: 終了日時は打刻しない
+            conn.execute(
+                f"UPDATE {AIタスク要求テーブル} SET プロジェクト = ?, タイトル = ?, 要求内容 = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
+                "PID = '', 更新日時 = ? "
+                "WHERE 利用者ID = ? AND タスクID = ?",
+                [プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, 利用者ID, タスクID],
             )
         conn.commit()
         return _タスク要求取得(conn, 利用者ID, タスクID)
@@ -1082,6 +1376,23 @@ def タイムアウトエラー化(制限分: int = 30) -> list[dict]:
     return 対象一覧
 
 
+def _実行条件による初期状態(conn: sqlite3.Connection, 利用者ID: str, タスクID: str) -> str:
+    """本登録時の要求状態を実行開始条件から決める。
+
+    即時（かつ実行条件『無し』）または条件行なしは 待機（すぐ実行対象）、
+    それ以外は 準備完了（実行開始条件の充足待ち）とする。
+    """
+    row = conn.execute(
+        f"SELECT 実行区分, 実行条件 FROM {AIタスク実行条件テーブル} WHERE 利用者ID = ? AND タスクID = ?",
+        [利用者ID, タスクID],
+    ).fetchone()
+    if row is None:
+        return "待機"
+    if str(row["実行区分"]) == "即時" and str(row["実行条件"]) == "無し":
+        return "待機"
+    return "準備完了"
+
+
 def タスク本登録(
     利用者ID: str,
     タスクID: str,
@@ -1094,6 +1405,7 @@ def タスク本登録(
 
     仮登録の プロジェクト・実行有効・開始日時・実行回数 は引き継ぎ、終了日時を記録して PID をクリアする。
     実行有効フラグは各 AIタスク明細にもコピーする（明細実行の可否判定に使う）。
+    要求の状態は実行開始条件により 待機（即時）または 準備完了（条件充足待ち）で書き込む。
     """
     初期化()
     conn = 接続取得()
@@ -1104,6 +1416,7 @@ def タスク本登録(
         実行有効値 = int(仮.get("実行有効", 1)) if 仮 else 1
         要求TASK_AI_NAME = str(仮.get("TASK_AI_NAME", TASK_AI_NAME既定) or TASK_AI_NAME既定)
         要求TASK_AI_MODEL = str(仮.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定)
+        初期状態 = _実行条件による初期状態(conn, 利用者ID, タスクID)
         conn.execute(f"DELETE FROM {AIタスク要求テーブル} WHERE 利用者ID = ? AND タスクID = ?", [利用者ID, タスクID])
         conn.execute(f"DELETE FROM {AIタスク明細テーブル} WHERE 利用者ID = ? AND タスクID = ?", [利用者ID, タスクID])
         監査 = _監査項目(利用者ID, 利用者ID)
@@ -1115,7 +1428,7 @@ def タスク本登録(
             f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
             [
                 利用者ID, タスクID, str(仮.get("プロジェクト", "")), タイトル, 要求内容,
-                要求TASK_AI_NAME, 要求TASK_AI_MODEL, 実行有効値, "準備完了", マーメイド記号,
+                要求TASK_AI_NAME, 要求TASK_AI_MODEL, 実行有効値, 初期状態, マーメイド記号,
                 "",
                 str(仮.get("開始日時", "")),
                 _現在日時(),
