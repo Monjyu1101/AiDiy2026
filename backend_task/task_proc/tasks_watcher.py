@@ -237,12 +237,58 @@ def _次回繰り越し(条件: dict, 基準: datetime) -> str:
     return _次回実行日時計算(条件, 基準)
 
 
+def _発火可能状態(条件: dict) -> bool:
+    """発火してよい状態（実行有効 かつ 要求が 準備完了 / 完了）かを返す。"""
+    try:
+        有効 = int(条件.get("要求実行有効") or 0) == 1
+    except (TypeError, ValueError):
+        有効 = False
+    return 有効 and str(条件.get("要求状態", "")) in ("準備完了", "完了")
+
+
+def _保持可能状態(条件: dict) -> bool:
+    """次回実行日時を保持してよい状態（実行有効 かつ 要求が 待機/実行中/準備完了/完了）かを返す。
+
+    待機・実行中は自タスクの実行サイクル途中なので次回実行日時は消さない
+    （期限が到来しても発火せず次周期へスキップする）。クリアするのは
+    無効・準備中・エラー・中止などの発火対象外だけ。
+    """
+    try:
+        有効 = int(条件.get("要求実行有効") or 0) == 1
+    except (TypeError, ValueError):
+        有効 = False
+    return 有効 and str(条件.get("要求状態", "")) in ("待機", "実行中", "準備完了", "完了")
+
+
+def 実行条件再計算(利用者ID: str, タスクID: str) -> str:
+    """実行条件の編集・実行有効切替・状態変更時に次回実行日時を計算し直す。
+
+    保持可能状態（実行有効 かつ 要求が 待機/実行中/準備完了/完了）の時間駆動条件だけ
+    次回を計算し、それ以外（無効・準備中・エラー・中止や即時など）は空に戻す。
+    """
+    条件 = tasks_db.実行条件監視取得(利用者ID, タスクID)
+    if 条件 is None:
+        return ""
+    時間駆動 = str(条件.get("実行区分", "")) in ("時間指定", "間隔実行", "定時実行")
+    新次回 = _次回実行日時計算(条件, datetime.now()) if 時間駆動 and _保持可能状態(条件) else ""
+    if 新次回 != str(条件.get("次回実行日時", "")):
+        tasks_db.次回実行日時更新(利用者ID, タスクID, 新次回)
+    return 新次回
+
+
 def 起動時実行条件初期化(logger: logging.Logger) -> None:
     """PG 起動時（タイマー起動前）の実行条件初期化。
 
+    発火対象外（時間駆動でない・保持可能状態でない）の条件は次回実行日時を一括で空にする。
     停止中に期限が到来した条件（次回実行日時 <= now）は発火させずに次周期へ更新し、
     起動直後のまとめて発火を防ぐ。未計算（空）の時間駆動条件はここで初回計算する。
     """
+    try:
+        クリア件数 = tasks_db.発火対象外次回実行日時クリア()
+        if クリア件数:
+            logger.info(f"発火対象外の次回実行日時をクリアしました: {クリア件数} 件")
+    except Exception:
+        logger.exception("発火対象外の次回実行日時クリアでエラーが発生しました")
     now = datetime.now()
     now文字 = now.strftime("%Y-%m-%d %H:%M:%S")
     for 条件 in tasks_db.実行条件監視一覧():
@@ -251,6 +297,8 @@ def 起動時実行条件初期化(logger: logging.Logger) -> None:
         try:
             if str(条件.get("実行区分", "")) not in ("時間指定", "間隔実行", "定時実行"):
                 continue
+            if not _保持可能状態(条件):
+                continue  # 次回実行日時は一括クリア済み
             次回 = str(条件.get("次回実行日時", ""))
             if 次回 == "":
                 初回 = _次回実行日時計算(条件, now)
@@ -287,7 +335,9 @@ def _実行条件確認(logger: logging.Logger) -> None:
     """hh:mm が変わった監視回だけ、次回実行日時と実行条件を確認して発火する。
 
     発火条件: 要求が 準備完了 / 完了 かつ実行有効で、明細が全件待機または全件完了。
-    実行途中などで発火できない回は実行せず、次回実行日時だけ次周期へ更新する（スキップ）。
+    保持可能状態でない条件（無効・準備中・エラー・中止など）は次回実行日時を空にする。
+    自タスクの実行サイクル途中（待機/実行中）や条件不成立の回（フォルダ変化なし等）は
+    発火せず次回実行日時だけ次周期へ更新する（スキップ。消さない）。
     発火時は 明細 → 要求 の順で 待機 に戻し、次回実行日時を更新する。
     """
     global _前回確認分
@@ -305,6 +355,16 @@ def _実行条件確認(logger: logging.Logger) -> None:
             区分 = str(条件.get("実行区分", ""))
             時間駆動 = 区分 in ("時間指定", "間隔実行", "定時実行")
 
+            if not _保持可能状態(条件):
+                # 発火対象外（無効・準備中・エラー・中止など）は次回実行日時を空にする
+                if 時間駆動 and str(条件.get("次回実行日時", "")):
+                    tasks_db.次回実行日時更新(利用者ID, タスクID, "")
+                    logger.info(
+                        f"発火対象外のため次回実行日時をクリアしました: {利用者ID}/{タスクID} "
+                        f"状態={条件.get('要求状態', '')} 実行有効={条件.get('要求実行有効', '')}"
+                    )
+                continue
+
             def 次回送り() -> None:
                 """発火せずに次周期へ進める（時間指定は一回限りなので空にする）。"""
                 if 時間駆動:
@@ -320,6 +380,11 @@ def _実行条件確認(logger: logging.Logger) -> None:
                     continue
                 if 次回 > now文字:
                     continue
+
+            if not _発火可能状態(条件):
+                # 自タスクが待機/実行中（実行サイクル途中）: 発火せず次周期へスキップ
+                次回送り()
+                continue
 
             # フォルダ変化条件の確認（実行区分=即時 + フォルダ変化 は毎分確認）
             スナップショット: tuple[int, str] | None = None
@@ -345,7 +410,8 @@ def _実行条件確認(logger: logging.Logger) -> None:
                     continue
 
             if not tasks_db.タスク発火(利用者ID, タスクID):
-                次回送り()  # 実行途中・エラー・中止など: 実行せず次回実行日時だけ更新（この回はスキップ）
+                # 明細が実行途中など: 発火せずに次周期へスキップ（消さない）
+                次回送り()
                 continue
 
             if スナップショット is not None:
@@ -396,8 +462,13 @@ def _監視1回(logger: logging.Logger) -> None:
                 logger.exception(f"失敗登録もエラー: {利用者ID}/{タスクID}")
 
     # --- 未実行のタスク明細（先行完了済み）→ sub_proc.py で 1 ステップ実行 ---
-    # code agent 系は 1 明細まで。通知音などの軽量明細は依存関係が許せば同時起動する。
-    code_agent実行中 = any(not _軽量並行明細か(行) for 行 in tasks_db.実行中明細一覧())
+    # code agent 系はタスク単位で 1 明細まで（タスク間は並行実行する）。
+    # 通知音などの軽量明細は依存関係が許せば同時起動する。
+    code_agent実行中タスク = {
+        (str(行["利用者ID"]), str(行["タスクID"]))
+        for 行 in tasks_db.実行中明細一覧()
+        if not _軽量並行明細か(行)
+    }
     for 行 in tasks_db.実行待ち明細一覧():
         利用者ID = str(行["利用者ID"])
         タスクID = str(行["タスクID"])
@@ -406,7 +477,7 @@ def _監視1回(logger: logging.Logger) -> None:
         if not os.path.isfile(出力JSONパス):
             continue  # AI 生成タスク以外（出力 JSON なし）は自動実行の対象外
         軽量並行明細 = _軽量並行明細か(行)
-        if code_agent実行中 and not 軽量並行明細:
+        if (利用者ID, タスクID) in code_agent実行中タスク and not 軽量並行明細:
             continue
         try:
             if int(行.get("実行回数", 0) or 0) >= 実行回数上限:
@@ -415,7 +486,7 @@ def _監視1回(logger: logging.Logger) -> None:
                 continue
             _明細実行開始(行, 出力JSONパス, logger)
             if not 軽量並行明細:
-                code_agent実行中 = True
+                code_agent実行中タスク.add((利用者ID, タスクID))
         except Exception as e:
             logger.exception(f"ステップ実行開始に失敗しました: {利用者ID}/{タスクID} SEQ={明細SEQ}")
             try:

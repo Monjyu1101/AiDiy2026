@@ -62,8 +62,27 @@ const taskModelOptions = computed(() => {
 const 修正モード = computed(() => !!props.編集タスク);
 const タスクID表示 = computed(() => 修正モード.value ? String(props.編集タスク?.タスクID ?? '') : '(新規)');
 // 押せるのは 状況選択肢 と更新前の状態。更新前の状態を選ぶと状態を変えずに内容だけ更新する
+// タスク明細があるタスクは 準備完了 にも戻せる（有効なら明細も待機に戻して再起動可能）
 const 現状態 = computed(() => String(props.編集タスク?.状態 ?? ''));
-const 状況選択可 = (状況: string) => 状況選択肢.includes(状況) || 状況 === 現状態.value;
+const 明細あり = ref(false);
+const 状況選択可 = (状況: string) =>
+  状況選択肢.includes(状況)
+  || 状況 === 現状態.value
+  || (状況 === '準備完了' && 明細あり.value);
+
+const 明細有無読込 = async () => {
+  明細あり.value = false;
+  if (!props.編集タスク) return;
+  try {
+    const res = await taskClient.post('/task/タスク明細/一覧', {
+      利用者ID: props.利用者ID,
+      タスクID: String(props.編集タスク?.タスクID ?? '')
+    });
+    明細あり.value = res.data.status === 'OK' && (res.data.data?.items ?? []).length > 0;
+  } catch (e) {
+    明細あり.value = false;
+  }
+};
 
 // 実行開始条件（右側パネル）。現状は登録のみ対応で、実行は即時のまま
 const 実行区分選択肢 = ['即時', '時間指定', '間隔実行', '定時実行'];
@@ -209,7 +228,11 @@ const 入力初期化 = () => {
   入力状況.value = 編集 && 状況表示リスト.includes(編集状態) ? 編集状態 : '準備開始';
   状況変更可.value = !!編集;
   実行条件初期化();
-  if (編集) void 実行条件読込();
+  明細あり.value = false;
+  if (編集) {
+    void 実行条件読込();
+    void 明細有無読込();
+  }
   void モデル選択肢読込().then(() => {
     const ai候補 = taskAiOptions.value;
     if (編集) {
@@ -627,6 +650,17 @@ const 登録 = async () => {
   min-height: 0;
 }
 
+/* 幅が足りない時だけ右の実行開始条件パネルを下に回す（横スクロールバー防止） */
+@media (max-width: 1000px) {
+  .dialog-body {
+    flex-direction: column;
+  }
+
+  .dialog-right {
+    width: 100%;
+  }
+}
+
 /* 左: タスク要求本体 / 右: 実行開始条件パネル */
 .dialog-left {
   flex: 1;
@@ -638,6 +672,7 @@ const 登録 = async () => {
 
 .dialog-right {
   width: 400px;
+  max-width: 100%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -779,6 +814,9 @@ const 登録 = async () => {
 
 .detail-select {
   height: 28px;
+  /* 長い選択肢（プロジェクトパス等）で親を押し広げない */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .detail-textarea {
@@ -800,6 +838,7 @@ const 登録 = async () => {
 /* マスタ保守と同じ実行有効欄（入力欄風ボックス + 中央の ✅/☐） */
 .valid-checkbox-label {
   width: 320px;
+  max-width: 100%;
   min-height: 28px;
   padding: 0 8px;
   border: 1px solid #4b5563;

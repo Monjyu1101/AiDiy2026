@@ -1676,6 +1676,7 @@ onBeforeUnmount(() => {
           v-else-if="タスク編集Payload.kind === 'response'"
           :is-open="true"
           :タイトル="タスク編集Payload?.タイトル || '応答内容'"
+          :要求内容="タスク編集Payload?.要求内容 || ''"
           :内容="タスク編集Payload?.内容 || ''"
           @close="タスク編集ウィンドウを閉じる"
         />

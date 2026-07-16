@@ -45,7 +45,8 @@ const columns: Column[] = [
   { key: '開始日時', label: '開始日時', width: '140px', sortable: false, align: 'center' },
   { key: '終了日時', label: '終了日時', width: '140px', sortable: false, align: 'center' },
   { key: '実行回数', label: '実行回数', width: '70px', sortable: false, align: 'right' },
-  { key: '応答内容', label: '応答内容', width: '240px', sortable: false }
+  { key: '応答内容', label: '応答内容', width: '240px', sortable: false },
+  { key: '更新日時', label: '更新日時', width: '140px', sortable: false, align: 'center' }
 ];
 
 const totalCount = computed(() => props.明細.length);
@@ -58,6 +59,16 @@ const pagedRows = computed(() => {
 const goToPage = (page: number) => {
   if (page < 1 || page > totalPages.value) return;
   currentPage.value = page;
+};
+
+// 状態セルのクラス: 実行中は緑ブリンク（行は薄緑）、完了/エラー/中止は行を灰色にするマーカー
+// エラー/中止は状態セルの文字を赤にする
+const 状態クラス = (value: any) => {
+  const 状態 = String(value ?? '');
+  if (状態 === '実行中') return 'status-running';
+  if (状態 === 'エラー' || 状態 === '中止') return 'status-done status-alert';
+  if (状態 === '完了') return 'status-done';
+  return '';
 };
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -158,21 +169,25 @@ const 登録完了 = () => {
 // ==================================================
 const 応答内容ダイアログ表示 = ref(false);
 const 応答内容タイトル = ref('');
+const 応答内容要求値 = ref('');
 const 応答内容表示値 = ref('');
 
 const 応答内容を開く = (row: Record<string, any>) => {
+  const 要求内容 = String(row.要求内容 ?? '');
   const 内容 = String(row.応答内容 ?? '');
-  if (!内容.trim()) return;
-  const タイトル = `応答内容 - ${props.タスクID}/${row.明細SEQ}${row.タイトル ? ' ' + row.タイトル : ''}`;
+  if (!要求内容.trim() && !内容.trim()) return;
+  const タイトル = `要求・応答内容 - ${props.タスクID}/${row.明細SEQ}${row.タイトル ? ' ' + row.タイトル : ''}`;
   if (window.desktopApi?.openTaskDialogWindow) {
     void window.desktopApi.openTaskDialogWindow({
       kind: 'response',
       タイトル,
+      要求内容,
       内容
     });
     return;
   }
   応答内容タイトル.value = タイトル;
+  応答内容要求値.value = 要求内容;
   応答内容表示値.value = 内容;
   応答内容ダイアログ表示.value = true;
 };
@@ -247,6 +262,9 @@ onBeforeUnmount(() => {
               <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="実行有効状態" />
             </button>
           </template>
+          <template v-else-if="column.key === '状態'">
+            <span :class="状態クラス(value)">{{ value ?? '' }}</span>
+          </template>
           <template v-else-if="column.key === '応答内容'">
             <a
               v-if="String(value ?? '').trim()"
@@ -275,6 +293,7 @@ onBeforeUnmount(() => {
     <AIタスク応答内容
       :is-open="応答内容ダイアログ表示"
       :タイトル="応答内容タイトル"
+      :要求内容="応答内容要求値"
       :内容="応答内容表示値"
       @close="応答内容ダイアログ表示 = false"
     />
@@ -354,8 +373,37 @@ onBeforeUnmount(() => {
   background-color: #eef3f8;
 }
 
-.panel-body :deep(tbody tr:hover) {
+/* 行カラーリング: 完了/エラー/中止は灰色、実行中は薄緑 */
+.panel-body :deep(tbody tr:has(.status-done) td) {
+  background-color: #d9d9d9;
+  color: #555;
+}
+
+.panel-body :deep(tbody tr:has(.status-running) td) {
+  background-color: #d9f2e0;
+}
+
+.panel-body :deep(tbody tr:hover td) {
   background-color: #dceeff;
+}
+
+/* 実行中: 状態セルの文字は緑ブリンク */
+.panel-body :deep(.status-running) {
+  color: #15803d;
+  font-weight: 700;
+  animation: status-blink 1s ease-in-out infinite;
+}
+
+/* エラー/中止: 状態セルの文字は赤 */
+.panel-body :deep(.status-alert) {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+@keyframes status-blink {
+  50% {
+    opacity: 0.2;
+  }
 }
 
 .panel-body :deep(tbody td a),

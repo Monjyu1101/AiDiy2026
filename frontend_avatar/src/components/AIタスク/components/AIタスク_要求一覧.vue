@@ -48,17 +48,34 @@ const columns: Column[] = [
   { key: '次回実行日時', label: '次回日時', width: '140px', sortable: true, align: 'center' },
   { key: '実行回数', label: '実行回数', width: '70px', sortable: false, align: 'right' },
   { key: '応答タイトル', label: '応答タイトル', width: '110px', sortable: false },
-  { key: '応答内容', label: '応答内容', width: '240px', sortable: false }
+  { key: '応答内容', label: '応答内容', width: '240px', sortable: false },
+  { key: '更新日時', label: '更新日時', width: '140px', sortable: true, align: 'center' }
 ];
 
 const totalCount = computed(() => rows.value.length);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
+// 既定ソート: 次回実行日時の昇順（値無しは下へ）、同値はタスクIDの降順
+const 既定ソート比較 = (a: Record<string, any>, b: Record<string, any>) => {
+  const a次回 = String(a?.次回実行日時 ?? '').trim();
+  const b次回 = String(b?.次回実行日時 ?? '').trim();
+  if (a次回 !== b次回) {
+    if (!a次回) return 1;
+    if (!b次回) return -1;
+    return a次回 < b次回 ? -1 : 1;
+  }
+  return String(b?.タスクID ?? '').localeCompare(String(a?.タスクID ?? ''), 'ja');
+};
+
 const sortedRows = computed(() => {
   const list = [...rows.value];
-  if (!sortKey.value) return list;
+  if (!sortKey.value) {
+    list.sort(既定ソート比較);
+    return list;
+  }
   list.sort((a, b) => {
     const result = String(a?.[sortKey.value] ?? '').localeCompare(String(b?.[sortKey.value] ?? ''), 'ja');
-    return sortOrder.value === 'desc' ? -result : result;
+    if (result !== 0) return sortOrder.value === 'desc' ? -result : result;
+    return 既定ソート比較(a, b);
   });
   return list;
 });
@@ -87,7 +104,6 @@ const goToPage = (page: number) => {
 // ==================================================
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let dialogChannel: BroadcastChannel | null = null;
-let 初期選択済み = false;
 let 要求最大更新日時 = '';
 
 const 利用者ID取得 = () => props.利用者ID.trim();
@@ -99,29 +115,32 @@ const 最大更新日時計算 = (items: Record<string, any>[]) => {
   }, '');
 };
 
+// リフレッシュ判定の基準はサーバー計算の最大更新日時（実行条件テーブルの更新も含む）。
+// 一覧行から計算すると実行条件だけ更新された場合に不一致のまま毎回リフレッシュしてしまう
+const 最大更新日時取得 = async (): Promise<string> => {
+  const 利用者ID = 利用者ID取得();
+  if (!利用者ID) return 要求最大更新日時;
+  const res = await taskClient.post('/task/タスク要求/最大更新日時', { 利用者ID });
+  if (res.data.status !== 'OK') return 要求最大更新日時;
+  return String(res.data.data?.最大更新日時 ?? '');
+};
+
 const loadData = async () => {
   try {
     const 利用者ID = 利用者ID取得();
     if (!利用者ID) return;
-    const 前状態 = new Map(rows.value.map((row) => [row.タスクID, `${row.状態}|${row.更新日時}`]));
+    // 基準は一覧より先に取得する（取得後の更新は次回の確認で拾う）
+    const 新基準 = await 最大更新日時取得();
     const res = await taskClient.post('/task/タスク要求/一覧', {
       利用者ID
     });
     if (res.data.status === 'OK') {
       rows.value = res.data.data?.items ?? [];
-      要求最大更新日時 = 最大更新日時計算(rows.value);
-      if (!初期選択済み && !props.選択タスクID && rows.value.length > 0) {
-        初期選択済み = true;
-        emit('select', rows.value[0]);
-      }
-      // 選択中タスクの状態・更新日時が変わっていたら再選択でフロー図・明細を更新する
-      if (props.選択タスクID) {
-        const 選択行 = rows.value.find((row) => row.タスクID === props.選択タスクID);
-        if (選択行 && 前状態.size > 0
-            && 前状態.get(選択行.タスクID) !== `${選択行.状態}|${選択行.更新日時}`) {
-          emit('select', 選択行);
-        }
-      }
+      要求最大更新日時 = 新基準;
+      // 初回や更新日時変化によるリロード時は、最大更新日時の行を選択してフロー図・明細を更新する
+      const 行最大更新日時 = 最大更新日時計算(rows.value);
+      const 最大更新行 = rows.value.find((row) => String(row.更新日時 ?? '') === 行最大更新日時);
+      if (最大更新行) emit('select', 最大更新行);
     } else {
       void qMessage(res.data.message || 'タスク要求一覧の取得に失敗しました。', 'error');
     }
@@ -134,9 +153,7 @@ const 更新確認 = async () => {
   try {
     const 利用者ID = 利用者ID取得();
     if (!利用者ID) return;
-    const res = await taskClient.post('/task/タスク要求/最大更新日時', { 利用者ID });
-    if (res.data.status !== 'OK') return;
-    const 最大更新日時 = String(res.data.data?.最大更新日時 ?? '');
+    const 最大更新日時 = await 最大更新日時取得();
     if (最大更新日時 !== 要求最大更新日時) {
       await loadData();
     }
@@ -154,6 +171,24 @@ const selectRow = (row: Record<string, any>) => {
   emit('select', row);
 };
 
+// 行カラーリング: 完了/エラー/中止は灰色（ただし次回実行日時ありは白=通常のまま）
+const 行状態クラス = (row: Record<string, any>) => {
+  const 状態 = String(row?.状態 ?? '');
+  if (['完了', 'エラー', '中止'].includes(状態)) {
+    const 次回 = String(row?.次回実行日時 ?? '').trim();
+    return 次回 ? '' : 'row-inactive';
+  }
+  return '';
+};
+
+// 状態セルの文字: 実行中は緑ブリンク、エラー/中止は赤文字
+const 状態セルクラス = (value: any) => {
+  const 状態 = String(value ?? '');
+  if (状態 === '実行中') return 'status-running';
+  if (状態 === 'エラー' || 状態 === '中止') return 'status-alert';
+  return '';
+};
+
 // 実行有効欄クリック: 確認のうえタスク要求・タスク明細の実行有効フラグをまとめて切り替える
 const 実行有効切替 = async (row: Record<string, any>) => {
   const 新実行有効 = !row.実行有効;
@@ -168,10 +203,6 @@ const 実行有効切替 = async (row: Record<string, any>) => {
     if (res.data.status === 'OK') {
       void qMessage(res.data.message || (新実行有効 ? 'タスクを有効化しました。' : 'タスクを無効化しました。'));
       await loadData();
-      if (row.タスクID === props.選択タスクID) {
-        const 選択行 = rows.value.find((r) => r.タスクID === row.タスクID);
-        if (選択行) emit('select', 選択行);
-      }
     } else {
       void qMessage(res.data.message || '実行有効フラグの変更に失敗しました。', 'error');
     }
@@ -223,21 +254,25 @@ const 登録完了 = async (item: Record<string, any> | null) => {
 // ==================================================
 const 応答内容ダイアログ表示 = ref(false);
 const 応答内容タイトル = ref('');
+const 応答内容要求値 = ref('');
 const 応答内容表示値 = ref('');
 
 const 応答内容を開く = (row: Record<string, any>) => {
+  const 要求内容 = String(row.要求内容 ?? '');
   const 内容 = String(row.応答内容 ?? '');
-  if (!内容.trim()) return;
-  const タイトル = `応答内容 - ${row.タスクID}${row.応答タイトル ? ' / ' + row.応答タイトル : ''}`;
+  if (!要求内容.trim() && !内容.trim()) return;
+  const タイトル = `要求・応答内容 - ${row.タスクID}${row.応答タイトル ? ' / ' + row.応答タイトル : ''}`;
   if (window.desktopApi?.openTaskDialogWindow) {
     void window.desktopApi.openTaskDialogWindow({
       kind: 'response',
       タイトル,
+      要求内容,
       内容
     });
     return;
   }
   応答内容タイトル.value = タイトル;
+  応答内容要求値.value = 要求内容;
   応答内容表示値.value = 内容;
   応答内容ダイアログ表示.value = true;
 };
@@ -297,7 +332,7 @@ defineExpose({ loadData, 新規ダイアログ表示 });
             <button
               type="button"
               class="select-indicator"
-              :class="{ active: row.タスクID === props.選択タスクID }"
+              :class="[{ active: row.タスクID === props.選択タスクID }, 行状態クラス(row)]"
               title="このタスク要求を選択"
               @click="selectRow(row)"
             >
@@ -314,6 +349,9 @@ defineExpose({ loadData, 新規ダイアログ表示 });
           </template>
           <template v-else-if="column.key === 'タイトル'">
             {{ value ?? '' }}
+          </template>
+          <template v-else-if="column.key === '状態'">
+            <span :class="状態セルクラス(value)">{{ value ?? '' }}</span>
           </template>
           <template v-else-if="column.key === '実行有効'">
             <button
@@ -354,6 +392,7 @@ defineExpose({ loadData, 新規ダイアログ表示 });
     <AIタスク応答内容
       :is-open="応答内容ダイアログ表示"
       :タイトル="応答内容タイトル"
+      :要求内容="応答内容要求値"
       :内容="応答内容表示値"
       @close="応答内容ダイアログ表示 = false"
     />
@@ -444,7 +483,32 @@ defineExpose({ loadData, 新規ダイアログ表示 });
   background-color: #eef3f8;
 }
 
-.panel-body :deep(tbody tr:hover) {
+/* 行カラーリング: 完了/エラー（次回実行日時なし）は灰色 */
+.panel-body :deep(tbody tr:has(.row-inactive) td) {
+  background-color: #d9d9d9;
+  color: #555;
+}
+
+/* 実行中: 状態セルの文字のみ緑ブリンク */
+.status-running {
+  color: #15803d;
+  font-weight: 700;
+  animation: status-blink 1s ease-in-out infinite;
+}
+
+/* エラー/中止: 状態セルの文字は赤 */
+.status-alert {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+@keyframes status-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.panel-body :deep(tbody tr:hover td) {
   background-color: #dceeff;
 }
 

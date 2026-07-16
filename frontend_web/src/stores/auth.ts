@@ -13,6 +13,9 @@ import type { AuthState, LoginResult } from '../types'
 import apiClient from '../api/client'
 import router from '../router'
 
+// 認証確認の多重発行防止（起動途中の応答待ちが重ならないようにする）
+let 認証確認Promise: Promise<void> | null = null
+
 export const useAuthStore = defineStore('auth', {
     state: (): AuthState => ({
         token: localStorage.getItem('token') || '',
@@ -32,7 +35,12 @@ export const useAuthStore = defineStore('auth', {
                 return
             }
             if (this.authChecked) return
-            await this.fetchUser()
+            if (!認証確認Promise) {
+                認証確認Promise = this.fetchUser().finally(() => {
+                    認証確認Promise = null
+                })
+            }
+            await 認証確認Promise
         },
         async login(username: string, password: string): Promise<LoginResult> {
             try {
@@ -68,8 +76,12 @@ export const useAuthStore = defineStore('auth', {
                     localStorage.setItem('user', JSON.stringify(this.user))
                     this.authChecked = true
                 }
-            } catch (error) {
-                this.logout()
+            } catch (error: any) {
+                // 認証エラー（401 はインターセプターがログアウト済み）だけログアウトし、
+                // 応答なし（backend 起動途中など）は判定保留にして次の遷移で再確認する
+                if (error?.response) {
+                    this.logout()
+                }
             }
         },
         logout(): void {

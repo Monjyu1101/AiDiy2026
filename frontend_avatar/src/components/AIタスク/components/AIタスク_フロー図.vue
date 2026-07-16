@@ -159,6 +159,24 @@ function マーメイド生成(rows: Record<string, any>[], direction: string): 
   if (critNodes.size > 0) {
     lines.push(`  class ${[...critNodes].map((seq) => `N${seq}`).join(',')} crit;`);
   }
+
+  // 明細状態の反映（一覧の配色と同じ: 完了/エラーは灰色、実行中は薄緑＋ブリンク）
+  // done/running を crit/term より後に定義して状態色を優先する
+  lines.push('  classDef done fill:#d9d9d9,stroke:#9e9e9e,color:#555555;');
+  lines.push('  classDef running fill:#d9f2e0,stroke:#15803d,stroke-width:2px,color:#14532d;');
+  const doneNodes = sorted
+    .filter((row) => ['完了', 'エラー'].includes(String(row.状態 ?? '')))
+    .map((row) => `N${Number(row.明細SEQ)}`);
+  const runningNodes = sorted
+    .filter((row) => String(row.状態 ?? '') === '実行中')
+    .map((row) => `N${Number(row.明細SEQ)}`);
+  if (doneNodes.length > 0) {
+    lines.push(`  class ${doneNodes.join(',')} done;`);
+  }
+  if (runningNodes.length > 0) {
+    lines.push(`  class ${runningNodes.join(',')} running;`);
+  }
+
   edgeKeys.forEach((key, index) => {
     if (critEdges.has(key)) {
       lines.push(`  linkStyle ${index} stroke:#66bb6a,stroke-width:2.5px;`);
@@ -316,6 +334,17 @@ onBeforeUnmount(() => {
   width: 100% !important;
   height: 100% !important;
   max-width: none !important;
+}
+
+/* 実行中の明細ノードはブリンクさせる（mermaid が class 名を SVG に付与する） */
+.diagram-host :deep(.node.running) {
+  animation: node-blink 1s ease-in-out infinite;
+}
+
+@keyframes node-blink {
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .critical-path {

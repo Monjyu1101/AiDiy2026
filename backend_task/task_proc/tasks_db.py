@@ -570,7 +570,7 @@ def タスク明細一覧(利用者ID: str, タスクID: str) -> list[dict]:
     try:
         rows = conn.execute(
             "SELECT 利用者ID, タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, "
-            f"PID, 開始日時, 終了日時, 実行回数, 応答内容 FROM {AIタスク明細テーブル} "
+            f"PID, 開始日時, 終了日時, 実行回数, 応答内容, 更新日時 FROM {AIタスク明細テーブル} "
             "WHERE 利用者ID = ? AND タスクID = ? ORDER BY 明細SEQ",
             [利用者ID, タスクID],
         ).fetchall()
@@ -681,6 +681,25 @@ def 実行条件監視一覧() -> list[dict]:
         conn.close()
 
 
+def 実行条件監視取得(利用者ID: str, タスクID: str) -> dict | None:
+    """発火確認と同じ形（親要求の状態つき）で実行条件 1 件を返す（無ければ None）。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        row = conn.execute(
+            "SELECT j.利用者ID, j.タスクID, j.実行区分, j.間隔区分, j.間隔値, j.定時区分, j.実行曜日, j.実行日, j.開始時刻, "
+            "j.実行条件, j.監視フォルダ, j.フォルダ内ファイル数, j.フォルダ内最終日時, j.前回実行日時, j.次回実行日時, "
+            "r.状態 AS 要求状態, r.実行有効 AS 要求実行有効 "
+            f"FROM {AIタスク実行条件テーブル} j JOIN {AIタスク要求テーブル} r "
+            "ON r.利用者ID = j.利用者ID AND r.タスクID = j.タスクID "
+            "WHERE j.利用者ID = ? AND j.タスクID = ?",
+            [利用者ID, タスクID],
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
 def 次回実行日時更新(利用者ID: str, タスクID: str, 次回実行日時: str, 前回実行日時: str | None = None) -> None:
     """実行条件の次回実行日時（発火時は前回実行日時も）を更新する。"""
     初期化()
@@ -704,6 +723,32 @@ def 次回実行日時更新(利用者ID: str, タスクID: str, 次回実行日
         conn.close()
 
 
+def 発火対象外次回実行日時クリア() -> int:
+    """発火対象外の実行条件の次回実行日時を一括で空にして件数を返す。
+
+    対象外 = 時間駆動（時間指定/間隔実行/定時実行）でない、または保持可能状態
+    （実行有効 かつ 要求が 待機/実行中/準備完了/完了）でないもの。監視ループの
+    対象にならない行（即時など）も含めて漏れなくクリアする。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        cur = conn.execute(
+            f"UPDATE {AIタスク実行条件テーブル} SET 次回実行日時 = '', 更新日時 = ? "
+            "WHERE 次回実行日時 != '' AND ("
+            "実行区分 NOT IN ('時間指定', '間隔実行', '定時実行') "
+            f"OR NOT EXISTS (SELECT 1 FROM {AIタスク要求テーブル} r "
+            f"WHERE r.利用者ID = {AIタスク実行条件テーブル}.利用者ID "
+            f"AND r.タスクID = {AIタスク実行条件テーブル}.タスクID "
+            "AND r.実行有効 = 1 AND r.状態 IN ('待機', '実行中', '準備完了', '完了')))",
+            [_現在日時()],
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
 def フォルダ状態記録(利用者ID: str, タスクID: str, ファイル数: int, 最終日時: str) -> None:
     """フォルダ変化判定用のスナップショット（ファイル数・最終更新日時）を保存する。"""
     初期化()
@@ -715,6 +760,26 @@ def フォルダ状態記録(利用者ID: str, タスクID: str, ファイル数
             [ファイル数, 最終日時, _現在日時(), 利用者ID, タスクID],
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def 明細全件有効待機化(利用者ID: str, タスクID: str) -> int:
+    """準備完了への戻し時: 全明細を 実行有効=1・状態=待機 に戻して再実行可能にする。
+
+    PID・開始日時・終了日時・実行回数もリセットする（タスク発火と同じ初期化）。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        cur = conn.execute(
+            f"UPDATE {AIタスク明細テーブル} SET 実行有効 = 1, 状態 = '待機', PID = '', "
+            "開始日時 = '', 終了日時 = '', 実行回数 = 0, 更新日時 = ? "
+            "WHERE 利用者ID = ? AND タスクID = ?",
+            [_現在日時(), 利用者ID, タスクID],
+        )
+        conn.commit()
+        return cur.rowcount
     finally:
         conn.close()
 

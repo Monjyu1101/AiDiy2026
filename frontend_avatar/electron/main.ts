@@ -38,7 +38,7 @@ const LOGIN_BOUNDS: BoundsPreset = { width: 320, height: 240, minWidth: 320, min
 const CORE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const CHAT_BASE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const SETTINGS_BOUNDS: BoundsPreset = { width: 720, height: 580, minWidth: 580, minHeight: 400 }
-const TASK_DIALOG_BOUNDS: BoundsPreset = { width: 720, height: 560, minWidth: 560, minHeight: 420 }
+const TASK_DIALOG_BOUNDS: BoundsPreset = { width: 1280, height: 800, minWidth: 640, minHeight: 480 }
 const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   chat: CHAT_BASE_BOUNDS,
   file: CHAT_BASE_BOUNDS,

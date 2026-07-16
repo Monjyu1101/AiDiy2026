@@ -30,9 +30,12 @@ const 選択マーメイド記号 = ref('');
 const 明細rows = ref<Record<string, any>[]>([]);
 
 // 要求パネルでタスクを選択したら、フロー図と明細を差し替える
+// ちらつき防止のため事前クリアせず、取得成功時に置き換える
 async function タスク明細読込(タスクID: string) {
-  明細rows.value = [];
-  if (!タスクID) return;
+  if (!タスクID) {
+    明細rows.value = [];
+    return;
+  }
   try {
     const res = await taskClient.post('/task/タスク明細/一覧', {
       利用者ID: props.利用者ID,
@@ -49,10 +52,16 @@ async function タスク明細読込(タスクID: string) {
 }
 
 async function タスク選択(row: Record<string, any>) {
-  選択タスクID.value = String(row.タスクID ?? '');
+  const 新タスクID = String(row.タスクID ?? '');
+  const タスク変更 = 新タスクID !== 選択タスクID.value;
+  選択タスクID.value = 新タスクID;
   選択タイトル.value = String(row.タイトル ?? '');
   選択マーメイド記号.value = String(row.マーメイド記号 ?? '');
-  await タスク明細読込(選択タスクID.value);
+  // 同一タスクの再選択では明細を取得しない（明細一覧側の更新監視が reload を発行する）
+  if (タスク変更) {
+    明細rows.value = [];
+    await タスク明細読込(新タスクID);
+  }
 }
 
 async function タスク明細再読込() {

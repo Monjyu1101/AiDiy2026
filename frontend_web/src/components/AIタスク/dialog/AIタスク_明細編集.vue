@@ -403,6 +403,9 @@ const 登録 = async () => {
   line-height: normal;
   appearance: auto;
   align-self: center;
+  /* 長い選択肢で親を押し広げない */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .one-line-row,

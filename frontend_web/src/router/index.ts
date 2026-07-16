@@ -377,10 +377,16 @@ router.beforeEach(async (to, _from, next) => {
             next('/ログイン')
             return
         }
-        await authStore.ensureAuth()
-        if (!authStore.user) {
-            next('/ログイン')
-            return
+        if (authStore.user) {
+            // キャッシュ済み利用者がいれば遷移をブロックせず、認証確認は裏で行う
+            // （backend 起動途中の応答待ちで画面遷移が止まるのを防ぐ。無効トークンは 401 でログアウトされる）
+            void authStore.ensureAuth()
+        } else {
+            await authStore.ensureAuth()
+            if (!authStore.user) {
+                next('/ログイン')
+                return
+            }
         }
     }
     next()
