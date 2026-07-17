@@ -129,6 +129,7 @@ class タスク要求本登録リクエスト(BaseModel):
     要求内容: str = ""
     マーメイド記号: str = ""
     明細: list[dict]
+    応答内容: str = ""
 
 
 class タスク要求AI失敗リクエスト(BaseModel):
@@ -613,6 +614,7 @@ async def タスク要求本登録(request: タスク要求本登録リクエス
             request.要求内容.strip(),
             request.マーメイド記号.strip(),
             request.明細,
+            request.応答内容.strip(),
         )
         return _OK({"item": item}, f"タスク {request.タスクID} を本登録しました。")
     except Exception as e:
