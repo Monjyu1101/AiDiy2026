@@ -681,6 +681,28 @@ def 実行条件監視一覧() -> list[dict]:
         conn.close()
 
 
+def 即時発火対象一覧() -> list[dict]:
+    """即時実行かつ実行有効・準備完了の要求を返す（実行条件行が無い場合も即時扱い）。
+
+    即時実行（実行区分='即時'）は時間駆動条件を持たないため 実行条件監視一覧() の対象外であり、
+    放置すると準備完了のまま次回実行が発火しない。10 秒ループの先頭でこの一覧を確認し、
+    タスク発火() で待機に戻すことで、条件監視より前に毎回（1 分ゲート無しで）再実行させる。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        rows = conn.execute(
+            f"SELECT r.利用者ID, r.タスクID FROM {AIタスク要求テーブル} r "
+            f"LEFT JOIN {AIタスク実行条件テーブル} j ON j.利用者ID = r.利用者ID AND j.タスクID = r.タスクID "
+            "WHERE r.実行有効 = 1 AND r.状態 = '準備完了' "
+            "AND (j.実行区分 IS NULL OR j.実行区分 = '即時') "
+            "ORDER BY r.タスクID"
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
 def 実行条件監視取得(利用者ID: str, タスクID: str) -> dict | None:
     """発火確認と同じ形（親要求の状態つき）で実行条件 1 件を返す（無ければ None）。"""
     初期化()
@@ -1441,23 +1463,6 @@ def タイムアウトエラー化(制限分: int = 30) -> list[dict]:
     return 対象一覧
 
 
-def _実行条件による初期状態(conn: sqlite3.Connection, 利用者ID: str, タスクID: str) -> str:
-    """本登録時の要求状態を実行開始条件から決める。
-
-    即時（かつ実行条件『無し』）または条件行なしは 待機（すぐ実行対象）、
-    それ以外は 準備完了（実行開始条件の充足待ち）とする。
-    """
-    row = conn.execute(
-        f"SELECT 実行区分, 実行条件 FROM {AIタスク実行条件テーブル} WHERE 利用者ID = ? AND タスクID = ?",
-        [利用者ID, タスクID],
-    ).fetchone()
-    if row is None:
-        return "待機"
-    if str(row["実行区分"]) == "即時" and str(row["実行条件"]) == "無し":
-        return "待機"
-    return "準備完了"
-
-
 def タスク本登録(
     利用者ID: str,
     タスクID: str,
@@ -1471,7 +1476,8 @@ def タスク本登録(
 
     仮登録の プロジェクト・実行有効・開始日時・実行回数 は引き継ぎ、終了日時を記録して PID をクリアする。
     実行有効フラグは各 AIタスク明細にもコピーする（明細実行の可否判定に使う）。
-    要求の状態は実行開始条件により 待機（即時）または 準備完了（条件充足待ち）で書き込む。
+    要求の状態は常に 準備完了（実行開始条件の充足待ち）で書き込む。即時実行の場合は
+    実行条件監視ループが 10 秒ごとに 準備完了 を 待機 へ戻して即座に実行を開始する。
     要求内容には仮登録時の人間の入力をそのまま引き継ぎ、AI がタスク分解のために整理した文章は
     応答内容へ書き込む（人間の元の要求が上書きされて消えないようにするため）。
     """
@@ -1484,7 +1490,7 @@ def タスク本登録(
         実行有効値 = int(仮.get("実行有効", 1)) if 仮 else 1
         要求TASK_AI_NAME = str(仮.get("TASK_AI_NAME", TASK_AI_NAME既定) or TASK_AI_NAME既定)
         要求TASK_AI_MODEL = str(仮.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定)
-        初期状態 = _実行条件による初期状態(conn, 利用者ID, タスクID)
+        初期状態 = "準備完了"
         conn.execute(f"DELETE FROM {AIタスク要求テーブル} WHERE 利用者ID = ? AND タスクID = ?", [利用者ID, タスクID])
         conn.execute(f"DELETE FROM {AIタスク明細テーブル} WHERE 利用者ID = ? AND タスクID = ?", [利用者ID, タスクID])
         監査 = _監査項目(利用者ID, 利用者ID)

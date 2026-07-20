@@ -331,6 +331,22 @@ def _フォルダ状態取得(パス: str) -> tuple[int, str] | None:
         return None
 
 
+def _即時実行条件確認(logger: logging.Logger) -> None:
+    """即時実行（実行区分='即時'）かつ実行有効・準備完了の要求を待機に戻す。
+
+    時間駆動条件が無い即時実行は _実行条件確認 の対象外（1 分ゲートの対象にもならない）ため、
+    実行条件監視ループの先頭で毎回（10 秒ごとに）確認し、他の処理より先に待機へ戻す。
+    """
+    for 行 in tasks_db.即時発火対象一覧():
+        利用者ID = str(行["利用者ID"])
+        タスクID = str(行["タスクID"])
+        try:
+            if tasks_db.タスク発火(利用者ID, タスクID):
+                logger.info(f"即時実行のため待機に戻しました: {利用者ID}/{タスクID}")
+        except Exception:
+            logger.exception(f"即時実行の待機化でエラーが発生しました: {利用者ID}/{タスクID}")
+
+
 def _実行条件確認(logger: logging.Logger) -> None:
     """hh:mm が変わった監視回だけ、次回実行日時と実行条件を確認して発火する。
 
@@ -514,6 +530,7 @@ async def 実行条件監視ループ(logger: logging.Logger) -> None:
     logger.info(f"実行開始条件の監視ループを開始しました (interval={実行条件監視間隔秒}s)")
     while True:
         try:
+            await asyncio.to_thread(_即時実行条件確認, logger)
             await asyncio.to_thread(_実行条件確認, logger)
         except Exception:
             logger.exception("実行開始条件の監視ループでエラーが発生しました")
