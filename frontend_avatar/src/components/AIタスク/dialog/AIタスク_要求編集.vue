@@ -62,7 +62,7 @@ const taskModelOptions = computed(() => {
 const 修正モード = computed(() => !!props.編集タスク);
 const タスクID表示 = computed(() => 修正モード.value ? String(props.編集タスク?.タスクID ?? '') : '(新規)');
 // 押せるのは 状況選択肢 と更新前の状態。更新前の状態を選ぶと状態を変えずに内容だけ更新する
-// タスク明細があるタスクは 準備完了 にも戻せる（有効なら明細も待機に戻して再起動可能）
+// タスク明細があるタスクは 準備完了 にも戻せる（実行有効の状態に関わらず明細は待機に戻して再起動可能にする）
 const 現状態 = computed(() => String(props.編集タスク?.状態 ?? ''));
 const 明細あり = ref(false);
 const 状況選択可 = (状況: string) =>
