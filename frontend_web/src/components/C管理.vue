@@ -33,7 +33,7 @@
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <router-link class="menu-card menu-card-fixed" to="/C管理/C権限/一覧?URLメニュー=/C管理">
+          <router-link class="menu-card menu-card-fixed" to="/C管理/C権限/一覧?URLメニュー=／C管理">
             <div class="menu-card-title">
               <span class="icon">C権</span>
               C権限
@@ -43,7 +43,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/C管理/C利用者/一覧?URLメニュー=/C管理">
+          <router-link class="menu-card menu-card-fixed" to="/C管理/C利用者/一覧?URLメニュー=／C管理">
             <div class="menu-card-title">
               <span class="icon">C利</span>
               C利用者
@@ -53,7 +53,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/C管理/C採番/一覧?URLメニュー=/C管理">
+          <router-link class="menu-card menu-card-fixed" to="/C管理/C採番/一覧?URLメニュー=／C管理">
             <div class="menu-card-title">
               <span class="icon">C採</span>
               C採番

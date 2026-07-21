@@ -28,7 +28,7 @@ const 有効列表示 = computed(() => 無効も表示.value);
 const 生産区分ID = ref('');
 const 生産区分一覧 = ref<M生産区分[]>([]);
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value ?? null);
-const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const toHalfwidthUrl = (value: string): string => value.replace(/／/g, '/').replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const {
   URLメニュー,
   URL戻り先,

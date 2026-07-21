@@ -35,8 +35,8 @@ const lastModifiedTime = ref<string | null>(null);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const normalizeQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
-const toHalfwidthUrl = (value) => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const toVisibleUrlValue = (value) => value.replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
+const toHalfwidthUrl = (value) => value.replace(/／/g, '/').replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const toFullwidthUrl = (value) => value.replace(/\//g, '／').replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
 
 const formatDate = (date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -211,12 +211,7 @@ const handleDropUpdate = async ({ scheduleId, vehicleId, dateStr }) => {
 
 const openEditForm = (scheduleId = null, vehicleId = null, dateStr = null) => {
   saveListSession();
-  const returnPath = {
-    path: '/Sスケジュール/S配車_週表示',
-    query: { 開始日付: formatDateISO(対象日付.value) }
-  };
-  const resolvedReturnUrl = toVisibleUrlValue(router.resolve(returnPath).fullPath);
-  const returnQuery = `URL戻り先=${resolvedReturnUrl}${URLメニュー.value ? `&URLメニュー=${encodeURIComponent(URLメニュー.value)}` : ''}`;
+  const returnQuery = `URL戻り先=${toFullwidthUrl(route.path)}${URLメニュー.value ? `&URLメニュー=${toFullwidthUrl(URLメニュー.value)}` : ''}`;
 
   if (scheduleId) {
     const queryString = `配車伝票ID=${encodeURIComponent(scheduleId)}&${returnQuery}`;

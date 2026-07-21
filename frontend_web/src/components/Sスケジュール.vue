@@ -24,7 +24,7 @@ import { RouterLink } from 'vue-router';
       <div class="schedule-menu-sections">
         <div class="menu-row">
           <!-- S配車_週表示カード -->
-          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S配車_週表示?URLメニュー=/Sスケジュール">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S配車_週表示?URLメニュー=／Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S週</span>
               S配車_週表示
@@ -35,7 +35,7 @@ import { RouterLink } from 'vue-router';
           </RouterLink>
 
           <!-- S配車_日表示カード -->
-          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S配車_日表示?URLメニュー=/Sスケジュール">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S配車_日表示?URLメニュー=／Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S日</span>
               S配車_日表示
@@ -50,7 +50,7 @@ import { RouterLink } from 'vue-router';
 
         <div class="menu-row">
           <!-- S生産_週表示カード -->
-          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S生産_週表示?URLメニュー=/Sスケジュール">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S生産_週表示?URLメニュー=／Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S生週</span>
               S生産_週表示
@@ -61,7 +61,7 @@ import { RouterLink } from 'vue-router';
           </RouterLink>
 
           <!-- S生産_日表示カード -->
-          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S生産_日表示?URLメニュー=/Sスケジュール">
+          <RouterLink class="menu-card menu-card-fixed" to="/Sスケジュール/S生産_日表示?URLメニュー=／Sスケジュール">
             <div class="menu-card-title">
               <span class="icon">S生日</span>
               S生産_日表示

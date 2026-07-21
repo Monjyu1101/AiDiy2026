@@ -22,7 +22,7 @@ import qQRcode from '../../_share/qQRcode.vue';
 const route = useRoute();
 const router = useRouter();
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
-const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const toHalfwidthUrl = (value: string): string => value.replace(/／/g, '/').replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const URLメニュー = computed(() => {
   const value = normalizeQueryValue(route.query.URLメニュー);
   return value ? String(value) : '';

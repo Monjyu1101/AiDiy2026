@@ -40,7 +40,7 @@ const lastModifiedTime = ref<string | null>(null);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const normalizeQueryValue = (value: any): any => (Array.isArray(value) ? value[0] : value);
-const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const toHalfwidthUrl = (value: string): string => value.replace(/／/g, '/').replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 
 const parseStartDate = (value: any): any => {
   if (!value) return null;
@@ -347,9 +347,7 @@ watch(() => route.query.開始日付, () => {
             v-else
             :日付リスト="日付リスト"
             :商品データ="表示商品データ"
-            :商品分類ID="商品分類ID"
             :URLメニュー="URLメニュー"
-            :URL戻り先="URL戻り先"
         />
     </div>
   </div>

@@ -19,7 +19,7 @@ const URL戻り先 = computed(() => {
   const value = Array.isArray(route.query.URL戻り先) ? route.query.URL戻り先[0] : route.query.URL戻り先
   return value ? String(value) : ''
 })
-const toHalfwidthUrl = (value: string) => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=')
+const toHalfwidthUrl = (value: string) => value.replace(/／/g, '/').replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=')
 const メニュー = () => {
   if (URLメニュー.value) router.push(toHalfwidthUrl(URLメニュー.value))
 }

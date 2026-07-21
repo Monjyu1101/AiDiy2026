@@ -47,17 +47,7 @@ const props = defineProps({
     required: false,
     default: () => []
   },
-  商品分類ID: {
-    type: String,
-    required: false,
-    default: ''
-  },
   URLメニュー: {
-    type: String,
-    required: false,
-    default: ''
-  },
-  URL戻り先: {
     type: String,
     required: false,
     default: ''
@@ -160,22 +150,11 @@ const isNegativeStock = (dayData: 日別データ型): boolean => {
   return Number(dayData.推定在庫) < 0;
 };
 
-const toVisibleUrlValue = (value: string): string => {
-  return value.replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
-};
-
-const buildReturnUrl = (date: string): string => {
-  const returnDate = displayDates.value[0] || date;
-  let url = `/Vビュー/V商品推移表?開始日付=${returnDate}`;
-  if (props.商品分類ID) url += `&商品分類ID=${encodeURIComponent(props.商品分類ID)}`;
-  if (props.URLメニュー) url += `&URLメニュー=${encodeURIComponent(props.URLメニュー)}`;
-  if (props.URL戻り先) url += `&URL戻り先=${encodeURIComponent(props.URL戻り先)}`;
-  return toVisibleUrlValue(url);
-};
+const toFullwidthUrl = (value: string): string =>
+  value.replace(/\//g, '／').replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
 
 const openList = (type: string, product: 商品型, date: string) => {
   if (!date || !product?.商品ID) return;
-  const visibleReturnUrl = buildReturnUrl(date);
 
   const pathMap = {
     入庫: '/Tトラン/T商品入庫/一覧',
@@ -185,15 +164,14 @@ const openList = (type: string, product: 商品型, date: string) => {
 
   const path = pathMap[type];
   if (!path) return;
-  const returnQuery = `URL戻り先=${visibleReturnUrl}${props.URLメニュー ? `&URLメニュー=${encodeURIComponent(props.URLメニュー)}` : ''}`;
+  const returnQuery = `URL戻り先=${toFullwidthUrl('/Vビュー/V商品推移表')}${props.URLメニュー ? `&URLメニュー=${toFullwidthUrl(props.URLメニュー)}` : ''}`;
   const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&商品ID=${encodeURIComponent(product.商品ID)}&${returnQuery}`;
   router.push(`${path}?${queryString}`);
 };
 
 const openSeisanList = (type: string, product: 商品型, date: string) => {
   if (!date || !product?.商品ID) return;
-  const visibleReturnUrl = buildReturnUrl(date);
-  const returnQuery = `URL戻り先=${visibleReturnUrl}${props.URLメニュー ? `&URLメニュー=${encodeURIComponent(props.URLメニュー)}` : ''}`;
+  const returnQuery = `URL戻り先=${toFullwidthUrl('/Vビュー/V商品推移表')}${props.URLメニュー ? `&URLメニュー=${toFullwidthUrl(props.URLメニュー)}` : ''}`;
 
   if (type === '受入') {
     const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&受入商品ID=${encodeURIComponent(product.商品ID)}&${returnQuery}`;

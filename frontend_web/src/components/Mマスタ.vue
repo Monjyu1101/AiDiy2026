@@ -19,7 +19,7 @@
 
       <div class="master-menu-sections">
         <div class="menu-row">
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M車両/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M車両/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M車</span>
               M車両
@@ -29,7 +29,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M配車区分/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M配車区分/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M配</span>
               M配車区分
@@ -43,7 +43,7 @@
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品分類/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品分類/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M分</span>
               M商品分類
@@ -53,7 +53,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M商</span>
               M商品
@@ -63,7 +63,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M取引先分類/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M取引先分類/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M取分</span>
               M取引先分類
@@ -73,7 +73,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M取引先/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M取引先/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M取</span>
               M取引先
@@ -83,7 +83,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品構成/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M商品構成/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M構</span>
               M商品構成
@@ -98,7 +98,7 @@
 
         <div class="menu-row">
 
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M生産区分/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M生産区分/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M生</span>
               M生産区分
@@ -108,7 +108,7 @@
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M生産工程/一覧?URLメニュー=/Mマスタ">
+          <router-link class="menu-card menu-card-fixed" to="/Mマスタ/M生産工程/一覧?URLメニュー=／Mマスタ">
             <div class="menu-card-title">
               <span class="icon">M工</span>
               M生産工程

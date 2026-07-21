@@ -18,7 +18,9 @@ interface MenuItem { code: string; label: string; desc: string; to: string; }
 interface MenuRow  { axis: string; title: string; accent: string; panelBg: string; panelBgStrong: string; items: MenuItem[]; }
 
 const BACK = '/メニュー';
-const q = (base: string) => `${base}?URLメニュー=${encodeURIComponent(BACK)}`;
+const toFullwidthUrl = (value: string): string =>
+  value.replace(/\//g, '／').replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
+const q = (base: string) => `${base}?URLメニュー=${toFullwidthUrl(BACK)}`;
 
 const rows = ref<MenuRow[]>([
   {

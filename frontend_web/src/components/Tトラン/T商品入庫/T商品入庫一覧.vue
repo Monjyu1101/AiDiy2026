@@ -31,15 +31,7 @@ const 終了日付 = ref('');
 const 商品ID = ref('');
 const 商品一覧 = ref<any[]>([]);
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
-const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const normalizeRouteUrl = (value: string): string => {
-  const halfwidth = toHalfwidthUrl(value);
-  try {
-    return decodeURIComponent(halfwidth);
-  } catch {
-    return halfwidth;
-  }
-};
+const toHalfwidthUrl = (value: string): string => value.replace(/／/g, '/').replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const {
   URLメニュー,
   URL戻り先,
@@ -116,12 +108,12 @@ const loadProductList = async (shouldNotify = true) => {
 
 const handleMenu = () => {
   if (!URLメニュー.value) return;
-  router.push(normalizeRouteUrl(URLメニュー.value));
+  router.push(toHalfwidthUrl(URLメニュー.value));
 };
 
 const handleCancel = () => {
   if (!URL戻り先.value) return;
-  router.push(normalizeRouteUrl(URL戻り先.value));
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 
 applyQueryParams(route.query);
