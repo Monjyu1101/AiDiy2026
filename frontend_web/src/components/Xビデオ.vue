@@ -43,13 +43,22 @@ const router = useRouter();
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
+const URLメニュー = computed(() => {
+  const value = normalizeQueryValue(route.query.URLメニュー as string | string[] | undefined);
   return value ? String(value) : '';
 });
+const URL戻り先 = computed(() => {
+  const value = normalizeQueryValue(route.query.URL戻り先 as string | string[] | undefined);
+  return value ? String(value) : '';
+});
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
 const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 </script>
 
@@ -57,7 +66,10 @@ const handleReturn = () => {
   <div class="menu-view">
     <h2 class="page-title">
       <span class="title-text">【 Xビデオ 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleReturn">戻る</button>
+      </div>
     </h2>
 
     <div class="content">
@@ -317,8 +329,29 @@ const handleReturn = () => {
   flex: 1;
 }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

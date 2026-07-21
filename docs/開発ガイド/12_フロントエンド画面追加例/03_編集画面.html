@@ -274,12 +274,12 @@ const validateForm = () => {
   登録・変更・削除の成功後は一覧画面へリダイレクトし、
   <code>message</code> と <code>type=success</code> をクエリパラメータで渡す。
   一覧画面側がそれを受け取って成功メッセージを表示する。
-  クエリパラメータ <code>戻URL</code> が指定されている場合はそちらへ遷移する。
+  クエリパラメータ <code>URLメニュー</code> が指定されている場合はそちらへ遷移する。
  </p>
  <pre><code>const handleSuccess = (messageText) => {
-  if (戻URL.value) {
-    // 戻URLが指定されている場合（全角→半角変換を挟む）
-    router.push(toHalfwidthUrl(戻URL.value));
+  if (URLメニュー.value) {
+    // URL戻り先またはURLメニューが指定されている場合（全角→半角変換を挟む）
+    router.push(toHalfwidthUrl(URLメニュー.value));
     return;
   }
   // 一覧画面へリダイレクト（成功メッセージ付き）

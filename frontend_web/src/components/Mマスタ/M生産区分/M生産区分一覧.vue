@@ -15,6 +15,7 @@ import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import 生産区分一覧テーブル from './components/M生産区分一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
+import { useListSessionState, consumeReturnMessage } from '../../../utils/listSessionState';
 
 const router = useRouter();
 const route = useRoute();
@@ -25,24 +26,33 @@ const 有効列表示 = computed(() => 無効も表示.value);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
-  return value ? String(value) : '';
+const {
+  URLメニュー,
+  URL戻り先,
+  現在URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router, {
+  getState: () => ({
+    件数制限: 件数制限.value,
+    無効も表示: 無効も表示.value
+  }),
+  applyState: (state) => {
+    件数制限.value = state.件数制限 ?? true;
+    無効も表示.value = state.無効も表示 ?? false;
+  }
 });
-const 編集戻URL = computed(() => {
-  const query = { ...route.query };
-  delete query.message;
-  delete query.type;
-  delete query.戻URL;
-  return router.resolve({ path: route.path, query }).fullPath;
-});
+resetOrRestoreListSession();
 
 const handleReload = () => {
+  saveListSession();
   生産区分一覧テーブルRef.value?.loadData();
 };
 
 const openCreate = () => {
-  const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
+  saveListSession();
+  const query: Record<string, string> = { モード: '新規', URL戻り先: 現在URL戻り先.value };
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
   router.push({ path: '/Mマスタ/M生産区分/編集', query });
 };
 
@@ -57,13 +67,21 @@ const clearMessageQuery = (query: typeof route.query) => {
   router.replace({ path: route.path, query: nextQuery });
 };
 
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
 const handleCancel = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 
 onMounted(() => {
-  if (route.query.message) {
+  const pendingMessage = consumeReturnMessage(route);
+  if (pendingMessage) {
+    showMessage(pendingMessage.message, pendingMessage.type);
+  } else if (route.query.message) {
     const text = normalizeQueryValue(route.query.message as string | string[] | undefined);
     const type = normalizeQueryValue(route.query.type as string | string[] | undefined);
     showMessage(String(text ?? ''), type ? String(type) : undefined);
@@ -79,13 +97,20 @@ watch(() => route.query.message, (newMessage) => {
     clearMessageQuery(route.query);
   }
 });
+watch([件数制限, 無効も表示], () => {
+  saveListSession();
+});
+
 </script>
 
 <template>
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 M生産区分 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleCancel">戻る</button>
+      </div>
     </h2>
 
     <div class="content">
@@ -112,7 +137,7 @@ watch(() => route.query.message, (newMessage) => {
           </label>
         </div>
 
-        <component :is="生産区分一覧テーブル" ref="生産区分一覧テーブルRef" :件数制限="件数制限" :無効も表示="無効も表示" :有効列表示="有効列表示" :戻URL="編集戻URL" />
+        <component :is="生産区分一覧テーブル" ref="生産区分一覧テーブルRef" :件数制限="件数制限" :無効も表示="無効も表示" :有効列表示="有効列表示" :URLメニュー="URLメニュー" :URL戻り先="現在URL戻り先" />
       </div>
     </div>
   </div>
@@ -147,8 +172,29 @@ watch(() => route.query.message, (newMessage) => {
   flex: 1;
 }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

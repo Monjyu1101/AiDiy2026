@@ -18,7 +18,7 @@ interface MenuItem { code: string; label: string; desc: string; to: string; }
 interface MenuRow  { axis: string; title: string; accent: string; panelBg: string; panelBgStrong: string; items: MenuItem[]; }
 
 const BACK = '/メニュー';
-const q = (base: string) => `${base}?戻URL=${encodeURIComponent(BACK)}`;
+const q = (base: string) => `${base}?URLメニュー=${encodeURIComponent(BACK)}`;
 
 const rows = ref<MenuRow[]>([
   {

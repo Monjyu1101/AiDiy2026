@@ -21,19 +21,31 @@ const router = useRouter();
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
+const URLメニュー = computed(() => {
+  const value = normalizeQueryValue(route.query.URLメニュー as string | string[] | undefined);
   return value ? String(value) : '';
 });
+const URL戻り先 = computed(() => {
+  const value = normalizeQueryValue(route.query.URL戻り先 as string | string[] | undefined);
+  return value ? String(value) : '';
+});
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
 const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 </script>
 
 <template>
   <div class="page-container">
-    <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+    <div class="header-actions">
+      <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+      <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleReturn">戻る</button>
+    </div>
     <iframe
       class="solar-frame"
       :src="frameSrc"
@@ -60,11 +72,18 @@ const handleReturn = () => {
   display: block;
 }
 
-.btn-return {
+.header-actions {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu,
+.btn-return {
   height: 28px;
   padding: 0 12px;
   border: 1px solid rgba(255, 255, 255, 0.40);
@@ -76,6 +95,7 @@ const handleReturn = () => {
   backdrop-filter: blur(8px);
 }
 
+.btn-menu:hover,
 .btn-return:hover {
   background: rgba(6, 36, 48, 0.86);
 }

@@ -15,6 +15,7 @@ import { ref, onMounted, reactive, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
+import { saveReturnMessage } from '../../../utils/listSessionState';
 
 type 出庫明細Form = {
   明細SEQ: number
@@ -27,8 +28,12 @@ const route = useRoute();
 const router = useRouter();
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
+const URLメニュー = computed(() => {
+  const value = normalizeQueryValue(route.query.URLメニュー);
+  return value ? String(value) : '';
+});
+const URL戻り先 = computed(() => {
+  const value = normalizeQueryValue(route.query.URL戻り先);
   return value ? String(value) : '';
 });
 
@@ -334,15 +339,21 @@ const applyQueryParams = async (query: any) => {
 
 const buildListQuery = (extra = {}) => {
   const query: Record<string, any> = { ...extra };
-  if (戻URL.value) query.戻URL = 戻URL.value;
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
   return Object.keys(query).length ? query : undefined;
 };
 
+const pushReturnTarget = (messageText?: string): boolean => {
+  const target = URL戻り先.value || URLメニュー.value;
+  if (!target) return false;
+  const halfwidthTarget = toHalfwidthUrl(target);
+  if (messageText) saveReturnMessage(halfwidthTarget, messageText, 'success');
+  router.push(halfwidthTarget);
+  return true;
+};
+
 const handleSuccess = (messageText: string) => {
-  if (戻URL.value) {
-    router.push(toHalfwidthUrl(戻URL.value));
-    return;
-  }
+  if (pushReturnTarget(messageText)) return;
   router.push({
     path: '/Tトラン/T商品出庫/一覧',
     query: buildListQuery({ message: messageText, type: 'success' })
@@ -350,12 +361,18 @@ const handleSuccess = (messageText: string) => {
 };
 
 const backToList = () => {
+  if (pushReturnTarget()) return;
   router.push({ path: '/Tトラン/T商品出庫/一覧', query: buildListQuery() });
 };
 
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
 const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 
 const saveData = async () => {
@@ -431,7 +448,10 @@ watch(() => route.query, async (query) => {
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 T商品出庫 】{{ isCreateMode ? '新規登録' : '編集' }}</span>
-      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleReturn">戻る</button>
+      </div>
     </h2>
 
     <div class="content">
@@ -627,8 +647,29 @@ watch(() => route.query, async (query) => {
 
 .title-text { flex: 1; }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

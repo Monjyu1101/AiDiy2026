@@ -23,7 +23,8 @@ const props = defineProps({
   件数制限: { type: Boolean, default: true },
   無効も表示: { type: Boolean, default: false },
   有効列表示: { type: Boolean, default: false },
-  戻URL: { type: String, default: '' }
+  URLメニュー: { type: String, default: '' },
+  URL戻り先: { type: String, default: '' }
 });
 
 const router = useRouter();
@@ -125,8 +126,11 @@ const goToPage = (page: number) => {
 
 const openDetail = (row: any) => {
   const query: Record<string, string> = { モード: '編集', 商品ID: row.商品ID };
-  if (props.戻URL) {
-    query.戻URL = props.戻URL;
+  if (props.URLメニュー) {
+    query.URLメニュー = props.URLメニュー;
+  }
+  if (props.URL戻り先) {
+    query.URL戻り先 = props.URL戻り先;
   }
   router.push({ path: '/Mマスタ/M商品構成/編集', query });
 };

@@ -17,6 +17,7 @@ import apiClient from '../../api/client';
 import TransitionTable from './components/V商品推移表テーブル.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { qMessage } from '../../utils/qAlert';
+import { useListSessionState } from '../../utils/listSessionState';
 import { useAuthStore } from '../../stores/auth';
 
 const DISPLAY_DAYS = 32;
@@ -40,10 +41,6 @@ let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const normalizeQueryValue = (value: any): any => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
-  return value ? String(value) : '';
-});
 
 const parseStartDate = (value: any): any => {
   if (!value) return null;
@@ -53,6 +50,23 @@ const parseStartDate = (value: any): any => {
   if (!parsed.isValid()) return null;
   return parsed.startOf('day');
 };
+
+const {
+  URLメニュー,
+  URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router, {
+  getState: () => ({
+    開始日付: currentDate.value.format('YYYY-MM-DD'),
+    商品分類ID: 商品分類ID.value
+  }),
+  applyState: (state) => {
+    const parsed = parseStartDate(state.開始日付);
+    currentDate.value = parsed || currentDate.value;
+    商品分類ID.value = state.商品分類ID ?? '';
+  }
+});
 
 const applyQueryParams = (query: any) => {
   const raw = normalizeQueryValue(query.開始日付);
@@ -224,6 +238,7 @@ const stopAutoRefresh = () => {
 };
 
 const handleCategoryChange = async () => {
+  saveListSession();
   商品データ.value = [];
   商品一覧.value = [];
   await fetchData();
@@ -233,12 +248,14 @@ const handleCategoryChange = async () => {
 // ナビゲーション操作
 const moveMonth = async (months: number) => {
   currentDate.value = currentDate.value.add(months, 'month');
+  saveListSession();
   router.replace({ path: route.path, query: buildPageQuery(startDate.value) });
   await fetchData();
 };
 
 const moveDay = async (days: number) => {
   currentDate.value = currentDate.value.add(days, 'day');
+  saveListSession();
   applyFallbackDateList();
   router.replace({ path: route.path, query: buildPageQuery(startDate.value) });
   await fetchData();
@@ -247,17 +264,24 @@ const moveDay = async (days: number) => {
 const buildPageQuery = (開始日付: string) => {
   const query: Record<string, string> = { 開始日付 };
   if (商品分類ID.value) query.商品分類ID = 商品分類ID.value;
-  if (戻URL.value) query.戻URL = 戻URL.value;
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
+  if (URL戻り先.value) query.URL戻り先 = URL戻り先.value;
   return query;
 };
 
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
 const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 
 onMounted(() => {
   applyQueryParams(route.query);
+  resetOrRestoreListSession();
   applyFallbackDateList();
   loadCategoryList();
   loadProductList();
@@ -282,7 +306,10 @@ watch(() => route.query.開始日付, () => {
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 V商品推移表 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleReturn">戻る</button>
+      </div>
     </h2>
     
     <!-- ナビゲーション -->
@@ -321,6 +348,8 @@ watch(() => route.query.開始日付, () => {
             :日付リスト="日付リスト"
             :商品データ="表示商品データ"
             :商品分類ID="商品分類ID"
+            :URLメニュー="URLメニュー"
+            :URL戻り先="URL戻り先"
         />
     </div>
   </div>
@@ -356,8 +385,29 @@ watch(() => route.query.開始日付, () => {
   flex: 1;
 }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

@@ -51,6 +51,16 @@ const props = defineProps({
     type: String,
     required: false,
     default: ''
+  },
+  URLメニュー: {
+    type: String,
+    required: false,
+    default: ''
+  },
+  URL戻り先: {
+    type: String,
+    required: false,
+    default: ''
   }
 });
 
@@ -158,6 +168,8 @@ const buildReturnUrl = (date: string): string => {
   const returnDate = displayDates.value[0] || date;
   let url = `/Vビュー/V商品推移表?開始日付=${returnDate}`;
   if (props.商品分類ID) url += `&商品分類ID=${encodeURIComponent(props.商品分類ID)}`;
+  if (props.URLメニュー) url += `&URLメニュー=${encodeURIComponent(props.URLメニュー)}`;
+  if (props.URL戻り先) url += `&URL戻り先=${encodeURIComponent(props.URL戻り先)}`;
   return toVisibleUrlValue(url);
 };
 
@@ -173,19 +185,21 @@ const openList = (type: string, product: 商品型, date: string) => {
 
   const path = pathMap[type];
   if (!path) return;
-  const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&商品ID=${encodeURIComponent(product.商品ID)}&戻URL=${visibleReturnUrl}`;
+  const returnQuery = `URL戻り先=${visibleReturnUrl}${props.URLメニュー ? `&URLメニュー=${encodeURIComponent(props.URLメニュー)}` : ''}`;
+  const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&商品ID=${encodeURIComponent(product.商品ID)}&${returnQuery}`;
   router.push(`${path}?${queryString}`);
 };
 
 const openSeisanList = (type: string, product: 商品型, date: string) => {
   if (!date || !product?.商品ID) return;
   const visibleReturnUrl = buildReturnUrl(date);
+  const returnQuery = `URL戻り先=${visibleReturnUrl}${props.URLメニュー ? `&URLメニュー=${encodeURIComponent(props.URLメニュー)}` : ''}`;
 
   if (type === '受入') {
-    const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&受入商品ID=${encodeURIComponent(product.商品ID)}&戻URL=${visibleReturnUrl}`;
+    const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&受入商品ID=${encodeURIComponent(product.商品ID)}&${returnQuery}`;
     router.push(`/Tトラン/T生産/一覧?${queryString}`);
   } else if (type === '払出') {
-    const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&払出商品ID=${encodeURIComponent(product.商品ID)}&戻URL=${visibleReturnUrl}`;
+    const queryString = `開始日付=${encodeURIComponent(date)}&終了日付=${encodeURIComponent(date)}&払出商品ID=${encodeURIComponent(product.商品ID)}&${returnQuery}`;
     router.push(`/Tトラン/T生産払出/一覧?${queryString}`);
   }
 };
@@ -554,4 +568,3 @@ const isRecentUpdate = (updatedStr: any): boolean => {
   animation: blink 2s infinite;
 }
 </style>
-

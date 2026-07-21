@@ -16,6 +16,7 @@ import { useRouter, useRoute } from 'vue-router';
 import apiClient from '../../../api/client';
 import 商品一覧テーブル from './components/M商品一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
+import { useListSessionState, consumeReturnMessage } from '../../../utils/listSessionState';
 import type { M商品分類 } from '../../../types';
 
 const router = useRouter();
@@ -29,24 +30,35 @@ const 商品分類一覧 = ref<M商品分類[]>([]);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
-  return value ? String(value) : '';
+const {
+  URLメニュー,
+  URL戻り先,
+  現在URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router, {
+  getState: () => ({
+    件数制限: 件数制限.value,
+    無効も表示: 無効も表示.value,
+    商品分類ID: 商品分類ID.value
+  }),
+  applyState: (state) => {
+    件数制限.value = state.件数制限 ?? true;
+    無効も表示.value = state.無効も表示 ?? false;
+    商品分類ID.value = state.商品分類ID ?? '';
+  }
 });
-const 編集戻URL = computed(() => {
-  const query = { ...route.query };
-  delete query.message;
-  delete query.type;
-  delete query.戻URL;
-  return router.resolve({ path: route.path, query }).fullPath;
-});
+resetOrRestoreListSession();
 
 const handleReload = () => {
+  saveListSession();
   商品一覧テーブルRef.value?.loadData();
 };
 
 const openCreate = () => {
-  const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
+  saveListSession();
+  const query: Record<string, string> = { モード: '新規', URL戻り先: 現在URL戻り先.value };
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
   router.push({ path: '/Mマスタ/M商品/編集', query });
 };
 
@@ -77,13 +89,22 @@ const clearMessageQuery = (query: typeof route.query) => {
   router.replace({ path: route.path, query: nextQuery });
 };
 
-const handleCancel = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
 };
 
+const handleCancel = () => {
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
+};
+
+const pendingReturnMessage = consumeReturnMessage(route);
+
 onMounted(() => {
-  if (route.query.message) {
+  if (pendingReturnMessage) {
+    showMessage(pendingReturnMessage.message, pendingReturnMessage.type);
+  } else if (route.query.message) {
     const text = normalizeQueryValue(route.query.message as string | string[] | undefined);
     const type = normalizeQueryValue(route.query.type as string | string[] | undefined);
     showMessage(String(text ?? ''), type ? String(type) : undefined);
@@ -92,7 +113,7 @@ onMounted(() => {
 });
 
 onMounted(async () => {
-  const hasRouteMessage = Boolean(route.query.message);
+  const hasRouteMessage = Boolean(pendingReturnMessage) || Boolean(route.query.message);
   await loadProductCategoryList(!hasRouteMessage);
 });
 
@@ -104,13 +125,20 @@ watch(() => route.query.message, (newMessage) => {
     clearMessageQuery(route.query);
   }
 });
+watch([件数制限, 無効も表示, 商品分類ID], () => {
+  saveListSession();
+});
+
 </script>
 
 <template>
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 M商品 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleCancel">戻る</button>
+      </div>
     </h2>
 
     <div class="content">
@@ -155,7 +183,7 @@ watch(() => route.query.message, (newMessage) => {
           :件数制限="件数制限"
           :無効も表示="無効も表示"
           :有効列表示="有効列表示"
-          :戻URL="編集戻URL"
+          :URLメニュー="URLメニュー" :URL戻り先="現在URL戻り先"
         />
       </div>
     </div>
@@ -191,8 +219,29 @@ watch(() => route.query.message, (newMessage) => {
   flex: 1;
 }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

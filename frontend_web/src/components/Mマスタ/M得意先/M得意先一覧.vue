@@ -14,19 +14,35 @@
 import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import 得意先一覧テーブル from './components/M得意先一覧テーブル.vue';
+import { useListSessionState, consumeReturnMessage } from '../../../utils/listSessionState';
 
 const router = useRouter();
 const route = useRoute();
 const 得意先一覧テーブルRef = ref(null);
 const message = ref('');
 const messageType = ref('success');
+const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
+const {
+  URLメニュー,
+  URL戻り先,
+  現在URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router);
+resetOrRestoreListSession();
 
 const handleReload = () => {
+  saveListSession();
   得意先一覧テーブルRef.value?.loadData();
 };
 
 const openCreate = () => {
-  router.push({ path: '/Mマスタ/M得意先/編集', query: { モード: '新規' } });
+  saveListSession();
+  const query: Record<string, string> = { モード: '新規', URL戻り先: 現在URL戻り先.value };
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
+  router.push({ path: '/Mマスタ/M得意先/編集', query });
 };
 
 const showMessage = (msg, type) => {
@@ -38,23 +54,52 @@ const showMessage = (msg, type) => {
 };
 
 onMounted(() => {
-  if (route.query.message) {
-    showMessage(route.query.message, route.query.type);
-    router.replace({ path: route.path });
+  const pendingMessage = consumeReturnMessage(route);
+  if (pendingMessage) {
+    showMessage(pendingMessage.message, pendingMessage.type);
+  } else if (route.query.message) {
+    const text = normalizeQueryValue(route.query.message as string | string[] | undefined);
+    const type = normalizeQueryValue(route.query.type as string | string[] | undefined);
+    showMessage(String(text ?? ''), type ? String(type) : undefined);
+    const nextQuery = { ...route.query };
+    delete nextQuery.message;
+    delete nextQuery.type;
+    router.replace({ path: route.path, query: nextQuery });
   }
 });
 
 watch(() => route.query.message, (newMessage) => {
   if (newMessage) {
-    showMessage(newMessage, route.query.type);
-    router.replace({ path: route.path });
+    const text = normalizeQueryValue(newMessage as string | string[] | undefined);
+    const type = normalizeQueryValue(route.query.type as string | string[] | undefined);
+    showMessage(String(text ?? ''), type ? String(type) : undefined);
+    const nextQuery = { ...route.query };
+    delete nextQuery.message;
+    delete nextQuery.type;
+    router.replace({ path: route.path, query: nextQuery });
   }
 });
+
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
+const handleCancel = () => {
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
+};
 </script>
 
 <template>
   <div class="page-container">
-    <h2 class="page-title">【 M得意先 】</h2>
+    <h2 class="page-title">
+      <span class="title-text">【 M得意先 】</span>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleCancel">戻る</button>
+      </div>
+    </h2>
 
     <div class="content">
       <div class="section">
@@ -69,7 +114,12 @@ watch(() => route.query.message, (newMessage) => {
           </div>
         </div>
 
-        <component :is="得意先一覧テーブル" ref="得意先一覧テーブルRef" />
+        <component
+          :is="得意先一覧テーブル"
+          ref="得意先一覧テーブルRef"
+          :URLメニュー="URLメニュー"
+          :URL戻り先="現在URL戻り先"
+        />
       </div>
     </div>
   </div>
@@ -95,7 +145,33 @@ watch(() => route.query.message, (newMessage) => {
   color: #5a4a3a;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3);
+  display: flex;
+  align-items: center;
 }
+.title-text { flex: 1; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.btn-menu {
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.btn-menu:hover { background: linear-gradient(135deg, #5a6268 0%, #495057 100%); }
+.btn-return {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.btn-return:hover { background: linear-gradient(135deg, #c82333 0%, #a71d2a 100%); }
 .content {
   padding: 8px 20px 20px 20px;
   flex: 1;

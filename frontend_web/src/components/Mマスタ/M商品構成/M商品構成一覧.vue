@@ -16,6 +16,7 @@ import { useRouter, useRoute } from 'vue-router';
 import apiClient from '../../../api/client';
 import 商品構成一覧テーブル from './components/M商品構成一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
+import { useListSessionState, consumeReturnMessage } from '../../../utils/listSessionState';
 import type { M生産区分 } from '../../../types';
 
 const router = useRouter();
@@ -28,24 +29,35 @@ const 生産区分ID = ref('');
 const 生産区分一覧 = ref<M生産区分[]>([]);
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value ?? null);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
-  return value ? String(value) : '';
+const {
+  URLメニュー,
+  URL戻り先,
+  現在URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router, {
+  getState: () => ({
+    件数制限: 件数制限.value,
+    無効も表示: 無効も表示.value,
+    生産区分ID: 生産区分ID.value
+  }),
+  applyState: (state) => {
+    件数制限.value = state.件数制限 ?? true;
+    無効も表示.value = state.無効も表示 ?? false;
+    生産区分ID.value = state.生産区分ID ?? '';
+  }
 });
-const 編集戻URL = computed(() => {
-  const query = { ...route.query };
-  delete query.message;
-  delete query.type;
-  delete query.戻URL;
-  return router.resolve({ path: route.path, query }).fullPath;
-});
+resetOrRestoreListSession();
 
 const handleReload = () => {
+  saveListSession();
   商品構成一覧テーブルRef.value?.loadData();
 };
 
 const openCreate = () => {
-  const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
+  saveListSession();
+  const query: Record<string, string> = { モード: '新規', URL戻り先: 現在URL戻り先.value };
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
   router.push({ path: '/Mマスタ/M商品構成/編集', query });
 };
 
@@ -76,13 +88,22 @@ const clearMessageQuery = (query: typeof route.query) => {
   router.replace({ path: route.path, query: nextQuery });
 };
 
-const handleCancel = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
 };
 
+const handleCancel = () => {
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
+};
+
+const pendingReturnMessage = consumeReturnMessage(route);
+
 onMounted(() => {
-  if (route.query.message) {
+  if (pendingReturnMessage) {
+    showMessage(pendingReturnMessage.message, pendingReturnMessage.type);
+  } else if (route.query.message) {
     const text = normalizeQueryValue(route.query.message);
     const type = normalizeQueryValue(route.query.type);
     showMessage(String(text ?? ''), type ? String(type) : undefined);
@@ -91,7 +112,7 @@ onMounted(() => {
 });
 
 onMounted(async () => {
-  const hasRouteMessage = Boolean(route.query.message);
+  const hasRouteMessage = Boolean(pendingReturnMessage) || Boolean(route.query.message);
   await loadProductionTypeList(!hasRouteMessage);
 });
 
@@ -103,13 +124,20 @@ watch(() => route.query.message, (newMessage) => {
     clearMessageQuery(route.query);
   }
 });
+watch([件数制限, 無効も表示, 生産区分ID], () => {
+  saveListSession();
+});
+
 </script>
 
 <template>
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 M商品構成 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleCancel">戻る</button>
+      </div>
     </h2>
 
     <div class="content">
@@ -147,7 +175,7 @@ watch(() => route.query.message, (newMessage) => {
           </label>
         </div>
 
-        <component :is="商品構成一覧テーブル" ref="商品構成一覧テーブルRef" :生産区分ID="生産区分ID" :件数制限="件数制限" :無効も表示="無効も表示" :有効列表示="有効列表示" :戻URL="編集戻URL" />
+        <component :is="商品構成一覧テーブル" ref="商品構成一覧テーブルRef" :生産区分ID="生産区分ID" :件数制限="件数制限" :無効も表示="無効も表示" :有効列表示="有効列表示" :URLメニュー="URLメニュー" :URL戻り先="現在URL戻り先" />
       </div>
     </div>
   </div>
@@ -182,8 +210,29 @@ watch(() => route.query.message, (newMessage) => {
   flex: 1;
 }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

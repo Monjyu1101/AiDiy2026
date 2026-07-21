@@ -45,7 +45,11 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  戻URL: {
+  URLメニュー: {
+    type: String,
+    default: ''
+  },
+  URL戻り先: {
     type: String,
     default: ''
   }
@@ -190,8 +194,11 @@ const goToPage = (page) => {
 
 const openDetail = (row) => {
   const query: Record<string, any> = { モード: '編集', 配車伝票ID: row.配車伝票ID };
-  if (props.戻URL) {
-    query.戻URL = props.戻URL;
+  if (props.URLメニュー) {
+    query.URLメニュー = props.URLメニュー;
+  }
+  if (props.URL戻り先) {
+    query.URL戻り先 = props.URL戻り先;
   }
   router.push({ path: '/Tトラン/T配車/編集', query });
 };

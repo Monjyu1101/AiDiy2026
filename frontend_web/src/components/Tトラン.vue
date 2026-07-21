@@ -23,7 +23,7 @@ import { RouterLink } from 'vue-router';
 
       <div class="transaction-menu-sections">
         <div class="menu-row">
-          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T配車/一覧?戻URL=/Tトラン">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T配車/一覧?URLメニュー=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T配</span>
               T配車
@@ -37,7 +37,7 @@ import { RouterLink } from 'vue-router';
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品入庫/一覧?戻URL=/Tトラン">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品入庫/一覧?URLメニュー=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T入</span>
               T商品入庫
@@ -47,7 +47,7 @@ import { RouterLink } from 'vue-router';
             </div>
           </RouterLink>
 
-          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品出庫/一覧?戻URL=/Tトラン">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品出庫/一覧?URLメニュー=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T出</span>
               T商品出庫
@@ -57,7 +57,7 @@ import { RouterLink } from 'vue-router';
             </div>
           </RouterLink>
 
-          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品棚卸/一覧?戻URL=/Tトラン">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T商品棚卸/一覧?URLメニュー=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T棚</span>
               T商品棚卸
@@ -71,7 +71,7 @@ import { RouterLink } from 'vue-router';
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T生産/一覧?戻URL=/Tトラン">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T生産/一覧?URLメニュー=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T生</span>
               T生産
@@ -80,7 +80,7 @@ import { RouterLink } from 'vue-router';
               生産日・工程・製品・数量・ステータスの登録と進捗管理
             </div>
           </RouterLink>
-          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T生産払出/一覧?戻URL=/Tトラン">
+          <RouterLink class="menu-card menu-card-fixed" to="/Tトラン/T生産払出/一覧?URLメニュー=/Tトラン">
             <div class="menu-card-title">
               <span class="icon">T払</span>
               T生産払出

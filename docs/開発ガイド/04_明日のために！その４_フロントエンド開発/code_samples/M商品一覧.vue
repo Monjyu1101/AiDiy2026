@@ -29,15 +29,14 @@ const 商品分類一覧 = ref<M商品分類[]>([]);
 const normalizeQueryValue = (value: string | string[] | null | undefined): string | null =>
   Array.isArray(value) ? value[0] ?? null : value ?? null;
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL as string | string[] | undefined);
+const URLメニュー = computed(() => {
+  const value = normalizeQueryValue(route.query.URLメニュー as string | string[] | undefined);
   return value ? String(value) : '';
 });
-const 編集戻URL = computed(() => {
+const 現在URL戻り先 = computed(() => {
   const query = { ...route.query };
   delete query.message;
   delete query.type;
-  delete query.戻URL;
   return router.resolve({ path: route.path, query }).fullPath;
 });
 
@@ -46,7 +45,7 @@ const handleReload = () => {
 };
 
 const openCreate = () => {
-  const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
+  const query: Record<string, string> = { モード: '新規', URL戻り先: 現在URL戻り先.value };
   router.push({ path: '/Mマスタ/M商品/編集', query });
 };
 
@@ -78,8 +77,8 @@ const clearMessageQuery = (query: typeof route.query) => {
 };
 
 const handleCancel = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
 };
 
 onMounted(() => {
@@ -110,7 +109,7 @@ watch(() => route.query.message, (newMessage) => {
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 M商品 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
+      <button v-if="URLメニュー" class="btn-return" @click="handleCancel">戻る</button>
     </h2>
 
     <div class="content">
@@ -155,7 +154,7 @@ watch(() => route.query.message, (newMessage) => {
           :件数制限="件数制限"
           :無効も表示="無効も表示"
           :有効列表示="有効列表示"
-          :戻URL="編集戻URL"
+          :URLメニュー="URLメニュー" :URL戻り先="現在URL戻り先"
         />
       </div>
     </div>

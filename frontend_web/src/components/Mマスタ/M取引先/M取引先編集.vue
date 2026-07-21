@@ -15,6 +15,7 @@ import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
+import { saveReturnMessage } from '../../../utils/listSessionState';
 import type { M取引先分類 } from '../../../types';
 import qQRcode from '../../_share/qQRcode.vue';
 import qGoogleMap from '../../_share/qGoogleMap.vue';
@@ -23,8 +24,12 @@ const route = useRoute();
 const router = useRouter();
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
+const URLメニュー = computed(() => {
+  const value = normalizeQueryValue(route.query.URLメニュー);
+  return value ? String(value) : '';
+});
+const URL戻り先 = computed(() => {
+  const value = normalizeQueryValue(route.query.URL戻り先);
   return value ? String(value) : '';
 });
 
@@ -189,25 +194,37 @@ const applyQueryParams = async (query) => {
 };
 const buildListQuery = (extra = {}) => {
   const query: Record<string, any> = { ...extra };
-  if (戻URL.value) query.戻URL = 戻URL.value;
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
   return Object.keys(query).length ? query : undefined;
 };
+
+const pushReturnTarget = (messageText?: string): boolean => {
+  const target = URL戻り先.value || URLメニュー.value;
+  if (!target) return false;
+  const halfwidthTarget = toHalfwidthUrl(target);
+  if (messageText) saveReturnMessage(halfwidthTarget, messageText, 'success');
+  router.push(halfwidthTarget);
+  return true;
+};
 const handleSuccess = (messageText) => {
-  if (戻URL.value) {
-    router.push(toHalfwidthUrl(戻URL.value));
-    return;
-  }
+  if (pushReturnTarget(messageText)) return;
   router.push({
     path: '/Mマスタ/M取引先/一覧',
     query: buildListQuery({ message: messageText, type: 'success' })
   });
 };
 const backToList = () => {
+  if (pushReturnTarget()) return;
   router.push({ path: '/Mマスタ/M取引先/一覧', query: buildListQuery() });
 };
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
 const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 const saveData = async () => {
   if (!validateForm()) {
@@ -259,7 +276,10 @@ watch(() => route.query, async (query) => {
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 M取引先 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleReturn">戻る</button>
+      </div>
     </h2>
     <div class="content">
       <div class="section">
@@ -392,7 +412,29 @@ watch(() => route.query, async (query) => {
 .page-container { width: 100%; height: 100%; display: flex; flex-direction: column; background: linear-gradient(135deg, #faf7f2 0%, #f5f1e8 50%, #f0ebe0 100%); }
 .page-title { background: linear-gradient(135deg, #e6d5b7 0%, #dcc8a6 50%, #d2bb95 100%); margin: 0 0 5px 0; font-size: 14px; width: 100%; box-sizing: border-box; padding: 10px 20px 10px 40px; height: 35px; line-height: 20px; color: #5a4a3a; font-weight: bold; box-shadow: 0 2px 4px rgba(210, 187, 149, 0.3); display: flex; align-items: center; }
 .title-text { flex: 1; }
-.btn-return { margin-left: auto; height: 24px; padding: 0 12px; border: none; border-radius: 0; cursor: pointer; font-size: 12px; background-color: #dc3545; color: #fff; }
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return { height: 24px; padding: 0 12px; border: none; border-radius: 0; cursor: pointer; font-size: 12px; background-color: #dc3545; color: #fff; }
 .content { padding: 8px 20px 20px 20px; flex: 1; min-height: 0; }
 .toolbar { margin-bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .detail-form { display: flex; flex-direction: column; gap: 0; }

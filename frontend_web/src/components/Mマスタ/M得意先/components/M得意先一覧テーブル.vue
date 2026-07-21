@@ -16,6 +16,11 @@ import { useRouter } from 'vue-router';
 import apiClient from '../../../../api/client';
 import qTublerFrame from '../../../_share/qTublerFrame.vue';
 
+const props = defineProps({
+  URLメニュー: { type: String, default: '' },
+  URL戻り先: { type: String, default: '' }
+});
+
 const router = useRouter();
 
 const 得意先一覧 = ref([]);
@@ -103,7 +108,10 @@ const goToPage = (page) => {
 };
 
 const openDetail = (row) => {
-  router.push({ path: '/Mマスタ/M得意先/編集', query: { モード: '編集', 得意先ID: row.得意先ID } });
+  const query: Record<string, string> = { モード: '編集', 得意先ID: row.得意先ID };
+  if (props.URLメニュー) query.URLメニュー = props.URLメニュー;
+  if (props.URL戻り先) query.URL戻り先 = props.URL戻り先;
+  router.push({ path: '/Mマスタ/M得意先/編集', query });
 };
 
 const loadData = async () => {

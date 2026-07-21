@@ -22,8 +22,8 @@ const route = useRoute();
 const router = useRouter();
 const normalizeQueryValue = (value: any): string | null => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value: string): string => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
+const URLメニュー = computed(() => {
+  const value = normalizeQueryValue(route.query.URLメニュー);
   return value ? String(value) : '';
 });
 
@@ -240,15 +240,15 @@ const applyQueryParams = async (query) => {
 
 const buildListQuery = (extra = {}) => {
   const query: Record<string, any> = { ...extra };
-  if (戻URL.value) {
-    query.戻URL = 戻URL.value;
+  if (URLメニュー.value) {
+    query.URLメニュー = URLメニュー.value;
   }
   return Object.keys(query).length ? query : undefined;
 };
 
 const handleSuccess = (messageText) => {
-  if (戻URL.value) {
-    router.push(toHalfwidthUrl(戻URL.value));
+  if (URLメニュー.value) {
+    router.push(toHalfwidthUrl(URLメニュー.value));
     return;
   }
   router.push({
@@ -262,8 +262,8 @@ const backToList = () => {
 };
 
 const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
 };
 
 // ==================================================
@@ -343,7 +343,7 @@ watch(() => route.query, async (query) => {
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 M商品 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+      <button v-if="URLメニュー" class="btn-return" @click="handleReturn">戻る</button>
     </h2>
 
     <div class="content">

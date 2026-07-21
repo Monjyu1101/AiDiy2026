@@ -86,7 +86,7 @@ onBeforeUnmount(() => {
 
       <div class="other-menu-sections">
         <div class="menu-row">
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/X自己紹介/表示?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/X自己紹介/表示?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">X自</span>
               X自己紹介
@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xビデオ?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xビデオ?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">Xビ</span>
               Xビデオ
@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
         <div class="menu-hairline"></div>
 
         <div class="menu-row">
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xインベーダー/ゲーム?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xインベーダー/ゲーム?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">X侵</span>
               Xインベーダー
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xテトリス/ゲーム?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xテトリス/ゲーム?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">Xテ</span>
               Xテトリス
@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xリバーシ/ゲーム?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xリバーシ/ゲーム?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">Xリ</span>
               Xリバーシ
@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/X立体リバーシ/ゲーム?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/X立体リバーシ/ゲーム?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">X立</span>
               X立体リバーシ
@@ -182,7 +182,7 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールfable/ゲーム?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールfable/ゲーム?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">Xピ</span>
               Xピンボールfable
@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールsol/ゲーム?戻URL=/Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールsol/ゲーム?URLメニュー=/Xその他">
             <div class="menu-card-title">
               <span class="icon">X陽</span>
               Xピンボールsol

@@ -13,7 +13,7 @@ Step 1. ファイル配置を確認
 
 Step 2. 一覧テーブルを先に完成
 - API: POST /apps/V商品/一覧
-- props: 商品分類ID / 件数制限 / 無効も表示 / 有効列表示 / 戻URL
+- props: 商品分類ID / 件数制限 / 無効も表示 / 有効列表示 / URLメニュー
 - 有効列は 無効も表示=true のときだけ表示
 - カラム/フィルタ/ソート/ページング
 - defineExpose({ loadData })

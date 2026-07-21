@@ -19,7 +19,7 @@
 
       <div class="menu-grid">
         <!-- V商品推移表カード -->
-        <router-link class="menu-card menu-card-fixed" to="/Vビュー/V商品推移表?戻URL=/Vビュー">
+        <router-link class="menu-card menu-card-fixed" to="/Vビュー/V商品推移表?URLメニュー=/Vビュー">
           <div class="menu-card-title">
             <span class="icon">V推</span>
             V商品推移表

@@ -32,14 +32,14 @@
 2. 静的HTML型では `frontend_web/public/<画面名>/index.html` / `index.js` / `style.css` を作る。
 3. iframe 型では `src/components/Xその他/<画面名>.vue` を作る。
 4. `src/router/index.ts` の `baseRoutes` に `/Xその他/<画面名>/ゲーム` または `/Xその他/<画面名>/表示` を追加し、`meta.requiresAuth: true` と `title` を設定する。
-5. `src/components/Xその他.vue` にメニューカードを追加する。通常は `router-link` で `?戻URL=/Xその他` を渡す。
+5. `src/components/Xその他.vue` にメニューカードを追加する。通常は `router-link` で `?URLメニュー=/Xその他` を渡す。
 6. 外部ライブラリ、画像、音源、地図、フォント、外部APIを使う場合は `NOTICE.md` に出典、ライセンス、ネットワーク制限時の挙動を残す。
 
 ## iframe ラッパーの基準
 - `frameSrc` は `const baseUrl = import.meta.env.BASE_URL || '/'` を使って `${baseUrl}<画面名>/index.html` とする。
-- `戻URL` は `route.query.戻URL` から読み、全角 `？＆＝` を半角へ正規化してから `router.push()` する。
+- `URLメニュー` は `route.query.URLメニュー`、必要に応じて `URL戻り先` は `route.query.URL戻り先` から読み、全角 `？＆＝` を半角へ正規化してから `router.push()` する。
 - ラッパーは `height: 100%`, `display: flex`、iframe は `flex: 1` または `height: 100%` を持たせる。
-- iframe 内から親アプリの認証ストアや router へ直接触らない。戻る操作は Vue ラッパー側で担当する。
+- iframe 内から親アプリの認証ストアや router へ直接触らない。戻る操作は Vue ラッパー側で担当し、`URL戻り先` があれば優先して戻る。
 - 静的HTML本体は `/core` `/apps` API に依存させない。API が必要なら通常 Vue 画面に寄せる。
 
 ## 静的 JS の実装基準

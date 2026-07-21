@@ -16,6 +16,7 @@ import { useRouter, useRoute } from 'vue-router';
 import apiClient from '../../../api/client';
 import 商品入庫一覧テーブル from './components/T商品入庫一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
+import { useListSessionState, consumeReturnMessage } from '../../../utils/listSessionState';
 
 const router = useRouter();
 const route = useRoute();
@@ -39,31 +40,38 @@ const normalizeRouteUrl = (value: string): string => {
     return halfwidth;
   }
 };
-const isTトランURL = (value: string): boolean => {
-  const normalized = normalizeRouteUrl(value);
-  return normalized === '/Tトラン' || normalized.startsWith('/Tトラン/');
-};
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
-  return value ? String(value) : '';
-});
-const 編集戻URL = computed(() => {
-  if (戻URL.value && !isTトランURL(戻URL.value)) {
-    return normalizeRouteUrl(戻URL.value);
+const {
+  URLメニュー,
+  URL戻り先,
+  現在URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router, {
+  getState: () => ({
+    件数制限: 件数制限.value,
+    無効も表示: 無効も表示.value,
+    開始日付: 開始日付.value,
+    終了日付: 終了日付.value,
+    商品ID: 商品ID.value
+  }),
+  applyState: (state) => {
+    件数制限.value = state.件数制限 ?? true;
+    無効も表示.value = state.無効も表示 ?? false;
+    開始日付.value = state.開始日付 ?? '';
+    終了日付.value = state.終了日付 ?? '';
+    商品ID.value = state.商品ID ?? '';
   }
-  const query = { ...route.query };
-  delete query.message;
-  delete query.type;
-  delete query.戻URL;
-  return router.resolve({ path: route.path, query }).fullPath;
 });
 
 const handleReload = () => {
+  saveListSession();
   商品入庫一覧テーブルRef.value?.loadData();
 };
 
 const openCreate = () => {
-  const query: Record<string, string> = { モード: '新規', 戻URL: 編集戻URL.value };
+  saveListSession();
+  const query: Record<string, string> = { モード: '新規', URL戻り先: 現在URL戻り先.value };
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
   if (開始日付.value && 開始日付.value === 終了日付.value) {
     query.入庫日 = 開始日付.value;
   }
@@ -106,16 +114,25 @@ const loadProductList = async (shouldNotify = true) => {
   }
 };
 
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(normalizeRouteUrl(URLメニュー.value));
+};
+
 const handleCancel = () => {
-  if (!戻URL.value) return;
-  router.push(normalizeRouteUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(normalizeRouteUrl(URL戻り先.value));
 };
 
 applyQueryParams(route.query);
+resetOrRestoreListSession();
 
 onMounted(async () => {
-  const hasRouteMessage = Boolean(route.query.message);
-  if (hasRouteMessage) {
+  const pendingReturnMessage = consumeReturnMessage(route);
+  const hasRouteMessage = Boolean(pendingReturnMessage) || Boolean(route.query.message);
+  if (pendingReturnMessage) {
+    showMessage(pendingReturnMessage.message, pendingReturnMessage.type);
+  } else if (hasRouteMessage) {
     const text = normalizeQueryValue(route.query.message);
     const type = normalizeQueryValue(route.query.type);
     showMessage(String(text ?? ''), type ? String(type) : undefined);
@@ -139,13 +156,20 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
     handleReload();
   }
 });
+watch([件数制限, 無効も表示, 開始日付, 終了日付, 商品ID], () => {
+  saveListSession();
+});
+
 </script>
 
 <template>
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 T商品入庫 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleCancel">戻る</button>
+      </div>
     </h2>
 
     <div class="content">
@@ -202,7 +226,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
           :件数制限="件数制限"
           :無効も表示="無効も表示"
           :有効列表示="有効列表示"
-          :戻URL="編集戻URL"
+          :URLメニュー="URLメニュー" :URL戻り先="現在URL戻り先"
         />
       </div>
     </div>
@@ -238,8 +262,29 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.商
   flex: 1;
 }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

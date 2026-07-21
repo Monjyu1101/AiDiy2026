@@ -16,6 +16,7 @@ import { useRoute, useRouter } from 'vue-router';
 import apiClient from '../../api/client';
 import DailyTable from './components/S配車_日表示テーブル.vue';
 import { qMessage } from '../../utils/qAlert';
+import { useListSessionState, consumeReturnMessage } from '../../utils/listSessionState';
 import { useAuthStore } from '../../stores/auth';
 
 const route = useRoute();
@@ -35,10 +36,6 @@ let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 const normalizeQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
 const toHalfwidthUrl = (value) => value.replace(/？/g, '?').replace(/＆/g, '&').replace(/＝/g, '=');
 const toVisibleUrlValue = (value) => value.replace(/\?/g, '？').replace(/&/g, '＆').replace(/=/g, '＝');
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
-  return value ? String(value) : '';
-});
 
 const formatDate = (date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -52,6 +49,23 @@ const formatDateISO = (date) => {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const {
+  URLメニュー,
+  URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router, {
+  getState: () => ({
+    開始日付: 表示日付.value ? formatDateISO(表示日付.value) : ''
+  }),
+  applyState: (state) => {
+    if (!state.開始日付) return;
+    const parsed = new Date(state.開始日付);
+    if (Number.isNaN(parsed.getTime())) return;
+    表示日付.value = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  }
+});
 
 const addDays = (date, days) => {
   const next = new Date(date);
@@ -259,15 +273,17 @@ const handleDropUpdate = async ({ scheduleId, vehicleId, timeSlot }) => {
 };
 
 const openEditForm = (scheduleId = null, vehicleId = null, timeSlot = null) => {
+  saveListSession();
   const baseDate = formatDateISO(表示日付.value);
   const returnPath = {
     path: '/Sスケジュール/S配車_日表示',
     query: { 開始日付: baseDate }
   };
   const resolvedReturnUrl = toVisibleUrlValue(router.resolve(returnPath).fullPath);
+  const returnQuery = `URL戻り先=${resolvedReturnUrl}${URLメニュー.value ? `&URLメニュー=${encodeURIComponent(URLメニュー.value)}` : ''}`;
   
   if (scheduleId) {
-    const queryString = `配車伝票ID=${encodeURIComponent(scheduleId)}&戻URL=${resolvedReturnUrl}`;
+    const queryString = `配車伝票ID=${encodeURIComponent(scheduleId)}&${returnQuery}`;
     router.push(`/Tトラン/T配車/編集?${queryString}`);
   } else if (vehicleId && timeSlot) {
     const normalizedTime = timeSlot.padStart(5, '0');
@@ -277,38 +293,49 @@ const openEditForm = (scheduleId = null, vehicleId = null, timeSlot = null) => {
     const startDateTime = `${baseDate}T${normalizedTime}`;
     const endDateTime = `${baseDate}T${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
 
-    const queryString = `モード=${encodeURIComponent('新規')}&車両ID=${encodeURIComponent(String(vehicleId))}&配車開始日時=${encodeURIComponent(startDateTime)}&配車終了日時=${encodeURIComponent(endDateTime)}&戻URL=${resolvedReturnUrl}`;
+    const queryString = `モード=${encodeURIComponent('新規')}&車両ID=${encodeURIComponent(String(vehicleId))}&配車開始日時=${encodeURIComponent(startDateTime)}&配車終了日時=${encodeURIComponent(endDateTime)}&${returnQuery}`;
     router.push(`/Tトラン/T配車/編集?${queryString}`);
   }
 };
 
 const buildPageQuery = (開始日付) => {
   const query: Record<string, string> = { 開始日付 };
-  if (戻URL.value) {
-    query.戻URL = 戻URL.value;
-  }
+  if (URLメニュー.value) query.URLメニュー = URLメニュー.value;
+  if (URL戻り先.value) query.URL戻り先 = URL戻り先.value;
   return query;
 };
 
 const moveDay = async (delta) => {
   表示日付.value = addDays(表示日付.value, delta);
+  saveListSession();
   router.replace({ path: route.path, query: buildPageQuery(formatDateISO(表示日付.value)) });
   await loadSchedules();
 };
 
 const moveWeek = async (delta) => {
   表示日付.value = addDays(表示日付.value, delta * 7);
+  saveListSession();
   router.replace({ path: route.path, query: buildPageQuery(formatDateISO(表示日付.value)) });
   await loadSchedules();
 };
 
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(toHalfwidthUrl(URLメニュー.value));
+};
+
 const handleReturn = () => {
-  if (!戻URL.value) return;
-  router.push(toHalfwidthUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(toHalfwidthUrl(URL戻り先.value));
 };
 
 const initialize = async () => {
   applyQueryParams(route.query);
+  resetOrRestoreListSession();
+  const pendingReturnMessage = consumeReturnMessage(route);
+  if (pendingReturnMessage) {
+    showMessage(pendingReturnMessage.message, pendingReturnMessage.type);
+  }
   ensureCurrentDate();
   await loadVehicles();
   await loadSchedules();
@@ -336,7 +363,10 @@ watch(() => route.query, async (query) => {
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 S配車_日表示 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleReturn">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleReturn">戻る</button>
+      </div>
     </h2>
 
     <div class="navigation">
@@ -392,8 +422,29 @@ watch(() => route.query, async (query) => {
   flex: 1;
 }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;
@@ -480,4 +531,3 @@ watch(() => route.query, async (query) => {
   color: #5a4a3a;
 }
 </style>
-

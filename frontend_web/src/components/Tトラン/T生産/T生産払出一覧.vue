@@ -16,6 +16,7 @@ import { useRouter, useRoute } from 'vue-router';
 import apiClient from '../../../api/client';
 import 払出一覧テーブル from './components/T生産払出一覧テーブル.vue';
 import { qMessage } from '../../../utils/qAlert';
+import { useListSessionState, consumeReturnMessage } from '../../../utils/listSessionState';
 
 const router = useRouter();
 const route = useRoute();
@@ -39,19 +40,35 @@ const normalizeRouteUrl = (value: string): string => {
   try { return decodeURIComponent(h); } catch { return h; }
 };
 
-const 戻URL = computed(() => {
-  const value = normalizeQueryValue(route.query.戻URL);
-  return value ? String(value) : '';
-});
-const 編集戻URL = computed(() => {
-  const query = { ...route.query };
-  delete query.message;
-  delete query.type;
-  delete query.戻URL;
-  return router.resolve({ path: route.path, query }).fullPath;
+const {
+  URLメニュー,
+  URL戻り先,
+  現在URL戻り先,
+  saveListSession,
+  resetOrRestoreListSession
+} = useListSessionState(route, router, {
+  getState: () => ({
+    件数制限: 件数制限.value,
+    無効も表示: 無効も表示.value,
+    開始日付: 開始日付.value,
+    終了日付: 終了日付.value,
+    生産区分ID: 生産区分ID.value,
+    生産工程ID: 生産工程ID.value,
+    払出商品ID: 払出商品ID.value
+  }),
+  applyState: (state) => {
+    件数制限.value = state.件数制限 ?? true;
+    無効も表示.value = state.無効も表示 ?? false;
+    開始日付.value = state.開始日付 ?? '';
+    終了日付.value = state.終了日付 ?? '';
+    生産区分ID.value = state.生産区分ID ?? '';
+    生産工程ID.value = state.生産工程ID ?? '';
+    払出商品ID.value = state.払出商品ID ?? '';
+  }
 });
 
 const handleReload = () => {
+  saveListSession();
   払出一覧テーブルRef.value?.loadData();
 };
 
@@ -104,16 +121,24 @@ const loadProductList = async () => {
   } catch { /* 無視 */ }
 };
 
+const handleMenu = () => {
+  if (!URLメニュー.value) return;
+  router.push(normalizeRouteUrl(URLメニュー.value));
+};
+
 const handleCancel = () => {
-  if (!戻URL.value) return;
-  router.push(normalizeRouteUrl(戻URL.value));
+  if (!URL戻り先.value) return;
+  router.push(normalizeRouteUrl(URL戻り先.value));
 };
 
 applyQueryParams(route.query);
+resetOrRestoreListSession();
 
 onMounted(async () => {
-  const hasRouteMessage = Boolean(route.query.message);
-  if (hasRouteMessage) {
+  const pendingReturnMessage = consumeReturnMessage(route);
+  if (pendingReturnMessage) {
+    showMessage(pendingReturnMessage.message, pendingReturnMessage.type);
+  } else if (route.query.message) {
     const text = normalizeQueryValue(route.query.message);
     const type = normalizeQueryValue(route.query.type);
     showMessage(String(text ?? ''), type ? String(type) : undefined);
@@ -137,13 +162,20 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
   applyQueryParams(route.query);
   if (払出一覧テーブルRef.value) handleReload();
 });
+watch([件数制限, 無効も表示, 開始日付, 終了日付, 生産区分ID, 生産工程ID, 払出商品ID], () => {
+  saveListSession();
+});
+
 </script>
 
 <template>
   <div class="page-container">
     <h2 class="page-title">
       <span class="title-text">【 T生産払出一覧 】</span>
-      <button v-if="戻URL" class="btn-return" @click="handleCancel">戻る</button>
+      <div class="header-actions">
+        <button v-if="URLメニュー" class="btn-menu" @click="handleMenu">メニュー</button>
+        <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" class="btn-return" @click="handleCancel">戻る</button>
+      </div>
     </h2>
 
     <div class="content">
@@ -221,7 +253,7 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
           :件数制限="件数制限"
           :無効も表示="無効も表示"
           :有効列表示="有効列表示"
-          :戻URL="編集戻URL"
+          :URLメニュー="URLメニュー" :URL戻り先="現在URL戻り先"
         />
       </div>
     </div>
@@ -255,8 +287,29 @@ watch(() => [route.query.開始日付, route.query.終了日付, route.query.生
 
 .title-text { flex: 1; }
 
-.btn-return {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-menu {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-menu:hover {
+  background-color: #5a6268;
+}
+
+.btn-return {
   height: 24px;
   padding: 0 12px;
   border: none;

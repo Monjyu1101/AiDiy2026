@@ -40,7 +40,7 @@
      <tr><td>ツールバー右</td><td>「新規」ボタン → <code>openCreate()</code> で編集画面へ</td></tr>
      <tr><td>チェックボックス</td><td>件数制限・無効も表示（変更時に <code>handleReload()</code>）</td></tr>
      <tr><td>一覧テーブル</td><td><code>&lt;component :is="..."&gt;</code> で子コンポーネントをマウント</td></tr>
-     <tr><td>タイトルバー右端</td><td>戻URLがある場合のみ「戻る」ボタンを表示</td></tr>
+     <tr><td>タイトルバー右端</td><td>URLメニューがある場合のみ「戻る」ボタンを表示</td></tr>
     </tbody>
    </table>
   </section>
@@ -83,7 +83,7 @@ const 車両一覧テーブルRef = ref(null);</code></pre>
   :件数制限     — true: 上限1000件取得, false: 全件取得
   :無効も表示   — APIリクエストに渡す（false: 有効のみ, true: 全レコード）
   :有効列表示   — 無効も表示ONのとき「有効」列をテーブルに表示する
-  :戻URL        — 行クリック時に編集画面へ渡す戻URL（編集完了後にここへ戻る）
+  :URLメニュー        — URLメニューは大元メニュー、URL戻り先は行クリック時の現在画面（編集完了後にここへ戻る）
 
   ※ Vue コンポーネントタグ名は ASCII のみ有効。
     日本語コンポーネントは &lt;component :is="..."&gt; で使用する。
@@ -94,7 +94,7 @@ const 車両一覧テーブルRef = ref(null);</code></pre>
   :件数制限="件数制限"
   :無効も表示="無効も表示"
   :有効列表示="有効列表示"
-  :戻URL="編集戻URL"
+  :URLメニュー="URLメニュー" :URL戻り先="現在URL戻り先"
 /&gt;</code></pre>
   </section>
 
@@ -125,7 +125,7 @@ defineExpose({
   件数制限: { type: Boolean, default: true },
   無効も表示: { type: Boolean, default: false },
   有効列表示: { type: Boolean, default: false },
-  戻URL: { type: String, default: '' }
+  URLメニュー: { type: String, default: '' }
 });</code></pre>
 
    <h3>columns computed — 有効列の動的 splice</h3>
@@ -201,7 +201,7 @@ defineExpose({
      <tr><td>2</td><td><code>有効列表示 = computed(() =&gt; 無効も表示.value)</code> になっているか</td></tr>
      <tr><td>3</td><td>チェックボックスに <code>@change="handleReload"</code> が付いているか</td></tr>
      <tr><td>4</td><td><code>&lt;component :is="..."&gt;</code> で日本語コンポーネントを使用しているか（タグ名を直接使っていないか）</td></tr>
-     <tr><td>5</td><td>子コンポーネントに <code>:件数制限</code> / <code>:無効も表示</code> / <code>:有効列表示</code> / <code>:戻URL</code> を渡しているか</td></tr>
+     <tr><td>5</td><td>子コンポーネントに <code>:件数制限</code> / <code>:無効も表示</code> / <code>:有効列表示</code> / <code>:URLメニュー</code> を渡しているか</td></tr>
      <tr><td>6</td><td>子コンポーネントに <code>ref="..."</code> が付いており <code>handleReload</code> から <code>?.loadData()</code> を呼んでいるか</td></tr>
      <tr><td>7</td><td>一覧テーブル側で <code>props.件数制限</code> / <code>props.無効も表示</code> を API リクエストボディに含めているか</td></tr>
      <tr><td>8</td><td><code>columns</code> が <code>computed</code> になっており、<code>props.有効列表示</code> で <code>splice</code> しているか</td></tr>
