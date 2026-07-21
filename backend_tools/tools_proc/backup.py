@@ -34,10 +34,17 @@ class BackupCheckError(Exception):
     pass
 
 
-def _load_native_module(project_root: str):
-    """backend_server/AIコア/AIバックアップ.py を動的にロードする"""
+_AIDIY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _load_native_module():
+    """AiDiy 自身の backend_server/AIコア/AIバックアップ.py を動的にロードする。
+
+    バックアップ対象（project_root）は小説執筆フォルダ等プログラムと無関係な場合もあるため、
+    ネイティブ実装は常に AiDiy 自身のものを使う（対象フォルダ側に同名モジュールは不要）。
+    """
     native_path = os.path.join(
-        project_root, "backend_server", "AIコア", "AIバックアップ.py"
+        _AIDIY_ROOT, "backend_server", "AIコア", "AIバックアップ.py"
     )
     if not os.path.isfile(native_path):
         raise BackupSaveError(
@@ -67,7 +74,7 @@ class BackupSave:
 
     def _get_native(self):
         if self._native is None:
-            self._native = _load_native_module(self.root)
+            self._native = _load_native_module()
         return self._native
 
     def run(self) -> dict:
