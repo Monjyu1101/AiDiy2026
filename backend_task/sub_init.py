@@ -154,6 +154,9 @@ flowchart LR
 """
 
 
+JSON保存最大試行回数 = 2
+
+
 def プロンプト生成_JSON保存(分解結果: str, 出力JSONパス: str, 利用者ID: str, タスクID: str, プロジェクト: str, task_ai_name: str, task_ai_model: str) -> str:
     return f"""次の「タスク分解結果」から JSON オブジェクトを取り出し、JSON ファイルとして保存してください。
 ファイルの保存先: {出力JSONパス}
@@ -252,6 +255,32 @@ def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model
     return 行リスト
 
 
+def JSON保存と検証(分解結果: str, 出力JSONパス: str, プロジェクト: str, task_ai_name: str, task_ai_model: str) -> tuple[dict, list[dict]]:
+    """第2ステップ（JSON保存）と第3ステップ（検証）を実行する。失敗時は例外を送出する。"""
+    if os.path.exists(出力JSONパス):
+        os.remove(出力JSONパス)
+
+    ログ(f"第2ステップ: JSON保存 (ai={task_ai_name}, model={task_ai_model}, project_path={AIDIYルート})")
+    res = POST送信(MCP_URL, {
+        "prompt": プロンプト生成_JSON保存(分解結果, 出力JSONパス, 利用者ID, タスクID, プロジェクト, task_ai_name, task_ai_model),
+        "ai_name": task_ai_name,
+        "ai_model": task_ai_model,
+        "project_path": AIDIYルート,
+    })
+    ログ(f"第2ステップ応答: {json.dumps(res, ensure_ascii=False)[:300]}")
+    if res.get("error") or res.get("status") != "OK":
+        raise RuntimeError(f"第2ステップ（JSON保存）に失敗しました: {res.get('error') or res.get('result')}")
+
+    # 第3ステップ: 出力 JSON の確認と検証
+    if not os.path.isfile(出力JSONパス):
+        raise RuntimeError(f"出力 JSON が生成されませんでした: {出力JSONパス}")
+    with open(出力JSONパス, "r", encoding="utf-8-sig") as f:
+        データ = json.load(f)
+    行リスト = JSON検証(データ, task_ai_name, task_ai_model)
+    ログ(f"JSON 検証 OK: 明細 {len(行リスト)} 件")
+    return データ, 行リスト
+
+
 def 本登録(データ: dict, 行リスト: list[dict], 元要求内容: str) -> None:
     # 要求内容は仮登録時の人間の入力をそのまま残し、AI がタスク分解のために整理した
     # 文章（データ["要求内容"]）は応答内容へ送る（人間の元の要求が消えないようにするため）
@@ -332,24 +361,17 @@ def main() -> int:
             raise RuntimeError("第1ステップ（タスク分解）の応答が空です")
 
         # 2. 第2ステップ: AiDiy ルート（"../"）で AI が既定形式の JSON を temp/output へ書き込む
-        ログ(f"第2ステップ: JSON保存 (ai={task_ai_name}, model={task_ai_model}, project_path={AIDIYルート})")
-        res = POST送信(MCP_URL, {
-            "prompt": プロンプト生成_JSON保存(分解結果, 出力JSONパス, 利用者ID, タスクID, プロジェクト, task_ai_name, task_ai_model),
-            "ai_name": task_ai_name,
-            "ai_model": task_ai_model,
-            "project_path": AIDIYルート,
-        })
-        ログ(f"第2ステップ応答: {json.dumps(res, ensure_ascii=False)[:300]}")
-        if res.get("error") or res.get("status") != "OK":
-            raise RuntimeError(f"第2ステップ（JSON保存）に失敗しました: {res.get('error') or res.get('result')}")
-
-        # 3. 出力 JSON の確認と検証
-        if not os.path.isfile(出力JSONパス):
-            raise RuntimeError(f"出力 JSON が生成されませんでした: {出力JSONパス}")
-        with open(出力JSONパス, "r", encoding="utf-8-sig") as f:
-            データ = json.load(f)
-        行リスト = JSON検証(データ, task_ai_name, task_ai_model)
-        ログ(f"JSON 検証 OK: 明細 {len(行リスト)} 件")
+        # 3. 第3ステップ: 出力 JSON の確認と検証
+        # JSON保存・検証は AI 応答の揺れで失敗することがあるため、1回だけ自動リトライする
+        for 試行 in range(1, JSON保存最大試行回数 + 1):
+            try:
+                データ, 行リスト = JSON保存と検証(分解結果, 出力JSONパス, プロジェクト, task_ai_name, task_ai_model)
+                break
+            except Exception as e:
+                ログ(f"第2/第3ステップ 試行{試行}回目 失敗: {e}")
+                if 試行 >= JSON保存最大試行回数:
+                    raise
+                ログ("自動リカバリー: 第2ステップ（JSON保存）を再試行します")
 
         # 4. DB へ本登録（仮登録は置き換え）
         本登録(データ, 行リスト, 要求内容)

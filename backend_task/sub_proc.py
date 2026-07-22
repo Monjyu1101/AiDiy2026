@@ -20,6 +20,8 @@
    （ステップ0 開始 の応答内容は処理目標、実行済ステップの応答内容は作業記録として渡す）
 4. aidiy_code_agents MCP へ、指定プロジェクトフォルダ・指定 AI で「このステップだけ実行」を依頼する
 5. 正常時は /task/タスク明細/完了、エラー時は /task/タスク明細/失敗 を呼ぶ
+   （操作検証ありの明細は、AI が /task_check_okng で報告した状態を確認する。
+   　書き込みなし・エラーのいずれかの場合は、検証結果を踏まえて1回だけ自動リトライする）
 """
 
 from __future__ import annotations
@@ -77,19 +79,30 @@ def 明細行整形(行: dict) -> dict:
     }
 
 
-def 完了明細一覧取得() -> list[dict]:
-    """完了済みの AIタスク明細（応答内容つき）を明細SEQ順で返す。"""
+def 明細一覧取得() -> list[dict]:
+    """AIタスク明細の全件（状態フィルタなし）を返す。"""
     res = POST送信(f"{TASK_API}/タスク明細/一覧", {
         "利用者ID": 利用者ID,
         "タスクID": タスクID,
     }, timeout=60)
     if res.get("status") != "OK":
         raise RuntimeError(f"タスク明細一覧の取得に失敗しました: {res.get('message')}")
-    items = res.get("data", {}).get("items", [])
-    return [行 for 行 in items if str(行.get("状態", "")).strip() == "完了"]
+    return res.get("data", {}).get("items", [])
 
 
-def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict]) -> str:
+def 明細1件取得(全明細: list[dict], 対象SEQ: int) -> dict:
+    for 行 in 全明細:
+        if int(行.get("明細SEQ", -1)) == 対象SEQ:
+            return 行
+    return {}
+
+
+def 完了明細一覧取得() -> list[dict]:
+    """完了済みの AIタスク明細（応答内容つき）を明細SEQ順で返す。"""
+    return [行 for 行 in 明細一覧取得() if str(行.get("状態", "")).strip() == "完了"]
+
+
+def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict], 前回失敗理由: str = "") -> str:
     全ステップ = "\n".join(
         f"  {int(行['明細SEQ'])}. {str(行['タイトル']).strip()}（先行SEQ: {str(行['先行SEQ']).strip() or 'なし'}）"
         for 行 in データ["明細"]
@@ -113,6 +126,13 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
   Body: {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証内容の要約"}}
   検証で問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。
 """
+    リトライブロック = ""
+    if 前回失敗理由:
+        リトライブロック = f"""
+【前回試行の検証結果】前回このステップを実行しましたが、検証NGまたは検証結果の未報告により
+やり直しになっています。次の内容を踏まえて、問題を解消したうえで再実行してください。
+前回の理由: {前回失敗理由}
+"""
     return f"""あなたはタスクの 1 ステップを実行する担当です。今回のステップの作業だけを実行してください。
 
 タスク全体のタイトル: {str(データ.get('タイトル', '')).strip()}
@@ -126,7 +146,7 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
 【今回のステップ】※この処理だけ実行してください。
 ステップ{対象['明細SEQ']} {対象['タイトル']}
 {対象['要求内容']}
-{操作検証ブロック}
+{リトライブロック}{操作検証ブロック}
 注意:
 - 今回のステップの作業のみを行い、先行・後続ステップの作業は行わないでください。
 - AiDiy の MCP ツールが HTTP で利用できます。
@@ -168,6 +188,17 @@ def 完了報告(応答内容: str) -> None:
     }, timeout=60)
     if res.get("status") != "OK":
         raise RuntimeError(f"完了報告に失敗しました: {res.get('message')}")
+
+
+def 再試行登録() -> None:
+    """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す。"""
+    res = POST送信(f"{TASK_API}/タスク明細/再試行", {
+        "利用者ID": 利用者ID,
+        "タスクID": タスクID,
+        "明細SEQ": 明細SEQ,
+    }, timeout=60)
+    if res.get("status") != "OK":
+        raise RuntimeError(f"明細の再試行登録に失敗しました: {res.get('message')}")
 
 
 def 失敗報告(メッセージ: str) -> None:
@@ -240,22 +271,51 @@ def main() -> int:
         ログ(f"完了明細取得: {len(完了明細)} 件")
 
         # 5. code_agents へステップ実行を依頼（指定プロジェクトフォルダ・指定 AI）
+        # 6. 操作検証ありの明細は、AI が task_check_okng で報告した状態を確認する。
+        #    書き込みなし・エラーのいずれかの場合は、検証結果を踏まえて1回だけ自動リトライする
         task_ai_name = 対象.get("TASK_AI_NAME") or TASK_AI_NAME既定
         task_ai_model = 対象.get("TASK_AI_MODEL") or TASK_AI_MODEL既定
-        ログ(f"code_agents run 呼び出し (タイトル={対象['タイトル']}, ai={task_ai_name}, model={task_ai_model}, project_path={プロジェクト})")
-        payload = {"prompt": プロンプト生成(データ, 対象, 完了明細), "ai_name": task_ai_name, "ai_model": task_ai_model}
-        if プロジェクト:
-            payload["project_path"] = プロジェクト
-        res = POST送信(MCP_URL, payload)
-        ログ(f"code_agents run 応答: {json.dumps(res, ensure_ascii=False)[:500]}")
-        if res.get("error") or res.get("status") != "OK":
-            raise RuntimeError(f"code_agents の実行に失敗しました: {res.get('error') or res.get('result')}")
+        最大試行回数 = 2 if 対象.get("操作検証") else 1
+        前回失敗理由 = ""
+        for 試行 in range(1, 最大試行回数 + 1):
+            ログ(f"code_agents run 呼び出し (試行{試行}/{最大試行回数}, タイトル={対象['タイトル']}, ai={task_ai_name}, model={task_ai_model}, project_path={プロジェクト})")
+            payload = {
+                "prompt": プロンプト生成(データ, 対象, 完了明細, 前回失敗理由),
+                "ai_name": task_ai_name,
+                "ai_model": task_ai_model,
+            }
+            if プロジェクト:
+                payload["project_path"] = プロジェクト
+            res = POST送信(MCP_URL, payload)
+            ログ(f"code_agents run 応答: {json.dumps(res, ensure_ascii=False)[:500]}")
 
-        # 6. 完了報告
-        応答内容 = str(res.get("result") or json.dumps(res, ensure_ascii=False))
-        完了報告(応答内容)
-        ログ("ステップ完了")
-        return 0
+            失敗理由 = ""
+            if res.get("error") or res.get("status") != "OK":
+                失敗理由 = f"code_agents の実行に失敗しました: {res.get('error') or res.get('result')}"
+            elif not 対象.get("操作検証"):
+                # 操作検証なし: そのまま完了報告
+                応答内容 = str(res.get("result") or json.dumps(res, ensure_ascii=False))
+                完了報告(応答内容)
+                ログ("ステップ完了")
+                return 0
+            else:
+                # 操作検証あり: AI が task_check_okng で報告した状態を確認する
+                最終行 = 明細1件取得(明細一覧取得(), 明細SEQ)
+                最終状態 = str(最終行.get("状態", "")).strip()
+                if 最終状態 == "完了":
+                    ログ("ステップ完了（操作検証OK）")
+                    return 0
+                elif 最終状態 == "エラー":
+                    失敗理由 = str(最終行.get("応答内容", "")).strip() or "操作検証でNGと判定されました。"
+                else:
+                    失敗理由 = f"操作検証の結果がAIから報告されませんでした（task_check_okng 未呼び出し、現状態={最終状態 or '不明'}）。"
+
+            if 試行 >= 最大試行回数:
+                raise RuntimeError(失敗理由)
+            ログ(f"試行{試行}回目 失敗: {失敗理由}")
+            ログ("自動リカバリー: 検証結果を踏まえてステップを再試行します")
+            前回失敗理由 = 失敗理由
+            再試行登録()
 
     except Exception as e:
         ログ(f"エラー: {e}\n{traceback.format_exc()}")

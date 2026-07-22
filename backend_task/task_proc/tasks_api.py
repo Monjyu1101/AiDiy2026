@@ -171,6 +171,12 @@ class タスク明細失敗リクエスト(BaseModel):
     メッセージ: str = ""
 
 
+class タスク明細再試行リクエスト(BaseModel):
+    利用者ID: str
+    タスクID: str
+    明細SEQ: int
+
+
 class タスク検証OKNGリクエスト(BaseModel):
     """AIエージェントが操作検証の結果を直接報告するためのリクエスト（task_check_okng 用）。"""
     利用者ID: str
@@ -706,6 +712,20 @@ async def タスク明細失敗(request: タスク明細失敗リクエスト) -
     except Exception as e:
         logger.error(f"タスク明細の失敗登録に失敗: {e}")
         return _NG(f"タスク明細の失敗登録に失敗しました: {e}")
+
+
+@router.post("/タスク明細/再試行", tags=["タスク明細"])
+async def タスク明細再試行(request: タスク明細再試行リクエスト) -> dict:
+    """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す（sub_proc.py 用）。"""
+    try:
+        利用者ID = request.利用者ID.strip()
+        if not 利用者ID:
+            return _NG("利用者IDを指定してください。")
+        item = tasks_db.明細再試行(利用者ID, request.タスクID, request.明細SEQ)
+        return _OK({"item": item}, f"タスク {request.タスクID} SEQ{request.明細SEQ} を再試行のため実行中に戻しました。")
+    except Exception as e:
+        logger.error(f"タスク明細の再試行登録に失敗: {e}")
+        return _NG(f"タスク明細の再試行登録に失敗しました: {e}")
 
 
 @check_router.post("/task_check_okng", tags=["タスク明細"])
