@@ -69,6 +69,7 @@ TASK_AI_MODEL既定 = "auto"
     "先行SEQ",
     "TASK_AI_NAME",
     "TASK_AI_MODEL",
+    "操作検証",
     "実行有効",
     "状態",
     "PID",
@@ -261,6 +262,7 @@ def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
             先行SEQ TEXT NOT NULL DEFAULT '',
             TASK_AI_NAME TEXT NOT NULL DEFAULT 'claude_cli',
             TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
+            操作検証 INTEGER NOT NULL DEFAULT 0,
             実行有効 INTEGER NOT NULL DEFAULT 1,
             状態 TEXT NOT NULL DEFAULT '待機',
             PID TEXT NOT NULL DEFAULT '',
@@ -356,6 +358,8 @@ def _AIタスク明細テーブル再作成(conn: sqlite3.Connection) -> None:
             elif カラム == "実行有効":
                 # 旧カラム名「有効」からの移行時は値を引き継ぐ
                 select_exprs.append(_識別子("有効") if "有効" in 旧カラム else "1")
+            elif カラム == "操作検証":
+                select_exprs.append("0")
             else:
                 select_exprs.append("''")
         conn.execute(
@@ -569,7 +573,7 @@ def タスク明細一覧(利用者ID: str, タスクID: str) -> list[dict]:
     conn = 接続取得()
     try:
         rows = conn.execute(
-            "SELECT 利用者ID, タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, "
+            "SELECT 利用者ID, タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 操作検証, 実行有効, 状態, "
             f"PID, 開始日時, 終了日時, 実行回数, 応答内容, 更新日時 FROM {AIタスク明細テーブル} "
             "WHERE 利用者ID = ? AND タスクID = ? ORDER BY 明細SEQ",
             [利用者ID, タスクID],
@@ -584,7 +588,7 @@ def タスク明細取得(利用者ID: str, タスクID: str, 明細SEQ: int) ->
     conn = 接続取得()
     try:
         row = conn.execute(
-            "SELECT 利用者ID, タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, "
+            "SELECT 利用者ID, タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 操作検証, 実行有効, 状態, "
             f"PID, 開始日時, 終了日時, 実行回数, 応答内容 FROM {AIタスク明細テーブル} "
             "WHERE 利用者ID = ? AND タスクID = ? AND 明細SEQ = ?",
             [利用者ID, タスクID, 明細SEQ],
@@ -1308,6 +1312,7 @@ def 明細更新登録(
     先行SEQ: str,
     TASK_AI_NAME: str,
     TASK_AI_MODEL: str,
+    操作検証: bool,
     実行有効: bool,
     状態: str,
 ) -> dict:
@@ -1318,16 +1323,16 @@ def 明細更新登録(
         now = _現在日時()
         if 状態 == "待機":
             cur = conn.execute(
-                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 開始日時 = '', 終了日時 = '', 実行回数 = 0, 応答内容 = '', 更新日時 = ? "
                 "WHERE 利用者ID = ? AND タスクID = ? AND 明細SEQ = ?",
-                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, 利用者ID, タスクID, 明細SEQ],
+                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, 利用者ID, タスクID, 明細SEQ],
             )
         else:
             cur = conn.execute(
-                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 更新日時 = ? WHERE 利用者ID = ? AND タスクID = ? AND 明細SEQ = ?",
-                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, 利用者ID, タスクID, 明細SEQ],
+                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, 利用者ID, タスクID, 明細SEQ],
             )
         conn.execute(
             f"UPDATE {AIタスク要求テーブル} SET 更新日時 = ? WHERE 利用者ID = ? AND タスクID = ?",
@@ -1514,8 +1519,8 @@ def タスク本登録(
         for 行 in 明細:
             明細SEQ = int(行["明細SEQ"])
             conn.execute(
-                f"INSERT INTO {AIタスク明細テーブル} (利用者ID, タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, {監査カラム}) "
-                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
+                f"INSERT INTO {AIタスク明細テーブル} (利用者ID, タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 操作検証, 実行有効, 状態, {監査カラム}) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
                 [
                     利用者ID,
                     タスクID,
@@ -1525,6 +1530,7 @@ def タスク本登録(
                     str(行.get("先行SEQ", "")),
                     要求TASK_AI_NAME,
                     要求TASK_AI_MODEL,
+                    1 if 行.get("操作検証") else 0,
                     実行有効値,
                     "待機",
                     *監査値,

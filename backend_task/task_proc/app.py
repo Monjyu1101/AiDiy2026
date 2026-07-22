@@ -19,6 +19,7 @@ from log_config import get_logger
 from .routes import router
 from .runtime import build_lifespan, setup_reboot_watcher
 from .tasks_api import router as tasks_router
+from .tasks_api import check_router
 
 
 def create_app() -> FastAPI:
@@ -35,5 +36,6 @@ def create_app() -> FastAPI:
     )
     task_app.include_router(router)
     task_app.include_router(tasks_router)
+    task_app.include_router(check_router)
     setup_reboot_watcher(logger)
     return task_app

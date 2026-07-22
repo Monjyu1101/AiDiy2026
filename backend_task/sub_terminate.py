@@ -10,17 +10,23 @@
 
 """AIタスクの終了明細を処理するサブプロセス。
 
-終了明細では最終ステータス更新の前に、sub_proc と同様の内容（処理目標と
-実行済ステップの記録）を指定プロジェクトフォルダ・指定 AI へ渡し、
-各実行ステップの検証と最終結果の検証を行って結論を応答内容へ記録する。
+終了明細（DB上の操作検証フラグ、他のいずれかの明細でファイル操作があれば true）に
+応じて処理を分岐する。
+- 操作検証=false: ファイル操作を伴う明細が無いため、AIを介さずそのまま終了完了にする
+- 操作検証=true : sub_proc と同様の内容（処理目標と実行済ステップの記録）を指定
+  プロジェクトフォルダ・指定 AI へ渡し、最終検証と結論の task_check_okng 報告を依頼する。
+  AI が報告せずに戻ってきた場合は、明細を強制的にエラーで確定する。
 標準ライブラリのみで動作する。
 
 処理の流れ:
 1. 出力 JSON（AI 生成のタスク分解結果）から対象 SEQ（終了明細）を特定する
 2. /task/タスク要求/取得 でプロジェクトを取得する
-3. /task/タスク明細/一覧 から完了済み明細の応答内容を取得する
-4. aidiy_code_agents MCP へ各実行ステップの検証と最終結果の検証を依頼する
-5. 検証の結論を応答内容として /task/タスク明細/終了完了 を呼ぶ
+3. /task/タスク明細/一覧 から全明細（完了済みの応答内容、対象行の操作検証フラグ）を取得する
+4. 操作検証=false なら /task/タスク明細/終了完了 を呼んで終了する
+5. 操作検証=true なら aidiy_code_agents MCP へ最終検証を依頼し、結論は AI 自身が
+   http://localhost:8093/task_check_okng へ直接報告する
+6. AI 応答後に明細の状態を確認し、完了/エラーのいずれにも更新されていなければ
+   /task/タスク明細/失敗 で強制的にエラーにする
 """
 
 from __future__ import annotations
@@ -40,6 +46,7 @@ TASK_AI_MODEL既定 = "auto"
 
 タスクID = ""
 利用者ID = ""
+明細SEQ = 0
 ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_terminate.log")
 
 
@@ -74,16 +81,22 @@ def タスク要求取得() -> dict:
     return res.get("data", {}).get("item", {})
 
 
-def 完了明細一覧取得() -> list[dict]:
-    """完了済みの AIタスク明細（応答内容つき）を明細SEQ順で返す。"""
+def 明細一覧取得() -> list[dict]:
+    """AIタスク明細の全件（状態フィルタなし）を返す。DB上の操作検証フラグもここから取れる。"""
     res = POST送信(f"{TASK_API}/タスク明細/一覧", {
         "利用者ID": 利用者ID,
         "タスクID": タスクID,
     }, timeout=60)
     if res.get("status") != "OK":
         raise RuntimeError(f"タスク明細一覧の取得に失敗しました: {res.get('message')}")
-    items = res.get("data", {}).get("items", [])
-    return [行 for 行 in items if str(行.get("状態", "")).strip() == "完了"]
+    return res.get("data", {}).get("items", [])
+
+
+def 明細1件取得(全明細: list[dict], 対象SEQ: int) -> dict:
+    for 行 in 全明細:
+        if int(行.get("明細SEQ", -1)) == 対象SEQ:
+            return 行
+    return {}
 
 
 def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict]) -> str:
@@ -99,7 +112,7 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
         見出し = f"ステップ{seq} {タイトル} " + ("処理目標" if seq == 0 else "実行済")
         実行済.append(f"``` {見出し}\n{応答内容}\n```")
     実行済ブロック = "\n".join(実行済) if 実行済 else "（実行済ステップはまだありません）"
-    return f"""あなたはタスクの 1 ステップを実行する担当です。今回のステップの作業だけを実行してください。
+    return f"""あなたはタスク全体の最終検証（操作検証）を行う担当です。今回は検証のみを行ってください。
 
 タスク全体のタイトル: {str(データ.get('タイトル', '')).strip()}
 
@@ -109,7 +122,7 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
 実行済ステップの記録（ステップ0 開始 の応答内容が処理目標です）:
 {実行済ブロック}
 
-【今回のステップ】※この処理だけ実行してください。
+【今回のステップ】※検証のみを行ってください。
 ステップ{対象['明細SEQ']} {対象['タイトル']}
 各実行ステップの検証と最終結果の検証をお願いします。
 
@@ -121,12 +134,20 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
   ツール一覧の確認: GET http://localhost:8095/<mcp名>/list
   ツールの実行: POST http://localhost:8095/<mcp名>/<メソッド> （JSON ボディ）
   例: aidiy_notification_sounds, aidiy_sqlite, aidiy_chrome_devtools など
-- 検証した内容と結論（成功 / 問題あり）を簡潔に報告してください。
+- 検証結果は必ず次の HTTP エンドポイントへ直接報告してください（あなた自身が curl 等で呼び出します）。
+  POST http://localhost:8093/task_check_okng
+  Content-Type: application/json
+  Body: {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証結論の要約"}}
+  問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。
+  この報告が今回のステップの完了条件です。報告を行わずに終えないでください。
 """
 
 
 def 検証実行(データ: dict, 対象: dict, 完了明細: list[dict], プロジェクト: str) -> str:
-    """code_agents で各実行ステップと最終結果を検証し、結論を返す（失敗しても例外にしない）。"""
+    """code_agents で各実行ステップと最終結果を検証させる（結論は AI が task_check_okng へ報告する）。
+
+    失敗しても例外にはしない。呼び出し元は AI 応答後に明細の状態を見て成否を判定する。
+    """
     try:
         task_ai_name = str(対象.get("TASK_AI_NAME", "") or TASK_AI_NAME既定).strip()
         task_ai_model = str(対象.get("TASK_AI_MODEL", "") or TASK_AI_MODEL既定).strip()
@@ -138,15 +159,28 @@ def 検証実行(データ: dict, 対象: dict, 完了明細: list[dict], プロ
         ログ(f"code_agents run 応答: {json.dumps(res, ensure_ascii=False)[:500]}")
         if res.get("error") or res.get("status") != "OK":
             raise RuntimeError(f"code_agents の実行に失敗しました: {res.get('error') or res.get('result')}")
-        結論 = str(res.get("result") or "").strip()
-        return 結論 or "終了処理を完了しました。"
+        return str(res.get("result") or "").strip()
     except Exception as e:
-        ログ(f"検証失敗: {e}")
-        return f"終了処理を完了しました。\n[注意] 検証失敗: {e}"
+        ログ(f"検証実行失敗: {e}")
+        return f"[注意] 検証実行失敗: {e}"
+
+
+def 失敗報告(メッセージ: str) -> None:
+    if not 利用者ID or not タスクID or not 明細SEQ:
+        return
+    try:
+        POST送信(f"{TASK_API}/タスク明細/失敗", {
+            "利用者ID": 利用者ID,
+            "タスクID": タスクID,
+            "明細SEQ": 明細SEQ,
+            "メッセージ": メッセージ[:500],
+        }, timeout=60)
+    except Exception as e:
+        ログ(f"失敗報告もエラー: {e}")
 
 
 def main() -> int:
-    global タスクID, 利用者ID, ログパス
+    global タスクID, 利用者ID, 明細SEQ, ログパス
     try:
         if len(sys.argv) < 3:
             raise ValueError("使い方: python sub_terminate.py <temp/output/利用者ID.タスクID.json> <SEQ>")
@@ -176,26 +210,46 @@ def main() -> int:
         要求 = タスク要求取得()
         プロジェクト = str(要求.get("プロジェクト", "")).strip()
 
-        # 3. 完了済み明細の応答内容を取得（ステップ0 の処理目標と実行済ステップの記録）
-        完了明細 = 完了明細一覧取得()
-        ログ(f"完了明細取得: {len(完了明細)} 件")
+        # 3. 全明細を取得（完了済み明細の応答内容 と、対象行の DB 上の操作検証フラグ）
+        全明細 = 明細一覧取得()
+        完了明細 = [行 for 行 in 全明細 if str(行.get("状態", "")).strip() == "完了"]
+        操作検証 = bool(明細1件取得(全明細, 明細SEQ).get("操作検証", False))
+        ログ(f"完了明細取得: {len(完了明細)} 件, 操作検証={操作検証}")
 
-        # 4. 各実行ステップの検証と最終結果の検証（結論を応答内容にする）
-        応答内容 = 検証実行(データ, 対象, 完了明細, プロジェクト)
+        if not 操作検証:
+            # 4a. ファイル操作を伴う明細が無いため、AIを介さずそのまま終了完了にする
+            res = POST送信(f"{TASK_API}/タスク明細/終了完了", {
+                "利用者ID": 利用者ID,
+                "タスクID": タスクID,
+                "明細SEQ": 明細SEQ,
+                "応答内容": "操作検証対象のファイル操作がないため、終了処理を完了しました。",
+            }, timeout=60)
+            if res.get("status") != "OK":
+                raise RuntimeError(f"終了完了報告に失敗しました: {res.get('message')}")
+            ログ("終了処理 完了（操作検証なし）")
+            return 0
 
-        # 5. 検証の結論を応答内容として終了明細を完了
-        res = POST送信(f"{TASK_API}/タスク明細/終了完了", {
-            "利用者ID": 利用者ID,
-            "タスクID": タスクID,
-            "明細SEQ": 明細SEQ,
-            "応答内容": 応答内容,
-        }, timeout=60)
-        if res.get("status") != "OK":
-            raise RuntimeError(f"終了完了報告に失敗しました: {res.get('message')}")
-        ログ("終了処理 完了")
-        return 0
+        # 4b. 操作検証あり: これまでの応答結果を全て渡し、AIに最終検証と
+        #     task_check_okng による状態報告を依頼する（状態更新は AI 自身が行う）
+        結論 = 検証実行(データ, 対象, 完了明細, プロジェクト)
+        ログ(f"検証結果: {結論[:300]}")
+
+        # 5. AIが task_check_okng で状態を更新したか確認する
+        最終行 = 明細1件取得(明細一覧取得(), 明細SEQ)
+        最終状態 = str(最終行.get("状態", "")).strip()
+
+        # 6. 完了/エラーのいずれにも更新されていなければ、強制的にエラーで確定する
+        if 最終状態 not in ("完了", "エラー"):
+            ログ(f"AIによる状態報告がありませんでした（現状態={最終状態 or '不明'}）。強制的にエラーにします。")
+            失敗報告("操作検証の結果がAIから報告されませんでした（task_check_okng 未呼び出し）。")
+            return 1
+
+        ログ(f"終了処理 完了（操作検証あり、状態={最終状態}）")
+        return 0 if 最終状態 == "完了" else 1
+
     except Exception as e:
         ログ(f"エラー: {e}\n{traceback.format_exc()}")
+        失敗報告(str(e))
         return 1
 
 

@@ -39,6 +39,7 @@ const columns: Column[] = [
   { key: '明細SEQ', label: 'SEQ', width: '50px', sortable: false, align: 'center' },
   { key: 'タイトル', label: 'タイトル', width: '150px', sortable: false },
   { key: '先行SEQ', label: '先行SEQ', width: '80px', sortable: false, align: 'center' },
+  { key: '操作検証', label: '操作検証', width: '60px', sortable: false, align: 'center' },
   { key: '実行有効', label: '実行有効', width: '60px', sortable: false, align: 'center' },
   { key: '状態', label: '状態', width: '90px', sortable: false, align: 'center' },
   { key: 'PID', label: 'PID', width: '60px', sortable: false, align: 'center' },
@@ -251,6 +252,9 @@ onBeforeUnmount(() => {
               class="seq-link"
               @click.prevent="修正ダイアログ表示(row)"
             >{{ value ?? '' }}</a>
+          </template>
+          <template v-else-if="column.key === '操作検証'">
+            <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="操作検証状態" />
           </template>
           <template v-else-if="column.key === '実行有効'">
             <button

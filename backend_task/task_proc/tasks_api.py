@@ -32,6 +32,10 @@ logger = get_logger("tasks_api")
 
 router = APIRouter(prefix="/task")
 
+# AIエージェント（code_agents 実行中の AI 自身）が curl 等で直接呼べるよう、
+# 日本語パスの percent-encode を避けた ASCII 専用の無プレフィックスルーター
+check_router = APIRouter()
+
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _出力DIR = os.path.join(_BASE_DIR, "temp", "output")
 
@@ -118,6 +122,7 @@ class タスク明細更新登録リクエスト(BaseModel):
     先行SEQ: str = ""
     TASK_AI_NAME: str = "claude_cli"
     TASK_AI_MODEL: str = "auto"
+    操作検証: bool = False
     実行有効: bool = True
     状態: str = "待機"
 
@@ -163,6 +168,15 @@ class タスク明細失敗リクエスト(BaseModel):
     利用者ID: str
     タスクID: str
     明細SEQ: int
+    メッセージ: str = ""
+
+
+class タスク検証OKNGリクエスト(BaseModel):
+    """AIエージェントが操作検証の結果を直接報告するためのリクエスト（task_check_okng 用）。"""
+    利用者ID: str
+    タスクID: str
+    SEQ: int
+    状態: str
     メッセージ: str = ""
 
 
@@ -566,6 +580,7 @@ async def タスク明細更新登録(request: タスク明細更新登録リク
             先行SEQ,
             request.TASK_AI_NAME.strip() or "claude_cli",
             request.TASK_AI_MODEL.strip() or "auto",
+            request.操作検証,
             request.実行有効,
             状態,
         )
@@ -691,3 +706,28 @@ async def タスク明細失敗(request: タスク明細失敗リクエスト) -
     except Exception as e:
         logger.error(f"タスク明細の失敗登録に失敗: {e}")
         return _NG(f"タスク明細の失敗登録に失敗しました: {e}")
+
+
+@check_router.post("/task_check_okng", tags=["タスク明細"])
+async def task_check_okng(request: タスク検証OKNGリクエスト) -> dict:
+    """操作検証の結果を AI エージェントから直接報告してもらうための ASCII エンドポイント。
+
+    http://localhost:8093/task_check_okng で日本語パスの percent-encode なしに呼べる。
+    状態='完了' は 明細完了 と同じ扱い、状態='エラー' は 明細失敗 と同じ扱いで DB を更新する。
+    """
+    利用者ID = request.利用者ID.strip()
+    タスクID = request.タスクID.strip()
+    状態 = request.状態.strip()
+    if not 利用者ID or not タスクID:
+        return _NG("利用者IDとタスクIDを指定してください。")
+    if 状態 not in ("完了", "エラー"):
+        return _NG("状態は 完了 または エラー を指定してください。")
+    try:
+        if 状態 == "完了":
+            item = tasks_db.明細完了(利用者ID, タスクID, request.SEQ, request.メッセージ)
+            return _OK({"item": item}, f"タスク {タスクID} SEQ{request.SEQ} を完了として登録しました。")
+        item = tasks_db.明細失敗(利用者ID, タスクID, request.SEQ, request.メッセージ or "操作検証NG")
+        return _OK({"item": item}, f"タスク {タスクID} SEQ{request.SEQ} をエラーとして登録しました。")
+    except Exception as e:
+        logger.error(f"task_check_okng の更新に失敗: {e}")
+        return _NG(f"task_check_okng の更新に失敗しました: {e}")

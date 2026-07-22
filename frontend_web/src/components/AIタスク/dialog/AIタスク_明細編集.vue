@@ -20,6 +20,7 @@ const 入力要求内容 = ref('');
 const 入力先行SEQ = ref('');
 const 入力TASK_AI_NAME = ref('claude_cli');
 const 入力TASK_AI_MODEL = ref('auto');
+const 入力操作検証 = ref(false);
 const 入力実行有効 = ref(true);
 const 入力状態 = ref('待機');
 const 状態選択肢 = ['待機', '中止'];
@@ -84,6 +85,7 @@ watch(() => props.isOpen, (open) => {
     入力TASK_AI_NAME.value = chooseAvailable(編集.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'claude_cli', taskAiOptions.value) || 'claude_cli';
     入力TASK_AI_MODEL.value = chooseAvailable(編集.TASK_AI_MODEL || currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
   });
+  入力操作検証.value = Boolean(編集.操作検証);
   入力実行有効.value = Boolean(編集.実行有効);
   入力状態.value = String(編集.状態 ?? '待機') || '待機';
 });
@@ -112,6 +114,7 @@ const 登録 = async () => {
       先行SEQ: 入力先行SEQ.value.trim(),
       TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
       TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
+      操作検証: 入力操作検証.value,
       実行有効: 入力実行有効.value,
       状態: 入力状態.value
     });
@@ -197,6 +200,20 @@ const 登録 = async () => {
             <select v-model="入力TASK_AI_MODEL" class="detail-select">
               <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
             </select>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">操作検証</div>
+          <div class="detail-value">
+            <label class="valid-checkbox-label">
+              <input
+                v-model="入力操作検証"
+                type="checkbox"
+                class="valid-checkbox"
+                aria-label="操作検証の切り替え"
+              />
+              <span class="valid-checkbox-mark" :class="{ 'valid-checkbox-inactive': !入力操作検証 }">{{ 入力操作検証 ? '✅' : '☐' }}</span>
+            </label>
           </div>
         </div>
         <div class="detail-row">
