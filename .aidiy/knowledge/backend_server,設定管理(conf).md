@@ -55,11 +55,11 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 | `get(key, default)` | dict 形式フォールバック |
 | `update(dict)` | 複数キーを一括更新 |
 
-### DEFAULT_CONFIG のキー構成（46 キー）
+### DEFAULT_CONFIG のキー構成
 
 | カテゴリ | 主なキー |
 |---------|---------|
-| WebUI | `WEB_BASE`, `CORE_BASE`, `WEBUI_FIRST_PAGE` |
+| サービス / WebUI | `WEB_BASE`, `CORE_BASE`, `AVATAR_BASE`, `TASK_BASE`, `TEAM_BASE`, `LOCAL_BASE`, `TOOLS_BASE`, `APPS_BASE`, `WEBUI_FIRST_PAGE` |
 | API Key | `gemini_key_id`, `freeai_key_id`, `claude_key_id`, `openai_key_id`, `copilot_key_id`, `openrt_key_id`, `ollama_key_id` |
 | OpenAI/Azure | `openai_api_type`, `openai_organization`, `azure_endpoint`, `azure_version`, `azure_key_id` |
 | Ollama | `ollama_host` |

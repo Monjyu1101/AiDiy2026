@@ -44,7 +44,7 @@ AUTO_MODE = False
 
 # VS Code chatLanguageModels.json 用設定 — aidiy_local (backend_local)
 LOCAL_CHAT_PROVIDER_NAME = "aidiy_local"
-LOCAL_CHAT_URL = "http://127.0.0.1:8094/v1/chat/completions"
+LOCAL_CHAT_URL = "http://127.0.0.1:8096/v1/chat/completions"
 LOCAL_CHAT_MODEL_IDS_FALLBACK = [
     "google/gemma-4-E2B-it",
     "google/gemma-4-E4B-it",
@@ -404,7 +404,7 @@ def setup(choices: dict | None = None) -> bool:
     label = "バックエンド(local)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {BACKEND_LOCAL_DIR}")
-    print_info("対象: ローカル LLM / OpenAI 互換 API (ポート 8094)")
+    print_info("対象: ローカル LLM / OpenAI 互換 API (ポート 8096)")
 
     if not BACKEND_LOCAL_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {BACKEND_LOCAL_DIR}")

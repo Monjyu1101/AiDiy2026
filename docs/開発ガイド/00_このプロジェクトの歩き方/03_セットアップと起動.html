@@ -164,7 +164,7 @@ python _start.py</code></pre>
  <h3>_start.py が行うこと</h3>
  <p>起動時に次の6項目を順に確認します（既定値は( )内の通り）。</p>
  <ul>
- <li>バックエンド(local) を起動するか（既定: No、ポート8094、ローカルLLM）</li>
+ <li>バックエンド(local) を起動するか（既定: No、ポート8096、ローカルLLM）</li>
  <li>バックエンド(tools) を起動するか（既定: Yes、ポート8095、MCPサーバー群）</li>
  <li>バックエンド(core,apps) を起動するか（既定: Yes、ポート8091/9098）</li>
  <li>バックエンド(task) を起動するか（既定: Yes、ポート8093）</li>
@@ -176,7 +176,7 @@ python _start.py</code></pre>
  <div>
  <strong>_start.py の動作詳細</strong>
  <ul>
- <li>選択したサービスのポート（8090/8091/9098/8092/8093/8094/8095）を使用中のプロセスを自動で停止</li>
+ <li>選択したサービスのポート（8090/8091/9098/8092/8093/8096/8095）を使用中のプロセスを自動で停止</li>
  <li>Web は <code>http://localhost:8090</code>、Avatar は <code>http://127.0.0.1:8092</code> を自動で開く</li>
  <li>サーバーがクラッシュした場合、15秒後に自動再起動</li>
  <li>Ctrl+C で全サーバーを一括停止</li>
@@ -196,7 +196,7 @@ python _start.py</code></pre>
 
  <div>
  <strong>ポートが使用中の場合</strong>
- <p>選択したサービスのポート（8090/8091/9098/8092/8093/8094/8095）が既に使用されている場合はエラーになります。<br>
+ <p>選択したサービスのポート（8090/8091/9098/8092/8093/8096/8095）が既に使用されている場合はエラーになります。<br>
  その場合は <code>python.exe</code> や <code>node.exe</code> のプロセスを終了してから再起動してください。</p>
  </div>
  </section>
@@ -223,7 +223,7 @@ python _start.py</code></pre>
 
  <h3>ローカルLLM サーバー (backend_local、必要時のみ)</h3>
  <pre><code>cd workspace/AiDiy2026/backend_local
-.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8094</code></pre>
+.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096</code></pre>
 
  <h3>Command Hermes (常駐しないCLI)</h3>
  <pre><code>cd workspace/AiDiy2026/command_hermes

@@ -1,0 +1,16 @@
+[project]
+name = "aidiy-backend-team"
+version = "0.1.0"
+description = "AiDiy multi-agent team mock server"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["team_proc"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

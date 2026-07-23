@@ -20,7 +20,7 @@
 | 項目 | 現行仕様 |
 |------|----------|
 | JWT 方式 | HS256 |
-| 有効期限 | 60 分（同期元: `backend_server/auth.py`） |
+| 有効期限 | 600 分（同期元: `backend_server/auth.py`） |
 | 延長 API | `POST /core/auth/トークン更新` |
 | 画面ログイン API | `POST /core/auth/ログイン` |
 | 現在利用者 API | `POST /core/auth/現在利用者` |
@@ -47,7 +47,7 @@ body: { 利用者ID, パスワード }
 
 - 延長 API は `POST /core/auth/トークン更新`。
 - 期限切れ後の JWT では延長できない。
-- 延長対象外の操作だけを続けると、ログイン中に見えても 60 分で期限切れになる。
+- 延長対象外の操作だけを続けると、ログイン中に見えても 600 分で期限切れになる。
 - 詳細な延長対象と除外条件は `認証延長ルール.md` を確認する。
 
 ## 現在利用者取得
@@ -66,7 +66,7 @@ body: { 利用者ID, パスワード }
 
 - パスワード保存・照合方式は [`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) を確認する。通常登録はハッシュ保存を前提にし、既存DB互換のため認証側はプレーン保存利用者も照合できるようにする。
 - `POST /core/auth/トークン更新` は認証済みトークンを要求するため、失効後の復旧用途には使えない。
-- `backend_server/auth.py` の `ACCESS_TOKEN_EXPIRE_MINUTES` を変更した場合は、docs と `.aidiy/knowledge` の「60分」表記を横断検索して更新する。
+- `backend_server/auth.py` の `ACCESS_TOKEN_EXPIRE_MINUTES` を変更した場合は、docs と `.aidiy/knowledge` の有効期限表記を横断検索して更新する。
 
 ## 確認方法
 

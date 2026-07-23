@@ -82,10 +82,12 @@ class TaskAgents:
         enabled: bool = True,
         return_task_id: bool = True,
         request_timeout_sec: int = 15,
+        task_id: Optional[str] = None,
     ) -> dict:
-        """AIタスク要求を登録する。登録後の分解・実行完了は待たない。"""
+        """AIタスク要求を登録する。task_idは通常省略し、外部IDを引き継ぐ場合だけ指定する。"""
         prompt = (prompt or "").strip()
         user_id = (user_id or "").strip() or "admin"
+        task_id = (task_id or "").strip()
         if not prompt:
             return {"status": "NG", "message": "prompt を指定してください。"}
 
@@ -95,8 +97,10 @@ class TaskAgents:
             "要求内容": prompt,
             "TASK_AI_NAME": (ai_name or "").strip() or "claude_cli",
             "TASK_AI_MODEL": (ai_model or "").strip() or "auto",
-            "有効": bool(enabled),
+            "実行有効": bool(enabled),
         }
+        if task_id:
+            payload["タスクID"] = task_id
         data = self._post_task_api("/task/タスク要求/AI登録", payload, request_timeout_sec)
 
         if data.get("status") != "OK":

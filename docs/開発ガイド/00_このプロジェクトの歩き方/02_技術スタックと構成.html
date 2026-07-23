@@ -73,7 +73,7 @@
  <ul>
  <li><strong>backend_tools/tools_main.py (8095)</strong> — MCPサーバー群（Chrome操作、SQLite確認、コードチェック等、16個）</li>
  <li><strong>backend_task/task_main.py (8093)</strong> — AIタスク要求をAIが明細タスクへ分解し、Code CLIで実行</li>
- <li><strong>backend_local/local_main.py (8094)</strong> — OpenAI互換のローカルLLM(Gemma)推論。<code>_start.py</code>の既定では起動しない</li>
+ <li><strong>backend_local/local_main.py (8096)</strong> — OpenAI互換のローカルLLM(Gemma)推論。<code>_start.py</code>の既定では起動しない</li>
  </ul>
  <p>
  また <code>command_hermes</code>(<code>aidiy_hermes</code>)というコード支援CLIもあるが、常駐サーバーではなく<code>_start.py</code>の起動対象外。詳細は各フォルダの <code>AGENTS.md</code> を参照してください。
@@ -262,7 +262,7 @@
   AGENTS.md
 
  backend_tools/ # MCPサーバー群 (ポート8095、16個)
- backend_local/ # ローカルLLM(Gemma)サーバー (ポート8094)
+ backend_local/ # ローカルLLM(Gemma)サーバー (ポート8096)
  backend_task/ # AIタスク実行+定期タスクサーバー (ポート8093)
  command_hermes/ # aidiy_hermes コード支援CLI (常駐なし)
 

@@ -25,8 +25,8 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 - [ ] MCP は 18 サーバー構成として記載している。
   - 同期元: `backend_tools/tools_main.py`, `backend_tools/tools_proc/`
   - 含める: `aidiy_backup`（旧表現: `aidiy_backup_check` / `aidiy_backup_save`）、`aidiy_task_agents`、`aidiy_windows_control`
-- [ ] 常駐バックエンドは 5 サーバー構成（core 8091 / apps 9098 / tools 8095 / local 8094 / task 8093）として記載している。
-- [ ] Vite proxy は `/core` → 8091、`/apps` → 9098、`/task` → 8093 の 3 経路で記載している。
+- [ ] 常駐バックエンドは 6 サーバー構成（core 8091 / apps 9098 / tools 8095 / local 8096 / task 8093 / team 8094）として記載している。
+- [ ] Vite proxy は `/core` → 8091、`/apps` → 9098、`/task` → 8093、`/team` → 8094 の 4 経路で記載している。
 - [ ] `backend_task` は「AIタスク実行 + 定期タスク」として記載している（旧表現: 定期タスクのみ）。
   - 同期元: `backend_task/task_proc/tasks_api.py`, `backend_task/task_proc/tasks_watcher.py`
 - [ ] Docker 構成に `backend_tools` を含めていない。

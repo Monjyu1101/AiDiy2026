@@ -36,6 +36,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8093',
         changeOrigin: true,
       },
+      '/team': {
+        target: 'http://127.0.0.1:8094',
+        changeOrigin: true,
+      },
     },
   },
 })

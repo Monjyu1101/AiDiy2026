@@ -731,8 +731,8 @@ class conf_models:
         result = {"auto": "yyyy/mm/dd - auto (default)"}
         if self.ollama_models:
             result.update(self.ollama_models)
-        # backend_local（localhost:8094）経由のローカル LLM も選べるようにする
-        result["local_chat"] = "backend_local (localhost:8094) 経由のローカル LLM"
+        # backend_local（localhost:8096）経由のローカル LLM も選べるようにする
+        result["local_chat"] = "backend_local (localhost:8096) 経由のローカル LLM"
         return result
 
     def _get_opencode_cli_models(self) -> Dict[str, str]:

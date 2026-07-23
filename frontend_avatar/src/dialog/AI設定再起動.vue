@@ -59,6 +59,8 @@ const selections = reactive({
   codePermissions: 'auto',
   taskAi: '',
   taskModel: '',
+  teamAi: '',
+  teamModel: '',
 })
 
 const CHAT_MODEL_KEYS: Record<string, string> = {
@@ -121,6 +123,7 @@ const codeModelOptions4 = computed(() => buildCodeModelOptions(selections.codeAi
 const codeModelOptions5 = computed(() => buildCodeModelOptions(selections.codeAi5))
 const codeModelOptions6 = computed(() => buildCodeModelOptions(selections.codeAi6))
 const taskModelOptions = computed(() => buildCodeModelOptions(selections.taskAi))
+const teamModelOptions = computed(() => buildCodeModelOptions(selections.teamAi))
 
 function buildCodeModelOptions(aiName: string) {
   const models = availableModels.value?.code_models?.[aiName] || {}
@@ -198,6 +201,7 @@ async function loadConfig() {
     selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || ''
     selections.codePermissions = currentSettings.value.CODE_PERMISSIONS || 'auto'
     selections.taskAi = chooseAvailable(currentSettings.value.TASK_AI_NAME || 'claude_cli', codeAiOptions.value)
+    selections.teamAi = chooseAvailable(currentSettings.value.TEAM_AI_NAME || 'claude_cli', codeAiOptions.value)
 
     const chatKey = CHAT_MODEL_KEYS[selections.chatAi]
     const liveKey = LIVE_MODEL_KEYS[selections.liveAi]
@@ -213,6 +217,7 @@ async function loadConfig() {
     selections.codeModel5 = chooseAvailable(currentSettings.value.CODE_AI5_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi5] || {}))
     selections.codeModel6 = chooseAvailable(currentSettings.value.CODE_AI6_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi6] || {}))
     selections.taskModel = chooseAvailable(currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[selections.taskAi] || {}))
+    selections.teamModel = chooseAvailable(currentSettings.value.TEAM_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[selections.teamAi] || {}))
 
     await nextTick()
     hasLoadedConfig.value = true
@@ -246,6 +251,8 @@ function buildNextSettings() {
   nextSettings.CODE_AI6_MODEL = selections.codeModel6
   nextSettings.TASK_AI_NAME = selections.taskAi
   nextSettings.TASK_AI_MODEL = selections.taskModel
+  nextSettings.TEAM_AI_NAME = selections.teamAi
+  nextSettings.TEAM_AI_MODEL = selections.teamModel
 
   const normalizedCodeBasePath = normalizeCodeBasePath(selections.codeBasePath)
   if (normalizedCodeBasePath) {
@@ -265,7 +272,7 @@ function buildNextSettings() {
 }
 
 async function submitSettings(
-  再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_tools?: boolean; reboot_local?: boolean; reboot_task?: boolean },
+  再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_tools?: boolean; reboot_local?: boolean; reboot_task?: boolean; reboot_team?: boolean },
   waitSeconds = 15,
   save = false,
 ) {
@@ -299,7 +306,7 @@ async function submitSettings(
 }
 
 function handleSave() {
-  void submitSettings({ reboot_core: false, reboot_apps: true, reboot_tools: true, reboot_local: false, reboot_task: false })
+  void submitSettings({ reboot_core: false, reboot_apps: true, reboot_tools: true, reboot_local: false, reboot_task: false, reboot_team: false })
 }
 
 async function handleSaveOnly() {
@@ -313,7 +320,7 @@ async function handleSaveOnly() {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: buildNextSettings(),
-      再起動要求: { reboot_core: false, reboot_apps: false, reboot_tools: false, reboot_local: false, reboot_task: false },
+      再起動要求: { reboot_core: false, reboot_apps: false, reboot_tools: false, reboot_local: false, reboot_task: false, reboot_team: false },
       save: true,
     })
     if (response?.data?.status !== 'OK') {
@@ -344,7 +351,7 @@ async function handleResetReboot() {
     const response = await apiClient.post('/core/AIコア/モデル情報/設定', {
       セッションID: props.sessionId,
       モデル設定: {},
-      再起動要求: { reboot_core: true, reboot_apps: true, reboot_tools: true, reboot_local: true, reboot_task: true },
+      再起動要求: { reboot_core: true, reboot_apps: true, reboot_tools: true, reboot_local: true, reboot_task: true, reboot_team: true },
       リセット: true,
     })
 
@@ -424,6 +431,14 @@ watch(() => selections.taskAi, (newValue) => {
   const models = Object.keys(availableModels.value?.code_models?.[newValue] || {})
   if (models.length > 0 && !models.includes(selections.taskModel)) {
     selections.taskModel = models[0]!
+  }
+})
+
+watch(() => selections.teamAi, (newValue) => {
+  if (isInitializing.value) return
+  const models = Object.keys(availableModels.value?.code_models?.[newValue] || {})
+  if (models.length > 0 && !models.includes(selections.teamModel)) {
+    selections.teamModel = models[0]!
   }
 })
 
@@ -685,6 +700,26 @@ onMounted(() => {
                 <div class="config-panel-control">
                   <select id="config-task-model-select" v-model="selections.taskModel" class="config-panel-select">
                     <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="config-panel-section">
+              <div class="config-panel-section-header">Team AI Model</div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-team-ai-select">TEAM_AI_NAME:</label>
+                <div class="config-panel-control">
+                  <select id="config-team-ai-select" v-model="selections.teamAi" class="config-panel-select">
+                    <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-team-model-select">TEAM_AI_MODEL:</label>
+                <div class="config-panel-control">
+                  <select id="config-team-model-select" v-model="selections.teamModel" class="config-panel-select">
+                    <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
                   </select>
                 </div>
               </div>

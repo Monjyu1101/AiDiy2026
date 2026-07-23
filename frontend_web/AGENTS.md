@@ -110,5 +110,6 @@ AI packet やモデル設定の詳細は `.aidiy/knowledge` の AI コア関連 
 - S系は `components/Sスケジューラー/` を見る（route path は `/Sスケジュール/*`）。
 - X系は `components/Xその他/` と `public/` を見る。
 - AIタスク画面は `components/AIタスク/`（要求一覧 / フロー図 / 明細一覧 + 編集ダイアログ、API は backend_task の `/task/*`）を見る。
+- AIチーム画面は `components/AIチーム/AIチーム.vue` を軽量な親とし、メンバー・立体表示・作業一覧の3コンポーネントと `useAIチーム.ts` へ責務を分ける。
 - API client や認証は `src/api/client.ts` と `src/stores/auth.ts` を見る。
 - UI ルールや画面追加手順は必ず `.aidiy/knowledge/_index.md` から該当 HowTo を開く。

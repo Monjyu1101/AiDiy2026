@@ -10,7 +10,7 @@
 
 """開発環境起動スクリプト（まとめ役）
 
-各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps/task)・
+各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps/task/team)・
 フロントエンド(Web/Avatar) を統一手順で起動します。各サービスの環境確認・
 起動コマンドはフォルダ側に委譲し、このスクリプトは起動順序・出力集約・
 ブラウザ表示・自動再起動監視・一括停止を一元管理します。
@@ -20,6 +20,7 @@
 - backend_tools/_start.py    PORT / check_environment / start / kill_ports
 - backend_server/_start.py   CORE_PORT / APPS_PORT / check_environment / start_core / start_apps
 - backend_task/_start.py     PORT / check_environment / start / kill_ports
+- backend_team/_start.py     PORT / check_environment / start / kill_ports
 - frontend_web/_start.py     PORT / check_environment / start / kill_ports
 - frontend_avatar/_start.py  PORT / check_environment / start / kill_electron_processes
 
@@ -29,10 +30,11 @@
 3. バックエンド(core)
 4. バックエンド(apps)
 5. バックエンド(task)
-6. フロントエンド(Web)
-7. フロントエンド(Avatar)
-8. ページ表示
-9. 自動再起動監視
+6. バックエンド(team)
+7. フロントエンド(Web)
+8. フロントエンド(Avatar)
+9. ページ表示
+10. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -99,7 +101,7 @@ RESTART_WAIT_SECONDS = 15
 BACKEND_TOOLS_SHOW_AUTOMATION_BANNER = False
 
 # フォルダ別 _start.py モジュール（_init_modules で設定）
-LOCAL = TOOLS = SERVER = TASK = WEB = AVATAR = None
+LOCAL = TOOLS = SERVER = TASK = TEAM = WEB = AVATAR = None
 
 
 def _load_folder_module(folder: str):
@@ -113,11 +115,12 @@ def _load_folder_module(folder: str):
 
 
 def _init_modules() -> None:
-    global LOCAL, TOOLS, SERVER, TASK, WEB, AVATAR
+    global LOCAL, TOOLS, SERVER, TASK, TEAM, WEB, AVATAR
     LOCAL = _load_folder_module("backend_local")
     TOOLS = _load_folder_module("backend_tools")
     SERVER = _load_folder_module("backend_server")
     TASK = _load_folder_module("backend_task")
+    TEAM = _load_folder_module("backend_team")
     WEB = _load_folder_module("frontend_web")
     AVATAR = _load_folder_module("frontend_avatar")
 
@@ -322,15 +325,16 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
     return default_yes
 
 
-def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool]:
+def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool, bool]:
     print_header("起動条件の確認")
     local_enabled         = prompt_choice("バックエンド(local)     起動しますか?", default_yes=False)
     backend_tools_enabled = prompt_choice("バックエンド(tools)     起動しますか?", default_yes=True)
     backend_enabled       = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
     backend_task_enabled  = prompt_choice("バックエンド(task)      起動しますか?", default_yes=True)
+    backend_team_enabled  = prompt_choice("バックエンド(team)      起動しますか?", default_yes=True)
     web_enabled           = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
     avatar_enabled        = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
-    return local_enabled, backend_tools_enabled, backend_enabled, backend_task_enabled, web_enabled, avatar_enabled
+    return local_enabled, backend_tools_enabled, backend_enabled, backend_task_enabled, backend_team_enabled, web_enabled, avatar_enabled
 
 
 # ============================================================
@@ -425,6 +429,7 @@ def validate_initial_environment(
     backend_tools_enabled: bool,
     backend_enabled: bool,
     backend_task_enabled: bool,
+    backend_team_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
 ) -> tuple[bool, str | None]:
@@ -466,6 +471,15 @@ def validate_initial_environment(
         else:
             print_error(f"バックエンド(task): 未準備 ({detail})")
             print_info("  対応例: cd backend_task && uv sync --upgrade")
+            has_error = True
+
+    if backend_team_enabled:
+        ok, detail = TEAM.check_environment()
+        if ok:
+            print_success(f"バックエンド(team): OK ({detail})")
+        else:
+            print_error(f"バックエンド(team): 未準備 ({detail})")
+            print_info("  対応例: cd backend_team && uv sync --upgrade")
             has_error = True
 
     if web_enabled or avatar_enabled:
@@ -518,6 +532,7 @@ def _port_for(name: str) -> int | None:
         "バックエンド(core)": SERVER.CORE_PORT,
         "バックエンド(apps)": SERVER.APPS_PORT,
         "バックエンド(task)": TASK.PORT,
+        "バックエンド(team)": TEAM.PORT,
         "フロントエンド(Web)": WEB.PORT,
         "フロントエンド(Avatar)": AVATAR.PORT,
     }.get(name)
@@ -536,6 +551,8 @@ def start_service(
             process = LOCAL.start()
         elif name == "バックエンド(task)":
             process = TASK.start()
+        elif name == "バックエンド(team)":
+            process = TEAM.start()
         elif name == "バックエンド(core)":
             process = SERVER.start_core()
         elif name == "バックエンド(apps)":
@@ -567,6 +584,7 @@ def maybe_kill_initial_ports(
     backend_tools_enabled: bool,
     backend_enabled: bool,
     backend_task_enabled: bool,
+    backend_team_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
 ) -> None:
@@ -580,6 +598,8 @@ def maybe_kill_initial_ports(
         kill_process_on_port(SERVER.APPS_PORT)
     if backend_task_enabled:
         kill_process_on_port(TASK.PORT)
+    if backend_team_enabled:
+        kill_process_on_port(TEAM.PORT)
     if web_enabled:
         kill_process_on_port(WEB.PORT)
     if avatar_enabled:
@@ -594,6 +614,7 @@ def start_initial_services(
     start_backend_tools_enabled: bool,
     start_backend_enabled: bool,
     start_backend_task_enabled: bool,
+    start_backend_team_enabled: bool,
     avatar_enabled: bool,
     web_enabled: bool,
     processes: dict[str, subprocess.Popen[bytes]],
@@ -606,6 +627,7 @@ def start_initial_services(
         "バックエンド(core)": start_backend_enabled,
         "バックエンド(apps)": start_backend_enabled,
         "バックエンド(task)": start_backend_task_enabled,
+        "バックエンド(team)": start_backend_team_enabled,
         "フロントエンド(Web)": web_enabled,
         "フロントエンド(Avatar)": False,
     }
@@ -615,6 +637,7 @@ def start_initial_services(
         backend_tools_enabled=start_backend_tools_enabled,
         backend_enabled=start_backend_enabled,
         backend_task_enabled=start_backend_task_enabled,
+        backend_team_enabled=start_backend_team_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
     )
@@ -642,6 +665,11 @@ def start_initial_services(
         print_header("バックエンド(task) 起動")
         start_service("バックエンド(task)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["バックエンド(task)"], label="バックエンド(task)")
+
+    if start_backend_team_enabled:
+        print_header("バックエンド(team) 起動")
+        start_service("バックエンド(team)", processes, last_output_times, npm_command)
+        wait_for_services_quiet(last_output_times, ["バックエンド(team)"], label="バックエンド(team)")
 
     if web_enabled:
         print_header("フロントエンド(Web) 起動")
@@ -721,13 +749,14 @@ def monitor_and_restart(
 def main() -> None:
     _init_modules()
 
-    local_enabled, backend_tools_enabled, backend_enabled, backend_task_enabled, web_enabled, avatar_enabled = collect_startup_choices()
+    local_enabled, backend_tools_enabled, backend_enabled, backend_task_enabled, backend_team_enabled, web_enabled, avatar_enabled = collect_startup_choices()
 
     is_ready, npm_command = validate_initial_environment(
         local_enabled=local_enabled,
         backend_tools_enabled=backend_tools_enabled,
         backend_enabled=backend_enabled,
         backend_task_enabled=backend_task_enabled,
+        backend_team_enabled=backend_team_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
     )
@@ -749,6 +778,7 @@ def main() -> None:
                 start_backend_tools_enabled=backend_tools_enabled,
                 start_backend_enabled=backend_enabled,
                 start_backend_task_enabled=backend_task_enabled,
+                start_backend_team_enabled=backend_team_enabled,
                 avatar_enabled=avatar_enabled,
                 web_enabled=web_enabled,
                 processes=processes,
@@ -770,6 +800,8 @@ def main() -> None:
                 print_success(f"バックエンド(apps): http://localhost:{SERVER.APPS_PORT}/docs")
             if "バックエンド(task)" in processes:
                 print_success(f"バックエンド(task): http://localhost:{TASK.PORT}/docs")
+            if "バックエンド(team)" in processes:
+                print_success(f"バックエンド(team): http://localhost:{TEAM.PORT}/docs")
             if "フロントエンド(Web)" in processes:
                 print_success(f"フロントエンド(Web): http://localhost:{WEB.PORT}/")
             if "フロントエンド(Avatar)" in processes:

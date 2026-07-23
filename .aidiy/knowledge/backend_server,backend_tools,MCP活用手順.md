@@ -78,6 +78,8 @@
 
 SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まずアプリ API や既存初期化処理で再現できないか確認する。
 
+`aidiy_task_agents.submit`の`task_id`は通常は指定不要で、省略時はbackend_taskが`TASK.mmdd.hhmmss`形式で自動採番する。呼出元のIDをAタスク要求まで引き継ぐ必要がある場合だけ指定する。
+
 ## アクセスインターフェース（3種類）
 
 各 MCP は同一ポート（8095）で 3 つのインターフェースを同時提供する。

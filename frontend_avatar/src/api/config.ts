@@ -84,5 +84,7 @@ export function defaultModelSettings(): ModelSettings {
     CODE_PERMISSIONS: 'auto',
     TASK_AI_NAME: 'claude_cli',
     TASK_AI_MODEL: 'auto',
+    TEAM_AI_NAME: 'claude_cli',
+    TEAM_AI_MODEL: 'auto',
   }
 }

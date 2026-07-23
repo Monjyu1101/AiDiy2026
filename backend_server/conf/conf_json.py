@@ -25,7 +25,8 @@ class conf_json:
         'CORE_BASE': '8091',
         'AVATAR_BASE': '8092',
         'TASK_BASE': '8093',
-        'LOCAL_BASE': '8094',
+        'TEAM_BASE': '8094',
+        'LOCAL_BASE': '8096',
         'TOOLS_BASE': '8095',
         'APPS_BASE': '8098',
         'WEBUI_FIRST_PAGE': 'メニュー',
@@ -104,6 +105,10 @@ class conf_json:
         # TaskAI設定
         'TASK_AI_NAME': 'claude_cli',
         'TASK_AI_MODEL': 'auto',
+
+        # TeamAI設定
+        'TEAM_AI_NAME': 'claude_cli',
+        'TEAM_AI_MODEL': 'auto',
     }
 
     def __init__(self, json: str = None):

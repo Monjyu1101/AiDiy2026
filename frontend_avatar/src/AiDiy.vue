@@ -721,6 +721,8 @@ function 初期化処理(message: Record<string, any>) {
     CODE_PERMISSIONS: settings.CODE_PERMISSIONS || 'auto',
     TASK_AI_NAME: settings.TASK_AI_NAME || 'claude_cli',
     TASK_AI_MODEL: settings.TASK_AI_MODEL || 'auto',
+    TEAM_AI_NAME: settings.TEAM_AI_NAME || 'claude_cli',
+    TEAM_AI_MODEL: settings.TEAM_AI_MODEL || 'auto',
   }
 
   初期スピーカー有効.value = buttons.スピーカー ?? true

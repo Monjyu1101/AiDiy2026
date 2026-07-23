@@ -5871,7 +5871,7 @@ class HermesCLI:
             return "anthropic"
         if "ollama.com" in base_url or "localhost:11434" in base_url or "127.0.0.1:11434" in base_url:
             return "ollama"
-        if "localhost:8094" in base_url or "127.0.0.1:8094" in base_url:
+        if "localhost:8096" in base_url or "127.0.0.1:8096" in base_url:
             return "local_chat"
         return provider
 
@@ -5967,8 +5967,8 @@ class HermesCLI:
                 "default_model": self._aidiy_provider_default_model("anthropic"),
             }
         elif provider == "local_chat":
-            # backend_local（既定 localhost:8094）の OpenAI 互換 API。認証不要。
-            port = str(cfg.get("LOCAL_BASE") or "8094").strip() or "8094"
+            # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
+            port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
             entry = {
                 "slug": "local_chat",
                 "name": "Local Chat (backend_local)",
@@ -12313,8 +12313,8 @@ def _freeai_model_from_value(value: str) -> str | None:
 
 
 def _load_local_chat_defaults(cfg: dict[str, Any], model_override: str | None = None) -> dict[str, str]:
-    # backend_local（既定 localhost:8094）の OpenAI 互換 API。認証不要。
-    port = str(cfg.get("LOCAL_BASE") or "8094").strip() or "8094"
+    # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
+    port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
     model = str(model_override or cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it").strip()
     return {
         "provider": "custom",

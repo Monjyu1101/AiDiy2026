@@ -58,7 +58,9 @@ const モデル設定 = ref({
   CODE_AI6_NAME: '',
   CODE_PERMISSIONS: 'auto',
   TASK_AI_NAME: 'claude_cli',
-  TASK_AI_MODEL: 'auto'
+  TASK_AI_MODEL: 'auto',
+  TEAM_AI_NAME: 'claude_cli',
+  TEAM_AI_MODEL: 'auto'
 });
 
 const チャットモード = ref<チャットモード型>('live');
@@ -121,7 +123,9 @@ function コア状態リセット() {
      CODE_AI6_NAME: '',
      CODE_PERMISSIONS: 'auto',
      TASK_AI_NAME: 'claude_cli',
-     TASK_AI_MODEL: 'auto'
+     TASK_AI_MODEL: 'auto',
+     TEAM_AI_NAME: 'claude_cli',
+     TEAM_AI_MODEL: 'auto'
    };
   パネルボタン状態.value = パネル状態生成();
   パネル表示中.value = パネル状態生成();
@@ -194,7 +198,9 @@ function 初期化処理(message: Record<string, any>) {
     CODE_AI6_NAME: settings.CODE_AI6_NAME || '',
     CODE_PERMISSIONS: settings.CODE_PERMISSIONS || 'auto',
     TASK_AI_NAME: settings.TASK_AI_NAME || 'claude_cli',
-    TASK_AI_MODEL: settings.TASK_AI_MODEL || 'auto'
+    TASK_AI_MODEL: settings.TASK_AI_MODEL || 'auto',
+    TEAM_AI_NAME: settings.TEAM_AI_NAME || 'claude_cli',
+    TEAM_AI_MODEL: settings.TEAM_AI_MODEL || 'auto'
   };
 
   初期マイク有効.value = Boolean(buttons.マイク);
@@ -912,4 +918,3 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 </style>
-

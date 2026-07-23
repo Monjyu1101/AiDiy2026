@@ -216,7 +216,7 @@ for key, value in 監査項目.items():
   <div>
   <strong>注意</strong>
   <ul>
-   <li>JWTトークンの有効期限は60分です。期限切れ時は再ログインが必要</li>
+   <li>JWTトークンの有効期限は600分です。期限切れ時は再ログインが必要</li>
    <li>初期投入アカウント（admin等）は平文で保存されます。API経由で新規作成した利用者はbcryptでハッシュ化されます（<code>core_crud/C利用者.py</code> の <code>hash_パスワード</code>/<code>verify_パスワード</code>）</li>
    <li>権限IDは文字列型です。<code>'1'</code> で比較してください (数値の <code>1</code> ではない)</li>
   </ul>

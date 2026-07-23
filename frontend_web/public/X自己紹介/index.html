@@ -1168,7 +1168,7 @@
                 <h3 class="feature-title">マルチサーバー構成</h3>
                 <p class="feature-description">
                     core 8091 / apps 9098 / mcp 8095 /<br>
-                    local 8094 / task 8093 の 5 サーバーを分離。<br>
+                    local 8096 / task 8093 の 5 サーバーを分離。<br>
                     AI 系・業務系・自己検証系を Vite Proxy で透過的にまとめます。
                 </p>
             </div>
@@ -1228,7 +1228,7 @@
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="5">0</span>
                 <span class="stat-label">常駐サーバー</span>
-                <span class="stat-sub">core 8091 / apps 9098 / tools 8095 / local 8094 / task 8093</span>
+                <span class="stat-sub">core 8091 / apps 9098 / tools 8095 / local 8096 / task 8093</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="3">0</span>
@@ -1363,7 +1363,7 @@ Key:   利用者名</pre>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🧠 backend_local (ローカル LLM)</h3>
                 <p>HuggingFace Gemma を transformers + torch でローカル推論し、OpenAI 互換 Chat Completions API として提供。stream / tools 対応。クラウド API なしでもチャット AI を利用可能。</p>
-                <div class="meta-tags"><span>local_main.py:8094</span><span>OpenAI 互換</span><span>Gemma</span></div>
+                <div class="meta-tags"><span>local_main.py:8096</span><span>OpenAI 互換</span><span>Gemma</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 frontend_web</h3>
@@ -1377,7 +1377,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔒 認証 + 採番</h3>
-                <p>JWT 認証（HS256・60分）を Pinia + Axios interceptor で自動管理。C採番テーブルで AUTOINCREMENT 不使用のカスタム ID を一元管理。</p>
+                <p>JWT 認証（HS256・600分）を Pinia + Axios interceptor で自動管理。C採番テーブルで AUTOINCREMENT 不使用のカスタム ID を一元管理。</p>
                 <div class="meta-tags"><span>JWT / HS256</span><span>C採番</span><span>監査フィールド</span></div>
             </div>
         </div>

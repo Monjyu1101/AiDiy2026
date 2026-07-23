@@ -27,7 +27,7 @@ import openai
 
 # backend_local（ローカル LLM サーバー）の既定接続先
 _DEFAULT_LOCAL_HOST = "http://localhost"
-_DEFAULT_LOCAL_PORT = "8094"
+_DEFAULT_LOCAL_PORT = "8096"
 _LOCAL_SELF_LOOP_KEYS = ("CHAT_LOCAL_SELF_LOOP", "LOCAL_CHAT_SELF_LOOP")
 
 
@@ -57,7 +57,7 @@ class ChatAI:
     """
     Local Chat api統合クラス（backend_local の OpenAI互換API使用・APIキー不要）
 
-    backend_local（local_main.py / 既定 localhost:8094）が提供する
+    backend_local（local_main.py / 既定 localhost:8096）が提供する
     `POST /v1/chat/completions` をバックエンドに使う。実モデルは backend_local 側で
     AiDiy_key.json の CHAT_LOCAL_MODEL に従ってロードされる。
     """
@@ -173,7 +173,7 @@ class ChatAI:
         try:
             if not self.is_alive:
                 logger.warning("ChatAI(Local)実行: ChatAIが開始されていません")
-                return "Local ChatAIが停止状態です。backend_local(localhost:8094)が起動しているか確認してください。"
+                return "Local ChatAIが停止状態です。backend_local(localhost:8096)が起動しているか確認してください。"
 
             # 自己ループ（aidiy_chat_llms）: 自前 MCP 群をツールとして使い、
             # tool_calls をサーバー側で実行しながら応答が確定するまで回す。

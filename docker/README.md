@@ -34,7 +34,7 @@ http://localhost:9098/docs  # Apps API (M系, T系, V系, S系)
 ## この構成に含まれないサービス
 
 - `backend_tools`（`8095`、MCP 18 サーバー同居: `aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup` / `aidiy_image_generation` / `aidiy_movie_generation` / `aidiy_speech_to_text` / `aidiy_text_to_speech` / `aidiy_obs_studio_control` / `aidiy_ffmpeg_control` / `aidiy_notification_sounds` / `aidiy_code_agents` / `aidiy_chat_llms` / `aidiy_task_agents` / `aidiy_windows_control`）は、この Docker ガイドの構成には含めていません。ブラウザ自動操作などの MCP は、通常のローカル開発手順で `backend_tools` を別途扱う前提です。
-- `backend_task`（`8093`、AIタスク実行）と `backend_local`（`8094`、ローカル LLM）も未起動です。nginx にも `/task` のプロキシがないため、**AIタスク画面はこの Docker 構成では動作しません**。
+- `backend_task`（`8093`、AIタスク実行）と `backend_local`（`8096`、ローカル LLM）も未起動です。nginx にも `/task` のプロキシがないため、**AIタスク画面はこの Docker 構成では動作しません**。
 
 ## 🔧 基本操作
 
@@ -168,7 +168,7 @@ docker_2start.bat
 - 8091: Backend Core API
 - 9098: Backend Apps API
 - 8093: Backend Task（この Docker 構成では未提供）
-- 8094: Backend Local（この Docker 構成では未提供）
+- 8096: Backend Local（この Docker 構成では未提供）
 - 8095: Backend MCP（この Docker 構成では未提供）
 - 80: HTTP（Nginxプロキシ、自動的にHTTPSへリダイレクト）
 - 443: HTTPS（Nginxプロキシ）

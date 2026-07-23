@@ -93,6 +93,9 @@ def 初期モデル設定生成(app_conf) -> dict:
         # TaskAI設定
         "TASK_AI_NAME": app_conf.json.get("TASK_AI_NAME", "claude_cli"),
         "TASK_AI_MODEL": app_conf.json.get("TASK_AI_MODEL", "auto"),
+        # TeamAI設定
+        "TEAM_AI_NAME": app_conf.json.get("TEAM_AI_NAME", "claude_cli"),
+        "TEAM_AI_MODEL": app_conf.json.get("TEAM_AI_MODEL", "auto"),
     }
     return モデル設定正規化(設定)
 

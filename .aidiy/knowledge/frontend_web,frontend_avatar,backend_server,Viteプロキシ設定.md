@@ -24,11 +24,12 @@
         → /core/* → backend core (8091)
         → /apps/* → backend apps (9098)
         → /task/* → backend task (8093)
+        → /team/* → backend team (8094)
 ```
 
-- 画面側では `/core/...`、`/apps/...`、`/task/...` の相対URLだけを書く。
-- backend の `http://127.0.0.1:8091` / `9098` / `8093` をコンポーネントへ直書きしない。
-- 本番では Vite dev server がいないため、Nginx 等で同等の `/core` / `/apps` / `/task` プロキシを用意する。
+- 画面側では `/core/...`、`/apps/...`、`/task/...`、`/team/...` の相対URLだけを書く。
+- backend の `http://127.0.0.1:8091` / `9098` / `8093` / `8094` をコンポーネントへ直書きしない。
+- 本番では Vite dev server がいないため、Nginx 等で同等の `/core` / `/apps` / `/task` / `/team` プロキシを用意する。
 
 ## proxy 設定の基準
 
@@ -37,6 +38,7 @@ proxy: {
   '/core': { target: 'http://127.0.0.1:8091', changeOrigin: true, ws: true },
   '/apps': { target: 'http://127.0.0.1:9098', changeOrigin: true, ws: true },
   '/task': { target: 'http://127.0.0.1:8093', changeOrigin: true },
+  '/team': { target: 'http://127.0.0.1:8094', changeOrigin: true },
 }
 ```
 
@@ -53,7 +55,8 @@ proxy: {
 | `backend_server/core_main.py` | 8091 |
 | `backend_server/apps_main.py` | 9098 |
 | `backend_task/task_main.py` | 8093 |
-| `backend_local/local_main.py` | 8094 |
+| `backend_team/team_main.py` | 8094 |
+| `backend_local/local_main.py` | 8096 |
 | `backend_tools/tools_main.py` | 8095 |
 
 `backend_task` には CORS ミドルウェアがないため、ブラウザからの `/task` 呼び出しは必ず Vite proxy（または Nginx 等のリバースプロキシ）経由にする。`frontend_avatar` の Electron 本番のみ `TASK_BASE_URL`（`http://127.0.0.1:8093`）へ直結する。

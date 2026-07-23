@@ -34,7 +34,7 @@ cd ..\backend_task
 .\.venv\Scripts\python.exe -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093
 
 cd ..\backend_local
-.\.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8094
+.\.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
 
 # Hermes は on-demand CLI
 cd ..\command_hermes
@@ -47,7 +47,7 @@ cd ..\command_hermes
 
 | プロンプト | デフォルト | 内容 |
 |------------|------------|------|
-| `バックエンド(local) 起動しますか?` | No | port 8094。未起動時は AI設定の `local_chat` 候補から除外 |
+| `バックエンド(local) 起動しますか?` | No | port 8096。未起動時は AI設定の `local_chat` 候補から除外 |
 | `tools 起動しますか?` | Yes | port 8095 |
 | `バックエンド(core,apps) 起動しますか?` | Yes | port 8091 / 9098 |
 | `バックエンド(task) 起動しますか?` | Yes | port 8093 |
@@ -74,7 +74,7 @@ netstat -ano | findstr :8091
 taskkill /PID <pid> /F
 ```
 
-`9098`、`8095`、`8093`、`8094` も同じ手順で確認する。
+`9098`、`8095`、`8093`、`8096` も同じ手順で確認する。
 
 ## 起動時処理
 

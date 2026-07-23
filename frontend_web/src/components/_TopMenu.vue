@@ -32,6 +32,9 @@ const props = defineProps({
         <RouterLink to="/AIタスク" active-class="active" class="tab">
           AIタスク
         </RouterLink>
+        <RouterLink to="/AIチーム" active-class="active" class="tab">
+          AIチーム
+        </RouterLink>
         <RouterLink to="/メニュー" active-class="active" class="tab">
           メニュー
         </RouterLink>

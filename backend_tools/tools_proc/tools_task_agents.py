@@ -52,6 +52,7 @@ def register_tools(mcp_ta, task_agents):
         ai_name: str = "claude_cli",
         ai_model: str = "auto",
         user_id: str = "admin",
+        task_id: str = "",
         enabled: bool = True,
         return_task_id: bool = True,
         request_timeout_sec: int = 15,
@@ -59,17 +60,19 @@ def register_tools(mcp_ta, task_agents):
         """
         backend_task の AIタスク要求へ非同期タスクを投入する。
         登録だけを行い、タスク分解や実行完了は待たない。
+        task_id は通常指定不要。外部システムのIDを引き継ぐ場合だけ指定する。
         """
         result = await asyncio.to_thread(
             task_agents.submit,
-            prompt,
-            project_path,
-            ai_name,
-            ai_model,
-            user_id,
-            enabled,
-            return_task_id,
-            request_timeout_sec,
+            prompt=prompt,
+            project_path=project_path,
+            ai_name=ai_name,
+            ai_model=ai_model,
+            user_id=user_id,
+            enabled=enabled,
+            return_task_id=return_task_id,
+            request_timeout_sec=request_timeout_sec,
+            task_id=task_id,
         )
         return json.dumps(result, ensure_ascii=False)
 
@@ -123,13 +126,14 @@ def create_router(task_agents) -> APIRouter:
                 },
                 "submit": {
                     "summary": "AIタスク投入",
-                    "description": "指定 prompt を backend_task の /task/タスク要求/AI登録 に渡し、タスクを準備中として登録する。8093 未起動時は status=NG で理由を返す。",
+                    "description": "指定promptをbackend_taskの/task/タスク要求/AI登録へ渡し、タスクを準備開始として登録する。task_idは通常指定不要で、省略時はbackend_taskが自動採番する。8093未起動時はstatus=NGで理由を返す。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "タスク化したい依頼内容"},
                         "project_path": {"type": "string", "required": False, "description": "対象プロジェクトのパス。backend_task の プロジェクト に対応"},
                         "ai_name": {"type": "string", "required": False, "default": "claude_cli", "description": "TASK_AI_NAME。claude_sdk / claude_cli / codex_cli / aidiy_hermes など"},
                         "ai_model": {"type": "string", "required": False, "default": "auto", "description": "TASK_AI_MODEL"},
                         "user_id": {"type": "string", "required": False, "default": "admin", "description": "利用者ID"},
+                        "task_id": {"type": "string", "required": False, "default": "", "description": "任意のタスクID。通常は指定不要。外部IDを引き継ぐ場合だけ指定し、省略時はTASK.mmdd.hhmmssで自動採番"},
                         "enabled": {"type": "boolean", "required": False, "default": True, "description": "有効。true なら backend_task の watcher が処理対象にする"},
                         "return_task_id": {"type": "boolean", "required": False, "default": True, "description": "応答に task_id を含める"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15, "description": "登録 API 呼び出しのタイムアウト秒"},
@@ -156,7 +160,7 @@ def create_router(task_agents) -> APIRouter:
                         "task_id": {"type": "string", "required": True, "description": "タスクID"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15},
                     },
-                    "example_request": {"user_id": "admin", "task_id": "20260709.123456"},
+                    "example_request": {"user_id": "admin", "task_id": "TASK.0709.123456"},
                 },
                 "get_detail_status": {
                     "summary": "AIタスク明細状態取得",
@@ -166,7 +170,7 @@ def create_router(task_agents) -> APIRouter:
                         "task_id": {"type": "string", "required": True, "description": "タスクID"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15},
                     },
-                    "example_request": {"user_id": "admin", "task_id": "20260709.123456"},
+                    "example_request": {"user_id": "admin", "task_id": "TASK.0709.123456"},
                 },
                 "run": {
                     "summary": "AIタスク投入（submit の別名）",
@@ -183,14 +187,15 @@ def create_router(task_agents) -> APIRouter:
             if method_name in {"submit", "run"}:
                 return await asyncio.to_thread(
                     task_agents.submit,
-                    req.prompt,
-                    req.project_path,
-                    req.ai_name,
-                    req.ai_model,
-                    req.user_id,
-                    req.enabled,
-                    req.return_task_id,
-                    req.request_timeout_sec,
+                    prompt=req.prompt,
+                    project_path=req.project_path,
+                    ai_name=req.ai_name,
+                    ai_model=req.ai_model,
+                    user_id=req.user_id,
+                    enabled=req.enabled,
+                    return_task_id=req.return_task_id,
+                    request_timeout_sec=req.request_timeout_sec,
+                    task_id=req.task_id or req.タスクID,
                 )
             if method_name == "get_request_status":
                 user_id = req.利用者ID or req.user_id

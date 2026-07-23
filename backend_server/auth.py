@@ -15,7 +15,7 @@ from typing import Optional
 # 本番環境では環境変数から読み込むべき
 SECRET_KEY = "dummy-secret-key-for-development"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 600
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """JWTトークンを作成"""

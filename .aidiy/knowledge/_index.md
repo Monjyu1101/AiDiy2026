@@ -22,6 +22,7 @@
 | `backend_tools` | MCP サーバー群 |
 | `backend_local` | ローカル LLM サーバー（OpenAI 互換 Gemma 推論） |
 | `backend_task` | AIタスク実行 + 定期タスク FastAPI サーバー |
+| `backend_team` | 複数AIエージェントのチーム活動 FastAPI サーバー |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
 

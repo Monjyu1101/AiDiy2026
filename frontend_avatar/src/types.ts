@@ -59,4 +59,6 @@ export interface ModelSettings {
   CODE_PERMISSIONS: string;
   TASK_AI_NAME: string;
   TASK_AI_MODEL: string;
+  TEAM_AI_NAME: string;
+  TEAM_AI_MODEL: string;
 }

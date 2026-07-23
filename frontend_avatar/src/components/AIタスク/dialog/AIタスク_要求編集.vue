@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 // AIタスク_要求編集ダイアログ: マスタ保守と同じラベル/内容の行レイアウト
-// 新規: AI登録 API で仮タスク（準備中）を作成する
+// 新規: AI登録 API で仮タスク（準備開始）を作成する
 // 修正: 更新登録 API で実行中プロセスを停止してからタスク要求を更新する（準備開始で再分解）
 import { ref, computed, watch } from 'vue';
 import type { PropType } from 'vue';
@@ -333,7 +333,7 @@ const 登録 = async () => {
           実行条件: 実行条件ペイロード()
         });
     if (res.data.status === 'OK') {
-      void qMessage(res.data.message || 'タスクを準備中として登録しました。');
+      void qMessage(res.data.message || 'タスクを準備開始として登録しました。');
       emit('registered', res.data.data?.item ?? null);
       emit('close');
     } else {

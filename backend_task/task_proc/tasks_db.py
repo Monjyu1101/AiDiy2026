@@ -176,7 +176,7 @@ def _現在日時() -> str:
 
 
 def 新規タスクID() -> str:
-    return datetime.now().strftime("%Y%m%d.%H%M%S")
+    return datetime.now().strftime("TASK.%m%d.%H%M%S")
 
 
 def _監査項目(利用者ID: str = "system", 利用者名: str = "システム") -> dict[str, str]:
@@ -903,7 +903,7 @@ def 仮タスク登録(
     TASK_AI_MODEL: str = TASK_AI_MODEL既定,
     実行有効: bool = True,
 ) -> dict:
-    """AI 生成待ちの仮タスクを『準備中』状態で登録する（実行は監視ループに任せる）。"""
+    """AI生成待ちの仮タスクを「準備開始」で登録する（実行は監視ループに任せる）。"""
     初期化()
     conn = 接続取得()
     try:
@@ -913,7 +913,7 @@ def 仮タスク登録(
         conn.execute(
             f"INSERT INTO {AIタスク要求テーブル} (利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, {監査カラム}) "
             f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
-            [利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, "準備中", *監査値],
+            [利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, "準備開始", *監査値],
         )
         conn.commit()
         return _タスク要求取得(conn, 利用者ID, タスクID)
@@ -922,13 +922,13 @@ def 仮タスク登録(
 
 
 def 実行待ち一覧() -> list[dict]:
-    """PID 未設定の仮登録（準備中）を返す。監視ループが 5 秒間隔で確認する。"""
+    """PID未設定の仮登録（準備開始）を返す。監視ループが5秒間隔で確認する。"""
     初期化()
     conn = 接続取得()
     try:
         rows = conn.execute(
             "SELECT 利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 実行回数, 登録利用者ID "
-            f"FROM {AIタスク要求テーブル} WHERE 状態 = '準備中' AND PID = '' ORDER BY タスクID"
+            f"FROM {AIタスク要求テーブル} WHERE 状態 = '準備開始' AND PID = '' ORDER BY タスクID"
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -936,14 +936,15 @@ def 実行待ち一覧() -> list[dict]:
 
 
 def 実行開始記録(利用者ID: str, タスクID: str, pid: int) -> None:
-    """subprocess 起動時に PID・開始日時・実行回数+1 を記録する。"""
+    """sub_init起動時に準備中へ進め、PID・開始日時・実行回数を記録する。"""
     初期化()
     conn = 接続取得()
     try:
         now = _現在日時()
         conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET PID = ?, 開始日時 = ?, 実行回数 = 実行回数 + 1, 更新日時 = ? "
-            "WHERE 利用者ID = ? AND タスクID = ?",
+            f"UPDATE {AIタスク要求テーブル} SET 状態 = '準備中', PID = ?, 開始日時 = ?, "
+            "終了日時 = '', 実行回数 = 実行回数 + 1, 更新日時 = ? "
+            "WHERE 利用者ID = ? AND タスクID = ? AND 状態 = '準備開始' AND PID = ''",
             [str(pid), now, now, 利用者ID, タスクID],
         )
         conn.commit()
@@ -955,7 +956,7 @@ def 実行待ち明細一覧() -> list[dict]:
     """実行可能な AIタスク明細（実行有効・待機・PID なし・先行 SEQ が全て完了）を返す。
 
     親の AIタスク要求が 待機 / 実行中 のものだけを対象とする
-    （準備中・準備完了・失敗・完了のタスクは実行しない。準備完了は実行開始条件の充足待ちに使う）。
+    （準備開始・準備中・準備完了・失敗・完了のタスクは実行しない。準備完了は実行開始条件の充足待ちに使う）。
     明細の 実行有効 = 0 は実行対象にしない（明細作成は実行有効フラグに関係なく行う）。
     """
     初期化()
@@ -1258,14 +1259,14 @@ def タスク要求更新登録(
 ) -> dict:
     """修正ダイアログの内容で AIタスク要求を更新する（PID クリア済み前提）。
 
-    準備中（再準備）は開始日時・終了日時・実行回数をリセットし、監視ループに再分解させる。
+    準備開始（再準備）は開始日時・終了日時・実行回数をリセットし、監視ループに再分解させる。
     """
     初期化()
     conn = 接続取得()
     try:
         now = _現在日時()
         タイトル = 要求内容.splitlines()[0][:40] if 要求内容 else ""
-        if 状態 == "準備中":
+        if 状態 == "準備開始":
             conn.execute(
                 f"UPDATE {AIタスク要求テーブル} SET プロジェクト = ?, タイトル = ?, 要求内容 = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 開始日時 = '', 終了日時 = '', 実行回数 = 0, 更新日時 = ? "
@@ -1411,6 +1412,10 @@ def PID全クリア() -> None:
     conn = 接続取得()
     try:
         now = _現在日時()
+        conn.execute(
+            f"UPDATE {AIタスク要求テーブル} SET 状態 = '準備開始' "
+            "WHERE PID != '' AND 状態 = '準備中'"
+        )
         conn.execute(
             f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機' WHERE PID != '' AND 状態 = '実行中'"
         )

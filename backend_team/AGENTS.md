@@ -1,0 +1,99 @@
+# backend_team 実装概要
+
+## 本書の目的
+
+このファイルは `backend_team` の構成、提供 API、実装入口を示す概要ドキュメントです。
+具体的な起動・検証手順は `.aidiy/knowledge/` に集約します。
+AI エージェントは、本書に一時的な作業メモを追記しないでください。
+
+## 概要
+
+`backend_team` はポート `8094` 上で動作する、複数AIエージェントの継続活動を管理する FastAPI サーバーです。
+現段階はUI検討用の仮実装です。要員マスタとチーム作業は共有SQLiteへ保存し、活動状態はインメモリ管理です。
+
+- 設定: `backend_server/_config/AiDiy_key.json` の `TEAM_BASE`、`TEAM_AI_NAME`、`TEAM_AI_MODEL`
+- 初期ポート: `8094`
+- 起動: `uvicorn team_main:app --host 0.0.0.0 --port 8094`
+- DB: `backend_server/_data/AiDiy/database.db` の `Aチーム要員` / `Aチーム作業`
+- 状態: エージェント、活動履歴、シミュレーション有効状態（仕事・雑談・瞑想）
+- 定期処理: 8秒間隔のエージェント状態更新 + 5秒間隔の`Aチーム作業`監視
+- 再起動: `backend_team/temp/reboot_team.txt`
+
+## 提供 API
+
+| エンドポイント | 役割 |
+|----------------|------|
+| `GET /`、`GET /health` | 稼働状況 |
+| `POST /team/状態/取得` | チーム全体のスナップショット |
+| `POST /team/設定/取得` | `CODE_BASE_PATH`とTeamAI設定の取得 |
+| `POST /team/エージェント/一覧` | エージェント一覧 |
+| `POST /team/エージェント/召喚` | persona値で`Aチーム要員`をupsertして有効化 |
+| `POST /team/エージェント/排除` | `Aチーム要員`の行を残して無効化 |
+| `POST /team/エージェント/状態変更` | 状態、作業内容、ひとことの変更 |
+| `POST /team/活動/一覧` | 活動履歴 |
+| `POST /team/シミュレーション/切替` | 自動行動の開始・停止 |
+| `POST /team/召喚要員/一覧` | `persona/` の有効なフォルダ名を召喚候補として取得 |
+| `POST /team/要員/一覧` / `取得` | `Aチーム要員` の参照 |
+| `POST /team/要員/登録` / `変更` / `削除` | `Aチーム要員` の保守 |
+| `POST /team/作業/一覧` / `取得` / `最大更新日時` | `Aチーム作業` の参照と5秒ポーリング用更新確認 |
+| `POST /team/作業/登録` / `変更` | `Aチーム作業` の追加・編集 |
+
+レスポンスは `status`、`message`、`data` の統一形式です。
+
+## Aチーム要員
+
+| 項目 | 内容 |
+|------|------|
+| `要員ID` | 主キー |
+| `要員名` | 表示名 |
+| `役割` | チーム内の担当 |
+| `人格情報` | 口調、行動方針、性格など |
+| `有効` | 稼働対象フラグ |
+| 監査8項目 | 登録・更新の日時、利用者ID、利用者名、端末ID |
+
+初期データは `要員ID=admin`、`要員名=admin`、`有効=1` の1件です。初期投入は冪等で、既存値を上書きしません。
+persona要員は召喚時に `persona.json` の現在値でupsertし、排除時は行を削除せず `有効=0` にします。
+`admin` は削除・無効化・排除できません。
+
+## Aチーム作業
+
+`Aタスク要求`に対応するAIチーム用の作業台帳です。主キーは`利用者ID`と`作業ID`の組み合わせです。
+新規作業ID（チームタスク識別子）は`TEAM.mmdd.hhmmss`形式です。
+
+| 項目 | 内容 |
+|------|------|
+| `利用者ID` / `作業ID` | 複合主キー |
+| `プロジェクト` / `タイトル` / `要求内容` | 作業の依頼内容 |
+| `TEAM_AI_NAME` / `TEAM_AI_MODEL` | チーム管理に使用するAI設定 |
+| `TASK_AI_NAME` / `TASK_AI_MODEL` | 作業実行に使用するAI設定 |
+| `実行有効` / `状態` | 実行可否と`準備開始`・`準備中`・`準備完了`・`待機`・`実行中`・`エラー`・`完了`・`中止` |
+| `PID` / `開始日時` / `終了日時` / `実行回数` | 実行管理項目 |
+| `タスクID` | `aidiy_task_agents`へ投入した`Aタスク要求`のID |
+| `応答タイトル` / `応答内容` | 作業結果 |
+| 監査8項目 | 登録・更新の日時、利用者ID、利用者名、端末ID |
+
+## ファイル構成
+
+| パス | 役割 |
+|------|------|
+| `team_main.py` | FastAPI エントリポイント |
+| `team_proc/config.py` | 共通 `conf_json` による `TEAM_BASE` 読取 |
+| `team_proc/app.py` | アプリ生成 |
+| `team_proc/routes.py` | HTTP API |
+| `team_proc/store.py` | インメモリ状態と自動行動 |
+| `team_proc/team_db.py` | `Aチーム要員` の作成、初期データ、CRUD |
+| `team_proc/team_work_db.py` | `Aチーム作業` の作成、一覧、追加、編集 |
+| `team_proc/team_watcher.py` | 5秒間隔で準備開始の作業を取得し、準備中へ更新して`sub_init.py`を起動 |
+| `sub_init.py` | 作業IDを`task_id`に指定して`aidiy_task_agents`へ投入し、同じIDをAタスク要求へ引き継ぐ。成功時にAチーム作業を準備完了へ更新 |
+| `team_proc/runtime.py` | lifespan、再起動監視 |
+| `_start.py` / `_setup.py` / `_cleanup.py` | 全体スクリプトからの委譲先 |
+| `persona/<要員ID>/persona.json` | 召喚候補。フォルダ名は1～16文字、空白なしで、英数字・日本語・`_`・`-`のみ。`admin` は削除禁止初期要員 |
+| `team_proc/persona_catalog.py` | personaフォルダの検証、読込、召喚要員一覧化 |
+
+## 次段階
+
+- チーム、活動履歴の永続化
+- 投入した`Aタスク要求`の完了状態・応答内容の同期
+- チーム要員への担当割当
+- Code CLIプロセスの実行・監視
+- WebSocketによるフロントエンドへの状態配信

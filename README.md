@@ -12,6 +12,7 @@
 - [backend_tools/AGENTS.md](./backend_tools/AGENTS.md)
 - [backend_local/AGENTS.md](./backend_local/AGENTS.md)
 - [backend_task/AGENTS.md](./backend_task/AGENTS.md)
+- [backend_team/AGENTS.md](./backend_team/AGENTS.md)
 - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 - [docs/](./docs/)
@@ -25,16 +26,18 @@
 - バックエンド: FastAPI + SQLAlchemy + SQLite
 - Command Hermes: `command_hermes` / `aidiy_hermes`（コード支援用 CLI 基盤、常駐サーバーではない）
 - バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**18 サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Windows Control）
-- バックエンド Local: `backend_local`（ポート 8094、OpenAI 互換の Gemma ローカル推論サーバー）
+- バックエンド Local: `backend_local`（ポート 8096、OpenAI 互換の Gemma ローカル推論サーバー）
 - バックエンド Task: `backend_task`（ポート 8093、AIタスク実行 + 定期タスク FastAPI）
+- バックエンド Team: `backend_team`（ポート 8094、複数AIエージェントのチーム活動モック）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
-- 常駐バックエンドは **5 サーバー構成**
+- 常駐バックエンドは **6 サーバー構成**
   - `core_main.py` : `8091`
   - `apps_main.py` : `9098`
   - `tools_main.py` : `8095`
-  - `local_main.py` : `8094`（`_start.py` のデフォルトは起動しない）
+  - `local_main.py` : `8096`（`_start.py` のデフォルトは起動しない）
   - `task_main.py` : `8093`
+  - `team_main.py` : `8094`
 - 補助 CLI として `command_hermes` を統合
   - `aidiy_hermes` : on-demand 実行のコードエージェント CLI
 - Web フロントは `8090`
@@ -85,8 +88,9 @@ python _setup.py
 3. `backend_tools` の `uv sync --upgrade`、必要に応じて MCP 設定ファイル書き込み（Claude / Gemini 向け）
 4. `backend_server` の `uv sync --upgrade`
 5. `backend_task` の `uv sync --upgrade`
-6. `frontend_web` の `npm install`
-7. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
+6. `backend_team` の `uv sync --upgrade`
+7. `frontend_web` の `npm install`
+8. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
 8. `command_hermes` の `.venv` 作成 / `uv sync --upgrade` / `aidiy_hermes` 登録試行
 
 補足:
@@ -124,7 +128,7 @@ python _start.py
 ```bash
 # バックエンド Local（OpenAI 互換 Gemma、必要時のみ）
 cd backend_local
-.venv/Scripts/python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8094
+.venv/Scripts/python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
 
 # バックエンド MCP
 cd backend_tools
@@ -141,6 +145,10 @@ cd backend_server
 # バックエンド Task
 cd backend_task
 .venv/Scripts/python.exe -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093
+
+# バックエンド Team
+cd backend_team
+.venv/Scripts/python.exe -m uvicorn team_main:app --reload --host 0.0.0.0 --port 8094
 
 # Command Hermes（対話 CLI）
 cd command_hermes
@@ -165,8 +173,9 @@ npm run dev
 | Web フロント | http://localhost:8090 |
 | Core API Docs | http://localhost:8091/docs |
 | Apps API Docs | http://localhost:9098/docs |
-| Backend Local Docs | http://localhost:8094/docs |
+| Backend Local Docs | http://localhost:8096/docs |
 | Backend Task Docs | http://localhost:8093/docs |
+| Backend Team Docs | http://localhost:8094/docs |
 | Backend MCP 一覧 | http://localhost:8095/ |
 | Backend MCP ツール一覧 | http://localhost:8095/{mcp_name}/list |
 | Backend MCP SSE 接続 | http://localhost:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
@@ -207,6 +216,7 @@ netstat -ano | findstr :8091
 netstat -ano | findstr :9098
 netstat -ano | findstr :8093
 netstat -ano | findstr :8094
+netstat -ano | findstr :8096
 netstat -ano | findstr :8095
 netstat -ano | findstr :8092
 taskkill /PID <pid> /F
@@ -264,6 +274,7 @@ python _cleanup.py
 4. [backend_tools/AGENTS.md](./backend_tools/AGENTS.md)
 5. [backend_local/AGENTS.md](./backend_local/AGENTS.md)
 6. [backend_task/AGENTS.md](./backend_task/AGENTS.md)
-7. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
-8. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
+7. [backend_team/AGENTS.md](./backend_team/AGENTS.md)
+8. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
+9. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 9. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

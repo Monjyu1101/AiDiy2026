@@ -12,7 +12,7 @@
 AiDiy Local LLM サーバー エントリポイント
 
 HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API として
-1 ポート (8094) で提供する。
+1 ポート (8096) で提供する。
 
 主要エンドポイント:
 - POST /v1/chat/completions  OpenAI 標準チャット補完
@@ -25,7 +25,7 @@ HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API として
 
 | 設定 | AiDiy_key.json キー | 既定 |
 |------|---------------------|------|
-| 待受ポート | LOCAL_BASE | 8094 |
+| 待受ポート | LOCAL_BASE | 8096 |
 | モデル ID | CHAT_LOCAL_MODEL | google/gemma-4-E2B-it |
 | HF トークン | huggingface_key_read | （なし） |
 | デバイス | CHAT_LOCAL_DEVICE | auto |
@@ -72,7 +72,7 @@ from local_proc.aidiy_config import AiDiyConfig
 _cfg = AiDiyConfig()
 logger.info("設定ソース: %s (%s)", _cfg.path, "読込OK" if _cfg.loaded else "見つからず→デフォルト使用")
 
-LOCAL_PORT = _cfg.get_int("LOCAL_BASE", 8094)
+LOCAL_PORT = _cfg.get_int("LOCAL_BASE", 8096)
 LOCAL_MODEL = _cfg.get_str("CHAT_LOCAL_MODEL", "google/gemma-4-E2B-it")
 LOCAL_DEVICE = _cfg.get_str("CHAT_LOCAL_DEVICE", "auto")
 LOCAL_DTYPE = _cfg.get_str("CHAT_LOCAL_DTYPE", "auto")
@@ -106,7 +106,7 @@ app = FastAPI(
     title="AiDiy Local LLM Server",
     description=(
         "HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API で提供するローカル推論サーバー。\n\n"
-        "OpenAI SDK の `base_url` に `http://localhost:8094/v1` を指定して利用できます。\n\n"
+        "OpenAI SDK の `base_url` に `http://localhost:8096/v1` を指定して利用できます。\n\n"
         "- `POST /v1/chat/completions` — チャット補完（OpenAI 標準）\n"
         "- `GET /v1/models` — モデル一覧"
     ),
