@@ -18,7 +18,7 @@ import {
   type エージェント,
   type エージェント状態,
   状態情報,
-} from './AIチーム_型';
+} from '../AIチーム_型';
 
 type 実行状態 = {
   group: THREE.Group;
@@ -892,6 +892,15 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   font-size: 9px;
   letter-spacing: 0.05em;
+}
+
+.view-chip {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(108, 78, 196, 0.94), rgba(143, 104, 221, 0.9));
+  border-color: rgba(93, 68, 168, 0.95);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(44, 24, 101, 0.3);
 }
 
 .view-icon { margin-right: 6px; color: #5bd9ff; }

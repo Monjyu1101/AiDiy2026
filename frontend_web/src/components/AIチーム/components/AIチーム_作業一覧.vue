@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // 5秒ごとに要員ID単位の最大更新日時を確認し、変化時だけ一覧を再取得する
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import apiClient from '../../api/client';
-import { useAuthStore } from '../../stores/auth';
-import TeamWorkEdit from './dialog/Aチーム作業編集.vue';
-import type { チーム作業 } from './AIチーム_型';
-import { use自由配置パネル } from './use自由配置パネル';
+import apiClient from '../../../api/client';
+import { useAuthStore } from '../../../stores/auth';
+import TeamWorkEdit from '../dialog/AIチーム_作業編集.vue';
+import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
+import type { チーム作業 } from '../AIチーム_型';
+import { use自由配置パネル } from '../use自由配置パネル';
 
 const authStore = useAuthStore();
 const 要員ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
@@ -81,6 +82,42 @@ const 作業を開く = (work: チーム作業) => {
   編集ダイアログ表示.value = true;
 };
 
+const 応答内容ダイアログ表示 = ref(false);
+const 応答内容タイトル = ref('');
+const 応答内容要求値 = ref('');
+const 応答内容表示値 = ref('');
+
+const 応答内容を開く = (work: チーム作業) => {
+  const 要求 = String(work.要求内容 ?? '');
+  const 内容 = String(work.応答内容 ?? '');
+  if (!要求.trim() && !内容.trim()) return;
+  応答内容タイトル.value = `要求・応答内容 - ${work.作業ID}${work.応答タイトル ? ' / ' + work.応答タイトル : ''}`;
+  応答内容要求値.value = 要求;
+  応答内容表示値.value = 内容;
+  応答内容ダイアログ表示.value = true;
+};
+
+// シングルクリックで編集ダイアログ、ダブルクリックで応答内容ダイアログ。
+// クリックをそのまま処理すると dblclick 時に編集ダイアログが割り込むため、
+// 一定時間待って dblclick が来なければシングルクリック扱いにする。
+let 行クリックタイマー: ReturnType<typeof setTimeout> | null = null;
+
+const 行クリック = (work: チーム作業) => {
+  if (行クリックタイマー) clearTimeout(行クリックタイマー);
+  行クリックタイマー = setTimeout(() => {
+    行クリックタイマー = null;
+    作業を開く(work);
+  }, 220);
+};
+
+const 行ダブルクリック = (work: チーム作業) => {
+  if (行クリックタイマー) {
+    clearTimeout(行クリックタイマー);
+    行クリックタイマー = null;
+  }
+  応答内容を開く(work);
+};
+
 const 保存後処理 = (work: チーム作業) => {
   const index = 作業一覧.value.findIndex((item) => item.作業ID === work.作業ID);
   if (index >= 0) 作業一覧.value.splice(index, 1, work);
@@ -101,6 +138,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (refreshTimer) clearInterval(refreshTimer);
+  if (行クリックタイマー) clearTimeout(行クリックタイマー);
 });
 </script>
 
@@ -138,7 +176,12 @@ onBeforeUnmount(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="work in 作業一覧" :key="work.作業ID" @click="作業を開く(work)">
+          <tr
+            v-for="work in 作業一覧"
+            :key="work.作業ID"
+            @click="行クリック(work)"
+            @dblclick="行ダブルクリック(work)"
+          >
             <td class="work-id">{{ work.作業ID }}</td>
             <td>
               <strong>{{ work.タイトル || '（タイトルなし）' }}</strong>
@@ -170,6 +213,14 @@ onBeforeUnmount(() => {
     @close="編集ダイアログ表示 = false"
     @saved="保存後処理"
   />
+
+  <AIチーム_応答内容
+    :is-open="応答内容ダイアログ表示"
+    :タイトル="応答内容タイトル"
+    :要求内容="応答内容要求値"
+    :内容="応答内容表示値"
+    @close="応答内容ダイアログ表示 = false"
+  />
 </template>
 
 <style scoped>
@@ -192,13 +243,22 @@ onBeforeUnmount(() => {
 
 .panel-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  margin: 0 2px 14px;
+  gap: 10px;
+  margin: -18px -14px 14px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(108, 78, 196, 0.22), rgba(143, 104, 221, 0.16));
+  border-bottom: 1px solid rgba(143, 104, 221, 0.25);
+  border-radius: 14px 14px 0 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(44, 24, 101, 0.15);
 }
 
 .panel-heading h2 {
   margin: 2px 0 0;
+  color: #fff;
   font-size: 16px;
 }
 

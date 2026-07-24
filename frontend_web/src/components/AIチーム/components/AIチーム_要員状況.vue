@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import apiClient from '../../api/client';
-import AiTeamMemberSummon from './dialog/AIチーム_メンバー召喚.vue';
-import type { エージェント, チーム状況, チーム要員, 状態表示 } from './AIチーム_型';
-import { use自由配置パネル } from './use自由配置パネル';
+import apiClient from '../../../api/client';
+import AiTeamMemberSummon from '../dialog/AIチーム_メンバー召喚.vue';
+import type { エージェント, チーム状況, チーム要員, 状態表示 } from '../AIチーム_型';
+import { use自由配置パネル } from '../use自由配置パネル';
 
 const props = defineProps<{
   エージェント一覧: エージェント[];
@@ -181,13 +181,22 @@ onBeforeUnmount(() => {
 
 .panel-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  margin: 0 2px 14px;
+  gap: 10px;
+  margin: -18px -14px 14px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(108, 78, 196, 0.22), rgba(143, 104, 221, 0.16));
+  border-bottom: 1px solid rgba(143, 104, 221, 0.25);
+  border-radius: 14px 14px 0 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(44, 24, 101, 0.15);
 }
 
 .panel-heading h2 {
   margin: 2px 0 0;
+  color: #fff;
   font-size: 16px;
 }
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import AiTeamMembers from './AIチーム_メンバー.vue';
-import AiTeamViewer from './AIチーム_立体表示.vue';
-import AiTeamWorkList from './AIチーム_作業一覧.vue';
+import AiTeamMembers from './components/AIチーム_要員状況.vue';
+import AiTeamViewer from './components/AIチーム_立体表示.vue';
+import AiTeamWorkList from './components/AIチーム_作業一覧.vue';
 import { 状態情報 } from './AIチーム_型';
 import { useAIチーム } from './useAIチーム';
 
