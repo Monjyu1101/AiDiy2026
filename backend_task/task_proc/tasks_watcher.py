@@ -464,6 +464,17 @@ def _タイムアウト確認(logger: logging.Logger) -> None:
         logger.exception("実行タイムアウト処理でエラーが発生しました")
 
 
+def _チーム状況確認(logger: logging.Logger) -> None:
+    """有効なAチーム要員×実行有効なAタスク要求（24時間以内更新）を要員IDで集計し、Aチーム状況を更新する。
+
+    実行開始条件の監視ループ（10秒間隔）の最後に毎回呼ばれる。
+    """
+    try:
+        tasks_db.チーム状況更新()
+    except Exception:
+        logger.exception("Aチーム状況の更新でエラーが発生しました")
+
+
 def _監視1回(logger: logging.Logger) -> None:
     # --- 仮登録（準備開始・PIDなし）→ 準備中 + sub_init.pyでAIタスク分解 ---
     for 行 in tasks_db.実行待ち一覧():
@@ -530,7 +541,7 @@ async def 実行条件監視ループ(logger: logging.Logger) -> None:
 
     明細起動（5 秒間隔の 監視ループ）とは分離して 10 秒間隔で回し、フォルダ走査などで
     時間がかかっても明細起動を遅らせない。実行条件の発火確認とタイムアウト確認は
-    hh:mm が変わった監視回だけ（毎分 1 回）、この順で行う。
+    hh:mm が変わった監視回だけ（毎分 1 回）行い、Aチーム状況の更新は毎回（10秒ごと）の最後に行う。
     """
     global _前回確認分
     logger.info(f"実行開始条件の監視ループを開始しました (interval={実行条件監視間隔秒}s)")
@@ -542,6 +553,7 @@ async def 実行条件監視ループ(logger: logging.Logger) -> None:
                 _前回確認分 = 現在分
                 await asyncio.to_thread(_実行条件確認, logger)
                 await asyncio.to_thread(_タイムアウト確認, logger)
+            await asyncio.to_thread(_チーム状況確認, logger)
         except Exception:
             logger.exception("実行開始条件の監視ループでエラーが発生しました")
         await asyncio.sleep(実行条件監視間隔秒)

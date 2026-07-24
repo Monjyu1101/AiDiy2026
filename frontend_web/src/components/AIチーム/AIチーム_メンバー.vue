@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import apiClient from '../../api/client';
 import AiTeamMemberSummon from './dialog/AIチーム_メンバー召喚.vue';
-import type { エージェント, チーム要員, 状態表示 } from './AIチーム_型';
+import type { エージェント, チーム状況, チーム要員, 状態表示 } from './AIチーム_型';
 import { use自由配置パネル } from './use自由配置パネル';
 
 const props = defineProps<{
@@ -39,6 +40,32 @@ const 召喚ダイアログを開く = () => {
   召喚ダイアログ表示.value = true;
 };
 
+const 状況一覧 = ref<チーム状況[]>([]);
+let 状況更新Timer: ReturnType<typeof setInterval> | null = null;
+
+const 選択中状況 = computed(
+  () => 状況一覧.value.find((item) => item.要員ID === props.選択中エージェント?.id) ?? null,
+);
+
+const 状況を読み込む = async () => {
+  try {
+    const response = await apiClient.post('/team/状況/一覧', {});
+    if (response.data?.status !== 'OK') return;
+    const items = response.data?.data?.items;
+    if (Array.isArray(items)) 状況一覧.value = items as チーム状況[];
+  } catch {
+    // 自動更新確認の失敗は、通常操作を邪魔しない。
+  }
+};
+
+onMounted(async () => {
+  await 状況を読み込む();
+  状況更新Timer = setInterval(() => void 状況を読み込む(), 10000);
+});
+
+onBeforeUnmount(() => {
+  if (状況更新Timer) clearInterval(状況更新Timer);
+});
 </script>
 
 <template>
@@ -96,8 +123,16 @@ const 召喚ダイアログを開く = () => {
       </div>
       <strong>{{ 選択中エージェント.作業内容 }}</strong>
       <p v-if="選択中エージェント.ひとこと">「{{ 選択中エージェント.ひとこと }}」</p>
-      <div class="progress-track"><span></span></div>
-      <small>コンテキスト使用量 42%</small>
+      <div v-if="選択中状況" class="status-summary">
+        <div class="status-row">
+          <span class="status-chip status-waiting">待機 {{ 選択中状況.待機数 }}</span>
+          <span class="status-chip status-running">実行 {{ 選択中状況.実行数 }}</span>
+          <span class="status-chip status-done">完了 {{ 選択中状況.完了数 }}</span>
+          <span class="status-chip status-error">エラー {{ 選択中状況.エラー数 }}</span>
+        </div>
+        <small>最終更新: {{ 選択中状況.最終更新日時 || '-' }}</small>
+      </div>
+      <small v-else class="status-empty">直近24時間のAIタスク実績はありません</small>
       <div class="member-action">
         <span v-if="選択中エージェント.id === 'admin'">初期メンバー・退場不可</span>
         <button
@@ -300,20 +335,56 @@ const 召喚ダイアログを開く = () => {
   line-height: 1.5;
 }
 
-.progress-track {
-  height: 3px;
+.status-summary {
   margin: 12px 0 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(120, 151, 169, 0.15);
 }
 
-.progress-track span {
-  width: 42%;
-  height: 100%;
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.status-chip {
+  padding: 3px 7px;
+  border: 1px solid rgba(120, 151, 169, 0.3);
+  border-radius: 999px;
+  color: #b7c9d3;
+  background: rgba(120, 151, 169, 0.12);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.status-chip.status-waiting {
+  border-color: rgba(139, 184, 255, 0.4);
+  color: #8bb8ff;
+  background: rgba(139, 184, 255, 0.12);
+}
+
+.status-chip.status-running {
+  border-color: rgba(101, 232, 183, 0.4);
+  color: #65e8b7;
+  background: rgba(101, 232, 183, 0.12);
+}
+
+.status-chip.status-done {
+  border-color: rgba(120, 151, 169, 0.4);
+  color: #9fb4c0;
+  background: rgba(120, 151, 169, 0.12);
+}
+
+.status-chip.status-error {
+  border-color: rgba(255, 107, 129, 0.4);
+  color: #ff8fa3;
+  background: rgba(255, 107, 129, 0.12);
+}
+
+.status-empty {
   display: block;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #58d4f0, #68e8ad);
+  margin: 12px 0 6px;
+  color: #5f7686;
+  font-size: 9px;
 }
 
 .agent-detail small {

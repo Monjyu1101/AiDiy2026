@@ -64,7 +64,7 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         del app
-        # システム開始時（再起動含む）: 残存 PID のプロセスを強制停止してクリア
+        # システム開始時（再起動含む）: 残存 PID をエラーとして記録しクリア（強制停止はしない）
         from . import tasks_watcher
         await asyncio.to_thread(tasks_watcher.起動時クリーンアップ, logger)
         # タイマー起動前: 停止中に期限が到来した実行条件は発火させず次周期へ更新する

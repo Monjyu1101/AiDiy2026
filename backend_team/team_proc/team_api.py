@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from log_config import get_logger
 
-from . import persona_catalog, team_db, team_work_db
+from . import persona_catalog, team_db, team_status_db, team_work_db
 from .config import 設定読込
 from .store import ストア
 
@@ -395,3 +395,17 @@ async def チーム作業変更(request: チーム作業保存要求) -> dict:
     except Exception as e:
         logger.error(f"チーム作業の変更に失敗: {e}")
         return ng(f"チーム作業の変更に失敗しました: {e}")
+
+
+@router.post("/状況/一覧", tags=["チーム状況"])
+async def チーム状況一覧() -> dict:
+    """要員ごとのAタスク要求集計（待機数・実行数・完了数・エラー数）を取得する。
+
+    集計自体はbackend_task側（10秒間隔）が行い、Aチーム状況テーブルを作り直している。
+    """
+    try:
+        items = team_status_db.状況一覧()
+        return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
+    except Exception as e:
+        logger.error(f"チーム状況一覧の取得に失敗: {e}")
+        return ng(f"チーム状況一覧の取得に失敗しました: {e}")

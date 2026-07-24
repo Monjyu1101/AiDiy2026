@@ -21,6 +21,17 @@ export type チーム要員 = {
   有効: boolean;
 };
 
+export type チーム状況 = {
+  要員ID: string;
+  要員名: string;
+  最終更新日時: string;
+  待機数: number;
+  実行数: number;
+  完了数: number;
+  エラー数: number;
+  更新日時: string;
+};
+
 export type チーム作業 = {
   作業ID: string;
   要員ID: string;

@@ -31,6 +31,8 @@ AIタスク要求テーブル = "Aタスク要求"
 AIタスク明細テーブル = "Aタスク明細"
 AIタスク実行条件テーブル = "Aタスク実行条件"
 AIチーム作業テーブル = "Aチーム作業"
+AIチーム要員テーブル = "Aチーム要員"
+AIチーム状況テーブル = "Aチーム状況"
 _採番テーブル = "C採番"
 _採番ID = "Aタスク要求"
 _採番プレフィックス = "TK"
@@ -1696,5 +1698,66 @@ def タスク失敗(利用者ID: str, タスクID: str, メッセージ: str) ->
         )
         conn.commit()
         return _タスク要求取得(conn, 利用者ID, タスクID)
+    finally:
+        conn.close()
+
+
+def _チーム状況テーブル作成(conn: sqlite3.Connection) -> None:
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {AIチーム状況テーブル} (
+            要員ID TEXT NOT NULL PRIMARY KEY,
+            要員名 TEXT NOT NULL DEFAULT '',
+            最終更新日時 TEXT NOT NULL DEFAULT '',
+            待機数 INTEGER NOT NULL DEFAULT 0,
+            実行数 INTEGER NOT NULL DEFAULT 0,
+            完了数 INTEGER NOT NULL DEFAULT 0,
+            エラー数 INTEGER NOT NULL DEFAULT 0,
+            更新日時 TEXT NOT NULL DEFAULT ''
+        )
+    """)
+
+
+def チーム状況更新() -> int:
+    """有効なAチーム要員 × 実行有効なAタスク要求（24時間以内更新）を要員IDで集計し、Aチーム状況を作り直す。
+
+    実行開始条件の監視ループ（10秒間隔）の最後に毎回呼ばれる。
+    Aチーム要員はbackend_team側が作成するテーブルのため、未起動などで存在しない場合は何もしない。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        now = _現在日時()
+        閾値 = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+        _チーム状況テーブル作成(conn)
+        try:
+            conn.execute(f"DELETE FROM {AIチーム状況テーブル}")
+            conn.execute(
+                f"""
+                INSERT INTO {AIチーム状況テーブル}
+                    (要員ID, 要員名, 最終更新日時, 待機数, 実行数, 完了数, エラー数, 更新日時)
+                SELECT
+                    c.要員ID,
+                    c.要員名,
+                    MAX(t.更新日時),
+                    SUM(CASE WHEN t.状態 IN ('準備完了', '待機') THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN t.状態 IN ('準備中', '実行中') THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN t.状態 = '完了' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN t.状態 = 'エラー' THEN 1 ELSE 0 END),
+                    ?
+                  FROM {AIチーム要員テーブル} c
+                  JOIN {AIタスク要求テーブル} t ON t.利用者ID = c.要員ID
+                 WHERE c.有効 = 1
+                   AND t.実行有効 = 1
+                   AND t.更新日時 >= ?
+                 GROUP BY c.要員ID, c.要員名
+                """,
+                [now, 閾値],
+            )
+        except sqlite3.OperationalError:
+            conn.rollback()
+            return 0
+        件数 = conn.execute(f"SELECT COUNT(*) FROM {AIチーム状況テーブル}").fetchone()[0]
+        conn.commit()
+        return 件数
     finally:
         conn.close()

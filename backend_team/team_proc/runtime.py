@@ -62,7 +62,7 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
         from . import team_work_db
 
         team_work_db.初期化()
-        起動時クリーンアップ(logger)
+        await asyncio.to_thread(起動時クリーンアップ, logger)
         tasks = [
             asyncio.create_task(シミュレーションループ(logger), name="backend_team_simulation"),
             asyncio.create_task(監視ループ(logger), name="backend_team_work_watcher"),
