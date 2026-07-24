@@ -23,6 +23,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from log_config import get_logger, setup_logging
 from team_proc import team_work_db
 

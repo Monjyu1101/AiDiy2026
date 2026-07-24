@@ -84,8 +84,8 @@ persona要員は召喚時に `persona.json` の現在値でupsertし、排除時
 | `team_proc/store.py` | インメモリ状態と自動行動 |
 | `team_proc/team_db.py` | `Aチーム要員` の作成、初期データ、CRUD |
 | `team_proc/team_work_db.py` | `Aチーム作業` の作成、一覧、追加、編集 |
-| `team_proc/team_watcher.py` | 5秒間隔で準備開始の作業を取得し、準備中へ更新して`sub_init.py`を起動 |
-| `sub_init.py` | 作業IDを`task_id`に指定して`aidiy_task_agents`へ投入し、同じIDをAタスク要求へ引き継ぐ。成功時にAチーム作業を準備完了へ更新 |
+| `team_proc/team_watcher.py` | 5秒間隔で準備開始の作業を取得し、準備中へ更新して`team_sub/sub_init.py`を起動 |
+| `team_sub/sub_init.py` | 作業IDを`task_id`に指定して`aidiy_task_agents`へ投入し、同じIDをAタスク要求へ引き継ぐ。成功時にAチーム作業を準備完了へ更新 |
 | `team_proc/runtime.py` | lifespan、再起動監視 |
 | `_start.py` / `_setup.py` / `_cleanup.py` | 全体スクリプトからの委譲先 |
 | `persona/<要員ID>/persona.json` | 召喚候補。フォルダ名は1～16文字、空白なしで、英数字・日本語・`_`・`-`のみ。`admin` は削除禁止初期要員 |

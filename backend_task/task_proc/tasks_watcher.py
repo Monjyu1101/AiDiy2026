@@ -13,8 +13,10 @@
 - 5秒間隔でタスク要求を確認し、PID未設定の仮登録（準備開始）を見つけたら
   temp/input/<利用者ID>.<タスクID>.json を出力して sub_init.py を subprocess 起動する。
   起動時に準備中へ進め、PID・開始日時・実行回数を記録する。
-- システム開始時（再起動含む）は、テーブルに残った PID のプロセスを強制停止して
-  PID をクリアする（クリア後は監視ループが自動で再実行する）。
+- 実行開始条件の監視（10秒間隔、実際の確認は hh:mm 変化時＝毎分1回）に続けて、
+  開始日時だけが入ったまま実行タイムアウト分（既定30分）以上経過した実行をエラーにする。
+- システム開始時（再起動含む）は、テーブルに残った PID をエラーとして記録しクリアする
+  （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
 
 from __future__ import annotations
@@ -40,10 +42,10 @@ _前回確認分 = ""
 _曜日番号 = {"月": 0, "火": 1, "水": 2, "木": 3, "金": 4, "土": 5, "日": 6}
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SUB_INITパス = os.path.join(_BASE_DIR, "sub_init.py")
-_SUB_STARTパス = os.path.join(_BASE_DIR, "sub_start.py")
-_SUB_PROCパス = os.path.join(_BASE_DIR, "sub_proc.py")
-_SUB_TERMINATEパス = os.path.join(_BASE_DIR, "sub_terminate.py")
+_SUB_INITパス = os.path.join(_BASE_DIR, "task_sub", "sub_init.py")
+_SUB_STARTパス = os.path.join(_BASE_DIR, "task_sub", "sub_start.py")
+_SUB_PROCパス = os.path.join(_BASE_DIR, "task_sub", "sub_proc.py")
+_SUB_TERMINATEパス = os.path.join(_BASE_DIR, "task_sub", "sub_terminate.py")
 _入力DIR = os.path.join(_BASE_DIR, "temp", "input")
 _出力DIR = os.path.join(_BASE_DIR, "temp", "output")
 
@@ -79,17 +81,20 @@ def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
 
 
 def 起動時クリーンアップ(logger: logging.Logger) -> None:
-    """システム開始時: テーブルに残った PID を強制停止してクリアする。"""
+    """システム開始時: テーブルに残った PID をエラーとして記録しクリアする。
+
+    PID は OS に再利用され得るため、別プロセスを誤って停止する恐れがあり強制停止はしない。
+    """
     try:
         残存 = tasks_db.残存PID一覧()
         for 行 in 残存:
-            pid = str(行.get("PID", "")).strip()
-            if pid.isdigit():
-                logger.info(f"起動時クリーンアップ: {行['テーブル']} {行.get('利用者ID', '')}/{行['タスクID']} PID={pid}")
-                _プロセス強制停止(int(pid), logger)
+            logger.info(
+                f"起動時クリーンアップ: {行['テーブル']} {行.get('利用者ID', '')}/{行['タスクID']} "
+                f"PID={行.get('PID', '')}"
+            )
         if 残存:
             tasks_db.PID全クリア()
-            logger.info(f"PID を {len(残存)} 件クリアしました（監視ループが再実行します）")
+            logger.info(f"PID を {len(残存)} 件エラーにしてクリアしました")
     except Exception:
         logger.exception("起動時クリーンアップでエラーが発生しました")
 
@@ -347,20 +352,16 @@ def _即時実行条件確認(logger: logging.Logger) -> None:
 
 
 def _実行条件確認(logger: logging.Logger) -> None:
-    """hh:mm が変わった監視回だけ、次回実行日時と実行条件を確認して発火する。
+    """次回実行日時と実行条件を確認して発火する。
 
+    実行開始条件の監視ループ（hh:mm 変化時、毎分 1 回）から呼ばれる。
     発火条件: 要求が 準備完了 / 完了 かつ実行有効で、明細が全件待機または全件完了。
     保持可能状態でない条件（無効・準備開始・準備中・エラー・中止など）は次回実行日時を空にする。
     自タスクの実行サイクル途中（待機/実行中）や条件不成立の回（フォルダ変化なし等）は
     発火せず次回実行日時だけ次周期へ更新する（スキップ。消さない）。
     発火時は 明細 → 要求 の順で 待機 に戻し、次回実行日時を更新する。
     """
-    global _前回確認分
     now = datetime.now()
-    現在分 = now.strftime("%Y-%m-%d %H:%M")
-    if 現在分 == _前回確認分:
-        return
-    _前回確認分 = 現在分
     now文字 = now.strftime("%Y-%m-%d %H:%M:%S")
 
     for 条件 in tasks_db.実行条件監視一覧():
@@ -440,8 +441,11 @@ def _実行条件確認(logger: logging.Logger) -> None:
             logger.exception(f"実行条件確認でエラーが発生しました: {利用者ID}/{タスクID}")
 
 
-def _監視1回(logger: logging.Logger) -> None:
-    # --- 開始日時だけが入ったまま実行タイムアウト分以上経過 → 状態=エラー・実行有効=0 ---
+def _タイムアウト確認(logger: logging.Logger) -> None:
+    """開始日時だけが入ったまま実行タイムアウト分以上経過した実行を強制停止してエラーにする。
+
+    実行開始条件の監視ループ（hh:mm 変化時、毎分 1 回）から呼ばれる。
+    """
     try:
         タイムアウト対象 = tasks_db.タイムアウト対象一覧(実行タイムアウト分)
         for 行 in タイムアウト対象:
@@ -459,6 +463,8 @@ def _監視1回(logger: logging.Logger) -> None:
     except Exception:
         logger.exception("実行タイムアウト処理でエラーが発生しました")
 
+
+def _監視1回(logger: logging.Logger) -> None:
     # --- 仮登録（準備開始・PIDなし）→ 準備中 + sub_init.pyでAIタスク分解 ---
     for 行 in tasks_db.実行待ち一覧():
         利用者ID = str(行["利用者ID"])
@@ -523,13 +529,19 @@ async def 実行条件監視ループ(logger: logging.Logger) -> None:
     """実行開始条件の確認ループ。
 
     明細起動（5 秒間隔の 監視ループ）とは分離して 10 秒間隔で回し、フォルダ走査などで
-    時間がかかっても明細起動を遅らせない。実際の発火確認は hh:mm 変化時（毎分 1 回）。
+    時間がかかっても明細起動を遅らせない。実行条件の発火確認とタイムアウト確認は
+    hh:mm が変わった監視回だけ（毎分 1 回）、この順で行う。
     """
+    global _前回確認分
     logger.info(f"実行開始条件の監視ループを開始しました (interval={実行条件監視間隔秒}s)")
     while True:
         try:
             await asyncio.to_thread(_即時実行条件確認, logger)
-            await asyncio.to_thread(_実行条件確認, logger)
+            現在分 = datetime.now().strftime("%Y-%m-%d %H:%M")
+            if 現在分 != _前回確認分:
+                _前回確認分 = 現在分
+                await asyncio.to_thread(_実行条件確認, logger)
+                await asyncio.to_thread(_タイムアウト確認, logger)
         except Exception:
             logger.exception("実行開始条件の監視ループでエラーが発生しました")
         await asyncio.sleep(実行条件監視間隔秒)

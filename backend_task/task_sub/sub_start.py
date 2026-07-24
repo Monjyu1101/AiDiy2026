@@ -28,7 +28,7 @@ import traceback
 import urllib.request
 from urllib.parse import quote
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_API = "http://localhost:8093/task"
 バックアップURL = "http://localhost:8095/aidiy_backup/save/run"
 

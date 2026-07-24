@@ -13,10 +13,10 @@
 - 5秒間隔でチーム作業を確認し、投入待ち（準備開始・未投入）を見つけたら
   temp/input/<作業ID>.json を出力して sub_init.py を subprocess 起動する。
   起動時に準備中へ進め、PID・開始日時・実行回数を記録する。
-- 開始日時だけが入ったまま実行タイムアウト分以上経過した作業は、プロセスを
-  強制停止してエラーにする。
-- システム開始時（再起動含む）は、テーブルに残った PID のプロセスを強制停止して
-  未投入の作業を準備開始へ戻す。
+- 開始日時だけが入ったまま実行タイムアウト分以上経過した作業は、hh:mm が変わった
+  監視回だけ（毎分1回）強制停止してエラーにする。
+- システム開始時（再起動含む）は、テーブルに残った未投入の作業をエラーとして記録しクリアする
+  （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from . import team_work_db
@@ -36,8 +37,11 @@ from . import team_work_db
 実行回数上限 = 3
 
 _BASE_DIR = Path(__file__).resolve().parents[1]
-_SUB_INITパス = _BASE_DIR / "sub_init.py"
+_SUB_INITパス = _BASE_DIR / "team_sub" / "sub_init.py"
 _入力DIR = _BASE_DIR / "temp" / "input"
+
+# 実行タイムアウトの確認は hh:mm が変わった監視回だけ処理する（毎分 1 回）
+_前回確認分 = ""
 
 
 def _安全ファイル名部品(値: str) -> str:
@@ -80,16 +84,17 @@ def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
 
 
 def 起動時クリーンアップ(logger: logging.Logger) -> None:
-    """再起動前から残るsub_initを停止し、未投入作業を準備開始へ戻す。"""
+    """システム開始時: 未投入のまま残った作業をエラーとして記録しクリアする。
+
+    PID は OS に再利用され得るため、別プロセスを誤って停止する恐れがあり強制停止はしない。
+    """
     try:
         残存 = team_work_db.残存PID一覧()
         for 行 in 残存:
-            pid = str(行.get("PID", "")).strip()
-            if pid.isdigit():
-                _プロセス強制停止(int(pid), logger)
+            logger.info(f"起動時クリーンアップ: 作業ID={行.get('作業ID', '')} PID={行.get('PID', '')}")
         更新件数 = team_work_db.PID全クリア()
         if 更新件数:
-            logger.info(f"残存作業プロセスを{更新件数}件準備開始へ戻しました")
+            logger.info(f"残存作業を{更新件数}件エラーにしてクリアしました")
     except Exception:
         logger.exception("チーム作業の起動時クリーンアップに失敗しました")
 
@@ -138,8 +143,11 @@ def _作業実行開始(行: dict, logger: logging.Logger) -> None:
         logger.exception(f"チーム作業sub_initの起動に失敗しました: {作業ID}")
 
 
-def _監視1回(logger: logging.Logger) -> None:
-    # --- 開始日時だけが入ったまま実行タイムアウト分以上経過 → 状態=エラー・実行有効=0 ---
+def _タイムアウト確認(logger: logging.Logger) -> None:
+    """開始日時だけが入ったまま実行タイムアウト分以上経過した作業を強制停止してエラーにする。
+
+    監視ループ（5秒間隔）から、hh:mm が変わった回だけ（毎分1回）呼ばれる。
+    """
     try:
         タイムアウト対象 = team_work_db.作業タイムアウト対象一覧(team_work_db.実行タイムアウト分)
         for 行 in タイムアウト対象:
@@ -156,6 +164,14 @@ def _監視1回(logger: logging.Logger) -> None:
             logger.warning(f"実行タイムアウト対象をエラーにしました: {更新件数} 件")
     except Exception:
         logger.exception("実行タイムアウト処理でエラーが発生しました")
+
+
+def _監視1回(logger: logging.Logger) -> None:
+    global _前回確認分
+    現在分 = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if 現在分 != _前回確認分:
+        _前回確認分 = 現在分
+        _タイムアウト確認(logger)
 
     # --- 投入待ち（準備開始・未投入）→ 準備中 + sub_init.pyでAIタスク投入 ---
     for 行 in team_work_db.投入待ち一覧():
