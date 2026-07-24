@@ -1668,7 +1668,6 @@ onBeforeUnmount(() => {
           v-else-if="タスク編集Payload.kind === 'detail'"
           :is-open="true"
           :key="`detail-${タスク編集Payload?.編集明細?.タスクID || ''}-${タスク編集Payload?.編集明細?.明細SEQ || ''}`"
-          :利用者ID="String(タスク編集Payload?.利用者ID || '')"
           :編集明細="タスク編集Payload?.編集明細 || null"
           @close="タスク編集ウィンドウを閉じる"
           @registered="タスク編集登録完了"
@@ -1831,7 +1830,7 @@ onBeforeUnmount(() => {
       title="AiDiy AI Task (フロー図)"
       theme="purple"
     >
-      <component :is="AIタスクフローウィンドウ" :利用者ID="String(利用者?.利用者ID || '')" />
+      <component :is="AIタスクフローウィンドウ" />
     </component>
 
     <component
@@ -1840,7 +1839,7 @@ onBeforeUnmount(() => {
       title="AiDiy AI Task (タスク明細)"
       theme="purple"
     >
-      <component :is="AIタスク明細ウィンドウ" :利用者ID="String(利用者?.利用者ID || '')" />
+      <component :is="AIタスク明細ウィンドウ" />
     </component>
 
     <section v-else class="loading-state">

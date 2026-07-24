@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 from __future__ import annotations
 
 import importlib.util
@@ -13,7 +21,7 @@ KEY_JSON_PATH = BACKEND_SERVER_DIR / "_config" / "AiDiy_key.json"
 CONF_JSON_PATH = BACKEND_SERVER_DIR / "conf" / "conf_json.py"
 
 
-def _load_conf_json_class() -> type:
+def _conf_jsonクラス読込() -> type:
     """conf パッケージ全体を読み込まず、共通 conf_json 実装だけを利用する。"""
     spec = importlib.util.spec_from_file_location("_aidiy_team_conf_json", CONF_JSON_PATH)
     if spec is None or spec.loader is None:
@@ -24,11 +32,11 @@ def _load_conf_json_class() -> type:
 
 
 @lru_cache(maxsize=1)
-def load_config() -> Any:
+def 設定読込() -> Any:
     """共通 conf_json で AiDiy_key.json を読み、不足キーも共通規則で補完する。"""
-    return _load_conf_json_class()(json=str(KEY_JSON_PATH))
+    return _conf_jsonクラス読込()(json=str(KEY_JSON_PATH))
 
 
-def get_team_port() -> int:
+def チームポート取得() -> int:
     """TEAM_BASE を返す。初期値と不足キー補完は conf_json.DEFAULT_CONFIG に集約する。"""
-    return int(load_config().TEAM_BASE)
+    return int(設定読込().TEAM_BASE)

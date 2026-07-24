@@ -10,7 +10,7 @@
 
 """タスク明細の 1 ステップ実行サブプロセス。
 
-監視ループが `python sub_proc.py <temp/output/利用者ID.タスクID.json> <SEQ>` で起動する。
+監視ループが `python sub_proc.py <temp/output/タスクID.json> <SEQ>` で起動する。
 標準ライブラリのみで動作する。
 
 処理の流れ:
@@ -41,7 +41,6 @@ TASK_AI_NAME既定 = "claude_cli"
 TASK_AI_MODEL既定 = "auto"
 
 タスクID = ""
-利用者ID = ""
 明細SEQ = 0
 ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_proc.log")
 
@@ -82,7 +81,6 @@ def 明細行整形(行: dict) -> dict:
 def 明細一覧取得() -> list[dict]:
     """AIタスク明細の全件（状態フィルタなし）を返す。"""
     res = POST送信(f"{TASK_API}/タスク明細/一覧", {
-        "利用者ID": 利用者ID,
         "タスクID": タスクID,
     }, timeout=60)
     if res.get("status") != "OK":
@@ -123,7 +121,7 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
 次の HTTP エンドポイントへ直接報告してください（curl 等でこの AI エージェント自身が呼び出します）。
   POST http://localhost:8093/task_check_okng
   Content-Type: application/json
-  Body: {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証内容の要約"}}
+  Body: {{"タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証内容の要約"}}
   検証で問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。
 """
     リトライブロック = ""
@@ -181,7 +179,6 @@ def 通知音直接再生(通知種別: str) -> dict:
 
 def 完了報告(応答内容: str) -> None:
     res = POST送信(f"{TASK_API}/タスク明細/完了", {
-        "利用者ID": 利用者ID,
         "タスクID": タスクID,
         "明細SEQ": 明細SEQ,
         "応答内容": 応答内容,
@@ -193,7 +190,6 @@ def 完了報告(応答内容: str) -> None:
 def 再試行登録() -> None:
     """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す。"""
     res = POST送信(f"{TASK_API}/タスク明細/再試行", {
-        "利用者ID": 利用者ID,
         "タスクID": タスクID,
         "明細SEQ": 明細SEQ,
     }, timeout=60)
@@ -202,11 +198,10 @@ def 再試行登録() -> None:
 
 
 def 失敗報告(メッセージ: str) -> None:
-    if not 利用者ID or not タスクID or not 明細SEQ:
+    if not タスクID or not 明細SEQ:
         return
     try:
         POST送信(f"{TASK_API}/タスク明細/失敗", {
-            "利用者ID": 利用者ID,
             "タスクID": タスクID,
             "明細SEQ": 明細SEQ,
             "メッセージ": メッセージ[:500],
@@ -216,10 +211,10 @@ def 失敗報告(メッセージ: str) -> None:
 
 
 def main() -> int:
-    global タスクID, 利用者ID, 明細SEQ, ログパス
+    global タスクID, 明細SEQ, ログパス
     try:
         if len(sys.argv) < 3:
-            raise ValueError("使い方: python sub_proc.py <temp/output/利用者ID.タスクID.json> <SEQ>")
+            raise ValueError("使い方: python sub_proc.py <temp/output/タスクID.json> <SEQ>")
         出力JSONパス = os.path.abspath(sys.argv[1])
         明細SEQ = int(sys.argv[2])
         ファイルステム = os.path.splitext(os.path.basename(出力JSONパス))[0]
@@ -243,12 +238,11 @@ def main() -> int:
         if os.path.isfile(入力JSONパス):
             with open(入力JSONパス, "r", encoding="utf-8-sig") as f:
                 入力 = json.load(f)
-                利用者ID = str(入力.get("利用者ID", "")).strip()
                 タスクID = str(入力.get("タスクID", "")).strip()
                 プロジェクト = str(入力.get("プロジェクト", "")).strip()
-        if not 利用者ID or not タスクID:
-            raise ValueError("入力 JSON に 利用者ID または タスクID がありません")
-        ログ(f"=== ステップ実行 開始: {利用者ID}/{タスクID} SEQ={明細SEQ} ===")
+        if not タスクID:
+            raise ValueError("入力 JSON に タスクID がありません")
+        ログ(f"=== ステップ実行 開始: {タスクID} SEQ={明細SEQ} ===")
 
         # 3. 定型通知音は AI を経由せず直接再生する
         通知種別 = 通知音種別取得(対象)

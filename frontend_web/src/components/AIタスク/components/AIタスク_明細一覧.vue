@@ -1,12 +1,11 @@
 <script setup lang="ts">
 // AIタスク_明細一覧: 選択中タスクのタスク明細表をタブラー表示（データは親から受け取る）
-// 5秒ごとに利用者ID + タスクID単位の最大更新日時を確認し、変化時は親へ再読込を依頼する
+// 5秒ごとにタスクID単位の最大更新日時を確認し、変化時は親へ再読込を依頼する
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import type { PropType } from 'vue';
 import type { Column } from '../../../types';
 import apiClient from '../../../api/client';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
-import { useAuthStore } from '../../../stores/auth';
 import qTublerFrame from '../../_share/qTublerFrame.vue';
 import qBooleanCheckbox from '../../_share/qBooleanCheckbox.vue';
 import AIタスク_明細編集 from '../dialog/AIタスク_明細編集.vue';
@@ -21,7 +20,6 @@ const emit = defineEmits(['reload']);
 const currentPage = ref(1);
 const pageSize = ref(100);
 const rowKey = '明細SEQ';
-const authStore = useAuthStore();
 
 const columns: Column[] = [
   { key: '明細SEQ', label: 'SEQ', width: '50px', sortable: false, align: 'center' },
@@ -63,13 +61,9 @@ const 状態クラス = (value: any) => {
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let 明細最大更新日時 = '';
 
-const 利用者ID取得 = () => String(authStore.user?.利用者ID ?? '').trim();
-
 const 最大更新日時取得 = async () => {
-  const 利用者ID = 利用者ID取得();
-  if (!利用者ID || !props.タスクID) return '';
+  if (!props.タスクID) return '';
   const res = await apiClient.post('/task/タスク明細/最大更新日時', {
-    利用者ID,
     タスクID: props.タスクID
   });
   if (res.data.status !== 'OK') return 明細最大更新日時;
@@ -113,7 +107,6 @@ const 実行有効切替 = async (row: Record<string, any>) => {
   if (!confirmed) return;
   try {
     const res = await apiClient.post('/task/タスク明細/実行有効切替', {
-      利用者ID: 利用者ID取得(),
       タスクID: props.タスクID,
       明細SEQ: Number(row.明細SEQ ?? 0),
       実行有効: 新実行有効

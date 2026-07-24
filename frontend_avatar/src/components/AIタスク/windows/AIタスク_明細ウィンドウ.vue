@@ -18,22 +18,17 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { taskClient } from '@/api/client';
 import AIタスク明細一覧 from '../components/AIタスク_明細一覧.vue';
 
-const props = defineProps({
-  利用者ID: { type: String, default: '' }
-});
-
 const 選択タスクID = ref('');
 const 明細rows = ref<Record<string, any>[]>([]);
 let channel: BroadcastChannel | null = null;
 
 async function 明細読込() {
-  if (!選択タスクID.value || !props.利用者ID) {
+  if (!選択タスクID.value) {
     明細rows.value = [];
     return;
   }
   try {
     const res = await taskClient.post('/task/タスク明細/一覧', {
-      利用者ID: props.利用者ID,
       タスクID: 選択タスクID.value
     });
     明細rows.value = res.data.status === 'OK' ? (res.data.data?.items ?? []) : [];
@@ -66,7 +61,6 @@ onBeforeUnmount(() => {
   <div class="task-window-body">
     <component
       :is="AIタスク明細一覧"
-      :利用者ID="props.利用者ID"
       :タスクID="選択タスクID"
       :明細="明細rows"
       :showHeader="false"

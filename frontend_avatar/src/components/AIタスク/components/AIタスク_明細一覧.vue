@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 // AIタスク_明細一覧: 選択中タスクのタスク明細表をタブラー表示（データは親から受け取る）
-// 5秒ごとに利用者ID + タスクID単位の最大更新日時を確認し、変化時は親へ再読込を依頼する
+// 5秒ごとにタスクID単位の最大更新日時を確認し、変化時は親へ再読込を依頼する
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import type { PropType } from 'vue';
 import type { Column } from '@/types';
@@ -24,7 +24,6 @@ import AIタスク明細編集 from '../dialog/AIタスク_明細編集.vue';
 import AIタスク応答内容 from '../dialog/AIタスク_応答内容.vue';
 
 const props = defineProps({
-  利用者ID: { type: String, default: '' },
   タスクID: { type: String, default: '' },
   明細: { type: Array as PropType<Record<string, any>[]>, default: () => [] },
   showHeader: { type: Boolean, default: true }
@@ -76,13 +75,9 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let dialogChannel: BroadcastChannel | null = null;
 let 明細最大更新日時 = '';
 
-const 利用者ID取得 = () => props.利用者ID.trim();
-
 const 最大更新日時取得 = async () => {
-  const 利用者ID = 利用者ID取得();
-  if (!利用者ID || !props.タスクID) return '';
+  if (!props.タスクID) return '';
   const res = await taskClient.post('/task/タスク明細/最大更新日時', {
-    利用者ID,
     タスクID: props.タスクID
   });
   if (res.data.status !== 'OK') return 明細最大更新日時;
@@ -126,7 +121,6 @@ const 実行有効切替 = async (row: Record<string, any>) => {
   if (!confirmed) return;
   try {
     const res = await taskClient.post('/task/タスク明細/実行有効切替', {
-      利用者ID: 利用者ID取得(),
       タスクID: props.タスクID,
       明細SEQ: Number(row.明細SEQ ?? 0),
       実行有効: 新実行有効
@@ -152,7 +146,6 @@ const 修正ダイアログ表示 = (row: Record<string, any>) => {
   if (window.desktopApi?.openTaskDialogWindow) {
     void window.desktopApi.openTaskDialogWindow({
       kind: 'detail',
-      利用者ID: props.利用者ID,
       編集明細: { ...row }
     });
     return;
@@ -288,7 +281,6 @@ onBeforeUnmount(() => {
     <component
       :is="AIタスク明細編集"
       :is-open="dialogOpen"
-      :利用者ID="props.利用者ID"
       :編集明細="編集明細"
       @close="dialogOpen = false"
       @registered="登録完了"

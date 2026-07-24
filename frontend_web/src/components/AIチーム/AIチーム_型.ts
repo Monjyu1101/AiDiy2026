@@ -22,8 +22,8 @@ export type チーム要員 = {
 };
 
 export type チーム作業 = {
-  利用者ID: string;
   作業ID: string;
+  要員ID: string;
   プロジェクト: string;
   タイトル: string;
   要求内容: string;

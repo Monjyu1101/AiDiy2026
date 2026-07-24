@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 5秒ごとに利用者ID単位の最大更新日時を確認し、変化時だけ一覧を再取得する
+// 5秒ごとに要員ID単位の最大更新日時を確認し、変化時だけ一覧を再取得する
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import apiClient from '../../api/client';
 import { useAuthStore } from '../../stores/auth';
@@ -8,7 +8,7 @@ import type { チーム作業 } from './AIチーム_型';
 import { use自由配置パネル } from './use自由配置パネル';
 
 const authStore = useAuthStore();
-const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
+const 要員ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
 const 作業一覧 = ref<チーム作業[]>([]);
 const 読込中 = ref(false);
 const 読込エラー = ref('');
@@ -28,7 +28,7 @@ const {
 
 const 最大更新日時取得 = async (): Promise<string> => {
   const response = await apiClient.post('/team/作業/最大更新日時', {
-    利用者ID: 利用者ID.value,
+    要員ID: 要員ID.value,
   });
   if (response.data?.status !== 'OK') return 作業最大更新日時;
   return String(response.data?.data?.最大更新日時 ?? '');
@@ -41,7 +41,7 @@ const 作業一覧読込 = async () => {
   try {
     // 一覧取得中に更新が入った場合は、次回確認で拾えるよう基準を先に取得する。
     const newBaseline = await 最大更新日時取得();
-    const response = await apiClient.post('/team/作業/一覧', { 利用者ID: 利用者ID.value });
+    const response = await apiClient.post('/team/作業/一覧', { 要員ID: 要員ID.value });
     if (response.data?.status !== 'OK') {
       throw new Error(response.data?.message || 'チーム作業を取得できませんでした');
     }

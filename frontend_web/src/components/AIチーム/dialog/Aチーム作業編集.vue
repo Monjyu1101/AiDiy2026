@@ -198,7 +198,7 @@ const 登録 = async () => {
     const response = await apiClient.post(
       修正モード.value ? '/team/作業/変更' : '/team/作業/登録',
       {
-        利用者ID: 利用者ID.value,
+        要員ID: 利用者ID.value,
         作業ID: props.編集作業?.作業ID ?? '',
         プロジェクト: 入力プロジェクト.value.trim(),
         要求内容: 入力要求内容.value.trim(),

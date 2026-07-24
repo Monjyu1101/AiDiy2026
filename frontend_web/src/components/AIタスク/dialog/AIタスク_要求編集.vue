@@ -66,7 +66,6 @@ const 明細有無読込 = async () => {
   if (!props.編集タスク) return;
   try {
     const res = await apiClient.post('/task/タスク明細/一覧', {
-      利用者ID: 利用者ID.value,
       タスクID: String(props.編集タスク?.タスクID ?? '')
     });
     明細あり.value = res.data.status === 'OK' && (res.data.data?.items ?? []).length > 0;

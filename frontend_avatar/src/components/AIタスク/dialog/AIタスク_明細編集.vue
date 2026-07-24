@@ -19,7 +19,6 @@ import { qMessage } from '@/utils/qAlert';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
-  利用者ID: { type: String, default: '' },
   編集明細: { type: Object as PropType<Record<string, any> | null>, default: null }
 });
 const emit = defineEmits(['close', 'registered']);
@@ -117,7 +116,6 @@ const 登録 = async () => {
   登録中.value = true;
   try {
     const res = await taskClient.post('/task/タスク明細/更新登録', {
-      利用者ID: props.利用者ID,
       タスクID: タスクID表示.value,
       明細SEQ: Number(props.編集明細?.明細SEQ ?? 0),
       タイトル,

@@ -1,16 +1,28 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import AsyncIterator, Callable
 
-from .store import simulation_loop
-from .team_watcher import startup_cleanup, watch_loop
+from fastapi import FastAPI
+
+from .store import シミュレーションループ
+from .team_watcher import 監視ループ, 起動時クリーンアップ
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
@@ -30,6 +42,7 @@ def setup_reboot_watcher(logger) -> None:
         return True
 
     if consume():
+        logger.info("reboot_team.txt を検知したため終了します")
         raise SystemExit("reboot_team.txt detected")
 
     def watch() -> None:
@@ -42,28 +55,29 @@ def setup_reboot_watcher(logger) -> None:
     threading.Thread(target=watch, daemon=True, name="backend_team_reboot_watcher").start()
 
 
-@asynccontextmanager
-async def lifespan(app):
-    del app
-    from log_config import get_logger
-    from . import team_work_db
+def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[None]]:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        del app
+        from . import team_work_db
 
-    logger = get_logger("team_main")
-    team_work_db.initialize()
-    startup_cleanup(logger)
-    tasks = [
-        asyncio.create_task(simulation_loop(logger), name="backend_team_simulation"),
-        asyncio.create_task(watch_loop(logger), name="backend_team_work_watcher"),
-    ]
-    logger.info("backend_team を開始しました")
-    try:
-        yield
-    finally:
-        for task in tasks:
-            task.cancel()
-        for task in tasks:
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        logger.info("backend_team を停止しました")
+        team_work_db.初期化()
+        起動時クリーンアップ(logger)
+        tasks = [
+            asyncio.create_task(シミュレーションループ(logger), name="backend_team_simulation"),
+            asyncio.create_task(監視ループ(logger), name="backend_team_work_watcher"),
+        ]
+        logger.info("backend_team を開始しました")
+        try:
+            yield
+        finally:
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            logger.info("backend_team を停止しました")
+
+    return lifespan

@@ -48,8 +48,8 @@ _入力DIR = os.path.join(_BASE_DIR, "temp", "input")
 _出力DIR = os.path.join(_BASE_DIR, "temp", "output")
 
 
-def _タスクファイル名(利用者ID: str, タスクID: str) -> str:
-    return f"{利用者ID}.{タスクID}.json"
+def _タスクファイル名(タスクID: str) -> str:
+    return f"{タスクID}.json"
 
 
 def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
@@ -99,7 +99,7 @@ def _タスク実行開始(行: dict, logger: logging.Logger) -> None:
     利用者ID = str(行["利用者ID"])
     タスクID = str(行["タスクID"])
     os.makedirs(_入力DIR, exist_ok=True)
-    入力JSONパス = os.path.join(_入力DIR, _タスクファイル名(利用者ID, タスクID))
+    入力JSONパス = os.path.join(_入力DIR, _タスクファイル名(タスクID))
     with open(入力JSONパス, "w", encoding="utf-8") as f:
         json.dump({
             "利用者ID": 利用者ID,
@@ -124,7 +124,6 @@ def _タスク実行開始(行: dict, logger: logging.Logger) -> None:
 
 def _明細実行開始(行: dict, 出力JSONパス: str, logger: logging.Logger) -> None:
     """実行可能なタスク明細 1 件についてサブプロセスを起動して PID を記録する。"""
-    利用者ID = str(行["利用者ID"])
     タスクID = str(行["タスクID"])
     明細SEQ = int(行["明細SEQ"])
     タイトル = str(行.get("タイトル", ""))
@@ -142,8 +141,8 @@ def _明細実行開始(行: dict, 出力JSONパス: str, logger: logging.Logger
         stderr=subprocess.DEVNULL,
         creationflags=creationflags,
     )
-    tasks_db.明細実行開始記録(利用者ID, タスクID, 明細SEQ, proc.pid)
-    logger.info(f"ステップ実行を開始しました: {利用者ID}/{タスクID} SEQ={明細SEQ} タイトル={タイトル} PID={proc.pid}")
+    tasks_db.明細実行開始記録(タスクID, 明細SEQ, proc.pid)
+    logger.info(f"ステップ実行を開始しました: {タスクID} SEQ={明細SEQ} タイトル={タイトル} PID={proc.pid}")
 
 
 def _軽量並行明細か(行: dict) -> bool:
@@ -481,34 +480,33 @@ def _監視1回(logger: logging.Logger) -> None:
     # code agent 系はタスク単位で 1 明細まで（タスク間は並行実行する）。
     # 通知音などの軽量明細は依存関係が許せば同時起動する。
     code_agent実行中タスク = {
-        (str(行["利用者ID"]), str(行["タスクID"]))
+        str(行["タスクID"])
         for 行 in tasks_db.実行中明細一覧()
         if not _軽量並行明細か(行)
     }
     for 行 in tasks_db.実行待ち明細一覧():
-        利用者ID = str(行["利用者ID"])
         タスクID = str(行["タスクID"])
         明細SEQ = int(行["明細SEQ"])
-        出力JSONパス = os.path.join(_出力DIR, _タスクファイル名(利用者ID, タスクID))
+        出力JSONパス = os.path.join(_出力DIR, _タスクファイル名(タスクID))
         if not os.path.isfile(出力JSONパス):
             continue  # AI 生成タスク以外（出力 JSON なし）は自動実行の対象外
         軽量並行明細 = _軽量並行明細か(行)
-        if (利用者ID, タスクID) in code_agent実行中タスク and not 軽量並行明細:
+        if タスクID in code_agent実行中タスク and not 軽量並行明細:
             continue
         try:
             if int(行.get("実行回数", 0) or 0) >= 実行回数上限:
-                tasks_db.明細失敗(利用者ID, タスクID, 明細SEQ, f"実行回数が上限({実行回数上限}回)に達しました")
-                logger.warning(f"実行回数上限のため失敗にしました: {利用者ID}/{タスクID} SEQ={明細SEQ}")
+                tasks_db.明細失敗(タスクID, 明細SEQ, f"実行回数が上限({実行回数上限}回)に達しました")
+                logger.warning(f"実行回数上限のため失敗にしました: {タスクID} SEQ={明細SEQ}")
                 continue
             _明細実行開始(行, 出力JSONパス, logger)
             if not 軽量並行明細:
-                code_agent実行中タスク.add((利用者ID, タスクID))
+                code_agent実行中タスク.add(タスクID)
         except Exception as e:
-            logger.exception(f"ステップ実行開始に失敗しました: {利用者ID}/{タスクID} SEQ={明細SEQ}")
+            logger.exception(f"ステップ実行開始に失敗しました: {タスクID} SEQ={明細SEQ}")
             try:
-                tasks_db.明細失敗(利用者ID, タスクID, 明細SEQ, f"実行開始エラー: {e}")
+                tasks_db.明細失敗(タスクID, 明細SEQ, f"実行開始エラー: {e}")
             except Exception:
-                logger.exception(f"失敗登録もエラー: {利用者ID}/{タスクID} SEQ={明細SEQ}")
+                logger.exception(f"失敗登録もエラー: {タスクID} SEQ={明細SEQ}")
 
 
 async def 監視ループ(logger: logging.Logger) -> None:

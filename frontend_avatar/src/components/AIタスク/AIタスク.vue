@@ -38,7 +38,6 @@ async function タスク明細読込(タスクID: string) {
   }
   try {
     const res = await taskClient.post('/task/タスク明細/一覧', {
-      利用者ID: props.利用者ID,
       タスクID
     });
     if (res.data.status === 'OK') {
@@ -97,7 +96,6 @@ async function タスク明細再読込() {
       <div class="task-panel">
         <component
           :is="AIタスク明細一覧"
-          :利用者ID="props.利用者ID"
           :タスクID="選択タスクID"
           :明細="明細rows"
           @reload="タスク明細再読込"

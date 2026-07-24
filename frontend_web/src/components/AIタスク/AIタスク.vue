@@ -3,7 +3,6 @@
 import { ref } from 'vue';
 import apiClient from '../../api/client';
 import { qMessage } from '../../utils/qAlert';
-import { useAuthStore } from '../../stores/auth';
 import AIタスク_要求一覧 from './components/AIタスク_要求一覧.vue';
 import AIタスク_フロー図 from './components/AIタスク_フロー図.vue';
 import AIタスク_明細一覧 from './components/AIタスク_明細一覧.vue';
@@ -12,7 +11,6 @@ const 選択タスクID = ref('');
 const 選択タイトル = ref('');
 const 選択マーメイド記号 = ref('');
 const 明細rows = ref<Record<string, any>[]>([]);
-const authStore = useAuthStore();
 
 // 要求パネルでタスクを選択したら、フロー図と明細を差し替える
 // ちらつき防止のため事前クリアせず、取得成功時に置き換える
@@ -23,7 +21,6 @@ async function タスク明細読込(タスクID: string) {
   }
   try {
     const res = await apiClient.post('/task/タスク明細/一覧', {
-      利用者ID: String(authStore.user?.利用者ID ?? ''),
       タスクID
     });
     if (res.data.status === 'OK') {

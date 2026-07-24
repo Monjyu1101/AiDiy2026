@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 from __future__ import annotations
 
 import asyncio
@@ -30,11 +38,11 @@ from . import persona_catalog, team_db
 色候補 = ("#5bd9ff", "#9d91ff", "#5ce3a1", "#ff8fc2", "#ffd078", "#78afff", "#d893ff", "#74e9dc")
 
 
-def now_iso() -> str:
+def 現在日時ISO() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-class TeamStore:
+class チームストア:
     """仮実装用のインメモリチーム状態。DB永続化は次段階で追加する。"""
 
     def __init__(self) -> None:
@@ -43,86 +51,86 @@ class TeamStore:
         self._revision = 0
         self._agents: list[dict] = []
         self._activities: list[dict] = []
-        self.reload_members(record_activity=False)
-        self._record("admin", "AIチームの見守りを開始しました", "#5bd9ff")
+        self.要員再読込(活動記録=False)
+        self._活動記録("admin", "AIチームの見守りを開始しました", "#5bd9ff")
 
-    def _record(self, name: str, content: str, color: str) -> None:
+    def _活動記録(self, 名前: str, 内容: str, 色: str) -> None:
         self._revision += 1
         self._activities.insert(0, {
             "活動ID": uuid4().hex,
-            "発生日時": now_iso(),
-            "エージェント名": name,
-            "内容": content,
-            "色": color,
+            "発生日時": 現在日時ISO(),
+            "エージェント名": 名前,
+            "内容": 内容,
+            "色": 色,
         })
         del self._activities[50:]
 
-    def _add_member(
+    def _要員追加(
         self,
-        member: dict,
-        index: int,
-        state: str = "召喚中",
-        record_activity: bool = True,
-        member_type: str = "DB",
+        要員: dict,
+        番号: int,
+        状態: str = "召喚中",
+        活動記録: bool = True,
+        要員種別: str = "DB",
     ) -> dict:
-        name = str(member["要員名"])
-        role = str(member["役割"])
-        color = 色候補[index % len(色候補)]
-        agent = {
-            "エージェントID": str(member["要員ID"]),
-            "エージェント名": name,
-            "要員種別": member_type,
-            "役割": role,
-            "人格情報": str(member["人格情報"]),
-            "色": color,
-            "状態": state,
-            "作業内容": 作業候補[index % len(作業候補)] if state == "作業中" else "次の行動を考えています",
-            "ひとこと": 雑談候補[index % len(雑談候補)] if state == "相談中" else "",
+        名前 = str(要員["要員名"])
+        役割 = str(要員["役割"])
+        色 = 色候補[番号 % len(色候補)]
+        エージェント = {
+            "エージェントID": str(要員["要員ID"]),
+            "エージェント名": 名前,
+            "要員種別": 要員種別,
+            "役割": 役割,
+            "人格情報": str(要員["人格情報"]),
+            "色": 色,
+            "状態": 状態,
+            "作業内容": 作業候補[番号 % len(作業候補)] if 状態 == "作業中" else "次の行動を考えています",
+            "ひとこと": 雑談候補[番号 % len(雑談候補)] if 状態 == "相談中" else "",
             "位置": (
                 {"x": 0.3, "y": 0.66, "z": 5.35}
-                if state == "召喚中"
+                if 状態 == "召喚中"
                 else {"x": 0.0, "y": 0.66, "z": 0.0}
             ),
-            "更新日時": now_iso(),
+            "更新日時": 現在日時ISO(),
         }
-        self._agents.append(agent)
-        if record_activity:
-            self._record(name, f"{role}エージェントを召喚しました", color)
-        return agent
+        self._agents.append(エージェント)
+        if 活動記録:
+            self._活動記録(名前, f"{役割}エージェントを召喚しました", 色)
+        return エージェント
 
-    def reload_members(self, record_activity: bool = True) -> None:
+    def 要員再読込(self, 活動記録: bool = True) -> None:
         with self._lock:
-            members = team_db.list_members()
-            member_ids = {str(member["要員ID"]) for member in members}
+            要員一覧 = team_db.要員一覧()
+            要員ID集合 = {str(要員["要員ID"]) for 要員 in 要員一覧}
             self._agents = [
-                agent
-                for agent in self._agents
-                if agent.get("要員種別") != "DB"
-                or agent["エージェントID"] in member_ids
+                エージェント
+                for エージェント in self._agents
+                if エージェント.get("要員種別") != "DB"
+                or エージェント["エージェントID"] in 要員ID集合
             ]
-            current = {
-                agent["エージェントID"]: agent
-                for agent in self._agents
-                if agent.get("要員種別") == "DB"
+            現在 = {
+                エージェント["エージェントID"]: エージェント
+                for エージェント in self._agents
+                if エージェント.get("要員種別") == "DB"
             }
-            for index, member in enumerate(members):
-                member_id = str(member["要員ID"])
-                if member_id not in current:
-                    state = "作業中" if member_id == team_db.ADMIN_ID else "召喚中"
-                    self._add_member(
-                        member,
-                        index,
-                        state,
-                        record_activity,
-                        member_type="DB",
+            for 番号, 要員 in enumerate(要員一覧):
+                要員ID = str(要員["要員ID"])
+                if 要員ID not in 現在:
+                    状態 = "作業中" if 要員ID == team_db.管理者要員ID else "召喚中"
+                    self._要員追加(
+                        要員,
+                        番号,
+                        状態,
+                        活動記録,
+                        要員種別="DB",
                     )
                 else:
-                    current[member_id]["エージェント名"] = str(member["要員名"])
-                    current[member_id]["役割"] = str(member["役割"])
-                    current[member_id]["人格情報"] = str(member["人格情報"])
+                    現在[要員ID]["エージェント名"] = str(要員["要員名"])
+                    現在[要員ID]["役割"] = str(要員["役割"])
+                    現在[要員ID]["人格情報"] = str(要員["人格情報"])
 
-    def snapshot(self) -> dict:
-        self.reload_members()
+    def スナップショット(self) -> dict:
+        self.要員再読込()
         with self._lock:
             return {
                 "revision": self._revision,
@@ -131,36 +139,36 @@ class TeamStore:
                 "活動": deepcopy(self._activities[:10]),
                 "集計": {
                     "召喚数": len(self._agents),
-                    "作業中": sum(a["状態"] == "作業中" for a in self._agents),
-                    "相談中": sum(a["状態"] == "相談中" for a in self._agents),
-                    "瞑想中": sum(a["状態"] == "瞑想中" for a in self._agents),
+                    "作業中": sum(agent["状態"] == "作業中" for agent in self._agents),
+                    "相談中": sum(agent["状態"] == "相談中" for agent in self._agents),
+                    "瞑想中": sum(agent["状態"] == "瞑想中" for agent in self._agents),
                 },
             }
 
-    def list_agents(self) -> list[dict]:
-        self.reload_members()
+    def エージェント一覧(self) -> list[dict]:
+        self.要員再読込()
         with self._lock:
             return deepcopy(self._agents)
 
-    def list_activities(self, limit: int) -> list[dict]:
+    def 活動一覧(self, 件数: int) -> list[dict]:
         with self._lock:
-            return deepcopy(self._activities[:limit])
+            return deepcopy(self._activities[:件数])
 
-    def summon(self, member_id: str, requested_role: str = "") -> dict:
-        if not member_id.strip():
+    def 召喚(self, 要員ID: str, 依頼役割: str = "") -> dict:
+        if not 要員ID.strip():
             raise ValueError("召喚する要員を選択してください")
-        member = persona_catalog.get_persona(member_id)
-        if member is None:
+        要員 = persona_catalog.召喚要員取得(要員ID)
+        if 要員 is None:
             raise ValueError("personaフォルダに対象要員が見つかりません")
-        del requested_role
+        del 依頼役割
         with self._lock:
             if any(
-                agent["エージェントID"] == member["要員ID"]
-                for agent in self._agents
+                エージェント["エージェントID"] == 要員["要員ID"]
+                for エージェント in self._agents
             ):
                 raise ValueError("対象要員は既に召喚されています")
-            member = team_db.upsert_persona_member(
-                member,
+            要員 = team_db.要員召喚登録(
+                要員,
                 {
                     "利用者ID": "system",
                     "利用者名": "システム",
@@ -168,31 +176,31 @@ class TeamStore:
                 },
             )
             return deepcopy(
-                self._add_member(
-                    member,
+                self._要員追加(
+                    要員,
                     len(self._agents),
-                    state="召喚中",
-                    member_type="DB",
+                    状態="召喚中",
+                    要員種別="DB",
                 )
             )
 
-    def expel(self, member_id: str) -> dict:
-        member_id = member_id.strip()
-        if member_id == team_db.ADMIN_ID:
+    def 排除(self, 要員ID: str) -> dict:
+        要員ID = 要員ID.strip()
+        if 要員ID == team_db.管理者要員ID:
             raise ValueError("admin要員は排除できません")
         with self._lock:
-            agent = next(
+            エージェント = next(
                 (
                     row
                     for row in self._agents
-                    if row["エージェントID"] == member_id
+                    if row["エージェントID"] == 要員ID
                 ),
                 None,
             )
-            if agent is None:
-                raise KeyError(member_id)
-            item = team_db.disable_member(
-                member_id,
+            if エージェント is None:
+                raise KeyError(要員ID)
+            item = team_db.要員排除(
+                要員ID,
                 {
                     "利用者ID": "system",
                     "利用者名": "システム",
@@ -202,62 +210,62 @@ class TeamStore:
             self._agents = [
                 row
                 for row in self._agents
-                if row["エージェントID"] != member_id
+                if row["エージェントID"] != 要員ID
             ]
-            self._record(
-                agent["エージェント名"],
+            self._活動記録(
+                エージェント["エージェント名"],
                 "チーム空間から排除しました",
-                agent["色"],
+                エージェント["色"],
             )
             return item
 
-    def update_state(self, agent_id: str, state: str, content: str = "", comment: str = "") -> dict:
-        if state not in (*状態候補, "召喚中"):
-            raise ValueError(f"未対応の状態です: {state}")
+    def 状態変更(self, エージェントID: str, 状態: str, 作業内容: str = "", ひとこと: str = "") -> dict:
+        if 状態 not in (*状態候補, "召喚中"):
+            raise ValueError(f"未対応の状態です: {状態}")
         with self._lock:
-            agent = next((row for row in self._agents if row["エージェントID"] == agent_id), None)
-            if agent is None:
-                raise KeyError(agent_id)
-            agent["状態"] = state
-            agent["作業内容"] = content.strip() or self._default_content(state)
-            agent["ひとこと"] = comment.strip() or (random.choice(雑談候補) if state == "相談中" else "")
-            agent["更新日時"] = now_iso()
-            self._record(agent["エージェント名"], f"{state}: {agent['作業内容']}", agent["色"])
-            return deepcopy(agent)
+            エージェント = next((row for row in self._agents if row["エージェントID"] == エージェントID), None)
+            if エージェント is None:
+                raise KeyError(エージェントID)
+            エージェント["状態"] = 状態
+            エージェント["作業内容"] = 作業内容.strip() or self._既定作業内容(状態)
+            エージェント["ひとこと"] = ひとこと.strip() or (random.choice(雑談候補) if 状態 == "相談中" else "")
+            エージェント["更新日時"] = 現在日時ISO()
+            self._活動記録(エージェント["エージェント名"], f"{状態}: {エージェント['作業内容']}", エージェント["色"])
+            return deepcopy(エージェント)
 
-    def set_simulation(self, enabled: bool) -> bool:
+    def シミュレーション切替(self, 有効: bool) -> bool:
         with self._lock:
-            self._simulation_enabled = enabled
+            self._simulation_enabled = 有効
             self._revision += 1
             return self._simulation_enabled
 
-    def _default_content(self, state: str) -> str:
+    def _既定作業内容(self, 状態: str) -> str:
         return {
             "作業中": random.choice(作業候補),
             "相談中": "仲間とアイデア交換",
             "瞑想中": "静かに思考と文脈を整理中",
             "移動中": "オフィスを気ままに移動中",
             "召喚中": "雑談エリアでチームに合流中",
-        }[state]
+        }[状態]
 
-    def tick(self) -> None:
+    def 進行(self) -> None:
         with self._lock:
             if not self._simulation_enabled or not self._agents:
                 return
-            agent = random.choice(self._agents)
-            state = random.choices(状態候補, weights=(48, 20, 14, 18), k=1)[0]
-            self.update_state(agent["エージェントID"], state)
+            エージェント = random.choice(self._agents)
+            状態 = random.choices(状態候補, weights=(48, 20, 14, 18), k=1)[0]
+            self.状態変更(エージェント["エージェントID"], 状態)
 
 
-store = TeamStore()
+ストア = チームストア()
 
 
-async def simulation_loop(logger) -> None:
+async def シミュレーションループ(logger) -> None:
     logger.info("backend_team モックシミュレーションを開始しました")
     try:
         while True:
             await asyncio.sleep(8)
-            store.tick()
+            ストア.進行()
     except asyncio.CancelledError:
         logger.info("backend_team モックシミュレーションを停止しました")
         raise

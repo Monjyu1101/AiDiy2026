@@ -25,6 +25,8 @@ def init_C採番_data(db: Session, 認証情報: Optional[Dict] = None):
         ("T商品棚卸", 10000, "商品棚卸の採番", True),
         ("T商品入庫", 10000, "商品入庫の採番", True),
         ("T商品出庫", 10000, "商品出庫の採番", True),
+        ("Aタスク要求", 1000, "AIタスク要求の採番（TK）", True),
+        ("Aチーム作業", 1000, "AIチーム作業の採番（TW）", True),
         ("Xテスト", 10000, "テスト用の採番", False),
     ]
     登録項目 = create_audit_fields(認証情報)

@@ -74,7 +74,7 @@ def main() -> int:
     global ログパス
     try:
         if len(sys.argv) < 3:
-            raise ValueError("使い方: python sub_start.py <temp/output/利用者ID.タスクID.json> <SEQ>")
+            raise ValueError("使い方: python sub_start.py <temp/output/タスクID.json> <SEQ>")
         出力JSONパス = os.path.abspath(sys.argv[1])
         明細SEQ = int(sys.argv[2])
         ファイルステム = os.path.splitext(os.path.basename(出力JSONパス))[0]
@@ -105,7 +105,6 @@ def main() -> int:
 
         # 3. 応答内容へ要求内容をコピーして開始明細を完了
         res = POST送信(f"{TASK_API}/タスク明細/開始完了", {
-            "利用者ID": 利用者ID,
             "タスクID": タスクID,
             "明細SEQ": 明細SEQ,
             "応答内容": 要求内容 + バックアップ注記,

@@ -4,16 +4,12 @@ import { ref, computed, watch } from 'vue';
 import type { PropType } from 'vue';
 import apiClient from '../../../api/client';
 import { qMessage } from '../../../utils/qAlert';
-import { useAuthStore } from '../../../stores/auth';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
   編集明細: { type: Object as PropType<Record<string, any> | null>, default: null }
 });
 const emit = defineEmits(['close', 'registered']);
-
-const authStore = useAuthStore();
-const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? ''));
 
 const 入力タイトル = ref('');
 const 入力要求内容 = ref('');
@@ -106,7 +102,6 @@ const 登録 = async () => {
   登録中.value = true;
   try {
     const res = await apiClient.post('/task/タスク明細/更新登録', {
-      利用者ID: 利用者ID.value,
       タスクID: タスクID表示.value,
       明細SEQ: Number(props.編集明細?.明細SEQ ?? 0),
       タイトル,

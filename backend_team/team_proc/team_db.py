@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
 
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
+"""Aチーム要員の DB アクセス。"""
+
 from __future__ import annotations
 
 import sqlite3
@@ -8,39 +18,41 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = PROJECT_ROOT / "backend_server" / "_data" / "AiDiy" / "database.db"
-TABLE_NAME = "Aチーム要員"
-ADMIN_ID = "admin"
+要員テーブル = "Aチーム要員"
+管理者要員ID = "admin"
 
 
-def _now() -> str:
+def _現在日時() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _connect() -> sqlite3.Connection:
+def 接続取得() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH, timeout=30)
-    connection.row_factory = sqlite3.Row
-    return connection
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
+    return conn
 
 
-def _create_audit(user_id: str, user_name: str, terminal_id: str) -> dict[str, str]:
-    now = _now()
+def _監査項目(利用者ID: str, 利用者名: str, 端末ID: str) -> dict[str, str]:
+    now = _現在日時()
     return {
         "登録日時": now,
-        "登録利用者ID": user_id,
-        "登録利用者名": user_name,
-        "登録端末ID": terminal_id,
+        "登録利用者ID": 利用者ID,
+        "登録利用者名": 利用者名,
+        "登録端末ID": 端末ID,
         "更新日時": now,
-        "更新利用者ID": user_id,
-        "更新利用者名": user_name,
-        "更新端末ID": terminal_id,
+        "更新利用者ID": 利用者ID,
+        "更新利用者名": 利用者名,
+        "更新端末ID": 端末ID,
     }
 
 
-def initialize() -> None:
-    with _connect() as connection:
-        connection.execute(f"""
-            CREATE TABLE IF NOT EXISTS "{TABLE_NAME}" (
+def 初期化() -> None:
+    conn = 接続取得()
+    try:
+        conn.execute(f"""
+            CREATE TABLE IF NOT EXISTS "{要員テーブル}" (
                 要員ID TEXT NOT NULL PRIMARY KEY,
                 要員名 TEXT NOT NULL,
                 役割 TEXT NOT NULL DEFAULT '',
@@ -56,118 +68,133 @@ def initialize() -> None:
                 更新端末ID TEXT NOT NULL
             )
         """)
-        connection.execute(f"""
+        conn.execute(f"""
             CREATE TRIGGER IF NOT EXISTS "Aチーム要員_admin削除禁止"
-            BEFORE DELETE ON "{TABLE_NAME}"
-            WHEN OLD.要員ID = '{ADMIN_ID}'
+            BEFORE DELETE ON "{要員テーブル}"
+            WHEN OLD.要員ID = '{管理者要員ID}'
             BEGIN
                 SELECT RAISE(ABORT, 'admin要員は削除できません');
             END
         """)
-        connection.execute(f"""
+        conn.execute(f"""
             CREATE TRIGGER IF NOT EXISTS "Aチーム要員_admin無効化禁止"
-            BEFORE UPDATE OF 有効 ON "{TABLE_NAME}"
-            WHEN OLD.要員ID = '{ADMIN_ID}' AND NEW.有効 = 0
+            BEFORE UPDATE OF 有効 ON "{要員テーブル}"
+            WHEN OLD.要員ID = '{管理者要員ID}' AND NEW.有効 = 0
             BEGIN
                 SELECT RAISE(ABORT, 'admin要員は無効化できません');
             END
         """)
-        audit = _create_audit("system", "システム", "backend_team")
-        connection.execute(
+        監査 = _監査項目("system", "システム", "backend_team")
+        conn.execute(
             f"""
-            INSERT OR IGNORE INTO "{TABLE_NAME}" (
+            INSERT OR IGNORE INTO "{要員テーブル}" (
                 要員ID, 要員名, 役割, 人格情報, 有効,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
             ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                ADMIN_ID, "admin", "チーム管理者", "チーム全体を見守り、必要に応じて調整する。",
-                audit["登録日時"], audit["登録利用者ID"], audit["登録利用者名"], audit["登録端末ID"],
-                audit["更新日時"], audit["更新利用者ID"], audit["更新利用者名"], audit["更新端末ID"],
+                管理者要員ID, "admin", "チーム管理者", "チーム全体を見守り、必要に応じて調整する。",
+                監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
+                監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
             ),
         )
-        connection.commit()
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def list_members(include_disabled: bool = False) -> list[dict]:
-    initialize()
-    sql = f'SELECT * FROM "{TABLE_NAME}"'
+def 要員一覧(無効も表示: bool = False) -> list[dict]:
+    初期化()
+    sql = f'SELECT * FROM "{要員テーブル}"'
     params: list = []
-    if not include_disabled:
+    if not 無効も表示:
         sql += " WHERE 有効 = ?"
         params.append(1)
     sql += " ORDER BY CASE WHEN 要員ID = 'admin' THEN 0 ELSE 1 END, 要員ID"
-    with _connect() as connection:
-        return [dict(row) for row in connection.execute(sql, params).fetchall()]
+    conn = 接続取得()
+    try:
+        return [dict(row) for row in conn.execute(sql, params).fetchall()]
+    finally:
+        conn.close()
 
 
-def get_member(member_id: str) -> dict | None:
-    initialize()
-    with _connect() as connection:
-        row = connection.execute(
-            f'SELECT * FROM "{TABLE_NAME}" WHERE 要員ID = ?', [member_id]
+def 要員取得(要員ID: str) -> dict | None:
+    初期化()
+    conn = 接続取得()
+    try:
+        row = conn.execute(
+            f'SELECT * FROM "{要員テーブル}" WHERE 要員ID = ?', [要員ID]
         ).fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
 
 
-def create_member(data: dict, operator: dict) -> dict:
-    initialize()
-    audit = _create_audit(operator["利用者ID"], operator["利用者名"], operator["端末ID"])
-    with _connect() as connection:
+def 要員登録(要員データ: dict, 操作者: dict) -> dict:
+    初期化()
+    監査 = _監査項目(操作者["利用者ID"], 操作者["利用者名"], 操作者["端末ID"])
+    conn = 接続取得()
+    try:
         try:
-            connection.execute(
+            conn.execute(
                 f"""
-                INSERT INTO "{TABLE_NAME}" (
+                INSERT INTO "{要員テーブル}" (
                     要員ID, 要員名, 役割, 人格情報, 有効,
                     登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                     更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    data["要員ID"], data["要員名"], data["役割"], data["人格情報"], int(data["有効"]),
-                    audit["登録日時"], audit["登録利用者ID"], audit["登録利用者名"], audit["登録端末ID"],
-                    audit["更新日時"], audit["更新利用者ID"], audit["更新利用者名"], audit["更新端末ID"],
+                    要員データ["要員ID"], 要員データ["要員名"], 要員データ["役割"], 要員データ["人格情報"], int(要員データ["有効"]),
+                    監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
+                    監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
                 ),
             )
-            connection.commit()
+            conn.commit()
         except sqlite3.IntegrityError as exc:
             raise ValueError("同じ要員IDが既に登録されています") from exc
-    return get_member(data["要員ID"]) or {}
+    finally:
+        conn.close()
+    return 要員取得(要員データ["要員ID"]) or {}
 
 
-def update_member(data: dict, operator: dict) -> dict:
-    initialize()
-    if data["要員ID"] == ADMIN_ID and not data["有効"]:
+def 要員変更(要員データ: dict, 操作者: dict) -> dict:
+    初期化()
+    if 要員データ["要員ID"] == 管理者要員ID and not 要員データ["有効"]:
         raise ValueError("admin要員は無効化できません")
-    if get_member(data["要員ID"]) is None:
-        raise KeyError(data["要員ID"])
-    now = _now()
-    with _connect() as connection:
-        connection.execute(
+    if 要員取得(要員データ["要員ID"]) is None:
+        raise KeyError(要員データ["要員ID"])
+    now = _現在日時()
+    conn = 接続取得()
+    try:
+        conn.execute(
             f"""
-            UPDATE "{TABLE_NAME}"
+            UPDATE "{要員テーブル}"
                SET 要員名 = ?, 役割 = ?, 人格情報 = ?, 有効 = ?,
                    更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ?
              WHERE 要員ID = ?
             """,
             (
-                data["要員名"], data["役割"], data["人格情報"], int(data["有効"]),
-                now, operator["利用者ID"], operator["利用者名"], operator["端末ID"], data["要員ID"],
+                要員データ["要員名"], 要員データ["役割"], 要員データ["人格情報"], int(要員データ["有効"]),
+                now, 操作者["利用者ID"], 操作者["利用者名"], 操作者["端末ID"], 要員データ["要員ID"],
             ),
         )
-        connection.commit()
-    return get_member(data["要員ID"]) or {}
+        conn.commit()
+    finally:
+        conn.close()
+    return 要員取得(要員データ["要員ID"]) or {}
 
 
-def upsert_persona_member(data: dict, operator: dict) -> dict:
+def 要員召喚登録(要員データ: dict, 操作者: dict) -> dict:
     """召喚時にpersonaの現在値で要員を登録または更新し、有効化する。"""
-    initialize()
-    audit = _create_audit(operator["利用者ID"], operator["利用者名"], operator["端末ID"])
-    with _connect() as connection:
-        connection.execute(
+    初期化()
+    監査 = _監査項目(操作者["利用者ID"], 操作者["利用者名"], 操作者["端末ID"])
+    conn = 接続取得()
+    try:
+        conn.execute(
             f"""
-            INSERT INTO "{TABLE_NAME}" (
+            INSERT INTO "{要員テーブル}" (
                 要員ID, 要員名, 役割, 人格情報, 有効,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
@@ -183,49 +210,57 @@ def upsert_persona_member(data: dict, operator: dict) -> dict:
                 更新端末ID = excluded.更新端末ID
             """,
             (
-                data["要員ID"], data["要員名"], data["役割"], data["人格情報"],
-                audit["登録日時"], audit["登録利用者ID"], audit["登録利用者名"], audit["登録端末ID"],
-                audit["更新日時"], audit["更新利用者ID"], audit["更新利用者名"], audit["更新端末ID"],
+                要員データ["要員ID"], 要員データ["要員名"], 要員データ["役割"], 要員データ["人格情報"],
+                監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
+                監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
             ),
         )
-        connection.commit()
-    return get_member(data["要員ID"]) or {}
+        conn.commit()
+    finally:
+        conn.close()
+    return 要員取得(要員データ["要員ID"]) or {}
 
 
-def disable_member(member_id: str, operator: dict) -> dict:
+def 要員排除(要員ID: str, 操作者: dict) -> dict:
     """排除時に要員行を残したまま無効化する。"""
-    initialize()
-    if member_id == ADMIN_ID:
+    初期化()
+    if 要員ID == 管理者要員ID:
         raise ValueError("admin要員は排除できません")
-    now = _now()
-    with _connect() as connection:
-        cursor = connection.execute(
+    now = _現在日時()
+    conn = 接続取得()
+    try:
+        cursor = conn.execute(
             f"""
-            UPDATE "{TABLE_NAME}"
+            UPDATE "{要員テーブル}"
                SET 有効 = 0,
                    更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ?
              WHERE 要員ID = ?
             """,
             (
                 now,
-                operator["利用者ID"],
-                operator["利用者名"],
-                operator["端末ID"],
-                member_id,
+                操作者["利用者ID"],
+                操作者["利用者名"],
+                操作者["端末ID"],
+                要員ID,
             ),
         )
         if cursor.rowcount == 0:
-            raise KeyError(member_id)
-        connection.commit()
-    return get_member(member_id) or {}
+            raise KeyError(要員ID)
+        conn.commit()
+    finally:
+        conn.close()
+    return 要員取得(要員ID) or {}
 
 
-def delete_member(member_id: str) -> None:
-    initialize()
-    if member_id == ADMIN_ID:
+def 要員削除(要員ID: str) -> None:
+    初期化()
+    if 要員ID == 管理者要員ID:
         raise ValueError("admin要員は削除できません")
-    with _connect() as connection:
-        cursor = connection.execute(f'DELETE FROM "{TABLE_NAME}" WHERE 要員ID = ?', [member_id])
+    conn = 接続取得()
+    try:
+        cursor = conn.execute(f'DELETE FROM "{要員テーブル}" WHERE 要員ID = ?', [要員ID])
         if cursor.rowcount == 0:
-            raise KeyError(member_id)
-        connection.commit()
+            raise KeyError(要員ID)
+        conn.commit()
+    finally:
+        conn.close()

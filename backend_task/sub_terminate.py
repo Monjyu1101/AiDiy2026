@@ -84,7 +84,6 @@ def タスク要求取得() -> dict:
 def 明細一覧取得() -> list[dict]:
     """AIタスク明細の全件（状態フィルタなし）を返す。DB上の操作検証フラグもここから取れる。"""
     res = POST送信(f"{TASK_API}/タスク明細/一覧", {
-        "利用者ID": 利用者ID,
         "タスクID": タスクID,
     }, timeout=60)
     if res.get("status") != "OK":
@@ -137,7 +136,7 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
 - 検証結果は必ず次の HTTP エンドポイントへ直接報告してください（あなた自身が curl 等で呼び出します）。
   POST http://localhost:8093/task_check_okng
   Content-Type: application/json
-  Body: {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証結論の要約"}}
+  Body: {{"タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証結論の要約"}}
   問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。
   この報告が今回のステップの完了条件です。報告を行わずに終えないでください。
 """
@@ -166,11 +165,10 @@ def 検証実行(データ: dict, 対象: dict, 完了明細: list[dict], プロ
 
 
 def 失敗報告(メッセージ: str) -> None:
-    if not 利用者ID or not タスクID or not 明細SEQ:
+    if not タスクID or not 明細SEQ:
         return
     try:
         POST送信(f"{TASK_API}/タスク明細/失敗", {
-            "利用者ID": 利用者ID,
             "タスクID": タスクID,
             "明細SEQ": 明細SEQ,
             "メッセージ": メッセージ[:500],
@@ -183,7 +181,7 @@ def main() -> int:
     global タスクID, 利用者ID, 明細SEQ, ログパス
     try:
         if len(sys.argv) < 3:
-            raise ValueError("使い方: python sub_terminate.py <temp/output/利用者ID.タスクID.json> <SEQ>")
+            raise ValueError("使い方: python sub_terminate.py <temp/output/タスクID.json> <SEQ>")
         出力JSONパス = os.path.abspath(sys.argv[1])
         明細SEQ = int(sys.argv[2])
         ファイルステム = os.path.splitext(os.path.basename(出力JSONパス))[0]
@@ -219,7 +217,6 @@ def main() -> int:
         if not 操作検証:
             # 4a. ファイル操作を伴う明細が無いため、AIを介さずそのまま終了完了にする
             res = POST送信(f"{TASK_API}/タスク明細/終了完了", {
-                "利用者ID": 利用者ID,
                 "タスクID": タスクID,
                 "明細SEQ": 明細SEQ,
                 "応答内容": "操作検証対象のファイル操作がないため、終了処理を完了しました。",
