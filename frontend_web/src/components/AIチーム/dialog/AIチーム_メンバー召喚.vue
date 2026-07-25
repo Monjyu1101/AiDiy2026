@@ -210,7 +210,7 @@ const 召喚する = async () => {
 
 .summon-dialog footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid rgba(121, 161, 186, 0.12);

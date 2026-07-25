@@ -1,65 +1,162 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import apiClient from '../../api/client';
 import AiTeamMembers from './components/AIチーム_要員状況.vue';
-import AiTeamViewer from './components/AIチーム_立体表示.vue';
+import AiTeamViewer from './components/AIチーム_空間表示.vue';
 import AiTeamWorkList from './components/AIチーム_作業一覧.vue';
-import { 状態情報 } from './AIチーム_型';
-import { useAIチーム } from './useAIチーム';
+import {
+  type エージェント,
+  type エージェント状態,
+  type チーム要員,
+  type 稼働要員,
+  状態情報,
+  要員色一覧,
+} from './AIチーム_型';
 
-const {
-  エージェント一覧,
-  選択中ID,
-  召喚対象ID,
-  要員読込中,
-  要員読込エラー,
-  召喚中,
-  排除中ID,
-  選択中エージェント,
-  稼働数,
-  相談数,
-  瞑想数,
-  召喚可能要員一覧,
-  要員一覧を読み込む,
-  選択要員を召喚,
-  選択要員を排除,
-  状態を更新,
-} = useAIチーム();
+const 稼働要員を変換 = (要員: 稼働要員, index: number): エージェント => {
+  const state: エージェント状態 = 要員.状態 in 状態情報 ? 要員.状態 : '召喚中';
+  return {
+    id: 要員.エージェントID,
+    名前: 要員.エージェント名,
+    役割: 要員.役割,
+    人格情報: 要員.人格情報,
+    ...要員色一覧[index % 要員色一覧.length],
+    状態: state,
+    作業内容: 要員.作業内容 || '次の行動を考えています',
+    ひとこと: 要員.ひとこと || '',
+    状態更新時刻: 8 + Math.random() * 8,
+  };
+};
+
+const エージェント一覧 = ref<エージェント[]>([]);
+const 召喚要員一覧 = ref<チーム要員[]>([]);
+const 選択中ID = ref('');
+const 召喚対象ID = ref('');
+const 要員読込中 = ref(false);
+const 要員読込エラー = ref('');
+const 召喚中 = ref(false);
+const 排除中ID = ref('');
+
+const 選択中エージェント = computed(
+  () => エージェント一覧.value.find((agent) => agent.id === 選択中ID.value) ?? null,
+);
+const 召喚可能要員一覧 = computed(() => {
+  const summonedIds = new Set(エージェント一覧.value.map((agent) => agent.id));
+  return 召喚要員一覧.value.filter((member) => !summonedIds.has(member.要員ID));
+});
+
+const 召喚対象を補正 = (preferredId = '') => {
+  if (preferredId && 召喚可能要員一覧.value.some((member) => member.要員ID === preferredId)) {
+    召喚対象ID.value = preferredId;
+    return;
+  }
+  if (!召喚可能要員一覧.value.some((member) => member.要員ID === 召喚対象ID.value)) {
+    召喚対象ID.value = 召喚可能要員一覧.value[0]?.要員ID ?? '';
+  }
+};
+
+const 要員一覧を読み込む = async () => {
+  if (要員読込中.value) return;
+  要員読込中.value = true;
+  要員読込エラー.value = '';
+  try {
+    const [activeResponse, summonResponse] = await Promise.all([
+      apiClient.post('/team/エージェント/一覧', {}),
+      apiClient.post('/team/召喚要員/一覧', {}),
+    ]);
+    if (activeResponse.data?.status !== 'OK') {
+      throw new Error(activeResponse.data?.message || '稼働要員を取得できませんでした');
+    }
+    if (summonResponse.data?.status !== 'OK') {
+      throw new Error(summonResponse.data?.message || '召喚要員一覧を取得できませんでした');
+    }
+    const activeItems = activeResponse.data?.data?.items;
+    const summonItems = summonResponse.data?.data?.items;
+    if (!Array.isArray(activeItems) || !Array.isArray(summonItems)) {
+      throw new Error('要員一覧の応答形式が正しくありません');
+    }
+    召喚要員一覧.value = summonItems as チーム要員[];
+    エージェント一覧.value = (activeItems as 稼働要員[]).map(稼働要員を変換);
+    選択中ID.value = エージェント一覧.value[0]?.id ?? '';
+    召喚対象を補正();
+  } catch (error) {
+    要員読込エラー.value = error instanceof Error ? error.message : '要員一覧を取得できませんでした';
+  } finally {
+    要員読込中.value = false;
+  }
+};
+
+const 選択要員を召喚 = async () => {
+  if (召喚中.value || !召喚対象ID.value) return false;
+  召喚中.value = true;
+  要員読込エラー.value = '';
+  try {
+    const response = await apiClient.post('/team/エージェント/召喚', {
+      要員ID: 召喚対象ID.value,
+    });
+    if (response.data?.status !== 'OK') {
+      throw new Error(response.data?.message || '要員を召喚できませんでした');
+    }
+    const item = response.data?.data as 稼働要員 | undefined;
+    if (!item?.エージェントID) {
+      throw new Error('召喚結果の応答形式が正しくありません');
+    }
+    const agent = 稼働要員を変換(item, エージェント一覧.value.length);
+    エージェント一覧.value.push(agent);
+    選択中ID.value = agent.id;
+    召喚対象を補正();
+    return true;
+  } catch (error) {
+    要員読込エラー.value = error instanceof Error ? error.message : '要員を召喚できませんでした';
+    return false;
+  } finally {
+    召喚中.value = false;
+  }
+};
+
+const 選択要員を排除 = async () => {
+  const agent = 選択中エージェント.value;
+  if (!agent || agent.id === 'admin' || 排除中ID.value) return;
+  排除中ID.value = agent.id;
+  要員読込エラー.value = '';
+  try {
+    const response = await apiClient.post('/team/エージェント/排除', {
+      要員ID: agent.id,
+    });
+    if (response.data?.status !== 'OK') {
+      throw new Error(response.data?.message || '要員を排除できませんでした');
+    }
+    エージェント一覧.value = エージェント一覧.value.filter((item) => item.id !== agent.id);
+    選択中ID.value = エージェント一覧.value[0]?.id ?? '';
+    召喚対象を補正(agent.id);
+  } catch (error) {
+    要員読込エラー.value = error instanceof Error ? error.message : '要員を排除できませんでした';
+  } finally {
+    排除中ID.value = '';
+  }
+};
+
+const 状態を更新 = (
+  id: string,
+  state: エージェント状態,
+  work: string,
+  comment: string,
+) => {
+  const agent = エージェント一覧.value.find((item) => item.id === id);
+  if (!agent) return;
+  agent.状態 = state;
+  agent.作業内容 = work;
+  agent.ひとこと = comment;
+};
 
 onMounted(要員一覧を読み込む);
 </script>
 
 <template>
   <section class="team-page">
-    <header class="team-header">
-      <div class="title-block">
-        <div class="eyebrow"><span class="live-dot"></span>CONTINUOUS AGENT SPACE</div>
-        <div class="title-row">
-          <h1>AIチーム</h1>
-          <span class="mock-badge">MOCKUP</span>
-        </div>
-        <p>自律エージェントたちが、仕事をしたり、雑談したり、瞑想したり。</p>
-      </div>
-
-      <div class="summary">
-        <div class="summary-item">
-          <span class="summary-value">{{ エージェント一覧.length }}</span>
-          <span class="summary-label">要員数</span>
-        </div>
-        <div class="summary-item active">
-          <span class="summary-value">{{ 稼働数 }}</span>
-          <span class="summary-label">作業中</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-value">{{ 相談数 }}</span>
-          <span class="summary-label">相談中</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-value">{{ 瞑想数 }}</span>
-          <span class="summary-label">瞑想中</span>
-        </div>
-      </div>
-
-    </header>
+    <div class="panel-header">
+      <span class="panel-title">【AIチーム】</span>
+    </div>
 
     <div class="workspace">
       <AiTeamMembers
@@ -107,91 +204,28 @@ onMounted(要員一覧を読み込む);
   background: radial-gradient(circle at 48% -20%, rgba(50, 163, 203, 0.16), transparent 42%), #07111d;
 }
 
-.team-header {
-  min-height: 108px;
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) auto;
+.panel-header {
+  display: flex;
   align-items: center;
-  gap: 30px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(7, 17, 29, 0.92);
+  gap: 8px;
+  padding: 0 12px;
+  height: 28px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, rgba(108, 78, 196, 0.78), rgba(143, 104, 221, 0.72));
+  border-bottom: 1px solid rgba(93, 68, 168, 0.95);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(44, 24, 101, 0.3);
   z-index: 4;
+  flex-shrink: 0;
 }
 
-.eyebrow {
-  color: #5ddaf7;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-}
-
-.live-dot {
-  width: 7px;
-  height: 7px;
-  display: inline-block;
-  margin-right: 7px;
-  border-radius: 50%;
-  background: #5ce3a1;
-  box-shadow: 0 0 12px #5ce3a1;
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 3px 0 2px;
-}
-
-.title-row h1 {
-  margin: 0;
-  font-size: 26px;
-}
-
-.mock-badge {
-  padding: 3px 8px;
-  border: 1px solid rgba(155, 132, 255, 0.48);
-  border-radius: 999px;
-  color: #c9bbff;
-  font-size: 9px;
-}
-
-.title-block p {
-  margin: 0;
-  color: #8ca5b8;
-  font-size: 12px;
-}
-
-.summary {
-  display: flex;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(14, 30, 45, 0.66);
-}
-
-.summary-item {
-  min-width: 76px;
-  padding: 10px 14px;
-  text-align: center;
-}
-
-.summary-value,
-.summary-label {
-  display: block;
-}
-
-.summary-value {
-  font-size: 20px;
-  font-weight: 760;
-}
-
-.summary-item.active .summary-value {
-  color: #62e7b0;
-}
-
-.summary-label {
-  color: var(--muted);
-  font-size: 10px;
+.panel-title {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 .workspace {
@@ -206,22 +240,12 @@ onMounted(要員一覧を読み込む);
   .workspace {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .summary {
-    display: none;
-  }
 }
 
 @media (max-width: 760px) {
   .team-page {
     height: auto;
     overflow: visible;
-  }
-
-  .team-header {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 14px 16px;
   }
 
   .workspace {

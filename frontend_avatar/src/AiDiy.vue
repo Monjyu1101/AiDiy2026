@@ -203,7 +203,12 @@ const コード6Ref = ref<コードパネル参照型 | null>(null)
 const 自動選択表示 = ref(true)
 const 認証エラーメッセージKey = 'avatar_auth_error'
 const コアViewRef = ref<{ 字幕追加: (text: string) => void } | null>(null)
-const タスク要求WindowRef = ref<{ 新規ダイアログ表示: () => void } | null>(null)
+const タスク要求WindowRef = ref<{
+  新規ダイアログ表示: () => void;
+  自分のみ表示: boolean;
+  管理者か: boolean;
+  表示範囲切替: () => void;
+} | null>(null)
 
 const versions = window.desktopApi?.versions
 
@@ -1602,7 +1607,7 @@ onBeforeUnmount(() => {
         <span class="web-right-user" :title="利用者ラベル">{{ 利用者ラベル }}</span>
       </div>
       <div class="web-task-body">
-        <component :is="AIタスクビュー" :利用者ID="String(利用者?.利用者ID || '')" />
+        <component :is="AIタスクビュー" :利用者ID="String(利用者?.利用者ID || '')" :権限ID="String(利用者?.権限ID || '')" />
       </div>
     </div>
     </div>
@@ -1811,6 +1816,14 @@ onBeforeUnmount(() => {
     >
       <template #title-right>
         <button
+          type="button"
+          class="task-title-scope-btn"
+          :class="{ locked: !タスク要求WindowRef?.管理者か }"
+          :disabled="!タスク要求WindowRef?.管理者か"
+          :title="タスク要求WindowRef?.管理者か ? 'クリックで自分限定/全ユーザー表示を切り替え' : '自分のタスクのみ表示できます（admin限定で全ユーザー表示可）'"
+          @click="タスク要求WindowRef?.表示範囲切替()"
+        >{{ タスク要求WindowRef?.自分のみ表示 ?? true ? '✅' : '⬜' }} {{ String(利用者?.利用者ID || '') }}限定</button>
+        <button
           class="task-title-new-btn"
           type="button"
           title="タスク要求を新規作成"
@@ -1821,6 +1834,7 @@ onBeforeUnmount(() => {
         :is="AIタスク要求ウィンドウ"
         ref="タスク要求WindowRef"
         :利用者ID="String(利用者?.利用者ID || '')"
+        :権限ID="String(利用者?.権限ID || '')"
       />
     </component>
 
@@ -2028,6 +2042,30 @@ onBeforeUnmount(() => {
 .task-title-new-btn:hover {
   background: rgba(30, 126, 52, 0.96);
   border-color: rgba(255, 255, 255, 0.68);
+}
+
+.task-title-scope-btn {
+  height: 20px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.task-title-scope-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.68);
+}
+
+.task-title-scope-btn:disabled,
+.task-title-scope-btn.locked {
+  cursor: default;
+  opacity: 0.85;
 }
 
 /* ===== Web版 左右分割レイアウト ===== */

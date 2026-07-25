@@ -97,6 +97,7 @@ def main() -> None:
         "/aidiy_code_agents/docs",
         "/aidiy_chat_llms/docs",
         "/aidiy_task_agents/docs",
+        "/aidiy_team_agents/docs",
         "/aidiy_windows_control/docs",
         "/aidiy_chat_completions/docs",
     ]
@@ -257,6 +258,13 @@ def main() -> None:
     if "task_api_base" not in task_config:
         raise AssertionError(f"task_agents config: unexpected keys {sorted(task_config.keys())}")
     print("  OK task_agents")
+
+    # Team agents は config のみ。submit / run は作業投入が発生するため別途明示して実行する。
+    team_config = post("/aidiy_team_agents/config")
+    assert_no_error("team_agents config", team_config)
+    if "team_api_base" not in team_config:
+        raise AssertionError(f"team_agents config: unexpected keys {sorted(team_config.keys())}")
+    print("  OK team_agents")
 
     # Windows Control は読み取り系のみ（マウス/キーボード操作・アプリ起動は行わない）
     windows = post("/aidiy_windows_control/list_windows")

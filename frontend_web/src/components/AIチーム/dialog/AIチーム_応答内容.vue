@@ -146,7 +146,7 @@ const 表示内容 = computed(() => {
 
 .dialog-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
   padding: 8px 12px;
   border-top: 1px solid rgba(93, 68, 168, 0.85);

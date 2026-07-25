@@ -75,20 +75,20 @@ onBeforeUnmount(() => {
       </div>
       <div class="q-alert-footer">
         <button
-          v-if="showCancel"
-          type="button"
-          class="q-alert-btn q-alert-btn-cancel"
-          @click="handleCancel"
-        >
-          キャンセル
-        </button>
-        <button
           ref="okBtn"
           type="button"
           class="q-alert-btn q-alert-btn-ok"
           @click="handleOk"
         >
           OK
+        </button>
+        <button
+          v-if="showCancel"
+          type="button"
+          class="q-alert-btn q-alert-btn-cancel"
+          @click="handleCancel"
+        >
+          キャンセル
         </button>
       </div>
     </div>

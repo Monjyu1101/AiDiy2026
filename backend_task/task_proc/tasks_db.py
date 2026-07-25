@@ -39,85 +39,6 @@ _採番プレフィックス = "TK"
 _採番初期値 = 1000
 TASK_AI_NAME既定 = "claude_cli"
 TASK_AI_MODEL既定 = "auto"
-要求PKカラム = ["タスクID"]
-明細PKカラム = ["タスクID", "明細SEQ"]
-要求カラム順 = [
-    "タスクID",
-    "利用者ID",
-    "プロジェクト",
-    "タイトル",
-    "要求内容",
-    "TASK_AI_NAME",
-    "TASK_AI_MODEL",
-    "実行有効",
-    "状態",
-    "マーメイド記号",
-    "PID",
-    "開始日時",
-    "終了日時",
-    "実行回数",
-    "応答タイトル",
-    "応答内容",
-    "登録日時",
-    "登録利用者ID",
-    "登録利用者名",
-    "登録端末ID",
-    "更新日時",
-    "更新利用者ID",
-    "更新利用者名",
-    "更新端末ID",
-]
-明細カラム順 = [
-    "タスクID",
-    "明細SEQ",
-    "タイトル",
-    "要求内容",
-    "先行SEQ",
-    "TASK_AI_NAME",
-    "TASK_AI_MODEL",
-    "操作検証",
-    "実行有効",
-    "状態",
-    "PID",
-    "開始日時",
-    "終了日時",
-    "実行回数",
-    "応答内容",
-    "登録日時",
-    "登録利用者ID",
-    "登録利用者名",
-    "登録端末ID",
-    "更新日時",
-    "更新利用者ID",
-    "更新利用者名",
-    "更新端末ID",
-]
-実行条件PKカラム = ["利用者ID", "タスクID"]
-実行条件カラム順 = [
-    "利用者ID",
-    "タスクID",
-    "実行区分",
-    "間隔区分",
-    "間隔値",
-    "定時区分",
-    "実行曜日",
-    "実行日",
-    "開始時刻",
-    "実行条件",
-    "監視フォルダ",
-    "フォルダ内ファイル数",
-    "フォルダ内最終日時",
-    "前回実行日時",
-    "次回実行日時",
-    "登録日時",
-    "登録利用者ID",
-    "登録利用者名",
-    "登録端末ID",
-    "更新日時",
-    "更新利用者ID",
-    "更新利用者名",
-    "更新端末ID",
-]
 
 # 実行条件の区分は文字値で保持する（状態と同じ日本語ファースト方針）
 実行区分値 = ("即時", "時間指定", "間隔実行", "定時実行")
@@ -256,27 +177,6 @@ _監査カラムDDL = """
 """
 
 
-def _カラム一覧(conn: sqlite3.Connection, テーブル名: str) -> list[sqlite3.Row]:
-    return list(conn.execute(f"PRAGMA table_info({_識別子(テーブル名)})"))
-
-
-def _PKカラム一覧(conn: sqlite3.Connection, テーブル名: str) -> list[str]:
-    rows = _カラム一覧(conn, テーブル名)
-    return [row[1] for row in sorted([row for row in rows if row[5] > 0], key=lambda row: row[5])]
-
-
-def _カラム名一覧(conn: sqlite3.Connection, テーブル名: str) -> list[str]:
-    return [row[1] for row in _カラム一覧(conn, テーブル名)]
-
-
-def _テーブル存在(conn: sqlite3.Connection, テーブル名: str) -> bool:
-    row = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-        [テーブル名],
-    ).fetchone()
-    return row is not None
-
-
 def _AIタスク要求テーブル作成(conn: sqlite3.Connection) -> None:
     conn.execute(f"""
         CREATE TABLE IF NOT EXISTS {AIタスク要求テーブル} (
@@ -350,105 +250,6 @@ def _AIタスク実行条件テーブル作成(conn: sqlite3.Connection) -> None
     """)
 
 
-def _AIタスク要求群再作成(conn: sqlite3.Connection) -> None:
-    if _テーブル存在(conn, AIタスク要求テーブル):
-        旧テーブル = f"{AIタスク要求テーブル}_old"
-        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
-        conn.execute(f"ALTER TABLE {_識別子(AIタスク要求テーブル)} RENAME TO {_識別子(旧テーブル)}")
-        _AIタスク要求テーブル作成(conn)
-        旧カラム = set(_カラム名一覧(conn, 旧テーブル))
-        task_ai_name, task_ai_model = _TASK_AI設定()
-        select_exprs: list[str] = []
-        params: list[str] = []
-        for カラム in 要求カラム順:
-            if カラム in 旧カラム:
-                select_exprs.append(_識別子(カラム))
-            elif カラム == "TASK_AI_NAME":
-                select_exprs.append("?")
-                params.append(task_ai_name)
-            elif カラム == "TASK_AI_MODEL":
-                select_exprs.append("?")
-                params.append(task_ai_model)
-            elif カラム == "実行有効":
-                # 旧カラム名「有効」からの移行時は値を引き継ぐ
-                select_exprs.append(_識別子("有効") if "有効" in 旧カラム else "1")
-            elif カラム == "実行回数":
-                select_exprs.append("0")
-            else:
-                select_exprs.append("''")
-        conn.execute(
-            f"INSERT INTO {_識別子(AIタスク要求テーブル)} ({', '.join(_識別子(c) for c in 要求カラム順)}) "
-            f"SELECT {', '.join(select_exprs)} FROM {_識別子(旧テーブル)}",
-            params,
-        )
-        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
-        return
-    _AIタスク要求テーブル作成(conn)
-
-
-def _AIタスク明細テーブル再作成(conn: sqlite3.Connection) -> None:
-    if _テーブル存在(conn, AIタスク明細テーブル):
-        旧テーブル = f"{AIタスク明細テーブル}_old"
-        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
-        conn.execute(f"ALTER TABLE {_識別子(AIタスク明細テーブル)} RENAME TO {_識別子(旧テーブル)}")
-        _AIタスク明細テーブル作成(conn)
-        旧カラム = set(_カラム名一覧(conn, 旧テーブル))
-        task_ai_name, task_ai_model = _TASK_AI設定()
-        select_exprs: list[str] = []
-        params: list[str] = []
-        for カラム in 明細カラム順:
-            if カラム in 旧カラム:
-                select_exprs.append(_識別子(カラム))
-            elif カラム == "TASK_AI_NAME":
-                select_exprs.append("?")
-                params.append(task_ai_name)
-            elif カラム == "TASK_AI_MODEL":
-                select_exprs.append("?")
-                params.append(task_ai_model)
-            elif カラム == "実行有効":
-                # 旧カラム名「有効」からの移行時は値を引き継ぐ
-                select_exprs.append(_識別子("有効") if "有効" in 旧カラム else "1")
-            elif カラム == "操作検証":
-                select_exprs.append("0")
-            else:
-                select_exprs.append("''")
-        conn.execute(
-            f"INSERT INTO {_識別子(AIタスク明細テーブル)} ({', '.join(_識別子(c) for c in 明細カラム順)}) "
-            f"SELECT {', '.join(select_exprs)} FROM {_識別子(旧テーブル)}",
-            params,
-        )
-        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
-        return
-    _AIタスク明細テーブル作成(conn)
-
-
-def _AIタスク実行条件テーブル再作成(conn: sqlite3.Connection) -> None:
-    if _テーブル存在(conn, AIタスク実行条件テーブル):
-        旧テーブル = f"{AIタスク実行条件テーブル}_old"
-        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
-        conn.execute(f"ALTER TABLE {_識別子(AIタスク実行条件テーブル)} RENAME TO {_識別子(旧テーブル)}")
-        _AIタスク実行条件テーブル作成(conn)
-        旧カラム = set(_カラム名一覧(conn, 旧テーブル))
-        select_exprs: list[str] = []
-        params: list[object] = []
-        for カラム in 実行条件カラム順:
-            if カラム in 旧カラム:
-                select_exprs.append(_識別子(カラム))
-            elif カラム in 実行条件既定値:
-                select_exprs.append("?")
-                params.append(実行条件既定値[カラム])
-            else:
-                select_exprs.append("''")
-        conn.execute(
-            f"INSERT INTO {_識別子(AIタスク実行条件テーブル)} ({', '.join(_識別子(c) for c in 実行条件カラム順)}) "
-            f"SELECT {', '.join(select_exprs)} FROM {_識別子(旧テーブル)}",
-            params,
-        )
-        conn.execute(f"DROP TABLE IF EXISTS {_識別子(旧テーブル)}")
-        return
-    _AIタスク実行条件テーブル作成(conn)
-
-
 # 手動登録 API 用の標準明細テンプレート（明細SEQ, タイトル, 先行SEQ）
 _標準明細テンプレート: list[tuple[int, str, str]] = [
     (0, "開始", ""),
@@ -462,7 +263,7 @@ _標準明細テンプレート: list[tuple[int, str, str]] = [
 ]
 
 def 初期化() -> None:
-    """テーブル作成と既存 DB 向けカラム追加を行う。多重呼び出し可。"""
+    """テーブル作成を行う。多重呼び出し可。"""
     global _初期化済み
     if _初期化済み:
         return
@@ -472,26 +273,6 @@ def 初期化() -> None:
         _AIタスク明細テーブル作成(conn)
         _AIタスク実行条件テーブル作成(conn)
         conn.commit()
-
-        if (
-            _PKカラム一覧(conn, AIタスク要求テーブル) != 要求PKカラム
-            or _カラム名一覧(conn, AIタスク要求テーブル) != 要求カラム順
-        ):
-            _AIタスク要求群再作成(conn)
-            conn.commit()
-        if (
-            _PKカラム一覧(conn, AIタスク明細テーブル) != 明細PKカラム
-            or _カラム名一覧(conn, AIタスク明細テーブル) != 明細カラム順
-        ):
-            _AIタスク明細テーブル再作成(conn)
-            conn.commit()
-        if (
-            _PKカラム一覧(conn, AIタスク実行条件テーブル) != 実行条件PKカラム
-            or _カラム名一覧(conn, AIタスク実行条件テーブル) != 実行条件カラム順
-        ):
-            _AIタスク実行条件テーブル再作成(conn)
-            conn.commit()
-
         _初期化済み = True
     finally:
         conn.close()
@@ -524,96 +305,107 @@ def _タスク登録(
     return タスクID
 
 
-def _要求応答補完(conn: sqlite3.Connection, 利用者ID: str, タスクID: str = "") -> int:
-    """要求側の応答欄が空の場合、最新の完了明細から補完する。
-
-    実行中サーバーの世代差などで明細だけに応答が残ったデータを、一覧/API取得時に
-    自己修復するための補助処理。既に要求側へ応答が入っている行は上書きしない。
-    """
-    条件 = "r.利用者ID = ? AND (r.応答タイトル = '' OR r.応答内容 = '')"
-    params: list[object] = [利用者ID]
-    if タスクID:
-        条件 += " AND r.タスクID = ?"
-        params.append(タスクID)
-
-    rows = conn.execute(
-        f"""
-        SELECT r.利用者ID, r.タスクID,
-               m.タイトル AS 応答タイトル,
-               m.応答内容 AS 応答内容
-          FROM {AIタスク要求テーブル} r
-          JOIN {AIタスク明細テーブル} m
-            ON m.タスクID = r.タスクID
-         WHERE {条件}
-           AND m.状態 = '完了'
-           AND m.応答内容 != ''
-           AND m.更新日時 = (
-                SELECT MAX(m2.更新日時)
-                  FROM {AIタスク明細テーブル} m2
-                 WHERE m2.タスクID = r.タスクID
-                   AND m2.状態 = '完了'
-                   AND m2.応答内容 != ''
-           )
-         ORDER BY r.タスクID, m.明細SEQ DESC
-        """,
-        params,
-    ).fetchall()
-
-    更新件数 = 0
-    更新済み: set[tuple[str, str]] = set()
-    now = _現在日時()
-    for row in rows:
-        key = (str(row["利用者ID"]), str(row["タスクID"]))
-        if key in 更新済み:
-            continue
-        conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET 応答タイトル = ?, 応答内容 = ?, 更新日時 = ? "
-            "WHERE 利用者ID = ? AND タスクID = ?",
-            [str(row["応答タイトル"] or ""), str(row["応答内容"] or ""), now, key[0], key[1]],
-        )
-        更新済み.add(key)
-        更新件数 += 1
-    return 更新件数
+def 管理者判定(利用者ID: str) -> bool:
+    """C利用者（backend_server共有）の権限IDが管理者(1)かどうかを判定する。"""
+    conn = 接続取得()
+    try:
+        row = conn.execute(
+            "SELECT 権限ID FROM C利用者 WHERE 利用者ID = ?",
+            [利用者ID],
+        ).fetchone()
+        return bool(row) and str(row["権限ID"]) == "1"
+    except sqlite3.OperationalError:
+        return False
+    finally:
+        conn.close()
 
 
-def タスク要求一覧(利用者ID: str) -> list[dict]:
+def タスク要求一覧(利用者ID: str, 全ユーザー: bool = False) -> list[dict]:
     初期化()
     conn = 接続取得()
     try:
-        if _要求応答補完(conn, 利用者ID):
-            conn.commit()
+        # 一覧は更新日時の降順。直近1か月分・最大1000件までに絞る
+        期間閾値 = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        条件 = "r.更新日時 >= ?"
+        params: list = [期間閾値]
+        if not 全ユーザー:
+            条件 = "r.利用者ID = ? AND " + 条件
+            params = [利用者ID, 期間閾値]
         rows = conn.execute(
             "SELECT r.利用者ID, r.タスクID, r.プロジェクト, r.タイトル, r.要求内容, r.TASK_AI_NAME, r.TASK_AI_MODEL, r.実行有効, r.状態, r.マーメイド記号, "
             "r.PID, r.開始日時, r.終了日時, r.実行回数, r.応答タイトル, r.応答内容, r.更新日時, "
-            "COALESCE(j.次回実行日時, '') AS 次回実行日時 "
+            "COALESCE(j.次回実行日時, '') AS 次回実行日時, "
+            "CASE WHEN r.状態 IN ('完了', 'エラー', '中止') AND COALESCE(j.次回実行日時, '') = '' THEN 9 ELSE 1 END AS 表示優先順位 "
             f"FROM {AIタスク要求テーブル} r "
             f"LEFT JOIN {AIタスク実行条件テーブル} j ON j.利用者ID = r.利用者ID AND j.タスクID = r.タスクID "
-            "WHERE r.利用者ID = ? "
-            "ORDER BY CASE WHEN r.タスクID GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].*' THEN 1 ELSE 0 END DESC, "
-            "r.タスクID DESC",
-            [利用者ID],
+            f"WHERE {条件} "
+            "ORDER BY 表示優先順位 ASC, r.更新日時 DESC "
+            "LIMIT 1000",
+            params,
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
         conn.close()
 
 
-def タスク要求最大更新日時(利用者ID: str) -> str:
+def タスク要求最大更新日時(利用者ID: str, 全ユーザー: bool = False) -> str:
     初期化()
     conn = 接続取得()
     try:
-        if _要求応答補完(conn, 利用者ID):
-            conn.commit()
         # 実行条件（次回実行日時など）の更新も一覧の再取得対象にする
-        row = conn.execute(
-            "SELECT MAX(m) AS 最大更新日時 FROM ("
-            f"SELECT MAX(更新日時) AS m FROM {AIタスク要求テーブル} WHERE 利用者ID = ? "
-            f"UNION ALL SELECT MAX(更新日時) FROM {AIタスク実行条件テーブル} WHERE 利用者ID = ?)",
-            [利用者ID, 利用者ID],
-        ).fetchone()
+        if 全ユーザー:
+            row = conn.execute(
+                "SELECT MAX(m) AS 最大更新日時 FROM ("
+                f"SELECT MAX(更新日時) AS m FROM {AIタスク要求テーブル} "
+                f"UNION ALL SELECT MAX(更新日時) FROM {AIタスク実行条件テーブル})"
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT MAX(m) AS 最大更新日時 FROM ("
+                f"SELECT MAX(更新日時) AS m FROM {AIタスク要求テーブル} WHERE 利用者ID = ? "
+                f"UNION ALL SELECT MAX(更新日時) FROM {AIタスク実行条件テーブル} WHERE 利用者ID = ?)",
+                [利用者ID, 利用者ID],
+            ).fetchone()
         return str(row["最大更新日時"] or "") if row else ""
     finally:
         conn.close()
+
+
+def タスク要求新規既定値(利用者ID: str) -> dict:
+    """新規登録時の既定値（プロジェクト / TASK_AI_NAME / TASK_AI_MODEL）を返す。
+
+    AIタスク_要求編集ダイアログの新規時と同じ条件で決める。
+    利用者IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（AiDiy_key.json）を使う。
+    プロジェクトは空文字もそのまま引き継ぐ（ダイアログが空欄を初期表示するのと同じ）。
+    """
+    初期化()
+    規定AI_NAME, 規定AI_MODEL = _TASK_AI設定()
+    既定 = {
+        "プロジェクト": "",
+        "TASK_AI_NAME": 規定AI_NAME or TASK_AI_NAME既定,
+        "TASK_AI_MODEL": 規定AI_MODEL or TASK_AI_MODEL既定,
+        "参照タスクID": "",
+    }
+    利用者ID = (利用者ID or "").strip()
+    if not 利用者ID:
+        return 既定
+    conn = 接続取得()
+    try:
+        row = conn.execute(
+            "SELECT タスクID, プロジェクト, TASK_AI_NAME, TASK_AI_MODEL "
+            f"FROM {AIタスク要求テーブル} WHERE 利用者ID = ? ORDER BY 更新日時 DESC, タスクID DESC LIMIT 1",
+            [利用者ID],
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return 既定
+    return {
+        "プロジェクト": str(row["プロジェクト"] or ""),
+        "TASK_AI_NAME": str(row["TASK_AI_NAME"] or "").strip() or 既定["TASK_AI_NAME"],
+        "TASK_AI_MODEL": str(row["TASK_AI_MODEL"] or "").strip() or 既定["TASK_AI_MODEL"],
+        "参照タスクID": str(row["タスクID"] or ""),
+    }
 
 
 def タスク明細一覧(タスクID: str) -> list[dict]:
@@ -699,6 +491,7 @@ def _Aチーム作業反映(
     状態: str | None = None,
     応答タイトル: str | None = None,
     応答内容: str | None = None,
+    終了日時: str | None = None,
     guard: str = "状態 != 'エラー'",
 ) -> None:
     """タスクIDがAチーム作業から投入されたものであれば、状態・応答内容をチーム側にも反映する。
@@ -706,6 +499,8 @@ def _Aチーム作業反映(
     Aチーム作業とAタスク要求は同一SQLiteを共有しているため、同一トランザクションで直接UPDATEする
     （タスクIDが一致しなければ何も更新されない）。guardはAチーム作業側の現在状態に対する条件で、
     通常は既にエラーの項目を上書きしない。エラー化や再試行（エラーからの復帰）は呼び出し側で指定する。
+    終了日時は完了時に必ず渡すこと。渡さないと Aチーム作業側の終了日時が空のまま残り、
+    team_work_db の作業タイムアウト対象一覧（終了日時=''）に誤って引っかかりエラー化されてしまう。
     """
     項目: dict[str, str] = {}
     if 状態 is not None:
@@ -714,6 +509,8 @@ def _Aチーム作業反映(
         項目["応答タイトル"] = 応答タイトル
     if 応答内容 is not None:
         項目["応答内容"] = 応答内容
+    if 終了日時 is not None:
+        項目["終了日時"] = 終了日時
     if not 項目:
         return
     now = _現在日時()
@@ -730,9 +527,17 @@ def タスク要求取得(利用者ID: str, タスクID: str) -> dict:
     初期化()
     conn = 接続取得()
     try:
-        if _要求応答補完(conn, 利用者ID, タスクID):
-            conn.commit()
         return _タスク要求取得(conn, 利用者ID, タスクID)
+    finally:
+        conn.close()
+
+
+def タスク要求取得byタスクID(タスクID: str) -> dict:
+    """AIタスク要求 1 件をタスクID単独主キーで取得する（利用者ID不要）。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        return _タスク要求取得byタスクID(conn, タスクID)
     finally:
         conn.close()
 
@@ -1175,7 +980,7 @@ def 明細完了(タスクID: str, 明細SEQ: int, 応答内容: str = "") -> di
                 "WHERE タスクID = ? AND 状態 != 'エラー'",
                 [now, 応答タイトル, 応答内容, now, タスクID],
             )
-            _Aチーム作業反映(conn, タスクID, 状態="完了", 応答タイトル=応答タイトル, 応答内容=応答内容)
+            _Aチーム作業反映(conn, タスクID, 状態="完了", 応答タイトル=応答タイトル, 応答内容=応答内容, 終了日時=now)
         else:
             conn.execute(
                 f"UPDATE {AIタスク要求テーブル} SET 応答タイトル = ?, 応答内容 = ?, 更新日時 = ? "
@@ -1249,7 +1054,7 @@ def 終了明細完了(タスクID: str, 明細SEQ: int, 応答内容: str = "�
             "WHERE タスクID = ? AND 状態 != 'エラー'",
             [now, 応答タイトル, 応答内容, now, タスクID],
         )
-        _Aチーム作業反映(conn, タスクID, 状態="完了", 応答タイトル=応答タイトル, 応答内容=応答内容)
+        _Aチーム作業反映(conn, タスクID, 状態="完了", 応答タイトル=応答タイトル, 応答内容=応答内容, 終了日時=now)
         conn.commit()
         return _タスク要求取得byタスクID(conn, タスクID)
     finally:

@@ -145,6 +145,17 @@ SERVERS = [
         "call": ("task_agents_config", {}),
     },
     {
+        "name": "aidiy_team_agents",
+        "expected": {
+            "team_agents_config",
+            "team_agents_submit",
+            "team_agents_get_work_status",
+            "team_agents_get_work_list",
+            "team_agents_get_member_list",
+        },
+        "call": ("team_agents_config", {}),
+    },
+    {
         "name": "aidiy_windows_control",
         "expected": {
             "mouse_click", "keyboard_type", "keyboard_shortcut",

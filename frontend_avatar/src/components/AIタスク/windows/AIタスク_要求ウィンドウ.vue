@@ -13,15 +13,21 @@
 <script setup lang="ts">
 // AIタスク_要求ウィンドウ (Electron task1): タスク要求一覧を単独ウィンドウで表示し、
 // 選択タスクを BroadcastChannel(avatar-task-sync) でフロー図 / 明細ウィンドウへ配信する
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import AIタスク要求一覧 from '../components/AIタスク_要求一覧.vue';
 
 const props = defineProps({
-  利用者ID: { type: String, default: '' }
+  利用者ID: { type: String, default: '' },
+  権限ID: { type: String, default: '' }
 });
 
 const 選択タスクID = ref('');
-const 要求一覧Ref = ref<{ 新規ダイアログ表示: () => void } | null>(null);
+const 要求一覧Ref = ref<{
+  新規ダイアログ表示: () => void;
+  自分のみ表示: boolean;
+  管理者か: boolean;
+  表示範囲切替: () => void;
+} | null>(null);
 let 選択タイトル = '';
 let 選択マーメイド記号 = '';
 let channel: BroadcastChannel | null = null;
@@ -47,6 +53,12 @@ function 新規ダイアログ表示() {
   要求一覧Ref.value?.新規ダイアログ表示();
 }
 
+const 自分のみ表示 = computed(() => 要求一覧Ref.value?.自分のみ表示 ?? true);
+const 管理者か = computed(() => 要求一覧Ref.value?.管理者か ?? false);
+function 表示範囲切替() {
+  要求一覧Ref.value?.表示範囲切替();
+}
+
 onMounted(() => {
   channel = new BroadcastChannel('avatar-task-sync');
   channel.addEventListener('message', (event: MessageEvent) => {
@@ -64,7 +76,7 @@ onBeforeUnmount(() => {
   channel = null;
 });
 
-defineExpose({ 新規ダイアログ表示 });
+defineExpose({ 新規ダイアログ表示, 自分のみ表示, 管理者か, 表示範囲切替 });
 </script>
 
 <template>
@@ -73,6 +85,7 @@ defineExpose({ 新規ダイアログ表示 });
       :is="AIタスク要求一覧"
       ref="要求一覧Ref"
       :利用者ID="props.利用者ID"
+      :権限ID="props.権限ID"
       :選択タスクID="選択タスクID"
       :showHeader="false"
       @select="タスク選択"

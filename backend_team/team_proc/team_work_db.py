@@ -15,6 +15,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta
 
+from .config import 設定読込
 from .team_db import DB_PATH
 
 作業テーブル = "Aチーム作業"
@@ -74,100 +75,13 @@ def 初期化() -> None:
                 PRIMARY KEY (作業ID)
             )
         """)
-        columns = {
-            row[1]
-            for row in conn.execute(f'PRAGMA table_info("{作業テーブル}")').fetchall()
-        }
-        if "TASK_AI_NAME" not in columns:
-            conn.execute(
-                f'ALTER TABLE "{作業テーブル}" ADD COLUMN TASK_AI_NAME TEXT NOT NULL DEFAULT \'claude_cli\''
-            )
-            conn.execute(f'UPDATE "{作業テーブル}" SET TASK_AI_NAME = TEAM_AI_NAME')
-        if "TASK_AI_MODEL" not in columns:
-            conn.execute(
-                f'ALTER TABLE "{作業テーブル}" ADD COLUMN TASK_AI_MODEL TEXT NOT NULL DEFAULT \'auto\''
-            )
-            conn.execute(f'UPDATE "{作業テーブル}" SET TASK_AI_MODEL = TEAM_AI_MODEL')
-        if "タスクID" not in columns:
-            conn.execute(
-                f'ALTER TABLE "{作業テーブル}" ADD COLUMN タスクID TEXT NOT NULL DEFAULT \'\''
-            )
-        if "要員ID" not in columns:
-            # 旧スキーマ（利用者ID・複合PK）からの移行: 列追加のうえ値を引き継ぐ
-            if "利用者ID" in columns:
-                conn.execute(f'ALTER TABLE "{作業テーブル}" ADD COLUMN 要員ID TEXT NOT NULL DEFAULT \'\'')
-                conn.execute(f'UPDATE "{作業テーブル}" SET 要員ID = 利用者ID')
-            else:
-                conn.execute(f'ALTER TABLE "{作業テーブル}" ADD COLUMN 要員ID TEXT NOT NULL DEFAULT \'\'')
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS "IX_Aチーム作業_状態"
             ON "{作業テーブル}" (要員ID, 状態, 作業ID)
         """)
         conn.commit()
-
-        # 旧スキーマ（利用者ID を含む複合PK）が残っている場合はテーブルを作り直す
-        PKカラム = [row[1] for row in conn.execute(f'PRAGMA table_info("{作業テーブル}")').fetchall() if row[5] > 0]
-        if PKカラム != ["作業ID"]:
-            _旧スキーマ再作成(conn)
-            conn.commit()
     finally:
         conn.close()
-
-
-def _旧スキーマ再作成(conn: sqlite3.Connection) -> None:
-    """複合PK（利用者ID, 作業ID）だった旧テーブルを 作業ID 単独PKへ作り直す。"""
-    旧テーブル = f"{作業テーブル}_old"
-    conn.execute(f'DROP TABLE IF EXISTS "{旧テーブル}"')
-    conn.execute(f'ALTER TABLE "{作業テーブル}" RENAME TO "{旧テーブル}"')
-    conn.execute(f"""
-        CREATE TABLE "{作業テーブル}" (
-            作業ID TEXT NOT NULL,
-            要員ID TEXT NOT NULL,
-            プロジェクト TEXT NOT NULL DEFAULT '',
-            タイトル TEXT NOT NULL DEFAULT '',
-            要求内容 TEXT NOT NULL DEFAULT '',
-            TEAM_AI_NAME TEXT NOT NULL DEFAULT 'claude_cli',
-            TEAM_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
-            TASK_AI_NAME TEXT NOT NULL DEFAULT 'claude_cli',
-            TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
-            タスクID TEXT NOT NULL DEFAULT '',
-            実行有効 INTEGER NOT NULL DEFAULT 1,
-            状態 TEXT NOT NULL DEFAULT '準備開始',
-            PID TEXT NOT NULL DEFAULT '',
-            開始日時 TEXT NOT NULL DEFAULT '',
-            終了日時 TEXT NOT NULL DEFAULT '',
-            実行回数 INTEGER NOT NULL DEFAULT 0,
-            応答タイトル TEXT NOT NULL DEFAULT '',
-            応答内容 TEXT NOT NULL DEFAULT '',
-            登録日時 TEXT NOT NULL,
-            登録利用者ID TEXT NOT NULL,
-            登録利用者名 TEXT NOT NULL,
-            登録端末ID TEXT NOT NULL,
-            更新日時 TEXT NOT NULL,
-            更新利用者ID TEXT NOT NULL,
-            更新利用者名 TEXT NOT NULL,
-            更新端末ID TEXT NOT NULL,
-            PRIMARY KEY (作業ID)
-        )
-    """)
-    conn.execute(f"""
-        INSERT INTO "{作業テーブル}" (
-            作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
-            TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
-            実行有効, 状態, PID, 開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容,
-            登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
-            更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-        )
-        SELECT
-            作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
-            TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
-            実行有効, 状態, PID, 開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容,
-            登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
-            更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-        FROM "{旧テーブル}"
-        GROUP BY 作業ID
-    """)
-    conn.execute(f'DROP TABLE IF EXISTS "{旧テーブル}"')
 
 
 def _採番確保(conn: sqlite3.Connection) -> None:
@@ -223,17 +137,21 @@ def 作業一覧(要員ID: str) -> list[dict]:
     初期化()
     conn = 接続取得()
     try:
+        # 一覧は表示優先順位（完了/エラー/中止=9、それ以外=1）昇順・更新日時降順。直近1か月分・最大1000件までに絞る
+        期間閾値 = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
         rows = conn.execute(
             f"""
             SELECT 作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
                    実行有効, 状態, PID,
-                   開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, 更新日時
+                   開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, 更新日時,
+                   CASE WHEN 状態 IN ('完了', 'エラー', '中止') THEN 9 ELSE 1 END AS 表示優先順位
               FROM "{作業テーブル}"
-             WHERE 要員ID = ?
-             ORDER BY 作業ID DESC
+             WHERE 要員ID = ? AND 更新日時 >= ?
+             ORDER BY 表示優先順位 ASC, 更新日時 DESC
+             LIMIT 1000
             """,
-            [要員ID],
+            [要員ID, 期間閾値],
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -271,6 +189,64 @@ def 作業取得(要員ID: str, 作業ID: str) -> dict | None:
         return dict(row) if row else None
     finally:
         conn.close()
+
+
+def 作業新規既定値(要員ID: str) -> dict:
+    """新規登録時の既定値（プロジェクト / TEAM_AI / TASK_AI）を返す。
+
+    AIチーム_作業編集ダイアログの新規時と同じ条件で決める。
+    要員IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値
+    （`AiDiy_key.json` の `CODE_BASE_PATH` / `TEAM_AI_*` / `TASK_AI_*`）を使う。
+    """
+    try:
+        設定 = 設定読込()
+        規定 = {
+            "プロジェクト": str(getattr(設定, "CODE_BASE_PATH", "") or "../"),
+            "TEAM_AI_NAME": str(getattr(設定, "TEAM_AI_NAME", "") or "claude_cli"),
+            "TEAM_AI_MODEL": str(getattr(設定, "TEAM_AI_MODEL", "") or "auto"),
+            "TASK_AI_NAME": str(getattr(設定, "TASK_AI_NAME", "") or "claude_cli"),
+            "TASK_AI_MODEL": str(getattr(設定, "TASK_AI_MODEL", "") or "auto"),
+            "参照作業ID": "",
+        }
+    except Exception:
+        規定 = {
+            "プロジェクト": "../",
+            "TEAM_AI_NAME": "claude_cli",
+            "TEAM_AI_MODEL": "auto",
+            "TASK_AI_NAME": "claude_cli",
+            "TASK_AI_MODEL": "auto",
+            "参照作業ID": "",
+        }
+
+    要員ID = (要員ID or "").strip()
+    if not 要員ID:
+        return 規定
+    初期化()
+    conn = 接続取得()
+    try:
+        row = conn.execute(
+            f"""
+            SELECT 作業ID, プロジェクト, TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL
+              FROM "{作業テーブル}"
+             WHERE 要員ID = ?
+             ORDER BY 更新日時 DESC, 作業ID DESC
+             LIMIT 1
+            """,
+            [要員ID],
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return 規定
+    既定 = dict(規定)
+    既定["参照作業ID"] = str(row["作業ID"] or "")
+    # プロジェクトは空文字もそのまま引き継ぐ（ダイアログが最終作業の値を初期表示するのと同じ）
+    既定["プロジェクト"] = str(row["プロジェクト"] or "")
+    for キー in ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL"):
+        値 = str(row[キー] or "").strip()
+        if 値:
+            既定[キー] = 値
+    return 既定
 
 
 def 作業登録(作業データ: dict, 操作者: dict) -> dict:

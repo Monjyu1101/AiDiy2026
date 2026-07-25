@@ -569,10 +569,10 @@ const 登録 = async () => {
         </div>
       </div>
       <footer class="dialog-footer">
-        <button class="dialog-button" @click="emit('close')">キャンセル</button>
         <button class="dialog-button primary" :disabled="登録中" @click="登録">
           {{ 登録中 ? '登録中...' : '登録' }}
         </button>
+        <button class="dialog-button" @click="emit('close')">キャンセル</button>
       </footer>
     </div>
   </div>
@@ -928,7 +928,7 @@ const 登録 = async () => {
 
 .dialog-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
   padding: 10px 14px;
   border-top: 1px solid rgba(93, 68, 168, 0.85);

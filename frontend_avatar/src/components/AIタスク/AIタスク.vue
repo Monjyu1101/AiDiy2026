@@ -21,7 +21,8 @@ import AIタスクフロー図 from './components/AIタスク_フロー図.vue';
 import AIタスク明細一覧 from './components/AIタスク_明細一覧.vue';
 
 const props = defineProps({
-  利用者ID: { type: String, default: '' }
+  利用者ID: { type: String, default: '' },
+  権限ID: { type: String, default: '' }
 });
 
 const 選択タスクID = ref('');
@@ -76,6 +77,7 @@ async function タスク明細再読込() {
         <component
           :is="AIタスク要求一覧"
           :利用者ID="props.利用者ID"
+          :権限ID="props.権限ID"
           :選択タスクID="選択タスクID"
           @select="タスク選択"
         />

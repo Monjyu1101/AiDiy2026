@@ -84,24 +84,26 @@ def 初期化() -> None:
                 SELECT RAISE(ABORT, 'admin要員は無効化できません');
             END
         """)
-        監査 = _監査項目("system", "システム", "backend_team")
-        conn.execute(
-            f"""
-            INSERT OR IGNORE INTO "{要員テーブル}" (
-                要員ID, 要員名, 役割, 人格情報, 有効,
-                登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
-                更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                管理者要員ID, "admin", "チーム管理者", "チーム全体を見守り、必要に応じて調整する。",
-                監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
-                監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
-            ),
-        )
         conn.commit()
     finally:
         conn.close()
+
+
+初期要員ID一覧 = ("admin", "MELCHIOR", "BALTHASAR", "CASPER")
+
+
+def 初期要員を召喚() -> None:
+    """起動時、要員が1名も登録されていなければpersonaの最新値で初期メンバーを召喚登録する。"""
+    初期化()
+    if 要員一覧(無効も表示=True):
+        return
+    from . import persona_catalog
+
+    操作者 = {"利用者ID": "system", "利用者名": "システム", "端末ID": "backend_team"}
+    for 要員ID in 初期要員ID一覧:
+        要員 = persona_catalog.召喚要員取得(要員ID)
+        if 要員 is not None:
+            要員召喚登録(要員, 操作者)
 
 
 def 要員一覧(無効も表示: bool = False) -> list[dict]:

@@ -13,7 +13,7 @@ AiDiy は、日本語を第一言語とするフルスタック業務システ�
 
 - Backend: FastAPI + SQLAlchemy + SQLite。
 - Command Hermes: `aidiy_hermes` コード支援 CLI（常駐なし）。
-- Backend MCP: 18 個の MCP サーバー（Chrome / Desktop / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Windows Control）。
+- Backend MCP: 19 個の MCP サーバー（Chrome / Desktop / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）。
 - Backend Local: OpenAI 互換の Gemma ローカル推論サーバー（ポート 8096）。
 - Backend Task: AIタスク実行 + 定期タスクサーバー（ポート 8093）。
 - Backend Team: 複数AIエージェントのチーム活動サーバー（ポート 8094、現状はモック）。

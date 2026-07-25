@@ -76,15 +76,21 @@ class TaskAgents:
         self,
         prompt: str,
         project_path: Optional[str] = None,
-        ai_name: str = "claude_cli",
-        ai_model: str = "auto",
+        ai_name: Optional[str] = None,
+        ai_model: Optional[str] = None,
         user_id: str = "admin",
         enabled: bool = True,
         return_task_id: bool = True,
         request_timeout_sec: int = 15,
         task_id: Optional[str] = None,
     ) -> dict:
-        """AIタスク要求を登録する。task_idは通常省略し、外部IDを引き継ぐ場合だけ指定する。"""
+        """AIタスク要求を登録する。task_idは通常省略し、外部IDを引き継ぐ場合だけ指定する。
+
+        project_path / ai_name / ai_model が None（未指定）のときは payload に載せず、
+        backend_task 側が AIタスク_要求編集の新規時と同じ条件
+        （利用者IDの更新最終レコードの値、無ければ規定値）で補完する。
+        空文字は明示指定として送る（プロジェクトは空欄のまま登録される）。
+        """
         prompt = (prompt or "").strip()
         user_id = (user_id or "").strip() or "admin"
         task_id = (task_id or "").strip()
@@ -93,12 +99,16 @@ class TaskAgents:
 
         payload = {
             "利用者ID": user_id,
-            "プロジェクト": (project_path or "").strip(),
             "要求内容": prompt,
-            "TASK_AI_NAME": (ai_name or "").strip() or "claude_cli",
-            "TASK_AI_MODEL": (ai_model or "").strip() or "auto",
             "実行有効": bool(enabled),
         }
+        # None は送らない（backend_task が更新最終レコード → 規定値で補完する）
+        if project_path is not None:
+            payload["プロジェクト"] = str(project_path).strip()
+        if ai_name is not None:
+            payload["TASK_AI_NAME"] = str(ai_name).strip()
+        if ai_model is not None:
+            payload["TASK_AI_MODEL"] = str(ai_model).strip()
         if task_id:
             payload["タスクID"] = task_id
         data = self._post_task_api("/task/タスク要求/AI登録", payload, request_timeout_sec)
@@ -117,6 +127,10 @@ class TaskAgents:
             "message": "タスクを投入しました。",
             "利用者ID": str(item.get("利用者ID") or user_id),
             "タスクID": task_id,
+            # 未指定時に backend_task が補完した値を確認できるよう、登録結果を返す
+            "プロジェクト": str(item.get("プロジェクト") or ""),
+            "TASK_AI_NAME": str(item.get("TASK_AI_NAME") or ""),
+            "TASK_AI_MODEL": str(item.get("TASK_AI_MODEL") or ""),
         }
         if return_task_id:
             result["task_id"] = task_id

@@ -11,6 +11,7 @@
 """AIタスクの開始明細を処理するサブプロセス。
 
 開始明細では AI を使わず、HTTP API 経由の疎結合で次の定型処理を行う。
+ローカルの temp/input・temp/output JSON には依存せず、タスクID と SEQ だけで完結する。
 標準ライブラリのみで動作する。
 
 処理の流れ:
@@ -74,24 +75,17 @@ def main() -> int:
     global ログパス
     try:
         if len(sys.argv) < 3:
-            raise ValueError("使い方: python sub_start.py <temp/output/タスクID.json> <SEQ>")
-        出力JSONパス = os.path.abspath(sys.argv[1])
+            raise ValueError("使い方: python sub_start.py <タスクID> <SEQ>")
+        タスクID = str(sys.argv[1]).strip()
         明細SEQ = int(sys.argv[2])
-        ファイルステム = os.path.splitext(os.path.basename(出力JSONパス))[0]
-        ログパス = os.path.join(BASE_DIR, "temp", "task", f"{ファイルステム}.step{明細SEQ}.log")
+        if not タスクID:
+            raise ValueError("タスクIDが指定されていません")
+        ログパス = os.path.join(BASE_DIR, "temp", "task", f"{タスクID}.step{明細SEQ}.log")
 
-        with open(出力JSONパス, "r", encoding="utf-8-sig") as f:
-            データ = json.load(f)
-        利用者ID = str(データ.get("利用者ID", "")).strip()
-        タスクID = str(データ.get("タスクID", "")).strip()
-        if not 利用者ID or not タスクID:
-            raise ValueError("出力 JSON に 利用者ID または タスクID がありません")
-
-        ログ(f"=== 開始処理: {利用者ID}/{タスクID} SEQ={明細SEQ} ===")
+        ログ(f"=== 開始処理: {タスクID} SEQ={明細SEQ} ===")
 
         # 1. AIタスク要求 を取得（応答内容へのコピーとバックアップ対象の特定に使う）
         res = POST送信(f"{TASK_API}/タスク要求/取得", {
-            "利用者ID": 利用者ID,
             "タスクID": タスクID,
         }, timeout=60)
         if res.get("status") != "OK":

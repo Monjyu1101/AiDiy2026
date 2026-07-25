@@ -638,6 +638,7 @@ MCP_MODULES = [
             {"server_name": "aidiy_code_agents",       "sse_url": "http://localhost:8095/aidiy_code_agents/sse"},
             {"server_name": "aidiy_chat_llms",         "sse_url": "http://localhost:8095/aidiy_chat_llms/sse"},
             {"server_name": "aidiy_task_agents",       "sse_url": "http://localhost:8095/aidiy_task_agents/sse"},
+            {"server_name": "aidiy_team_agents",       "sse_url": "http://localhost:8095/aidiy_team_agents/sse"},
         ],
     },
 ]

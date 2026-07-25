@@ -24,6 +24,7 @@ import AIタスク応答内容 from '../dialog/AIタスク_応答内容.vue';
 
 const props = defineProps({
   利用者ID: { type: String, default: '' },
+  権限ID: { type: String, default: '' },
   選択タスクID: { type: String, default: '' },
   showHeader: { type: Boolean, default: true }
 });
@@ -39,6 +40,7 @@ const rowKey = 'タスクID';
 const columns: Column[] = [
   { key: '選択', label: '選', width: '46px', sortable: false, align: 'center' },
   { key: 'タスクID', label: 'タスクID', width: '150px', sortable: true, align: 'center' },
+  { key: '利用者ID', label: '利用者ID', width: '90px', sortable: true, align: 'center' },
   { key: 'タイトル', label: 'タイトル', width: '170px', sortable: true },
   { key: '実行有効', label: '実行有効', width: '60px', sortable: true, align: 'center' },
   { key: '状態', label: '状態', width: '90px', sortable: true, align: 'center' },
@@ -54,28 +56,14 @@ const columns: Column[] = [
 
 const totalCount = computed(() => rows.value.length);
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)));
-// 既定ソート: 次回実行日時の昇順（値無しは下へ）、同値はタスクIDの降順
-const 既定ソート比較 = (a: Record<string, any>, b: Record<string, any>) => {
-  const a次回 = String(a?.次回実行日時 ?? '').trim();
-  const b次回 = String(b?.次回実行日時 ?? '').trim();
-  if (a次回 !== b次回) {
-    if (!a次回) return 1;
-    if (!b次回) return -1;
-    return a次回 < b次回 ? -1 : 1;
-  }
-  return String(b?.タスクID ?? '').localeCompare(String(a?.タスクID ?? ''), 'ja');
-};
 
+// 列未クリック時は backend が返した順（表示優先順位→更新日時降順）のまま表示する
 const sortedRows = computed(() => {
+  if (!sortKey.value) return rows.value;
   const list = [...rows.value];
-  if (!sortKey.value) {
-    list.sort(既定ソート比較);
-    return list;
-  }
   list.sort((a, b) => {
     const result = String(a?.[sortKey.value] ?? '').localeCompare(String(b?.[sortKey.value] ?? ''), 'ja');
-    if (result !== 0) return sortOrder.value === 'desc' ? -result : result;
-    return 既定ソート比較(a, b);
+    return sortOrder.value === 'desc' ? -result : result;
   });
   return list;
 });
@@ -107,6 +95,9 @@ let dialogChannel: BroadcastChannel | null = null;
 let 要求最大更新日時 = '';
 
 const 利用者ID取得 = () => props.利用者ID.trim();
+const 管理者か = computed(() => props.権限ID === '1');
+// admin は既定オフ（全利用者表示）で切替も可能。admin 以外は常にオン固定（自分のタスクのみ）
+const 自分のみ表示 = ref(!管理者か.value);
 
 const 最大更新日時計算 = (items: Record<string, any>[]) => {
   return items.reduce((max, row) => {
@@ -120,7 +111,10 @@ const 最大更新日時計算 = (items: Record<string, any>[]) => {
 const 最大更新日時取得 = async (): Promise<string> => {
   const 利用者ID = 利用者ID取得();
   if (!利用者ID) return 要求最大更新日時;
-  const res = await taskClient.post('/task/タスク要求/最大更新日時', { 利用者ID });
+  const res = await taskClient.post('/task/タスク要求/最大更新日時', {
+    利用者ID,
+    全ユーザー: !自分のみ表示.value
+  });
   if (res.data.status !== 'OK') return 要求最大更新日時;
   return String(res.data.data?.最大更新日時 ?? '');
 };
@@ -132,7 +126,8 @@ const loadData = async () => {
     // 基準は一覧より先に取得する（取得後の更新は次回の確認で拾う）
     const 新基準 = await 最大更新日時取得();
     const res = await taskClient.post('/task/タスク要求/一覧', {
-      利用者ID
+      利用者ID,
+      全ユーザー: !自分のみ表示.value
     });
     if (res.data.status === 'OK') {
       rows.value = res.data.data?.items ?? [];
@@ -147,6 +142,13 @@ const loadData = async () => {
   } catch (e) {
     void qMessage('タスク要求一覧の取得でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
   }
+};
+
+// admin だけクリックで自分限定/全ユーザー表示を切り替えられる
+const 表示範囲切替 = () => {
+  if (!管理者か.value) return;
+  自分のみ表示.value = !自分のみ表示.value;
+  void loadData();
 };
 
 const 更新確認 = async () => {
@@ -171,14 +173,9 @@ const selectRow = (row: Record<string, any>) => {
   emit('select', row);
 };
 
-// 行カラーリング: 完了/エラー/中止は灰色（ただし次回実行日時ありは白=通常のまま）
+// 行カラーリング: 表示優先順位が9（backend算出の灰色対象）の行を灰色にする
 const 行状態クラス = (row: Record<string, any>) => {
-  const 状態 = String(row?.状態 ?? '');
-  if (['完了', 'エラー', '中止'].includes(状態)) {
-    const 次回 = String(row?.次回実行日時 ?? '').trim();
-    return 次回 ? '' : 'row-inactive';
-  }
-  return '';
+  return Number(row?.表示優先順位 ?? 1) === 9 ? 'row-inactive' : '';
 };
 
 // 状態セルの文字: 実行中は緑ブリンク、エラー/中止は赤文字
@@ -301,13 +298,24 @@ onBeforeUnmount(() => {
   dialogChannel = null;
 });
 
-defineExpose({ loadData, 新規ダイアログ表示 });
+defineExpose({ loadData, 新規ダイアログ表示, 自分のみ表示, 管理者か, 表示範囲切替 });
 </script>
 
 <template>
   <div class="request-panel">
     <div v-if="props.showHeader" class="panel-header">
       <span class="panel-title">【タスク要求】</span>
+      <button
+        type="button"
+        class="scope-toggle"
+        :class="{ locked: !管理者か }"
+        :disabled="!管理者か"
+        :title="管理者か ? 'クリックで自分限定/全ユーザー表示を切り替え' : '自分のタスクのみ表示できます（admin限定で全ユーザー表示可）'"
+        @click="表示範囲切替"
+      >
+        <span class="scope-check">{{ 自分のみ表示 ? '✅' : '⬜' }}</span>
+        <span class="scope-text">{{ 利用者ID取得() }}限定</span>
+      </button>
       <button class="new-button" @click="新規ダイアログ表示">新規</button>
     </div>
 
@@ -430,6 +438,36 @@ defineExpose({ loadData, 新規ダイアログ表示 });
   color: #fff;
   font-weight: bold;
   letter-spacing: 1px;
+}
+
+.scope-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.scope-toggle:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.scope-toggle:disabled,
+.scope-toggle.locked {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.scope-check {
+  font-size: 11px;
+  line-height: 1;
 }
 
 .new-button {

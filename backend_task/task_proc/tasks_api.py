@@ -37,7 +37,6 @@ router = APIRouter(prefix="/task")
 check_router = APIRouter()
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_出力DIR = os.path.join(_BASE_DIR, "temp", "output")
 
 
 class タスク要求登録リクエスト(BaseModel):
@@ -48,11 +47,12 @@ class タスク要求登録リクエスト(BaseModel):
 
 class タスク要求一覧リクエスト(BaseModel):
     利用者ID: str
+    全ユーザー: bool = False
 
 
 class タスク要求取得リクエスト(BaseModel):
-    利用者ID: str
     タスクID: str
+    利用者ID: str = ""  # 空ならタスクIDだけで引く（タスクIDはAIタスク要求の単独主キー）
 
 
 class タスク明細一覧リクエスト(BaseModel):
@@ -73,12 +73,19 @@ class タスク実行条件入力(BaseModel):
 
 
 class タスク要求AI登録リクエスト(BaseModel):
+    """AI登録（新規の仮登録）。
+
+    プロジェクト / TASK_AI_NAME / TASK_AI_MODEL は None（未指定）のとき、
+    AIタスク_要求編集ダイアログの新規時と同じ条件で補完する
+    （利用者IDの更新最終レコードの値 → 無ければ規定値）。
+    空文字は「その値を明示指定した」扱いで、プロジェクトは空欄のまま登録する。
+    """
     利用者ID: str
     タスクID: str = ""
-    プロジェクト: str = ""
+    プロジェクト: str | None = None
     要求内容: str
-    TASK_AI_NAME: str = "claude_cli"
-    TASK_AI_MODEL: str = "auto"
+    TASK_AI_NAME: str | None = None
+    TASK_AI_MODEL: str | None = None
     実行有効: bool = True
     実行条件: タスク実行条件入力 | None = None
 
@@ -220,48 +227,15 @@ def _NG(message: str) -> dict:
     return {"status": "NG", "message": message, "data": {}}
 
 
-def _出力JSON明細更新(タスクID: str, item: dict) -> bool:
-    """sub_proc.py が参照する出力 JSON の明細内容も DB 更新に合わせる。"""
-    path = os.path.join(_出力DIR, f"{タスクID}.json")
-    if not os.path.isfile(path):
-        return False
-    with open(path, "r", encoding="utf-8-sig") as f:
-        data = json.load(f)
-    明細 = data.get("明細")
-    if not isinstance(明細, list):
-        return False
-    対象SEQ = int(item.get("明細SEQ", -1))
-    更新済み = False
-    for row in 明細:
-        if not isinstance(row, dict):
-            continue
-        try:
-            if int(row.get("明細SEQ", -1)) != 対象SEQ:
-                continue
-        except (TypeError, ValueError):
-            continue
-        row["タイトル"] = str(item.get("タイトル", ""))
-        row["要求内容"] = str(item.get("要求内容", ""))
-        row["先行SEQ"] = str(item.get("先行SEQ", ""))
-        row["TASK_AI_NAME"] = str(item.get("TASK_AI_NAME", "claude_cli"))
-        row["TASK_AI_MODEL"] = str(item.get("TASK_AI_MODEL", "auto"))
-        更新済み = True
-        break
-    if not 更新済み:
-        return False
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    return True
-
-
 @router.post("/タスク要求/一覧", tags=["タスク要求"])
 async def タスク要求一覧(request: タスク要求一覧リクエスト) -> dict:
     try:
         利用者ID = request.利用者ID.strip()
         if not 利用者ID:
             return _NG("利用者IDを指定してください。")
-        items = tasks_db.タスク要求一覧(利用者ID)
+        # 全ユーザー表示は管理者のみ許可（クライアント指定の真偽値は信用せずサーバー側で確認する）
+        全ユーザー = request.全ユーザー and tasks_db.管理者判定(利用者ID)
+        items = tasks_db.タスク要求一覧(利用者ID, 全ユーザー)
         return _OK({"items": items, "total": len(items)})
     except Exception as e:
         logger.error(f"タスク要求一覧の取得に失敗: {e}")
@@ -271,11 +245,12 @@ async def タスク要求一覧(request: タスク要求一覧リクエスト) -
 @router.post("/タスク要求/取得", tags=["タスク要求"])
 async def タスク要求取得(request: タスク要求取得リクエスト) -> dict:
     try:
-        利用者ID = request.利用者ID.strip()
         タスクID = request.タスクID.strip()
-        if not 利用者ID or not タスクID:
-            return _NG("利用者IDとタスクIDを指定してください。")
-        item = tasks_db.タスク要求取得(利用者ID, タスクID)
+        利用者ID = request.利用者ID.strip()
+        if not タスクID:
+            return _NG("タスクIDを指定してください。")
+        # タスクIDはAIタスク要求の単独主キーのため、利用者ID省略時はタスクIDだけで引く
+        item = tasks_db.タスク要求取得(利用者ID, タスクID) if 利用者ID else tasks_db.タスク要求取得byタスクID(タスクID)
         if not item:
             return _NG(f"タスク {タスクID} が見つかりません。")
         return _OK({"item": item})
@@ -304,7 +279,8 @@ async def タスク要求最大更新日時(request: タスク要求一覧リク
         利用者ID = request.利用者ID.strip()
         if not 利用者ID:
             return _NG("利用者IDを指定してください。")
-        return _OK({"最大更新日時": tasks_db.タスク要求最大更新日時(利用者ID)})
+        全ユーザー = request.全ユーザー and tasks_db.管理者判定(利用者ID)
+        return _OK({"最大更新日時": tasks_db.タスク要求最大更新日時(利用者ID, 全ユーザー)})
     except Exception as e:
         logger.error(f"タスク要求最大更新日時の取得に失敗: {e}")
         return _NG(f"タスク要求最大更新日時の取得に失敗しました: {e}")
@@ -418,14 +394,19 @@ async def タスク要求AI登録(request: タスク要求AI登録リクエス�
         if tasks_db.タスク要求取得(利用者ID, タスクID):
             return _NG(f"タスク {タスクID} は既に登録されています。")
         タイトル = 要求内容.splitlines()[0][:40]
+        # 未指定（None）の項目は新規時の既定値（更新最終レコード → 規定値）で補完する
+        既定 = tasks_db.タスク要求新規既定値(利用者ID)
+        プロジェクト = 既定["プロジェクト"] if request.プロジェクト is None else request.プロジェクト.strip()
+        TASK_AI_NAME = (request.TASK_AI_NAME or "").strip() or 既定["TASK_AI_NAME"]
+        TASK_AI_MODEL = (request.TASK_AI_MODEL or "").strip() or 既定["TASK_AI_MODEL"]
         item = tasks_db.仮タスク登録(
             タスクID,
             タイトル,
             要求内容,
             利用者ID,
-            request.プロジェクト.strip(),
-            request.TASK_AI_NAME.strip() or "claude_cli",
-            request.TASK_AI_MODEL.strip() or "auto",
+            プロジェクト,
+            TASK_AI_NAME,
+            TASK_AI_MODEL,
             request.実行有効,
         )
         tasks_db.実行条件登録(利用者ID, タスクID, 実行条件.model_dump())
@@ -586,11 +567,7 @@ async def タスク明細更新登録(request: タスク明細更新登録リク
         )
         if not item:
             return _NG(f"タスク明細 {タスクID} SEQ={request.明細SEQ} が見つかりません。")
-        JSON同期 = _出力JSON明細更新(タスクID, item)
-        message = f"タスク明細 SEQ={request.明細SEQ} を更新しました。"
-        if not JSON同期:
-            message += " 出力JSONは未更新です。"
-        return _OK({"item": item, "JSON同期": JSON同期}, message)
+        return _OK({"item": item}, f"タスク明細 SEQ={request.明細SEQ} を更新しました。")
     except Exception as e:
         logger.error(f"タスク明細更新登録に失敗: {e}")
         return _NG(f"タスク明細更新登録に失敗しました: {e}")

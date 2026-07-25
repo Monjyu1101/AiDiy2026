@@ -127,7 +127,7 @@ def _タスク実行開始(行: dict, logger: logging.Logger) -> None:
     logger.info(f"AIタスク生成を開始しました: {利用者ID}/{タスクID} PID={proc.pid}")
 
 
-def _明細実行開始(行: dict, 出力JSONパス: str, logger: logging.Logger) -> None:
+def _明細実行開始(行: dict, logger: logging.Logger) -> None:
     """実行可能なタスク明細 1 件についてサブプロセスを起動して PID を記録する。"""
     タスクID = str(行["タスクID"])
     明細SEQ = int(行["明細SEQ"])
@@ -140,7 +140,7 @@ def _明細実行開始(行: dict, 出力JSONパス: str, logger: logging.Logger
         サブプロセスパス = _SUB_PROCパス
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     proc = subprocess.Popen(
-        [sys.executable, サブプロセスパス, 出力JSONパス, str(明細SEQ)],
+        [sys.executable, サブプロセスパス, タスクID, str(明細SEQ)],
         cwd=_BASE_DIR,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -515,7 +515,7 @@ def _監視1回(logger: logging.Logger) -> None:
                 tasks_db.明細失敗(タスクID, 明細SEQ, f"実行回数が上限({実行回数上限}回)に達しました")
                 logger.warning(f"実行回数上限のため失敗にしました: {タスクID} SEQ={明細SEQ}")
                 continue
-            _明細実行開始(行, 出力JSONパス, logger)
+            _明細実行開始(行, logger)
             if not 軽量並行明細:
                 code_agent実行中タスク.add(タスクID)
         except Exception as e:

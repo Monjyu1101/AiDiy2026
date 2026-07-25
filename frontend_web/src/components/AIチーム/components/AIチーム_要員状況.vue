@@ -75,21 +75,16 @@ onBeforeUnmount(() => {
     :style="{ transform: `translate3d(${位置.x}px, ${位置.y}px, 0)`, zIndex }"
   >
     <div
-      class="panel-heading drag-handle"
+      class="panel-header drag-handle"
       title="ドラッグして移動"
       @pointerdown="ドラッグ開始"
       @pointermove="ドラッグ中"
       @pointerup="ドラッグ終了"
       @pointercancel="ドラッグ終了"
     >
-      <div>
-        <span class="panel-kicker">TEAM MEMBERS</span>
-        <h2>メンバー</h2>
-      </div>
-      <div class="heading-actions">
-        <span class="member-count">{{ エージェント一覧.length }}名</span>
-        <button type="button" @click="召喚ダイアログを開く">＋ 召喚</button>
-      </div>
+      <span class="panel-title">【要員状況】</span>
+      <span class="panel-count">{{ エージェント一覧.length }}名</span>
+      <button type="button" class="new-button" @pointerdown.stop @click="召喚ダイアログを開く">召喚</button>
     </div>
 
     <div class="agent-list">
@@ -171,33 +166,49 @@ onBeforeUnmount(() => {
   left: 0;
   padding: 18px 14px;
   overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 1px solid rgba(93, 68, 168, 0.95);
   background: rgba(11, 24, 37, 0.94);
   box-shadow: 0 18px 45px rgba(2, 8, 14, 0.42);
   z-index: 8;
   will-change: transform;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.panel-heading {
+.agent-panel:hover {
+  border-color: rgba(154, 120, 235, 0.95);
+  box-shadow:
+    0 18px 45px rgba(2, 8, 14, 0.42),
+    0 0 0 1px rgba(154, 120, 235, 0.4),
+    0 0 16px rgba(154, 120, 235, 0.4);
+}
+
+.panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   margin: -18px -14px 14px;
-  padding: 8px 14px;
-  background: linear-gradient(135deg, rgba(108, 78, 196, 0.22), rgba(143, 104, 221, 0.16));
-  border-bottom: 1px solid rgba(143, 104, 221, 0.25);
-  border-radius: 14px 14px 0 0;
+  padding: 0 10px;
+  height: 28px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, rgba(108, 78, 196, 0.78), rgba(143, 104, 221, 0.72));
+  border-bottom: 1px solid rgba(93, 68, 168, 0.95);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(44, 24, 101, 0.15);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(44, 24, 101, 0.3);
 }
 
-.panel-heading h2 {
-  margin: 2px 0 0;
-  color: #fff;
-  font-size: 16px;
+.panel-title {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.panel-count {
+  color: #e4ddff;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .drag-handle {
@@ -206,34 +217,20 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 
-.heading-actions {
-  display: grid;
-  justify-items: end;
-  gap: 5px;
-}
-
-.heading-actions button {
-  padding: 5px 8px;
-  border: 1px solid rgba(135, 114, 255, 0.48);
-  border-radius: 7px;
-  color: #d8ceff;
-  background: rgba(101, 76, 190, 0.18);
+.new-button {
+  margin-left: auto;
+  height: 22px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 3px;
+  background-color: #28a745;
+  color: #fff;
+  font-size: 12px;
   cursor: pointer;
-  font-size: 9px;
 }
 
-.panel-kicker {
-  color: #5ddaf7;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-}
-
-.member-count {
-  margin-top: 3px;
-  color: #7e98aa;
-  font-size: 10px;
-  font-weight: 700;
+.new-button:hover {
+  background-color: #1e7e34;
 }
 
 .agent-list {

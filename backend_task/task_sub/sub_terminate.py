@@ -16,16 +16,16 @@
 - 操作検証=true : sub_proc と同様の内容（処理目標と実行済ステップの記録）を指定
   プロジェクトフォルダ・指定 AI へ渡し、最終検証と結論の task_check_okng 報告を依頼する。
   AI が報告せずに戻ってきた場合は、明細を強制的にエラーで確定する。
+ローカルの temp/input・temp/output JSON には依存せず、タスクID と SEQ だけで完結する。
 標準ライブラリのみで動作する。
 
 処理の流れ:
-1. 出力 JSON（AI 生成のタスク分解結果）から対象 SEQ（終了明細）を特定する
-2. /task/タスク要求/取得 でプロジェクトを取得する
-3. /task/タスク明細/一覧 から全明細（完了済みの応答内容、対象行の操作検証フラグ）を取得する
-4. 操作検証=false なら /task/タスク明細/終了完了 を呼んで終了する
-5. 操作検証=true なら aidiy_code_agents MCP へ最終検証を依頼し、結論は AI 自身が
+1. /task/タスク要求/取得 でタスク全体（タイトル・プロジェクト）を取得する
+2. /task/タスク明細/一覧 から全明細（完了済みの応答内容、対象行の操作検証フラグ）を取得する
+3. 操作検証=false なら /task/タスク明細/終了完了 を呼んで終了する
+4. 操作検証=true なら aidiy_code_agents MCP へ最終検証を依頼し、結論は AI 自身が
    http://localhost:8093/task_check_okng へ直接報告する
-6. AI 応答後に明細の状態を確認し、完了/エラーのいずれにも更新されていなければ
+5. AI 応答後に明細の状態を確認し、完了/エラーのいずれにも更新されていなければ
    /task/タスク明細/失敗 で強制的にエラーにする
 """
 
@@ -45,7 +45,6 @@ TASK_AI_NAME既定 = "claude_cli"
 TASK_AI_MODEL既定 = "auto"
 
 タスクID = ""
-利用者ID = ""
 明細SEQ = 0
 ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_terminate.log")
 
@@ -73,7 +72,6 @@ def POST送信(url: str, payload: dict, timeout: int = 3600) -> dict:
 
 def タスク要求取得() -> dict:
     res = POST送信(f"{TASK_API}/タスク要求/取得", {
-        "利用者ID": 利用者ID,
         "タスクID": タスクID,
     }, timeout=60)
     if res.get("status") != "OK":
@@ -98,10 +96,10 @@ def 明細1件取得(全明細: list[dict], 対象SEQ: int) -> dict:
     return {}
 
 
-def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict]) -> str:
+def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対象: dict, 完了明細: list[dict]) -> str:
     全ステップ = "\n".join(
         f"  {int(行['明細SEQ'])}. {str(行['タイトル']).strip()}（先行SEQ: {str(行['先行SEQ']).strip() or 'なし'}）"
-        for 行 in データ["明細"]
+        for 行 in 全明細
     )
     実行済: list[str] = []
     for 行 in sorted(完了明細, key=lambda 行: int(行["明細SEQ"])):
@@ -113,7 +111,7 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
     実行済ブロック = "\n".join(実行済) if 実行済 else "（実行済ステップはまだありません）"
     return f"""あなたはタスク全体の最終検証（操作検証）を行う担当です。今回は検証のみを行ってください。
 
-タスク全体のタイトル: {str(データ.get('タイトル', '')).strip()}
+タスク全体のタイトル: {タスクタイトル}
 
 全ステップ:
 {全ステップ}
@@ -142,7 +140,7 @@ def プロンプト生成(データ: dict, 対象: dict, 完了明細: list[dict
 """
 
 
-def 検証実行(データ: dict, 対象: dict, 完了明細: list[dict], プロジェクト: str) -> str:
+def 検証実行(タスクタイトル: str, 全明細: list[dict], 対象: dict, 完了明細: list[dict], プロジェクト: str) -> str:
     """code_agents で各実行ステップと最終結果を検証させる（結論は AI が task_check_okng へ報告する）。
 
     失敗しても例外にはしない。呼び出し元は AI 応答後に明細の状態を見て成否を判定する。
@@ -151,7 +149,7 @@ def 検証実行(データ: dict, 対象: dict, 完了明細: list[dict], プロ
         task_ai_name = str(対象.get("TASK_AI_NAME", "") or TASK_AI_NAME既定).strip()
         task_ai_model = str(対象.get("TASK_AI_MODEL", "") or TASK_AI_MODEL既定).strip()
         ログ(f"code_agents run 呼び出し (検証, ai={task_ai_name}, model={task_ai_model}, project_path={プロジェクト})")
-        payload = {"prompt": プロンプト生成(データ, 対象, 完了明細), "ai_name": task_ai_name, "ai_model": task_ai_model}
+        payload = {"prompt": プロンプト生成(タスクタイトル, 全明細, 対象, 完了明細), "ai_name": task_ai_name, "ai_model": task_ai_model}
         if プロジェクト:
             payload["project_path"] = プロジェクト
         res = POST送信(MCP_URL, payload)
@@ -178,40 +176,30 @@ def 失敗報告(メッセージ: str) -> None:
 
 
 def main() -> int:
-    global タスクID, 利用者ID, 明細SEQ, ログパス
+    global タスクID, 明細SEQ, ログパス
     try:
         if len(sys.argv) < 3:
-            raise ValueError("使い方: python sub_terminate.py <temp/output/タスクID.json> <SEQ>")
-        出力JSONパス = os.path.abspath(sys.argv[1])
+            raise ValueError("使い方: python sub_terminate.py <タスクID> <SEQ>")
+        タスクID = str(sys.argv[1]).strip()
         明細SEQ = int(sys.argv[2])
-        ファイルステム = os.path.splitext(os.path.basename(出力JSONパス))[0]
-        ログパス = os.path.join(BASE_DIR, "temp", "task", f"{ファイルステム}.step{明細SEQ}.log")
+        if not タスクID:
+            raise ValueError("タスクIDが指定されていません")
+        ログパス = os.path.join(BASE_DIR, "temp", "task", f"{タスクID}.step{明細SEQ}.log")
 
-        # 1. 出力 JSON から対象（終了明細）を特定
-        with open(出力JSONパス, "r", encoding="utf-8-sig") as f:
-            データ = json.load(f)
-        利用者ID = str(データ.get("利用者ID", "")).strip()
-        タスクID = str(データ.get("タスクID", "")).strip()
-        if not 利用者ID or not タスクID:
-            raise ValueError("出力 JSON に 利用者ID または タスクID がありません")
-        対象 = None
-        for 行 in データ.get("明細", []):
-            if isinstance(行, dict) and int(行["明細SEQ"]) == 明細SEQ:
-                対象 = 行
-                break
-        if 対象 is None:
-            raise ValueError(f"出力 JSON に SEQ={明細SEQ} の明細がありません")
+        ログ(f"=== 終了処理: {タスクID} SEQ={明細SEQ} ===")
 
-        ログ(f"=== 終了処理: {利用者ID}/{タスクID} SEQ={明細SEQ} ===")
-
-        # 2. AIタスク要求 からプロジェクトを取得
+        # 1. AIタスク要求 からタイトル・プロジェクトを取得
         要求 = タスク要求取得()
+        タスクタイトル = str(要求.get("タイトル", "")).strip()
         プロジェクト = str(要求.get("プロジェクト", "")).strip()
 
-        # 3. 全明細を取得（完了済み明細の応答内容 と、対象行の DB 上の操作検証フラグ）
+        # 2. 全明細を取得（対象＝終了明細の特定、完了済み明細の応答内容、DB上の操作検証フラグ）
         全明細 = 明細一覧取得()
+        対象 = 明細1件取得(全明細, 明細SEQ)
+        if not 対象:
+            raise ValueError(f"タスク明細に SEQ={明細SEQ} がありません")
         完了明細 = [行 for 行 in 全明細 if str(行.get("状態", "")).strip() == "完了"]
-        操作検証 = bool(明細1件取得(全明細, 明細SEQ).get("操作検証", False))
+        操作検証 = bool(対象.get("操作検証", False))
         ログ(f"完了明細取得: {len(完了明細)} 件, 操作検証={操作検証}")
 
         if not 操作検証:
@@ -228,7 +216,7 @@ def main() -> int:
 
         # 4b. 操作検証あり: これまでの応答結果を全て渡し、AIに最終検証と
         #     task_check_okng による状態報告を依頼する（状態更新は AI 自身が行う）
-        結論 = 検証実行(データ, 対象, 完了明細, プロジェクト)
+        結論 = 検証実行(タスクタイトル, 全明細, 対象, 完了明細, プロジェクト)
         ログ(f"検証結果: {結論[:300]}")
 
         # 5. AIが task_check_okng で状態を更新したか確認する

@@ -12,6 +12,13 @@
 
 team_watcher.py が temp/input/<作業ID>.json に入力値を書き、
 このスクリプトを `python sub_init.py <入力JSONパス>` で起動する。
+
+処理の流れ:
+1. 入力 JSON（要員ID / 作業ID / 要求内容 など）を読み込む
+2. 有効な要員一覧を取得し、要求内容に最も適した要員をAIに選ばせて
+   temp/output/<作業ID>.json へ JSON 形式で書き出させる
+3. 出力 JSON を検証する（有効な要員一覧に無ければ既定利用者ID='admin'へフォールバック）
+4. 決定した利用者IDで aidiy_task_agents へ投入する
 """
 
 from __future__ import annotations
@@ -26,13 +33,20 @@ from urllib.request import Request, urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from log_config import get_logger, setup_logging
-from team_proc import team_work_db
+from team_proc import team_db, team_work_db
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
+AIDIY_ROOT = BASE_DIR.parent
 TASK_AGENTS_URL = (
     os.environ.get("AIDIY_TASK_AGENTS_URL")
     or "http://127.0.0.1:8095/aidiy_task_agents/submit"
 )
+CODE_AGENTS_URL = (
+    os.environ.get("AIDIY_CODE_AGENTS_URL")
+    or "http://127.0.0.1:8095/aidiy_code_agents/run"
+)
+既定利用者ID = "admin"
+利用者選択最大試行回数 = 2
 
 
 def POST送信(url: str, payload: dict, timeout: int = 30) -> dict:
@@ -47,14 +61,90 @@ def POST送信(url: str, payload: dict, timeout: int = 30) -> dict:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"aidiy_task_agents HTTP {exc.code}: {body[:500]}") from exc
+        raise RuntimeError(f"HTTP {exc.code}: {body[:500]}") from exc
     except URLError as exc:
-        raise RuntimeError(f"aidiy_task_agentsへ接続できません: {exc.reason}") from exc
+        raise RuntimeError(f"接続できません ({url}): {exc.reason}") from exc
     except json.JSONDecodeError as exc:
-        raise RuntimeError("aidiy_task_agentsからJSON以外の応答が返りました") from exc
+        raise RuntimeError(f"JSON以外の応答が返りました ({url})") from exc
 
 
-def タスク投入(項目: dict) -> dict:
+def _候補一覧テキスト(候補: list[dict]) -> str:
+    行一覧 = []
+    for 要員 in 候補:
+        役割 = str(要員.get("役割", "")).strip()
+        人格行 = str(要員.get("人格情報", "")).strip().splitlines()
+        人格概要 = 人格行[0] if 人格行 else ""
+        行一覧.append(f"- {要員['要員ID']}: {役割} / {人格概要}")
+    return "\n".join(行一覧)
+
+
+def プロンプト生成_担当選択(要求内容: str, 候補: list[dict], 出力JSONパス: str) -> str:
+    return f"""次の作業依頼を確認し、実行を担当させるのに最も適した要員を、下記の有効な要員一覧から1名選んでください。
+
+作業内容:
+{要求内容}
+
+有効な要員一覧（要員ID: 役割 / 人格情報）:
+{_候補一覧テキスト(候補)}
+
+選んだ要員IDを、次のファイルへ JSON 形式で保存してください。
+保存先: {出力JSONパス}
+保存先フォルダは既に存在します。UTF-8（BOMなし）で保存してください。
+コードフェンスや説明文は付けず、次の形式だけを保存してください。キー名は完全一致させてください。
+このファイル保存以外の作業（コードの修正、他ファイルの作成など）は一切行わないでください。
+
+{{
+  "利用者ID": "選んだ要員ID"
+}}
+"""
+
+
+def 担当要員を選択(要求内容: str, 作業ID: str, logger) -> str:
+    """要求内容に最も適した要員IDをAIに選ばせる。失敗・不正時は既定利用者IDへフォールバックする。"""
+    候補 = team_db.要員一覧()
+    候補ID集合 = {str(要員["要員ID"]) for 要員 in 候補}
+    if not 候補:
+        logger.warning("有効な要員が1名もいないため既定利用者IDで投入します")
+        return 既定利用者ID
+
+    出力DIR = BASE_DIR / "temp" / "output"
+    出力DIR.mkdir(parents=True, exist_ok=True)
+    出力JSONパス = str(出力DIR / f"{作業ID}.json").replace("\\", "/")
+
+    for 試行 in range(1, 利用者選択最大試行回数 + 1):
+        try:
+            if os.path.exists(出力JSONパス):
+                os.remove(出力JSONパス)
+            res = POST送信(CODE_AGENTS_URL, {
+                "prompt": プロンプト生成_担当選択(要求内容, 候補, 出力JSONパス),
+                "ai_name": "claude_cli",
+                "ai_model": "auto",
+                "project_path": str(AIDIY_ROOT),
+            })
+            if res.get("error") or res.get("status") != "OK":
+                raise RuntimeError(str(res.get("error") or res.get("result")))
+            if not os.path.isfile(出力JSONパス):
+                raise RuntimeError("出力 JSON が生成されませんでした")
+            with open(出力JSONパス, "r", encoding="utf-8-sig") as f:
+                データ = json.load(f)
+            選択ID = str(データ.get("利用者ID", "")).strip()
+            if 選択ID not in 候補ID集合:
+                raise ValueError(f"選択された要員IDが有効な要員一覧にありません: {選択ID!r}")
+            return 選択ID
+        except Exception as e:
+            logger.warning(f"担当要員の選択 試行{試行}回目 失敗: {e}")
+        finally:
+            if os.path.exists(出力JSONパス):
+                try:
+                    os.remove(出力JSONパス)
+                except OSError:
+                    pass
+
+    logger.warning(f"担当要員の選択に失敗したため既定利用者ID({既定利用者ID})で投入します: {作業ID}")
+    return 既定利用者ID
+
+
+def タスク投入(項目: dict, 利用者ID: str) -> dict:
     return POST送信(
         TASK_AGENTS_URL,
         {
@@ -62,7 +152,7 @@ def タスク投入(項目: dict) -> dict:
             "project_path": str(項目.get("プロジェクト", "")),
             "ai_name": str(項目.get("TASK_AI_NAME", "claude_cli")),
             "ai_model": str(項目.get("TASK_AI_MODEL", "auto")),
-            "user_id": str(項目["要員ID"]),
+            "user_id": 利用者ID,
             "task_id": str(項目["作業ID"]),
             "enabled": bool(int(項目.get("実行有効", 1) or 0)),
             "return_task_id": True,
@@ -74,7 +164,6 @@ def タスク投入(項目: dict) -> dict:
 def main() -> int:
     setup_logging("sub_init")
     logger = get_logger("team_sub_init")
-    入力パス: Path | None = None
     要員ID = ""
     作業ID = ""
     try:
@@ -88,8 +177,11 @@ def main() -> int:
         if not 要員ID or not 作業ID or not str(項目.get("要求内容", "")).strip():
             raise ValueError("入力JSONに要員ID、作業ID、要求内容がありません")
 
-        logger.info(f"aidiy_task_agentsへ投入します: {作業ID} (要員ID={要員ID})")
-        結果 = タスク投入(項目)
+        担当利用者ID = 担当要員を選択(str(項目["要求内容"]), 作業ID, logger)
+        logger.info(
+            f"aidiy_task_agentsへ投入します: {作業ID} (要員ID={要員ID} -> 利用者ID={担当利用者ID})"
+        )
+        結果 = タスク投入(項目, 担当利用者ID)
         if 結果.get("status") != "OK":
             raise RuntimeError(str(結果.get("message") or "AIタスク投入に失敗しました"))
         タスクID = str(結果.get("タスクID") or 結果.get("task_id") or "").strip()
@@ -106,12 +198,6 @@ def main() -> int:
             except Exception:
                 logger.exception("Aチーム作業への失敗記録にも失敗しました")
         return 1
-    finally:
-        if 入力パス is not None:
-            try:
-                入力パス.unlink(missing_ok=True)
-            except OSError:
-                logger.warning(f"入力JSONを削除できませんでした: {入力パス}")
 
 
 if __name__ == "__main__":

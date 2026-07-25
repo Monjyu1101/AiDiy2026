@@ -24,9 +24,11 @@ logger = get_logger(__name__)
 
 class TaskAgentsRequest(BaseModel):
     prompt: str = ""
+    # project_path / ai_name / ai_model は未指定（null）可。
+    # backend_task が AIタスク_要求編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
     project_path: Optional[str] = None
-    ai_name: str = "claude_cli"
-    ai_model: str = "auto"
+    ai_name: Optional[str] = None
+    ai_model: Optional[str] = None
     user_id: str = "admin"
     task_id: str = ""
     利用者ID: str = ""
@@ -49,8 +51,8 @@ def register_tools(mcp_ta, task_agents):
     async def task_agents_submit(
         prompt: str,
         project_path: Optional[str] = None,
-        ai_name: str = "claude_cli",
-        ai_model: str = "auto",
+        ai_name: Optional[str] = None,
+        ai_model: Optional[str] = None,
         user_id: str = "admin",
         task_id: str = "",
         enabled: bool = True,
@@ -60,6 +62,8 @@ def register_tools(mcp_ta, task_agents):
         """
         backend_task の AIタスク要求へ非同期タスクを投入する。
         登録だけを行い、タスク分解や実行完了は待たない。
+        project_path / ai_name / ai_model は通常指定不要。未指定なら AIタスク画面の新規時と同じ条件
+        （利用者IDの更新最終レコードの値、無ければ規定値）で補完される。
         task_id は通常指定不要。外部システムのIDを引き継ぐ場合だけ指定する。
         """
         result = await asyncio.to_thread(
@@ -126,12 +130,12 @@ def create_router(task_agents) -> APIRouter:
                 },
                 "submit": {
                     "summary": "AIタスク投入",
-                    "description": "指定promptをbackend_taskの/task/タスク要求/AI登録へ渡し、タスクを準備開始として登録する。task_idは通常指定不要で、省略時はbackend_taskが自動採番する。8093未起動時はstatus=NGで理由を返す。",
+                    "description": "指定promptをbackend_taskの/task/タスク要求/AI登録へ渡し、タスクを準備開始として登録する。project_path / ai_name / ai_model / task_idは通常指定不要。project_path / ai_name / ai_model の省略（null）時は AIタスク_要求編集の新規時と同じ条件（利用者IDの更新最終レコードの値、無ければ規定値）で補完し、task_idは省略時にbackend_taskが自動採番する。8093未起動時はstatus=NGで理由を返す。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "タスク化したい依頼内容"},
-                        "project_path": {"type": "string", "required": False, "description": "対象プロジェクトのパス。backend_task の プロジェクト に対応"},
-                        "ai_name": {"type": "string", "required": False, "default": "claude_cli", "description": "TASK_AI_NAME。claude_sdk / claude_cli / codex_cli / aidiy_hermes など"},
-                        "ai_model": {"type": "string", "required": False, "default": "auto", "description": "TASK_AI_MODEL"},
+                        "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_task の プロジェクト に対応。null なら更新最終レコードの値、無ければ空欄。空文字は明示的な空欄指定"},
+                        "ai_name": {"type": "string", "required": False, "default": None, "description": "TASK_AI_NAME。claude_sdk / claude_cli / codex_cli / aidiy_hermes など。null なら更新最終レコードの値、無ければ規定値"},
+                        "ai_model": {"type": "string", "required": False, "default": None, "description": "TASK_AI_MODEL。null なら更新最終レコードの値、無ければ規定値"},
                         "user_id": {"type": "string", "required": False, "default": "admin", "description": "利用者ID"},
                         "task_id": {"type": "string", "required": False, "default": "", "description": "任意のタスクID。通常は指定不要。外部IDを引き継ぐ場合だけ指定し、省略時はTASK.mmdd.hhmmssで自動採番"},
                         "enabled": {"type": "boolean", "required": False, "default": True, "description": "有効。true なら backend_task の watcher が処理対象にする"},
@@ -140,15 +144,15 @@ def create_router(task_agents) -> APIRouter:
                     },
                     "example_request": {
                         "prompt": "frontend_web の AIタスク画面にローディング表示を追加してください",
-                        "project_path": "/workspaces/AiDiy2026",
-                        "ai_name": "codex_cli",
-                        "ai_model": "auto",
                     },
                     "response_fields": {
                         "status": "OK / NG",
                         "message": "投入結果の短いメッセージ",
                         "利用者ID": "登録時に使った利用者ID",
                         "タスクID": "登録された AIタスク要求のタスクID",
+                        "プロジェクト": "登録に使われたプロジェクト（未指定時は補完後の値）",
+                        "TASK_AI_NAME": "登録に使われた TASK_AI_NAME（未指定時は補完後の値）",
+                        "TASK_AI_MODEL": "登録に使われた TASK_AI_MODEL（未指定時は補完後の値）",
                         "task_id": "登録された AIタスク要求のタスクID。return_task_id=true のときだけ返す互換フィールド",
                     },
                 },
@@ -191,7 +195,8 @@ def create_router(task_agents) -> APIRouter:
                     project_path=req.project_path,
                     ai_name=req.ai_name,
                     ai_model=req.ai_model,
-                    user_id=req.user_id,
+                    # 利用者ID は補完時の参照キーになるため、日本語キーでの指定も受け付ける
+                    user_id=req.利用者ID or req.user_id,
                     enabled=req.enabled,
                     return_task_id=req.return_task_id,
                     request_timeout_sec=req.request_timeout_sec,

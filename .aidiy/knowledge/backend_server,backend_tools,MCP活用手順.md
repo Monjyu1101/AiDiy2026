@@ -10,7 +10,7 @@
 ## 関連ファイル
 - `backend_server/_config/AiDiy_mcp.json` — Claude Agent SDK に渡す MCP 接続定義
 - `backend_server/core_router/AIコア/AIコード_claude.py` — Claude Agent SDK で MCP を使う処理
-- `backend_tools/tools_main.py` — 18個の SSE MCP サーバー入口
+- `backend_tools/tools_main.py` — 19個の SSE MCP サーバー入口
 - `backend_tools/mcp_stdio.py` — SSE を stdio client へ中継
 - `backend_tools/tools_proc/` — 各 MCP のロジック
 
@@ -33,6 +33,7 @@
 | `aidiy_ffmpeg_control` | `http://localhost:8095/aidiy_ffmpeg_control/sse` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） |
 | `aidiy_code_agents` | `http://localhost:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
 | `aidiy_task_agents` | `http://localhost:8095/aidiy_task_agents/sse` | backend_task API への AIタスク非同期投入、要求/明細状態取得 |
+| `aidiy_team_agents` | `http://localhost:8095/aidiy_team_agents/sse` | backend_team API への AIチーム作業投入、作業/要員状態取得 |
 | `aidiy_windows_control` | `http://localhost:8095/aidiy_windows_control/sse` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
 
 ## AiDiy_mcp.json の形式
@@ -74,11 +75,16 @@
 | ffmpeg / ffprobe による動画合成・字幕焼き込み、ffplay でプレビュー再生 | `aidiy_ffmpeg_control` |
 | AI コードエージェント実行（CodeAI CLI 経由） | `aidiy_code_agents` |
 | AIタスクへ依頼を投入して非同期実行させる | `aidiy_task_agents` |
+| AIチームの要員へ作業を投入して非同期実行させる | `aidiy_team_agents` |
 | マウス/キーボード操作、ウィンドウ制御、プロセス管理 | `aidiy_windows_control` |
 
 SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まずアプリ API や既存初期化処理で再現できないか確認する。
 
 `aidiy_task_agents.submit`の`task_id`は通常は指定不要で、省略時はbackend_taskが`TASK.mmdd.hhmmss`形式で自動採番する。呼出元のIDをAタスク要求まで引き継ぐ必要がある場合だけ指定する。
+
+`aidiy_task_agents.submit`の`project_path` / `ai_name` / `ai_model`も通常は指定不要（null）。未指定時はbackend_taskがAIタスク_要求編集ダイアログの新規時と同じ条件、つまり利用者IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`TASK_AI_NAME` / `TASK_AI_MODEL`）を使う。特定のプロジェクトやAIを狙う場合だけ明示指定する（`project_path`の空文字は「プロジェクト空欄」の明示指定として扱う）。
+
+`aidiy_team_agents.submit`は`Aチーム作業`を`状態=準備開始`で追加する。作業IDはbackend_teamが`TW`＋8桁で自動採番するため指定できない。`member_id`（要員ID、既定`admin`）はAチーム要員の要員IDで、候補は`get_member_list`で確認する。`project_path` / `team_ai_name` / `team_ai_model` / `task_ai_name` / `task_ai_model`は通常は指定不要（null）で、未指定時はbackend_teamがAIチーム_作業編集ダイアログの新規時と同じ条件、つまり要員IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`CODE_BASE_PATH` / `TEAM_AI_*` / `TASK_AI_*`）を使う。登録後はbackend_teamの監視ループ（5秒間隔）が`aidiy_task_agents`へ投入するため、AIタスクを直接作る場合は`aidiy_task_agents`を使う。
 
 ## アクセスインターフェース（3種類）
 

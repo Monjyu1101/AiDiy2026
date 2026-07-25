@@ -52,6 +52,7 @@ export type チーム作業 = {
   応答タイトル: string;
   応答内容: string;
   更新日時: string;
+  表示優先順位: number;
 };
 
 export type 稼働要員 = {

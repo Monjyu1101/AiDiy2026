@@ -101,14 +101,21 @@ class チーム作業取得要求(チーム作業一覧要求):
 
 
 class チーム作業保存要求(操作情報):
+    """チーム作業の登録 / 変更。
+
+    プロジェクト / TEAM_AI_* / TASK_AI_* は None（未指定）可。
+    登録（新規）のときは AIチーム_作業編集ダイアログの新規時と同じ条件で補完する
+    （要員IDの更新最終レコードの値 → 無ければ規定値）。
+    空文字は「その値を明示指定した」扱いで、プロジェクトは空欄のまま登録する。
+    """
     要員ID: str = ""
     作業ID: str = ""
-    プロジェクト: str = ""
+    プロジェクト: str | None = None
     要求内容: str
-    TEAM_AI_NAME: str = "claude_cli"
-    TEAM_AI_MODEL: str = "auto"
-    TASK_AI_NAME: str = "claude_cli"
-    TASK_AI_MODEL: str = "auto"
+    TEAM_AI_NAME: str | None = None
+    TEAM_AI_MODEL: str | None = None
+    TASK_AI_NAME: str | None = None
+    TASK_AI_MODEL: str | None = None
     実行有効: bool = True
     状態: str = "準備開始"
 
@@ -357,15 +364,26 @@ def _作業データ(request: チーム作業保存要求, 編集中: bool) -> d
         raise ValueError("要求内容を入力してください")
     if request.状態 not in team_work_db.状態入力一覧:
         raise ValueError("状態が正しくありません")
+    # 新規は未指定（None）の項目を既定値（更新最終レコード → 規定値）で補完する。
+    # 変更は対象行の値をフロントエンドが必ず送るため補完しない（既存挙動を保つ）。
+    既定 = {
+        "プロジェクト": "",
+        "TEAM_AI_NAME": "claude_cli",
+        "TEAM_AI_MODEL": "auto",
+        "TASK_AI_NAME": "claude_cli",
+        "TASK_AI_MODEL": "auto",
+    }
+    if not 編集中:
+        既定.update(team_work_db.作業新規既定値(要員ID))
     return {
         "要員ID": 要員ID,
         "作業ID": 作業ID,
-        "プロジェクト": request.プロジェクト.strip(),
+        "プロジェクト": 既定["プロジェクト"] if request.プロジェクト is None else request.プロジェクト.strip(),
         "要求内容": 要求内容,
-        "TEAM_AI_NAME": request.TEAM_AI_NAME.strip() or "claude_cli",
-        "TEAM_AI_MODEL": request.TEAM_AI_MODEL.strip() or "auto",
-        "TASK_AI_NAME": request.TASK_AI_NAME.strip() or "claude_cli",
-        "TASK_AI_MODEL": request.TASK_AI_MODEL.strip() or "auto",
+        "TEAM_AI_NAME": (request.TEAM_AI_NAME or "").strip() or 既定["TEAM_AI_NAME"],
+        "TEAM_AI_MODEL": (request.TEAM_AI_MODEL or "").strip() or 既定["TEAM_AI_MODEL"],
+        "TASK_AI_NAME": (request.TASK_AI_NAME or "").strip() or 既定["TASK_AI_NAME"],
+        "TASK_AI_MODEL": (request.TASK_AI_MODEL or "").strip() or 既定["TASK_AI_MODEL"],
         "実行有効": request.実行有効,
         "状態": request.状態,
     }

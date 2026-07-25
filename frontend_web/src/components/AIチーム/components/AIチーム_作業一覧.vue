@@ -131,6 +131,9 @@ const 状態class = (status: チーム作業['状態']) => ({
   stopped: status === 'エラー' || status === '中止',
 });
 
+// 行カラーリング: 表示優先順位が9（backend算出の灰色対象）の行を灰色にする
+const 行状態クラス = (work: チーム作業) => (Number(work.表示優先順位 ?? 1) === 9 ? 'row-inactive' : '');
+
 onMounted(async () => {
   await 作業一覧読込();
   自動更新開始();
@@ -149,21 +152,16 @@ onBeforeUnmount(() => {
     :style="{ transform: `translate3d(${位置.x}px, ${位置.y}px, 0)`, zIndex }"
   >
     <div
-      class="panel-heading drag-handle"
+      class="panel-header drag-handle"
       title="ドラッグして移動"
       @pointerdown="ドラッグ開始"
       @pointermove="ドラッグ中"
       @pointerup="ドラッグ終了"
       @pointercancel="ドラッグ終了"
     >
-      <div>
-        <span class="panel-kicker">TEAM WORK</span>
-        <h2>チーム作業</h2>
-      </div>
-      <div class="heading-actions">
-        <span class="task-count">{{ 作業一覧.length }}件</span>
-        <button type="button" @pointerdown.stop @click="新規作業を開く">＋ 追加</button>
-      </div>
+      <span class="panel-title">【チーム作業】</span>
+      <span class="panel-count">{{ 作業一覧.length }}件</span>
+      <button type="button" class="new-button" @pointerdown.stop @click="新規作業を開く">追加</button>
     </div>
 
     <div class="table-frame">
@@ -179,6 +177,7 @@ onBeforeUnmount(() => {
           <tr
             v-for="work in 作業一覧"
             :key="work.作業ID"
+            :class="行状態クラス(work)"
             @click="行クリック(work)"
             @dblclick="行ダブルクリック(work)"
           >
@@ -233,33 +232,49 @@ onBeforeUnmount(() => {
   left: 0;
   padding: 18px 14px;
   overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 1px solid rgba(93, 68, 168, 0.95);
   background: rgba(11, 24, 37, 0.94);
   box-shadow: 0 18px 45px rgba(2, 8, 14, 0.42);
   z-index: 7;
   will-change: transform;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.panel-heading {
+.task-panel:hover {
+  border-color: rgba(154, 120, 235, 0.95);
+  box-shadow:
+    0 18px 45px rgba(2, 8, 14, 0.42),
+    0 0 0 1px rgba(154, 120, 235, 0.4),
+    0 0 16px rgba(154, 120, 235, 0.4);
+}
+
+.panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   margin: -18px -14px 14px;
-  padding: 8px 14px;
-  background: linear-gradient(135deg, rgba(108, 78, 196, 0.22), rgba(143, 104, 221, 0.16));
-  border-bottom: 1px solid rgba(143, 104, 221, 0.25);
-  border-radius: 14px 14px 0 0;
+  padding: 0 10px;
+  height: 28px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, rgba(108, 78, 196, 0.78), rgba(143, 104, 221, 0.72));
+  border-bottom: 1px solid rgba(93, 68, 168, 0.95);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(44, 24, 101, 0.15);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(44, 24, 101, 0.3);
 }
 
-.panel-heading h2 {
-  margin: 2px 0 0;
-  color: #fff;
-  font-size: 16px;
+.panel-title {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.panel-count {
+  color: #e4ddff;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .drag-handle {
@@ -268,26 +283,22 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 
-.panel-kicker {
-  color: #5ddaf7;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
+.new-button {
+  margin-left: auto;
+  height: 22px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 3px;
+  background-color: #28a745;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
 }
 
-.heading-actions {
-  display: grid;
-  justify-items: end;
-  gap: 5px;
+.new-button:hover {
+  background-color: #1e7e34;
 }
 
-.task-count {
-  color: #7e98aa;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.heading-actions button,
 .panel-message button {
   padding: 5px 8px;
   border: 1px solid rgba(135, 114, 255, 0.48);
@@ -301,7 +312,6 @@ onBeforeUnmount(() => {
 .table-frame {
   overflow: hidden;
   border: 1px solid rgba(139, 206, 231, 0.12);
-  border-radius: 10px;
 }
 
 table {
@@ -342,6 +352,23 @@ tbody tr {
 
 tbody tr:hover {
   background: rgba(75, 125, 151, 0.12);
+}
+
+/* 行カラーリング: 表示優先順位9（完了/エラー/中止）は灰色 */
+tbody tr.row-inactive {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+tbody tr.row-inactive td {
+  color: #5f7686;
+}
+
+tbody tr.row-inactive .work-id {
+  color: #4a5b68;
+}
+
+tbody tr.row-inactive td small {
+  color: #4a5b68;
 }
 
 .work-id {

@@ -99,7 +99,11 @@ print(res.json())
 | Movie Generation | `http://localhost:8095/aidiy_movie_generation/sse` |
 | OBS Studio Control | `http://localhost:8095/aidiy_obs_studio_control/sse` |
 | FFmpeg Control | `http://localhost:8095/aidiy_ffmpeg_control/sse` |
+| Notification Sounds | `http://localhost:8095/aidiy_notification_sounds/sse` |
 | Code Agents | `http://localhost:8095/aidiy_code_agents/sse` |
+| Chat LLM | `http://localhost:8095/aidiy_chat_llms/sse` |
+| Task Agents | `http://localhost:8095/aidiy_task_agents/sse` |
+| Team Agents | `http://localhost:8095/aidiy_team_agents/sse` |
 | Windows Control | `http://localhost:8095/aidiy_windows_control/sse` |
 
 アクセスは localhost 限定。外部接続は 403。
