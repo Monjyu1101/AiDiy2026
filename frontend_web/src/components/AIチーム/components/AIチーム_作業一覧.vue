@@ -25,7 +25,7 @@ const {
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
-} = use自由配置パネル('AIチーム_作業一覧位置', 'right');
+} = use自由配置パネル('AIチーム_作業一覧位置', 'right', 'top');
 
 const 最大更新日時取得 = async (): Promise<string> => {
   const response = await apiClient.post('/team/作業/最大更新日時', {
@@ -321,7 +321,7 @@ table {
 }
 
 th {
-  padding: 7px 8px;
+  padding: 4px 8px;
   color: #718b9b;
   background: rgba(18, 38, 54, 0.9);
   text-align: left;
@@ -338,11 +338,12 @@ th:last-child {
 }
 
 td {
-  padding: 8px;
+  padding: 3px 8px;
   border-top: 1px solid rgba(139, 206, 231, 0.08);
   color: #d8e8ef;
   vertical-align: middle;
   font-size: 10px;
+  line-height: 1.25;
 }
 
 tbody tr {
@@ -386,7 +387,7 @@ td small {
 }
 
 td small {
-  margin-top: 3px;
+  margin-top: 0;
   color: #60798a;
   font-size: 8px;
 }
@@ -394,7 +395,7 @@ td small {
 .status-badge {
   display: inline-block;
   width: 48px;
-  padding: 3px 0;
+  padding: 1px 0;
   border: 1px solid #60798a;
   border-radius: 999px;
   text-align: center;

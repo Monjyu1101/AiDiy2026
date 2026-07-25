@@ -31,7 +31,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import team_work_db
+from . import team_exp_db, team_work_db
 
 監視間隔秒 = 5
 実行回数上限 = 3
@@ -39,6 +39,8 @@ from . import team_work_db
 _BASE_DIR = Path(__file__).resolve().parents[1]
 _SUB_INITパス = _BASE_DIR / "team_sub" / "sub_init.py"
 _入力DIR = _BASE_DIR / "temp" / "input"
+_SUB_EXPパス = _BASE_DIR / "team_sub" / "sub_exp.py"
+_経験入力DIR = _BASE_DIR / "temp" / "exp"
 
 # 実行タイムアウトの確認は hh:mm が変わった監視回だけ処理する（毎分 1 回）
 _前回確認分 = ""
@@ -50,6 +52,10 @@ def _安全ファイル名部品(値: str) -> str:
 
 def _入力パス(作業ID: str) -> Path:
     return _入力DIR / f"{_安全ファイル名部品(作業ID)}.json"
+
+
+def _経験入力パス(経験ID: str) -> Path:
+    return _経験入力DIR / f"{_安全ファイル名部品(経験ID)}.json"
 
 
 def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
@@ -97,6 +103,14 @@ def 起動時クリーンアップ(logger: logging.Logger) -> None:
             logger.info(f"残存作業を{更新件数}件エラーにしてクリアしました")
     except Exception:
         logger.exception("チーム作業の起動時クリーンアップに失敗しました")
+    try:
+        for 行 in team_exp_db.生成中一覧():
+            logger.info(f"起動時クリーンアップ: 経験ID={行.get('経験ID', '')} PID={行.get('PID', '')}")
+        経験件数 = team_exp_db.生成中をエラー化("システム再起動のため中断しました")
+        if 経験件数:
+            logger.info(f"生成中の経験を{経験件数}件エラーにしてクリアしました")
+    except Exception:
+        logger.exception("Aチーム経験の起動時クリーンアップに失敗しました")
 
 
 def _作業実行開始(行: dict, logger: logging.Logger) -> None:
@@ -166,12 +180,77 @@ def _タイムアウト確認(logger: logging.Logger) -> None:
         logger.exception("実行タイムアウト処理でエラーが発生しました")
 
 
+def _経験生成開始(対象: dict, logger: logging.Logger) -> None:
+    """完了した作業 1 件を経験化する。仮登録 → sub_exp.py 起動まで行う。"""
+    作業ID = str(対象["作業ID"])
+    経験 = team_exp_db.経験仮登録(対象)
+    if not 経験:
+        # 同時実行などで既に登録済み
+        return
+    経験ID = str(経験["経験ID"])
+    try:
+        _経験入力DIR.mkdir(parents=True, exist_ok=True)
+        入力パス = _経験入力パス(経験ID)
+        with 入力パス.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "経験ID": 経験ID,
+                    "作業ID": 作業ID,
+                    "タスクID": str(対象.get("タスクID", "")),
+                    "要員ID": str(対象.get("要員ID", "")),
+                    "プロジェクト": str(対象.get("プロジェクト", "")),
+                    "要求内容": str(対象.get("要求内容", "")),
+                    "TEAM_AI_NAME": str(対象.get("TEAM_AI_NAME", "claude_cli")),
+                    "TEAM_AI_MODEL": str(対象.get("TEAM_AI_MODEL", "auto")),
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        proc = subprocess.Popen(
+            [sys.executable, str(_SUB_EXPパス), str(入力パス)],
+            cwd=str(_BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+        )
+        team_exp_db.生成開始記録(経験ID, proc.pid)
+        logger.info(f"Aチーム経験の生成を開始しました: {経験ID} (作業={作業ID}) PID={proc.pid}")
+    except Exception as e:
+        team_exp_db.経験失敗記録(経験ID, f"sub_exp起動エラー: {e}")
+        logger.exception(f"Aチーム経験のsub_exp起動に失敗しました: {経験ID}")
+
+
+def _経験生成確認(logger: logging.Logger) -> None:
+    """完了から1時間以内で経験未登録の作業を経験化する（1分ごと）。"""
+    try:
+        # 生成が長引いたものはエラーにして次回に持ち越さない
+        for 行 in team_exp_db.生成タイムアウト対象一覧():
+            pid = str(行.get("PID", "")).strip()
+            logger.warning(
+                f"経験生成タイムアウト({team_exp_db.生成タイムアウト分}分): "
+                f"{行.get('経験ID', '')} 開始日時={行.get('開始日時', '')} PID={pid}"
+            )
+            if pid.isdigit():
+                _プロセス強制停止(int(pid), logger)
+            team_exp_db.経験失敗記録(
+                str(行["経験ID"]), f"生成が{team_exp_db.生成タイムアウト分}分を超えたため中断しました"
+            )
+        for 対象 in team_exp_db.経験対象一覧():
+            _経験生成開始(対象, logger)
+    except Exception:
+        logger.exception("Aチーム経験の生成確認でエラーが発生しました")
+
+
 def _監視1回(logger: logging.Logger) -> None:
     global _前回確認分
     現在分 = datetime.now().strftime("%Y-%m-%d %H:%M")
     if 現在分 != _前回確認分:
         _前回確認分 = 現在分
         _タイムアウト確認(logger)
+        _経験生成確認(logger)
 
     # --- 投入待ち（準備開始・未投入）→ 準備中 + sub_init.pyでAIタスク投入 ---
     for 行 in team_work_db.投入待ち一覧():

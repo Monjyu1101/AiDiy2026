@@ -21,6 +21,39 @@ export type チーム要員 = {
   有効: boolean;
 };
 
+export type チーム経験 = {
+  経験ID: string;
+  作業ID: string;
+  タスクID: string;
+  要員ID: string;
+  プロジェクト: string;
+  /** 何を: 実行したタスクのタイトル */
+  タスクタイトル: string;
+  要求内容: string;
+  /** タスクの実行結果（応答内容） */
+  実行応答内容: string;
+  /** タスクの完了日時 */
+  完了日時: string;
+  タイトル: string;
+  経験値: number;
+  分類: string;
+  経験内容: string;
+  学び: string;
+  状態: '生成中' | '完了' | 'エラー';
+  開始日時: string;
+  終了日時: string;
+  エラー内容: string;
+  更新日時: string;
+};
+
+export type チーム目標 = {
+  CODE_BASE_PATH: string;
+  チーム目標: string;
+  更新日時: string;
+  更新利用者ID?: string;
+  更新利用者名?: string;
+};
+
 export type チーム状況 = {
   要員ID: string;
   要員名: string;

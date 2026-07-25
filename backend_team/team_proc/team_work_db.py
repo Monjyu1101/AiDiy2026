@@ -22,6 +22,8 @@ from .team_db import DB_PATH
 状態一覧 = ("準備開始", "準備中", "準備完了", "待機", "実行中", "エラー", "完了", "中止")
 状態入力一覧 = 状態一覧
 実行タイムアウト分 = 30
+一覧最大件数 = 100
+一覧対象日数 = 30
 
 _採番テーブル = "C採番"
 _採番ID = "Aチーム作業"
@@ -137,8 +139,9 @@ def 作業一覧(要員ID: str) -> list[dict]:
     初期化()
     conn = 接続取得()
     try:
-        # 一覧は表示優先順位（完了/エラー/中止=9、それ以外=1）昇順・更新日時降順。直近1か月分・最大1000件までに絞る
-        期間閾値 = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        # 一覧は表示優先順位（完了/エラー/中止=9、それ以外=1）昇順・更新日時降順。
+        # 直近 一覧対象日数 分・最大 一覧最大件数 までに絞る
+        期間閾値 = (datetime.now() - timedelta(days=一覧対象日数)).strftime("%Y-%m-%d %H:%M:%S")
         rows = conn.execute(
             f"""
             SELECT 作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
@@ -149,9 +152,9 @@ def 作業一覧(要員ID: str) -> list[dict]:
               FROM "{作業テーブル}"
              WHERE 要員ID = ? AND 更新日時 >= ?
              ORDER BY 表示優先順位 ASC, 更新日時 DESC
-             LIMIT 1000
+             LIMIT ?
             """,
-            [要員ID, 期間閾値],
+            [要員ID, 期間閾値, 一覧最大件数],
         ).fetchall()
         return [dict(row) for row in rows]
     finally:

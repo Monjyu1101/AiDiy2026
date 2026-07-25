@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from log_config import get_logger
 
-from . import persona_catalog, team_db, team_status_db, team_work_db
+from . import persona_catalog, team_db, team_exp_db, team_goal_db, team_status_db, team_work_db
 from .config import 設定読込
 from .store import ストア
 
@@ -118,6 +118,45 @@ class チーム作業保存要求(操作情報):
     TASK_AI_MODEL: str | None = None
     実行有効: bool = True
     状態: str = "準備開始"
+
+
+class チーム経験一覧要求(BaseModel):
+    """掲示板に出ているプロジェクト（CODE_BASE_PATH）で絞って一覧する。"""
+    プロジェクト: str = ""
+    要員ID: str = ""
+    件数: int = Field(default=team_exp_db.一覧最大件数, ge=1, le=1000)
+
+
+class チーム経験取得要求(BaseModel):
+    経験ID: str
+
+
+class チーム経験本登録要求(BaseModel):
+    """sub_exp.py が AI 出力の検証後に呼ぶ。"""
+    経験ID: str
+    タイトル: str
+    経験値: int = Field(default=0, ge=0, le=100)
+    分類: str = ""
+    経験内容: str = ""
+    学び: str = ""
+
+
+class チーム経験失敗要求(BaseModel):
+    経験ID: str
+    メッセージ: str = ""
+
+
+class チーム目標取得要求(BaseModel):
+    CODE_BASE_PATH: str
+
+
+class チーム目標保存要求(操作情報):
+    CODE_BASE_PATH: str
+    チーム目標: str = ""
+
+
+class チーム目標削除要求(操作情報):
+    CODE_BASE_PATH: str
 
 
 @router.post("/状態/取得", tags=["AIチーム"])
@@ -413,6 +452,160 @@ async def チーム作業変更(request: チーム作業保存要求) -> dict:
     except Exception as e:
         logger.error(f"チーム作業の変更に失敗: {e}")
         return ng(f"チーム作業の変更に失敗しました: {e}")
+
+
+@router.post("/経験/一覧", tags=["チーム経験"])
+async def チーム経験一覧(request: チーム経験一覧要求) -> dict:
+    """Aチーム経験を完了日時の新しい順で返す（プロジェクト・要員で絞り込み可）。"""
+    try:
+        プロジェクト = request.プロジェクト.strip()
+        要員ID = request.要員ID.strip()
+        items = team_exp_db.経験一覧(プロジェクト, 要員ID, request.件数)
+        return ok(f"{len(items)}件取得しました", {
+            "items": items,
+            "total": len(items),
+            "経験値合計": team_exp_db.経験合計(プロジェクト, 要員ID),
+        })
+    except Exception as e:
+        logger.error(f"チーム経験一覧の取得に失敗: {e}")
+        return ng(f"チーム経験一覧の取得に失敗しました: {e}")
+
+
+@router.post("/経験/最大更新日時", tags=["チーム経験"])
+async def チーム経験最大更新日時(request: チーム経験一覧要求) -> dict:
+    """一覧の再取得判定に使う最大更新日時（5秒ポーリング用）。"""
+    try:
+        return ok("最大更新日時を取得しました", {
+            "最大更新日時": team_exp_db.経験最大更新日時(
+                request.プロジェクト.strip(), request.要員ID.strip()
+            ),
+        })
+    except Exception as e:
+        logger.error(f"チーム経験の最大更新日時の取得に失敗: {e}")
+        return ng(f"チーム経験の最大更新日時の取得に失敗しました: {e}")
+
+
+@router.post("/経験/取得", tags=["チーム経験"])
+async def チーム経験取得(request: チーム経験取得要求) -> dict:
+    try:
+        経験ID = request.経験ID.strip()
+        if not 経験ID:
+            return ng("経験IDを指定してください")
+        item = team_exp_db.経験取得(経験ID)
+        return ok("経験を取得しました", {"item": item}) if item else ng("対象の経験が見つかりません")
+    except Exception as e:
+        logger.error(f"チーム経験の取得に失敗: {e}")
+        return ng(f"チーム経験の取得に失敗しました: {e}")
+
+
+@router.post("/経験/本登録", tags=["チーム経験"])
+async def チーム経験本登録(request: チーム経験本登録要求) -> dict:
+    """sub_exp.py からの本登録。仮登録済みレコードへ経験値を書き戻して完了にする。"""
+    try:
+        経験ID = request.経験ID.strip()
+        タイトル = request.タイトル.strip()
+        if not 経験ID:
+            return ng("経験IDを指定してください")
+        if not タイトル:
+            return ng("タイトルを指定してください")
+        item = team_exp_db.経験本登録(経験ID, {
+            "タイトル": タイトル,
+            "経験値": request.経験値,
+            "分類": request.分類.strip(),
+            "経験内容": request.経験内容.strip(),
+            "学び": request.学び.strip(),
+        })
+        return ok(f"経験 {経験ID} を登録しました", {"item": item})
+    except KeyError:
+        return ng("対象の経験が見つかりません")
+    except Exception as e:
+        logger.error(f"チーム経験の本登録に失敗: {e}")
+        return ng(f"チーム経験の本登録に失敗しました: {e}")
+
+
+@router.post("/経験/失敗", tags=["チーム経験"])
+async def チーム経験失敗(request: チーム経験失敗要求) -> dict:
+    """sub_exp.py からの失敗記録。経験をエラー状態にする。"""
+    try:
+        経験ID = request.経験ID.strip()
+        if not 経験ID:
+            return ng("経験IDを指定してください")
+        team_exp_db.経験失敗記録(経験ID, request.メッセージ.strip() or "経験の生成に失敗しました")
+        return ok(f"経験 {経験ID} をエラーにしました")
+    except Exception as e:
+        logger.error(f"チーム経験の失敗記録に失敗: {e}")
+        return ng(f"チーム経験の失敗記録に失敗しました: {e}")
+
+
+@router.post("/目標/一覧", tags=["チーム目標"])
+async def チーム目標一覧() -> dict:
+    """CODE_BASE_PATH ごとのチーム目標を、更新日時の新しい順で返す。"""
+    try:
+        items = team_goal_db.目標一覧()
+        return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
+    except Exception as e:
+        logger.error(f"チーム目標一覧の取得に失敗: {e}")
+        return ng(f"チーム目標一覧の取得に失敗しました: {e}")
+
+
+@router.post("/目標/最終", tags=["チーム目標"])
+async def チーム目標最終() -> dict:
+    """更新日時が最新のチーム目標を返す（チーム空間の掲示板に出す値）。"""
+    try:
+        item = team_goal_db.最終目標取得()
+        return ok("チーム目標を取得しました", {"item": item or {}})
+    except Exception as e:
+        logger.error(f"チーム目標の取得に失敗: {e}")
+        return ng(f"チーム目標の取得に失敗しました: {e}")
+
+
+@router.post("/目標/取得", tags=["チーム目標"])
+async def チーム目標取得(request: チーム目標取得要求) -> dict:
+    try:
+        パス = request.CODE_BASE_PATH.strip()
+        if not パス:
+            return ng("CODE_BASE_PATHを指定してください")
+        item = team_goal_db.目標取得(パス)
+        return ok("チーム目標を取得しました", {"item": item}) if item else ng("対象のチーム目標が見つかりません")
+    except Exception as e:
+        logger.error(f"チーム目標の取得に失敗: {e}")
+        return ng(f"チーム目標の取得に失敗しました: {e}")
+
+
+@router.post("/目標/保存", tags=["チーム目標"])
+async def チーム目標保存(request: チーム目標保存要求) -> dict:
+    """CODE_BASE_PATH 単位の登録・変更（同じパスなら上書き）。"""
+    try:
+        パス = request.CODE_BASE_PATH.strip()
+        目標 = request.チーム目標.strip()
+        if not パス:
+            return ng("CODE_BASE_PATHを指定してください")
+        if not 目標:
+            return ng("チーム目標を入力してください")
+        item = team_goal_db.目標保存(パス, 目標, request.操作者())
+        return ok(f"{パス} のチーム目標を保存しました", {"item": item})
+    except ValueError as exc:
+        return ng(str(exc))
+    except Exception as e:
+        logger.error(f"チーム目標の保存に失敗: {e}")
+        return ng(f"チーム目標の保存に失敗しました: {e}")
+
+
+@router.post("/目標/削除", tags=["チーム目標"])
+async def チーム目標削除(request: チーム目標削除要求) -> dict:
+    try:
+        パス = request.CODE_BASE_PATH.strip()
+        if not パス:
+            return ng("CODE_BASE_PATHを指定してください")
+        team_goal_db.目標削除(パス)
+        return ok(f"{パス} のチーム目標を削除しました")
+    except KeyError:
+        return ng("対象のチーム目標が見つかりません")
+    except ValueError as exc:
+        return ng(str(exc))
+    except Exception as e:
+        logger.error(f"チーム目標の削除に失敗: {e}")
+        return ng(f"チーム目標の削除に失敗しました: {e}")
 
 
 @router.post("/状況/一覧", tags=["チーム状況"])

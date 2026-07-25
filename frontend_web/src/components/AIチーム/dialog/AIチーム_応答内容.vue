@@ -1,27 +1,36 @@
 <script setup lang="ts">
-// AIチーム_応答内容: 作業一覧の行ダブルクリックで開く読み取り専用ダイアログ
-// 要求内容が渡されたときは 要求内容 / 応答内容 の2セクションで表示する
-// 応答内容が JSON としてパースできれば整形（json.dumps 相当）して表示する
+// AIチーム_応答内容: 作業一覧・経験一覧の行ダブルクリックで開く読み取り専用ダイアログ
+// 渡された 要求内容 / 応答内容 / 経験内容 のうち、中身のあるものだけをセクション表示する
+// 各内容が JSON としてパースできれば整形（json.dumps 相当）して表示する
 import { computed } from 'vue';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
   タイトル: { type: String, default: '応答内容' },
   要求内容: { type: String, default: '' },
-  内容: { type: String, default: '' }
+  内容: { type: String, default: '' },
+  経験内容: { type: String, default: '' }
 });
 const emit = defineEmits(['close']);
 
-const 要求内容あり = computed(() => String(props.要求内容 ?? '').trim() !== '');
-
-const 表示内容 = computed(() => {
-  const raw = String(props.内容 ?? '');
+const 整形 = (値: string) => {
+  const raw = String(値 ?? '');
   if (!raw.trim()) return '';
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
     return raw;
   }
+};
+
+// セクションは「見出し + 本文」の配列にまとめ、作業一覧と経験一覧で同じ形で表示する
+const セクション一覧 = computed(() => {
+  const 候補: { 見出し: string; 本文: string }[] = [
+    { 見出し: '要求内容', 本文: 整形(props.要求内容) },
+    { 見出し: '応答内容', 本文: 整形(props.内容) },
+    { 見出し: '経験内容', 本文: 整形(props.経験内容) }
+  ];
+  return 候補.filter((項目) => 項目.本文.trim() !== '');
 });
 </script>
 
@@ -33,12 +42,11 @@ const 表示内容 = computed(() => {
         <button class="dialog-close" @click="emit('close')">×</button>
       </header>
       <div class="dialog-body">
-        <template v-if="要求内容あり">
-          <div class="section-label">要求内容</div>
-          <pre class="content-pre">{{ props.要求内容 }}</pre>
-          <div class="section-label">応答内容</div>
+        <template v-for="セクション in セクション一覧" :key="セクション.見出し">
+          <div v-if="セクション一覧.length > 1" class="section-label">{{ セクション.見出し }}</div>
+          <pre class="content-pre">{{ セクション.本文 }}</pre>
         </template>
-        <pre class="content-pre">{{ 表示内容 }}</pre>
+        <div v-if="セクション一覧.length === 0" class="section-empty">表示できる内容がありません。</div>
       </div>
       <footer class="dialog-footer">
         <button class="dialog-button" @click="emit('close')">閉じる</button>
@@ -129,6 +137,12 @@ const 表示内容 = computed(() => {
 
 .content-pre:last-child {
   margin-bottom: 0;
+}
+
+.section-empty {
+  padding: 12px;
+  color: #9ca3af;
+  font-size: 12px;
 }
 
 .content-pre {

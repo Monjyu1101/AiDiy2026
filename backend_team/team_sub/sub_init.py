@@ -15,8 +15,9 @@ team_watcher.py が temp/input/<作業ID>.json に入力値を書き、
 
 処理の流れ:
 1. 入力 JSON（要員ID / 作業ID / 要求内容 など）を読み込む
-2. 有効な要員一覧を取得し、要求内容に最も適した要員をAIに選ばせて
-   temp/output/<作業ID>.json へ JSON 形式で書き出させる
+2. 有効な要員一覧と、要員ごとの Aチーム経験（経験値・分類・直近の学び）を取得し、
+   要求内容に最も適した要員をAIに選ばせて temp/output/<作業ID>.json へ JSON 形式で書き出させる
+   （経験のある要員へ寄せることで、蓄積したナレッジが再利用される）
 3. 出力 JSON を検証する（有効な要員一覧に無ければ既定利用者ID='admin'へフォールバック）
 4. 決定した利用者IDで aidiy_task_agents へ投入する
 """
@@ -33,7 +34,7 @@ from urllib.request import Request, urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from log_config import get_logger, setup_logging
-from team_proc import team_db, team_work_db
+from team_proc import team_db, team_exp_db, team_work_db
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 AIDIY_ROOT = BASE_DIR.parent
@@ -78,7 +79,36 @@ def _候補一覧テキスト(候補: list[dict]) -> str:
     return "\n".join(行一覧)
 
 
-def プロンプト生成_担当選択(要求内容: str, 候補: list[dict], 出力JSONパス: str) -> str:
+def _経験一覧テキスト(経験概要: list[dict], 候補ID集合: set[str]) -> str:
+    """要員ごとの経験値と直近の経験（分類・学び）を、選択の判断材料として並べる。"""
+    行一覧: list[str] = []
+    for 概要 in 経験概要:
+        要員ID = str(概要.get("要員ID", ""))
+        if 要員ID not in 候補ID集合:
+            continue
+        行一覧.append(
+            f"- {要員ID}: 経験値合計 {概要.get('経験値合計', 0)} / {概要.get('件数', 0)}件"
+            f" / 最終 {概要.get('最終完了日時', '') or '記録なし'}"
+        )
+        for 経験 in 概要.get("直近", []):
+            タイトル = str(経験.get("タスクタイトル", "")).strip() or "（タイトルなし）"
+            分類 = str(経験.get("分類", "")).strip() or "未分類"
+            学び = str(経験.get("学び", "")).strip()
+            行一覧.append(f"    - [{分類}/{経験.get('経験値', 0)}] {タイトル}")
+            if 学び:
+                行一覧.append(f"      学び: {学び[:160]}")
+    if not 行一覧:
+        return "（まだ経験の記録がありません。人格情報と役割だけで判断してください）"
+    return "\n".join(行一覧)
+
+
+def プロンプト生成_担当選択(
+    要求内容: str,
+    候補: list[dict],
+    出力JSONパス: str,
+    経験概要: list[dict],
+) -> str:
+    候補ID集合 = {str(要員["要員ID"]) for 要員 in 候補}
     return f"""次の作業依頼を確認し、実行を担当させるのに最も適した要員を、下記の有効な要員一覧から1名選んでください。
 
 作業内容:
@@ -86,6 +116,14 @@ def プロンプト生成_担当選択(要求内容: str, 候補: list[dict], �
 
 有効な要員一覧（要員ID: 役割 / 人格情報）:
 {_候補一覧テキスト(候補)}
+
+要員ごとの経験（Aチーム経験の記録。経験値が高い・関連する経験がある要員はナレッジを再利用できます）:
+{_経験一覧テキスト(経験概要, 候補ID集合)}
+
+選び方の指針:
+- 今回の作業内容と似た経験（分類や学びの内容が近いもの）を持つ要員を優先してください。同じ担当者に寄せると蓄積した知見をそのまま使えます。
+- 似た経験を持つ要員がいない場合は、役割と人格情報の適性で選んでください。
+- 経験値の高さだけで決めず、作業内容との関連を重視してください。
 
 選んだ要員IDを、次のファイルへ JSON 形式で保存してください。
 保存先: {出力JSONパス}
@@ -99,13 +137,26 @@ def プロンプト生成_担当選択(要求内容: str, 候補: list[dict], �
 """
 
 
-def 担当要員を選択(要求内容: str, 作業ID: str, logger) -> str:
-    """要求内容に最も適した要員IDをAIに選ばせる。失敗・不正時は既定利用者IDへフォールバックする。"""
+def 担当要員を選択(要求内容: str, 作業ID: str, logger, プロジェクト: str = "") -> str:
+    """要求内容に最も適した要員IDをAIに選ばせる。失敗・不正時は既定利用者IDへフォールバックする。
+
+    判断材料として Aチーム経験（要員ごとの経験値・直近の学び）も渡す。
+    """
     候補 = team_db.要員一覧()
     候補ID集合 = {str(要員["要員ID"]) for 要員 in 候補}
     if not 候補:
         logger.warning("有効な要員が1名もいないため既定利用者IDで投入します")
         return 既定利用者ID
+
+    # 経験の取得に失敗しても担当選択は続ける（経験なしとして扱う）
+    try:
+        経験概要 = team_exp_db.要員別経験概要(プロジェクト)
+        if not any(str(概要.get("要員ID")) in 候補ID集合 for 概要 in 経験概要):
+            # そのプロジェクトの経験が無ければ全プロジェクトの経験で判断する
+            経験概要 = team_exp_db.要員別経験概要("")
+    except Exception as e:
+        logger.warning(f"Aチーム経験の取得に失敗したため経験なしで選択します: {e}")
+        経験概要 = []
 
     出力DIR = BASE_DIR / "temp" / "output"
     出力DIR.mkdir(parents=True, exist_ok=True)
@@ -116,7 +167,7 @@ def 担当要員を選択(要求内容: str, 作業ID: str, logger) -> str:
             if os.path.exists(出力JSONパス):
                 os.remove(出力JSONパス)
             res = POST送信(CODE_AGENTS_URL, {
-                "prompt": プロンプト生成_担当選択(要求内容, 候補, 出力JSONパス),
+                "prompt": プロンプト生成_担当選択(要求内容, 候補, 出力JSONパス, 経験概要),
                 "ai_name": "claude_cli",
                 "ai_model": "auto",
                 "project_path": str(AIDIY_ROOT),
@@ -177,7 +228,9 @@ def main() -> int:
         if not 要員ID or not 作業ID or not str(項目.get("要求内容", "")).strip():
             raise ValueError("入力JSONに要員ID、作業ID、要求内容がありません")
 
-        担当利用者ID = 担当要員を選択(str(項目["要求内容"]), 作業ID, logger)
+        担当利用者ID = 担当要員を選択(
+            str(項目["要求内容"]), 作業ID, logger, str(項目.get("プロジェクト", "")).strip()
+        )
         logger.info(
             f"aidiy_task_agentsへ投入します: {作業ID} (要員ID={要員ID} -> 利用者ID={担当利用者ID})"
         )

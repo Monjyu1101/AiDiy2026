@@ -17,7 +17,16 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   type エージェント,
   type エージェント状態,
+  type チーム目標,
 } from '../AIチーム_型';
+import {
+  type NPC個体,
+  type 造形ヘルパー,
+  NPC群を更新,
+  NPCを配置,
+} from '../AIチーム_NPC制御';
+// 草原の小物は毎回同じ配置にしたいので、NPC と同じシード付き擬似乱数で座標を決める
+import { 乱数を作る } from '../AIチーム_NPC型';
 
 type 実行状態 = {
   group: THREE.Group;
@@ -27,25 +36,18 @@ type 実行状態 = {
   状態更新時刻: number;
 };
 
-type 蝶状態 = {
-  group: THREE.Group;
-  中心: THREE.Vector3;
-  半径: number;
-  速さ: number;
-  位相: number;
-  翼: THREE.Mesh[];
-};
-
 const props = defineProps<{
   エージェント一覧: エージェント[];
   選択中ID: string;
   要員読込中: boolean;
   要員読込エラー: string;
+  チーム目標: チーム目標 | null;
 }>();
 
 const emit = defineEmits<{
   select: [id: string];
   retry: [];
+  目標クリック: [];
   stateChange: [
     id: string,
     state: エージェント状態,
@@ -65,8 +67,8 @@ const 稼働数 = computed(() => エージェント一覧.value.filter((agent) =
 const 相談数 = computed(() => エージェント一覧.value.filter((agent) => agent.状態 === '相談中').length);
 const 瞑想数 = computed(() => エージェント一覧.value.filter((agent) => agent.状態 === '瞑想中').length);
 const ホバー中ID = ref('');
-const シミュレーション中 = ref(true);
-const 速度倍率 = ref(1);
+// 時間の進み方は画面から変更せず、この規定値で固定する（1.0 倍が標準。0 にすると時間が止まる）
+const 経過速度倍率 = 1;
 const 現在時刻 = ref('');
 const ラベル要素 = new Map<string, HTMLElement>();
 
@@ -81,12 +83,21 @@ let 経過時間 = 0;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const 掲示板注視点 = new THREE.Vector3();
+// NPC飛行船が吊り下げて運ぶ「チーム目標」掲示板（常にカメラを向き、クリックで保守ダイアログ）
+// 位置と向きは AIチーム_NPC動作_飛行船.ts 側が毎フレーム決める
+const 目標掲示板 = {
+  group: null as THREE.Group | null,
+  板: null as THREE.Mesh | null,
+  縁: null as THREE.Mesh | null,
+};
+const 目標掲示板幅 = 13;
+const 目標掲示板縦 = 4.6;
+let 目標テクスチャ: THREE.CanvasTexture | null = null;
+const 目標ホバー = ref(false);
 const 実行状態一覧 = new Map<string, 実行状態>();
 const 掲示板一覧: THREE.Group[] = [];
-// 草原の動くもの（雲は流れ、炎は揺れ、蝶は円を描いて飛ぶ）
-const 雲一覧: THREE.Group[] = [];
-const 炎一覧: THREE.Mesh[] = [];
-const 蝶一覧: 蝶状態[] = [];
+// NPC（ネコ・イヌ・雲・蝶）。造形と動作は AIチーム_NPC制御.ts と AIチーム_NPC動作_*.ts で調整する
+const NPC一覧: NPC個体[] = [];
 const 破棄対象: Array<THREE.BufferGeometry | THREE.Material> = [];
 const 破棄テクスチャ: THREE.Texture[] = [];
 
@@ -126,6 +137,14 @@ const ジオメトリ = <T extends THREE.BufferGeometry>(geometry: T): T => {
   return geometry;
 };
 
+// NPC動作モジュールへ渡す造形ヘルパー（生成物をこの画面の破棄リストへ載せる）
+const NPC造形ヘルパー: 造形ヘルパー = {
+  ジオメトリ,
+  マテリアル,
+  マテリアル登録: (material) => 破棄対象.push(material),
+  テクスチャ登録: (texture) => 破棄テクスチャ.push(texture),
+};
+
 const メッシュ = (
   geometry: THREE.BufferGeometry,
   material: THREE.Material,
@@ -141,13 +160,16 @@ const メッシュ = (
 type エリアキー = '仕事' | '雑談' | '瞑想' | '休憩';
 
 // 4エリアを xy=00/01/10/11 の正方グリッドに配置する（上から見て 左下=雑談 左上=仕事 右上=瞑想 右下=休憩）
-const セルサイズ = 8;
-const 通路幅 = 1.4;
+// セルサイズと通路幅は 2 倍にしてあり、エリアの円（台座半径 = セルサイズ/2 - 1.4）も直径 2 倍になる
+const セルサイズ = 16;
+const 通路幅 = 2.8;
 const グリッド間隔 = セルサイズ + 通路幅;
+const 台座半径 = セルサイズ / 2 - 1.4;
 // 要員が草原に立つ基準高さ（足元が y=0 になるモデルなので、わずかに浮かせて上下動の余地を作る）
 const 要員基準Y = 0.06;
-// 案内板を吊る高さ
+// 案内板を吊る高さと、エリア中心から案内板までの距離
 const 掲示板高さ = 2.5;
+const 掲示板オフセット = セルサイズ / 2 + 3.5;
 
 const エリア座標: Record<エリアキー, { x: 0 | 1; y: 0 | 1; 色: number }> = {
   雑談: { x: 0, y: 0, 色: 0x8bb8ff },
@@ -171,13 +193,14 @@ const 状態エリア: Record<エージェント状態, エリアキー> = {
 };
 
 // エリア中心からの相対オフセット（座席）。indexで使い回す
+// 広くなった円の中で要員が散らばるよう、エリア拡大に合わせて外側へ広げている
 const 座席オフセット: [number, number][] = [
-  [-2.1, -1.5],
-  [2.1, -1.5],
-  [-2.1, 1.7],
-  [2.1, 1.7],
-  [0, -2.7],
-  [0, 2.9],
+  [-3.2, -2.3],
+  [3.2, -2.3],
+  [-3.2, 2.6],
+  [3.2, 2.6],
+  [0, -4.1],
+  [0, 4.4],
 ];
 
 const エリア位置 = (状態: エージェント状態, index = 0): THREE.Vector3 => {
@@ -185,18 +208,6 @@ const エリア位置 = (状態: エージェント状態, index = 0): THREE.Vec
   if (状態 === '召喚中') return new THREE.Vector3(cx, 要員基準Y, cz);
   const [ox, oz] = 座席オフセット[index % 座席オフセット.length];
   return new THREE.Vector3(cx + ox, 要員基準Y, cz + oz);
-};
-
-// 草原の小物は毎回同じ配置にしたいので、シード付き擬似乱数で座標を決める
-const 乱数を作る = (seed: number) => {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 };
 
 // 草原の小物は数が多いため、ジオメトリとマテリアルを 1 組だけ作って共有する
@@ -284,43 +295,17 @@ const 空を作る = () => {
     toneMapped: false,
   });
   破棄対象.push(skyMaterial);
-  const sky = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(78, 24, 16)), skyMaterial);
-  sky.position.y = 6;
+  const sky = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(118, 24, 16)), skyMaterial);
+  sky.position.y = 8;
   scene.add(sky);
 
   // 太陽（見た目だけの発光球）
   const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xfff6d8, toneMapped: false });
   破棄対象.push(sunMaterial);
   const sun = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(2.4, 16, 12)), sunMaterial);
-  sun.position.set(-34, 34, -46);
+  sun.position.set(-52, 48, -68);
   scene.add(sun);
 
-  const 雲材 = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 1,
-    metalness: 0,
-    transparent: true,
-    opacity: 0.9,
-  });
-  破棄対象.push(雲材);
-  const 雲玉 = ジオメトリ(new THREE.SphereGeometry(1, 10, 8));
-  const 乱数 = 乱数を作る(20260725);
-  for (let index = 0; index < 9; index += 1) {
-    const cloud = new THREE.Group();
-    const 角度 = (index / 9) * Math.PI * 2 + 乱数() * 0.5;
-    const 距離 = 30 + 乱数() * 22;
-    cloud.position.set(Math.cos(角度) * 距離, 15 + 乱数() * 9, Math.sin(角度) * 距離);
-    const 個数 = 3 + Math.floor(乱数() * 3);
-    for (let part = 0; part < 個数; part += 1) {
-      const puff = new THREE.Mesh(雲玉, 雲材);
-      puff.position.set((part - 個数 / 2) * 2.1 + 乱数(), 乱数() * 0.9, 乱数() * 1.6);
-      puff.scale.set(2.4 + 乱数() * 1.5, 1.3 + 乱数() * 0.6, 1.9 + 乱数());
-      cloud.add(puff);
-    }
-    cloud.scale.setScalar(0.8 + 乱数() * 0.7);
-    scene.add(cloud);
-    雲一覧.push(cloud);
-  }
 };
 
 const 草地テクスチャを作る = (): THREE.Texture | null => {
@@ -358,7 +343,7 @@ const 草地テクスチャを作る = (): THREE.Texture | null => {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(26, 26);
+  texture.repeat.set(40, 40);
   破棄テクスチャ.push(texture);
   return texture;
 };
@@ -368,7 +353,7 @@ const 草原を作る = () => {
   const 草地材 = マテリアル(0x74b155, { roughness: 0.95, metalness: 0.02 });
   const texture = 草地テクスチャを作る();
   if (texture) 草地材.map = texture;
-  const ground = new THREE.Mesh(ジオメトリ(new THREE.CircleGeometry(70, 64)), 草地材);
+  const ground = new THREE.Mesh(ジオメトリ(new THREE.CircleGeometry(104, 72)), 草地材);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
@@ -383,10 +368,10 @@ const 草原を作る = () => {
   // なだらかな稜線にしたいので、遠くに低く広い丘を並べる
   for (let index = 0; index < 20; index += 1) {
     const 角度 = (index / 20) * Math.PI * 2 + 乱数() * 0.22;
-    const 距離 = 55 + 乱数() * 10;
+    const 距離 = 82 + 乱数() * 14;
     const hill = new THREE.Mesh(丘, 丘材[index % 丘材.length]);
-    hill.position.set(Math.cos(角度) * 距離, -0.5, Math.sin(角度) * 距離);
-    hill.scale.set(13 + 乱数() * 9, 2.1 + 乱数() * 2.2, 11 + 乱数() * 8);
+    hill.position.set(Math.cos(角度) * 距離, -0.6, Math.sin(角度) * 距離);
+    hill.scale.set(19 + 乱数() * 13, 3.0 + 乱数() * 3.2, 16 + 乱数() * 11);
     scene.add(hill);
   }
 };
@@ -485,11 +470,11 @@ const 石を置く = (x: number, z: number, scale = 1, seed = 4) => {
 const 小道を作る = () => {
   if (!scene) return;
   const 土材 = マテリアル(0xcbb185, { roughness: 0.95, metalness: 0.0 });
-  const 縦 = new THREE.Mesh(ジオメトリ(new THREE.PlaneGeometry(通路幅 + 0.5, グリッド間隔 * 2.6)), 土材);
+  const 縦 = new THREE.Mesh(ジオメトリ(new THREE.PlaneGeometry(通路幅 + 0.5, グリッド間隔 * 2.05)), 土材);
   縦.rotation.x = -Math.PI / 2;
   縦.position.y = 0.012;
   縦.receiveShadow = true;
-  const 横 = new THREE.Mesh(ジオメトリ(new THREE.PlaneGeometry(グリッド間隔 * 2.6, 通路幅 + 0.5)), 土材);
+  const 横 = new THREE.Mesh(ジオメトリ(new THREE.PlaneGeometry(グリッド間隔 * 2.05, 通路幅 + 0.5)), 土材);
   横.rotation.x = -Math.PI / 2;
   横.position.y = 0.012;
   横.receiveShadow = true;
@@ -506,22 +491,22 @@ const 作業テントを作る = (x: number, z: number, color: number) => {
     new THREE.Color(color).lerp(new THREE.Color(0x2c6379), 0.74).getHex(),
     { roughness: 0.98, metalness: 0.0, side: THREE.DoubleSide, flatShading: true },
   );
-  const 支柱 = ジオメトリ(new THREE.CylinderGeometry(0.07, 0.07, 2.3, 8));
+  const 支柱 = ジオメトリ(new THREE.CylinderGeometry(0.08, 0.08, 2.7, 8));
   const 柱位置: [number, number][] = [
-    [-2.9, -2.2],
-    [2.9, -2.2],
-    [-2.9, 2.2],
-    [2.9, 2.2],
+    [-4.4, -3.4],
+    [4.4, -3.4],
+    [-4.4, 3.6],
+    [4.4, 3.6],
   ];
   柱位置.forEach(([px, pz]) => {
-    group.add(メッシュ(支柱, p.木材, [px, 1.15, pz]));
+    group.add(メッシュ(支柱, p.木材, [px, 1.35, pz]));
   });
-  const roof = メッシュ(ジオメトリ(new THREE.ConeGeometry(4.4, 1.75, 4)), 天幕, [0, 3.1, 0]);
+  const roof = メッシュ(ジオメトリ(new THREE.ConeGeometry(6.4, 2.2, 4)), 天幕, [0, 3.8, 0]);
   roof.rotation.y = Math.PI / 4;
   group.add(roof);
-  group.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.11, 10, 8)), p.木材, [0, 4.02, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(5.95, 0.09, 0.09)), p.濃木材, [0, 2.28, -2.2]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(5.95, 0.09, 0.09)), p.濃木材, [0, 2.28, 2.2]));
+  group.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.13, 10, 8)), p.木材, [0, 4.98, 0]));
+  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(8.95, 0.1, 0.1)), p.濃木材, [0, 2.68, -3.4]));
+  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(8.95, 0.1, 0.1)), p.濃木材, [0, 2.68, 3.6]));
   scene.add(group);
 };
 
@@ -559,28 +544,31 @@ const 雑談スペースを作る = (x: number, z: number, color: number) => {
   const 傘布 = マテリアル(color, { roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
 
   // 丸テーブルとパラソル
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(1.15, 1.15, 0.12, 28)), p.木材, [0, 0.78, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.12, 0.16, 0.78, 12)), p.濃木材, [0, 0.39, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.05, 0.05, 2.5, 8)), p.木材, [0, 1.25, 0]));
-  const 傘 = メッシュ(ジオメトリ(new THREE.ConeGeometry(1.55, 1.0, 10)), 傘布, [0, 2.36, 0]);
+  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(1.6, 1.6, 0.12, 28)), p.木材, [0, 0.78, 0]));
+  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.14, 0.18, 0.78, 12)), p.濃木材, [0, 0.39, 0]));
+  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.055, 0.055, 3.0, 8)), p.木材, [0, 1.5, 0]));
+  const 傘 = メッシュ(ジオメトリ(new THREE.ConeGeometry(2.3, 1.2, 10)), 傘布, [0, 2.86, 0]);
   group.add(傘);
-  group.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.08, 10, 8)), p.木材, [0, 2.92, 0]));
+  group.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.09, 10, 8)), p.木材, [0, 3.52, 0]));
 
-  // 丸太スツール
+  // 丸太スツール（要員の立ち位置の内側に並べる）
   const 丸太 = ジオメトリ(new THREE.CylinderGeometry(0.3, 0.32, 0.48, 12));
   [
-    [-1.75, -0.6],
-    [1.75, -0.6],
-    [-1.75, 0.9],
-    [1.75, 0.9],
+    [-2.5, -1.1],
+    [2.5, -1.1],
+    [-2.5, 1.6],
+    [2.5, 1.6],
+    [0, -2.7],
+    [0, 3.0],
   ].forEach(([sx, sz]) => {
     group.add(メッシュ(丸太, p.濃木材, [sx, 0.24, sz]));
   });
 
-  // マグカップ 2 つ
+  // マグカップ 3 つ
   const カップ = ジオメトリ(new THREE.CylinderGeometry(0.09, 0.08, 0.16, 10));
-  group.add(メッシュ(カップ, p.布材, [-0.35, 0.92, 0.18]));
-  group.add(メッシュ(カップ, p.布材, [0.38, 0.92, -0.12]));
+  group.add(メッシュ(カップ, p.布材, [-0.5, 0.92, 0.3]));
+  group.add(メッシュ(カップ, p.布材, [0.55, 0.92, -0.18]));
+  group.add(メッシュ(カップ, p.布材, [0.1, 0.92, 0.72]));
   scene.add(group);
 };
 
@@ -666,16 +654,12 @@ const ハンモックを作る = (x: number, z: number) => {
   scene.add(group);
 };
 
-const 焚き火を作る = (x: number, z: number) => {
+// 炎は出さず、石で囲った薪だけを置く（焚き火跡）
+const 焚き火跡を作る = (x: number, z: number) => {
   if (!scene) return;
   const p = 部品を用意();
   const group = new THREE.Group();
   group.position.set(x, 0, z);
-  const 炎材 = マテリアル(0xffb347, {
-    emissive: 0xff7b32,
-    emissiveIntensity: 1.35,
-    roughness: 0.4,
-  });
   for (let index = 0; index < 7; index += 1) {
     const 角度 = (index / 7) * Math.PI * 2;
     const rock = new THREE.Mesh(p.石, p.石材);
@@ -690,10 +674,6 @@ const 焚き火を作る = (x: number, z: number) => {
     log.rotation.set(Math.PI / 2.4, (index / 3) * Math.PI, 0);
     group.add(log);
   }
-  const flame = メッシュ(ジオメトリ(new THREE.ConeGeometry(0.3, 0.72, 8)), 炎材, [0, 0.52, 0]);
-  flame.name = 'flame';
-  group.add(flame);
-  炎一覧.push(flame);
   scene.add(group);
 };
 
@@ -779,37 +759,6 @@ const 柵を作る = (x: number, z: number, rotation = 0, 本数 = 4) => {
   scene.add(group);
 };
 
-const 蝶を作る = (x: number, z: number, 色: number, seed = 6) => {
-  if (!scene) return;
-  const 乱数 = 乱数を作る(seed);
-  const 翼材 = new THREE.MeshStandardMaterial({
-    color: 色,
-    roughness: 0.6,
-    metalness: 0.0,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.92,
-  });
-  破棄対象.push(翼材);
-  const 翼形 = ジオメトリ(new THREE.CircleGeometry(0.16, 8, 0, Math.PI));
-  const group = new THREE.Group();
-  const 左 = new THREE.Mesh(翼形, 翼材);
-  const 右 = new THREE.Mesh(翼形, 翼材);
-  左.rotation.set(-Math.PI / 2, 0, 0);
-  右.rotation.set(-Math.PI / 2, 0, Math.PI);
-  group.add(左, 右);
-  group.position.set(x, 1.5, z);
-  scene.add(group);
-  蝶一覧.push({
-    group: markRaw(group),
-    中心: new THREE.Vector3(x, 1.5, z),
-    半径: 1.6 + 乱数() * 2.2,
-    速さ: 0.5 + 乱数() * 0.5,
-    位相: 乱数() * Math.PI * 2,
-    翼: [左, 右],
-  });
-};
-
 const 地面パッチを作る = (
   x: number,
   z: number,
@@ -830,9 +779,17 @@ const 地面パッチを作る = (
 
   if (種類 === 'デッキ') {
     const 板 = マテリアル(0x9c6a3c, { roughness: 0.88, metalness: 0.02 });
-    const 板形 = ジオメトリ(new THREE.BoxGeometry(radius * 1.92, 0.02, 0.07));
-    for (let index = -3; index <= 3; index += 1) {
-      const plank = メッシュ(板形, 板, [x, 0.095, z + index * (radius / 4)]);
+    // 板の長さを円の弦から求め、丸いデッキの継ぎ目に見えるようにする
+    const 本数 = 6;
+    const 間隔 = radius / (本数 + 1);
+    for (let index = -本数; index <= 本数; index += 1) {
+      const オフセット = index * 間隔;
+      const 長さ = Math.sqrt(Math.max(radius * radius - オフセット * オフセット, 0)) * 1.94;
+      const plank = メッシュ(
+        ジオメトリ(new THREE.BoxGeometry(長さ, 0.02, 0.07)),
+        板,
+        [x, 0.095, z + オフセット],
+      );
       plank.castShadow = false;
       scene.add(plank);
     }
@@ -853,6 +810,137 @@ const 地面パッチを作る = (
   ring.rotation.x = -Math.PI / 2;
   ring.castShadow = false;
   scene.add(ring);
+};
+
+// チーム目標のテキストを大きな板に描く（神の声のように読ませたいので余白と行間を広く取る）
+const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  const 目標 = props.チーム目標;
+  const 本文 = String(目標?.チーム目標 ?? '').trim() || 'チーム目標が未登録です';
+  const パス = String(目標?.CODE_BASE_PATH ?? '').trim();
+  const 更新 = String(目標?.更新日時 ?? '').trim();
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  const 背景 = context.createLinearGradient(0, 0, 0, canvas.height);
+  背景.addColorStop(0, '#fffdf0');
+  背景.addColorStop(1, '#e3f0e2');
+  context.fillStyle = 背景;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = 'rgba(120, 160, 120, 0.55)';
+  context.lineWidth = 10;
+  context.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+  context.fillStyle = 'rgba(96, 150, 108, 0.9)';
+  context.fillRect(0, 0, canvas.width, 12);
+  context.fillRect(0, canvas.height - 12, canvas.width, 12);
+
+  context.textBaseline = 'alphabetic';
+  context.font = '700 40px "Yu Gothic", "Meiryo", sans-serif';
+  context.fillStyle = '#4a7c59';
+  context.fillText('TEAM GOAL  /  チーム目標', 60, 78);
+  if (パス) {
+    context.font = '600 34px "Yu Gothic", "Meiryo", sans-serif';
+    context.fillStyle = '#7a6a3c';
+    context.textAlign = 'right';
+    context.fillText(パス, canvas.width - 60, 78);
+    context.textAlign = 'left';
+  }
+  context.fillStyle = 'rgba(120, 160, 120, 0.45)';
+  context.fillRect(60, 100, canvas.width - 120, 3);
+
+  // 本文は板幅に合わせて折り返す（最大 4 行。溢れたら末尾を … にする）
+  context.font = '700 66px "Yu Gothic", "Meiryo", sans-serif';
+  context.fillStyle = '#2f3a2f';
+  const 最大幅 = canvas.width - 130;
+  const 行: string[] = [];
+  本文.split(/\r?\n/).forEach((段落) => {
+    let 現在行 = '';
+    Array.from(段落).forEach((文字) => {
+      const 候補 = 現在行 + 文字;
+      if (context.measureText(候補).width > 最大幅 && 現在行) {
+        行.push(現在行);
+        現在行 = 文字;
+      } else {
+        現在行 = 候補;
+      }
+    });
+    行.push(現在行);
+  });
+  const 最大行数 = 4;
+  const 表示行 = 行.slice(0, 最大行数);
+  if (行.length > 最大行数 && 表示行.length > 0) {
+    表示行[表示行.length - 1] = `${表示行[表示行.length - 1].slice(0, -1)}…`;
+  }
+  // 本文の描画域は y=130〜470（下の最終更新行に重ならない範囲）
+  const 行高 = 84;
+  const 開始Y = 130 + (最大行数 - 表示行.length) * (行高 / 2) + 行高 * 0.72;
+  表示行.forEach((行文字, index) => {
+    context.fillText(行文字, 65, 開始Y + index * 行高);
+  });
+
+  context.font = '600 30px "Yu Gothic", "Meiryo", sans-serif';
+  context.fillStyle = 'rgba(90, 110, 90, 0.8)';
+  context.fillText(更新 ? `最終更新 ${更新}` : 'クリックで保守', 62, canvas.height - 34);
+  context.textAlign = 'right';
+  context.fillText('クリックで保守', canvas.width - 62, canvas.height - 34);
+  context.textAlign = 'left';
+};
+
+const 目標掲示板を作る = () => {
+  if (!scene) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1536;
+  canvas.height = 544;
+  目標テクスチャへ描く(canvas);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  破棄テクスチャ.push(texture);
+  目標テクスチャ = texture;
+  目標テクスチャ.userData.canvas = canvas;
+
+  const group = new THREE.Group();
+  // 初期位置は飛行船が最初の更新で上書きする
+  group.position.set(0, 10, 0);
+  group.name = 'team-goal-board';
+
+  const 板材 = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
+  破棄対象.push(板材);
+  const 板 = new THREE.Mesh(
+    ジオメトリ(new THREE.PlaneGeometry(目標掲示板幅, 目標掲示板縦)),
+    板材,
+  );
+  板.name = 'team-goal-panel';
+  板.userData.目標掲示板 = true;
+  group.add(板);
+  目標掲示板.板 = 板;
+
+  // 光の縁取り（神の声らしさ）
+  const 縁材 = new THREE.MeshBasicMaterial({
+    color: 0xfff6d0,
+    transparent: true,
+    opacity: 0.42,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  破棄対象.push(縁材);
+  const 縁 = new THREE.Mesh(
+    ジオメトリ(new THREE.PlaneGeometry(目標掲示板幅 + 0.7, 目標掲示板縦 + 0.7)),
+    縁材,
+  );
+  縁.position.z = -0.05;
+  group.add(縁);
+  目標掲示板.縁 = 縁;
+
+  scene.add(group);
+  目標掲示板.group = group;
+};
+
+const 目標掲示板を更新 = () => {
+  const canvas = 目標テクスチャ?.userData.canvas as HTMLCanvasElement | undefined;
+  if (!目標テクスチャ || !canvas) return;
+  目標テクスチャへ描く(canvas);
+  目標テクスチャ.needsUpdate = true;
 };
 
 const 掲示板を作る = (
@@ -1069,11 +1157,11 @@ const シーンを作る = () => {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fd4ea);
   // 遠景の丘がうっすら霞むように、空色寄りのフォグを薄くかける
-  scene.fog = new THREE.Fog(0xcfe8ee, 46, 96);
+  scene.fog = new THREE.Fog(0xcfe8ee, 74, 146);
 
   camera = new THREE.PerspectiveCamera(42, 1, 0.1, 220);
   // 空と稜線が見える低めの視点から始める
-  camera.position.set(17, 10.5, 17);
+  camera.position.set(30, 18, 30);
 
   renderer = new THREE.WebGLRenderer({
     canvas: canvasRef.value,
@@ -1092,8 +1180,8 @@ const シーンを作る = () => {
   controls.enableDamping = true;
   controls.dampingFactor = 0.075;
   controls.enablePan = false;
-  controls.minDistance = 10;
-  controls.maxDistance = 42;
+  controls.minDistance = 12;
+  controls.maxDistance = 78;
   controls.minPolarAngle = 0.28;
   controls.maxPolarAngle = Math.PI / 2.22;
   controls.target.set(0, 1.5, 0);
@@ -1102,18 +1190,18 @@ const シーンを作る = () => {
   // 昼の草原の光（空色の環境光 + 温かい太陽光）
   scene.add(new THREE.HemisphereLight(0xdff1ff, 0x6f9c52, 1.15));
   const keyLight = new THREE.DirectionalLight(0xfff3d6, 2.5);
-  keyLight.position.set(-16, 20, -12);
+  keyLight.position.set(-24, 30, -18);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(2048, 2048);
-  keyLight.shadow.camera.left = -20;
-  keyLight.shadow.camera.right = 20;
-  keyLight.shadow.camera.top = 20;
-  keyLight.shadow.camera.bottom = -20;
-  keyLight.shadow.camera.far = 70;
+  keyLight.shadow.camera.left = -32;
+  keyLight.shadow.camera.right = 32;
+  keyLight.shadow.camera.top = 32;
+  keyLight.shadow.camera.bottom = -32;
+  keyLight.shadow.camera.far = 110;
   keyLight.shadow.normalBias = 0.02;
   scene.add(keyLight);
   const fillLight = new THREE.DirectionalLight(0xd7ecff, 0.5);
-  fillLight.position.set(12, 9, 14);
+  fillLight.position.set(18, 14, 21);
   scene.add(fillLight);
 
   空を作る();
@@ -1121,7 +1209,6 @@ const シーンを作る = () => {
   小道を作る();
 
   // 4エリアはグリッド座標から中心を求めて、草原の地面パッチとして配置する
-  const 台座半径 = セルサイズ / 2 - 0.7;
   const パッチ種類: Record<エリアキー, '芝' | 'デッキ' | '砂利' | '石畳'> = {
     仕事: 'デッキ',
     雑談: '砂利',
@@ -1134,90 +1221,162 @@ const シーンを作る = () => {
   });
 
   {
-    // 仕事エリア: 日除けテントの下に机を並べる
+    // 仕事エリア: 日除けテントの下に、座席位置と同じ並びで机を置く
     const [cx, cz] = エリア中心('仕事');
     作業テントを作る(cx, cz, エリア座標.仕事.色);
-    作業机を作る(cx - 2.1, cz - 1.6, 0);
-    作業机を作る(cx - 2.1, cz + 1.6, 0);
-    作業机を作る(cx + 2.1, cz - 1.6, 0);
-    作業机を作る(cx + 2.1, cz + 1.6, 0);
-    茂みを作る(cx + 3.6, cz + 3.4, 1, 101);
-    花畑を作る(cx - 3.6, cz + 3.4, 1.2, 8, 102);
+    座席オフセット.forEach(([ox, oz]) => {
+      作業机を作る(cx + ox, cz + oz - 0.1, 0);
+    });
+    茂みを作る(cx + 5.4, cz + 5.0, 1, 101);
+    花畑を作る(cx - 5.4, cz + 5.0, 1.6, 12, 102);
+    石を置く(cx - 5.6, cz - 4.8, 0.95, 103);
   }
   {
     // 雑談エリア: パラソル付きの丸テーブルと丸太スツール
     const [cx, cz] = エリア中心('雑談');
     雑談スペースを作る(cx, cz, エリア座標.雑談.色);
-    木を作る(cx - 3.5, cz + 3.2, 1.05, 111);
-    茂みを作る(cx + 3.5, cz - 3.3, 0.95, 112);
-    花畑を作る(cx + 3.2, cz + 3.2, 1.4, 10, 113);
+    木を作る(cx - 5.2, cz + 4.8, 1.05, 111);
+    茂みを作る(cx + 5.3, cz - 4.9, 0.95, 112);
+    花畑を作る(cx + 5.0, cz + 5.0, 1.8, 14, 113);
+    ベンチを作る(cx - 5.4, cz - 1.2, Math.PI / 2);
   }
   {
     // 瞑想エリア: 石畳の座と灯籠、静かな小石まわり
     const [cx, cz] = エリア中心('瞑想');
-    瞑想スペースを作る(cx - 1.6, cz, 121);
-    瞑想スペースを作る(cx + 1.6, cz, 122);
-    石灯籠を作る(cx, cz - 3.1);
-    石灯籠を作る(cx, cz + 3.1);
-    石を置く(cx + 3.4, cz + 3.2, 1.15, 123);
-    茂みを作る(cx - 3.5, cz - 3.3, 0.9, 124);
+    瞑想スペースを作る(cx - 2.9, cz - 0.6, 121);
+    瞑想スペースを作る(cx + 2.9, cz - 0.6, 122);
+    瞑想スペースを作る(cx, cz + 3.4, 123);
+    石灯籠を作る(cx - 5.2, cz - 4.4);
+    石灯籠を作る(cx + 5.2, cz - 4.4);
+    石灯籠を作る(cx, cz - 5.4);
+    石を置く(cx + 5.2, cz + 4.6, 1.15, 124);
+    茂みを作る(cx - 5.3, cz + 4.7, 0.9, 125);
   }
   {
     // 休憩エリア: ハンモック・ベンチ・焚き火
     const [cx, cz] = エリア中心('休憩');
-    ハンモックを作る(cx, cz - 1.35);
-    ベンチを作る(cx - 3.2, cz - 0.3, Math.PI / 2);
-    ベンチを作る(cx + 3.2, cz - 0.3, -Math.PI / 2);
-    焚き火を作る(cx, cz + 1.5);
-    木を作る(cx + 4.2, cz + 4.0, 1.05, 131);
-    花畑を作る(cx - 3.4, cz - 3.4, 1.3, 9, 132);
+    ハンモックを作る(cx, cz - 2.2);
+    ベンチを作る(cx - 5.0, cz - 0.4, Math.PI / 2);
+    ベンチを作る(cx + 5.0, cz - 0.4, -Math.PI / 2);
+    ベンチを作る(cx - 1.9, cz + 5.2, Math.PI);
+    焚き火跡を作る(cx, cz + 2.0);
+    木を作る(cx + 5.4, cz + 5.2, 1.05, 131);
+    花畑を作る(cx - 5.2, cz - 5.0, 1.7, 12, 132);
   }
 
   // 4エリアの外周に木立・茂み・花・石を散らして「草原の中にいる」感じを作る
   {
     const 乱数 = 乱数を作る(50607);
-    const 内側 = グリッド間隔 * 0.86;
-    // 案内板の手前に木を置くと文字が隠れるため、板の周囲は木立を避ける
-    const 案内板位置 = (Object.keys(エリア座標) as エリアキー[]).map((key) => {
-      const [cx, cz] = エリア中心(key);
-      const 北側 = key === '仕事' || key === '瞑想';
-      return [cx, cz + (北側 ? -1 : 1) * (セルサイズ / 2 + 3.5)] as [number, number];
-    });
-    const 板に近い = (x: number, z: number) =>
-      案内板位置.some(([bx, bz]) => Math.hypot(x - bx, z - bz) < 4.6);
-    for (let index = 0; index < 30; index += 1) {
-      const 角度 = (index / 30) * Math.PI * 2 + 乱数() * 0.22;
-      const 距離 = 内側 + 4.8 + 乱数() * 13;
+    // 斜め方向はエリア中心が最も遠いので、その外周（対角の中心距離 + 台座半径）を基準に散らす
+    const 内側 = (グリッド間隔 / 2) * Math.SQRT2 + 台座半径;
+    const エリア中心一覧 = (Object.keys(エリア座標) as エリアキー[]).map((key) => エリア中心(key));
+    // エリアの円の中に小物が乗らないようにする
+    const エリア内 = (x: number, z: number) =>
+      エリア中心一覧.some(([cx, cz]) => Math.hypot(x - cx, z - cz) < 台座半径 + 1);
+    const 池位置: [number, number, number][] = [
+      [-4, 33, 3.4],
+      [31, 5, 2.6],
+    ];
+    // 案内板や池の手前に木を置くと隠れてしまうため、その周囲は木立を避ける
+    const 避ける位置: [number, number, number][] = [
+      ...(Object.keys(エリア座標) as エリアキー[]).map((key) => {
+        const [cx, cz] = エリア中心(key);
+        const 北側 = key === '仕事' || key === '瞑想';
+        return [cx, cz + (北側 ? -1 : 1) * 掲示板オフセット, 5.2] as [number, number, number];
+      }),
+      ...池位置.map(([px, pz, pr]) => [px, pz, pr + 2.6] as [number, number, number]),
+    ];
+    const 近すぎる = (x: number, z: number) =>
+      避ける位置.some(([ax, az, ar]) => Math.hypot(x - ax, z - az) < ar);
+    for (let index = 0; index < 44; index += 1) {
+      const 角度 = (index / 44) * Math.PI * 2 + 乱数() * 0.16;
+      const 距離 = 内側 + 1.5 + 乱数() * 21;
       const x = Math.cos(角度) * 距離;
       const z = Math.sin(角度) * 距離;
+      if (エリア内(x, z)) continue;
       const 種 = 乱数();
       if (種 > 0.52) {
-        if (板に近い(x, z)) 花畑を作る(x, z, 1.5, 10, 400 + index);
+        if (近すぎる(x, z)) 花畑を作る(x, z, 1.8, 12, 400 + index);
         else 木を作る(x, z, 1.05 + 乱数() * 0.85, 200 + index);
       } else if (種 > 0.3) 茂みを作る(x, z, 0.85 + 乱数() * 0.7, 300 + index);
-      else if (種 > 0.14) 花畑を作る(x, z, 1.5 + 乱数(), 10 + Math.floor(乱数() * 8), 400 + index);
+      else if (種 > 0.14) 花畑を作る(x, z, 1.6 + 乱数(), 10 + Math.floor(乱数() * 8), 400 + index);
       else 石を置く(x, z, 0.9 + 乱数() * 0.9, 500 + index);
     }
-    // 通路の四隅寄りにも小さな彩りを置く
-    for (let index = 0; index < 8; index += 1) {
-      const 角度 = (index / 8) * Math.PI * 2 + 0.4;
-      const 距離 = 内側 * 0.72;
-      花畑を作る(Math.cos(角度) * 距離, Math.sin(角度) * 距離, 0.9, 6, 600 + index);
+    // 十字の通路沿い（エリアの間）にも小さな彩りを置く
+    for (let index = 0; index < 16; index += 1) {
+      const 軸 = index % 4;
+      const 段 = Math.floor(index / 4);
+      const 距離 = 8 + 段 * 4.6;
+      const 横 = (段 % 2 === 0 ? 1 : -1) * (通路幅 / 2 + 1.7);
+      const [x, z] =
+        軸 === 0 ? [距離, 横] : 軸 === 1 ? [-距離, 横] : 軸 === 2 ? [横, 距離] : [横, -距離];
+      if (エリア内(x, z)) continue;
+      花畑を作る(x, z, 1.1, 8, 600 + index);
     }
-    蝶を作る(-2.4, 2.8, 0xfff0a0, 701);
-    蝶を作る(3.2, -3.4, 0xffc0dd, 702);
-    蝶を作る(0.6, 6.4, 0xc8f0ff, 703);
-
     // 4本の小道が交わる中心に道標、草原には池と柵を置いて風景に変化を付ける
     道標を作る(0, 0);
-    池を作る(-15.5, -13.5, 2.6, 901);
-    池を作る(16.5, 12.5, 1.9, 902);
-    柵を作る(-20, 4.5, Math.PI / 2, 5);
-    柵を作る(19, -7.5, Math.PI / 2.4, 4);
-    柵を作る(-6, 20, 0.15, 5);
+    目標掲示板を作る();
+    池位置.forEach(([px, pz, pr], index) => 池を作る(px, pz, pr, 901 + index));
+    柵を作る(-34, 8, Math.PI / 2, 6);
+    柵を作る(32, -14, Math.PI / 2.4, 5);
+    柵を作る(-11, 34, 0.15, 6);
+
+    // --- NPC（ネコ・イヌ・雲・蝶）---
+    // 池は避けて歩くよう禁止円として渡す
+    const NPC禁止円 = 池位置.map(
+      ([px, pz, pr]) => [px, pz, pr + 1.2] as [number, number, number],
+    );
+    // 飛行船は 4 エリアの上空を旋回し、チーム目標の掲示板を吊り下げて運ぶ
+    NPC一覧.push(
+      NPCを配置(
+        scene,
+        '飛行船',
+        NPC造形ヘルパー,
+        { 位置: new THREE.Vector3(0, 0, 0), 種: 851 },
+        { 吊り下げ物: 目標掲示板.group },
+      ),
+      NPCを配置(scene, 'ネコ', NPC造形ヘルパー, {
+        位置: new THREE.Vector3(-6.5, 0, 5.5),
+        禁止円: NPC禁止円,
+      }),
+      NPCを配置(scene, 'イヌ', NPC造形ヘルパー, {
+        位置: new THREE.Vector3(7.5, 0, -5),
+        禁止円: NPC禁止円,
+      }),
+    );
+    [
+      [-5, 6, 0xfff0a0],
+      [6.5, -7, 0xffc0dd],
+      [1.5, 13, 0xc8f0ff],
+      [-13, -2, 0xd8ffc0],
+    ].forEach(([bx, bz, 色], index) => {
+      NPC一覧.push(
+        NPCを配置(
+          scene!,
+          '蝶',
+          NPC造形ヘルパー,
+          { 位置: new THREE.Vector3(bx, 1.5, bz), 種: 701 + index },
+          { 色 },
+        ),
+      );
+    });
+    const 雲乱数 = 乱数を作る(20260725);
+    for (let index = 0; index < 9; index += 1) {
+      const 角度 = (index / 9) * Math.PI * 2 + 雲乱数() * 0.5;
+      const 距離 = 48 + 雲乱数() * 32;
+      NPC一覧.push(
+        NPCを配置(scene, '雲', NPC造形ヘルパー, {
+          位置: new THREE.Vector3(
+            Math.cos(角度) * 距離,
+            21 + 雲乱数() * 12,
+            Math.sin(角度) * 距離,
+          ),
+          種: 801 + index,
+        }),
+      );
+    }
   }
 
-  const 掲示板オフセット = セルサイズ / 2 + 3.5;
   {
     const [cx, cz] = エリア中心('仕事');
     掲示板を作る(
@@ -1309,7 +1468,7 @@ const 描画 = (時刻: number) => {
   if (!renderer || !scene || !camera) return;
   const rawDelta = Math.min((時刻 - 前フレーム時刻) / 1000, 0.05);
   前フレーム時刻 = 時刻;
-  const delta = シミュレーション中.value ? rawDelta * 速度倍率.value : 0;
+  const delta = rawDelta * 経過速度倍率;
   経過時間 += delta;
 
   エージェント一覧.value.forEach((agent, index) => {
@@ -1370,32 +1529,19 @@ const 描画 = (時刻: number) => {
     board.position.y = 掲示板高さ + Math.sin(時刻 * 0.0012 + index * 1.8) * 0.07;
     掲示板注視点.set(camera!.position.x, board.position.y, camera!.position.z);
     board.lookAt(掲示板注視点);
-    const scale = THREE.MathUtils.clamp(board.position.distanceTo(camera!.position) / 30, 0.85, 1.12);
+    const scale = THREE.MathUtils.clamp(board.position.distanceTo(camera!.position) / 46, 0.85, 1.15);
     board.scale.setScalar(scale);
   });
 
-  // 雲はゆっくり流れ、端まで来たら反対側へ戻す
-  雲一覧.forEach((cloud, index) => {
-    cloud.position.x += delta * (0.35 + (index % 4) * 0.12);
-    if (cloud.position.x > 58) cloud.position.x = -58;
-  });
-  炎一覧.forEach((flame, index) => {
-    const 揺れ = Math.sin(時刻 * 0.011 + index * 1.4);
-    flame.scale.set(0.9 + 揺れ * 0.12, 1 + 揺れ * 0.22, 0.9 + 揺れ * 0.12);
-    flame.rotation.y += rawDelta * 1.6;
-  });
-  蝶一覧.forEach((butterfly, index) => {
-    const t = 経過時間 * butterfly.速さ + butterfly.位相;
-    butterfly.group.position.set(
-      butterfly.中心.x + Math.cos(t) * butterfly.半径,
-      butterfly.中心.y + Math.sin(t * 1.7) * 0.45,
-      butterfly.中心.z + Math.sin(t) * butterfly.半径,
-    );
-    butterfly.group.rotation.y = -t;
-    const 羽ばたき = Math.sin(時刻 * 0.02 + index) * 0.9;
-    butterfly.翼[0].rotation.y = 羽ばたき;
-    butterfly.翼[1].rotation.y = -羽ばたき;
-  });
+  // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
+  if (目標掲示板.縁) {
+    const 縁材 = 目標掲示板.縁.material as THREE.MeshBasicMaterial;
+    const 目標値 = 目標ホバー.value ? 0.85 : 0.34 + (Math.sin(時刻 * 0.0016) + 1) * 0.06;
+    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 0.12);
+  }
+
+  // NPC（ネコ・イヌ・雲・蝶）はそれぞれの動作モジュールが自分で動く
+  NPC群を更新(NPC一覧, { 経過時間, delta, 時刻, camera: camera! });
   ラベル位置を更新();
   renderer.render(scene, camera);
   animationId = requestAnimationFrame(描画);
@@ -1435,19 +1581,38 @@ const エージェントIDをヒットテスト = (clientX: number, clientY: num
   return hits[0]?.object.userData.agentId as string | undefined;
 };
 
+const 目標掲示板をヒットテスト = (clientX: number, clientY: number) => {
+  if (!renderer || !camera || !目標掲示板.板) return false;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  return raycaster.intersectObject(目標掲示板.板, false).length > 0;
+};
+
 const キャンバスクリック = (event: MouseEvent) => {
+  if (目標掲示板をヒットテスト(event.clientX, event.clientY)) {
+    emit('目標クリック');
+    return;
+  }
   const id = エージェントIDをヒットテスト(event.clientX, event.clientY);
   if (id) emit('select', id);
 };
 
 const キャンバスポインター移動 = (event: PointerEvent) => {
-  const id = エージェントIDをヒットテスト(event.clientX, event.clientY) ?? '';
+  目標ホバー.value = 目標掲示板をヒットテスト(event.clientX, event.clientY);
+  const id = 目標ホバー.value
+    ? ''
+    : エージェントIDをヒットテスト(event.clientX, event.clientY) ?? '';
   ホバー中ID.value = id;
-  if (renderer) renderer.domElement.style.cursor = id ? 'pointer' : 'grab';
+  if (renderer) {
+    renderer.domElement.style.cursor = 目標ホバー.value || id ? 'pointer' : 'grab';
+  }
 };
 
 const キャンバスポインター離脱 = () => {
   ホバー中ID.value = '';
+  目標ホバー.value = false;
   if (renderer) renderer.domElement.style.cursor = 'grab';
 };
 
@@ -1457,7 +1622,7 @@ const エージェントを選択 = (id: string) => {
 
 const カメラを戻す = () => {
   if (!camera || !controls) return;
-  camera.position.set(17, 10.5, 17);
+  camera.position.set(30, 18, 30);
   controls.target.set(0, 1.5, 0);
   controls.update();
 };
@@ -1466,6 +1631,11 @@ watch(
   () => props.エージェント一覧.map((agent) => agent.id).join('|'),
   () => エージェント表示を同期(),
   { flush: 'post' },
+);
+
+watch(
+  () => [props.チーム目標?.CODE_BASE_PATH, props.チーム目標?.チーム目標, props.チーム目標?.更新日時],
+  () => 目標掲示板を更新(),
 );
 
 onMounted(() => {
@@ -1482,9 +1652,11 @@ onBeforeUnmount(() => {
   破棄テクスチャ.forEach((texture) => texture.dispose());
   実行状態一覧.clear();
   掲示板一覧.length = 0;
-  雲一覧.length = 0;
-  炎一覧.length = 0;
-  蝶一覧.length = 0;
+  目標掲示板.group = null;
+  目標掲示板.板 = null;
+  目標掲示板.縁 = null;
+  目標テクスチャ = null;
+  NPC一覧.length = 0;
   部品 = null;
   ラベル要素.clear();
   scene = null;
@@ -1557,29 +1729,6 @@ onBeforeUnmount(() => {
       <span><b>DRAG</b> 360° 回転</span>
       <span><b>WHEEL</b> ズーム</span>
       <button type="button" @click="カメラを戻す">視点を戻す</button>
-    </div>
-
-    <div class="scene-controls">
-      <button
-        type="button"
-        class="play-button"
-        :aria-label="シミュレーション中 ? '一時停止' : '再開'"
-        @click="シミュレーション中 = !シミュレーション中"
-      >
-        {{ シミュレーション中 ? 'Ⅱ' : '▶' }}
-      </button>
-      <div class="speed-control">
-        <span>時間速度</span>
-        <input
-          v-model.number="速度倍率"
-          type="range"
-          min="0.4"
-          max="2"
-          step="0.2"
-          aria-label="エージェントの移動速度"
-        />
-        <b>{{ 速度倍率.toFixed(1) }}×</b>
-      </div>
     </div>
   </main>
 </template>
@@ -1795,44 +1944,6 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-size: 8px;
 }
-
-.scene-controls {
-  position: absolute;
-  bottom: 16px;
-  left: 18px;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  border: 1px solid rgba(196, 231, 200, 0.2);
-  border-radius: 9px;
-  background: rgba(16, 40, 27, 0.62);
-}
-
-.play-button {
-  width: 25px;
-  height: 25px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 6px;
-  color: #9aeed2;
-  background: rgba(76, 213, 164, 0.13);
-  cursor: pointer;
-}
-
-.speed-control {
-  display: grid;
-  grid-template-columns: auto 70px 28px;
-  align-items: center;
-  gap: 7px;
-  color: #b9d5bf;
-  font-size: 8px;
-}
-
-.speed-control input { width: 70px; margin: 0; accent-color: #8ddc7a; }
-.speed-control b { color: #e6f4e4; font-size: 8px; }
 
 @media (max-width: 760px) {
   .scene-stage { min-height: 520px; order: 1; }

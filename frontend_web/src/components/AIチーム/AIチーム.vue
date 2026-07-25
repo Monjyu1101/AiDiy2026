@@ -4,9 +4,12 @@ import apiClient from '../../api/client';
 import AiTeamMembers from './components/AIチーム_要員状況.vue';
 import AiTeamViewer from './components/AIチーム_空間表示.vue';
 import AiTeamWorkList from './components/AIチーム_作業一覧.vue';
+import AiTeamExpList from './components/AIチーム_経験一覧.vue';
+import AiTeamGoalEdit from './dialog/AIチーム_目標編集.vue';
 import {
   type エージェント,
   type エージェント状態,
+  type チーム目標,
   type チーム要員,
   type 稼働要員,
   状態情報,
@@ -36,6 +39,9 @@ const 要員読込中 = ref(false);
 const 要員読込エラー = ref('');
 const 召喚中 = ref(false);
 const 排除中ID = ref('');
+// チーム空間の掲示板に出す「最終更新のチーム目標」と、その保守ダイアログ
+const チーム目標 = ref<チーム目標 | null>(null);
+const 目標編集表示 = ref(false);
 
 const 選択中エージェント = computed(
   () => エージェント一覧.value.find((agent) => agent.id === 選択中ID.value) ?? null,
@@ -149,7 +155,29 @@ const 状態を更新 = (
   agent.ひとこと = comment;
 };
 
-onMounted(要員一覧を読み込む);
+const チーム目標を読み込む = async () => {
+  try {
+    const response = await apiClient.post('/team/目標/最終', {});
+    if (response.data?.status !== 'OK') return;
+    const item = response.data.data?.item as チーム目標 | undefined;
+    チーム目標.value = item && item.CODE_BASE_PATH ? item : null;
+  } catch {
+    // 掲示板は表示だけなので、取得できないときは未登録扱いにする
+    チーム目標.value = null;
+  }
+};
+
+const 目標保存後 = (item: チーム目標) => {
+  チーム目標.value = item;
+};
+
+// 掲示板に出ているプロジェクト。経験一覧はこのパスの経験だけを表示する
+const 掲示板プロジェクト = computed(() => String(チーム目標.value?.CODE_BASE_PATH ?? ''));
+
+onMounted(() => {
+  void 要員一覧を読み込む();
+  void チーム目標を読み込む();
+});
 </script>
 
 <template>
@@ -181,12 +209,21 @@ onMounted(要員一覧を読み込む);
         :選択中ID="選択中ID"
         :要員読込中="要員読込中"
         :要員読込エラー="要員読込エラー"
+        :チーム目標="チーム目標"
         @select="選択中ID = $event"
         @retry="要員一覧を読み込む"
         @state-change="状態を更新"
+        @目標クリック="目標編集表示 = true"
       />
       <AiTeamWorkList />
+      <AiTeamExpList :プロジェクト="掲示板プロジェクト" />
     </div>
+
+    <AiTeamGoalEdit
+      :isOpen="目標編集表示"
+      @close="目標編集表示 = false"
+      @saved="目標保存後"
+    />
   </section>
 </template>
 
