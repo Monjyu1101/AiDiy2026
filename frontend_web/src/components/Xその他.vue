@@ -202,6 +202,16 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールsol_new/ゲーム?URLメニュー=／Xその他">
+            <div class="menu-card-title">
+              <span class="icon">進化</span>
+              Xピンボールsol 進化版
+            </div>
+            <div class="menu-card-description">
+              成功と失敗の軌道を記憶し、プレイするたび盤面が進化する改善版ネオンピンボール
+            </div>
+          </router-link>
+
         </div>
       </div>
     </div>

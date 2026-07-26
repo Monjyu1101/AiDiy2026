@@ -27,6 +27,8 @@ const {
   panelRef,
   位置,
   zIndex,
+  開いている,
+  開閉を切替,
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
@@ -145,6 +147,7 @@ onBeforeUnmount(() => {
   <aside
     ref="panelRef"
     class="pdca-panel"
+    :class="{ collapsed: !開いている }"
     :style="{ transform: `translate3d(${位置.x}px, ${位置.y}px, 0)`, zIndex }"
   >
     <div
@@ -155,16 +158,24 @@ onBeforeUnmount(() => {
       @pointerup="ドラッグ終了"
       @pointercancel="ドラッグ終了"
     >
+      <button
+        type="button"
+        class="collapse-toggle"
+        :title="開いている ? '閉じる' : '開く'"
+        :aria-expanded="開いている"
+        @pointerdown.stop
+        @click="開閉を切替"
+      >{{ 開いている ? '▼' : '▶' }}</button>
       <span class="panel-title">【改善ループ】</span>
       <span class="panel-count">{{ 改善一覧.length }}件</span>
       <span class="panel-total">実行中 {{ 実行中件数 }}</span>
     </div>
 
-    <div class="panel-project" :title="対象プロジェクト">
+    <div v-if="開いている" class="panel-project" :title="対象プロジェクト">
       {{ 対象プロジェクト || '（掲示板のプロジェクト未設定）' }}
     </div>
 
-    <div class="table-frame">
+    <div v-if="開いている" class="table-frame">
       <table>
         <thead>
           <tr>
@@ -221,12 +232,16 @@ onBeforeUnmount(() => {
 .pdca-panel {
   width: 470px;
   max-width: calc(100% - 24px);
-  max-height: calc(100% - 36px);
+  /* 画面縦幅の 50% までに収め、あふれる分は本体側で縦スクロールさせる。
+     縦の狭い画面では画面割合が置き場所（.workspace）を超えてしまうので、そちらも上限にする */
+  max-height: min(50vh, calc(100% - 36px));
   position: absolute;
   top: 0;
   left: 0;
   padding: 18px 14px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid rgba(93, 68, 168, 0.95);
   background: rgba(11, 24, 37, 0.94);
   box-shadow: 0 18px 45px rgba(2, 8, 14, 0.42);
@@ -244,6 +259,7 @@ onBeforeUnmount(() => {
 }
 
 .panel-header {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -256,6 +272,34 @@ onBeforeUnmount(() => {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 0 -1px 0 rgba(44, 24, 101, 0.3);
+}
+
+.collapse-toggle {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: -2px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* 閉じたときはタイトルバーだけを残す（本体側の余白を消す） */
+.pdca-panel.collapsed {
+  padding-bottom: 0;
+}
+
+.pdca-panel.collapsed .panel-header {
+  margin-bottom: 0;
 }
 
 .panel-title {
@@ -286,6 +330,7 @@ onBeforeUnmount(() => {
 }
 
 .panel-project {
+  flex: none;
   margin-bottom: 8px;
   overflow: hidden;
   color: #7bbbd0;
@@ -296,7 +341,9 @@ onBeforeUnmount(() => {
 }
 
 .table-frame {
-  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   border: 1px solid rgba(139, 206, 231, 0.12);
 }
 
@@ -461,7 +508,6 @@ td small {
 @media (max-width: 760px) {
   .pdca-panel {
     width: min(430px, calc(100% - 24px));
-    max-height: calc(100% - 24px);
   }
 }
 </style>

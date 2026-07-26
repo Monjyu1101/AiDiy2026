@@ -127,6 +127,8 @@ def 計画を投入(
 def main() -> int:
     setup_logging("sub_pdca_plan")
     logger = get_logger("team_sub_pdca_plan")
+    プロジェクト = ""
+    チーム目標 = ""
     try:
         if len(sys.argv) < 2:
             raise ValueError("使い方: python sub_pdca_plan.py <temp/pdca/入力JSON>")
@@ -151,8 +153,11 @@ def main() -> int:
         return 0 if 計画を投入(
             要員ID, プロジェクト, チーム目標, ループ, 成功一覧, logger
         ) else 1
-    except Exception:
+    except Exception as exc:
         logger.exception("改善ループ(P)の投入処理に失敗しました")
+        sub_pdca__common.投入失敗を記録(
+            "P", プロジェクト, チーム目標, f"投入処理エラー: {exc}", logger
+        )
         return 1
 
 

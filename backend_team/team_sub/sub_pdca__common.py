@@ -164,6 +164,26 @@ def 実行不能を記録(
     logger.warning(f"改善ループ({区分})は投入しませんでした: 改善ID={改善ID} 理由={理由}")
 
 
+def 投入失敗を記録(区分: str, プロジェクト: str, チーム目標: str, 理由: str, logger) -> None:
+    """投入処理そのものが例外で落ちたとき、終了済みレコードだけ残して次の段へ進めるようにする。
+
+    レコードを1件も残さないと、次の分の確認でまた同じ区分が投入され、同じ失敗を延々と
+    繰り返して改善ループが進まなくなる（team_watcher._改善ループ確認 は未終了レコードの
+    有無で次の段を決めるため）。
+    """
+    if not プロジェクト:
+        # プロジェクトが取れない＝入力JSONすら読めていない場合は記録先を決められない
+        logger.warning(f"改善ループ({区分})はプロジェクト不明のため失敗レコードを残せません")
+        return
+    try:
+        実行不能を記録(
+            区分, プロジェクト, チーム目標,
+            team_pdca_db.ループ最大値(プロジェクト), 理由, logger,
+        )
+    except Exception:
+        logger.exception(f"改善ループ({区分})の失敗レコード作成にも失敗しました")
+
+
 def 段を投入(
     区分: str,
     要員ID: str,
@@ -236,6 +256,8 @@ def 段を実行(区分: str, 前段区分: str, プロンプト生成: プロ�
     """
     setup_logging(ログ名)
     logger = get_logger(f"team_{ログ名}")
+    プロジェクト = ""
+    チーム目標 = ""
     try:
         if len(sys.argv) < 2:
             raise ValueError(f"使い方: python {ログ名}.py <temp/pdca/入力JSON>")
@@ -274,6 +296,7 @@ def 段を実行(区分: str, 前段区分: str, プロンプト生成: プロ�
         return 0 if 段を投入(
             区分, 要員ID, プロジェクト, チーム目標, ループ, 要求内容, logger
         ) else 1
-    except Exception:
+    except Exception as exc:
         logger.exception(f"改善ループ({区分})の投入処理に失敗しました")
+        投入失敗を記録(区分, プロジェクト, チーム目標, f"投入処理エラー: {exc}", logger)
         return 1

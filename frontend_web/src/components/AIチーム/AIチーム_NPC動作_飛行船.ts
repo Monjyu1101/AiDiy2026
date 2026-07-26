@@ -31,6 +31,16 @@ export type 飛行船設定 = {
   吊り下げ物: THREE.Object3D | null;
   /** 吊り下げ物を常にカメラへ向けるか（掲示板を読ませたいので既定 true） */
   吊り下げカメラ追従: boolean;
+  /** 船体の左右に入れる文字（空文字なら入れない） */
+  側面文字: string;
+  /** 側面文字の色 */
+  側面文字色: string;
+  /** 船体長に対する側面文字の横幅の割合 */
+  側面文字幅比: number;
+  /** 船体の上下半径に対する側面文字の高さの割合 */
+  側面文字高比: number;
+  /** 側面文字を船体中心からどれだけ上へずらすか（船体の上下半径に対する割合） */
+  側面文字上下位置: number;
 };
 
 export const 飛行船既定設定: 飛行船設定 = {
@@ -47,6 +57,75 @@ export const 飛行船既定設定: 飛行船設定 = {
   吊り下げ距離: 4.6,
   吊り下げ物: null,
   吊り下げカメラ追従: true,
+  側面文字: 'The voice of God.',
+  側面文字色: '#8b9298',
+  側面文字幅比: 0.5,
+  側面文字高比: 0.62,
+  側面文字上下位置: 0.16,
+};
+
+/** 側面文字のテクスチャ。背景は透明にして、文字だけを船体へ乗せる */
+const 側面文字テクスチャを作る = (
+  文字: string,
+  色: string,
+  縦横比: number,
+): THREE.CanvasTexture | null => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = Math.max(32, Math.round(1024 * 縦横比));
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  // 文字が横幅いっぱいに収まるまで字面を詰める（文字列を差し替えても溢れないようにする）
+  const 余白 = canvas.width * 0.04;
+  let 字高 = canvas.height * 0.72;
+  for (let 試行 = 0; 試行 < 12; 試行 += 1) {
+    context.font = `600 ${Math.round(字高)}px "Segoe UI", "Yu Gothic", "Meiryo", sans-serif`;
+    if (context.measureText(文字).width <= canvas.width - 余白 * 2) break;
+    字高 *= 0.92;
+  }
+  context.fillStyle = 色;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(文字, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.anisotropy = 4;
+  return texture;
+};
+
+/**
+ * 船体（楕円体）の側面に沿う文字板をつくる。
+ * 平らな板をそのまま置くと端が船体から浮くので、頂点ごとに楕円体表面の x 半径を求めて寄せる。
+ * 側 = 1 が右（+x）、-1 が左（-x）。どちらもその側から読める向きになる。
+ */
+const 側面文字形を作る = (
+  側: 1 | -1,
+  半幅: number,
+  半高: number,
+  半長: number,
+  文字幅: number,
+  文字高: number,
+  中心Y: number,
+): THREE.PlaneGeometry => {
+  const 幾何 = new THREE.PlaneGeometry(文字幅, 文字高, 32, 2);
+  // 面を左右へ向ける。回転後は横方向が z、高さが y になる
+  幾何.rotateY((側 * Math.PI) / 2);
+  幾何.translate(0, 中心Y, 0);
+  const 属性 = 幾何.attributes.position;
+  for (let i = 0; i < 属性.count; i += 1) {
+    const y = 属性.getY(i);
+    const z = 属性.getZ(i);
+    // 楕円体 (x/半幅)^2 + (y/半高)^2 + (z/半長)^2 = 1 を x について解く。
+    // 端で 0 に潰れて折り返さないよう、中身は下限で止めておく
+    const 比 = 1 - (z / 半長) ** 2 - (y / 半高) ** 2;
+    属性.setX(i, 側 * (半幅 * Math.sqrt(Math.max(比, 0.04)) + 0.03));
+  }
+  属性.needsUpdate = true;
+  幾何.computeVertexNormals();
+  return 幾何;
 };
 
 export const 飛行船定義: NPC定義<飛行船設定> = {
@@ -123,6 +202,53 @@ export const 飛行船定義: NPC定義<飛行船設定> = {
     group.traverse((object) => {
       if (object instanceof THREE.Mesh) object.castShadow = true;
     });
+
+    // 船体の左右に文字を入れる。影を落とすと透明部分まで四角い影になるので、
+    // castShadow を立てる traverse のあとに追加している
+    if (設定.側面文字) {
+      const 半幅 = 設定.船体径 * 0.5;
+      const 半高 = 設定.船体径 * 0.5 * 0.92;
+      const 半長 = 設定.船体長 * 0.5;
+      const 文字幅 = 設定.船体長 * 設定.側面文字幅比;
+      const 文字高 = 半高 * 設定.側面文字高比;
+      const texture = 側面文字テクスチャを作る(
+        設定.側面文字,
+        設定.側面文字色,
+        文字高 / 文字幅,
+      );
+      if (texture) {
+        ヘルパー.テクスチャ登録(texture);
+        const 文字材 = new THREE.MeshStandardMaterial({
+          map: texture,
+          transparent: true,
+          roughness: 0.7,
+          metalness: 0.05,
+          // 船体のすぐ外側に浮かせているため、書き込まなくても前後関係は狂わない
+          depthWrite: false,
+        });
+        ヘルパー.マテリアル登録(文字材);
+        ([1, -1] as const).forEach((側) => {
+          const 文字 = new THREE.Mesh(
+            ジオメトリ(
+              側面文字形を作る(
+                側,
+                半幅,
+                半高,
+                半長,
+                文字幅,
+                文字高,
+                半高 * 設定.側面文字上下位置,
+              ),
+            ),
+            文字材,
+          );
+          文字.castShadow = false;
+          文字.receiveShadow = false;
+          group.add(文字);
+        });
+      }
+    }
+
     scene.add(group);
 
     const 中心 = 配置.位置.clone();

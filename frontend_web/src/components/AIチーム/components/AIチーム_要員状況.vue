@@ -31,6 +31,8 @@ const {
   panelRef,
   位置,
   zIndex,
+  開いている,
+  開閉を切替,
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
@@ -94,6 +96,7 @@ onBeforeUnmount(() => {
   <aside
     ref="panelRef"
     class="agent-panel"
+    :class="{ collapsed: !開いている }"
     :style="{ transform: `translate3d(${位置.x}px, ${位置.y}px, 0)`, zIndex }"
   >
     <div
@@ -104,12 +107,20 @@ onBeforeUnmount(() => {
       @pointerup="ドラッグ終了"
       @pointercancel="ドラッグ終了"
     >
+      <button
+        type="button"
+        class="collapse-toggle"
+        :title="開いている ? '閉じる' : '開く'"
+        :aria-expanded="開いている"
+        @pointerdown.stop
+        @click="開閉を切替"
+      >{{ 開いている ? '▼' : '▶' }}</button>
       <span class="panel-title">【要員状況】</span>
       <span class="panel-count">{{ エージェント一覧.length }}名</span>
       <button type="button" class="new-button" @pointerdown.stop @click="召喚ダイアログを開く">召喚</button>
     </div>
 
-    <div class="agent-list">
+    <div v-if="開いている" class="agent-list">
       <button
         v-for="agent in エージェント一覧"
         :key="agent.id"
@@ -141,7 +152,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div v-if="選択中エージェント" class="agent-detail">
+    <div v-if="開いている && 選択中エージェント" class="agent-detail">
       <div class="detail-top">
         <span class="detail-pulse" :style="{ background: 選択中エージェント.色CSS }"></span>
         <span>{{ 選択中エージェント.状態 }}</span>
@@ -189,12 +200,16 @@ onBeforeUnmount(() => {
 <style scoped>
 .agent-panel {
   width: 240px;
-  max-height: calc(100% - 36px);
+  /* 画面縦幅の 80% までに収め、あふれる分は要員一覧側で縦スクロールさせる。
+     縦の狭い画面では画面割合が置き場所（.workspace）を超えてしまうので、そちらも上限にする */
+  max-height: min(80vh, calc(100% - 36px));
   position: absolute;
   top: 0;
   left: 0;
   padding: 18px 14px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid rgba(93, 68, 168, 0.95);
   background: rgba(11, 24, 37, 0.94);
   box-shadow: 0 18px 45px rgba(2, 8, 14, 0.42);
@@ -212,6 +227,7 @@ onBeforeUnmount(() => {
 }
 
 .panel-header {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -224,6 +240,34 @@ onBeforeUnmount(() => {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 0 -1px 0 rgba(44, 24, 101, 0.3);
+}
+
+.collapse-toggle {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: -2px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* 閉じたときはタイトルバーだけを残す（本体側の余白を消す） */
+.agent-panel.collapsed {
+  padding-bottom: 0;
+}
+
+.agent-panel.collapsed .panel-header {
+  margin-bottom: 0;
 }
 
 .panel-title {
@@ -263,8 +307,13 @@ onBeforeUnmount(() => {
 }
 
 .agent-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
   gap: 5px;
+  /* grid の子が内容幅で膨らんでスクロールバーと重ならないようにする */
+  align-content: start;
 }
 
 .agent-card {
@@ -376,6 +425,7 @@ onBeforeUnmount(() => {
 }
 
 .agent-detail {
+  flex: none;
   margin-top: 16px;
   padding: 13px;
   border: 1px solid var(--line);
@@ -531,7 +581,6 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) {
   .agent-panel {
     width: min(240px, calc(100% - 24px));
-    max-height: calc(100% - 24px);
   }
 
   .agent-list {

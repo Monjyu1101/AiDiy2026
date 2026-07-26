@@ -48,6 +48,12 @@ CODE_AGENTS_URL = (
 )
 既定利用者ID = "admin"
 利用者選択最大試行回数 = 2
+# 担当要員の選択は aidiy_code_agents/run が Code CLI を同期実行するため、応答まで数分かかる。
+# POST送信 の既定（30秒）のままだと必ず timed out になり、毎回 既定利用者ID へ
+# フォールバックして経験ベースの担当選択がまったく効かなくなる。
+# 全試行の合計が team_work_db.準備無進捗タイムアウト分（10分）に収まる値にすること。
+# 収まらないと、選択の再試行中に準備プロセスごとタイムアウトで打ち切られる。
+利用者選択タイムアウト秒 = 240
 
 
 def POST送信(url: str, payload: dict, timeout: int = 30) -> dict:
@@ -166,12 +172,16 @@ def 担当要員を選択(要求内容: str, 作業ID: str, logger, プロジェ
         try:
             if os.path.exists(出力JSONパス):
                 os.remove(出力JSONパス)
-            res = POST送信(CODE_AGENTS_URL, {
-                "prompt": プロンプト生成_担当選択(要求内容, 候補, 出力JSONパス, 経験概要),
-                "ai_name": "claude_cli",
-                "ai_model": "auto",
-                "project_path": str(AIDIY_ROOT),
-            })
+            res = POST送信(
+                CODE_AGENTS_URL,
+                {
+                    "prompt": プロンプト生成_担当選択(要求内容, 候補, 出力JSONパス, 経験概要),
+                    "ai_name": "claude_cli",
+                    "ai_model": "auto",
+                    "project_path": str(AIDIY_ROOT),
+                },
+                timeout=利用者選択タイムアウト秒,
+            )
             if res.get("error") or res.get("status") != "OK":
                 raise RuntimeError(str(res.get("error") or res.get("result")))
             if not os.path.isfile(出力JSONパス):

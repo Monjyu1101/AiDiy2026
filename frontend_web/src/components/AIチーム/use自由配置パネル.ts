@@ -11,6 +11,8 @@ export const use自由配置パネル = (
 ) => {
   const panelRef = ref<HTMLElement | null>(null);
   const zIndex = ref(++前面連番);
+  // タイトルバーの ▼ / ▶ で本体を開閉する。位置と同じ保存先へ入れて、次回も同じ状態で開く
+  const 開いている = ref(true);
   // ドラッグ（または保存位置の復元）までは初期位置へ追従する。
   // 一覧の読み込みで高さが変わっても、下寄せパネルが画面外へはみ出さないようにするため。
   let 初期位置追従 = true;
@@ -48,8 +50,16 @@ export const use自由配置パネル = (
     return 位置を制限(x, y);
   };
 
-  const 位置を保存 = () => {
-    localStorage.setItem(storageKey, JSON.stringify(位置));
+  const 状態を保存 = () => {
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({ x: 位置.x, y: 位置.y, 開いている: 開いている.value }),
+    );
+  };
+
+  const 開閉を切替 = () => {
+    開いている.value = !開いている.value;
+    状態を保存();
   };
 
   const ドラッグ開始 = (event: PointerEvent) => {
@@ -77,7 +87,7 @@ export const use自由配置パネル = (
     if (ドラッグ.pointerId !== event.pointerId) return;
     ドラッグ.pointerId = -1;
     初期位置追従 = false;
-    位置を保存();
+    状態を保存();
   };
 
   const 位置を適用 = (次: { x: number; y: number }) => {
@@ -92,6 +102,8 @@ export const use自由配置パネル = (
       const 保存あり = Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y));
       if (保存あり) 初期位置追従 = false;
       位置を適用(保存あり ? 位置を制限(Number(saved.x), Number(saved.y)) : fallback);
+      // 開閉は後から足した項目なので、入っていない保存データは開いた状態として扱う
+      if (typeof saved.開いている === 'boolean') 開いている.value = saved.開いている;
     } catch {
       位置を適用(fallback);
     }
@@ -113,6 +125,8 @@ export const use自由配置パネル = (
     panelRef,
     位置,
     zIndex,
+    開いている,
+    開閉を切替,
     ドラッグ開始,
     ドラッグ中,
     ドラッグ終了,

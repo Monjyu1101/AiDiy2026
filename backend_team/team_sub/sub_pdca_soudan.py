@@ -171,6 +171,9 @@ def 相談を投入(
 def main() -> int:
     setup_logging("sub_pdca_soudan")
     logger = get_logger("team_sub_pdca_soudan")
+    プロジェクト = ""
+    チーム目標 = ""
+    区分 = "S"
     try:
         if len(sys.argv) < 2:
             raise ValueError("使い方: python sub_pdca_soudan.py <temp/pdca/入力JSON>")
@@ -215,9 +218,18 @@ def main() -> int:
             except Exception:
                 logger.exception(f"改善ループ({区分})の作成に失敗しました: 要員ID={要員ID}")
         logger.info(f"改善ループ({区分})の投入を終えました: 成功 {成功数}/{len(要員一覧)} 件")
+        if not 成功数 and not team_pdca_db.ループ区分一覧(プロジェクト, ループ, 区分):
+            # 1件もレコードを作れていないと、次の分にまた同じ段が投入されて堂々巡りになる
+            sub_pdca__common.実行不能を記録(
+                区分, プロジェクト, チーム目標, ループ,
+                f"{len(要員一覧)}名すべての投入に失敗しました", logger,
+            )
         return 0 if 成功数 else 1
-    except Exception:
+    except Exception as exc:
         logger.exception("改善ループの投入処理に失敗しました")
+        sub_pdca__common.投入失敗を記録(
+            区分, プロジェクト, チーム目標, f"投入処理エラー: {exc}", logger
+        )
         return 1
 
 
