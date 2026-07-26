@@ -17,6 +17,7 @@ const 編集ダイアログ表示 = ref(false);
 const 編集作業 = ref<チーム作業 | null>(null);
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let 作業最大更新日時 = '';
+let 作業取得中 = false;
 
 const {
   panelRef,
@@ -35,10 +36,13 @@ const 最大更新日時取得 = async (): Promise<string> => {
   return String(response.data?.data?.最大更新日時 ?? '');
 };
 
-const 作業一覧読込 = async () => {
-  if (読込中.value) return;
-  読込中.value = true;
-  読込エラー.value = '';
+const 作業一覧読込 = async (読込表示 = true) => {
+  if (作業取得中) return;
+  作業取得中 = true;
+  if (読込表示) {
+    読込中.value = true;
+    読込エラー.value = '';
+  }
   try {
     // 一覧取得中に更新が入った場合は、次回確認で拾えるよう基準を先に取得する。
     const newBaseline = await 最大更新日時取得();
@@ -50,18 +54,22 @@ const 作業一覧読込 = async () => {
     if (!Array.isArray(items)) throw new Error('チーム作業の応答形式が正しくありません');
     作業一覧.value = items as チーム作業[];
     作業最大更新日時 = newBaseline;
+    読込エラー.value = '';
   } catch (error) {
-    読込エラー.value = error instanceof Error ? error.message : 'チーム作業を取得できませんでした';
+    if (読込表示) {
+      読込エラー.value = error instanceof Error ? error.message : 'チーム作業を取得できませんでした';
+    }
   } finally {
-    読込中.value = false;
+    if (読込表示) 読込中.value = false;
+    作業取得中 = false;
   }
 };
 
 const 更新確認 = async () => {
   try {
-    if (読込中.value) return;
+    if (作業取得中) return;
     const maxUpdatedAt = await 最大更新日時取得();
-    if (maxUpdatedAt !== 作業最大更新日時) await 作業一覧読込();
+    if (maxUpdatedAt !== 作業最大更新日時) await 作業一覧読込(false);
   } catch {
     // 自動更新確認の失敗は、通常操作を邪魔しない。
   }
@@ -86,14 +94,17 @@ const 応答内容ダイアログ表示 = ref(false);
 const 応答内容タイトル = ref('');
 const 応答内容要求値 = ref('');
 const 応答内容表示値 = ref('');
+const まとめ内容表示値 = ref('');
 
 const 応答内容を開く = (work: チーム作業) => {
   const 要求 = String(work.要求内容 ?? '');
   const 内容 = String(work.応答内容 ?? '');
-  if (!要求.trim() && !内容.trim()) return;
+  const まとめ = String(work.まとめ内容 ?? '');
+  if (!要求.trim() && !内容.trim() && !まとめ.trim()) return;
   応答内容タイトル.value = `要求・応答内容 - ${work.作業ID}${work.応答タイトル ? ' / ' + work.応答タイトル : ''}`;
   応答内容要求値.value = 要求;
   応答内容表示値.value = 内容;
+  まとめ内容表示値.value = まとめ;
   応答内容ダイアログ表示.value = true;
 };
 
@@ -127,7 +138,7 @@ const 保存後処理 = (work: チーム作業) => {
 const 状態class = (status: チーム作業['状態']) => ({
   waiting: ['準備開始', '準備中', '準備完了', '待機'].includes(status),
   working: status === '実行中',
-  completed: status === '完了',
+  completed: status === '完了' || status === '済',
   stopped: status === 'エラー' || status === '中止',
 });
 
@@ -196,7 +207,7 @@ onBeforeUnmount(() => {
       <div v-if="読込中" class="panel-message">チーム作業を読み込んでいます…</div>
       <div v-else-if="読込エラー" class="panel-message error">
         <span>{{ 読込エラー }}</span>
-        <button type="button" @click="作業一覧読込">再読込</button>
+        <button type="button" @click="() => 作業一覧読込()">再読込</button>
       </div>
       <div v-else-if="作業一覧.length === 0" class="panel-message">
         登録済みのチーム作業はありません。
@@ -218,6 +229,7 @@ onBeforeUnmount(() => {
     :タイトル="応答内容タイトル"
     :要求内容="応答内容要求値"
     :内容="応答内容表示値"
+    :まとめ内容="まとめ内容表示値"
     @close="応答内容ダイアログ表示 = false"
   />
 </template>
@@ -355,7 +367,7 @@ tbody tr:hover {
   background: rgba(75, 125, 151, 0.12);
 }
 
-/* 行カラーリング: 表示優先順位9（完了/エラー/中止）は灰色 */
+/* 行カラーリング: 表示優先順位9（完了/済/エラー/中止）は灰色 */
 tbody tr.row-inactive {
   background: rgba(255, 255, 255, 0.03);
 }

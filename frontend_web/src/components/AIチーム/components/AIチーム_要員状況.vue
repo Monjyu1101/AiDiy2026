@@ -42,9 +42,14 @@ const 召喚ダイアログを開く = () => {
 
 const 状況一覧 = ref<チーム状況[]>([]);
 let 状況更新Timer: ReturnType<typeof setInterval> | null = null;
+let 状況最大更新日時 = '';
 
 const 選択中状況 = computed(
   () => 状況一覧.value.find((item) => item.要員ID === props.選択中エージェント?.id) ?? null,
+);
+
+const 要員別状況 = computed(
+  () => new Map(状況一覧.value.map((item) => [item.要員ID, item])),
 );
 
 const 状況を読み込む = async () => {
@@ -53,6 +58,22 @@ const 状況を読み込む = async () => {
     if (response.data?.status !== 'OK') return;
     const items = response.data?.data?.items;
     if (Array.isArray(items)) 状況一覧.value = items as チーム状況[];
+    状況最大更新日時 = await 最大更新日時を取得する();
+  } catch {
+    // 自動更新確認の失敗は、通常操作を邪魔しない。
+  }
+};
+
+const 最大更新日時を取得する = async (): Promise<string> => {
+  const response = await apiClient.post('/team/状況/最大更新日時', {});
+  if (response.data?.status !== 'OK') return 状況最大更新日時;
+  return String(response.data?.data?.最大更新日時 ?? '');
+};
+
+const 状況更新を確認する = async () => {
+  try {
+    const 最大更新日時 = await 最大更新日時を取得する();
+    if (最大更新日時 !== 状況最大更新日時) await 状況を読み込む();
   } catch {
     // 自動更新確認の失敗は、通常操作を邪魔しない。
   }
@@ -60,11 +81,12 @@ const 状況を読み込む = async () => {
 
 onMounted(async () => {
   await 状況を読み込む();
-  状況更新Timer = setInterval(() => void 状況を読み込む(), 10000);
+  状況更新Timer = setInterval(() => void 状況更新を確認する(), 5000);
 });
 
 onBeforeUnmount(() => {
   if (状況更新Timer) clearInterval(状況更新Timer);
+  状況最大更新日時 = '';
 });
 </script>
 
@@ -93,7 +115,12 @@ onBeforeUnmount(() => {
         :key="agent.id"
         type="button"
         class="agent-card"
-        :class="{ selected: agent.id === 選択中ID }"
+        :class="{
+          selected: agent.id === 選択中ID,
+          'state-working': agent.状態 === '作業中',
+          'state-meditating': agent.状態 === '瞑想中',
+          'state-resting': agent.状態 === '休憩中',
+        }"
         @click="emit('select', agent.id)"
       >
         <span class="agent-avatar" :style="{ '--agent-color': agent.色CSS }">
@@ -101,12 +128,15 @@ onBeforeUnmount(() => {
         </span>
         <span class="agent-copy">
           <span class="agent-name-row">
-            <strong>{{ agent.名前 }}</strong>
-            <span class="state-dot" :style="{ color: 状態情報[agent.状態].色 }">
-              {{ 状態情報[agent.状態].記号 }}
+            <strong>{{ agent.名前 }} - {{ agent.状態 }}</strong>
+          </span>
+          <span class="agent-role-row">
+            <span class="agent-role">{{ agent.役割 }}</span>
+            <span class="agent-counts">
+              <span class="agent-running-count">実行 {{ 要員別状況.get(agent.id)?.実行数 ?? 0 }}</span>
+              <span class="agent-summary-count">まとめ {{ 要員別状況.get(agent.id)?.まとめ中数 ?? 0 }}</span>
             </span>
           </span>
-          <span class="agent-role">{{ agent.役割 }} · {{ agent.状態 }}</span>
         </span>
       </button>
     </div>
@@ -121,7 +151,6 @@ onBeforeUnmount(() => {
       <div v-if="選択中状況" class="status-summary">
         <div class="status-row">
           <span class="status-chip status-waiting">待機 {{ 選択中状況.待機数 }}</span>
-          <span class="status-chip status-running">実行 {{ 選択中状況.実行数 }}</span>
           <span class="status-chip status-done">完了 {{ 選択中状況.完了数 }}</span>
           <span class="status-chip status-error">エラー {{ 選択中状況.エラー数 }}</span>
         </div>
@@ -261,6 +290,54 @@ onBeforeUnmount(() => {
   background: linear-gradient(90deg, rgba(48, 146, 184, 0.2), rgba(50, 78, 111, 0.08));
 }
 
+.agent-card.state-working {
+  border-color: rgba(70, 190, 255, 0.78);
+  animation: working-blink 1.8s ease-in-out infinite;
+}
+
+.agent-card.state-meditating {
+  border-color: rgba(72, 235, 164, 0.76);
+  animation: meditating-blink 2.2s ease-in-out infinite;
+}
+
+.agent-card.state-resting {
+  border-color: rgba(132, 145, 153, 0.24);
+  background: rgba(82, 91, 97, 0.1);
+  filter: saturate(0.58);
+  opacity: 0.82;
+}
+
+@keyframes working-blink {
+  0%, 100% {
+    background: rgba(49, 145, 211, 0.14);
+    box-shadow: inset 0 0 5px rgba(70, 190, 255, 0.12);
+  }
+  50% {
+    border-color: rgba(105, 215, 255, 1);
+    background: rgba(42, 159, 232, 0.4);
+    box-shadow: inset 0 0 16px rgba(91, 210, 255, 0.34), 0 0 8px rgba(70, 190, 255, 0.25);
+  }
+}
+
+@keyframes meditating-blink {
+  0%, 100% {
+    background: rgba(51, 160, 117, 0.13);
+    box-shadow: inset 0 0 5px rgba(72, 235, 164, 0.11);
+  }
+  50% {
+    border-color: rgba(112, 255, 195, 1);
+    background: rgba(45, 185, 128, 0.38);
+    box-shadow: inset 0 0 16px rgba(91, 255, 185, 0.31), 0 0 8px rgba(72, 235, 164, 0.23);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-card.state-working,
+  .agent-card.state-meditating {
+    animation: none;
+  }
+}
+
 .agent-avatar {
   width: 34px;
   height: 34px;
@@ -283,7 +360,6 @@ onBeforeUnmount(() => {
 .agent-name-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
 }
 
 .agent-name-row strong {
@@ -292,16 +368,11 @@ onBeforeUnmount(() => {
 
 .agent-role {
   display: block;
-  margin-top: 2px;
   overflow: hidden;
   color: #718a9d;
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.state-dot {
-  font-size: 9px;
 }
 
 .agent-detail {
@@ -372,6 +443,42 @@ onBeforeUnmount(() => {
   border-color: rgba(101, 232, 183, 0.4);
   color: #65e8b7;
   background: rgba(101, 232, 183, 0.12);
+}
+
+.agent-role-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  min-width: 0;
+}
+
+.agent-summary-count {
+  padding: 1px 5px;
+  border: 1px solid rgba(255, 207, 115, 0.44);
+  border-radius: 999px;
+  color: #ffcf73;
+  background: rgba(255, 207, 115, 0.12);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.agent-counts {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.agent-running-count {
+  padding: 1px 5px;
+  border: 1px solid rgba(101, 232, 183, 0.4);
+  border-radius: 999px;
+  color: #65e8b7;
+  background: rgba(101, 232, 183, 0.12);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .status-chip.status-done {

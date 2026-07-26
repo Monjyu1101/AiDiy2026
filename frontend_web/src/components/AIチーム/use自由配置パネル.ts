@@ -4,7 +4,8 @@ let 前面連番 = 20;
 
 export const use自由配置パネル = (
   storageKey: string,
-  initialSide: 'left' | 'right',
+  /** 初期表示の横位置。`center` は親の幅に対する中央寄せ */
+  initialSide: 'left' | 'center' | 'right',
   /** 初期表示の縦位置。パネル同士が重ならないように呼び出し側で上下を分ける */
   initialVertical: 'top' | 'bottom' = 'top',
 ) => {
@@ -36,9 +37,11 @@ export const use自由配置パネル = (
   const 初期位置 = () => {
     const panel = panelRef.value;
     const parent = panel?.offsetParent as HTMLElement | null;
-    const x = initialSide === 'right' && panel && parent
-      ? parent.clientWidth - panel.offsetWidth - 18
-      : 18;
+    let x = 18;
+    if (panel && parent) {
+      if (initialSide === 'right') x = parent.clientWidth - panel.offsetWidth - 18;
+      else if (initialSide === 'center') x = (parent.clientWidth - panel.offsetWidth) / 2;
+    }
     const y = initialVertical === 'bottom' && panel && parent
       ? parent.clientHeight - panel.offsetHeight - 18
       : 18;

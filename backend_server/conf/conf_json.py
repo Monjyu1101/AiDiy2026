@@ -77,11 +77,11 @@ class conf_json:
         # CodeAI設定
         'CODE_BASE_PATH': '../',
         'CODE_PERMISSIONS': 'auto',
-        'CODE_AI1_NAME': 'claude_sdk',
+        'CODE_AI1_NAME': 'codex_cli',
         'CODE_AI1_MODEL': 'auto',
-        'CODE_AI2_NAME': 'copilot_cli',
+        'CODE_AI2_NAME': 'claude_sdk',
         'CODE_AI2_MODEL': 'auto',
-        'CODE_AI3_NAME': 'codex_cli',
+        'CODE_AI3_NAME': 'copilot_cli',
         'CODE_AI3_MODEL': 'auto',
         'CODE_AI4_NAME': 'antigravity_cli',
         'CODE_AI4_MODEL': 'auto',
@@ -103,11 +103,11 @@ class conf_json:
         'CODE_VERIFY': 'auto',
 
         # TaskAI設定
-        'TASK_AI_NAME': 'claude_cli',
+        'TASK_AI_NAME': 'codex_cli',
         'TASK_AI_MODEL': 'auto',
 
         # TeamAI設定
-        'TEAM_AI_NAME': 'claude_cli',
+        'TEAM_AI_NAME': 'codex_cli',
         'TEAM_AI_MODEL': 'auto',
     }
 

@@ -50,6 +50,15 @@ _入力DIR = os.path.join(_BASE_DIR, "temp", "input")
 _出力DIR = os.path.join(_BASE_DIR, "temp", "output")
 
 
+def _サブプロセス環境() -> dict:
+    """サブプロセスの標準出力を UTF-8 にする環境変数を足して返す。
+
+    Windows では既定が cp932 になり、AI応答に含まれる — や絵文字を print した時点で
+    UnicodeEncodeError になってステップが失敗するため（変換できない文字は置換する）。
+    """
+    return {**os.environ, "PYTHONIOENCODING": "utf-8:replace"}
+
+
 def _タスクファイル名(タスクID: str) -> str:
     return f"{タスクID}.json"
 
@@ -122,8 +131,9 @@ def _タスク実行開始(行: dict, logger: logging.Logger) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         creationflags=creationflags,
+        env=_サブプロセス環境(),
     )
-    tasks_db.実行開始記録(利用者ID, タスクID, proc.pid)
+    tasks_db.実行開始記録(タスクID, proc.pid)
     logger.info(f"AIタスク生成を開始しました: {利用者ID}/{タスクID} PID={proc.pid}")
 
 
@@ -145,6 +155,7 @@ def _明細実行開始(行: dict, logger: logging.Logger) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         creationflags=creationflags,
+        env=_サブプロセス環境(),
     )
     tasks_db.明細実行開始記録(タスクID, 明細SEQ, proc.pid)
     logger.info(f"ステップ実行を開始しました: {タスクID} SEQ={明細SEQ} タイトル={タイトル} PID={proc.pid}")
@@ -264,19 +275,19 @@ def _保持可能状態(条件: dict) -> bool:
     return 有効 and str(条件.get("要求状態", "")) in ("待機", "実行中", "準備完了", "完了")
 
 
-def 実行条件再計算(利用者ID: str, タスクID: str) -> str:
+def 実行条件再計算(タスクID: str) -> str:
     """実行条件の編集・実行有効切替・状態変更時に次回実行日時を計算し直す。
 
     保持可能状態（実行有効 かつ 要求が 待機/実行中/準備完了/完了）の時間駆動条件だけ
     次回を計算し、それ以外（無効・準備開始・準備中・エラー・中止や即時など）は空に戻す。
     """
-    条件 = tasks_db.実行条件監視取得(利用者ID, タスクID)
+    条件 = tasks_db.実行条件監視取得(タスクID)
     if 条件 is None:
         return ""
     時間駆動 = str(条件.get("実行区分", "")) in ("時間指定", "間隔実行", "定時実行")
     新次回 = _次回実行日時計算(条件, datetime.now()) if 時間駆動 and _保持可能状態(条件) else ""
     if 新次回 != str(条件.get("次回実行日時", "")):
-        tasks_db.次回実行日時更新(利用者ID, タスクID, 新次回)
+        tasks_db.次回実行日時更新(タスクID, 新次回)
     return 新次回
 
 
@@ -307,11 +318,11 @@ def 起動時実行条件初期化(logger: logging.Logger) -> None:
             if 次回 == "":
                 初回 = _次回実行日時計算(条件, now)
                 if 初回:
-                    tasks_db.次回実行日時更新(利用者ID, タスクID, 初回)
+                    tasks_db.次回実行日時更新(タスクID, 初回)
                 continue
             if 次回 <= now文字:
                 新次回 = _次回繰り越し(条件, now)
-                tasks_db.次回実行日時更新(利用者ID, タスクID, 新次回)
+                tasks_db.次回実行日時更新(タスクID, 新次回)
                 logger.info(
                     f"起動時に期限切れの次回実行日時を更新しました: {利用者ID}/{タスクID} {次回} -> {新次回 or 'なし'}"
                 )
@@ -345,7 +356,7 @@ def _即時実行条件確認(logger: logging.Logger) -> None:
         利用者ID = str(行["利用者ID"])
         タスクID = str(行["タスクID"])
         try:
-            if tasks_db.タスク発火(利用者ID, タスクID):
+            if tasks_db.タスク発火(タスクID):
                 logger.info(f"即時実行のため待機に戻しました: {利用者ID}/{タスクID}")
         except Exception:
             logger.exception(f"即時実行の待機化でエラーが発生しました: {利用者ID}/{タスクID}")
@@ -374,7 +385,7 @@ def _実行条件確認(logger: logging.Logger) -> None:
             if not _保持可能状態(条件):
                 # 発火対象外（無効・準備開始・準備中・エラー・中止など）は次回実行日時を空にする
                 if 時間駆動 and str(条件.get("次回実行日時", "")):
-                    tasks_db.次回実行日時更新(利用者ID, タスクID, "")
+                    tasks_db.次回実行日時更新(タスクID, "")
                     logger.info(
                         f"発火対象外のため次回実行日時をクリアしました: {利用者ID}/{タスクID} "
                         f"状態={条件.get('要求状態', '')} 実行有効={条件.get('要求実行有効', '')}"
@@ -384,7 +395,7 @@ def _実行条件確認(logger: logging.Logger) -> None:
             def 次回送り() -> None:
                 """発火せずに次周期へ進める（時間指定は一回限りなので空にする）。"""
                 if 時間駆動:
-                    tasks_db.次回実行日時更新(利用者ID, タスクID, _次回繰り越し(条件, now))
+                    tasks_db.次回実行日時更新(タスクID, _次回繰り越し(条件, now))
 
             if 時間駆動:
                 次回 = str(条件.get("次回実行日時", ""))
@@ -392,7 +403,7 @@ def _実行条件確認(logger: logging.Logger) -> None:
                     # 初回は次回実行日時の計算だけ行う
                     初回次回 = _次回実行日時計算(条件, now)
                     if 初回次回:
-                        tasks_db.次回実行日時更新(利用者ID, タスクID, 初回次回)
+                        tasks_db.次回実行日時更新(タスクID, 初回次回)
                     continue
                 if 次回 > now文字:
                     continue
@@ -418,22 +429,22 @@ def _実行条件確認(logger: logging.Logger) -> None:
                     保存ファイル数 = -1
                 if 保存ファイル数 < 0:
                     # 初回はスナップショット取得のみ（登録直後の誤発火防止）
-                    tasks_db.フォルダ状態記録(利用者ID, タスクID, スナップショット[0], スナップショット[1])
+                    tasks_db.フォルダ状態記録(タスクID, スナップショット[0], スナップショット[1])
                     次回送り()
                     continue
                 if スナップショット == (保存ファイル数, str(条件.get("フォルダ内最終日時", ""))):
                     次回送り()  # 変化なし: 発火せず次周期へ
                     continue
 
-            if not tasks_db.タスク発火(利用者ID, タスクID):
+            if not tasks_db.タスク発火(タスクID):
                 # 明細が実行途中など: 発火せずに次周期へスキップ（消さない）
                 次回送り()
                 continue
 
             if スナップショット is not None:
-                tasks_db.フォルダ状態記録(利用者ID, タスクID, スナップショット[0], スナップショット[1])
+                tasks_db.フォルダ状態記録(タスクID, スナップショット[0], スナップショット[1])
             次回 = _次回実行日時計算(条件, now) if 時間駆動 and 区分 != "時間指定" else ""
-            tasks_db.次回実行日時更新(利用者ID, タスクID, 次回, 前回実行日時=now文字)
+            tasks_db.次回実行日時更新(タスクID, 次回, 前回実行日時=now文字)
             logger.info(
                 f"実行開始条件により再実行します: {利用者ID}/{タスクID} 区分={区分} 次回={次回 or 'なし'}"
             )
@@ -482,14 +493,14 @@ def _監視1回(logger: logging.Logger) -> None:
         タスクID = str(行["タスクID"])
         try:
             if int(行.get("実行回数", 0) or 0) >= 実行回数上限:
-                tasks_db.タスク失敗(利用者ID, タスクID, f"実行回数が上限({実行回数上限}回)に達しました")
+                tasks_db.タスク失敗(タスクID, f"実行回数が上限({実行回数上限}回)に達しました")
                 logger.warning(f"実行回数上限のため失敗にしました: {利用者ID}/{タスクID}")
                 continue
             _タスク実行開始(行, logger)
         except Exception as e:
             logger.exception(f"タスク実行開始に失敗しました: {利用者ID}/{タスクID}")
             try:
-                tasks_db.タスク失敗(利用者ID, タスクID, f"実行開始エラー: {e}")
+                tasks_db.タスク失敗(タスクID, f"実行開始エラー: {e}")
             except Exception:
                 logger.exception(f"失敗登録もエラー: {利用者ID}/{タスクID}")
 

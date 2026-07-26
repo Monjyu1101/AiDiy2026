@@ -16,7 +16,7 @@ import { computed, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
 import { useAuthStore } from '../../../stores/auth';
 import { qConfirm, qMessage } from '../../../utils/qAlert';
-import type { チーム目標 } from '../AIチーム_型';
+import type { チーム目標, チーム要員 } from '../AIチーム_型';
 
 const props = defineProps<{ isOpen: boolean }>();
 
@@ -26,6 +26,7 @@ const emit = defineEmits<{
 }>();
 
 const 既定パス = '../';
+const 既定動員要員数 = 2;
 const authStore = useAuthStore();
 const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
 const 利用者名 = computed(() => String(authStore.user?.利用者名 ?? authStore.user?.利用者ID ?? 'admin'));
@@ -35,6 +36,17 @@ const プロジェクト選択肢 = ref<{ value: string; label: string }[]>([]);
 const 選択パス = ref('');
 const 入力パス = ref(既定パス);
 const 入力目標 = ref('');
+const 入力改善ループ = ref(false);
+const 入力最大ループ回数 = ref(1);
+const 入力動員要員数 = ref(既定動員要員数);
+const 最大ループ回数選択肢 = Array.from({ length: 99 }, (_, index) => index + 1);
+// 相談へ動員できるのは admin 以外の有効要員だけなので、その人数を動員要員数の上限にする
+const 有効要員数 = ref(1);
+const 動員要員数選択肢 = computed(() =>
+  Array.from({ length: Math.max(1, 有効要員数.value) }, (_, index) => index + 1),
+);
+const 動員要員数を丸める = (人数: unknown) =>
+  Math.min(Math.max(1, 有効要員数.value), Math.max(1, Number(人数 ?? 既定動員要員数)));
 const 読込中 = ref(false);
 const 保存中 = ref(false);
 const 削除中 = ref(false);
@@ -74,19 +86,38 @@ const プロジェクト選択肢読込 = async () => {
   }
 };
 
+const 有効要員数読込 = async () => {
+  try {
+    const response = await apiClient.post('/team/要員/一覧', { 無効も表示: false });
+    const items = (response.data?.status === 'OK' ? response.data.data?.items ?? [] : []) as チーム要員[];
+    // admin は相談の動員対象外なので数に含めない
+    有効要員数.value = Math.max(1, items.filter((要員) => 要員.要員ID !== 'admin').length);
+  } catch {
+    有効要員数.value = 1;
+  }
+};
+
 const 一覧から選ぶ = (項目: チーム目標) => {
   選択パス.value = プロジェクト選択肢.value.some((option) => option.value === 項目.CODE_BASE_PATH)
     ? 項目.CODE_BASE_PATH
     : '';
   入力パス.value = 項目.CODE_BASE_PATH;
   入力目標.value = 項目.チーム目標;
+  入力改善ループ.value = Boolean(項目.改善ループ);
+  入力最大ループ回数.value = Math.min(99, Math.max(1, Number(項目.最大ループ回数 ?? 1)));
+  入力動員要員数.value = 動員要員数を丸める(項目.動員要員数);
 };
 
 watch(選択パス, (value) => {
   if (!value) return;
   入力パス.value = value;
   const 既存 = 目標一覧.value.find((項目) => 項目.CODE_BASE_PATH === value);
-  if (既存) 入力目標.value = 既存.チーム目標;
+  if (既存) {
+    入力目標.value = 既存.チーム目標;
+    入力改善ループ.value = Boolean(既存.改善ループ);
+    入力最大ループ回数.value = Math.min(99, Math.max(1, Number(既存.最大ループ回数 ?? 1)));
+    入力動員要員数.value = 動員要員数を丸める(既存.動員要員数);
+  }
 });
 
 watch(
@@ -96,7 +127,11 @@ watch(
     選択パス.value = '';
     入力パス.value = 既定パス;
     入力目標.value = '';
-    await Promise.all([目標一覧読込(), プロジェクト選択肢読込()]);
+    入力改善ループ.value = false;
+    入力最大ループ回数.value = 1;
+    // 選択肢の上限は有効要員数に依存するため、読込後に丸め直す
+    await Promise.all([目標一覧読込(), プロジェクト選択肢読込(), 有効要員数読込()]);
+    入力動員要員数.value = 動員要員数を丸める(既定動員要員数);
     // 最終更新の 1 件を初期表示にする（掲示板に出ている目標をそのまま編集できる）
     const 先頭 = 目標一覧.value[0];
     if (先頭) 一覧から選ぶ(先頭);
@@ -120,6 +155,9 @@ const 保存 = async () => {
     const response = await apiClient.post('/team/目標/保存', {
       CODE_BASE_PATH: パス,
       チーム目標: 目標,
+      改善ループ: 入力改善ループ.value,
+      最大ループ回数: 入力最大ループ回数.value,
+      動員要員数: 入力動員要員数.value,
       操作利用者ID: 利用者ID.value,
       操作利用者名: 利用者名.value,
       操作端末ID: 'frontend_web',
@@ -129,9 +167,15 @@ const 保存 = async () => {
       return;
     }
     const item = response.data.data?.item as チーム目標 | undefined;
-    void qMessage(response.data.message || 'チーム目標を保存しました。');
-    await 目標一覧読込();
-    if (item) emit('saved', item);
+    // 保存した内容をそのまま親へ渡す（改善一覧パネルの表示・非表示はこの値で切り替わる）
+    emit('saved', {
+      ...(item ?? { CODE_BASE_PATH: パス, チーム目標: 目標, 更新日時: '' }),
+      改善ループ: 入力改善ループ.value,
+      最大ループ回数: 入力最大ループ回数.value,
+      動員要員数: 入力動員要員数.value,
+    });
+    // 1件保存したら用は済むのでダイアログを閉じる
+    emit('close');
   } catch {
     void qMessage('チーム目標の保存でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
   } finally {
@@ -234,6 +278,37 @@ const 削除 = async () => {
                     class="detail-textarea"
                     placeholder="よく考えて、行うべきことを実行する。"
                   ></textarea>
+                </div>
+              </div>
+              <div class="detail-row one-line-row">
+                <div class="detail-label">ループ実行</div>
+                <div class="detail-value">
+                  <div class="loop-settings">
+                    <label class="valid-checkbox-label">
+                    <input
+                      v-model="入力改善ループ"
+                      type="checkbox"
+                      class="valid-checkbox"
+                      aria-label="改善ループの切り替え"
+                    />
+                    <span
+                      class="valid-checkbox-mark"
+                      :class="{ 'valid-checkbox-inactive': !入力改善ループ }"
+                    >{{ 入力改善ループ ? '✅' : '☐' }}</span>
+                    </label>
+                    <label class="max-loop-label" for="最大ループ回数">最大ループ回数</label>
+                    <select id="最大ループ回数" v-model.number="入力最大ループ回数" class="max-loop-select">
+                      <option v-for="回数 in 最大ループ回数選択肢" :key="回数" :value="回数">
+                        {{ 回数 === 99 ? '99（無制限）' : 回数 }}
+                      </option>
+                    </select>
+                    <label class="mobilize-label" for="動員要員数">動員要員数</label>
+                    <select id="動員要員数" v-model.number="入力動員要員数" class="mobilize-select">
+                      <option v-for="人数 in 動員要員数選択肢" :key="人数" :value="人数">
+                        {{ 人数 }}
+                      </option>
+                    </select>
+                  </div>
                 </div>
               </div>
               <p class="goal-note">
@@ -486,6 +561,94 @@ const 削除 = async () => {
 .required-mark {
   margin-left: 2px;
   color: #dc2626;
+}
+
+.valid-checkbox-label {
+  width: 52px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  color: #16a34a;
+  background: #05070b;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  user-select: none;
+}
+
+.valid-checkbox-label:focus-within {
+  border-color: #8f68dd;
+  box-shadow: inset 0 0 0 1px rgba(143, 104, 221, 0.35);
+}
+
+.valid-checkbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.valid-checkbox-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #16a34a;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.valid-checkbox-inactive {
+  color: #d1d5db;
+}
+
+.loop-settings {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.max-loop-label {
+  margin-left: auto;
+  color: #cbd5e1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.max-loop-select {
+  width: 112px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  color: #f3f4f6;
+  background: #05070b;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.mobilize-label {
+  color: #cbd5e1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mobilize-select {
+  width: 52px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #4b5563;
+  border-radius: 3px;
+  color: #e5e7eb;
+  background: #0f172a;
 }
 
 .goal-note {

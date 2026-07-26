@@ -75,16 +75,16 @@ export function defaultModelSettings(): ModelSettings {
   return {
     CHAT_AI_NAME: 'gemini_chat',
     LIVE_AI_NAME: 'gemini_live',
-    CODE_AI1_NAME: 'claude_sdk',
-    CODE_AI2_NAME: 'copilot_cli',
-    CODE_AI3_NAME: 'codex_cli',
+    CODE_AI1_NAME: 'codex_cli',
+    CODE_AI2_NAME: 'claude_sdk',
+    CODE_AI3_NAME: 'copilot_cli',
     CODE_AI4_NAME: 'antigravity_cli',
     CODE_AI5_NAME: 'opencode_cli',
     CODE_AI6_NAME: 'aidiy_hermes',
     CODE_PERMISSIONS: 'auto',
-    TASK_AI_NAME: 'claude_cli',
+    TASK_AI_NAME: 'codex_cli',
     TASK_AI_MODEL: 'auto',
-    TEAM_AI_NAME: 'claude_cli',
+    TEAM_AI_NAME: 'codex_cli',
     TEAM_AI_MODEL: 'auto',
   }
 }

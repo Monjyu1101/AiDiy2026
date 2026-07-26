@@ -193,7 +193,6 @@ const 実行有効切替 = async (row: Record<string, any>) => {
   if (!confirmed) return;
   try {
     const res = await taskClient.post('/task/タスク要求/実行有効切替', {
-      利用者ID: 利用者ID取得(),
       タスクID: String(row.タスクID ?? ''),
       実行有効: 新実行有効
     });

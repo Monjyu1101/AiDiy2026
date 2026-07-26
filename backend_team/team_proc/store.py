@@ -17,9 +17,9 @@ from datetime import datetime
 from threading import RLock
 from uuid import uuid4
 
-from . import persona_catalog, team_db
+from . import persona_catalog, team_db, team_status_db
 
-状態候補 = ("作業中", "相談中", "瞑想中", "移動中")
+状態候補 = ("作業中", "相談中", "雑談中", "瞑想中", "移動中", "休憩中")
 作業候補 = (
     "要件を小さなタスクへ分解中",
     "既存コードの影響範囲を調査中",
@@ -141,7 +141,9 @@ class チームストア:
                     "召喚数": len(self._agents),
                     "作業中": sum(agent["状態"] == "作業中" for agent in self._agents),
                     "相談中": sum(agent["状態"] == "相談中" for agent in self._agents),
+                    "雑談中": sum(agent["状態"] == "雑談中" for agent in self._agents),
                     "瞑想中": sum(agent["状態"] == "瞑想中" for agent in self._agents),
+                    "休憩中": sum(agent["状態"] == "休憩中" for agent in self._agents),
                 },
             }
 
@@ -228,7 +230,7 @@ class チームストア:
                 raise KeyError(エージェントID)
             エージェント["状態"] = 状態
             エージェント["作業内容"] = 作業内容.strip() or self._既定作業内容(状態)
-            エージェント["ひとこと"] = ひとこと.strip() or (random.choice(雑談候補) if 状態 == "相談中" else "")
+            エージェント["ひとこと"] = ひとこと.strip() or (random.choice(雑談候補) if 状態 in ("相談中", "雑談中") else "")
             エージェント["更新日時"] = 現在日時ISO()
             self._活動記録(エージェント["エージェント名"], f"{状態}: {エージェント['作業内容']}", エージェント["色"])
             return deepcopy(エージェント)
@@ -243,18 +245,63 @@ class チームストア:
         return {
             "作業中": random.choice(作業候補),
             "相談中": "仲間とアイデア交換",
+            "雑談中": "雑談エリアで仲間とアイデア交換",
             "瞑想中": "静かに思考と文脈を整理中",
             "移動中": "オフィスを気ままに移動中",
+            "休憩中": "休憩エリアでひと息ついている",
             "召喚中": "雑談エリアでチームに合流中",
         }[状態]
+
+    @staticmethod
+    def _待機時状態(経験最終更新日時: str, タスク最終更新日時: str = "") -> str:
+        """作業・経験の更新後1分は休憩し、その後は経験の更新秒で待機場所を切り替える。"""
+        現在 = datetime.now()
+        更新日時一覧: list[datetime] = []
+        for 更新日時 in (経験最終更新日時, タスク最終更新日時):
+            if not 更新日時:
+                continue
+            try:
+                更新日時一覧.append(datetime.fromisoformat(更新日時))
+            except ValueError:
+                continue
+        if 更新日時一覧 and min(max(0, (現在 - 更新日時).total_seconds()) for 更新日時 in 更新日時一覧) <= 60:
+            return "休憩中"
+        if not 経験最終更新日時:
+            return "休憩中"
+        try:
+            最終更新 = datetime.fromisoformat(経験最終更新日時)
+        except ValueError:
+            return "休憩中"
+        経過秒 = max(0, (現在 - 最終更新).total_seconds())
+        秒一桁 = 最終更新.second % 10
+        切替分 = 秒一桁 if 秒一桁 else 10
+        区間 = int(経過秒 // (切替分 * 60))
+        return "雑談中" if 区間 % 2 == 1 else "休憩中"
+
+    @classmethod
+    def _状況連動状態(cls, 状況: dict | None) -> str:
+        if 状況 and int(状況.get("実行数", 0) or 0) > 0:
+            return "作業中"
+        if 状況 and int(状況.get("まとめ中数", 0) or 0) > 0:
+            return "瞑想中"
+        return cls._待機時状態(
+            str((状況 or {}).get("経験最終更新日時", "") or ""),
+            str((状況 or {}).get("最終更新日時", "") or ""),
+        )
 
     def 進行(self) -> None:
         with self._lock:
             if not self._simulation_enabled or not self._agents:
                 return
-            エージェント = random.choice(self._agents)
-            状態 = random.choices(状態候補, weights=(48, 20, 14, 18), k=1)[0]
-            self.状態変更(エージェント["エージェントID"], 状態)
+            状況マップ = {str(row["要員ID"]): row for row in team_status_db.状況一覧()}
+            for エージェント in self._agents:
+                状況 = 状況マップ.get(エージェント["エージェントID"])
+                # Aチーム状況を取得できなかった要員は、推測で状態を変えず現在値を維持する
+                if 状況 is None:
+                    continue
+                状態 = self._状況連動状態(状況)
+                if エージェント["状態"] != 状態:
+                    self.状態変更(エージェント["エージェントID"], 状態)
 
 
 ストア = チームストア()

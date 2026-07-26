@@ -236,7 +236,7 @@ onBeforeUnmount(() => {
   <div class="flow-panel">
     <div v-if="props.showHeader" class="panel-header">
       <span class="panel-title">【フロー図】</span>
-      <span v-if="props.タスクID" class="panel-subtitle">{{ props.タスクID }} {{ props.タイトル }}</span>
+      <span v-if="props.タスクID" class="panel-subtitle">{{ props.タスクID }}</span>
     </div>
 
     <div class="panel-body">
@@ -245,6 +245,8 @@ onBeforeUnmount(() => {
       </div>
       <template v-else>
         <div v-if="renderError" class="panel-error">{{ renderError }}</div>
+        <!-- タイトルは図の左上にプレーン表示する（見出しはタスクIDだけにする） -->
+        <div v-if="props.タイトル" class="diagram-title">{{ props.タイトル }}</div>
         <div ref="diagramHost" class="diagram-host"></div>
         <div v-if="クリティカルパス表示" class="critical-path">
           <span class="critical-label">クリティカルパス:</span>
@@ -318,6 +320,17 @@ onBeforeUnmount(() => {
   color: #ef5350;
   font-size: 12px;
   padding: 4px;
+}
+
+.diagram-title {
+  flex-shrink: 0;
+  padding: 0 2px 6px;
+  font-size: 13px;
+  color: #ddd;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .diagram-host {

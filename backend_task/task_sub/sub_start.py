@@ -36,6 +36,22 @@ TASK_API = "http://localhost:8093/task"
 ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_start.log")
 
 
+def _標準出力をUTF8化() -> None:
+    """AI応答に含まれる — や絵文字で print が落ちないようにする。
+
+    サブプロセスの標準出力は Windows では cp932 になるため、変換できない文字があると
+    UnicodeEncodeError で処理全体が失敗してしまう。UTF-8（変換不可は置換）へ切り替える。
+    """
+    for ストリーム in (sys.stdout, sys.stderr):
+        try:
+            ストリーム.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_標準出力をUTF8化()
+
+
 def ログ(メッセージ: str) -> None:
     print(メッセージ, flush=True)
     os.makedirs(os.path.dirname(ログパス), exist_ok=True)

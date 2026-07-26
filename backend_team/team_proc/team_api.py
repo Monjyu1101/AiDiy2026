@@ -17,7 +17,15 @@ from pydantic import BaseModel, Field
 
 from log_config import get_logger
 
-from . import persona_catalog, team_db, team_exp_db, team_goal_db, team_status_db, team_work_db
+from . import (
+    persona_catalog,
+    team_db,
+    team_exp_db,
+    team_goal_db,
+    team_pdca_db,
+    team_status_db,
+    team_work_db,
+)
 from .config import 設定読込
 from .store import ストア
 
@@ -137,13 +145,19 @@ class チーム経験本登録要求(BaseModel):
     タイトル: str
     経験値: int = Field(default=0, ge=0, le=100)
     分類: str = ""
-    経験内容: str = ""
+    まとめ内容: str = ""
     学び: str = ""
 
 
 class チーム経験失敗要求(BaseModel):
     経験ID: str
     メッセージ: str = ""
+
+
+class チーム改善一覧要求(BaseModel):
+    """掲示板に出ているプロジェクト（CODE_BASE_PATH）で絞って一覧する。"""
+    プロジェクト: str = ""
+    件数: int = Field(default=team_pdca_db.一覧最大件数, ge=1, le=1000)
 
 
 class チーム目標取得要求(BaseModel):
@@ -153,6 +167,11 @@ class チーム目標取得要求(BaseModel):
 class チーム目標保存要求(操作情報):
     CODE_BASE_PATH: str
     チーム目標: str = ""
+    改善ループ: bool = False
+    最大ループ回数: int = Field(default=team_goal_db.既定最大ループ回数, ge=1, le=99)
+    動員要員数: int = Field(
+        default=team_goal_db.既定動員要員数, ge=1, le=team_goal_db.動員要員数上限
+    )
 
 
 class チーム目標削除要求(操作情報):
@@ -512,7 +531,7 @@ async def チーム経験本登録(request: チーム経験本登録要求) -> d
             "タイトル": タイトル,
             "経験値": request.経験値,
             "分類": request.分類.strip(),
-            "経験内容": request.経験内容.strip(),
+            "まとめ内容": request.まとめ内容.strip(),
             "学び": request.学び.strip(),
         })
         return ok(f"経験 {経験ID} を登録しました", {"item": item})
@@ -535,6 +554,29 @@ async def チーム経験失敗(request: チーム経験失敗要求) -> dict:
     except Exception as e:
         logger.error(f"チーム経験の失敗記録に失敗: {e}")
         return ng(f"チーム経験の失敗記録に失敗しました: {e}")
+
+
+@router.post("/改善/一覧", tags=["チーム改善"])
+async def チーム改善一覧(request: チーム改善一覧要求) -> dict:
+    """改善ループ（PDCA）の実行状況を、改善IDの新しい順で返す。"""
+    try:
+        items = team_pdca_db.改善一覧(request.プロジェクト.strip(), request.件数)
+        return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
+    except Exception as e:
+        logger.error(f"チーム改善一覧の取得に失敗: {e}")
+        return ng(f"チーム改善一覧の取得に失敗しました: {e}")
+
+
+@router.post("/改善/最大更新日時", tags=["チーム改善"])
+async def チーム改善最大更新日時(request: チーム改善一覧要求) -> dict:
+    """一覧の再取得判定に使う最大更新日時（5秒ポーリング用）。"""
+    try:
+        return ok("最大更新日時を取得しました", {
+            "最大更新日時": team_pdca_db.改善最大更新日時(request.プロジェクト.strip()),
+        })
+    except Exception as e:
+        logger.error(f"チーム改善の最大更新日時の取得に失敗: {e}")
+        return ng(f"チーム改善の最大更新日時の取得に失敗しました: {e}")
 
 
 @router.post("/目標/一覧", tags=["チーム目標"])
@@ -582,7 +624,24 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             return ng("CODE_BASE_PATHを指定してください")
         if not 目標:
             return ng("チーム目標を入力してください")
-        item = team_goal_db.目標保存(パス, 目標, request.操作者())
+        変更前 = team_goal_db.目標取得(パス)
+        item = team_goal_db.目標保存(
+            パス,
+            目標,
+            request.操作者(),
+            request.改善ループ,
+            request.最大ループ回数,
+            request.動員要員数,
+        )
+        if team_goal_db.改善履歴クリア必要(変更前, 目標, request.改善ループ):
+            # 最大ループ回数・動員要員数だけの変更では履歴を残し、
+            # 目標またはループON/OFFの変更時だけクリアする。
+            クリア件数 = team_pdca_db.改善クリア(パス)
+            logger.info(f"目標または改善ループ変更のためAチーム改善をクリアしました: {パス} ({クリア件数}件)")
+            return ok(
+                f"{パス} のチーム目標を保存し、改善ループの記録を{クリア件数}件クリアしました",
+                {"item": item, "改善クリア件数": クリア件数},
+            )
         return ok(f"{パス} のチーム目標を保存しました", {"item": item})
     except ValueError as exc:
         return ng(str(exc))
@@ -598,6 +657,8 @@ async def チーム目標削除(request: チーム目標削除要求) -> dict:
         if not パス:
             return ng("CODE_BASE_PATHを指定してください")
         team_goal_db.目標削除(パス)
+        # 目標が消えたら改善ループの記録も残さない
+        team_pdca_db.改善クリア(パス)
         return ok(f"{パス} のチーム目標を削除しました")
     except KeyError:
         return ng("対象のチーム目標が見つかりません")
@@ -610,7 +671,7 @@ async def チーム目標削除(request: チーム目標削除要求) -> dict:
 
 @router.post("/状況/一覧", tags=["チーム状況"])
 async def チーム状況一覧() -> dict:
-    """要員ごとのAタスク要求集計（待機数・実行数・完了数・エラー数）を取得する。
+    """要員ごとのAタスク要求と経験生成（待機数・実行数・まとめ中数・完了数・エラー数）を取得する。
 
     集計自体はbackend_task側（10秒間隔）が行い、Aチーム状況テーブルを作り直している。
     """
@@ -620,3 +681,16 @@ async def チーム状況一覧() -> dict:
     except Exception as e:
         logger.error(f"チーム状況一覧の取得に失敗: {e}")
         return ng(f"チーム状況一覧の取得に失敗しました: {e}")
+
+
+@router.post("/状況/最大更新日時", tags=["チーム状況"])
+async def チーム状況最大更新日時() -> dict:
+    """一覧の再取得判定に使う最大更新日時（5秒ポーリング用）。"""
+    try:
+        return ok(
+            "最大更新日時を取得しました",
+            {"最大更新日時": team_status_db.状況最大更新日時()},
+        )
+    except Exception as e:
+        logger.error(f"チーム状況の最大更新日時取得に失敗: {e}")
+        return ng(f"チーム状況の最大更新日時取得に失敗しました: {e}")

@@ -59,12 +59,19 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         del app
-        from . import team_db, team_exp_db, team_goal_db, team_work_db
+        from . import team_db, team_exp_db, team_goal_db, team_pdca_db, team_work_db
 
         team_work_db.初期化()
         team_exp_db.初期化()
+        team_pdca_db.初期化()
         await asyncio.to_thread(team_db.初期要員を召喚)
         await asyncio.to_thread(team_goal_db.初期目標を投入)
+        解除件数 = await asyncio.to_thread(team_goal_db.起動時改善ループをオフ)
+        if 解除件数:
+            logger.info(
+                "backend_team 起動時にAチーム目標の改善ループをオフへ戻しました: %d件",
+                解除件数,
+            )
         await asyncio.to_thread(起動時クリーンアップ, logger)
         tasks = [
             asyncio.create_task(シミュレーションループ(logger), name="backend_team_simulation"),

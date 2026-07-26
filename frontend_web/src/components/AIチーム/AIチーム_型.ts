@@ -1,4 +1,4 @@
-export type エージェント状態 = '作業中' | '相談中' | '瞑想中' | '移動中' | '召喚中';
+export type エージェント状態 = '作業中' | '相談中' | '雑談中' | '瞑想中' | '移動中' | '休憩中' | '召喚中';
 
 export type エージェント = {
   id: string;
@@ -37,7 +37,7 @@ export type チーム経験 = {
   タイトル: string;
   経験値: number;
   分類: string;
-  経験内容: string;
+  まとめ内容: string;
   学び: string;
   状態: '生成中' | '完了' | 'エラー';
   開始日時: string;
@@ -46,9 +46,33 @@ export type チーム経験 = {
   更新日時: string;
 };
 
+export type チーム改善 = {
+  改善ID: string;
+  プロジェクト: string;
+  ループ: number;
+  作業ID: string;
+  チーム目標: string;
+  要員ID: string;
+  /** S=相談 / P=計画 / D=実行 / C=評価 / A=改善 */
+  PDCA区分: string;
+  /** 対応するAチーム作業の状態を写した表示用の値 */
+  状況: string;
+  開始日時: string;
+  終了日時: string;
+  応答内容: string;
+  まとめ内容: string;
+  更新日時: string;
+};
+
 export type チーム目標 = {
   CODE_BASE_PATH: string;
   チーム目標: string;
+  /** 目標に向けた改善ループを回すかどうか（既定はオフ） */
+  改善ループ?: boolean | number;
+  /** 1〜98は上限回数、99は無制限 */
+  最大ループ回数?: number;
+  /** 改善ループの相談フェーズへ動員する要員数（1〜admin以外の有効要員数、既定2） */
+  動員要員数?: number;
   更新日時: string;
   更新利用者ID?: string;
   更新利用者名?: string;
@@ -58,8 +82,10 @@ export type チーム状況 = {
   要員ID: string;
   要員名: string;
   最終更新日時: string;
+  経験最終更新日時: string;
   待機数: number;
   実行数: number;
+  まとめ中数: number;
   完了数: number;
   エラー数: number;
   更新日時: string;
@@ -77,13 +103,14 @@ export type チーム作業 = {
   TASK_AI_MODEL: string;
   タスクID: string;
   実行有効: boolean | number;
-  状態: '準備開始' | '準備中' | '準備完了' | '待機' | '実行中' | 'エラー' | '完了' | '中止';
+  状態: '準備開始' | '準備中' | '準備完了' | '待機' | '実行中' | 'エラー' | '完了' | '済' | '中止';
   PID: string;
   開始日時: string;
   終了日時: string;
   実行回数: number;
   応答タイトル: string;
   応答内容: string;
+  まとめ内容: string;
   更新日時: string;
   表示優先順位: number;
 };
@@ -103,8 +130,10 @@ export type 状態表示 = Record<エージェント状態, { 色: string; 記�
 export const 状態情報: 状態表示 = {
   作業中: { 色: '#65e8b7', 記号: '●' },
   相談中: { 色: '#8bb8ff', 記号: '◆' },
+  雑談中: { 色: '#8bb8ff', 記号: '◆' },
   瞑想中: { 色: '#ffd580', 記号: '◉' },
   移動中: { 色: '#b8a7ff', 記号: '→' },
+  休憩中: { 色: '#7be3b0', 記号: '○' },
   召喚中: { 色: '#f58cff', 記号: '✦' },
 };
 

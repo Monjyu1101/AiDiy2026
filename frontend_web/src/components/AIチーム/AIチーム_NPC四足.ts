@@ -58,6 +58,10 @@ export type 四足設定 = {
   /** 尾を振る速さと角度 */
   尾速度: number;
   尾振り角: number;
+  /** 尾の付け根から先が向く基準角。正の大角度で後方へ垂れる */
+  尾基準角: number;
+  /** true の場合、常時ではなく間欠的に尾を振る */
+  尾を時々振る: boolean;
   /** 体格 */
   体長: number;
   体幅: number;
@@ -247,7 +251,7 @@ const 体を組む = (
   尾.position.set(0, 設定.体高 * 0.34, 設定.体長 * 0.44);
   const 尾長 = 設定.体長 * 0.42;
   const 尾軸 = new THREE.Group();
-  尾軸.rotation.x = -Math.PI / 3.2;
+  尾軸.rotation.x = 設定.尾基準角;
   const 尾本体 = new THREE.Mesh(
     ジオメトリ(new THREE.CapsuleGeometry(設定.体高 * 0.1, 尾長, 4, 8)),
     体材,
@@ -395,7 +399,8 @@ export const 四足NPCを生成 = (
     });
 
     // 尾（歩行中はよく振り、眠ると止まって体へ寄せる）
-    const 尾勢い = 状態 === '眠る' ? 0.12 : 歩行中 ? 1 : 0.45;
+    const 間欠振り = !設定.尾を時々振る || Math.sin(時刻 * 0.00036 + 位相) > 0.48;
+    const 尾勢い = 状態 === '眠る' ? 0.08 : 間欠振り ? (歩行中 ? 1 : 0.7) : 0.06;
     部位.尾.rotation.y =
       Math.sin(時刻 * 0.001 * 設定.尾速度 + 位相) * 設定.尾振り角 * 尾勢い;
     部位.尾.rotation.x = -現在姿勢.尾傾き;

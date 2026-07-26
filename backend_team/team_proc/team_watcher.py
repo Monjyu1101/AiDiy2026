@@ -15,6 +15,8 @@
   起動時に準備中へ進め、PID・開始日時・実行回数を記録する。
 - 開始日時だけが入ったまま実行タイムアウト分以上経過した作業は、hh:mm が変わった
   監視回だけ（毎分1回）強制停止してエラーにする。
+- 毎分1回、Aチーム目標の改善ループ（PDCA）も確認する。実行中の要員がいない空き時間で、
+  前の段が終わっていれば次の段を対応する sub_pdca_*.py で投入する。
 - システム開始時（再起動含む）は、テーブルに残った未投入の作業をエラーとして記録しクリアする
   （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
@@ -31,7 +33,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import team_exp_db, team_work_db
+from . import team_exp_db, team_goal_db, team_pdca_db, team_status_db, team_work_db
 
 監視間隔秒 = 5
 実行回数上限 = 3
@@ -41,9 +43,30 @@ _SUB_INITパス = _BASE_DIR / "team_sub" / "sub_init.py"
 _入力DIR = _BASE_DIR / "temp" / "input"
 _SUB_EXPパス = _BASE_DIR / "team_sub" / "sub_exp.py"
 _経験入力DIR = _BASE_DIR / "temp" / "exp"
+_SUB_PDCAパス = {
+    "S": _BASE_DIR / "team_sub" / "sub_pdca_soudan.py",
+    "P": _BASE_DIR / "team_sub" / "sub_pdca_plan.py",
+    "D": _BASE_DIR / "team_sub" / "sub_pdca_do.py",
+    "C": _BASE_DIR / "team_sub" / "sub_pdca_check.py",
+    "A": _BASE_DIR / "team_sub" / "sub_pdca_action.py",
+}
+_改善入力DIR = _BASE_DIR / "temp" / "pdca"
 
 # 実行タイムアウトの確認は hh:mm が変わった監視回だけ処理する（毎分 1 回）
 _前回確認分 = ""
+# 起動中の改善ループ投入プロセス（前回分が動いている間は次を投入しない）
+_改善プロセス: subprocess.Popen | None = None
+# 未実装区分の案内は毎分繰り返さず、プロジェクト×区分ごとに1回だけ出す
+_改善未実装通知済み: set[tuple[str, str]] = set()
+
+
+def _サブプロセス環境() -> dict:
+    """サブプロセスの標準出力を UTF-8 にする環境変数を足して返す。
+
+    Windows では既定が cp932 になり、AI応答に含まれる — や絵文字を print した時点で
+    UnicodeEncodeError になって処理が失敗するため（変換できない文字は置換する）。
+    """
+    return {**os.environ, "PYTHONIOENCODING": "utf-8:replace"}
 
 
 def _安全ファイル名部品(値: str) -> str:
@@ -56,6 +79,11 @@ def _入力パス(作業ID: str) -> Path:
 
 def _経験入力パス(経験ID: str) -> Path:
     return _経験入力DIR / f"{_安全ファイル名部品(経験ID)}.json"
+
+
+def _改善入力パス(プロジェクト: str, 区分: str) -> Path:
+    時刻 = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return _改善入力DIR / f"{_安全ファイル名部品(プロジェクト)}_{_安全ファイル名部品(区分)}_{時刻}.json"
 
 
 def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
@@ -111,6 +139,12 @@ def 起動時クリーンアップ(logger: logging.Logger) -> None:
             logger.info(f"生成中の経験を{経験件数}件エラーにしてクリアしました")
     except Exception:
         logger.exception("Aチーム経験の起動時クリーンアップに失敗しました")
+    try:
+        改善件数 = team_pdca_db.取り残し終了()
+        if 改善件数:
+            logger.info(f"終了済み作業に対応する改善レコードを{改善件数}件回収しました")
+    except Exception:
+        logger.exception("Aチーム改善の起動時クリーンアップに失敗しました")
 
 
 def _作業実行開始(行: dict, logger: logging.Logger) -> None:
@@ -149,6 +183,7 @@ def _作業実行開始(行: dict, logger: logging.Logger) -> None:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=creationflags,
+            env=_サブプロセス環境(),
         )
         team_work_db.実行開始記録(作業ID, proc.pid)
         logger.info(f"チーム作業のタスク投入を開始しました: {作業ID} PID={proc.pid}")
@@ -215,6 +250,7 @@ def _経験生成開始(対象: dict, logger: logging.Logger) -> None:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=creationflags,
+            env=_サブプロセス環境(),
         )
         team_exp_db.生成開始記録(経験ID, proc.pid)
         logger.info(f"Aチーム経験の生成を開始しました: {経験ID} (作業={作業ID}) PID={proc.pid}")
@@ -244,6 +280,102 @@ def _経験生成確認(logger: logging.Logger) -> None:
         logger.exception("Aチーム経験の生成確認でエラーが発生しました")
 
 
+def _改善実行開始(目標: dict, 区分: str, logger: logging.Logger) -> subprocess.Popen | None:
+    """PDCA 1段分の入力 JSON を出力し、区分に対応する sub_pdca_*.py を起動する。"""
+    プロジェクト = str(目標.get("CODE_BASE_PATH", ""))
+    スクリプト = _SUB_PDCAパス[区分]
+    try:
+        _改善入力DIR.mkdir(parents=True, exist_ok=True)
+        入力パス = _改善入力パス(プロジェクト, 区分)
+        with 入力パス.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "プロジェクト": プロジェクト,
+                    "チーム目標": str(目標.get("チーム目標", "")),
+                    "PDCA区分": 区分,
+                    "最大ループ回数": max(1, min(99, int(目標.get("最大ループ回数", 1) or 1))),
+                    "動員要員数": max(
+                        1,
+                        min(
+                            team_goal_db.動員要員数上限,
+                            int(目標.get("動員要員数", team_goal_db.既定動員要員数)
+                                or team_goal_db.既定動員要員数),
+                        ),
+                    ),
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        proc = subprocess.Popen(
+            [sys.executable, str(スクリプト), str(入力パス)],
+            cwd=str(_BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+            env=_サブプロセス環境(),
+        )
+        logger.info(
+            f"改善ループ({区分})の投入を開始しました: プロジェクト={プロジェクト} PID={proc.pid}"
+        )
+        return proc
+    except Exception:
+        logger.exception(f"改善ループ({区分})の起動に失敗しました: プロジェクト={プロジェクト}")
+        return None
+
+
+def _改善ループ確認(logger: logging.Logger) -> None:
+    """改善ループがオンの目標について、空き時間なら次の PDCA 段を投入する（1分ごと）。
+
+    投入するのは次のすべてを満たすときだけ。
+    - 前回の投入プロセスが残っていない
+    - Aチーム状況で実行中（準備中・実行中）の要員が 1 人もいない＝空き時間
+    - そのプロジェクトの Aチーム改善に未終了レコードが無く、次の区分が実装済み
+    """
+    global _改善プロセス
+    try:
+        if _改善プロセス is not None and _改善プロセス.poll() is None:
+            return
+        _改善プロセス = None
+        対象一覧 = team_goal_db.改善ループ対象一覧()
+        if not 対象一覧:
+            return
+        # Aチーム作業が終わっているのに未終了で残った改善レコードを回収しておく
+        回収件数 = team_pdca_db.取り残し終了()
+        if 回収件数:
+            logger.info(f"終了済みのAチーム作業に対応する改善レコードを{回収件数}件回収しました")
+        実行中人数 = team_status_db.実行中要員数()
+        if 実行中人数 > 0:
+            return
+        for 目標 in 対象一覧:
+            プロジェクト = str(目標.get("CODE_BASE_PATH", ""))
+            区分 = team_pdca_db.次のPDCA区分(プロジェクト)
+            if not 区分:
+                continue
+            最大ループ回数 = max(1, min(99, int(目標.get("最大ループ回数", 1) or 1)))
+            if (
+                区分 == "S"
+                and 最大ループ回数 != 99
+                and team_pdca_db.ループ最大値(プロジェクト) >= 最大ループ回数
+            ):
+                continue
+            if 区分 not in team_pdca_db.実装済みPDCA区分 or 区分 not in _SUB_PDCAパス:
+                if (プロジェクト, 区分) not in _改善未実装通知済み:
+                    _改善未実装通知済み.add((プロジェクト, 区分))
+                    logger.info(
+                        f"改善ループの次の区分({区分})は未実装のため投入しません: プロジェクト={プロジェクト}"
+                    )
+                continue
+            _改善未実装通知済み.discard((プロジェクト, 区分))
+            _改善プロセス = _改善実行開始(目標, 区分, logger)
+            # 空き時間を埋めるのは1サイクルにつき1プロジェクトだけにする
+            break
+    except Exception:
+        logger.exception("改善ループの確認でエラーが発生しました")
+
+
 def _監視1回(logger: logging.Logger) -> None:
     global _前回確認分
     現在分 = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -251,6 +383,7 @@ def _監視1回(logger: logging.Logger) -> None:
         _前回確認分 = 現在分
         _タイムアウト確認(logger)
         _経験生成確認(logger)
+        _改善ループ確認(logger)
 
     # --- 投入待ち（準備開始・未投入）→ 準備中 + sub_init.pyでAIタスク投入 ---
     for 行 in team_work_db.投入待ち一覧():

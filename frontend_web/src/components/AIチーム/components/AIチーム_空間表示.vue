@@ -33,7 +33,8 @@ type 実行状態 = {
   目的地: THREE.Vector3;
   位相: number;
   速度: number;
-  状態更新時刻: number;
+  割当状態: エージェント状態;
+  次自由行動時刻: number;
 };
 
 const props = defineProps<{
@@ -48,12 +49,6 @@ const emit = defineEmits<{
   select: [id: string];
   retry: [];
   目標クリック: [];
-  stateChange: [
-    id: string,
-    state: エージェント状態,
-    work: string,
-    comment: string,
-  ];
 }>();
 
 const stageRef = ref<HTMLElement | null>(null);
@@ -64,8 +59,9 @@ const 要員読込中 = computed(() => props.要員読込中);
 const 要員読込エラー = computed(() => props.要員読込エラー);
 const 要員数 = computed(() => エージェント一覧.value.length);
 const 稼働数 = computed(() => エージェント一覧.value.filter((agent) => agent.状態 === '作業中').length);
-const 相談数 = computed(() => エージェント一覧.value.filter((agent) => agent.状態 === '相談中').length);
+const 相談数 = computed(() => エージェント一覧.value.filter((agent) => ['相談中', '雑談中'].includes(agent.状態)).length);
 const 瞑想数 = computed(() => エージェント一覧.value.filter((agent) => agent.状態 === '瞑想中').length);
+const 休憩数 = computed(() => エージェント一覧.value.filter((agent) => ['移動中', '休憩中'].includes(agent.状態)).length);
 const ホバー中ID = ref('');
 // 時間の進み方は画面から変更せず、この規定値で固定する（1.0 倍が標準。0 にすると時間が止まる）
 const 経過速度倍率 = 1;
@@ -89,6 +85,8 @@ const 目標掲示板 = {
   group: null as THREE.Group | null,
   板: null as THREE.Mesh | null,
   縁: null as THREE.Mesh | null,
+  改善明滅: null as THREE.Mesh | null,
+  改善ネオン芯: null as THREE.Group | null,
 };
 const 目標掲示板幅 = 13;
 const 目標掲示板縦 = 4.6;
@@ -96,7 +94,7 @@ let 目標テクスチャ: THREE.CanvasTexture | null = null;
 const 目標ホバー = ref(false);
 const 実行状態一覧 = new Map<string, 実行状態>();
 const 掲示板一覧: THREE.Group[] = [];
-// NPC（ネコ・イヌ・雲・蝶）。造形と動作は AIチーム_NPC制御.ts と AIチーム_NPC動作_*.ts で調整する
+// NPC（ネコ・イヌ・馬・雲・蝶）。造形と動作は AIチーム_NPC制御.ts と AIチーム_NPC動作_*.ts で調整する
 const NPC一覧: NPC個体[] = [];
 const 破棄対象: Array<THREE.BufferGeometry | THREE.Material> = [];
 const 破棄テクスチャ: THREE.Texture[] = [];
@@ -187,8 +185,10 @@ const エリア中心 = (key: エリアキー): [number, number] => {
 const 状態エリア: Record<エージェント状態, エリアキー> = {
   作業中: '仕事',
   相談中: '雑談',
+  雑談中: '雑談',
   瞑想中: '瞑想',
   移動中: '休憩',
+  休憩中: '休憩',
   召喚中: '雑談',
 };
 
@@ -208,6 +208,20 @@ const エリア位置 = (状態: エージェント状態, index = 0): THREE.Vec
   if (状態 === '召喚中') return new THREE.Vector3(cx, 要員基準Y, cz);
   const [ox, oz] = 座席オフセット[index % 座席オフセット.length];
   return new THREE.Vector3(cx + ox, 要員基準Y, cz + oz);
+};
+
+/** 指定されたエリア円内で自由行動するための目的地 */
+const エリア内自由位置 = (状態: エージェント状態): THREE.Vector3 => {
+  const [cx, cz] = エリア中心(状態エリア[状態]);
+  if (状態 === '召喚中') return new THREE.Vector3(cx, 要員基準Y, cz);
+  const 角度 = Math.random() * Math.PI * 2;
+  const 距離 = 2.3 + Math.sqrt(Math.random()) * Math.max(0.5, 台座半径 - 4);
+  return new THREE.Vector3(cx + Math.cos(角度) * 距離, 要員基準Y, cz + Math.sin(角度) * 距離);
+};
+
+const 指定エリア外 = (位置: THREE.Vector3, 状態: エージェント状態) => {
+  const [cx, cz] = エリア中心(状態エリア[状態]);
+  return Math.hypot(位置.x - cx, 位置.z - cz) > 台座半径 - 0.8;
 };
 
 // 草原の小物は数が多いため、ジオメトリとマテリアルを 1 組だけ作って共有する
@@ -932,6 +946,53 @@ const 目標掲示板を作る = () => {
   group.add(縁);
   目標掲示板.縁 = 縁;
 
+  // 改善ループ中は、掲示板全体へ薄いピンクの明滅を重ねる。
+  const 改善明滅材 = new THREE.MeshBasicMaterial({
+    color: 0xff1493,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    toneMapped: false,
+    blending: THREE.AdditiveBlending,
+  });
+  破棄対象.push(改善明滅材);
+  const 改善明滅 = new THREE.Mesh(
+    ジオメトリ(new THREE.PlaneGeometry(目標掲示板幅, 目標掲示板縦)),
+    改善明滅材,
+  );
+  改善明滅.position.z = 0.035;
+  改善明滅.visible = Boolean(props.チーム目標?.改善ループ);
+  改善明滅.renderOrder = 2;
+  group.add(改善明滅);
+  目標掲示板.改善明滅 = 改善明滅;
+
+  // ネオン管の白い発光芯。外側のピンクの縁と重ねて、光のにじみを作る。
+  const ネオン芯材 = new THREE.MeshBasicMaterial({
+    color: 0xffeaf6,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    toneMapped: false,
+    blending: THREE.AdditiveBlending,
+  });
+  破棄対象.push(ネオン芯材);
+  const ネオン芯 = new THREE.Group();
+  const 横芯形状 = ジオメトリ(new THREE.BoxGeometry(目標掲示板幅 + 0.42, 0.1, 0.06));
+  const 縦芯形状 = ジオメトリ(new THREE.BoxGeometry(0.1, 目標掲示板縦 + 0.42, 0.06));
+  [-1, 1].forEach((方向) => {
+    const 横芯 = new THREE.Mesh(横芯形状, ネオン芯材);
+    横芯.position.set(0, 方向 * (目標掲示板縦 / 2 + 0.2), 0.065);
+    ネオン芯.add(横芯);
+    const 縦芯 = new THREE.Mesh(縦芯形状, ネオン芯材);
+    縦芯.position.set(方向 * (目標掲示板幅 / 2 + 0.2), 0, 0.065);
+    ネオン芯.add(縦芯);
+  });
+  ネオン芯.visible = Boolean(props.チーム目標?.改善ループ);
+  ネオン芯.renderOrder = 3;
+  group.add(ネオン芯);
+  目標掲示板.改善ネオン芯 = ネオン芯;
+
   scene.add(group);
   目標掲示板.group = group;
 };
@@ -1133,7 +1194,8 @@ const エージェントを追加 = (agent: エージェント, index: number) =
     目的地: startPosition.clone(),
     位相: Math.random() * Math.PI * 2,
     速度: 0.65 + Math.random() * 0.2,
-    状態更新時刻: 経過時間 + 8 + Math.random() * 8,
+    割当状態: agent.状態,
+    次自由行動時刻: 経過時間 + 2 + Math.random() * 4,
   });
 };
 
@@ -1321,7 +1383,7 @@ const シーンを作る = () => {
     柵を作る(32, -14, Math.PI / 2.4, 5);
     柵を作る(-11, 34, 0.15, 6);
 
-    // --- NPC（ネコ・イヌ・雲・蝶）---
+    // --- NPC（ネコ・イヌ・馬・雲・蝶）---
     // 池は避けて歩くよう禁止円として渡す
     const NPC禁止円 = 池位置.map(
       ([px, pz, pr]) => [px, pz, pr + 1.2] as [number, number, number],
@@ -1344,6 +1406,19 @@ const シーンを作る = () => {
         禁止円: NPC禁止円,
       }),
     );
+    // カメラから見て4エリアの向こう側を放牧エリアにする。白馬は離れたときだけ黒馬を追う
+    const 黒馬 = NPCを配置(scene, '黒馬', NPC造形ヘルパー, {
+      位置: new THREE.Vector3(0, 0, 0),
+      種: 910,
+    });
+    const 白馬 = NPCを配置(
+      scene,
+      '白馬',
+      NPC造形ヘルパー,
+      { 位置: new THREE.Vector3(0, 0, 0), 種: 911 },
+      { 追跡対象: 黒馬.group, 追従開始距離: 14, 追従終了距離: 7 },
+    );
+    NPC一覧.push(黒馬, 白馬);
     [
       [-5, 6, 0xfff0a0],
       [6.5, -7, 0xffc0dd],
@@ -1435,35 +1510,6 @@ const サイズ更新 = () => {
   camera.updateProjectionMatrix();
 };
 
-const 次の状態へ = (agent: エージェント, index: number) => {
-  const runtime = 実行状態一覧.get(agent.id);
-  if (!runtime) return;
-  const roll = Math.random();
-  let nextState: エージェント状態;
-  if (roll < 0.48) nextState = '作業中';
-  else if (roll < 0.68) nextState = '相談中';
-  else if (roll < 0.82) nextState = '瞑想中';
-  else nextState = '移動中';
-
-  runtime.状態更新時刻 = 経過時間 + 8 + Math.random() * 10;
-  runtime.目的地.copy(エリア位置(nextState, index));
-
-  let work = '';
-  let comment = '';
-  if (nextState === '作業中') {
-    work = 作業候補[Math.floor(Math.random() * 作業候補.length)];
-  } else if (nextState === '相談中') {
-    work = '仲間とアイデア交換';
-    comment = 雑談候補[Math.floor(Math.random() * 雑談候補.length)];
-  } else if (nextState === '瞑想中') {
-    work = '静かに思考と文脈を整理中';
-    comment = '次の行動を見つめ直しています';
-  } else {
-    work = '休憩エリアでひと息ついている';
-  }
-  emit('stateChange', agent.id, nextState, work, comment);
-};
-
 const 描画 = (時刻: number) => {
   if (!renderer || !scene || !camera) return;
   const rawDelta = Math.min((時刻 - 前フレーム時刻) / 1000, 0.05);
@@ -1474,9 +1520,14 @@ const 描画 = (時刻: number) => {
   エージェント一覧.value.forEach((agent, index) => {
     const runtime = 実行状態一覧.get(agent.id);
     if (!runtime) return;
-    if (delta > 0 && 経過時間 >= runtime.状態更新時刻) 次の状態へ(agent, index);
-
     const group = runtime.group;
+    // 要員状況の状態を正とし、表示位置が違うエリアなら指定エリアへの移動を優先する
+    if (runtime.割当状態 !== agent.状態 || 指定エリア外(group.position, agent.状態)) {
+      runtime.割当状態 = agent.状態;
+      runtime.目的地.copy(エリア位置(agent.状態, index));
+      runtime.速度 = 1.35;
+      runtime.次自由行動時刻 = Number.POSITIVE_INFINITY;
+    }
     const direction = runtime.目的地.clone().sub(group.position);
     direction.y = 0;
     const distance = direction.length();
@@ -1485,6 +1536,21 @@ const 描画 = (時刻: number) => {
       direction.normalize();
       group.position.addScaledVector(direction, Math.min(distance, delta * runtime.速度));
       group.rotation.y = THREE.MathUtils.lerp(group.rotation.y, Math.atan2(direction.x, direction.z), 0.08);
+    } else if (delta > 0) {
+      if (!Number.isFinite(runtime.次自由行動時刻)) {
+        runtime.次自由行動時刻 = 経過時間 + 1 + Math.random() * 3;
+      } else if (経過時間 >= runtime.次自由行動時刻) {
+        if (Math.random() < 0.34) {
+          // ときどきその場にとどまる
+          runtime.目的地.copy(group.position);
+          runtime.次自由行動時刻 = 経過時間 + 3 + Math.random() * 7;
+        } else {
+          // 割り当てられた同じエリア内の別地点へ歩く
+          runtime.目的地.copy(エリア内自由位置(agent.状態));
+          runtime.速度 = 0.42 + Math.random() * 0.42;
+          runtime.次自由行動時刻 = Number.POSITIVE_INFINITY;
+        }
+      }
     }
 
     const bob = Math.sin(時刻 * 0.0027 + runtime.位相);
@@ -1519,7 +1585,7 @@ const 描画 = (時刻: number) => {
     }
     const head = group.getObjectByName('head');
     if (head) {
-      head.rotation.y = agent.状態 === '相談中' ? Math.sin(時刻 * 0.0016 + runtime.位相) * 0.4 : bob * 0.06;
+      head.rotation.y = ['相談中', '雑談中'].includes(agent.状態) ? Math.sin(時刻 * 0.0016 + runtime.位相) * 0.4 : bob * 0.06;
       head.rotation.x = agent.状態 === '瞑想中' ? 0.22 : agent.状態 === '作業中' ? 0.14 : 0;
     }
   });
@@ -1534,10 +1600,36 @@ const 描画 = (時刻: number) => {
   });
 
   // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
+  const 改善ループ中 = Boolean(props.チーム目標?.改善ループ);
+  // ゆっくりした明滅へ、ごく短い瞬断を混ぜてネオン管らしい点灯の揺らぎを作る。
+  const 瞬断 = Math.sin(時刻 * 0.021) + Math.sin(時刻 * 0.0137) > 1.72 ? 0.2 : 1;
+  const ネオン強度 = (0.72 + (Math.sin(時刻 * 0.0045) + 1) * 0.14) * 瞬断;
   if (目標掲示板.縁) {
     const 縁材 = 目標掲示板.縁.material as THREE.MeshBasicMaterial;
-    const 目標値 = 目標ホバー.value ? 0.85 : 0.34 + (Math.sin(時刻 * 0.0016) + 1) * 0.06;
-    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 0.12);
+    縁材.color.setHex(改善ループ中 ? 0xff1493 : 0xfff6d0);
+    const 目標値 = 目標ホバー.value
+      ? 0.85
+      : 改善ループ中
+        ? 0.18 + ネオン強度 * 0.78
+        : 0.34 + (Math.sin(時刻 * 0.0016) + 1) * 0.06;
+    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 改善ループ中 ? 0.32 : 0.12);
+  }
+  if (目標掲示板.改善明滅) {
+    目標掲示板.改善明滅.visible = 改善ループ中;
+    if (改善ループ中) {
+      const 明滅材 = 目標掲示板.改善明滅.material as THREE.MeshBasicMaterial;
+      明滅材.opacity = 0.025 + ネオン強度 * 0.085;
+    }
+  }
+  if (目標掲示板.改善ネオン芯) {
+    目標掲示板.改善ネオン芯.visible = 改善ループ中;
+    if (改善ループ中) {
+      const 芯材 = (目標掲示板.改善ネオン芯.children[0] as THREE.Mesh)
+        .material as THREE.MeshBasicMaterial;
+      芯材.opacity = 0.28 + ネオン強度 * 0.72;
+      const 芯拡大 = 1 + ネオン強度 * 0.004;
+      目標掲示板.改善ネオン芯.scale.setScalar(芯拡大);
+    }
   }
 
   // NPC（ネコ・イヌ・雲・蝶）はそれぞれの動作モジュールが自分で動く
@@ -1628,8 +1720,18 @@ const カメラを戻す = () => {
 };
 
 watch(
-  () => props.エージェント一覧.map((agent) => agent.id).join('|'),
-  () => エージェント表示を同期(),
+  () => props.エージェント一覧.map((agent) => `${agent.id}:${agent.状態}`).join('|'),
+  () => {
+    エージェント表示を同期();
+    props.エージェント一覧.forEach((agent, index) => {
+      const runtime = 実行状態一覧.get(agent.id);
+      if (!runtime || runtime.割当状態 === agent.状態) return;
+      runtime.割当状態 = agent.状態;
+      runtime.目的地.copy(エリア位置(agent.状態, index));
+      runtime.速度 = 1.35;
+      runtime.次自由行動時刻 = Number.POSITIVE_INFINITY;
+    });
+  },
   { flush: 'post' },
 );
 
@@ -1655,6 +1757,8 @@ onBeforeUnmount(() => {
   目標掲示板.group = null;
   目標掲示板.板 = null;
   目標掲示板.縁 = null;
+  目標掲示板.改善明滅 = null;
+  目標掲示板.改善ネオン芯 = null;
   目標テクスチャ = null;
   NPC一覧.length = 0;
   部品 = null;
@@ -1696,8 +1800,9 @@ onBeforeUnmount(() => {
       <div class="scene-right">
         <span class="stat-chip">要員<b>{{ 要員数 }}</b></span>
         <span class="stat-chip active">作業中<b>{{ 稼働数 }}</b></span>
-        <span class="stat-chip">相談中<b>{{ 相談数 }}</b></span>
+        <span class="stat-chip">雑談中<b>{{ 相談数 }}</b></span>
         <span class="stat-chip">瞑想中<b>{{ 瞑想数 }}</b></span>
+        <span class="stat-chip">休憩中<b>{{ 休憩数 }}</b></span>
         <div class="scene-clock"><span>LIVE</span>{{ 現在時刻 }}</div>
       </div>
     </div>
@@ -1710,7 +1815,7 @@ onBeforeUnmount(() => {
       class="world-label"
       :class="{
         selected: agent.id === 選択中ID,
-        talking: agent.状態 === '相談中',
+        talking: ['相談中', '雑談中'].includes(agent.状態),
         hovered: agent.id === ホバー中ID,
       }"
       :style="{ '--agent-color': agent.色CSS }"
@@ -1720,7 +1825,7 @@ onBeforeUnmount(() => {
     >
       <span class="world-name">{{ agent.名前 }}</span>
       <span class="world-role">{{ agent.役割 || '役割未設定' }}</span>
-      <span v-if="agent.状態 === '相談中' && agent.ひとこと" class="speech">
+      <span v-if="['相談中', '雑談中'].includes(agent.状態) && agent.ひとこと" class="speech">
         {{ agent.ひとこと }}
       </span>
     </button>

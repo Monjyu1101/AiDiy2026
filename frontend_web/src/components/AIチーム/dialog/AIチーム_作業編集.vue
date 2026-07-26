@@ -20,8 +20,12 @@ const authStore = useAuthStore();
 const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
 const 利用者名 = computed(() => String(authStore.user?.利用者名 ?? authStore.user?.利用者ID ?? 'admin'));
 const 修正モード = computed(() => props.編集作業 !== null);
-const 状況選択肢 = ['準備開始', '準備完了', '中止'];
-const 状況表示リスト = ['準備開始', '準備中', '準備完了', '待機', '実行中', 'エラー', '完了', '中止'];
+// 新規は作業の担当としてログイン利用者IDを使う。修正は対象作業の要員IDをそのまま引き継ぐ
+const 対象要員ID = computed(() =>
+  props.編集作業 ? String(props.編集作業.要員ID ?? '') || 利用者ID.value : 利用者ID.value
+);
+const 状況選択肢 = ['準備開始', '準備完了', '済', '中止'];
+const 状況表示リスト = ['準備開始', '準備中', '準備完了', '待機', '実行中', 'エラー', '完了', '済', '中止'];
 const 現状態 = computed(() => String(props.編集作業?.状態 ?? ''));
 const 状況選択可 = (status: string) =>
   状況選択肢.includes(status) || status === 現状態.value;
@@ -198,7 +202,7 @@ const 登録 = async () => {
     const response = await apiClient.post(
       修正モード.value ? '/team/作業/変更' : '/team/作業/登録',
       {
-        要員ID: 利用者ID.value,
+        要員ID: 対象要員ID.value,
         作業ID: props.編集作業?.作業ID ?? '',
         プロジェクト: 入力プロジェクト.value.trim(),
         要求内容: 入力要求内容.value.trim(),
@@ -242,9 +246,15 @@ const 登録 = async () => {
         </header>
 
         <div class="dialog-body">
-          <div class="detail-row">
-            <div class="detail-label">作業ID</div>
-            <div class="detail-value">{{ 編集作業?.作業ID || '(新規)' }}</div>
+          <div class="detail-row split-row">
+            <div class="detail-half">
+              <div class="detail-label">作業ID</div>
+              <div class="detail-value">{{ 編集作業?.作業ID || '(新規)' }}</div>
+            </div>
+            <div class="detail-half">
+              <div class="detail-label">要員ID</div>
+              <div class="detail-value">{{ 対象要員ID }}</div>
+            </div>
           </div>
           <div class="detail-row">
             <div class="detail-label">プロジェクト</div>
@@ -421,6 +431,21 @@ const 登録 = async () => {
   width: 100%;
   margin-top: -1px;
   flex: 0 0 auto;
+}
+
+/* 1 行を左右 50% ずつに割って、ラベル+内容の組を 2 つ並べる（作業ID / 要員ID） */
+.detail-row.split-row {
+  gap: 0;
+}
+
+.split-row .detail-half {
+  display: flex;
+  flex: 1 1 50%;
+  min-width: 0;
+}
+
+.split-row .detail-half + .detail-half {
+  margin-left: -1px;
 }
 
 .detail-label {

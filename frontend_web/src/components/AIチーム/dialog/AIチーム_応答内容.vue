@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // AIチーム_応答内容: 作業一覧・経験一覧の行ダブルクリックで開く読み取り専用ダイアログ
-// 渡された 要求内容 / 応答内容 / 経験内容 のうち、中身のあるものだけをセクション表示する
+// 渡された 要求内容 / 応答内容 / まとめ内容 のうち、中身のあるものだけをセクション表示する
 // 各内容が JSON としてパースできれば整形（json.dumps 相当）して表示する
 import { computed } from 'vue';
 
@@ -9,7 +9,7 @@ const props = defineProps({
   タイトル: { type: String, default: '応答内容' },
   要求内容: { type: String, default: '' },
   内容: { type: String, default: '' },
-  経験内容: { type: String, default: '' }
+  まとめ内容: { type: String, default: '' }
 });
 const emit = defineEmits(['close']);
 
@@ -28,7 +28,7 @@ const セクション一覧 = computed(() => {
   const 候補: { 見出し: string; 本文: string }[] = [
     { 見出し: '要求内容', 本文: 整形(props.要求内容) },
     { 見出し: '応答内容', 本文: 整形(props.内容) },
-    { 見出し: '経験内容', 本文: 整形(props.経験内容) }
+    { 見出し: 'まとめ内容', 本文: 整形(props.まとめ内容) }
   ];
   return 候補.filter((項目) => 項目.本文.trim() !== '');
 });

@@ -73,7 +73,7 @@ def 初期化() -> None:
                 タイトル TEXT NOT NULL DEFAULT '',
                 経験値 INTEGER NOT NULL DEFAULT 0,
                 分類 TEXT NOT NULL DEFAULT '',
-                経験内容 TEXT NOT NULL DEFAULT '',
+                まとめ内容 TEXT NOT NULL DEFAULT '',
                 学び TEXT NOT NULL DEFAULT '',
                 状態 TEXT NOT NULL DEFAULT '生成中',
                 PID TEXT NOT NULL DEFAULT '',
@@ -90,6 +90,14 @@ def 初期化() -> None:
                 更新端末ID TEXT NOT NULL
             )
         """)
+        既存列 = {row["name"] for row in conn.execute(f'PRAGMA table_info("{経験テーブル}")')}
+        if "まとめ内容" not in 既存列:
+            if "経験内容" in 既存列:
+                conn.execute(f'ALTER TABLE "{経験テーブル}" RENAME COLUMN 経験内容 TO まとめ内容')
+            else:
+                conn.execute(
+                    f'ALTER TABLE "{経験テーブル}" ADD COLUMN まとめ内容 TEXT NOT NULL DEFAULT \'\''
+                )
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS "IX_Aチーム経験_要員"
             ON "{経験テーブル}" (要員ID, 更新日時)
@@ -229,7 +237,7 @@ def 経験一覧(プロジェクト: str = "", 要員ID: str = "", 件数: int =
         sql = f"""
             SELECT 経験ID, 作業ID, タスクID, 要員ID, プロジェクト,
                    タスクタイトル, 要求内容, 実行応答内容, 完了日時,
-                   タイトル, 経験値, 分類, 経験内容, 学び,
+                   タイトル, 経験値, 分類, まとめ内容, 学び,
                    状態, 開始日時, 終了日時, エラー内容, 更新日時
               FROM "{経験テーブル}"{条件}
              ORDER BY CASE WHEN 完了日時 = '' THEN 1 ELSE 0 END,
@@ -381,17 +389,23 @@ def 生成開始記録(経験ID: str, pid: int) -> None:
 
 
 def 経験本登録(経験ID: str, データ: dict) -> dict:
-    """AI が出力した経験値を書き戻して完了にする。"""
+    """AI が出力した経験値を書き戻し、元の作業・改善を「済」にする。"""
     初期化()
-    if 経験取得(経験ID) is None:
-        raise KeyError(経験ID)
     now = _現在日時()
+    まとめ内容 = str(データ.get("まとめ内容", ""))
     conn = 接続取得()
     try:
+        対象 = conn.execute(
+            f'SELECT 作業ID FROM "{経験テーブル}" WHERE 経験ID = ?',
+            [経験ID],
+        ).fetchone()
+        if 対象 is None:
+            raise KeyError(経験ID)
+        作業ID = str(対象["作業ID"] or "")
         conn.execute(
             f"""
             UPDATE "{経験テーブル}"
-               SET タイトル = ?, 経験値 = ?, 分類 = ?, 経験内容 = ?, 学び = ?,
+               SET タイトル = ?, 経験値 = ?, 分類 = ?, まとめ内容 = ?, 学び = ?,
                    状態 = '完了', PID = '', 終了日時 = ?, エラー内容 = '',
                    更新日時 = ?, 更新利用者ID = 'system', 更新利用者名 = 'システム',
                    更新端末ID = 'backend_team'
@@ -401,12 +415,32 @@ def 経験本登録(経験ID: str, データ: dict) -> dict:
                 str(データ.get("タイトル", ""))[:120],
                 int(データ.get("経験値", 0) or 0),
                 str(データ.get("分類", ""))[:40],
-                str(データ.get("経験内容", "")),
+                まとめ内容,
                 str(データ.get("学び", "")),
                 now,
                 now,
                 経験ID,
             ),
+        )
+        conn.execute(
+            f"""
+            UPDATE "{作業テーブル}"
+               SET 状態 = '済', PID = '', まとめ内容 = ?,
+                   更新日時 = ?, 更新利用者ID = 'system', 更新利用者名 = 'システム',
+                   更新端末ID = 'backend_team'
+             WHERE 作業ID = ? AND 状態 = '完了'
+            """,
+            [まとめ内容, now, 作業ID],
+        )
+        conn.execute(
+            """
+            UPDATE "Aチーム改善"
+               SET 状況 = '済', 終了日時 = ?, まとめ内容 = ?,
+                   更新日時 = ?, 更新利用者ID = 'system', 更新利用者名 = 'システム',
+                   更新端末ID = 'backend_team'
+             WHERE 作業ID = ? AND 状況 = '完了'
+            """,
+            [now, まとめ内容, now, 作業ID],
         )
         conn.commit()
     finally:

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import apiClient from '../../api/client';
 import AiTeamMembers from './components/AIチーム_要員状況.vue';
 import AiTeamViewer from './components/AIチーム_空間表示.vue';
 import AiTeamWorkList from './components/AIチーム_作業一覧.vue';
 import AiTeamExpList from './components/AIチーム_経験一覧.vue';
+import AiTeamPdcaList from './components/AIチーム_改善一覧.vue';
 import AiTeamGoalEdit from './dialog/AIチーム_目標編集.vue';
 import {
   type エージェント,
@@ -39,6 +40,8 @@ const 要員読込中 = ref(false);
 const 要員読込エラー = ref('');
 const 召喚中 = ref(false);
 const 排除中ID = ref('');
+let 要員更新Timer: ReturnType<typeof setInterval> | null = null;
+let 要員取得中 = false;
 // チーム空間の掲示板に出す「最終更新のチーム目標」と、その保守ダイアログ
 const チーム目標 = ref<チーム目標 | null>(null);
 const 目標編集表示 = ref(false);
@@ -61,10 +64,13 @@ const 召喚対象を補正 = (preferredId = '') => {
   }
 };
 
-const 要員一覧を読み込む = async () => {
-  if (要員読込中.value) return;
-  要員読込中.value = true;
-  要員読込エラー.value = '';
+const 要員一覧を読み込む = async (読込表示 = true) => {
+  if (要員取得中) return;
+  要員取得中 = true;
+  if (読込表示) {
+    要員読込中.value = true;
+    要員読込エラー.value = '';
+  }
   try {
     const [activeResponse, summonResponse] = await Promise.all([
       apiClient.post('/team/エージェント/一覧', {}),
@@ -82,13 +88,21 @@ const 要員一覧を読み込む = async () => {
       throw new Error('要員一覧の応答形式が正しくありません');
     }
     召喚要員一覧.value = summonItems as チーム要員[];
+    const 現在選択ID = 選択中ID.value;
     エージェント一覧.value = (activeItems as 稼働要員[]).map(稼働要員を変換);
-    選択中ID.value = エージェント一覧.value[0]?.id ?? '';
+    選択中ID.value = エージェント一覧.value.some((agent) => agent.id === 現在選択ID)
+      ? 現在選択ID
+      : エージェント一覧.value[0]?.id ?? '';
     召喚対象を補正();
+    要員読込エラー.value = '';
   } catch (error) {
-    要員読込エラー.value = error instanceof Error ? error.message : '要員一覧を取得できませんでした';
+    // 5秒ごとの自動更新失敗では、現在の空間表示を黒いエラー表示に差し替えない。
+    if (読込表示) {
+      要員読込エラー.value = error instanceof Error ? error.message : '要員一覧を取得できませんでした';
+    }
   } finally {
-    要員読込中.value = false;
+    if (読込表示) 要員読込中.value = false;
+    要員取得中 = false;
   }
 };
 
@@ -142,19 +156,6 @@ const 選択要員を排除 = async () => {
   }
 };
 
-const 状態を更新 = (
-  id: string,
-  state: エージェント状態,
-  work: string,
-  comment: string,
-) => {
-  const agent = エージェント一覧.value.find((item) => item.id === id);
-  if (!agent) return;
-  agent.状態 = state;
-  agent.作業内容 = work;
-  agent.ひとこと = comment;
-};
-
 const チーム目標を読み込む = async () => {
   try {
     const response = await apiClient.post('/team/目標/最終', {});
@@ -171,12 +172,20 @@ const 目標保存後 = (item: チーム目標) => {
   チーム目標.value = item;
 };
 
-// 掲示板に出ているプロジェクト。経験一覧はこのパスの経験だけを表示する
+// 掲示板に出ているプロジェクト。経験一覧・改善一覧はこのパスの分だけを表示する
 const 掲示板プロジェクト = computed(() => String(チーム目標.value?.CODE_BASE_PATH ?? ''));
+// 改善一覧は、掲示板の目標で改善ループがオンのときだけ出す（オフなら表示しない）
+const 改善ループ有効 = computed(() => Boolean(チーム目標.value?.改善ループ));
 
 onMounted(() => {
   void 要員一覧を読み込む();
   void チーム目標を読み込む();
+  // 自動更新は画面を維持したままバックグラウンドで行う。
+  要員更新Timer = setInterval(() => void 要員一覧を読み込む(false), 5000);
+});
+
+onBeforeUnmount(() => {
+  if (要員更新Timer) clearInterval(要員更新Timer);
 });
 </script>
 
@@ -212,11 +221,11 @@ onMounted(() => {
         :チーム目標="チーム目標"
         @select="選択中ID = $event"
         @retry="要員一覧を読み込む"
-        @state-change="状態を更新"
         @目標クリック="目標編集表示 = true"
       />
       <AiTeamWorkList />
       <AiTeamExpList :プロジェクト="掲示板プロジェクト" />
+      <AiTeamPdcaList v-if="改善ループ有効" :プロジェクト="掲示板プロジェクト" />
     </div>
 
     <AiTeamGoalEdit

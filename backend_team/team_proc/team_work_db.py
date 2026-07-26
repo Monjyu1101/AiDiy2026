@@ -19,7 +19,7 @@ from .config import 設定読込
 from .team_db import DB_PATH
 
 作業テーブル = "Aチーム作業"
-状態一覧 = ("準備開始", "準備中", "準備完了", "待機", "実行中", "エラー", "完了", "中止")
+状態一覧 = ("準備開始", "準備中", "準備完了", "待機", "実行中", "エラー", "完了", "済", "中止")
 状態入力一覧 = 状態一覧
 実行タイムアウト分 = 30
 一覧最大件数 = 100
@@ -66,6 +66,7 @@ def 初期化() -> None:
                 実行回数 INTEGER NOT NULL DEFAULT 0,
                 応答タイトル TEXT NOT NULL DEFAULT '',
                 応答内容 TEXT NOT NULL DEFAULT '',
+                まとめ内容 TEXT NOT NULL DEFAULT '',
                 登録日時 TEXT NOT NULL,
                 登録利用者ID TEXT NOT NULL,
                 登録利用者名 TEXT NOT NULL,
@@ -77,6 +78,14 @@ def 初期化() -> None:
                 PRIMARY KEY (作業ID)
             )
         """)
+        既存列 = {row["name"] for row in conn.execute(f'PRAGMA table_info("{作業テーブル}")')}
+        if "まとめ内容" not in 既存列:
+            if "経験内容" in 既存列:
+                conn.execute(f'ALTER TABLE "{作業テーブル}" RENAME COLUMN 経験内容 TO まとめ内容')
+            else:
+                conn.execute(
+                    f'ALTER TABLE "{作業テーブル}" ADD COLUMN まとめ内容 TEXT NOT NULL DEFAULT \'\''
+                )
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS "IX_Aチーム作業_状態"
             ON "{作業テーブル}" (要員ID, 状態, 作業ID)
@@ -139,7 +148,7 @@ def 作業一覧(要員ID: str) -> list[dict]:
     初期化()
     conn = 接続取得()
     try:
-        # 一覧は表示優先順位（完了/エラー/中止=9、それ以外=1）昇順・更新日時降順。
+        # 一覧は表示優先順位（完了/済/エラー/中止=9、それ以外=1）昇順・更新日時降順。
         # 直近 一覧対象日数 分・最大 一覧最大件数 までに絞る
         期間閾値 = (datetime.now() - timedelta(days=一覧対象日数)).strftime("%Y-%m-%d %H:%M:%S")
         rows = conn.execute(
@@ -147,8 +156,8 @@ def 作業一覧(要員ID: str) -> list[dict]:
             SELECT 作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
                    実行有効, 状態, PID,
-                   開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, 更新日時,
-                   CASE WHEN 状態 IN ('完了', 'エラー', '中止') THEN 9 ELSE 1 END AS 表示優先順位
+                   開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, まとめ内容, 更新日時,
+                   CASE WHEN 状態 IN ('完了', '済', 'エラー', '中止') THEN 9 ELSE 1 END AS 表示優先順位
               FROM "{作業テーブル}"
              WHERE 要員ID = ? AND 更新日時 >= ?
              ORDER BY 表示優先順位 ASC, 更新日時 DESC
@@ -183,7 +192,7 @@ def 作業取得(要員ID: str, 作業ID: str) -> dict | None:
             SELECT 作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
                    実行有効, 状態, PID,
-                   開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, 更新日時
+                   開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, まとめ内容, 更新日時
               FROM "{作業テーブル}"
              WHERE 要員ID = ? AND 作業ID = ?
             """,
@@ -316,6 +325,7 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
     実行回数 = int(現行["実行回数"] or 0)
     応答タイトル = str(現行["応答タイトル"] or "")
     応答内容 = str(現行["応答内容"] or "")
+    まとめ内容 = str(現行["まとめ内容"] or "")
     if 作業データ["状態"] == "準備開始":
         タスクID = ""
         PID = ""
@@ -324,9 +334,10 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
         実行回数 = 0
         応答タイトル = ""
         応答内容 = ""
+        まとめ内容 = ""
     if 作業データ["状態"] == "実行中" and not 開始日時:
         開始日時 = now
-    if 作業データ["状態"] in ("完了", "中止"):
+    if 作業データ["状態"] in ("完了", "済", "中止"):
         終了日時 = now
     elif 作業データ["状態"] == "待機":
         終了日時 = ""
@@ -340,7 +351,7 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
                    TASK_AI_NAME = ?, TASK_AI_MODEL = ?,
                    実行有効 = ?, 状態 = ?,
                    タスクID = ?, PID = ?, 開始日時 = ?, 終了日時 = ?,
-                   実行回数 = ?, 応答タイトル = ?, 応答内容 = ?,
+                   実行回数 = ?, 応答タイトル = ?, 応答内容 = ?, まとめ内容 = ?,
                    更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ?
              WHERE 要員ID = ? AND 作業ID = ?
             """,
@@ -361,6 +372,7 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
                 実行回数,
                 応答タイトル,
                 応答内容,
+                まとめ内容,
                 now,
                 操作者["利用者ID"],
                 操作者["利用者名"],
@@ -373,6 +385,37 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
     finally:
         conn.close()
     return 作業取得(作業データ["要員ID"], 作業データ["作業ID"]) or {}
+
+
+def 直接投入登録(作業データ: dict, 操作者: dict) -> dict:
+    """担当要員が決まっている作業を、sub_init を経由せず投入するために登録する。
+
+    改善ループ（PDCA）のように要員が確定している場合に使う。状態='準備中'・開始日時=now・
+    実行回数=1 で作り、呼び出し側が 投入成功記録() / 投入失敗記録() で確定させる。
+    投入待ち一覧（状態='準備開始'）には出ないため sub_init による二重投入は起きず、
+    開始日時が入るので実行タイムアウト監視の対象にもなる。
+    """
+    データ = dict(作業データ)
+    データ["状態"] = "準備中"
+    項目 = 作業登録(データ, 操作者)
+    作業ID = str(項目.get("作業ID", ""))
+    if not 作業ID:
+        return 項目
+    now = _現在日時()
+    conn = 接続取得()
+    try:
+        conn.execute(
+            f"""
+            UPDATE "{作業テーブル}"
+               SET 開始日時 = ?, 実行回数 = 1, 更新日時 = ?
+             WHERE 作業ID = ? AND 状態 = '準備中'
+            """,
+            [now, now, 作業ID],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return 作業取得(str(データ["要員ID"]), 作業ID) or 項目
 
 
 def 投入待ち一覧() -> list[dict]:

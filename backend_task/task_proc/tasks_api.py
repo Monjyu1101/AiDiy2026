@@ -91,7 +91,7 @@ class タスク要求AI登録リクエスト(BaseModel):
 
 
 class タスク要求更新登録リクエスト(BaseModel):
-    利用者ID: str
+    利用者ID: str = ""  # キーはタスクID単独。互換のため受け取るだけで使わない
     タスクID: str
     プロジェクト: str = ""
     要求内容: str
@@ -107,7 +107,7 @@ class タスク明細全消去リクエスト(BaseModel):
 
 
 class タスク実行有効切替リクエスト(BaseModel):
-    利用者ID: str
+    利用者ID: str = ""  # キーはタスクID単独。互換のため受け取るだけで使わない
     タスクID: str
     実行有効: bool
 
@@ -132,7 +132,7 @@ class タスク明細更新登録リクエスト(BaseModel):
 
 
 class タスク要求本登録リクエスト(BaseModel):
-    利用者ID: str
+    利用者ID: str = ""  # 仮登録が無い場合に記録する所有者（通常は仮登録の値を引き継ぐ）
     タスクID: str
     タイトル: str
     要求内容: str = ""
@@ -142,7 +142,7 @@ class タスク要求本登録リクエスト(BaseModel):
 
 
 class タスク要求AI失敗リクエスト(BaseModel):
-    利用者ID: str
+    利用者ID: str = ""  # キーはタスクID単独。互換のため受け取るだけで使わない
     タスクID: str
     メッセージ: str = ""
 
@@ -246,11 +246,10 @@ async def タスク要求一覧(request: タスク要求一覧リクエスト) -
 async def タスク要求取得(request: タスク要求取得リクエスト) -> dict:
     try:
         タスクID = request.タスクID.strip()
-        利用者ID = request.利用者ID.strip()
         if not タスクID:
             return _NG("タスクIDを指定してください。")
-        # タスクIDはAIタスク要求の単独主キーのため、利用者ID省略時はタスクIDだけで引く
-        item = tasks_db.タスク要求取得(利用者ID, タスクID) if 利用者ID else tasks_db.タスク要求取得byタスクID(タスクID)
+        # CRUDのキーはタスクID単独。リクエストの利用者IDは互換のため受け取るだけで使わない
+        item = tasks_db.タスク要求取得(タスクID)
         if not item:
             return _NG(f"タスク {タスクID} が見つかりません。")
         return _OK({"item": item})
@@ -261,13 +260,15 @@ async def タスク要求取得(request: タスク要求取得リクエスト) -
 
 @router.post("/タスク実行条件/取得", tags=["タスク要求"])
 async def タスク実行条件取得(request: タスク要求取得リクエスト) -> dict:
-    """タスク要求に紐づく実行開始条件を返す。未設定なら空 item（即時扱い）。"""
+    """タスク要求に紐づく実行開始条件を返す。未設定なら空 item（即時扱い）。
+
+    キーはタスクID単独。利用者IDは互換のため受け取るだけで使わない。
+    """
     try:
-        利用者ID = request.利用者ID.strip()
         タスクID = request.タスクID.strip()
-        if not 利用者ID or not タスクID:
-            return _NG("利用者IDとタスクIDを指定してください。")
-        return _OK({"item": tasks_db.実行条件取得(利用者ID, タスクID)})
+        if not タスクID:
+            return _NG("タスクIDを指定してください。")
+        return _OK({"item": tasks_db.実行条件取得(タスクID)})
     except Exception as e:
         logger.error(f"タスク実行条件の取得に失敗: {e}")
         return _NG(f"タスク実行条件の取得に失敗しました: {e}")
@@ -391,7 +392,8 @@ async def タスク要求AI登録(request: タスク要求AI登録リクエス�
         # 仮登録のみ行う（タスクID: TASK.mmdd.hhmmss、状態: 準備開始）。
         # 実行は監視ループが 5 秒間隔で PID 未設定の仮登録を拾って開始する。
         タスクID = 指定タスクID or tasks_db.新規タスクID()
-        if tasks_db.タスク要求取得(利用者ID, タスクID):
+        # タスクIDは単独主キーなので、他利用者が使っている場合も重複として弾く
+        if tasks_db.タスク要求取得(タスクID):
             return _NG(f"タスク {タスクID} は既に登録されています。")
         タイトル = 要求内容.splitlines()[0][:40]
         # 未指定（None）の項目は新規時の既定値（更新最終レコード → 規定値）で補完する
@@ -409,8 +411,8 @@ async def タスク要求AI登録(request: タスク要求AI登録リクエス�
             TASK_AI_MODEL,
             request.実行有効,
         )
-        tasks_db.実行条件登録(利用者ID, タスクID, 実行条件.model_dump())
-        tasks_watcher.実行条件再計算(利用者ID, タスクID)
+        tasks_db.実行条件登録(タスクID, 実行条件.model_dump(), 利用者ID)
+        tasks_watcher.実行条件再計算(タスクID)
         return _OK({"item": item}, f"タスク {タスクID} を準備開始として登録しました。")
     except Exception as e:
         logger.error(f"タスク要求のAI登録に失敗: {e}")
@@ -431,11 +433,10 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
     状況=それ以外（更新前の状態など）は最新の状態を保持して内容だけ更新する
     （ダイアログ表示中に状態が変わっていても NG にしない）。
     """
-    利用者ID = request.利用者ID.strip()
     タスクID = request.タスクID.strip()
     要求内容 = request.要求内容.strip()
-    if not 利用者ID or not タスクID:
-        return _NG("利用者IDとタスクIDを指定してください。")
+    if not タスクID:
+        return _NG("タスクIDを指定してください。")
     if not 要求内容:
         return _NG("要求内容を入力してください。")
     実行条件 = request.実行条件
@@ -444,7 +445,8 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
         if エラー:
             return _NG(エラー)
     try:
-        現行 = tasks_db.タスク要求取得(利用者ID, タスクID)
+        # CRUDのキーはタスクID単独。利用者IDは所有者を表す属性なので更新条件には使わない
+        現行 = tasks_db.タスク要求取得(タスクID)
         if not 現行:
             return _NG(f"タスク {タスクID} が見つかりません。")
         状況 = request.状況.strip()
@@ -462,11 +464,10 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
             # 更新前の状態を保持（内容だけ更新）。ダイアログ表示中に状態が
             # 変わっていた場合も NG にせず、最新の状態を採用する
             状態 = str(現行.get("状態", ""))
-        for pid in tasks_db.タスクPID一覧(利用者ID, タスクID):
+        for pid in tasks_db.タスクPID一覧(タスクID):
             tasks_watcher._プロセス強制停止(pid, logger)
-        tasks_db.タスクPIDクリア(利用者ID, タスクID)
+        tasks_db.タスクPIDクリア(タスクID)
         item = tasks_db.タスク要求更新登録(
-            利用者ID,
             タスクID,
             request.プロジェクト.strip(),
             要求内容,
@@ -481,9 +482,9 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
             # 準備完了: 実行有効フラグの状態に関わらず全明細を 実行有効・待機 に戻して再起動可能にする
             tasks_db.明細全件有効待機化(タスクID)
         if 実行条件 is not None:
-            tasks_db.実行条件登録(利用者ID, タスクID, 実行条件.model_dump())
+            tasks_db.実行条件登録(タスクID, 実行条件.model_dump())
         # 実行条件・状態・実行有効のどれが変わっても次回実行日時を計算し直す
-        tasks_watcher.実行条件再計算(利用者ID, タスクID)
+        tasks_watcher.実行条件再計算(タスクID)
         return _OK({"item": item}, f"タスク {タスクID} を {状態} として更新しました。")
     except Exception as e:
         logger.error(f"タスク要求の更新登録に失敗: {e}")
@@ -493,15 +494,15 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
 @router.post("/タスク要求/実行有効切替", tags=["タスク要求"])
 async def タスク要求実行有効切替(request: タスク実行有効切替リクエスト) -> dict:
     """タスク要求と全タスク明細の実行有効フラグをまとめて更新する。"""
-    利用者ID = request.利用者ID.strip()
     タスクID = request.タスクID.strip()
-    if not 利用者ID or not タスクID:
-        return _NG("利用者IDとタスクIDを指定してください。")
+    if not タスクID:
+        return _NG("タスクIDを指定してください。")
     try:
-        item = tasks_db.タスク実行有効更新(利用者ID, タスクID, request.実行有効)
+        # 更新登録と同じく、対象はタスクIDだけで引く
+        item = tasks_db.タスク実行有効更新(タスクID, request.実行有効)
         if not item:
             return _NG(f"タスク {タスクID} が見つかりません。")
-        tasks_watcher.実行条件再計算(利用者ID, タスクID)
+        tasks_watcher.実行条件再計算(タスクID)
         表示 = "有効化" if request.実行有効 else "無効化"
         return _OK({"item": item}, f"タスク {タスクID} を{表示}しました。")
     except Exception as e:
@@ -597,12 +598,13 @@ async def タスク明細全消去(request: タスク明細全消去リクエス
 @router.post("/タスク要求/本登録", tags=["タスク要求"])
 async def タスク要求本登録(request: タスク要求本登録リクエスト) -> dict:
     try:
-        利用者ID = request.利用者ID.strip()
-        if not 利用者ID:
-            return _NG("利用者IDを指定してください。")
+        タスクID = request.タスクID.strip()
+        if not タスクID:
+            return _NG("タスクIDを指定してください。")
+        # 所有者は仮登録の値を引き継ぐ。リクエストの利用者IDは仮登録が無い場合の予備
         item = tasks_db.タスク本登録(
-            利用者ID,
-            request.タスクID,
+            request.利用者ID.strip(),
+            タスクID,
             request.タイトル.strip(),
             request.要求内容.strip(),
             request.マーメイド記号.strip(),
@@ -618,10 +620,10 @@ async def タスク要求本登録(request: タスク要求本登録リクエス
 @router.post("/タスク要求/AI失敗", tags=["タスク要求"])
 async def タスク要求AI失敗(request: タスク要求AI失敗リクエスト) -> dict:
     try:
-        利用者ID = request.利用者ID.strip()
-        if not 利用者ID:
-            return _NG("利用者IDを指定してください。")
-        item = tasks_db.タスク失敗(利用者ID, request.タスクID, request.メッセージ)
+        タスクID = request.タスクID.strip()
+        if not タスクID:
+            return _NG("タスクIDを指定してください。")
+        item = tasks_db.タスク失敗(タスクID, request.メッセージ)
         return _OK({"item": item}, f"タスク {request.タスクID} を失敗として登録しました。")
     except Exception as e:
         logger.error(f"タスク要求のAI失敗登録に失敗: {e}")

@@ -16,7 +16,12 @@ const props = defineProps({
 const emit = defineEmits(['close', 'registered']);
 
 const authStore = useAuthStore();
-const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? ''));
+const ログイン利用者ID = computed(() => String(authStore.user?.利用者ID ?? ''));
+// 更新系のキーはタスクID単独。利用者IDは所有者の表示と、新規登録時の所有者指定にだけ使う。
+// 修正時は対象タスクの所有者（admin が他利用者のタスクを開く場合がある）、新規時はログインID。
+const 対象利用者ID = computed(() =>
+  props.編集タスク ? String(props.編集タスク.利用者ID ?? '') : ログイン利用者ID.value
+);
 
 const プロジェクト選択肢 = ref<{ value: string; label: string }[]>([]);
 const 選択プロジェクト = ref('');
@@ -52,6 +57,8 @@ const taskModelOptions = computed(() => {
 
 const 修正モード = computed(() => !!props.編集タスク);
 const タスクID表示 = computed(() => 修正モード.value ? String(props.編集タスク?.タスクID ?? '') : '(新規)');
+// 新規はログインIDをそのまま登録する。修正は対象タスクの所有者を表示する
+const 利用者ID表示 = computed(() => 対象利用者ID.value || ログイン利用者ID.value);
 // 押せるのは 状況選択肢 と更新前の状態。更新前の状態を選ぶと状態を変えずに内容だけ更新する
 // タスク明細があるタスクは 準備完了 にも戻せる（実行有効の状態に関わらず明細は待機に戻して再起動可能にする）
 const 現状態 = computed(() => String(props.編集タスク?.状態 ?? ''));
@@ -114,7 +121,6 @@ const 実行条件読込 = async () => {
   if (!props.編集タスク) return;
   try {
     const res = await apiClient.post('/task/タスク実行条件/取得', {
-      利用者ID: 利用者ID.value,
       タスクID: String(props.編集タスク?.タスクID ?? '')
     });
     const item = res.data.status === 'OK' ? res.data.data?.item : null;
@@ -302,7 +308,6 @@ const 登録 = async () => {
   try {
     const res = 修正モード.value
       ? await apiClient.post('/task/タスク要求/更新登録', {
-          利用者ID: 利用者ID.value,
           タスクID: String(props.編集タスク?.タスクID ?? ''),
           プロジェクト: 入力プロジェクト.value.trim(),
           要求内容: 入力要求内容.value.trim(),
@@ -313,7 +318,7 @@ const 登録 = async () => {
           実行条件: 実行条件ペイロード()
         })
       : await apiClient.post('/task/タスク要求/AI登録', {
-          利用者ID: 利用者ID.value,
+          利用者ID: 対象利用者ID.value,
           プロジェクト: 入力プロジェクト.value.trim(),
           要求内容: 入力要求内容.value.trim(),
           TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
@@ -345,10 +350,18 @@ const 登録 = async () => {
       </header>
       <div class="dialog-body">
         <div class="dialog-left">
-        <div class="detail-row">
-          <div class="detail-label">タスクID</div>
-          <div class="detail-value">
-            <span class="value-text">{{ タスクID表示 }}</span>
+        <div class="detail-row split-row">
+          <div class="detail-half">
+            <div class="detail-label">タスクID</div>
+            <div class="detail-value">
+              <span class="value-text">{{ タスクID表示 }}</span>
+            </div>
+          </div>
+          <div class="detail-half">
+            <div class="detail-label">利用者ID</div>
+            <div class="detail-value">
+              <span class="value-text">{{ 利用者ID表示 }}</span>
+            </div>
           </div>
         </div>
         <div class="detail-row">
@@ -728,6 +741,21 @@ const 登録 = async () => {
   width: 100%;
   margin-top: -1px;
   flex: 0 0 auto;
+}
+
+/* 1 行を左右 50% ずつに割って、ラベル+内容の組を 2 つ並べる（タスクID / 利用者ID） */
+.detail-row.split-row {
+  gap: 0;
+}
+
+.split-row .detail-half {
+  display: flex;
+  flex: 1 1 50%;
+  min-width: 0;
+}
+
+.split-row .detail-half + .detail-half {
+  margin-left: -1px;
 }
 
 .detail-label {
