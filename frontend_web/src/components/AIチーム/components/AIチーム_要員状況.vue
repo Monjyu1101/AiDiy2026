@@ -43,8 +43,11 @@ const 召喚ダイアログを開く = () => {
 };
 
 const 状況一覧 = ref<チーム状況[]>([]);
+const 更新確認間隔ミリ秒 = 10_000;
+const 強制更新間隔ミリ秒 = 30_000;
 let 状況更新Timer: ReturnType<typeof setInterval> | null = null;
 let 状況最大更新日時 = '';
+let 状況最終読込時刻 = 0;
 
 const 選択中状況 = computed(
   () => 状況一覧.value.find((item) => item.要員ID === props.選択中エージェント?.id) ?? null,
@@ -54,28 +57,31 @@ const 要員別状況 = computed(
   () => new Map(状況一覧.value.map((item) => [item.要員ID, item])),
 );
 
-const 状況を読み込む = async () => {
-  try {
-    const response = await apiClient.post('/team/状況/一覧', {});
-    if (response.data?.status !== 'OK') return;
-    const items = response.data?.data?.items;
-    if (Array.isArray(items)) 状況一覧.value = items as チーム状況[];
-    状況最大更新日時 = await 最大更新日時を取得する();
-  } catch {
-    // 自動更新確認の失敗は、通常操作を邪魔しない。
-  }
-};
-
 const 最大更新日時を取得する = async (): Promise<string> => {
   const response = await apiClient.post('/team/状況/最大更新日時', {});
   if (response.data?.status !== 'OK') return 状況最大更新日時;
   return String(response.data?.data?.最大更新日時 ?? '');
 };
 
+const 状況を読み込む = async (確認済み最大更新日時?: string) => {
+  try {
+    const response = await apiClient.post('/team/状況/一覧', {});
+    if (response.data?.status !== 'OK') return;
+    const items = response.data?.data?.items;
+    if (Array.isArray(items)) 状況一覧.value = items as チーム状況[];
+    状況最終読込時刻 = Date.now();
+    状況最大更新日時 = 確認済み最大更新日時 ?? await 最大更新日時を取得する();
+  } catch {
+    // 自動更新確認の失敗は、通常操作を邪魔しない。
+  }
+};
+
 const 状況更新を確認する = async () => {
   try {
     const 最大更新日時 = await 最大更新日時を取得する();
-    if (最大更新日時 !== 状況最大更新日時) await 状況を読み込む();
+    const 元データ変更あり = 最大更新日時 !== 状況最大更新日時;
+    const 三十秒経過 = Date.now() - 状況最終読込時刻 >= 強制更新間隔ミリ秒;
+    if (元データ変更あり || 三十秒経過) await 状況を読み込む(最大更新日時);
   } catch {
     // 自動更新確認の失敗は、通常操作を邪魔しない。
   }
@@ -83,12 +89,13 @@ const 状況更新を確認する = async () => {
 
 onMounted(async () => {
   await 状況を読み込む();
-  状況更新Timer = setInterval(() => void 状況更新を確認する(), 5000);
+  状況更新Timer = setInterval(() => void 状況更新を確認する(), 更新確認間隔ミリ秒);
 });
 
 onBeforeUnmount(() => {
   if (状況更新Timer) clearInterval(状況更新Timer);
   状況最大更新日時 = '';
+  状況最終読込時刻 = 0;
 });
 </script>
 

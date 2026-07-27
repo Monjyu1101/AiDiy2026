@@ -22,6 +22,7 @@ import sqlite3
 from .team_db import DB_PATH
 
 状況テーブル = "Aチーム状況"
+状況元テーブル = ("Aチーム要員", "Aチーム作業", "Aチーム経験", "Aチーム改善")
 
 
 def 接続取得() -> sqlite3.Connection:
@@ -75,7 +76,6 @@ def 実行中要員数() -> int:
     finally:
         conn.close()
 
-
 def 状況一覧() -> list[dict]:
     conn = 接続取得()
     try:
@@ -90,14 +90,31 @@ def 状況一覧() -> list[dict]:
         conn.close()
 
 
+def _テーブル最大更新日時(conn: sqlite3.Connection, テーブル名: str) -> str:
+    """存在するテーブルの最大更新日時を返す。未作成なら空文字を返す。"""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        [テーブル名],
+    ).fetchone()
+    if not exists:
+        return ""
+    row = conn.execute(
+        f'SELECT MAX(更新日時) AS 最大更新日時 FROM "{テーブル名}"'
+    ).fetchone()
+    return str(row["最大更新日時"] or "") if row else ""
+
+
 def 状況最大更新日時() -> str:
-    """一覧の再取得判定に使う最大更新日時を返す。"""
+    """状況一覧の変更判定に使う、元データ4テーブルの最大更新日時を返す。
+
+    Aチーム状況はbackend_taskが10秒ごとに全件再生成するため、その更新日時を
+    変更判定に使うと元データが不変でも毎回変化してしまう。
+    """
     conn = 接続取得()
     try:
-        _テーブル確保(conn)
-        row = conn.execute(
-            f'SELECT MAX(更新日時) AS 最大更新日時 FROM "{状況テーブル}"'
-        ).fetchone()
-        return str(row["最大更新日時"] or "") if row else ""
+        return max(
+            (_テーブル最大更新日時(conn, テーブル名) for テーブル名 in 状況元テーブル),
+            default="",
+        )
     finally:
         conn.close()

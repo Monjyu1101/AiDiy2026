@@ -56,6 +56,7 @@ const 動員要員数選択肢 = computed(() =>
 const 動員要員数を丸める = (人数: unknown) =>
   Math.min(Math.max(1, 有効要員数.value), Math.max(1, Number(人数 ?? 既定動員要員数)));
 const 読込中 = ref(false);
+const 参照中 = ref(false);
 const 保存中 = ref(false);
 const 削除中 = ref(false);
 
@@ -91,6 +92,30 @@ const プロジェクト選択肢読込 = async () => {
     }));
   } catch {
     プロジェクト選択肢.value = [];
+  }
+};
+
+const フォルダ参照 = async () => {
+  参照中.value = true;
+  try {
+    const response = await apiClient.post('/core/AIコア/フォルダ参照', {
+      初期パス: 入力パス.value,
+    });
+    if (response.data?.status === 'OK') {
+      const path = String(response.data.data?.選択パス ?? '').replace(/\\/g, '/');
+      if (path) {
+        入力パス.value = path;
+        選択パス.value = プロジェクト選択肢.value.some((option) => option.value === path)
+          ? path
+          : '';
+      }
+    } else {
+      void qMessage(response.data?.message || 'フォルダ参照に失敗しました。', 'error');
+    }
+  } catch {
+    void qMessage('フォルダ参照でエラーが発生しました。', 'error');
+  } finally {
+    参照中.value = false;
   }
 };
 
@@ -263,7 +288,7 @@ const 削除 = async () => {
 
             <div class="goal-form">
               <div class="detail-row one-line-row">
-                <div class="detail-label">パス選択</div>
+                <div class="detail-label">プロジェクト</div>
                 <div class="detail-value">
                   <select v-model="選択パス" class="detail-select">
                     <option value="">（選択してください）</option>
@@ -275,10 +300,13 @@ const 削除 = async () => {
               </div>
               <div class="detail-row one-line-row">
                 <div class="detail-label">
-                  パス入力<span class="required-mark">*</span>
+                  フォルダ指定<span class="required-mark">*</span>
                 </div>
-                <div class="detail-value">
+                <div class="detail-value value-inline">
                   <input v-model.trim="入力パス" type="text" class="detail-input" placeholder="../" />
+                  <button type="button" class="dialog-button browse" :disabled="参照中" @click="フォルダ参照">
+                    {{ 参照中 ? '参照中…' : '参照' }}
+                  </button>
                 </div>
               </div>
               <div class="detail-row request-row">
@@ -575,6 +603,8 @@ const 削除 = async () => {
 .detail-select { height: 26px; }
 
 .detail-input {
+  flex: 1 1 auto;
+  width: auto;
   margin: 0;
   padding: 0 8px;
 }
@@ -601,6 +631,8 @@ const 削除 = async () => {
   min-height: 190px;
   resize: vertical;
 }
+
+.value-inline { gap: 8px; }
 
 .required-mark {
   margin-left: 2px;
@@ -841,6 +873,14 @@ const 削除 = async () => {
   border-color: rgba(220, 38, 38, 0.7);
   color: #ffd9d9;
   background: rgba(120, 30, 30, 0.55);
+}
+
+.dialog-button.browse {
+  min-width: 58px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border-radius: 0;
 }
 
 @media (max-width: 760px) {

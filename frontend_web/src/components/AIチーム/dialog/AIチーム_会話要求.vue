@@ -250,7 +250,7 @@ onBeforeUnmount(() => 経過計測停止());
             <b>{{ 掲示板プロジェクト || '未設定（共通設定を使用）' }}</b>
           </div>
 
-          <div class="detail-row">
+          <div class="detail-row one-line-row">
             <label class="detail-label">プロジェクト</label>
             <div class="detail-value">
               <select v-model="選択プロジェクト" class="detail-select" :disabled="読込中 || 送信中">
@@ -261,7 +261,7 @@ onBeforeUnmount(() => 経過計測停止());
               </select>
             </div>
           </div>
-          <div class="detail-row">
+          <div class="detail-row one-line-row">
             <label class="detail-label">フォルダ指定</label>
             <div class="detail-value value-inline">
               <input v-model="入力プロジェクト" class="detail-input" type="text" :disabled="送信中" />
@@ -270,7 +270,7 @@ onBeforeUnmount(() => 経過計測停止());
               </button>
             </div>
           </div>
-          <div class="detail-row">
+          <div class="detail-row one-line-row">
             <label class="detail-label">TASK_AI_NAME</label>
             <div class="detail-value">
               <select v-model="入力TASK_AI_NAME" class="detail-select" :disabled="読込中 || 送信中">
@@ -278,7 +278,7 @@ onBeforeUnmount(() => 経過計測停止());
               </select>
             </div>
           </div>
-          <div class="detail-row">
+          <div class="detail-row one-line-row">
             <label class="detail-label">TASK_AI_MODEL</label>
             <div class="detail-value">
               <select v-model="入力TASK_AI_MODEL" class="detail-select" :disabled="読込中 || 送信中">
@@ -341,20 +341,20 @@ onBeforeUnmount(() => 経過計測停止());
 }
 
 .dialog-content {
-  width: min(920px, 96vw);
-  max-height: 92vh;
+  width: min(900px, 96vw);
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(143, 104, 221, 0.78);
-  border-radius: 6px;
+  border: 1px solid rgba(143, 104, 221, 0.75);
+  border-radius: 4px;
   color: #e5e7eb;
   background: #07080c;
-  box-shadow: 0 0 30px rgba(60, 42, 128, 0.7);
+  box-shadow: 0 0 24px rgba(60, 42, 128, 0.65);
 }
 
 .dialog-header {
-  min-height: 36px;
+  min-height: 34px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -395,10 +395,15 @@ onBeforeUnmount(() => 経過計測停止());
 }
 .board-base b { color: #c9f8df; font-weight: 600; word-break: break-all; }
 
-.detail-row { display: flex; width: 100%; margin-top: -1px; }
+.detail-row {
+  width: 100%;
+  display: flex;
+  margin-top: -1px;
+  flex: 0 0 auto;
+}
 .detail-label {
-  width: 150px;
-  min-height: 36px;
+  width: 120px;
+  min-height: 34px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -408,20 +413,22 @@ onBeforeUnmount(() => 経過計測停止());
   color: #fff;
   background: linear-gradient(135deg, #37474f, rgba(70, 104, 205, 0.74));
   box-sizing: border-box;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
+  z-index: 1;
 }
 .detail-value {
   min-width: 0;
-  min-height: 36px;
+  min-height: 34px;
   flex: 1;
   display: flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border: 1px solid #4b5563;
   border-left: 0;
   background: #10131a;
   box-sizing: border-box;
+  font-size: 13px;
 }
 .request-row .detail-value { align-items: stretch; }
 .detail-input, .detail-select, .detail-textarea {
@@ -435,8 +442,35 @@ onBeforeUnmount(() => 経過計測停止());
   box-sizing: border-box;
   font: inherit;
 }
-.detail-input, .detail-select { height: 27px; }
-.detail-textarea { min-height: 116px; resize: vertical; line-height: 1.55; }
+.detail-input, .detail-select { height: 26px; }
+.detail-input {
+  flex: 1 1 auto;
+  width: auto;
+  margin: 0;
+  padding: 0 8px;
+}
+.detail-select {
+  max-width: 100%;
+  min-height: 26px;
+  display: block;
+  align-self: center;
+  margin: 0;
+  padding: 0 28px 0 8px;
+  line-height: normal;
+  appearance: auto;
+}
+.one-line-row,
+.one-line-row .detail-label,
+.one-line-row .detail-value {
+  height: 34px;
+  min-height: 34px;
+}
+.one-line-row .detail-value {
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.detail-textarea { min-height: 170px; resize: vertical; line-height: 1.55; }
 .detail-input:disabled, .detail-select:disabled, .detail-textarea:disabled { opacity: 0.65; }
 .value-inline { gap: 8px; }
 .required-mark { margin-left: 2px; color: #ff7eb6; }
@@ -476,15 +510,15 @@ onBeforeUnmount(() => 経過計測停止());
   word-break: break-word;
 }
 
-.dialog-footer { display: flex; justify-content: center; gap: 8px; padding: 9px 12px; border-top: 1px solid rgba(93, 68, 168, 0.85); }
-.dialog-button { padding: 6px 18px; border: 1px solid #4b5563; border-radius: 0; color: #f3f4f6; background: #1f2937; cursor: pointer; }
-.dialog-button.browse { height: 27px; flex: 0 0 auto; padding: 0 12px; }
+.dialog-footer { display: flex; justify-content: center; gap: 8px; padding: 8px 12px; border-top: 1px solid rgba(93, 68, 168, 0.85); }
+.dialog-button { padding: 6px 16px; border: 1px solid #4b5563; border-radius: 0; color: #f3f4f6; background: #1f2937; cursor: pointer; }
+.dialog-button.browse { height: 26px; flex: 0 0 auto; padding: 0 12px; }
 .dialog-button.primary { border-color: #28a745; color: #fff; background: #28a745; }
 .dialog-button:disabled { opacity: 0.5; cursor: default; }
 
 @media (max-width: 680px) {
   .dialog-overlay { padding: 8px; }
-  .detail-label { width: 124px; }
+  .detail-label { width: 112px; }
   .agent-card small { display: none; }
 }
 </style>
