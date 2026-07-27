@@ -19,7 +19,8 @@
 - 毎分1回、終わった Aチーム作業に対応する未終了の改善レコードを回収する
   （改善ループのオン・オフに関わらず行う）。
 - 毎分1回、Aチーム目標の改善ループ（PDCA）も確認する。実行中の要員がいない空き時間で、
-  前の段が終わっていれば次の段を対応する sub_pdca_*.py で投入する。
+  前の段が終わっていれば次の段を、目標のパターン（SPDCA/PlanDo）に対応する
+  sub_SPDCA_*.py / sub_PlanDo_*.py で投入する。
 - システム開始時（再起動含む）は、テーブルに残った未投入の作業をエラーとして記録しクリアする
   （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
@@ -47,11 +48,17 @@ _入力DIR = _BASE_DIR / "temp" / "input"
 _SUB_EXPパス = _BASE_DIR / "team_sub" / "sub_exp.py"
 _経験入力DIR = _BASE_DIR / "temp" / "exp"
 _SUB_PDCAパス = {
-    "S": _BASE_DIR / "team_sub" / "sub_pdca_soudan.py",
-    "P": _BASE_DIR / "team_sub" / "sub_pdca_plan.py",
-    "D": _BASE_DIR / "team_sub" / "sub_pdca_do.py",
-    "C": _BASE_DIR / "team_sub" / "sub_pdca_check.py",
-    "A": _BASE_DIR / "team_sub" / "sub_pdca_action.py",
+    "SPDCA": {
+        "S": _BASE_DIR / "team_sub" / "sub_SPDCA_soudan.py",
+        "P": _BASE_DIR / "team_sub" / "sub_SPDCA_plan.py",
+        "D": _BASE_DIR / "team_sub" / "sub_SPDCA_do.py",
+        "C": _BASE_DIR / "team_sub" / "sub_SPDCA_check.py",
+        "A": _BASE_DIR / "team_sub" / "sub_SPDCA_action.py",
+    },
+    "PlanDo": {
+        "P": _BASE_DIR / "team_sub" / "sub_PlanDo_plan.py",
+        "D": _BASE_DIR / "team_sub" / "sub_PlanDo_do.py",
+    },
 }
 _改善入力DIR = _BASE_DIR / "temp" / "pdca"
 
@@ -292,9 +299,13 @@ def _経験生成確認(logger: logging.Logger) -> None:
 
 
 def _改善実行開始(目標: dict, 区分: str, logger: logging.Logger) -> subprocess.Popen | None:
-    """PDCA 1段分の入力 JSON を出力し、区分に対応する sub_pdca_*.py を起動する。"""
+    """PDCA 1段分の入力 JSON を出力し、パターン・区分に対応する sub_SPDCA_*.py / sub_PlanDo_*.py を起動する。"""
     プロジェクト = str(目標.get("CODE_BASE_PATH", ""))
-    スクリプト = _SUB_PDCAパス[区分]
+    パターン = str(目標.get("パターン") or team_pdca_db.既定パターン)
+    スクリプト = _SUB_PDCAパス.get(パターン, {}).get(区分)
+    if スクリプト is None:
+        logger.warning(f"改善ループ({パターン}/{区分})に対応するスクリプトがありません: プロジェクト={プロジェクト}")
+        return None
     try:
         _改善入力DIR.mkdir(parents=True, exist_ok=True)
         入力パス = _改善入力パス(プロジェクト, 区分)
@@ -303,6 +314,7 @@ def _改善実行開始(目標: dict, 区分: str, logger: logging.Logger) -> su
                 {
                     "プロジェクト": プロジェクト,
                     "チーム目標": str(目標.get("チーム目標", "")),
+                    "パターン": パターン,
                     "PDCA区分": 区分,
                     "最大ループ回数": max(1, min(99, int(目標.get("最大ループ回数", 1) or 1))),
                     "動員要員数": max(
@@ -376,12 +388,14 @@ def _改善ループ確認(logger: logging.Logger) -> None:
             return
         for 目標 in 対象一覧:
             プロジェクト = str(目標.get("CODE_BASE_PATH", ""))
-            区分 = team_pdca_db.次のPDCA区分(プロジェクト)
+            パターン = str(目標.get("パターン") or team_pdca_db.既定パターン)
+            区分一覧 = team_pdca_db.パターン区分一覧.get(パターン, team_pdca_db.パターン区分一覧[team_pdca_db.既定パターン])
+            区分 = team_pdca_db.次のPDCA区分(プロジェクト, パターン)
             if not 区分:
                 continue
             最大ループ回数 = max(1, min(99, int(目標.get("最大ループ回数", 1) or 1)))
             現在ループ = team_pdca_db.ループ最大値(プロジェクト)
-            if 区分 == "S" and 最大ループ回数 != 99 and 現在ループ >= 最大ループ回数:
+            if 区分 == 区分一覧[0] and 最大ループ回数 != 99 and 現在ループ >= 最大ループ回数:
                 # 止まったのか、やり切って終わったのかを区別できるよう1回だけ記録する
                 if (プロジェクト, "完了") not in _改善未実装通知済み:
                     _改善未実装通知済み.add((プロジェクト, "完了"))
@@ -391,7 +405,7 @@ def _改善ループ確認(logger: logging.Logger) -> None:
                     )
                 continue
             _改善未実装通知済み.discard((プロジェクト, "完了"))
-            if 区分 not in team_pdca_db.実装済みPDCA区分 or 区分 not in _SUB_PDCAパス:
+            if 区分 not in 区分一覧 or 区分 not in _SUB_PDCAパス.get(パターン, {}):
                 if (プロジェクト, 区分) not in _改善未実装通知済み:
                     _改善未実装通知済み.add((プロジェクト, 区分))
                     logger.info(

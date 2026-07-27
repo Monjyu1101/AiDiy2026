@@ -703,7 +703,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "CODE_OPENCODE_CLI_MODEL",
             "CODE_CLAUDE_OLLAMA_MODEL", "CODE_CODEX_OLLAMA_MODEL",
             "CODE_BASE_PATH",
-            "CODE_MAX_TURNS", "CODE_PLAN", "CODE_VERIFY", "CODE_PERMISSIONS",
+            "CODE_MAX_TURNS", "CODE_PLAN", "CODE_VERIFY", "CODE_PERMISSIONS", "CODE_SELF_CHECK_LOOP",
             # TaskAI設定
             "TASK_AI_NAME", "TASK_AI_MODEL",
             # TeamAI設定

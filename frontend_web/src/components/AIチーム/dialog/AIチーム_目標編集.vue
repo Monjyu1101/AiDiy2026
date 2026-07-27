@@ -27,6 +27,13 @@ const emit = defineEmits<{
 
 const 既定パス = '../';
 const 既定動員要員数 = 2;
+const 既定パターン: 'SPDCA' | 'PlanDo' = 'PlanDo';
+const パターン選択肢: { value: 'SPDCA' | 'PlanDo'; label: string }[] = [
+  { value: 'SPDCA', label: 'SPDCA（相談→計画→実行→評価→改善）' },
+  { value: 'PlanDo', label: 'PlanDo（計画→実行）' },
+];
+const パターン正規化 = (値: unknown): 'SPDCA' | 'PlanDo' =>
+  値 === 'SPDCA' || 値 === 'PlanDo' ? 値 : 既定パターン;
 const authStore = useAuthStore();
 const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
 const 利用者名 = computed(() => String(authStore.user?.利用者名 ?? authStore.user?.利用者ID ?? 'admin'));
@@ -39,6 +46,7 @@ const 入力目標 = ref('');
 const 入力改善ループ = ref(false);
 const 入力最大ループ回数 = ref(1);
 const 入力動員要員数 = ref(既定動員要員数);
+const 入力パターン = ref<'SPDCA' | 'PlanDo'>(既定パターン);
 const 最大ループ回数選択肢 = Array.from({ length: 99 }, (_, index) => index + 1);
 // 相談へ動員できるのは admin 以外の有効要員だけなので、その人数を動員要員数の上限にする
 const 有効要員数 = ref(1);
@@ -106,6 +114,7 @@ const 一覧から選ぶ = (項目: チーム目標) => {
   入力改善ループ.value = Boolean(項目.改善ループ);
   入力最大ループ回数.value = Math.min(99, Math.max(1, Number(項目.最大ループ回数 ?? 1)));
   入力動員要員数.value = 動員要員数を丸める(項目.動員要員数);
+  入力パターン.value = パターン正規化(項目.パターン);
 };
 
 watch(選択パス, (value) => {
@@ -117,6 +126,7 @@ watch(選択パス, (value) => {
     入力改善ループ.value = Boolean(既存.改善ループ);
     入力最大ループ回数.value = Math.min(99, Math.max(1, Number(既存.最大ループ回数 ?? 1)));
     入力動員要員数.value = 動員要員数を丸める(既存.動員要員数);
+    入力パターン.value = パターン正規化(既存.パターン);
   }
 });
 
@@ -129,6 +139,7 @@ watch(
     入力目標.value = '';
     入力改善ループ.value = false;
     入力最大ループ回数.value = 1;
+    入力パターン.value = 既定パターン;
     // 選択肢の上限は有効要員数に依存するため、読込後に丸め直す
     await Promise.all([目標一覧読込(), プロジェクト選択肢読込(), 有効要員数読込()]);
     入力動員要員数.value = 動員要員数を丸める(既定動員要員数);
@@ -158,6 +169,7 @@ const 保存 = async () => {
       改善ループ: 入力改善ループ.value,
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
+      パターン: 入力パターン.value,
       操作利用者ID: 利用者ID.value,
       操作利用者名: 利用者名.value,
       操作端末ID: 'frontend_web',
@@ -173,6 +185,7 @@ const 保存 = async () => {
       改善ループ: 入力改善ループ.value,
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
+      パターン: 入力パターン.value,
     });
     // 1件保存したら用は済むのでダイアログを閉じる
     emit('close');
@@ -309,6 +322,16 @@ const 削除 = async () => {
                       </option>
                     </select>
                   </div>
+                </div>
+              </div>
+              <div class="detail-row one-line-row">
+                <div class="detail-label">パターン</div>
+                <div class="detail-value">
+                  <select id="パターン" v-model="入力パターン" class="detail-select">
+                    <option v-for="option in パターン選択肢" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
                 </div>
               </div>
               <p class="goal-note">

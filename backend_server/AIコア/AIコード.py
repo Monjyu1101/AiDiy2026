@@ -579,7 +579,7 @@ class CodeAgent:
         """
         input_text処理:
         1. AI実行 + output_stream/output_text送信
-        2. バックアップ検証ループ（最大5回）
+        2. バックアップ検証ループ（self_check_loopで指定回数）
         3. 生成ファイル通知
         4. update_info送信
 
@@ -756,7 +756,7 @@ class CodeAgent:
         1. ストリーム開始通知
         2. AI実行 + output_text送信
         3. ストリーム終了通知
-        4. バックアップ検証ループ（最大5回）
+        4. バックアップ検証ループ（self_check_loopで指定回数）
         5. 生成ファイル通知
         6. update_info送信
 
@@ -845,12 +845,20 @@ class CodeAgent:
                     サムネイル画像=None
                 )
 
-            # バックアップ＋自己検証ループ
+            # バックアップ＋自己検証ループ（self_check_loop=0ならバックアップなし・エージェント呼び出しのみ）
             今回更新あり = False
             try:
-                logger.info("[CodeAgent] バックアップ検証ループを開始します")
-                今回更新あり = await self._バックアップ検証ループ(ai_instance)
-                logger.info(f"[CodeAgent] バックアップ検証ループ完了: 更新あり={今回更新あり}")
+                セッション設定 = self.接続.モデル設定 if self.接続 and hasattr(self.接続, "モデル設定") else None
+                try:
+                    self_check_loop = int(セッション設定.get("CODE_SELF_CHECK_LOOP", 1)) if isinstance(セッション設定, dict) else 1
+                except (TypeError, ValueError):
+                    self_check_loop = 1
+                if self_check_loop > 0:
+                    logger.info(f"[CodeAgent] バックアップ検証ループを開始します（最大{self_check_loop}回）")
+                    今回更新あり = await self._バックアップ検証ループ(ai_instance, self_check_loop)
+                    logger.info(f"[CodeAgent] バックアップ検証ループ完了: 更新あり={今回更新あり}")
+                else:
+                    logger.info("[CodeAgent] self_check_loop=0 のためバックアップ・検証をスキップします")
             except Exception as e:
                 logger.error(f"[CodeAgent] バックアップ検証ループエラー: {e}")
 
@@ -876,8 +884,8 @@ class CodeAgent:
         
         return 出力メッセージ内容
 
-    async def _バックアップ検証ループ(self, ai_instance: Any) -> bool:
-        """バックアップ→検証→修正を繰り返すシンプルループ（最大5回）"""
+    async def _バックアップ検証ループ(self, ai_instance: Any, 最大ループ回数: int = 1) -> bool:
+        """バックアップ→検証→修正を繰り返すシンプルループ（最大回数はself_check_loopで指定）"""
 
 
         # プロジェクトルート（backend_serverの親ディレクトリ）を対象とする
@@ -887,12 +895,12 @@ class CodeAgent:
         セッション設定 = self.接続.モデル設定 if self.接続 and hasattr(self.接続, "モデル設定") else None
         今回更新あり = False
 
-        logger.info("[検証ループ] 開始（最大5回）")
+        logger.info(f"[検証ループ] 開始（最大{最大ループ回数}回）")
 
         # 初回バックアップ前に少し待機（ファイル書き込み完了を待つ）
         await asyncio.sleep(0.5)
 
-        for n in range(1, 6):  # 最大5回
+        for n in range(1, 最大ループ回数 + 1):
             # 強制停止フラグチェック
             if self.強制停止フラグ:
                 logger.info(f"[検証ループ] 強制停止フラグ検出 → 検証中断")

@@ -15,10 +15,10 @@
 検査のための読み取り・確認コマンドは実行してよいが、ソースの修正は行わせない。
 
 team_watcher.py（1分ごとの確認）が temp/pdca/<ファイル名>.json に入力値を書き、
-このスクリプトを `python sub_pdca_check.py <入力JSONパス>` で起動する。
+このスクリプトを `python sub_SPDCA_check.py <入力JSONパス>` で起動する。
 
 前段の確認・担当要員のAI選択・作業/改善レコードの作成・タスク投入は
-`sub_pdca__common.py`（D・C・A 共通）が行う。ここではAIへ渡すプロンプトだけを定義する。
+`sub_SPDCA__common.py`（D・C・A 共通）が行う。ここではAIへ渡すプロンプトだけを定義する。
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import sub_pdca__common
+import sub_SPDCA__common
 
 
 def プロンプト生成_評価(
@@ -82,7 +82,7 @@ def プロンプト生成_評価(
 
 
 def main() -> int:
-    return sub_pdca__common.段を実行("C", "D", プロンプト生成_評価, "sub_pdca_check")
+    return sub_SPDCA__common.段を実行("C", "D", プロンプト生成_評価, "sub_SPDCA_check")
 
 
 if __name__ == "__main__":

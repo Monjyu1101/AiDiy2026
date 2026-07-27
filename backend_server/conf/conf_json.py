@@ -101,6 +101,7 @@ class conf_json:
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',
         'CODE_VERIFY': 'auto',
+        'CODE_SELF_CHECK_LOOP': 1,
 
         # TaskAI設定
         'TASK_AI_NAME': 'codex_cli',

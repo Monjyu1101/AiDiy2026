@@ -14,12 +14,13 @@
 まとめ内容（検査結果）を受け取り、実際に動かして改善点が無いかを確認させる。
 動作確認のための実行は行ってよいが、ソースの修正は行わせない。
 ここでまとめた改善点は、次サイクルのS（相談）へ引き継がれて改善が続いていく。
+担当は新たにAIへ選ばせず、検査を行った本人（Cの担当要員）がそのまま実施する（要員継続）。
 
 team_watcher.py（1分ごとの確認）が temp/pdca/<ファイル名>.json に入力値を書き、
-このスクリプトを `python sub_pdca_action.py <入力JSONパス>` で起動する。
+このスクリプトを `python sub_SPDCA_action.py <入力JSONパス>` で起動する。
 
-前段の確認・担当要員のAI選択・作業/改善レコードの作成・タスク投入は
-`sub_pdca__common.py`（D・C・A 共通）が行う。ここではAIへ渡すプロンプトだけを定義する。
+前段の確認・担当要員の引き継ぎ・作業/改善レコードの作成・タスク投入は
+`sub_SPDCA__common.py`（D・C・A 共通）が行う。ここではAIへ渡すプロンプトだけを定義する。
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import sub_pdca__common
+import sub_SPDCA__common
 
 
 def プロンプト生成_改善(
@@ -84,7 +85,7 @@ def プロンプト生成_改善(
 
 
 def main() -> int:
-    return sub_pdca__common.段を実行("A", "C", プロンプト生成_改善, "sub_pdca_action")
+    return sub_SPDCA__common.段を実行("A", "C", プロンプト生成_改善, "sub_SPDCA_action", 要員継続=True)
 
 
 if __name__ == "__main__":

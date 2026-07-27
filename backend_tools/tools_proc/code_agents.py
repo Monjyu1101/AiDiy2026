@@ -41,7 +41,9 @@ class CodeAgentsError(Exception):
 
 class _NullConnection:
     """MCP経由実行時の接続ダミー。WebSocket送信を全て無視する。"""
-    モデル設定: dict = {}
+
+    def __init__(self, モデル設定: Optional[dict] = None):
+        self.モデル設定: dict = モデル設定 or {}
 
     async def send_to_channel(self, *args: Any, **kwargs: Any) -> None:
         pass
@@ -271,7 +273,8 @@ Args:
     code_permissions: 権限設定（auto / full / none）
     system_instruction: システム指示（省略時はデフォルト文）
     resume: セッション継続フラグ
-    timeout_sec: タイムアウト秒数""")
+    timeout_sec: タイムアウト秒数
+    self_check_loop: バックアップ＋自己検証ループの最大回数（default: 0=実行のみ・バックアップなし。1以上でその回数までバックアップ＋AI検証修正を実行）""")
 
         return "\n".join(lines)
 
@@ -292,6 +295,7 @@ Args:
         system_instruction: Optional[str] = None,
         resume: bool = True,
         timeout_sec: int = 1200,
+        self_check_loop: int = 0,
     ) -> dict:
         """
         AIコード.py の CodeAgent を使ってコードエージェントを実行する。
@@ -310,6 +314,9 @@ Args:
             system_instruction: システム指示（省略時はデフォルト文）
             resume: セッション継続フラグ
             timeout_sec: タイムアウト秒数
+            self_check_loop: バックアップ＋自己検証ループの最大回数。
+                              default: 0 = 実行のみ（バックアップ・自己検証なし）。
+                              1以上でその回数までAIコード.pyと同じバックアップ＋AI検証修正を実行する。
 
         Returns:
             {"status": "OK"/"NG", "result": "...", "project_path": "...", ...}
@@ -342,7 +349,7 @@ Args:
             絶対パス=resolved_path,
             AI_NAME=ai_name,
             AI_MODEL=ai_model,
-            接続=_NullConnection(),
+            接続=_NullConnection({"CODE_BASE_PATH": resolved_path}),
             保存関数=None,
         )
 
@@ -357,6 +364,8 @@ Args:
                 "prompt_length": len(prompt),
             }
 
+        self_check_updated = False
+        self_check_files: list[str] = []
         try:
             result_text = await ai_instance.実行(
                 要求テキスト=prompt,
@@ -364,6 +373,10 @@ Args:
                 タイムアウト秒数=timeout_sec,
                 resume=resume,
             )
+
+            if self_check_loop > 0:
+                self_check_updated = await agent._バックアップ検証ループ(ai_instance, self_check_loop)
+                self_check_files = list(agent.累積変更ファイル)
         finally:
             await ai_instance.終了()
 
@@ -374,4 +387,7 @@ Args:
             "ai_name": ai_name,
             "ai_model": ai_model,
             "prompt_length": len(prompt),
+            "self_check_loop": self_check_loop,
+            "self_check_updated": self_check_updated,
+            "self_check_files": self_check_files,
         }

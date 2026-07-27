@@ -73,6 +73,8 @@ export type チーム目標 = {
   最大ループ回数?: number;
   /** 改善ループの相談フェーズへ動員する要員数（1〜admin以外の有効要員数、既定2） */
   動員要員数?: number;
+  /** 改善ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */
+  パターン?: 'SPDCA' | 'PlanDo';
   更新日時: string;
   更新利用者ID?: string;
   更新利用者名?: string;

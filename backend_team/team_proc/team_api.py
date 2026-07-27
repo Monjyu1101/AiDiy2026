@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -172,6 +174,7 @@ class チーム目標保存要求(操作情報):
     動員要員数: int = Field(
         default=team_goal_db.既定動員要員数, ge=1, le=team_goal_db.動員要員数上限
     )
+    パターン: Literal["SPDCA", "PlanDo"] = team_goal_db.既定パターン
 
 
 class チーム目標削除要求(操作情報):
@@ -632,8 +635,9 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             request.改善ループ,
             request.最大ループ回数,
             request.動員要員数,
+            request.パターン,
         )
-        if team_goal_db.改善履歴クリア必要(変更前, 目標, request.改善ループ):
+        if team_goal_db.改善履歴クリア必要(変更前, 目標, request.改善ループ, request.パターン):
             # 最大ループ回数・動員要員数だけの変更では履歴を残し、
             # 目標またはループON/OFFの変更時だけクリアする。
             クリア件数 = team_pdca_db.改善クリア(パス)

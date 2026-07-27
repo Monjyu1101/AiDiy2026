@@ -88,6 +88,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_MAX_TURNS": app_conf.json.get("CODE_MAX_TURNS", 999),
         "CODE_PLAN": app_conf.json.get("CODE_PLAN", "auto"),
         "CODE_VERIFY": app_conf.json.get("CODE_VERIFY", "auto"),
+        "CODE_SELF_CHECK_LOOP": app_conf.json.get("CODE_SELF_CHECK_LOOP", 1),
         "CODE_BASE_PATH": code_base_path_raw,
         "CODE_PERMISSIONS": app_conf.json.get("CODE_PERMISSIONS", "auto"),
         # TaskAI設定

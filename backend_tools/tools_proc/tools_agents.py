@@ -39,6 +39,7 @@ class AgentsRequest(BaseModel):
     system_instruction: Optional[str] = None
     resume: bool = True
     timeout_sec: int = 1200
+    self_check_loop: int = 0
 
 
 _AGENTS_METHODS = [
@@ -64,6 +65,7 @@ _AGENTS_METHODS = [
             "system_instruction": {"type": "string", "required": False},
             "resume": {"type": "boolean", "required": False, "default": True},
             "timeout_sec": {"type": "integer", "required": False, "default": 1200},
+            "self_check_loop": {"type": "integer", "required": False, "default": 0, "description": "バックアップ＋自己検証ループの最大回数（0=実行のみ）"},
         },
     },
 ]
@@ -108,21 +110,23 @@ def register_tools(mcp_ca, code_agents):
             system_instruction: Optional[str] = None,
             resume: bool = True,
             timeout_sec: int = 1200,
+            self_check_loop: int = 0,
         ) -> str:
             """AIコード.py の CodeAgent を実行する（起動時に description が動的更新される）"""
             try:
                 result = await code_agents.run_async(
-                    prompt,
-                    project_path,
-                    ai_name,
-                    ai_model,
-                    max_turns,
-                    code_plan,
-                    code_verify,
-                    code_permissions,
-                    system_instruction,
-                    resume,
-                    timeout_sec,
+                    prompt=prompt,
+                    project_path=project_path,
+                    ai_name=ai_name,
+                    ai_model=ai_model,
+                    max_turns=max_turns,
+                    code_plan=code_plan,
+                    code_verify=code_verify,
+                    code_permissions=code_permissions,
+                    system_instruction=system_instruction,
+                    resume=resume,
+                    timeout_sec=timeout_sec,
+                    self_check_loop=self_check_loop,
                 )
             except CodeAgentsError as e:
                 raise ValueError(str(e)) from e
@@ -192,6 +196,7 @@ def create_router(code_agents) -> APIRouter:
                         "system_instruction": {"type": "string", "required": False, "description": "システムプロンプトへの追記テキスト"},
                         "resume": {"type": "boolean", "required": False, "default": True, "description": "True で前回セッションを継続する"},
                         "timeout_sec": {"type": "integer", "required": False, "default": 1200, "description": "タイムアウト秒（デフォルト 20 分）"},
+                        "self_check_loop": {"type": "integer", "required": False, "default": 0, "description": "バックアップ＋自己検証ループの最大回数。0=実行のみ（バックアップなし）。1以上でその回数までバックアップ＋AI検証修正を実行"},
                     },
                     "example_request": {
                         "prompt": "backend_server/apps_router/M商品.py に商品検索エンドポイントを追加してください",
@@ -234,6 +239,7 @@ def create_router(code_agents) -> APIRouter:
                     system_instruction=req.system_instruction,
                     resume=req.resume,
                     timeout_sec=req.timeout_sec,
+                    self_check_loop=req.self_check_loop,
                 )
                 return result
             else:

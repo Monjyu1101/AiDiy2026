@@ -14,23 +14,21 @@ S は計画（P）を立てる前の意見交換で、複数名が並行して�
 ここで出た意見を次の P（計画）で 1 つの計画にまとめます。
 
 team_watcher.py（1分ごとの確認）が temp/pdca/<ファイル名>.json に入力値を書き、
-このスクリプトを `python sub_pdca_soudan.py <入力JSONパス>` で起動する。
+このスクリプトを `python sub_SPDCA_soudan.py <入力JSONパス>` で起動する。
 
 処理の流れ:
 1. 入力 JSON（プロジェクト / チーム目標 / PDCA区分 / 最大ループ回数 / 動員要員数）を読み込む
-2. 有効な要員のうち admin 以外から指定された動員要員数までランダムに選ぶ（1名もいなければ admin）
+2. 有効な要員のうち admin 以外を候補にして、相談内容に最も適した要員を動員要員数まで
+   AIに順に選ばせる（sub_init.py と同じ選択処理。候補が尽きる・選べない場合はそこで打ち切る）
 3. 要員ごとに Aチーム作業（状態=準備中）→ Aチーム改善（開始レコード）→
    aidiy_task_agents への投入（Aタスク要求）の順で作る
 4. 投入に成功した作業は 準備完了 にする。失敗した作業はエラーにし、
    対応する Aチーム改善レコードも終了させて次のサイクルを止めない
-
-担当要員は既に決まっているため、sub_init.py のような AI による担当選択は行わない。
 """
 
 from __future__ import annotations
 
 import json
-import random
 import sys
 from pathlib import Path
 
@@ -42,35 +40,52 @@ from log_config import get_logger, setup_logging
 from team_proc import team_db, team_pdca_db
 
 # Aチーム作業・Aチーム改善の作成とタスク投入は全区分で同じ処理を使う
-import sub_pdca__common
+import sub_SPDCA__common
+# 担当要員のAI選択は sub_init.py と同じ処理を使う（有効要員 + Aチーム経験で判断させる）
+from sub_init import 担当要員を選択, 既定利用者ID
 
-既定利用者ID = "admin"
 既定動員要員数 = 2
 # Aチーム目標の動員要員数はここで固定の人数に丸めない。
 # 実際に動員できるのは admin 以外の有効要員数までなので、それを上限にする。
 動員要員数上限 = 99
 
 
-def 相談要員を選ぶ(logger, 動員要員数: int = 既定動員要員数) -> list[str]:
-    """有効な要員のうちadmin以外から、Aチーム目標の動員要員数までランダムに選ぶ。
+def 相談要員を選ぶ(要求内容: str, ループ: int, プロジェクト: str, 動員要員数: int, logger) -> list[str]:
+    """相談内容に最も適した要員を、動員要員数を上限にAIへ順に選ばせる（sub_init.py と同じ選択処理）。
 
-    動員要員数がadmin以外の有効要員数を超える場合は、その全員が上限になる。
-    admin以外が1名もいなければadmin 1名。
+    admin は選任専任者ではなく極力避けるため、候補は admin 以外の有効要員に絞り込む。
+    候補が1名もいない場合はadmin 1名にフォールバックする。複数名選ぶ場合は、
+    既に選ばれた要員を候補から除いて重複なく選び直す。AI選択に失敗した場合は
+    そこまでに選べた人数で打ち切り、1名も選べなければadmin 1名にする。
     """
-    指定人数 = max(1, min(動員要員数上限, int(動員要員数)))
-    候補 = [
-        str(要員["要員ID"])
-        for 要員 in team_db.要員一覧()
-        if str(要員["要員ID"]) != team_db.管理者要員ID
-    ]
-    if not 候補:
+    全候補 = [要員 for 要員 in team_db.要員一覧() if str(要員["要員ID"]) != team_db.管理者要員ID]
+    if not 全候補:
         logger.warning(f"admin以外の有効な要員がいないため{既定利用者ID}へ投入します")
         return [既定利用者ID]
-    if 指定人数 > len(候補):
+
+    指定人数 = max(1, min(動員要員数上限, len(全候補), int(動員要員数)))
+    if 指定人数 < min(動員要員数上限, int(動員要員数)):
         logger.info(
-            f"動員要員数({指定人数})が有効要員数({len(候補)})を超えるため全員を動員します"
+            f"動員要員数({動員要員数})が有効要員数({len(全候補)})を超えるため全員を上限に動員します"
         )
-    return random.sample(候補, min(指定人数, len(候補)))
+
+    選出済み: list[str] = []
+    残り候補 = list(全候補)
+    for 順番 in range(1, 指定人数 + 1):
+        要員ID = 担当要員を選択(要求内容, f"pdca_S_{ループ}_{順番}", logger, プロジェクト, 候補=残り候補)
+        if 要員ID == 既定利用者ID:
+            # 残り候補にadminは含めていないため、返ってきたらAI選択失敗によるフォールバック
+            logger.warning(f"相談要員のAI選択に失敗したため{順番}人目以降の動員を打ち切ります")
+            break
+        選出済み.append(要員ID)
+        残り候補 = [要員 for 要員 in 残り候補 if str(要員["要員ID"]) != 要員ID]
+        if not 残り候補:
+            break
+
+    if not 選出済み:
+        logger.warning(f"相談要員を1名も選べなかったため{既定利用者ID}へ投入します")
+        return [既定利用者ID]
+    return 選出済み
 
 
 def 次ループ番号(プロジェクト: str, 最大ループ回数: int) -> int:
@@ -92,7 +107,7 @@ def 前サイクルの改善内容(プロジェクト: str, ループ: int) -> s
     成功一覧 = [row for row in A一覧 if str(row.get("状況", "")) == "済"]
     if not 成功一覧:
         return ""
-    return sub_pdca__common.まとめ内容(sub_pdca__common.最新の成功記録(成功一覧))
+    return sub_SPDCA__common.まとめ内容(sub_SPDCA__common.最新の成功記録(成功一覧))
 
 
 def プロンプト生成_相談(
@@ -157,7 +172,7 @@ def 相談を投入(
     前サイクル改善: str = "",
 ) -> bool:
     """要員1名分の Aチーム作業・Aチーム改善・Aタスク要求を作る。"""
-    return sub_pdca__common.段を投入(
+    return sub_SPDCA__common.段を投入(
         区分,
         要員ID,
         プロジェクト,
@@ -169,14 +184,14 @@ def 相談を投入(
 
 
 def main() -> int:
-    setup_logging("sub_pdca_soudan")
-    logger = get_logger("team_sub_pdca_soudan")
+    setup_logging("sub_SPDCA_soudan")
+    logger = get_logger("team_sub_SPDCA_soudan")
     プロジェクト = ""
     チーム目標 = ""
     区分 = "S"
     try:
         if len(sys.argv) < 2:
-            raise ValueError("使い方: python sub_pdca_soudan.py <temp/pdca/入力JSON>")
+            raise ValueError("使い方: python sub_SPDCA_soudan.py <temp/pdca/入力JSON>")
         入力パス = Path(sys.argv[1]).resolve()
         with 入力パス.open("r", encoding="utf-8-sig") as f:
             項目 = json.load(f)
@@ -199,9 +214,12 @@ def main() -> int:
             )
             return 0
 
-        要員一覧 = 相談要員を選ぶ(logger, 動員要員数)
         # 2周目以降は前サイクルのAで洗い出した改善点を引き継いで議論を続ける
         前サイクル改善 = 前サイクルの改善内容(プロジェクト, ループ)
+        選択用要求内容 = f"チーム目標「{チーム目標}」に向けた意見交換（相談）に参加する（プロジェクト: {プロジェクト}）。"
+        if 前サイクル改善:
+            選択用要求内容 += f"\n\n前サイクルのA（改善）で洗い出された改善点:\n{前サイクル改善}"
+        要員一覧 = 相談要員を選ぶ(選択用要求内容, ループ, プロジェクト, 動員要員数, logger)
         logger.info(
             f"改善ループ({区分})を開始します: プロジェクト={プロジェクト} "
             f"ループ={ループ} 要員={','.join(要員一覧)} "
@@ -220,14 +238,14 @@ def main() -> int:
         logger.info(f"改善ループ({区分})の投入を終えました: 成功 {成功数}/{len(要員一覧)} 件")
         if not 成功数 and not team_pdca_db.ループ区分一覧(プロジェクト, ループ, 区分):
             # 1件もレコードを作れていないと、次の分にまた同じ段が投入されて堂々巡りになる
-            sub_pdca__common.実行不能を記録(
+            sub_SPDCA__common.実行不能を記録(
                 区分, プロジェクト, チーム目標, ループ,
                 f"{len(要員一覧)}名すべての投入に失敗しました", logger,
             )
         return 0 if 成功数 else 1
     except Exception as exc:
         logger.exception("改善ループの投入処理に失敗しました")
-        sub_pdca__common.投入失敗を記録(
+        sub_SPDCA__common.投入失敗を記録(
             区分, プロジェクト, チーム目標, f"投入処理エラー: {exc}", logger
         )
         return 1

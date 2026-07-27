@@ -30,7 +30,7 @@ from log_config import get_logger, setup_logging
 from team_proc import team_pdca_db
 
 # 前段の完了確認、Aチーム作業・Aチーム改善の作成とタスク投入は全区分で同じ処理を使う
-import sub_pdca__common
+import sub_SPDCA__common
 
 
 def 計画要員を選ぶ(S一覧: list[dict], 成功一覧: list[dict]) -> str:
@@ -113,7 +113,7 @@ def 計画を投入(
     logger,
 ) -> bool:
     """Pは相談の成功レコード全件を計画材料にするため、まとめ内容の連結を自前で作る。"""
-    return sub_pdca__common.段を投入(
+    return sub_SPDCA__common.段を投入(
         "P",
         要員ID,
         プロジェクト,
@@ -125,13 +125,13 @@ def 計画を投入(
 
 
 def main() -> int:
-    setup_logging("sub_pdca_plan")
-    logger = get_logger("team_sub_pdca_plan")
+    setup_logging("sub_SPDCA_plan")
+    logger = get_logger("team_sub_SPDCA_plan")
     プロジェクト = ""
     チーム目標 = ""
     try:
         if len(sys.argv) < 2:
-            raise ValueError("使い方: python sub_pdca_plan.py <temp/pdca/入力JSON>")
+            raise ValueError("使い方: python sub_SPDCA_plan.py <temp/pdca/入力JSON>")
         入力パス = Path(sys.argv[1]).resolve()
         with 入力パス.open("r", encoding="utf-8-sig") as f:
             項目 = json.load(f)
@@ -142,7 +142,7 @@ def main() -> int:
             raise ValueError("入力JSONにPのプロジェクトとチーム目標がありません")
 
         # Sの完了確認はD・C・Aと同じ共通処理を使う（成功が複数ある点だけPの扱いが違う）
-        ループ, S一覧, 成功一覧 = sub_pdca__common.前段結果を取得(プロジェクト, "S")
+        ループ, S一覧, 成功一覧 = sub_SPDCA__common.前段結果を取得(プロジェクト, "S")
         if len(成功一覧) == 1:
             return 0 if 単一相談を計画へ引き継ぐ(成功一覧[0], logger) else 1
         要員ID = 計画要員を選ぶ(S一覧, 成功一覧)
@@ -155,7 +155,7 @@ def main() -> int:
         ) else 1
     except Exception as exc:
         logger.exception("改善ループ(P)の投入処理に失敗しました")
-        sub_pdca__common.投入失敗を記録(
+        sub_SPDCA__common.投入失敗を記録(
             "P", プロジェクト, チーム目標, f"投入処理エラー: {exc}", logger
         )
         return 1
