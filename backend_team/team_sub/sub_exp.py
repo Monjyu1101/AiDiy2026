@@ -40,6 +40,8 @@ TASK_API = "http://localhost:8093/task"
 MCP_URL = "http://localhost:8095/aidiy_code_agents/run"
 TEAM_AI_NAME既定 = "claude_cli"
 TEAM_AI_MODEL既定 = "auto"
+TASK_AI_NAME既定 = "claude_cli"
+TASK_AI_MODEL既定 = "auto"
 JSON保存最大試行回数 = 2
 明細最大件数 = 40
 
@@ -211,17 +213,24 @@ def JSON検証(データ: dict, 作業ID: str) -> dict:
 
 
 def JSON保存と検証(
-    まとめ結果: str, 出力JSONパス: str, 作業ID: str, ai_name: str, ai_model: str
+    まとめ結果: str,
+    出力JSONパス: str,
+    作業ID: str,
+    team_ai_name: str,
+    team_ai_model: str,
 ) -> dict:
     """第2ステップ（JSON保存）と第3ステップ（検証）を実行する。失敗時は例外を送出する。"""
     if os.path.exists(出力JSONパス):
         os.remove(出力JSONパス)
 
-    ログ(f"第2ステップ: JSON保存 (ai={ai_name}, model={ai_model}, project_path={AIDIYルート})")
+    ログ(
+        f"第2ステップ: JSON保存 (ai={team_ai_name}, model={team_ai_model}, "
+        f"project_path={AIDIYルート})"
+    )
     res = POST送信(MCP_URL, {
         "prompt": プロンプト生成_JSON保存(まとめ結果, 出力JSONパス, 経験ID, 作業ID),
-        "ai_name": ai_name,
-        "ai_model": ai_model,
+        "ai_name": team_ai_name,
+        "ai_model": team_ai_model,
         "project_path": AIDIYルート,
     })
     ログ(f"第2ステップ応答: {json.dumps(res, ensure_ascii=False)[:300]}")
@@ -270,8 +279,18 @@ def main() -> int:
         要員ID = str(入力.get("要員ID", "")).strip()
         プロジェクト = str(入力.get("プロジェクト", "")).strip()
         要求内容 = str(入力.get("要求内容", "")).strip()
-        ai_name = str(入力.get("TEAM_AI_NAME", TEAM_AI_NAME既定) or TEAM_AI_NAME既定).strip()
-        ai_model = str(入力.get("TEAM_AI_MODEL", TEAM_AI_MODEL既定) or TEAM_AI_MODEL既定).strip()
+        team_ai_name = str(
+            入力.get("TEAM_AI_NAME", TEAM_AI_NAME既定) or TEAM_AI_NAME既定
+        ).strip()
+        team_ai_model = str(
+            入力.get("TEAM_AI_MODEL", TEAM_AI_MODEL既定) or TEAM_AI_MODEL既定
+        ).strip()
+        task_ai_name = str(
+            入力.get("TASK_AI_NAME", TASK_AI_NAME既定) or TASK_AI_NAME既定
+        ).strip()
+        task_ai_model = str(
+            入力.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定
+        ).strip()
         if not 経験ID or not 作業ID or not タスクID:
             raise ValueError("入力 JSON に 経験ID、作業ID または タスクID がありません")
 
@@ -293,11 +312,14 @@ def main() -> int:
         ログ(f"明細取得: {len(明細)} 件")
 
         # 2. 第1ステップ: 対象プロジェクトで経験値をまとめる（ファイル書き込みなし）
-        ログ(f"第1ステップ: 経験まとめ (ai={ai_name}, model={ai_model}, project_path={プロジェクト or '既定'})")
+        ログ(
+            f"第1ステップ: 経験まとめ (ai={task_ai_name}, model={task_ai_model}, "
+            f"project_path={プロジェクト or '既定'})"
+        )
         payload = {
             "prompt": プロンプト生成_経験まとめ(経験ID, 作業ID, 要員ID, プロジェクト, 要求内容, 明細本文),
-            "ai_name": ai_name,
-            "ai_model": ai_model,
+            "ai_name": task_ai_name,
+            "ai_model": task_ai_model,
         }
         if プロジェクト:
             payload["project_path"] = プロジェクト
@@ -312,7 +334,13 @@ def main() -> int:
         # 3. 第2ステップ（JSON保存）と第3ステップ（検証）。AI 応答の揺れで失敗することがあるため1回リトライする
         for 試行 in range(1, JSON保存最大試行回数 + 1):
             try:
-                整形 = JSON保存と検証(まとめ結果, 出力JSONパス, 作業ID, ai_name, ai_model)
+                整形 = JSON保存と検証(
+                    まとめ結果,
+                    出力JSONパス,
+                    作業ID,
+                    team_ai_name,
+                    team_ai_model,
+                )
                 break
             except Exception as e:
                 ログ(f"第2/第3ステップ 試行{試行}回目 失敗: {e}")

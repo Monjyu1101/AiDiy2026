@@ -14,6 +14,7 @@
 import { computed, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import AiTeamConversation from '../dialog/AIチーム_会話要求.vue';
 import {
   type エージェント,
   type エージェント状態,
@@ -63,6 +64,8 @@ const 相談数 = computed(() => エージェント一覧.value.filter((agent) =
 const 瞑想数 = computed(() => エージェント一覧.value.filter((agent) => agent.状態 === '瞑想中').length);
 const 休憩数 = computed(() => エージェント一覧.value.filter((agent) => ['移動中', '休憩中'].includes(agent.状態)).length);
 const ホバー中ID = ref('');
+const 会話対象 = ref<エージェント | null>(null);
+const 会話ダイアログ表示 = ref(false);
 // 時間の進み方は画面から変更せず、この規定値で固定する（1.0 倍が標準。0 にすると時間が止まる）
 const 経過速度倍率 = 1;
 const 現在時刻 = ref('');
@@ -1729,6 +1732,20 @@ const キャンバスクリック = (event: MouseEvent) => {
   if (id) emit('select', id);
 };
 
+const 会話を開く = (id: string) => {
+  const agent = エージェント一覧.value.find((item) => item.id === id);
+  if (!agent) return;
+  emit('select', id);
+  会話対象.value = agent;
+  会話ダイアログ表示.value = true;
+};
+
+const キャンバスダブルクリック = (event: MouseEvent) => {
+  if (目標掲示板をヒットテスト(event.clientX, event.clientY)) return;
+  const id = エージェントIDをヒットテスト(event.clientX, event.clientY);
+  if (id) 会話を開く(id);
+};
+
 const キャンバスポインター移動 = (event: PointerEvent) => {
   目標ホバー.value = 目標掲示板をヒットテスト(event.clientX, event.clientY);
   const id = 目標ホバー.value
@@ -1814,6 +1831,7 @@ onBeforeUnmount(() => {
       class="scene-canvas"
       aria-label="ドラッグで360度回転できるAIチームの3D草原ワークスペース"
       @click="キャンバスクリック"
+      @dblclick="キャンバスダブルクリック"
       @pointermove="キャンバスポインター移動"
       @pointerleave="キャンバスポインター離脱"
     ></canvas>
@@ -1858,6 +1876,7 @@ onBeforeUnmount(() => {
       }"
       :style="{ '--agent-color': agent.色CSS }"
       @click.stop="エージェントを選択(agent.id)"
+      @dblclick.stop="会話を開く(agent.id)"
       @mouseenter="ホバー中ID = agent.id"
       @mouseleave="ホバー中ID = ''"
     >
@@ -1871,8 +1890,17 @@ onBeforeUnmount(() => {
     <div class="camera-help">
       <span><b>DRAG</b> 360° 回転</span>
       <span><b>WHEEL</b> ズーム</span>
+      <span><b>DOUBLE CLICK</b> 会話</span>
       <button type="button" @click="カメラを戻す">視点を戻す</button>
     </div>
+
+    <component
+      :is="AiTeamConversation"
+      :is-open="会話ダイアログ表示"
+      :エージェント="会話対象"
+      :チーム目標="props.チーム目標"
+      @close="会話ダイアログ表示 = false"
+    />
   </main>
 </template>
 

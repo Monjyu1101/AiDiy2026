@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_db, team_exp_db, team_work_db
+from team_proc.config import 設定読込
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 AIDIY_ROOT = BASE_DIR.parent
@@ -47,6 +48,8 @@ CODE_AGENTS_URL = (
     or "http://127.0.0.1:8095/aidiy_code_agents/run"
 )
 既定利用者ID = "admin"
+TEAM_AI_NAME既定 = "claude_cli"
+TEAM_AI_MODEL既定 = "auto"
 利用者選択最大試行回数 = 2
 # 担当要員の選択は aidiy_code_agents/run が Code CLI を同期実行するため、応答まで数分かかる。
 # POST送信 の既定（30秒）のままだと必ず timed out になり、毎回 既定利用者ID へ
@@ -144,14 +147,34 @@ def プロンプト生成_担当選択(
 
 
 def 担当要員を選択(
-    要求内容: str, 作業ID: str, logger, プロジェクト: str = "", 候補: list[dict] | None = None
+    要求内容: str,
+    作業ID: str,
+    logger,
+    プロジェクト: str = "",
+    候補: list[dict] | None = None,
+    team_ai_name: str | None = None,
+    team_ai_model: str | None = None,
 ) -> str:
     """要求内容に最も適した要員IDをAIに選ばせる。失敗・不正時は既定利用者IDへフォールバックする。
 
     判断材料として Aチーム経験（要員ごとの経験値・直近の学び）も渡す。
     候補を省略した場合は有効な要員一覧全員（admin含む）から選ぶ。
     呼び出し側で admin を避けたい等の絞り込みをしたい場合は候補に絞り込み済みの一覧を渡す。
+    この選定処理は AiDiy ルートで実行するため TEAM_AI_NAME / TEAM_AI_MODEL を使う。
+    未指定時は共通設定の TEAM_AI_* を使う（改善ループから直接呼ぶ場合）。
     """
+    try:
+        設定 = 設定読込()
+        team_ai_name = (team_ai_name or "").strip() or str(
+            getattr(設定, "TEAM_AI_NAME", "") or TEAM_AI_NAME既定
+        ).strip()
+        team_ai_model = (team_ai_model or "").strip() or str(
+            getattr(設定, "TEAM_AI_MODEL", "") or TEAM_AI_MODEL既定
+        ).strip()
+    except Exception:
+        team_ai_name = (team_ai_name or "").strip() or TEAM_AI_NAME既定
+        team_ai_model = (team_ai_model or "").strip() or TEAM_AI_MODEL既定
+
     候補 = 候補 if 候補 is not None else team_db.要員一覧()
     候補ID集合 = {str(要員["要員ID"]) for 要員 in 候補}
     if not 候補:
@@ -180,8 +203,8 @@ def 担当要員を選択(
                 CODE_AGENTS_URL,
                 {
                     "prompt": プロンプト生成_担当選択(要求内容, 候補, 出力JSONパス, 経験概要),
-                    "ai_name": "claude_cli",
-                    "ai_model": "auto",
+                    "ai_name": team_ai_name,
+                    "ai_model": team_ai_model,
                     "project_path": str(AIDIY_ROOT),
                 },
                 timeout=利用者選択タイムアウト秒,
@@ -243,7 +266,12 @@ def main() -> int:
             raise ValueError("入力JSONに要員ID、作業ID、要求内容がありません")
 
         担当利用者ID = 担当要員を選択(
-            str(項目["要求内容"]), 作業ID, logger, str(項目.get("プロジェクト", "")).strip()
+            str(項目["要求内容"]),
+            作業ID,
+            logger,
+            str(項目.get("プロジェクト", "")).strip(),
+            team_ai_name=str(項目.get("TEAM_AI_NAME", TEAM_AI_NAME既定)),
+            team_ai_model=str(項目.get("TEAM_AI_MODEL", TEAM_AI_MODEL既定)),
         )
         logger.info(
             f"aidiy_task_agentsへ投入します: {作業ID} (要員ID={要員ID} -> 利用者ID={担当利用者ID})"

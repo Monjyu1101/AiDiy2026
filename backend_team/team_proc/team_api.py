@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter
@@ -21,6 +22,7 @@ from log_config import get_logger
 
 from . import (
     persona_catalog,
+    team_chat,
     team_db,
     team_exp_db,
     team_goal_db,
@@ -59,6 +61,14 @@ class 状態変更要求(BaseModel):
 
 class 排除要求(BaseModel):
     要員ID: str
+
+
+class エージェント会話要求(BaseModel):
+    要員ID: str = Field(min_length=1, max_length=persona_catalog.要員ID最大長)
+    プロジェクト: str = Field(min_length=1, max_length=1000)
+    TASK_AI_NAME: str = Field(min_length=1, max_length=100)
+    TASK_AI_MODEL: str = Field(min_length=1, max_length=200)
+    要求内容: str = Field(min_length=1, max_length=10000)
 
 
 class 活動一覧要求(BaseModel):
@@ -260,6 +270,36 @@ async def エージェント排除(request: 排除要求) -> dict:
     except Exception as e:
         logger.error(f"エージェントの排除に失敗: {e}")
         return ng(f"エージェントの排除に失敗しました: {e}")
+
+
+@router.post("/エージェント/会話", tags=["AIチーム"])
+async def エージェント会話(request: エージェント会話要求) -> dict:
+    """要員のpersonaを設定し、aidiy_code_agentsへ単発会話を同期依頼する。"""
+    try:
+        要員ID = request.要員ID.strip()
+        プロジェクト = request.プロジェクト.strip()
+        task_ai_name = request.TASK_AI_NAME.strip()
+        task_ai_model = request.TASK_AI_MODEL.strip()
+        要求内容 = request.要求内容.strip()
+        if not all((要員ID, プロジェクト, task_ai_name, task_ai_model, 要求内容)):
+            return ng("要員ID、プロジェクト、TASK_AI_NAME、TASK_AI_MODEL、要求内容を指定してください")
+        item = await asyncio.to_thread(
+            team_chat.会話実行,
+            要員ID,
+            プロジェクト,
+            task_ai_name,
+            task_ai_model,
+            要求内容,
+        )
+        return ok("エージェントから応答がありました", item)
+    except ValueError as exc:
+        return ng(str(exc))
+    except TimeoutError as exc:
+        logger.warning(f"エージェント会話がタイムアウトしました: {exc}")
+        return ng(str(exc))
+    except Exception as e:
+        logger.error(f"エージェント会話に失敗: {e}")
+        return ng(f"エージェント会話に失敗しました: {e}")
 
 
 @router.post("/活動/一覧", tags=["AIチーム"])

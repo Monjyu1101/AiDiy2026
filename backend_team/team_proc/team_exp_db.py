@@ -172,7 +172,8 @@ def 経験対象一覧() -> list[dict]:
         rows = conn.execute(
             f"""
             SELECT w.作業ID, w.タスクID, w.プロジェクト, w.要求内容,
-                   w.TEAM_AI_NAME, w.TEAM_AI_MODEL, w.更新日時,
+                   w.TEAM_AI_NAME, w.TEAM_AI_MODEL,
+                   w.TASK_AI_NAME, w.TASK_AI_MODEL, w.更新日時,
                    w.要員ID AS 依頼元要員ID,
                    r.利用者ID AS 要員ID,
                    r.タイトル AS タスクタイトル,

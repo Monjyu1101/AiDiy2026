@@ -11,7 +11,7 @@ AI エージェントは、本書に一時的な作業メモを追記しない�
 `backend_team` はポート `8094` 上で動作する、複数AIエージェントの継続活動を管理する FastAPI サーバーです。
 現段階はUI検討用の仮実装です。要員マスタとチーム作業は共有SQLiteへ保存し、活動状態はインメモリ管理です。
 
-- 設定: `backend_server/_config/AiDiy_key.json` の `TEAM_BASE`、`TEAM_AI_NAME`、`TEAM_AI_MODEL`
+- 設定: `backend_server/_config/AiDiy_key.json` の `TEAM_BASE`、`TEAM_AI_NAME`、`TEAM_AI_MODEL`、`TASK_AI_NAME`、`TASK_AI_MODEL`
 - 初期ポート: `8094`
 - 起動: `uvicorn team_main:app --host 0.0.0.0 --port 8094`
 - DB: `backend_server/_data/AiDiy/database.db` の `Aチーム要員` / `Aチーム作業` / `Aチーム目標` / `Aチーム経験` / `Aチーム改善` / `Aチーム状況`（`Aチーム状況` は読取専用、backend_task側が更新。`Aチーム改善` の終了日時・応答内容もbackend_task側が更新）
@@ -30,6 +30,7 @@ AI エージェントは、本書に一時的な作業メモを追記しない�
 | `POST /team/エージェント/一覧` | エージェント一覧 |
 | `POST /team/エージェント/召喚` | persona値で`Aチーム要員`をupsertして有効化 |
 | `POST /team/エージェント/排除` | `Aチーム要員`の行を残して無効化 |
+| `POST /team/エージェント/会話` | personaをシステム指示へ設定し、選択したプロジェクトと`TASK_AI_*`で`aidiy_code_agents`へ単発会話を同期依頼（最大3分、履歴保持なし） |
 | `POST /team/エージェント/状態変更` | 状態、作業内容、ひとことの変更 |
 | `POST /team/活動/一覧` | 活動履歴 |
 | `POST /team/シミュレーション/切替` | 自動行動の開始・停止 |
@@ -74,8 +75,8 @@ persona要員は召喚時に `persona.json` の現在値でupsertし、排除時
 | `作業ID` | 主キー |
 | `要員ID` | 作業を保有する要員 |
 | `プロジェクト` / `タイトル` / `要求内容` | 作業の依頼内容 |
-| `TEAM_AI_NAME` / `TEAM_AI_MODEL` | チーム管理に使用するAI設定 |
-| `TASK_AI_NAME` / `TASK_AI_MODEL` | 作業実行に使用するAI設定 |
+| `TEAM_AI_NAME` / `TEAM_AI_MODEL` | AiDiy ルート（`../`）で行うチーム管理処理（担当選定、結果JSON整形）に使用するAI設定 |
+| `TASK_AI_NAME` / `TASK_AI_MODEL` | 対象プロジェクトフォルダで行う作業実行・経験整理に使用するAI設定 |
 | `実行有効` / `状態` | 実行可否と`準備開始`・`準備中`・`準備完了`・`待機`・`実行中`・`エラー`・`完了`・`済`・`中止` |
 | `PID` / `開始日時` / `終了日時` / `実行回数` | 実行管理項目 |
 | `タスクID` | `aidiy_task_agents`へ投入した`Aタスク要求`のID |
@@ -104,8 +105,8 @@ persona要員は召喚時に `persona.json` の現在値でupsertし、排除時
 1. `Aチーム作業`が`状態=完了`かつ`更新日時`が1時間以内、紐づく`Aタスク要求`も`状態=完了`、
    `Aチーム経験`に同じ`作業ID`が未登録のものを対象にする。
 2. `開始日時`だけ入れた仮登録（`状態=生成中`、`PID=CLAIM`）を作り、`team_sub/sub_exp.py`を起動して PID を記録する。
-3. `sub_exp.py`は`backend_task`から`AIタスク明細`を取得し、対象プロジェクトのパスで AI に経験値をまとめさせ（第1ステップ）、
-   AiDiy ルート（`../`）で AI に JSON を`temp/exp/output/<経験ID>.json`へ書かせる（第2ステップ）。
+3. `sub_exp.py`は`backend_task`から`AIタスク明細`を取得し、対象プロジェクトのパスで `TASK_AI_NAME / TASK_AI_MODEL` の AI に経験値をまとめさせ（第1ステップ）、
+   AiDiy ルート（`../`）で `TEAM_AI_NAME / TEAM_AI_MODEL` の AI に JSON を`temp/exp/output/<経験ID>.json`へ書かせる（第2ステップ）。
    検証後に`/team/経験/本登録`へ書き戻す。本登録と同時に元の`Aチーム作業`を`済`へ変更して`まとめ内容`へ複写し、対応する`Aチーム改善`も`状況=済`・`まとめ内容`へ複写して終了させる。元の応答内容は保持する。失敗時は`/team/経験/失敗`でエラーにする。
 
 蓄積した経験は担当割当にも使います。`team_sub/sub_init.py`が担当要員を AI に選ばせるとき、

@@ -349,9 +349,16 @@ Args:
             絶対パス=resolved_path,
             AI_NAME=ai_name,
             AI_MODEL=ai_model,
-            接続=_NullConnection({"CODE_BASE_PATH": resolved_path}),
+            接続=_NullConnection({
+                "CODE_BASE_PATH": resolved_path,
+                "CODE_PERMISSIONS": code_permissions,
+            }),
             保存関数=None,
         )
+        # HTTP / MCP 呼び出し側が指定した persona などのシステム指示を、
+        # CodeAgent が生成する CodeAI インスタンスへ確実に引き継ぐ。
+        if isinstance(system_instruction, str) and system_instruction.strip():
+            agent.システム指示 = system_instruction.strip()
 
         ai_instance = await agent._ensure_ai_instance()
         if not ai_instance:

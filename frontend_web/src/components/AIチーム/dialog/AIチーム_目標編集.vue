@@ -293,47 +293,68 @@ const 削除 = async () => {
                   ></textarea>
                 </div>
               </div>
-              <div class="detail-row one-line-row">
-                <div class="detail-label">ループ実行</div>
-                <div class="detail-value">
-                  <div class="loop-settings">
-                    <label class="valid-checkbox-label">
+              <section
+                class="loop-panel"
+                :class="{ active: 入力改善ループ }"
+                aria-labelledby="loop-panel-title"
+              >
+                <div class="loop-panel-head">
+                  <div class="loop-panel-title-wrap">
+                    <span class="loop-panel-icon" aria-hidden="true">↻</span>
+                    <div>
+                      <h4 id="loop-panel-title">改善ループ</h4>
+                      <p>目標達成に向けた自動サイクルの実行条件</p>
+                    </div>
+                  </div>
+                  <label class="loop-switch">
                     <input
                       v-model="入力改善ループ"
                       type="checkbox"
-                      class="valid-checkbox"
                       aria-label="改善ループの切り替え"
                     />
-                    <span
-                      class="valid-checkbox-mark"
-                      :class="{ 'valid-checkbox-inactive': !入力改善ループ }"
-                    >{{ 入力改善ループ ? '✅' : '☐' }}</span>
-                    </label>
-                    <label class="max-loop-label" for="最大ループ回数">最大ループ回数</label>
-                    <select id="最大ループ回数" v-model.number="入力最大ループ回数" class="max-loop-select">
+                    <span class="loop-switch-track" aria-hidden="true">
+                      <span class="loop-switch-thumb"></span>
+                    </span>
+                    <span class="loop-switch-status">
+                      {{ 入力改善ループ ? '実行する' : '停止中' }}
+                    </span>
+                  </label>
+                </div>
+
+                <div class="loop-config-grid">
+                  <label class="loop-config-item loop-pattern-setting" for="パターン">
+                    <span class="loop-config-label">進行パターン</span>
+                    <select id="パターン" v-model="入力パターン" class="loop-config-select">
+                      <option v-for="option in パターン選択肢" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                    <span class="loop-config-help">
+                      {{ 入力パターン === 'SPDCA' ? '相談から改善までの5段階' : '計画と実行を繰り返す2段階' }}
+                    </span>
+                  </label>
+
+                  <label class="loop-config-item" for="最大ループ回数">
+                    <span class="loop-config-label">最大ループ回数</span>
+                    <select id="最大ループ回数" v-model.number="入力最大ループ回数" class="loop-config-select">
                       <option v-for="回数 in 最大ループ回数選択肢" :key="回数" :value="回数">
-                        {{ 回数 === 99 ? '99（無制限）' : 回数 }}
+                        {{ 回数 === 99 ? '99（無制限）' : `${回数} 回` }}
                       </option>
                     </select>
-                    <label class="mobilize-label" for="動員要員数">動員要員数</label>
-                    <select id="動員要員数" v-model.number="入力動員要員数" class="mobilize-select">
+                    <span class="loop-config-help">99を選ぶと無制限</span>
+                  </label>
+
+                  <label class="loop-config-item" for="動員要員数">
+                    <span class="loop-config-label">相談の参加人数</span>
+                    <select id="動員要員数" v-model.number="入力動員要員数" class="loop-config-select">
                       <option v-for="人数 in 動員要員数選択肢" :key="人数" :value="人数">
-                        {{ 人数 }}
+                        {{ 人数 }} 人
                       </option>
                     </select>
-                  </div>
+                    <span class="loop-config-help">有効な要員から動員</span>
+                  </label>
                 </div>
-              </div>
-              <div class="detail-row one-line-row">
-                <div class="detail-label">パターン</div>
-                <div class="detail-value">
-                  <select id="パターン" v-model="入力パターン" class="detail-select">
-                    <option v-for="option in パターン選択肢" :key="option.value" :value="option.value">
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </div>
-              </div>
+              </section>
               <p class="goal-note">
                 CODE_BASE_PATH ごとに 1 件です。同じパスを保存すると上書きされ、
                 更新日時が最新の目標がチーム空間の掲示板に表示されます。
@@ -586,97 +607,200 @@ const 削除 = async () => {
   color: #dc2626;
 }
 
-.valid-checkbox-label {
-  width: 52px;
-  height: 26px;
-  min-height: 26px;
-  padding: 0 8px;
-  border: 1px solid #4b5563;
-  border-radius: 4px;
-  color: #16a34a;
-  background: #05070b;
-  box-sizing: border-box;
-  position: relative;
+.loop-panel {
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(82, 94, 119, 0.9);
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(18, 23, 34, 0.98), rgba(10, 13, 20, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.loop-panel.active {
+  border-color: rgba(113, 92, 211, 0.95);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(106, 85, 207, 0.1),
+    0 8px 24px rgba(35, 24, 82, 0.18);
+}
+
+.loop-panel-head {
+  min-height: 58px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(75, 85, 99, 0.72);
+  background: linear-gradient(90deg, rgba(70, 104, 205, 0.15), rgba(143, 104, 221, 0.08));
+  box-sizing: border-box;
+}
+
+.loop-panel-title-wrap {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.loop-panel-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(143, 104, 221, 0.48);
+  border-radius: 9px;
+  color: #b7a4ff;
+  background: rgba(91, 68, 168, 0.2);
+  font-size: 21px;
+  line-height: 1;
+}
+
+.loop-panel-title-wrap h4 {
+  margin: 0;
+  color: #f4f1ff;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.loop-panel-title-wrap p {
+  margin: 3px 0 0;
+  color: #8f9baa;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.loop-switch {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
   user-select: none;
 }
 
-.valid-checkbox-label:focus-within {
-  border-color: #8f68dd;
-  box-shadow: inset 0 0 0 1px rgba(143, 104, 221, 0.35);
-}
-
-.valid-checkbox {
+.loop-switch input {
   position: absolute;
   width: 1px;
   height: 1px;
   opacity: 0;
-  pointer-events: none;
 }
 
-.valid-checkbox-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #16a34a;
-  font-size: 16px;
-  line-height: 1;
+.loop-switch-track {
+  width: 42px;
+  height: 22px;
+  position: relative;
+  display: block;
+  border: 1px solid #5b6473;
+  border-radius: 999px;
+  background: #252b35;
+  box-sizing: border-box;
+  transition: border-color 180ms ease, background 180ms ease;
 }
 
-.valid-checkbox-inactive {
-  color: #d1d5db;
+.loop-switch-thumb {
+  width: 16px;
+  height: 16px;
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  border-radius: 50%;
+  background: #a8b0bd;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  transition: transform 180ms ease, background 180ms ease;
 }
 
-.loop-settings {
-  width: 100%;
-  display: flex;
-  align-items: center;
+.loop-switch input:checked + .loop-switch-track {
+  border-color: #7e69d8;
+  background: linear-gradient(135deg, #4668cd, #8f68dd);
+}
+
+.loop-switch input:checked + .loop-switch-track .loop-switch-thumb {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+.loop-switch input:focus-visible + .loop-switch-track {
+  outline: 2px solid rgba(174, 151, 255, 0.72);
+  outline-offset: 2px;
+}
+
+.loop-switch-status {
+  min-width: 42px;
+  color: #9aa5b4;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.loop-panel.active .loop-switch-status { color: #bdaeff; }
+
+.loop-config-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.8fr) minmax(130px, 0.9fr) minmax(130px, 0.9fr);
   gap: 8px;
+  padding: 10px;
 }
 
-.max-loop-label {
-  margin-left: auto;
+.loop-config-item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(72, 82, 101, 0.78);
+  border-radius: 6px;
+  background: rgba(5, 7, 11, 0.62);
+  box-sizing: border-box;
+}
+
+.loop-config-item:focus-within {
+  border-color: rgba(143, 104, 221, 0.8);
+  box-shadow: 0 0 0 2px rgba(143, 104, 221, 0.1);
+}
+
+.loop-config-label {
   color: #cbd5e1;
-  font-size: 12px;
-  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.max-loop-select {
-  width: 112px;
-  height: 26px;
-  padding: 0 6px;
+.loop-config-select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 28px 0 8px;
   border: 1px solid #4b5563;
-  border-radius: 4px;
+  border-radius: 5px;
   color: #f3f4f6;
-  background: #05070b;
+  background: #080b11;
   box-sizing: border-box;
   font: inherit;
-}
-
-.mobilize-label {
-  color: #cbd5e1;
   font-size: 12px;
-  white-space: nowrap;
 }
 
-.mobilize-select {
-  width: 52px;
-  height: 26px;
-  padding: 0 6px;
-  border: 1px solid #4b5563;
-  border-radius: 3px;
-  color: #e5e7eb;
-  background: #0f172a;
+.loop-config-select:focus {
+  border-color: #8f68dd;
+  outline: none;
+}
+
+.loop-config-help {
+  overflow: hidden;
+  color: #758192;
+  font-size: 9px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .goal-note {
-  margin: 10px 2px 0;
-  color: #8b98a5;
+  margin: 9px 1px 0;
+  padding: 7px 10px;
+  border-left: 2px solid rgba(70, 104, 205, 0.72);
+  border-radius: 0 4px 4px 0;
+  color: #8895a5;
+  background: rgba(70, 104, 205, 0.06);
   font-size: 11px;
   line-height: 1.6;
 }
@@ -722,5 +846,15 @@ const 削除 = async () => {
 @media (max-width: 760px) {
   .goal-layout { grid-template-columns: minmax(0, 1fr); }
   .goal-list-body { max-height: 180px; }
+  .loop-config-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .loop-pattern-setting { grid-column: 1 / -1; }
+}
+
+@media (max-width: 520px) {
+  .dialog-overlay { padding: 10px; }
+  .loop-panel-head { align-items: flex-start; }
+  .loop-panel-title-wrap p { display: none; }
+  .loop-config-grid { grid-template-columns: minmax(0, 1fr); }
+  .loop-pattern-setting { grid-column: auto; }
 }
 </style>
