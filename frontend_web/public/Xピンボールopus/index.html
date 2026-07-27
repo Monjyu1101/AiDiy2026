@@ -1,0 +1,81 @@
+<!--
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス v1.1".
+-->
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#120c07">
+  <title>Xピンボールopus</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="stage" aria-label="Xピンボールopus 大渓谷">
+    <canvas id="game"></canvas>
+    <div id="load-error" class="load-error">
+      3D 渓谷を読み込み中です。表示されない場合はネットワーク接続を確認してください。
+    </div>
+  </main>
+
+  <header id="hud">
+    <section class="hud-left">
+      <span class="hud-label">EXPEDITION SCORE</span>
+      <strong id="score">0000000</strong>
+      <div class="multiplier"><span>MULTIPLIER</span><b id="multiplier">×1</b></div>
+    </section>
+    <section class="hud-center">
+      <span class="hud-label">TORRENT</span>
+      <div class="torrent-track"><i id="torrent-bar"></i><em id="torrent-value">0%</em></div>
+      <b id="mode-badge">PLAYER MODE</b>
+    </section>
+    <section class="hud-right">
+      <span class="hud-label">HIGH SCORE</span>
+      <strong id="high-score">0000000</strong>
+      <div id="balls" class="balls" aria-label="残りの岩球"></div>
+    </section>
+  </header>
+
+  <div id="announcer" role="status"></div>
+  <div id="combo"></div>
+
+  <aside id="rope-status" aria-label="吊り橋の縄の耐久">
+    <span>ROPE BRIDGE</span><strong id="rope-value">3</strong>
+    <div class="rope-track"><i id="rope-bar"></i></div>
+    <em id="rope-hint">CATCHES THE FALL</em>
+  </aside>
+
+  <aside id="idol-status" aria-label="黄金像ターゲット">
+    <span>IDOL</span>
+    <div class="idol-marks">
+      <i data-mark="I">I</i><i data-mark="D">D</i><i data-mark="O">O</i><i data-mark="L">L</i>
+    </div>
+    <em id="idol-hint">AWAKEN THE GOLD</em>
+  </aside>
+
+  <div id="controls">A / ← LEFT　　D / → RIGHT　　BOTH = HAUL BRIDGE　　SPACE / ↓ RELEASE　　P PAUSE</div>
+  <button id="launch" type="button" aria-label="盤右側の岩山から岩球を解放"><span>HOLD</span>RELEASE</button>
+  <button id="bridge" type="button" aria-label="吊り橋を巻き上げる"><span>DUAL FLIP</span>HAUL</button>
+  <button id="sound" type="button" aria-label="サウンド切り替え">SOUND ON</button>
+
+  <div id="title-screen" class="overlay visible">
+    <div class="canyon-logo"><i></i><i></i><i></i><b>◎</b></div>
+    <div class="eyebrow">THE CANYON REMEMBERS EVERY STONE THAT FELL</div>
+    <h1 data-text="OPUS//CANYON">OPUS//CANYON</h1>
+    <h2>X PINBALL</h2>
+    <p class="tagline">ROLL THE BOULDER. OUTRUN THE FLOOD.</p>
+    <div class="title-actions">
+      <button id="start" type="button">ENTER THE CANYON</button>
+      <button id="demo-start" class="button-secondary" type="button">AUTOPILOT DEMO</button>
+    </div>
+    <p class="rules">遺跡ゲートを撃ち抜き I / D / O / L を灯せ ・ 蔓を掴んで谷を渡れ<br>増水率 100% で鉄砲水、転がる巨岩は敵にも味方にもなる</p>
+  </div>
+
+  <div id="pause-screen" class="overlay"><div><h3>STILL WATER</h3><p>PAUSED</p><button id="resume" type="button">RESUME</button></div></div>
+  <div id="gameover-screen" class="overlay"><div><div class="eyebrow">SWALLOWED BY THE RAVINE</div><h3>GAME OVER</h3><p id="final-score"></p><button id="restart" type="button">DESCEND AGAIN</button></div></div>
+
+  <div class="dust"></div><div class="vignette"></div><div id="flash"></div>
+  <script type="module" src="game.js"></script>
+</body>
+</html>

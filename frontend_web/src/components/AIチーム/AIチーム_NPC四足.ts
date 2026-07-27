@@ -9,6 +9,7 @@ import {
   type NPC個体,
   type NPC更新引数,
   type NPC配置,
+  type 手動操作状態,
   type 造形ヘルパー,
   範囲乱数,
 } from './AIチーム_NPC型';
@@ -51,8 +52,11 @@ export type 四足設定 = {
   移動距離: [number, number];
   /** 初期位置を中心とした徘徊半径 */
   徘徊半径: number;
-  /** 歩行モーションの速さ（脚の振り） */
-  歩調速度: number;
+  /**
+   * 足の運びの微調整。1 なら足が地面を蹴る距離と実際に進む距離がぴったり合い、地面を滑らない。
+   * 大きくすると小刻みに、小さくするとゆったり運ぶ（滑って見えるので 1 から大きく離さない）。
+   */
+  歩調微調整: number;
   /** 脚を振る角度 */
   脚振り角: number;
   /** 尾を振る速さと角度 */
@@ -343,9 +347,16 @@ export const 四足NPCを生成 = (
 
   let 目的地 = 目的地を選ぶ();
 
+  // 脚の付け根から接地点までを振り子とみなしたときの、足が地面を蹴る 1 歩ぶんの長さ。
+  // 歩調をこの長さと実際の移動量から進めることで、速度をいくつにしても足が滑らない。
+  const 一歩の長さ = Math.max(2 * 設定.脚長 * Math.sin(設定.脚振り角), 0.01);
+
+  // 一人称視点で操作されているあいだは、位置と向きを画面側に任せて見た目だけ合わせる
+  let 手動: 手動操作状態 | null = null;
+
   const 更新 = ({ 経過時間, delta, 時刻, camera }: NPC更新引数) => {
     // 状態の切り替え
-    if (delta > 0 && 経過時間 >= 状態終了時刻) {
+    if (!手動 && delta > 0 && 経過時間 >= 状態終了時刻) {
       状態 = 次状態を選ぶ(設定, 状態);
       状態終了時刻 = 経過時間 + 範囲乱数(設定.滞在時間[状態]);
       目的地 = 状態 === '歩く' ? 目的地を選ぶ() : group.position.clone();
@@ -353,7 +364,14 @@ export const 四足NPCを生成 = (
 
     // 移動（歩く状態のみ。着いたら残り時間で次の場所へ向かう）
     let 歩行中 = false;
-    if (状態 === '歩く' && delta > 0) {
+    let 進んだ = 0;
+    if (手動) {
+      状態 = '歩く';
+      // 解除した直後に行き先を選び直せるよう、自律用の予定はいったん先送りしておく
+      状態終了時刻 = 経過時間 + 0.5;
+      進んだ = 手動.速さ * delta;
+      歩行中 = 進んだ > 1e-4;
+    } else if (状態 === '歩く' && delta > 0) {
       const 差 = 目的地.clone().sub(group.position);
       差.y = 0;
       const 距離 = 差.length();
@@ -361,7 +379,8 @@ export const 四足NPCを生成 = (
         目的地 = 目的地を選ぶ();
       } else {
         差.normalize();
-        group.position.addScaledVector(差, Math.min(距離, delta * 設定.歩く速度));
+        進んだ = Math.min(距離, delta * 設定.歩く速度);
+        group.position.addScaledVector(差, 進んだ);
         group.rotation.y = THREE.MathUtils.lerp(
           group.rotation.y,
           Math.atan2(差.x, 差.z) + Math.PI,
@@ -389,7 +408,9 @@ export const 四足NPCを生成 = (
       状態 === 'やすむ' ? Math.sin(時刻 * 0.0012 + 位相) * 0.5 : 呼吸 * 0.05;
 
     // 脚（歩行中は前後で位相を反転させて振り、休む・眠るときは姿勢表の角度へ折りたたむ）
-    if (歩行中) 歩調 += delta * 設定.歩調速度;
+    // 歩調は経過時間ではなく「実際に進んだ距離」で進める。対角の2組が交互に地面を蹴るので、
+    // 1周期（2π）で 2 歩ぶん進む勘定になる
+    if (歩行中) 歩調 += (進んだ / 一歩の長さ) * Math.PI * 設定.歩調微調整;
     部位.脚.forEach((脚, index) => {
       const 前脚 = index < 2;
       const 位相差 = (前脚 ? 0 : Math.PI) + (index % 2 === 0 ? 0 : Math.PI);
@@ -420,5 +441,13 @@ export const 四足NPCを生成 = (
     }
   };
 
-  return { 種別, group, 更新 };
+  return {
+    種別,
+    group,
+    更新,
+    手動操作: (状態: 手動操作状態 | null) => {
+      手動 = 状態;
+      if (!状態) 目的地 = group.position.clone();
+    },
+  };
 };

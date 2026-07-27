@@ -36,6 +36,12 @@ type 実行状態 = {
   速度: number;
   割当状態: エージェント状態;
   次自由行動時刻: number;
+  /** うさぎ穴にはまっている残り秒。0 より大きいあいだは動けず、あたふたする */
+  はまり残り: number;
+  /** 這い出た直後に同じ穴へ落ち直さないための猶予秒 */
+  穴無視残り: number;
+  /** はまっている穴の中心（這い出る向きを決めるのに使う） */
+  はまった穴: THREE.Vector3;
 };
 
 const props = defineProps<{
@@ -47,7 +53,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  select: [id: string];
   retry: [];
   目標クリック: [];
 }>();
@@ -63,7 +68,12 @@ const 稼働数 = computed(() => エージェント一覧.value.filter((agent) =
 const 相談数 = computed(() => エージェント一覧.value.filter((agent) => ['相談中', '雑談中'].includes(agent.状態)).length);
 const 瞑想数 = computed(() => エージェント一覧.value.filter((agent) => agent.状態 === '瞑想中').length);
 const 休憩数 = computed(() => エージェント一覧.value.filter((agent) => ['移動中', '休憩中'].includes(agent.状態)).length);
-const ホバー中ID = ref('');
+// 一人称視点。要員のときは 一人称ID に要員 ID が入り、生き物のときは 一人称NPC に実体が入る。
+// バッジに出す名前は 一人称ラベル で、空なら通常の俯瞰カメラ。Esc で解除する
+const 一人称ID = ref('');
+const 一人称ラベル = ref('');
+// 視点を移しただけでは相手は自律行動のまま。矢印キーを押した時点で操作（憑依）へ切り替わる
+const 憑依中 = ref(false);
 const 会話対象 = ref<エージェント | null>(null);
 const 会話ダイアログ表示 = ref(false);
 // 時間の進み方は画面から変更せず、この規定値で固定する（1.0 倍が標準。0 にすると時間が止まる）
@@ -81,6 +91,11 @@ let 前フレーム時刻 = 0;
 let 経過時間 = 0;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
+// 一人称視点に入る直前の俯瞰カメラ。Esc でここへ戻す
+const 復帰カメラ位置 = new THREE.Vector3();
+const 復帰注視点 = new THREE.Vector3();
+const 一人称注視点 = new THREE.Vector3();
+const 一人称体格 = new THREE.Box3();
 const 掲示板注視点 = new THREE.Vector3();
 // NPC飛行船が吊り下げて運ぶ「チーム目標」掲示板（常にカメラを向き、クリックで保守ダイアログ）
 // 位置と向きは AIチーム_NPC動作_飛行船.ts 側が毎フレーム決める
@@ -97,7 +112,7 @@ let 目標テクスチャ: THREE.CanvasTexture | null = null;
 const 目標ホバー = ref(false);
 const 実行状態一覧 = new Map<string, 実行状態>();
 const 掲示板一覧: THREE.Group[] = [];
-// NPC（ネコ・イヌ・馬・雲・蝶）。造形と動作は AIチーム_NPC制御.ts と AIチーム_NPC動作_*.ts で調整する
+// NPC（ネコ・イヌ・馬・うさぎ・カモ・雲・蝶）。造形と動作は AIチーム_NPC制御.ts と AIチーム_NPC動作_*.ts で調整する
 const NPC一覧: NPC個体[] = [];
 const 破棄対象: Array<THREE.BufferGeometry | THREE.Material> = [];
 const 破棄テクスチャ: THREE.Texture[] = [];
@@ -225,6 +240,33 @@ const エリア内自由位置 = (状態: エージェント状態): THREE.Vecto
 const 指定エリア外 = (位置: THREE.Vector3, 状態: エージェント状態) => {
   const [cx, cz] = エリア中心(状態エリア[状態]);
   return Math.hypot(位置.x - cx, 位置.z - cz) > 台座半径 - 0.8;
+};
+
+// うさぎが掘った穴。多いと草原が穴だらけになるので、同時に存在する数を絞る
+const うさぎ穴上限 = 6;
+/** うさぎが掘り終えたときに呼ばれる。その場所へ うさぎ穴 NPC を置く */
+const うさぎ穴を掘る = (位置: THREE.Vector3) => {
+  if (!scene) return;
+  if (NPC一覧.filter((npc) => npc.種別 === 'うさぎ穴').length >= うさぎ穴上限) return;
+  NPC一覧.push(
+    NPCを配置(scene, 'うさぎ穴', NPC造形ヘルパー, {
+      位置: 位置.clone(),
+      種: Math.floor(Math.random() * 1000000),
+    }),
+  );
+};
+
+/** 要員が踏み抜いた うさぎ穴。見つからなければ null */
+const はまる穴を探す = (位置: THREE.Vector3): THREE.Group | null => {
+  for (const npc of NPC一覧) {
+    if (npc.種別 !== 'うさぎ穴') continue;
+    const 半径 = (npc.group.userData.穴半径 as number) ?? 0;
+    if (半径 <= 0) continue;
+    if (Math.hypot(位置.x - npc.group.position.x, 位置.z - npc.group.position.z) < 半径) {
+      return npc.group;
+    }
+  }
+  return null;
 };
 
 // 草原の小物は数が多いため、ジオメトリとマテリアルを 1 組だけ作って共有する
@@ -1199,6 +1241,9 @@ const エージェントを追加 = (agent: エージェント, index: number) =
     速度: 0.65 + Math.random() * 0.2,
     割当状態: agent.状態,
     次自由行動時刻: 経過時間 + 2 + Math.random() * 4,
+    はまり残り: 0,
+    穴無視残り: 0,
+    はまった穴: new THREE.Vector3(),
   });
 };
 
@@ -1338,7 +1383,7 @@ const シーンを作る = () => {
     // エリアの円の中に小物が乗らないようにする
     const エリア内 = (x: number, z: number) =>
       エリア中心一覧.some(([cx, cz]) => Math.hypot(x - cx, z - cz) < 台座半径 + 1);
-    // 1つ目の池は鴨の住処。奥に置くと鴨が見えないため、中央通路の南端（z=19.3）と
+    // 1つ目の池はカモの住処。奥に置くとカモが見えないため、中央通路の南端（z=19.3）と
     // 掲示板（z=20.9）を避けたうえで手前へ寄せている
     const 池位置: [number, number, number][] = [
       [0, 24, 3.4],
@@ -1388,7 +1433,7 @@ const シーンを作る = () => {
     柵を作る(32, -14, Math.PI / 2.4, 5);
     柵を作る(-11, 34, 0.15, 6);
 
-    // --- NPC（ネコ・イヌ・馬・雲・蝶）---
+    // --- NPC（ネコ・イヌ・馬・うさぎ・カモ・雲・蝶）---
     // 池は避けて歩くよう禁止円として渡す
     const NPC禁止円 = 池位置.map(
       ([px, pz, pr]) => [px, pz, pr + 1.2] as [number, number, number],
@@ -1425,26 +1470,64 @@ const シーンを作る = () => {
     );
     NPC一覧.push(黒馬, 白馬);
 
-    // 鴨の親子。1つ目の池を住処にして、親鴨が岸の散歩と水浴びを繰り返す。
-    // 子鴨は「これ以上親へ近づかない距離」を 0.5m から 0.2m 刻みで持たせてあり、
+    // うさぎは雑談エリアと休憩エリアの2つを遊び場にして、ぴょんぴょん跳ね回る。
+    // 馬と同じ距離制御（追従開始 / 追従終了のヒステリシス）で、黒うさぎが主体に動き白うさぎが追う。
+    {
+      const [雑談x, 雑談z] = エリア中心('雑談');
+      const [休憩x, 休憩z] = エリア中心('休憩');
+      const 遊び場 = [
+        { x: 雑談x, z: 雑談z, 半径: 台座半径 - 1.0 },
+        { x: 休憩x, z: 休憩z, 半径: 台座半径 - 1.0 },
+      ];
+      // エリアの中央に置いた大きな備品には乗り上げないようにする
+      const うさぎ禁止円: [number, number, number][] = [
+        [雑談x, 雑談z, 2.2],
+        [休憩x, 休憩z - 2.2, 2.0],
+        [休憩x, 休憩z + 2.0, 1.1],
+      ];
+      const 黒うさぎ = NPCを配置(
+        scene,
+        '黒うさぎ',
+        NPC造形ヘルパー,
+        { 位置: new THREE.Vector3(雑談x + 3.2, 0, 雑談z + 3.4), 種: 930, 禁止円: うさぎ禁止円 },
+        { 遊び場, 穴を掘る: うさぎ穴を掘る },
+      );
+      const 白うさぎ = NPCを配置(
+        scene,
+        '白うさぎ',
+        NPC造形ヘルパー,
+        { 位置: new THREE.Vector3(雑談x + 4.4, 0, 雑談z + 2.2), 種: 931, 禁止円: うさぎ禁止円 },
+        {
+          遊び場,
+          穴を掘る: うさぎ穴を掘る,
+          追跡対象: 黒うさぎ.group,
+          追従開始距離: 5,
+          追従終了距離: 2,
+        },
+      );
+      NPC一覧.push(黒うさぎ, 白うさぎ);
+    }
+
+    // カモの親子。1つ目の池を住処にして、親カモが岸の散歩と水浴びを繰り返す。
+    // 子カモは「これ以上親へ近づかない距離」を 0.5m から 0.2m 刻みで持たせてあり、
     // 親が離れるとそれぞれ自分の距離まで詰めるので、近い順の縦一列になる。
     // NPC群を更新 は配列順に進めるため、親を先に push して子が最新位置を見られるようにする。
     {
       const [池x, 池z, 池半径] = 池位置[0];
       const 水場 = { x: 池x, z: 池z, 半径: 池半径 };
-      const 鴨大 = NPCを配置(
+      const カモ大 = NPCを配置(
         scene,
-        '鴨大',
+        'カモ大',
         NPC造形ヘルパー,
         { 位置: new THREE.Vector3(池x + 池半径 + 1.4, 0, 池z), 種: 920 },
         { 水場 },
       );
-      NPC一覧.push(鴨大);
+      NPC一覧.push(カモ大);
       for (let index = 0; index < 5; index += 1) {
         NPC一覧.push(
           NPCを配置(
             scene,
-            '鴨小',
+            'カモ小',
             NPC造形ヘルパー,
             {
               位置: new THREE.Vector3(
@@ -1454,7 +1537,7 @@ const シーンを作る = () => {
               ),
               種: 921 + index,
             },
-            { 水場, 親: 鴨大.group, 最小距離: 0.5 + index * 0.2 },
+            { 水場, 親: カモ大.group, 最小距離: 0.5 + index * 0.2 },
           ),
         );
       }
@@ -1562,8 +1645,39 @@ const 描画 = (時刻: number) => {
     const runtime = 実行状態一覧.get(agent.id);
     if (!runtime) return;
     const group = runtime.group;
+
+    // --- うさぎ穴 ---
+    // 歩いていて穴を踏み抜くと、しばらく抜け出せずにあたふたする
+    if (delta > 0 && runtime.穴無視残り > 0) runtime.穴無視残り -= delta;
+    if (delta > 0 && runtime.はまり残り <= 0 && runtime.穴無視残り <= 0) {
+      const 穴 = はまる穴を探す(group.position);
+      if (穴) {
+        runtime.はまり残り = 2.4 + Math.random() * 1.8;
+        runtime.はまった穴.copy(穴.position);
+      }
+    }
+    const はまり中 = runtime.はまり残り > 0;
+    if (はまり中 && delta > 0) {
+      runtime.はまり残り -= delta;
+      if (runtime.はまり残り <= 0) {
+        // 這い上がって穴の外へ。すぐ落ち直さないよう猶予を置き、あわてて歩き出す
+        const 逃げ = group.position.clone().sub(runtime.はまった穴);
+        逃げ.y = 0;
+        if (逃げ.lengthSq() < 1e-4) 逃げ.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+        逃げ.setLength(1.25);
+        group.position.copy(runtime.はまった穴).add(逃げ);
+        group.position.y = 要員基準Y;
+        runtime.穴無視残り = 5;
+        runtime.目的地.copy(エリア内自由位置(agent.状態));
+        runtime.速度 = 0.85;
+        runtime.次自由行動時刻 = Number.POSITIVE_INFINITY;
+      }
+    }
+
+    // 憑依した要員だけは、行き先を自分で決めずに矢印キーで動く（見ているだけなら自律行動のまま）
+    const 操作中 = 憑依中.value && 一人称ID.value === agent.id;
     // 要員状況の状態を正とし、表示位置が違うエリアなら指定エリアへの移動を優先する
-    if (runtime.割当状態 !== agent.状態 || 指定エリア外(group.position, agent.状態)) {
+    if (!操作中 && !はまり中 && (runtime.割当状態 !== agent.状態 || 指定エリア外(group.position, agent.状態))) {
       runtime.割当状態 = agent.状態;
       runtime.目的地.copy(エリア位置(agent.状態, index));
       runtime.速度 = 1.35;
@@ -1572,12 +1686,19 @@ const 描画 = (時刻: number) => {
     const direction = runtime.目的地.clone().sub(group.position);
     direction.y = 0;
     const distance = direction.length();
-    const 歩行中 = delta > 0 && distance > 0.06;
-    if (歩行中) {
+    const 歩行中 = 操作中
+      ? 前進速さ !== 0
+      : !はまり中 && delta > 0 && distance > 0.06;
+    if (操作中) {
+      // 移動そのものは 一人称を進める が行う。ここでは行き先を足元へ寄せておき、
+      // 解除した瞬間に元の場所へ走り出さないようにする
+      runtime.目的地.copy(group.position);
+      runtime.次自由行動時刻 = 経過時間 + 1;
+    } else if (歩行中) {
       direction.normalize();
       group.position.addScaledVector(direction, Math.min(distance, delta * runtime.速度));
       group.rotation.y = THREE.MathUtils.lerp(group.rotation.y, Math.atan2(direction.x, direction.z), 0.08);
-    } else if (delta > 0) {
+    } else if (!はまり中 && delta > 0) {
       if (!Number.isFinite(runtime.次自由行動時刻)) {
         runtime.次自由行動時刻 = 経過時間 + 1 + Math.random() * 3;
       } else if (経過時間 >= runtime.次自由行動時刻) {
@@ -1597,7 +1718,12 @@ const 描画 = (時刻: number) => {
     const bob = Math.sin(時刻 * 0.0027 + runtime.位相);
     // 歩行中は足の運びに合わせて上下に弾ませ、立ち止まると呼吸だけにする
     const 歩調 = Math.sin(時刻 * 0.0105 + runtime.位相);
-    group.position.y = 要員基準Y + (歩行中 ? Math.abs(歩調) * 0.05 : bob * 0.022);
+    // 穴にはまっているあいだは腰まで沈める。地面に隠れて下半身が見えなくなり、落ちて見える
+    const あたふた = Math.sin(時刻 * 0.024 + runtime.位相);
+    group.position.y = はまり中
+      ? 要員基準Y - 0.62 + Math.abs(あたふた) * 0.16
+      : 要員基準Y + (歩行中 ? Math.abs(歩調) * 0.05 : bob * 0.022);
+    if (はまり中) group.rotation.y += あたふた * 0.05;
     const ring = group.getObjectByName('ring') as THREE.Mesh | undefined;
     if (ring) {
       ring.rotation.z += rawDelta * (agent.状態 === '作業中' ? 0.45 : 0.85);
@@ -1616,22 +1742,44 @@ const 描画 = (時刻: number) => {
           ? 0.2 + bob * 0.03
           : bob * 0.1;
     if (leftArm && rightArm) {
-      leftArm.rotation.x = 腕振り;
-      rightArm.rotation.x = -腕振り;
+      if (はまり中) {
+        // 両手を頭の上へ突き上げ、左右交互にばたばたと振って助けを求める
+        leftArm.rotation.x = -2.7 + あたふた * 0.5;
+        rightArm.rotation.x = -2.7 - あたふた * 0.5;
+        leftArm.rotation.z = 0.32 + あたふた * 0.3;
+        rightArm.rotation.z = -0.32 + あたふた * 0.3;
+      } else {
+        leftArm.rotation.x = 腕振り;
+        rightArm.rotation.x = -腕振り;
+        leftArm.rotation.z = 0.16;
+        rightArm.rotation.z = -0.16;
+      }
     }
     if (leftLeg && rightLeg) {
-      const 脚振り = 歩行中 ? 歩調 * 0.55 : 0;
+      const 脚振り = はまり中 ? あたふた * 0.7 : 歩行中 ? 歩調 * 0.55 : 0;
       leftLeg.rotation.x = -脚振り;
       rightLeg.rotation.x = 脚振り;
     }
     const head = group.getObjectByName('head');
     if (head) {
-      head.rotation.y = ['相談中', '雑談中'].includes(agent.状態) ? Math.sin(時刻 * 0.0016 + runtime.位相) * 0.4 : bob * 0.06;
-      head.rotation.x = agent.状態 === '瞑想中' ? 0.22 : agent.状態 === '作業中' ? 0.14 : 0;
+      head.rotation.y = はまり中
+        ? Math.sin(時刻 * 0.019 + runtime.位相) * 0.55
+        : ['相談中', '雑談中'].includes(agent.状態)
+          ? Math.sin(時刻 * 0.0016 + runtime.位相) * 0.4
+          : bob * 0.06;
+      // はまっているあいだは助けを求めるように上を向く
+      head.rotation.x = はまり中
+        ? -0.28
+        : agent.状態 === '瞑想中'
+          ? 0.22
+          : agent.状態 === '作業中'
+            ? 0.14
+            : 0;
     }
   });
 
-  controls?.update();
+  // 一人称視点のあいだは OrbitControls を止める（カメラは NPC 更新のあとで合わせる）
+  if (!一人称ラベル.value) controls?.update();
   掲示板一覧.forEach((board, index) => {
     board.position.y = 掲示板高さ + Math.sin(時刻 * 0.0012 + index * 1.8) * 0.07;
     掲示板注視点.set(camera!.position.x, board.position.y, camera!.position.z);
@@ -1673,8 +1821,13 @@ const 描画 = (時刻: number) => {
     }
   }
 
-  // NPC（ネコ・イヌ・雲・蝶）はそれぞれの動作モジュールが自分で動く
-  NPC群を更新(NPC一覧, { 経過時間, delta, 時刻, camera: camera! });
+  // NPC はそれぞれの動作モジュールが自分で動く。寿命が尽きた うさぎ穴 はここで一覧から消える
+  // 放牧地のような「見る側の位置で決まる配置」は俯瞰カメラを基準にする。
+  // 一人称でその生き物に乗って動くと配置ごと引きずられてしまうため
+  const 俯瞰位置 = 一人称ラベル.value ? 復帰カメラ位置 : camera.position;
+  NPC群を更新(NPC一覧, { 経過時間, delta, 時刻, camera: camera!, 俯瞰位置 });
+  // 操作対象が動いたあとにカメラを合わせる。追えなくなったら俯瞰へ戻す
+  if (一人称ラベル.value && !一人称を進める(delta, 時刻)) 一人称を解除();
   ラベル位置を更新();
   renderer.render(scene, camera);
   animationId = requestAnimationFrame(描画);
@@ -1688,30 +1841,21 @@ const ラベル位置を更新 = () => {
     const element = ラベル要素.get(agent.id);
     const runtime = 実行状態一覧.get(agent.id);
     if (!element || !runtime) return;
+    // 一人称視点で覗いている本人の名札は、目の前に張り付くので出さない
+    if (agent.id === 一人称ID.value) {
+      element.style.opacity = '0';
+      return;
+    }
     const projected = runtime.group.position.clone().add(new THREE.Vector3(0, 2.2, 0)).project(camera!);
     const visible = projected.z > -1 && projected.z < 1;
     element.style.transform = `translate(-50%, -100%) translate(${(projected.x * 0.5 + 0.5) * width}px, ${(-projected.y * 0.5 + 0.5) * height}px)`;
     element.style.opacity = visible ? '1' : '0';
-    element.style.pointerEvents = visible ? 'auto' : 'none';
   });
 };
 
 const ラベルRef設定 = (id: string, element: Element | null) => {
   if (element instanceof HTMLElement) ラベル要素.set(id, element);
   else ラベル要素.delete(id);
-};
-
-const エージェントIDをヒットテスト = (clientX: number, clientY: number) => {
-  if (!renderer || !camera) return;
-  const rect = renderer.domElement.getBoundingClientRect();
-  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-  const hits = raycaster.intersectObjects(
-    [...実行状態一覧.values()].map((runtime) => runtime.group),
-    true,
-  );
-  return hits[0]?.object.userData.agentId as string | undefined;
 };
 
 const 目標掲示板をヒットテスト = (clientX: number, clientY: number) => {
@@ -1723,51 +1867,335 @@ const 目標掲示板をヒットテスト = (clientX: number, clientY: number) 
   return raycaster.intersectObject(目標掲示板.板, false).length > 0;
 };
 
+// 草原そのものはクリックで反応させない。3D 側で操作できるのはチーム目標の掲示板だけで、
+// 要員の選択・視点切替・会話は【要員状況】パネルから行う
 const キャンバスクリック = (event: MouseEvent) => {
-  if (目標掲示板をヒットテスト(event.clientX, event.clientY)) {
-    emit('目標クリック');
-    return;
-  }
-  const id = エージェントIDをヒットテスト(event.clientX, event.clientY);
-  if (id) emit('select', id);
+  if (目標掲示板をヒットテスト(event.clientX, event.clientY)) emit('目標クリック');
 };
 
 const 会話を開く = (id: string) => {
   const agent = エージェント一覧.value.find((item) => item.id === id);
   if (!agent) return;
-  emit('select', id);
   会話対象.value = agent;
   会話ダイアログ表示.value = true;
 };
 
-const キャンバスダブルクリック = (event: MouseEvent) => {
-  if (目標掲示板をヒットテスト(event.clientX, event.clientY)) return;
-  const id = エージェントIDをヒットテスト(event.clientX, event.clientY);
-  if (id) 会話を開く(id);
-};
-
 const キャンバスポインター移動 = (event: PointerEvent) => {
   目標ホバー.value = 目標掲示板をヒットテスト(event.clientX, event.clientY);
-  const id = 目標ホバー.value
-    ? ''
-    : エージェントIDをヒットテスト(event.clientX, event.clientY) ?? '';
-  ホバー中ID.value = id;
   if (renderer) {
-    renderer.domElement.style.cursor = 目標ホバー.value || id ? 'pointer' : 'grab';
+    renderer.domElement.style.cursor = 目標ホバー.value ? 'pointer' : 'grab';
   }
 };
 
 const キャンバスポインター離脱 = () => {
-  ホバー中ID.value = '';
   目標ホバー.value = false;
   if (renderer) renderer.domElement.style.cursor = 'grab';
 };
 
-const エージェントを選択 = (id: string) => {
-  emit('select', id);
+// --- 一人称視点 ---
+// 【要員状況】から要員や生き物を選ぶと、その目の高さへカメラを移して見ている方向を映す。
+// 矢印キーの上下で前後移動、左右で向き変更。馬だけは上を押し続けると駆け足まで速くなる。
+// Esc（または視点を戻す）で俯瞰へ戻る。
+
+type 一人称移動設定 = {
+  /** 押した直後の速さ（m/秒） */
+  速さ: number;
+  /** 押し続けたときの上限（加速しない相手は 速さ と同じ） */
+  最高: number;
+  /** 1 秒あたりの加速量。0 なら最初から最高速 */
+  加速: number;
+  /** 向きを変える速さ（ラジアン/秒） */
+  旋回: number;
+  /** モデルの正面。要員は +z、動物は -z を向いている */
+  向き符号: 1 | -1;
+  /** 1 歩の長さ（m）。頭の揺れをこの歩幅に合わせて刻む */
+  歩幅: number;
+  /** 1 歩ごとの頭の上下（m） */
+  揺れ縦: number;
+  /** 1 歩ごとの体の傾き（ラジアン）。カモは横に大きく振ってヨタヨタ歩きになる */
+  揺れ横: number;
 };
 
+/**
+ * 生き物ボタンの名前 → 一人称で操る NPC と移動の性格。
+ * 目線 / 前オフセット を書かない相手は、体の大きさから自動で決める（鼻先の少し前に置く）。
+ */
+const 生き物視点表: Record<
+  string,
+  Omit<一人称移動設定, '向き符号'> & {
+    種別: string;
+    目線?: number;
+    前オフセット?: number;
+    /** 12m 先の注視点を目線から何 m 下げるか。大きいほど足元寄りを見る */
+    見下ろし?: number;
+  }
+> = {
+  // 馬だけは鼻先ではなく背中に乗った位置から見る。首の前後運動が目の前で見える
+  馬: {
+    種別: '黒馬',
+    速さ: 2.4,
+    最高: 8,
+    加速: 2.2,
+    旋回: 1.4,
+    歩幅: 1.7,
+    揺れ縦: 0.13,
+    揺れ横: 0.045,
+    目線: 3.05,
+    前オフセット: -0.2,
+  },
+  イヌ: { 種別: 'イヌ', 速さ: 1.6, 最高: 1.6, 加速: 0, 旋回: 2.6, 歩幅: 0.42, 揺れ縦: 0.055, 揺れ横: 0.04 },
+  ネコ: { 種別: 'ネコ', 速さ: 1.1, 最高: 1.1, 加速: 0, 旋回: 2.6, 歩幅: 0.28, 揺れ縦: 0.04, 揺れ横: 0.05 },
+  うさぎ: { 種別: '黒うさぎ', 速さ: 1.4, 最高: 1.4, 加速: 0, 旋回: 2.8, 歩幅: 0.5, 揺れ縦: 0.012, 揺れ横: 0.02 },
+  // カモは歩幅が小さいぶん揺れが速くなるので、横振りは控えめにして酔わないようにする。
+  // 目線を下げて足元寄りを見ることで、後ろについてくる子カモが視界に入る
+  カモ: {
+    種別: 'カモ大',
+    速さ: 0.8,
+    最高: 0.8,
+    加速: 0,
+    旋回: 2.4,
+    歩幅: 0.3,
+    揺れ縦: 0.03,
+    揺れ横: 0.035,
+    目線: 0.3,
+    見下ろし: 2.1,
+  },
+};
+
+const 要員移動設定: 一人称移動設定 = {
+  速さ: 1.5,
+  最高: 1.5,
+  加速: 0,
+  旋回: 2.2,
+  向き符号: 1,
+  歩幅: 0.62,
+  揺れ縦: 0.05,
+  揺れ横: 0.022,
+};
+
+let 一人称NPC: NPC個体 | null = null;
+let 一人称設定: 一人称移動設定 = 要員移動設定;
+let 一人称目線 = 1.62;
+let 一人称前オフセット = 0.3;
+let 一人称見下ろし = 0.6;
+// 水に浮くなどで沈むぶんの目線補正。境目でカクつかないよう毎フレーム滑らかに寄せる
+let 一人称目線補正 = 0;
+let 前進速さ = 0;
+// 歩くリズムに合わせて頭を揺らすための位相。1 歩で π 進む
+let 一人称揺れ位相 = 0;
+// 前フレームの立ち位置。実際に動いた距離から揺れを刻む（自律行動でも憑依でも同じ扱いにする）
+const 一人称前回位置 = new THREE.Vector3();
+const 押しキー = new Set<string>();
+// 草原の円（半径 104）からはみ出さないようにする
+const 一人称行動半径 = 96;
+
+const 一人称対象グループ = (): THREE.Group | null => {
+  if (一人称ID.value) return 実行状態一覧.get(一人称ID.value)?.group ?? null;
+  return 一人称NPC?.group ?? null;
+};
+
+/** 切り替えの共通処理。元の俯瞰カメラを控え、前の操作対象を自律行動へ戻す */
+const 一人称を始める = (ラベル: string) => {
+  if (!camera || !controls) return;
+  if (!一人称ラベル.value) {
+    復帰カメラ位置.copy(camera.position);
+    復帰注視点.copy(controls.target);
+  }
+  一人称NPC?.手動操作?.(null);
+  一人称NPC = null;
+  一人称ID.value = '';
+  一人称ラベル.value = ラベル;
+  憑依中.value = false;
+  前進速さ = 0;
+  一人称揺れ位相 = 0;
+  一人称目線補正 = 0;
+  押しキー.clear();
+  controls.enabled = false;
+};
+
+/** 切り替え直後に、揺れの基準となる立ち位置を合わせておく */
+const 一人称の足元を記録 = () => {
+  const group = 一人称対象グループ();
+  if (group) 一人称前回位置.copy(group.position);
+};
+
+const 一人称へ入る = (id: string) => {
+  const 要員 = エージェント一覧.value.find((agent) => agent.id === id);
+  if (!camera || !controls || !要員 || !実行状態一覧.has(id)) return;
+  一人称を始める(要員.名前);
+  一人称ID.value = id;
+  一人称設定 = 要員移動設定;
+  一人称目線 = 1.62;
+  一人称前オフセット = 0.3;
+  一人称見下ろし = 0.6;
+  一人称の足元を記録();
+};
+
+const 生き物視点へ入る = (名前: string) => {
+  const 定義 = 生き物視点表[名前 as keyof typeof 生き物視点表];
+  if (!camera || !controls || !定義) return;
+  const npc = NPC一覧.find((item) => item.種別 === 定義.種別 && item.手動操作);
+  if (!npc) return;
+  一人称を始める(名前);
+  一人称NPC = npc;
+  一人称設定 = { ...定義, 向き符号: -1 };
+
+  // 体の大きさから目線の高さと前へ出す距離を決める。
+  // 回転したままだと軸に沿った箱にならないので、いったん向きを戻して自分の体だけを測る。
+  const 元の向き = npc.group.rotation.y;
+  npc.group.rotation.y = 0;
+  npc.group.updateMatrixWorld(true);
+  一人称体格.setFromObject(npc.group);
+  npc.group.rotation.y = 元の向き;
+  npc.group.updateMatrixWorld(true);
+
+  const 頭頂 = 一人称体格.max.y - npc.group.position.y;
+  // 動物の正面は -z。鼻先（min.z）より少し前へ出さないと、自分の鼻が視界をふさぐ
+  const 鼻先まで = npc.group.position.z - 一人称体格.min.z;
+  一人称目線 = 定義.目線 ?? Math.max(0.22, 頭頂 * 0.88);
+  一人称前オフセット = 定義.前オフセット ?? Math.max(0.2, 鼻先まで + 0.1);
+  一人称見下ろし = 定義.見下ろし ?? 0.6;
+  一人称の足元を記録();
+};
+
+const 一人称を解除 = () => {
+  if (!一人称ラベル.value) return;
+  一人称NPC?.手動操作?.(null);
+  一人称NPC = null;
+  一人称ID.value = '';
+  一人称ラベル.value = '';
+  憑依中.value = false;
+  押しキー.clear();
+  前進速さ = 0;
+  if (!camera || !controls) return;
+  controls.enabled = true;
+  camera.position.copy(復帰カメラ位置);
+  controls.target.copy(復帰注視点);
+  controls.update();
+};
+
+/** 矢印キーで動かし、カメラを頭へ合わせる。対象を見失ったら false */
+const 一人称を進める = (delta: number, 時刻: number) => {
+  const group = 一人称対象グループ();
+  if (!camera || !group) return false;
+
+  // 足場や体勢で動きが変わる相手（跳ぶうさぎ、水面を滑るカモ）はここで性質を受け取る
+  const 特性 = 一人称NPC?.移動特性?.() ?? {};
+  const 速さ倍率 = 特性.速さ倍率 ?? 1;
+  const 揺れ倍率 = 特性.揺れ倍率 ?? 1;
+  const 目線補正 = 特性.目線補正 ?? 0;
+
+  // 憑依していないあいだは相手の自律行動にまかせ、カメラだけ乗せてついていく
+  if (憑依中.value) {
+    const 旋回入力 = (押しキー.has('ArrowLeft') ? 1 : 0) - (押しキー.has('ArrowRight') ? 1 : 0);
+    const 前後入力 = (押しキー.has('ArrowUp') ? 1 : 0) - (押しキー.has('ArrowDown') ? 1 : 0);
+    // 穴にはまっている要員は、もがき終わるまで動かせない
+    const はまり中 = (実行状態一覧.get(一人称ID.value)?.はまり残り ?? 0) > 0;
+
+    group.rotation.y += 旋回入力 * 一人称設定.旋回 * delta;
+
+    if (はまり中 || 前後入力 === 0) {
+      前進速さ = 0;
+    } else if (前後入力 > 0) {
+      // 押し続けるほど速くなる（加速 0 の相手は最初から最高速のまま）
+      前進速さ =
+        一人称設定.加速 > 0
+          ? Math.min(一人称設定.最高, Math.max(前進速さ, 一人称設定.速さ) + 一人称設定.加速 * delta)
+          : 一人称設定.速さ;
+    } else {
+      前進速さ = -一人称設定.速さ * 0.45;
+    }
+
+    const 実速さ = 前進速さ * 速さ倍率;
+    if (実速さ !== 0) {
+      const 進x = 一人称設定.向き符号 * Math.sin(group.rotation.y);
+      const 進z = 一人称設定.向き符号 * Math.cos(group.rotation.y);
+      group.position.x += 進x * 実速さ * delta;
+      group.position.z += 進z * 実速さ * delta;
+      const 中心距離 = Math.hypot(group.position.x, group.position.z);
+      if (中心距離 > 一人称行動半径) {
+        group.position.x *= 一人称行動半径 / 中心距離;
+        group.position.z *= 一人称行動半径 / 中心距離;
+      }
+    }
+
+    // 見た目づくりには「進もうとしている速さ」を渡す。
+    // 実際に進んだ量を渡すと、着地している間に跳ぶのをやめてしまう
+    一人称NPC?.手動操作?.({
+      速さ: Math.abs(前進速さ),
+      全力: 前進速さ > 一人称設定.速さ * 1.6,
+    });
+  }
+
+  const 前x = 一人称設定.向き符号 * Math.sin(group.rotation.y);
+  const 前z = 一人称設定.向き符号 * Math.cos(group.rotation.y);
+
+  // --- 頭の揺れ ---
+  // 実際に動いた距離で刻むので、自律行動でついていくときも同じように揺れる。
+  // 止まっているあいだも呼吸ぶんだけ動かして、視界が固まって見えないようにする。
+  const 移動距離 = Math.hypot(
+    group.position.x - 一人称前回位置.x,
+    group.position.z - 一人称前回位置.z,
+  );
+  一人称前回位置.copy(group.position);
+  const 速さ = delta > 0 ? 移動距離 / delta : 0;
+  一人称揺れ位相 += (移動距離 / 一人称設定.歩幅) * Math.PI;
+  const 勢い = 一人称設定.最高 > 一人称設定.速さ
+    ? 0.55 + 0.45 * Math.min(1, 速さ / 一人称設定.最高)
+    : 1;
+  const 揺れ強さ = (速さ > 0.01 ? 勢い : 0) * 揺れ倍率;
+  const 呼吸 = Math.sin(時刻 * 0.0022) * 0.008;
+  const 縦揺れ = Math.abs(Math.sin(一人称揺れ位相)) * 一人称設定.揺れ縦 * 揺れ強さ + 呼吸;
+  const 横傾き = Math.sin(一人称揺れ位相) * 一人称設定.揺れ横 * 揺れ強さ;
+  // 水に浮くなど、体の沈みぶんだけ目線を下げる（境目で跳ねないよう滑らかに寄せる）
+  一人称目線補正 = THREE.MathUtils.lerp(一人称目線補正, 目線補正, Math.min(1, delta * 4));
+  const 目線 = 一人称目線 + 一人称目線補正;
+  // カメラを前後に揺らすと「進んでは少し遅くなる」ように見えて速度が一定に感じられないため、
+  // 前後の動きはカメラには入れない（馬の首など、体側の動きで見せる）
+
+  camera.position.set(
+    group.position.x + 前x * 一人称前オフセット,
+    group.position.y + 目線 + 縦揺れ,
+    group.position.z + 前z * 一人称前オフセット,
+  );
+  一人称注視点.set(
+    group.position.x + 前x * 12,
+    group.position.y + 目線 - 一人称見下ろし + 縦揺れ * 0.4,
+    group.position.z + 前z * 12,
+  );
+  camera.lookAt(一人称注視点);
+  // 体の傾きは lookAt のあとに足す（lookAt は上方向を +y に戻してしまうため）
+  camera.rotateZ(横傾き);
+  return true;
+};
+
+const 操作キー一覧 = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+const キー押下 = (event: KeyboardEvent) => {
+  if (!一人称ラベル.value) return;
+  if (event.key === 'Escape') {
+    一人称を解除();
+    event.preventDefault();
+    return;
+  }
+  if (操作キー一覧.includes(event.key)) {
+    // 矢印キーを押した時点で、自律行動を止めて操作へ切り替える
+    憑依中.value = true;
+    押しキー.add(event.key);
+    // 矢印キーで画面がスクロールしてしまわないようにする
+    event.preventDefault();
+  }
+};
+
+const キー解放 = (event: KeyboardEvent) => {
+  if (操作キー一覧.includes(event.key)) 押しキー.delete(event.key);
+};
+
+// 画面から離れたときにキーが押しっぱなし扱いで残らないようにする
+const キー全解放 = () => 押しキー.clear();
+
 const カメラを戻す = () => {
+  一人称を解除();
   if (!camera || !controls) return;
   camera.position.set(30, 18, 30);
   controls.target.set(0, 1.5, 0);
@@ -1795,12 +2223,22 @@ watch(
   () => 目標掲示板を更新(),
 );
 
+// 【要員状況】パネルから呼ぶ入口。カメラと会話ダイアログはこの画面が持っているため、
+// 親（AIチーム.vue）が要員のクリック / ダブルクリックをここへ中継する
+defineExpose({ 一人称へ入る, 生き物視点へ入る, 会話を開く });
+
 onMounted(() => {
   シーンを作る();
   エージェント表示を同期();
+  window.addEventListener('keydown', キー押下);
+  window.addEventListener('keyup', キー解放);
+  window.addEventListener('blur', キー全解放);
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', キー押下);
+  window.removeEventListener('keyup', キー解放);
+  window.removeEventListener('blur', キー全解放);
   cancelAnimationFrame(animationId);
   resizeObserver?.disconnect();
   controls?.dispose();
@@ -1815,6 +2253,8 @@ onBeforeUnmount(() => {
   目標掲示板.改善明滅 = null;
   目標掲示板.改善ネオン芯 = null;
   目標テクスチャ = null;
+  // うさぎ穴のように自前で資源を持つ NPC を片付けてから一覧を空にする
+  NPC一覧.forEach((npc) => npc.破棄?.());
   NPC一覧.length = 0;
   部品 = null;
   ラベル要素.clear();
@@ -1831,7 +2271,6 @@ onBeforeUnmount(() => {
       class="scene-canvas"
       aria-label="ドラッグで360度回転できるAIチームの3D草原ワークスペース"
       @click="キャンバスクリック"
-      @dblclick="キャンバスダブルクリック"
       @pointermove="キャンバスポインター移動"
       @pointerleave="キャンバスポインター離脱"
     ></canvas>
@@ -1863,34 +2302,44 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <button
+    <!-- 名札は誰がどこにいるかを示すだけの表示。操作は【要員状況】パネル側で行う -->
+    <div
       v-for="agent in エージェント一覧"
       :key="`label-${agent.id}`"
       :ref="(element) => ラベルRef設定(agent.id, element as Element | null)"
-      type="button"
       class="world-label"
       :class="{
         selected: agent.id === 選択中ID,
         talking: ['相談中', '雑談中'].includes(agent.状態),
-        hovered: agent.id === ホバー中ID,
       }"
       :style="{ '--agent-color': agent.色CSS }"
-      @click.stop="エージェントを選択(agent.id)"
-      @dblclick.stop="会話を開く(agent.id)"
-      @mouseenter="ホバー中ID = agent.id"
-      @mouseleave="ホバー中ID = ''"
     >
       <span class="world-name">{{ agent.名前 }}</span>
       <span class="world-role">{{ agent.役割 || '役割未設定' }}</span>
       <span v-if="['相談中', '雑談中'].includes(agent.状態) && agent.ひとこと" class="speech">
         {{ agent.ひとこと }}
       </span>
-    </button>
+    </div>
 
+    <div v-if="一人称ラベル" class="first-person-badge" :class="{ possessed: 憑依中 }">
+      <span class="fp-eye">◉</span>
+      <span class="fp-name">{{ 一人称ラベル }} {{ 憑依中 ? 'に憑依中' : 'の視点' }}</span>
+      <template v-if="憑依中">
+        <span class="fp-hint"><b>↑↓</b> 前後</span>
+        <span class="fp-hint"><b>←→</b> 向き</span>
+        <span v-if="一人称ラベル === '馬'" class="fp-hint"><b>↑長押し</b> 駆け足</span>
+      </template>
+      <span v-else class="fp-hint"><b>↑↓←→</b> で憑依</span>
+      <span class="fp-hint"><b>ESC</b> で解除</span>
+    </div>
+
+    <!-- 一人称中の操作説明は下部中央のバッジに出すので、ここでは重ねて出さない -->
     <div class="camera-help">
-      <span><b>DRAG</b> 360° 回転</span>
-      <span><b>WHEEL</b> ズーム</span>
-      <span><b>DOUBLE CLICK</b> 会話</span>
+      <template v-if="!一人称ラベル">
+        <span><b>DRAG</b> 360° 回転</span>
+        <span><b>WHEEL</b> ズーム</span>
+        <span>要員状況をクリックでその人の視点</span>
+      </template>
       <button type="button" @click="カメラを戻す">視点を戻す</button>
     </div>
 
@@ -2045,7 +2494,8 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   color: #eaf7fb;
   background: rgba(7, 20, 31, 0.86);
-  cursor: pointer;
+  /* 名札は表示だけ。マウス操作は素通りさせて、名札越しでも視点をドラッグできるようにする */
+  pointer-events: none;
   will-change: transform;
 }
 
@@ -2072,8 +2522,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.world-label:hover .world-role,
-.world-label.hovered .world-role { transform: translate(-50%, 0); opacity: 1; }
+/* 役割は選択中の要員だけ名札の下に出す（名札はマウスを受け取らないため hover では出せない） */
+.world-label.selected .world-role { transform: translate(-50%, 0); opacity: 1; }
 
 .speech {
   position: absolute;
@@ -2114,6 +2564,43 @@ onBeforeUnmount(() => {
   background: rgba(30, 66, 44, 0.6);
   cursor: pointer;
   font-size: 8px;
+}
+
+/* 一人称視点中であることと、解除の仕方を画面下部中央で知らせる */
+.first-person-badge {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 13px;
+  border: 1px solid rgba(196, 231, 200, 0.35);
+  border-radius: 999px;
+  transform: translateX(-50%);
+  color: #eaf7ec;
+  background: rgba(16, 40, 27, 0.72);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* 憑依中は縁を明るくして、操作を握っていることを分かりやすくする */
+.first-person-badge.possessed {
+  border-color: rgba(123, 227, 176, 0.85);
+  box-shadow: 0 0 14px rgba(123, 227, 176, 0.3);
+}
+
+.first-person-badge .fp-eye { color: #7be3b0; }
+.first-person-badge.possessed .fp-eye { color: #ffe08a; }
+.first-person-badge .fp-name { font-weight: 700; }
+.first-person-badge .fp-hint { color: #b6d4c0; font-size: 9px; }
+.first-person-badge .fp-hint b {
+  margin-right: 3px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: #f0f7ee;
+  background: rgba(123, 227, 176, 0.25);
 }
 
 @media (max-width: 760px) {

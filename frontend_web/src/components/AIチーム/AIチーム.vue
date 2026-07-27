@@ -32,6 +32,8 @@ const 稼働要員を変換 = (要員: 稼働要員, index: number): エージ�
   };
 };
 
+// カメラと会話ダイアログは空間表示が持っているため、【要員状況】の操作をここから中継する
+const 空間表示Ref = ref<InstanceType<typeof AiTeamViewer> | null>(null);
 const エージェント一覧 = ref<エージェント[]>([]);
 const 召喚要員一覧 = ref<チーム要員[]>([]);
 const 選択中ID = ref('');
@@ -210,16 +212,19 @@ onBeforeUnmount(() => {
         :召喚実行="選択要員を召喚"
         :要員再読込="要員一覧を読み込む"
         @select="選択中ID = $event"
+        @視点="空間表示Ref?.一人称へ入る($event)"
+        @会話="空間表示Ref?.会話を開く($event)"
+        @生き物視点="空間表示Ref?.生き物視点へ入る($event)"
         @expel="選択要員を排除"
         @update:summon-target="召喚対象ID = $event"
       />
       <AiTeamViewer
+        ref="空間表示Ref"
         :エージェント一覧="エージェント一覧"
         :選択中ID="選択中ID"
         :要員読込中="要員読込中"
         :要員読込エラー="要員読込エラー"
         :チーム目標="チーム目標"
-        @select="選択中ID = $event"
         @retry="要員一覧を読み込む"
         @目標クリック="目標編集表示 = true"
       />

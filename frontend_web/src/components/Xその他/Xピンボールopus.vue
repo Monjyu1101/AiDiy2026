@@ -8,7 +8,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const baseUrl = import.meta.env.BASE_URL || '/'
-const frameSrc = `${baseUrl}Xピンボールsol_new/index.html`
+const frameSrc = `${baseUrl}Xピンボールopus/index.html`
 const route = useRoute()
 const router = useRouter()
 const URLメニュー = computed(() => {
@@ -31,25 +31,25 @@ const 戻る = () => {
 <template>
   <div class="page-container">
     <h2 class="page-title">
-      <span>【 Xピンボールsol 進化版 】</span>
+      <span>【 Xピンボールopus 】</span>
       <div class="header-actions">
         <button v-if="URLメニュー" @click="メニュー">メニュー</button>
         <button v-if="URL戻り先 && URL戻り先 !== URLメニュー" @click="戻る">戻る</button>
       </div>
     </h2>
     <div class="iframe-wrapper">
-      <iframe class="game-frame" :src="frameSrc" title="Xピンボールsol 進化版" allow="autoplay; fullscreen"></iframe>
+      <iframe class="game-frame" :src="frameSrc" title="Xピンボールopus" allow="autoplay; fullscreen"></iframe>
     </div>
   </div>
 </template>
 
 <style scoped>
-.page-container { width: 100%; height: 100%; min-height: 620px; display: flex; flex-direction: column; background: #04020b; }
-.page-title { height: 35px; min-height: 35px; margin: 0 0 5px; padding: 8px 20px 8px 40px; display: flex; align-items: center; color: #ffe3a4; font-size: 14px; background: linear-gradient(90deg, #160817, #351122, #10152c); box-shadow: 0 2px 12px rgba(255, 77, 24, .25); }
+.page-container { width: 100%; height: 100%; min-height: 620px; display: flex; flex-direction: column; background: #120c07; }
+.page-title { height: 35px; min-height: 35px; margin: 0 0 5px; padding: 8px 20px 8px 40px; display: flex; align-items: center; color: #ffe6ba; font-size: 14px; background: linear-gradient(90deg, #160e08, #4b2b13, #112c35); box-shadow: 0 2px 12px rgba(201, 136, 74, .3); }
 .page-title span { flex: 1; }
 .header-actions { display: flex; align-items: center; gap: 8px; }
-.page-title button { border: 1px solid #ff7538; background: #2b101d; color: #fff0d2; cursor: pointer; padding: 3px 12px; }
-.page-title button:hover { background: #5a1821; box-shadow: 0 0 10px #ff5d2e; }
+.page-title button { border: 1px solid #d99a57; background: #29180c; color: #fff0d2; cursor: pointer; padding: 3px 12px; }
+.page-title button:hover { background: #573117; box-shadow: 0 0 10px #e0a35c; }
 .iframe-wrapper { width: 100%; flex: 1; min-height: 585px; }
 .game-frame { display: block; width: 100%; height: 100%; border: 0; }
 </style>

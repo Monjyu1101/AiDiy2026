@@ -4,7 +4,14 @@
 
 import * as THREE from 'three';
 
-import type { NPC定義, NPC個体, NPC更新引数, NPC配置, 造形ヘルパー } from './AIチーム_NPC型';
+import type {
+  NPC定義,
+  NPC個体,
+  NPC更新引数,
+  NPC配置,
+  手動操作状態,
+  造形ヘルパー,
+} from './AIチーム_NPC型';
 
 type 馬状態 = '走る' | '歩く' | 'とどまる';
 
@@ -30,9 +37,13 @@ const 共通設定: Omit<馬設定, '役割' | '体色' | 'たてがみ色' | '�
 
 const 最小中心距離 = 27;
 
-/** カメラから見て4エリアの向こう側にある放牧エリア中心 */
-const 基準位置 = (camera: THREE.Camera, 設定: 馬設定) => {
-  const カメラ方向 = new THREE.Vector3(camera.position.x, 0, camera.position.z);
+/** 首の付け根の基準姿勢。歩くリズムに合わせてこの前後に振る */
+const 首基準角 = -0.46;
+const 首基準Z = -0.72;
+
+/** 俯瞰カメラから見て4エリアの向こう側にある放牧エリア中心 */
+const 基準位置 = (俯瞰位置: THREE.Vector3, 設定: 馬設定) => {
+  const カメラ方向 = new THREE.Vector3(俯瞰位置.x, 0, 俯瞰位置.z);
   if (カメラ方向.lengthSq() < 0.01) カメラ方向.set(0, 0, 1);
   return カメラ方向.normalize().multiplyScalar(-設定.基準距離);
 };
@@ -62,8 +73,8 @@ const 馬体を作る = (ヘルパー: 造形ヘルパー, 設定: 馬設定) =>
   group.add(胴);
 
   const 首 = new THREE.Group();
-  首.position.set(0, 1.62, -0.72);
-  首.rotation.x = -0.46;
+  首.position.set(0, 1.62, 首基準Z);
+  首.rotation.x = 首基準角;
   const 首本体 = new THREE.Mesh(ジオメトリ(new THREE.CapsuleGeometry(0.27, 0.78, 5, 12)), 体材);
   首本体.position.y = 0.42;
   首.add(首本体);
@@ -152,9 +163,54 @@ const 馬を生成 = (
     if (状態 !== 'とどまる') 目的地 = 放牧目的地(基準, 設定, 状態 === '走る' ? 1.15 : 0.85);
   };
 
-  const 更新 = ({ delta, 時刻, camera }: NPC更新引数) => {
+  /** 脚・胴・首・尾の動き。自律行動でも一人称操作でも、いまの速度から同じように作る */
+  const 見た目を更新 = (速度: number, delta: number, 時刻: number) => {
+    if (速度 > 0) 歩調 += delta * (状態 === '走る' ? 12.5 : 7.2);
+    部位.脚.forEach((脚, index) => {
+      const 対角位相 = index === 0 || index === 3 ? 0 : Math.PI;
+      const 振幅 = 状態 === '走る' ? 0.72 : 状態 === '歩く' ? 0.42 : 0.03;
+      脚.rotation.x = THREE.MathUtils.lerp(脚.rotation.x, Math.sin(歩調 + 対角位相) * 振幅, 0.32);
+    });
+    const 弾み = 速度 > 0 ? Math.abs(Math.sin(歩調 * 2)) * (状態 === '走る' ? 0.1 : 0.045) : 0;
+    部位.胴.position.y = 1.42 + 弾み;
+    部位.首.rotation.z = Math.sin(歩調 * 2) * (速度 > 0 ? 0.025 : 0.008);
+    // 首は一歩ごとに前後へ大きく波打つ。走るほど深く伸び縮みする
+    const 首振り = 状態 === '走る' ? 0.19 : 状態 === '歩く' ? 0.085 : 0.014;
+    const 首波 = Math.sin(歩調);
+    部位.首.rotation.x = THREE.MathUtils.lerp(部位.首.rotation.x, 首基準角 + 首波 * 首振り, 0.4);
+    部位.首.position.z = THREE.MathUtils.lerp(
+      部位.首.position.z,
+      首基準Z + 首波 * (状態 === '走る' ? 0.11 : 状態 === '歩く' ? 0.05 : 0.008),
+      0.4,
+    );
+    // 普段は静かに垂らし、間欠的に左右へ強く叩いて虫を払う
+    const 尾叩き中 = Math.sin(時刻 * 0.00043 + (設定.役割 === '先導' ? 0 : 2.1)) > 0.68;
+    const 尾振幅 = 尾叩き中 ? 0.62 : 0.035;
+    const 尾速度 = 尾叩き中 ? 0.012 : 0.0018;
+    部位.尾.rotation.y = THREE.MathUtils.lerp(
+      部位.尾.rotation.y,
+      Math.sin(時刻 * 尾速度) * 尾振幅,
+      尾叩き中 ? 0.28 : 0.06,
+    );
+  };
+
+  // 一人称視点で操作されているあいだは、位置と向きを画面側に任せて見た目だけ合わせる
+  let 手動: 手動操作状態 | null = null;
+
+  const 更新 = ({ delta, 時刻, 俯瞰位置 }: NPC更新引数) => {
     if (delta <= 0) return;
-    const 基準 = 基準位置(camera, 設定);
+
+    if (手動) {
+      状態 = 手動.速さ < 0.05 ? 'とどまる' : 手動.全力 ? '走る' : '歩く';
+      状態残り = 1;
+      追従中 = false;
+      目的地.copy(group.position);
+      前回基準.copy(基準位置(俯瞰位置, 設定));
+      見た目を更新(手動.速さ, delta, 時刻);
+      return;
+    }
+
+    const 基準 = 基準位置(俯瞰位置, 設定);
     const 基準移動量 = 基準.distanceTo(前回基準);
     前回基準.lerp(基準, Math.min(1, delta * 1.4));
     let 速度 = 0;
@@ -196,27 +252,22 @@ const 馬を生成 = (
       }
     }
 
-    if (速度 > 0) 歩調 += delta * (状態 === '走る' ? 12.5 : 7.2);
-    部位.脚.forEach((脚, index) => {
-      const 対角位相 = index === 0 || index === 3 ? 0 : Math.PI;
-      const 振幅 = 状態 === '走る' ? 0.72 : 状態 === '歩く' ? 0.42 : 0.03;
-      脚.rotation.x = THREE.MathUtils.lerp(脚.rotation.x, Math.sin(歩調 + 対角位相) * 振幅, 0.32);
-    });
-    const 弾み = 速度 > 0 ? Math.abs(Math.sin(歩調 * 2)) * (状態 === '走る' ? 0.1 : 0.045) : 0;
-    部位.胴.position.y = 1.42 + 弾み;
-    部位.首.rotation.z = Math.sin(歩調 * 2) * (速度 > 0 ? 0.025 : 0.008);
-    // 普段は静かに垂らし、間欠的に左右へ強く叩いて虫を払う
-    const 尾叩き中 = Math.sin(時刻 * 0.00043 + (設定.役割 === '先導' ? 0 : 2.1)) > 0.68;
-    const 尾振幅 = 尾叩き中 ? 0.62 : 0.035;
-    const 尾速度 = 尾叩き中 ? 0.012 : 0.0018;
-    部位.尾.rotation.y = THREE.MathUtils.lerp(
-      部位.尾.rotation.y,
-      Math.sin(時刻 * 尾速度) * 尾振幅,
-      尾叩き中 ? 0.28 : 0.06,
-    );
+    見た目を更新(速度, delta, 時刻);
   };
 
-  return { 種別, group, 更新 };
+  return {
+    種別,
+    group,
+    更新,
+    手動操作: (状態指定: 手動操作状態 | null) => {
+      手動 = 状態指定;
+      if (!状態指定) {
+        状態 = '歩く';
+        状態残り = 0;
+        目的地.copy(group.position);
+      }
+    },
+  };
 };
 
 export const 黒馬定義: NPC定義<馬設定> = {

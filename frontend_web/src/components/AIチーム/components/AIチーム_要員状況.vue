@@ -22,9 +22,45 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [id: string];
+  /** その要員の一人称視点へ切り替える */
+  視点: [id: string];
+  /** その要員との会話ダイアログを開く */
+  会話: [id: string];
+  /** 草原の生き物の一人称視点へ切り替える */
+  生き物視点: [名前: string];
   expel: [];
   'update:summonTarget': [id: string];
 }>();
+
+// 草原にいる NPC のうち、一人称で動かせる生き物
+const 生き物一覧 = ['馬', 'イヌ', 'ネコ', 'うさぎ', 'カモ'];
+
+// 押したボタンにフォーカスが残っていると、一人称の矢印キー操作がボタン側へ渡ってしまう
+const フォーカスを外す = (event: Event) => {
+  (event.currentTarget as HTMLElement | null)?.blur();
+};
+
+const 生き物視点を選ぶ = (名前: string, event: Event) => {
+  フォーカスを外す(event);
+  emit('生き物視点', 名前);
+};
+
+// ダブルクリック（会話）でも 1 回目の click が先に来るため、視点の切り替えだけ少し待って、
+// ダブルクリックだと分かった時点で取り消す
+let 視点待ちタイマー = 0;
+
+const 要員をクリック = (id: string, event: Event) => {
+  フォーカスを外す(event);
+  emit('select', id);
+  window.clearTimeout(視点待ちタイマー);
+  視点待ちタイマー = window.setTimeout(() => emit('視点', id), 260);
+};
+
+const 要員をダブルクリック = (id: string) => {
+  window.clearTimeout(視点待ちタイマー);
+  emit('select', id);
+  emit('会話', id);
+};
 
 const 召喚ダイアログ表示 = ref(false);
 const {
@@ -93,6 +129,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  window.clearTimeout(視点待ちタイマー);
   if (状況更新Timer) clearInterval(状況更新Timer);
   状況最大更新日時 = '';
   状況最終読込時刻 = 0;
@@ -139,7 +176,9 @@ onBeforeUnmount(() => {
           'state-meditating': agent.状態 === '瞑想中',
           'state-resting': agent.状態 === '休憩中',
         }"
-        @click="emit('select', agent.id)"
+        :title="`クリックで ${agent.名前} の視点へ / ダブルクリックで会話`"
+        @click="要員をクリック(agent.id, $event)"
+        @dblclick="要員をダブルクリック(agent.id)"
       >
         <span class="agent-avatar" :style="{ '--agent-color': agent.色CSS }">
           {{ agent.名前.slice(0, 1) }}
@@ -157,6 +196,18 @@ onBeforeUnmount(() => {
           </span>
         </span>
       </button>
+    </div>
+
+    <!-- 草原の生き物の視点。要員と同じく、選ぶとその目線に切り替わる -->
+    <div v-if="開いている" class="creature-row">
+      <button
+        v-for="生き物 in 生き物一覧"
+        :key="生き物"
+        type="button"
+        class="creature-button"
+        :title="`${生き物}の視点へ`"
+        @click="生き物視点を選ぶ(生き物, $event)"
+      >{{ 生き物 }}</button>
     </div>
 
     <div v-if="開いている && 選択中エージェント" class="agent-detail">
@@ -222,7 +273,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 18px 45px rgba(2, 8, 14, 0.42);
   z-index: 8;
   will-change: transform;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
 .agent-panel:hover {
@@ -268,9 +319,16 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.16);
 }
 
-/* 閉じたときはタイトルバーだけを残す（本体側の余白を消す） */
+/* 閉じたときはタイトルバーだけを残す（本体側の余白を消す）。
+   草原を広く見せたいので、折り畳み中は薄くして背景を透かす（触れると戻る） */
 .agent-panel.collapsed {
   padding-bottom: 0;
+  opacity: 0.34;
+}
+
+.agent-panel.collapsed:hover,
+.agent-panel.collapsed:focus-within {
+  opacity: 1;
 }
 
 .agent-panel.collapsed .panel-header {
@@ -429,6 +487,35 @@ onBeforeUnmount(() => {
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.creature-row {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.creature-button {
+  flex: 1 1 auto;
+  padding: 5px 6px;
+  border: 1px solid rgba(123, 227, 176, 0.3);
+  border-radius: 7px;
+  color: #a9dcc2;
+  background: rgba(45, 96, 74, 0.22);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.creature-button:hover {
+  border-color: rgba(123, 227, 176, 0.7);
+  color: #e2f7ec;
+  background: rgba(45, 130, 94, 0.4);
 }
 
 .agent-detail {

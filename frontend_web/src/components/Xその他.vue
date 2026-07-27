@@ -202,13 +202,13 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールsol_new/ゲーム?URLメニュー=／Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールopus/ゲーム?URLメニュー=／Xその他">
             <div class="menu-card-title">
-              <span class="icon">進化</span>
-              Xピンボールsol 進化版
+              <span class="icon">X谷</span>
+              Xピンボールopus
             </div>
             <div class="menu-card-description">
-              成功と失敗の軌道を記憶し、プレイするたび盤面が進化する改善版ネオンピンボール
+              岩球・吊り橋・黄金像・鉄砲水が連動する大渓谷3Dピンボール
             </div>
           </router-link>
 

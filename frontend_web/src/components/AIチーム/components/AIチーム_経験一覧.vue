@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 18px 45px rgba(2, 8, 14, 0.42);
   z-index: 7;
   will-change: transform;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
 .exp-panel:hover {
@@ -290,9 +290,16 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.16);
 }
 
-/* 閉じたときはタイトルバーだけを残す（本体側の余白を消す） */
+/* 閉じたときはタイトルバーだけを残す（本体側の余白を消す）。
+   草原を広く見せたいので、折り畳み中は薄くして背景を透かす（触れると戻る） */
 .exp-panel.collapsed {
   padding-bottom: 0;
+  opacity: 0.34;
+}
+
+.exp-panel.collapsed:hover,
+.exp-panel.collapsed:focus-within {
+  opacity: 1;
 }
 
 .exp-panel.collapsed .panel-header {

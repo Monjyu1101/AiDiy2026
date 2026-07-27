@@ -21,6 +21,9 @@ DB_PATH = PROJECT_ROOT / "backend_server" / "_data" / "AiDiy" / "database.db"
 要員テーブル = "Aチーム要員"
 管理者要員ID = "admin"
 
+# プロセス内でテーブル作成を一度だけ行うためのフラグ
+_初期化済み = False
+
 
 def _現在日時() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -30,7 +33,17 @@ def 接続取得() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
+    # database.db は backend_server / backend_task / backend_team が同時に触る。
+    # 既定のジャーナルだと書き込み中に読み取りが弾かれて "database is locked" になるため、
+    # 読み書きが並行できる WAL にし、ロック待ちも接続の timeout に合わせて長めに取る。
+    conn.execute("PRAGMA busy_timeout = 30000")
+    try:
+        # WAL への切替は排他ロックが要るので、他プロセスが掴んでいる間は失敗する。
+        # 一度でも成功すれば DB ファイルの属性として残るため、失敗しても次の接続に任せる。
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+    except sqlite3.Error:
+        pass
     return conn
 
 
@@ -49,6 +62,12 @@ def _監査項目(利用者ID: str, 利用者名: str, 端末ID: str) -> dict[st
 
 
 def 初期化() -> None:
+    """テーブル作成を行う。多重呼び出し可。"""
+    # CREATE TABLE / CREATE TRIGGER は IF NOT EXISTS でも書き込みロックを取るため、
+    # 毎回呼ぶと "database is locked" を招く。プロセス内で一度成功したら以降は何もしない。
+    global _初期化済み
+    if _初期化済み:
+        return
     conn = 接続取得()
     try:
         conn.execute(f"""
@@ -85,6 +104,7 @@ def 初期化() -> None:
             END
         """)
         conn.commit()
+        _初期化済み = True
     finally:
         conn.close()
 

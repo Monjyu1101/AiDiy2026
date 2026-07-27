@@ -110,10 +110,10 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'Xピンボールsol' }
     },
     {
-        path: '/Xその他/Xピンボールsol_new/ゲーム',
-        name: 'Xピンボールsol_new',
-        component: () => import('../components/Xその他/Xピンボールsol_new.vue'),
-        meta: { requiresAuth: true, title: 'Xピンボールsol 進化版' }
+        path: '/Xその他/Xピンボールopus/ゲーム',
+        name: 'Xピンボールopus',
+        component: () => import('../components/Xその他/Xピンボールopus.vue'),
+        meta: { requiresAuth: true, title: 'Xピンボールopus' }
     },
     {
         path: '/Xその他/X世界の絶景/表示',

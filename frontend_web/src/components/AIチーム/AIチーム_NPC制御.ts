@@ -9,8 +9,10 @@ import { イヌ定義 } from './AIチーム_NPC動作_イヌ';
 import { ネコ定義 } from './AIチーム_NPC動作_ネコ';
 import { 蝶定義 } from './AIチーム_NPC動作_蝶';
 import { 雲定義 } from './AIチーム_NPC動作_雲';
-import { 鴨大定義, 鴨小定義 } from './AIチーム_NPC動作_鴨';
+import { カモ大定義, カモ小定義 } from './AIチーム_NPC動作_カモ';
 import { 飛行船定義 } from './AIチーム_NPC動作_飛行船';
+import { 白うさぎ定義, 黒うさぎ定義 } from './AIチーム_NPC動作_うさぎ';
+import { うさぎ穴定義 } from './AIチーム_NPC動作_うさぎ穴';
 import { 白馬定義, 黒馬定義 } from './AIチーム_NPC動作_馬';
 import type { NPC個体, NPC更新引数, NPC配置, 造形ヘルパー } from './AIチーム_NPC型';
 
@@ -23,8 +25,11 @@ const NPC定義一覧 = {
   飛行船: 飛行船定義,
   黒馬: 黒馬定義,
   白馬: 白馬定義,
-  鴨大: 鴨大定義,
-  鴨小: 鴨小定義,
+  黒うさぎ: 黒うさぎ定義,
+  白うさぎ: 白うさぎ定義,
+  うさぎ穴: うさぎ穴定義,
+  カモ大: カモ大定義,
+  カモ小: カモ小定義,
 } as const;
 
 export type NPC種別 = keyof typeof NPC定義一覧;
@@ -46,7 +51,14 @@ export const NPCを配置 = <T extends NPC種別>(
   return 定義.生成(scene, ヘルパー, 配置, 設定 as never);
 };
 
-/** 配置済みの NPC をまとめて 1 フレーム進める */
+/**
+ * 配置済みの NPC をまとめて 1 フレーム進める。
+ * 更新は必ず配列順に行う（カモの子が親の最新位置を見られるように、親を先に置いてある）。
+ * そのあとで、寿命が尽きた NPC（うさぎ穴など）を一覧から取り除く。
+ */
 export const NPC群を更新 = (一覧: NPC個体[], 引数: NPC更新引数): void => {
   一覧.forEach((npc) => npc.更新(引数));
+  for (let index = 一覧.length - 1; index >= 0; index -= 1) {
+    if (一覧[index].寿命切れ?.()) 一覧.splice(index, 1);
+  }
 };
