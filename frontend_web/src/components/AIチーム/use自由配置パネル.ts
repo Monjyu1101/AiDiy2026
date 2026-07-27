@@ -8,11 +8,17 @@ export const use自由配置パネル = (
   initialSide: 'left' | 'center' | 'right',
   /** 初期表示の縦位置。パネル同士が重ならないように呼び出し側で上下を分ける */
   initialVertical: 'top' | 'bottom' = 'top',
+  options: {
+    /** 保存状態がないときの開閉状態 */
+    initialOpen?: boolean;
+    /** 同じ隅から始まるパネルを重ねないための縦方向オフセット */
+    initialOffsetY?: number;
+  } = {},
 ) => {
   const panelRef = ref<HTMLElement | null>(null);
   const zIndex = ref(++前面連番);
   // タイトルバーの ▼ / ▶ で本体を開閉する。位置と同じ保存先へ入れて、次回も同じ状態で開く
-  const 開いている = ref(true);
+  const 開いている = ref(options.initialOpen ?? true);
   // ドラッグ（または保存位置の復元）までは初期位置へ追従する。
   // 一覧の読み込みで高さが変わっても、下寄せパネルが画面外へはみ出さないようにするため。
   let 初期位置追従 = true;
@@ -45,8 +51,8 @@ export const use自由配置パネル = (
       else if (initialSide === 'center') x = (parent.clientWidth - panel.offsetWidth) / 2;
     }
     const y = initialVertical === 'bottom' && panel && parent
-      ? parent.clientHeight - panel.offsetHeight - 18
-      : 18;
+      ? parent.clientHeight - panel.offsetHeight - 18 - (options.initialOffsetY ?? 0)
+      : 18 + (options.initialOffsetY ?? 0);
     return 位置を制限(x, y);
   };
 
@@ -102,7 +108,7 @@ export const use自由配置パネル = (
       const 保存あり = Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y));
       if (保存あり) 初期位置追従 = false;
       位置を適用(保存あり ? 位置を制限(Number(saved.x), Number(saved.y)) : fallback);
-      // 開閉は後から足した項目なので、入っていない保存データは開いた状態として扱う
+      // 開閉は後から足した項目なので、入っていない保存データは呼び出し側の初期値を使う
       if (typeof saved.開いている === 'boolean') 開いている.value = saved.開いている;
     } catch {
       位置を適用(fallback);

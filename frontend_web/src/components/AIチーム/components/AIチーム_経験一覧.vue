@@ -31,7 +31,10 @@ const {
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
-} = use自由配置パネル('AIチーム_経験一覧位置', 'right', 'bottom');
+} = use自由配置パネル('AIチーム_経験一覧位置', 'right', 'top', {
+  initialOpen: false,
+  initialOffsetY: 40,
+});
 
 const 最大更新日時取得 = async (): Promise<string> => {
   const response = await apiClient.post('/team/経験/最大更新日時', {

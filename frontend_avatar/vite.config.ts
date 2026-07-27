@@ -7,6 +7,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'monaco-editor',
+      'mermaid',
       'three',
       '@pixiv/three-vrm',
       '@pixiv/three-vrm-animation',

@@ -2542,7 +2542,7 @@ onBeforeUnmount(() => {
 
 .camera-help {
   position: absolute;
-  right: 18px;
+  left: 18px;
   bottom: 17px;
   z-index: 3;
   display: flex;
