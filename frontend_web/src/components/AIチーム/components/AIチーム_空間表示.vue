@@ -50,6 +50,8 @@ const props = defineProps<{
   要員読込中: boolean;
   要員読込エラー: string;
   チーム目標: チーム目標 | null;
+  /** 改善ループが動いているか。掲示板のネオン点灯はこれで切り替える */
+  改善実行中: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -1088,7 +1090,7 @@ const 目標掲示板を作る = () => {
     改善明滅材,
   );
   改善明滅.position.z = 0.035;
-  改善明滅.visible = Boolean(props.チーム目標?.改善ループ);
+  改善明滅.visible = props.改善実行中;
   改善明滅.renderOrder = 2;
   group.add(改善明滅);
   目標掲示板.改善明滅 = 改善明滅;
@@ -1114,7 +1116,7 @@ const 目標掲示板を作る = () => {
     縦芯.position.set(方向 * (目標掲示板幅 / 2 + 0.2), 0, 0.065);
     ネオン芯.add(縦芯);
   });
-  ネオン芯.visible = Boolean(props.チーム目標?.改善ループ);
+  ネオン芯.visible = props.改善実行中;
   ネオン芯.renderOrder = 3;
   group.add(ネオン芯);
   目標掲示板.改善ネオン芯 = ネオン芯;
@@ -1885,7 +1887,8 @@ const 描画 = (時刻: number) => {
   });
 
   // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
-  const 改善ループ中 = Boolean(props.チーム目標?.改善ループ);
+  // ループが上限まで回り切ったら、改善ループONのままでもネオンは消す
+  const 改善ループ中 = props.改善実行中;
   // ゆっくりした明滅へ、ごく短い瞬断を混ぜてネオン管らしい点灯の揺らぎを作る。
   const 瞬断 = Math.sin(時刻 * 0.021) + Math.sin(時刻 * 0.0137) > 1.72 ? 0.2 : 1;
   const ネオン強度 = (0.72 + (Math.sin(時刻 * 0.0045) + 1) * 0.14) * 瞬断;

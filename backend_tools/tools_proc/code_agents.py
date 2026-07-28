@@ -273,7 +273,7 @@ Args:
     code_permissions: 権限設定（auto / full / none）
     system_instruction: システム指示（省略時はデフォルト文）
     resume: セッション継続フラグ
-    timeout_sec: タイムアウト秒数
+    timeout_sec: タイムアウト秒数（default: 1800=30分）
     self_check_loop: バックアップ＋自己検証ループの最大回数（default: 0=実行のみ・バックアップなし。1以上でその回数までバックアップ＋AI検証修正を実行）""")
 
         return "\n".join(lines)
@@ -294,7 +294,7 @@ Args:
         code_permissions: str = "auto",
         system_instruction: Optional[str] = None,
         resume: bool = True,
-        timeout_sec: int = 1200,
+        timeout_sec: int = 1800,
         self_check_loop: int = 0,
     ) -> dict:
         """
@@ -313,7 +313,7 @@ Args:
             code_permissions: 権限設定（auto / full / none）
             system_instruction: システム指示（省略時はデフォルト文）
             resume: セッション継続フラグ
-            timeout_sec: タイムアウト秒数
+            timeout_sec: タイムアウト秒数（default: 1800=30分）
             self_check_loop: バックアップ＋自己検証ループの最大回数。
                               default: 0 = 実行のみ（バックアップ・自己検証なし）。
                               1以上でその回数までAIコード.pyと同じバックアップ＋AI検証修正を実行する。

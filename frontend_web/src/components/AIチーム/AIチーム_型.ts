@@ -75,6 +75,12 @@ export type チーム目標 = {
   動員要員数?: number;
   /** 改善ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */
   パターン?: 'SPDCA' | 'PlanDo';
+  /** 改善ループの各段を実行するAI（Aチーム作業側） */
+  TEAM_AI_NAME?: string;
+  TEAM_AI_MODEL?: string;
+  /** 改善ループから投入するAタスク側のAI */
+  TASK_AI_NAME?: string;
+  TASK_AI_MODEL?: string;
   更新日時: string;
   更新利用者ID?: string;
   更新利用者名?: string;

@@ -38,7 +38,7 @@ class AgentsRequest(BaseModel):
     code_permissions: str = "auto"
     system_instruction: Optional[str] = None
     resume: bool = True
-    timeout_sec: int = 1200
+    timeout_sec: int = 1800
     self_check_loop: int = 0
 
 
@@ -64,7 +64,7 @@ _AGENTS_METHODS = [
             "code_permissions": {"type": "string", "required": False, "default": "auto"},
             "system_instruction": {"type": "string", "required": False},
             "resume": {"type": "boolean", "required": False, "default": True},
-            "timeout_sec": {"type": "integer", "required": False, "default": 1200},
+            "timeout_sec": {"type": "integer", "required": False, "default": 1800},
             "self_check_loop": {"type": "integer", "required": False, "default": 0, "description": "バックアップ＋自己検証ループの最大回数（0=実行のみ）"},
         },
     },
@@ -109,7 +109,7 @@ def register_tools(mcp_ca, code_agents):
             code_permissions: str = "auto",
             system_instruction: Optional[str] = None,
             resume: bool = True,
-            timeout_sec: int = 1200,
+            timeout_sec: int = 1800,
             self_check_loop: int = 0,
         ) -> str:
             """AIコード.py の CodeAgent を実行する（起動時に description が動的更新される）"""
@@ -195,13 +195,13 @@ def create_router(code_agents) -> APIRouter:
                         "code_permissions": {"type": "string", "required": False, "default": "auto", "description": "実行権限レベル（auto / all / limited）"},
                         "system_instruction": {"type": "string", "required": False, "description": "システムプロンプトへの追記テキスト"},
                         "resume": {"type": "boolean", "required": False, "default": True, "description": "True で前回セッションを継続する"},
-                        "timeout_sec": {"type": "integer", "required": False, "default": 1200, "description": "タイムアウト秒（デフォルト 20 分）"},
+                        "timeout_sec": {"type": "integer", "required": False, "default": 1800, "description": "タイムアウト秒（デフォルト 30 分）"},
                         "self_check_loop": {"type": "integer", "required": False, "default": 0, "description": "バックアップ＋自己検証ループの最大回数。0=実行のみ（バックアップなし）。1以上でその回数までバックアップ＋AI検証修正を実行"},
                     },
                     "example_request": {
                         "prompt": "backend_server/apps_router/M商品.py に商品検索エンドポイントを追加してください",
                         "ai_name": "auto",
-                        "timeout_sec": 1200,
+                        "timeout_sec": 1800,
                     },
                     "response_fields": {
                         "ok": "True=成功",

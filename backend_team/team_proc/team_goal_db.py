@@ -31,6 +31,12 @@ from .team_db import DB_PATH, 接続取得
 # 改善ループのパターン。SPDCA=S→P→D→C→Aの5段、PlanDo=P→Dの2段
 許可パターン = ("SPDCA", "PlanDo")
 既定パターン = "PlanDo"
+# 改善ループの各段で使うAI。目標ごとに持ち、Aチーム作業・Aタスクの投入時に使う
+AI設定キー = ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL")
+既定TEAM_AI_NAME = "claude_cli"
+既定TEAM_AI_MODEL = "auto"
+既定TASK_AI_NAME = "claude_cli"
+既定TASK_AI_MODEL = "auto"
 
 
 def _現在日時() -> str:
@@ -84,6 +90,10 @@ def 初期化() -> None:
                 最大ループ回数 INTEGER NOT NULL DEFAULT 1,
                 動員要員数 INTEGER NOT NULL DEFAULT 2,
                 パターン TEXT NOT NULL DEFAULT '{既定パターン}',
+                TEAM_AI_NAME TEXT NOT NULL DEFAULT '{既定TEAM_AI_NAME}',
+                TEAM_AI_MODEL TEXT NOT NULL DEFAULT '{既定TEAM_AI_MODEL}',
+                TASK_AI_NAME TEXT NOT NULL DEFAULT '{既定TASK_AI_NAME}',
+                TASK_AI_MODEL TEXT NOT NULL DEFAULT '{既定TASK_AI_MODEL}',
                 更新連番 INTEGER NOT NULL DEFAULT 0,
                 登録日時 TEXT NOT NULL,
                 登録利用者ID TEXT NOT NULL,
@@ -113,6 +123,18 @@ def 初期化() -> None:
             conn.execute(
                 f"ALTER TABLE \"{目標テーブル}\" ADD COLUMN パターン TEXT NOT NULL DEFAULT '{既定パターン}'"
             )
+        # AI設定列は後から足したため、既存DBには無い。既定値付きで追加する
+        AI設定既定 = {
+            "TEAM_AI_NAME": 既定TEAM_AI_NAME,
+            "TEAM_AI_MODEL": 既定TEAM_AI_MODEL,
+            "TASK_AI_NAME": 既定TASK_AI_NAME,
+            "TASK_AI_MODEL": 既定TASK_AI_MODEL,
+        }
+        for 列名, 既定値 in AI設定既定.items():
+            if 列名 not in 既存列:
+                conn.execute(
+                    f"ALTER TABLE \"{目標テーブル}\" ADD COLUMN {列名} TEXT NOT NULL DEFAULT '{既定値}'"
+                )
         conn.commit()
     finally:
         conn.close()
@@ -127,14 +149,17 @@ def 初期目標を投入() -> None:
         conn.execute(
             f"""
             INSERT OR IGNORE INTO "{目標テーブル}" (
-                CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン, 更新連番,
+                CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 既定CODE_BASE_PATH, 既定チーム目標, 0, 既定最大ループ回数,
-                既定動員要員数, 既定パターン, _次の更新連番(conn),
+                既定動員要員数, 既定パターン,
+                既定TEAM_AI_NAME, 既定TEAM_AI_MODEL, 既定TASK_AI_NAME, 既定TASK_AI_MODEL,
+                _次の更新連番(conn),
                 監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
                 監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
             ),
@@ -170,6 +195,7 @@ def 目標一覧() -> list[dict]:
         rows = conn.execute(
             f"""
             SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
@@ -187,7 +213,8 @@ def 改善ループ対象一覧() -> list[dict]:
     try:
         rows = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン, 更新日時
+            SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新日時
               FROM "{目標テーブル}"
              WHERE 改善ループ = 1 AND CODE_BASE_PATH != '' AND チーム目標 != ''
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
@@ -205,6 +232,7 @@ def 目標取得(code_base_path: str) -> dict | None:
         row = conn.execute(
             f"""
             SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}" WHERE CODE_BASE_PATH = ?
             """,
@@ -223,6 +251,7 @@ def 最終目標取得() -> dict | None:
         row = conn.execute(
             f"""
             SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
@@ -242,27 +271,41 @@ def 目標保存(
     最大ループ回数: int = 既定最大ループ回数,
     動員要員数: int = 既定動員要員数,
     パターン: str = 既定パターン,
+    TEAM_AI_NAME: str = 既定TEAM_AI_NAME,
+    TEAM_AI_MODEL: str = 既定TEAM_AI_MODEL,
+    TASK_AI_NAME: str = 既定TASK_AI_NAME,
+    TASK_AI_MODEL: str = 既定TASK_AI_MODEL,
 ) -> dict:
     """パス単位のupsert。既存があれば目標・改善ループ設定と更新監査を書き換える。"""
     初期化()
     if パターン not in 許可パターン:
         raise ValueError(f"パターンは {'/'.join(許可パターン)} のいずれかを指定してください")
+    # AI設定は選択肢が環境で変わるため値の妥当性までは見ず、空のときだけ既定へ寄せる
+    team_ai_name = str(TEAM_AI_NAME or "").strip() or 既定TEAM_AI_NAME
+    team_ai_model = str(TEAM_AI_MODEL or "").strip() or 既定TEAM_AI_MODEL
+    task_ai_name = str(TASK_AI_NAME or "").strip() or 既定TASK_AI_NAME
+    task_ai_model = str(TASK_AI_MODEL or "").strip() or 既定TASK_AI_MODEL
     監査 = _監査項目(操作者["利用者ID"], 操作者["利用者名"], 操作者["端末ID"])
     conn = 接続取得()
     try:
         conn.execute(
             f"""
             INSERT INTO "{目標テーブル}" (
-                CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン, 更新連番,
+                CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(CODE_BASE_PATH) DO UPDATE SET
                 チーム目標 = excluded.チーム目標,
                 改善ループ = excluded.改善ループ,
                 最大ループ回数 = excluded.最大ループ回数,
                 動員要員数 = excluded.動員要員数,
                 パターン = excluded.パターン,
+                TEAM_AI_NAME = excluded.TEAM_AI_NAME,
+                TEAM_AI_MODEL = excluded.TEAM_AI_MODEL,
+                TASK_AI_NAME = excluded.TASK_AI_NAME,
+                TASK_AI_MODEL = excluded.TASK_AI_MODEL,
                 更新連番 = excluded.更新連番,
                 更新日時 = excluded.更新日時,
                 更新利用者ID = excluded.更新利用者ID,
@@ -272,7 +315,9 @@ def 目標保存(
             (
                 code_base_path, チーム目標, int(bool(改善ループ)),
                 max(1, min(99, int(最大ループ回数))),
-                max(1, min(動員要員数上限, int(動員要員数))), パターン, _次の更新連番(conn),
+                max(1, min(動員要員数上限, int(動員要員数))), パターン,
+                team_ai_name, team_ai_model, task_ai_name, task_ai_model,
+                _次の更新連番(conn),
                 監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
                 監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
             ),

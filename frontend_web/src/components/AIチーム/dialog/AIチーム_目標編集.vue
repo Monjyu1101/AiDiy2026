@@ -34,6 +34,13 @@ const パターン選択肢: { value: 'SPDCA' | 'PlanDo'; label: string }[] = [
 ];
 const パターン正規化 = (値: unknown): 'SPDCA' | 'PlanDo' =>
   値 === 'SPDCA' || 値 === 'PlanDo' ? 値 : 既定パターン;
+// AI選択肢が読めなかったときに使う最終フォールバック
+const 既定AI = {
+  TEAM_AI_NAME: 'claude_cli',
+  TEAM_AI_MODEL: 'auto',
+  TASK_AI_NAME: 'claude_cli',
+  TASK_AI_MODEL: 'auto',
+};
 const authStore = useAuthStore();
 const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
 const 利用者名 = computed(() => String(authStore.user?.利用者名 ?? authStore.user?.利用者ID ?? 'admin'));
@@ -47,6 +54,15 @@ const 入力改善ループ = ref(false);
 const 入力最大ループ回数 = ref(1);
 const 入力動員要員数 = ref(既定動員要員数);
 const 入力パターン = ref<'SPDCA' | 'PlanDo'>(既定パターン);
+const 入力TEAM_AI_NAME = ref(既定AI.TEAM_AI_NAME);
+const 入力TEAM_AI_MODEL = ref(既定AI.TEAM_AI_MODEL);
+const 入力TASK_AI_NAME = ref(既定AI.TASK_AI_NAME);
+const 入力TASK_AI_MODEL = ref(既定AI.TASK_AI_MODEL);
+// AIコアが返す利用可能モデルと、AiDiy_key.json 側の規定値
+const 利用可能モデル = ref<Record<string, any>>({ code_models: {} });
+const 規定設定 = ref<Record<string, any>>({});
+// AI設定の一括反映中は、名称変更に連動するモデル補正を止める
+const AI反映中 = ref(false);
 const 最大ループ回数選択肢 = Array.from({ length: 99 }, (_, index) => index + 1);
 // 相談へ動員できるのは admin 以外の有効要員だけなので、その人数を動員要員数の上限にする
 const 有効要員数 = ref(1);
@@ -55,6 +71,20 @@ const 動員要員数選択肢 = computed(() =>
 );
 const 動員要員数を丸める = (人数: unknown) =>
   Math.min(Math.max(1, 有効要員数.value), Math.max(1, Number(人数 ?? 既定動員要員数)));
+const AI名称選択肢 = computed(() => Object.keys(利用可能モデル.value?.code_models || {}));
+const モデル選択肢 = (AI名称: string) =>
+  Object.entries(利用可能モデル.value?.code_models?.[AI名称] || {}).map(([value, label]) => ({
+    value,
+    label: String(label || value),
+  }));
+const TEAMモデル選択肢 = computed(() => モデル選択肢(入力TEAM_AI_NAME.value));
+const TASKモデル選択肢 = computed(() => モデル選択肢(入力TASK_AI_NAME.value));
+// 選択肢に無い値は先頭へ寄せる（環境ごとに使えるAIが違うため）
+const 選択可能な値 = (値: unknown, 候補: string[]) => {
+  const 文字列 = String(値 || '');
+  return 文字列 && 候補.includes(文字列) ? 文字列 : 候補[0] || '';
+};
+
 const 読込中 = ref(false);
 const 参照中 = ref(false);
 const 保存中 = ref(false);
@@ -94,6 +124,61 @@ const プロジェクト選択肢読込 = async () => {
     プロジェクト選択肢.value = [];
   }
 };
+
+const モデル選択肢読込 = async () => {
+  try {
+    const [モデル応答, 設定応答] = await Promise.all([
+      apiClient.post('/core/AIコア/モデル情報/TASK選択肢', {}),
+      apiClient.post('/team/設定/取得', {}),
+    ]);
+    if (モデル応答.data?.status !== 'OK' || 設定応答.data?.status !== 'OK') throw new Error();
+    利用可能モデル.value = モデル応答.data.data?.available_models || { code_models: {} };
+    規定設定.value = 設定応答.data.data || {};
+  } catch {
+    利用可能モデル.value = { code_models: { claude_cli: { auto: 'auto' } } };
+    規定設定.value = { ...既定AI };
+  }
+};
+
+// 目標のAI設定をフォームへ入れる。値が無い項目は AiDiy_key.json の規定値で埋める
+const AI設定を反映 = (元: Partial<チーム目標> | null) => {
+  AI反映中.value = true;
+  const 規定 = 規定設定.value;
+  入力TEAM_AI_NAME.value =
+    選択可能な値(元?.TEAM_AI_NAME || 規定.TEAM_AI_NAME || 既定AI.TEAM_AI_NAME, AI名称選択肢.value) ||
+    既定AI.TEAM_AI_NAME;
+  入力TEAM_AI_MODEL.value =
+    選択可能な値(
+      元?.TEAM_AI_MODEL || 規定.TEAM_AI_MODEL || 既定AI.TEAM_AI_MODEL,
+      TEAMモデル選択肢.value.map((項目) => 項目.value),
+    ) || 既定AI.TEAM_AI_MODEL;
+  入力TASK_AI_NAME.value =
+    選択可能な値(元?.TASK_AI_NAME || 規定.TASK_AI_NAME || 既定AI.TASK_AI_NAME, AI名称選択肢.value) ||
+    既定AI.TASK_AI_NAME;
+  入力TASK_AI_MODEL.value =
+    選択可能な値(
+      元?.TASK_AI_MODEL || 規定.TASK_AI_MODEL || 既定AI.TASK_AI_MODEL,
+      TASKモデル選択肢.value.map((項目) => 項目.value),
+    ) || 既定AI.TASK_AI_MODEL;
+  AI反映中.value = false;
+};
+
+// AI名称を変えたとき、そのAIに無いモデルが残らないよう先頭へ寄せる
+watch(入力TEAM_AI_NAME, (value) => {
+  if (AI反映中.value) return;
+  const models = Object.keys(利用可能モデル.value?.code_models?.[value] || {});
+  if (models.length && !models.includes(入力TEAM_AI_MODEL.value)) {
+    入力TEAM_AI_MODEL.value = models[0]!;
+  }
+}, { flush: 'sync' });
+
+watch(入力TASK_AI_NAME, (value) => {
+  if (AI反映中.value) return;
+  const models = Object.keys(利用可能モデル.value?.code_models?.[value] || {});
+  if (models.length && !models.includes(入力TASK_AI_MODEL.value)) {
+    入力TASK_AI_MODEL.value = models[0]!;
+  }
+}, { flush: 'sync' });
 
 const フォルダ参照 = async () => {
   参照中.value = true;
@@ -140,6 +225,7 @@ const 一覧から選ぶ = (項目: チーム目標) => {
   入力最大ループ回数.value = Math.min(99, Math.max(1, Number(項目.最大ループ回数 ?? 1)));
   入力動員要員数.value = 動員要員数を丸める(項目.動員要員数);
   入力パターン.value = パターン正規化(項目.パターン);
+  AI設定を反映(項目);
 };
 
 watch(選択パス, (value) => {
@@ -152,6 +238,10 @@ watch(選択パス, (value) => {
     入力最大ループ回数.value = Math.min(99, Math.max(1, Number(既存.最大ループ回数 ?? 1)));
     入力動員要員数.value = 動員要員数を丸める(既存.動員要員数);
     入力パターン.value = パターン正規化(既存.パターン);
+    AI設定を反映(既存);
+  } else {
+    // 未登録パス（新規）は、掲示板に出ている最終目標のAI設定を引き継ぐ
+    AI設定を反映(目標一覧.value[0] ?? null);
   }
 });
 
@@ -166,11 +256,13 @@ watch(
     入力最大ループ回数.value = 1;
     入力パターン.value = 既定パターン;
     // 選択肢の上限は有効要員数に依存するため、読込後に丸め直す
-    await Promise.all([目標一覧読込(), プロジェクト選択肢読込(), 有効要員数読込()]);
+    await Promise.all([目標一覧読込(), プロジェクト選択肢読込(), 有効要員数読込(), モデル選択肢読込()]);
     入力動員要員数.value = 動員要員数を丸める(既定動員要員数);
     // 最終更新の 1 件を初期表示にする（掲示板に出ている目標をそのまま編集できる）
     const 先頭 = 目標一覧.value[0];
     if (先頭) 一覧から選ぶ(先頭);
+    // 1件も無ければ規定値をそのまま出す
+    else AI設定を反映(null);
   },
   { immediate: true },
 );
@@ -195,6 +287,10 @@ const 保存 = async () => {
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
+      TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
+      TEAM_AI_MODEL: 入力TEAM_AI_MODEL.value,
+      TASK_AI_NAME: 入力TASK_AI_NAME.value,
+      TASK_AI_MODEL: 入力TASK_AI_MODEL.value,
       操作利用者ID: 利用者ID.value,
       操作利用者名: 利用者名.value,
       操作端末ID: 'frontend_web',
@@ -211,6 +307,10 @@ const 保存 = async () => {
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
+      TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
+      TEAM_AI_MODEL: 入力TEAM_AI_MODEL.value,
+      TASK_AI_NAME: 入力TASK_AI_NAME.value,
+      TASK_AI_MODEL: 入力TASK_AI_MODEL.value,
     });
     // 1件保存したら用は済むのでダイアログを閉じる
     emit('close');
@@ -380,6 +480,44 @@ const 削除 = async () => {
                       </option>
                     </select>
                     <span class="loop-config-help">有効な要員から動員</span>
+                  </label>
+                </div>
+
+                <div class="loop-config-grid ai-config-grid">
+                  <label class="loop-config-item" for="TEAM_AI_NAME">
+                    <span class="loop-config-label">TEAM_AI_NAME</span>
+                    <select id="TEAM_AI_NAME" v-model="入力TEAM_AI_NAME" class="loop-config-select">
+                      <option v-for="name in AI名称選択肢" :key="name" :value="name">{{ name }}</option>
+                    </select>
+                    <span class="loop-config-help">各段を実行するAI</span>
+                  </label>
+
+                  <label class="loop-config-item" for="TEAM_AI_MODEL">
+                    <span class="loop-config-label">TEAM_AI_MODEL</span>
+                    <select id="TEAM_AI_MODEL" v-model="入力TEAM_AI_MODEL" class="loop-config-select">
+                      <option v-for="model in TEAMモデル選択肢" :key="model.value" :value="model.value">
+                        {{ model.label }}
+                      </option>
+                    </select>
+                    <span class="loop-config-help">autoはCLI既定</span>
+                  </label>
+
+                  <label class="loop-config-item" for="TASK_AI_NAME">
+                    <span class="loop-config-label">TASK_AI_NAME</span>
+                    <select id="TASK_AI_NAME" v-model="入力TASK_AI_NAME" class="loop-config-select">
+                      <option v-for="name in AI名称選択肢" :key="name" :value="name">{{ name }}</option>
+                    </select>
+                    <span class="loop-config-help">Aタスク側のAI</span>
+                  </label>
+
+                  <label class="loop-config-item" for="TASK_AI_MODEL">
+                    <span class="loop-config-label">TASK_AI_MODEL</span>
+                    <select id="TASK_AI_MODEL" v-model="入力TASK_AI_MODEL" class="loop-config-select">
+                      <option v-for="model in TASKモデル選択肢" :key="model.value" :value="model.value">
+                        {{ model.label }}
+                      </option>
+                    </select>
+                    <span class="loop-config-help">autoはCLI既定</span>
                   </label>
                 </div>
               </section>
@@ -775,6 +913,12 @@ const 削除 = async () => {
   padding: 10px;
 }
 
+/* AI設定は4項目そろって1組なので、ループ条件とは別の等幅グリッドにする */
+.ai-config-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding-top: 0;
+}
+
 .loop-config-item {
   min-width: 0;
   display: flex;
@@ -887,6 +1031,7 @@ const 削除 = async () => {
   .goal-layout { grid-template-columns: minmax(0, 1fr); }
   .goal-list-body { max-height: 180px; }
   .loop-config-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-config-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .loop-pattern-setting { grid-column: 1 / -1; }
 }
 
@@ -895,6 +1040,7 @@ const 削除 = async () => {
   .loop-panel-head { align-items: flex-start; }
   .loop-panel-title-wrap p { display: none; }
   .loop-config-grid { grid-template-columns: minmax(0, 1fr); }
+  .ai-config-grid { grid-template-columns: minmax(0, 1fr); }
   .loop-pattern-setting { grid-column: auto; }
 }
 </style>

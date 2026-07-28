@@ -13,11 +13,11 @@
     盤 y: 0(奥 = 遺跡の高台) → 1080(手前 = 谷底へ落ちる縁)
 
   奥へ向かって標高が上がり、手前は谷底へ急落する岩の斜面になっている。
-  three.js は npm 依存を増やさないため CDN から module import する。
-  取得できない環境ではこのファイルが評価されず #load-error がそのまま残る。
+  three.js はこの公開ディレクトリに固定版を同梱して module import する。
+  CDN やネットワーク接続に依存せず、配布物だけで初期化できる。
 */
 
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js';
+import * as THREE from './vendor/three.module.js';
 
 /* ============================================================
    盤座標系とワールドへの写像
@@ -877,7 +877,8 @@ const walls = [
 
 const LANE_X = 676;     // 盤右側の投入峰。ここから左向きに岩球を解放する
 const LANE_Y = 350;
-const ENTER_Y = 380;    // 旧発射経路との互換用。投入峰からの球は解放時に entered へ移る
+const LAUNCH_ENTRY_X = 610; // 投入峰を抜けて盤面へ入ったとみなす x 座標
+const LAUNCH_MIN_SPEED = 270;
 const DRAIN_Y = 1058;   // 谷底へ落ちた判定。3D 地形が急落し始める by=1040 の少し先
 const DRAIN_TERROR_SPAN = 0.32; // 失敗球がレンズ目前を覆う時間
 
@@ -899,6 +900,12 @@ const SWAY_GAIN = 0.55;    // 左右方向は弱める。岩肌の凹凸で軌�
 const GRAD_STEP = 6;       // 勾配を測る中央差分の幅（盤 px）
 const FALL_ACCEL_MAX = 2600;
 const MAX_SPEED = 1250;
+// 1 回の物理積分で岩球が進んでよい距離。速度ではなく移動量から分割数を決め、
+// 一時的な高速度や描画フレームの揺れでも岩壁をまたいでしまわないようにする。
+const PHYSICS_TRAVEL_PER_STEP = BALL_R * 0.55;
+const PHYSICS_MIN_STEPS = 3;
+const PHYSICS_MAX_STEPS = 12;
+const COLLISION_SLOP = 0.35; // 接触面からの微小な離隔。連続反射を防ぐ。
 const FLIP_SPEED = 19;     // フリッパーの角速度（rad/s）
 const FLIPPER_R = 11;      // フリッパーの当たり半径（盤 px）
 const SURFACE_CAP = 1500;  // フリッパー面が球へ渡せる速度の上限（盤 px/s）
@@ -909,17 +916,30 @@ const WALL_BOUNCE = 0.72;
    ============================================================ */
 
 const keys = { left: false, right: false };   // 入力はキー / ボタン / ポインターすべてここへ集約する
+const keySources = { left: new Set(), right: new Set() };
 const pointers = new Map();
+
+// 同じフリッパーを複数の操作で押している間は、どれか一つを離しても戻さない。
+// キーボード、盤面タップ、画面ボタンのいずれも最終的には keys だけを物理側へ渡す。
+const setFlipperInput = (side, source, pressed) => {
+  if (side !== 'left' && side !== 'right') return;
+  if (pressed) keySources[side].add(source);
+  else keySources[side].delete(source);
+  keys[side] = keySources[side].size > 0;
+};
 
 const el = (selector) => document.querySelector(selector);
 const ui = {
   score: el('#score'), high: el('#high-score'), multiplier: el('#multiplier'), balls: el('#balls'),
   modeBadge: el('#mode-badge'), announcer: el('#announcer'), combo: el('#combo'), flash: el('#flash'),
-  launch: el('#launch'), bridge: el('#bridge'), sound: el('#sound'),
+  launch: el('#launch'), bridge: el('#bridge'), flipperLeft: el('#flipper-left'), flipperRight: el('#flipper-right'),
+  pauseButton: el('#pause'), sound: el('#sound'),
   title: el('#title-screen'), pause: el('#pause-screen'), gameover: el('#gameover-screen'), final: el('#final-score'),
   idolPanel: el('#idol-status'), idolHint: el('#idol-hint'),
   ropePanel: el('#rope-status'), ropeValue: el('#rope-value'), ropeBar: el('#rope-bar'), ropeHint: el('#rope-hint'),
   torrentTrack: el('.torrent-track'), torrentBar: el('#torrent-bar'), torrentValue: el('#torrent-value'),
+  explorationPanel: el('#exploration-status'), explorationCount: el('#exploration-count'), explorationStage: el('#exploration-stage'),
+  explorationGoal: el('#exploration-goal'), explorationCondition: el('#exploration-condition'), explorationReward: el('#exploration-reward'),
 };
 
 let mode = 'title';   // title / play / paused / over
@@ -938,6 +958,45 @@ let bridgePointerId = null;
 let announceTimer = 0;
 let demoRestartAt = 0;
 let autoDemoTimer = 0;
+
+// 自動確認用の読み取り記録。ゲーム進行には使わず、実際に通った通常経路の
+// 結果だけを残す。検証 API からゲーム状態を書き換える近道はここへ作らない。
+const verificationState = {
+  run: 0,
+  entries: 0,
+  bridgeRescues: 0,
+  floodStarts: 0,
+  explorationRewards: 0,
+  events: [],
+};
+
+const resetVerification = () => {
+  verificationState.run += 1;
+  verificationState.entries = 0;
+  verificationState.bridgeRescues = 0;
+  verificationState.floodStarts = 0;
+  verificationState.explorationRewards = 0;
+  verificationState.events.length = 0;
+};
+
+const recordVerification = (type, detail = {}) => {
+  verificationState.events.push({
+    type,
+    at: Number(gameTime.toFixed(3)),
+    ...detail,
+  });
+  // 長時間のデモでも状態 API を軽く保つ。
+  if (verificationState.events.length > 20) verificationState.events.shift();
+};
+
+const syncActionControls = () => {
+  const canPause = mode === 'play' || mode === 'paused';
+  ui.pauseButton.disabled = !canPause;
+  ui.pauseButton.textContent = mode === 'paused' ? 'RESUME' : 'PAUSE';
+  ui.pauseButton.setAttribute('aria-pressed', String(mode === 'paused'));
+  ui.pauseButton.setAttribute('aria-label', mode === 'paused' ? 'ゲームを再開' : 'ゲームを一時停止');
+  ui.sound.setAttribute('aria-pressed', String(!muted));
+};
 
 // 実際に得点へ掛かる倍率。基礎倍率（IDOL）と鉄砲水の係数を一箇所で合成し、
 // HUD の表示と加点が別々の値を見ることがないようにする。
@@ -958,8 +1017,9 @@ const updateHud = () => {
 };
 
 // 得点はここに集約する。倍率の掛け方とハイスコア更新を一箇所に閉じ込める。
-const addScore = (points) => {
-  score += Math.round(points * scoreMultiplier());
+// 遠征踏破のような固定報酬だけは applyMultiplier=false で、表示どおりの点数を加える。
+const addScore = (points, applyMultiplier = true) => {
+  score += Math.round(points * (applyMultiplier ? scoreMultiplier() : 1));
   if (score > highScore) {
     highScore = score;
     try { localStorage.setItem('x-pinball-opus-high', String(highScore)); } catch (_) { /* 保存できなくても進行は妨げない */ }
@@ -1046,6 +1106,13 @@ const rockHit = (power) => {
 // 直近の衝突法線。押し戻しまで済ませ、反発の掛け方は呼び出し側で決める。
 const hitNormal = { nx: 0, ny: 0, depth: 0 };
 
+const capBallSpeed = (ball) => {
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (speed <= MAX_SPEED) return;
+  ball.vx *= MAX_SPEED / speed;
+  ball.vy *= MAX_SPEED / speed;
+};
+
 const segmentHit = (ball, ax, ay, bx, by, radius) => {
   const dx = bx - ax;
   const dy = by - ay;
@@ -1062,17 +1129,22 @@ const segmentHit = (ball, ax, ay, bx, by, radius) => {
   let nx;
   let ny;
   if (distance < 1e-4) {
-    // 中心が線分に乗ってしまった場合は線分の法線側へ逃がす。
+    // 中心が線分に乗ってしまった場合は、進行方向と逆側へ逃がす。
+    // 常に同じ側を選ぶと、壁を横切った高速球をさらに外へ押し出してしまう。
     const length = Math.sqrt(length2);
     nx = -dy / length;
     ny = dx / length;
+    if (ball.vx * nx + ball.vy * ny > 0) {
+      nx = -nx;
+      ny = -ny;
+    }
   } else {
     nx = ox / distance;
     ny = oy / distance;
   }
   const depth = minimum - distance;
-  ball.x += nx * depth;
-  ball.y += ny * depth;
+  ball.x += nx * (depth + COLLISION_SLOP);
+  ball.y += ny * (depth + COLLISION_SLOP);
   hitNormal.nx = nx;
   hitNormal.ny = ny;
   hitNormal.depth = depth;
@@ -1090,15 +1162,16 @@ const circleHit = (ball, cx, cy, radius) => {
   let nx;
   let ny;
   if (distance < 1e-4) {
-    // 中心が完全に重なった場合は手前（谷側）へ逃がす。
-    nx = 0;
-    ny = 1;
+    // 中心が完全に重なった場合も、入射方向の反対へ逃がして反射を成立させる。
+    const speed = Math.hypot(ball.vx, ball.vy);
+    nx = speed > 1e-4 ? -ball.vx / speed : 0;
+    ny = speed > 1e-4 ? -ball.vy / speed : 1;
   } else {
     nx = ox / distance;
     ny = oy / distance;
   }
-  ball.x = cx + nx * minimum;
-  ball.y = cy + ny * minimum;
+  ball.x = cx + nx * (minimum + COLLISION_SLOP);
+  ball.y = cy + ny * (minimum + COLLISION_SLOP);
   hitNormal.nx = nx;
   hitNormal.ny = ny;
   hitNormal.depth = minimum - distance;
@@ -1111,6 +1184,7 @@ const reflect = (ball, nx, ny, bounce) => {
   if (along >= 0) return 0;
   ball.vx -= (1 + bounce) * along * nx;
   ball.vy -= (1 + bounce) * along * ny;
+  capBallSpeed(ball);
   return Math.min(1, -along / 600);
 };
 
@@ -1132,6 +1206,12 @@ const IDOL_REHIT_SCORE = 250;      // 点灯済みの石柱への再命中
 const IDOL_AWAKE_SCORE = 12000;    // 4 基そろえた
 const IDOL_MULTIPLIER_MAX = 8;
 const IDOL_HIT_COOLDOWN = 0.18;    // 同じ石柱の連続判定を抑える秒数
+// 3D の boulderPool と同じ上限。通常球を含め、画面上の岩球をこの数より増やさない。
+const ECHO_BOULDER_TOTAL_MAX = 3;
+const ECHO_BOULDER_SPREAD = [
+  { x: -38, y: 42, vx: -210, vy: 215 },
+  { x: 38, y: 54, vx: 210, vy: 260 },
+];
 
 const idolState = {
   targets: [
@@ -1155,6 +1235,8 @@ const idolState = {
   awake: false,
   cycles: 0,    // 4 基そろえた回数
   rise: 0,      // 黄金像の起立の追従値（0〜1）
+  echoBoulders: 0, // 今回の覚醒で追加された ECHO BOULDER 数
+  echoCycle: 0,    // 同じ覚醒中に報酬を二重発行しないための識別子
 };
 
 const syncIdolHud = () => {
@@ -1167,6 +1249,7 @@ const syncIdolHud = () => {
       ? `GOLD AWAKENED ×${idolState.cycles}`
       : `AWAKEN THE GOLD ${idolState.litCount}/${idolState.targets.length}`;
   }
+  if (explorationState.stage === 0) syncExplorationHud();
 };
 
 // full=true でゲーム全体の初期化（4 基そろえた回数も戻す）。
@@ -1179,6 +1262,8 @@ const resetIdol = (full = false) => {
   });
   idolState.litCount = 0;
   idolState.awake = false;
+  idolState.echoBoulders = 0;
+  idolState.echoCycle = 0;
   if (full) {
     idolState.cycles = 0;
     idolState.targets.forEach((target) => { target.glow = 0; });
@@ -1187,18 +1272,20 @@ const resetIdol = (full = false) => {
   syncIdolHud();
 };
 
-const awakenIdol = () => {
+const awakenIdol = (sourceBall) => {
   idolState.awake = true;
   idolState.cycles += 1;
   multiplier = Math.min(IDOL_MULTIPLIER_MAX, multiplier + 1);
   addScore(IDOL_AWAKE_SCORE);   // 倍率を上げてから加点する
-  announce('THE IDOL AWAKENS');
+  const echoCount = releaseEchoBoulders(sourceBall);
+  announce(echoCount > 0 ? `ECHO BOULDERS ×${echoCount}` : 'THE IDOL AWAKENS');
   tone(180, 0.55, 'triangle', 0.055, 4.2);
   tone(268, 0.65, 'sine', 0.04, 3.1);
   noise(0.42, 0.032, 1500);
   shakeView(1.45);
   // 増水は最後に足す。100% に届いた場合は鉄砲水の実況で上書きさせる。
   registerHit(TORRENT_AWAKE_GAIN);
+  syncExplorationProgress();
 };
 
 const updateIdolTarget = (ball, target) => {
@@ -1222,7 +1309,7 @@ const updateIdolTarget = (ball, target) => {
   tone(300 + idolState.litCount * 90, 0.2, 'square', 0.032, 2.4);
   registerHit(TORRENT_LIT_GAIN);
   addScore(IDOL_HIT_SCORE);
-  if (idolState.litCount >= idolState.targets.length) awakenIdol();
+  if (idolState.litCount >= idolState.targets.length) awakenIdol(ball);
   else announce(`GATE ${target.mark}`);
   syncIdolHud();
 };
@@ -1277,6 +1364,10 @@ const BRIDGE_BOUNCE = 0.86;
 const BRIDGE_LIFT = 660;        // 受け止めた球へ最低限与える奥向きの速度（盤 px/s）
 const BRIDGE_SAVE_SCORE = 2500;
 const BRIDGE_SAVE_COOLDOWN = 0.25;   // 同じ球の連続判定を抑える秒数
+const BRIDGE_ARM_Y = 790;            // この位置より谷側へ落ちた岩球だけを救出対象にする
+const BRIDGE_ARM_SPEED = 110;        // 横移動中の岩球へ縄を無駄打ちしないための最低落下速度
+const BRIDGE_FLOOD_SCORE = 4500;     // 鉄砲水中の救出は危険に見合う追加得点を与える
+const BRIDGE_FLOOD_TIME = 1.3;       // 同上。濁流の得点時間を少しだけ延長する
 
 // 橋の縄の形。当たり判定の線分も 3D の踏板もここから作り、見た目と判定をずらさない。
 const bridgePoint = (t) => ({
@@ -1295,6 +1386,11 @@ const bridgeState = {
   timer: 0,            // 張っている残り秒。0 なら当たり判定を持たない
   deploys: 0,          // 巻き上げた回数
   saves: 0,            // 受け止めた回数
+  floodSaves: 0,       // 鉄砲水中に受け止めた回数
+  expeditionSaved: false, // 探索の第二段階へ反映済みか（救出そのものは複数回できる）
+  windowOpen: false,   // 落下中の岩球が橋を張る時機にいるか
+  status: 'ready',     // ready / empty / armed / missed / saved / flood-save / snapped
+  lastScore: 0,        // 直近の救出の基礎報酬。HUD の表示内容と得点を対応させる
   raise: 0,            // 踏板のせり上がりの追従値（0〜1）
   flash: 0,            // 受け止めた直後の閃光（0〜1）
 };
@@ -1308,17 +1404,28 @@ const syncBridgeHud = () => {
   if (ui.ropeBar) ui.ropeBar.style.width = `${(bridgeState.uses / BRIDGE_USES) * 100}%`;
   if (ui.ropePanel) {
     ui.ropePanel.classList.toggle('frayed', bridgeState.uses === 1);
-    ui.ropePanel.classList.toggle('broken', bridgeState.uses <= 0);
+    ui.ropePanel.classList.toggle('broken', bridgeState.uses <= 0 && bridgeState.timer <= 0);
+    ui.ropePanel.classList.toggle('armed', bridgeState.status === 'armed');
+    ui.ropePanel.classList.toggle('saved', bridgeState.status === 'saved');
+    ui.ropePanel.classList.toggle('flood-save', bridgeState.status === 'flood-save');
+    ui.ropePanel.classList.toggle('missed', bridgeState.status === 'missed');
   }
   if (ui.ropeHint) {
-    if (bridgeState.uses <= 0) ui.ropeHint.textContent = 'ROPE SNAPPED';
-    else if (bridgeState.timer > 0) ui.ropeHint.textContent = 'BRIDGE HAULED';
-    else ui.ropeHint.textContent = `CATCHES THE FALL ×${bridgeState.uses}`;
+    if (bridgeState.status === 'armed') ui.ropeHint.textContent = 'VINES READY — CATCH THE FALL';
+    else if (bridgeState.status === 'saved') ui.ropeHint.textContent = `VINES SAVED THE ROCK +${bridgeState.lastScore.toLocaleString()}`;
+    else if (bridgeState.status === 'flood-save') ui.ropeHint.textContent = `FLOOD RESCUE +${bridgeState.lastScore.toLocaleString()} / +${BRIDGE_FLOOD_TIME.toFixed(1)}s`;
+    else if (bridgeState.uses <= 0) ui.ropeHint.textContent = 'ROPE SNAPPED';
+    else if (bridgeState.status === 'missed') ui.ropeHint.textContent = 'FALL MISSED — ROPE LOST';
+    else if (bridgeState.status === 'empty') ui.ropeHint.textContent = 'NO FALL — WAIT FOR THE DROP';
+    else if (bridgeState.windowOpen) ui.ropeHint.textContent = 'DROP NOW — VINES CAN REACH';
+    else ui.ropeHint.textContent = `WATCH THE FALL ×${bridgeState.uses}`;
   }
   if (ui.bridge) {
     ui.bridge.disabled = bridgeState.uses <= 0;
     ui.bridge.classList.toggle('ready', bridgeState.uses > 0 && mode === 'play');
+    ui.bridge.classList.toggle('window', bridgeState.uses > 0 && bridgeState.windowOpen && bridgeState.timer <= 0);
   }
+  if (explorationState.stage === 1) syncExplorationHud();
 };
 
 // full=true でゲーム全体の初期化。縄の耐久は球をまたいで残すので、
@@ -1326,28 +1433,63 @@ const syncBridgeHud = () => {
 const resetBridge = (full = false) => {
   bridgeState.timer = 0;
   dualFlipLatched = false;
+  bridgeState.windowOpen = false;
+  bridgeState.status = 'ready';
+  bridgeState.lastScore = 0;
   if (full) {
     bridgeState.uses = BRIDGE_USES;
     bridgeState.deploys = 0;
     bridgeState.saves = 0;
+    bridgeState.floodSaves = 0;
+    bridgeState.expeditionSaved = false;
     bridgeState.raise = 0;
     bridgeState.flash = 0;
   }
   syncBridgeHud();
 };
 
-// 巻き上げ。耐久切れと張っている最中は空振りさせ、1 回の同時押しで 1 回だけ減らす。
+// 谷底へ落ちつつある岩球だけを、橋を張る対象として返す。早過ぎる巻き上げは
+// 耐久を消費させず、HUD で「待つべきだった」ことを明示する。
+const bridgeRescueCandidate = () => balls.find((ball) => (
+  ball.alive && !ball.lane && !ball.launchGuide && !ball.draining
+  && ball.y >= BRIDGE_ARM_Y && ball.y < DRAIN_Y + ball.r
+  && ball.vy >= BRIDGE_ARM_SPEED
+  && ball.x >= BRIDGE_X0 - ball.r - 34 && ball.x <= BRIDGE_X1 + ball.r + 34
+));
+
+const refreshBridgeWindow = () => {
+  const windowOpen = bridgeState.timer <= 0 && Boolean(bridgeRescueCandidate());
+  if (bridgeState.windowOpen === windowOpen) return;
+  bridgeState.windowOpen = windowOpen;
+  if (bridgeState.status === 'ready' || bridgeState.status === 'empty') syncBridgeHud();
+};
+
+// 巻き上げ。落下に合わせて成功した展開だけが耐久を使う。耐久切れ、張っている最中、
+// または早過ぎる入力は同じ経路で空振りにして、ボタンとキーボードで差を作らない。
 const haulBridge = () => {
   if (mode !== 'play') return false;
   if (bridgeState.uses <= 0) {
+    bridgeState.status = 'snapped';
+    syncBridgeHud();
+    announce('THE ROPE IS GONE');
     tone(90, 0.18, 'square', 0.02, 0.35);
     return false;
   }
   if (bridgeState.timer > 0) return false;
+  if (!bridgeRescueCandidate()) {
+    bridgeState.status = 'empty';
+    bridgeState.windowOpen = false;
+    syncBridgeHud();
+    announce('NO FALL TO CATCH');
+    tone(118, 0.12, 'square', 0.018, 0.68);
+    return false;
+  }
 
   bridgeState.uses -= 1;
   bridgeState.deploys += 1;
   bridgeState.timer = BRIDGE_SPAN;
+  bridgeState.status = 'armed';
+  bridgeState.windowOpen = false;
   syncBridgeHud();
   announce(bridgeState.uses > 0 ? 'ROPE BRIDGE' : 'LAST ROPE');
   tone(140, 0.26, 'sawtooth', 0.038, 3.4);
@@ -1370,12 +1512,31 @@ const updateBridgeHit = (ball) => {
     if (gameTime - ball.bridgeAt < BRIDGE_SAVE_COOLDOWN) return;
     ball.bridgeAt = gameTime;
     bridgeState.saves += 1;
+    const floodRescue = torrentState.flood;
+    const rescueScore = floodRescue ? BRIDGE_FLOOD_SCORE : BRIDGE_SAVE_SCORE;
+    bridgeState.lastScore = rescueScore;
+    bridgeState.status = floodRescue ? 'flood-save' : 'saved';
+    verificationState.bridgeRescues += 1;
+    recordVerification('bridge-rescue', { flood: floodRescue, points: rescueScore });
+    if (floodRescue) {
+      bridgeState.floodSaves += 1;
+      torrentState.bridgeRescues += 1;
+      torrentState.timer = Math.min(FLOOD_SPAN + BRIDGE_FLOOD_TIME * 2, torrentState.timer + BRIDGE_FLOOD_TIME);
+    }
     registerHit(TORRENT_SAVE_GAIN);
-    addScore(BRIDGE_SAVE_SCORE);
-    announce('CAUGHT BY THE VINES');
+    addScore(rescueScore);
+    announce(floodRescue ? 'FLOODLINE RESCUE' : 'CAUGHT BY THE VINES');
     tone(330, 0.22, 'triangle', 0.036, 2.6);
     noise(0.16, 0.022, 900);
     shakeView(0.8);
+    // 探索の救出試練は最初の成功だけを達成事実にする。以後の救出は得点と
+    // 濁流連鎖へ寄与するが、段階表示や達成報酬を重複させない。
+    if (!bridgeState.expeditionSaved) {
+      bridgeState.expeditionSaved = true;
+      syncExplorationProgress();
+    }
+    syncBridgeHud();
+    syncTorrentHud();
     return;
   }
 };
@@ -1438,10 +1599,137 @@ const torrentState = {
   flood: false,    // 鉄砲水モードか
   timer: 0,        // 鉄砲水の残り秒
   floods: 0,       // 鉄砲水へ移った回数
+  bridgeRescues: 0, // 鉄砲水中に吊り橋で救出した回数
   combo: 0,        // 連続命中の段数
   comboAt: -9,     // 最後に命中した時刻。COMBO_SPAN を過ぎたら切る
   flow: 0,         // 水流メッシュの追従値（0〜1）
   flash: 0,        // 画面全体の閃光（0〜1）
+};
+
+/* ============================================================
+   峡谷探索の段階
+
+   目標の達成事実は IDOL / ROPE BRIDGE / TORRENT の各状態だけに置く。
+   ここはその事実を「どこまで踏査が進んだか」へ写す状態である。IDOL、橋、
+   鉄砲水の個別報酬は各ギミックへ残し、三試練をすべて越えたときだけ固定の
+   遠征達成報酬を発行する。rewarded を同一ゲーム中のラッチにすることで、
+   複数の岩球が同時に当たっても二重加点しない。
+   ============================================================ */
+
+const EXPEDITION_COMPLETE_SCORE = 30000;
+const explorationState = {
+  stage: 0,          // 到達済みの最大段階（0〜3）。進行表示は次の段でこの値を読む
+  advancedAt: -1,    // 最後に段階が進んだゲーム内時刻。状態確認と演出の重複防止用
+  rewarded: false,   // 三試練達成報酬をこのゲームですでに発行したか
+  rewardPoints: 0,   // 実際に加算した固定報酬。HUD と得点計算の同期確認に使う
+  rewardedAt: -1,
+};
+
+let explorationAdvanceTimer = 0;
+
+const explorationHudContent = () => {
+  if (explorationState.stage === 0) {
+    return {
+      stage: '第一踏査', goal: '黄金像を目覚めさせる',
+      condition: `遺跡ゲートを撃ち抜き I・D・O・L を灯せ　${idolState.litCount} / ${idolState.targets.length}`,
+      reward: '報酬　基礎倍率 +1 ・ 12,000 × 実効倍率',
+    };
+  }
+  if (explorationState.stage === 1) {
+    return {
+      stage: '第二踏査', goal: '蔓の救出',
+      condition: `落下表示で両フリップ　救出 ${bridgeState.expeditionSaved ? '1 / 1' : '0 / 1'}　ROPE ${bridgeState.uses} / ${BRIDGE_USES}`,
+      reward: '報酬　2,500 × 実効倍率 ・ 増水 +10（鉄砲水中は延長救出）',
+    };
+  }
+  if (explorationState.stage === 2) {
+    return {
+      stage: '第三踏査', goal: '鉄砲水を起こす',
+      condition: '連鎖をつなぎ TORRENT を100%へ',
+      reward: '報酬　8秒間 ×2 ・ 6,000 × 実効倍率',
+    };
+  }
+  return {
+    stage: '峡谷踏査完了', goal: '遺跡・蔓・鉄砲水を制覇',
+    condition: '三つの試練を越えた。次の遠征でも谷は応える',
+    reward: explorationState.rewarded
+      ? `達成報酬　${explorationState.rewardPoints.toLocaleString()}点（固定）`
+      : `達成報酬　${EXPEDITION_COMPLETE_SCORE.toLocaleString()}点（固定）`,
+  };
+};
+
+const syncExplorationHud = (advanced = false) => {
+  if (!ui.explorationPanel) return;
+  const { stage, goal, condition, reward } = explorationHudContent();
+  ui.explorationCount.textContent = `${explorationState.stage} / 3`;
+  ui.explorationStage.textContent = stage;
+  ui.explorationGoal.textContent = goal;
+  ui.explorationCondition.textContent = condition;
+  ui.explorationReward.textContent = reward;
+  ui.explorationPanel.classList.remove('stage-0', 'stage-1', 'stage-2', 'stage-3', 'complete');
+  ui.explorationPanel.classList.add(`stage-${explorationState.stage}`);
+  ui.explorationPanel.classList.toggle('complete', explorationState.stage === 3);
+  ui.explorationPanel.classList.toggle('rewarded', explorationState.rewarded);
+  ui.explorationPanel.querySelectorAll('.exploration-steps i').forEach((step, index) => {
+    step.classList.toggle('done', index < explorationState.stage);
+  });
+  if (!advanced) return;
+  ui.explorationPanel.classList.remove('advanced');
+  void ui.explorationPanel.offsetWidth;
+  ui.explorationPanel.classList.add('advanced');
+  clearTimeout(explorationAdvanceTimer);
+  explorationAdvanceTimer = setTimeout(() => ui.explorationPanel.classList.remove('advanced'), 900);
+};
+
+// 判定順は必ず IDOL → ROPE BRIDGE → TORRENT。後段を先に達成していても、
+// 前段を越えるまでは踏査を進めず、三つの達成事実がそろったときだけ完了にする。
+const explorationStageFromSources = () => {
+  if (idolState.cycles < 1) return 0;
+  if (!bridgeState.expeditionSaved) return 1;
+  if (torrentState.floods < 1) return 2;
+  return 3;
+};
+
+const awardExplorationCompletion = () => {
+  if (explorationState.stage !== 3 || explorationState.rewarded) return false;
+  explorationState.rewarded = true;
+  explorationState.rewardPoints = EXPEDITION_COMPLETE_SCORE;
+  explorationState.rewardedAt = gameTime;
+  verificationState.explorationRewards += 1;
+  recordVerification('exploration-reward', { points: EXPEDITION_COMPLETE_SCORE });
+  addScore(explorationState.rewardPoints, false);
+  announce(`CANYON EXPEDITION +${explorationState.rewardPoints.toLocaleString()}`);
+  tone(392, 0.42, 'triangle', 0.055, 3.2);
+  tone(587, 0.68, 'sine', 0.045, 2.3);
+  noise(0.3, 0.035, 1700);
+  shakeView(2.1);
+  return true;
+};
+
+const syncExplorationProgress = () => {
+  const stage = explorationStageFromSources();
+  const advanced = stage > explorationState.stage;
+  if (advanced) {
+    explorationState.stage = stage;
+    explorationState.advancedAt = gameTime;
+  }
+  const rewarded = awardExplorationCompletion();
+  if (advanced || rewarded) syncExplorationHud(true);
+  return advanced || rewarded;
+};
+
+// 球の入れ替えでは探索を戻さない。新規ゲーム開始時だけ、既存ギミックの full reset と
+// 同じ境界で初期化する。
+const resetExploration = () => {
+  explorationState.stage = 0;
+  explorationState.advancedAt = -1;
+  explorationState.rewarded = false;
+  explorationState.rewardPoints = 0;
+  explorationState.rewardedAt = -1;
+  clearTimeout(explorationAdvanceTimer);
+  explorationAdvanceTimer = 0;
+  if (ui.explorationPanel) ui.explorationPanel.classList.remove('advanced');
+  syncExplorationHud();
 };
 
 let torrentFlow = null;         // 3D の水流メッシュ
@@ -1475,6 +1763,8 @@ const startFlood = () => {
   torrentState.flood = true;
   torrentState.timer = FLOOD_SPAN;
   torrentState.floods += 1;
+  verificationState.floodStarts += 1;
+  recordVerification('flood-start', { number: torrentState.floods });
   torrentState.flash = 1;
   floodFactor = FLOOD_FACTOR;
   addScore(FLOOD_SCORE);   // 倍率を上げてから加点する
@@ -1485,6 +1775,7 @@ const startFlood = () => {
   tone(210, 0.8, 'triangle', 0.04, 0.35);
   noise(0.9, 0.05, 420);
   shakeView(2.3);
+  syncExplorationProgress();
 };
 
 // 鉄砲水の終わり。増水率は 0 へ戻し、次の 100% までまた溜め直させる。
@@ -1519,6 +1810,7 @@ const resetTorrent = (full = false) => {
   resetCombo();
   if (full) {
     torrentState.floods = 0;
+    torrentState.bridgeRescues = 0;
     torrentState.flow = 0;
     torrentState.flash = 0;
   }
@@ -1710,6 +2002,7 @@ const updateFlipperHit = (ball, flipper) => {
   const bounce = Math.abs(flipper.omega) > 0.5 ? 0.78 : 0.34;
   ball.vx = rvx - (1 + bounce) * along * nx + svx;
   ball.vy = rvy - (1 + bounce) * along * ny + svy;
+  capBallSpeed(ball);
   rockHit(Math.min(1, (-along + surface * 0.35) / 900));
   if (surface > 200) tone(150 + Math.random() * 90, 0.1, 'square', 0.028, 1.7);
 };
@@ -1738,11 +2031,13 @@ const updateBall = (ball, dt) => {
   applySlope(ball, dt);
   applyFlood(ball, dt);
 
-  const speed = Math.hypot(ball.vx, ball.vy);
-  if (speed > MAX_SPEED) {
-    ball.vx *= MAX_SPEED / speed;
-    ball.vy *= MAX_SPEED / speed;
+  // 発射峰の途中だけは、岩肌の細かな勾配に負けて右側へ戻らないよう左向きの
+  // 最低速度を保つ。盤面へ入った後は通常の地形・衝突物理だけへ完全に戻す。
+  if (ball.launchGuide) {
+    ball.vx = Math.min(ball.vx, -LAUNCH_MIN_SPEED);
+    ball.vy = clamp(ball.vy, -120, 160);
   }
+  capBallSpeed(ball);
 
   ball.x += ball.vx * dt;
   ball.y += ball.vy * dt;
@@ -1757,25 +2052,31 @@ const updateBall = (ball, dt) => {
     rockHit(power * 0.6);
     // 岩壁を強く叩くほど谷が増水する。サブステップで同じ接触を何度も拾うので、
     // 石柱の得点と同じく時間で間引く。
-    if (power < TORRENT_WALL_MIN || gameTime - ball.wallAt < TORRENT_WALL_COOLDOWN) continue;
-    ball.wallAt = gameTime;
-    registerHit(TORRENT_WALL_GAIN + power * TORRENT_WALL_POWER);
+    if (power >= TORRENT_WALL_MIN && gameTime - ball.wallAt >= TORRENT_WALL_COOLDOWN) {
+      ball.wallAt = gameTime;
+      registerHit(TORRENT_WALL_GAIN + power * TORRENT_WALL_POWER);
+    }
+    // 漏斗の継ぎ目で 2 本の岩壁を同じサブステップに反射すると、速度が不自然に
+    // 増幅する。最初に解決した接触だけを採用し、次の積分で残りを判定する。
+    break;
   }
   for (let i = 0; i < idolState.targets.length; i += 1) updateIdolTarget(ball, idolState.targets[i]);
   updateBridgeHit(ball);
   for (let i = 0; i < flippers.length; i += 1) updateFlipperHit(ball, flippers[i]);
 
-  // 発射レーンを登り切った。ガイド壁の上端を越えたので盤面側へ振る。
-  if (!ball.entered && ball.y < ENTER_Y) {
+  // 投入峰から盤面へ抜けた瞬間だけ、カメラと演出を盤面状態へ切り替える。
+  if (ball.launchGuide && ball.x <= LAUNCH_ENTRY_X) {
+    ball.launchGuide = false;
     ball.entered = true;
-    ball.vx = -Math.max(240, Math.abs(ball.vx) + 100);
+    verificationState.entries += 1;
+    recordVerification('boulder-entered', { echo: ball.echo });
     announce('INTO THE CANYON');
     tone(210, 0.22, 'triangle', 0.035, 2.2);
   }
 
   // 左右は人工的な盤端で落とさず、盤外の地形勾配へ球を流す。
   // 極端に遠くへ抜けた場合だけ安全弁として落球扱いにする。
-  if (ball.y > DRAIN_Y || ball.x < -420 || ball.x > BOARD_W + 420) {
+  if (ball.y - ball.r > DRAIN_Y || ball.x < -420 || ball.x > BOARD_W + 420) {
     ball.draining = true;
     ball.drainAt = gameTime;
     // サイドアウトでも最後は視界の内側へ寄せ、失敗演出を必ず見せる。
@@ -1787,12 +2088,39 @@ const updateBall = (ball, dt) => {
    ラウンド進行
    ============================================================ */
 
-const makeBall = (x = LANE_X, y = LANE_Y, lane = true, vx = 0, vy = 0) => ({
+const makeBall = (x = LANE_X, y = LANE_Y, lane = true, vx = 0, vy = 0, echo = false) => ({
   x, y, px: x, py: y, vx, vy, r: BALL_R, lane, entered: !lane, alive: true, born: gameTime,
+  launchGuide: false,
   draining: false, drainAt: -1,
+  echo,
   bridgeAt: -9,   // 吊り橋で受け止めた最後の時刻。サブステップの二重加点を防ぐ
   wallAt: -9,     // 岩壁で増水を数えた最後の時刻。同上
 });
+
+// IDOL 完成時の報酬。追加球も通常球と同じ balls 配列へ入れることで、物理、得点、
+// 排出、残機・ゲームオーバー判定を特別扱いせずに共有する。boulderPool の数を上限に
+// するため、描画用メッシュが足りない球を生成することもない。
+const releaseEchoBoulders = (sourceBall) => {
+  if (!sourceBall || idolState.echoCycle === idolState.cycles) return 0;
+  idolState.echoCycle = idolState.cycles;
+  const maxBalls = Math.min(ECHO_BOULDER_TOTAL_MAX, boulderPool.length);
+  const available = Math.max(0, maxBalls - balls.length);
+  const echoCount = Math.min(available, ECHO_BOULDER_SPREAD.length);
+
+  for (let i = 0; i < echoCount; i += 1) {
+    const spread = ECHO_BOULDER_SPREAD[i];
+    balls.push(makeBall(
+      clamp(sourceBall.x + spread.x, BALL_R, BOARD_W - BALL_R),
+      sourceBall.y + spread.y,
+      false,
+      sourceBall.vx * 0.35 + spread.vx,
+      Math.max(sourceBall.vy * 0.35, 0) + spread.vy,
+      true,
+    ));
+  }
+  idolState.echoBoulders = echoCount;
+  return echoCount;
+};
 
 const resetRound = () => {
   balls = [makeBall()];
@@ -1817,11 +2145,13 @@ const launchBall = (forcedCharge = null) => {
   if (!ball) return false;
   const power = forcedCharge == null ? charge : clamp(forcedCharge, 0, 1);
   ball.lane = false;
-  ball.entered = true;
+  ball.entered = false;
+  ball.launchGuide = true;
   // 砲のように打ち上げず、右側岩山の留め具を外して左へ転がす。
   // power は最初のひと押しだけに使い、その後は地形勾配へ任せる。
   ball.vx = -175 - power * 125;
   ball.vy = 18 + power * 42;
+  recordVerification('boulder-launched', { power: Number(power.toFixed(3)) });
   charging = false;
   charge = 0;
   ui.launch.classList.remove('visible');
@@ -1840,6 +2170,7 @@ const gameOver = () => {
   bridgeState.timer = 0;
   syncBridgeHud();
   resetTorrent();
+  syncActionControls();
   announce('SWALLOWED BY THE RAVINE');
   tone(96, 0.9, 'sawtooth', 0.07, 0.2);
   noise(0.7, 0.045, 180);
@@ -1870,17 +2201,19 @@ const startGame = (useDemo = false) => {
   multiplier = 1;
   gameTime = 0;
   demoRestartAt = 0;
-  keys.left = false;
-  keys.right = false;
-  pointers.clear();
+  resetVerification();
+  recordVerification(useDemo ? 'demo-start' : 'game-start');
+  releaseAllKeys();
   ui.title.classList.remove('visible');
   ui.pause.classList.remove('visible');
   ui.gameover.classList.remove('visible');
   resetIdol(true);
   resetBridge(true);
   resetTorrent(true);
+  resetExploration();
   resetRound();
   updateHud();
+  syncActionControls();
   announce(demoMode ? 'AUTOPILOT ONLINE' : 'THE CANYON AWAKES');
   tone(110, 0.35, 'sawtooth', 0.06, 4);
 };
@@ -1899,6 +2232,7 @@ const togglePause = (forceResume = false) => {
     ui.pause.classList.remove('visible');
     syncBridgeHud();
   }
+  syncActionControls();
 };
 
 /* ============================================================
@@ -1929,16 +2263,28 @@ const updateGame = (dt) => {
   // 左右フリッパーの同時押しで吊り橋を巻き上げる。押しっぱなしで連続発動しないよう、
   // 立ち上がりだけをラッチで拾う（Xピンボールsol の dualFlipLatched と同じ方式）。
   if (keys.left && keys.right) {
-    if (!dualFlipLatched) haulBridge();
-    dualFlipLatched = true;
+    if (!dualFlipLatched) {
+      dualFlipLatched = true;
+      haulBridge();
+    }
   } else {
     dualFlipLatched = false;
   }
 
+  refreshBridgeWindow();
+
   // 張っている時間を減らす。切れた瞬間に HUD の文言を戻す。
   if (bridgeState.timer > 0) {
     bridgeState.timer = Math.max(0, bridgeState.timer - dt);
-    if (bridgeState.timer === 0) syncBridgeHud();
+    if (bridgeState.timer === 0) {
+      if (bridgeState.status === 'armed' || bridgeState.status === 'saved' || bridgeState.status === 'flood-save') {
+        bridgeState.status = bridgeState.uses <= 0 ? 'snapped' : (bridgeState.status === 'armed' ? 'missed' : 'ready');
+        if (bridgeState.status === 'snapped' || bridgeState.status === 'missed') {
+          announce(bridgeState.status === 'snapped' ? 'THE LAST ROPE SNAPS' : 'THE VINES FALL BACK');
+        }
+      }
+      syncBridgeHud();
+    }
   }
 
   // 鉄砲水の残り時間。切れたら通常状態へ戻し、増水率を 0 から溜め直させる。
@@ -1965,8 +2311,13 @@ const updateGame = (dt) => {
     flipper.angle += step;
   });
 
-  // 高速時の貫通を防ぐためサブステップで積分する。
-  const steps = 3;
+  // 高速時の貫通を防ぐため、固定回数ではなく 1 ステップの移動量から分割する。
+  const fastest = balls.reduce((max, ball) => Math.max(max, Math.hypot(ball.vx, ball.vy)), 0);
+  const steps = clamp(
+    Math.ceil(Math.max(fastest, MAX_SPEED * 0.55) * dt / PHYSICS_TRAVEL_PER_STEP),
+    PHYSICS_MIN_STEPS,
+    PHYSICS_MAX_STEPS,
+  );
   for (let i = 0; i < steps; i += 1) {
     for (let b = 0; b < balls.length; b += 1) updateBall(balls[b], dt / steps);
   }
@@ -1981,6 +2332,8 @@ const updateGame = (dt) => {
 let inputAbort = null;
 
 const releaseAllKeys = () => {
+  keySources.left.clear();
+  keySources.right.clear();
   keys.left = false;
   keys.right = false;
   pointers.clear();
@@ -2000,11 +2353,11 @@ const keyInput = (event, pressed) => {
   }
   if (mode !== 'play' || demoMode) return;
   if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
-    keys.left = pressed;
+    setFlipperInput('left', 'keyboard-left', pressed);
     event.preventDefault();
   }
   if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
-    keys.right = pressed;
+    setFlipperInput('right', 'keyboard-right', pressed);
     event.preventDefault();
   }
   if (event.key === ' ' || event.key === 'ArrowDown') {
@@ -2016,10 +2369,12 @@ const keyInput = (event, pressed) => {
 };
 
 const releasePointer = (event) => {
-  const side = pointers.get(event.pointerId);
-  if (!side) return;
+  const input = pointers.get(event.pointerId);
+  if (!input) return;
   pointers.delete(event.pointerId);
-  if (![...pointers.values()].includes(side)) keys[side] = false;
+  // タップでも次の描画フレームで最低一度は押下状態を通す。
+  // これにより短い画面ボタン操作もキーボードと同じ物理入力になる。
+  requestAnimationFrame(() => setFlipperInput(input.side, input.source, false));
 };
 
 const bindInput = () => {
@@ -2035,12 +2390,48 @@ const bindInput = () => {
     if (mode !== 'play' || demoMode) return;
     ensureAudio();
     const side = event.clientX < window.innerWidth / 2 ? 'left' : 'right';
-    keys[side] = true;
-    pointers.set(event.pointerId, side);
+    const source = `canvas:${event.pointerId}`;
+    setFlipperInput(side, source, true);
+    pointers.set(event.pointerId, { side, source });
     canvas.setPointerCapture(event.pointerId);
   }, opt);
   canvas.addEventListener('pointerup', releasePointer, opt);
   canvas.addEventListener('pointercancel', releasePointer, opt);
+
+  // タッチ端末では、盤面を覆う HUD の下でも左右を確実に選べる明示ボタンを使う。
+  // クリック（キーボード起動）は短い押下として同じ keys 状態へ流す。
+  const bindFlipperButton = (button, side) => {
+    let lastPointerAt = 0;
+    const pulse = () => {
+      const source = `button-key-${side}`;
+      setFlipperInput(side, source, true);
+      requestAnimationFrame(() => setFlipperInput(side, source, false));
+    };
+    button.addEventListener('pointerdown', (event) => {
+      if (mode !== 'play' || demoMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      ensureAudio();
+      lastPointerAt = performance.now();
+      const source = `button-${side}:${event.pointerId}`;
+      setFlipperInput(side, source, true);
+      pointers.set(event.pointerId, { side, source });
+      button.setPointerCapture(event.pointerId);
+    }, opt);
+    const release = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      releasePointer(event);
+    };
+    button.addEventListener('pointerup', release, opt);
+    button.addEventListener('pointercancel', release, opt);
+    button.addEventListener('click', () => {
+      if (mode !== 'play' || demoMode || performance.now() - lastPointerAt < 550) return;
+      pulse();
+    }, opt);
+  };
+  bindFlipperButton(ui.flipperLeft, 'left');
+  bindFlipperButton(ui.flipperRight, 'right');
 
   // 発射ボタンは押している間ためて、離した強さで打ち出す。
   ui.launch.addEventListener('pointerdown', (event) => {
@@ -2070,17 +2461,19 @@ const bindInput = () => {
 
   // 吊り橋ボタン。専用の経路は作らず、左右フリッパーの同時押しとして keys へ流す。
   // 巻き上げの判定は updateGame のラッチ 1 箇所だけに残す。
-  const bridgePress = (down) => {
+  let bridgePointerAt = 0;
+  const bridgePress = (down, source = 'bridge-button') => {
     if (mode !== 'play' || demoMode) return;
-    keys.left = down;
-    keys.right = down;
+    setFlipperInput('left', source, down);
+    setFlipperInput('right', source, down);
   };
   ui.bridge.addEventListener('pointerdown', (event) => {
     event.preventDefault();
     event.stopPropagation();
     ensureAudio();
-    bridgePress(true);
+    bridgePointerAt = performance.now();
     bridgePointerId = event.pointerId;
+    bridgePress(true, `bridge:${event.pointerId}`);
     ui.bridge.setPointerCapture(event.pointerId);
   }, opt);
   const releaseBridgePointer = (event) => {
@@ -2088,21 +2481,30 @@ const bindInput = () => {
     event.preventDefault();
     event.stopPropagation();
     bridgePointerId = null;
-    bridgePress(false);
+    bridgePress(false, `bridge:${event.pointerId}`);
   };
   ui.bridge.addEventListener('pointerup', releaseBridgePointer, opt);
   ui.bridge.addEventListener('pointercancel', releaseBridgePointer, opt);
-  // ポインターを持たない環境向けの保険。pointerup 後の click は
-  // 張っている最中なので haulBridge() 側で空振りになり、二重に縄を減らさない。
-  ui.bridge.addEventListener('click', () => { if (mode === 'play' && !demoMode) haulBridge(); }, opt);
+  // キーボードでボタンを起動した場合も、物理入力と同じ keys の同時押しへ流す。
+  ui.bridge.addEventListener('click', () => {
+    if (mode !== 'play' || demoMode || performance.now() - bridgePointerAt < 550) return;
+    bridgePress(true, 'bridge-key');
+    requestAnimationFrame(() => bridgePress(false, 'bridge-key'));
+  }, opt);
 
   el('#start').addEventListener('click', () => startGame(false), opt);
   el('#demo-start').addEventListener('click', () => startGame(true), opt);
   el('#restart').addEventListener('click', () => startGame(false), opt);
   el('#resume').addEventListener('click', () => togglePause(true), opt);
+  ui.pauseButton.addEventListener('click', () => {
+    if (mode !== 'play' && mode !== 'paused') return;
+    ensureAudio();
+    togglePause();
+  }, opt);
   ui.sound.addEventListener('click', () => {
     muted = !muted;
     ui.sound.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
+    syncActionControls();
     if (!muted) tone(420, 0.08, 'square', 0.025, 1.4);
   }, opt);
 };
@@ -2464,6 +2866,8 @@ const disposeAll = () => {
     inputAbort = null;
   }
   clearTimeout(announceTimer);
+  clearTimeout(explorationAdvanceTimer);
+  explorationAdvanceTimer = 0;
   clearTimeout(autoDemoTimer);
   autoDemoTimer = 0;
   if (audio) {
@@ -2516,6 +2920,7 @@ const init = () => {
   ready = true;
 
   updateHud();
+  syncActionControls();
   syncIdolHud();
   syncBridgeHud();
   syncTorrentHud();
@@ -2603,6 +3008,7 @@ window.XPinballOpusStage = {
       ready,
       running: raf !== 0,
       disposed,
+      loop: { ready, running: raf !== 0, disposed },
       revision: THREE.REVISION,
       frames: frameCount,
       elapsed: Number(elapsed.toFixed(2)),
@@ -2624,15 +3030,55 @@ window.XPinballOpusStage = {
       ball: { x: Math.round(ballBoard.x), y: Math.round(ballBoard.y), external: externalBall },
       shake: Number(view.shake.toFixed(3)),
       board: { w: BOARD_W, h: BOARD_H, scale: SCALE },
+      // 3D の描画状態と、同じ通常経路を通過した盤上ギミックの要約を並べる。
+      // 詳細は XPinballOpus.getState() に残し、ここでは自動確認の判定に必要な
+      // 事実だけを公開する。読み取り専用であり、盤面状態は変更しない。
+      game: {
+        explorationStage: explorationState.stage,
+        idolAwake: idolState.awake,
+        bridgeRescues: bridgeState.saves,
+        floodStarts: torrentState.floods,
+        boulderEntries: verificationState.entries,
+        verification: verificationSnapshot().checks,
+      },
     };
   },
 };
 
 /* ============================================================
    盤の読み取り / 操作 API
-   自動確認から球の位置と速度を追えるようにする。
-   （ギミック・得点の probe 系は後続ステップで足す）
+   自動確認から通常プレイで起きたギミックを判定できるようにする。
+   操作は発射・フリッパー入力・ポーズの既存経路だけを呼び、状態を直接変更しない。
    ============================================================ */
+
+const verificationSnapshot = () => ({
+  run: verificationState.run,
+  entries: verificationState.entries,
+  bridgeRescues: verificationState.bridgeRescues,
+  floodStarts: verificationState.floodStarts,
+  explorationRewards: verificationState.explorationRewards,
+  checks: {
+    boulderEntered: verificationState.entries > 0,
+    bridgeRescued: verificationState.bridgeRescues > 0,
+    floodStarted: verificationState.floodStarts > 0,
+    explorationRewardedOnce: verificationState.explorationRewards === 1,
+  },
+  events: verificationState.events.map((event) => ({ ...event })),
+});
+
+// 両フリッパー同時押しを、画面の吊り橋ボタンと同じ入力経路へ流す。
+// 成功や救出を強制しないので、橋を張る時機と物理判定は通常プレイと共通になる。
+const tapBridgeFromApi = () => {
+  if (mode !== 'play' || demoMode) return false;
+  const source = 'api-bridge';
+  setFlipperInput('left', source, true);
+  setFlipperInput('right', source, true);
+  requestAnimationFrame(() => {
+    setFlipperInput('left', source, false);
+    setFlipperInput('right', source, false);
+  });
+  return true;
+};
 
 window.XPinballOpus = {
   getState: () => ({
@@ -2701,10 +3147,38 @@ window.XPinballOpus = {
       flow: Number(torrentState.flow.toFixed(3)),
       flash: Number(torrentState.flash.toFixed(3)),
     },
+    exploration: {
+      stage: explorationState.stage,
+      total: 3,
+      completed: explorationState.stage === 3,
+      advancedAt: Number(explorationState.advancedAt.toFixed(3)),
+      rewarded: explorationState.rewarded,
+      rewardPoints: explorationState.rewardPoints,
+      rewardedAt: Number(explorationState.rewardedAt.toFixed(3)),
+      sources: {
+        idolAwakened: idolState.cycles > 0,
+        bridgeRescued: bridgeState.expeditionSaved,
+        floodStarted: torrentState.floods > 0,
+      },
+    },
+    rocks: {
+      active: balls.length,
+      maximum: ECHO_BOULDER_TOTAL_MAX,
+      enteredNow: balls.filter((ball) => ball.entered).length,
+      entering: balls.filter((ball) => ball.launchGuide).length,
+      entries: verificationState.entries,
+    },
+    verification: verificationSnapshot(),
   }),
+  getVerification: verificationSnapshot,
   startGame: () => startGame(false),
   startDemo: () => startGame(true),
   launch: (power = 1) => launchBall(power),
   pause: () => togglePause(),
-  press: (side, down) => { if (side === 'left' || side === 'right') keys[side] = Boolean(down); },
+  press: (side, down) => {
+    if (side !== 'left' && side !== 'right' || mode !== 'play' || demoMode) return false;
+    setFlipperInput(side, `api-${side}`, Boolean(down));
+    return true;
+  },
+  tapBridge: tapBridgeFromApi,
 };

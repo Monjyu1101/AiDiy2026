@@ -39,6 +39,12 @@ MCP_URL = "http://localhost:8095/aidiy_code_agents/run"
 通知音URL = "http://localhost:8095/aidiy_notification_sounds/play"
 TASK_AI_NAME既定 = "claude_cli"
 TASK_AI_MODEL既定 = "auto"
+# 1ステップの実行タイムアウト秒。tasks_watcher.実行タイムアウト分（既定60分）と揃える。
+# 明示的に渡さないと aidiy_code_agents 側の既定値（30分）で先に打ち切られる。
+CODE実行タイムアウト秒 = 3600
+# HTTP 側は code_agents のタイムアウトが先に効くよう少し長く取る
+# （HTTP が先に切れると、AI からの結果もエラー理由も受け取れないため）
+CODE実行HTTPタイムアウト秒 = CODE実行タイムアウト秒 + 300
 
 タスクID = ""
 明細SEQ = 0
@@ -274,10 +280,11 @@ def main() -> int:
                 "prompt": プロンプト生成(タスクタイトル, 全明細, 対象, 完了明細, 前回失敗理由),
                 "ai_name": task_ai_name,
                 "ai_model": task_ai_model,
+                "timeout_sec": CODE実行タイムアウト秒,
             }
             if プロジェクト:
                 payload["project_path"] = プロジェクト
-            res = POST送信(MCP_URL, payload)
+            res = POST送信(MCP_URL, payload, timeout=CODE実行HTTPタイムアウト秒)
             ログ(f"code_agents run 応答: {json.dumps(res, ensure_ascii=False)[:500]}")
 
             失敗理由 = ""

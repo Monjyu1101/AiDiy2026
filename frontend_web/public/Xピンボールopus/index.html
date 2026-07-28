@@ -15,7 +15,7 @@
   <main id="stage" aria-label="Xピンボールopus 大渓谷">
     <canvas id="game"></canvas>
     <div id="load-error" class="load-error">
-      3D 渓谷を読み込み中です。表示されない場合はネットワーク接続を確認してください。
+      3D 渓谷を読み込み中です。表示されない場合は WebGL が有効か確認してください。
     </div>
   </main>
 
@@ -43,7 +43,7 @@
   <aside id="rope-status" aria-label="吊り橋の縄の耐久">
     <span>ROPE BRIDGE</span><strong id="rope-value">3</strong>
     <div class="rope-track"><i id="rope-bar"></i></div>
-    <em id="rope-hint">CATCHES THE FALL</em>
+    <em id="rope-hint">WATCH THE FALL</em>
   </aside>
 
   <aside id="idol-status" aria-label="黄金像ターゲット">
@@ -54,10 +54,22 @@
     <em id="idol-hint">AWAKEN THE GOLD</em>
   </aside>
 
-  <div id="controls">A / ← LEFT　　D / → RIGHT　　BOTH = HAUL BRIDGE　　SPACE / ↓ RELEASE　　P PAUSE</div>
+  <aside id="exploration-status" class="stage-0" aria-label="峡谷探索の進行" aria-live="polite">
+    <div class="exploration-heading"><span>CANYON EXPEDITION</span><b id="exploration-count">0 / 3</b></div>
+    <div class="exploration-steps" aria-hidden="true"><i></i><i></i><i></i></div>
+    <strong id="exploration-stage">第一踏査</strong>
+    <b id="exploration-goal">黄金像を目覚めさせる</b>
+    <em id="exploration-condition">遺跡ゲートを撃ち抜き I・D・O・L を灯せ　0 / 4</em>
+    <span id="exploration-reward">報酬　基礎倍率 +1 ・ 12,000 × 実効倍率</span>
+  </aside>
+
+  <div id="controls">A / ← LEFT　　D / → RIGHT　　← + → WHEN ROCK FALLS = HAUL BRIDGE　　SPACE / ↓ RELEASE　　P PAUSE</div>
+  <button id="flipper-left" class="flipper-control" type="button" aria-label="左フリッパー" aria-keyshortcuts="A ArrowLeft"><span>LEFT</span>FLIP</button>
+  <button id="flipper-right" class="flipper-control" type="button" aria-label="右フリッパー" aria-keyshortcuts="D ArrowRight"><span>RIGHT</span>FLIP</button>
   <button id="launch" type="button" aria-label="盤右側の岩山から岩球を解放"><span>HOLD</span>RELEASE</button>
   <button id="bridge" type="button" aria-label="吊り橋を巻き上げる"><span>DUAL FLIP</span>HAUL</button>
-  <button id="sound" type="button" aria-label="サウンド切り替え">SOUND ON</button>
+  <button id="pause" type="button" aria-label="ゲームを一時停止" aria-keyshortcuts="P Escape">PAUSE</button>
+  <button id="sound" type="button" aria-label="サウンド切り替え" aria-pressed="true">SOUND ON</button>
 
   <div id="title-screen" class="overlay visible">
     <div class="canyon-logo"><i></i><i></i><i></i><b>◎</b></div>

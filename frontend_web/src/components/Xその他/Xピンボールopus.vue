@@ -44,12 +44,17 @@ const 戻る = () => {
 </template>
 
 <style scoped>
-.page-container { width: 100%; height: 100%; min-height: 620px; display: flex; flex-direction: column; background: #120c07; }
+.page-container { width: 100%; height: 100%; min-height: min(620px, 100dvh); display: flex; flex-direction: column; background: #120c07; }
 .page-title { height: 35px; min-height: 35px; margin: 0 0 5px; padding: 8px 20px 8px 40px; display: flex; align-items: center; color: #ffe6ba; font-size: 14px; background: linear-gradient(90deg, #160e08, #4b2b13, #112c35); box-shadow: 0 2px 12px rgba(201, 136, 74, .3); }
 .page-title span { flex: 1; }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .page-title button { border: 1px solid #d99a57; background: #29180c; color: #fff0d2; cursor: pointer; padding: 3px 12px; }
 .page-title button:hover { background: #573117; box-shadow: 0 0 10px #e0a35c; }
-.iframe-wrapper { width: 100%; flex: 1; min-height: 585px; }
+.iframe-wrapper { width: 100%; flex: 1; min-height: min(585px, calc(100dvh - 40px)); }
 .game-frame { display: block; width: 100%; height: 100%; border: 0; }
+
+@media (max-height: 520px) {
+  .page-container { min-height: 360px; }
+  .iframe-wrapper { min-height: 320px; }
+}
 </style>

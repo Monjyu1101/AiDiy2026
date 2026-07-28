@@ -318,7 +318,7 @@ class CodeAI:
     
         
     
-    async def 実行(self, 要求テキスト: str, タイムアウト秒数: int = 1200,
+    async def 実行(self, 要求テキスト: str, タイムアウト秒数: int = 1800,
                    resume: bool = True, 読取専用: bool = False, 絶対パス: str = None, file_path: str = None, 変更ファイル一覧: list = None, 再プラン要求: bool = False) -> str:
         """
         Claude Agent SDK実行（セッション.chatメソッド使用）

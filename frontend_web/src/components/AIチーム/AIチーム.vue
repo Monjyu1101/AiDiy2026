@@ -46,6 +46,8 @@ let 要員更新Timer: ReturnType<typeof setInterval> | null = null;
 let 要員取得中 = false;
 // チーム空間の掲示板に出す「最終更新のチーム目標」と、その保守ダイアログ
 const チーム目標 = ref<チーム目標 | null>(null);
+// 改善ループが動いているか（掲示板と同じ5秒周期で更新。ネオン点灯の切り替えに使う）
+const 改善実行中 = ref(false);
 const 目標編集表示 = ref(false);
 
 const 選択中エージェント = computed(
@@ -164,14 +166,18 @@ const チーム目標を読み込む = async () => {
     if (response.data?.status !== 'OK') return;
     const item = response.data.data?.item as チーム目標 | undefined;
     チーム目標.value = item && item.CODE_BASE_PATH ? item : null;
+    改善実行中.value = Boolean(チーム目標.value) && Boolean(response.data.data?.改善実行中);
   } catch {
     // 掲示板は表示だけなので、取得できないときは未登録扱いにする
     チーム目標.value = null;
+    改善実行中.value = false;
   }
 };
 
 const 目標保存後 = (item: チーム目標) => {
   チーム目標.value = item;
+  // 保存で改善ループのON/OFFやループ回数が変わるため、実行中かどうかを取り直す
+  void チーム目標を読み込む();
 };
 
 // 掲示板に出ているプロジェクト。経験一覧・改善一覧はこのパスの分だけを表示する
@@ -183,7 +189,11 @@ onMounted(() => {
   void 要員一覧を読み込む();
   void チーム目標を読み込む();
   // 自動更新は画面を維持したままバックグラウンドで行う。
-  要員更新Timer = setInterval(() => void 要員一覧を読み込む(false), 5000);
+  // 掲示板も同じ周期で読み直し、改善ループの進捗（ループ数・最終段の件数）を最新にする。
+  要員更新Timer = setInterval(() => {
+    void 要員一覧を読み込む(false);
+    void チーム目標を読み込む();
+  }, 5000);
 });
 
 onBeforeUnmount(() => {
@@ -225,6 +235,7 @@ onBeforeUnmount(() => {
         :要員読込中="要員読込中"
         :要員読込エラー="要員読込エラー"
         :チーム目標="チーム目標"
+        :改善実行中="改善実行中"
         @retry="要員一覧を読み込む"
         @目標クリック="目標編集表示 = true"
       />
