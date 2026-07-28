@@ -413,8 +413,8 @@ const 草地テクスチャを作る = (): THREE.Texture | null => {
   return texture;
 };
 
-// 丘は地面に埋まった半球なので、足元（xz平面）では楕円の障害物として扱う
-const 丘一覧: Array<{ x: number; z: number; rx: number; rz: number }> = [];
+// 丘は「潰した半球」なので、足元（xz平面）の位置から表面の高さを楕円体の式で逆算できる
+const 丘一覧: Array<{ x: number; z: number; rx: number; ry: number; rz: number }> = [];
 
 /** 指定位置が丘の footprint（楕円）の中かどうか。余裕を足すと少し広めに判定する */
 const 丘と重なる = (x: number, z: number, 余裕 = 0) =>
@@ -424,20 +424,23 @@ const 丘と重なる = (x: number, z: number, 余裕 = 0) =>
     return nx * nx + nz * nz < 1;
   });
 
-/** 丘の中に入っていたら、中心から見た同じ方向のまま楕円の外縁まで押し出す */
-const 丘の外へ押し出す = (x: number, z: number, 余裕 = 0): [number, number] => {
+/**
+ * 指定位置での丘の表面高さ（地面 y=0 基準）。
+ * 丘は中心 y=-0.6 に置いた単位半球を非一様スケールした楕円体なので、
+ * 足元の (x,z) を楕円体の断面に当てはめて y を求める。footprint の外や
+ * 丘の縁（半球の -0.6 側で地面より低くなる部分）では 0 を返し、平地と滑らかにつながる
+ */
+const 丘の高さ = (x: number, z: number): number => {
+  let 最大高さ = 0;
   for (const 丘 of 丘一覧) {
-    const dx = x - 丘.x;
-    const dz = z - 丘.z;
-    const nx = dx / (丘.rx + 余裕);
-    const nz = dz / (丘.rz + 余裕);
-    const 距離 = Math.hypot(nx, nz);
-    if (距離 > 0.0001 && 距離 < 1) {
-      x = 丘.x + dx / 距離;
-      z = 丘.z + dz / 距離;
-    }
+    const nx = (x - 丘.x) / 丘.rx;
+    const nz = (z - 丘.z) / 丘.rz;
+    const 二乗和 = nx * nx + nz * nz;
+    if (二乗和 >= 1) continue;
+    const 高さ = -0.6 + Math.sqrt(1 - 二乗和) * 丘.ry;
+    if (高さ > 最大高さ) 最大高さ = 高さ;
   }
-  return [x, z];
+  return 最大高さ;
 };
 
 const 草原を作る = () => {
@@ -466,7 +469,13 @@ const 草原を作る = () => {
     hill.position.set(Math.cos(角度) * 距離, -0.6, Math.sin(角度) * 距離);
     hill.scale.set(19 + 乱数() * 13, 3.0 + 乱数() * 3.2, 16 + 乱数() * 11);
     scene.add(hill);
-    丘一覧.push({ x: hill.position.x, z: hill.position.z, rx: hill.scale.x, rz: hill.scale.z });
+    丘一覧.push({
+      x: hill.position.x,
+      z: hill.position.z,
+      rx: hill.scale.x,
+      ry: hill.scale.y,
+      rz: hill.scale.z,
+    });
   }
 };
 
@@ -2199,16 +2208,15 @@ const 一人称を進める = (delta: number, 時刻: number) => {
       const 進z = 一人称設定.向き符号 * Math.cos(group.rotation.y);
       group.position.x += 進x * 実速さ * delta;
       group.position.z += 進z * 実速さ * delta;
-      // 丘は登れないので、土の中を突っ切らないよう外縁で止める
-      const [押し出しx, 押し出しz] = 丘の外へ押し出す(group.position.x, group.position.z, 0.6);
-      group.position.x = 押し出しx;
-      group.position.z = 押し出しz;
       const 中心距離 = Math.hypot(group.position.x, group.position.z);
       if (中心距離 > 一人称行動半径) {
         group.position.x *= 一人称行動半径 / 中心距離;
         group.position.z *= 一人称行動半径 / 中心距離;
       }
     }
+    // 丘の斜面に合わせて滑らかに登り降りする（止まっているあいだも高さは追従させる）
+    const 丘の目標高さ = 丘の高さ(group.position.x, group.position.z);
+    group.position.y = THREE.MathUtils.lerp(group.position.y, 丘の目標高さ, Math.min(1, delta * 6));
 
     // 見た目づくりには「進もうとしている速さ」を渡す。
     // 実際に進んだ量を渡すと、着地している間に跳ぶのをやめてしまう
