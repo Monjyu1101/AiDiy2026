@@ -70,20 +70,20 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
         # タイマー起動前: 停止中に期限が到来した実行条件は発火させず次周期へ更新する
         await asyncio.to_thread(tasks_watcher.起動時実行条件初期化, logger)
 
-        watcher = asyncio.create_task(tasks_watcher.監視ループ(logger), name="backend_task_ai_watcher")
-        条件watcher = asyncio.create_task(
-            tasks_watcher.実行条件監視ループ(logger), name="backend_task_condition_watcher"
-        )
+        tasks = [
+            asyncio.create_task(tasks_watcher.起動監視ループ(logger), name="backend_task_launch_watcher"),
+            asyncio.create_task(tasks_watcher.状態監視ループ(logger), name="backend_task_status_watcher"),
+        ]
         logger.info(
-            "backend_task を開始しました (明細起動=%ss, 実行条件確認=%ss)",
-            tasks_watcher.監視間隔秒, tasks_watcher.実行条件監視間隔秒,
+            "backend_task を開始しました (起動監視=%ss, 状態監視=%ss)",
+            tasks_watcher.起動監視間隔秒, tasks_watcher.状態監視間隔秒,
         )
         try:
             yield
         finally:
-            for task in (watcher, 条件watcher):
+            for task in tasks:
                 task.cancel()
-            for task in (watcher, 条件watcher):
+            for task in tasks:
                 try:
                     await task
                 except asyncio.CancelledError:

@@ -13,7 +13,7 @@ Team Agents モジュール
 
 backend_team の HTTP API に疎結合で接続し、Aチーム作業レコードを追加する。
 DB 直書きや backend_team の import は行わない。
-登録された作業は backend_team の監視ループが拾い、AIタスク要求へ投入する。
+登録された作業は backend_team の起動監視ループが拾い、AIタスク要求へ投入する。
 """
 
 from __future__ import annotations

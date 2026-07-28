@@ -43,7 +43,9 @@ def 現在日時ISO() -> str:
 
 
 class チームストア:
-    """仮実装用のインメモリチーム状態。DB永続化は次段階で追加する。"""
+    """AIチーム表示（アバター）用のインメモリ状態。位置・雑談演出は非永続だが、
+    状態そのものは team_status_db の実データ（実行中・まとめ中など）に連動する。
+    """
 
     def __init__(self) -> None:
         self._lock = RLock()
@@ -308,11 +310,11 @@ class チームストア:
 
 
 async def シミュレーションループ(logger) -> None:
-    logger.info("backend_team モックシミュレーションを開始しました")
+    logger.info("backend_team のAIチーム表示シミュレーションを開始しました")
     try:
         while True:
             await asyncio.sleep(8)
             ストア.進行()
     except asyncio.CancelledError:
-        logger.info("backend_team モックシミュレーションを停止しました")
+        logger.info("backend_team のAIチーム表示シミュレーションを停止しました")
         raise

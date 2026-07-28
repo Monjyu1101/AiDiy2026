@@ -65,7 +65,7 @@ def 接続取得() -> sqlite3.Connection:
 def 初期化() -> None:
     """テーブル作成を行う。多重呼び出し可。"""
     # CREATE TABLE は IF NOT EXISTS でも書き込みロックを取るため、
-    # 監視ループのように毎回呼ばれる経路で実行すると "database is locked" を招く。
+    # 起動監視ループのように毎回呼ばれる経路で実行すると "database is locked" を招く。
     # プロセス内で一度成功したら以降は何もしない。
     global _初期化済み
     if _初期化済み:

@@ -10,7 +10,7 @@
 
 """タスク明細の 1 ステップ実行サブプロセス。
 
-監視ループが `python sub_proc.py <タスクID> <SEQ>` で起動する。
+起動監視ループが `python sub_proc.py <タスクID> <SEQ>` で起動する。
 ローカルの temp/input・temp/output JSON には依存せず、タスクID と SEQ だけで完結する。
 標準ライブラリのみで動作する。
 

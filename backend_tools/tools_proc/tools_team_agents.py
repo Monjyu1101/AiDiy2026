@@ -66,7 +66,7 @@ def register_tools(mcp_te, team_agents):
         """
         backend_team の Aチーム作業へ非同期作業を投入する。
         登録だけを行い、AIタスク要求への投入や実行完了は待たない
-        （登録後は backend_team の監視ループが AIタスク要求へ投入する）。
+        （登録後は backend_team の起動監視ループが AIタスク要求へ投入する）。
         作業IDは backend_team が TW+8桁で自動採番する。
         project_path / team_ai_name / team_ai_model / task_ai_name / task_ai_model は通常指定不要。
         未指定なら AIチーム画面の新規時と同じ条件

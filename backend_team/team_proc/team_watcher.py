@@ -10,17 +10,19 @@
 
 """Aチーム作業の監視ループとプロセス管理。
 
-- 5秒間隔でチーム作業を確認し、投入待ち（準備開始・未投入）を見つけたら
+タイマーは2本（backend_task/tasks_watcher.py と同じ構成、詳細は各ループの docstring 参照）。
+
+- 起動監視タイマー = 起動監視ループ（5秒間隔）: 投入待ち（準備開始・未投入）を見つけたら
   temp/input/<作業ID>.json を出力して sub_init.py を subprocess 起動する。
   起動時に準備中へ進め、PID・開始日時・実行回数を記録する。
-- 開始してから無進捗タイムアウト分（既定30分）以上ひとつも進捗が無い作業は、hh:mm が
-  変わった監視回だけ（毎分1回）強制停止してエラーにする。状態='準備中'（sub_init.py に
-  よる担当選択とAIタスク投入）だけは準備無進捗タイムアウト分（既定10分）で見る。
-- 毎分1回、終わった Aチーム作業に対応する未終了の改善レコードを回収する
-  （改善ループのオン・オフに関わらず行う）。
-- 毎分1回、Aチーム目標の改善ループ（PDCA）も確認する。実行中の要員がいない空き時間で、
-  前の段が終わっていれば次の段を、目標のパターン（SPDCA/PlanDo）に対応する
-  sub_SPDCA_*.py / sub_PlanDo_*.py で投入する。
+- 状態監視タイマー = 状態監視ループ（10秒間隔、実際の確認は hh:mm 変化時＝毎分1回）:
+  - 開始してから無進捗タイムアウト分（既定30分）以上ひとつも進捗が無い作業を強制停止してエラーにする。
+    状態='準備中'（sub_init.py による担当選択とAIタスク投入）だけは準備無進捗タイムアウト分（既定10分）で見る。
+  - 終わった Aチーム作業に対応する未終了の改善レコードを回収する
+    （改善ループのオン・オフに関わらず行う）。
+  - Aチーム目標の改善ループ（PDCA）も確認する。実行中の要員がいない空き時間で、
+    前の段が終わっていれば次の段を、目標のパターン（SPDCA/PlanDo）に対応する
+    sub_SPDCA_*.py / sub_PlanDo_*.py で投入する。
 - システム開始時（再起動含む）は、テーブルに残った未投入の作業をエラーとして記録しクリアする
   （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
@@ -39,7 +41,8 @@ from pathlib import Path
 
 from . import team_exp_db, team_goal_db, team_pdca_db, team_status_db, team_work_db
 
-監視間隔秒 = 5
+起動監視間隔秒 = 5
+状態監視間隔秒 = 10
 実行回数上限 = 3
 
 _BASE_DIR = Path(__file__).resolve().parents[1]
@@ -62,7 +65,7 @@ _SUB_PDCAパス = {
 }
 _改善入力DIR = _BASE_DIR / "temp" / "pdca"
 
-# 無進捗タイムアウトの確認は hh:mm が変わった監視回だけ処理する（毎分 1 回）
+# 状態監視タイマーの本処理は hh:mm が変わった確認回だけ処理する（毎分 1 回）
 _前回確認分 = ""
 # 起動中の改善ループ投入プロセス（前回分が動いている間は次を投入しない）
 _改善プロセス: subprocess.Popen | None = None
@@ -207,7 +210,7 @@ def _作業実行開始(行: dict, logger: logging.Logger) -> None:
 def _タイムアウト確認(logger: logging.Logger) -> None:
     """開始してから無進捗タイムアウト分以上ひとつも進捗が無い作業を強制停止してエラーにする。
 
-    監視ループ（5秒間隔）から、hh:mm が変わった回だけ（毎分1回）呼ばれる。
+    状態監視ループ（hh:mm が変わった回だけ、毎分1回）から呼ばれる。
     """
     try:
         タイムアウト対象 = team_work_db.作業タイムアウト対象一覧(
@@ -424,27 +427,46 @@ def _改善ループ確認(logger: logging.Logger) -> None:
         logger.exception("改善ループの確認でエラーが発生しました")
 
 
-def _監視1回(logger: logging.Logger) -> None:
-    global _前回確認分
-    現在分 = datetime.now().strftime("%Y-%m-%d %H:%M")
-    if 現在分 != _前回確認分:
-        _前回確認分 = 現在分
-        _タイムアウト確認(logger)
-        _経験生成確認(logger)
-        # 回収は改善ループのオン・オフに関わらず行い、そのうえで次の段の投入を判断する
-        _改善回収(logger)
-        _改善ループ確認(logger)
-
+def _起動監視1回(logger: logging.Logger) -> None:
     # --- 投入待ち（準備開始・未投入）→ 準備中 + sub_init.pyでAIタスク投入 ---
     for 行 in team_work_db.投入待ち一覧():
         _作業実行開始(行, logger)
 
 
-async def 監視ループ(logger: logging.Logger) -> None:
-    logger.info(f"チーム作業監視ループを開始しました (interval={監視間隔秒}s)")
+def _状態監視1回(logger: logging.Logger) -> None:
+    global _前回確認分
+    現在分 = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if 現在分 == _前回確認分:
+        return
+    _前回確認分 = 現在分
+    _タイムアウト確認(logger)
+    _経験生成確認(logger)
+    # 回収は改善ループのオン・オフに関わらず行い、そのうえで次の段の投入を判断する
+    _改善回収(logger)
+    _改善ループ確認(logger)
+
+
+async def 起動監視ループ(logger: logging.Logger) -> None:
+    """起動監視タイマー：投入待ちの作業を見つけて sub_init.py を起動する（5秒間隔）。"""
+    logger.info(f"チーム作業の起動監視ループを開始しました (interval={起動監視間隔秒}s)")
     while True:
         try:
-            await asyncio.to_thread(_監視1回, logger)
+            await asyncio.to_thread(_起動監視1回, logger)
         except Exception:
-            logger.exception("チーム作業監視ループでエラーが発生しました")
-        await asyncio.sleep(監視間隔秒)
+            logger.exception("チーム作業の起動監視ループでエラーが発生しました")
+        await asyncio.sleep(起動監視間隔秒)
+
+
+async def 状態監視ループ(logger: logging.Logger) -> None:
+    """状態監視タイマー：無進捗タイムアウト・経験生成・改善ループを確認する。
+
+    起動（5 秒間隔の 起動監視ループ）とは分離して 10 秒間隔で回すが、本処理は
+    hh:mm が変わった監視回だけ（毎分 1 回）行う。
+    """
+    logger.info(f"チーム作業の状態監視ループを開始しました (interval={状態監視間隔秒}s)")
+    while True:
+        try:
+            await asyncio.to_thread(_状態監視1回, logger)
+        except Exception:
+            logger.exception("チーム作業の状態監視ループでエラーが発生しました")
+        await asyncio.sleep(状態監視間隔秒)

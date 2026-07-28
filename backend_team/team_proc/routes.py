@@ -12,29 +12,26 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi import APIRouter
+
+from .runtime import now_hms
 
 router = APIRouter()
 
 
 @router.get("/")
-async def root() -> dict:
+async def root() -> dict[str, str]:
     return {
         "status": "OK",
         "message": "backend_team is running",
-        "data": {
-            "service": "backend_team",
-            "time": datetime.now().astimezone().isoformat(timespec="seconds"),
-        },
+        "time": now_hms(),
     }
 
 
 @router.get("/health")
-async def health() -> dict:
+async def health() -> dict[str, str]:
     return {
         "status": "OK",
-        "message": "healthy",
-        "data": {"service": "backend_team"},
+        "service": "backend_team",
+        "time": now_hms(),
     }

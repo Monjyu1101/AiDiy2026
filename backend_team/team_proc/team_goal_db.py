@@ -86,6 +86,7 @@ def 初期化() -> None:
             CREATE TABLE IF NOT EXISTS "{目標テーブル}" (
                 CODE_BASE_PATH TEXT NOT NULL PRIMARY KEY,
                 チーム目標 TEXT NOT NULL DEFAULT '',
+                自己ループ INTEGER NOT NULL DEFAULT 0,
                 改善ループ INTEGER NOT NULL DEFAULT 0,
                 最大ループ回数 INTEGER NOT NULL DEFAULT 1,
                 動員要員数 INTEGER NOT NULL DEFAULT 2,
@@ -105,36 +106,6 @@ def 初期化() -> None:
                 更新端末ID TEXT NOT NULL
             )
         """)
-        # 既存DBには 改善ループ 列が無いため、無い場合だけ追加する（既定はオフ）。
-        既存列 = {row["name"] for row in conn.execute(f'PRAGMA table_info("{目標テーブル}")')}
-        if "改善ループ" not in 既存列:
-            conn.execute(
-                f'ALTER TABLE "{目標テーブル}" ADD COLUMN 改善ループ INTEGER NOT NULL DEFAULT 0'
-            )
-        if "最大ループ回数" not in 既存列:
-            conn.execute(
-                f'ALTER TABLE "{目標テーブル}" ADD COLUMN 最大ループ回数 INTEGER NOT NULL DEFAULT 1'
-            )
-        if "動員要員数" not in 既存列:
-            conn.execute(
-                f'ALTER TABLE "{目標テーブル}" ADD COLUMN 動員要員数 INTEGER NOT NULL DEFAULT 2'
-            )
-        if "パターン" not in 既存列:
-            conn.execute(
-                f"ALTER TABLE \"{目標テーブル}\" ADD COLUMN パターン TEXT NOT NULL DEFAULT '{既定パターン}'"
-            )
-        # AI設定列は後から足したため、既存DBには無い。既定値付きで追加する
-        AI設定既定 = {
-            "TEAM_AI_NAME": 既定TEAM_AI_NAME,
-            "TEAM_AI_MODEL": 既定TEAM_AI_MODEL,
-            "TASK_AI_NAME": 既定TASK_AI_NAME,
-            "TASK_AI_MODEL": 既定TASK_AI_MODEL,
-        }
-        for 列名, 既定値 in AI設定既定.items():
-            if 列名 not in 既存列:
-                conn.execute(
-                    f"ALTER TABLE \"{目標テーブル}\" ADD COLUMN {列名} TEXT NOT NULL DEFAULT '{既定値}'"
-                )
         conn.commit()
     finally:
         conn.close()
@@ -165,6 +136,24 @@ def 初期目標を投入() -> None:
             ),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def 起動時自己ループをオフ() -> int:
+    """backend_team 起動時、オンの自己ループをすべてオフへ戻す。
+
+    これは人による目標編集ではなく起動時の安全解除なので、更新日時・更新連番・監査項目は
+    変更しない。これにより、掲示板の最終目標の表示順も起動だけでは変化しない。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        cursor = conn.execute(
+            f'UPDATE "{目標テーブル}" SET 自己ループ = 0 WHERE 自己ループ != 0'
+        )
+        conn.commit()
+        return max(0, int(cursor.rowcount))
     finally:
         conn.close()
 

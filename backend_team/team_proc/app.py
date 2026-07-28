@@ -8,6 +8,10 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
+"""backend_team の FastAPI アプリ生成。"""
+
+from __future__ import annotations
+
 from fastapi import FastAPI
 
 from log_config import get_logger
@@ -19,19 +23,18 @@ from .team_api import router as team_router
 
 def create_app() -> FastAPI:
     logger = get_logger("team_main")
-    app = FastAPI(
+    team_app = FastAPI(
         title="AiDiy Backend Team",
-        description="複数AIエージェントのチーム活動を表現する仮実装API",
-        version="0.1.0-mock",
+        version="0.1.0",
         openapi_tags=[
-            {"name": "default", "description": "backend_team の稼働確認"},
-            {"name": "AIチーム", "description": "エージェントの状態、召喚、活動履歴のモックAPI"},
-            {"name": "チーム要員", "description": "Aチーム要員の保守API"},
-            {"name": "チーム作業", "description": "Aチーム作業の保守API"},
+            {"name": "default", "description": "backend_team の稼働確認 API"},
+            {"name": "AIチーム", "description": "エージェントの状態、召喚、活動履歴 API"},
+            {"name": "チーム要員", "description": "Aチーム要員の保守 API"},
+            {"name": "チーム作業", "description": "Aチーム作業の保守 API"},
         ],
         lifespan=build_lifespan(logger),
     )
-    app.include_router(router)
-    app.include_router(team_router)
+    team_app.include_router(router)
+    team_app.include_router(team_router)
     setup_reboot_watcher(logger)
-    return app
+    return team_app
