@@ -402,7 +402,7 @@ const 草地テクスチャを作る = (): THREE.Texture | null => {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(40, 40);
+  texture.repeat.set(85, 85);
   破棄テクスチャ.push(texture);
   return texture;
 };
@@ -412,7 +412,8 @@ const 草原を作る = () => {
   const 草地材 = マテリアル(0x74b155, { roughness: 0.95, metalness: 0.02 });
   const texture = 草地テクスチャを作る();
   if (texture) 草地材.map = texture;
-  const ground = new THREE.Mesh(ジオメトリ(new THREE.CircleGeometry(104, 72)), 草地材);
+  // 霧が完全に覆う距離（146）より外側まで芝生を敷き、縁が見えないようにする
+  const ground = new THREE.Mesh(ジオメトリ(new THREE.CircleGeometry(220, 72)), 草地材);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
@@ -1986,8 +1987,8 @@ let 一人称揺れ位相 = 0;
 // 前フレームの立ち位置。実際に動いた距離から揺れを刻む（自律行動でも憑依でも同じ扱いにする）
 const 一人称前回位置 = new THREE.Vector3();
 const 押しキー = new Set<string>();
-// 草原の円（半径 104）からはみ出さないようにする
-const 一人称行動半径 = 96;
+// 丘は中心から距離 82〜96 に配置している。その外縁の1.5倍まで走れるようにする
+const 一人称行動半径 = 96 * 1.5;
 
 const 一人称対象グループ = (): THREE.Group | null => {
   if (一人称ID.value) return 実行状態一覧.get(一人称ID.value)?.group ?? null;
