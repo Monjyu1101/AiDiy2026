@@ -279,6 +279,8 @@ type 共有部品 = {
   草: THREE.ConeGeometry;
   花芯: THREE.SphereGeometry;
   茎: THREE.CylinderGeometry;
+  サボテン: THREE.CapsuleGeometry;
+  サボテン腕: THREE.CapsuleGeometry;
   幹材: THREE.MeshStandardMaterial;
   葉材: THREE.MeshStandardMaterial[];
   茂み材: THREE.MeshStandardMaterial;
@@ -290,6 +292,7 @@ type 共有部品 = {
   濃木材: THREE.MeshStandardMaterial;
   布材: THREE.MeshStandardMaterial;
   金属材: THREE.MeshStandardMaterial;
+  サボテン材: THREE.MeshStandardMaterial;
 };
 
 let 部品: 共有部品 | null = null;
@@ -305,6 +308,8 @@ const 部品を用意 = (): 共有部品 => {
     草: ジオメトリ(new THREE.ConeGeometry(0.11, 0.5, 5)),
     花芯: ジオメトリ(new THREE.SphereGeometry(0.075, 8, 6)),
     茎: ジオメトリ(new THREE.CylinderGeometry(0.014, 0.014, 0.3, 4)),
+    サボテン: ジオメトリ(new THREE.CapsuleGeometry(0.22, 0.9, 4, 8)),
+    サボテン腕: ジオメトリ(new THREE.CapsuleGeometry(0.13, 0.5, 4, 8)),
     幹材: マテリアル(0x8a6244, { roughness: 0.92, metalness: 0.02 }),
     葉材: [
       マテリアル(0x4f9e46, { roughness: 0.88, metalness: 0.02 }),
@@ -325,6 +330,7 @@ const 部品を用意 = (): 共有部品 => {
     濃木材: マテリアル(0x8a5c33, { roughness: 0.86, metalness: 0.03 }),
     布材: マテリアル(0xf6f1e2, { roughness: 0.88, metalness: 0.0 }),
     金属材: マテリアル(0x9aa7ad, { roughness: 0.35, metalness: 0.7 }),
+    サボテン材: マテリアル(0x4f8f5c, { roughness: 0.85, metalness: 0.02 }),
   };
   return 部品;
 };
@@ -407,6 +413,33 @@ const 草地テクスチャを作る = (): THREE.Texture | null => {
   return texture;
 };
 
+// 丘は地面に埋まった半球なので、足元（xz平面）では楕円の障害物として扱う
+const 丘一覧: Array<{ x: number; z: number; rx: number; rz: number }> = [];
+
+/** 指定位置が丘の footprint（楕円）の中かどうか。余裕を足すと少し広めに判定する */
+const 丘と重なる = (x: number, z: number, 余裕 = 0) =>
+  丘一覧.some((丘) => {
+    const nx = (x - 丘.x) / (丘.rx + 余裕);
+    const nz = (z - 丘.z) / (丘.rz + 余裕);
+    return nx * nx + nz * nz < 1;
+  });
+
+/** 丘の中に入っていたら、中心から見た同じ方向のまま楕円の外縁まで押し出す */
+const 丘の外へ押し出す = (x: number, z: number, 余裕 = 0): [number, number] => {
+  for (const 丘 of 丘一覧) {
+    const dx = x - 丘.x;
+    const dz = z - 丘.z;
+    const nx = dx / (丘.rx + 余裕);
+    const nz = dz / (丘.rz + 余裕);
+    const 距離 = Math.hypot(nx, nz);
+    if (距離 > 0.0001 && 距離 < 1) {
+      x = 丘.x + dx / 距離;
+      z = 丘.z + dz / 距離;
+    }
+  }
+  return [x, z];
+};
+
 const 草原を作る = () => {
   if (!scene) return;
   const 草地材 = マテリアル(0x74b155, { roughness: 0.95, metalness: 0.02 });
@@ -433,6 +466,7 @@ const 草原を作る = () => {
     hill.position.set(Math.cos(角度) * 距離, -0.6, Math.sin(角度) * 距離);
     hill.scale.set(19 + 乱数() * 13, 3.0 + 乱数() * 3.2, 16 + 乱数() * 11);
     scene.add(hill);
+    丘一覧.push({ x: hill.position.x, z: hill.position.z, rx: hill.scale.x, rz: hill.scale.z });
   }
 };
 
@@ -463,6 +497,43 @@ const 木を作る = (x: number, z: number, scale = 1, seed = 1) => {
     leaf.receiveShadow = true;
     group.add(leaf);
   }
+  scene.add(group);
+};
+
+const サボテンを作る = (x: number, z: number, scale = 1, seed = 1) => {
+  if (!scene) return;
+  const p = 部品を用意();
+  const 乱数 = 乱数を作る(seed);
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  group.rotation.y = 乱数() * Math.PI * 2;
+
+  const trunk = new THREE.Mesh(p.サボテン, p.サボテン材);
+  trunk.position.y = 0.67;
+  trunk.castShadow = true;
+  trunk.receiveShadow = true;
+  group.add(trunk);
+
+  // サボテンらしいシルエットにするため、腕を0〜2本ランダムに生やす
+  const 腕数 = Math.floor(乱数() * 3);
+  for (let index = 0; index < 腕数; index += 1) {
+    const 向き = index === 0 ? 1 : -1;
+    const arm = new THREE.Mesh(p.サボテン腕, p.サボテン材);
+    arm.position.set(向き * 0.24, 0.75 + 乱数() * 0.3, 0);
+    arm.rotation.z = 向き * (0.9 + 乱数() * 0.3);
+    arm.castShadow = true;
+    arm.receiveShadow = true;
+    group.add(arm);
+  }
+
+  if (乱数() > 0.55) {
+    const 花 = new THREE.Mesh(p.花芯, p.花材[1]);
+    花.position.set(0, 1.15, 0);
+    花.scale.setScalar(1.4);
+    group.add(花);
+  }
+
   scene.add(group);
 };
 
@@ -1415,6 +1486,21 @@ const シーンを作る = () => {
       else if (種 > 0.14) 花畑を作る(x, z, 1.6 + 乱数(), 10 + Math.floor(乱数() * 8), 400 + index);
       else 石を置く(x, z, 0.9 + 乱数() * 0.9, 500 + index);
     }
+    // エリア近辺の固定オブジェクトとは別に、広げた草原の外側にも木とサボテンをまばらに散らす
+    {
+      const 外乱数 = 乱数を作る(70809);
+      const 外側開始 = 内側 + 24;
+      const 外側終了 = 130;
+      for (let index = 0; index < 80; index += 1) {
+        const 角度 = 外乱数() * Math.PI * 2;
+        const 距離 = 外側開始 + 外乱数() * (外側終了 - 外側開始);
+        const x = Math.cos(角度) * 距離;
+        const z = Math.sin(角度) * 距離;
+        if (エリア内(x, z) || 近すぎる(x, z) || 丘と重なる(x, z, 2)) continue;
+        if (外乱数() > 0.3) 木を作る(x, z, 0.9 + 外乱数() * 0.9, 700 + index);
+        else サボテンを作る(x, z, 0.85 + 外乱数() * 0.6, 800 + index);
+      }
+    }
     // 十字の通路沿い（エリアの間）にも小さな彩りを置く
     for (let index = 0; index < 16; index += 1) {
       const 軸 = index % 4;
@@ -2113,6 +2199,10 @@ const 一人称を進める = (delta: number, 時刻: number) => {
       const 進z = 一人称設定.向き符号 * Math.cos(group.rotation.y);
       group.position.x += 進x * 実速さ * delta;
       group.position.z += 進z * 実速さ * delta;
+      // 丘は登れないので、土の中を突っ切らないよう外縁で止める
+      const [押し出しx, 押し出しz] = 丘の外へ押し出す(group.position.x, group.position.z, 0.6);
+      group.position.x = 押し出しx;
+      group.position.z = 押し出しz;
       const 中心距離 = Math.hypot(group.position.x, group.position.z);
       if (中心距離 > 一人称行動半径) {
         group.position.x *= 一人称行動半径 / 中心距離;
