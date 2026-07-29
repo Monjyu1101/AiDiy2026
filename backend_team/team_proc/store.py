@@ -256,7 +256,9 @@ class チームストア:
 
     @staticmethod
     def _待機時状態(経験最終更新日時: str, タスク最終更新日時: str = "") -> str:
-        """作業・経験の更新後1分は休憩し、その後は経験の更新秒で待機場所を切り替える。"""
+        """作業・経験の更新後1分は休憩し、その後は更新日時の秒で待機場所を切り替える。
+        経験・タスクの更新履歴が無い要員（新規召喚直後など）は雑談中からスタートする。
+        """
         現在 = datetime.now()
         更新日時一覧: list[datetime] = []
         for 更新日時 in (経験最終更新日時, タスク最終更新日時):
@@ -268,12 +270,14 @@ class チームストア:
                 continue
         if 更新日時一覧 and min(max(0, (現在 - 更新日時).total_seconds()) for 更新日時 in 更新日時一覧) <= 60:
             return "休憩中"
-        if not 経験最終更新日時:
-            return "休憩中"
+        # 経験が未生成の要員は、依頼の更新日時をトグルの基準時刻として代用する
+        基準日時 = 経験最終更新日時 or タスク最終更新日時
+        if not 基準日時:
+            return "雑談中"
         try:
-            最終更新 = datetime.fromisoformat(経験最終更新日時)
+            最終更新 = datetime.fromisoformat(基準日時)
         except ValueError:
-            return "休憩中"
+            return "雑談中"
         経過秒 = max(0, (現在 - 最終更新).total_seconds())
         秒一桁 = 最終更新.second % 10
         切替分 = 秒一桁 if 秒一桁 else 10
