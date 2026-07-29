@@ -50,7 +50,7 @@ const props = defineProps<{
   要員読込中: boolean;
   要員読込エラー: string;
   チーム目標: チーム目標 | null;
-  /** 改善ループが動いているか。掲示板のネオン点灯はこれで切り替える */
+  /** 目標ループが動いているか。掲示板のネオン点灯はこれで切り替える */
   改善実行中: boolean;
 }>();
 
@@ -1074,7 +1074,7 @@ const 目標掲示板を作る = () => {
   group.add(縁);
   目標掲示板.縁 = 縁;
 
-  // 改善ループ中は、掲示板全体へ薄いピンクの明滅を重ねる。
+  // 目標ループ中は、掲示板全体へ薄いピンクの明滅を重ねる。
   const 改善明滅材 = new THREE.MeshBasicMaterial({
     color: 0xff1493,
     transparent: true,
@@ -1887,31 +1887,31 @@ const 描画 = (時刻: number) => {
   });
 
   // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
-  // ループが上限まで回り切ったら、改善ループONのままでもネオンは消す
-  const 改善ループ中 = props.改善実行中;
+  // ループが上限まで回り切ったら、目標ループONのままでもネオンは消す
+  const 目標ループ中 = props.改善実行中;
   // ゆっくりした明滅へ、ごく短い瞬断を混ぜてネオン管らしい点灯の揺らぎを作る。
   const 瞬断 = Math.sin(時刻 * 0.021) + Math.sin(時刻 * 0.0137) > 1.72 ? 0.2 : 1;
   const ネオン強度 = (0.72 + (Math.sin(時刻 * 0.0045) + 1) * 0.14) * 瞬断;
   if (目標掲示板.縁) {
     const 縁材 = 目標掲示板.縁.material as THREE.MeshBasicMaterial;
-    縁材.color.setHex(改善ループ中 ? 0xff1493 : 0xfff6d0);
+    縁材.color.setHex(目標ループ中 ? 0xff1493 : 0xfff6d0);
     const 目標値 = 目標ホバー.value
       ? 0.85
-      : 改善ループ中
+      : 目標ループ中
         ? 0.18 + ネオン強度 * 0.78
         : 0.34 + (Math.sin(時刻 * 0.0016) + 1) * 0.06;
-    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 改善ループ中 ? 0.32 : 0.12);
+    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 目標ループ中 ? 0.32 : 0.12);
   }
   if (目標掲示板.改善明滅) {
-    目標掲示板.改善明滅.visible = 改善ループ中;
-    if (改善ループ中) {
+    目標掲示板.改善明滅.visible = 目標ループ中;
+    if (目標ループ中) {
       const 明滅材 = 目標掲示板.改善明滅.material as THREE.MeshBasicMaterial;
       明滅材.opacity = 0.025 + ネオン強度 * 0.085;
     }
   }
   if (目標掲示板.改善ネオン芯) {
-    目標掲示板.改善ネオン芯.visible = 改善ループ中;
-    if (改善ループ中) {
+    目標掲示板.改善ネオン芯.visible = 目標ループ中;
+    if (目標ループ中) {
       const 芯材 = (目標掲示板.改善ネオン芯.children[0] as THREE.Mesh)
         .material as THREE.MeshBasicMaterial;
       芯材.opacity = 0.28 + ネオン強度 * 0.72;

@@ -50,7 +50,8 @@ const プロジェクト選択肢 = ref<{ value: string; label: string }[]>([]);
 const 選択パス = ref('');
 const 入力パス = ref(既定パス);
 const 入力目標 = ref('');
-const 入力改善ループ = ref(false);
+const 入力自動目標設定 = ref(false);
+const 入力目標ループ = ref(false);
 const 入力最大ループ回数 = ref(1);
 const 入力動員要員数 = ref(既定動員要員数);
 const 入力パターン = ref<'SPDCA' | 'PlanDo'>(既定パターン);
@@ -221,7 +222,8 @@ const 一覧から選ぶ = (項目: チーム目標) => {
     : '';
   入力パス.value = 項目.CODE_BASE_PATH;
   入力目標.value = 項目.チーム目標;
-  入力改善ループ.value = Boolean(項目.改善ループ);
+  入力自動目標設定.value = Boolean(項目.自動目標設定);
+  入力目標ループ.value = Boolean(項目.目標ループ);
   入力最大ループ回数.value = Math.min(99, Math.max(1, Number(項目.最大ループ回数 ?? 1)));
   入力動員要員数.value = 動員要員数を丸める(項目.動員要員数);
   入力パターン.value = パターン正規化(項目.パターン);
@@ -234,7 +236,8 @@ watch(選択パス, (value) => {
   const 既存 = 目標一覧.value.find((項目) => 項目.CODE_BASE_PATH === value);
   if (既存) {
     入力目標.value = 既存.チーム目標;
-    入力改善ループ.value = Boolean(既存.改善ループ);
+    入力自動目標設定.value = Boolean(既存.自動目標設定);
+    入力目標ループ.value = Boolean(既存.目標ループ);
     入力最大ループ回数.value = Math.min(99, Math.max(1, Number(既存.最大ループ回数 ?? 1)));
     入力動員要員数.value = 動員要員数を丸める(既存.動員要員数);
     入力パターン.value = パターン正規化(既存.パターン);
@@ -252,7 +255,8 @@ watch(
     選択パス.value = '';
     入力パス.value = 既定パス;
     入力目標.value = '';
-    入力改善ループ.value = false;
+    入力自動目標設定.value = false;
+    入力目標ループ.value = false;
     入力最大ループ回数.value = 1;
     入力パターン.value = 既定パターン;
     // 選択肢の上限は有効要員数に依存するため、読込後に丸め直す
@@ -283,7 +287,8 @@ const 保存 = async () => {
     const response = await apiClient.post('/team/目標/保存', {
       CODE_BASE_PATH: パス,
       チーム目標: 目標,
-      改善ループ: 入力改善ループ.value,
+      自動目標設定: 入力自動目標設定.value,
+      目標ループ: 入力目標ループ.value,
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
@@ -303,7 +308,8 @@ const 保存 = async () => {
     // 保存した内容をそのまま親へ渡す（改善一覧パネルの表示・非表示はこの値で切り替わる）
     emit('saved', {
       ...(item ?? { CODE_BASE_PATH: パス, チーム目標: 目標, 更新日時: '' }),
-      改善ループ: 入力改善ループ.value,
+      自動目標設定: 入力自動目標設定.value,
+      目標ループ: 入力目標ループ.value,
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
@@ -422,29 +428,56 @@ const 削除 = async () => {
                 </div>
               </div>
               <section
+                class="loop-panel simple-loop-panel"
+                :class="{ active: 入力自動目標設定 }"
+                aria-labelledby="self-loop-panel-title"
+              >
+                <div class="loop-panel-head">
+                  <div class="loop-panel-title-wrap">
+                    <span class="loop-panel-icon" aria-hidden="true">↻</span>
+                    <div>
+                      <h4 id="self-loop-panel-title">自動目標設定</h4>
+                    </div>
+                  </div>
+                  <label class="loop-switch">
+                    <input
+                      v-model="入力自動目標設定"
+                      type="checkbox"
+                      aria-label="自動目標設定の切り替え"
+                    />
+                    <span class="loop-switch-track" aria-hidden="true">
+                      <span class="loop-switch-thumb"></span>
+                    </span>
+                    <span class="loop-switch-status">
+                      {{ 入力自動目標設定 ? '実行する' : '停止中' }}
+                    </span>
+                  </label>
+                </div>
+              </section>
+              <section
                 class="loop-panel"
-                :class="{ active: 入力改善ループ }"
+                :class="{ active: 入力目標ループ }"
                 aria-labelledby="loop-panel-title"
               >
                 <div class="loop-panel-head">
                   <div class="loop-panel-title-wrap">
                     <span class="loop-panel-icon" aria-hidden="true">↻</span>
                     <div>
-                      <h4 id="loop-panel-title">改善ループ</h4>
+                      <h4 id="loop-panel-title">目標ループ</h4>
                       <p>目標達成に向けた自動サイクルの実行条件</p>
                     </div>
                   </div>
                   <label class="loop-switch">
                     <input
-                      v-model="入力改善ループ"
+                      v-model="入力目標ループ"
                       type="checkbox"
-                      aria-label="改善ループの切り替え"
+                      aria-label="目標ループの切り替え"
                     />
                     <span class="loop-switch-track" aria-hidden="true">
                       <span class="loop-switch-thumb"></span>
                     </span>
                     <span class="loop-switch-status">
-                      {{ 入力改善ループ ? '実行する' : '停止中' }}
+                      {{ 入力目標ループ ? '実行する' : '停止中' }}
                     </span>
                   </label>
                 </div>

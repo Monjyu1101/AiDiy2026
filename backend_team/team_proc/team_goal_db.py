@@ -28,10 +28,10 @@ from .team_db import DB_PATH, 接続取得
 既定動員要員数 = 2
 # 動員要員数の保存上限。実際に動員できる人数は投入時に有効要員数（admin除く）で頭打ちにする。
 動員要員数上限 = 99
-# 改善ループのパターン。SPDCA=S→P→D→C→Aの5段、PlanDo=P→Dの2段
+# 目標ループのパターン。SPDCA=S→P→D→C→Aの5段、PlanDo=P→Dの2段
 許可パターン = ("SPDCA", "PlanDo")
 既定パターン = "PlanDo"
-# 改善ループの各段で使うAI。目標ごとに持ち、Aチーム作業・Aタスクの投入時に使う
+# 目標ループの各段で使うAI。目標ごとに持ち、Aチーム作業・Aタスクの投入時に使う
 AI設定キー = ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL")
 既定TEAM_AI_NAME = "claude_cli"
 既定TEAM_AI_MODEL = "auto"
@@ -63,8 +63,8 @@ def _次の更新連番(conn: sqlite3.Connection) -> int:
     return int(row["次"]) if row else 1
 
 
-def 改善履歴クリア必要(変更前: dict | None, チーム目標: str, 改善ループ: bool, パターン: str = 既定パターン) -> bool:
-    """既存目標・改善ループON/OFF・パターンのいずれかが変わった場合だけ改善履歴をクリアする。
+def 改善履歴クリア必要(変更前: dict | None, チーム目標: str, 目標ループ: bool, パターン: str = 既定パターン) -> bool:
+    """既存目標・目標ループON/OFF・パターンのいずれかが変わった場合だけ改善履歴をクリアする。
 
     パターンが変わると PDCA区分の並びや意味（S/P/D/C/A ⇔ P/D）が変わり、
     ループ番号や直前段の判定に不整合が起きるため、目標変更と同様にクリア対象にする。
@@ -73,7 +73,7 @@ def 改善履歴クリア必要(変更前: dict | None, チーム目標: str, �
         return False
     return (
         str(変更前.get("チーム目標", "")) != チーム目標
-        or bool(変更前.get("改善ループ", 0)) != bool(改善ループ)
+        or bool(変更前.get("目標ループ", 0)) != bool(目標ループ)
         or str(変更前.get("パターン", 既定パターン)) != パターン
     )
 
@@ -86,8 +86,8 @@ def 初期化() -> None:
             CREATE TABLE IF NOT EXISTS "{目標テーブル}" (
                 CODE_BASE_PATH TEXT NOT NULL PRIMARY KEY,
                 チーム目標 TEXT NOT NULL DEFAULT '',
-                自己ループ INTEGER NOT NULL DEFAULT 0,
-                改善ループ INTEGER NOT NULL DEFAULT 0,
+                自動目標設定 INTEGER NOT NULL DEFAULT 0,
+                目標ループ INTEGER NOT NULL DEFAULT 0,
                 最大ループ回数 INTEGER NOT NULL DEFAULT 1,
                 動員要員数 INTEGER NOT NULL DEFAULT 2,
                 パターン TEXT NOT NULL DEFAULT '{既定パターン}',
@@ -120,14 +120,14 @@ def 初期目標を投入() -> None:
         conn.execute(
             f"""
             INSERT OR IGNORE INTO "{目標テーブル}" (
-                CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                CODE_BASE_PATH, チーム目標, 自動目標設定, 目標ループ, 最大ループ回数, 動員要員数, パターン,
                 TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                既定CODE_BASE_PATH, 既定チーム目標, 0, 既定最大ループ回数,
+                既定CODE_BASE_PATH, 既定チーム目標, 0, 0, 既定最大ループ回数,
                 既定動員要員数, 既定パターン,
                 既定TEAM_AI_NAME, 既定TEAM_AI_MODEL, 既定TASK_AI_NAME, 既定TASK_AI_MODEL,
                 _次の更新連番(conn),
@@ -140,8 +140,8 @@ def 初期目標を投入() -> None:
         conn.close()
 
 
-def 起動時自己ループをオフ() -> int:
-    """backend_team 起動時、オンの自己ループをすべてオフへ戻す。
+def 起動時自動目標設定をオフ() -> int:
+    """backend_team 起動時、オンの自動目標設定をすべてオフへ戻す。
 
     これは人による目標編集ではなく起動時の安全解除なので、更新日時・更新連番・監査項目は
     変更しない。これにより、掲示板の最終目標の表示順も起動だけでは変化しない。
@@ -150,7 +150,7 @@ def 起動時自己ループをオフ() -> int:
     conn = 接続取得()
     try:
         cursor = conn.execute(
-            f'UPDATE "{目標テーブル}" SET 自己ループ = 0 WHERE 自己ループ != 0'
+            f'UPDATE "{目標テーブル}" SET 自動目標設定 = 0 WHERE 自動目標設定 != 0'
         )
         conn.commit()
         return max(0, int(cursor.rowcount))
@@ -158,8 +158,8 @@ def 起動時自己ループをオフ() -> int:
         conn.close()
 
 
-def 起動時改善ループをオフ() -> int:
-    """backend_team 起動時、オンの改善ループをすべてオフへ戻す。
+def 起動時目標ループをオフ() -> int:
+    """backend_team 起動時、オンの目標ループをすべてオフへ戻す。
 
     これは人による目標編集ではなく起動時の安全解除なので、更新日時・更新連番・監査項目は
     変更しない。これにより、掲示板の最終目標の表示順も起動だけでは変化しない。
@@ -168,7 +168,7 @@ def 起動時改善ループをオフ() -> int:
     conn = 接続取得()
     try:
         cursor = conn.execute(
-            f'UPDATE "{目標テーブル}" SET 改善ループ = 0 WHERE 改善ループ != 0'
+            f'UPDATE "{目標テーブル}" SET 目標ループ = 0 WHERE 目標ループ != 0'
         )
         conn.commit()
         return max(0, int(cursor.rowcount))
@@ -183,7 +183,7 @@ def 目標一覧() -> list[dict]:
     try:
         rows = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動目標設定, 目標ループ, 最大ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
@@ -195,17 +195,17 @@ def 目標一覧() -> list[dict]:
         conn.close()
 
 
-def 改善ループ対象一覧() -> list[dict]:
-    """改善ループがオンの目標を、更新日時の新しい順で返す（PDCAの自動投入対象）。"""
+def 目標ループ対象一覧() -> list[dict]:
+    """目標ループがオンの目標を、更新日時の新しい順で返す（PDCAの自動投入対象）。"""
     初期化()
     conn = 接続取得()
     try:
         rows = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動目標設定, 目標ループ, 最大ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新日時
               FROM "{目標テーブル}"
-             WHERE 改善ループ = 1 AND CODE_BASE_PATH != '' AND チーム目標 != ''
+             WHERE 目標ループ = 1 AND CODE_BASE_PATH != '' AND チーム目標 != ''
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
             """
         ).fetchall()
@@ -220,7 +220,7 @@ def 目標取得(code_base_path: str) -> dict | None:
     try:
         row = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動目標設定, 目標ループ, 最大ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}" WHERE CODE_BASE_PATH = ?
@@ -239,7 +239,7 @@ def 最終目標取得() -> dict | None:
     try:
         row = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動目標設定, 目標ループ, 最大ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
@@ -256,7 +256,8 @@ def 目標保存(
     code_base_path: str,
     チーム目標: str,
     操作者: dict,
-    改善ループ: bool = False,
+    自動目標設定: bool = False,
+    目標ループ: bool = False,
     最大ループ回数: int = 既定最大ループ回数,
     動員要員数: int = 既定動員要員数,
     パターン: str = 既定パターン,
@@ -265,7 +266,7 @@ def 目標保存(
     TASK_AI_NAME: str = 既定TASK_AI_NAME,
     TASK_AI_MODEL: str = 既定TASK_AI_MODEL,
 ) -> dict:
-    """パス単位のupsert。既存があれば目標・改善ループ設定と更新監査を書き換える。"""
+    """パス単位のupsert。既存があれば目標・自動目標設定・目標ループ設定と更新監査を書き換える。"""
     初期化()
     if パターン not in 許可パターン:
         raise ValueError(f"パターンは {'/'.join(許可パターン)} のいずれかを指定してください")
@@ -280,14 +281,15 @@ def 目標保存(
         conn.execute(
             f"""
             INSERT INTO "{目標テーブル}" (
-                CODE_BASE_PATH, チーム目標, 改善ループ, 最大ループ回数, 動員要員数, パターン,
+                CODE_BASE_PATH, チーム目標, 自動目標設定, 目標ループ, 最大ループ回数, 動員要員数, パターン,
                 TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(CODE_BASE_PATH) DO UPDATE SET
                 チーム目標 = excluded.チーム目標,
-                改善ループ = excluded.改善ループ,
+                自動目標設定 = excluded.自動目標設定,
+                目標ループ = excluded.目標ループ,
                 最大ループ回数 = excluded.最大ループ回数,
                 動員要員数 = excluded.動員要員数,
                 パターン = excluded.パターン,
@@ -302,7 +304,7 @@ def 目標保存(
                 更新端末ID = excluded.更新端末ID
             """,
             (
-                code_base_path, チーム目標, int(bool(改善ループ)),
+                code_base_path, チーム目標, int(bool(自動目標設定)), int(bool(目標ループ)),
                 max(1, min(99, int(最大ループ回数))),
                 max(1, min(動員要員数上限, int(動員要員数))), パターン,
                 team_ai_name, team_ai_model, task_ai_name, task_ai_model,

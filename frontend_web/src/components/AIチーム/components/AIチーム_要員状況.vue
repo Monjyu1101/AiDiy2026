@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import apiClient from '../../../api/client';
-import AiTeamMemberSummon from '../dialog/AIチーム_メンバー召喚.vue';
+import AiTeamMemberSummon from '../dialog/AIチーム_要員召喚.vue';
 import type { エージェント, チーム状況, チーム要員, 状態表示 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
 

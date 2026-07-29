@@ -6,6 +6,7 @@ import AiTeamViewer from './components/AIチーム_空間表示.vue';
 import AiTeamWorkList from './components/AIチーム_作業一覧.vue';
 import AiTeamExpList from './components/AIチーム_経験一覧.vue';
 import AiTeamPdcaList from './components/AIチーム_改善一覧.vue';
+import AiTeamTalkList from './components/AIチーム_雑談一覧.vue';
 import AiTeamGoalEdit from './dialog/AIチーム_目標編集.vue';
 import {
   type エージェント,
@@ -46,7 +47,7 @@ let 要員更新Timer: ReturnType<typeof setInterval> | null = null;
 let 要員取得中 = false;
 // チーム空間の掲示板に出す「最終更新のチーム目標」と、その保守ダイアログ
 const チーム目標 = ref<チーム目標 | null>(null);
-// 改善ループが動いているか（掲示板と同じ5秒周期で更新。ネオン点灯の切り替えに使う）
+// 目標ループが動いているか（掲示板と同じ5秒周期で更新。ネオン点灯の切り替えに使う）
 const 改善実行中 = ref(false);
 const 目標編集表示 = ref(false);
 
@@ -176,20 +177,22 @@ const チーム目標を読み込む = async () => {
 
 const 目標保存後 = (item: チーム目標) => {
   チーム目標.value = item;
-  // 保存で改善ループのON/OFFやループ回数が変わるため、実行中かどうかを取り直す
+  // 保存で目標ループのON/OFFやループ回数が変わるため、実行中かどうかを取り直す
   void チーム目標を読み込む();
 };
 
 // 掲示板に出ているプロジェクト。経験一覧・改善一覧はこのパスの分だけを表示する
 const 掲示板プロジェクト = computed(() => String(チーム目標.value?.CODE_BASE_PATH ?? ''));
-// 改善一覧は、掲示板の目標で改善ループがオンのときだけ出す（オフなら表示しない）
-const 改善ループ有効 = computed(() => Boolean(チーム目標.value?.改善ループ));
+// 改善一覧は、掲示板の目標で目標ループがオンのときだけ出す（オフなら表示しない）
+const 目標ループ有効 = computed(() => Boolean(チーム目標.value?.目標ループ));
+// 雑談一覧は、掲示板の目標で自動目標設定がオンのときだけ出す（オフなら表示しない）
+const 自動目標設定有効 = computed(() => Boolean(チーム目標.value?.自動目標設定));
 
 onMounted(() => {
   void 要員一覧を読み込む();
   void チーム目標を読み込む();
   // 自動更新は画面を維持したままバックグラウンドで行う。
-  // 掲示板も同じ周期で読み直し、改善ループの進捗（ループ数・最終段の件数）を最新にする。
+  // 掲示板も同じ周期で読み直し、目標ループの進捗（ループ数・最終段の件数）を最新にする。
   要員更新Timer = setInterval(() => {
     void 要員一覧を読み込む(false);
     void チーム目標を読み込む();
@@ -241,7 +244,8 @@ onBeforeUnmount(() => {
       />
       <AiTeamWorkList />
       <AiTeamExpList :プロジェクト="掲示板プロジェクト" />
-      <AiTeamPdcaList v-if="改善ループ有効" :プロジェクト="掲示板プロジェクト" />
+      <AiTeamPdcaList v-if="目標ループ有効" :プロジェクト="掲示板プロジェクト" />
+      <AiTeamTalkList v-if="自動目標設定有効" :プロジェクト="掲示板プロジェクト" />
     </div>
 
     <AiTeamGoalEdit

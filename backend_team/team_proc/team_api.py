@@ -28,6 +28,7 @@ from . import (
     team_goal_db,
     team_pdca_db,
     team_status_db,
+    team_talk_db,
     team_work_db,
 )
 from .config import 設定読込
@@ -172,6 +173,12 @@ class チーム改善一覧要求(BaseModel):
     件数: int = Field(default=team_pdca_db.一覧最大件数, ge=1, le=1000)
 
 
+class チーム雑談一覧要求(BaseModel):
+    """掲示板に出ているプロジェクト（CODE_BASE_PATH）で絞って一覧する。"""
+    プロジェクト: str = ""
+    件数: int = Field(default=team_talk_db.一覧最大件数, ge=1, le=1000)
+
+
 class チーム目標取得要求(BaseModel):
     CODE_BASE_PATH: str
 
@@ -179,13 +186,14 @@ class チーム目標取得要求(BaseModel):
 class チーム目標保存要求(操作情報):
     CODE_BASE_PATH: str
     チーム目標: str = ""
-    改善ループ: bool = False
+    自動目標設定: bool = False
+    目標ループ: bool = False
     最大ループ回数: int = Field(default=team_goal_db.既定最大ループ回数, ge=1, le=99)
     動員要員数: int = Field(
         default=team_goal_db.既定動員要員数, ge=1, le=team_goal_db.動員要員数上限
     )
     パターン: Literal["SPDCA", "PlanDo"] = team_goal_db.既定パターン
-    # 改善ループの各段で使うAI。選択肢は環境依存のため文字列のまま受け、空なら既定値にする
+    # 目標ループの各段で使うAI。選択肢は環境依存のため文字列のまま受け、空なら既定値にする
     TEAM_AI_NAME: str = team_goal_db.既定TEAM_AI_NAME
     TEAM_AI_MODEL: str = team_goal_db.既定TEAM_AI_MODEL
     TASK_AI_NAME: str = team_goal_db.既定TASK_AI_NAME
@@ -606,7 +614,7 @@ async def チーム経験失敗(request: チーム経験失敗要求) -> dict:
 
 @router.post("/改善/一覧", tags=["チーム改善"])
 async def チーム改善一覧(request: チーム改善一覧要求) -> dict:
-    """改善ループ（PDCA）の実行状況を、改善IDの新しい順で返す。"""
+    """目標ループ（PDCA）の実行状況を、改善IDの新しい順で返す。"""
     try:
         items = team_pdca_db.改善一覧(request.プロジェクト.strip(), request.件数)
         return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
@@ -627,6 +635,29 @@ async def チーム改善最大更新日時(request: チーム改善一覧要求
         return ng(f"チーム改善の最大更新日時の取得に失敗しました: {e}")
 
 
+@router.post("/雑談/一覧", tags=["チーム雑談"])
+async def チーム雑談一覧(request: チーム雑談一覧要求) -> dict:
+    """雑談を新しい順で返す。"""
+    try:
+        items = team_talk_db.雑談一覧(request.プロジェクト.strip(), request.件数)
+        return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
+    except Exception as e:
+        logger.error(f"チーム雑談一覧の取得に失敗: {e}")
+        return ng(f"チーム雑談一覧の取得に失敗しました: {e}")
+
+
+@router.post("/雑談/最大更新日時", tags=["チーム雑談"])
+async def チーム雑談最大更新日時(request: チーム雑談一覧要求) -> dict:
+    """一覧の再取得判定に使う最大更新日時（5秒ポーリング用）。"""
+    try:
+        return ok("最大更新日時を取得しました", {
+            "最大更新日時": team_talk_db.雑談最大更新日時(request.プロジェクト.strip()),
+        })
+    except Exception as e:
+        logger.error(f"チーム雑談の最大更新日時の取得に失敗: {e}")
+        return ng(f"チーム雑談の最大更新日時の取得に失敗しました: {e}")
+
+
 @router.post("/目標/一覧", tags=["チーム目標"])
 async def チーム目標一覧() -> dict:
     """CODE_BASE_PATH ごとのチーム目標を、更新日時の新しい順で返す。"""
@@ -640,17 +671,17 @@ async def チーム目標一覧() -> dict:
 
 @router.post("/目標/最終", tags=["チーム目標"])
 async def チーム目標最終() -> dict:
-    """更新日時が最新のチーム目標と、改善ループが動いているかを返す（掲示板に出す値）。
+    """更新日時が最新のチーム目標と、目標ループが動いているかを返す（掲示板に出す値）。
 
     掲示板は5秒ごとにこれを読み、`改善実行中` でネオン点灯を切り替える。
-    改善ループがオフ、または最大ループ回数まで回って最終段が決着（済 または エラー）
+    目標ループがオフ、または最大ループ回数まで回って最終段が決着（済 または エラー）
     していれば false。エラーで終わっても次のループは投入されないため停止とみなす。
     """
     try:
         item = team_goal_db.最終目標取得()
         if not item:
             return ok("チーム目標を取得しました", {"item": {}, "改善実行中": False})
-        改善実行中 = bool(item.get("改善ループ")) and team_pdca_db.改善ループ実行中(
+        改善実行中 = bool(item.get("目標ループ")) and team_pdca_db.目標ループ実行中(
             str(item.get("CODE_BASE_PATH", "")),
             str(item.get("パターン", "") or team_goal_db.既定パターン),
             int(item.get("最大ループ回数", 1) or 1),
@@ -689,7 +720,8 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             パス,
             目標,
             request.操作者(),
-            request.改善ループ,
+            request.自動目標設定,
+            request.目標ループ,
             request.最大ループ回数,
             request.動員要員数,
             request.パターン,
@@ -698,13 +730,13 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             request.TASK_AI_NAME,
             request.TASK_AI_MODEL,
         )
-        if team_goal_db.改善履歴クリア必要(変更前, 目標, request.改善ループ, request.パターン):
+        if team_goal_db.改善履歴クリア必要(変更前, 目標, request.目標ループ, request.パターン):
             # 最大ループ回数・動員要員数だけの変更では履歴を残し、
             # 目標またはループON/OFFの変更時だけクリアする。
             クリア件数 = team_pdca_db.改善クリア(パス)
-            logger.info(f"目標または改善ループ変更のためAチーム改善をクリアしました: {パス} ({クリア件数}件)")
+            logger.info(f"目標または目標ループ変更のためAチーム改善をクリアしました: {パス} ({クリア件数}件)")
             return ok(
-                f"{パス} のチーム目標を保存し、改善ループの記録を{クリア件数}件クリアしました",
+                f"{パス} のチーム目標を保存し、目標ループの記録を{クリア件数}件クリアしました",
                 {"item": item, "改善クリア件数": クリア件数},
             )
         return ok(f"{パス} のチーム目標を保存しました", {"item": item})
@@ -722,7 +754,7 @@ async def チーム目標削除(request: チーム目標削除要求) -> dict:
         if not パス:
             return ng("CODE_BASE_PATHを指定してください")
         team_goal_db.目標削除(パス)
-        # 目標が消えたら改善ループの記録も残さない
+        # 目標が消えたら目標ループの記録も残さない
         team_pdca_db.改善クリア(パス)
         return ok(f"{パス} のチーム目標を削除しました")
     except KeyError:

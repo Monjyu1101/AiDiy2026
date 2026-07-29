@@ -64,21 +64,33 @@ export type チーム改善 = {
   更新日時: string;
 };
 
+export type チーム雑談 = {
+  雑談ID: string;
+  プロジェクト: string;
+  要員ID: string;
+  要求内容: string;
+  発言内容: string;
+  登録日時: string;
+  更新日時: string;
+};
+
 export type チーム目標 = {
   CODE_BASE_PATH: string;
   チーム目標: string;
-  /** 目標に向けた改善ループを回すかどうか（既定はオフ） */
-  改善ループ?: boolean | number;
+  /** 自動目標設定を回すかどうか（既定はオフ） */
+  自動目標設定?: boolean | number;
+  /** 目標に向けた目標ループを回すかどうか（既定はオフ） */
+  目標ループ?: boolean | number;
   /** 1〜98は上限回数、99は無制限 */
   最大ループ回数?: number;
-  /** 改善ループの相談フェーズへ動員する要員数（1〜admin以外の有効要員数、既定2） */
+  /** 目標ループの相談フェーズへ動員する要員数（1〜admin以外の有効要員数、既定2） */
   動員要員数?: number;
-  /** 改善ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */
+  /** 目標ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */
   パターン?: 'SPDCA' | 'PlanDo';
-  /** 改善ループの各段を実行するAI（Aチーム作業側） */
+  /** 目標ループの各段を実行するAI（Aチーム作業側） */
   TEAM_AI_NAME?: string;
   TEAM_AI_MODEL?: string;
-  /** 改善ループから投入するAタスク側のAI */
+  /** 目標ループから投入するAタスク側のAI */
   TASK_AI_NAME?: string;
   TASK_AI_MODEL?: string;
   更新日時: string;
