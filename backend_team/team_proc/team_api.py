@@ -189,7 +189,7 @@ class チーム目標保存要求(操作情報):
     自動作業設定: bool = False
     チーム作業: str = ""
     作業ループ: bool = False
-    最大ループ回数: int = Field(default=team_goal_db.既定最大ループ回数, ge=1, le=99)
+    作業ループ回数: int = Field(default=team_goal_db.既定作業ループ回数, ge=1, le=99)
     動員要員数: int = Field(
         default=team_goal_db.既定動員要員数, ge=1, le=team_goal_db.動員要員数上限
     )
@@ -483,9 +483,9 @@ def _依頼データ(request: チーム依頼保存要求, 編集中: bool) -> d
     # 変更は対象行の値をフロントエンドが必ず送るため補完しない（既存挙動を保つ）。
     既定 = {
         "プロジェクト": "",
-        "TEAM_AI_NAME": "claude_cli",
+        "TEAM_AI_NAME": "codex_cli",
         "TEAM_AI_MODEL": "auto",
-        "TASK_AI_NAME": "claude_cli",
+        "TASK_AI_NAME": "codex_cli",
         "TASK_AI_MODEL": "auto",
     }
     if not 編集中:
@@ -638,7 +638,7 @@ async def チーム作業最大更新日時(request: チーム作業一覧要求
 
 @router.post("/会話/一覧", tags=["チーム会話"])
 async def チーム会話一覧(request: チーム会話一覧要求) -> dict:
-    """会話を新しい順で返す。"""
+    """プロジェクト内の要員ごとの最終発言を新しい順で返す。"""
     try:
         items = team_talk_db.会話一覧(request.プロジェクト.strip(), request.件数)
         return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
@@ -672,21 +672,16 @@ async def チーム目標一覧() -> dict:
 
 @router.post("/目標/最終", tags=["チーム目標"])
 async def チーム目標最終() -> dict:
-    """更新日時が最新のチーム作業と、作業ループが動いているかを返す（掲示板に出す値）。
+    """更新日時が最新のチーム作業と、赤ネオンの点灯状態を返す（掲示板に出す値）。
 
     掲示板は5秒ごとにこれを読み、`作業実行中` でネオン点灯を切り替える。
-    作業ループがオフ、または最大ループ回数まで回って最終段が決着（済 または エラー）
-    していれば false。エラーで終わっても次のループは投入されないため停止とみなす。
+    作業ループがオン、かつチーム作業に空白以外の内容があれば true。
     """
     try:
         item = team_goal_db.最終目標取得()
         if not item:
             return ok("チーム作業を取得しました", {"最大更新日時": "", "item": {}, "作業実行中": False})
-        作業実行中 = bool(item.get("作業ループ")) and team_pdca_db.作業ループ実行中(
-            str(item.get("CODE_BASE_PATH", "")),
-            str(item.get("パターン", "") or team_goal_db.既定パターン),
-            int(item.get("最大ループ回数", 1) or 1),
-        )
+        作業実行中 = bool(item.get("作業ループ")) and bool(str(item.get("チーム作業", "")).strip())
         return ok("チーム作業を取得しました", {
             "最大更新日時": str(item.get("更新日時", "")),
             "item": item,
@@ -719,7 +714,7 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
         テーマ = request.チーム目標.strip()
         if not パス:
             return ng("CODE_BASE_PATHを指定してください")
-        if not 目標:
+        if not 目標 and not bool(request.自動作業設定):
             return ng("チーム作業を入力してください")
         if not テーマ:
             return ng("チーム目標を入力してください")
@@ -731,7 +726,7 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             request.操作者(),
             request.自動作業設定,
             request.作業ループ,
-            request.最大ループ回数,
+            request.作業ループ回数,
             request.動員要員数,
             request.パターン,
             request.TEAM_AI_NAME,
@@ -739,14 +734,30 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             request.TASK_AI_NAME,
             request.TASK_AI_MODEL,
         )
+        response_data = {"item": item}
+        クリア内容: list[str] = []
         if team_goal_db.作業履歴クリア必要(変更前, 目標, request.作業ループ, request.パターン):
-            # 最大ループ回数・動員要員数だけの変更では履歴を残し、
-            # 目標またはループON/OFFの変更時だけクリアする。
-            クリア件数 = team_pdca_db.作業クリア(パス)
-            logger.info(f"目標または作業ループ変更のためAチーム作業をクリアしました: {パス} ({クリア件数}件)")
+            # 作業ループ回数・動員要員数だけの変更では履歴を残し、
+            # チーム作業・ループON/OFF・パターンの変更時だけクリアする。
+            作業クリア件数 = team_pdca_db.作業クリア(パス)
+            response_data["作業クリア件数"] = 作業クリア件数
+            クリア内容.append(f"作業ループの記録{作業クリア件数}件")
+            logger.info(
+                f"チーム作業・作業ループ・パターン変更のためAチーム作業をクリアしました: "
+                f"{パス} ({作業クリア件数}件)"
+            )
+        if team_goal_db.会話クリア必要(変更前, テーマ, request.自動作業設定):
+            会話クリア件数 = team_talk_db.会話クリア(パス)
+            response_data["会話クリア件数"] = 会話クリア件数
+            クリア内容.append(f"会話{会話クリア件数}件")
+            logger.info(
+                f"チーム目標または自動作業設定変更のためAチーム会話をクリアしました: "
+                f"{パス} ({会話クリア件数}件)"
+            )
+        if クリア内容:
             return ok(
-                f"{パス} のチーム作業を保存し、作業ループの記録を{クリア件数}件クリアしました",
-                {"item": item, "作業クリア件数": クリア件数},
+                f"{パス} のチーム作業を保存し、{'、'.join(クリア内容)}をクリアしました",
+                response_data,
             )
         return ok(f"{パス} のチーム作業を保存しました", {"item": item})
     except ValueError as exc:

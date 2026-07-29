@@ -24,8 +24,9 @@
     前の段が終わっていれば次の段を、目標のパターン（SPDCA/PlanDo）に対応する
     sub_SPDCA_*.py / sub_PlanDo_*.py で投入する。
   - Aチーム目標（最終更新1件）の自動作業設定がオンなら、雑談エリア（状態=雑談中）の
-    要員から1名を選んで sub_hatugen.py を起動し、Aチーム会話へ「今やるべきこと」の
-    発言を1件集める（雑談確認）。
+    要員から1名を選んで sub_self_talk.py を起動し、分の下一桁1〜9の回にAチーム会話へ
+    「今やるべきこと」の発言を1件集める（雑談確認）。下一桁0の回は、有効要員数の50%以上の
+    意見があれば sub_self_work.py を起動し、admin人格でチーム作業へ取りまとめる。
 - システム開始時（再起動含む）は、テーブルに残った未投入の依頼をエラーとして記録しクリアする
   （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
@@ -40,7 +41,7 @@ import random
 import re
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import team_db, team_exp_db, team_goal_db, team_pdca_db, team_status_db, team_talk_db, team_work_db
@@ -69,17 +70,27 @@ _SUB_PDCAパス = {
     },
 }
 _作業入力DIR = _BASE_DIR / "temp" / "pdca"
-_SUB_HATUGENパス = _BASE_DIR / "team_sub" / "sub_hatugen.py"
+_SUB_TERMINATEパス = _BASE_DIR / "team_sub" / "sub_PlanDo_terminate.py"
+_SUB_SELF_TALKパス = _BASE_DIR / "team_sub" / "sub_self_talk.py"
+_SUB_SELF_WORKパス = _BASE_DIR / "team_sub" / "sub_self_work.py"
 _雑談入力DIR = _BASE_DIR / "temp" / "talk"
 
 # 状態監視タイマーの本処理は hh:mm が変わった確認回だけ処理する（毎分 1 回）
 _前回確認分 = ""
 # 起動中の作業ループ投入プロセス（前回分が動いている間は次を投入しない）
 _作業プロセス: subprocess.Popen | None = None
+# 起動中のPlanDo／SPDCA共通終了フック
+_終了プロセス: subprocess.Popen | None = None
+# 起動中プロセスが正常終了したときに完了済みへ移すキー
+_終了処理中キー: tuple[str, str, int, int, str] | None = None
+# 同じ完了状態で毎分終了フックを繰り返さないための識別キー
+_終了処理済みキー: set[tuple[str, str, int, int, str]] = set()
 # 未実装区分の案内は毎分繰り返さず、プロジェクト×区分ごとに1回だけ出す
 _作業未実装通知済み: set[tuple[str, str]] = set()
 # 起動中の雑談発言プロセス（前回分が動いている間は次を投入しない。最大3分程度かかる）
 _雑談プロセス: subprocess.Popen | None = None
+# 起動中のチーム作業取りまとめプロセス（分の下一桁0の回にだけ投入を確認する）
+_自己作業プロセス: subprocess.Popen | None = None
 
 
 def _サブプロセス環境() -> dict:
@@ -108,9 +119,19 @@ def _作業入力パス(プロジェクト: str, 区分: str) -> Path:
     return _作業入力DIR / f"{_安全ファイル名部品(プロジェクト)}_{_安全ファイル名部品(区分)}_{時刻}.json"
 
 
+def _終了入力パス(プロジェクト: str) -> Path:
+    時刻 = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return _作業入力DIR / f"{_安全ファイル名部品(プロジェクト)}_terminate_{時刻}.json"
+
+
 def _雑談入力パス(プロジェクト: str) -> Path:
     時刻 = datetime.now().strftime("%Y%m%d_%H%M%S")
     return _雑談入力DIR / f"{_安全ファイル名部品(プロジェクト)}_{時刻}.json"
+
+
+def _自己作業入力パス(プロジェクト: str) -> Path:
+    時刻 = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return _雑談入力DIR / f"{_安全ファイル名部品(プロジェクト)}_self_work_{時刻}.json"
 
 
 def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
@@ -338,7 +359,7 @@ def _作業実行開始(目標: dict, 区分: str, logger: logging.Logger) -> su
                     "チーム作業": str(目標.get("チーム作業", "")),
                     "パターン": パターン,
                     "PDCA区分": 区分,
-                    "最大ループ回数": max(1, min(99, int(目標.get("最大ループ回数", 1) or 1))),
+                    "作業ループ回数": max(1, min(99, int(目標.get("作業ループ回数", 1) or 1))),
                     "動員要員数": max(
                         1,
                         min(
@@ -402,7 +423,11 @@ def _作業ループ確認(logger: logging.Logger) -> None:
         if _作業プロセス is not None and _作業プロセス.poll() is None:
             return
         _作業プロセス = None
-        対象一覧 = team_goal_db.作業ループ対象一覧()
+        対象一覧 = [
+            目標
+            for 目標 in team_goal_db.作業ループ対象一覧()
+            if bool(目標.get("作業ループ")) and str(目標.get("チーム作業", "")).strip()
+        ]
         if not 対象一覧:
             return
         実行中人数 = team_status_db.実行中要員数()
@@ -415,15 +440,15 @@ def _作業ループ確認(logger: logging.Logger) -> None:
             区分 = team_pdca_db.次のPDCA区分(プロジェクト, パターン)
             if not 区分:
                 continue
-            最大ループ回数 = max(1, min(99, int(目標.get("最大ループ回数", 1) or 1)))
+            作業ループ回数 = max(1, min(99, int(目標.get("作業ループ回数", 1) or 1)))
             現在ループ = team_pdca_db.ループ最大値(プロジェクト)
-            if 区分 == 区分一覧[0] and 最大ループ回数 != 99 and 現在ループ >= 最大ループ回数:
+            if 区分 == 区分一覧[0] and 作業ループ回数 != 99 and 現在ループ >= 作業ループ回数:
                 # 止まったのか、やり切って終わったのかを区別できるよう1回だけ記録する
                 if (プロジェクト, "完了") not in _作業未実装通知済み:
                     _作業未実装通知済み.add((プロジェクト, "完了"))
                     logger.info(
-                        f"作業ループは最大ループ回数に達したため終了しました: "
-                        f"プロジェクト={プロジェクト} 完了={現在ループ}周 最大={最大ループ回数}周"
+                        f"作業ループは作業ループ回数に達したため終了しました: "
+                        f"プロジェクト={プロジェクト} 完了={現在ループ}周 設定={作業ループ回数}周"
                     )
                 continue
             _作業未実装通知済み.discard((プロジェクト, "完了"))
@@ -442,6 +467,88 @@ def _作業ループ確認(logger: logging.Logger) -> None:
         logger.exception("作業ループの確認でエラーが発生しました")
 
 
+def _終了実行開始(目標: dict, logger: logging.Logger) -> subprocess.Popen | None:
+    """作業ループ終了時の入力JSONを出力し、PlanDo／SPDCA共通終了フックを起動する。"""
+    プロジェクト = str(目標.get("CODE_BASE_PATH", "")).strip()
+    パターン = str(目標.get("パターン") or team_pdca_db.既定パターン)
+    try:
+        _作業入力DIR.mkdir(parents=True, exist_ok=True)
+        入力パス = _終了入力パス(プロジェクト)
+        with 入力パス.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "プロジェクト": プロジェクト,
+                    "チーム目標": str(目標.get("チーム目標", "")),
+                    "チーム作業": str(目標.get("チーム作業", "")),
+                    "自動作業設定": bool(目標.get("自動作業設定")),
+                    "パターン": パターン,
+                    "作業ループ回数": max(1, min(99, int(目標.get("作業ループ回数", 1) or 1))),
+                    "現在ループ": team_pdca_db.ループ最大値(プロジェクト),
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        proc = subprocess.Popen(
+            [sys.executable, str(_SUB_TERMINATEパス), str(入力パス)],
+            cwd=str(_BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+            env=_サブプロセス環境(),
+        )
+        logger.info(
+            f"作業ループ終了フックを開始しました: プロジェクト={プロジェクト} "
+            f"パターン={パターン} PID={proc.pid}"
+        )
+        return proc
+    except Exception:
+        logger.exception(f"作業ループ終了フックの起動に失敗しました: プロジェクト={プロジェクト} パターン={パターン}")
+        return None
+
+
+def _作業ループ終了確認(logger: logging.Logger) -> None:
+    """毎分用の終了判定で作業完了を検知し、PlanDo／SPDCA共通終了フックを1回起動する。"""
+    global _終了プロセス, _終了処理中キー
+    try:
+        if _終了プロセス is not None:
+            終了コード = _終了プロセス.poll()
+            if 終了コード is None:
+                return
+            if 終了コード == 0 and _終了処理中キー is not None:
+                _終了処理済みキー.add(_終了処理中キー)
+            _終了プロセス = None
+            _終了処理中キー = None
+        for 目標 in team_goal_db.作業ループ対象一覧():
+            プロジェクト = str(目標.get("CODE_BASE_PATH", "")).strip()
+            チーム作業 = str(目標.get("チーム作業", "")).strip()
+            if not プロジェクト or not bool(目標.get("作業ループ")) or not チーム作業:
+                continue
+            パターン = str(目標.get("パターン") or team_pdca_db.既定パターン)
+            作業ループ回数 = max(1, min(99, int(目標.get("作業ループ回数", 1) or 1)))
+            if not team_pdca_db.作業ループ終了済み(プロジェクト, パターン, 作業ループ回数):
+                continue
+            現在ループ = team_pdca_db.ループ最大値(プロジェクト)
+            終了キー = (
+                プロジェクト,
+                パターン,
+                作業ループ回数,
+                現在ループ,
+                str(目標.get("更新日時", "")),
+            )
+            if 終了キー in _終了処理済みキー:
+                continue
+            _終了プロセス = _終了実行開始(目標, logger)
+            if _終了プロセス is not None:
+                _終了処理中キー = 終了キー
+            # 1分の確認につき1プロジェクトだけ起動する
+            break
+    except Exception:
+        logger.exception("作業ループ終了フックの確認でエラーが発生しました")
+
+
 def _雑談発言者を選ぶ(候補: list[str], プロジェクト: str) -> str | None:
     """発言の無い1名（複数いればランダム）、全員発言済みなら最も古い発言者を選ぶ。"""
     if not 候補:
@@ -453,8 +560,26 @@ def _雑談発言者を選ぶ(候補: list[str], プロジェクト: str) -> str
     return min(候補, key=lambda 要員ID: 発言済み.get(要員ID, ""))
 
 
-def _雑談実行開始(会話: dict, 目標: dict, 他者意見一覧: list[dict], logger: logging.Logger) -> subprocess.Popen | None:
-    """雑談1件分の入力 JSON を出力し、sub_hatugen.py を起動する。"""
+def _10分以内の発言か(最終発言日時: str, 現在日時: datetime | None = None) -> bool:
+    """最終発言日時が現在から10分以内なら True。解釈できない日時は False。"""
+    if not 最終発言日時:
+        return False
+    try:
+        最終発言 = datetime.strptime(最終発言日時, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return False
+    現在 = 現在日時 or datetime.now()
+    return 最終発言 >= 現在 - timedelta(minutes=10)
+
+
+def _雑談実行開始(
+    会話: dict,
+    目標: dict,
+    他者意見一覧: list[dict],
+    自身の前回発言: str,
+    logger: logging.Logger,
+) -> subprocess.Popen | None:
+    """雑談1件分の入力 JSON を出力し、sub_self_talk.py を起動する。"""
     プロジェクト = str(会話.get("プロジェクト", ""))
     要員ID = str(会話.get("要員ID", ""))
     try:
@@ -463,7 +588,6 @@ def _雑談実行開始(会話: dict, 目標: dict, 他者意見一覧: list[dic
         with 入力パス.open("w", encoding="utf-8") as f:
             json.dump(
                 {
-                    "会話ID": str(会話.get("会話ID", "")),
                     "プロジェクト": プロジェクト,
                     "要員ID": 要員ID,
                     "チーム目標": str(目標.get("チーム目標", "")),
@@ -473,6 +597,7 @@ def _雑談実行開始(会話: dict, 目標: dict, 他者意見一覧: list[dic
                         {"要員ID": str(行.get("要員ID", "")), "発言内容": str(行.get("発言内容", ""))}
                         for 行 in 他者意見一覧
                     ],
+                    "自身の1回前の発言": 自身の前回発言,
                 },
                 f,
                 ensure_ascii=False,
@@ -481,42 +606,58 @@ def _雑談実行開始(会話: dict, 目標: dict, 他者意見一覧: list[dic
 
         creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         proc = subprocess.Popen(
-            [sys.executable, str(_SUB_HATUGENパス), str(入力パス)],
+            [sys.executable, str(_SUB_SELF_TALKパス), str(入力パス)],
             cwd=str(_BASE_DIR),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=creationflags,
             env=_サブプロセス環境(),
         )
-        logger.info(f"雑談の発言を開始しました: 会話ID={会話.get('会話ID', '')} 要員ID={要員ID} PID={proc.pid}")
+        logger.info(f"雑談の発言を開始しました: 要員ID={要員ID} プロジェクト={プロジェクト} PID={proc.pid}")
         return proc
     except Exception:
         logger.exception(f"雑談の発言起動に失敗しました: 要員ID={要員ID} プロジェクト={プロジェクト}")
         return None
 
 
-def _雑談確認(logger: logging.Logger) -> None:
-    """自動作業設定がオンなら、雑談エリアの要員から1名を選んで発言させる（1分ごと）。
+def _雑談確認(logger: logging.Logger, 現在日時: datetime | None = None) -> None:
+    """目標を協議中なら、雑談エリアの要員から1名を選んで発言させる（毎分、下一桁0分を除く）。
 
     投入するのは次のすべてを満たすときだけ。
-    - 前回の発言投入プロセスが残っていない（sub_hatugen.py は最大3分程度かかる）
-    - Aチーム目標の最終更新（掲示板に出ている目標）で自動作業設定がオン
+    - 前回の発言投入プロセスが残っていない（sub_self_talk.py は最大3分程度かかる）
+    - Aチーム目標の最終更新（掲示板に出ている目標）でチーム目標が入力済み
+    - 自動作業設定がオン
+    - チーム作業が空欄（作業内容を協議中）
+    - Aチーム会話に発言内容が空の行（他者の発言処理中）が無い
     - 雑談エリア（状態=雑談中、admin以外）の要員が1名以上いる
+    - 発言予定の要員が直近10分以内に発言していない
 
     選ぶのは、Aチーム会話に発言（発言内容あり）の無い要員を優先し、
-    全員発言済みなら最も古い発言者。選んだ要員IDで空の会話行を追加して
-    発言シーケンスに入ったことをマーキングしてから sub_hatugen.py を起動する。
+    全員発言済みなら最も古い発言者。選んだプロジェクト・要員IDの会話行を空にして
+    発言シーケンスに入ったことをマーキングしてから sub_self_talk.py を起動する。
+    AIへ渡す意見には他者の最終発言に加え、対象要員自身の1回前の発言も含める。
     """
     global _雑談プロセス
     try:
+        現在 = 現在日時 or datetime.now()
+        if 現在.minute % 10 == 0:
+            return
         if _雑談プロセス is not None and _雑談プロセス.poll() is None:
             return
         _雑談プロセス = None
         目標 = team_goal_db.最終目標取得()
-        if not 目標 or not bool(目標.get("自動作業設定")):
+        if not 目標:
+            return
+        if not str(目標.get("チーム目標", "")).strip():
+            return
+        if not bool(目標.get("自動作業設定")):
+            return
+        if str(目標.get("チーム作業", "")).strip():
             return
         プロジェクト = str(目標.get("CODE_BASE_PATH", ""))
         if not プロジェクト:
+            return
+        if team_talk_db.発言中あり():
             return
         候補 = [
             str(エージェント["エージェントID"])
@@ -527,15 +668,127 @@ def _雑談確認(logger: logging.Logger) -> None:
         要員ID = _雑談発言者を選ぶ(候補, プロジェクト)
         if not 要員ID:
             return
-        操作者 = {"利用者ID": "system", "利用者名": "システム", "端末ID": "backend_team"}
-        会話 = team_talk_db.発言登録(プロジェクト, 要員ID, 操作者)
+        自身の前回会話 = team_talk_db.会話取得(プロジェクト, 要員ID) or {}
+        if _10分以内の発言か(str(自身の前回会話.get("更新日時", ""))):
+            return
+        自身の前回発言 = str(自身の前回会話.get("発言内容", "")).strip()
         他者意見一覧 = [
             行 for 行 in team_talk_db.最新発言一覧(プロジェクト)
             if str(行.get("要員ID", "")) != 要員ID
         ]
-        _雑談プロセス = _雑談実行開始(会話, 目標, 他者意見一覧, logger)
+        操作者 = {"利用者ID": "system", "利用者名": "システム", "端末ID": "backend_team"}
+        会話 = team_talk_db.発言登録(プロジェクト, 要員ID, 操作者)
+        _雑談プロセス = _雑談実行開始(
+            会話,
+            目標,
+            他者意見一覧,
+            自身の前回発言,
+            logger,
+        )
+        if _雑談プロセス is None:
+            team_talk_db.発言更新(
+                プロジェクト,
+                要員ID,
+                "",
+                "(発言プロセスを起動できませんでした)",
+            )
     except Exception:
         logger.exception("雑談の確認でエラーが発生しました")
+
+
+def _自己作業実行開始(目標: dict, 意見一覧: list[dict], logger: logging.Logger) -> subprocess.Popen | None:
+    """各要員の意見をJSONへ出力し、adminによるsub_self_work.pyを起動する。"""
+    プロジェクト = str(目標.get("CODE_BASE_PATH", "")).strip()
+    try:
+        _雑談入力DIR.mkdir(parents=True, exist_ok=True)
+        入力パス = _自己作業入力パス(プロジェクト)
+        with 入力パス.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "プロジェクト": プロジェクト,
+                    "チーム目標": str(目標.get("チーム目標", "")),
+                    "TASK_AI_NAME": str(目標.get("TASK_AI_NAME", "claude_cli")),
+                    "TASK_AI_MODEL": str(目標.get("TASK_AI_MODEL", "auto")),
+                    "意見一覧": [
+                        {"要員ID": str(行.get("要員ID", "")), "発言内容": str(行.get("発言内容", ""))}
+                        for 行 in 意見一覧
+                    ],
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        proc = subprocess.Popen(
+            [sys.executable, str(_SUB_SELF_WORKパス), str(入力パス)],
+            cwd=str(_BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+            env=_サブプロセス環境(),
+        )
+        logger.info(
+            f"チーム作業の取りまとめを開始しました: プロジェクト={プロジェクト} "
+            f"意見数={len(意見一覧)} PID={proc.pid}"
+        )
+        return proc
+    except Exception:
+        logger.exception(f"チーム作業の取りまとめ起動に失敗しました: プロジェクト={プロジェクト}")
+        return None
+
+
+def _自己作業確認(logger: logging.Logger, 現在日時: datetime | None = None) -> None:
+    """分の下一桁0の回に、十分な意見があればadminのチーム作業取りまとめを起動する。
+
+    チーム目標あり・自動作業設定オン・チーム作業空欄を前提とし、有効要員ID数
+    （adminを含む）の50%以上にあたる要員から発言が集まった場合だけ起動する。
+    """
+    global _自己作業プロセス
+    try:
+        現在 = 現在日時 or datetime.now()
+        if 現在.minute % 10 != 0:
+            return
+        if _自己作業プロセス is not None and _自己作業プロセス.poll() is None:
+            return
+        _自己作業プロセス = None
+        if _雑談プロセス is not None and _雑談プロセス.poll() is None:
+            return
+
+        目標 = team_goal_db.最終目標取得()
+        if not 目標:
+            return
+        if not str(目標.get("チーム目標", "")).strip():
+            return
+        if not bool(目標.get("自動作業設定")):
+            return
+        if str(目標.get("チーム作業", "")).strip():
+            return
+        プロジェクト = str(目標.get("CODE_BASE_PATH", "")).strip()
+        if not プロジェクト or team_talk_db.発言中あり():
+            return
+
+        有効要員ID一覧 = [
+            str(要員.get("要員ID", "")).strip()
+            for 要員 in team_db.要員一覧()
+            if str(要員.get("要員ID", "")).strip()
+        ]
+        if not 有効要員ID一覧:
+            return
+        有効要員ID集合 = set(有効要員ID一覧)
+        意見一覧 = [
+            行
+            for 行 in team_talk_db.最新発言一覧(プロジェクト)
+            if str(行.get("要員ID", "")) in 有効要員ID集合
+            and str(行.get("発言内容", "")).strip()
+        ]
+        必要意見数 = (len(有効要員ID一覧) + 1) // 2
+        if len(意見一覧) < 必要意見数:
+            return
+
+        _自己作業プロセス = _自己作業実行開始(目標, 意見一覧, logger)
+    except Exception:
+        logger.exception("チーム作業の取りまとめ確認でエラーが発生しました")
 
 
 def _起動監視1回(logger: logging.Logger) -> None:
@@ -555,7 +808,9 @@ def _状態監視1回(logger: logging.Logger) -> None:
     # 回収は作業ループのオン・オフに関わらず行い、そのうえで次の段の投入を判断する
     _作業回収(logger)
     _作業ループ確認(logger)
+    _作業ループ終了確認(logger)
     _雑談確認(logger)
+    _自己作業確認(logger)
 
 
 async def 起動監視ループ(logger: logging.Logger) -> None:

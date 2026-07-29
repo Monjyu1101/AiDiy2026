@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // AIチーム_作業状況: 掲示板に出ているプロジェクトの作業ループ（PDCA）の実行状況を一覧表示する
-// 5秒ごとにプロジェクト単位の最大更新日時を確認し、変化時だけ一覧を再取得する
+// 開いている間は5秒、折り畳み中は10秒ごとに更新確認し、非表示中は停止する
 // 表示するのは作業ループがオンのときだけ（オフのときは AIチーム.vue 側で描画しない）
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
 import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
 import type { チーム作業 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
+import { use表示連動ポーリング } from '../use表示連動ポーリング';
 
 const props = defineProps<{
   /** 掲示板に表示中のプロジェクト（CODE_BASE_PATH）。この分だけを一覧する */
@@ -16,7 +17,6 @@ const props = defineProps<{
 const 作業一覧 = ref<チーム作業[]>([]);
 const 読込中 = ref(false);
 const 読込エラー = ref('');
-let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let 作業最大更新日時 = '';
 let 作業取得中 = false;
 
@@ -83,10 +83,7 @@ const 更新確認 = async () => {
   }
 };
 
-const 自動更新開始 = () => {
-  if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(() => void 更新確認(), 5000);
-};
+use表示連動ポーリング(更新確認, 5000, 開いている);
 
 // 掲示板のプロジェクトが変わったら、その分の作業へ切り替える
 watch(対象プロジェクト, () => {
@@ -135,11 +132,6 @@ const 日時表示 = (値: string) => String(値 ?? '').replace(/^\d{4}-/, '').s
 
 onMounted(async () => {
   await 作業一覧読込();
-  自動更新開始();
-});
-
-onBeforeUnmount(() => {
-  if (refreshTimer) clearInterval(refreshTimer);
 });
 </script>
 

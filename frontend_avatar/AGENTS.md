@@ -77,6 +77,7 @@ Electron 版は BrowserWindow の role を main process で管理します。
 - `settings`
 - `task1`〜`task3`（AIタスクの要求 / フロー図 / 明細ウィンドウ）
 - `taskDialog`（タスク要求 / 明細の編集ダイアログウィンドウ）
+- タイトルバーの `TEAM` は frontend_web 稼働時だけ表示し、`/AIチーム?単体表示=1` を専用BrowserWindowへ直接ルーティングしてAIチーム本体だけを表示する。閉じたときはウィンドウを破棄し、非表示のまま接続を維持しない
 
 Electron では role ごとに BrowserWindow を持ちます。
 Web では単一ページ内のタブとして扱います（AIタスクは `AIタスク.vue` の 3 パネル一体表示）。

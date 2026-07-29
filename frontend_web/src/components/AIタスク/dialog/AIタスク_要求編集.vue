@@ -27,7 +27,7 @@ const プロジェクト選択肢 = ref<{ value: string; label: string }[]>([]);
 const 選択プロジェクト = ref('');
 const 入力プロジェクト = ref('');
 const 入力要求内容 = ref('');
-const 入力TASK_AI_NAME = ref('claude_cli');
+const 入力TASK_AI_NAME = ref('codex_cli');
 const 入力TASK_AI_MODEL = ref('auto');
 const 入力実行有効 = ref(true);
 const 入力状況 = ref('準備開始');
@@ -49,6 +49,7 @@ const TASK_CODE_MODELS既定 = {
 };
 const availableModels = ref<Record<string, any>>({ code_models: { ...TASK_CODE_MODELS既定 } });
 const currentSettings = ref<Record<string, any>>({});
+const 新規既定値 = ref<Record<string, any>>({});
 const taskAiOptions = computed(() => Object.keys(availableModels.value?.code_models || {}));
 const taskModelOptions = computed(() => {
   const models = availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {};
@@ -193,7 +194,22 @@ async function モデル選択肢読込() {
     }
   } catch {
     availableModels.value = { code_models: { ...TASK_CODE_MODELS既定 } };
-    currentSettings.value = { TASK_AI_NAME: 'claude_cli', TASK_AI_MODEL: 'auto' };
+    currentSettings.value = { CODE_BASE_PATH: '../', TASK_AI_NAME: 'codex_cli', TASK_AI_MODEL: 'auto' };
+  }
+}
+
+async function 新規既定値読込() {
+  if (props.編集タスク) {
+    新規既定値.value = {};
+    return;
+  }
+  try {
+    const res = await apiClient.post('/task/タスク要求/新規既定値', {
+      利用者ID: 対象利用者ID.value,
+    });
+    新規既定値.value = res.data.status === 'OK' ? (res.data.data || {}) : {};
+  } catch {
+    新規既定値.value = {};
   }
 }
 
@@ -214,15 +230,27 @@ const 選択肢読込 = async () => {
 
 watch(() => props.isOpen, (open) => {
   if (open) {
-    void モデル選択肢読込().then(() => {
+    void Promise.all([モデル選択肢読込(), 新規既定値読込()]).then(() => {
       const ai候補 = taskAiOptions.value;
       if (props.編集タスク) {
-        入力TASK_AI_NAME.value = chooseAvailable(props.編集タスク.TASK_AI_NAME || 'claude_cli', ai候補) || 'claude_cli';
+        入力TASK_AI_NAME.value = chooseAvailable(props.編集タスク.TASK_AI_NAME || 'codex_cli', ai候補) || 'codex_cli';
         入力TASK_AI_MODEL.value = chooseAvailable(props.編集タスク.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
       } else {
-        const lastAi = props.最終タスク?.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'claude_cli';
-        const lastModel = props.最終タスク?.TASK_AI_MODEL || currentSettings.value.TASK_AI_MODEL || 'auto';
-        入力TASK_AI_NAME.value = chooseAvailable(lastAi, ai候補) || 'claude_cli';
+        入力プロジェクト.value = String(
+          新規既定値.value.プロジェクト
+          ?? props.最終タスク?.プロジェクト
+          ?? currentSettings.value.CODE_BASE_PATH
+          ?? '../',
+        );
+        const lastAi = 新規既定値.value.TASK_AI_NAME
+          || props.最終タスク?.TASK_AI_NAME
+          || currentSettings.value.TASK_AI_NAME
+          || 'codex_cli';
+        const lastModel = 新規既定値.value.TASK_AI_MODEL
+          || props.最終タスク?.TASK_AI_MODEL
+          || currentSettings.value.TASK_AI_MODEL
+          || 'auto';
+        入力TASK_AI_NAME.value = chooseAvailable(lastAi, ai候補) || 'codex_cli';
         入力TASK_AI_MODEL.value = chooseAvailable(lastModel, Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
       }
     });
@@ -311,7 +339,7 @@ const 登録 = async () => {
           タスクID: String(props.編集タスク?.タスクID ?? ''),
           プロジェクト: 入力プロジェクト.value.trim(),
           要求内容: 入力要求内容.value.trim(),
-          TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
+          TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'codex_cli',
           TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
           実行有効: 入力実行有効.value,
           状況: 入力状況.value,
@@ -321,7 +349,7 @@ const 登録 = async () => {
           利用者ID: 対象利用者ID.value,
           プロジェクト: 入力プロジェクト.value.trim(),
           要求内容: 入力要求内容.value.trim(),
-          TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
+          TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'codex_cli',
           TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
           実行有効: 入力実行有効.value,
           実行条件: 実行条件ペイロード()

@@ -29,7 +29,7 @@ import AI設定再起動 from '@/dialog/AI設定再起動.vue'
 import 再起動カウントダウン from '@/dialog/再起動カウントダウン.vue'
 import WindowShell from '@/components/_WindowShell.vue'
 import apiClient from '@/api/client'
-import { defaultModelSettings } from '@/api/config'
+import { defaultModelSettings, FRONTEND_WEB_TEAM_URL } from '@/api/config'
 import { AIWebSocket, createWebSocketUrl } from '@/api/websocket'
 import type { AuthUser, ChatMessage, MessageKind, ModelSettings } from '@/types'
 
@@ -65,6 +65,8 @@ const 認証Storage = isElectron ? localStorage : sessionStorage
 const PANEL_KEYS: PanelKey[] = ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4', 'code5', 'code6']
 const TASK_KEYS: TaskKey[] = ['task1', 'task2', 'task3']
 const WEB_CORE_PATH = '/AiDiy'
+const FRONTEND_WEB_AVAILABLE_KEY = 'frontend_web_available'
+const FRONTEND_WEB_TEAM_URL_KEY = 'frontend_web_team_url'
 
 function URLセッションID取得(): string {
   const searchParams = new URLSearchParams(window.location.search)
@@ -81,6 +83,8 @@ function 認証データ初期化() {
   認証Storage.removeItem('token')
   認証Storage.removeItem('user')
   認証Storage.removeItem('avatar_session_id')
+  認証Storage.removeItem(FRONTEND_WEB_AVAILABLE_KEY)
+  認証Storage.removeItem(FRONTEND_WEB_TEAM_URL_KEY)
   認証Storage.removeItem(認証エラーメッセージKey)
 }
 
@@ -216,8 +220,102 @@ const アクティブタブ = ref<PanelKey>('chat')
 const 右アクティブタブ = ref<右ペインタブ型>('core')
 // AIタスク画面の表示状態（Web: 左上の切替ボタン、Electron: 右下の TASK ボタン）
 const AIタスク表示 = ref(false)
+const frontendWeb起動中 = ref(
+  isElectron && 認証Storage.getItem(FRONTEND_WEB_AVAILABLE_KEY) === '1',
+)
+const frontendWebTeamUrl = ref(
+  isElectron
+    ? 認証Storage.getItem(FRONTEND_WEB_TEAM_URL_KEY) || FRONTEND_WEB_TEAM_URL
+    : FRONTEND_WEB_TEAM_URL,
+)
 const 分割比率 = ref(50)
 const リサイズ中 = ref(false)
+let frontendWeb確認タイマー: number | null = null
+let チームWebWindow: Window | null = null
+
+function frontendWeb停止時処理() {
+  if (isElectron) {
+    void window.desktopApi?.closeTeamPage?.()
+  } else if (チームWebWindow && !チームWebWindow.closed) {
+    チームWebWindow.close()
+    チームWebWindow = null
+  }
+}
+
+async function frontendWeb起動確認(): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 2000)
+  try {
+    let available = false
+    if (isElectron) {
+      const resolvedUrl = await window.desktopApi?.checkFrontendWeb?.(FRONTEND_WEB_TEAM_URL)
+      available = Boolean(resolvedUrl)
+      if (resolvedUrl) {
+        frontendWebTeamUrl.value = resolvedUrl
+        認証Storage.setItem(FRONTEND_WEB_TEAM_URL_KEY, resolvedUrl)
+      } else {
+        認証Storage.removeItem(FRONTEND_WEB_TEAM_URL_KEY)
+      }
+      認証Storage.setItem(FRONTEND_WEB_AVAILABLE_KEY, available ? '1' : '0')
+    } else {
+      await fetch(FRONTEND_WEB_TEAM_URL, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+      available = true
+    }
+    frontendWeb起動中.value = available
+    if (!available) frontendWeb停止時処理()
+    return available
+  } catch {
+    frontendWeb起動中.value = false
+    if (isElectron) 認証Storage.setItem(FRONTEND_WEB_AVAILABLE_KEY, '0')
+    frontendWeb停止時処理()
+    return false
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+function frontendWeb確認開始() {
+  if (frontendWeb確認タイマー) return
+  void frontendWeb起動確認()
+  frontendWeb確認タイマー = window.setInterval(() => void frontendWeb起動確認(), 5000)
+}
+
+function frontendWeb確認停止() {
+  if (frontendWeb確認タイマー) {
+    window.clearInterval(frontendWeb確認タイマー)
+    frontendWeb確認タイマー = null
+  }
+  frontendWeb起動中.value = false
+}
+
+async function チーム画面切替() {
+  if (!frontendWeb起動中.value) return
+  if (isElectron) {
+    const opened = await window.desktopApi?.toggleTeamPage?.(
+      frontendWebTeamUrl.value,
+      認証トークン.value,
+      利用者.value ? { ...利用者.value } : null,
+    )
+    if (opened === false) {
+      // ボタンで閉じた場合。ウィンドウはhideせず破棄され、接続も終了する。
+      return
+    }
+    if (opened !== true) frontendWeb起動中.value = false
+    return
+  }
+
+  if (チームWebWindow && !チームWebWindow.closed) {
+    チームWebWindow.close()
+    チームWebWindow = null
+    return
+  }
+  チームWebWindow = window.open(frontendWebTeamUrl.value, 'aidiy-team')
+}
 
 function リサイズ開始(e: MouseEvent) {
   e.preventDefault()
@@ -690,6 +788,8 @@ function 認証クリア(message = '') {
   認証Storage.removeItem('token')
   認証Storage.removeItem('user')
   認証Storage.removeItem('avatar_session_id')
+  認証Storage.removeItem(FRONTEND_WEB_AVAILABLE_KEY)
+  認証Storage.removeItem(FRONTEND_WEB_TEAM_URL_KEY)
   if (message) {
     認証Storage.setItem(認証エラーメッセージKey, message)
   } else {
@@ -724,9 +824,9 @@ function 初期化処理(message: Record<string, any>) {
     CODE_AI5_NAME: settings.CODE_AI5_NAME || '',
     CODE_AI6_NAME: settings.CODE_AI6_NAME || '',
     CODE_PERMISSIONS: settings.CODE_PERMISSIONS || 'auto',
-    TASK_AI_NAME: settings.TASK_AI_NAME || 'claude_cli',
+    TASK_AI_NAME: settings.TASK_AI_NAME || 'codex_cli',
     TASK_AI_MODEL: settings.TASK_AI_MODEL || 'auto',
-    TEAM_AI_NAME: settings.TEAM_AI_NAME || 'claude_cli',
+    TEAM_AI_NAME: settings.TEAM_AI_NAME || 'codex_cli',
     TEAM_AI_MODEL: settings.TEAM_AI_MODEL || 'auto',
   }
 
@@ -883,6 +983,7 @@ async function ログイン送信(payload: { 利用者ID: string; パスワー�
     認証Storage.removeItem('avatar_session_id')
     セッションID.value = URL内セッションID
     if (isElectron) {
+      await frontendWeb起動確認()
       await window.desktopApi?.openCoreWindow?.()
     } else {
       try {
@@ -1223,6 +1324,22 @@ watch(
   { deep: true },
 )
 
+watch(
+  コアウィンドウ,
+  (active) => {
+    if (active) {
+      frontendWeb確認開始()
+      return
+    }
+    frontendWeb確認停止()
+    if (!isElectron && チームWebWindow && !チームWebWindow.closed) {
+      チームWebWindow.close()
+      チームWebWindow = null
+    }
+  },
+  { immediate: true },
+)
+
 
 onMounted(async () => {
   window.addEventListener('auth-expired', 認証期限切れ処理)
@@ -1324,6 +1441,10 @@ onBeforeUnmount(() => {
   デスクトップチャンネル?.removeEventListener('message', デスクトップチャンネルメッセージ処理)
   デスクトップチャンネル?.close()
   スナップショット再試行停止()
+  frontendWeb確認停止()
+  if (!isElectron && チームWebWindow && !チームWebWindow.closed) {
+    チームWebWindow.close()
+  }
   コア切断()
 })
 </script>
@@ -1519,10 +1640,12 @@ onBeforeUnmount(() => {
               :core-busy="コア処理中"
               :core-error="コアエラー"
               :show-user-label="false"
+              :show-team-button="frontendWeb起動中"
               title-status-source="input"
               @toggle-panel="パネル切替"
               @reconnect="再接続"
               @open-setting-restart="設定再起動を開く"
+              @open-team="チーム画面切替"
               @logout="認証クリア()"
             />
           </div>
@@ -1631,10 +1754,12 @@ onBeforeUnmount(() => {
       :core-busy="コア処理中"
       :core-error="コアエラー"
       :show-task-button="true"
+      :show-team-button="frontendWeb起動中"
       @toggle-panel="パネル切替"
       @reconnect="再接続"
       @open-setting-restart="設定再起動を開く"
       @open-task="タスクウィンドウ切替"
+      @open-team="チーム画面切替"
       @logout="認証クリア()"
     />
 

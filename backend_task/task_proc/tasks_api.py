@@ -95,7 +95,7 @@ class タスク要求更新登録リクエスト(BaseModel):
     タスクID: str
     プロジェクト: str = ""
     要求内容: str
-    TASK_AI_NAME: str = "claude_cli"
+    TASK_AI_NAME: str = tasks_db.TASK_AI_NAME既定
     TASK_AI_MODEL: str = "auto"
     実行有効: bool = True
     状況: str = "準備開始"  # 準備開始 / 準備完了 / 中止 / 更新前の状態
@@ -124,7 +124,7 @@ class タスク明細更新登録リクエスト(BaseModel):
     タイトル: str
     要求内容: str = ""
     先行SEQ: str = ""
-    TASK_AI_NAME: str = "claude_cli"
+    TASK_AI_NAME: str = tasks_db.TASK_AI_NAME既定
     TASK_AI_MODEL: str = "auto"
     操作検証: bool = False
     実行有効: bool = True
@@ -240,6 +240,19 @@ async def タスク要求一覧(request: タスク要求一覧リクエスト) -
     except Exception as e:
         logger.error(f"タスク要求一覧の取得に失敗: {e}")
         return _NG(f"タスク要求一覧の取得に失敗しました: {e}")
+
+
+@router.post("/タスク要求/新規既定値", tags=["タスク要求"])
+async def タスク要求新規既定値(request: タスク要求一覧リクエスト) -> dict:
+    """同じ利用者の更新最終レコード、未登録ならconfから新規画面の既定値を返す。"""
+    try:
+        利用者ID = request.利用者ID.strip()
+        if not 利用者ID:
+            return _NG("利用者IDを指定してください。")
+        return _OK(tasks_db.タスク要求新規既定値(利用者ID))
+    except Exception as e:
+        logger.error(f"タスク要求の新規既定値取得に失敗: {e}")
+        return _NG(f"タスク要求の新規既定値取得に失敗しました: {e}")
 
 
 @router.post("/タスク要求/取得", tags=["タスク要求"])
@@ -471,7 +484,7 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
             タスクID,
             request.プロジェクト.strip(),
             要求内容,
-            request.TASK_AI_NAME.strip() or "claude_cli",
+            request.TASK_AI_NAME.strip() or tasks_db.TASK_AI_NAME既定,
             request.TASK_AI_MODEL.strip() or "auto",
             request.実行有効,
             状態,
@@ -560,7 +573,7 @@ async def タスク明細更新登録(request: タスク明細更新登録リク
             タイトル,
             要求内容,
             先行SEQ,
-            request.TASK_AI_NAME.strip() or "claude_cli",
+            request.TASK_AI_NAME.strip() or tasks_db.TASK_AI_NAME既定,
             request.TASK_AI_MODEL.strip() or "auto",
             request.操作検証,
             request.実行有効,

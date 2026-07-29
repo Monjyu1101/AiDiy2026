@@ -79,9 +79,9 @@ def 初期化() -> None:
                 プロジェクト TEXT NOT NULL DEFAULT '',
                 タイトル TEXT NOT NULL DEFAULT '',
                 要求内容 TEXT NOT NULL DEFAULT '',
-                TEAM_AI_NAME TEXT NOT NULL DEFAULT 'claude_cli',
+                TEAM_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
                 TEAM_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
-                TASK_AI_NAME TEXT NOT NULL DEFAULT 'claude_cli',
+                TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
                 TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
                 タスクID TEXT NOT NULL DEFAULT '',
                 実行有効 INTEGER NOT NULL DEFAULT 1,
@@ -233,18 +233,18 @@ def 依頼新規既定値(要員ID: str) -> dict:
         設定 = 設定読込()
         規定 = {
             "プロジェクト": str(getattr(設定, "CODE_BASE_PATH", "") or "../"),
-            "TEAM_AI_NAME": str(getattr(設定, "TEAM_AI_NAME", "") or "claude_cli"),
+            "TEAM_AI_NAME": str(getattr(設定, "TEAM_AI_NAME", "") or "codex_cli"),
             "TEAM_AI_MODEL": str(getattr(設定, "TEAM_AI_MODEL", "") or "auto"),
-            "TASK_AI_NAME": str(getattr(設定, "TASK_AI_NAME", "") or "claude_cli"),
+            "TASK_AI_NAME": str(getattr(設定, "TASK_AI_NAME", "") or "codex_cli"),
             "TASK_AI_MODEL": str(getattr(設定, "TASK_AI_MODEL", "") or "auto"),
             "参照依頼ID": "",
         }
     except Exception:
         規定 = {
             "プロジェクト": "../",
-            "TEAM_AI_NAME": "claude_cli",
+            "TEAM_AI_NAME": "codex_cli",
             "TEAM_AI_MODEL": "auto",
-            "TASK_AI_NAME": "claude_cli",
+            "TASK_AI_NAME": "codex_cli",
             "TASK_AI_MODEL": "auto",
             "参照依頼ID": "",
         }

@@ -11,23 +11,18 @@
 """Aチーム会話の DB アクセス。
 
 雑談エリアの要員から選んだ1名の発言を、team_watcher.py の1分ごとの確認（雑談確認）から
-sub_hatugen.py 経由で書き込む。登録経路はこれのみで、フロントエンドからの直接登録は無い。
+sub_self_talk.py 経由で書き込む。登録経路はこれのみで、フロントエンドからの直接登録は無い。
 """
 
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .team_db import DB_PATH, 接続取得
 
 会話テーブル = "Aチーム会話"
 一覧最大件数 = 100
-
-_採番テーブル = "C採番"
-_採番ID = "Aチーム会話"
-_採番プレフィックス = "TC"
-_採番初期値 = 1000
 
 
 def _現在日時() -> str:
@@ -48,93 +43,143 @@ def _監査項目(利用者ID: str, 利用者名: str, 端末ID: str) -> dict[st
     }
 
 
+def _テーブル作成(conn: sqlite3.Connection) -> None:
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS "{会話テーブル}" (
+            プロジェクト TEXT NOT NULL,
+            要員ID TEXT NOT NULL,
+            要求内容 TEXT NOT NULL DEFAULT '',
+            発言内容 TEXT NOT NULL DEFAULT '',
+            登録日時 TEXT NOT NULL,
+            登録利用者ID TEXT NOT NULL,
+            登録利用者名 TEXT NOT NULL,
+            登録端末ID TEXT NOT NULL,
+            更新日時 TEXT NOT NULL,
+            更新利用者ID TEXT NOT NULL,
+            更新利用者名 TEXT NOT NULL,
+            更新端末ID TEXT NOT NULL,
+            PRIMARY KEY (プロジェクト, 要員ID)
+        )
+    """)
+
+
+def _現行スキーマか(conn: sqlite3.Connection) -> bool:
+    列一覧 = conn.execute(f'PRAGMA table_info("{会話テーブル}")').fetchall()
+    if not 列一覧:
+        return False
+    主キー = [
+        str(列["name"])
+        for 列 in sorted(列一覧, key=lambda 列: int(列["pk"]))
+        if int(列["pk"]) > 0
+    ]
+    return 主キー == ["プロジェクト", "要員ID"] and all(
+        str(列["name"]) != "会話ID" for 列 in 列一覧
+    )
+
+
+def _旧スキーマ移行(conn: sqlite3.Connection) -> None:
+    """会話ID主キーの履歴型テーブルを、要員ごとの最終発言型へ移行する。"""
+    旧テーブル = f"{会話テーブル}_旧"
+    conn.execute(f'DROP TABLE IF EXISTS "{旧テーブル}"')
+    conn.execute(f'ALTER TABLE "{会話テーブル}" RENAME TO "{旧テーブル}"')
+    _テーブル作成(conn)
+
+    旧列 = {
+        str(列["name"])
+        for 列 in conn.execute(f'PRAGMA table_info("{旧テーブル}")').fetchall()
+    }
+    移行列 = {
+        "プロジェクト", "要員ID", "要求内容", "発言内容",
+        "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
+        "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID",
+    }
+    if 移行列.issubset(旧列):
+        conn.execute(f"""
+            INSERT INTO "{会話テーブル}" (
+                プロジェクト, 要員ID, 要求内容, 発言内容,
+                登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
+                更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
+            )
+            SELECT
+                old.プロジェクト, old.要員ID, old.要求内容, old.発言内容,
+                old.登録日時, old.登録利用者ID, old.登録利用者名, old.登録端末ID,
+                old.更新日時, old.更新利用者ID, old.更新利用者名, old.更新端末ID
+              FROM "{旧テーブル}" old
+             WHERE old.rowid = (
+                SELECT latest.rowid
+                  FROM "{旧テーブル}" latest
+                 WHERE latest.プロジェクト = old.プロジェクト
+                   AND latest.要員ID = old.要員ID
+                 ORDER BY latest.更新日時 DESC, latest.rowid DESC
+                 LIMIT 1
+             )
+        """)
+    conn.execute(f'DROP TABLE "{旧テーブル}"')
+
+
+def _次更新日時(conn: sqlite3.Connection, プロジェクト: str, 要員ID: str) -> str:
+    """同じ秒の連続更新でもポーリングが検知できるよう、更新日時を必ず増加させる。"""
+    now = datetime.now().replace(microsecond=0)
+    row = conn.execute(
+        f'SELECT 更新日時 FROM "{会話テーブル}" WHERE プロジェクト = ? AND 要員ID = ?',
+        [プロジェクト, 要員ID],
+    ).fetchone()
+    if row and row["更新日時"]:
+        try:
+            前回 = datetime.fromisoformat(str(row["更新日時"]))
+            if now <= 前回:
+                now = 前回 + timedelta(seconds=1)
+        except ValueError:
+            pass
+    return now.strftime("%Y-%m-%d %H:%M:%S")
+
+
 def 初期化() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = 接続取得()
     try:
-        conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS "{会話テーブル}" (
-                会話ID TEXT NOT NULL PRIMARY KEY,
-                プロジェクト TEXT NOT NULL DEFAULT '',
-                要員ID TEXT NOT NULL DEFAULT '',
-                要求内容 TEXT NOT NULL DEFAULT '',
-                発言内容 TEXT NOT NULL DEFAULT '',
-                登録日時 TEXT NOT NULL,
-                登録利用者ID TEXT NOT NULL,
-                登録利用者名 TEXT NOT NULL,
-                登録端末ID TEXT NOT NULL,
-                更新日時 TEXT NOT NULL,
-                更新利用者ID TEXT NOT NULL,
-                更新利用者名 TEXT NOT NULL,
-                更新端末ID TEXT NOT NULL
-            )
-        """)
+        テーブルあり = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            [会話テーブル],
+        ).fetchone()
+        if テーブルあり and not _現行スキーマか(conn):
+            _旧スキーマ移行(conn)
+        else:
+            _テーブル作成(conn)
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS "IX_Aチーム会話_プロジェクト"
-            ON "{会話テーブル}" (プロジェクト, 会話ID)
+            ON "{会話テーブル}" (プロジェクト, 更新日時)
         """)
         conn.commit()
     finally:
         conn.close()
 
 
-def _採番確保(conn: sqlite3.Connection) -> None:
-    """C採番（backend_server共有）にAチーム会話用の採番行が無ければ作成する。"""
-    conn.execute(f"""
-        CREATE TABLE IF NOT EXISTS "{_採番テーブル}" (
-            採番ID TEXT NOT NULL PRIMARY KEY,
-            最終採番値 INTEGER NOT NULL,
-            採番備考 TEXT,
-            有効 INTEGER NOT NULL DEFAULT 1,
-            登録日時 TEXT NOT NULL,
-            登録利用者ID TEXT NOT NULL,
-            登録利用者名 TEXT,
-            登録端末ID TEXT NOT NULL,
-            更新日時 TEXT NOT NULL,
-            更新利用者ID TEXT NOT NULL,
-            更新利用者名 TEXT,
-            更新端末ID TEXT NOT NULL
-        )
-    """)
-    now = _現在日時()
-    conn.execute(
-        f"""
-        INSERT OR IGNORE INTO "{_採番テーブル}" (
-            採番ID, 最終採番値, 採番備考, 有効,
-            登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
-            更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-        ) VALUES (?, ?, ?, 1, ?, 'system', 'システム', 'backend_team', ?, 'system', 'システム', 'backend_team')
-        """,
-        [_採番ID, _採番初期値, "AIチーム会話の採番（TC）", now, now],
-    )
-
-
-def _新規会話ID(conn: sqlite3.Connection) -> str:
-    _採番確保(conn)
-    conn.execute(
-        f'UPDATE "{_採番テーブル}" SET 最終採番値 = 最終採番値 + 1 WHERE 採番ID = ?',
-        [_採番ID],
-    )
-    行 = conn.execute(
-        f'SELECT 最終採番値 FROM "{_採番テーブル}" WHERE 採番ID = ?', [_採番ID]
-    ).fetchone()
-    return f"{_採番プレフィックス}{行[0]:08d}"
-
-
-def 起動時クリア() -> int:
-    """backend_team 起動時、Aチーム会話を全件削除する（会話はその場限りの表示用のため引き継がない）。"""
+def 会話クリア(プロジェクト: str = "") -> int:
+    """指定プロジェクトの会話を削除する。プロジェクトが空なら全件削除する。"""
     初期化()
     conn = 接続取得()
     try:
-        cursor = conn.execute(f'DELETE FROM "{会話テーブル}"')
+        if プロジェクト:
+            cursor = conn.execute(
+                f'DELETE FROM "{会話テーブル}" WHERE プロジェクト = ?',
+                [プロジェクト],
+            )
+        else:
+            cursor = conn.execute(f'DELETE FROM "{会話テーブル}"')
         conn.commit()
         return max(0, int(cursor.rowcount))
     finally:
         conn.close()
 
 
+def 起動時クリア() -> int:
+    """backend_team 起動時、Aチーム会話を全件削除する（会話はその場限りの表示用のため引き継がない）。"""
+    return 会話クリア()
+
+
 def 会話一覧(プロジェクト: str = "", 件数: int = 一覧最大件数) -> list[dict]:
-    """会話を新しい順で返す。"""
+    """要員ごとの最終発言を新しい順で返す。"""
     初期化()
     conn = 接続取得()
     try:
@@ -143,9 +188,9 @@ def 会話一覧(プロジェクト: str = "", 件数: int = 一覧最大件数)
         params.append(max(1, int(件数)))
         rows = conn.execute(
             f"""
-            SELECT 会話ID, プロジェクト, 要員ID, 要求内容, 発言内容, 登録日時, 更新日時
+            SELECT プロジェクト, 要員ID, 要求内容, 発言内容, 登録日時, 更新日時
               FROM "{会話テーブル}"{条件}
-             ORDER BY 会話ID DESC
+             ORDER BY 更新日時 DESC, 要員ID
              LIMIT ?
             """,
             params,
@@ -155,12 +200,13 @@ def 会話一覧(プロジェクト: str = "", 件数: int = 一覧最大件数)
         conn.close()
 
 
-def 会話取得(会話ID: str) -> dict | None:
+def 会話取得(プロジェクト: str, 要員ID: str) -> dict | None:
     初期化()
     conn = 接続取得()
     try:
         row = conn.execute(
-            f'SELECT * FROM "{会話テーブル}" WHERE 会話ID = ?', [会話ID]
+            f'SELECT * FROM "{会話テーブル}" WHERE プロジェクト = ? AND 要員ID = ?',
+            [プロジェクト, 要員ID],
         ).fetchone()
         return dict(row) if row else None
     finally:
@@ -168,7 +214,7 @@ def 会話取得(会話ID: str) -> dict | None:
 
 
 def 発言状況一覧(プロジェクト: str) -> dict[str, str]:
-    """要員IDごとの最終発言日時（発言内容が入っている行の登録日時）を返す。
+    """要員IDごとの最終発言日時（発言内容が入っている行の更新日時）を返す。
 
     team_watcher.py の雑談確認が、次の発言者（未発言優先、全員発言済みなら最古の発言者）を
     選ぶために使う。空の発言（発言シーケンスに入っただけの行）は対象にしない。
@@ -178,10 +224,9 @@ def 発言状況一覧(プロジェクト: str) -> dict[str, str]:
     try:
         rows = conn.execute(
             f"""
-            SELECT 要員ID, MAX(登録日時) AS 最終発言日時
+            SELECT 要員ID, 更新日時 AS 最終発言日時
               FROM "{会話テーブル}"
              WHERE プロジェクト = ? AND 発言内容 != ''
-             GROUP BY 要員ID
             """,
             [プロジェクト],
         ).fetchall()
@@ -190,25 +235,39 @@ def 発言状況一覧(プロジェクト: str) -> dict[str, str]:
         conn.close()
 
 
+def 発言中あり(プロジェクト: str = "") -> bool:
+    """発言内容が空の行（sub_self_talk.py の応答待ち）が1件でもあれば True を返す。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        条件 = " AND プロジェクト = ?" if プロジェクト else ""
+        row = conn.execute(
+            f"""
+            SELECT 1
+              FROM "{会話テーブル}"
+             WHERE 発言内容 = ''{条件}
+             LIMIT 1
+            """,
+            [プロジェクト] if プロジェクト else [],
+        ).fetchone()
+        return row is not None
+    finally:
+        conn.close()
+
+
 def 最新発言一覧(プロジェクト: str) -> list[dict]:
-    """要員ごとの最新の発言（会話IDが最大のもの）を返す。「他者意見」として次の発言者へ渡す。"""
+    """要員ごとの最終発言を返す。「他者意見」として次の発言者へ渡す。"""
     初期化()
     conn = 接続取得()
     try:
         rows = conn.execute(
             f"""
-            SELECT t1.会話ID, t1.要員ID, t1.要求内容, t1.発言内容, t1.登録日時
-              FROM "{会話テーブル}" t1
-              INNER JOIN (
-                  SELECT 要員ID, MAX(会話ID) AS 最大会話ID
-                    FROM "{会話テーブル}"
-                   WHERE プロジェクト = ? AND 発言内容 != ''
-                   GROUP BY 要員ID
-              ) t2 ON t1.要員ID = t2.要員ID AND t1.会話ID = t2.最大会話ID
-             WHERE t1.プロジェクト = ?
-             ORDER BY t1.会話ID DESC
+            SELECT プロジェクト, 要員ID, 要求内容, 発言内容, 登録日時, 更新日時
+              FROM "{会話テーブル}"
+             WHERE プロジェクト = ? AND 発言内容 != ''
+             ORDER BY 更新日時 DESC, 要員ID
             """,
-            [プロジェクト, プロジェクト],
+            [プロジェクト],
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -216,22 +275,27 @@ def 最新発言一覧(プロジェクト: str) -> list[dict]:
 
 
 def 発言登録(プロジェクト: str, 要員ID: str, 操作者: dict) -> dict:
-    """発言シーケンスに入ったことを示す空の会話行を追加する（要求内容・発言内容はあとで発言更新が書く）。"""
+    """対象要員の1行を空にして発言中とし、完了後に発言更新で最終発言を書き戻す。"""
     初期化()
     監査 = _監査項目(操作者["利用者ID"], 操作者["利用者名"], 操作者["端末ID"])
     conn = 接続取得()
     try:
-        会話ID = _新規会話ID(conn)
         conn.execute(
             f"""
             INSERT INTO "{会話テーブル}" (
-                会話ID, プロジェクト, 要員ID, 要求内容, 発言内容,
+                プロジェクト, 要員ID, 要求内容, 発言内容,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(プロジェクト, 要員ID) DO UPDATE SET
+                要求内容 = '', 発言内容 = '',
+                更新日時 = excluded.更新日時,
+                更新利用者ID = excluded.更新利用者ID,
+                更新利用者名 = excluded.更新利用者名,
+                更新端末ID = excluded.更新端末ID
             """,
             (
-                会話ID, プロジェクト, 要員ID,
+                プロジェクト, 要員ID,
                 監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
                 監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
             ),
@@ -239,24 +303,45 @@ def 発言登録(プロジェクト: str, 要員ID: str, 操作者: dict) -> dic
         conn.commit()
     finally:
         conn.close()
-    return 会話取得(会話ID) or {}
+    return 会話取得(プロジェクト, 要員ID) or {}
 
 
-def 発言更新(会話ID: str, 要求内容: str, 発言内容: str) -> None:
-    """発言登録で作った行へ、実際に送った依頼内容と発言内容を書き戻す（sub_hatugen.py の結果）。"""
+def 要求内容更新(プロジェクト: str, 要員ID: str, 要求内容: str) -> None:
+    """AI起動前に要求内容だけを書き込み、発言内容が空の処理中状態は維持する。"""
     初期化()
-    now = _現在日時()
     conn = 接続取得()
     try:
+        now = _次更新日時(conn, プロジェクト, 要員ID)
+        conn.execute(
+            f"""
+            UPDATE "{会話テーブル}"
+               SET 要求内容 = ?,
+                   更新日時 = ?, 更新利用者ID = 'system',
+                   更新利用者名 = 'システム', 更新端末ID = 'backend_team'
+             WHERE プロジェクト = ? AND 要員ID = ?
+            """,
+            [要求内容, now, プロジェクト, 要員ID],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def 発言更新(プロジェクト: str, 要員ID: str, 要求内容: str, 発言内容: str) -> None:
+    """プロジェクト・要員IDの行へ、実際に送った依頼内容と最終発言を書き戻す。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        now = _次更新日時(conn, プロジェクト, 要員ID)
         conn.execute(
             f"""
             UPDATE "{会話テーブル}"
                SET 要求内容 = ?, 発言内容 = ?,
                    更新日時 = ?, 更新利用者ID = 'system',
                    更新利用者名 = 'システム', 更新端末ID = 'backend_team'
-             WHERE 会話ID = ?
+             WHERE プロジェクト = ? AND 要員ID = ?
             """,
-            [要求内容, 発言内容, now, 会話ID],
+            [要求内容, 発言内容, now, プロジェクト, 要員ID],
         )
         conn.commit()
     finally:

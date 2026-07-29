@@ -53,7 +53,7 @@ const 入力テーマ = ref('');
 const 入力自動作業設定 = ref(false);
 const 入力目標 = ref('');
 const 入力作業ループ = ref(false);
-const 入力最大ループ回数 = ref(1);
+const 入力作業ループ回数 = ref(1);
 const 入力動員要員数 = ref(既定動員要員数);
 const 入力パターン = ref<'SPDCA' | 'PlanDo'>(既定パターン);
 const 入力TEAM_AI_NAME = ref(既定AI.TEAM_AI_NAME);
@@ -65,7 +65,7 @@ const 利用可能モデル = ref<Record<string, any>>({ code_models: {} });
 const 規定設定 = ref<Record<string, any>>({});
 // AI設定の一括反映中は、名称変更に連動するモデル補正を止める
 const AI反映中 = ref(false);
-const 最大ループ回数選択肢 = Array.from({ length: 99 }, (_, index) => index + 1);
+const 作業ループ回数選択肢 = Array.from({ length: 99 }, (_, index) => index + 1);
 // 相談へ動員できるのは admin 以外の有効要員だけなので、その人数を動員要員数の上限にする
 const 有効要員数 = ref(1);
 const 動員要員数選択肢 = computed(() =>
@@ -97,6 +97,14 @@ const 既定パス選択中 = computed(() => 入力パス.value.trim() === 既�
 const 登録済み = computed(() =>
   目標一覧.value.some((項目) => 項目.CODE_BASE_PATH === 入力パス.value.trim()),
 );
+
+// 利用者が自動作業を新たに開始するときは、前回のチーム作業をそのまま再利用させない。
+// 一覧・プロジェクト選択によるフォーム反映ではこの処理を通さず、保存済み内容を維持する。
+const 自動作業設定を変更 = (event: Event) => {
+  const 次の設定 = (event.target as HTMLInputElement).checked;
+  if (!入力自動作業設定.value && 次の設定) 入力目標.value = '';
+  入力自動作業設定.value = 次の設定;
+};
 
 const 目標一覧読込 = async () => {
   読込中.value = true;
@@ -226,7 +234,7 @@ const 一覧から選ぶ = (項目: チーム目標) => {
   入力自動作業設定.value = Boolean(項目.自動作業設定);
   入力目標.value = 項目.チーム作業;
   入力作業ループ.value = Boolean(項目.作業ループ);
-  入力最大ループ回数.value = Math.min(99, Math.max(1, Number(項目.最大ループ回数 ?? 1)));
+  入力作業ループ回数.value = Math.min(99, Math.max(1, Number(項目.作業ループ回数 ?? 1)));
   入力動員要員数.value = 動員要員数を丸める(項目.動員要員数);
   入力パターン.value = パターン正規化(項目.パターン);
   AI設定を反映(項目);
@@ -241,7 +249,7 @@ watch(選択パス, (value) => {
     入力自動作業設定.value = Boolean(既存.自動作業設定);
     入力目標.value = 既存.チーム作業;
     入力作業ループ.value = Boolean(既存.作業ループ);
-    入力最大ループ回数.value = Math.min(99, Math.max(1, Number(既存.最大ループ回数 ?? 1)));
+    入力作業ループ回数.value = Math.min(99, Math.max(1, Number(既存.作業ループ回数 ?? 1)));
     入力動員要員数.value = 動員要員数を丸める(既存.動員要員数);
     入力パターン.value = パターン正規化(既存.パターン);
     AI設定を反映(既存);
@@ -261,7 +269,7 @@ watch(
     入力自動作業設定.value = false;
     入力目標.value = '';
     入力作業ループ.value = false;
-    入力最大ループ回数.value = 1;
+    入力作業ループ回数.value = 1;
     入力パターン.value = 既定パターン;
     // 選択肢の上限は有効要員数に依存するため、読込後に丸め直す
     await Promise.all([目標一覧読込(), プロジェクト選択肢読込(), 有効要員数読込(), モデル選択肢読込()]);
@@ -283,7 +291,7 @@ const 保存 = async () => {
     void qMessage('CODE_BASE_PATH を入力してください。', 'error');
     return;
   }
-  if (!目標) {
+  if (!目標 && !入力自動作業設定.value) {
     void qMessage('チーム作業を入力してください。', 'error');
     return;
   }
@@ -299,7 +307,7 @@ const 保存 = async () => {
       自動作業設定: 入力自動作業設定.value,
       チーム作業: 目標,
       作業ループ: 入力作業ループ.value,
-      最大ループ回数: 入力最大ループ回数.value,
+      作業ループ回数: 入力作業ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
       TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
@@ -322,7 +330,7 @@ const 保存 = async () => {
       自動作業設定: 入力自動作業設定.value,
       チーム作業: 目標,
       作業ループ: 入力作業ループ.value,
-      最大ループ回数: 入力最大ループ回数.value,
+      作業ループ回数: 入力作業ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
       TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
@@ -436,7 +444,6 @@ const 削除 = async () => {
                     v-model.trim="入力テーマ"
                     type="text"
                     class="detail-input"
-                    placeholder="成功と失敗を学習し、今よりも優れたソフトウェアを創る。"
                   />
                 </div>
               </div>
@@ -454,9 +461,10 @@ const 削除 = async () => {
                   </div>
                   <label class="loop-switch">
                     <input
-                      v-model="入力自動作業設定"
+                      :checked="入力自動作業設定"
                       type="checkbox"
                       aria-label="自動作業設定の切り替え"
+                      @change="自動作業設定を変更"
                     />
                     <span class="loop-switch-track" aria-hidden="true">
                       <span class="loop-switch-thumb"></span>
@@ -469,13 +477,12 @@ const 削除 = async () => {
               </section>
               <div class="detail-row request-row">
                 <div class="detail-label">
-                  チーム作業<span class="required-mark">*</span>
+                  チーム作業<span v-if="!入力自動作業設定" class="required-mark">*</span>
                 </div>
                 <div class="detail-value">
                   <textarea
                     v-model="入力目標"
                     class="detail-textarea"
-                    placeholder="斬新なアイデアで、未踏のフロンティアを切り開け！"
                   ></textarea>
                 </div>
               </div>
@@ -520,10 +527,10 @@ const 削除 = async () => {
                     </span>
                   </label>
 
-                  <label class="loop-config-item" for="最大ループ回数">
-                    <span class="loop-config-label">最大ループ回数</span>
-                    <select id="最大ループ回数" v-model.number="入力最大ループ回数" class="loop-config-select">
-                      <option v-for="回数 in 最大ループ回数選択肢" :key="回数" :value="回数">
+                  <label class="loop-config-item" for="作業ループ回数">
+                    <span class="loop-config-label">作業ループ回数</span>
+                    <select id="作業ループ回数" v-model.number="入力作業ループ回数" class="loop-config-select">
+                      <option v-for="回数 in 作業ループ回数選択肢" :key="回数" :value="回数">
                         {{ 回数 === 99 ? '99（無制限）' : `${回数} 回` }}
                       </option>
                     </select>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, net, screen, session } from 'electron'
 import { readdir } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -39,6 +39,7 @@ const CORE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minH
 const CHAT_BASE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const SETTINGS_BOUNDS: BoundsPreset = { width: 720, height: 580, minWidth: 580, minHeight: 400 }
 const TASK_DIALOG_BOUNDS: BoundsPreset = { width: 1280, height: 800, minWidth: 640, minHeight: 480 }
+const TEAM_BOUNDS: BoundsPreset = { width: 1280, height: 800, minWidth: 800, minHeight: 520 }
 const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   chat: CHAT_BASE_BOUNDS,
   file: CHAT_BASE_BOUNDS,
@@ -69,6 +70,7 @@ let loginWindow: BrowserWindow | null = null
 let coreWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
 let taskDialogWindow: BrowserWindow | null = null
+let teamWindow: BrowserWindow | null = null
 const panelWindows = new Map<PanelKey, BrowserWindow>()
 const taskWindows = new Map<TaskKey, BrowserWindow>()
 const windowRoles = new Map<number, WindowRole>()
@@ -482,6 +484,152 @@ function closeAllTaskWindows() {
   })
 }
 
+function closeTeamWindow() {
+  if (teamWindow && !teamWindow.isDestroyed()) {
+    teamWindow.destroy()
+  }
+  teamWindow = null
+}
+
+function normalizeTeamPageUrl(rawUrl: string): URL | null {
+  try {
+    const url = new URL(rawUrl)
+    const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
+    if (!['http:', 'https:'].includes(url.protocol) || !loopbackHosts.has(url.hostname)) {
+      return null
+    }
+    url.pathname = '/AIチーム'
+    url.search = ''
+    url.searchParams.set('単体表示', '1')
+    url.hash = ''
+    return url
+  } catch {
+    return null
+  }
+}
+
+async function probeFrontendWebUrl(teamUrl: URL): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2000)
+  try {
+    const requestUrl = new URL(teamUrl)
+    requestUrl.searchParams.set('_avatar_health', Date.now().toString())
+    const response = await net.fetch(requestUrl.toString(), {
+      method: 'HEAD',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    return response.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function resolveAvailableFrontendWebUrl(rawUrl: string): Promise<string | null> {
+  const primaryUrl = normalizeTeamPageUrl(rawUrl)
+  if (!primaryUrl) return null
+
+  const hostCandidates = Array.from(new Set([
+    primaryUrl.hostname,
+    'localhost',
+    '127.0.0.1',
+    '[::1]',
+  ]))
+  const candidates = hostCandidates.map((hostname) => {
+    const candidate = new URL(primaryUrl)
+    candidate.hostname = hostname
+    return candidate
+  })
+  const results = await Promise.all(
+    candidates.map(async (candidate) => (
+      await probeFrontendWebUrl(candidate) ? candidate.toString() : null
+    )),
+  )
+  return results.find((url): url is string => Boolean(url)) ?? null
+}
+
+async function openTeamPage(
+  rawUrl: string,
+  token: string,
+  user: Record<string, unknown> | null,
+): Promise<boolean> {
+  const teamUrl = normalizeTeamPageUrl(rawUrl)
+  if (!teamUrl) return false
+
+  if (!teamWindow || teamWindow.isDestroyed()) {
+    const appPath = app.getAppPath()
+    const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy.ico')
+    teamWindow = new BrowserWindow({
+      width: TEAM_BOUNDS.width,
+      height: TEAM_BOUNDS.height,
+      minWidth: TEAM_BOUNDS.minWidth,
+      minHeight: TEAM_BOUNDS.minHeight,
+      show: false,
+      backgroundColor: '#07111f',
+      frame: true,
+      resizable: true,
+      minimizable: false,
+      autoHideMenuBar: true,
+      title: 'AiDiy AI Team',
+      icon: iconPath,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        webSecurity: true,
+        backgroundThrottling: false,
+      },
+    })
+    teamWindow.setBounds({
+      ...getCenteredPosition(TEAM_BOUNDS.width, TEAM_BOUNDS.height),
+      width: TEAM_BOUNDS.width,
+      height: TEAM_BOUNDS.height,
+    }, false)
+    teamWindow.on('closed', () => {
+      teamWindow = null
+    })
+  }
+
+  const targetWindow = teamWindow
+  try {
+    // frontend_web と同じ origin を一度開き、Avatar のログイン情報をlocalStorageへ渡してから
+    // Vue Router の /AIチームを表示する。AIチーム本体はfrontend_web側だけに置く。
+    const bootstrapUrl = new URL('/ログイン', teamUrl)
+    await targetWindow.loadURL(bootstrapUrl.toString())
+    if (token) {
+      const tokenJson = JSON.stringify(token)
+      const userJson = JSON.stringify(JSON.stringify(user ?? null))
+      await targetWindow.webContents.executeJavaScript(
+        `localStorage.setItem('token', ${tokenJson}); localStorage.setItem('user', ${userJson});`,
+        true,
+      )
+    }
+    await targetWindow.loadURL(teamUrl.toString())
+    if (!targetWindow.isDestroyed()) {
+      targetWindow.show()
+      targetWindow.focus()
+    }
+    return true
+  } catch {
+    closeTeamWindow()
+    return false
+  }
+}
+
+async function toggleTeamPage(
+  rawUrl: string,
+  token: string,
+  user: Record<string, unknown> | null,
+): Promise<boolean> {
+  if (teamWindow && !teamWindow.isDestroyed()) {
+    closeTeamWindow()
+    return false
+  }
+  return openTeamPage(rawUrl, token, user)
+}
+
 function applyPrimaryMode(window: BrowserWindow, mode: WindowMode) {
   const bounds = mode === 'login' ? LOGIN_BOUNDS : CORE_BOUNDS
   const position = mode === 'core'
@@ -568,6 +716,7 @@ function createCoreWindow(show = true) {
   coreWindow.on('closed', () => {
     closeAllPanelWindows()
     closeAllTaskWindows()
+    closeTeamWindow()
     if (coreWindow) {
       windowRoles.delete(coreWindow.id)
     }
@@ -599,6 +748,7 @@ async function openCoreWindow(sourceWindow?: BrowserWindow | null) {
 async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
   closeAllPanelWindows()
   closeAllTaskWindows()
+  closeTeamWindow()
   const nextLoginWindow = createLoginWindow(false)
   await waitForReady(nextLoginWindow)
   if (!nextLoginWindow.isDestroyed()) {
@@ -833,6 +983,18 @@ app.whenReady().then(() => {
   ipcMain.handle('panel:get-states', () => ({ ...panelStates }))
 
   ipcMain.handle('task:toggle-all', async () => toggleTaskWindows())
+
+  ipcMain.handle('team:check-frontend-web', (_event, url: string) =>
+    resolveAvailableFrontendWebUrl(url),
+  )
+  ipcMain.handle(
+    'team:toggle-page',
+    (_event, url: string, token: string, user: Record<string, unknown> | null) =>
+      toggleTeamPage(url, token, user),
+  )
+  ipcMain.handle('team:close-page', () => {
+    closeTeamWindow()
+  })
 
   ipcMain.handle('task-dialog:open', (_event, payload: Record<string, any>) => {
     openTaskDialogWindow(payload)

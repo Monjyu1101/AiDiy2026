@@ -65,7 +65,6 @@ export type チーム作業 = {
 };
 
 export type チーム会話 = {
-  会話ID: string;
   プロジェクト: string;
   要員ID: string;
   要求内容: string;
@@ -83,7 +82,7 @@ export type チーム目標 = {
   /** 目標に向けた作業ループを回すかどうか（既定はオフ） */
   作業ループ?: boolean | number;
   /** 1〜98は上限回数、99は無制限 */
-  最大ループ回数?: number;
+  作業ループ回数?: number;
   /** 作業ループの相談フェーズへ動員する要員数（1〜admin以外の有効要員数、既定2） */
   動員要員数?: number;
   /** 作業ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */

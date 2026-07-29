@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // AIチーム_会話状況: 掲示板に出ているプロジェクトのAチーム会話を一覧表示する
-// 5秒ごとにプロジェクト単位の最大更新日時を確認し、変化時だけ一覧を再取得する
+// 開いている間は5秒、折り畳み中は10秒ごとに更新確認し、非表示中は停止する
 // 表示するのは自動作業設定がオンのときだけ（オフのときは AIチーム.vue 側で描画しない）
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
 import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
 import type { チーム会話 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
+import { use表示連動ポーリング } from '../use表示連動ポーリング';
 
 const props = defineProps<{
   /** 掲示板に表示中のプロジェクト（CODE_BASE_PATH）。この分だけを一覧する */
@@ -16,7 +17,6 @@ const props = defineProps<{
 const 会話一覧 = ref<チーム会話[]>([]);
 const 読込中 = ref(false);
 const 読込エラー = ref('');
-let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let 会話最大更新日時 = '';
 let 会話取得中 = false;
 
@@ -82,10 +82,7 @@ const 更新確認 = async () => {
   }
 };
 
-const 自動更新開始 = () => {
-  if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(() => void 更新確認(), 5000);
-};
+use表示連動ポーリング(更新確認, 5000, 開いている);
 
 // 掲示板のプロジェクトが変わったら、その分の会話へ切り替える
 watch(対象プロジェクト, () => {
@@ -103,7 +100,7 @@ const 内容を開く = (会話: チーム会話) => {
   const 要求 = String(会話.要求内容 ?? '');
   const 発言 = String(会話.発言内容 ?? '');
   if (!要求.trim() && !発言.trim()) return;
-  内容タイトル.value = 会話.要員ID || 会話.会話ID;
+  内容タイトル.value = 会話.要員ID;
   内容要求値.value = 要求;
   内容応答値.value = 発言;
   内容ダイアログ表示.value = true;
@@ -113,11 +110,6 @@ const 日時表示 = (値: string) => String(値 ?? '').replace(/^\d{4}-/, '').s
 
 onMounted(async () => {
   await 会話一覧読込();
-  自動更新開始();
-});
-
-onBeforeUnmount(() => {
-  if (refreshTimer) clearInterval(refreshTimer);
 });
 </script>
 
@@ -158,18 +150,18 @@ onBeforeUnmount(() => {
           <tr>
             <th>誰が</th>
             <th>発言内容</th>
-            <th>登録日時</th>
+            <th>最終発言日時</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="会話 in 会話一覧"
-            :key="会話.会話ID"
+            :key="`${会話.プロジェクト}:${会話.要員ID}`"
             @dblclick="内容を開く(会話)"
           >
             <td class="member-id">{{ 会話.要員ID }}</td>
-            <td class="talk-text">{{ 会話.発言内容 }}</td>
-            <td class="done-at">{{ 日時表示(会話.登録日時) }}</td>
+            <td class="talk-text">{{ 会話.発言内容 || (会話.要求内容 ? '（発言処理中）' : '') }}</td>
+            <td class="done-at">{{ 日時表示(会話.更新日時) }}</td>
           </tr>
         </tbody>
       </table>

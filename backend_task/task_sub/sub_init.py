@@ -37,7 +37,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AIDIYルート = os.path.normpath(os.path.join(BASE_DIR, ".."))
 TASK_API = "http://localhost:8093/task"
 MCP_URL = "http://localhost:8095/aidiy_code_agents/run"
-TASK_AI_NAME既定 = "claude_cli"
+TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 
 タスクID = ""

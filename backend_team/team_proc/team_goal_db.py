@@ -19,13 +19,14 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 
+from .config import 設定読込
 from .team_db import DB_PATH, 接続取得
 
 目標テーブル = "Aチーム目標"
 既定CODE_BASE_PATH = "../"
 既定チーム作業 = "斬新なアイデアで、未踏のフロンティアを切り開け！"
 既定チーム目標 = "成功と失敗を学習し、今よりも優れたソフトウェアを創る。"
-既定最大ループ回数 = 1
+既定作業ループ回数 = 1
 既定動員要員数 = 2
 # 動員要員数の保存上限。実際に動員できる人数は投入時に有効要員数（admin除く）で頭打ちにする。
 動員要員数上限 = 99
@@ -34,9 +35,9 @@ from .team_db import DB_PATH, 接続取得
 既定パターン = "PlanDo"
 # 作業ループの各段で使うAI。目標ごとに持ち、Aチーム依頼・Aタスクの投入時に使う
 AI設定キー = ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL")
-既定TEAM_AI_NAME = "claude_cli"
+既定TEAM_AI_NAME = "codex_cli"
 既定TEAM_AI_MODEL = "auto"
-既定TASK_AI_NAME = "claude_cli"
+既定TASK_AI_NAME = "codex_cli"
 既定TASK_AI_MODEL = "auto"
 
 
@@ -79,6 +80,16 @@ def 作業履歴クリア必要(変更前: dict | None, チーム作業: str, �
     )
 
 
+def 会話クリア必要(変更前: dict | None, チーム目標: str, 自動作業設定: bool) -> bool:
+    """チーム目標または自動作業設定が変わった場合だけ、そのプロジェクトの会話をクリアする。"""
+    if 変更前 is None:
+        return False
+    return (
+        str(変更前.get("チーム目標", "")) != チーム目標
+        or bool(変更前.get("自動作業設定", 0)) != bool(自動作業設定)
+    )
+
+
 def 初期化() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = 接続取得()
@@ -90,7 +101,7 @@ def 初期化() -> None:
                 自動作業設定 INTEGER NOT NULL DEFAULT 0,
                 チーム作業 TEXT NOT NULL DEFAULT '',
                 作業ループ INTEGER NOT NULL DEFAULT 0,
-                最大ループ回数 INTEGER NOT NULL DEFAULT 1,
+                作業ループ回数 INTEGER NOT NULL DEFAULT 1,
                 動員要員数 INTEGER NOT NULL DEFAULT 2,
                 パターン TEXT NOT NULL DEFAULT '{既定パターン}',
                 TEAM_AI_NAME TEXT NOT NULL DEFAULT '{既定TEAM_AI_NAME}',
@@ -114,24 +125,32 @@ def 初期化() -> None:
 
 
 def 初期目標を投入() -> None:
-    """起動時、1 件も無ければ既定のパスと目標を投入する（既存値は上書きしない）。"""
+    """起動時、1 件も無ければ既定のパスと目標をconfのAI設定で投入する。"""
     初期化()
+    設定 = 設定読込()
+    AI設定 = {
+        "TEAM_AI_NAME": str(設定.TEAM_AI_NAME).strip() or 既定TEAM_AI_NAME,
+        "TEAM_AI_MODEL": str(設定.TEAM_AI_MODEL).strip() or 既定TEAM_AI_MODEL,
+        "TASK_AI_NAME": str(設定.TASK_AI_NAME).strip() or 既定TASK_AI_NAME,
+        "TASK_AI_MODEL": str(設定.TASK_AI_MODEL).strip() or 既定TASK_AI_MODEL,
+    }
     conn = 接続取得()
     try:
         監査 = _監査項目("system", "システム", "backend_team")
         conn.execute(
             f"""
             INSERT OR IGNORE INTO "{目標テーブル}" (
-                CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 最大ループ回数, 動員要員数, パターン,
+                CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
                 TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                既定CODE_BASE_PATH, 既定チーム目標, 0, 既定チーム作業, 0, 既定最大ループ回数,
+                既定CODE_BASE_PATH, 既定チーム目標, 0, 既定チーム作業, 0, 既定作業ループ回数,
                 既定動員要員数, 既定パターン,
-                既定TEAM_AI_NAME, 既定TEAM_AI_MODEL, 既定TASK_AI_NAME, 既定TASK_AI_MODEL,
+                AI設定["TEAM_AI_NAME"], AI設定["TEAM_AI_MODEL"],
+                AI設定["TASK_AI_NAME"], AI設定["TASK_AI_MODEL"],
                 _次の更新連番(conn),
                 監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
                 監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
@@ -185,7 +204,7 @@ def 目標一覧() -> list[dict]:
     try:
         rows = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
@@ -198,16 +217,16 @@ def 目標一覧() -> list[dict]:
 
 
 def 作業ループ対象一覧() -> list[dict]:
-    """作業ループがオンの目標を、更新日時の新しい順で返す（PDCAの自動投入対象）。"""
+    """作業ループがオンかつチーム作業入力済みの目標を、PDCAの自動投入対象として返す。"""
     初期化()
     conn = 接続取得()
     try:
         rows = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新日時
               FROM "{目標テーブル}"
-             WHERE 作業ループ = 1 AND CODE_BASE_PATH != '' AND チーム作業 != ''
+             WHERE 作業ループ = 1 AND TRIM(CODE_BASE_PATH) != '' AND TRIM(チーム作業) != ''
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
             """
         ).fetchall()
@@ -222,7 +241,7 @@ def 目標取得(code_base_path: str) -> dict | None:
     try:
         row = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}" WHERE CODE_BASE_PATH = ?
@@ -241,7 +260,7 @@ def 最終目標取得() -> dict | None:
     try:
         row = conn.execute(
             f"""
-            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 最大ループ回数, 動員要員数, パターン,
+            SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
@@ -261,7 +280,7 @@ def 目標保存(
     操作者: dict,
     自動作業設定: bool = False,
     作業ループ: bool = False,
-    最大ループ回数: int = 既定最大ループ回数,
+    作業ループ回数: int = 既定作業ループ回数,
     動員要員数: int = 既定動員要員数,
     パターン: str = 既定パターン,
     TEAM_AI_NAME: str = 既定TEAM_AI_NAME,
@@ -284,7 +303,7 @@ def 目標保存(
         conn.execute(
             f"""
             INSERT INTO "{目標テーブル}" (
-                CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 最大ループ回数, 動員要員数, パターン,
+                CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
                 TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
@@ -294,7 +313,7 @@ def 目標保存(
                 自動作業設定 = excluded.自動作業設定,
                 チーム作業 = excluded.チーム作業,
                 作業ループ = excluded.作業ループ,
-                最大ループ回数 = excluded.最大ループ回数,
+                作業ループ回数 = excluded.作業ループ回数,
                 動員要員数 = excluded.動員要員数,
                 パターン = excluded.パターン,
                 TEAM_AI_NAME = excluded.TEAM_AI_NAME,
@@ -309,7 +328,7 @@ def 目標保存(
             """,
             (
                 code_base_path, チーム目標, int(bool(自動作業設定)), チーム作業, int(bool(作業ループ)),
-                max(1, min(99, int(最大ループ回数))),
+                max(1, min(99, int(作業ループ回数))),
                 max(1, min(動員要員数上限, int(動員要員数))), パターン,
                 team_ai_name, team_ai_model, task_ai_name, task_ai_model,
                 _次の更新連番(conn),
@@ -323,6 +342,168 @@ def 目標保存(
     finally:
         conn.close()
     return 目標取得(code_base_path) or {}
+
+
+def 取りまとめ反映(
+    code_base_path: str,
+    要求内容: str,
+    取りまとめ内容: str,
+    要員ID: str = "admin",
+) -> dict:
+    """AIの取りまとめをチーム作業へ設定し、会話をadminの取りまとめ1件へ置き換える。
+
+    AI処理中に利用者がチーム作業を入力した場合は上書きしない。目標更新・会話置換は
+    同じトランザクションで行い、どちらかだけが反映される状態を防ぐ。
+    """
+    from . import team_pdca_db, team_talk_db
+
+    初期化()
+    team_talk_db.初期化()
+    team_pdca_db.初期化()
+    内容 = str(取りまとめ内容).strip()
+    if not 内容:
+        raise ValueError("取りまとめ内容が空です")
+    監査 = _監査項目("system", "システム", "backend_team")
+    conn = 接続取得()
+    try:
+        cursor = conn.execute(
+            f"""
+            UPDATE "{目標テーブル}"
+               SET チーム作業 = ?, 更新連番 = ?,
+                   更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ?
+             WHERE CODE_BASE_PATH = ? AND TRIM(チーム作業) = ''
+            """,
+            [
+                内容,
+                _次の更新連番(conn),
+                監査["更新日時"],
+                監査["更新利用者ID"],
+                監査["更新利用者名"],
+                監査["更新端末ID"],
+                code_base_path,
+            ],
+        )
+        if int(cursor.rowcount) != 1:
+            raise ValueError("対象のチーム目標が無いか、チーム作業が既に入力されています")
+
+        conn.execute(
+            f'DELETE FROM "{team_talk_db.会話テーブル}" WHERE プロジェクト = ?',
+            [code_base_path],
+        )
+        conn.execute(
+            f'DELETE FROM "{team_pdca_db.作業テーブル}" WHERE プロジェクト = ?',
+            [code_base_path],
+        )
+        conn.execute(
+            f"""
+            INSERT INTO "{team_talk_db.会話テーブル}" (
+                プロジェクト, 要員ID, 要求内容, 発言内容,
+                登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
+                更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                code_base_path,
+                要員ID,
+                要求内容,
+                内容,
+                監査["登録日時"],
+                監査["登録利用者ID"],
+                監査["登録利用者名"],
+                監査["登録端末ID"],
+                監査["更新日時"],
+                監査["更新利用者ID"],
+                監査["更新利用者名"],
+                監査["更新端末ID"],
+            ],
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return 目標取得(code_base_path) or {}
+
+
+def 作業ループ終了後更新(code_base_path: str) -> dict:
+    """作業ループ完了後、自動作業設定に応じて再協議または停止へ切り替える。
+
+    自動作業設定がオンならチーム作業を空欄にして対象プロジェクトの会話をクリアし、
+    次の作業を協議できる状態へ戻す。オフなら作業ループをオフにして再投入を止める。
+    AI終了判定後に利用者が設定を変えた場合へ配慮し、DBの現在値で分岐する。
+    """
+    from . import team_talk_db
+
+    初期化()
+    team_talk_db.初期化()
+    監査 = _監査項目("system", "システム", "backend_team")
+    conn = 接続取得()
+    処理 = "変更なし"
+    try:
+        row = conn.execute(
+            f"""
+            SELECT 自動作業設定, 作業ループ, チーム作業
+              FROM "{目標テーブル}"
+             WHERE CODE_BASE_PATH = ?
+            """,
+            [code_base_path],
+        ).fetchone()
+        if not row:
+            raise ValueError("対象のチーム目標が見つかりません")
+
+        # 起動後に利用者が停止または作業内容変更を行った場合は、その現在値を上書きしない。
+        if not bool(row["作業ループ"]) or not str(row["チーム作業"] or "").strip():
+            conn.rollback()
+        elif bool(row["自動作業設定"]):
+            conn.execute(
+                f"""
+                UPDATE "{目標テーブル}"
+                   SET チーム作業 = '', 更新連番 = ?,
+                       更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ?
+                 WHERE CODE_BASE_PATH = ?
+                """,
+                [
+                    _次の更新連番(conn),
+                    監査["更新日時"],
+                    監査["更新利用者ID"],
+                    監査["更新利用者名"],
+                    監査["更新端末ID"],
+                    code_base_path,
+                ],
+            )
+            conn.execute(
+                f'DELETE FROM "{team_talk_db.会話テーブル}" WHERE プロジェクト = ?',
+                [code_base_path],
+            )
+            conn.commit()
+            処理 = "再協議"
+        else:
+            conn.execute(
+                f"""
+                UPDATE "{目標テーブル}"
+                   SET 作業ループ = 0, 更新連番 = ?,
+                       更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ?
+                 WHERE CODE_BASE_PATH = ?
+                """,
+                [
+                    _次の更新連番(conn),
+                    監査["更新日時"],
+                    監査["更新利用者ID"],
+                    監査["更新利用者名"],
+                    監査["更新端末ID"],
+                    code_base_path,
+                ],
+            )
+            conn.commit()
+            処理 = "停止"
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {"処理": 処理, "item": 目標取得(code_base_path) or {}}
 
 
 def 目標削除(code_base_path: str) -> None:

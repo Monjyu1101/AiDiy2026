@@ -38,6 +38,11 @@ const api = {
   minimizeCurrentWindow: () => ipcRenderer.invoke('window:minimize-self'),
   togglePanel: (panel: PanelKey) => ipcRenderer.invoke('panel:toggle', panel),
   toggleTaskWindows: () => ipcRenderer.invoke('task:toggle-all') as Promise<boolean>,
+  checkFrontendWeb: (url: string) =>
+    ipcRenderer.invoke('team:check-frontend-web', url) as Promise<string | null>,
+  toggleTeamPage: (url: string, token: string, user: Record<string, unknown> | null) =>
+    ipcRenderer.invoke('team:toggle-page', url, token, user) as Promise<boolean>,
+  closeTeamPage: () => ipcRenderer.invoke('team:close-page') as Promise<void>,
   openTaskDialogWindow: (payload: Record<string, any>) => ipcRenderer.invoke('task-dialog:open', payload),
   getTaskDialogPayload: () => ipcRenderer.invoke('task-dialog:get-payload') as Promise<Record<string, any> | null>,
   applyPanelStates: (states: Record<PanelKey, boolean>) => ipcRenderer.invoke('panel:apply-states', states) as Promise<Record<PanelKey, boolean>>,

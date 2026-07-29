@@ -4,6 +4,7 @@ import apiClient from '../../../api/client';
 import AiTeamMemberSummon from '../dialog/AIチーム_要員召喚.vue';
 import type { エージェント, チーム状況, チーム要員, 状態表示 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
+import { use表示連動ポーリング } from '../use表示連動ポーリング';
 
 const props = defineProps<{
   エージェント一覧: エージェント[];
@@ -79,9 +80,9 @@ const 召喚ダイアログを開く = () => {
 };
 
 const 状況一覧 = ref<チーム状況[]>([]);
+// 開いている間は10秒、折り畳み中は20秒ごとに更新確認し、非表示中は停止する
 const 更新確認間隔ミリ秒 = 10_000;
 const 強制更新間隔ミリ秒 = 30_000;
-let 状況更新Timer: ReturnType<typeof setInterval> | null = null;
 let 状況最大更新日時 = '';
 let 状況最終読込時刻 = 0;
 
@@ -123,14 +124,14 @@ const 状況更新を確認する = async () => {
   }
 };
 
+use表示連動ポーリング(状況更新を確認する, 更新確認間隔ミリ秒, 開いている);
+
 onMounted(async () => {
   await 状況を読み込む();
-  状況更新Timer = setInterval(() => void 状況更新を確認する(), 更新確認間隔ミリ秒);
 });
 
 onBeforeUnmount(() => {
   window.clearTimeout(視点待ちタイマー);
-  if (状況更新Timer) clearInterval(状況更新Timer);
   状況最大更新日時 = '';
   状況最終読込時刻 = 0;
 });

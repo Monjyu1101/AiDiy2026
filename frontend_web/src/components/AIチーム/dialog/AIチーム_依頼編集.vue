@@ -34,9 +34,9 @@ const プロジェクト選択肢 = ref<{ value: string; label: string }[]>([]);
 const 選択プロジェクト = ref('');
 const 入力プロジェクト = ref('');
 const 入力要求内容 = ref('');
-const 入力TEAM_AI_NAME = ref('claude_cli');
+const 入力TEAM_AI_NAME = ref('codex_cli');
 const 入力TEAM_AI_MODEL = ref('auto');
-const 入力TASK_AI_NAME = ref('claude_cli');
+const 入力TASK_AI_NAME = ref('codex_cli');
 const 入力TASK_AI_MODEL = ref('auto');
 const 入力実行有効 = ref(true);
 const 入力状況 = ref('準備開始');
@@ -75,12 +75,12 @@ const モデル選択肢読込 = async () => {
     availableModels.value = modelResponse.data.data?.available_models || { code_models: {} };
     currentSettings.value = settingResponse.data.data || {};
   } catch {
-    availableModels.value = { code_models: { claude_cli: { auto: 'auto' } } };
+    availableModels.value = { code_models: { codex_cli: { auto: 'auto' } } };
     currentSettings.value = {
       CODE_BASE_PATH: '../',
-      TEAM_AI_NAME: 'claude_cli',
+      TEAM_AI_NAME: 'codex_cli',
       TEAM_AI_MODEL: 'auto',
-      TASK_AI_NAME: 'claude_cli',
+      TASK_AI_NAME: 'codex_cli',
       TASK_AI_MODEL: 'auto',
     };
   }
@@ -123,15 +123,15 @@ const フォーム初期化 = async () => {
   フォーム初期化中.value = true;
   const aiCandidates = teamAiOptions.value;
   const initialWork = work ?? props.最終依頼;
-  const teamAiName = initialWork?.TEAM_AI_NAME || currentSettings.value.TEAM_AI_NAME || 'claude_cli';
-  入力TEAM_AI_NAME.value = chooseAvailable(teamAiName, aiCandidates) || 'claude_cli';
+  const teamAiName = initialWork?.TEAM_AI_NAME || currentSettings.value.TEAM_AI_NAME || 'codex_cli';
+  入力TEAM_AI_NAME.value = chooseAvailable(teamAiName, aiCandidates) || 'codex_cli';
   const teamModelCandidates = Object.keys(
     availableModels.value?.code_models?.[入力TEAM_AI_NAME.value] || {},
   );
   const teamModelName = initialWork?.TEAM_AI_MODEL || currentSettings.value.TEAM_AI_MODEL || 'auto';
   入力TEAM_AI_MODEL.value = chooseAvailable(teamModelName, teamModelCandidates) || 'auto';
-  const taskAiName = initialWork?.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'claude_cli';
-  入力TASK_AI_NAME.value = chooseAvailable(taskAiName, taskAiOptions.value) || 'claude_cli';
+  const taskAiName = initialWork?.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'codex_cli';
+  入力TASK_AI_NAME.value = chooseAvailable(taskAiName, taskAiOptions.value) || 'codex_cli';
   const taskModelCandidates = Object.keys(
     availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {},
   );

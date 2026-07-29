@@ -607,10 +607,11 @@ async def TASKモデル選択肢取得(http_request: Request):
 
         conf_json = getattr(conf, "json", None) if conf else None
         現在設定 = {
-            "TASK_AI_NAME": getattr(conf_json, "TASK_AI_NAME", "claude_cli") if conf_json else "claude_cli",
+            "CODE_BASE_PATH": getattr(conf_json, "CODE_BASE_PATH", "../") if conf_json else "../",
+            "TASK_AI_NAME": getattr(conf_json, "TASK_AI_NAME", "codex_cli") if conf_json else "codex_cli",
             "TASK_AI_MODEL": getattr(conf_json, "TASK_AI_MODEL", "auto") if conf_json else "auto",
         }
-        code_models.setdefault(str(現在設定["TASK_AI_NAME"] or "claude_cli"), {"auto": "auto"})
+        code_models.setdefault(str(現在設定["TASK_AI_NAME"] or "codex_cli"), {"auto": "auto"})
         return {
             "status": "OK",
             "message": "TASKモデル選択肢取得成功",

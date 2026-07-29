@@ -37,7 +37,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_API = "http://localhost:8093/task"
 MCP_URL = "http://localhost:8095/aidiy_code_agents/run"
 通知音URL = "http://localhost:8095/aidiy_notification_sounds/play"
-TASK_AI_NAME既定 = "claude_cli"
+TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 # 1ステップの実行タイムアウト秒。tasks_watcher.実行タイムアウト分（既定60分）と揃える。
 # 明示的に渡さないと aidiy_code_agents 側の既定値（30分）で先に打ち切られる。

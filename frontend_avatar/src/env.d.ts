@@ -13,6 +13,7 @@
 interface ImportMetaEnv {
   readonly VITE_CORE_BASE_URL?: string
   readonly VITE_CORE_WS_URL?: string
+  readonly VITE_WEB_BASE_URL?: string
 }
 
 declare global {
@@ -55,6 +56,9 @@ declare global {
       minimizeCurrentWindow?: () => Promise<void>
       togglePanel?: (panel: AvatarPanelKey) => Promise<Record<AvatarPanelKey, boolean>>
       toggleTaskWindows?: () => Promise<boolean>
+      checkFrontendWeb?: (url: string) => Promise<string | null>
+      toggleTeamPage?: (url: string, token: string, user: Record<string, unknown> | null) => Promise<boolean>
+      closeTeamPage?: () => Promise<void>
       openTaskDialogWindow?: (payload: Record<string, any>) => Promise<void>
       getTaskDialogPayload?: () => Promise<Record<string, any> | null>
       applyPanelStates?: (states: Record<AvatarPanelKey, boolean>) => Promise<Record<AvatarPanelKey, boolean>>

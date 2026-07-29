@@ -26,7 +26,7 @@ const emit = defineEmits(['close', 'registered']);
 const 入力タイトル = ref('');
 const 入力要求内容 = ref('');
 const 入力先行SEQ = ref('');
-const 入力TASK_AI_NAME = ref('claude_cli');
+const 入力TASK_AI_NAME = ref('codex_cli');
 const 入力TASK_AI_MODEL = ref('auto');
 const 入力操作検証 = ref(false);
 const 入力実行有効 = ref(true);
@@ -79,7 +79,7 @@ async function モデル選択肢読込() {
     }
   } catch {
     availableModels.value = { code_models: { ...TASK_CODE_MODELS既定 } };
-    currentSettings.value = { TASK_AI_NAME: 'claude_cli', TASK_AI_MODEL: 'auto' };
+    currentSettings.value = { TASK_AI_NAME: 'codex_cli', TASK_AI_MODEL: 'auto' };
   }
 }
 
@@ -90,7 +90,7 @@ const 入力初期化 = () => {
   入力要求内容.value = String(編集.要求内容 ?? '');
   入力先行SEQ.value = String(編集.先行SEQ ?? '');
   void モデル選択肢読込().then(() => {
-    入力TASK_AI_NAME.value = chooseAvailable(編集.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'claude_cli', taskAiOptions.value) || 'claude_cli';
+    入力TASK_AI_NAME.value = chooseAvailable(編集.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'codex_cli', taskAiOptions.value) || 'codex_cli';
     入力TASK_AI_MODEL.value = chooseAvailable(編集.TASK_AI_MODEL || currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
   });
   入力操作検証.value = Boolean(編集.操作検証);
@@ -121,7 +121,7 @@ const 登録 = async () => {
       タイトル,
       要求内容: 入力要求内容.value.trim(),
       先行SEQ: 入力先行SEQ.value.trim(),
-      TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'claude_cli',
+      TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'codex_cli',
       TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
       操作検証: 入力操作検証.value,
       実行有効: 入力実行有効.value,

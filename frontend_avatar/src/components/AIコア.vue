@@ -43,6 +43,7 @@ const props = defineProps<{
   showUserLabel?: boolean;
   titleStatusSource?: 'core' | 'input';
   showTaskButton?: boolean;
+  showTeamButton?: boolean;
 }>()
 
 // --- 字幕キュー（最小5秒・最大30秒表示） ---
@@ -96,6 +97,7 @@ const emit = defineEmits<{
   audioStateChange: [payload: { micEnabled: boolean; speakerEnabled: boolean; audioConnected: boolean }];
   logout: [];
   openTask: [];
+  openTeam: [];
 }>()
 
 const UI自動非表示秒数 = 15000
@@ -437,6 +439,13 @@ defineExpose({ 字幕追加 })
   >
     <template v-if="UI表示中" #title-right>
       <button
+        v-if="props.showTeamButton"
+        class="title-action-button title-team-button"
+        type="button"
+        title="frontend_web のAIチーム画面を表示"
+        @click="emit('openTeam')"
+      >TEAM</button>
+      <button
         v-if="props.showTaskButton"
         class="title-action-button title-task-button"
         type="button"
@@ -757,6 +766,22 @@ defineExpose({ 字幕追加 })
 .title-task-button:hover {
   background: #581c87;
   border-color: #4c1d95;
+}
+
+.title-team-button {
+  width: auto;
+  padding: 0 8px;
+  background: #075985;
+  border-color: #0c4a6e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.title-team-button:hover {
+  background: #0369a1;
+  border-color: #075985;
 }
 
 .audio-visualizer-overlay {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 5秒ごとに要員ID単位の最大更新日時を確認し、変化時だけ一覧を再取得する
+// 開いている間は5秒、折り畳み中は10秒ごとに更新確認し、非表示中は停止する
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import apiClient from '../../../api/client';
 import { useAuthStore } from '../../../stores/auth';
@@ -7,6 +7,7 @@ import TeamWorkEdit from '../dialog/AIチーム_依頼編集.vue';
 import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
 import type { チーム依頼 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
+import { use表示連動ポーリング } from '../use表示連動ポーリング';
 
 const authStore = useAuthStore();
 const 要員ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
@@ -15,9 +16,19 @@ const 読込中 = ref(false);
 const 読込エラー = ref('');
 const 編集ダイアログ表示 = ref(false);
 const 編集依頼 = ref<チーム依頼 | null>(null);
-let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let 依頼最大更新日時 = '';
 let 依頼取得中 = false;
+
+// 一覧は未完了を上に表示するため先頭行＝最終更新とは限らない。
+// 新規依頼へ引き継ぐ値は、状態に関係なく本当の最終レコードから取得する。
+const 最終依頼 = computed<チーム依頼 | null>(() => {
+  const items = [...依頼一覧.value];
+  items.sort((a, b) =>
+    String(b.更新日時 ?? '').localeCompare(String(a.更新日時 ?? ''))
+    || String(b.依頼ID ?? '').localeCompare(String(a.依頼ID ?? '')),
+  );
+  return items[0] ?? null;
+});
 
 const {
   panelRef,
@@ -79,10 +90,7 @@ const 更新確認 = async () => {
   }
 };
 
-const 自動更新開始 = () => {
-  if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(() => void 更新確認(), 5000);
-};
+use表示連動ポーリング(更新確認, 5000, 開いている);
 
 const 新規依頼を開く = () => {
   編集依頼.value = null;
@@ -151,11 +159,9 @@ const 行状態クラス = (work: チーム依頼) => (Number(work.表示優先�
 
 onMounted(async () => {
   await 依頼一覧読込();
-  自動更新開始();
 });
 
 onBeforeUnmount(() => {
-  if (refreshTimer) clearInterval(refreshTimer);
   if (行クリックタイマー) clearTimeout(行クリックタイマー);
 });
 </script>
@@ -232,7 +238,7 @@ onBeforeUnmount(() => {
     :is="TeamWorkEdit"
     :isOpen="編集ダイアログ表示"
     :編集依頼="編集依頼"
-    :最終依頼="依頼一覧[0] ?? null"
+    :最終依頼="最終依頼"
     @close="編集ダイアログ表示 = false"
     @saved="保存後処理"
   />

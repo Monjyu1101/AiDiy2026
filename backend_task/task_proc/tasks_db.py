@@ -39,7 +39,8 @@ _採番テーブル = "C採番"
 _採番ID = "Aタスク要求"
 _採番プレフィックス = "TK"
 _採番初期値 = 1000
-TASK_AI_NAME既定 = "claude_cli"
+CODE_BASE_PATH既定 = "../"
+TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 
 # 実行条件の区分は文字値で保持する（状態と同じ日本語ファースト方針）
@@ -78,14 +79,18 @@ TASK_AI_MODEL既定 = "auto"
 }
 
 
-def _TASK_AI設定() -> tuple[str, str]:
+def _タスク規定設定() -> tuple[str, str, str]:
     path = os.path.normpath(os.path.join(_BASE_DIR, "..", "backend_server", "_config", "AiDiy_key.json"))
     try:
         with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
-        return str(data.get("TASK_AI_NAME", TASK_AI_NAME既定)), str(data.get("TASK_AI_MODEL", TASK_AI_MODEL既定))
+        return (
+            str(data.get("CODE_BASE_PATH", CODE_BASE_PATH既定)),
+            str(data.get("TASK_AI_NAME", TASK_AI_NAME既定)),
+            str(data.get("TASK_AI_MODEL", TASK_AI_MODEL既定)),
+        )
     except Exception:
-        return TASK_AI_NAME既定, TASK_AI_MODEL既定
+        return CODE_BASE_PATH既定, TASK_AI_NAME既定, TASK_AI_MODEL既定
 
 
 def _識別子(name: str) -> str:
@@ -197,7 +202,7 @@ def _AIタスク要求テーブル作成(conn: sqlite3.Connection) -> None:
             プロジェクト TEXT NOT NULL DEFAULT '',
             タイトル TEXT NOT NULL,
             要求内容 TEXT NOT NULL DEFAULT '',
-            TASK_AI_NAME TEXT NOT NULL DEFAULT 'claude_cli',
+            TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
             TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
             実行有効 INTEGER NOT NULL DEFAULT 1,
             状態 TEXT NOT NULL DEFAULT '準備完了',
@@ -222,7 +227,7 @@ def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
             タイトル TEXT NOT NULL,
             要求内容 TEXT NOT NULL DEFAULT '',
             先行SEQ TEXT NOT NULL DEFAULT '',
-            TASK_AI_NAME TEXT NOT NULL DEFAULT 'claude_cli',
+            TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
             TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
             操作検証 INTEGER NOT NULL DEFAULT 0,
             実行有効 INTEGER NOT NULL DEFAULT 1,
@@ -331,7 +336,7 @@ def _タスク登録(
         [利用者ID, タスクID, タイトル, 要求内容, 状態, *監査値],
     )
     for 明細SEQ, タイトル, 先行SEQ in 明細:
-        task_ai_name, task_ai_model = _TASK_AI設定()
+        _, task_ai_name, task_ai_model = _タスク規定設定()
         conn.execute(
             f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 状態, {監査カラム}) "
             f"VALUES (?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
@@ -414,9 +419,9 @@ def タスク要求新規既定値(利用者ID: str) -> dict:
     プロジェクトは空文字もそのまま引き継ぐ（ダイアログが空欄を初期表示するのと同じ）。
     """
     初期化()
-    規定AI_NAME, 規定AI_MODEL = _TASK_AI設定()
+    規定プロジェクト, 規定AI_NAME, 規定AI_MODEL = _タスク規定設定()
     既定 = {
-        "プロジェクト": "",
+        "プロジェクト": 規定プロジェクト or CODE_BASE_PATH既定,
         "TASK_AI_NAME": 規定AI_NAME or TASK_AI_NAME既定,
         "TASK_AI_MODEL": 規定AI_MODEL or TASK_AI_MODEL既定,
         "参照タスクID": "",

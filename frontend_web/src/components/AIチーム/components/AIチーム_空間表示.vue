@@ -50,7 +50,7 @@ const props = defineProps<{
   要員読込中: boolean;
   要員読込エラー: string;
   チーム目標: チーム目標 | null;
-  /** 作業ループが動いているか。掲示板のネオン点灯はこれで切り替える */
+  /** 作業ループがオンかつチーム作業入力済みか。掲示板の赤ネオンはこれで切り替える */
   作業実行中: boolean;
 }>();
 
@@ -991,14 +991,27 @@ const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
   context.fillStyle = 'rgba(120, 160, 120, 0.45)';
   context.fillRect(60, 100, canvas.width - 120, 3);
 
-  // 板幅に合わせて折り返して描く（最大行数を超えたら末尾を … にする）。表示した行数を返す
+  const 最大幅 = canvas.width - 130;
+
+  // チーム目標は必ず1行に収め、板幅を超える場合だけ末尾を「…」にする。
+  const 一行へ省略 = (本文: string): string => {
+    const 一行本文 = 本文.replace(/\s*\r?\n\s*/g, ' ');
+    if (context.measureText(一行本文).width <= 最大幅) return 一行本文;
+    let 表示文 = '';
+    for (const 文字 of Array.from(一行本文)) {
+      if (context.measureText(`${表示文}${文字}…`).width > 最大幅) break;
+      表示文 += 文字;
+    }
+    return `${表示文}…`;
+  };
+
+  // チーム作業は残りの表示域へ折り返して描く（最大行数を超えたら末尾を … にする）。
   const 折り返して描く = (
     本文: string,
     開始Y: number,
     行高: number,
     最大行数: number,
-  ): number => {
-    const 最大幅 = canvas.width - 130;
+  ) => {
     const 行: string[] = [];
     本文.split(/\r?\n/).forEach((段落) => {
       let 現在行 = '';
@@ -1020,23 +1033,22 @@ const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
     表示行.forEach((行文字, index) => {
       context.fillText(行文字, 65, 開始Y + index * 行高);
     });
-    return 表示行.length;
   };
 
-  // 本文は上下2段（目標 / 作業）に分け、間をヘアラインで仕切る。
-  // 1段あたりの表示域は約190pxで、最大3行まで（溢れたら末尾を…にする）
+  // 1行目はチーム目標、その下の残り領域はチーム作業へ使う。
   context.font = '700 48px "Yu Gothic", "Meiryo", sans-serif';
   context.fillStyle = '#2f3a2f';
-  折り返して描く(目標文, 168, 54, 3);
+  context.fillText(一行へ省略(目標文), 65, 168);
 
   context.strokeStyle = 'rgba(120, 160, 120, 0.35)';
   context.lineWidth = 1;
   context.beginPath();
-  context.moveTo(60, 300);
-  context.lineTo(canvas.width - 60, 300);
+  context.moveTo(60, 205);
+  context.lineTo(canvas.width - 60, 205);
   context.stroke();
 
-  折り返して描く(作業文, 350, 54, 3);
+  context.font = '700 44px "Yu Gothic", "Meiryo", sans-serif';
+  折り返して描く(作業文, 260, 49, 5);
 
   context.font = '600 30px "Yu Gothic", "Meiryo", sans-serif';
   context.fillStyle = 'rgba(90, 110, 90, 0.8)';
@@ -1907,7 +1919,7 @@ const 描画 = (時刻: number) => {
   });
 
   // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
-  // ループが上限まで回り切ったら、作業ループONのままでもネオンは消す
+  // 作業ループがオンかつチーム作業入力済みなら赤ネオンを点灯する
   const 作業ループ中 = props.作業実行中;
   // 実行中でなくても、自動作業設定がオンならブルーのネオンで知らせる
   const 自動作業設定オン = !作業ループ中 && Boolean(props.チーム目標?.自動作業設定);

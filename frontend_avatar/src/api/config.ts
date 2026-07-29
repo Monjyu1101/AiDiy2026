@@ -48,8 +48,22 @@ function resolveTaskBaseUrl(): string {
   return 'http://127.0.0.1:8093'
 }
 
+function resolveFrontendWebBaseUrl(): string {
+  if (import.meta.env.VITE_WEB_BASE_URL) {
+    return import.meta.env.VITE_WEB_BASE_URL.replace(/\/$/, '')
+  }
+
+  if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+    return `${window.location.protocol}//${window.location.hostname}:8090`
+  }
+
+  return 'http://127.0.0.1:8090'
+}
+
 export const CORE_BASE_URL = resolveHttpBaseUrl()
 export const TASK_BASE_URL = resolveTaskBaseUrl()
+export const FRONTEND_WEB_BASE_URL = resolveFrontendWebBaseUrl()
+export const FRONTEND_WEB_TEAM_URL = `${FRONTEND_WEB_BASE_URL}/AIチーム`
 export const AI_WS_ENDPOINT = resolveWebSocketEndpoint()
 export const DEFAULT_VRM_MODEL_URL = '/vrm/VRM_AiDiy.vrm'
 export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'
@@ -76,8 +90,8 @@ export function defaultModelSettings(): ModelSettings {
     CHAT_AI_NAME: 'gemini_chat',
     LIVE_AI_NAME: 'gemini_live',
     CODE_AI1_NAME: 'codex_cli',
-    CODE_AI2_NAME: 'claude_sdk',
-    CODE_AI3_NAME: 'copilot_cli',
+    CODE_AI2_NAME: 'copilot_cli',
+    CODE_AI3_NAME: 'claude_cli',
     CODE_AI4_NAME: 'antigravity_cli',
     CODE_AI5_NAME: 'opencode_cli',
     CODE_AI6_NAME: 'aidiy_hermes',

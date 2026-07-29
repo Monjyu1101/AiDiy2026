@@ -129,7 +129,7 @@ def _タスク実行開始(行: dict, logger: logging.Logger) -> None:
             "タスクID": タスクID,
             "プロジェクト": str(行.get("プロジェクト", "")),
             "要求内容": str(行.get("要求内容", "")),
-            "TASK_AI_NAME": str(行.get("TASK_AI_NAME", "claude_cli")),
+            "TASK_AI_NAME": str(行.get("TASK_AI_NAME", "codex_cli")),
             "TASK_AI_MODEL": str(行.get("TASK_AI_MODEL", "auto")),
         }, f, ensure_ascii=False, indent=2)
 

@@ -200,8 +200,8 @@ async function loadConfig() {
     selections.codeAi6 = chooseAvailable(currentSettings.value.CODE_AI6_NAME, codeAiOptions.value)
     selections.codeBasePath = currentSettings.value.CODE_BASE_PATH || Object.keys(codeBaseOptions.value || {})[0] || ''
     selections.codePermissions = currentSettings.value.CODE_PERMISSIONS || 'auto'
-    selections.taskAi = chooseAvailable(currentSettings.value.TASK_AI_NAME || 'claude_cli', codeAiOptions.value)
-    selections.teamAi = chooseAvailable(currentSettings.value.TEAM_AI_NAME || 'claude_cli', codeAiOptions.value)
+    selections.taskAi = chooseAvailable(currentSettings.value.TASK_AI_NAME || 'codex_cli', codeAiOptions.value)
+    selections.teamAi = chooseAvailable(currentSettings.value.TEAM_AI_NAME || 'codex_cli', codeAiOptions.value)
 
     const chatKey = CHAT_MODEL_KEYS[selections.chatAi]
     const liveKey = LIVE_MODEL_KEYS[selections.liveAi]

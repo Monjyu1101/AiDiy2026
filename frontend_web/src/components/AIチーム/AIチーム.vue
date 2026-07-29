@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import apiClient from '../../api/client';
 import AiTeamMembers from './components/AIチーム_要員状況.vue';
 import AiTeamViewer from './components/AIチーム_空間表示.vue';
@@ -8,6 +8,7 @@ import AiTeamExpList from './components/AIチーム_経験状況.vue';
 import AiTeamPdcaList from './components/AIチーム_作業状況.vue';
 import AiTeamTalkList from './components/AIチーム_会話状況.vue';
 import AiTeamGoalEdit from './dialog/AIチーム_目標編集.vue';
+import { use表示連動ポーリング } from './use表示連動ポーリング';
 import {
   type エージェント,
   type エージェント状態,
@@ -43,11 +44,10 @@ const 要員読込中 = ref(false);
 const 要員読込エラー = ref('');
 const 召喚中 = ref(false);
 const 排除中ID = ref('');
-let 要員更新Timer: ReturnType<typeof setInterval> | null = null;
 let 要員取得中 = false;
 // チーム空間の掲示板に出す「最終更新のチーム目標」と、その保守ダイアログ
 const チーム目標 = ref<チーム目標 | null>(null);
-// 作業ループが動いているか（掲示板と同じ5秒周期で更新。ネオン点灯の切り替えに使う）
+// 作業ループがオンかつチーム作業入力済みか（掲示板と同じ5秒周期で更新。赤ネオンに使う）
 const 作業実行中 = ref(false);
 const 目標編集表示 = ref(false);
 
@@ -185,22 +185,23 @@ const 目標保存後 = (item: チーム目標) => {
 const 掲示板プロジェクト = computed(() => String(チーム目標.value?.CODE_BASE_PATH ?? ''));
 // 作業状況は、掲示板の目標で作業ループがオンのときだけ出す（オフなら表示しない）
 const 作業ループ有効 = computed(() => Boolean(チーム目標.value?.作業ループ));
-// 会話状況は、掲示板の目標で自動作業設定がオンのときだけ出す（オフなら表示しない）
-const 自動作業設定有効 = computed(() => Boolean(チーム目標.value?.自動作業設定));
+// 会話状況は、目標を入力して自動作業をオンにし、まだチーム作業を決めていない協議中だけ出す
+const チーム会話表示中 = computed(() => (
+  Boolean(String(チーム目標.value?.チーム目標 ?? '').trim())
+  && Boolean(チーム目標.value?.自動作業設定)
+  && !String(チーム目標.value?.チーム作業 ?? '').trim()
+));
+
+const 全体更新 = () => {
+  void 要員一覧を読み込む(false);
+  void チーム目標を読み込む();
+};
+
+use表示連動ポーリング(全体更新, 5000);
 
 onMounted(() => {
   void 要員一覧を読み込む();
   void チーム目標を読み込む();
-  // 自動更新は画面を維持したままバックグラウンドで行う。
-  // 掲示板も同じ周期で読み直し、作業ループの進捗（ループ数・最終段の件数）を最新にする。
-  要員更新Timer = setInterval(() => {
-    void 要員一覧を読み込む(false);
-    void チーム目標を読み込む();
-  }, 5000);
-});
-
-onBeforeUnmount(() => {
-  if (要員更新Timer) clearInterval(要員更新Timer);
 });
 </script>
 
@@ -245,7 +246,7 @@ onBeforeUnmount(() => {
       <AiTeamWorkList />
       <AiTeamExpList :プロジェクト="掲示板プロジェクト" />
       <AiTeamPdcaList v-if="作業ループ有効" :プロジェクト="掲示板プロジェクト" />
-      <AiTeamTalkList v-if="自動作業設定有効" :プロジェクト="掲示板プロジェクト" />
+      <AiTeamTalkList v-if="チーム会話表示中" :プロジェクト="掲示板プロジェクト" />
     </div>
 
     <AiTeamGoalEdit

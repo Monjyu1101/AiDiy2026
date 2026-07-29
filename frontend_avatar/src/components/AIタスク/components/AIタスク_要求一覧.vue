@@ -99,6 +99,18 @@ const 管理者か = computed(() => props.権限ID === '1');
 // admin は既定オフ（全利用者表示）で切替も可能。admin 以外は常にオン固定（自分のタスクのみ）
 const 自分のみ表示 = ref(!管理者か.value);
 
+// 一覧は未完了を上に表示し、adminは全利用者も表示できるため、先頭行を引継元にしない。
+// 新規要求へは、ログイン利用者本人の本当の最終更新レコードを引き継ぐ。
+const 最終タスク = computed<Record<string, any> | null>(() => {
+  const 利用者ID = 利用者ID取得();
+  const items = rows.value.filter((row) => String(row.利用者ID ?? '') === 利用者ID);
+  items.sort((a, b) =>
+    String(b.更新日時 ?? '').localeCompare(String(a.更新日時 ?? ''))
+    || String(b.タスクID ?? '').localeCompare(String(a.タスクID ?? '')),
+  );
+  return items[0] ?? null;
+});
+
 const 最大更新日時計算 = (items: Record<string, any>[]) => {
   return items.reduce((max, row) => {
     const 更新日時 = String(row.更新日時 ?? '');
@@ -391,7 +403,7 @@ defineExpose({ loadData, 新規ダイアログ表示, 自分のみ表示, 管理
       :is-open="dialogOpen"
       :利用者ID="props.利用者ID"
       :編集タスク="編集タスク"
-      :最終タスク="rows[0] ?? null"
+      :最終タスク="最終タスク"
       @close="dialogOpen = false"
       @registered="登録完了"
     />
