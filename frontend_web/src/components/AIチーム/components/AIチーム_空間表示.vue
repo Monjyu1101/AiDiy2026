@@ -954,12 +954,13 @@ const 地面パッチを作る = (
   scene.add(ring);
 };
 
-// チーム作業のテキストを大きな板に描く（神の声のように読ませたいので余白と行間を広く取る）
+// チーム目標・チーム作業のテキストを大きな板に描く（神の声のように読ませたいので余白と行間を広く取る）
 const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
   const context = canvas.getContext('2d');
   if (!context) return;
   const 目標 = props.チーム目標;
-  const 本文 = String(目標?.チーム作業 ?? '').trim() || 'チーム作業が未登録です';
+  const 目標文 = String(目標?.チーム目標 ?? '').trim() || 'チーム目標が未登録です';
+  const 作業文 = String(目標?.チーム作業 ?? '').trim() || 'チーム作業が未登録です';
   const パス = String(目標?.CODE_BASE_PATH ?? '').trim();
   const 更新 = String(目標?.更新日時 ?? '').trim();
 
@@ -979,7 +980,7 @@ const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
   context.textBaseline = 'alphabetic';
   context.font = '700 40px "Yu Gothic", "Meiryo", sans-serif';
   context.fillStyle = '#4a7c59';
-  context.fillText('TEAM GOAL  /  チーム作業', 60, 78);
+  context.fillText('TEAM BOARD', 60, 78);
   if (パス) {
     context.font = '600 34px "Yu Gothic", "Meiryo", sans-serif';
     context.fillStyle = '#7a6a3c';
@@ -990,35 +991,52 @@ const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
   context.fillStyle = 'rgba(120, 160, 120, 0.45)';
   context.fillRect(60, 100, canvas.width - 120, 3);
 
-  // 本文は板幅に合わせて折り返す（最大 4 行。溢れたら末尾を … にする）
-  context.font = '700 66px "Yu Gothic", "Meiryo", sans-serif';
-  context.fillStyle = '#2f3a2f';
-  const 最大幅 = canvas.width - 130;
-  const 行: string[] = [];
-  本文.split(/\r?\n/).forEach((段落) => {
-    let 現在行 = '';
-    Array.from(段落).forEach((文字) => {
-      const 候補 = 現在行 + 文字;
-      if (context.measureText(候補).width > 最大幅 && 現在行) {
-        行.push(現在行);
-        現在行 = 文字;
-      } else {
-        現在行 = 候補;
-      }
+  // 板幅に合わせて折り返して描く（最大行数を超えたら末尾を … にする）。表示した行数を返す
+  const 折り返して描く = (
+    本文: string,
+    開始Y: number,
+    行高: number,
+    最大行数: number,
+  ): number => {
+    const 最大幅 = canvas.width - 130;
+    const 行: string[] = [];
+    本文.split(/\r?\n/).forEach((段落) => {
+      let 現在行 = '';
+      Array.from(段落).forEach((文字) => {
+        const 候補 = 現在行 + 文字;
+        if (context.measureText(候補).width > 最大幅 && 現在行) {
+          行.push(現在行);
+          現在行 = 文字;
+        } else {
+          現在行 = 候補;
+        }
+      });
+      行.push(現在行);
     });
-    行.push(現在行);
-  });
-  const 最大行数 = 4;
-  const 表示行 = 行.slice(0, 最大行数);
-  if (行.length > 最大行数 && 表示行.length > 0) {
-    表示行[表示行.length - 1] = `${表示行[表示行.length - 1].slice(0, -1)}…`;
-  }
-  // 本文の描画域は y=130〜470（下の最終更新行に重ならない範囲）
-  const 行高 = 84;
-  const 開始Y = 130 + (最大行数 - 表示行.length) * (行高 / 2) + 行高 * 0.72;
-  表示行.forEach((行文字, index) => {
-    context.fillText(行文字, 65, 開始Y + index * 行高);
-  });
+    const 表示行 = 行.slice(0, 最大行数);
+    if (行.length > 最大行数 && 表示行.length > 0) {
+      表示行[表示行.length - 1] = `${表示行[表示行.length - 1].slice(0, -1)}…`;
+    }
+    表示行.forEach((行文字, index) => {
+      context.fillText(行文字, 65, 開始Y + index * 行高);
+    });
+    return 表示行.length;
+  };
+
+  // 本文は上下2段（目標 / 作業）に分け、間をヘアラインで仕切る。
+  // 1段あたりの表示域は約190pxで、最大3行まで（溢れたら末尾を…にする）
+  context.font = '700 48px "Yu Gothic", "Meiryo", sans-serif';
+  context.fillStyle = '#2f3a2f';
+  折り返して描く(目標文, 168, 54, 3);
+
+  context.strokeStyle = 'rgba(120, 160, 120, 0.35)';
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(60, 300);
+  context.lineTo(canvas.width - 60, 300);
+  context.stroke();
+
+  折り返して描く(作業文, 350, 54, 3);
 
   context.font = '600 30px "Yu Gothic", "Meiryo", sans-serif';
   context.fillStyle = 'rgba(90, 110, 90, 0.8)';
@@ -1074,9 +1092,11 @@ const 目標掲示板を作る = () => {
   group.add(縁);
   目標掲示板.縁 = 縁;
 
-  // 作業ループ中は、掲示板全体へ薄いピンクの明滅を重ねる。
+  // 作業ループ中はピンク、実行中でなくても自動作業設定オンならブルーの明滅を掲示板全体へ重ねる。
+  const ネオン点灯初期 = props.作業実行中 || Boolean(props.チーム目標?.自動作業設定);
+  const ネオン色初期 = props.作業実行中 ? 0xff1493 : 0x1e90ff;
   const 作業明滅材 = new THREE.MeshBasicMaterial({
-    color: 0xff1493,
+    color: ネオン色初期,
     transparent: true,
     opacity: 0,
     side: THREE.DoubleSide,
@@ -1090,7 +1110,7 @@ const 目標掲示板を作る = () => {
     作業明滅材,
   );
   作業明滅.position.z = 0.035;
-  作業明滅.visible = props.作業実行中;
+  作業明滅.visible = ネオン点灯初期;
   作業明滅.renderOrder = 2;
   group.add(作業明滅);
   目標掲示板.作業明滅 = 作業明滅;
@@ -1116,7 +1136,7 @@ const 目標掲示板を作る = () => {
     縦芯.position.set(方向 * (目標掲示板幅 / 2 + 0.2), 0, 0.065);
     ネオン芯.add(縦芯);
   });
-  ネオン芯.visible = props.作業実行中;
+  ネオン芯.visible = ネオン点灯初期;
   ネオン芯.renderOrder = 3;
   group.add(ネオン芯);
   目標掲示板.作業ネオン芯 = ネオン芯;
@@ -1889,29 +1909,34 @@ const 描画 = (時刻: number) => {
   // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
   // ループが上限まで回り切ったら、作業ループONのままでもネオンは消す
   const 作業ループ中 = props.作業実行中;
+  // 実行中でなくても、自動作業設定がオンならブルーのネオンで知らせる
+  const 自動作業設定オン = !作業ループ中 && Boolean(props.チーム目標?.自動作業設定);
+  const ネオン点灯 = 作業ループ中 || 自動作業設定オン;
+  const ネオン色 = 作業ループ中 ? 0xff1493 : 0x1e90ff;
   // ゆっくりした明滅へ、ごく短い瞬断を混ぜてネオン管らしい点灯の揺らぎを作る。
   const 瞬断 = Math.sin(時刻 * 0.021) + Math.sin(時刻 * 0.0137) > 1.72 ? 0.2 : 1;
   const ネオン強度 = (0.72 + (Math.sin(時刻 * 0.0045) + 1) * 0.14) * 瞬断;
   if (目標掲示板.縁) {
     const 縁材 = 目標掲示板.縁.material as THREE.MeshBasicMaterial;
-    縁材.color.setHex(作業ループ中 ? 0xff1493 : 0xfff6d0);
+    縁材.color.setHex(ネオン点灯 ? ネオン色 : 0xfff6d0);
     const 目標値 = 目標ホバー.value
       ? 0.85
-      : 作業ループ中
+      : ネオン点灯
         ? 0.18 + ネオン強度 * 0.78
         : 0.34 + (Math.sin(時刻 * 0.0016) + 1) * 0.06;
-    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 作業ループ中 ? 0.32 : 0.12);
+    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, ネオン点灯 ? 0.32 : 0.12);
   }
   if (目標掲示板.作業明滅) {
-    目標掲示板.作業明滅.visible = 作業ループ中;
-    if (作業ループ中) {
+    目標掲示板.作業明滅.visible = ネオン点灯;
+    if (ネオン点灯) {
       const 明滅材 = 目標掲示板.作業明滅.material as THREE.MeshBasicMaterial;
+      明滅材.color.setHex(ネオン色);
       明滅材.opacity = 0.025 + ネオン強度 * 0.085;
     }
   }
   if (目標掲示板.作業ネオン芯) {
-    目標掲示板.作業ネオン芯.visible = 作業ループ中;
-    if (作業ループ中) {
+    目標掲示板.作業ネオン芯.visible = ネオン点灯;
+    if (ネオン点灯) {
       const 芯材 = (目標掲示板.作業ネオン芯.children[0] as THREE.Mesh)
         .material as THREE.MeshBasicMaterial;
       芯材.opacity = 0.28 + ネオン強度 * 0.72;
@@ -2321,7 +2346,12 @@ watch(
 );
 
 watch(
-  () => [props.チーム目標?.CODE_BASE_PATH, props.チーム目標?.チーム作業, props.チーム目標?.更新日時],
+  () => [
+    props.チーム目標?.CODE_BASE_PATH,
+    props.チーム目標?.チーム目標,
+    props.チーム目標?.チーム作業,
+    props.チーム目標?.更新日時,
+  ],
   () => 目標掲示板を更新(),
 );
 

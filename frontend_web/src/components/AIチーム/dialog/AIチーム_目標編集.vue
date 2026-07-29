@@ -436,7 +436,7 @@ const 削除 = async () => {
                     v-model.trim="入力テーマ"
                     type="text"
                     class="detail-input"
-                    placeholder="改善すべき点を改善する"
+                    placeholder="成功と失敗を学習し、今よりも優れたソフトウェアを創る。"
                   />
                 </div>
               </div>
@@ -475,7 +475,7 @@ const 削除 = async () => {
                   <textarea
                     v-model="入力目標"
                     class="detail-textarea"
-                    placeholder="よく考えて、行うべきことを実行する。"
+                    placeholder="斬新なアイデアで、未踏のフロンティアを切り開け！"
                   ></textarea>
                 </div>
               </div>
