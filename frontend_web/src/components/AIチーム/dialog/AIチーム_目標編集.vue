@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-// Aチーム目標の保守: 左に登録済パス一覧、右にパス選択・パス入力・チーム目標入力
+// Aチーム目標の保守: 左に登録済パス一覧、右にパス選択・パス入力・チーム作業入力
 import { computed, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
 import { useAuthStore } from '../../../stores/auth';
@@ -49,9 +49,10 @@ const 目標一覧 = ref<チーム目標[]>([]);
 const プロジェクト選択肢 = ref<{ value: string; label: string }[]>([]);
 const 選択パス = ref('');
 const 入力パス = ref(既定パス);
+const 入力テーマ = ref('');
+const 入力自動作業設定 = ref(false);
 const 入力目標 = ref('');
-const 入力自動目標設定 = ref(false);
-const 入力目標ループ = ref(false);
+const 入力作業ループ = ref(false);
 const 入力最大ループ回数 = ref(1);
 const 入力動員要員数 = ref(既定動員要員数);
 const 入力パターン = ref<'SPDCA' | 'PlanDo'>(既定パターン);
@@ -221,9 +222,10 @@ const 一覧から選ぶ = (項目: チーム目標) => {
     ? 項目.CODE_BASE_PATH
     : '';
   入力パス.value = 項目.CODE_BASE_PATH;
-  入力目標.value = 項目.チーム目標;
-  入力自動目標設定.value = Boolean(項目.自動目標設定);
-  入力目標ループ.value = Boolean(項目.目標ループ);
+  入力テーマ.value = 項目.チーム目標;
+  入力自動作業設定.value = Boolean(項目.自動作業設定);
+  入力目標.value = 項目.チーム作業;
+  入力作業ループ.value = Boolean(項目.作業ループ);
   入力最大ループ回数.value = Math.min(99, Math.max(1, Number(項目.最大ループ回数 ?? 1)));
   入力動員要員数.value = 動員要員数を丸める(項目.動員要員数);
   入力パターン.value = パターン正規化(項目.パターン);
@@ -235,9 +237,10 @@ watch(選択パス, (value) => {
   入力パス.value = value;
   const 既存 = 目標一覧.value.find((項目) => 項目.CODE_BASE_PATH === value);
   if (既存) {
-    入力目標.value = 既存.チーム目標;
-    入力自動目標設定.value = Boolean(既存.自動目標設定);
-    入力目標ループ.value = Boolean(既存.目標ループ);
+    入力テーマ.value = 既存.チーム目標;
+    入力自動作業設定.value = Boolean(既存.自動作業設定);
+    入力目標.value = 既存.チーム作業;
+    入力作業ループ.value = Boolean(既存.作業ループ);
     入力最大ループ回数.value = Math.min(99, Math.max(1, Number(既存.最大ループ回数 ?? 1)));
     入力動員要員数.value = 動員要員数を丸める(既存.動員要員数);
     入力パターン.value = パターン正規化(既存.パターン);
@@ -254,9 +257,10 @@ watch(
     if (!open) return;
     選択パス.value = '';
     入力パス.value = 既定パス;
+    入力テーマ.value = '';
+    入力自動作業設定.value = false;
     入力目標.value = '';
-    入力自動目標設定.value = false;
-    入力目標ループ.value = false;
+    入力作業ループ.value = false;
     入力最大ループ回数.value = 1;
     入力パターン.value = 既定パターン;
     // 選択肢の上限は有効要員数に依存するため、読込後に丸め直す
@@ -274,11 +278,16 @@ watch(
 const 保存 = async () => {
   const パス = 入力パス.value.trim();
   const 目標 = 入力目標.value.trim();
+  const テーマ = 入力テーマ.value.trim();
   if (!パス) {
     void qMessage('CODE_BASE_PATH を入力してください。', 'error');
     return;
   }
   if (!目標) {
+    void qMessage('チーム作業を入力してください。', 'error');
+    return;
+  }
+  if (!テーマ) {
     void qMessage('チーム目標を入力してください。', 'error');
     return;
   }
@@ -286,9 +295,10 @@ const 保存 = async () => {
   try {
     const response = await apiClient.post('/team/目標/保存', {
       CODE_BASE_PATH: パス,
-      チーム目標: 目標,
-      自動目標設定: 入力自動目標設定.value,
-      目標ループ: 入力目標ループ.value,
+      チーム目標: テーマ,
+      自動作業設定: 入力自動作業設定.value,
+      チーム作業: 目標,
+      作業ループ: 入力作業ループ.value,
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
@@ -301,15 +311,17 @@ const 保存 = async () => {
       操作端末ID: 'frontend_web',
     });
     if (response.data?.status !== 'OK') {
-      void qMessage(response.data?.message || 'チーム目標を保存できませんでした。', 'error');
+      void qMessage(response.data?.message || 'チーム作業を保存できませんでした。', 'error');
       return;
     }
     const item = response.data.data?.item as チーム目標 | undefined;
-    // 保存した内容をそのまま親へ渡す（改善一覧パネルの表示・非表示はこの値で切り替わる）
+    // 保存した内容をそのまま親へ渡す（作業状況パネルの表示・非表示はこの値で切り替わる）
     emit('saved', {
-      ...(item ?? { CODE_BASE_PATH: パス, チーム目標: 目標, 更新日時: '' }),
-      自動目標設定: 入力自動目標設定.value,
-      目標ループ: 入力目標ループ.value,
+      ...(item ?? { CODE_BASE_PATH: パス, チーム目標: テーマ, チーム作業: 目標, 更新日時: '' }),
+      チーム目標: テーマ,
+      自動作業設定: 入力自動作業設定.value,
+      チーム作業: 目標,
+      作業ループ: 入力作業ループ.value,
       最大ループ回数: 入力最大ループ回数.value,
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
@@ -321,7 +333,7 @@ const 保存 = async () => {
     // 1件保存したら用は済むのでダイアログを閉じる
     emit('close');
   } catch {
-    void qMessage('チーム目標の保存でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
+    void qMessage('チーム作業の保存でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
   } finally {
     保存中.value = false;
   }
@@ -330,7 +342,7 @@ const 保存 = async () => {
 const 削除 = async () => {
   const パス = 入力パス.value.trim();
   if (!パス || 既定パス選択中.value) return;
-  if (!(await qConfirm(`${パス} のチーム目標を削除しますか？`))) return;
+  if (!(await qConfirm(`${パス} のチーム作業を削除しますか？`))) return;
   削除中.value = true;
   try {
     const response = await apiClient.post('/team/目標/削除', {
@@ -340,10 +352,10 @@ const 削除 = async () => {
       操作端末ID: 'frontend_web',
     });
     if (response.data?.status !== 'OK') {
-      void qMessage(response.data?.message || 'チーム目標を削除できませんでした。', 'error');
+      void qMessage(response.data?.message || 'チーム作業を削除できませんでした。', 'error');
       return;
     }
-    void qMessage(response.data.message || 'チーム目標を削除しました。');
+    void qMessage(response.data.message || 'チーム作業を削除しました。');
     await 目標一覧読込();
     const 先頭 = 目標一覧.value[0];
     if (先頭) {
@@ -351,7 +363,7 @@ const 削除 = async () => {
       emit('saved', 先頭);
     }
   } catch {
-    void qMessage('チーム目標の削除でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
+    void qMessage('チーム作業の削除でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
   } finally {
     削除中.value = false;
   }
@@ -385,7 +397,7 @@ const 削除 = async () => {
                     @click="一覧から選ぶ(項目)"
                   >
                     <span class="goal-list-path">{{ 項目.CODE_BASE_PATH }}</span>
-                    <span class="goal-list-text">{{ 項目.チーム目標 }}</span>
+                    <span class="goal-list-text">{{ 項目.チーム作業 }}</span>
                     <span class="goal-list-date">{{ 項目.更新日時 }}</span>
                   </button>
                 </li>
@@ -415,9 +427,49 @@ const 削除 = async () => {
                   </button>
                 </div>
               </div>
-              <div class="detail-row request-row">
+              <div class="detail-row one-line-row">
                 <div class="detail-label">
                   チーム目標<span class="required-mark">*</span>
+                </div>
+                <div class="detail-value">
+                  <input
+                    v-model.trim="入力テーマ"
+                    type="text"
+                    class="detail-input"
+                    placeholder="改善すべき点を改善する"
+                  />
+                </div>
+              </div>
+              <section
+                class="loop-panel simple-loop-panel"
+                :class="{ active: 入力自動作業設定 }"
+                aria-labelledby="self-loop-panel-title"
+              >
+                <div class="loop-panel-head">
+                  <div class="loop-panel-title-wrap">
+                    <span class="loop-panel-icon" aria-hidden="true">↻</span>
+                    <div>
+                      <h4 id="self-loop-panel-title">自動作業設定</h4>
+                    </div>
+                  </div>
+                  <label class="loop-switch">
+                    <input
+                      v-model="入力自動作業設定"
+                      type="checkbox"
+                      aria-label="自動作業設定の切り替え"
+                    />
+                    <span class="loop-switch-track" aria-hidden="true">
+                      <span class="loop-switch-thumb"></span>
+                    </span>
+                    <span class="loop-switch-status">
+                      {{ 入力自動作業設定 ? '実行する' : '停止中' }}
+                    </span>
+                  </label>
+                </div>
+              </section>
+              <div class="detail-row request-row">
+                <div class="detail-label">
+                  チーム作業<span class="required-mark">*</span>
                 </div>
                 <div class="detail-value">
                   <textarea
@@ -428,56 +480,29 @@ const 削除 = async () => {
                 </div>
               </div>
               <section
-                class="loop-panel simple-loop-panel"
-                :class="{ active: 入力自動目標設定 }"
-                aria-labelledby="self-loop-panel-title"
-              >
-                <div class="loop-panel-head">
-                  <div class="loop-panel-title-wrap">
-                    <span class="loop-panel-icon" aria-hidden="true">↻</span>
-                    <div>
-                      <h4 id="self-loop-panel-title">自動目標設定</h4>
-                    </div>
-                  </div>
-                  <label class="loop-switch">
-                    <input
-                      v-model="入力自動目標設定"
-                      type="checkbox"
-                      aria-label="自動目標設定の切り替え"
-                    />
-                    <span class="loop-switch-track" aria-hidden="true">
-                      <span class="loop-switch-thumb"></span>
-                    </span>
-                    <span class="loop-switch-status">
-                      {{ 入力自動目標設定 ? '実行する' : '停止中' }}
-                    </span>
-                  </label>
-                </div>
-              </section>
-              <section
                 class="loop-panel"
-                :class="{ active: 入力目標ループ }"
+                :class="{ active: 入力作業ループ }"
                 aria-labelledby="loop-panel-title"
               >
                 <div class="loop-panel-head">
                   <div class="loop-panel-title-wrap">
                     <span class="loop-panel-icon" aria-hidden="true">↻</span>
                     <div>
-                      <h4 id="loop-panel-title">目標ループ</h4>
+                      <h4 id="loop-panel-title">作業ループ</h4>
                       <p>目標達成に向けた自動サイクルの実行条件</p>
                     </div>
                   </div>
                   <label class="loop-switch">
                     <input
-                      v-model="入力目標ループ"
+                      v-model="入力作業ループ"
                       type="checkbox"
-                      aria-label="目標ループの切り替え"
+                      aria-label="作業ループの切り替え"
                     />
                     <span class="loop-switch-track" aria-hidden="true">
                       <span class="loop-switch-thumb"></span>
                     </span>
                     <span class="loop-switch-status">
-                      {{ 入力目標ループ ? '実行する' : '停止中' }}
+                      {{ 入力作業ループ ? '実行する' : '停止中' }}
                     </span>
                   </label>
                 </div>

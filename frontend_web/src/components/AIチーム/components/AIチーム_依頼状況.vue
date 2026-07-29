@@ -28,7 +28,7 @@ const {
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
-} = use自由配置パネル('AIチーム_依頼一覧位置', 'right', 'top', {
+} = use自由配置パネル('AIチーム_依頼状況位置', 'right', 'top', {
   initialOpen: false,
 });
 
@@ -183,7 +183,7 @@ onBeforeUnmount(() => {
         @pointerdown.stop
         @click="開閉を切替"
       >{{ 開いている ? '▼' : '▶' }}</button>
-      <span class="panel-title">【チーム依頼】</span>
+      <span class="panel-title">【依頼状況】</span>
       <span class="panel-count">{{ 依頼一覧.length }}件</span>
       <button type="button" class="new-button" @pointerdown.stop @click="新規依頼を開く">追加</button>
     </div>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// AIチーム_雑談一覧: 掲示板に出ているプロジェクトのAチーム雑談を一覧表示する
+// AIチーム_会話状況: 掲示板に出ているプロジェクトのAチーム会話を一覧表示する
 // 5秒ごとにプロジェクト単位の最大更新日時を確認し、変化時だけ一覧を再取得する
-// 表示するのは自動目標設定がオンのときだけ（オフのときは AIチーム.vue 側で描画しない）
+// 表示するのは自動作業設定がオンのときだけ（オフのときは AIチーム.vue 側で描画しない）
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
 import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
-import type { チーム雑談 } from '../AIチーム_型';
+import type { チーム会話 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
 
 const props = defineProps<{
@@ -13,12 +13,12 @@ const props = defineProps<{
   プロジェクト: string;
 }>();
 
-const 雑談一覧 = ref<チーム雑談[]>([]);
+const 会話一覧 = ref<チーム会話[]>([]);
 const 読込中 = ref(false);
 const 読込エラー = ref('');
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
-let 雑談最大更新日時 = '';
-let 雑談取得中 = false;
+let 会話最大更新日時 = '';
+let 会話取得中 = false;
 
 const 対象プロジェクト = computed(() => String(props.プロジェクト ?? '').trim());
 
@@ -31,19 +31,19 @@ const {
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
-} = use自由配置パネル('AIチーム_雑談一覧位置', 'center', 'bottom');
+} = use自由配置パネル('AIチーム_会話状況位置', 'center', 'bottom');
 
 const 最大更新日時取得 = async (): Promise<string> => {
-  const response = await apiClient.post('/team/雑談/最大更新日時', {
+  const response = await apiClient.post('/team/会話/最大更新日時', {
     プロジェクト: 対象プロジェクト.value,
   });
-  if (response.data?.status !== 'OK') return 雑談最大更新日時;
+  if (response.data?.status !== 'OK') return 会話最大更新日時;
   return String(response.data?.data?.最大更新日時 ?? '');
 };
 
-const 雑談一覧読込 = async (読込表示 = true) => {
-  if (雑談取得中) return;
-  雑談取得中 = true;
+const 会話一覧読込 = async (読込表示 = true) => {
+  if (会話取得中) return;
+  会話取得中 = true;
   if (読込表示) {
     読込中.value = true;
     読込エラー.value = '';
@@ -51,32 +51,32 @@ const 雑談一覧読込 = async (読込表示 = true) => {
   try {
     // 一覧取得中に更新が入った場合は、次回確認で拾えるよう基準を先に取得する。
     const newBaseline = await 最大更新日時取得();
-    const response = await apiClient.post('/team/雑談/一覧', {
+    const response = await apiClient.post('/team/会話/一覧', {
       プロジェクト: 対象プロジェクト.value,
     });
     if (response.data?.status !== 'OK') {
-      throw new Error(response.data?.message || 'チーム雑談を取得できませんでした');
+      throw new Error(response.data?.message || 'チーム会話を取得できませんでした');
     }
     const items = response.data?.data?.items;
-    if (!Array.isArray(items)) throw new Error('チーム雑談の応答形式が正しくありません');
-    雑談一覧.value = items as チーム雑談[];
-    雑談最大更新日時 = newBaseline;
+    if (!Array.isArray(items)) throw new Error('チーム会話の応答形式が正しくありません');
+    会話一覧.value = items as チーム会話[];
+    会話最大更新日時 = newBaseline;
     読込エラー.value = '';
   } catch (error) {
     if (読込表示) {
-      読込エラー.value = error instanceof Error ? error.message : 'チーム雑談を取得できませんでした';
+      読込エラー.value = error instanceof Error ? error.message : 'チーム会話を取得できませんでした';
     }
   } finally {
     if (読込表示) 読込中.value = false;
-    雑談取得中 = false;
+    会話取得中 = false;
   }
 };
 
 const 更新確認 = async () => {
   try {
-    if (雑談取得中) return;
+    if (会話取得中) return;
     const maxUpdatedAt = await 最大更新日時取得();
-    if (maxUpdatedAt !== 雑談最大更新日時) await 雑談一覧読込(false);
+    if (maxUpdatedAt !== 会話最大更新日時) await 会話一覧読込(false);
   } catch {
     // 自動更新確認の失敗は、通常操作を邪魔しない。
   }
@@ -87,10 +87,10 @@ const 自動更新開始 = () => {
   refreshTimer = setInterval(() => void 更新確認(), 5000);
 };
 
-// 掲示板のプロジェクトが変わったら、その分の雑談へ切り替える
+// 掲示板のプロジェクトが変わったら、その分の会話へ切り替える
 watch(対象プロジェクト, () => {
-  雑談最大更新日時 = '';
-  void 雑談一覧読込();
+  会話最大更新日時 = '';
+  void 会話一覧読込();
 });
 
 const 内容ダイアログ表示 = ref(false);
@@ -99,11 +99,11 @@ const 内容要求値 = ref('');
 const 内容応答値 = ref('');
 
 // ダブルクリックで 要求内容 / 発言内容 を共通ダイアログに表示する
-const 内容を開く = (雑談: チーム雑談) => {
-  const 要求 = String(雑談.要求内容 ?? '');
-  const 発言 = String(雑談.発言内容 ?? '');
+const 内容を開く = (会話: チーム会話) => {
+  const 要求 = String(会話.要求内容 ?? '');
+  const 発言 = String(会話.発言内容 ?? '');
   if (!要求.trim() && !発言.trim()) return;
-  内容タイトル.value = 雑談.要員ID || 雑談.雑談ID;
+  内容タイトル.value = 会話.要員ID || 会話.会話ID;
   内容要求値.value = 要求;
   内容応答値.value = 発言;
   内容ダイアログ表示.value = true;
@@ -112,7 +112,7 @@ const 内容を開く = (雑談: チーム雑談) => {
 const 日時表示 = (値: string) => String(値 ?? '').replace(/^\d{4}-/, '').slice(0, 14);
 
 onMounted(async () => {
-  await 雑談一覧読込();
+  await 会話一覧読込();
   自動更新開始();
 });
 
@@ -144,8 +144,8 @@ onBeforeUnmount(() => {
         @pointerdown.stop
         @click="開閉を切替"
       >{{ 開いている ? '▼' : '▶' }}</button>
-      <span class="panel-title">【雑談】</span>
-      <span class="panel-count">{{ 雑談一覧.length }}件</span>
+      <span class="panel-title">【会話状況】</span>
+      <span class="panel-count">{{ 会話一覧.length }}件</span>
     </div>
 
     <div v-if="開いている" class="panel-project" :title="対象プロジェクト">
@@ -163,24 +163,24 @@ onBeforeUnmount(() => {
         </thead>
         <tbody>
           <tr
-            v-for="雑談 in 雑談一覧"
-            :key="雑談.雑談ID"
-            @dblclick="内容を開く(雑談)"
+            v-for="会話 in 会話一覧"
+            :key="会話.会話ID"
+            @dblclick="内容を開く(会話)"
           >
-            <td class="member-id">{{ 雑談.要員ID }}</td>
-            <td class="talk-text">{{ 雑談.発言内容 }}</td>
-            <td class="done-at">{{ 日時表示(雑談.登録日時) }}</td>
+            <td class="member-id">{{ 会話.要員ID }}</td>
+            <td class="talk-text">{{ 会話.発言内容 }}</td>
+            <td class="done-at">{{ 日時表示(会話.登録日時) }}</td>
           </tr>
         </tbody>
       </table>
 
-      <div v-if="読込中" class="panel-message">チーム雑談を読み込んでいます…</div>
+      <div v-if="読込中" class="panel-message">チーム会話を読み込んでいます…</div>
       <div v-else-if="読込エラー" class="panel-message error">
         <span>{{ 読込エラー }}</span>
-        <button type="button" @click="() => 雑談一覧読込()">再読込</button>
+        <button type="button" @click="() => 会話一覧読込()">再読込</button>
       </div>
-      <div v-else-if="雑談一覧.length === 0" class="panel-message">
-        まだ雑談の記録はありません。
+      <div v-else-if="会話一覧.length === 0" class="panel-message">
+        まだ会話の記録はありません。
       </div>
       <div v-else class="panel-hint">行をダブルクリックで要求内容・発言内容を表示</div>
     </div>

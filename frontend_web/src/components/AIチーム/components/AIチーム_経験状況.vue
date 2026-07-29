@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// AIチーム_経験一覧: 掲示板に出ているプロジェクトの経験だけを一覧表示する
+// AIチーム_経験状況: 掲示板に出ているプロジェクトの経験だけを一覧表示する
 // 5秒ごとにプロジェクト単位の最大更新日時を確認し、変化時だけ一覧を再取得する
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
@@ -31,7 +31,7 @@ const {
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
-} = use自由配置パネル('AIチーム_経験一覧位置', 'right', 'top', {
+} = use自由配置パネル('AIチーム_経験状況位置', 'right', 'top', {
   initialOpen: false,
   initialOffsetY: 40,
 });
@@ -168,7 +168,7 @@ onBeforeUnmount(() => {
         @pointerdown.stop
         @click="開閉を切替"
       >{{ 開いている ? '▼' : '▶' }}</button>
-      <span class="panel-title">【チーム経験】</span>
+      <span class="panel-title">【経験状況】</span>
       <span class="panel-count">{{ 経験一覧.length }}件</span>
       <span class="panel-total">経験値 {{ 経験値合計 }}</span>
     </div>

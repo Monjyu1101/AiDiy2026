@@ -51,7 +51,7 @@ export type チーム作業 = {
   プロジェクト: string;
   ループ: number;
   依頼ID: string;
-  チーム目標: string;
+  チーム作業: string;
   要員ID: string;
   /** S=相談 / P=計画 / D=実行 / C=評価 / A=改善 */
   PDCA区分: string;
@@ -64,8 +64,8 @@ export type チーム作業 = {
   更新日時: string;
 };
 
-export type チーム雑談 = {
-  雑談ID: string;
+export type チーム会話 = {
+  会話ID: string;
   プロジェクト: string;
   要員ID: string;
   要求内容: string;
@@ -77,20 +77,21 @@ export type チーム雑談 = {
 export type チーム目標 = {
   CODE_BASE_PATH: string;
   チーム目標: string;
-  /** 自動目標設定を回すかどうか（既定はオフ） */
-  自動目標設定?: boolean | number;
-  /** 目標に向けた目標ループを回すかどうか（既定はオフ） */
-  目標ループ?: boolean | number;
+  /** 自動作業設定を回すかどうか（既定はオフ） */
+  自動作業設定?: boolean | number;
+  チーム作業: string;
+  /** 目標に向けた作業ループを回すかどうか（既定はオフ） */
+  作業ループ?: boolean | number;
   /** 1〜98は上限回数、99は無制限 */
   最大ループ回数?: number;
-  /** 目標ループの相談フェーズへ動員する要員数（1〜admin以外の有効要員数、既定2） */
+  /** 作業ループの相談フェーズへ動員する要員数（1〜admin以外の有効要員数、既定2） */
   動員要員数?: number;
-  /** 目標ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */
+  /** 作業ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */
   パターン?: 'SPDCA' | 'PlanDo';
-  /** 目標ループの各段を実行するAI（Aチーム依頼側） */
+  /** 作業ループの各段を実行するAI（Aチーム依頼側） */
   TEAM_AI_NAME?: string;
   TEAM_AI_MODEL?: string;
-  /** 目標ループから投入するAタスク側のAI */
+  /** 作業ループから投入するAタスク側のAI */
   TASK_AI_NAME?: string;
   TASK_AI_MODEL?: string;
   更新日時: string;

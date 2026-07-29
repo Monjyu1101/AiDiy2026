@@ -8,13 +8,13 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""Aチーム雑談の DB アクセス（参照専用。登録経路は別途追加予定）。"""
+"""Aチーム会話の DB アクセス（参照専用。登録経路は別途追加予定）。"""
 
 from __future__ import annotations
 
 from .team_db import DB_PATH, 接続取得
 
-雑談テーブル = "Aチーム雑談"
+会話テーブル = "Aチーム会話"
 一覧最大件数 = 100
 
 
@@ -23,8 +23,8 @@ def 初期化() -> None:
     conn = 接続取得()
     try:
         conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS "{雑談テーブル}" (
-                雑談ID TEXT NOT NULL PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS "{会話テーブル}" (
+                会話ID TEXT NOT NULL PRIMARY KEY,
                 プロジェクト TEXT NOT NULL DEFAULT '',
                 要員ID TEXT NOT NULL DEFAULT '',
                 要求内容 TEXT NOT NULL DEFAULT '',
@@ -40,16 +40,16 @@ def 初期化() -> None:
             )
         """)
         conn.execute(f"""
-            CREATE INDEX IF NOT EXISTS "IX_Aチーム雑談_プロジェクト"
-            ON "{雑談テーブル}" (プロジェクト, 雑談ID)
+            CREATE INDEX IF NOT EXISTS "IX_Aチーム会話_プロジェクト"
+            ON "{会話テーブル}" (プロジェクト, 会話ID)
         """)
         conn.commit()
     finally:
         conn.close()
 
 
-def 雑談一覧(プロジェクト: str = "", 件数: int = 一覧最大件数) -> list[dict]:
-    """雑談を新しい順で返す。"""
+def 会話一覧(プロジェクト: str = "", 件数: int = 一覧最大件数) -> list[dict]:
+    """会話を新しい順で返す。"""
     初期化()
     conn = 接続取得()
     try:
@@ -58,9 +58,9 @@ def 雑談一覧(プロジェクト: str = "", 件数: int = 一覧最大件数)
         params.append(max(1, int(件数)))
         rows = conn.execute(
             f"""
-            SELECT 雑談ID, プロジェクト, 要員ID, 要求内容, 発言内容, 登録日時, 更新日時
-              FROM "{雑談テーブル}"{条件}
-             ORDER BY 雑談ID DESC
+            SELECT 会話ID, プロジェクト, 要員ID, 要求内容, 発言内容, 登録日時, 更新日時
+              FROM "{会話テーブル}"{条件}
+             ORDER BY 会話ID DESC
              LIMIT ?
             """,
             params,
@@ -70,14 +70,14 @@ def 雑談一覧(プロジェクト: str = "", 件数: int = 一覧最大件数)
         conn.close()
 
 
-def 雑談最大更新日時(プロジェクト: str = "") -> str:
+def 会話最大更新日時(プロジェクト: str = "") -> str:
     """一覧の再取得判定に使う最大更新日時を返す。"""
     初期化()
     conn = 接続取得()
     try:
         条件 = " WHERE プロジェクト = ?" if プロジェクト else ""
         row = conn.execute(
-            f'SELECT MAX(更新日時) AS 最大更新日時 FROM "{雑談テーブル}"{条件}',
+            f'SELECT MAX(更新日時) AS 最大更新日時 FROM "{会話テーブル}"{条件}',
             [プロジェクト] if プロジェクト else [],
         ).fetchone()
         return str(row["最大更新日時"] or "") if row else ""

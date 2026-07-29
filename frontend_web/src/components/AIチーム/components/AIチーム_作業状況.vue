@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// AIチーム_作業一覧: 掲示板に出ているプロジェクトの目標ループ（PDCA）の実行状況を一覧表示する
+// AIチーム_作業状況: 掲示板に出ているプロジェクトの作業ループ（PDCA）の実行状況を一覧表示する
 // 5秒ごとにプロジェクト単位の最大更新日時を確認し、変化時だけ一覧を再取得する
-// 表示するのは目標ループがオンのときだけ（オフのときは AIチーム.vue 側で描画しない）
+// 表示するのは作業ループがオンのときだけ（オフのときは AIチーム.vue 側で描画しない）
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
 import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
@@ -32,7 +32,7 @@ const {
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
-} = use自由配置パネル('AIチーム_作業一覧位置', 'center', 'bottom');
+} = use自由配置パネル('AIチーム_作業状況位置', 'center', 'bottom');
 
 const 最大更新日時取得 = async (): Promise<string> => {
   const response = await apiClient.post('/team/作業/最大更新日時', {
@@ -100,9 +100,9 @@ const 内容要求値 = ref('');
 const 内容応答値 = ref('');
 const 内容まとめ値 = ref('');
 
-// ダブルクリックで チーム目標 / 応答内容 を共通ダイアログに表示する
+// ダブルクリックで チーム作業 / 応答内容 を共通ダイアログに表示する
 const 内容を開く = (作業: チーム作業) => {
-  const 目標 = String(作業.チーム目標 ?? '');
+  const 目標 = String(作業.チーム作業 ?? '');
   const 応答 = String(作業.応答内容 ?? '');
   const まとめ = String(作業.まとめ内容 ?? '');
   if (!目標.trim() && !応答.trim() && !まとめ.trim()) return;
@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
         @pointerdown.stop
         @click="開閉を切替"
       >{{ 開いている ? '▼' : '▶' }}</button>
-      <span class="panel-title">【目標ループ】</span>
+      <span class="panel-title">【作業状況】</span>
       <span class="panel-count">{{ 作業一覧.length }}件</span>
       <span class="panel-total">実行中 {{ 実行中件数 }}</span>
     </div>
@@ -212,9 +212,9 @@ onBeforeUnmount(() => {
         <button type="button" @click="() => 作業一覧読込()">再読込</button>
       </div>
       <div v-else-if="作業一覧.length === 0" class="panel-message">
-        まだ目標ループの記録はありません。空き時間に相談（S）から始まります。
+        まだ作業ループの記録はありません。空き時間に相談（S）から始まります。
       </div>
-      <div v-else class="panel-hint">行をダブルクリックでチーム目標・応答内容を表示</div>
+      <div v-else class="panel-hint">行をダブルクリックでチーム作業・応答内容を表示</div>
     </div>
   </aside>
 

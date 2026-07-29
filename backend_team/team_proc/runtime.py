@@ -75,17 +75,17 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
         team_pdca_db.初期化()
         await asyncio.to_thread(team_db.初期要員を召喚)
         await asyncio.to_thread(team_goal_db.初期目標を投入)
-        自動目標設定解除件数 = await asyncio.to_thread(team_goal_db.起動時自動目標設定をオフ)
-        if 自動目標設定解除件数:
+        自動作業設定解除件数 = await asyncio.to_thread(team_goal_db.起動時自動作業設定をオフ)
+        if 自動作業設定解除件数:
             logger.info(
-                "backend_team 起動時にAチーム目標の自動目標設定をオフへ戻しました: %d件",
-                自動目標設定解除件数,
+                "backend_team 起動時にAチーム目標の自動作業設定をオフへ戻しました: %d件",
+                自動作業設定解除件数,
             )
-        目標ループ解除件数 = await asyncio.to_thread(team_goal_db.起動時目標ループをオフ)
-        if 目標ループ解除件数:
+        作業ループ解除件数 = await asyncio.to_thread(team_goal_db.起動時作業ループをオフ)
+        if 作業ループ解除件数:
             logger.info(
-                "backend_team 起動時にAチーム目標の目標ループをオフへ戻しました: %d件",
-                目標ループ解除件数,
+                "backend_team 起動時にAチーム目標の作業ループをオフへ戻しました: %d件",
+                作業ループ解除件数,
             )
         # システム開始時（再起動含む）: 残存 PID・生成中の経験などをエラーとして記録しクリア（強制停止はしない）
         await asyncio.to_thread(起動時クリーンアップ, logger)

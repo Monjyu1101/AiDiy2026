@@ -50,7 +50,7 @@ const props = defineProps<{
   要員読込中: boolean;
   要員読込エラー: string;
   チーム目標: チーム目標 | null;
-  /** 目標ループが動いているか。掲示板のネオン点灯はこれで切り替える */
+  /** 作業ループが動いているか。掲示板のネオン点灯はこれで切り替える */
   作業実行中: boolean;
 }>();
 
@@ -99,7 +99,7 @@ const 復帰注視点 = new THREE.Vector3();
 const 一人称注視点 = new THREE.Vector3();
 const 一人称体格 = new THREE.Box3();
 const 掲示板注視点 = new THREE.Vector3();
-// NPC飛行船が吊り下げて運ぶ「チーム目標」掲示板（常にカメラを向き、クリックで保守ダイアログ）
+// NPC飛行船が吊り下げて運ぶ「チーム作業」掲示板（常にカメラを向き、クリックで保守ダイアログ）
 // 位置と向きは AIチーム_NPC動作_飛行船.ts 側が毎フレーム決める
 const 目標掲示板 = {
   group: null as THREE.Group | null,
@@ -954,12 +954,12 @@ const 地面パッチを作る = (
   scene.add(ring);
 };
 
-// チーム目標のテキストを大きな板に描く（神の声のように読ませたいので余白と行間を広く取る）
+// チーム作業のテキストを大きな板に描く（神の声のように読ませたいので余白と行間を広く取る）
 const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
   const context = canvas.getContext('2d');
   if (!context) return;
   const 目標 = props.チーム目標;
-  const 本文 = String(目標?.チーム目標 ?? '').trim() || 'チーム目標が未登録です';
+  const 本文 = String(目標?.チーム作業 ?? '').trim() || 'チーム作業が未登録です';
   const パス = String(目標?.CODE_BASE_PATH ?? '').trim();
   const 更新 = String(目標?.更新日時 ?? '').trim();
 
@@ -979,7 +979,7 @@ const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
   context.textBaseline = 'alphabetic';
   context.font = '700 40px "Yu Gothic", "Meiryo", sans-serif';
   context.fillStyle = '#4a7c59';
-  context.fillText('TEAM GOAL  /  チーム目標', 60, 78);
+  context.fillText('TEAM GOAL  /  チーム作業', 60, 78);
   if (パス) {
     context.font = '600 34px "Yu Gothic", "Meiryo", sans-serif';
     context.fillStyle = '#7a6a3c';
@@ -1074,7 +1074,7 @@ const 目標掲示板を作る = () => {
   group.add(縁);
   目標掲示板.縁 = 縁;
 
-  // 目標ループ中は、掲示板全体へ薄いピンクの明滅を重ねる。
+  // 作業ループ中は、掲示板全体へ薄いピンクの明滅を重ねる。
   const 作業明滅材 = new THREE.MeshBasicMaterial({
     color: 0xff1493,
     transparent: true,
@@ -1536,7 +1536,7 @@ const シーンを作る = () => {
     const NPC禁止円 = 池位置.map(
       ([px, pz, pr]) => [px, pz, pr + 1.2] as [number, number, number],
     );
-    // 飛行船は 4 エリアの上空を旋回し、チーム目標の掲示板を吊り下げて運ぶ
+    // 飛行船は 4 エリアの上空を旋回し、チーム作業の掲示板を吊り下げて運ぶ
     NPC一覧.push(
       NPCを配置(
         scene,
@@ -1887,31 +1887,31 @@ const 描画 = (時刻: number) => {
   });
 
   // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
-  // ループが上限まで回り切ったら、目標ループONのままでもネオンは消す
-  const 目標ループ中 = props.作業実行中;
+  // ループが上限まで回り切ったら、作業ループONのままでもネオンは消す
+  const 作業ループ中 = props.作業実行中;
   // ゆっくりした明滅へ、ごく短い瞬断を混ぜてネオン管らしい点灯の揺らぎを作る。
   const 瞬断 = Math.sin(時刻 * 0.021) + Math.sin(時刻 * 0.0137) > 1.72 ? 0.2 : 1;
   const ネオン強度 = (0.72 + (Math.sin(時刻 * 0.0045) + 1) * 0.14) * 瞬断;
   if (目標掲示板.縁) {
     const 縁材 = 目標掲示板.縁.material as THREE.MeshBasicMaterial;
-    縁材.color.setHex(目標ループ中 ? 0xff1493 : 0xfff6d0);
+    縁材.color.setHex(作業ループ中 ? 0xff1493 : 0xfff6d0);
     const 目標値 = 目標ホバー.value
       ? 0.85
-      : 目標ループ中
+      : 作業ループ中
         ? 0.18 + ネオン強度 * 0.78
         : 0.34 + (Math.sin(時刻 * 0.0016) + 1) * 0.06;
-    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 目標ループ中 ? 0.32 : 0.12);
+    縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 作業ループ中 ? 0.32 : 0.12);
   }
   if (目標掲示板.作業明滅) {
-    目標掲示板.作業明滅.visible = 目標ループ中;
-    if (目標ループ中) {
+    目標掲示板.作業明滅.visible = 作業ループ中;
+    if (作業ループ中) {
       const 明滅材 = 目標掲示板.作業明滅.material as THREE.MeshBasicMaterial;
       明滅材.opacity = 0.025 + ネオン強度 * 0.085;
     }
   }
   if (目標掲示板.作業ネオン芯) {
-    目標掲示板.作業ネオン芯.visible = 目標ループ中;
-    if (目標ループ中) {
+    目標掲示板.作業ネオン芯.visible = 作業ループ中;
+    if (作業ループ中) {
       const 芯材 = (目標掲示板.作業ネオン芯.children[0] as THREE.Mesh)
         .material as THREE.MeshBasicMaterial;
       芯材.opacity = 0.28 + ネオン強度 * 0.72;
@@ -1966,7 +1966,7 @@ const 目標掲示板をヒットテスト = (clientX: number, clientY: number) 
   return raycaster.intersectObject(目標掲示板.板, false).length > 0;
 };
 
-// 草原そのものはクリックで反応させない。3D 側で操作できるのはチーム目標の掲示板だけで、
+// 草原そのものはクリックで反応させない。3D 側で操作できるのはチーム作業の掲示板だけで、
 // 要員の選択・視点切替・会話は【要員状況】パネルから行う
 const キャンバスクリック = (event: MouseEvent) => {
   if (目標掲示板をヒットテスト(event.clientX, event.clientY)) emit('目標クリック');
@@ -2321,7 +2321,7 @@ watch(
 );
 
 watch(
-  () => [props.チーム目標?.CODE_BASE_PATH, props.チーム目標?.チーム目標, props.チーム目標?.更新日時],
+  () => [props.チーム目標?.CODE_BASE_PATH, props.チーム目標?.チーム作業, props.チーム目標?.更新日時],
   () => 目標掲示板を更新(),
 );
 

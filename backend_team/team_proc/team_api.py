@@ -173,7 +173,7 @@ class チーム作業一覧要求(BaseModel):
     件数: int = Field(default=team_pdca_db.一覧最大件数, ge=1, le=1000)
 
 
-class チーム雑談一覧要求(BaseModel):
+class チーム会話一覧要求(BaseModel):
     """掲示板に出ているプロジェクト（CODE_BASE_PATH）で絞って一覧する。"""
     プロジェクト: str = ""
     件数: int = Field(default=team_talk_db.一覧最大件数, ge=1, le=1000)
@@ -186,14 +186,15 @@ class チーム目標取得要求(BaseModel):
 class チーム目標保存要求(操作情報):
     CODE_BASE_PATH: str
     チーム目標: str = ""
-    自動目標設定: bool = False
-    目標ループ: bool = False
+    自動作業設定: bool = False
+    チーム作業: str = ""
+    作業ループ: bool = False
     最大ループ回数: int = Field(default=team_goal_db.既定最大ループ回数, ge=1, le=99)
     動員要員数: int = Field(
         default=team_goal_db.既定動員要員数, ge=1, le=team_goal_db.動員要員数上限
     )
     パターン: Literal["SPDCA", "PlanDo"] = team_goal_db.既定パターン
-    # 目標ループの各段で使うAI。選択肢は環境依存のため文字列のまま受け、空なら既定値にする
+    # 作業ループの各段で使うAI。選択肢は環境依存のため文字列のまま受け、空なら既定値にする
     TEAM_AI_NAME: str = team_goal_db.既定TEAM_AI_NAME
     TEAM_AI_MODEL: str = team_goal_db.既定TEAM_AI_MODEL
     TASK_AI_NAME: str = team_goal_db.既定TASK_AI_NAME
@@ -614,7 +615,7 @@ async def チーム経験失敗(request: チーム経験失敗要求) -> dict:
 
 @router.post("/作業/一覧", tags=["チーム作業"])
 async def チーム作業一覧(request: チーム作業一覧要求) -> dict:
-    """目標ループ（PDCA）の実行状況を、作業IDの新しい順で返す。"""
+    """作業ループ（PDCA）の実行状況を、作業IDの新しい順で返す。"""
     try:
         items = team_pdca_db.作業一覧(request.プロジェクト.strip(), request.件数)
         return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
@@ -635,32 +636,32 @@ async def チーム作業最大更新日時(request: チーム作業一覧要求
         return ng(f"チーム作業の最大更新日時の取得に失敗しました: {e}")
 
 
-@router.post("/雑談/一覧", tags=["チーム雑談"])
-async def チーム雑談一覧(request: チーム雑談一覧要求) -> dict:
-    """雑談を新しい順で返す。"""
+@router.post("/会話/一覧", tags=["チーム会話"])
+async def チーム会話一覧(request: チーム会話一覧要求) -> dict:
+    """会話を新しい順で返す。"""
     try:
-        items = team_talk_db.雑談一覧(request.プロジェクト.strip(), request.件数)
+        items = team_talk_db.会話一覧(request.プロジェクト.strip(), request.件数)
         return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
     except Exception as e:
-        logger.error(f"チーム雑談一覧の取得に失敗: {e}")
-        return ng(f"チーム雑談一覧の取得に失敗しました: {e}")
+        logger.error(f"チーム会話一覧の取得に失敗: {e}")
+        return ng(f"チーム会話一覧の取得に失敗しました: {e}")
 
 
-@router.post("/雑談/最大更新日時", tags=["チーム雑談"])
-async def チーム雑談最大更新日時(request: チーム雑談一覧要求) -> dict:
+@router.post("/会話/最大更新日時", tags=["チーム会話"])
+async def チーム会話最大更新日時(request: チーム会話一覧要求) -> dict:
     """一覧の再取得判定に使う最大更新日時（5秒ポーリング用）。"""
     try:
         return ok("最大更新日時を取得しました", {
-            "最大更新日時": team_talk_db.雑談最大更新日時(request.プロジェクト.strip()),
+            "最大更新日時": team_talk_db.会話最大更新日時(request.プロジェクト.strip()),
         })
     except Exception as e:
-        logger.error(f"チーム雑談の最大更新日時の取得に失敗: {e}")
-        return ng(f"チーム雑談の最大更新日時の取得に失敗しました: {e}")
+        logger.error(f"チーム会話の最大更新日時の取得に失敗: {e}")
+        return ng(f"チーム会話の最大更新日時の取得に失敗しました: {e}")
 
 
 @router.post("/目標/一覧", tags=["チーム目標"])
 async def チーム目標一覧() -> dict:
-    """CODE_BASE_PATH ごとのチーム目標を、更新日時の新しい順で返す。"""
+    """CODE_BASE_PATH ごとのチーム作業を、更新日時の新しい順で返す。"""
     try:
         items = team_goal_db.目標一覧()
         return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
@@ -671,25 +672,29 @@ async def チーム目標一覧() -> dict:
 
 @router.post("/目標/最終", tags=["チーム目標"])
 async def チーム目標最終() -> dict:
-    """更新日時が最新のチーム目標と、目標ループが動いているかを返す（掲示板に出す値）。
+    """更新日時が最新のチーム作業と、作業ループが動いているかを返す（掲示板に出す値）。
 
     掲示板は5秒ごとにこれを読み、`作業実行中` でネオン点灯を切り替える。
-    目標ループがオフ、または最大ループ回数まで回って最終段が決着（済 または エラー）
+    作業ループがオフ、または最大ループ回数まで回って最終段が決着（済 または エラー）
     していれば false。エラーで終わっても次のループは投入されないため停止とみなす。
     """
     try:
         item = team_goal_db.最終目標取得()
         if not item:
-            return ok("チーム目標を取得しました", {"item": {}, "作業実行中": False})
-        作業実行中 = bool(item.get("目標ループ")) and team_pdca_db.目標ループ実行中(
+            return ok("チーム作業を取得しました", {"最大更新日時": "", "item": {}, "作業実行中": False})
+        作業実行中 = bool(item.get("作業ループ")) and team_pdca_db.作業ループ実行中(
             str(item.get("CODE_BASE_PATH", "")),
             str(item.get("パターン", "") or team_goal_db.既定パターン),
             int(item.get("最大ループ回数", 1) or 1),
         )
-        return ok("チーム目標を取得しました", {"item": item, "作業実行中": 作業実行中})
+        return ok("チーム作業を取得しました", {
+            "最大更新日時": str(item.get("更新日時", "")),
+            "item": item,
+            "作業実行中": 作業実行中,
+        })
     except Exception as e:
-        logger.error(f"チーム目標の取得に失敗: {e}")
-        return ng(f"チーム目標の取得に失敗しました: {e}")
+        logger.error(f"チーム作業の取得に失敗: {e}")
+        return ng(f"チーム作業の取得に失敗しました: {e}")
 
 
 @router.post("/目標/取得", tags=["チーム目標"])
@@ -699,10 +704,10 @@ async def チーム目標取得(request: チーム目標取得要求) -> dict:
         if not パス:
             return ng("CODE_BASE_PATHを指定してください")
         item = team_goal_db.目標取得(パス)
-        return ok("チーム目標を取得しました", {"item": item}) if item else ng("対象のチーム目標が見つかりません")
+        return ok("チーム作業を取得しました", {"item": item}) if item else ng("対象のチーム作業が見つかりません")
     except Exception as e:
-        logger.error(f"チーム目標の取得に失敗: {e}")
-        return ng(f"チーム目標の取得に失敗しました: {e}")
+        logger.error(f"チーム作業の取得に失敗: {e}")
+        return ng(f"チーム作業の取得に失敗しました: {e}")
 
 
 @router.post("/目標/保存", tags=["チーム目標"])
@@ -710,18 +715,22 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
     """CODE_BASE_PATH 単位の登録・変更（同じパスなら上書き）。"""
     try:
         パス = request.CODE_BASE_PATH.strip()
-        目標 = request.チーム目標.strip()
+        目標 = request.チーム作業.strip()
+        テーマ = request.チーム目標.strip()
         if not パス:
             return ng("CODE_BASE_PATHを指定してください")
         if not 目標:
+            return ng("チーム作業を入力してください")
+        if not テーマ:
             return ng("チーム目標を入力してください")
         変更前 = team_goal_db.目標取得(パス)
         item = team_goal_db.目標保存(
             パス,
             目標,
+            テーマ,
             request.操作者(),
-            request.自動目標設定,
-            request.目標ループ,
+            request.自動作業設定,
+            request.作業ループ,
             request.最大ループ回数,
             request.動員要員数,
             request.パターン,
@@ -730,21 +739,21 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             request.TASK_AI_NAME,
             request.TASK_AI_MODEL,
         )
-        if team_goal_db.作業履歴クリア必要(変更前, 目標, request.目標ループ, request.パターン):
+        if team_goal_db.作業履歴クリア必要(変更前, 目標, request.作業ループ, request.パターン):
             # 最大ループ回数・動員要員数だけの変更では履歴を残し、
             # 目標またはループON/OFFの変更時だけクリアする。
             クリア件数 = team_pdca_db.作業クリア(パス)
-            logger.info(f"目標または目標ループ変更のためAチーム作業をクリアしました: {パス} ({クリア件数}件)")
+            logger.info(f"目標または作業ループ変更のためAチーム作業をクリアしました: {パス} ({クリア件数}件)")
             return ok(
-                f"{パス} のチーム目標を保存し、目標ループの記録を{クリア件数}件クリアしました",
+                f"{パス} のチーム作業を保存し、作業ループの記録を{クリア件数}件クリアしました",
                 {"item": item, "作業クリア件数": クリア件数},
             )
-        return ok(f"{パス} のチーム目標を保存しました", {"item": item})
+        return ok(f"{パス} のチーム作業を保存しました", {"item": item})
     except ValueError as exc:
         return ng(str(exc))
     except Exception as e:
-        logger.error(f"チーム目標の保存に失敗: {e}")
-        return ng(f"チーム目標の保存に失敗しました: {e}")
+        logger.error(f"チーム作業の保存に失敗: {e}")
+        return ng(f"チーム作業の保存に失敗しました: {e}")
 
 
 @router.post("/目標/削除", tags=["チーム目標"])
@@ -754,16 +763,16 @@ async def チーム目標削除(request: チーム目標削除要求) -> dict:
         if not パス:
             return ng("CODE_BASE_PATHを指定してください")
         team_goal_db.目標削除(パス)
-        # 目標が消えたら目標ループの記録も残さない
+        # 目標が消えたら作業ループの記録も残さない
         team_pdca_db.作業クリア(パス)
-        return ok(f"{パス} のチーム目標を削除しました")
+        return ok(f"{パス} のチーム作業を削除しました")
     except KeyError:
-        return ng("対象のチーム目標が見つかりません")
+        return ng("対象のチーム作業が見つかりません")
     except ValueError as exc:
         return ng(str(exc))
     except Exception as e:
-        logger.error(f"チーム目標の削除に失敗: {e}")
-        return ng(f"チーム目標の削除に失敗しました: {e}")
+        logger.error(f"チーム作業の削除に失敗: {e}")
+        return ng(f"チーム作業の削除に失敗しました: {e}")
 
 
 @router.post("/状況/一覧", tags=["チーム状況"])
