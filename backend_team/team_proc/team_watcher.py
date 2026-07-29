@@ -23,6 +23,9 @@
   - Aチーム目標の作業ループ（PDCA）も確認する。実行中の要員がいない空き時間で、
     前の段が終わっていれば次の段を、目標のパターン（SPDCA/PlanDo）に対応する
     sub_SPDCA_*.py / sub_PlanDo_*.py で投入する。
+  - Aチーム目標（最終更新1件）の自動作業設定がオンなら、雑談エリア（状態=雑談中）の
+    要員から1名を選んで sub_hatugen.py を起動し、Aチーム会話へ「今やるべきこと」の
+    発言を1件集める（雑談確認）。
 - システム開始時（再起動含む）は、テーブルに残った未投入の依頼をエラーとして記録しクリアする
   （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
@@ -33,13 +36,15 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import team_exp_db, team_goal_db, team_pdca_db, team_status_db, team_work_db
+from . import team_db, team_exp_db, team_goal_db, team_pdca_db, team_status_db, team_talk_db, team_work_db
+from .store import ストア
 
 起動監視間隔秒 = 5
 状態監視間隔秒 = 10
@@ -64,6 +69,8 @@ _SUB_PDCAパス = {
     },
 }
 _作業入力DIR = _BASE_DIR / "temp" / "pdca"
+_SUB_HATUGENパス = _BASE_DIR / "team_sub" / "sub_hatugen.py"
+_雑談入力DIR = _BASE_DIR / "temp" / "talk"
 
 # 状態監視タイマーの本処理は hh:mm が変わった確認回だけ処理する（毎分 1 回）
 _前回確認分 = ""
@@ -71,6 +78,8 @@ _前回確認分 = ""
 _作業プロセス: subprocess.Popen | None = None
 # 未実装区分の案内は毎分繰り返さず、プロジェクト×区分ごとに1回だけ出す
 _作業未実装通知済み: set[tuple[str, str]] = set()
+# 起動中の雑談発言プロセス（前回分が動いている間は次を投入しない。最大3分程度かかる）
+_雑談プロセス: subprocess.Popen | None = None
 
 
 def _サブプロセス環境() -> dict:
@@ -97,6 +106,11 @@ def _経験入力パス(経験ID: str) -> Path:
 def _作業入力パス(プロジェクト: str, 区分: str) -> Path:
     時刻 = datetime.now().strftime("%Y%m%d_%H%M%S")
     return _作業入力DIR / f"{_安全ファイル名部品(プロジェクト)}_{_安全ファイル名部品(区分)}_{時刻}.json"
+
+
+def _雑談入力パス(プロジェクト: str) -> Path:
+    時刻 = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return _雑談入力DIR / f"{_安全ファイル名部品(プロジェクト)}_{時刻}.json"
 
 
 def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
@@ -428,6 +442,102 @@ def _作業ループ確認(logger: logging.Logger) -> None:
         logger.exception("作業ループの確認でエラーが発生しました")
 
 
+def _雑談発言者を選ぶ(候補: list[str], プロジェクト: str) -> str | None:
+    """発言の無い1名（複数いればランダム）、全員発言済みなら最も古い発言者を選ぶ。"""
+    if not 候補:
+        return None
+    発言済み = team_talk_db.発言状況一覧(プロジェクト)
+    未発言 = [要員ID for 要員ID in 候補 if 要員ID not in 発言済み]
+    if 未発言:
+        return random.choice(未発言)
+    return min(候補, key=lambda 要員ID: 発言済み.get(要員ID, ""))
+
+
+def _雑談実行開始(会話: dict, 目標: dict, 他者意見一覧: list[dict], logger: logging.Logger) -> subprocess.Popen | None:
+    """雑談1件分の入力 JSON を出力し、sub_hatugen.py を起動する。"""
+    プロジェクト = str(会話.get("プロジェクト", ""))
+    要員ID = str(会話.get("要員ID", ""))
+    try:
+        _雑談入力DIR.mkdir(parents=True, exist_ok=True)
+        入力パス = _雑談入力パス(プロジェクト)
+        with 入力パス.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "会話ID": str(会話.get("会話ID", "")),
+                    "プロジェクト": プロジェクト,
+                    "要員ID": 要員ID,
+                    "チーム目標": str(目標.get("チーム目標", "")),
+                    "TASK_AI_NAME": str(目標.get("TASK_AI_NAME", "claude_cli")),
+                    "TASK_AI_MODEL": str(目標.get("TASK_AI_MODEL", "auto")),
+                    "他者意見": [
+                        {"要員ID": str(行.get("要員ID", "")), "発言内容": str(行.get("発言内容", ""))}
+                        for 行 in 他者意見一覧
+                    ],
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        proc = subprocess.Popen(
+            [sys.executable, str(_SUB_HATUGENパス), str(入力パス)],
+            cwd=str(_BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+            env=_サブプロセス環境(),
+        )
+        logger.info(f"雑談の発言を開始しました: 会話ID={会話.get('会話ID', '')} 要員ID={要員ID} PID={proc.pid}")
+        return proc
+    except Exception:
+        logger.exception(f"雑談の発言起動に失敗しました: 要員ID={要員ID} プロジェクト={プロジェクト}")
+        return None
+
+
+def _雑談確認(logger: logging.Logger) -> None:
+    """自動作業設定がオンなら、雑談エリアの要員から1名を選んで発言させる（1分ごと）。
+
+    投入するのは次のすべてを満たすときだけ。
+    - 前回の発言投入プロセスが残っていない（sub_hatugen.py は最大3分程度かかる）
+    - Aチーム目標の最終更新（掲示板に出ている目標）で自動作業設定がオン
+    - 雑談エリア（状態=雑談中、admin以外）の要員が1名以上いる
+
+    選ぶのは、Aチーム会話に発言（発言内容あり）の無い要員を優先し、
+    全員発言済みなら最も古い発言者。選んだ要員IDで空の会話行を追加して
+    発言シーケンスに入ったことをマーキングしてから sub_hatugen.py を起動する。
+    """
+    global _雑談プロセス
+    try:
+        if _雑談プロセス is not None and _雑談プロセス.poll() is None:
+            return
+        _雑談プロセス = None
+        目標 = team_goal_db.最終目標取得()
+        if not 目標 or not bool(目標.get("自動作業設定")):
+            return
+        プロジェクト = str(目標.get("CODE_BASE_PATH", ""))
+        if not プロジェクト:
+            return
+        候補 = [
+            str(エージェント["エージェントID"])
+            for エージェント in ストア.エージェント一覧()
+            if エージェント.get("状態") == "雑談中"
+            and str(エージェント["エージェントID"]) != team_db.管理者要員ID
+        ]
+        要員ID = _雑談発言者を選ぶ(候補, プロジェクト)
+        if not 要員ID:
+            return
+        操作者 = {"利用者ID": "system", "利用者名": "システム", "端末ID": "backend_team"}
+        会話 = team_talk_db.発言登録(プロジェクト, 要員ID, 操作者)
+        他者意見一覧 = [
+            行 for 行 in team_talk_db.最新発言一覧(プロジェクト)
+            if str(行.get("要員ID", "")) != 要員ID
+        ]
+        _雑談プロセス = _雑談実行開始(会話, 目標, 他者意見一覧, logger)
+    except Exception:
+        logger.exception("雑談の確認でエラーが発生しました")
+
+
 def _起動監視1回(logger: logging.Logger) -> None:
     # --- 投入待ち（準備開始・未投入）→ 準備中 + sub_init.pyでAIタスク投入 ---
     for 行 in team_work_db.投入待ち一覧():
@@ -445,6 +555,7 @@ def _状態監視1回(logger: logging.Logger) -> None:
     # 回収は作業ループのオン・オフに関わらず行い、そのうえで次の段の投入を判断する
     _作業回収(logger)
     _作業ループ確認(logger)
+    _雑談確認(logger)
 
 
 async def 起動監視ループ(logger: logging.Logger) -> None:
