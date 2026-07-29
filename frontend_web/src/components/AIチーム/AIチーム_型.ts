@@ -23,7 +23,7 @@ export type チーム要員 = {
 
 export type チーム経験 = {
   経験ID: string;
-  作業ID: string;
+  依頼ID: string;
   タスクID: string;
   要員ID: string;
   プロジェクト: string;
@@ -46,16 +46,16 @@ export type チーム経験 = {
   更新日時: string;
 };
 
-export type チーム改善 = {
-  改善ID: string;
+export type チーム作業 = {
+  作業ID: string;
   プロジェクト: string;
   ループ: number;
-  作業ID: string;
+  依頼ID: string;
   チーム目標: string;
   要員ID: string;
   /** S=相談 / P=計画 / D=実行 / C=評価 / A=改善 */
   PDCA区分: string;
-  /** 対応するAチーム作業の状態を写した表示用の値 */
+  /** 対応するAチーム依頼の状態を写した表示用の値 */
   状況: string;
   開始日時: string;
   終了日時: string;
@@ -87,7 +87,7 @@ export type チーム目標 = {
   動員要員数?: number;
   /** 目標ループのパターン（SPDCA=S→P→D→C→Aの5段 / PlanDo=P→Dの2段、既定SPDCA） */
   パターン?: 'SPDCA' | 'PlanDo';
-  /** 目標ループの各段を実行するAI（Aチーム作業側） */
+  /** 目標ループの各段を実行するAI（Aチーム依頼側） */
   TEAM_AI_NAME?: string;
   TEAM_AI_MODEL?: string;
   /** 目標ループから投入するAタスク側のAI */
@@ -111,8 +111,8 @@ export type チーム状況 = {
   更新日時: string;
 };
 
-export type チーム作業 = {
-  作業ID: string;
+export type チーム依頼 = {
+  依頼ID: string;
   要員ID: string;
   プロジェクト: string;
   タイトル: string;

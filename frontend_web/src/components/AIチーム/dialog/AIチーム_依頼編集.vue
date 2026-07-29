@@ -3,30 +3,30 @@ import { computed, ref, watch } from 'vue';
 import apiClient from '../../../api/client';
 import { useAuthStore } from '../../../stores/auth';
 import { qMessage } from '../../../utils/qAlert';
-import type { チーム作業 } from '../AIチーム_型';
+import type { チーム依頼 } from '../AIチーム_型';
 
 const props = defineProps<{
   isOpen: boolean;
-  編集作業: チーム作業 | null;
-  最終作業: チーム作業 | null;
+  編集依頼: チーム依頼 | null;
+  最終依頼: チーム依頼 | null;
 }>();
 
 const emit = defineEmits<{
   close: [];
-  saved: [item: チーム作業];
+  saved: [item: チーム依頼];
 }>();
 
 const authStore = useAuthStore();
 const 利用者ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
 const 利用者名 = computed(() => String(authStore.user?.利用者名 ?? authStore.user?.利用者ID ?? 'admin'));
-const 修正モード = computed(() => props.編集作業 !== null);
-// 新規は作業の担当としてログイン利用者IDを使う。修正は対象作業の要員IDをそのまま引き継ぐ
+const 修正モード = computed(() => props.編集依頼 !== null);
+// 新規は依頼の担当としてログイン利用者IDを使う。修正は対象依頼の要員IDをそのまま引き継ぐ
 const 対象要員ID = computed(() =>
-  props.編集作業 ? String(props.編集作業.要員ID ?? '') || 利用者ID.value : 利用者ID.value
+  props.編集依頼 ? String(props.編集依頼.要員ID ?? '') || 利用者ID.value : 利用者ID.value
 );
 const 状況選択肢 = ['準備開始', '準備完了', '済', '中止'];
 const 状況表示リスト = ['準備開始', '準備中', '準備完了', '待機', '実行中', 'エラー', '完了', '済', '中止'];
-const 現状態 = computed(() => String(props.編集作業?.状態 ?? ''));
+const 現状態 = computed(() => String(props.編集依頼?.状態 ?? ''));
 const 状況選択可 = (status: string) =>
   状況選択肢.includes(status) || status === 現状態.value;
 
@@ -100,7 +100,7 @@ const プロジェクト選択肢読込 = async () => {
 };
 
 const フォーム初期化 = async () => {
-  const work = props.編集作業;
+  const work = props.編集依頼;
   入力要求内容.value = work?.要求内容 ?? '';
   入力実行有効.value = work ? Boolean(work.実行有効) : true;
   const currentStatus = String(work?.状態 ?? '');
@@ -111,8 +111,8 @@ const フォーム初期化 = async () => {
   await Promise.all([モデル選択肢読込(), プロジェクト選択肢読込()]);
   const initialProject = work
     ? work.プロジェクト
-    : props.最終作業
-      ? props.最終作業.プロジェクト
+    : props.最終依頼
+      ? props.最終依頼.プロジェクト
       : String(currentSettings.value.CODE_BASE_PATH || '../');
   入力プロジェクト.value = initialProject;
   選択プロジェクト.value = プロジェクト選択肢.value.some(
@@ -122,7 +122,7 @@ const フォーム初期化 = async () => {
     : '';
   フォーム初期化中.value = true;
   const aiCandidates = teamAiOptions.value;
-  const initialWork = work ?? props.最終作業;
+  const initialWork = work ?? props.最終依頼;
   const teamAiName = initialWork?.TEAM_AI_NAME || currentSettings.value.TEAM_AI_NAME || 'claude_cli';
   入力TEAM_AI_NAME.value = chooseAvailable(teamAiName, aiCandidates) || 'claude_cli';
   const teamModelCandidates = Object.keys(
@@ -200,10 +200,10 @@ const 登録 = async () => {
   登録中.value = true;
   try {
     const response = await apiClient.post(
-      修正モード.value ? '/team/作業/変更' : '/team/作業/登録',
+      修正モード.value ? '/team/依頼/変更' : '/team/依頼/登録',
       {
         要員ID: 対象要員ID.value,
-        作業ID: props.編集作業?.作業ID ?? '',
+        依頼ID: props.編集依頼?.依頼ID ?? '',
         プロジェクト: 入力プロジェクト.value.trim(),
         要求内容: 入力要求内容.value.trim(),
         TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
@@ -218,18 +218,18 @@ const 登録 = async () => {
       },
     );
     if (response.data?.status !== 'OK') {
-      void qMessage(response.data?.message || 'チーム作業を登録できませんでした。', 'error');
+      void qMessage(response.data?.message || 'チーム依頼を登録できませんでした。', 'error');
       return;
     }
-    const item = response.data?.data?.item as チーム作業 | undefined;
-    if (!item?.作業ID) {
+    const item = response.data?.data?.item as チーム依頼 | undefined;
+    if (!item?.依頼ID) {
       void qMessage('登録結果の応答形式が正しくありません。', 'error');
       return;
     }
     emit('saved', item);
     emit('close');
   } catch {
-    void qMessage('チーム作業の登録でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
+    void qMessage('チーム依頼の登録でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
   } finally {
     登録中.value = false;
   }
@@ -239,17 +239,17 @@ const 登録 = async () => {
 <template>
   <Teleport to="body">
     <div v-if="isOpen" class="dialog-overlay" @click.self="emit('close')">
-      <section class="dialog-content" role="dialog" aria-modal="true" aria-label="チーム作業編集">
+      <section class="dialog-content" role="dialog" aria-modal="true" aria-label="チーム依頼編集">
         <header class="dialog-header">
-          <h3>【チーム作業】{{ 修正モード ? '(修正)' : '(新規)' }}</h3>
+          <h3>【チーム依頼】{{ 修正モード ? '(修正)' : '(新規)' }}</h3>
           <button type="button" class="dialog-close" aria-label="閉じる" @click="emit('close')">×</button>
         </header>
 
         <div class="dialog-body">
           <div class="detail-row split-row">
             <div class="detail-half">
-              <div class="detail-label">作業ID</div>
-              <div class="detail-value">{{ 編集作業?.作業ID || '(新規)' }}</div>
+              <div class="detail-label">依頼ID</div>
+              <div class="detail-value">{{ 編集依頼?.依頼ID || '(新規)' }}</div>
             </div>
             <div class="detail-half">
               <div class="detail-label">要員ID</div>
@@ -283,7 +283,7 @@ const 登録 = async () => {
                 v-model="入力要求内容"
                 class="detail-textarea"
                 rows="9"
-                placeholder="AIチームへ依頼する作業内容を入力してください"
+                placeholder="AIチームへ依頼する依頼内容を入力してください"
               ></textarea>
             </div>
           </div>
@@ -433,7 +433,7 @@ const 登録 = async () => {
   flex: 0 0 auto;
 }
 
-/* 1 行を左右 50% ずつに割って、ラベル+内容の組を 2 つ並べる（作業ID / 要員ID） */
+/* 1 行を左右 50% ずつに割って、ラベル+内容の組を 2 つ並べる（依頼ID / 要員ID） */
 .detail-row.split-row {
   gap: 0;
 }

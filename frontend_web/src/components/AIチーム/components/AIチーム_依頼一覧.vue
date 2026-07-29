@@ -3,21 +3,21 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import apiClient from '../../../api/client';
 import { useAuthStore } from '../../../stores/auth';
-import TeamWorkEdit from '../dialog/AIチーム_作業編集.vue';
+import TeamWorkEdit from '../dialog/AIチーム_依頼編集.vue';
 import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
-import type { チーム作業 } from '../AIチーム_型';
+import type { チーム依頼 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
 
 const authStore = useAuthStore();
 const 要員ID = computed(() => String(authStore.user?.利用者ID ?? 'admin'));
-const 作業一覧 = ref<チーム作業[]>([]);
+const 依頼一覧 = ref<チーム依頼[]>([]);
 const 読込中 = ref(false);
 const 読込エラー = ref('');
 const 編集ダイアログ表示 = ref(false);
-const 編集作業 = ref<チーム作業 | null>(null);
+const 編集依頼 = ref<チーム依頼 | null>(null);
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
-let 作業最大更新日時 = '';
-let 作業取得中 = false;
+let 依頼最大更新日時 = '';
+let 依頼取得中 = false;
 
 const {
   panelRef,
@@ -28,21 +28,21 @@ const {
   ドラッグ開始,
   ドラッグ中,
   ドラッグ終了,
-} = use自由配置パネル('AIチーム_作業一覧位置', 'right', 'top', {
+} = use自由配置パネル('AIチーム_依頼一覧位置', 'right', 'top', {
   initialOpen: false,
 });
 
 const 最大更新日時取得 = async (): Promise<string> => {
-  const response = await apiClient.post('/team/作業/最大更新日時', {
+  const response = await apiClient.post('/team/依頼/最大更新日時', {
     要員ID: 要員ID.value,
   });
-  if (response.data?.status !== 'OK') return 作業最大更新日時;
+  if (response.data?.status !== 'OK') return 依頼最大更新日時;
   return String(response.data?.data?.最大更新日時 ?? '');
 };
 
-const 作業一覧読込 = async (読込表示 = true) => {
-  if (作業取得中) return;
-  作業取得中 = true;
+const 依頼一覧読込 = async (読込表示 = true) => {
+  if (依頼取得中) return;
+  依頼取得中 = true;
   if (読込表示) {
     読込中.value = true;
     読込エラー.value = '';
@@ -50,30 +50,30 @@ const 作業一覧読込 = async (読込表示 = true) => {
   try {
     // 一覧取得中に更新が入った場合は、次回確認で拾えるよう基準を先に取得する。
     const newBaseline = await 最大更新日時取得();
-    const response = await apiClient.post('/team/作業/一覧', { 要員ID: 要員ID.value });
+    const response = await apiClient.post('/team/依頼/一覧', { 要員ID: 要員ID.value });
     if (response.data?.status !== 'OK') {
-      throw new Error(response.data?.message || 'チーム作業を取得できませんでした');
+      throw new Error(response.data?.message || 'チーム依頼を取得できませんでした');
     }
     const items = response.data?.data?.items;
-    if (!Array.isArray(items)) throw new Error('チーム作業の応答形式が正しくありません');
-    作業一覧.value = items as チーム作業[];
-    作業最大更新日時 = newBaseline;
+    if (!Array.isArray(items)) throw new Error('チーム依頼の応答形式が正しくありません');
+    依頼一覧.value = items as チーム依頼[];
+    依頼最大更新日時 = newBaseline;
     読込エラー.value = '';
   } catch (error) {
     if (読込表示) {
-      読込エラー.value = error instanceof Error ? error.message : 'チーム作業を取得できませんでした';
+      読込エラー.value = error instanceof Error ? error.message : 'チーム依頼を取得できませんでした';
     }
   } finally {
     if (読込表示) 読込中.value = false;
-    作業取得中 = false;
+    依頼取得中 = false;
   }
 };
 
 const 更新確認 = async () => {
   try {
-    if (作業取得中) return;
+    if (依頼取得中) return;
     const maxUpdatedAt = await 最大更新日時取得();
-    if (maxUpdatedAt !== 作業最大更新日時) await 作業一覧読込(false);
+    if (maxUpdatedAt !== 依頼最大更新日時) await 依頼一覧読込(false);
   } catch {
     // 自動更新確認の失敗は、通常操作を邪魔しない。
   }
@@ -84,13 +84,13 @@ const 自動更新開始 = () => {
   refreshTimer = setInterval(() => void 更新確認(), 5000);
 };
 
-const 新規作業を開く = () => {
-  編集作業.value = null;
+const 新規依頼を開く = () => {
+  編集依頼.value = null;
   編集ダイアログ表示.value = true;
 };
 
-const 作業を開く = (work: チーム作業) => {
-  編集作業.value = work;
+const 依頼を開く = (work: チーム依頼) => {
+  編集依頼.value = work;
   編集ダイアログ表示.value = true;
 };
 
@@ -100,12 +100,12 @@ const 応答内容要求値 = ref('');
 const 応答内容表示値 = ref('');
 const まとめ内容表示値 = ref('');
 
-const 応答内容を開く = (work: チーム作業) => {
+const 応答内容を開く = (work: チーム依頼) => {
   const 要求 = String(work.要求内容 ?? '');
   const 内容 = String(work.応答内容 ?? '');
   const まとめ = String(work.まとめ内容 ?? '');
   if (!要求.trim() && !内容.trim() && !まとめ.trim()) return;
-  応答内容タイトル.value = `要求・応答内容 - ${work.作業ID}${work.応答タイトル ? ' / ' + work.応答タイトル : ''}`;
+  応答内容タイトル.value = `要求・応答内容 - ${work.依頼ID}${work.応答タイトル ? ' / ' + work.応答タイトル : ''}`;
   応答内容要求値.value = 要求;
   応答内容表示値.value = 内容;
   まとめ内容表示値.value = まとめ;
@@ -117,15 +117,15 @@ const 応答内容を開く = (work: チーム作業) => {
 // 一定時間待って dblclick が来なければシングルクリック扱いにする。
 let 行クリックタイマー: ReturnType<typeof setTimeout> | null = null;
 
-const 行クリック = (work: チーム作業) => {
+const 行クリック = (work: チーム依頼) => {
   if (行クリックタイマー) clearTimeout(行クリックタイマー);
   行クリックタイマー = setTimeout(() => {
     行クリックタイマー = null;
-    作業を開く(work);
+    依頼を開く(work);
   }, 220);
 };
 
-const 行ダブルクリック = (work: チーム作業) => {
+const 行ダブルクリック = (work: チーム依頼) => {
   if (行クリックタイマー) {
     clearTimeout(行クリックタイマー);
     行クリックタイマー = null;
@@ -133,13 +133,13 @@ const 行ダブルクリック = (work: チーム作業) => {
   応答内容を開く(work);
 };
 
-const 保存後処理 = (work: チーム作業) => {
-  const index = 作業一覧.value.findIndex((item) => item.作業ID === work.作業ID);
-  if (index >= 0) 作業一覧.value.splice(index, 1, work);
-  else 作業一覧.value.unshift(work);
+const 保存後処理 = (work: チーム依頼) => {
+  const index = 依頼一覧.value.findIndex((item) => item.依頼ID === work.依頼ID);
+  if (index >= 0) 依頼一覧.value.splice(index, 1, work);
+  else 依頼一覧.value.unshift(work);
 };
 
-const 状態class = (status: チーム作業['状態']) => ({
+const 状態class = (status: チーム依頼['状態']) => ({
   waiting: ['準備開始', '準備中', '準備完了', '待機'].includes(status),
   working: status === '実行中',
   completed: status === '完了' || status === '済',
@@ -147,10 +147,10 @@ const 状態class = (status: チーム作業['状態']) => ({
 });
 
 // 行カラーリング: 表示優先順位が9（backend算出の灰色対象）の行を灰色にする
-const 行状態クラス = (work: チーム作業) => (Number(work.表示優先順位 ?? 1) === 9 ? 'row-inactive' : '');
+const 行状態クラス = (work: チーム依頼) => (Number(work.表示優先順位 ?? 1) === 9 ? 'row-inactive' : '');
 
 onMounted(async () => {
-  await 作業一覧読込();
+  await 依頼一覧読込();
   自動更新開始();
 });
 
@@ -183,29 +183,29 @@ onBeforeUnmount(() => {
         @pointerdown.stop
         @click="開閉を切替"
       >{{ 開いている ? '▼' : '▶' }}</button>
-      <span class="panel-title">【チーム作業】</span>
-      <span class="panel-count">{{ 作業一覧.length }}件</span>
-      <button type="button" class="new-button" @pointerdown.stop @click="新規作業を開く">追加</button>
+      <span class="panel-title">【チーム依頼】</span>
+      <span class="panel-count">{{ 依頼一覧.length }}件</span>
+      <button type="button" class="new-button" @pointerdown.stop @click="新規依頼を開く">追加</button>
     </div>
 
     <div v-if="開いている" class="table-frame">
       <table>
         <thead>
           <tr>
-            <th>作業ID</th>
+            <th>依頼ID</th>
             <th>タイトル</th>
             <th>状態</th>
           </tr>
         </thead>
         <tbody>
           <tr
-            v-for="work in 作業一覧"
-            :key="work.作業ID"
+            v-for="work in 依頼一覧"
+            :key="work.依頼ID"
             :class="行状態クラス(work)"
             @click="行クリック(work)"
             @dblclick="行ダブルクリック(work)"
           >
-            <td class="work-id">{{ work.作業ID }}</td>
+            <td class="work-id">{{ work.依頼ID }}</td>
             <td>
               <strong>{{ work.タイトル || '（タイトルなし）' }}</strong>
               <small>{{ work.TEAM_AI_NAME }} / {{ work.TEAM_AI_MODEL }}</small>
@@ -217,13 +217,13 @@ onBeforeUnmount(() => {
         </tbody>
       </table>
 
-      <div v-if="読込中" class="panel-message">チーム作業を読み込んでいます…</div>
+      <div v-if="読込中" class="panel-message">チーム依頼を読み込んでいます…</div>
       <div v-else-if="読込エラー" class="panel-message error">
         <span>{{ 読込エラー }}</span>
-        <button type="button" @click="() => 作業一覧読込()">再読込</button>
+        <button type="button" @click="() => 依頼一覧読込()">再読込</button>
       </div>
-      <div v-else-if="作業一覧.length === 0" class="panel-message">
-        登録済みのチーム作業はありません。
+      <div v-else-if="依頼一覧.length === 0" class="panel-message">
+        登録済みのチーム依頼はありません。
       </div>
     </div>
   </aside>
@@ -231,8 +231,8 @@ onBeforeUnmount(() => {
   <component
     :is="TeamWorkEdit"
     :isOpen="編集ダイアログ表示"
-    :編集作業="編集作業"
-    :最終作業="作業一覧[0] ?? null"
+    :編集依頼="編集依頼"
+    :最終依頼="依頼一覧[0] ?? null"
     @close="編集ダイアログ表示 = false"
     @saved="保存後処理"
   />

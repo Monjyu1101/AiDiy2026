@@ -298,7 +298,7 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 | `aidiy_code_agents` | AI コードエージェント実行（AIコード / CodeAI CLI 経由） |
 | `aidiy_chat_llms` | AIチャット の ChatAI を MCP ツールとして公開（`aidiy_chat_completions` の OpenAI / Ollama 互換エンドポイントの実体） |
 | `aidiy_task_agents` | backend_task の AIタスク要求への非同期投入（`submit`）と進捗確認（`get_request_status` / `get_detail_status`） |
-| `aidiy_team_agents` | backend_team の Aチーム作業への非同期投入（`submit`）と進捗確認（`get_work_status` / `get_work_list` / `get_member_list`） |
+| `aidiy_team_agents` | backend_team の Aチーム依頼への非同期投入（`submit`）と進捗確認（`get_work_status` / `get_work_list` / `get_member_list`） |
 | `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
 各 MCP は **SSE Transport**、**Streamable HTTP Transport**、**stdio gateway（`mcp_stdio.py`）** の 3 トランスポートを同一ポートで提供します。Python の `requests` でそのまま呼び出せるため、自動化スクリプトやバックエンドルーターからも利用できます。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供します。

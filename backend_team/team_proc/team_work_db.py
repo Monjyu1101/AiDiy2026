@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""Aチーム作業の DB アクセス。"""
+"""Aチーム依頼の DB アクセス。"""
 
 from __future__ import annotations
 
@@ -18,11 +18,11 @@ from datetime import datetime, timedelta
 from .config import 設定読込
 from .team_db import DB_PATH
 
-作業テーブル = "Aチーム作業"
+依頼テーブル = "Aチーム依頼"
 状態一覧 = ("準備開始", "準備中", "準備完了", "待機", "実行中", "エラー", "完了", "済", "中止")
 状態入力一覧 = 状態一覧
-# 進捗が止まってからこの分数でタイムアウトにする（作業の総実行時間の上限ではない）。
-# backend_task は明細を1つ終えるたびに Aチーム作業の更新日時を動かすため、
+# 進捗が止まってからこの分数でタイムアウトにする（依頼の総実行時間の上限ではない）。
+# backend_task は明細を1つ終えるたびに Aチーム依頼の更新日時を動かすため、
 # 進んでいる限り何時間かかってもタイムアウトしない。
 無進捗タイムアウト分 = 30
 # 状態='準備中'（sub_init.py による担当要員の選択とAIタスク投入）だけは短く見る。
@@ -32,8 +32,8 @@ from .team_db import DB_PATH
 一覧対象日数 = 30
 
 _採番テーブル = "C採番"
-_採番ID = "Aチーム作業"
-_採番プレフィックス = "TW"
+_採番ID = "Aチーム依頼"
+_採番プレフィックス = "TR"
 _採番初期値 = 1000
 
 # プロセス内でテーブル作成を一度だけ行うためのフラグ
@@ -73,8 +73,8 @@ def 初期化() -> None:
     conn = 接続取得()
     try:
         conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS "{作業テーブル}" (
-                作業ID TEXT NOT NULL,
+            CREATE TABLE IF NOT EXISTS "{依頼テーブル}" (
+                依頼ID TEXT NOT NULL,
                 要員ID TEXT NOT NULL,
                 プロジェクト TEXT NOT NULL DEFAULT '',
                 タイトル TEXT NOT NULL DEFAULT '',
@@ -101,20 +101,12 @@ def 初期化() -> None:
                 更新利用者ID TEXT NOT NULL,
                 更新利用者名 TEXT NOT NULL,
                 更新端末ID TEXT NOT NULL,
-                PRIMARY KEY (作業ID)
+                PRIMARY KEY (依頼ID)
             )
         """)
-        既存列 = {row["name"] for row in conn.execute(f'PRAGMA table_info("{作業テーブル}")')}
-        if "まとめ内容" not in 既存列:
-            if "経験内容" in 既存列:
-                conn.execute(f'ALTER TABLE "{作業テーブル}" RENAME COLUMN 経験内容 TO まとめ内容')
-            else:
-                conn.execute(
-                    f'ALTER TABLE "{作業テーブル}" ADD COLUMN まとめ内容 TEXT NOT NULL DEFAULT \'\''
-                )
         conn.execute(f"""
-            CREATE INDEX IF NOT EXISTS "IX_Aチーム作業_状態"
-            ON "{作業テーブル}" (要員ID, 状態, 作業ID)
+            CREATE INDEX IF NOT EXISTS "IX_Aチーム依頼_状態"
+            ON "{依頼テーブル}" (要員ID, 状態, 依頼ID)
         """)
         conn.commit()
         _初期化済み = True
@@ -123,7 +115,7 @@ def 初期化() -> None:
 
 
 def _採番確保(conn: sqlite3.Connection) -> None:
-    """C採番（backend_server共有）にAチーム作業用の採番行が無ければ作成する。"""
+    """C採番（backend_server共有）にAチーム依頼用の採番行が無ければ作成する。"""
     conn.execute(f"""
         CREATE TABLE IF NOT EXISTS "{_採番テーブル}" (
             採番ID TEXT NOT NULL PRIMARY KEY,
@@ -149,12 +141,12 @@ def _採番確保(conn: sqlite3.Connection) -> None:
             更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
         ) VALUES (?, ?, ?, 1, ?, 'system', 'システム', 'backend_team', ?, 'system', 'システム', 'backend_team')
         """,
-        [_採番ID, _採番初期値, "AIチーム作業の採番（TW）", now, now],
+        [_採番ID, _採番初期値, "AIチーム依頼の採番（TR）", now, now],
     )
 
 
-def _新規作業ID(conn: sqlite3.Connection, 要員ID: str) -> str:
-    del 要員ID  # 作業ID は単独PKのためグローバルに一意（引数は呼び出し互換のため保持）
+def _新規依頼ID(conn: sqlite3.Connection, 要員ID: str) -> str:
+    del 要員ID  # 依頼ID は単独PKのためグローバルに一意（引数は呼び出し互換のため保持）
     _採番確保(conn)
     conn.execute(
         f'UPDATE "{_採番テーブル}" SET 最終採番値 = 最終採番値 + 1 WHERE 採番ID = ?',
@@ -171,7 +163,7 @@ def _タイトル(要求内容: str) -> str:
     return 要求内容.splitlines()[0][:40] if 要求内容 else ""
 
 
-def 作業一覧(要員ID: str) -> list[dict]:
+def 依頼一覧(要員ID: str) -> list[dict]:
     初期化()
     conn = 接続取得()
     try:
@@ -180,12 +172,12 @@ def 作業一覧(要員ID: str) -> list[dict]:
         期間閾値 = (datetime.now() - timedelta(days=一覧対象日数)).strftime("%Y-%m-%d %H:%M:%S")
         rows = conn.execute(
             f"""
-            SELECT 作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
+            SELECT 依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
                    実行有効, 状態, PID,
                    開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, まとめ内容, 更新日時,
                    CASE WHEN 状態 IN ('完了', '済', 'エラー', '中止') THEN 9 ELSE 1 END AS 表示優先順位
-              FROM "{作業テーブル}"
+              FROM "{依頼テーブル}"
              WHERE 要員ID = ? AND 更新日時 >= ?
              ORDER BY 表示優先順位 ASC, 更新日時 DESC
              LIMIT ?
@@ -197,12 +189,12 @@ def 作業一覧(要員ID: str) -> list[dict]:
         conn.close()
 
 
-def 作業最大更新日時(要員ID: str) -> str:
+def 依頼最大更新日時(要員ID: str) -> str:
     初期化()
     conn = 接続取得()
     try:
         row = conn.execute(
-            f'SELECT MAX(更新日時) AS 最大更新日時 FROM "{作業テーブル}" WHERE 要員ID = ?',
+            f'SELECT MAX(更新日時) AS 最大更新日時 FROM "{依頼テーブル}" WHERE 要員ID = ?',
             [要員ID],
         ).fetchone()
         return str(row["最大更新日時"] or "") if row else ""
@@ -210,30 +202,30 @@ def 作業最大更新日時(要員ID: str) -> str:
         conn.close()
 
 
-def 作業取得(要員ID: str, 作業ID: str) -> dict | None:
+def 依頼取得(要員ID: str, 依頼ID: str) -> dict | None:
     初期化()
     conn = 接続取得()
     try:
         row = conn.execute(
             f"""
-            SELECT 作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
+            SELECT 依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
                    実行有効, 状態, PID,
                    開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, まとめ内容, 更新日時
-              FROM "{作業テーブル}"
-             WHERE 要員ID = ? AND 作業ID = ?
+              FROM "{依頼テーブル}"
+             WHERE 要員ID = ? AND 依頼ID = ?
             """,
-            [要員ID, 作業ID],
+            [要員ID, 依頼ID],
         ).fetchone()
         return dict(row) if row else None
     finally:
         conn.close()
 
 
-def 作業新規既定値(要員ID: str) -> dict:
+def 依頼新規既定値(要員ID: str) -> dict:
     """新規登録時の既定値（プロジェクト / TEAM_AI / TASK_AI）を返す。
 
-    AIチーム_作業編集ダイアログの新規時と同じ条件で決める。
+    AIチーム_依頼編集ダイアログの新規時と同じ条件で決める。
     要員IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値
     （`AiDiy_key.json` の `CODE_BASE_PATH` / `TEAM_AI_*` / `TASK_AI_*`）を使う。
     """
@@ -245,7 +237,7 @@ def 作業新規既定値(要員ID: str) -> dict:
             "TEAM_AI_MODEL": str(getattr(設定, "TEAM_AI_MODEL", "") or "auto"),
             "TASK_AI_NAME": str(getattr(設定, "TASK_AI_NAME", "") or "claude_cli"),
             "TASK_AI_MODEL": str(getattr(設定, "TASK_AI_MODEL", "") or "auto"),
-            "参照作業ID": "",
+            "参照依頼ID": "",
         }
     except Exception:
         規定 = {
@@ -254,7 +246,7 @@ def 作業新規既定値(要員ID: str) -> dict:
             "TEAM_AI_MODEL": "auto",
             "TASK_AI_NAME": "claude_cli",
             "TASK_AI_MODEL": "auto",
-            "参照作業ID": "",
+            "参照依頼ID": "",
         }
 
     要員ID = (要員ID or "").strip()
@@ -265,10 +257,10 @@ def 作業新規既定値(要員ID: str) -> dict:
     try:
         row = conn.execute(
             f"""
-            SELECT 作業ID, プロジェクト, TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL
-              FROM "{作業テーブル}"
+            SELECT 依頼ID, プロジェクト, TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL
+              FROM "{依頼テーブル}"
              WHERE 要員ID = ?
-             ORDER BY 更新日時 DESC, 作業ID DESC
+             ORDER BY 更新日時 DESC, 依頼ID DESC
              LIMIT 1
             """,
             [要員ID],
@@ -278,8 +270,8 @@ def 作業新規既定値(要員ID: str) -> dict:
     if not row:
         return 規定
     既定 = dict(規定)
-    既定["参照作業ID"] = str(row["作業ID"] or "")
-    # プロジェクトは空文字もそのまま引き継ぐ（ダイアログが最終作業の値を初期表示するのと同じ）
+    既定["参照依頼ID"] = str(row["依頼ID"] or "")
+    # プロジェクトは空文字もそのまま引き継ぐ（ダイアログが最終依頼の値を初期表示するのと同じ）
     既定["プロジェクト"] = str(row["プロジェクト"] or "")
     for キー in ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL"):
         値 = str(row[キー] or "").strip()
@@ -288,16 +280,16 @@ def 作業新規既定値(要員ID: str) -> dict:
     return 既定
 
 
-def 作業登録(作業データ: dict, 操作者: dict) -> dict:
+def 依頼登録(依頼データ: dict, 操作者: dict) -> dict:
     初期化()
     now = _現在日時()
     conn = 接続取得()
     try:
-        作業ID = _新規作業ID(conn, 作業データ["要員ID"])
+        依頼ID = _新規依頼ID(conn, 依頼データ["要員ID"])
         conn.execute(
             f"""
-            INSERT INTO "{作業テーブル}" (
-                作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
+            INSERT INTO "{依頼テーブル}" (
+                依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
                 TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
                 実行有効, 状態,
                 PID, 開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容,
@@ -310,17 +302,17 @@ def 作業登録(作業データ: dict, 操作者: dict) -> dict:
             )
             """,
             (
-                作業ID,
-                作業データ["要員ID"],
-                作業データ["プロジェクト"],
-                _タイトル(作業データ["要求内容"]),
-                作業データ["要求内容"],
-                作業データ["TEAM_AI_NAME"],
-                作業データ["TEAM_AI_MODEL"],
-                作業データ["TASK_AI_NAME"],
-                作業データ["TASK_AI_MODEL"],
-                int(作業データ["実行有効"]),
-                作業データ["状態"],
+                依頼ID,
+                依頼データ["要員ID"],
+                依頼データ["プロジェクト"],
+                _タイトル(依頼データ["要求内容"]),
+                依頼データ["要求内容"],
+                依頼データ["TEAM_AI_NAME"],
+                依頼データ["TEAM_AI_MODEL"],
+                依頼データ["TASK_AI_NAME"],
+                依頼データ["TASK_AI_MODEL"],
+                int(依頼データ["実行有効"]),
+                依頼データ["状態"],
                 now,
                 操作者["利用者ID"],
                 操作者["利用者名"],
@@ -334,16 +326,16 @@ def 作業登録(作業データ: dict, 操作者: dict) -> dict:
         conn.commit()
     finally:
         conn.close()
-    return 作業取得(作業データ["要員ID"], 作業ID) or {}
+    return 依頼取得(依頼データ["要員ID"], 依頼ID) or {}
 
 
-def 作業変更(作業データ: dict, 操作者: dict) -> dict:
+def 依頼変更(依頼データ: dict, 操作者: dict) -> dict:
     初期化()
-    if 作業データ["状態"] not in 状態一覧:
+    if 依頼データ["状態"] not in 状態一覧:
         raise ValueError("状態が正しくありません")
-    現行 = 作業取得(作業データ["要員ID"], 作業データ["作業ID"])
+    現行 = 依頼取得(依頼データ["要員ID"], 依頼データ["依頼ID"])
     if 現行 is None:
-        raise KeyError(作業データ["作業ID"])
+        raise KeyError(依頼データ["依頼ID"])
     now = _現在日時()
     タスクID = str(現行["タスクID"] or "")
     PID = str(現行["PID"] or "")
@@ -353,7 +345,7 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
     応答タイトル = str(現行["応答タイトル"] or "")
     応答内容 = str(現行["応答内容"] or "")
     まとめ内容 = str(現行["まとめ内容"] or "")
-    if 作業データ["状態"] == "準備開始":
+    if 依頼データ["状態"] == "準備開始":
         タスクID = ""
         PID = ""
         開始日時 = ""
@@ -362,17 +354,17 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
         応答タイトル = ""
         応答内容 = ""
         まとめ内容 = ""
-    if 作業データ["状態"] == "実行中" and not 開始日時:
+    if 依頼データ["状態"] == "実行中" and not 開始日時:
         開始日時 = now
-    if 作業データ["状態"] in ("完了", "済", "中止"):
+    if 依頼データ["状態"] in ("完了", "済", "中止"):
         終了日時 = now
-    elif 作業データ["状態"] == "待機":
+    elif 依頼データ["状態"] == "待機":
         終了日時 = ""
     conn = 接続取得()
     try:
         conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET プロジェクト = ?, タイトル = ?, 要求内容 = ?,
                    TEAM_AI_NAME = ?, TEAM_AI_MODEL = ?,
                    TASK_AI_NAME = ?, TASK_AI_MODEL = ?,
@@ -380,18 +372,18 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
                    タスクID = ?, PID = ?, 開始日時 = ?, 終了日時 = ?,
                    実行回数 = ?, 応答タイトル = ?, 応答内容 = ?, まとめ内容 = ?,
                    更新日時 = ?, 更新利用者ID = ?, 更新利用者名 = ?, 更新端末ID = ?
-             WHERE 要員ID = ? AND 作業ID = ?
+             WHERE 要員ID = ? AND 依頼ID = ?
             """,
             (
-                作業データ["プロジェクト"],
-                _タイトル(作業データ["要求内容"]),
-                作業データ["要求内容"],
-                作業データ["TEAM_AI_NAME"],
-                作業データ["TEAM_AI_MODEL"],
-                作業データ["TASK_AI_NAME"],
-                作業データ["TASK_AI_MODEL"],
-                int(作業データ["実行有効"]),
-                作業データ["状態"],
+                依頼データ["プロジェクト"],
+                _タイトル(依頼データ["要求内容"]),
+                依頼データ["要求内容"],
+                依頼データ["TEAM_AI_NAME"],
+                依頼データ["TEAM_AI_MODEL"],
+                依頼データ["TASK_AI_NAME"],
+                依頼データ["TASK_AI_MODEL"],
+                int(依頼データ["実行有効"]),
+                依頼データ["状態"],
                 タスクID,
                 PID,
                 開始日時,
@@ -404,62 +396,62 @@ def 作業変更(作業データ: dict, 操作者: dict) -> dict:
                 操作者["利用者ID"],
                 操作者["利用者名"],
                 操作者["端末ID"],
-                作業データ["要員ID"],
-                作業データ["作業ID"],
+                依頼データ["要員ID"],
+                依頼データ["依頼ID"],
             ),
         )
         conn.commit()
     finally:
         conn.close()
-    return 作業取得(作業データ["要員ID"], 作業データ["作業ID"]) or {}
+    return 依頼取得(依頼データ["要員ID"], 依頼データ["依頼ID"]) or {}
 
 
-def 直接投入登録(作業データ: dict, 操作者: dict) -> dict:
-    """担当要員が決まっている作業を、sub_init を経由せず投入するために登録する。
+def 直接投入登録(依頼データ: dict, 操作者: dict) -> dict:
+    """担当要員が決まっている依頼を、sub_init を経由せず投入するために登録する。
 
     目標ループ（PDCA）のように要員が確定している場合に使う。状態='準備中'・開始日時=now・
     実行回数=1 で作り、呼び出し側が 投入成功記録() / 投入失敗記録() で確定させる。
     投入待ち一覧（状態='準備開始'）には出ないため sub_init による二重投入は起きず、
     開始日時が入るので無進捗タイムアウト監視の対象にもなる。
     """
-    データ = dict(作業データ)
+    データ = dict(依頼データ)
     データ["状態"] = "準備中"
-    項目 = 作業登録(データ, 操作者)
-    作業ID = str(項目.get("作業ID", ""))
-    if not 作業ID:
+    項目 = 依頼登録(データ, 操作者)
+    依頼ID = str(項目.get("依頼ID", ""))
+    if not 依頼ID:
         return 項目
     now = _現在日時()
     conn = 接続取得()
     try:
         conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET 開始日時 = ?, 実行回数 = 1, 更新日時 = ?
-             WHERE 作業ID = ? AND 状態 = '準備中'
+             WHERE 依頼ID = ? AND 状態 = '準備中'
             """,
-            [now, now, 作業ID],
+            [now, now, 依頼ID],
         )
         conn.commit()
     finally:
         conn.close()
-    return 作業取得(str(データ["要員ID"]), 作業ID) or 項目
+    return 依頼取得(str(データ["要員ID"]), 依頼ID) or 項目
 
 
 def 投入待ち一覧() -> list[dict]:
-    """準備開始かつ未投入で、sub_initによるAIタスク登録を待つ作業を返す。"""
+    """準備開始かつ未投入で、sub_initによるAIタスク登録を待つ依頼を返す。"""
     初期化()
     conn = 接続取得()
     try:
         rows = conn.execute(
             f"""
-            SELECT 作業ID, 要員ID, プロジェクト, タイトル, 要求内容,
+            SELECT 依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
                    TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
                    実行有効, 状態, PID, 実行回数
-              FROM "{作業テーブル}"
+              FROM "{依頼テーブル}"
              WHERE 状態 = '準備開始'
                AND PID = ''
                AND タスクID = ''
-             ORDER BY 作業ID
+             ORDER BY 依頼ID
             """
         ).fetchall()
         return [dict(row) for row in rows]
@@ -467,7 +459,7 @@ def 投入待ち一覧() -> list[dict]:
         conn.close()
 
 
-def 作業確保(作業ID: str) -> bool:
+def 依頼確保(依頼ID: str) -> bool:
     """準備開始の1件を準備中へ進めて確保し、sub_initの二重起動を防ぐ。"""
     初期化()
     now = _現在日時()
@@ -475,18 +467,18 @@ def 作業確保(作業ID: str) -> bool:
     try:
         cursor = conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET 状態 = '準備中', PID = 'CLAIM',
                    開始日時 = ?, 終了日時 = '', 実行回数 = 実行回数 + 1,
                    応答タイトル = '', 応答内容 = '',
                    更新日時 = ?, 更新利用者ID = 'system',
                    更新利用者名 = 'システム', 更新端末ID = 'backend_team'
-             WHERE 作業ID = ?
+             WHERE 依頼ID = ?
                AND 状態 = '準備開始'
                AND PID = ''
                AND タスクID = ''
             """,
-            [now, now, 作業ID],
+            [now, now, 依頼ID],
         )
         conn.commit()
         return cursor.rowcount == 1
@@ -494,64 +486,64 @@ def 作業確保(作業ID: str) -> bool:
         conn.close()
 
 
-def 実行開始記録(作業ID: str, pid: int) -> None:
-    """CLAIM中の作業へsub_initのPIDを記録する。先に完了した場合は上書きしない。"""
+def 実行開始記録(依頼ID: str, pid: int) -> None:
+    """CLAIM中の依頼へsub_initのPIDを記録する。先に完了した場合は上書きしない。"""
     now = _現在日時()
     conn = 接続取得()
     try:
         conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET PID = ?, 更新日時 = ?
-             WHERE 作業ID = ?
+             WHERE 依頼ID = ?
                AND 状態 = '準備中' AND PID = 'CLAIM'
             """,
-            [str(pid), now, 作業ID],
+            [str(pid), now, 依頼ID],
         )
         conn.commit()
     finally:
         conn.close()
 
 
-def 投入成功記録(作業ID: str, タスクID: str) -> None:
-    """aidiy_task_agentsへの投入成功を作業行へ反映する。"""
+def 投入成功記録(依頼ID: str, タスクID: str) -> None:
+    """aidiy_task_agentsへの投入成功を依頼行へ反映する。"""
     now = _現在日時()
     conn = 接続取得()
     try:
         cursor = conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET タスクID = ?, 状態 = '準備完了', PID = '',
                    応答タイトル = 'AIタスク投入済み',
                    更新日時 = ?, 更新利用者ID = 'system',
                    更新利用者名 = 'システム', 更新端末ID = 'backend_team'
-             WHERE 作業ID = ? AND 状態 = '準備中'
+             WHERE 依頼ID = ? AND 状態 = '準備中'
             """,
-            [タスクID, now, 作業ID],
+            [タスクID, now, 依頼ID],
         )
         if cursor.rowcount != 1:
-            raise KeyError(作業ID)
+            raise KeyError(依頼ID)
         conn.commit()
     finally:
         conn.close()
 
 
-def 投入失敗記録(作業ID: str, メッセージ: str) -> None:
+def 投入失敗記録(依頼ID: str, メッセージ: str) -> None:
     """sub_initの起動またはタスク投入失敗をエラーとして記録する。"""
     now = _現在日時()
     conn = 接続取得()
     try:
         conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET 状態 = 'エラー', PID = '', 終了日時 = ?,
                    応答タイトル = 'AIタスク投入エラー', 応答内容 = ?,
                    更新日時 = ?, 更新利用者ID = 'system',
                    更新利用者名 = 'システム', 更新端末ID = 'backend_team'
-             WHERE 作業ID = ?
+             WHERE 依頼ID = ?
                AND (状態 = '準備中' OR PID != '')
             """,
-            [now, メッセージ[:2000], now, 作業ID],
+            [now, メッセージ[:2000], now, 依頼ID],
         )
         conn.commit()
     finally:
@@ -565,8 +557,8 @@ def 残存PID一覧() -> list[dict]:
     try:
         rows = conn.execute(
             f"""
-            SELECT 作業ID, 要員ID, PID
-              FROM "{作業テーブル}"
+            SELECT 依頼ID, 要員ID, PID
+              FROM "{依頼テーブル}"
              WHERE PID != ''
             """
         ).fetchall()
@@ -576,7 +568,7 @@ def 残存PID一覧() -> list[dict]:
 
 
 def PID全クリア() -> int:
-    """システム開始時: 未投入のまま残った作業をエラーとして記録しクリアする。
+    """システム開始時: 未投入のまま残った依頼をエラーとして記録しクリアする。
 
     再起動時点でプロセスが生きているか判断できず、PID は OS に再利用され得るため
     強制停止はしない（別プロセスを誤って停止する恐れがあるため）。自動再実行はせずエラー化のみ行う。
@@ -586,7 +578,7 @@ def PID全クリア() -> int:
     try:
         cursor = conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET 状態 = 'エラー', 実行有効 = 0, PID = '', 終了日時 = ?,
                    応答タイトル = 'システム再起動エラー', 応答内容 = 'システム再起動のため中断しました',
                    更新日時 = ?, 更新利用者ID = 'system',
@@ -601,22 +593,22 @@ def PID全クリア() -> int:
         conn.close()
 
 
-def 作業タイムアウト対象一覧(
+def 依頼タイムアウト対象一覧(
     制限分: int = 無進捗タイムアウト分,
     準備制限分: int = 準備無進捗タイムアウト分,
 ) -> list[dict]:
-    """開始してから制限分以上ひとつも進捗が無い作業を返す。
+    """開始してから制限分以上ひとつも進捗が無い依頼を返す。
 
     経過の起点は開始日時ではなく「開始日時と更新日時の新しい方」にする。開始日時だけを見ると
     AIタスク全体（明細生成 + 全ステップ実行 + 経験生成）の合計に制限をかけることになり、
-    正常に進んでいる長時間の作業まで打ち切ってしまうため。backend_task は明細を1つ
-    終えるたびに Aチーム作業を更新する（tasks_db._Aチーム作業反映）ので、
+    正常に進んでいる長時間の依頼まで打ち切ってしまうため。backend_task は明細を1つ
+    終えるたびに Aチーム依頼を更新する（tasks_db._Aチーム依頼反映）ので、
     進捗が続く限りここには載らない。
 
     制限分は状態で使い分ける。状態='準備中'（sub_init.py が担当要員を選んでAIタスクを
     投入している最中）は準備制限分、それ以外は制限分を使う。
 
-    呼び出し側で PID のプロセスを停止してから 作業タイムアウト対象エラー化() でエラー化する。
+    呼び出し側で PID のプロセスを停止してから 依頼タイムアウト対象エラー化() でエラー化する。
     """
     初期化()
     conn = 接続取得()
@@ -625,9 +617,9 @@ def 作業タイムアウト対象一覧(
         準備閾値 = (datetime.now() - timedelta(minutes=準備制限分)).strftime("%Y-%m-%d %H:%M:%S")
         rows = conn.execute(
             f"""
-            SELECT 作業ID, 要員ID, 状態, PID, 開始日時, 更新日時,
+            SELECT 依頼ID, 要員ID, 状態, PID, 開始日時, 更新日時,
                    MAX(開始日時, 更新日時) AS 最終進捗日時
-              FROM "{作業テーブル}"
+              FROM "{依頼テーブル}"
              WHERE 開始日時 != '' AND 終了日時 = '' AND 状態 != 'エラー'
                AND MAX(開始日時, 更新日時) <= (CASE WHEN 状態 = '準備中' THEN ? ELSE ? END)
             """,
@@ -638,7 +630,7 @@ def 作業タイムアウト対象一覧(
         conn.close()
 
 
-def 作業タイムアウト対象エラー化(対象一覧: list[dict]) -> int:
+def 依頼タイムアウト対象エラー化(対象一覧: list[dict]) -> int:
     """タイムアウト対象を 状態='エラー'・実行有効=0・PID='' にする。"""
     if not 対象一覧:
         return 0
@@ -648,23 +640,23 @@ def 作業タイムアウト対象エラー化(対象一覧: list[dict]) -> int:
     try:
         更新件数 = 0
         for 行 in 対象一覧:
-            作業ID = str(行.get("作業ID", ""))
+            依頼ID = str(行.get("依頼ID", ""))
             PID = str(行.get("PID", ""))
             開始日時 = str(行.get("開始日時", ""))
             更新日時 = str(行.get("更新日時", ""))
-            if not 作業ID:
+            if not 依頼ID:
                 continue
             # 一覧を取ってからここまでの間に進捗（更新日時の変化）があれば打ち切らない
             cursor = conn.execute(
                 f"""
-                UPDATE "{作業テーブル}"
+                UPDATE "{依頼テーブル}"
                    SET 状態 = 'エラー', 実行有効 = 0, PID = '', 終了日時 = ?,
                        応答タイトル = '無進捗タイムアウト', 更新日時 = ?
-                 WHERE 作業ID = ?
+                 WHERE 依頼ID = ?
                    AND 状態 != 'エラー' AND 終了日時 = '' AND PID = ?
                    AND 開始日時 = ? AND 更新日時 = ?
                 """,
-                [now, now, 作業ID, PID, 開始日時, 更新日時],
+                [now, now, 依頼ID, PID, 開始日時, 更新日時],
             )
             更新件数 += cursor.rowcount
         conn.commit()

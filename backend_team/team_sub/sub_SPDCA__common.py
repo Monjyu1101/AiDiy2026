@@ -15,7 +15,7 @@
 - `前段結果を取得()`: 前段の全レコードが `済` / `エラー` になったかを確認する
 - `最新の成功記録()` / `まとめ内容()`: 前段から次段へ引き渡す本文を取り出す
 - `同ループのまとめ()` / `参照節()`: 同じループの前の段の内容を、あるときだけ追加で読ませる
-- `段を投入()`: Aチーム作業（準備中）→ Aチーム改善の開始レコード → タスク投入
+- `段を投入()`: Aチーム依頼（準備中）→ Aチーム作業の開始レコード → タスク投入
 - `実行不能を記録()`: 引き継ぐ内容が無いとき、終了済みレコードだけ残して次段へ送る
 
 D・C・A はさらに「前段のまとめ内容（最新1件）を受け取り、担当をAIに選ばせて
@@ -113,8 +113,8 @@ def 前段結果を取得(プロジェクト: str, 前段区分: str) -> tuple[i
 
 
 def 最新の成功記録(成功一覧: list[dict]) -> dict:
-    """「済」レコードのうち最新の1件（改善IDが最大のもの）を返す。"""
-    return sorted(成功一覧, key=lambda row: str(row.get("改善ID", "")))[-1]
+    """「済」レコードのうち最新の1件（作業IDが最大のもの）を返す。"""
+    return sorted(成功一覧, key=lambda row: str(row.get("作業ID", "")))[-1]
 
 
 def まとめ内容(記録: dict) -> str:
@@ -155,10 +155,10 @@ def 参照節(見出し: str, 本文: str) -> str:
 
 
 def 要員をAIに選ばせる(区分: str, 本文: str, プロジェクト: str, ループ: int, logger) -> str:
-    """本文の作業を担当させるのに最適な要員をAIに選ばせる（sub_init.py と同じ選択処理）。
+    """本文の依頼を担当させるのに最適な要員をAIに選ばせる（sub_init.py と同じ選択処理）。
 
     選択結果のJSONを書き出す一時ファイル名には区分とループ番号を使う
-    （作業IDはこの時点では未採番）。失敗・不正時は sub_init 側で既定利用者IDへフォールバックする。
+    （依頼IDはこの時点では未採番）。失敗・不正時は sub_init 側で既定利用者IDへフォールバックする。
     """
     要員ID = 担当要員を選択(本文, f"pdca_{区分}_{ループ}", logger, プロジェクト)
     if 要員ID == 既定利用者ID:
@@ -166,16 +166,16 @@ def 要員をAIに選ばせる(区分: str, 本文: str, プロジェクト: str
     return 要員ID
 
 
-def タスク投入(作業: dict, 要員ID: str) -> str:
+def タスク投入(依頼: dict, 要員ID: str) -> str:
     結果 = POST送信(
         TASK_AGENTS_URL,
         {
-            "prompt": str(作業["要求内容"]),
-            "project_path": str(作業.get("プロジェクト", "")),
-            "ai_name": str(作業.get("TASK_AI_NAME", "claude_cli")),
-            "ai_model": str(作業.get("TASK_AI_MODEL", "auto")),
+            "prompt": str(依頼["要求内容"]),
+            "project_path": str(依頼.get("プロジェクト", "")),
+            "ai_name": str(依頼.get("TASK_AI_NAME", "claude_cli")),
+            "ai_model": str(依頼.get("TASK_AI_MODEL", "auto")),
             "user_id": 要員ID,
-            "task_id": str(作業["作業ID"]),
+            "task_id": str(依頼["依頼ID"]),
             "enabled": True,
             "return_task_id": True,
             "request_timeout_sec": 15,
@@ -193,20 +193,20 @@ def 実行不能を記録(
     区分: str, プロジェクト: str, チーム目標: str, ループ: int, 理由: str, logger
 ) -> None:
     """引き継ぐ内容が無いとき、終了済みレコードだけ残して次の段へ進めるようにする。"""
-    改善 = team_pdca_db.改善登録(
+    作業 = team_pdca_db.作業登録(
         {
             "プロジェクト": プロジェクト,
             "ループ": ループ,
-            "作業ID": "",
+            "依頼ID": "",
             "チーム目標": チーム目標,
             "要員ID": "",
             "PDCA区分": 区分,
         }
     )
-    改善ID = str(改善.get("改善ID", ""))
-    if 改善ID:
-        team_pdca_db.改善終了記録(改善ID, 理由)
-    logger.warning(f"目標ループ({区分})は投入しませんでした: 改善ID={改善ID} 理由={理由}")
+    作業ID = str(作業.get("作業ID", ""))
+    if 作業ID:
+        team_pdca_db.作業終了記録(作業ID, 理由)
+    logger.warning(f"目標ループ({区分})は投入しませんでした: 作業ID={作業ID} 理由={理由}")
 
 
 def 投入失敗を記録(区分: str, プロジェクト: str, チーム目標: str, 理由: str, logger) -> None:
@@ -233,9 +233,9 @@ def AI設定を決める(プロジェクト: str, 要員ID: str) -> dict:
     """目標ループの投入に使う AI 設定（TEAM_AI / TASK_AI）を決める。
 
     Aチーム目標編集で指定した値をそのループの全段で使う。目標側が空のときだけ、
-    従来どおり要員の最終作業（無ければ `AiDiy_key.json` の規定値）を引き継ぐ。
+    従来どおり要員の最終依頼（無ければ `AiDiy_key.json` の規定値）を引き継ぐ。
     """
-    既定 = team_work_db.作業新規既定値(要員ID)
+    既定 = team_work_db.依頼新規既定値(要員ID)
     try:
         目標 = team_goal_db.目標取得(プロジェクト) or {}
     except Exception:
@@ -257,9 +257,9 @@ def 段を投入(
     要求内容: str,
     logger,
 ) -> bool:
-    """要員1名分の Aチーム作業・Aチーム改善・Aタスク要求を作る。"""
+    """要員1名分の Aチーム依頼・Aチーム作業・Aタスク要求を作る。"""
     既定 = AI設定を決める(プロジェクト, 要員ID)
-    作業 = team_work_db.直接投入登録(
+    依頼 = team_work_db.直接投入登録(
         {
             "要員ID": 要員ID,
             "プロジェクト": プロジェクト,
@@ -272,43 +272,43 @@ def 段を投入(
         },
         操作者,
     )
-    作業ID = str(作業.get("作業ID", ""))
-    if not 作業ID:
-        raise RuntimeError("Aチーム作業の登録に失敗しました")
+    依頼ID = str(依頼.get("依頼ID", ""))
+    if not 依頼ID:
+        raise RuntimeError("Aチーム依頼の登録に失敗しました")
 
-    改善 = team_pdca_db.改善登録(
+    作業 = team_pdca_db.作業登録(
         {
             "プロジェクト": プロジェクト,
             "ループ": ループ,
-            "作業ID": 作業ID,
+            "依頼ID": 依頼ID,
             "チーム目標": チーム目標,
             "要員ID": 要員ID,
             "PDCA区分": 区分,
         }
     )
-    改善ID = str(改善.get("改善ID", ""))
+    作業ID = str(作業.get("作業ID", ""))
 
     try:
-        タスクID = タスク投入(作業, 要員ID)
-        team_work_db.投入成功記録(作業ID, タスクID)
-        if 改善ID:
-            team_pdca_db.改善状況記録(改善ID, "準備完了")
+        タスクID = タスク投入(依頼, 要員ID)
+        team_work_db.投入成功記録(依頼ID, タスクID)
+        if 作業ID:
+            team_pdca_db.作業状況記録(作業ID, "準備完了")
         logger.info(
-            f"目標ループ({区分})を投入しました: 改善ID={改善ID} 作業ID={作業ID} "
+            f"目標ループ({区分})を投入しました: 作業ID={作業ID} 依頼ID={依頼ID} "
             f"要員ID={要員ID} タスクID={タスクID}"
         )
         return True
     except Exception as exc:
-        logger.exception(f"目標ループ({区分})の投入に失敗しました: 作業ID={作業ID} 要員ID={要員ID}")
+        logger.exception(f"目標ループ({区分})の投入に失敗しました: 依頼ID={依頼ID} 要員ID={要員ID}")
         try:
-            team_work_db.投入失敗記録(作業ID, str(exc))
+            team_work_db.投入失敗記録(依頼ID, str(exc))
         except Exception:
-            logger.exception(f"Aチーム作業への失敗記録にも失敗しました: {作業ID}")
-        if 改善ID:
+            logger.exception(f"Aチーム依頼への失敗記録にも失敗しました: {依頼ID}")
+        if 作業ID:
             try:
-                team_pdca_db.改善終了記録(改善ID, f"投入エラー: {exc}")
+                team_pdca_db.作業終了記録(作業ID, f"投入エラー: {exc}")
             except Exception:
-                logger.exception(f"Aチーム改善への失敗記録にも失敗しました: {改善ID}")
+                logger.exception(f"Aチーム作業への失敗記録にも失敗しました: {作業ID}")
         return False
 
 
@@ -362,7 +362,7 @@ def 段を実行(
         if not 本文:
             実行不能を記録(
                 区分, プロジェクト, チーム目標, ループ,
-                f"{前段区分} {前段記録.get('改善ID', '')} に引き継ぐ内容がありません", logger,
+                f"{前段区分} {前段記録.get('作業ID', '')} に引き継ぐ内容がありません", logger,
             )
             return 0
 
@@ -383,7 +383,7 @@ def 段を実行(
             )
         logger.info(
             f"目標ループ({区分})を開始します: プロジェクト={プロジェクト} "
-            f"ループ={ループ} 要員ID={要員ID} 前段={前段記録.get('改善ID', '')}"
+            f"ループ={ループ} 要員ID={要員ID} 前段={前段記録.get('作業ID', '')}"
         )
         要求内容 = プロンプト生成(要員ID, プロジェクト, チーム目標, まとめ一覧)
         return 0 if 段を投入(

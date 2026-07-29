@@ -10,7 +10,7 @@
 
 """Aチーム経験の DB アクセス。
 
-完了した Aチーム作業（＋紐づく Aタスク要求も完了）1 件につき経験 1 件を作る。
+完了した Aチーム依頼（＋紐づく Aタスク要求も完了）1 件につき経験 1 件を作る。
 1) 状態監視ループ（1分ごと）が 開始日時 だけ入れて仮登録する
 2) team_sub/sub_exp.py が AI に経験値を JSON 出力させる
 3) その結果を本登録として書き戻す
@@ -24,10 +24,10 @@ from datetime import datetime, timedelta
 from .team_db import DB_PATH, 接続取得
 
 経験テーブル = "Aチーム経験"
-作業テーブル = "Aチーム作業"
+依頼テーブル = "Aチーム依頼"
 タスク要求テーブル = "Aタスク要求"
 状態一覧 = ("生成中", "完了", "エラー")
-対象時間 = 1  # 完了からこの時間内（時間）の作業を経験化する
+対象時間 = 1  # 完了からこの時間内（時間）の依頼を経験化する
 生成タイムアウト分 = 30
 一覧最大件数 = 100
 
@@ -62,7 +62,7 @@ def 初期化() -> None:
         conn.execute(f"""
             CREATE TABLE IF NOT EXISTS "{経験テーブル}" (
                 経験ID TEXT NOT NULL PRIMARY KEY,
-                作業ID TEXT NOT NULL UNIQUE,
+                依頼ID TEXT NOT NULL UNIQUE,
                 タスクID TEXT NOT NULL DEFAULT '',
                 要員ID TEXT NOT NULL DEFAULT '',
                 プロジェクト TEXT NOT NULL DEFAULT '',
@@ -90,14 +90,6 @@ def 初期化() -> None:
                 更新端末ID TEXT NOT NULL
             )
         """)
-        既存列 = {row["name"] for row in conn.execute(f'PRAGMA table_info("{経験テーブル}")')}
-        if "まとめ内容" not in 既存列:
-            if "経験内容" in 既存列:
-                conn.execute(f'ALTER TABLE "{経験テーブル}" RENAME COLUMN 経験内容 TO まとめ内容')
-            else:
-                conn.execute(
-                    f'ALTER TABLE "{経験テーブル}" ADD COLUMN まとめ内容 TEXT NOT NULL DEFAULT \'\''
-                )
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS "IX_Aチーム経験_要員"
             ON "{経験テーブル}" (要員ID, 更新日時)
@@ -158,12 +150,12 @@ def 経験対象一覧() -> list[dict]:
     """経験化の対象を返す。
 
     条件は次のすべて。
-    - Aチーム作業が 状態='完了' で、更新日時が 対象時間 以内
+    - Aチーム依頼が 状態='完了' で、更新日時が 対象時間 以内
     - 紐づく Aタスク要求（タスクID一致）も 状態='完了'
-    - Aチーム経験に同じ作業IDが未登録
+    - Aチーム経験に同じ依頼IDが未登録
 
     要員IDは「実際に実行した」Aタスク要求の利用者IDを採る。
-    Aチーム作業の要員IDは依頼元で、sub_init が AI に選ばせた担当者とは異なることがあるため。
+    Aチーム依頼の要員IDは依頼元で、sub_init が AI に選ばせた担当者とは異なることがあるため。
     """
     初期化()
     conn = 接続取得()
@@ -171,7 +163,7 @@ def 経験対象一覧() -> list[dict]:
         閾値 = (datetime.now() - timedelta(hours=対象時間)).strftime("%Y-%m-%d %H:%M:%S")
         rows = conn.execute(
             f"""
-            SELECT w.作業ID, w.タスクID, w.プロジェクト, w.要求内容,
+            SELECT w.依頼ID, w.タスクID, w.プロジェクト, w.要求内容,
                    w.TEAM_AI_NAME, w.TEAM_AI_MODEL,
                    w.TASK_AI_NAME, w.TASK_AI_MODEL, w.更新日時,
                    w.要員ID AS 依頼元要員ID,
@@ -179,13 +171,13 @@ def 経験対象一覧() -> list[dict]:
                    r.タイトル AS タスクタイトル,
                    r.応答内容 AS 実行応答内容,
                    r.終了日時 AS 完了日時
-              FROM "{作業テーブル}" w
+              FROM "{依頼テーブル}" w
               JOIN "{タスク要求テーブル}" r ON r.タスクID = w.タスクID
              WHERE w.状態 = '完了'
                AND w.更新日時 >= ?
                AND w.タスクID != ''
                AND r.状態 = '完了'
-               AND NOT EXISTS (SELECT 1 FROM "{経験テーブル}" e WHERE e.作業ID = w.作業ID)
+               AND NOT EXISTS (SELECT 1 FROM "{経験テーブル}" e WHERE e.依頼ID = w.依頼ID)
              ORDER BY w.更新日時
             """,
             [閾値],
@@ -236,7 +228,7 @@ def 経験一覧(プロジェクト: str = "", 要員ID: str = "", 件数: int =
     try:
         条件, params = _絞り込み条件(プロジェクト, 要員ID)
         sql = f"""
-            SELECT 経験ID, 作業ID, タスクID, 要員ID, プロジェクト,
+            SELECT 経験ID, 依頼ID, タスクID, 要員ID, プロジェクト,
                    タスクタイトル, 要求内容, 実行応答内容, 完了日時,
                    タイトル, 経験値, 分類, まとめ内容, 学び,
                    状態, 開始日時, 終了日時, エラー内容, 更新日時
@@ -329,7 +321,7 @@ def 要員別経験概要(プロジェクト: str = "", 要員件数: int = 5) -
 def 経験仮登録(対象: dict) -> dict:
     """開始日時だけ入れて経験レコードを作る（状態=生成中）。
 
-    同じ作業IDが既にあれば None ではなく空 dict を返す（UNIQUE 制約で二重登録を防ぐ）。
+    同じ依頼IDが既にあれば None ではなく空 dict を返す（UNIQUE 制約で二重登録を防ぐ）。
     """
     初期化()
     now = _現在日時()
@@ -340,7 +332,7 @@ def 経験仮登録(対象: dict) -> dict:
         conn.execute(
             f"""
             INSERT INTO "{経験テーブル}" (
-                経験ID, 作業ID, タスクID, 要員ID, プロジェクト,
+                経験ID, 依頼ID, タスクID, 要員ID, プロジェクト,
                 タスクタイトル, 要求内容, 実行応答内容, 完了日時,
                 状態, PID, 開始日時,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
@@ -349,7 +341,7 @@ def 経験仮登録(対象: dict) -> dict:
             """,
             (
                 経験ID,
-                str(対象["作業ID"]),
+                str(対象["依頼ID"]),
                 str(対象.get("タスクID", "")),
                 str(対象.get("要員ID", "")),
                 str(対象.get("プロジェクト", "")),
@@ -390,19 +382,19 @@ def 生成開始記録(経験ID: str, pid: int) -> None:
 
 
 def 経験本登録(経験ID: str, データ: dict) -> dict:
-    """AI が出力した経験値を書き戻し、元の作業・改善を「済」にする。"""
+    """AI が出力した経験値を書き戻し、元の依頼・作業を「済」にする。"""
     初期化()
     now = _現在日時()
     まとめ内容 = str(データ.get("まとめ内容", ""))
     conn = 接続取得()
     try:
         対象 = conn.execute(
-            f'SELECT 作業ID FROM "{経験テーブル}" WHERE 経験ID = ?',
+            f'SELECT 依頼ID FROM "{経験テーブル}" WHERE 経験ID = ?',
             [経験ID],
         ).fetchone()
         if 対象 is None:
             raise KeyError(経験ID)
-        作業ID = str(対象["作業ID"] or "")
+        依頼ID = str(対象["依頼ID"] or "")
         conn.execute(
             f"""
             UPDATE "{経験テーブル}"
@@ -425,23 +417,23 @@ def 経験本登録(経験ID: str, データ: dict) -> dict:
         )
         conn.execute(
             f"""
-            UPDATE "{作業テーブル}"
+            UPDATE "{依頼テーブル}"
                SET 状態 = '済', PID = '', まとめ内容 = ?,
                    更新日時 = ?, 更新利用者ID = 'system', 更新利用者名 = 'システム',
                    更新端末ID = 'backend_team'
-             WHERE 作業ID = ? AND 状態 = '完了'
+             WHERE 依頼ID = ? AND 状態 = '完了'
             """,
-            [まとめ内容, now, 作業ID],
+            [まとめ内容, now, 依頼ID],
         )
         conn.execute(
             """
-            UPDATE "Aチーム改善"
+            UPDATE "Aチーム作業"
                SET 状況 = '済', 終了日時 = ?, まとめ内容 = ?,
                    更新日時 = ?, 更新利用者ID = 'system', 更新利用者名 = 'システム',
                    更新端末ID = 'backend_team'
-             WHERE 作業ID = ? AND 状況 = '完了'
+             WHERE 依頼ID = ? AND 状況 = '完了'
             """,
-            [now, まとめ内容, now, 作業ID],
+            [now, まとめ内容, now, 依頼ID],
         )
         conn.commit()
     finally:
@@ -474,7 +466,7 @@ def 生成中一覧() -> list[dict]:
     conn = 接続取得()
     try:
         rows = conn.execute(
-            f'SELECT 経験ID, 作業ID, PID FROM "{経験テーブル}" WHERE 状態 = \'生成中\' AND PID != \'\''
+            f'SELECT 経験ID, 依頼ID, PID FROM "{経験テーブル}" WHERE 状態 = \'生成中\' AND PID != \'\''
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -511,7 +503,7 @@ def 生成タイムアウト対象一覧(制限分: int = 生成タイムアウ�
         閾値 = (datetime.now() - timedelta(minutes=制限分)).strftime("%Y-%m-%d %H:%M:%S")
         rows = conn.execute(
             f"""
-            SELECT 経験ID, 作業ID, PID, 開始日時
+            SELECT 経験ID, 依頼ID, PID, 開始日時
               FROM "{経験テーブル}"
              WHERE 状態 = '生成中' AND 開始日時 != '' AND 開始日時 <= ?
             """,

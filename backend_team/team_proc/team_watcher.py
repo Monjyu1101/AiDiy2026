@@ -8,22 +8,22 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""Aチーム作業の監視ループとプロセス管理。
+"""Aチーム依頼の監視ループとプロセス管理。
 
 タイマーは2本（backend_task/tasks_watcher.py と同じ構成、詳細は各ループの docstring 参照）。
 
 - 起動監視タイマー = 起動監視ループ（5秒間隔）: 投入待ち（準備開始・未投入）を見つけたら
-  temp/input/<作業ID>.json を出力して sub_init.py を subprocess 起動する。
+  temp/input/<依頼ID>.json を出力して sub_init.py を subprocess 起動する。
   起動時に準備中へ進め、PID・開始日時・実行回数を記録する。
 - 状態監視タイマー = 状態監視ループ（10秒間隔、実際の確認は hh:mm 変化時＝毎分1回）:
-  - 開始してから無進捗タイムアウト分（既定30分）以上ひとつも進捗が無い作業を強制停止してエラーにする。
+  - 開始してから無進捗タイムアウト分（既定30分）以上ひとつも進捗が無い依頼を強制停止してエラーにする。
     状態='準備中'（sub_init.py による担当選択とAIタスク投入）だけは準備無進捗タイムアウト分（既定10分）で見る。
-  - 終わった Aチーム作業に対応する未終了の改善レコードを回収する
+  - 終わった Aチーム依頼に対応する未終了の作業レコードを回収する
     （目標ループのオン・オフに関わらず行う）。
   - Aチーム目標の目標ループ（PDCA）も確認する。実行中の要員がいない空き時間で、
     前の段が終わっていれば次の段を、目標のパターン（SPDCA/PlanDo）に対応する
     sub_SPDCA_*.py / sub_PlanDo_*.py で投入する。
-- システム開始時（再起動含む）は、テーブルに残った未投入の作業をエラーとして記録しクリアする
+- システム開始時（再起動含む）は、テーブルに残った未投入の依頼をエラーとして記録しクリアする
   （PID は再利用され得るため、プロセスの強制停止はしない）。
 """
 
@@ -63,14 +63,14 @@ _SUB_PDCAパス = {
         "D": _BASE_DIR / "team_sub" / "sub_PlanDo_do.py",
     },
 }
-_改善入力DIR = _BASE_DIR / "temp" / "pdca"
+_作業入力DIR = _BASE_DIR / "temp" / "pdca"
 
 # 状態監視タイマーの本処理は hh:mm が変わった確認回だけ処理する（毎分 1 回）
 _前回確認分 = ""
 # 起動中の目標ループ投入プロセス（前回分が動いている間は次を投入しない）
-_改善プロセス: subprocess.Popen | None = None
+_作業プロセス: subprocess.Popen | None = None
 # 未実装区分の案内は毎分繰り返さず、プロジェクト×区分ごとに1回だけ出す
-_改善未実装通知済み: set[tuple[str, str]] = set()
+_作業未実装通知済み: set[tuple[str, str]] = set()
 
 
 def _サブプロセス環境() -> dict:
@@ -86,17 +86,17 @@ def _安全ファイル名部品(値: str) -> str:
     return re.sub(r"[^0-9A-Za-z_.\-぀-ヿ㐀-鿿]", "_", 値)
 
 
-def _入力パス(作業ID: str) -> Path:
-    return _入力DIR / f"{_安全ファイル名部品(作業ID)}.json"
+def _入力パス(依頼ID: str) -> Path:
+    return _入力DIR / f"{_安全ファイル名部品(依頼ID)}.json"
 
 
 def _経験入力パス(経験ID: str) -> Path:
     return _経験入力DIR / f"{_安全ファイル名部品(経験ID)}.json"
 
 
-def _改善入力パス(プロジェクト: str, 区分: str) -> Path:
+def _作業入力パス(プロジェクト: str, 区分: str) -> Path:
     時刻 = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return _改善入力DIR / f"{_安全ファイル名部品(プロジェクト)}_{_安全ファイル名部品(区分)}_{時刻}.json"
+    return _作業入力DIR / f"{_安全ファイル名部品(プロジェクト)}_{_安全ファイル名部品(区分)}_{時刻}.json"
 
 
 def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
@@ -131,19 +131,19 @@ def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
 
 
 def 起動時クリーンアップ(logger: logging.Logger) -> None:
-    """システム開始時: 未投入のまま残った作業をエラーとして記録しクリアする。
+    """システム開始時: 未投入のまま残った依頼をエラーとして記録しクリアする。
 
     PID は OS に再利用され得るため、別プロセスを誤って停止する恐れがあり強制停止はしない。
     """
     try:
         残存 = team_work_db.残存PID一覧()
         for 行 in 残存:
-            logger.info(f"起動時クリーンアップ: 作業ID={行.get('作業ID', '')} PID={行.get('PID', '')}")
+            logger.info(f"起動時クリーンアップ: 依頼ID={行.get('依頼ID', '')} PID={行.get('PID', '')}")
         更新件数 = team_work_db.PID全クリア()
         if 更新件数:
-            logger.info(f"残存作業を{更新件数}件エラーにしてクリアしました")
+            logger.info(f"残存依頼を{更新件数}件エラーにしてクリアしました")
     except Exception:
-        logger.exception("チーム作業の起動時クリーンアップに失敗しました")
+        logger.exception("チーム依頼の起動時クリーンアップに失敗しました")
     try:
         for 行 in team_exp_db.生成中一覧():
             logger.info(f"起動時クリーンアップ: 経験ID={行.get('経験ID', '')} PID={行.get('PID', '')}")
@@ -153,31 +153,31 @@ def 起動時クリーンアップ(logger: logging.Logger) -> None:
     except Exception:
         logger.exception("Aチーム経験の起動時クリーンアップに失敗しました")
     try:
-        改善件数 = team_pdca_db.取り残し終了()
-        if 改善件数:
-            logger.info(f"終了済み作業に対応する改善レコードを{改善件数}件回収しました")
+        作業件数 = team_pdca_db.取り残し終了()
+        if 作業件数:
+            logger.info(f"終了済み依頼に対応する作業レコードを{作業件数}件回収しました")
     except Exception:
-        logger.exception("Aチーム改善の起動時クリーンアップに失敗しました")
+        logger.exception("Aチーム作業の起動時クリーンアップに失敗しました")
 
 
-def _作業実行開始(行: dict, logger: logging.Logger) -> None:
-    """投入待ち作業 1 件について入力 JSON を出力し、sub_init.py を起動して PID を記録する。"""
-    作業ID = str(行["作業ID"])
-    if not team_work_db.作業確保(作業ID):
+def _依頼実行開始(行: dict, logger: logging.Logger) -> None:
+    """投入待ち依頼 1 件について入力 JSON を出力し、sub_init.py を起動して PID を記録する。"""
+    依頼ID = str(行["依頼ID"])
+    if not team_work_db.依頼確保(依頼ID):
         return
     if int(行.get("実行回数", 0) or 0) >= 実行回数上限:
-        team_work_db.投入失敗記録(作業ID, f"実行回数が上限({実行回数上限}回)に達しました")
-        logger.warning(f"実行回数上限のため失敗にしました: {作業ID}")
+        team_work_db.投入失敗記録(依頼ID, f"実行回数が上限({実行回数上限}回)に達しました")
+        logger.warning(f"実行回数上限のため失敗にしました: {依頼ID}")
         return
 
     try:
         _入力DIR.mkdir(parents=True, exist_ok=True)
-        入力パス = _入力パス(作業ID)
+        入力パス = _入力パス(依頼ID)
         with 入力パス.open("w", encoding="utf-8") as f:
             json.dump(
                 {
                     "要員ID": str(行.get("要員ID", "")),
-                    "作業ID": 作業ID,
+                    "依頼ID": 依頼ID,
                     "プロジェクト": str(行.get("プロジェクト", "")),
                     "要求内容": str(行.get("要求内容", "")),
                     "TEAM_AI_NAME": str(行.get("TEAM_AI_NAME", "claude_cli")),
@@ -200,20 +200,20 @@ def _作業実行開始(行: dict, logger: logging.Logger) -> None:
             creationflags=creationflags,
             env=_サブプロセス環境(),
         )
-        team_work_db.実行開始記録(作業ID, proc.pid)
-        logger.info(f"チーム作業のタスク投入を開始しました: {作業ID} PID={proc.pid}")
+        team_work_db.実行開始記録(依頼ID, proc.pid)
+        logger.info(f"チーム依頼のタスク投入を開始しました: {依頼ID} PID={proc.pid}")
     except Exception as e:
-        team_work_db.投入失敗記録(作業ID, f"sub_init起動エラー: {e}")
-        logger.exception(f"チーム作業sub_initの起動に失敗しました: {作業ID}")
+        team_work_db.投入失敗記録(依頼ID, f"sub_init起動エラー: {e}")
+        logger.exception(f"チーム依頼sub_initの起動に失敗しました: {依頼ID}")
 
 
 def _タイムアウト確認(logger: logging.Logger) -> None:
-    """開始してから無進捗タイムアウト分以上ひとつも進捗が無い作業を強制停止してエラーにする。
+    """開始してから無進捗タイムアウト分以上ひとつも進捗が無い依頼を強制停止してエラーにする。
 
     状態監視ループ（hh:mm が変わった回だけ、毎分1回）から呼ばれる。
     """
     try:
-        タイムアウト対象 = team_work_db.作業タイムアウト対象一覧(
+        タイムアウト対象 = team_work_db.依頼タイムアウト対象一覧(
             team_work_db.無進捗タイムアウト分, team_work_db.準備無進捗タイムアウト分
         )
         for 行 in タイムアウト対象:
@@ -226,21 +226,21 @@ def _タイムアウト確認(logger: logging.Logger) -> None:
             )
             logger.warning(
                 f"無進捗タイムアウト({制限分}分)のためキャンセルします: "
-                f"{行.get('作業ID', '')} (要員ID={行.get('要員ID', '')} 状態={状態}) "
+                f"{行.get('依頼ID', '')} (要員ID={行.get('要員ID', '')} 状態={状態}) "
                 f"開始日時={行.get('開始日時', '')} 最終進捗={行.get('最終進捗日時', '')} PID={pid}"
             )
             if pid.isdigit():
                 _プロセス強制停止(int(pid), logger)
         if タイムアウト対象:
-            更新件数 = team_work_db.作業タイムアウト対象エラー化(タイムアウト対象)
+            更新件数 = team_work_db.依頼タイムアウト対象エラー化(タイムアウト対象)
             logger.warning(f"無進捗タイムアウト対象をエラーにしました: {更新件数} 件")
     except Exception:
         logger.exception("無進捗タイムアウト処理でエラーが発生しました")
 
 
 def _経験生成開始(対象: dict, logger: logging.Logger) -> None:
-    """完了した作業 1 件を経験化する。仮登録 → sub_exp.py 起動まで行う。"""
-    作業ID = str(対象["作業ID"])
+    """完了した依頼 1 件を経験化する。仮登録 → sub_exp.py 起動まで行う。"""
+    依頼ID = str(対象["依頼ID"])
     経験 = team_exp_db.経験仮登録(対象)
     if not 経験:
         # 同時実行などで既に登録済み
@@ -253,7 +253,7 @@ def _経験生成開始(対象: dict, logger: logging.Logger) -> None:
             json.dump(
                 {
                     "経験ID": 経験ID,
-                    "作業ID": 作業ID,
+                    "依頼ID": 依頼ID,
                     "タスクID": str(対象.get("タスクID", "")),
                     "要員ID": str(対象.get("要員ID", "")),
                     "プロジェクト": str(対象.get("プロジェクト", "")),
@@ -278,14 +278,14 @@ def _経験生成開始(対象: dict, logger: logging.Logger) -> None:
             env=_サブプロセス環境(),
         )
         team_exp_db.生成開始記録(経験ID, proc.pid)
-        logger.info(f"Aチーム経験の生成を開始しました: {経験ID} (作業={作業ID}) PID={proc.pid}")
+        logger.info(f"Aチーム経験の生成を開始しました: {経験ID} (依頼={依頼ID}) PID={proc.pid}")
     except Exception as e:
         team_exp_db.経験失敗記録(経験ID, f"sub_exp起動エラー: {e}")
         logger.exception(f"Aチーム経験のsub_exp起動に失敗しました: {経験ID}")
 
 
 def _経験生成確認(logger: logging.Logger) -> None:
-    """完了から1時間以内で経験未登録の作業を経験化する（1分ごと）。"""
+    """完了から1時間以内で経験未登録の依頼を経験化する（1分ごと）。"""
     try:
         # 生成が長引いたものはエラーにして次回に持ち越さない
         for 行 in team_exp_db.生成タイムアウト対象一覧():
@@ -305,7 +305,7 @@ def _経験生成確認(logger: logging.Logger) -> None:
         logger.exception("Aチーム経験の生成確認でエラーが発生しました")
 
 
-def _改善実行開始(目標: dict, 区分: str, logger: logging.Logger) -> subprocess.Popen | None:
+def _作業実行開始(目標: dict, 区分: str, logger: logging.Logger) -> subprocess.Popen | None:
     """PDCA 1段分の入力 JSON を出力し、パターン・区分に対応する sub_SPDCA_*.py / sub_PlanDo_*.py を起動する。"""
     プロジェクト = str(目標.get("CODE_BASE_PATH", ""))
     パターン = str(目標.get("パターン") or team_pdca_db.既定パターン)
@@ -314,8 +314,8 @@ def _改善実行開始(目標: dict, 区分: str, logger: logging.Logger) -> su
         logger.warning(f"目標ループ({パターン}/{区分})に対応するスクリプトがありません: プロジェクト={プロジェクト}")
         return None
     try:
-        _改善入力DIR.mkdir(parents=True, exist_ok=True)
-        入力パス = _改善入力パス(プロジェクト, 区分)
+        _作業入力DIR.mkdir(parents=True, exist_ok=True)
+        入力パス = _作業入力パス(プロジェクト, 区分)
         with 入力パス.open("w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -356,20 +356,20 @@ def _改善実行開始(目標: dict, 区分: str, logger: logging.Logger) -> su
         return None
 
 
-def _改善回収(logger: logging.Logger) -> None:
-    """Aチーム作業が終わっているのに未終了で残った改善レコードを回収する（1分ごと）。
+def _作業回収(logger: logging.Logger) -> None:
+    """Aチーム依頼が終わっているのに未終了で残った作業レコードを回収する（1分ごと）。
 
     目標ループのオン・オフや空き時間の有無とは無関係に毎分行う。目標ループがオンの
     プロジェクトだけを対象にしていると、起動時のオフ解除（team_goal_db.起動時目標ループをオフ）
-    直後にタイムアウトやエラーで確定した作業を誰も回収できず、改善レコードが未終了のまま
+    直後にタイムアウトやエラーで確定した依頼を誰も回収できず、作業レコードが未終了のまま
     固着してしまうため。
     """
     try:
         回収件数 = team_pdca_db.取り残し終了()
         if 回収件数:
-            logger.info(f"終了済みのAチーム作業に対応する改善レコードを{回収件数}件回収しました")
+            logger.info(f"終了済みのAチーム依頼に対応する作業レコードを{回収件数}件回収しました")
     except Exception:
-        logger.exception("Aチーム改善の回収でエラーが発生しました")
+        logger.exception("Aチーム作業の回収でエラーが発生しました")
 
 
 def _目標ループ確認(logger: logging.Logger) -> None:
@@ -378,15 +378,15 @@ def _目標ループ確認(logger: logging.Logger) -> None:
     投入するのは次のすべてを満たすときだけ。
     - 前回の投入プロセスが残っていない
     - Aチーム状況で実行中（準備中・実行中）の要員が 1 人もいない＝空き時間
-    - そのプロジェクトの Aチーム改善に未終了レコードが無く、次の区分が実装済み
+    - そのプロジェクトの Aチーム作業に未終了レコードが無く、次の区分が実装済み
 
-    未終了レコードの回収は _改善回収() が毎分行うため、ここでは行わない。
+    未終了レコードの回収は _作業回収() が毎分行うため、ここでは行わない。
     """
-    global _改善プロセス
+    global _作業プロセス
     try:
-        if _改善プロセス is not None and _改善プロセス.poll() is None:
+        if _作業プロセス is not None and _作業プロセス.poll() is None:
             return
-        _改善プロセス = None
+        _作業プロセス = None
         対象一覧 = team_goal_db.目標ループ対象一覧()
         if not 対象一覧:
             return
@@ -404,23 +404,23 @@ def _目標ループ確認(logger: logging.Logger) -> None:
             現在ループ = team_pdca_db.ループ最大値(プロジェクト)
             if 区分 == 区分一覧[0] and 最大ループ回数 != 99 and 現在ループ >= 最大ループ回数:
                 # 止まったのか、やり切って終わったのかを区別できるよう1回だけ記録する
-                if (プロジェクト, "完了") not in _改善未実装通知済み:
-                    _改善未実装通知済み.add((プロジェクト, "完了"))
+                if (プロジェクト, "完了") not in _作業未実装通知済み:
+                    _作業未実装通知済み.add((プロジェクト, "完了"))
                     logger.info(
                         f"目標ループは最大ループ回数に達したため終了しました: "
                         f"プロジェクト={プロジェクト} 完了={現在ループ}周 最大={最大ループ回数}周"
                     )
                 continue
-            _改善未実装通知済み.discard((プロジェクト, "完了"))
+            _作業未実装通知済み.discard((プロジェクト, "完了"))
             if 区分 not in 区分一覧 or 区分 not in _SUB_PDCAパス.get(パターン, {}):
-                if (プロジェクト, 区分) not in _改善未実装通知済み:
-                    _改善未実装通知済み.add((プロジェクト, 区分))
+                if (プロジェクト, 区分) not in _作業未実装通知済み:
+                    _作業未実装通知済み.add((プロジェクト, 区分))
                     logger.info(
                         f"目標ループの次の区分({区分})は未実装のため投入しません: プロジェクト={プロジェクト}"
                     )
                 continue
-            _改善未実装通知済み.discard((プロジェクト, 区分))
-            _改善プロセス = _改善実行開始(目標, 区分, logger)
+            _作業未実装通知済み.discard((プロジェクト, 区分))
+            _作業プロセス = _作業実行開始(目標, 区分, logger)
             # 空き時間を埋めるのは1サイクルにつき1プロジェクトだけにする
             break
     except Exception:
@@ -430,7 +430,7 @@ def _目標ループ確認(logger: logging.Logger) -> None:
 def _起動監視1回(logger: logging.Logger) -> None:
     # --- 投入待ち（準備開始・未投入）→ 準備中 + sub_init.pyでAIタスク投入 ---
     for 行 in team_work_db.投入待ち一覧():
-        _作業実行開始(行, logger)
+        _依頼実行開始(行, logger)
 
 
 def _状態監視1回(logger: logging.Logger) -> None:
@@ -442,18 +442,18 @@ def _状態監視1回(logger: logging.Logger) -> None:
     _タイムアウト確認(logger)
     _経験生成確認(logger)
     # 回収は目標ループのオン・オフに関わらず行い、そのうえで次の段の投入を判断する
-    _改善回収(logger)
+    _作業回収(logger)
     _目標ループ確認(logger)
 
 
 async def 起動監視ループ(logger: logging.Logger) -> None:
-    """起動監視タイマー：投入待ちの作業を見つけて sub_init.py を起動する（5秒間隔）。"""
-    logger.info(f"チーム作業の起動監視ループを開始しました (interval={起動監視間隔秒}s)")
+    """起動監視タイマー：投入待ちの依頼を見つけて sub_init.py を起動する（5秒間隔）。"""
+    logger.info(f"チーム依頼の起動監視ループを開始しました (interval={起動監視間隔秒}s)")
     while True:
         try:
             await asyncio.to_thread(_起動監視1回, logger)
         except Exception:
-            logger.exception("チーム作業の起動監視ループでエラーが発生しました")
+            logger.exception("チーム依頼の起動監視ループでエラーが発生しました")
         await asyncio.sleep(起動監視間隔秒)
 
 
@@ -463,10 +463,10 @@ async def 状態監視ループ(logger: logging.Logger) -> None:
     起動（5 秒間隔の 起動監視ループ）とは分離して 10 秒間隔で回すが、本処理は
     hh:mm が変わった監視回だけ（毎分 1 回）行う。
     """
-    logger.info(f"チーム作業の状態監視ループを開始しました (interval={状態監視間隔秒}s)")
+    logger.info(f"チーム依頼の状態監視ループを開始しました (interval={状態監視間隔秒}s)")
     while True:
         try:
             await asyncio.to_thread(_状態監視1回, logger)
         except Exception:
-            logger.exception("チーム作業の状態監視ループでエラーが発生しました")
+            logger.exception("チーム依頼の状態監視ループでエラーが発生しました")
         await asyncio.sleep(状態監視間隔秒)

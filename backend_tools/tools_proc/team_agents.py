@@ -11,9 +11,9 @@
 """
 Team Agents モジュール
 
-backend_team の HTTP API に疎結合で接続し、Aチーム作業レコードを追加する。
+backend_team の HTTP API に疎結合で接続し、Aチーム依頼レコードを追加する。
 DB 直書きや backend_team の import は行わない。
-登録された作業は backend_team の起動監視ループが拾い、AIタスク要求へ投入する。
+登録された依頼は backend_team の起動監視ループが拾い、AIタスク要求へ投入する。
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import requests
 
 
 class TeamAgents:
-    """backend_team API へ Aチーム作業を投入する薄いクライアント"""
+    """backend_team API へ Aチーム依頼を投入する薄いクライアント"""
 
     def __init__(self, team_api_base: Optional[str] = None):
         self.team_api_base = (team_api_base or os.environ.get("AIDIY_TEAM_API_BASE") or "http://localhost:8094").rstrip("/")
@@ -35,7 +35,7 @@ class TeamAgents:
         health_url = f"{self.team_api_base}/health"
         info = {
             "team_api_base": self.team_api_base,
-            "submit_endpoint": f"{self.team_api_base}/team/作業/登録",
+            "submit_endpoint": f"{self.team_api_base}/team/依頼/登録",
             "health": {"ok": False, "url": health_url, "message": ""},
         }
         try:
@@ -86,11 +86,11 @@ class TeamAgents:
         return_work_id: bool = True,
         request_timeout_sec: int = 15,
     ) -> dict:
-        """Aチーム作業を「準備開始」で登録する。作業IDは backend_team が自動採番する。
+        """Aチーム依頼を「準備開始」で登録する。依頼IDは backend_team が自動採番する。
 
         project_path / team_ai_name / team_ai_model / task_ai_name / task_ai_model が
         None（未指定）のときは payload に載せず、backend_team 側が
-        AIチーム_作業編集の新規時と同じ条件
+        AIチーム_依頼編集の新規時と同じ条件
         （要員IDの更新最終レコードの値、無ければ規定値）で補完する。
         空文字は明示指定として送る（プロジェクトは空欄のまま登録される）。
         """
@@ -119,22 +119,22 @@ class TeamAgents:
             payload["TASK_AI_NAME"] = str(task_ai_name).strip()
         if task_ai_model is not None:
             payload["TASK_AI_MODEL"] = str(task_ai_model).strip()
-        data = self._post_team_api("/team/作業/登録", payload, request_timeout_sec)
+        data = self._post_team_api("/team/依頼/登録", payload, request_timeout_sec)
 
         if data.get("status") != "OK":
             return {
                 "status": "NG",
-                "message": str(data.get("message") or "backend_team への作業投入に失敗しました。"),
+                "message": str(data.get("message") or "backend_team への依頼投入に失敗しました。"),
                 "要員ID": member_id,
             }
 
         item = data.get("data", {}).get("item", {})
-        work_id = str(item.get("作業ID", ""))
+        work_id = str(item.get("依頼ID", ""))
         result = {
             "status": "OK",
-            "message": "チーム作業を投入しました。",
+            "message": "チーム依頼を投入しました。",
             "要員ID": str(item.get("要員ID") or member_id),
-            "作業ID": work_id,
+            "依頼ID": work_id,
             # 未指定時に backend_team が補完した値を確認できるよう、登録結果を返す
             "プロジェクト": str(item.get("プロジェクト") or ""),
             "TEAM_AI_NAME": str(item.get("TEAM_AI_NAME") or ""),
@@ -148,45 +148,45 @@ class TeamAgents:
         return result
 
     def get_work_status(self, member_id: str, work_id: str, request_timeout_sec: int = 15) -> dict:
-        """Aチーム作業 1 件の状態を backend_team API から取得する。"""
+        """Aチーム依頼 1 件の状態を backend_team API から取得する。"""
         member_id = (member_id or "").strip()
         work_id = (work_id or "").strip()
         if not member_id or not work_id:
-            return {"status": "NG", "message": "要員IDと作業IDを指定してください。"}
+            return {"status": "NG", "message": "要員IDと依頼IDを指定してください。"}
         data = self._post_team_api(
-            "/team/作業/取得",
-            {"要員ID": member_id, "作業ID": work_id},
+            "/team/依頼/取得",
+            {"要員ID": member_id, "依頼ID": work_id},
             request_timeout_sec,
         )
         if data.get("status") != "OK":
             return {
                 "status": "NG",
-                "message": str(data.get("message") or "チーム作業の取得に失敗しました。"),
+                "message": str(data.get("message") or "チーム依頼の取得に失敗しました。"),
                 "要員ID": member_id,
-                "作業ID": work_id,
+                "依頼ID": work_id,
             }
         return {
             "status": "OK",
             "message": str(data.get("message") or ""),
             "要員ID": member_id,
-            "作業ID": work_id,
+            "依頼ID": work_id,
             "item": data.get("data", {}).get("item", {}),
         }
 
     def get_work_list(self, member_id: str, request_timeout_sec: int = 15) -> dict:
-        """要員のAチーム作業一覧を backend_team API から取得する。"""
+        """要員のAチーム依頼一覧を backend_team API から取得する。"""
         member_id = (member_id or "").strip()
         if not member_id:
             return {"status": "NG", "message": "要員IDを指定してください。"}
         data = self._post_team_api(
-            "/team/作業/一覧",
+            "/team/依頼/一覧",
             {"要員ID": member_id},
             request_timeout_sec,
         )
         if data.get("status") != "OK":
             return {
                 "status": "NG",
-                "message": str(data.get("message") or "チーム作業一覧の取得に失敗しました。"),
+                "message": str(data.get("message") or "チーム依頼一覧の取得に失敗しました。"),
                 "要員ID": member_id,
             }
         body = data.get("data", {})

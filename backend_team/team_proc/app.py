@@ -30,7 +30,7 @@ def create_app() -> FastAPI:
             {"name": "default", "description": "backend_team の稼働確認 API"},
             {"name": "AIチーム", "description": "エージェントの状態、召喚、活動履歴 API"},
             {"name": "チーム要員", "description": "Aチーム要員の保守 API"},
-            {"name": "チーム作業", "description": "Aチーム作業の保守 API"},
+            {"name": "チーム依頼", "description": "Aチーム依頼の保守 API"},
         ],
         lifespan=build_lifespan(logger),
     )

@@ -15,7 +15,7 @@ team_watcher.py（1分ごとの処理）が temp/exp/<経験ID>.json に入力�
 backend_task/task_sub/sub_init.py と同じ 2 段構えで動く。
 
 処理の流れ:
-1. 入力 JSON（経験ID / 作業ID / タスクID / 要員ID / プロジェクト / 要求内容）を読み込む
+1. 入力 JSON（経験ID / 依頼ID / タスクID / 要員ID / プロジェクト / 要求内容）を読み込む
 2. backend_task から AIタスク明細の一覧を取得する
 3. 第1ステップ: 対象プロジェクトのフォルダで AI が明細内容を読み、経験値をまとめて
    応答本文へ返す（ファイル書き込みなし）
@@ -118,45 +118,45 @@ def 明細テキスト(明細: list[dict]) -> str:
     return "\n".join(行)
 
 
-def JSON形式サンプル(経験ID: str, 作業ID: str) -> str:
+def JSON形式サンプル(経験ID: str, 依頼ID: str) -> str:
     return f"""{{
   "経験ID": "{経験ID}",
-  "作業ID": "{作業ID}",
+  "依頼ID": "{依頼ID}",
   "タイトル": "この経験を一言で表すタイトル（40文字以内）",
   "経験値": 35,
   "分類": "実装",
   "まとめ内容": "何をどう進めて、どこまで到達したかの具体的なまとめ",
-  "学び": "次の作業に活かせる判断基準や注意点"
+  "学び": "次の依頼に活かせる判断基準や注意点"
 }}"""
 
 
 def プロンプト生成_経験まとめ(
-    経験ID: str, 作業ID: str, 要員ID: str, プロジェクト: str, 要求内容: str, 明細本文: str
+    経験ID: str, 依頼ID: str, 要員ID: str, プロジェクト: str, 要求内容: str, 明細本文: str
 ) -> str:
     return f"""次に示すのは、このプロジェクトで完了したAIタスクの明細内容です。
-担当した要員がこの作業から得た「経験値」としてまとめ、結果を JSON 形式の文字列として応答本文にそのまま出力してください。
+担当した要員がこの依頼から得た「経験値」としてまとめ、結果を JSON 形式の文字列として応答本文にそのまま出力してください。
 このプロジェクトの構成や実装状況も確認し、実際に何が変わったのかを踏まえてまとめてください。
-ファイルの作成・書き込み・コードの修正などの作業は一切行わず、応答本文へ JSON を出力するだけにしてください。
+ファイルの作成・書き込み・コードの修正などの依頼は一切行わず、応答本文へ JSON を出力するだけにしてください。
 
 要員ID: {要員ID}
 対象プロジェクト: {プロジェクト or '（未指定）'}
-作業の要求内容:
+依頼の要求内容:
 {要求内容}
 
 AIタスク明細の内容:
 {明細本文}
 
 出力する JSON の形式:
-{JSON形式サンプル(経験ID, 作業ID)}
+{JSON形式サンプル(経験ID, 依頼ID)}
 
 まとめ方の指示:
-- 経験値は 1〜100 の整数で、この作業の難しさと学びの大きさを評価した点数にしてください。
+- 経験値は 1〜100 の整数で、この依頼の難しさと学びの大きさを評価した点数にしてください。
   単純な確認だけなら 10 前後、複数ファイルにまたがる実装や不具合の切り分けを伴うなら 40〜70、
-  設計から検証まで一通り行った大きな作業なら 80 以上を目安にします。
+  設計から検証まで一通り行った大きな依頼なら 80 以上を目安にします。
 - 分類は「実装」「調査」「修正」「検証」「運用」「その他」のいずれか 1 語にしてください。
 - まとめ内容は、対象（ファイル名・機能名・画面名・API名など）と、行った変更・確認の内容、
   到達点が第三者に伝わるように 200 文字程度で具体的に書いてください。
-- 学びは、次に似た作業を行うときの判断基準や注意点を 100 文字程度で書いてください。
+- 学びは、次に似た依頼を行うときの判断基準や注意点を 100 文字程度で書いてください。
 - 文体は「〜する」「〜を確認した」調の常体で統一し、口語表現は避けてください。
 - 絵文字、顔文字、矢印記号、囲み文字、装飾的な特殊記号は一切使用しないでください。
   Windows 環境の cp932 エンコードで書き込みエラーになるため、通常の漢字・ひらがな・カタカナ・
@@ -164,33 +164,33 @@ AIタスク明細の内容:
 """
 
 
-def プロンプト生成_JSON保存(まとめ結果: str, 出力JSONパス: str, 経験ID: str, 作業ID: str) -> str:
+def プロンプト生成_JSON保存(まとめ結果: str, 出力JSONパス: str, 経験ID: str, 依頼ID: str) -> str:
     return f"""次の「経験まとめ結果」から JSON オブジェクトを取り出し、JSON ファイルとして保存してください。
 ファイルの保存先: {出力JSONパス}
 保存先フォルダは既に存在します。UTF-8（BOMなし）で保存してください。
 コードフェンスや説明文は取り除き、下記の既定形式（キー名は完全一致）に整えて保存してください。
 まとめの内容（タイトル・経験値・分類・まとめ内容・学び）は変更しないでください。
-このファイル保存以外の作業（コードの修正、他ファイルの作成など）は一切行わないでください。
+このファイル保存以外の依頼（コードの修正、他ファイルの作成など）は一切行わないでください。
 
 既定形式:
-{JSON形式サンプル(経験ID, 作業ID)}
+{JSON形式サンプル(経験ID, 依頼ID)}
 
 経験まとめ結果:
 {まとめ結果}
 """
 
 
-def JSON検証(データ: dict, 作業ID: str) -> dict:
+def JSON検証(データ: dict, 依頼ID: str) -> dict:
     """出力 JSON を検証して本登録用の dict に整える。不正なら ValueError。"""
     if not isinstance(データ, dict):
         raise ValueError("JSON のルートがオブジェクトではありません")
-    for キー in ("経験ID", "作業ID", "タイトル", "経験値", "分類", "まとめ内容", "学び"):
+    for キー in ("経験ID", "依頼ID", "タイトル", "経験値", "分類", "まとめ内容", "学び"):
         if キー not in データ:
             raise ValueError(f"キー '{キー}' がありません")
     if str(データ["経験ID"]).strip() != 経験ID:
         raise ValueError("経験IDが入力 JSON と一致していません")
-    if str(データ["作業ID"]).strip() != 作業ID:
-        raise ValueError("作業IDが入力 JSON と一致していません")
+    if str(データ["依頼ID"]).strip() != 依頼ID:
+        raise ValueError("依頼IDが入力 JSON と一致していません")
     タイトル = str(データ["タイトル"]).strip()
     まとめ内容 = str(データ["まとめ内容"]).strip()
     if not タイトル:
@@ -215,7 +215,7 @@ def JSON検証(データ: dict, 作業ID: str) -> dict:
 def JSON保存と検証(
     まとめ結果: str,
     出力JSONパス: str,
-    作業ID: str,
+    依頼ID: str,
     team_ai_name: str,
     team_ai_model: str,
 ) -> dict:
@@ -228,7 +228,7 @@ def JSON保存と検証(
         f"project_path={AIDIYルート})"
     )
     res = POST送信(MCP_URL, {
-        "prompt": プロンプト生成_JSON保存(まとめ結果, 出力JSONパス, 経験ID, 作業ID),
+        "prompt": プロンプト生成_JSON保存(まとめ結果, 出力JSONパス, 経験ID, 依頼ID),
         "ai_name": team_ai_name,
         "ai_model": team_ai_model,
         "project_path": AIDIYルート,
@@ -241,7 +241,7 @@ def JSON保存と検証(
         raise RuntimeError(f"出力 JSON が生成されませんでした: {出力JSONパス}")
     with open(出力JSONパス, "r", encoding="utf-8-sig") as f:
         データ = json.load(f)
-    整形 = JSON検証(データ, 作業ID)
+    整形 = JSON検証(データ, 依頼ID)
     ログ(f"JSON 検証 OK: 経験値 {整形['経験値']} / {整形['タイトル']}")
     return 整形
 
@@ -274,7 +274,7 @@ def main() -> int:
         with open(入力パス, "r", encoding="utf-8-sig") as f:
             入力 = json.load(f)
         経験ID = str(入力.get("経験ID", "")).strip()
-        作業ID = str(入力.get("作業ID", "")).strip()
+        依頼ID = str(入力.get("依頼ID", "")).strip()
         タスクID = str(入力.get("タスクID", "")).strip()
         要員ID = str(入力.get("要員ID", "")).strip()
         プロジェクト = str(入力.get("プロジェクト", "")).strip()
@@ -291,12 +291,12 @@ def main() -> int:
         task_ai_model = str(
             入力.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定
         ).strip()
-        if not 経験ID or not 作業ID or not タスクID:
-            raise ValueError("入力 JSON に 経験ID、作業ID または タスクID がありません")
+        if not 経験ID or not 依頼ID or not タスクID:
+            raise ValueError("入力 JSON に 経験ID、依頼ID または タスクID がありません")
 
         ファイルステム = os.path.splitext(os.path.basename(入力パス))[0]
         ログパス = os.path.join(BASE_DIR, "temp", "exp", f"{ファイルステム}.log")
-        ログ(f"=== AIチーム経験 生成開始: {経験ID} (作業={作業ID} / タスク={タスクID}) ===")
+        ログ(f"=== AIチーム経験 生成開始: {経験ID} (依頼={依頼ID} / タスク={タスクID}) ===")
 
         出力DIR = os.path.join(BASE_DIR, "temp", "exp", "output")
         os.makedirs(出力DIR, exist_ok=True)
@@ -317,7 +317,7 @@ def main() -> int:
             f"project_path={プロジェクト or '既定'})"
         )
         payload = {
-            "prompt": プロンプト生成_経験まとめ(経験ID, 作業ID, 要員ID, プロジェクト, 要求内容, 明細本文),
+            "prompt": プロンプト生成_経験まとめ(経験ID, 依頼ID, 要員ID, プロジェクト, 要求内容, 明細本文),
             "ai_name": task_ai_name,
             "ai_model": task_ai_model,
         }
@@ -337,7 +337,7 @@ def main() -> int:
                 整形 = JSON保存と検証(
                     まとめ結果,
                     出力JSONパス,
-                    作業ID,
+                    依頼ID,
                     team_ai_name,
                     team_ai_model,
                 )

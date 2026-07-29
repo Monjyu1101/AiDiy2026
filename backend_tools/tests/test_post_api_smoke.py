@@ -259,7 +259,7 @@ def main() -> None:
         raise AssertionError(f"task_agents config: unexpected keys {sorted(task_config.keys())}")
     print("  OK task_agents")
 
-    # Team agents は config のみ。submit / run は作業投入が発生するため別途明示して実行する。
+    # Team agents は config のみ。submit / run は依頼投入が発生するため別途明示して実行する。
     team_config = post("/aidiy_team_agents/config")
     assert_no_error("team_agents config", team_config)
     if "team_api_base" not in team_config:

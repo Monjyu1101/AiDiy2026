@@ -20,10 +20,10 @@ team_watcher.py（1分ごとの確認）が temp/pdca/<ファイル名>.json に
 1. 入力 JSON（プロジェクト / チーム目標 / PDCA区分 / 最大ループ回数 / 動員要員数）を読み込む
 2. 有効な要員のうち admin 以外を候補にして、相談内容に最も適した要員を動員要員数まで
    AIに順に選ばせる（sub_init.py と同じ選択処理。候補が尽きる・選べない場合はそこで打ち切る）
-3. 要員ごとに Aチーム作業（状態=準備中）→ Aチーム改善（開始レコード）→
+3. 要員ごとに Aチーム依頼（状態=準備中）→ Aチーム作業（開始レコード）→
    aidiy_task_agents への投入（Aタスク要求）の順で作る
-4. 投入に成功した作業は 準備完了 にする。失敗した作業はエラーにし、
-   対応する Aチーム改善レコードも終了させて次のサイクルを止めない
+4. 投入に成功した依頼は 準備完了 にする。失敗した依頼はエラーにし、
+   対応する Aチーム作業レコードも終了させて次のサイクルを止めない
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 from log_config import get_logger, setup_logging
 from team_proc import team_db, team_pdca_db
 
-# Aチーム作業・Aチーム改善の作成とタスク投入は全区分で同じ処理を使う
+# Aチーム依頼・Aチーム作業の作成とタスク投入は全区分で同じ処理を使う
 import sub_SPDCA__common
 # 担当要員のAI選択は sub_init.py と同じ処理を使う（有効要員 + Aチーム経験で判断させる）
 from sub_init import 担当要員を選択, 既定利用者ID
@@ -171,7 +171,7 @@ def 相談を投入(
     logger,
     前サイクル改善: str = "",
 ) -> bool:
-    """要員1名分の Aチーム作業・Aチーム改善・Aタスク要求を作る。"""
+    """要員1名分の Aチーム依頼・Aチーム作業・Aタスク要求を作る。"""
     return sub_SPDCA__common.段を投入(
         区分,
         要員ID,

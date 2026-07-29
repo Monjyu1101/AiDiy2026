@@ -1352,7 +1352,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔌 MCP サーバー (統合)</h3>
-                <p>FastAPI + SSE で 19 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・通知音再生・コードエージェント実行・チャット LLM 実行・AIタスク非同期投入・AIチーム作業投入・Windows デスクトップ操作制御を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
+                <p>FastAPI + SSE で 19 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・通知音再生・コードエージェント実行・チャット LLM 実行・AIタスク非同期投入・AIチーム依頼投入・Windows デスクトップ操作制御を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
                 <div class="meta-tags"><span>tools_main.py:8095</span><span>SSE × 19</span><span>HTTP POST</span><span>stdio gateway</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
@@ -1695,7 +1695,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">👥 aidiy_team_agents<span class="fx-new-badge">NEW</span></h3>
-                <p>backend_team の Aチーム作業へ非同期で作業を投入。作業IDは TW+8桁で自動採番され、登録後は backend_team の監視ループが AIタスク要求へ引き継ぐ。プロジェクトや AI 設定は未指定なら更新最終レコード → 規定値で補完。</p>
+                <p>backend_team の Aチーム依頼へ非同期で依頼を投入。依頼IDは TR+8桁で自動採番され、登録後は backend_team の監視ループが AIタスク要求へ引き継ぐ。プロジェクトや AI 設定は未指定なら更新最終レコード → 規定値で補完。</p>
                 <div class="meta-tags"><span>submit</span><span>get_work_status</span><span>要員ID</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">

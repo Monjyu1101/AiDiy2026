@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""backend_team の AIチーム業務 API ルーター（エージェント、要員、作業）。"""
+"""backend_team の AIチーム業務 API ルーター（エージェント、要員、依頼）。"""
 
 from __future__ import annotations
 
@@ -113,24 +113,24 @@ class 要員削除要求(操作情報):
     要員ID: str
 
 
-class チーム作業一覧要求(BaseModel):
+class チーム依頼一覧要求(BaseModel):
     要員ID: str = "admin"
 
 
-class チーム作業取得要求(チーム作業一覧要求):
-    作業ID: str
+class チーム依頼取得要求(チーム依頼一覧要求):
+    依頼ID: str
 
 
-class チーム作業保存要求(操作情報):
-    """チーム作業の登録 / 変更。
+class チーム依頼保存要求(操作情報):
+    """チーム依頼の登録 / 変更。
 
     プロジェクト / TEAM_AI_* / TASK_AI_* は None（未指定）可。
-    登録（新規）のときは AIチーム_作業編集ダイアログの新規時と同じ条件で補完する
+    登録（新規）のときは AIチーム_依頼編集ダイアログの新規時と同じ条件で補完する
     （要員IDの更新最終レコードの値 → 無ければ規定値）。
     空文字は「その値を明示指定した」扱いで、プロジェクトは空欄のまま登録する。
     """
     要員ID: str = ""
-    作業ID: str = ""
+    依頼ID: str = ""
     プロジェクト: str | None = None
     要求内容: str
     TEAM_AI_NAME: str | None = None
@@ -167,7 +167,7 @@ class チーム経験失敗要求(BaseModel):
     メッセージ: str = ""
 
 
-class チーム改善一覧要求(BaseModel):
+class チーム作業一覧要求(BaseModel):
     """掲示板に出ているプロジェクト（CODE_BASE_PATH）で絞って一覧する。"""
     プロジェクト: str = ""
     件数: int = Field(default=team_pdca_db.一覧最大件数, ge=1, le=1000)
@@ -426,54 +426,54 @@ async def 要員削除(request: 要員削除要求) -> dict:
         return ng(f"要員の削除に失敗しました: {e}")
 
 
-@router.post("/作業/一覧", tags=["チーム作業"])
-async def チーム作業一覧(request: チーム作業一覧要求) -> dict:
+@router.post("/依頼/一覧", tags=["チーム依頼"])
+async def チーム依頼一覧(request: チーム依頼一覧要求) -> dict:
     try:
         要員ID = request.要員ID.strip()
         if not 要員ID:
             return ng("要員IDを指定してください")
-        items = team_work_db.作業一覧(要員ID)
+        items = team_work_db.依頼一覧(要員ID)
         return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
     except Exception as e:
-        logger.error(f"チーム作業一覧の取得に失敗: {e}")
-        return ng(f"チーム作業一覧の取得に失敗しました: {e}")
+        logger.error(f"チーム依頼一覧の取得に失敗: {e}")
+        return ng(f"チーム依頼一覧の取得に失敗しました: {e}")
 
 
-@router.post("/作業/最大更新日時", tags=["チーム作業"])
-async def チーム作業最大更新日時(request: チーム作業一覧要求) -> dict:
+@router.post("/依頼/最大更新日時", tags=["チーム依頼"])
+async def チーム依頼最大更新日時(request: チーム依頼一覧要求) -> dict:
     try:
         要員ID = request.要員ID.strip()
         if not 要員ID:
             return ng("要員IDを指定してください")
         return ok(
             "最大更新日時を取得しました",
-            {"最大更新日時": team_work_db.作業最大更新日時(要員ID)},
+            {"最大更新日時": team_work_db.依頼最大更新日時(要員ID)},
         )
     except Exception as e:
-        logger.error(f"チーム作業最大更新日時の取得に失敗: {e}")
-        return ng(f"チーム作業最大更新日時の取得に失敗しました: {e}")
+        logger.error(f"チーム依頼最大更新日時の取得に失敗: {e}")
+        return ng(f"チーム依頼最大更新日時の取得に失敗しました: {e}")
 
 
-@router.post("/作業/取得", tags=["チーム作業"])
-async def チーム作業取得(request: チーム作業取得要求) -> dict:
+@router.post("/依頼/取得", tags=["チーム依頼"])
+async def チーム依頼取得(request: チーム依頼取得要求) -> dict:
     try:
         要員ID = request.要員ID.strip()
-        作業ID = request.作業ID.strip()
-        if not 要員ID or not 作業ID:
-            return ng("要員IDと作業IDを指定してください")
-        item = team_work_db.作業取得(要員ID, 作業ID)
-        return ok("作業を取得しました", {"item": item}) if item else ng("対象作業が見つかりません")
+        依頼ID = request.依頼ID.strip()
+        if not 要員ID or not 依頼ID:
+            return ng("要員IDと依頼IDを指定してください")
+        item = team_work_db.依頼取得(要員ID, 依頼ID)
+        return ok("依頼を取得しました", {"item": item}) if item else ng("対象依頼が見つかりません")
     except Exception as e:
-        logger.error(f"チーム作業の取得に失敗: {e}")
-        return ng(f"チーム作業の取得に失敗しました: {e}")
+        logger.error(f"チーム依頼の取得に失敗: {e}")
+        return ng(f"チーム依頼の取得に失敗しました: {e}")
 
 
-def _作業データ(request: チーム作業保存要求, 編集中: bool) -> dict:
+def _依頼データ(request: チーム依頼保存要求, 編集中: bool) -> dict:
     要員ID = request.要員ID.strip() or request.操作利用者ID.strip() or "admin"
-    作業ID = request.作業ID.strip()
+    依頼ID = request.依頼ID.strip()
     要求内容 = request.要求内容.strip()
-    if 編集中 and not 作業ID:
-        raise ValueError("作業IDを指定してください")
+    if 編集中 and not 依頼ID:
+        raise ValueError("依頼IDを指定してください")
     if not 要求内容:
         raise ValueError("要求内容を入力してください")
     if request.状態 not in team_work_db.状態入力一覧:
@@ -488,10 +488,10 @@ def _作業データ(request: チーム作業保存要求, 編集中: bool) -> d
         "TASK_AI_MODEL": "auto",
     }
     if not 編集中:
-        既定.update(team_work_db.作業新規既定値(要員ID))
+        既定.update(team_work_db.依頼新規既定値(要員ID))
     return {
         "要員ID": 要員ID,
-        "作業ID": 作業ID,
+        "依頼ID": 依頼ID,
         "プロジェクト": 既定["プロジェクト"] if request.プロジェクト is None else request.プロジェクト.strip(),
         "要求内容": 要求内容,
         "TEAM_AI_NAME": (request.TEAM_AI_NAME or "").strip() or 既定["TEAM_AI_NAME"],
@@ -503,30 +503,30 @@ def _作業データ(request: チーム作業保存要求, 編集中: bool) -> d
     }
 
 
-@router.post("/作業/登録", tags=["チーム作業"])
-async def チーム作業登録(request: チーム作業保存要求) -> dict:
+@router.post("/依頼/登録", tags=["チーム依頼"])
+async def チーム依頼登録(request: チーム依頼保存要求) -> dict:
     try:
-        item = team_work_db.作業登録(_作業データ(request, 編集中=False), request.操作者())
-        return ok(f"作業 {item['作業ID']} を登録しました", {"item": item})
+        item = team_work_db.依頼登録(_依頼データ(request, 編集中=False), request.操作者())
+        return ok(f"依頼 {item['依頼ID']} を登録しました", {"item": item})
     except ValueError as exc:
         return ng(str(exc))
     except Exception as e:
-        logger.error(f"チーム作業の登録に失敗: {e}")
-        return ng(f"チーム作業の登録に失敗しました: {e}")
+        logger.error(f"チーム依頼の登録に失敗: {e}")
+        return ng(f"チーム依頼の登録に失敗しました: {e}")
 
 
-@router.post("/作業/変更", tags=["チーム作業"])
-async def チーム作業変更(request: チーム作業保存要求) -> dict:
+@router.post("/依頼/変更", tags=["チーム依頼"])
+async def チーム依頼変更(request: チーム依頼保存要求) -> dict:
     try:
-        item = team_work_db.作業変更(_作業データ(request, 編集中=True), request.操作者())
-        return ok(f"作業 {item['作業ID']} を変更しました", {"item": item})
+        item = team_work_db.依頼変更(_依頼データ(request, 編集中=True), request.操作者())
+        return ok(f"依頼 {item['依頼ID']} を変更しました", {"item": item})
     except KeyError:
-        return ng("対象作業が見つかりません")
+        return ng("対象依頼が見つかりません")
     except ValueError as exc:
         return ng(str(exc))
     except Exception as e:
-        logger.error(f"チーム作業の変更に失敗: {e}")
-        return ng(f"チーム作業の変更に失敗しました: {e}")
+        logger.error(f"チーム依頼の変更に失敗: {e}")
+        return ng(f"チーム依頼の変更に失敗しました: {e}")
 
 
 @router.post("/経験/一覧", tags=["チーム経験"])
@@ -612,27 +612,27 @@ async def チーム経験失敗(request: チーム経験失敗要求) -> dict:
         return ng(f"チーム経験の失敗記録に失敗しました: {e}")
 
 
-@router.post("/改善/一覧", tags=["チーム改善"])
-async def チーム改善一覧(request: チーム改善一覧要求) -> dict:
-    """目標ループ（PDCA）の実行状況を、改善IDの新しい順で返す。"""
+@router.post("/作業/一覧", tags=["チーム作業"])
+async def チーム作業一覧(request: チーム作業一覧要求) -> dict:
+    """目標ループ（PDCA）の実行状況を、作業IDの新しい順で返す。"""
     try:
-        items = team_pdca_db.改善一覧(request.プロジェクト.strip(), request.件数)
+        items = team_pdca_db.作業一覧(request.プロジェクト.strip(), request.件数)
         return ok(f"{len(items)}件取得しました", {"items": items, "total": len(items)})
     except Exception as e:
-        logger.error(f"チーム改善一覧の取得に失敗: {e}")
-        return ng(f"チーム改善一覧の取得に失敗しました: {e}")
+        logger.error(f"チーム作業一覧の取得に失敗: {e}")
+        return ng(f"チーム作業一覧の取得に失敗しました: {e}")
 
 
-@router.post("/改善/最大更新日時", tags=["チーム改善"])
-async def チーム改善最大更新日時(request: チーム改善一覧要求) -> dict:
+@router.post("/作業/最大更新日時", tags=["チーム作業"])
+async def チーム作業最大更新日時(request: チーム作業一覧要求) -> dict:
     """一覧の再取得判定に使う最大更新日時（5秒ポーリング用）。"""
     try:
         return ok("最大更新日時を取得しました", {
-            "最大更新日時": team_pdca_db.改善最大更新日時(request.プロジェクト.strip()),
+            "最大更新日時": team_pdca_db.作業最大更新日時(request.プロジェクト.strip()),
         })
     except Exception as e:
-        logger.error(f"チーム改善の最大更新日時の取得に失敗: {e}")
-        return ng(f"チーム改善の最大更新日時の取得に失敗しました: {e}")
+        logger.error(f"チーム作業の最大更新日時の取得に失敗: {e}")
+        return ng(f"チーム作業の最大更新日時の取得に失敗しました: {e}")
 
 
 @router.post("/雑談/一覧", tags=["チーム雑談"])
@@ -673,20 +673,20 @@ async def チーム目標一覧() -> dict:
 async def チーム目標最終() -> dict:
     """更新日時が最新のチーム目標と、目標ループが動いているかを返す（掲示板に出す値）。
 
-    掲示板は5秒ごとにこれを読み、`改善実行中` でネオン点灯を切り替える。
+    掲示板は5秒ごとにこれを読み、`作業実行中` でネオン点灯を切り替える。
     目標ループがオフ、または最大ループ回数まで回って最終段が決着（済 または エラー）
     していれば false。エラーで終わっても次のループは投入されないため停止とみなす。
     """
     try:
         item = team_goal_db.最終目標取得()
         if not item:
-            return ok("チーム目標を取得しました", {"item": {}, "改善実行中": False})
-        改善実行中 = bool(item.get("目標ループ")) and team_pdca_db.目標ループ実行中(
+            return ok("チーム目標を取得しました", {"item": {}, "作業実行中": False})
+        作業実行中 = bool(item.get("目標ループ")) and team_pdca_db.目標ループ実行中(
             str(item.get("CODE_BASE_PATH", "")),
             str(item.get("パターン", "") or team_goal_db.既定パターン),
             int(item.get("最大ループ回数", 1) or 1),
         )
-        return ok("チーム目標を取得しました", {"item": item, "改善実行中": 改善実行中})
+        return ok("チーム目標を取得しました", {"item": item, "作業実行中": 作業実行中})
     except Exception as e:
         logger.error(f"チーム目標の取得に失敗: {e}")
         return ng(f"チーム目標の取得に失敗しました: {e}")
@@ -730,14 +730,14 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             request.TASK_AI_NAME,
             request.TASK_AI_MODEL,
         )
-        if team_goal_db.改善履歴クリア必要(変更前, 目標, request.目標ループ, request.パターン):
+        if team_goal_db.作業履歴クリア必要(変更前, 目標, request.目標ループ, request.パターン):
             # 最大ループ回数・動員要員数だけの変更では履歴を残し、
             # 目標またはループON/OFFの変更時だけクリアする。
-            クリア件数 = team_pdca_db.改善クリア(パス)
-            logger.info(f"目標または目標ループ変更のためAチーム改善をクリアしました: {パス} ({クリア件数}件)")
+            クリア件数 = team_pdca_db.作業クリア(パス)
+            logger.info(f"目標または目標ループ変更のためAチーム作業をクリアしました: {パス} ({クリア件数}件)")
             return ok(
                 f"{パス} のチーム目標を保存し、目標ループの記録を{クリア件数}件クリアしました",
-                {"item": item, "改善クリア件数": クリア件数},
+                {"item": item, "作業クリア件数": クリア件数},
             )
         return ok(f"{パス} のチーム目標を保存しました", {"item": item})
     except ValueError as exc:
@@ -755,7 +755,7 @@ async def チーム目標削除(request: チーム目標削除要求) -> dict:
             return ng("CODE_BASE_PATHを指定してください")
         team_goal_db.目標削除(パス)
         # 目標が消えたら目標ループの記録も残さない
-        team_pdca_db.改善クリア(パス)
+        team_pdca_db.作業クリア(パス)
         return ok(f"{パス} のチーム目標を削除しました")
     except KeyError:
         return ng("対象のチーム目標が見つかりません")

@@ -31,7 +31,7 @@ from .team_db import DB_PATH, 接続取得
 # 目標ループのパターン。SPDCA=S→P→D→C→Aの5段、PlanDo=P→Dの2段
 許可パターン = ("SPDCA", "PlanDo")
 既定パターン = "PlanDo"
-# 目標ループの各段で使うAI。目標ごとに持ち、Aチーム作業・Aタスクの投入時に使う
+# 目標ループの各段で使うAI。目標ごとに持ち、Aチーム依頼・Aタスクの投入時に使う
 AI設定キー = ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL")
 既定TEAM_AI_NAME = "claude_cli"
 既定TEAM_AI_MODEL = "auto"
@@ -63,8 +63,8 @@ def _次の更新連番(conn: sqlite3.Connection) -> int:
     return int(row["次"]) if row else 1
 
 
-def 改善履歴クリア必要(変更前: dict | None, チーム目標: str, 目標ループ: bool, パターン: str = 既定パターン) -> bool:
-    """既存目標・目標ループON/OFF・パターンのいずれかが変わった場合だけ改善履歴をクリアする。
+def 作業履歴クリア必要(変更前: dict | None, チーム目標: str, 目標ループ: bool, パターン: str = 既定パターン) -> bool:
+    """既存目標・目標ループON/OFF・パターンのいずれかが変わった場合だけ作業履歴をクリアする。
 
     パターンが変わると PDCA区分の並びや意味（S/P/D/C/A ⇔ P/D）が変わり、
     ループ番号や直前段の判定に不整合が起きるため、目標変更と同様にクリア対象にする。

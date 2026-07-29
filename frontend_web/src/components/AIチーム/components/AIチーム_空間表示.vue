@@ -51,7 +51,7 @@ const props = defineProps<{
   要員読込エラー: string;
   チーム目標: チーム目標 | null;
   /** 目標ループが動いているか。掲示板のネオン点灯はこれで切り替える */
-  改善実行中: boolean;
+  作業実行中: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -105,8 +105,8 @@ const 目標掲示板 = {
   group: null as THREE.Group | null,
   板: null as THREE.Mesh | null,
   縁: null as THREE.Mesh | null,
-  改善明滅: null as THREE.Mesh | null,
-  改善ネオン芯: null as THREE.Group | null,
+  作業明滅: null as THREE.Mesh | null,
+  作業ネオン芯: null as THREE.Group | null,
 };
 const 目標掲示板幅 = 13;
 const 目標掲示板縦 = 4.6;
@@ -1075,7 +1075,7 @@ const 目標掲示板を作る = () => {
   目標掲示板.縁 = 縁;
 
   // 目標ループ中は、掲示板全体へ薄いピンクの明滅を重ねる。
-  const 改善明滅材 = new THREE.MeshBasicMaterial({
+  const 作業明滅材 = new THREE.MeshBasicMaterial({
     color: 0xff1493,
     transparent: true,
     opacity: 0,
@@ -1084,16 +1084,16 @@ const 目標掲示板を作る = () => {
     toneMapped: false,
     blending: THREE.AdditiveBlending,
   });
-  破棄対象.push(改善明滅材);
-  const 改善明滅 = new THREE.Mesh(
+  破棄対象.push(作業明滅材);
+  const 作業明滅 = new THREE.Mesh(
     ジオメトリ(new THREE.PlaneGeometry(目標掲示板幅, 目標掲示板縦)),
-    改善明滅材,
+    作業明滅材,
   );
-  改善明滅.position.z = 0.035;
-  改善明滅.visible = props.改善実行中;
-  改善明滅.renderOrder = 2;
-  group.add(改善明滅);
-  目標掲示板.改善明滅 = 改善明滅;
+  作業明滅.position.z = 0.035;
+  作業明滅.visible = props.作業実行中;
+  作業明滅.renderOrder = 2;
+  group.add(作業明滅);
+  目標掲示板.作業明滅 = 作業明滅;
 
   // ネオン管の白い発光芯。外側のピンクの縁と重ねて、光のにじみを作る。
   const ネオン芯材 = new THREE.MeshBasicMaterial({
@@ -1116,10 +1116,10 @@ const 目標掲示板を作る = () => {
     縦芯.position.set(方向 * (目標掲示板幅 / 2 + 0.2), 0, 0.065);
     ネオン芯.add(縦芯);
   });
-  ネオン芯.visible = props.改善実行中;
+  ネオン芯.visible = props.作業実行中;
   ネオン芯.renderOrder = 3;
   group.add(ネオン芯);
-  目標掲示板.改善ネオン芯 = ネオン芯;
+  目標掲示板.作業ネオン芯 = ネオン芯;
 
   scene.add(group);
   目標掲示板.group = group;
@@ -1888,7 +1888,7 @@ const 描画 = (時刻: number) => {
 
   // 掲示板の位置と向きは飛行船（NPC）が運ぶ。ここでは光の縁の演出だけ行う
   // ループが上限まで回り切ったら、目標ループONのままでもネオンは消す
-  const 目標ループ中 = props.改善実行中;
+  const 目標ループ中 = props.作業実行中;
   // ゆっくりした明滅へ、ごく短い瞬断を混ぜてネオン管らしい点灯の揺らぎを作る。
   const 瞬断 = Math.sin(時刻 * 0.021) + Math.sin(時刻 * 0.0137) > 1.72 ? 0.2 : 1;
   const ネオン強度 = (0.72 + (Math.sin(時刻 * 0.0045) + 1) * 0.14) * 瞬断;
@@ -1902,21 +1902,21 @@ const 描画 = (時刻: number) => {
         : 0.34 + (Math.sin(時刻 * 0.0016) + 1) * 0.06;
     縁材.opacity = THREE.MathUtils.lerp(縁材.opacity, 目標値, 目標ループ中 ? 0.32 : 0.12);
   }
-  if (目標掲示板.改善明滅) {
-    目標掲示板.改善明滅.visible = 目標ループ中;
+  if (目標掲示板.作業明滅) {
+    目標掲示板.作業明滅.visible = 目標ループ中;
     if (目標ループ中) {
-      const 明滅材 = 目標掲示板.改善明滅.material as THREE.MeshBasicMaterial;
+      const 明滅材 = 目標掲示板.作業明滅.material as THREE.MeshBasicMaterial;
       明滅材.opacity = 0.025 + ネオン強度 * 0.085;
     }
   }
-  if (目標掲示板.改善ネオン芯) {
-    目標掲示板.改善ネオン芯.visible = 目標ループ中;
+  if (目標掲示板.作業ネオン芯) {
+    目標掲示板.作業ネオン芯.visible = 目標ループ中;
     if (目標ループ中) {
-      const 芯材 = (目標掲示板.改善ネオン芯.children[0] as THREE.Mesh)
+      const 芯材 = (目標掲示板.作業ネオン芯.children[0] as THREE.Mesh)
         .material as THREE.MeshBasicMaterial;
       芯材.opacity = 0.28 + ネオン強度 * 0.72;
       const 芯拡大 = 1 + ネオン強度 * 0.004;
-      目標掲示板.改善ネオン芯.scale.setScalar(芯拡大);
+      目標掲示板.作業ネオン芯.scale.setScalar(芯拡大);
     }
   }
 
@@ -2352,8 +2352,8 @@ onBeforeUnmount(() => {
   目標掲示板.group = null;
   目標掲示板.板 = null;
   目標掲示板.縁 = null;
-  目標掲示板.改善明滅 = null;
-  目標掲示板.改善ネオン芯 = null;
+  目標掲示板.作業明滅 = null;
+  目標掲示板.作業ネオン芯 = null;
   目標テクスチャ = null;
   // うさぎ穴のように自前で資源を持つ NPC を片付けてから一覧を空にする
   NPC一覧.forEach((npc) => npc.破棄?.());

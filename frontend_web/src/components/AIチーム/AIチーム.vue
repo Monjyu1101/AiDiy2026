@@ -3,9 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import apiClient from '../../api/client';
 import AiTeamMembers from './components/AIチーム_要員状況.vue';
 import AiTeamViewer from './components/AIチーム_空間表示.vue';
-import AiTeamWorkList from './components/AIチーム_作業一覧.vue';
+import AiTeamWorkList from './components/AIチーム_依頼一覧.vue';
 import AiTeamExpList from './components/AIチーム_経験一覧.vue';
-import AiTeamPdcaList from './components/AIチーム_改善一覧.vue';
+import AiTeamPdcaList from './components/AIチーム_作業一覧.vue';
 import AiTeamTalkList from './components/AIチーム_雑談一覧.vue';
 import AiTeamGoalEdit from './dialog/AIチーム_目標編集.vue';
 import {
@@ -48,7 +48,7 @@ let 要員取得中 = false;
 // チーム空間の掲示板に出す「最終更新のチーム目標」と、その保守ダイアログ
 const チーム目標 = ref<チーム目標 | null>(null);
 // 目標ループが動いているか（掲示板と同じ5秒周期で更新。ネオン点灯の切り替えに使う）
-const 改善実行中 = ref(false);
+const 作業実行中 = ref(false);
 const 目標編集表示 = ref(false);
 
 const 選択中エージェント = computed(
@@ -167,11 +167,11 @@ const チーム目標を読み込む = async () => {
     if (response.data?.status !== 'OK') return;
     const item = response.data.data?.item as チーム目標 | undefined;
     チーム目標.value = item && item.CODE_BASE_PATH ? item : null;
-    改善実行中.value = Boolean(チーム目標.value) && Boolean(response.data.data?.改善実行中);
+    作業実行中.value = Boolean(チーム目標.value) && Boolean(response.data.data?.作業実行中);
   } catch {
     // 掲示板は表示だけなので、取得できないときは未登録扱いにする
     チーム目標.value = null;
-    改善実行中.value = false;
+    作業実行中.value = false;
   }
 };
 
@@ -181,9 +181,9 @@ const 目標保存後 = (item: チーム目標) => {
   void チーム目標を読み込む();
 };
 
-// 掲示板に出ているプロジェクト。経験一覧・改善一覧はこのパスの分だけを表示する
+// 掲示板に出ているプロジェクト。経験一覧・作業一覧はこのパスの分だけを表示する
 const 掲示板プロジェクト = computed(() => String(チーム目標.value?.CODE_BASE_PATH ?? ''));
-// 改善一覧は、掲示板の目標で目標ループがオンのときだけ出す（オフなら表示しない）
+// 作業一覧は、掲示板の目標で目標ループがオンのときだけ出す（オフなら表示しない）
 const 目標ループ有効 = computed(() => Boolean(チーム目標.value?.目標ループ));
 // 雑談一覧は、掲示板の目標で自動目標設定がオンのときだけ出す（オフなら表示しない）
 const 自動目標設定有効 = computed(() => Boolean(チーム目標.value?.自動目標設定));
@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
         :要員読込中="要員読込中"
         :要員読込エラー="要員読込エラー"
         :チーム目標="チーム目標"
-        :改善実行中="改善実行中"
+        :作業実行中="作業実行中"
         @retry="要員一覧を読み込む"
         @目標クリック="目標編集表示 = true"
       />

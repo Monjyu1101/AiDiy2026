@@ -19,7 +19,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 ## 概要
 
 `backend_tools` はポート `8095` 上で 19 個の MCP サーバーを同居させる FastMCP アプリケーションです。
-ブラウザ操作、デスクトップキャプチャ、DB確認、ログ確認、コードチェック、バックアップ確認、画像/動画生成、音声認識/合成、OBS / ffmpeg 制御、通知音再生、コードエージェント実行、チャット LLM 実行、AIタスク非同期投入、AIチーム作業投入、Windows デスクトップ操作制御を AI エージェントから利用できるようにします。
+ブラウザ操作、デスクトップキャプチャ、DB確認、ログ確認、コードチェック、バックアップ確認、画像/動画生成、音声認識/合成、OBS / ffmpeg 制御、通知音再生、コードエージェント実行、チャット LLM 実行、AIタスク非同期投入、AIチーム依頼投入、Windows デスクトップ操作制御を AI エージェントから利用できるようにします。
 加えて OpenAI / Ollama 互換の標準チャットインターフェース `aidiy_chat_completions` を HTTP で提供します。
 
 ## 提供 MCP
@@ -43,7 +43,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `aidiy_code_agents` | AI コードエージェント実行（CodeAI CLI 経由） |
 | `aidiy_chat_llms` | AI チャット LLM 実行（AIチャット.py 系 ChatAI 経由 / `aidiy_code_agents` 互換 IF） |
 | `aidiy_task_agents` | backend_task API への AIタスク非同期投入。`submit`の`task_id`は通常省略し、外部IDを引き継ぐ場合だけ指定。`project_path` / `ai_name` / `ai_model` も通常省略（null）で、backend_task が更新最終レコードの値 → 規定値で補完 |
-| `aidiy_team_agents` | backend_team API への AIチーム作業投入。`submit`は`Aチーム作業`を準備開始で登録し、作業IDはbackend_teamが自動採番。`project_path` / `team_ai_*` / `task_ai_*` は通常省略（null）で、backend_team が更新最終レコードの値 → 規定値で補完 |
+| `aidiy_team_agents` | backend_team API への AIチーム依頼投入。`submit`は`Aチーム依頼`を準備開始で登録し、依頼IDはbackend_teamが自動採番。`project_path` / `team_ai_*` / `task_ai_*` は通常省略（null）で、backend_team が更新最終レコードの値 → 規定値で補完 |
 | `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
 `aidiy_chat_llms` は SSE / Streamable HTTP / stdio の 3 トランスポートに対応します。
@@ -84,7 +84,7 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://localhost:8095/
 | `tools_proc/chat_llm.py` | ChatAI ラッパー（チャット LLM 実行 / OpenAI 互換 completions） |
 | `tools_proc/tools_chat.py` | `aidiy_chat_llms` MCP 登録 + HTTP 2 系統ルート（独自 IF / OpenAI 互換 IF） |
 | `tools_proc/task_agents.py` / `tools_proc/tools_task_agents.py` | backend_task API への AIタスク投入 |
-| `tools_proc/team_agents.py` / `tools_proc/tools_team_agents.py` | backend_team API への AIチーム作業投入 |
+| `tools_proc/team_agents.py` / `tools_proc/tools_team_agents.py` | backend_team API への AIチーム依頼投入 |
 | `tools_proc/windows_control.py` / `tools_proc/tools_windows_control.py` | Windows デスクトップ操作制御（マウス/キーボード/ウィンドウ/プロセス/クリップボード/UI Automation） |
 
 ## アーキテクチャ

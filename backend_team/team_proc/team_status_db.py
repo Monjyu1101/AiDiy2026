@@ -22,7 +22,7 @@ import sqlite3
 from .team_db import DB_PATH
 
 状況テーブル = "Aチーム状況"
-状況元テーブル = ("Aチーム要員", "Aチーム作業", "Aチーム経験", "Aチーム改善")
+状況元テーブル = ("Aチーム要員", "Aチーム依頼", "Aチーム経験", "Aチーム作業")
 
 
 def 接続取得() -> sqlite3.Connection:
@@ -59,15 +59,6 @@ def _テーブル確保(conn: sqlite3.Connection) -> None:
             更新日時 TEXT NOT NULL DEFAULT ''
         )
     """)
-    既存列 = {row["name"] for row in conn.execute(f'PRAGMA table_info("{状況テーブル}")')}
-    if "まとめ中数" not in 既存列:
-        conn.execute(
-            f'ALTER TABLE "{状況テーブル}" ADD COLUMN まとめ中数 INTEGER NOT NULL DEFAULT 0'
-        )
-    if "経験最終更新日時" not in 既存列:
-        conn.execute(
-            f'ALTER TABLE "{状況テーブル}" ADD COLUMN 経験最終更新日時 TEXT NOT NULL DEFAULT \'\''
-        )
     conn.commit()
 
 

@@ -8,15 +8,15 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""Aチーム作業の入力 JSON を aidiy_task_agents へ投入するサブプロセス。
+"""Aチーム依頼の入力 JSON を aidiy_task_agents へ投入するサブプロセス。
 
-team_watcher.py が temp/input/<作業ID>.json に入力値を書き、
+team_watcher.py が temp/input/<依頼ID>.json に入力値を書き、
 このスクリプトを `python sub_init.py <入力JSONパス>` で起動する。
 
 処理の流れ:
-1. 入力 JSON（要員ID / 作業ID / 要求内容 など）を読み込む
+1. 入力 JSON（要員ID / 依頼ID / 要求内容 など）を読み込む
 2. 有効な要員一覧と、要員ごとの Aチーム経験（経験値・分類・直近の学び）を取得し、
-   要求内容に最も適した要員をAIに選ばせて temp/output/<作業ID>.json へ JSON 形式で書き出させる
+   要求内容に最も適した要員をAIに選ばせて temp/output/<依頼ID>.json へ JSON 形式で書き出させる
    （経験のある要員へ寄せることで、蓄積したナレッジが再利用される）
 3. 出力 JSON を検証する（有効な要員一覧に無ければ既定利用者ID='admin'へフォールバック）
 4. 決定した利用者IDで aidiy_task_agents へ投入する
@@ -118,9 +118,9 @@ def プロンプト生成_担当選択(
     経験概要: list[dict],
 ) -> str:
     候補ID集合 = {str(要員["要員ID"]) for 要員 in 候補}
-    return f"""次の作業依頼を確認し、実行を担当させるのに最も適した要員を、下記の有効な要員一覧から1名選んでください。
+    return f"""次の依頼を確認し、実行を担当させるのに最も適した要員を、下記の有効な要員一覧から1名選んでください。
 
-作業内容:
+依頼内容:
 {要求内容}
 
 有効な要員一覧（要員ID: 役割 / 人格情報）:
@@ -130,15 +130,15 @@ def プロンプト生成_担当選択(
 {_経験一覧テキスト(経験概要, 候補ID集合)}
 
 選び方の指針:
-- 今回の作業内容と似た経験（分類や学びの内容が近いもの）を持つ要員を優先してください。同じ担当者に寄せると蓄積した知見をそのまま使えます。
+- 今回の依頼内容と似た経験（分類や学びの内容が近いもの）を持つ要員を優先してください。同じ担当者に寄せると蓄積した知見をそのまま使えます。
 - 似た経験を持つ要員がいない場合は、役割と人格情報の適性で選んでください。
-- 経験値の高さだけで決めず、作業内容との関連を重視してください。
+- 経験値の高さだけで決めず、依頼内容との関連を重視してください。
 
 選んだ要員IDを、次のファイルへ JSON 形式で保存してください。
 保存先: {出力JSONパス}
 保存先フォルダは既に存在します。UTF-8（BOMなし）で保存してください。
 コードフェンスや説明文は付けず、次の形式だけを保存してください。キー名は完全一致させてください。
-このファイル保存以外の作業（コードの修正、他ファイルの作成など）は一切行わないでください。
+このファイル保存以外の依頼（コードの修正、他ファイルの作成など）は一切行わないでください。
 
 {{
   "利用者ID": "選んだ要員ID"
@@ -148,7 +148,7 @@ def プロンプト生成_担当選択(
 
 def 担当要員を選択(
     要求内容: str,
-    作業ID: str,
+    依頼ID: str,
     logger,
     プロジェクト: str = "",
     候補: list[dict] | None = None,
@@ -193,7 +193,7 @@ def 担当要員を選択(
 
     出力DIR = BASE_DIR / "temp" / "output"
     出力DIR.mkdir(parents=True, exist_ok=True)
-    出力JSONパス = str(出力DIR / f"{作業ID}.json").replace("\\", "/")
+    出力JSONパス = str(出力DIR / f"{依頼ID}.json").replace("\\", "/")
 
     for 試行 in range(1, 利用者選択最大試行回数 + 1):
         try:
@@ -228,7 +228,7 @@ def 担当要員を選択(
                 except OSError:
                     pass
 
-    logger.warning(f"担当要員の選択に失敗したため既定利用者ID({既定利用者ID})で投入します: {作業ID}")
+    logger.warning(f"担当要員の選択に失敗したため既定利用者ID({既定利用者ID})で投入します: {依頼ID}")
     return 既定利用者ID
 
 
@@ -241,7 +241,7 @@ def タスク投入(項目: dict, 利用者ID: str) -> dict:
             "ai_name": str(項目.get("TASK_AI_NAME", "claude_cli")),
             "ai_model": str(項目.get("TASK_AI_MODEL", "auto")),
             "user_id": 利用者ID,
-            "task_id": str(項目["作業ID"]),
+            "task_id": str(項目["依頼ID"]),
             "enabled": bool(int(項目.get("実行有効", 1) or 0)),
             "return_task_id": True,
             "request_timeout_sec": 15,
@@ -253,28 +253,28 @@ def main() -> int:
     setup_logging("sub_init")
     logger = get_logger("team_sub_init")
     要員ID = ""
-    作業ID = ""
+    依頼ID = ""
     try:
         if len(sys.argv) < 2:
-            raise ValueError("使い方: python sub_init.py <temp/input/作業ID.json>")
+            raise ValueError("使い方: python sub_init.py <temp/input/依頼ID.json>")
         入力パス = Path(sys.argv[1]).resolve()
         with 入力パス.open("r", encoding="utf-8-sig") as f:
             項目 = json.load(f)
         要員ID = str(項目.get("要員ID", "")).strip()
-        作業ID = str(項目.get("作業ID", "")).strip()
-        if not 要員ID or not 作業ID or not str(項目.get("要求内容", "")).strip():
-            raise ValueError("入力JSONに要員ID、作業ID、要求内容がありません")
+        依頼ID = str(項目.get("依頼ID", "")).strip()
+        if not 要員ID or not 依頼ID or not str(項目.get("要求内容", "")).strip():
+            raise ValueError("入力JSONに要員ID、依頼ID、要求内容がありません")
 
         担当利用者ID = 担当要員を選択(
             str(項目["要求内容"]),
-            作業ID,
+            依頼ID,
             logger,
             str(項目.get("プロジェクト", "")).strip(),
             team_ai_name=str(項目.get("TEAM_AI_NAME", TEAM_AI_NAME既定)),
             team_ai_model=str(項目.get("TEAM_AI_MODEL", TEAM_AI_MODEL既定)),
         )
         logger.info(
-            f"aidiy_task_agentsへ投入します: {作業ID} (要員ID={要員ID} -> 利用者ID={担当利用者ID})"
+            f"aidiy_task_agentsへ投入します: {依頼ID} (要員ID={要員ID} -> 利用者ID={担当利用者ID})"
         )
         結果 = タスク投入(項目, 担当利用者ID)
         if 結果.get("status") != "OK":
@@ -282,16 +282,16 @@ def main() -> int:
         タスクID = str(結果.get("タスクID") or 結果.get("task_id") or "").strip()
         if not タスクID:
             raise RuntimeError("aidiy_task_agentsの応答にタスクIDがありません")
-        team_work_db.投入成功記録(作業ID, タスクID)
-        logger.info(f"AIタスクを投入しました: {作業ID} -> {タスクID}")
+        team_work_db.投入成功記録(依頼ID, タスクID)
+        logger.info(f"AIタスクを投入しました: {依頼ID} -> {タスクID}")
         return 0
     except Exception as exc:
-        logger.exception(f"チーム作業のAIタスク投入に失敗しました: {作業ID}")
-        if 作業ID:
+        logger.exception(f"チーム依頼のAIタスク投入に失敗しました: {依頼ID}")
+        if 依頼ID:
             try:
-                team_work_db.投入失敗記録(作業ID, str(exc))
+                team_work_db.投入失敗記録(依頼ID, str(exc))
             except Exception:
-                logger.exception("Aチーム作業への失敗記録にも失敗しました")
+                logger.exception("Aチーム依頼への失敗記録にも失敗しました")
         return 1
 
 

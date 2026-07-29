@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 class TeamAgentsRequest(BaseModel):
     prompt: str = ""
     # project_path / team_ai_* / task_ai_* は未指定（null）可。
-    # backend_team が AIチーム_作業編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
+    # backend_team が AIチーム_依頼編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
     project_path: Optional[str] = None
     member_id: str = "admin"
     team_ai_name: Optional[str] = None
@@ -34,7 +34,7 @@ class TeamAgentsRequest(BaseModel):
     task_ai_model: Optional[str] = None
     work_id: str = ""
     要員ID: str = ""
-    作業ID: str = ""
+    依頼ID: str = ""
     include_disabled: bool = False
     enabled: bool = True
     return_work_id: bool = True
@@ -64,10 +64,10 @@ def register_tools(mcp_te, team_agents):
         request_timeout_sec: int = 15,
     ) -> str:
         """
-        backend_team の Aチーム作業へ非同期作業を投入する。
+        backend_team の Aチーム依頼へ非同期依頼を投入する。
         登録だけを行い、AIタスク要求への投入や実行完了は待たない
         （登録後は backend_team の起動監視ループが AIタスク要求へ投入する）。
-        作業IDは backend_team が TW+8桁で自動採番する。
+        依頼IDは backend_team が TR+8桁で自動採番する。
         project_path / team_ai_name / team_ai_model / task_ai_name / task_ai_model は通常指定不要。
         未指定なら AIチーム画面の新規時と同じ条件
         （要員IDの更新最終レコードの値、無ければ規定値）で補完される。
@@ -93,7 +93,7 @@ def register_tools(mcp_te, team_agents):
         work_id: str,
         request_timeout_sec: int = 15,
     ) -> str:
-        """要員IDと作業IDで Aチーム作業 1 件の状態を取得する。"""
+        """要員IDと依頼IDで Aチーム依頼 1 件の状態を取得する。"""
         result = await asyncio.to_thread(
             team_agents.get_work_status,
             member_id,
@@ -107,7 +107,7 @@ def register_tools(mcp_te, team_agents):
         member_id: str,
         request_timeout_sec: int = 15,
     ) -> str:
-        """要員IDで Aチーム作業一覧の状態を取得する。"""
+        """要員IDで Aチーム依頼一覧の状態を取得する。"""
         result = await asyncio.to_thread(
             team_agents.get_work_list,
             member_id,
@@ -137,7 +137,7 @@ def create_router(team_agents) -> APIRouter:
     async def http_team_agents_docs() -> dict:
         return {
             "service": "aidiy_team_agents",
-            "description": "backend_team API に疎結合で接続し、Aチーム作業を非同期投入する。登録後のAIタスク投入・実行完了は待たない。",
+            "description": "backend_team API に疎結合で接続し、Aチーム依頼を非同期投入する。登録後のAIタスク投入・実行完了は待たない。",
             "endpoint": "POST /aidiy_team_agents/{method_name}",
             "content_type": "application/json",
             "methods": {
@@ -147,10 +147,10 @@ def create_router(team_agents) -> APIRouter:
                     "example_request": {},
                 },
                 "submit": {
-                    "summary": "チーム作業投入",
-                    "description": "指定promptをbackend_teamの/team/作業/登録へ渡し、Aチーム作業を準備開始として登録する。作業IDはbackend_teamがTW+8桁で自動採番する。project_path / team_ai_* / task_ai_* は通常指定不要で、省略（null）時は AIチーム_作業編集の新規時と同じ条件（要員IDの更新最終レコードの値、無ければ規定値）で補完する。8094未起動時はstatus=NGで理由を返す。",
+                    "summary": "チーム依頼投入",
+                    "description": "指定promptをbackend_teamの/team/依頼/登録へ渡し、Aチーム依頼を準備開始として登録する。依頼IDはbackend_teamがTR+8桁で自動採番する。project_path / team_ai_* / task_ai_* は通常指定不要で、省略（null）時は AIチーム_依頼編集の新規時と同じ条件（要員IDの更新最終レコードの値、無ければ規定値）で補完する。8094未起動時はstatus=NGで理由を返す。",
                     "parameters": {
-                        "prompt": {"type": "string", "required": True, "description": "作業化したい依頼内容"},
+                        "prompt": {"type": "string", "required": True, "description": "依頼化したい依頼内容"},
                         "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_team の プロジェクト に対応。null なら更新最終レコードの値、無ければ規定値（CODE_BASE_PATH）。空文字は明示的な空欄指定"},
                         "member_id": {"type": "string", "required": False, "default": "admin", "description": "要員ID。Aチーム要員の要員ID（get_member_list で確認できる）"},
                         "team_ai_name": {"type": "string", "required": False, "default": None, "description": "TEAM_AI_NAME。null なら更新最終レコードの値、無ければ規定値"},
@@ -162,35 +162,35 @@ def create_router(team_agents) -> APIRouter:
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15, "description": "登録 API 呼び出しのタイムアウト秒"},
                     },
                     "example_request": {
-                        "prompt": "frontend_web の AIチーム画面に作業件数の表示を追加してください",
+                        "prompt": "frontend_web の AIチーム画面に依頼件数の表示を追加してください",
                     },
                     "response_fields": {
                         "status": "OK / NG",
                         "message": "投入結果の短いメッセージ",
                         "要員ID": "登録時に使った要員ID",
-                        "作業ID": "登録された Aチーム作業の作業ID",
+                        "依頼ID": "登録された Aチーム依頼の依頼ID",
                         "プロジェクト": "登録に使われたプロジェクト（未指定時は補完後の値）",
                         "TEAM_AI_NAME": "登録に使われた TEAM_AI_NAME（未指定時は補完後の値）",
                         "TEAM_AI_MODEL": "登録に使われた TEAM_AI_MODEL（未指定時は補完後の値）",
                         "TASK_AI_NAME": "登録に使われた TASK_AI_NAME（未指定時は補完後の値）",
                         "TASK_AI_MODEL": "登録に使われた TASK_AI_MODEL（未指定時は補完後の値）",
                         "状態": "登録直後の状態（準備開始）",
-                        "work_id": "登録された Aチーム作業の作業ID。return_work_id=true のときだけ返す互換フィールド",
+                        "work_id": "登録された Aチーム依頼の依頼ID。return_work_id=true のときだけ返す互換フィールド",
                     },
                 },
                 "get_work_status": {
-                    "summary": "チーム作業状態取得",
-                    "description": "要員IDと作業IDで /team/作業/取得 を呼び出し、画面表示で使う作業 1 件の item を返す。",
+                    "summary": "チーム依頼状態取得",
+                    "description": "要員IDと依頼IDで /team/依頼/取得 を呼び出し、画面表示で使う依頼 1 件の item を返す。",
                     "parameters": {
                         "member_id": {"type": "string", "required": True, "description": "要員ID"},
-                        "work_id": {"type": "string", "required": True, "description": "作業ID"},
+                        "work_id": {"type": "string", "required": True, "description": "依頼ID"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15},
                     },
-                    "example_request": {"member_id": "admin", "work_id": "TW00001001"},
+                    "example_request": {"member_id": "admin", "work_id": "TR00001001"},
                 },
                 "get_work_list": {
-                    "summary": "チーム作業一覧取得",
-                    "description": "要員IDで /team/作業/一覧 を呼び出し、画面表示で使う作業一覧相当の items と total を返す。",
+                    "summary": "チーム依頼一覧取得",
+                    "description": "要員IDで /team/依頼/一覧 を呼び出し、画面表示で使う依頼一覧相当の items と total を返す。",
                     "parameters": {
                         "member_id": {"type": "string", "required": True, "description": "要員ID"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15},
@@ -207,13 +207,13 @@ def create_router(team_agents) -> APIRouter:
                     "example_request": {},
                 },
                 "run": {
-                    "summary": "チーム作業投入（submit の別名）",
+                    "summary": "チーム依頼投入（submit の別名）",
                     "description": "aidiy_code_agents / aidiy_task_agents 互換の呼び出し名として用意した submit の別名。実行完了は待たない。",
                 },
             },
         }
 
-    @router.post("/aidiy_team_agents/{method_name}", summary="チーム作業投入")
+    @router.post("/aidiy_team_agents/{method_name}", summary="チーム依頼投入")
     async def http_team_agents(method_name: str, req: TeamAgentsRequest = TeamAgentsRequest()) -> dict:
         try:
             if method_name == "config":
@@ -235,7 +235,7 @@ def create_router(team_agents) -> APIRouter:
                 )
             if method_name == "get_work_status":
                 member_id = req.要員ID or req.member_id
-                work_id = req.作業ID or req.work_id
+                work_id = req.依頼ID or req.work_id
                 return await asyncio.to_thread(
                     team_agents.get_work_status,
                     member_id,
