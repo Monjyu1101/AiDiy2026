@@ -125,14 +125,33 @@ class TeamTalkDbTest(unittest.TestCase):
             "会話状況を分かりやすくする",
             [{"要員ID": "member-2", "発言内容": "表示内容を整理したいです。"}],
             "APIの一覧順を確認したいです。",
+            "D:/work/project-a",
         )
 
         self.assertIn("何を対象に", prompt)
         self.assertIn("どのような行動を取り", prompt)
         self.assertIn("何を確認するか", prompt)
         self.assertIn("具体的な対象を少なくとも1つ", prompt)
-        self.assertIn("確認できない固有名詞や数値は作らない", prompt)
+        self.assertIn("自分で確認していない固有名詞や数値は書かない", prompt)
         self.assertIn("APIの一覧順を確認したいです。（自身の1回前の発言）", prompt)
+
+    def test_発言依頼は発言前にソースを調べさせる(self) -> None:
+        """推測ではなく実物を読ませるための手順が入っていること。"""
+        prompt = sub_self_talk.依頼内容を作る(
+            "会話状況を分かりやすくする",
+            [],
+            "",
+            "D:/work/project-a",
+        )
+
+        self.assertIn("対象プロジェクト（作業ディレクトリ）: D:/work/project-a", prompt)
+        self.assertIn("`_AIDIY.md`", prompt)
+        self.assertIn("`AGENTS.md`", prompt)
+        self.assertIn("`.aidiy/knowledge/_index.md`", prompt)
+        self.assertIn("実物を読み、現状を把握する", prompt)
+        self.assertIn("実際に確認したファイルパス", prompt)
+        self.assertIn("http://localhost:8095/", prompt)
+        self.assertIn("ファイルの作成・変更・削除、git操作、サーバー操作は行わないでください", prompt)
 
     def test_旧履歴を複合主キーの最終発言へ移行して上書きする(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -260,7 +279,72 @@ class TeamTalkDbTest(unittest.TestCase):
         self.assertEqual(payload["project_path"], "D:/work/project-a")
         self.assertEqual(payload["ai_name"], "codex_cli")
         self.assertEqual(payload["ai_model"], "gpt-test")
+        self.assertEqual(payload["code_permissions"], "none")
+        self.assertEqual(payload["timeout_sec"], team_chat.CODE_AGENT_TIMEOUT秒)
         self.assertEqual(result["応答内容"], "発言")
+
+    def test_会話実行の調査モードはツール利用を許可して延長する(self) -> None:
+        """ソースを読ませるため、権限指定を外しタイムアウトを延ばすこと。
+
+        code_permissions="none" のままだと CLI に bypassPermissions が渡らず、
+        非対話実行ではツールが拒否されてソースを一切読めない。
+        """
+        response = {"status": "OK", "result": "発言"}
+        with (
+            patch.object(team_chat, "_ペルソナ指示", return_value="persona") as persona,
+            patch.object(team_chat, "_POST送信", return_value=response) as post,
+        ):
+            team_chat.会話実行(
+                "member-1",
+                "D:/work/project-a",
+                "codex_cli",
+                "gpt-test",
+                "今やるべきことは？",
+                調査モード=True,
+            )
+
+        payload = post.call_args.args[0]
+        self.assertEqual(payload["code_permissions"], "auto")
+        self.assertEqual(payload["timeout_sec"], team_chat.調査CODE_AGENT_TIMEOUT秒)
+        self.assertEqual(post.call_args.args[1], team_chat.調査HTTP_TIMEOUT秒)
+        self.assertEqual(persona.call_args.args, ("member-1", True))
+
+    def test_ペルソナ指示は調査モードで読み取り調査を許可する(self) -> None:
+        要員 = {"要員名": "テスト要員", "役割": "調査担当", "人格情報": "慎重", "有効": True}
+        with (
+            patch.object(team_chat.team_db, "要員取得", return_value=要員),
+            patch.object(team_chat.persona_catalog, "召喚要員取得", return_value={}),
+        ):
+            通常 = team_chat._ペルソナ指示("member-1")
+            調査 = team_chat._ペルソナ指示("member-1", True)
+
+        self.assertIn("会話応答専用", 通常)
+        self.assertNotIn("会話応答専用", 調査)
+        self.assertIn("読み取りツールで必ず確認", 調査)
+        self.assertIn("変更・削除", 調査)
+        # 何から読み始めるかを示さないと、AIが的外れな場所を探して精度が落ちる
+        self.assertIn("`_AIDIY.md`", 調査)
+        self.assertIn("`AGENTS.md`", 調査)
+        self.assertIn("`.aidiy/knowledge/_index.md`", 調査)
+        self.assertIn("http://localhost:8095/", 調査)
+
+    def test_エージェント会話APIは調査モードで依頼する(self) -> None:
+        """利用者画面の会話も、ソースを読んだうえで答えさせること。"""
+        with patch.object(team_chat, "会話実行", return_value={"応答内容": "回答"}) as chat:
+            response = asyncio.run(
+                team_api.エージェント会話(
+                    team_api.エージェント会話要求(
+                        要員ID="member-1",
+                        プロジェクト="D:/work/project-a",
+                        TASK_AI_NAME="codex_cli",
+                        TASK_AI_MODEL="gpt-test",
+                        要求内容="今の実装はどうなっていますか",
+                    )
+                )
+            )
+
+        self.assertEqual(response["status"], "OK")
+        self.assertTrue(chat.call_args.kwargs.get("調査モード"))
 
     def test_sub_self_talkはAI起動前に要求内容を更新する(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -287,8 +371,9 @@ class TeamTalkDbTest(unittest.TestCase):
                 self.assertIn("チーム目標: 会話状況を改善する", 要求内容)
                 呼出順.append("要求内容更新")
 
-            def 会話実行(*args) -> dict:
+            def 会話実行(*args, **kwargs) -> dict:
                 呼出順.append("AI起動")
+                self.assertTrue(kwargs.get("調査モード"))
                 return {"応答内容": "具体的な発言"}
 
             def 発言更新(*args) -> None:

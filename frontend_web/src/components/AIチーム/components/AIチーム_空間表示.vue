@@ -960,7 +960,8 @@ const 目標テクスチャへ描く = (canvas: HTMLCanvasElement) => {
   if (!context) return;
   const 目標 = props.チーム目標;
   const 目標文 = String(目標?.チーム目標 ?? '').trim() || 'チーム目標が未登録です';
-  const 作業文 = String(目標?.チーム作業 ?? '').trim() || 'チーム作業が未登録です';
+  // チーム作業が空欄なのは未設定ではなく、雑談エリアで作業案を協議している最中の状態
+  const 作業文 = String(目標?.チーム作業 ?? '').trim() || '（AIチームで作業案を相談中）';
   const パス = String(目標?.CODE_BASE_PATH ?? '').trim();
   const 更新 = String(目標?.更新日時 ?? '').trim();
 

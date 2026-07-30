@@ -290,6 +290,10 @@ let idolStatue = null;      // 門の奥の黄金像。IDOL 完成で起立さ�
 let idolStatueBaseY = 0;    // 起立前の局所 y。演出はここからの相対で動かす
 let idolStatueLight = null;
 const boulderPool = [];   // 岩球メッシュ。マルチボールを見込んで 3 個まで持つ
+let cairnGroup = null;    // 直前の落球地点に積む「記憶のケルン」
+let cairnStoneMat = null;
+let cairnMemoryMat = null;
+let cairnLight = null;
 let ready = false;
 
 const buildRenderer = () => {
@@ -940,6 +944,8 @@ const ui = {
   torrentTrack: el('.torrent-track'), torrentBar: el('#torrent-bar'), torrentValue: el('#torrent-value'),
   explorationPanel: el('#exploration-status'), explorationCount: el('#exploration-count'), explorationStage: el('#exploration-stage'),
   explorationGoal: el('#exploration-goal'), explorationCondition: el('#exploration-condition'), explorationReward: el('#exploration-reward'),
+  cairnPanel: el('#cairn-status'), cairnStage: el('#cairn-stage'), cairnMessage: el('#cairn-message'),
+  cairnSteps: [el('#cairn-step-record'), el('#cairn-step-wait'), el('#cairn-step-rescue')],
 };
 
 let mode = 'title';   // title / play / paused / over
@@ -959,6 +965,111 @@ let announceTimer = 0;
 let demoRestartAt = 0;
 let autoDemoTimer = 0;
 
+// 直前に失われた岩球の盤面座標を、次の遠征へ渡す「記憶のケルン」の原点として残す。
+// ラウンド境界で次球へ有効化し、物理更新で一度だけ消費する。
+let boulderSerial = 0;
+const CAIRN_RESCUE_RADIUS = BALL_R * 1.8;
+const CAIRN_RETURN_LIFT = 720;
+const cairnState = {
+  x: null,
+  y: null,
+  vx: null,
+  vy: null,
+  rescueVx: null,
+  rescueVy: null,
+  rescueFallback: false,
+  sourceBallId: null,
+  sourceEcho: false,
+  recordedAt: -1,
+  records: 0,
+  waiting: false,       // 落球地点を記録済みで、次の通常球が生まれるのを待っている
+  active: false,        // targetBallId の通常球だけを一度救済できる
+  targetBallId: null,
+  activatedAt: -1,
+  used: false,
+  usedAt: -1,
+  uses: 0,
+};
+
+// HUD 専用の進行フラグは持たず、記録値と waiting / active / used の組み合わせを
+// そのまま三段階へ写像する。これにより物理と表示の状態遷移が分岐しない。
+const syncCairnHud = () => {
+  const recorded = (
+    Number.isFinite(cairnState.x) && Number.isFinite(cairnState.y)
+    && Number.isFinite(cairnState.vx) && Number.isFinite(cairnState.vy)
+  );
+  let view;
+
+  if (cairnState.used) {
+    view = {
+      state: 'rescued', stage: 2, current: -1, completed: 3, label: '救出済み',
+      message: '記憶した落球軌道の逆軌道を一度だけ使用し、岩球を救出しました',
+    };
+  } else if (cairnState.active) {
+    view = {
+      state: 'available', stage: 2, current: 2, completed: 2, label: '救出可能',
+      message: '記憶した落球軌道の逆軌道で、この通常球を一度だけ救出できます',
+    };
+  } else if (cairnState.waiting) {
+    view = {
+      state: 'waiting', stage: 1, current: 1, completed: 1, label: '次球待機',
+      message: '落球軌道を記憶しました。次の通常球を待っています',
+    };
+  } else if (recorded) {
+    view = {
+      state: 'recorded', stage: 1, current: 1, completed: 1, label: '記録済み',
+      message: '落球軌道を記憶しました',
+    };
+  } else {
+    view = {
+      state: 'unrecorded', stage: 0, current: 0, completed: 0, label: '記録待ち',
+      message: '落球の軌道を待っています',
+    };
+  }
+
+  ui.cairnPanel.classList.remove('stage-0', 'stage-1', 'stage-2');
+  ui.cairnPanel.classList.add(`stage-${view.stage}`);
+  ui.cairnPanel.classList.toggle('complete', view.completed === ui.cairnSteps.length);
+  ui.cairnPanel.dataset.state = view.state;
+  ui.cairnPanel.setAttribute('aria-label', `記憶のケルン: ${view.label}`);
+  ui.cairnStage.textContent = view.label;
+  ui.cairnMessage.textContent = view.message;
+
+  const stepNames = ['記録', '待機', '救出'];
+  ui.cairnSteps.forEach((step, index) => {
+    const current = index === view.current;
+    const done = index < view.completed;
+    step.classList.toggle('current', current);
+    step.classList.toggle('done', done);
+    step.setAttribute('aria-label', `${stepNames[index]}（${done ? '完了' : current ? '現在' : '未到達'}）`);
+    if (current) step.setAttribute('aria-current', 'step');
+    else step.removeAttribute('aria-current');
+  });
+};
+
+const resetCairn = () => {
+  boulderSerial = 0;
+  cairnState.x = null;
+  cairnState.y = null;
+  cairnState.vx = null;
+  cairnState.vy = null;
+  cairnState.rescueVx = null;
+  cairnState.rescueVy = null;
+  cairnState.rescueFallback = false;
+  cairnState.sourceBallId = null;
+  cairnState.sourceEcho = false;
+  cairnState.recordedAt = -1;
+  cairnState.records = 0;
+  cairnState.waiting = false;
+  cairnState.active = false;
+  cairnState.targetBallId = null;
+  cairnState.activatedAt = -1;
+  cairnState.used = false;
+  cairnState.usedAt = -1;
+  cairnState.uses = 0;
+  syncCairnHud();
+};
+
 // 自動確認用の読み取り記録。ゲーム進行には使わず、実際に通った通常経路の
 // 結果だけを残す。検証 API からゲーム状態を書き換える近道はここへ作らない。
 const verificationState = {
@@ -967,6 +1078,7 @@ const verificationState = {
   bridgeRescues: 0,
   floodStarts: 0,
   explorationRewards: 0,
+  explorationRewardRounds: [],
   events: [],
 };
 
@@ -976,6 +1088,7 @@ const resetVerification = () => {
   verificationState.bridgeRescues = 0;
   verificationState.floodStarts = 0;
   verificationState.explorationRewards = 0;
+  verificationState.explorationRewardRounds.length = 0;
   verificationState.events.length = 0;
 };
 
@@ -1020,7 +1133,7 @@ const updateHud = () => {
 // 遠征踏破のような固定報酬だけは applyMultiplier=false で、表示どおりの点数を加える。
 const addScore = (points, applyMultiplier = true) => {
   score += Math.round(points * (applyMultiplier ? scoreMultiplier() : 1));
-  if (score > highScore) {
+  if (!demoMode && score > highScore) {
     highScore = score;
     try { localStorage.setItem('x-pinball-opus-high', String(highScore)); } catch (_) { /* 保存できなくても進行は妨げない */ }
   }
@@ -1529,12 +1642,10 @@ const updateBridgeHit = (ball) => {
     tone(330, 0.22, 'triangle', 0.036, 2.6);
     noise(0.16, 0.022, 900);
     shakeView(0.8);
-    // 探索の救出試練は最初の成功だけを達成事実にする。以後の救出は得点と
-    // 濁流連鎖へ寄与するが、段階表示や達成報酬を重複させない。
-    if (!bridgeState.expeditionSaved) {
-      bridgeState.expeditionSaved = true;
-      syncExplorationProgress();
-    }
+    // ゲーム全体の初回救出ラッチは従来どおり残しつつ、探索は周回開始時の
+    // saves を基準にするため、救出のたびに現在周回の進行を同期する。
+    bridgeState.expeditionSaved = true;
+    syncExplorationProgress();
     syncBridgeHud();
     syncTorrentHud();
     return;
@@ -1609,23 +1720,32 @@ const torrentState = {
 /* ============================================================
    峡谷探索の段階
 
-   目標の達成事実は IDOL / ROPE BRIDGE / TORRENT の各状態だけに置く。
-   ここはその事実を「どこまで踏査が進んだか」へ写す状態である。IDOL、橋、
-   鉄砲水の個別報酬は各ギミックへ残し、三試練をすべて越えたときだけ固定の
-   遠征達成報酬を発行する。rewarded を同一ゲーム中のラッチにすることで、
-   複数の岩球が同時に当たっても二重加点しない。
+   目標の達成事実は IDOL / ROPE BRIDGE / TORRENT の各累積状態だけに置く。
+   周回開始時の値を基準として保持し、そこから増えた達成だけを「どこまで踏査が
+   進んだか」へ写す。IDOL、橋、鉄砲水の個別報酬は各ギミックへ残し、三試練を
+   すべて越えたときだけ固定の遠征達成報酬を発行する。
    ============================================================ */
 
 const EXPEDITION_COMPLETE_SCORE = 30000;
 const explorationState = {
+  round: 1,          // 現在の探索周回。ゲーム開始時を 1 とし、踏査完了後の次球で進める
   stage: 0,          // 到達済みの最大段階（0〜3）。進行表示は次の段でこの値を読む
   advancedAt: -1,    // 最後に段階が進んだゲーム内時刻。状態確認と演出の重複防止用
-  rewarded: false,   // 三試練達成報酬をこのゲームですでに発行したか
+  baselines: {       // この周回より前の累積達成。各値を超えた分だけを新規達成とする
+    idolCycles: 0,
+    bridgeSaves: 0,
+    floodStarts: 0,
+  },
+  rewardedRounds: new Set(), // 達成報酬を発行済みの周回。ゲーム中は消さず二重加点を防ぐ
   rewardPoints: 0,   // 実際に加算した固定報酬。HUD と得点計算の同期確認に使う
   rewardedAt: -1,
 };
 
 let explorationAdvanceTimer = 0;
+
+const isExplorationRoundRewarded = (round = explorationState.round) => (
+  explorationState.rewardedRounds.has(round)
+);
 
 const explorationHudContent = () => {
   if (explorationState.stage === 0) {
@@ -1638,7 +1758,7 @@ const explorationHudContent = () => {
   if (explorationState.stage === 1) {
     return {
       stage: '第二踏査', goal: '蔓の救出',
-      condition: `落下表示で両フリップ　救出 ${bridgeState.expeditionSaved ? '1 / 1' : '0 / 1'}　ROPE ${bridgeState.uses} / ${BRIDGE_USES}`,
+      condition: `落下表示で両フリップ　救出 ${bridgeState.saves > explorationState.baselines.bridgeSaves ? '1 / 1' : '0 / 1'}　ROPE ${bridgeState.uses} / ${BRIDGE_USES}`,
       reward: '報酬　2,500 × 実効倍率 ・ 増水 +10（鉄砲水中は延長救出）',
     };
   }
@@ -1652,7 +1772,7 @@ const explorationHudContent = () => {
   return {
     stage: '峡谷踏査完了', goal: '遺跡・蔓・鉄砲水を制覇',
     condition: '三つの試練を越えた。次の遠征でも谷は応える',
-    reward: explorationState.rewarded
+    reward: isExplorationRoundRewarded()
       ? `達成報酬　${explorationState.rewardPoints.toLocaleString()}点（固定）`
       : `達成報酬　${EXPEDITION_COMPLETE_SCORE.toLocaleString()}点（固定）`,
   };
@@ -1669,7 +1789,7 @@ const syncExplorationHud = (advanced = false) => {
   ui.explorationPanel.classList.remove('stage-0', 'stage-1', 'stage-2', 'stage-3', 'complete');
   ui.explorationPanel.classList.add(`stage-${explorationState.stage}`);
   ui.explorationPanel.classList.toggle('complete', explorationState.stage === 3);
-  ui.explorationPanel.classList.toggle('rewarded', explorationState.rewarded);
+  ui.explorationPanel.classList.toggle('rewarded', isExplorationRoundRewarded());
   ui.explorationPanel.querySelectorAll('.exploration-steps i').forEach((step, index) => {
     step.classList.toggle('done', index < explorationState.stage);
   });
@@ -1681,22 +1801,24 @@ const syncExplorationHud = (advanced = false) => {
   explorationAdvanceTimer = setTimeout(() => ui.explorationPanel.classList.remove('advanced'), 900);
 };
 
-// 判定順は必ず IDOL → ROPE BRIDGE → TORRENT。後段を先に達成していても、
-// 前段を越えるまでは踏査を進めず、三つの達成事実がそろったときだけ完了にする。
+// 判定順は必ず IDOL → ROPE BRIDGE → TORRENT。累積値そのものではなく、
+// 周回開始時の基準を超えた新しい達成だけで次の踏査へ進める。
 const explorationStageFromSources = () => {
-  if (idolState.cycles < 1) return 0;
-  if (!bridgeState.expeditionSaved) return 1;
-  if (torrentState.floods < 1) return 2;
+  if (idolState.cycles <= explorationState.baselines.idolCycles) return 0;
+  if (bridgeState.saves <= explorationState.baselines.bridgeSaves) return 1;
+  if (torrentState.floods <= explorationState.baselines.floodStarts) return 2;
   return 3;
 };
 
 const awardExplorationCompletion = () => {
-  if (explorationState.stage !== 3 || explorationState.rewarded) return false;
-  explorationState.rewarded = true;
+  const round = explorationState.round;
+  if (explorationState.stage !== 3 || isExplorationRoundRewarded(round)) return false;
+  explorationState.rewardedRounds.add(round);
   explorationState.rewardPoints = EXPEDITION_COMPLETE_SCORE;
   explorationState.rewardedAt = gameTime;
   verificationState.explorationRewards += 1;
-  recordVerification('exploration-reward', { points: EXPEDITION_COMPLETE_SCORE });
+  verificationState.explorationRewardRounds.push(round);
+  recordVerification('exploration-reward', { round, points: EXPEDITION_COMPLETE_SCORE });
   addScore(explorationState.rewardPoints, false);
   announce(`CANYON EXPEDITION +${explorationState.rewardPoints.toLocaleString()}`);
   tone(392, 0.42, 'triangle', 0.055, 3.2);
@@ -1707,29 +1829,36 @@ const awardExplorationCompletion = () => {
 };
 
 const syncExplorationProgress = () => {
-  const stage = explorationStageFromSources();
-  const advanced = stage > explorationState.stage;
+  const nextStage = explorationStageFromSources();
+  const advanced = nextStage > explorationState.stage;
   if (advanced) {
-    explorationState.stage = stage;
+    explorationState.stage = nextStage;
     explorationState.advancedAt = gameTime;
   }
-  const rewarded = awardExplorationCompletion();
+  const rewarded = advanced && nextStage === 3 && awardExplorationCompletion();
   if (advanced || rewarded) syncExplorationHud(true);
   return advanced || rewarded;
 };
 
-// 球の入れ替えでは探索を戻さない。新規ゲーム開始時だけ、既存ギミックの full reset と
-// 同じ境界で初期化する。
-const resetExploration = () => {
+const beginExplorationRound = (round) => {
+  explorationState.round = round;
   explorationState.stage = 0;
   explorationState.advancedAt = -1;
-  explorationState.rewarded = false;
   explorationState.rewardPoints = 0;
   explorationState.rewardedAt = -1;
+  explorationState.baselines.idolCycles = idolState.cycles;
+  explorationState.baselines.bridgeSaves = bridgeState.saves;
+  explorationState.baselines.floodStarts = torrentState.floods;
   clearTimeout(explorationAdvanceTimer);
   explorationAdvanceTimer = 0;
   if (ui.explorationPanel) ui.explorationPanel.classList.remove('advanced');
   syncExplorationHud();
+};
+
+// 新規ゲーム開始時は報酬状態を含む探索全体を初期化する。
+const resetExploration = () => {
+  explorationState.rewardedRounds.clear();
+  beginExplorationRound(1);
 };
 
 let torrentFlow = null;         // 3D の水流メッシュ
@@ -2007,6 +2136,124 @@ const updateFlipperHit = (ball, flipper) => {
   if (surface > 200) tone(150 + Math.random() * 90, 0.1, 'square', 0.028, 1.7);
 };
 
+const recordCairnOrigin = (ball) => {
+  if (ball.echo) return;
+
+  // 落球演出が位置や速度を変える前の進行方向を記憶する。不正な物理値が
+  // 次球へ伝播しないよう、公開・救出に使う値は必ず有限値へ正規化する。
+  cairnState.vx = Number.isFinite(ball.vx) ? ball.vx : 0;
+  cairnState.vy = Number.isFinite(ball.vy) ? ball.vy : 0;
+  // 安全弁へ抜けた球は盤外、下端へ落ちた球は排出口より先にいるため、次球を
+  // 盤内へ戻せるよう球の半径を含めて有効範囲へ補正する。
+  cairnState.x = clamp(ball.x, ball.r, BOARD_W - ball.r);
+  cairnState.y = clamp(ball.y, ball.r, DRAIN_Y - ball.r);
+  cairnState.sourceBallId = ball.id;
+  cairnState.sourceEcho = ball.echo;
+  cairnState.recordedAt = gameTime;
+  cairnState.records += 1;
+  // 多球中は次ラウンドを始めない。最後の球が消えて resetRound() が通常球を
+  // 生成するまで待機し、既存球や後から生まれる ECHO 球には引き継がない。
+  cairnState.waiting = true;
+  cairnState.active = false;
+  cairnState.targetBallId = null;
+  cairnState.activatedAt = -1;
+  cairnState.used = false;
+  cairnState.usedAt = -1;
+  cairnState.rescueVx = null;
+  cairnState.rescueVy = null;
+  cairnState.rescueFallback = false;
+  syncCairnHud();
+  recordVerification('cairn-origin-recorded', {
+    ballId: ball.id,
+    echo: ball.echo,
+    x: Number(cairnState.x.toFixed(3)),
+    y: Number(cairnState.y.toFixed(3)),
+    vx: Number(cairnState.vx.toFixed(3)),
+    vy: Number(cairnState.vy.toFixed(3)),
+  });
+};
+
+const cairnRescueVelocity = () => {
+  const sourceVx = Number.isFinite(cairnState.vx) ? cairnState.vx : 0;
+  const sourceVy = Number.isFinite(cairnState.vy) ? cairnState.vy : 0;
+  const sourceSpeed = Math.hypot(sourceVx, sourceVy);
+
+  // ほぼ静止した記録は反転しても谷から離れられない。盤の中央へ寄せながら
+  // 奥へ押し戻す既存の投入速度・救出揚力を使い、安全な帰還軌道へ置き換える。
+  if (sourceSpeed < LAUNCH_MIN_SPEED) {
+    return {
+      vx: cairnState.x <= BOARD_W / 2 ? LAUNCH_MIN_SPEED : -LAUNCH_MIN_SPEED,
+      vy: -CAIRN_RETURN_LIFT,
+      fallback: true,
+    };
+  }
+
+  // 落球直前の進行方向をそのまま反転する。異常に大きい記録は通常物理と同じ
+  // MAX_SPEED へベクトル比を保ったまま収め、次の積分へ過大な速度を渡さない。
+  const scale = Math.min(1, MAX_SPEED / sourceSpeed);
+  return {
+    vx: -sourceVx * scale,
+    vy: -sourceVy * scale,
+    fallback: false,
+  };
+};
+
+const rescueByCairn = (ball) => {
+  if (
+    !ball.cairnTarget || ball.echo || !ball.entered || ball.launchGuide
+    || !cairnState.active || cairnState.used
+    || cairnState.targetBallId !== ball.id
+    || cairnState.x == null || cairnState.y == null
+    || ball.vy <= 0
+  ) return false;
+
+  const dx = ball.x - cairnState.x;
+  const dy = ball.y - cairnState.y;
+  if (dx * dx + dy * dy > (CAIRN_RESCUE_RADIUS + ball.r) ** 2) return false;
+
+  // 位置や速度を変える前に消費を確定する。以後のサブステップや衝突処理が
+  // 同じ接近を拾っても、同じケルンが二度発動する余地を残さない。
+  cairnState.active = false;
+  cairnState.used = true;
+  cairnState.usedAt = gameTime;
+  cairnState.uses += 1;
+  ball.cairnTarget = false;
+
+  // 岩球をケルンの盤面側へ置き直し、横滑りを弱めて確実に谷から押し戻す。
+  ball.x = clamp(cairnState.x, ball.r, BOARD_W - ball.r);
+  ball.y = clamp(
+    cairnState.y - CAIRN_RESCUE_RADIUS - ball.r - COLLISION_SLOP,
+    ball.r,
+    DRAIN_Y - ball.r,
+  );
+  ball.px = ball.x;
+  ball.py = ball.y;
+  const rescueVelocity = cairnRescueVelocity();
+  ball.vx = rescueVelocity.vx;
+  ball.vy = rescueVelocity.vy;
+  capBallSpeed(ball);
+  cairnState.rescueVx = ball.vx;
+  cairnState.rescueVy = ball.vy;
+  cairnState.rescueFallback = rescueVelocity.fallback;
+  syncCairnHud();
+  recordVerification('cairn-rescue', {
+    ballId: ball.id,
+    use: cairnState.uses,
+    x: Number(cairnState.x.toFixed(3)),
+    y: Number(cairnState.y.toFixed(3)),
+    sourceVx: Number(cairnState.vx.toFixed(3)),
+    sourceVy: Number(cairnState.vy.toFixed(3)),
+    vx: Number(cairnState.rescueVx.toFixed(3)),
+    vy: Number(cairnState.rescueVy.toFixed(3)),
+    fallback: cairnState.rescueFallback,
+  });
+  announce('REMEMBERED BY THE CAIRN');
+  tone(294, 0.3, 'triangle', 0.045, 2.4);
+  noise(0.16, 0.024, 760);
+  shakeView(0.9);
+  return true;
+};
+
 const updateBall = (ball, dt) => {
   if (!ball.alive) return;
   if (ball.draining) {
@@ -2045,6 +2292,10 @@ const updateBall = (ball, dt) => {
   ball.vx *= Math.pow(0.9975, dt * 60);
   ball.vy *= Math.pow(0.9986, dt * 60);
 
+  // サブステップごとの積分直後に判定し、壁・橋・フリッパーの反発や落球判定より
+  // 先に一回限りの救済を確定する。救済した積分では他の衝突を重ねない。
+  if (rescueByCairn(ball)) return;
+
   for (let i = 0; i < walls.length; i += 1) {
     const wall = walls[i];
     if (!segmentHit(ball, wall.a[0], wall.a[1], wall.b[0], wall.b[1], 0)) continue;
@@ -2077,6 +2328,9 @@ const updateBall = (ball, dt) => {
   // 左右は人工的な盤端で落とさず、盤外の地形勾配へ球を流す。
   // 極端に遠くへ抜けた場合だけ安全弁として落球扱いにする。
   if (ball.y - ball.r > DRAIN_Y || ball.x < -420 || ball.x > BOARD_W + 420) {
+    // draining の球は関数冒頭で返しているため、物理サブステップが続いても
+    // 同じ落球を再記録しない。多球では後から遷移した球が直前地点を上書きする。
+    recordCairnOrigin(ball);
     ball.draining = true;
     ball.drainAt = gameTime;
     // サイドアウトでも最後は視界の内側へ寄せ、失敗演出を必ず見せる。
@@ -2089,13 +2343,37 @@ const updateBall = (ball, dt) => {
    ============================================================ */
 
 const makeBall = (x = LANE_X, y = LANE_Y, lane = true, vx = 0, vy = 0, echo = false) => ({
+  id: ++boulderSerial,
   x, y, px: x, py: y, vx, vy, r: BALL_R, lane, entered: !lane, alive: true, born: gameTime,
   launchGuide: false,
   draining: false, drainAt: -1,
   echo,
+  cairnTarget: false,
   bridgeAt: -9,   // 吊り橋で受け止めた最後の時刻。サブステップの二重加点を防ぐ
   wallAt: -9,     // 岩壁で増水を数えた最後の時刻。同上
 });
+
+const activateCairnFor = (ball) => {
+  if (
+    !ball || ball.echo || !cairnState.waiting
+    || cairnState.x == null || cairnState.y == null
+  ) return false;
+
+  cairnState.waiting = false;
+  cairnState.active = true;
+  cairnState.targetBallId = ball.id;
+  cairnState.activatedAt = gameTime;
+  cairnState.used = false;
+  cairnState.usedAt = -1;
+  ball.cairnTarget = true;
+  syncCairnHud();
+  recordVerification('cairn-activated', {
+    ballId: ball.id,
+    x: Number(cairnState.x.toFixed(3)),
+    y: Number(cairnState.y.toFixed(3)),
+  });
+  return true;
+};
 
 // IDOL 完成時の報酬。追加球も通常球と同じ balls 配列へ入れることで、物理、得点、
 // 排出、残機・ゲームオーバー判定を特別扱いせずに共有する。boulderPool の数を上限に
@@ -2123,10 +2401,20 @@ const releaseEchoBoulders = (sourceBall) => {
 };
 
 const resetRound = () => {
-  balls = [makeBall()];
+  // 通常のラウンド更新は全球が消えた後だけ。多球中の ECHO を次球と誤認したり、
+  // 生きている球を破棄してケルンを早期に有効化したりしない。
+  if (balls.some((ball) => ball.alive)) return false;
+  const nextBall = makeBall();
+  balls = [nextBall];
+  activateCairnFor(nextBall);
   charging = false;
   charge = 0;
   flippers.forEach((flipper) => { flipper.angle = flipper.rest; flipper.omega = 0; });
+  // 未完了の落球では現在の踏査を維持する。三試練を越えた後だけ、次球を
+  // 新しい遠征の第一踏査として開始し、その時点の累積達成を基準に取り直す。
+  if (explorationState.stage === 3) {
+    beginExplorationRound(explorationState.round + 1);
+  }
   // 点灯は球をまたいで残す。1 球で 4 基そろえるのは実質不可能で、
   // 毎球リセットすると倍率が一度も上がらない。
   // 起立させ切った後だけ石柱を伏せ直し、次の段の倍率を狙わせる。
@@ -2137,6 +2425,7 @@ const resetRound = () => {
   // 鉄砲水は残り時間で終わらせる。球ごとに戻すのは打ち続けた連鎖だけ。
   resetCombo();
   ui.launch.classList.add('visible');
+  return true;
 };
 
 const launchBall = (forcedCharge = null) => {
@@ -2201,6 +2490,8 @@ const startGame = (useDemo = false) => {
   multiplier = 1;
   gameTime = 0;
   demoRestartAt = 0;
+  balls = [];
+  resetCairn();
   resetVerification();
   recordVerification(useDemo ? 'demo-start' : 'game-start');
   releaseAllKeys();
@@ -2212,6 +2503,7 @@ const startGame = (useDemo = false) => {
   resetTorrent(true);
   resetExploration();
   resetRound();
+  syncCairnHud();
   updateHud();
   syncActionControls();
   announce(demoMode ? 'AUTOPILOT ONLINE' : 'THE CANYON AWAKES');
@@ -2698,6 +2990,67 @@ const buildFlippers = () => {
   return group;
 };
 
+// 直前の落球地点へ積む小石。物理の cairnState.x/y をそのまま配置へ使い、
+// 見た目だけの別座標や当たり判定を持たせない。低い積層なので、手前の
+// フリッパーや吊り橋を覆わず、岩球が通過するときも物理挙動を変えない。
+const buildMemoryCairn = () => {
+  const group = new THREE.Group();
+  const stoneGeo = keep(new THREE.DodecahedronGeometry(1, 0));
+  cairnStoneMat = keep(new THREE.MeshStandardMaterial({
+    color: 0x806b4d,
+    emissive: 0x6d3518,
+    emissiveIntensity: 0.04,
+    roughness: 0.94,
+    metalness: 0.03,
+    flatShading: true,
+  }));
+  cairnMemoryMat = keep(new THREE.MeshStandardMaterial({
+    color: 0xb18a4b,
+    emissive: 0xff8e32,
+    emissiveIntensity: 0.08,
+    roughness: 0.58,
+    metalness: 0.18,
+    transparent: true,
+    opacity: 0.1,
+  }));
+
+  // 下ほど広く、上ほど小さくして、岩球とは輪郭の異なる積み石に見せる。
+  const stones = [
+    { p: [-0.45, 0.38, 0.05], s: [0.78, 0.40, 0.62], r: [0.16, 0.28, -0.08] },
+    { p: [0.42, 0.40, -0.08], s: [0.72, 0.43, 0.58], r: [-0.12, -0.34, 0.12] },
+    { p: [-0.02, 0.91, 0.02], s: [0.68, 0.42, 0.55], r: [0.08, 0.52, -0.06] },
+    { p: [0.08, 1.43, -0.03], s: [0.48, 0.36, 0.43], r: [-0.1, -0.18, 0.1] },
+  ];
+  stones.forEach(({ p, s, r }) => {
+    const stone = new THREE.Mesh(stoneGeo, cairnStoneMat);
+    stone.position.set(...p);
+    stone.scale.set(...s);
+    stone.rotation.set(...r);
+    stone.castShadow = true;
+    stone.receiveShadow = true;
+    group.add(stone);
+  });
+
+  // 地表の記憶環は救済可能時だけ強く灯り、使用後は薄い痕跡へ戻る。
+  const ring = new THREE.Mesh(
+    keep(new THREE.TorusGeometry(1.32, 0.075, 6, 24)),
+    cairnMemoryMat,
+  );
+  ring.position.y = 0.14;
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+
+  cairnLight = new THREE.PointLight(0xff8f3a, 0, 16, 2);
+  cairnLight.position.set(0, 1.2, 0);
+  group.add(cairnLight);
+
+  group.rotation.y = 0.24;
+  group.visible = false;
+  cairnGroup = group;
+  scene.add(group);
+  return group;
+};
+
 /* ============================================================
    リサイズ
    ============================================================ */
@@ -2735,6 +3088,7 @@ let externalBall = false;
 const ballWorld = new THREE.Vector3();
 const ballBoard = { x: BOARD_W * 0.5, y: BOARD_H * 0.62 };
 const spinAxis = new THREE.Vector3(0, 0, 1);
+const cairnWorld = new THREE.Vector3();
 let prevBallX = ballBoard.x;
 let prevBallY = ballBoard.y;
 
@@ -2788,6 +3142,34 @@ const updateBoulders = (time) => {
   flippers.forEach((flipper) => { if (flipper.pivot) flipper.pivot.rotation.y = -flipper.angle; });
 };
 
+// ケルンの位置と強度は毎フレーム cairnState へ追従する。救済可能な次球には
+// 脈動する琥珀光、待機中には弱い残光、使用済みには消えかけた石環を見せる。
+const updateCairnVisuals = (time) => {
+  if (!cairnGroup) return;
+  const recorded = Number.isFinite(cairnState.x) && Number.isFinite(cairnState.y);
+  cairnGroup.visible = recorded;
+  if (!recorded) return;
+
+  boardToWorld(cairnState.x, cairnState.y, 0.08, cairnWorld);
+  cairnGroup.position.copy(cairnWorld);
+
+  const rescuable = cairnState.active && !cairnState.used;
+  const waiting = cairnState.waiting && !cairnState.used;
+  const pulse = 0.5 + Math.sin(time * 5.4) * 0.5;
+  cairnStoneMat.emissiveIntensity = rescuable
+    ? 0.78 + pulse * 0.52
+    : waiting ? 0.24 + pulse * 0.12 : 0.025;
+  cairnMemoryMat.emissiveIntensity = rescuable
+    ? 1.75 + pulse * 1.15
+    : waiting ? 0.52 + pulse * 0.24 : 0.06;
+  cairnMemoryMat.opacity = rescuable ? 0.9 : waiting ? 0.42 : 0.09;
+  cairnLight.intensity = rescuable
+    ? 2.7 + pulse * 2.2
+    : waiting ? 0.38 + pulse * 0.22 : 0;
+  const scale = rescuable ? 1 + pulse * 0.035 : waiting ? 0.96 : 0.88;
+  cairnGroup.scale.setScalar(scale);
+};
+
 const updateMist = (dt) => {
   const pos = mistPoints.geometry.attributes.position;
   const speeds = mistPoints.userData.speeds;
@@ -2812,6 +3194,7 @@ const frame = (timestamp) => {
   updateIdolVisuals(dt, elapsed);
   updateBridgeVisuals(dt, elapsed);
   updateTorrentVisuals(dt, elapsed);
+  updateCairnVisuals(elapsed);
   updateMist(dt);
   updateCamera(dt, elapsed);
   skyDome.position.copy(camera.position);
@@ -2899,6 +3282,7 @@ const init = () => {
   buildRopeBridge();
   buildTorrentFlow();
   buildFlippers();
+  buildMemoryCairn();
   for (let i = 0; i < 3; i += 1) {
     const mesh = buildBoulder();
     mesh.visible = i === 0;
@@ -2925,6 +3309,7 @@ const init = () => {
   syncBridgeHud();
   syncTorrentHud();
   syncComboHud();
+  syncCairnHud();
   bindInput();
 
   // Xピンボール共通の自動描画確認入口。通常表示ではタイトル画面を保ち、
@@ -3051,20 +3436,120 @@ window.XPinballOpusStage = {
    操作は発射・フリッパー入力・ポーズの既存経路だけを呼び、状態を直接変更しない。
    ============================================================ */
 
-const verificationSnapshot = () => ({
-  run: verificationState.run,
-  entries: verificationState.entries,
-  bridgeRescues: verificationState.bridgeRescues,
-  floodStarts: verificationState.floodStarts,
-  explorationRewards: verificationState.explorationRewards,
-  checks: {
-    boulderEntered: verificationState.entries > 0,
-    bridgeRescued: verificationState.bridgeRescues > 0,
-    floodStarted: verificationState.floodStarts > 0,
-    explorationRewardedOnce: verificationState.explorationRewards === 1,
-  },
-  events: verificationState.events.map((event) => ({ ...event })),
-});
+const explorationSnapshot = () => {
+  const rewardedRounds = [...explorationState.rewardedRounds].sort((a, b) => a - b);
+  // 周回番号は踏査完了後の resetRound() でだけ進むため、現在段階と組み合わせれば
+  // 報酬記録とは独立して完了周回数を算出できる。
+  const completedRoundCount = Math.max(
+    0,
+    explorationState.round - (explorationState.stage === 3 ? 0 : 1),
+  );
+  return {
+    round: explorationState.round,
+    stage: explorationState.stage,
+    total: 3,
+    completed: explorationState.stage === 3,
+    completedRoundCount,
+    advancedAt: Number(explorationState.advancedAt.toFixed(3)),
+    rewarded: isExplorationRoundRewarded(),
+    rewardIssueCount: verificationState.explorationRewards,
+    rewardedRounds,
+    rewardPoints: explorationState.rewardPoints,
+    rewardedAt: Number(explorationState.rewardedAt.toFixed(3)),
+    baselines: { ...explorationState.baselines },
+    sources: {
+      idolAwakened: idolState.cycles > explorationState.baselines.idolCycles,
+      bridgeRescued: bridgeState.saves > explorationState.baselines.bridgeSaves,
+      floodStarted: torrentState.floods > explorationState.baselines.floodStarts,
+    },
+    relatedEvents: verificationState.events
+      .filter((event) => event.type === 'exploration-reward')
+      .map((event) => ({ ...event })),
+  };
+};
+
+const cairnSnapshot = () => {
+  const recorded = (
+    Number.isFinite(cairnState.x) && Number.isFinite(cairnState.y)
+    && Number.isFinite(cairnState.vx) && Number.isFinite(cairnState.vy)
+  );
+  const targetBall = balls.find((ball) => ball.id === cairnState.targetBallId);
+  return {
+    recorded,
+    position: recorded ? {
+      x: Number(cairnState.x.toFixed(3)),
+      y: Number(cairnState.y.toFixed(3)),
+    } : null,
+    velocity: recorded ? {
+      vx: Number(cairnState.vx.toFixed(3)),
+      vy: Number(cairnState.vy.toFixed(3)),
+    } : null,
+    rescueVelocity: Number.isFinite(cairnState.rescueVx) && Number.isFinite(cairnState.rescueVy) ? {
+      vx: Number(cairnState.rescueVx.toFixed(3)),
+      vy: Number(cairnState.rescueVy.toFixed(3)),
+      fallback: cairnState.rescueFallback,
+    } : null,
+    sourceBallId: cairnState.sourceBallId,
+    sourceEcho: cairnState.sourceEcho,
+    recordedAt: Number(cairnState.recordedAt.toFixed(3)),
+    records: cairnState.records,
+    waiting: cairnState.waiting,
+    active: cairnState.active,
+    used: cairnState.used,
+    activatedAt: Number(cairnState.activatedAt.toFixed(3)),
+    usedAt: Number(cairnState.usedAt.toFixed(3)),
+    uses: cairnState.uses,
+    targetBallId: cairnState.targetBallId,
+    targetBall: targetBall ? {
+      id: targetBall.id,
+      echo: targetBall.echo,
+      alive: targetBall.alive,
+      entered: targetBall.entered,
+      draining: targetBall.draining,
+      cairnTarget: targetBall.cairnTarget,
+    } : null,
+    relatedEvents: verificationState.events
+      .filter((event) => event.type.startsWith('cairn-'))
+      .map((event) => ({ ...event })),
+  };
+};
+
+const verificationSnapshot = () => {
+  const explorationRewardRounds = [...verificationState.explorationRewardRounds];
+  const uniqueRewardRounds = new Set(explorationRewardRounds);
+  const explorationRewardsUnique = (
+    verificationState.explorationRewards === explorationRewardRounds.length
+    && explorationRewardRounds.length === uniqueRewardRounds.size
+  );
+  const exploration = explorationSnapshot();
+  const cairn = cairnSnapshot();
+  return {
+    run: verificationState.run,
+    entries: verificationState.entries,
+    bridgeRescues: verificationState.bridgeRescues,
+    floodStarts: verificationState.floodStarts,
+    explorationRewards: verificationState.explorationRewards,
+    explorationRewardRounds,
+    exploration,
+    cairn,
+    checks: {
+      boulderEntered: verificationState.entries > 0,
+      bridgeRescued: verificationState.bridgeRescues > 0,
+      floodStarted: verificationState.floodStarts > 0,
+      explorationRewardedOnce: verificationState.explorationRewards > 0 && explorationRewardsUnique,
+      explorationRewardsUnique,
+      explorationResumed: exploration.round > 1,
+      explorationRewardsMatchCompleted: (
+        exploration.completedRoundCount === exploration.rewardIssueCount
+        && exploration.rewardIssueCount === exploration.rewardedRounds.length
+      ),
+      cairnRecorded: cairn.recorded,
+      cairnRescueAvailable: cairn.active && !cairn.used,
+      cairnRescueConsumed: cairn.used && !cairn.active,
+    },
+    events: verificationState.events.map((event) => ({ ...event })),
+  };
+};
 
 // 両フリッパー同時押しを、画面の吊り橋ボタンと同じ入力経路へ流す。
 // 成功や救出を強制しないので、橋を張る時機と物理判定は通常プレイと共通になる。
@@ -3099,9 +3584,11 @@ window.XPinballOpus = {
       pressed: keys[flipper.side],
     })),
     balls: balls.map((ball) => ({
+      id: ball.id,
       x: Math.round(ball.x), y: Math.round(ball.y),
       vx: Math.round(ball.vx), vy: Math.round(ball.vy),
       lane: ball.lane, entered: ball.entered, alive: ball.alive, draining: ball.draining,
+      echo: ball.echo, cairnTarget: ball.cairnTarget,
     })),
     idol: {
       litCount: idolState.litCount,
@@ -3147,20 +3634,8 @@ window.XPinballOpus = {
       flow: Number(torrentState.flow.toFixed(3)),
       flash: Number(torrentState.flash.toFixed(3)),
     },
-    exploration: {
-      stage: explorationState.stage,
-      total: 3,
-      completed: explorationState.stage === 3,
-      advancedAt: Number(explorationState.advancedAt.toFixed(3)),
-      rewarded: explorationState.rewarded,
-      rewardPoints: explorationState.rewardPoints,
-      rewardedAt: Number(explorationState.rewardedAt.toFixed(3)),
-      sources: {
-        idolAwakened: idolState.cycles > 0,
-        bridgeRescued: bridgeState.expeditionSaved,
-        floodStarted: torrentState.floods > 0,
-      },
-    },
+    exploration: explorationSnapshot(),
+    cairn: cairnSnapshot(),
     rocks: {
       active: balls.length,
       maximum: ECHO_BOULDER_TOTAL_MAX,

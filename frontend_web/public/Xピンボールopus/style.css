@@ -158,6 +158,86 @@ body {
   100% { filter: brightness(1); transform: translateX(0); }
 }
 
+/* 記憶のケルン。探索 HUD の下で、未到達・現在・完了を石の濃淡と残光で示す。 */
+#cairn-status {
+  position: fixed; z-index: 9; top: 226px; right: clamp(12px, 3vw, 36px);
+  width: clamp(220px, 25vw, 300px); padding: 9px 11px 10px;
+  overflow: hidden; border-right: 2px solid var(--rock);
+  background:
+    linear-gradient(270deg, rgba(30, 19, 11, .92), rgba(13, 17, 18, .36)),
+    repeating-linear-gradient(0deg, transparent 0 8px, rgba(255, 210, 122, .025) 8px 9px);
+  clip-path: polygon(13px 0, 100% 0, 100% 100%, 0 100%, 0 13px);
+  color: #f4e1c4; text-align: right; text-shadow: 0 2px 10px rgba(6, 3, 1, .95);
+  pointer-events: none;
+  transition: border-color .24s, filter .24s, background .24s;
+}
+.cairn-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  color: #d6a36d; font: 900 8px Consolas, monospace; letter-spacing: .16em;
+}
+.cairn-heading b { color: #f2c47a; font-size: 10px; letter-spacing: .04em; }
+.cairn-steps {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px;
+  margin: 7px 0 0; padding: 0; list-style: none;
+}
+.cairn-steps li {
+  position: relative; min-width: 0; padding: 5px 3px 4px;
+  border: 1px solid rgba(165, 141, 110, .2);
+  background: rgba(7, 9, 9, .52);
+  color: rgba(211, 192, 165, .38); font: 800 8px/1 Consolas, monospace;
+  text-align: center; letter-spacing: .12em; opacity: .62;
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, .58);
+  transition: color .22s, opacity .22s, border-color .22s, background .22s, box-shadow .22s;
+}
+/* stage-* は初期描画にも効き、後続の状態連動では current/done または aria-current でも同じ意匠になる。 */
+#cairn-status.stage-0 #cairn-step-record,
+#cairn-status.stage-1 #cairn-step-wait,
+#cairn-status.stage-2 #cairn-step-rescue,
+#cairn-status .cairn-steps li.current,
+#cairn-status .cairn-steps li[aria-current="step"] {
+  border-color: rgba(255, 190, 91, .88);
+  background: linear-gradient(180deg, rgba(124, 70, 26, .7), rgba(44, 28, 16, .72));
+  color: #fff1cc; opacity: 1;
+  text-shadow: 0 0 7px #ffb43c;
+  box-shadow: 0 0 10px rgba(255, 180, 60, .58), inset 0 0 8px rgba(255, 214, 143, .16);
+  animation: cairn-current 1.35s ease-in-out infinite alternate;
+}
+#cairn-status.stage-1 #cairn-step-record,
+#cairn-status.stage-2 #cairn-step-record,
+#cairn-status.stage-2 #cairn-step-wait,
+#cairn-status.complete .cairn-steps li,
+#cairn-status .cairn-steps li.done {
+  border-color: rgba(70, 196, 216, .58);
+  background: linear-gradient(180deg, rgba(25, 83, 92, .58), rgba(13, 35, 39, .68));
+  color: #d9f7ff; opacity: .82;
+  text-shadow: 0 0 6px rgba(70, 196, 216, .8);
+  box-shadow: 0 0 7px rgba(70, 196, 216, .3), inset 0 0 6px rgba(127, 220, 255, .12);
+  animation: none;
+}
+#cairn-message {
+  min-height: 1.35em; margin: 6px 0 0;
+  color: rgba(235, 215, 187, .78); font: 700 8px/1.35 Consolas, monospace;
+  letter-spacing: .04em;
+}
+#cairn-status.stage-1 { border-color: var(--gold); }
+#cairn-status.stage-2 {
+  border-color: var(--torrent);
+  background:
+    linear-gradient(270deg, rgba(32, 68, 70, .9), rgba(34, 21, 12, .42)),
+    repeating-linear-gradient(0deg, transparent 0 8px, rgba(127, 220, 255, .035) 8px 9px);
+}
+#cairn-status.stage-2 #cairn-stage,
+#cairn-status.stage-2 #cairn-message { color: #d9f7ff; text-shadow: 0 0 9px rgba(70, 196, 216, .82); }
+#cairn-status.complete {
+  border-color: rgba(127, 220, 255, .62); filter: saturate(.72);
+  background: linear-gradient(270deg, rgba(24, 48, 51, .84), rgba(16, 14, 11, .4));
+}
+#cairn-status.complete #cairn-stage,
+#cairn-status.complete #cairn-message { color: rgba(217, 247, 255, .72); text-shadow: none; }
+@keyframes cairn-current {
+  to { filter: brightness(1.16); box-shadow: 0 0 14px rgba(255, 190, 85, .78), inset 0 0 10px rgba(255, 225, 168, .24); }
+}
+
 /* ---------------- 操作ボタン ---------------- */
 #launch {
   position: fixed; z-index: 14; right: clamp(13px, 4vw, 48px); bottom: 34px; display: none;
@@ -283,6 +363,7 @@ body {
   #rope-status strong { font-size: 18px; }
   #idol-status { top: 206px; left: 8px; width: 124px; padding: 7px 9px; }
   #exploration-status { top: 112px; right: 8px; width: calc(100vw - 148px); min-width: 0; padding: 7px 8px 8px; }
+  #cairn-status { top: 235px; right: 8px; width: calc(100vw - 148px); min-width: 0; padding: 7px 8px 8px; }
   .exploration-heading { font-size: 7px; }
   .exploration-heading b { font-size: 9px; }
   .exploration-steps { margin: 5px 0; }
@@ -290,6 +371,11 @@ body {
   #exploration-stage { font-size: 11px; }
   #exploration-goal { margin-top: 2px; font-size: 9px; }
   #exploration-condition, #exploration-reward { margin-top: 3px; font-size: 6px; line-height: 1.35; }
+  .cairn-heading { font-size: 7px; }
+  .cairn-heading b { font-size: 9px; }
+  .cairn-steps { gap: 3px; margin-top: 5px; }
+  .cairn-steps li { padding: 4px 2px 3px; font-size: 7px; letter-spacing: .06em; }
+  #cairn-message { margin-top: 5px; font-size: 7px; }
   #score, #high-score { font-size: 20px; }
   #controls { bottom: 5px; padding: 0 72px; font-size: 6px; line-height: 1.35; letter-spacing: .03em; }
   #pause, #sound { top: 76px; padding: 5px 6px; font-size: 7px; }
@@ -314,6 +400,10 @@ body {
   #idol-status { display: none; }
   #exploration-status { top: 96px; }
   #exploration-reward { display: none; }
+  #cairn-status { top: 190px; }
+  .cairn-steps { margin-top: 4px; }
+  .cairn-steps li { padding-block: 3px; }
+  #cairn-message { margin-top: 4px; }
   #combo { top: 144px; }
 }
 
@@ -321,5 +411,11 @@ body {
   .dust { opacity: .16; }
   .canyon-logo i, #launch.visible, #bridge.ready, #idol-status.awake { animation-duration: 5s; }
   #exploration-status.advanced { animation: none; filter: brightness(1.28); }
+  #cairn-status .cairn-steps li { transition: none; }
+  #cairn-status.stage-0 #cairn-step-record,
+  #cairn-status.stage-1 #cairn-step-wait,
+  #cairn-status.stage-2 #cairn-step-rescue,
+  #cairn-status .cairn-steps li.current,
+  #cairn-status .cairn-steps li[aria-current="step"] { animation: none; filter: brightness(1.12); }
   .overlay h1::before, .overlay h1::after { animation: none; }
 }

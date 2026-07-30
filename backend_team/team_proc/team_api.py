@@ -288,7 +288,11 @@ async def エージェント排除(request: 排除要求) -> dict:
 
 @router.post("/エージェント/会話", tags=["AIチーム"])
 async def エージェント会話(request: エージェント会話要求) -> dict:
-    """要員のpersonaを設定し、aidiy_code_agentsへ単発会話を同期依頼する。"""
+    """要員のpersonaを設定し、aidiy_code_agentsへ単発会話を同期依頼する。
+
+    調査モードで依頼するため、AIは対象プロジェクトの入口ドキュメントとソースを実際に読んでから
+    回答する。応答まで最大5分程度かかるので、画面側の待機上限も6分に合わせてある。
+    """
     try:
         要員ID = request.要員ID.strip()
         プロジェクト = request.プロジェクト.strip()
@@ -304,6 +308,7 @@ async def エージェント会話(request: エージェント会話要求) -> d
             task_ai_name,
             task_ai_model,
             要求内容,
+            調査モード=True,
         )
         return ok("エージェントから応答がありました", item)
     except ValueError as exc:

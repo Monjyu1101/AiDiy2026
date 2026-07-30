@@ -27,7 +27,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
-const 最大待機ミリ秒 = 180_000;
+// 会話は調査モード（team_chat.py）で依頼する。AIが対象プロジェクトのソースを読んでから
+// 回答するため、backend_team 側は CodeAgent 300秒 / HTTP 360秒で待つ。画面もそれに合わせる。
+const 最大待機秒 = 360;
+const 最大待機ミリ秒 = 最大待機秒 * 1000;
 const プロジェクト選択肢 = ref<選択肢[]>([]);
 const 選択プロジェクト = ref('');
 const 入力プロジェクト = ref('');
@@ -50,7 +53,7 @@ const taskModelOptions = computed(() => {
   const models = availableModels.value.code_models?.[入力TASK_AI_NAME.value] ?? {};
   return Object.entries(models).map(([value, label]) => ({ value, label: String(label || value) }));
 });
-const 待機表示 = computed(() => `応答待機中… ${経過秒.value}秒 / 最大180秒`);
+const 待機表示 = computed(() => `応答待機中… ${経過秒.value}秒 / 最大${最大待機秒}秒`);
 
 const chooseAvailable = (current: unknown, candidates: string[]) => {
   const value = String(current ?? '');
@@ -67,7 +70,7 @@ const 経過計測開始 = () => {
   const 開始 = Date.now();
   経過秒.value = 0;
   経過Timer = setInterval(() => {
-    経過秒.value = Math.min(180, Math.floor((Date.now() - 開始) / 1000));
+    経過秒.value = Math.min(最大待機秒, Math.floor((Date.now() - 開始) / 1000));
   }, 1000);
 };
 
@@ -211,7 +214,7 @@ const 会話送信 = async () => {
   } catch (error) {
     const code = String((error as { code?: string })?.code ?? '');
     エラー内容.value = code === 'ECONNABORTED'
-      ? '3分以内に応答が完了しませんでした。時間をおいて再度お試しください。'
+      ? `${最大待機秒}秒以内に応答が完了しませんでした。時間をおいて再度お試しください。`
       : '会話通信でエラーが発生しました。backend_team (8094) と backend_tools (8095) を確認してください。';
   } finally {
     経過計測停止();
@@ -305,7 +308,7 @@ onBeforeUnmount(() => 経過計測停止());
             <div class="waiting-orbit"><i></i><i></i><i></i></div>
             <div>
               <strong>{{ 待機表示 }}</strong>
-              <span>personaを設定してAIエージェントへ問い合わせています</span>
+              <span>personaを設定し、プロジェクトのソースを調べたうえで回答します</span>
             </div>
           </div>
           <div v-else-if="エラー内容" class="response-panel error" role="alert">

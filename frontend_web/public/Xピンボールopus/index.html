@@ -63,6 +63,16 @@
     <span id="exploration-reward">報酬　基礎倍率 +1 ・ 12,000 × 実効倍率</span>
   </aside>
 
+  <aside id="cairn-status" class="stage-0" aria-label="記憶のケルンの進行">
+    <div class="cairn-heading"><span>MEMORY CAIRN</span><b id="cairn-stage">記録待ち</b></div>
+    <ol id="cairn-steps" class="cairn-steps" aria-label="記憶のケルンの三段階">
+      <li id="cairn-step-record">記録</li>
+      <li id="cairn-step-wait">待機</li>
+      <li id="cairn-step-rescue">救出</li>
+    </ol>
+    <p id="cairn-message" role="status" aria-live="polite" aria-atomic="true">落球の軌道を待っています</p>
+  </aside>
+
   <div id="controls">A / ← LEFT　　D / → RIGHT　　← + → WHEN ROCK FALLS = HAUL BRIDGE　　SPACE / ↓ RELEASE　　P PAUSE</div>
   <button id="flipper-left" class="flipper-control" type="button" aria-label="左フリッパー" aria-keyshortcuts="A ArrowLeft"><span>LEFT</span>FLIP</button>
   <button id="flipper-right" class="flipper-control" type="button" aria-label="右フリッパー" aria-keyshortcuts="D ArrowRight"><span>RIGHT</span>FLIP</button>
