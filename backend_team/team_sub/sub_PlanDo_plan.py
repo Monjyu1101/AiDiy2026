@@ -20,10 +20,11 @@ team_watcher.py（1分ごとの確認）が temp/pdca/<ファイル名>.json に
 1. 入力 JSON（プロジェクト / チーム作業 / PDCA区分 / 作業ループ回数）を読み込む
 2. 有効な要員のうち admin 以外を候補にして、計画内容に最も適した1名をAIに選ばせる
    （sub_init.py と同じ選択処理。admin以外の候補が1名もいない場合だけ admin にする）
-3. Aチーム依頼（状態=準備中）→ Aチーム作業（開始レコード）→
-   aidiy_task_agents への投入（Aタスク要求）の順で作る
-4. 投入に成功した依頼は 準備完了 にする。失敗した場合は対応する
-   Aチーム作業レコードも終了させて次のサイクルを止めない
+3. Aチーム作業（開始レコード）を作り、aidiy_task_agents（backend_task）は経由せず
+   sub_self_talk.py と同じ経路で aidiy_code_agents を直接呼び出して応答を得る
+   （調査モード。読み取り系ツールは使えるがソースの変更はシステム指示で禁止する）
+4. 応答内容をそのまま次段への引き継ぎ内容（まとめ内容）として Aチーム作業を「済」にする。
+   Aチーム依頼・Aチーム経験の生成を経ないぶん、投入から完了までが同期1回で完結する
 """
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 from log_config import get_logger, setup_logging
 from team_proc import team_db, team_pdca_db
 
-# Aチーム依頼・Aチーム作業の作成とタスク投入は全区分で同じ処理を使う
+# 前段の取得・要員未確定時の後始末は他のPDCA段と共通の処理を使う
 import sub_SPDCA__common
 # 担当要員のAI選択は sub_init.py と同じ処理を使う（有効要員 + Aチーム経験で判断させる）
 from sub_init import 担当要員を選択, 既定利用者ID
@@ -128,7 +129,7 @@ def プロンプト生成_計画(
 """
 
 
-def 計画を投入(
+def 計画を実行(
     要員ID: str,
     プロジェクト: str,
     チーム目標: str,
@@ -138,16 +139,9 @@ def 計画を投入(
     logger,
     前サイクル進捗: str = "",
 ) -> bool:
-    """要員1名分の Aチーム依頼・Aチーム作業・Aタスク要求を作る。"""
-    return sub_SPDCA__common.段を投入(
-        区分,
-        要員ID,
-        プロジェクト,
-        チーム作業,
-        ループ,
-        プロンプト生成_計画(要員ID, プロジェクト, チーム目標, チーム作業, 前サイクル進捗),
-        logger,
-    )
+    """プロンプトを組み立て、sub_SPDCA__common.段を直接実行 で aidiy_code_agents を直接呼ぶ。"""
+    要求内容 = プロンプト生成_計画(要員ID, プロジェクト, チーム目標, チーム作業, 前サイクル進捗)
+    return sub_SPDCA__common.段を直接実行(区分, 要員ID, プロジェクト, チーム作業, ループ, 要求内容, logger)
 
 
 def main() -> int:
@@ -191,7 +185,7 @@ def main() -> int:
         )
         成功 = False
         try:
-            成功 = 計画を投入(要員ID, プロジェクト, チーム目標, チーム作業, 区分, ループ, logger, 前サイクル進捗)
+            成功 = 計画を実行(要員ID, プロジェクト, チーム目標, チーム作業, 区分, ループ, logger, 前サイクル進捗)
         except Exception:
             logger.exception(f"作業ループ({区分})の作成に失敗しました: 要員ID={要員ID}")
         if not 成功 and not team_pdca_db.ループ区分一覧(プロジェクト, ループ, 区分):

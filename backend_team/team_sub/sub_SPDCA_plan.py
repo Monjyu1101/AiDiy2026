@@ -13,6 +13,11 @@
 直前のS（相談）が全件「済」または「エラー」になった後、Sの「済」レコードに
 保存されたまとめ内容を1つの実行計画へ取りまとめる。担当は、成功したSを作った要員から
 ランダムに1名選ぶ。全Sがエラーの場合はS参加者から選び、目標を基に計画を作らせる。
+
+成功Sが1件だけの場合は sub_SPDCA__common.単一相談を計画へ引き継ぐ（AIを起動せず upsert）。
+それ以外は、aidiy_task_agents（backend_task）は経由せず sub_self_talk.py と同じ経路で
+aidiy_code_agents を直接呼び出して応答を得て、応答内容をそのままAチーム作業の
+まとめ内容として「済」にする（調査モード。読み取り系ツールは使えるがソースの変更は禁止する）。
 """
 
 from __future__ import annotations
@@ -29,7 +34,7 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 from log_config import get_logger, setup_logging
 from team_proc import team_pdca_db
 
-# 前段の完了確認、Aチーム依頼・Aチーム作業の作成とタスク投入は全区分で同じ処理を使う
+# 前段の完了確認・要員未確定時の後始末は他のPDCA段と共通の処理を使う
 import sub_SPDCA__common
 
 
@@ -106,7 +111,7 @@ def プロンプト生成_計画(
 """
 
 
-def 計画を投入(
+def 計画を実行(
     要員ID: str,
     プロジェクト: str,
     チーム目標: str,
@@ -115,16 +120,12 @@ def 計画を投入(
     成功一覧: list[dict],
     logger,
 ) -> bool:
-    """Pは相談の成功レコード全件を計画材料にするため、まとめ内容の連結を自前で作る。"""
-    return sub_SPDCA__common.段を投入(
-        "P",
-        要員ID,
-        プロジェクト,
-        チーム作業,
-        ループ,
-        プロンプト生成_計画(要員ID, プロジェクト, チーム目標, チーム作業, 成功一覧),
-        logger,
-    )
+    """Pは相談の成功レコード全件を計画材料にするため、まとめ内容の連結を自前で作る。
+
+    プロンプトを組み立てたら、sub_SPDCA__common.段を直接実行 で aidiy_code_agents を直接呼ぶ。
+    """
+    要求内容 = プロンプト生成_計画(要員ID, プロジェクト, チーム目標, チーム作業, 成功一覧)
+    return sub_SPDCA__common.段を直接実行("P", 要員ID, プロジェクト, チーム作業, ループ, 要求内容, logger)
 
 
 def main() -> int:
@@ -154,7 +155,7 @@ def main() -> int:
             f"作業ループ(P)を開始します: プロジェクト={プロジェクト} "
             f"ループ={ループ} 要員ID={要員ID} 相談結果={len(成功一覧)}件"
         )
-        return 0 if 計画を投入(
+        return 0 if 計画を実行(
             要員ID, プロジェクト, チーム目標, チーム作業, ループ, 成功一覧, logger
         ) else 1
     except Exception as exc:

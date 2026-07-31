@@ -21,8 +21,10 @@ P（計画）とD（実行）のまとめも一緒に渡し、1周ぶんの経�
 team_watcher.py（1分ごとの確認）が temp/pdca/<ファイル名>.json に入力値を書き、
 このスクリプトを `python sub_SPDCA_action.py <入力JSONパス>` で起動する。
 
-前段の確認・担当要員の引き継ぎ・依頼/作業レコードの作成・タスク投入は
-`sub_SPDCA__common.py`（D・C・A 共通）が行う。ここではAIへ渡すプロンプトだけを定義する。
+前段の確認・担当要員の引き継ぎは `sub_SPDCA__common.py`（D・C・A 共通）が行う。
+ここではAIへ渡すプロンプトだけを定義する。A は動作確認と改善点の洗い出しだけで
+ソースを変更しないため、aidiy_task_agents（backend_task）は経由せず、sub_self_talk.py
+と同じ経路で aidiy_code_agents を直接呼び出してその場で完了させる（段を実行 の 直接実行=True）。
 """
 
 from __future__ import annotations
@@ -96,7 +98,8 @@ def プロンプト生成_改善(
 
 def main() -> int:
     return sub_SPDCA__common.段を実行(
-        "A", "C", プロンプト生成_改善, "sub_SPDCA_action", 要員継続=True, 参照区分=("P", "D")
+        "A", "C", プロンプト生成_改善, "sub_SPDCA_action", 要員継続=True, 参照区分=("P", "D"),
+        直接実行=True,
     )
 
 

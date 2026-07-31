@@ -63,7 +63,7 @@ sys.path.insert(0, str(_TEAM_SUB_DIR.parent))
 sys.path.insert(0, str(_TEAM_SUB_DIR))
 
 from log_config import get_logger, setup_logging
-from team_proc import team_goal_db, team_pdca_db, team_work_db
+from team_proc import team_chat, team_goal_db, team_pdca_db, team_work_db
 
 # 担当要員のAI選択は sub_init.py と同じ処理を使う（有効要員 + Aチーム経験で判断させる）
 from sub_init import 担当要員を選択, 既定利用者ID
@@ -312,6 +312,57 @@ def 段を投入(
         return False
 
 
+def 段を直接実行(
+    区分: str,
+    要員ID: str,
+    プロジェクト: str,
+    チーム作業: str,
+    ループ: int,
+    要求内容: str,
+    logger,
+) -> bool:
+    """要員1名分の Aチーム作業を作り、aidiy_code_agents を直接呼んでその場で完了させる。
+
+    sub_self_talk.py と同じ経路（team_chat.会話実行、調査モード）で応答を同期的に得て、
+    応答内容をそのまま次段への引き継ぎ内容（まとめ内容）として「済」にする。
+    Aチーム依頼の作成・aidiy_task_agents への投入・Aチーム経験の生成は行わない
+    （調査だけを行い、ソースを変更しない S・P・C・A 向け。ソースを変更する D は
+    段を投入 を使い、実施内容の細分化・追跡ができる backend_task 経由のまま残す）。
+    """
+    作業 = team_pdca_db.作業登録(
+        {
+            "プロジェクト": プロジェクト,
+            "ループ": ループ,
+            "依頼ID": "",
+            "チーム作業": チーム作業,
+            "要員ID": 要員ID,
+            "PDCA区分": 区分,
+            "状況": "実行中",
+        }
+    )
+    作業ID = str(作業.get("作業ID", ""))
+    if not 作業ID:
+        raise RuntimeError("Aチーム作業の登録に失敗しました")
+
+    try:
+        既定 = AI設定を決める(プロジェクト, 要員ID)
+        結果 = team_chat.会話実行(
+            要員ID,
+            プロジェクト,
+            既定["TASK_AI_NAME"],
+            既定["TASK_AI_MODEL"],
+            要求内容,
+            調査モード=True,
+        )
+        team_pdca_db.作業完了記録(作業ID, str(結果.get("応答内容", "")))
+        logger.info(f"作業ループ({区分})を完了しました: 作業ID={作業ID} 要員ID={要員ID}")
+        return True
+    except Exception as exc:
+        logger.exception(f"作業ループ({区分})の実行に失敗しました: 作業ID={作業ID} 要員ID={要員ID}")
+        team_pdca_db.作業終了記録(作業ID, f"実行エラー: {exc}")
+        return False
+
+
 def 段を実行(
     区分: str,
     前段区分: str,
@@ -319,6 +370,7 @@ def 段を実行(
     ログ名: str,
     要員継続: bool = False,
     参照区分: tuple[str, ...] = (),
+    直接実行: bool = False,
 ) -> int:
     """D・C・A の共通メイン処理。前段の結果を受け取り、担当を選んで1件投入する。
 
@@ -332,6 +384,10 @@ def 段を実行(
     参照区分には、前段に加えて同じループから読ませたい区分を古い順に渡す
     （例: C は ("P",)、A は ("P", "D")）。取得できなかった区分は空文字になる。
     プロンプト生成へは {区分: まとめ内容} の辞書で前段ぶんと合わせて渡す。
+
+    直接実行=True の場合、aidiy_task_agents への投入（段を投入）ではなく
+    段を直接実行 を使い、aidiy_code_agents を直接呼んでその場で完了させる
+    （C・A 向け。ソースを変更する D では使わない）。
     """
     setup_logging(ログ名)
     logger = get_logger(f"team_{ログ名}")
@@ -387,7 +443,8 @@ def 段を実行(
             f"ループ={ループ} 要員ID={要員ID} 前段={前段記録.get('作業ID', '')}"
         )
         要求内容 = プロンプト生成(要員ID, プロジェクト, チーム目標, チーム作業, まとめ一覧)
-        return 0 if 段を投入(
+        投入処理 = 段を直接実行 if 直接実行 else 段を投入
+        return 0 if 投入処理(
             区分, 要員ID, プロジェクト, チーム作業, ループ, 要求内容, logger
         ) else 1
     except Exception as exc:
