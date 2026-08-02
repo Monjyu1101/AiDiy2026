@@ -92,7 +92,7 @@ AiDiy は 6 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `backend_tools/tools_main.py` | MCP サーバー群 | 8095 |
 | `backend_local/local_main.py` | ローカル LLM（OpenAI 互換 Gemma 推論） | 8096 |
 | `backend_task/task_main.py` | AIタスク実行（要求の AI 分解 + Code CLI 実行）、定期タスク | 8093 |
-| `backend_team/team_main.py` | 複数AIエージェントのチーム活動管理（現状はモック） | 8094 |
+| `backend_team/team_main.py` | 複数AIエージェントのチーム活動管理 | 8094 |
 | `command_hermes` | `aidiy_hermes` CLI 基盤 | 常駐なし |
 | `frontend_web` | 通常 Web UI | 8090 |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar | 8092 |
@@ -109,7 +109,7 @@ AiDiy は 6 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `backend_tools/` | 19 個の MCP（Chrome DevTools、Desktop Capture、SQLite、PostgreSQL、Logs、Code Check、Backup、Image / Movie Generation、Speech-to-Text、Text-to-Speech、OBS Studio Control、FFmpeg Control、Notification Sounds、Code Agents、Chat LLM、Task Agents、Team Agents、Windows Control）と OpenAI / Ollama 互換 Chat Completions |
 | `backend_local/` | ローカル LLM サーバー（HuggingFace Gemma を `transformers` + `torch` で推論、OpenAI 互換 Chat Completions API） |
 | `backend_task/` | AIタスク実行 + 定期タスク FastAPI サーバー（タスク要求 / タスク明細 API、Code CLI 実行ウォッチャー） |
-| `backend_team/` | 複数AIエージェントのチーム活動 FastAPI サーバー（現状はインメモリのモック） |
+| `backend_team/` | 複数AIエージェントのチーム活動 FastAPI サーバー（要員 / 依頼 / 目標 / 経験 / 作業 / 会話 API、PlanDo・SPDCA 作業ループ実行） |
 | `frontend_web/` | Vue 3 + Vite + TypeScript の Web UI |
 | `frontend_avatar/` | Electron/Web 対応の AI Avatar UI |
 | `docs/` | HTML 形式の開発ガイド |

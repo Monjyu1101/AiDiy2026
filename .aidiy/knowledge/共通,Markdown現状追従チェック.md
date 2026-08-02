@@ -46,7 +46,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 
 ## 認証チェックリスト
 
-- [ ] JWT 有効期限は 60 分として書く。
+- [ ] JWT 有効期限は 600 分として書く。
   - 同期元: `backend_server/auth.py`
 - [ ] 認証 Storage を対象別に分けて書く。
   - `frontend_web`: `localStorage`

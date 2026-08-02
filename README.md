@@ -28,7 +28,7 @@
 - バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**19 サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）
 - バックエンド Local: `backend_local`（ポート 8096、OpenAI 互換の Gemma ローカル推論サーバー）
 - バックエンド Task: `backend_task`（ポート 8093、AIタスク実行 + 定期タスク FastAPI）
-- バックエンド Team: `backend_team`（ポート 8094、複数AIエージェントのチーム活動モック）
+- バックエンド Team: `backend_team`（ポート 8094、複数AIエージェントのチーム活動 FastAPI）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
 - 常駐バックエンドは **6 サーバー構成**

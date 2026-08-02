@@ -9,7 +9,7 @@ AI エージェントは、本書に一時的な作業メモを追記しない�
 ## 概要
 
 `backend_team` はポート `8094` 上で動作する、複数AIエージェントの継続活動を管理する FastAPI サーバーです。
-現段階はUI検討用の仮実装です。要員マスタとチーム依頼は共有SQLiteへ保存し、活動状態はインメモリ管理です。
+要員マスタ、チーム依頼、目標、経験、作業、会話は共有 SQLite へ保存し、エージェントの活動状態はインメモリで管理します。
 
 - 設定: `backend_server/_config/AiDiy_key.json` の `TEAM_BASE`、`TEAM_AI_NAME`、`TEAM_AI_MODEL`、`TASK_AI_NAME`、`TASK_AI_MODEL`
 - 初期ポート: `8094`

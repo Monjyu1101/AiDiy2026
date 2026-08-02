@@ -14,7 +14,7 @@
   - `tools_main.py` : `8095`
   - `local_main.py` : `8096`（`_start.py` のデフォルトは起動しない）
   - `task_main.py` : `8093`（AIタスク実行 + 定期タスク）
-  - `team_main.py` : `8094`（複数AIエージェントのチーム活動、現状はモック）
+  - `team_main.py` : `8094`（複数AIエージェントのチーム活動）
 - Web フロントは `frontend_web`、ポート `8090`
 - Avatar フロントは `frontend_avatar`、ポート `8092`
 - DB は **SQLite**
@@ -138,7 +138,7 @@ npm run dev
 | Apps API Docs | http://localhost:9098/docs |
 | Task API Docs | http://localhost:8093/docs |
 | Local API Docs | http://localhost:8096/docs |
-| Backend MCP 一覧（17 サーバー） | http://localhost:8095/ |
+| Backend MCP 一覧（19 サーバー） | http://localhost:8095/ |
 | Backend MCP ツール一覧 | http://localhost:8095/{mcp_name}/list |
 | Backend MCP SSE 接続 | http://localhost:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
 | Avatar Web モード | http://localhost:8092 |

@@ -16,7 +16,7 @@ AiDiy は、日本語を第一言語とするフルスタック業務システ�
 - Backend MCP: 19 個の MCP サーバー（Chrome / Desktop / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）。
 - Backend Local: OpenAI 互換の Gemma ローカル推論サーバー（ポート 8096）。
 - Backend Task: AIタスク実行 + 定期タスクサーバー（ポート 8093）。
-- Backend Team: 複数AIエージェントのチーム活動サーバー（ポート 8094、現状はモック）。
+- Backend Team: 複数AIエージェントのチーム活動サーバー（ポート 8094）。
 - Frontend Web: Vue 3 + Vite + TypeScript。
 - Frontend Avatar: Electron / Web デュアルモードの AI Avatar UI。
 - AI コア: チャット、音声、画像、ファイル、code1〜code6 のコード支援パネル。

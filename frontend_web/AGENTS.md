@@ -46,7 +46,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 - template の component tag は ASCII にする。
 - 日本語 component は import して `<component :is="...">` で扱う。
 - UI framework / CSS framework は使わず、既存 CSS と共有コンポーネントへ合わせる。
-- API は `/core/*`、`/apps/*`、`/task/*` を Vite proxy 経由で呼ぶ（`/task/*` は backend_task 8093）。
+- API は `/core/*`、`/apps/*`、`/task/*`、`/team/*` を Vite proxy 経由で呼ぶ（`/task/*` は backend_task 8093、`/team/*` は backend_team 8094）。
 - ビルドや type-check の実行判断は `開発環境運用手順.md` を確認する。
 - TypeScript は strict mode 無効の設定で運用しているが、既存型定義を使い、不要な `any` の拡大は避ける。
 
