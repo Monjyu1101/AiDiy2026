@@ -386,8 +386,12 @@ class LiveAI:
             # live_lasttimeを先に更新
             self.live_lasttime = time.time()
             
-            # セッションにテキスト送信
-            await self.live_session.send(input=text, end_of_turn=True)
+            # セッションにテキスト送信（旧 send(input=..., end_of_turn=True) の後継）
+            from google.genai import types as _types
+            await self.live_session.send_client_content(
+                turns=_types.Content(role="user", parts=[_types.Part(text=text)]),
+                turn_complete=True,
+            )
             # logger.info(f"テキスト送信:完了 text={text[:50]}{'...' if len(text) > 50 else ''}")
             pass
             return True
@@ -438,7 +442,12 @@ class LiveAI:
             self.live_lasttime = time.time()
             
             # セッションに音声送信
-            await self.live_session.send(input={"mime_type": "audio/pcm", "data": bytes_data})
+            # 旧 send(input={"mime_type":...}) は realtime_input.media_chunks へ変換され非推奨のため
+            # send_realtime_input(audio=...) を使う。mime_type にはサンプリングレートを明示する。
+            from google.genai import types as _types
+            await self.live_session.send_realtime_input(
+                audio=_types.Blob(data=bytes_data, mime_type=f"audio/pcm;rate={self.input_rate}")
+            )
             # logger.info(f"音声送信:完了 bytes={len(bytes_data)}")
             pass
             return True
@@ -542,8 +551,11 @@ class LiveAI:
                 self.parent_manager.セッションデータ['最終イメージ'] = resized_image_data
                 self.parent_manager.セッションデータ['最終イメージ時刻'] = time.time()
             
-            # リサイズされた画像を送信
-            await self.live_session.send(input={"mime_type": f"image/{format}", "data": resized_image_data})
+            # リサイズされた画像を送信（media_chunks 非推奨のため video= で送る）
+            from google.genai import types as _types
+            await self.live_session.send_realtime_input(
+                video=_types.Blob(data=resized_image_data, mime_type=f"image/{format}")
+            )
             
             # logger.info(f"画像送信:完了 リサイズ後送信")
             pass
@@ -783,9 +795,10 @@ class LiveAI:
             pass
             
             # ツール設定
+            # code_execution は native-audio 系 Live モデルが非対応
+            # （"Code Execution tool is not supported for this model." で 1007 切断される）ため付けない。
             tools = [
                 {"google_search": {}},
-                {"code_execution": {}}
             ]
             
             # ツール呼び出し機能を追加
@@ -1094,14 +1107,14 @@ class LiveAI:
                 # Geminiに結果を返送
                 if self.live_session:
                     try:
-                        tool_response = types.LiveClientToolResponse(
+                        # 旧 send(input=LiveClientToolResponse(...)) の後継
+                        await self.live_session.send_tool_response(
                             function_responses=[types.FunctionResponse(
                                 name=f_name,
                                 id=f_id,
                                 response={"result": result},
                             )]
                         )
-                        await self.live_session.send(input=tool_response)
                     except Exception as e:
                         logger.warning(f"Gemini結果返送エラー: {e}")
                         

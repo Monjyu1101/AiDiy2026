@@ -529,9 +529,10 @@ class LiveAI:
                     ws_url = f"wss://api.openai.com/v1/realtime?model={self.LIVE_MODEL}"
 
                     # WebSocketヘッダー（リスト形式: ["Header: value", ...]）
+                    # GA 版 Realtime api では OpenAI-Beta ヘッダーを付けてはいけない
+                    # （付けると "The Realtime Beta API is no longer supported" で拒否される）
                     headers = [
                         f"Authorization: Bearer {self.api_key}",
-                        "OpenAI-Beta: realtime=v1"
                     ]
                     if self.organization:
                         headers.append(f"OpenAI-Organization: {self.organization}")
@@ -543,7 +544,6 @@ class LiveAI:
                     # ヘッダーはmonjyu実装に合わせてdict形式も許容
                     headers_dict = {
                         "Authorization": f"Bearer {self.api_key}",
-                        "OpenAI-Beta": "realtime=v1",
                     }
                     if self.organization:
                         headers_dict["OpenAI-Organization"] = self.organization
@@ -561,7 +561,6 @@ class LiveAI:
                         logger.warning(f"WebSocket接続(ヘッダdict)失敗: {e}; ヘッダ配列で再試行")
                         headers_list = [
                             f"Authorization: Bearer {self.api_key}",
-                            "OpenAI-Beta: realtime=v1",
                         ]
                         if self.organization:
                             headers_list.append(f"OpenAI-Organization: {self.organization}")
@@ -716,8 +715,8 @@ class LiveAI:
                                 self.エラーフラグ = True
                                 break
 
-                            # 音声データ受信
-                            elif msg_type == "response.audio.delta":
+                            # 音声データ受信（GA: response.output_audio.delta / Beta: response.audio.delta）
+                            elif msg_type in ("response.output_audio.delta", "response.audio.delta"):
                                 audio_base64 = response_data.get("delta")
                                 if audio_base64 and self.音声受信Ｑ:
                                     bytes_data = base64.b64decode(audio_base64)
@@ -740,7 +739,8 @@ class LiveAI:
                                         logger.warning(f"音声送信エラー: {e}")
 
                             # 音声テキスト完了（音声出力の字幕）
-                            elif msg_type == "response.audio_transcript.done":
+                            # GA: response.output_audio_transcript.done / Beta: response.audio_transcript.done
+                            elif msg_type in ("response.output_audio_transcript.done", "response.audio_transcript.done"):
                                 transcript = response_data.get('transcript')
                                 if transcript and self.テキスト受信Ｑ:
                                     # logger.info(f"テキスト受信:{transcript[:100]}{'...' if len(transcript) > 100 else ''} length={len(transcript)}")
@@ -784,12 +784,14 @@ class LiveAI:
                                 "session.created", "session.updated", "response.created",
                                 "conversation.item.created", "rate_limits.updated",
                                 "response.output_item.added", "response.audio.done",
+                                "response.output_audio.done",
                                 "response.content_part.added", "response.content_part.done",
                                 "response.output_item.done", "response.done",
                                 "input_audio_buffer.speech_started",
                                 "input_audio_buffer.speech_stopped",
                                 "input_audio_buffer.committed",
                                 "response.audio_transcript.delta",
+                                "response.output_audio_transcript.delta",
                             ]:
                                 pass  # 正常な応答タイプはログ出力しない
                             else:
@@ -900,15 +902,26 @@ class LiveAI:
             # logger.info(f"システム指示長: {len(instructions)} 文字")
             pass
 
-            # OpenAI Realtime api形式のセッション設定を返す
+            # OpenAI Realtime api（GA）形式のセッション設定を返す
+            # Beta からの変更点: session.type 必須、modalities→output_modalities、
+            # voice/turn_detection は audio.output / audio.input 配下へ移動、format はオブジェクト。
             session_config = {
-                "modalities": ["audio", "text"],
+                "type": "realtime",
+                "output_modalities": ["audio"],
                 "instructions": instructions,
-                "voice": self.LIVE_VOICE,
-                "turn_detection": {
-                    "type": "server_vad",
-                    "threshold": 0.5,
-                    "silence_duration_ms": 1500,
+                "audio": {
+                    "input": {
+                        "format": {"type": "audio/pcm", "rate": self.input_rate},
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "threshold": 0.5,
+                            "silence_duration_ms": 1500,
+                        },
+                    },
+                    "output": {
+                        "format": {"type": "audio/pcm", "rate": self.output_rate},
+                        "voice": self.LIVE_VOICE,
+                    },
                 },
             }
 
@@ -947,13 +960,22 @@ class LiveAI:
             # エラー時は最小設定で復旧を試行
             logger.warning("最小設定で復旧試行")
             return {
-                "modalities": ["audio", "text"],
+                "type": "realtime",
+                "output_modalities": ["audio"],
                 "instructions": "あなたは、美しい日本語を話す賢いAIアシスタントです。",
-                "voice": self.LIVE_VOICE,
-                "turn_detection": {
-                    "type": "server_vad",
-                    "threshold": 0.5,
-                    "silence_duration_ms": 1500,
+                "audio": {
+                    "input": {
+                        "format": {"type": "audio/pcm", "rate": self.input_rate},
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "threshold": 0.5,
+                            "silence_duration_ms": 1500,
+                        },
+                    },
+                    "output": {
+                        "format": {"type": "audio/pcm", "rate": self.output_rate},
+                        "voice": self.LIVE_VOICE,
+                    },
                 },
             }
 
