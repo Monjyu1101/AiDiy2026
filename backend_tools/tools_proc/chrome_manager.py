@@ -91,6 +91,21 @@ class ChromeManager:
         except Exception:
             return False
 
+    def is_verified(self) -> bool:
+        """
+        直近の疎通確認 TTL 内かどうかを HTTP 通信なしで返す。
+        呼び出し側のホットパス（既に起動確認済みのセッション）で
+        launch()/is_running() のスレッド・HTTP 往復を避けるために使う。
+        """
+        return time.monotonic() < self._verified_until
+
+    def mark_unreachable(self) -> None:
+        """
+        疎通確認 TTL を即時失効させる。CDP コマンドが WebSocket 接続エラーで
+        失敗した際に呼び、TTL 満了を待たず次回呼び出しで再確認させる。
+        """
+        self._verified_until = 0.0
+
     def get_version(self) -> dict | None:
         """Chrome のバージョン情報を返す (未起動時は None)"""
         import json

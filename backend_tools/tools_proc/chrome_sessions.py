@@ -209,9 +209,20 @@ class ChromeSessionRegistry:
                 )
                 manager.headless = bool(entry.get("headless", False))
                 cdp = CDPClient(port=entry["port"])
+                cdp._on_unreachable = manager.mark_unreachable
                 inst = (manager, cdp)
                 self._instances[name] = inst
             return inst
+
+    def peek(self, name: str = DEFAULT_SESSION) -> tuple[ChromeManager, CDPClient] | None:
+        """
+        登録済みインスタンスがあればロック取得のみで即座に返す（起動確認や
+        ポート再割り当ては行わない）。ホットパス用の高速版で、未登録／
+        未起動の場合は None を返すので、その場合は get() を使うこと。
+        """
+        name = name or DEFAULT_SESSION
+        with self._lock:
+            return self._instances.get(name)
 
     def list(self) -> list[dict]:
         """登録済みセッションの一覧（稼働状態付き）を返す"""

@@ -75,6 +75,9 @@ class CDPClient:
         # tab_id 省略時 (= "auto") に解決したタブをセッション内で使い回すキャッシュ。
         # 呼び出しのたびに /json でタブ一覧を取得し直すコストを避ける。
         self._auto_tab: Optional[dict] = None
+        # WebSocket 接続エラー発生時に呼ぶコールバック（ChromeManager.mark_unreachable
+        # をセッション登録時に紐付け、疎通確認 TTL を即時失効させて再確認させる）。
+        self._on_unreachable: Optional[Any] = None
 
     # ------------------------------------------------------------------ #
     # 内部ヘルパー
@@ -176,6 +179,10 @@ class CDPClient:
                 # なった可能性がある。次回呼び出しで再解決させるためキャッシュを破棄。
                 if self._auto_tab is not None and self._auto_tab.get("webSocketDebuggerUrl") == ws_url:
                     self._auto_tab = None
+                # Chrome 自体が落ちている可能性もあるため、疎通確認 TTL を即時失効
+                # させ、次回 ensure_running() で TTL 満了を待たず再確認させる。
+                if self._on_unreachable is not None:
+                    self._on_unreachable()
                 raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}") from e
             except TimeoutError:
                 await self._discard_connection(ws_url, ws)
@@ -217,7 +224,13 @@ class CDPClient:
         ))
 
     async def resolve_tab_async(self, tab_id: Optional[str] = None) -> dict:
-        """同期 HTTP をイベントループ外で実行してタブ情報を返す。"""
+        """
+        タブ情報を返す。自動解決タブがキャッシュ済みならスレッドに逃がさず即座に返す
+        （HTTP を伴わないため）。未キャッシュ／明示 tab_id の場合のみ同期 HTTP を
+        イベントループ外で実行する。
+        """
+        if (not tab_id or tab_id == "auto") and self._auto_tab is not None:
+            return self._auto_tab
         return await asyncio.to_thread(self.resolve_tab, tab_id)
 
     def resolve_tab(self, tab_id: Optional[str] = None) -> dict:
@@ -484,35 +497,56 @@ class CDPClient:
         if fmt == "jpeg":
             params["quality"] = quality
 
-        metrics_overridden = False
         if full_page:
+            # Emulation.setDeviceMetricsOverride/clear の往復をなくし、
+            # captureBeyondViewport + clip でビューポート外までまとめて撮る。
             metrics = await self.send_command(ws, "Page.getLayoutMetrics")
-            content = metrics.get("contentSize", {})
+            content = metrics.get("cssContentSize") or metrics.get("contentSize", {})
             w = max(1, int(content.get("width", 1280)))
             h = max(1, int(content.get("height", 800)))
-            await self.send_command(
-                ws,
-                "Emulation.setDeviceMetricsOverride",
-                {"width": w, "height": h, "deviceScaleFactor": 1, "mobile": False},
-            )
-            metrics_overridden = True
+            params["clip"] = {"x": 0, "y": 0, "width": w, "height": h, "scale": 1}
+            params["captureBeyondViewport"] = True
 
-        try:
-            result = await self.send_command(ws, "Page.captureScreenshot", params)
-        finally:
-            if metrics_overridden:
-                await self.send_command(ws, "Emulation.clearDeviceMetricsOverride")
-
+        result = await self.send_command(ws, "Page.captureScreenshot", params)
         data = result.get("data", "")
 
         if save_path and data:
-            raw = base64.b64decode(data)
-            if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
-                # フォルダ指定 → yyyymmdd.hhmmss.png で保存
-                os.makedirs(save_path, exist_ok=True)
-                fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
-                dest = os.path.join(save_path, fname)
-                # フォルダ保存は常に PNG
+            await asyncio.to_thread(self._save_screenshot_file, save_path, data, fmt, quality)
+
+        return data
+
+    @staticmethod
+    def _save_screenshot_file(save_path: str, data: str, fmt: str, quality: int) -> None:
+        """Base64 デコード・PIL 変換・ファイル書き込み（ブロッキング I/O）。
+        event loop を塞がないよう asyncio.to_thread から呼び出すこと。"""
+        raw = base64.b64decode(data)
+        if os.path.isdir(save_path) or save_path.endswith(("/", "\\")):
+            # フォルダ指定 → yyyymmdd.hhmmss.png で保存
+            os.makedirs(save_path, exist_ok=True)
+            fname = datetime.now().strftime("%Y%m%d.%H%M%S") + ".png"
+            dest = os.path.join(save_path, fname)
+            # フォルダ保存は常に PNG
+            if fmt == "jpeg":
+                img = _PILImage.open(io.BytesIO(raw))
+                buf = io.BytesIO()
+                img.save(buf, format="PNG", optimize=True)
+                save_bytes = buf.getvalue()
+            else:
+                save_bytes = raw
+        else:
+            # ファイル指定 → 拡張子に合わせて変換
+            dest = save_path
+            parent = os.path.dirname(os.path.abspath(dest))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            ext = os.path.splitext(save_path)[1].lower()
+            if ext in (".jpg", ".jpeg"):
+                img = _PILImage.open(io.BytesIO(raw))
+                buf = io.BytesIO()
+                img.convert("RGB").save(buf, format="JPEG", quality=quality, optimize=True)
+                save_bytes = buf.getvalue()
+            else:
+                # .png その他 → PNG のまま保存
                 if fmt == "jpeg":
                     img = _PILImage.open(io.BytesIO(raw))
                     buf = io.BytesIO()
@@ -520,31 +554,8 @@ class CDPClient:
                     save_bytes = buf.getvalue()
                 else:
                     save_bytes = raw
-            else:
-                # ファイル指定 → 拡張子に合わせて変換
-                dest = save_path
-                parent = os.path.dirname(os.path.abspath(dest))
-                if parent:
-                    os.makedirs(parent, exist_ok=True)
-                ext = os.path.splitext(save_path)[1].lower()
-                if ext in (".jpg", ".jpeg"):
-                    img = _PILImage.open(io.BytesIO(raw))
-                    buf = io.BytesIO()
-                    img.convert("RGB").save(buf, format="JPEG", quality=quality, optimize=True)
-                    save_bytes = buf.getvalue()
-                else:
-                    # .png その他 → PNG のまま保存
-                    if fmt == "jpeg":
-                        img = _PILImage.open(io.BytesIO(raw))
-                        buf = io.BytesIO()
-                        img.save(buf, format="PNG", optimize=True)
-                        save_bytes = buf.getvalue()
-                    else:
-                        save_bytes = raw
-            with open(dest, "wb") as f:
-                f.write(save_bytes)
-
-        return data
+        with open(dest, "wb") as f:
+            f.write(save_bytes)
 
     # ------------------------------------------------------------------ #
     # JavaScript 実行

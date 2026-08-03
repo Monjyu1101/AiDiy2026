@@ -28,12 +28,13 @@ class _FakeMCP:
 
 
 class _FakeChromeManager:
-    def __init__(self):
+    def __init__(self, verified: bool = False):
         self.ensure_thread_id: int | None = None
         self.ensure_count = 0
         self.active_count = 0
         self.max_active_count = 0
         self._lock = threading.Lock()
+        self._verified = verified
 
     def ensure_running(self, show_automation_banner=None):
         self.ensure_thread_id = threading.get_ident()
@@ -44,7 +45,11 @@ class _FakeChromeManager:
         time.sleep(0.02)
         with self._lock:
             self.active_count -= 1
+        self._verified = True
         return "already_running"
+
+    def is_verified(self) -> bool:
+        return self._verified
 
 
 class _FakeRegistry:
@@ -56,6 +61,27 @@ class _FakeRegistry:
     def get(self, session="default", headless=None):
         self.get_thread_id = threading.get_ident()
         time.sleep(0.02)
+        return self.manager, self.cdp
+
+    def peek(self, session="default"):
+        # ホットパスは未検証（is_verified=False 相当）として常に slow path を通す。
+        return None
+
+
+class _FakeWarmRegistry:
+    """既に起動確認済みのセッションを peek() でヒットさせるテスト用レジストリ。"""
+
+    def __init__(self):
+        self.manager = _FakeChromeManager(verified=True)
+        self.cdp = object()
+        self.get_called = False
+
+    def peek(self, session="default"):
+        return (self.manager, self.cdp)
+
+    def get(self, session="default", headless=None):
+        # ウォームパスが機能していれば呼ばれないはず。
+        self.get_called = True
         return self.manager, self.cdp
 
 
@@ -83,6 +109,16 @@ class ChromeEnsureTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(registry.manager.ensure_count, 2)
         self.assertEqual(registry.manager.max_active_count, 1)
+
+    async def test_warm_session_skips_registry_get_and_ensure_running(self):
+        registry = _FakeWarmRegistry()
+        ensure_chrome = register_tools(_FakeMCP(), registry)
+
+        cdp = await ensure_chrome(session="test")
+
+        self.assertIs(cdp, registry.cdp)
+        self.assertFalse(registry.get_called)
+        self.assertEqual(registry.manager.ensure_count, 0)
 
 
 if __name__ == "__main__":

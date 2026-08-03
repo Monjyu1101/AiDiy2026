@@ -153,6 +153,14 @@ def register_tools(mcp, registry):
     ):
         """セッションの Chrome を確保して CDPClient を返す（未起動なら起動）"""
         session = session or "default"
+
+        # ウォームパス: 疎通確認 TTL が有効な間はロック・スレッド往復を使わず
+        # 即座に返す（peek/is_verified はどちらも HTTP を伴わない軽量チェック）。
+        if headless is None:
+            cached = registry.peek(session)
+            if cached is not None and cached[0].is_verified():
+                return cached[1]
+
         lock = startup_locks.setdefault(session, asyncio.Lock())
         async with lock:
             # セッション表の確認には CDP の同期 HTTP 疎通が含まれる場合がある。
