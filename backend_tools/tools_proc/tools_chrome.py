@@ -57,9 +57,9 @@ class ChromeDevToolsRequest(BaseModel):
 
 
 _CHROME_DEVTOOLS_METHODS = [
-    {"name": "navigate", "description": "指定 URL へ移動する",
+    {"name": "navigate", "description": "指定 URL へ移動する。戻り値に readyState を含むため、多くの場合 wait_for_load は不要",
      "parameters": {"url": {"type": "string", "required": True}, "tab_id": {"type": "string", "required": False}, "show_automation_banner": {"type": "boolean", "required": False, "default": True}}},
-    {"name": "reload", "description": "現在のページをリロードする", "parameters": {"tab_id": {"type": "string", "required": False}}},
+    {"name": "reload", "description": "現在のページをリロードする。戻り値に readyState を含む", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "go_back", "description": "ブラウザの戻るボタン相当", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "go_forward", "description": "ブラウザの進むボタン相当", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "screenshot", "description": "スクリーンショットを撮る",
@@ -86,7 +86,7 @@ _CHROME_DEVTOOLS_METHODS = [
     {"name": "activate_tab", "description": "指定タブをアクティブにする", "parameters": {"tab_id": {"type": "string", "required": True}}},
     {"name": "set_viewport", "description": "ビューポートサイズを設定する",
      "parameters": {"width": {"type": "integer", "required": True}, "height": {"type": "integer", "required": True}, "tab_id": {"type": "string", "required": False}}},
-    {"name": "wait_for_load", "description": "ページのロード完了を待つ",
+    {"name": "wait_for_load", "description": "ページのロード完了を待つ。navigate/reload の readyState が complete でない場合のみ使用（多用すると遅くなる）",
      "parameters": {"tab_id": {"type": "string", "required": False}, "timeout": {"type": "number", "required": False, "default": 10.0}}},
     {"name": "install_console_capture", "description": "コンソールログのキャプチャをページに設置する", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "get_console_logs", "description": "キャプチャされたコンソールログを取得する",
@@ -179,7 +179,8 @@ def register_tools(mcp, registry):
         show_automation_banner: bool = True,
     ) -> str:
         """
-        指定URLへ移動する。
+        指定URLへ移動する。戻り値に readyState を含むため、続けて操作してよいか
+        その場で判断できる（多くの場合 wait_for_load の呼び出しは不要）。
 
         Args:
             show_automation_banner: Chrome 未起動時の自動起動で「自動操作中」の帯を表示する。
@@ -191,7 +192,7 @@ def register_tools(mcp, registry):
 
     @mcp.tool()
     async def reload(session: str = "default", tab_id: Optional[str] = None) -> str:
-        """現在のページをリロードする"""
+        """現在のページをリロードする（戻り値に readyState を含む）"""
         cdp = await _ensure_chrome(session=session)
         result = await cdp.reload(tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
@@ -349,7 +350,11 @@ def register_tools(mcp, registry):
 
     @mcp.tool()
     async def wait_for_load(session: str = "default", tab_id: Optional[str] = None, timeout: float = 10.0) -> str:
-        """ページのロード完了を待つ（最大timeout秒）"""
+        """
+        ページのロード完了を待つ（最大timeout秒）。
+        navigate/reload の戻り値の readyState が 'complete' でない場合のみ使う。
+        毎回呼ぶと遅くなるため多用しないこと。
+        """
         cdp = await _ensure_chrome(session=session)
         result = await cdp.wait_for_load(tab_id, timeout)
         return json.dumps({"result": result}, ensure_ascii=False)
@@ -667,6 +672,9 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
             "endpoint": "POST /aidiy_chrome_devtools/{method_name}",
             "content_type": "application/json",
             "how_to_call": "method_name を URL パスに指定し、JSON body に各メソッドのパラメータをフラットに渡す。tab_id を省略すると最初のタブを使用する。session を省略すると 'default' セッション（従来の Chrome）を使用する。",
+            "tab_id": {
+                "description": "省略または 'auto' 指定で、セッション内で一度解決したタブ（自動解決タブ）を再利用する。毎回タブ一覧を取得し直さないため高速。タブを閉じる/切り替える操作をした場合は次回呼び出しで自動的に再解決される。複数タブを明示的に使い分けたい場合のみ list_tabs で取得した id を指定する。",
+            },
             "sessions": {
                 "description": "session パラメータ（自由な文字列）ごとに独立した Chrome（ポート・プロファイル）を起動・管理する。並行実行（自動テスト等）は session を分けることで互いに干渉しない。",
                 "default": "標準は 'default' で通常は指定不要（省略時はポート 9222 + 従来プロファイルで後方互換）",
@@ -732,7 +740,8 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
                 "js_get_dialog_state": {},
             },
             "response_fields": {
-                "navigate / reload / go_back / go_forward": {"result": "成功=True または完了メッセージ"},
+                "navigate / reload": {"result": "完了メッセージ（readyState を含む。'complete' でなければ必要な場合のみ wait_for_load を使う）"},
+                "go_back / go_forward": {"result": "成功=True または完了メッセージ"},
                 "screenshot": {"type": "image", "data": "PNG の base64 文字列", "mimeType": "image/png"},
                 "get_page_info": {"url": "現在の URL", "title": "ページタイトル", "readyState": "complete / loading / interactive"},
                 "get_html": {"result": "ページ HTML 全文"},

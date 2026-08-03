@@ -72,6 +72,9 @@ class CDPClient:
         self._ws_locks: dict[str, asyncio.Lock] = {}
         self._connection_loop: Optional[asyncio.AbstractEventLoop] = None
         self._command_id = 0
+        # tab_id 省略時 (= "auto") に解決したタブをセッション内で使い回すキャッシュ。
+        # 呼び出しのたびに /json でタブ一覧を取得し直すコストを避ける。
+        self._auto_tab: Optional[dict] = None
 
     # ------------------------------------------------------------------ #
     # 内部ヘルパー
@@ -169,6 +172,10 @@ class CDPClient:
 
             except (websockets.exceptions.WebSocketException, OSError) as e:
                 await self._discard_connection(ws_url, ws)
+                # 自動解決タブがこの接続先だった場合、タブが閉じられた等で無効に
+                # なった可能性がある。次回呼び出しで再解決させるためキャッシュを破棄。
+                if self._auto_tab is not None and self._auto_tab.get("webSocketDebuggerUrl") == ws_url:
+                    self._auto_tab = None
                 raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}") from e
             except TimeoutError:
                 await self._discard_connection(ws_url, ws)
@@ -217,15 +224,22 @@ class CDPClient:
         """
         タブ情報を返す
 
-        tab_id が None の場合は type=page の最初のタブを返す。
+        tab_id が None または "auto" の場合は "自動解決タブ" を使う。
+        セッション内で一度解決したタブ情報をキャッシュして使い回すため、
+        呼び出しのたびに Chrome へタブ一覧を問い合わせるコストを避けられる。
+        tab_id を明示指定した場合は常にタブ一覧から検索する（キャッシュ不使用）。
         """
+        is_auto = not tab_id or tab_id == "auto"
+        if is_auto and self._auto_tab is not None:
+            return self._auto_tab
+
         tabs = self.list_tabs()
         if not tabs:
             raise ChromeDevToolsError(
                 "タブが見つかりません。Chrome でページを開いてください。"
             )
 
-        if tab_id:
+        if not is_auto:
             tab = next((t for t in tabs if t["id"] == tab_id), None)
             if not tab:
                 available = [t["id"] for t in tabs]
@@ -236,7 +250,9 @@ class CDPClient:
             return tab
 
         page_tabs = [t for t in tabs if t.get("type") == "page"]
-        return page_tabs[0] if page_tabs else tabs[0]
+        tab = page_tabs[0] if page_tabs else tabs[0]
+        self._auto_tab = tab
+        return tab
 
     def get_ws_url(self, tab: dict) -> str:
         """タブの webSocketDebuggerUrl を取得"""
@@ -302,6 +318,8 @@ class CDPClient:
         """タブを閉じ、対応する再利用 WebSocket も破棄する。"""
         tab = await self.resolve_tab_async(tab_id)
         ws_url = self.get_ws_url(tab)
+        if self._auto_tab is not None and self._auto_tab.get("id") == tab_id:
+            self._auto_tab = None
         try:
             return await asyncio.to_thread(self.close_tab_sync, tab_id)
         finally:
@@ -319,6 +337,22 @@ class CDPClient:
     # ナビゲーション
     # ------------------------------------------------------------------ #
 
+    async def _quick_ready_state(self, ws: str) -> str:
+        """
+        document.readyState を 1 回だけ確認する（ポーリングしない）。
+
+        ページ遷移直後に「busy かどうか」を即座に呼び出し元へ返すためのヘルパー。
+        wait_for_load のような完了待ちループは行わず、その場の状態を返してすぐ戻る。
+        """
+        try:
+            result = await self.send_command(
+                ws, "Runtime.evaluate",
+                {"expression": "document.readyState", "returnByValue": True},
+            )
+            return result.get("result", {}).get("value", "") or "unknown"
+        except ChromeDevToolsError:
+            return "unknown"
+
     async def navigate(self, url: str, tab_id: Optional[str] = None) -> str:
         """URL に移動する"""
         tab = await self.resolve_tab_async(tab_id)
@@ -328,14 +362,16 @@ class CDPClient:
         error = result.get("errorText", "")
         if error:
             return f"移動エラー: {error} → {url}"
-        return f"移動完了: {url} (frame: {frame_id[:8]}...)"
+        state = await self._quick_ready_state(ws)
+        return f"移動完了: {url} (frame: {frame_id[:8]}..., readyState: {state})"
 
     async def reload(self, tab_id: Optional[str] = None) -> str:
         """ページをリロードする"""
         tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         await self.send_command(ws, "Page.reload", {})
-        return "リロードしました"
+        state = await self._quick_ready_state(ws)
+        return f"リロードしました (readyState: {state})"
 
     async def go_back(self, tab_id: Optional[str] = None) -> str:
         """ブラウザの戻るボタン相当"""
@@ -706,6 +742,10 @@ class CDPClient:
     ) -> str:
         """
         document.readyState が 'complete' になるまでポーリング (最大 timeout 秒)
+
+        navigate/reload は戻り値に readyState を含めて即座に返るため、
+        「まだ complete になっていない」ことが分かっている場合のみ、
+        本メソッドで完了を待つ用途に限定して使うこと（多用すると遅くなる）。
         """
         tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
@@ -726,7 +766,7 @@ class CDPClient:
             if state == "complete":
                 return f"ロード完了 ({elapsed:.1f}秒)"
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.2)
 
     # ------------------------------------------------------------------ #
     # コンソールログ (JS 注入キャプチャ)

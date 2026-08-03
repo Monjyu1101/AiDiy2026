@@ -50,6 +50,11 @@ _PROFILE_DIR = str(Path(__file__).parent.parent / "temp" / "_chrome_profile")
 _LOOPBACK_HOST = "127.0.0.1"
 _NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
+# launch() は呼び出しのたびに /json/version へ疎通確認していたため、
+# 連続するツール呼び出しのたびに HTTP ラウンドトリップが発生していた。
+# 直近の疎通確認から一定時間は結果を信用し、確認を省略する。
+_VERIFIED_TTL = 5.0
+
 
 class ChromeManager:
     """
@@ -71,6 +76,7 @@ class ChromeManager:
         self.show_automation_banner = show_automation_banner
         self.headless = headless
         self._process: subprocess.Popen | None = None
+        self._verified_until: float = 0.0
 
     # ------------------------------------------------------------------ #
     # 状態確認
@@ -239,7 +245,11 @@ class ChromeManager:
         Raises:
             FileNotFoundError: Chrome が見つからない場合
         """
+        if time.monotonic() < self._verified_until:
+            return "already_running"
+
         if self.is_running():
+            self._verified_until = time.monotonic() + _VERIFIED_TTL
             return "already_running"
 
         chrome_path = self.find_chrome()
@@ -264,6 +274,7 @@ class ChromeManager:
         deadline = time.monotonic() + wait_timeout
         while time.monotonic() < deadline:
             if self.is_running():
+                self._verified_until = time.monotonic() + _VERIFIED_TTL
                 logger.info(f"起動完了 (port={self.debug_port})")
                 return "launched"
             time.sleep(0.3)
