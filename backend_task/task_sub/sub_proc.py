@@ -34,7 +34,7 @@ import urllib.request
 from urllib.parse import quote
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TASK_API = "http://localhost:8093/task"
+TASK_API = "http://127.0.0.1:8093/task"
 MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
 通知音URL = "http://127.0.0.1:8095/aidiy_notification_sounds/play"
 _LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -134,7 +134,7 @@ def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対
 【操作検証】このステップはファイルの更新・追加・書込を伴う作業です。作業後に変更内容を
 実際に確認し、意図した通りに反映されているか検証してください。検証したら、結果を必ず
 次の HTTP エンドポイントへ直接報告してください（curl 等でこの AI エージェント自身が呼び出します）。
-  POST http://localhost:8093/task_check_okng
+  POST http://127.0.0.1:8093/task_check_okng
   Content-Type: application/json
   Body: {{"タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証内容の要約"}}
   検証で問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。

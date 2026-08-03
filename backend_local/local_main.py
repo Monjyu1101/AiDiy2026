@@ -106,7 +106,7 @@ app = FastAPI(
     title="AiDiy Local LLM Server",
     description=(
         "HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API で提供するローカル推論サーバー。\n\n"
-        "OpenAI SDK の `base_url` に `http://localhost:8096/v1` を指定して利用できます。\n\n"
+        "OpenAI SDK の `base_url` に `http://127.0.0.1:8096/v1` を指定して利用できます。\n\n"
         "- `POST /v1/chat/completions` — チャット補完（OpenAI 標準）\n"
         "- `GET /v1/models` — モデル一覧"
     ),
@@ -180,7 +180,7 @@ async def health() -> dict:
 # ------------------------------------------------------------------ #
 
 if __name__ == "__main__":
-    base = f"http://localhost:{LOCAL_PORT}"
+    base = f"http://127.0.0.1:{LOCAL_PORT}"
     source, local_only = engine.resolve_source()
     logger.info("AiDiy Local LLM Server")
     logger.info(f"Model            : {LOCAL_MODEL}")

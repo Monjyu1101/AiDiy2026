@@ -34,7 +34,7 @@ from tools_proc.code_agents import CodeAgents, CodeAgentsError
 
 
 TEST_PROMPT = "1+1の計算結果だけを数字で答えてください。余計な説明は不要です。"
-BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://127.0.0.1:8095").rstrip("/")
 HTTP_TIMEOUT = float(os.environ.get("AIDIY_MCP_EXTERNAL_TIMEOUT", "1200"))
 
 

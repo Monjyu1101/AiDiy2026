@@ -27,7 +27,7 @@ async def evaluate(ws_url: str, expression: str) -> dict:
 
 
 def find_ws_url(tab_id: str) -> str:
-    resp = urllib.request.urlopen("http://localhost:9222/json")
+    resp = urllib.request.urlopen("http://127.0.0.1:9222/json")
     pages = json.loads(resp.read())
     for p in pages:
         if p.get("id") == tab_id:

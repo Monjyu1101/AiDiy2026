@@ -35,8 +35,8 @@ from urllib.parse import quote
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AIDIYルート = os.path.normpath(os.path.join(BASE_DIR, ".."))
-TEAM_API = "http://localhost:8094/team"
-TASK_API = "http://localhost:8093/task"
+TEAM_API = "http://127.0.0.1:8094/team"
+TASK_API = "http://127.0.0.1:8093/task"
 MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
 _LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TEAM_AI_NAME既定 = "claude_cli"

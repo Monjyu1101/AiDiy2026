@@ -27,7 +27,7 @@ class TaskAgents:
     """backend_task API へ AIタスク要求を投入する薄いクライアント"""
 
     def __init__(self, task_api_base: Optional[str] = None):
-        self.task_api_base = (task_api_base or os.environ.get("AIDIY_TASK_API_BASE") or "http://localhost:8093").rstrip("/")
+        self.task_api_base = (task_api_base or os.environ.get("AIDIY_TASK_API_BASE") or "http://127.0.0.1:8093").rstrip("/")
 
     def get_config(self) -> dict:
         """接続先と疎通状態を返す。backend_task 未起動でも例外にしない。"""

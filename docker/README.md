@@ -27,8 +27,8 @@ https://localhost/
 ## 📚 API
 
 ```
-http://localhost:8091/docs  # Core API (C系, A系)
-http://localhost:9098/docs  # Apps API (M系, T系, V系, S系)
+http://127.0.0.1:8091/docs  # Core API (C系, A系)
+http://127.0.0.1:9098/docs  # Apps API (M系, T系, V系, S系)
 ```
 
 ## この構成に含まれないサービス

@@ -42,7 +42,7 @@ proxy: {
 }
 ```
 
-- `ws: true` は WebSocket 転送に必要。AIコアの `ws://localhost:8090/core/ws/AIコア` も backend core へ転送される。
+- `ws: true` は WebSocket 転送に必要。AIコアの `ws://127.0.0.1:8090/core/ws/AIコア` も backend core へ転送される。
 - `/core` / `/apps` の prefix は backend 側エンドポイントでも使うため、rewrite で削らない。
 - `frontend_avatar` は `strictPort: true`。WebSocket URL を host から動的生成するため 8092 固定が前提。
 
@@ -70,9 +70,9 @@ proxy: {
 
 ```python
 origins = [
-    "http://localhost:8090",
-    "http://localhost:8092",
-    "http://localhost:5173",
+    "http://127.0.0.1:8090",
+    "http://127.0.0.1:8092",
+    "http://127.0.0.1:5173",
 ]
 ```
 
@@ -89,7 +89,7 @@ Electron と Web で同じ proxy 前提にできるよう、明示 URL を増や
 ## 注意点
 - CORS エラーではまず `core_main.py` / `apps_main.py` の許可リストを見る。
 - `localhost` と `127.0.0.1` はブラウザ上の origin が別。CORS、Storage、ログイン状態で混同しない。
-- Vite dev server を介さず `http://localhost:8091/core/...` へ直アクセスすると、Origin 条件が通常の画面確認と変わる。
+- Vite dev server を介さず `http://127.0.0.1:8091/core/...` へ直アクセスすると、Origin 条件が通常の画面確認と変わる。
 - 静的X系の `public/<画面名>/index.html` は Vite がそのまま配信する。404 の場合は proxy ではなく `public` パス、`BASE_URL`、日本語URLエンコードを疑う。
 
 ## 確認方法
@@ -97,7 +97,7 @@ Electron と Web で同じ proxy 前提にできるよう、明示 URL を増や
 ```powershell
 cd frontend_web
 npm run dev
-Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:8090/core/サーバー状態'
+Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8090/core/サーバー状態'
 ```
 
 - DevTools Network で `OPTIONS` が 200 を返すか、`Access-Control-Allow-Origin` が付くかを確認する。

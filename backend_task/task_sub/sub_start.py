@@ -30,7 +30,7 @@ import urllib.request
 from urllib.parse import quote
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TASK_API = "http://localhost:8093/task"
+TASK_API = "http://127.0.0.1:8093/task"
 バックアップURL = "http://127.0.0.1:8095/aidiy_backup/save/run"
 _LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 

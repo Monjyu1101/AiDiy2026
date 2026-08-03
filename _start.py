@@ -356,7 +356,7 @@ def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool, bool]
 # ============================================================
 def open_browser(port: int) -> None:
     print_header("ページ表示")
-    url = f"http://localhost:{port}"
+    url = f"http://127.0.0.1:{port}"
     try:
         webbrowser.open(url)
         print_success(f"ブラウザを開きました: {url}")
@@ -368,7 +368,7 @@ def _tools_post(path: str, body: dict, timeout: int = 30) -> dict:
     """backend_tools の HTTP POST インターフェースを呼ぶ (urllib のみ使用)"""
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
-        f"http://localhost:{TOOLS.PORT}{path}",
+        f"http://127.0.0.1:{TOOLS.PORT}{path}",
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -379,7 +379,7 @@ def _tools_post(path: str, body: dict, timeout: int = 30) -> dict:
 
 def open_browser_via_tools(port: int) -> bool:
     print_header("ブラウザページ表示")
-    url = f"http://localhost:{port}"
+    url = f"http://127.0.0.1:{port}"
     try:
         _tools_post(
             "/aidiy_chrome_devtools/new_page",
@@ -802,22 +802,22 @@ def main() -> None:
 
             print_header("起動完了")
             if "バックエンド(local)" in processes:
-                print_success(f"バックエンド(local): http://localhost:{LOCAL.PORT}/docs")
-                print_info   (f"  OpenAI互換 (利用時にモデルロード): http://localhost:{LOCAL.PORT}/v1/chat/completions")
+                print_success(f"バックエンド(local): http://127.0.0.1:{LOCAL.PORT}/docs")
+                print_info   (f"  OpenAI互換 (利用時にモデルロード): http://127.0.0.1:{LOCAL.PORT}/v1/chat/completions")
             if "バックエンド(tools)" in processes:
-                print_success(f"バックエンド(tools) Swagger UI : http://localhost:{TOOLS.PORT}/docs")
-                print_info   (f"  ツール一覧(例)            : http://localhost:{TOOLS.PORT}/aidiy_text_to_speech/list")
-                print_info   (f"  利用可能 ツール 一覧      : http://localhost:{TOOLS.PORT}/")
+                print_success(f"バックエンド(tools) Swagger UI : http://127.0.0.1:{TOOLS.PORT}/docs")
+                print_info   (f"  ツール一覧(例)            : http://127.0.0.1:{TOOLS.PORT}/aidiy_text_to_speech/list")
+                print_info   (f"  利用可能 ツール 一覧      : http://127.0.0.1:{TOOLS.PORT}/")
             if "バックエンド(core)" in processes:
-                print_success(f"バックエンド(core): http://localhost:{SERVER.CORE_PORT}/docs")
+                print_success(f"バックエンド(core): http://127.0.0.1:{SERVER.CORE_PORT}/docs")
             if "バックエンド(apps)" in processes:
-                print_success(f"バックエンド(apps): http://localhost:{SERVER.APPS_PORT}/docs")
+                print_success(f"バックエンド(apps): http://127.0.0.1:{SERVER.APPS_PORT}/docs")
             if "バックエンド(task)" in processes:
-                print_success(f"バックエンド(task): http://localhost:{TASK.PORT}/docs")
+                print_success(f"バックエンド(task): http://127.0.0.1:{TASK.PORT}/docs")
             if "バックエンド(team)" in processes:
-                print_success(f"バックエンド(team): http://localhost:{TEAM.PORT}/docs")
+                print_success(f"バックエンド(team): http://127.0.0.1:{TEAM.PORT}/docs")
             if "フロントエンド(Web)" in processes:
-                print_success(f"フロントエンド(Web): http://localhost:{WEB.PORT}/")
+                print_success(f"フロントエンド(Web): http://127.0.0.1:{WEB.PORT}/")
             if "フロントエンド(Avatar)" in processes:
                 print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{AVATAR.PORT}")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)

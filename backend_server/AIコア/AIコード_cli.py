@@ -347,7 +347,7 @@ class CodeAI:
             if (self.code_model or "").lower() == "local_chat":
                 local_args = [
                     "--provider", "lmstudio",
-                    "--base-url", "http://localhost:8096/v1",
+                    "--base-url", "http://127.0.0.1:8096/v1",
                     "--api-key", "local",
                     "--model", "local_chat",
                 ]

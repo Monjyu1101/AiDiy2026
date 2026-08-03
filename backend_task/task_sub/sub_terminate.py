@@ -24,7 +24,7 @@
 2. /task/タスク明細/一覧 から全明細（完了済みの応答内容、対象行の操作検証フラグ）を取得する
 3. 操作検証=false なら /task/タスク明細/終了完了 を呼んで終了する
 4. 操作検証=true なら aidiy_code_agents MCP へ最終検証を依頼し、結論は AI 自身が
-   http://localhost:8093/task_check_okng へ直接報告する
+   http://127.0.0.1:8093/task_check_okng へ直接報告する
 5. AI 応答後に明細の状態を確認し、完了/エラーのいずれにも更新されていなければ
    /task/タスク明細/失敗 で強制的にエラーにする
 """
@@ -39,7 +39,7 @@ import urllib.request
 from urllib.parse import quote
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TASK_API = "http://localhost:8093/task"
+TASK_API = "http://127.0.0.1:8093/task"
 MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
 _LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TASK_AI_NAME既定 = "codex_cli"
@@ -149,7 +149,7 @@ def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対
   ツールの実行: POST http://127.0.0.1:8095/<mcp名>/<メソッド> （JSON ボディ）
   例: aidiy_notification_sounds, aidiy_sqlite, aidiy_chrome_devtools など
 - 検証結果は必ず次の HTTP エンドポイントへ直接報告してください（あなた自身が curl 等で呼び出します）。
-  POST http://localhost:8093/task_check_okng
+  POST http://127.0.0.1:8093/task_check_okng
   Content-Type: application/json
   Body: {{"タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証結論の要約"}}
   問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。

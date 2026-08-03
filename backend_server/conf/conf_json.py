@@ -50,7 +50,7 @@ class conf_json:
 
         # Ollamaの基本設定（ローカルLLM）
         'ollama_key_id': '< your ollama api key >',
-        'ollama_host': 'http://localhost:11434',
+        'ollama_host': 'http://127.0.0.1:11434',
 
         # HuggingFaceの基本設定（ローカルLLM / モデルダウンロード）
         'huggingface_key_read': '< your huggingface read key >',

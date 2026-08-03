@@ -257,7 +257,7 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 | 判定 | `window.desktopApi` あり | `window.desktopApi` なし |
 | 認証 Storage | `localStorage` | `sessionStorage` |
 | UI | 複数 Electron ウィンドウ | 左アバター + 右タブ |
-| アクセス | `http://127.0.0.1:8092` | `http://localhost:8092` |
+| アクセス | `http://127.0.0.1:8092` | `http://127.0.0.1:8092` |
 
 主な技術:
 
@@ -301,7 +301,7 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 | `aidiy_team_agents` | backend_team の Aチーム依頼への非同期投入（`submit`）と進捗確認（`get_work_status` / `get_work_list` / `get_member_list`） |
 | `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
-各 MCP は **SSE Transport**、**Streamable HTTP Transport**、**stdio gateway（`mcp_stdio.py`）** の 3 トランスポートを同一ポートで提供します。Python の `requests` でそのまま呼び出せるため、自動化スクリプトやバックエンドルーターからも利用できます。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://localhost:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供します。
+各 MCP は **SSE Transport**、**Streamable HTTP Transport**、**stdio gateway（`mcp_stdio.py`）** の 3 トランスポートを同一ポートで提供します。Python の `requests` でそのまま呼び出せるため、自動化スクリプトやバックエンドルーターからも利用できます。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://127.0.0.1:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供します。
 
 MCP の使い分けと設定は `.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md` を参照してください。
 

@@ -255,7 +255,7 @@ cd command_hermes
 ```powershell
 @'
 from cli_main import HermesCLI
-cli = HermesCLI(model="deepseek-v4-flash", base_url="http://localhost:11434/v1")
+cli = HermesCLI(model="deepseek-v4-flash", base_url="http://127.0.0.1:11434/v1")
 print(cli.process_command("/q"))
 cli.process_command("/model qwen3:latest")
 print(cli.model)

@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools_proc.movie_generation import MovieGeneration, MovieGenerationError
 
 
-BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://127.0.0.1:8095").rstrip("/")
 HTTP_TIMEOUT = float(os.environ.get("AIDIY_MCP_EXTERNAL_TIMEOUT", "1200"))
 POST_SAVE_DIR = Path(__file__).resolve().parent / "temp" / "post_movie"
 

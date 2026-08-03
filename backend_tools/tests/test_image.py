@@ -23,7 +23,7 @@ from PIL import Image as PILImage
 from tools_proc.image_generation import ImageGeneration, ImageGenerationError
 
 
-BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://127.0.0.1:8095").rstrip("/")
 HTTP_TIMEOUT = float(os.environ.get("AIDIY_MCP_EXTERNAL_TIMEOUT", "1200"))
 POST_SAVE_DIR = Path(__file__).resolve().parent / "temp" / "post_image"
 

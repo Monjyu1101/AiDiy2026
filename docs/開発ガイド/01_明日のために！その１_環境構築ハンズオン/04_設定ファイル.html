@@ -55,8 +55,8 @@
   port: 8090,
   host: '0.0.0.0',
   proxy: {
-    '/core': { target: 'http://localhost:8091', changeOrigin: true },
-    '/apps': { target: 'http://localhost:9098', changeOrigin: true }
+    '/core': { target: 'http://127.0.0.1:8091', changeOrigin: true },
+    '/apps': { target: 'http://127.0.0.1:9098', changeOrigin: true }
   }
 }</code></pre>
 

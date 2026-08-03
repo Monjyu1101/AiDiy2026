@@ -40,7 +40,7 @@ class ObsStudioControlError(Exception):
 class ObsStudioControl:
     """OBS Studio WebSocket v5 クライアント"""
 
-    DEFAULT_HOST = "localhost"
+    DEFAULT_HOST = "127.0.0.1"
     DEFAULT_PORT = 4455
     DEFAULT_PASSWORD = "aidiy4455"
     DEFAULT_TIMEOUT = 10.0

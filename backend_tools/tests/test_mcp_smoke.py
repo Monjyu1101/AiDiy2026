@@ -41,7 +41,7 @@ from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 
 
-BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://127.0.0.1:8095").rstrip("/")
 
 
 SERVERS = [

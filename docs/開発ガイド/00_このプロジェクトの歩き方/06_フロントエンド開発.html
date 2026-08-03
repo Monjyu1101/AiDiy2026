@@ -148,13 +148,13 @@
 
  <pre><code> Vite Proxy の仕組み
  ブラウザ → Vite開発サーバー → バックエンドサーバー
-/core/C利用者/一覧 →  localhost:8091/core/C利用者/一覧
-/apps/M車両/一覧  →  localhost:9098/apps/M車両/一覧
+/core/C利用者/一覧 →  127.0.0.1:8091/core/C利用者/一覧
+/apps/M車両/一覧  →  127.0.0.1:9098/apps/M車両/一覧
  (CORSの問題を回避)</code></pre>
 
  <ul>
  <li>フロントエンドでは <code>/core/*</code> や <code>/apps/*</code> のパスでAPIを呼び出します</li>
- <li>Viteの開発サーバーが <code>localhost:8091</code> や <code>localhost:9098</code> にプロキシします</li>
+ <li>Viteの開発サーバーが <code>127.0.0.1:8091</code> や <code>127.0.0.1:9098</code> にプロキシします</li>
  <li>404エラーが出る場合は<code>vite.config.ts</code>のプロキシ設定を確認してください</li>
  </ul>
 
@@ -162,8 +162,8 @@
  <strong>設定ファイル</strong>
  <p><code>frontend_web/vite.config.ts</code> の <code>server.proxy</code> セクションで設定されています。</p>
  <p>
- <code>/core</code> → <code>http://localhost:8091/core</code><br>
- <code>/apps</code> → <code>http://localhost:9098/apps</code>
+ <code>/core</code> → <code>http://127.0.0.1:8091/core</code><br>
+ <code>/apps</code> → <code>http://127.0.0.1:9098/apps</code>
  </p>
  </div>
  </section>

@@ -71,11 +71,11 @@ body: { 利用者ID, パスワード }
 ## 確認方法
 
 ```powershell
-$login = Invoke-RestMethod -Method Post -Uri "http://localhost:8091/core/auth/ログイン" `
+$login = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8091/core/auth/ログイン" `
   -ContentType "application/json" `
   -Body '{"利用者ID":"admin","パスワード":"admin"}'
 
 $token = $login.data.access_token
-Invoke-RestMethod -Method Post -Uri "http://localhost:8091/core/auth/トークン更新" `
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8091/core/auth/トークン更新" `
   -Headers @{ Authorization = "Bearer $token" }
 ```

@@ -170,16 +170,16 @@ npm run dev
 
 | サービス | URL |
 |---|---|
-| Web フロント | http://localhost:8090 |
-| Core API Docs | http://localhost:8091/docs |
-| Apps API Docs | http://localhost:9098/docs |
-| Backend Local Docs | http://localhost:8096/docs |
-| Backend Task Docs | http://localhost:8093/docs |
-| Backend Team Docs | http://localhost:8094/docs |
-| Backend MCP 一覧 | http://localhost:8095/ |
-| Backend MCP ツール一覧 | http://localhost:8095/{mcp_name}/list |
-| Backend MCP SSE 接続 | http://localhost:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
-| Avatar Web モード | http://localhost:8092 |
+| Web フロント | http://127.0.0.1:8090 |
+| Core API Docs | http://127.0.0.1:8091/docs |
+| Apps API Docs | http://127.0.0.1:9098/docs |
+| Backend Local Docs | http://127.0.0.1:8096/docs |
+| Backend Task Docs | http://127.0.0.1:8093/docs |
+| Backend Team Docs | http://127.0.0.1:8094/docs |
+| Backend MCP 一覧 | http://127.0.0.1:8095/ |
+| Backend MCP ツール一覧 | http://127.0.0.1:8095/{mcp_name}/list |
+| Backend MCP SSE 接続 | http://127.0.0.1:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
+| Avatar Web モード | http://127.0.0.1:8092 |
 | Avatar Electron モード | `npm run dev` で Electron アプリ起動 |
 
 MCP は 19 サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup` / `aidiy_image_generation` / `aidiy_movie_generation` / `aidiy_speech_to_text` / `aidiy_text_to_speech` / `aidiy_obs_studio_control` / `aidiy_ffmpeg_control` / `aidiy_notification_sounds` / `aidiy_code_agents` / `aidiy_chat_llms` / `aidiy_task_agents` / `aidiy_team_agents` / `aidiy_windows_control`）です。詳細は [backend_tools/AGENTS.md](./backend_tools/AGENTS.md) を参照してください。

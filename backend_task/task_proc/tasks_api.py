@@ -717,7 +717,7 @@ async def タスク明細再試行(request: タスク明細再試行リクエス
 async def task_check_okng(request: タスク検証OKNGリクエスト) -> dict:
     """操作検証の結果を AI エージェントから直接報告してもらうための ASCII エンドポイント。
 
-    http://localhost:8093/task_check_okng で日本語パスの percent-encode なしに呼べる。
+    http://127.0.0.1:8093/task_check_okng で日本語パスの percent-encode なしに呼べる。
     状態='完了' は 明細完了 と同じ扱い、状態='エラー' は 明細失敗 と同じ扱いで DB を更新する。
     """
     タスクID = request.タスクID.strip()

@@ -6,6 +6,6 @@ start "cmd.exe" "python" _setup.py
 
 ECHO;
 ECHO Waiting... 5s
-ping localhost -w 1000 -n 5 >nul
+ping 127.0.0.1 -w 1000 -n 5 >nul
 
 exit

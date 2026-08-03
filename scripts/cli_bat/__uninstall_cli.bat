@@ -15,7 +15,7 @@ start npm uninstall -g @github/copilot
 
 ECHO;
 ECHO Waiting...5s
-ping localhost -w 1000 -n 5 >nul
+ping 127.0.0.1 -w 1000 -n 5 >nul
 
 ECHO;
 ECHO -----------

@@ -16,7 +16,7 @@ GemmaEngine をバックエンドに、以下の標準エンドポイントを�
 - GET  /v1/models            （利用可能モデル一覧）
 
 OpenAI SDK / 各種クライアントの base_url に
-http://localhost:8096/v1 を指定して利用できる。
+http://127.0.0.1:8096/v1 を指定して利用できる。
 """
 
 import asyncio

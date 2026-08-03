@@ -462,7 +462,7 @@ app.openapi = _build_custom_openapi
 # ------------------------------------------------------------------ #
 
 if __name__ == "__main__":
-    base = f"http://localhost:{MCP_PORT}"
+    base = f"http://127.0.0.1:{MCP_PORT}"
     logger.info(f"MCP Index            : {base}/")
     logger.info(f"--- initialize[POST] / list[GET] / ping[GET] / {{method}}[POST] ---")
     logger.info(f"Chrome               : {base}/aidiy_chrome_devtools/  SSE:{MOUNT}/sse")

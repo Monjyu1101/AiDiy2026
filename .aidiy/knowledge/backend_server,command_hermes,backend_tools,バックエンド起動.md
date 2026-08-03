@@ -110,10 +110,10 @@ cd backend_server
 ## 確認方法
 
 ```text
-http://localhost:8091/docs
-http://localhost:9098/docs
-http://localhost:8093/docs
-http://localhost:8095/aidiy_sqlite/sse
+http://127.0.0.1:8091/docs
+http://127.0.0.1:9098/docs
+http://127.0.0.1:8093/docs
+http://127.0.0.1:8095/aidiy_sqlite/sse
 ```
 
 Backend 変更後の最小確認:

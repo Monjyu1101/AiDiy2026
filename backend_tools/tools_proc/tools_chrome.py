@@ -688,8 +688,8 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
             },
             "example_requests": {
                 "list_tabs": {},
-                "navigate": {"url": "http://localhost:8090"},
-                "navigate (別セッション)": {"url": "http://localhost:8090", "session": "自動テストA"},
+                "navigate": {"url": "http://127.0.0.1:8090"},
+                "navigate (別セッション)": {"url": "http://127.0.0.1:8090", "session": "自動テストA"},
                 "open_session": {"session": "自動テストA", "headless": True},
                 "list_sessions": {},
                 "close_session": {"session": "自動テストA"},

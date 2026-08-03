@@ -133,15 +133,15 @@ npm run dev
 
 | 用途 | URL |
 |------|-----|
-| Web フロント | http://localhost:8090 |
-| Core API Docs | http://localhost:8091/docs |
-| Apps API Docs | http://localhost:9098/docs |
-| Task API Docs | http://localhost:8093/docs |
-| Local API Docs | http://localhost:8096/docs |
-| Backend MCP 一覧（19 サーバー） | http://localhost:8095/ |
-| Backend MCP ツール一覧 | http://localhost:8095/{mcp_name}/list |
-| Backend MCP SSE 接続 | http://localhost:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
-| Avatar Web モード | http://localhost:8092 |
+| Web フロント | http://127.0.0.1:8090 |
+| Core API Docs | http://127.0.0.1:8091/docs |
+| Apps API Docs | http://127.0.0.1:9098/docs |
+| Task API Docs | http://127.0.0.1:8093/docs |
+| Local API Docs | http://127.0.0.1:8096/docs |
+| Backend MCP 一覧（19 サーバー） | http://127.0.0.1:8095/ |
+| Backend MCP ツール一覧 | http://127.0.0.1:8095/{mcp_name}/list |
+| Backend MCP SSE 接続 | http://127.0.0.1:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
+| Avatar Web モード | http://127.0.0.1:8092 |
 
 初期ユーザー:
 
@@ -211,7 +211,7 @@ npm run dev
   - 複数ウィンドウ
 - Web
   - `sessionStorage`
-  - `http://localhost:8092`
+  - `http://127.0.0.1:8092`
   - 単一タブ + 左右分割
 
 ---

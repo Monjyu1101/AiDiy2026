@@ -43,7 +43,7 @@ Codex など stdio クライアントから使う場合:
 
 ```powershell
 Set-Location backend_tools
-.venv/Scripts/python.exe mcp_stdio.py --sse-url http://localhost:8095/aidiy_chrome_devtools/sse
+.venv/Scripts/python.exe mcp_stdio.py --sse-url http://127.0.0.1:8095/aidiy_chrome_devtools/sse
 ```
 
 ## 依存関係
@@ -61,11 +61,11 @@ Node.js / `package.json` / `node_modules` は不要。
 
 | インターフェース | 説明 | 代表 URL / コマンド |
 |----------------|------|-------------------|
-| **SSE（MCP標準）** | AI エージェント・MCP クライアントが使う標準トランスポート | `http://localhost:8095/{mcp_name}/sse` |
+| **SSE（MCP標準）** | AI エージェント・MCP クライアントが使う標準トランスポート | `http://127.0.0.1:8095/{mcp_name}/sse` |
 | **stdio gateway** | `mcp_stdio.py` が SSE を stdin/stdout に変換。Codex 等の stdio 専用 CLI が使う | `mcp_stdio.py --sse-url .../sse` |
-| **HTTP POST（FastAPI）** | REST API として直接呼び出せる。Swagger UI (`/docs`) で試行可能。Python から最も簡単に利用できる | `POST http://localhost:8095/{mcp_name}/{method_name}` |
+| **HTTP POST（FastAPI）** | REST API として直接呼び出せる。Swagger UI (`/docs`) で試行可能。Python から最も簡単に利用できる | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` |
 
-各 MCP の引数仕様は `GET http://localhost:8095/{mcp_name}/docs` で JSON 取得できる。
+各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/docs` で JSON 取得できる。
 
 ### Python から利用する例
 
@@ -73,12 +73,12 @@ Node.js / `package.json` / `node_modules` は不要。
 import requests
 
 # コードチェック
-res = requests.post("http://localhost:8095/aidiy_code_check/check_python_ruff",
+res = requests.post("http://127.0.0.1:8095/aidiy_code_check/check_python_ruff",
                     json={"file_path": "backend_server/core_main.py", "venv_project": "backend_server"})
 print(res.json())
 
 # バックアップ実行
-res = requests.post("http://localhost:8095/aidiy_backup/save/run", json={})
+res = requests.post("http://127.0.0.1:8095/aidiy_backup/save/run", json={})
 print(res.json())
 ```
 
@@ -86,25 +86,25 @@ print(res.json())
 
 | MCP | SSE |
 |-----|-----|
-| Chrome DevTools | `http://localhost:8095/aidiy_chrome_devtools/sse` |
-| Desktop Capture | `http://localhost:8095/aidiy_desktop_capture/sse` |
-| SQLite | `http://localhost:8095/aidiy_sqlite/sse` |
-| PostgreSQL | `http://localhost:8095/aidiy_postgres/sse` |
-| Logs | `http://localhost:8095/aidiy_logs/sse` |
-| Code Check | `http://localhost:8095/aidiy_code_check/sse` |
-| Backup | `http://localhost:8095/aidiy_backup/sse` |
-| Image Generation | `http://localhost:8095/aidiy_image_generation/sse` |
-| Speech-to-Text | `http://localhost:8095/aidiy_speech_to_text/sse` |
-| Text-to-Speech | `http://localhost:8095/aidiy_text_to_speech/sse` |
-| Movie Generation | `http://localhost:8095/aidiy_movie_generation/sse` |
-| OBS Studio Control | `http://localhost:8095/aidiy_obs_studio_control/sse` |
-| FFmpeg Control | `http://localhost:8095/aidiy_ffmpeg_control/sse` |
-| Notification Sounds | `http://localhost:8095/aidiy_notification_sounds/sse` |
-| Code Agents | `http://localhost:8095/aidiy_code_agents/sse` |
-| Chat LLM | `http://localhost:8095/aidiy_chat_llms/sse` |
-| Task Agents | `http://localhost:8095/aidiy_task_agents/sse` |
-| Team Agents | `http://localhost:8095/aidiy_team_agents/sse` |
-| Windows Control | `http://localhost:8095/aidiy_windows_control/sse` |
+| Chrome DevTools | `http://127.0.0.1:8095/aidiy_chrome_devtools/sse` |
+| Desktop Capture | `http://127.0.0.1:8095/aidiy_desktop_capture/sse` |
+| SQLite | `http://127.0.0.1:8095/aidiy_sqlite/sse` |
+| PostgreSQL | `http://127.0.0.1:8095/aidiy_postgres/sse` |
+| Logs | `http://127.0.0.1:8095/aidiy_logs/sse` |
+| Code Check | `http://127.0.0.1:8095/aidiy_code_check/sse` |
+| Backup | `http://127.0.0.1:8095/aidiy_backup/sse` |
+| Image Generation | `http://127.0.0.1:8095/aidiy_image_generation/sse` |
+| Speech-to-Text | `http://127.0.0.1:8095/aidiy_speech_to_text/sse` |
+| Text-to-Speech | `http://127.0.0.1:8095/aidiy_text_to_speech/sse` |
+| Movie Generation | `http://127.0.0.1:8095/aidiy_movie_generation/sse` |
+| OBS Studio Control | `http://127.0.0.1:8095/aidiy_obs_studio_control/sse` |
+| FFmpeg Control | `http://127.0.0.1:8095/aidiy_ffmpeg_control/sse` |
+| Notification Sounds | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` |
+| Code Agents | `http://127.0.0.1:8095/aidiy_code_agents/sse` |
+| Chat LLM | `http://127.0.0.1:8095/aidiy_chat_llms/sse` |
+| Task Agents | `http://127.0.0.1:8095/aidiy_task_agents/sse` |
+| Team Agents | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
+| Windows Control | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
 
 アクセスは localhost 限定。外部接続は 403。
 

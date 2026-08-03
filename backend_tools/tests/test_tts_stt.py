@@ -38,7 +38,7 @@ from tools_proc.speech_to_text import SpeechToText, SpeechToTextError
 
 TEST_TEXT = "本日は晴天なり。音声合成と音声認識のテストです。"
 POST_TEST_TEXT = "本日は晴天なり。HTTP POST API の音声合成と音声認識のテストです。"
-BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://127.0.0.1:8095").rstrip("/")
 HTTP_TIMEOUT = float(os.environ.get("AIDIY_MCP_EXTERNAL_TIMEOUT", "1200"))
 POST_SAVE_DIR = Path(__file__).resolve().parent / "temp" / "post_tts_stt"
 

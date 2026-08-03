@@ -25,7 +25,7 @@ from pathlib import Path
 # api ライブラリ
 import openai
 
-_DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+_DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 _OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1"
 _OLLAMA_CLOUD_SUFFIXES = (":cloud", ":clude")
 

@@ -19,7 +19,7 @@ if sys.platform == 'win32':
 
 OUTPUT_DIR = 'D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ\\テスト紹介_ビデオページ生成_ja\\images'
 TEMPLATE_IMAGE_DIR = ''
-IMAGE_GEN_API_URL = 'http://localhost:8095/aidiy_image_generation/generate'
+IMAGE_GEN_API_URL = 'http://127.0.0.1:8095/aidiy_image_generation/generate'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 

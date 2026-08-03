@@ -57,7 +57,7 @@
  </tr>
  <tr>
  <td><strong>CORS</strong></td>
- <td>localhost:8090, :5173, :3000 を許可</td>
+ <td>127.0.0.1:8090, :5173, :3000 を許可</td>
  <td>特定ドメインのみ</td>
  </tr>
  <tr>
@@ -72,7 +72,7 @@
  </tr>
  <tr>
  <td><strong>Webサーバー</strong></td>
- <td>localhost:8090/8091/9098（開発サーバー）</td>
+ <td>127.0.0.1:8090/8091/9098（開発サーバー）</td>
  <td>Nginx（リバースプロキシ）</td>
  </tr>
  </tbody>
@@ -183,21 +183,21 @@ server {
 
  # フロントエンド
  location / {
- proxy_pass http://localhost:8090;
+ proxy_pass http://127.0.0.1:8090;
  proxy_set_header Host $host;
  proxy_set_header X-Real-IP $remote_addr;
  }
 
  # Core API
  location /core/ {
- proxy_pass http://localhost:8091/core/;
+ proxy_pass http://127.0.0.1:8091/core/;
  proxy_set_header Host $host;
  proxy_set_header X-Real-IP $remote_addr;
  }
 
  # Apps API
  location /apps/ {
- proxy_pass http://localhost:9098/apps/;
+ proxy_pass http://127.0.0.1:9098/apps/;
  proxy_set_header Host $host;
  proxy_set_header X-Real-IP $remote_addr;
  }

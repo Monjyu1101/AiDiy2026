@@ -28,7 +28,7 @@ class TeamAgents:
     """backend_team API へ Aチーム依頼を投入する薄いクライアント"""
 
     def __init__(self, team_api_base: Optional[str] = None):
-        self.team_api_base = (team_api_base or os.environ.get("AIDIY_TEAM_API_BASE") or "http://localhost:8094").rstrip("/")
+        self.team_api_base = (team_api_base or os.environ.get("AIDIY_TEAM_API_BASE") or "http://127.0.0.1:8094").rstrip("/")
 
     def get_config(self) -> dict:
         """接続先と疎通状態を返す。backend_team 未起動でも例外にしない。"""

@@ -48,7 +48,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 `aidiy_chat_llms` は SSE / Streamable HTTP / stdio の 3 トランスポートに対応します。
 さらに `aidiy_chat_completions`（HTTP のみ）が OpenAI Chat Completions / Ollama 互換の標準チャットインターフェースを提供し、同じ ChatAI をバックエンドに使います。
-OpenAI SDK / Ollama クライアントの `base_url` に `http://localhost:8095/aidiy_chat_completions/v1` を指定して利用できます。
+OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/aidiy_chat_completions/v1` を指定して利用できます。
 
 | 標準チャット IF | エンドポイント |
 |-----------------|----------------|
@@ -93,19 +93,19 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://localhost:8095/
 
 | トランスポート | エンドポイント / コマンド | 主な利用者 |
 |----------------|--------------------------|-----------|
-| **SSE Transport** | `http://localhost:8095/{mcp_name}/sse` | AI エージェント、Claude Code、MCP クライアント |
-| **Streamable HTTP Transport** | `POST http://localhost:8095/{mcp_name}/{method_name}` | Python スクリプト、curl、自動化処理 |
-| **stdio gateway** | `mcp_stdio.py --sse-url http://localhost:8095/{mcp_name}/sse` | Codex など stdio 専用の Code CLI |
+| **SSE Transport** | `http://127.0.0.1:8095/{mcp_name}/sse` | AI エージェント、Claude Code、MCP クライアント |
+| **Streamable HTTP Transport** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` | Python スクリプト、curl、自動化処理 |
+| **stdio gateway** | `mcp_stdio.py --sse-url http://127.0.0.1:8095/{mcp_name}/sse` | Codex など stdio 専用の Code CLI |
 
-MCP一覧は `GET http://localhost:8095/` で確認できます。  
-各 MCP のツール一覧・引数仕様は `GET http://localhost:8095/{mcp_name}/list` が JSON で返します。  
-死活確認は `GET http://localhost:8095/{mcp_name}/ping`、初期化情報は `POST http://localhost:8095/{mcp_name}/initialize` です。
+MCP一覧は `GET http://127.0.0.1:8095/` で確認できます。  
+各 MCP のツール一覧・引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` が JSON で返します。  
+死活確認は `GET http://127.0.0.1:8095/{mcp_name}/ping`、初期化情報は `POST http://127.0.0.1:8095/{mcp_name}/initialize` です。
 
 Python から `requests` で直接呼び出す例:
 
 ```python
 import requests
-res = requests.post("http://localhost:8095/aidiy_sqlite/list_tables", json={})
+res = requests.post("http://127.0.0.1:8095/aidiy_sqlite/list_tables", json={})
 print(res.json())
 ```
 
@@ -120,7 +120,7 @@ SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場�
 - MCP を追加する場合は `tools_main.py` と `tools_proc/` を確認する。
 - MCP / HTTP API の検証コードは `tests/` に置く。
 - 複数 MCP を組み合わせる自動化処理は `aidiy_automations/` に置く。
-- `aidiy_automations/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成_解説.py` は `localhost:8095/aidiy_text_to_speech/synthesize` の `play=true` を使い、進行案内を挟みながら実行する。
+- `aidiy_automations/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成_解説.py` は `127.0.0.1:8095/aidiy_text_to_speech/synthesize` の `play=true` を使い、進行案内を挟みながら実行する。
 - 題材、生成先、テンプレート、開始ステップは `aidiy_automations/ビデオページ生成__設定.json`、`aidiy_automations/ビデオページ生成__状況.json`、CLI 引数で管理する。`__main__` に全体の流れを置き、詳細処理は `step_*` 関数へ分ける。
 - 自動化ステップは `00` を初期確認、`01`〜`nn` を実行と検証、`99` を最終処理として並べる。
 - `aidiy_automations/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成_解説.py` は `01`〜`99` の各ステップ完了後に、Chrome DevTools CDP で `?auto=loop` のビデオ表示を再描写する。

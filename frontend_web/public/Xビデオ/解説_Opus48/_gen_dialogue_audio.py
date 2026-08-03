@@ -15,7 +15,7 @@ import urllib.request
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 OUTPUT_DIR = '/workspaces/AiDiy2026/frontend_web/public/Xビデオ/解説_Claude_Opus4-8/audio'
-TTS_API_URL = 'http://localhost:8095/aidiy_text_to_speech/synthesize'
+TTS_API_URL = 'http://127.0.0.1:8095/aidiy_text_to_speech/synthesize'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 

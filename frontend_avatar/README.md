@@ -27,7 +27,7 @@ npm run dev
 ブラウザからは次で確認できます。
 
 ```text
-http://localhost:8092
+http://127.0.0.1:8092
 ```
 
 ## 主な構成
@@ -41,10 +41,10 @@ http://localhost:8092
 
 ## 接続先
 
-- Core API / WebSocket: `http://localhost:8091` / `ws://localhost:8091/core/ws/AIコア`
-- Apps API: `http://localhost:9098`
-- Task API（AIタスク）: `http://localhost:8093`（開発時は Vite proxy `/task` 経由、Electron 本番は直結）
-- Backend MCP（19 サーバー同居）: `http://localhost:8095/`（一覧）、`http://localhost:8095/{mcp_name}/sse`（SSE 接続）
+- Core API / WebSocket: `http://127.0.0.1:8091` / `ws://127.0.0.1:8091/core/ws/AIコア`
+- Apps API: `http://127.0.0.1:9098`
+- Task API（AIタスク）: `http://127.0.0.1:8093`（開発時は Vite proxy `/task` 経由、Electron 本番は直結）
+- Backend MCP（19 サーバー同居）: `http://127.0.0.1:8095/`（一覧）、`http://127.0.0.1:8095/{mcp_name}/sse`（SSE 接続）
 
 ## 補足コマンド
 

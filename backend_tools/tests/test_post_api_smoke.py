@@ -36,7 +36,7 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://localhost:8095").rstrip("/")
+BASE_URL = os.environ.get("AIDIY_MCP_BASE_URL", "http://127.0.0.1:8095").rstrip("/")
 TIMEOUT = float(os.environ.get("AIDIY_MCP_HTTP_TIMEOUT", "30"))
 TEMP_DIR = Path(__file__).resolve().parent / "temp"
 

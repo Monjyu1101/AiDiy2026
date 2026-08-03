@@ -51,7 +51,7 @@ let updateTitleUnderlineLogged = false;
 // サーバー状態を取得
 const getReadyCount = async () => {
   try {
-    const response = await fetch('http://localhost:8091/core/サーバー状態');
+    const response = await fetch('/core/サーバー状態');
     const data = await response.json();
     isReady.value = data.ready_count;
     isBusy.value = data.busy_count;

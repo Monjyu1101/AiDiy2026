@@ -12,7 +12,7 @@
 aidiy_desktop_capture MCP テスト
 
 backend_tools (port 8095) が起動済みの状態で実行すること。
-SSE エンドポイント: http://localhost:8095/aidiy_desktop_capture/sse
+SSE エンドポイント: http://127.0.0.1:8095/aidiy_desktop_capture/sse
 
 実行:
     cd backend_tools
@@ -37,7 +37,7 @@ os.environ["no_proxy"] = "localhost,127.0.0.1"
 from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 
-SSE_URL    = "http://localhost:8095/aidiy_desktop_capture/sse"
+SSE_URL    = "http://127.0.0.1:8095/aidiy_desktop_capture/sse"
 SAVE_DIR   = Path(__file__).parent / "temp"
 
 

@@ -114,8 +114,8 @@
 cd frontend_web
 npm run type-check
 node --check .\public\<画面名>\index.js
-Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:8090/<URLエンコード済み画面名>/index.html'
-Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:8090/Xその他/<画面名>/ゲーム'
+Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8090/<URLエンコード済み画面名>/index.html'
+Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8090/Xその他/<画面名>/ゲーム'
 ```
 
 - Vue 直実装の場合は `node --check` 対象がないため、`npm run type-check` を優先する。

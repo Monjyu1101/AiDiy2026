@@ -25,7 +25,7 @@
  ユーザー
 
  フロントエンド (Vue 3 + Vite) サーバー
- localhost:8090
+ 127.0.0.1:8090
  画面コンポーネント
  C管理/ Mマスタ/ Tトラン/ Vビュー/ Sスケジューラー/
  AIコア/ Xテスト/ _share/共有部品
@@ -37,7 +37,7 @@
 
 
  Core サーバー    Apps サーバー
- localhost:8091   localhost:9098
+ 127.0.0.1:8091   127.0.0.1:9098
 
  FastAPI + JWT認証   FastAPI + JWT認証
 
@@ -317,7 +317,7 @@
  <tbody>
  <tr>
  <td><strong>フロントエンド画面</strong></td>
- <td><a href="http://localhost:8090/" target="_blank">http://localhost:8090/</a></td>
+ <td><a href="http://127.0.0.1:8090/" target="_blank">http://127.0.0.1:8090/</a></td>
  <td><code>admin</code> / <code>********</code> でログイン。AI画面は <code>/AiDiy</code></td>
  </tr>
  <tr>
@@ -327,17 +327,17 @@
  </tr>
  <tr>
  <td><strong>Swagger Core API</strong></td>
- <td><a href="http://localhost:8091/docs" target="_blank">http://localhost:8091/docs</a></td>
+ <td><a href="http://127.0.0.1:8091/docs" target="_blank">http://127.0.0.1:8091/docs</a></td>
  <td>Swagger UIでC系・A系のAPIを確認・テスト</td>
  </tr>
  <tr>
  <td><strong>Swagger Apps API</strong></td>
- <td><a href="http://localhost:9098/docs" target="_blank">http://localhost:9098/docs</a></td>
+ <td><a href="http://127.0.0.1:9098/docs" target="_blank">http://127.0.0.1:9098/docs</a></td>
  <td>Swagger UIでM系・T系・V系・S系・X系のAPIを確認・テスト</td>
  </tr>
  <tr>
  <td><strong>Backend MCP 一覧</strong></td>
- <td><a href="http://localhost:8095/" target="_blank">http://localhost:8095/</a></td>
+ <td><a href="http://127.0.0.1:8095/" target="_blank">http://127.0.0.1:8095/</a></td>
  <td>backend_tools が提供する16個のMCPサーバー一覧（例: <code>/aidiy_chrome_devtools/list</code>）</td>
  </tr>
  </tbody>
@@ -348,7 +348,7 @@
  <p>フロントエンドからのAPIリクエストはプロキシ経由で転送されます。</p>
  <ul>
  <li>パスが <code>/core/*</code> なら Core、<code>/apps/*</code> なら Apps へ転送</li>
- <li>Viteの設定で <code>localhost:8091</code> と <code>localhost:9098</code> に振り分け</li>
+ <li>Viteの設定で <code>127.0.0.1:8091</code> と <code>127.0.0.1:9098</code> に振り分け</li>
  <li>全てのAPI操作は<strong>POST</strong>メソッドを使用</li>
  </ul>
  <p>詳細は <code>frontend_web/vite.config.ts</code> を参照してください。</p>
@@ -358,9 +358,9 @@
  <strong>CORS許可オリジン</strong>
  <p><code>backend_server/core_main.py</code> と <code>apps_main.py</code> で以下のオリジンが許可されています。</p>
  <ul>
- <li><code>http://localhost:8090</code> — Vite本番開発サーバー</li>
- <li><code>http://localhost:5173</code> — Viteデフォルトポート</li>
- <li><code>http://localhost:3000</code> — 代替ポート</li>
+ <li><code>http://127.0.0.1:8090</code> — Vite本番開発サーバー</li>
+ <li><code>http://127.0.0.1:5173</code> — Viteデフォルトポート</li>
+ <li><code>http://127.0.0.1:3000</code> — 代替ポート</li>
  </ul>
  </div>
 
@@ -387,7 +387,7 @@
  <ol>
  <li><strong>ユーザー操作</strong>: ブラウザで一覧画面を開く</li>
  <li><strong>Vue コンポーネント</strong>: <code>C利用者一覧.vue</code> がAPI呼び出しを実行</li>
- <li><strong>Viteプロキシ</strong>: <code>/core/C利用者/一覧</code> → <code>localhost:8091/core/C利用者/一覧</code> へ転送</li>
+ <li><strong>Viteプロキシ</strong>: <code>/core/C利用者/一覧</code> → <code>127.0.0.1:8091/core/C利用者/一覧</code> へ転送</li>
  <li><strong>FastAPI Router</strong>: <code>core_router/C利用者.py</code> がPOSTリクエストを受信</li>
  <li><strong>認証チェック</strong>: JWTトークンを検証</li>
  <li><strong>CRUD処理</strong>: <code>core_crud/C利用者.py</code> がデータベースを検索</li>

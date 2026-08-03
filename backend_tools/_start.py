@@ -298,8 +298,8 @@ def main() -> None:
 
     process = start()
     threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name} Swagger UI : http://localhost:{PORT}/docs")
-    print_info(f"  利用可能 ツール 一覧 : http://localhost:{PORT}/")
+    print_success(f"{name} Swagger UI : http://127.0.0.1:{PORT}/docs")
+    print_info(f"  利用可能 ツール 一覧 : http://127.0.0.1:{PORT}/")
     print_info("Ctrl+C で停止します")
     try:
         while True:

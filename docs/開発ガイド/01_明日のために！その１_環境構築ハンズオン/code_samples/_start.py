@@ -473,7 +473,7 @@ def collect_startup_choices() -> tuple[bool, bool, bool]:
 
 def open_browser(port: int) -> None:
     print_header("ページ表示")
-    url = f"http://localhost:{port}"
+    url = f"http://127.0.0.1:{port}"
     try:
         webbrowser.open(url)
         print_success(f"ブラウザを開きました: {url}")
@@ -776,11 +776,11 @@ def main() -> None:
 
             print_header("起動完了")
             if "バックエンド(core)" in processes:
-                print_success(f"バックエンド(core): http://localhost:{BACKEND_CORE_PORT}/docs")
+                print_success(f"バックエンド(core): http://127.0.0.1:{BACKEND_CORE_PORT}/docs")
             if "バックエンド(apps)" in processes:
-                print_success(f"バックエンド(apps): http://localhost:{BACKEND_APPS_PORT}/docs")
+                print_success(f"バックエンド(apps): http://127.0.0.1:{BACKEND_APPS_PORT}/docs")
             if "フロントエンド(Web)" in processes:
-                print_success(f"フロントエンド(Web): http://localhost:{FRONTEND_WEB_PORT}/")
+                print_success(f"フロントエンド(Web): http://127.0.0.1:{FRONTEND_WEB_PORT}/")
             if "フロントエンド(Avatar)" in processes:
                 print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{FRONTEND_AVATAR_PORT}")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)

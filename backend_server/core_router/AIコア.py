@@ -48,7 +48,7 @@ def _backend_local稼働中(app_conf) -> bool:
     """backend_local の /health を短時間で確認する。未起動なら local_chat を候補から外す。"""
     try:
         conf_json = getattr(app_conf, "json", {}) if app_conf else {}
-        host = str(conf_json.get("LOCAL_HOST", "http://localhost") or "http://localhost").strip().rstrip("/")
+        host = str(conf_json.get("LOCAL_HOST", "http://127.0.0.1") or "http://127.0.0.1").strip().rstrip("/")
         if host and "://" not in host:
             host = f"http://{host}"
         port = str(conf_json.get("LOCAL_BASE", "8096") or "8096").strip()

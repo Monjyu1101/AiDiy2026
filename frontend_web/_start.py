@@ -282,7 +282,7 @@ def main() -> None:
 
     process = start()
     threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name}: http://localhost:{PORT}/")
+    print_success(f"{name}: http://127.0.0.1:{PORT}/")
     print_info("Ctrl+C で停止します")
     try:
         while True:

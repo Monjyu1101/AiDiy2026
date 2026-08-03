@@ -279,8 +279,8 @@ def main() -> None:
 
     process = start()
     threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name}: http://localhost:{PORT}/docs")
-    print_info(f"  OpenAI互換 (利用時にモデルロード): http://localhost:{PORT}/v1/chat/completions")
+    print_success(f"{name}: http://127.0.0.1:{PORT}/docs")
+    print_info(f"  OpenAI互換 (利用時にモデルロード): http://127.0.0.1:{PORT}/v1/chat/completions")
     print_info("Ctrl+C で停止します")
     try:
         while True:

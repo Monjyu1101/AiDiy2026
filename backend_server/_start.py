@@ -304,8 +304,8 @@ def main() -> None:
         processes["バックエンド(apps)"] = start_apps()
         for name, proc in processes.items():
             threading.Thread(target=_stream_output, args=(name, proc.stdout), daemon=True).start()
-        print_success(f"バックエンド(core): http://localhost:{CORE_PORT}/docs")
-        print_success(f"バックエンド(apps): http://localhost:{APPS_PORT}/docs")
+        print_success(f"バックエンド(core): http://127.0.0.1:{CORE_PORT}/docs")
+        print_success(f"バックエンド(apps): http://127.0.0.1:{APPS_PORT}/docs")
         print_info("Ctrl+C で停止します")
         while True:
             time.sleep(1)

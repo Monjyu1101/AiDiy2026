@@ -71,7 +71,7 @@ EXPOSE 8090 8091 9098
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8091/docs || exit 1
+    CMD curl -f http://127.0.0.1:8091/docs || exit 1
 
 # Start script
 COPY docker/start.sh /app/

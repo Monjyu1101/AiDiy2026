@@ -99,7 +99,7 @@ backend_server/_config/AiDiy_mcp.json
   "mcpServers": {
     "aidiy_chrome_devtools": {
       "type": "sse",
-      "url": "http://localhost:8095/aidiy_chrome_devtools/sse"
+      "url": "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
     },
     ...
   }

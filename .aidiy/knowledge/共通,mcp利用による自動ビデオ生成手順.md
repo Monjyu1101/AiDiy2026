@@ -250,7 +250,7 @@ mcp__aidiy_text_to_speech__synthesize_speech
 
 > **HTTP POST でも同等の処理を呼び出せる。** MCP クライアントを使わず、スクリプトから直接叩く場合に便利。
 > ```
-> POST http://localhost:8095/aidiy_text_to_speech/synthesize
+> POST http://127.0.0.1:8095/aidiy_text_to_speech/synthesize
 > Content-Type: application/json
 > Body: { "text": "ナレーション本文", "provider": "edge", "voice": "female",
 >         "save_path": "D:/.../audio/scene_001.mp3", "local_play": false }
@@ -379,7 +379,7 @@ mcp__aidiy_image_generation__generate_image
 
 > **HTTP POST でも同等の処理を呼び出せる。**
 > ```
-> POST http://localhost:8095/aidiy_image_generation/generate
+> POST http://127.0.0.1:8095/aidiy_image_generation/generate
 > Content-Type: application/json
 > Body: { "prompt": "...", "provider": "openai", "model": "gpt-image-2",
 >         "size": "1792x1024", "quality": "medium",
@@ -428,7 +428,7 @@ mcp__aidiy_movie_generation__generate_movie
 ### HTTP POST
 
 ```
-POST http://localhost:8095/aidiy_movie_generation/generate
+POST http://127.0.0.1:8095/aidiy_movie_generation/generate
 Content-Type: application/json
 Body: {
   "prompt": "A soft cherry blossom garden with petals drifting in the breeze, cinematic 4K",
@@ -463,7 +463,7 @@ D:/OneDrive/_sandbox/AiDiy2026/backend_tools/.venv/Scripts/python.exe ^
   <tab_id> "play()"
 ```
 
-スクリプトは `http://localhost:9222/json` から `webSocketDebuggerUrl` を引き、`Runtime.evaluate` を `userGesture:true, awaitPromise:false, returnByValue:true` で送る。`websockets` ライブラリは `backend_tools/.venv` に入っている（システム Python には無い）。
+スクリプトは `http://127.0.0.1:9222/json` から `webSocketDebuggerUrl` を引き、`Runtime.evaluate` を `userGesture:true, awaitPromise:false, returnByValue:true` で送る。`websockets` ライブラリは `backend_tools/.venv` に入っている（システム Python には無い）。
 
 確認は `eval_js` で次の状態が取れていれば成功:
 

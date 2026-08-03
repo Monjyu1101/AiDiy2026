@@ -18,23 +18,23 @@
 
 | サーバー名 | SSE URL | 主な用途 |
 |-----------|---------|---------|
-| `aidiy_chrome_devtools` | `http://localhost:8095/aidiy_chrome_devtools/sse` | ブラウザ操作、DOM取得、ナビゲーション。`session` パラメータ（省略時 `default`）で複数 Chrome を並行セッション管理でき、自動テストの並行実行が可能。使用後は `close_session` で破棄 |
-| `aidiy_desktop_capture` | `http://localhost:8095/aidiy_desktop_capture/sse` | デスクトップのスクリーンショット、クリック、キー入力 |
-| `aidiy_sqlite` | `http://localhost:8095/aidiy_sqlite/sse` | SQLite DB 参照、テーブル/件数確認 |
-| `aidiy_postgres` | `http://localhost:8095/aidiy_postgres/sse` | PostgreSQL 参照、スキーマ/件数確認 |
-| `aidiy_logs` | `http://localhost:8095/aidiy_logs/sse` | ログ tail、Traceback、ERROR 確認 |
-| `aidiy_code_check` | `http://localhost:8095/aidiy_code_check/sse` | Python 構文、ruff、TypeScript 型チェック |
-| `aidiy_backup` | `http://localhost:8095/aidiy_backup/sse` | 差分バックアップ保存 / 確認（HTTP は `save` / `check` に分岐） |
-| `aidiy_image_generation` | `http://localhost:8095/aidiy_image_generation/sse` | AI 画像生成（OpenAI / Gemini / FreeAI） |
-| `aidiy_movie_generation` | `http://localhost:8095/aidiy_movie_generation/sse` | AI 動画生成（Google Gemini Veo、MP4 保存、base64 返却なし） |
-| `aidiy_speech_to_text` | `http://localhost:8095/aidiy_speech_to_text/sse` | 音声認識（speech_recognition / Whisper） |
-| `aidiy_text_to_speech` | `http://localhost:8095/aidiy_text_to_speech/sse` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） |
-| `aidiy_obs_studio_control` | `http://localhost:8095/aidiy_obs_studio_control/sse` | OBS Studio 制御（配信、録画、シーン、ソース、音声） |
-| `aidiy_ffmpeg_control` | `http://localhost:8095/aidiy_ffmpeg_control/sse` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） |
-| `aidiy_code_agents` | `http://localhost:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
-| `aidiy_task_agents` | `http://localhost:8095/aidiy_task_agents/sse` | backend_task API への AIタスク非同期投入、要求/明細状態取得 |
-| `aidiy_team_agents` | `http://localhost:8095/aidiy_team_agents/sse` | backend_team API への AIチーム依頼投入、依頼/要員状態取得 |
-| `aidiy_windows_control` | `http://localhost:8095/aidiy_windows_control/sse` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
+| `aidiy_chrome_devtools` | `http://127.0.0.1:8095/aidiy_chrome_devtools/sse` | ブラウザ操作、DOM取得、ナビゲーション。`session` パラメータ（省略時 `default`）で複数 Chrome を並行セッション管理でき、自動テストの並行実行が可能。使用後は `close_session` で破棄 |
+| `aidiy_desktop_capture` | `http://127.0.0.1:8095/aidiy_desktop_capture/sse` | デスクトップのスクリーンショット、クリック、キー入力 |
+| `aidiy_sqlite` | `http://127.0.0.1:8095/aidiy_sqlite/sse` | SQLite DB 参照、テーブル/件数確認 |
+| `aidiy_postgres` | `http://127.0.0.1:8095/aidiy_postgres/sse` | PostgreSQL 参照、スキーマ/件数確認 |
+| `aidiy_logs` | `http://127.0.0.1:8095/aidiy_logs/sse` | ログ tail、Traceback、ERROR 確認 |
+| `aidiy_code_check` | `http://127.0.0.1:8095/aidiy_code_check/sse` | Python 構文、ruff、TypeScript 型チェック |
+| `aidiy_backup` | `http://127.0.0.1:8095/aidiy_backup/sse` | 差分バックアップ保存 / 確認（HTTP は `save` / `check` に分岐） |
+| `aidiy_image_generation` | `http://127.0.0.1:8095/aidiy_image_generation/sse` | AI 画像生成（OpenAI / Gemini / FreeAI） |
+| `aidiy_movie_generation` | `http://127.0.0.1:8095/aidiy_movie_generation/sse` | AI 動画生成（Google Gemini Veo、MP4 保存、base64 返却なし） |
+| `aidiy_speech_to_text` | `http://127.0.0.1:8095/aidiy_speech_to_text/sse` | 音声認識（speech_recognition / Whisper） |
+| `aidiy_text_to_speech` | `http://127.0.0.1:8095/aidiy_text_to_speech/sse` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） |
+| `aidiy_obs_studio_control` | `http://127.0.0.1:8095/aidiy_obs_studio_control/sse` | OBS Studio 制御（配信、録画、シーン、ソース、音声） |
+| `aidiy_ffmpeg_control` | `http://127.0.0.1:8095/aidiy_ffmpeg_control/sse` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） |
+| `aidiy_code_agents` | `http://127.0.0.1:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
+| `aidiy_task_agents` | `http://127.0.0.1:8095/aidiy_task_agents/sse` | backend_task API への AIタスク非同期投入、要求/明細状態取得 |
+| `aidiy_team_agents` | `http://127.0.0.1:8095/aidiy_team_agents/sse` | backend_team API への AIチーム依頼投入、依頼/要員状態取得 |
+| `aidiy_windows_control` | `http://127.0.0.1:8095/aidiy_windows_control/sse` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
 
 ## AiDiy_mcp.json の形式
 
@@ -43,11 +43,11 @@
   "mcpServers": {
     "aidiy_chrome_devtools": {
       "type": "sse",
-      "url": "http://localhost:8095/aidiy_chrome_devtools/sse"
+      "url": "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
     },
     "aidiy_sqlite": {
       "type": "sse",
-      "url": "http://localhost:8095/aidiy_sqlite/sse"
+      "url": "http://127.0.0.1:8095/aidiy_sqlite/sse"
     }
   }
 }
@@ -92,11 +92,11 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 
 | インターフェース | 説明 |
 |----------------|------|
-| **SSE（MCP標準）** | `http://localhost:8095/{mcp_name}/sse` — AI エージェント・MCP クライアントが接続する標準トランスポート |
+| **SSE（MCP標準）** | `http://127.0.0.1:8095/{mcp_name}/sse` — AI エージェント・MCP クライアントが接続する標準トランスポート |
 | **stdio gateway** | `mcp_stdio.py --sse-url .../sse` — SSE を stdin/stdout に変換。Codex など stdio 専用 CLI が使う |
-| **HTTP POST（FastAPI）** | `POST http://localhost:8095/{mcp_name}/{method_name}` — REST API として直接呼び出し可能。Swagger UI (`/docs`) で試行できる |
+| **HTTP POST（FastAPI）** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` — REST API として直接呼び出し可能。Swagger UI (`/docs`) で試行できる |
 
-各 MCP の引数仕様 JSON: `GET http://localhost:8095/{mcp_name}/docs`
+各 MCP の引数仕様 JSON: `GET http://127.0.0.1:8095/{mcp_name}/docs`
 
 ## Python から利用する場合
 
@@ -107,26 +107,26 @@ SSE クライアントを使わなくても、`requests` で HTTP POST を直接
 import requests
 
 # SQLite テーブル一覧
-res = requests.post("http://localhost:8095/aidiy_sqlite/list_tables", json={})
+res = requests.post("http://127.0.0.1:8095/aidiy_sqlite/list_tables", json={})
 print(res.json())
 
 # Python 構文チェック
-res = requests.post("http://localhost:8095/aidiy_code_check/check_python_syntax",
+res = requests.post("http://127.0.0.1:8095/aidiy_code_check/check_python_syntax",
                     json={"file_path": "backend_server/core_main.py", "venv_project": "backend_server"})
 print(res.json())
 
 # TTS でテキストを読み上げ（サーバー側ローカル再生）
-res = requests.post("http://localhost:8095/aidiy_text_to_speech/synthesize",
+res = requests.post("http://127.0.0.1:8095/aidiy_text_to_speech/synthesize",
                     json={"speech_text": "処理が完了しました", "play": True})
 print(res.json())  # {"save_path": "temp/output/....mp3"}
 
 # Chrome で URL を開く
-res = requests.post("http://localhost:8095/aidiy_chrome_devtools/navigate",
-                    json={"url": "http://localhost:8090"})
+res = requests.post("http://127.0.0.1:8095/aidiy_chrome_devtools/navigate",
+                    json={"url": "http://127.0.0.1:8090"})
 print(res.json())
 ```
 
-ツール一覧は `GET http://localhost:8095/{mcp_name}/list` で確認できる（例: `http://localhost:8095/aidiy_sqlite/list`）。
+ツール一覧は `GET http://127.0.0.1:8095/{mcp_name}/list` で確認できる（例: `http://127.0.0.1:8095/aidiy_sqlite/list`）。
 
 ## Claude Agent SDK から使う場合
 
@@ -139,7 +139,7 @@ print(res.json())
 Codex など SSE を直接扱えないクライアントは `backend_tools/mcp_stdio.py` を使う。
 
 ```powershell
-backend_tools\.venv\Scripts\python.exe backend_tools\mcp_stdio.py --sse-url http://localhost:8095/aidiy_sqlite/sse
+backend_tools\.venv\Scripts\python.exe backend_tools\mcp_stdio.py --sse-url http://127.0.0.1:8095/aidiy_sqlite/sse
 ```
 
 Codex の `url = ...` は streamable HTTP 用なので、AiDiy MCP の SSE URL を直接指定しない。
@@ -152,9 +152,9 @@ Codex の `url = ...` は streamable HTTP 用なので、AiDiy MCP の SSE URL �
 
 ## 不調時の切り分け
 
-- 8095 が反応しない場合は `curl http://localhost:8095/` で本体起動を確認する
-- SSE だけ確認する場合は `curl http://localhost:8095/aidiy_sqlite/sse` を使う
-- Chrome DevTools が不安定な場合は `curl http://localhost:9222/json` でデバッグポートを確認する
+- 8095 が反応しない場合は `curl http://127.0.0.1:8095/` で本体起動を確認する
+- SSE だけ確認する場合は `curl http://127.0.0.1:8095/aidiy_sqlite/sse` を使う
+- Chrome DevTools が不安定な場合は `curl http://127.0.0.1:9222/json` でデバッグポートを確認する
 - PostgreSQL MCP だけ失敗する場合は、`psycopg` 未導入、DSN 未設定、外部 DB 接続不可を切り分ける
 - `Transport closed` や timeout が続く場合は同じ MCP 呼び出しを繰り返さず、代替確認と未確認範囲を明示する
 
@@ -167,9 +167,9 @@ Codex の `url = ...` は streamable HTTP 用なので、AiDiy MCP の SSE URL �
 ## 確認方法
 
 ```powershell
-curl http://localhost:8095/
-curl http://localhost:8095/aidiy_sqlite/sse
-curl http://localhost:9222/json
+curl http://127.0.0.1:8095/
+curl http://127.0.0.1:8095/aidiy_sqlite/sse
+curl http://127.0.0.1:9222/json
 ```
 
 `/sse` が `text/event-stream` を返せば対象 MCP は起動している。

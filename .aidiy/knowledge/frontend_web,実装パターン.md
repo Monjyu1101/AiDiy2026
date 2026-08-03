@@ -116,7 +116,7 @@ import { qAlert, qConfirm } from '@/utils/qAlert'
 - `<C利用者一覧 />` のような日本語タグを書くとブラウザで無効扱いになる。
 - 権限IDを数値で比較して条件が通らない。
 - `npm run build` を明示指示なしに実行して `dist/` を生成する。
-- Vite proxy を使わず `http://localhost:8091` へ直叩きして CORS 条件が変わる。
+- Vite proxy を使わず `http://127.0.0.1:8091` へ直叩きして CORS 条件が変わる。
 - backend schema に存在しない表示専用項目を payload に入れる。
 - 検索欄や編集欄の幅が画面ごとにばらつく。
 

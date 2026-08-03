@@ -41,7 +41,7 @@ command = "<repo>\\backend_tools\\.venv\\Scripts\\python.exe"
 args = [
   "<repo>\\backend_tools\\mcp_stdio.py",
   "--sse-url",
-  "http://localhost:8095/aidiy_chrome_devtools/sse",
+  "http://127.0.0.1:8095/aidiy_chrome_devtools/sse",
 ]
 startup_timeout_sec = 60
 ```
@@ -55,7 +55,7 @@ startup_timeout_sec = 60
       "args": [
         "<repo>\\\\backend_tools\\\\mcp_stdio.py",
         "--sse-url",
-        "http://localhost:8095/aidiy_chrome_devtools/sse"
+        "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
       ]
     }
   }

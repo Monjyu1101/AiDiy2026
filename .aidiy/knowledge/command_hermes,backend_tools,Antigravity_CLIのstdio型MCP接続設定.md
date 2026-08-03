@@ -14,7 +14,7 @@
 
 ```json
 "aidiy_chrome_devtools": {
-  "serverUrl": "http://localhost:8095/aidiy_chrome_devtools/sse"
+  "serverUrl": "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
 }
 ```
 
@@ -91,7 +91,7 @@
     "args": [
       "D:\\OneDrive\\_sandbox\\AiDiy2026\\backend_tools\\mcp_stdio.py",
       "--sse-url",
-      "http://localhost:8095/aidiy_chrome_devtools/sse"
+      "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
     ]
   }
   ```

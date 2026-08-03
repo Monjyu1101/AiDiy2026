@@ -90,7 +90,7 @@ Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI �
 判断基準:
 - `ollama_key_id` が `<` で始まる場合は local Ollama を使う
 - 有効なキーがある場合は Ollama Cloud `https://ollama.com/v1` を使う
-- local は `ollama_host + "/v1"`、既定は `http://localhost:11434/v1`
+- local は `ollama_host + "/v1"`、既定は `http://127.0.0.1:11434/v1`
 - Cloud 直叩き時はモデル名から `:cloud` と入力揺れの `:clude` を外して API に渡す
 
 注意:
@@ -107,6 +107,6 @@ Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI �
 
 ## 確認方法
 
-- `GET http://localhost:8091/core/AIコア/モデル情報/取得` で現在設定と利用可能モデル一覧を確認する（要認証）
+- `GET http://127.0.0.1:8091/core/AIコア/モデル情報/取得` で現在設定と利用可能モデル一覧を確認する（要認証）
 - 設定 UI で Chat / Live / Code1〜Code6 / Task / Team の選択肢が出ることを確認する
 - 保存後に `AiDiy_key.json` が更新され、core server が再起動することを確認する

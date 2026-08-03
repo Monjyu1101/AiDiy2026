@@ -26,7 +26,7 @@ Nginx (HTTPS :443 / HTTP :80)
 
 - `backend_tools` (`:8095`) は Docker 構成に含めない。MCP 検証が必要な場合はローカルで別途起動する。
 - `docker-compose.yml` は core/apps の `8091` / `9098` も直接公開する。
-- 通常の画面確認は `https://localhost/`、Swagger 確認は `http://localhost:8091/docs` / `http://localhost:9098/docs` を使う。
+- 通常の画面確認は `https://localhost/`、Swagger 確認は `http://127.0.0.1:8091/docs` / `http://127.0.0.1:9098/docs` を使う。
 - コンテナ名は `aidiy2026`。ログ確認は `docker logs aidiy2026`。
 
 ## 起動手順
@@ -63,8 +63,8 @@ cd docker
 
 ```powershell
 curl.exe -k https://localhost/
-curl.exe http://localhost:8091/docs
-curl.exe http://localhost:9098/docs
+curl.exe http://127.0.0.1:8091/docs
+curl.exe http://127.0.0.1:9098/docs
 docker logs aidiy2026
 ```
 

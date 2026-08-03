@@ -177,7 +177,7 @@ python _start.py</code></pre>
  <strong>_start.py の動作詳細</strong>
  <ul>
  <li>選択したサービスのポート（8090/8091/9098/8092/8093/8096/8095）を使用中のプロセスを自動で停止</li>
- <li>Web は <code>http://localhost:8090</code>、Avatar は <code>http://127.0.0.1:8092</code> を自動で開く</li>
+ <li>Web は <code>http://127.0.0.1:8090</code>、Avatar は <code>http://127.0.0.1:8092</code> を自動で開く</li>
  <li>サーバーがクラッシュした場合、15秒後に自動再起動</li>
  <li>Ctrl+C で全サーバーを一括停止</li>
  </ul>
@@ -186,11 +186,11 @@ python _start.py</code></pre>
  <div>
  <strong>起動成功時の表示</strong>
  <p>選択したサービスに応じて、以下のようなメッセージが表示されれば正常に起動しています。</p>
- <pre><code>バックエンド(tools) Swagger UI : http://localhost:8095/docs
-バックエンド(core): http://localhost:8091/docs
-バックエンド(apps): http://localhost:9098/docs
-バックエンド(task): http://localhost:8093/docs
-フロントエンド(Web): http://localhost:8090/
+ <pre><code>バックエンド(tools) Swagger UI : http://127.0.0.1:8095/docs
+バックエンド(core): http://127.0.0.1:8091/docs
+バックエンド(apps): http://127.0.0.1:9098/docs
+バックエンド(task): http://127.0.0.1:8093/docs
+フロントエンド(Web): http://127.0.0.1:8090/
 フロントエンド(Avatar): renderer http://127.0.0.1:8092</code></pre>
  </div>
 
@@ -301,7 +301,7 @@ python _start.py
  <p>起動後、以下の手順で動作を確認してください。</p>
 
  <h3>1. ブラウザで確認</h3>
- <p>ブラウザで <a href="http://localhost:8090/" target="_blank">http://localhost:8090/</a> を開いてログイン画面が表示されることを確認します。</p>
+ <p>ブラウザで <a href="http://127.0.0.1:8090/" target="_blank">http://127.0.0.1:8090/</a> を開いてログイン画面が表示されることを確認します。</p>
 
  <h3>2. 初期ログイン</h3>
  <ul>
@@ -315,22 +315,22 @@ python _start.py
  <h3>4. API確認</h3>
  <p>以下のURLからSwagger UIでAPIの動作を確認できます。</p>
  <ul>
- <li><strong>Core API</strong>: <a href="http://localhost:8091/docs" target="_blank">http://localhost:8091/docs</a> (C系・A系のAPI)</li>
- <li><strong>Apps API</strong>: <a href="http://localhost:9098/docs" target="_blank">http://localhost:9098/docs</a> (M系・T系・V系・S系のAPI)</li>
+ <li><strong>Core API</strong>: <a href="http://127.0.0.1:8091/docs" target="_blank">http://127.0.0.1:8091/docs</a> (C系・A系のAPI)</li>
+ <li><strong>Apps API</strong>: <a href="http://127.0.0.1:9098/docs" target="_blank">http://127.0.0.1:9098/docs</a> (M系・T系・V系・S系のAPI)</li>
  </ul>
  </section>
 
  <section id="health-check">
   <h2>ヘルスチェック</h2>
   <p>バックエンドが起動しているか確認するコマンドです。</p>
-  <pre><code>curl http://localhost:8091/core/サーバー状態</code></pre>
+  <pre><code>curl http://127.0.0.1:8091/core/サーバー状態</code></pre>
 
   <h3>完了条件チェックリスト</h3>
   <p>以下を全て満たせば、環境構築は完了です。</p>
   <ul>
-  <li>localhost:8090 が表示される</li>
-  <li>localhost:8091/docs が表示される</li>
-  <li>localhost:9098/docs が表示される</li>
+  <li>127.0.0.1:8090 が表示される</li>
+  <li>127.0.0.1:8091/docs が表示される</li>
+  <li>127.0.0.1:9098/docs が表示される</li>
   <li>admin でログインに成功する</li>
   <li>/core/サーバー状態 が応答を返す</li>
   </ul>

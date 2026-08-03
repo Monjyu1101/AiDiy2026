@@ -448,7 +448,7 @@ def upsert_vscode_chat_completions(path: Path) -> bool:
     try:
         providers = load_json_list_file(path)
         if not providers:
-            providers = [{"name": "Ollama", "vendor": "ollama", "url": "http://localhost:11434"}]
+            providers = [{"name": "Ollama", "vendor": "ollama", "url": "http://127.0.0.1:11434"}]
 
         providers = _upsert_provider(providers, _build_chat_completions_provider())
         providers = _upsert_provider(providers, _build_local_chat_provider())
