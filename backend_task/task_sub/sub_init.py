@@ -36,7 +36,8 @@ from urllib.parse import quote
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AIDIYルート = os.path.normpath(os.path.join(BASE_DIR, ".."))
 TASK_API = "http://localhost:8093/task"
-MCP_URL = "http://localhost:8095/aidiy_code_agents/run"
+MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
+_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 
@@ -88,7 +89,7 @@ def POST送信(url: str, payload: dict, timeout: int = 3600) -> dict:
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
-    with urllib.request.urlopen(req, timeout=timeout) as res:
+    with _LOCAL_HTTP_OPENER.open(req, timeout=timeout) as res:
         return json.loads(res.read().decode("utf-8"))
 
 

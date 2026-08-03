@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 from .log_config import get_logger
 
 _logger = get_logger("video_gen.infra")
+_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 if TYPE_CHECKING:
     from .ctx import VideoGenCtx
@@ -44,7 +45,7 @@ def post_json(url: str, payload: dict, timeout_sec: int = 120) -> dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout_sec) as res:
+        with _LOCAL_HTTP_OPENER.open(req, timeout=timeout_sec) as res:
             raw = res.read().decode("utf-8", errors="replace")
     except urllib.error.URLError as e:
         _logger.error("HTTP API 接続失敗: %s (%s)", url, e)

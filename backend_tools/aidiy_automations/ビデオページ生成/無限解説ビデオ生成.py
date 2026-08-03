@@ -55,9 +55,10 @@ SETTING_JSON_PATH = SCRIPT_DIR / "_ビデオページ生成_解説_設定.json"
 STEPS_JSON_PATH = SCRIPT_DIR / "_ビデオページ生成_解説_状況.json"
 VIDEO_SCRIPT_PATH = SCRIPT_DIR / "ビデオページ生成_解説.py"
 
-BACKUP_API_URL = "http://localhost:8095/aidiy_backup/save"
-CODE_AGENTS_API_URL = "http://localhost:8095/aidiy_code_agents"
-BACKUP_PING_URL = "http://localhost:8095/aidiy_backup/ping"
+BACKUP_API_URL = "http://127.0.0.1:8095/aidiy_backup/save"
+CODE_AGENTS_API_URL = "http://127.0.0.1:8095/aidiy_code_agents"
+BACKUP_PING_URL = "http://127.0.0.1:8095/aidiy_backup/ping"
+_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 LOOP_WAIT_SEC = 300
 TOPIC_WAIT_SEC = 600
@@ -123,7 +124,7 @@ def post_json(url: str, payload: dict[str, Any] | None = None, timeout_sec: int 
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout_sec) as res:
+    with _LOCAL_HTTP_OPENER.open(req, timeout=timeout_sec) as res:
         raw = res.read().decode("utf-8", errors="replace")
     result = json.loads(raw)
     if isinstance(result, dict) and result.get("error"):
@@ -132,7 +133,7 @@ def post_json(url: str, payload: dict[str, Any] | None = None, timeout_sec: int 
 
 
 def get_url(url: str, timeout_sec: int = 5) -> str:
-    with urllib.request.urlopen(url, timeout=timeout_sec) as res:
+    with _LOCAL_HTTP_OPENER.open(url, timeout=timeout_sec) as res:
         return res.read().decode("utf-8", errors="replace")
 
 
@@ -304,8 +305,9 @@ def spawn_agent_task(name: str, prompt: str, timeout_sec: int, *, resume: bool) 
         "payload=json.load(open(payload_path,encoding='utf-8'))\n"
         "data=json.dumps(payload,ensure_ascii=False).encode('utf-8')\n"
         "req=urllib.request.Request(url,data=data,headers={'Content-Type':'application/json'},method='POST')\n"
+        "opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))\n"
         "try:\n"
-        "    with urllib.request.urlopen(req,timeout=payload.get('timeout_sec',1200)+120) as res:\n"
+        "    with opener.open(req,timeout=payload.get('timeout_sec',1200)+120) as res:\n"
         "        raw=res.read().decode('utf-8',errors='replace')\n"
         "except Exception as e:\n"
         "    raw=json.dumps({'status':'NG','error':str(e)},ensure_ascii=False)\n"

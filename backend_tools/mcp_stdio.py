@@ -39,7 +39,7 @@ from mcp.server.stdio import stdio_server
 
 from log_config import get_logger, setup_logging
 
-DEFAULT_HOST = "localhost"
+DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8095
 DEFAULT_MOUNT_PATH = "/aidiy_chrome_devtools/sse"
 

@@ -40,7 +40,8 @@ from urllib.parse import quote
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_API = "http://localhost:8093/task"
-MCP_URL = "http://localhost:8095/aidiy_code_agents/run"
+MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
+_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 
@@ -82,7 +83,7 @@ def POST送信(url: str, payload: dict, timeout: int = 3600) -> dict:
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
-    with urllib.request.urlopen(req, timeout=timeout) as res:
+    with _LOCAL_HTTP_OPENER.open(req, timeout=timeout) as res:
         return json.loads(res.read().decode("utf-8"))
 
 
@@ -144,8 +145,8 @@ def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対
 - 処理目標に対して各実行ステップの記録と実際の成果物を照合し、最終結果を検証してください。
 - ファイル操作を伴わない処理は、渡された実行済ステップの記録だけから簡素に判断し、ファイル確認や追加のツール実行は行わないでください。
 - AiDiy の MCP ツールが HTTP で利用できます。
-  ツール一覧の確認: GET http://localhost:8095/<mcp名>/list
-  ツールの実行: POST http://localhost:8095/<mcp名>/<メソッド> （JSON ボディ）
+  ツール一覧の確認: GET http://127.0.0.1:8095/<mcp名>/list
+  ツールの実行: POST http://127.0.0.1:8095/<mcp名>/<メソッド> （JSON ボディ）
   例: aidiy_notification_sounds, aidiy_sqlite, aidiy_chrome_devtools など
 - 検証結果は必ず次の HTTP エンドポイントへ直接報告してください（あなた自身が curl 等で呼び出します）。
   POST http://localhost:8093/task_check_okng

@@ -300,7 +300,7 @@ def create_completions_router(chat_llm) -> APIRouter:
         """OpenAI / Ollama 互換チャットインターフェースのドキュメント"""
         return {
             "service": "aidiy_chat_completions",
-            "description": "OpenAI Chat Completions / Ollama 互換の標準チャットインターフェース。AIチャット.py 系の ChatAI をバックエンドに使用する。OpenAI SDK / Ollama クライアントの base_url に http://localhost:8095/aidiy_chat_completions/v1 を指定して利用できる。",
+            "description": "OpenAI Chat Completions / Ollama 互換の標準チャットインターフェース。AIチャット.py 系の ChatAI をバックエンドに使用する。OpenAI SDK / Ollama クライアントの base_url に http://127.0.0.1:8095/aidiy_chat_completions/v1 を指定して利用できる。",
             "endpoints": {
                 "POST /aidiy_chat_completions/v1/chat/completions": "チャット補完（OpenAI 標準パス）",
                 "GET /aidiy_chat_completions/v1/models": "利用可能モデル（ai_name）一覧",
@@ -314,7 +314,7 @@ def create_completions_router(chat_llm) -> APIRouter:
             "vision": "対応。最後の user メッセージの content に image_url パート（data: URL / http(s) URL）を含めると、vision 対応モデルへ画像を添付する（単一画像）。",
             "tool_calling": "対応（openrt_chat / ollama_chat / gemini_chat / freeai_chat）。tools / tool_choice を渡すと function calling を行い、tool_calls と finish_reason='tool_calls' を返す。gemini 系は OpenAI tools を Gemini function calling に内部変換する。",
             "openai_sdk_example": {
-                "base_url": "http://localhost:8095/aidiy_chat_completions/v1",
+                "base_url": "http://127.0.0.1:8095/aidiy_chat_completions/v1",
                 "api_key": "（任意・未使用）",
                 "model": "ollama_chat",
             },

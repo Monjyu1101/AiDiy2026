@@ -5,7 +5,7 @@
 ## 置くもの
 
 - 動画生成、音声生成、画像生成などを連続実行する自動化
-- `localhost:8095` の HTTP API を利用するジョブ
+- `127.0.0.1:8095` の HTTP API を利用するジョブ
 - AiDiy プロジェクト内の素材作成や確認作業を自動化するスクリプト
 
 ## 方針
@@ -42,7 +42,7 @@ Xビデオ素材生成を 9 ステップで自動実行するスクリプト群�
 | `shared.video_base_dir` | 生成先ルートフォルダ |
 | `shared.tts_guide` | 音声案内 ON/OFF |
 | `shared.browser_preview` | Chrome 再描写 ON/OFF |
-| `shared.*_api_url` | 各 localhost:8095 HTTP API |
+| `shared.*_api_url` | 各 127.0.0.1:8095 HTTP API |
 
 ### 実行方法
 

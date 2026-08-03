@@ -287,24 +287,27 @@ class MCPツールブリッジ:
       - 定義: GET  {base_url}/{mcp}/list     -> {"tools": [{name, description, inputSchema}]}
       - 実行: POST {base_url}/{mcp}/{method} -> 任意 JSON
 
-    self-call は localhost HTTP のため標準ライブラリ urllib のみを使う（requests 非依存）。
+    self-call は IPv4 loopback HTTP のため標準ライブラリ urllib のみを使う（requests 非依存）。
+    Windows のシステムプロキシと localhost の IPv6 フォールバックを避けるため、
+    proxy 無効の専用 opener を使用する。
     aidiy_chat_llms / aidiy_code_agents 自身は無限再帰防止のため既定で除外する。
     """
 
     既定除外 = {"aidiy_chat_llms", "aidiy_code_agents"}
 
-    def __init__(self, base_url: str = "http://localhost:8095", exclude=None):
+    def __init__(self, base_url: str = "http://127.0.0.1:8095", exclude=None):
         self.base_url = base_url.rstrip("/")
         self.exclude = set(exclude) if exclude is not None else set(self.既定除外)
         self._tools_cache = None  # (tools, name_map)
         self._http_methods_cache: Dict[str, set[str]] = {}
+        self._http_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     # ---- 収集 ----
 
     def list_mcps(self) -> List[str]:
         """8095 のインデックスから露出対象 MCP 名一覧を取得（除外を適用）。"""
         try:
-            with urllib.request.urlopen(f"{self.base_url}/", timeout=10) as resp:
+            with self._http_opener.open(f"{self.base_url}/", timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             names = data.get("mcps", []) if isinstance(data, dict) else []
         except Exception as e:
@@ -339,7 +342,7 @@ class MCPツールブリッジ:
         name_map: Dict[str, Any] = {}
         for mcp in self.list_mcps():
             try:
-                with urllib.request.urlopen(f"{self.base_url}/{mcp}/list", timeout=10) as resp:
+                with self._http_opener.open(f"{self.base_url}/{mcp}/list", timeout=10) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
             except Exception:
                 continue
@@ -379,7 +382,7 @@ class MCPツールブリッジ:
                 headers={"Content-Type": "application/json"},
             )
             try:
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                with self._http_opener.open(req, timeout=timeout) as resp:
                     raw = resp.read().decode("utf-8")
                 try:
                     return json.loads(raw)
@@ -433,7 +436,7 @@ class MCPツールブリッジ:
             return self._http_methods_cache[mcp]
         methods: set[str] = set()
         try:
-            with urllib.request.urlopen(f"{self.base_url}/{mcp}/docs", timeout=5) as resp:
+            with self._http_opener.open(f"{self.base_url}/{mcp}/docs", timeout=5) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             if isinstance(data, dict) and isinstance(data.get("methods"), dict):
                 methods = set(data["methods"].keys())

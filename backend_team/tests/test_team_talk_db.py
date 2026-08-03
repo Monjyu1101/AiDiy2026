@@ -150,7 +150,7 @@ class TeamTalkDbTest(unittest.TestCase):
         self.assertIn("`.aidiy/knowledge/_index.md`", prompt)
         self.assertIn("実物を読み、現状を把握する", prompt)
         self.assertIn("実際に確認したファイルパス", prompt)
-        self.assertIn("http://localhost:8095/", prompt)
+        self.assertIn("http://127.0.0.1:8095/", prompt)
         self.assertIn("ファイルの作成・変更・削除、git操作、サーバー操作は行わないでください", prompt)
 
     def test_旧履歴を複合主キーの最終発言へ移行して上書きする(self) -> None:
@@ -326,7 +326,7 @@ class TeamTalkDbTest(unittest.TestCase):
         self.assertIn("`_AIDIY.md`", 調査)
         self.assertIn("`AGENTS.md`", 調査)
         self.assertIn("`.aidiy/knowledge/_index.md`", 調査)
-        self.assertIn("http://localhost:8095/", 調査)
+        self.assertIn("http://127.0.0.1:8095/", 調査)
 
     def test_エージェント会話APIは調査モードで依頼する(self) -> None:
         """利用者画面の会話も、ソースを読んだうえで答えさせること。"""

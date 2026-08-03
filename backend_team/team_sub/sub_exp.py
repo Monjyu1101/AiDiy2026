@@ -37,7 +37,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AIDIYルート = os.path.normpath(os.path.join(BASE_DIR, ".."))
 TEAM_API = "http://localhost:8094/team"
 TASK_API = "http://localhost:8093/task"
-MCP_URL = "http://localhost:8095/aidiy_code_agents/run"
+MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
+_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TEAM_AI_NAME既定 = "claude_cli"
 TEAM_AI_MODEL既定 = "auto"
 TASK_AI_NAME既定 = "claude_cli"
@@ -82,7 +83,7 @@ def POST送信(url: str, payload: dict, timeout: int = 3600) -> dict:
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
-    with urllib.request.urlopen(req, timeout=timeout) as res:
+    with _LOCAL_HTTP_OPENER.open(req, timeout=timeout) as res:
         return json.loads(res.read().decode("utf-8"))
 
 

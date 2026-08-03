@@ -31,7 +31,8 @@ from urllib.parse import quote
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_API = "http://localhost:8093/task"
-バックアップURL = "http://localhost:8095/aidiy_backup/save/run"
+バックアップURL = "http://127.0.0.1:8095/aidiy_backup/save/run"
+_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_start.log")
 
@@ -69,7 +70,7 @@ def POST送信(url: str, payload: dict, timeout: int = 600) -> dict:
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
-    with urllib.request.urlopen(req, timeout=timeout) as res:
+    with _LOCAL_HTTP_OPENER.open(req, timeout=timeout) as res:
         return json.loads(res.read().decode("utf-8"))
 
 

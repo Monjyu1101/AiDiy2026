@@ -17,7 +17,7 @@ aidiy_code_agents が AIコード を駆動するのに対し、本モジュー�
 MCP ツールの description で通知する。
 
 ツール公開先:
-    SSE: http://localhost:8095/aidiy_chat_llms/sse
+    SSE: http://127.0.0.1:8095/aidiy_chat_llms/sse
 
 加えて OpenAI / Ollama 互換の標準チャットインターフェース
 (/aidiy_chat_completions) からも本ラッパーを利用する。

@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import os
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 from . import persona_catalog, team_db
 
@@ -37,6 +37,7 @@ CODE_AGENTS_URL = (
     os.environ.get("AIDIY_CODE_AGENTS_URL")
     or "http://127.0.0.1:8095/aidiy_code_agents/run"
 )
+_LOCAL_HTTP_OPENER = build_opener(ProxyHandler({}))
 # 利用者画面の待機上限（3分）より先に backend_team が結果を確定できるよう、
 # CodeAgent 自体は170秒、HTTP接続は180秒で打ち切る。
 CODE_AGENT_TIMEOUT秒 = 170
@@ -58,7 +59,7 @@ def _POST送信(payload: dict, http_timeout秒: int = HTTP_TIMEOUT秒) -> dict:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=http_timeout秒) as response:
+        with _LOCAL_HTTP_OPENER.open(request, timeout=http_timeout秒) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
@@ -106,8 +107,8 @@ def _ペルソナ指示(要員ID: str, 調査モード: bool = False) -> str:
   `docs/`                 … 業務システム機能を追加するときの手順
 そこから辿って、話題に関係するソース・設定・ログの実物を確認します。
 読み取り・検索・一覧の操作は自由に行って構いません。AiDiy の MCP ツールも HTTP で利用できます。
-  ツール一覧の確認: GET http://localhost:8095/<mcp名>/list
-  ツールの実行: POST http://localhost:8095/<mcp名>/<メソッド> （JSON ボディ）
+  ツール一覧の確認: GET http://127.0.0.1:8095/<mcp名>/list
+  ツールの実行: POST http://127.0.0.1:8095/<mcp名>/<メソッド> （JSON ボディ）
 答えるときは、実際に確認したファイルパスや関数名など、具体的な根拠を挙げてください。
 自分で確認していない固有名詞や数値は書かないでください。
 

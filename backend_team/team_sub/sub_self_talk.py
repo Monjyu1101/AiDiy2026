@@ -84,8 +84,8 @@ def 依頼内容を作る(
 4. そのうえで、まだ手が付いていない・確認が必要な具体的な箇所を1つ選ぶ。
 
 調査には読み取り系のツールを自由に使って構いません。AiDiy の MCP ツールも HTTP で利用できます。
-  ツール一覧の確認: GET http://localhost:8095/<mcp名>/list
-  ツールの実行: POST http://localhost:8095/<mcp名>/<メソッド> （JSON ボディ）
+  ツール一覧の確認: GET http://127.0.0.1:8095/<mcp名>/list
+  ツールの実行: POST http://127.0.0.1:8095/<mcp名>/<メソッド> （JSON ボディ）
   例: aidiy_sqlite, aidiy_logs, aidiy_code_check など
 ファイルの作成・変更・削除、git操作、サーバー操作は行わないでください。ここでは意見を出すだけです。
 

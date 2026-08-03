@@ -56,7 +56,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 _TEAM_SUB_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_TEAM_SUB_DIR.parent))
@@ -72,6 +72,7 @@ TASK_AGENTS_URL = (
     os.environ.get("AIDIY_TASK_AGENTS_URL")
     or "http://127.0.0.1:8095/aidiy_task_agents/submit"
 )
+_LOCAL_HTTP_OPENER = build_opener(ProxyHandler({}))
 操作者 = {"利用者ID": "system", "利用者名": "システム", "端末ID": "backend_team"}
 
 # プロンプト生成関数の形: (要員ID, プロジェクト, チーム目標, チーム作業, 区分ごとのまとめ内容) -> 要求内容
@@ -87,7 +88,7 @@ def POST送信(url: str, payload: dict, timeout: int = 30) -> dict:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _LOCAL_HTTP_OPENER.open(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")

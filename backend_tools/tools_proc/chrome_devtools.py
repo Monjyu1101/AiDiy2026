@@ -35,6 +35,22 @@ import websockets
 from tools_proc.desktop_capture import DesktopCapture
 
 
+_LOOPBACK_HOST = "127.0.0.1"
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def _normalize_loopback_ws_url(ws_url: str) -> str:
+    """Chrome が返す localhost の WebSocket URL を IPv4 loopback へ固定する。"""
+    parsed = urllib.parse.urlsplit(ws_url)
+    if parsed.hostname != "localhost":
+        return ws_url
+
+    port = f":{parsed.port}" if parsed.port is not None else ""
+    return urllib.parse.urlunsplit(
+        (parsed.scheme, f"{_LOOPBACK_HOST}{port}", parsed.path, parsed.query, parsed.fragment)
+    )
+
+
 class ChromeDevToolsError(Exception):
     """CDP 接続・操作エラー"""
     pass
@@ -49,7 +65,7 @@ class CDPClient:
     シンプルな実装。
     """
 
-    def __init__(self, host: str = "localhost", port: int = 9222):
+    def __init__(self, host: str = _LOOPBACK_HOST, port: int = 9222):
         self.host = host
         self.port = port
 
@@ -61,7 +77,9 @@ class CDPClient:
         """Chrome DevTools HTTP エンドポイントに GET リクエスト"""
         url = f"http://{self.host}:{self.port}{path}"
         try:
-            with urllib.request.urlopen(url, timeout=5) as resp:
+            # OS のシステムプロキシは loopback CDP 通信に不要。Windows では
+            # 127.0.0.1 が proxy bypass 対象外となり、5秒タイムアウトする場合がある。
+            with _NO_PROXY_OPENER.open(url, timeout=5) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.URLError as e:
             raise ChromeDevToolsError(
@@ -161,7 +179,7 @@ class CDPClient:
                 f"タブ '{tab.get('id')}' に WebSocket URL がありません。\n"
                 f"既に別のデバッガが接続している可能性があります。"
             )
-        return ws_url
+        return _normalize_loopback_ws_url(ws_url)
 
     # ------------------------------------------------------------------ #
     # タブ管理
@@ -170,7 +188,13 @@ class CDPClient:
     def list_tabs(self) -> list[dict]:
         """開いているタブ/ページの一覧を取得"""
         raw = self._http_get("/json")
-        return raw if isinstance(raw, list) else []
+        if not isinstance(raw, list):
+            return []
+        for tab in raw:
+            ws_url = tab.get("webSocketDebuggerUrl")
+            if ws_url:
+                tab["webSocketDebuggerUrl"] = _normalize_loopback_ws_url(ws_url)
+        return raw
 
     def get_version(self) -> dict:
         """Chrome バージョン情報を取得"""
@@ -185,7 +209,7 @@ class CDPClient:
                 "ブラウザレベルの WebSocket URL が取得できません。"
                 "Chrome が --remote-debugging-port で起動しているか確認してください。"
             )
-        return ws_url
+        return _normalize_loopback_ws_url(ws_url)
 
     def new_tab_sync(self, retries: int = 5, retry_delay: float = 1.5) -> dict:
         """新規ブランクタブを開く (同期)。Chrome 起動直後のリトライ対応"""

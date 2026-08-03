@@ -44,6 +44,12 @@ _CHROME_CANDIDATES = [
 # 専用プロファイルディレクトリ (ユーザーの通常プロファイルと分離)
 _PROFILE_DIR = str(Path(__file__).parent.parent / "temp" / "_chrome_profile")
 
+# Chrome の CDP は同一マシン内だけで使う。Windows のシステムプロキシや
+# localhost の IPv6 -> IPv4 フォールバックを経由すると、疎通確認だけで
+# 数秒かかる環境があるため、IPv4 loopback と proxy 無効の opener を固定する。
+_LOOPBACK_HOST = "127.0.0.1"
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 class ChromeManager:
     """
@@ -72,9 +78,9 @@ class ChromeManager:
 
     def is_running(self) -> bool:
         """Chrome がデバッグポートで応答しているか確認"""
-        url = f"http://localhost:{self.debug_port}/json/version"
+        url = f"http://{_LOOPBACK_HOST}:{self.debug_port}/json/version"
         try:
-            with urllib.request.urlopen(url, timeout=2) as resp:
+            with _NO_PROXY_OPENER.open(url, timeout=2) as resp:
                 return resp.status == 200
         except Exception:
             return False
@@ -83,9 +89,9 @@ class ChromeManager:
         """Chrome のバージョン情報を返す (未起動時は None)"""
         import json
 
-        url = f"http://localhost:{self.debug_port}/json/version"
+        url = f"http://{_LOOPBACK_HOST}:{self.debug_port}/json/version"
         try:
-            with urllib.request.urlopen(url, timeout=2) as resp:
+            with _NO_PROXY_OPENER.open(url, timeout=2) as resp:
                 return json.loads(resp.read().decode())
         except Exception:
             return None
@@ -275,7 +281,8 @@ class ChromeManager:
         Raises:
             FileNotFoundError: Chrome が見つからない場合
         """
-        self._setup_profile()
         if self.is_running():
             return "already_running"
+        # launch() が起動直前にプロファイルを初期化する。
+        # ここでも行うと未起動時に同じファイル処理が2回走る。
         return self.launch(show_automation_banner=show_automation_banner)

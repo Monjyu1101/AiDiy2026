@@ -29,7 +29,7 @@ import os
 import sys
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -47,6 +47,7 @@ CODE_AGENTS_URL = (
     os.environ.get("AIDIY_CODE_AGENTS_URL")
     or "http://127.0.0.1:8095/aidiy_code_agents/run"
 )
+_LOCAL_HTTP_OPENER = build_opener(ProxyHandler({}))
 既定利用者ID = "admin"
 TEAM_AI_NAME既定 = "claude_cli"
 TEAM_AI_MODEL既定 = "auto"
@@ -67,7 +68,7 @@ def POST送信(url: str, payload: dict, timeout: int = 30) -> dict:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _LOCAL_HTTP_OPENER.open(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")

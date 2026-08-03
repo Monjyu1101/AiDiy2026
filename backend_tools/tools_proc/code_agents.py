@@ -16,7 +16,7 @@ AIコード.py (CodeAgent) を MCP ツールとして公開するラッパー。
 利用可能な AI 名を MCP ツールの description で通知する。
 
 ツール公開先:
-    SSE: http://localhost:8095/aidiy_code_agents/sse
+    SSE: http://127.0.0.1:8095/aidiy_code_agents/sse
 """
 
 import json

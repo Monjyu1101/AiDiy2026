@@ -53,6 +53,20 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+
+def _configure_loopback_proxy_bypass() -> None:
+    """子プロセスのローカルHTTP通信がシステムプロキシを経由しないようにする。"""
+    required = ("localhost", "127.0.0.1", "::1")
+    for key in ("NO_PROXY", "no_proxy"):
+        current = [item.strip() for item in os.environ.get(key, "").split(",") if item.strip()]
+        known = {item.lower() for item in current}
+        current.extend(item for item in required if item.lower() not in known)
+        os.environ[key] = ",".join(current)
+
+
+_configure_loopback_proxy_bypass()
+
+
 if sys.platform == "win32":
     import msvcrt
 
