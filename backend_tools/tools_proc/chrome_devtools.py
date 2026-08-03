@@ -61,13 +61,17 @@ class CDPClient:
     Chrome DevTools Protocol (CDP) クライアント
 
     各メソッドは CDP の HTTP エンドポイントまたは WebSocket を介して
-    Chrome を操作する。send_command は毎回新規 WebSocket 接続を確立する
-    シンプルな実装。
+    Chrome を操作する。WebSocket 接続はターゲット URL ごとに再利用し、
+    同一ターゲットへのコマンドは順番に処理する。
     """
 
     def __init__(self, host: str = _LOOPBACK_HOST, port: int = 9222):
         self.host = host
         self.port = port
+        self._ws_connections: dict[str, Any] = {}
+        self._ws_locks: dict[str, asyncio.Lock] = {}
+        self._connection_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._command_id = 0
 
     # ------------------------------------------------------------------ #
     # 内部ヘルパー
@@ -108,17 +112,39 @@ class CDPClient:
         Returns:
             CDP レスポンスの result フィールド
         """
-        cmd = {"id": 1, "method": method, "params": params or {}}
+        ws_url = _normalize_loopback_ws_url(ws_url)
+        loop = asyncio.get_running_loop()
+        if self._connection_loop is not loop:
+            # テストなどでイベントループが切り替わった場合、前ループに紐づく
+            # WebSocket / Lock を再利用しない。
+            self._ws_connections = {}
+            self._ws_locks = {}
+            self._connection_loop = loop
 
-        try:
-            async with websockets.connect(
-                ws_url,
-                max_size=50 * 1024 * 1024,  # 50MB (スクリーンショット対応)
-                open_timeout=10,
-            ) as ws:
-                await ws.send(json.dumps(cmd))
+        lock = self._ws_locks.setdefault(ws_url, asyncio.Lock())
+        async with lock:
+            ws = self._ws_connections.get(ws_url)
+            try:
+                self._command_id += 1
+                command_id = self._command_id
+                cmd = {"id": command_id, "method": method, "params": params or {}}
+                payload = json.dumps(cmd)
 
-                loop = asyncio.get_running_loop()
+                # Chrome 再起動後など、キャッシュ接続だけが切れている場合は
+                # send 失敗を検知して一度だけ再接続する。受信後の再送は
+                # 非冪等コマンドの二重実行を避けるため行わない。
+                for send_attempt in range(2):
+                    if ws is None:
+                        ws = await self._open_connection(ws_url)
+                    try:
+                        await ws.send(payload)
+                        break
+                    except (websockets.exceptions.WebSocketException, OSError):
+                        await self._discard_connection(ws_url, ws)
+                        ws = None
+                        if send_attempt >= 1:
+                            raise
+
                 deadline = loop.time() + timeout
 
                 while True:
@@ -128,13 +154,11 @@ class CDPClient:
                             f"CDP コマンド '{method}' がタイムアウトしました ({timeout}秒)"
                         )
 
-                    raw = await asyncio.wait_for(
-                        ws.recv(), timeout=min(remaining, 5.0)
-                    )
+                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
                     msg = json.loads(raw)
 
                     # イベント (id なし) はスキップしてレスポンスを待つ
-                    if msg.get("id") == 1:
+                    if msg.get("id") == command_id:
                         if "error" in msg:
                             err = msg["error"]
                             raise ChromeDevToolsError(
@@ -143,8 +167,51 @@ class CDPClient:
                             )
                         return msg.get("result", {})
 
-        except websockets.exceptions.WebSocketException as e:
-            raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}")
+            except (websockets.exceptions.WebSocketException, OSError) as e:
+                await self._discard_connection(ws_url, ws)
+                raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}") from e
+            except TimeoutError:
+                await self._discard_connection(ws_url, ws)
+                raise
+
+    async def _open_connection(self, ws_url: str) -> Any:
+        ws = await websockets.connect(
+            ws_url,
+            max_size=50 * 1024 * 1024,  # 50MB (スクリーンショット対応)
+            open_timeout=10,
+            proxy=None,  # loopback CDP をシステムプロキシへ流さない
+        )
+        self._ws_connections[ws_url] = ws
+        return ws
+
+    async def _discard_connection(self, ws_url: str, ws: Any = None) -> None:
+        """キャッシュ済み接続を破棄する。呼び出し元で対象 Lock を保持する。"""
+        current = self._ws_connections.get(ws_url)
+        if current is None or (ws is not None and current is not ws):
+            return
+        self._ws_connections.pop(ws_url, None)
+        try:
+            await asyncio.wait_for(current.close(), timeout=1.0)
+        except Exception:
+            pass
+
+    async def close_connection(self, ws_url: str) -> None:
+        """指定ターゲットの再利用接続を閉じる。"""
+        ws_url = _normalize_loopback_ws_url(ws_url)
+        lock = self._ws_locks.setdefault(ws_url, asyncio.Lock())
+        async with lock:
+            await self._discard_connection(ws_url)
+
+    async def close_connections(self) -> None:
+        """このクライアントが保持するすべての WebSocket 接続を閉じる。"""
+        await asyncio.gather(*(
+            self.close_connection(ws_url)
+            for ws_url in list(self._ws_connections)
+        ))
+
+    async def resolve_tab_async(self, tab_id: Optional[str] = None) -> dict:
+        """同期 HTTP をイベントループ外で実行してタブ情報を返す。"""
+        return await asyncio.to_thread(self.resolve_tab, tab_id)
 
     def resolve_tab(self, tab_id: Optional[str] = None) -> dict:
         """
@@ -231,6 +298,15 @@ class CDPClient:
         except ChromeDevToolsError:
             return False
 
+    async def close_tab(self, tab_id: str) -> bool:
+        """タブを閉じ、対応する再利用 WebSocket も破棄する。"""
+        tab = await self.resolve_tab_async(tab_id)
+        ws_url = self.get_ws_url(tab)
+        try:
+            return await asyncio.to_thread(self.close_tab_sync, tab_id)
+        finally:
+            await self.close_connection(ws_url)
+
     def activate_tab_sync(self, tab_id: str) -> bool:
         """タブをアクティブにする (同期)"""
         try:
@@ -245,7 +321,7 @@ class CDPClient:
 
     async def navigate(self, url: str, tab_id: Optional[str] = None) -> str:
         """URL に移動する"""
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         result = await self.send_command(ws, "Page.navigate", {"url": url})
         frame_id = result.get("frameId", "")
@@ -256,7 +332,7 @@ class CDPClient:
 
     async def reload(self, tab_id: Optional[str] = None) -> str:
         """ページをリロードする"""
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         await self.send_command(ws, "Page.reload", {})
         return "リロードしました"
@@ -279,7 +355,7 @@ class CDPClient:
 
     async def get_page_info(self, tab_id: Optional[str] = None) -> dict:
         """URL・タイトル・readyState などページ基本情報を取得"""
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         result = await self.send_command(
             ws,
@@ -317,7 +393,7 @@ class CDPClient:
 
     async def get_html(self, tab_id: Optional[str] = None) -> str:
         """ページ全体の HTML を取得"""
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         doc = await self.send_command(ws, "DOM.getDocument", {"depth": -1})
         root_node_id = doc["root"]["nodeId"]
@@ -365,13 +441,14 @@ class CDPClient:
         if shutter_sounds == "auto":
             DesktopCapture._play_shutter_sound()
 
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
 
         params: dict = {"format": fmt}
         if fmt == "jpeg":
             params["quality"] = quality
 
+        metrics_overridden = False
         if full_page:
             metrics = await self.send_command(ws, "Page.getLayoutMetrics")
             content = metrics.get("contentSize", {})
@@ -382,11 +459,13 @@ class CDPClient:
                 "Emulation.setDeviceMetricsOverride",
                 {"width": w, "height": h, "deviceScaleFactor": 1, "mobile": False},
             )
+            metrics_overridden = True
 
-        result = await self.send_command(ws, "Page.captureScreenshot", params)
-
-        if full_page:
-            await self.send_command(ws, "Emulation.clearDeviceMetricsOverride")
+        try:
+            result = await self.send_command(ws, "Page.captureScreenshot", params)
+        finally:
+            if metrics_overridden:
+                await self.send_command(ws, "Emulation.clearDeviceMetricsOverride")
 
         data = result.get("data", "")
 
@@ -454,7 +533,7 @@ class CDPClient:
         Raises:
             ChromeDevToolsError: JS 実行時例外が発生した場合
         """
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
 
         result = await self.send_command(
@@ -613,7 +692,7 @@ class CDPClient:
         self, width: int, height: int, tab_id: Optional[str] = None
     ) -> str:
         """ビューポートサイズを設定"""
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         await self.send_command(
             ws,
@@ -628,7 +707,7 @@ class CDPClient:
         """
         document.readyState が 'complete' になるまでポーリング (最大 timeout 秒)
         """
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         loop = asyncio.get_running_loop()
         start = loop.time()
@@ -722,11 +801,11 @@ class CDPClient:
 
     async def clear_console_logs(self, tab_id: Optional[str] = None) -> str:
         """キャプチャされたコンソールログをクリア"""
-        result = await self.eval_js(
+        await self.eval_js(
             "window.__mcp_console_logs = []; window.__mcp_console_logs.length",
             tab_id,
         )
-        return f"クリアしました (0件)"
+        return "クリアしました (0件)"
 
     # ------------------------------------------------------------------ #
     # ネットワーク監視 (JS 注入キャプチャ)
@@ -850,7 +929,7 @@ class CDPClient:
 
     async def get_cookies(self, tab_id: Optional[str] = None) -> list[dict]:
         """ページのクッキーを取得"""
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws = self.get_ws_url(tab)
         result = await self.send_command(ws, "Network.getAllCookies")
         return result.get("cookies", [])
@@ -910,7 +989,7 @@ class CDPClient:
                          eval_js で setTimeout を使いボタンをクリックする場合は
                          クリック遅延より大きな値を指定する（例: 30）。
         """
-        tab = self.resolve_tab(tab_id)
+        tab = await self.resolve_tab_async(tab_id)
         ws_url = self.get_ws_url(tab)
         handle_params: dict = {"accept": accept}
         if prompt_text:
@@ -922,11 +1001,14 @@ class CDPClient:
             return json.dumps(result, ensure_ascii=False)
 
         # イベント駆動: 同一 WebSocket 上で Page.javascriptDialogOpening を待機してから応答
+        # 通常コマンド用の再利用接続と同じターゲットへ二重接続しない。
+        await self.close_connection(ws_url)
         try:
             async with websockets.connect(
                 ws_url,
                 max_size=50 * 1024 * 1024,
                 open_timeout=10,
+                proxy=None,
             ) as ws:
                 loop = asyncio.get_running_loop()
 
@@ -937,7 +1019,7 @@ class CDPClient:
                     remaining = deadline - loop.time()
                     if remaining <= 0:
                         raise TimeoutError("Page.enable タイムアウト")
-                    raw = await asyncio.wait_for(ws.recv(), timeout=min(remaining, 5.0))
+                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
                     if json.loads(raw).get("id") == 1:
                         break
 
@@ -966,7 +1048,7 @@ class CDPClient:
                     remaining = deadline - loop.time()
                     if remaining <= 0:
                         raise TimeoutError("handleJavaScriptDialog タイムアウト")
-                    raw = await asyncio.wait_for(ws.recv(), timeout=min(remaining, 5.0))
+                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
                     msg = json.loads(raw)
                     if msg.get("id") == 2:
                         if "error" in msg:

@@ -155,7 +155,11 @@ class ChromeSessionRegistry:
 
         # 既存エントリ: ポートが他プロセスに奪われていたら再割り当て
         # （Chrome 応答ありなら再接続、応答なし かつ ポート使用中なら別アプリ）
-        if not self._chrome_responding(entry["port"]) and not _port_is_free(entry["port"]):
+        if (
+            name not in self._instances
+            and not self._chrome_responding(entry["port"])
+            and not _port_is_free(entry["port"])
+        ):
             if name != DEFAULT_SESSION:
                 old_port = entry["port"]
                 entry["port"] = self._allocate_port()
@@ -241,9 +245,15 @@ class ChromeSessionRegistry:
             return False
         manager, _ = self.get(name)
         if not manager.is_running():
+            with self._lock:
+                self._instances.pop(name, None)
             return False
         stopped = manager._kill_on_debug_port()
         if stopped:
+            with self._lock:
+                # 次回は新しい CDPClient を生成し、停止前の WebSocket
+                # キャッシュを再利用しない。
+                self._instances.pop(name, None)
             logger.info(f"Chrome セッション '{name}' (port={entry['port']}) を停止しました")
         return stopped
 

@@ -144,14 +144,24 @@ def register_tools(mcp, registry):
     """aidiy_chrome_devtools MCP ツールを mcp インスタンスに登録する。
     HTTP ルートでも使える _ensure_chrome コルーチンを返す。"""
 
+    startup_locks: dict[str, asyncio.Lock] = {}
+
     async def _ensure_chrome(
         show_automation_banner: Optional[bool] = None,
         session: str = "default",
         headless: Optional[bool] = None,
     ):
         """セッションの Chrome を確保して CDPClient を返す（未起動なら起動）"""
-        chrome, cdp = registry.get(session, headless=headless)
-        if not chrome.is_running():
+        session = session or "default"
+        lock = startup_locks.setdefault(session, asyncio.Lock())
+        async with lock:
+            # セッション表の確認には CDP の同期 HTTP 疎通が含まれる場合がある。
+            # FastAPI / MCP のイベントループを止めないよう全体をスレッドへ逃がす。
+            chrome, cdp = await asyncio.to_thread(
+                registry.get,
+                session,
+                headless,
+            )
             await asyncio.to_thread(
                 chrome.ensure_running,
                 show_automation_banner=show_automation_banner,
@@ -318,7 +328,7 @@ def register_tools(mcp, registry):
     async def close_tab(session: str = "default", *, tab_id: str) -> str:
         """指定タブを閉じる"""
         cdp = await _ensure_chrome(session=session)
-        ok = await asyncio.to_thread(cdp.close_tab_sync, tab_id)
+        ok = await cdp.close_tab(tab_id)
         return json.dumps({"result": "閉じました" if ok else "失敗しました"}, ensure_ascii=False)
 
     @mcp.tool()
@@ -470,7 +480,7 @@ def register_tools(mcp, registry):
                     loaded = json.loads(stripped)
                     if not isinstance(loaded, dict):
                         raise ValueError(
-                            f"params は JSON オブジェクトである必要があります (例: '{{\"accept\": true}}')"
+                            "params は JSON オブジェクトである必要があります (例: '{\"accept\": true}')"
                         )
                     parsed_params = loaded
         if tab_id == "browser":
@@ -834,7 +844,7 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
                 target_id = result.get("targetId", "") if isinstance(result, dict) else ""
                 return {"id": target_id, "url": req.url or "about:blank"}
             elif method_name in ("close_tab", "close_page"):
-                ok = await asyncio.to_thread(cdp.close_tab_sync, req.tab_id or "")
+                ok = await cdp.close_tab(req.tab_id or "")
                 return {"result": "閉じました" if ok else "失敗しました"}
             elif method_name == "activate_tab":
                 ok = await asyncio.to_thread(cdp.activate_tab_sync, req.tab_id or "")

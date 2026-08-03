@@ -45,11 +45,11 @@ class ChromeManagerLaunchOptionTests(unittest.TestCase):
 
     def test_ensure_running_forwards_banner_override(self):
         manager = ChromeManager()
-        with patch.object(manager, "_setup_profile"):
-            with patch.object(manager, "is_running", return_value=False):
-                with patch.object(manager, "launch", return_value="launched") as launch_mock:
-                    result = manager.ensure_running(show_automation_banner=False)
+        with patch.object(manager, "is_running") as health_mock:
+            with patch.object(manager, "launch", return_value="launched") as launch_mock:
+                result = manager.ensure_running(show_automation_banner=False)
         self.assertEqual(result, "launched")
+        health_mock.assert_not_called()
         launch_mock.assert_called_once_with(show_automation_banner=False)
 
 

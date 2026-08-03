@@ -37,7 +37,7 @@ class ChromeSessionRegistryTests(unittest.TestCase):
         self._p1 = patch("tools_proc.chrome_sessions._port_is_free", return_value=True)
         self._p2 = patch.object(ChromeSessionRegistry, "_chrome_responding", return_value=False)
         self._p1.start()
-        self._p2.start()
+        self._chrome_responding_mock = self._p2.start()
 
     def tearDown(self):
         self._p1.stop()
@@ -70,6 +70,7 @@ class ChromeSessionRegistryTests(unittest.TestCase):
     def test_same_name_returns_same_instance(self):
         registry = _make_registry(self._tmp.name)
         self.assertIs(registry.get("google")[0], registry.get("google")[0])
+        self._chrome_responding_mock.assert_not_called()
 
     def test_mapping_persists_across_restart(self):
         registry = _make_registry(self._tmp.name)
@@ -88,6 +89,15 @@ class ChromeSessionRegistryTests(unittest.TestCase):
         # headless=None（省略）では設定を変えない
         manager2, _ = registry.get("テストA")
         self.assertTrue(manager2.headless)
+
+    def test_close_discards_cached_client_even_when_not_running(self):
+        registry = _make_registry(self._tmp.name)
+        manager_before, _ = registry.get("google")
+
+        self.assertFalse(registry.close("google"))
+
+        manager_after, _ = registry.get("google")
+        self.assertIsNot(manager_after, manager_before)
 
     def test_list_and_delete(self):
         registry = _make_registry(self._tmp.name)

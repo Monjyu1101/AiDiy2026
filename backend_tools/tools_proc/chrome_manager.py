@@ -281,8 +281,6 @@ class ChromeManager:
         Raises:
             FileNotFoundError: Chrome が見つからない場合
         """
-        if self.is_running():
-            return "already_running"
-        # launch() が起動直前にプロファイルを初期化する。
-        # ここでも行うと未起動時に同じファイル処理が2回走る。
+        # launch() が疎通確認と、必要な場合だけプロファイル初期化・起動を行う。
+        # ここで先に is_running() を呼ぶと全リクエストで疎通が二重になる。
         return self.launch(show_automation_banner=show_automation_banner)
