@@ -37,7 +37,7 @@ FRONTEND_PATH = "frontend_web" # フロントエンドフォルダパス
 
 # データベース設定
 DATABASE_TYPE = "sqlite" # "postgresql" or "sqlite"
-SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
+SQLITE_DB_REL_PATH = Path("_data/AiDiy/database.db")
 
 # a/auto 指定時に、以降の質問をデフォルト値で自動回答する
 AUTO_MODE = False

@@ -46,8 +46,8 @@ class ObsStudioControl:
     DEFAULT_TIMEOUT = 10.0
 
     # OBS 接続設定ファイル（backend_tools 起点）
-    _OBS_CONFIG_REL = "../backend_server/_config/mcp_obs_studio_control.json"
-    _LEGACY_OBS_CONFIG_REL = "../backend_server/_config/aidiy_obs_studio_control.json"
+    _OBS_CONFIG_REL = "../_config/mcp_obs_studio_control.json"
+    _LEGACY_OBS_CONFIG_REL = "../_config/aidiy_obs_studio_control.json"
 
     def __init__(
         self,

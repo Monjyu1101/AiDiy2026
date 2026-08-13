@@ -339,7 +339,7 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "aidiy_sqlite は AiDiy DB (backend_server/_data/AiDiy/database.db) の read-only 中心クエリを提供する。",
+        "aidiy_sqlite は AiDiy DB (_data/AiDiy/database.db) の read-only 中心クエリを提供する。",
         "aidiy_logs は backend_server / backend_tools のログ末尾と ERROR 抽出を提供する。",
         "aidiy_code_check は Python 構文 / ruff / TypeScript 型チェックの 3 種類に対応する。",
         "aidiy_backup は差分バックアップで HTTP の save / check に分岐する。"

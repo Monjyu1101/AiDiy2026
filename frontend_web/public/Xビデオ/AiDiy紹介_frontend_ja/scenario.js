@@ -4,7 +4,7 @@ window.SCENARIO = {
   "title": "AiDiy frontend_web - Vue 3 + qTubler + 日本語ファースト UI",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "frontend_web/AGENTS.md、.aidiy/knowledge の実装パターン・画面追加手順・Vue Router・Pinia から実装実態を抜粋して構成。"
+    "summary": "frontend_web/AGENTS.md、_AIDIY/knowledge の実装パターン・画面追加手順・Vue Router・Pinia から実装実態を抜粋して構成。"
   },
   "target": {
     "language": "ja-JP",
@@ -291,14 +291,14 @@ window.SCENARIO = {
       "accent_soft": "rgba(196,155,255,0.18)",
       "kicker": "AUTH & PROXY",
       "headline": "JWT を localStorage に保存し、\n401 は interceptor でログアウト",
-      "lead": "token と user を `localStorage` に保存します。401 は Axios response interceptor でログアウト処理へ流れます。API は `/core/*` → 8091、`/apps/*` → 9098 に Vite proxy 経由で転送します。",
-      "subtitle": "localStorage + Axios interceptor。Vite proxy で /core→8091、/apps→9098 に転送。",
+      "lead": "token と user を `localStorage` に保存します。401 は Axios response interceptor でログアウト処理へ流れます。API は `/core/*` → 8091、`/apps/*` → 8098 に Vite proxy 経由で転送します。",
+      "subtitle": "localStorage + Axios interceptor。Vite proxy で /core→8091、/apps→8098 に転送。",
       "image": "images/scene_004.png",
       "chips": [
         "JWT localStorage",
         "Axios interceptor",
         "/core→8091",
-        "/apps→9098"
+        "/apps→8098"
       ],
       "metrics": [
         {
@@ -311,7 +311,7 @@ window.SCENARIO = {
         },
         {
           "label": "proxy 先",
-          "value": "8091 / 9098"
+          "value": "8091 / 8098"
         }
       ],
       "cards": [
@@ -336,14 +336,14 @@ window.SCENARIO = {
           "lines": [
             "`baseURL: '/'` で Vite proxy を経由",
             "`/core/*` → `http://127.0.0.1:8091`",
-            "`/apps/*` → `http://127.0.0.1:9098`"
+            "`/apps/*` → `http://127.0.0.1:8098`"
           ]
         }
       ],
       "facts": [
         "token と user は `localStorage` の `token` / `user` キーに保存する。",
         "401 は `client.ts` の response interceptor でログアウト処理へ流れる。",
-        "API の `baseURL` は `/` とし、Vite proxy で `/core` → 8091、`/apps` → 9098 に転送する。",
+        "API の `baseURL` は `/` とし、Vite proxy で `/core` → 8091、`/apps` → 8098 に転送する。",
         "直接 `http://localhost:8091` を叩かない（CORS 条件が変わる）。"
       ],
       "evidence": [
@@ -357,7 +357,7 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "ログイン情報はブラウザに保存し、API リクエストは Vite Proxy で Core と Apps に自動で振り分けます。",
-      "long_narration": "ログイン後のトークンと利用者情報はブラウザの localStorage に保存します。API のエラーは Axios のインターセプターが自動でキャッチして、ログアウト画面に誘導します。サーバーとの通信はすべて Vite の Proxy 設定を経由します。/core で始まるパスは Core サーバー（ポート 8091）に、/apps で始まるパスは Apps サーバー（ポート 9098）に自動で振り分けられます。この仕組みのおかげで、フロントエンドのコードにサーバーのアドレスを直書きしなくて済みます。AI がコードを生成するときも「/apps/商品/一覧を呼ぶ」と書けば、Proxy が自動で転送先を解決します。",
+      "long_narration": "ログイン後のトークンと利用者情報はブラウザの localStorage に保存します。API のエラーは Axios のインターセプターが自動でキャッチして、ログアウト画面に誘導します。サーバーとの通信はすべて Vite の Proxy 設定を経由します。/core で始まるパスは Core サーバー（ポート 8091）に、/apps で始まるパスは Apps サーバー（ポート 8098）に自動で振り分けられます。この仕組みのおかげで、フロントエンドのコードにサーバーのアドレスを直書きしなくて済みます。AI がコードを生成するときも「/apps/商品/一覧を呼ぶ」と書けば、Proxy が自動で転送先を解決します。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
       "short_duration_sec": 7.848,

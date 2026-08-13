@@ -512,22 +512,22 @@ class CodeAI:
             return base_prompt
 
     def _aidiy参照プロンプト取得(self, 実行パス: str = None) -> str:
-        """.aidiy/knowledge/_index.md がある場合のみ、知見参照指示を返す"""
+        """_AIDIY/knowledge/_index.md がある場合のみ、知見参照指示を返す"""
         try:
             base_dir = Path(実行パス if 実行パス else self.cwd_str).resolve()
-            index_path = base_dir / ".aidiy" / "knowledge" / "_index.md"
+            index_path = base_dir / "_AIDIY" / "knowledge" / "_index.md"
             if not index_path.exists():
                 return ""
             display_path = index_path.resolve().as_posix()
             return (
                 "\n\n"
                 "プロジェクト内のファイル操作するときは、\n"
-                ".aidiy/knowledgeフォルダ並びに.aidiy/knowledge/_index.mdを確認し、\n"
+                "_AIDIY/knowledgeフォルダ並びに_AIDIY/knowledge/_index.mdを確認し、\n"
                 "類似の操作の記載があれば知見として利用すること。\n"
                 f"参照先: `{display_path}`"
             )
         except Exception as e:
-            logger.warning(f".aidiy/knowledge 参照プロンプト生成エラー: {e}")
+            logger.warning(f"_AIDIY/knowledge 参照プロンプト生成エラー: {e}")
             return ""
 
     async def 開始(self):

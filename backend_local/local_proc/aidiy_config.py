@@ -11,7 +11,7 @@
 """
 AiDiy_key.json 読み取りユーティリティ（backend_local 用）
 
-backend_server/_config/AiDiy_key.json を読み込み、backend_local の各種設定を
+プロジェクトルートの _config/AiDiy_key.json を読み込み、backend_local の各種設定を
 環境変数を一切使わずに JSON から取得する。
 
 値の優先順位:
@@ -25,10 +25,11 @@ import json
 import os
 from typing import Any, Optional
 
-# backend_local ディレクトリ（local_proc の親）と AiDiy_key.json の固定パス
+# backend_local ディレクトリ（local_proc の親）と共有設定の既定パス
 _BACKEND_LOCAL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_CONFIG_DIR = "../_config"
 _CONFIG_DIR = os.path.normpath(
-    os.path.join(_BACKEND_LOCAL_DIR, "..", "backend_server", "_config")
+    os.path.join(_BACKEND_LOCAL_DIR, DEFAULT_CONFIG_DIR)
 )
 _KEY_PATH = os.path.join(_CONFIG_DIR, "AiDiy_key.json")
 # ローカル LLM のモデル一覧ファイル（--all の取得対象）

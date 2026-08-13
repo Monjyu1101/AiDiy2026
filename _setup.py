@@ -17,8 +17,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 
 フォルダ別スクリプト:
 - backend_server/_setup.py   バックエンド(core,apps)
-- backend_task/_setup.py     バックエンド(task)
-- backend_team/_setup.py     バックエンド(team)
+- backend_taskteam/_setup.py バックエンド(task,team)
 - backend_tools/_setup.py    バックエンド(tools) + MCP 設定
 - backend_local/_setup.py    バックエンド(local)
 - frontend_web/_setup.py     フロントエンド(Web)
@@ -30,6 +29,9 @@ Usage:
 """
 
 import importlib.util
+import os
+import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -45,6 +47,11 @@ BASE_DIR = Path(__file__).resolve().parent
 
 FRONTEND_COMMAND = "npm"
 DATABASE_TYPE = "sqlite"
+PORT_CORE = 8091
+PORT_APPS = 8098
+PORT_TASKTEAM = 8093
+PORT_TOOLS = 8095
+PORT_LOCAL = 8096
 
 AUTO_MODE = False
 GLOBAL_CLI_INSTALL_PROCESSES = []
@@ -119,6 +126,41 @@ def _load_folder_module(folder: str):
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+# `_setup.py` を import するフォルダ（= `__pycache__` が生成される）。
+IMPORT_CACHE_FOLDERS = (
+    "backend_local",
+    "backend_tools",
+    "backend_server",
+    "backend_taskteam",
+    "frontend_web",
+    "frontend_avatar",
+    "command_hermes",
+)
+
+
+def _handle_remove_readonly(func, path, exc_info):
+    del exc_info
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def remove_folder_import_caches() -> None:
+    """フォルダ別 `_setup.py` の import で生成された `__pycache__` を消す。
+
+    フロントエンド(Web/Avatar)は Node.js プロジェクトだが、セットアップと
+    クリーンアップだけ Python で実行するため、この import 分だけが残ってしまう。
+    """
+    for folder in IMPORT_CACHE_FOLDERS:
+        pycache_dir = BASE_DIR / folder / "__pycache__"
+        if not pycache_dir.is_dir():
+            continue
+        try:
+            shutil.rmtree(pycache_dir, onerror=_handle_remove_readonly)
+            print_success(f"__pycache__ ({folder}) を削除しました: {pycache_dir}")
+        except Exception as e:
+            print_warning(f"__pycache__ ({folder}) の削除に失敗しました: {e}")
 
 
 # ============================================================
@@ -555,8 +597,7 @@ def collect_setup_choices() -> dict | None:
         "pg_migrate":            False,
         "local":                 False,
         "local_download":        "no",
-        "task":                  False,
-        "team":                  False,
+        "taskteam":              False,
         "mcp":                   False,
         "mcp_config":            False,
         "web":                   False,
@@ -584,8 +625,7 @@ def collect_setup_choices() -> dict | None:
         choices["pg_restore"]      = ask_yes_no("バックエンド: 初期データベースを復元しますか？", default="n")
         choices["pg_migrate"]      = ask_yes_no("バックエンド: マイグレーション(alembic upgrade head)を実行しますか？", default="y")
 
-    choices["task"] = ask_yes_no("バックエンド(task)のセットアップを実行しますか？", default="y")
-    choices["team"] = ask_yes_no("バックエンド(team)のセットアップを実行しますか？", default="y")
+    choices["taskteam"] = ask_yes_no("バックエンド(task,team)のセットアップを実行しますか？", default="y")
 
     choices["web"] = ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y")
     choices["avatar"] = ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y")
@@ -607,11 +647,10 @@ def main():
     print_info("  2. バックエンド(local)")
     print_info("  3. バックエンド(tools)")
     print_info("  4. バックエンド(core,apps)")
-    print_info("  5. バックエンド(task)")
-    print_info("  6. バックエンド(team)")
-    print_info("  7. フロントエンド(Web)")
-    print_info("  8. フロントエンド(Avatar)")
-    print_info("  9. コマンド(hermes)")
+    print_info("  5. バックエンド(task,team)")
+    print_info("  6. フロントエンド(Web)")
+    print_info("  7. フロントエンド(Avatar)")
+    print_info("  8. コマンド(hermes)")
     print()
 
     ensure_prerequisites()
@@ -679,26 +718,15 @@ def main():
         print_warning("バックエンド(core,apps)のセットアップをスキップしました。")
 
     print()
-    if choices["task"]:
-        task_mod = _load_folder_module("backend_task")
-        if not task_mod.setup(choices):
-            error_locations.append("バックエンド(task)")
+    if choices["taskteam"]:
+        taskteam_mod = _load_folder_module("backend_taskteam")
+        if not taskteam_mod.setup(choices):
+            error_locations.append("バックエンド(task,team)")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("バックエンド(task)のセットアップをスキップしました。")
-
-    print()
-    if choices["team"]:
-        team_mod = _load_folder_module("backend_team")
-        if not team_mod.setup(choices):
-            error_locations.append("バックエンド(team)")
-            if not continue_on_error:
-                print_setup_summary(error_locations)
-                sys.exit(1)
-    else:
-        print_warning("バックエンド(team)のセットアップをスキップしました。")
+        print_warning("バックエンド(task,team)のセットアップをスキップしました。")
 
     print()
     if choices["web"]:
@@ -740,16 +768,18 @@ def main():
     else:
         print_warning("コマンド(hermes)のセットアップをスキップしました。")
 
+    print()
+    remove_folder_import_caches()
+
     print_setup_summary(error_locations)
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
     print_info("  個別起動:")
-    print_info("    Local起動: cd backend_local && uv run uvicorn local_main:app --reload --host 0.0.0.0 --port 8096")
-    print_info("    MCP起動  : cd backend_tools && uv run uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095")
-    print_info("    Core起動 : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port 8091")
-    print_info("    Apps起動 : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098")
-    print_info("    Task起動 : cd backend_task && uv run uvicorn task_main:app --reload --host 0.0.0.0 --port 8093")
-    print_info("    Team起動 : cd backend_team && uv run uvicorn team_main:app --reload --host 0.0.0.0 --port 8094")
+    print_info(f"    Local起動: cd backend_local && uv run uvicorn local_main:app --reload --host 0.0.0.0 --port {PORT_LOCAL}")
+    print_info(f"    MCP起動  : cd backend_tools && uv run uvicorn tools_main:app --reload --host 0.0.0.0 --port {PORT_TOOLS}")
+    print_info(f"    Core起動 : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port {PORT_CORE}")
+    print_info(f"    Apps起動 : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port {PORT_APPS}")
+    print_info(f"    バックエンド(task,team)起動: cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発  : cd frontend_web && npm run dev")
     print_info("    Avatar   : cd frontend_avatar && npm run dev")
     if sys.platform == "win32":
@@ -775,3 +805,6 @@ if __name__ == "__main__":
     except Exception as e:
         print_error(f"予期しないエラーが発生しました: {e}")
         sys.exit(1)
+    finally:
+        # 中断・エラー終了でも import 由来の `__pycache__` を残さない。
+        remove_folder_import_caches()

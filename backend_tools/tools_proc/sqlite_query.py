@@ -11,7 +11,7 @@
 """
 SQLite クエリモジュール
 
-`backend_server/_data/AiDiy/database.db` に対し、AIエージェントが
+`_data/AiDiy/database.db` に対し、AIエージェントが
 **自己検証のため** にスキーマ確認・件数確認・SELECT を行うための
 最小限のツール群を提供する。
 
@@ -35,7 +35,7 @@ class SqliteQueryError(Exception):
 class SqliteQuery:
     """AiDiy の SQLite DB に対する安全なクエリアクセスを提供する"""
 
-    DEFAULT_DB_REL = os.path.join("backend_server", "_data", "AiDiy", "database.db")
+    DEFAULT_DB_REL = os.path.join("_data", "AiDiy", "database.db")
     MAX_ROWS_LIMIT = 1000
 
     # 書き込み系 SQL の先頭キーワード

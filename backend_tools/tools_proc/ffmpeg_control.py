@@ -54,8 +54,8 @@ class FfmpegControl:
     DEFAULT_OUTPUT_BYTES = 1024 * 1024  # stdout/stderr の文字列化上限
 
     # 接続設定ファイル（backend_tools 起点）
-    _FFMPEG_CONFIG_REL = "../backend_server/_config/mcp_ffmpeg_control.json"
-    _LEGACY_FFMPEG_CONFIG_REL = "../backend_server/_config/aidiy_ffmpeg_control.json"
+    _FFMPEG_CONFIG_REL = "../_config/mcp_ffmpeg_control.json"
+    _LEGACY_FFMPEG_CONFIG_REL = "../_config/aidiy_ffmpeg_control.json"
 
     def __init__(
         self,

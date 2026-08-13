@@ -75,7 +75,7 @@ window.SCENARIO = {
         },
         {
           "label": "Apps API",
-          "value": "port 9098"
+          "value": "port 8098"
         }
       ],
       "cards": [

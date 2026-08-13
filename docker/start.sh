@@ -3,6 +3,10 @@
 
 set -e  # Exit on error
 
+PORT_WEB=8090
+PORT_CORE=8091
+PORT_APPS=8098
+
 echo "=========================================="
 echo "  AiDiy2026 Starting..."
 echo "=========================================="
@@ -10,22 +14,22 @@ echo "=========================================="
 cd /app
 
 # Start Backend Core API (core_main) in background
-echo "[1/3] Starting Backend Core API (port 8091)..."
+echo "[1/3] Starting Backend Core API (port ${PORT_CORE})..."
 cd /app/backend_server
-python -m uvicorn core_main:app --host 0.0.0.0 --port 8091 --log-level info &
+python -m uvicorn core_main:app --host 0.0.0.0 --port "${PORT_CORE}" --log-level info &
 CORE_PID=$!
 sleep 2
 
 # Start Backend Apps API (apps_main) in background
-echo "[2/3] Starting Backend Apps API (port 9098)..."
-python -m uvicorn apps_main:app --host 0.0.0.0 --port 9098 --log-level info &
+echo "[2/3] Starting Backend Apps API (port ${PORT_APPS})..."
+python -m uvicorn apps_main:app --host 0.0.0.0 --port "${PORT_APPS}" --log-level info &
 APPS_PID=$!
 sleep 2
 
 # Start Frontend server with simple HTTP server
-echo "[3/3] Starting Frontend (port 8090)..."
+echo "[3/3] Starting Frontend (port ${PORT_WEB})..."
 cd /app/frontend_web/dist
-python -m http.server 8090 &
+python -m http.server "${PORT_WEB}" &
 FRONTEND_PID=$!
 
 echo ""
@@ -34,9 +38,9 @@ echo "  AiDiy2026 Started Successfully!"
 echo "=========================================="
 echo ""
 echo "Services:"
-echo "  - Frontend:    http://127.0.0.1:8090"
-echo "  - Core API:    http://127.0.0.1:8091/docs"
-echo "  - Apps API:    http://127.0.0.1:9098/docs"
+echo "  - Frontend:    http://127.0.0.1:${PORT_WEB}"
+echo "  - Core API:    http://127.0.0.1:${PORT_CORE}/docs"
+echo "  - Apps API:    http://127.0.0.1:${PORT_APPS}/docs"
 echo ""
 echo "Default Login:"
 echo "  - Username: admin"

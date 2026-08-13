@@ -75,7 +75,7 @@ class MovieGeneration:
     # AiDiy_key.json へのパス（backend_tools 起点）
     # ================================================================== #
 
-    _KEY_CONFIG_REL = "../backend_server/_config/AiDiy_key.json"
+    _KEY_CONFIG_REL = "../_config/AiDiy_key.json"
 
     # ------------------------------------------------------------------ #
     # API キー解決（共通）

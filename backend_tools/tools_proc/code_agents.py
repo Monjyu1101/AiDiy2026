@@ -52,7 +52,7 @@ class _NullConnection:
 class CodeAgents:
     """AIコード.py の CodeAgent を MCP 経由で起動するラッパークラス"""
 
-    KEY_JSON_REL = os.path.join("backend_server", "_config", "AiDiy_key.json")
+    KEY_JSON_REL = os.path.join("_config", "AiDiy_key.json")
 
     def __init__(self, project_root: Optional[str] = None):
         if project_root:
@@ -94,7 +94,7 @@ class CodeAgents:
 
         1. project_path が指定されていれば絶対パスに正規化して返す。
         2. なければ AiDiy_key.json の CODE_BASE_PATH を使う。
-           CODE_BASE_PATH は相対パス（例: "../"）の場合、backend_server/_config/ 基準で解釈。
+           CODE_BASE_PATH は相対パス（例: "../"）の場合、_config/ 基準で解釈。
         3. それも取得できなければプロジェクトルートを返す。
         """
         if project_path:
@@ -103,7 +103,7 @@ class CodeAgents:
         key = self._load_key_json()
         code_base = key.get("CODE_BASE_PATH", "").strip()
         if code_base:
-            config_dir = os.path.join(self.root, "backend_server", "_config")
+            config_dir = os.path.join(self.root, "_config")
             resolved = Path(config_dir) / code_base
             return str(resolved.resolve())
 

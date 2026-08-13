@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 class TaskAgentsRequest(BaseModel):
     prompt: str = ""
     # project_path / ai_name / ai_model は未指定（null）可。
-    # backend_task が AIタスク_要求編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
+    # backend_taskteam が AIタスク_要求編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
     project_path: Optional[str] = None
     ai_name: Optional[str] = None
     ai_model: Optional[str] = None
@@ -43,7 +43,7 @@ def register_tools(mcp_ta, task_agents):
 
     @mcp_ta.tool()
     async def task_agents_config() -> str:
-        """backend_task API の接続先と疎通状態を返す。"""
+        """backend_taskteam API の接続先と疎通状態を返す。"""
         info = await asyncio.to_thread(task_agents.get_config)
         return json.dumps(info, ensure_ascii=False)
 
@@ -60,7 +60,7 @@ def register_tools(mcp_ta, task_agents):
         request_timeout_sec: int = 15,
     ) -> str:
         """
-        backend_task の AIタスク要求へ非同期タスクを投入する。
+        backend_taskteam の AIタスク要求へ非同期タスクを投入する。
         登録だけを行い、タスク分解や実行完了は待たない。
         project_path / ai_name / ai_model は通常指定不要。未指定なら AIタスク画面の新規時と同じ条件
         （利用者IDの更新最終レコードの値、無ければ規定値）で補完される。
@@ -119,26 +119,26 @@ def create_router(task_agents) -> APIRouter:
     async def http_task_agents_docs() -> dict:
         return {
             "service": "aidiy_task_agents",
-            "description": "backend_task API に疎結合で接続し、AIタスク要求を非同期投入する。登録後の分解・実行完了は待たない。",
+            "description": "backend_taskteam API に疎結合で接続し、AIタスク要求を非同期投入する。登録後の分解・実行完了は待たない。",
             "endpoint": "POST /aidiy_task_agents/{method_name}",
             "content_type": "application/json",
             "methods": {
                 "config": {
                     "summary": "接続設定取得",
-                    "description": "backend_task API の接続先と /health の疎通状態を返す。backend_task 未起動でも error ではなく health.ok=false を返す。",
+                    "description": "backend_taskteam API の接続先と /health の疎通状態を返す。backend_taskteam 未起動でも error ではなく health.ok=false を返す。",
                     "example_request": {},
                 },
                 "submit": {
                     "summary": "AIタスク投入",
-                    "description": "指定promptをbackend_taskの/task/タスク要求/AI登録へ渡し、タスクを準備開始として登録する。project_path / ai_name / ai_model / task_idは通常指定不要。project_path / ai_name / ai_model の省略（null）時は AIタスク_要求編集の新規時と同じ条件（利用者IDの更新最終レコードの値、無ければ規定値）で補完し、task_idは省略時にbackend_taskが自動採番する。8093未起動時はstatus=NGで理由を返す。",
+                    "description": "指定promptをbackend_taskteamの/task/タスク要求/AI登録へ渡し、タスクを準備開始として登録する。project_path / ai_name / ai_model / task_idは通常指定不要。project_path / ai_name / ai_model の省略（null）時は AIタスク_要求編集の新規時と同じ条件（利用者IDの更新最終レコードの値、無ければ規定値）で補完し、task_idは省略時にbackend_taskteamが自動採番する。8093未起動時はstatus=NGで理由を返す。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "タスク化したい依頼内容"},
-                        "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_task の プロジェクト に対応。null なら更新最終レコードの値、無ければ空欄。空文字は明示的な空欄指定"},
+                        "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_taskteam の Task API の プロジェクト に対応。null なら更新最終レコードの値、無ければ空欄。空文字は明示的な空欄指定"},
                         "ai_name": {"type": "string", "required": False, "default": None, "description": "TASK_AI_NAME。claude_sdk / claude_cli / codex_cli / aidiy_hermes など。null なら更新最終レコードの値、無ければ規定値"},
                         "ai_model": {"type": "string", "required": False, "default": None, "description": "TASK_AI_MODEL。null なら更新最終レコードの値、無ければ規定値"},
                         "user_id": {"type": "string", "required": False, "default": "admin", "description": "利用者ID"},
                         "task_id": {"type": "string", "required": False, "default": "", "description": "任意のタスクID。通常は指定不要。外部IDを引き継ぐ場合だけ指定し、省略時はTASK.mmdd.hhmmssで自動採番"},
-                        "enabled": {"type": "boolean", "required": False, "default": True, "description": "有効。true なら backend_task の watcher が処理対象にする"},
+                        "enabled": {"type": "boolean", "required": False, "default": True, "description": "有効。true なら backend_taskteam の Task watcher が処理対象にする"},
                         "return_task_id": {"type": "boolean", "required": False, "default": True, "description": "応答に task_id を含める"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15, "description": "登録 API 呼び出しのタイムアウト秒"},
                     },

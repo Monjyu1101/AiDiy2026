@@ -38,6 +38,7 @@ THIS_DIR = Path(__file__).resolve().parent
 BACKEND_LOCAL_DIR = THIS_DIR
 PROJECT_ROOT = THIS_DIR.parent
 BACKEND_SERVER_DIR = PROJECT_ROOT / "backend_server"
+CONFIG_DIR = PROJECT_ROOT / "_config"
 BACKEND_LOCAL_ENV = ".venv"
 
 AUTO_MODE = False
@@ -197,7 +198,7 @@ def _write_json_list_file(path: Path, data: list) -> bool:
 
 
 def _load_local_chat_model_ids() -> list:
-    local_path = BACKEND_SERVER_DIR / "_config" / "AiDiy_chat_local.json"
+    local_path = CONFIG_DIR / "AiDiy_chat_local.json"
     try:
         with open(local_path, encoding="utf-8") as f:
             data = json.load(f)

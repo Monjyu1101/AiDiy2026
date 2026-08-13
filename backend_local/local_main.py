@@ -20,12 +20,12 @@ HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API として
 - GET  /                     稼働状況（モデル/デバイス/ロード状態）
 - GET  /health               ヘルスチェック
 
-設定は backend_server/_config/AiDiy_key.json から読み込む（環境変数は一切使わない）。
+設定は _config/AiDiy_key.json から読み込む（環境変数は一切使わない）。
 値の優先順位: AiDiy_key.json > 組み込みデフォルト。
 
 | 設定 | AiDiy_key.json キー | 既定 |
 |------|---------------------|------|
-| 待受ポート | LOCAL_BASE | 8096 |
+| 待受ポート | PORT_LOCAL | 8096 |
 | モデル ID | CHAT_LOCAL_MODEL | google/gemma-4-E2B-it |
 | HF トークン | huggingface_key_read | （なし） |
 | デバイス | CHAT_LOCAL_DEVICE | auto |
@@ -72,7 +72,7 @@ from local_proc.aidiy_config import AiDiyConfig
 _cfg = AiDiyConfig()
 logger.info("設定ソース: %s (%s)", _cfg.path, "読込OK" if _cfg.loaded else "見つからず→デフォルト使用")
 
-LOCAL_PORT = _cfg.get_int("LOCAL_BASE", 8096)
+PORT_LOCAL = _cfg.get_int("PORT_LOCAL", 8096)
 LOCAL_MODEL = _cfg.get_str("CHAT_LOCAL_MODEL", "google/gemma-4-E2B-it")
 LOCAL_DEVICE = _cfg.get_str("CHAT_LOCAL_DEVICE", "auto")
 LOCAL_DTYPE = _cfg.get_str("CHAT_LOCAL_DTYPE", "auto")
@@ -106,7 +106,7 @@ app = FastAPI(
     title="AiDiy Local LLM Server",
     description=(
         "HuggingFace Gemma モデルを OpenAI / ChatGPT 互換 API で提供するローカル推論サーバー。\n\n"
-        "OpenAI SDK の `base_url` に `http://127.0.0.1:8096/v1` を指定して利用できます。\n\n"
+        f"OpenAI SDK の `base_url` に `http://127.0.0.1:{PORT_LOCAL}/v1` を指定して利用できます。\n\n"
         "- `POST /v1/chat/completions` — チャット補完（OpenAI 標準）\n"
         "- `GET /v1/models` — モデル一覧"
     ),
@@ -180,7 +180,7 @@ async def health() -> dict:
 # ------------------------------------------------------------------ #
 
 if __name__ == "__main__":
-    base = f"http://127.0.0.1:{LOCAL_PORT}"
+    base = f"http://127.0.0.1:{PORT_LOCAL}"
     source, local_only = engine.resolve_source()
     logger.info("AiDiy Local LLM Server")
     logger.info(f"Model            : {LOCAL_MODEL}")
@@ -196,4 +196,4 @@ if __name__ == "__main__":
         logger.warning("モデルが未ダウンロードかつ HF_TOKEN 未設定です。Gemma はゲートモデルのため、")
         logger.warning("  HuggingFace でライセンス同意のうえ HF_TOKEN を設定し、")
         logger.warning("  事前に `uv run python download_model.py` を実行することを推奨します。")
-    uvicorn.run(app, host="0.0.0.0", port=LOCAL_PORT, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=PORT_LOCAL, log_level="warning")

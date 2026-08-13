@@ -154,9 +154,9 @@ class TextToSpeech:
     }
 
     # AiDiy_key.json へのパス（backend_tools 起点）
-    _KEY_CONFIG_REL = "../backend_server/_config/AiDiy_key.json"
-    _TTS_CONFIG_REL = "../backend_server/_config/mcp_text_to_speech.json"
-    _LEGACY_TTS_CONFIG_REL = "../backend_server/_config/aidiy_text_to_speech.json"
+    _KEY_CONFIG_REL = "../_config/AiDiy_key.json"
+    _TTS_CONFIG_REL = "../_config/mcp_text_to_speech.json"
+    _LEGACY_TTS_CONFIG_REL = "../_config/aidiy_text_to_speech.json"
 
     # ------------------------------------------------------------------ #
     # 起動時 ffmpeg プローブ
@@ -436,7 +436,7 @@ class TextToSpeech:
         desc += (
             f" Edge の female/male 自動解決は {', '.join(self.EDGE_SUPPORTED_LANGUAGE_CODES)} "
             "に対応。language=ja の場合、AiDiy、DB、API、MCP などのシステム用語は "
-            "backend_server/_config/mcp_text_to_speech.json の読み上げ用辞書で自動変換する。"
+            "_config/mcp_text_to_speech.json の読み上げ用辞書で自動変換する。"
         )
         return desc
 

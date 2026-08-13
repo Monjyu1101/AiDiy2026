@@ -13,7 +13,7 @@
     "URL1（Ollama 公式）: https://ollama.com/",
     "URL2（Ollama Library）: https://ollama.com/library",
     "URL3（AiDiy 現行仕様）: D:/OneDrive/_sandbox/AiDiy2026/AGENTS.md, D:/OneDrive/_sandbox/AiDiy2026/CLAUDE.md",
-    "URL4（backend_server 設定）: backend_server/_config/AiDiy_mcp.json 等の AI 設定",
+    "URL4（共通設定）: _config/AiDiy_mcp.json 等の AI 設定",
 
     "【Ollama の要点】ローカル環境で LLM (Llama 3, Mistral, Phi-3 等) を簡単に動作させるツール。API サーバー機能を持っており、OpenAI 互換 API を提供するため、既存の AI アプリケーションに組み込みやすい。強みは完全オフライン動作による機密情報の保護、API コストのゼロ化、モデルの自由な選択とカスタマイズ。注意点は GPU リソース（VRAM）への依存度が高く、モデルサイズによって推論速度が大きく変動すること。",
 

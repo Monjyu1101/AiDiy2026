@@ -442,7 +442,7 @@ defineExpose({ 字幕追加 })
         v-if="props.showTeamButton"
         class="title-action-button title-team-button"
         type="button"
-        title="frontend_web のAIチーム画面を表示"
+        title="AIチーム画面を表示"
         @click="emit('openTeam')"
       >TEAM</button>
       <button

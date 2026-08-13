@@ -3,31 +3,31 @@
 ## 本書の目的
 
 このファイルは **AiDiy プロジェクト全体の実装概要、基本方針、アーキテクチャ概要** を示す入口ドキュメントです。
-具体的な起動手順、追加手順、検証手順、トラブル対応などの HowTo は `.aidiy/knowledge/` に集約します。
+具体的な起動手順、追加手順、検証手順、トラブル対応などの HowTo は `_AIDIY/knowledge/` に集約します。
 
 本書は日本語で分かりやすく記載します。追記時も同じ方針を維持してください。
 AI エージェントは、本書に個別手順や一時的な作業メモを追記しないでください。
 
 ## HowTo の参照先
 
-ファイル操作や実装作業を伴う場合は、まず `.aidiy/knowledge/_index.md` を確認してください。
-業務システム機能追加は `docs/` の開発ガイドを優先し、コアシステム機能調整は `.aidiy/knowledge/_index.md` を入口にします。
+ファイル操作や実装作業を伴う場合は、まず `_AIDIY/knowledge/_index.md` を確認してください。
+業務システム機能追加は `docs/` の開発ガイドを優先し、コアシステム機能調整は `_AIDIY/knowledge/_index.md` を入口にします。
 
 | 目的 | 参照先 |
 |------|--------|
-| ナレッジ全体の入口 | [`.aidiy/knowledge/_index.md`](./.aidiy/knowledge/_index.md) |
-| 起動、依存関係、DB、API確認、よくある問題 | [`.aidiy/knowledge/共通,開発環境運用手順.md`](./.aidiy/knowledge/共通,開発環境運用手順.md) |
-| Backend API / DB 追加 | [`.aidiy/knowledge/backend_server,M系マスタ追加手順.md`](./.aidiy/knowledge/backend_server,M系マスタ追加手順.md)、[`.aidiy/knowledge/backend_server,T系トランザクション追加手順.md`](./.aidiy/knowledge/backend_server,T系トランザクション追加手順.md)、[`.aidiy/knowledge/backend_server,V系エンドポイント追加手順.md`](./.aidiy/knowledge/backend_server,V系エンドポイント追加手順.md)、[`.aidiy/knowledge/backend_server,S系スケジューラ追加手順.md`](./.aidiy/knowledge/backend_server,S系スケジューラ追加手順.md) |
-| スキーマ変更 | [`.aidiy/knowledge/backend_server,スキーマ変更手順.md`](./.aidiy/knowledge/backend_server,スキーマ変更手順.md) |
-| 設定管理 (conf/) | [`.aidiy/knowledge/backend_server,設定管理(conf).md`](./.aidiy/knowledge/backend_server,設定管理(conf).md) |
-| frontend_web 画面追加 | [`.aidiy/knowledge/frontend_web,画面追加手順.md`](./.aidiy/knowledge/frontend_web,画面追加手順.md) |
-| frontend_web Router / Store パターン | [`.aidiy/knowledge/frontend_web,Vue Routerパターン.md`](./.aidiy/knowledge/frontend_web,Vue Routerパターン.md)、[`.aidiy/knowledge/frontend_web,Pinia Storeパターン.md`](./.aidiy/knowledge/frontend_web,Pinia Storeパターン.md) |
-| frontend_avatar / Electron / VRM / 音声 | [`.aidiy/knowledge/frontend_avatar,ElectronIPC追加手順.md`](./.aidiy/knowledge/frontend_avatar,ElectronIPC追加手順.md)、[`.aidiy/knowledge/frontend_avatar,VRM_VRMA追加手順.md`](./.aidiy/knowledge/frontend_avatar,VRM_VRMA追加手順.md)、[`.aidiy/knowledge/backend_server,frontend_avatar,AI音声処理.md`](./.aidiy/knowledge/backend_server,frontend_avatar,AI音声処理.md) |
-| AI コア / Code CLI / MCP | [`.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md`](./.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md) |
-| command_hermes Provider / Slash Command | [`.aidiy/knowledge/command_hermes,Provider一覧と選択ロジック.md`](./.aidiy/knowledge/command_hermes,Provider一覧と選択ロジック.md)、[`.aidiy/knowledge/command_hermes,Slash Command一覧.md`](./.aidiy/knowledge/command_hermes,Slash Command一覧.md) |
-| GitHub issue 運用 | [`.aidiy/knowledge/共通,GitHubIssue運用手順.md`](./.aidiy/knowledge/共通,GitHubIssue運用手順.md) |
+| ナレッジ全体の入口 | [`_AIDIY/knowledge/_index.md`](./_AIDIY/knowledge/_index.md) |
+| 起動、依存関係、DB、API確認、よくある問題 | [`_AIDIY/knowledge/共通,開発環境運用手順.md`](./_AIDIY/knowledge/共通,開発環境運用手順.md) |
+| Backend API / DB 追加 | [`_AIDIY/knowledge/backend_server,M系マスタ追加手順.md`](./_AIDIY/knowledge/backend_server,M系マスタ追加手順.md)、[`_AIDIY/knowledge/backend_server,T系トランザクション追加手順.md`](./_AIDIY/knowledge/backend_server,T系トランザクション追加手順.md)、[`_AIDIY/knowledge/backend_server,V系エンドポイント追加手順.md`](./_AIDIY/knowledge/backend_server,V系エンドポイント追加手順.md)、[`_AIDIY/knowledge/backend_server,S系スケジューラ追加手順.md`](./_AIDIY/knowledge/backend_server,S系スケジューラ追加手順.md) |
+| スキーマ変更 | [`_AIDIY/knowledge/backend_server,スキーマ変更手順.md`](./_AIDIY/knowledge/backend_server,スキーマ変更手順.md) |
+| 設定管理 (conf/) | [`_AIDIY/knowledge/backend_server,設定管理(conf).md`](<./_AIDIY/knowledge/backend_server,設定管理(conf).md>) |
+| frontend_web 画面追加 | [`_AIDIY/knowledge/frontend_web,画面追加手順.md`](./_AIDIY/knowledge/frontend_web,画面追加手順.md) |
+| frontend_web Router / Store パターン | [`_AIDIY/knowledge/frontend_web,Vue Routerパターン.md`](./_AIDIY/knowledge/frontend_web,Vue Routerパターン.md)、[`_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md`](./_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md) |
+| frontend_avatar / Electron / VRM / 音声 | [`_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md`](./_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md)、[`_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md`](./_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md)、[`_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md`](./_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md) |
+| AI コア / Code CLI / MCP | [`_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md`](./_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md) |
+| command_hermes Provider / Slash Command | [`_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](./_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md)、[`_AIDIY/knowledge/command_hermes,Slash Command一覧.md`](./_AIDIY/knowledge/command_hermes,Slash Command一覧.md) |
+| GitHub issue 運用 | [`_AIDIY/knowledge/共通,GitHubIssue運用手順.md`](./_AIDIY/knowledge/共通,GitHubIssue運用手順.md) |
 
-`.aidiy/knowledge` は作業ログ置き場ではありません。残す内容は、次回以降に再利用できる HowTo、判断基準、注意点、確認方法だけです。
+`_AIDIY/knowledge` は作業ログ置き場ではありません。残す内容は、次回以降に再利用できる HowTo、判断基準、注意点、確認方法だけです。
 
 ## 関連ドキュメント
 
@@ -39,8 +39,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | [command_hermes/AGENTS.md](./command_hermes/AGENTS.md) | `aidiy_hermes` CLI 基盤の実装詳細 |
 | [backend_tools/AGENTS.md](./backend_tools/AGENTS.md) | MCP サーバー群の実装詳細 |
 | [backend_local/AGENTS.md](./backend_local/AGENTS.md) | ローカル LLM（OpenAI 互換 Gemma）サーバーの実装詳細 |
-| [backend_task/AGENTS.md](./backend_task/AGENTS.md) | AIタスク実行 + 定期タスク FastAPI サーバーの実装詳細 |
-| [backend_team/AGENTS.md](./backend_team/AGENTS.md) | 複数AIエージェントのチーム活動サーバーの実装詳細 |
+| [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md) | AIタスク実行・定期タスク・複数AIエージェントのチーム活動を統合した FastAPI サーバーの実装詳細 |
 | [frontend_web/AGENTS.md](./frontend_web/AGENTS.md) | Vue 3 + Vite + TypeScript の Web UI 実装詳細 |
 | [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md) | Electron/Web デュアルモード Avatar の実装詳細 |
 | [docs/](./docs/) | HTML 形式の詳細ドキュメント |
@@ -65,7 +64,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 - DB項目名、API項目名、フロントエンド変数名はできるだけ一致させる。
 - `request`、`query`、`item`、`items`、`total`、`limit` などの一般名は英字のまま使用してよい。
 - ファイル内容確認は UTF-8 指定で読む。
-- HowTo、検証手順、失敗対処は AGENTS.md ではなく `.aidiy/knowledge/` に置く。
+- HowTo、検証手順、失敗対処は AGENTS.md ではなく `_AIDIY/knowledge/` に置く。
 - `npm run build` は原則として日常的な確認手順に含めない。配布物作成、ビルド成果物確認、利用者明示依頼など、実行理由が明確な場合だけ実行する。
 
 ## 日本語ファースト設計
@@ -83,22 +82,21 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## アーキテクチャ概要
 
-AiDiy は 6 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成します。
+AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成します。
 
 | コンポーネント | 役割 | 主なポート |
 |----------------|------|------------|
 | `backend_server/core_main.py` | C系、A系、認証、AIコア | 8091 |
-| `backend_server/apps_main.py` | M系、T系、V系、S系 | 9098 |
+| `backend_server/apps_main.py` | M系、T系、V系、S系 | 8098 |
 | `backend_tools/tools_main.py` | MCP サーバー群 | 8095 |
 | `backend_local/local_main.py` | ローカル LLM（OpenAI 互換 Gemma 推論） | 8096 |
-| `backend_task/task_main.py` | AIタスク実行（要求の AI 分解 + Code CLI 実行）、定期タスク | 8093 |
-| `backend_team/team_main.py` | 複数AIエージェントのチーム活動管理 | 8094 |
+| `backend_taskteam/taskteam_main.py` | AIタスク実行（要求の AI 分解 + Code CLI 実行）、定期タスク、複数AIエージェントのチーム活動管理 | 8093 |
 | `command_hermes` | `aidiy_hermes` CLI 基盤 | 常駐なし |
 | `frontend_web` | 通常 Web UI | 8090 |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar | 8092 |
 
-`core_main.py` と `apps_main.py` は同じ SQLite DB を共有します（`backend_task` も同じ DB の `Aタスク要求` / `Aタスク明細` を使用）。
-フロントエンドは Vite proxy で `/core/*` を 8091、`/apps/*` を 9098、`/task/*` を 8093、`/team/*` を 8094 へ振り分けます。
+`core_main.py`、`apps_main.py`、`taskteam_main.py` は同じ SQLite DB を共有します。`taskteam_main.py` は `Aタスク*` と `Aチーム*` を同一プロセスで管理します。
+フロントエンドは Vite proxy で `/core/*` を 8091、`/apps/*` を 8098、`/task/*` と `/team/*` を同じ 8093 へ振り分けます。
 
 ## ディレクトリ概要
 
@@ -108,12 +106,14 @@ AiDiy は 6 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `command_hermes/` | `aidiy_hermes` CLI |
 | `backend_tools/` | 19 個の MCP（Chrome DevTools、Desktop Capture、SQLite、PostgreSQL、Logs、Code Check、Backup、Image / Movie Generation、Speech-to-Text、Text-to-Speech、OBS Studio Control、FFmpeg Control、Notification Sounds、Code Agents、Chat LLM、Task Agents、Team Agents、Windows Control）と OpenAI / Ollama 互換 Chat Completions |
 | `backend_local/` | ローカル LLM サーバー（HuggingFace Gemma を `transformers` + `torch` で推論、OpenAI 互換 Chat Completions API） |
-| `backend_task/` | AIタスク実行 + 定期タスク FastAPI サーバー（タスク要求 / タスク明細 API、Code CLI 実行ウォッチャー） |
-| `backend_team/` | 複数AIエージェントのチーム活動 FastAPI サーバー（要員 / 依頼 / 目標 / 経験 / 作業 / 会話 API、PlanDo・SPDCA 作業ループ実行） |
+| `backend_taskteam/` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー（`/task/*`、`/team/*`、各監視ループ） |
 | `frontend_web/` | Vue 3 + Vite + TypeScript の Web UI |
 | `frontend_avatar/` | Electron/Web 対応の AI Avatar UI |
+| `_config/` | API キー、AI モデル、MCP などの共通設定 |
+| `_data/` | 共通 SQLite DB などの永続データ |
+| `_icons/` | アプリケーション共通アイコン |
 | `docs/` | HTML 形式の開発ガイド |
-| `.aidiy/knowledge/` | プロジェクト専用 HowTo と再利用ナレッジ |
+| `_AIDIY/knowledge/` | プロジェクト専用 HowTo と再利用ナレッジ |
 | `scripts/` | 補助スクリプト（BOM 除去、画像変換、起動 / 停止 bat など） |
 | `backup/` | `aidiy_backup` MCP の差分バックアップ出力先。ソースではないため編集・参照対象にしない |
 | `docker/` | Docker + nginx（HTTPS）構成一式 |
@@ -152,13 +152,13 @@ AiDiy は 6 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 ## DB 方針
 
 - SQLite を使う。
-- DB ファイルは `backend_server/_data/AiDiy/database.db`。
+- DB ファイルは `_data/AiDiy/database.db`。
 - Alembic は使わない。
 - 既存DBが残る場合、モデル変更だけではスキーマ差分は反映されない。
 - カスタムID生成は `C採番` で管理し、AUTOINCREMENT を前提にしない。
 - 全テーブルは登録 / 更新の監査フィールドを持つ。
 
-スキーマ変更の具体手順は `.aidiy/knowledge/backend_server,スキーマ変更手順.md` を参照してください。
+スキーマ変更の具体手順は `_AIDIY/knowledge/backend_server,スキーマ変更手順.md` を参照してください。
 
 ## 提供機能
 
@@ -193,8 +193,8 @@ AiDiy は 6 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 
 - `AIコア`: WebSocket + マルチベンダー AI + Code CLI パネル。
 - `A会話履歴`: 会話履歴保存。
-- `Aタスク要求` / `Aタスク明細`: AIタスク自動実行（backend_task が管理、Web / Avatar の AIタスク画面から操作）。明細は `先行SEQ` による DAG で、直列だけでなく水平の並行分岐を含む自由なタスクフローを定義でき、フロー図はクリティカルパス基準で表示する。
-- `Aチーム要員`: backend_team のエージェント要員マスタ。初期要員 `admin` は削除不可。
+- `Aタスク要求` / `Aタスク明細`: AIタスク自動実行（backend_taskteam が管理、Web / Avatar の AIタスク画面から操作）。明細は `先行SEQ` による DAG で、直列だけでなく水平の並行分岐を含む自由なタスクフローを定義でき、フロー図はクリティカルパス基準で表示する。
+- `Aチーム要員`: backend_taskteam のエージェント要員マスタ。初期要員 `admin` は削除不可。
 
 ### X系 Experimental
 
@@ -236,7 +236,7 @@ AIコアは、テキスト、音声、画像、ファイル、コード支援を
 | `CHAT_AI_NAME` | テキストチャット |
 | `LIVE_AI_NAME` | 音声リアルタイム対話 |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | code1〜code6 のコード支援 |
-| `TASK_AI_NAME` / `TASK_AI_MODEL` | backend_task の AIタスク自動実行 |
+| `TASK_AI_NAME` / `TASK_AI_MODEL` | backend_taskteam の AIタスク自動実行 |
 
 Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` を想定します。
 
@@ -297,13 +297,13 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 | `aidiy_notification_sounds` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは読み上げ合成） |
 | `aidiy_code_agents` | AI コードエージェント実行（AIコード / CodeAI CLI 経由） |
 | `aidiy_chat_llms` | AIチャット の ChatAI を MCP ツールとして公開（`aidiy_chat_completions` の OpenAI / Ollama 互換エンドポイントの実体） |
-| `aidiy_task_agents` | backend_task の AIタスク要求への非同期投入（`submit`）と進捗確認（`get_request_status` / `get_detail_status`） |
-| `aidiy_team_agents` | backend_team の Aチーム依頼への非同期投入（`submit`）と進捗確認（`get_work_status` / `get_work_list` / `get_member_list`） |
+| `aidiy_task_agents` | backend_taskteam の AIタスク要求への非同期投入（`submit`）と進捗確認（`get_request_status` / `get_detail_status`） |
+| `aidiy_team_agents` | backend_taskteam の Aチーム依頼への非同期投入（`submit`）と進捗確認（`get_work_status` / `get_work_list` / `get_member_list`） |
 | `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
 各 MCP は **SSE Transport**、**Streamable HTTP Transport**、**stdio gateway（`mcp_stdio.py`）** の 3 トランスポートを同一ポートで提供します。Python の `requests` でそのまま呼び出せるため、自動化スクリプトやバックエンドルーターからも利用できます。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://127.0.0.1:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供します。
 
-MCP の使い分けと設定は `.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md` を参照してください。
+MCP の使い分けと設定は `_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md` を参照してください。
 
 ## 実装確認の入口
 
@@ -313,8 +313,7 @@ MCP の使い分けと設定は `.aidiy/knowledge/backend_server,backend_tools,M
 - Hermes: `command_hermes/AGENTS.md`
 - MCP: `backend_tools/AGENTS.md`
 - Local: `backend_local/AGENTS.md`
-- Task: `backend_task/AGENTS.md`
-- Team: `backend_team/AGENTS.md`
+- Task / Team: `backend_taskteam/AGENTS.md`
 - Web: `frontend_web/AGENTS.md`
 - Avatar: `frontend_avatar/AGENTS.md`
 

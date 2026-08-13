@@ -40,7 +40,7 @@ from mcp.server.stdio import stdio_server
 from log_config import get_logger, setup_logging
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8095
+PORT_TOOLS = 8095
 DEFAULT_MOUNT_PATH = "/aidiy_chrome_devtools/sse"
 
 setup_logging()
@@ -102,8 +102,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.environ.get("AIDIY_MCP_PORT", str(DEFAULT_PORT))),
-        help=f"SSE URL 未指定時のポート番号。既定値: {DEFAULT_PORT}",
+        default=int(os.environ.get("AIDIY_MCP_PORT", str(PORT_TOOLS))),
+        help=f"SSE URL 未指定時のポート番号。既定値: {PORT_TOOLS}",
     )
     parser.add_argument(
         "--mount-path",

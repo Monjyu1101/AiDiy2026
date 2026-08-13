@@ -27,7 +27,7 @@ import openai
 
 # backend_local（ローカル LLM サーバー）の既定接続先
 _DEFAULT_LOCAL_HOST = "http://127.0.0.1"
-_DEFAULT_LOCAL_PORT = "8096"
+PORT_LOCAL = "8096"
 _LOCAL_SELF_LOOP_KEYS = ("CHAT_LOCAL_SELF_LOOP", "LOCAL_CHAT_SELF_LOOP")
 
 
@@ -36,7 +36,7 @@ def _build_base_url(host: str, port: str) -> str:
     h = (host or _DEFAULT_LOCAL_HOST).strip().rstrip("/")
     if not h.startswith("http://") and not h.startswith("https://"):
         h = "http://" + h
-    p = str(port or _DEFAULT_LOCAL_PORT).strip()
+    p = str(port or PORT_LOCAL).strip()
     return f"{h}:{p}/v1"
 
 
@@ -77,16 +77,16 @@ class ChatAI:
 
         # backend_local 接続先（host / port）を conf から取得
         self.local_host = _DEFAULT_LOCAL_HOST
-        self.local_port = _DEFAULT_LOCAL_PORT
+        self.port_local = PORT_LOCAL
         self.self_loop_enabled = False
         try:
             if 親 and hasattr(親, "conf") and 親.conf and hasattr(親.conf, "json"):
                 host = 親.conf.json.get("LOCAL_HOST", "")
                 if host and isinstance(host, str) and not host.startswith("<"):
                     self.local_host = host.strip()
-                port = 親.conf.json.get("LOCAL_BASE", "")
-                if port and not str(port).startswith("<"):
-                    self.local_port = str(port).strip()
+                port_local = 親.conf.json.get("PORT_LOCAL", "")
+                if port_local and not str(port_local).startswith("<"):
+                    self.port_local = str(port_local).strip()
                 for key in _LOCAL_SELF_LOOP_KEYS:
                     if key in 親.conf.json:
                         self.self_loop_enabled = _bool設定値(親.conf.json.get(key), default=False)
@@ -131,7 +131,7 @@ class ChatAI:
     async def 開始(self):
         """ChatAI開始（apiクライアント初期化）"""
         try:
-            base_url = _build_base_url(self.local_host, self.local_port)
+            base_url = _build_base_url(self.local_host, self.port_local)
             try:
                 # backend_local は認証なし。OpenAI クライアントはダミーキーを要求するため "local" を渡す。
                 self.client = openai.OpenAI(

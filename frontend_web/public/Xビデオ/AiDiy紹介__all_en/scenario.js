@@ -4,7 +4,7 @@ window.SCENARIO = {
   "title": "AiDiy - A Full-Stack Business Management Template Built for Real-World Business Apps",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "Extracted from AGENTS.md and .aidiy/knowledge to provide a fact-based, comprehensive introduction covering all features and characteristics of AiDiy."
+    "summary": "Extracted from AGENTS.md and _AIDIY/knowledge to provide a fact-based, comprehensive introduction covering all features and characteristics of AiDiy."
   },
   "target": {
     "language": "en",
@@ -224,10 +224,10 @@ window.SCENARIO = {
       "lead": "Two backend_server processes, the backend_tools MCP hub, frontend_web, and frontend_avatar — a 5-service architecture.",
       "subtitle": "3 resident backends + 2 frontends, all sharing a single SQLite DB.",
       "image": "images/scene_003.png",
-      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 9098, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8092, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
+      "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 8098, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8092, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
       "chips": [
         "core_main port 8091",
-        "apps_main port 9098",
+        "apps_main port 8098",
         "backend_tools port 8095",
         "frontend_web port 8090",
         "frontend_avatar port 8092"
@@ -251,7 +251,7 @@ window.SCENARIO = {
           "title": "backend_server",
           "lines": [
             "core_main: 8091 (C-series, Auth, AI Core)",
-            "apps_main: 9098 (M/T/V/S-series)",
+            "apps_main: 8098 (M/T/V/S-series)",
             "Shared SQLite DB"
           ]
         },
@@ -267,7 +267,7 @@ window.SCENARIO = {
           "title": "frontend_web",
           "lines": [
             "8090: Vue 3 + Vite + TypeScript",
-            "/core → 8091, /apps → 9098 proxy",
+            "/core → 8091, /apps → 8098 proxy",
             "qTubler + Pinia + Vue Router"
           ]
         },
@@ -281,22 +281,22 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "backend_server is a 2-server configuration — core_main (8091) and apps_main (9098) — both sharing the same SQLite DB.",
+        "backend_server is a 2-server configuration — core_main (8091) and apps_main (8098) — both sharing the same SQLite DB.",
         "backend_tools (8095) hosts 14 MCP servers on the same port and provides SSE / Streamable HTTP / stdio transports.",
-        "frontend_web's Vite proxy routes /core to 8091 and /apps to 9098."
+        "frontend_web's Vite proxy routes /core to 8091 and /apps to 8098."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "core_main.py and apps_main.py share the same SQLite DB. The frontend uses Vite proxy to route /core/* to 8091 and /apps/* to 9098."
+          "text": "core_main.py and apps_main.py share the same SQLite DB. The frontend uses Vite proxy to route /core/* to 8091 and /apps/* to 8098."
         },
         {
           "source": "CLAUDE.md",
-          "text": "backend_server core 8091 / apps 9098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092."
+          "text": "backend_server core 8091 / apps 8098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092."
         }
       ],
       "short_narration": "AiDiy runs as 5 services — two backends, an MCP hub, and Web and Avatar frontends.",
-      "long_narration": "AiDiy's service architecture consists of 5 services. backend_server's core_main runs on port 8091 handling authentication, permissions, and the AI core. apps_main runs on port 9098 handling business-domain APIs. backend_tools provides a hub of 14 MCP tools on port 8095. frontend_web serves the Vue 3 Web UI on port 8090 and uses Vite proxy to route /core to 8091 and /apps to 9098. frontend_avatar is an AI avatar client on port 8092 supporting both Electron and browser. The two backends share the same SQLite database file.",
+      "long_narration": "AiDiy's service architecture consists of 5 services. backend_server's core_main runs on port 8091 handling authentication, permissions, and the AI core. apps_main runs on port 8098 handling business-domain APIs. backend_tools provides a hub of 14 MCP tools on port 8095. frontend_web serves the Vue 3 Web UI on port 8090 and uses Vite proxy to route /core to 8091 and /apps to 8098. frontend_avatar is an AI avatar client on port 8092 supporting both Electron and browser. The two backends share the same SQLite database file.",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 0.0,
@@ -557,7 +557,7 @@ window.SCENARIO = {
       "facts": [
         "backend_tools consolidates 14 MCP servers with 3 transports — SSE / Streamable HTTP / stdio — on the single port 8095.",
         "The video page generation feature (ビデオページ生成機能) provides 2 scripts (solo avatar / two-person dialogue) that automate the full 9 steps from topic to HTML.",
-        "Knowledge management entry point is .aidiy/knowledge/_index.md — the gateway to all HowTo guides."
+        "Knowledge management entry point is _AIDIY/knowledge/_index.md — the gateway to all HowTo guides."
       ],
       "evidence": [
         {

@@ -11,8 +11,8 @@
 """
 Task Agents モジュール
 
-backend_task の HTTP API に疎結合で接続し、AIタスク要求を非同期投入する。
-DB 直書きや backend_task の import は行わない。
+backend_taskteam の HTTP API に疎結合で接続し、AIタスク要求を非同期投入する。
+DB 直書きや backend_taskteam の import は行わない。
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ import requests
 
 
 class TaskAgents:
-    """backend_task API へ AIタスク要求を投入する薄いクライアント"""
+    """backend_taskteam API へ AIタスク要求を投入する薄いクライアント"""
 
     def __init__(self, task_api_base: Optional[str] = None):
         self.task_api_base = (task_api_base or os.environ.get("AIDIY_TASK_API_BASE") or "http://127.0.0.1:8093").rstrip("/")
 
     def get_config(self) -> dict:
-        """接続先と疎通状態を返す。backend_task 未起動でも例外にしない。"""
+        """接続先と疎通状態を返す。backend_taskteam 未起動でも例外にしない。"""
         health_url = f"{self.task_api_base}/health"
         info = {
             "task_api_base": self.task_api_base,
@@ -46,11 +46,11 @@ class TaskAgents:
                 "message": res.text[:300],
             }
         except requests.RequestException as e:
-            info["health"]["message"] = f"backend_task に接続できません: {e}"
+            info["health"]["message"] = f"backend_taskteam に接続できません: {e}"
         return info
 
     def _post_task_api(self, path: str, payload: dict, request_timeout_sec: int) -> dict:
-        """backend_task の API を POST で呼び出す。接続不能時も dict で返す。"""
+        """backend_taskteam の API を POST で呼び出す。接続不能時も dict で返す。"""
         url = f"{self.task_api_base}{path}"
         try:
             res = requests.post(url, json=payload, timeout=max(1, int(request_timeout_sec)))
@@ -60,15 +60,15 @@ class TaskAgents:
             return {
                 "status": "NG",
                 "message": (
-                    f"backend_task ({self.task_api_base}) に接続できません。"
-                    f"backend_task を起動してから再実行してください。"
+                    f"backend_taskteam ({self.task_api_base}) に接続できません。"
+                    f"backend_taskteam を起動してから再実行してください。"
                 ),
                 "error": str(e),
             }
         except ValueError as e:
             return {
                 "status": "NG",
-                "message": "backend_task から JSON ではない応答が返りました。",
+                "message": "backend_taskteam から JSON ではない応答が返りました。",
                 "error": str(e),
             }
 
@@ -87,7 +87,7 @@ class TaskAgents:
         """AIタスク要求を登録する。task_idは通常省略し、外部IDを引き継ぐ場合だけ指定する。
 
         project_path / ai_name / ai_model が None（未指定）のときは payload に載せず、
-        backend_task 側が AIタスク_要求編集の新規時と同じ条件
+        backend_taskteam 側が AIタスク_要求編集の新規時と同じ条件
         （利用者IDの更新最終レコードの値、無ければ規定値）で補完する。
         空文字は明示指定として送る（プロジェクトは空欄のまま登録される）。
         """
@@ -102,7 +102,7 @@ class TaskAgents:
             "要求内容": prompt,
             "実行有効": bool(enabled),
         }
-        # None は送らない（backend_task が更新最終レコード → 規定値で補完する）
+        # None は送らない（backend_taskteam が更新最終レコード → 規定値で補完する）
         if project_path is not None:
             payload["プロジェクト"] = str(project_path).strip()
         if ai_name is not None:
@@ -116,7 +116,7 @@ class TaskAgents:
         if data.get("status") != "OK":
             return {
                 "status": "NG",
-                "message": str(data.get("message") or "backend_task へのタスク投入に失敗しました。"),
+                "message": str(data.get("message") or "backend_taskteam へのタスク投入に失敗しました。"),
                 "利用者ID": user_id,
             }
 
@@ -127,7 +127,7 @@ class TaskAgents:
             "message": "タスクを投入しました。",
             "利用者ID": str(item.get("利用者ID") or user_id),
             "タスクID": task_id,
-            # 未指定時に backend_task が補完した値を確認できるよう、登録結果を返す
+            # 未指定時に backend_taskteam が補完した値を確認できるよう、登録結果を返す
             "プロジェクト": str(item.get("プロジェクト") or ""),
             "TASK_AI_NAME": str(item.get("TASK_AI_NAME") or ""),
             "TASK_AI_MODEL": str(item.get("TASK_AI_MODEL") or ""),
@@ -137,7 +137,7 @@ class TaskAgents:
         return result
 
     def get_request_status(self, user_id: str, task_id: str, request_timeout_sec: int = 15) -> dict:
-        """AIタスク要求 1 件の状態を backend_task API から取得する。"""
+        """AIタスク要求 1 件の状態を backend_taskteam API から取得する。"""
         user_id = (user_id or "").strip()
         task_id = (task_id or "").strip()
         if not user_id or not task_id:
@@ -163,7 +163,7 @@ class TaskAgents:
         }
 
     def get_detail_status(self, user_id: str, task_id: str, request_timeout_sec: int = 15) -> dict:
-        """AIタスク明細一覧の状態を backend_task API から取得する。"""
+        """AIタスク明細一覧の状態を backend_taskteam API から取得する。"""
         user_id = (user_id or "").strip()
         task_id = (task_id or "").strip()
         if not user_id or not task_id:

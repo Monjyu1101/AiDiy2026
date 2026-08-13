@@ -73,17 +73,17 @@ def print_info(message: str) -> None:
 
 
 BACKEND_PATH = "backend_server"
-BACKEND_CORE_PORT = 8091
-BACKEND_APPS_PORT = 9098
+PORT_CORE = 8091
+PORT_APPS = 8098
 BACKEND_CORE_APP = "core_main:app"
 BACKEND_APPS_APP = "apps_main:app"
 BACKEND_ENV_CANDIDATES = [".venv", "venv"]
 
 FRONTEND_WEB_PATH = "frontend_web"
-FRONTEND_WEB_PORT = 8090
+PORT_WEB = 8090
 
 FRONTEND_AVATAR_PATH = "frontend_avatar"
-FRONTEND_AVATAR_PORT = 8092
+PORT_AVATAR = 8092
 
 FRONTEND_COMMAND = "npm"
 QUIET_WAIT_SECONDS = 20
@@ -348,17 +348,17 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
 
 
 def start_backend_core() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(core)", get_backend_command(BACKEND_CORE_APP, BACKEND_CORE_PORT), BACKEND_DIR)
+    return launch_process("バックエンド(core)", get_backend_command(BACKEND_CORE_APP, PORT_CORE), BACKEND_DIR)
 
 
 def start_backend_apps() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(apps)", get_backend_command(BACKEND_APPS_APP, BACKEND_APPS_PORT), BACKEND_DIR)
+    return launch_process("バックエンド(apps)", get_backend_command(BACKEND_APPS_APP, PORT_APPS), BACKEND_DIR)
 
 
 def start_frontend_web(npm_command: str) -> subprocess.Popen[bytes]:
     return launch_process(
         "フロントエンド(Web)",
-        [npm_command, "run", "dev", "--", "--port", str(FRONTEND_WEB_PORT)],
+        [npm_command, "run", "dev", "--", "--port", str(PORT_WEB)],
         FRONTEND_WEB_DIR,
     )
 
@@ -623,12 +623,12 @@ def maybe_kill_initial_ports(
 ) -> None:
     print_header("既存プロセス整理")
     if backend_enabled:
-        kill_process_on_port(BACKEND_CORE_PORT)
-        kill_process_on_port(BACKEND_APPS_PORT)
+        kill_process_on_port(PORT_CORE)
+        kill_process_on_port(PORT_APPS)
     if web_enabled:
-        kill_process_on_port(FRONTEND_WEB_PORT)
+        kill_process_on_port(PORT_WEB)
     if avatar_enabled:
-        kill_process_on_port(FRONTEND_AVATAR_PORT)
+        kill_process_on_port(PORT_AVATAR)
         # electronmon が spawn した electron.exe は別プロセスグループで残留する場合があるため
         # ポートkillだけでなく、プロセス名でも明示的に停止する
         kill_electron_processes()
@@ -672,16 +672,16 @@ def start_initial_services(
 
     if avatar_enabled and ensure_optional_service_ready("フロントエンド(Avatar)", npm_command):
         selected_flags["フロントエンド(Avatar)"] = True
-        kill_process_on_port(FRONTEND_AVATAR_PORT)
+        kill_process_on_port(PORT_AVATAR)
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
 
     if web_enabled and "フロントエンド(Web)" in processes:
-        open_browser(FRONTEND_WEB_PORT)
+        open_browser(PORT_WEB)
 
     if avatar_enabled and "フロントエンド(Avatar)" in processes:
-        open_browser(FRONTEND_AVATAR_PORT)
+        open_browser(PORT_AVATAR)
 
     return selected_flags
 
@@ -699,10 +699,10 @@ def monitor_and_restart(
 
     process_crash_time: dict[str, float] = {}
     port_map = {
-        "バックエンド(core)": BACKEND_CORE_PORT,
-        "バックエンド(apps)": BACKEND_APPS_PORT,
-        "フロントエンド(Web)": FRONTEND_WEB_PORT,
-        "フロントエンド(Avatar)": FRONTEND_AVATAR_PORT,
+        "バックエンド(core)": PORT_CORE,
+        "バックエンド(apps)": PORT_APPS,
+        "フロントエンド(Web)": PORT_WEB,
+        "フロントエンド(Avatar)": PORT_AVATAR,
     }
 
     while True:
@@ -776,13 +776,13 @@ def main() -> None:
 
             print_header("起動完了")
             if "バックエンド(core)" in processes:
-                print_success(f"バックエンド(core): http://127.0.0.1:{BACKEND_CORE_PORT}/docs")
+                print_success(f"バックエンド(core): http://127.0.0.1:{PORT_CORE}/docs")
             if "バックエンド(apps)" in processes:
-                print_success(f"バックエンド(apps): http://127.0.0.1:{BACKEND_APPS_PORT}/docs")
+                print_success(f"バックエンド(apps): http://127.0.0.1:{PORT_APPS}/docs")
             if "フロントエンド(Web)" in processes:
-                print_success(f"フロントエンド(Web): http://127.0.0.1:{FRONTEND_WEB_PORT}/")
+                print_success(f"フロントエンド(Web): http://127.0.0.1:{PORT_WEB}/")
             if "フロントエンド(Avatar)" in processes:
-                print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{FRONTEND_AVATAR_PORT}")
+                print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{PORT_AVATAR}")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)
 
         except KeyboardInterrupt:

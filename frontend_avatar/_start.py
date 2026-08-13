@@ -15,7 +15,7 @@ electronmon が spawn した electron.exe は別プロセスグループで残�
 起動前・停止後に kill_electron_processes() で残留プロセスを排除します。
 
 公開 API:
-    PORT
+    PORT_AVATAR
     get_npm_command() -> str | None
     check_environment() -> (bool, str)
     start(npm_command) -> subprocess.Popen
@@ -72,7 +72,7 @@ def print_info(message: str) -> None:
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_AVATAR_DIR = THIS_DIR
-PORT = 8092
+PORT_AVATAR = 8092
 FRONTEND_COMMAND = "npm"
 
 
@@ -270,7 +270,7 @@ def kill_process_on_port(port: int) -> bool:
 
 
 def kill_ports() -> None:
-    kill_process_on_port(PORT)
+    kill_process_on_port(PORT_AVATAR)
     kill_electron_processes()
 
 
@@ -332,7 +332,7 @@ def main() -> None:
 
     process = start()
     threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name}: renderer http://127.0.0.1:{PORT}")
+    print_success(f"{name}: renderer http://127.0.0.1:{PORT_AVATAR}")
     print_info("Ctrl+C で停止します")
     try:
         while True:

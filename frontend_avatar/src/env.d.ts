@@ -13,14 +13,14 @@
 interface ImportMetaEnv {
   readonly VITE_CORE_BASE_URL?: string
   readonly VITE_CORE_WS_URL?: string
-  readonly VITE_WEB_BASE_URL?: string
+  readonly VITE_TASKTEAM_BASE_URL?: string
 }
 
 declare global {
   type AvatarPanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
   type AvatarTaskKey = 'task1' | 'task2' | 'task3'
   type AvatarWindowMode = 'login' | 'core'
-  type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey | AvatarTaskKey | 'settings' | 'taskDialog'
+  type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey | AvatarTaskKey | 'settings' | 'taskDialog' | 'team'
   type AvatarWindowBounds = { x: number; y: number; width: number; height: number }
   type AvatarWindowMetrics = AvatarWindowBounds & { minWidth: number; minHeight: number }
   type AvatarWindowPointerSnapshot = {
@@ -56,9 +56,8 @@ declare global {
       minimizeCurrentWindow?: () => Promise<void>
       togglePanel?: (panel: AvatarPanelKey) => Promise<Record<AvatarPanelKey, boolean>>
       toggleTaskWindows?: () => Promise<boolean>
-      checkFrontendWeb?: (url: string) => Promise<string | null>
-      toggleTeamPage?: (url: string, token: string, user: Record<string, unknown> | null) => Promise<boolean>
-      closeTeamPage?: () => Promise<void>
+      toggleTeamWindow?: () => Promise<boolean>
+      closeTeamWindow?: () => Promise<void>
       openTaskDialogWindow?: (payload: Record<string, any>) => Promise<void>
       getTaskDialogPayload?: () => Promise<Record<string, any> | null>
       applyPanelStates?: (states: Record<AvatarPanelKey, boolean>) => Promise<Record<AvatarPanelKey, boolean>>

@@ -2422,7 +2422,7 @@ onBeforeUnmount(() => {
 
     <div v-if="要員読込中" class="viewer-message">
       <strong>要員一覧を読み込んでいます</strong>
-      <span>backend_team に接続中...</span>
+      <span>backend_taskteam に接続中...</span>
     </div>
     <div v-else-if="要員読込エラー" class="viewer-message error">
       <strong>要員一覧を表示できません</strong>

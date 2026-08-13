@@ -70,8 +70,8 @@ STEPS_JSON_NAME = "_ビデオページ生成_解説_状況.json"
 SETTING_JSON_PATH = os.path.join(_SCRIPT_DIR, SETTING_JSON_NAME)
 STEPS_JSON_PATH = os.path.join(_SCRIPT_DIR, STEPS_JSON_NAME)
 
-NEWS_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, ".aidiy", "knowledge", "frontend_web,X系ニュース型掛け合いビデオ.md")
-AUTO_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, ".aidiy", "knowledge", "共通,mcp利用による自動ビデオ生成手順.md")
+NEWS_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "frontend_web,X系ニュース型掛け合いビデオ.md")
+AUTO_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "共通,mcp利用による自動ビデオ生成手順.md")
 
 
 # ================================================================== #

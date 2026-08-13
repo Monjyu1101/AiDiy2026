@@ -74,8 +74,8 @@ STEPS_JSON_NAME = "_ビデオページ生成_小説小話_状況.json"
 SETTING_JSON_PATH = os.path.join(_SCRIPT_DIR, SETTING_JSON_NAME)
 STEPS_JSON_PATH = os.path.join(_SCRIPT_DIR, STEPS_JSON_NAME)
 
-NEWS_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, ".aidiy", "knowledge", "backend_server,backend_tools,MCP活用手順.md")
-AUTO_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, ".aidiy", "knowledge", "共通,mcp利用による自動ビデオ生成手順.md")
+NEWS_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "backend_server,backend_tools,MCP活用手順.md")
+AUTO_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "共通,mcp利用による自動ビデオ生成手順.md")
 
 # 小話アバター（女性一人）。テンプレートの VRM_AiDiy.vrm から差し替える。
 AVATAR_VRM_PATH = "../_vrm/VRM_female.vrm"

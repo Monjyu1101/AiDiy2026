@@ -13,7 +13,11 @@ logger = get_logger(__name__)
 
 import os
 import json
+import tempfile
 from typing import Any, Dict
+
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_CONFIG_FILE = '../_config/AiDiy_key.json'
 
 class conf_json:
     """設定JSON管理クラス（シンプル実装・プロパティアクセス対応）"""
@@ -21,14 +25,13 @@ class conf_json:
     # デフォルト設定値
     DEFAULT_CONFIG = {
         # WebUI設定
-        'WEB_BASE': '8090',
-        'CORE_BASE': '8091',
-        'AVATAR_BASE': '8092',
-        'TASK_BASE': '8093',
-        'TEAM_BASE': '8094',
-        'LOCAL_BASE': '8096',
-        'TOOLS_BASE': '8095',
-        'APPS_BASE': '8098',
+        'PORT_WEB': '8090',
+        'PORT_CORE': '8091',
+        'PORT_AVATAR': '8092',
+        'PORT_TASKTEAM': '8093',
+        'PORT_TOOLS': '8095',
+        'PORT_LOCAL': '8096',
+        'PORT_APPS': '8098',
         'WEBUI_FIRST_PAGE': 'メニュー',
 
         # APIキー
@@ -112,6 +115,18 @@ class conf_json:
         'TEAM_AI_MODEL': 'auto',
     }
 
+    # 旧版のポート設定は読み込み時に新しいキーへ一度だけ移行する。
+    # TASK/TEAM は同一プロセスのため PORT_TASKTEAM に統合する。
+    LEGACY_PORT_KEYS = {
+        'PORT_WEB': ('WEB_BASE',),
+        'PORT_CORE': ('CORE_BASE',),
+        'PORT_AVATAR': ('AVATAR_BASE',),
+        'PORT_TASKTEAM': ('TASK_BASE', 'TEAM_BASE'),
+        'PORT_TOOLS': ('TOOLS_BASE',),
+        'PORT_LOCAL': ('LOCAL_BASE',),
+        'PORT_APPS': ('APPS_BASE',),
+    }
+
     def __init__(self, json: str = None):
         """
         初期化
@@ -120,7 +135,7 @@ class conf_json:
             json: 設定ファイルパス（省略時はデフォルト）
         """
         if json is None:
-            json = '_config/AiDiy_key.json'
+            json = os.path.normpath(os.path.join(BACKEND_DIR, DEFAULT_CONFIG_FILE))
 
         object.__setattr__(self, '_config_file', json)
         object.__setattr__(self, '_config_data', {})
@@ -137,29 +152,165 @@ class conf_json:
             try:
                 with open(config_file, 'r', encoding='utf-8-sig') as f:
                     config_data = json.load(f)
-                if not isinstance(config_data, dict):
-                    raise ValueError("設定JSONのルートはオブジェクト(dict)である必要があります")
-                object.__setattr__(self, '_config_data', config_data)
-                logger.info(f'設定ファイル読み込み完了: {config_file}')
-            except Exception as e:
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error(f'設定ファイル読み込みエラー: {e}')
-                object.__setattr__(self, '_config_data', self.DEFAULT_CONFIG.copy())
-                保存要否 = True
+                raise ValueError(
+                    f'設定ファイルの形式が不正です（元ファイルは変更しません）: {config_file}'
+                ) from e
+            except OSError as e:
+                logger.error(f'設定ファイル読み込みエラー: {e}')
+                raise
+
+            if not isinstance(config_data, dict):
+                logger.error('設定JSONのルートはオブジェクト(dict)である必要があります')
+                raise ValueError(
+                    f'設定JSONのルートがオブジェクトではありません（元ファイルは変更しません）: {config_file}'
+                )
+            object.__setattr__(self, '_config_data', config_data)
+            logger.info(f'設定ファイル読み込み完了: {config_file}')
         else:
             logger.warning(f'設定ファイルが存在しません: {config_file}')
             object.__setattr__(self, '_config_data', self.DEFAULT_CONFIG.copy())
+            保存要否 = True
+
+        # 旧ポートキーを現行キーへ移行してから不足項目を補完
+        if self._migrate_port_keys():
             保存要否 = True
 
         # 既存設定に不足しているデフォルト項目を補完
         if self._apply_default_keys():
             保存要否 = True
 
+        # ポートは1～65535の文字列へ正規化する
+        if self._validate_and_normalize_port_values():
+            保存要否 = True
+
         # CODE_AI2_NAME～6_NAMEが"auto"の場合、CODE_AI1_NAMEの値をコピー
         if self._apply_code_ai_auto():
             保存要否 = True
 
-        if 保存要否:
-            self._save()
+        if 保存要否 and not self._save():
+            raise OSError(f'設定ファイルを保存できません: {config_file}')
+
+    def _migrate_port_keys(self) -> bool:
+        """旧ポートキーを新キーへ移行し、旧キーを設定から除去する。"""
+        config_data = object.__getattribute__(self, '_config_data')
+        変更あり = False
+
+        for new_key, old_keys in self.LEGACY_PORT_KEYS.items():
+            existing_old_keys = [key for key in old_keys if key in config_data]
+            old_values = [config_data[key] for key in existing_old_keys]
+            new_key_was_missing = new_key not in config_data
+            normalized_old_values = (
+                [self._normalize_port_value(new_key, value) for value in old_values]
+                if new_key_was_missing
+                else []
+            )
+
+            if new_key_was_missing and normalized_old_values:
+                config_data[new_key] = normalized_old_values[0]
+                変更あり = True
+                logger.info(f'ポート設定を移行しました: {existing_old_keys[0]} -> {new_key}')
+            elif not new_key_was_missing:
+                normalized_value = self._normalize_port_value(new_key, config_data[new_key])
+                if normalized_value != config_data[new_key]:
+                    config_data[new_key] = normalized_value
+                    変更あり = True
+
+            if (
+                new_key_was_missing
+                and len(normalized_old_values) >= 2
+                and len(set(normalized_old_values)) > 1
+            ):
+                logger.warning(
+                    'TASK_BASE と TEAM_BASE の値が異なるため、'
+                    'PORT_TASKTEAM には TASK_BASE の値を採用します'
+                )
+
+            for old_key in old_keys:
+                if old_key in config_data:
+                    del config_data[old_key]
+                    変更あり = True
+
+        return 変更あり
+
+    @staticmethod
+    def _normalize_port_value(key: str, value: Any) -> str:
+        """ポート値を検証し、JSONで使用する10進文字列へ統一する。"""
+        if isinstance(value, bool):
+            raise ValueError(f'{key} は1～65535のポート番号で指定してください: {value!r}')
+
+        text = str(value).strip()
+        if not text.isdecimal():
+            raise ValueError(f'{key} は1～65535のポート番号で指定してください: {value!r}')
+
+        port = int(text, 10)
+        if not 1 <= port <= 65535:
+            raise ValueError(f'{key} は1～65535のポート番号で指定してください: {value!r}')
+        return str(port)
+
+    def _validate_and_normalize_port_values(self) -> bool:
+        """現行ポートキーを検証し、値を文字列へ正規化する。"""
+        config_data = object.__getattribute__(self, '_config_data')
+        変更あり = False
+        for key in self.LEGACY_PORT_KEYS:
+            if key not in config_data:
+                continue
+            normalized_value = self._normalize_port_value(key, config_data[key])
+            if normalized_value != config_data[key]:
+                config_data[key] = normalized_value
+                変更あり = True
+        return 変更あり
+
+    def _normalize_port_updates(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """書き込みデータ内の旧ポートキーを現行キーへ変換する。"""
+        normalized = dict(data)
+
+        for new_key, old_keys in self.LEGACY_PORT_KEYS.items():
+            existing_old_keys = [key for key in old_keys if key in normalized]
+            normalized_old_values = []
+
+            if new_key in normalized:
+                source_key = new_key
+            elif existing_old_keys:
+                source_key = existing_old_keys[0]
+                normalized_old_values = [
+                    self._normalize_port_value(new_key, normalized[key])
+                    for key in existing_old_keys
+                ]
+                normalized[new_key] = normalized_old_values[0]
+                logger.info(f'ポート設定を変換しました: {source_key} -> {new_key}')
+            else:
+                source_key = None
+
+            if (
+                source_key in old_keys
+                and len(normalized_old_values) >= 2
+                and len(set(normalized_old_values)) > 1
+            ):
+                logger.warning(
+                    'TASK_BASE と TEAM_BASE の値が異なるため、'
+                    'PORT_TASKTEAM には TASK_BASE の値を採用します'
+                )
+
+            for old_key in old_keys:
+                normalized.pop(old_key, None)
+
+            if source_key is not None:
+                normalized[new_key] = self._normalize_port_value(new_key, normalized[new_key])
+
+        return normalized
+
+    def _ordered_config_data(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+        """既定キーを先頭へ並べ、未知キーの現在順を末尾に維持する。"""
+        ordered = {}
+        for key in self.DEFAULT_CONFIG:
+            if key in config_data:
+                ordered[key] = config_data[key]
+        for key, value in config_data.items():
+            if key not in ordered:
+                ordered[key] = value
+        return ordered
 
     def _apply_default_keys(self) -> bool:
         """不足しているデフォルト設定キーを補完"""
@@ -170,13 +321,7 @@ class conf_json:
                 config_data[key] = value
                 変更あり = True
         # 並び順をDEFAULT_CONFIG準拠に統一（未知キーは末尾維持）
-        ordered = {}
-        for key in self.DEFAULT_CONFIG.keys():
-            if key in config_data:
-                ordered[key] = config_data[key]
-        for key, value in config_data.items():
-            if key not in ordered:
-                ordered[key] = value
+        ordered = self._ordered_config_data(config_data)
         if list(ordered.keys()) != list(config_data.keys()):
             変更あり = True
         object.__setattr__(self, '_config_data', ordered)
@@ -208,21 +353,45 @@ class conf_json:
                 logger.debug(f'{code_ai_key}が"auto"のため、CODE_AI1_NAMEの値({code_ai1})をコピーしました')
         return 変更あり
 
-    def _save(self) -> bool:
-        """設定ファイルを保存"""
+    def _save(self, config_data: Dict[str, Any] = None) -> bool:
+        """設定ファイルを同一フォルダの一時ファイル経由で安全に保存する。"""
+        temp_path = None
         try:
             config_file = object.__getattribute__(self, '_config_file')
-            config_data = object.__getattribute__(self, '_config_data')
+            if config_data is None:
+                config_data = object.__getattribute__(self, '_config_data')
 
-            os.makedirs(os.path.dirname(config_file), exist_ok=True)
+            config_dir = os.path.dirname(os.path.abspath(config_file))
+            os.makedirs(config_dir, exist_ok=True)
 
-            with open(config_file, 'w', encoding='utf-8') as f:
+            with tempfile.NamedTemporaryFile(
+                mode='w',
+                encoding='utf-8',
+                newline='\n',
+                prefix=f'.{os.path.basename(config_file)}.',
+                suffix='.tmp',
+                dir=config_dir,
+                delete=False,
+            ) as f:
+                temp_path = f.name
                 json.dump(config_data, f, indent=4, ensure_ascii=False)
+                f.write('\n')
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(temp_path, config_file)
+            temp_path = None
             logger.info(f'設定ファイル保存完了: {config_file}')
             return True
         except Exception as e:
             logger.error(f'設定ファイル保存エラー: {e}')
             return False
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     def __getattr__(self, key: str) -> Any:
         """プロパティアクセスで設定値を取得"""
@@ -236,9 +405,8 @@ class conf_json:
         if key.startswith('_'):
             object.__setattr__(self, key, value)
         else:
-            config_data = object.__getattribute__(self, '_config_data')
-            config_data[key] = value
-            self._save()
+            if not self.set(key, value):
+                raise OSError(f'設定値を保存できません: {key}')
 
     def get(self, key: str, default: Any = None) -> Any:
         """設定値を取得（辞書形式）"""
@@ -247,20 +415,37 @@ class conf_json:
 
     def set(self, key: str, value: Any) -> bool:
         """設定値を設定し、ファイルに保存（辞書形式）"""
-        config_data = object.__getattribute__(self, '_config_data')
-        config_data[key] = value
-        return self._save()
+        return self.update({key: value})
 
     def update(self, data: Dict[str, Any]) -> bool:
         """複数の設定値を一括更新し、ファイルに保存"""
+        if not isinstance(data, dict):
+            raise TypeError('更新データはdictで指定してください')
+
         config_data = object.__getattribute__(self, '_config_data')
-        config_data.update(data)
-        return self._save()
+        updated = dict(config_data)
+        updated.update(self._normalize_port_updates(data))
+
+        # 防御的に旧キーを除去し、現行ポート値を再検証する
+        for old_keys in self.LEGACY_PORT_KEYS.values():
+            for old_key in old_keys:
+                updated.pop(old_key, None)
+        for key in self.LEGACY_PORT_KEYS:
+            if key in updated:
+                updated[key] = self._normalize_port_value(key, updated[key])
+
+        updated = self._ordered_config_data(updated)
+        if not self._save(updated):
+            return False
+
+        object.__setattr__(self, '_config_data', updated)
+        return True
 
 
 ConfigJsonManager = conf_json
 
 __all__ = [
+    "DEFAULT_CONFIG_FILE",
     "conf_json",
     "ConfigJsonManager",
 ]

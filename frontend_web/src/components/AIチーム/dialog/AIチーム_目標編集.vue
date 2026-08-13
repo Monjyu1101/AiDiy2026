@@ -116,7 +116,7 @@ const 目標一覧読込 = async () => {
     }
     目標一覧.value = (response.data.data?.items ?? []) as チーム目標[];
   } catch {
-    void qMessage('チーム目標一覧の取得でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
+    void qMessage('チーム目標一覧の取得でエラーが発生しました。backend_taskteam (8093) を確認してください。', 'error');
   } finally {
     読込中.value = false;
   }
@@ -341,7 +341,7 @@ const 保存 = async () => {
     // 1件保存したら用は済むのでダイアログを閉じる
     emit('close');
   } catch {
-    void qMessage('チーム作業の保存でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
+    void qMessage('チーム作業の保存でエラーが発生しました。backend_taskteam (8093) を確認してください。', 'error');
   } finally {
     保存中.value = false;
   }
@@ -371,7 +371,7 @@ const 削除 = async () => {
       emit('saved', 先頭);
     }
   } catch {
-    void qMessage('チーム作業の削除でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
+    void qMessage('チーム作業の削除でエラーが発生しました。backend_taskteam (8093) を確認してください。', 'error');
   } finally {
     削除中.value = false;
   }

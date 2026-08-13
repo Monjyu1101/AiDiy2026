@@ -229,7 +229,7 @@ const 登録 = async () => {
     emit('saved', item);
     emit('close');
   } catch {
-    void qMessage('チーム依頼の登録でエラーが発生しました。backend_team (8094) を確認してください。', 'error');
+    void qMessage('チーム依頼の登録でエラーが発生しました。backend_taskteam (8093) を確認してください。', 'error');
   } finally {
     登録中.value = false;
   }

@@ -41,7 +41,6 @@ Thumbs.db
 
 # Data directories (mounted as volumes)
 _data/
-backend_server/_data/
 *.db
 *.db-*
 

@@ -1921,7 +1921,8 @@ def _looks_like_slash_command(text: str) -> bool:
 # AiDiy model/provider configuration
 # ============================================================================
 
-_AIDIY_KEY_JSON = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
+_AIDIY_CONFIG_DIR = _PROJECT_ROOT.parent / "_config"
+_AIDIY_KEY_JSON = _AIDIY_CONFIG_DIR / "AiDiy_key.json"
 _DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 _OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1"
 _OLLAMA_CLOUD_SUFFIXES = (":cloud", ":cloude", ":clude")
@@ -2025,7 +2026,7 @@ def _aidiy_cli_normalize_prompt(text: str) -> str:
 
 
 def _aidiy_cli_code_permissions() -> str:
-    config_path = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
+    config_path = _AIDIY_KEY_JSON
     try:
         with config_path.open("r", encoding="utf-8-sig") as f:
             cfg = json.load(f)
@@ -5871,7 +5872,8 @@ class HermesCLI:
             return "anthropic"
         if "ollama.com" in base_url or "localhost:11434" in base_url or "127.0.0.1:11434" in base_url:
             return "ollama"
-        if "localhost:8096" in base_url or "127.0.0.1:8096" in base_url:
+        port_local = str((self._aidiy_config or {}).get("PORT_LOCAL") or "8096").strip() or "8096"
+        if f"localhost:{port_local}" in base_url or f"127.0.0.1:{port_local}" in base_url:
             return "local_chat"
         return provider
 
@@ -5968,12 +5970,12 @@ class HermesCLI:
             }
         elif provider == "local_chat":
             # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
-            port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
+            port_local = str(cfg.get("PORT_LOCAL") or "8096").strip() or "8096"
             entry = {
                 "slug": "local_chat",
                 "name": "Local Chat (backend_local)",
                 "runtime_provider": "custom",
-                "base_url": f"http://localhost:{port}/v1",
+                "base_url": f"http://localhost:{port_local}/v1",
                 "api_key": "no-key-required",
                 "api_mode": "chat_completions",
                 "default_model": self._aidiy_provider_default_model("local_chat"),
@@ -12314,11 +12316,11 @@ def _freeai_model_from_value(value: str) -> str | None:
 
 def _load_local_chat_defaults(cfg: dict[str, Any], model_override: str | None = None) -> dict[str, str]:
     # backend_local（既定 localhost:8096）の OpenAI 互換 API。認証不要。
-    port = str(cfg.get("LOCAL_BASE") or "8096").strip() or "8096"
+    port_local = str(cfg.get("PORT_LOCAL") or "8096").strip() or "8096"
     model = str(model_override or cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it").strip()
     return {
         "provider": "custom",
-        "base_url": f"http://localhost:{port}/v1",
+        "base_url": f"http://localhost:{port_local}/v1",
         "api_key": "no-key-required",
         "model": model,
     }
@@ -12343,7 +12345,7 @@ def _load_freeai_defaults(cfg: dict[str, Any], model_override: str | None = None
 
 
 def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str, str]:
-    config_path = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
+    config_path = _AIDIY_KEY_JSON
     try:
         with config_path.open("r", encoding="utf-8") as f:
             cfg = json.load(f)
@@ -12385,7 +12387,7 @@ def _load_aidiy_hermes_provider_defaults(provider: str | None) -> dict[str, str]
     if not provider_slug:
         return {}
 
-    config_path = _PROJECT_ROOT.parent / "backend_server" / "_config" / "AiDiy_key.json"
+    config_path = _AIDIY_KEY_JSON
     try:
         with config_path.open("r", encoding="utf-8") as f:
             cfg = json.load(f)

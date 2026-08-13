@@ -13,7 +13,7 @@
 Vite 開発サーバー (ポート 8090) を起動します。
 
 公開 API:
-    PORT
+    PORT_WEB
     get_npm_command() -> str | None
     check_environment() -> (bool, str)
     start(npm_command) -> subprocess.Popen
@@ -69,7 +69,7 @@ def print_info(message: str) -> None:
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_WEB_DIR = THIS_DIR
-PORT = 8090
+PORT_WEB = 8090
 FRONTEND_COMMAND = "npm"
 
 
@@ -130,7 +130,7 @@ def start(npm_command: str | None = None) -> subprocess.Popen[bytes]:
         raise RuntimeError("npm コマンドが見つかりません")
     return launch_process(
         "フロントエンド(Web)",
-        [npm_command, "run", "dev", "--", "--port", str(PORT)],
+        [npm_command, "run", "dev", "--", "--port", str(PORT_WEB)],
         FRONTEND_WEB_DIR,
     )
 
@@ -223,7 +223,7 @@ def kill_process_on_port(port: int) -> bool:
 
 
 def kill_ports() -> None:
-    kill_process_on_port(PORT)
+    kill_process_on_port(PORT_WEB)
 
 
 # ============================================================
@@ -282,7 +282,7 @@ def main() -> None:
 
     process = start()
     threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name}: http://127.0.0.1:{PORT}/")
+    print_success(f"{name}: http://127.0.0.1:{PORT_WEB}/")
     print_info("Ctrl+C で停止します")
     try:
         while True:

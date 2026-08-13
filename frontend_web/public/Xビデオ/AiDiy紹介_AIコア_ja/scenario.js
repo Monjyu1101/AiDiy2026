@@ -167,7 +167,7 @@ window.SCENARIO = {
         {
           "title": "設定管理",
           "lines": [
-            "`backend_server/_config/AiDiy_key.json` で一元管理",
+            "`_config/AiDiy_key.json` で一元管理",
             "`conf_json.py` が読み書きと不足キー補完",
             "`conf_model.py` が AI モデル一覧を動的生成"
           ]
@@ -185,7 +185,7 @@ window.SCENARIO = {
         "`CHAT_AI_NAME` は `_chat` で終わる名前を使う規約がある。",
         "`LIVE_AI_NAME` は `_live`、`CODE_AI*_NAME` は `_sdk` / `_cli` が原則（例外: `aidiy_hermes`）。",
         "比較は完全一致を前提にし、前方一致へ寄せない。",
-        "設定は `backend_server/_config/AiDiy_key.json` で一元管理する。"
+        "設定は `_config/AiDiy_key.json` で一元管理する。"
       ],
       "evidence": [
         {
@@ -422,17 +422,17 @@ window.SCENARIO = {
       ],
       "facts": [
         "`AIコード_claude.py` が Claude Agent SDK を使い MCP ツールをエージェントに渡す。",
-        "MCP 接続定義は `backend_server/_config/AiDiy_mcp.json` に集約する。",
+        "MCP 接続定義は `_config/AiDiy_mcp.json` に集約する。",
         "`CODE_AI*_NAME = \"*_sdk\"` で `AIコード_claude.py` が起動する。"
       ],
       "evidence": [
         {
           "source": "backend_server/AGENTS.md",
-          "text": "MCP サーバー本体は `backend_tools` にあります。`backend_server` では `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。"
+          "text": "MCP サーバー本体は `backend_tools` にあります。`backend_server` はプロジェクトルートの `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。"
         },
         {
           "source": "backend_server,backend_tools,MCP活用手順.md",
-          "text": "MCP 接続定義は `backend_server/_config/AiDiy_mcp.json` に集約する。`AIコード_claude.py` 側で `conf.models.mcp_servers` を Claude Agent SDK に渡す。"
+          "text": "MCP 接続定義は `_config/AiDiy_mcp.json` に集約する。`AIコード_claude.py` 側で `conf.models.mcp_servers` を Claude Agent SDK に渡す。"
         }
       ],
       "short_narration": "MCP は、AI が使える道具セットです。画面確認やデータ確認も手伝えます。",

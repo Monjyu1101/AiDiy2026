@@ -10,7 +10,7 @@
 
 """フロントエンド(Avatar) クリーンアップスクリプト
 
-node_modules / dist / dist-electron を削除します。
+node_modules / dist / dist-electron / __pycache__ / .pytest_cache を削除します。
 
 公開 API:
     cleanup(choices: dict | None = None) -> None
@@ -138,6 +138,19 @@ def remove_directory(path: Path, description: str) -> bool:
     return False
 
 
+def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
+    deleted_count = 0
+    print_info(f"{label}: __pycache__ フォルダを検索中...")
+    for pycache in target_dir.rglob("__pycache__"):
+        if remove_directory(pycache, f"__pycache__ ({label})"):
+            deleted_count += 1
+    print_info(f"{label}: .pytest_cache フォルダを検索中...")
+    for pytest_cache in target_dir.rglob(".pytest_cache"):
+        if remove_directory(pytest_cache, f".pytest_cache ({label})"):
+            deleted_count += 1
+    return deleted_count
+
+
 # ============================================================
 # クリーンアップ本体
 # ============================================================
@@ -161,6 +174,9 @@ def cleanup(choices: dict | None = None) -> None:
         build_dir = FRONTEND_AVATAR_DIR / build_dir_name
         if remove_directory(build_dir, f"{build_dir_name} ({label})"):
             deleted_count += 1
+
+    # node_modules / ビルド成果物を消してから走査し、無駄なスキャンを避ける。
+    deleted_count += cleanup_common_python_caches(FRONTEND_AVATAR_DIR, label)
 
     if deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")

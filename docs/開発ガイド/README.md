@@ -10,15 +10,14 @@
 
 - バックエンドは **6 サーバー**
   - `core_main.py` : `8091`
-  - `apps_main.py` : `9098`
+  - `apps_main.py` : `8098`
   - `tools_main.py` : `8095`
   - `local_main.py` : `8096`（`_start.py` のデフォルトは起動しない）
-  - `task_main.py` : `8093`（AIタスク実行 + 定期タスク）
-  - `team_main.py` : `8094`（複数AIエージェントのチーム活動）
+  - `taskteam_main.py` : `8093`（AIタスク実行 + 定期タスク + 複数AIエージェントのチーム活動）
 - Web フロントは `frontend_web`、ポート `8090`
 - Avatar フロントは `frontend_avatar`、ポート `8092`
 - DB は **SQLite**
-  - `backend_server/_data/AiDiy/database.db`
+  - `_data/AiDiy/database.db`
 - スキーマ変更は **Alembic なし**
   - モデル更新
   - 既存 DB には `ALTER TABLE` などを `init.py` で適用
@@ -39,8 +38,8 @@ AiDiy2026/
 │   ├── tools_main.py
 │   ├── tools_proc/
 │   └── AGENTS.md
-├── backend_task/
-│   ├── task_main.py
+├── backend_taskteam/
+│   ├── taskteam_main.py
 │   └── AGENTS.md
 ├── backend_server/
 │   ├── core_main.py
@@ -91,7 +90,7 @@ python _start.py
 - バックエンド(local)（デフォルト No）
 - tools
 - バックエンド(core/apps)
-- バックエンド(task)
+- バックエンド(task,team)
 - フロントエンド(Web)
 - フロントエンド(Avatar)
 
@@ -112,11 +111,11 @@ cd backend_server
 
 # backend apps
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098
+.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8098
 
-# backend task
-cd backend_task
-.venv/Scripts/python.exe -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093
+# backend task,team
+cd backend_taskteam
+.venv/Scripts/python.exe -m uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093
 
 # frontend web
 cd frontend_web
@@ -135,8 +134,8 @@ npm run dev
 |------|-----|
 | Web フロント | http://127.0.0.1:8090 |
 | Core API Docs | http://127.0.0.1:8091/docs |
-| Apps API Docs | http://127.0.0.1:9098/docs |
-| Task API Docs | http://127.0.0.1:8093/docs |
+| Apps API Docs | http://127.0.0.1:8098/docs |
+| Task / Team API Docs | http://127.0.0.1:8093/docs |
 | Local API Docs | http://127.0.0.1:8096/docs |
 | Backend MCP 一覧（19 サーバー） | http://127.0.0.1:8095/ |
 | Backend MCP ツール一覧 | http://127.0.0.1:8095/{mcp_name}/list |
@@ -175,7 +174,7 @@ npm run dev
 - `apps_crud/__init__.py` 追加漏れに注意
 - M 系一覧は通常 V 系エンドポイントを使う
 - パスワードは現状平文比較
-- Claude のブラウザ自動操作は `backend_tools` と `backend_server/_config/AiDiy_mcp.json` を併用する
+- Claude のブラウザ自動操作は `backend_tools` と `_config/AiDiy_mcp.json` を併用する
 
 ---
 

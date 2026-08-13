@@ -36,7 +36,7 @@ THIS_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = THIS_DIR
 BACKEND_ENV_LIST = [".venv", "venv"]
 DATABASE_TYPE = "sqlite"
-SQLITE_DB_REL_PATH = Path("_data/AiDiy/database.db")
+SQLITE_DB_REL_PATH = Path("../_data/AiDiy/database.db")
 
 AUTO_MODE = False
 

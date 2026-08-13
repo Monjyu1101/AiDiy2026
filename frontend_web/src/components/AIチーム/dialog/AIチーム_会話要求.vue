@@ -28,7 +28,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 // 会話は調査モード（team_chat.py）で依頼する。AIが対象プロジェクトのソースを読んでから
-// 回答するため、backend_team 側は CodeAgent 300秒 / HTTP 360秒で待つ。画面もそれに合わせる。
+// 回答するため、backend_taskteam 側は CodeAgent 300秒 / HTTP 360秒で待つ。画面もそれに合わせる。
 const 最大待機秒 = 360;
 const 最大待機ミリ秒 = 最大待機秒 * 1000;
 const プロジェクト選択肢 = ref<選択肢[]>([]);
@@ -215,7 +215,7 @@ const 会話送信 = async () => {
     const code = String((error as { code?: string })?.code ?? '');
     エラー内容.value = code === 'ECONNABORTED'
       ? `${最大待機秒}秒以内に応答が完了しませんでした。時間をおいて再度お試しください。`
-      : '会話通信でエラーが発生しました。backend_team (8094) と backend_tools (8095) を確認してください。';
+      : '会話通信でエラーが発生しました。backend_taskteam (8093) と backend_tools (8095) を確認してください。';
   } finally {
     経過計測停止();
     送信中.value = false;

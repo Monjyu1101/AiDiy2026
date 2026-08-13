@@ -1961,7 +1961,7 @@ def _load_aidiy_mcp_servers() -> Dict[str, dict]:
         from pathlib import Path
         import json as _json
         candidates = [
-            Path(__file__).resolve().parents[2] / "backend_server" / "_config" / "AiDiy_mcp.json",
+            Path(__file__).resolve().parents[2] / "_config" / "AiDiy_mcp.json",
         ]
         for path in candidates:
             if path.exists():

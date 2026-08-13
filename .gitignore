@@ -103,8 +103,6 @@ pids
 *.pid.lock
 _data/
 **/_data/**
-backend_server/_data/
-backend_server/_data/**
 *.db
 *.sqlite
 *.sqlite3

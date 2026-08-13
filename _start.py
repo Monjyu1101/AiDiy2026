@@ -10,31 +10,29 @@
 
 """開発環境起動スクリプト（まとめ役）
 
-各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps/task/team)・
+各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps/task,team)・
 フロントエンド(Web/Avatar) を統一手順で起動します。各サービスの環境確認・
 起動コマンドはフォルダ側に委譲し、このスクリプトは起動順序・出力集約・
 ブラウザ表示・自動再起動監視・一括停止を一元管理します。
 
 フォルダ別スクリプト:
-- backend_local/_start.py    PORT / check_environment / start / kill_ports
-- backend_tools/_start.py    PORT / check_environment / start / kill_ports
-- backend_server/_start.py   CORE_PORT / APPS_PORT / check_environment / start_core / start_apps
-- backend_task/_start.py     PORT / check_environment / start / kill_ports
-- backend_team/_start.py     PORT / check_environment / start / kill_ports
-- frontend_web/_start.py     PORT / check_environment / start / kill_ports
-- frontend_avatar/_start.py  PORT / check_environment / start / kill_electron_processes
+- backend_local/_start.py    PORT_LOCAL / check_environment / start / kill_ports
+- backend_tools/_start.py    PORT_TOOLS / check_environment / start / kill_ports
+- backend_server/_start.py   PORT_CORE / PORT_APPS / check_environment / start_core / start_apps
+- backend_taskteam/_start.py PORT_TASKTEAM / check_environment / start / kill_ports
+- frontend_web/_start.py     PORT_WEB / check_environment / start / kill_ports
+- frontend_avatar/_start.py  PORT_AVATAR / check_environment / start / kill_electron_processes
 
 標準の起動順:
 1. バックエンド(local)
 2. バックエンド(tools)
 3. バックエンド(core)
 4. バックエンド(apps)
-5. バックエンド(task)
-6. バックエンド(team)
-7. フロントエンド(Web)
-8. フロントエンド(Avatar)
-9. ページ表示
-10. 自動再起動監視
+5. バックエンド(task,team)
+6. フロントエンド(Web)
+7. フロントエンド(Avatar)
+8. ページ表示
+9. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -43,6 +41,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -68,6 +67,8 @@ _configure_loopback_proxy_bypass()
 
 
 if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
     import msvcrt
 
 
@@ -113,9 +114,19 @@ QUIET_WAIT_SECONDS = 20
 QUIET_MAX_WAIT_SECONDS = 60
 RESTART_WAIT_SECONDS = 15
 BACKEND_TOOLS_SHOW_AUTOMATION_BANNER = False
+CLEANUP_STOP_REQUEST_PATH = BASE_DIR / ".cleanup_stop_request.json"
+MANAGED_SERVICE_NAMES = frozenset({
+    "バックエンド(local)",
+    "バックエンド(tools)",
+    "バックエンド(core)",
+    "バックエンド(apps)",
+    "バックエンド(task,team)",
+    "フロントエンド(Web)",
+    "フロントエンド(Avatar)",
+})
 
 # フォルダ別 _start.py モジュール（_init_modules で設定）
-LOCAL = TOOLS = SERVER = TASK = TEAM = WEB = AVATAR = None
+LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = None
 
 
 def _load_folder_module(folder: str):
@@ -128,15 +139,105 @@ def _load_folder_module(folder: str):
     return mod
 
 
+def _remove_folder_import_cache(folder: str) -> None:
+    """フォルダ別 `_start.py` の import で生成された `__pycache__` を消す。
+
+    フロントエンド(Web/Avatar)は Node.js プロジェクトだが、起動処理だけ
+    Python で実行するため、この import 分だけがフォルダに残ってしまう。
+    モジュールは読み込み済みのため、削除しても起動処理には影響しない。
+    """
+    pycache_dir = BASE_DIR / folder / "__pycache__"
+    if not pycache_dir.is_dir():
+        return
+    try:
+        shutil.rmtree(pycache_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+
 def _init_modules() -> None:
-    global LOCAL, TOOLS, SERVER, TASK, TEAM, WEB, AVATAR
+    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR
     LOCAL = _load_folder_module("backend_local")
     TOOLS = _load_folder_module("backend_tools")
     SERVER = _load_folder_module("backend_server")
-    TASK = _load_folder_module("backend_task")
-    TEAM = _load_folder_module("backend_team")
+    TASKTEAM = _load_folder_module("backend_taskteam")
     WEB = _load_folder_module("frontend_web")
     AVATAR = _load_folder_module("frontend_avatar")
+
+    # 起動そのものには不要なので、import で残ったキャッシュは畳んでおく。
+    for folder in ("frontend_web", "frontend_avatar"):
+        _remove_folder_import_cache(folder)
+
+
+def _pid_is_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+
+    if sys.platform == "win32":
+        # Windows の os.kill(pid, 0) は POSIX の存在確認とは異なり、
+        # TerminateProcess(..., 0) として対象を終了させるため使用しない。
+        process_query_limited_information = 0x1000
+        still_active = 259
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        open_process = kernel32.OpenProcess
+        open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        open_process.restype = wintypes.HANDLE
+        get_exit_code_process = kernel32.GetExitCodeProcess
+        get_exit_code_process.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        get_exit_code_process.restype = wintypes.BOOL
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+
+        handle = open_process(process_query_limited_information, False, pid)
+        if not handle:
+            # 権限不足なら存在しないとは断定せず、停止要求を維持する。
+            return ctypes.get_last_error() == 5
+        try:
+            exit_code = wintypes.DWORD()
+            if not get_exit_code_process(handle, ctypes.byref(exit_code)):
+                return True
+            return exit_code.value == still_active
+        finally:
+            close_handle(handle)
+
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def cleanup_stop_requested_services() -> set[str]:
+    """稼働中の `_cleanup.py` が停止を要求したサービス名を返す。"""
+    try:
+        payload = json.loads(CLEANUP_STOP_REQUEST_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return set()
+    except (json.JSONDecodeError, OSError):
+        CLEANUP_STOP_REQUEST_PATH.unlink(missing_ok=True)
+        return set()
+
+    try:
+        owner_pid = int(payload.get("owner_pid", 0))
+    except (TypeError, ValueError):
+        owner_pid = 0
+    if not _pid_is_running(owner_pid):
+        CLEANUP_STOP_REQUEST_PATH.unlink(missing_ok=True)
+        return set()
+
+    services = payload.get("services", [])
+    if not isinstance(services, list):
+        return set()
+    return {
+        service
+        for service in services
+        if isinstance(service, str) and service in MANAGED_SERVICE_NAMES
+    }
 
 
 def get_npm_command() -> str | None:
@@ -339,16 +440,15 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
     return default_yes
 
 
-def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool, bool]:
+def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool]:
     print_header("起動条件の確認")
     local_enabled         = prompt_choice("バックエンド(local)     起動しますか?", default_yes=False)
     backend_tools_enabled = prompt_choice("バックエンド(tools)     起動しますか?", default_yes=True)
     backend_enabled       = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
-    backend_task_enabled  = prompt_choice("バックエンド(task)      起動しますか?", default_yes=True)
-    backend_team_enabled  = prompt_choice("バックエンド(team)      起動しますか?", default_yes=True)
+    backend_taskteam_enabled = prompt_choice("バックエンド(task,team) 起動しますか?", default_yes=True)
     web_enabled           = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
     avatar_enabled        = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
-    return local_enabled, backend_tools_enabled, backend_enabled, backend_task_enabled, backend_team_enabled, web_enabled, avatar_enabled
+    return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled
 
 
 # ============================================================
@@ -368,7 +468,7 @@ def _tools_post(path: str, body: dict, timeout: int = 30) -> dict:
     """backend_tools の HTTP POST インターフェースを呼ぶ (urllib のみ使用)"""
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
-        f"http://127.0.0.1:{TOOLS.PORT}{path}",
+        f"http://127.0.0.1:{TOOLS.PORT_TOOLS}{path}",
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -442,8 +542,7 @@ def validate_initial_environment(
     local_enabled: bool,
     backend_tools_enabled: bool,
     backend_enabled: bool,
-    backend_task_enabled: bool,
-    backend_team_enabled: bool,
+    backend_taskteam_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
 ) -> tuple[bool, str | None]:
@@ -478,22 +577,13 @@ def validate_initial_environment(
             print_info("  対応例: cd backend_server && uv sync --upgrade")
             has_error = True
 
-    if backend_task_enabled:
-        ok, detail = TASK.check_environment()
+    if backend_taskteam_enabled:
+        ok, detail = TASKTEAM.check_environment()
         if ok:
-            print_success(f"バックエンド(task): OK ({detail})")
+            print_success(f"バックエンド(task,team): OK ({detail})")
         else:
-            print_error(f"バックエンド(task): 未準備 ({detail})")
-            print_info("  対応例: cd backend_task && uv sync --upgrade")
-            has_error = True
-
-    if backend_team_enabled:
-        ok, detail = TEAM.check_environment()
-        if ok:
-            print_success(f"バックエンド(team): OK ({detail})")
-        else:
-            print_error(f"バックエンド(team): 未準備 ({detail})")
-            print_info("  対応例: cd backend_team && uv sync --upgrade")
+            print_error(f"バックエンド(task,team): 未準備 ({detail})")
+            print_info("  対応例: cd backend_taskteam && uv sync --upgrade")
             has_error = True
 
     if web_enabled or avatar_enabled:
@@ -541,14 +631,13 @@ def ensure_optional_service_ready(name: str, npm_command: str | None) -> bool:
 
 def _port_for(name: str) -> int | None:
     return {
-        "バックエンド(local)": LOCAL.PORT,
-        "バックエンド(tools)": TOOLS.PORT,
-        "バックエンド(core)": SERVER.CORE_PORT,
-        "バックエンド(apps)": SERVER.APPS_PORT,
-        "バックエンド(task)": TASK.PORT,
-        "バックエンド(team)": TEAM.PORT,
-        "フロントエンド(Web)": WEB.PORT,
-        "フロントエンド(Avatar)": AVATAR.PORT,
+        "バックエンド(local)": LOCAL.PORT_LOCAL,
+        "バックエンド(tools)": TOOLS.PORT_TOOLS,
+        "バックエンド(core)": SERVER.PORT_CORE,
+        "バックエンド(apps)": SERVER.PORT_APPS,
+        "バックエンド(task,team)": TASKTEAM.PORT_TASKTEAM,
+        "フロントエンド(Web)": WEB.PORT_WEB,
+        "フロントエンド(Avatar)": AVATAR.PORT_AVATAR,
     }.get(name)
 
 
@@ -558,15 +647,17 @@ def start_service(
     last_output_times: dict[str, float],
     npm_command: str | None,
 ) -> bool:
+    if name in cleanup_stop_requested_services():
+        print_warning(f"[{name}] クリーンアップ対象のため起動をスキップします")
+        return False
+
     try:
         if name == "バックエンド(tools)":
             process = TOOLS.start()
         elif name == "バックエンド(local)":
             process = LOCAL.start()
-        elif name == "バックエンド(task)":
-            process = TASK.start()
-        elif name == "バックエンド(team)":
-            process = TEAM.start()
+        elif name == "バックエンド(task,team)":
+            process = TASKTEAM.start()
         elif name == "バックエンド(core)":
             process = SERVER.start_core()
         elif name == "バックエンド(apps)":
@@ -597,27 +688,24 @@ def maybe_kill_initial_ports(
     local_enabled: bool,
     backend_tools_enabled: bool,
     backend_enabled: bool,
-    backend_task_enabled: bool,
-    backend_team_enabled: bool,
+    backend_taskteam_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
 ) -> None:
     print_header("既存プロセス整理")
     if local_enabled:
-        kill_process_on_port(LOCAL.PORT)
+        kill_process_on_port(LOCAL.PORT_LOCAL)
     if backend_tools_enabled:
-        kill_process_on_port(TOOLS.PORT)
+        kill_process_on_port(TOOLS.PORT_TOOLS)
     if backend_enabled:
-        kill_process_on_port(SERVER.CORE_PORT)
-        kill_process_on_port(SERVER.APPS_PORT)
-    if backend_task_enabled:
-        kill_process_on_port(TASK.PORT)
-    if backend_team_enabled:
-        kill_process_on_port(TEAM.PORT)
+        kill_process_on_port(SERVER.PORT_CORE)
+        kill_process_on_port(SERVER.PORT_APPS)
+    if backend_taskteam_enabled:
+        kill_process_on_port(TASKTEAM.PORT_TASKTEAM)
     if web_enabled:
-        kill_process_on_port(WEB.PORT)
+        kill_process_on_port(WEB.PORT_WEB)
     if avatar_enabled:
-        kill_process_on_port(AVATAR.PORT)
+        kill_process_on_port(AVATAR.PORT_AVATAR)
         # electronmon が spawn した electron.exe は別プロセスグループで残留する場合があるため
         AVATAR.kill_electron_processes()
     time.sleep(1)
@@ -627,8 +715,7 @@ def start_initial_services(
     start_backend_local_enabled: bool,
     start_backend_tools_enabled: bool,
     start_backend_enabled: bool,
-    start_backend_task_enabled: bool,
-    start_backend_team_enabled: bool,
+    start_backend_taskteam_enabled: bool,
     avatar_enabled: bool,
     web_enabled: bool,
     processes: dict[str, subprocess.Popen[bytes]],
@@ -640,8 +727,7 @@ def start_initial_services(
         "バックエンド(tools)": start_backend_tools_enabled,
         "バックエンド(core)": start_backend_enabled,
         "バックエンド(apps)": start_backend_enabled,
-        "バックエンド(task)": start_backend_task_enabled,
-        "バックエンド(team)": start_backend_team_enabled,
+        "バックエンド(task,team)": start_backend_taskteam_enabled,
         "フロントエンド(Web)": web_enabled,
         "フロントエンド(Avatar)": False,
     }
@@ -650,8 +736,7 @@ def start_initial_services(
         local_enabled=start_backend_local_enabled,
         backend_tools_enabled=start_backend_tools_enabled,
         backend_enabled=start_backend_enabled,
-        backend_task_enabled=start_backend_task_enabled,
-        backend_team_enabled=start_backend_team_enabled,
+        backend_taskteam_enabled=start_backend_taskteam_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
     )
@@ -675,15 +760,14 @@ def start_initial_services(
         start_service("バックエンド(apps)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["バックエンド(apps)"], label="バックエンド(apps)")
 
-    if start_backend_task_enabled:
-        print_header("バックエンド(task) 起動")
-        start_service("バックエンド(task)", processes, last_output_times, npm_command)
-        wait_for_services_quiet(last_output_times, ["バックエンド(task)"], label="バックエンド(task)")
-
-    if start_backend_team_enabled:
-        print_header("バックエンド(team) 起動")
-        start_service("バックエンド(team)", processes, last_output_times, npm_command)
-        wait_for_services_quiet(last_output_times, ["バックエンド(team)"], label="バックエンド(team)")
+    if start_backend_taskteam_enabled:
+        print_header("バックエンド(task,team) 起動")
+        start_service("バックエンド(task,team)", processes, last_output_times, npm_command)
+        wait_for_services_quiet(
+            last_output_times,
+            ["バックエンド(task,team)"],
+            label="バックエンド(task,team)",
+        )
 
     if web_enabled:
         print_header("フロントエンド(Web) 起動")
@@ -692,20 +776,44 @@ def start_initial_services(
 
     if avatar_enabled and ensure_optional_service_ready("フロントエンド(Avatar)", npm_command):
         selected_flags["フロントエンド(Avatar)"] = True
-        kill_process_on_port(AVATAR.PORT)
+        kill_process_on_port(AVATAR.PORT_AVATAR)
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
 
     if web_enabled and "フロントエンド(Web)" in processes:
-        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(WEB.PORT)):
-            open_browser(WEB.PORT)
+        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(WEB.PORT_WEB)):
+            open_browser(WEB.PORT_WEB)
 
     if avatar_enabled and "フロントエンド(Avatar)" in processes:
-        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(AVATAR.PORT)):
-            open_browser(AVATAR.PORT)
+        if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(AVATAR.PORT_AVATAR)):
+            open_browser(AVATAR.PORT_AVATAR)
 
     return selected_flags
+
+
+def suspend_services_for_cleanup(
+    selected_services: dict[str, bool],
+    processes: dict[str, subprocess.Popen[bytes]],
+    process_crash_time: dict[str, float],
+) -> set[str]:
+    """クリーンアップ対象を自動再起動から外し、監視中なら停止する。"""
+    requested_services = cleanup_stop_requested_services()
+    for name in list(selected_services):
+        if name not in requested_services:
+            continue
+        was_selected = selected_services.get(name, False)
+        process = processes.pop(name, None)
+        if not was_selected and process is None:
+            continue
+
+        selected_services[name] = False
+        process_crash_time.pop(name, None)
+        print_warning(f"[{name}] クリーンアップ対象のため自動再起動を停止します")
+        if process is not None:
+            stop_processes({name: process})
+
+    return requested_services
 
 
 def monitor_and_restart(
@@ -723,6 +831,7 @@ def monitor_and_restart(
 
     while True:
         current_time = time.time()
+        suspend_services_for_cleanup(selected_services, processes, process_crash_time)
 
         for name in list(processes.keys()):
             process = processes[name]
@@ -763,14 +872,20 @@ def monitor_and_restart(
 def main() -> None:
     _init_modules()
 
-    local_enabled, backend_tools_enabled, backend_enabled, backend_task_enabled, backend_team_enabled, web_enabled, avatar_enabled = collect_startup_choices()
+    (
+        local_enabled,
+        backend_tools_enabled,
+        backend_enabled,
+        backend_taskteam_enabled,
+        web_enabled,
+        avatar_enabled,
+    ) = collect_startup_choices()
 
     is_ready, npm_command = validate_initial_environment(
         local_enabled=local_enabled,
         backend_tools_enabled=backend_tools_enabled,
         backend_enabled=backend_enabled,
-        backend_task_enabled=backend_task_enabled,
-        backend_team_enabled=backend_team_enabled,
+        backend_taskteam_enabled=backend_taskteam_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
     )
@@ -791,8 +906,7 @@ def main() -> None:
                 start_backend_local_enabled=local_enabled,
                 start_backend_tools_enabled=backend_tools_enabled,
                 start_backend_enabled=backend_enabled,
-                start_backend_task_enabled=backend_task_enabled,
-                start_backend_team_enabled=backend_team_enabled,
+                start_backend_taskteam_enabled=backend_taskteam_enabled,
                 avatar_enabled=avatar_enabled,
                 web_enabled=web_enabled,
                 processes=processes,
@@ -802,24 +916,22 @@ def main() -> None:
 
             print_header("起動完了")
             if "バックエンド(local)" in processes:
-                print_success(f"バックエンド(local): http://127.0.0.1:{LOCAL.PORT}/docs")
-                print_info   (f"  OpenAI互換 (利用時にモデルロード): http://127.0.0.1:{LOCAL.PORT}/v1/chat/completions")
+                print_success(f"バックエンド(local): http://127.0.0.1:{LOCAL.PORT_LOCAL}/docs")
+                print_info   (f"  OpenAI互換 (利用時にモデルロード): http://127.0.0.1:{LOCAL.PORT_LOCAL}/v1/chat/completions")
             if "バックエンド(tools)" in processes:
-                print_success(f"バックエンド(tools) Swagger UI : http://127.0.0.1:{TOOLS.PORT}/docs")
-                print_info   (f"  ツール一覧(例)            : http://127.0.0.1:{TOOLS.PORT}/aidiy_text_to_speech/list")
-                print_info   (f"  利用可能 ツール 一覧      : http://127.0.0.1:{TOOLS.PORT}/")
+                print_success(f"バックエンド(tools) Swagger UI : http://127.0.0.1:{TOOLS.PORT_TOOLS}/docs")
+                print_info   (f"  ツール一覧(例)            : http://127.0.0.1:{TOOLS.PORT_TOOLS}/aidiy_text_to_speech/list")
+                print_info   (f"  利用可能 ツール 一覧      : http://127.0.0.1:{TOOLS.PORT_TOOLS}/")
             if "バックエンド(core)" in processes:
-                print_success(f"バックエンド(core): http://127.0.0.1:{SERVER.CORE_PORT}/docs")
+                print_success(f"バックエンド(core): http://127.0.0.1:{SERVER.PORT_CORE}/docs")
             if "バックエンド(apps)" in processes:
-                print_success(f"バックエンド(apps): http://127.0.0.1:{SERVER.APPS_PORT}/docs")
-            if "バックエンド(task)" in processes:
-                print_success(f"バックエンド(task): http://127.0.0.1:{TASK.PORT}/docs")
-            if "バックエンド(team)" in processes:
-                print_success(f"バックエンド(team): http://127.0.0.1:{TEAM.PORT}/docs")
+                print_success(f"バックエンド(apps): http://127.0.0.1:{SERVER.PORT_APPS}/docs")
+            if "バックエンド(task,team)" in processes:
+                print_success(f"バックエンド(task,team): http://127.0.0.1:{TASKTEAM.PORT_TASKTEAM}/docs")
             if "フロントエンド(Web)" in processes:
-                print_success(f"フロントエンド(Web): http://127.0.0.1:{WEB.PORT}/")
+                print_success(f"フロントエンド(Web): http://127.0.0.1:{WEB.PORT_WEB}/")
             if "フロントエンド(Avatar)" in processes:
-                print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{AVATAR.PORT}")
+                print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{AVATAR.PORT_AVATAR}")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)
 
         except KeyboardInterrupt:

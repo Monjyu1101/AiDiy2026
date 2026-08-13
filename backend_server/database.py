@@ -12,9 +12,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
-# データベースファイルのパス
-DB_DIR = os.path.join(os.path.dirname(__file__), "_data", "AiDiy")
-DB_PATH = os.path.join(DB_DIR, "database.db")
+# backend_server/ を基準にしたデータベース既定値（実体はプロジェクトルート）
+DEFAULT_DATABASE_PATH = "../_data/AiDiy/database.db"
+DB_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), DEFAULT_DATABASE_PATH))
+DB_DIR = os.path.dirname(DB_PATH)
 
 # ディレクトリが存在しない場合は作成
 os.makedirs(DB_DIR, exist_ok=True)

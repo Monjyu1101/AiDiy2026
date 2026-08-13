@@ -3,21 +3,21 @@
 ## 本書の目的
 
 このファイルは `command_hermes` の位置づけ、構成、実装入口を示す概要ドキュメントです。
-起動方法、CLI オプション、確認コマンドなどの HowTo は `.aidiy/knowledge` に移動しています。
+起動方法、CLI オプション、確認コマンドなどの HowTo は `_AIDIY/knowledge` に移動しています。
 AI エージェントは、本書に個別手順や一時的な作業メモを追記しないでください。
-業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../.aidiy/knowledge/_index.md` を入口にします。
+業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../_AIDIY/knowledge/_index.md` を入口にします。
 
 ## HowTo 参照先
 
 | 目的 | 参照先 |
 |------|--------|
-| `aidiy_hermes` の起動、provider、CLI 確認 | [`../.aidiy/knowledge/command_hermes,backend_server,運用手順.md`](../.aidiy/knowledge/command_hermes,backend_server,運用手順.md) |
-| TUI、slash command、補完、spinner の調整 | [`../.aidiy/knowledge/command_hermes,TUI調整手順.md`](../.aidiy/knowledge/command_hermes,TUI調整手順.md) |
-| Code CLI として AiDiy に追加・調整する | [`../.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](../.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
-| Code CLI のプロンプト整形 | [`../.aidiy/knowledge/backend_server,CodeCLIプロンプト整形.md`](../.aidiy/knowledge/backend_server,CodeCLIプロンプト整形.md) |
-| CLI 出力の ANSI 制御コード対処 | [`../.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](../.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
-| Provider 一覧と選択ロジック | [`../.aidiy/knowledge/command_hermes,Provider一覧と選択ロジック.md`](../.aidiy/knowledge/command_hermes,Provider一覧と選択ロジック.md) |
-| Slash Command 一覧と追加手順 | [`../.aidiy/knowledge/command_hermes,Slash Command一覧.md`](../.aidiy/knowledge/command_hermes,Slash Command一覧.md) |
+| `aidiy_hermes` の起動、provider、CLI 確認 | [`../_AIDIY/knowledge/command_hermes,backend_server,運用手順.md`](../_AIDIY/knowledge/command_hermes,backend_server,運用手順.md) |
+| TUI、slash command、補完、spinner の調整 | [`../_AIDIY/knowledge/command_hermes,TUI調整手順.md`](../_AIDIY/knowledge/command_hermes,TUI調整手順.md) |
+| Code CLI として AiDiy に追加・調整する | [`../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
+| Code CLI のプロンプト整形 | [`../_AIDIY/knowledge/backend_server,CodeCLIプロンプト整形.md`](../_AIDIY/knowledge/backend_server,CodeCLIプロンプト整形.md) |
+| CLI 出力の ANSI 制御コード対処 | [`../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
+| Provider 一覧と選択ロジック | [`../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md) |
+| Slash Command 一覧と追加手順 | [`../_AIDIY/knowledge/command_hermes,Slash Command一覧.md`](../_AIDIY/knowledge/command_hermes,Slash Command一覧.md) |
 
 ## 概要
 
@@ -51,7 +51,7 @@ Windows ネイティブ実行では、`terminal` は Git Bash があれば使い
 
 `cli_main.py` の provider は API provider と CLI bridge の両方を扱います。31 の provider overlay と 50 以上のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。
 
-詳細な一覧と選択ロジックは `.aidiy/knowledge/command_hermes,Provider一覧と選択ロジック.md` を参照してください。
+詳細な一覧と選択ロジックは `_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md` を参照してください。
 
 ## ディレクトリ構成
 

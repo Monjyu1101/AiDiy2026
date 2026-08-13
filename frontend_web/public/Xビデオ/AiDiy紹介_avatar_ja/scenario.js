@@ -4,7 +4,7 @@ window.SCENARIO = {
   "title": "AiDiy - frontend_avatar 紹介",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "frontend_avatar/AGENTS.md と .aidiy/knowledge の関連ファイルから実装実態を抜粋して構成。"
+    "summary": "frontend_avatar/AGENTS.md と _AIDIY/knowledge の関連ファイルから実装実態を抜粋して構成。"
   },
   "target": {
     "language": "ja-JP",
@@ -259,7 +259,7 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": ".aidiy/knowledge/frontend_avatar,Electronウィンドウ管理.md",
+          "source": "_AIDIY/knowledge/frontend_avatar,Electronウィンドウ管理.md",
           "text": "全ウィンドウは transparent: true, frame: false, hasShadow: false の透過フレームレスウィンドウです。"
         }
       ],
@@ -337,11 +337,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": ".aidiy/knowledge/frontend_avatar,VRM_VRMA追加手順.md",
+          "source": "_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md",
           "text": "VRM は frontend_avatar/public/vrm/ に置く。VRMA は frontend_avatar/public/vrma/<フォルダ名>/ に置く。現行フォルダは サンプル / 標準。"
         },
         {
-          "source": ".aidiy/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md",
+          "source": "_AIDIY/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md",
           "text": "現行方針は単一クリップの THREE.LoopRepeat ではなく、finished イベントで次の VRMA を選択して再生する巡回方式。"
         }
       ],
@@ -419,7 +419,7 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": ".aidiy/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md",
+          "source": "_AIDIY/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md",
           "text": "表示選択候補は アバター / xneko(猫) / xeyes(目) / アナログ時計 / デジタル時計 / カレンダー / 無し など。"
         },
         {

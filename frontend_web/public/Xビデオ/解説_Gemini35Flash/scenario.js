@@ -408,11 +408,11 @@ window.SCENARIO = {
       "headline": "AiDiy の AIコア / Code AI に\ngemini-3.5-flash を組み込む",
       "lead": "設定ファイルを数行変えるだけで、Gemini 3.5 Flash をチャット・コード支援に活用できます。",
       "image": "images/scene_005.png",
-      "source_summary": "AiDiy では AIコア設定の CHAT_AI_NAME に gemini_chat（または gemini 系の _chat サフィックスのモデル）を、CODE_AI 系に gemini_cli を指定することで Gemini 3.5 Flash を利用できる。backend_server/_config/ 内の設定ファイルを更新するだけで切り替え可能。",
+      "source_summary": "AiDiy では AIコア設定の CHAT_AI_NAME に gemini_chat（または gemini 系の _chat サフィックスのモデル）を、CODE_AI 系に gemini_cli を指定することで Gemini 3.5 Flash を利用できる。_config/ 内の設定ファイルを更新するだけで切り替え可能。",
       "factual_bullets": [
         "AIコアの CHAT_AI_NAME: gemini 系モデルを指定（_chat サフィックス）",
         "CODE_AI1_NAME〜CODE_AI6_NAME: gemini_cli を指定",
-        "設定ファイル: backend_server/_config/AiDiy_key.json などを更新",
+        "設定ファイル: _config/AiDiy_key.json などを更新",
         "Google AI Studio / Vertex AI の API キーが必要",
         "gemini-3.5-flash は Flash レベルのレイテンシなので Code AI に最適"
       ],
@@ -422,7 +422,7 @@ window.SCENARIO = {
       ],
       "image_prompt": "Software integration diagram: AiDiy dashboard interface on the left with flowing data streams connecting to a glowing Gemini logo on the right. Green accent tones on dark background. Configuration file icons and API connection symbols between the two systems. Clean tech illustration style.",
       "source_documents": [
-        "AiDiy 実装コード backend_server/_config/",
+        "AiDiy 共通設定 _config/",
         "AiDiy AGENTS.md / CLAUDE.md"
       ],
       "chips": [

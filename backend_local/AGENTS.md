@@ -4,7 +4,7 @@
 
 このファイルは `backend_local` の構成、提供 API、実装入口を示す概要ドキュメントです。
 AI エージェントは、本書に個別手順や一時的な作業メモを追記しないでください。
-コアシステム機能調整は `../.aidiy/knowledge/_index.md` を入口にします。
+コアシステム機能調整は `../_AIDIY/knowledge/_index.md` を入口にします。
 
 ## 概要
 
@@ -85,13 +85,13 @@ cd backend_local && uv run python local_main.py
 
 ## 設定（AiDiy_key.json）
 
-設定は `backend_server/_config/AiDiy_key.json` から読み込む。**環境変数は使わない**。
+設定はプロジェクトルートの `_config/AiDiy_key.json` から読み込む。**環境変数は使わない**。
 値の優先順位は **AiDiy_key.json > 組み込みデフォルト**。
 `< ... >` 形式のプレースホルダ値は「未設定」として扱い、デフォルトにフォールバックする。
 
 | 設定 | AiDiy_key.json キー | 既定 |
 |------|---------------------|------|
-| 待受ポート | `LOCAL_BASE` | `8096` |
+| 待受ポート | `PORT_LOCAL` | `8096` |
 | モデル ID / ローカルパス | `CHAT_LOCAL_MODEL` | `google/gemma-4-E2B-it` |
 | HF トークン（読み取り） | `huggingface_key_read` | （なし） |
 | デバイス | `CHAT_LOCAL_DEVICE` | `auto` |
@@ -100,7 +100,7 @@ cd backend_local && uv run python local_main.py
 | モデル配置先 | `CHAT_LOCAL_MODELS_DIR` | `temp/models` |
 | オフライン強制 | `CHAT_LOCAL_OFFLINE` | `0` |
 
-`LOCAL_BASE` と `CHAT_LOCAL_MODEL` は `conf_json.DEFAULT_CONFIG` に登録済みのため、
+`PORT_LOCAL` と `CHAT_LOCAL_MODEL` は `conf_json.DEFAULT_CONFIG` に登録済みのため、
 AiDiy_key.json に無くても起動時に補完される。その他の `CHAT_LOCAL_*` は任意キー
 （無ければ上表の既定値を使用。チューニングしたいときだけ追加する）。
 

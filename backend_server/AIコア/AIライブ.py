@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 USER_VOICE_INTERRUPT_SECONDS = 1.0  # ユーザー音声が1.0秒以上経過でAI音声出力
 
 _LIVE_CONTEXT_JSON_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config", "AiDiy_live__context.json")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_config", "AiDiy_live__context.json")
 )
 
 _LIVE_CONTEXT_TEMPLATE_LINES = [

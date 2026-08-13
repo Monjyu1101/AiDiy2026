@@ -75,7 +75,7 @@ git --version</code></pre>
  <strong>補足: SQLiteについて</strong>
  <p>
  本プロジェクトではSQLiteを使用しますが、SQLiteはPythonに<strong>標準で組み込まれている</strong>ため、
- 別途インストールする必要はありません。データベースファイルは <code>backend_server\_data\AiDiy\database.db</code> に自動生成されます。
+ 別途インストールする必要はありません。データベースファイルは <code>_data\AiDiy\database.db</code> に自動生成されます。
  </p>
  </div>
  </section>
@@ -98,7 +98,7 @@ python _setup.py</code></pre>
  <li><strong>バックエンド(local)</strong> — <code>backend_local</code> の <code>uv sync --upgrade</code>（ローカルLLMサーバー、任意でモデル事前ダウンロード）</li>
  <li><strong>バックエンド(tools)</strong> — <code>backend_tools</code> の <code>uv sync --upgrade</code> とMCP設定ファイルの書き込み（Claude / Gemini向け）</li>
  <li><strong>バックエンド(core,apps)</strong> — <code>backend_server</code> の <code>uv sync --upgrade</code></li>
- <li><strong>バックエンド(task)</strong> — <code>backend_task</code> の <code>uv sync --upgrade</code></li>
+ <li><strong>バックエンド(task,team)</strong> — <code>backend_taskteam</code> の <code>uv sync --upgrade</code></li>
  <li><strong>フロントエンド(Web)</strong> — <code>frontend_web</code> の <code>npm install</code></li>
  <li><strong>フロントエンド(Avatar)</strong> — <code>frontend_avatar</code> の <code>npm install</code>（必要に応じてElectronバイナリの補完）</li>
  <li><strong>コマンド(hermes)</strong> — <code>command_hermes</code> の <code>.venv</code> 作成 / <code>uv sync --upgrade</code> / <code>aidiy_hermes</code> 登録試行</li>
@@ -121,7 +121,7 @@ python _setup.py</code></pre>
  <strong>セットアップ時の注意</strong>
  <ul>
  <li>インターネット接続が必要です（パッケージダウンロードのため）</li>
- <li>SQLiteデータベースは <code>backend_server\_data\AiDiy\database.db</code> に作成されます</li>
+ <li>SQLiteデータベースは <code>_data\AiDiy\database.db</code> に作成されます</li>
  </ul>
  </div>
 
@@ -141,7 +141,7 @@ npm config set proxy http://n.n.n.n:nnnn</code></pre>
  <div>
  <strong>設定ファイルの場所</strong>
  <p>
- <code>backend_server/_config/AiDiy_key.json</code> にAPIキーを保存します。<br>
+ <code>_config/AiDiy_key.json</code> にAPIキーを保存します。<br>
  このフォルダは<strong>公開リポジトリに含めない</strong>方針のため、<code>.gitignore</code> で除外されています。
  </p>
  </div>
@@ -166,8 +166,8 @@ python _start.py</code></pre>
  <ul>
  <li>バックエンド(local) を起動するか（既定: No、ポート8096、ローカルLLM）</li>
  <li>バックエンド(tools) を起動するか（既定: Yes、ポート8095、MCPサーバー群）</li>
- <li>バックエンド(core,apps) を起動するか（既定: Yes、ポート8091/9098）</li>
- <li>バックエンド(task) を起動するか（既定: Yes、ポート8093）</li>
+ <li>バックエンド(core,apps) を起動するか（既定: Yes、ポート8091/8098）</li>
+ <li>バックエンド(task,team) を起動するか（既定: Yes、ポート8093）</li>
  <li>フロントエンド(Web) を起動するか（既定: Yes、ポート8090）</li>
  <li>フロントエンド(Avatar) を起動するか（既定: No、ポート8092）</li>
  </ul>
@@ -176,7 +176,7 @@ python _start.py</code></pre>
  <div>
  <strong>_start.py の動作詳細</strong>
  <ul>
- <li>選択したサービスのポート（8090/8091/9098/8092/8093/8096/8095）を使用中のプロセスを自動で停止</li>
+ <li>選択したサービスのポート（8090/8091/8098/8092/8093/8096/8095）を使用中のプロセスを自動で停止</li>
  <li>Web は <code>http://127.0.0.1:8090</code>、Avatar は <code>http://127.0.0.1:8092</code> を自動で開く</li>
  <li>サーバーがクラッシュした場合、15秒後に自動再起動</li>
  <li>Ctrl+C で全サーバーを一括停止</li>
@@ -188,15 +188,15 @@ python _start.py</code></pre>
  <p>選択したサービスに応じて、以下のようなメッセージが表示されれば正常に起動しています。</p>
  <pre><code>バックエンド(tools) Swagger UI : http://127.0.0.1:8095/docs
 バックエンド(core): http://127.0.0.1:8091/docs
-バックエンド(apps): http://127.0.0.1:9098/docs
-バックエンド(task): http://127.0.0.1:8093/docs
+バックエンド(apps): http://127.0.0.1:8098/docs
+バックエンド(task,team): http://127.0.0.1:8093/docs
 フロントエンド(Web): http://127.0.0.1:8090/
 フロントエンド(Avatar): renderer http://127.0.0.1:8092</code></pre>
  </div>
 
  <div>
  <strong>ポートが使用中の場合</strong>
- <p>選択したサービスのポート（8090/8091/9098/8092/8093/8096/8095）が既に使用されている場合はエラーになります。<br>
+ <p>選択したサービスのポート（8090/8091/8098/8092/8093/8096/8095）が既に使用されている場合はエラーになります。<br>
  その場合は <code>python.exe</code> や <code>node.exe</code> のプロセスを終了してから再起動してください。</p>
  </div>
  </section>
@@ -211,15 +211,15 @@ python _start.py</code></pre>
 
  <h3>Apps サーバー</h3>
  <pre><code>cd workspace/AiDiy2026/backend_server
-.venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098</code></pre>
+.venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8098</code></pre>
 
  <h3>MCP サーバー (backend_tools)</h3>
  <pre><code>cd workspace/AiDiy2026/backend_tools
 .venv\Scripts\python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095</code></pre>
 
- <h3>AIタスク サーバー (backend_task)</h3>
- <pre><code>cd workspace/AiDiy2026/backend_task
-.venv\Scripts\python.exe -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093</code></pre>
+ <h3>AIタスク・AIチーム統合サーバー (backend_taskteam)</h3>
+ <pre><code>cd workspace/AiDiy2026/backend_taskteam
+.venv\Scripts\python.exe -m uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093</code></pre>
 
  <h3>ローカルLLM サーバー (backend_local、必要時のみ)</h3>
  <pre><code>cd workspace/AiDiy2026/backend_local
@@ -262,7 +262,7 @@ python _start.py
 バックエンド(local)     起動しますか? y/[n]
 バックエンド(tools)     起動しますか? [y]/n
 バックエンド(core,apps) 起動しますか? [y]/n
-バックエンド(task)      起動しますか? [y]/n
+バックエンド(task,team) 起動しますか? [y]/n
 フロントエンド(Web)     起動しますか? [y]/n
 フロントエンド(Avatar)  起動しますか? y/[n]</code></pre>
 
@@ -316,7 +316,7 @@ python _start.py
  <p>以下のURLからSwagger UIでAPIの動作を確認できます。</p>
  <ul>
  <li><strong>Core API</strong>: <a href="http://127.0.0.1:8091/docs" target="_blank">http://127.0.0.1:8091/docs</a> (C系・A系のAPI)</li>
- <li><strong>Apps API</strong>: <a href="http://127.0.0.1:9098/docs" target="_blank">http://127.0.0.1:9098/docs</a> (M系・T系・V系・S系のAPI)</li>
+ <li><strong>Apps API</strong>: <a href="http://127.0.0.1:8098/docs" target="_blank">http://127.0.0.1:8098/docs</a> (M系・T系・V系・S系のAPI)</li>
  </ul>
  </section>
 
@@ -330,7 +330,7 @@ python _start.py
   <ul>
   <li>127.0.0.1:8090 が表示される</li>
   <li>127.0.0.1:8091/docs が表示される</li>
-  <li>127.0.0.1:9098/docs が表示される</li>
+  <li>127.0.0.1:8098/docs が表示される</li>
   <li>admin でログインに成功する</li>
   <li>/core/サーバー状態 が応答を返す</li>
   </ul>
@@ -348,7 +348,7 @@ python _start.py
  </thead>
  <tbody>
  <tr>
- <td><strong>ポート8090/8091/9098が使用中</strong></td>
+ <td><strong>ポート8090/8091/8098が使用中</strong></td>
  <td>
  既存のプロセスを終了してから再起動してください。<br>
  <code>taskkill /F /IM python.exe</code><br>
@@ -373,7 +373,7 @@ python _start.py
  <td><strong>データベースエラー</strong></td>
  <td>
  データベースを削除して再作成してください。<br>
- <code>del backend_server\_data\AiDiy\database.db</code><br>
+ <code>del _data\AiDiy\database.db</code><br>
  その後 <code>python _start.py</code> で再起動
  </td>
  </tr>

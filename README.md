@@ -11,8 +11,7 @@
 - [command_hermes/AGENTS.md](./command_hermes/AGENTS.md)
 - [backend_tools/AGENTS.md](./backend_tools/AGENTS.md)
 - [backend_local/AGENTS.md](./backend_local/AGENTS.md)
-- [backend_task/AGENTS.md](./backend_task/AGENTS.md)
-- [backend_team/AGENTS.md](./backend_team/AGENTS.md)
+- [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
 - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 - [docs/](./docs/)
@@ -27,17 +26,15 @@
 - Command Hermes: `command_hermes` / `aidiy_hermes`（コード支援用 CLI 基盤、常駐サーバーではない）
 - バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**19 サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）
 - バックエンド Local: `backend_local`（ポート 8096、OpenAI 互換の Gemma ローカル推論サーバー）
-- バックエンド Task: `backend_task`（ポート 8093、AIタスク実行 + 定期タスク FastAPI）
-- バックエンド Team: `backend_team`（ポート 8094、複数AIエージェントのチーム活動 FastAPI）
+- バックエンド TaskTeam: `backend_taskteam`（ポート 8093、AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
-- 常駐バックエンドは **6 サーバー構成**
+- 常駐バックエンドは **5 サーバー構成**
   - `core_main.py` : `8091`
-  - `apps_main.py` : `9098`
+  - `apps_main.py` : `8098`
   - `tools_main.py` : `8095`
   - `local_main.py` : `8096`（`_start.py` のデフォルトは起動しない）
-  - `task_main.py` : `8093`
-  - `team_main.py` : `8094`
+  - `taskteam_main.py` : `8093`（`/task/*` と `/team/*`）
 - 補助 CLI として `command_hermes` を統合
   - `aidiy_hermes` : on-demand 実行のコードエージェント CLI
 - Web フロントは `8090`
@@ -46,8 +43,8 @@
 ### 主な特徴
 
 - **マルチ Code CLI 対応** — `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `antigravity_cli` / `opencode_cli` / `aidiy_hermes` を切り替えて、`code1`〜`code6` の6コードパネルで同時並走
-- **AIタスク自動実行** — 要求を登録すると AI が明細タスクへ分解し、`backend_task` が Code CLI で実行。カンバン方式でも垂直の流れ作業だけでもなく、先行SEQ（複数指定可）で水平の並行分岐を含む**自由なタスクフロー**を定義でき、**クリティカルパス**基準のフロー図で可視化・実行（Web / Avatar の AIタスク画面から操作）
-- **自己改善機構** — コードエージェントが修正完了後に `.aidiy/knowledge/` へ知見を自動整理し、使うほど修正精度が上がる
+- **AIタスク自動実行** — 要求を登録すると AI が明細タスクへ分解し、`backend_taskteam` が Code CLI で実行。カンバン方式でも垂直の流れ作業だけでもなく、先行SEQ（複数指定可）で水平の並行分岐を含む**自由なタスクフロー**を定義でき、**クリティカルパス**基準のフロー図で可視化・実行（Web / Avatar の AIタスク画面から操作）
+- **自己改善機構** — コードエージェントが修正完了後に `_AIDIY/knowledge/` へ知見を自動整理し、使うほど修正精度が上がる
 - **日本語ネイティブ** — テーブル名・API・コンポーネント名まで日本語で統一
 - **AI 音声対話コーディング** — Avatar に話しかけながらコードを書き進められる
 
@@ -87,10 +84,9 @@ python _setup.py
 2. `backend_local` の `uv sync --upgrade`
 3. `backend_tools` の `uv sync --upgrade`、必要に応じて MCP 設定ファイル書き込み（Claude / Gemini 向け）
 4. `backend_server` の `uv sync --upgrade`
-5. `backend_task` の `uv sync --upgrade`
-6. `backend_team` の `uv sync --upgrade`
-7. `frontend_web` の `npm install`
-8. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
+5. `backend_taskteam` の `uv sync --upgrade`
+6. `frontend_web` の `npm install`
+7. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
 8. `command_hermes` の `.venv` 作成 / `uv sync --upgrade` / `aidiy_hermes` 登録試行
 
 補足:
@@ -98,7 +94,7 @@ python _setup.py
 - DB は SQLite です。
 - Alembic は使いません。
 - PostgreSQL 関連処理は現在の通常運用では使いません。
-- API キー設定ファイル `backend_server/_config/AiDiy_key.json` は初回起動時にひな形が生成されます。
+- API キー設定ファイル `_config/AiDiy_key.json` は初回起動時にひな形が生成されます。
 
 ---
 
@@ -115,7 +111,7 @@ python _start.py
 - バックエンド(local) を起動するか（デフォルト No）
 - tools を起動するか
 - バックエンド(core, apps) を起動するか
-- バックエンド(task) を起動するか
+- バックエンド(task,team) を起動するか
 - フロントエンド(Web) を起動するか
 - フロントエンド(Avatar) を起動するか
 
@@ -140,15 +136,11 @@ cd backend_server
 
 # バックエンド Apps
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 9098
+.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8098
 
-# バックエンド Task
-cd backend_task
-.venv/Scripts/python.exe -m uvicorn task_main:app --reload --host 0.0.0.0 --port 8093
-
-# バックエンド Team
-cd backend_team
-.venv/Scripts/python.exe -m uvicorn team_main:app --reload --host 0.0.0.0 --port 8094
+# バックエンド TaskTeam
+cd backend_taskteam
+.venv/Scripts/python.exe -m uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093
 
 # Command Hermes（対話 CLI）
 cd command_hermes
@@ -172,10 +164,9 @@ npm run dev
 |---|---|
 | Web フロント | http://127.0.0.1:8090 |
 | Core API Docs | http://127.0.0.1:8091/docs |
-| Apps API Docs | http://127.0.0.1:9098/docs |
+| Apps API Docs | http://127.0.0.1:8098/docs |
 | Backend Local Docs | http://127.0.0.1:8096/docs |
-| Backend Task Docs | http://127.0.0.1:8093/docs |
-| Backend Team Docs | http://127.0.0.1:8094/docs |
+| Backend TaskTeam Docs | http://127.0.0.1:8093/docs |
 | Backend MCP 一覧 | http://127.0.0.1:8095/ |
 | Backend MCP ツール一覧 | http://127.0.0.1:8095/{mcp_name}/list |
 | Backend MCP SSE 接続 | http://127.0.0.1:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
@@ -213,9 +204,8 @@ MCP は 19 サーバー（`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `a
 ```powershell
 netstat -ano | findstr :8090
 netstat -ano | findstr :8091
-netstat -ano | findstr :9098
+netstat -ano | findstr :8098
 netstat -ano | findstr :8093
-netstat -ano | findstr :8094
 netstat -ano | findstr :8096
 netstat -ano | findstr :8095
 netstat -ano | findstr :8092
@@ -226,6 +216,7 @@ taskkill /PID <pid> /F
 
 - `_start.py` を再実行すると、対象ポートの既存プロセスは起動前に自動整理されます。
 - バックエンドのみ再読込したい場合は `backend_server/temp/reboot_core.txt` または `backend_server/temp/reboot_apps.txt` を作成します。
+- TaskTeam のみ再読込したい場合は `backend_taskteam/temp/reboot_taskteam.txt` を作成します。
 - `command_hermes` はポート待受しない CLI のため、必要なら `Ctrl+C` でその場のプロセスだけ停止します。
 
 ---
@@ -249,6 +240,7 @@ python _cleanup.py
 - 必要に応じて SQLite DB
 
 `_cleanup.py` は `command_hermes` についても `.venv` / `venv` と Python キャッシュの削除対象を確認します。
+常駐サービスを選択した場合は、対応する待受プロセス（Avatar は残留 Electron も含む）をファイル削除前に自動停止します。ルート `_start.py` の監視中でも選択対象は自動再起動から外れ、選択していないサービスは停止しません。
 
 クリーンアップ後は再度 `python _setup.py` が必要です。
 
@@ -262,7 +254,7 @@ python _cleanup.py
 - `command_hermes` は `_start.py` では起動しません。`python _setup.py` で導入し、`aidiy_hermes` または `command_hermes\cli_main.py` を必要時に実行します。
 - Web フロントの AI 画面ルートは **`/AiDiy`** です。
 - Avatar は Electron と Web の両モードがあります。Web モードでは認証情報を `sessionStorage` に保持します。
-- DB ファイルは通常 `backend_server/_data/AiDiy/database.db` にあります。
+- DB ファイルは通常 `_data/AiDiy/database.db` にあります。
 
 ---
 
@@ -273,8 +265,7 @@ python _cleanup.py
 3. [command_hermes/AGENTS.md](./command_hermes/AGENTS.md)
 4. [backend_tools/AGENTS.md](./backend_tools/AGENTS.md)
 5. [backend_local/AGENTS.md](./backend_local/AGENTS.md)
-6. [backend_task/AGENTS.md](./backend_task/AGENTS.md)
-7. [backend_team/AGENTS.md](./backend_team/AGENTS.md)
-8. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
-9. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
+6. [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
+7. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
+8. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 9. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

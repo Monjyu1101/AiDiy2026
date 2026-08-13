@@ -157,9 +157,9 @@ class conf_models:
         self._sync_local_model_configs()
 
     def _config_dir_path(self) -> str:
-        """backend_server/_config ディレクトリを返す"""
+        """プロジェクトルートの _config ディレクトリを返す"""
         return os.path.normpath(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config")
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_config")
         )
 
     def _config_file_path(self, filename: str) -> str:

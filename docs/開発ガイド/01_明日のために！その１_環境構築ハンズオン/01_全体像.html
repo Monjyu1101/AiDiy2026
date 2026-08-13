@@ -31,16 +31,16 @@
    - DB種別が postgresql のときのみ追加処理
 
 2. python _start.py
-   - 8090 / 8091 / 9098 の既存プロセス確認と停止
+   - 8090 / 8091 / 8098 の既存プロセス確認と停止
    - core_main:app を 8091 で起動
-   - apps_main:app を 9098 で起動
+   - apps_main:app を 8098 で起動
    - vite を 8090 で起動
    - 出力監視、異常終了時は15秒後に再起動
 
 3. ブラウザで動作確認
    - Frontend: http://127.0.0.1:8090
    - Core API docs: http://127.0.0.1:8091/docs
-   - Apps API docs: http://127.0.0.1:9098/docs</code></pre>
+   - Apps API docs: http://127.0.0.1:8098/docs</code></pre>
 
   <h2>構成の見取り図</h2>
   <table>
@@ -70,8 +70,8 @@
   <h2>補足: 実際のルートスクリプトとの違い</h2>
   <p>
   現在のルート <code>_setup.py</code> / <code>_start.py</code> は、本ハンズオンの簡略サンプルに加えて
-  バックエンド(tools/local/task)と <code>command_hermes</code> のセットアップ・起動確認も行います
-  （MCPサーバー群 8095、ローカルLLM 8096、AIタスク 8093。詳細は
+  バックエンド(tools/local/task,team)と <code>command_hermes</code> のセットアップ・起動確認も行います
+  （MCPサーバー群 8095、ローカルLLM 8096、AIタスク・AIチーム 8093。詳細は
   <a href="../00_このプロジェクトの歩き方/02_技術スタックと構成.html">00_このプロジェクトの歩き方/02_技術スタックと構成</a> を参照）。<br>
   ここでは考え方を掴むため、まず core/apps/Web/Avatar だけの単純化した流れで理解します。
   </p>

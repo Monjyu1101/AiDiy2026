@@ -102,7 +102,7 @@ FastMCP.call_tool = _logged_call_tool
 # ------------------------------------------------------------------ #
 
 CHROME_PORT = int(os.environ.get("CHROME_DEBUG_PORT", "9222"))
-MCP_PORT    = int(os.environ.get("MCP_PORT", "8095"))
+PORT_TOOLS  = int(os.environ.get("PORT_TOOLS", os.environ.get("MCP_PORT", "8095")))
 MOUNT       = os.environ.get("MCP_MOUNT_PATH", "/aidiy_chrome_devtools")
 MOUNT_DC    = os.environ.get("MCP_DC_MOUNT_PATH", "/aidiy_desktop_capture")
 MOUNT_SQ    = os.environ.get("MCP_SQ_MOUNT_PATH", "/aidiy_sqlite")
@@ -203,7 +203,7 @@ def _make_mcp(name: str) -> FastMCP:
     return FastMCP(
         name,
         host="0.0.0.0",
-        port=MCP_PORT,
+        port=PORT_TOOLS,
         mount_path="/",
         sse_path="/sse",
         message_path="/messages/",
@@ -462,7 +462,7 @@ app.openapi = _build_custom_openapi
 # ------------------------------------------------------------------ #
 
 if __name__ == "__main__":
-    base = f"http://127.0.0.1:{MCP_PORT}"
+    base = f"http://127.0.0.1:{PORT_TOOLS}"
     logger.info(f"MCP Index            : {base}/")
     logger.info(f"--- initialize[POST] / list[GET] / ping[GET] / {{method}}[POST] ---")
     logger.info(f"Chrome               : {base}/aidiy_chrome_devtools/  SSE:{MOUNT}/sse")
@@ -486,4 +486,4 @@ if __name__ == "__main__":
     logger.info(f"TeamAgents           : {base}/aidiy_team_agents/  SSE:{MOUNT_TM}/sse")
     logger.info(f"WindowsControl       : {base}/aidiy_windows_control/  SSE:{MOUNT_WC}/sse")
     logger.info(f"ChatCompletions      : {base}/aidiy_chat_completions/v1/chat/completions [OpenAI/Ollama 互換]")
-    uvicorn.run(app, host="0.0.0.0", port=MCP_PORT, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=PORT_TOOLS, log_level="warning")

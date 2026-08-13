@@ -20,7 +20,7 @@
   <h2>コード全体（参照）</h2>
   <p>
   次のコードブロックは、理解しやすいよう <strong>core/apps・Web・Avatarのセットアップだけに絞った簡略版</strong>（<code>code_samples/_setup.py</code>）を読み込んで表示しています。<br>
-  実際のルート <code>_setup.py</code> はこれに加えて、バックエンド(tools/local/task)と <code>command_hermes</code> のセットアップも行います（対象は8項目）。処理の考え方（対話形式で項目ごとに実行可否を確認する）は共通です。
+  実際のルート <code>_setup.py</code> はこれに加えて、バックエンド(tools/local/task,team)と <code>command_hermes</code> のセットアップも行います（対象は8項目）。処理の考え方（対話形式で項目ごとに実行可否を確認する）は共通です。
   </p>
   <pre data-src="code_samples/_setup.py"><code>読み込み中...</code></pre>
 
@@ -66,7 +66,7 @@
     <li>初期 SQL 復元</li>
     <li><code>alembic upgrade head</code></li>
   </ul>
-  <p>SQLite ファイルの実体は <code>workspace/AiDiy2026/backend_server/_data/AiDiy/database.db</code> です。</p>
+  <p>SQLite ファイルの実体は <code>workspace/AiDiy2026/_data/AiDiy/database.db</code> です。</p>
 
   <h2>重要ポイント3: 対話形式と失敗時の継続</h2>
   <table>
@@ -98,4 +98,3 @@ python _start.py</code></pre>
   </nav>
 </body>
 </html>
-

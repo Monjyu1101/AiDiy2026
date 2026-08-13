@@ -14,7 +14,7 @@
 モデルは起動時にはロードせず、利用時（最初のリクエスト）に遅延ロードされます。
 
 公開 API:
-    PORT
+    PORT_LOCAL
     check_environment() -> (bool, str)
     start() -> subprocess.Popen
     kill_ports()
@@ -70,7 +70,7 @@ def print_info(message: str) -> None:
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_LOCAL_DIR = THIS_DIR
-PORT = 8096
+PORT_LOCAL = 8096
 APP = "local_main:app"
 ENV_CANDIDATES = [".venv", "venv"]
 
@@ -93,8 +93,8 @@ def check_command_exists(command: str) -> bool:
 def get_command() -> list[str]:
     python_path = find_python_in_env(BACKEND_LOCAL_DIR, ENV_CANDIDATES)
     if python_path is not None:
-        return [str(python_path), "-m", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT)]
-    return ["uv", "run", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT)]
+        return [str(python_path), "-m", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_LOCAL)]
+    return ["uv", "run", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_LOCAL)]
 
 
 def check_environment() -> tuple[bool, str]:
@@ -220,7 +220,7 @@ def kill_process_on_port(port: int) -> bool:
 
 
 def kill_ports() -> None:
-    kill_process_on_port(PORT)
+    kill_process_on_port(PORT_LOCAL)
 
 
 # ============================================================
@@ -279,8 +279,8 @@ def main() -> None:
 
     process = start()
     threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name}: http://127.0.0.1:{PORT}/docs")
-    print_info(f"  OpenAI互換 (利用時にモデルロード): http://127.0.0.1:{PORT}/v1/chat/completions")
+    print_success(f"{name}: http://127.0.0.1:{PORT_LOCAL}/docs")
+    print_info(f"  OpenAI互換 (利用時にモデルロード): http://127.0.0.1:{PORT_LOCAL}/v1/chat/completions")
     print_info("Ctrl+C で停止します")
     try:
         while True:

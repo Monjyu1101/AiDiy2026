@@ -1138,7 +1138,7 @@
         </div>
         <div class="hero-tags">
             <span>日本語テーブル名 / API / JSON / 画面</span>
-            <span>FastAPI 8091 + 9098</span>
+            <span>FastAPI 8091 + 8098</span>
             <span>Vue 3 + Vite + TypeScript</span>
             <span>Electron + VRM + 音声AI</span>
             <span>🧠 自己改善機構 — 使うほど育つ</span>
@@ -1167,7 +1167,7 @@
                 <span class="feature-icon">🖥️</span>
                 <h3 class="feature-title">マルチサーバー構成</h3>
                 <p class="feature-description">
-                    core 8091 / apps 9098 / mcp 8095 /<br>
+                    core 8091 / apps 8098 / mcp 8095 /<br>
                     local 8096 / task 8093 の 5 サーバーを分離。<br>
                     AI 系・業務系・自己検証系を Vite Proxy で透過的にまとめます。
                 </p>
@@ -1194,7 +1194,7 @@
                 <span class="feature-icon">🧠</span>
                 <h3 class="feature-title">自己改善機構</h3>
                 <p class="feature-description">
-                    修正完了後に <code style="color:#00ffff">.aidiy/knowledge/</code> へ<br>
+                    修正完了後に <code style="color:#00ffff">_AIDIY/knowledge/</code> へ<br>
                     知見を自動整理。次回の同種修正で再利用し、<br>
                     <strong>使うほどに育つ</strong>テンプレート。
                 </p>
@@ -1228,7 +1228,7 @@
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="5">0</span>
                 <span class="stat-label">常駐サーバー</span>
-                <span class="stat-sub">core 8091 / apps 9098 / tools 8095 / local 8096 / task 8093</span>
+                <span class="stat-sub">core 8091 / apps 8098 / tools 8095 / local 8096 / task 8093</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="3">0</span>
@@ -1348,7 +1348,7 @@ Key:   利用者名</pre>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🗄️ backend_server</h3>
                 <p>FastAPI + SQLAlchemy + SQLite。POST 中心 API、統一レスポンス形式、C採番、監査フィールド、Reboot 機構を標準装備。Alembic 不使用。</p>
-                <div class="meta-tags"><span>core_main.py:8091</span><span>apps_main.py:9098</span><span>No Alembic</span></div>
+                <div class="meta-tags"><span>core_main.py:8091</span><span>apps_main.py:8098</span><span>No Alembic</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔌 MCP サーバー (統合)</h3>
@@ -1356,9 +1356,9 @@ Key:   利用者名</pre>
                 <div class="meta-tags"><span>tools_main.py:8095</span><span>SSE × 19</span><span>HTTP POST</span><span>stdio gateway</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">🤖 backend_task (AIタスク)<span class="fx-new-badge">NEW</span></h3>
-                <p>タスク要求を登録すると AI が明細タスクへ自動分解し、Code CLI（TASK_AI_NAME）で実行。カンバン方式でも垂直の流れ作業だけでもなく、先行SEQ（複数指定可）で水平の並行分岐を含む自由なタスクフローを定義。依存が満たされた明細から自動実行し、クリティカルパス基準のフロー図で進行を可視化。5 秒間隔の監視ループ、実行回数上限つき。Web / Avatar の AIタスク画面（要求一覧・フロー図・明細一覧）から操作。</p>
-                <div class="meta-tags"><span>task_main.py:8093</span><span>自由なタスクフロー</span><span>クリティカルパス実行</span><span>Code CLI 実行</span></div>
+                <h3 class="architecture-title">🤖 backend_taskteam (AIタスク・AIチーム)<span class="fx-new-badge">NEW</span></h3>
+                <p>AIタスク要求の自動分解・Code CLI 実行と、複数AIエージェントのチーム活動を同一サーバーで管理。タスクは先行SEQ（複数指定可）で水平の並行分岐を含む自由なフローを定義し、依存が満たされた明細から自動実行する。Web / Avatar の AIタスク画面と AIチーム画面から操作。</p>
+                <div class="meta-tags"><span>taskteam_main.py:8093</span><span>/task + /team</span><span>クリティカルパス実行</span><span>Code CLI 実行</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🧠 backend_local (ローカル LLM)</h3>
@@ -1570,18 +1570,18 @@ Key:   利用者名</pre>
     <!-- 6. 自己改善機構 -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🧠 自己改善機構 — 実装詳細</h2>
-        <p class="section-subtitle animate-on-scroll">使うほど育つ .aidiy/knowledge/ 知見システム。</p>
+        <p class="section-subtitle animate-on-scroll">使うほど育つ _AIDIY/knowledge/ 知見システム。</p>
         <div class="advanced-grid">
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🧠</span>
-                <h3 class="feature-title">.aidiy/knowledge/ 知見フォルダ</h3>
+                <h3 class="feature-title">_AIDIY/knowledge/ 知見フォルダ</h3>
                 <p class="feature-description">
                     コードエージェントは修正が完了するたびに、<br>
-                    プロジェクト専用の <code style="color:#00ffff">.aidiy/knowledge/</code> フォルダへ<br>
+                    プロジェクト専用の <code style="color:#00ffff">_AIDIY/knowledge/</code> フォルダへ<br>
                     知見を自動整理します。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
-                    次回の同種修正では <code>.aidiy/knowledge/_index.md</code> を参照し、<br>
+                    次回の同種修正では <code>_AIDIY/knowledge/_index.md</code> を参照し、<br>
                     過去の成功パターンを再利用して精度を高めます。<br>
                     <strong>使うほどに、システム自体が育ちます。</strong>
                 </div>
@@ -1597,7 +1597,7 @@ Key:   利用者名</pre>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     単なる作業ログではなく<br>
                     「次回の修正判断に使える情報」を残します。<br>
-                    <strong>仕様はソースへ、知見は .aidiy/knowledge へ。</strong>
+                    <strong>仕様はソースへ、知見は _AIDIY/knowledge へ。</strong>
                 </div>
             </div>
         </div>
@@ -1690,12 +1690,12 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🤖 aidiy_task_agents<span class="fx-new-badge">NEW</span></h3>
-                <p>backend_task の AIタスク要求へ非同期でタスクを投入。登録のみを行いタスク分解や実行完了は待たず、進捗は別ツールで確認する非ブロッキング設計。AI エージェントから AIタスク自動実行を起動する入口。</p>
+                <p>backend_taskteam の AIタスク要求へ非同期でタスクを投入。登録のみを行いタスク分解や実行完了は待たず、進捗は別ツールで確認する非ブロッキング設計。AI エージェントから AIタスク自動実行を起動する入口。</p>
                 <div class="meta-tags"><span>submit</span><span>get_request_status</span><span>非同期投入</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">👥 aidiy_team_agents<span class="fx-new-badge">NEW</span></h3>
-                <p>backend_team の Aチーム依頼へ非同期で依頼を投入。依頼IDは TR+8桁で自動採番され、登録後は backend_team の監視ループが AIタスク要求へ引き継ぐ。プロジェクトや AI 設定は未指定なら更新最終レコード → 規定値で補完。</p>
+                <p>backend_taskteam の Aチーム依頼へ非同期で依頼を投入。依頼IDは TR+8桁で自動採番され、登録後は同サーバーの監視ループが AIタスク要求へ引き継ぐ。プロジェクトや AI 設定は未指定なら更新最終レコード → 規定値で補完。</p>
                 <div class="meta-tags"><span>submit</span><span>get_work_status</span><span>要員ID</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
@@ -1744,7 +1744,7 @@ Key:   利用者名</pre>
         <div class="expansion-grid">
             <div class="expansion-item animate-on-scroll">
                 <h4>🌱 蓄積で育つ</h4>
-                <p>.aidiy/knowledge/ の知見が積み上がるほど、修正の初手精度が上がる。</p>
+                <p>_AIDIY/knowledge/ の知見が積み上がるほど、修正の初手精度が上がる。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🔌 MCP 拡張</h4>

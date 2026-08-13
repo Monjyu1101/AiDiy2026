@@ -16,7 +16,7 @@ except ImportError:
     sys.exit(1)
 
 # APIキー取得
-KEY_PATH = Path(__file__).resolve().parent.parent.parent.parent / "backend_server/_config/AiDiy_key.json"
+KEY_PATH = Path(__file__).resolve().parents[3] / "_config" / "AiDiy_key.json"
 with open(KEY_PATH) as f:
     keys = json.load(f)
 api_key = keys.get("openai_key_id", "")
@@ -67,7 +67,7 @@ TASKS = [
         "size": "1024x1536",
         "prompt": (
             "Vertical 2:3 architecture poster for AiDiy multi-server and multi-CLI system. "
-            "Three resident server blocks: core 8091, apps 9098, mcp 8095, all feeding one AI core panel. "
+            "Three resident server blocks: core 8091, apps 8098, mcp 8095, all feeding one AI core panel. "
             "From the AI core panel, branch out seven code lanes labeled: Claude CLI, Copilot CLI, Codex CLI, "
             "Antigravity CLI, OpenCode CLI, claude_sdk, aidiy_hermes. "
             "Highlight aidiy_hermes as a distinct Python subprocess engine. "

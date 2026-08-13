@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-// AIタスク画面: 要求 / フロー図 / 明細 の 3 パネル構成（API は backend_task が担当）
+// AIタスク画面: 要求 / フロー図 / 明細 の 3 パネル構成（API は backend_taskteam が担当）
 // frontend_web の AIタスク.vue と同等。認証は 利用者ID prop で受け取る。
 import { ref } from 'vue';
 import { taskClient } from '@/api/client';
@@ -47,7 +47,7 @@ async function タスク明細読込(タスクID: string) {
       void qMessage(res.data.message || 'タスク明細の取得に失敗しました。', 'error');
     }
   } catch (e) {
-    void qMessage('タスク明細の取得でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
+    void qMessage('タスク明細の取得でエラーが発生しました。backend_taskteam (8093) の起動を確認してください。', 'error');
   }
 }
 

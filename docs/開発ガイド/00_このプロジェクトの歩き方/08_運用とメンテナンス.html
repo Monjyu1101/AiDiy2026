@@ -32,7 +32,7 @@
  <pre><code><span># 1. サーバーを停止 (Ctrl+C 推奨)</span>
 
 <span># 2. データベースファイルを削除</span>
-del workspace/AiDiy2026/backend_server\_data\AiDiy\database.db
+del workspace/AiDiy2026/_data\AiDiy\database.db
 
 <span># 3. サーバーを再起動してDBを再作成</span>
 cd workspace/AiDiy2026
@@ -51,7 +51,7 @@ python _start.py</code></pre>
  <tbody>
  <tr>
  <td><strong>データベースファイル</strong></td>
- <td><code>backend_server\_data\AiDiy\database.db</code></td>
+ <td><code>_data\AiDiy\database.db</code></td>
  </tr>
  <tr>
  <td><strong>バックアップ命名規則</strong></td>
@@ -137,7 +137,7 @@ echo. > backend_server/temp/reboot_apps.txt</code></pre>
  <div>
  <div>ステップ2: データベースのリセット</div>
  <pre><code><span># DBファイルを削除</span>
-del workspace/AiDiy2026/backend_server\_data\AiDiy\database.db
+del workspace/AiDiy2026/_data\AiDiy\database.db
 
 <span># サーバー再起動でDBを再作成</span>
 cd workspace/AiDiy2026
@@ -148,10 +148,10 @@ python _start.py</code></pre>
  <div>ステップ3: ポート競合の解消</div>
  <pre><code><span># 1. サーバーを停止する</span>
 
-<span># 2. ポート 8090/8091/9098 の使用状況を確認</span>
+<span># 2. ポート 8090/8091/8098 の使用状況を確認</span>
 netstat -ano | findstr :8090
 netstat -ano | findstr :8091
-netstat -ano | findstr :9098
+netstat -ano | findstr :8098
 
 <span># 3. プロセスを強制終了</span>
 taskkill /F /IM python.exe
@@ -235,10 +235,10 @@ npm install</code></pre>
  <p>SQLiteはファイルコピーでバックアップできます。</p>
 
  <pre><code><span># バックアップの作成</span>
-copy workspace/AiDiy2026/backend_server\_data\AiDiy\database.db workspace/AiDiy2026/backup\database_20260214.db
+copy workspace/AiDiy2026/_data\AiDiy\database.db workspace/AiDiy2026/backup\database_20260214.db
 
 <span># バックアップからの復元</span>
-copy workspace/AiDiy2026/backup\database_20260214.db workspace/AiDiy2026/backend_server\_data\AiDiy\database.db</code></pre>
+copy workspace/AiDiy2026/backup\database_20260214.db workspace/AiDiy2026/_data\AiDiy\database.db</code></pre>
 
  <div>
  <strong>バックアップのポイント </strong>

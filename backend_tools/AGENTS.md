@@ -3,18 +3,18 @@
 ## 本書の目的
 
 このファイルは `backend_tools` の構成、提供 MCP、実装入口を示す概要ドキュメントです。
-起動、依存関係、SSE URL、環境変数、運用手順は `.aidiy/knowledge` に移動しています。
+起動、依存関係、SSE URL、環境変数、運用手順は `_AIDIY/knowledge` に移動しています。
 AI エージェントは、本書に個別手順や一時的な作業メモを追記しないでください。
-業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../.aidiy/knowledge/_index.md` を入口にします。
+業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../_AIDIY/knowledge/_index.md` を入口にします。
 
 ## HowTo 参照先
 
 | 目的 | 参照先 |
 |------|--------|
-| 起動、stdio bridge、環境変数、ログ | [`../.aidiy/knowledge/backend_tools,backend_server,運用手順.md`](../.aidiy/knowledge/backend_tools,backend_server,運用手順.md) |
-| MCP サーバー構成、新規 MCP 追加 | [`../.aidiy/knowledge/backend_tools,構成.md`](../.aidiy/knowledge/backend_tools,構成.md) |
-| MCP の使い分け、AI エージェントからの利用 | [`../.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md`](../.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md) |
-| Code CLI 側の MCP 設定 | [`../.aidiy/knowledge/command_hermes,backend_tools,CodeCLI_MCP設定.md`](../.aidiy/knowledge/command_hermes,backend_tools,CodeCLI_MCP設定.md) |
+| 起動、stdio bridge、環境変数、ログ | [`../_AIDIY/knowledge/backend_tools,backend_server,運用手順.md`](../_AIDIY/knowledge/backend_tools,backend_server,運用手順.md) |
+| MCP サーバー構成、新規 MCP 追加 | [`../_AIDIY/knowledge/backend_tools,構成.md`](../_AIDIY/knowledge/backend_tools,構成.md) |
+| MCP の使い分け、AI エージェントからの利用 | [`../_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md`](../_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md) |
+| Code CLI 側の MCP 設定 | [`../_AIDIY/knowledge/command_hermes,backend_tools,CodeCLI_MCP設定.md`](../_AIDIY/knowledge/command_hermes,backend_tools,CodeCLI_MCP設定.md) |
 
 ## 概要
 
@@ -42,8 +42,8 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `aidiy_notification_sounds` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは text_to_speech で読み上げ合成） |
 | `aidiy_code_agents` | AI コードエージェント実行（CodeAI CLI 経由） |
 | `aidiy_chat_llms` | AI チャット LLM 実行（AIチャット.py 系 ChatAI 経由 / `aidiy_code_agents` 互換 IF） |
-| `aidiy_task_agents` | backend_task API への AIタスク非同期投入。`submit`の`task_id`は通常省略し、外部IDを引き継ぐ場合だけ指定。`project_path` / `ai_name` / `ai_model` も通常省略（null）で、backend_task が更新最終レコードの値 → 規定値で補完 |
-| `aidiy_team_agents` | backend_team API への AIチーム依頼投入。`submit`は`Aチーム依頼`を準備開始で登録し、依頼IDはbackend_teamが自動採番。`project_path` / `team_ai_*` / `task_ai_*` は通常省略（null）で、backend_team が更新最終レコードの値 → 規定値で補完 |
+| `aidiy_task_agents` | backend_taskteam の `/task` API への AIタスク非同期投入。`submit`の`task_id`は通常省略し、外部IDを引き継ぐ場合だけ指定。`project_path` / `ai_name` / `ai_model` も通常省略（null）で、統合サーバーが更新最終レコードの値 → 規定値で補完 |
+| `aidiy_team_agents` | backend_taskteam の `/team` API への AIチーム依頼投入。`submit`は`Aチーム依頼`を準備開始で登録し、依頼IDは統合サーバーが自動採番。`project_path` / `team_ai_*` / `task_ai_*` は通常省略（null）で、統合サーバーが更新最終レコードの値 → 規定値で補完 |
 | `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
 `aidiy_chat_llms` は SSE / Streamable HTTP / stdio の 3 トランスポートに対応します。
@@ -61,10 +61,11 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 |------|------|
 | `tools_main.py` | FastAPI 上に 19 個の FastMCP を同居 |
 | `mcp_stdio.py` | stdio <-> SSE bridge |
-| `tests/` | MCP / HTTP API のテスト、動作確認スクリプト |
 | `aidiy_automations/` | MCP / HTTP API を組み合わせる自動化スクリプト |
-| `aidiy_automations/ビデオページ生成_紹介.py` | 一人アバター（AiDiy）による紹介・ガイド型ビデオ自動生成（version: "mcp"、short/long narration 形式） |
-| `aidiy_automations/ビデオページ生成_解説.py` | 二人アバター（男女）の掛け合いによる解説・ニュース型ビデオ自動生成（version: "duo-v2"、dialogue 形式） |
+| `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` | 一人アバター（AiDiy）による紹介・ガイド型ビデオ自動生成（version: "mcp"、short/long narration 形式） |
+| `aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` | 二人アバター（男女）の掛け合いによる解説・ニュース型ビデオ自動生成（version: "duo-v2"、dialogue 形式） |
+| `aidiy_automations/ビデオページ生成/ビデオページ生成_小説小話.py` | 小説・小話型ビデオ自動生成 |
+| `aidiy_automations/ビデオページ生成/ビデオページ生成_翻訳ja2xx.py` | 既存ビデオの多言語（ja → 他言語）展開 |
 | `tools_proc/chrome_manager.py` | Chrome プロセス管理 |
 | `tools_proc/chrome_sessions.py` | Chrome セッションレジストリ（session 名 → ポート・プロファイルの辞書管理、`temp/_chrome_sessions.json` に永続化） |
 | `tools_proc/chrome_devtools.py` | CDP client |
@@ -83,8 +84,8 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 | `tools_proc/code_agents.py` | CodeAI CLI ラッパー（コードエージェント実行） |
 | `tools_proc/chat_llm.py` | ChatAI ラッパー（チャット LLM 実行 / OpenAI 互換 completions） |
 | `tools_proc/tools_chat.py` | `aidiy_chat_llms` MCP 登録 + HTTP 2 系統ルート（独自 IF / OpenAI 互換 IF） |
-| `tools_proc/task_agents.py` / `tools_proc/tools_task_agents.py` | backend_task API への AIタスク投入 |
-| `tools_proc/team_agents.py` / `tools_proc/tools_team_agents.py` | backend_team API への AIチーム依頼投入 |
+| `tools_proc/task_agents.py` / `tools_proc/tools_task_agents.py` | backend_taskteam の `/task` API への AIタスク投入 |
+| `tools_proc/team_agents.py` / `tools_proc/tools_team_agents.py` | backend_taskteam の `/team` API への AIチーム依頼投入 |
 | `tools_proc/windows_control.py` / `tools_proc/tools_windows_control.py` | Windows デスクトップ操作制御（マウス/キーボード/ウィンドウ/プロセス/クリップボード/UI Automation） |
 
 ## アーキテクチャ
@@ -118,11 +119,10 @@ SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場�
 ## 実装時の入口
 
 - MCP を追加する場合は `tools_main.py` と `tools_proc/` を確認する。
-- MCP / HTTP API の検証コードは `tests/` に置く。
 - 複数 MCP を組み合わせる自動化処理は `aidiy_automations/` に置く。
-- `aidiy_automations/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成_解説.py` は `127.0.0.1:8095/aidiy_text_to_speech/synthesize` の `play=true` を使い、進行案内を挟みながら実行する。
-- 題材、生成先、テンプレート、開始ステップは `aidiy_automations/ビデオページ生成__設定.json`、`aidiy_automations/ビデオページ生成__状況.json`、CLI 引数で管理する。`__main__` に全体の流れを置き、詳細処理は `step_*` 関数へ分ける。
+- `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` は `127.0.0.1:8095/aidiy_text_to_speech/synthesize` の `play=true` を使い、進行案内を挟みながら実行する。
+- 題材、生成先、テンプレート、開始ステップは `aidiy_automations/ビデオページ生成/_ビデオページ生成_<種別>_設定.json`、`aidiy_automations/ビデオページ生成/_ビデオページ生成_<種別>_状況.json`、CLI 引数で管理する。`__main__` に全体の流れを置き、詳細処理は `step_*` 関数へ分ける。
 - 自動化ステップは `00` を初期確認、`01`〜`nn` を実行と検証、`99` を最終処理として並べる。
-- `aidiy_automations/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成_解説.py` は `01`〜`99` の各ステップ完了後に、Chrome DevTools CDP で `?auto=loop` のビデオ表示を再描写する。
-- SSE / stdio の接続問題は `mcp_stdio.py` と `.aidiy/knowledge/backend_tools,backend_server,運用手順.md` を確認する。
-- AIコード側の MCP 設定は `backend_server/_config/AiDiy_mcp.json` と `CodeCLI_MCP設定.md` を確認する。
+- `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` は `01`〜`99` の各ステップ完了後に、Chrome DevTools CDP で `?auto=loop` のビデオ表示を再描写する。
+- SSE / stdio の接続問題は `mcp_stdio.py` と `_AIDIY/knowledge/backend_tools,backend_server,運用手順.md` を確認する。
+- AIコード側の MCP 設定は `_config/AiDiy_mcp.json` と `CodeCLI_MCP設定.md` を確認する。

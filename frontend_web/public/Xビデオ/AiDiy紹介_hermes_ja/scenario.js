@@ -4,7 +4,7 @@ window.SCENARIO = {
   "title": "AiDiy Hermes - コードエージェント CLI 紹介",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "command_hermes/AGENTS.md と .aidiy/knowledge から実装実態を抜粋して構成。"
+    "summary": "command_hermes/AGENTS.md と _AIDIY/knowledge から実装実態を抜粋して構成。"
   },
   "target": {
     "language": "ja-JP",
@@ -264,7 +264,7 @@ window.SCENARIO = {
           "text": "31 の provider overlay と 50 以上のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。"
         },
         {
-          "source": ".aidiy/knowledge/command_hermes,Provider一覧と選択ロジック.md",
+          "source": "_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md",
           "text": "`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されています。"
         }
       ],
@@ -339,11 +339,11 @@ window.SCENARIO = {
       ],
       "evidence": [
         {
-          "source": ".aidiy/knowledge/command_hermes,Slash Command一覧.md",
+          "source": "_AIDIY/knowledge/command_hermes,Slash Command一覧.md",
           "text": "Session 23 コマンド、Configuration 13 コマンド、Tools & Skills 11 コマンド、Info 12 コマンド、Exit 1 コマンド。"
         },
         {
-          "source": ".aidiy/knowledge/command_hermes,Slash Command一覧.md",
+          "source": "_AIDIY/knowledge/command_hermes,Slash Command一覧.md",
           "text": "`COMMAND_REGISTRY` は `CommandDef` dataclass のリストです。正規名 + alias で検索します。"
         }
       ],

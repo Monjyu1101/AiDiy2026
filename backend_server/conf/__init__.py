@@ -11,7 +11,13 @@
 from .__main__ import Conf, _conf_class, conf
 from .conf_json import conf_json, ConfigJsonManager
 from .conf_model import conf_models
-from .conf_path import conf_path
+from .conf_path import (
+    DEFAULT_CONFIG_DIR,
+    DEFAULT_DATA_DIR,
+    DEFAULT_DATABASE_PATH,
+    DEFAULT_ICONS_DIR,
+    conf_path,
+)
 
 __all__ = [
     "Conf",
@@ -20,5 +26,9 @@ __all__ = [
     "conf_json",
     "ConfigJsonManager",
     "conf_models",
+    "DEFAULT_CONFIG_DIR",
+    "DEFAULT_DATA_DIR",
+    "DEFAULT_DATABASE_PATH",
+    "DEFAULT_ICONS_DIR",
     "conf_path",
 ]

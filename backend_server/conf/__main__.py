@@ -84,9 +84,6 @@ class Conf:
                 self.models.fetch_all_models()
             return True
 
-        except ValueError:
-            logger.error(f'無効な実行モード: {runMode}')
-            return False
         except Exception as e:
             logger.error(f'設定初期化エラー: {e}')
             return False

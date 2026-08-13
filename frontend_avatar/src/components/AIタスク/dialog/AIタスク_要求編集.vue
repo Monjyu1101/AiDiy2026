@@ -371,7 +371,7 @@ const 登録 = async () => {
       void qMessage(res.data.message || 'タスクの登録に失敗しました。', 'error');
     }
   } catch (e) {
-    void qMessage('タスクの登録でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
+    void qMessage('タスクの登録でエラーが発生しました。backend_taskteam (8093) の起動を確認してください。', 'error');
   } finally {
     登録中.value = false;
   }

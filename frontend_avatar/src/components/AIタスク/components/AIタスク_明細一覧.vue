@@ -132,7 +132,7 @@ const 実行有効切替 = async (row: Record<string, any>) => {
       void qMessage(res.data.message || '実行有効フラグの変更に失敗しました。', 'error');
     }
   } catch (e) {
-    void qMessage('実行有効フラグの変更でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
+    void qMessage('実行有効フラグの変更でエラーが発生しました。backend_taskteam (8093) の起動を確認してください。', 'error');
   }
 };
 

@@ -4,7 +4,7 @@ window.SCENARIO = {
   "title": "AiDiy backend_server - 4層構造と日本語ファースト設計",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "backend_server/AGENTS.md、.aidiy/knowledge の実装パターン・採番・監査フィールド・M系T系追加手順から実装実態を抜粋して構成。"
+    "summary": "backend_server/AGENTS.md、_AIDIY/knowledge の実装パターン・採番・監査フィールド・M系T系追加手順から実装実態を抜粋して構成。"
   },
   "target": {
     "language": "ja-JP",
@@ -52,13 +52,13 @@ window.SCENARIO = {
       "accent": "#29d8ff",
       "accent_soft": "rgba(41,216,255,0.18)",
       "kicker": "DUAL SERVER",
-      "headline": "core_main (8091) と apps_main (9098) が\n同じ SQLite DB を共有",
-      "lead": "Core は C系・A系・認証・AIコアを担当し、Apps は M系・T系・V系・S系を担当します。DB ファイルは `backend_server/_data/AiDiy/database.db` の1ファイルを両サーバーで共有します。",
-      "subtitle": "core_main:8091 と apps_main:9098 が同一 SQLite DB を共有する 2 サーバー構成。",
+      "headline": "core_main (8091) と apps_main (8098) が\n同じ SQLite DB を共有",
+      "lead": "Core は C系・A系・認証・AIコアを担当し、Apps は M系・T系・V系・S系を担当します。DB ファイルは `_data/AiDiy/database.db` の1ファイルを両サーバーで共有します。",
+      "subtitle": "core_main:8091 と apps_main:8098 が同一 SQLite DB を共有する 2 サーバー構成。",
       "image": "images/scene_001.png",
       "chips": [
         "core_main:8091",
-        "apps_main:9098",
+        "apps_main:8098",
         "SQLite 共有",
         "FastAPI"
       ],
@@ -86,7 +86,7 @@ window.SCENARIO = {
           ]
         },
         {
-          "title": "apps_main (9098)",
+          "title": "apps_main (8098)",
           "lines": [
             "M系: M配車区分、M車両、M商品、M商品構成 など",
             "T系: T配車、T生産、T商品入出庫・棚卸",
@@ -103,22 +103,22 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "`core_main.py` はポート 8091、`apps_main.py` はポート 9098 で起動する。",
-        "両サーバーは `backend_server/_data/AiDiy/database.db` の同一 SQLite ファイルを共有する。",
+        "`core_main.py` はポート 8091、`apps_main.py` はポート 8098 で起動する。",
+        "両サーバーは `_data/AiDiy/database.db` の同一 SQLite ファイルを共有する。",
         "技術スタック: Python 3.13、FastAPI、SQLAlchemy、SQLite、uv、Pydantic、JWT。"
       ],
       "evidence": [
         {
           "source": "backend_server/AGENTS.md",
-          "text": "`core_main.py`：C系、A系、認証、files、AIコア（ポート 8091）。`apps_main.py`：M系、T系、V系、S系（ポート 9098）。"
+          "text": "`core_main.py`：C系、A系、認証、files、AIコア（ポート 8091）。`apps_main.py`：M系、T系、V系、S系（ポート 8098）。"
         },
         {
           "source": "backend_server/AGENTS.md",
-          "text": "DB ファイルは `backend_server/_data/AiDiy/database.db` です。`core_main.py` と `apps_main.py` は同じ SQLite DB を共有します。"
+          "text": "DB ファイルは `_data/AiDiy/database.db` です。`core_main.py` と `apps_main.py` は同じ SQLite DB を共有します。"
         }
       ],
       "short_narration": "Core（認証・AI）と Apps（業務機能）の 2 本構成で、データベースを共有します。",
-      "long_narration": "バックエンドは 2 本のサーバーで動いています。1 本目は Core サーバー（ポート 8091）で、ログイン認証・利用者管理・AI 機能を担当します。2 本目は Apps サーバー（ポート 9098）で、配車・生産・在庫などの業務機能を担当します。2 本は同じデータベースを共有しているため、データは 1 か所にまとまります。言語は Python 3.13、Web API の仕組みは FastAPI という最新フレームワークを使っています。FastAPI は速く動き、API の仕様書（Swagger）を自動で作成してくれるのが特徴です。Swagger 画面をブラウザで開けば、フロントエンドなしで直接 API の動作確認ができます。",
+      "long_narration": "バックエンドは 2 本のサーバーで動いています。1 本目は Core サーバー（ポート 8091）で、ログイン認証・利用者管理・AI 機能を担当します。2 本目は Apps サーバー（ポート 8098）で、配車・生産・在庫などの業務機能を担当します。2 本は同じデータベースを共有しているため、データは 1 か所にまとまります。言語は Python 3.13、Web API の仕組みは FastAPI という最新フレームワークを使っています。FastAPI は速く動き、API の仕様書（Swagger）を自動で作成してくれるのが特徴です。Swagger 画面をブラウザで開けば、フロントエンドなしで直接 API の動作確認ができます。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_duration_sec": 6.6,

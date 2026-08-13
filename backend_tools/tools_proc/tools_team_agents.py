@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 class TeamAgentsRequest(BaseModel):
     prompt: str = ""
     # project_path / team_ai_* / task_ai_* は未指定（null）可。
-    # backend_team が AIチーム_依頼編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
+    # backend_taskteam が AIチーム_依頼編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
     project_path: Optional[str] = None
     member_id: str = "admin"
     team_ai_name: Optional[str] = None
@@ -46,7 +46,7 @@ def register_tools(mcp_te, team_agents):
 
     @mcp_te.tool()
     async def team_agents_config() -> str:
-        """backend_team API の接続先と疎通状態を返す。"""
+        """backend_taskteam API の接続先と疎通状態を返す。"""
         info = await asyncio.to_thread(team_agents.get_config)
         return json.dumps(info, ensure_ascii=False)
 
@@ -64,10 +64,10 @@ def register_tools(mcp_te, team_agents):
         request_timeout_sec: int = 15,
     ) -> str:
         """
-        backend_team の Aチーム依頼へ非同期依頼を投入する。
+        backend_taskteam の Aチーム依頼へ非同期依頼を投入する。
         登録だけを行い、AIタスク要求への投入や実行完了は待たない
-        （登録後は backend_team の起動監視ループが AIタスク要求へ投入する）。
-        依頼IDは backend_team が TR+8桁で自動採番する。
+        （登録後は backend_taskteam の起動監視ループが AIタスク要求へ投入する）。
+        依頼IDは backend_taskteam が TR+8桁で自動採番する。
         project_path / team_ai_name / team_ai_model / task_ai_name / task_ai_model は通常指定不要。
         未指定なら AIチーム画面の新規時と同じ条件
         （要員IDの更新最終レコードの値、無ければ規定値）で補完される。
@@ -137,27 +137,27 @@ def create_router(team_agents) -> APIRouter:
     async def http_team_agents_docs() -> dict:
         return {
             "service": "aidiy_team_agents",
-            "description": "backend_team API に疎結合で接続し、Aチーム依頼を非同期投入する。登録後のAIタスク投入・実行完了は待たない。",
+            "description": "backend_taskteam API に疎結合で接続し、Aチーム依頼を非同期投入する。登録後のAIタスク投入・実行完了は待たない。",
             "endpoint": "POST /aidiy_team_agents/{method_name}",
             "content_type": "application/json",
             "methods": {
                 "config": {
                     "summary": "接続設定取得",
-                    "description": "backend_team API の接続先と /health の疎通状態を返す。backend_team 未起動でも error ではなく health.ok=false を返す。",
+                    "description": "backend_taskteam API の接続先と /health の疎通状態を返す。backend_taskteam 未起動でも error ではなく health.ok=false を返す。",
                     "example_request": {},
                 },
                 "submit": {
                     "summary": "チーム依頼投入",
-                    "description": "指定promptをbackend_teamの/team/依頼/登録へ渡し、Aチーム依頼を準備開始として登録する。依頼IDはbackend_teamがTR+8桁で自動採番する。project_path / team_ai_* / task_ai_* は通常指定不要で、省略（null）時は AIチーム_依頼編集の新規時と同じ条件（要員IDの更新最終レコードの値、無ければ規定値）で補完する。8094未起動時はstatus=NGで理由を返す。",
+                    "description": "指定promptをbackend_taskteamの/team/依頼/登録へ渡し、Aチーム依頼を準備開始として登録する。依頼IDはbackend_taskteamがTR+8桁で自動採番する。project_path / team_ai_* / task_ai_* は通常指定不要で、省略（null）時は AIチーム_依頼編集の新規時と同じ条件（要員IDの更新最終レコードの値、無ければ規定値）で補完する。8093未起動時はstatus=NGで理由を返す。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "依頼化したい依頼内容"},
-                        "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_team の プロジェクト に対応。null なら更新最終レコードの値、無ければ規定値（CODE_BASE_PATH）。空文字は明示的な空欄指定"},
+                        "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_taskteam の Team API の プロジェクト に対応。null なら更新最終レコードの値、無ければ規定値（CODE_BASE_PATH）。空文字は明示的な空欄指定"},
                         "member_id": {"type": "string", "required": False, "default": "admin", "description": "要員ID。Aチーム要員の要員ID（get_member_list で確認できる）"},
                         "team_ai_name": {"type": "string", "required": False, "default": None, "description": "TEAM_AI_NAME。null なら更新最終レコードの値、無ければ規定値"},
                         "team_ai_model": {"type": "string", "required": False, "default": None, "description": "TEAM_AI_MODEL。null なら更新最終レコードの値、無ければ規定値"},
                         "task_ai_name": {"type": "string", "required": False, "default": None, "description": "TASK_AI_NAME。null なら更新最終レコードの値、無ければ規定値"},
                         "task_ai_model": {"type": "string", "required": False, "default": None, "description": "TASK_AI_MODEL。null なら更新最終レコードの値、無ければ規定値"},
-                        "enabled": {"type": "boolean", "required": False, "default": True, "description": "実行有効。true なら backend_team の watcher が処理対象にする"},
+                        "enabled": {"type": "boolean", "required": False, "default": True, "description": "実行有効。true なら backend_taskteam の Team watcher が処理対象にする"},
                         "return_work_id": {"type": "boolean", "required": False, "default": True, "description": "応答に work_id を含める"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15, "description": "登録 API 呼び出しのタイムアウト秒"},
                     },

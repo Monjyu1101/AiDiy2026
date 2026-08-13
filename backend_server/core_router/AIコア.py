@@ -51,8 +51,8 @@ def _backend_local稼働中(app_conf) -> bool:
         host = str(conf_json.get("LOCAL_HOST", "http://127.0.0.1") or "http://127.0.0.1").strip().rstrip("/")
         if host and "://" not in host:
             host = f"http://{host}"
-        port = str(conf_json.get("LOCAL_BASE", "8096") or "8096").strip()
-        url = f"{host}:{port}/health"
+        port_local = str(conf_json.get("PORT_LOCAL", "8096") or "8096").strip()
+        url = f"{host}:{port_local}/health"
         with urllib.request.urlopen(url, timeout=0.35) as resp:
             return 200 <= int(getattr(resp, "status", 0) or 0) < 300
     except Exception:
@@ -884,15 +884,10 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                     os.makedirs(local_temp_dir, exist_ok=True)
                     with open(os.path.join(local_temp_dir, "reboot_local.txt"), "w", encoding="utf-8") as f:
                         f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                if reboot_task:
-                    task_temp_dir = os.path.join(プロジェクトルート, "backend_task", "temp")
-                    os.makedirs(task_temp_dir, exist_ok=True)
-                    with open(os.path.join(task_temp_dir, "reboot_task.txt"), "w", encoding="utf-8") as f:
-                        f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                if reboot_team:
-                    team_temp_dir = os.path.join(プロジェクトルート, "backend_team", "temp")
-                    os.makedirs(team_temp_dir, exist_ok=True)
-                    with open(os.path.join(team_temp_dir, "reboot_team.txt"), "w", encoding="utf-8") as f:
+                if reboot_task or reboot_team:
+                    taskteam_temp_dir = os.path.join(プロジェクトルート, "backend_taskteam", "temp")
+                    os.makedirs(taskteam_temp_dir, exist_ok=True)
+                    with open(os.path.join(taskteam_temp_dir, "reboot_taskteam.txt"), "w", encoding="utf-8") as f:
                         f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 logger.info(
                     "再起動要求受信: reboot_core=%s reboot_apps=%s reboot_tools=%s reboot_local=%s reboot_task=%s reboot_team=%s",

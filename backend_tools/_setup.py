@@ -42,6 +42,7 @@ THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parent
 BASE_DIR = PROJECT_ROOT
 BACKEND_DIR = PROJECT_ROOT / "backend_server"
+CONFIG_DIR = PROJECT_ROOT / "_config"
 backend_tools_DIR = THIS_DIR
 backend_tools_ENV_CANDIDATES = [".venv", "venv"]
 
@@ -366,7 +367,7 @@ def _load_local_chat_model_ids() -> list:
 
     読めない／空の場合は LOCAL_CHAT_MODEL_IDS_FALLBACK を使う。
     """
-    local_path = BACKEND_DIR / "_config" / "AiDiy_chat_local.json"
+    local_path = CONFIG_DIR / "AiDiy_chat_local.json"
     try:
         data = load_json_dict_file(local_path)
         models = data.get("models")
@@ -400,7 +401,7 @@ def _build_local_chat_provider() -> dict:
 
 
 def _load_aidiy_key_value(key: str) -> str:
-    key_path = BACKEND_DIR / "_config" / "AiDiy_key.json"
+    key_path = CONFIG_DIR / "AiDiy_key.json"
     try:
         data = load_json_dict_file(key_path)
         return str(data.get(key, ""))
@@ -801,7 +802,7 @@ def configure_clients(module: dict | None = None) -> bool:
     all_ok = True
 
     # 1) AiDiy プロジェクト設定 (mcpServers)
-    aidiy_mcp = BACKEND_DIR / "_config" / "AiDiy_mcp.json"
+    aidiy_mcp = CONFIG_DIR / "AiDiy_mcp.json"
     print_info(f"[AiDiy設定]   {aidiy_mcp}")
     all_ok &= upsert_json_mcp_servers(aidiy_mcp, [(sn, {"type": "sse", "url": url}) for sn, url in servers])
 

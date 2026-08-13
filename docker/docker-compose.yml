@@ -7,16 +7,16 @@ services:
     # External ports exposed for direct access
     ports:
       - "8091:8091"  # Backend Core API
-      - "9098:9098"  # Backend Apps API
+      - "8098:8098"  # Backend Apps API
     volumes:
       # Mount temp directory for persistent data
       - ../temp:/app/temp
-      # Mount database directory (backend_server配下に配置)
-      - ../_data:/app/backend_server/_data
-      # Mount backend icons (if needed)
-      - ../backend_server/_icons:/app/backend_server/_icons
+      # Mount database directory (project root)
+      - ../_data:/app/_data
+      # Mount shared icons (if needed)
+      - ../_icons:/app/_icons
       # Mount config directory for API keys
-      - ../backend_server/_config:/app/backend_server/_config:ro
+      - ../_config:/app/_config:ro
       # Share frontend dist with nginx
       - frontend-dist:/app/frontend_web/dist
     environment:

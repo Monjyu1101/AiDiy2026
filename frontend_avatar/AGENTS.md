@@ -3,22 +3,22 @@
 ## 本書の目的
 
 このファイルは `frontend_avatar` の構成、実装方針、主要な入口を示す概要ドキュメントです。
-起動、変更チェック、IPC 追加、VRM / VRMA、音声処理などの HowTo は `.aidiy/knowledge` に移動しています。
+起動、変更チェック、IPC 追加、VRM / VRMA、音声処理などの HowTo は `_AIDIY/knowledge` に移動しています。
 AI エージェントは、本書に個別手順や一時的な作業メモを追記しないでください。
-業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../.aidiy/knowledge/_index.md` を入口にします。
+業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../_AIDIY/knowledge/_index.md` を入口にします。
 
 ## HowTo 参照先
 
 | 目的 | 参照先 |
 |------|--------|
-| Electron / Web 両対応の変更チェック | [`../.aidiy/knowledge/frontend_avatar,変更チェック.md`](../.aidiy/knowledge/frontend_avatar,変更チェック.md) |
-| Electron IPC 追加 | [`../.aidiy/knowledge/frontend_avatar,ElectronIPC追加手順.md`](../.aidiy/knowledge/frontend_avatar,ElectronIPC追加手順.md) |
-| VRM / VRMA 追加 | [`../.aidiy/knowledge/frontend_avatar,VRM_VRMA追加手順.md`](../.aidiy/knowledge/frontend_avatar,VRM_VRMA追加手順.md) |
-| アバター表示、VRMA 再生、表示選択 UI | [`../.aidiy/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md`](../.aidiy/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md) |
-| xneko / xeyes ウィジェット | [`../.aidiy/knowledge/frontend_avatar,xneko_xeyesウィジェット追加手順.md`](../.aidiy/knowledge/frontend_avatar,xneko_xeyesウィジェット追加手順.md) |
-| 音声入力・音声再生 | [`../.aidiy/knowledge/backend_server,frontend_avatar,AI音声処理.md`](../.aidiy/knowledge/backend_server,frontend_avatar,AI音声処理.md) |
-| AI WebSocket packet | [`../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
-| AI モデル設定 | [`../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
+| Electron / Web 両対応の変更チェック | [`../_AIDIY/knowledge/frontend_avatar,変更チェック.md`](../_AIDIY/knowledge/frontend_avatar,変更チェック.md) |
+| Electron IPC 追加 | [`../_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md`](../_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md) |
+| VRM / VRMA 追加 | [`../_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md`](../_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md) |
+| アバター表示、VRMA 再生、表示選択 UI | [`../_AIDIY/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md`](../_AIDIY/knowledge/frontend_avatar,frontend_web,アバター表示とVRMA.md) |
+| xneko / xeyes ウィジェット | [`../_AIDIY/knowledge/frontend_avatar,xneko_xeyesウィジェット追加手順.md`](../_AIDIY/knowledge/frontend_avatar,xneko_xeyesウィジェット追加手順.md) |
+| 音声入力・音声再生 | [`../_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md) |
+| AI WebSocket packet | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
+| AI モデル設定 | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
 
 ## 概要
 
@@ -31,7 +31,7 @@ Electron デスクトップアプリと通常 Web ブラウザの両方で動作
 | 認証 storage | `localStorage` | `sessionStorage` |
 | UI | 複数 BrowserWindow | 左アバター + 右タブ |
 | パネル | IPC で show / hide | `アクティブタブ` |
-| API | `/core` `/task` proxy / config（本番は 8091 / 8093 直結） | `/core` `/task` proxy / 動的 URL |
+| API | `/core` `/task` `/team` proxy / config（本番は core 8091、task・team 8093 直結） | `/core` `/task` `/team` proxy / 動的 URL |
 
 Web 版 AI 画面は `/AiDiy` 系の route / query で role を表現します。
 Electron 版は BrowserWindow の role を main process で管理します。
@@ -55,11 +55,12 @@ Electron 版は BrowserWindow の role を main process で管理します。
 | `electron/preload.ts` | renderer へ `desktopApi` を公開 |
 | `src/AiDiy.vue` | 認証、接続、role / panel 状態、Web layout の中心 |
 | `src/main.ts` | renderer 初期化 |
-| `src/api/client.ts` | REST API client（`apiClient` = core、`taskClient` = backend_task） |
+| `src/api/client.ts` | REST API client（`apiClient` = core、`taskClient` / `teamClient` = backend_taskteam） |
 | `src/api/websocket.ts` | AI コア WebSocket |
-| `src/api/config.ts` | API URL（`CORE_BASE_URL` / `TASK_BASE_URL`）、モデル設定、VRM / VRMA 定数 |
+| `src/api/config.ts` | API URL（`CORE_BASE_URL` / `TASKTEAM_BASE_URL`）、モデル設定、VRM / VRMA 定数 |
 | `src/components/` | AIコア、Avatar、音声、チャット、コードなどの各パネル |
 | `src/components/AIタスク/` | AIタスク画面（components / dialog / windows。windows は Electron 分割ウィンドウ用） |
+| `src/components/AIチーム/` | AIチーム画面（3D空間、要員、依頼、経験、作業、会話、編集ダイアログ） |
 | `src/dialog/` | AI 設定などの dialog |
 | `public/vrm/` | VRM モデル |
 | `public/vrma/` | VRMA モーション |
@@ -77,10 +78,10 @@ Electron 版は BrowserWindow の role を main process で管理します。
 - `settings`
 - `task1`〜`task3`（AIタスクの要求 / フロー図 / 明細ウィンドウ）
 - `taskDialog`（タスク要求 / 明細の編集ダイアログウィンドウ）
-- タイトルバーの `TEAM` は frontend_web 稼働時だけ表示し、`/AIチーム?単体表示=1` を専用BrowserWindowへ直接ルーティングしてAIチーム本体だけを表示する。閉じたときはウィンドウを破棄し、非表示のまま接続を維持しない
+- `team`（`frontend_avatar` 内のAIチームを表示する専用ウィンドウ。`frontend_web` には依存しない）
 
 Electron では role ごとに BrowserWindow を持ちます。
-Web では単一ページ内のタブとして扱います（AIタスクは `AIタスク.vue` の 3 パネル一体表示）。
+Web では単一ページ内で表示を切り替えます（AIタスクは3パネル一体表示、AIチームは全画面表示）。
 
 ## 状態同期
 
@@ -101,7 +102,8 @@ taskDialog へ渡す行データは IPC（structured clone）を通るため、�
 - REST API は認証、設定取得、初期化に使う。
 - WebSocket はチャット、音声、画像、ファイル、コードパネルのリアルタイム通信に使う。
 - WebSocket の packet 形式は `AIコアWebSocket仕様.md` を参照する。
-- AIタスクは `taskClient`（backend_task 8093）で REST + 5 秒ポーリング。WebSocket は使わない。
+- AIタスクは `taskClient`（backend_taskteam 8093）で REST + 5 秒ポーリング。WebSocket は使わない。
+- AIチームは `teamClient`（backend_taskteam 8093）を中心に、プロジェクト選択を同じ統合サーバーの `taskClient`、モデル情報とフォルダ参照を `apiClient` で取得する。`frontend_web` は起動不要。
 
 ## 実装時の入口
 
@@ -109,4 +111,4 @@ taskDialog へ渡す行データは IPC（structured clone）を通るため、�
 - 接続まわりは `src/api/config.ts`、`src/api/client.ts`、`src/api/websocket.ts` をセットで見る。
 - アバター表示は `AIコア_アバター.vue`、`AIコア_自立身体制御.ts`、`AIコア_自動カメラワーク.ts` を起点に見る。
 - 音声は `AIコア_音声処理.ts` の `AudioController` を起点に見る。
-- Web と Electron の差分は `.aidiy/knowledge/frontend_avatar,変更チェック.md` を先に確認する。
+- Web と Electron の差分は `_AIDIY/knowledge/frontend_avatar,変更チェック.md` を先に確認する。

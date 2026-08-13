@@ -10,7 +10,7 @@
 
 import axios from 'axios'
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
-import { CORE_BASE_URL, TASK_BASE_URL } from '@/api/config'
+import { CORE_BASE_URL, TASKTEAM_BASE_URL } from '@/api/config'
 
 const authStorage = window.desktopApi ? localStorage : sessionStorage
 
@@ -48,7 +48,10 @@ function createApiClient(baseURL: string): AxiosInstance {
 
 const apiClient = createApiClient(CORE_BASE_URL)
 
-// backend_task (8093) 用クライアント（dev は Vite proxy 経由、Electron 本番は直接接続）
-export const taskClient = createApiClient(TASK_BASE_URL)
+// backend_taskteam (8093) の Task API 用クライアント（dev は Vite proxy 経由、Electron 本番は直接接続）
+export const taskClient = createApiClient(TASKTEAM_BASE_URL)
+
+// backend_taskteam の /team (8093) 用クライアント（dev は Vite proxy 経由、Electron 本番は直接接続）
+export const teamClient = createApiClient(TASKTEAM_BASE_URL)
 
 export default apiClient

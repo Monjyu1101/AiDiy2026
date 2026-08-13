@@ -135,7 +135,7 @@ const 登録 = async () => {
       void qMessage(res.data.message || 'タスク明細の更新に失敗しました。', 'error');
     }
   } catch (e) {
-    void qMessage('タスク明細の更新でエラーが発生しました。backend_task (8093) の起動を確認してください。', 'error');
+    void qMessage('タスク明細の更新でエラーが発生しました。backend_taskteam (8093) の起動を確認してください。', 'error');
   } finally {
     登録中.value = false;
   }

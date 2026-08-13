@@ -13,7 +13,7 @@
   - `backend_server/AGENTS.md`
   - `backend_tools/AGENTS.md`
   - `backend_local/AGENTS.md`
-  - `backend_task/AGENTS.md`
+  - `backend_taskteam/AGENTS.md`
   - `command_hermes/AGENTS.md`
   - `frontend_web/AGENTS.md`
   - `frontend_avatar/AGENTS.md`
@@ -41,14 +41,14 @@ cd backend_tools
 
 そのほかは手動テストで確認してください。
 
-- API: http://127.0.0.1:8091/docs / http://127.0.0.1:9098/docs / http://127.0.0.1:8093/docs
+- API: http://127.0.0.1:8091/docs / http://127.0.0.1:8098/docs / http://127.0.0.1:8093/docs
 - UI: http://127.0.0.1:8090
 - MCP 連携変更時: `backend_tools` の 19 MCP サーバー（一覧は `GET http://127.0.0.1:8095/`、SSE は `http://127.0.0.1:8095/<mcp_name>/sse`）も確認
 
 ## セキュリティ
 
 - APIキーなどの機密情報はコミットしないでください
-- `backend_server/_config/AiDiy_key.json` は `.gitignore` で除外しています
+- `_config/AiDiy_key.json` は `.gitignore` で除外しています
 
 ## 相談
 

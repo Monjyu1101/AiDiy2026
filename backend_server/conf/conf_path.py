@@ -14,6 +14,15 @@ logger = get_logger(__name__)
 import os
 from typing import Dict, Optional
 
+
+# backend_server/ を基準にした共有フォルダの既定値。
+# 実体はプロジェクトルート直下へ集約し、各機能はこの相対値から絶対パスを解決する。
+DEFAULT_CONFIG_DIR = '../_config'
+DEFAULT_DATA_DIR = '../_data'
+DEFAULT_DATABASE_PATH = '../_data/AiDiy/database.db'
+DEFAULT_ICONS_DIR = '../_icons'
+
+
 class conf_path:
     """パス管理クラス"""
 
@@ -29,6 +38,12 @@ class conf_path:
 
         # 外部パス一覧のルート(2階層上、初期値は相対パス)
         self.external_root_path = '../../'
+
+        # プロジェクト共有フォルダ（backend_server/ 基準、初期値は相対パス）
+        self.config_path = DEFAULT_CONFIG_DIR
+        self.data_path = DEFAULT_DATA_DIR
+        self.database_path = DEFAULT_DATABASE_PATH
+        self.icons_path = DEFAULT_ICONS_DIR
 
         # 外部パス一覧 - _AIDIY.md を含むプロジェクト検出
         self.external_root_dic = {}
@@ -56,6 +71,14 @@ class conf_path:
                 self.external_root_path = self.exec_abs_root  # フォールバック
             else:
                 self.external_root_path = self._normalize_path(grandparent_path)
+
+            # 共有フォルダは backend_server の1階層上（プロジェクトルート）に置く
+            self.config_path = self._normalize_path(os.path.join(backend_dir, DEFAULT_CONFIG_DIR))
+            self.data_path = self._normalize_path(os.path.join(backend_dir, DEFAULT_DATA_DIR))
+            self.database_path = os.path.abspath(
+                os.path.join(backend_dir, DEFAULT_DATABASE_PATH)
+            ).replace('\\', '/')
+            self.icons_path = self._normalize_path(os.path.join(backend_dir, DEFAULT_ICONS_DIR))
 
             # 外部パス一覧の構築
             self.external_root_dic = self._discover_agents_projects(self.external_root_path)
@@ -120,5 +143,9 @@ class conf_path:
 
 
 __all__ = [
+    "DEFAULT_CONFIG_DIR",
+    "DEFAULT_DATA_DIR",
+    "DEFAULT_DATABASE_PATH",
+    "DEFAULT_ICONS_DIR",
     "conf_path",
 ]

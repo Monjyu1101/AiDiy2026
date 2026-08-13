@@ -4,8 +4,8 @@
 
 ## 前提
 
-- `backend_server`（`8091` / `9098`）が起動していること
-- AIタスク画面（TASK ボタン / task ウィンドウ）を使う場合は `backend_task`（`8093`）も起動していること
+- `backend_server`（`8091` / `8098`）が起動していること
+- AIタスク画面（TASK ボタン / task ウィンドウ）または AIチーム画面を使う場合は `backend_taskteam`（`8093`）も起動していること
 - Claude 系のブラウザ自動操作まで使う場合は `backend_tools`（`8095`）も起動していること
 
 ## 開発起動
@@ -42,8 +42,8 @@ http://127.0.0.1:8092
 ## 接続先
 
 - Core API / WebSocket: `http://127.0.0.1:8091` / `ws://127.0.0.1:8091/core/ws/AIコア`
-- Apps API: `http://127.0.0.1:9098`
-- Task API（AIタスク）: `http://127.0.0.1:8093`（開発時は Vite proxy `/task` 経由、Electron 本番は直結）
+- Apps API: `http://127.0.0.1:8098`
+- Task / Team API（AIタスク・AIチーム）: `http://127.0.0.1:8093`（開発時は Vite proxy `/task` / `/team` 経由、Electron 本番は直結）
 - Backend MCP（19 サーバー同居）: `http://127.0.0.1:8095/`（一覧）、`http://127.0.0.1:8095/{mcp_name}/sse`（SSE 接続）
 
 ## 補足コマンド

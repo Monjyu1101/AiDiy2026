@@ -15,7 +15,7 @@
 このスクリプトを直接実行して core / apps を単体起動することもできます。
 
 公開 API:
-    CORE_PORT, APPS_PORT
+    PORT_CORE, PORT_APPS
     check_environment() -> (bool, str)
     start_core() -> subprocess.Popen
     start_apps() -> subprocess.Popen
@@ -75,8 +75,8 @@ def print_info(message: str) -> None:
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = THIS_DIR
-CORE_PORT = 8091
-APPS_PORT = 9098
+PORT_CORE = 8091
+PORT_APPS = 8098
 CORE_APP = "core_main:app"
 APPS_APP = "apps_main:app"
 ENV_CANDIDATES = [".venv", "venv"]
@@ -143,11 +143,11 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
 
 
 def start_core() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(core)", get_backend_command(CORE_APP, CORE_PORT), BACKEND_DIR)
+    return launch_process("バックエンド(core)", get_backend_command(CORE_APP, PORT_CORE), BACKEND_DIR)
 
 
 def start_apps() -> subprocess.Popen[bytes]:
-    return launch_process("バックエンド(apps)", get_backend_command(APPS_APP, APPS_PORT), BACKEND_DIR)
+    return launch_process("バックエンド(apps)", get_backend_command(APPS_APP, PORT_APPS), BACKEND_DIR)
 
 
 # ============================================================
@@ -238,8 +238,8 @@ def kill_process_on_port(port: int) -> bool:
 
 
 def kill_ports() -> None:
-    kill_process_on_port(CORE_PORT)
-    kill_process_on_port(APPS_PORT)
+    kill_process_on_port(PORT_CORE)
+    kill_process_on_port(PORT_APPS)
 
 
 # ============================================================
@@ -304,8 +304,8 @@ def main() -> None:
         processes["バックエンド(apps)"] = start_apps()
         for name, proc in processes.items():
             threading.Thread(target=_stream_output, args=(name, proc.stdout), daemon=True).start()
-        print_success(f"バックエンド(core): http://127.0.0.1:{CORE_PORT}/docs")
-        print_success(f"バックエンド(apps): http://127.0.0.1:{APPS_PORT}/docs")
+        print_success(f"バックエンド(core): http://127.0.0.1:{PORT_CORE}/docs")
+        print_success(f"バックエンド(apps): http://127.0.0.1:{PORT_APPS}/docs")
         print_info("Ctrl+C で停止します")
         while True:
             time.sleep(1)

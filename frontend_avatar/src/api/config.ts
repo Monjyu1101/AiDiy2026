@@ -10,6 +10,9 @@
 
 import type { ModelSettings } from '@/types'
 
+const PORT_CORE = 8091
+const PORT_TASKTEAM = 8093
+
 function resolveHttpBaseUrl(): string {
   if (import.meta.env.VITE_CORE_BASE_URL) {
     return import.meta.env.VITE_CORE_BASE_URL
@@ -19,7 +22,7 @@ function resolveHttpBaseUrl(): string {
     return '/'
   }
 
-  return 'http://127.0.0.1:8091'
+  return `http://127.0.0.1:${PORT_CORE}`
 }
 
 function resolveWebSocketEndpoint(): string {
@@ -32,38 +35,24 @@ function resolveWebSocketEndpoint(): string {
     return `${protocol}//${window.location.host}/core/ws/AIコア`
   }
 
-  return 'ws://127.0.0.1:8091/core/ws/AIコア'
+  return `ws://127.0.0.1:${PORT_CORE}/core/ws/AIコア`
 }
 
-function resolveTaskBaseUrl(): string {
-  if (import.meta.env.VITE_TASK_BASE_URL) {
-    return import.meta.env.VITE_TASK_BASE_URL
+function resolveTaskTeamBaseUrl(): string {
+  if (import.meta.env.VITE_TASKTEAM_BASE_URL) {
+    return import.meta.env.VITE_TASKTEAM_BASE_URL
   }
 
-  // dev は Vite proxy（/task → 8093）、Electron 本番は backend_task へ直接接続
+  // dev は Vite proxy（/task・/team → 8093）、Electron 本番は backend_taskteam へ直接接続
   if (import.meta.env.DEV) {
     return '/'
   }
 
-  return 'http://127.0.0.1:8093'
-}
-
-function resolveFrontendWebBaseUrl(): string {
-  if (import.meta.env.VITE_WEB_BASE_URL) {
-    return import.meta.env.VITE_WEB_BASE_URL.replace(/\/$/, '')
-  }
-
-  if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-    return `${window.location.protocol}//${window.location.hostname}:8090`
-  }
-
-  return 'http://127.0.0.1:8090'
+  return `http://127.0.0.1:${PORT_TASKTEAM}`
 }
 
 export const CORE_BASE_URL = resolveHttpBaseUrl()
-export const TASK_BASE_URL = resolveTaskBaseUrl()
-export const FRONTEND_WEB_BASE_URL = resolveFrontendWebBaseUrl()
-export const FRONTEND_WEB_TEAM_URL = `${FRONTEND_WEB_BASE_URL}/AIチーム`
+export const TASKTEAM_BASE_URL = resolveTaskTeamBaseUrl()
 export const AI_WS_ENDPOINT = resolveWebSocketEndpoint()
 export const DEFAULT_VRM_MODEL_URL = '/vrm/VRM_AiDiy.vrm'
 export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'

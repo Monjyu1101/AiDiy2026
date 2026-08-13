@@ -31,12 +31,12 @@ python _start.py</code></pre>
   <p><strong>注意:</strong> <code>create_all()</code> は「まだ存在しないテーブル」だけを作成し、既存テーブルのデータは変更しません。新規テーブル追加のためだけに <code>database.db</code> を削除する必要はありません。</p>
 
   <h2>既存テーブルのカラム追加・削除・型変更が必要な場合</h2>
-  <p><code>create_all()</code> は既存テーブルへのカラム追加・削除・型変更には効きません。この場合は手動SQL（<code>ALTER TABLE</code> やテーブル再作成）が必要です。手順は <code>.aidiy/knowledge/backend_server,スキーマ変更手順.md</code> を参照してください。</p>
+  <p><code>create_all()</code> は既存テーブルへのカラム追加・削除・型変更には効きません。この場合は手動SQL（<code>ALTER TABLE</code> やテーブル再作成）が必要です。手順は <code>_AIDIY/knowledge/backend_server,スキーマ変更手順.md</code> を参照してください。</p>
   <p>開発環境で「既存データを残す必要がない」場合に限り、<code>database.db</code> を削除して全テーブルを作り直す方法も選択肢になります。ただし実データがある環境では行わないでください。</p>
 
   <h2>生成確認</h2>
   <ul>
-    <li><code>http://127.0.0.1:9098/docs</code> でM商品APIが表示される</li>
+    <li><code>http://127.0.0.1:8098/docs</code> でM商品APIが表示される</li>
     <li>SQLiteブラウザで <code>M商品</code> テーブルが作成されている</li>
   </ul>
 
@@ -57,7 +57,7 @@ python _start.py</code></pre>
     <li>[ ] <code>apps_crud/init.py</code> に初期化処理を追加した</li>
     <li>[ ] 一覧/検索/変更確認に使えるサンプルデータを投入した</li>
     <li>[ ] 起動ログに致命的エラーがない</li>
-    <li>[ ] 9098 Swagger UIが正常表示される</li>
+    <li>[ ] 8098 Swagger UIが正常表示される</li>
   </ul>
 
   <nav>
@@ -67,4 +67,3 @@ python _start.py</code></pre>
   </nav>
 </body>
 </html>
-

@@ -15,7 +15,7 @@
 このスクリプトを直接実行して MCP サーバーを単体起動することもできます。
 
 公開 API:
-    PORT
+    PORT_TOOLS
     check_environment() -> (bool, str)
     start() -> subprocess.Popen
     kill_ports()
@@ -71,7 +71,7 @@ def print_info(message: str) -> None:
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_TOOLS_DIR = THIS_DIR
-PORT = 8095
+PORT_TOOLS = 8095
 APP = "tools_main:app"
 ENV_CANDIDATES = [".venv", "venv"]
 
@@ -111,8 +111,8 @@ def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
 def get_command() -> list[str]:
     python_path = find_python_in_env(BACKEND_TOOLS_DIR, ENV_CANDIDATES)
     if python_path is not None:
-        return [str(python_path), "-m", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT)]
-    return ["uv", "run", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT)]
+        return [str(python_path), "-m", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_TOOLS)]
+    return ["uv", "run", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_TOOLS)]
 
 
 def check_environment() -> tuple[bool, str]:
@@ -239,7 +239,7 @@ def kill_process_on_port(port: int) -> bool:
 
 
 def kill_ports() -> None:
-    kill_process_on_port(PORT)
+    kill_process_on_port(PORT_TOOLS)
 
 
 # ============================================================
@@ -298,8 +298,8 @@ def main() -> None:
 
     process = start()
     threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name} Swagger UI : http://127.0.0.1:{PORT}/docs")
-    print_info(f"  利用可能 ツール 一覧 : http://127.0.0.1:{PORT}/")
+    print_success(f"{name} Swagger UI : http://127.0.0.1:{PORT_TOOLS}/docs")
+    print_info(f"  利用可能 ツール 一覧 : http://127.0.0.1:{PORT_TOOLS}/")
     print_info("Ctrl+C で停止します")
     try:
         while True:

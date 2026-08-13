@@ -11,17 +11,17 @@
 """プロジェクトクリーンアップスクリプト（まとめ役）
 
 各フォルダの `_cleanup.py` を import し、不要なキャッシュ・ビルド成果物・
-仮想環境などを対話的に一括削除します。ルート固有の処理（ルート temp /
-backup フォルダの削除、グローバル npm ツールのアンインストール）のみ
-このスクリプトが直接担当し、フォルダ固有の処理は各フォルダの
-`_cleanup.py` に委譲します。
+仮想環境などを対話的に一括削除します。クリーンアップを実行する場合は、削除開始前に
+全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止します。ルート固有の
+処理（ルート temp / backup フォルダの削除、グローバル npm ツールの
+アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
+各フォルダの `_cleanup.py` に委譲します。
 
 フォルダ別スクリプト:
 - backend_local/_cleanup.py    cleanup(choices)
 - backend_tools/_cleanup.py    cleanup(choices)（グローバル MCP 設定も解除）
 - backend_server/_cleanup.py   cleanup(choices)
-- backend_task/_cleanup.py     cleanup(choices)
-- backend_team/_cleanup.py     cleanup(choices)
+- backend_taskteam/_cleanup.py cleanup(choices)
 - frontend_web/_cleanup.py     cleanup(choices)
 - frontend_avatar/_cleanup.py  cleanup(choices)
 - command_hermes/_cleanup.py   cleanup(choices)（ランチャー/PATH も解除）
@@ -31,12 +31,14 @@ Usage:
 """
 
 import importlib.util
+import json
 import os
 import shutil
 import stat
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -49,9 +51,8 @@ BASE_DIR = Path(__file__).resolve().parent
 
 BACKEND_PATH = "backend_server"
 BACKEND_ENV_LIST = [".venv", "venv"]
-BACKEND_TASK_PATH = "backend_task"
-BACKEND_TASK_ENV_LIST = [".venv", "venv"]
-BACKEND_TEAM_PATH = "backend_team"
+BACKEND_TASKTEAM_PATH = "backend_taskteam"
+BACKEND_TASKTEAM_ENV_LIST = [".venv", "venv"]
 BACKEND_TOOLS_PATH = "backend_tools"
 BACKEND_TOOLS_ENV_LIST = [".venv", "venv"]
 BACKEND_LOCAL_PATH = "backend_local"
@@ -61,9 +62,10 @@ BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
 
 BACKUP_PATH = "backup"
 ROOT_TEMP_PATH = "temp"
+CLEANUP_STOP_REQUEST_PATH = BASE_DIR / ".cleanup_stop_request.json"
 
 DATABASE_TYPE = "sqlite"
-SQLITE_DB_REL_PATH = Path("backend_server/_data/AiDiy/database.db")
+SQLITE_DB_REL_PATH = Path("_data/AiDiy/database.db")
 
 AUTO_MODE = False
 
@@ -117,6 +119,139 @@ def _load_folder_module(folder: str):
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def _load_folder_start_module(folder: str):
+    """選択対象の既存プロセス停止に使う `_start.py` を読み込む。"""
+    name = f"aidiy_{folder}_start_for_cleanup"
+    path = BASE_DIR / folder / "_start.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _remove_folder_import_cache(folder: str) -> None:
+    """`_start.py` / `_cleanup.py` の import で生成された `__pycache__` を消す。
+
+    各フォルダの `cleanup()` は自分自身が import された後に走るため、
+    ローダーが書き出したバイトコードが残る場合がある。呼び出し後に掃除する。
+    """
+    pycache_dir = BASE_DIR / folder / "__pycache__"
+    if not pycache_dir.is_dir():
+        return
+    try:
+        shutil.rmtree(pycache_dir, onerror=handle_remove_readonly)
+        print_success(f"__pycache__ ({folder}) を削除しました: {pycache_dir}")
+    except Exception as e:
+        print_warning(f"__pycache__ ({folder}) の削除に失敗しました: {e}")
+
+
+def _remove_root_python_caches() -> None:
+    """ルート直下と `scripts/` の `__pycache__` を消す（フォルダ別の担当外）。"""
+    targets = [BASE_DIR / "__pycache__"]
+    for relative_path in ROOT_CACHE_SCAN_PATHS:
+        scan_dir = BASE_DIR / relative_path
+        if scan_dir.is_dir():
+            targets.extend(sorted(scan_dir.rglob("__pycache__")))
+    for pycache_dir in targets:
+        if not pycache_dir.is_dir():
+            continue
+        remove_directory(pycache_dir, "__pycache__ (ルート)")
+
+
+def _run_folder_cleanup(folder: str, choices: dict) -> None:
+    """フォルダ別 `cleanup()` を実行し、import で残ったキャッシュを片付ける。"""
+    try:
+        _load_folder_module(folder).cleanup(choices)
+    finally:
+        _remove_folder_import_cache(folder)
+
+
+SERVICE_CLEANUP_TARGETS = (
+    ("local", "backend_local", "バックエンド(local)", ("バックエンド(local)",)),
+    ("tools", "backend_tools", "バックエンド(tools)", ("バックエンド(tools)",)),
+    (
+        "backend",
+        "backend_server",
+        "バックエンド(core,apps)",
+        ("バックエンド(core)", "バックエンド(apps)"),
+    ),
+    (
+        "taskteam",
+        "backend_taskteam",
+        "バックエンド(task,team)",
+        ("バックエンド(task,team)",),
+    ),
+    ("web", "frontend_web", "フロントエンド(Web)", ("フロントエンド(Web)",)),
+    (
+        "avatar",
+        "frontend_avatar",
+        "フロントエンド(Avatar)",
+        ("フロントエンド(Avatar)",),
+    ),
+)
+
+# `_start.py` / `_cleanup.py` を import するフォルダ（= `__pycache__` が生成される）。
+IMPORT_CACHE_FOLDERS = tuple(
+    folder for _choice_key, folder, _description, _service_names in SERVICE_CLEANUP_TARGETS
+) + (BACKEND_HERMES_PATH,)
+
+# フォルダ別 `_cleanup.py` の担当外になる、ルート側の Python キャッシュ。
+ROOT_CACHE_SCAN_PATHS = ("scripts",)
+
+
+@contextmanager
+def cleanup_stop_request(choices: dict):
+    """ルート `_start.py` に、全常駐サービスの自動再起動停止を通知する。"""
+    _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
+    services = [
+        service_name
+        for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
+        for service_name in service_names
+    ]
+    payload = {
+        "owner_pid": os.getpid(),
+        "services": services,
+        "created_at": time.time(),
+    }
+    temporary_path = CLEANUP_STOP_REQUEST_PATH.with_suffix(
+        f"{CLEANUP_STOP_REQUEST_PATH.suffix}.{os.getpid()}.tmp",
+    )
+    try:
+        temporary_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, CLEANUP_STOP_REQUEST_PATH)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    try:
+        yield
+    finally:
+        try:
+            current = json.loads(CLEANUP_STOP_REQUEST_PATH.read_text(encoding="utf-8"))
+            if current.get("owner_pid") == os.getpid():
+                CLEANUP_STOP_REQUEST_PATH.unlink(missing_ok=True)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            pass
+
+
+def stop_all_services(choices: dict) -> None:
+    """全常駐サービスの待受プロセスを、ファイル削除前に停止する。"""
+    _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
+    print_header("クリーンアップ前の既存プロセス整理")
+    for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
+        print_info(f"{description} の既存プロセスを停止します")
+        _load_folder_start_module(folder).kill_ports()
+
+    # `_start.py` の起動前整理と同様に、OS側のポート解放を短時間待つ。
+    time.sleep(1)
+
+
+# 以前の内部名を参照するテスト・補助コードとの互換性を保つ。
+stop_selected_services = stop_all_services
 
 
 # ============================================================
@@ -258,6 +393,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
 
     print_header("クリーンアップ内容の選択")
     print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
+    print_info("常駐サービスが起動中の場合は、削除開始前にすべて停止します。")
 
     choices: dict = {
         "npm_uninstall":  False,
@@ -271,12 +407,9 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "backend_logs":   None,
         "backend_temp":   None,
         "backend_sqlite": None,
-        "task":           False,
-        "task_envs":      {},
-        "task_temp":      None,
-        "team":           False,
-        "team_env":       False,
-        "team_temp":      False,
+        "taskteam":       False,
+        "taskteam_envs":  {},
+        "taskteam_temp":  None,
         "local":          False,
         "local_envs":     {},
         "local_temp":     None,
@@ -345,31 +478,19 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
             ):
                 choices["backend_sqlite"] = ask_yes_no("  SQLite データベースを削除しますか？", default="n")
 
-    choices["task"] = ask_yes_no("バックエンド(task)をクリーンアップしますか？", default="y")
-    if choices["task"]:
-        task_dir = base_dir / BACKEND_TASK_PATH
-        if task_dir.exists():
-            for env_name in BACKEND_TASK_ENV_LIST:
-                if (task_dir / env_name).exists():
-                    choices["task_envs"][env_name] = ask_yes_no(
-                        f"  {BACKEND_TASK_PATH}/{env_name} を削除しますか？", default="y",
+    choices["taskteam"] = ask_yes_no("バックエンド(task,team)をクリーンアップしますか？", default="y")
+    if choices["taskteam"]:
+        taskteam_dir = base_dir / BACKEND_TASKTEAM_PATH
+        if taskteam_dir.exists():
+            for env_name in BACKEND_TASKTEAM_ENV_LIST:
+                if (taskteam_dir / env_name).exists():
+                    choices["taskteam_envs"][env_name] = ask_yes_no(
+                        f"  {BACKEND_TASKTEAM_PATH}/{env_name} を削除しますか？", default="y",
                     )
-            if (task_dir / "temp").exists():
-                choices["task_temp"] = ask_yes_no(
-                    f"  {BACKEND_TASK_PATH}/temp フォルダを削除しますか？", default="y",
+            if (taskteam_dir / "temp").exists():
+                choices["taskteam_temp"] = ask_yes_no(
+                    f"  {BACKEND_TASKTEAM_PATH}/temp フォルダを削除しますか？", default="y",
                 )
-
-    choices["team"] = ask_yes_no("バックエンド(team)をクリーンアップしますか？", default="y")
-    if choices["team"]:
-        team_dir = base_dir / BACKEND_TEAM_PATH
-        if (team_dir / ".venv").exists():
-            choices["team_env"] = ask_yes_no(
-                f"  {BACKEND_TEAM_PATH}/.venv を削除しますか？", default="y",
-            )
-        if (team_dir / "temp").exists():
-            choices["team_temp"] = ask_yes_no(
-                f"  {BACKEND_TEAM_PATH}/temp フォルダを削除しますか？", default="y",
-            )
 
     choices["web"] = ask_yes_no("フロントエンド(Web)をクリーンアップしますか？", default="y")
     choices["avatar"] = ask_yes_no("フロントエンド(Avatar)をクリーンアップしますか？", default="y")
@@ -394,30 +515,11 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
 # ============================================================
 # メイン
 # ============================================================
-def main():
-    print_header("プロジェクト クリーンアップ")
-
-    base_dir = BASE_DIR
-    print_info(f"プロジェクトディレクトリ: {base_dir}")
-    print_info("クリーンアップ対象:")
-    print_info("  1. ルート temp フォルダ")
-    print_info("  2. ルート backup フォルダ")
-    print_info("  3. バックエンド(local)")
-    print_info("  4. バックエンド(tools)")
-    print_info("  5. バックエンド(core,apps)")
-    print_info("  6. バックエンド(task)")
-    print_info("  7. バックエンド(team)")
-    print_info("  8. フロントエンド(Web)")
-    print_info("  9. フロントエンド(Avatar)")
-    print_info(" 10. コマンド(hermes)")
-    print()
-
-    choices = collect_cleanup_choices(base_dir)
-    if choices is None:
-        print_info("クリーンアップをキャンセルしました")
-        return
-
+def execute_cleanup(base_dir: Path, choices: dict) -> None:
+    """選択済みの処理を、プロセス停止から順番に実行する。"""
     print_header("一括実行開始")
+
+    stop_all_services(choices)
 
     if choices["npm_uninstall"]:
         uninstall_global_npm_tools()
@@ -435,51 +537,51 @@ def main():
 
     print()
     if choices["local"]:
-        _load_folder_module("backend_local").cleanup(choices)
+        _run_folder_cleanup("backend_local", choices)
     else:
         print_info("バックエンド(local) のクリーンアップをスキップしました")
 
     print()
     if choices["tools"]:
-        _load_folder_module("backend_tools").cleanup(choices)
+        _run_folder_cleanup("backend_tools", choices)
     else:
         print_info("バックエンド(tools) のクリーンアップをスキップしました")
 
     print()
     if choices["backend"]:
-        _load_folder_module("backend_server").cleanup(choices)
+        _run_folder_cleanup("backend_server", choices)
     else:
         print_info("バックエンド(core,apps)のクリーンアップをスキップしました")
 
     print()
-    if choices["task"]:
-        _load_folder_module("backend_task").cleanup(choices)
+    if choices["taskteam"]:
+        _run_folder_cleanup("backend_taskteam", choices)
     else:
-        print_info("バックエンド(task)のクリーンアップをスキップしました")
-
-    print()
-    if choices["team"]:
-        _load_folder_module("backend_team").cleanup(choices)
-    else:
-        print_info("バックエンド(team)のクリーンアップをスキップしました")
+        print_info("バックエンド(task,team)のクリーンアップをスキップしました")
 
     print()
     if choices["web"]:
-        _load_folder_module("frontend_web").cleanup(choices)
+        _run_folder_cleanup("frontend_web", choices)
     else:
         print_info("フロントエンド(Web)のクリーンアップをスキップしました")
 
     print()
     if choices["avatar"]:
-        _load_folder_module("frontend_avatar").cleanup(choices)
+        _run_folder_cleanup("frontend_avatar", choices)
     else:
         print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
 
     print()
     if choices["hermes"]:
-        _load_folder_module("command_hermes").cleanup(choices)
+        _run_folder_cleanup("command_hermes", choices)
     else:
         print_info("コマンド(hermes) のクリーンアップをスキップしました")
+
+    print()
+    # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
+    for folder in IMPORT_CACHE_FOLDERS:
+        _remove_folder_import_cache(folder)
+    _remove_root_python_caches()
 
     print()
     print_header("クリーンアップ完了")
@@ -488,6 +590,32 @@ def main():
     print()
     print_info("クリーンアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)
+
+
+def main():
+    print_header("プロジェクト クリーンアップ")
+
+    base_dir = BASE_DIR
+    print_info(f"プロジェクトディレクトリ: {base_dir}")
+    print_info("クリーンアップ対象:")
+    print_info("  1. ルート temp フォルダ")
+    print_info("  2. ルート backup フォルダ")
+    print_info("  3. バックエンド(local)")
+    print_info("  4. バックエンド(tools)")
+    print_info("  5. バックエンド(core,apps)")
+    print_info("  6. バックエンド(task,team)")
+    print_info("  7. フロントエンド(Web)")
+    print_info("  8. フロントエンド(Avatar)")
+    print_info("  9. コマンド(hermes)")
+    print()
+
+    choices = collect_cleanup_choices(base_dir)
+    if choices is None:
+        print_info("クリーンアップをキャンセルしました")
+        return
+
+    with cleanup_stop_request(choices):
+        execute_cleanup(base_dir, choices)
 
 
 if __name__ == "__main__":

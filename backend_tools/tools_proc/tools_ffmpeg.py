@@ -206,7 +206,7 @@ def register_tools(mcp_ff, ffmpeg_c):
     if _ff_skipped:
         logger.warning(
             f"aidiy_ffmpeg_control 非公開（-version 失敗）: {_ff_skipped} — "
-            f"backend_server/_config/aidiy_ffmpeg_control.json のパスを確認してください"
+            f"_config/aidiy_ffmpeg_control.json のパスを確認してください"
         )
 
 

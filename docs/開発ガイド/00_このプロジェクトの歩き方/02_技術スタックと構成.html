@@ -37,7 +37,7 @@
 
 
  Core サーバー    Apps サーバー
- 127.0.0.1:8091   127.0.0.1:9098
+ 127.0.0.1:8091   127.0.0.1:8098
 
  FastAPI + JWT認証   FastAPI + JWT認証
 
@@ -61,7 +61,7 @@
  <p>
  <strong>業務画面(C/M/T/V/S/A系)のバックエンドは2つのサーバーで構成されます</strong><br>
  • <strong>Core API (8091)</strong>: C系（共通管理）とA系（AI機能）を担当<br>
- • <strong>Apps API (9098)</strong>: M系（マスタ）、T系（トランザクション）、V系（ビュー）、S系（スケジューラー）を担当
+ • <strong>Apps API (8098)</strong>: M系（マスタ）、T系（トランザクション）、V系（ビュー）、S系（スケジューラー）を担当
  </p>
  </div>
 
@@ -72,7 +72,7 @@
  </p>
  <ul>
  <li><strong>backend_tools/tools_main.py (8095)</strong> — MCPサーバー群（Chrome操作、SQLite確認、コードチェック等、16個）</li>
- <li><strong>backend_task/task_main.py (8093)</strong> — AIタスク要求をAIが明細タスクへ分解し、Code CLIで実行</li>
+ <li><strong>backend_taskteam/taskteam_main.py (8093)</strong> — AIタスク要求の分解・実行と複数AIエージェントのチーム活動を同一プロセスで管理</li>
  <li><strong>backend_local/local_main.py (8096)</strong> — OpenAI互換のローカルLLM(Gemma)推論。<code>_start.py</code>の既定では起動しない</li>
  </ul>
  <p>
@@ -220,7 +220,7 @@
 
  backend_server/ # バックエンドサーバー
   core_main.py # Core APIエントリポイント (ポート8091)
-  apps_main.py # Apps APIエントリポイント (ポート9098)
+  apps_main.py # Apps APIエントリポイント (ポート8098)
   database.py # DB接続設定
   auth.py, deps.py # JWT認証・依存性注入
 
@@ -263,7 +263,7 @@
 
  backend_tools/ # MCPサーバー群 (ポート8095、16個)
  backend_local/ # ローカルLLM(Gemma)サーバー (ポート8096)
- backend_task/ # AIタスク実行+定期タスクサーバー (ポート8093)
+ backend_taskteam/ # AIタスク実行+AIチーム統合サーバー (ポート8093)
  command_hermes/ # aidiy_hermes コード支援CLI (常駐なし)
 
  docs/開発ガイド/
@@ -287,7 +287,7 @@
  <td>Apps API関連のModel・CRUD・Router（M系・T系・V系・S系を担当）</td>
  </tr>
  <tr>
- <td><code>backend_server/_data/</code></td>
+ <td><code>_data/</code></td>
  <td>SQLiteデータベースファイルの格納場所</td>
  </tr>
  <tr>
@@ -332,7 +332,7 @@
  </tr>
  <tr>
  <td><strong>Swagger Apps API</strong></td>
- <td><a href="http://127.0.0.1:9098/docs" target="_blank">http://127.0.0.1:9098/docs</a></td>
+ <td><a href="http://127.0.0.1:8098/docs" target="_blank">http://127.0.0.1:8098/docs</a></td>
  <td>Swagger UIでM系・T系・V系・S系・X系のAPIを確認・テスト</td>
  </tr>
  <tr>
@@ -348,7 +348,7 @@
  <p>フロントエンドからのAPIリクエストはプロキシ経由で転送されます。</p>
  <ul>
  <li>パスが <code>/core/*</code> なら Core、<code>/apps/*</code> なら Apps へ転送</li>
- <li>Viteの設定で <code>127.0.0.1:8091</code> と <code>127.0.0.1:9098</code> に振り分け</li>
+ <li>Viteの設定で <code>127.0.0.1:8091</code> と <code>127.0.0.1:8098</code> に振り分け</li>
  <li>全てのAPI操作は<strong>POST</strong>メソッドを使用</li>
  </ul>
  <p>詳細は <code>frontend_web/vite.config.ts</code> を参照してください。</p>
@@ -442,7 +442,7 @@
    </tr>
    <tr>
    <td><strong>Apps</strong></td>
-   <td>9098</td>
+   <td>8098</td>
    <td><code>/apps/*</code></td>
    <td>M系 (M商品, M車両, M配車区分) / T系 (T配車, T商品入庫等) / V系 / S系</td>
    </tr>

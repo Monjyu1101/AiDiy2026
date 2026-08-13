@@ -360,7 +360,7 @@ window.SCENARIO = {
         "AiDiy AIコアの設定: CHAT_AI_NAME / LIVE_AI_NAME を変更",
         "claude-opus-4-8 を指定するだけで最新モデルに切り替え",
         "テキストチャット・画像分析・リアルタイム音声対話に対応",
-        "設定ファイル: backend_server/_config/AiDiy_config.json"
+        "設定ファイル: _config/AiDiy_config.json"
       ],
       "forbidden_elements": [
         "設定変更で全機能が即利用可能と断言しない（APIキーや権限確認が必要な場合あり）"
@@ -397,8 +397,8 @@ window.SCENARIO = {
         {
           "speaker": "female",
           "expression": "neutral",
-          "telop_text": "設定ファイルは backend_server/_config/AiDiy_config.json で管理されています。",
-          "naration_text": "設定ファイルは backend_server の _config フォルダにある AiDiy_config.json です。ここで AI モデルの種類や、チャット・コード支援それぞれのモデルを個別に指定できます。環境ごとに使い分けることも可能です。",
+          "telop_text": "設定ファイルは _config/AiDiy_config.json で管理されています。",
+          "naration_text": "設定ファイルはプロジェクトルートの _config フォルダにある AiDiy_config.json です。ここで AI モデルの種類や、チャット・コード支援それぞれのモデルを個別に指定できます。環境ごとに使い分けることも可能です。",
           "audio": "audio/dlg_005_03_female.mp3",
           "duration_sec": 14.88
         },

@@ -3,29 +3,29 @@
 ## 本書の目的
 
 このファイルは `backend_server` の構成、設計方針、実装入口を示す概要ドキュメントです。
-具体的な追加手順、スキーマ変更、起動、デバッグ、落とし穴は `.aidiy/knowledge` に移動しています。
+具体的な追加手順、スキーマ変更、起動、デバッグ、落とし穴は `_AIDIY/knowledge` に移動しています。
 AI エージェントは、本書に個別手順や一時的な作業メモを追記しないでください。
-業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../.aidiy/knowledge/_index.md` を入口にします。
+業務システム機能追加は `../docs/` の開発ガイドを優先し、コアシステム機能調整は `../_AIDIY/knowledge/_index.md` を入口にします。
 
 ## HowTo 参照先
 
 | 目的 | 参照先 |
 |------|--------|
-| backend の層構造、Model / Schema / CRUD / Router パターン | [`../.aidiy/knowledge/backend_server,実装パターン.md`](../.aidiy/knowledge/backend_server,実装パターン.md) |
-| 開発環境起動、依存関係、DB、Swagger、よくある問題 | [`../.aidiy/knowledge/共通,開発環境運用手順.md`](../.aidiy/knowledge/共通,開発環境運用手順.md) |
-| 既存 DB へのスキーマ差分反映 | [`../.aidiy/knowledge/backend_server,スキーマ変更手順.md`](../.aidiy/knowledge/backend_server,スキーマ変更手順.md) |
-| C採番と監査フィールド | [`../.aidiy/knowledge/backend_server,C採番と監査フィールド.md`](../.aidiy/knowledge/backend_server,C採番と監査フィールド.md) |
-| C利用者パスワード運用 | [`../.aidiy/knowledge/backend_server,C利用者パスワード運用.md`](../.aidiy/knowledge/backend_server,C利用者パスワード運用.md) |
-| JWT 認証 | [`../.aidiy/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](../.aidiy/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md) |
-| M系マスタ追加 | [`../.aidiy/knowledge/backend_server,M系マスタ追加手順.md`](../.aidiy/knowledge/backend_server,M系マスタ追加手順.md) |
-| T系トランザクション追加 | [`../.aidiy/knowledge/backend_server,T系トランザクション追加手順.md`](../.aidiy/knowledge/backend_server,T系トランザクション追加手順.md) |
-| V系エンドポイント追加 | [`../.aidiy/knowledge/backend_server,V系エンドポイント追加手順.md`](../.aidiy/knowledge/backend_server,V系エンドポイント追加手順.md) |
-| S系スケジューラ追加 | [`../.aidiy/knowledge/backend_server,S系スケジューラ追加手順.md`](../.aidiy/knowledge/backend_server,S系スケジューラ追加手順.md) |
-| AIコア WebSocket | [`../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
-| AIモデル設定 | [`../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](../.aidiy/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
-| 設定管理（conf_json / conf_model / conf_path） | [`../.aidiy/knowledge/backend_server,設定管理(conf).md`](../.aidiy/knowledge/backend_server,設定管理(conf).md) |
-| Code CLI 追加 | [`../.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](../.aidiy/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
-| MCP 構成・活用 | [`../.aidiy/knowledge/backend_tools,構成.md`](../.aidiy/knowledge/backend_tools,構成.md)、[`../.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md`](../.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md) |
+| backend の層構造、Model / Schema / CRUD / Router パターン | [`../_AIDIY/knowledge/backend_server,実装パターン.md`](../_AIDIY/knowledge/backend_server,実装パターン.md) |
+| 開発環境起動、依存関係、DB、Swagger、よくある問題 | [`../_AIDIY/knowledge/共通,開発環境運用手順.md`](../_AIDIY/knowledge/共通,開発環境運用手順.md) |
+| 既存 DB へのスキーマ差分反映 | [`../_AIDIY/knowledge/backend_server,スキーマ変更手順.md`](../_AIDIY/knowledge/backend_server,スキーマ変更手順.md) |
+| C採番と監査フィールド | [`../_AIDIY/knowledge/backend_server,C採番と監査フィールド.md`](../_AIDIY/knowledge/backend_server,C採番と監査フィールド.md) |
+| C利用者パスワード運用 | [`../_AIDIY/knowledge/backend_server,C利用者パスワード運用.md`](../_AIDIY/knowledge/backend_server,C利用者パスワード運用.md) |
+| JWT 認証 | [`../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md) |
+| M系マスタ追加 | [`../_AIDIY/knowledge/backend_server,M系マスタ追加手順.md`](../_AIDIY/knowledge/backend_server,M系マスタ追加手順.md) |
+| T系トランザクション追加 | [`../_AIDIY/knowledge/backend_server,T系トランザクション追加手順.md`](../_AIDIY/knowledge/backend_server,T系トランザクション追加手順.md) |
+| V系エンドポイント追加 | [`../_AIDIY/knowledge/backend_server,V系エンドポイント追加手順.md`](../_AIDIY/knowledge/backend_server,V系エンドポイント追加手順.md) |
+| S系スケジューラ追加 | [`../_AIDIY/knowledge/backend_server,S系スケジューラ追加手順.md`](../_AIDIY/knowledge/backend_server,S系スケジューラ追加手順.md) |
+| AIコア WebSocket | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
+| AIモデル設定 | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
+| 設定管理（conf_json / conf_model / conf_path） | [`../_AIDIY/knowledge/backend_server,設定管理(conf).md`](<../_AIDIY/knowledge/backend_server,設定管理(conf).md>) |
+| Code CLI 追加 | [`../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
+| MCP 構成・活用 | [`../_AIDIY/knowledge/backend_tools,構成.md`](../_AIDIY/knowledge/backend_tools,構成.md)、[`../_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md`](../_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md) |
 
 ## 概要
 
@@ -35,7 +35,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | エントリ | 役割 | ポート |
 |----------|------|--------|
 | `core_main.py` | C系、A系、認証、files、AIコア | 8091 |
-| `apps_main.py` | M系、T系、V系、S系 | 9098 |
+| `apps_main.py` | M系、T系、V系、S系 | 8098 |
 
 ## 技術スタック
 
@@ -81,8 +81,9 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `core_router/` | Core API / V系 / AIコア |
 | `apps_router/` | Apps API / V系 / S系 |
 | `AIコア/` | AI provider、WebSocket、Code CLI 連携 |
-| `_config/` | `AiDiy_key.json` などの設定 |
-| `_data/` | SQLite DB |
+| `../_config/` | `AiDiy_key.json` などのプロジェクト共通設定 |
+| `../_data/` | プロジェクト共通 SQLite DB |
+| `../_icons/` | プロジェクト共通アイコン |
 | `temp/` | logs、reboot file、一時ファイル |
 
 ## core/apps の分担
@@ -106,10 +107,10 @@ Apps:
 
 ## DB と初期化
 
-DB ファイルは `backend_server/_data/AiDiy/database.db` です。
+DB ファイルは `_data/AiDiy/database.db` です。
 `create_all()` は新規テーブル作成には効きますが、既存テーブルのカラム追加・削除・型変更には効きません。
 
-スキーマ差分、初期データ、DBリセットの判断は `.aidiy/knowledge` の手順を優先してください。
+スキーマ差分、初期データ、DBリセットの判断は `_AIDIY/knowledge` の手順を優先してください。
 
 ## 設定管理
 
@@ -121,7 +122,7 @@ DB ファイルは `backend_server/_data/AiDiy/database.db` です。
 | `conf_json` | `AiDiy_key.json` の読み書き、不足キー補完、即時保存 |
 | `conf_models` | AI モデル一覧管理、provider API からの取得とキャッシュ |
 
-詳細は `.aidiy/knowledge/backend_server,設定管理(conf).md` を参照してください。
+詳細は `_AIDIY/knowledge/backend_server,設定管理(conf).md` を参照してください。
 
 ## AI コア
 
@@ -146,16 +147,16 @@ AI 名の規約:
 | `CHAT_AI_NAME` | `_chat` で終わる |
 | `LIVE_AI_NAME` | `_live` で終わる |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外として `aidiy_hermes` |
-| `TASK_AI_NAME` | Code AI と同じ規約。`backend_task` の AIタスク自動実行で使用 |
+| `TASK_AI_NAME` | Code AI と同じ規約。`backend_taskteam` の AIタスク自動実行で使用 |
 
 比較は完全一致を前提にし、前方一致へ寄せない。
 
 ## MCP 連携
 
 MCP サーバー本体は `backend_tools` にあります。
-`backend_server` では `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。
+`backend_server` ではプロジェクトルートの `_config/AiDiy_mcp.json` を読み、Claude Agent SDK などへ MCP 設定を渡します。
 
-MCP の構成と使い分けは `.aidiy/knowledge/backend_tools,構成.md` と `.aidiy/knowledge/backend_server,backend_tools,MCP活用手順.md` を参照してください。
+MCP の構成と使い分けは `_AIDIY/knowledge/backend_tools,構成.md` と `_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md` を参照してください。
 
 ## 実装時の入口
 
@@ -164,4 +165,4 @@ MCP の構成と使い分けは `.aidiy/knowledge/backend_tools,構成.md` と `
 - 一覧画面用の JOIN は V系 Router を見る。
 - 認証付き API は `deps.get_現在利用者` を使う。
 - AIコア変更は `core_router/AIコア.py` と `AIコア/` を起点に見る。
-- 具体手順は必ず `.aidiy/knowledge/_index.md` から該当 HowTo を開く。
+- 具体手順は必ず `_AIDIY/knowledge/_index.md` から該当 HowTo を開く。

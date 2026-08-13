@@ -22,10 +22,10 @@
  <div>
   <strong>AiDiy 2026年版について</strong>
   <ul>
-  <li>フロント: <code>8090</code> / バックエンド: <code>8091</code>(Core) / <code>9098</code>(Apps)</li>
-  <li>実際の常駐バックエンドはこれに加えて <code>8095</code>(MCPツール群 backend_tools) / <code>8093</code>(AIタスク backend_task) / <code>8096</code>(ローカルLLM backend_local、既定では未起動) を含む5サーバー構成。補助として常駐しないCLI <code>command_hermes</code>(aidiy_hermes) もある</li>
-  <li>本ガイドは業務画面(C/M/T/V/S/A系)を中心にCore・Apps・Web・Avatarの流れを解説する。MCP/ローカルLLM/AIタスクの詳細は各サブプロジェクトの <code>AGENTS.md</code> を参照</li>
-  <li>DB: SQLiteファイル <code>backend_server/_data/AiDiy/database.db</code></li>
+  <li>フロント: <code>8090</code> / バックエンド: <code>8091</code>(Core) / <code>8098</code>(Apps)</li>
+  <li>実際の常駐バックエンドはこれに加えて <code>8095</code>(MCPツール群 backend_tools) / <code>8093</code>(AIタスク・AIチーム backend_taskteam) / <code>8096</code>(ローカルLLM backend_local、既定では未起動) を含む5サーバー構成。補助として常駐しないCLI <code>command_hermes</code>(aidiy_hermes) もある</li>
+  <li>本ガイドは業務画面(C/M/T/V/S/A系)を中心にCore・Apps・Web・Avatarの流れを解説する。MCP/ローカルLLM/AIタスク・AIチームの詳細は各サブプロジェクトの <code>AGENTS.md</code> を参照</li>
+  <li>DB: SQLiteファイル <code>_data/AiDiy/database.db</code></li>
   <li>マイグレーションツール(Alembic)は使わず、DB削除で再構築</li>
   </ul>
  </div>
@@ -106,7 +106,7 @@ python _start.py</code></pre>
   <ul>
   <li><strong>フロントエンド</strong>: <a href="http://127.0.0.1:8090/" target="_blank">http://127.0.0.1:8090/</a> ログイン: <code>admin</code> / <code>********</code></li>
   <li><strong>Core API</strong>: <a href="http://127.0.0.1:8091/docs" target="_blank">http://127.0.0.1:8091/docs</a></li>
-  <li><strong>Apps API</strong>: <a href="http://127.0.0.1:9098/docs" target="_blank">http://127.0.0.1:9098/docs</a></li>
+  <li><strong>Apps API</strong>: <a href="http://127.0.0.1:8098/docs" target="_blank">http://127.0.0.1:8098/docs</a></li>
   </ul>
 
   <div>
@@ -114,7 +114,7 @@ python _start.py</code></pre>
   <ul>
    <li><strong>ポート競合</strong> &#x2192; 既に <code>python.exe</code> や <code>node.exe</code> が動いていないか確認</li>
    <li><strong>ログイン失敗</strong> &#x2192; パスワードは <code>********</code> (大文字小文字に注意)</li>
-   <li><strong>DB異常</strong> &#x2192; <code>backend_server\_data\AiDiy\database.db</code> を削除して再起動</li>
+   <li><strong>DB異常</strong> &#x2192; <code>_data\AiDiy\database.db</code> を削除して再起動</li>
   </ul>
   <p>
    <strong>停止方法</strong>: 起動したターミナルで <code>Ctrl+C</code>。必要なら <code>taskkill</code> で個別停止
@@ -211,7 +211,7 @@ python _start.py</code></pre>
    <div>SQLite</div>
    <div>必須: <strong>データベース</strong></div>
    <p>Pythonに同梱されているため個別インストール不要です。</p>
-   <small>データファイル: <code>backend_server\_data\AiDiy\database.db</code></small>
+   <small>データファイル: <code>_data\AiDiy\database.db</code></small>
   </div>
 
   <div>
@@ -253,7 +253,7 @@ uv --version</code></pre>
    </tr>
    <tr>
    <td><strong>Apps API</strong></td>
-   <td><a href="http://127.0.0.1:9098/docs" target="_blank">http://127.0.0.1:9098/docs</a></td>
+   <td><a href="http://127.0.0.1:8098/docs" target="_blank">http://127.0.0.1:8098/docs</a></td>
    <td>Swagger UIでApps系(M系、T系、V系、S系)のAPIを確認</td>
    </tr>
   </tbody>

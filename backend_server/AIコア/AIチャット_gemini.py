@@ -769,7 +769,7 @@ if __name__ == "__main__":
 
     def _load_config():
         try:
-            base_dir = Path(__file__).resolve().parents[1]
+            base_dir = Path(__file__).resolve().parents[2]
             config_path = base_dir / "_config" / "AiDiy_key.json"
             if not config_path.exists():
                 print(f"configが見つかりません: {config_path}")

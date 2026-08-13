@@ -24,7 +24,7 @@ from log_config import get_logger
 logger = get_logger(__name__)
 
 _CHAT_CONTEXT_JSON_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_config", "AiDiy_chat__context.json")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_config", "AiDiy_chat__context.json")
 )
 
 _CHAT_CONTEXT_TEMPLATE_LINES = [
