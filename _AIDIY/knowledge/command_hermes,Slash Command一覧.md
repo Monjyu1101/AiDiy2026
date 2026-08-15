@@ -35,7 +35,7 @@ class CommandDef:
 
 ## 全コマンド一覧
 
-### Session（23 コマンド）
+### Session（24 コマンド）
 
 | コマンド | エイリアス | 説明 |
 |---------|-----------|------|
@@ -61,6 +61,7 @@ class CommandDef:
 | `/goal` | | 目標設定 |
 | `/status` | | ステータス表示 |
 | `/resume` | | 再開 |
+| `/restart` | | 実行中の run を drain してから Gateway を再起動（Gateway） |
 | `/sethome` | `set-home` | ホーム設定（Gateway） |
 
 ### Configuration（13 コマンド）

@@ -42,6 +42,12 @@
 8. `conf_json.DEFAULT_CONFIG` と `AiDiy_key.json` に必要な `CODE_<CLI名>_MODEL` を追加する
 9. frontend の `CODE_MODEL_KEYS` に CLI 名と保存キーの対応を追加する
 10. 設定 UI で `availableModels.code_models` から新CLIが選べることを確認する
+11. `AIセッション管理.py` のセッション設定と `core_router/AIコア.py` の設定保存キー一覧へ `CODE_<CLI名>_MODEL` を追加する
+12. `core_router/AIコア.py` の `/モデル情報/TASK選択肢` フォールバック一覧に CLI 名を追加する
+13. 両フロントの `AIタスク_要求編集.vue` / `AIタスク_明細編集.vue` の `TASK_CODE_MODELS既定` に CLI 名を追加する
+14. 手動起動が要る場合は `scripts/cli_bat/_<CLI名>.bat` と `__install_cli.bat` / `__uninstall_cli.bat` を追加する
+
+11〜13 は API 失敗時やセッション未確立時のフォールバック経路で、通常操作では気づけない。追加漏れの実績があるため、既存 CLI 名（`codex_cli` など）で全文検索して対応箇所を突き合わせる。
 
 ## Hermes 統合時の判断基準
 

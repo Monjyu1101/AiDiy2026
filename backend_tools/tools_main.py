@@ -276,7 +276,7 @@ app = FastAPI(
         "19 MCP ツールを HTTP POST で直接呼び出せます。\n\n"
         "加えて OpenAI / Ollama 互換の標準チャットインターフェース "
         "`POST /aidiy_chat_completions/v1/chat/completions` を提供します。\n\n"
-        "各 MCP の詳細は `GET /{mcp_name}/docs` を参照してください。"
+        "各 MCP のツール一覧と引数仕様は `GET /{mcp_name}/list` を参照してください。"
     ),
     version="1.0.0",
     generate_unique_id_function=_unique_op_id,

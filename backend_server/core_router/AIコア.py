@@ -594,6 +594,7 @@ async def TASKモデル選択肢取得(http_request: Request):
             "copilot_cli": {"auto": "auto"},
             "codex_cli": {"auto": "auto"},
             "antigravity_cli": {"auto": "auto"},
+            "grok_cli": {"auto": "auto"},
             "opencode_cli": {"auto": "auto"},
             "aidiy_hermes": {"auto": "auto"},
         }
@@ -701,7 +702,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "CODE_AI1_MODEL", "CODE_AI2_MODEL", "CODE_AI3_MODEL", "CODE_AI4_MODEL", "CODE_AI5_MODEL", "CODE_AI6_MODEL",
             "CODE_CLAUDE_SDK_MODEL", "CODE_CLAUDE_CLI_MODEL",
             "CODE_COPILOT_CLI_MODEL", "CODE_ANTIGRAVITY_CLI_MODEL", "CODE_CODEX_CLI_MODEL", "CODE_AIDIY_HERMES_MODEL",
-            "CODE_OPENCODE_CLI_MODEL",
+            "CODE_OPENCODE_CLI_MODEL", "CODE_GROK_CLI_MODEL",
             "CODE_CLAUDE_OLLAMA_MODEL", "CODE_CODEX_OLLAMA_MODEL",
             "CODE_BASE_PATH",
             "CODE_MAX_TURNS", "CODE_PLAN", "CODE_VERIFY", "CODE_PERMISSIONS", "CODE_SELF_CHECK_LOOP",
@@ -1194,6 +1195,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         provider_key = "CODE_ANTIGRAVITY_CLI_MODEL"
                     elif ai_name == "codex_cli":
                         provider_key = "CODE_CODEX_CLI_MODEL"
+                    elif ai_name == "grok_cli":
+                        provider_key = "CODE_GROK_CLI_MODEL"
                     elif ai_name == "aidiy_hermes":
                         provider_key = "CODE_AIDIY_HERMES_MODEL"
                     elif ai_name == "opencode_cli":

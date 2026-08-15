@@ -182,33 +182,13 @@ onBeforeUnmount(() => {
             </div>
           </router-link>
 
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールfable/ゲーム?URLメニュー=／Xその他">
+          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xドッグファイト/ゲーム?URLメニュー=／Xその他">
             <div class="menu-card-title">
-              <span class="icon">Xピ</span>
-              Xピンボールfable
+              <span class="icon">X空</span>
+              Xドッグファイト
             </div>
             <div class="menu-card-description">
-              サイバーパンク風3D表示・回路スピナーでキックバックを充填するネオンピンボール
-            </div>
-          </router-link>
-
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールsol/ゲーム?URLメニュー=／Xその他">
-            <div class="menu-card-title">
-              <span class="icon">X陽</span>
-              Xピンボールsol
-            </div>
-            <div class="menu-card-description">
-              重力反転・空間転移・可動セイルで軌道を奏でる非対称ネオンピンボール
-            </div>
-          </router-link>
-
-          <router-link class="menu-card menu-card-fixed" to="/Xその他/Xピンボールopus/ゲーム?URLメニュー=／Xその他">
-            <div class="menu-card-title">
-              <span class="icon">X谷</span>
-              Xピンボールopus
-            </div>
-            <div class="menu-card-description">
-              岩球・吊り橋・黄金像・鉄砲水が連動する大渓谷3Dピンボール
+              ロックオン・追尾ミサイル・レーダーを備えた3D空中戦闘
             </div>
           </router-link>
 

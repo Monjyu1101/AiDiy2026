@@ -407,6 +407,8 @@ class CodeAgent:
                         tool = "aidiy_hermes"
                     elif ai_name == "opencode_cli":
                         tool = "opencode"
+                    elif ai_name == "grok_cli":
+                        tool = "grok"
                     else:
                         tool = ai_name or "コマンド"
                     メッセージ = f"{ai_label}{tool}が利用できません。（{tool}未インストール?)"

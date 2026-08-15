@@ -44,6 +44,7 @@ const TASK_CODE_MODELS既定 = {
   copilot_cli: { auto: 'auto' },
   codex_cli: { auto: 'auto' },
   antigravity_cli: { auto: 'auto' },
+  grok_cli: { auto: 'auto' },
   opencode_cli: { auto: 'auto' },
   aidiy_hermes: { auto: 'auto' },
 };

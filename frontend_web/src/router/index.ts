@@ -98,22 +98,10 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'X立体リバーシ' }
     },
     {
-        path: '/Xその他/Xピンボールfable/ゲーム',
-        name: 'Xピンボールfable',
-        component: () => import('../components/Xその他/Xピンボールfable.vue'),
-        meta: { requiresAuth: true, title: 'Xピンボールfable' }
-    },
-    {
-        path: '/Xその他/Xピンボールsol/ゲーム',
-        name: 'Xピンボールsol',
-        component: () => import('../components/Xその他/Xピンボールsol.vue'),
-        meta: { requiresAuth: true, title: 'Xピンボールsol' }
-    },
-    {
-        path: '/Xその他/Xピンボールopus/ゲーム',
-        name: 'Xピンボールopus',
-        component: () => import('../components/Xその他/Xピンボールopus.vue'),
-        meta: { requiresAuth: true, title: 'Xピンボールopus' }
+        path: '/Xその他/Xドッグファイト/ゲーム',
+        name: 'Xドッグファイト',
+        component: () => import('../components/Xその他/Xドッグファイト.vue'),
+        meta: { requiresAuth: true, title: 'Xドッグファイト' }
     },
     {
         path: '/Xその他/X世界の絶景/表示',

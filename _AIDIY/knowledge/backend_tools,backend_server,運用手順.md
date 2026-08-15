@@ -65,7 +65,7 @@ Node.js / `package.json` / `node_modules` は不要。
 | **stdio gateway** | `mcp_stdio.py` が SSE を stdin/stdout に変換。Codex 等の stdio 専用 CLI が使う | `mcp_stdio.py --sse-url .../sse` |
 | **HTTP POST（FastAPI）** | REST API として直接呼び出せる。Swagger UI (`/docs`) で試行可能。Python から最も簡単に利用できる | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` |
 
-各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/docs` で JSON 取得できる。
+各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` で JSON 取得できる（`/{mcp_name}/docs` は存在しない。Swagger UI は本体の `http://127.0.0.1:8095/docs`）。
 
 ### Python から利用する例
 

@@ -49,7 +49,7 @@ Windows ネイティブ実行では、`terminal` は Git Bash があれば使い
 
 ## Provider 概要
 
-`cli_main.py` の provider は API provider と CLI bridge の両方を扱います。31 の provider overlay と 50 以上のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。
+`cli_main.py` の provider は API provider と CLI bridge の両方を扱います。32 の provider overlay と 70 のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。
 
 詳細な一覧と選択ロジックは `_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md` を参照してください。
 

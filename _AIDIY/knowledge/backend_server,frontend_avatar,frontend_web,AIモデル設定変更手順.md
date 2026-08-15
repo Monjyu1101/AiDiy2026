@@ -23,7 +23,7 @@
 |------|-----------|----|
 | `CHAT_AI_NAME` | `_chat` | `gemini_chat`, `openrt_chat`, `freeai_chat`, `ollama_chat` |
 | `LIVE_AI_NAME` | `_live` | `gemini_live`, `openai_live` |
-| `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `antigravity_cli`, `opencode_cli`, `aidiy_hermes` |
+| `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `antigravity_cli`, `grok_cli`, `opencode_cli`, `aidiy_hermes` |
 | `TASK_AI_NAME` / `TEAM_AI_NAME` | Code AI と同じ候補を使用 | `claude_cli`, `codex_cli`, `aidiy_hermes` |
 
 判定は完全一致を前提にする。`startswith()` などの前方一致へ変えない。
@@ -78,7 +78,7 @@ Electron では settings 専用ウィンドウ、Web では同じコンポーネ
 
 `backend_local` が未起動の場合、`/core/AIコア/モデル情報/取得` は `local_chat` を chat / code モデル候補から除外する。`_start.py` の backend_local 起動デフォルトは No のため、local LLM を使うときだけ明示起動する。
 
-Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI では `auto` / `full` / `none` を選択でき、保存時は `AiDiy_key.json` へ書き込まれる。`none` の場合、Claude / Antigravity / Copilot 系の bypass、yolo、自動全ツール許可オプションは付与しない。ただし `codex_cli` はサンドボックス無視を常に有効にするため、`--dangerously-bypass-approvals-and-sandbox` を付与する。CLI 実行時の具体的な反映処理は `AIコード_cli.py` / `AIコード_claude.py` / `command_hermes` 側の実装に合わせて確認する。
+Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI では `auto` / `full` / `none` を選択でき、保存時は `AiDiy_key.json` へ書き込まれる。`none` の場合、Claude / Antigravity / Copilot / Grok 系の bypass、yolo、自動全ツール許可オプションは付与しない（`grok_cli` は `--always-approve` を省略する）。ただし `codex_cli` はサンドボックス無視を常に有効にするため、`--dangerously-bypass-approvals-and-sandbox` を付与する。CLI 実行時の具体的な反映処理は `AIコード_cli.py` / `AIコード_claude.py` / `command_hermes` 側の実装に合わせて確認する。
 
 ## Ollama Chat の local / Cloud 切替
 

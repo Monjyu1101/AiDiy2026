@@ -116,33 +116,43 @@ class conf_models:
         # コードAIモデル一覧
         self.CODE_CLAUDE_SDK_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "sonnet": "yyyy/mm/dd - sonnet",
+            "fable": "yyyy/mm/dd - fable",
             "opus": "yyyy/mm/dd - opus",
+            "sonnet": "yyyy/mm/dd - sonnet",
             "haiku": "yyyy/mm/dd - haiku",
         }
         self.CODE_CLAUDE_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "sonnet": "yyyy/mm/dd - sonnet",
+            "fable": "yyyy/mm/dd - fable",
             "opus": "yyyy/mm/dd - opus",
+            "sonnet": "yyyy/mm/dd - sonnet",
             "haiku": "yyyy/mm/dd - haiku",
         }
         self.CODE_COPILOT_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "claude-sonnet-4.5": "yyyy/mm/dd - claude-sonnet-4.5",
+            "claude-fable-5": "yyyy/mm/dd - claude-fable-5",
+            "claude-opus-5": "yyyy/mm/dd - claude-opus-5",
+            "claude-sonnet-5": "yyyy/mm/dd - claude-sonnet-5",
             "claude-haiku-4.5": "yyyy/mm/dd - claude-haiku-4.5",
+            "gpt-5.6-sol": "yyyy/mm/dd - gpt-5.6-sol",
+            "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
+            "gpt-5.6-luna": "yyyy/mm/dd - gpt-5.6-luna",
+            "gemini-3.7-flash": "yyyy/mm/dd - gemini-3.7-flash",
         }
         self.CODE_ANTIGRAVITY_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "gemini-2.5-flash": "yyyy/mm/dd - gemini-2.5-flash",
-            "gemini-3-pro-preview": "yyyy/mm/dd - gemini-3-pro-preview",
+            "gemini-3.7-flash": "yyyy/mm/dd - gemini-3.7-flash",
         }
         self.CODE_CODEX_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "gpt-5.2": "yyyy/mm/dd - gpt-5.2",
-            "gpt-5.1-codex": "yyyy/mm/dd - gpt-5.1-codex",
-            "gpt-5.1-codex-max": "yyyy/mm/dd - gpt-5.1-codex-max",
-            "gpt-5.1-codex-mini": "yyyy/mm/dd - gpt-5.1-codex-mini",
-            "gpt-5.1": "yyyy/mm/dd - gpt-5.1",
+            "gpt-5.6-sol": "yyyy/mm/dd - gpt-5.6-sol",
+            "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
+            "gpt-5.6-luna": "yyyy/mm/dd - gpt-5.6-luna",
+        }
+        self.CODE_GROK_CLI_MODELS = {
+            "auto": "yyyy/mm/dd - auto (default)",
+            "grok-4.6": "yyyy/mm/dd - grok-4.6",
+            "grok-4.5": "yyyy/mm/dd - grok-4.5",
         }
 
         # ローカル LLM（backend_local）チャットモデル一覧の既定値
@@ -169,8 +179,8 @@ class conf_models:
         return os.path.join(config_dir, filename)
 
     def _write_json_file(self, file_path: str, payload: dict) -> None:
-        """JSONファイルを書き込む"""
-        with open(file_path, "w", encoding="utf-8") as f:
+        """JSONファイルを書き込む（.editorconfig に合わせ BOM なし UTF-8 / LF）"""
+        with open(file_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)
 
     def _load_or_create_live_config(
@@ -296,6 +306,10 @@ class conf_models:
         self.CODE_CODEX_CLI_MODELS = self._load_or_create_code_config(
             "AiDiy_code_codex_cli.json",
             self.CODE_CODEX_CLI_MODELS,
+        )
+        self.CODE_GROK_CLI_MODELS = self._load_or_create_code_config(
+            "AiDiy_code_grok_cli.json",
+            self.CODE_GROK_CLI_MODELS,
         )
         self.CHAT_LOCAL_MODELS = self._load_or_create_code_config(
             "AiDiy_chat_local.json",
@@ -764,6 +778,7 @@ class conf_models:
             "copilot_cli": self.CODE_COPILOT_CLI_MODELS,
             "antigravity_cli": self.CODE_ANTIGRAVITY_CLI_MODELS,
             "codex_cli": self.CODE_CODEX_CLI_MODELS,
+            "grok_cli": self.CODE_GROK_CLI_MODELS,
             "opencode_cli": self._get_opencode_cli_models(),
             "aidiy_hermes": self._get_aidiy_hermes_models(),
         }

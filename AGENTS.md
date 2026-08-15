@@ -198,7 +198,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 
 ### X系 Experimental
 
-- `Xテトリス`、`Xインベーダー`、`Xリバーシ`、`X立体リバーシ`、`Xピンボールfable`、`Xピンボールsol`。
+- `Xテトリス`、`Xインベーダー`、`Xリバーシ`、`X立体リバーシ`、`Xドッグファイト`。
 - `X世界の絶景`、`X太陽系`、`X動画再生BGM`、`Xビデオ`。
 - `X自己紹介`。
 
@@ -237,8 +237,9 @@ AIコアは、テキスト、音声、画像、ファイル、コード支援を
 | `LIVE_AI_NAME` | 音声リアルタイム対話 |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | code1〜code6 のコード支援 |
 | `TASK_AI_NAME` / `TASK_AI_MODEL` | backend_taskteam の AIタスク自動実行 |
+| `TEAM_AI_NAME` / `TEAM_AI_MODEL` | backend_taskteam の AIチーム依頼実行 |
 
-Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`opencode_cli`、`aidiy_hermes` を想定します。
+Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`grok_cli`、`opencode_cli`、`aidiy_hermes` を想定します。
 
 ## frontend_web 概要
 

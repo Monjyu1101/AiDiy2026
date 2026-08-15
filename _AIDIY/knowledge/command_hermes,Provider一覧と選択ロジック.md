@@ -24,7 +24,7 @@
 
 ## Provider Overlay 一覧
 
-`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 31 の provider が定義されています。各 overlay は transport、auth type、env var を指定します。
+`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 32 の provider が定義されています。各 overlay は transport、auth type、env var を指定します。
 
 | カテゴリ | Provider |
 |---------|----------|
@@ -37,7 +37,7 @@
 
 ## Alias 解決
 
-50 以上のエイリアスが `ALIASES` 辞書に定義されています。フレンドリ名（`claude`, `grok`, `qwen` など）を canonical ID にマッピングします。`cli_main.py` の `process_command()` で `/model claude` のように使えます。
+70 のエイリアスが `ALIASES` 辞書に定義されています。フレンドリ名（`claude`, `grok`, `qwen` など）を canonical ID にマッピングします。`cli_main.py` の `process_command()` で `/model claude` のように使えます。
 
 ## Interactive Picker（/model コマンド）
 

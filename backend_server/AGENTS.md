@@ -133,10 +133,12 @@ AIコアは、テキスト、音声、画像、ファイル、コード支援を
 - `AIセッション管理`
 - `AIストリーミング処理`
 - `AI音声処理`
-- `AIチャット*`
-- `AIコード*`
-- `AIコード_cli.py`
-- `AIコード_claude.py`
+- `AIチャット*`（`gemini` / `local` / `ollama` / `openrt`）
+- `AIライブ*`（`gemini` / `openai`）
+- `AIコード*`（`AIコード_cli.py`、`AIコード_claude.py`）
+- `AI内部ツール`
+- `AIバックアップ`
+- `AI音声認識`
 
 Code AI は `code1`〜`code6` / `CODE_AI1_NAME`〜`CODE_AI6_NAME` を前提にします。
 
@@ -148,6 +150,7 @@ AI 名の規約:
 | `LIVE_AI_NAME` | `_live` で終わる |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外として `aidiy_hermes` |
 | `TASK_AI_NAME` | Code AI と同じ規約。`backend_taskteam` の AIタスク自動実行で使用 |
+| `TEAM_AI_NAME` | Code AI と同じ規約。`backend_taskteam` の AIチーム依頼実行で使用 |
 
 比較は完全一致を前提にし、前方一致へ寄せない。
 

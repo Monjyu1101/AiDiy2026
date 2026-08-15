@@ -25,6 +25,7 @@
         → /apps/* → backend apps (8098)
         → /task/* → backend taskteam (8093)
         → /team/* → backend taskteam (8093)
+        → /mcp/*  → backend tools (8095)   ※ frontend_web のみ。prefix は rewrite で除去
 ```
 
 - 画面側では `/core/...`、`/apps/...`、`/task/...`、`/team/...` の相対URLだけを書く。
@@ -39,11 +40,16 @@ proxy: {
   '/apps': { target: 'http://127.0.0.1:8098', changeOrigin: true, ws: true },
   '/task': { target: 'http://127.0.0.1:8093', changeOrigin: true },
   '/team': { target: 'http://127.0.0.1:8093', changeOrigin: true },
+  // frontend_web のみ。backend_tools は prefix を持たないため rewrite で除去する
+  '/mcp':  { target: 'http://127.0.0.1:8095', changeOrigin: true,
+             rewrite: (path: string) => path.replace(/^\/mcp/, '') },
 }
 ```
 
 - `ws: true` は WebSocket 転送に必要。AIコアの `ws://127.0.0.1:8090/core/ws/AIコア` も backend core へ転送される。
 - `/core` / `/apps` の prefix は backend 側エンドポイントでも使うため、rewrite で削らない。
+- `/mcp` は `frontend_web/vite.config.ts` にだけある。`frontend_avatar` は `/core` `/apps` `/task` `/team` の 4 経路。
+- 現状 `frontend_web/src` から `/mcp` を呼ぶコードはない。手元検証用の経路として残っている。
 - `frontend_avatar` は `strictPort: true`。WebSocket URL を host から動的生成するため 8092 固定が前提。
 
 ## 現行ポート

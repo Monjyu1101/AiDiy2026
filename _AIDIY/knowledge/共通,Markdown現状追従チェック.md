@@ -26,7 +26,9 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - 同期元: `backend_tools/tools_main.py`, `backend_tools/tools_proc/`
   - 含める: `aidiy_backup`（旧表現: `aidiy_backup_check` / `aidiy_backup_save`）、`aidiy_task_agents`、`aidiy_team_agents`、`aidiy_windows_control`
 - [ ] 常駐バックエンドは 5 サーバー構成（core 8091 / apps 8098 / tools 8095 / local 8096 / task・team 8093）として記載している。
-- [ ] Vite proxy は `/core` → 8091、`/apps` → 8098、`/task` → 8093、`/team` → 8093 の 4 経路で記載している。
+- [ ] Vite proxy は `/core` → 8091、`/apps` → 8098、`/task` → 8093、`/team` → 8093 で記載している。
+  - `frontend_avatar` は上記 4 経路。`frontend_web` はこれに `/mcp` → 8095（rewrite で prefix 除去）を加えた 5 経路。
+  - 同期元: `frontend_web/vite.config.ts`, `frontend_avatar/vite.config.ts`
 - [ ] `backend_taskteam` は「AIタスク実行 + 定期タスク + 複数AIエージェントのチーム活動」として記載している。
   - 同期元: `backend_taskteam/task_proc/tasks_api.py`, `backend_taskteam/task_proc/tasks_watcher.py`, `backend_taskteam/team_proc/team_api.py`, `backend_taskteam/team_proc/team_watcher.py`
   - AIタスクとAIチームは `backend_taskteam` の単一サービスとして記載する。
@@ -72,7 +74,10 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - 同期元: `backend_server/apps_models/M商品.py`, `apps_schema/M商品.py`, `apps_crud/M商品.py`, `apps_router/M商品.py`, `apps_router/V商品.py`
   - 同期元: `frontend_web/src/components/Mマスタ/M商品/M商品一覧.vue`, `M商品編集.vue`, `components/M商品一覧テーブル.vue`
   - 確認項目: `商品分類ID`, `有効`, `件数制限`, `無効も表示`, `qBooleanCheckbox`, `ListRequest`
-- [ ] X系に `X立体リバーシ` と `X世界の絶景` を含める。
+- [ ] X系に `X立体リバーシ`、`X世界の絶景`、`X太陽系`、`Xドッグファイト`、`Xビデオ`（独立ルート `/Xビデオ`）を含める。
+  - 同期元: `frontend_web/src/router/index.ts`, `frontend_web/src/components/Xその他/`
+- [ ] `frontend_web` の Core 系ルートに `/AiDiy`、`/AIタスク`、`/AIチーム` を含める。
+  - 同期元: `frontend_web/src/router/coreRouter.ts`
 - [ ] `frontend_avatar` の表示選択は現行コンポーネント名で書く。
   - `AIコア_xneko.vue`, `AIコア_xeyes.vue`, `AIコア_アナログ時計.vue`, `AIコア_デジタル時計.vue`, `AIコア_カレンダー.vue`
   - `AIコア.vue` は `アバター表示` チェックボックスではなく `表示選択` select。

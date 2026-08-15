@@ -224,6 +224,7 @@
 | hermes を MCP サーバーとして起動・Code CLI から接続する | [`command_hermes,MCP_サーバー起動.md`](./command_hermes,MCP_サーバー起動.md) |
 | hermes-agent 新バージョンへ追従・移行する | [`command_hermes,Upstream移行手順.md`](./command_hermes,Upstream移行手順.md) |
 | opencode_cli 追加（パス解決・コマンド構築・suffix除去）のパターンを確認する | [`backend_server,opencode_cli追加と実行パターン.md`](./backend_server,opencode_cli追加と実行パターン.md) |
+| grok_cli 追加（パス解決・コマンド構築・モデル候補・配線箇所）のパターンを確認する | [`backend_server,grok_cli追加と実行パターン.md`](./backend_server,grok_cli追加と実行パターン.md) |
 | antigravity_cli のタイムアウト延長・継続フラグの調整パターンを確認する | [`backend_server,antigravity_cliタイムアウトと継続オプション.md`](./backend_server,antigravity_cliタイムアウトと継続オプション.md) |
 | Windows ネイティブ実行の OS 分岐規則・落とし穴を確認する | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |
 

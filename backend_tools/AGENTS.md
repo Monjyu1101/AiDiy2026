@@ -66,6 +66,8 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 | `aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` | 二人アバター（男女）の掛け合いによる解説・ニュース型ビデオ自動生成（version: "duo-v2"、dialogue 形式） |
 | `aidiy_automations/ビデオページ生成/ビデオページ生成_小説小話.py` | 小説・小話型ビデオ自動生成 |
 | `aidiy_automations/ビデオページ生成/ビデオページ生成_翻訳ja2xx.py` | 既存ビデオの多言語（ja → 他言語）展開 |
+| `aidiy_automations/ビデオページ生成/無限解説ビデオ生成.py` | `ビデオページ生成_解説.py` を外側から継続制御する常時実行ランナー（`aidiy_backup` の差分検知と `aidiy_code_agents` への題材更新依頼で回す） |
+| `aidiy_automations/ビデオページ生成/utils/` | 各生成スクリプト共通の ctx / infra / steps / generation / runner / log_config |
 | `tools_proc/chrome_manager.py` | Chrome プロセス管理 |
 | `tools_proc/chrome_sessions.py` | Chrome セッションレジストリ（session 名 → ポート・プロファイルの辞書管理、`temp/_chrome_sessions.json` に永続化） |
 | `tools_proc/chrome_devtools.py` | CDP client |

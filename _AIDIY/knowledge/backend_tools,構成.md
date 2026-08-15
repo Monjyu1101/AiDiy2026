@@ -20,6 +20,7 @@
 - `backend_tools/tools_proc/chrome_manager.py`
 - `backend_tools/tools_proc/chrome_sessions.py`（セッション名 → ポート/プロファイルの辞書管理、`temp/_chrome_sessions.json` に永続化）
 - `backend_tools/tools_proc/chrome_devtools.py`
+- `backend_tools/tools_proc/desktop_capture.py`
 - `backend_tools/tools_proc/sqlite_query.py`
 - `backend_tools/tools_proc/postgres_query.py`
 - `backend_tools/tools_proc/log_tailer.py`
@@ -31,7 +32,9 @@
 - `backend_tools/tools_proc/text_to_speech.py`
 - `backend_tools/tools_proc/obs_studio_control.py`
 - `backend_tools/tools_proc/ffmpeg_control.py`
+- `backend_tools/tools_proc/notification_sounds.py`
 - `backend_tools/tools_proc/code_agents.py`
+- `backend_tools/tools_proc/chat_llm.py`（`tools_proc/tools_chat.py` が MCP 登録と OpenAI 互換 HTTP ルートを持つ）
 - `backend_tools/tools_proc/task_agents.py`
 - `backend_tools/tools_proc/team_agents.py`
 - `backend_tools/tools_proc/windows_control.py`
@@ -78,13 +81,15 @@ print(res.json())  # {"save_path": "..."}
 | `aidiy_logs` | backend_server / backend_tools のログ確認 | `http://127.0.0.1:8095/aidiy_logs/sse` |
 | `aidiy_code_check` | Python 構文、ruff、TypeScript 型チェック | `http://127.0.0.1:8095/aidiy_code_check/sse` |
 | `aidiy_backup` | 差分バックアップ保存 / 確認。HTTP は `save` / `check` に分岐 | `http://127.0.0.1:8095/aidiy_backup/sse` |
-| `aidiy_image_generation` | AI 画像生成（OpenAI / Gemini / FreeAI） | `http://127.0.0.1:8095/aidiy_image_generation/sse` |
+| `aidiy_image_generation` | AI 画像生成（`auto` は codex → antigravity → openai → freeai → gemini の順でフォールバック） | `http://127.0.0.1:8095/aidiy_image_generation/sse` |
 | `aidiy_speech_to_text` | 音声認識（speech_recognition / Whisper） | `http://127.0.0.1:8095/aidiy_speech_to_text/sse` |
 | `aidiy_text_to_speech` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） | `http://127.0.0.1:8095/aidiy_text_to_speech/sse` |
 | `aidiy_obs_studio_control` | OBS Studio WebSocket 制御 | `http://127.0.0.1:8095/aidiy_obs_studio_control/sse` |
 | `aidiy_ffmpeg_control` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） | `http://127.0.0.1:8095/aidiy_ffmpeg_control/sse` |
 | `aidiy_movie_generation` | AI 動画生成（Google Gemini Veo、MP4 保存、base64 返却なし） | `http://127.0.0.1:8095/aidiy_movie_generation/sse` |
+| `aidiy_notification_sounds` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは読み上げ合成） | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` |
 | `aidiy_code_agents` | AI コードエージェント実行（CodeAI CLI 経由） | `http://127.0.0.1:8095/aidiy_code_agents/sse` |
+| `aidiy_chat_llms` | AIチャット の ChatAI を MCP 化。OpenAI / Ollama 互換の `aidiy_chat_completions`（HTTP のみ）の実体 | `http://127.0.0.1:8095/aidiy_chat_llms/sse` |
 | `aidiy_task_agents` | backend_taskteam の Task API への AIタスク非同期投入、要求/明細状態取得 | `http://127.0.0.1:8095/aidiy_task_agents/sse` |
 | `aidiy_team_agents` | backend_taskteam の Team API への AIチーム依頼投入、依頼/要員状態取得 | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
 | `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |

@@ -202,6 +202,14 @@ class CodeAI:
                 if os.path.isfile(candidate):
                     return candidate
             return "agy"
+        if self.code_ai == "grok_cli":
+            # 公式 Grok Build CLI（xai-org/grok-build）。npm ではなく ~/.grok/bin へ入る
+            userprofile = os.environ.get('USERPROFILE', os.path.expanduser('~'))
+            exe = 'grok.exe' if os.name == 'nt' else 'grok'
+            candidate = os.path.join(userprofile, '.grok', 'bin', exe)
+            if os.path.isfile(candidate):
+                return candidate
+            return "grok"
         if self.code_ai in ("claude_ollama", "codex_ollama"):
             return "ollama"
         if os.name == 'nt':
@@ -373,6 +381,26 @@ class CodeAI:
             if not 初回:
                 cmd_args.append("-c")
             return cmd_args
+
+        if self.code_ai == "grok_cli":
+            # Grok Build CLI (grok) — 公式 xai-org/grok-build
+            common = list(base)
+            if self.code_permissions != "none":
+                # --always-approve（別名 --yolo）で全ツール実行を自動承認
+                common.append("--always-approve")
+            # モデルがautoの場合はモデル指定を省略
+            if self.code_model and self.code_model.lower() != "auto":
+                common.extend(["--model", self.code_model])
+            if repo_path:
+                common.extend(["--cwd", repo_path])
+            # 自動更新チェックはヘッドレス実行では不要
+            common.append("--no-auto-update")
+            if 初回:
+                # -p (--single) は単発プロンプト。応答を stdout へ出して終了する
+                return common + ["-p", プロンプト]
+            else:
+                # -c (--continue) で同一 cwd の直近セッションを継続する
+                return common + ["-c", "-p", プロンプト]
 
         if self.code_ai == "copilot_cli":
             # GitHub Copilot CLI
@@ -834,7 +862,7 @@ class CodeAI:
             初回送信 = not resume or not self.session_started
 
             # 完全なプロンプト構築（プロバイダー別）
-            if self.code_ai in ["claude_cli", "copilot_cli", "antigravity_cli", "codex_cli", "opencode_cli"]:
+            if self.code_ai in ["claude_cli", "copilot_cli", "antigravity_cli", "codex_cli", "opencode_cli", "grok_cli"]:
                 # 履歴送信不要。初回のみ system_prompt を付与して方針を伝える
                 if 初回送信:
                     完全プロンプト = f"{self.system_prompt}\n\n{送信用要求テキスト}"

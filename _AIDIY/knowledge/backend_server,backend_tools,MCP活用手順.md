@@ -25,13 +25,15 @@
 | `aidiy_logs` | `http://127.0.0.1:8095/aidiy_logs/sse` | ログ tail、Traceback、ERROR 確認 |
 | `aidiy_code_check` | `http://127.0.0.1:8095/aidiy_code_check/sse` | Python 構文、ruff、TypeScript 型チェック |
 | `aidiy_backup` | `http://127.0.0.1:8095/aidiy_backup/sse` | 差分バックアップ保存 / 確認（HTTP は `save` / `check` に分岐） |
-| `aidiy_image_generation` | `http://127.0.0.1:8095/aidiy_image_generation/sse` | AI 画像生成（OpenAI / Gemini / FreeAI） |
+| `aidiy_image_generation` | `http://127.0.0.1:8095/aidiy_image_generation/sse` | AI 画像生成（`auto` は codex → antigravity → openai → freeai → gemini の順でフォールバック） |
 | `aidiy_movie_generation` | `http://127.0.0.1:8095/aidiy_movie_generation/sse` | AI 動画生成（Google Gemini Veo、MP4 保存、base64 返却なし） |
 | `aidiy_speech_to_text` | `http://127.0.0.1:8095/aidiy_speech_to_text/sse` | 音声認識（speech_recognition / Whisper） |
 | `aidiy_text_to_speech` | `http://127.0.0.1:8095/aidiy_text_to_speech/sse` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） |
 | `aidiy_obs_studio_control` | `http://127.0.0.1:8095/aidiy_obs_studio_control/sse` | OBS Studio 制御（配信、録画、シーン、ソース、音声） |
 | `aidiy_ffmpeg_control` | `http://127.0.0.1:8095/aidiy_ffmpeg_control/sse` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） |
+| `aidiy_notification_sounds` | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは読み上げ合成） |
 | `aidiy_code_agents` | `http://127.0.0.1:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
+| `aidiy_chat_llms` | `http://127.0.0.1:8095/aidiy_chat_llms/sse` | AIチャット の ChatAI を MCP 化。OpenAI / Ollama 互換の `aidiy_chat_completions`（HTTP のみ）の実体 |
 | `aidiy_task_agents` | `http://127.0.0.1:8095/aidiy_task_agents/sse` | backend_taskteam の Task API への AIタスク非同期投入、要求/明細状態取得 |
 | `aidiy_team_agents` | `http://127.0.0.1:8095/aidiy_team_agents/sse` | backend_taskteam の Team API への AIチーム依頼投入、依頼/要員状態取得 |
 | `aidiy_windows_control` | `http://127.0.0.1:8095/aidiy_windows_control/sse` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
@@ -73,7 +75,9 @@
 | テキスト→音声変換（MP3 出力） | `aidiy_text_to_speech` |
 | OBS Studio の配信、録画、シーン、ソース、音声制御 | `aidiy_obs_studio_control` |
 | ffmpeg / ffprobe による動画合成・字幕焼き込み、ffplay でプレビュー再生 | `aidiy_ffmpeg_control` |
+| 長時間処理の開始 / 終了 / 注意をローカル通知音で知らせる | `aidiy_notification_sounds` |
 | AI コードエージェント実行（CodeAI CLI 経由） | `aidiy_code_agents` |
+| AIチャット の ChatAI をツール／OpenAI 互換 API として呼ぶ | `aidiy_chat_llms` |
 | AIタスクへ依頼を投入して非同期実行させる | `aidiy_task_agents` |
 | AIチームの要員へ依頼を投入して非同期実行させる | `aidiy_team_agents` |
 | マウス/キーボード操作、ウィンドウ制御、プロセス管理 | `aidiy_windows_control` |
@@ -96,7 +100,7 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 | **stdio gateway** | `mcp_stdio.py --sse-url .../sse` — SSE を stdin/stdout に変換。Codex など stdio 専用 CLI が使う |
 | **HTTP POST（FastAPI）** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` — REST API として直接呼び出し可能。Swagger UI (`/docs`) で試行できる |
 
-各 MCP の引数仕様 JSON: `GET http://127.0.0.1:8095/{mcp_name}/docs`
+各 MCP の引数仕様 JSON: `GET http://127.0.0.1:8095/{mcp_name}/list`（`/{mcp_name}/docs` は存在しない。Swagger UI は本体の `http://127.0.0.1:8095/docs`）
 
 ## Python から利用する場合
 

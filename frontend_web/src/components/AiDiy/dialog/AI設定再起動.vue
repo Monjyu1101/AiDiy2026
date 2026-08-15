@@ -89,6 +89,7 @@ const CODE_MODEL_KEYS: Record<string, string> = {
   copilot_cli: 'CODE_COPILOT_CLI_MODEL',
   antigravity_cli: 'CODE_ANTIGRAVITY_CLI_MODEL',
   codex_cli: 'CODE_CODEX_CLI_MODEL',
+  grok_cli: 'CODE_GROK_CLI_MODEL',
   opencode_cli: 'CODE_OPENCODE_CLI_MODEL',
   aidiy_hermes: 'CODE_AIDIY_HERMES_MODEL',
   claude_ollama: 'CODE_CLAUDE_OLLAMA_MODEL',

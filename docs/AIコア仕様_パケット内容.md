@@ -28,6 +28,7 @@
    - `セッションID`
    - `ソケット番号`
 4. サーバーが `メッセージ識別: "init"` を返す
+5. welcome 対象ソケットには続けて `welcome_info` が届く
 
 ### 初回送信例
 
@@ -53,8 +54,20 @@
 
 補足:
 
+- `init` は全ソケット共通で送られます。クライアントは `init` の `セッションID` を採番結果として保持します。
 - `core` ソケットの `init` では `メッセージ内容` に `ボタン` と `モデル設定` が入ります。
-- `input` / `audio` / `file` / `0` - `4` の `init` は基本的に空です。
+- `input` / `audio` / `file` / `0` - `6` の `init` は基本的に空です。
+
+### init 後の welcome
+
+`init` の後、welcome 対象ソケット（`core` と数値チャンネル `0` - `6`）には `welcome_info` が届きます。`input` / `audio` / `file` には届きません。
+
+- `core`: `welcome_info` は `Project: <CODE_ROOT_PATH>`、続く `welcome_text` は `_AIDIY.md` の内容。
+- `0`: AiDiy 本体の自己紹介（Live のモデル / ボイス入り）。
+- `1` - `6`: `私は Code Agent (n) です。` に Code AI 名とモデル名。
+- 数値チャンネルでは `welcome_info` の後に会話履歴が送られ、`welcome_text` は各 AI モジュールの初期化完了後に非同期で届きます。
+
+同期元: `backend_server/AIコア/AIセッション管理.py`（`init`）、`backend_server/core_router/AIコア.py`（`welcome対象チャンネル一覧`、`数値チャンネル一覧`、`コードチャンネル一覧`）
 
 ---
 
