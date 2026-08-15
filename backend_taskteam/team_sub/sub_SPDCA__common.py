@@ -64,6 +64,7 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_chat, team_goal_db, team_pdca_db, team_work_db
+from team_proc.config import AIモデル
 
 # 担当要員のAI選択は sub_init.py と同じ処理を使う（有効要員 + Aチーム経験で判断させる）
 from sub_init import 担当要員を選択, 既定利用者ID
@@ -74,6 +75,10 @@ TASK_AGENTS_URL = (
 )
 _LOCAL_HTTP_OPENER = build_opener(ProxyHandler({}))
 操作者 = {"利用者ID": "system", "利用者名": "システム", "端末ID": "backend_team"}
+
+# 各段が使うモデルのフェーズ。相談・計画は plan、実施は do、評価・改善は check。
+# `AiDiy_key.json` の TASK_AI_MODEL_<フェーズ> / TEAM_AI_MODEL_<フェーズ> に対応する。
+段フェーズ = {"S": "plan", "P": "plan", "D": "do", "C": "check", "A": "check"}
 
 # プロンプト生成関数の形: (要員ID, プロジェクト, チーム目標, チーム作業, 区分ごとのまとめ内容) -> 要求内容
 # 第5引数は {"P": 計画のまとめ, "D": 実行のまとめ, ...} の形で、前段と参照区分の内容が入る。
@@ -174,7 +179,10 @@ def タスク投入(依頼: dict, 要員ID: str) -> str:
             "prompt": str(依頼["要求内容"]),
             "project_path": str(依頼.get("プロジェクト", "")),
             "ai_name": str(依頼.get("TASK_AI_NAME", "claude_cli")),
-            "ai_model": str(依頼.get("TASK_AI_MODEL", "auto")),
+            # 依頼が持つ TASK 側3種を、そのまま Aタスク要求の準備 / 各ステップ / 最終確認へ渡す
+            "ai_model_plan": str(依頼.get("TASK_AI_MODEL_plan", "auto")),
+            "ai_model_do": str(依頼.get("TASK_AI_MODEL_do", "auto")),
+            "ai_model_check": str(依頼.get("TASK_AI_MODEL_check", "auto")),
             "user_id": 要員ID,
             "task_id": str(依頼["依頼ID"]),
             "enabled": True,
@@ -235,6 +243,10 @@ def AI設定を決める(プロジェクト: str, 要員ID: str) -> dict:
 
     Aチーム目標編集で指定した値をそのループの全段で使う。目標側が空のときだけ、
     従来どおり要員の最終依頼（無ければ `AiDiy_key.json` の規定値）を引き継ぐ。
+
+    モデルは3種ずつをそのまま Aチーム依頼へ引き渡す。TEAM 側は段（S・P=plan /
+    D=do / C・A=check）で使い分け、TASK 側は投入した Aタスクが内部のフェーズ
+    （準備 / 各ステップ / 最終確認）で使い分ける。
     """
     既定 = team_work_db.依頼新規既定値(要員ID)
     try:
@@ -247,6 +259,17 @@ def AI設定を決める(プロジェクト: str, 要員ID: str) -> dict:
         if 値:
             既定[キー] = 値
     return 既定
+
+
+def 段のモデル(既定: dict, 区分: str, 接頭辞: str = "TASK") -> str:
+    """その段（S・P=plan / D=do / C・A=check）で使うモデルを返す。
+
+    Aタスクを作らず code_agents を直に呼ぶ段（S・P・C・A）で使う。
+    指定が `auto` なら共通設定のフェーズ別値へ落とす。
+    """
+    フェーズ = 段フェーズ.get(区分, "do")
+    値 = str(既定.get(f"{接頭辞}_AI_MODEL_{フェーズ}", "") or "").strip()
+    return 値 if 値 and 値 != "auto" else AIモデル(接頭辞, フェーズ)
 
 
 def 段を投入(
@@ -265,11 +288,8 @@ def 段を投入(
             "要員ID": 要員ID,
             "プロジェクト": プロジェクト,
             "要求内容": 要求内容,
-            "TEAM_AI_NAME": 既定["TEAM_AI_NAME"],
-            "TEAM_AI_MODEL": 既定["TEAM_AI_MODEL"],
-            "TASK_AI_NAME": 既定["TASK_AI_NAME"],
-            "TASK_AI_MODEL": 既定["TASK_AI_MODEL"],
             "実行有効": 1,
+            **{カラム: 既定[カラム] for カラム in team_work_db.AI設定カラム},
         },
         操作者,
     )
@@ -351,7 +371,7 @@ def 段を直接実行(
             要員ID,
             プロジェクト,
             既定["TASK_AI_NAME"],
-            既定["TASK_AI_MODEL"],
+            段のモデル(既定, 区分),
             要求内容,
             調査モード=True,
         )

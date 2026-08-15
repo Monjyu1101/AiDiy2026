@@ -58,7 +58,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "LIVE_GEMINI_VOICE": app_conf.json.get("LIVE_GEMINI_VOICE", "Zephyr"),
         "LIVE_FREEAI_MODEL": app_conf.json.get("LIVE_FREEAI_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
         "LIVE_FREEAI_VOICE": app_conf.json.get("LIVE_FREEAI_VOICE", "Zephyr"),
-        "LIVE_OPENAI_MODEL": app_conf.json.get("LIVE_OPENAI_MODEL", "gpt-realtime-mini"),
+        "LIVE_OPENAI_MODEL": app_conf.json.get("LIVE_OPENAI_MODEL", "gpt-realtime-2.1-mini"),
         "LIVE_OPENAI_VOICE": app_conf.json.get("LIVE_OPENAI_VOICE", "marin"),
         # CodeAI設定
         "CODE_AI1_NAME": app_conf.json.get("CODE_AI1_NAME", "copilot"),
@@ -94,10 +94,14 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_PERMISSIONS": app_conf.json.get("CODE_PERMISSIONS", "auto"),
         # TaskAI設定
         "TASK_AI_NAME": app_conf.json.get("TASK_AI_NAME", "claude_cli"),
-        "TASK_AI_MODEL": app_conf.json.get("TASK_AI_MODEL", "auto"),
+        "TASK_AI_MODEL_plan": app_conf.json.get("TASK_AI_MODEL_plan", "auto"),
+        "TASK_AI_MODEL_do": app_conf.json.get("TASK_AI_MODEL_do", "auto"),
+        "TASK_AI_MODEL_check": app_conf.json.get("TASK_AI_MODEL_check", "auto"),
         # TeamAI設定
         "TEAM_AI_NAME": app_conf.json.get("TEAM_AI_NAME", "claude_cli"),
-        "TEAM_AI_MODEL": app_conf.json.get("TEAM_AI_MODEL", "auto"),
+        "TEAM_AI_MODEL_plan": app_conf.json.get("TEAM_AI_MODEL_plan", "auto"),
+        "TEAM_AI_MODEL_do": app_conf.json.get("TEAM_AI_MODEL_do", "auto"),
+        "TEAM_AI_MODEL_check": app_conf.json.get("TEAM_AI_MODEL_check", "auto"),
     }
     return モデル設定正規化(設定)
 

@@ -19,7 +19,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 
-from .config import 設定読込
+from .config import AIモデル, 設定読込
 from .team_db import DB_PATH, 接続取得
 
 目標テーブル = "Aチーム目標"
@@ -33,12 +33,21 @@ from .team_db import DB_PATH, 接続取得
 # 作業ループのパターン。SPDCA=S→P→D→C→Aの5段、PlanDo=P→Dの2段
 許可パターン = ("SPDCA", "PlanDo")
 既定パターン = "PlanDo"
-# 作業ループの各段で使うAI。目標ごとに持ち、Aチーム依頼・Aタスクの投入時に使う
-AI設定キー = ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL")
+# 作業ループの各段で使うAI。目標ごとに持ち、Aチーム依頼・Aタスクの投入時に使う。
+# モデルは段に応じて plan（相談・計画）/ do（実施）/ check（評価・改善）を使い分ける。
+AIモデルフェーズ = ("plan", "do", "check")
+AIモデルカラム = tuple(
+    f"{接頭辞}_AI_MODEL_{フェーズ}"
+    for 接頭辞 in ("TEAM", "TASK")
+    for フェーズ in AIモデルフェーズ
+)
+AI設定キー = ("TEAM_AI_NAME", "TASK_AI_NAME", *AIモデルカラム)
+_AI設定列 = ("TEAM_AI_NAME", "TASK_AI_NAME", *AIモデルカラム)
+_AI設定列SQL = ", ".join(_AI設定列)
 既定TEAM_AI_NAME = "codex_cli"
-既定TEAM_AI_MODEL = "auto"
 既定TASK_AI_NAME = "codex_cli"
-既定TASK_AI_MODEL = "auto"
+# モデルは TEAM / TASK・フェーズを問わず auto（CLI 既定に任せる）を初期値にする
+既定AI_MODEL = "auto"
 
 
 def _現在日時() -> str:
@@ -105,9 +114,13 @@ def 初期化() -> None:
                 動員要員数 INTEGER NOT NULL DEFAULT 2,
                 パターン TEXT NOT NULL DEFAULT '{既定パターン}',
                 TEAM_AI_NAME TEXT NOT NULL DEFAULT '{既定TEAM_AI_NAME}',
-                TEAM_AI_MODEL TEXT NOT NULL DEFAULT '{既定TEAM_AI_MODEL}',
+                TEAM_AI_MODEL_plan TEXT NOT NULL DEFAULT '{既定AI_MODEL}',
+                TEAM_AI_MODEL_do TEXT NOT NULL DEFAULT '{既定AI_MODEL}',
+                TEAM_AI_MODEL_check TEXT NOT NULL DEFAULT '{既定AI_MODEL}',
                 TASK_AI_NAME TEXT NOT NULL DEFAULT '{既定TASK_AI_NAME}',
-                TASK_AI_MODEL TEXT NOT NULL DEFAULT '{既定TASK_AI_MODEL}',
+                TASK_AI_MODEL_plan TEXT NOT NULL DEFAULT '{既定AI_MODEL}',
+                TASK_AI_MODEL_do TEXT NOT NULL DEFAULT '{既定AI_MODEL}',
+                TASK_AI_MODEL_check TEXT NOT NULL DEFAULT '{既定AI_MODEL}',
                 更新連番 INTEGER NOT NULL DEFAULT 0,
                 登録日時 TEXT NOT NULL,
                 登録利用者ID TEXT NOT NULL,
@@ -124,15 +137,21 @@ def 初期化() -> None:
         conn.close()
 
 
+
+
 def 初期目標を投入() -> None:
     """起動時、1 件も無ければ既定のパスと目標をconfのAI設定で投入する。"""
     初期化()
     設定 = 設定読込()
+    # モデルは段ごとに使い分けるため、共通設定のフェーズ別値をそのまま初期値にする
     AI設定 = {
         "TEAM_AI_NAME": str(設定.TEAM_AI_NAME).strip() or 既定TEAM_AI_NAME,
-        "TEAM_AI_MODEL": str(設定.TEAM_AI_MODEL).strip() or 既定TEAM_AI_MODEL,
         "TASK_AI_NAME": str(設定.TASK_AI_NAME).strip() or 既定TASK_AI_NAME,
-        "TASK_AI_MODEL": str(設定.TASK_AI_MODEL).strip() or 既定TASK_AI_MODEL,
+        **{
+            f"{接頭辞}_AI_MODEL_{フェーズ}": AIモデル(接頭辞, フェーズ, 既定AI_MODEL)
+            for 接頭辞 in ("TEAM", "TASK")
+            for フェーズ in AIモデルフェーズ
+        },
     }
     conn = 接続取得()
     try:
@@ -141,16 +160,15 @@ def 初期目標を投入() -> None:
             f"""
             INSERT OR IGNORE INTO "{目標テーブル}" (
                 CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
-                TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
+                {_AI設定列SQL}, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(_AI設定列))}, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 既定CODE_BASE_PATH, 既定チーム目標, 0, 既定チーム作業, 0, 既定作業ループ回数,
                 既定動員要員数, 既定パターン,
-                AI設定["TEAM_AI_NAME"], AI設定["TEAM_AI_MODEL"],
-                AI設定["TASK_AI_NAME"], AI設定["TASK_AI_MODEL"],
+                *[AI設定[列] for 列 in _AI設定列],
                 _次の更新連番(conn),
                 監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
                 監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],
@@ -205,7 +223,7 @@ def 目標一覧() -> list[dict]:
         rows = conn.execute(
             f"""
             SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
-                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
+                   {_AI設定列SQL},
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
@@ -224,7 +242,7 @@ def 作業ループ対象一覧() -> list[dict]:
         rows = conn.execute(
             f"""
             SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
-                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新日時
+                   {_AI設定列SQL}, 更新日時
               FROM "{目標テーブル}"
              WHERE 作業ループ = 1 AND TRIM(CODE_BASE_PATH) != '' AND TRIM(チーム作業) != ''
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
@@ -242,7 +260,7 @@ def 目標取得(code_base_path: str) -> dict | None:
         row = conn.execute(
             f"""
             SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
-                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
+                   {_AI設定列SQL},
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}" WHERE CODE_BASE_PATH = ?
             """,
@@ -261,7 +279,7 @@ def 最終目標取得() -> dict | None:
         row = conn.execute(
             f"""
             SELECT CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
-                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
+                   {_AI設定列SQL},
                    更新日時, 更新利用者ID, 更新利用者名
               FROM "{目標テーブル}"
              ORDER BY 更新日時 DESC, 更新連番 DESC, CODE_BASE_PATH
@@ -284,19 +302,26 @@ def 目標保存(
     動員要員数: int = 既定動員要員数,
     パターン: str = 既定パターン,
     TEAM_AI_NAME: str = 既定TEAM_AI_NAME,
-    TEAM_AI_MODEL: str = 既定TEAM_AI_MODEL,
     TASK_AI_NAME: str = 既定TASK_AI_NAME,
-    TASK_AI_MODEL: str = 既定TASK_AI_MODEL,
+    **AIモデル指定: str,
 ) -> dict:
-    """パス単位のupsert。既存があれば目標・テーマ・自動作業設定・作業ループ設定と更新監査を書き換える。"""
+    """パス単位のupsert。既存があれば目標・テーマ・自動作業設定・作業ループ設定と更新監査を書き換える。
+
+    モデルは `TEAM_AI_MODEL_plan` などフェーズ別のキーワード引数で受け取る。
+    """
     初期化()
     if パターン not in 許可パターン:
         raise ValueError(f"パターンは {'/'.join(許可パターン)} のいずれかを指定してください")
+    想定外 = set(AIモデル指定) - set(AIモデルカラム)
+    if 想定外:
+        raise TypeError(f"目標保存が受け取れない引数です: {sorted(想定外)}")
     # AI設定は選択肢が環境で変わるため値の妥当性までは見ず、空のときだけ既定へ寄せる
-    team_ai_name = str(TEAM_AI_NAME or "").strip() or 既定TEAM_AI_NAME
-    team_ai_model = str(TEAM_AI_MODEL or "").strip() or 既定TEAM_AI_MODEL
-    task_ai_name = str(TASK_AI_NAME or "").strip() or 既定TASK_AI_NAME
-    task_ai_model = str(TASK_AI_MODEL or "").strip() or 既定TASK_AI_MODEL
+    AI設定 = {
+        "TEAM_AI_NAME": str(TEAM_AI_NAME or "").strip() or 既定TEAM_AI_NAME,
+        "TASK_AI_NAME": str(TASK_AI_NAME or "").strip() or 既定TASK_AI_NAME,
+    }
+    for カラム in AIモデルカラム:
+        AI設定[カラム] = str(AIモデル指定.get(カラム, "") or "").strip() or 既定AI_MODEL
     監査 = _監査項目(操作者["利用者ID"], 操作者["利用者名"], 操作者["端末ID"])
     conn = 接続取得()
     try:
@@ -304,10 +329,10 @@ def 目標保存(
             f"""
             INSERT INTO "{目標テーブル}" (
                 CODE_BASE_PATH, チーム目標, 自動作業設定, チーム作業, 作業ループ, 作業ループ回数, 動員要員数, パターン,
-                TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, 更新連番,
+                {_AI設定列SQL}, 更新連番,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(_AI設定列))}, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(CODE_BASE_PATH) DO UPDATE SET
                 チーム目標 = excluded.チーム目標,
                 自動作業設定 = excluded.自動作業設定,
@@ -316,10 +341,7 @@ def 目標保存(
                 作業ループ回数 = excluded.作業ループ回数,
                 動員要員数 = excluded.動員要員数,
                 パターン = excluded.パターン,
-                TEAM_AI_NAME = excluded.TEAM_AI_NAME,
-                TEAM_AI_MODEL = excluded.TEAM_AI_MODEL,
-                TASK_AI_NAME = excluded.TASK_AI_NAME,
-                TASK_AI_MODEL = excluded.TASK_AI_MODEL,
+                {', '.join(f'{列} = excluded.{列}' for 列 in _AI設定列)},
                 更新連番 = excluded.更新連番,
                 更新日時 = excluded.更新日時,
                 更新利用者ID = excluded.更新利用者ID,
@@ -330,7 +352,7 @@ def 目標保存(
                 code_base_path, チーム目標, int(bool(自動作業設定)), チーム作業, int(bool(作業ループ)),
                 max(1, min(99, int(作業ループ回数))),
                 max(1, min(動員要員数上限, int(動員要員数))), パターン,
-                team_ai_name, team_ai_model, task_ai_name, task_ai_model,
+                *[AI設定[列] for 列 in _AI設定列],
                 _次の更新連番(conn),
                 監査["登録日時"], 監査["登録利用者ID"], 監査["登録利用者名"], 監査["登録端末ID"],
                 監査["更新日時"], 監査["更新利用者ID"], 監査["更新利用者名"], 監査["更新端末ID"],

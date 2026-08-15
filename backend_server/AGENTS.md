@@ -154,6 +154,9 @@ AI 名の規約:
 
 比較は完全一致を前提にし、前方一致へ寄せない。
 
+TASK / TEAM のモデルは `TASK_AI_MODEL_plan` / `_do` / `_check` の3種指定です（TEAM も同様）。
+旧版の単一キー `TASK_AI_MODEL` / `TEAM_AI_MODEL` は `conf_json` が読込時と更新時に3キーへ移行します。
+
 ## MCP 連携
 
 MCP サーバー本体は `backend_tools` にあります。

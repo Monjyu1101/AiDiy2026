@@ -28,6 +28,38 @@
 
 判定は完全一致を前提にする。`startswith()` などの前方一致へ変えない。
 
+## TASK / TEAM モデルの3種指定
+
+モデルだけは AI 名1つに対して plan / do / check の3種を持つ。
+
+| キー | 使う処理 |
+|------|---------|
+| `TASK_AI_MODEL_plan` | Aタスクの準備＝明細分解（`task_sub/sub_init.py`）、Aチーム要員選定・経験まとめ、雑談発言 |
+| `TASK_AI_MODEL_do` | Aタスクの各ステップ実行（`task_sub/sub_proc.py`）、自己作業、要求・明細・依頼レコードの既定値 |
+| `TASK_AI_MODEL_check` | 終了時の最終確認（`task_sub/sub_terminate.py`） |
+| `TEAM_AI_MODEL_plan` / `_do` / `_check` | 作業ループの段（S・P=plan / D=do / C・A=check、`team_sub/sub_SPDCA__common.py` の `段フェーズ`） |
+
+判断基準:
+
+- 共通設定（`AiDiy_key.json`）と `Aタスク要求` レコードが3種を持つ。要求側の指定が優先で、
+  空なら共通設定のフェーズ別値を使う（`task_sub/sub_init.py` の `入力モデル()`、
+  `task_sub/sub_terminate.py` の `要求モデル()`）。
+- `Aタスク明細` は各ステップの実行だけなので `TASK_AI_MODEL_do` 1列。本登録時に要求の `_do` が入る。
+- フェーズが1つしかない処理も、キー名でどのフェーズかを明示する。
+  会話要求と雑談は `TASK_AI_MODEL_plan`、自己作業は `TASK_AI_MODEL_do`、経験まとめは依頼の `*_AI_MODEL_plan`。
+- `Aチーム目標` と `Aチーム依頼` は TEAM・TASK それぞれ3列（計6列）を持ち、
+  目標 → 依頼 → Aタスク要求 と3種のまま引き渡す（`sub_SPDCA__common.AI設定を決める()` → `タスク投入()`）。
+- TEAM 側3種は作業ループの段（S・P=plan / D=do / C・A=check）、TASK 側3種は投入した Aタスクの
+  内部フェーズ（準備 / 各ステップ / 最終確認）に対応する。
+- Aタスクを作らず code_agents を直に呼ぶ段（S・P・C・A）は `段のモデル()` が区分に対応する
+  フェーズを選び、`auto` なら共通設定のフェーズ別値へ落とす。
+- 旧版の単一キー（`TASK_AI_MODEL` / `TEAM_AI_MODEL`）は廃止済み。設定・DB列・API・MCP のいずれにも
+  存在しないので、新しいキーだけを使う。
+- API（`/task/タスク要求/AI登録`・`/更新登録`、`/team/目標/保存`・`/team/依頼/登録`・`/変更`）は
+  フェーズ別キーだけを受け付ける。未指定の項目は更新最終レコード → 規定値の順で補完される。
+- MCP の `aidiy_task_agents.submit` は `ai_model_plan` / `_do` / `_check`、
+  `aidiy_team_agents.submit` は `team_ai_model_plan` / `task_ai_model_plan` などでフェーズ別に指定する。
+
 ## 設定変更手順
 
 ### JSON を直接編集する場合
@@ -52,9 +84,13 @@
   "CODE_AI6_NAME": "aidiy_hermes",
   "CODE_AI6_MODEL": "auto",
   "TASK_AI_NAME": "codex_cli",
-  "TASK_AI_MODEL": "auto",
+  "TASK_AI_MODEL_plan": "auto",
+  "TASK_AI_MODEL_do": "auto",
+  "TASK_AI_MODEL_check": "auto",
   "TEAM_AI_NAME": "codex_cli",
-  "TEAM_AI_MODEL": "auto"
+  "TEAM_AI_MODEL_plan": "auto",
+  "TEAM_AI_MODEL_do": "auto",
+  "TEAM_AI_MODEL_check": "auto"
 }
 ```
 
@@ -108,5 +144,5 @@ Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI �
 ## 確認方法
 
 - `GET http://127.0.0.1:8091/core/AIコア/モデル情報/取得` で現在設定と利用可能モデル一覧を確認する（要認証）
-- 設定 UI で Chat / Live / Code1〜Code6 / Task / Team の選択肢が出ることを確認する
+- 設定 UI で Chat / Live / Code1〜Code6 / Task / Team の選択肢が出ることを確認する（Task / Team は plan / do / check の3行）
 - 保存後に `AiDiy_key.json` が更新され、core server が再起動することを確認する

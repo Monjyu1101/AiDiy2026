@@ -86,8 +86,12 @@ export function defaultModelSettings(): ModelSettings {
     CODE_AI6_NAME: 'aidiy_hermes',
     CODE_PERMISSIONS: 'auto',
     TASK_AI_NAME: 'codex_cli',
-    TASK_AI_MODEL: 'auto',
+    TASK_AI_MODEL_plan: 'auto',
+    TASK_AI_MODEL_do: 'auto',
+    TASK_AI_MODEL_check: 'auto',
     TEAM_AI_NAME: 'codex_cli',
-    TEAM_AI_MODEL: 'auto',
+    TEAM_AI_MODEL_plan: 'auto',
+    TEAM_AI_MODEL_do: 'auto',
+    TEAM_AI_MODEL_check: 'auto',
   }
 }

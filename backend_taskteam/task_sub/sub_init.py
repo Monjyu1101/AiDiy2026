@@ -47,14 +47,29 @@ DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
 ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_init.log")
 
 
-def TASK_AI設定() -> tuple[str, str]:
+def 入力モデル(入力: dict, フェーズ: str) -> str:
+    """入力 JSON（AIタスク要求レコードの値）から指定フェーズのモデルを取り出す。
+
+    フェーズは plan（準備）/ do（各ステップ）/ check（終了時の最終確認）。
+    レコード側に指定が無ければ `AiDiy_key.json` のフェーズ別規定値を使う。
+    """
+    値 = str(入力.get(f"TASK_AI_MODEL_{フェーズ}", "") or "").strip()
+    return 値 or TASK_AIモデル(フェーズ)
+
+
+def TASK_AIモデル(フェーズ: str) -> str:
+    """`AiDiy_key.json` の `TASK_AI_MODEL_<フェーズ>` を返す。
+
+    フェーズは plan / do / check。
+    """
     path = os.path.normpath(os.path.join(BASE_DIR, DEFAULT_CONFIG_PATH))
     try:
         with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
-        return str(data.get("TASK_AI_NAME", TASK_AI_NAME既定) or TASK_AI_NAME既定), str(data.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定)
+        値 = data.get(f"TASK_AI_MODEL_{フェーズ}", TASK_AI_MODEL既定)
+        return str(値 or TASK_AI_MODEL既定).strip() or TASK_AI_MODEL既定
     except Exception:
-        return TASK_AI_NAME既定, TASK_AI_MODEL既定
+        return TASK_AI_MODEL既定
 
 
 def _標準出力をUTF8化() -> None:
@@ -103,10 +118,10 @@ def JSON形式サンプル(利用者ID: str, タスクID: str, プロジェク�
   "要求内容": "入力された要求内容を整理した文章",
   "マーメイド記号": "TD",
   "明細": [
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 0, "タイトル": "開始", "要求内容": "", "先行SEQ": "", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL": "{task_ai_model}", "操作検証": false}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 1, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "0", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL": "{task_ai_model}", "操作検証": false}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 2, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "1", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL": "{task_ai_model}", "操作検証": true}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 9999, "タイトル": "終了", "要求内容": "", "先行SEQ": "2", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL": "{task_ai_model}", "操作検証": true}}
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 0, "タイトル": "開始", "要求内容": "", "先行SEQ": "", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 1, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "0", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 2, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "1", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 9999, "タイトル": "終了", "要求内容": "", "先行SEQ": "2", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true}}
   ]
 }}"""
 
@@ -123,7 +138,7 @@ def プロンプト生成_タスク分解(利用者ID: str, タスクID: str, �
 {JSON形式サンプル(利用者ID, タスクID, プロジェクト, task_ai_name, task_ai_model)}
 
 JSON のキー名は上記のテーブル項目名だけを使ってください。別名は禁止です。
-TASK_AI_NAME と TASK_AI_MODEL は全明細に必ず設定してください。通常は上記例の値をそのまま使います。
+TASK_AI_NAME と TASK_AI_MODEL_do は全明細に必ず設定してください。通常は上記例の値をそのまま使います。
 明細は必ずオブジェクト配列にしてください。配列行は禁止です。
 - 明細SEQ=0 は開始行、タイトルは必ず「開始」、先行SEQ は空文字
 - 明細SEQ=9999 は終了行、タイトルは必ず「終了」
@@ -233,7 +248,10 @@ def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model
             "要求内容": str(行["要求内容"]).strip(),
             "先行SEQ": str(行["先行SEQ"]).strip(),
             "TASK_AI_NAME": str(行.get("TASK_AI_NAME", default_task_ai_name) or default_task_ai_name).strip(),
-            "TASK_AI_MODEL": str(行.get("TASK_AI_MODEL", default_task_ai_model) or default_task_ai_model).strip(),
+            # 明細は各ステップの実行なので do 用モデルだけを持つ
+            "TASK_AI_MODEL_do": str(
+                行.get("TASK_AI_MODEL_do", default_task_ai_model) or default_task_ai_model
+            ).strip(),
             "操作検証": _真偽値(行.get("操作検証", False)),
         })
     明細SEQ集合 = {行["明細SEQ"] for 行 in 行リスト}
@@ -273,16 +291,27 @@ def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model
     return 行リスト
 
 
-def JSON保存と検証(分解結果: str, 出力JSONパス: str, プロジェクト: str, task_ai_name: str, task_ai_model: str) -> tuple[dict, list[dict]]:
-    """第2ステップ（JSON保存）と第3ステップ（検証）を実行する。失敗時は例外を送出する。"""
+def JSON保存と検証(
+    分解結果: str,
+    出力JSONパス: str,
+    プロジェクト: str,
+    task_ai_name: str,
+    task_ai_model: str,
+    plan_ai_model: str,
+) -> tuple[dict, list[dict]]:
+    """第2ステップ（JSON保存）と第3ステップ（検証）を実行する。失敗時は例外を送出する。
+
+    `task_ai_model` は生成する明細へ書き込む値（明細実行 = do 用）、
+    `plan_ai_model` はこの分解処理自体を動かすモデル（plan 用）。
+    """
     if os.path.exists(出力JSONパス):
         os.remove(出力JSONパス)
 
-    ログ(f"第2ステップ: JSON保存 (ai={task_ai_name}, model={task_ai_model}, project_path={AIDIYルート})")
+    ログ(f"第2ステップ: JSON保存 (ai={task_ai_name}, model={plan_ai_model}, project_path={AIDIYルート})")
     res = POST送信(MCP_URL, {
         "prompt": プロンプト生成_JSON保存(分解結果, 出力JSONパス, 利用者ID, タスクID, プロジェクト, task_ai_name, task_ai_model),
         "ai_name": task_ai_name,
-        "ai_model": task_ai_model,
+        "ai_model": plan_ai_model,
         "project_path": AIDIYルート,
     })
     ログ(f"第2ステップ応答: {json.dumps(res, ensure_ascii=False)[:300]}")
@@ -341,7 +370,10 @@ def main() -> int:
         プロジェクト = str(入力.get("プロジェクト", "")).strip()
         要求内容 = str(入力.get("要求内容", "")).strip()
         task_ai_name = str(入力.get("TASK_AI_NAME", TASK_AI_NAME既定) or TASK_AI_NAME既定).strip()
-        task_ai_model = str(入力.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定).strip()
+        # 生成する明細へ引き継ぐのは do のモデル（各ステップの実行に使う）
+        task_ai_model = 入力モデル(入力, "do")
+        # タスク分解（準備）そのものは plan のモデルで動かす
+        plan_ai_model = 入力モデル(入力, "plan")
         if not 利用者ID or not タスクID or not 要求内容:
             raise ValueError("入力 JSON に 利用者ID、タスクID または 要求内容 がありません")
 
@@ -362,11 +394,11 @@ def main() -> int:
             os.remove(出力JSONパス)
 
         # 1. 第1ステップ: 指定プロジェクトフォルダで AI がタスク分解（ファイル書き込みなし）
-        ログ(f"第1ステップ: タスク分解 (ai={task_ai_name}, model={task_ai_model}, project_path={プロジェクト or '既定'})")
+        ログ(f"第1ステップ: タスク分解 (ai={task_ai_name}, model={plan_ai_model}, project_path={プロジェクト or '既定'})")
         payload = {
             "prompt": プロンプト生成_タスク分解(利用者ID, タスクID, プロジェクト, 要求内容, task_ai_name, task_ai_model),
             "ai_name": task_ai_name,
-            "ai_model": task_ai_model,
+            "ai_model": plan_ai_model,
         }
         if プロジェクト:
             payload["project_path"] = プロジェクト
@@ -383,7 +415,9 @@ def main() -> int:
         # JSON保存・検証は AI 応答の揺れで失敗することがあるため、1回だけ自動リトライする
         for 試行 in range(1, JSON保存最大試行回数 + 1):
             try:
-                データ, 行リスト = JSON保存と検証(分解結果, 出力JSONパス, プロジェクト, task_ai_name, task_ai_model)
+                データ, 行リスト = JSON保存と検証(
+                    分解結果, 出力JSONパス, プロジェクト, task_ai_name, task_ai_model, plan_ai_model
+                )
                 break
             except Exception as e:
                 ログ(f"第2/第3ステップ 試行{試行}回目 失敗: {e}")

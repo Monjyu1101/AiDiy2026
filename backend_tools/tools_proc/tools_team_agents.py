@@ -29,9 +29,13 @@ class TeamAgentsRequest(BaseModel):
     project_path: Optional[str] = None
     member_id: str = "admin"
     team_ai_name: Optional[str] = None
-    team_ai_model: Optional[str] = None
+    team_ai_model_plan: Optional[str] = None
+    team_ai_model_do: Optional[str] = None
+    team_ai_model_check: Optional[str] = None
     task_ai_name: Optional[str] = None
-    task_ai_model: Optional[str] = None
+    task_ai_model_plan: Optional[str] = None
+    task_ai_model_do: Optional[str] = None
+    task_ai_model_check: Optional[str] = None
     work_id: str = ""
     要員ID: str = ""
     依頼ID: str = ""
@@ -56,9 +60,13 @@ def register_tools(mcp_te, team_agents):
         project_path: Optional[str] = None,
         member_id: str = "admin",
         team_ai_name: Optional[str] = None,
-        team_ai_model: Optional[str] = None,
+        team_ai_model_plan: Optional[str] = None,
+        team_ai_model_do: Optional[str] = None,
+        team_ai_model_check: Optional[str] = None,
         task_ai_name: Optional[str] = None,
-        task_ai_model: Optional[str] = None,
+        task_ai_model_plan: Optional[str] = None,
+        task_ai_model_do: Optional[str] = None,
+        task_ai_model_check: Optional[str] = None,
         enabled: bool = True,
         return_work_id: bool = True,
         request_timeout_sec: int = 15,
@@ -68,7 +76,9 @@ def register_tools(mcp_te, team_agents):
         登録だけを行い、AIタスク要求への投入や実行完了は待たない
         （登録後は backend_taskteam の起動監視ループが AIタスク要求へ投入する）。
         依頼IDは backend_taskteam が TR+8桁で自動採番する。
-        project_path / team_ai_name / team_ai_model / task_ai_name / task_ai_model は通常指定不要。
+        project_path / team_ai_name / task_ai_name / *_ai_model_* は通常指定不要。
+        モデルは TEAM が作業ループの段（相談・計画 / 実施 / 評価・改善）、
+        TASK が投入する Aタスクの内部フェーズ（準備 / 各ステップ / 最終確認）に対応する。
         未指定なら AIチーム画面の新規時と同じ条件
         （要員IDの更新最終レコードの値、無ければ規定値）で補完される。
         """
@@ -78,9 +88,13 @@ def register_tools(mcp_te, team_agents):
             project_path=project_path,
             member_id=member_id,
             team_ai_name=team_ai_name,
-            team_ai_model=team_ai_model,
+            team_ai_model_plan=team_ai_model_plan,
+            team_ai_model_do=team_ai_model_do,
+            team_ai_model_check=team_ai_model_check,
             task_ai_name=task_ai_name,
-            task_ai_model=task_ai_model,
+            task_ai_model_plan=task_ai_model_plan,
+            task_ai_model_do=task_ai_model_do,
+            task_ai_model_check=task_ai_model_check,
             enabled=enabled,
             return_work_id=return_work_id,
             request_timeout_sec=request_timeout_sec,
@@ -154,9 +168,13 @@ def create_router(team_agents) -> APIRouter:
                         "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_taskteam の Team API の プロジェクト に対応。null なら更新最終レコードの値、無ければ規定値（CODE_BASE_PATH）。空文字は明示的な空欄指定"},
                         "member_id": {"type": "string", "required": False, "default": "admin", "description": "要員ID。Aチーム要員の要員ID（get_member_list で確認できる）"},
                         "team_ai_name": {"type": "string", "required": False, "default": None, "description": "TEAM_AI_NAME。null なら更新最終レコードの値、無ければ規定値"},
-                        "team_ai_model": {"type": "string", "required": False, "default": None, "description": "TEAM_AI_MODEL。null なら更新最終レコードの値、無ければ規定値"},
+                        "team_ai_model_plan": {"type": "string", "required": False, "default": None, "description": "作業ループの相談・計画（S・P）で使うモデル"},
+                        "team_ai_model_do": {"type": "string", "required": False, "default": None, "description": "作業ループの実施（D）で使うモデル"},
+                        "team_ai_model_check": {"type": "string", "required": False, "default": None, "description": "作業ループの評価・改善（C・A）で使うモデル"},
                         "task_ai_name": {"type": "string", "required": False, "default": None, "description": "TASK_AI_NAME。null なら更新最終レコードの値、無ければ規定値"},
-                        "task_ai_model": {"type": "string", "required": False, "default": None, "description": "TASK_AI_MODEL。null なら更新最終レコードの値、無ければ規定値"},
+                        "task_ai_model_plan": {"type": "string", "required": False, "default": None, "description": "投入する Aタスクの準備（明細分解）で使うモデル"},
+                        "task_ai_model_do": {"type": "string", "required": False, "default": None, "description": "投入する Aタスクの各ステップ実行で使うモデル"},
+                        "task_ai_model_check": {"type": "string", "required": False, "default": None, "description": "投入する Aタスクの最終確認で使うモデル"},
                         "enabled": {"type": "boolean", "required": False, "default": True, "description": "実行有効。true なら backend_taskteam の Team watcher が処理対象にする"},
                         "return_work_id": {"type": "boolean", "required": False, "default": True, "description": "応答に work_id を含める"},
                         "request_timeout_sec": {"type": "integer", "required": False, "default": 15, "description": "登録 API 呼び出しのタイムアウト秒"},
@@ -171,9 +189,9 @@ def create_router(team_agents) -> APIRouter:
                         "依頼ID": "登録された Aチーム依頼の依頼ID",
                         "プロジェクト": "登録に使われたプロジェクト（未指定時は補完後の値）",
                         "TEAM_AI_NAME": "登録に使われた TEAM_AI_NAME（未指定時は補完後の値）",
-                        "TEAM_AI_MODEL": "登録に使われた TEAM_AI_MODEL（未指定時は補完後の値）",
+                        "TEAM_AI_MODEL_plan / _do / _check": "登録に使われた TEAM 側モデル3種（未指定時は補完後の値）",
                         "TASK_AI_NAME": "登録に使われた TASK_AI_NAME（未指定時は補完後の値）",
-                        "TASK_AI_MODEL": "登録に使われた TASK_AI_MODEL（未指定時は補完後の値）",
+                        "TASK_AI_MODEL_plan / _do / _check": "登録に使われた TASK 側モデル3種（未指定時は補完後の値）",
                         "状態": "登録直後の状態（準備開始）",
                         "work_id": "登録された Aチーム依頼の依頼ID。return_work_id=true のときだけ返す互換フィールド",
                     },
@@ -226,9 +244,13 @@ def create_router(team_agents) -> APIRouter:
                     # 要員ID は補完時の参照キーになるため、日本語キーでの指定も受け付ける
                     member_id=req.要員ID or req.member_id,
                     team_ai_name=req.team_ai_name,
-                    team_ai_model=req.team_ai_model,
+                    team_ai_model_plan=req.team_ai_model_plan,
+                    team_ai_model_do=req.team_ai_model_do,
+                    team_ai_model_check=req.team_ai_model_check,
                     task_ai_name=req.task_ai_name,
-                    task_ai_model=req.task_ai_model,
+                    task_ai_model_plan=req.task_ai_model_plan,
+                    task_ai_model_do=req.task_ai_model_do,
+                    task_ai_model_check=req.task_ai_model_check,
                     enabled=req.enabled,
                     return_work_id=req.return_work_id,
                     request_timeout_sec=req.request_timeout_sec,

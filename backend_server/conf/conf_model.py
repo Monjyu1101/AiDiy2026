@@ -56,9 +56,8 @@ class conf_models:
             "gemini-live-2.5-flash-preview": "yyyy/mm/dd - gemini-live-2.5-flash-preview",
         }
         self.LIVE_OPENAI_MODELS = {
-            "gpt-realtime-mini": "yyyy/mm/dd - gpt-realtime-mini",
-            "gpt-realtime-1.5": "yyyy/mm/dd - gpt-realtime-1.5",
-            "gpt-realtime-2": "yyyy/mm/dd - gpt-realtime-2"
+            "gpt-realtime-2.1-mini": "2026/07/06 - gpt-realtime-2.1-mini",
+            "gpt-realtime-2.1": "2026/07/06 - gpt-realtime-2.1",
         }
 
         # ライブAIボイス一覧
@@ -102,7 +101,7 @@ class conf_models:
             "alloy": "Alloy Female",
             "ash": "Ash",
             "ballad": "Ballad Female",
-            "ceder": "Cedar",
+            "cedar": "Cedar",
             "coral": "Coral Female",
             "echo": "Echo",
             "fable": "Fable",

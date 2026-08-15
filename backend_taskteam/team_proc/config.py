@@ -37,3 +37,15 @@ def 設定読込() -> Any:
     """共通 conf_json で AiDiy_key.json を読み、不足キーも共通規則で補完する。"""
     return _conf_jsonクラス読込()(json=str(KEY_JSON_PATH))
 
+
+def AIモデル(接頭辞: str, フェーズ: str, 既定: str = "auto") -> str:
+    """`TASK_AI_MODEL_<フェーズ>` / `TEAM_AI_MODEL_<フェーズ>` を返す。
+
+    接頭辞は TASK / TEAM、フェーズは plan / do / check。
+    """
+    try:
+        設定 = 設定読込()
+    except Exception:
+        return 既定
+    return str(getattr(設定, f"{接頭辞}_AI_MODEL_{フェーズ}", "") or "").strip() or 既定
+

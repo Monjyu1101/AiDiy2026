@@ -314,6 +314,10 @@ def get_antigravity_mcp_config_path() -> Path:
     return Path.home() / ".gemini" / "antigravity-cli" / "mcp_config.json"
 
 
+def get_grok_config_path() -> Path:
+    return Path.home() / ".grok" / "config.toml"
+
+
 def remove_toml_table(content: str, table_header: str) -> str:
     lines = content.splitlines()
     table_index = None
@@ -335,8 +339,7 @@ def remove_toml_table(content: str, table_header: str) -> str:
     return "\n".join(lines).rstrip() + ("\n" if lines else "")
 
 
-def remove_codex_mcp_servers_by_prefix(prefix: str) -> bool:
-    config_path = Path.home() / ".codex" / "config.toml"
+def remove_toml_mcp_servers_by_prefix(config_path: Path, prefix: str, label: str) -> bool:
     header_prefix = f"[mcp_servers.{prefix}"
     try:
         if not config_path.exists():
@@ -365,11 +368,21 @@ def remove_codex_mcp_servers_by_prefix(prefix: str) -> bool:
             print_info(f"{prefix}* は未設定です: {config_path}")
             return True
         config_path.write_text(updated, encoding="utf-8")
-        print_success(f"{', '.join(removed_names)} の MCP 設定を削除しました: {config_path}")
+        print_success(f"{', '.join(removed_names)} の MCP 設定を削除しました: {config_path} ({label})")
         return True
     except Exception as e:
-        print_error(f"Codex設定更新エラー: {config_path} ({e})")
+        print_error(f"{label}設定更新エラー: {config_path} ({e})")
         return False
+
+
+def remove_codex_mcp_servers_by_prefix(prefix: str) -> bool:
+    return remove_toml_mcp_servers_by_prefix(
+        Path.home() / ".codex" / "config.toml", prefix, "Codex"
+    )
+
+
+def remove_grok_mcp_servers_by_prefix(prefix: str) -> bool:
+    return remove_toml_mcp_servers_by_prefix(get_grok_config_path(), prefix, "Grok")
 
 
 def cleanup_global_mcp_configs(prefix: str = BACKEND_TOOLS_SERVER_PREFIX):
@@ -391,6 +404,10 @@ def cleanup_global_mcp_configs(prefix: str = BACKEND_TOOLS_SERVER_PREFIX):
 
     print_info(f"Codex CLI 設定も解除対象です: {Path.home() / '.codex' / 'config.toml'}")
     if remove_codex_mcp_servers_by_prefix(prefix):
+        updated_count += 1
+
+    print_info(f"Grok CLI 設定も解除対象です: {get_grok_config_path()}")
+    if remove_grok_mcp_servers_by_prefix(prefix):
         updated_count += 1
 
     vscode_chat = get_vscode_chat_models_path()

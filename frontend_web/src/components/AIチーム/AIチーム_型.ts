@@ -89,10 +89,15 @@ export type チーム目標 = {
   パターン?: 'SPDCA' | 'PlanDo';
   /** 作業ループの各段を実行するAI（Aチーム依頼側） */
   TEAM_AI_NAME?: string;
-  TEAM_AI_MODEL?: string;
+  /** モデルは plan（相談・計画=S・P）/ do（実施=D）/ check（評価・改善=C・A）の3種 */
+  TEAM_AI_MODEL_plan?: string;
+  TEAM_AI_MODEL_do?: string;
+  TEAM_AI_MODEL_check?: string;
   /** 作業ループから投入するAタスク側のAI */
   TASK_AI_NAME?: string;
-  TASK_AI_MODEL?: string;
+  TASK_AI_MODEL_plan?: string;
+  TASK_AI_MODEL_do?: string;
+  TASK_AI_MODEL_check?: string;
   更新日時: string;
   更新利用者ID?: string;
   更新利用者名?: string;
@@ -118,9 +123,14 @@ export type チーム依頼 = {
   タイトル: string;
   要求内容: string;
   TEAM_AI_NAME: string;
-  TEAM_AI_MODEL: string;
+  /** モデルは plan / do / check の3種。TEAM は作業ループの段、TASK は Aタスクの内部フェーズ */
+  TEAM_AI_MODEL_plan: string;
+  TEAM_AI_MODEL_do: string;
+  TEAM_AI_MODEL_check: string;
   TASK_AI_NAME: string;
-  TASK_AI_MODEL: string;
+  TASK_AI_MODEL_plan: string;
+  TASK_AI_MODEL_do: string;
+  TASK_AI_MODEL_check: string;
   タスクID: string;
   実行有効: boolean | number;
   状態: '準備開始' | '準備中' | '準備完了' | '待機' | '実行中' | 'エラー' | '完了' | '済' | '中止';

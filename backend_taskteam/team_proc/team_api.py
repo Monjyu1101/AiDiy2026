@@ -31,7 +31,7 @@ from . import (
     team_talk_db,
     team_work_db,
 )
-from .config import 設定読込
+from .config import AIモデル, 設定読込
 from .store import ストア
 
 logger = get_logger("team_api")
@@ -65,10 +65,11 @@ class 排除要求(BaseModel):
 
 
 class エージェント会話要求(BaseModel):
+    # 会話は Aタスクを作らず1回だけ調査する用途なので、使うモデルは plan 用の1つ
     要員ID: str = Field(min_length=1, max_length=persona_catalog.要員ID最大長)
     プロジェクト: str = Field(min_length=1, max_length=1000)
     TASK_AI_NAME: str = Field(min_length=1, max_length=100)
-    TASK_AI_MODEL: str = Field(min_length=1, max_length=200)
+    TASK_AI_MODEL_plan: str = Field(min_length=1, max_length=200)
     要求内容: str = Field(min_length=1, max_length=10000)
 
 
@@ -134,9 +135,14 @@ class チーム依頼保存要求(操作情報):
     プロジェクト: str | None = None
     要求内容: str
     TEAM_AI_NAME: str | None = None
-    TEAM_AI_MODEL: str | None = None
     TASK_AI_NAME: str | None = None
-    TASK_AI_MODEL: str | None = None
+    # モデルは3種ずつ
+    TEAM_AI_MODEL_plan: str | None = None
+    TEAM_AI_MODEL_do: str | None = None
+    TEAM_AI_MODEL_check: str | None = None
+    TASK_AI_MODEL_plan: str | None = None
+    TASK_AI_MODEL_do: str | None = None
+    TASK_AI_MODEL_check: str | None = None
     実行有効: bool = True
     状態: str = "準備開始"
 
@@ -194,11 +200,16 @@ class チーム目標保存要求(操作情報):
         default=team_goal_db.既定動員要員数, ge=1, le=team_goal_db.動員要員数上限
     )
     パターン: Literal["SPDCA", "PlanDo"] = team_goal_db.既定パターン
-    # 作業ループの各段で使うAI。選択肢は環境依存のため文字列のまま受け、空なら既定値にする
+    # 作業ループの各段で使うAI。選択肢は環境依存のため文字列のまま受け、空なら既定値にする。
+    # モデルは plan（相談・計画）/ do（実施）/ check（評価・改善）の3種
     TEAM_AI_NAME: str = team_goal_db.既定TEAM_AI_NAME
-    TEAM_AI_MODEL: str = team_goal_db.既定TEAM_AI_MODEL
     TASK_AI_NAME: str = team_goal_db.既定TASK_AI_NAME
-    TASK_AI_MODEL: str = team_goal_db.既定TASK_AI_MODEL
+    TEAM_AI_MODEL_plan: str | None = None
+    TEAM_AI_MODEL_do: str | None = None
+    TEAM_AI_MODEL_check: str | None = None
+    TASK_AI_MODEL_plan: str | None = None
+    TASK_AI_MODEL_do: str | None = None
+    TASK_AI_MODEL_check: str | None = None
 
 
 class チーム目標削除要求(操作情報):
@@ -221,9 +232,13 @@ async def チーム設定取得() -> dict:
         return ok("チーム設定を取得しました", {
             "CODE_BASE_PATH": str(config.CODE_BASE_PATH),
             "TEAM_AI_NAME": str(config.TEAM_AI_NAME),
-            "TEAM_AI_MODEL": str(config.TEAM_AI_MODEL),
+            "TEAM_AI_MODEL_plan": AIモデル("TEAM", "plan"),
+            "TEAM_AI_MODEL_do": AIモデル("TEAM", "do"),
+            "TEAM_AI_MODEL_check": AIモデル("TEAM", "check"),
             "TASK_AI_NAME": str(config.TASK_AI_NAME),
-            "TASK_AI_MODEL": str(config.TASK_AI_MODEL),
+            "TASK_AI_MODEL_plan": AIモデル("TASK", "plan"),
+            "TASK_AI_MODEL_do": AIモデル("TASK", "do"),
+            "TASK_AI_MODEL_check": AIモデル("TASK", "check"),
         })
     except Exception as e:
         logger.error(f"チーム設定の取得に失敗: {e}")
@@ -297,10 +312,10 @@ async def エージェント会話(request: エージェント会話要求) -> d
         要員ID = request.要員ID.strip()
         プロジェクト = request.プロジェクト.strip()
         task_ai_name = request.TASK_AI_NAME.strip()
-        task_ai_model = request.TASK_AI_MODEL.strip()
+        task_ai_model = request.TASK_AI_MODEL_plan.strip()
         要求内容 = request.要求内容.strip()
         if not all((要員ID, プロジェクト, task_ai_name, task_ai_model, 要求内容)):
-            return ng("要員ID、プロジェクト、TASK_AI_NAME、TASK_AI_MODEL、要求内容を指定してください")
+            return ng("要員ID、プロジェクト、TASK_AI_NAME、TASK_AI_MODEL_plan、要求内容を指定してください")
         item = await asyncio.to_thread(
             team_chat.会話実行,
             要員ID,
@@ -489,21 +504,24 @@ def _依頼データ(request: チーム依頼保存要求, 編集中: bool) -> d
     既定 = {
         "プロジェクト": "",
         "TEAM_AI_NAME": "codex_cli",
-        "TEAM_AI_MODEL": "auto",
         "TASK_AI_NAME": "codex_cli",
-        "TASK_AI_MODEL": "auto",
+        **{カラム: "auto" for カラム in team_work_db.AIモデルカラム},
     }
     if not 編集中:
         既定.update(team_work_db.依頼新規既定値(要員ID))
+    # フェーズ別の指定が無い項目は既定値で埋める
+    モデル = {
+        カラム: (getattr(request, カラム, None) or "").strip() or 既定[カラム]
+        for カラム in team_work_db.AIモデルカラム
+    }
     return {
         "要員ID": 要員ID,
         "依頼ID": 依頼ID,
         "プロジェクト": 既定["プロジェクト"] if request.プロジェクト is None else request.プロジェクト.strip(),
         "要求内容": 要求内容,
         "TEAM_AI_NAME": (request.TEAM_AI_NAME or "").strip() or 既定["TEAM_AI_NAME"],
-        "TEAM_AI_MODEL": (request.TEAM_AI_MODEL or "").strip() or 既定["TEAM_AI_MODEL"],
         "TASK_AI_NAME": (request.TASK_AI_NAME or "").strip() or 既定["TASK_AI_NAME"],
-        "TASK_AI_MODEL": (request.TASK_AI_MODEL or "").strip() or 既定["TASK_AI_MODEL"],
+        **モデル,
         "実行有効": request.実行有効,
         "状態": request.状態,
     }
@@ -735,9 +753,12 @@ async def チーム目標保存(request: チーム目標保存要求) -> dict:
             request.動員要員数,
             request.パターン,
             request.TEAM_AI_NAME,
-            request.TEAM_AI_MODEL,
             request.TASK_AI_NAME,
-            request.TASK_AI_MODEL,
+            **{
+                カラム: 値
+                for カラム in team_goal_db.AIモデルカラム
+                if (値 := getattr(request, カラム, None))
+            },
         )
         response_data = {"item": item}
         クリア内容: list[str] = []

@@ -15,7 +15,7 @@ const 入力タイトル = ref('');
 const 入力要求内容 = ref('');
 const 入力先行SEQ = ref('');
 const 入力TASK_AI_NAME = ref('codex_cli');
-const 入力TASK_AI_MODEL = ref('auto');
+const 入力TASK_AI_MODEL_do = ref('auto');
 const 入力操作検証 = ref(false);
 const 入力実行有効 = ref(true);
 const 入力状態 = ref('待機');
@@ -68,7 +68,7 @@ async function モデル選択肢読込() {
     }
   } catch {
     availableModels.value = { code_models: { ...TASK_CODE_MODELS既定 } };
-    currentSettings.value = { TASK_AI_NAME: 'codex_cli', TASK_AI_MODEL: 'auto' };
+    currentSettings.value = { TASK_AI_NAME: 'codex_cli', TASK_AI_MODEL_do: 'auto' };
   }
 }
 
@@ -80,7 +80,7 @@ watch(() => props.isOpen, (open) => {
   入力先行SEQ.value = String(編集.先行SEQ ?? '');
   void モデル選択肢読込().then(() => {
     入力TASK_AI_NAME.value = chooseAvailable(編集.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'codex_cli', taskAiOptions.value) || 'codex_cli';
-    入力TASK_AI_MODEL.value = chooseAvailable(編集.TASK_AI_MODEL || currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
+    入力TASK_AI_MODEL_do.value = chooseAvailable(編集.TASK_AI_MODEL_do || currentSettings.value.TASK_AI_MODEL_do || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
   });
   入力操作検証.value = Boolean(編集.操作検証);
   入力実行有効.value = Boolean(編集.実行有効);
@@ -89,8 +89,8 @@ watch(() => props.isOpen, (open) => {
 
 watch(入力TASK_AI_NAME, (newValue) => {
   const models = Object.keys(availableModels.value?.code_models?.[newValue] || {});
-  if (models.length > 0 && !models.includes(入力TASK_AI_MODEL.value)) {
-    入力TASK_AI_MODEL.value = models[0]!;
+  if (models.length > 0 && !models.includes(入力TASK_AI_MODEL_do.value)) {
+    入力TASK_AI_MODEL_do.value = models[0]!;
   }
 });
 
@@ -109,7 +109,7 @@ const 登録 = async () => {
       要求内容: 入力要求内容.value.trim(),
       先行SEQ: 入力先行SEQ.value.trim(),
       TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'codex_cli',
-      TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
+      TASK_AI_MODEL_do: 入力TASK_AI_MODEL_do.value.trim() || 'auto',
       操作検証: 入力操作検証.value,
       実行有効: 入力実行有効.value,
       状態: 入力状態.value
@@ -191,9 +191,9 @@ const 登録 = async () => {
           </div>
         </div>
         <div class="detail-row one-line-row">
-          <div class="detail-label">TASK_AI_MODEL</div>
+          <div class="detail-label">TASK_AI_MODEL_do</div>
           <div class="detail-value">
-            <select v-model="入力TASK_AI_MODEL" class="detail-select">
+            <select v-model="入力TASK_AI_MODEL_do" class="detail-select">
               <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
             </select>
           </div>

@@ -40,9 +40,9 @@ const パターン正規化 = (値: unknown): 'SPDCA' | 'PlanDo' =>
 // AI選択肢が読めなかったときに使う最終フォールバック
 const 既定AI = {
   TEAM_AI_NAME: 'claude_cli',
-  TEAM_AI_MODEL: 'auto',
   TASK_AI_NAME: 'claude_cli',
-  TASK_AI_MODEL: 'auto',
+  // plan / do / check の3種とも、選択肢が読めないときは auto を最終フォールバックにする
+  モデル: 'auto',
 };
 const 利用者ID = computed(() => props.利用者ID || 'admin');
 const 利用者名 = computed(() => props.利用者名 || props.利用者ID || 'admin');
@@ -59,9 +59,13 @@ const 入力作業ループ回数 = ref(1);
 const 入力動員要員数 = ref(既定動員要員数);
 const 入力パターン = ref<'SPDCA' | 'PlanDo'>(既定パターン);
 const 入力TEAM_AI_NAME = ref(既定AI.TEAM_AI_NAME);
-const 入力TEAM_AI_MODEL = ref(既定AI.TEAM_AI_MODEL);
+const 入力TEAM_AI_MODEL_plan = ref(既定AI.モデル);
+const 入力TEAM_AI_MODEL_do = ref(既定AI.モデル);
+const 入力TEAM_AI_MODEL_check = ref(既定AI.モデル);
 const 入力TASK_AI_NAME = ref(既定AI.TASK_AI_NAME);
-const 入力TASK_AI_MODEL = ref(既定AI.TASK_AI_MODEL);
+const 入力TASK_AI_MODEL_plan = ref(既定AI.モデル);
+const 入力TASK_AI_MODEL_do = ref(既定AI.モデル);
+const 入力TASK_AI_MODEL_check = ref(既定AI.モデル);
 // AIコアが返す利用可能モデルと、AiDiy_key.json 側の規定値
 const 利用可能モデル = ref<Record<string, any>>({ code_models: {} });
 const 規定設定 = ref<Record<string, any>>({});
@@ -87,6 +91,27 @@ const TASKモデル選択肢 = computed(() => モデル選択肢(入力TASK_AI_N
 const 選択可能な値 = (値: unknown, 候補: string[]) => {
   const 文字列 = String(値 || '');
   return 文字列 && 候補.includes(文字列) ? 文字列 : 候補[0] || '';
+};
+
+// モデルは plan（相談・計画 = S・P）/ do（実施 = D）/ check（評価・改善 = C・A）の3種
+const AIモデルフェーズ = ['plan', 'do', 'check'] as const;
+const TEAMモデル入力 = [入力TEAM_AI_MODEL_plan, 入力TEAM_AI_MODEL_do, 入力TEAM_AI_MODEL_check];
+const TASKモデル入力 = [入力TASK_AI_MODEL_plan, 入力TASK_AI_MODEL_do, 入力TASK_AI_MODEL_check];
+
+// 目標の値 → AiDiy_key.json の規定値 → 既定AI の順で、選択中AIの候補へ寄せて入れる
+const モデル反映 = (接頭辞: 'TEAM' | 'TASK', 元: Partial<チーム目標> | null) => {
+  const 規定 = 規定設定.value;
+  const 既定値 = 既定AI.モデル;
+  const 候補 = (接頭辞 === 'TEAM' ? TEAMモデル選択肢.value : TASKモデル選択肢.value).map(
+    (項目) => 項目.value,
+  );
+  const 入力一覧 = 接頭辞 === 'TEAM' ? TEAMモデル入力 : TASKモデル入力;
+  AIモデルフェーズ.forEach((フェーズ, 位置) => {
+    const キー = `${接頭辞}_AI_MODEL_${フェーズ}`;
+    const 値 =
+      (元 as Record<string, any> | null)?.[キー] || 規定[キー] || 既定値;
+    入力一覧[位置]!.value = 選択可能な値(値, 候補) || 既定値;
+  });
 };
 
 const 読込中 = ref(false);
@@ -159,19 +184,11 @@ const AI設定を反映 = (元: Partial<チーム目標> | null) => {
   入力TEAM_AI_NAME.value =
     選択可能な値(元?.TEAM_AI_NAME || 規定.TEAM_AI_NAME || 既定AI.TEAM_AI_NAME, AI名称選択肢.value) ||
     既定AI.TEAM_AI_NAME;
-  入力TEAM_AI_MODEL.value =
-    選択可能な値(
-      元?.TEAM_AI_MODEL || 規定.TEAM_AI_MODEL || 既定AI.TEAM_AI_MODEL,
-      TEAMモデル選択肢.value.map((項目) => 項目.value),
-    ) || 既定AI.TEAM_AI_MODEL;
+  モデル反映('TEAM', 元);
   入力TASK_AI_NAME.value =
     選択可能な値(元?.TASK_AI_NAME || 規定.TASK_AI_NAME || 既定AI.TASK_AI_NAME, AI名称選択肢.value) ||
     既定AI.TASK_AI_NAME;
-  入力TASK_AI_MODEL.value =
-    選択可能な値(
-      元?.TASK_AI_MODEL || 規定.TASK_AI_MODEL || 既定AI.TASK_AI_MODEL,
-      TASKモデル選択肢.value.map((項目) => 項目.value),
-    ) || 既定AI.TASK_AI_MODEL;
+  モデル反映('TASK', 元);
   AI反映中.value = false;
 };
 
@@ -179,16 +196,19 @@ const AI設定を反映 = (元: Partial<チーム目標> | null) => {
 watch(入力TEAM_AI_NAME, (value) => {
   if (AI反映中.value) return;
   const models = Object.keys(利用可能モデル.value?.code_models?.[value] || {});
-  if (models.length && !models.includes(入力TEAM_AI_MODEL.value)) {
-    入力TEAM_AI_MODEL.value = models[0]!;
+  if (!models.length) return;
+  // plan / do / check は同じ AI の候補から選ぶため、AI名変更時はまとめて寄せ直す
+  for (const モデル of TEAMモデル入力) {
+    if (!models.includes(モデル.value)) モデル.value = models[0]!;
   }
 }, { flush: 'sync' });
 
 watch(入力TASK_AI_NAME, (value) => {
   if (AI反映中.value) return;
   const models = Object.keys(利用可能モデル.value?.code_models?.[value] || {});
-  if (models.length && !models.includes(入力TASK_AI_MODEL.value)) {
-    入力TASK_AI_MODEL.value = models[0]!;
+  if (!models.length) return;
+  for (const モデル of TASKモデル入力) {
+    if (!models.includes(モデル.value)) モデル.value = models[0]!;
   }
 }, { flush: 'sync' });
 
@@ -313,9 +333,13 @@ const 保存 = async () => {
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
       TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
-      TEAM_AI_MODEL: 入力TEAM_AI_MODEL.value,
+      TEAM_AI_MODEL_plan: 入力TEAM_AI_MODEL_plan.value,
+      TEAM_AI_MODEL_do: 入力TEAM_AI_MODEL_do.value,
+      TEAM_AI_MODEL_check: 入力TEAM_AI_MODEL_check.value,
       TASK_AI_NAME: 入力TASK_AI_NAME.value,
-      TASK_AI_MODEL: 入力TASK_AI_MODEL.value,
+      TASK_AI_MODEL_plan: 入力TASK_AI_MODEL_plan.value,
+      TASK_AI_MODEL_do: 入力TASK_AI_MODEL_do.value,
+      TASK_AI_MODEL_check: 入力TASK_AI_MODEL_check.value,
       操作利用者ID: 利用者ID.value,
       操作利用者名: 利用者名.value,
       操作端末ID: 'frontend_avatar',
@@ -336,9 +360,13 @@ const 保存 = async () => {
       動員要員数: 入力動員要員数.value,
       パターン: 入力パターン.value,
       TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
-      TEAM_AI_MODEL: 入力TEAM_AI_MODEL.value,
+      TEAM_AI_MODEL_plan: 入力TEAM_AI_MODEL_plan.value,
+      TEAM_AI_MODEL_do: 入力TEAM_AI_MODEL_do.value,
+      TEAM_AI_MODEL_check: 入力TEAM_AI_MODEL_check.value,
       TASK_AI_NAME: 入力TASK_AI_NAME.value,
-      TASK_AI_MODEL: 入力TASK_AI_MODEL.value,
+      TASK_AI_MODEL_plan: 入力TASK_AI_MODEL_plan.value,
+      TASK_AI_MODEL_do: 入力TASK_AI_MODEL_do.value,
+      TASK_AI_MODEL_check: 入力TASK_AI_MODEL_check.value,
     });
     // 1件保存したら用は済むのでダイアログを閉じる
     emit('close');
@@ -559,14 +587,34 @@ const 削除 = async () => {
                     <span class="loop-config-help">各段を実行するAI</span>
                   </label>
 
-                  <label class="loop-config-item" for="TEAM_AI_MODEL">
-                    <span class="loop-config-label">TEAM_AI_MODEL</span>
-                    <select id="TEAM_AI_MODEL" v-model="入力TEAM_AI_MODEL" class="loop-config-select">
+                  <label class="loop-config-item" for="TEAM_AI_MODEL_plan">
+                    <span class="loop-config-label">TEAM_AI_MODEL_plan</span>
+                    <select id="TEAM_AI_MODEL_plan" v-model="入力TEAM_AI_MODEL_plan" class="loop-config-select">
                       <option v-for="model in TEAMモデル選択肢" :key="model.value" :value="model.value">
                         {{ model.label }}
                       </option>
                     </select>
-                    <span class="loop-config-help">autoはCLI既定</span>
+                    <span class="loop-config-help">相談・計画（S・P）</span>
+                  </label>
+
+                  <label class="loop-config-item" for="TEAM_AI_MODEL_do">
+                    <span class="loop-config-label">TEAM_AI_MODEL_do</span>
+                    <select id="TEAM_AI_MODEL_do" v-model="入力TEAM_AI_MODEL_do" class="loop-config-select">
+                      <option v-for="model in TEAMモデル選択肢" :key="model.value" :value="model.value">
+                        {{ model.label }}
+                      </option>
+                    </select>
+                    <span class="loop-config-help">実施（D）</span>
+                  </label>
+
+                  <label class="loop-config-item" for="TEAM_AI_MODEL_check">
+                    <span class="loop-config-label">TEAM_AI_MODEL_check</span>
+                    <select id="TEAM_AI_MODEL_check" v-model="入力TEAM_AI_MODEL_check" class="loop-config-select">
+                      <option v-for="model in TEAMモデル選択肢" :key="model.value" :value="model.value">
+                        {{ model.label }}
+                      </option>
+                    </select>
+                    <span class="loop-config-help">評価・改善（C・A）</span>
                   </label>
 
                   <label class="loop-config-item" for="TASK_AI_NAME">
@@ -577,14 +625,34 @@ const 削除 = async () => {
                     <span class="loop-config-help">Aタスク側のAI</span>
                   </label>
 
-                  <label class="loop-config-item" for="TASK_AI_MODEL">
-                    <span class="loop-config-label">TASK_AI_MODEL</span>
-                    <select id="TASK_AI_MODEL" v-model="入力TASK_AI_MODEL" class="loop-config-select">
+                  <label class="loop-config-item" for="TASK_AI_MODEL_plan">
+                    <span class="loop-config-label">TASK_AI_MODEL_plan</span>
+                    <select id="TASK_AI_MODEL_plan" v-model="入力TASK_AI_MODEL_plan" class="loop-config-select">
                       <option v-for="model in TASKモデル選択肢" :key="model.value" :value="model.value">
                         {{ model.label }}
                       </option>
                     </select>
-                    <span class="loop-config-help">autoはCLI既定</span>
+                    <span class="loop-config-help">相談・計画（S・P）</span>
+                  </label>
+
+                  <label class="loop-config-item" for="TASK_AI_MODEL_do">
+                    <span class="loop-config-label">TASK_AI_MODEL_do</span>
+                    <select id="TASK_AI_MODEL_do" v-model="入力TASK_AI_MODEL_do" class="loop-config-select">
+                      <option v-for="model in TASKモデル選択肢" :key="model.value" :value="model.value">
+                        {{ model.label }}
+                      </option>
+                    </select>
+                    <span class="loop-config-help">実施（D）</span>
+                  </label>
+
+                  <label class="loop-config-item" for="TASK_AI_MODEL_check">
+                    <span class="loop-config-label">TASK_AI_MODEL_check</span>
+                    <select id="TASK_AI_MODEL_check" v-model="入力TASK_AI_MODEL_check" class="loop-config-select">
+                      <option v-for="model in TASKモデル選択肢" :key="model.value" :value="model.value">
+                        {{ model.label }}
+                      </option>
+                    </select>
+                    <span class="loop-config-help">評価・改善（C・A）</span>
                   </label>
                 </div>
               </section>

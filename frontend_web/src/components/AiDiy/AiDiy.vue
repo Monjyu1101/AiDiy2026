@@ -58,9 +58,13 @@ const モデル設定 = ref({
   CODE_AI6_NAME: '',
   CODE_PERMISSIONS: 'auto',
   TASK_AI_NAME: 'claude_cli',
-  TASK_AI_MODEL: 'auto',
+  TASK_AI_MODEL_plan: 'auto',
+  TASK_AI_MODEL_do: 'auto',
+  TASK_AI_MODEL_check: 'auto',
   TEAM_AI_NAME: 'claude_cli',
-  TEAM_AI_MODEL: 'auto'
+  TEAM_AI_MODEL_plan: 'auto',
+  TEAM_AI_MODEL_do: 'auto',
+  TEAM_AI_MODEL_check: 'auto'
 });
 
 const チャットモード = ref<チャットモード型>('live');
@@ -123,9 +127,13 @@ function コア状態リセット() {
      CODE_AI6_NAME: '',
      CODE_PERMISSIONS: 'auto',
      TASK_AI_NAME: 'claude_cli',
-     TASK_AI_MODEL: 'auto',
+     TASK_AI_MODEL_plan: 'auto',
+     TASK_AI_MODEL_do: 'auto',
+     TASK_AI_MODEL_check: 'auto',
      TEAM_AI_NAME: 'claude_cli',
-     TEAM_AI_MODEL: 'auto'
+     TEAM_AI_MODEL_plan: 'auto',
+     TEAM_AI_MODEL_do: 'auto',
+     TEAM_AI_MODEL_check: 'auto'
    };
   パネルボタン状態.value = パネル状態生成();
   パネル表示中.value = パネル状態生成();
@@ -198,9 +206,13 @@ function 初期化処理(message: Record<string, any>) {
     CODE_AI6_NAME: settings.CODE_AI6_NAME || '',
     CODE_PERMISSIONS: settings.CODE_PERMISSIONS || 'auto',
     TASK_AI_NAME: settings.TASK_AI_NAME || 'claude_cli',
-    TASK_AI_MODEL: settings.TASK_AI_MODEL || 'auto',
+    TASK_AI_MODEL_plan: settings.TASK_AI_MODEL_plan || 'auto',
+    TASK_AI_MODEL_do: settings.TASK_AI_MODEL_do || 'auto',
+    TASK_AI_MODEL_check: settings.TASK_AI_MODEL_check || 'auto',
     TEAM_AI_NAME: settings.TEAM_AI_NAME || 'claude_cli',
-    TEAM_AI_MODEL: settings.TEAM_AI_MODEL || 'auto'
+    TEAM_AI_MODEL_plan: settings.TEAM_AI_MODEL_plan || 'auto',
+    TEAM_AI_MODEL_do: settings.TEAM_AI_MODEL_do || 'auto',
+    TEAM_AI_MODEL_check: settings.TEAM_AI_MODEL_check || 'auto'
   };
 
   初期マイク有効.value = Boolean(buttons.マイク);

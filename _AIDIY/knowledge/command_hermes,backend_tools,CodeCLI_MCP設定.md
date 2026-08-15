@@ -15,6 +15,7 @@
 | Gemini | project `.gemini/settings.json` | BOM なし UTF-8 で保存する |
 | Antigravity | `C:\Users\admin\.gemini\antigravity-cli\mcp_config.json` | `mcp_stdio.py` を経由した stdio server として登録する（Codexと同様） |
 | Codex | `C:\Users\admin\.codex\config.toml` | `mcp_stdio.py` を stdio server として登録する |
+| Grok | `C:\Users\admin\.grok\config.toml` | ネイティブ SSE（`type = "sse"`）。stdio ブリッジは使わない |
 | Copilot | `C:\Users\admin\.copilot\mcp-config.json` | `_setup.py` / `_cleanup.py` の対象 |
 | OpenCode | `C:\Users\admin\.config\opencode\opencode.json` | 公式 docs では `mcp` キー配下。`.opencode/` は agents / commands / plugins などのディレクトリ用途 |
 
@@ -28,7 +29,24 @@
 - `scripts/cli_bat/_codex_cli.bat`
 - `backend_tools/mcp_stdio.py`
 - `C:\Users\admin\.codex\config.toml`
+- `C:\Users\admin\.grok\config.toml`
 - `C:\Users\admin\.gemini\antigravity-cli\mcp_config.json`
+
+## Grok へ SSE で直接登録する設定
+
+Grok Build CLI（`grok`）は `~/.grok/config.toml` へ `type = "sse"` で直接書きます。`url` だけだと streamable HTTP 扱いになるので、`type` を省略しない。
+
+Grok の `type=sse` は GET `/sse` のあと、同じ URL へ Streamable HTTP の `initialize` を POST する。サーバー側は GET を従来 SSE、POST/DELETE を Streamable HTTP として扱う。`grok mcp doctor <name>` で handshake が通ることを確認する。
+
+### Grok の設定例 (config.toml)
+```toml
+[mcp_servers.aidiy_chrome_devtools]
+url = "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
+type = "sse"
+enabled = true
+```
+
+`grok mcp add --transport sse <name> <sse-url>` でも同じ内容になる。`~/.claude.json` も読むが、同名は `~/.grok/config.toml` が優先する。
 
 ## Codex / Antigravity から stdio ブリッジを介して AiDiy MCP を使う設定
 
@@ -66,7 +84,7 @@ startup_timeout_sec = 60
 
 ## セットアップ/クリーンアップの方針
 
-- `python _setup.py` は必要に応じて Claude / Gemini / Copilot / OpenCode / Codex / Antigravity 用 MCP 設定を生成する
+- `python _setup.py` は必要に応じて Claude / Gemini / Copilot / OpenCode / Codex / Grok / Antigravity 用 MCP 設定を生成する
 - `python _cleanup.py` は AiDiy が追加した MCP 設定を削除する
 - `.claude/` と `.gemini/` は CLI がローカルで更新するため、project 配下に置く場合は `.gitignore` に入れる
 
@@ -90,8 +108,10 @@ startup_timeout_sec = 60
 claude mcp list
 gemini mcp list
 codex mcp list
+grok mcp list
+grok inspect
 python _setup.py
 python _cleanup.py
 ```
 
-`_setup.py` 実行後は `.gitignore` に `.claude/` と `.gemini/` が含まれること、Codex/Antigravity 設定では `mcp_stdio.py --sse-url ...` 形式になっていることを確認する。Codex は `startup_timeout_sec` を使うため、古い `startup_timeout_ms` が残っている場合は秒指定へ更新する。
+`_setup.py` 実行後は `.gitignore` に `.claude/` と `.gemini/` が含まれること、Codex/Antigravity 設定では `mcp_stdio.py --sse-url ...` 形式になっていることを確認する。Codex は `startup_timeout_sec` を使うため、古い `startup_timeout_ms` が残っている場合は秒指定へ更新する。Grok は `~/.grok/config.toml` の各 `aidiy_*` に `type = "sse"` があること、`grok mcp list` にサーバーが出ることを確認する。

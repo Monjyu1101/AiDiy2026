@@ -117,7 +117,8 @@ def main() -> int:
         要員ID = str(項目.get("要員ID", "")).strip()
         チーム目標 = str(項目.get("チーム目標", "")).strip()
         TASK_AI_NAME = str(項目.get("TASK_AI_NAME", "claude_cli")).strip() or "claude_cli"
-        TASK_AI_MODEL = str(項目.get("TASK_AI_MODEL", "auto")).strip() or "auto"
+        # 雑談は意見出し（相談）なので plan 用モデルを使う
+        TASK_AI_MODEL_plan = str(項目.get("TASK_AI_MODEL_plan", "auto")).strip() or "auto"
         他者意見一覧 = 項目.get("他者意見", []) or []
         自身の前回発言 = str(項目.get("自身の1回前の発言", "")).strip()
         if not プロジェクト or not 要員ID:
@@ -130,7 +131,7 @@ def main() -> int:
             要員ID,
             プロジェクト,
             TASK_AI_NAME,
-            TASK_AI_MODEL,
+            TASK_AI_MODEL_plan,
             依頼内容,
             調査モード=True,
         )

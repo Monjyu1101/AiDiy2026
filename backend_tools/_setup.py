@@ -12,7 +12,7 @@
 
 このフォルダ (backend_tools) 単体のセットアップを行います。
 依存関係 (uv sync --upgrade / npm install) のインストールに加え、Claude / Copilot /
-Antigravity / OpenCode / Codex / VS Code 各クライアントの MCP 設定書き込みを行います。
+Antigravity / OpenCode / Codex / Grok / VS Code 各クライアントの MCP 設定書き込みを行います。
 
 ルートの `_setup.py` から import して下記関数を呼び出すことも、
 このスクリプトを直接実行して単体セットアップすることもできます。
@@ -340,6 +340,10 @@ def get_antigravity_mcp_config_path() -> Path:
     return Path.home() / ".gemini" / "antigravity-cli" / "mcp_config.json"
 
 
+def get_grok_config_path() -> Path:
+    return Path.home() / ".grok" / "config.toml"
+
+
 def _build_chat_completions_provider() -> dict:
     models = [
         {
@@ -516,8 +520,7 @@ def upsert_toml_table(path: Path, table_header: str, body_lines: list[str]) -> b
         return False
 
 
-def remove_codex_mcp_servers(server_names: set[str]) -> bool:
-    config_path = Path.home() / ".codex" / "config.toml"
+def remove_toml_mcp_servers(config_path: Path, server_names: set[str], label: str) -> bool:
     try:
         if not config_path.exists():
             return True
@@ -533,11 +536,19 @@ def remove_codex_mcp_servers(server_names: set[str]) -> bool:
         if not removed:
             return True
         config_path.write_text(updated, encoding="utf-8")
-        print_info(f"Codex MCP設定から削除しました: {config_path} ({', '.join(removed)})")
+        print_info(f"{label} MCP設定から削除しました: {config_path} ({', '.join(removed)})")
         return True
     except Exception as e:
-        print_error(f"Codex MCP設定削除エラー: {config_path} ({e})")
+        print_error(f"{label} MCP設定削除エラー: {config_path} ({e})")
         return False
+
+
+def remove_codex_mcp_servers(server_names: set[str]) -> bool:
+    return remove_toml_mcp_servers(Path.home() / ".codex" / "config.toml", server_names, "Codex")
+
+
+def remove_grok_mcp_servers(server_names: set[str]) -> bool:
+    return remove_toml_mcp_servers(get_grok_config_path(), server_names, "Grok")
 
 
 def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
@@ -607,6 +618,23 @@ def upsert_codex_backend_tools_config(module: dict) -> bool:
     return True
 
 
+def upsert_grok_backend_tools_config(module: dict) -> bool:
+    """Grok Build CLI は SSE をネイティブ対応するため、stdio ブリッジは使わない。"""
+    config_path = get_grok_config_path()
+    server_name = module.get("server_name", module["name"])
+    sse_url = module.get("sse_url", "").strip()
+    table_header = f"[mcp_servers.{server_name}]"
+    body_lines = [
+        f'url = "{toml_escape_string(sse_url)}"',
+        'type = "sse"',
+        "enabled = true",
+    ]
+    if not upsert_toml_table(config_path, table_header, body_lines):
+        return False
+    print_success(f"Grok の {server_name} 設定を書き込みました: {config_path}")
+    return True
+
+
 # ============================================================
 # tools モジュール定義
 # 新しい tools を追加するときはここにエントリを追加するだけ
@@ -634,6 +662,7 @@ MCP_MODULES = [
             {"server_name": "aidiy_obs_studio_control","sse_url": "http://127.0.0.1:8095/aidiy_obs_studio_control/sse"},
             {"server_name": "aidiy_ffmpeg_control",    "sse_url": "http://127.0.0.1:8095/aidiy_ffmpeg_control/sse"},
             {"server_name": "aidiy_notification_sounds","sse_url": "http://127.0.0.1:8095/aidiy_notification_sounds/sse"},
+            {"server_name": "aidiy_windows_control",   "sse_url": "http://127.0.0.1:8095/aidiy_windows_control/sse"},
             # aidiy_code_agents / aidiy_chat_llms は自前 MCP 群をツールとして利用する
             # （他サーバーが出そろってから接続したい）ため、必ず末尾に並べる。
             {"server_name": "aidiy_code_agents",       "sse_url": "http://127.0.0.1:8095/aidiy_code_agents/sse"},
@@ -733,6 +762,7 @@ def show_current_config(module: dict | None = None) -> None:
         ("グローバル ~/.gemini/antigravity-cli/mcp_config.json (Antigravity)", antigravity_mcp,               "mcpServers"),
         ("グローバル ~/.config/opencode/opencode.json (OpenCode)", opencode_mcp,                            "mcp"),
         ("グローバル ~/.codex/config.toml (Codex CLI)",            Path.home() / ".codex" / "config.toml",  "mcpServers"),
+        ("グローバル ~/.grok/config.toml (Grok CLI)",              get_grok_config_path(),                  "mcpServers"),
         ("グローバル Code/User/mcp.json (VS Code)",                vscode_mcp,                              "servers"),
     ]
 
@@ -774,8 +804,9 @@ def configure_clients(module: dict | None = None) -> bool:
     module = module or MODULE
     label = f"{module['name']} MCP 設定"
     print_header(label)
-    print_info("Claude / GitHub Copilot / Antigravity / OpenCode / Codex / VS Code 用のグローバル設定ファイルを書き込みます。")
-    print_info("Codex CLI は stdio の mcp_stdio.py を起動し、その先で backend_tools の SSE へ接続します。")
+    print_info("Claude / GitHub Copilot / Antigravity / OpenCode / Codex / Grok / VS Code 用のグローバル設定ファイルを書き込みます。")
+    print_info("Codex / Antigravity は stdio の mcp_stdio.py を起動し、その先で backend_tools の SSE へ接続します。")
+    print_info("Grok CLI は ~/.grok/config.toml へ type=sse で直接登録します。")
 
     servers: list[tuple[str, str]] = []
     main_sn  = module.get("server_name", module["name"])
@@ -870,7 +901,14 @@ def configure_clients(module: dict | None = None) -> bool:
         codex_module = {**module, "server_name": sn, "sse_url": url}
         all_ok &= upsert_codex_backend_tools_config(codex_module)
 
-    # 7) VS Code (servers)
+    # 7) Grok CLI (TOML, native SSE)
+    grok_path = get_grok_config_path()
+    print_info(f"[Grok CLI]    {grok_path}")
+    for sn, url in servers:
+        grok_module = {**module, "server_name": sn, "sse_url": url}
+        all_ok &= upsert_grok_backend_tools_config(grok_module)
+
+    # 8) VS Code (servers)
     VSCODE_EXCLUDE = {"aidiy_code_agents", "aidiy_chat_llms"}
     vscode_servers = [(sn, url) for sn, url in servers if sn not in VSCODE_EXCLUDE]
     vscode_mcp = get_vscode_mcp_path()
@@ -898,7 +936,7 @@ def configure_clients(module: dict | None = None) -> bool:
         top_key="servers",
     )
 
-    # 8) VS Code チャットモデル (aidiy_chat_completions / OpenAI 互換 chat-completions)
+    # 9) VS Code チャットモデル (aidiy_chat_completions / OpenAI 互換 chat-completions)
     vscode_chat = get_vscode_chat_models_path()
     print_info(f"[VS Code Chat] {vscode_chat}")
     all_ok &= upsert_vscode_chat_completions(vscode_chat)

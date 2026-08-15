@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_db, team_exp_db, team_work_db
-from team_proc.config import 設定読込
+from team_proc.config import AIモデル, 設定読込
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 AIDIY_ROOT = BASE_DIR.parent
@@ -161,17 +161,17 @@ def 担当要員を選択(
     判断材料として Aチーム経験（要員ごとの経験値・直近の学び）も渡す。
     候補を省略した場合は有効な要員一覧全員（admin含む）から選ぶ。
     呼び出し側で admin を避けたい等の絞り込みをしたい場合は候補に絞り込み済みの一覧を渡す。
-    この選定処理は AiDiy ルートで実行するため TEAM_AI_NAME / TEAM_AI_MODEL を使う。
-    未指定時は共通設定の TEAM_AI_* を使う（作業ループから直接呼ぶ場合）。
+    この選定処理は AiDiy ルートで実行するため TEAM_AI_NAME / TEAM_AI_MODEL_plan を使う。
+    要員選定は計画（plan）の一部なので、モデルは共通設定の TEAM_AI_MODEL_plan を既定にする。
     """
     try:
         設定 = 設定読込()
         team_ai_name = (team_ai_name or "").strip() or str(
             getattr(設定, "TEAM_AI_NAME", "") or TEAM_AI_NAME既定
         ).strip()
-        team_ai_model = (team_ai_model or "").strip() or str(
-            getattr(設定, "TEAM_AI_MODEL", "") or TEAM_AI_MODEL既定
-        ).strip()
+        team_ai_model = (team_ai_model or "").strip() or AIモデル(
+            "TEAM", "plan", TEAM_AI_MODEL既定
+        )
     except Exception:
         team_ai_name = (team_ai_name or "").strip() or TEAM_AI_NAME既定
         team_ai_model = (team_ai_model or "").strip() or TEAM_AI_MODEL既定
@@ -233,6 +233,12 @@ def 担当要員を選択(
     return 既定利用者ID
 
 
+def _planモデル(項目: dict) -> str:
+    """依頼レコードの TEAM_AI_MODEL_plan を返す（`auto` なら共通設定のフェーズ別値）。"""
+    値 = str(項目.get("TEAM_AI_MODEL_plan", "") or "").strip()
+    return 値 if 値 and 値 != "auto" else AIモデル("TEAM", "plan", TEAM_AI_MODEL既定)
+
+
 def タスク投入(項目: dict, 利用者ID: str) -> dict:
     return POST送信(
         TASK_AGENTS_URL,
@@ -240,7 +246,10 @@ def タスク投入(項目: dict, 利用者ID: str) -> dict:
             "prompt": str(項目["要求内容"]),
             "project_path": str(項目.get("プロジェクト", "")),
             "ai_name": str(項目.get("TASK_AI_NAME", "claude_cli")),
-            "ai_model": str(項目.get("TASK_AI_MODEL", "auto")),
+            # 依頼が持つ TASK 側3種を、そのまま Aタスク要求の準備 / 各ステップ / 最終確認へ渡す
+            "ai_model_plan": str(項目.get("TASK_AI_MODEL_plan", "auto")),
+            "ai_model_do": str(項目.get("TASK_AI_MODEL_do", "auto")),
+            "ai_model_check": str(項目.get("TASK_AI_MODEL_check", "auto")),
             "user_id": 利用者ID,
             "task_id": str(項目["依頼ID"]),
             "enabled": bool(int(項目.get("実行有効", 1) or 0)),
@@ -272,7 +281,8 @@ def main() -> int:
             logger,
             str(項目.get("プロジェクト", "")).strip(),
             team_ai_name=str(項目.get("TEAM_AI_NAME", TEAM_AI_NAME既定)),
-            team_ai_model=str(項目.get("TEAM_AI_MODEL", TEAM_AI_MODEL既定)),
+            # 要員選定は計画（plan）。依頼の TEAM_AI_MODEL_plan を使い、auto なら共通設定へ落とす
+            team_ai_model=_planモデル(項目),
         )
         logger.info(
             f"aidiy_task_agentsへ投入します: {依頼ID} (要員ID={要員ID} -> 利用者ID={担当利用者ID})"

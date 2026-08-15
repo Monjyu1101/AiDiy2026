@@ -24,11 +24,13 @@ logger = get_logger(__name__)
 
 class TaskAgentsRequest(BaseModel):
     prompt: str = ""
-    # project_path / ai_name / ai_model は未指定（null）可。
+    # project_path / ai_name / ai_model_* は未指定（null）可。
     # backend_taskteam が AIタスク_要求編集の新規時と同じ条件（更新最終レコード → 規定値）で補完する
     project_path: Optional[str] = None
     ai_name: Optional[str] = None
-    ai_model: Optional[str] = None
+    ai_model_plan: Optional[str] = None
+    ai_model_do: Optional[str] = None
+    ai_model_check: Optional[str] = None
     user_id: str = "admin"
     task_id: str = ""
     利用者ID: str = ""
@@ -52,7 +54,9 @@ def register_tools(mcp_ta, task_agents):
         prompt: str,
         project_path: Optional[str] = None,
         ai_name: Optional[str] = None,
-        ai_model: Optional[str] = None,
+        ai_model_plan: Optional[str] = None,
+        ai_model_do: Optional[str] = None,
+        ai_model_check: Optional[str] = None,
         user_id: str = "admin",
         task_id: str = "",
         enabled: bool = True,
@@ -62,8 +66,9 @@ def register_tools(mcp_ta, task_agents):
         """
         backend_taskteam の AIタスク要求へ非同期タスクを投入する。
         登録だけを行い、タスク分解や実行完了は待たない。
-        project_path / ai_name / ai_model は通常指定不要。未指定なら AIタスク画面の新規時と同じ条件
+        project_path / ai_name / ai_model_* は通常指定不要。未指定なら AIタスク画面の新規時と同じ条件
         （利用者IDの更新最終レコードの値、無ければ規定値）で補完される。
+        モデルは plan（準備＝明細分解）/ do（各ステップの実行）/ check（終了時の最終確認）で指定する。
         task_id は通常指定不要。外部システムのIDを引き継ぐ場合だけ指定する。
         """
         result = await asyncio.to_thread(
@@ -71,7 +76,9 @@ def register_tools(mcp_ta, task_agents):
             prompt=prompt,
             project_path=project_path,
             ai_name=ai_name,
-            ai_model=ai_model,
+            ai_model_plan=ai_model_plan,
+            ai_model_do=ai_model_do,
+            ai_model_check=ai_model_check,
             user_id=user_id,
             enabled=enabled,
             return_task_id=return_task_id,
@@ -130,12 +137,14 @@ def create_router(task_agents) -> APIRouter:
                 },
                 "submit": {
                     "summary": "AIタスク投入",
-                    "description": "指定promptをbackend_taskteamの/task/タスク要求/AI登録へ渡し、タスクを準備開始として登録する。project_path / ai_name / ai_model / task_idは通常指定不要。project_path / ai_name / ai_model の省略（null）時は AIタスク_要求編集の新規時と同じ条件（利用者IDの更新最終レコードの値、無ければ規定値）で補完し、task_idは省略時にbackend_taskteamが自動採番する。8093未起動時はstatus=NGで理由を返す。",
+                    "description": "指定promptをbackend_taskteamの/task/タスク要求/AI登録へ渡し、タスクを準備開始として登録する。project_path / ai_name / ai_model_* / task_idは通常指定不要。project_path / ai_name / ai_model_* の省略（null）時は AIタスク_要求編集の新規時と同じ条件（利用者IDの更新最終レコードの値、無ければ規定値）で補完し、task_idは省略時にbackend_taskteamが自動採番する。8093未起動時はstatus=NGで理由を返す。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "タスク化したい依頼内容"},
                         "project_path": {"type": "string", "required": False, "default": None, "description": "対象プロジェクトのパス。backend_taskteam の Task API の プロジェクト に対応。null なら更新最終レコードの値、無ければ空欄。空文字は明示的な空欄指定"},
                         "ai_name": {"type": "string", "required": False, "default": None, "description": "TASK_AI_NAME。claude_sdk / claude_cli / codex_cli / aidiy_hermes など。null なら更新最終レコードの値、無ければ規定値"},
-                        "ai_model": {"type": "string", "required": False, "default": None, "description": "TASK_AI_MODEL。null なら更新最終レコードの値、無ければ規定値"},
+                        "ai_model_plan": {"type": "string", "required": False, "default": None, "description": "準備（AIによる明細分解）に使うモデル。null なら更新最終レコードの値、無ければ規定値"},
+                        "ai_model_do": {"type": "string", "required": False, "default": None, "description": "各ステップの実行に使うモデル。null なら更新最終レコードの値、無ければ規定値"},
+                        "ai_model_check": {"type": "string", "required": False, "default": None, "description": "終了時の最終確認に使うモデル。null なら更新最終レコードの値、無ければ規定値"},
                         "user_id": {"type": "string", "required": False, "default": "admin", "description": "利用者ID"},
                         "task_id": {"type": "string", "required": False, "default": "", "description": "任意のタスクID。通常は指定不要。外部IDを引き継ぐ場合だけ指定し、省略時はTASK.mmdd.hhmmssで自動採番"},
                         "enabled": {"type": "boolean", "required": False, "default": True, "description": "有効。true なら backend_taskteam の Task watcher が処理対象にする"},
@@ -152,7 +161,9 @@ def create_router(task_agents) -> APIRouter:
                         "タスクID": "登録された AIタスク要求のタスクID",
                         "プロジェクト": "登録に使われたプロジェクト（未指定時は補完後の値）",
                         "TASK_AI_NAME": "登録に使われた TASK_AI_NAME（未指定時は補完後の値）",
-                        "TASK_AI_MODEL": "登録に使われた TASK_AI_MODEL（未指定時は補完後の値）",
+                        "TASK_AI_MODEL_plan": "登録に使われた準備用モデル（未指定時は補完後の値）",
+                        "TASK_AI_MODEL_do": "登録に使われた各ステップ用モデル（未指定時は補完後の値）",
+                        "TASK_AI_MODEL_check": "登録に使われた最終確認用モデル（未指定時は補完後の値）",
                         "task_id": "登録された AIタスク要求のタスクID。return_task_id=true のときだけ返す互換フィールド",
                     },
                 },
@@ -194,7 +205,9 @@ def create_router(task_agents) -> APIRouter:
                     prompt=req.prompt,
                     project_path=req.project_path,
                     ai_name=req.ai_name,
-                    ai_model=req.ai_model,
+                    ai_model_plan=req.ai_model_plan,
+                    ai_model_do=req.ai_model_do,
+                    ai_model_check=req.ai_model_check,
                     # 利用者ID は補完時の参照キーになるため、日本語キーでの指定も受け付ける
                     user_id=req.利用者ID or req.user_id,
                     enabled=req.enabled,

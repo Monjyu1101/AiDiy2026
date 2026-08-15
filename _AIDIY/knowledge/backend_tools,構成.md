@@ -47,8 +47,9 @@
 
 | トランスポート | アクセス方法 | 用途 |
 |----------------|-------------|------|
-| **SSE Transport** | `http://127.0.0.1:8095/{mcp_name}/sse` | AI エージェント・MCP クライアントが接続 |
-| **Streamable HTTP Transport** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` | Python / curl / 自動化スクリプトが直接呼び出し |
+| **SSE Transport** | `GET /{mcp_name}/sse` + `POST /{mcp_name}/messages/` | Claude や公式 MCP SSE クライアントが接続 |
+| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` | Grok の `type=sse`（initialize を `/sse` へ POST）と Streamable HTTP クライアント。REST の `{method_name}` より先にミドルウェアが受け取る |
+| **HTTP POST（REST）** | `POST /{mcp_name}/{method_name}` | Python / curl / 自動化スクリプトが直接呼び出し |
 | **stdio gateway** | `mcp_stdio.py --sse-url .../sse` | Codex など stdio 専用の Code CLI が経由 |
 
 MCP一覧: `GET http://127.0.0.1:8095/` — 全 MCP 名を返す。  
@@ -126,7 +127,8 @@ print(res.json())  # {"save_path": "..."}
 
 ### 確認
 12. `backend_tools` 再起動後 `curl http://127.0.0.1:8095/aidiy_<name>/sse` が `text/event-stream` を返すか確認
-13. Hermes / Claude CLI で `mcp list` 相当を実行し、新規サーバーが `ok` 表示になることを確認
+13. `grok mcp doctor aidiy_<name>` が healthy になること（Grok は `/sse` へ initialize を POST する）
+14. Hermes / Claude CLI で `mcp list` 相当を実行し、新規サーバーが `ok` 表示になることを確認
 
 ## 再起動ウォッチャー
 

@@ -58,7 +58,12 @@ export interface ModelSettings {
   CODE_AI6_NAME: string;
   CODE_PERMISSIONS: string;
   TASK_AI_NAME: string;
-  TASK_AI_MODEL: string;
+  // TASK / TEAM のモデルは plan（計画）/ do（実施）/ check（検証）の3種指定
+  TASK_AI_MODEL_plan: string;
+  TASK_AI_MODEL_do: string;
+  TASK_AI_MODEL_check: string;
   TEAM_AI_NAME: string;
-  TEAM_AI_MODEL: string;
+  TEAM_AI_MODEL_plan: string;
+  TEAM_AI_MODEL_do: string;
+  TEAM_AI_MODEL_check: string;
 }

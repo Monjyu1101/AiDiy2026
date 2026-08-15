@@ -64,7 +64,7 @@ class LiveAI:
     """
 
     def __init__(self, セッションID: str, parent_manager=None, 
-                 live_ai: str = "openai", live_model: str = "gpt-realtime-mini", live_voice: str = "marin", 
+                 live_ai: str = "openai", live_model: str = "gpt-realtime-2.1-mini", live_voice: str = "marin", 
                  api_key: str = None, organization: str = None, system_instruction: str = None):
         """初期化"""
 

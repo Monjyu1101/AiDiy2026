@@ -35,7 +35,7 @@ const プロジェクト選択肢 = ref<選択肢[]>([]);
 const 選択プロジェクト = ref('');
 const 入力プロジェクト = ref('');
 const 入力TASK_AI_NAME = ref('claude_cli');
-const 入力TASK_AI_MODEL = ref('auto');
+const 入力TASK_AI_MODEL_plan = ref('auto');
 const 入力要求内容 = ref('');
 const 応答内容 = ref('');
 const エラー内容 = ref('');
@@ -103,7 +103,7 @@ const 選択肢読込 = async () => {
     currentSettings.value = {
       CODE_BASE_PATH: '../',
       TASK_AI_NAME: 'claude_cli',
-      TASK_AI_MODEL: 'auto',
+      TASK_AI_MODEL_plan: 'auto',
     };
   } finally {
     読込中.value = false;
@@ -130,8 +130,9 @@ const フォーム初期化 = async () => {
   const modelCandidates = Object.keys(
     availableModels.value.code_models?.[入力TASK_AI_NAME.value] ?? {},
   );
-  入力TASK_AI_MODEL.value = chooseAvailable(
-    currentSettings.value.TASK_AI_MODEL || 'auto',
+  // 会話は Aタスクを作らない1回きりの調査なので、モデルは plan 用の1つだけ使う
+  入力TASK_AI_MODEL_plan.value = chooseAvailable(
+    currentSettings.value.TASK_AI_MODEL_plan || 'auto',
     modelCandidates,
   ) || 'auto';
 };
@@ -149,8 +150,8 @@ watch(選択プロジェクト, (value) => {
 
 watch(入力TASK_AI_NAME, (value) => {
   const models = Object.keys(availableModels.value.code_models?.[value] ?? {});
-  if (models.length && !models.includes(入力TASK_AI_MODEL.value)) {
-    入力TASK_AI_MODEL.value = models[0] ?? 'auto';
+  if (models.length && !models.includes(入力TASK_AI_MODEL_plan.value)) {
+    入力TASK_AI_MODEL_plan.value = models[0] ?? 'auto';
   }
 });
 
@@ -202,7 +203,7 @@ const 会話送信 = async () => {
       要員ID: agent.id,
       プロジェクト: project,
       TASK_AI_NAME: 入力TASK_AI_NAME.value,
-      TASK_AI_MODEL: 入力TASK_AI_MODEL.value,
+      TASK_AI_MODEL_plan: 入力TASK_AI_MODEL_plan.value,
       要求内容: requestText,
     }, { timeout: 最大待機ミリ秒 });
     if (response.data?.status !== 'OK') {
@@ -282,9 +283,9 @@ onBeforeUnmount(() => 経過計測停止());
             </div>
           </div>
           <div class="detail-row one-line-row">
-            <label class="detail-label">TASK_AI_MODEL</label>
+            <label class="detail-label">TASK_AI_MODEL_plan</label>
             <div class="detail-value">
-              <select v-model="入力TASK_AI_MODEL" class="detail-select" :disabled="読込中 || 送信中">
+              <select v-model="入力TASK_AI_MODEL_plan" class="detail-select" :disabled="読込中 || 送信中">
                 <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">
                   {{ model.label }}
                 </option>

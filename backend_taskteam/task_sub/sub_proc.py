@@ -40,6 +40,7 @@ MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
 _LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
+DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
 # 1ステップの実行タイムアウト秒。tasks_watcher.実行タイムアウト分（既定60分）と揃える。
 # 明示的に渡さないと aidiy_code_agents 側の既定値（30分）で先に打ち切られる。
 CODE実行タイムアウト秒 = 3600
@@ -66,6 +67,21 @@ def _標準出力をUTF8化() -> None:
 
 
 _標準出力をUTF8化()
+
+
+def TASK_AIモデル(フェーズ: str) -> str:
+    """`AiDiy_key.json` の `TASK_AI_MODEL_<フェーズ>` を返す。
+
+    フェーズは plan / do / check。
+    """
+    path = os.path.normpath(os.path.join(BASE_DIR, DEFAULT_CONFIG_PATH))
+    try:
+        with open(path, "r", encoding="utf-8-sig") as f:
+            data = json.load(f)
+        値 = data.get(f"TASK_AI_MODEL_{フェーズ}", TASK_AI_MODEL既定)
+        return str(値 or TASK_AI_MODEL既定).strip() or TASK_AI_MODEL既定
+    except Exception:
+        return TASK_AI_MODEL既定
 
 
 def ログ(メッセージ: str) -> None:
@@ -272,7 +288,8 @@ def main() -> int:
         # 6. 操作検証ありの明細は、AI が task_check_okng で報告した状態を確認する。
         #    書き込みなし・エラーのいずれかの場合は、検証結果を踏まえて1回だけ自動リトライする
         task_ai_name = 対象.get("TASK_AI_NAME") or TASK_AI_NAME既定
-        task_ai_model = 対象.get("TASK_AI_MODEL") or TASK_AI_MODEL既定
+        # 明細実行は do フェーズ。明細に指定が無いときだけ共通設定の TASK_AI_MODEL_do を使う
+        task_ai_model = 対象.get("TASK_AI_MODEL_do") or TASK_AIモデル("do")
         最大試行回数 = 2 if 対象.get("操作検証") else 1
         前回失敗理由 = ""
         for 試行 in range(1, 最大試行回数 + 1):

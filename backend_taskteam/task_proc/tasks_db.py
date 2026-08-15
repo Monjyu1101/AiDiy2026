@@ -44,6 +44,10 @@ _採番初期値 = 1000
 CODE_BASE_PATH既定 = "../"
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
+# AIタスク要求が持つモデルは3種。準備（AIによる明細分解）= plan、各ステップの実行 = do、
+# 終了明細の最終確認 = check。明細レコードは do だけを持つ。
+AIモデルフェーズ = ("plan", "do", "check")
+AIモデルカラム = tuple(f"TASK_AI_MODEL_{フェーズ}" for フェーズ in AIモデルフェーズ)
 
 # 実行条件の区分は文字値で保持する（状態と同じ日本語ファースト方針）
 実行区分値 = ("即時", "時間指定", "間隔実行", "定時実行")
@@ -81,18 +85,29 @@ TASK_AI_MODEL既定 = "auto"
 }
 
 
-def _タスク規定設定() -> tuple[str, str, str]:
+def _タスク規定設定() -> dict:
+    """要求・明細レコードの既定値を `AiDiy_key.json` から読む。
+
+    モデルは plan（準備）/ do（各ステップ）/ check（終了時の最終確認）の3種。
+    """
+    既定 = {
+        "プロジェクト": CODE_BASE_PATH既定,
+        "TASK_AI_NAME": TASK_AI_NAME既定,
+        **{f"TASK_AI_MODEL_{フェーズ}": TASK_AI_MODEL既定 for フェーズ in AIモデルフェーズ},
+    }
     path = os.path.normpath(os.path.join(_BASE_DIR, DEFAULT_CONFIG_PATH))
     try:
         with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
-        return (
-            str(data.get("CODE_BASE_PATH", CODE_BASE_PATH既定)),
-            str(data.get("TASK_AI_NAME", TASK_AI_NAME既定)),
-            str(data.get("TASK_AI_MODEL", TASK_AI_MODEL既定)),
-        )
     except Exception:
-        return CODE_BASE_PATH既定, TASK_AI_NAME既定, TASK_AI_MODEL既定
+        return 既定
+    設定 = dict(既定)
+    設定["プロジェクト"] = str(data.get("CODE_BASE_PATH", CODE_BASE_PATH既定))
+    設定["TASK_AI_NAME"] = str(data.get("TASK_AI_NAME", TASK_AI_NAME既定))
+    for フェーズ in AIモデルフェーズ:
+        キー = f"TASK_AI_MODEL_{フェーズ}"
+        設定[キー] = str(data.get(キー, TASK_AI_MODEL既定) or TASK_AI_MODEL既定)
+    return 設定
 
 
 def _識別子(name: str) -> str:
@@ -205,7 +220,9 @@ def _AIタスク要求テーブル作成(conn: sqlite3.Connection) -> None:
             タイトル TEXT NOT NULL,
             要求内容 TEXT NOT NULL DEFAULT '',
             TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
-            TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
+            TASK_AI_MODEL_plan TEXT NOT NULL DEFAULT 'auto',
+            TASK_AI_MODEL_do TEXT NOT NULL DEFAULT 'auto',
+            TASK_AI_MODEL_check TEXT NOT NULL DEFAULT 'auto',
             実行有効 INTEGER NOT NULL DEFAULT 1,
             状態 TEXT NOT NULL DEFAULT '準備完了',
             マーメイド記号 TEXT NOT NULL DEFAULT '',
@@ -221,6 +238,10 @@ def _AIタスク要求テーブル作成(conn: sqlite3.Connection) -> None:
     """)
 
 
+
+
+
+
 def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
     conn.execute(f"""
         CREATE TABLE IF NOT EXISTS {AIタスク明細テーブル} (
@@ -230,7 +251,7 @@ def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
             要求内容 TEXT NOT NULL DEFAULT '',
             先行SEQ TEXT NOT NULL DEFAULT '',
             TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
-            TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
+            TASK_AI_MODEL_do TEXT NOT NULL DEFAULT 'auto',
             操作検証 INTEGER NOT NULL DEFAULT 0,
             実行有効 INTEGER NOT NULL DEFAULT 1,
             状態 TEXT NOT NULL DEFAULT '待機',
@@ -338,9 +359,12 @@ def _タスク登録(
         [利用者ID, タスクID, タイトル, 要求内容, 状態, *監査値],
     )
     for 明細SEQ, タイトル, 先行SEQ in 明細:
-        _, task_ai_name, task_ai_model = _タスク規定設定()
+        規定 = _タスク規定設定()
+        task_ai_name = 規定["TASK_AI_NAME"]
+        # 明細は各ステップの実行なので do のモデルを使う
+        task_ai_model = 規定["TASK_AI_MODEL_do"]
         conn.execute(
-            f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 状態, {監査カラム}) "
+            f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 状態, {監査カラム}) "
             f"VALUES (?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
             [タスクID, 明細SEQ, タイトル, 先行SEQ, task_ai_name, task_ai_model, "待機", *監査値],
         )
@@ -374,7 +398,8 @@ def タスク要求一覧(利用者ID: str, 全ユーザー: bool = False) -> li
             条件 = "r.利用者ID = ? AND " + 条件
             params = [利用者ID, 期間閾値]
         rows = conn.execute(
-            "SELECT r.利用者ID, r.タスクID, r.プロジェクト, r.タイトル, r.要求内容, r.TASK_AI_NAME, r.TASK_AI_MODEL, r.実行有効, r.状態, r.マーメイド記号, "
+            "SELECT r.利用者ID, r.タスクID, r.プロジェクト, r.タイトル, r.要求内容, r.TASK_AI_NAME, "
+            f"{', '.join('r.' + カラム for カラム in AIモデルカラム)}, r.実行有効, r.状態, r.マーメイド記号, "
             "r.PID, r.開始日時, r.終了日時, r.実行回数, r.応答タイトル, r.応答内容, r.更新日時, "
             "COALESCE(j.次回実行日時, '') AS 次回実行日時, "
             "CASE WHEN r.状態 IN ('完了', 'エラー', '中止') AND COALESCE(j.次回実行日時, '') = '' THEN 9 ELSE 1 END AS 表示優先順位 "
@@ -414,18 +439,18 @@ def タスク要求最大更新日時(利用者ID: str, 全ユーザー: bool = 
 
 
 def タスク要求新規既定値(利用者ID: str) -> dict:
-    """新規登録時の既定値（プロジェクト / TASK_AI_NAME / TASK_AI_MODEL）を返す。
+    """新規登録時の既定値（プロジェクト / TASK_AI_NAME / TASK_AI_MODEL_plan・_do・_check）を返す。
 
     AIタスク_要求編集ダイアログの新規時と同じ条件で決める。
     利用者IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（AiDiy_key.json）を使う。
     プロジェクトは空文字もそのまま引き継ぐ（ダイアログが空欄を初期表示するのと同じ）。
     """
     初期化()
-    規定プロジェクト, 規定AI_NAME, 規定AI_MODEL = _タスク規定設定()
+    規定 = _タスク規定設定()
     既定 = {
-        "プロジェクト": 規定プロジェクト or CODE_BASE_PATH既定,
-        "TASK_AI_NAME": 規定AI_NAME or TASK_AI_NAME既定,
-        "TASK_AI_MODEL": 規定AI_MODEL or TASK_AI_MODEL既定,
+        "プロジェクト": 規定["プロジェクト"] or CODE_BASE_PATH既定,
+        "TASK_AI_NAME": 規定["TASK_AI_NAME"] or TASK_AI_NAME既定,
+        **{カラム: 規定[カラム] or TASK_AI_MODEL既定 for カラム in AIモデルカラム},
         "参照タスクID": "",
     }
     利用者ID = (利用者ID or "").strip()
@@ -434,7 +459,7 @@ def タスク要求新規既定値(利用者ID: str) -> dict:
     conn = 接続取得()
     try:
         row = conn.execute(
-            "SELECT タスクID, プロジェクト, TASK_AI_NAME, TASK_AI_MODEL "
+            f"SELECT タスクID, プロジェクト, TASK_AI_NAME, {', '.join(AIモデルカラム)} "
             f"FROM {AIタスク要求テーブル} WHERE 利用者ID = ? ORDER BY 更新日時 DESC, タスクID DESC LIMIT 1",
             [利用者ID],
         ).fetchone()
@@ -445,7 +470,10 @@ def タスク要求新規既定値(利用者ID: str) -> dict:
     return {
         "プロジェクト": str(row["プロジェクト"] or ""),
         "TASK_AI_NAME": str(row["TASK_AI_NAME"] or "").strip() or 既定["TASK_AI_NAME"],
-        "TASK_AI_MODEL": str(row["TASK_AI_MODEL"] or "").strip() or 既定["TASK_AI_MODEL"],
+        **{
+            カラム: str(row[カラム] or "").strip() or 既定[カラム]
+            for カラム in AIモデルカラム
+        },
         "参照タスクID": str(row["タスクID"] or ""),
     }
 
@@ -455,7 +483,7 @@ def タスク明細一覧(タスクID: str) -> list[dict]:
     conn = 接続取得()
     try:
         rows = conn.execute(
-            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 操作検証, 実行有効, 状態, "
+            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, "
             f"PID, 開始日時, 終了日時, 実行回数, 応答内容, 更新日時 FROM {AIタスク明細テーブル} "
             "WHERE タスクID = ? ORDER BY 明細SEQ",
             [タスクID],
@@ -470,7 +498,7 @@ def タスク明細取得(タスクID: str, 明細SEQ: int) -> dict:
     conn = 接続取得()
     try:
         row = conn.execute(
-            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 操作検証, 実行有効, 状態, "
+            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, "
             f"PID, 開始日時, 終了日時, 実行回数, 応答内容 FROM {AIタスク明細テーブル} "
             "WHERE タスクID = ? AND 明細SEQ = ?",
             [タスクID, 明細SEQ],
@@ -509,7 +537,8 @@ def タスク要求登録(利用者ID: str, タイトル: str, 要求内容: str
 def _タスク要求取得(conn: sqlite3.Connection, タスクID: str) -> dict:
     """CRUDのキーはタスクID単独。利用者IDは所有者を表す属性で、キーには使わない。"""
     row = conn.execute(
-        "SELECT 利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, マーメイド記号, "
+        "SELECT 利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, "
+        f"{', '.join(AIモデルカラム)}, 実行有効, 状態, マーメイド記号, "
         f"PID, 開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, 更新日時 FROM {AIタスク要求テーブル} "
         "WHERE タスクID = ?",
         [タスクID],
@@ -868,7 +897,9 @@ def 仮タスク登録(
     利用者ID: str,
     プロジェクト: str = "",
     TASK_AI_NAME: str = TASK_AI_NAME既定,
-    TASK_AI_MODEL: str = TASK_AI_MODEL既定,
+    TASK_AI_MODEL_plan: str = TASK_AI_MODEL既定,
+    TASK_AI_MODEL_do: str = TASK_AI_MODEL既定,
+    TASK_AI_MODEL_check: str = TASK_AI_MODEL既定,
     実行有効: bool = True,
 ) -> dict:
     """AI生成待ちの仮タスクを「準備開始」で登録する（実行は起動監視ループに任せる）。"""
@@ -879,9 +910,19 @@ def 仮タスク登録(
         監査カラム = ", ".join(監査.keys())
         監査値 = list(監査.values())
         conn.execute(
-            f"INSERT INTO {AIタスク要求テーブル} (利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, {監査カラム}) "
-            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
-            [利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, "準備開始", *監査値],
+            "INSERT INTO {テーブル} (利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, "
+            "{モデルカラム}, 実行有効, 状態, {監査カラム}) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {監査値プレース})".format(
+                テーブル=AIタスク要求テーブル,
+                モデルカラム=", ".join(AIモデルカラム),
+                監査カラム=監査カラム,
+                監査値プレース=", ".join("?" * len(監査値)),
+            ),
+            [
+                利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME,
+                TASK_AI_MODEL_plan, TASK_AI_MODEL_do, TASK_AI_MODEL_check,
+                1 if 実行有効 else 0, "準備開始", *監査値,
+            ],
         )
         conn.commit()
         return _タスク要求取得(conn, タスクID)
@@ -895,7 +936,8 @@ def 実行待ち一覧() -> list[dict]:
     conn = 接続取得()
     try:
         rows = conn.execute(
-            "SELECT 利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 実行回数, 登録利用者ID "
+            "SELECT 利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, "
+            f"{', '.join(AIモデルカラム)}, 実行回数, 登録利用者ID "
             f"FROM {AIタスク要求テーブル} WHERE 状態 = '準備開始' AND PID = '' ORDER BY タスクID"
         ).fetchall()
         return [dict(row) for row in rows]
@@ -931,7 +973,7 @@ def 実行待ち明細一覧() -> list[dict]:
     conn = 接続取得()
     try:
         rows = conn.execute(
-            "SELECT m.タスクID, m.明細SEQ, m.タイトル, m.先行SEQ, m.TASK_AI_NAME, m.TASK_AI_MODEL, m.実行回数 "
+            "SELECT m.タスクID, m.明細SEQ, m.タイトル, m.先行SEQ, m.TASK_AI_NAME, m.TASK_AI_MODEL_do, m.実行回数 "
             f"FROM {AIタスク明細テーブル} m JOIN {AIタスク要求テーブル} r "
             "ON r.タスクID = m.タスクID "
             "WHERE m.実行有効 = 1 AND m.状態 = '待機' AND m.PID = '' AND r.状態 IN ('待機', '実行中') "
@@ -1234,7 +1276,9 @@ def タスク要求更新登録(
     プロジェクト: str,
     要求内容: str,
     TASK_AI_NAME: str,
-    TASK_AI_MODEL: str,
+    TASK_AI_MODEL_plan: str,
+    TASK_AI_MODEL_do: str,
+    TASK_AI_MODEL_check: str,
     実行有効: bool,
     状態: str,
 ) -> dict:
@@ -1251,27 +1295,37 @@ def タスク要求更新登録(
     try:
         now = _現在日時()
         タイトル = 要求内容.splitlines()[0][:40] if 要求内容 else ""
+        更新列 = (
+            "プロジェクト = ?, タイトル = ?, 要求内容 = ?, TASK_AI_NAME = ?, "
+            + ", ".join(f"{カラム} = ?" for カラム in AIモデルカラム)
+            + ", 実行有効 = ?, 状態 = ?, "
+        )
+        更新値 = [
+            プロジェクト, タイトル, 要求内容, TASK_AI_NAME,
+            TASK_AI_MODEL_plan, TASK_AI_MODEL_do, TASK_AI_MODEL_check,
+            1 if 実行有効 else 0, 状態,
+        ]
         if 状態 == "準備開始":
             conn.execute(
-                f"UPDATE {AIタスク要求テーブル} SET プロジェクト = ?, タイトル = ?, 要求内容 = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク要求テーブル} SET {更新列}"
                 "PID = '', 開始日時 = '', 終了日時 = '', 実行回数 = 0, 更新日時 = ? "
                 "WHERE タスクID = ?",
-                [プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, タスクID],
+                [*更新値, now, タスクID],
             )
         elif 状態 == "中止":
             conn.execute(
-                f"UPDATE {AIタスク要求テーブル} SET プロジェクト = ?, タイトル = ?, 要求内容 = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク要求テーブル} SET {更新列}"
                 "PID = '', 終了日時 = ?, 更新日時 = ? "
                 "WHERE タスクID = ?",
-                [プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, now, タスクID],
+                [*更新値, now, now, タスクID],
             )
         else:
             # 更新前の状態を保持する更新: 終了日時は打刻しない
             conn.execute(
-                f"UPDATE {AIタスク要求テーブル} SET プロジェクト = ?, タイトル = ?, 要求内容 = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク要求テーブル} SET {更新列}"
                 "PID = '', 更新日時 = ? "
                 "WHERE タスクID = ?",
-                [プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 1 if 実行有効 else 0, 状態, now, タスクID],
+                [*更新値, now, タスクID],
             )
         # 画面の操作は「エラーを上書きしない」通常ガードの対象外にする（人の判断を優先する）。
         # 終了日時は必ず渡す。渡さないと Aチーム依頼側が空のまま残り、まだ実行中と見なされる。
@@ -1333,7 +1387,7 @@ def 明細更新登録(
     要求内容: str,
     先行SEQ: str,
     TASK_AI_NAME: str,
-    TASK_AI_MODEL: str,
+    TASK_AI_MODEL_do: str,
     操作検証: bool,
     実行有効: bool,
     状態: str,
@@ -1345,16 +1399,16 @@ def 明細更新登録(
         now = _現在日時()
         if 状態 == "待機":
             cur = conn.execute(
-                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL_do = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 開始日時 = '', 終了日時 = '', 実行回数 = 0, 応答内容 = '', 更新日時 = ? "
                 "WHERE タスクID = ? AND 明細SEQ = ?",
-                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
+                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
             )
         else:
             cur = conn.execute(
-                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL_do = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 更新日時 = ? WHERE タスクID = ? AND 明細SEQ = ?",
-                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
+                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
             )
         conn.execute(
             f"UPDATE {AIタスク要求テーブル} SET 更新日時 = ? WHERE タスクID = ?",
@@ -1582,7 +1636,10 @@ def タスク本登録(
         利用者ID = str(仮.get("利用者ID", "")) or 利用者ID
         実行有効値 = int(仮.get("実行有効", 1)) if 仮 else 1
         要求TASK_AI_NAME = str(仮.get("TASK_AI_NAME", TASK_AI_NAME既定) or TASK_AI_NAME既定)
-        要求TASK_AI_MODEL = str(仮.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定)
+        要求モデル = {
+            カラム: str(仮.get(カラム, TASK_AI_MODEL既定) or TASK_AI_MODEL既定)
+            for カラム in AIモデルカラム
+        }
         初期状態 = "準備完了"
         conn.execute(f"DELETE FROM {AIタスク要求テーブル} WHERE タスクID = ?", [タスクID])
         conn.execute(f"DELETE FROM {AIタスク明細テーブル} WHERE タスクID = ?", [タスクID])
@@ -1590,12 +1647,19 @@ def タスク本登録(
         監査カラム = ", ".join(監査.keys())
         監査値 = list(監査.values())
         conn.execute(
-            f"INSERT INTO {AIタスク要求テーブル} (利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, TASK_AI_MODEL, 実行有効, 状態, マーメイド記号, "
-            f"PID, 開始日時, 終了日時, 実行回数, 応答内容, {監査カラム}) "
-            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
+            "INSERT INTO {テーブル} (利用者ID, タスクID, プロジェクト, タイトル, 要求内容, TASK_AI_NAME, "
+            "{モデルカラム}, 実行有効, 状態, マーメイド記号, "
+            "PID, 開始日時, 終了日時, 実行回数, 応答内容, {監査カラム}) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {監査値プレース})".format(
+                テーブル=AIタスク要求テーブル,
+                モデルカラム=", ".join(AIモデルカラム),
+                監査カラム=監査カラム,
+                監査値プレース=", ".join("?" * len(監査値)),
+            ),
             [
                 利用者ID, タスクID, str(仮.get("プロジェクト", "")), タイトル, 要求内容,
-                要求TASK_AI_NAME, 要求TASK_AI_MODEL, 実行有効値, 初期状態, マーメイド記号,
+                要求TASK_AI_NAME, *[要求モデル[カラム] for カラム in AIモデルカラム],
+                実行有効値, 初期状態, マーメイド記号,
                 "",
                 str(仮.get("開始日時", "")),
                 _現在日時(),
@@ -1607,7 +1671,7 @@ def タスク本登録(
         for 行 in 明細:
             明細SEQ = int(行["明細SEQ"])
             conn.execute(
-                f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL, 操作検証, 実行有効, 状態, {監査カラム}) "
+                f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, {監査カラム}) "
                 f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
                 [
                     タスクID,
@@ -1616,7 +1680,8 @@ def タスク本登録(
                     str(行.get("要求内容", "")),
                     str(行.get("先行SEQ", "")),
                     要求TASK_AI_NAME,
-                    要求TASK_AI_MODEL,
+                    # 明細は各ステップの実行なので do のモデルを引き継ぐ
+                    要求モデル["TASK_AI_MODEL_do"],
                     1 if 行.get("操作検証") else 0,
                     実行有効値,
                     "待機",

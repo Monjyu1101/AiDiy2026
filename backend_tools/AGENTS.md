@@ -96,8 +96,9 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 
 | トランスポート | エンドポイント / コマンド | 主な利用者 |
 |----------------|--------------------------|-----------|
-| **SSE Transport** | `http://127.0.0.1:8095/{mcp_name}/sse` | AI エージェント、Claude Code、MCP クライアント |
-| **Streamable HTTP Transport** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` | Python スクリプト、curl、自動化処理 |
+| **SSE Transport** | `GET /{mcp_name}/sse` + `POST /{mcp_name}/messages/` | Claude Code、stdio bridge、公式 MCP SSE クライアント |
+| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` | Grok（`type=sse` は initialize を `/sse` へ POST する）、MCP Streamable HTTP クライアント |
+| **HTTP POST（REST）** | `POST /{mcp_name}/{method_name}` | Python スクリプト、curl、自動化処理 |
 | **stdio gateway** | `mcp_stdio.py --sse-url http://127.0.0.1:8095/{mcp_name}/sse` | Codex など stdio 専用の Code CLI |
 
 MCP一覧は `GET http://127.0.0.1:8095/` で確認できます。  

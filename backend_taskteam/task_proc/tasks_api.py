@@ -75,7 +75,7 @@ class タスク実行条件入力(BaseModel):
 class タスク要求AI登録リクエスト(BaseModel):
     """AI登録（新規の仮登録）。
 
-    プロジェクト / TASK_AI_NAME / TASK_AI_MODEL は None（未指定）のとき、
+    プロジェクト / TASK_AI_NAME / TASK_AI_MODEL_plan・_do・_check は None（未指定）のとき、
     AIタスク_要求編集ダイアログの新規時と同じ条件で補完する
     （利用者IDの更新最終レコードの値 → 無ければ規定値）。
     空文字は「その値を明示指定した」扱いで、プロジェクトは空欄のまま登録する。
@@ -85,7 +85,9 @@ class タスク要求AI登録リクエスト(BaseModel):
     プロジェクト: str | None = None
     要求内容: str
     TASK_AI_NAME: str | None = None
-    TASK_AI_MODEL: str | None = None
+    TASK_AI_MODEL_plan: str | None = None
+    TASK_AI_MODEL_do: str | None = None
+    TASK_AI_MODEL_check: str | None = None
     実行有効: bool = True
     実行条件: タスク実行条件入力 | None = None
 
@@ -96,7 +98,9 @@ class タスク要求更新登録リクエスト(BaseModel):
     プロジェクト: str = ""
     要求内容: str
     TASK_AI_NAME: str = tasks_db.TASK_AI_NAME既定
-    TASK_AI_MODEL: str = "auto"
+    TASK_AI_MODEL_plan: str | None = None
+    TASK_AI_MODEL_do: str | None = None
+    TASK_AI_MODEL_check: str | None = None
     実行有効: bool = True
     状況: str = "準備開始"  # 準備開始 / 準備完了 / 中止 / 更新前の状態
     実行条件: タスク実行条件入力 | None = None
@@ -125,7 +129,8 @@ class タスク明細更新登録リクエスト(BaseModel):
     要求内容: str = ""
     先行SEQ: str = ""
     TASK_AI_NAME: str = tasks_db.TASK_AI_NAME既定
-    TASK_AI_MODEL: str = "auto"
+    # 明細は各ステップの実行なので do 用モデルだけを持つ
+    TASK_AI_MODEL_do: str = "auto"
     操作検証: bool = False
     実行有効: bool = True
     状態: str = "待機"
@@ -225,6 +230,18 @@ def _OK(data: dict, message: str = "") -> dict:
 
 def _NG(message: str) -> dict:
     return {"status": "NG", "message": message, "data": {}}
+
+
+def _モデル3種(request, 既定: dict) -> dict:
+    """リクエストから TASK_AI_MODEL_plan / _do / _check を決める。
+
+    未指定（None・空文字）の項目は既定値で埋める。
+    """
+    return {
+        カラム: (getattr(request, カラム, None) or "").strip()
+        or str(既定.get(カラム, "") or tasks_db.TASK_AI_MODEL既定)
+        for カラム in tasks_db.AIモデルカラム
+    }
 
 
 @router.post("/タスク要求/一覧", tags=["タスク要求"])
@@ -413,7 +430,7 @@ async def タスク要求AI登録(request: タスク要求AI登録リクエス�
         既定 = tasks_db.タスク要求新規既定値(利用者ID)
         プロジェクト = 既定["プロジェクト"] if request.プロジェクト is None else request.プロジェクト.strip()
         TASK_AI_NAME = (request.TASK_AI_NAME or "").strip() or 既定["TASK_AI_NAME"]
-        TASK_AI_MODEL = (request.TASK_AI_MODEL or "").strip() or 既定["TASK_AI_MODEL"]
+        モデル = _モデル3種(request, 既定)
         item = tasks_db.仮タスク登録(
             タスクID,
             タイトル,
@@ -421,7 +438,9 @@ async def タスク要求AI登録(request: タスク要求AI登録リクエス�
             利用者ID,
             プロジェクト,
             TASK_AI_NAME,
-            TASK_AI_MODEL,
+            モデル["TASK_AI_MODEL_plan"],
+            モデル["TASK_AI_MODEL_do"],
+            モデル["TASK_AI_MODEL_check"],
             request.実行有効,
         )
         tasks_db.実行条件登録(タスクID, 実行条件.model_dump(), 利用者ID)
@@ -480,12 +499,16 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
         for pid in tasks_db.タスクPID一覧(タスクID):
             tasks_watcher._プロセス強制停止(pid, logger)
         tasks_db.タスクPIDクリア(タスクID)
+        # 未指定の項目は更新前のレコード値を保つ
+        モデル = _モデル3種(request, 現行)
         item = tasks_db.タスク要求更新登録(
             タスクID,
             request.プロジェクト.strip(),
             要求内容,
             request.TASK_AI_NAME.strip() or tasks_db.TASK_AI_NAME既定,
-            request.TASK_AI_MODEL.strip() or "auto",
+            モデル["TASK_AI_MODEL_plan"],
+            モデル["TASK_AI_MODEL_do"],
+            モデル["TASK_AI_MODEL_check"],
             request.実行有効,
             状態,
         )
@@ -574,7 +597,7 @@ async def タスク明細更新登録(request: タスク明細更新登録リク
             要求内容,
             先行SEQ,
             request.TASK_AI_NAME.strip() or tasks_db.TASK_AI_NAME既定,
-            request.TASK_AI_MODEL.strip() or "auto",
+            request.TASK_AI_MODEL_do.strip() or "auto",
             request.操作検証,
             request.実行有効,
             状態,

@@ -32,7 +32,9 @@ const 選択プロジェクト = ref('');
 const 入力プロジェクト = ref('');
 const 入力要求内容 = ref('');
 const 入力TASK_AI_NAME = ref('codex_cli');
-const 入力TASK_AI_MODEL = ref('auto');
+const 入力TASK_AI_MODEL_plan = ref('auto');
+const 入力TASK_AI_MODEL_do = ref('auto');
+const 入力TASK_AI_MODEL_check = ref('auto');
 const 入力実行有効 = ref(true);
 const 入力状況 = ref('準備開始');
 const 状況選択肢 = ['準備開始', '中止'];
@@ -60,6 +62,19 @@ const taskModelOptions = computed(() => {
   const models = availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {};
   return Object.entries(models).map(([value, label]) => ({ value, label: label || value }));
 });
+
+// plan（準備）/ do（各ステップ）/ check（終了時の最終確認）を、選択中 AI の候補へ寄せて入れる
+const モデル初期化 = (値取得: (フェーズ: string) => unknown) => {
+  const 候補 = Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {});
+  const 入力 = {
+    plan: 入力TASK_AI_MODEL_plan,
+    do: 入力TASK_AI_MODEL_do,
+    check: 入力TASK_AI_MODEL_check,
+  };
+  for (const [フェーズ, ref入力] of Object.entries(入力)) {
+    ref入力.value = chooseAvailable(String(値取得(フェーズ) || 'auto'), 候補) || 'auto';
+  }
+};
 
 const 修正モード = computed(() => !!props.編集タスク);
 const タスクID表示 = computed(() => 修正モード.value ? String(props.編集タスク?.タスクID ?? '') : '(新規)');
@@ -203,7 +218,7 @@ async function モデル選択肢読込() {
     }
   } catch {
     availableModels.value = { code_models: { ...TASK_CODE_MODELS既定 } };
-    currentSettings.value = { CODE_BASE_PATH: '../', TASK_AI_NAME: 'codex_cli', TASK_AI_MODEL: 'auto' };
+    currentSettings.value = { CODE_BASE_PATH: '../', TASK_AI_NAME: 'codex_cli', TASK_AI_MODEL_do: 'auto' };
   }
 }
 
@@ -258,7 +273,7 @@ const 入力初期化 = () => {
     const ai候補 = taskAiOptions.value;
     if (編集) {
       入力TASK_AI_NAME.value = chooseAvailable(編集.TASK_AI_NAME || 'codex_cli', ai候補) || 'codex_cli';
-      入力TASK_AI_MODEL.value = chooseAvailable(編集.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
+      モデル初期化((フェーズ) => 編集[`TASK_AI_MODEL_${フェーズ}`]);
     } else {
       入力プロジェクト.value = String(
         新規既定値.value.プロジェクト
@@ -270,12 +285,13 @@ const 入力初期化 = () => {
         || props.最終タスク?.TASK_AI_NAME
         || currentSettings.value.TASK_AI_NAME
         || 'codex_cli';
-      const lastModel = 新規既定値.value.TASK_AI_MODEL
-        || props.最終タスク?.TASK_AI_MODEL
-        || currentSettings.value.TASK_AI_MODEL
-        || 'auto';
       入力TASK_AI_NAME.value = chooseAvailable(lastAi, ai候補) || 'codex_cli';
-      入力TASK_AI_MODEL.value = chooseAvailable(lastModel, Object.keys(availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {})) || 'auto';
+      // 新規は 新規既定値（更新最終レコード）→ 直前タスク → 共通設定 の順にフェーズ別の値を引く
+      モデル初期化((フェーズ) =>
+        新規既定値.value[`TASK_AI_MODEL_${フェーズ}`]
+        || props.最終タスク?.[`TASK_AI_MODEL_${フェーズ}`]
+        || currentSettings.value[`TASK_AI_MODEL_${フェーズ}`],
+      );
     }
   });
   void 選択肢読込();
@@ -289,8 +305,12 @@ watch(選択プロジェクト, (value) => {
 
 watch(入力TASK_AI_NAME, (newValue) => {
   const models = Object.keys(availableModels.value?.code_models?.[newValue] || {});
-  if (models.length > 0 && !models.includes(入力TASK_AI_MODEL.value)) {
-    入力TASK_AI_MODEL.value = models[0]!;
+  if (models.length === 0) return;
+  // plan / do / check は同じ AI の候補から選ぶため、AI名変更時はまとめて寄せ直す
+  for (const モデル of [入力TASK_AI_MODEL_plan, 入力TASK_AI_MODEL_do, 入力TASK_AI_MODEL_check]) {
+    if (!models.includes(モデル.value)) {
+      モデル.value = models[0]!;
+    }
   }
 });
 
@@ -350,7 +370,9 @@ const 登録 = async () => {
           プロジェクト: 入力プロジェクト.value.trim(),
           要求内容: 入力要求内容.value.trim(),
           TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'codex_cli',
-          TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
+          TASK_AI_MODEL_plan: 入力TASK_AI_MODEL_plan.value.trim() || 'auto',
+          TASK_AI_MODEL_do: 入力TASK_AI_MODEL_do.value.trim() || 'auto',
+          TASK_AI_MODEL_check: 入力TASK_AI_MODEL_check.value.trim() || 'auto',
           実行有効: 入力実行有効.value,
           状況: 入力状況.value,
           実行条件: 実行条件ペイロード()
@@ -360,7 +382,9 @@ const 登録 = async () => {
           プロジェクト: 入力プロジェクト.value.trim(),
           要求内容: 入力要求内容.value.trim(),
           TASK_AI_NAME: 入力TASK_AI_NAME.value.trim() || 'codex_cli',
-          TASK_AI_MODEL: 入力TASK_AI_MODEL.value.trim() || 'auto',
+          TASK_AI_MODEL_plan: 入力TASK_AI_MODEL_plan.value.trim() || 'auto',
+          TASK_AI_MODEL_do: 入力TASK_AI_MODEL_do.value.trim() || 'auto',
+          TASK_AI_MODEL_check: 入力TASK_AI_MODEL_check.value.trim() || 'auto',
           実行有効: 入力実行有効.value,
           実行条件: 実行条件ペイロード()
         });
@@ -447,11 +471,30 @@ const 登録 = async () => {
           </div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">TASK_AI_MODEL</div>
+          <div class="detail-label">TASK_AI_MODEL_plan</div>
           <div class="detail-value">
-            <select v-model="入力TASK_AI_MODEL" class="detail-select">
+            <select v-model="入力TASK_AI_MODEL_plan" class="detail-select">
               <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
             </select>
+            <span class="model-phase-note">準備（AIによる明細分解）</span>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">TASK_AI_MODEL_do</div>
+          <div class="detail-value">
+            <select v-model="入力TASK_AI_MODEL_do" class="detail-select">
+              <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+            </select>
+            <span class="model-phase-note">各ステップの実行</span>
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">TASK_AI_MODEL_check</div>
+          <div class="detail-value">
+            <select v-model="入力TASK_AI_MODEL_check" class="detail-select">
+              <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+            </select>
+            <span class="model-phase-note">終了時の最終確認</span>
           </div>
         </div>
         <div class="detail-row">
@@ -865,6 +908,12 @@ const 登録 = async () => {
   height: 28px;
   padding: 0 8px;
   min-width: 0;
+}
+
+.model-phase-note {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .detail-select {

@@ -214,7 +214,7 @@ onBeforeUnmount(() => {
             <td class="work-id">{{ work.依頼ID }}</td>
             <td>
               <strong>{{ work.タイトル || '（タイトルなし）' }}</strong>
-              <small>{{ work.TEAM_AI_NAME }} / {{ work.TEAM_AI_MODEL }}</small>
+              <small>{{ work.TEAM_AI_NAME }} / {{ work.TEAM_AI_MODEL_do }}</small>
             </td>
             <td>
               <span class="status-badge" :class="状態class(work.状態)">{{ work.状態 }}</span>

@@ -236,8 +236,10 @@ AIコアは、テキスト、音声、画像、ファイル、コード支援を
 | `CHAT_AI_NAME` | テキストチャット |
 | `LIVE_AI_NAME` | 音声リアルタイム対話 |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | code1〜code6 のコード支援 |
-| `TASK_AI_NAME` / `TASK_AI_MODEL` | backend_taskteam の AIタスク自動実行 |
-| `TEAM_AI_NAME` / `TEAM_AI_MODEL` | backend_taskteam の AIチーム依頼実行 |
+| `TASK_AI_NAME` / `TASK_AI_MODEL_plan` / `_do` / `_check` | backend_taskteam の AIタスク自動実行 |
+| `TEAM_AI_NAME` / `TEAM_AI_MODEL_plan` / `_do` / `_check` | backend_taskteam の AIチーム依頼実行 |
+
+TASK / TEAM のモデルは plan（計画）/ do（実施）/ check（検証）の3種指定です。
 
 Code AI の有効値は `claude_sdk`、`claude_cli`、`copilot_cli`、`codex_cli`、`antigravity_cli`、`grok_cli`、`opencode_cli`、`aidiy_hermes` を想定します。
 

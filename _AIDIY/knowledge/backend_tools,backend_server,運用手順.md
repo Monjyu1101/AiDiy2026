@@ -150,6 +150,7 @@ PATH 上にない環境ではフルパスへ書き換える。MCP ツールは a
 - PostgreSQL は `psycopg[binary]` 未導入でもサーバー起動は継続し、PostgreSQL ツール呼び出し時にエラーを返す。
 - Code Check は副作用なしの検査系のみを実行する。build や dev server 起動はしない。
 - `permission_mode="bypassPermissions"` は backend_server 側の AIコードエージェント設定であり、MCP サーバー自身は localhost 制限で守る。
+- Grok の `type=sse` 接続は `grok mcp doctor <name>` で handshake を確認する。405 なら `tools_main.py` の POST `/sse`（Streamable HTTP）受け口を疑う。
 
 ## 使い分け
 

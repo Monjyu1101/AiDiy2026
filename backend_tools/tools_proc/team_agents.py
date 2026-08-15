@@ -79,20 +79,27 @@ class TeamAgents:
         project_path: Optional[str] = None,
         member_id: str = "admin",
         team_ai_name: Optional[str] = None,
-        team_ai_model: Optional[str] = None,
         task_ai_name: Optional[str] = None,
-        task_ai_model: Optional[str] = None,
         enabled: bool = True,
         return_work_id: bool = True,
         request_timeout_sec: int = 15,
+        team_ai_model_plan: Optional[str] = None,
+        team_ai_model_do: Optional[str] = None,
+        team_ai_model_check: Optional[str] = None,
+        task_ai_model_plan: Optional[str] = None,
+        task_ai_model_do: Optional[str] = None,
+        task_ai_model_check: Optional[str] = None,
     ) -> dict:
         """Aチーム依頼を「準備開始」で登録する。依頼IDは backend_taskteam が自動採番する。
 
-        project_path / team_ai_name / team_ai_model / task_ai_name / task_ai_model が
-        None（未指定）のときは payload に載せず、backend_taskteam 側が
-        AIチーム_依頼編集の新規時と同じ条件
+        project_path / team_ai_name / task_ai_name / *_ai_model_* が None（未指定）のときは
+        payload に載せず、backend_taskteam 側が AIチーム_依頼編集の新規時と同じ条件
         （要員IDの更新最終レコードの値、無ければ規定値）で補完する。
         空文字は明示指定として送る（プロジェクトは空欄のまま登録される）。
+
+        モデルは plan / do / check の3種ずつ指定する。TEAM 側は作業ループの段
+        （相談・計画 / 実施 / 評価・改善）、TASK 側は投入する Aタスクの内部フェーズ
+        （準備 / 各ステップ / 最終確認）に対応する。
         """
         prompt = (prompt or "").strip()
         member_id = (member_id or "").strip() or "admin"
@@ -113,12 +120,15 @@ class TeamAgents:
             payload["プロジェクト"] = str(project_path).strip()
         if team_ai_name is not None:
             payload["TEAM_AI_NAME"] = str(team_ai_name).strip()
-        if team_ai_model is not None:
-            payload["TEAM_AI_MODEL"] = str(team_ai_model).strip()
         if task_ai_name is not None:
             payload["TASK_AI_NAME"] = str(task_ai_name).strip()
-        if task_ai_model is not None:
-            payload["TASK_AI_MODEL"] = str(task_ai_model).strip()
+        for 接頭辞, 値一覧 in (
+            ("TEAM", (team_ai_model_plan, team_ai_model_do, team_ai_model_check)),
+            ("TASK", (task_ai_model_plan, task_ai_model_do, task_ai_model_check)),
+        ):
+            for フェーズ, 値 in zip(("plan", "do", "check"), 値一覧):
+                if 値 is not None:
+                    payload[f"{接頭辞}_AI_MODEL_{フェーズ}"] = str(値).strip()
         data = self._post_team_api("/team/依頼/登録", payload, request_timeout_sec)
 
         if data.get("status") != "OK":
@@ -138,9 +148,12 @@ class TeamAgents:
             # 未指定時に backend_taskteam が補完した値を確認できるよう、登録結果を返す
             "プロジェクト": str(item.get("プロジェクト") or ""),
             "TEAM_AI_NAME": str(item.get("TEAM_AI_NAME") or ""),
-            "TEAM_AI_MODEL": str(item.get("TEAM_AI_MODEL") or ""),
             "TASK_AI_NAME": str(item.get("TASK_AI_NAME") or ""),
-            "TASK_AI_MODEL": str(item.get("TASK_AI_MODEL") or ""),
+            **{
+                f"{接頭辞}_AI_MODEL_{フェーズ}": str(item.get(f"{接頭辞}_AI_MODEL_{フェーズ}") or "")
+                for 接頭辞 in ("TEAM", "TASK")
+                for フェーズ in ("plan", "do", "check")
+            },
             "状態": str(item.get("状態") or ""),
         }
         if return_work_id:

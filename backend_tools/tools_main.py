@@ -11,7 +11,7 @@
 """
 AiDiy MCP サーバー エントリポイント
 
-SSE + HTTP POST インターフェースを 1 ポート (8095) で提供する。
+SSE / Streamable HTTP / HTTP POST を 1 ポート (8095) で提供する。
 MCP ツールの実装は tools_proc/tools_*.py に分割してある。
 """
 
@@ -19,6 +19,8 @@ import os
 import sys
 import threading
 import time
+from contextlib import AsyncExitStack, asynccontextmanager
+from collections.abc import AsyncIterator
 from typing import Optional
 
 # UTF-8出力を強制（Windows文字化け対策）
@@ -33,7 +35,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.requests import Request
 from fastapi import Response
 from fastapi.routing import APIRoute
+from starlette.applications import Starlette
+from starlette.routing import Route
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import StreamableHTTPASGIApp
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from log_config import setup_logging, get_logger
 from tools_proc.chrome_sessions import ChromeSessionRegistry
@@ -258,6 +264,82 @@ tools_windows_control.register_tools(mcp_wc, winctl)
 mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_description()
 
 # ------------------------------------------------------------------ #
+# SSE + Streamable HTTP を同一マウントに合成
+# GET /sse + POST /messages/ = 従来 SSE（Claude / stdio / Python sse_client）
+# POST|DELETE /sse と /mcp    = Streamable HTTP
+#   Grok の type=sse は initialize を /sse へ POST する
+# ------------------------------------------------------------------ #
+
+def _ensure_session_manager(mcp_instance: FastMCP) -> StreamableHTTPSessionManager:
+    if mcp_instance._session_manager is None:
+        mcp_instance._session_manager = StreamableHTTPSessionManager(
+            app=mcp_instance._mcp_server,
+            event_store=mcp_instance._event_store,
+            retry_interval=mcp_instance._retry_interval,
+            json_response=mcp_instance.settings.json_response,
+            stateless=mcp_instance.settings.stateless_http,
+            security_settings=mcp_instance.settings.transport_security,
+            max_request_body_size=mcp_instance.settings.max_request_body_size,
+        )
+    return mcp_instance._session_manager
+
+
+def _mcp_transport_app(mcp_instance: FastMCP) -> Starlette:
+    sse_starlette = mcp_instance.sse_app()
+    http_asgi = StreamableHTTPASGIApp(_ensure_session_manager(mcp_instance))
+    return Starlette(
+        debug=False,
+        routes=[
+            Route("/sse", endpoint=http_asgi, methods=["POST", "DELETE"]),
+            *list(sse_starlette.routes),
+            Route("/mcp", endpoint=http_asgi),
+        ],
+    )
+
+
+def _dispatch_streamable_http(mcp_name: str, path: str, method: str):
+    """REST の {method_name} より先に Streamable HTTP へ渡すパスなら ASGI を返す。"""
+    inst = MCP_MAP.get(mcp_name)
+    if inst is None:
+        return None
+    if path in (f"/{mcp_name}/sse", f"/{mcp_name}/sse/") and method in ("POST", "DELETE"):
+        return StreamableHTTPASGIApp(_ensure_session_manager(inst))
+    if path in (f"/{mcp_name}/mcp", f"/{mcp_name}/mcp/"):
+        return StreamableHTTPASGIApp(_ensure_session_manager(inst))
+    return None
+
+
+class _McpTransportMiddleware:
+    """POST /{mcp}/sse が REST の {method_name} に吸われないようにする。"""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            method = scope.get("method", "").upper()
+            for mcp_name in MCP_MAP:
+                prefix = f"/{mcp_name}/"
+                if path == f"/{mcp_name}" or path.startswith(prefix):
+                    asgi = _dispatch_streamable_http(mcp_name, path, method)
+                    if asgi is not None:
+                        await asgi(scope, receive, send)
+                        return
+                    break
+        await self.app(scope, receive, send)
+
+
+@asynccontextmanager
+async def _mcp_lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async with AsyncExitStack() as stack:
+        for inst in MCP_MAP.values():
+            await stack.enter_async_context(_ensure_session_manager(inst).run())
+        logger.info("Streamable HTTP session manager を %d 本起動しました", len(MCP_MAP))
+        yield
+
+
+# ------------------------------------------------------------------ #
 # FastAPI アプリ
 # ------------------------------------------------------------------ #
 
@@ -280,6 +362,7 @@ app = FastAPI(
     ),
     version="1.0.0",
     generate_unique_id_function=_unique_op_id,
+    lifespan=_mcp_lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -287,6 +370,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(_McpTransportMiddleware)
 
 # ------------------------------------------------------------------ #
 # MCP_MAP: initialize / list / ping 共通エンドポイント用
@@ -389,28 +473,28 @@ for _mcp_name, _mcp_instance in MCP_MAP.items():
     _register_mcp_http_meta(_mcp_name, _mcp_instance)
 
 # ------------------------------------------------------------------ #
-# MCP SSE サーバーをサブパスにマウント
+# MCP SSE / Streamable HTTP サーバーをサブパスにマウント
 # ------------------------------------------------------------------ #
 
-app.mount(MOUNT,    mcp.sse_app())
-app.mount(MOUNT_DC, mcp_dc.sse_app())
-app.mount(MOUNT_SQ, mcp_sq.sse_app())
-app.mount(MOUNT_PG, mcp_pg.sse_app())
-app.mount(MOUNT_LG, mcp_lg.sse_app())
-app.mount(MOUNT_CC, mcp_cc.sse_app())
-app.mount(MOUNT_BK, mcp_bk.sse_app())
-app.mount(MOUNT_IG, mcp_ig.sse_app())
-app.mount(MOUNT_MG, mcp_mg.sse_app())
-app.mount(MOUNT_ST, mcp_st.sse_app())
-app.mount(MOUNT_TS, mcp_ts.sse_app())
-app.mount(MOUNT_OB, mcp_ob.sse_app())
-app.mount(MOUNT_FF, mcp_ff.sse_app())
-app.mount(MOUNT_NS, mcp_ns.sse_app())
-app.mount(MOUNT_CA, mcp_ca.sse_app())
-app.mount(MOUNT_CL, mcp_cl.sse_app())
-app.mount(MOUNT_TA, mcp_ta.sse_app())
-app.mount(MOUNT_TM, mcp_tm.sse_app())
-app.mount(MOUNT_WC, mcp_wc.sse_app())
+app.mount(MOUNT,    _mcp_transport_app(mcp))
+app.mount(MOUNT_DC, _mcp_transport_app(mcp_dc))
+app.mount(MOUNT_SQ, _mcp_transport_app(mcp_sq))
+app.mount(MOUNT_PG, _mcp_transport_app(mcp_pg))
+app.mount(MOUNT_LG, _mcp_transport_app(mcp_lg))
+app.mount(MOUNT_CC, _mcp_transport_app(mcp_cc))
+app.mount(MOUNT_BK, _mcp_transport_app(mcp_bk))
+app.mount(MOUNT_IG, _mcp_transport_app(mcp_ig))
+app.mount(MOUNT_MG, _mcp_transport_app(mcp_mg))
+app.mount(MOUNT_ST, _mcp_transport_app(mcp_st))
+app.mount(MOUNT_TS, _mcp_transport_app(mcp_ts))
+app.mount(MOUNT_OB, _mcp_transport_app(mcp_ob))
+app.mount(MOUNT_FF, _mcp_transport_app(mcp_ff))
+app.mount(MOUNT_NS, _mcp_transport_app(mcp_ns))
+app.mount(MOUNT_CA, _mcp_transport_app(mcp_ca))
+app.mount(MOUNT_CL, _mcp_transport_app(mcp_cl))
+app.mount(MOUNT_TA, _mcp_transport_app(mcp_ta))
+app.mount(MOUNT_TM, _mcp_transport_app(mcp_tm))
+app.mount(MOUNT_WC, _mcp_transport_app(mcp_wc))
 
 # ------------------------------------------------------------------ #
 # OpenAPI パス順序カスタマイズ

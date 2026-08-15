@@ -184,9 +184,28 @@ Task と Team の全 DB モジュールはプロジェクトルートの `_data/
 設定はプロジェクトルートの `_config/AiDiy_key.json` と共通 `backend_server/conf/conf_json.py` を参照します。主なキーは次です。
 
 - `CODE_BASE_PATH`。
-- `TASK_AI_NAME` / `TASK_AI_MODEL`。
-- `TEAM_AI_NAME` / `TEAM_AI_MODEL`。
+- `TASK_AI_NAME` / `TASK_AI_MODEL_plan` / `TASK_AI_MODEL_do` / `TASK_AI_MODEL_check`。
+- `TEAM_AI_NAME` / `TEAM_AI_MODEL_plan` / `TEAM_AI_MODEL_do` / `TEAM_AI_MODEL_check`。
 - `PORT_TASKTEAM`。現行値は `8093`。
+
+モデルはフェーズごとに使い分けます。Aタスクは準備（AIによる明細分解）が plan、各ステップの実行が do、
+終了時の最終確認が check。作業ループは S・P が plan、D が do、C・A が check。
+
+`Aタスク要求` は `TASK_AI_MODEL_plan` / `_do` / `_check` の3列、`Aチーム目標` と `Aチーム依頼` は
+TEAM・TASK それぞれ3列（計6列）を持ち、各編集ダイアログから指定します。
+`Aタスク明細` は各ステップの実行だけなので `TASK_AI_MODEL_do` 1列で、本登録時に要求の `_do` を引き継ぎます。
+フェーズが1つしかない処理もキー名でフェーズを明示します（会話要求は `TASK_AI_MODEL_plan`、
+雑談は `TASK_AI_MODEL_plan`、自己作業は `TASK_AI_MODEL_do`、経験まとめは依頼の `*_AI_MODEL_plan`）。
+
+モデルの流れは 目標 → 依頼 → Aタスク要求 で、3種のまま引き渡します
+（`team_sub/sub_SPDCA__common.AI設定を決める()` → `タスク投入()`）。TEAM 側3種は作業ループの段
+（S・P=plan / D=do / C・A=check）、TASK 側3種は投入した Aタスクの内部フェーズ（準備 / 各ステップ /
+最終確認）で使い分けます。Aタスクを作らず code_agents を直に呼ぶ段（S・P・C・A）は
+`段のモデル()` が区分に対応するフェーズを選び、`auto` なら共通設定のフェーズ別値へ落とします。
+
+モデルはフェーズ別キーだけで扱います（旧版の単一キー `TASK_AI_MODEL` / `TEAM_AI_MODEL` は
+DB 列・API・MCP のいずれにも存在しません）。MCP は `aidiy_task_agents.submit` が
+`ai_model_plan` / `_do` / `_check`、`aidiy_team_agents.submit` が `team_ai_model_plan` などで指定します。
 
 ## temp の分離
 

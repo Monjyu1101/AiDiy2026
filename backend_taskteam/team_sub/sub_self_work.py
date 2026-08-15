@@ -71,7 +71,8 @@ def main() -> int:
         プロジェクト = str(項目.get("プロジェクト", "")).strip()
         チーム目標 = str(項目.get("チーム目標", "")).strip()
         TASK_AI_NAME = str(項目.get("TASK_AI_NAME", "claude_cli")).strip() or "claude_cli"
-        TASK_AI_MODEL = str(項目.get("TASK_AI_MODEL", "auto")).strip() or "auto"
+        # 自己作業はソースを変更する実施なので do 用モデルを使う
+        TASK_AI_MODEL_do = str(項目.get("TASK_AI_MODEL_do", "auto")).strip() or "auto"
         意見一覧 = 項目.get("意見一覧", []) or []
         if not プロジェクト or not チーム目標:
             raise ValueError("入力JSONにプロジェクト・チーム目標がありません")
@@ -84,7 +85,7 @@ def main() -> int:
             team_db.管理者要員ID,
             プロジェクト,
             TASK_AI_NAME,
-            TASK_AI_MODEL,
+            TASK_AI_MODEL_do,
             依頼内容,
         )
         取りまとめ内容 = str(結果.get("応答内容", "")).strip()

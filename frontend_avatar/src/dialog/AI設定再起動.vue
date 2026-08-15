@@ -58,9 +58,13 @@ const selections = reactive({
   codeBasePath: '',
   codePermissions: 'auto',
   taskAi: '',
-  taskModel: '',
+  taskModelPlan: '',
+  taskModelDo: '',
+  taskModelCheck: '',
   teamAi: '',
-  teamModel: '',
+  teamModelPlan: '',
+  teamModelDo: '',
+  teamModelCheck: '',
 })
 
 const CHAT_MODEL_KEYS: Record<string, string> = {
@@ -217,8 +221,14 @@ async function loadConfig() {
     selections.codeModel4 = chooseAvailable(currentSettings.value.CODE_AI4_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi4] || {}))
     selections.codeModel5 = chooseAvailable(currentSettings.value.CODE_AI5_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi5] || {}))
     selections.codeModel6 = chooseAvailable(currentSettings.value.CODE_AI6_MODEL, Object.keys(availableModels.value?.code_models?.[selections.codeAi6] || {}))
-    selections.taskModel = chooseAvailable(currentSettings.value.TASK_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[selections.taskAi] || {}))
-    selections.teamModel = chooseAvailable(currentSettings.value.TEAM_AI_MODEL || 'auto', Object.keys(availableModels.value?.code_models?.[selections.teamAi] || {}))
+    const taskModelKeys = Object.keys(availableModels.value?.code_models?.[selections.taskAi] || {})
+    selections.taskModelPlan = chooseAvailable(currentSettings.value.TASK_AI_MODEL_plan || 'auto', taskModelKeys)
+    selections.taskModelDo = chooseAvailable(currentSettings.value.TASK_AI_MODEL_do || 'auto', taskModelKeys)
+    selections.taskModelCheck = chooseAvailable(currentSettings.value.TASK_AI_MODEL_check || 'auto', taskModelKeys)
+    const teamModelKeys = Object.keys(availableModels.value?.code_models?.[selections.teamAi] || {})
+    selections.teamModelPlan = chooseAvailable(currentSettings.value.TEAM_AI_MODEL_plan || 'auto', teamModelKeys)
+    selections.teamModelDo = chooseAvailable(currentSettings.value.TEAM_AI_MODEL_do || 'auto', teamModelKeys)
+    selections.teamModelCheck = chooseAvailable(currentSettings.value.TEAM_AI_MODEL_check || 'auto', teamModelKeys)
 
     await nextTick()
     hasLoadedConfig.value = true
@@ -251,9 +261,13 @@ function buildNextSettings() {
   nextSettings.CODE_AI6_NAME = selections.codeAi6
   nextSettings.CODE_AI6_MODEL = selections.codeModel6
   nextSettings.TASK_AI_NAME = selections.taskAi
-  nextSettings.TASK_AI_MODEL = selections.taskModel
+  nextSettings.TASK_AI_MODEL_plan = selections.taskModelPlan
+  nextSettings.TASK_AI_MODEL_do = selections.taskModelDo
+  nextSettings.TASK_AI_MODEL_check = selections.taskModelCheck
   nextSettings.TEAM_AI_NAME = selections.teamAi
-  nextSettings.TEAM_AI_MODEL = selections.teamModel
+  nextSettings.TEAM_AI_MODEL_plan = selections.teamModelPlan
+  nextSettings.TEAM_AI_MODEL_do = selections.teamModelDo
+  nextSettings.TEAM_AI_MODEL_check = selections.teamModelCheck
 
   const normalizedCodeBasePath = normalizeCodeBasePath(selections.codeBasePath)
   if (normalizedCodeBasePath) {
@@ -430,16 +444,23 @@ watch(() => selections.codeAi6, (newValue) => syncCodeModel('codeModel6', newVal
 watch(() => selections.taskAi, (newValue) => {
   if (isInitializing.value) return
   const models = Object.keys(availableModels.value?.code_models?.[newValue] || {})
-  if (models.length > 0 && !models.includes(selections.taskModel)) {
-    selections.taskModel = models[0]!
+  if (models.length === 0) return
+  // plan / do / check は同じ AI の候補から選ぶため、AI名変更時はまとめて寄せ直す
+  for (const key of ['taskModelPlan', 'taskModelDo', 'taskModelCheck'] as const) {
+    if (!models.includes(selections[key])) {
+      selections[key] = models[0]!
+    }
   }
 })
 
 watch(() => selections.teamAi, (newValue) => {
   if (isInitializing.value) return
   const models = Object.keys(availableModels.value?.code_models?.[newValue] || {})
-  if (models.length > 0 && !models.includes(selections.teamModel)) {
-    selections.teamModel = models[0]!
+  if (models.length === 0) return
+  for (const key of ['teamModelPlan', 'teamModelDo', 'teamModelCheck'] as const) {
+    if (!models.includes(selections[key])) {
+      selections[key] = models[0]!
+    }
   }
 })
 
@@ -697,9 +718,25 @@ onMounted(() => {
                 </div>
               </div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-task-model-select">TASK_AI_MODEL:</label>
+                <label class="config-panel-label" for="config-task-model-plan-select">TASK_AI_MODEL_plan:</label>
                 <div class="config-panel-control">
-                  <select id="config-task-model-select" v-model="selections.taskModel" class="config-panel-select">
+                  <select id="config-task-model-plan-select" v-model="selections.taskModelPlan" class="config-panel-select">
+                    <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-task-model-do-select">TASK_AI_MODEL_do:</label>
+                <div class="config-panel-control">
+                  <select id="config-task-model-do-select" v-model="selections.taskModelDo" class="config-panel-select">
+                    <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-task-model-check-select">TASK_AI_MODEL_check:</label>
+                <div class="config-panel-control">
+                  <select id="config-task-model-check-select" v-model="selections.taskModelCheck" class="config-panel-select">
                     <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
                   </select>
                 </div>
@@ -717,9 +754,25 @@ onMounted(() => {
                 </div>
               </div>
               <div class="config-panel-field">
-                <label class="config-panel-label" for="config-team-model-select">TEAM_AI_MODEL:</label>
+                <label class="config-panel-label" for="config-team-model-plan-select">TEAM_AI_MODEL_plan:</label>
                 <div class="config-panel-control">
-                  <select id="config-team-model-select" v-model="selections.teamModel" class="config-panel-select">
+                  <select id="config-team-model-plan-select" v-model="selections.teamModelPlan" class="config-panel-select">
+                    <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-team-model-do-select">TEAM_AI_MODEL_do:</label>
+                <div class="config-panel-control">
+                  <select id="config-team-model-do-select" v-model="selections.teamModelDo" class="config-panel-select">
+                    <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-team-model-check-select">TEAM_AI_MODEL_check:</label>
+                <div class="config-panel-control">
+                  <select id="config-team-model-check-select" v-model="selections.teamModelCheck" class="config-panel-select">
                     <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
                   </select>
                 </div>

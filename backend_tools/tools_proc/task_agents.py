@@ -77,19 +77,24 @@ class TaskAgents:
         prompt: str,
         project_path: Optional[str] = None,
         ai_name: Optional[str] = None,
-        ai_model: Optional[str] = None,
         user_id: str = "admin",
         enabled: bool = True,
         return_task_id: bool = True,
         request_timeout_sec: int = 15,
         task_id: Optional[str] = None,
+        ai_model_plan: Optional[str] = None,
+        ai_model_do: Optional[str] = None,
+        ai_model_check: Optional[str] = None,
     ) -> dict:
         """AIタスク要求を登録する。task_idは通常省略し、外部IDを引き継ぐ場合だけ指定する。
 
-        project_path / ai_name / ai_model が None（未指定）のときは payload に載せず、
+        project_path / ai_name / ai_model_* が None（未指定）のときは payload に載せず、
         backend_taskteam 側が AIタスク_要求編集の新規時と同じ条件
         （利用者IDの更新最終レコードの値、無ければ規定値）で補完する。
         空文字は明示指定として送る（プロジェクトは空欄のまま登録される）。
+
+        モデルはフェーズごとに指定する。ai_model_plan（準備＝明細分解）/ ai_model_do
+        （各ステップの実行）/ ai_model_check（終了時の最終確認）。
         """
         prompt = (prompt or "").strip()
         user_id = (user_id or "").strip() or "admin"
@@ -107,8 +112,11 @@ class TaskAgents:
             payload["プロジェクト"] = str(project_path).strip()
         if ai_name is not None:
             payload["TASK_AI_NAME"] = str(ai_name).strip()
-        if ai_model is not None:
-            payload["TASK_AI_MODEL"] = str(ai_model).strip()
+        for フェーズ, 値 in (
+            ("plan", ai_model_plan), ("do", ai_model_do), ("check", ai_model_check)
+        ):
+            if 値 is not None:
+                payload[f"TASK_AI_MODEL_{フェーズ}"] = str(値).strip()
         if task_id:
             payload["タスクID"] = task_id
         data = self._post_task_api("/task/タスク要求/AI登録", payload, request_timeout_sec)
@@ -130,7 +138,9 @@ class TaskAgents:
             # 未指定時に backend_taskteam が補完した値を確認できるよう、登録結果を返す
             "プロジェクト": str(item.get("プロジェクト") or ""),
             "TASK_AI_NAME": str(item.get("TASK_AI_NAME") or ""),
-            "TASK_AI_MODEL": str(item.get("TASK_AI_MODEL") or ""),
+            "TASK_AI_MODEL_plan": str(item.get("TASK_AI_MODEL_plan") or ""),
+            "TASK_AI_MODEL_do": str(item.get("TASK_AI_MODEL_do") or ""),
+            "TASK_AI_MODEL_check": str(item.get("TASK_AI_MODEL_check") or ""),
         }
         if return_task_id:
             result["task_id"] = task_id

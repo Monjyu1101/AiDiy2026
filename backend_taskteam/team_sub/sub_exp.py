@@ -43,6 +43,7 @@ TEAM_AI_NAME既定 = "claude_cli"
 TEAM_AI_MODEL既定 = "auto"
 TASK_AI_NAME既定 = "claude_cli"
 TASK_AI_MODEL既定 = "auto"
+DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
 JSON保存最大試行回数 = 2
 明細最大件数 = 40
 
@@ -64,6 +65,32 @@ def _標準出力をUTF8化() -> None:
 
 
 _標準出力をUTF8化()
+
+
+def 入力モデル(入力: dict, 接頭辞: str, フェーズ: str, 既定: str = "auto") -> str:
+    """入力 JSON（Aチーム依頼レコードの値）から指定フェーズのモデルを取り出す。
+
+    依頼側が `auto`（モデル指定なし）なら共通設定のフェーズ別値へ落とす。
+    """
+    値 = str(入力.get(f"{接頭辞}_AI_MODEL_{フェーズ}", "") or "").strip()
+    return 値 if 値 and 値 != "auto" else AIモデル(接頭辞, フェーズ, 既定)
+
+
+def AIモデル(接頭辞: str, フェーズ: str, 既定: str = "auto") -> str:
+    """`AiDiy_key.json` の `<接頭辞>_AI_MODEL_<フェーズ>` を返す。
+
+    接頭辞は TASK / TEAM、フェーズは plan / do / check。
+    旧版の単一キーしかない設定でも読めるようにする。
+    """
+    path = os.path.normpath(os.path.join(BASE_DIR, DEFAULT_CONFIG_PATH))
+    旧キー = f"{接頭辞}_AI_MODEL"
+    try:
+        with open(path, "r", encoding="utf-8-sig") as f:
+            data = json.load(f)
+        値 = data.get(f"{旧キー}_{フェーズ}", data.get(旧キー, 既定))
+        return str(値 or 既定).strip() or 既定
+    except Exception:
+        return 既定
 
 
 def ログ(メッセージ: str) -> None:
@@ -283,15 +310,12 @@ def main() -> int:
         team_ai_name = str(
             入力.get("TEAM_AI_NAME", TEAM_AI_NAME既定) or TEAM_AI_NAME既定
         ).strip()
-        team_ai_model = str(
-            入力.get("TEAM_AI_MODEL", TEAM_AI_MODEL既定) or TEAM_AI_MODEL既定
-        ).strip()
         task_ai_name = str(
             入力.get("TASK_AI_NAME", TASK_AI_NAME既定) or TASK_AI_NAME既定
         ).strip()
-        task_ai_model = str(
-            入力.get("TASK_AI_MODEL", TASK_AI_MODEL既定) or TASK_AI_MODEL既定
-        ).strip()
+        # 経験まとめは計画（plan）扱い。依頼レコードの plan 用モデルを使う
+        team_ai_model = 入力モデル(入力, "TEAM", "plan", TEAM_AI_MODEL既定)
+        task_ai_model = 入力モデル(入力, "TASK", "plan", TASK_AI_MODEL既定)
         if not 経験ID or not 依頼ID or not タスクID:
             raise ValueError("入力 JSON に 経験ID、依頼ID または タスクID がありません")
 

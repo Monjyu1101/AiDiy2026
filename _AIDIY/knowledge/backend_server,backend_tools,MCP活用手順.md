@@ -86,7 +86,7 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 
 `aidiy_task_agents.submit`の`task_id`は通常は指定不要で、省略時はbackend_taskteamが`TASK.mmdd.hhmmss`形式で自動採番する。呼出元のIDをAタスク要求まで引き継ぐ必要がある場合だけ指定する。
 
-`aidiy_task_agents.submit`の`project_path` / `ai_name` / `ai_model`も通常は指定不要（null）。未指定時はbackend_taskteamがAIタスク_要求編集ダイアログの新規時と同じ条件、つまり利用者IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`TASK_AI_NAME` / `TASK_AI_MODEL`）を使う。特定のプロジェクトやAIを狙う場合だけ明示指定する（`project_path`の空文字は「プロジェクト空欄」の明示指定として扱う）。
+`aidiy_task_agents.submit`の`project_path` / `ai_name` / `ai_model`も通常は指定不要（null）。未指定時はbackend_taskteamがAIタスク_要求編集ダイアログの新規時と同じ条件、つまり利用者IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`TASK_AI_NAME` / `TASK_AI_MODEL_do`）を使う。特定のプロジェクトやAIを狙う場合だけ明示指定する（`project_path`の空文字は「プロジェクト空欄」の明示指定として扱う）。
 
 `aidiy_team_agents.submit`は`Aチーム依頼`を`状態=準備開始`で追加する。依頼IDはbackend_taskteamが`TR`＋8桁で自動採番するため指定できない。`member_id`（要員ID、既定`admin`）はAチーム要員の要員IDで、候補は`get_member_list`で確認する。`project_path` / `team_ai_name` / `team_ai_model` / `task_ai_name` / `task_ai_model`は通常は指定不要（null）で、未指定時はbackend_taskteamがAIチーム_依頼編集ダイアログの新規時と同じ条件、つまり要員IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`CODE_BASE_PATH` / `TEAM_AI_*` / `TASK_AI_*`）を使う。登録後はbackend_taskteamの監視ループ（5秒間隔）が`aidiy_task_agents`へ投入するため、AIタスクを直接作る場合は`aidiy_task_agents`を使う。
 
@@ -96,7 +96,8 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 
 | インターフェース | 説明 |
 |----------------|------|
-| **SSE（MCP標準）** | `http://127.0.0.1:8095/{mcp_name}/sse` — AI エージェント・MCP クライアントが接続する標準トランスポート |
+| **SSE（MCP標準）** | `GET /{mcp_name}/sse` + `POST /{mcp_name}/messages/` — Claude や公式 MCP SSE クライアント |
+| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` — Grok の `type=sse` は initialize を `/sse` へ POST する。同じ URL の GET は従来 SSE のまま |
 | **stdio gateway** | `mcp_stdio.py --sse-url .../sse` — SSE を stdin/stdout に変換。Codex など stdio 専用 CLI が使う |
 | **HTTP POST（FastAPI）** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` — REST API として直接呼び出し可能。Swagger UI (`/docs`) で試行できる |
 
@@ -158,6 +159,7 @@ Codex の `url = ...` は streamable HTTP 用なので、AiDiy MCP の SSE URL �
 
 - 8095 が反応しない場合は `curl http://127.0.0.1:8095/` で本体起動を確認する
 - SSE だけ確認する場合は `curl http://127.0.0.1:8095/aidiy_sqlite/sse` を使う
+- Grok の handshake は `grok mcp doctor aidiy_sqlite` で確認する（`type=sse` は `/sse` へ initialize を POST する。405 なら `tools_main.py` の POST `/sse` 受け口を疑う）
 - Chrome DevTools が不安定な場合は `curl http://127.0.0.1:9222/json` でデバッグポートを確認する
 - PostgreSQL MCP だけ失敗する場合は、`psycopg` 未導入、DSN 未設定、外部 DB 接続不可を切り分ける
 - `Transport closed` や timeout が続く場合は同じ MCP 呼び出しを繰り返さず、代替確認と未確認範囲を明示する

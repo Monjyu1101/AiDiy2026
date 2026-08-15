@@ -610,7 +610,9 @@ async def TASKモデル選択肢取得(http_request: Request):
         現在設定 = {
             "CODE_BASE_PATH": getattr(conf_json, "CODE_BASE_PATH", "../") if conf_json else "../",
             "TASK_AI_NAME": getattr(conf_json, "TASK_AI_NAME", "codex_cli") if conf_json else "codex_cli",
-            "TASK_AI_MODEL": getattr(conf_json, "TASK_AI_MODEL", "auto") if conf_json else "auto",
+            "TASK_AI_MODEL_plan": getattr(conf_json, "TASK_AI_MODEL_plan", "auto") if conf_json else "auto",
+            "TASK_AI_MODEL_do": getattr(conf_json, "TASK_AI_MODEL_do", "auto") if conf_json else "auto",
+            "TASK_AI_MODEL_check": getattr(conf_json, "TASK_AI_MODEL_check", "auto") if conf_json else "auto",
         }
         code_models.setdefault(str(現在設定["TASK_AI_NAME"] or "codex_cli"), {"auto": "auto"})
         return {
@@ -707,9 +709,9 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "CODE_BASE_PATH",
             "CODE_MAX_TURNS", "CODE_PLAN", "CODE_VERIFY", "CODE_PERMISSIONS", "CODE_SELF_CHECK_LOOP",
             # TaskAI設定
-            "TASK_AI_NAME", "TASK_AI_MODEL",
+            "TASK_AI_NAME", "TASK_AI_MODEL_plan", "TASK_AI_MODEL_do", "TASK_AI_MODEL_check",
             # TeamAI設定
-            "TEAM_AI_NAME", "TEAM_AI_MODEL",
+            "TEAM_AI_NAME", "TEAM_AI_MODEL_plan", "TEAM_AI_MODEL_do", "TEAM_AI_MODEL_check",
         }
 
         if リセット:

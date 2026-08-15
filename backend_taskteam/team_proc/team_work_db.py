@@ -15,7 +15,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta
 
-from .config import 設定読込
+from .config import AIモデル, 設定読込
 from .team_db import DB_PATH
 
 依頼テーブル = "Aチーム依頼"
@@ -35,6 +35,17 @@ _採番テーブル = "C採番"
 _採番ID = "Aチーム依頼"
 _採番プレフィックス = "TR"
 _採番初期値 = 1000
+
+# 依頼が持つモデルは3種ずつ。TEAM 側は作業ループの段（S・P=plan / D=do / C・A=check）、
+# TASK 側は投入する Aタスクの内部フェーズ（準備=plan / 各ステップ=do / 最終確認=check）に対応する。
+AIモデルフェーズ = ("plan", "do", "check")
+AIモデルカラム = tuple(
+    f"{接頭辞}_AI_MODEL_{フェーズ}"
+    for 接頭辞 in ("TEAM", "TASK")
+    for フェーズ in AIモデルフェーズ
+)
+AI設定カラム = ("TEAM_AI_NAME", "TASK_AI_NAME", *AIモデルカラム)
+_AI設定列SQL = ", ".join(AI設定カラム)
 
 # プロセス内でテーブル作成を一度だけ行うためのフラグ
 _初期化済み = False
@@ -80,9 +91,13 @@ def 初期化() -> None:
                 タイトル TEXT NOT NULL DEFAULT '',
                 要求内容 TEXT NOT NULL DEFAULT '',
                 TEAM_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
-                TEAM_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
+                TEAM_AI_MODEL_plan TEXT NOT NULL DEFAULT 'auto',
+                TEAM_AI_MODEL_do TEXT NOT NULL DEFAULT 'auto',
+                TEAM_AI_MODEL_check TEXT NOT NULL DEFAULT 'auto',
                 TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
-                TASK_AI_MODEL TEXT NOT NULL DEFAULT 'auto',
+                TASK_AI_MODEL_plan TEXT NOT NULL DEFAULT 'auto',
+                TASK_AI_MODEL_do TEXT NOT NULL DEFAULT 'auto',
+                TASK_AI_MODEL_check TEXT NOT NULL DEFAULT 'auto',
                 タスクID TEXT NOT NULL DEFAULT '',
                 実行有効 INTEGER NOT NULL DEFAULT 1,
                 状態 TEXT NOT NULL DEFAULT '準備開始',
@@ -112,6 +127,8 @@ def 初期化() -> None:
         _初期化済み = True
     finally:
         conn.close()
+
+
 
 
 def _採番確保(conn: sqlite3.Connection) -> None:
@@ -173,7 +190,7 @@ def 依頼一覧(要員ID: str) -> list[dict]:
         rows = conn.execute(
             f"""
             SELECT 依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
-                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
+                   {_AI設定列SQL}, タスクID,
                    実行有効, 状態, PID,
                    開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, まとめ内容, 更新日時,
                    CASE WHEN 状態 IN ('完了', '済', 'エラー', '中止') THEN 9 ELSE 1 END AS 表示優先順位
@@ -209,7 +226,7 @@ def 依頼取得(要員ID: str, 依頼ID: str) -> dict | None:
         row = conn.execute(
             f"""
             SELECT 依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
-                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
+                   {_AI設定列SQL}, タスクID,
                    実行有効, 状態, PID,
                    開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容, まとめ内容, 更新日時
               FROM "{依頼テーブル}"
@@ -228,24 +245,28 @@ def 依頼新規既定値(要員ID: str) -> dict:
     AIチーム_依頼編集ダイアログの新規時と同じ条件で決める。
     要員IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値
     （`AiDiy_key.json` の `CODE_BASE_PATH` / `TEAM_AI_*` / `TASK_AI_*`）を使う。
+
+    モデルは plan / do / check の3種ずつで、規定値も共通設定のフェーズ別値から取る。
     """
     try:
         設定 = 設定読込()
         規定 = {
             "プロジェクト": str(getattr(設定, "CODE_BASE_PATH", "") or "../"),
             "TEAM_AI_NAME": str(getattr(設定, "TEAM_AI_NAME", "") or "codex_cli"),
-            "TEAM_AI_MODEL": str(getattr(設定, "TEAM_AI_MODEL", "") or "auto"),
             "TASK_AI_NAME": str(getattr(設定, "TASK_AI_NAME", "") or "codex_cli"),
-            "TASK_AI_MODEL": str(getattr(設定, "TASK_AI_MODEL", "") or "auto"),
+            **{
+                f"{接頭辞}_AI_MODEL_{フェーズ}": AIモデル(接頭辞, フェーズ)
+                for 接頭辞 in ("TEAM", "TASK")
+                for フェーズ in AIモデルフェーズ
+            },
             "参照依頼ID": "",
         }
     except Exception:
         規定 = {
             "プロジェクト": "../",
             "TEAM_AI_NAME": "codex_cli",
-            "TEAM_AI_MODEL": "auto",
             "TASK_AI_NAME": "codex_cli",
-            "TASK_AI_MODEL": "auto",
+            **{カラム: "auto" for カラム in AIモデルカラム},
             "参照依頼ID": "",
         }
 
@@ -257,7 +278,7 @@ def 依頼新規既定値(要員ID: str) -> dict:
     try:
         row = conn.execute(
             f"""
-            SELECT 依頼ID, プロジェクト, TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL
+            SELECT 依頼ID, プロジェクト, {_AI設定列SQL}
               FROM "{依頼テーブル}"
              WHERE 要員ID = ?
              ORDER BY 更新日時 DESC, 依頼ID DESC
@@ -273,7 +294,7 @@ def 依頼新規既定値(要員ID: str) -> dict:
     既定["参照依頼ID"] = str(row["依頼ID"] or "")
     # プロジェクトは空文字もそのまま引き継ぐ（ダイアログが最終依頼の値を初期表示するのと同じ）
     既定["プロジェクト"] = str(row["プロジェクト"] or "")
-    for キー in ("TEAM_AI_NAME", "TEAM_AI_MODEL", "TASK_AI_NAME", "TASK_AI_MODEL"):
+    for キー in AI設定カラム:
         値 = str(row[キー] or "").strip()
         if 値:
             既定[キー] = 値
@@ -290,13 +311,13 @@ def 依頼登録(依頼データ: dict, 操作者: dict) -> dict:
             f"""
             INSERT INTO "{依頼テーブル}" (
                 依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
-                TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL, タスクID,
+                {_AI設定列SQL}, タスクID,
                 実行有効, 状態,
                 PID, 開始日時, 終了日時, 実行回数, 応答タイトル, 応答内容,
                 登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
                 更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?,
+                ?, ?, ?, ?, ?, {', '.join('?' * len(AI設定カラム))}, '', ?, ?,
                 '', '', '', 0, '', '',
                 ?, ?, ?, ?, ?, ?, ?, ?
             )
@@ -307,10 +328,7 @@ def 依頼登録(依頼データ: dict, 操作者: dict) -> dict:
                 依頼データ["プロジェクト"],
                 _タイトル(依頼データ["要求内容"]),
                 依頼データ["要求内容"],
-                依頼データ["TEAM_AI_NAME"],
-                依頼データ["TEAM_AI_MODEL"],
-                依頼データ["TASK_AI_NAME"],
-                依頼データ["TASK_AI_MODEL"],
+                *[依頼データ[カラム] for カラム in AI設定カラム],
                 int(依頼データ["実行有効"]),
                 依頼データ["状態"],
                 now,
@@ -366,8 +384,7 @@ def 依頼変更(依頼データ: dict, 操作者: dict) -> dict:
             f"""
             UPDATE "{依頼テーブル}"
                SET プロジェクト = ?, タイトル = ?, 要求内容 = ?,
-                   TEAM_AI_NAME = ?, TEAM_AI_MODEL = ?,
-                   TASK_AI_NAME = ?, TASK_AI_MODEL = ?,
+                   {', '.join(f'{カラム} = ?' for カラム in AI設定カラム)},
                    実行有効 = ?, 状態 = ?,
                    タスクID = ?, PID = ?, 開始日時 = ?, 終了日時 = ?,
                    実行回数 = ?, 応答タイトル = ?, 応答内容 = ?, まとめ内容 = ?,
@@ -378,10 +395,7 @@ def 依頼変更(依頼データ: dict, 操作者: dict) -> dict:
                 依頼データ["プロジェクト"],
                 _タイトル(依頼データ["要求内容"]),
                 依頼データ["要求内容"],
-                依頼データ["TEAM_AI_NAME"],
-                依頼データ["TEAM_AI_MODEL"],
-                依頼データ["TASK_AI_NAME"],
-                依頼データ["TASK_AI_MODEL"],
+                *[依頼データ[カラム] for カラム in AI設定カラム],
                 int(依頼データ["実行有効"]),
                 依頼データ["状態"],
                 タスクID,
@@ -445,7 +459,7 @@ def 投入待ち一覧() -> list[dict]:
         rows = conn.execute(
             f"""
             SELECT 依頼ID, 要員ID, プロジェクト, タイトル, 要求内容,
-                   TEAM_AI_NAME, TEAM_AI_MODEL, TASK_AI_NAME, TASK_AI_MODEL,
+                   {_AI設定列SQL},
                    実行有効, 状態, PID, 実行回数
               FROM "{依頼テーブル}"
              WHERE 状態 = '準備開始'

@@ -45,6 +45,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import team_db, team_exp_db, team_goal_db, team_pdca_db, team_status_db, team_talk_db, team_work_db
+from .config import AIモデル
 from .store import ストア
 
 起動監視間隔秒 = 5
@@ -217,9 +218,11 @@ def _依頼実行開始(行: dict, logger: logging.Logger) -> None:
                     "プロジェクト": str(行.get("プロジェクト", "")),
                     "要求内容": str(行.get("要求内容", "")),
                     "TEAM_AI_NAME": str(行.get("TEAM_AI_NAME", "claude_cli")),
-                    "TEAM_AI_MODEL": str(行.get("TEAM_AI_MODEL", "auto")),
                     "TASK_AI_NAME": str(行.get("TASK_AI_NAME", "claude_cli")),
-                    "TASK_AI_MODEL": str(行.get("TASK_AI_MODEL", "auto")),
+                    **{
+                        カラム: str(行.get(カラム, "auto") or "auto")
+                        for カラム in team_work_db.AIモデルカラム
+                    },
                     "実行有効": int(行.get("実行有効", 1) or 0),
                 },
                 f,
@@ -295,9 +298,12 @@ def _経験生成開始(対象: dict, logger: logging.Logger) -> None:
                     "プロジェクト": str(対象.get("プロジェクト", "")),
                     "要求内容": str(対象.get("要求内容", "")),
                     "TEAM_AI_NAME": str(対象.get("TEAM_AI_NAME", "claude_cli")),
-                    "TEAM_AI_MODEL": str(対象.get("TEAM_AI_MODEL", "auto")),
                     "TASK_AI_NAME": str(対象.get("TASK_AI_NAME", "claude_cli")),
-                    "TASK_AI_MODEL": str(対象.get("TASK_AI_MODEL", "auto")),
+                    # 経験まとめは plan 扱い。sub_exp.py が依頼の plan 用モデルを使う
+                    **{
+                        カラム: str(対象.get(カラム, "auto") or "auto")
+                        for カラム in team_work_db.AIモデルカラム
+                    },
                 },
                 f,
                 ensure_ascii=False,
@@ -573,6 +579,14 @@ def _10分以内の発言か(最終発言日時: str, 現在日時: datetime | N
     return 最終発言 >= 現在 - timedelta(minutes=10)
 
 
+def _目標のTASKモデル(目標: dict, フェーズ: str) -> str:
+    """目標のフェーズ別モデルを返す。`auto`（指定なし）なら共通設定のフェーズ別値を使う。"""
+    値 = str(目標.get(f"TASK_AI_MODEL_{フェーズ}", "") or "").strip()
+    if 値 and 値 != "auto":
+        return 値
+    return AIモデル("TASK", フェーズ)
+
+
 def _雑談実行開始(
     会話: dict,
     目標: dict,
@@ -593,7 +607,8 @@ def _雑談実行開始(
                     "要員ID": 要員ID,
                     "チーム目標": str(目標.get("チーム目標", "")),
                     "TASK_AI_NAME": str(目標.get("TASK_AI_NAME", "claude_cli")),
-                    "TASK_AI_MODEL": str(目標.get("TASK_AI_MODEL", "auto")),
+                    # 雑談は意見出し（相談）なので plan フェーズのモデルを使う
+                    "TASK_AI_MODEL_plan": _目標のTASKモデル(目標, "plan"),
                     "他者意見": [
                         {"要員ID": str(行.get("要員ID", "")), "発言内容": str(行.get("発言内容", ""))}
                         for 行 in 他者意見一覧
@@ -709,7 +724,8 @@ def _自己作業実行開始(目標: dict, 意見一覧: list[dict], logger: lo
                     "プロジェクト": プロジェクト,
                     "チーム目標": str(目標.get("チーム目標", "")),
                     "TASK_AI_NAME": str(目標.get("TASK_AI_NAME", "claude_cli")),
-                    "TASK_AI_MODEL": str(目標.get("TASK_AI_MODEL", "auto")),
+                    # 自己作業はソースを変更する実施なので do フェーズのモデルを使う
+                    "TASK_AI_MODEL_do": _目標のTASKモデル(目標, "do"),
                     "意見一覧": [
                         {"要員ID": str(行.get("要員ID", "")), "発言内容": str(行.get("発言内容", ""))}
                         for 行 in 意見一覧

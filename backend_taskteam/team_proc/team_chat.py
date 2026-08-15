@@ -172,6 +172,6 @@ def 会話実行(
         "要員ID": 要員ID,
         "プロジェクト": str(response.get("project_path") or プロジェクト),
         "TASK_AI_NAME": str(response.get("ai_name") or task_ai_name),
-        "TASK_AI_MODEL": str(response.get("ai_model") or task_ai_model),
+        "TASK_AI_MODEL_plan": str(response.get("ai_model") or task_ai_model),
         "応答内容": 応答内容,
     }

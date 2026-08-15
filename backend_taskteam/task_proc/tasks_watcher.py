@@ -130,7 +130,11 @@ def _タスク実行開始(行: dict, logger: logging.Logger) -> None:
             "プロジェクト": str(行.get("プロジェクト", "")),
             "要求内容": str(行.get("要求内容", "")),
             "TASK_AI_NAME": str(行.get("TASK_AI_NAME", "codex_cli")),
-            "TASK_AI_MODEL": str(行.get("TASK_AI_MODEL", "auto")),
+            # 分解は plan、生成する明細へ引き継ぐのは do（check は終了明細が使う）
+            **{
+                カラム: str(行.get(カラム, "auto") or "auto")
+                for カラム in tasks_db.AIモデルカラム
+            },
         }, f, ensure_ascii=False, indent=2)
 
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0

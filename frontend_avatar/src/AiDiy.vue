@@ -740,9 +740,13 @@ function 初期化処理(message: Record<string, any>) {
     CODE_AI6_NAME: settings.CODE_AI6_NAME || '',
     CODE_PERMISSIONS: settings.CODE_PERMISSIONS || 'auto',
     TASK_AI_NAME: settings.TASK_AI_NAME || 'codex_cli',
-    TASK_AI_MODEL: settings.TASK_AI_MODEL || 'auto',
+    TASK_AI_MODEL_plan: settings.TASK_AI_MODEL_plan || 'auto',
+    TASK_AI_MODEL_do: settings.TASK_AI_MODEL_do || 'auto',
+    TASK_AI_MODEL_check: settings.TASK_AI_MODEL_check || 'auto',
     TEAM_AI_NAME: settings.TEAM_AI_NAME || 'codex_cli',
-    TEAM_AI_MODEL: settings.TEAM_AI_MODEL || 'auto',
+    TEAM_AI_MODEL_plan: settings.TEAM_AI_MODEL_plan || 'auto',
+    TEAM_AI_MODEL_do: settings.TEAM_AI_MODEL_do || 'auto',
+    TEAM_AI_MODEL_check: settings.TEAM_AI_MODEL_check || 'auto',
   }
 
   初期スピーカー有効.value = buttons.スピーカー ?? true

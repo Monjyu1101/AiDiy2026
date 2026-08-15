@@ -113,7 +113,9 @@ Code AI を 1 つ追加するときに触る箇所（`grok_cli` の実績）:
 - モデル一覧はアカウントの割り当てで変わる。`grok models` の実行結果を正とする
 - `--no-auto-update` は `--help` に記載がない。有効性は無効フラグ（`error: unexpected argument` が即座に出る）との比較で確認する
 - 設定 UI の候補は backend の `available_models.code_models` から生成されるため、追加後は core server の再起動が必要
-- 既存の `~/.claude.json` を読むため、AiDiy の MCP サーバー群は追加設定なしで grok からも見える（`grok inspect` で確認できる）
+- `_setup.py` は `~/.grok/config.toml` に `aidiy_*` を `type = "sse"` で書く。`grok mcp list` と `grok inspect` で確認する
+- Grok の `type=sse` は `/sse` へ Streamable HTTP の `initialize` を POST する。`grok mcp doctor <name>` が healthy なら接続できている
+- `~/.claude.json` も読むが、同名は `config.toml` が優先する。stdio ブリッジは使わない
 
 ## 確認方法
 
@@ -122,6 +124,7 @@ grok --version
 grok models
 grok --always-approve --cwd "D:\OneDrive\_sandbox\AiDiy2026" --no-auto-update -p "おはよう"
 grok --always-approve --cwd "D:\OneDrive\_sandbox\AiDiy2026" --no-auto-update -c -p "さっき私は何と言った？"
+grok mcp list
 grok inspect
 ```
 

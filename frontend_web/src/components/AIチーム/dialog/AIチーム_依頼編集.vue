@@ -35,9 +35,13 @@ const 選択プロジェクト = ref('');
 const 入力プロジェクト = ref('');
 const 入力要求内容 = ref('');
 const 入力TEAM_AI_NAME = ref('codex_cli');
-const 入力TEAM_AI_MODEL = ref('auto');
+const 入力TEAM_AI_MODEL_plan = ref('auto');
+const 入力TEAM_AI_MODEL_do = ref('auto');
+const 入力TEAM_AI_MODEL_check = ref('auto');
 const 入力TASK_AI_NAME = ref('codex_cli');
-const 入力TASK_AI_MODEL = ref('auto');
+const 入力TASK_AI_MODEL_plan = ref('auto');
+const 入力TASK_AI_MODEL_do = ref('auto');
+const 入力TASK_AI_MODEL_check = ref('auto');
 const 入力実行有効 = ref(true);
 const 入力状況 = ref('準備開始');
 const 状況変更可 = ref(false);
@@ -63,6 +67,33 @@ const chooseAvailable = (current: unknown, candidates: string[]) => {
   return value && candidates.includes(value) ? value : candidates[0] || '';
 };
 
+// モデルは3種ずつ。TEAM 側は作業ループの段（S・P / D / C・A）、
+// TASK 側は投入する Aタスクの内部フェーズ（準備 / 各ステップ / 最終確認）に対応する
+const AIモデルフェーズ = ['plan', 'do', 'check'] as const;
+const TEAMモデル入力 = [入力TEAM_AI_MODEL_plan, 入力TEAM_AI_MODEL_do, 入力TEAM_AI_MODEL_check];
+const TASKモデル入力 = [入力TASK_AI_MODEL_plan, 入力TASK_AI_MODEL_do, 入力TASK_AI_MODEL_check];
+
+// 依頼の値 → 共通設定の順に、選択中AIの候補へ寄せて入れる
+const モデル反映 = (接頭辞: 'TEAM' | 'TASK', 元: Record<string, any> | null | undefined) => {
+  const AI名 = 接頭辞 === 'TEAM' ? 入力TEAM_AI_NAME.value : 入力TASK_AI_NAME.value;
+  const 候補 = Object.keys(availableModels.value?.code_models?.[AI名] || {});
+  const 入力一覧 = 接頭辞 === 'TEAM' ? TEAMモデル入力 : TASKモデル入力;
+  AIモデルフェーズ.forEach((フェーズ, 位置) => {
+    const キー = `${接頭辞}_AI_MODEL_${フェーズ}`;
+    const 値 = 元?.[キー] || currentSettings.value[キー] || 'auto';
+    入力一覧[位置]!.value = chooseAvailable(値, 候補) || 'auto';
+  });
+};
+
+// AI名を変えたとき、そのAIに無いモデルが残らないよう先頭へ寄せる
+const 候補へ寄せる = (接頭辞: 'TEAM' | 'TASK', AI名: string) => {
+  const models = Object.keys(availableModels.value?.code_models?.[AI名] || {});
+  if (!models.length) return;
+  for (const モデル of 接頭辞 === 'TEAM' ? TEAMモデル入力 : TASKモデル入力) {
+    if (!models.includes(モデル.value)) モデル.value = models[0]!;
+  }
+};
+
 const モデル選択肢読込 = async () => {
   try {
     const [modelResponse, settingResponse] = await Promise.all([
@@ -79,9 +110,13 @@ const モデル選択肢読込 = async () => {
     currentSettings.value = {
       CODE_BASE_PATH: '../',
       TEAM_AI_NAME: 'codex_cli',
-      TEAM_AI_MODEL: 'auto',
       TASK_AI_NAME: 'codex_cli',
-      TASK_AI_MODEL: 'auto',
+      TEAM_AI_MODEL_plan: 'auto',
+      TEAM_AI_MODEL_do: 'auto',
+      TEAM_AI_MODEL_check: 'auto',
+      TASK_AI_MODEL_plan: 'auto',
+      TASK_AI_MODEL_do: 'auto',
+      TASK_AI_MODEL_check: 'auto',
     };
   }
 };
@@ -125,18 +160,10 @@ const フォーム初期化 = async () => {
   const initialWork = work ?? props.最終依頼;
   const teamAiName = initialWork?.TEAM_AI_NAME || currentSettings.value.TEAM_AI_NAME || 'codex_cli';
   入力TEAM_AI_NAME.value = chooseAvailable(teamAiName, aiCandidates) || 'codex_cli';
-  const teamModelCandidates = Object.keys(
-    availableModels.value?.code_models?.[入力TEAM_AI_NAME.value] || {},
-  );
-  const teamModelName = initialWork?.TEAM_AI_MODEL || currentSettings.value.TEAM_AI_MODEL || 'auto';
-  入力TEAM_AI_MODEL.value = chooseAvailable(teamModelName, teamModelCandidates) || 'auto';
+  モデル反映('TEAM', initialWork);
   const taskAiName = initialWork?.TASK_AI_NAME || currentSettings.value.TASK_AI_NAME || 'codex_cli';
   入力TASK_AI_NAME.value = chooseAvailable(taskAiName, taskAiOptions.value) || 'codex_cli';
-  const taskModelCandidates = Object.keys(
-    availableModels.value?.code_models?.[入力TASK_AI_NAME.value] || {},
-  );
-  const taskModelName = initialWork?.TASK_AI_MODEL || currentSettings.value.TASK_AI_MODEL || 'auto';
-  入力TASK_AI_MODEL.value = chooseAvailable(taskModelName, taskModelCandidates) || 'auto';
+  モデル反映('TASK', initialWork);
   フォーム初期化中.value = false;
 };
 
@@ -152,25 +179,24 @@ watch(選択プロジェクト, (value) => {
 });
 
 watch(入力TEAM_AI_NAME, (value) => {
-  const models = Object.keys(availableModels.value?.code_models?.[value] || {});
-  if (models.length && !models.includes(入力TEAM_AI_MODEL.value)) {
-    入力TEAM_AI_MODEL.value = models[0]!;
-  }
+  候補へ寄せる('TEAM', value);
+  // TEAM を変えたら TASK 側も同じ選択に追従させる（別々に選び直すこともできる）
   if (!フォーム初期化中.value) {
     入力TASK_AI_NAME.value = value;
-    入力TASK_AI_MODEL.value = 入力TEAM_AI_MODEL.value;
+    AIモデルフェーズ.forEach((_, 位置) => {
+      TASKモデル入力[位置]!.value = TEAMモデル入力[位置]!.value;
+    });
   }
 }, { flush: 'sync' });
 
-watch(入力TEAM_AI_MODEL, (value) => {
-  if (!フォーム初期化中.value) 入力TASK_AI_MODEL.value = value;
-}, { flush: 'sync' });
+TEAMモデル入力.forEach((モデル, 位置) => {
+  watch(モデル, (value) => {
+    if (!フォーム初期化中.value) TASKモデル入力[位置]!.value = value;
+  }, { flush: 'sync' });
+});
 
 watch(入力TASK_AI_NAME, (value) => {
-  const models = Object.keys(availableModels.value?.code_models?.[value] || {});
-  if (models.length && !models.includes(入力TASK_AI_MODEL.value)) {
-    入力TASK_AI_MODEL.value = models[0]!;
-  }
+  候補へ寄せる('TASK', value);
 }, { flush: 'sync' });
 
 const フォルダ参照 = async () => {
@@ -207,9 +233,13 @@ const 登録 = async () => {
         プロジェクト: 入力プロジェクト.value.trim(),
         要求内容: 入力要求内容.value.trim(),
         TEAM_AI_NAME: 入力TEAM_AI_NAME.value,
-        TEAM_AI_MODEL: 入力TEAM_AI_MODEL.value,
+        TEAM_AI_MODEL_plan: 入力TEAM_AI_MODEL_plan.value,
+        TEAM_AI_MODEL_do: 入力TEAM_AI_MODEL_do.value,
+        TEAM_AI_MODEL_check: 入力TEAM_AI_MODEL_check.value,
         TASK_AI_NAME: 入力TASK_AI_NAME.value,
-        TASK_AI_MODEL: 入力TASK_AI_MODEL.value,
+        TASK_AI_MODEL_plan: 入力TASK_AI_MODEL_plan.value,
+        TASK_AI_MODEL_do: 入力TASK_AI_MODEL_do.value,
+        TASK_AI_MODEL_check: 入力TASK_AI_MODEL_check.value,
         実行有効: 入力実行有効.value,
         状態: 入力状況.value,
         操作利用者ID: 利用者ID.value,
@@ -296,13 +326,36 @@ const 登録 = async () => {
             </div>
           </div>
           <div class="detail-row one-line-row">
-            <div class="detail-label">TEAM_AI_MODEL</div>
+            <div class="detail-label">TEAM_AI_MODEL_plan</div>
             <div class="detail-value">
-              <select v-model="入力TEAM_AI_MODEL" class="detail-select">
+              <select v-model="入力TEAM_AI_MODEL_plan" class="detail-select">
                 <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">
                   {{ model.label }}
                 </option>
               </select>
+              <span class="model-phase-note">相談・計画（S・P）</span>
+            </div>
+          </div>
+          <div class="detail-row one-line-row">
+            <div class="detail-label">TEAM_AI_MODEL_do</div>
+            <div class="detail-value">
+              <select v-model="入力TEAM_AI_MODEL_do" class="detail-select">
+                <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">
+                  {{ model.label }}
+                </option>
+              </select>
+              <span class="model-phase-note">実施（D）</span>
+            </div>
+          </div>
+          <div class="detail-row one-line-row">
+            <div class="detail-label">TEAM_AI_MODEL_check</div>
+            <div class="detail-value">
+              <select v-model="入力TEAM_AI_MODEL_check" class="detail-select">
+                <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">
+                  {{ model.label }}
+                </option>
+              </select>
+              <span class="model-phase-note">評価・改善（C・A）</span>
             </div>
           </div>
           <div class="detail-row one-line-row">
@@ -314,13 +367,36 @@ const 登録 = async () => {
             </div>
           </div>
           <div class="detail-row one-line-row">
-            <div class="detail-label">TASK_AI_MODEL</div>
+            <div class="detail-label">TASK_AI_MODEL_plan</div>
             <div class="detail-value">
-              <select v-model="入力TASK_AI_MODEL" class="detail-select">
+              <select v-model="入力TASK_AI_MODEL_plan" class="detail-select">
                 <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">
                   {{ model.label }}
                 </option>
               </select>
+              <span class="model-phase-note">Aタスクの準備</span>
+            </div>
+          </div>
+          <div class="detail-row one-line-row">
+            <div class="detail-label">TASK_AI_MODEL_do</div>
+            <div class="detail-value">
+              <select v-model="入力TASK_AI_MODEL_do" class="detail-select">
+                <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">
+                  {{ model.label }}
+                </option>
+              </select>
+              <span class="model-phase-note">各ステップの実行</span>
+            </div>
+          </div>
+          <div class="detail-row one-line-row">
+            <div class="detail-label">TASK_AI_MODEL_check</div>
+            <div class="detail-value">
+              <select v-model="入力TASK_AI_MODEL_check" class="detail-select">
+                <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">
+                  {{ model.label }}
+                </option>
+              </select>
+              <span class="model-phase-note">終了時の最終確認</span>
             </div>
           </div>
           <div class="detail-row">
@@ -498,6 +574,12 @@ const 登録 = async () => {
 }
 
 .detail-input,
+.model-phase-note {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
 .detail-select {
   height: 26px;
 }
