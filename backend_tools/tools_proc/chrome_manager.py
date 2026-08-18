@@ -156,8 +156,11 @@ class ChromeManager:
             "--no-default-browser-check",
             "--disable-default-apps",
             "--autoplay-policy=no-user-gesture-required",
-            # パスワード保存・変更提案・漏洩検知ダイアログをすべて抑制
-            "--disable-features=PasswordManagerOnboarding,AutofillEnableAccountWalletStorage,PasswordLeakDetection,PasswordCheck",
+            # パスワード保存・変更提案・漏洩検知・自動パスワード変更フローをすべて抑制
+            # (PasswordChangeSubmission は漏洩検知後に表示される「パスワードを変更」誘導フロー本体)
+            "--disable-features=PasswordManagerOnboarding,AutofillEnableAccountWalletStorage,"
+            "PasswordLeakDetection,PasswordCheck,PasswordChangeSubmission,"
+            "FetchChangePasswordUrlForPasswordChange,AutofillPasswordSurvey",
         ]
         if should_show_banner:
             args.append("--enable-automation")
@@ -229,11 +232,11 @@ class ChromeManager:
         existing.setdefault("profile", {})
         existing["credentials_enable_service"] = False
         existing["profile"]["password_manager_enabled"] = False
+        # 実際の pref キーは "profile.password_manager_leak_detection"。
+        # "password_manager.leak_detection_enabled" は存在しないキーで無効だった。
+        existing["profile"]["password_manager_leak_detection"] = False
         existing.setdefault("safebrowsing", {})
         existing["safebrowsing"]["password_protection_warning_trigger"] = 0
-        existing["password_manager"] = {
-            "leak_detection_enabled": False,
-        }
 
         prefs_path.write_text(
             json.dumps(existing, ensure_ascii=False, indent=2),
