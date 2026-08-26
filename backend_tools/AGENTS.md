@@ -18,7 +18,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 概要
 
-`backend_tools` はポート `8095` 上で 19 個の MCP サーバーを同居させる FastMCP アプリケーションです。
+`backend_tools` はポート `8095` 上で 19 個の MCP サーバーを同居させる MCP SDK 2.x の `MCPServer` アプリケーションです。
 ブラウザ操作、デスクトップキャプチャ、DB確認、ログ確認、コードチェック、バックアップ確認、画像/動画生成、音声認識/合成、OBS / ffmpeg 制御、通知音再生、コードエージェント実行、チャット LLM 実行、AIタスク非同期投入、AIチーム依頼投入、Windows デスクトップ操作制御を AI エージェントから利用できるようにします。
 加えて OpenAI / Ollama 互換の標準チャットインターフェース `aidiy_chat_completions` を HTTP で提供します。
 
@@ -59,7 +59,7 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 
 | パス | 役割 |
 |------|------|
-| `tools_main.py` | FastAPI 上に 19 個の FastMCP を同居 |
+| `tools_main.py` | FastAPI 上に 19 個の `MCPServer` を同居 |
 | `mcp_stdio.py` | stdio <-> SSE bridge |
 | `aidiy_automations/` | MCP / HTTP API を組み合わせる自動化スクリプト |
 | `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` | 一人アバター（AiDiy）による紹介・ガイド型ビデオ自動生成（version: "mcp"、short/long narration 形式） |

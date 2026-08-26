@@ -39,8 +39,19 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - ビデオ自動生成: `backend_tools/aidiy_automations/ビデオページ生成/`（旧: `aidiy_automations/` 直下）
   - CLI ランチャー: `scripts/cli_bat/_claude-code.bat` など（旧: `_*_AiDiy.bat`）
   - Xビデオの VRM: `frontend_web/public/Xビデオ/_vrm/` を `../_vrm/` で共有（旧: 各ビデオフォルダ内 `vrm/`）
-- [ ] Docker 構成に `backend_tools` を含めていない。
-  - MCP 検証はローカル起動を前提に書く。
+- [ ] Docker 構成に `backend_tools` / `backend_taskteam` / `backend_local` を含めていない。
+  - MCP 検証はローカル起動を前提に書く。AIタスク・AIチーム画面は Docker 構成では動かない。
+  - `frontend_web` のビルドは `docker/Dockerfile` の `frontend-builder` ステージがイメージ内で行う。ホストの `npm run build` や `frontend_web/dist/` のマウントを前提にしない。
+  - ホストへ公開するポートは `8091` / `8098` / `80` / `443` だけ。`8090` はコンテナ内部のみ。
+- [ ] 自動テストは `backend_server/tests/` の `unittest` だけとして書く。
+  - `backend_tools/tests/`（`test_mcp_smoke.py` など）は存在しない。
+  - コマンドは `python -m unittest discover -s tests -v`。
+- [ ] `C利用者` のパスワードは bcrypt ハッシュ保存として書く。
+  - 旧表現: 「平文比較」。認証はプレーン一致 → bcrypt 照合の順で既存 DB 互換を保つ。
+  - 同期元: `backend_server/core_crud/C利用者.py`
+- [ ] Code CLI へモデルを渡すとき `auto` は引数ごと省略すると書く。
+  - `--model auto` は不正なモデル名として CLI 側が失敗する。
+  - 同期元: `backend_server/AIコア/AIコード_cli.py` の `_コマンド構築()`
 - [ ] `command_hermes` は `_setup.py` / `_cleanup.py` に統合済み、`_start.py` の常駐起動対象外として書く。
 - [ ] Code AI 名は `aidiy_hermes` として書く。
   - 旧表現: `hermes_cli`
@@ -95,7 +106,13 @@ rg -n 'includeInactive|無効も検索|router/index\.ts へのルート追加|�
 rg -n 'start\.py|_stop\.py|8095.*Docker|npm run build' $files
 
 # 旧フォルダ構成の残骸（ヒットしたら現行パスへ直す）
-rg -n 'core_router/AIコア/|backend_server/_config|_config/aidiy_|aidiy_automations/ビデオページ生成_|_AiDiy\.bat|src/stores/AIモデル設定|components/Avatar\.vue|13 MCP|14 個の MCP' $files
+rg -n 'core_router/AIコア/|core_router\\AIコア\\|backend_server/_config|_config/aidiy_|aidiy_automations/ビデオページ生成_|_AiDiy\.bat|src/stores/AIモデル設定|components/Avatar\.vue|13 MCP|14 個の MCP' $files
+
+# 実在しないテスト・旧仕様の残骸
+rg -n 'backend_tools.tests|test_mcp_smoke|test_post_api_smoke|test_c利用者_password|平文比較|自動テストは整備されていません' $files
+
+# コンポーネント配置（サブフォルダ化済み。1階層直下で書いていないか）
+rg -n 'components/C管理/C利用者一覧\.vue|components/C管理/C権限一覧\.vue|components/C管理/C採番一覧\.vue' $files
 ```
 
 ## `_AIDIY/knowledge` 整理後の確認

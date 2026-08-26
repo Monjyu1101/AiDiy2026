@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>04 DB再作成と反映</title>
+  <title>04 スキーマ反映</title>
   <link rel="stylesheet" href="../_shared/doc.css">
   <script src="../_shared/doc.js" defer></script>
 </head>
@@ -14,7 +14,7 @@
     <a href="05_CRUD作成.html">次へ: 05_CRUD作成</a>
   </nav>
 
-  <h1>04_DB再作成と反映</h1>
+  <h1>04_スキーマ反映</h1>
   <p>このプロジェクトの標準運用は SQLite + <code>create_all()</code> です。Alembicのようなマイグレーションツールは使いません。</p>
 
   <h2>新規テーブル追加時の手順（M商品のようなケース）</h2>
@@ -31,7 +31,7 @@ python _start.py</code></pre>
   <p><strong>注意:</strong> <code>create_all()</code> は「まだ存在しないテーブル」だけを作成し、既存テーブルのデータは変更しません。新規テーブル追加のためだけに <code>database.db</code> を削除する必要はありません。</p>
 
   <h2>既存テーブルのカラム追加・削除・型変更が必要な場合</h2>
-  <p><code>create_all()</code> は既存テーブルへのカラム追加・削除・型変更には効きません。この場合は手動SQL（<code>ALTER TABLE</code> やテーブル再作成）が必要です。手順は <code>_AIDIY/knowledge/backend_server,スキーマ変更手順.md</code> を参照してください。</p>
+  <p><code>create_all()</code> は既存テーブルへのカラム追加・削除・型変更には効きません。この場合は <code>backend_server/core_crud/init.py</code> または <code>backend_server/apps_crud/init.py</code> に、存在確認つきの冪等な差分処理（<code>ALTER TABLE</code> やテーブル再作成）を追加します。手順は <code>_AIDIY/knowledge/backend_server,スキーマ変更手順.md</code> を参照してください。</p>
   <p>開発環境で「既存データを残す必要がない」場合に限り、<code>database.db</code> を削除して全テーブルを作り直す方法も選択肢になります。ただし実データがある環境では行わないでください。</p>
 
   <h2>生成確認</h2>
@@ -44,7 +44,7 @@ python _start.py</code></pre>
   <table>
     <tr><th>症状</th><th>原因</th><th>対処</th></tr>
     <tr><td>テーブルが作成されない</td><td>Model import漏れ、または <code>create_all(tables=[...])</code> への追加漏れ</td><td><code>apps_models/__init__.py</code> と <code>apps_main.py</code> の <code>create_all(tables=[...])</code> を確認</td></tr>
-    <tr><td>既存テーブルのカラムが増えない</td><td><code>create_all()</code> は既存テーブルの変更に対応しない</td><td>スキーマ変更手順に従い手動SQLで対応</td></tr>
+    <tr><td>既存テーブルのカラムが増えない</td><td><code>create_all()</code> は既存テーブルの変更に対応しない</td><td>スキーマ変更手順に従い、起動時の冪等な差分処理を追加</td></tr>
     <tr><td>起動時エラー</td><td>型定義不整合</td><td>Model/Schema/Routerの項目名整合を再確認</td></tr>
   </table>
 

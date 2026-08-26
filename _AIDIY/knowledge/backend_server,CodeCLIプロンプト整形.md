@@ -56,7 +56,7 @@ def _システムプロンプト構築(self) -> str:
 ## 確認方法
 
 ```powershell
-backend_server\.venv\Scripts\python.exe -m py_compile backend_server\core_router\AIコア\AIコード_cli.py
+backend_server\.venv\Scripts\python.exe -m py_compile backend_server\AIコア\AIコード_cli.py
 ```
 
 追加で確認すること:

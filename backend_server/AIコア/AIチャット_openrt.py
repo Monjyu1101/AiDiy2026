@@ -169,17 +169,17 @@ class ChatAI:
                 ブリッジ = MCPツールブリッジ()
                 tools, name_map = ブリッジ.collect_tools()
                 if tools:
-                    msgs = []
-                    sys_text = システムプロンプト or getattr(self, "system_instruction", None)
-                    if sys_text:
-                        msgs.append({"role": "system", "content": sys_text})
-                    msgs.append({"role": "user", "content": 要求テキスト})
+                    # 会話履歴を引き継いだ上で自己ループへ渡す。
+                    # 先頭（system + 過去履歴）が毎ターン同一になり、プロンプトキャッシュが効く。
+                    self._履歴追加(role="user", text=要求テキスト)
+                    msgs = self._メッセージ履歴構築(システムプロンプト=システムプロンプト)
                     結果 = await 自己ループ実行(
                         self, msgs, ブリッジ, tools, name_map, max_turns, タイムアウト秒数
                     )
                     self.last_tool_trace = 結果["tool_trace"]
                     self.last_tool_turns = 結果["turns"]
                     self.last_tool_stopped = 結果["stopped"]
+                    self._履歴追加(role="assistant", text=結果["content"] or "!")
                     return 結果["content"] or "!"
                 # tools 無し（8095 未起動等）→ 通常処理にフォールバック
 
@@ -230,14 +230,21 @@ class ChatAI:
 
             タイムアウトタスク = asyncio.create_task(タイムアウト監視())
 
-            try:
-                # 履歴追加（画像データも含める）
-                self._履歴追加(role="user", text=要求テキスト, image_data=image_data)
+            # 自己ループから completions_tools["messages"] を渡された呼び出しは
+            # そちらが会話の実体。ここで履歴を触ると空 user が溜まり先頭が崩れる。
+            外部メッセージ = bool(completions_tools and completions_tools.get("messages"))
 
-                # 履歴構築
-                メッセージ履歴 = self._メッセージ履歴構築(
-                    システムプロンプト=システムプロンプト
-                )
+            try:
+                if 外部メッセージ:
+                    メッセージ履歴 = completions_tools["messages"]
+                else:
+                    # 履歴追加（画像データも含める）
+                    self._履歴追加(role="user", text=要求テキスト, image_data=image_data)
+
+                    # 履歴構築
+                    メッセージ履歴 = self._メッセージ履歴構築(
+                        システムプロンプト=システムプロンプト
+                    )
 
                 # 非同期でapi実行
                 応答テキスト = await asyncio.get_event_loop().run_in_executor(
@@ -257,8 +264,9 @@ class ChatAI:
                 # 応答がない場合のデフォルト値
                 final_result = 応答テキスト.strip() if 応答テキスト.strip() else "!"
 
-                # 履歴追加
-                self._履歴追加(role="assistant", text=final_result)
+                # 履歴追加（自己ループ中は呼び出し元がまとめて記録する）
+                if not 外部メッセージ:
+                    self._履歴追加(role="assistant", text=final_result)
 
                 if final_result == "!" and テキスト受信処理Ｑ:
                     try:
@@ -545,14 +553,16 @@ class ChatAI:
             system_prompt_text = "あなたは、美しい日本語を話す、賢いAIアシスタントです。"
 
         # システムプロンプト追加
+        # 先頭は毎回同一のため、Anthropic 系ではここをキャッシュ境界にする
+        system_part = {
+            "type": "text",
+            "text": system_prompt_text
+        }
+        if self._キャッシュ印を使う():
+            system_part["cache_control"] = {"type": "ephemeral"}
         メッセージ.append({
             "role": "system",
-            "content": [
-                {
-                    "type": "text",
-                    "text": system_prompt_text
-                }
-            ]
+            "content": [system_part]
         })
 
         # 履歴追加
@@ -588,7 +598,24 @@ class ChatAI:
                     ]
                 })
 
+        # 直前ターンまでをキャッシュ境界にする（今回の user は毎回変わるので 1 つ手前）
+        if self._キャッシュ印を使う() and len(メッセージ) >= 3:
+            前ターン最終 = メッセージ[-2]["content"][-1]
+            if isinstance(前ターン最終, dict):
+                前ターン最終["cache_control"] = {"type": "ephemeral"}
+
         return メッセージ
+
+    def _キャッシュ印を使う(self) -> bool:
+        """明示 cache_control が必要なモデルか（OpenRouter 経由の Anthropic 系）"""
+        try:
+            from AIコア.AI内部ツール import キャッシュ印対象モデル
+        except ImportError:
+            try:
+                from AI内部ツール import キャッシュ印対象モデル
+            except ImportError:
+                return False
+        return キャッシュ印対象モデル(self.chat_model)
 
     def _履歴追加(self, role: str, text: str, image_data: dict = None):
         """履歴にメッセージを追加（画像対応）"""

@@ -39,6 +39,7 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_db, team_pdca_db
+from team_proc import team_context
 
 # 前段の取得・要員未確定時の後始末は他のPDCA段と共通の処理を使う
 import sub_SPDCA__common
@@ -92,17 +93,22 @@ def プロンプト生成_計画(
     チーム作業: str,
     前サイクル進捗: str = "",
 ) -> str:
-    引き継ぎ = ""
+    """P（計画）。定型部は _config/AiDiy_team__plando_context.json から読む。"""
     if 前サイクル進捗:
-        引き継ぎ = f"""
-## 前サイクルのD（実行）の実施内容
-
-{前サイクル進捗}
-
-この内容を踏まえてください。ゼロから考え直すのではなく、前サイクルの実施結果や
-残った課題のうち、いま取り組む価値が高いものを見極めて計画を立ててください。
-すでに解消済みの項目があれば現状を確認したうえでその旨を述べ、新たに気づいた論点があれば足してください。
-"""
+        引き継ぎブロック = team_context.差し込み(
+            "plando", "plan_carryover_lines", {"前サイクル進捗": 前サイクル進捗}
+        )
+    else:
+        引き継ぎブロック = team_context.コンテキスト取得("plando", "carryover_empty_lines")
+    return team_context.差し込み("plando", "common_instruction_lines", {
+        "プロジェクト": プロジェクト,
+        "チーム目標": チーム目標,
+        "チーム作業": チーム作業,
+        "引き継ぎブロック": 引き継ぎブロック,
+        "今回要求ブロック": team_context.差し込み(
+            "plando", "plan_request_lines", {"要員ID": 要員ID}
+        ),
+    })
 
     return f"""あなたはAIチームの要員「{要員ID}」です。チーム作業に向けて、次に実行する計画を立ててください。
 

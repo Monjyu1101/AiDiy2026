@@ -29,12 +29,14 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_chat, team_db, team_goal_db
+from team_proc import team_context
 
 
 def 依頼内容を作る(
     チーム目標: str,
     意見一覧: list[dict],
 ) -> str:
+    """admin の作業取りまとめ。定型部は _config/AiDiy_team__talk_context.json から読む。"""
     if 意見一覧:
         各人の意見 = "\n\n".join(
             f"### {行.get('要員ID', '')} の意見\n{str(行.get('発言内容', '')).strip()}"
@@ -43,19 +45,10 @@ def 依頼内容を作る(
     else:
         各人の意見 = "意見はありません。"
 
-    return f"""チーム目標: {チーム目標}
-
-## 各要員の意見
-
-{各人の意見}
-
-あなたはAIチームの管理者adminです。各要員の意見を参考に、チーム目標を達成するために
-チームが次に実行する「やるべき作業」を1つに取りまとめてください。
-対象、実施内容、完了条件または確認方法が分かる具体的な作業指示にしてください。
-複数の意見が競合するときは目標への効果と実行可能性を基準に統合または選択してください。
-応答はそのまま「チーム作業」欄へ登録します。前置き、議論の要約、挨拶は付けず、作業指示だけを簡潔に回答してください。
-確認できない固有名詞や数値は作らないでください。
-"""
+    return team_context.差し込み("talk", "work_instruction_lines", {
+        "チーム目標": チーム目標,
+        "各人の意見": 各人の意見,
+    })
 
 
 def main() -> int:

@@ -101,6 +101,7 @@
 | backend の層構造、実装パターン、落とし穴 | [`backend_server,実装パターン.md`](./backend_server,実装パターン.md) |
 | ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 | backend / MCP / task・team 起動、ポート残留 | [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、[`backend_tools,構成.md`](./backend_tools,構成.md) |
+| AIタスク（要求分解・明細DAG・実行開始条件）、AIチーム（依頼・経験・作業ループ・自動会話）の仕様 | `backend_taskteam/AGENTS.md`（HowTo 化された内容が無いため、実装概要が正） |
 | aidiy_hermes で MCP が `failed` / ツール未認識 | [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) |
 | Windows ネイティブで terminal / file 操作が落ちる、OS 分岐を入れたい | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |
 | hermes を MCP サーバーとして Code CLI から使う | [`command_hermes,MCP_サーバー起動.md`](./command_hermes,MCP_サーバー起動.md) |

@@ -35,7 +35,7 @@ const router = createRouter({
 {
   path: '/C管理/C利用者/一覧',
   name: 'C利用者一覧',
-  component: () => import('../components/C管理/C利用者一覧.vue'),
+  component: () => import('../components/C管理/C利用者/C利用者一覧.vue'),
   meta: { requiresAuth: true, title: 'C利用者一覧' },
 }
 ```
@@ -97,7 +97,7 @@ router.afterEach((to) => {
 
 1. 画面のカテゴリを決める（C系→coreRouter, M/T/V/S系→appsRouter, X系/その他→index.ts）
 2. 該当 router ファイルにルート定義を追加
-3. `path` はコンポーネント配置と対応させる（`src/components/C管理/C利用者一覧.vue` → `/C管理/C利用者/一覧`）
+3. `path` はコンポーネント配置と対応させる（`src/components/C管理/C利用者/C利用者一覧.vue` → `/C管理/C利用者/一覧`）
 4. `meta.title` を設定（`afterEach` でドキュメントタイトルに反映される）
 5. 認証が必要なら `requiresAuth: true` を設定
 

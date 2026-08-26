@@ -34,7 +34,7 @@
 ## 確認方法
 
 ```powershell
-backend_server\.venv\Scripts\python.exe -m py_compile backend_server\core_router\AIコア\AIコード_cli.py
+backend_server\.venv\Scripts\python.exe -m py_compile backend_server\AIコア\AIコード_cli.py
 command_hermes\.venv\Scripts\python.exe -m py_compile command_hermes\tools\code_execution_tool.py
 cd frontend_avatar
 npm run type-check

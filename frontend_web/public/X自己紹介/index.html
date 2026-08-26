@@ -1142,7 +1142,7 @@
             <span>Vue 3 + Vite + TypeScript</span>
             <span>Electron + VRM + 音声AI</span>
             <span>🧠 自己改善機構 — 使うほど育つ</span>
-            <span>claude / copilot / codex / antigravity / opencode / hermes CLI</span>
+            <span>claude / copilot / codex / antigravity / grok / opencode / hermes CLI</span>
             <span>🔌 MCP Hub ×19 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task / team / windows</span>
             <span>🤖 AIタスク自動実行 — AI分解 × 自由なタスクフロー × クリティカルパス実行</span>
         </div>
@@ -1187,7 +1187,7 @@
                 <p class="feature-description">
                     チャット・画像・音声・6 画面コード支援を<br>
                     WebSocket で一体化。<br>
-                    Claude / OpenAI / Gemini マルチベンダー対応。
+                    Gemini / FreeAI / OpenRouter / Ollama / ローカル Gemma を切替。
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
@@ -1214,7 +1214,7 @@
                 <p class="feature-description">
                     browser / capture / sqlite / postgres / logs / check / backup /<br>
                     image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task / team / windows の 19 MCP サーバー同居。<br>
-                    7 種の Code CLI を code1〜code6 パネルで並走可能。
+                    8 種の Code CLI を code1〜code6 パネルで並走可能。
                 </p>
             </div>
         </div>
@@ -1231,9 +1231,9 @@
                 <span class="stat-sub">core 8091 / apps 8098 / tools 8095 / local 8096 / task 8093</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="3">0</span>
-                <span class="stat-label">AI ベンダー</span>
-                <span class="stat-sub">Claude / OpenAI / Gemini</span>
+                <span class="stat-number" data-count="6">0</span>
+                <span class="stat-label">対話 AI 系統</span>
+                <span class="stat-sub">Gemini / FreeAI / OpenRouter / Ollama / ローカル Gemma / OpenAI Realtime</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="7">0</span>
@@ -1246,9 +1246,9 @@
                 <span class="stat-sub">code1 から code6</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="7">0</span>
+                <span class="stat-number" data-count="8">0</span>
                 <span class="stat-label">Code CLI 種</span>
-                <span class="stat-sub">claude_sdk / claude / copilot / codex / antigravity / opencode / hermes</span>
+                <span class="stat-sub">claude_sdk / claude / copilot / codex / antigravity / grok / opencode / hermes</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="1">0</span>
@@ -1266,9 +1266,9 @@
                 <span class="stat-sub">browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task / team / windows</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="60">0</span>
+                <span class="stat-number" data-count="600">0</span>
                 <span class="stat-label">JWT 分</span>
-                <span class="stat-sub">認証有効期限</span>
+                <span class="stat-sub">認証有効期限（HS256）</span>
             </div>
         </div>
     </section>
@@ -1331,11 +1331,11 @@ Key:   利用者名</pre>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>A系 — AI</h4>
-                <p>AI コア・会話履歴</p>
+                <p>AI コア・会話履歴・Aタスク（要求 / 明細 / 実行条件）・Aチーム（要員 / 依頼 / 目標 / 経験 / 作業 / 会話 / 状況）</p>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>X系 — Experimental</h4>
-                <p>ゲーム・自己紹介ページ</p>
+                <p>ゲーム・ビジュアルデモ・自動生成ビデオ・自己紹介ページ</p>
             </div>
         </div>
     </section>
@@ -1460,7 +1460,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔁 AI Flow</h3>
-                <p>マイク・テキスト・画像・コード操作 → REST + WebSocket + Vite Proxy → Claude / GPT / Gemini / Ollama を用途ごとに切替 → チャット・音声応答・コード表示・アバター演出。</p>
+                <p>マイク・テキスト・画像・コード操作 → REST + WebSocket + Vite Proxy → チャットは Gemini / FreeAI / OpenRouter / Ollama / ローカル Gemma、音声は Gemini Live / OpenAI Realtime、コードは 8 種の Code AI を用途ごとに切替 → チャット・音声応答・コード表示・アバター演出。</p>
                 <div class="meta-tags"><span>Input</span><span>Transport</span><span>AI Core</span><span>Output</span></div>
             </div>
         </div>
@@ -1500,15 +1500,98 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 5. command_hermes 独自エージェント基盤 -->
+    <!-- 5. AIタスク・AIチーム -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">🔀 AIタスク・AIチーム — 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">要求を投げると、AI が分解し、依頼を配り、実行して、経験を残す。すべて backend_taskteam の単一サーバー（ポート 8093）が回します。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🧩 要求の AI 分解</h3>
+                <p>要求を「準備開始」で仮登録すると、起動監視が AI を呼んで開始行・処理行・終了行の明細へ分解し本登録する。分解は 2 段構えで、第 1 段が対象プロジェクトを読んで内容を組み立て、第 2 段が既定形式の JSON を書き出す。</p>
+                <div class="meta-tags"><span>sub_init.py</span><span>2 段構え</span><span>TK+8桁 採番</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🕸️ 自由なタスクフロー（DAG）</h3>
+                <p>カンバンの固定列でも垂直の流れ作業でもなく、先行SEQ（カンマ区切りで複数指定可）による DAG。先行明細が全完了した明細を実行可能とし、依存を満たしたものから並行起動する。フロー図は最長経路をクリティカルパスとして配置。</p>
+                <div class="meta-tags"><span>先行SEQ</span><span>並行分岐</span><span>クリティカルパス</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">⏱️ 実行開始条件</h3>
+                <p>実行区分（即時 / 時間指定 / 間隔実行 / 定時実行）と実行条件（無し / フォルダ変化）の 2 軸。条件待ちは「準備完了」で待機し、成立したら明細 → 要求の順に「待機」へ戻して再実行する。停止中に過ぎた期限は一括発火せず次の周期へ送る。</p>
+                <div class="meta-tags"><span>Aタスク実行条件</span><span>毎分ゲート</span><span>フォルダ変化検知</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">✅ 自己検証つき実行</h3>
+                <p>開始明細は AI を使わず aidiy_backup で差分バックアップを取る。処理明細は 1 ステップだけを Code AI へ依頼し、操作検証ありなら AI 自身の報告を確認して、書き込みなし・エラーなら 1 回だけ自動リトライ。終了明細が最終検証を行う。</p>
+                <div class="meta-tags"><span>差分バックアップ</span><span>操作検証</span><span>自動リトライ</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">👥 AIチーム要員と依頼</h3>
+                <p>依頼を登録すると、有効要員と各要員の蓄積経験（経験値・分類・直近の学び）を材料に AI が担当を選ぶ。経験のある要員へ寄せることで、貯めたナレッジがそのまま再利用される。担当が決まると AIタスク要求へ引き渡される。</p>
+                <div class="meta-tags"><span>persona 115 体</span><span>TR+8桁</span><span>経験ベース選定</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔁 作業ループ（PlanDo / SPDCA）</h3>
+                <p>チーム目標に対して PlanDo（P 計画 → D 実行）または SPDCA（S 相談 → P 計画 → D 実行 → C 評価 → A 改善）を回す。ソース変更を許すのは D だけで、C と A は読み取り・テスト・動作確認に徹する。ループ回数は 1〜99（99 は無制限）。</p>
+                <div class="meta-tags"><span>PlanDo</span><span>SPDCA</span><span>D のみ変更可</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">💬 自動会話と取りまとめ</h3>
+                <p>自動作業設定がオンなら、分の下一桁 1〜9 の回に雑談エリアの要員が 1 名ずつ「今やるべきこと」を発言する。発言はプロジェクトのソースを実際に読む調査モードで行う。下一桁 0 の回に、有効要員の 50% 以上の意見が集まっていれば admin 人格がチーム作業へ取りまとめる。</p>
+                <div class="meta-tags"><span>調査モード</span><span>50% ゲート</span><span>admin 取りまとめ</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🧠 経験の蓄積</h3>
+                <p>依頼が完了すると、実行済み明細を AI が読み直して経験値・分類・まとめ・学びを生成し、Aチーム経験へ本登録する。次の依頼の担当選定がこの経験を参照するため、チームは回すほど適材適所になっていく。</p>
+                <div class="meta-tags"><span>sub_exp.py</span><span>TE+8桁</span><span>選定へフィードバック</span></div>
+            </div>
+        </div>
+        <div class="advanced-grid" style="margin-top:30px;">
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🎛️</span>
+                <h3 class="feature-title">フェーズ別モデル指定</h3>
+                <p class="feature-description">
+                    plan（計画）/ do（実施）/ check（検証）の<br>
+                    3 種を別々のモデルで指定できます。<br>
+                    重い思考と軽い実行を使い分け。
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    Aタスク: 準備=plan / 各ステップ=do / 最終確認=check<br>
+                    作業ループ: S・P=plan / D=do / C・A=check<br>
+                    <strong>目標 → 依頼 → タスク要求</strong> と 3 種のまま引き渡し
+                </div>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🌾</span>
+                <h3 class="feature-title">3D チーム空間</h3>
+                <p class="feature-description">
+                    要員を 3D 草原に配置し、依頼・経験・作業・会話を<br>
+                    パネル表示。飛行船が吊るす掲示板にチーム目標を出し、<br>
+                    クリックで目標編集を開きます。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🔌</span>
+                <h3 class="feature-title">MCP からも起動</h3>
+                <p class="feature-description">
+                    <code style="color:#00ffff">aidiy_task_agents</code> /
+                    <code style="color:#00ffff">aidiy_team_agents</code> で<br>
+                    外部 AI エージェントから非同期投入。<br>
+                    登録だけ行い、進捗は別ツールで確認します。
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. command_hermes 独自エージェント基盤 -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🧰 command_hermes — 独自エージェント基盤</h2>
         <p class="section-subtitle animate-on-scroll">AiDiy に統合された on-demand コードエージェント CLI。TUI・ツール・コンテキスト圧縮を内蔵。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🤖 AIAgent コア</h3>
-                <p>OpenAI SDK 経由で Ollama（OpenAI 互換 API）と通信するエージェント中核クラス。最大 99 イテレーションのツール呼び出しループ、割り込み機構（スレッドセーフ）、思考コールバック・ツール進捗コールバックを標準装備。</p>
-                <div class="meta-tags"><span>max_iterations=99</span><span>thread-safe interrupt</span><span>callback chain</span></div>
+                <p>OpenAI SDK 経由で Ollama（OpenAI 互換 API）と通信するエージェント中核クラス。既定 90 イテレーションのツール呼び出しループ（AiDiy から呼ぶときは CODE_MAX_TURNS で上書き）、割り込み機構（スレッドセーフ）、思考コールバック・ツール進捗コールバックを標準装備。</p>
+                <div class="meta-tags"><span>max_turns=90</span><span>thread-safe interrupt</span><span>callback chain</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔧 ツールシステム</h3>
@@ -1543,7 +1626,7 @@ Key:   利用者名</pre>
                 <p class="feature-description">
                     AiDiy 本体では <code style="color:#00ffff">CODE_AI*_NAME = "aidiy_hermes"</code><br>
                     としてコードパネルから呼び出し可能。<br>
-                    backend_server/AIコード_cli.py が subprocess で起動。
+                    backend_server/AIコア/AIコード_cli.py が subprocess で起動。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     <code>aidiy_hermes -Q -z "指示"</code> の形式で<br>
@@ -1567,7 +1650,7 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 6. 自己改善機構 -->
+    <!-- 7. 自己改善機構 -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🧠 自己改善機構 — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">使うほど育つ _AIDIY/knowledge/ 知見システム。</p>
@@ -1603,7 +1686,7 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 7. MCP Hub × 19 + Multi CLI -->
+    <!-- 8. MCP Hub × 19 + Multi CLI -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 19 + Multi CLI — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">ポート 8095 に 19 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
@@ -1675,7 +1758,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🤖 aidiy_code_agents</h3>
-                <p>Claude / Copilot / Codex / Antigravity / opencode / hermes など複数の CodeAI CLI をエージェントとして呼び出し。コード生成・修正・レビューを AI が直接 CLI 経由で実行。</p>
+                <p>Claude / Copilot / Codex / Antigravity / Grok / opencode / hermes など複数の CodeAI CLI をエージェントとして呼び出し。コード生成・修正・レビューを AI が直接 CLI 経由で実行。</p>
                 <div class="meta-tags"><span>CodeAI CLI</span><span>multi-agent</span><span>subprocess</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
@@ -1725,13 +1808,13 @@ Key:   利用者名</pre>
                 <span class="feature-icon">🔧</span>
                 <h3 class="feature-title">マルチ Code CLI 対応</h3>
                 <p class="feature-description">
-                    7 種の Code CLI を code1〜code6 パネルへ<br>
+                    8 種の Code CLI を code1〜code6 パネルへ<br>
                     自由に割り当てて並走できます。<br>
                     新しいツールも手順に沿って追加可能。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
-                    claude_sdk &nbsp;/&nbsp; claude_cli &nbsp;/&nbsp; copilot_cli<br>
-                    codex_cli &nbsp;/&nbsp; antigravity_cli &nbsp;/&nbsp; opencode_cli &nbsp;/&nbsp; aidiy_hermes
+                    claude_sdk &nbsp;/&nbsp; claude_cli &nbsp;/&nbsp; copilot_cli &nbsp;/&nbsp; codex_cli<br>
+                    antigravity_cli &nbsp;/&nbsp; grok_cli &nbsp;/&nbsp; opencode_cli &nbsp;/&nbsp; aidiy_hermes
                 </div>
             </div>
         </div>
@@ -1752,7 +1835,7 @@ Key:   利用者名</pre>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🤖 CLI エコシステム</h4>
-                <p>claude / copilot / codex / antigravity / opencode / hermes に続く新 Code CLI も <code style="color:#00ffff">_sdk</code> / <code style="color:#00ffff">_cli</code> 命名規約で追加可能。</p>
+                <p>claude / copilot / codex / antigravity / grok / opencode / hermes に続く新 Code CLI も <code style="color:#00ffff">_sdk</code> / <code style="color:#00ffff">_cli</code> 命名規約で追加可能。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🧰 hermes 独自エージェント進化</h4>

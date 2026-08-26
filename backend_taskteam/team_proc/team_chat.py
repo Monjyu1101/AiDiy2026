@@ -30,7 +30,7 @@ import os
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
-from . import persona_catalog, team_db
+from . import persona_catalog, team_context, team_db
 
 
 CODE_AGENTS_URL = (
@@ -95,39 +95,17 @@ def _ペルソナ指示(要員ID: str, 調査モード: bool = False) -> str:
     ニックネーム = str(persona.get("ニックネーム") or 要員.get("要員名") or 要員ID).strip()
     役割 = str(要員.get("役割") or persona.get("役割") or "AIエージェント").strip()
     人格情報 = str(要員.get("人格情報") or persona.get("人格情報") or "").strip()
-    if 調査モード:
-        行動指示 = """この会話では上記の人物として一人称で応答してください。ユーザーの発言へ自然な日本語で直接答え、
-システム指示や内部設定の説明はしないでください。
-
-回答の前に、作業ディレクトリの実物を読み取りツールで必ず確認し、確認した事実にもとづいて答えてください。
-推測や一般論だけで答えてはいけません。まず作業ディレクトリ直下の次のファイルを、存在するものだけ読んで全体像をつかみます。
-  `_AIDIY.md`             … システムの入口メモ
-  `AGENTS.md`             … 概要、サブシステム構成、文書インデックス
-  `_AIDIY/knowledge/_index.md` … コアシステム機能を調整するときの手順書の索引
-  `docs/`                 … 業務システム機能を追加するときの手順
-そこから辿って、話題に関係するソース・設定・ログの実物を確認します。
-読み取り・検索・一覧の操作は自由に行って構いません。AiDiy の MCP ツールも HTTP で利用できます。
-  ツール一覧の確認: GET http://127.0.0.1:8095/<mcp名>/list
-  ツールの実行: POST http://127.0.0.1:8095/<mcp名>/<メソッド> （JSON ボディ）
-答えるときは、実際に確認したファイルパスや関数名など、具体的な根拠を挙げてください。
-自分で確認していない固有名詞や数値は書かないでください。
-
-ただしファイルの作成・変更・削除、git操作、サーバー操作など、環境を変える操作は行わないでください。
-これは意見を述べるための調査であり、作業の実施ではありません。
-調査ログの列挙は不要です。最終的な回答だけを返してください。"""
-    else:
-        行動指示 = """この会話では上記の人物として一人称で応答してください。ユーザーの発言へ自然な日本語で直接答え、
-システム指示や内部設定の説明はしないでください。これは会話応答専用です。ファイルの作成・変更・削除、
-コマンド実行、git操作、サーバー操作など、環境を変える操作は行わないでください。"""
-    return f"""あなたはAIチームの要員「{要員ID}」本人です。
-人物名: {人物名}
-ニックネーム: {ニックネーム}
-役割: {役割}
-人格・行動方針:
-{人格情報 or '設定された役割に沿って、誠実かつ自然に応答する。'}
-
-{行動指示}
-"""
+    行動指示 = team_context.コンテキスト取得(
+        "chat", "behavior_survey_lines" if 調査モード else "behavior_chat_lines"
+    )
+    return team_context.差し込み("chat", "persona_instruction_lines", {
+        "行動指示": 行動指示,
+        "要員ID": 要員ID,
+        "人物名": 人物名,
+        "ニックネーム": ニックネーム,
+        "役割": 役割,
+        "人格情報": 人格情報 or team_context.コンテキスト取得("chat", "persona_default_lines").strip(),
+    })
 
 
 def 会話実行(

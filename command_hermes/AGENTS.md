@@ -37,6 +37,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | 依存管理 | `pyproject.toml` / `uv sync --upgrade` |
 | TUI | `prompt_toolkit` |
 | 通信 | `requests`、`httpx`、OpenAI 互換 client、Claude API 連携 |
+| MCP サーバー | MCP SDK 2.x の `MCPServer`（`hermes mcp serve`） |
 | 実行方式 | 単体 CLI / subprocess 呼び出し |
 
 ## Windows ホストでの動作

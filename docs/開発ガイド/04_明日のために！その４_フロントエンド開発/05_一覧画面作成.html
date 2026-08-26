@@ -59,16 +59,26 @@
 
   <h3>実装コード（<code>C利用者一覧.vue</code> より抜粋）</h3>
   <pre><code>&lt;script setup lang="ts"&gt;
-import { ref, computed } from 'vue';
-import UserListTable from './components/C利用者一覧テーブル.vue';
+ import { ref, computed } from 'vue';
+ import { useRoute, useRouter } from 'vue-router';
+ import UserListTable from './components/C利用者一覧テーブル.vue';
+ import { useListSessionState } from '../../../utils/listSessionState';
 
-const userListTableRef = ref(null);
+ const route = useRoute();
+ const router = useRouter();
+ const userListTableRef = ref(null);
 const 件数制限 = ref(true);      // デフォルトON
 const 無効も表示 = ref(false);   // デフォルトOFF
-const 有効列表示 = computed(() =&gt; 無効も表示.value);
+ const 有効列表示 = computed(() =&gt; 無効も表示.value);
 
-const handleReload = () =&gt; {
-  userListTableRef.value?.loadData();
+ // route/router と getState/applyState を渡し、検索条件と戻り先を sessionStorage に保持する
+ const { URLメニュー, 現在URL戻り先, saveListSession } = useListSessionState(route, router, {
+   getState: () =&gt; ({ 件数制限: 件数制限.value, 無効も表示: 無効も表示.value })
+ });
+
+ const handleReload = () =&gt; {
+   saveListSession();
+   userListTableRef.value?.loadData();
 };
 &lt;/script&gt;
 

@@ -226,6 +226,17 @@ class ChatAI:
 
         return "\n\n".join(messages)
 
+    def _自己ループメッセージ構築(self) -> list:
+        """自己ループ用に履歴辞書を OpenAI messages 形式へ変換する（system が先頭）"""
+        messages = []
+        for key in sorted(self.履歴辞書.keys(), key=lambda x: int(x)):
+            item = self.履歴辞書[key]
+            role = item["type"]
+            if role not in ("system", "user", "assistant"):
+                continue
+            messages.append({"role": role, "content": item["text"]})
+        return messages
+
     async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 120,
                    システムプロンプト: str = None, file_path: str = None,
                    completions_tools: dict = None, 自己ループ: bool = False,
@@ -261,17 +272,20 @@ class ChatAI:
                 ブリッジ = MCPツールブリッジ()
                 tools, name_map = ブリッジ.collect_tools()
                 if tools:
-                    msgs = []
+                    # 会話履歴を引き継いだ上で自己ループへ渡す。
+                    # 先頭（system + 過去履歴）が毎ターン同一になり、暗黙キャッシュが効く。
                     sys_text = システムプロンプト or getattr(self, "system_instruction", None)
-                    if sys_text:
-                        msgs.append({"role": "system", "content": sys_text})
-                    msgs.append({"role": "user", "content": 要求テキスト})
+                    if len(self.履歴辞書) == 0 and sys_text:
+                        self._履歴追加(sys_text, "system")
+                    self._履歴追加(要求テキスト, "user")
+                    msgs = self._自己ループメッセージ構築()
                     結果 = await 自己ループ実行(
                         self, msgs, ブリッジ, tools, name_map, max_turns, タイムアウト秒数
                     )
                     self.last_tool_trace = 結果["tool_trace"]
                     self.last_tool_turns = 結果["turns"]
                     self.last_tool_stopped = 結果["stopped"]
+                    self._履歴追加(結果["content"] or "!", "assistant")
                     return 結果["content"] or "!"
                 # tools 無し（8095 未起動等）→ 通常処理にフォールバック
 

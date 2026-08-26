@@ -39,7 +39,7 @@
     <li>グローバルツール更新（pip, wheel, setuptools, uv）</li>
     <li>グローバル npm ツール更新（AI CLI群）</li>
     <li>バックエンド環境準備（<code>uv sync</code>）</li>
-    <li>フロントエンド環境準備（<code>npm install</code>）</li>
+    <li>フロントエンド環境準備（<code>npm install</code> + <code>npm update</code>）</li>
     <li><code>DATABASE_TYPE</code> が <code>postgresql</code> の場合のみ DB 復元とマイグレーション</li>
     <li>完了メッセージ表示</li>
   </ol>
@@ -57,6 +57,7 @@
     <li><code>check_npm_installed()</code> で npm の存在確認</li>
     <li><code>package.json</code> の存在確認</li>
     <li><code>npm install</code> で依存関係を取得</li>
+    <li><code>npm update</code> で <code>package.json</code> の宣言範囲内の最新版へ更新</li>
   </ul>
 
   <h2>重要ポイント2: SQLite運用時の挙動</h2>
@@ -87,7 +88,7 @@ python _start.py</code></pre>
   <h2>チェックリスト</h2>
   <ul>
     <li><code>uv sync</code> が成功している</li>
-    <li><code>npm install</code> が成功している</li>
+    <li><code>npm install</code> と <code>npm update</code> が成功している</li>
     <li><code>python _start.py</code> に進める状態になっている</li>
   </ul>
 

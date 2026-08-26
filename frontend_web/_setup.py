@@ -10,7 +10,7 @@
 
 """フロントエンド(Web) セットアップスクリプト
 
-Vue 3 / Vite / TypeScript の依存関係 (npm install) を導入します。
+Vue 3 / Vite / TypeScript の依存関係を導入し、宣言範囲内の最新版へ更新します。
 
 公開 API:
     setup(choices=None) -> bool
@@ -165,12 +165,16 @@ def setup(choices: dict | None = None) -> bool:
         print_error(f"{label}: package.json が見つかりません: {package_json}")
         return False
 
-    if run_command([npm_command(), "install"], cwd=FRONTEND_WEB_DIR):
-        print_success(f"{label}: セットアップが完了しました。")
-        return True
+    if not run_command([npm_command(), "install"], cwd=FRONTEND_WEB_DIR):
+        print_error(f"{label}: セットアップに失敗しました。")
+        return False
 
-    print_error(f"{label}: セットアップに失敗しました。")
-    return False
+    if not run_command([npm_command(), "update"], cwd=FRONTEND_WEB_DIR):
+        print_error(f"{label}: 依存関係の最新版への更新に失敗しました。")
+        return False
+
+    print_success(f"{label}: セットアップが完了しました。")
+    return True
 
 
 def main():

@@ -39,17 +39,31 @@
 
 ## SSE エンドポイントのマウント方法
 
-`app.mount()` でサブアプリとして使う場合、FastMCP の `sse_path` / `message_path` は
-マウントポイント相対（`/sse`, `/messages/`）にし、`mount_path` で絶対パスを指定する必要がある。
+`app.mount()` でサブアプリとして使う場合、MCP SDK 2.x の `MCPServer.sse_app()` には
+マウントポイント相対の `sse_path` / `message_path`（`/sse`, `/messages/`）を渡す。
 
 ```python
 # NG: マウント後に 404 になる
-mcp_ca = FastMCP("aidiy_code_agents", sse_path="/aidiy_code_agents/sse", message_path="/aidiy_code_agents/messages/")
+mcp_ca = MCPServer("aidiy_code_agents")
+app.mount(
+    "/aidiy_code_agents",
+    mcp_ca.sse_app(
+        sse_path="/aidiy_code_agents/sse",
+        message_path="/aidiy_code_agents/messages/",
+    ),
+)
 
-# OK: mount_path で SseServerTransport にフルパスを伝え、sse_path/message_path は相対に
-mcp_ca = FastMCP("aidiy_code_agents", mount_path="/aidiy_code_agents", sse_path="/sse", message_path="/messages/")
-app.mount("/aidiy_code_agents", mcp_ca.sse_app())
+# OK: sse_path/message_path はマウントポイント相対にする
+mcp_ca = MCPServer("aidiy_code_agents")
+app.mount(
+    "/aidiy_code_agents",
+    mcp_ca.sse_app(
+        sse_path="/sse",
+        message_path="/messages/",
+        host="127.0.0.1",
+    ),
+)
 ```
 
 理由: Starlette の `app.mount()` はリクエストパスからマウントプレフィックスを除去してサブアプリへ渡す。
-`SseServerTransport` へ伝えるクライアント向け URL（`normalized_message_endpoint`）は `mount_path + message_path` で生成されるため、`mount_path` に正しい絶対パスを渡す必要がある。
+そのためサブアプリ内部のルートも、マウントプレフィックスを含まない相対パスで登録する必要がある。

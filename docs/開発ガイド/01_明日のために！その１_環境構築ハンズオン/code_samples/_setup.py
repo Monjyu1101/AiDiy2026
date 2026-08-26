@@ -487,7 +487,7 @@ def setup_backend():
     if BACKEND_VENV_DIR.exists():
         print_success(f"{label}: 既存の仮想環境を検出しました: {BACKEND_VENV_DIR}")
 
-    if run_command(["uv", "sync"], cwd=BACKEND_DIR):
+    if run_command(["uv", "sync", "--upgrade"], cwd=BACKEND_DIR):
         print_success(f"{label}: セットアップが完了しました。")
     else:
         print_error(f"{label}: セットアップに失敗しました。")
@@ -542,12 +542,16 @@ def setup_frontend_web():
         print_error(f"{label}: package.json が見つかりません: {package_json}")
         return False
 
-    if run_command([npm_command(), "install"], cwd=FRONTEND_WEB_DIR):
-        print_success(f"{label}: セットアップが完了しました。")
-        return True
+    if not run_command([npm_command(), "install"], cwd=FRONTEND_WEB_DIR):
+        print_error(f"{label}: セットアップに失敗しました。")
+        return False
 
-    print_error(f"{label}: セットアップに失敗しました。")
-    return False
+    if not run_command([npm_command(), "update"], cwd=FRONTEND_WEB_DIR):
+        print_error(f"{label}: 依存関係の最新版への更新に失敗しました。")
+        return False
+
+    print_success(f"{label}: セットアップが完了しました。")
+    return True
 
 
 def setup_frontend_avatar():
@@ -565,37 +569,40 @@ def setup_frontend_avatar():
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
         return False
 
-    # 1. npm install（postinstall で Electron バイナリも取得を試みる。失敗しても続行）
+    # 1. npm install（postinstall で Electron バイナリも取得を試みる）
     print_info(f"{label}: npm install を実行します...")
+    install_recovery_needed = False
     if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
         print_warning(f"{label}: npm install が失敗しました。Electron バイナリの手動取得を試みます。")
+        install_recovery_needed = True
+        if not run_command([npm_command(), "install", "--ignore-scripts"], cwd=FRONTEND_AVATAR_DIR):
+            return False
+
+    # 2. package.json の宣言範囲内で最新版へ更新する
+    if not run_command([npm_command(), "update"], cwd=FRONTEND_AVATAR_DIR):
+        print_warning(f"{label}: npm update が失敗しました。postinstall をスキップして再試行します。")
+        install_recovery_needed = True
+        if not run_command([npm_command(), "update", "--ignore-scripts"], cwd=FRONTEND_AVATAR_DIR):
+            return False
 
     exe_name = "electron.exe" if sys.platform == "win32" else "electron"
     electron_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name
 
-    # テスト用: electron.exe を削除してフォールバックを検証
-    # if electron_exe.exists():
-    #     electron_exe.unlink()
-    #     print_warning(f"{label}: [テスト用] {electron_exe} を削除しました。")
-
-    # electron リカバリ処理
+    # 3. Electron リカバリ処理
     if not electron_exe.exists():
-        # a. --ignore-scripts で一度インストールして postinstall をスキップし、バイナリだけを手動で配置する
-        if not run_command([npm_command(), "install", "--ignore-scripts"], cwd=FRONTEND_AVATAR_DIR):
-            #return False
-            pass
-        # b. GitHub からバイナリ取得
+        install_recovery_needed = True
         if not install_electron_binary(FRONTEND_AVATAR_DIR, label):
             return False
-        # c. npm install を再実行して仕上げ
-        #    Electron バイナリは配置済みのため、ここで失敗しても続行する
+
+    # 4. リカバリを行った場合は postinstall を含む通常インストールで仕上げる
+    if install_recovery_needed:
         print_info(f"{label}: npm install を再実行してセットアップを完了させます...")
-        #if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-        #    print_warning(f"{label}: npm install (再実行) に失敗しましたが続行します。")
         if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
             return False
-        # d. electron install 成功
-        print_info(f"{label}: electron がインストール出来ました。")
+        if not electron_exe.exists():
+            print_error(f"{label}: Electron バイナリを確認できません: {electron_exe}")
+            return False
+        print_info(f"{label}: Electron のインストールを確認しました。")
 
     print_success(f"{label}: セットアップが完了しました。")
     return True

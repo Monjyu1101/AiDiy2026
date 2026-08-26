@@ -411,7 +411,7 @@ print('provider SDKs OK')
 
 # ========== 5.4 oneshot 実行 ==========
 python ..\_setup.py
-aidiy_hermes -z -Q "こんにちは"
+aidiy_hermes -Q -z "こんにちは"
 
 # ========== 5.5 provider / model 切替 ==========
 aidiy_hermes -z --provider ollama --model "deepseek-v4-flash:cloud" -Q "test"
@@ -425,8 +425,8 @@ for s in get_mcp_status():
 "
 
 # ========== 5.7 stdout/stderr 分離 ==========
-$out = aidiy_hermes -z -Q "Hello" 2>$null
-$err = aidiy_hermes -z -Q "Hello" >$null
+$out = aidiy_hermes -Q -z "Hello" 2>$null
+$err = aidiy_hermes -Q -z "Hello" >$null
 Write-Host "stdout: $out"
 Write-Host "stderr: $err"
 ```

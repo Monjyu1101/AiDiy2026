@@ -119,7 +119,13 @@ mkdir -p frontend_web/src/components/Mマスタ/M新テーブル/components</cod
       <td><code>URLメニュー</code></td>
       <td>String</td>
       <td><code>''</code></td>
-      <td>URLメニューは大元メニュー、URL戻り先は行クリック時の現在画面（編集完了後にここへ戻る）</td>
+      <td>大元のカテゴリメニューへ戻るためのURL</td>
+     </tr>
+     <tr>
+      <td><code>URL戻り先</code></td>
+      <td>String</td>
+      <td><code>''</code></td>
+      <td>行クリック時の現在画面。編集完了後に検索条件を保った一覧へ戻るために使う</td>
      </tr>
     </tbody>
    </table>
@@ -127,6 +133,7 @@ mkdir -p frontend_web/src/components/Mマスタ/M新テーブル/components</cod
    <pre><code>const 件数制限 = ref(true);
 const 無効も表示 = ref(false);
 const 有効列表示 = computed(() =&gt; 無効も表示.value); // 無効も表示ONのとき「有効」列を表示</code></pre>
+   <p><code>useListSessionState()</code> へ検索条件の <code>getState</code> / <code>applyState</code> を渡し、一覧離脱前に <code>saveListSession()</code> を呼びます。これにより、編集画面から戻ったときも検索条件と戻り先を復元できます。</p>
    <p>子へ渡すテンプレートパターン:</p>
    <pre><code>&lt;!-- ※ Vue コンポーネントタグ名は ASCII のみ有効。日本語コンポーネントは &lt;component :is="..."&gt; で使用する --&gt;
 &lt;component

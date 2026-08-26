@@ -21,7 +21,7 @@ const ICON_DATA = [
   },
   {
     name: 'Claude Code',
-    iconUrl: 'https://docs.anthropic.com/en/images/claude-code-logo.svg',
+    iconUrl: 'https://cdn.simpleicons.org/claudecode',
     linkUrl: 'https://docs.anthropic.com/en/docs/claude-code/overview',
     category: 'AI Provider',
   },
@@ -89,6 +89,36 @@ const ICON_DATA = [
     name: 'opencode',
     iconUrl: 'https://opencode.ai/favicon.ico',
     linkUrl: 'https://opencode.ai',
+    category: 'AI Provider',
+  },
+  {
+    name: 'xAI',
+    iconUrl: 'https://cdn.simpleicons.org/x',
+    linkUrl: 'https://x.ai',
+    category: 'AI Provider',
+  },
+  {
+    name: 'Grok CLI',
+    iconUrl: 'https://cdn.simpleicons.org/x',
+    linkUrl: 'https://x.ai/grok',
+    category: 'AI Provider',
+  },
+  {
+    name: 'Google Antigravity',
+    iconUrl: 'https://cdn.simpleicons.org/googlegemini',
+    linkUrl: 'https://antigravity.google',
+    category: 'AI Provider',
+  },
+  {
+    name: 'Hugging Face',
+    iconUrl: 'https://cdn.simpleicons.org/huggingface',
+    linkUrl: 'https://huggingface.co',
+    category: 'AI Provider',
+  },
+  {
+    name: 'Gemma',
+    iconUrl: 'https://cdn.simpleicons.org/googlegemini',
+    linkUrl: 'https://ai.google.dev/gemma',
     category: 'AI Provider',
   },
 
@@ -225,6 +255,18 @@ const ICON_DATA = [
     name: 'ruff',
     iconUrl: 'https://cdn.simpleicons.org/ruff',
     linkUrl: 'https://docs.astral.sh/ruff',
+    category: 'Framework',
+  },
+  {
+    name: 'FFmpeg',
+    iconUrl: 'https://cdn.simpleicons.org/ffmpeg',
+    linkUrl: 'https://ffmpeg.org',
+    category: 'Framework',
+  },
+  {
+    name: 'OBS Studio',
+    iconUrl: 'https://cdn.simpleicons.org/obsstudio',
+    linkUrl: 'https://obsproject.com',
     category: 'Framework',
   },
 

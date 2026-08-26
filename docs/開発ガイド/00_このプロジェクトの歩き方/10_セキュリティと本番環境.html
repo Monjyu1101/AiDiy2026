@@ -57,7 +57,7 @@
  </tr>
  <tr>
  <td><strong>CORS</strong></td>
- <td>127.0.0.1:8090, :5173, :3000 を許可</td>
+ <td>localhost / 127.0.0.1 の 8090, 8092, 5173, 3000 とDocker用HTTP/HTTPSを許可</td>
  <td>特定ドメインのみ</td>
  </tr>
  <tr>
@@ -72,7 +72,7 @@
  </tr>
  <tr>
  <td><strong>Webサーバー</strong></td>
- <td>127.0.0.1:8090/8091/8098（開発サーバー）</td>
+ <td>Web 8090、Avatar 8092、5バックエンド 8091/8093/8095/8096/8098</td>
  <td>Nginx（リバースプロキシ）</td>
  </tr>
  </tbody>
@@ -257,28 +257,25 @@ WantedBy=multi-user.target</code></pre>
 
  <section id="docker">
  <h2>Docker対応</h2>
- <p>Dockerを使った本番デプロイの例です。</p>
+ <p>現行リポジトリには <code>docker/</code> の実装済み構成があります。Core / Apps / frontend_webを1つのアプリコンテナで動かし、別のNginxコンテナがHTTPSと静的配信を担当します。</p>
 
- <pre><code># Dockerfile (例: Core API)
-FROM python:3.13-slim
-WORKDIR /app
-COPY . .
-RUN pip install uv && uv sync
-CMD ["uvicorn", "core_main:app", "--host", "0.0.0.0", "--port", "8091"]</code></pre>
+ <pre><code>cd docker
+docker_1build.bat  # 初回またはWeb変更反映時
+docker_2start.bat  # 起動
+docker_3stop.bat   # 停止</code></pre>
 
- <pre><code># docker-compose.yml
-version: '3.8'
-services:
- core:
-   build: ./backend_server
-   command: uvicorn core_main:app --host 0.0.0.0 --port 8091
- apps:
-   build: ./backend_server
-   command: uvicorn apps_main:app --host 0.0.0.0 --port 8098</code></pre>
+ <ul>
+ <li>画面: <code>https://localhost/</code>（自己署名証明書）</li>
+ <li>ホスト公開ポート: <code>80</code>, <code>443</code>, <code>8091</code>, <code>8098</code>。Webの8090はコンテナ内部のみ</li>
+ <li>frontend_webは <code>docker/Dockerfile</code> の <code>frontend-builder</code> ステージでビルドし、named volume経由でNginxへ共有する。ホストの <code>frontend_web/dist/</code> は使わない</li>
+ <li><code>backend_tools</code> (8095)、<code>backend_taskteam</code> (8093)、<code>backend_local</code> (8096) はこのDocker構成に含まれない</li>
+ <li>Nginxに <code>/task</code> / <code>/team</code> proxyはないため、AIタスク画面とAIチーム画面はこの構成では動作しない</li>
+ <li>詳細と証明書・削除手順は <code>docker/README.md</code> を一次情報とする</li>
+ </ul>
 
  <div>
  <strong>注意 </strong>
- <p>本番環境ではDocker Composeの環境変数にパスワードを直接書かないでください。</p>
+ <p><code>_config/</code> はread-onlyでマウントされます。秘密情報をイメージやComposeへ直書きせず、ホスト側の設定を管理してください。</p>
  </div>
  </section>
 

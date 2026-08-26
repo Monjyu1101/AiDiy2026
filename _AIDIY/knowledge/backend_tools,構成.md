@@ -12,7 +12,7 @@
 - Codex など stdio クライアント向けの SSE 変換入口は `backend_tools/mcp_stdio.py`
 - 再利用ロジックは `backend_tools/tools_proc/` に置く
 - `tools_main.py` からは `tools_proc.<module>` として import する
-- `tools_main.py` は 19 本の `FastMCP` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す
+- `tools_main.py` は MCP SDK 2.x の 19 本の `MCPServer` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す
 
 ## 関連ファイル
 - `backend_tools/tools_main.py`
@@ -103,7 +103,8 @@ print(res.json())  # {"save_path": "..."}
    - `from tools_proc.<サーバー名> import ...` の import
    - `MOUNT_<略号> = os.environ.get("MCP_<略号>_MOUNT_PATH", "/aidiy_<name>")`
    - インスタンス生成（例: `xx = ImageGeneration()`）
-   - `mcp_<略号> = FastMCP("aidiy_<name>", host="0.0.0.0", port=MCP_PORT, sse_path=..., message_path=..., warn_on_duplicate_tools=False)`
+   - `mcp_<略号> = MCPServer("aidiy_<name>", warn_on_duplicate_tools=False)`
+   - `sse_app(sse_path="/sse", message_path="/messages/", host="127.0.0.1")` と `streamable_http_app(streamable_http_path="/mcp", host="127.0.0.1")` を既存の `_mcp_transport_app()` で合成する
    - `@mcp_<略号>.tool()` でツール登録
    - Starlette `routes` に `*mcp_<略号>.sse_app().routes` を追加
    - 起動ログに `logger.info(f"... SSE : http://127.0.0.1:{MCP_PORT}{MOUNT_<略号>}/sse")` を追加
@@ -155,12 +156,15 @@ Chrome DevTools 系ツールは `_ensure_chrome()` で Chrome の起動状態を
 ## stdio bridge の注意点
 
 - Codex の `url = ...` は streamable HTTP 用。AiDiy の SSE エンドポイントは `mcp_stdio.py` を挟む
-- `ClientSession.call_tool()` へ `req.params.meta` を中継する場合、MCP SDK 1.27 系では `RequestParams.Meta` モデルが渡ることがある。`model_dump(by_alias=True, exclude_none=True)` 相当で `dict` に正規化してから渡す
-- 未対応だと `argument after ** must be a mapping, not Meta`、`Transport closed`、タイムアウトとして見えることがある
+- MCP SDK 2.x の SSE クライアントは `httpx2.AsyncClient` を使う。`httpx.AsyncClient` を factory から返すと `AsyncClient object has no attribute sse` になる
+- 低レベル `Server` の中継ハンドラーは `Server(..., on_list_tools=..., on_call_tool=...)` で登録する。1.x の `server.request_handlers[...]` は使わない
+- 初期化結果は `server_info`、要求パラメータは `CallToolRequestParams` などの snake_case 属性で参照する
+- `ClientSession.call_tool()` へ `params.meta` を中継する場合は `model_dump(by_alias=True, exclude_none=True)` 相当で `dict` に正規化する
 
 ## 注意点
 
 - `tools_main.py` は入口として残し、`tools_proc` へ入れない
+- MCP SDK は `mcp[cli]>=2,<3` を使い、`MCPServer` を `mcp.server.mcpserver` から import する。MCP 1.x の `mcp.server.fastmcp.FastMCP` へ戻さない
 - stdio と SSE の transport 変換は `mcp_stdio.py` に閉じ込める
 - SQLite / PostgreSQL は既定 read-only。検証は SELECT / describe / count を優先する
 - Chrome DevTools MCP は Python CDP 実装。Node.js 版 `chrome-devtools-mcp` 前提で復旧しない

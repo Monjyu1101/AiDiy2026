@@ -44,7 +44,7 @@ hermes mcp serve
        └─ action == "serve"
             └─ mcp_serve.run_mcp_server()
                  ├─ EventBridge.start()   # バックグラウンドポーリング開始
-                 ├─ create_mcp_server()   # FastMCP で 10 ツールを登録
+                 ├─ create_mcp_server()   # MCP SDK 2.x の MCPServer で 10 ツールを登録
                  └─ server.run_stdio_async()  # stdio トランスポートで待機
 ```
 
@@ -119,8 +119,8 @@ print('Tools:', [t.name for t in tools])
 
 ## 注意点
 
-- `mcp` パッケージが必要: `pip install 'mcp'`。インストールなしで起動しようとすると ImportError で停止する。
-- `FastMCP` は `mcp.server.fastmcp` から import する（バージョンによって `mcp.server.fastmcp` → `fastmcp` にパスが変わることがある）。
+- `mcp>=2,<3` パッケージが必要。インストールなしで起動しようとすると ImportError で停止する。
+- MCP サーバーは `MCPServer` を `mcp.server.mcpserver` から import する。MCP 1.x の `mcp.server.fastmcp.FastMCP` は使わない。
 - `hermes mcp serve` は stdio サーバーなので Code CLI が子プロセスとして起動する。プロセスが落ちると接続も切れる。
 - `EventBridge` は `SessionDB` が起動時に利用可能でないとポーリングを無効化してメッセージイベントが届かなくなる。Hermes 本体が動いている状態で接続すること。
 - `hermes mcp serve` は Hermes が **クライアントとして** AiDiy MCP に接続するフロー（`mcp_tool.py`）とは別の独立した機能。混同しないこと（→ SSE 接続は [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) 参照）。

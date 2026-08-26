@@ -313,7 +313,8 @@ class MCPツールブリッジ:
         except Exception as e:
             logger.warning(f"MCPツールブリッジ: MCP一覧取得失敗: {e}")
             names = []
-        return [n for n in names if n not in self.exclude]
+        # tools 定義はプロンプト先頭に載るため、順序を固定してキャッシュを壊さない
+        return sorted(n for n in names if n not in self.exclude)
 
     @staticmethod
     def safe_tool_name(mcp: str, method: str, used: Dict[str, Any]) -> str:
@@ -346,7 +347,8 @@ class MCPツールブリッジ:
                     data = json.loads(resp.read().decode("utf-8"))
             except Exception:
                 continue
-            for t in data.get("tools", []):
+            # ツール順もプロンプト先頭の一部。MCP 側の返却順に依存させない
+            for t in sorted(data.get("tools", []), key=lambda x: str(x.get("name") or "")):
                 method = t.get("name")
                 if not method:
                     continue
@@ -457,6 +459,56 @@ class MCPツールブリッジ:
 # 6. 自己ループ実行（ChatAI を tool_calls 実行しながら回す共通ループ）
 # ============================================================
 
+# プロンプトキャッシュのブレークポイントを明示指定するモデル（OpenRouter 経由の Anthropic 系）。
+# OpenAI / DeepSeek 系は自動キャッシュのため印は不要、ローカル推論も不要。
+_キャッシュ印対象キーワード = ("claude", "anthropic")
+
+# Anthropic のブレークポイント上限は 4。system 用に 1 枠残す。
+_キャッシュ印上限 = 3
+
+
+def キャッシュ印対象モデル(モデル名: str) -> bool:
+    """明示 cache_control を付けるべきモデルか判定する"""
+    低 = str(モデル名 or "").lower()
+    return any(k in 低 for k in _キャッシュ印対象キーワード)
+
+
+def _キャッシュ印付与(messages: List[Dict[str, Any]]) -> None:
+    """messages 末尾に cache_control を付け直す（ローリングブレークポイント）。
+
+    毎ターン末尾へ印を移すことで、前ターンまでの内容がキャッシュ済みプレフィックスとして
+    再利用される。古い印は上限を超えた分だけ先頭側から外す。
+    """
+    if not messages:
+        return
+
+    # 末尾メッセージの content を parts 形式へ寄せて印を付ける
+    末尾 = messages[-1]
+    content = 末尾.get("content")
+    if isinstance(content, str) and content:
+        parts = [{"type": "text", "text": content}]
+    elif isinstance(content, list) and content:
+        parts = content
+    else:
+        return  # content 無し（tool_calls のみ等）には印を付けられない
+    最終パート = parts[-1]
+    if not isinstance(最終パート, dict):
+        return
+    最終パート["cache_control"] = {"type": "ephemeral"}
+    末尾["content"] = parts
+
+    # 上限超過分の古い印を外す（system 側の印は別枠のため対象外）
+    印付き = [
+        p
+        for m in messages
+        if m.get("role") != "system" and isinstance(m.get("content"), list)
+        for p in m["content"]
+        if isinstance(p, dict) and "cache_control" in p
+    ]
+    for p in 印付き[: max(0, len(印付き) - _キャッシュ印上限)]:
+        p.pop("cache_control", None)
+
+
 async def 自己ループ実行(ai_instance, messages: List[Dict[str, Any]], ブリッジ: "MCPツールブリッジ",
                         tools: List[Dict[str, Any]], name_map: Dict[str, Any],
                         max_turns: int = 8, timeout: int = 120) -> Dict[str, Any]:
@@ -473,8 +525,12 @@ async def 自己ループ実行(ai_instance, messages: List[Dict[str, Any]], ブ
     content = ""
     completed = False
     turn = -1
+    印付与 = キャッシュ印対象モデル(getattr(ai_instance, "chat_model", ""))
 
     for turn in range(max_turns):
+        if 印付与:
+            # 前ターンまでの messages をキャッシュ済みプレフィックスとして再利用させる
+            _キャッシュ印付与(messages)
         completions_tools = {"tools": tools, "tool_choice": "auto", "messages": messages}
         result_text = await ai_instance.実行(
             要求テキスト="",

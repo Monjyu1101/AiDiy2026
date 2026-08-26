@@ -37,9 +37,12 @@ from fastapi import Response
 from fastapi.routing import APIRoute
 from starlette.applications import Starlette
 from starlette.routing import Route
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.server import StreamableHTTPASGIApp
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from mcp.server.mcpserver import MCPServer
+from mcp.server.streamable_http_manager import (
+    StreamableHTTPASGIApp,
+    StreamableHTTPSessionManager,
+)
+from mcp.types import LATEST_PROTOCOL_VERSION
 
 from log_config import setup_logging, get_logger
 from tools_proc.chrome_sessions import ChromeSessionRegistry
@@ -71,7 +74,7 @@ setup_logging()
 logger = get_logger(__name__)
 
 # 呼び出されたツール名をログに出力する（"Processing request of type CallToolRequest" の代替）
-_original_fastmcp_call_tool = FastMCP.call_tool
+_original_mcpserver_call_tool = MCPServer.call_tool
 
 
 _LOG_PARAM_MAX_LEN = 50
@@ -96,12 +99,12 @@ def _summarize_arguments(arguments: dict, max_keys: int = 3) -> str:
     return ", ".join(parts)
 
 
-async def _logged_call_tool(self: FastMCP, name: str, arguments: dict):
+async def _logged_call_tool(self: MCPServer, name: str, arguments: dict, context=None):
     logger.info("ツール呼び出し: %s / %s (%s)", self.name, name, _summarize_arguments(arguments))
-    return await _original_fastmcp_call_tool(self, name, arguments)
+    return await _original_mcpserver_call_tool(self, name, arguments, context)
 
 
-FastMCP.call_tool = _logged_call_tool
+MCPServer.call_tool = _logged_call_tool
 
 # ------------------------------------------------------------------ #
 # 設定
@@ -202,17 +205,13 @@ def _setup_reboot_watcher():
 _setup_reboot_watcher()
 
 # ------------------------------------------------------------------ #
-# FastMCP インスタンス生成
+# MCPServer インスタンス生成
 # ------------------------------------------------------------------ #
 
-def _make_mcp(name: str) -> FastMCP:
-    return FastMCP(
+def _make_mcp(name: str) -> MCPServer:
+    return MCPServer(
         name,
-        host="0.0.0.0",
-        port=PORT_TOOLS,
-        mount_path="/",
-        sse_path="/sse",
-        message_path="/messages/",
+        version="1.0.0",
         warn_on_duplicate_tools=False,
     )
 
@@ -270,22 +269,24 @@ mcp_ts._tool_manager._tools["synthesize_speech"].description = tts.get_descripti
 #   Grok の type=sse は initialize を /sse へ POST する
 # ------------------------------------------------------------------ #
 
-def _ensure_session_manager(mcp_instance: FastMCP) -> StreamableHTTPSessionManager:
-    if mcp_instance._session_manager is None:
-        mcp_instance._session_manager = StreamableHTTPSessionManager(
-            app=mcp_instance._mcp_server,
-            event_store=mcp_instance._event_store,
-            retry_interval=mcp_instance._retry_interval,
-            json_response=mcp_instance.settings.json_response,
-            stateless=mcp_instance.settings.stateless_http,
-            security_settings=mcp_instance.settings.transport_security,
-            max_request_body_size=mcp_instance.settings.max_request_body_size,
+def _ensure_session_manager(mcp_instance: MCPServer) -> StreamableHTTPSessionManager:
+    try:
+        return mcp_instance.session_manager
+    except RuntimeError:
+        # MCP 2.x は streamable_http_app() の生成時に session manager を初期化する。
+        mcp_instance.streamable_http_app(
+            streamable_http_path="/mcp",
+            host="127.0.0.1",
         )
-    return mcp_instance._session_manager
+        return mcp_instance.session_manager
 
 
-def _mcp_transport_app(mcp_instance: FastMCP) -> Starlette:
-    sse_starlette = mcp_instance.sse_app()
+def _mcp_transport_app(mcp_instance: MCPServer) -> Starlette:
+    sse_starlette = mcp_instance.sse_app(
+        sse_path="/sse",
+        message_path="/messages/",
+        host="127.0.0.1",
+    )
     http_asgi = StreamableHTTPASGIApp(_ensure_session_manager(mcp_instance))
     return Starlette(
         debug=False,
@@ -376,7 +377,7 @@ app.add_middleware(_McpTransportMiddleware)
 # MCP_MAP: initialize / list / ping 共通エンドポイント用
 # ------------------------------------------------------------------ #
 
-MCP_MAP: dict = {}  # mcp_name -> FastMCP instance (下部で設定)
+MCP_MAP: dict = {}  # mcp_name -> MCPServer instance (下部で設定)
 
 
 @app.get("/")
@@ -394,17 +395,17 @@ def _register_mcp_http_meta(mcp_name: str, mcp_instance) -> None:
     @app.post(f"/{mcp_name}/initialize", tags=[mcp_name],
               summary=f"{mcp_name} — MCP 初期化",
               operation_id=f"{mcp_name}_initialize")
-    async def _initialize(mcp_name=mcp_name):
+    async def _initialize():
         return {
-            "protocolVersion": "2024-11-05",
-            "serverInfo": {"name": mcp_name, "version": "1.0"},
+            "protocolVersion": LATEST_PROTOCOL_VERSION,
+            "serverInfo": {"name": mcp_name, "version": mcp_instance.version},
             "capabilities": {"tools": {}},
         }
 
     @app.get(f"/{mcp_name}/list", tags=[mcp_name],
              summary=f"{mcp_name} — ツール一覧",
              operation_id=f"{mcp_name}_list")
-    async def _list(mcp_name=mcp_name, mcp_instance=mcp_instance):
+    async def _list():
         tools = [
             {
                 "name": name,
@@ -418,9 +419,38 @@ def _register_mcp_http_meta(mcp_name: str, mcp_instance) -> None:
     @app.get(f"/{mcp_name}/ping", tags=[mcp_name],
              summary=f"{mcp_name} — 疎通確認",
              operation_id=f"{mcp_name}_ping")
-    async def _ping(mcp_name=mcp_name):
+    async def _ping():
         return {"status": "ok", "name": mcp_name}
 
+
+# ------------------------------------------------------------------ #
+# MCP_MAP と initialize / list / ping の共通エンドポイントを先に登録
+# 汎用の /{method_name} REST ルートより前に置き、静的パスを優先する。
+# ------------------------------------------------------------------ #
+
+MCP_MAP.update({
+    "aidiy_chrome_devtools":    mcp,
+    "aidiy_desktop_capture":    mcp_dc,
+    "aidiy_sqlite":             mcp_sq,
+    "aidiy_postgres":           mcp_pg,
+    "aidiy_logs":               mcp_lg,
+    "aidiy_code_check":         mcp_cc,
+    "aidiy_backup":             mcp_bk,
+    "aidiy_image_generation":   mcp_ig,
+    "aidiy_movie_generation":   mcp_mg,
+    "aidiy_speech_to_text":     mcp_st,
+    "aidiy_text_to_speech":     mcp_ts,
+    "aidiy_obs_studio_control": mcp_ob,
+    "aidiy_ffmpeg_control":     mcp_ff,
+    "aidiy_notification_sounds": mcp_ns,
+    "aidiy_code_agents":        mcp_ca,
+    "aidiy_chat_llms":          mcp_cl,
+    "aidiy_task_agents":        mcp_ta,
+    "aidiy_team_agents":        mcp_tm,
+    "aidiy_windows_control":    mcp_wc,
+})
+for _mcp_name, _mcp_instance in MCP_MAP.items():
+    _register_mcp_http_meta(_mcp_name, _mcp_instance)
 
 # ------------------------------------------------------------------ #
 # HTTP ルート登録
@@ -443,34 +473,6 @@ app.include_router(tools_task_agents.create_router(task_agents))
 app.include_router(tools_team_agents.create_router(team_agents))
 app.include_router(tools_windows_control.create_router(winctl))
 app.include_router(tools_chat.create_completions_router(chat_llm))
-
-# ------------------------------------------------------------------ #
-# initialize / list / ping エンドポイントを全 MCP に登録
-# ------------------------------------------------------------------ #
-
-MCP_MAP.update({
-    "aidiy_chrome_devtools":    mcp,
-    "aidiy_desktop_capture":    mcp_dc,
-    "aidiy_sqlite":             mcp_sq,
-    "aidiy_postgres":           mcp_pg,
-    "aidiy_logs":               mcp_lg,
-    "aidiy_code_check":         mcp_cc,
-    "aidiy_backup":             mcp_bk,
-    "aidiy_image_generation":   mcp_ig,
-    "aidiy_movie_generation":   mcp_mg,
-    "aidiy_speech_to_text":     mcp_st,
-    "aidiy_text_to_speech":     mcp_ts,
-    "aidiy_obs_studio_control": mcp_ob,
-    "aidiy_ffmpeg_control":         mcp_ff,
-    "aidiy_notification_sounds":    mcp_ns,
-    "aidiy_code_agents":            mcp_ca,
-    "aidiy_chat_llms":              mcp_cl,
-    "aidiy_task_agents":            mcp_ta,
-    "aidiy_team_agents":            mcp_tm,
-    "aidiy_windows_control":        mcp_wc,
-})
-for _mcp_name, _mcp_instance in MCP_MAP.items():
-    _register_mcp_http_meta(_mcp_name, _mcp_instance)
 
 # ------------------------------------------------------------------ #
 # MCP SSE / Streamable HTTP サーバーをサブパスにマウント

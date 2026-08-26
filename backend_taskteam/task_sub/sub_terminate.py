@@ -38,6 +38,11 @@ import traceback
 import urllib.request
 from urllib.parse import quote
 
+_SELF_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SELF_DIR not in sys.path:
+    sys.path.insert(0, _SELF_DIR)
+from sub_context import 差し込み  # noqa: E402  同フォルダの定型コンテキスト読込
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_API = "http://127.0.0.1:8093/task"
 MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
@@ -139,11 +144,8 @@ def 明細1件取得(全明細: list[dict], 対象SEQ: int) -> dict:
     return {}
 
 
-def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対象: dict, 完了明細: list[dict]) -> str:
-    全ステップ = "\n".join(
-        f"  {int(行['明細SEQ'])}. {str(行['タイトル']).strip()}（先行SEQ: {str(行['先行SEQ']).strip() or 'なし'}）"
-        for 行 in 全明細
-    )
+def 実行済ブロック生成(完了明細: list[dict]) -> str:
+    """完了済み明細の応答内容を、実行済み記録のブロックへ組み立てる"""
     実行済: list[str] = []
     for 行 in sorted(完了明細, key=lambda 行: int(行["明細SEQ"])):
         seq = int(行["明細SEQ"])
@@ -151,36 +153,34 @@ def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対
         応答内容 = str(行.get("応答内容", "")).strip()
         見出し = f"ステップ{seq} {タイトル} " + ("処理目標" if seq == 0 else "実行済")
         実行済.append(f"``` {見出し}\n{応答内容}\n```")
-    実行済ブロック = "\n".join(実行済) if 実行済 else "（実行済ステップはまだありません）"
-    return f"""あなたはタスク全体の最終検証（操作検証）を行う担当です。今回は検証のみを行ってください。
+    return "\n".join(実行済) if 実行済 else "（実行済ステップはまだありません）"
 
-タスク全体のタイトル: {タスクタイトル}
 
-全ステップ:
-{全ステップ}
+def 全ステップ生成(全明細: list[dict]) -> str:
+    """全明細を、依存関係つきのステップ一覧テキストへ組み立てる"""
+    return "\n".join(
+        f"  {int(行['明細SEQ'])}. {str(行['タイトル']).strip()}（先行SEQ: {str(行['先行SEQ']).strip() or 'なし'}）"
+        for 行 in 全明細
+    )
 
-実行済ステップの記録（ステップ0 開始 の応答内容が処理目標です）:
-{実行済ブロック}
 
-【今回のステップ】※検証のみを行ってください。
-ステップ{対象['明細SEQ']} {対象['タイトル']}
-各実行ステップの検証と最終結果の検証をお願いします。
+def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対象: dict, 完了明細: list[dict]) -> str:
+    """check フェーズ。定型部は _config/AiDiy_task__context.json から読む。
 
-注意:
-- 検証のみを行い、コードの修正や新しい作業は行わないでください。
-- 処理目標に対して各実行ステップの記録と実際の成果物を照合し、最終結果を検証してください。
-- ファイル操作を伴わない処理は、渡された実行済ステップの記録だけから簡素に判断し、ファイル確認や追加のツール実行は行わないでください。
-- AiDiy の MCP ツールが HTTP で利用できます。
-  ツール一覧の確認: GET http://127.0.0.1:8095/<mcp名>/list
-  ツールの実行: POST http://127.0.0.1:8095/<mcp名>/<メソッド> （JSON ボディ）
-  例: aidiy_notification_sounds, aidiy_sqlite, aidiy_chrome_devtools など
-- 検証結果は必ず次の HTTP エンドポイントへ直接報告してください（あなた自身が curl 等で呼び出します）。
-  POST http://127.0.0.1:8093/task_check_okng
-  Content-Type: application/json
-  Body: {{"タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証結論の要約"}}
-  問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。
-  この報告が今回のステップの完了条件です。報告を行わずに終えないでください。
-"""
+    外枠（common_instruction_lines）は do と共通。直前の do ステップと先頭が
+    一致するため、最終検証でもプロンプトキャッシュが効く。
+    """
+    今回要求ブロック = 差し込み("check_request_lines", {
+        "明細SEQ": 対象["明細SEQ"],
+        "明細タイトル": 対象["タイトル"],
+        "タスクID": タスクID,
+    })
+    return 差し込み("common_instruction_lines", {
+        "タスクタイトル": タスクタイトル,
+        "全ステップ": 全ステップ生成(全明細),
+        "実行済ブロック": 実行済ブロック生成(完了明細),
+        "今回要求ブロック": 今回要求ブロック,
+    })
 
 
 def 検証実行(

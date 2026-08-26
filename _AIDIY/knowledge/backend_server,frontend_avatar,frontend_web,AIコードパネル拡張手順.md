@@ -78,7 +78,7 @@
 
 ```powershell
 backend_server\.venv\Scripts\python.exe -m py_compile backend_server\core_router\AIコア.py
-backend_server\.venv\Scripts\python.exe -m py_compile backend_server\core_router\AIコア\AIセッション管理.py
+backend_server\.venv\Scripts\python.exe -m py_compile backend_server\AIコア\AIセッション管理.py
 cd frontend_web
 npm run type-check
 cd ..\frontend_avatar

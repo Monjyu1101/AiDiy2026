@@ -95,15 +95,27 @@ backend_taskteam/temp/reboot_taskteam.txt
 
 明細の依存関係はカンバン固定列ではなく、`先行SEQ`（カンマ区切りで複数指定可）による DAG です。実行可能判定は先行明細の全完了を条件とし、フロントエンドのフロー図は最長経路をクリティカルパスとして配置します。
 
+### 各サブプロセスの役割
+
+| サブプロセス | 対象 | 動作 |
+|--------------|------|------|
+| `task_sub/sub_init.py` | 要求の準備 | 2段構え。第1ステップは対象プロジェクトフォルダで AI に分解させ、応答本文へ JSON 文字列を返させる（書き込みなし）。第2ステップは AiDiy ルート（`"../"`）で `temp/output/<タスクID>.json` へ書き出させる |
+| `task_sub/sub_start.py` | 開始明細 | AI を使わず、`aidiy_backup` MCP でプロジェクトの差分バックアップを取り、要求内容を応答内容へコピーして`開始完了`にする |
+| `task_sub/sub_proc.py` | 処理明細 | 1ステップだけを `aidiy_code_agents` へ依頼する。`操作検証`ありの明細は AI が `/task_check_okng` へ報告した状態を確認し、書き込みなし・エラーのいずれかなら検証結果を踏まえて1回だけ自動リトライする |
+| `task_sub/sub_terminate.py` | 終了明細 | `操作検証=false`（どの明細もファイル操作なし）なら AI を介さず`終了完了`。`true` なら最終検証を依頼し、AI が `/task_check_okng` へ報告する。無報告で戻った場合は強制的にエラーで確定する |
+
+`sub_proc.py` / `sub_terminate.py` は `temp/input` / `temp/output` に依存せず、タスクID と SEQ だけで完結します。
+
 ### 実行開始条件
 
-`Aタスク実行条件`は要求の起動条件を保持します。
+`Aタスク実行条件`は要求の起動条件を、タスクID 単独を主キーに保持します。区分は2軸です。
 
-- 即時。
-- 時間指定。
-- 間隔実行（分・時・日）。
-- 定時実行（毎日・毎週・毎月）。
-- フォルダ変化。
+| 列 | 値 | 補足 |
+|----|----|------|
+| `実行区分` | `即時` / `時間指定` / `間隔実行` / `定時実行` | 間隔は `間隔区分`（分・時・日）+ `間隔値`、定時は `定時区分`（毎日・毎週・毎月）+ `実行曜日` / `実行日` / `開始時刻` |
+| `実行条件` | `無し` / `フォルダ変化` | `フォルダ変化`は `監視フォルダ`のファイル数・最終更新日時のスナップショット比較で判定する |
+
+状態は`準備完了`（条件の充足待ち）で待機し、条件成立で明細 → 要求の順に`待機`へ戻して再実行します。時間駆動条件と`フォルダ変化`の確認は状態監視ループの毎分ゲートで行い、`即時`だけは1分ゲート無しで10秒ループの先頭から再実行させます。
 
 停止中に期限を過ぎた条件は、起動時に過去分を一括発火せず次の周期へ更新します。
 
@@ -144,9 +156,9 @@ Task の無進捗タイムアウトは、`準備中`の要求が10分、それ�
 
 1. `Aチーム依頼`を`準備開始`で登録する。
 2. Team 起動監視が`team_sub/sub_init.py`を起動する。
-3. persona と既存経験を材料に担当要員を選ぶ。
+3. 有効要員一覧と要員ごとの `Aチーム経験`（経験値・分類・直近の学び）を材料に、AI へ担当要員を選ばせる。経験のある要員へ寄せることで蓄積ナレッジが再利用される。出力が有効要員一覧に無ければ `admin` へフォールバックする。
 4. 依頼IDを task ID として `aidiy_task_agents`へ投入し、`Aタスク要求`と紐づける。
-5. Task の進捗を同じ SQLite DB へ反映し、完了後に`team_sub/sub_exp.py`が経験を生成する。
+5. Task の進捗を同じ SQLite DB へ反映し、完了後に`team_sub/sub_exp.py`が経験を生成する。`sub_exp.py`は `task_sub/sub_init.py` と同じ2段構えで、第1ステップが対象プロジェクトで明細を読んで経験値をまとめ、第2ステップが AiDiy ルートで `temp/team/exp/output/<経験ID>.json` へ書き出す。
 6. 経験本登録後、依頼を`済`へ進め、まとめ内容を保存する。
 
 無進捗タイムアウトは、担当選択・タスク投入中の`準備中`が10分、それ以外が30分です。
@@ -177,6 +189,28 @@ Task の無進捗タイムアウトは、`準備中`の要求が10分、それ�
 
 `Aチーム目標.作業ループ回数`は1〜99で、99は無制限です。`動員要員数`は相談段の人数上限です。起動時には自動作業設定と作業ループをオフへ戻し、前回プロセスの続きを無断で再開しません。
 
+### 自動会話（雑談）と取りまとめ
+
+`Aチーム目標`（最終更新1件）の自動作業設定がオンのとき、Team 状態監視の毎分ゲートで次を回します。チーム作業の中身を、要員の意見から決めるための仕組みです。
+
+| 分の下一桁 | 起動するもの | 動作 |
+|-----------|--------------|------|
+| 1〜9 | `team_sub/sub_self_talk.py` | 雑談エリア（状態=`雑談中`）の要員から1名を選び、チーム目標・他要員の最新発言・その要員自身の1回前の発言を渡して「今やるべきこと」を1件発言させ、`Aチーム会話`の該当行へ書き戻す。意見を集めるだけで実行はしない |
+| 0 | `team_sub/sub_self_work.py` | 有効要員数の50%以上の意見が集まっていれば、admin 人格でチーム作業へ取りまとめる。成功時は `Aチーム会話`を admin の取りまとめ1件へ置き換え、`Aチーム目標.チーム作業`へ反映し、対象プロジェクトの既存 `Aチーム作業`をクリアする |
+
+雑談は「前回プロセスが動いている間は次を投入しない」で直列化しています。発言のタイムアウトを延ばすと発言頻度がそのまま落ちる点に注意してください。
+
+### 単発会話の2モード
+
+`team_proc/team_chat.py` は `backend_tools` へ依存せず、`aidiy_code_agents` の HTTP API を毎回呼びます。会話履歴や CodeAgent インスタンスは Team 側に保持しません。モードは2つです。
+
+| モード | 使う処理 | 権限 / タイムアウト |
+|--------|----------|---------------------|
+| 調査モード | 利用者画面の会話（`/team/エージェント/会話`）、雑談の発言（`sub_self_talk.py`） | `code_permissions` を既定（`auto`）に戻してツールを使わせる。CodeAgent 300秒 / HTTP 360秒。システム指示で「読み取り調査のみ・変更禁止」を明示する |
+| 通常モード（既定） | 意見の取りまとめ（`sub_self_work.py`）など、入力が全て渡っていて追加調査が要らない用途 | `code_permissions="none"` でツール禁止。CodeAgent 170秒 / HTTP 180秒 |
+
+調査モードの HTTP 360秒は、フロントエンド `AIチーム_会話要求.vue` の `最大待機秒 = 360` と揃えています。片方だけ変えないでください。
+
 ## DB と設定
 
 Task と Team の全 DB モジュールはプロジェクトルートの `_data/AiDiy/database.db` を sqlite3 で直接参照します。各接続は30秒の timeout / busy timeout、WAL、`synchronous=NORMAL` を使い、複数サーバー・サブプロセスの並行アクセスに備えます。
@@ -187,6 +221,48 @@ Task と Team の全 DB モジュールはプロジェクトルートの `_data/
 - `TASK_AI_NAME` / `TASK_AI_MODEL_plan` / `TASK_AI_MODEL_do` / `TASK_AI_MODEL_check`。
 - `TEAM_AI_NAME` / `TEAM_AI_MODEL_plan` / `TEAM_AI_MODEL_do` / `TEAM_AI_MODEL_check`。
 - `PORT_TASKTEAM`。現行値は `8093`。
+
+Task が AI へ渡すプロンプトの定型部は `_config/AiDiy_task__context.json` に外だししています。
+無ければ `task_sub/sub_context.py` が初回実行時にひな形を書き出し、あればその内容を使います
+（`AiDiy_chat__context.json` などと同じ方式）。キーは次のとおりです。
+
+- `plan_instruction_lines` / `plan_save_instruction_lines`。要求分解と JSON 保存。
+- `common_instruction_lines`。do と check で共通の外枠。
+- `do_request_lines` / `do_verify_lines` / `do_retry_lines`。ステップ実行の `[今回要求]` 部。
+- `check_request_lines`。最終検証の `[今回要求]` 部。
+
+本文中の `{要求内容}` などは差込キーです。置換は 1 回だけの走査で行うため、
+JSON の例に出てくる波括弧はエスケープ不要で、差し込んだ値の中身は再走査されません。
+
+do と check は同じ外枠を共有し、`[タイトル]` → `[全体タスク]` → `[実行済み]` → `[今回要求]`
+の順に並べます。毎回変わるのは `[今回要求]` 以降だけなので、ステップが進んでも先頭が変化せず、
+最終検証も直前ステップと同じ先頭を再利用できて、プロバイダのプロンプトキャッシュが効きます。
+役割（「1 ステップを実行する担当」「最終検証を行う担当」）とフェーズ固有の指示は
+`[今回要求]` の冒頭に置きます。ここを外枠へ動かすと do と check で先頭が食い違い、
+キャッシュが効かなくなります。同じ理由で、外枠に差込キーを増やすのも避けてください。
+あわせて外枠の冒頭で「実際に行うのは `[今回要求]` だけ」と宣言し、
+実行AIが全体タスクや実行済みステップに手を出すのを防ぎます。
+
+Team 側は用途ごとにファイルを分けてあり、`team_proc/team_context.py` が同じ方式で読み込みます。
+
+| ファイル | 用途 |
+| --- | --- |
+| `AiDiy_team__spdca_context.json` | 作業ループ SPDCA（S=相談 / P=計画 / D=実行 / C=評価 / A=改善） |
+| `AiDiy_team__plando_context.json` | 作業ループ PlanDo（P=計画 / D=実行） |
+| `AiDiy_team__select_context.json` | 依頼を担当させる要員の選択 |
+| `AiDiy_team__exp_context.json` | 完了した依頼から経験値をまとめる |
+| `AiDiy_team__talk_context.json` | 要員の自律発言（雑談）と admin の作業取りまとめ |
+| `AiDiy_team__chat_context.json` | 要員チャットのペルソナ指示 |
+
+作業ループ（spdca / plando）は task と同じ考え方で外枠を共通化し、
+`[プロジェクト]` → `[チーム目標]` → `[チーム作業]` → `[引き継ぎ]` → `[今回要求]` の順に並べます。
+段ごとに変わる役割と指示は `[今回要求]` 側に置くので、同じループの中では先頭が変わりません。
+ただし段が進むと `[引き継ぎ]` の中身が入れ替わるため、キャッシュが効くのは外枠と
+プロジェクト・目標・作業までです。
+
+雑談（`talk_instruction_lines`）とチャット（`persona_instruction_lines`）は、
+固定の手順・行動指示を先頭に置き、要員ごとに変わる情報を末尾へ回しています。
+これらは要員ごと・ラウンドごとに繰り返し呼ばれるので、先頭を揃える効果が最も大きい箇所です。
 
 モデルはフェーズごとに使い分けます。Aタスクは準備（AIによる明細分解）が plan、各ステップの実行が do、
 終了時の最終確認が check。作業ループは S・P が plan、D が do、C・A が check。
@@ -236,7 +312,9 @@ Task ID と Team 依頼IDが同じ文字列になる連携があるため、Task
 | `task_proc/tasks_api.py` | `/task/*` API |
 | `task_proc/tasks_db.py` | `Aタスク*` と連携する `Aチーム*` の DB 操作 |
 | `task_proc/tasks_watcher.py` | Task の起動・状態監視とサブプロセス起動 |
-| `task_sub/` | 要求分解、開始、処理、終了の各 Task サブプロセス |
+| `task_sub/` | 要求分解（`sub_init.py`）、開始（`sub_start.py`）、処理（`sub_proc.py`）、終了（`sub_terminate.py`）の各 Task サブプロセス |
+| `task_sub/sub_context.py` | Task の定型コンテキスト（plan / do / check）の読込 |
+| `team_proc/team_context.py` | Team の定型コンテキスト（用途別6ファイル）の読込 |
 | `team_proc/team_api.py` | `/team/*` API |
 | `team_proc/store.py` | エージェントのインメモリ状態とシミュレーション |
 | `team_proc/config.py` | 共通設定の読込 |
@@ -248,9 +326,9 @@ Task ID と Team 依頼IDが同じ文字列になる連携があるため、Task
 | `team_proc/team_pdca_db.py` | `Aチーム作業` と作業ループ判定 |
 | `team_proc/team_talk_db.py` | `Aチーム会話` |
 | `team_proc/team_status_db.py` | `Aチーム状況`の読取 |
-| `team_proc/team_chat.py` | persona 指示付き単発会話 |
+| `team_proc/team_chat.py` | persona 指示付き単発会話（調査モード / 通常モード） |
 | `team_proc/team_watcher.py` | Team の依頼・経験・PDCA・会話監視 |
-| `team_sub/` | 担当選択、経験生成、PlanDo / SPDCA、自動会話の各サブプロセス |
+| `team_sub/` | 担当選択（`sub_init.py`）、経験生成（`sub_exp.py`）、PlanDo（`sub_PlanDo_*.py`）、SPDCA（`sub_SPDCA_*.py` と共通処理 `sub_SPDCA__common.py`）、雑談発言（`sub_self_talk.py`）、取りまとめ（`sub_self_work.py`）の各サブプロセス |
 | `persona/<要員ID>/persona.json` | 召喚候補。`admin` は削除不可 |
 | `_start.py` / `_setup.py` / `_cleanup.py` | ルートスクリプトからの委譲先 |
 | `pyproject.toml` / `uv.lock` | uv 依存定義と lock |

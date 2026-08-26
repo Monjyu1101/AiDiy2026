@@ -271,25 +271,29 @@ const validateForm = () => {
  <section>
  <h2>7. 登録・変更・削除成功後のリダイレクト</h2>
  <p>
-  登録・変更・削除の成功後は一覧画面へリダイレクトし、
-  <code>message</code> と <code>type=success</code> をクエリパラメータで渡す。
-  一覧画面側がそれを受け取って成功メッセージを表示する。
-  クエリパラメータ <code>URLメニュー</code> が指定されている場合はそちらへ遷移する。
+  登録・変更・削除の成功後は、<code>URL戻り先</code>、<code>URLメニュー</code>、標準一覧の順で戻り先を決めます。
+  戻り先URLにメッセージ用クエリを足せない場合は <code>saveReturnMessage()</code> で <code>sessionStorage</code> に一時保存し、一覧画面が <code>consumeReturnMessage()</code> で一度だけ表示します。
  </p>
- <pre><code>const handleSuccess = (messageText) => {
-  if (URLメニュー.value) {
-    // URL戻り先またはURLメニューが指定されている場合（全角→半角変換を挟む）
-    router.push(toHalfwidthUrl(URLメニュー.value));
-    return;
-  }
-  // 一覧画面へリダイレクト（成功メッセージ付き）
+ <pre><code>import { saveReturnMessage } from '../../../utils/listSessionState';
+
+const pushReturnTarget = (messageText?: string): boolean =&gt; {
+  const target = URL戻り先.value || URLメニュー.value;
+  if (!target) return false;
+  const normalizedTarget = toHalfwidthUrl(target);
+  if (messageText) saveReturnMessage(normalizedTarget, messageText, 'success');
+  router.push(normalizedTarget);
+  return true;
+};
+
+const handleSuccess = (messageText) =&gt; {
+  if (pushReturnTarget(messageText)) return;
   router.push({
     path: '/Mマスタ/M車両/一覧',
     query: { message: messageText, type: 'success' }
   });
 };</code></pre>
  <p>
-  一覧画面では <code>route.query.message</code> を受け取り <code>qMessage()</code> で表示する。
+  一覧画面では <code>consumeReturnMessage(route)</code> または <code>route.query.message</code> を受け取り <code>qMessage()</code> で表示する。
   <code>type=success</code> / <code>type=error</code> によって表示スタイルが変わる。
  </p>
  </section>

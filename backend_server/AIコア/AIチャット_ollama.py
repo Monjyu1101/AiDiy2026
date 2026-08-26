@@ -178,17 +178,17 @@ class ChatAI:
                 ブリッジ = MCPツールブリッジ()
                 tools, name_map = ブリッジ.collect_tools()
                 if tools:
-                    msgs = []
-                    sys_text = システムプロンプト or getattr(self, "system_instruction", None)
-                    if sys_text:
-                        msgs.append({"role": "system", "content": sys_text})
-                    msgs.append({"role": "user", "content": 要求テキスト})
+                    # 会話履歴を引き継いだ上で自己ループへ渡す。
+                    # 先頭（system + 過去履歴）が毎ターン同一になり、プロンプトキャッシュが効く。
+                    self._履歴追加(role="user", text=要求テキスト)
+                    msgs = self._メッセージ履歴構築(システムプロンプト=システムプロンプト)
                     結果 = await 自己ループ実行(
                         self, msgs, ブリッジ, tools, name_map, max_turns, タイムアウト秒数
                     )
                     self.last_tool_trace = 結果["tool_trace"]
                     self.last_tool_turns = 結果["turns"]
                     self.last_tool_stopped = 結果["stopped"]
+                    self._履歴追加(role="assistant", text=結果["content"] or "!")
                     return 結果["content"] or "!"
                 # tools 無し（8095 未起動等）→ 通常処理にフォールバック
 
@@ -223,9 +223,16 @@ class ChatAI:
 
             タイムアウトタスク = asyncio.create_task(タイムアウト監視())
 
+            # 自己ループから completions_tools["messages"] を渡された呼び出しは
+            # そちらが会話の実体。ここで履歴を触ると空 user が溜まり先頭が崩れる。
+            外部メッセージ = bool(completions_tools and completions_tools.get("messages"))
+
             try:
-                self._履歴追加(role="user", text=要求テキスト, image_data=image_data)
-                メッセージ履歴 = self._メッセージ履歴構築(システムプロンプト=システムプロンプト)
+                if 外部メッセージ:
+                    メッセージ履歴 = completions_tools["messages"]
+                else:
+                    self._履歴追加(role="user", text=要求テキスト, image_data=image_data)
+                    メッセージ履歴 = self._メッセージ履歴構築(システムプロンプト=システムプロンプト)
 
                 応答テキスト = await asyncio.get_event_loop().run_in_executor(
                     None,
@@ -240,7 +247,9 @@ class ChatAI:
 
                 タイムアウトタスク.cancel()
                 final_result = 応答テキスト.strip() if 応答テキスト.strip() else "!"
-                self._履歴追加(role="assistant", text=final_result)
+                # 自己ループ中は呼び出し元がまとめて記録する
+                if not 外部メッセージ:
+                    self._履歴追加(role="assistant", text=final_result)
 
                 if final_result == "!" and テキスト受信処理Ｑ:
                     try:

@@ -40,10 +40,11 @@
      <tr><td>ツールバー右</td><td>「新規」ボタン → <code>openCreate()</code> で編集画面へ</td></tr>
      <tr><td>チェックボックス</td><td>件数制限・無効も表示（変更時に <code>handleReload()</code>）</td></tr>
      <tr><td>一覧テーブル</td><td><code>&lt;component :is="..."&gt;</code> で子コンポーネントをマウント</td></tr>
-     <tr><td>タイトルバー右端</td><td>URLメニューがある場合のみ「戻る」ボタンを表示</td></tr>
+     <tr><td>タイトルバー右端</td><td><code>URLメニュー</code> があれば「メニュー」、別の <code>URL戻り先</code> があれば「戻る」を表示</td></tr>
     </tbody>
-   </table>
-  </section>
+    </table>
+    <p>現行実装では <code>src/utils/listSessionState.ts</code> の <code>useListSessionState()</code> を使い、検索条件・<code>URLメニュー</code>・<code>URL戻り先</code> を <code>sessionStorage</code> に保存します。編集画面から復帰したときは保存状態を復元し、成功メッセージは <code>consumeReturnMessage()</code> で一度だけ受け取ります。</p>
+   </section>
 
   <section>
    <h2>件数制限・無効も表示チェックボックスの UI パターン</h2>
@@ -83,7 +84,8 @@ const 車両一覧テーブルRef = ref(null);</code></pre>
   :件数制限     — true: 上限1000件取得, false: 全件取得
   :無効も表示   — APIリクエストに渡す（false: 有効のみ, true: 全レコード）
   :有効列表示   — 無効も表示ONのとき「有効」列をテーブルに表示する
-  :URLメニュー        — URLメニューは大元メニュー、URL戻り先は行クリック時の現在画面（編集完了後にここへ戻る）
+  :URLメニュー  — 大元メニューへ戻るURL
+  :URL戻り先    — 行クリック時の一覧URL（編集完了後にここへ戻る）
 
   ※ Vue コンポーネントタグ名は ASCII のみ有効。
     日本語コンポーネントは &lt;component :is="..."&gt; で使用する。

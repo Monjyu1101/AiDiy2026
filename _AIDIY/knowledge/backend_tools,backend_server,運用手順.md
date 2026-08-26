@@ -53,6 +53,15 @@ Set-Location backend_tools
 uv sync --upgrade
 ```
 
+`backend_tools/pyproject.toml` は MCP SDK の最新メジャー系列を `mcp[cli]>=2,<3` で指定する。
+MCP 2.x では `FastMCP` が `MCPServer` へ変更されているため、`mcp.server.fastmcp` を復活させる目的で 1.x へ固定しない。
+依存更新後に起動時 import error が出た場合は、まず次を確認する。
+
+```powershell
+.venv/Scripts/python.exe -c "from importlib.metadata import version; print(version('mcp'))"
+.venv/Scripts/python.exe -c "import tools_main; print(len(tools_main.MCP_MAP))"
+```
+
 Node.js / `package.json` / `node_modules` は不要。
 
 ## アクセスインターフェース（3種類）

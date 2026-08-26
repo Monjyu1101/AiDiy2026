@@ -115,7 +115,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `docs/` | HTML 形式の開発ガイド |
 | `_AIDIY/knowledge/` | プロジェクト専用 HowTo と再利用ナレッジ |
 | `scripts/` | 補助スクリプト（BOM 除去、画像変換、起動 / 停止 bat など） |
-| `backup/` | `aidiy_backup` MCP の差分バックアップ出力先。ソースではないため編集・参照対象にしない |
+| `backup/` | `aidiy_backup` MCP の差分バックアップ出力先。初回保存時に生成されるため、未実行のリポジトリには存在しない。ソースではないため編集・参照対象にしない |
 | `docker/` | Docker + nginx（HTTPS）構成一式 |
 
 ## テーブル命名規則

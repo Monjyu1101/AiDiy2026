@@ -22,7 +22,7 @@
  if (authStore.user.権限ID === '1')
 
 2. ログイン後のリダイレクト
- stores/auth.ts:36 で /Xその他 へリダイレクト
+ stores/auth.ts でAPI応答の初期ページへ遷移し、未設定時は /Xその他 を使う
 
 3. WebSocketのリロード対応
  URLクエリパラメータ ?セッションID=<uuid> で管理

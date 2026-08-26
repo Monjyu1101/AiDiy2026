@@ -33,6 +33,11 @@ import traceback
 import urllib.request
 from urllib.parse import quote
 
+_SELF_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SELF_DIR not in sys.path:
+    sys.path.insert(0, _SELF_DIR)
+from sub_context import 差し込み  # noqa: E402  同フォルダの定型コンテキスト読込
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_API = "http://127.0.0.1:8093/task"
 MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
@@ -131,11 +136,8 @@ def 明細1件取得(全明細: list[dict], 対象SEQ: int) -> dict:
     return {}
 
 
-def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対象: dict, 完了明細: list[dict], 前回失敗理由: str = "") -> str:
-    全ステップ = "\n".join(
-        f"  {int(行['明細SEQ'])}. {str(行['タイトル']).strip()}（先行SEQ: {str(行['先行SEQ']).strip() or 'なし'}）"
-        for 行 in 全明細
-    )
+def 実行済ブロック生成(完了明細: list[dict]) -> str:
+    """完了済み明細の応答内容を、実行済み記録のブロックへ組み立てる"""
     実行済: list[str] = []
     for 行 in sorted(完了明細, key=lambda 行: int(行["明細SEQ"])):
         seq = int(行["明細SEQ"])
@@ -143,47 +145,46 @@ def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対
         応答内容 = str(行.get("応答内容", "")).strip()
         見出し = f"ステップ{seq} {タイトル} " + ("処理目標" if seq == 0 else "実行済")
         実行済.append(f"``` {見出し}\n{応答内容}\n```")
-    実行済ブロック = "\n".join(実行済) if 実行済 else "（実行済ステップはまだありません）"
+    return "\n".join(実行済) if 実行済 else "（実行済ステップはまだありません）"
+
+
+def 全ステップ生成(全明細: list[dict]) -> str:
+    """全明細を、依存関係つきのステップ一覧テキストへ組み立てる"""
+    return "\n".join(
+        f"  {int(行['明細SEQ'])}. {str(行['タイトル']).strip()}（先行SEQ: {str(行['先行SEQ']).strip() or 'なし'}）"
+        for 行 in 全明細
+    )
+
+
+def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対象: dict, 完了明細: list[dict], 前回失敗理由: str = "") -> str:
+    """do フェーズ。定型部は _config/AiDiy_task__context.json から読む。
+
+    外枠（common_instruction_lines）は check と共通で、役割や do 固有の指示は
+    末尾の [今回要求] 側に入れる。こうするとステップが進んでも先頭が変わらず、
+    最終検証（check）も同じ先頭を再利用できる。
+    """
     操作検証ブロック = ""
     if 対象.get("操作検証"):
-        操作検証ブロック = f"""
-【操作検証】このステップはファイルの更新・追加・書込を伴う作業です。作業後に変更内容を
-実際に確認し、意図した通りに反映されているか検証してください。検証したら、結果を必ず
-次の HTTP エンドポイントへ直接報告してください（curl 等でこの AI エージェント自身が呼び出します）。
-  POST http://127.0.0.1:8093/task_check_okng
-  Content-Type: application/json
-  Body: {{"タスクID": "{タスクID}", "SEQ": {対象['明細SEQ']}, "状態": "完了", "メッセージ": "検証内容の要約"}}
-  検証で問題が見つかった場合は 状態 を "エラー" にし、メッセージ に理由を書いてください。
-"""
-    リトライブロック = ""
+        操作検証ブロック = 差し込み("do_verify_lines", {
+            "タスクID": タスクID,
+            "明細SEQ": 対象["明細SEQ"],
+        })
+    再試行ブロック = ""
     if 前回失敗理由:
-        リトライブロック = f"""
-【前回試行の検証結果】前回このステップを実行しましたが、検証NGまたは検証結果の未報告により
-やり直しになっています。次の内容を踏まえて、問題を解消したうえで再実行してください。
-前回の理由: {前回失敗理由}
-"""
-    return f"""あなたはタスクの 1 ステップを実行する担当です。今回のステップの作業だけを実行してください。
-
-タスク全体のタイトル: {タスクタイトル}
-
-全ステップ:
-{全ステップ}
-
-実行済ステップの記録（ステップ0 開始 の応答内容が処理目標です）:
-{実行済ブロック}
-
-【今回のステップ】※この処理だけ実行してください。
-ステップ{対象['明細SEQ']} {対象['タイトル']}
-{対象['要求内容']}
-{リトライブロック}{操作検証ブロック}
-注意:
-- 今回のステップの作業のみを行い、先行・後続ステップの作業は行わないでください。
-- AiDiy の MCP ツールが HTTP で利用できます。
-  ツール一覧の確認: GET http://127.0.0.1:8095/<mcp名>/list
-  ツールの実行: POST http://127.0.0.1:8095/<mcp名>/<メソッド> （JSON ボディ）
-  例: aidiy_notification_sounds, aidiy_sqlite, aidiy_chrome_devtools など
-- 作業が完了したら、実行した内容と結果を簡潔に報告してください。
-"""
+        再試行ブロック = 差し込み("do_retry_lines", {"前回失敗理由": 前回失敗理由})
+    今回要求ブロック = 差し込み("do_request_lines", {
+        "明細SEQ": 対象["明細SEQ"],
+        "明細タイトル": 対象["タイトル"],
+        "明細要求内容": 対象["要求内容"],
+        "再試行ブロック": 再試行ブロック,
+        "操作検証ブロック": 操作検証ブロック,
+    })
+    return 差し込み("common_instruction_lines", {
+        "タスクタイトル": タスクタイトル,
+        "全ステップ": 全ステップ生成(全明細),
+        "実行済ブロック": 実行済ブロック生成(完了明細),
+        "今回要求ブロック": 今回要求ブロック,
+    })
 
 
 def 通知音種別取得(対象: dict) -> str:

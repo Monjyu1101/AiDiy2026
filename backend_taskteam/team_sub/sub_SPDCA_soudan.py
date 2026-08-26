@@ -41,6 +41,7 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_db, team_pdca_db
+from team_proc import team_context
 
 # 前段の取得・要員未確定時の後始末は他のPDCA段と共通の処理を使う
 import sub_SPDCA__common
@@ -121,17 +122,23 @@ def プロンプト生成_相談(
     人数: int,
     前サイクル改善: str = "",
 ) -> str:
-    引き継ぎ = ""
+    """S（相談）。定型部は _config/AiDiy_team__spdca_context.json から読む。"""
     if 前サイクル改善:
-        引き継ぎ = f"""
-## 前サイクルのA（改善）で洗い出された改善点
-
-{前サイクル改善}
-
-この内容を出発点にしてください。ゼロから考え直すのではなく、前サイクルで残った改善点や
-申し送りのうち、いま取り組む価値が高いものを見極めて意見を出してください。
-すでに解消済みの項目があれば現状を確認したうえでその旨を述べ、新たに気づいた論点があれば足してください。
-"""
+        引き継ぎブロック = team_context.差し込み(
+            "spdca", "soudan_carryover_lines", {"前サイクル改善": 前サイクル改善}
+        )
+    else:
+        引き継ぎブロック = team_context.コンテキスト取得("spdca", "carryover_empty_lines")
+    今回要求ブロック = team_context.差し込み(
+        "spdca", "soudan_request_lines", {"要員ID": 要員ID, "人数": 人数}
+    )
+    return team_context.差し込み("spdca", "common_instruction_lines", {
+        "プロジェクト": プロジェクト,
+        "チーム目標": チーム目標,
+        "チーム作業": チーム作業,
+        "引き継ぎブロック": 引き継ぎブロック,
+        "今回要求ブロック": 今回要求ブロック,
+    })
 
     return f"""あなたはAIチームの要員「{要員ID}」です。チーム作業に向けて、いま何に取り組むべきかの意見を出してください。
 

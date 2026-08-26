@@ -17,6 +17,6 @@ dependencies = [
     "pydantic",
     "websockets",
     "fal-client",
-    "mcp",
+    "mcp>=2,<3",
     "windows-curses; sys_platform == 'win32'",
 ]

@@ -31,18 +31,18 @@
 
 ## テスト
 
-`backend_tools` にはスモークテストがあります（`backend_tools` 起動後に実行）。
+自動テストは `backend_server/tests/` の `unittest` だけです（設定管理まわり）。サーバー起動は不要です。
 
 ```powershell
-cd backend_tools
-.venv\Scripts\python.exe tests\test_mcp_smoke.py
-.venv\Scripts\python.exe tests\test_post_api_smoke.py
+cd backend_server
+.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
 そのほかは手動テストで確認してください。
 
 - API: http://127.0.0.1:8091/docs / http://127.0.0.1:8098/docs / http://127.0.0.1:8093/docs
 - UI: http://127.0.0.1:8090
+- 型チェック: `frontend_web` / `frontend_avatar` は `npm run type-check`（`npm run build` は明示依頼時のみ）
 - MCP 連携変更時: `backend_tools` の 19 MCP サーバー（一覧は `GET http://127.0.0.1:8095/`、SSE は `http://127.0.0.1:8095/<mcp_name>/sse`）も確認
 
 ## セキュリティ

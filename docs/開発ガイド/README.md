@@ -20,7 +20,7 @@
   - `_data/AiDiy/database.db`
 - スキーマ変更は **Alembic なし**
   - モデル更新
-  - 既存 DB には `ALTER TABLE` などを `init.py` で適用
+  - 既存 DB への差分は `backend_server/core_crud/init.py` / `backend_server/apps_crud/init.py` の起動時冪等処理（`ALTER TABLE` など）で適用
 - 画面や API は日本語命名が基本
 
 ---
@@ -173,7 +173,7 @@ npm run dev
 - V 系は DB VIEW ではなく生 SQL
 - `apps_crud/__init__.py` 追加漏れに注意
 - M 系一覧は通常 V 系エンドポイントを使う
-- パスワードは現状平文比較
+- API経由で登録するパスワードはbcryptハッシュ保存。初期投入アカウントは現行実装では平文互換のため、認証はプレーン一致→bcrypt照合の順で行う（`backend_server/core_crud/C利用者.py`）
 - Claude のブラウザ自動操作は `backend_tools` と `_config/AiDiy_mcp.json` を併用する
 
 ---
@@ -184,6 +184,8 @@ npm run dev
 - 認証: `frontend_web/src/stores/auth.ts`
 - API: `frontend_web/src/api/client.ts`
 - AI 画面ルート: `/AiDiy`
+- AIタスク / AIチーム: `/AIタスク` / `/AIチーム`（APIは8093の`/task/*` / `/team/*`）
+- Vite proxy: `/core`→8091、`/apps`→8098、`/task`・`/team`→8093、`/mcp`→8095
 - 一覧画面は `qTublerFrame` ベース
 
 主要カテゴリ:
@@ -232,11 +234,17 @@ echo. > backend_server/temp/reboot_apps.txt
 
 ## 9. テスト方針
 
-現状、**自動テストは整備されていません**。基本は手動確認です。
+自動テストは `backend_server/tests/` の `unittest`（設定管理まわり）だけです。基本は手動確認です。
+
+```powershell
+cd backend_server
+.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
 
 - API: Swagger UI
 - Web UI: ブラウザ
 - Avatar: Electron / Web の両モード確認
+- フロント型チェック: `npm run type-check`（`npm run build` は明示依頼時のみ）
 
 実装追加後は最低でも以下を確認します。
 
@@ -256,8 +264,11 @@ echo. > backend_server/temp/reboot_apps.txt
 2. [AGENTS.md](../../AGENTS.md)
 3. [backend_server/AGENTS.md](../../backend_server/AGENTS.md)
 4. [backend_tools/AGENTS.md](../../backend_tools/AGENTS.md)
-5. [frontend_web/AGENTS.md](../../frontend_web/AGENTS.md)
-6. [frontend_avatar/AGENTS.md](../../frontend_avatar/AGENTS.md)
+5. [backend_taskteam/AGENTS.md](../../backend_taskteam/AGENTS.md)
+6. [backend_local/AGENTS.md](../../backend_local/AGENTS.md)
+7. [command_hermes/AGENTS.md](../../command_hermes/AGENTS.md)
+8. [frontend_web/AGENTS.md](../../frontend_web/AGENTS.md)
+9. [frontend_avatar/AGENTS.md](../../frontend_avatar/AGENTS.md)
 
 ---
 

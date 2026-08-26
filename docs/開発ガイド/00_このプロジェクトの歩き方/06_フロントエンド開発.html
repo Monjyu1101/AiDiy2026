@@ -51,7 +51,7 @@
   Vビュー/ # V系 (View) 画面
   Sスケジューラー/ # S系 (Scheduler) 画面
   AiDiy/ # AI インターフェース
-  Xテスト/ # 実験的機能
+  Xその他/ # 実験的機能
   _share/ # 共通部品 (qTubler, dialogs)
 
  stores/ # Pinia状態管理
@@ -149,12 +149,15 @@
  <pre><code> Vite Proxy の仕組み
  ブラウザ → Vite開発サーバー → バックエンドサーバー
 /core/C利用者/一覧 →  127.0.0.1:8091/core/C利用者/一覧
-/apps/M車両/一覧  →  127.0.0.1:8098/apps/M車両/一覧
+ /apps/M車両/一覧  →  127.0.0.1:8098/apps/M車両/一覧
+ /task/要求/一覧   →  127.0.0.1:8093/task/要求/一覧
+ /team/要員/一覧   →  127.0.0.1:8093/team/要員/一覧
+ /mcp/...          →  127.0.0.1:8095/...（/mcp prefixは除去）
  (CORSの問題を回避)</code></pre>
 
  <ul>
- <li>フロントエンドでは <code>/core/*</code> や <code>/apps/*</code> のパスでAPIを呼び出します</li>
- <li>Viteの開発サーバーが <code>127.0.0.1:8091</code> や <code>127.0.0.1:8098</code> にプロキシします</li>
+ <li>フロントエンドでは <code>/core/*</code>、<code>/apps/*</code>、<code>/task/*</code>、<code>/team/*</code>、<code>/mcp/*</code> のパスでAPIを呼び出します</li>
+ <li>Viteの開発サーバーがCore 8091、Apps 8098、Task/Team 8093、Tools 8095へプロキシします</li>
  <li>404エラーが出る場合は<code>vite.config.ts</code>のプロキシ設定を確認してください</li>
  </ul>
 
@@ -163,7 +166,9 @@
  <p><code>frontend_web/vite.config.ts</code> の <code>server.proxy</code> セクションで設定されています。</p>
  <p>
  <code>/core</code> → <code>http://127.0.0.1:8091/core</code><br>
- <code>/apps</code> → <code>http://127.0.0.1:8098/apps</code>
+ <code>/apps</code> → <code>http://127.0.0.1:8098/apps</code><br>
+ <code>/task</code> / <code>/team</code> → <code>http://127.0.0.1:8093</code><br>
+ <code>/mcp</code> → <code>http://127.0.0.1:8095</code>（rewriteでprefix除去）
  </p>
  </div>
  </section>
@@ -225,14 +230,14 @@ onMounted(() => {
  <p>Vue Routerを使ってURLとコンポーネントを対応付けています。</p>
 
  <h3>1. ページコンポーネント作成</h3>
- <p><code>src/components/Xテスト/MyNew.vue</code> のように既存カテゴリ配下へページコンポーネントを作成します。</p>
+ <p><code>src/components/Xその他/MyNew.vue</code> のように既存カテゴリ配下へページコンポーネントを作成します。</p>
 
  <h3>2. ルート登録</h3>
  <p>M/T/V/S系は <code>src/router/appsRouter.ts</code>、C/A系は <code>src/router/coreRouter.ts</code>、X系は <code>src/router/index.ts</code> にルートを追加します。</p>
  <pre><code>{
  path: '/Xその他/MyNew/表示',
  name: 'MyNew',
- component: () => import('../components/Xテスト/MyNew.vue'),
+ component: () => import('../components/Xその他/MyNew.vue'),
  meta: { requiresAuth: true, title: 'MyNew' }
 }</code></pre>
 
@@ -282,8 +287,8 @@ console.log(authStore.user)
  <div>
  <strong>補足: 現在の主要ルート</strong>
  <ul>
- <li>AI画面は <code>/AiDiy</code>（<code>src/router/coreRouter.ts</code>）</li>
- <li>X系は <code>/Xその他/Xテトリス/ゲーム</code> などの配下に配置されています</li>
+ <li>AI画面は <code>/AiDiy</code>、AIタスクは <code>/AIタスク</code>、AIチームは <code>/AIチーム</code>（いずれも <code>src/router/coreRouter.ts</code>）</li>
+ <li>X系は <code>/Xその他/Xテトリス/ゲーム</code> などに加え、動画は独立ルート <code>/Xビデオ</code> を使います</li>
  <li>ログイン後はAPI応答の <code>初期ページ</code> があればそのパス、無ければ <code>/Xその他</code> に遷移します</li>
  </ul>
  </div>

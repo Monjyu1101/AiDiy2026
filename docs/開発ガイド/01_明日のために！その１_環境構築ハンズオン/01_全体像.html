@@ -27,7 +27,7 @@
   <h2>処理の流れ（全体）</h2>
   <pre><code>1. python _setup.py
    - uv sync（バックエンド依存関係）
-   - npm install（フロントエンド依存関係）
+   - npm install + npm update（フロントエンド依存関係）
    - DB種別が postgresql のときのみ追加処理
 
 2. python _start.py

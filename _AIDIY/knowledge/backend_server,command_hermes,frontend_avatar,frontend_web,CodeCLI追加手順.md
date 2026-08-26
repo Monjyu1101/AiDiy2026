@@ -35,6 +35,7 @@
 1. `AIコード_cli.py` の `_コマンドパス取得()` に CLI 名を追加する
 2. `バージョン確認()` に確認コマンドと timeout を追加する
 3. `_コマンド構築()` に初回会話と継続会話のコマンド生成を追加する
+   - モデルが `auto`（大文字小文字問わず）や空のときは `--model` 相当の引数を付けず、CLI 側の既定モデルに任せる。`--model auto` を渡すと不明なモデル名として CLI が失敗する
 4. OS 依存の起動条件やパス変換が必要なら同ファイル内で分岐する
 5. `AIコード.py` の welcome 文言、候補一覧、未インストール案内を更新する
 6. `conf_model.py` に `CODE_<CLI名>_MODELS` または動的生成ロジックを追加し、`get_code_models()` の返却対象へ入れる
@@ -66,7 +67,7 @@
 - `code1`〜`code6` は WebSocket チャンネル/パネル名。CLI 名をチャンネル名として増やさない
 - Windows で WSL 経由実行が必要な CLI は、作業ディレクトリとパス形式の差異を吸収する
 - 設定変更は起動中サーバーへ自動反映されない。必要に応じて core server を再起動する
-- `aidiy_hermes` の Code AI 呼び出しでは `-z -Q "本文"` の順にする。`-Q -z "本文"` だと TUI 側のタイトルやバナーが出る場合がある
+- `aidiy_hermes` の Code AI 呼び出しでは `-Q -z "本文"` の順にする。`-Q`（quiet）は真偽フラグ、`-z`（oneshot）は `nargs="?" const=""` で本文を値に取るため、`-z -Q "本文"` と書くと oneshot が空になり本文が位置引数へ流れて TUI のタイトルやバナーが出る
 - `aidiy_hermes` のワンショットでは、stdout は正式回答専用、stderr は thinking / step / tool 進捗 / 警告 / `session_id` 用に分ける
 - `CODE_AIDIY_HERMES_MODEL` が `auto` 以外のときは、`--provider ollama --model <model>` を渡す。AiDiy の設定画面で扱う `aidiy_hermes` モデル候補は Ollama 系を前提にする
 - TUI の `/model` では `AiDiy_key.json` を使い、`ollama` / `openai` / `openrt` / `gemini` / `freeai` / `anthropic` を選べるようにする。Code AI 経由のモデル指定とは役割を分ける
@@ -80,18 +81,18 @@
 - Web / Avatar の設定ダイアログで新CLIを選択できる
 - バージョン確認、新規会話、継続会話のコマンドが組める
 - `code1`〜`code6` のどのスロットに割り当てても WebSocket チャンネルは `code1`〜`code6` のまま動く
-- `aidiy_hermes -z -Q "おはよう"` がバナーなしで応答する
-- `aidiy_hermes -z --provider ollama --model "<Ollamaモデル>" -Q "おはよう"` が応答する
+- `aidiy_hermes -Q -z "おはよう"` がバナーなしで応答する
+- `aidiy_hermes -Q --provider ollama --model "<Ollamaモデル>" -z "おはよう"` が応答する
 - `uv tool run --from aidiy-hermes python -c "import openai; import anthropic; import google.genai"` が通る
 
 ```powershell
-backend_server\.venv\Scripts\python.exe -m py_compile backend_server\core_router\AIコア\AIコード_cli.py
+backend_server\.venv\Scripts\python.exe -m py_compile backend_server\AIコア\AIコード_cli.py
 backend_server\.venv\Scripts\python.exe -m py_compile backend_server\conf\conf_model.py
 cd command_hermes
 uv sync --upgrade
 python ..\_setup.py
 aidiy_hermes --version
-aidiy_hermes -z -Q "おはよう"
+aidiy_hermes -Q -z "おはよう"
 cd frontend_avatar
 npm run type-check
 cd ..\frontend_web

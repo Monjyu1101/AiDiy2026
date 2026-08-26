@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_db, team_exp_db, team_work_db
+from team_proc import team_context
 from team_proc.config import AIモデル, 設定読込
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -118,33 +119,14 @@ def プロンプト生成_担当選択(
     出力JSONパス: str,
     経験概要: list[dict],
 ) -> str:
+    """定型部は _config/AiDiy_team__select_context.json から読む。"""
     候補ID集合 = {str(要員["要員ID"]) for 要員 in 候補}
-    return f"""次の依頼を確認し、実行を担当させるのに最も適した要員を、下記の有効な要員一覧から1名選んでください。
-
-依頼内容:
-{要求内容}
-
-有効な要員一覧（要員ID: 役割 / 人格情報）:
-{_候補一覧テキスト(候補)}
-
-要員ごとの経験（Aチーム経験の記録。経験値が高い・関連する経験がある要員はナレッジを再利用できます）:
-{_経験一覧テキスト(経験概要, 候補ID集合)}
-
-選び方の指針:
-- 今回の依頼内容と似た経験（分類や学びの内容が近いもの）を持つ要員を優先してください。同じ担当者に寄せると蓄積した知見をそのまま使えます。
-- 似た経験を持つ要員がいない場合は、役割と人格情報の適性で選んでください。
-- 経験値の高さだけで決めず、依頼内容との関連を重視してください。
-
-選んだ要員IDを、次のファイルへ JSON 形式で保存してください。
-保存先: {出力JSONパス}
-保存先フォルダは既に存在します。UTF-8（BOMなし）で保存してください。
-コードフェンスや説明文は付けず、次の形式だけを保存してください。キー名は完全一致させてください。
-このファイル保存以外の依頼（コードの修正、他ファイルの作成など）は一切行わないでください。
-
-{{
-  "利用者ID": "選んだ要員ID"
-}}
-"""
+    return team_context.差し込み("select", "select_instruction_lines", {
+        "要求内容": 要求内容,
+        "_候補一覧テキスト(候補)": _候補一覧テキスト(候補),
+        "_経験一覧テキスト(経験概要, 候補ID集合)": _経験一覧テキスト(経験概要, 候補ID集合),
+        "出力JSONパス": 出力JSONパス,
+    })
 
 
 def 担当要員を選択(

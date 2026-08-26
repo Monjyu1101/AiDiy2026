@@ -28,7 +28,7 @@
  127.0.0.1:8090
  画面コンポーネント
  C管理/ Mマスタ/ Tトラン/ Vビュー/ Sスケジューラー/
- AIコア/ Xテスト/ _share/共有部品
+ AIコア/ Xその他/ _share/共有部品
 
 
  APIリクエスト
@@ -71,8 +71,8 @@
  このガイドはCore/Apps/Web/Avatarを中心に解説しますが、現行リポジトリには次のサーバーも存在します。
  </p>
  <ul>
- <li><strong>backend_tools/tools_main.py (8095)</strong> — MCPサーバー群（Chrome操作、SQLite確認、コードチェック等、16個）</li>
- <li><strong>backend_taskteam/taskteam_main.py (8093)</strong> — AIタスク要求の分解・実行と複数AIエージェントのチーム活動を同一プロセスで管理</li>
+ <li><strong>backend_tools/tools_main.py (8095)</strong> — Chrome操作、DB確認、メディア生成、Task/Team Agents、Windows操作など19個のMCPとOpenAI/Ollama互換Chat Completions</li>
+ <li><strong>backend_taskteam/taskteam_main.py (8093)</strong> — AIタスク要求の分解・実行、定期タスク、複数AIエージェントのチーム活動を同一プロセスで管理</li>
  <li><strong>backend_local/local_main.py (8096)</strong> — OpenAI互換のローカルLLM(Gemma)推論。<code>_start.py</code>の既定では起動しない</li>
  </ul>
  <p>
@@ -96,12 +96,12 @@
  <tbody>
  <tr>
  <td><strong>Python</strong></td>
- <td>3.13</td>
+ <td>3.13以上</td>
  <td>サーバーサイド言語</td>
  </tr>
  <tr>
  <td><strong>FastAPI</strong></td>
- <td>最新</td>
+ <td>0.141.1</td>
  <td>APIフレームワーク</td>
  </tr>
  <tr>
@@ -149,32 +149,32 @@
  <tbody>
  <tr>
  <td><strong>Vue 3</strong></td>
- <td>3.x</td>
+ <td>3.5.41</td>
  <td>UIフレームワーク（Composition API使用）</td>
  </tr>
  <tr>
  <td><strong>Vite</strong></td>
- <td>最新</td>
+ <td>8.2.2</td>
  <td>ビルドツール（HMR対応）</td>
  </tr>
  <tr>
  <td><strong>Pinia</strong></td>
- <td>最新</td>
+ <td>4.0.3</td>
  <td>Vue状態管理ライブラリ</td>
  </tr>
  <tr>
  <td><strong>jQuery</strong></td>
- <td>3.x</td>
+ <td>4.0.0</td>
  <td>一部レガシー機能の補助</td>
  </tr>
  <tr>
  <td><strong>TypeScript</strong></td>
- <td>最新</td>
- <td>型安全なJavaScript（strict mode 無効）</td>
+ <td>5.9.3</td>
+ <td>型安全なJavaScript（strict mode 無効、現行vue-tsc互換の最新版）</td>
  </tr>
  <tr>
- <td><strong>Vue Router 4</strong></td>
- <td>4.x</td>
+ <td><strong>Vue Router</strong></td>
+ <td>5.2.0</td>
  <td>ルーティング（日本語URL対応）</td>
  </tr>
  <tr>
@@ -192,7 +192,7 @@
 
  <div>
  <strong>推奨バージョン</strong>
- <p>Node.js <strong>v22.14.0</strong> / npm <strong>11.3.0</strong> で動作確認済みです。</p>
+ <p>2026-08-26 時点で Node.js <strong>v24.18.0</strong> / npm <strong>11.3.0</strong>、Python <strong>3.14.4</strong> で動作確認済みです。</p>
  </div>
 
  <div>
@@ -249,7 +249,7 @@
     Vビュー/ # V系ビュースクリーン
     Sスケジューラー/ # S系スケジューラースクリーン
     AiDiy/ # AI機能インターフェース
-    Xテスト/ # 実験的機能
+    Xその他/ # 実験的機能
     _share/ # 共有コンポーネント
    stores/ # 状態管理(Pinia)
    api/client.ts # Axios with JWT
@@ -261,7 +261,7 @@
   vite.config.ts # Avatar Webモード (8092)
   AGENTS.md
 
- backend_tools/ # MCPサーバー群 (ポート8095、16個)
+ backend_tools/ # MCPサーバー群 (ポート8095、19個)
  backend_local/ # ローカルLLM(Gemma)サーバー (ポート8096)
  backend_taskteam/ # AIタスク実行+AIチーム統合サーバー (ポート8093)
  command_hermes/ # aidiy_hermes コード支援CLI (常駐なし)
@@ -333,12 +333,22 @@
  <tr>
  <td><strong>Swagger Apps API</strong></td>
  <td><a href="http://127.0.0.1:8098/docs" target="_blank">http://127.0.0.1:8098/docs</a></td>
- <td>Swagger UIでM系・T系・V系・S系・X系のAPIを確認・テスト</td>
+ <td>Swagger UIでM系・T系・V系・S系のAPIを確認・テスト</td>
+ </tr>
+ <tr>
+ <td><strong>Swagger Task / Team API</strong></td>
+ <td><a href="http://127.0.0.1:8093/docs" target="_blank">http://127.0.0.1:8093/docs</a></td>
+ <td>AIタスク・定期タスク・AIチームのAPIを確認</td>
+ </tr>
+ <tr>
+ <td><strong>Swagger Local API</strong></td>
+ <td><a href="http://127.0.0.1:8096/docs" target="_blank">http://127.0.0.1:8096/docs</a></td>
+ <td>ローカルLLMを起動した場合のみ利用</td>
  </tr>
  <tr>
  <td><strong>Backend MCP 一覧</strong></td>
  <td><a href="http://127.0.0.1:8095/" target="_blank">http://127.0.0.1:8095/</a></td>
- <td>backend_tools が提供する16個のMCPサーバー一覧（例: <code>/aidiy_chrome_devtools/list</code>）</td>
+ <td>backend_tools が提供する19個のMCPサーバー一覧（例: <code>/aidiy_chrome_devtools/list</code>）</td>
  </tr>
  </tbody>
  </table>
@@ -347,9 +357,9 @@
  <strong>プロキシ設定について</strong>
  <p>フロントエンドからのAPIリクエストはプロキシ経由で転送されます。</p>
  <ul>
- <li>パスが <code>/core/*</code> なら Core、<code>/apps/*</code> なら Apps へ転送</li>
- <li>Viteの設定で <code>127.0.0.1:8091</code> と <code>127.0.0.1:8098</code> に振り分け</li>
- <li>全てのAPI操作は<strong>POST</strong>メソッドを使用</li>
+ <li><code>/core</code> → 8091、<code>/apps</code> → 8098、<code>/task</code>・<code>/team</code> → 8093、<code>/mcp</code> → 8095 に転送</li>
+ <li><code>/mcp</code> は転送時にprefixを除去する。Avatar側には <code>/mcp</code> proxyはない</li>
+ <li>業務CRUDのAPI操作は原則<strong>POST</strong>メソッドを使用</li>
  </ul>
  <p>詳細は <code>frontend_web/vite.config.ts</code> を参照してください。</p>
  </div>
@@ -446,6 +456,12 @@
    <td><code>/apps/*</code></td>
    <td>M系 (M商品, M車両, M配車区分) / T系 (T配車, T商品入庫等) / V系 / S系</td>
    </tr>
+   <tr>
+   <td><strong>Task / Team</strong></td>
+   <td>8093</td>
+   <td><code>/task/*</code> / <code>/team/*</code></td>
+   <td>Aタスク要求/明細、定期タスク、AIチーム依頼・会話・作業</td>
+   </tr>
   </tbody>
   </table>
 
@@ -453,7 +469,7 @@
   <strong>迷ったら</strong>
   <ol>
    <li>テーブル名の先頭文字 (C/A/M/T/V/S) を見る</li>
-   <li>C/A なら <code>/core</code>、それ以外は <code>/apps</code></li>
+    <li>C系とAIコア/A会話履歴は <code>/core</code>、M/T/V/S系は <code>/apps</code>、AIタスク・AIチームは <code>/task</code> / <code>/team</code></li>
    <li>一覧APIで先に疎通確認する</li>
   </ol>
   </div>

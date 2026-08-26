@@ -76,7 +76,7 @@ python _start.py</code></pre>
  <p>サーバーのログを確認する方法です。</p>
 
  <h3>ログの出力方法</h3>
- <p><code>python _start.py</code> の出力がそのままログとなります。</p>
+ <p><code>python _start.py</code> のコンソール出力に加え、バックエンドのログは主に <code>backend_server/temp/logs/</code> へ保存されます。</p>
 
  <div>
  <strong>ヒント </strong>
@@ -131,26 +131,23 @@ echo. > backend_server/temp/reboot_apps.txt</code></pre>
  <li><strong>ユーザー名</strong>: <code>admin</code></li>
  <li><strong>パスワード</strong>: <code>********</code></li>
  </ul>
- <p>初期アカウントでもログインできない場合はデータベースをリセットしてください。</p>
+ <p>初期アカウントでもログインできない場合は、401レスポンス、JWT設定、<code>C利用者</code> の有効状態とパスワードを確認します。DB全体のリセットを先に行わないでください。</p>
  </div>
 
  <div>
- <div>ステップ2: データベースのリセット</div>
- <pre><code><span># DBファイルを削除</span>
-del workspace/AiDiy2026/_data\AiDiy\database.db
-
-<span># サーバー再起動でDBを再作成</span>
-cd workspace/AiDiy2026
-python _start.py</code></pre>
+ <div>ステップ2: データベースとスキーマ差分の確認</div>
+ <p><code>_data/AiDiy/database.db</code> をバックアップし、Modelと実カラム、<code>core_crud/init.py</code> / <code>apps_crud/init.py</code> の起動時差分処理を確認してから再起動します。DB削除はデータ破棄が許可された開発環境の最終手段です。</p>
  </div>
 
  <div>
  <div>ステップ3: ポート競合の解消</div>
  <pre><code><span># 1. サーバーを停止する</span>
 
-<span># 2. ポート 8090/8091/8098 の使用状況を確認</span>
+<span># 2. 起動対象ポートの使用状況を確認（例）</span>
 netstat -ano | findstr :8090
 netstat -ano | findstr :8091
+netstat -ano | findstr :8093
+netstat -ano | findstr :8095
 netstat -ano | findstr :8098
 
 <span># 3. プロセスを強制終了</span>
@@ -181,20 +178,20 @@ npm install</code></pre>
  <pre><code>cd workspace/AiDiy2026
  python _cleanup.py</code></pre>
 
- <p>このスクリプトは<strong>対話形式</strong>で以下のファイル/フォルダを削除します。</p>
+ <p>このスクリプトは<strong>対話形式</strong>で対象を最初にまとめて選択し、常駐サービスを停止してからクリーンアップします。</p>
 
- <h3>バックエンド関連</h3>
+ <h3>主な選択対象</h3>
  <table>
  <thead>
  <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
  </thead>
  <tbody>
- <tr><td><code>__pycache__/</code></td><td>Pythonバイトコードキャッシュ</td><td>自動削除</td></tr>
- <tr><td><code>.pytest_cache/</code></td><td>pytestキャッシュ</td><td>自動削除</td></tr>
- <tr><td><code>.venv/</code></td><td>Python仮想環境</td><td>確認後削除 (y)</td></tr>
- <tr><td><code>logs/</code></td><td>ログファイル（中身のみ）</td><td>確認後削除 (y)</td></tr>
- <tr><td><code>temp/</code></td><td>一時ファイル（中身のみ）</td><td>確認後削除 (y)</td></tr>
- <tr><td><code>database.db</code></td><td>SQLiteデータベース</td><td>確認後削除 (<strong>n</strong>)</td></tr>
+ <tr><td>グローバルAI CLI</td><td>npm系AI CLIツールのアンインストール</td><td><strong>n</strong></td></tr>
+ <tr><td><code>backend_local</code></td><td>仮想環境とtemp（ダウンロード済みモデルを含む）</td><td>対象選択 y</td></tr>
+ <tr><td><code>backend_tools</code></td><td>仮想環境、node_modules、temp、MCP設定解除</td><td>対象選択 y</td></tr>
+ <tr><td><code>backend_server</code></td><td>仮想環境、temp、SQLite DB</td><td>対象選択 y / DB削除は<strong>n</strong></td></tr>
+ <tr><td><code>backend_taskteam</code></td><td>仮想環境とtemp</td><td>対象選択 y</td></tr>
+ <tr><td><code>command_hermes</code></td><td>仮想環境、temp、ランチャー/PATH登録</td><td>対象選択 y</td></tr>
  </tbody>
  </table>
 
@@ -204,8 +201,8 @@ npm install</code></pre>
  <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
  </thead>
  <tbody>
- <tr><td><code>node_modules/</code></td><td>Node.jsパッケージ</td><td>確認後削除 (y)</td></tr>
- <tr><td><code>dist/</code></td><td>ビルド成果物</td><td>自動削除</td></tr>
+ <tr><td><code>frontend_web</code></td><td>node_modules、dist、キャッシュ等はサブプロジェクトのcleanupへ委譲</td><td>対象選択 y</td></tr>
+ <tr><td><code>frontend_avatar</code></td><td>node_modules、dist、Electron成果物等はサブプロジェクトのcleanupへ委譲</td><td>対象選択 y</td></tr>
  </tbody>
  </table>
 
@@ -215,15 +212,14 @@ npm install</code></pre>
  <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
  </thead>
  <tbody>
- <tr><td><code>backup/</code></td><td>バックアップフォルダ</td><td>確認後削除 (y)</td></tr>
+ <tr><td><code>backup/</code></td><td><code>aidiy_backup</code> の差分バックアップ出力。削除前に復旧要否を確認</td><td>存在時 y</td></tr>
  </tbody>
  </table>
 
  <div>
  <strong>Tip</strong>
- <p>Gitを使用している場合は<code>.gitignore</code>にこれらを追加してください。<br>
- _cleanup.py は配布用のZipファイル作成にも使えます。<br>
- クリーンアップ後は <code>python _setup.py</code> で再セットアップが必要です。</p>
+ <p>SQLite DB、backup、ダウンロード済みモデルを消す選択は復旧不能になり得ます。選択内容を確認してから実行してください。<br>
+ 仮想環境やnode_modulesを削除した後は <code>python _setup.py</code> で再セットアップします。</p>
  </div>
  </section>
 

@@ -28,7 +28,7 @@ from contextlib import AsyncExitStack
 from typing import Any
 
 import anyio
-import httpx
+import httpx2
 
 import mcp.types as types
 from mcp import ClientSession
@@ -69,20 +69,20 @@ def build_default_sse_url(host: str, port: int, mount_path: str) -> str:
 
 def create_local_http_client(
     headers: dict[str, str] | None = None,
-    timeout: httpx.Timeout | None = None,
-    auth: httpx.Auth | None = None,
-) -> httpx.AsyncClient:
+    timeout: httpx2.Timeout | None = None,
+    auth: httpx2.Auth | None = None,
+) -> httpx2.AsyncClient:
     """localhost SSE への接続で環境由来の proxy 設定を踏まない。"""
     kwargs: dict[str, Any] = {
         "follow_redirects": True,
         "trust_env": False,
-        "timeout": timeout or httpx.Timeout(30.0, read=300.0),
+        "timeout": timeout or httpx2.Timeout(30.0, read=300.0),
     }
     if headers is not None:
         kwargs["headers"] = headers
     if auth is not None:
         kwargs["auth"] = auth
-    return httpx.AsyncClient(**kwargs)
+    return httpx2.AsyncClient(**kwargs)
 
 
 def parse_args() -> argparse.Namespace:
@@ -164,11 +164,11 @@ class BackendMcpBridge:
             session = await self._stack.enter_async_context(ClientSession(read_stream, write_stream))
             init_result = await session.initialize()
             self._session = session
-            self._server_info = init_result.serverInfo
+            self._server_info = init_result.server_info
             logger.info(
                 "backend_tools 初期化完了: %s %s",
-                init_result.serverInfo.name,
-                init_result.serverInfo.version,
+                init_result.server_info.name,
+                init_result.server_info.version,
             )
             return session
 
@@ -207,19 +207,37 @@ class BackendMcpBridge:
         name: str,
         arguments: dict | None,
         meta: dict[str, object] | object | None,
-    ) -> types.CallToolResult:
+        input_responses=None,
+        request_state: str | None = None,
+    ):
         return await self._invoke(
             "call_tool",
             name=name,
             arguments=arguments,
             meta=_mcp_model_to_dict(meta),
+            input_responses=input_responses,
+            request_state=request_state,
+            allow_input_required=True,
         )
 
     async def list_prompts(self, params: types.PaginatedRequestParams | None) -> types.ListPromptsResult:
         return await self._invoke("list_prompts", params=params)
 
-    async def get_prompt(self, name: str, arguments: dict[str, str] | None) -> types.GetPromptResult:
-        return await self._invoke("get_prompt", name=name, arguments=arguments)
+    async def get_prompt(
+        self,
+        name: str,
+        arguments: dict[str, str] | None,
+        input_responses=None,
+        request_state: str | None = None,
+    ):
+        return await self._invoke(
+            "get_prompt",
+            name=name,
+            arguments=arguments,
+            input_responses=input_responses,
+            request_state=request_state,
+            allow_input_required=True,
+        )
 
     async def list_resources(self, params: types.PaginatedRequestParams | None) -> types.ListResourcesResult:
         return await self._invoke("list_resources", params=params)
@@ -230,58 +248,65 @@ class BackendMcpBridge:
     ) -> types.ListResourceTemplatesResult:
         return await self._invoke("list_resource_templates", params=params)
 
-    async def read_resource(self, uri: str) -> types.ReadResourceResult:
-        return await self._invoke("read_resource", uri=uri)
+    async def read_resource(self, uri: str, input_responses=None, request_state: str | None = None):
+        return await self._invoke(
+            "read_resource",
+            uri=uri,
+            input_responses=input_responses,
+            request_state=request_state,
+            allow_input_required=True,
+        )
 
 
 def create_proxy_server(bridge: BackendMcpBridge) -> Server:
-    server = Server(
+    async def handle_list_tools(_ctx, params: types.PaginatedRequestParams | None):
+        return await bridge.list_tools(params)
+
+    async def handle_call_tool(_ctx, params: types.CallToolRequestParams):
+        return await bridge.call_tool(
+            name=params.name,
+            arguments=params.arguments,
+            meta=params.meta,
+            input_responses=params.input_responses,
+            request_state=params.request_state,
+        )
+
+    async def handle_list_prompts(_ctx, params: types.PaginatedRequestParams | None):
+        return await bridge.list_prompts(params)
+
+    async def handle_get_prompt(_ctx, params: types.GetPromptRequestParams):
+        return await bridge.get_prompt(
+            params.name,
+            params.arguments,
+            input_responses=params.input_responses,
+            request_state=params.request_state,
+        )
+
+    async def handle_list_resources(_ctx, params: types.PaginatedRequestParams | None):
+        return await bridge.list_resources(params)
+
+    async def handle_list_resource_templates(_ctx, params: types.PaginatedRequestParams | None):
+        return await bridge.list_resource_templates(params)
+
+    async def handle_read_resource(_ctx, params: types.ReadResourceRequestParams):
+        return await bridge.read_resource(
+            str(params.uri),
+            input_responses=params.input_responses,
+            request_state=params.request_state,
+        )
+
+    return Server(
         name="aidiy_chrome_devtools_stdio",
         version="0.1.0",
         instructions="Codex 用の stdio ブリッジ。実体のツールは backend_tools(SSE) 側で提供する。",
+        on_list_tools=handle_list_tools,
+        on_call_tool=handle_call_tool,
+        on_list_prompts=handle_list_prompts,
+        on_get_prompt=handle_get_prompt,
+        on_list_resources=handle_list_resources,
+        on_list_resource_templates=handle_list_resource_templates,
+        on_read_resource=handle_read_resource,
     )
-
-    async def handle_list_tools(req: types.ListToolsRequest) -> types.ServerResult:
-        result = await bridge.list_tools(req.params)
-        return types.ServerResult(result)
-
-    async def handle_call_tool(req: types.CallToolRequest) -> types.ServerResult:
-        result = await bridge.call_tool(
-            name=req.params.name,
-            arguments=req.params.arguments,
-            meta=req.params.meta,
-        )
-        return types.ServerResult(result)
-
-    async def handle_list_prompts(req: types.ListPromptsRequest) -> types.ServerResult:
-        result = await bridge.list_prompts(req.params)
-        return types.ServerResult(result)
-
-    async def handle_get_prompt(req: types.GetPromptRequest) -> types.ServerResult:
-        result = await bridge.get_prompt(req.params.name, req.params.arguments)
-        return types.ServerResult(result)
-
-    async def handle_list_resources(req: types.ListResourcesRequest) -> types.ServerResult:
-        result = await bridge.list_resources(req.params)
-        return types.ServerResult(result)
-
-    async def handle_list_resource_templates(req: types.ListResourceTemplatesRequest) -> types.ServerResult:
-        result = await bridge.list_resource_templates(req.params)
-        return types.ServerResult(result)
-
-    async def handle_read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
-        result = await bridge.read_resource(str(req.params.uri))
-        return types.ServerResult(result)
-
-    server.request_handlers[types.ListToolsRequest] = handle_list_tools
-    server.request_handlers[types.CallToolRequest] = handle_call_tool
-    server.request_handlers[types.ListPromptsRequest] = handle_list_prompts
-    server.request_handlers[types.GetPromptRequest] = handle_get_prompt
-    server.request_handlers[types.ListResourcesRequest] = handle_list_resources
-    server.request_handlers[types.ListResourceTemplatesRequest] = handle_list_resource_templates
-    server.request_handlers[types.ReadResourceRequest] = handle_read_resource
-
-    return server
 
 
 async def async_main() -> None:

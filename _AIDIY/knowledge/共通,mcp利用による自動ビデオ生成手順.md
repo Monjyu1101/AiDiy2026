@@ -104,7 +104,7 @@ frontend_web/public/Xビデオ/
     "AGENTS.md",
     "backend_tools/AGENTS.md"
   ],
-  "source_summary": "backend_tools は port 8095 上で 19 個の MCP サーバーを同居させる FastMCP アプリケーション。",
+  "source_summary": "backend_tools は port 8095 上で MCP SDK 2.x の 19 個の MCPServer を同居させるアプリケーション。",
   "factual_bullets": [
     "Chrome DevTools",
     "desktop_capture",

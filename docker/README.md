@@ -121,9 +121,9 @@ docker_2start.bat        # 再起動
 ### ポートが使用中
 
 ```cmd
-# ポート確認
-netstat -ano | findstr :8090
+# ポート確認（この構成が使うのは 80 / 443 / 8091 / 8098）
 netstat -ano | findstr :443
+netstat -ano | findstr :8091
 
 # ローカル起動を停止してから再実行
 docker_2start.bat
@@ -163,8 +163,8 @@ docker_2start.bat
 
 ## 📝 技術情報
 
-**ポート:**
-- 8090: Frontend (Vue 3)
+**ポート（ホストへ公開されるのは 8091 / 8098 / 80 / 443 のみ）:**
+- 8090: Frontend (Vue 3) — コンテナ内の `python -m http.server` のみ。ホストへは非公開（画面は nginx が配信）
 - 8091: Backend Core API
 - 8098: Backend Apps API
 - 8093: Backend TaskTeam（AIタスク・AIチーム。この Docker 構成では未提供）

@@ -86,7 +86,7 @@ python _cleanup.py
 aidiy_hermes
 
 # 1ショット
-aidiy_hermes -z -Q "このフォルダの構成を要約して"
+aidiy_hermes -Q -z "このフォルダの構成を要約して"
 
 # provider / model 指定
 aidiy_hermes -z --provider openai -m gpt-5.2 -Q "TODO を整理して"
@@ -94,7 +94,7 @@ aidiy_hermes -z --provider ollama -m deepseek-v4-flash:cloud -Q "ファイル一
 ```
 
 AiDiy の Code AI 連携では、タイトルやバナーを出さないため `-z` を先に置き、クエリ直前に `-Q` を置く。
-`-z` は本文省略可にしておき、`-z -Q "本文"` の形を 1ショットとして扱えるようにする。
+`-Q`（quiet）は真偽フラグ、`-z`（oneshot）は `nargs="?"` で本文を値に取る。したがって 1ショットは `-Q -z "本文"` の順にし、本文は必ず `-z` の直後へ置く。
 
 ワンショット / quiet 実行の出力契約:
 
@@ -136,7 +136,7 @@ AiDiy の Code AI 連携では、タイトルやバナーを出さないため `
 連携箇所:
 
 - `AIコード_cli.py`: 実行ファイル探索、`--version`、`aidiy_hermes -Q -z ...` のコマンド構築。
-- `AIコード_cli.py`: `aidiy_hermes -z -Q ...`、モデル指定時は `aidiy_hermes -z --provider ollama --model <model> -Q ...` のコマンド構築。
+- `AIコード_cli.py`: `aidiy_hermes -Q -z "本文"`、モデル指定時は `aidiy_hermes -Q --model <model> -z "本文"` のコマンド構築。
 - `conf_json.py`: `CODE_AIDIY_HERMES_MODEL`。
 - `conf_model.py`: `get_code_models()["aidiy_hermes"]`。
 - frontend の AI 設定画面: code AI 選択肢。
@@ -152,7 +152,7 @@ Set-Location command_hermes
 .venv\Scripts\python.exe cli_main.py --help
 .venv\Scripts\python.exe cli_main.py --list-tools
 python ..\_setup.py          # .cmd を再生成
-aidiy_hermes -z -Q "おはよう"
+aidiy_hermes -Q -z "おはよう"
 aidiy_hermes -z --provider ollama --model "deepseek-v4-flash:cloud" -Q "おはよう"
 .venv\Scripts\python.exe -c "import openai; import anthropic; import google.genai; print('provider sdks ok')"
 ```

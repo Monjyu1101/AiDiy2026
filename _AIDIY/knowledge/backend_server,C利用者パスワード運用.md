@@ -18,7 +18,7 @@
 - `backend_server/core_router/C利用者.py`
 - `backend_server/auth.py`
 
-パスワード専用のテストは未整備です。追加する場合は `backend_server/tests/` へ置きます。
+現行実装では `core_crud/C利用者.py` の `hash_パスワード()` が bcrypt で保存し、`verify_パスワード()` がプレーン一致 → bcrypt 照合の順で判定します。
 
 ## 実装手順
 
@@ -50,10 +50,15 @@
 
 ## 確認方法
 
+パスワード専用の自動テストは未整備なので、現状は手動確認です。
+`backend_server/tests/` にある既存 `unittest`（設定管理まわり）は次で流せます。追加する場合も同じ場所へ置きます。
+
 ```powershell
 cd backend_server
-uv run python tests/test_c利用者_password.py
+.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
+
+手動確認は Swagger（`http://127.0.0.1:8091/docs`）の `C利用者` 登録・変更・`auth` ログインで行います。
 
 確認観点:
 

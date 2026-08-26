@@ -157,14 +157,14 @@ UNIQUE constraint failed: C利用者.利用者ID
  <td><code>core_main.py</code> または <code>apps_main.py</code> のルーター登録を確認</td>
  </tr>
  <tr>
- <td><code>EADDRINUSE :8090/:8091/:8098</code></td>
+ <td><code>EADDRINUSE :8090/:8091/:8092/:8093/:8095/:8096/:8098</code></td>
  <td>ポートが既に使用中</td>
  <td><code>taskkill /F /IM python.exe</code></td>
  </tr>
  <tr>
  <td><code>no such column</code></td>
  <td>モデルとDBの不一致</td>
- <td><code>database.db</code> を削除して再起動</td>
+ <td>起動時のスキーマ差分処理を確認し、バックアップ後に再起動。DB削除はデータ破棄可能な場合だけ</td>
  </tr>
  </tbody>
  </table>
@@ -341,7 +341,7 @@ UNIQUE constraint failed: C利用者.利用者ID
   </tr>
   <tr>
   <td>初期データが更新されない</td>
-  <td>初期投入は「adminが未存在」の時のみ実行されます。database.db を削除して再起動。</td>
+  <td>初期投入は「adminが未存在」の時のみ実行されます。既存データを更新する場合は対象レコードを明示的に変更し、DB全体は削除しません。</td>
   </tr>
  </tbody>
  </table>

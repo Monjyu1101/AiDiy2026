@@ -18,7 +18,7 @@
 
  <section id="overview">
  <h2>テストの概要</h2>
- <p>このプロジェクトでは手動テストを基本としています。</p>
+ <p>このプロジェクトでは、設定管理の <code>unittest</code>、フロントエンドの型チェック、Swagger UIとブラウザによる手動確認を組み合わせます。</p>
 
  <div>
  <strong>この章で学ぶこと</strong>
@@ -37,10 +37,15 @@
  <div>
  <strong>重要なポイント</strong>
  <p>
- <strong>自動テストは未導入です。</strong><br>
- Swagger UI を使った手動テストが基本です。
+ <strong>自動テストは <code>backend_server/tests/</code> の設定管理テストだけです。</strong><br>
+ 業務APIはSwagger UIを使った手動テストも行います。
  </p>
  </div>
+
+ <h3>unittest の実行</h3>
+ <pre><code>cd backend_server
+.venv\Scripts\python.exe -m unittest discover -s tests -v</code></pre>
+ <p>現行テストは <code>test_conf_init.py</code> と <code>test_conf_json_ports.py</code> です。<code>backend_tools/tests/</code> やpytestスイートはありません。</p>
 
  <h3>Swagger UI での手動テスト</h3>
  <p>バックエンドAPIのテストにはSwagger UI を使用します。</p>
@@ -72,25 +77,25 @@
  <div>
  <strong>補足情報</strong>
  <p>
- pytest 等の自動テストフレームワークは導入されていません。<br>
- 将来的に導入する場合は、別途ドキュメントを参照してください。
+  pytestは導入されていません。現行の自動テストはPython標準の <code>unittest</code> です。<br>
+  テスト対象や実行コマンドは <code>backend_server/tests/</code> の実在ファイルを基準にしてください。
  </p>
  </div>
  </section>
 
  <section id="test-structure">
  <h2>テスト構造</h2>
- <p>Swagger UI でのテストは以下の流れで行います。</p>
+ <p>自動テストとSwagger UIでの確認は以下の流れで行います。</p>
 
  <div>
  <div>
  <div>ステップ1: 準備</div>
- <p>テスト対象のAPIエンドポイントを確認</p>
+ <p>変更対象に対応するunittestとAPIエンドポイントを確認</p>
  </div>
 
  <div>
  <div>ステップ2: 実行</div>
- <p>リクエストパラメータを設定して実行</p>
+ <p>unittestを実行し、必要に応じてSwaggerでリクエストを実行</p>
  </div>
 
  <div>
@@ -123,20 +128,17 @@
  <li>F12キーで開発者ツールを開き、エラーがないか確認</li>
  </ol>
 
- <h3>TypeScript 型チェックとビルド検証</h3>
+  <h3>TypeScript 型チェック</h3>
  <p>フロントエンドのコード品質を確認するためのコマンドです。</p>
  <pre><code><span># TypeScript 型チェック（ビルドなし）</span>
 cd frontend_web
-npm run type-check
-
-<span># 型チェック + 本番ビルド</span>
-npm run build</code></pre>
+npm run type-check</code></pre>
  <div>
  <strong>補足</strong>
  <p>
  TypeScript は strict mode 無効で運用しています。<br>
- <code>npm run build</code> は型チェック後にプロダクションビルドを実行します。<br>
- ビルド成果物は <code>dist/</code> フォルダに出力されます。
+  日常の確認は <code>npm run type-check</code> を使います。<br>
+  <code>npm run build</code> は配布物作成、Docker反映、ビルド成果物確認など実行理由が明確な場合だけ行います。
  </p>
  </div>
  </section>

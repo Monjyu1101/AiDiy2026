@@ -24,8 +24,8 @@ Nginx (HTTPS :443 / HTTP :80)
   -> backend apps (:8098)
 ```
 
-- `backend_tools` (`:8095`) は Docker 構成に含めない。MCP 検証が必要な場合はローカルで別途起動する。
-- `docker-compose.yml` は core/apps の `8091` / `8098` も直接公開する。
+- `backend_tools` (`:8095`)、`backend_taskteam` (`:8093`)、`backend_local` (`:8096`) は Docker 構成に含めない。nginx にも `/task` / `/team` のプロキシが無いため、AIタスク画面とAIチーム画面はこの構成では動かない。MCP 検証が必要な場合はローカルで別途起動する。
+- `docker-compose.yml` が公開するホストポートは core/apps の `8091` / `8098` と nginx の `80` / `443` だけ。コンテナ内では `start.sh` が `python -m http.server 8090` も動かすが、`8090` はホストへ公開しないため画面確認は `https://localhost/` を使う。
 - 通常の画面確認は `https://localhost/`、Swagger 確認は `http://127.0.0.1:8091/docs` / `http://127.0.0.1:8098/docs` を使う。
 - コンテナ名は `aidiy2026`。ログ確認は `docker logs aidiy2026`。
 
@@ -38,7 +38,7 @@ cd docker
 .\docker_3stop.bat    # 停止
 ```
 
-`docker_1build.bat` は `frontend_web` の `npm run build` で `dist/` を作ってから Docker イメージをビルドする。`npm run dev` の変更は Docker 側へ反映されないため、Docker で画面確認する前に再ビルドする。
+`docker_1build.bat` は SSL 証明書を生成してから `docker-compose build --no-cache` を実行する。ホスト側で `npm run build` は行わず、`frontend_web` のビルドは `docker/Dockerfile` の `frontend-builder` ステージ（`node:20-alpine` + `npm ci` + `npm run build`）がイメージ内で行う。ホストの `frontend_web/dist/` は使わないため、`npm run dev` の変更を Docker へ反映するにはイメージの再ビルドが必要。
 
 ## マウント構成
 
@@ -47,7 +47,8 @@ cd docker
 | `../_data/` | `/app/_data/` | SQLite DB（書き込み可） |
 | `../_config/` | `/app/_config/` | APIキー設定（read-only） |
 | `../_icons/` | `/app/_icons/` | アプリケーション共通アイコン |
-| `../frontend_web/dist/` | `/app/frontend_web/dist/` | ビルド済み静的ファイル |
+| `../temp/` | `/app/temp/` | ログ・作業ファイル |
+| named volume `frontend-dist` | `/app/frontend_web/dist`（app）<br>`/usr/share/nginx/html`（nginx, read-only） | イメージ内でビルドした静的ファイルを nginx へ共有する。ホストのフォルダではない |
 
 - ローカル開発と Docker は、どちらもプロジェクトルートの `_data/AiDiy/database.db` を使用する。
 - `_config` は read-only。設定変更は Docker 外で `_config/AiDiy_key.json` を編集し、コンテナを再起動して反映する。

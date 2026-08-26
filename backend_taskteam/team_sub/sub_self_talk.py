@@ -36,14 +36,17 @@ sys.path.insert(0, str(_TEAM_SUB_DIR))
 
 from log_config import get_logger, setup_logging
 from team_proc import team_chat, team_talk_db
+from team_proc import team_context
 
 
 def 依頼内容を作る(
+    要員ID: str,
     チーム目標: str,
     他者意見一覧: list[dict],
     自身の前回発言: str = "",
     プロジェクト: str = "",
 ) -> str:
+    """要員の自律発言。定型部は _config/AiDiy_team__talk_context.json から読む。"""
     if 他者意見一覧:
         他者意見 = "\n\n".join(
             f"### {行.get('要員ID', '')} の直近の発言\n{str(行.get('発言内容', '')).strip()}"
@@ -54,12 +57,16 @@ def 依頼内容を作る(
 
     自身の前回発言欄 = ""
     if 自身の前回発言.strip():
-        自身の前回発言欄 = f"""
+        自身の前回発言欄 = team_context.差し込み(
+            "talk", "talk_self_previous_lines", {"自身の前回発言.strip()": 自身の前回発言.strip()}
+        )
 
-## 自身の1回前の発言
-
-{自身の前回発言.strip()}（自身の1回前の発言）
-"""
+    return team_context.差し込み("talk", "talk_instruction_lines", {
+        "チーム目標": チーム目標,
+        "プロジェクト": プロジェクト.strip() or "（未指定）",
+        "他者意見": 他者意見,
+        "自身の前回発言欄": 自身の前回発言欄,
+    })
 
     プロジェクト欄 = f"対象プロジェクト（作業ディレクトリ）: {プロジェクト}\n" if プロジェクト.strip() else ""
 
