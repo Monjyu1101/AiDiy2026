@@ -164,6 +164,16 @@ Codex の `url = ...` は streamable HTTP 用なので、AiDiy MCP の SSE URL �
 - PostgreSQL MCP だけ失敗する場合は、`psycopg` 未導入、DSN 未設定、外部 DB 接続不可を切り分ける
 - `Transport closed` や timeout が続く場合は同じ MCP 呼び出しを繰り返さず、代替確認と未確認範囲を明示する
 
+### Gemini のツール実行後に thought_signature で 400 になる場合
+
+`Function call is missing a thought_signature in functionCall parts` は MCP 個別ツールの失敗ではなく、Gemini のツール呼び出し履歴を次ターンへ戻す際の署名欠落を示す。
+
+- 実装確認先は `backend_server/AIコア/AIチャット_gemini.py` の `_function_call_part_to_tool_call()` と `_messages_to_gemini_contents()`。
+- Gemini 応答の `Part.thought_signature` は opaque な `bytes` のため、OpenAI 互換 `tool_calls` へ移すときは Base64 文字列として保持する。
+- MCP 実行後に Gemini の `functionCall` Part を再構築するとき、Base64 を `bytes` に戻して同じ Part の `thought_signature` へ設定する。
+- `use_tools=False` で回避するのは切り分け用途に限る。恒久対処は署名を改変せず履歴へ保持すること。
+- 回帰確認は `backend_server/.venv/Scripts/python.exe -m unittest tests.test_gemini_thought_signature -v` を実行する。
+
 ## バックアップ系 MCP の注意
 
 - `backup_run` が長時間化する場合、編集前なら通常のファイル確認で続行してよい

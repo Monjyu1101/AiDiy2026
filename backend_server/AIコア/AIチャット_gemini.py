@@ -17,6 +17,7 @@ import time
 import datetime
 import threading
 import json
+import base64
 import asyncio
 import queue
 from typing import Optional, Dict, Any
@@ -580,6 +581,52 @@ class ChatAI:
         fcc = types.FunctionCallingConfig(mode=mode, allowed_function_names=allowed)
         return types.ToolConfig(function_calling_config=fcc)
 
+    @staticmethod
+    def _thought_signature_to_text(signature) -> Optional[str]:
+        """Gemini の opaque な thought_signature を JSON 安全な文字列へ変換する。"""
+        if not signature:
+            return None
+        if isinstance(signature, str):
+            return signature
+        try:
+            return base64.b64encode(bytes(signature)).decode("ascii")
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _thought_signature_from_text(signature) -> Optional[bytes]:
+        """tool_calls に保持した thought_signature を Gemini SDK の bytes へ戻す。"""
+        if not signature:
+            return None
+        if isinstance(signature, bytes):
+            return signature
+        if not isinstance(signature, str):
+            return None
+        try:
+            return base64.b64decode(signature, validate=True)
+        except (ValueError, TypeError):
+            return None
+
+    def _function_call_part_to_tool_call(self, part, call_id: str) -> Optional[dict]:
+        """Gemini の function_call Part を署名ごと OpenAI 互換形式へ変換する。"""
+        fc = getattr(part, "function_call", None)
+        if fc is None:
+            return None
+        args = dict(getattr(fc, "args", None) or {})
+        tool_call = {
+            "id": getattr(fc, "id", None) or call_id,
+            "type": "function",
+            "function": {
+                "name": getattr(fc, "name", ""),
+                "arguments": json.dumps(args, ensure_ascii=False),
+            },
+        }
+        signature = self._thought_signature_to_text(getattr(part, "thought_signature", None))
+        if signature:
+            # AiDiy 拡張。Gemini の次ターンで同じ functionCall Part に復元する。
+            tool_call["thought_signature"] = signature
+        return tool_call
+
     def _messages_to_gemini_contents(self, msgs: list) -> tuple:
         """OpenAI messages を (system_instruction, [types.Content]) に変換する。
         assistant.tool_calls / tool 結果（function_response）のリンクを保持する。"""
@@ -633,7 +680,14 @@ class ChatAI:
                         args = {}
                     if not isinstance(args, dict):
                         args = {}
-                    parts.append(types.Part.from_function_call(name=fn.get("name", ""), args=args))
+                    function_call_part = types.Part.from_function_call(
+                        name=fn.get("name", ""),
+                        args=args,
+                    )
+                    signature = self._thought_signature_from_text(tc.get("thought_signature"))
+                    if signature:
+                        function_call_part.thought_signature = signature
+                    parts.append(function_call_part)
             if parts:
                 contents.append(types.Content(role=gemini_role, parts=parts))
 
@@ -704,17 +758,12 @@ class ChatAI:
                 text = getattr(part, "text", None)
                 if text:
                     result_text += text
-                fc = getattr(part, "function_call", None)
-                if fc is not None:
-                    args = dict(getattr(fc, "args", None) or {})
-                    tool_calls.append({
-                        "id": getattr(fc, "id", None) or ("call_" + uuid.uuid4().hex[:24]),
-                        "type": "function",
-                        "function": {
-                            "name": getattr(fc, "name", ""),
-                            "arguments": json.dumps(args, ensure_ascii=False),
-                        },
-                    })
+                tool_call = self._function_call_part_to_tool_call(
+                    part,
+                    "call_" + uuid.uuid4().hex[:24],
+                )
+                if tool_call is not None:
+                    tool_calls.append(tool_call)
 
         self.last_tool_calls = tool_calls
         result_text = result_text.strip()

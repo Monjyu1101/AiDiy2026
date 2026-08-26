@@ -7,6 +7,8 @@
 const { spawn } = require('node:child_process')
 const readline = require('node:readline')
 
+const electronmonCli = require.resolve('electronmon/bin/cli.js')
+
 const SUPPRESS_PATTERNS = [
   // WebRTC デスクトップキャプチャ系ノイズ（WGC/DXGI）を一括抑止
   /desktop_capture/i,
@@ -31,9 +33,8 @@ function pipeFiltered(input, output) {
 
 const args = process.argv.slice(2)
 
-const child = spawn('electronmon', args, {
+const child = spawn(process.execPath, [electronmonCli, ...args], {
   stdio: ['inherit', 'pipe', 'pipe'],
-  shell: true,
   env: process.env,
 })
 
