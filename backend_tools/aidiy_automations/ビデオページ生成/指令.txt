@@ -9,23 +9,23 @@
 
 【手順】
 1. grok_cli で最新のAIニュースを調査し、上記条件に合う候補を3件挙げる。
-2. "D:\OneDrive\_sandbox\AiDiy2026\frontend_web\public\Xビデオ\ニュース_*" のフォルダ名を一覧し、
+2. "frontend_web\public\Xビデオ\ニュース_*" のフォルダ名を一覧し、
    既存テーマと重複しない候補を1件に絞り込んで題材を確定する。
 3. 確定した題材を
-   "D:\OneDrive\_sandbox\AiDiy2026\backend_tools\aidiy_automations\ビデオページ生成\_ビデオページ生成_解説_設定.json"
+   "backend_tools\aidiy_automations\ビデオページ生成\_ビデオページ生成_解説_設定.json"
    の topic と folder_name へ書き込む。folder_name は ニュース_YYYYMMDD_<テーマ>_ja 形式にする。
    ※ 以降の全ステップは、この設定JSONの内容だけを見て進めること。
      手順2で選んだ題材と成果物が食い違うと、最終確認で不合格になる。
-4. "D:\OneDrive\_sandbox\AiDiy2026\backend_tools\aidiy_automations\ビデオページ生成\ビデオページ生成_解説.py"
+4. "backend_tools\aidiy_automations\ビデオページ生成\ビデオページ生成_解説.py"
    をステップ番号を指定して1ステップずつ実行する。
    実行コマンド: cd backend_tools && .venv\Scripts\python aidiy_automations\ビデオページ生成\ビデオページ生成_解説.py <ステップ番号>
-   ステップ番号は 0=初期確認 1=フォルダ作成 2=シナリオ作成 3=HTML修正 4=画像生成
-                  5=中間確認 6=音声生成 7=再生時間更新 8=最終確認 99=完成案内
+   ステップ番号は 0=初期確認 1=フォルダ作成 2=ルーティング追加 3=シナリオ作成 4=HTML修正
+                  5=画像生成 6=中間確認 7=音声生成 8=再生時間更新 9=最終確認 99=完成案内
    1つのステップを1つの明細にする（複数ステップをまとめて実行しない）。
-5. "D:\OneDrive\_sandbox\AiDiy2026\frontend_web\src\components\Xビデオ.vue" のメニューへ
-   完成したページのカードを追加する。リンクは <folder_name>/index.html?auto=loop とする
-   （auto=loop でループ再生、音声は既定で有効）。
-6. frontend_web で npm run type-check が通ることを確認する。
+   ※ ステップ2で "frontend_web\src\components\Xビデオ.vue" のメニューカードと
+     "frontend_web\src\router\index.ts" のルーティングが自動登録される。
+     ここが成功してからブラウザ表示が始まるので、手動でメニューへ追加しないこと。
+5. frontend_web で npm run type-check が通ることを確認する。
 
 【完了条件】
 - 出力フォルダに index.html / scenario.js / images / audio が揃っている

@@ -228,7 +228,7 @@ def scenario_title_and_lead(scenario_path: str) -> tuple[str, str]:
     index_html_matches_theme は scenario.js の title / project_name が index.html に
     含まれるかで判定する。HTML 修正の指示に同じ値を実データとして埋め込まないと、
     エージェントが独自に要約したタイトルを書いてしまい検証NGのやり直しを繰り返すため、
-    各スクリプトの Step 03 はこの値を指示へ差し込む。
+    各スクリプトの Step 04 はこの値を指示へ差し込む。
     """
     if not os.path.isfile(scenario_path):
         return "", ""
@@ -499,6 +499,7 @@ def ensure_step_markdown(md_path: str, folder_name: str, topic: str) -> None:
         f"テーマ: {topic}\n\n"
         "## 進捗\n"
         "- [x] フォルダ作成\n"
+        "- [ ] ルーティング追加\n"
         "- [ ] シナリオ作成\n"
         "- [ ] HTML修正\n"
         "- [ ] 画像生成\n"
@@ -569,7 +570,7 @@ def render_scene_image_script(
     extra_imports: str = "",
     extra_constants: str = "",
 ) -> str:
-    """Step 04 用の _gen_scene_images.py 本文を返す。
+    """Step 05 用の _gen_scene_images.py 本文を返す。
 
     Parameters
     ----------
@@ -723,7 +724,7 @@ def ensure_scene_image_script(
     extra_imports: str = "",
     extra_constants: str = "",
 ) -> None:
-    """Step 04 用の補助スクリプトを再生成する。"""
+    """Step 05 用の補助スクリプトを再生成する。"""
     content = render_scene_image_script(
         ctx=ctx,
         output_dir=output_dir,
@@ -746,7 +747,7 @@ def render_dialogue_audio_script(
     script_docstring: str = "ナレーション音声生成スクリプト",
     extra_imports: str = "",
 ) -> str:
-    """Step 06 用の _gen_audio.py 本文を返す。"""
+    """Step 07 用の _gen_audio.py 本文を返す。"""
     return (
         "# -*- coding: utf-8 -*-\n"
         f'"""\n{script_docstring}\n\n'
@@ -805,7 +806,7 @@ def ensure_dialogue_audio_script(
     script_docstring: str = "ナレーション音声生成スクリプト",
     extra_imports: str = "",
 ) -> None:
-    """Step 06 用の補助スクリプトを再生成する。"""
+    """Step 07 用の補助スクリプトを再生成する。"""
     content = render_dialogue_audio_script(
         ctx=ctx,
         output_dir=output_dir,

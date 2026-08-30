@@ -25,7 +25,7 @@ from .infra import (
     step_no_to_value, step_value_to_int,
     get_completed_step, set_completed_step, ensure_steps_json,
     guide_tts, refresh_browser_preview, start_final_playback,
-    agent_run, step_instruction_header,
+    agent_run, step_instruction_header, topic_brief,
     verify_and_backup_until_stable,
     post_backup_api,
 )
@@ -209,7 +209,7 @@ async def step_create_folder(
         "  - robocopy / copy などでのコピー（Python 側で実行済みです）\n"
         "  - 既存ファイルの上書き・削除・内容修正\n"
         "  - index.html や scenario.js の中身の確認\n"
-        "    （テンプレートのテーマのままで正常です。Step 03 で更新します）\n"
+        "    （テンプレートのテーマのままで正常です。Step 04 で更新します）\n"
         "  - 参考資料・ナレッジ・設定ファイルの読み込み\n"
         "  - 他フォルダの調査\n"
         + (
@@ -247,7 +247,290 @@ async def step_create_folder(
 
 
 # ================================================================== #
-# Step 06: 音声生成
+# Step 02: ルーティング追加
+# ================================================================== #
+
+# folder_name の接頭辞 → Xビデオ.vue のセクション見出し。
+# 上から順に判定し、どれにも当たらない場合は最後の要素の見出しへ入れる。
+_VUE_SECTION_RULES = (
+    ("AiDiy紹介", "AiDiy紹介"),
+    ("AiDiy解説", "AiDiy実装・解説"),
+    ("AiDiy実装", "AiDiy実装例"),
+    ("ニュース", "時事ニュース・解説"),
+    ("解説", "時事ニュース・解説"),
+    ("小説", "時事ニュース・解説"),
+    ("", "時事ニュース・解説"),
+)
+
+
+def _routing_target_paths(ctx: VideoGenCtx) -> tuple[str, str, str]:
+    """メニュー Vue と router のパス、URL セグメント（"Xビデオ"）を返す。
+
+    video_base_dir は "<repo>/frontend_web/public/Xビデオ" 形式なので、
+    そこから frontend_web を辿る。見つからない場合だけ repo_dir を使う。
+    """
+    video_base = os.path.normpath(ctx.video_base_dir)
+    url_segment = os.path.basename(video_base) or "Xビデオ"
+    frontend_dir = os.path.dirname(os.path.dirname(video_base))
+    vue_path = os.path.join(frontend_dir, "src", "components", f"{url_segment}.vue")
+    router_path = os.path.join(frontend_dir, "src", "router", "index.ts")
+    if not (os.path.isfile(vue_path) and os.path.isfile(router_path)) and ctx.repo_dir:
+        alt_dir = os.path.join(ctx.repo_dir, "frontend_web")
+        alt_vue = os.path.join(alt_dir, "src", "components", f"{url_segment}.vue")
+        alt_router = os.path.join(alt_dir, "src", "router", "index.ts")
+        if os.path.isfile(alt_vue) and os.path.isfile(alt_router):
+            return alt_vue, alt_router, url_segment
+    return vue_path, router_path, url_segment
+
+
+def _vue_const_name(folder_name: str) -> str:
+    """folder_name から Vue の const 名を作る（JS 識別子として安全な形にする）。"""
+    name = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in folder_name)
+    if not name or name[0].isdigit():
+        name = f"v_{name}"
+    return f"{name}Url"
+
+
+def _menu_card_texts(folder_name: str, topic: str) -> tuple[str, str, str]:
+    """メニューカードの (アイコン, タイトル, 説明) を folder_name と topic から作る。
+
+    ここで作るのは AI が整える前の下書き。機械的に作っておくことで、
+    AI 側が文言を直せなかった場合でも意味の通るカードが残る。
+    """
+    parts = [p for p in folder_name.split("_") if p]
+    lang_suffixes = {"ja", "en", "zh", "ko", "fr", "de", "es", "pt", "it", "ru"}
+    if len(parts) > 1 and parts[-1].lower() in lang_suffixes:
+        parts = parts[:-1]
+    head = parts[0] if parts else folder_name
+    rest = [p for p in parts[1:] if not (len(p) == 8 and p.isdigit())]
+    title = f"{head} ({' '.join(rest)})" if rest else head
+    icon = f"X{head[:2]}" if head else "X動"
+
+    brief = topic_brief(topic, 160)
+    for prefix in ("テーマ:", "テーマ："):
+        if brief.startswith(prefix):
+            brief = brief[len(prefix):].strip()
+            break
+    description = " ".join(brief.split())[:100] or f"{folder_name} の自動生成ビデオ"
+    return icon, title, description
+
+
+def _html_escape(text: str) -> str:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _ensure_router_alias(router_path: str, url_segment: str, folder_name: str) -> str:
+    """router/index.ts に createStaticAliasRoute を 1 件追加する。戻り値は状態文字列。"""
+    alias_path = f"/{url_segment}/{folder_name}"
+    target_path = f"{url_segment}/{folder_name}/index.html"
+
+    with open(router_path, encoding="utf-8") as f:
+        text = f.read()
+
+    if f"'{alias_path}'" in text:
+        return "既存"
+
+    anchor = text.find("const router = createRouter(")
+    if anchor < 0:
+        return "失敗（createRouter が見つかりません）"
+    close_idx = text.rfind("\n]", 0, anchor)
+    if close_idx < 0:
+        return "失敗（baseRoutes の終端が見つかりません）"
+
+    block = (
+        "    createStaticAliasRoute(\n"
+        f"        '{alias_path}',\n"
+        f"        '{target_path}',\n"
+        f"        '{url_segment}'\n"
+        "    ),\n"
+    )
+    updated = text[:close_idx + 1] + block + text[close_idx + 1:]
+    with open(router_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(updated)
+    return "追加"
+
+
+def _ensure_vue_menu_card(
+    vue_path: str,
+    url_segment: str,
+    folder_name: str,
+    icon: str,
+    title: str,
+    description: str,
+) -> str:
+    """Xビデオ.vue に URL const とメニューカードを 1 件追加する。戻り値は状態文字列。"""
+    const_name = _vue_const_name(folder_name)
+    page_url = f"{url_segment}/{folder_name}/index.html"
+
+    with open(vue_path, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+
+    if any(page_url in ln for ln in lines):
+        return "既存"
+
+    # 1) <script setup> の URL 定義群の末尾へ const を追加する
+    const_marker = "${baseUrl}"
+    const_idx = None
+    for i, ln in enumerate(lines):
+        if ln.startswith("const ") and const_marker in ln and ln.rstrip().endswith(";"):
+            const_idx = i
+    if const_idx is None:
+        return "失敗（URL const の定義位置が見つかりません）"
+    lines.insert(const_idx + 1, f"const {const_name} = `${{baseUrl}}{page_url}`;")
+
+    # 2) folder_name に合うセクションの menu-row 末尾へカードを追加する
+    section_label = _VUE_SECTION_RULES[-1][1]
+    for prefix, label in _VUE_SECTION_RULES:
+        if prefix and folder_name.startswith(prefix):
+            section_label = label
+            break
+
+    section_idx = None
+    for i, ln in enumerate(lines):
+        if f'<div class="section-label">{section_label}</div>' in ln:
+            section_idx = i
+            break
+    if section_idx is None:
+        return f"失敗（セクション見出しが見つかりません: {section_label}）"
+
+    row_end_idx = None
+    for i in range(section_idx + 1, len(lines)):
+        if lines[i] == "        </div>":
+            row_end_idx = i
+            break
+    if row_end_idx is None:
+        return f"失敗（menu-row の終端が見つかりません: {section_label}）"
+
+    card = [
+        f'          <a class="menu-card menu-card-fixed" :href="{const_name}" target="_blank" rel="noopener noreferrer">',
+        '            <div class="menu-card-title">',
+        f'              <span class="icon">{_html_escape(icon)}</span>',
+        f"              {_html_escape(title)}",
+        "            </div>",
+        '            <div class="menu-card-description">',
+        f"              {_html_escape(description)}",
+        "            </div>",
+        "          </a>",
+        "",
+    ]
+    lines[row_end_idx:row_end_idx] = card
+
+    with open(vue_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines))
+    return f"追加（{section_label}）"
+
+
+async def step_add_routing(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
+    """Step 02: Xビデオメニューへのカード追加とルーティング登録を行う。
+
+    フォルダを作っただけではメニューからも URL からもページへ到達できないため、
+    表示（ブラウザプレビュー）を始める前にここで導線を通しておく。
+    追加自体は Python が機械的に行い、AI には文言の調整と最終確認だけを依頼する。
+    """
+    sep("Step 02: ルーティング追加")
+    step_name = "Step 02: ルーティング追加"
+    new_dir = ctx.output_dir
+    folder_name = ctx.folder_name
+    topic = ctx.topic
+    md_path = os.path.join(new_dir, f"{folder_name}.md")
+
+    vue_path, router_path, url_segment = _routing_target_paths(ctx)
+    alias_path = f"/{url_segment}/{folder_name}"
+    page_url = f"{url_segment}/{folder_name}/index.html"
+    const_name = _vue_const_name(folder_name)
+
+    step_summary = (
+        f'  "{folder_name}" を {url_segment} メニューとルーティングへ登録します。\n'
+        f'  "{os.path.basename(vue_path)}" にメニューカードを、'
+        f'"{os.path.basename(router_path)}" に createStaticAliasRoute を追加します。'
+    )
+
+    tts_msg = (
+        "Step two, routing registration is starting. I will add the video to the menu and the router."
+        if ctx.use_english_voice else
+        f"{step_name} を開始します。Xビデオメニューとルーティングへ登録します。"
+    )
+    guide_tts(ctx, tts_msg)
+
+    ok_files = check(f"メニュー Vue 存在: {vue_path}", os.path.isfile(vue_path))
+    ok_router = check(f"ルーター存在: {router_path}", os.path.isfile(router_path))
+    if not (ok_files and ok_router):
+        print("  [routing] 対象ファイルが見つからないため登録できません")
+        return False
+
+    icon, title, description = _menu_card_texts(folder_name, topic)
+    router_state = _ensure_router_alias(router_path, url_segment, folder_name)
+    print(f"  [routing] ルーティング: {router_state} -> {alias_path}")
+    vue_state = _ensure_vue_menu_card(vue_path, url_segment, folder_name, icon, title, description)
+    print(f"  [routing] メニューカード: {vue_state} -> {const_name}")
+
+    ensure_step_markdown(md_path, folder_name, topic)
+
+    prompt = (
+        step_instruction_header(ctx, step_name, step_summary)
+        + f'"{folder_name}" をメニューとルーティングへ登録する作業です。\n'
+        "追加そのものはこのスクリプトが Python で実行済みです。AI 側は文言の調整と確認だけを行ってください。\n\n"
+        "【対象ファイル】\n"
+        f'  "{vue_path}"\n'
+        f'  "{router_path}"\n\n'
+        "【確認すること】\n"
+        f"  1. {os.path.basename(router_path)} に次のルートがあること\n"
+        f"       createStaticAliasRoute('{alias_path}', '{page_url}', '{url_segment}')\n"
+        f"  2. {os.path.basename(vue_path)} に const {const_name} があり、\n"
+        f"     その値が `${{baseUrl}}{page_url}` になっていること\n"
+        f"  3. 追加されたメニューカードが :href=\"{const_name}\" を参照していること\n\n"
+        "【直してよいこと】メニューカードの文言だけです\n"
+        "  - menu-card-title の見出し（今は下書きの機械生成です）\n"
+        "  - menu-card-description の説明文（今回のテーマに合う 1 行の日本語にしてください）\n"
+        "  - span.icon の短いラベル（2〜3 文字。周りのカードと重複しない表記にしてください）\n"
+        f"  今回のテーマ: {topic_brief(topic, 200)}\n\n"
+        "【やらないこと】\n"
+        "  - 他のメニューカード・他のルート定義の変更や削除\n"
+        f'  - "{new_dir}" 配下のファイルの変更（このステップでは触りません）\n'
+        "  - npm / vite などのコマンド実行\n"
+        "  - 新しいセクションやレイアウトの追加\n\n"
+        "【報告】追加されたルートとメニューカードを引用し、文言をどう直したかだけ答えてください。\n"
+    )
+    await agent_run(ctx, ca, prompt, timeout_sec=240)
+
+    mark_step_done(md_path, "ルーティング追加")
+
+    def validate() -> bool:
+        try:
+            with open(router_path, encoding="utf-8") as f:
+                router_text = f.read()
+            with open(vue_path, encoding="utf-8") as f:
+                vue_text = f.read()
+        except OSError as e:
+            print(f"  [routing] ファイル読み込みに失敗しました: {e}")
+            return False
+
+        ok1 = check(f"ルート登録: {alias_path}", f"'{alias_path}'" in router_text)
+        ok2 = check(f"リダイレクト先: {page_url}", f"'{page_url}'" in router_text)
+        ok3 = check(f"メニュー URL const: {const_name}", f"const {const_name}" in vue_text)
+        ok4 = check(f"メニューカード参照: {const_name}", f':href="{const_name}"' in vue_text)
+        # カードを差し込んだあとにタグの数が合っているかだけ見る（簡易構文チェック）
+        ok5 = check(
+            "メニューカードのタグ整合",
+            vue_text.count('<a class="menu-card') == vue_text.count("</a>"),
+        )
+        return ok1 and ok2 and ok3 and ok4 and ok5
+
+    return await verify_and_backup_until_stable(
+        ctx=ctx, ca=ca,
+        step_name=step_name, step_summary=step_summary,
+        target_paths=[vue_path, router_path, md_path],
+        validate=validate, verify_timeout_sec=240, attempt=attempt,
+    )
+
+
+# ================================================================== #
+# Step 07: 音声生成
 # ================================================================== #
 
 async def step_generate_audio(
@@ -257,9 +540,9 @@ async def step_generate_audio(
     audio_script_name: str,
     attempt: int = 1,
 ) -> bool:
-    """Step 06: ナレーション / 掛け合い音声を生成する。"""
-    sep("Step 06: 音声生成")
-    step_name = "Step 06: 音声生成"
+    """Step 07: ナレーション / 掛け合い音声を生成する。"""
+    sep("Step 07: 音声生成")
+    step_name = "Step 07: 音声生成"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
@@ -273,7 +556,7 @@ async def step_generate_audio(
     )
 
     tts_msg = (
-        "Step six, audio generation is starting. I will generate the narration audio."
+        "Step seven, audio generation is starting. I will generate the narration audio."
         if ctx.use_english_voice else
         f"{step_name} を開始します。ナレーション音声を生成します。"
     )
@@ -316,13 +599,13 @@ async def step_generate_audio(
 
 
 # ================================================================== #
-# Step 07: 再生時間更新
+# Step 08: 再生時間更新
 # ================================================================== #
 
 async def step_update_durations(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    """Step 07: 音声ナレーションの実時間で scenario.js の duration_sec を更新する。"""
-    sep("Step 07: 再生時間更新")
-    step_name = "Step 07: 再生時間更新"
+    """Step 08: 音声ナレーションの実時間で scenario.js の duration_sec を更新する。"""
+    sep("Step 08: 再生時間更新")
+    step_name = "Step 08: 再生時間更新"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
@@ -336,7 +619,7 @@ async def step_update_durations(ctx: VideoGenCtx, ca: dict, attempt: int = 1) ->
     )
 
     tts_msg = (
-        "Step seven, duration update is starting. I will update the playback durations from the generated audio."
+        "Step eight, duration update is starting. I will update the playback durations from the generated audio."
         if ctx.use_english_voice else
         f"{step_name} を開始します。音声ナレーションの再生時間を反映します。"
     )
@@ -400,9 +683,9 @@ async def step_completion_notice(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -
     sep("Step 99: 完成案内")
 
     completed_step = get_completed_step(ctx)
-    if step_value_to_int(completed_step) < 8:
-        print(f"  [NG] Step 08 が未完了です（現在: {completed_step or '未実行'}）")
-        print("  Step 08: 最終確認 を先に実行してください。")
+    if step_value_to_int(completed_step) < 9:
+        print(f"  [NG] Step 09 が未完了です（現在: {completed_step or '未実行'}）")
+        print("  Step 09: 最終確認 を先に実行してください。")
         return False
 
     print(f"  [complete] Step 99: 完成案内: {ctx.folder_name}")
@@ -478,15 +761,17 @@ async def run_automation_loop(
                 print(f"  → [Step {step_no:02d}: {step_name}] 完了")
                 _logger.info("Step %02d [%s] 完了", step_no, step_name)
                 set_completed_step(ctx, step_no)
+                # 表示は Step 02: ルーティング追加 が成功してから始める。
+                # Step 01 の直後はメニューもルートも未登録で、ページを開いても正しく表示できないため。
                 # 生成途中は無音プレビュー、最終チェックが通ったら音声つきループ再生へ切り替える
-                if 1 <= step_no <= 7:
+                if 2 <= step_no <= 8:
                     await refresh_browser_preview(
                         ctx,
                         f"Step {step_no:02d}: {step_name}",
                         ensure_fn=ensure_fn,
                         speaker_enabled=False,
                     )
-                elif step_no in (8, 99):
+                elif step_no in (9, 99):
                     await start_final_playback(ctx, f"Step {step_no:02d}: {step_name}")
                 break
             else:

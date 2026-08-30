@@ -217,9 +217,9 @@ def next_step_after(value: str) -> int:
     current = step_value_to_int(value)
     if current < 0:
         return 0
-    if 0 <= current < 8:
+    if 0 <= current < 9:
         return current + 1
-    if current == 8:
+    if current == 9:
         return 99
     return 99
 
@@ -381,13 +381,14 @@ def progress_step_label(step_name: str) -> str:
     labels = {
         "Step 00: 初期確認": "Step zero, preflight",
         "Step 01: フォルダ作成": "Step one, folder preparation",
-        "Step 02: シナリオ作成": "Step two, scenario translation",
-        "Step 03: HTML修正": "Step three, HTML translation",
-        "Step 04: 画像生成": "Step four, image generation",
-        "Step 05: 中間確認": "Step five, mid review",
-        "Step 06: 音声生成": "Step six, audio generation",
-        "Step 07: 再生時間更新": "Step seven, duration update",
-        "Step 08: 最終確認": "Step eight, final review",
+        "Step 02: ルーティング追加": "Step two, routing registration",
+        "Step 03: シナリオ作成": "Step three, scenario translation",
+        "Step 04: HTML修正": "Step four, HTML translation",
+        "Step 05: 画像生成": "Step five, image generation",
+        "Step 06: 中間確認": "Step six, mid review",
+        "Step 07: 音声生成": "Step seven, audio generation",
+        "Step 08: 再生時間更新": "Step eight, duration update",
+        "Step 09: 最終確認": "Step nine, final review",
         "Step 99: 完成案内": "Step ninety-nine, completion notice",
     }
     return labels.get(step_name, step_name)
@@ -880,7 +881,7 @@ def build_ctx(
     from .ctx import VideoGenCtx
 
     if valid_steps is None:
-        valid_steps = {0, 1, 2, 3, 4, 5, 6, 7, 8, 99}
+        valid_steps = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 99}
 
     setting = load_setting_json(setting_json_path, setting_json_name)
     sn = setting_json_name
@@ -888,7 +889,7 @@ def build_ctx(
     s_shared = require_mapping(setting, "shared", sn)
 
     if len(argv) > 2:
-        print("ERROR: 引数は実行ステップ番号を 1 つだけ指定できます（00、01〜08、99）")
+        print("ERROR: 引数は実行ステップ番号を 1 つだけ指定できます（00、01〜09、99）")
         sys.exit(1)
 
     step_specified = len(argv) == 2
@@ -899,7 +900,7 @@ def build_ctx(
             print(f"ERROR: 実行ステップは整数で指定してください（指定値: {argv[1]}）")
             sys.exit(1)
         if start_step not in valid_steps:
-            print(f"ERROR: 実行ステップは 00、01〜08、99 で指定してください（指定値: {start_step}）")
+            print(f"ERROR: 実行ステップは 00、01〜09、99 で指定してください（指定値: {start_step}）")
             sys.exit(1)
     else:
         data = ensure_steps_json(steps_json_path, steps_json_name, steps_keys)

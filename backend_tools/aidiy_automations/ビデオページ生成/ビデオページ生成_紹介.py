@@ -54,7 +54,7 @@ from utils.generation import (
     backup_images_for_fix_mode, count_scenario_scenes, count_scenario_dialogues,
 )
 from utils.steps import (
-    step00_preflight, step_create_folder, step_generate_audio,
+    step00_preflight, step_add_routing, step_create_folder, step_generate_audio,
     step_update_durations, step_completion_notice,
 )
 
@@ -163,12 +163,12 @@ def _build_narration_audio_bodies() -> tuple[str, str, str]:
 
 
 # ================================================================== #
-# Step 02: シナリオ作成
+# Step 03: シナリオ作成
 # ================================================================== #
 
 async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    sep("Step 02: シナリオ作成")
-    step_name = "Step 02: シナリオ作成"
+    sep("Step 03: シナリオ作成")
+    step_name = "Step 03: シナリオ作成"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
@@ -272,12 +272,12 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
 
 
 # ================================================================== #
-# Step 03: HTML修正
+# Step 04: HTML修正
 # ================================================================== #
 
 async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    sep("Step 03: HTML修正")
-    step_name = "Step 03: HTML修正"
+    sep("Step 04: HTML修正")
+    step_name = "Step 04: HTML修正"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
@@ -362,12 +362,12 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
 
 
 # ================================================================== #
-# Step 04: 画像生成
+# Step 05: 画像生成
 # ================================================================== #
 
 async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    sep("Step 04: 画像生成")
-    step_name = "Step 04: 画像生成"
+    sep("Step 05: 画像生成")
+    step_name = "Step 05: 画像生成"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
@@ -425,7 +425,7 @@ async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
 
 
 # ================================================================== #
-# Step 05: 中間確認
+# Step 06: 中間確認
 # ================================================================== #
 
 async def _recover_sources(ctx: VideoGenCtx, ca: dict, *, reason: str, attempt: int = 1) -> bool:
@@ -439,8 +439,8 @@ async def _recover_sources(ctx: VideoGenCtx, ca: dict, *, reason: str, attempt: 
 
 
 async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    sep("Step 05: 中間確認")
-    step_name = "Step 05: 中間確認"
+    sep("Step 06: 中間確認")
+    step_name = "Step 06: 中間確認"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
@@ -462,7 +462,7 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
         return sum(1 for f in os.listdir(images_dir) if f.endswith(".png") and os.path.getsize(os.path.join(images_dir, f)) > 1000) if os.path.isdir(images_dir) else 0
 
     if not os.path.isfile(scenario_path) or not os.path.isfile(index_path) or _count_valid_images() < expected_image_count:
-        reason = (f"Step 05 の前提不足 (scenario={os.path.isfile(scenario_path)}, "
+        reason = (f"Step 06 の前提不足 (scenario={os.path.isfile(scenario_path)}, "
                   f"index={os.path.isfile(index_path)}, images={_count_valid_images()}/{expected_image_count})")
         if not await _recover_sources(ctx, ca, reason=reason, attempt=attempt):
             return False
@@ -514,17 +514,17 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
     )
     if ok:
         return True
-    await _recover_sources(ctx, ca, reason="Step 05 の検証が NG だったため Step 02〜04 を再実行します", attempt=attempt)
+    await _recover_sources(ctx, ca, reason="Step 06 の検証が NG だったため Step 03〜04 を再実行します", attempt=attempt)
     return False
 
 
 # ================================================================== #
-# Step 08: 最終確認
+# Step 09: 最終確認
 # ================================================================== #
 
 async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    sep("Step 08: 最終確認")
-    step_name = "Step 08: 最終確認"
+    sep("Step 09: 最終確認")
+    step_name = "Step 09: 最終確認"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
 
@@ -543,8 +543,8 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
     guide_tts(ctx, f"{step_name} を開始します。成果物を最終確認します。")
     ensure_step_markdown(md_path, folder_name, ctx.topic)
 
-    if step_value_to_int(get_completed_step(ctx)) >= 8:
-        print("  [SKIP] Step 08 は既に完了済みです")
+    if step_value_to_int(get_completed_step(ctx)) >= 9:
+        print("  [SKIP] Step 09 は既に完了済みです")
         return True
 
     prompt = (
@@ -612,6 +612,8 @@ def main(argv: list | None = None) -> None:
     args = argv if argv is not None else sys.argv
     if len(args) >= 2 and args[1] in ("-h", "--help", "/?"):
         print(f"使い方: python aidiy_automations\\ビデオページ生成\\{SCRIPT_FILE_NAME} [実行ステップ番号]")
+        print("  実行ステップ番号: 0=初期確認 1=フォルダ作成 2=ルーティング追加 3=シナリオ作成 4=HTML修正")
+        print("                  5=画像生成 6=中間確認 7=音声生成 8=再生時間更新 9=最終確認 99=完成案内")
         return
 
     runner = VideoGenRunner.from_argv(
@@ -641,13 +643,14 @@ def main(argv: list | None = None) -> None:
     steps = [
         (0,  "初期確認",     lambda ca, attempt=1: step00_preflight(ctx, ca, attempt=attempt)),
         (1,  "フォルダ作成", lambda ca, attempt=1: step_create_folder(ctx, ca, (NEWS_VIDEO_KNOWLEDGE_PATH, AUTO_VIDEO_KNOWLEDGE_PATH), attempt=attempt)),
-        (2,  "シナリオ作成", lambda ca, attempt=1: step_create_scenario(ctx, ca, attempt=attempt)),
-        (3,  "HTML修正",     lambda ca, attempt=1: step_update_html(ctx, ca, attempt=attempt)),
-        (4,  "画像生成",     lambda ca, attempt=1: step_generate_images(ctx, ca, attempt=attempt)),
-        (5,  "中間確認",     lambda ca, attempt=1: step_mid_review(ctx, ca, attempt=attempt)),
-        (6,  "音声生成",     _step_gen_audio),
-        (7,  "再生時間更新", lambda ca, attempt=1: step_update_durations(ctx, ca, attempt=attempt)),
-        (8,  "最終確認",     lambda ca, attempt=1: step_final_review(ctx, ca, attempt=attempt)),
+        (2,  "ルーティング追加", lambda ca, attempt=1: step_add_routing(ctx, ca, attempt=attempt)),
+        (3,  "シナリオ作成", lambda ca, attempt=1: step_create_scenario(ctx, ca, attempt=attempt)),
+        (4,  "HTML修正",     lambda ca, attempt=1: step_update_html(ctx, ca, attempt=attempt)),
+        (5,  "画像生成",     lambda ca, attempt=1: step_generate_images(ctx, ca, attempt=attempt)),
+        (6,  "中間確認",     lambda ca, attempt=1: step_mid_review(ctx, ca, attempt=attempt)),
+        (7,  "音声生成",     _step_gen_audio),
+        (8,  "再生時間更新", lambda ca, attempt=1: step_update_durations(ctx, ca, attempt=attempt)),
+        (9,  "最終確認",     lambda ca, attempt=1: step_final_review(ctx, ca, attempt=attempt)),
         (99, "完成案内",     lambda ca, attempt=1: step_completion_notice(ctx, ca, attempt=attempt)),
     ]
 
