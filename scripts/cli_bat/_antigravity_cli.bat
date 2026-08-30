@@ -2,6 +2,13 @@
 setlocal
 cd /d "%~dp0../.."
 
+title Antigravity CLI
+ECHO.
+ECHO ============================================================
+ECHO   Antigravity CLI
+ECHO   %~nx0
+ECHO ============================================================
+
 set "MODEL="
 set "ANTIGRAVITY_INSTALLER=%TEMP%\aidiy_antigravity_install.cmd"
 set "AGY_EXE=%LOCALAPPDATA%\agy\bin\agy.exe"

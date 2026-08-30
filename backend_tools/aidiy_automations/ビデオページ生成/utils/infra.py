@@ -257,31 +257,84 @@ def post_backup_api(backup_url: str, dry_run: bool) -> dict:
 _post_backup_api = post_backup_api
 
 
+def _差分ファイル絞り込み(files: list, 対象フォルダ: str) -> list:
+    """差分ファイル一覧から、いま操作しているフォルダ配下のものだけを取り出す。
+
+    バックアップ API はプロジェクト全体を見るため、他の作業の変更も差分に混ざる。
+    ステップの成果を確かめたいときは、この絞り込み結果の件数で見る。
+    パス表記のゆれ（区切り文字・大文字小文字・相対/絶対）を吸収して比較する。
+    """
+    基準 = os.path.normcase(os.path.abspath(str(対象フォルダ or ""))).replace("\\", "/").rstrip("/")
+    if not 基準:
+        return []
+    絞り込み: list = []
+    for path in files:
+        s = str(path or "").strip()
+        if not s:
+            continue
+        正規 = os.path.normcase(os.path.abspath(s)).replace("\\", "/")
+        if 正規 == 基準 or 正規.startswith(基準 + "/"):
+            絞り込み.append(s)
+    return 絞り込み
+
+
+def _差分表示(files: list, 対象フォルダ: str = "", 対象ラベル: str = "") -> int:
+    """差分ファイルを表示し、操作中フォルダ配下の件数を返す（対象フォルダ未指定なら 0）。"""
+    if files:
+        for path in files[:10]:
+            print(f"    - {path}")
+        if len(files) > 10:
+            print(f"    ... 他 {len(files) - 10} 件")
+    if not 対象フォルダ:
+        return 0
+    対象 = _差分ファイル絞り込み(files, 対象フォルダ)
+    ラベル = 対象ラベル or 対象フォルダ
+    print(f"  [backup] うち操作中フォルダ配下: {len(対象)} 件 ({ラベル})")
+    for path in 対象[:10]:
+        print(f"    * {path}")
+    if len(対象) > 10:
+        print(f"    ... 他 {len(対象) - 10} 件")
+    return len(対象)
+
+
 def backup_diff_count(ctx: "VideoGenCtx") -> int:
-    """POST /aidiy_backup/save/scan で現時点の差分バックアップ対象ファイル数を返す。"""
+    """POST /aidiy_backup/save/scan で現時点の差分バックアップ対象ファイル数を返す。
+
+    戻り値（全体の差分件数）は従来どおり。あわせて、いま操作しているフォルダ
+    （ctx.output_dir）配下の件数も数えて表示する。全体件数には他の作業による変更も
+    混ざるため、そのステップが成果物へ触れたかどうかはこの内訳で確認する。
+    """
     result = _post_backup_api(ctx.backup_api_url, dry_run=True)
     count = int(result.get("count", 0))
     files = result.get("差分ファイル", []) or []
     print(f"  [backup] dry_run 差分ファイル数: {count}")
-    if files:
-        for path in files[:10]:
-            print(f"    - {path}")
-        if len(files) > 10:
-            print(f"    ... 他 {len(files) - 10} 件")
+    _差分表示(files, ctx.output_dir, ctx.folder_name)
     return count
 
 
-def backup_diff_count_url(backup_url: str) -> int:
-    """URL 直接版（step_create_folder などで使用）。"""
+def backup_diff_count_detail(ctx: "VideoGenCtx") -> tuple[int, int]:
+    """(全体の差分件数, 操作中フォルダ配下の差分件数) を返す。
+
+    件数の内訳で分岐したいステップ用。表示内容は backup_diff_count と同じ。
+    """
+    result = _post_backup_api(ctx.backup_api_url, dry_run=True)
+    count = int(result.get("count", 0))
+    files = result.get("差分ファイル", []) or []
+    print(f"  [backup] dry_run 差分ファイル数: {count}")
+    対象件数 = _差分表示(files, ctx.output_dir, ctx.folder_name)
+    return count, 対象件数
+
+
+def backup_diff_count_url(backup_url: str, 対象フォルダ: str = "", 対象ラベル: str = "") -> int:
+    """URL 直接版（step_create_folder などで使用）。
+
+    対象フォルダを渡すと、その配下の差分件数も内訳として表示する（戻り値は全体件数のまま）。
+    """
     result = _post_backup_api(backup_url, dry_run=True)
     count = int(result.get("count", 0))
     files = result.get("差分ファイル", []) or []
     print(f"  [backup] dry_run 差分ファイル数: {count}")
-    if files:
-        for path in files[:10]:
-            print(f"    - {path}")
-        if len(files) > 10:
-            print(f"    ... 他 {len(files) - 10} 件")
+    _差分表示(files, 対象フォルダ, 対象ラベル)
     return count
 
 
@@ -391,6 +444,18 @@ def _preview_url(frontend_base_url: str, folder_name: str, *, speaker_enabled: b
     folder = urllib.parse.quote(folder_name.replace("\\", "/"), safe="")
     speaker_query = "" if speaker_enabled else "&speaker=false"
     return f"{base}/Xビデオ/{folder}/index.html?auto=loop&preview_min_sec={PREVIEW_MIN_SCENE_SEC:g}{speaker_query}"
+
+
+def _playback_url(frontend_base_url: str, folder_name: str) -> str:
+    """完成後の再生 URL。閲覧者が開くときと同じ条件にする。
+
+    途中経過のプレビューと違い preview_min_sec を付けない。あれを残すと各シーンが
+    最低表示秒数で切り替わってしまい、実際の再生と尺が合わなくなるため。
+    speaker は既定で有効なので指定しない（?auto=loop だけで音声つきループ再生）。
+    """
+    base = frontend_base_url.rstrip("/")
+    folder = urllib.parse.quote(folder_name.replace("\\", "/"), safe="")
+    return f"{base}/Xビデオ/{folder}/index.html?auto=loop"
 
 
 def ensure_preview_minimum_duration_mcp(index_path: str) -> None:
@@ -554,9 +619,50 @@ async def refresh_browser_preview(
         print(f"  [browser] 再描写をスキップしました: {e}")
 
 
+async def start_final_playback(ctx: "VideoGenCtx", step_label: str) -> None:
+    """最終チェックが通ったあと、音声つきのループ再生を開始する。
+
+    生成途中は refresh_browser_preview が無音（?speaker=false）＋ preview_min_sec つきで
+    進捗を映しているだけなので、仕上がりの確認にはならない。最終確認まで通ったら、
+    閲覧者が開くのと同じ ?auto=loop で開き直し、音声つきで最初から流す。
+    """
+    if not ctx.browser_preview:
+        return
+    index_path = os.path.join(ctx.output_dir, "index.html")
+    if not os.path.isfile(index_path):
+        print(f"  [browser] index.html が無いため再生を開始できません: {index_path}")
+        return
+
+    url = _playback_url(ctx.frontend_base_url, ctx.folder_name)
+    try:
+        result = await asyncio.to_thread(
+            post_mcp_method,
+            ctx.chrome_api_url,
+            "navigate",
+            {"url": url, "show_automation_banner": False},
+            90,
+        )
+        print(f"  [browser] {step_label}: 音声つきループ再生を開始しました -> {url}")
+        print(f"  [browser] {result}")
+    except Exception as e:
+        print(f"  [browser] 再生の開始をスキップしました: {e}")
+
+
 # ================================================================== #
 # CodeAgents ユーティリティ (agent_utils)
 # ================================================================== #
+
+def topic_brief(topic: str, limit: int = 300) -> str:
+    """設定ファイルの topic から、画面文言の指示に必要な先頭部分だけを取り出す。
+
+    topic は出典 URL、確認済みの事実、留保、シーン構成、パイプライン仕様メモまで含む
+    2000 字超の長文になる。全文を HTML 修正の指示に貼ると、画面文言に関係ない内容まで
+    index.html へ書き込もうとして検証NGのやり直しが増えるため、
+    「【...】」ブロックの手前（先頭の「テーマ: ...」）だけを使う。
+    """
+    head = topic.split("【", 1)[0].strip() or topic.strip()
+    return head[:limit]
+
 
 def step_instruction_header(ctx: "VideoGenCtx", step_name: str, step_summary: str) -> str:
     """CodeAgents への各作業指示に付ける共通ヘッダー。"""
@@ -635,7 +741,11 @@ async def _agent_verify_step(
         "  2. 既に存在する場合も内容を読み、今回のフォルダ名・テーマと合っているか確認してください。\n"
         "  3. 問題があればこの場で修正してください。\n"
         "  4. 問題がなければ変更せず、OK と判断した根拠を短く表示してください。\n"
-        "  5. 最後に、修正したファイルと未修正で OK としたファイルを一覧表示してください。\n"
+        "  5. 最後に、修正したファイルと未修正で OK としたファイルを一覧表示してください。\n\n"
+        "【確認コスト】\n"
+        "  画像（.png / .jpg）や音声（.mp3 / .wav）などのバイナリは中身を読み込まず、\n"
+        "  ファイルの存在・件数・サイズだけで判断してください。1 件ずつ開くと検証がタイムアウトします。\n"
+        "  テキストファイルも全文ではなく、判断に必要な箇所だけを読んでください。\n"
     )
     await agent_run(ctx, ca, prompt, timeout_sec=timeout_sec)
 
@@ -677,13 +787,21 @@ async def verify_and_backup_until_stable(
             _tts(f"{label} verification is starting. Attempt {attempt}.")
         else:
             _tts(f"{step_name} の検証を開始します。試行 {attempt}回目です。")
-        await _agent_verify_step(
-            ctx, ca,
-            step_name=step_name,
-            step_summary=step_summary,
-            target_paths=target_paths,
-            timeout_sec=verify_timeout_sec,
-        )
+        # 検証エージェントは「見つけた問題をその場で直す」補助であり、合否の判定者ではない。
+        # ここで例外（CodeAgents API のタイムアウトや接続断）を素通しすると、ステップ本体が
+        # 成功していても試行ごと失敗扱いになり、リトライ上限まで無駄に繰り返してしまう。
+        # 失敗しても Python 側の validate() へ進め、機械的チェックで合否を決める。
+        try:
+            await _agent_verify_step(
+                ctx, ca,
+                step_name=step_name,
+                step_summary=step_summary,
+                target_paths=target_paths,
+                timeout_sec=verify_timeout_sec,
+            )
+        except Exception as e:
+            print(f"  [verify] 検証エージェントが失敗しました（Python 側検証で続行します）: {e}")
+            _logger.warning("検証エージェント失敗（validate へ続行）: %s [%s]", e, step_name)
 
         if not validate():
             print("  [verify] Python 側検証が NG です")
@@ -693,7 +811,14 @@ async def verify_and_backup_until_stable(
                 _tts(f"{step_name} の検証で問題が見つかりました。同じステップをやり直します。", voice="male")
             return False
 
-        diff_count = backup_diff_count(ctx)
+        # 判定は従来どおり全体の差分件数で行う（バックアップの取りこぼしを防ぐため）。
+        # 操作中フォルダ配下の件数は内訳として確認し、成果物へ触れたかどうかを追えるようにする。
+        diff_count, 対象差分 = backup_diff_count_detail(ctx)
+        if diff_count > 0 and 対象差分 == 0:
+            print(
+                f"  [backup] 注意: 差分 {diff_count} 件はすべて {ctx.folder_name} の外です"
+                "（このステップは出力フォルダへ書き込んでいません）"
+            )
         if diff_count == 0:
             print("  [backup] 差分なし。次のステップへ進みます")
             if ctx.use_english_voice:

@@ -20,12 +20,12 @@ window.SCENARIO = {
       "headline": "日本語ファーストの\nフルスタック業務管理テンプレート AiDiy",
       "lead": "FastAPI + Vue 3 + AI コア + TOOL HUB を組み合わせた、日本語圏の開発者向けフルスタック開発環境です。",
       "image": "images/scene_000.png",
-      "source_summary": "AiDiy は日本語ファーストのフルスタック業務管理テンプレート。5 サービス構成（backend_server/backend_tools/frontend_web/frontend_avatar）で業務管理・AI コア・TOOL HUB・3D アバターを統合。この動画は ビデオページ生成機能で自動生成。",
+      "source_summary": "AiDiy は日本語ファーストのフルスタック業務管理テンプレート。7 サービス構成（backend_server/backend_tools/frontend_web/frontend_avatar）で業務管理・AI コア・TOOL HUB・3D アバターを統合。この動画は ビデオページ生成機能で自動生成。",
       "factual_bullets": [
         "FastAPI + SQLAlchemy + SQLite (Python 3.13) + Vue 3 + Vite + TypeScript の構成",
-        "5 サービス: backend_server (8091/8098), backend_tools (8095), frontend_web (8090), frontend_avatar (8092)",
+        "7 サービス: backend_server (8091/8098), backend_tools (8095), frontend_web (8090), frontend_avatar (8092)",
         "日本語ファースト設計: テーブル名・API パス・変数名すべて日本語",
-        "業務サンプル（C/M/T/V/S系）・AI コア・14 MCP・Electron アバター を統合",
+        "業務サンプル（C/M/T/V/S系）・AI コア・19 MCP・Electron アバター を統合",
         "この動画は AiDiy のビデオページ生成機能で自動生成"
       ],
       "forbidden_elements": [
@@ -45,7 +45,7 @@ window.SCENARIO = {
         {
           "speaker": "male",
           "expression": "neutral",
-          "telop_text": "AiDiy は 5 つのサービスで構成されるフルスタック開発環境です。",
+          "telop_text": "AiDiy は 7 つのサービスで構成されるフルスタック開発環境です。",
           "naration_text": "AiDiy は backend_server、backend_tools、frontend_web、frontend_avatar という複数のサービスが連携して動くフルスタックなシステムです。バックエンドは FastAPI と SQLAlchemy と SQLite を組み合わせ、Python 3.13 の最新環境で動かします。フロントエンドは Vue 3 と Vite と TypeScript で構成された Web UI と、Electron 対応の 3D アバター UI が揃っています。開発テンプレートとしても、AI 実験の基盤としても幅広く使えます。",
           "audio": "audio/dlg_000_02_male.mp3",
           "duration_sec": 29.52
@@ -71,20 +71,22 @@ window.SCENARIO = {
     },
     {
       "id": "scene_001",
-      "title": "フルスタック構成 — 5 サービスとポート配置",
+      "title": "フルスタック構成 — 7 サービスとポート配置",
       "accent": "#2e86ab",
       "accent_soft": "rgba(46, 134, 171, 0.18)",
       "kicker": "ARCHITECTURE",
-      "headline": "5 サービスが連携する\nフルスタック構成",
-      "lead": "backend_server・backend_tools・frontend_web・frontend_avatar の 4 サービスが各ポートで連携します。",
+      "headline": "7 サービスが連携する\nフルスタック構成",
+      "lead": "backend_server 2 本、MCP ハブ、AIタスクと AIチームの実行基盤、ローカル推論、frontend 2 種。7 つのサービスが 1 つの SQLite を共有します。",
       "image": "images/scene_001.png",
-      "source_summary": "AiDiy の 5 サービス構成: backend_server (core_main 8091 / apps_main 8098)、backend_tools (8095)、frontend_web (8090)、frontend_avatar (8092)。FastAPI + SQLAlchemy + SQLite + Vue 3 + Vite + TypeScript の技術スタック。",
+      "source_summary": "AiDiy の 7 サービス構成: backend_server (core_main 8091 / apps_main 8098)、backend_tools (8095)、frontend_web (8090)、frontend_avatar (8092)。FastAPI + SQLAlchemy + SQLite + Vue 3 + Vite + TypeScript の技術スタック。",
       "factual_bullets": [
         "core_main.py (8091): 認証・C系・A系・AI コア WebSocket",
         "apps_main.py (8098): M系マスタ・T系トランザクション・V系・S系スケジューラ",
-        "tools_main.py (8095): 14 MCP サーバーを 3 トランスポートで提供",
+        "tools_main.py (8095): 19 MCP サーバーを 3 トランスポートで提供",
         "frontend_web (8090): Vue 3 + Vite、Vite proxy で /core → 8091, /apps → 8098",
-        "frontend_avatar (8092): Electron/Web デュアルモード、Three.js + VRM"
+        "frontend_avatar (8092): Electron/Web デュアルモード、Three.js + VRM",
+        "taskteam_main.py (8093): AIタスクの明細実行と AIチームの依頼・経験を担当",
+        "backend_local (8096): OpenAI 互換の Gemma ローカル推論サーバー"
       ],
       "forbidden_elements": [
         "ポート番号が変更不可であるかのような断言",
@@ -98,7 +100,7 @@ window.SCENARIO = {
           "telop_text": "backend_server は FastAPI + SQLAlchemy + SQLite で動くバックエンドです。",
           "naration_text": "AiDiy のバックエンドは backend_server として FastAPI と SQLAlchemy と SQLite を組み合わせて構築されています。2 本の uvicorn プロセスに分かれており、認証・利用者・AI コアを担う core_main.py がポート 8091 で動き、マスタ・トランザクション・スケジューラを担う apps_main.py がポート 8098 で動きます。両サーバーは同じ SQLite データベースファイルを共有しているため、データの一貫性を保ちながら役割ごとに分離できています。",
           "audio": "audio/dlg_001_01_female.mp3",
-          "duration_sec": 32.616
+          "duration_sec": 32.688
         },
         {
           "speaker": "male",
@@ -106,26 +108,26 @@ window.SCENARIO = {
           "telop_text": "frontend_web は Vue 3 + Vite + TypeScript で作られた Web UI です。",
           "naration_text": "フロントエンドは frontend_web として Vue 3 と Vite と TypeScript で構成されています。ポート 8090 で動き、Vite の開発用プロキシが /core/* のリクエストをポート 8091 に、/apps/* のリクエストをポート 8098 に転送します。Vue Router と Pinia によるルーティングと状態管理、qTubler という独自テーブルコンポーネントを使ったリッチな業務 UI が特徴です。WebSocket 通信も内蔵しており、AI コアとのリアルタイム対話ができます。",
           "audio": "audio/dlg_001_02_male.mp3",
-          "duration_sec": 27.576
+          "duration_sec": 27.696
         },
         {
           "speaker": "female",
           "expression": "neutral",
-          "telop_text": "frontend_avatar は Electron と Web の両方で動く 3D アバター UI です。",
-          "naration_text": "frontend_avatar はポート 8092 で動く Electron 兼 Web の 3D アバターインターフェースです。Electron で起動した場合は複数ウィンドウを使ったデスクトップアプリとして動き、通常のブラウザで開いた場合は左右にアバターを配置した Web UI として動きます。Three.js と @pixiv/three-vrm を使った VRM モデルの表示と口パク同期が実装されており、AI との音声対話を視覚的に楽しめます。",
+          "telop_text": "AIタスクとチームを動かす backend_taskteam が 8093、ローカル推論の backend_local が 8096 です。",
+          "naration_text": "バックエンドは backend_server の 2 本だけではありません。ポート 8093 の backend_taskteam は、AIタスクの明細実行と、AIチームの依頼・経験の管理をまとめて担当します。ポート 8096 の backend_local は、OpenAI 互換のインターフェースを持つ Gemma のローカル推論サーバーです。さらにポート 8095 の backend_tools が MCP ハブとして動きます。フロントエンドは 8090 の frontend_web と 8092 の frontend_avatar。合わせて 7 つのサービスが、_data/AiDiy/database.db という 1 つの SQLite を共有しています。業務データと AI の実行履歴が同じ場所にあるので、AIタスクの進捗を業務画面から追うこともできます。",
           "audio": "audio/dlg_001_03_female.mp3",
-          "duration_sec": 28.92
+          "duration_sec": 47.544
         },
         {
           "speaker": "male",
           "expression": "neutral",
-          "telop_text": "backend_tools は 14 の MCP サーバーをポート 8095 に集約した TOOL HUB です。",
-          "naration_text": "backend_tools はポート 8095 で動く AiDiy TOOL HUB です。ブラウザ操作、スクリーンショット、SQLite や PostgreSQL への接続、ログ確認、コードチェック、バックアップ、画像・動画・音声の AI 生成、OBS 録画制御、FFmpeg 動画処理、コードエージェント実行という 14 の MCP サーバーが集約されています。SSE、Streamable HTTP、stdio の 3 つのトランスポートに加えて、HTTP POST で直接呼び出せるため、Python スクリプトや AI エージェントからシンプルに利用できます。",
+          "telop_text": "backend_tools は 19 の MCP サーバーをポート 8095 に集約した TOOL HUB です。",
+          "naration_text": "backend_tools はポート 8095 で動く AiDiy TOOL HUB です。ブラウザ操作、スクリーンショット、SQLite や PostgreSQL への接続、ログ確認、コードチェック、バックアップ、画像・動画・音声の AI 生成、OBS 録画制御、FFmpeg 動画処理、コードエージェント実行という 19 の MCP サーバーが集約されています。SSE、Streamable HTTP、stdio の 3 つのトランスポートに加えて、HTTP POST で直接呼び出せるため、Python スクリプトや AI エージェントからシンプルに利用できます。",
           "audio": "audio/dlg_001_04_male.mp3",
-          "duration_sec": 31.368
+          "duration_sec": 31.416
         }
       ],
-      "duration_sec": 120.48
+      "duration_sec": 139.344
     },
     {
       "id": "scene_002",
@@ -338,7 +340,7 @@ window.SCENARIO = {
           "telop_text": "frontend_avatar は Electron デスクトップアプリと Web ブラウザ両対応の AI アバター UI です。",
           "naration_text": "frontend_avatar は、Electron デスクトップアプリと通常のブラウザの両方で動く AI アバター UI です。ポート 8092 にアクセスし、window.desktopApi が存在する場合は Electron モード、存在しない場合は Web ブラウザモードとして動作します。Electron モードでは複数のウィンドウを使ったリッチなデスクトップ体験が、Web モードでは左アバターと右タブ UI を組み合わせた画面が使えます。",
           "audio": "audio/dlg_005_01_female.mp3",
-          "duration_sec": 26.928
+          "duration_sec": 26.832
         },
         {
           "speaker": "male",
@@ -362,49 +364,49 @@ window.SCENARIO = {
           "telop_text": "認証は Electron が localStorage、Web が sessionStorage と自動で切り替わります。",
           "naration_text": "Electron モードと Web モードでは認証のストレージも異なります。Electron では localStorage を使い、Web では sessionStorage を使うため、モードに応じた安全な認証管理が自動で行われます。tsconfig は strict mode が有効になっており、型安全な実装が保証されています。Vite proxy の設定は frontend_web と共通で、/core/* を 8091、/apps/* を 8098 に転送する構成です。デスクトップアプリと Web で同じコードベースが動く、デュアルモード設計が技術的な面白さです。",
           "audio": "audio/dlg_005_04_male.mp3",
-          "duration_sec": 31.32
+          "duration_sec": 31.416
         }
       ],
       "duration_sec": 117.648
     },
     {
       "id": "scene_006",
-      "title": "AiDiy TOOL HUB とビデオ自動生成",
+      "title": "AiDiy TOOL HUB × 19 とビデオ自動生成",
       "accent": "#b8860b",
       "accent_soft": "rgba(184, 134, 11, 0.18)",
       "kicker": "TOOL HUB & AUTOMATION",
-      "headline": "14 MCP サーバーと\nビデオページ 9 ステップ全自動化",
+      "headline": "19 MCP サーバーと\nビデオページ Step00 から Step99 までの手順全自動化",
       "lead": "ブラウザ操作・AI 生成・OBS 録画・コードエージェントを 1 つのポートで統一し、ビデオ制作まで自動化します。",
       "image": "images/scene_006.png",
-      "source_summary": "backend_tools = AiDiy TOOL HUB。14 MCP を SSE/Streamable HTTP/stdio の 3 トランスポートでポート 8095 に集約。ビデオページ生成_解説.py と ビデオページ生成_紹介.py が 9 ステップでシナリオ→画像→音声→HTML を全自動化。この動画も AiDiy の自動生成。",
+      "source_summary": "backend_tools = AiDiy TOOL HUB。19 MCP を SSE/Streamable HTTP/stdio の 3 トランスポートでポート 8095 に集約。ビデオページ生成_解説.py と ビデオページ生成_紹介.py が Step00 から Step99 までの手順でシナリオ→画像→音声→HTML を全自動化。この動画も AiDiy の自動生成。",
       "factual_bullets": [
-        "14 MCP サーバーをポート 8095 に集約: ブラウザ・データ・AI生成・自動化の 4 カテゴリ",
+        "19 MCP サーバーをポート 8095 に集約: ブラウザ・データ・AI生成・自動化の 4 カテゴリ",
         "SSE / Streamable HTTP / stdio の 3 トランスポートを同一ポートで提供",
         "HTTP POST で直接呼び出し可能 (MCP クライアント不要)",
-        "ビデオページ生成_解説.py / 紹介.py が 9 ステップでシナリオ→画像→音声→HTML を全自動化",
+        "ビデオページ生成_解説.py / 紹介.py が Step00 から Step99 までの手順でシナリオ→画像→音声→HTML を全自動化",
         "この動画も AiDiy TOOL HUB + CodeAgents が自動生成した"
       ],
       "forbidden_elements": [
         "AiDiy TOOL HUB が競合製品より優れると断言すること",
         "ビデオ自動生成が常に完全な品質で出力されると断言すること"
       ],
-      "image_prompt": "A workflow automation diagram: top shows 14 MCP server icons arranged in a circle around port 8095 hub. Bottom shows an 9-step automation pipeline: scenario.js → image generation → audio synthesis → HTML assembly. Gold/amber color accent, dark background, arrows connecting each step, AiDiy logo at center.",
+      "image_prompt": "A workflow automation diagram: top shows 19 MCP server icons arranged in a circle around port 8095 hub. Bottom shows an 9-step automation pipeline: scenario.js → image generation → audio synthesis → HTML assembly. Gold/amber color accent, dark background, arrows connecting each step, AiDiy logo at center.",
       "dialogue": [
         {
           "speaker": "female",
           "expression": "neutral",
-          "telop_text": "backend_tools は 14 の MCP を SSE・HTTP・stdio の 3 トランスポートで提供します。",
-          "naration_text": "AiDiy TOOL HUB は backend_tools として実装された 14 の MCP サーバーの集合体です。ポート 8095 の tools_main.py を起動するだけで、SSE、Streamable HTTP、stdio の 3 つのトランスポートが同時に有効になります。Claude Desktop など MCP 対応 AI から stdio 経由で呼び出すこともでき、Python から requests.post を使って直接 HTTP でツールを呼び出すこともできます。用途に合わせて接続方式を選べる柔軟な設計です。",
+          "telop_text": "backend_tools は 19 の MCP を SSE・HTTP・stdio の 3 トランスポートで提供します。",
+          "naration_text": "AiDiy TOOL HUB は backend_tools として実装された 19 の MCP サーバーの集合体です。ポート 8095 の tools_main.py を起動するだけで、SSE、Streamable HTTP、stdio の 3 つのトランスポートが同時に有効になります。Claude Desktop など MCP 対応 AI から stdio 経由で呼び出すこともでき、Python から requests.post を使って直接 HTTP でツールを呼び出すこともできます。用途に合わせて接続方式を選べる柔軟な設計です。",
           "audio": "audio/dlg_006_01_female.mp3",
-          "duration_sec": 33.312
+          "duration_sec": 33.336
         },
         {
           "speaker": "male",
           "expression": "neutral",
-          "telop_text": "14 の MCP はブラウザ・データ・AI 生成・自動化の 4 カテゴリに整理されています。",
-          "naration_text": "14 の MCP サーバーは 4 つのカテゴリに分かれています。ブラウザ・画面操作系の aidiy_chrome_devtools と aidiy_desktop_capture。データ管理・開発補助系の aidiy_sqlite、aidiy_postgres、aidiy_logs、aidiy_code_check、aidiy_backup。AI 生成系の aidiy_image_generation、aidiy_movie_generation、aidiy_speech_to_text、aidiy_text_to_speech。運用自動化系の aidiy_obs_studio_control、aidiy_ffmpeg_control、aidiy_code_agents です。",
+          "telop_text": "19 の MCP はブラウザ・データ・AI 生成・自動化の 4 カテゴリに整理されています。",
+          "naration_text": "19 の MCP サーバーは 4 つのカテゴリに分かれています。ブラウザ・画面操作系の aidiy_chrome_devtools と aidiy_desktop_capture。データ管理・開発補助系の aidiy_sqlite、aidiy_postgres、aidiy_logs、aidiy_code_check、aidiy_backup。AI 生成系の aidiy_image_generation、aidiy_movie_generation、aidiy_speech_to_text、aidiy_text_to_speech。運用自動化系の aidiy_obs_studio_control、aidiy_ffmpeg_control、aidiy_code_agents です。",
           "audio": "audio/dlg_006_02_male.mp3",
-          "duration_sec": 29.592
+          "duration_sec": 29.664
         },
         {
           "speaker": "female",
@@ -417,10 +419,10 @@ window.SCENARIO = {
         {
           "speaker": "male",
           "expression": "neutral",
-          "telop_text": "ビデオページ生成スクリプトが 9 ステップでビデオ制作を全自動化します。",
-          "naration_text": "AiDiy TOOL HUB の活用例として、ビデオページ自動生成があります。ビデオページ生成_解説.py と ビデオページ生成_紹介.py の 2 つのスクリプトが、シナリオ作成から画像生成、音声合成、HTML 組み立てまでを 9 ステップで自動化します。トピックを設定するだけで AI がシナリオを考え、MCP が画像と音声を生成し、完成した HTML ページが出来上がります。まさに AiDiy 自身がビデオを作るという自己言及的な機能です。",
+          "telop_text": "ビデオページ生成スクリプトが Step00 から Step99 までの手順でビデオ制作を全自動化します。",
+          "naration_text": "AiDiy TOOL HUB の活用例として、ビデオページ自動生成があります。ビデオページ生成_解説.py と ビデオページ生成_紹介.py の 2 つのスクリプトが、シナリオ作成から画像生成、音声合成、HTML 組み立てまでを Step00 から Step99 までの手順で自動化します。トピックを設定するだけで AI がシナリオを考え、MCP が画像と音声を生成し、完成した HTML ページが出来上がります。まさに AiDiy 自身がビデオを作るという自己言及的な機能です。",
           "audio": "audio/dlg_006_04_male.mp3",
-          "duration_sec": 28.632
+          "duration_sec": 30.456
         },
         {
           "speaker": "female",
@@ -431,7 +433,74 @@ window.SCENARIO = {
           "duration_sec": 27.48
         }
       ],
-      "duration_sec": 152.616
+      "duration_sec": 154.536
+    },
+    {
+      "id": "scene_007",
+      "title": "AIタスクと AIチーム — 要求を書くだけで AI が動く",
+      "accent": "#7dffb3",
+      "accent_soft": "rgba(125, 255, 179, 0.18)",
+      "kicker": "AI TASK & AI TEAM",
+      "headline": "日本語の要求を明細へ分解して自動実行\n3D 空間では AI 要員がチームで動く",
+      "lead": "backend_taskteam が担う 2 つの機能です。AIタスクは要求を実行明細へ分解し、依存を判断しながら実行します。AIチームは AI 要員が相談し、経験を貯めて次に活かします。",
+      "image": "images/scene_007.png",
+      "source_summary": "backend_taskteam/AGENTS.md の Task 機能・Team 機能、frontend_web/src/components/AIタスク・AIチーム の現行実装に基づく。",
+      "factual_bullets": [
+        "backend_taskteam (8093): AIタスクの /task/* と AIチームの /team/* を提供",
+        "要求を準備開始で登録すると sub_init.py が AI に明細へ分解させ、開始行・処理行・終了行を本登録する",
+        "先行SEQ による DAG で依存を判断し、条件を満たした明細は並行起動する",
+        "実行区分は即時 / 時間指定 / 間隔実行 / 定時実行の 4 種。実行条件にフォルダ変化も選べる",
+        "Aチーム依頼は要員ごとの経験を材料に AI が担当を選び、完了後に経験を生成して次へ再利用する",
+        "開始明細は差分バックアップ、操作検証つき明細は 1 回だけ自動リトライ"
+      ],
+      "forbidden_elements": [
+        "実装にない機能の追加",
+        "誇張表現"
+      ],
+      "image_prompt": "Wide concept illustration split into two halves: the upper half shows an automated task flow with branching nodes and a clock icon for scheduled execution, the lower half shows several gentle glowing AI companions gathered in a park-like 3D space exchanging speech bubbles. Dark background, cyan and green glow, modern technical illustration.",
+      "dialogue": [
+        {
+          "speaker": "female",
+          "expression": "neutral",
+          "telop_text": "AiDiy には、AI に仕事そのものを任せる AIタスクという機能があります。",
+          "naration_text": "ここからは AIタスクと AIチームを見ていきます。どちらもポート 8093 の backend_taskteam が担当しています。まず AIタスクです。やってほしいことを日本語で書いて登録すると、AI がその中身を読んで、実行する手順、つまり明細へ自動的に分解します。分解を担当するのは task_sub の sub_init.py で、開始行、処理行、終了行という形で明細が本登録されます。人が手順書を書く必要はありません。",
+          "audio": "audio/dlg_007_01_female.mp3",
+          "duration_sec": 32.016
+        },
+        {
+          "speaker": "male",
+          "expression": "neutral",
+          "telop_text": "明細は先行SEQ で依存関係を持つので、順番と並行を自動で判断します。",
+          "naration_text": "分解された明細には先行SEQ という項目があって、どの明細が終わったら始めるかを指定します。カンマ区切りで複数指定できるので、依存関係は一直線ではなく DAG になります。先行する明細がすべて完了した明細は実行可能と判定され、依存を満たしたものは並行して起動します。画面中央のフロー図には、この依存グラフと、最長経路であるクリティカルパスが表示されます。",
+          "audio": "audio/dlg_007_02_male.mp3",
+          "duration_sec": 24.96
+        },
+        {
+          "speaker": "female",
+          "expression": "neutral",
+          "telop_text": "実行の開始条件は即時、時間指定、間隔実行、定時実行の 4 種類です。",
+          "naration_text": "AIタスクで特徴的なのが実行開始条件です。実行区分は 4 種類あります。すぐ動かす即時、指定した日時に 1 回だけ動く時間指定、分や時の単位で繰り返す間隔実行、そして毎日、毎週、毎月の決まった時刻に動く定時実行です。これに加えて実行条件としてフォルダ変化を選ぶと、監視フォルダの中身が変わったときだけ動かせます。一度登録すれば、人が居なくてもタスクが回り続けます。",
+          "audio": "audio/dlg_007_03_female.mp3",
+          "duration_sec": 29.664
+        },
+        {
+          "speaker": "male",
+          "expression": "neutral",
+          "telop_text": "AIチームでは、召喚した AI 要員が 3D 空間で相談しながら仕事を分担します。",
+          "naration_text": "もうひとつが AIチームです。こちらは persona ディレクトリから AI 要員を召喚してチームを作ります。画面は 3D の空間になっていて、要員がその場に立ち、吹き出しで意見を交わします。チーム目標を登録して自動作業設定をオンにすると、要員が順番に今やるべきことを発言し、有効要員の半数以上の意見が集まったところで、admin 人格がチーム作業として取りまとめます。作業の進め方は PlanDo と SPDCA の 2 パターンから選べます。",
+          "audio": "audio/dlg_007_04_male.mp3",
+          "duration_sec": 28.608
+        },
+        {
+          "speaker": "female",
+          "expression": "neutral",
+          "telop_text": "依頼は経験のある要員へ自動で割り振られ、完了後は経験として蓄積されます。",
+          "naration_text": "AIチームに依頼を出すと、AI が担当要員を選びます。このとき材料になるのが、要員ごとに蓄積された Aチーム経験です。経験値、分類、直近の学びを見て、いちばん合いそうな要員へ寄せます。選ばれた依頼はそのまま AIタスクとして投入され、明細に分解されて実行されます。完了すると sub_exp.py が経験を生成し、次の担当選びに再利用されます。使うほどチームが育っていく仕組みです。任せる不安に対しては、開始時の差分バックアップと、操作検証つき明細の 1 回だけの自動リトライが用意されています。",
+          "audio": "audio/dlg_007_05_female.mp3",
+          "duration_sec": 39.936
+        }
+      ],
+      "duration_sec": 155.184
     },
     {
       "id": "scene_999",
@@ -441,37 +510,37 @@ window.SCENARIO = {
       "layout": "hero",
       "kicker": "AIDIY ALL-IN-ONE",
       "headline": "日本語ファーストの開発と\nAI 自動化の循環を体験しよう",
-      "lead": "業務管理テンプレート・AI コア・3D アバター・14 MCP TOOL HUB——すべてが AiDiy の中に揃っています。",
+      "lead": "業務管理テンプレート・AI コア・3D アバター・19 MCP TOOL HUB——すべてが AiDiy の中に揃っています。",
       "image": "images/scene_999.png",
       "source_summary": "AiDiy 全体のまとめ: 日本語ファーストのフルスタック業務管理テンプレート・5サービス構成・業務サンプル・AI コア・frontend_avatar・AiDiy TOOL HUB・ビデオ自動生成まで。この動画も AiDiy が自動生成。チャンネル登録誘導。",
       "factual_bullets": [
-        "日本語ファーストの 5 サービス構成フルスタック業務管理テンプレート",
+        "日本語ファーストの 7 サービス構成フルスタック業務管理テンプレート",
         "C/M/T/V/S 系の実践的な業務サンプル",
         "マルチ AI・WebSocket・Code AI 6 パネルの AI コア",
         "Electron/Web デュアルモード + VRM アバター",
-        "14 MCP TOOL HUB + ビデオ 9 ステップ全自動生成"
+        "19 MCP TOOL HUB + ビデオ Step00 から Step99 までの手順全自動生成"
       ],
       "forbidden_elements": [
         "AiDiy が商用製品として公式リリースされているかのような断言",
         "チャンネル登録数や視聴数への言及"
       ],
-      "image_prompt": "A triumphant summary visualization of AiDiy: center shows the AiDiy logo with circular orbit of feature icons (Japanese code, business dashboard, AI chat, VRM avatar, 14 MCP tools, video generation). Two avatar silhouettes (female right, male left) standing proudly. Blue color scheme with gold accents, inspiring futuristic aesthetic.",
+      "image_prompt": "A triumphant summary visualization of AiDiy: center shows the AiDiy logo with circular orbit of feature icons (Japanese code, business dashboard, AI chat, VRM avatar, 19 MCP tools, video generation). Two avatar silhouettes (female right, male left) standing proudly. Blue color scheme with gold accents, inspiring futuristic aesthetic.",
       "dialogue": [
         {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "AiDiy は日本語ファーストのフルスタック業務管理テンプレートと AI 自動化基盤です。",
-          "naration_text": "今回の動画で紹介した AiDiy は、FastAPI と Vue 3 を軸にした日本語ファーストのフルスタック業務管理テンプレートです。5 つのサービスが連携し、業務管理サンプル、AI コア、3D アバター、14 の MCP サーバーという多彩な機能が組み込まれています。テーブル名からコード変数まで日本語で統一した設計は、日本語圏の開発者が業務ドメインとコードを直感的に対応させる上で大きな助けになります。",
+          "naration_text": "今回の動画で紹介した AiDiy は、FastAPI と Vue 3 を軸にした日本語ファーストのフルスタック業務管理テンプレートです。7 つのサービスが連携し、業務管理サンプル、AI コア、3D アバター、19 の MCP サーバーという多彩な機能が組み込まれています。テーブル名からコード変数まで日本語で統一した設計は、日本語圏の開発者が業務ドメインとコードを直感的に対応させる上で大きな助けになります。",
           "audio": "audio/dlg_999_01_male.mp3",
-          "duration_sec": 25.632
+          "duration_sec": 25.728
         },
         {
           "speaker": "female",
           "expression": "neutral",
-          "telop_text": "業務サンプル・AI コア・アバター・14 MCP など、盛りだくさんの構成です。",
-          "naration_text": "特に印象的なのは、日本語ファースト設計のユニークさ、業務管理のリアルなサンプル、AI コアの多機能ぶり、Electron と Web の両対応アバター UI、そして 14 の MCP を集約した TOOL HUB という豊富な構成です。開発テンプレートとしても使えますし、AI 自動化の実験基盤としても活用できます。日本語を母国語とする開発者に向けて丁寧に作られていることが、細部からも伝わってきます。",
+          "telop_text": "業務サンプル・AI コア・アバター・19 MCP など、盛りだくさんの構成です。",
+          "naration_text": "特に印象的なのは、日本語ファースト設計のユニークさ、業務管理のリアルなサンプル、AI コアの多機能ぶり、Electron と Web の両対応アバター UI、そして 19 の MCP を集約した TOOL HUB という豊富な構成です。開発テンプレートとしても使えますし、AI 自動化の実験基盤としても活用できます。日本語を母国語とする開発者に向けて丁寧に作られていることが、細部からも伝わってきます。",
           "audio": "audio/dlg_999_02_female.mp3",
-          "duration_sec": 27.456
+          "duration_sec": 27.576
         },
         {
           "speaker": "male",
@@ -490,8 +559,8 @@ window.SCENARIO = {
           "duration_sec": 39.048
         }
       ],
-      "duration_sec": 117.336
+      "duration_sec": 117.552
     }
   ],
-  "total_duration_sec": 1015.896
+  "total_duration_sec": 1192.08
 };

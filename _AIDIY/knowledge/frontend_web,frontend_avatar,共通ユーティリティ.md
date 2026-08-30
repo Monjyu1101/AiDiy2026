@@ -6,7 +6,7 @@
 
 - Monaco Editor の Worker 設定や言語推定を変更するとき
 - qAlert / qConfirm / qColorPicker ダイアログの動作を変更するとき
-- 両プロジェクトで同じ実装がコピーされているユーティリティを修正するとき
+- 両プロジェクトで同じ実装がコピーされているユーティリティ・画面コンポーネントを修正するとき
 - モナコの拡張子マッピングに言語を追加するとき
 
 ## Monaco Editor ユーティリティ
@@ -102,7 +102,8 @@ const color = await qColorPicker('#ff0000', '色を選択')
 
 ## コピー状態の同期ルール
 
-`utils/` 以下のファイルは両プロジェクトで実質コピー状態です。以下のルールで運用します:
+`utils/` 以下のファイルと、AIタスク / AIチーム / AiDiy / `_share` 系の**画面コンポーネント**は
+両プロジェクトで実質コピー状態です。以下のルールで運用します:
 
 | 操作 | 手順 |
 |------|------|
@@ -117,3 +118,9 @@ const color = await qColorPicker('#ff0000', '色を選択')
 | `utils/monaco.ts` | ほぼ同一（avatar のマップがやや少ない） |
 | `utils/qAlert.ts` | ほぼ同一（web に qMessage 追加） |
 | `api/websocket.ts` | 同一インターフェース、実装に若干の差異あり |
+| `components/_share/*.vue`（qTublerFrame, qBooleanCheckbox など） | ほぼ同一 |
+| `components/AIタスク/**/*.vue`、`components/AIチーム/**/*.vue` | ほぼ同一（列定義・セル描画・scoped CSS まで同じ） |
+
+コンポーネントは `<template>` だけでなく **`<style scoped>` も両方に書く**こと。
+scoped CSS は片方に入れても他方へ波及しないため、見た目だけ片側に残る差異が生まれやすい。
+確認は両方の `npm run type-check`（MCP なら `check_typescript` を project ごとに 2 回）。

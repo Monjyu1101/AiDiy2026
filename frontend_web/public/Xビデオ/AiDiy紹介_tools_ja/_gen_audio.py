@@ -12,7 +12,7 @@ import os
 import urllib.error
 import urllib.request
 
-OUTPUT_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\AiDiy紹介_ToolHub\\audio'
+OUTPUT_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\AiDiy紹介_tools_ja\\audio'
 TTS_API_URL = 'http://127.0.0.1:8095/aidiy_text_to_speech/synthesize'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

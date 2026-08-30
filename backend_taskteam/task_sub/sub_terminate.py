@@ -50,6 +50,25 @@ _LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({})
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
+# 終了明細（最終検証）のタイムアウト。sub_proc.py と同じ計算で、終了明細の 予測分数 から求める。
+# 同期元: tasks_watcher.py の 明細標準タイムアウト分 / 明細タイムアウト倍率 / 明細最低タイムアウト分。
+# 渡さないと aidiy_code_agents 側の既定値（30分）が使われ、監視側の打ち切りと食い違う。
+CODE標準タイムアウト分 = 30
+CODEタイムアウト倍率 = 2
+CODE最低タイムアウト分 = 10
+CODE実行マージン秒 = 60
+CODE実行HTTP余裕秒 = 300
+
+
+def CODE実行タイムアウト秒(予測分数) -> int:
+    """明細の予測分数（分）から code_agents へ渡すタイムアウト秒を求める（sub_proc.py と同じ規則）。"""
+    try:
+        分 = int(str(予測分数).strip())
+    except (TypeError, ValueError):
+        分 = 0
+    制限分 = CODE標準タイムアウト分 if 分 <= 0 else max(CODE最低タイムアウト分, 分 * CODEタイムアウト倍率)
+    return max(60, 制限分 * 60 - CODE実行マージン秒)
+
 
 タスクID = ""
 明細SEQ = 0
@@ -199,11 +218,20 @@ def 検証実行(
         task_ai_name = str(対象.get("TASK_AI_NAME", "") or TASK_AI_NAME既定).strip()
         # 終了時の最終確認は check フェーズ。AIタスク要求の TASK_AI_MODEL_check を使う
         task_ai_model = 要求モデル(要求, "check")
-        ログ(f"code_agents run 呼び出し (検証, ai={task_ai_name}, model={task_ai_model}, project_path={プロジェクト})")
-        payload = {"prompt": プロンプト生成(タスクタイトル, 全明細, 対象, 完了明細), "ai_name": task_ai_name, "ai_model": task_ai_model}
+        実行秒 = CODE実行タイムアウト秒(対象.get("予測分数"))
+        ログ(
+            f"code_agents run 呼び出し (検証, ai={task_ai_name}, model={task_ai_model}, "
+            f"予測={対象.get('予測分数') or '未見積り'}, timeout={実行秒}秒, project_path={プロジェクト})"
+        )
+        payload = {
+            "prompt": プロンプト生成(タスクタイトル, 全明細, 対象, 完了明細),
+            "ai_name": task_ai_name,
+            "ai_model": task_ai_model,
+            "timeout_sec": 実行秒,
+        }
         if プロジェクト:
             payload["project_path"] = プロジェクト
-        res = POST送信(MCP_URL, payload)
+        res = POST送信(MCP_URL, payload, timeout=実行秒 + CODE実行HTTP余裕秒)
         ログ(f"code_agents run 応答: {json.dumps(res, ensure_ascii=False)[:500]}")
         if res.get("error") or res.get("status") != "OK":
             raise RuntimeError(f"code_agents の実行に失敗しました: {res.get('error') or res.get('result')}")

@@ -529,7 +529,10 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
 
 @router.post("/タスク要求/実行有効切替", tags=["タスク要求"])
 async def タスク要求実行有効切替(request: タスク実行有効切替リクエスト) -> dict:
-    """タスク要求と全タスク明細の実行有効フラグをまとめて更新する。"""
+    """タスク要求と全タスク明細の実行有効フラグをまとめて更新する。
+
+    有効化のときは、エラーで止まっている要求・明細を 待機 に戻して再実行できるようにする。
+    """
     タスクID = request.タスクID.strip()
     if not タスクID:
         return _NG("タスクIDを指定してください。")
@@ -548,13 +551,20 @@ async def タスク要求実行有効切替(request: タスク実行有効切替
 
 @router.post("/タスク明細/実行有効切替", tags=["タスク明細"])
 async def タスク明細実行有効切替(request: タスク明細実行有効切替リクエスト) -> dict:
-    """タスク明細 1 行の実行有効フラグを更新する。"""
+    """タスク明細 1 行の実行有効フラグを更新する。
+
+    有効化のときは、その明細が エラー / 完了 なら 待機 に戻して再実行できるようにする
+    （親のタスク要求も エラー / 完了 なら 待機 へ戻す）。完了を戻すのは、
+    仕上がりが気に入らないステップだけを選んで実行し直せるようにするため。
+    """
     タスクID = request.タスクID.strip()
     if not タスクID:
         return _NG("タスクIDを指定してください。")
     try:
         if not tasks_db.明細実行有効更新(タスクID, request.明細SEQ, request.実行有効):
             return _NG(f"タスク明細 {タスクID} SEQ={request.明細SEQ} が見つかりません。")
+        # 要求の状態が エラー から 待機 へ戻ることがあるので、次回実行日時を計算し直す
+        tasks_watcher.実行条件再計算(タスクID)
         表示 = "有効化" if request.実行有効 else "無効化"
         return _OK({}, f"タスク明細 SEQ={request.明細SEQ} を{表示}しました。")
     except Exception as e:
@@ -742,6 +752,11 @@ async def task_check_okng(request: タスク検証OKNGリクエスト) -> dict:
 
     http://127.0.0.1:8093/task_check_okng で日本語パスの percent-encode なしに呼べる。
     状態='完了' は 明細完了 と同じ扱い、状態='エラー' は 明細失敗 と同じ扱いで DB を更新する。
+
+    報告できるのは 状態='実行中' の明細（＝いま自分が実行を任されている 1 行）だけに限る。
+    制限が無いと、AI が「他のステップも実行済みだから」とまとめて完了報告してしまい、
+    実際には走っていない明細が 実行回数0・開始日時なし のまま完了になる。
+    後段の最終検証で辻褄が合わずエラーになるため、ここで受け付けない。
     """
     タスクID = request.タスクID.strip()
     状態 = request.状態.strip()
@@ -750,6 +765,19 @@ async def task_check_okng(request: タスク検証OKNGリクエスト) -> dict:
     if 状態 not in ("完了", "エラー"):
         return _NG("状態は 完了 または エラー を指定してください。")
     try:
+        現行 = tasks_db.明細1件取得(タスクID, request.SEQ)
+        if 現行 is None:
+            return _NG(f"タスク {タスクID} SEQ{request.SEQ} が見つかりません。")
+        現状態 = str(現行.get("状態", "")).strip()
+        if 現状態 != "実行中":
+            logger.warning(
+                f"実行中でない明細への報告を拒否しました: {タスクID} SEQ{request.SEQ} "
+                f"状態={現状態 or '不明'} 報告={状態}"
+            )
+            return _NG(
+                f"タスク {タスクID} SEQ{request.SEQ} は実行中ではありません（現在: {現状態 or '不明'}）。"
+                "いま実行を任されている明細だけが報告できます。他の明細の状態は変更できません。"
+            )
         if 状態 == "完了":
             item = tasks_db.明細完了(タスクID, request.SEQ, request.メッセージ)
             return _OK({"item": item}, f"タスク {タスクID} SEQ{request.SEQ} を完了として登録しました。")

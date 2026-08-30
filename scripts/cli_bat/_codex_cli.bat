@@ -2,6 +2,13 @@
 setlocal
 cd /d "%~dp0../.."
 
+title Codex CLI
+ECHO.
+ECHO ============================================================
+ECHO   Codex CLI
+ECHO   %~nx0
+ECHO ============================================================
+
 set "CODEX_CMD=%USERPROFILE%\AppData\Roaming\npm\codex.cmd"
 set "MODEL="
 set /p "UPDATE=update [N]/y: "

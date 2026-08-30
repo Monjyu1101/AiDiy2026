@@ -168,13 +168,14 @@ def register_image_gen_tools(mcp_ig, ig):
             prompt: 生成プロンプト（例: "かわいい猫の画像"）
             provider: "auto"=codex→antigravity→openai→freeai→gemini /
                       "gemini"（gemini_key_id が必要） /
-                      "freeai"（freeai_key_id が必要） / "openai" / "codex" / "antigravity"
+                      "freeai"（freeai_key_id が必要） / "openai" / "codex" / "antigravity" /
+                      "grok"=grok→codex→antigravity→openai→freeai→gemini
             model:
               OpenAI: "auto"=gpt-image-2 / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
               Gemini/FreeAI: "auto"=gemini-3.1-flash-image-preview /
                              "gemini-3.1-flash-image-preview" / "gemini-3-pro-image-preview" /
                              "gemini-2.5-flash-image"
-              Auto/Codex/Antigravity: 指定値は無視
+              Auto/Codex/Antigravity/Grok: 指定値は無視
             size:
               OpenAI: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" / ...
               Gemini/FreeAI: "auto"=1024x1024 / "512x512" / "1024x1024" / "1920x1080" / "1080x1920"
@@ -184,7 +185,7 @@ def register_image_gen_tools(mcp_ig, ig):
             original_path: 参照画像のパス（省略可）
             save_path: 保存先。フォルダ指定なら yyyymmdd.hhmmss.png で保存。
                        ファイル指定なら指定ファイルに保存。省略時は backend_server/temp/output/ に保存。
-                       Auto/Codex/Antigravity は backend_server/temp/output/yyyymmdd.hhmmss.png を必ず残し、
+                       Auto/Codex/Antigravity/Grok は backend_server/temp/output/yyyymmdd.hhmmss.png を必ず残し、
                        指定がある場合はその PNG を save_path にもコピーする。
         """
         try:
@@ -414,15 +415,15 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
             "methods": {
                 "generate": {
                     "summary": "AI 画像生成",
-                    "description": "プロンプトから画像を生成して base64 PNG で返す。auto/codex/antigravity は backend_server/temp/output/yyyymmdd.hhmmss.png を必ず残し、save_path 指定時は同じ PNG を追加コピーする。",
+                    "description": "プロンプトから画像を生成して base64 PNG で返す。auto/codex/antigravity/grok は backend_server/temp/output/yyyymmdd.hhmmss.png を必ず残し、save_path 指定時は同じ PNG を追加コピーする。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "生成プロンプト（例: 'かわいい猫の画像'）"},
-                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openai", "gemini", "freeai", "codex", "antigravity"], "description": "画像生成プロバイダ。auto=codex→antigravity→openai→freeai→gemini。codex=codex→antigravity→openai→freeai→gemini。openai=openai→freeai→gemini。freeai=freeai→gemini。gemini=gemini→openai。antigravity=antigravity→codex→freeai→gemini"},
-                        "model": {"type": "string", "required": False, "default": "auto", "description": "OpenAI: gpt-image-2 / dall-e-3。Gemini/FreeAI: gemini-3.1-flash-image-preview など。auto / codex / antigravity では無視"},
+                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openai", "gemini", "freeai", "codex", "antigravity", "grok"], "description": "画像生成プロバイダ。auto=codex→antigravity→openai→freeai→gemini。codex=codex→antigravity→openai→freeai→gemini。openai=openai→freeai→gemini。freeai=freeai→gemini。gemini=gemini→openai。antigravity=antigravity→codex→freeai→gemini。grok=grok→codex→antigravity→openai→freeai→gemini"},
+                        "model": {"type": "string", "required": False, "default": "auto", "description": "OpenAI: gpt-image-2 / dall-e-3。Gemini/FreeAI: gemini-3.1-flash-image-preview など。auto / codex / antigravity / grok では無視"},
                         "size": {"type": "string", "required": False, "default": "auto", "description": "解像度。例: '1024x1024' / '1920x1080' / '1080x1920'"},
                         "quality": {"type": "string", "required": False, "default": "auto", "description": "OpenAI only: low / medium / high / standard / hd"},
                         "original_path": {"type": "string", "required": False, "description": "編集元画像の絶対パス（image-to-image 時）"},
-                        "save_path": {"type": "string", "required": False, "description": "保存先。省略時は temp/output/ に yyyymmdd.hhmmss.png で自動保存。auto / codex / antigravity では timestamp PNG からコピー"},
+                        "save_path": {"type": "string", "required": False, "description": "保存先。省略時は temp/output/ に yyyymmdd.hhmmss.png で自動保存。auto / codex / antigravity / grok では timestamp PNG からコピー"},
                     },
                     "example_request": {"prompt": "富士山と桜の夕景、写実的", "provider": "auto", "size": "1920x1080"},
                     "response_fields": {"type": "image", "data": "PNG base64 文字列", "save_path": "保存先パス", "generated_path": "CLI 系の timestamp PNG パス", "mimeType": "image/png"},

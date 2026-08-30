@@ -2,6 +2,13 @@
 setlocal
 cd /d "%~dp0../.."
 
+title Claude Code
+ECHO.
+ECHO ============================================================
+ECHO   Claude Code
+ECHO   %~nx0
+ECHO ============================================================
+
 set "CLAUDE_CMD=%USERPROFILE%\AppData\Roaming\npm\claude.cmd"
 set "MODEL="
 set /p "UPDATE=update [N]/y: "

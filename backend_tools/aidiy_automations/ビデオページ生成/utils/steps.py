@@ -12,6 +12,7 @@ step_completion_notice を提供する。
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import time
 
@@ -23,7 +24,7 @@ from .infra import (
     sep, check, run_python_script,
     step_no_to_value, step_value_to_int,
     get_completed_step, set_completed_step, ensure_steps_json,
-    guide_tts, refresh_browser_preview,
+    guide_tts, refresh_browser_preview, start_final_playback,
     agent_run, step_instruction_header,
     verify_and_backup_until_stable,
     post_backup_api,
@@ -89,24 +90,66 @@ async def step00_preflight(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
 # Step 01: フォルダ作成
 # ================================================================== #
 
+def _テンプレートを機械コピー(template_dir: str, new_dir: str) -> tuple[list[str], list[str]]:
+    """テンプレートフォルダを Python で直接コピーする。
+
+    以前は AI へ robocopy を実行させていたが、コマンドの成否がエージェント任せになり
+    フォルダ作成が失敗することがあったため、コピー自体はここで機械的に済ませる
+    （AI には結果の確認だけを依頼する）。
+
+    - audio / images / __pycache__ の中身はコピーしない（各動画で生成するため）
+    - テンプレート側の進捗 Markdown はコピーしない（今回のテーマで作り直すため）
+    - 既存ファイルは上書きしない（作りかけの成果物を壊さないため）
+
+    戻り値: (コピーしたファイル名, 既存のため据え置いたファイル名)
+    """
+    除外フォルダ = {"audio", "images", "__pycache__", ".git"}
+    コピー済: list[str] = []
+    据え置き: list[str] = []
+    for root, dirs, files in os.walk(template_dir):
+        dirs[:] = [d for d in dirs if d not in 除外フォルダ]
+        相対 = os.path.relpath(root, template_dir)
+        出力先 = new_dir if 相対 == "." else os.path.join(new_dir, 相対)
+        os.makedirs(出力先, exist_ok=True)
+        for name in files:
+            if name.lower().endswith(".md"):
+                continue  # 進捗 Markdown は ensure_step_markdown が今回のテーマで作る
+            dst = os.path.join(出力先, name)
+            if os.path.isfile(dst):
+                据え置き.append(name)
+                continue
+            shutil.copy2(os.path.join(root, name), dst)
+            コピー済.append(name)
+    return コピー済, 据え置き
+
+
 async def step_create_folder(
     ctx: VideoGenCtx,
     ca: dict,
     knowledge_paths: tuple[str, str],
     attempt: int = 1,
 ) -> bool:
-    """Step 01: 出力フォルダの土台を作成する。"""
+    """Step 01: 出力フォルダの土台を作成する。
+
+    テンプレートのコピー・images/audio の作成・進捗 Markdown の作成は Python 側で機械的に行い、
+    AI には「揃っているか」「テンプレート由来の文言が残っていないか」の確認だけを依頼する。
+    """
     sep("Step 01: フォルダ作成")
     step_name = "Step 01: フォルダ作成"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
     template_dir = ctx.template_dir
-    news_knowledge, auto_knowledge = knowledge_paths
+    # knowledge_paths は他ステップと同じ引数で受けるが、このステップでは渡さない。
+    # 存在確認だけの作業にナレッジは不要で、読ませると調査が始まりタイムアウトの原因になる。
+    _ = knowledge_paths
 
+    # topic 全文（2000字超）は貼らない。フォルダの存在確認に内容は要らず、
+    # 長い指示ほど AI が余計な調査を始めてタイムアウトしやすくなるため。
     step_summary = (
-        f'  テーマ「{topic}」の動画フォルダ "{new_dir}" を作成します。\n'
-        "  テンプレートから index.html / scenario.js などをコピーし、images/・audio/ と進捗 Markdown を用意します。"
+        f'  動画フォルダ "{new_dir}" を用意します。\n'
+        "  テンプレートからのコピー、images/・audio/ の作成、進捗 Markdown の用意は\n"
+        "  このスクリプトが Python で実行済みです。AI 側はファイルの存在確認だけを行ってください。"
     )
 
     md_path    = os.path.join(new_dir, f"{folder_name}.md")
@@ -124,68 +167,82 @@ async def step_create_folder(
         and os.path.isfile(os.path.join(new_dir, "scenario.js"))
     )
     if folder_already_exists:
-        print("  [既存] コピー先に index.html / scenario.js が存在。テンプレートからの再コピーはスキップします")
+        print("  [既存] コピー先に index.html / scenario.js が存在します。テンプレートからのコピーは行いません")
     else:
-        print("  [新規] フォルダを作成します")
+        print("  [新規] テンプレートからフォルダを作成します")
 
     images_dir = os.path.join(new_dir, "images")
     audio_dir = os.path.join(new_dir, "audio")
-    md_content = (
-        f"# {folder_name}\n"
-        f"テーマ: {topic}\n\n"
-        "## 進捗\n"
-        "- [x] フォルダ作成\n"
-        "- [ ] シナリオ作成\n"
-        "- [ ] HTML修正\n"
-        "- [ ] 画像生成\n"
-        "- [ ] 中間確認\n"
-        "- [ ] 音声生成\n"
-        "- [ ] 再生時間更新\n"
-        "- [ ] 完成\n"
-    )
 
+    # テンプレートのコピーは AI に任せず機械的に行う。ただし出力フォルダが既にある場合は一切コピーしない
+    # （途中まで作った scenario.js などをテンプレートで壊さないため）
+    os.makedirs(new_dir, exist_ok=True)
+    if not folder_already_exists:
+        try:
+            コピー済, 据え置き = _テンプレートを機械コピー(template_dir, new_dir)
+            print(f"  [copy] テンプレートから {len(コピー済)} 件コピーしました（既存のため据え置き {len(据え置き)} 件）")
+            if コピー済:
+                表示 = ", ".join(コピー済[:12]) + (" ..." if len(コピー済) > 12 else "")
+                print(f"         {表示}")
+        except Exception as e:
+            print(f"  [copy] テンプレートのコピーに失敗しました: {e}")
+            _logger.exception("テンプレートのコピーに失敗しました")
+
+    # images / audio と進捗 Markdown も AI を待たずに用意する（AI 側は確認だけ）
+    os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(audio_dir, exist_ok=True)
+    ensure_step_markdown(md_path, folder_name, topic)
+
+    # 指示は「存在確認だけ」に絞る。調査・修正の余地を残すと AI が読み込みや点検を始め、
+    # フォルダ作成ステップが実行タイムアウトまで伸びるため。
     prompt = (
         step_instruction_header(ctx, step_name, step_summary)
-        + "以下の手順を実行してください。\n\n"
-        "【目的】\n"
-        f'「{topic}」というテーマの動画フォルダを作成する。\n\n'
-        "【参考ナレッジ】\n"
-        f'  - "{news_knowledge}"\n'
-        f'  - "{auto_knowledge}"\n\n'
+        + "このステップで行うのは、下記ファイルの存在確認だけです。\n"
+        "コピー・作成・修正・調査は一切行わないでください。ファイルの中身を開く必要もありません。\n\n"
+        "【確認するもの】次の 5 つがあるかどうかだけを見てください\n"
+        f'  "{index_path}"\n'
+        f'  "{os.path.join(new_dir, "scenario.js")}"\n'
+        f'  "{images_dir}"（この時点では空でよい）\n'
+        f'  "{audio_dir}"（この時点では空でよい）\n'
+        f'  "{md_path}"\n\n'
+        "【やらないこと】\n"
+        "  - robocopy / copy などでのコピー（Python 側で実行済みです）\n"
+        "  - 既存ファイルの上書き・削除・内容修正\n"
+        "  - index.html や scenario.js の中身の確認\n"
+        "    （テンプレートのテーマのままで正常です。Step 03 で更新します）\n"
+        "  - 参考資料・ナレッジ・設定ファイルの読み込み\n"
+        "  - 他フォルダの調査\n"
         + (
-            "【手順 1】テンプレートフォルダをコピー\n"
-            f'  robocopy "{template_dir}" "{new_dir}" /E /XD audio /XD images /XD __pycache__ /NP /NDL\n'
-            "  ※ robocopy は成功時に終了コード 1〜7 を返す（エラーは 8 以上）。\n"
-            "  ※ images/ は各動画で生成するため除外する。\n\n"
+            ""
             if not folder_already_exists else
-            "【手順 1】テンプレートフォルダのコピー — スキップ\n"
-            f'  コピー先 "{new_dir}" に index.html と scenario.js が存在するため\n'
-            "  テンプレートからの再コピーは絶対に行わないでください。\n"
-            "  既存ファイルの上書き・削除も禁止です。\n\n"
+            f'  - テンプレートからのコピー（"{new_dir}" には作りかけの内容が入っています）\n'
         )
-        + "【手順 2】images / audio フォルダを確認・作成\n"
-        f'  フォルダが存在しなければ作成: "{images_dir}"\n\n'
-        f'  フォルダが存在しなければ作成: "{audio_dir}"\n\n'
-        "【手順 3】進捗管理ファイルを作成\n"
-        f'  パス: "{md_path}"\n'
-        "  内容:\n"
-        f"{md_content}\n"
-        "【手順 4】作成後のファイル一覧を表示して確認\n"
+        + "\n"
+        "【報告】フォルダ直下のファイル一覧を表示し、上の 5 つが揃っているかだけ答えてください。\n"
+        "  足りないものがあれば名前を挙げるだけにしてください（補完は不要です）。\n"
     )
     await agent_run(ctx, ca, prompt, timeout_sec=180)
 
+    # AI が誤って消した場合に備えて、確認後にもう一度だけ整える（既存は壊さない）
     os.makedirs(images_dir, exist_ok=True)
     os.makedirs(audio_dir, exist_ok=True)
     ensure_step_markdown(md_path, folder_name, topic)
 
     def validate() -> bool:
-        return check(f"フォルダ存在: {new_dir}", os.path.isdir(new_dir))
+        ok1 = check(f"フォルダ存在: {new_dir}", os.path.isdir(new_dir))
+        ok2 = check("index.html 存在", os.path.isfile(index_path))
+        ok3 = check("scenario.js 存在", os.path.isfile(os.path.join(new_dir, "scenario.js")))
+        ok4 = check("images / audio フォルダ存在",
+                    os.path.isdir(images_dir) and os.path.isdir(audio_dir))
+        ok5 = check("進捗 Markdown 存在", os.path.isfile(md_path))
+        return ok1 and ok2 and ok3 and ok4 and ok5
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
         target_paths=[new_dir, index_path, os.path.join(new_dir, "scenario.js"), md_path],
-        validate=validate, verify_timeout_sec=600, attempt=attempt,
+        # 存在確認だけのステップなので検証エージェントにも長い時間を与えない
+        validate=validate, verify_timeout_sec=180, attempt=attempt,
     )
 
 
@@ -421,13 +478,16 @@ async def run_automation_loop(
                 print(f"  → [Step {step_no:02d}: {step_name}] 完了")
                 _logger.info("Step %02d [%s] 完了", step_no, step_name)
                 set_completed_step(ctx, step_no)
-                if 1 <= step_no <= 8:
+                # 生成途中は無音プレビュー、最終チェックが通ったら音声つきループ再生へ切り替える
+                if 1 <= step_no <= 7:
                     await refresh_browser_preview(
                         ctx,
                         f"Step {step_no:02d}: {step_name}",
                         ensure_fn=ensure_fn,
-                        speaker_enabled=step_no >= 8,
+                        speaker_enabled=False,
                     )
+                elif step_no in (8, 99):
+                    await start_final_playback(ctx, f"Step {step_no:02d}: {step_name}")
                 break
             else:
                 if attempt < ctx.max_retries:

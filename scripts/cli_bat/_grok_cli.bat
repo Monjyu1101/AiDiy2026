@@ -2,6 +2,13 @@
 setlocal
 cd /d "%~dp0../.."
 
+title Grok Build CLI
+ECHO.
+ECHO ============================================================
+ECHO   Grok Build CLI
+ECHO   %~nx0
+ECHO ============================================================
+
 set "MODEL="
 set /p "UPDATE=update [N]/y: "
 if /I "%UPDATE%"=="y" (

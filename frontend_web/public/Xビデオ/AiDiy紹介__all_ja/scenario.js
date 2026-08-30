@@ -31,8 +31,8 @@ window.SCENARIO = {
       "background_word": "",
       "kicker": "INTRODUCTION",
       "headline": "AiDiy の全体像と設計思想を\n6つのシーンで紹介します",
-      "lead": "日本語ファースト設計・サービス構成・業務サンプル・AI コア・MCP TOOL HUB・ビデオ自動生成まで、AiDiy の実態を順番に見ていきます。",
-      "subtitle": "日本語ファースト業務管理テンプレートの全機能・全特徴をわかりやすくお届けします。",
+      "lead": "日本語ファースト設計・サービス構成・業務サンプル・AI コアとアバター・MCP TOOL HUB・AIタスクと AIチーム・ビデオ自動生成まで、AiDiy の実態を順番に見ていきます。",
+      "subtitle": "日本語ファースト設計から AIタスク・AIチームまで、AiDiy の全体像を順番に紹介します。",
       "image": "images/scene_000.png",
       "chips": [],
       "metrics": [],
@@ -40,14 +40,14 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "image_prompt": "Square 1:1 hero poster for AiDiy. Make the word AiDiy itself the coolest central visual, with premium futuristic typography, strong cyan and electric blue glow, elegant Japanese enterprise AI platform mood, dark background, clean composition, high readability, polished technology branding aesthetic, no clutter, no extra fake logos, no dense paragraphs.",
-      "short_narration": "AiDiy は AI + Do It Yourself をコンセプトにした、日本語ファーストのフルスタック業務管理テンプレートです。",
-      "long_narration": "この動画は、AiDiy のビデオページ生成機能で自動生成されました。シナリオ作成から画像生成、音声合成、HTML 組み立てまで、すべてを MCP と CodeAgents が担当しています。AiDiy という名前には、AI と Do It Yourself、つまり AI の力を借りながら、自分たちの業務システムや自動化ツールを自分たちで作っていく、というコンセプトを込めています。日本語を第一言語として設計されたフルスタック業務管理テンプレートとして、FastAPI、SQLAlchemy、SQLite、Vue 3、Vite、TypeScript を中核に、実務に近い業務サンプルと AI 実験基盤をひとつにまとめています。このビデオでは、日本語ファースト設計、サービス構成、業務サンプル、AI コアとアバター、Code AI、そして MCP TOOL HUB とビデオ自動生成まで、AiDiy の全体像を 6 つのシーンで順番に紹介します。",
+      "short_narration": "AiDiy の全体像を紹介します。日本語ファースト設計、サービス構成、AI コア、MCP TOOL HUB、AIタスクと AIチームまで順番に見ていきます。",
+      "long_narration": "この動画は、AiDiy のビデオページ生成機能で自動生成されました。シナリオ作成から画像生成、音声合成、HTML 組み立てまで、すべてを MCP と CodeAgents が担当しています。AiDiy という名前には、AI と Do It Yourself、つまり AI の力を借りながら、自分たちの業務システムや自動化ツールを自分たちで作っていく、というコンセプトを込めています。日本語を第一言語として設計されたフルスタック業務管理テンプレートとして、FastAPI、SQLAlchemy、SQLite、Vue 3、Vite、TypeScript を中核に、実務に近い業務サンプルと AI 実験基盤をひとつにまとめています。このビデオでは、日本語ファースト設計、サービス構成、業務サンプル、AI コアとアバター、Code AI、MCP TOOL HUB、そして AIタスクと AIチーム、ビデオ自動生成まで、AiDiy の全体像を 6 つのシーンで順番に紹介します。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 7.44,
+      "short_duration_sec": 10.632,
       "long_start_sec": 0.0,
-      "long_duration_sec": 51.528
+      "long_duration_sec": 52.56
     },
     {
       "id": "scene_001",
@@ -116,13 +116,13 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "AiDiy は Python 3.13 の FastAPI と Vue 3 を中核に、業務サンプルと AI 実験基盤をひとつにまとめたテンプレートです。",
-      "long_narration": "AiDiy は、日本語を第一言語として設計されたフルスタック業務管理テンプレートです。Python 3.13 の FastAPI と SQLAlchemy、SQLite をバックエンドの中核に、フロントエンドは Vue 3 と Vite と TypeScript で構成します。権限管理、マスタ管理、トランザクション、スケジューラ、在庫管理などの業務サンプルを実装済みで含み、さらに AI チャット、音声、画像生成、Code AI エージェント、14 個の MCP ツールを統合した実験基盤でもあります。業務システムの開発テンプレートと AI 実験基盤を、ひとつのプロジェクトにまとめたのが AiDiy です。",
+      "long_narration": "AiDiy は、日本語を第一言語として設計されたフルスタック業務管理テンプレートです。Python 3.13 の FastAPI と SQLAlchemy、SQLite をバックエンドの中核に、フロントエンドは Vue 3 と Vite と TypeScript で構成します。権限管理、マスタ管理、トランザクション、スケジューラ、在庫管理などの業務サンプルを実装済みで含み、さらに AI チャット、音声、画像生成、Code AI エージェント、19 個の MCP ツールを統合した実験基盤でもあります。業務システムの開発テンプレートと AI 実験基盤を、ひとつのプロジェクトにまとめたのが AiDiy です。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 9.072,
+      "short_duration_sec": 8.376,
       "long_start_sec": 0.0,
-      "long_duration_sec": 36.84
+      "long_duration_sec": 37.104
     },
     {
       "id": "scene_002",
@@ -206,9 +206,9 @@ window.SCENARIO = {
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.936,
+      "short_duration_sec": 7.44,
       "long_start_sec": 0.0,
-      "long_duration_sec": 34.08
+      "long_duration_sec": 36.216
     },
     {
       "id": "scene_003",
@@ -218,8 +218,8 @@ window.SCENARIO = {
       "accent_soft": "rgba(255, 107, 214, 0.18)",
       "kicker": "ARCHITECTURE",
       "headline": "5 本のサービスが\nひとつの DB を中心に動く",
-      "lead": "backend_server が 2 本、backend_tools の MCP ハブ、frontend_web と frontend_avatar の 5 サービス構成です。",
-      "subtitle": "3 常駐バックエンド + 2 フロントエンドで、ひとつの SQLite DB を共有します。",
+      "lead": "backend_server が 2 本、backend_tools の MCP ハブ、AIタスクと AIチームを動かす backend_taskteam、ローカル推論の backend_local、frontend_web と frontend_avatar の構成です。",
+      "subtitle": "backend 4 種 + frontend 2 種。DB は 1 つの SQLite を共有します。",
       "image": "images/scene_003.png",
       "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 8098, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8092, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
       "chips": [
@@ -231,16 +231,16 @@ window.SCENARIO = {
       ],
       "metrics": [
         {
-          "label": "常駐サービス",
-          "value": "5"
+          "label": "backend",
+          "value": "4 種"
         },
         {
-          "label": "共有DB",
-          "value": "SQLite"
+          "label": "frontend",
+          "value": "2 種"
         },
         {
-          "label": "Vite proxy",
-          "value": "2本"
+          "label": "共有 DB",
+          "value": "SQLite 1 つ"
         }
       ],
       "cards": [
@@ -256,7 +256,7 @@ window.SCENARIO = {
           "title": "backend_tools",
           "lines": [
             "tools_main: 8095 (MCP TOOL HUB)",
-            "14 個の MCP を同一ポートに集約",
+            "19 個の MCP を同一ポートに集約",
             "SSE / HTTP / stdio 3 トランスポート"
           ]
         },
@@ -275,11 +275,19 @@ window.SCENARIO = {
             "Three.js + @pixiv/three-vrm",
             "AI アバタークライアント"
           ]
+        },
+        {
+          "title": "backend_taskteam / backend_local",
+          "lines": [
+            "taskteam: 8093 (AIタスク + AIチーム)",
+            "local: 8096 (OpenAI 互換 Gemma 推論)",
+            "DB は backend_server と同じ SQLite を共有"
+          ]
         }
       ],
       "facts": [
         "backend_server は core_main (8091) と apps_main (8098) の 2 サーバー構成で同じ SQLite DB を共有する。",
-        "backend_tools (8095) は 14 個の MCP サーバーを同居させ SSE / Streamable HTTP / stdio を提供する。",
+        "backend_tools (8095) は 19 個の MCP サーバーを同居させ SSE / Streamable HTTP / stdio を提供する。",
         "frontend_web の Vite プロキシは /core を 8091、/apps を 8098 に振り分ける。"
       ],
       "evidence": [
@@ -292,14 +300,14 @@ window.SCENARIO = {
           "text": "backend_server core 8091 / apps 8098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092。"
         }
       ],
-      "short_narration": "AiDiy は 5 本のサービスで動きます。2 つのバックエンド、MCP ハブ、Web と Avatar フロントエンドです。",
-      "long_narration": "AiDiy のサービス構成は 5 本です。backend_server の core_main が 8091 番ポートで認証・権限・AI コアを担当し、apps_main が 8098 番ポートで業務系 API を扱います。backend_tools は 8095 番ポートで 14 個の MCP ツールを提供するハブです。frontend_web は 8090 番ポートで Vue 3 の Web UI を提供し、Vite プロキシで /core を 8091 に、/apps を 8098 に振り分けます。frontend_avatar は 8092 番ポートで Electron とブラウザの両方に対応する AI アバタークライアントです。2 つのバックエンドは同じ SQLite DB ファイルを共有しています。",
+      "short_narration": "バックエンド 4 種、フロントエンド 2 種の構成です。MCP ハブ、AIタスクとチームの実行基盤、ローカル推論が独立して動きます。",
+      "long_narration": "AiDiy のサービス構成を見ていきます。バックエンドは 4 種類です。backend_server は 2 本立てで、ポート 8091 の core_main が認証と AI コア、ポート 8098 の apps_main が業務データを担当します。backend_tools はポート 8095 の MCP TOOL HUB で、19 個の MCP サーバーをひとつのポートに集約しています。backend_taskteam はポート 8093 で、AIタスクと AIチームの実行基盤です。backend_local はポート 8096 で、OpenAI 互換のローカル推論サーバーを提供します。フロントエンドは 2 種類。ポート 8090 の frontend_web が業務画面を、ポート 8092 の frontend_avatar が Electron と Web のデュアルモードで AI アバターを担当します。データベースはひとつの SQLite を全サービスで共有しているので、業務データと AI の実行履歴を同じ場所で扱えます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.984,
+      "short_duration_sec": 8.232,
       "long_start_sec": 0.0,
-      "long_duration_sec": 39.96
+      "long_duration_sec": 48.552
     },
     {
       "id": "scene_004",
@@ -387,9 +395,9 @@ window.SCENARIO = {
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.024,
+      "short_duration_sec": 6.408,
       "long_start_sec": 0.0,
-      "long_duration_sec": 44.52
+      "long_duration_sec": 43.152
     },
     {
       "id": "scene_005",
@@ -478,19 +486,19 @@ window.SCENARIO = {
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 7.296,
+      "short_duration_sec": 6.84,
       "long_start_sec": 0.0,
-      "long_duration_sec": 47.304
+      "long_duration_sec": 44.64
     },
     {
       "id": "scene_006",
-      "title": "MCP TOOL HUB × 14 とビデオ自動生成",
+      "title": "MCP TOOL HUB × 19 とビデオ自動生成",
       "expression": "neutral",
       "accent": "#00e0b8",
       "accent_soft": "rgba(0, 224, 184, 0.18)",
       "kicker": "MCP HUB + AUTO VIDEO",
-      "headline": "14 の MCP がつながり、\nこの動画も全自動で生成された",
-      "lead": "backend_tools は 14 個の MCP をひとつのポートに集約し、AI エージェントがブラウザ操作から動画生成まで担います。",
+      "headline": "19 個の MCP をひとつのポートに集約\nブラウザ操作から動画生成まで",
+      "lead": "backend_tools は 19 個の MCP をひとつのポートに集約し、AI エージェントがブラウザ操作から動画生成まで担います。",
       "subtitle": "MCP は飾りではなく、AI の観測・生成・検証を支える実働ツール群。このビデオもその産物です。",
       "image": "images/scene_006.png",
       "image_prompt": "Vertical 2:3 MCP hub infographic poster, center AI agent node with fourteen connected utility nodes for browser, desktop, sqlite, postgres, logs, code check, backup, image generation, movie generation, speech-to-text, text-to-speech, OBS studio control, ffmpeg control, code agents, clean green-cyan enterprise network diagram on dark background, modern technical style, no mascots",
@@ -503,16 +511,16 @@ window.SCENARIO = {
       ],
       "metrics": [
         {
-          "label": "MCP数",
-          "value": "14"
+          "label": "MCP サーバー",
+          "value": "19 個"
         },
         {
           "label": "ポート",
-          "value": "8095"
+          "value": "8095 に集約"
         },
         {
-          "label": "自動化ステップ",
-          "value": "9"
+          "label": "トランスポート",
+          "value": "SSE / HTTP / stdio"
         }
       ],
       "cards": [
@@ -536,7 +544,8 @@ window.SCENARIO = {
           "lines": [
             "aidiy_image_generation / aidiy_movie_generation",
             "aidiy_speech_to_text / aidiy_text_to_speech",
-            "aidiy_obs_studio_control / aidiy_ffmpeg_control / aidiy_code_agents"
+            "aidiy_obs_studio_control / aidiy_ffmpeg_control",
+            "aidiy_windows_control / aidiy_notification_sounds"
           ]
         },
         {
@@ -544,33 +553,125 @@ window.SCENARIO = {
           "lines": [
             "topic → scenario.js 生成",
             "画像生成 → 音声合成 → HTML 組み立て",
-            "9 ステップを MCP + CodeAgents が全自動化"
+            "Step00 から Step99 まで MCP + CodeAgents が全自動化"
+          ]
+        },
+        {
+          "title": "AI 連携",
+          "lines": [
+            "aidiy_code_agents (Code CLI 実行)",
+            "aidiy_chat_llms (チャット LLM)",
+            "aidiy_task_agents / aidiy_team_agents"
           ]
         }
       ],
       "facts": [
-        "backend_tools は 14 個の MCP サーバーを SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 に集約する。",
+        "backend_tools は 19 個の MCP サーバーを SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 に集約する。",
         "ビデオページ生成は 2 スクリプト（ひとりアバター用 / 二人掛け合い用）で topic から HTML まで 9 ステップを全自動化する。",
         "知識の整理は _AIDIY/knowledge/_index.md が全 HowTo の入口。"
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "backend_tools は 14 個の MCP サーバーを SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 に集約します。"
+          "text": "backend_tools は 19 個の MCP サーバーを SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 に集約します。"
         },
         {
           "source": "AGENTS.md",
           "text": "ビデオページ生成自動化: topic から scenario.js 生成→画像生成→音声合成→HTML 組み立てまでを 9 ステップで全自動化。"
         }
       ],
-      "short_narration": "14 個の MCP がひとつのポートに集まり、この動画も AiDiy 自身の機能で全自動生成しています。",
-      "long_narration": "backend_tools は 8095 番ポートに 14 個の MCP サーバーを同居させた TOOL HUB です。ブラウザ自動操作、デスクトップキャプチャ、SQLite・PostgreSQL のデータ参照、ログ監視、コードチェック、バックアップ、画像生成、動画生成、音声認識、音声合成、OBS Studio 制御、FFmpeg 制御、コードエージェント実行まで揃っています。SSE・Streamable HTTP・stdio の 3 トランスポートを同一ポートで提供し、HTTP POST でどこからでも呼び出せます。そして今見ているこのビデオ自体が AiDiy のビデオページ生成機能で自動生成されています。シナリオ作成から画像生成、音声合成、HTML 組み立てまで 9 ステップを MCP と CodeAgents が全自動で処理しました。",
+      "short_narration": "19 個の MCP がひとつのポートに集まり、この動画も AiDiy 自身の機能で全自動生成しています。",
+      "long_narration": "backend_tools は 8095 番ポートに 19 個の MCP サーバーを同居させた TOOL HUB です。ブラウザ自動操作、デスクトップキャプチャ、SQLite・PostgreSQL のデータ参照、ログ監視、コードチェック、バックアップ、画像生成、動画生成、音声認識、音声合成、OBS Studio 制御、FFmpeg 制御、コードエージェント実行まで揃っています。SSE・Streamable HTTP・stdio の 3 トランスポートを同一ポートで提供し、HTTP POST でどこからでも呼び出せます。そして今見ているこのビデオ自体が AiDiy のビデオページ生成機能で自動生成されています。シナリオ作成から画像生成、音声合成、HTML 組み立てまで 9 ステップを MCP と CodeAgents が全自動で処理しました。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.48,
+      "short_duration_sec": 6.864,
       "long_start_sec": 0.0,
-      "long_duration_sec": 48.84
+      "long_duration_sec": 50.232
+    },
+    {
+      "id": "scene_007",
+      "title": "AIタスクと AIチーム",
+      "expression": "neutral",
+      "accent": "#7dffb3",
+      "accent_soft": "rgba(125, 255, 179, 0.18)",
+      "kicker": "AI TASK + AI TEAM",
+      "headline": "日本語で書くだけで手順に分けて自動実行\n3D 空間では AI 要員がチームで動く",
+      "lead": "AIタスクは、日本語で書いた要求を AI が実行明細へ分解し、依存関係を判断しながら自動実行します。定時実行に登録すれば人が居なくても動き続けます。AIチームは AI の要員が 3D 空間に集まり、相談しながら仕事を分担し、やった経験を次に活かします。",
+      "subtitle": "要求を書く → AI が手順に分ける → 順番と並行を判断して実行 → 決めた時刻に自分から動く。",
+      "image": "images/scene_007.png",
+      "image_prompt": "Vertical 2:3 concept poster split into two halves: the upper half shows an automated task flow with branching nodes and a clock icon indicating scheduled execution, the lower half shows several gentle glowing AI companions gathered in a park-like 3D space exchanging speech bubbles. Dark background, cyan and green glow, modern technical illustration, no text baked into the image.",
+      "chips": [
+        "要求を日本語で書く",
+        "AI が明細へ分解",
+        "先行SEQ による並行実行",
+        "定時実行",
+        "AI 要員が相談"
+      ],
+      "metrics": [
+        {
+          "label": "担当サーバー",
+          "value": "backend_taskteam:8093"
+        },
+        {
+          "label": "API",
+          "value": "/task/* と /team/*"
+        },
+        {
+          "label": "実行区分",
+          "value": "即時 / 時間指定 / 間隔 / 定時"
+        }
+      ],
+      "cards": [
+        {
+          "title": "AIタスク",
+          "lines": [
+            "日本語の要求を AI が実行明細へ分解",
+            "先行SEQ による DAG で順番と並行を判断",
+            "即時・時間指定・間隔・定時実行から選べる"
+          ]
+        },
+        {
+          "title": "AIチーム",
+          "lines": [
+            "歴史上の人物から AI 要員を召喚",
+            "3D 空間で相談し、チーム作業を決める",
+            "PlanDo / SPDCA の作業ループで進める"
+          ]
+        },
+        {
+          "title": "任せられる仕組み",
+          "lines": [
+            "開始時に差分バックアップを自動取得",
+            "操作検証つき明細は 1 回だけ自動リトライ",
+            "完了タスクは経験として次の担当選びに活きる"
+          ]
+        }
+      ],
+      "facts": [
+        "AIタスク・AIチームは backend_taskteam（ポート 8093）が担当し、API は /task/* と /team/*。",
+        "明細の依存は先行SEQ（カンマ区切りで複数指定可）による DAG で、依存を満たした明細は並行起動する。",
+        "実行区分は即時 / 時間指定 / 間隔実行 / 定時実行の 4 種。実行条件にフォルダ変化も選べる。",
+        "Aチーム依頼は有効要員の経験を材料に AI が担当を選び、完了後に経験を生成して次へ再利用する。"
+      ],
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "text": "Backend TaskTeam: AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合したサーバー（ポート 8093）。"
+        },
+        {
+          "source": "backend_taskteam/AGENTS.md",
+          "text": "有効要員一覧と要員ごとの Aチーム経験を材料に、AI へ担当要員を選ばせる。経験のある要員へ寄せることで蓄積ナレッジが再利用される。"
+        }
+      ],
+      "short_narration": "AIタスクは日本語の要求を AI が手順に分けて自動実行します。AIチームでは AI の要員が集まり、相談しながら仕事を分担します。",
+      "long_narration": "AiDiy には、AI に仕事そのものを任せる仕組みがふたつあります。ひとつめが AIタスクです。やってほしいことを日本語で書くと、AI がその中身を読んで実行明細へ分解します。明細には先行SEQ で依存関係を持たせられるので、順番に進めるものと同時に進められるものを判断しながら実行します。実行の開始条件は 4 種類。すぐ動かす即時、日時を決める時間指定、分や時の単位でくり返す間隔実行、そして毎日・毎週・毎月の決まった時刻に動く定時実行です。監視フォルダの変化をきっかけにすることもできます。ふたつめが AIチームです。歴史上の人物をもとにした AI 要員を召喚してチームを作り、3D の空間に集まった要員が相談しながら、今やるべきことを決めていきます。依頼を出すと、これまでの経験をもとに AI が担当者を選び、そのまま AIタスクとして実行されます。終わった仕事は経験として蓄積され、次の担当選びに活きていきます。どちらも backend_taskteam が担当し、業務データと同じ SQLite を共有しています。",
+      "short_audio": "audio/short_scene_007.mp3",
+      "long_audio": "audio/long_scene_007.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 10.008,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 59.112
     },
     {
       "id": "scene_999",
@@ -593,15 +694,15 @@ window.SCENARIO = {
       "evidence": [],
       "image_prompt": "Square 1:1 ending visual for AiDiy. Beautiful typography centered on 'Thank you for Watching', refined luxury tech style, dark blue gradient background, subtle violet glow, clean centered layout, premium and readable, no extra UI elements, no character, no clutter. Polished square closing card suitable for a product introduction ending.",
       "short_narration": "ご視聴ありがとうございました。チャンネル登録をぜひお願いします。AiDiy でなにを創りますか？",
-      "long_narration": "ご視聴ありがとうございました。この動画は AiDiy 自身のビデオページ生成機能で自動生成されました。シナリオ作成・画像生成・音声合成・HTML 組み立てを、すべて MCP と CodeAgents が担当しています。AiDiy には日本語ファースト設計、5 つのサービス、豊富な業務サンプル、AI コア、14 個の MCP ツール、そして自動ビデオ生成まで、いますぐ動かせる部品がそろっています。気に入っていただけたら、チャンネル登録でぜひ応援してください。次の動画でまた会いましょう！日本語ファースト設計と AI の組み合わせが気になった方は、ぜひ AiDiy を手元で動かしてみてください。あなたならこのテンプレートで、どんな業務システムや AI 実験を作りますか？",
+      "long_narration": "ご視聴ありがとうございました。この動画は AiDiy 自身のビデオページ生成機能で自動生成されました。シナリオ作成・画像生成・音声合成・HTML 組み立てを、すべて MCP と CodeAgents が担当しています。AiDiy には日本語ファースト設計、7 つのサービス、豊富な業務サンプル、AI コア、19 個の MCP ツール、そして自動ビデオ生成まで、いますぐ動かせる部品がそろっています。気に入っていただけたら、チャンネル登録でぜひ応援してください。次の動画でまた会いましょう！日本語ファースト設計と AI の組み合わせが気になった方は、ぜひ AiDiy を手元で動かしてみてください。あなたならこのテンプレートで、どんな業務システムや AI 実験を作りますか？",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.024,
+      "short_duration_sec": 5.592,
       "long_start_sec": 0.0,
-      "long_duration_sec": 40.224
+      "long_duration_sec": 39.384
     }
   ],
-  "total_short_duration_sec": 56.256,
-  "total_long_duration_sec": 343.296
+  "total_short_duration_sec": 70.392,
+  "total_long_duration_sec": 410.952
 };

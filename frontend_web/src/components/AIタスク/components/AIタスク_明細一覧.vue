@@ -32,6 +32,8 @@ const columns: Column[] = [
   { key: '開始日時', label: '開始日時', width: '140px', sortable: false, align: 'center' },
   { key: '終了日時', label: '終了日時', width: '140px', sortable: false, align: 'center' },
   { key: '実行回数', label: '実行回数', width: '70px', sortable: false, align: 'right' },
+  { key: '予測分数', label: '予測分', width: '60px', sortable: false, align: 'right' },
+  { key: '実績分数', label: '実績分', width: '60px', sortable: false, align: 'right' },
   { key: '応答内容', label: '応答内容', width: '240px', sortable: false },
   { key: '更新日時', label: '更新日時', width: '140px', sortable: false, align: 'center' }
 ];
@@ -103,7 +105,11 @@ const 自動更新開始 = () => {
 // 実行有効欄クリック: 確認のうえタスク明細 1 行の実行有効フラグを切り替える
 const 実行有効切替 = async (row: Record<string, any>) => {
   const 新実行有効 = !row.実行有効;
-  const confirmed = await qConfirm(`タスク明細を${新実行有効 ? '有効化' : '無効化'}しますか？`);
+  // 有効化はエラー・完了とも待機へ戻す（＝そのステップの再実行）ので、その旨を確認文に出す
+  const 確認文 = 新実行有効
+    ? 'タスク明細を有効化しますか？\nエラー・完了のステップは待機に戻り、もう一度実行されます。'
+    : 'タスク明細を無効化しますか？';
+  const confirmed = await qConfirm(確認文);
   if (!confirmed) return;
   try {
     const res = await apiClient.post('/task/タスク明細/実行有効切替', {
@@ -205,7 +211,9 @@ onBeforeUnmount(() => {
             >{{ value ?? '' }}</a>
           </template>
           <template v-else-if="column.key === '操作検証'">
-            <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="操作検証状態" />
+            <span class="check-flag">
+              <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="操作検証状態" />
+            </span>
           </template>
           <template v-else-if="column.key === '実行有効'">
             <button
@@ -216,6 +224,10 @@ onBeforeUnmount(() => {
             >
               <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="実行有効状態" />
             </button>
+          </template>
+          <template v-else-if="column.key === '予測分数' || column.key === '実績分数'">
+            <!-- 未見積り・未実行の 0 は空欄にして、値のある行だけ目に入るようにする -->
+            {{ Number(value ?? 0) > 0 ? value : '' }}
           </template>
           <template v-else-if="column.key === '状態'">
             <span :class="状態クラス(value)">{{ value ?? '' }}</span>
@@ -403,6 +415,26 @@ onBeforeUnmount(() => {
   justify-content: center;
   color: rgba(220, 214, 247, 0.55);
   font-size: 13px;
+}
+
+/* 操作検証は実行有効と同じ大きさに揃え、色は淡いグレー（クリックできない表示専用の印） */
+.check-flag {
+  display: inline-flex;
+  align-items: center;
+}
+
+.check-flag :deep(.readonly-checkbox) {
+  width: 12px;
+  height: 12px;
+}
+
+.check-flag :deep(.readonly-checkbox-mark) {
+  font-size: 9px;
+}
+
+.check-flag :deep(.readonly-checkbox.is-checked) {
+  border-color: #9aa8b5;
+  background: #9aa8b5;
 }
 
 .valid-toggle {

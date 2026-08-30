@@ -48,13 +48,14 @@ from utils.infra import (
 )
 from utils.generation import (
     ensure_scene_image_script, ensure_dialogue_audio_script,
-    validate_scene_id_range, index_html_matches_theme,
+    validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs, index_html_matches_theme,
     ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, count_scenario_scenes, count_scenario_dialogues,
 )
 from utils.steps import (
     step00_preflight, step_generate_audio,
     step_update_durations, step_completion_notice,
+    _テンプレートを機械コピー,
 )
 
 # ================================================================== #
@@ -228,9 +229,9 @@ async def step_create_folder(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bo
     topic = ctx.topic
 
     step_summary = (
-        f'  テンプレートフォルダを "{new_dir}" へコピーします。\n'
-        "  ★ このステップではファイルの内容（テキスト）を一切変更しません。コピーと空フォルダ作成のみです。\n"
-        f"  ★ テンプレート（元ファイル）: {ctx.template_dir} — 翻訳ステップでいつでも参照できます。"
+        f'  動画フォルダ "{new_dir}" を用意します。\n'
+        "  テンプレートのコピーと images/・audio/ の作成は、このスクリプトが Python で実行済みです。\n"
+        "  AI 側はファイルの存在確認だけを行ってください。内容の変更・翻訳は一切しません。"
     )
     md_path    = os.path.join(new_dir, f"{folder_name}.md")
     index_path = os.path.join(new_dir, "index.html")
@@ -247,45 +248,48 @@ async def step_create_folder(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bo
 
     images_dir = os.path.join(new_dir, "images")
     audio_dir = os.path.join(new_dir, "audio")
-    md_content = (
-        f"# {folder_name}\n"
-        f"テーマ: {topic}\n\n"
-        "## 進捗\n"
-        "- [x] フォルダ作成\n"
-        "- [ ] シナリオ作成\n"
-        "- [ ] HTML修正\n"
-        "- [ ] 画像生成\n"
-        "- [ ] 中間確認\n"
-        "- [ ] 音声生成\n"
-        "- [ ] 再生時間更新\n"
-        "- [ ] 完成\n"
-    )
 
+    # テンプレートのコピーは AI に任せず機械的に行う。ただし出力フォルダが既にある場合は一切コピーしない
+    os.makedirs(new_dir, exist_ok=True)
+    if not folder_already_exists:
+        try:
+            コピー済, 据え置き = _テンプレートを機械コピー(ctx.template_dir, new_dir)
+            print(f"  [copy] テンプレートから {len(コピー済)} 件コピーしました（既存のため据え置き {len(据え置き)} 件）")
+        except Exception as e:
+            print(f"  [copy] テンプレートのコピーに失敗しました: {e}")
+    else:
+        print("  [copy] 既存フォルダのため、テンプレートからのコピーは行いません")
+    os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(audio_dir, exist_ok=True)
+    ensure_step_markdown(md_path, folder_name, topic)
+
+    # 指示は「存在確認だけ」に絞る。調査・修正の余地を残すと AI が読み込みや点検を始め、
+    # フォルダ作成ステップが実行タイムアウトまで伸びるため。
     prompt = (
         "以下は AiDiy の自動ビデオ生成ワークフローの 1 ステップです。\n\n"
-        "【★ 最重要制約 ★】\n"
-        "  このステップはファイルのコピーと空フォルダ作成のみです。\n"
-        "  ファイルの内容（テキスト）を絶対に変更・翻訳しないでください。\n"
-        f"  テンプレート（元ファイル）は {ctx.template_dir} にあり、翻訳ステップでいつでも参照できます。\n\n"
         f"【今回のステップ内容】\n{step_summary}\n\n"
-        "以下の手順を実行してください。\n\n"
+        "このステップで行うのは、下記ファイルの存在確認だけです。\n"
+        "コピー・作成・修正・翻訳・調査は一切行わないでください。ファイルの中身を開く必要もありません。\n\n"
+        "【確認するもの】次の 5 つがあるかどうかだけを見てください\n"
+        f'  "{index_path}"\n'
+        f'  "{scenario_path}"\n'
+        f'  "{images_dir}"（この時点では空でよい）\n'
+        f'  "{audio_dir}"（この時点では空でよい）\n'
+        f'  "{md_path}"\n\n'
+        "【やらないこと】\n"
+        "  - robocopy / copy などでのコピー（Python 側で実行済みです）\n"
+        "  - 既存ファイルの上書き・削除・内容修正・翻訳\n"
+        "  - index.html や scenario.js の中身の確認（翻訳前のままで正常です）\n"
+        "  - 参考資料・ナレッジ・設定ファイルの読み込み\n"
+        "  - 他フォルダの調査\n"
         + (
-            "【手順 1】テンプレートフォルダをコピー\n"
-            f'  robocopy "{ctx.template_dir}" "{new_dir}" /E /XD audio /XD images /XD __pycache__ /NP /NDL\n'
-            "  ※ robocopy は成功時に終了コード 1〜7 を返す（エラーは 8 以上）。\n"
-            "  ※ コピーしたファイルの内容は一切編集しない。\n\n"
+            ""
             if not folder_already_exists else
-            "【手順 1】テンプレートフォルダのコピー — スキップ\n"
-            f'  コピー先 "{new_dir}" に index.html と scenario.js が存在するため再コピーしない。\n\n'
+            f'  - テンプレートからのコピー（"{new_dir}" には作りかけの内容が入っています）\n'
         )
-        + "【手順 2】images / audio フォルダを確認・作成\n"
-        f'  フォルダが存在しなければ作成: "{images_dir}"\n'
-        f'  フォルダが存在しなければ作成: "{audio_dir}"\n\n'
-        "【手順 3】進捗管理ファイルを作成\n"
-        f'  パス: "{md_path}"\n'
-        f"  内容:\n{md_content}\n"
-        "【手順 4】作成後のファイル一覧を表示して確認\n"
-        "  index.html と scenario.js が存在すれば OK。内容は確認不要（翻訳しない）。\n"
+        + "\n"
+        "【報告】フォルダ直下のファイル一覧を表示し、上の 5 つが揃っているかだけ答えてください。\n"
+        "  足りないものがあれば名前を挙げるだけにしてください（補完は不要です）。\n"
     )
     await agent_run(ctx, ca, prompt, timeout_sec=180)
 
@@ -301,7 +305,8 @@ async def step_create_folder(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bo
     if not (ok1 and ok2 and ok3 and ok4 and ok5):
         return False
 
-    diff = backup_diff_count_url(ctx.backup_api_url)
+    # 判定は全体の差分件数のまま。内訳として出力フォルダ配下の件数も表示させる
+    diff = backup_diff_count_url(ctx.backup_api_url, new_dir, folder_name)
     if diff > 0:
         backup_save_once_url(ctx.backup_api_url)
     return True
@@ -392,7 +397,9 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
                 "window.SCENARIO" in c and "scene_999" in c and folder_name in c,
             )
         ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=10, label="翻訳シナリオ") if ok1 else False
-        return ok1 and ok2 and ok3
+        ok4 = validate_scene_expressions(scenario_path, label="翻訳シナリオ") if ok1 else False
+        ok5 = validate_scene_media_refs(scenario_path, label="翻訳シナリオ") if ok1 else False
+        return ok1 and ok2 and ok3 and ok4 and ok5
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
@@ -540,8 +547,9 @@ async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
+        # 画像は件数が多く検証エージェントの確認に時間がかかるため、他ステップより長めにする
         target_paths=[scenario_path, gen_img_py, images_dir, md_path],
-        validate=validate, verify_timeout_sec=300, attempt=attempt,
+        validate=validate, verify_timeout_sec=600, attempt=attempt,
     )
 
 

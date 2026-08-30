@@ -56,6 +56,9 @@ const props = defineProps({
         <RouterLink to="/リンク" active-class="active" class="tab">
           リンク
         </RouterLink>
+        <RouterLink to="/Xビデオ" active-class="active" class="tab">
+          Xビデオ
+        </RouterLink>
         <RouterLink to="/Xその他" active-class="active" class="tab">
           Xその他
         </RouterLink>

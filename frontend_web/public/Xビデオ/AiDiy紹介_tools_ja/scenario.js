@@ -1,10 +1,10 @@
 window.SCENARIO = {
-  "project_name": "AiDiy紹介_ToolHub",
+  "project_name": "AiDiy紹介_tools_ja",
   "version": "mcp",
-  "title": "AiDiy TOOL HUB - 14 の MCP が繋がるツール基盤",
+  "title": "AiDiy TOOL HUB - 19 の MCP が繋がるツール基盤",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "backend_tools の 14 MCP と 3 トランスポート構成を AGENTS.md / backend_tools/AGENTS.md から抜粋し、ToolHub 紹介として構成する。"
+    "summary": "backend_tools の 19 MCP と 3 トランスポート構成を AGENTS.md / backend_tools/AGENTS.md から抜粋し、ToolHub 紹介として構成する。"
   },
   "target": {
     "language": "ja-JP",
@@ -27,10 +27,10 @@ window.SCENARIO = {
       "accent": "#29d8ff",
       "accent_soft": "rgba(41, 216, 255, 0.2)",
       "kicker": "INTRODUCTION",
-      "headline": "14 のツールが集まる\nAiDiy の TOOL HUB",
+      "headline": "19 のツールが集まる\nAiDiy の TOOL HUB",
       "image": "images/scene_000.png",
       "chips": [
-        "14 MCP",
+        "19 MCP",
         "ポート 8095",
         "3 トランスポート",
         "HTTP API 直接呼び出し"
@@ -38,36 +38,38 @@ window.SCENARIO = {
       "metrics": [],
       "cards": [],
       "facts": [
-        "backend_tools はポート 8095 で 14 個の MCP サーバーを同居させる。",
+        "backend_tools はポート 8095 で 19 個の MCP サーバーを同居させる。",
         "SSE / Streamable HTTP / stdio の 3 トランスポートを同一ポートで提供する。",
         "Web ブラウザ、Python スクリプト、AI エージェントいずれからも統一的に呼び出せる。"
       ],
       "evidence": [
         {
           "source": "backend_tools/AGENTS.md",
-          "text": "backend_tools はポート 8095 上で 14 個の MCP サーバーを同居させる FastMCP アプリケーション。"
+          "text": "backend_tools はポート 8095 上で 19 個の MCP サーバーを同居させる FastMCP アプリケーション。"
         },
         {
           "source": "AGENTS.md",
-          "text": "backend_tools の 14 個の MCP は SSE / Streamable HTTP / stdio の 3 トランスポートを同一ポートで提供する。"
+          "text": "backend_tools の 19 個の MCP は SSE / Streamable HTTP / stdio の 3 トランスポートを同一ポートで提供する。"
         }
       ],
-      "image_prompt": "Square 1:1 hero poster for AiDiy TOOL HUB. Central hub icon with 14 connected tool nodes glowing in cyan and electric blue, dark background, futuristic tech aesthetic, clean lines, text 'AiDiy TOOL HUB' in bold premium typography, professional software branding, no fake logos, no clutter.",
-      "short_narration": "AiDiy の backend_tools は 14 の MCP が集まる TOOL HUB です。",
-      "long_narration": "この動画は AiDiy の video_generation 機能によって自動生成されました。今回は AiDiy のツール基盤である backend_tools、つまり「AiDiy TOOL HUB」を紹介します。ポート 8095 に 14 個の MCP サーバーが同居しており、ブラウザ操作からデータ確認、AI による画像・動画・音声の生成、コードエージェントまで、あらゆる自動化ツールが一カ所にまとまっています。Web、Python、AI エージェントのどこからでも同じ方法で呼び出せる点が TOOL HUB の大きな特徴です。",
+      "image_prompt": "Square 1:1 hero poster for AiDiy TOOL HUB. Central hub icon with 19 connected tool nodes glowing in cyan and electric blue, dark background, futuristic tech aesthetic, clean lines, text 'AiDiy TOOL HUB' in bold premium typography, professional software branding, no fake logos, no clutter.",
+      "short_narration": "AiDiy の backend_tools は 19 の MCP が集まる TOOL HUB です。",
+      "long_narration": "この動画は AiDiy の video_generation 機能によって自動生成されました。今回は AiDiy のツール基盤である backend_tools、つまり「AiDiy TOOL HUB」を紹介します。ポート 8095 に 19 個の MCP サーバーが同居しており、ブラウザ操作からデータ確認、AI による画像・動画・音声の生成、コードエージェントまで、あらゆる自動化ツールが一カ所にまとまっています。Web、Python、AI エージェントのどこからでも同じ方法で呼び出せる点が TOOL HUB の大きな特徴です。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_duration_sec": 4.68,
-      "long_duration_sec": 28.584
+      "short_duration_sec": 5.112,
+      "long_duration_sec": 30.264,
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
     },
     {
       "id": "scene_001",
-      "title": "14 の MCP サーバー一覧",
+      "title": "19 の MCP サーバー一覧",
       "expression": "neutral",
       "accent": "#29d8ff",
       "accent_soft": "rgba(41, 216, 255, 0.18)",
       "kicker": "MCP CATALOG",
-      "headline": "ブラウザからコードエージェントまで\n14 ツールがひとつの基盤に",
+      "headline": "ブラウザからコードエージェントまで\n19 ツールがひとつの基盤に",
       "image": "images/scene_001.png",
       "chips": [
         "Chrome DevTools",
@@ -79,7 +81,7 @@ window.SCENARIO = {
       "metrics": [
         {
           "label": "MCP サーバー数",
-          "value": "14"
+          "value": "19"
         },
         {
           "label": "ポート",
@@ -116,28 +118,40 @@ window.SCENARIO = {
           "title": "制御 & エージェント",
           "lines": [
             "aidiy_obs_studio_control / aidiy_ffmpeg_control",
-            "aidiy_code_agents"
+            "aidiy_windows_control（Windows UI 操作）",
+            "aidiy_notification_sounds（通知音）"
+          ]
+        },
+        {
+          "title": "AI 連携",
+          "lines": [
+            "aidiy_code_agents（Code CLI 実行）",
+            "aidiy_chat_llms（チャット LLM 呼び出し）",
+            "aidiy_task_agents / aidiy_team_agents"
           ]
         }
       ],
       "facts": [
-        "14 個の MCP: chrome_devtools, desktop_capture, sqlite, postgres, logs, code_check, backup, image_generation, movie_generation, speech_to_text, text_to_speech, obs_studio_control, ffmpeg_control, code_agents。",
+        "19 個の MCP: chrome_devtools, desktop_capture, sqlite, postgres, logs, code_check, backup, image_generation, movie_generation, speech_to_text, text_to_speech, obs_studio_control, ffmpeg_control, code_agents。",
         "すべて tools_main.py に FastMCP として同居する。",
         "各 MCP のツール一覧は GET http://localhost:8095/{mcp_name}/list で確認できる。"
       ],
       "evidence": [
         {
           "source": "backend_tools/AGENTS.md",
-          "text": "aidiy_chrome_devtools, aidiy_desktop_capture, aidiy_sqlite, aidiy_postgres, aidiy_logs, aidiy_code_check, aidiy_backup, aidiy_image_generation, aidiy_movie_generation, aidiy_speech_to_text, aidiy_text_to_speech, aidiy_obs_studio_control, aidiy_ffmpeg_control, aidiy_code_agents の 14 個。"
+          "text": "aidiy_chrome_devtools, aidiy_desktop_capture, aidiy_sqlite, aidiy_postgres, aidiy_logs, aidiy_code_check, aidiy_backup, aidiy_image_generation, aidiy_movie_generation, aidiy_speech_to_text, aidiy_text_to_speech, aidiy_obs_studio_control, aidiy_ffmpeg_control, aidiy_code_agents, aidiy_chat_llms, aidiy_task_agents, aidiy_team_agents, aidiy_windows_control, aidiy_notification_sounds の 19 個。"
         }
       ],
-      "image_prompt": "Vertical 2:3 catalog poster showing 14 MCP server tiles arranged in a clean 4-group grid (browser, data, AI generation, control), each tile with a simple icon and name, dark background, cyan accent lines, enterprise tech style, no fake logos.",
-      "short_narration": "14 の MCP が分野別に整理され、ポート 8095 に集まっています。",
-      "long_narration": "backend_tools には 14 個の MCP サーバーが搭載されています。ブラウザを Chrome DevTools Protocol で直接操作する chrome_devtools、OS のスクリーンショットを取る desktop_capture、SQLite や PostgreSQL でデータを確認する sqlite と postgres、ログを監視する logs、Python の構文チェックや TypeScript の型チェックを行う code_check、差分バックアップを管理する backup、AI で画像や動画を生成する image_generation と movie_generation、音声認識と音声合成を担う speech_to_text と text_to_speech、OBS Studio を制御する obs_studio_control、動画を編集する ffmpeg_control、そして AI コードエージェントを起動する code_agents です。",
+      "image_prompt": "Vertical 2:3 catalog poster showing 19 MCP server tiles arranged in a clean 4-group grid (browser, data, AI generation, control), each tile with a simple icon and name, dark background, cyan accent lines, enterprise tech style, no fake logos.",
+      "short_narration": "19 の MCP は、ブラウザ、データ、AI 生成、制御、AI 連携の 5 グループに分かれています。",
+      "long_narration": "AiDiy TOOL HUB に含まれる 19 の MCP サーバーを、5 つのグループに分けて見ていきます。ひとつめはブラウザとキャプチャ。aidiy_chrome_devtools が CDP で Chrome を操作し、aidiy_desktop_capture が OS のスクリーンショットを取ります。ふたつめはデータと品質。aidiy_sqlite と aidiy_postgres がデータベースを、aidiy_logs がログを、aidiy_code_check がコード検査を、aidiy_backup が差分バックアップを担当します。みっつめは AI 生成。画像生成、動画生成、音声認識、音声合成の 4 つです。よっつめは制御。OBS Studio の配信制御、ffmpeg の動画処理、Windows の UI 操作、そして通知音です。いつつめが AI 連携で、Code CLI を動かす aidiy_code_agents、チャット LLM を呼ぶ aidiy_chat_llms、そして AIタスクと AIチームを外部から操作する aidiy_task_agents と aidiy_team_agents があります。",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
-      "short_duration_sec": 5.232,
-      "long_duration_sec": 37.56
+      "short_duration_sec": 7.872,
+      "long_duration_sec": 55.704,
+      "lead": "ブラウザ操作、データ、AI 生成、制御、そして AI 連携まで。19 の MCP がひとつのポートに集約されています。",
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
     },
     {
       "id": "scene_002",
@@ -192,9 +206,9 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "SSE Transport: http://localhost:8095/{mcp_name}/sse — AI エージェント・Claude Code・MCP クライアント向け。",
-        "Streamable HTTP: POST http://localhost:8095/{mcp_name}/{method_name} — Python の requests や curl で直接利用。",
-        "stdio gateway: mcp_stdio.py — stdio 専用 Code CLI（Codex など）向け。",
+        "SSE Transport: http://localhost:8095/{mcp_name}/sse - AI エージェント・Claude Code・MCP クライアント向け。",
+        "Streamable HTTP: POST http://localhost:8095/{mcp_name}/{method_name} - Python の requests や curl で直接利用。",
+        "stdio gateway: mcp_stdio.py - stdio 専用 Code CLI（Codex など）向け。",
         "3 トランスポートすべてが同一ポート 8095 で提供される。"
       ],
       "evidence": [
@@ -208,8 +222,10 @@ window.SCENARIO = {
       "long_narration": "backend_tools の特徴のひとつは、すべての MCP が 3 種類のトランスポートに対応していることです。1 つ目は SSE Transport で、AI エージェントや Claude Code などの MCP クライアントが接続するエンドポイントです。2 つ目は Streamable HTTP で、Python の requests ライブラリや curl から POST リクエストとして直接呼び出せます。3 つ目は stdio gateway で、Codex のように stdio しか使えない Code CLI 向けに mcp_stdio.py が橋渡し役を担います。どのルートを選んでも、同じポート 8095 の同じ MCP に繋がるため、用途に応じて使い分けられます。",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
-      "short_duration_sec": 4.968,
-      "long_duration_sec": 32.448
+      "short_duration_sec": 6.144,
+      "long_duration_sec": 37.56,
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
     },
     {
       "id": "scene_003",
@@ -274,8 +290,10 @@ window.SCENARIO = {
       "long_narration": "aidiy_chrome_devtools は Chrome DevTools Protocol を使ってブラウザを Python から直接操作する MCP です。Node.js に依存せず、Python だけで動きます。Chrome は ChromeManager がプロセスを一元管理し、デバッグポート 9222 で起動します。ナビゲーション、クリック、テキスト入力、JavaScript の実行、コンソールログ取得、ネットワークキャプチャなど、E2E テストや画面自動化に必要な操作がそろっています。aidiy_desktop_capture は OS レベルのスクリーンショットを撮るツールで、モニター番号や座標指定、ウィンドウタイトルによるキャプチャが可能です。この 2 つを組み合わせると、ブラウザ内外を問わず画面操作と確認を自動化できます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_duration_sec": 3.648,
-      "long_duration_sec": 35.016
+      "short_duration_sec": 3.84,
+      "long_duration_sec": 34.944,
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
     },
     {
       "id": "scene_004",
@@ -355,8 +373,10 @@ window.SCENARIO = {
       "long_narration": "データと品質管理に関する MCP も充実しています。aidiy_sqlite は AiDiy の SQLite データベースをクエリで確認でき、aidiy_postgres は外部の PostgreSQL にも接続できます。aidiy_logs はバックエンドサーバーのログを末尾から取得したり、エラーと例外を自動で抽出したりします。aidiy_code_check は Python ファイルの構文チェック、ruff による linting、TypeScript の型チェックの 3 種類に対応しています。aidiy_backup は差分バックアップで変更ファイルだけを保存し、バージョン履歴の確認や前後の差分表示もできます。これらを AI エージェントから組み合わせることで、コーディングと品質確認を自動化できます。",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
-      "short_duration_sec": 4.776,
-      "long_duration_sec": 36.576
+      "short_duration_sec": 6.384,
+      "long_duration_sec": 42.768,
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
     },
     {
       "id": "scene_005",
@@ -438,8 +458,10 @@ window.SCENARIO = {
       "long_narration": "AI によるメディア生成も TOOL HUB に統合されています。aidiy_image_generation は OpenAI の gpt-image や DALL-E-3、Gemini、FreeAI の 3 プロバイダを切り替えて使えます。aidiy_movie_generation は Google の Gemini Veo を使って 4 秒〜8 秒の動画を MP4 として生成します。音声合成の aidiy_text_to_speech は Edge TTS、OpenAI、Gemini、FreeAI の 4 プロバイダに対応し、MP3 ファイルとして出力できるほか、local_play オプションでその場で再生することもできます。発音辞書による自動読み替えも搭載済みです。音声認識の aidiy_speech_to_text はオフラインで動く speech_recognition と高精度な OpenAI Whisper の両方に対応しています。実はこの動画の音声ナレーションも TTS MCP によって生成されています。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_duration_sec": 3.48,
-      "long_duration_sec": 43.944
+      "short_duration_sec": 4.656,
+      "long_duration_sec": 54.312,
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
     },
     {
       "id": "scene_006",
@@ -490,9 +512,17 @@ window.SCENARIO = {
         {
           "title": "aidiy_code_agents",
           "lines": [
-            "claude_sdk / copilot_cli / codex_cli など 7 種類",
+            "claude_sdk / copilot_cli / codex_cli など",
             "AI コードエージェントを subprocess で起動",
             "プロジェクトパス・モデル・ターン数を指定できる"
+          ]
+        },
+        {
+          "title": "aidiy_windows_control",
+          "lines": [
+            "キーボード・マウス・ウィンドウを操作",
+            "UI Automation でアプリを直接動かす",
+            "クリップボード・プロセス管理にも対応"
           ]
         }
       ],
@@ -516,8 +546,93 @@ window.SCENARIO = {
       "long_narration": "TOOL HUB には外部ツールの制御系 MCP も揃っています。aidiy_obs_studio_control は OBS Studio の WebSocket v5 を通じて、配信・録画の開始停止、シーンの切り替え、ソースの表示非表示、音声ミュートを AI から操作できます。aidiy_ffmpeg_control は ffmpeg、ffprobe、ffplay の薄いラッパーで、動画の合成や字幕焼き込み、指定区間のトリム、音声区間の自動検出、プレビュー再生に対応しています。そして aidiy_code_agents は claude_sdk、copilot_cli、codex_cli など 7 種類の AI コードエージェント CLI を subprocess として起動し、プロジェクトパスやモデル、最大ターン数を指定して実行できます。これら 3 つを組み合わせることで、コード生成から動画制作までを一連のワークフローとして自動化できます。",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
-      "short_duration_sec": 5.232,
-      "long_duration_sec": 46.92
+      "short_duration_sec": 4.848,
+      "long_duration_sec": 52.56,
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
+    },
+    {
+      "id": "scene_007",
+      "title": "AI 連携（チャット LLM とタスク・チーム）",
+      "expression": "neutral",
+      "accent": "#7dffb3",
+      "accent_soft": "rgba(125, 255, 179, 0.18)",
+      "kicker": "AI INTEGRATION",
+      "headline": "MCP から AIタスクと AIチームを動かす\nチャット LLM も HTTP ひとつで",
+      "lead": "TOOL HUB には AI 側と繋がる MCP も含まれます。aidiy_chat_llms はチャット LLM を、aidiy_task_agents と aidiy_team_agents は backend_taskteam の AIタスク・AIチームを外部から操作します。",
+      "subtitle": "MCP に対応した AI なら、AiDiy のタスク実行基盤をそのまま道具として使えます。",
+      "image": "images/scene_007.png",
+      "image_prompt": "Wide technical illustration: an MCP hub node on the left connected to three highlighted modules on the right labeled conceptually as chat LLM, task agent, and team agent, with a task flow diagram and a small group of AI companion figures behind them. Dark background, cyan and green glow, clean modern diagram style.",
+      "chips": [
+        "aidiy_chat_llms",
+        "aidiy_task_agents",
+        "aidiy_team_agents",
+        "aidiy_notification_sounds"
+      ],
+      "metrics": [
+        {
+          "label": "連携先",
+          "value": "backend_taskteam:8093"
+        },
+        {
+          "label": "呼び出し",
+          "value": "HTTP / SSE / stdio"
+        },
+        {
+          "label": "用途",
+          "value": "AI から AI を動かす"
+        }
+      ],
+      "cards": [
+        {
+          "title": "aidiy_chat_llms",
+          "lines": [
+            "設定済みのチャット LLM を MCP から呼ぶ",
+            "モデルを指定して 1 回の応答を得る",
+            "調査や要約を他の AI へ委ねられる"
+          ]
+        },
+        {
+          "title": "aidiy_task_agents",
+          "lines": [
+            "AIタスクの要求を外部から投入する",
+            "要求・明細の状態を取得して進捗を追う",
+            "AI エージェントが自分でタスクを起票できる"
+          ]
+        },
+        {
+          "title": "aidiy_team_agents",
+          "lines": [
+            "AIチームへ依頼を投入する",
+            "要員一覧・作業一覧・作業状況を取得",
+            "チームの活動を外部から観測できる"
+          ]
+        }
+      ],
+      "facts": [
+        "aidiy_task_agents は AIタスク要求の投入と、要求・明細の状態取得を提供する。",
+        "aidiy_team_agents は AIチーム依頼の投入と、要員一覧・作業一覧・作業状況の取得を提供する。",
+        "いずれも backend_taskteam（ポート 8093）の API を MCP ツールとして公開したもの。",
+        "aidiy_chat_llms は設定済みのチャット LLM を呼び出し、単発の応答を返す。"
+      ],
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "text": "Backend MCP: 19 個の MCP サーバー（… Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）。"
+        },
+        {
+          "source": "AGENTS.md",
+          "text": "Backend TaskTeam: AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合したサーバー（ポート 8093）。"
+        }
+      ],
+      "short_narration": "MCP から AIタスクや AIチームを動かせます。AI が別の AI に仕事を任せる、という使い方ができます。",
+      "long_narration": "TOOL HUB には、AI 側と繋がるための MCP も含まれています。aidiy_chat_llms は、設定済みのチャット LLM を MCP から呼び出す道具です。モデルを指定して一度きりの応答を得られるので、調査や要約を別の AI に任せられます。aidiy_task_agents と aidiy_team_agents は、ポート 8093 の backend_taskteam と繋がっています。task_agents は AIタスクの要求を外部から投入し、要求や明細の状態を取得できます。team_agents は AIチームへ依頼を投入し、要員一覧や作業状況を取得できます。つまり、MCP に対応した AI であれば、AiDiy のタスク実行基盤をそのまま道具として使えるということです。AI が自分でタスクを起票して、その進捗を自分で追いかける。そんな使い方ができます。作業の区切りを知らせる aidiy_notification_sounds と組み合わせると、長い自動処理も扱いやすくなります。",
+      "short_audio": "audio/short_scene_007.mp3",
+      "long_audio": "audio/long_scene_007.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 8.232,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 51.552
     },
     {
       "id": "scene_999",
@@ -529,7 +644,7 @@ window.SCENARIO = {
       "headline": "AiDiy TOOL HUB で\nあなたの自動化を次のレベルへ",
       "image": "images/scene_999.png",
       "chips": [
-        "14 MCP",
+        "19 MCP",
         "3 トランスポート",
         "ポート 8095",
         "全自動化対応"
@@ -537,7 +652,7 @@ window.SCENARIO = {
       "metrics": [
         {
           "label": "MCP 総数",
-          "value": "14"
+          "value": "19"
         },
         {
           "label": "トランスポート",
@@ -552,7 +667,7 @@ window.SCENARIO = {
         {
           "title": "今回紹介したこと",
           "lines": [
-            "14 MCP が一箇所に集まる TOOL HUB",
+            "19 MCP が一箇所に集まる TOOL HUB",
             "SSE / HTTP / stdio の 3 トランスポート",
             "ブラウザ・データ・AI 生成・制御すべてを統一 API で"
           ]
@@ -560,34 +675,36 @@ window.SCENARIO = {
         {
           "title": "AiDiy を使ってみよう",
           "lines": [
-            "backend_tools を起動するだけで 14 ツールが使える",
+            "backend_tools を起動するだけで 19 ツールが使える",
             "Python の requests で今すぐ試せる",
             "AI エージェントから自動化ワークフローを組める"
           ]
         }
       ],
       "facts": [
-        "backend_tools の 14 MCP は SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 から提供される。",
+        "backend_tools の 19 MCP は SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 から提供される。",
         "Python からは requests.post('http://localhost:8095/{mcp_name}/{method}', json={}) で直接呼び出せる。",
         "この動画自体が AiDiy TOOL HUB の video_generation 機能と TTS MCP によって自動生成された成果物。"
       ],
       "evidence": [
         {
           "source": "backend_tools/AGENTS.md",
-          "text": "14 個の MCP サーバーが同一ポート 8095 に同居し、SSE / Streamable HTTP / stdio の 3 トランスポートを提供する。"
+          "text": "19 個の MCP サーバーが同一ポート 8095 に同居し、SSE / Streamable HTTP / stdio の 3 トランスポートを提供する。"
         }
       ],
-      "image_prompt": "Square 1:1 summary poster for AiDiy TOOL HUB. Central glowing hub with 14 connected nodes, bold text '14 MCP TOOL HUB' in cyan typography, dark background, celebratory but professional mood, clean composition, inspiring call-to-action feel, no clutter, no fake logos.",
+      "image_prompt": "Square 1:1 summary poster for AiDiy TOOL HUB. Central glowing hub with 19 connected nodes, bold text '19 MCP TOOL HUB' in cyan typography, dark background, celebratory but professional mood, clean composition, inspiring call-to-action feel, no clutter, no fake logos.",
       "short_narration": "AiDiy TOOL HUB で、あらゆる自動化をひとつの基盤から始めましょう。",
-      "long_narration": "今回は AiDiy の TOOL HUB、つまり backend_tools が提供する 14 個の MCP サーバーを紹介しました。ブラウザ自動化からデータ確認、AI 画像・動画・音声生成、OBS や FFmpeg の制御、そして AI コードエージェントまで、すべてがポート 8095 ひとつに集まっています。SSE、HTTP、stdio の 3 つのトランスポートに対応しているので、Python スクリプトからでも AI エージェントからでも、同じツールを同じ感覚で呼び出せます。そしてこの動画自体が、AiDiy の video_generation 機能と TTS MCP を使って自動生成された成果物です。自分のプロジェクトでも試してみたいと思ったら、ぜひ AiDiy を手元で起動してみてください。きっと「あ、これ自分でもできる」という発見が待っています。参考になったらチャンネル登録と高評価をよろしくお願いします。次の動画でまた新しい AiDiy の機能をお届けします！",
+      "long_narration": "今回は AiDiy の TOOL HUB、つまり backend_tools が提供する 19 個の MCP サーバーを紹介しました。ブラウザ自動化からデータ確認、AI 画像・動画・音声生成、OBS や FFmpeg の制御、そして AI コードエージェントまで、すべてがポート 8095 ひとつに集まっています。SSE、HTTP、stdio の 3 つのトランスポートに対応しているので、Python スクリプトからでも AI エージェントからでも、同じツールを同じ感覚で呼び出せます。そしてこの動画自体が、AiDiy の video_generation 機能と TTS MCP を使って自動生成された成果物です。自分のプロジェクトでも試してみたいと思ったら、ぜひ AiDiy を手元で起動してみてください。きっと「あ、これ自分でもできる」という発見が待っています。参考になったらチャンネル登録と高評価をよろしくお願いします。次の動画でまた新しい AiDiy の機能をお届けします！",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_duration_sec": 3.648,
-      "long_duration_sec": 78.552
+      "short_duration_sec": 4.368,
+      "long_duration_sec": 51.456,
+      "short_start_sec": 0.0,
+      "long_start_sec": 0.0
     }
   ],
   "short_duration_sec": 35.664,
   "long_duration_sec": 339.6,
-  "total_short_duration_sec": 35.664,
-  "total_long_duration_sec": 339.6
+  "total_short_duration_sec": 51.456,
+  "total_long_duration_sec": 411.12
 };

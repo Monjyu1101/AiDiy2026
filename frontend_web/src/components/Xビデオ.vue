@@ -22,6 +22,8 @@ const 解説ビデオ生成Url = `${baseUrl}Xビデオ/AiDiy解説_ビデオ生�
 const backendUrl  = `${baseUrl}Xビデオ/AiDiy紹介_backend_ja/index.html`;
 const frontendUrl = `${baseUrl}Xビデオ/AiDiy紹介_frontend_ja/index.html`;
 const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア_ja/index.html`;
+const aiタスクUrl = `${baseUrl}Xビデオ/AiDiy紹介_AIタスク_ja/index.html`;
+const aiチームUrl = `${baseUrl}Xビデオ/AiDiy紹介_AIチーム_ja/index.html`;
 const toolsUrl    = `${baseUrl}Xビデオ/AiDiy紹介_tools_ja/index.html`;
 const hermesUrl   = `${baseUrl}Xビデオ/AiDiy紹介_hermes_ja/index.html`;
 const avatarUrl   = `${baseUrl}Xビデオ/AiDiy紹介_avatar_ja/index.html`;
@@ -33,7 +35,6 @@ const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar_ja/index.html`;
 const 解説AllUrl          = `${baseUrl}Xビデオ/AiDiy解説__all_ja/index.html`;
 const 解説AllEnUrl        = `${baseUrl}Xビデオ/AiDiy解説__all_en/index.html`;
 const 解説toolsUrl        = `${baseUrl}Xビデオ/AiDiy解説_tools_ja/index.html`;
-const ビデオページ生成解説Url = `${baseUrl}Xビデオ/AiDiy解説_ビデオページ生成_ja/index.html`;
 const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html`;
 const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
 const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
@@ -129,6 +130,26 @@ const handleReturn = () => {
             </div>
           </a>
 
+          <a class="menu-card menu-card-fixed" :href="aiタスクUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">Xタ</span>
+              AiDiy紹介 (AIタスク)
+            </div>
+            <div class="menu-card-description">
+              要求を AI が明細へ分解し DAG で自動実行・定時実行スケジュール運用を紹介
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="aiチームUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">Xチ</span>
+              AiDiy紹介 (AIチーム)
+            </div>
+            <div class="menu-card-description">
+              3D チーム空間で AI 要員が相談・依頼を分担し経験を蓄積する仕組みを紹介
+            </div>
+          </a>
+
           <a class="menu-card menu-card-fixed" :href="toolsUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">XMC</span>
@@ -220,16 +241,6 @@ const handleReturn = () => {
             </div>
             <div class="menu-card-description">
               14 の MCP サーバー・SSE/HTTP/stdio の 3 トランスポート・HTTP API 直接利用を二人掛け合いで解説
-            </div>
-          </a>
-
-          <a class="menu-card menu-card-fixed" :href="ビデオページ生成解説Url" target="_blank" rel="noopener noreferrer">
-            <div class="menu-card-title">
-              <span class="icon">XVG</span>
-              AiDiy解説 (ビデオページ生成)
-            </div>
-            <div class="menu-card-description">
-              シナリオ作成・画像生成・音声合成・HTML 組み立てを MCP と CodeAgents で全自動化する流れを解説
             </div>
           </a>
 

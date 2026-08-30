@@ -53,7 +53,7 @@ from utils.infra import (
 )
 from utils.generation import (
     ensure_scene_image_script, ensure_dialogue_audio_script,
-    validate_scene_id_range, index_html_matches_theme,
+    validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs, index_html_matches_theme,
     ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, count_scenario_scenes, count_scenario_dialogues,
 )
@@ -237,6 +237,13 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         "  - scene_001〜scene_005: 物語の展開（起承転結＋オチへの前振り）。最低限必須\n"
         "  - 必要に応じて scene_006〜scene_010 まで追加可\n"
         "  - scene_999: まとめ（オチの余韻と締め）。最後固定\n\n"
+        "■ ページ数は物語の展開に合わせて決めること（7 ページ固定ではない）\n"
+        "  - 基本の考え方: 場面が変わる、時間が飛ぶ、語り手の立場が変わる。そこがシーンの切れ目\n"
+        "  - 増やす判断: 1 つのシーンに場面転換が 2 回以上入るなら分けてシーンを増やす。\n"
+        "    オチまでの前振りが駆け足になるようなら、展開のシーンを足す\n"
+        "  - 減らす判断: 話が進まないシーンを足して水増ししないこと。短い小話は最小構成に収め、\n"
+        "    テンポとオチの切れ味を優先する\n"
+        "  - topic にシーン構成の指定があるときは、その指定を最優先する\n\n"
         "■ 各シーンの必須フィールド\n"
         '  "id", "title", "expression", "accent", "accent_soft",\n'
         '  "kicker", "headline", "lead", "subtitle",\n'
@@ -276,7 +283,9 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
             )
             ok_avatar = check("scenario.js avatar が VRM_female", "VRM_female.vrm" in c)
         ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=10, label="小話シナリオ") if ok1 else False
-        return ok1 and ok2 and ok_avatar and ok3
+        ok4 = validate_scene_expressions(scenario_path, label="小話シナリオ") if ok1 else False
+        ok5 = validate_scene_media_refs(scenario_path, label="小話シナリオ") if ok1 else False
+        return ok1 and ok2 and ok_avatar and ok3 and ok4 and ok5
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
@@ -429,8 +438,9 @@ async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
+        # 画像は件数が多く検証エージェントの確認に時間がかかるため、他ステップより長めにする
         target_paths=[scenario_path, gen_img_py, images_dir, md_path],
-        validate=validate, verify_timeout_sec=300, attempt=attempt,
+        validate=validate, verify_timeout_sec=600, attempt=attempt,
     )
 
 

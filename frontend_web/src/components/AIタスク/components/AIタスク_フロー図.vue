@@ -30,6 +30,14 @@ let renderSeq = 0;
 
 interface パス結果 {
   経路SEQ: number[];
+  予測合計: number;
+}
+
+// 経路の重みは予測分数（分）。未見積り（0・未設定）は 1 として扱うので、
+// 予測分数が 1 件も入っていないタスクでは従来どおりステップ数の最長経路になる。
+function 所要重み(row: Record<string, any>): number {
+  const 分 = Number(row?.予測分数 ?? 0);
+  return Number.isFinite(分) && 分 > 0 ? 分 : 1;
 }
 
 // クリティカルパス（最長依存経路）を求める
@@ -52,7 +60,7 @@ function クリティカルパス計算(rows: Record<string, any>[]): パス結�
         bestPred = p;
       }
     }
-    dist[seq] = base + 1;
+    dist[seq] = base + 所要重み(row);
     prev[seq] = bestPred;
   }
 
@@ -80,17 +88,24 @@ function クリティカルパス計算(rows: Record<string, any>[]): パス結�
     経路SEQ.unshift(cursor);
     cursor = prev[cursor] ?? null;
   }
-  return { 経路SEQ };
+  const 明細マップ = new Map(sorted.map((row) => [Number(row.明細SEQ), row]));
+  const 予測合計 = 経路SEQ.reduce((合計, seq) => {
+    const 分 = Number(明細マップ.get(seq)?.予測分数 ?? 0);
+    return 合計 + (Number.isFinite(分) && 分 > 0 ? 分 : 0);
+  }, 0);
+  return { 経路SEQ, 予測合計 };
 }
 
 const クリティカルパス = computed(() => クリティカルパス計算(props.明細));
 
 const クリティカルパス表示 = computed(() => {
-  const { 経路SEQ } = クリティカルパス.value;
+  const { 経路SEQ, 予測合計 } = クリティカルパス.value;
   if (経路SEQ.length === 0) return '';
   const byName = new Map(props.明細.map((row) => [Number(row.明細SEQ), String(row.タイトル || '')]));
   const names = 経路SEQ.map((seq) => byName.get(seq) ?? String(seq));
-  return names.join(' → ');
+  const 経路 = names.join(' → ');
+  // 予測分数が 1 件も入っていないタスクでは所要見込みを出さない
+  return 予測合計 > 0 ? `${経路}（予測 ${予測合計} 分）` : 経路;
 });
 
 // mermaid 図テキストを生成する（標準は上から下の TD）

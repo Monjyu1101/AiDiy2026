@@ -12,7 +12,7 @@
 画像生成モジュール
 
 OpenAI API（DALL-E 3 / GPT Image 2）、Gemini / FreeAI（Google Gemini API）、
-Codex CLI / Antigravity CLI を使って画像を生成する。
+Codex CLI / Antigravity CLI / Grok CLI を使って画像を生成する。
 """
 
 import base64
@@ -45,11 +45,15 @@ class ImageGeneration:
         "openai" — OpenAI DALL-E / GPT Image API
         "codex"  — Codex CLI（model は無視。antigravity → openai → freeai → gemini にフォールバック）
         "antigravity" — Antigravity CLI（model は無視。codex → freeai → gemini にフォールバック）
+        "grok"   — Grok CLI（model は無視。codex → antigravity → openai → freeai → gemini にフォールバック）
     """
 
     DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
     CODEX_TIMEOUT_SECONDS = int(os.environ.get("AIDIY_IMAGE_CODEX_TIMEOUT", "1200"))
     ANTIGRAVITY_TIMEOUT_SECONDS = int(os.environ.get("AIDIY_IMAGE_ANTIGRAVITY_TIMEOUT", "1200"))
+    GROK_TIMEOUT_SECONDS = int(os.environ.get("AIDIY_IMAGE_GROK_TIMEOUT", "1200"))
+    # CLI 系（codex / antigravity / grok）は model を無視して CLI 側の既定に任せる。
+    # grok は明示指定のときだけ使う（auto の既定順は従来どおり変えない）。
     _FALLBACK_CHAINS = {
         "auto": ["codex", "antigravity", "openai", "freeai", "gemini"],
         "codex": ["codex", "antigravity", "openai", "freeai", "gemini"],
@@ -57,7 +61,10 @@ class ImageGeneration:
         "freeai": ["freeai", "gemini"],
         "gemini": ["gemini", "openai"],
         "antigravity": ["antigravity", "codex", "freeai", "gemini"],
+        "grok": ["grok", "codex", "antigravity", "openai", "freeai", "gemini"],
     }
+    # model 指定を無視して CLI に任せるプロバイダ
+    _CLI_PROVIDERS = ("codex", "antigravity", "grok")
 
     # ================================================================== #
     # OpenAI モデルカタログ
@@ -250,6 +257,28 @@ class ImageGeneration:
 
         return ["agy"]
 
+    def _grok_command_base(self) -> list[str]:
+        """Grok CLI（xai-org/grok-build）の実行コマンドを返す。
+
+        npm ではなく ~/.grok/bin へ入るため、AIコード_cli.py と同じ探索順にする。
+        """
+        custom_cmd = (
+            os.environ.get("GROK_CLI_PATH")
+            or os.environ.get("GROK_CLI_CLI_PATH")
+            or os.environ.get("AIDIY_GROK_CLI_PATH")
+        )
+        if custom_cmd:
+            direct = self._npm_shim_to_direct_command(custom_cmd)
+            return direct if direct is not None else [custom_cmd]
+
+        userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+        exe = "grok.exe" if os.name == "nt" else "grok"
+        candidate = os.path.join(userprofile, ".grok", "bin", exe)
+        if os.path.isfile(candidate):
+            return [candidate]
+
+        return ["grok"]
+
     def _codex_output_path(self) -> Path:
         out_dir = Path(self._resolve_default_output_dir())
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -334,6 +363,16 @@ class ImageGeneration:
         quality: str,
     ) -> str:
         return self._build_cli_image_prompt("Antigravity CLI", prompt, output_path, original_path, size, quality)
+
+    def _build_grok_prompt(
+        self,
+        prompt: str,
+        output_path: Path,
+        original_path: Optional[str],
+        size: str,
+        quality: str,
+    ) -> str:
+        return self._build_cli_image_prompt("Grok CLI", prompt, output_path, original_path, size, quality)
 
     def _generate_codex(
         self,
@@ -471,6 +510,77 @@ class ImageGeneration:
             "quality": quality,
             "generated_path": str(output_path),
             "engine_note": "Antigravity CLI",
+        }
+        return img, info
+
+    def _generate_grok(
+        self,
+        prompt: str,
+        original_path: Optional[str],
+        size: str,
+        quality: str,
+    ) -> tuple[Image.Image, dict]:
+        output_path = self._codex_output_path()
+        if output_path.exists():
+            output_path.unlink()
+
+        cwd = Path(__file__).resolve().parent.parent.parent
+        # --always-approve: 全ツール実行を自動承認（ヘッドレス実行に必須）
+        # --no-auto-update: 自動更新チェックを止める
+        # -p: 単発プロンプト（応答を stdout に出して終了）
+        command = self._grok_command_base() + [
+            "--always-approve",
+            "--no-auto-update",
+            "--cwd",
+            str(cwd),
+            "-p",
+            self._build_grok_prompt(prompt, output_path, original_path, size, quality),
+        ]
+
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=str(cwd),
+                env=os.environ.copy(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=self.GROK_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except FileNotFoundError as e:
+            raise ImageGenerationError("grok CLI が見つかりません") from e
+        except subprocess.TimeoutExpired as e:
+            raise ImageGenerationError(
+                f"grok CLI がタイムアウトしました({self.GROK_TIMEOUT_SECONDS}秒)"
+            ) from e
+
+        if proc.returncode != 0:
+            stderr = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+            stdout = (proc.stdout or b"").decode("utf-8", errors="replace").strip()
+            detail = stderr or stdout or f"returncode={proc.returncode}"
+            raise ImageGenerationError(f"grok CLI 実行に失敗しました: {detail[:500]}")
+
+        if not output_path.is_file():
+            raise ImageGenerationError(f"grok CLI が画像ファイルを作成しませんでした: {output_path}")
+
+        try:
+            with Image.open(output_path) as src:
+                img = src.copy()
+        except Exception as e:
+            raise ImageGenerationError(f"grok CLI の出力を画像として読めません: {output_path}") from e
+
+        info = {
+            "provider": "grok",
+            "model": "ignored",
+            "prompt": prompt.strip(),
+            "original_path": original_path,
+            "width": img.width,
+            "height": img.height,
+            "size": size,
+            "quality": quality,
+            "generated_path": str(output_path),
+            "engine_note": "Grok CLI",
         }
         return img, info
 
@@ -664,6 +774,8 @@ class ImageGeneration:
             return self._generate_codex(prompt, original_path, size, quality)
         if provider == "antigravity":
             return self._generate_antigravity(prompt, original_path, size, quality)
+        if provider == "grok":
+            return self._generate_grok(prompt, original_path, size, quality)
         if provider == "openai":
             return self._generate_openai(prompt, original_path, model, size, quality)
         if provider in ("freeai", "gemini"):
@@ -688,12 +800,12 @@ class ImageGeneration:
 
         Args:
             prompt: 生成プロンプト
-            provider: "auto" / "openai" / "gemini" / "freeai" / "codex" / "antigravity"
+            provider: "auto" / "openai" / "gemini" / "freeai" / "codex" / "antigravity" / "grok"
             original_path: 参照画像のパス（省略可）
             model:
               OpenAI: "auto"=gpt-image-2 / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
               Gemini/FreeAI: "auto"=gemini-3.1-flash-image-preview
-              Auto/Codex/Antigravity: 指定値は無視
+              Auto/Codex/Antigravity/Grok: 指定値は無視
             size:
               OpenAI: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" / ...
               Gemini/FreeAI: "auto"=1024x1024 / "512x512" / "1024x1024" / "1920x1080" / "1080x1920"
@@ -708,16 +820,17 @@ class ImageGeneration:
             raise ImageGenerationError("prompt は必須です")
 
         provider = provider.strip().lower()
-        if provider not in ("auto", "openai", "gemini", "freeai", "codex", "antigravity"):
+        if provider not in self._FALLBACK_CHAINS:
+            valid = " / ".join(self._FALLBACK_CHAINS.keys())
             raise ImageGenerationError(
-                f"未対応の provider です: '{provider}'（auto / openai / gemini / freeai / codex / antigravity のみ）"
+                f"未対応の provider です: '{provider}'（{valid} のみ）"
             )
 
         if original_path and not os.path.isfile(original_path):
             raise ImageGenerationError(f"参照画像が見つかりません: '{original_path}'")
 
         chain = self._FALLBACK_CHAINS[provider]
-        effective_model = "auto" if provider in ("auto", "codex", "antigravity") else model
+        effective_model = "auto" if provider in ("auto", *self._CLI_PROVIDERS) else model
         errors: list[str] = []
         for index, candidate in enumerate(chain):
             try:
@@ -736,7 +849,7 @@ class ImageGeneration:
                 info["fallback_errors"] = errors
                 info["engine_note"] = f"{info.get('engine_note', candidate)} ({provider} fallback)"
 
-            if provider in ("auto", "codex", "antigravity") and not info.get("generated_path"):
+            if provider in ("auto", *self._CLI_PROVIDERS) and not info.get("generated_path"):
                 output_path = self._codex_output_path()
                 try:
                     self._save_png_file(img, output_path)

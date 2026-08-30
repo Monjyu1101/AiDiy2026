@@ -83,6 +83,34 @@ import { qAlert, qConfirm } from '@/utils/qAlert'
 - ID 選択欄のラベルは `商品`、`車両` など業務名にし、選択肢は `ID : 名称` 形式にする。
 - 検索欄も編集画面と同じラベル幅・入力幅へ揃える。
 
+## frontend_avatar との二重管理（修正前に必ず確認）
+
+`frontend_web/src/components/` の AIタスク / AIチーム / AiDiy / `_share` 系は、
+`frontend_avatar/src/components/` に**同名・ほぼ同内容のコピー**があります（`utils/`・`api/` も同じ。
+[`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) 参照）。
+
+1. 直す前に、同じ相対パスのファイルが avatar 側にあるか確認する。
+
+   PowerShell:
+
+   ```powershell
+   Get-ChildItem -Recurse -Filter "<ファイル名>.vue" frontend_web\src, frontend_avatar\src |
+     Select-Object FullName
+   ```
+
+   bash:
+
+   ```bash
+   grep -rl "<目印になる文字列>" frontend_web/src frontend_avatar/src
+   ```
+
+2. あれば**同じ修正を両方へ入れる**。片方だけ直すと Web と Avatar で見た目・挙動がずれ、
+   次に触った人が「直したはずの不具合が再発した」と誤認する。
+3. `<style scoped>` も同じ。CSS は片方に書いても他方へ波及しない。
+   一覧の列セル表示（チェックボックスの大きさ・色、状態文字の配色など）は両方の `.vue` に同じ CSS を書く。
+4. 確認は両方の `npm run type-check`（MCP なら `check_typescript` を `project=frontend_web` と
+   `project=frontend_avatar` の 2 回）。
+
 ## 明細型編集画面
 
 明細型マスタや明細型トランザクションの編集画面では、ヘッダー form と `明細一覧` 配列を分ける。
@@ -119,10 +147,11 @@ import { qAlert, qConfirm } from '@/utils/qAlert'
 - Vite proxy を使わず `http://127.0.0.1:8091` へ直叩きして CORS 条件が変わる。
 - backend schema に存在しない表示専用項目を payload に入れる。
 - 検索欄や編集欄の幅が画面ごとにばらつく。
+- `frontend_avatar` 側の同名コンポーネント（`.vue` の template と scoped CSS 両方）を直し忘れる。
 
 ## 最小確認
 
-- `npm run type-check` が通る。
+- `npm run type-check` が通る（avatar にも同名ファイルがあれば `frontend_avatar` でも通す）。
 - 画面遷移できる。
 - 一覧取得、ページング、ソートが通る。
 - 登録 / 変更 / 削除後に一覧へ戻り、再取得で反映される。

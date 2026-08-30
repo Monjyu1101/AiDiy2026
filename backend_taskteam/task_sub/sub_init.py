@@ -123,10 +123,10 @@ def JSON形式サンプル(利用者ID: str, タスクID: str, プロジェク�
   "要求内容": "入力された要求内容を整理した文章",
   "マーメイド記号": "TD",
   "明細": [
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 0, "タイトル": "開始", "要求内容": "", "先行SEQ": "", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 1, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "0", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 2, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "1", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 9999, "タイトル": "終了", "要求内容": "", "先行SEQ": "2", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true}}
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 0, "タイトル": "開始", "要求内容": "", "先行SEQ": "", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 1, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "0", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 2, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "1", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true, "予測分数": 10}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 9999, "タイトル": "終了", "要求内容": "", "先行SEQ": "2", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true, "予測分数": 10}}
   ]
 }}"""
 
@@ -157,6 +157,15 @@ def _真偽値(値) -> bool:
     if isinstance(値, str):
         return 値.strip().lower() in ("true", "1")
     return bool(値)
+
+
+def _正整数(値, 既定: int = 0) -> int:
+    """0 以上の整数へ変換する（変換できない・負値は既定値）。予測分数の取り込みに使う。"""
+    try:
+        n = int(str(値).strip())
+    except (TypeError, ValueError):
+        return 既定
+    return n if n >= 0 else 既定
 
 
 def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model: str) -> list[dict]:
@@ -198,6 +207,8 @@ def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model
                 行.get("TASK_AI_MODEL_do", default_task_ai_model) or default_task_ai_model
             ).strip(),
             "操作検証": _真偽値(行.get("操作検証", False)),
+            # AI が見積もった実行時間（分）。落とすと DB の予測分数が 0 のままになる
+            "予測分数": _正整数(行.get("予測分数")),
         })
     明細SEQ集合 = {行["明細SEQ"] for 行 in 行リスト}
     if len(明細SEQ集合) != len(行リスト):

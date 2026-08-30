@@ -11,7 +11,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shutil
+import unicodedata
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -111,8 +113,147 @@ def validate_scene_id_range(
     return ok_count and ok_edges and ok_required and ok_allowed
 
 
+# 許可するアバター表情。値を増やすとアバターの表情が崩れるため、
+# 全スクリプト共通で neutral 固定とする（happy などの混入を検出する）。
+ALLOWED_EXPRESSIONS = ("neutral",)
+
+
+def validate_scene_expressions(
+    path: str,
+    *,
+    label: str,
+    allowed: tuple = ALLOWED_EXPRESSIONS,
+) -> bool:
+    """
+    scenario.js の expression が許可値だけかを検証する。
+
+    scene 直下（紹介・小説小話型）と dialogue 内（解説・ニュース型）の
+    両方を走査するため、スクリプト種別を問わず使える。
+    """
+    try:
+        data = load_scenario_object(path)
+    except Exception as e:
+        print(f"  [scenario] {label} expression 検証をスキップ: {e}")
+        return False
+
+    allowed_set = set(allowed)
+    violations: list[str] = []
+
+    for scene in data.get("scenes", []):
+        if not isinstance(scene, dict):
+            continue
+        sid = str(scene.get("id", "?"))
+
+        if "expression" in scene:
+            value = str(scene.get("expression", "") or "")
+            if value not in allowed_set:
+                violations.append(f"{sid}.expression={value!r}")
+
+        dialogues = scene.get("dialogue", [])
+        if isinstance(dialogues, list):
+            for i, dlg in enumerate(dialogues, 1):
+                if not isinstance(dlg, dict) or "expression" not in dlg:
+                    continue
+                value = str(dlg.get("expression", "") or "")
+                if value not in allowed_set:
+                    violations.append(f"{sid}.dialogue[{i}].expression={value!r}")
+
+    allowed_text = " / ".join(sorted(allowed_set))
+    ok = check(
+        f"{label} expression 許可値のみ（{allowed_text}）",
+        not violations,
+    )
+    if violations:
+        for v in violations[:10]:
+            print(f"      NG: {v}")
+        if len(violations) > 10:
+            print(f"      ... 他 {len(violations) - 10} 件")
+    return ok
+
+
+def validate_scene_media_refs(path: str, *, label: str) -> bool:
+    """
+    scenario.js の image / audio 参照が規約どおりかを検証する。
+
+    - image は "images/" 配下を指すこと
+    - audio 系（audio / short_audio / long_audio）は "audio/" 配下を指すこと
+    - 参照が空でないこと
+    両スキーマを走査するため、スクリプト種別を問わず使える。
+    """
+    try:
+        data = load_scenario_object(path)
+    except Exception as e:
+        print(f"  [scenario] {label} メディア参照検証をスキップ: {e}")
+        return False
+
+    violations: list[str] = []
+
+    def _check_ref(where: str, key: str, value, expected_prefix: str) -> None:
+        text = str(value or "").strip()
+        if not text:
+            violations.append(f"{where}.{key} が空")
+        elif not text.startswith(expected_prefix):
+            violations.append(f"{where}.{key}={text!r}（{expected_prefix} 配下でない）")
+
+    for scene in data.get("scenes", []):
+        if not isinstance(scene, dict):
+            continue
+        sid = str(scene.get("id", "?"))
+
+        if "image" in scene:
+            _check_ref(sid, "image", scene.get("image"), "images/")
+
+        for key in ("short_audio", "long_audio", "audio"):
+            if key in scene:
+                _check_ref(sid, key, scene.get(key), "audio/")
+
+        dialogues = scene.get("dialogue", [])
+        if isinstance(dialogues, list):
+            for i, dlg in enumerate(dialogues, 1):
+                if isinstance(dlg, dict) and "audio" in dlg:
+                    _check_ref(f"{sid}.dialogue[{i}]", "audio", dlg.get("audio"), "audio/")
+
+    ok = check(f"{label} image / audio 参照パス規約", not violations)
+    if violations:
+        for v in violations[:10]:
+            print(f"      NG: {v}")
+        if len(violations) > 10:
+            print(f"      ... 他 {len(violations) - 10} 件")
+    return ok
+
+
+def scenario_title_and_lead(scenario_path: str) -> tuple[str, str]:
+    """scenario.js の top-level title と scene_000 の lead を返す。取れなければ空文字。
+
+    index_html_matches_theme は scenario.js の title / project_name が index.html に
+    含まれるかで判定する。HTML 修正の指示に同じ値を実データとして埋め込まないと、
+    エージェントが独自に要約したタイトルを書いてしまい検証NGのやり直しを繰り返すため、
+    各スクリプトの Step 03 はこの値を指示へ差し込む。
+    """
+    if not os.path.isfile(scenario_path):
+        return "", ""
+    try:
+        data = load_scenario_object(scenario_path)
+    except Exception as e:
+        print(f"  [警告] scenario.js を読めませんでした: {e}")
+        return "", ""
+    title = str(data.get("title", "") or "").strip()
+    lead = ""
+    for scene in data.get("scenes", []):
+        if isinstance(scene, dict) and str(scene.get("id", "")) == "scene_000":
+            lead = str(scene.get("lead", "") or "").strip()
+            break
+    return title, lead
+
+
 def index_html_matches_theme(index_path: str, scenario_path: str, folder_name: str, topic: str) -> bool:
-    """index.html が今回テーマ向けに更新済みかをざっくり判定する。"""
+    """index.html が今回テーマ向けに更新済みかを判定する。
+
+    HTML の見出しでは、scenario.js のタイトルと記号（`—` / `|` など）や
+    空白の表記が変わることがあるため、テーマ識別用の文字列は Unicode 正規化後に
+    記号・空白を除いて比較する。URL や長い topic 全文だけに依存しないよう、
+    scenario.js の title / project_name も候補に含める。
+    """
     if not os.path.isfile(index_path):
         return False
 
@@ -122,18 +263,23 @@ def index_html_matches_theme(index_path: str, scenario_path: str, folder_name: s
     if "<title>" not in html or "scenario.js" not in html:
         return False
 
-    markers = {folder_name.strip(), topic.strip()}
+    def _theme_key(value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", str(value or "")).casefold()
+        return re.sub(r"[^\wぁ-んァ-ヶ一-龯ー]+", "", normalized)
+
+    html_key = _theme_key(html)
+    markers = {_theme_key(folder_name), _theme_key(topic)}
     if os.path.isfile(scenario_path):
         try:
             data = load_scenario_object(scenario_path)
             for key in ("title", "project_name"):
                 value = str(data.get(key, "") or "").strip()
                 if value:
-                    markers.add(value)
+                    markers.add(_theme_key(value))
         except Exception:
             pass
 
-    return any(marker and marker in html for marker in markers)
+    return any(marker and marker in html_key for marker in markers)
 
 
 def collect_scenario_duration_stats(path: str) -> dict:

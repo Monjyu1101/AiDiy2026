@@ -31,8 +31,8 @@ window.SCENARIO = {
       "background_word": "",
       "kicker": "INTRODUCTION",
       "headline": "AiDiy's Big Picture and Design Philosophy\nIntroduced in 6 Scenes",
-      "lead": "From business-domain identifier conventions and service architecture to business samples, AI core, MCP TOOL HUB, and automated video generation — we walk through AiDiy's full picture step by step.",
-      "subtitle": "All features and highlights of this practical full-stack business management template, clearly explained.",
+      "lead": "From business-domain naming and service architecture to business samples, the AI Core and Avatar, the MCP TOOL HUB, AI Task and AI Team, and automated video generation — we walk through AiDiy in order.",
+      "subtitle": "From naming conventions to AI Task and AI Team — the whole picture of AiDiy, in order.",
       "image": "images/scene_000.png",
       "chips": [],
       "metrics": [],
@@ -40,12 +40,12 @@ window.SCENARIO = {
       "facts": [],
       "evidence": [],
       "image_prompt": "Square 1:1 hero poster for AiDiy. Make the word AiDiy itself the coolest central visual, with premium futuristic typography, strong cyan and electric blue glow, elegant Japanese enterprise AI platform mood, dark background, clean composition, high readability, polished technology branding aesthetic, no clutter, no extra fake logos, no dense paragraphs.",
-      "short_narration": "AiDiy is a full-stack business management template, built in Japan, around the concept of AI + Do It Yourself.",
+      "short_narration": "This video walks through AiDiy: naming conventions, service architecture, the AI Core, the MCP TOOL HUB, and AI Task and AI Team.",
       "long_narration": "This video was automatically generated using AiDiy's video page generation feature (ビデオページ生成機能). From scenario creation and image generation to speech synthesis and HTML assembly — everything is handled by MCP and CodeAgents. The name AiDiy combines AI and Do It Yourself — the idea of building your own business systems and automation tools with the power of AI. Built in Japan, AiDiy is a full-stack business management template built on FastAPI, SQLAlchemy, SQLite, Vue 3, Vite, and TypeScript, bundling practical business samples and an AI experimentation platform in one project. In this video, we cover AiDiy's full picture in 6 scenes: business-domain identifier conventions, service architecture, business samples, AI core and avatar, and the MCP TOOL HUB with automated video generation.",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.792,
+      "short_duration_sec": 8.904,
       "long_start_sec": 0.0,
       "long_duration_sec": 47.184,
       "duration_sec": 0.0
@@ -76,7 +76,7 @@ window.SCENARIO = {
         },
         {
           "label": "MCP",
-          "value": "14"
+          "value": "19"
         },
         {
           "label": "Code AI",
@@ -117,13 +117,13 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "AiDiy is a template that brings together business samples and an AI experimentation platform, with FastAPI (Python 3.13) and Vue 3 at its core.",
-      "long_narration": "AiDiy is a full-stack business management template designed with Japanese as its primary language. At the backend, it uses FastAPI, SQLAlchemy, and SQLite with Python 3.13. On the frontend, it is built with Vue 3, Vite, and TypeScript. It ships with ready-to-use business samples including permissions, master data, transactions, schedulers, and inventory management, and also serves as an experimentation platform integrating AI chat, voice, image generation, Code AI agents, and 14 MCP tools. AiDiy combines a business system development template with an AI experimentation platform in a single project.",
+      "long_narration": "AiDiy is a full-stack business management template designed with Japanese as its primary language. At the backend, it uses FastAPI, SQLAlchemy, and SQLite with Python 3.13. On the frontend, it is built with Vue 3, Vite, and TypeScript. It ships with ready-to-use business samples including permissions, master data, transactions, schedulers, and inventory management, and also serves as an experimentation platform integrating AI chat, voice, image generation, Code AI agents, and 19 MCP tools. AiDiy combines a business system development template with an AI experimentation platform in a single project.",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_start_sec": 0.0,
       "short_duration_sec": 10.008,
       "long_start_sec": 0.0,
-      "long_duration_sec": 37.776,
+      "long_duration_sec": 37.68,
       "duration_sec": 0.0
     },
     {
@@ -221,8 +221,8 @@ window.SCENARIO = {
       "accent_soft": "rgba(255, 107, 214, 0.18)",
       "kicker": "ARCHITECTURE",
       "headline": "5 Services Running\nAround One Shared DB",
-      "lead": "Two backend_server processes, the backend_tools MCP hub, frontend_web, and frontend_avatar — a 5-service architecture.",
-      "subtitle": "3 resident backends + 2 frontends, all sharing a single SQLite DB.",
+      "lead": "Two backend_server processes, the backend_tools MCP hub, backend_taskteam for AI Task and AI Team, backend_local for on-device inference, plus frontend_web and frontend_avatar.",
+      "subtitle": "Four backend services and two frontends, all sharing a single SQLite database.",
       "image": "images/scene_003.png",
       "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 8098, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8092, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
       "chips": [
@@ -234,16 +234,16 @@ window.SCENARIO = {
       ],
       "metrics": [
         {
-          "label": "Resident Services",
-          "value": "5"
+          "label": "Backend",
+          "value": "4 services"
+        },
+        {
+          "label": "Frontend",
+          "value": "2 services"
         },
         {
           "label": "Shared DB",
-          "value": "SQLite"
-        },
-        {
-          "label": "Vite proxy",
-          "value": "×2"
+          "value": "1 SQLite"
         }
       ],
       "cards": [
@@ -259,8 +259,8 @@ window.SCENARIO = {
           "title": "backend_tools",
           "lines": [
             "tools_main: 8095 (MCP TOOL HUB)",
-            "14 MCPs on a single port",
-            "SSE / HTTP / stdio – 3 transports"
+            "19 MCPs on a single port",
+            "SSE / HTTP / stdio - 3 transports"
           ]
         },
         {
@@ -277,6 +277,14 @@ window.SCENARIO = {
             "8092: Electron / Web dual-mode",
             "Three.js + @pixiv/three-vrm",
             "AI avatar client"
+          ]
+        },
+        {
+          "title": "backend_taskteam / backend_local",
+          "lines": [
+            "taskteam: 8093 (AI Task + AI Team)",
+            "local: 8096 (OpenAI-compatible Gemma inference)",
+            "Shares the same SQLite DB as backend_server"
           ]
         }
       ],
@@ -295,14 +303,14 @@ window.SCENARIO = {
           "text": "backend_server core 8091 / apps 8098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092."
         }
       ],
-      "short_narration": "AiDiy runs as 5 services — two backends, an MCP hub, and Web and Avatar frontends.",
-      "long_narration": "AiDiy's service architecture consists of 5 services. backend_server's core_main runs on port 8091 handling authentication, permissions, and the AI core. apps_main runs on port 8098 handling business-domain APIs. backend_tools provides a hub of 14 MCP tools on port 8095. frontend_web serves the Vue 3 Web UI on port 8090 and uses Vite proxy to route /core to 8091 and /apps to 8098. frontend_avatar is an AI avatar client on port 8092 supporting both Electron and browser. The two backends share the same SQLite database file.",
+      "short_narration": "Four backend services and two frontends. The MCP hub, the AI Task and Team platform, and local inference each run independently.",
+      "long_narration": "Let's look at how AiDiy is put together. There are four backend services. backend_server runs as two processes: core_main on port 8091 handles authentication and the AI Core, while apps_main on port 8098 handles business data. backend_tools is the MCP TOOL HUB on port 8095, consolidating nineteen MCP servers onto a single port. backend_taskteam on port 8093 is the execution platform for AI Task and AI Team. backend_local on port 8096 provides an OpenAI-compatible local inference server. On the frontend side there are two services: frontend_web on port 8090 for the business screens, and frontend_avatar on port 8092, which runs in both Electron and Web modes for the AI avatar. All services share a single SQLite database, so business data and AI execution history live in the same place.",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.216,
+      "short_duration_sec": 7.992,
       "long_start_sec": 0.0,
-      "long_duration_sec": 38.568,
+      "long_duration_sec": 52.104,
       "duration_sec": 0.0
     },
     {
@@ -490,16 +498,16 @@ window.SCENARIO = {
     },
     {
       "id": "scene_006",
-      "title": "MCP TOOL HUB × 14 and Automated Video Generation",
+      "title": "MCP TOOL HUB × 19 and Automated Video Generation",
       "expression": "neutral",
       "accent": "#00e0b8",
       "accent_soft": "rgba(0, 224, 184, 0.18)",
       "kicker": "MCP HUB + AUTO VIDEO",
-      "headline": "14 MCPs Connected —\nThis Video Was Auto-Generated Too",
-      "lead": "backend_tools consolidates 14 MCPs onto a single port, with AI agents handling everything from browser operations to video generation.",
+      "headline": "Nineteen MCPs on a single port\nFrom browser control to video generation",
+      "lead": "backend_tools consolidates 19 MCPs onto a single port, with AI agents handling everything from browser operations to video generation.",
       "subtitle": "MCPs are not decorative — they are a working toolset supporting AI observation, generation, and verification. This video is one of their outputs.",
       "image": "images/scene_006.png",
-      "image_prompt": "Vertical 2:3 MCP hub infographic poster, center AI agent node with fourteen connected utility nodes for browser, desktop, sqlite, postgres, logs, code check, backup, image generation, movie generation, speech-to-text, text-to-speech, OBS studio control, ffmpeg control, code agents, clean green-cyan enterprise network diagram on dark background, modern technical style, no mascots",
+      "image_prompt": "Vertical 2:3 MCP hub infographic poster, center AI agent node with nineteen connected utility nodes for browser, desktop, sqlite, postgres, logs, code check, backup, image generation, movie generation, speech-to-text, text-to-speech, OBS studio control, ffmpeg control, code agents, clean green-cyan enterprise network diagram on dark background, modern technical style, no mascots",
       "chips": [
         "port 8095",
         "14 MCP",
@@ -509,16 +517,16 @@ window.SCENARIO = {
       ],
       "metrics": [
         {
-          "label": "MCP Count",
-          "value": "14"
+          "label": "MCP servers",
+          "value": "19"
         },
         {
           "label": "Port",
-          "value": "8095"
+          "value": "consolidated on 8095"
         },
         {
-          "label": "Automation Steps",
-          "value": "9"
+          "label": "Transports",
+          "value": "SSE / HTTP / stdio"
         }
       ],
       "cards": [
@@ -542,15 +550,24 @@ window.SCENARIO = {
           "lines": [
             "aidiy_image_generation / aidiy_movie_generation",
             "aidiy_speech_to_text / aidiy_text_to_speech",
-            "aidiy_obs_studio_control / aidiy_ffmpeg_control / aidiy_code_agents"
+            "aidiy_obs_studio_control / aidiy_ffmpeg_control",
+            "aidiy_windows_control / aidiy_notification_sounds"
           ]
         },
         {
           "title": "Automated Video Generation",
           "lines": [
-            "topic → scenario.js generation",
-            "image generation → speech synthesis → HTML assembly",
-            "9 steps fully automated by MCP + CodeAgents"
+            "topic -> scenario.js generation",
+            "image generation -> speech synthesis -> HTML assembly",
+            "Step00 through Step99 fully automated by MCP + CodeAgents"
+          ]
+        },
+        {
+          "title": "AI Integration",
+          "lines": [
+            "aidiy_code_agents (Code CLI execution)",
+            "aidiy_chat_llms (chat LLMs)",
+            "aidiy_task_agents / aidiy_team_agents"
           ]
         }
       ],
@@ -569,15 +586,99 @@ window.SCENARIO = {
           "text": "Video page generation automation: 9-step full automation from topic to scenario.js generation → image generation → speech synthesis → HTML assembly."
         }
       ],
-      "short_narration": "14 MCPs are consolidated onto one port, and this video itself was fully auto-generated using AiDiy's own features.",
-      "long_narration": "backend_tools is a TOOL HUB hosting 14 MCP servers on port 8095. Its tools cover browser automation, desktop capture, SQLite and PostgreSQL data access, log monitoring, code checking, backup, image generation, video generation, speech-to-text, text-to-speech, OBS Studio control, FFmpeg control, and code agent execution. All three transports — SSE, Streamable HTTP, and stdio — are available on the same port, callable via HTTP POST from anywhere. And the very video you are watching now was automatically generated using AiDiy's own video page generation feature (ビデオページ生成機能). From scenario creation to image generation, speech synthesis, and HTML assembly — all 9 steps were fully automated by MCP and CodeAgents.",
+      "short_narration": "19 MCPs are consolidated onto one port, and this video itself was fully auto-generated using AiDiy's own features.",
+      "long_narration": "backend_tools is a TOOL HUB hosting 19 MCP servers on port 8095. Its tools cover browser automation, desktop capture, SQLite and PostgreSQL data access, log monitoring, code checking, backup, image generation, video generation, speech-to-text, text-to-speech, OBS Studio control, FFmpeg control, and code agent execution. All three transports — SSE, Streamable HTTP, and stdio — are available on the same port, callable via HTTP POST from anywhere. And the very video you are watching now was automatically generated using AiDiy's own video page generation feature (ビデオページ生成機能). From scenario creation to image generation, speech synthesis, and HTML assembly — all 9 steps were fully automated by MCP and CodeAgents.",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 7.056,
+      "short_duration_sec": 7.08,
       "long_start_sec": 0.0,
-      "long_duration_sec": 45.504,
+      "long_duration_sec": 45.432,
       "duration_sec": 0.0
+    },
+    {
+      "id": "scene_007",
+      "title": "AI Task and AI Team",
+      "expression": "neutral",
+      "accent": "#7dffb3",
+      "accent_soft": "rgba(125, 255, 179, 0.18)",
+      "kicker": "AI TASK + AI TEAM",
+      "headline": "Write a request in plain language and it runs itself\nAI members work together in a 3D space",
+      "lead": "AI Task breaks a request written in plain language into execution steps and runs them, judging dependencies as it goes. Register a schedule and it keeps running without anyone present. In AI Team, AI members gather in a 3D space, discuss, share the work, and carry their experience forward.",
+      "subtitle": "Write the request -> AI splits it into steps -> order and parallelism are handled -> it starts on schedule.",
+      "image": "images/scene_007.png",
+      "image_prompt": "Vertical 2:3 concept poster split into two halves: the upper half shows an automated task flow with branching nodes and a clock icon indicating scheduled execution, the lower half shows several gentle glowing AI companions gathered in a park-like 3D space exchanging speech bubbles. Dark background, cyan and green glow, modern technical illustration, no text baked into the image.",
+      "chips": [
+        "Plain-language request",
+        "Auto-split into steps",
+        "Parallel execution via predecessors",
+        "Scheduled runs",
+        "AI members discuss"
+      ],
+      "metrics": [
+        {
+          "label": "Service",
+          "value": "backend_taskteam:8093"
+        },
+        {
+          "label": "API",
+          "value": "/task/* and /team/*"
+        },
+        {
+          "label": "Triggers",
+          "value": "immediate / at-time / interval / scheduled"
+        }
+      ],
+      "cards": [
+        {
+          "title": "AI Task",
+          "lines": [
+            "AI splits a plain-language request into steps",
+            "A DAG of predecessors decides order and parallelism",
+            "Immediate, at-time, interval, or scheduled execution"
+          ]
+        },
+        {
+          "title": "AI Team",
+          "lines": [
+            "Summon AI members modeled on historical figures",
+            "They discuss in a 3D space and decide the team's work",
+            "PlanDo and SPDCA work loops drive the cycle"
+          ]
+        },
+        {
+          "title": "Why you can trust it",
+          "lines": [
+            "A differential backup is taken before work starts",
+            "Verified steps retry automatically once on failure",
+            "Finished work becomes experience for the next assignment"
+          ]
+        }
+      ],
+      "facts": [
+        "AI Task and AI Team run on backend_taskteam (port 8093), with APIs under /task/* and /team/*.",
+        "Step dependencies form a DAG via predecessor SEQs; steps whose dependencies are met start in parallel.",
+        "Execution triggers are immediate, at-time, interval, and scheduled, with folder-change as an extra condition.",
+        "Team requests pick an assignee from accumulated experience, and completed work generates new experience."
+      ],
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "text": "Backend TaskTeam: a server that unifies AI task execution, scheduled tasks, and multi-agent team activity (port 8093)."
+        },
+        {
+          "source": "backend_taskteam/AGENTS.md",
+          "text": "The AI picks an assignee from the active member list and each member's accumulated experience, so prior knowledge is reused."
+        }
+      ],
+      "short_narration": "AI Task splits a plain-language request into steps and runs them for you. In AI Team, AI members gather and share the work between them.",
+      "long_narration": "AiDiy has two ways to hand the work itself over to AI. The first is AI Task. Write what you want done in plain language, and the AI reads it and breaks it into execution steps. Each step can declare its predecessors, so the system decides what must run in order and what can run at the same time. There are four ways to trigger a run: immediately, at a specific date and time, at an interval measured in minutes or hours, or on a daily, weekly, or monthly schedule. You can also trigger on changes in a watched folder. The second is AI Team. You summon AI members modeled on historical figures to form a team, and those members gather in a 3D space to discuss what should be done next. When you submit a request, the AI picks an assignee based on accumulated experience, and the work runs as an AI Task. Finished work becomes experience that feeds the next assignment. Both run on backend_taskteam, sharing the same SQLite database as the business data.",
+      "short_audio": "audio/short_scene_007.mp3",
+      "long_audio": "audio/long_scene_007.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 7.848,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 52.512
     },
     {
       "id": "scene_999",
@@ -600,16 +701,16 @@ window.SCENARIO = {
       "evidence": [],
       "image_prompt": "Square 1:1 ending visual for AiDiy. Beautiful typography centered on 'Thank you for Watching', refined luxury tech style, dark blue gradient background, subtle violet glow, clean centered layout, premium and readable, no extra UI elements, no character, no clutter. Polished square closing card suitable for a product introduction ending.",
       "short_narration": "Thank you for watching. Please subscribe to support us. What will you build with AiDiy?",
-      "long_narration": "Thank you for watching. This video was automatically generated using AiDiy's own video page generation feature (ビデオページ生成機能). Scenario creation, image generation, speech synthesis, and HTML assembly were all handled by MCP and CodeAgents. AiDiy includes everything you need to get started right away: domain-aligned naming, 5 services, rich business samples, an AI core, 14 MCP tools, and automated video generation. If you enjoyed this video, please subscribe to support us. See you in the next video! If you were intrigued by the combination of practical domain naming and AI, please try running AiDiy yourself. What kind of business system or AI experiment would you build with this template?",
+      "long_narration": "Thank you for watching. This video was automatically generated using AiDiy's own video page generation feature (ビデオページ生成機能). Scenario creation, image generation, speech synthesis, and HTML assembly were all handled by MCP and CodeAgents. AiDiy includes everything you need to get started right away: domain-aligned naming, 7 services, rich business samples, an AI core, 19 MCP tools, and automated video generation. If you enjoyed this video, please subscribe to support us. See you in the next video! If you were intrigued by the combination of practical domain naming and AI, please try running AiDiy yourself. What kind of business system or AI experiment would you build with this template?",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
       "short_start_sec": 0.0,
       "short_duration_sec": 4.992,
       "long_start_sec": 0.0,
-      "long_duration_sec": 38.928,
+      "long_duration_sec": 38.784,
       "duration_sec": 0.0
     }
   ],
-  "total_short_duration_sec": 57.144,
-  "total_long_duration_sec": 328.368
+  "total_short_duration_sec": 68.904,
+  "total_long_duration_sec": 394.104
 };

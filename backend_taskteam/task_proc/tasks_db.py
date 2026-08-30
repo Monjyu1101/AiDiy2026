@@ -136,6 +136,36 @@ def _現在日時() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _正整数(値, 既定: int = 0) -> int:
+    """0 以上の整数へ変換する（変換できない・負値は既定値）。予測分数などの取り込みに使う。"""
+    try:
+        n = int(値)
+    except (TypeError, ValueError):
+        return 既定
+    return n if n >= 0 else 既定
+
+
+def _経過分数(開始日時: str, 終了日時: str) -> int:
+    """開始〜終了の経過分を返す（切り上げ、最低 1 分）。求められないときは 0。
+
+    明細の実績分数に使う。1 分未満で終わったステップも「0 分」ではなく 1 分として残し、
+    実行されたことが分かるようにする。
+    """
+    開始 = str(開始日時 or "").strip()
+    終了 = str(終了日時 or "").strip()
+    if not 開始 or not 終了:
+        return 0
+    try:
+        s = datetime.strptime(開始, "%Y-%m-%d %H:%M:%S")
+        e = datetime.strptime(終了, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return 0
+    秒 = (e - s).total_seconds()
+    if 秒 < 0:
+        return 0
+    return max(1, int((秒 + 59) // 60))
+
+
 def _採番確保(conn: sqlite3.Connection) -> None:
     """C採番（backend_server共有）にAタスク要求用の採番行が無ければ作成する。"""
     conn.execute(f"""
@@ -242,28 +272,57 @@ def _AIタスク要求テーブル作成(conn: sqlite3.Connection) -> None:
 
 
 
+_明細カラムDDL = f"""
+    タスクID TEXT NOT NULL,
+    明細SEQ INTEGER NOT NULL,
+    タイトル TEXT NOT NULL,
+    要求内容 TEXT NOT NULL DEFAULT '',
+    先行SEQ TEXT NOT NULL DEFAULT '',
+    TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
+    TASK_AI_MODEL_do TEXT NOT NULL DEFAULT 'auto',
+    操作検証 INTEGER NOT NULL DEFAULT 0,
+    実行有効 INTEGER NOT NULL DEFAULT 1,
+    状態 TEXT NOT NULL DEFAULT '待機',
+    PID TEXT NOT NULL DEFAULT '',
+    開始日時 TEXT NOT NULL DEFAULT '',
+    終了日時 TEXT NOT NULL DEFAULT '',
+    実行回数 INTEGER NOT NULL DEFAULT 0,
+    予測分数 INTEGER NOT NULL DEFAULT 0,
+    実績分数 INTEGER NOT NULL DEFAULT 0,
+    応答内容 TEXT NOT NULL DEFAULT '',
+    {_監査カラムDDL},
+    PRIMARY KEY (タスクID, 明細SEQ)
+"""
+
+# 業務項目は必ず監査項目より前に並べる規約。ALTER TABLE ADD COLUMN では末尾（監査項目の後ろ）に
+# 付いてしまうため、列順が規約どおりでない既存 DB はテーブルごと作り直して並べ替える。
+_明細列順 = [
+    "タスクID", "明細SEQ", "タイトル", "要求内容", "先行SEQ",
+    "TASK_AI_NAME", "TASK_AI_MODEL_do", "操作検証", "実行有効", "状態",
+    "PID", "開始日時", "終了日時", "実行回数", "予測分数", "実績分数", "応答内容",
+] + list(_監査項目().keys())
+
+
 def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
     conn.execute(f"""
         CREATE TABLE IF NOT EXISTS {AIタスク明細テーブル} (
-            タスクID TEXT NOT NULL,
-            明細SEQ INTEGER NOT NULL,
-            タイトル TEXT NOT NULL,
-            要求内容 TEXT NOT NULL DEFAULT '',
-            先行SEQ TEXT NOT NULL DEFAULT '',
-            TASK_AI_NAME TEXT NOT NULL DEFAULT 'codex_cli',
-            TASK_AI_MODEL_do TEXT NOT NULL DEFAULT 'auto',
-            操作検証 INTEGER NOT NULL DEFAULT 0,
-            実行有効 INTEGER NOT NULL DEFAULT 1,
-            状態 TEXT NOT NULL DEFAULT '待機',
-            PID TEXT NOT NULL DEFAULT '',
-            開始日時 TEXT NOT NULL DEFAULT '',
-            終了日時 TEXT NOT NULL DEFAULT '',
-            実行回数 INTEGER NOT NULL DEFAULT 0,
-            応答内容 TEXT NOT NULL DEFAULT '',
-            {_監査カラムDDL},
-            PRIMARY KEY (タスクID, 明細SEQ)
+            {_明細カラムDDL}
         )
     """)
+    現在列 = [str(row["name"]) for row in conn.execute(f"PRAGMA table_info({AIタスク明細テーブル})")]
+    if 現在列 == _明細列順:
+        return
+    # 列が足りない / 監査項目より後ろに業務項目が付いている旧スキーマを、正しい列順へ作り替える
+    移行テーブル = f"{AIタスク明細テーブル}_移行"
+    引継列 = ", ".join(_識別子(列) for 列 in _明細列順 if 列 in 現在列)
+    conn.execute(f"DROP TABLE IF EXISTS {_識別子(移行テーブル)}")
+    conn.execute(f"CREATE TABLE {_識別子(移行テーブル)} ({_明細カラムDDL})")
+    conn.execute(
+        f"INSERT INTO {_識別子(移行テーブル)} ({引継列}) "
+        f"SELECT {引継列} FROM {AIタスク明細テーブル}"
+    )
+    conn.execute(f"DROP TABLE {AIタスク明細テーブル}")
+    conn.execute(f"ALTER TABLE {_識別子(移行テーブル)} RENAME TO {AIタスク明細テーブル}")
 
 
 _実行条件カラムDDL = f"""
@@ -484,7 +543,7 @@ def タスク明細一覧(タスクID: str) -> list[dict]:
     try:
         rows = conn.execute(
             "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, "
-            f"PID, 開始日時, 終了日時, 実行回数, 応答内容, 更新日時 FROM {AIタスク明細テーブル} "
+            f"PID, 開始日時, 終了日時, 実行回数, 予測分数, 実績分数, 応答内容, 更新日時 FROM {AIタスク明細テーブル} "
             "WHERE タスクID = ? ORDER BY 明細SEQ",
             [タスクID],
         ).fetchall()
@@ -793,7 +852,7 @@ def 明細全件有効待機化(タスクID: str) -> int:
     try:
         cur = conn.execute(
             f"UPDATE {AIタスク明細テーブル} SET 実行有効 = 1, 状態 = '待機', PID = '', "
-            "開始日時 = '', 終了日時 = '', 実行回数 = 0, 更新日時 = ? "
+            "開始日時 = '', 終了日時 = '', 実行回数 = 0, 実績分数 = 0, 更新日時 = ? "
             "WHERE タスクID = ?",
             [_現在日時(), タスクID],
         )
@@ -831,7 +890,7 @@ def タスク発火(タスクID: str) -> bool:
         now = _現在日時()
         conn.execute(
             f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', 終了日時 = '', "
-            "実行回数 = 0, 更新日時 = ? WHERE タスクID = ?",
+            "実行回数 = 0, 実績分数 = 0, 更新日時 = ? WHERE タスクID = ?",
             [now, タスクID],
         )
         conn.execute(
@@ -968,6 +1027,8 @@ def 実行待ち明細一覧() -> list[dict]:
     親の AIタスク要求が 待機 / 実行中 のものだけを対象とする
     （準備開始・準備中・準備完了・失敗・完了のタスクは実行しない。準備完了は実行開始条件の充足待ちに使う）。
     明細の 実行有効 = 0 は実行対象にしない（明細作成は実行有効フラグに関係なく行う）。
+    要求の 実行有効 = 0 も実行対象にしない。エラーからの復旧で明細だけ有効に戻したとき、
+    要求が無効のまま実行が始まってしまうため（要求も有効に戻した時点で再開する）。
     """
     初期化()
     conn = 接続取得()
@@ -976,7 +1037,8 @@ def 実行待ち明細一覧() -> list[dict]:
             "SELECT m.タスクID, m.明細SEQ, m.タイトル, m.先行SEQ, m.TASK_AI_NAME, m.TASK_AI_MODEL_do, m.実行回数 "
             f"FROM {AIタスク明細テーブル} m JOIN {AIタスク要求テーブル} r "
             "ON r.タスクID = m.タスクID "
-            "WHERE m.実行有効 = 1 AND m.状態 = '待機' AND m.PID = '' AND r.状態 IN ('待機', '実行中') "
+            "WHERE m.実行有効 = 1 AND m.状態 = '待機' AND m.PID = '' "
+            "AND r.実行有効 = 1 AND r.状態 IN ('待機', '実行中') "
             "ORDER BY m.タスクID, m.明細SEQ"
         ).fetchall()
         候補 = [dict(row) for row in rows]
@@ -1059,20 +1121,69 @@ def 明細実行開始記録(タスクID: str, 明細SEQ: int, pid: int) -> None
         conn.close()
 
 
+def _明細開始日時(conn: sqlite3.Connection, タスクID: str, 明細SEQ: int) -> str:
+    """実績分数の計算に使う明細の開始日時を返す（無ければ空文字）。"""
+    row = conn.execute(
+        f"SELECT 開始日時 FROM {AIタスク明細テーブル} WHERE タスクID = ? AND 明細SEQ = ?",
+        [タスクID, 明細SEQ],
+    ).fetchone()
+    return str(row["開始日時"]) if row else ""
+
+
+def 明細PID解放(タスクID: str, 明細SEQ: int) -> bool:
+    """プロセスが消えた実行中明細を 待機・PID空 に戻す。戻せたら True。
+
+    対象は 状態='実行中' かつ PID あり の行だけ（完了・エラー・中止には触らない）。
+    開始日時も空に戻す（タイムアウト判定の対象から外し、起動監視で素直に再実行させるため）。
+    実行回数は戻さない。無限リトライを避けるため、実行回数上限の判定はそのまま活かす。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        cur = conn.execute(
+            f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', 実績分数 = 0, 更新日時 = ? "
+            "WHERE タスクID = ? AND 明細SEQ = ? AND 状態 = '実行中' AND PID != ''",
+            [_現在日時(), タスクID, 明細SEQ],
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def 明細1件取得(タスクID: str, 明細SEQ: int) -> dict | None:
+    """AIタスク明細 1 行を返す（無ければ None）。"""
+    初期化()
+    conn = 接続取得()
+    try:
+        row = conn.execute(
+            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, "
+            "操作検証, 実行有効, 状態, PID, 開始日時, 終了日時, 実行回数, 予測分数, 実績分数, 応答内容 "
+            f"FROM {AIタスク明細テーブル} WHERE タスクID = ? AND 明細SEQ = ?",
+            [タスクID, 明細SEQ],
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
 def 明細完了(タスクID: str, 明細SEQ: int, 応答内容: str = "") -> dict:
     """明細を完了にする。全明細が完了したら AIタスク要求も完了にする。
 
     完了した明細のタイトルと応答内容は AIタスク要求の 応答タイトル・応答内容 へ
     反映する（最新ステップの結果表示用）。
+    実績分数は 開始日時〜終了日時 から求めて記録する（予測分数との突き合わせに使う）。
     """
     初期化()
     conn = 接続取得()
     try:
         now = _現在日時()
+        実績 = _経過分数(_明細開始日時(conn, タスクID, 明細SEQ), now)
         cur = conn.execute(
-            f"UPDATE {AIタスク明細テーブル} SET 状態 = '完了', 終了日時 = ?, PID = '', 応答内容 = ?, 更新日時 = ? "
+            f"UPDATE {AIタスク明細テーブル} SET 状態 = '完了', 終了日時 = ?, PID = '', "
+            "実績分数 = ?, 応答内容 = ?, 更新日時 = ? "
             "WHERE タスクID = ? AND 明細SEQ = ? AND 状態 != 'エラー'",
-            [now, 応答内容, now, タスクID, 明細SEQ],
+            [now, 実績, 応答内容, now, タスクID, 明細SEQ],
         )
         if cur.rowcount <= 0:
             conn.commit()
@@ -1202,20 +1313,32 @@ def 明細再試行(タスクID: str, 明細SEQ: int) -> dict:
 
 
 def 明細失敗(タスクID: str, 明細SEQ: int, メッセージ: str) -> dict:
-    """明細をエラーにし、AIタスク要求もエラーにする（後続の実行を止める）。"""
+    """明細をエラーにし、AIタスク要求もエラーにする（後続の実行を止める）。
+
+    明細・要求とも 実行有効 = 0 にする（タイムアウト対象エラー化・PID全クリア と同じ扱い）。
+    実行有効を残すと画面のトグルが ON のままで「有効に戻す」操作ができず、
+    エラーからの復旧（実行有効の切替で 待機 へ戻す）が始められないため。
+
+    エラー内容は要求の 応答タイトル・応答内容 へ書く。要求内容（人が書いた依頼文）には
+    絶対に追記しない。追記すると人の文章がエラー履歴で汚れ、再実行時にその汚れた文章が
+    そのまま AI へ渡ってしまう。
+    """
     初期化()
     conn = 接続取得()
     try:
         now = _現在日時()
+        実績 = _経過分数(_明細開始日時(conn, タスクID, 明細SEQ), now)
         conn.execute(
-            f"UPDATE {AIタスク明細テーブル} SET 状態 = 'エラー', 終了日時 = ?, PID = '', 応答内容 = ?, 更新日時 = ? "
+            f"UPDATE {AIタスク明細テーブル} SET 状態 = 'エラー', 実行有効 = 0, "
+            "終了日時 = ?, PID = '', 実績分数 = ?, 応答内容 = ?, 更新日時 = ? "
             "WHERE タスクID = ? AND 明細SEQ = ?",
-            [now, メッセージ, now, タスクID, 明細SEQ],
+            [now, 実績, メッセージ, now, タスクID, 明細SEQ],
         )
         conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET 状態 = 'エラー', 要求内容 = 要求内容 || ?, 更新日時 = ? "
+            f"UPDATE {AIタスク要求テーブル} SET 状態 = 'エラー', 実行有効 = 0, "
+            "応答タイトル = ?, 応答内容 = ?, 更新日時 = ? "
             "WHERE タスクID = ?",
-            [f"\n[エラー] SEQ{明細SEQ}: {メッセージ}", now, タスクID],
+            [f"エラー SEQ{明細SEQ}", f"[エラー] SEQ{明細SEQ}: {メッセージ}", now, タスクID],
         )
         _Aチーム依頼反映(conn, タスクID, 状態="エラー", 応答内容=f"[エラー] SEQ{明細SEQ}: {メッセージ}", guard="")
         conn.commit()
@@ -1343,12 +1466,25 @@ def タスク要求更新登録(
 
 
 def タスク実行有効更新(タスクID: str, 実行有効: bool) -> dict:
-    """タスク要求と全タスク明細の実行有効フラグをまとめて更新する。"""
+    """タスク要求と全タスク明細の実行有効フラグをまとめて更新する。
+
+    無効 → 有効 への切替時は、エラーで止まっている要求・明細を 待機 に戻して再実行できるようにする。
+    画面のチェック操作は人の判断なので、エラーを上書きしない通常ガードの対象外にする。
+    明細は PID・開始日時・終了日時・実行回数もリセットする（タスク発火と同じ初期化）。
+    実行回数を残すと tasks_watcher の実行回数上限に即座に引っかかり、そのままエラーへ戻ってしまう。
+    """
     初期化()
     conn = 接続取得()
     try:
         now = _現在日時()
         実行有効値 = 1 if 実行有効 else 0
+        要求エラー = False
+        if 実行有効値 == 1:
+            req = conn.execute(
+                f"SELECT 状態 FROM {AIタスク要求テーブル} WHERE タスクID = ?",
+                [タスクID],
+            ).fetchone()
+            要求エラー = req is not None and str(req["状態"]) == "エラー"
         conn.execute(
             f"UPDATE {AIタスク要求テーブル} SET 実行有効 = ?, 更新日時 = ? WHERE タスクID = ?",
             [実行有効値, now, タスクID],
@@ -1357,6 +1493,21 @@ def タスク実行有効更新(タスクID: str, 実行有効: bool) -> dict:
             f"UPDATE {AIタスク明細テーブル} SET 実行有効 = ?, 更新日時 = ? WHERE タスクID = ?",
             [実行有効値, now, タスクID],
         )
+        if 実行有効値 == 1:
+            conn.execute(
+                f"UPDATE {AIタスク要求テーブル} SET 状態 = '待機', PID = '', 更新日時 = ? "
+                "WHERE タスクID = ? AND 状態 = 'エラー'",
+                [now, タスクID],
+            )
+            conn.execute(
+                f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', "
+                "終了日時 = '', 実行回数 = 0, 実績分数 = 0, 更新日時 = ? "
+                "WHERE タスクID = ? AND 状態 = 'エラー'",
+                [now, タスクID],
+            )
+            if 要求エラー:
+                # 終了日時を空へ戻さないと Aチーム依頼側が終了済みのまま残る（明細再試行と同じ扱い）
+                _Aチーム依頼反映(conn, タスクID, 状態="待機", 終了日時="", guard="状態 = 'エラー'")
         conn.commit()
         return _タスク要求取得(conn, タスクID)
     finally:
@@ -1364,7 +1515,15 @@ def タスク実行有効更新(タスクID: str, 実行有効: bool) -> dict:
 
 
 def 明細実行有効更新(タスクID: str, 明細SEQ: int, 実行有効: bool) -> bool:
-    """タスク明細 1 行の実行有効フラグを更新する。更新できたら True。"""
+    """タスク明細 1 行の実行有効フラグを更新する。更新できたら True。
+
+    無効 → 有効 への切替時、その明細が エラー / 完了 なら 待機 に戻して再実行できるようにする
+    （PID・開始日時・終了日時・実行回数もリセットする。理由は タスク実行有効更新 と同じ）。
+    完了も戻すのは、仕上がりが気に入らないステップだけを選んで実行し直せるようにするため。
+    先行SEQ の明細は完了のまま残るので、そのステップだけが再実行される。
+    親のタスク要求も エラー / 完了 なら 待機（終了日時は空）へ戻す。要求がその状態のままだと
+    実行待ち明細一覧 の対象にならず、明細だけ待機にしても実行が始まらないため（明細再試行 と同じ扱い）。
+    """
     初期化()
     conn = 接続取得()
     try:
@@ -1374,8 +1533,28 @@ def 明細実行有効更新(タスクID: str, 明細SEQ: int, 実行有効: boo
             "WHERE タスクID = ? AND 明細SEQ = ?",
             [1 if 実行有効 else 0, now, タスクID, 明細SEQ],
         )
+        更新済み = cur.rowcount > 0
+        if 更新済み and 実行有効:
+            戻し = conn.execute(
+                f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', "
+                "終了日時 = '', 実行回数 = 0, 実績分数 = 0, 更新日時 = ? "
+                "WHERE タスクID = ? AND 明細SEQ = ? AND 状態 IN ('エラー', '完了')",
+                [now, タスクID, 明細SEQ],
+            )
+            if 戻し.rowcount > 0:
+                # 要求が完了のままだと後続が起動しないので、終了日時も空へ戻して実行中へ戻せるようにする
+                要求戻し = conn.execute(
+                    f"UPDATE {AIタスク要求テーブル} SET 状態 = '待機', PID = '', 終了日時 = '', 更新日時 = ? "
+                    "WHERE タスクID = ? AND 状態 IN ('エラー', '完了')",
+                    [now, タスクID],
+                )
+                if 要求戻し.rowcount > 0:
+                    _Aチーム依頼反映(
+                        conn, タスクID, 状態="待機", 終了日時="",
+                        guard="状態 IN ('エラー', '完了')",
+                    )
         conn.commit()
-        return cur.rowcount > 0
+        return 更新済み
     finally:
         conn.close()
 
@@ -1400,7 +1579,7 @@ def 明細更新登録(
         if 状態 == "待機":
             cur = conn.execute(
                 f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL_do = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
-                "PID = '', 開始日時 = '', 終了日時 = '', 実行回数 = 0, 応答内容 = '', 更新日時 = ? "
+                "PID = '', 開始日時 = '', 終了日時 = '', 実行回数 = 0, 実績分数 = 0, 応答内容 = '', 更新日時 = ? "
                 "WHERE タスクID = ? AND 明細SEQ = ?",
                 [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
             )
@@ -1509,12 +1688,35 @@ def PID全クリア() -> None:
         conn.close()
 
 
-def タイムアウト対象一覧(制限分: int = 30, 準備制限分: int = 10) -> list[dict]:
-    """制限分以上まったく進捗が無い行を返す。
+def 明細タイムアウト分(予測分数, 標準分: int = 30, 最低分: int = 10, 倍率: int = 2) -> int:
+    """明細 1 件の打ち切り時間（分）を返す。
+
+    - 予測分数が 0 / 未設定（未見積り）: 標準分をそのまま使う
+    - 予測分数がある: 予測分数 × 倍率。短い見積りで即打ち切りにならないよう最低分は必ず確保する
+
+    例（標準30 / 最低10 / 倍率2）: 未見積り→30分、1分→10分、5分→10分、20分→40分
+    """
+    分 = _正整数(予測分数)
+    if 分 <= 0:
+        return 標準分
+    return max(最低分, 分 * 倍率)
+
+
+def タイムアウト対象一覧(
+    制限分: int = 30,
+    準備制限分: int = 10,
+    明細標準分: int = 30,
+    明細最低分: int = 10,
+    明細倍率: int = 2,
+) -> list[dict]:
+    """制限分以上まったく進捗が無い行を、適用した制限分つきで返す。
 
     AIタスク要求・AIタスク明細の両方が対象。判定の起点はテーブルごとに変える。
 
     - AIタスク明細: 開始日時。1 ステップは 1 プロセスの実行なので、開始からの経過でよい。
+      打ち切り時間は明細ごとに変わる（明細タイムアウト分 参照）。予測分数が入っていれば
+      その 2 倍まで待ち、未見積りなら標準分で見る。行ごとに閾値が違うため SQL では絞らず
+      候補を取り出して Python 側で判定する。
     - AIタスク要求: 開始日時と更新日時の新しい方。要求の開始日時は最初の明細が終わった
       時点で入ったきり更新されないため、開始日時だけで見ると「全ステップの合計時間」に
       制限をかけることになり、正常に進んでいる長いタスクまで打ち切ってしまう。
@@ -1530,8 +1732,9 @@ def タイムアウト対象一覧(制限分: int = 30, 準備制限分: int = 1
     初期化()
     conn = 接続取得()
     try:
-        閾値 = (datetime.now() - timedelta(minutes=制限分)).strftime("%Y-%m-%d %H:%M:%S")
-        準備閾値 = (datetime.now() - timedelta(minutes=準備制限分)).strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now()
+        閾値 = (now - timedelta(minutes=制限分)).strftime("%Y-%m-%d %H:%M:%S")
+        準備閾値 = (now - timedelta(minutes=準備制限分)).strftime("%Y-%m-%d %H:%M:%S")
         共通条件 = "開始日時 != '' AND 終了日時 = '' AND 状態 != 'エラー'"
         結果: list[dict] = []
         rows = conn.execute(
@@ -1541,13 +1744,21 @@ def タイムアウト対象一覧(制限分: int = 30, 準備制限分: int = 1
             f"AND MAX(開始日時, 更新日時) <= (CASE WHEN 状態 = '準備中' THEN ? ELSE ? END)",
             [準備閾値, 閾値],
         ).fetchall()
-        結果.extend({"テーブル": AIタスク要求テーブル, **dict(row)} for row in rows)
+        for row in rows:
+            適用 = 準備制限分 if str(row["状態"]) == "準備中" else 制限分
+            結果.append({"テーブル": AIタスク要求テーブル, "制限分": 適用, **dict(row)})
         rows = conn.execute(
-            f"SELECT タスクID, 明細SEQ, 状態, PID, 開始日時 "
-            f"FROM {AIタスク明細テーブル} WHERE {共通条件} AND 開始日時 <= ?",
-            [閾値],
+            f"SELECT タスクID, 明細SEQ, 状態, PID, 開始日時, 予測分数 "
+            f"FROM {AIタスク明細テーブル} WHERE {共通条件}",
         ).fetchall()
-        結果.extend({"テーブル": AIタスク明細テーブル, **dict(row)} for row in rows)
+        for row in rows:
+            適用 = 明細タイムアウト分(row["予測分数"], 明細標準分, 明細最低分, 明細倍率)
+            try:
+                開始 = datetime.strptime(str(row["開始日時"]), "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue  # 日時が壊れている行は打ち切り対象にしない
+            if (now - 開始).total_seconds() >= 適用 * 60:
+                結果.append({"テーブル": AIタスク明細テーブル, "制限分": 適用, **dict(row)})
         return 結果
     finally:
         conn.close()
@@ -1575,11 +1786,13 @@ def タイムアウト対象エラー化(対象一覧: list[dict]) -> int:
             if テーブル not in (AIタスク要求テーブル, AIタスク明細テーブル) or not タスクID:
                 continue
             if テーブル == AIタスク明細テーブル:
+                # 打ち切りまでにかかった時間も実績として残す（終了日時は入れず監視対象のまま扱う既存仕様は維持）
                 cur = conn.execute(
-                    f"UPDATE {AIタスク明細テーブル} SET 状態 = 'エラー', 実行有効 = 0, PID = '', 更新日時 = ? "
+                    f"UPDATE {AIタスク明細テーブル} SET 状態 = 'エラー', 実行有効 = 0, PID = '', "
+                    "実績分数 = ?, 更新日時 = ? "
                     "WHERE タスクID = ? AND 明細SEQ = ? "
                     "AND 状態 != 'エラー' AND 終了日時 = '' AND PID = ? AND 開始日時 = ?",
-                    [now, タスクID, int(行.get("明細SEQ", 0) or 0), PID, 開始日時],
+                    [_経過分数(開始日時, now), now, タスクID, int(行.get("明細SEQ", 0) or 0), PID, 開始日時],
                 )
             else:
                 # 要求側の終了日時は 明細失敗 と同じく空のままにする（明細再試行 で
@@ -1671,8 +1884,8 @@ def タスク本登録(
         for 行 in 明細:
             明細SEQ = int(行["明細SEQ"])
             conn.execute(
-                f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, {監査カラム}) "
-                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
+                f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, 予測分数, {監査カラム}) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
                 [
                     タスクID,
                     明細SEQ,
@@ -1685,6 +1898,8 @@ def タスク本登録(
                     1 if 行.get("操作検証") else 0,
                     実行有効値,
                     "待機",
+                    # 予測分数は AI がタスク分解時に見積もる。未指定・不正値は 0（未見積り）とする
+                    _正整数(行.get("予測分数")),
                     *監査値,
                 ],
             )
@@ -1695,15 +1910,20 @@ def タスク本登録(
 
 
 def タスク失敗(タスクID: str, メッセージ: str) -> dict:
-    """AI 生成に失敗した仮タスクを『エラー』の完了タスクにする（終了日時を記録し PID をクリア）。"""
+    """AI 生成に失敗した仮タスクを『エラー』の完了タスクにする（終了日時を記録し PID をクリア）。
+
+    実行有効 = 0 にするのは 明細失敗 と同じ理由（実行有効の切替でエラーから復旧させるため）。
+    エラー内容は 応答タイトル・応答内容 へ書く（要求内容＝人が書いた依頼文は書き換えない）。
+    """
     初期化()
     conn = 接続取得()
     try:
         now = _現在日時()
         conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET 状態 = 'エラー', 要求内容 = 要求内容 || ?, "
+            f"UPDATE {AIタスク要求テーブル} SET 状態 = 'エラー', 実行有効 = 0, "
+            "応答タイトル = ?, 応答内容 = ?, "
             "PID = '', 終了日時 = ?, 更新日時 = ? WHERE タスクID = ?",
-            [f"\n[エラー] {メッセージ}", now, now, タスクID],
+            ["エラー", f"[エラー] {メッセージ}", now, now, タスクID],
         )
         conn.commit()
         return _タスク要求取得(conn, タスクID)

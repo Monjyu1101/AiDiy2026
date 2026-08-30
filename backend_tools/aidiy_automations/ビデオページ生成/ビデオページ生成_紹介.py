@@ -45,12 +45,12 @@ from utils.infra import (
     step_instruction_header, guide_tts,
     step_no_to_value, step_value_to_int, get_completed_step,
     ensure_preview_minimum_duration_mcp,
-    run_python_script,
+    run_python_script, topic_brief,
 )
 from utils.generation import (
     ensure_scene_image_script, ensure_dialogue_audio_script,
-    validate_scene_id_range, index_html_matches_theme,
-    ensure_step_markdown, mark_step_done,
+    validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs, index_html_matches_theme,
+    scenario_title_and_lead, ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, count_scenario_scenes, count_scenario_dialogues,
 )
 from utils.steps import (
@@ -175,7 +175,7 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
 
     step_summary = (
         f'  "{folder_name}" の scenario.js を作成・更新します。\n'
-        "  8 シーン構成、short/long ナレーション、画像・音声パス、AiDiy 説明入りのまとめを整えます。"
+        "  7〜12 シーン構成、short/long ナレーション、画像・音声パス、AiDiy 説明入りのまとめを整えます。"
     )
     scenario_path = os.path.join(new_dir, "scenario.js")
     md_path       = os.path.join(new_dir, f"{folder_name}.md")
@@ -220,8 +220,15 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         "  - scene_001〜scene_005: 各テーマ。最低限必須\n"
         "  - 必要に応じて scene_006〜scene_010 まで追加可\n"
         "  - scene_999: まとめ。最後固定\n\n"
+        "■ ページ数はテーマの情報量に合わせて決めること（7 ページ固定ではない）\n"
+        "  - 基本の考え方: 紹介したい機能・論点が N 個あるなら『イントロ + N + まとめ』にする\n"
+        "  - 増やす判断: 1 つのシーンに別々の話題が 3 つ以上入るなら、そこは分けてシーンを増やす。\n"
+        "    説明が長くなって long_narration が 400 文字を超えそうなときも分けるサイン\n"
+        "  - 減らす判断: 内容の薄いシーンを足して水増ししないこと。語ることが少ないテーマは\n"
+        "    最小構成に収め、1 シーンあたりの密度を保つほうがよい\n"
+        "  - topic にシーン構成の指定があるときは、その指定を最優先する\n\n"
         "■ 各シーンの必須フィールド\n"
-        '  "id", "title", "expression", "accent", "accent_soft",\n'
+        '  "id", "title", "expression": "neutral", "accent", "accent_soft",\n'
         '  "kicker", "headline", "image": "images/scene_NNN.png",\n'
         '  "chips", "metrics", "cards", "facts", "evidence",\n'
         '  "short_narration", "long_narration",\n'
@@ -229,6 +236,8 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         '  "long_audio": "audio/long_scene_NNN.mp3",\n'
         '  "short_start_sec": 0.0, "short_duration_sec": 10.0,\n'
         '  "long_start_sec": 0.0, "long_duration_sec": 30.0\n\n'
+        '■ "expression" は全シーン "neutral" 固定にすること\n'
+        "  （happy などを混ぜるとアバターの表情が崩れる。他テーマの紹介動画も全シーン neutral で統一している）\n\n"
         "■ scene_000 の long_narration 冒頭に「AiDiy のビデオページ生成機能で自動生成されました」という趣旨を必ず入れる\n\n"
         "■ scene_999 の long_narration に必ず含めること\n"
         "  (1) AiDiy で作られたという説明  (2) チャンネル登録のお願い\n"
@@ -250,7 +259,9 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
                 "window.SCENARIO" in c and "scene_999" in c and folder_name in c,
             )
         ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=10, label="紹介シナリオ") if ok1 else False
-        return ok1 and ok2 and ok3
+        ok4 = validate_scene_expressions(scenario_path, label="紹介シナリオ") if ok1 else False
+        ok5 = validate_scene_media_refs(scenario_path, label="紹介シナリオ") if ok1 else False
+        return ok1 and ok2 and ok3 and ok4 and ok5
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
@@ -283,38 +294,53 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
     if index_html_matches_theme(index_path, scenario_path, folder_name, topic):
         print("  [既存] index.html は修正済みです。内容検証を行い、問題があれば修正します")
 
+    # 検証（index_html_matches_theme）は scenario.js の title / project_name などが
+    # index.html に含まれるかで判定する。指示側に同じ値を明示しないと、エージェントが
+    # 独自に要約したタイトルを書いてしまい、検証NGのリトライを繰り返す。
+    scenario_title, scene000_lead = scenario_title_and_lead(scenario_path)
+    title_source = scenario_title or folder_name
+
     fix_mode_prefix_html = ""
     if ctx.fix_mode and os.path.isfile(index_path):
-        with open(index_path, encoding="utf-8") as _f:
-            _existing_html = _f.read()
+        # 先頭抜粋は <style> しか入らず、修正対象（.brand / .top-note は 350 行目付近）を含まない。
+        # 抜粋は貼らず、パスを渡して必要な箇所だけ読ませる。
         fix_mode_prefix_html = (
             "【修正モード】\n"
-            "  HTML/CSS/JS の構造は維持してください。\n\n"
-            f"【修正前 index.html の関連部分（先頭抜粋）】\n```\n{_existing_html[:2000]}\n```\n"
-            f"【修正の基準となる topic】\n{topic}\n\n"
+            "  index.html は既にあります。全文を書き直さず、下記【更新箇所】の該当行だけを置換してください。\n\n"
         )
 
     prompt = (
         step_instruction_header(ctx, step_name, step_summary)
         + fix_mode_prefix_html
         + "以下の手順で index.html を修正してください。\n\n"
+        "【対象ファイル】\n"
+        f'  修正する: "{index_path}"\n'
+        f'  参照する（先に読むこと）: "{scenario_path}"\n\n'
         "【参考ナレッジ】\n"
         f'  - "{NEWS_VIDEO_KNOWLEDGE_PATH}"\n\n'
-        "【修正方針】\n"
-        "  - HTML/CSS/JavaScript の構造は維持する。\n"
-        "  - 1アバター（シングル）表示、リップシンク、字幕表示ロジックは維持する。\n"
-        "  - short_narration / long_narration の切り替え、short_audio / long_audio 再生ロジックは維持する。\n"
-        "  - テンプレート元テーマの文言だけを今回のテーマへ置き換える。\n\n"
+        "【厳守（守らないと検証NGでやり直しになります）】\n"
+        "  - 全文を書き直さない。下記【更新箇所】に挙げた箇所だけを置換する。\n"
+        "  - <style> と <script> の中身は変更しない。CSS クラス名、id、JavaScript の変数名・関数名、\n"
+        "    ファイルパス（scenario.js、images/、audio/、../_vrm/）は 1 文字も変えない。\n"
+        "  - 1アバター（シングル）表示、リップシンク、字幕表示ロジックは触らない。\n"
+        "  - short_narration / long_narration の切り替え、short_audio / long_audio 再生ロジックは触らない。\n"
+        "  - シーンの本文（見出し、セリフ、画像パス）は scenario.js が持つ。\n"
+        "    index.html にシーン内容を書き足さない。\n\n"
         "【更新箇所】\n"
-        f"  1. <title> タグにフォルダ名またはテーマ名を含める: {folder_name}\n"
-        "  2. .brand div の中身を今回の動画ブランド表示へ更新する。\n"
-        "  3. .top-note の中身をテーマの簡潔な説明文（1〜2文）へ更新する。\n"
-        "  4. 見出し、サブタイトル、説明文などにテンプレート元テーマが残っていれば置き換える。\n\n"
+        "  1. <title> …… 次の文字列をそのまま入れる（要約・短縮・語句の変更をしない）。\n"
+        f"       {title_source}\n"
+        "     前後に文言を足す場合も、この文字列は欠けなく含めること。\n"
+        "  2. .brand div の中身 …… 今回のテーマを表す短い見出し（全角 20 文字程度まで）。\n"
+        "     テンプレート元の「AiDiy 完全紹介」は残さない。\n"
+        "  3. .top-note div の中身 …… 下記の scene_000 lead を基に 1〜2 文で書く。<br> 区切りは残してよい。\n"
+        "  4. 1〜3 以外にテンプレート元テーマの文言が残っていれば今回のテーマへ置き換える。\n\n"
         "【今回のテーマ】\n"
         f"  フォルダ名: {folder_name}\n"
-        f"  テーマ詳細: {topic}\n\n"
+        f"  scenario.js の title: {scenario_title or '(取得できず)'}\n"
+        f"  scene_000 の lead: {scene000_lead or '(取得できず)'}\n"
+        f"  テーマ要約: {topic_brief(topic)}\n\n"
         f'"{md_path}" の「HTML修正」チェックを [x] にしてください。\n\n'
-        "【完了確認】index.html の <title> と .brand と .top-note 周辺を表示してください。\n"
+        "【完了確認】index.html の <title>、.brand、.top-note の最終的な文言を表示してください。\n"
     )
     await agent_run(ctx, ca, prompt, timeout_sec=300)
 
@@ -392,8 +418,9 @@ async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
+        # 画像は件数が多く検証エージェントの確認に時間がかかるため、他ステップより長めにする
         target_paths=[scenario_path, gen_img_py, images_dir, md_path],
-        validate=validate, verify_timeout_sec=300, attempt=attempt,
+        validate=validate, verify_timeout_sec=600, attempt=attempt,
     )
 
 

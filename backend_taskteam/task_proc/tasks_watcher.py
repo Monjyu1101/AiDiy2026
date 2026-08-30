@@ -40,8 +40,19 @@ from . import tasks_db
 起動監視間隔秒 = 5
 状態監視間隔秒 = 10
 実行回数上限 = 3
-# 1ステップの実行上限。sub_proc.py が code_agents へ渡す timeout_sec と揃える
+# AIタスク要求（タスク全体）が無進捗のまま放置されたときの打ち切り。
+# 明細を 1 つ終えるたびに更新日時が動くので、進捗が続く限りここには掛からない。
 実行タイムアウト分 = 60
+# 明細 1 ステップの打ち切り。予測分数が入っていれば 予測分数 × 倍率、未見積りは標準分で見る。
+# 見積りが極端に短い明細を即座に打ち切らないよう、最低分は必ず確保する。
+明細標準タイムアウト分 = 30
+明細タイムアウト倍率 = 2
+明細最低タイムアウト分 = 10
+# 同一タスク内で同時に走らせる code agent 明細の上限。
+# 先行SEQ で並行と定義された明細（フロー図の分岐）を実際に並行実行するための設定。
+# 1 にすると従来どおりタスク単位の直列実行になる。増やすほど CLI プロセスが同時に動き負荷が上がる。
+# タスクをまたぐ並行はこの上限の対象外（従来どおり制限なし）。
+明細並行上限 = 3
 # AIタスク要求の 状態='準備中'（sub_init.py による明細分解）だけは短く見る。
 # 分解は明細を作るだけの短い処理で、長引くのは応答待ちで固まっている場合だから。
 準備タイムアウト分 = 10
@@ -96,6 +107,54 @@ def _プロセス強制停止(pid: int, logger: logging.Logger) -> None:
         pass
     except Exception as e:
         logger.warning(f"PID {pid} の停止に失敗しました: {e}")
+
+
+def _プロセス生存(pid: int) -> bool:
+    """PID のプロセスが生きているかを返す。判定できないときは True（生存扱い）にする。
+
+    PID は OS に再利用され得るため、Windows では python プロセスかどうかまで確認する。
+    誤って「死んでいる」と判断すると実行中の明細を横取りしてしまうので、迷ったら生存側に倒す。
+    """
+    try:
+        if os.name == "nt":
+            確認 = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if f'"{pid}"' not in 確認.stdout:
+                return False
+            return "python" in 確認.stdout.lower()
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except Exception:
+        return True
+
+
+def _残存PIDクリーンアップ(logger: logging.Logger) -> None:
+    """DB に PID が残っているのにプロセスが生きていない明細を待機へ戻す。
+
+    明細の PID が残ったままだと `_起動監視1回` のタスク単位の直列化判定に引っかかり、
+    同一タスクの後続明細が実行タイムアウト（既定60分）まで一切起動できずに停滞する。
+    画面からの強制停止やプロセスの異常終了で起こり得るため、起動監視のたびに確認する。
+
+    AIタスク要求側の PID は準備タイムアウト（既定10分）で回復するうえ、後続をブロックしないため対象外。
+    """
+    try:
+        for 行 in tasks_db.実行中明細一覧():
+            pid = str(行.get("PID", "")).strip()
+            if not pid.isdigit() or _プロセス生存(int(pid)):
+                continue
+            タスクID = str(行["タスクID"])
+            明細SEQ = int(行["明細SEQ"])
+            if tasks_db.明細PID解放(タスクID, 明細SEQ):
+                logger.warning(
+                    f"プロセスが消えているため明細を待機へ戻しました: {タスクID} SEQ={明細SEQ} "
+                    f"タイトル={行.get('タイトル', '')} PID={pid}"
+                )
+    except Exception:
+        logger.exception("残存 PID の確認でエラーが発生しました")
 
 
 def 起動時クリーンアップ(logger: logging.Logger) -> None:
@@ -258,11 +317,31 @@ def _次回実行日時計算(条件: dict, 基準: datetime) -> str:
     return ""
 
 
+def _初回即時対象(条件: dict) -> bool:
+    """間隔実行でまだ一度も実行していない（準備完了 かつ 前回実行日時なし）かを返す。
+
+    間隔実行は登録時点から間隔後ではなく、初回だけ即時に走らせる。
+    2 回目以降は発火時刻 + 間隔（前回実行から間隔経過後）で回る。
+    """
+    if str(条件.get("実行区分", "")) != "間隔実行":
+        return False
+    if str(条件.get("要求状態", "")) != "準備完了":
+        return False
+    return str(条件.get("前回実行日時", "")) == ""
+
+
+def _次回算出(条件: dict, 基準: datetime) -> str:
+    """発火前に使う次回実行日時（初回の間隔実行は基準時刻そのもの＝即時発火）。"""
+    if _初回即時対象(条件):
+        return 基準.replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+    return _次回実行日時計算(条件, 基準)
+
+
 def _次回繰り越し(条件: dict, 基準: datetime) -> str:
     """発火せずに次周期へ送るときの次回実行日時（時間指定は一回限りなので空にする）。"""
     if str(条件.get("実行区分", "")) == "時間指定":
         return ""
-    return _次回実行日時計算(条件, 基準)
+    return _次回算出(条件, 基準)
 
 
 def _発火可能状態(条件: dict) -> bool:
@@ -293,12 +372,13 @@ def 実行条件再計算(タスクID: str) -> str:
 
     保持可能状態（実行有効 かつ 要求が 待機/実行中/準備完了/完了）の時間駆動条件だけ
     次回を計算し、それ以外（無効・準備開始・準備中・エラー・中止や即時など）は空に戻す。
+    未実行の間隔実行（準備完了 かつ 前回実行日時なし）は現在時刻を入れて初回を即時にする。
     """
     条件 = tasks_db.実行条件監視取得(タスクID)
     if 条件 is None:
         return ""
     時間駆動 = str(条件.get("実行区分", "")) in ("時間指定", "間隔実行", "定時実行")
-    新次回 = _次回実行日時計算(条件, datetime.now()) if 時間駆動 and _保持可能状態(条件) else ""
+    新次回 = _次回算出(条件, datetime.now()) if 時間駆動 and _保持可能状態(条件) else ""
     if 新次回 != str(条件.get("次回実行日時", "")):
         tasks_db.次回実行日時更新(タスクID, 新次回)
     return 新次回
@@ -329,7 +409,7 @@ def 起動時実行条件初期化(logger: logging.Logger) -> None:
                 continue  # 次回実行日時は一括クリア済み
             次回 = str(条件.get("次回実行日時", ""))
             if 次回 == "":
-                初回 = _次回実行日時計算(条件, now)
+                初回 = _次回算出(条件, now)
                 if 初回:
                     tasks_db.次回実行日時更新(タスクID, 初回)
                 continue
@@ -384,6 +464,7 @@ def _実行条件確認(logger: logging.Logger) -> None:
     自タスクの実行サイクル途中（待機/実行中）や条件不成立の回（フォルダ変化なし等）は
     発火せず次回実行日時だけ次周期へ更新する（スキップ。消さない）。
     発火時は 明細 → 要求 の順で 待機 に戻し、次回実行日時を更新する。
+    間隔実行の初回（準備完了 かつ 前回実行日時なし）は間隔を待たずに即時発火する。
     """
     now = datetime.now()
     now文字 = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -414,7 +495,7 @@ def _実行条件確認(logger: logging.Logger) -> None:
                 次回 = str(条件.get("次回実行日時", ""))
                 if 次回 == "":
                     # 初回は次回実行日時の計算だけ行う
-                    初回次回 = _次回実行日時計算(条件, now)
+                    初回次回 = _次回算出(条件, now)
                     if 初回次回:
                         tasks_db.次回実行日時更新(タスクID, 初回次回)
                     continue
@@ -456,6 +537,7 @@ def _実行条件確認(logger: logging.Logger) -> None:
 
             if スナップショット is not None:
                 tasks_db.フォルダ状態記録(タスクID, スナップショット[0], スナップショット[1])
+            # 発火後は必ず通常計算（間隔実行は発火時刻 + 間隔。ここで _次回算出 を使うと初回即時が続く）
             次回 = _次回実行日時計算(条件, now) if 時間駆動 and 区分 != "時間指定" else ""
             tasks_db.次回実行日時更新(タスクID, 次回, 前回実行日時=now文字)
             logger.info(
@@ -466,23 +548,28 @@ def _実行条件確認(logger: logging.Logger) -> None:
 
 
 def _タイムアウト確認(logger: logging.Logger) -> None:
-    """進捗が止まったまま実行タイムアウト分以上経過した実行を強制停止してエラーにする。
+    """進捗が止まったまま制限分以上経過した実行を強制停止してエラーにする。
 
     状態監視ループ（hh:mm 変化時、毎分 1 回）から呼ばれる。
+    明細は 1 件ずつ制限が変わる（予測分数 × 倍率、未見積りは標準分、下限は最低分）。
     AIタスク要求の 状態='準備中'（sub_init.py による明細分解）だけは準備タイムアウト分で見る。
     """
     try:
-        タイムアウト対象 = tasks_db.タイムアウト対象一覧(実行タイムアウト分, 準備タイムアウト分)
+        タイムアウト対象 = tasks_db.タイムアウト対象一覧(
+            実行タイムアウト分,
+            準備タイムアウト分,
+            明細標準タイムアウト分,
+            明細最低タイムアウト分,
+            明細タイムアウト倍率,
+        )
         for 行 in タイムアウト対象:
             pid = str(行.get("PID", "")).strip()
             状態 = str(行.get("状態", ""))
-            制限分 = (
-                準備タイムアウト分
-                if 行["テーブル"] == tasks_db.AIタスク要求テーブル and 状態 == "準備中"
-                else 実行タイムアウト分
-            )
+            制限分 = int(行.get("制限分") or 実行タイムアウト分)
+            予測 = 行.get("予測分数")
+            見積り = f" 予測={予測}分" if 予測 else ""
             logger.warning(
-                f"実行タイムアウト({制限分}分)のためキャンセルします: "
+                f"実行タイムアウト({制限分}分{見積り})のためキャンセルします: "
                 f"{行['テーブル']} {行.get('利用者ID', '')}/{行.get('タスクID', '')} "
                 f"SEQ={行.get('明細SEQ', '')} 状態={状態} "
                 f"開始日時={行.get('開始日時', '')} PID={pid}"
@@ -508,6 +595,9 @@ def _チーム状況確認(logger: logging.Logger) -> None:
 
 
 def _起動監視1回(logger: logging.Logger) -> None:
+    # --- 死んだ PID の解放（残したままだと同一タスクの後続明細が起動できない） ---
+    _残存PIDクリーンアップ(logger)
+
     # --- 仮登録（準備開始・PIDなし）→ 準備中 + sub_init.pyでAIタスク分解 ---
     for 行 in tasks_db.実行待ち一覧():
         利用者ID = str(行["利用者ID"])
@@ -526,13 +616,16 @@ def _起動監視1回(logger: logging.Logger) -> None:
                 logger.exception(f"失敗登録もエラー: {利用者ID}/{タスクID}")
 
     # --- 未実行のタスク明細（先行完了済み）→ sub_proc.py で 1 ステップ実行 ---
-    # code agent 系はタスク単位で 1 明細まで（タスク間は並行実行する）。
-    # 通知音などの軽量明細は依存関係が許せば同時起動する。
-    code_agent実行中タスク = {
-        str(行["タスクID"])
-        for 行 in tasks_db.実行中明細一覧()
-        if not _軽量並行明細か(行)
-    }
+    # 先行SEQ を満たした明細は、同一タスク内でも 明細並行上限 まで同時に起動する
+    # （フロー図の分岐どおりに並行実行するため）。タスクをまたぐ並行は従来どおり制限しない。
+    # 通知音などの軽量明細は code agent を使わないので、上限の対象外として常に同時起動する。
+    code_agent実行中数: dict[str, int] = {}
+    for 行 in tasks_db.実行中明細一覧():
+        if _軽量並行明細か(行):
+            continue
+        タスクID = str(行["タスクID"])
+        code_agent実行中数[タスクID] = code_agent実行中数.get(タスクID, 0) + 1
+
     for 行 in tasks_db.実行待ち明細一覧():
         タスクID = str(行["タスクID"])
         明細SEQ = int(行["明細SEQ"])
@@ -540,8 +633,8 @@ def _起動監視1回(logger: logging.Logger) -> None:
         if not os.path.isfile(出力JSONパス):
             continue  # AI 生成タスク以外（出力 JSON なし）は自動実行の対象外
         軽量並行明細 = _軽量並行明細か(行)
-        if タスクID in code_agent実行中タスク and not 軽量並行明細:
-            continue
+        if not 軽量並行明細 and code_agent実行中数.get(タスクID, 0) >= 明細並行上限:
+            continue  # このタスクは上限まで動いている。次の監視回で改めて起動する
         try:
             if int(行.get("実行回数", 0) or 0) >= 実行回数上限:
                 tasks_db.明細失敗(タスクID, 明細SEQ, f"実行回数が上限({実行回数上限}回)に達しました")
@@ -549,7 +642,7 @@ def _起動監視1回(logger: logging.Logger) -> None:
                 continue
             _明細実行開始(行, logger)
             if not 軽量並行明細:
-                code_agent実行中タスク.add(タスクID)
+                code_agent実行中数[タスクID] = code_agent実行中数.get(タスクID, 0) + 1
         except Exception as e:
             logger.exception(f"ステップ実行開始に失敗しました: {タスクID} SEQ={明細SEQ}")
             try:

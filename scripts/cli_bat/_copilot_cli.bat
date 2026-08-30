@@ -2,6 +2,13 @@
 setlocal
 cd /d "%~dp0../.."
 
+title GitHub Copilot CLI
+ECHO.
+ECHO ============================================================
+ECHO   GitHub Copilot CLI
+ECHO   %~nx0
+ECHO ============================================================
+
 set "COPILOT_CMD=%USERPROFILE%\AppData\Roaming\npm\copilot.cmd"
 set "MODEL="
 set /p "UPDATE=update [N]/y: "
