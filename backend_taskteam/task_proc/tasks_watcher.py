@@ -15,7 +15,8 @@
 - 起動監視タイマー = 起動監視ループ（5秒間隔）: タスク要求を確認し、PID未設定の仮登録
   （準備開始）を見つけたら temp/input/<利用者ID>.<タスクID>.json を出力して sub_init.py を
   subprocess 起動する。起動時に準備中へ進め、PID・開始日時・実行回数を記録する。
-  実行待ちのタスク明細も同様に sub_proc.py 等を起動する。
+  実行待ちのタスク明細も同様に sub_proc.py 等を起動する（対象は AI 分解済みのタスクだけで、
+  判定は DB の明細に要求内容があるかで行う。temp のファイル有無は見ない）。
 - 状態監視タイマー = 状態監視ループ（10秒間隔、実行条件の発火判定とタイムアウト確認は
   hh:mm 変化時＝毎分1回）: 実行開始条件を確認して満たせば「待機」に戻し、進捗が止まったまま
   実行タイムアウト分（既定60分）以上経過した実行をエラーにする。
@@ -57,6 +58,10 @@ from . import tasks_db
 # AIタスク要求の 状態='準備中'（sub_init.py による明細分解）だけは短く見る。
 # 分解は明細を作るだけの短い処理で、長引くのは応答待ちで固まっている場合だから。
 準備タイムアウト分 = 10
+# 間隔実行の初回だけ、間隔を待たずに走らせるまでの猶予（分）。
+# 0 にすると保存した瞬間の分に載り、発火確認（毎分 1 回）を取りこぼすことがある。
+# 秒を切り捨てて分に丸めるため、実際の開始は最大でもこの分数以内になる。
+初回即時猶予分 = 2
 
 # 実行開始条件は hh:mm が変わった確認回だけ処理する（毎分 1 回）
 _前回確認分 = ""
@@ -67,8 +72,10 @@ _SUB_INITパス = os.path.join(_BASE_DIR, "task_sub", "sub_init.py")
 _SUB_STARTパス = os.path.join(_BASE_DIR, "task_sub", "sub_start.py")
 _SUB_PROCパス = os.path.join(_BASE_DIR, "task_sub", "sub_proc.py")
 _SUB_TERMINATEパス = os.path.join(_BASE_DIR, "task_sub", "sub_terminate.py")
+# temp/input は sub_init.py へ分解の入力値を渡すためだけに使う。
+# 分解結果の temp/output/<タスクID>.json は sub_init.py が本登録に使うもので、
+# 監視側は参照しない（実行可否は DB の明細だけで判定する）。
 _入力DIR = os.path.join(_BASE_DIR, "temp", "input")
-_出力DIR = os.path.join(_BASE_DIR, "temp", "output")
 
 
 def _サブプロセス環境() -> dict:
@@ -319,22 +326,34 @@ def _次回実行日時計算(条件: dict, 基準: datetime) -> str:
 
 
 def _初回即時対象(条件: dict) -> bool:
-    """間隔実行でまだ一度も実行していない（準備完了 かつ 前回実行日時なし）かを返す。
+    """間隔実行でまだ一度も実行していない（準備完了 かつ 未実行）かを返す。
 
     間隔実行は登録時点から間隔後ではなく、初回だけ即時に走らせる。
     2 回目以降は発火時刻 + 間隔（前回実行から間隔経過後）で回る。
+
+    「未実行」は 前回実行日時なし だけでは足りない。一度動いたタスクを
+    修正ダイアログで 準備完了 へ戻すと 明細全件有効待機化 が明細の実行回数を
+    0 に戻し、実質「これから初回を走らせる」状態になる。ところが前回実行日時は
+    残るため、そのままでは次回が「今 + 間隔」になり、10 分条件なら
+    保存しても 10 分待たされる。明細が 1 件も動いていなければ初回として扱う。
     """
     if str(条件.get("実行区分", "")) != "間隔実行":
         return False
     if str(条件.get("要求状態", "")) != "準備完了":
         return False
-    return str(条件.get("前回実行日時", "")) == ""
+    if str(条件.get("前回実行日時", "")) == "":
+        return True
+    try:
+        return int(条件.get("実行済明細数") or 0) == 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _次回算出(条件: dict, 基準: datetime) -> str:
-    """発火前に使う次回実行日時（初回の間隔実行は基準時刻そのもの＝即時発火）。"""
+    """発火前に使う次回実行日時（初回の間隔実行は 初回即時猶予分 後＝ほぼ即時）。"""
     if _初回即時対象(条件):
-        return 基準.replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+        候補 = 基準 + timedelta(minutes=初回即時猶予分)
+        return 候補.replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
     return _次回実行日時計算(条件, 基準)
 
 
@@ -465,7 +484,7 @@ def _実行条件確認(logger: logging.Logger) -> None:
     自タスクの実行サイクル途中（待機/実行中）や条件不成立の回（フォルダ変化なし等）は
     発火せず次回実行日時だけ次周期へ更新する（スキップ。消さない）。
     発火時は 明細 → 要求 の順で 待機 に戻し、次回実行日時を更新する。
-    間隔実行の初回（準備完了 かつ 前回実行日時なし）は間隔を待たずに即時発火する。
+    間隔実行の初回（準備完了 かつ 未実行）は間隔を待たず 初回即時猶予分 後に発火する。
     """
     now = datetime.now()
     now文字 = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -594,6 +613,22 @@ def _チーム状況確認(logger: logging.Logger) -> None:
         logger.exception("Aチーム状況の更新でエラーが発生しました")
 
 
+# 自動実行の対象外として読み飛ばしたタスク。5 秒ごとの監視で同じ警告を出し続けないよう、
+# タスクごとに 1 回だけ記録する（黙って continue すると原因調査の手がかりが残らない）。
+_未定義タスク通知済み: set[str] = set()
+
+
+def _未定義タスク通知(タスクID: str, logger: logging.Logger) -> None:
+    """AI 分解を通っていないタスクを読み飛ばしたことを 1 回だけ記録する。"""
+    if タスクID in _未定義タスク通知済み:
+        return
+    _未定義タスク通知済み.add(タスクID)
+    logger.warning(
+        f"AI 分解を通っていないため自動実行の対象外にしました: {タスクID}"
+        "（明細の要求内容が全て空です。修正ダイアログの 準備開始 で再分解してください）"
+    )
+
+
 def _起動監視1回(logger: logging.Logger) -> None:
     # --- 死んだ PID の解放（残したままだと同一タスクの後続明細が起動できない） ---
     _残存PIDクリーンアップ(logger)
@@ -629,9 +664,12 @@ def _起動監視1回(logger: logging.Logger) -> None:
     for 行 in tasks_db.実行待ち明細一覧():
         タスクID = str(行["タスクID"])
         明細SEQ = int(行["明細SEQ"])
-        出力JSONパス = os.path.join(_出力DIR, _タスクファイル名(タスクID))
-        if not os.path.isfile(出力JSONパス):
-            continue  # AI 生成タスク以外（出力 JSON なし）は自動実行の対象外
+        # 自動実行の対象は「AI 分解を通ったタスク」だけ。判定は DB の明細（要求内容の有無）で行う。
+        # temp/output/<タスクID>.json は初回分解（sub_init.py）が本登録するための中継ファイルで、
+        # 本登録が済めば役目が終わる。temp は掃除される場所なので、実行判定には一切使わない。
+        if not int(行.get("定義済明細数") or 0):
+            _未定義タスク通知(タスクID, logger)
+            continue
         軽量並行明細 = _軽量並行明細か(行)
         if not 軽量並行明細 and code_agent実行中数.get(タスクID, 0) >= 明細並行上限:
             continue  # このタスクは上限まで動いている。次の監視回で改めて起動する

@@ -539,8 +539,19 @@ async def タスク要求更新登録(request: タスク要求更新登録リク
         if 実行条件 is not None:
             tasks_db.実行条件登録(タスクID, 実行条件.model_dump())
         # 実行条件・状態・実行有効のどれが変わっても次回実行日時を計算し直す
-        tasks_watcher.実行条件再計算(タスクID)
-        return _OK({"item": item}, f"タスク {タスクID} を {状態} として更新しました。")
+        次回実行日時 = tasks_watcher.実行条件再計算(タスクID)
+        # 間隔実行の初回は間隔を待たずに走る。画面で待たされたと誤解されないよう伝える
+        条件 = tasks_db.実行条件監視取得(タスクID)
+        初回即時 = bool(条件) and tasks_watcher._初回即時対象(条件)
+        message = f"タスク {タスクID} を {状態} として更新しました。"
+        if 初回即時:
+            message += f"初回は {tasks_watcher.初回即時猶予分} 分以内に開始します。"
+        elif 次回実行日時:
+            message += f"次回実行は {次回実行日時} です。"
+        return _OK(
+            {"item": item, "次回実行日時": 次回実行日時, "初回即時": 初回即時},
+            message,
+        )
     except Exception as e:
         logger.error(f"タスク要求の更新登録に失敗: {e}")
         return _NG(f"タスク要求の更新登録に失敗しました: {e}")

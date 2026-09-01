@@ -26,7 +26,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "1.2.0"
+version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -37,9 +37,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/95/1a/b5af41cc1fa14da277ec20ca5554dd2fcbc09b8523ac59b7a97fbb88e452/anthropic-1.2.0.tar.gz", hash = "sha256:12f8eedee7b7fb5685837b1371b7bfae1b281703f62355f4632598ec2fc53b34", size = 1137443, upload-time = "2026-08-27T20:29:12.68Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/50/463166f02179ab279edb61de1589a6f69cb3838d6a2fb6f2c92a3f8042f1/anthropic-1.3.0.tar.gz", hash = "sha256:6873492a77ede8849a161ab1bc78bc9a1e492a006d0b5bb4c57ac77845df838a", size = 1148177, upload-time = "2026-09-01T17:37:10.392Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/78/3f8b52708b03309e511990700bb8d0ec7a0c9db3d2a1e0d1c3ca417a4604/anthropic-1.2.0-py3-none-any.whl", hash = "sha256:b60642b3e3cd6b8e3e328a2d3f2863ad2b6e743f1037e42cc0143f7df99f63c6", size = 1289535, upload-time = "2026-08-27T20:29:11.01Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/5d/7863a9961d320c23787c7b594956afe4e878f9c0ae2376b11a20e416791d/anthropic-1.3.0-py3-none-any.whl", hash = "sha256:e7e7dbebf9f3c84a23954ab989378af6ae10a4d1804c81e9fea4b5ced695ce75", size = 1296959, upload-time = "2026-09-01T17:37:08.525Z" },
 ]
 
 [[package]]
@@ -384,7 +384,7 @@ wheels = [
 
 [[package]]
 name = "claude-agent-sdk"
-version = "0.2.148"
+version = "0.2.150"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -392,13 +392,13 @@ dependencies = [
     { name = "mcp" },
     { name = "sniffio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/f4/fb7f81b31e44f69af9f53b93c32e2047f3ca15cd6311cfe72bfdf420f1f5/claude_agent_sdk-0.2.148.tar.gz", hash = "sha256:45c9972fa72dc6006745239c6838cc3cea7a9b42d6927c89f7bdb6996a1983b0", size = 344717, upload-time = "2026-08-28T18:33:51.812Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6d/1e/99bababecf24a4a55a0775665ff0be010aff26f653fc9be2f4f17a0b5ef0/claude_agent_sdk-0.2.150.tar.gz", hash = "sha256:3856e932f8d45514ddf5ddd540fb844678bb11638cabf9b939ce8b708e4eb352", size = 344692, upload-time = "2026-09-01T18:07:15.284Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/f5/f4affb9f882bcf61422ea48491effb6ee2de28bfbdafd0ec90d1b959dad2/claude_agent_sdk-0.2.148-py3-none-macosx_11_0_arm64.whl", hash = "sha256:026e2b54bb3f3909712ff462b8469e2b1fc5471cfde796abc23f32d30b2c8ba1", size = 83882833, upload-time = "2026-08-28T18:33:56.238Z" },
-    { url = "https://files.pythonhosted.org/packages/af/cf/e1b11dd9fac877c8b44f022cf895f54f23854b916e09b32360e71209904c/claude_agent_sdk-0.2.148-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:c8cca1f4e4eb4e0c9f44ccfca6f651cf35e8f3914e483632ae8867c5619818a0", size = 88314490, upload-time = "2026-08-28T18:34:01.284Z" },
-    { url = "https://files.pythonhosted.org/packages/34/d4/53de4727576fa6b5a261414d420895f4eb5f0369e232d403f1096205709e/claude_agent_sdk-0.2.148-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:3fbbea7cc30099d14f894e12fef68b0ee42fa9982567df94e59499b6aff55959", size = 94014630, upload-time = "2026-08-28T18:34:06.238Z" },
-    { url = "https://files.pythonhosted.org/packages/d8/e9/2ea469751ed4df75a911c4bf4dcad1ff5b71ccc9aa1a4aa108583a2a66b5/claude_agent_sdk-0.2.148-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:221efbc0f583c80258189ab93e4f0d6b6a61ad61335de1fdf3e2331ad423dbeb", size = 94210928, upload-time = "2026-08-28T18:34:11.592Z" },
-    { url = "https://files.pythonhosted.org/packages/c3/ea/86ccd7a34446c37174e53f03c389b25f168c7f4fd4f00f3e130baae9c902/claude_agent_sdk-0.2.148-py3-none-win_amd64.whl", hash = "sha256:f155252940fd77f1bcc707836924ca3a9691d19bbc464914ae2b7ccf17f0410f", size = 96875177, upload-time = "2026-08-28T18:34:16.378Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/13/b5b86d90c95e8a691143eeb45bbf2e1c250324817980464d6ea63ef0f789/claude_agent_sdk-0.2.150-py3-none-macosx_11_0_arm64.whl", hash = "sha256:8f58d746f3552faeac52883b5a502a8d9b5aef067ea0b68fae5c9bae0f39d73d", size = 85396845, upload-time = "2026-09-01T18:07:19.074Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/8f/c17da4fa9cd8bddb8ac1538456dd0fde3a43abb1dfc28ca448f85e2a10d3/claude_agent_sdk-0.2.150-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:fee3ae2dd457742d82070b5fa122070ee8e2e80b4f9b37a57ff0a8261ade656d", size = 89904483, upload-time = "2026-09-01T18:07:22.671Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/95/5b33717b807c6fbe29fca55a246eab9a09a80c9dd288ffeb31f05681b7fc/claude_agent_sdk-0.2.150-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:813535a0267271d91af29c456ec26137b34a8b7bc066647ea59efba6e3c26c93", size = 95270310, upload-time = "2026-09-01T18:07:26.61Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/de/5a8b59e6a713ea3f4be88816cfd487b1a5b08c8ad9f042abe56d2decc184/claude_agent_sdk-0.2.150-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:cb65ff33060baa098b420232c630fa287d0f95e9469e7ceb706d0b7d8841888e", size = 95460277, upload-time = "2026-09-01T18:07:31.092Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/42/d147578a0df16c1b4b0deaebfb3d25e590ad5c16cb6b59a68f9dbb618be3/claude_agent_sdk-0.2.150-py3-none-win_amd64.whl", hash = "sha256:3b517a21c723854de778b38fa51660c5b68ee5fb6f28b2abf291a51471a7b378", size = 98078644, upload-time = "2026-09-01T18:07:35.734Z" },
 ]
 
 [[package]]
@@ -571,7 +571,7 @@ requests = [
 
 [[package]]
 name = "google-genai"
-version = "2.20.0"
+version = "2.21.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -585,9 +585,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/87/dd/eacd43097318ea6b3e648862713a964d5de261a2eabcc7826db9b9de9758/google_genai-2.20.0.tar.gz", hash = "sha256:d382186f024e9050a7a4b25af6eacba9aa16c6e09594f5d1b530f22ff7f9d76f", size = 664965, upload-time = "2026-08-25T21:28:27.136Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/a7/a45f64f22ab9302b55fcbeb32acb6f313690a7748629b01e451aad1817a3/google_genai-2.21.0.tar.gz", hash = "sha256:0ecc11c6a5b9f5e3cc58e77ae5fead00c6719f8a1b2b654b803f514a9a6b64c0", size = 677301, upload-time = "2026-08-31T21:49:14.508Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/a7/a979230234c9df019e008085c923726dc4d92c14a5701ad698e369c9ab2a/google_genai-2.20.0-py3-none-any.whl", hash = "sha256:49bddeccd29a4e6bf1706c5de67735f7115f537f08b6c36a70b8023c99399095", size = 1064276, upload-time = "2026-08-25T21:28:25.287Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/d7/c2419dd5fedd5803ce09810e4e39561a0a13a960b3f48d2581c12e42af3e/google_genai-2.21.0-py3-none-any.whl", hash = "sha256:36b575034be46a03acd603a852e22a6359f2cdd6b26bb1d65d9b7e0cc7ab3648", size = 1080223, upload-time = "2026-08-31T21:49:12.699Z" },
 ]
 
 [[package]]
@@ -1635,11 +1635,11 @@ wheels = [
 
 [[package]]
 name = "websocket-client"
-version = "1.9.1"
+version = "1.9.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2e/1d/ae61bca2a99d0735311b7b11b81931279b4a45c74a45034d31b39ad565d1/websocket_client-1.9.1.tar.gz", hash = "sha256:2e0916d2e28ccc82702f2f70aa7a654588e84a5cf2f5914099638b33547f2b7c", size = 82936, upload-time = "2026-08-29T13:45:40.346Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/cb/a5abcc2891249f393827c650c6296660ce40374ac22d99ab9aea41f9d2a2/websocket_client-1.9.2.tar.gz", hash = "sha256:0fcb57545848be86992e128218fd96dd87a6769ffdb1a968dff79632b85604d0", size = 84110, upload-time = "2026-08-31T14:08:40.964Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/0e/7b514f6eb4bf518a9af0285c1a78297467b95fd7d1ebab08b41f8889ab2f/websocket_client-1.9.1-py3-none-any.whl", hash = "sha256:19a871b81d0022589dd9e8e1b1891e0516d32113837dfb987d7691b6a425a1e2", size = 95460, upload-time = "2026-08-29T13:45:39.255Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/d2/cc4dc1271e464942db7ee278baae2daa99ee77cb2af744025c04da585a3e/websocket_client-1.9.2-py3-none-any.whl", hash = "sha256:e1a673830a9c7bfa47b1cd3d5e4178f4c9651d80a4eab02c9c23a1c3ec6250ce", size = 95786, upload-time = "2026-08-31T14:08:39.899Z" },
 ]
 
 [[package]]
