@@ -140,8 +140,14 @@ class ChromeManager:
         self,
         chrome_path: str,
         show_automation_banner: bool | None = None,
+        url: str | None = None,
     ) -> list[str]:
-        """Chrome 起動引数を組み立てる"""
+        """Chrome 起動引数を組み立てる。
+
+        url を渡すと起動時にそのページを開く。--autoplay-policy などの
+        起動引数はプロセス単位で効くため、音声つき自動再生を確実にしたい
+        ページは navigate ではなく起動引数として URL を渡す。
+        """
         should_show_banner = (
             self.show_automation_banner
             if show_automation_banner is None
@@ -167,7 +173,33 @@ class ChromeManager:
         if self.headless:
             args.append("--headless=new")
             args.append("--window-size=1920,1080")
+        if url:
+            # URL は必ず最後に置く（Chrome はオプションの後ろの引数を開く URL として扱う）
+            args.append(url)
         return args
+
+
+    def _open_url_in_running(self, url: str) -> bool:
+        """起動済み Chrome の同じプロファイルへ URL を開く。戻り値は実行できたか。
+
+        Chrome は同じ --user-data-dir で再実行すると、プロセスを増やさず起動中の
+        インスタンスへ URL を転送して新しいタブで開く。--autoplay-policy などの
+        起動引数は最初に起動したプロセスのものが効き続けるため、ここでは URL だけ渡す。
+        """
+        chrome_path = self.find_chrome()
+        if not chrome_path:
+            logger.warning("Chrome が見つからないため URL を開けませんでした")
+            return False
+        try:
+            subprocess.Popen(
+                [chrome_path, f"--user-data-dir={self.profile_dir}", url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"起動済み Chrome への URL オープンに失敗しました: {e}")
+            return False
 
     def _kill_on_debug_port(self) -> bool:
         """デバッグポートを使用している Chrome プロセスだけを停止する"""
@@ -248,6 +280,7 @@ class ChromeManager:
         self,
         wait_timeout: float = 30.0,
         show_automation_banner: bool | None = None,
+        url: str | None = None,
     ) -> str:
         """
         Chrome をリモートデバッグモードで起動する。
@@ -256,6 +289,8 @@ class ChromeManager:
             wait_timeout: 起動完了待ちのタイムアウト秒数
             show_automation_banner: True で「自動操作中」の帯表示あり。
                                     None の場合は現在の既定値を使う。
+            url: 指定するとそのページを開く。未起動なら起動引数として渡し、
+                 起動済みなら同じプロファイルへ新しいタブで開く。
 
         Returns:
             "already_running" | "launched" | "launch_failed"
@@ -264,10 +299,14 @@ class ChromeManager:
             FileNotFoundError: Chrome が見つからない場合
         """
         if time.monotonic() < self._verified_until:
+            if url:
+                self._open_url_in_running(url)
             return "already_running"
 
         if self.is_running():
             self._verified_until = time.monotonic() + _VERIFIED_TTL
+            if url:
+                self._open_url_in_running(url)
             return "already_running"
 
         chrome_path = self.find_chrome()
@@ -278,7 +317,7 @@ class ChromeManager:
                 "Chrome をインストールしてください。"
             )
 
-        args = self._build_launch_args(chrome_path, show_automation_banner)
+        args = self._build_launch_args(chrome_path, show_automation_banner, url)
         self._setup_profile()
 
         logger.info(f"起動: {chrome_path}")
@@ -300,9 +339,16 @@ class ChromeManager:
         logger.warning(f"起動タイムアウト ({wait_timeout}秒経過) — Chrome プロセスは起動しましたがデバッグポートが応答しませんでした")
         return "launch_failed"
 
-    def ensure_running(self, show_automation_banner: bool | None = None) -> str:
+    def ensure_running(
+        self,
+        show_automation_banner: bool | None = None,
+        url: str | None = None,
+    ) -> str:
         """
         Chrome が起動していなければ自動起動する。
+
+        Args:
+            url: 指定するとそのページを開く（未起動時は起動引数として渡す）。
 
         Returns:
             "already_running" | "launched" | "launch_failed"
@@ -312,4 +358,4 @@ class ChromeManager:
         """
         # launch() が疎通確認と、必要な場合だけプロファイル初期化・起動を行う。
         # ここで先に is_running() を呼ぶと全リクエストで疎通が二重になる。
-        return self.launch(show_automation_banner=show_automation_banner)
+        return self.launch(show_automation_banner=show_automation_banner, url=url)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// AIタスク画面: 要求 / フロー図 / 明細 の 3 パネル構成（API は backend_taskteam が担当）
+// AIタスク画面: 左上=タスク要求 / 左下=タスク明細 / 右=フロー図 の 3 パネル構成（API は backend_taskteam が担当）
 import { ref } from 'vue';
 import apiClient from '../../api/client';
 import { qMessage } from '../../utils/qAlert';
@@ -53,9 +53,10 @@ async function タスク明細再読込() {
 
 <template>
   <div class="ai-task-view">
+    <!-- 縦長では DOM の順にそのまま縦積みされるため、要求 → 明細 → フロー図 の順に置く -->
     <div class="task-grid">
-      <!-- パネル1: タスク要求 -->
-      <div class="task-panel">
+      <!-- 左上: タスク要求 -->
+      <div class="task-panel panel-request">
         <component
           :is="AIタスク_要求一覧"
           :選択タスクID="選択タスクID"
@@ -63,24 +64,24 @@ async function タスク明細再読込() {
         />
       </div>
 
-      <!-- パネル2: フロー図 -->
-      <div class="task-panel">
+      <!-- 左下: タスク明細 -->
+      <div class="task-panel panel-detail">
+        <component
+          :is="AIタスク_明細一覧"
+          :タスクID="選択タスクID"
+          :明細="明細rows"
+          @reload="タスク明細再読込"
+        />
+      </div>
+
+      <!-- 右側（縦2段ぶち抜き）: フロー図 -->
+      <div class="task-panel panel-flow">
         <component
           :is="AIタスク_フロー図"
           :タスクID="選択タスクID"
           :タイトル="選択タイトル"
           :マーメイド記号="選択マーメイド記号"
           :明細="明細rows"
-        />
-      </div>
-
-      <!-- パネル3: タスク明細 -->
-      <div class="task-panel">
-        <component
-          :is="AIタスク_明細一覧"
-          :タスクID="選択タスクID"
-          :明細="明細rows"
-          @reload="タスク明細再読込"
         />
       </div>
     </div>
@@ -97,11 +98,14 @@ async function タスク明細再読込() {
   overflow-x: hidden;
 }
 
-/* 3分割グリッド（横並び） */
+/* 横長: 左列を上下2段（要求 / 明細）、右列はフロー図が縦2段ぶち抜き */
 .task-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "request flow"
+    "detail  flow";
   gap: 18px;
   padding: 18px;
   width: 100%;
@@ -109,6 +113,10 @@ async function タスク明細再読込() {
   min-height: 100%;
   box-sizing: border-box;
 }
+
+.panel-request { grid-area: request; }
+.panel-detail  { grid-area: detail; }
+.panel-flow    { grid-area: flow; }
 
 .task-panel {
   background: #12101a;
@@ -129,13 +137,50 @@ async function タスク明細再読込() {
   box-shadow: 0 0 20px rgba(118, 97, 204, 0.45);
 }
 
-/* 縦長画面では3段（上下）に並べる */
+/* 縦長画面では 要求 → 明細 → フロー図 の順に縦積みする。
+   高さは 1fr の等分割（＝固定縦幅）ではなく auto にして、中身の量で決める。
+   パネル側の height:100% と panel-body の flex:1 を打ち消さないと、
+   auto 行の中で高さ 0 に潰れてヘッダーだけになるため :deep() で上書きする。 */
 @media (max-aspect-ratio: 1/1) {
+  .ai-task-view {
+    height: auto;
+    min-height: calc(100vh - 100px);
+  }
+
   .task-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "request"
+      "detail"
+      "flow";
+    height: auto;
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  /* 中身が空のときに潰れて読めなくならない程度の下限だけ持たせる */
+  .task-panel {
+    height: auto;
+    min-height: 180px;
+  }
+
+  .task-panel :deep(.request-panel),
+  .task-panel :deep(.detail-panel),
+  .task-panel :deep(.flow-panel) {
+    height: auto;
+  }
+
+  /* 一覧・フロー図の本体は内容の高さのまま伸ばす（内部スクロールにしない） */
+  .task-panel :deep(.panel-body),
+  .task-panel :deep(.diagram-host) {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  /* 横長では height:100% で引き伸ばしている図を、viewBox 比率のまま置く */
+  .task-panel :deep(.diagram-host svg) {
+    height: auto !important;
   }
 }
 </style>

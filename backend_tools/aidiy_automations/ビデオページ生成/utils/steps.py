@@ -25,6 +25,7 @@ from .infra import (
     step_no_to_value, step_value_to_int,
     get_completed_step, set_completed_step, ensure_steps_json,
     guide_tts, refresh_browser_preview, start_final_playback,
+    PREVIEW_AUTO_NONE, PREVIEW_AUTO_LOOP,
     agent_run, step_instruction_header, topic_brief,
     verify_and_backup_until_stable,
     post_backup_api,
@@ -90,20 +91,35 @@ async def step00_preflight(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
 # Step 01: フォルダ作成
 # ================================================================== #
 
-def _テンプレートを機械コピー(template_dir: str, new_dir: str) -> tuple[list[str], list[str]]:
+def _テンプレートを機械コピー(
+    template_dir: str,
+    new_dir: str,
+    *,
+    画像コピー: bool = False,
+) -> tuple[list[str], list[str]]:
     """テンプレートフォルダを Python で直接コピーする。
 
     以前は AI へ robocopy を実行させていたが、コマンドの成否がエージェント任せになり
     フォルダ作成が失敗することがあったため、コピー自体はここで機械的に済ませる
     （AI には結果の確認だけを依頼する）。
 
-    - audio / images / __pycache__ の中身はコピーしない（各動画で生成するため）
+    - audio / __pycache__ の中身はコピーしない（各動画で生成するため）
+    - images も既定ではコピーしない。テンプレートの絵をそのまま持ち込まず、
+      今回のテーマで作り直すため。生成時はコピーの代わりにテンプレート画像の
+      パスを参照として渡す（generation.参照画像ディレクトリ)
     - テンプレート側の進捗 Markdown はコピーしない（今回のテーマで作り直すため）
     - 既存ファイルは上書きしない（作りかけの成果物を壊さないため）
 
+    Args:
+        画像コピー: True で images の中身もコピーする。翻訳のように
+            絵をそのまま流用して作り直さない用途だけで使う。
+            コピーしておくと画像生成ステップが全件スキップになり、再実行が早く終わる。
+
     戻り値: (コピーしたファイル名, 既存のため据え置いたファイル名)
     """
-    除外フォルダ = {"audio", "images", "__pycache__", ".git"}
+    除外フォルダ = {"audio", "__pycache__", ".git"}
+    if not 画像コピー:
+        除外フォルダ.add("images")
     コピー済: list[str] = []
     据え置き: list[str] = []
     for root, dirs, files in os.walk(template_dir):
@@ -241,8 +257,11 @@ async def step_create_folder(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
         target_paths=[new_dir, index_path, os.path.join(new_dir, "scenario.js"), md_path],
-        # 存在確認だけのステップなので検証エージェントにも長い時間を与えない
+        # 存在確認だけのステップなので検証エージェントは呼ばない。
+        # 呼ぶと AI が構文チェックや Markdown の手直しで毎ラウンド差分を作り、
+        # ラウンドが積み上がって Step 01 だけで十数分かかる（タスク側がタイムアウトする）。
         validate=validate, verify_timeout_sec=180, attempt=attempt,
+        skip_agent_verify=True,
     )
 
 
@@ -678,15 +697,28 @@ async def step_update_durations(ctx: VideoGenCtx, ca: dict, attempt: int = 1) ->
 # Step 99: 完成案内
 # ================================================================== #
 
-async def step_completion_notice(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    """Step 99: 完成案内だけを行う。"""
+async def step_completion_notice(
+    ctx: VideoGenCtx,
+    ca: dict,
+    attempt: int = 1,
+    final_review_fn=None,
+) -> bool:
+    """Step 99: 未記録の最終確認を必要時に補完して完成案内を行う。"""
     sep("Step 99: 完成案内")
 
     completed_step = get_completed_step(ctx)
     if step_value_to_int(completed_step) < 9:
-        print(f"  [NG] Step 09 が未完了です（現在: {completed_step or '未実行'}）")
-        print("  Step 09: 最終確認 を先に実行してください。")
-        return False
+        if final_review_fn is None:
+            print(f"  [NG] Step 09 が未完了です（現在: {completed_step or '未実行'}）")
+            print("  Step 09: 最終確認 を先に実行してください。")
+            return False
+
+        print(f"  [recover] Step 09 が未記録です（現在: {completed_step or '未実行'}）")
+        print("  成果物を最終確認し、成功した場合だけ完成案内を続行します。")
+        if not await final_review_fn(ctx, ca, attempt=attempt):
+            print("  [NG] Step 09 の回復実行に失敗しました。")
+            return False
+        set_completed_step(ctx, 9)
 
     print(f"  [complete] Step 99: 完成案内: {ctx.folder_name}")
     tts_msg = (
@@ -763,13 +795,43 @@ async def run_automation_loop(
                 set_completed_step(ctx, step_no)
                 # 表示は Step 02: ルーティング追加 が成功してから始める。
                 # Step 01 の直後はメニューもルートも未登録で、ページを開いても正しく表示できないため。
-                # 生成途中は無音プレビュー、最終チェックが通ったら音声つきループ再生へ切り替える
-                if 2 <= step_no <= 8:
+                #
+                # 進み具合に合わせて再生モードを 4 段階で上げ、途中経過が見えるようにする。
+                #   Step 02-03（ルーティング追加・シナリオ作成）: 表示のみ・無音
+                #     この時点は index.html がテンプレート元のままで画像も音声も無い。
+                #     再生させても中身の無い画面が流れるだけなので、表示の確認にとどめる。
+                #   Step 04-06（HTML修正〜中間確認）: ループ再生・無音
+                #     今回のテーマが画面に載るので流して確認する。1 周で止めると
+                #     見に行ったときには終わっていることが多いのでループさせる。
+                #     音声はまだ生成前（Step 07）なので無音。
+                #   Step 07-08（音声生成・再生時間更新）: ループ再生・音声あり
+                #     Step 07 が終わった時点で audio/*.mp3 が揃い、動画として完成している。
+                #     ここを無音のままにすると「完成しているのに音が出ない」状態が
+                #     Step 09 が通るまで続き、Step 09 まで進まなければ永久に無音になる。
+                #   Step 09/99（最終確認・完成案内）: 音声つきループ再生
+                if 2 <= step_no <= 3:
                     await refresh_browser_preview(
                         ctx,
                         f"Step {step_no:02d}: {step_name}",
                         ensure_fn=ensure_fn,
                         speaker_enabled=False,
+                        auto_mode=PREVIEW_AUTO_NONE,
+                    )
+                elif 4 <= step_no <= 6:
+                    await refresh_browser_preview(
+                        ctx,
+                        f"Step {step_no:02d}: {step_name}",
+                        ensure_fn=ensure_fn,
+                        speaker_enabled=False,
+                        auto_mode=PREVIEW_AUTO_LOOP,
+                    )
+                elif 7 <= step_no <= 8:
+                    await refresh_browser_preview(
+                        ctx,
+                        f"Step {step_no:02d}: {step_name}",
+                        ensure_fn=ensure_fn,
+                        speaker_enabled=True,
+                        auto_mode=PREVIEW_AUTO_LOOP,
                     )
                 elif step_no in (9, 99):
                     await start_final_playback(ctx, f"Step {step_no:02d}: {step_name}")

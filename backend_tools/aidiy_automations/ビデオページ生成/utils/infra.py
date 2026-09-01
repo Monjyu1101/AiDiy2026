@@ -440,11 +440,33 @@ def guide_tts(
 PREVIEW_MIN_SCENE_SEC = 5.0
 
 
-def _preview_url(frontend_base_url: str, folder_name: str, *, speaker_enabled: bool = True) -> str:
+# 生成の進み具合に応じた途中経過プレビューの再生モード。
+# index.html は auto クエリを次のように解釈する（auto 無し=表示のみ）。
+#   なし   : ページを表示するだけ。自動再生しない
+#   yes    : 自動再生する（1 周で止まる）
+#   loop   : 自動再生してループする
+# 素材が揃っていない段階でループさせても同じ未完成画面を回すだけなので、
+# 段階を追って「表示だけ → 自動再生 → 音声つきループ」と上げていく。
+PREVIEW_AUTO_NONE = "none"
+PREVIEW_AUTO_YES  = "yes"
+PREVIEW_AUTO_LOOP = "loop"
+
+
+def _preview_url(
+    frontend_base_url: str,
+    folder_name: str,
+    *,
+    speaker_enabled: bool = True,
+    auto_mode: str = PREVIEW_AUTO_LOOP,
+) -> str:
     base = frontend_base_url.rstrip("/")
     folder = urllib.parse.quote(folder_name.replace("\\", "/"), safe="")
-    speaker_query = "" if speaker_enabled else "&speaker=false"
-    return f"{base}/Xビデオ/{folder}/index.html?auto=loop&preview_min_sec={PREVIEW_MIN_SCENE_SEC:g}{speaker_query}"
+    query = [f"preview_min_sec={PREVIEW_MIN_SCENE_SEC:g}"]
+    if auto_mode in (PREVIEW_AUTO_YES, PREVIEW_AUTO_LOOP):
+        query.insert(0, f"auto={auto_mode}")
+    if not speaker_enabled:
+        query.append("speaker=false")
+    return f"{base}/Xビデオ/{folder}/index.html?" + "&".join(query)
 
 
 def _playback_url(frontend_base_url: str, folder_name: str) -> str:
@@ -452,11 +474,13 @@ def _playback_url(frontend_base_url: str, folder_name: str) -> str:
 
     途中経過のプレビューと違い preview_min_sec を付けない。あれを残すと各シーンが
     最低表示秒数で切り替わってしまい、実際の再生と尺が合わなくなるため。
-    speaker は既定で有効なので指定しない（?auto=loop だけで音声つきループ再生）。
+    speaker=true は既定値と同じだが明示する。直前まで開いているのが
+    ?speaker=false の無音プレビューなので、音声つきへ切り替わったことを
+    URL から確認できるようにしておく。
     """
     base = frontend_base_url.rstrip("/")
     folder = urllib.parse.quote(folder_name.replace("\\", "/"), safe="")
-    return f"{base}/Xビデオ/{folder}/index.html?auto=loop"
+    return f"{base}/Xビデオ/{folder}/index.html?auto=loop&speaker=true"
 
 
 def ensure_preview_minimum_duration_mcp(index_path: str) -> None:
@@ -583,9 +607,10 @@ async def refresh_browser_preview(
     ensure_fn=None,
     require_existing_index: bool = True,
     speaker_enabled: bool = True,
+    auto_mode: str = PREVIEW_AUTO_LOOP,
 ) -> None:
     """
-    aidiy_chrome_devtools HTTP API で、生成中ビデオを ?auto=loop 表示する。
+    aidiy_chrome_devtools HTTP API で、生成中ビデオを途中経過表示する。
 
     Parameters
     ----------
@@ -596,6 +621,9 @@ async def refresh_browser_preview(
     require_existing_index : bool
     speaker_enabled : bool
         False の場合は ?speaker=false を付けてプレビュー音声を無効化する
+    auto_mode : str
+        PREVIEW_AUTO_NONE = 表示のみ / PREVIEW_AUTO_YES = 自動再生 /
+        PREVIEW_AUTO_LOOP = 自動再生してループ
     """
     if not ctx.browser_preview:
         return
@@ -606,7 +634,10 @@ async def refresh_browser_preview(
 
     if ensure_fn is not None:
         ensure_fn(index_path)
-    url = _preview_url(ctx.frontend_base_url, ctx.folder_name, speaker_enabled=speaker_enabled)
+    url = _preview_url(
+        ctx.frontend_base_url, ctx.folder_name,
+        speaker_enabled=speaker_enabled, auto_mode=auto_mode,
+    )
     try:
         result = await asyncio.to_thread(
             post_mcp_method,
@@ -620,12 +651,101 @@ async def refresh_browser_preview(
         print(f"  [browser] 再描写をスキップしました: {e}")
 
 
+_PLAYBACK_STATE_JS = (
+    "JSON.stringify({"
+    "ready: document.readyState,"
+    "playing: (typeof playing !== 'undefined') ? !!playing : null,"
+    "speaker: (typeof speakerEnabled !== 'undefined') ? !!speakerEnabled : null,"
+    "paused: (typeof audioPlayer !== 'undefined') ? !!audioPlayer.paused : null,"
+    "volume: (typeof audioPlayer !== 'undefined') ? audioPlayer.volume : null,"
+    # AudioContext が suspended のままだと、paused=false でも音が出ない。
+    # 「絵は進むのに無音」を切り分けるためここも見る。
+    "audio_ctx: (window._audioCtx) ? window._audioCtx.state : null"
+    "})"
+)
+
+# 再生が止まっているときに叩く復帰用 JS。
+# _triggerPlay() は _playbackStarted で二重起動を防いでいるため、そのまま呼ぶと
+# 2 回目以降が素通りして復帰しない。フラグを戻してから呼び直す。
+_TRIGGER_PLAY_JS = (
+    "(function(){"
+    "  try { if (window.__avatarResumeAudioContext) window.__avatarResumeAudioContext(); } catch(e) {}"
+    "  if (typeof _playbackStarted !== 'undefined') { _playbackStarted = false; }"
+    "  if (typeof _triggerPlay === 'function') { _triggerPlay(); return 'triggered'; }"
+    "  if (typeof play === 'function') { play(); return 'played'; }"
+    "  return 'no_trigger';"
+    "})()"
+)
+
+
+async def _ensure_playback_started(ctx: "VideoGenCtx", step_label: str) -> None:
+    """最終再生ページが実際に鳴り始めたか確かめ、止まっていれば起こす。
+
+    index.html は ?auto=loop を見て 5 秒後のフォールバックタイマーで自動再生を始める。
+    ページの読み込みが遅れるとそのタイマーが動く前にステップが終わり、開いただけで
+    静止して見えることがあるため、ここで状態を確認して _triggerPlay() を呼ぶ。
+    ブラウザ確認は補助なので、失敗してもステップの成否には影響させない。
+    """
+    async def _eval(expression: str):
+        return await asyncio.to_thread(
+            post_mcp_method,
+            ctx.chrome_api_url,
+            "eval_js",
+            {"expression": expression},
+            60,
+        )
+
+    for attempt in range(1, 4):
+        await asyncio.sleep(2)
+        try:
+            raw = await _eval(_PLAYBACK_STATE_JS)
+        except Exception as e:
+            print(f"  [browser] 再生状態を確認できませんでした: {e}")
+            return
+
+        # HTTP 応答は {"result": "<JS が返した JSON 文字列>"} の形で届く。
+        # 二重に包まれているので、外側の result を取り出してから JSON として読む。
+        state = raw
+        if isinstance(state, dict) and "result" in state:
+            state = state["result"]
+        if isinstance(state, str):
+            try:
+                state = json.loads(state)
+            except (TypeError, ValueError):
+                print(f"  [browser] 再生状態の応答を解釈できませんでした: {raw}")
+                return
+        if not isinstance(state, dict):
+            print(f"  [browser] 再生状態の応答を解釈できませんでした: {raw}")
+            return
+
+        if state.get("playing") and not state.get("paused"):
+            print(
+                f"  [browser] {step_label}: 再生中を確認しました"
+                f"（speaker={state.get('speaker')} volume={state.get('volume')}）"
+            )
+            return
+
+        print(f"  [browser] まだ再生が始まっていません（{attempt}/3）: {state}")
+        try:
+            await _eval(_TRIGGER_PLAY_JS)
+        except Exception as e:
+            print(f"  [browser] 再生開始の呼び出しに失敗しました: {e}")
+            return
+
+    print("  [browser] 再生開始を確認できませんでした。ページを手動で確認してください")
+
+
 async def start_final_playback(ctx: "VideoGenCtx", step_label: str) -> None:
     """最終チェックが通ったあと、音声つきのループ再生を開始する。
 
     生成途中は refresh_browser_preview が無音（?speaker=false）＋ preview_min_sec つきで
     進捗を映しているだけなので、仕上がりの確認にはならない。最終確認まで通ったら、
     閲覧者が開くのと同じ ?auto=loop で開き直し、音声つきで最初から流す。
+
+    ここだけ navigate ではなく launch_url を使う。navigate は起動済み Chrome の
+    既存タブを遷移させるだけで、--autoplay-policy=no-user-gesture-required のような
+    プロセス単位の起動引数が効いていない Chrome に当たると音声つき再生が始まらない。
+    launch_url は URL を Chrome の起動引数として渡すため、その条件を満たせる。
     """
     if not ctx.browser_preview:
         return
@@ -639,14 +759,20 @@ async def start_final_playback(ctx: "VideoGenCtx", step_label: str) -> None:
         result = await asyncio.to_thread(
             post_mcp_method,
             ctx.chrome_api_url,
-            "navigate",
+            "launch_url",
             {"url": url, "show_automation_banner": False},
             90,
         )
-        print(f"  [browser] {step_label}: 音声つきループ再生を開始しました -> {url}")
+        print(f"  [browser] {step_label}: 音声つきループ再生を開始します -> {url}")
         print(f"  [browser] {result}")
     except Exception as e:
         print(f"  [browser] 再生の開始をスキップしました: {e}")
+        return
+
+    # ページ側は ?auto=loop を見て 5 秒後に自力で再生を始めるが、読み込みが遅れると
+    # そのタイマーが動く前にこのステップが終わり、開いただけで止まって見えることがある。
+    # 実際に鳴り始めたかをここで確かめ、止まっていれば _triggerPlay() で起こす。
+    await _ensure_playback_started(ctx, step_label)
 
 
 # ================================================================== #
@@ -766,8 +892,15 @@ async def verify_and_backup_until_stable(
     attempt: int = 1,
     *,
     backup_url: str | None = None,
+    skip_agent_verify: bool = False,
 ) -> bool:
-    """backup_url は互換性のために残す。省略時は ctx.backup_api_url を使う。"""
+    """backup_url は互換性のために残す。省略時は ctx.backup_api_url を使う。
+
+    skip_agent_verify=True のステップは検証エージェントを呼ばず、Python 側の
+    validate() と差分バックアップだけで判定する。存在確認のように機械的チェックで
+    十分なステップで検証エージェントを回すと、AI が毎ラウンド何かを触って差分を
+    作り直し、ラウンドが積み上がってステップ全体が数十分に伸びるため。
+    """
     """
     CodeAgents 作業後の安定化処理。
 
@@ -784,25 +917,28 @@ async def verify_and_backup_until_stable(
 
     for round_no in range(1, ctx.max_backup_stabilize + 1):
         print(f"  [verify] {step_name} 検証ラウンド {round_no}/{ctx.max_backup_stabilize}")
-        if ctx.use_english_voice:
-            _tts(f"{label} verification is starting. Attempt {attempt}.")
+        if skip_agent_verify:
+            print("  [verify] このステップは Python 側検証のみで判定します（検証エージェントは呼びません）")
         else:
-            _tts(f"{step_name} の検証を開始します。試行 {attempt}回目です。")
-        # 検証エージェントは「見つけた問題をその場で直す」補助であり、合否の判定者ではない。
-        # ここで例外（CodeAgents API のタイムアウトや接続断）を素通しすると、ステップ本体が
-        # 成功していても試行ごと失敗扱いになり、リトライ上限まで無駄に繰り返してしまう。
-        # 失敗しても Python 側の validate() へ進め、機械的チェックで合否を決める。
-        try:
-            await _agent_verify_step(
-                ctx, ca,
-                step_name=step_name,
-                step_summary=step_summary,
-                target_paths=target_paths,
-                timeout_sec=verify_timeout_sec,
-            )
-        except Exception as e:
-            print(f"  [verify] 検証エージェントが失敗しました（Python 側検証で続行します）: {e}")
-            _logger.warning("検証エージェント失敗（validate へ続行）: %s [%s]", e, step_name)
+            if ctx.use_english_voice:
+                _tts(f"{label} verification is starting. Attempt {attempt}.")
+            else:
+                _tts(f"{step_name} の検証を開始します。試行 {attempt}回目です。")
+            # 検証エージェントは「見つけた問題をその場で直す」補助であり、合否の判定者ではない。
+            # ここで例外（CodeAgents API のタイムアウトや接続断）を素通しすると、ステップ本体が
+            # 成功していても試行ごと失敗扱いになり、リトライ上限まで無駄に繰り返してしまう。
+            # 失敗しても Python 側の validate() へ進め、機械的チェックで合否を決める。
+            try:
+                await _agent_verify_step(
+                    ctx, ca,
+                    step_name=step_name,
+                    step_summary=step_summary,
+                    target_paths=target_paths,
+                    timeout_sec=verify_timeout_sec,
+                )
+            except Exception as e:
+                print(f"  [verify] 検証エージェントが失敗しました（Python 側検証で続行します）: {e}")
+                _logger.warning("検証エージェント失敗（validate へ続行）: %s [%s]", e, step_name)
 
         if not validate():
             print("  [verify] Python 側検証が NG です")
@@ -828,11 +964,11 @@ async def verify_and_backup_until_stable(
                 _tts(f"{step_name} の差分はありません。次のステップへ進みます。")
             return True
 
-        print("  [backup] 差分あり。POST /aidiy_backup/save/run で保存して同ステップを再確認します")
+        print("  [backup] 差分あり。POST /aidiy_backup/save/run で保存します")
         if ctx.use_english_voice:
-            _tts(f"{label} has {diff_count} changed files. Saving a backup and checking again.", voice="male")
+            _tts(f"{label} has {diff_count} changed files. Saving a backup.", voice="male")
         else:
-            _tts(f"{step_name} で差分が {diff_count} 件あります。差分バックアップを保存して、もう一度確認します。", voice="male")
+            _tts(f"{step_name} で差分が {diff_count} 件あります。差分バックアップを保存します。", voice="male")
         if not backup_save_once(ctx):
             if ctx.use_english_voice:
                 _tts(f"{label} failed to save the backup.", voice="male")
@@ -841,12 +977,22 @@ async def verify_and_backup_until_stable(
             return False
 
         after_count = backup_diff_count(ctx)
-        if after_count != 0:
-            print("  [backup] バックアップ後も差分が残っています。同ステップを継続します")
+        if after_count == 0:
+            # 直前に validate() が通っていて差分も保存済みなので、このステップはここで完了。
+            # 以前はここから次ラウンドへ戻して検証エージェントをもう一度丸ごと実行しており、
+            # 1 ステップあたり数分を無駄にしていた（AI タスクの実行タイムアウトの原因）。
+            print("  [backup] 差分を保存しました。次のステップへ進みます")
             if ctx.use_english_voice:
-                _tts(f"{after_count} changed files remain after the backup. Continuing the same step.", voice="male")
+                _tts(f"{label} backup is saved. Moving to the next step.")
             else:
-                _tts(f"バックアップ後も差分が {after_count} 件残っています。同じステップを継続します。", voice="male")
+                _tts(f"{step_name} の差分バックアップを保存しました。次のステップへ進みます。")
+            return True
+
+        print("  [backup] バックアップ後も差分が残っています。同ステップを継続します")
+        if ctx.use_english_voice:
+            _tts(f"{after_count} changed files remain after the backup. Continuing the same step.", voice="male")
+        else:
+            _tts(f"バックアップ後も差分が {after_count} 件残っています。同じステップを継続します。", voice="male")
 
     print(f"  [backup] 差分ゼロ確認が {ctx.max_backup_stabilize} 回以内に完了しませんでした")
     if ctx.use_english_voice:

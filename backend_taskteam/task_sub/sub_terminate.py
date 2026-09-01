@@ -51,9 +51,8 @@ TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
 # 終了明細（最終検証）のタイムアウト。sub_proc.py と同じ計算で、終了明細の 予測分数 から求める。
-# 同期元: tasks_watcher.py の 明細標準タイムアウト分 / 明細タイムアウト倍率 / 明細最低タイムアウト分。
+# 同期元: tasks_watcher.py の 明細タイムアウト倍率 / 明細最低タイムアウト分。
 # 渡さないと aidiy_code_agents 側の既定値（30分）が使われ、監視側の打ち切りと食い違う。
-CODE標準タイムアウト分 = 30
 CODEタイムアウト倍率 = 2
 CODE最低タイムアウト分 = 10
 CODE実行マージン秒 = 60
@@ -66,7 +65,7 @@ def CODE実行タイムアウト秒(予測分数) -> int:
         分 = int(str(予測分数).strip())
     except (TypeError, ValueError):
         分 = 0
-    制限分 = CODE標準タイムアウト分 if 分 <= 0 else max(CODE最低タイムアウト分, 分 * CODEタイムアウト倍率)
+    制限分 = max(CODE最低タイムアウト分, 分 * CODEタイムアウト倍率)
     return max(60, 制限分 * 60 - CODE実行マージン秒)
 
 

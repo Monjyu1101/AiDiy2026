@@ -893,8 +893,12 @@ class ImageGeneration:
         fmt: str = "png",
         quality: int = 85,
         save_path: Optional[str] = None,
-    ) -> str:
-        """PIL Image を Base64 文字列で返す（desktop_capture と同形式）。
+        return_base64: bool = True,
+    ) -> tuple[str, str]:
+        """PIL Image を保存し、(base64, 保存先パス) を返す。
+
+        return_base64=False なら base64 は空文字にする。呼び出し側が保存先を
+        知っているのに同じ画像を base64 でも返すと、文脈が二重に膨らむため。
 
         Args:
             fmt: "png" または "jpeg"
@@ -941,4 +945,6 @@ class ImageGeneration:
         with open(dest, "wb") as f:
             f.write(file_data)
 
-        return base64.b64encode(data).decode("ascii")
+        if not return_base64:
+            return "", dest
+        return base64.b64encode(data).decode("ascii"), dest

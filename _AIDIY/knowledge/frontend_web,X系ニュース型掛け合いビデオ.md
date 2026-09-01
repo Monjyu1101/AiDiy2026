@@ -206,11 +206,18 @@ subtitleText.textContent = turn.subtitle || turn.text || "";
    - `index.html` — プレイヤー本体（ほぼそのまま使える）
    - `scenario.js` — シーン・ダイアログ定義を書き直す
    - `_gen_dialogue_audio.py` — DIALOGUES リストを書き直す
-3. `images/` フォルダを作成し、各シーンの背景画像を配置
-4. `audio/` フォルダを作成
-5. `backend_tools/.venv` の Python で `_gen_dialogue_audio.py` を実行して音声生成
-6. `Xビデオ.vue` にメニューカードを追加
+3. 導線を通す（ここまで済ませてから表示確認に進む）:
+   - `src/components/Xビデオ.vue` に URL const とメニューカードを追加
+   - `src/router/index.ts` に `createStaticAliasRoute('/Xビデオ/<フォルダ名>', 'Xビデオ/<フォルダ名>/index.html', 'Xビデオ')` を追加
+   - 片方だけではメニューからも URL からもページを開けない
+4. `images/` フォルダを作成し、各シーンの背景画像を配置
+5. `audio/` フォルダを作成
+6. `backend_tools/.venv` の Python で `_gen_dialogue_audio.py` を実行して音声生成
 7. ブラウザで動作確認（字幕・口パク・暗転切替・ステレオパン）
+
+自動化スクリプト（`ビデオページ生成_*.py`）では、この手順 3 が Step 02「ルーティング追加」に
+あたる。Step 01「フォルダ作成」の直後はまだメニューもルートも無く開けないため、
+ブラウザ表示は Step 02 が成功してから始まる。
 
 ---
 
@@ -223,4 +230,5 @@ subtitleText.textContent = turn.subtitle || turn.text || "";
 | 非話者アバターを `opacity` で透かす | `filter: brightness(0.58) saturate(0.45)` のみ使う（opacity は変えない） |
 | VRM の向きが外側を向く | left アバターは `Math.PI + Math.PI/6`、right は `Math.PI - Math.PI/6` が内向き |
 | `expression` に "happy" などを入れる | ニュース型は常に `"neutral"` 固定。フィールド値は無視される |
+| メニューカードだけ追加してルートを足さない | `Xビデオ.vue` と `src/router/index.ts` の両方に追加する（自動化では Step 02 が両方を登録） |
 | 既存音声を再生成してしまう | スクリプトのスキップ条件（500 bytes 超）で保護されるが、明示的に確認すること |

@@ -471,9 +471,9 @@ class CDPClient:
         full_page: bool = False,
         save_path: Optional[str] = None,
         shutter_sounds: str = "none",
-    ) -> str:
+    ) -> tuple[str, str]:
         """
-        スクリーンショットを Base64 文字列で返す
+        スクリーンショットを撮る
 
         Args:
             fmt: "png" または "jpeg"
@@ -485,7 +485,10 @@ class CDPClient:
             shutter_sounds: "auto" でシャッター音を再生。デフォルト "none"
 
         Returns:
-            Base64 エンコードされた画像データ
+            (base64 データ, 保存先パス) のタプル。
+            save_path を指定した場合は base64 を返さず ("", 保存先) になる。
+            保存したファイルを読めば済むのに同じ中身を base64 でも返すと、
+            呼び出し側のコンテキストが二重に膨らむため。
         """
         if shutter_sounds == "auto":
             DesktopCapture._play_shutter_sound()
@@ -510,13 +513,17 @@ class CDPClient:
         result = await self.send_command(ws, "Page.captureScreenshot", params)
         data = result.get("data", "")
 
+        saved_path = ""
         if save_path and data:
-            await asyncio.to_thread(self._save_screenshot_file, save_path, data, fmt, quality)
+            saved_path = await asyncio.to_thread(
+                self._save_screenshot_file, save_path, data, fmt, quality
+            )
+            data = ""  # ファイル名指定時は base64 を返さない
 
-        return data
+        return data, saved_path
 
     @staticmethod
-    def _save_screenshot_file(save_path: str, data: str, fmt: str, quality: int) -> None:
+    def _save_screenshot_file(save_path: str, data: str, fmt: str, quality: int) -> str:
         """Base64 デコード・PIL 変換・ファイル書き込み（ブロッキング I/O）。
         event loop を塞がないよう asyncio.to_thread から呼び出すこと。"""
         raw = base64.b64decode(data)
@@ -556,6 +563,7 @@ class CDPClient:
                     save_bytes = raw
         with open(dest, "wb") as f:
             f.write(save_bytes)
+        return dest
 
     # ------------------------------------------------------------------ #
     # JavaScript 実行

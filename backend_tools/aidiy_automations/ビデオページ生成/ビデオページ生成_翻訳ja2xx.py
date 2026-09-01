@@ -50,7 +50,8 @@ from utils.generation import (
     ensure_scene_image_script, ensure_dialogue_audio_script,
     validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs, index_html_matches_theme,
     ensure_step_markdown, mark_step_done,
-    backup_images_for_fix_mode, count_scenario_scenes, count_scenario_dialogues,
+    backup_images_for_fix_mode, 参照画像ディレクトリ,
+    count_scenario_scenes, count_scenario_dialogues,
 )
 from utils.steps import (
     step00_preflight, step_add_routing, step_generate_audio,
@@ -253,7 +254,11 @@ async def step_create_folder(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bo
     os.makedirs(new_dir, exist_ok=True)
     if not folder_already_exists:
         try:
-            コピー済, 据え置き = _テンプレートを機械コピー(ctx.template_dir, new_dir)
+            # 翻訳は元動画の絵をそのまま使う（作り直さない）。images もコピーして
+            # おくと、画像生成ステップが全件スキップになり再実行が短く済む。
+            コピー済, 据え置き = _テンプレートを機械コピー(
+                ctx.template_dir, new_dir, 画像コピー=True,
+            )
             print(f"  [copy] テンプレートから {len(コピー済)} 件コピーしました（既存のため据え置き {len(据え置き)} 件）")
         except Exception as e:
             print(f"  [copy] テンプレートのコピーに失敗しました: {e}")
@@ -429,8 +434,9 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
     md_path       = os.path.join(new_dir, f"{folder_name}.md")
     guide_tts(ctx, f"{progress_step_label(step_name)} is starting. I will translate the page title and visible descriptions.")
 
-    if index_html_matches_theme(index_path, scenario_path, folder_name, topic):
-        print("  [既存] index.html は修正済みです。内容検証を行い、問題があれば修正します")
+    already_valid = index_html_matches_theme(index_path, scenario_path, folder_name, topic)
+    if already_valid:
+        print("  [既存] index.html は機械検証済みです。CodeAgents の再実行を省略します")
 
     fix_mode_prefix_html = ""
     if ctx.fix_mode and os.path.isfile(index_path):
@@ -467,7 +473,10 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
         f'"{md_path}" の「HTML修正」チェックを [x] にしてください。\n\n'
         "【完了確認】index.html の <title> と .brand と .top-note の最終的な文言を表示してください。\n"
     )
-    await agent_run(ctx, ca, prompt, timeout_sec=300)
+    if already_valid:
+        mark_step_done(md_path, "HTML修正")
+    else:
+        await agent_run(ctx, ca, prompt, timeout_sec=300)
 
     def validate() -> bool:
         ok1 = check("index.html 存在", os.path.isfile(index_path))
@@ -483,6 +492,10 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
         step_name=step_name, step_summary=step_summary,
         target_paths=[index_path, scenario_path, md_path],
         validate=validate, verify_timeout_sec=240, attempt=attempt,
+        # Step 04 は直前の編集エージェントと Python 検証で十分に判定できる。
+        # 同じ対象へ検証エージェントを重ねると、外側のAIタスクがHTTP待ちで
+        # タイムアウトするため、ここでは再帰的な CodeAgents 呼び出しを行わない。
+        skip_agent_verify=True,
     )
 
 
@@ -519,10 +532,9 @@ async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
             print(f"  [既存] images/*.png が {len(existing)} 件存在します。内容検証を行い、問題があれば修正します")
     ensure_step_markdown(md_path, folder_name, topic)
 
-    if ctx.fix_mode and os.path.isdir(images_dir):
-        template_image_dir = backup_images_for_fix_mode(ctx, images_dir)
-    else:
-        template_image_dir = os.path.join(ctx.template_dir, "images")
+    template_image_dir = 参照画像ディレクトリ(ctx, images_dir)
+    if template_image_dir:
+        print(f"  [image] 参照画像フォルダ: {template_image_dir}")
 
     ensure_scene_image_script(
         ctx, gen_img_py,
@@ -547,9 +559,12 @@ async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
-        # 画像は件数が多く検証エージェントの確認に時間がかかるため、他ステップより長めにする
         target_paths=[scenario_path, gen_img_py, images_dir, md_path],
         validate=validate, verify_timeout_sec=600, attempt=attempt,
+        # 画像APIの実行後は、scenario.js の期待件数と PNG の実在・サイズを
+        # Python で確定できる。ここで検証エージェントを重ねると外側の
+        # AIタスクの60分監視に達するため、機械検証と差分バックアップだけで判定する。
+        skip_agent_verify=True,
     )
 
 
@@ -781,7 +796,9 @@ def main(argv: list | None = None) -> None:
         (7,  "音声生成",     _step_gen_audio),
         (8,  "再生時間更新", lambda ca, attempt=1: step_update_durations(ctx, ca, attempt=attempt)),
         (9,  "最終確認",     lambda ca, attempt=1: step_final_review(ctx, ca, attempt=attempt)),
-        (99, "完成案内",     lambda ca, attempt=1: step_completion_notice(ctx, ca, attempt=attempt)),
+        (99, "完成案内",     lambda ca, attempt=1: step_completion_notice(
+            ctx, ca, attempt=attempt, final_review_fn=step_final_review,
+        )),
     ]
 
     asyncio.run(runner.run(steps, ensure_fn=ensure_preview_minimum_duration_mcp))

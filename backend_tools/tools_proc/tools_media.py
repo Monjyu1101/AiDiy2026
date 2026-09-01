@@ -18,10 +18,11 @@ from datetime import datetime
 from typing import Optional, Union
 
 from fastapi import APIRouter
-from mcp.types import ImageContent
+from mcp.types import ImageContent, TextContent
 from pydantic import BaseModel
 
 from log_config import get_logger
+from tools_proc.media_output import base64を返すか, ファイル応答
 from tools_proc.image_generation import ImageGenerationError
 from tools_proc.movie_generation import MovieGenerationError
 from tools_proc.speech_to_text import SpeechToTextError
@@ -34,14 +35,20 @@ def _image_base64_and_paths(ig, img, info: dict, save_path: Optional[str]) -> tu
     """画像返却用 base64 と保存パスを作る。
 
     CLI 系は generated_path の PNG を正とし、ユーザー指定 save_path があればそこへコピーする。
+
+    save_path を明示された場合は base64 を作らない（空文字を返す）。呼び出し側は
+    保存先を知っていてファイルを読めるので、同じ画像を base64 でも返すと文脈が二重に膨らむ。
     """
+    返す = base64を返すか(save_path)
     generated_path = info.get("generated_path")
     if generated_path and os.path.isfile(generated_path):
         copied_path = ig.copy_generated_file(generated_path, save_path) if save_path else None
-        return ig.file_to_base64(generated_path), copied_path or generated_path, generated_path
+        data = ig.file_to_base64(generated_path) if 返す else ""
+        return data, copied_path or generated_path, generated_path
 
     output_path = save_path or ig._resolve_default_output_dir()
-    return ig.to_base64(img, "png", 85, output_path), output_path, None
+    data, dest = ig.to_base64(img, "png", 85, output_path, 返す)
+    return data, dest or output_path, None
 
 
 # ------------------------------------------------------------------ #
@@ -205,6 +212,12 @@ def register_image_gen_tools(mcp_ig, ig):
                 f"save_path={output_path}  generated_path={generated_path or '-'}"
             )
 
+            if not data:
+                # save_path 指定時は base64 を返さない（保存先を読めば済むため）
+                return [TextContent(
+                    type="text",
+                    text=json.dumps(ファイル応答(output_path, mime), ensure_ascii=False),
+                )]
             return [ImageContent(type="image", data=data, mimeType=mime)]
 
         except ImageGenerationError as e:
@@ -365,7 +378,11 @@ def register_tts_tools(mcp_ts, tts):
                 out_dir = os.path.join(os.path.dirname(__file__), "..", "..", "temp", "output")
                 os.makedirs(out_dir, exist_ok=True)
                 auto_path = os.path.join(out_dir, datetime.now().strftime("%Y%m%d.%H%M%S") + ".mp3")
-            base64_audio = await asyncio.to_thread(tts.to_base64, audio_bytes, auto_path)
+            # save_path を明示されたら base64 は返さない（保存先を読めば済むため）
+            返す = base64を返すか(save_path)
+            base64_audio, auto_path = await asyncio.to_thread(
+                tts.to_base64, audio_bytes, auto_path, 返す
+            )
 
             if local_play and audio_bytes:
                 play_ok = await asyncio.to_thread(tts.play_mp3, audio_bytes)
@@ -456,6 +473,12 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                 f"size={img.size} prompt={info['prompt'][:60]} "
                 f"save_path={auto_path} generated_path={generated_path or '-'}"
             )
+            if not base64_data:
+                # save_path 指定時は base64 を返さない（保存先を読めば済むため）
+                return {
+                    **ファイル応答(auto_path, "image/png"),
+                    "generated_path": generated_path,
+                }
             return {
                 "type": "image",
                 "data": base64_data,
@@ -635,7 +658,11 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                 out_dir = os.path.join(os.path.dirname(__file__), "..", "..", "temp", "output")
                 os.makedirs(out_dir, exist_ok=True)
                 auto_path = os.path.join(out_dir, datetime.now().strftime("%Y%m%d.%H%M%S") + ".mp3")
-            base64_audio = await asyncio.to_thread(tts.to_base64, audio_bytes, auto_path)
+            # save_path を明示されたら base64 は返さない（保存先を読めば済むため）
+            返す = base64を返すか(req.save_path)
+            base64_audio, auto_path = await asyncio.to_thread(
+                tts.to_base64, audio_bytes, auto_path, 返す
+            )
             logger.info(
                 f"http_tts: provider={info.get('used_provider')} voice={info.get('voice')} "
                 f"bytes={info.get('audio_bytes_length')} text_len={len(req.speech_text)} "

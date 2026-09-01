@@ -1034,8 +1034,12 @@ class TextToSpeech:
         self,
         audio_bytes: bytes,
         save_path: Optional[str] = None,
-    ) -> str:
-        """音声バイト列を Base64 文字列で返す。
+        return_base64: bool = True,
+    ) -> tuple[str, str]:
+        """音声バイト列を保存し、(base64, 保存先パス) を返す。
+
+        return_base64=False なら base64 は空文字にする。呼び出し側が保存先を
+        知っているのに同じ音声を base64 でも返すと、文脈が二重に膨らむため。
 
         Args:
             audio_bytes: 音声バイナリ（MP3 / WAV）
@@ -1080,7 +1084,9 @@ class TextToSpeech:
         with open(dest, "wb") as f:
             f.write(out_bytes)
 
-        return base64.b64encode(out_bytes).decode("ascii")
+        if not return_base64:
+            return "", dest
+        return base64.b64encode(out_bytes).decode("ascii"), dest
 
     # ------------------------------------------------------------------ #
     # 内部ヘルパー

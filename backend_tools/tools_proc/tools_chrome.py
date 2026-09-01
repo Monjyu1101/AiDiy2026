@@ -15,10 +15,11 @@ import json
 from typing import Optional
 
 from fastapi import APIRouter
-from mcp.types import ImageContent
+from mcp.types import ImageContent, TextContent
 from pydantic import BaseModel
 
 from log_config import get_logger
+from tools_proc.media_output import ファイル応答
 
 logger = get_logger(__name__)
 
@@ -59,10 +60,12 @@ class ChromeDevToolsRequest(BaseModel):
 _CHROME_DEVTOOLS_METHODS = [
     {"name": "navigate", "description": "指定 URL へ移動する。戻り値に readyState を含むため、多くの場合 wait_for_load は不要",
      "parameters": {"url": {"type": "string", "required": True}, "tab_id": {"type": "string", "required": False}, "show_automation_banner": {"type": "boolean", "required": False, "default": True}}},
+    {"name": "launch_url", "description": "URL を Chrome の起動引数として渡して開く。--autoplay-policy などプロセス単位でしか効かない起動引数を確実に適用したいページ（音声つき自動再生など）で navigate の代わりに使う。起動済みなら同じプロファイルへ新しいタブで開く",
+     "parameters": {"url": {"type": "string", "required": True}, "show_automation_banner": {"type": "boolean", "required": False, "default": True}}},
     {"name": "reload", "description": "現在のページをリロードする。戻り値に readyState を含む", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "go_back", "description": "ブラウザの戻るボタン相当", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "go_forward", "description": "ブラウザの進むボタン相当", "parameters": {"tab_id": {"type": "string", "required": False}}},
-    {"name": "screenshot", "description": "スクリーンショットを撮る",
+    {"name": "screenshot", "description": "スクリーンショットを撮る。save_path 未指定なら base64 を返し、save_path 指定時は保存だけして base64 は返さない（同じ画像を二重に返して文脈を膨らませないため）",
      "parameters": {"tab_id": {"type": "string", "required": False}, "full_page": {"type": "boolean", "required": False, "default": False}, "save_path": {"type": "string", "required": False}, "shutter_sounds": {"type": "string", "required": False, "default": "none", "values": ["auto", "none"], "description": "'auto' でシャッター音を再生"}}},
     {"name": "get_page_info", "description": "ページの URL・タイトル・readyState などを取得する", "parameters": {"tab_id": {"type": "string", "required": False}}},
     {"name": "get_html", "description": "ページ全体の HTML を取得する", "parameters": {"tab_id": {"type": "string", "required": False}}},
@@ -150,13 +153,20 @@ def register_tools(mcp, registry):
         show_automation_banner: Optional[bool] = None,
         session: str = "default",
         headless: Optional[bool] = None,
+        launch_url: Optional[str] = None,
     ):
-        """セッションの Chrome を確保して CDPClient を返す（未起動なら起動）"""
+        """セッションの Chrome を確保して CDPClient を返す（未起動なら起動）
+
+        launch_url を渡すと、Chrome の起動引数として URL を指定する。
+        --autoplay-policy などの起動引数はプロセス単位でしか効かないため、
+        音声つき自動再生を確実にしたいページはこちらで開く。
+        """
         session = session or "default"
 
         # ウォームパス: 疎通確認 TTL が有効な間はロック・スレッド往復を使わず
         # 即座に返す（peek/is_verified はどちらも HTTP を伴わない軽量チェック）。
-        if headless is None:
+        # launch_url 指定時は URL を開く必要があるため、ウォームパスは使わない。
+        if headless is None and launch_url is None:
             cached = registry.peek(session)
             if cached is not None and cached[0].is_verified():
                 return cached[1]
@@ -173,6 +183,7 @@ def register_tools(mcp, registry):
             await asyncio.to_thread(
                 chrome.ensure_running,
                 show_automation_banner=show_automation_banner,
+                url=launch_url,
             )
         return cdp
 
@@ -197,6 +208,31 @@ def register_tools(mcp, registry):
         cdp = await _ensure_chrome(show_automation_banner=show_automation_banner, session=session)
         result = await cdp.navigate(url, tab_id)
         return json.dumps({"result": result}, ensure_ascii=False)
+
+    @mcp.tool()
+    async def launch_url(
+        session: str = "default",
+        *,
+        url: str,
+        show_automation_banner: bool = True,
+    ) -> str:
+        """
+        URL を Chrome の起動引数として渡して開く。
+
+        navigate は起動済み Chrome の既存タブを遷移させるだけなので、
+        --autoplay-policy=no-user-gesture-required のようなプロセス単位の
+        起動引数が効いていない Chrome に当たると音声つき自動再生が始まらない。
+        音声つきで再生させたいページはこちらで開く。
+
+        Chrome が未起動なら起動引数として URL を渡して起動し、
+        起動済みなら同じプロファイルへ新しいタブとして開く。
+        """
+        await _ensure_chrome(
+            show_automation_banner=show_automation_banner,
+            session=session,
+            launch_url=url,
+        )
+        return json.dumps({"result": f"起動引数で開きました: {url}"}, ensure_ascii=False)
 
     @mcp.tool()
     async def reload(session: str = "default", tab_id: Optional[str] = None) -> str:
@@ -238,9 +274,17 @@ def register_tools(mcp, registry):
             shutter_sounds: "auto" でシャッター音を再生（Windows のみ）。デフォルト "none"
         """
         cdp = await _ensure_chrome(session=session)
-        data = await cdp.screenshot(tab_id=tab_id, full_page=full_page, save_path=save_path, shutter_sounds=shutter_sounds)
-        if save_path and data:
-            logger.info(f"screenshot saved: {save_path}")
+        data, saved_path = await cdp.screenshot(
+            tab_id=tab_id, full_page=full_page, save_path=save_path, shutter_sounds=shutter_sounds
+        )
+        if saved_path:
+            # save_path 指定時は base64 を返さない。保存先を読めば済むのに
+            # 同じ画像を base64 でも返すと、呼び出し側の文脈が二重に膨らむため。
+            logger.info(f"screenshot saved: {saved_path}")
+            return [TextContent(
+                type="text",
+                text=json.dumps(ファイル応答(saved_path, "image/png"), ensure_ascii=False),
+            )]
         return [ImageContent(type="image", data=data, mimeType="image/png")]
 
     @mcp.tool()
@@ -750,7 +794,7 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
             "response_fields": {
                 "navigate / reload": {"result": "完了メッセージ（readyState を含む。'complete' でなければ必要な場合のみ wait_for_load を使う）"},
                 "go_back / go_forward": {"result": "成功=True または完了メッセージ"},
-                "screenshot": {"type": "image", "data": "PNG の base64 文字列", "mimeType": "image/png"},
+                "screenshot": {"type": "image", "data": "PNG の base64 文字列", "mimeType": "image/png", "（save_path 指定時）": {"type": "file", "save_path": "保存先パス", "mimeType": "image/png"}},
                 "get_page_info": {"url": "現在の URL", "title": "ページタイトル", "readyState": "complete / loading / interactive"},
                 "get_html": {"result": "ページ HTML 全文"},
                 "get_text / get_page_content": {"result": "ページ内テキスト"},
@@ -797,6 +841,17 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
                 ok = await asyncio.to_thread(registry.delete, req.session)
                 return {"result": "削除しました" if ok else "見つかりません"}
 
+            if method_name == "launch_url":
+                # URL を起動引数として渡す。navigate と違い既存タブの遷移ではないため、
+                # --autoplay-policy などプロセス単位の起動引数が確実に効く。
+                await _ensure_chrome(
+                    show_automation_banner=req.show_automation_banner,
+                    session=req.session,
+                    headless=req.headless,
+                    launch_url=req.url or "about:blank",
+                )
+                return {"result": f"起動引数で開きました: {req.url or 'about:blank'}"}
+
             if method_name in ("navigate", "new_tab", "new_page", "open_session"):
                 cdp = await _ensure_chrome(
                     show_automation_banner=req.show_automation_banner,
@@ -823,7 +878,9 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
                 result = await cdp.go_forward(req.tab_id)
                 return {"result": result}
             elif method_name == "screenshot":
-                data = await cdp.screenshot(tab_id=req.tab_id, full_page=req.full_page, save_path=req.save_path, shutter_sounds=req.shutter_sounds)
+                data, saved_path = await cdp.screenshot(tab_id=req.tab_id, full_page=req.full_page, save_path=req.save_path, shutter_sounds=req.shutter_sounds)
+                if saved_path:
+                    return ファイル応答(saved_path, "image/png")
                 return {"type": "image", "data": data, "mimeType": "image/png"}
             elif method_name == "get_page_info":
                 info = await cdp.get_page_info(req.tab_id)

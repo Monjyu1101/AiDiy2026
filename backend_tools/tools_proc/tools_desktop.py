@@ -15,10 +15,11 @@ import json
 from typing import Optional
 
 from fastapi import APIRouter
-from mcp.types import ImageContent
+from mcp.types import ImageContent, TextContent
 from pydantic import BaseModel
 
 from log_config import get_logger
+from tools_proc.media_output import base64を返すか, ファイル応答
 from tools_proc.desktop_capture import DesktopCaptureError
 
 logger = get_logger(__name__)
@@ -122,7 +123,10 @@ def register_tools(mcp_dc, capture):
             if crosshair_pos or label_text:
                 img = await asyncio.to_thread(capture.annotate, img, crosshair_pos, label_text)
 
-            data = await asyncio.to_thread(capture.to_base64, img, format, quality, save_path)
+            返す = base64を返すか(save_path)
+            data, dest = await asyncio.to_thread(
+                capture.to_base64, img, format, quality, save_path, 返す
+            )
             mime = "image/jpeg" if format.lower() in ("jpeg", "jpg") else "image/png"
 
             logger.info(
@@ -131,6 +135,12 @@ def register_tools(mcp_dc, capture):
                 f"  save_path={save_path or '(default)'}"
             )
 
+            if not 返す:
+                # save_path 指定時は base64 を返さない（保存先を読めば済むため）
+                return [TextContent(
+                    type="text",
+                    text=json.dumps(ファイル応答(dest, mime), ensure_ascii=False),
+                )]
             return [ImageContent(type="image", data=data, mimeType=mime)]
 
         except DesktopCaptureError as e:
@@ -279,8 +289,14 @@ def create_router(capture) -> APIRouter:
                     )
                 if crosshair_pos or label_text:
                     img = await asyncio.to_thread(capture.annotate, img, crosshair_pos, label_text)
-                data = await asyncio.to_thread(capture.to_base64, img, req.format, req.quality, req.save_path)
                 mime = "image/jpeg" if req.format.lower() in ("jpeg", "jpg") else "image/png"
+                返す = base64を返すか(req.save_path)
+                data, dest = await asyncio.to_thread(
+                    capture.to_base64, img, req.format, req.quality, req.save_path, 返す
+                )
+                if not 返す:
+                    # save_path 指定時は base64 を返さない（保存先を読めば済むため）
+                    return ファイル応答(dest, mime)
                 return {"type": "image", "data": data, "mimeType": mime}
 
             elif method_name == "cursor_pos":

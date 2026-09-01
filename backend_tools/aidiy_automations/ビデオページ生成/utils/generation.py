@@ -27,15 +27,23 @@ from .infra import post_mcp_method, check
 # ================================================================== #
 
 def load_scenario_object(path: str) -> dict:
-    """window.SCENARIO = {...}; 形式の scenario.js を dict として読む。"""
+    """window.SCENARIO = {...}; 形式の scenario.js を dict として読む。
+
+    scenario.js はブラウザ実行用の補助 JavaScript を JSON 本体の後ろに
+    持てるため、ファイル全体を ``json.loads`` してはいけない。JSONDecoder
+    の ``raw_decode`` で先頭のオブジェクトだけを読み取る。
+    """
     with open(path, encoding="utf-8-sig") as f:
         content = f.read()
 
     json_str = content.strip()
     if json_str.startswith("window.SCENARIO ="):
         json_str = json_str[len("window.SCENARIO ="):].strip()
-    json_str = json_str.rstrip(";").strip()
-    data = json.loads(json_str)
+    try:
+        data, _ = json.JSONDecoder().raw_decode(json_str)
+    except json.JSONDecodeError:
+        # 補助コードがなく、末尾セミコロンだけの従来形式にも対応する。
+        data = json.loads(json_str.rstrip(";").strip())
     if not isinstance(data, dict):
         raise RuntimeError(f"scenario.js の内容が object ではありません: {path}")
     return data
@@ -557,6 +565,28 @@ def backup_images_for_fix_mode(ctx: "VideoGenCtx", images_dir: str) -> str:
     return orig_images_dir
 
 
+def 参照画像ディレクトリ(ctx: "VideoGenCtx", images_dir: str) -> str:
+    """画像生成へ渡す参照画像（original_path の元）フォルダを返す。無ければ空文字。
+
+    フォルダ作成では images をコピーしない。代わりに、既に出来ているテンプレート画像の
+    パスをここで渡し、画像生成 API へ original_path として送る。ゼロから描き起こすより
+    生成が速く、絵柄もテンプレートから離れにくい。コピーしないので出力フォルダは
+    汚れず、_gen_scene_images.py の「既存はスキップ」判定にも影響しない。
+
+    fix_mode のときは退避した自前の旧画像を参照にする（テンプレートではなく
+    前回の仕上がりを引き継ぎたいため）。
+    """
+    if ctx.fix_mode and os.path.isdir(images_dir):
+        return backup_images_for_fix_mode(ctx, images_dir)
+    候補 = os.path.join(ctx.template_dir, "images")
+    if not os.path.isdir(候補):
+        return ""
+    for fname in os.listdir(候補):
+        if fname.endswith(".png") and os.path.getsize(os.path.join(候補, fname)) > 1000:
+            return 候補
+    return ""
+
+
 # ================================================================== #
 # 補助スクリプト生成 (script_gen)
 # ================================================================== #
@@ -635,7 +665,10 @@ def render_scene_image_script(
         "    if os.path.isfile(path) and os.path.getsize(path) > 1000:\n"
         "        return path\n"
         "    return None\n\n\n"
-        "def post_json(url, payload, timeout_sec=600):\n"
+        # 画像自体は save_path へ先に保存される。HTTP 応答が戻らない場合も、
+        # 外側の AI タスク（60分監視）より十分早く失敗させ、次の試行で
+        # 保存済み画像をスキップして続行できるよう、1件の待機を5分に制限する。
+        "def post_json(url, payload, timeout_sec=300):\n"
         "    data = json.dumps(payload, ensure_ascii=False).encode('utf-8')\n"
         "    req = urllib.request.Request(\n"
         "        url,\n"
