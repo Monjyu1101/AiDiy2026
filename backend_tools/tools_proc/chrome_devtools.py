@@ -21,6 +21,7 @@ import asyncio
 import base64
 import io
 import json
+import logging
 import os
 import time
 import urllib.request
@@ -37,6 +38,7 @@ from tools_proc.desktop_capture import DesktopCapture
 
 _LOOPBACK_HOST = "127.0.0.1"
 _NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+logger = logging.getLogger(__name__)
 
 
 def _normalize_loopback_ws_url(ws_url: str) -> str:
@@ -53,6 +55,11 @@ def _normalize_loopback_ws_url(ws_url: str) -> str:
 
 class ChromeDevToolsError(Exception):
     """CDP 接続・操作エラー"""
+    pass
+
+
+class ChromeDevToolsTimeoutError(ChromeDevToolsError):
+    """CDP コマンドが制限時間内に応答しなかった場合の操作エラー。"""
     pass
 
 
@@ -173,6 +180,14 @@ class CDPClient:
                             )
                         return msg.get("result", {})
 
+            # TimeoutError は OSError の派生クラスでもあるため、接続エラーより
+            # 先に捕捉する。順序を逆にすると原因が空の「WebSocket 接続エラー」
+            # へ誤分類され、ログからタイムアウトと判定できなくなる。
+            except TimeoutError as e:
+                await self._discard_connection(ws_url, ws)
+                raise ChromeDevToolsTimeoutError(
+                    f"CDP コマンド '{method}' がタイムアウトしました ({timeout:g}秒)"
+                ) from e
             except (websockets.exceptions.WebSocketException, OSError) as e:
                 await self._discard_connection(ws_url, ws)
                 # 自動解決タブがこの接続先だった場合、タブが閉じられた等で無効に
@@ -184,9 +199,6 @@ class CDPClient:
                 if self._on_unreachable is not None:
                     self._on_unreachable()
                 raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}") from e
-            except TimeoutError:
-                await self._discard_connection(ws_url, ws)
-                raise
 
     async def _open_connection(self, ws_url: str) -> Any:
         ws = await websockets.connect(
@@ -510,7 +522,14 @@ class CDPClient:
             params["clip"] = {"x": 0, "y": 0, "width": w, "height": h, "scale": 1}
             params["captureBeyondViewport"] = True
 
-        result = await self.send_command(ws, "Page.captureScreenshot", params)
+        # キャプチャは読み取り専用で再実行してもページ状態を変更しない。
+        # Chrome が一時的に描画応答を返さない場合に限り、接続を張り直して
+        # 1回だけ再試行する（send_command はタイムアウト時に接続を破棄済み）。
+        try:
+            result = await self.send_command(ws, "Page.captureScreenshot", params)
+        except ChromeDevToolsTimeoutError:
+            logger.info("スクリーンショット取得がタイムアウトしたため1回再試行します")
+            result = await self.send_command(ws, "Page.captureScreenshot", params)
         data = result.get("data", "")
 
         saved_path = ""

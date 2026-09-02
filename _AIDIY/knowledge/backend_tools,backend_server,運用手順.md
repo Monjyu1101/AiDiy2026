@@ -151,6 +151,13 @@ PATH 上にない環境ではフルパスへ書き換える。MCP ツールは a
 - console 出力は UTF-8 固定。
 - ログ確認自体は `aidiy_logs` MCP でも行える。
 
+### Chrome DevTools / MCP 接続のログ判定
+
+- `クライアントが要求送信中に切断しました（正常終了扱い）` は、Code CLI やブラウザなどの MCP クライアントが要求送信中に終了・キャンセルした記録であり、サーバー障害ではない。INFO の1行だけを記録する。
+- `JS 実行エラー` は `eval_js` に渡した JavaScript 内の例外、`CDP コマンド ... がタイムアウトしました` は Chrome 操作の応答待ち超過であり、いずれも既知のツール失敗として INFO で記録し、呼び出し側へ具体的理由を返す。
+- スクリーンショット取得だけは、Chrome の一時的な描画遅延に対して接続を張り直し1回再試行する。再試行後も失敗した場合は上記のタイムアウトとして返す。
+- `Tool '...' raised an unexpected exception` や `Exception in ASGI application` の traceback が残る場合は、上記以外の実装不具合として調査する。
+
 ## 注意点
 
 - Chrome は最初のツール呼び出し時に `_ensure_chrome()` が起動確認する。

@@ -36,8 +36,10 @@ from fastapi.requests import Request
 from fastapi import Response
 from fastapi.routing import APIRoute
 from starlette.applications import Starlette
+from starlette.requests import ClientDisconnect
 from starlette.routing import Route
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 from mcp.server.streamable_http_manager import (
     StreamableHTTPASGIApp,
     StreamableHTTPSessionManager,
@@ -46,6 +48,7 @@ from mcp.types import LATEST_PROTOCOL_VERSION
 
 from log_config import setup_logging, get_logger
 from tools_proc.chrome_sessions import ChromeSessionRegistry
+from tools_proc.chrome_devtools import ChromeDevToolsError
 from tools_proc.desktop_capture import DesktopCapture
 from tools_proc.windows_control import WindowsControl
 from tools_proc.sqlite_query import SqliteQuery
@@ -101,7 +104,18 @@ def _summarize_arguments(arguments: dict, max_keys: int = 3) -> str:
 
 async def _logged_call_tool(self: MCPServer, name: str, arguments: dict, context=None):
     logger.info("ツール呼び出し: %s / %s (%s)", self.name, name, _summarize_arguments(arguments))
-    return await _original_mcpserver_call_tool(self, name, arguments, context)
+    try:
+        return await _original_mcpserver_call_tool(self, name, arguments, context)
+    except UnexpectedToolError as exc:
+        # CDP の接続・操作・JavaScript 実行エラーは、利用状況や入力内容から
+        # 起こり得る既知の失敗。MCP SDK のクラッシュ扱い（ERROR + traceback）
+        # ではなく ToolError（INFO + 呼び出し側へ具体的理由を返す）に変換する。
+        cause = exc.__cause__
+        while cause is not None:
+            if isinstance(cause, ChromeDevToolsError):
+                raise ToolError(str(cause)) from cause
+            cause = cause.__cause__
+        raise
 
 
 MCPServer.call_tool = _logged_call_tool
@@ -331,6 +345,25 @@ class _McpTransportMiddleware:
         await self.app(scope, receive, send)
 
 
+class _ClientDisconnectMiddleware:
+    """要求受信中のクライアント切断をサーバー障害として記録しない。"""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await self.app(scope, receive, send)
+        except ClientDisconnect:
+            if scope.get("type") != "http":
+                raise
+            logger.info(
+                "クライアントが要求送信中に切断しました（正常終了扱い）: %s %s",
+                scope.get("method", ""),
+                scope.get("path", ""),
+            )
+
+
 @asynccontextmanager
 async def _mcp_lifespan(_app: FastAPI) -> AsyncIterator[None]:
     async with AsyncExitStack() as stack:
@@ -372,6 +405,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(_McpTransportMiddleware)
+# Starlette は後から追加したミドルウェアが外側になる。MCP のマウント先を
+# 含む全 HTTP 経路から上がる ClientDisconnect を最外周で処理する。
+app.add_middleware(_ClientDisconnectMiddleware)
 
 # ------------------------------------------------------------------ #
 # MCP_MAP: initialize / list / ping 共通エンドポイント用
