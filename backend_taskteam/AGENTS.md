@@ -90,8 +90,34 @@ backend_taskteam/temp/reboot_taskteam.txt
 2. Task 起動監視が要求を`準備中`へ進め、`task_sub/sub_init.py`を起動する。
 3. AI が要求を明細へ分解し、開始行・処理行・終了行を本登録する。
 4. `先行SEQ`がすべて完了した明細を実行可能とし、依存を満たした明細を並行起動する。
-5. `task_sub/sub_start.py`、`sub_proc.py`、`sub_terminate.py`が結果を API へ反映する。
+5. `task_sub/sub_start.py`、`sub_do.py`、`sub_if.py`、`sub_or.py`、`sub_end.py`が結果を API へ反映する。
 6. 終了明細が完了すると要求を完了へ進める。チーム依頼由来の場合は経験生成まで Team 側と連動する。
+
+`Aタスク明細` の `タイプ` は `start` / `do` / `if` / `or` / `end` の5値で、`明細SEQ` の直後の列です。
+`0`=start、`9999`=end は SEQ で確定し、その間は AI（または明細編集ダイアログ）が
+`do`（通常実行）/ `if`（Y・N 判定の分岐）/ `or`（合流点）から選びます。登録は `tasks_db.明細タイプ()` を通し、
+AI の分解 JSON にも `明細SEQ` の直後のキーとして出させます。
+
+### if 分岐と or 合流
+
+`先行SEQ` の 1 要素は `5`（通常のエッジ）か `5=Y` / `5=N`（if 明細 5 の判定値で選ばれるエッジ）です
+（解析は `tasks_db.先行SEQ解析()`）。`=Y` / `=N` を付けられるのは先行が `if` 明細のときだけで、
+逆に `if` を先行に持つ明細は必ずどちらかを指定します。`sub_init.JSON検証()` が両方向とも検査し、
+`if` の Y 側・N 側の後続が揃っているかも確認します。
+
+| タイプ | サブプロセス | 動作 |
+|--------|--------------|------|
+| `if` | `task_sub/sub_if.py` | 要求内容を条件文として AI に Y / N を JSON で答えさせ、応答内容へ `Y: 理由` の形式で書き込む。判定の読み出しは `tasks_db.if判定値()`（先頭 1 文字） |
+| `or` | `task_sub/sub_or.py` | AI を使わない合流点。先行SEQ のいずれか 1 本が完了していれば機械的に完了する |
+
+実行可能判定は `or` だけ「いずれか 1 本」で、それ以外は従来どおり「全先行が完了」です。
+`if` で選ばれなかった枝の明細は `tasks_db.明細パス伝播()` が状態 `パス` にし、その下流へ連鎖させます
+（起動監視の毎回 5 秒ごとに実行）。`パス` は失敗ではないので要求の完了を妨げず、
+明細の実行有効切替や停止復旧では `待機` へ戻して分岐をやり直せます。
+
+明細タイプは実行するサブプロセスの選択そのものにも使います
+（`tasks_watcher._タイプ別サブプロセス`）。以前はタイトル文字列（「開始」「終了」）で分けていましたが、
+`if` / `or` はタイトルが自由なため判定できず、タイプ基準へ切り替えました。列を持たない旧 DB から移行した場合は`_明細タイプ補正()` が起動時に SEQ から埋め直します。
 
 明細の依存関係はカンバン固定列ではなく、`先行SEQ`（カンマ区切りで複数指定可）による DAG です。実行可能判定は先行明細の全完了を条件とし、フロントエンドのフロー図は最長経路をクリティカルパスとして配置します。
 
@@ -103,10 +129,12 @@ backend_taskteam/temp/reboot_taskteam.txt
 |--------------|------|------|
 | `task_sub/sub_init.py` | 要求の準備 | 2段構え。第1ステップは対象プロジェクトフォルダで AI に分解させ、応答本文へ JSON 文字列を返させる（書き込みなし）。第2ステップは AiDiy ルート（`"../"`）で `temp/output/<タスクID>.json` へ書き出させる |
 | `task_sub/sub_start.py` | 開始明細 | AI を使わず、`aidiy_backup` MCP でプロジェクトの差分バックアップを取り、要求内容を応答内容へコピーして`開始完了`にする |
-| `task_sub/sub_proc.py` | 処理明細 | 1ステップだけを `aidiy_code_agents` へ依頼する。`操作検証`ありの明細は AI が `/task_check_okng` へ報告した状態を確認し、書き込みなし・エラーのいずれかなら検証結果を踏まえて最大2回自動リトライする。再試行時は実行有効フラグと実行中PIDも復元する |
-| `task_sub/sub_terminate.py` | 終了明細 | `操作検証=false`（どの明細もファイル操作なし）なら AI を介さず`終了完了`。`true` なら最終検証を依頼し、AI が `/task_check_okng` へ報告する。無報告で戻った場合は強制的にエラーで確定する |
+| `task_sub/sub_do.py` | 処理明細 | 1ステップだけを `aidiy_code_agents` へ依頼する。`操作検証`ありの明細は AI が `/task_check_okng` へ報告した状態を確認し、書き込みなし・エラーのいずれかなら検証結果を踏まえて最大2回自動リトライする。再試行時は実行有効フラグと実行中PIDも復元する |
+| `task_sub/sub_if.py` | 分岐明細 | 要求内容の条件を AI に Y / N で判定させ、応答内容へ `Y: 理由` を書き込む。判定だけでファイル操作は行わせない |
+| `task_sub/sub_or.py` | 合流明細 | AI を使わず、通った先行SEQ を応答内容に記録して完了する |
+| `task_sub/sub_end.py` | 終了明細 | `操作検証=false`（どの明細もファイル操作なし）なら AI を介さず`終了完了`。`true` なら最終検証を依頼し、AI が `/task_check_okng` へ報告する。無報告で戻った場合は強制的にエラーで確定する |
 
-`sub_proc.py` / `sub_terminate.py` は `temp/input` / `temp/output` に依存せず、タスクID と SEQ だけで完結します。
+`sub_do.py` / `sub_end.py` は `temp/input` / `temp/output` に依存せず、タスクID と SEQ だけで完結します。
 
 ### 実行開始条件
 
@@ -323,7 +351,7 @@ Task ID と Team 依頼IDが同じ文字列になる連携があるため、Task
 | `task_proc/tasks_api.py` | `/task/*` API |
 | `task_proc/tasks_db.py` | `Aタスク*` と連携する `Aチーム*` の DB 操作 |
 | `task_proc/tasks_watcher.py` | Task の起動・状態監視とサブプロセス起動 |
-| `task_sub/` | 要求分解（`sub_init.py`）、開始（`sub_start.py`）、処理（`sub_proc.py`）、終了（`sub_terminate.py`）の各 Task サブプロセス |
+| `task_sub/` | 要求分解（`sub_init.py`）、開始（`sub_start.py`）、処理（`sub_do.py`）、終了（`sub_end.py`）の各 Task サブプロセス |
 | `task_sub/sub_context.py` | Task の定型コンテキスト（plan / do / check）の読込 |
 | `team_proc/team_context.py` | Team の定型コンテキスト（用途別6ファイル）の読込 |
 | `team_proc/team_api.py` | `/team/*` API |

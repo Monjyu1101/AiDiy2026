@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import json
 import math
+import re
 import sqlite3
 from datetime import datetime, timedelta
 
@@ -56,6 +57,19 @@ AIモデルカラム = tuple(f"TASK_AI_MODEL_{フェーズ}" for フェーズ in
 定時区分値 = ("毎日", "毎週", "毎月")
 実行曜日値 = ("日", "月", "火", "水", "木", "金", "土")
 実行条件値 = ("無し", "フォルダ変化")
+
+# 明細のタイプ。開始行(0)=start、終了行(9999)=end は明細SEQ で確定する。
+# その間の明細は do（通常実行）/ if（AI が Y・N を判定する分岐）/ or（合流点）から選ぶ。
+開始明細SEQ = 0
+終了明細SEQ = 9999
+明細タイプ値 = ("start", "do", "if", "or", "end")
+明細タイプ指定可能値 = ("do", "if", "or")
+分岐条件値 = ("Y", "N")
+
+# 明細の状態。パス は if 分岐で選ばれなかった枝（失敗ではない）。
+明細状態値 = ("待機", "実行中", "完了", "エラー", "中止", "パス")
+# 後続の判定で「もう動かない」とみなす状態。エラーは復旧余地があるので含めない。
+_決着済み状態 = ("完了", "パス", "中止")
 
 # ダイアログから登録する入力カラム（残りはウォッチャーが管理するサーバー項目）
 実行条件入力カラム = [
@@ -144,6 +158,53 @@ def _正整数(値, 既定: int = 0) -> int:
     except (TypeError, ValueError):
         return 既定
     return n if n >= 0 else 既定
+
+
+def 明細タイプ(明細SEQ, 指定=None) -> str:
+    """明細タイプを決める。開始行(0)=start / 終了行(9999)=end は明細SEQ で確定する。
+
+    それ以外は 指定 の do / if / or を採用し、未指定・不正値は do にする。
+    登録・移行のどちらもこの関数を通し、SEQ とタイプが食い違わないようにする。
+    """
+    seq = _正整数(明細SEQ, -1)
+    if seq == 開始明細SEQ:
+        return "start"
+    if seq == 終了明細SEQ:
+        return "end"
+    値 = str(指定 or "").strip().lower()
+    return 値 if 値 in 明細タイプ指定可能値 else "do"
+
+
+# 先行SEQ の 1 要素。`5` は通常のエッジ、`5=Y` `5=N` は if 明細 5 の判定値で選ばれるエッジ。
+_先行SEQ要素パターン = re.compile(r"^(\d+)(?:=([YN]))?$")
+
+
+def 先行SEQ解析(先行SEQ) -> list[tuple[int, str]]:
+    """先行SEQ 文字列を [(先行の明細SEQ, 分岐条件)] へ分解する。
+
+    分岐条件は "" / "Y" / "N"。書式が不正なときは ValueError を送出するので、
+    入力検証にもそのまま使える。
+    """
+    結果: list[tuple[int, str]] = []
+    for 要素 in str(先行SEQ or "").split(","):
+        要素 = 要素.strip().upper()
+        if not 要素:
+            continue
+        m = _先行SEQ要素パターン.match(要素)
+        if not m:
+            raise ValueError(f"先行SEQの書式が不正です: {要素}")
+        結果.append((int(m.group(1)), m.group(2) or ""))
+    return 結果
+
+
+def if判定値(応答内容) -> str:
+    """if 明細の応答内容から判定値（Y / N）を取り出す。
+
+    sub_if.py は応答内容を `Y: 理由` の形式で書き込むので、先頭 1 文字が判定値になる。
+    取り出せないときは空文字を返す（＝まだどちらの枝も選ばれていない）。
+    """
+    先頭 = str(応答内容 or "").strip()[:1].upper()
+    return 先頭 if 先頭 in 分岐条件値 else ""
 
 
 def _経過分数(開始日時: str, 終了日時: str) -> int:
@@ -276,6 +337,7 @@ def _AIタスク要求テーブル作成(conn: sqlite3.Connection) -> None:
 _明細カラムDDL = f"""
     タスクID TEXT NOT NULL,
     明細SEQ INTEGER NOT NULL,
+    タイプ TEXT NOT NULL DEFAULT 'do',
     タイトル TEXT NOT NULL,
     要求内容 TEXT NOT NULL DEFAULT '',
     先行SEQ TEXT NOT NULL DEFAULT '',
@@ -298,7 +360,7 @@ _明細カラムDDL = f"""
 # 業務項目は必ず監査項目より前に並べる規約。ALTER TABLE ADD COLUMN では末尾（監査項目の後ろ）に
 # 付いてしまうため、列順が規約どおりでない既存 DB はテーブルごと作り直して並べ替える。
 _明細列順 = [
-    "タスクID", "明細SEQ", "タイトル", "要求内容", "先行SEQ",
+    "タスクID", "明細SEQ", "タイプ", "タイトル", "要求内容", "先行SEQ",
     "TASK_AI_NAME", "TASK_AI_MODEL_do", "操作検証", "実行有効", "状態",
     "PID", "開始日時", "終了日時", "実行回数", "予測分数", "実績分数", "応答内容",
 ] + list(_監査項目().keys())
@@ -311,19 +373,42 @@ def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
         )
     """)
     現在列 = [str(row["name"]) for row in conn.execute(f"PRAGMA table_info({AIタスク明細テーブル})")]
-    if 現在列 == _明細列順:
-        return
-    # 列が足りない / 監査項目より後ろに業務項目が付いている旧スキーマを、正しい列順へ作り替える
-    移行テーブル = f"{AIタスク明細テーブル}_移行"
-    引継列 = ", ".join(_識別子(列) for 列 in _明細列順 if 列 in 現在列)
-    conn.execute(f"DROP TABLE IF EXISTS {_識別子(移行テーブル)}")
-    conn.execute(f"CREATE TABLE {_識別子(移行テーブル)} ({_明細カラムDDL})")
+    if 現在列 != _明細列順:
+        # 列が足りない / 監査項目より後ろに業務項目が付いている旧スキーマを、正しい列順へ作り替える
+        移行テーブル = f"{AIタスク明細テーブル}_移行"
+        引継列 = ", ".join(_識別子(列) for 列 in _明細列順 if 列 in 現在列)
+        conn.execute(f"DROP TABLE IF EXISTS {_識別子(移行テーブル)}")
+        conn.execute(f"CREATE TABLE {_識別子(移行テーブル)} ({_明細カラムDDL})")
+        conn.execute(
+            f"INSERT INTO {_識別子(移行テーブル)} ({引継列}) "
+            f"SELECT {引継列} FROM {AIタスク明細テーブル}"
+        )
+        conn.execute(f"DROP TABLE {AIタスク明細テーブル}")
+        conn.execute(f"ALTER TABLE {_識別子(移行テーブル)} RENAME TO {AIタスク明細テーブル}")
+    _明細タイプ補正(conn)
+
+
+def _明細タイプ補正(conn: sqlite3.Connection) -> None:
+    """タイプ列を 明細SEQ から決まる値へ揃える。
+
+    タイプ列を持たない旧 DB から移行した直後は全行が DDL の既定値 'do' になるため、
+    開始行(0)・終了行(9999) をここで埋め直す。既に正しい行は更新しない。
+    """
     conn.execute(
-        f"INSERT INTO {_識別子(移行テーブル)} ({引継列}) "
-        f"SELECT {引継列} FROM {AIタスク明細テーブル}"
+        f"UPDATE {AIタスク明細テーブル} SET タイプ = 'start' WHERE 明細SEQ = ? AND タイプ != 'start'",
+        [開始明細SEQ],
     )
-    conn.execute(f"DROP TABLE {AIタスク明細テーブル}")
-    conn.execute(f"ALTER TABLE {_識別子(移行テーブル)} RENAME TO {AIタスク明細テーブル}")
+    conn.execute(
+        f"UPDATE {AIタスク明細テーブル} SET タイプ = 'end' WHERE 明細SEQ = ? AND タイプ != 'end'",
+        [終了明細SEQ],
+    )
+    # 途中行は do / if / or のいずれか。想定外の値だけ do へ戻す（if・or は保存値を尊重する）
+    placeholders = ", ".join("?" for _ in 明細タイプ指定可能値)
+    conn.execute(
+        f"UPDATE {AIタスク明細テーブル} SET タイプ = 'do' "
+        f"WHERE 明細SEQ NOT IN (?, ?) AND タイプ NOT IN ({placeholders})",
+        [開始明細SEQ, 終了明細SEQ, *明細タイプ指定可能値],
+    )
 
 
 _実行条件カラムDDL = f"""
@@ -424,9 +509,9 @@ def _タスク登録(
         # 明細は各ステップの実行なので do のモデルを使う
         task_ai_model = 規定["TASK_AI_MODEL_do"]
         conn.execute(
-            f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 状態, {監査カラム}) "
-            f"VALUES (?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
-            [タスクID, 明細SEQ, タイトル, 先行SEQ, task_ai_name, task_ai_model, "待機", *監査値],
+            f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイプ, タイトル, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 状態, {監査カラム}) "
+            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
+            [タスクID, 明細SEQ, 明細タイプ(明細SEQ), タイトル, 先行SEQ, task_ai_name, task_ai_model, "待機", *監査値],
         )
     return タスクID
 
@@ -543,7 +628,7 @@ def タスク明細一覧(タスクID: str) -> list[dict]:
     conn = 接続取得()
     try:
         rows = conn.execute(
-            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, "
+            "SELECT タスクID, 明細SEQ, タイプ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, "
             f"PID, 開始日時, 終了日時, 実行回数, 予測分数, 実績分数, 応答内容, 更新日時 FROM {AIタスク明細テーブル} "
             "WHERE タスクID = ? ORDER BY 明細SEQ",
             [タスクID],
@@ -558,7 +643,7 @@ def タスク明細取得(タスクID: str, 明細SEQ: int) -> dict:
     conn = 接続取得()
     try:
         row = conn.execute(
-            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, "
+            "SELECT タスクID, 明細SEQ, タイプ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, "
             f"PID, 開始日時, 終了日時, 実行回数, 応答内容 FROM {AIタスク明細テーブル} "
             "WHERE タスクID = ? AND 明細SEQ = ?",
             [タスクID, 明細SEQ],
@@ -1028,6 +1113,116 @@ def 実行開始記録(タスクID: str, pid: int) -> None:
         conn.close()
 
 
+def _エッジ成立(先行SEQ: int, 条件: str, 状態表: dict[int, str], 応答表: dict[int, str]) -> bool:
+    """先行エッジ 1 本が通ったか。条件付きは先行 if の判定値が一致したときだけ通る。"""
+    if 状態表.get(先行SEQ) != "完了":
+        return False
+    if not 条件:
+        return True
+    return if判定値(応答表.get(先行SEQ, "")) == 条件
+
+
+def _エッジ不成立確定(先行SEQ: int, 条件: str, 状態表: dict[int, str], 応答表: dict[int, str]) -> bool:
+    """先行エッジ 1 本がもう通らないと確定したか。
+
+    先行が パス・中止 で終わった場合と、先行 if が反対の判定値で完了した場合。
+    エラーは再試行で完了になり得るので確定扱いにしない。
+    """
+    状態 = 状態表.get(先行SEQ)
+    if 状態 in ("パス", "中止"):
+        return True
+    if 条件 and 状態 == "完了":
+        判定 = if判定値(応答表.get(先行SEQ, ""))
+        return bool(判定) and 判定 != 条件
+    return False
+
+
+def _先行充足(行: dict, 状態表: dict[int, str], 応答表: dict[int, str]) -> bool:
+    """明細の先行SEQ を満たしたか。or 明細はいずれか 1 本、それ以外は全本が条件。"""
+    try:
+        先行 = 先行SEQ解析(行.get("先行SEQ", ""))
+    except ValueError:
+        return False  # 書式不正の明細は起動対象にしない（停止検査で DAG 不整合として出る）
+    if not 先行:
+        return True
+    判定 = [_エッジ成立(p, 条件, 状態表, 応答表) for p, 条件 in 先行]
+    if str(行.get("タイプ", "")) == "or":
+        return any(判定)
+    return all(判定)
+
+
+def _先行不成立確定(行: dict, 状態表: dict[int, str], 応答表: dict[int, str]) -> bool:
+    """明細がもう実行され得ないか。or 明細は全本、それ以外は 1 本でも確定すれば通らない。"""
+    try:
+        先行 = 先行SEQ解析(行.get("先行SEQ", ""))
+    except ValueError:
+        return False
+    if not 先行:
+        return False
+    判定 = [_エッジ不成立確定(p, 条件, 状態表, 応答表) for p, 条件 in 先行]
+    if str(行.get("タイプ", "")) == "or":
+        return all(判定)
+    return any(判定)
+
+
+def 明細パス伝播(タスクID: str = "") -> int:
+    """if 分岐で選ばれなかった枝の待機明細を パス にし、その下流へ連鎖させる。
+
+    パス は「条件で通らなかった」ことを表す状態で、失敗ではないため要求の完了を妨げない。
+    連鎖は変化が止まるまで繰り返す（1 回の呼び出しで枝の末端まで到達する）。
+    対象タスクを省略すると、実行中・待機中の全タスクを見る。
+    """
+    初期化()
+    conn = 接続取得()
+    try:
+        if タスクID:
+            対象 = [タスクID]
+        else:
+            対象 = [
+                str(r[0])
+                for r in conn.execute(
+                    f"SELECT タスクID FROM {AIタスク要求テーブル} "
+                    "WHERE 実行有効 = 1 AND 状態 IN ('待機', '実行中')"
+                )
+            ]
+        now = _現在日時()
+        件数 = 0
+        for tid in 対象:
+            明細 = [
+                dict(r)
+                for r in conn.execute(
+                    f"SELECT 明細SEQ, タイプ, 先行SEQ, 状態, 応答内容 FROM {AIタスク明細テーブル} "
+                    "WHERE タスクID = ?",
+                    [tid],
+                )
+            ]
+            状態表 = {int(行["明細SEQ"]): str(行["状態"]) for 行 in 明細}
+            応答表 = {int(行["明細SEQ"]): str(行["応答内容"] or "") for 行 in 明細}
+            while True:
+                今回 = [
+                    int(行["明細SEQ"])
+                    for 行 in 明細
+                    if 状態表.get(int(行["明細SEQ"])) == "待機"
+                    and _先行不成立確定(行, 状態表, 応答表)
+                ]
+                if not 今回:
+                    break
+                for seq in 今回:
+                    状態表[seq] = "パス"
+                conn.executemany(
+                    f"UPDATE {AIタスク明細テーブル} SET 状態 = 'パス', 終了日時 = ?, PID = '', "
+                    "応答内容 = '分岐条件により実行しませんでした。', 更新日時 = ? "
+                    "WHERE タスクID = ? AND 明細SEQ = ? AND 状態 = '待機'",
+                    [(now, now, tid, seq) for seq in 今回],
+                )
+                件数 += len(今回)
+        if 件数:
+            conn.commit()
+        return 件数
+    finally:
+        conn.close()
+
+
 def 実行待ち明細一覧() -> list[dict]:
     """実行可能な AIタスク明細（実行有効・待機・PID なし・先行 SEQ が全て完了）を返す。
 
@@ -1043,7 +1238,7 @@ def 実行待ち明細一覧() -> list[dict]:
     conn = 接続取得()
     try:
         rows = conn.execute(
-            "SELECT m.タスクID, m.明細SEQ, m.タイトル, m.先行SEQ, m.TASK_AI_NAME, m.TASK_AI_MODEL_do, m.実行回数, "
+            "SELECT m.タスクID, m.明細SEQ, m.タイプ, m.タイトル, m.先行SEQ, m.TASK_AI_NAME, m.TASK_AI_MODEL_do, m.実行回数, "
             # AI が分解した明細は 要求内容 が入る。標準テンプレートで作っただけの
             # 明細は全て空なので、これで「定義済みのタスクか」を DB だけで判定できる
             "(SELECT COUNT(*) FROM " + AIタスク明細テーブル + " d "
@@ -1059,31 +1254,24 @@ def 実行待ち明細一覧() -> list[dict]:
         if not 候補:
             return []
 
-        # タスクごとの明細状態マップで先行 SEQ の完了を確認する
+        # タスクごとの明細状態マップで先行 SEQ の充足を確認する
+        # （if 分岐の判定値を見るため 応答内容 も持つ）
         状態マップ: dict[str, dict[int, str]] = {}
+        応答マップ: dict[str, dict[int, str]] = {}
         for タスクID in {行["タスクID"] for 行 in 候補}:
-            状態マップ[タスクID] = {
-                int(r[0]): str(r[1])
-                for r in conn.execute(
-                    f"SELECT 明細SEQ, 状態 FROM {AIタスク明細テーブル} "
-                    "WHERE タスクID = ?",
-                    [タスクID],
-                )
-            }
+            明細行 = conn.execute(
+                f"SELECT 明細SEQ, 状態, 応答内容 FROM {AIタスク明細テーブル} "
+                "WHERE タスクID = ?",
+                [タスクID],
+            ).fetchall()
+            状態マップ[タスクID] = {int(r[0]): str(r[1]) for r in 明細行}
+            応答マップ[タスクID] = {int(r[0]): str(r[2] or "") for r in 明細行}
 
-        実行可能: list[dict] = []
-        for 行 in 候補:
-            状態表 = 状態マップ[行["タスクID"]]
-            先行OK = True
-            for p in str(行.get("先行SEQ", "")).split(","):
-                p = p.strip()
-                if not p:
-                    continue
-                if not p.isdigit() or 状態表.get(int(p)) != "完了":
-                    先行OK = False
-                    break
-            if 先行OK:
-                実行可能.append(行)
+        実行可能 = [
+            行
+            for 行 in 候補
+            if _先行充足(行, 状態マップ[行["タスクID"]], 応答マップ[行["タスクID"]])
+        ]
         return 実行可能
     finally:
         conn.close()
@@ -1171,7 +1359,7 @@ def 明細1件取得(タスクID: str, 明細SEQ: int) -> dict | None:
     conn = 接続取得()
     try:
         row = conn.execute(
-            "SELECT タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, "
+            "SELECT タスクID, 明細SEQ, タイプ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, "
             "操作検証, 実行有効, 状態, PID, 開始日時, 終了日時, 実行回数, 予測分数, 実績分数, 応答内容 "
             f"FROM {AIタスク明細テーブル} WHERE タスクID = ? AND 明細SEQ = ?",
             [タスクID, 明細SEQ],
@@ -1210,7 +1398,7 @@ def 明細完了(タスクID: str, 明細SEQ: int, 応答内容: str = "") -> di
         応答タイトル = str(行["タイトル"]) if 行 else ""
         残 = conn.execute(
             f"SELECT COUNT(*) FROM {AIタスク明細テーブル} "
-            "WHERE タスクID = ? AND 状態 != '完了'",
+            "WHERE タスクID = ? AND 状態 NOT IN ('完了', 'パス')",
             [タスクID],
         ).fetchone()[0]
         if 残 == 0:
@@ -1333,14 +1521,14 @@ def 再試行予測分数(予測分数, 未見積り分: int = 8, 倍率: float 
 
 
 def 明細再試行(タスクID: str, 明細SEQ: int, pid: int = 0) -> dict:
-    """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す（sub_proc.py 用）。
+    """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す（sub_do.py 用）。
 
     操作検証NG・未報告により明細とタスク要求がエラーになっていても、再試行のため実行中に戻す。
     明細失敗() は実行有効と PID をクリアするため、ここでは両方を必ず復元する。
     復元しないと、この試行が成功しても要求の実行有効=0が残り、後続明細が起動せず停止する。
 
     あわせて予測分数を 再試行予測分数 で引き上げて書き換える。書き換えた値は
-    sub_proc.py が code_agents へ渡す実行タイムアウトと、監視側の打ち切り判定
+    sub_do.py が code_agents へ渡す実行タイムアウトと、監視側の打ち切り判定
     （明細タイムアウト分）の両方にそのまま効くため、再試行は前回より長い時間で走る。
 
     開始日時も現在時刻へ入れ直す。監視側の打ち切りは 現在時刻 - 開始日時 で見るため、
@@ -1592,7 +1780,7 @@ def _停止診断1件(conn: sqlite3.Connection, req: sqlite3.Row, now: datetime)
     rows = [
         dict(r)
         for r in conn.execute(
-            "SELECT 明細SEQ, タイトル, 要求内容, 先行SEQ, 状態, 実行有効, 実行回数, "
+            "SELECT 明細SEQ, タイプ, タイトル, 要求内容, 先行SEQ, 状態, 実行有効, 実行回数, "
             "予測分数, 実績分数, PID, 開始日時, 応答内容 "
             f"FROM {AIタスク明細テーブル} WHERE タスクID = ? ORDER BY 明細SEQ",
             [tid],
@@ -1627,12 +1815,12 @@ def _停止診断1件(conn: sqlite3.Connection, req: sqlite3.Row, now: datetime)
     # 待機明細のうち、全先行SEQが完了したものを求める。これが1件も無く、
     # 実行中も無い場合は、循環・欠番などのDAG不整合で自然復旧しない。
     状態表 = {int(row["明細SEQ"]): str(row["状態"]) for row in rows}
+    応答表 = {int(row["明細SEQ"]): str(row.get("応答内容") or "") for row in rows}
     実行可能明細: list[int] = []
     for row in 未完了:
         if str(row["状態"]) != "待機" or not int(row["実行有効"] or 0) or str(row["PID"] or ""):
             continue
-        先行 = [p.strip() for p in str(row.get("先行SEQ") or "").split(",") if p.strip()]
-        if all(p.isdigit() and 状態表.get(int(p)) == "完了" for p in 先行):
+        if _先行充足(row, 状態表, 応答表):
             実行可能明細.append(int(row["明細SEQ"]))
 
     状態コード: list[str] = []
@@ -1913,7 +2101,8 @@ def タスク停止復旧(タスクID: str, 強制: bool = False, 復旧モー�
                 f"UPDATE {AIタスク明細テーブル} SET 実行有効 = 1, 更新日時 = ? WHERE タスクID = ?",
                 [now, タスクID],
             )
-            対象状態 = ("エラー", "実行中", "準備中") if 強制 else ("エラー",)
+            # パス は分岐で通らなかっただけなので、復旧時は常に待機へ戻して選び直せるようにする
+            対象状態 = ("エラー", "パス", "実行中", "準備中") if 強制 else ("エラー", "パス")
             placeholders = ", ".join("?" for _ in 対象状態)
             conn.execute(
                 f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', "
@@ -1922,7 +2111,8 @@ def タスク停止復旧(タスクID: str, 強制: bool = False, 復旧モー�
                 [now, タスクID, *対象状態],
             )
             未完了件数 = conn.execute(
-                f"SELECT COUNT(*) FROM {AIタスク明細テーブル} WHERE タスクID = ? AND 状態 != '完了'",
+                f"SELECT COUNT(*) FROM {AIタスク明細テーブル} WHERE タスクID = ? "
+                "AND 状態 NOT IN ('完了', 'パス')",
                 [タスクID],
             ).fetchone()[0]
             if 未完了件数:
@@ -1962,7 +2152,7 @@ def タスク停止復旧(タスクID: str, 強制: bool = False, 復旧モー�
 def 明細実行有効更新(タスクID: str, 明細SEQ: int, 実行有効: bool) -> bool:
     """タスク明細 1 行の実行有効フラグを更新する。更新できたら True。
 
-    無効 → 有効 への切替時、その明細が エラー / 完了 なら 待機 に戻して再実行できるようにする
+    無効 → 有効 への切替時、その明細が エラー / 完了 / パス なら 待機 に戻して再実行できるようにする
     （PID・開始日時・終了日時・実行回数もリセットする。理由は タスク実行有効更新 と同じ）。
     完了も戻すのは、仕上がりが気に入らないステップだけを選んで実行し直せるようにするため。
     先行SEQ の明細は完了のまま残るので、そのステップだけが再実行される。
@@ -1983,7 +2173,7 @@ def 明細実行有効更新(タスクID: str, 明細SEQ: int, 実行有効: boo
             戻し = conn.execute(
                 f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', "
                 "終了日時 = '', 実行回数 = 0, 実績分数 = 0, 更新日時 = ? "
-                "WHERE タスクID = ? AND 明細SEQ = ? AND 状態 IN ('エラー', '完了')",
+                "WHERE タスクID = ? AND 明細SEQ = ? AND 状態 IN ('エラー', '完了', 'パス')",
                 [now, タスクID, 明細SEQ],
             )
             if 戻し.rowcount > 0:
@@ -2015,24 +2205,29 @@ def 明細更新登録(
     操作検証: bool,
     実行有効: bool,
     状態: str,
+    タイプ: str = "",
 ) -> dict:
-    """明細編集ダイアログの内容で AIタスク明細 1 行を更新する。"""
+    """明細編集ダイアログの内容で AIタスク明細 1 行を更新する。
+
+    タイプは 明細タイプ() を通すので、開始行(0)・終了行(9999) は指定によらず start / end のまま。
+    """
     初期化()
     conn = 接続取得()
     try:
         now = _現在日時()
+        タイプ値 = 明細タイプ(明細SEQ, タイプ)
         if 状態 == "待機":
             cur = conn.execute(
-                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL_do = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク明細テーブル} SET タイプ = ?, タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL_do = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 開始日時 = '', 終了日時 = '', 実行回数 = 0, 実績分数 = 0, 応答内容 = '', 更新日時 = ? "
                 "WHERE タスクID = ? AND 明細SEQ = ?",
-                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
+                [タイプ値, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
             )
         else:
             cur = conn.execute(
-                f"UPDATE {AIタスク明細テーブル} SET タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL_do = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
+                f"UPDATE {AIタスク明細テーブル} SET タイプ = ?, タイトル = ?, 要求内容 = ?, 先行SEQ = ?, TASK_AI_NAME = ?, TASK_AI_MODEL_do = ?, 操作検証 = ?, 実行有効 = ?, 状態 = ?, "
                 "PID = '', 更新日時 = ? WHERE タスクID = ? AND 明細SEQ = ?",
-                [タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
+                [タイプ値, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 1 if 操作検証 else 0, 1 if 実行有効 else 0, 状態, now, タスクID, 明細SEQ],
             )
         conn.execute(
             f"UPDATE {AIタスク要求テーブル} SET 更新日時 = ? WHERE タスクID = ?",
@@ -2332,11 +2527,13 @@ def タスク本登録(
         for 行 in 明細:
             明細SEQ = int(行["明細SEQ"])
             conn.execute(
-                f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, 予測分数, {監査カラム}) "
-                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
+                f"INSERT INTO {AIタスク明細テーブル} (タスクID, 明細SEQ, タイプ, タイトル, 要求内容, 先行SEQ, TASK_AI_NAME, TASK_AI_MODEL_do, 操作検証, 実行有効, 状態, 予測分数, {監査カラム}) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {', '.join('?' * len(監査値))})",
                 [
                     タスクID,
                     明細SEQ,
+                    # 開始行・終了行は SEQ で確定し、その間は AI 指定の do / if / or を採用する
+                    明細タイプ(明細SEQ, 行.get("タイプ")),
                     str(行.get("タイトル", "")),
                     str(行.get("要求内容", "")),
                     str(行.get("先行SEQ", "")),

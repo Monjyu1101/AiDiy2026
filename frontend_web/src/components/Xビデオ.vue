@@ -38,6 +38,7 @@ const 解説toolsUrl        = `${baseUrl}Xビデオ/AiDiy解説_tools_ja/index.h
 const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html`;
 const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
 const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
+const ニュース_20260902_claudefablemythos_jaUrl = `${baseUrl}Xビデオ/ニュース_20260902_claudefablemythos_ja/index.html?auto=loop`;
 
 const route = useRoute();
 const router = useRouter();
@@ -320,6 +321,16 @@ const handleReturn = () => {
             </div>
             <div class="menu-card-description">
               GPT-5 / o3 / Codex など OpenAI 2026年前半のトピックを二人掛け合いで解説
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="ニュース_20260902_claudefablemythos_jaUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">CFM</span>
+              Claude Fable 5.1 / Mythos 5.1 発表
+            </div>
+            <div class="menu-card-description">
+              長時間の自律作業、コーディング、試作を支える性能向上とコスト削減を二人掛け合いで解説
             </div>
           </a>
 

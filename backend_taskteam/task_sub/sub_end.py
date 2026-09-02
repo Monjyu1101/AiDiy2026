@@ -13,7 +13,7 @@
 終了明細（DB上の操作検証フラグ、他のいずれかの明細でファイル操作があれば true）に
 応じて処理を分岐する。
 - 操作検証=false: ファイル操作を伴う明細が無いため、AIを介さずそのまま終了完了にする
-- 操作検証=true : sub_proc と同様の内容（処理目標と実行済ステップの記録）を指定
+- 操作検証=true : sub_do と同様の内容（処理目標と実行済ステップの記録）を指定
   プロジェクトフォルダ・指定 AI へ渡し、最終検証と結論の task_check_okng 報告を依頼する。
   AI が報告せずに戻ってきた場合は、明細を強制的にエラーで確定する。
 ローカルの temp/input・temp/output JSON には依存せず、タスクID と SEQ だけで完結する。
@@ -50,7 +50,7 @@ _LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({})
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
-# 終了明細（最終検証）のタイムアウト。sub_proc.py と同じ計算で、終了明細の 予測分数 から求める。
+# 終了明細（最終検証）のタイムアウト。sub_do.py と同じ計算で、終了明細の 予測分数 から求める。
 # 同期元: tasks_watcher.py の 明細タイムアウト倍率 / 明細最低タイムアウト分。
 # 渡さないと aidiy_code_agents 側の既定値（30分）が使われ、監視側の打ち切りと食い違う。
 CODEタイムアウト倍率 = 2
@@ -60,7 +60,7 @@ CODE実行HTTP余裕秒 = 300
 
 
 def CODE実行タイムアウト秒(予測分数) -> int:
-    """明細の予測分数（分）から code_agents へ渡すタイムアウト秒を求める（sub_proc.py と同じ規則）。"""
+    """明細の予測分数（分）から code_agents へ渡すタイムアウト秒を求める（sub_do.py と同じ規則）。"""
     try:
         分 = int(str(予測分数).strip())
     except (TypeError, ValueError):
@@ -71,7 +71,7 @@ def CODE実行タイムアウト秒(予測分数) -> int:
 
 タスクID = ""
 明細SEQ = 0
-ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_terminate.log")
+ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_end.log")
 
 
 def _標準出力をUTF8化() -> None:
@@ -257,7 +257,7 @@ def main() -> int:
     global タスクID, 明細SEQ, ログパス
     try:
         if len(sys.argv) < 3:
-            raise ValueError("使い方: python sub_terminate.py <タスクID> <SEQ>")
+            raise ValueError("使い方: python sub_end.py <タスクID> <SEQ>")
         タスクID = str(sys.argv[1]).strip()
         明細SEQ = int(sys.argv[2])
         if not タスクID:

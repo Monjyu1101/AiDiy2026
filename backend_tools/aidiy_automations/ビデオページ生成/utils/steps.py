@@ -384,23 +384,42 @@ def _ensure_vue_menu_card(
 ) -> str:
     """Xビデオ.vue に URL const とメニューカードを 1 件追加する。戻り値は状態文字列。"""
     const_name = _vue_const_name(folder_name)
-    page_url = f"{url_segment}/{folder_name}/index.html"
+    page_path = f"{url_segment}/{folder_name}/index.html"
+    # 完成後のメニュー導線は音声つきループ再生が要件。既存カードについても、
+    # 以前の自動化が作ったクエリなし URL を再実行時に補正できるようにする。
+    page_url = f"{page_path}?auto=loop"
+    expected_const = f"const {const_name} = `${{baseUrl}}{page_url}`;"
 
     with open(vue_path, encoding="utf-8") as f:
         lines = f.read().split("\n")
 
-    if any(page_url in ln for ln in lines):
-        return "既存"
+    const_idx = next(
+        (i for i, ln in enumerate(lines) if ln.startswith(f"const {const_name} = ")),
+        None,
+    )
+    card_exists = any(f':href="{const_name}"' in ln for ln in lines)
+    const_updated = False
+    if const_idx is not None:
+        if lines[const_idx] != expected_const:
+            lines[const_idx] = expected_const
+            const_updated = True
+        if card_exists:
+            if const_updated:
+                with open(vue_path, "w", encoding="utf-8", newline="\n") as f:
+                    f.write("\n".join(lines))
+                return "更新（音声つきループ）"
+            return "既存"
 
     # 1) <script setup> の URL 定義群の末尾へ const を追加する
-    const_marker = "${baseUrl}"
-    const_idx = None
-    for i, ln in enumerate(lines):
-        if ln.startswith("const ") and const_marker in ln and ln.rstrip().endswith(";"):
-            const_idx = i
     if const_idx is None:
-        return "失敗（URL const の定義位置が見つかりません）"
-    lines.insert(const_idx + 1, f"const {const_name} = `${{baseUrl}}{page_url}`;")
+        const_marker = "${baseUrl}"
+        insert_idx = None
+        for i, ln in enumerate(lines):
+            if ln.startswith("const ") and const_marker in ln and ln.rstrip().endswith(";"):
+                insert_idx = i
+        if insert_idx is None:
+            return "失敗（URL const の定義位置が見つかりません）"
+        lines.insert(insert_idx + 1, expected_const)
 
     # 2) folder_name に合うセクションの menu-row 末尾へカードを追加する
     section_label = _VUE_SECTION_RULES[-1][1]
@@ -461,6 +480,7 @@ async def step_add_routing(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
     vue_path, router_path, url_segment = _routing_target_paths(ctx)
     alias_path = f"/{url_segment}/{folder_name}"
     page_url = f"{url_segment}/{folder_name}/index.html"
+    menu_page_url = f"{page_url}?auto=loop"
     const_name = _vue_const_name(folder_name)
 
     step_summary = (
@@ -501,7 +521,7 @@ async def step_add_routing(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
         f"  1. {os.path.basename(router_path)} に次のルートがあること\n"
         f"       createStaticAliasRoute('{alias_path}', '{page_url}', '{url_segment}')\n"
         f"  2. {os.path.basename(vue_path)} に const {const_name} があり、\n"
-        f"     その値が `${{baseUrl}}{page_url}` になっていること\n"
+        f"     その値が `${{baseUrl}}{menu_page_url}` になっていること\n"
         f"  3. 追加されたメニューカードが :href=\"{const_name}\" を参照していること\n\n"
         "【直してよいこと】メニューカードの文言だけです\n"
         "  - menu-card-title の見出し（今は下書きの機械生成です）\n"
@@ -531,7 +551,10 @@ async def step_add_routing(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
 
         ok1 = check(f"ルート登録: {alias_path}", f"'{alias_path}'" in router_text)
         ok2 = check(f"リダイレクト先: {page_url}", f"'{page_url}'" in router_text)
-        ok3 = check(f"メニュー URL const: {const_name}", f"const {const_name}" in vue_text)
+        ok3 = check(
+            f"メニュー URL const（音声つきループ）: {const_name}",
+            f"const {const_name} = `${{baseUrl}}{menu_page_url}`;" in vue_text,
+        )
         ok4 = check(f"メニューカード参照: {const_name}", f':href="{const_name}"' in vue_text)
         # カードを差し込んだあとにタグの数が合っているかだけ見る（簡易構文チェック）
         ok5 = check(

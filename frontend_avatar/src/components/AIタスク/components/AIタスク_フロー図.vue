@@ -53,6 +53,25 @@ function 所要重み(row: Record<string, any>): number {
   return Number.isFinite(分) && 分 > 0 ? 分 : 1;
 }
 
+// 先行SEQ の 1 要素は `5`（通常のエッジ）か `5=Y` `5=N`（if 明細の判定値で選ばれるエッジ）。
+// 同期元: backend_taskteam/task_proc/tasks_db.py の 先行SEQ解析。
+interface 先行エッジ {
+  先行SEQ: number;
+  条件: string;
+}
+
+function 先行SEQ解析(先行SEQ: any): 先行エッジ[] {
+  return String(先行SEQ || '')
+    .split(',')
+    .map((要素) => 要素.trim().toUpperCase())
+    .filter((要素) => 要素 !== '')
+    .map((要素) => {
+      const m = /^(\d+)(?:=([YN]))?$/.exec(要素);
+      return m ? { 先行SEQ: Number(m[1]), 条件: m[2] || '' } : null;
+    })
+    .filter((e): e is 先行エッジ => e !== null);
+}
+
 // クリティカルパス（最長依存経路）を求める
 function クリティカルパス計算(rows: Record<string, any>[]): パス結果 {
   const dist: Record<number, number> = {};
@@ -61,10 +80,9 @@ function クリティカルパス計算(rows: Record<string, any>[]): パス結�
 
   for (const row of sorted) {
     const seq = Number(row.明細SEQ);
-    const preds = String(row.先行SEQ || '')
-      .split(',')
-      .map((s) => Number(s.trim()))
-      .filter((n) => !Number.isNaN(n) && n >= 0 && dist[n] !== undefined);
+    const preds = 先行SEQ解析(row.先行SEQ)
+      .map((e) => e.先行SEQ)
+      .filter((n) => dist[n] !== undefined);
     let base = 0;
     let bestPred: number | null = null;
     for (const p of preds) {
@@ -81,9 +99,8 @@ function クリティカルパス計算(rows: Record<string, any>[]): パス結�
   // 後続を持たない工程のうち、最長のものを終点とする
   const hasSuccessor = new Set<number>();
   for (const row of sorted) {
-    for (const s of String(row.先行SEQ || '').split(',')) {
-      const n = Number(s.trim());
-      if (!Number.isNaN(n) && n > 0) hasSuccessor.add(n);
+    for (const e of 先行SEQ解析(row.先行SEQ)) {
+      if (e.先行SEQ > 0) hasSuccessor.add(e.先行SEQ);
     }
   }
   let goal: number | null = null;
@@ -135,16 +152,22 @@ function マーメイド生成(rows: Record<string, any>[], direction: string): 
   const lines: string[] = [`flowchart ${direction}`];
 
   const sorted = [...rows].sort((a, b) => Number(a.明細SEQ) - Number(b.明細SEQ));
-  const predsMap = new Map<number, number[]>();
+  const predsMap = new Map<number, 先行エッジ[]>();
   for (const row of sorted) {
     const seq = Number(row.明細SEQ);
-    const preds = String(row.先行SEQ || '')
-      .split(',')
-      .map((s) => Number(s.trim()))
-      .filter((n) => !Number.isNaN(n) && n >= 0 && n !== seq);
+    const preds = 先行SEQ解析(row.先行SEQ).filter((e) => e.先行SEQ !== seq);
     predsMap.set(seq, preds);
-    const タイトル = String(row.タイトル || '').replace(/["\[\]<>]/g, '');
-    if (seq === 0 || seq === 9999) {
+    const タイトル = String(row.タイトル || '').replace(/["\[\]<>{}|]/g, '');
+    // 形はタイプで決める。開始・終了は端点（横長のラウンド四角）、if は判断（両端が三角の四角）、or は合流（円）
+    const タイプ = String(row.タイプ || '');
+    if (タイプ === 'start' || タイプ === 'end' || seq === 0 || seq === 9999) {
+      lines.push(`  N${seq}(["${タイトル}"])`);
+    } else if (タイプ === 'if') {
+      // 判断は四角の両端を三角にした形（hexagon）。Mermaid の菱形 `{}` は
+      // 幅・高さとも「ラベル幅 + ラベル高」の正方形になり、他のノードと釣り合わないため使わない。
+      // hexagon は高さ=ラベル高+余白、幅=ラベル幅+両端の三角ぶん で、四角と同じくラベル比例に収まる。
+      lines.push(`  N${seq}{{"${タイトル}"}}`);
+    } else if (タイプ === 'or') {
       lines.push(`  N${seq}(("${タイトル}"))`);
     } else {
       lines.push(`  N${seq}["${タイトル}"]`);
@@ -156,9 +179,11 @@ function マーメイド生成(rows: Record<string, any>[], direction: string): 
   for (const row of sorted) {
     const seq = Number(row.明細SEQ);
     const preds = predsMap.get(seq) ?? [];
-    for (const p of preds) {
-      lines.push(`  N${p} --> N${seq}`);
-      edgeKeys.push(`${p}>${seq}`);
+    for (const e of preds) {
+      // if からのエッジは判定値をラベルにして、どちらの枝か図で分かるようにする
+      const 矢印 = e.条件 ? `-->|${e.条件}|` : '-->';
+      lines.push(`  N${e.先行SEQ} ${矢印} N${seq}`);
+      edgeKeys.push(`${e.先行SEQ}>${seq}`);
     }
   }
 
@@ -179,6 +204,8 @@ function マーメイド生成(rows: Record<string, any>[], direction: string): 
   // done/running を crit/term より後に定義して状態色を優先する
   lines.push('  classDef done fill:#d9d9d9,stroke:#9e9e9e,color:#555555;');
   lines.push('  classDef running fill:#d9f2e0,stroke:#15803d,stroke-width:2px,color:#14532d;');
+  // パス: 分岐で通らなかった枝。失敗ではないので破線＋薄いグレーにする
+  lines.push('  classDef passed fill:#efefef,stroke:#bdbdbd,stroke-dasharray:4 3,color:#9e9e9e;');
   const doneNodes = sorted
     .filter((row) => ['完了', 'エラー'].includes(String(row.状態 ?? '')))
     .map((row) => `N${Number(row.明細SEQ)}`);
@@ -190,6 +217,12 @@ function マーメイド生成(rows: Record<string, any>[], direction: string): 
   }
   if (runningNodes.length > 0) {
     lines.push(`  class ${runningNodes.join(',')} running;`);
+  }
+  const passedNodes = sorted
+    .filter((row) => String(row.状態 ?? '') === 'パス')
+    .map((row) => `N${Number(row.明細SEQ)}`);
+  if (passedNodes.length > 0) {
+    lines.push(`  class ${passedNodes.join(',')} passed;`);
   }
 
   edgeKeys.forEach((key, index) => {

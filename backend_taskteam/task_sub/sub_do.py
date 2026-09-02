@@ -10,7 +10,7 @@
 
 """タスク明細の 1 ステップ実行サブプロセス。
 
-起動監視ループが `python sub_proc.py <タスクID> <SEQ>` で起動する。
+起動監視ループが `python sub_do.py <タスクID> <SEQ>` で起動する。
 ローカルの temp/input・temp/output JSON には依存せず、タスクID と SEQ だけで完結する。
 標準ライブラリのみで動作する。
 
@@ -81,7 +81,7 @@ def CODE実行タイムアウト秒(予測分数) -> int:
 
 タスクID = ""
 明細SEQ = 0
-ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_proc.log")
+ログパス = os.path.join(BASE_DIR, "temp", "task", "sub_do.log")
 
 
 def _標準出力をUTF8化() -> None:
@@ -293,7 +293,7 @@ def main() -> int:
     global タスクID, 明細SEQ, ログパス
     try:
         if len(sys.argv) < 3:
-            raise ValueError("使い方: python sub_proc.py <タスクID> <SEQ>")
+            raise ValueError("使い方: python sub_do.py <タスクID> <SEQ>")
         タスクID = str(sys.argv[1]).strip()
         明細SEQ = int(sys.argv[2])
         if not タスクID:

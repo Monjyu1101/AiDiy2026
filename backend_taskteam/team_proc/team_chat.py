@@ -16,7 +16,7 @@ backend_tools への依存は持たず、aidiy_code_agents の HTTP API を毎�
 会話には2つのモードがある。
 - 調査モード: プロジェクトの実物を確認したうえで答えてほしい用途。
   利用者画面の会話（`/team/エージェント/会話`）と雑談の発言（sub_self_talk.py）が使う。
-  task_sub/sub_proc.py と同じく権限を既定（auto）に戻してツールを使えるようにし、
+  task_sub/sub_do.py と同じく権限を既定（auto）に戻してツールを使えるようにし、
   タイムアウトも延長する。ただしシステム指示で「読み取り調査のみ・変更禁止」を明示する。
 - 通常モード（既定）: ツール利用を禁止（code_permissions="none"）し、170秒で打ち切る。
   AI の知識と与えられた文章だけで応答する。意見の取りまとめ（sub_self_work.py）のように、
@@ -118,7 +118,7 @@ def 会話実行(
 ) -> dict:
     """ペルソナを設定した CodeAgent へ単発会話を依頼し、応答内容を返す。
 
-    調査モード=True のときは、task_sub/sub_proc.py と同じく
+    調査モード=True のときは、task_sub/sub_do.py と同じく
     code_permissions を既定（auto）に戻してツールを使えるようにし、タイムアウトも延長する。
     False のときは従来どおりツール禁止・170秒の会話専用で動く。
     """

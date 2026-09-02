@@ -233,53 +233,8 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ'
     ),
     createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260827_anthropic_model_hardware_standard_ja',
-        'Xビデオ/ニュース_20260827_anthropic_model_hardware_standard_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260825_openai_jalapeno推論チップ_ja',
-        'Xビデオ/ニュース_20260825_openai_jalapeno推論チップ_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260812_spacexai_grok4.6_ja',
-        'Xビデオ/ニュース_20260812_spacexai_grok4.6_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260827_google_gemini_omni_1.1_flash_ja',
-        'Xビデオ/ニュース_20260827_google_gemini_omni_1.1_flash_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260825_nvidia_jetson_orin_nano_2_ja',
-        'Xビデオ/ニュース_20260825_nvidia_jetson_orin_nano_2_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260821_nvidia_avo_arc_agi_3_ja',
-        'Xビデオ/ニュース_20260821_nvidia_avo_arc_agi_3_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260827_anthropic_mhs_ja',
-        'Xビデオ/ニュース_20260827_anthropic_mhs_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260826_gemini_live音声生産性_ja',
-        'Xビデオ/ニュース_20260826_gemini_live音声生産性_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260827_gemini_omni_flash_ja',
-        'Xビデオ/ニュース_20260827_gemini_omni_flash_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260709_chatgpt_work_ja',
-        'Xビデオ/ニュース_20260709_chatgpt_work_ja/index.html',
+        '/Xビデオ/ニュース_20260902_claudefablemythos_ja',
+        'Xビデオ/ニュース_20260902_claudefablemythos_ja/index.html',
         'Xビデオ'
     ),
 ]

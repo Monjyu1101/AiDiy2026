@@ -145,6 +145,8 @@ class タスク明細実行有効切替リクエスト(BaseModel):
 class タスク明細更新登録リクエスト(BaseModel):
     タスクID: str
     明細SEQ: int
+    # do（通常実行）/ if（Y・N 判定の分岐）/ or（合流点）。開始行・終了行は SEQ で確定するので無視される
+    タイプ: str = "do"
     タイトル: str
     要求内容: str = ""
     先行SEQ: str = ""
@@ -199,7 +201,7 @@ class タスク明細失敗リクエスト(BaseModel):
 class タスク明細再試行リクエスト(BaseModel):
     タスクID: str
     明細SEQ: int
-    PID: int = 0  # 再試行を継続する sub_proc.py 自身の PID（旧クライアントは省略可）
+    PID: int = 0  # 再試行を継続する sub_do.py 自身の PID（旧クライアントは省略可）
 
 
 class タスク検証OKNGリクエスト(BaseModel):
@@ -740,10 +742,12 @@ async def タスク明細更新登録(request: タスク明細更新登録リク
         return _NG("タスクIDを指定してください。")
     if not タイトル:
         return _NG("タイトルを入力してください。")
-    for seq in [s.strip() for s in 先行SEQ.split(",") if s.strip()]:
-        if not seq.isdigit():
-            return _NG("先行SEQは数値のカンマ区切りで入力してください。")
-        if int(seq) == request.明細SEQ:
+    try:
+        先行一覧 = tasks_db.先行SEQ解析(先行SEQ)
+    except ValueError:
+        return _NG("先行SEQは数値のカンマ区切りで入力してください（分岐の後続は 2=Y のように指定します）。")
+    for seq, _条件 in 先行一覧:
+        if seq == request.明細SEQ:
             return _NG("先行SEQに自分自身は指定できません。")
     try:
         現行 = tasks_db.タスク明細取得(タスクID, request.明細SEQ)
@@ -767,6 +771,7 @@ async def タスク明細更新登録(request: タスク明細更新登録リク
             request.操作検証,
             request.実行有効,
             状態,
+            request.タイプ,
         )
         if not item:
             return _NG(f"タスク明細 {タスクID} SEQ={request.明細SEQ} が見つかりません。")
@@ -862,7 +867,7 @@ async def タスク明細開始完了(request: タスク明細開始完了リク
 
 @router.post("/タスク明細/終了完了", tags=["タスク明細"])
 async def タスク明細終了完了(request: タスク明細終了完了リクエスト) -> dict:
-    """終了明細を完了し、AIタスク要求を完了にする（sub_terminate.py 用）。"""
+    """終了明細を完了し、AIタスク要求を完了にする（sub_end.py 用）。"""
     try:
         タスクID = request.タスクID.strip()
         if not タスクID:
@@ -890,7 +895,7 @@ async def タスク明細失敗(request: タスク明細失敗リクエスト) -
 
 @router.post("/タスク明細/再試行", tags=["タスク明細"])
 async def タスク明細再試行(request: タスク明細再試行リクエスト) -> dict:
-    """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す（sub_proc.py 用）。
+    """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す（sub_do.py 用）。
 
     予測分数は再試行用に引き上げて書き換える（tasks_db.再試行予測分数）。
     呼び出し側はこの応答の 予測分数 を使って次の実行タイムアウトを取り直す。

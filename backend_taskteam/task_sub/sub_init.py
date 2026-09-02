@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import traceback
 import urllib.request
@@ -123,10 +124,13 @@ def JSON形式サンプル(利用者ID: str, タスクID: str, プロジェク�
   "要求内容": "入力された要求内容を整理した文章",
   "マーメイド記号": "TD",
   "明細": [
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 0, "タイトル": "開始", "要求内容": "", "先行SEQ": "", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 1, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "0", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 2, "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "1", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true, "予測分数": 10}},
-    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 9999, "タイトル": "終了", "要求内容": "", "先行SEQ": "2", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true, "予測分数": 10}}
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 0, "タイプ": "start", "タイトル": "開始", "要求内容": "", "先行SEQ": "", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 1, "タイプ": "do", "タイトル": "明細タイトル", "要求内容": "明細要求内容", "先行SEQ": "0", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 2, "タイプ": "if", "タイトル": "分岐条件のタイトル", "要求内容": "Y か N で判定させたい条件", "先行SEQ": "1", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 3, "タイプ": "do", "タイトル": "Yのときの明細タイトル", "要求内容": "Yのときの明細要求内容", "先行SEQ": "2=Y", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true, "予測分数": 10}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 4, "タイプ": "do", "タイトル": "Nのときの明細タイトル", "要求内容": "Nのときの明細要求内容", "先行SEQ": "2=N", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 5}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 5, "タイプ": "or", "タイトル": "合流", "要求内容": "", "先行SEQ": "3,4", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": false, "予測分数": 1}},
+    {{"利用者ID": "{利用者ID}", "タスクID": "{タスクID}", "明細SEQ": 9999, "タイプ": "end", "タイトル": "終了", "要求内容": "", "先行SEQ": "5", "TASK_AI_NAME": "{task_ai_name}", "TASK_AI_MODEL_do": "{task_ai_model}", "操作検証": true, "予測分数": 10}}
   ]
 }}"""
 
@@ -149,6 +153,44 @@ def プロンプト生成_JSON保存(分解結果: str, 出力JSONパス: str, �
         "JSON形式サンプル": JSON形式サンプル(利用者ID, タスクID, プロジェクト, task_ai_name, task_ai_model),
         "分解結果": 分解結果,
     })
+
+
+# 明細タイプ。開始行(0)=start / 終了行(9999)=end は SEQ で確定し、その間は do / if / or から選ぶ。
+# 同期元: tasks_db.py。sub_*.py は tasks_db を直接 import しない疎結合方針のため実装を持つ。
+明細タイプ指定可能値 = ("do", "if", "or")
+分岐条件値 = ("Y", "N")
+# 先行SEQ の 1 要素。`5` は通常のエッジ、`5=Y` `5=N` は if 明細 5 の判定値で選ばれるエッジ。
+_先行SEQ要素パターン = re.compile(r"^(\d+)(?:=([YN]))?$")
+
+
+def 明細タイプ(明細SEQ: int, 指定=None) -> str:
+    """明細タイプを決める（0=start / 9999=end / それ以外は指定の do・if・or、既定 do）。
+
+    tasks_db.明細タイプ() と同じ規則。
+    """
+    if 明細SEQ == 0:
+        return "start"
+    if 明細SEQ == 9999:
+        return "end"
+    値 = str(指定 or "").strip().lower()
+    return 値 if 値 in 明細タイプ指定可能値 else "do"
+
+
+def 先行SEQ解析(先行SEQ) -> list[tuple[int, str]]:
+    """先行SEQ 文字列を [(先行の明細SEQ, 分岐条件)] へ分解する（tasks_db.先行SEQ解析 と同じ規則）。
+
+    分岐条件は "" / "Y" / "N"。書式が不正なときは ValueError を送出する。
+    """
+    結果: list[tuple[int, str]] = []
+    for 要素 in str(先行SEQ or "").split(","):
+        要素 = 要素.strip().upper()
+        if not 要素:
+            continue
+        m = _先行SEQ要素パターン.match(要素)
+        if not m:
+            raise ValueError(f"先行SEQの書式が不正です: {要素}")
+        結果.append((int(m.group(1)), m.group(2) or ""))
+    return 結果
 
 
 def _真偽値(値) -> bool:
@@ -198,6 +240,8 @@ def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model
         n = int(行["明細SEQ"])
         行リスト.append({
             "明細SEQ": n,
+            # 開始行・終了行は SEQ で確定し、その間は AI 指定の do / if / or を採用する
+            "タイプ": 明細タイプ(n, 行.get("タイプ")),
             "タイトル": str(行["タイトル"]).strip(),
             "要求内容": str(行["要求内容"]).strip(),
             "先行SEQ": str(行["先行SEQ"]).strip(),
@@ -217,6 +261,7 @@ def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model
         raise ValueError("開始行（明細SEQ=0）がありません")
     if 9999 not in 明細SEQ集合:
         raise ValueError("終了行（明細SEQ=9999）がありません")
+    タイプ表 = {行["明細SEQ"]: 行["タイプ"] for 行 in 行リスト}
     for 行 in 行リスト:
         if 行["明細SEQ"] == 0:
             if 行["タイトル"] != "開始" or 行["先行SEQ"]:
@@ -230,12 +275,35 @@ def JSON検証(データ: dict, default_task_ai_name: str, default_task_ai_model
             raise ValueError(f"明細タイトルが空です: {行!r}")
         elif not 行["先行SEQ"]:
             raise ValueError(f"実作業明細の先行SEQが空です: {行!r}")
-        for p in 行["先行SEQ"].split(","):
-            p = p.strip()
-            if p and (not p.isdigit() or int(p) not in 明細SEQ集合):
+        for p, 条件 in 先行SEQ解析(行["先行SEQ"]):
+            if p not in 明細SEQ集合:
                 raise ValueError(f"先行SEQ '{行['先行SEQ']}' が明細SEQと対応していません")
-            if p and int(p) == 行["明細SEQ"]:
+            if p == 行["明細SEQ"]:
                 raise ValueError(f"先行SEQに自分自身が含まれています: {行!r}")
+            # 判定値を付けてよいのは先行が if 明細のときだけ。逆に if の後続は必ず付ける
+            先行タイプ = タイプ表.get(p, "do")
+            if 条件 and 先行タイプ != "if":
+                raise ValueError(
+                    f"先行SEQ '{p}={条件}' の明細SEQ={p} はタイプ if ではありません: {行!r}"
+                )
+            if 先行タイプ == "if" and not 条件:
+                raise ValueError(
+                    f"if 明細SEQ={p} を先行に持つ明細は '{p}=Y' か '{p}=N' で指定してください: {行!r}"
+                )
+
+    # if 明細は Y・N の両方に後続が要る（片方しか無いと、その判定になった時点で先が続かない）
+    for 行 in 行リスト:
+        if 行["タイプ"] != "if":
+            continue
+        for 判定 in 分岐条件値:
+            if not any(
+                (行["明細SEQ"], 判定) in 先行SEQ解析(他["先行SEQ"])
+                for 他 in 行リスト
+            ):
+                raise ValueError(
+                    f"if 明細SEQ={行['明細SEQ']} の {判定} 側の後続明細がありません"
+                    f"（先行SEQ に '{行['明細SEQ']}={判定}' を持つ明細が必要です）"
+                )
 
     # 操作検証: 開始行(0)は固定でfalse、終了行(9999)は実作業明細に1件でもtrueがあればtrue
     終了操作検証 = any(行["操作検証"] for 行 in 行リスト if 行["明細SEQ"] not in (0, 9999))

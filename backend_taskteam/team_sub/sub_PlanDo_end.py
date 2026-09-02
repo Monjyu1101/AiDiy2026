@@ -16,7 +16,7 @@ team_watcher.py の毎分確認が、現行の赤ネオン判定と同じ完了�
 
 終了時点のDBにある自動作業設定がオンなら、チーム作業とAチーム会話をクリアして次の作業の
 協議へ戻す。オフなら作業ループをオフにし、同じ完了作業の再実行を止める。
-`python sub_PlanDo_terminate.py <入力JSONパス>` で起動する。
+`python sub_PlanDo_end.py <入力JSONパス>` で起動する。
 """
 
 from __future__ import annotations
@@ -34,11 +34,11 @@ from team_proc import team_goal_db
 
 
 def main() -> int:
-    setup_logging("sub_PlanDo_terminate")
-    logger = get_logger("team_sub_PlanDo_terminate")
+    setup_logging("sub_PlanDo_end")
+    logger = get_logger("team_sub_PlanDo_end")
     try:
         if len(sys.argv) < 2:
-            raise ValueError("使い方: python sub_PlanDo_terminate.py <temp/pdca/入力JSON>")
+            raise ValueError("使い方: python sub_PlanDo_end.py <temp/pdca/入力JSON>")
         入力パス = Path(sys.argv[1]).resolve()
         with 入力パス.open("r", encoding="utf-8-sig") as f:
             項目 = json.load(f)

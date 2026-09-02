@@ -35,15 +35,15 @@
 | キー | 使う処理 |
 |------|---------|
 | `TASK_AI_MODEL_plan` | Aタスクの準備＝明細分解（`task_sub/sub_init.py`）、Aチーム要員選定・経験まとめ、雑談発言 |
-| `TASK_AI_MODEL_do` | Aタスクの各ステップ実行（`task_sub/sub_proc.py`）、自己作業、要求・明細・依頼レコードの既定値 |
-| `TASK_AI_MODEL_check` | 終了時の最終確認（`task_sub/sub_terminate.py`） |
+| `TASK_AI_MODEL_do` | Aタスクの各ステップ実行（`task_sub/sub_do.py`）、自己作業、要求・明細・依頼レコードの既定値 |
+| `TASK_AI_MODEL_check` | 終了時の最終確認（`task_sub/sub_end.py`） |
 | `TEAM_AI_MODEL_plan` / `_do` / `_check` | 作業ループの段（S・P=plan / D=do / C・A=check、`team_sub/sub_SPDCA__common.py` の `段フェーズ`） |
 
 判断基準:
 
 - 共通設定（`AiDiy_key.json`）と `Aタスク要求` レコードが3種を持つ。要求側の指定が優先で、
   空なら共通設定のフェーズ別値を使う（`task_sub/sub_init.py` の `入力モデル()`、
-  `task_sub/sub_terminate.py` の `要求モデル()`）。
+  `task_sub/sub_end.py` の `要求モデル()`）。
 - `Aタスク明細` は各ステップの実行だけなので `TASK_AI_MODEL_do` 1列。本登録時に要求の `_do` が入る。
 - フェーズが1つしかない処理も、キー名でどのフェーズかを明示する。
   会話要求と雑談は `TASK_AI_MODEL_plan`、自己作業は `TASK_AI_MODEL_do`、経験まとめは依頼の `*_AI_MODEL_plan`。

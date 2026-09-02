@@ -15,7 +15,7 @@
 - 起動監視タイマー = 起動監視ループ（5秒間隔）: タスク要求を確認し、PID未設定の仮登録
   （準備開始）を見つけたら temp/input/<利用者ID>.<タスクID>.json を出力して sub_init.py を
   subprocess 起動する。起動時に準備中へ進め、PID・開始日時・実行回数を記録する。
-  実行待ちのタスク明細も同様に sub_proc.py 等を起動する（対象は AI 分解済みのタスクだけで、
+  実行待ちのタスク明細も同様に sub_do.py 等を起動する（対象は AI 分解済みのタスクだけで、
   判定は DB の明細に要求内容があるかで行う。temp のファイル有無は見ない）。
 - 状態監視タイマー = 状態監視ループ（10秒間隔、実行条件の発火判定とタイムアウト確認は
   hh:mm 変化時＝毎分1回）: 実行開始条件を確認して満たせば「待機」に戻し、進捗が止まったまま
@@ -70,8 +70,19 @@ _曜日番号 = {"月": 0, "火": 1, "水": 2, "木": 3, "金": 4, "土": 5, "�
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SUB_INITパス = os.path.join(_BASE_DIR, "task_sub", "sub_init.py")
 _SUB_STARTパス = os.path.join(_BASE_DIR, "task_sub", "sub_start.py")
-_SUB_PROCパス = os.path.join(_BASE_DIR, "task_sub", "sub_proc.py")
-_SUB_TERMINATEパス = os.path.join(_BASE_DIR, "task_sub", "sub_terminate.py")
+_SUB_DOパス = os.path.join(_BASE_DIR, "task_sub", "sub_do.py")
+_SUB_IFパス = os.path.join(_BASE_DIR, "task_sub", "sub_if.py")
+_SUB_ORパス = os.path.join(_BASE_DIR, "task_sub", "sub_or.py")
+_SUB_ENDパス = os.path.join(_BASE_DIR, "task_sub", "sub_end.py")
+
+# 明細タイプ → 起動するサブプロセス
+_タイプ別サブプロセス = {
+    "start": _SUB_STARTパス,
+    "do": _SUB_DOパス,
+    "if": _SUB_IFパス,
+    "or": _SUB_ORパス,
+    "end": _SUB_ENDパス,
+}
 # temp/input は sub_init.py へ分解の入力値を渡すためだけに使う。
 # 分解結果の temp/output/<タスクID>.json は sub_init.py が本登録に使うもので、
 # 監視側は参照しない（実行可否は DB の明細だけで判定する）。
@@ -222,12 +233,10 @@ def _明細実行開始(行: dict, logger: logging.Logger) -> None:
     タスクID = str(行["タスクID"])
     明細SEQ = int(行["明細SEQ"])
     タイトル = str(行.get("タイトル", ""))
-    if タイトル == "開始":
-        サブプロセスパス = _SUB_STARTパス
-    elif タイトル == "終了":
-        サブプロセスパス = _SUB_TERMINATEパス
-    else:
-        サブプロセスパス = _SUB_PROCパス
+    # 起動先は明細タイプで決める。タイトルは表示名なので判定に使わない
+    # （if / or はタイトルが自由なため、文字列一致では分岐できない）
+    タイプ = tasks_db.明細タイプ(明細SEQ, 行.get("タイプ"))
+    サブプロセスパス = _タイプ別サブプロセス[タイプ]
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     proc = subprocess.Popen(
         [sys.executable, サブプロセスパス, タスクID, str(明細SEQ)],
@@ -238,7 +247,10 @@ def _明細実行開始(行: dict, logger: logging.Logger) -> None:
         env=_サブプロセス環境(),
     )
     tasks_db.明細実行開始記録(タスクID, 明細SEQ, proc.pid)
-    logger.info(f"ステップ実行を開始しました: {タスクID} SEQ={明細SEQ} タイトル={タイトル} PID={proc.pid}")
+    logger.info(
+        f"ステップ実行を開始しました: {タスクID} SEQ={明細SEQ} タイプ={タイプ} "
+        f"タイトル={タイトル} PID={proc.pid}"
+    )
 
 
 def _軽量並行明細か(行: dict) -> bool:
@@ -650,7 +662,15 @@ def _起動監視1回(logger: logging.Logger) -> None:
             except Exception:
                 logger.exception(f"失敗登録もエラー: {利用者ID}/{タスクID}")
 
-    # --- 未実行のタスク明細（先行完了済み）→ sub_proc.py で 1 ステップ実行 ---
+    # --- if 分岐で選ばれなかった枝を パス にして、待機のまま滞留させない ---
+    try:
+        パス件数 = tasks_db.明細パス伝播()
+        if パス件数:
+            logger.info(f"分岐条件により {パス件数} 件の明細をパスにしました")
+    except Exception:
+        logger.exception("明細パス伝播でエラーが発生しました")
+
+    # --- 未実行のタスク明細（先行完了済み）→ タイプ別サブプロセスで 1 ステップ実行 ---
     # 先行SEQ を満たした明細は、同一タスク内でも 明細並行上限 まで同時に起動する
     # （フロー図の分岐どおりに並行実行するため）。タスクをまたぐ並行は従来どおり制限しない。
     # 通知音などの軽量明細は code agent を使わないので、上限の対象外として常に同時起動する。

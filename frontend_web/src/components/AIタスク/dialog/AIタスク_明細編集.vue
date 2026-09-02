@@ -11,6 +11,9 @@ const props = defineProps({
 });
 const emit = defineEmits(['close', 'registered']);
 
+const 入力タイプ = ref('do');
+// 開始行(0)・終了行(9999)のタイプは明細SEQで確定するので選ばせない
+const タイプ選択肢 = ['do', 'if', 'or'];
 const 入力タイトル = ref('');
 const 入力要求内容 = ref('');
 const 入力先行SEQ = ref('');
@@ -21,7 +24,7 @@ const 入力実行有効 = ref(true);
 const 入力状態 = ref('待機');
 const 状態選択肢 = ['待機', '中止'];
 // 状態欄には遷移し得る全状態を表示し、選択可能なのは 状態選択肢 の2つだけに絞る
-const 状態表示リスト = ['待機', '実行中', 'エラー', '完了', '中止'];
+const 状態表示リスト = ['待機', '実行中', 'エラー', '完了', '中止', 'パス'];
 const 登録中 = ref(false);
 const TASK_CODE_MODELS既定 = {
   claude_sdk: { auto: 'auto' },
@@ -43,6 +46,12 @@ const taskModelOptions = computed(() => {
 
 const タスクID表示 = computed(() => String(props.編集明細?.タスクID ?? ''));
 const 明細SEQ表示 = computed(() => String(props.編集明細?.明細SEQ ?? ''));
+// 開始行(0)は start、終了行(9999)は end で固定。その間だけ do / if / or を選べる
+const タイプ固定 = computed(() => {
+  const seq = Number(props.編集明細?.明細SEQ ?? -1);
+  return seq === 0 || seq === 9999;
+});
+const タイプ表示 = computed(() => String(props.編集明細?.タイプ ?? ''));
 // 押せるのは 状態選択肢 と更新前の状態。更新前の状態を選ぶと状態を変えずに内容だけ更新する
 const 現状態 = computed(() => String(props.編集明細?.状態 ?? ''));
 const 状態選択可 = (状態: string) => 状態選択肢.includes(状態) || 状態 === 現状態.value;
@@ -75,6 +84,7 @@ async function モデル選択肢読込() {
 watch(() => props.isOpen, (open) => {
   if (!open) return;
   const 編集 = props.編集明細 ?? {};
+  入力タイプ.value = タイプ選択肢.includes(String(編集.タイプ ?? '')) ? String(編集.タイプ) : 'do';
   入力タイトル.value = String(編集.タイトル ?? '');
   入力要求内容.value = String(編集.要求内容 ?? '');
   入力先行SEQ.value = String(編集.先行SEQ ?? '');
@@ -105,6 +115,7 @@ const 登録 = async () => {
     const res = await apiClient.post('/task/タスク明細/更新登録', {
       タスクID: タスクID表示.value,
       明細SEQ: Number(props.編集明細?.明細SEQ ?? 0),
+      タイプ: 入力タイプ.value,
       タイトル,
       要求内容: 入力要求内容.value.trim(),
       先行SEQ: 入力先行SEQ.value.trim(),
@@ -149,6 +160,15 @@ const 登録 = async () => {
             <span class="value-text">{{ 明細SEQ表示 }}</span>
           </div>
         </div>
+        <div class="detail-row" :class="{ 'one-line-row': !タイプ固定 }">
+          <div class="detail-label">タイプ</div>
+          <div class="detail-value">
+            <span v-if="タイプ固定" class="value-text">{{ タイプ表示 }}</span>
+            <select v-else v-model="入力タイプ" class="detail-select">
+              <option v-for="t in タイプ選択肢" :key="t" :value="t">{{ t }}</option>
+            </select>
+          </div>
+        </div>
         <div class="detail-row">
           <div class="detail-label">タイトル<span class="required-mark">*</span></div>
           <div class="detail-value">
@@ -178,7 +198,7 @@ const 登録 = async () => {
               v-model.trim="入力先行SEQ"
               type="text"
               class="detail-input"
-              placeholder="0 または 1,2"
+              placeholder="0 または 1,2（分岐の後続は 2=Y / 2=N）"
             />
           </div>
         </div>

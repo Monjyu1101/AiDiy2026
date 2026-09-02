@@ -71,7 +71,7 @@ _SUB_PDCAパス = {
     },
 }
 _作業入力DIR = _BASE_DIR / "temp" / "team" / "pdca"
-_SUB_TERMINATEパス = _BASE_DIR / "team_sub" / "sub_PlanDo_terminate.py"
+_SUB_ENDパス = _BASE_DIR / "team_sub" / "sub_PlanDo_end.py"
 _SUB_SELF_TALKパス = _BASE_DIR / "team_sub" / "sub_self_talk.py"
 _SUB_SELF_WORKパス = _BASE_DIR / "team_sub" / "sub_self_work.py"
 _雑談入力DIR = _BASE_DIR / "temp" / "team" / "talk"
@@ -499,7 +499,7 @@ def _終了実行開始(目標: dict, logger: logging.Logger) -> subprocess.Pope
 
         creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         proc = subprocess.Popen(
-            [sys.executable, str(_SUB_TERMINATEパス), str(入力パス)],
+            [sys.executable, str(_SUB_ENDパス), str(入力パス)],
             cwd=str(_BASE_DIR),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

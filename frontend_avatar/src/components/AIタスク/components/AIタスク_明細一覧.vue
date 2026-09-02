@@ -36,6 +36,7 @@ const rowKey = '明細SEQ';
 
 const columns: Column[] = [
   { key: '明細SEQ', label: 'SEQ', width: '50px', sortable: false, align: 'center' },
+  { key: 'タイプ', label: 'タイプ', width: '60px', sortable: false, align: 'center' },
   { key: 'タイトル', label: 'タイトル', width: '150px', sortable: false },
   { key: '先行SEQ', label: '先行SEQ', width: '80px', sortable: false, align: 'center' },
   { key: '操作検証', label: '操作検証', width: '60px', sortable: false, align: 'center' },
@@ -63,12 +64,24 @@ const goToPage = (page: number) => {
   currentPage.value = page;
 };
 
+// タイプセルのクラス: start / end / if / or を色で区別する（do は既定色）
+const タイプクラス = (value: any) => {
+  const タイプ = String(value ?? '');
+  if (タイプ === 'start') return 'type-start';
+  if (タイプ === 'end') return 'type-end';
+  if (タイプ === 'if') return 'type-if';
+  if (タイプ === 'or') return 'type-or';
+  return '';
+};
+
 // 状態セルのクラス: 実行中は緑ブリンク（行は薄緑）、完了/エラー/中止は行を灰色にするマーカー
 // エラー/中止は状態セルの文字を赤にする
 const 状態クラス = (value: any) => {
   const 状態 = String(value ?? '');
   if (状態 === '実行中') return 'status-running';
   if (状態 === 'エラー' || 状態 === '中止') return 'status-done status-alert';
+  // パスは if 分岐で通らなかっただけなので、失敗の赤ではなく淡色にする
+  if (状態 === 'パス') return 'status-done status-passed';
   if (状態 === '完了') return 'status-done';
   return '';
 };
@@ -252,6 +265,9 @@ onBeforeUnmount(() => {
               @click.prevent="修正ダイアログ表示(row)"
             >{{ value ?? '' }}</a>
           </template>
+          <template v-else-if="column.key === 'タイプ'">
+            <span :class="タイプクラス(value)">{{ value ?? '' }}</span>
+          </template>
           <template v-else-if="column.key === '操作検証'">
             <span class="check-flag">
               <qBooleanCheckbox :checked="Boolean(value)" ariaLabel="操作検証状態" />
@@ -405,6 +421,33 @@ onBeforeUnmount(() => {
 /* エラー/中止: 状態セルの文字は赤 */
 .panel-body :deep(.status-alert) {
   color: #dc2626;
+  font-weight: 700;
+}
+
+/* タイプ: start / end / if / or に色を付け、do は既定色のままにする */
+.panel-body :deep(.type-start) {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.panel-body :deep(.type-end) {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.panel-body :deep(.type-if) {
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+.panel-body :deep(.type-or) {
+  color: #0e7490;
+  font-weight: 700;
+}
+
+/* パス: 分岐で通らなかった枝。エラーの赤とは分けて、通らなかったことだけ示す */
+.panel-body :deep(.status-passed) {
+  color: #9e9e9e;
   font-weight: 700;
 }
 

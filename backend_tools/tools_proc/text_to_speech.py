@@ -239,6 +239,8 @@ class TextToSpeech:
         (["Knowledge", "knowledge"], "ナレッジ"),
         ("SQLite", "エスキューライト"),
         ("Claude", "クロード"),
+        (["Mythos", "mythos", "MYTHOS"], "ミソス"),
+        (["Fable", "fable", "FABLE"], "フェーブル"),
         ("Copilot", "コパイロット"),
         ("Codex", "コーデックス"),
         ("Gemini", "ジェミニ"),

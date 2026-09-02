@@ -553,6 +553,10 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
         step_name=step_name, step_summary=step_summary,
         target_paths=[scenario_path, index_path, images_dir, gen_img_py, md_path],
         validate=validate, verify_timeout_sec=300, attempt=attempt,
+        # 中間確認本体で内容確認・必要箇所の修正を済ませ、直後に存在・画像件数・
+        # 進捗を機械検証する。検証エージェントを重ねると TaskTeam の20分上限を
+        # 超えるため、このステップでは二重実行しない。
+        skip_agent_verify=True,
     )
     if ok:
         return True
