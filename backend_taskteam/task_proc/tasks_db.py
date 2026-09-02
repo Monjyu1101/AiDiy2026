@@ -1332,10 +1332,12 @@ def 再試行予測分数(予測分数, 未見積り分: int = 8, 倍率: float 
     return max(分, min(上限分, math.ceil(分 * 倍率)))
 
 
-def 明細再試行(タスクID: str, 明細SEQ: int) -> dict:
+def 明細再試行(タスクID: str, 明細SEQ: int, pid: int = 0) -> dict:
     """自動リカバリーの再試行前に、明細とタスク要求の状態を実行中へ戻す（sub_proc.py 用）。
 
     操作検証NG・未報告により明細とタスク要求がエラーになっていても、再試行のため実行中に戻す。
+    明細失敗() は実行有効と PID をクリアするため、ここでは両方を必ず復元する。
+    復元しないと、この試行が成功しても要求の実行有効=0が残り、後続明細が起動せず停止する。
 
     あわせて予測分数を 再試行予測分数 で引き上げて書き換える。書き換えた値は
     sub_proc.py が code_agents へ渡す実行タイムアウトと、監視側の打ち切り判定
@@ -1354,18 +1356,25 @@ def 明細再試行(タスクID: str, 明細SEQ: int) -> dict:
     try:
         now = _現在日時()
         新予測分数 = 再試行予測分数(_明細予測分数(conn, タスクID, 明細SEQ))
+        PID = str(pid) if int(pid or 0) > 0 else ""
         conn.execute(
-            f"UPDATE {AIタスク明細テーブル} SET 状態 = '実行中', 開始日時 = ?, 終了日時 = '', "
-            "応答内容 = '', 予測分数 = ?, 更新日時 = ? "
+            f"UPDATE {AIタスク明細テーブル} SET 状態 = '実行中', 実行有効 = 1, PID = ?, "
+            "開始日時 = ?, 終了日時 = '', 応答内容 = '', 予測分数 = ?, 更新日時 = ? "
             "WHERE タスクID = ? AND 明細SEQ = ?",
-            [now, 新予測分数, now, タスクID, 明細SEQ],
+            [PID, now, 新予測分数, now, タスクID, 明細SEQ],
         )
         conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET 状態 = '実行中', 更新日時 = ? "
-            "WHERE タスクID = ? AND 状態 = 'エラー'",
+            f"UPDATE {AIタスク要求テーブル} SET 状態 = '実行中', 実行有効 = 1, "
+            "終了日時 = '', 更新日時 = ? WHERE タスクID = ? AND 状態 = 'エラー'",
             [now, タスクID],
         )
-        _Aチーム依頼反映(conn, タスクID, 状態="実行中", guard="状態 = 'エラー'")
+        _Aチーム依頼反映(
+            conn,
+            タスクID,
+            状態="実行中",
+            終了日時="",
+            guard="状態 = 'エラー'",
+        )
         conn.commit()
         return {"item": _タスク要求取得(conn, タスクID), "予測分数": 新予測分数}
     finally:
@@ -1577,6 +1586,162 @@ def タスク実行有効更新(タスクID: str, 実行有効: bool) -> dict:
 _未完了状態 = ("待機", "実行中", "準備中", "準備完了")
 
 
+def _停止診断1件(conn: sqlite3.Connection, req: sqlite3.Row, now: datetime) -> dict:
+    """1タスクの停止理由と、AI が選べる復旧方法を構造化して返す。"""
+    tid = str(req["タスクID"])
+    rows = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT 明細SEQ, タイトル, 要求内容, 先行SEQ, 状態, 実行有効, 実行回数, "
+            "予測分数, 実績分数, PID, 開始日時, 応答内容 "
+            f"FROM {AIタスク明細テーブル} WHERE タスクID = ? ORDER BY 明細SEQ",
+            [tid],
+        ).fetchall()
+    ]
+
+    進捗: dict[str, int] = {"全件": len(rows)}
+    for row in rows:
+        key = str(row["状態"]) or "不明"
+        進捗[key] = 進捗.get(key, 0) + 1
+
+    未完了 = [row for row in rows if str(row["状態"]) in _未完了状態]
+    エラー明細 = [row for row in rows if str(row["状態"]) == "エラー"]
+    無効明細 = [row for row in 未完了 if not int(row["実行有効"] or 0)]
+    実行中明細 = [row for row in rows if str(row["状態"]) == "実行中"]
+    定義済明細数 = sum(1 for row in rows if str(row.get("要求内容") or "").strip())
+
+    超過明細: list[dict] = []
+    for row in 実行中明細:
+        開始 = str(row["開始日時"] or "").strip()
+        if not 開始:
+            continue
+        try:
+            t0 = datetime.strptime(開始, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        経過分 = int((now - t0).total_seconds() // 60)
+        制限分 = 明細タイムアウト分(row["予測分数"])
+        if 経過分 >= 制限分:
+            超過明細.append({**row, "経過分": 経過分, "制限分": 制限分})
+
+    # 待機明細のうち、全先行SEQが完了したものを求める。これが1件も無く、
+    # 実行中も無い場合は、循環・欠番などのDAG不整合で自然復旧しない。
+    状態表 = {int(row["明細SEQ"]): str(row["状態"]) for row in rows}
+    実行可能明細: list[int] = []
+    for row in 未完了:
+        if str(row["状態"]) != "待機" or not int(row["実行有効"] or 0) or str(row["PID"] or ""):
+            continue
+        先行 = [p.strip() for p in str(row.get("先行SEQ") or "").split(",") if p.strip()]
+        if all(p.isdigit() and 状態表.get(int(p)) == "完了" for p in 先行):
+            実行可能明細.append(int(row["明細SEQ"]))
+
+    状態コード: list[str] = []
+    停止理由: list[str] = []
+
+    def add(code: str, message: str) -> None:
+        状態コード.append(code)
+        停止理由.append(message)
+
+    要求状態 = str(req["状態"])
+    要求有効 = int(req["実行有効"] or 0)
+    要求タイムアウト情報: dict = {}
+    if 要求状態 in ("準備中", "実行中") and not str(req["終了日時"] or ""):
+        基準文字 = max(str(req["開始日時"] or ""), str(req["更新日時"] or ""))
+        try:
+            基準日時 = datetime.strptime(基準文字, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            基準日時 = None
+        if 基準日時 is not None:
+            経過分 = int((now - 基準日時).total_seconds() // 60)
+            制限分 = 10 if 要求状態 == "準備中" else 60
+            if 経過分 >= 制限分:
+                要求タイムアウト情報 = {
+                    "状態": 要求状態,
+                    "PID": str(req["PID"] or ""),
+                    "開始日時": str(req["開始日時"] or ""),
+                    "経過分": 経過分,
+                    "制限分": 制限分,
+                }
+    if 要求状態 == "エラー":
+        add("REQUEST_ERROR", "要求がエラー")
+    if 要求タイムアウト情報:
+        add(
+            "REQUEST_TIMEOUT",
+            f"要求が無進捗のまま打ち切り時間を超えています（{要求タイムアウト情報['経過分']}分）",
+        )
+    if not 要求有効 and 未完了:
+        add("REQUEST_DISABLED", f"要求の実行有効が外れている（未完了明細 {len(未完了)} 件）")
+    if エラー明細:
+        add("DETAIL_ERROR", f"エラーの明細が {len(エラー明細)} 件")
+    if 無効明細:
+        add("DETAIL_DISABLED", f"未完了なのに実行有効が外れた明細が {len(無効明細)} 件")
+    if 超過明細:
+        add("DETAIL_TIMEOUT", f"打ち切り時間を超えた実行中明細が {len(超過明細)} 件")
+
+    停止判定対象状態 = (
+        要求状態 in ("待機", "実行中", "準備完了", "エラー")
+        or bool(要求タイムアウト情報)
+    )
+    実行対象状態 = 要求状態 in ("待機", "実行中")
+    if 停止判定対象状態 and not rows:
+        add("NO_DETAILS", "実行対象の要求に明細がありません")
+    elif 停止判定対象状態 and rows and 未完了 and 定義済明細数 == 0:
+        add("UNDEFINED_DETAILS", "AI分解済みの明細がありません（全明細の要求内容が空です）")
+    elif (
+        実行対象状態
+        and 要求有効
+        and 未完了
+        and not 実行中明細
+        and not 実行可能明細
+        and not エラー明細
+        and not 無効明細
+    ):
+        add("DAG_BLOCKED", "実行可能な明細がありません（先行SEQの循環または欠番の可能性があります）")
+
+    # 優先度は、プロセス停止が必要なタイムアウト > 再分解 > 手動修正 > 通常再開。
+    if "REQUEST_TIMEOUT" in 状態コード or "DETAIL_TIMEOUT" in 状態コード:
+        推奨操作 = "強制再開"
+    elif "NO_DETAILS" in 状態コード or "UNDEFINED_DETAILS" in 状態コード:
+        推奨操作 = "再分解"
+    elif "DAG_BLOCKED" in 状態コード:
+        推奨操作 = "手動修正"
+    elif 状態コード:
+        推奨操作 = "再開"
+    else:
+        推奨操作 = "なし"
+
+    復旧対象 = (
+        [row["明細SEQ"] for row in エラー明細]
+        + [row["明細SEQ"] for row in 無効明細]
+        + [row["明細SEQ"] for row in 超過明細]
+    )
+    if not 要求有効:
+        復旧対象.extend(row["明細SEQ"] for row in 未完了)
+    return {
+        "タスクID": tid,
+        "利用者ID": str(req["利用者ID"] or ""),
+        "タイトル": str(req["タイトル"] or ""),
+        "要求状態": 要求状態,
+        "要求実行有効": 要求有効,
+        "停止": bool(状態コード),
+        "状態コード": 状態コード,
+        "停止理由": 停止理由,
+        "推奨操作": 推奨操作,
+        "復旧可能": 推奨操作 in ("再開", "再分解", "強制再開"),
+        "通常復旧可能": 推奨操作 in ("再開", "再分解"),
+        "強制復旧必要": 推奨操作 == "強制再開",
+        "進捗": 進捗,
+        "定義済明細数": 定義済明細数,
+        "実行可能SEQ": 実行可能明細,
+        "エラー明細": エラー明細,
+        "実行有効オフ明細": 無効明細,
+        "タイムアウト超過明細": 超過明細,
+        "タイムアウト超過要求": 要求タイムアウト情報,
+        "再開SEQ": min(復旧対象) if 復旧対象 else None,
+        "最終更新日時": str(req["更新日時"] or ""),
+    }
+
+
 def タスク停止検査(タスクID: str = "", 停止のみ: bool = False) -> list[dict]:
     """タスクが止まっていないかを読み取り専用で判定する。
 
@@ -1587,10 +1752,13 @@ def タスク停止検査(タスクID: str = "", 停止のみ: bool = False) -> 
       3. エラーの明細がある
       4. 未完了なのに 実行有効 が外れている明細がある
       5. 実行中のまま打ち切り時間（明細タイムアウト分）を超えている明細がある
+      6. 準備中・実行中の要求が無進捗で打ち切り時間を超えている
+      7. 実行対象なのにAI分解済み明細が無い
+      8. 先行SEQの循環・欠番で実行可能な明細が無い
 
-    5 は監視ループが拾う前でも検出できるようにしてある。1〜4 は タスク停止復旧 で
-    復旧できる。5 は実行中扱いのままなので、停止復旧の前に監視ループの打ち切りを
-    待つか 強制=True を使う必要がある（判定材料として 経過分 を返す）。
+    エラー・無効化は通常の再開、明細なし・未定義は再分解で復旧できる。
+    タイムアウトは実行プロセスを止めるため 強制=True が必要。DAG不整合は
+    依存関係を自動書換えせず、推奨操作=手動修正として返す。
 
     Args:
         タスクID: 指定するとその 1 件だけ。空なら全タスク。
@@ -1604,85 +1772,20 @@ def タスク停止検査(タスクID: str = "", 停止のみ: bool = False) -> 
     try:
         if タスクID:
             reqs = conn.execute(
-                f"SELECT タスクID, 利用者ID, タイトル, 状態, 実行有効, 更新日時 "
+                f"SELECT タスクID, 利用者ID, タイトル, 状態, 実行有効, PID, 開始日時, 終了日時, 更新日時 "
                 f"FROM {AIタスク要求テーブル} WHERE タスクID = ?",
                 [タスクID],
             ).fetchall()
         else:
             reqs = conn.execute(
-                f"SELECT タスクID, 利用者ID, タイトル, 状態, 実行有効, 更新日時 "
+                f"SELECT タスクID, 利用者ID, タイトル, 状態, 実行有効, PID, 開始日時, 終了日時, 更新日時 "
                 f"FROM {AIタスク要求テーブル} ORDER BY タスクID"
             ).fetchall()
 
         now = datetime.now()
         結果: list[dict] = []
         for req in reqs:
-            tid = str(req["タスクID"])
-            rows = [
-                dict(r)
-                for r in conn.execute(
-                    "SELECT 明細SEQ, タイトル, 状態, 実行有効, 実行回数, 予測分数, 実績分数, "
-                    f"PID, 開始日時, 応答内容 FROM {AIタスク明細テーブル} "
-                    "WHERE タスクID = ? ORDER BY 明細SEQ",
-                    [tid],
-                ).fetchall()
-            ]
-
-            進捗: dict[str, int] = {"全件": len(rows)}
-            for r in rows:
-                キー = str(r["状態"]) or "不明"
-                進捗[キー] = 進捗.get(キー, 0) + 1
-
-            未完了 = [r for r in rows if str(r["状態"]) in _未完了状態]
-            エラー明細 = [r for r in rows if str(r["状態"]) == "エラー"]
-            無効明細 = [r for r in 未完了 if not int(r["実行有効"] or 0)]
-
-            超過明細 = []
-            for r in rows:
-                if str(r["状態"]) != "実行中":
-                    continue
-                開始 = str(r["開始日時"] or "").strip()
-                if not 開始:
-                    continue
-                try:
-                    t0 = datetime.strptime(開始, "%Y-%m-%d %H:%M:%S")
-                except ValueError:
-                    continue
-                経過分 = int((now - t0).total_seconds() // 60)
-                制限分 = 明細タイムアウト分(r["予測分数"])
-                if 経過分 >= 制限分:
-                    超過明細.append({**r, "経過分": 経過分, "制限分": 制限分})
-
-            理由: list[str] = []
-            if str(req["状態"]) == "エラー":
-                理由.append("要求がエラー")
-            if not int(req["実行有効"] or 0) and 未完了:
-                理由.append(f"要求の実行有効が外れている（未完了明細 {len(未完了)} 件）")
-            if エラー明細:
-                理由.append(f"エラーの明細が {len(エラー明細)} 件")
-            if 無効明細:
-                理由.append(f"未完了なのに実行有効が外れた明細が {len(無効明細)} 件")
-            if 超過明細:
-                理由.append(f"打ち切り時間を超えた実行中明細が {len(超過明細)} 件")
-
-            # 復旧すれば動き出すのは エラー明細 と 無効明細。小さい SEQ から再開する
-            復旧対象 = [r["明細SEQ"] for r in エラー明細] + [r["明細SEQ"] for r in 無効明細]
-            項目 = {
-                "タスクID": tid,
-                "利用者ID": str(req["利用者ID"] or ""),
-                "タイトル": str(req["タイトル"] or ""),
-                "要求状態": str(req["状態"]),
-                "要求実行有効": int(req["実行有効"] or 0),
-                "停止": bool(理由),
-                "停止理由": 理由,
-                "復旧可能": bool(エラー明細 or 無効明細 or str(req["状態"]) == "エラー"),
-                "進捗": 進捗,
-                "エラー明細": エラー明細,
-                "実行有効オフ明細": 無効明細,
-                "タイムアウト超過明細": 超過明細,
-                "再開SEQ": min(復旧対象) if 復旧対象 else None,
-                "最終更新日時": str(req["更新日時"] or ""),
-            }
+            項目 = _停止診断1件(conn, req, now)
             if 停止のみ and not 項目["停止"]:
                 continue
             結果.append(項目)
@@ -1691,7 +1794,7 @@ def タスク停止検査(タスクID: str = "", 停止のみ: bool = False) -> 
         conn.close()
 
 
-def タスク停止復旧(タスクID: str, 強制: bool = False) -> dict:
+def タスク停止復旧(タスクID: str, 強制: bool = False, 復旧モード: str = "auto") -> dict:
     """途中停止したタスクを、止まった明細から再開できる状態へ戻す。
 
     タスク実行有効更新(タスクID, True) と同じ復旧をしたうえで、監視タスクが
@@ -1704,9 +1807,9 @@ def タスク停止復旧(タスクID: str, 強制: bool = False) -> dict:
         実行回数・実績分数を 0 にする（実行回数を残すと実行回数上限で即エラーに戻るため）
       - 完了済みの明細には触れない。だから「途中から」再開できる
 
-    強制=False（既定）のとき、エラーが 1 件も無ければ何もしない。
-    実行中のタスクを巻き戻して二重起動させないための安全弁。
-    実行中でも状態を初期化したい場合だけ 強制=True にする。
+    復旧モード=auto は停止検査の 推奨操作 に従い、エラー・無効化は「再開」、
+    明細なし・未定義明細は「再分解」にする。タイムアウト中は強制=Trueが無ければ
+    何もしない。DAG循環・欠番は自動修復で依存関係を書き換えず、手動修正を求める。
 
     戻り値:
       {"タスクID", "復旧実施", "理由", "復旧前": {...}, "復旧後": {...}, "再開SEQ"}
@@ -1714,6 +1817,63 @@ def タスク停止復旧(タスクID: str, 強制: bool = False) -> dict:
       再開SEQ は復旧対象のうち最小の明細SEQ（対象なしは None）。
     """
     初期化()
+    診断一覧 = タスク停止検査(タスクID)
+    if not 診断一覧:
+        return {
+            "タスクID": タスクID, "復旧実施": False, "理由": "タスクIDが見つかりません",
+            "復旧前": {}, "復旧後": {}, "再開SEQ": None, "適用モード": "",
+        }
+    診断 = 診断一覧[0]
+    推奨操作 = str(診断["推奨操作"])
+    if 復旧モード == "auto":
+        if (
+            推奨操作 == "再分解"
+            or "NO_DETAILS" in 診断["状態コード"]
+            or "UNDEFINED_DETAILS" in 診断["状態コード"]
+            or (
+                "REQUEST_TIMEOUT" in 診断["状態コード"]
+                and 診断["要求状態"] == "準備中"
+            )
+        ):
+            適用モード = "再分解"
+        else:
+            適用モード = "再開"
+    else:
+        適用モード = 復旧モード
+
+    if not 診断["停止"]:
+        return {
+            "タスクID": タスクID, "復旧実施": False, "理由": "停止状態ではないため復旧不要",
+            "復旧前": 診断, "復旧後": 診断, "再開SEQ": None, "適用モード": 適用モード,
+        }
+    if 推奨操作 == "手動修正":
+        return {
+            "タスクID": タスクID, "復旧実施": False,
+            "理由": "先行SEQの循環または欠番は自動修復できません",
+            "復旧前": 診断, "復旧後": 診断, "再開SEQ": 診断["再開SEQ"], "適用モード": 適用モード,
+        }
+    if 適用モード == "再開" and (
+        "NO_DETAILS" in 診断["状態コード"]
+        or "UNDEFINED_DETAILS" in 診断["状態コード"]
+    ):
+        return {
+            "タスクID": タスクID, "復旧実施": False,
+            "理由": "実行可能な明細がないため再開できません。復旧モード=再分解を指定してください",
+            "復旧前": 診断, "復旧後": 診断, "再開SEQ": None, "適用モード": 適用モード,
+        }
+    if 推奨操作 == "強制再開" and not 強制:
+        return {
+            "タスクID": タスクID, "復旧実施": False,
+            "理由": "実行中プロセスの打ち切りが必要です。強制=trueで再実行してください",
+            "復旧前": 診断, "復旧後": 診断, "再開SEQ": 診断["再開SEQ"], "適用モード": 適用モード,
+        }
+    if 適用モード == "再分解" and 診断["進捗"].get("実行中", 0) and not 強制:
+        return {
+            "タスクID": タスクID, "復旧実施": False,
+            "理由": "実行中明細を止めて再分解するには強制=trueが必要です",
+            "復旧前": 診断, "復旧後": 診断, "再開SEQ": 診断["再開SEQ"], "適用モード": 適用モード,
+        }
+
     conn = 接続取得()
     try:
         now = _現在日時()
@@ -1721,16 +1881,6 @@ def タスク停止復旧(タスクID: str, 強制: bool = False) -> dict:
             f"SELECT 状態, 実行有効 FROM {AIタスク要求テーブル} WHERE タスクID = ?",
             [タスクID],
         ).fetchone()
-        if req is None:
-            return {
-                "タスクID": タスクID,
-                "復旧実施": False,
-                "理由": "タスクIDが見つかりません",
-                "復旧前": {},
-                "復旧後": {},
-                "再開SEQ": None,
-            }
-
         エラー明細 = [
             dict(row)
             for row in conn.execute(
@@ -1740,68 +1890,70 @@ def タスク停止復旧(タスクID: str, 強制: bool = False) -> dict:
             ).fetchall()
         ]
         要求エラー = str(req["状態"]) == "エラー"
-        復旧前 = {
-            "要求状態": str(req["状態"]),
-            "要求実行有効": int(req["実行有効"] or 0),
-            "エラー明細件数": len(エラー明細),
-            "エラー明細": エラー明細,
-        }
+        復旧前 = {**診断, "エラー明細件数": len(エラー明細)}
 
-        if not 強制 and not エラー明細 and not 要求エラー:
-            return {
-                "タスクID": タスクID,
-                "復旧実施": False,
-                "理由": "エラーが無いため復旧不要",
-                "復旧前": 復旧前,
-                "復旧後": 復旧前,
-                "再開SEQ": None,
-            }
-
-        conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET 実行有効 = 1, 更新日時 = ? WHERE タスクID = ?",
-            [now, タスクID],
-        )
-        conn.execute(
-            f"UPDATE {AIタスク明細テーブル} SET 実行有効 = 1, 更新日時 = ? WHERE タスクID = ?",
-            [now, タスクID],
-        )
-        conn.execute(
-            f"UPDATE {AIタスク要求テーブル} SET 状態 = '待機', PID = '', 更新日時 = ? "
-            "WHERE タスクID = ? AND 状態 = 'エラー'",
-            [now, タスクID],
-        )
-        conn.execute(
-            f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', "
-            "終了日時 = '', 実行回数 = 0, 実績分数 = 0, 更新日時 = ? "
-            "WHERE タスクID = ? AND 状態 = 'エラー'",
-            [now, タスクID],
-        )
-        if 要求エラー:
-            # 終了日時を空へ戻さないと Aチーム依頼側が終了済みのまま残る（明細再試行と同じ扱い）
-            _Aチーム依頼反映(conn, タスクID, 状態="待機", 終了日時="", guard="状態 = 'エラー'")
+        if 適用モード == "再分解":
+            conn.execute(
+                f"UPDATE {AIタスク要求テーブル} SET 状態 = '準備開始', 実行有効 = 1, PID = '', "
+                "開始日時 = '', 終了日時 = '', 実行回数 = 0, 更新日時 = ? WHERE タスクID = ?",
+                [now, タスクID],
+            )
+            conn.execute(
+                f"UPDATE {AIタスク明細テーブル} SET 実行有効 = 1, PID = '', 更新日時 = ? WHERE タスクID = ?",
+                [now, タスクID],
+            )
+            _Aチーム依頼反映(conn, タスクID, 状態="準備中", 終了日時="", guard="")
+        else:
+            # 完了済みの状態・応答は保持し、未完了だけを再実行可能にする。
+            conn.execute(
+                f"UPDATE {AIタスク要求テーブル} SET 実行有効 = 1, 更新日時 = ? WHERE タスクID = ?",
+                [now, タスクID],
+            )
+            conn.execute(
+                f"UPDATE {AIタスク明細テーブル} SET 実行有効 = 1, 更新日時 = ? WHERE タスクID = ?",
+                [now, タスクID],
+            )
+            対象状態 = ("エラー", "実行中", "準備中") if 強制 else ("エラー",)
+            placeholders = ", ".join("?" for _ in 対象状態)
+            conn.execute(
+                f"UPDATE {AIタスク明細テーブル} SET 状態 = '待機', PID = '', 開始日時 = '', "
+                "終了日時 = '', 実行回数 = 0, 実績分数 = 0, 更新日時 = ? "
+                f"WHERE タスクID = ? AND 状態 IN ({placeholders})",
+                [now, タスクID, *対象状態],
+            )
+            未完了件数 = conn.execute(
+                f"SELECT COUNT(*) FROM {AIタスク明細テーブル} WHERE タスクID = ? AND 状態 != '完了'",
+                [タスクID],
+            ).fetchone()[0]
+            if 未完了件数:
+                if 強制 or 要求エラー or str(req["状態"]) in ("完了", "中止"):
+                    conn.execute(
+                        f"UPDATE {AIタスク要求テーブル} SET 状態 = '待機', PID = '', 終了日時 = '', 更新日時 = ? "
+                        "WHERE タスクID = ?",
+                        [now, タスクID],
+                    )
+                _Aチーム依頼反映(conn, タスクID, 状態="待機", 終了日時="", guard="")
+            elif 要求エラー:
+                # 全明細が完了しているのに要求だけエラー、という不整合は完了へ収束させる。
+                # 完了済み明細を再実行すると副作用が二重になるため、状態だけを整える。
+                conn.execute(
+                    f"UPDATE {AIタスク要求テーブル} SET 状態 = '完了', PID = '', 終了日時 = ?, 更新日時 = ? "
+                    "WHERE タスクID = ?",
+                    [now, now, タスクID],
+                )
+                _Aチーム依頼反映(conn, タスクID, 状態="完了", 終了日時=now, guard="")
         conn.commit()
-
-        後req = conn.execute(
-            f"SELECT 状態, 実行有効 FROM {AIタスク要求テーブル} WHERE タスクID = ?",
-            [タスクID],
-        ).fetchone()
-        残エラー = conn.execute(
-            f"SELECT COUNT(*) AS n FROM {AIタスク明細テーブル} WHERE タスクID = ? AND 状態 = 'エラー'",
-            [タスクID],
-        ).fetchone()
-        復旧後 = {
-            "要求状態": str(後req["状態"]),
-            "要求実行有効": int(後req["実行有効"] or 0),
-            "エラー明細件数": int(残エラー["n"]),
-            "エラー明細": [],
-        }
+        復旧後一覧 = タスク停止検査(タスクID)
+        復旧後 = 復旧後一覧[0] if 復旧後一覧 else {}
+        復旧後["エラー明細件数"] = len(復旧後.get("エラー明細", []))
         return {
             "タスクID": タスクID,
             "復旧実施": True,
             "理由": "",
             "復旧前": 復旧前,
             "復旧後": 復旧後,
-            "再開SEQ": エラー明細[0]["明細SEQ"] if エラー明細 else None,
+            "再開SEQ": 診断["再開SEQ"],
+            "適用モード": 適用モード,
         }
     finally:
         conn.close()

@@ -267,6 +267,9 @@ def 再試行登録():
     res = POST送信(f"{TASK_API}/タスク明細/再試行", {
         "タスクID": タスクID,
         "明細SEQ": 明細SEQ,
+        # task_check_okng の NG 報告は DB の PID を空にする。再試行を続ける
+        # このプロセス自身を再登録し、監視・並行上限・強制停止の対象から外れないようにする。
+        "PID": os.getpid(),
     }, timeout=60)
     if res.get("status") != "OK":
         raise RuntimeError(f"明細の再試行登録に失敗しました: {res.get('message')}")
