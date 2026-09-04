@@ -113,6 +113,7 @@ ACHIEVEMENTS: List[Dict[str, Any]] = [
     {"id": "patch_wizard", "name": "Patch Wizard", "description": "Bend files to your will with targeted patches.", "category": "Tool Mastery", "kind": "lifetime", "icon": "wand", "threshold_metric": "total_patch_calls", "tiers": tiers([250, 750, 2000, 6000, 15000])},
     {"id": "file_archaeologist", "name": "File Archaeologist", "description": "Dig through the filesystem with reads and searches.", "category": "Tool Mastery", "kind": "lifetime", "icon": "folder", "threshold_metric": "total_file_reads_searches", "tiers": tiers([750, 2000, 6000, 15000, 50000])},
     {"id": "image_whisperer", "name": "Image Whisperer", "description": "Use image generation or vision tools enough for visual work.", "category": "Tool Mastery", "kind": "lifetime", "icon": "eye", "threshold_metric": "image_vision_calls", "tiers": tiers([100, 300, 1000, 3000, 8000])},
+    {"id": "voice_of_the_machine", "name": "Voice Of The Machine", "description": "Use text-to-speech or voice tooling repeatedly.", "category": "Tool Mastery", "kind": "lifetime", "icon": "wave", "threshold_metric": "tts_calls", "tiers": tiers([10, 30, 100, 300, 800])},
 
     # Model Lore
     {"id": "model_hopper", "name": "Model Hopper", "description": "Switch or inspect providers/models enough to count as a habit.", "category": "Model Lore", "kind": "lifetime", "icon": "swap", "threshold_metric": "model_events", "tiers": tiers([10000, 30000, 80000, 200000, 500000])},
@@ -141,16 +142,47 @@ ACHIEVEMENTS: List[Dict[str, Any]] = [
 ]
 
 
+def _data_dir() -> Path:
+    """Durable data root (``<hermes home>/plugin-data/hermes-achievements/``).
+
+    Was the install tree (``plugins/hermes-achievements/``) before the
+    plugin-data convention existed — state parked there died on
+    ``hermes plugins remove``/``update``. Legacy files migrate on first read.
+    """
+    try:
+        from plugins.plugin_storage import plugin_data_dir
+
+        return plugin_data_dir("hermes-achievements")
+    except Exception:
+        # Standalone dashboard import (no plugins package on sys.path):
+        # keep the plugin working with the same layout, computed locally.
+        root = get_hermes_home() / "plugin-data" / "hermes-achievements"
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+
+
+def _data_file(name: str) -> Path:
+    path = _data_dir() / name
+    if not path.exists():
+        legacy = get_hermes_home() / "plugins" / "hermes-achievements" / name
+        if legacy.exists():
+            try:
+                path.write_text(legacy.read_text(encoding="utf-8"), encoding="utf-8")
+            except Exception:
+                pass
+    return path
+
+
 def state_path() -> Path:
-    return get_hermes_home() / "plugins" / "hermes-achievements" / "state.json"
+    return _data_file("state.json")
 
 
 def snapshot_path() -> Path:
-    return get_hermes_home() / "plugins" / "hermes-achievements" / "scan_snapshot.json"
+    return _data_file("scan_snapshot.json")
 
 
 def checkpoint_path() -> Path:
-    return get_hermes_home() / "plugins" / "hermes-achievements" / "scan_checkpoint.json"
+    return _data_file("scan_checkpoint.json")
 
 
 def load_state() -> Dict[str, Any]:
@@ -158,7 +190,7 @@ def load_state() -> Dict[str, Any]:
     if not path.exists():
         return {"unlocks": {}}
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {"unlocks": {}}
 
@@ -166,7 +198,7 @@ def load_state() -> Dict[str, Any]:
 def save_state(state: Dict[str, Any]) -> None:
     path = state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2, sort_keys=True))
+    path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def _json_safe(value: Any) -> Any:
@@ -184,7 +216,7 @@ def load_snapshot() -> Optional[Dict[str, Any]]:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(data, dict):
             return data
     except Exception:
@@ -195,7 +227,7 @@ def load_snapshot() -> Optional[Dict[str, Any]]:
 def save_snapshot(data: Dict[str, Any]) -> None:
     path = snapshot_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(data), indent=2, sort_keys=True))
+    path.write_text(json.dumps(_json_safe(data), indent=2, sort_keys=True), encoding="utf-8")
 
 
 def load_checkpoint() -> Dict[str, Any]:
@@ -203,7 +235,7 @@ def load_checkpoint() -> Dict[str, Any]:
     if not path.exists():
         return {"schema_version": 1, "generated_at": 0, "sessions": {}}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(data, dict):
             data.setdefault("schema_version", 1)
             data.setdefault("generated_at", 0)
@@ -218,7 +250,7 @@ def load_checkpoint() -> Dict[str, Any]:
 def save_checkpoint(data: Dict[str, Any]) -> None:
     path = checkpoint_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_safe(data), indent=2, sort_keys=True))
+    path.write_text(json.dumps(_json_safe(data), indent=2, sort_keys=True), encoding="utf-8")
 
 
 def session_fingerprint(meta: Dict[str, Any]) -> Dict[str, Any]:
@@ -349,6 +381,7 @@ def analyze_messages(session_id: str, title: str, messages: List[Dict[str, Any]]
     process_calls = _count_tool(tool_sequence, "process") + len(re.findall(r"background\s*=\s*true", full_text, re.I))
     cron_calls = _count_tool(tool_sequence, "cronjob")
     image_vision_calls = _count_tool(tool_sequence, "image", "vision")
+    tts_calls = _count_tool(tool_sequence, "tts", "text_to_speech")
     skill_events = _count_tool(tool_sequence, "skill") + len(re.findall(r"\bskill", lower))
     skill_manage_events = _count_tool(tool_sequence, "skill_manage")
     memory_events = _count_tool(tool_sequence, "memory", "mnemosyne")
@@ -375,6 +408,7 @@ def analyze_messages(session_id: str, title: str, messages: List[Dict[str, Any]]
         "process_calls": process_calls,
         "cron_calls": cron_calls,
         "image_vision_calls": image_vision_calls,
+        "tts_calls": tts_calls,
         "skill_events": skill_events,
         "skill_manage_events": skill_manage_events,
         "memory_events": memory_events,
@@ -505,6 +539,7 @@ METRIC_LABELS = {
     "total_patch_calls": "lifetime targeted patch edits",
     "total_file_reads_searches": "lifetime read_file/search_files calls",
     "image_vision_calls": "image generation or vision tool calls",
+    "tts_calls": "text-to-speech or voice tool calls",
     "distinct_model_count": "distinct model names seen in session metadata",
     "distinct_provider_count": "distinct model providers inferred from session metadata",
     "claude_events": "Claude/Anthropic model mentions",
@@ -690,6 +725,7 @@ def aggregate_stats(sessions: List[Dict[str, Any]]) -> Dict[str, Any]:
         "total_cron_calls": 0,
         "browser_calls": 0,
         "image_vision_calls": 0,
+        "tts_calls": 0,
         "distinct_model_count": 0,
         "distinct_provider_count": 0,
         "local_model_chat_sessions": 0,
@@ -725,6 +761,7 @@ def aggregate_stats(sessions: List[Dict[str, Any]]) -> Dict[str, Any]:
         agg["total_cron_calls"] += s.get("cron_calls", 0)
         agg["browser_calls"] += s.get("browser_calls", 0)
         agg["image_vision_calls"] += s.get("image_vision_calls", 0)
+        agg["tts_calls"] += s.get("tts_calls", 0)
         for key in sum_keys:
             agg[key] += s.get(key, 0)
         model_names.update(s.get("model_names") or set())

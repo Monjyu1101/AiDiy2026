@@ -62,7 +62,7 @@ class conf_json:
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image',
-        'CHAT_FREEAI_MODEL': 'gemini-3.5-flash',
+        'CHAT_FREEAI_MODEL': 'gemini-3.8-flash',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image',
         'CHAT_OLLAMA_MODEL': 'deepseek-v4-flash:cloud',
         'CHAT_LOCAL_MODEL': 'google/gemma-4-E2B-it',

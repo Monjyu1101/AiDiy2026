@@ -18,10 +18,12 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | CLI 出力の ANSI 制御コード対処 | [`../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
 | Provider 一覧と選択ロジック | [`../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md) |
 | Slash Command 一覧と追加手順 | [`../_AIDIY/knowledge/command_hermes,Slash Command一覧.md`](../_AIDIY/knowledge/command_hermes,Slash Command一覧.md) |
+| upstream hermes-agent の新版へ移植する | [`../_AIDIY/knowledge/command_hermes,upstream移植手順.md`](../_AIDIY/knowledge/command_hermes,upstream移植手順.md) |
 
 ## 概要
 
 `command_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。
+upstream の `hermes-agent` 0.21 系を取り込み、AiDiy 固有のレイヤだけを重ねています。
 
 - 常駐 HTTP サーバーではない。
 - 実行名は `aidiy_hermes`。
@@ -38,35 +40,56 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | TUI | `prompt_toolkit` |
 | 通信 | `requests`、`httpx`、OpenAI 互換 client、Claude API 連携 |
 | MCP サーバー | MCP SDK 2.x の `MCPServer`（`hermes mcp serve`） |
+| upstream | hermes-agent 0.21.0 |
 | 実行方式 | 単体 CLI / subprocess 呼び出し |
 
 ## Windows ホストでの動作
 
-Windows ネイティブ実行では、`terminal` は Git Bash があれば使い、無い場合は PowerShell へフォールバックします。`LocalEnvironment` は snapshot 用の login shell を作らず、コマンドごとに軽量なシェルプロセスを起動します。
+upstream 0.21 は Windows ネイティブ実行を本体側で対応しています。`tools/environments/local.py`
+が Git Bash（`HERMES_GIT_BASH_PATH` / PortableGit / `Program Files\Git`）を探索し、MSYS 形式パスと
+Windows パスを相互変換します。`process_registry` は `winpty`、非 Windows は `ptyprocess` を使い、
+`os.setsid` / `fcntl` は Windows では呼びません。
 
-`file_operations.py`、`file_tools.py`、`terminal_tool.py`、`process_registry.py` は platform selector として動作します。Windows では対応する `*_win.py`、非 Windows では `*_linux.py` のどちらか一方だけを import します。`*_linux.py` は upstream / original に近い実装を残し、Windows 差分は `*_win.py` 側へ寄せます。
+このため 0.12 系で AiDiy が持っていた `*_win.py` / `*_linux.py` の platform selector 層は廃止しました。
+`file_operations.py`、`file_tools.py`、`terminal_tool.py`、`process_registry.py` は upstream のまま単一実装です。
 
-ファイル操作は Windows では `WindowsFileOperations` が Python の `pathlib` / `subprocess` を使って直接処理します。`read_file`、`write_file`、`search_files`、`patch` は `wc`、`sed`、`find` などの POSIX コマンドへ依存しないようにしています。
+Windows では Git for Windows（Git Bash）が必須です。見つからない場合、`terminal` ツールは
+インストールを促すエラーを返します。
 
 ## Provider 概要
 
-`cli_main.py` の provider は API provider と CLI bridge の両方を扱います。32 の provider overlay と 70 のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。
+provider は API provider と CLI bridge の両方を扱います。`hermes_cli/providers.py` に 42 の provider
+overlay と 89 のエイリアスがあり、`--provider` / config / 環境変数 / `auto` の優先順位で解決します。
+これとは別に `cli_main.py` が `_config/AiDiy_key.json` 由来の AiDiy provider 一覧（`/model` ピッカー）
+と外部 CLI ディスパッチを持ちます。
 
 詳細な一覧と選択ロジックは `_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md` を参照してください。
 
 ## ディレクトリ構成
 
+upstream のレイアウトを次の 3 点だけ読み替えています。
+
+- upstream のリポジトリ直下モジュール → `base/`
+- upstream の `agent/` パッケージ → `core/`
+- upstream の `cli.py` → `cli_main.py`
+
+読み替えは `cli_main.py` 冒頭の layout shim が行います。`sys.path` に `base/` と本ディレクトリを追加し、
+`sys.modules["agent"] = core`、`sys.modules["cli"] = cli_main` を登録するので、upstream 由来のコードは
+`from agent...` / `from cli import ...` のまま動きます。**upstream 由来コードの import 文は書き換えないでください。**
+
 | パス | 役割 |
 |------|------|
-| `cli_main.py` | CLI エントリ、provider/model picker、slash command 処理 |
-| `core/` | agent loop、prompt、display、retry |
-| `base/` | 共通定数、utils、toolsets |
-| `hermes_cli/` | slash command、TUI 補助、互換レイヤ |
-| `tools/` | file / terminal / web / media / planning / process |
-| `plugins/` | plugin 拡張 |
+| `cli_main.py` | CLI エントリ、TUI、slash command、AiDiy provider/model ピッカー |
+| `hermes_main.py` | `hermes auth` / `hermes model` などの管理サブコマンド入口 |
+| `core/` | upstream `agent/`。agent loop、prompt、display、retry、adapter |
+| `base/` | upstream ルートモジュール。`utils`、`toolsets`、`run_agent`、`hermes_constants` など |
+| `hermes_cli/` | slash command、CLI mixin、設定、認証、TUI 補助 |
+| `tools/` | file / terminal / web / media / planning / process / MCP |
+| `gateway/`、`tui_gateway/`、`cron/`、`acp_adapter/` | upstream 互換。AiDiy では常駐させない |
+| `plugins/`、`providers/` | plugin 拡張、provider 基底 |
 | `skills/`、`optional-skills/` | skill 資産 |
-| `environments/` | 実行環境補助 |
-| `gateway/` | upstream 互換のセッション環境ヘルパー（`session_context.py`） |
+| `optional-mcps/` | MCP サーバーカタログ（65 件の manifest、既定は無効）。`hermes_cli/mcp_catalog.py` が実行時に読む |
+| `locales/`、`assets/`、`scripts/`、`native/` | i18n カタログ、静的資産、bootstrap スクリプト |
 | `temp/` | 一時状態 |
 
 ## AiDiy 連携
@@ -86,3 +109,35 @@ Windows ネイティブ実行では、`terminal` は Git Bash があれば使い
 - TUI と slash command は `cli_main.py` と `hermes_cli/commands.py` を起点に確認する。
 - tool 追加や toolset 変更は `tools/` と `base/toolsets.py` を確認する。
 - AiDiy 本体連携は `backend_server/AIコア/AIコード_cli.py`、`conf_json.py`、`conf_model.py` を確認する。
+
+## upstream 追従時の注意
+
+`hermes-agent` の新版へ差し替えるときは、上記のレイアウト読み替えに加えて次の AiDiy レイヤを再適用します。
+手順の全体と落とし穴は [`../_AIDIY/knowledge/command_hermes,upstream移植手順.md`](../_AIDIY/knowledge/command_hermes,upstream移植手順.md)、
+移植後の機械的な検証は `python _verify.py --upstream ../hermes-agent-<version>` を使います。
+
+| 対象 | 内容 |
+|------|------|
+| `cli_main.py` | layout shim / `_AIDIY_*` 設定ブロック / `_aidiy_*` メソッド群 / `chat()` の外部 CLI ディスパッチ / `/model` フック / `cli_entry` argparse エントリ |
+| ブランディング | `cli_main.py` の `_AIDIY_RESPONSE_LABEL` / `_AIDIY_WELCOME_TEXT` / `_build_compact_banner()`、`hermes_cli/banner.py` の `HERMES_AGENT_LOGO`（AIDIY-HERMES ワードマーク）と `format_banner_version_label()`、`hermes_cli/_startup_fast.py`、`acp_adapter/server.py` |
+| `tools/mcp_tool.py` | `_load_aidiy_mcp_servers()` と `_load_mcp_config()` へのマージ |
+| OpenAI サブスク対応 | `cli_main.py` の `openai_oauth` provider（upstream `openai-codex` / ChatGPT OAuth）。`auth_runtime` フラグ、`_openai_oauth_model_ids()`、`_ensure_openai_oauth_auth()` |
+| `hermes_cli/auth.py` | `_codex_device_code_login()` でブラウザを自動オープン（`?user_code=` 付き、`HERMES_NO_BROWSER=1` で無効化） |
+| `hermes_main.py` | `hermes` サブコマンド（`auth` / `model` / `doctor`）用の入口。AiDiy 独自ファイル |
+| `cli_main.py` の `main()` | バンドルスキルの `sync_skills()` と MCP `discover_mcp_tools()` の起動時呼び出し |
+| `tools/daemon_pool.py` | Python 3.14 の `ThreadPoolExecutor` 内部変更に対応する `_adjust_thread_count` 分岐 |
+| `hermes_cli/main.py` | `_resolve_use_tui()` を常に False（Node/TS TUI は同梱しない） |
+| `hermes_cli/_parser.py` | `--tui` / `--dev` のヘルプ文言 |
+| `base/hermes_constants.py` | `_INSTALL_ROOT` と `_NODE_BOOTSTRAP_SCRIPT` を `parent.parent` に補正 |
+| `pyproject.toml` | upstream の core 依存 + AiDiy 追加分（anthropic / google-genai / fal-client / mcp / windows-curses） |
+
+`ui-tui/`、`web/`、`website/`、`evals/`、`tests/`、`mcp-research-data/`、`datagen-config-examples/`、
+`docker/`、`nix/` は同梱しません（いずれも実行時に参照されません）。
+upstream ルートの `setup.py` は wheel ビルド用のガードなので `base/` へは置きません。
+
+### バンドル資産の実行時配置
+
+`skills/` は「配布元」で、実体は `HERMES_HOME/skills` へ同期されて初めて認識されます。
+upstream はこの同期を `hermes_cli.main` の各エントリで行いますが、AiDiy の入口は `cli_main.py` なので
+そこを通りません。`cli_main.py` の `main()` で `tools.skills_sync.sync_skills(quiet=True)` を呼んでいます。
+これを外すとスキルが 0 件になります（`optional-mcps/` はリポジトリ内を直接読むので同期不要）。

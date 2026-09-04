@@ -422,6 +422,9 @@ class CodeAI:
             common = list(base)
             if self.code_permissions != "none":
                 common.append("--dangerously-skip-permissions")
+            # モデルがautoの場合はモデル指定を省略
+            if self.code_model and self.code_model.lower() != "auto":
+                common.extend(["--model", self.code_model])
             if repo_path:
                 common.extend(["--add-dir", repo_path])
             # --print-timeout: デフォルト5分を20分に延長

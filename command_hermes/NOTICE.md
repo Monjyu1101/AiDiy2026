@@ -2,7 +2,7 @@
 
 ## hermes-agent (Nous Research)
 
-This module (`command_hermes`) is based on **hermes-agent** by Nous Research.
+This module (`command_hermes`) is based on **hermes-agent** by Nous Research (v0.21.0).
 
 - Source: https://github.com/nousresearch/hermes-agent
 - Copyright: Copyright (c) Nous Research

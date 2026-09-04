@@ -129,7 +129,7 @@ class conf_models:
         }
         self.CODE_COPILOT_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "claude-fable-5": "yyyy/mm/dd - claude-fable-5",
+            "claude-fable-5.1": "yyyy/mm/dd - claude-fable-5.1",
             "claude-opus-5": "yyyy/mm/dd - claude-opus-5",
             "claude-sonnet-5": "yyyy/mm/dd - claude-sonnet-5",
             "claude-haiku-4.5": "yyyy/mm/dd - claude-haiku-4.5",
@@ -137,10 +137,13 @@ class conf_models:
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
             "gpt-5.6-luna": "yyyy/mm/dd - gpt-5.6-luna",
             "gemini-3.7-flash": "yyyy/mm/dd - gemini-3.7-flash",
+            "gemini-3.8-flash": "yyyy/mm/dd - gemini-3.8-flash",
         }
         self.CODE_ANTIGRAVITY_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "gemini-3.7-flash": "yyyy/mm/dd - gemini-3.7-flash",
+            "gemini-3.8-flash-high": "yyyy/mm/dd - gemini-3.8-flash-high",
+            "gemini-3.8-flash-medium": "yyyy/mm/dd - gemini-3.8-flash-medium",
+            "gemini-3.8-flash-low": "yyyy/mm/dd - gemini-3.8-flash-low",
         }
         self.CODE_CODEX_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",

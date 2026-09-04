@@ -21,111 +21,48 @@
 
 ## Upstream からの調整点
 
-この `command_hermes` は [Nous Research の hermes-agent](https://github.com/nousresearch/hermes-agent) v0.12.0 (MIT License) をフォークし、AiDiy 用に以下の調整を加えています。
+この `command_hermes` は [Nous Research の hermes-agent](https://github.com/nousresearch/hermes-agent) **v0.21.0** (MIT License) を取り込み、AiDiy 用のレイヤを重ねたものです。
+（2026-09-04 に v0.12.0 ベースから v0.21.0 ベースへ全面同期。旧ツリーは `command_hermes_0.12/` に退避。）
 
-オリジナルとの実差分は、6つのサブエージェントによる並行比較（`diff` + ファイル単位の調査）で確認済みです。
+### レイアウトの読み替え（3点のみ）
 
-### 全体構造の変更
+| upstream | AiDiy |
+|----------|-------|
+| リポジトリ直下のモジュール群 | `base/` |
+| `agent/` パッケージ | `core/` |
+| `cli.py` | `cli_main.py` |
 
-| 項目 | upstream | AiDiy |
-|------|----------|-------|
-| CLI エントリ | `cli.py` (12,275行) | `cli_main.py` (12,714行) — `argparse` + `cli_entry()` 追加 |
-| パッケージ名 | `agent/` ディレクトリ | `core/` にリネーム。`sys.modules["agent"] = core` 互換alias |
-| ルートスクリプト群 | 14ファイルがルート直置き | `base/` ディレクトリに移動（内容は同一） |
-| 依存管理 | `pyproject.toml` (extras多数) | `pyproject.toml` (必要最小限の dependencies) |
-| `run_agent.py` | ルート | `base/run_agent.py` (内容はupstreamと同一) |
+読み替えは `cli_main.py` 冒頭の **layout shim** が行います。`sys.path` へ `base/` と `command_hermes/` を追加し、
+`sys.modules["agent"] = core` と `sys.modules["cli"] = cli_main` を登録します。
+このため **upstream 由来コードの `from agent...` / `from cli import ...` は書き換え不要（書き換え禁止）** です。
 
-### 削除されたディレクトリ/ファイル
+`base/hermes_constants.py` だけは `_INSTALL_ROOT` / `_NODE_BOOTSTRAP_SCRIPT` を `parent.parent` に補正しています（`base/` に置いたため）。
 
-| 対象 | 規模 | 理由 |
-|------|------|------|
-| `cron/` | Node.js フルプロジェクト | 定期実行はAiDiy不要 |
-| `web/` | Vue 3 SPA (214KB lock) | AiDiy独自の `frontend_web` が別管理 |
-| `website/` | Docusaurus サイト (777KB lock) | ドキュメントはプロジェクトルートの `docs/` で管理 |
-| `ui-tui/` | Rust TUI (263KB) | Python `prompt_toolkit` TUIに置換 |
-| `tui_gateway/` | TUI gateway | Python TUI化に伴い削除 |
-| `acp_adapter/`, `acp_registry/` | ACP プロトコル (108KB) | 不要なプロトコルアダプタ |
-| `gateway/` | 50+ファイル (全platform) | `__init__.py` + `session_context.py` のみの互換スタブに縮退 |
-| `docs/`, `tests/`, `scripts/`, `packaging/`, `nix/`, `docker/` | 全ファイル | プロジェクトルートで一元管理 |
-| `pyproject.toml`, `uv.lock` | ビルド設定 | `pyproject.toml` を AiDiy 用に維持。`uv.lock` は固定せず再生成対象 |
-| `cli-config.yaml.example` | 55KBの設定例 | AiDiy_key.json方式のため不要 |
-| `setup-hermes.sh`, `hermes` | シェルランチャ | Windows `.cmd` ラッパーで代替 |
-| `cli.py` → `cli_main.py` | リネーム + 大幅改変 | AiDiy provider/oneshot 統合 |
+### 同梱するもの / しないもの
 
-### `cli_main.py` (upstream `cli.py`) の改変点
+同梱: `core/`（upstream `agent/`）、`base/`、`tools/`、`hermes_cli/`、`gateway/`、`tui_gateway/`、`cron/`、
+`acp_adapter/`、`plugins/`、`providers/`、`skills/`、`optional-skills/`、`locales/`、`assets/`、`scripts/`、`native/`
 
-| 改変 | 説明 |
+非同梱: `ui-tui/`（Node/TS TUI）、`web/`、`website/`、`evals/`、`tests/`、`docker/`、`nix/`
+
+0.12 系では `cron/`、`gateway/`、`tui_gateway/`、`acp_adapter/` を削除・スタブ化していましたが、
+0.21 では upstream コードが相互に参照するため **そのまま同梱**しています（AiDiy では常駐させないだけ）。
+
+### AiDiy レイヤ（upstream 追従時に再適用が必要）
+
+| 対象 | 内容 |
 |------|------|
-| `cli_entry()` 追加 (L12662) | `argparse` 駆動のconsole scriptエントリ。戻り値int |
-| `_load_aidiy_hermes_defaults()` (L12609) | `AiDiy_key.json` から provider/model 既定値を動的読込 |
-| `_resolve_aidiy_ollama_model()` (L12633) | 起動中のOllamaに `GET /api/tags` してモデル名解決 |
-| `_aidiy_provider_slugs()` / `_handle_aidiy_model_command()` (L5655-5925) | `/model` コマンドをAiDiy provider pickerに置換 |
-| 6 provider: ollama(local+cloud), openai, openrt, gemini/freeai, anthropic | すべて `AiDiy_key.json` で管理 |
-| quiet/oneshot 出力分離 (L12485-12543) | 運用出力をstderrにredirect、stdout=正式回答に固定 |
-| cron import fallback (L685-690) | `cron` 欠落時は `get_job` を None返却で代替 |
+| `cli_main.py` | layout shim / `_AIDIY_*` 設定ブロック（`AiDiy_key.json`、外部 CLI provider 定義）/ `_aidiy_*` メソッド群（`/model` ピッカー、モデル一覧取得、外部 CLI サブプロセス実行）/ `chat()` の CLI ディスパッチ / `_handle_model_switch` フック / `_AIDIY_RESPONSE_LABEL = "AiDiy,Hermes"` / `main()` 冒頭の MCP discovery / `cli_entry()` argparse エントリ |
+| `tools/mcp_tool.py` | `_load_aidiy_mcp_servers()` と `_load_mcp_config()` へのマージ |
+| `tools/daemon_pool.py` | Python 3.14 の `ThreadPoolExecutor` 内部変更対応 |
+| `hermes_cli/main.py` | `_resolve_use_tui()` を常に False |
+| `hermes_cli/_parser.py` | `--tui` / `--dev` のヘルプ文言 |
+| `base/hermes_constants.py` | `_INSTALL_ROOT` / `_NODE_BOOTSTRAP_SCRIPT` の補正 |
+| `pyproject.toml` | upstream core 依存 + anthropic / google-genai / fal-client / mcp / windows-curses |
+| `aidiy_hermes_exec.bat`、`_setup.py`、`_start.py`、`_cleanup.py` | AiDiy 専用。upstream には対応物なし |
 
-### `core/` 内の改変ファイル (upstream `agent/` 由来)
-
-| ファイル | 変更内容 |
-|---------|---------|
-| `display.py` | 日本語待機メッセージ `_static_wait_message()` 追加。1ショット静的な spinner モード追加 |
-| `curator.py` | `_strip_aux_credential()` / `_ReviewRuntimeBinding` 削除。初回実行ロジック簡略化 |
-| `credential_pool.py` | `_get_env_prefer_dotenv()` 削除。env 読込を `get_env_value()` に統一 |
-| `context_compressor.py` | `_summary_failure_cooldown_until` 削除。prune境界計算簡略化。タイムアウト条件から timeout を除外 |
-| `prompt_builder.py` | Kanban プロンプト文言変更。`api_server` プラットフォーム用SYSTEM_PROMPT削除 |
-| `error_classifier.py` | llama.cpp GBNF grammar fallback (`llama_cpp_grammar_pattern`) 削除。閾値判定簡略化 |
-| `curator_backup.py` | **削除** |
-| `think_scrubber.py` | **削除** |
-
-### `tools/` 内の改変ファイル
-
-| ファイル | 変更内容 |
-|---------|---------|
-| `mcp_tool.py` | **大規模改変**: `_is_sse()`, `_run_sse()`, `_load_aidiy_mcp_servers()` 追加。`get_mcp_servers_config()` にAiDiy_mcp.jsonマージ。keepalive削除。transport表示にSSE追加 |
-| `vision_tools.py` | 動画解析ツールセクション全体 (lines 805-1167) 削除 |
-| `file_operations.py` | ターミナルfence漏れ除去 (`_strip_terminal_fence_leaks()`) 削除。`lint` field削除 |
-| `file_tools.py` | `redact_sensitive_text` 引数変更。シンタックスチェック説明削除。write validation簡略化 |
-| `approval.py` | 危険パターンから `_SHELL_RC_FILES` / `_CREDENTIAL_FILES` 削除 |
-| `delegate_tool.py` | heartbeat間隔短縮 (15→5, 40→20)。fallback chain継承削除。provider filter継承簡略化 |
-| `schema_sanitizer.py` | llama.cpp 用 `strip_pattern_and_format()` リアクティブサニタイザ削除 |
-| `cronjob_tools.py` | `no_agent` サポート削除。`custom` provider fallback削除 |
-| `send_message_tool.py` | Feishu メディア添付サポート削除。QQ Bot 説明簡略化 |
-| `skill_manager_tool.py` | pin guard を削除防止→全変更防止に強化 |
-| `session_search_tool.py` | "auxiliary model" 参照を "Gemini Flash" / 汎用表現に置換 |
-| `tts_tool.py` | MiniMax API v2 対応 (endpoint, voice_id, speed/vol/pitch) |
-| `skill_provenance.py` | **削除** |
-
-### `hermes_cli/` 内の改変
-
-| ファイル | 変更内容 |
-|---------|---------|
-| `setup.py` | **削除** (プロジェクトルートの `_setup.py` に統一) |
-| `main.py` | パス注入ブロック追加 (L86-103)。Node TUI→Python `cli_main` 呼び出しにルーティング変更 |
-| `_parser.py` | `--dev` フラグのhelp文言をAiDiy用に変更 (「AiDiy Python TUI buildでは無効」) |
-
-### 追加されたファイル (upstreamにないもの)
-
-| ファイル | 目的 |
-|---------|------|
-| `NOTICE.md` | MITライセンス帰属表示 |
-| `AGENTS.md` | AiDiy command_hermes 実装概要・HowTo参照マップ |
-| `pyproject.toml` | 依存パッケージ一覧 |
-| `AIDIY-HERMESロゴ.txt` | ASCII art ブランドロゴ |
-| `tui画面出す.bat` | Windows TUI 起動バッチ |
-
-### 変更なし (upstream と完全同一) のディレクトリ
-
-以下のディレクトリは内容に変更がありません:
-- `environments/` — 全ファイル同一 (benchmarks含む)
-- `tools/browser_providers/` — 全ファイル同一
-- `tools/environments/` — 全ファイル同一
-- `skills/` — ディレクトリ構造同一 (26サブディレクトリ)
-- `plugins/` — ディレクトリ構造同一 (13サブディレクトリ)
-- `optional-skills/` — ディレクトリ構造同一
-- `core/__init__.py`, `core/transports/` — 内容同一
-- `core/prompt_caching.py`, `credential_sources.py`, `context_engine.py` など 30+ファイル — 内容同一
-- `base/hermes_constants.py`, `utils.py`, `model_tools.py`, `toolsets.py`, `toolset_distributions.py`, `batch_runner.py` — ルート→base移動のみで内容同一
-- `hermes_cli/banner.py` — 内容同一 (upstreamブランドのまま)
+0.12 系にあった `*_win.py` / `*_linux.py` の platform selector 層は、upstream 0.21 が Windows ネイティブ対応を
+本体に取り込んだため **廃止**しました。詳細は `command_hermes,Windows対応規則.md` を参照。
 
 ## TUI 調整方針
 
@@ -214,9 +151,9 @@
 
 ## import と依存関係
 
-- 共通モジュールは `command_hermes/base/` に一本化する
-- 旧版由来の `from hermes_constants import ...` や `from utils import ...` は `from base.hermes_constants import ...` / `from base.utils import ...` へ置換する
-- `model_tools` を参照する箇所は `from base import model_tools` にする
+- upstream 由来コードの import は **書き換えない**。`from agent.xxx import ...` / `from hermes_constants import ...` / `from utils import ...` / `from cli import ...` はそのままで動く（`cli_main.py` の layout shim が `sys.path` と `sys.modules` を張るため）
+- `from base.xxx import ...` / `from core.xxx import ...` は **書かない**。同じモジュールが二重ロードされ、モジュールレベルの状態が分裂する
+- `cli_main.py` 以外を単体で import して試すときは、先に `sys.path` へ `base/` と `command_hermes/` を追加し、`sys.modules["agent"] = core` を張る
 - 依存追加は `command_hermes/pyproject.toml` の dependencies へ追加する
 - `.venv` がない環境では、全 Python 構文確認と `tomllib` による `pyproject.toml` 検証を先に行う
 - console script ランチャは `_setup.py` が `~/.local/bin/aidiy_hermes.cmd` として生成する

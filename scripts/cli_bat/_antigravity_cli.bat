@@ -25,12 +25,16 @@ if /I "%UPDATE%"=="y" (
 :SELECT_MODEL
 ECHO.
 ECHO Antigravity CLI model list
-ECHO   1: Gemini 3.7 Flash - default
+ECHO   1: Gemini 3.8 Flash (High)
+ECHO   2: Gemini 3.8 Flash (Medium) - default
+ECHO   3: Gemini 3.8 Flash (Low)
 ECHO.
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: default]: "
 if not defined MODEL_NUMBER goto LAUNCH
-if "%MODEL_NUMBER%"=="1" set "MODEL=gemini-3.7-flash"
+if "%MODEL_NUMBER%"=="1" set "MODEL=gemini-3.8-flash-high"
+if "%MODEL_NUMBER%"=="2" set "MODEL=gemini-3.8-flash-medium"
+if "%MODEL_NUMBER%"=="3" set "MODEL=gemini-3.8-flash-low"
 if defined MODEL goto LAUNCH
 ECHO Invalid input. Enter a number or press Enter.
 goto SELECT_MODEL
