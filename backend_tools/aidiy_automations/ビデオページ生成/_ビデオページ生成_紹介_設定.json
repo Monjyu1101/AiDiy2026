@@ -20,9 +20,9 @@
 
     "【この動画の主役】AIチーム最大の特徴は、AI のメンバーが 3D の空間に集まっていて、話し合い、仕事を分担し、やった経験を貯めて次に活かすこと。ただの自動実行ではなく『チームが育っていく』点を山場として最も厚く扱うこと。",
 
-    "【出典 / 根拠資料】D:/OneDrive/_sandbox/AiDiy2026/backend_taskteam/AGENTS.md（Team 機能の節）, D:/OneDrive/_sandbox/AiDiy2026/AGENTS.md, D:/OneDrive/_sandbox/AiDiy2026/frontend_web/src/components/AIチーム/。記述は現行実装に基づくこと。",
+    "【出典 / 根拠資料】backend_taskteam/AGENTS.md（Team 機能の節）, AGENTS.md, frontend_web/src/components/AIチーム/。記述は現行実装に基づくこと。",
 
-    "【画像の方針（重要）】AiDiy の実画面スクリーンショットが D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ/sozai/ に用意してある。AIチームは 3D のチーム空間が主役なので、抽象イラストより実画面のほうが圧倒的に伝わる。そこで中盤 5 シーンは AI 画像生成をせず、素材フォルダの PNG を images/scene_NNN.png という名前でコピーして使うこと。scenario.js の image は規約どおり images/scene_NNN.png と書く（../sozai/ を直接参照してはいけない。検証に通らない）。コピーは Step 02（シナリオ作成）の作業の中で済ませる。Step 04 の _gen_scene_images.py は 1000 バイトを超える既存 PNG をスキップするため、先にコピーしておけばそのシーンは AI 生成されず実画面がそのまま採用される。",
+    "【画像の方針（重要）】AiDiy の実画面スクリーンショットが frontend_web/public/Xビデオ/sozai/ に用意してある。AIチームは 3D のチーム空間が主役なので、抽象イラストより実画面のほうが圧倒的に伝わる。そこで中盤 5 シーンは AI 画像生成をせず、素材フォルダの PNG を images/scene_NNN.png という名前でコピーして使うこと。scenario.js の image は規約どおり images/scene_NNN.png と書く（../sozai/ を直接参照してはいけない。検証に通らない）。コピーは Step 02（シナリオ作成）の作業の中で済ませる。Step 04 の _gen_scene_images.py は 1000 バイトを超える既存 PNG をスキップするため、先にコピーしておけばそのシーンは AI 生成されず実画面がそのまま採用される。",
 
     "【使用する実画面素材の割り当て】scene_001 ← sozai/web_AIチーム_要員召喚.png（歴史上の偉人が役割つきで並ぶ召喚ダイアログ）／scene_002 ← sozai/web_AIチーム.png（3D のチーム空間。公園のような場所に 4 名のメンバーが立ち吹き出しで会話、左にメンバー状況、右に依頼状況と経験状況、奥にチーム目標の掲示板）／scene_003 ← sozai/web_AIチーム_目標編集.png（チーム目標、自動作業設定のスイッチ、進め方 PlanDo / SPDCA、繰り返し回数、相談の参加人数）／scene_004 ← sozai/web_AIチーム_依頼編集.png（お願いの文章を書く画面。在庫管理の使い勝手を改善したい、という依頼例が実際に写っている）／scene_005 ← sozai/web_AIチーム_憑依視点.png（メンバーの目線に入って空間を歩いている画面）。同じ素材を複数のシーンで使い回さないこと。scene_000 と scene_999 の 2 枚だけ AI 画像生成で作る（文字を焼き込まない、明るく親しみやすい雰囲気のイラスト）。",
 
@@ -41,13 +41,13 @@
     "（参考: 生成パイプライン）topic から scenario.js 生成 → 画像生成 → 音声合成 → duration 計測まで全自動。Step 02: scenario.js 生成（＋実画面素材のコピー）、Step 03: index.html 更新、Step 04: 画像生成、Step 06: TTS 音声合成、Step 07: duration 計測。"
   ],
 
-  "template_dir": "D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ/AiDiy紹介__all_ja",
+  "template_dir": "../../../frontend_web/public/Xビデオ/AiDiy紹介__all_ja",
   "folder_name": "AiDiy紹介_AIチーム_ja",
   "language": "ja",
 
   "shared": {
     "_comment": "両スクリプト共通設定。通常は変更不要。",
-    "video_base_dir": "D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ",
+    "video_base_dir": "../../../frontend_web/public/Xビデオ",
     "frontend_base_url": "http://127.0.0.1:8090",
     "backup_api_url": "http://127.0.0.1:8095/aidiy_backup/save",
     "tts_api_url": "http://127.0.0.1:8095/aidiy_text_to_speech/synthesize",

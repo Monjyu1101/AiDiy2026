@@ -51,7 +51,7 @@ from utils.generation import (
     validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs, index_html_matches_theme,
     ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, 参照画像ディレクトリ,
-    count_scenario_scenes, count_scenario_dialogues,
+    count_scenario_scenes, count_scenario_dialogues, ensure_scene_html_pages,
 )
 from utils.steps import (
     step00_preflight, step_add_routing, step_generate_audio,
@@ -401,10 +401,14 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
                 "scenario.js 内容（SCENARIO + scene_999 + folder_name）",
                 "window.SCENARIO" in c and "scene_999" in c and folder_name in c,
             )
-        ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=10, label="翻訳シナリオ") if ok1 else False
+        ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=28, label="翻訳シナリオ") if ok1 else False
         ok4 = validate_scene_expressions(scenario_path, label="翻訳シナリオ") if ok1 else False
         ok5 = validate_scene_media_refs(scenario_path, label="翻訳シナリオ") if ok1 else False
-        return ok1 and ok2 and ok3 and ok4 and ok5
+        ok6 = False
+        if ok1:
+            updated = ensure_scene_html_pages(new_dir, scenario_path, language=ctx.language)
+            ok6 = check(f"scene HTML をシナリオ全件分生成（更新 {len(updated)} 件）", True)
+        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,

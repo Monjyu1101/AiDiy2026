@@ -41,9 +41,9 @@ Xビデオ素材生成を 9 ステップで自動実行するスクリプト群�
 |------|------|
 | `topic` | 動画テーマ（題材の説明文） |
 | `folder_name` | 出力フォルダ名 |
-| `template_dir` | コピー元テンプレートフォルダ |
+| `template_dir` | コピー元テンプレートフォルダ。相対パスは設定 JSON の配置フォルダ基準 |
 | `language` | 生成言語（`"ja"` または `"en"`） |
-| `shared.video_base_dir` | 生成先ルートフォルダ |
+| `shared.video_base_dir` | 生成先ルートフォルダ。相対パスは設定 JSON の配置フォルダ基準 |
 | `shared.tts_guide` | 音声案内 ON/OFF |
 | `shared.browser_preview` | Chrome 再描写 ON/OFF |
 | `shared.*_api_url` | 各 127.0.0.1:8095 HTTP API |

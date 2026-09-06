@@ -8,18 +8,19 @@
 # -------------------------------------------------------------------------
 
 """
-小説小話.py — female アバター一人語りによる「実話の小話」自動生成スクリプト
+小説小話.py — 一人語りによる「小説・小話」自動生成スクリプト
 
 ◆ このスクリプトが作るビデオ:
-    女性アバター（VRM_female、一人）が、実話の小話（エンタメ・ほっこり事件簿型）を
-    面白おかしく語る「ひとり語り・小話型」動画。AiDiy の機能紹介ではなく、
+    一人のアバターが、小説解説や実話の小話を
+    面白く語る「ひとり語り・小説小話型」動画。AiDiy の機能紹介ではなく、
     あくまで物語の語り手として 1 体で読み聞かせる。
     scenario.js の version は "mcp"。
     各シーンは short_narration（短い要約）と long_narration（詳しい語り）の 2 段階を持ち、
     音声ファイルは short_scene_NNN.mp3 / long_scene_NNN.mp3 の形式で生成する。
     AiDiy への言及は scene_999 の最後にひとことだけ軽く添える（本編・冒頭では一切触れない）。
-    アバターは "../_vrm/VRM_female.vrm"、ナレーション音声は edge / female。
-    テンプレートは "AiDiy紹介__all_ja" フォルダを使用（プレイヤー基盤のみ流用）。
+    ナレーション音声は edge / female。
+    テンプレートは設定 JSON から完成済みの「小説解説_AiDiy誕生_ja」を
+    相対参照し、調整済みのプレイヤー、画像レイアウト、文字配置を流用する。
 
 使い方:
     cd backend_tools
@@ -56,7 +57,7 @@ from utils.generation import (
     validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs, index_html_matches_theme,
     ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, 参照画像ディレクトリ,
-    count_scenario_scenes, count_scenario_dialogues,
+    count_scenario_scenes, count_scenario_dialogues, ensure_scene_html_pages,
 )
 from utils.steps import (
     step00_preflight, step_add_routing, step_create_folder, step_generate_audio,
@@ -67,7 +68,7 @@ from utils.steps import (
 # 定数
 # ================================================================== #
 
-SCRIPT_TYPE = "小話"
+SCRIPT_TYPE = "小説小話"
 SCRIPT_FILE_NAME = os.path.basename(__file__)
 SETTING_JSON_NAME = "_ビデオページ生成_小説小話_設定.json"
 STEPS_JSON_NAME = "_ビデオページ生成_小説小話_状況.json"
@@ -78,12 +79,8 @@ STEPS_JSON_PATH = os.path.join(_SCRIPT_DIR, STEPS_JSON_NAME)
 NEWS_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "backend_server,backend_tools,MCP活用手順.md")
 AUTO_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "共通,mcp利用による自動ビデオ生成手順.md")
 
-# 小話アバター（女性一人）。テンプレートの VRM_AiDiy.vrm から差し替える。
-AVATAR_VRM_PATH = "../_vrm/VRM_female.vrm"
-
-
 # ================================================================== #
-# 小話固有: 補助スクリプト生成
+# 小説小話固有: 補助スクリプト生成
 # ================================================================== #
 
 def _build_scene_image_prompt_body() -> str:
@@ -187,12 +184,12 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
 
     step_summary = (
         f'  "{folder_name}" の scenario.js を作成・更新します。\n'
-        "  女性アバター一人語りの小話として、short/long ナレーション、画像・音声パス、オチのあるまとめを整えます。"
+        "  一人語りの小説・小話として、short/long ナレーション、画像・音声パス、オチのあるまとめを整えます。"
     )
     scenario_path = os.path.join(new_dir, "scenario.js")
     md_path       = os.path.join(new_dir, f"{folder_name}.md")
     template_scen = os.path.join(ctx.template_dir, "scenario.js")
-    guide_tts(ctx, f"{step_name} を開始します。テーマに沿った小話の台本を作成します。")
+    guide_tts(ctx, f"{step_name} を開始します。テーマに沿った小説小話の台本を作成します。")
 
     if os.path.isfile(scenario_path):
         with open(scenario_path, encoding="utf-8") as f:
@@ -226,19 +223,20 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         '- window.SCENARIO = { ... } 形式を維持\n'
         '- "version": "mcp" を維持（duo-v2 にしないこと）\n'
         '- "project_name" と top-level の "title" を今回テーマに合わせて更新\n'
-        f'- assets_policy の "avatar" は必ず "{AVATAR_VRM_PATH}" にする（女性アバター一人）\n'
         '- assets_policy の "tts_provider" は "edge:female" にする\n'
-        '- assets_policy の他の値（visual_style / audio_dir / image_dir）はテンプレートのまま維持\n\n'
-        "■ これは AiDiy の機能紹介ではなく『実話の小話（エンタメ・ほっこり型）』のひとり語り動画です。\n"
-        "  - 女性アバター 1 体が物語の語り手として読み聞かせる構成にする。\n"
+        '- assets_policy の他の値はテンプレートのまま維持\n\n'
+        "■ これは AiDiy の機能紹介ではなく『小説解説または小話』のひとり語り動画です。\n"
+        "  - アバター 1 体が物語の語り手として読み聞かせる構成にする。\n"
         "  - 技術解説の数値や機能説明は入れない。chips / metrics / cards / facts / evidence は空配列でよい。\n"
         "  - 物語は headline / lead / subtitle と short/long narration で語る。\n\n"
-        "■ scenes 構成（最小7ページ、最大12ページ）\n"
-        "  - scene_000: イントロ（小話のつかみ）。先頭固定\n"
+        "■ scenes 構成（最小7ページ、最大30ページ）\n"
+        "  - scene_000: イントロ（小説・小話のつかみ）。先頭固定\n"
         "  - scene_001〜scene_005: 物語の展開（起承転結＋オチへの前振り）。最低限必須\n"
-        "  - 必要に応じて scene_006〜scene_010 まで追加可\n"
+        "  - 必要に応じて scene_006〜scene_028 まで追加可\n"
         "  - scene_999: まとめ（オチの余韻と締め）。最後固定\n\n"
-        "■ ページ数は物語の展開に合わせて決めること（7 ページ固定ではない）\n"
+        "■ 通常は物語の内容に応じて7〜20ページで構成する。30ページは絶対上限であり、目標ページ数ではない\n"
+        "  - 21〜30ページは、topic に明示指定がある場合、または20ページでは物語を詰め込みすぎる場合だけ使用する\n"
+        "  - ページ数は物語の展開に合わせて決めること（7ページ固定・30ページ固定ではない）\n"
         "  - 基本の考え方: 場面が変わる、時間が飛ぶ、語り手の立場が変わる。そこがシーンの切れ目\n"
         "  - 増やす判断: 1 つのシーンに場面転換が 2 回以上入るなら分けてシーンを増やす。\n"
         "    オチまでの前振りが駆け足になるようなら、展開のシーンを足す\n"
@@ -257,15 +255,15 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         '  "short_start_sec": 0.0, "short_duration_sec": 10.0,\n'
         '  "long_start_sec": 0.0, "long_duration_sec": 30.0\n\n'
         "■ 表情（expression）の方針\n"
-        "  - 基本は \"neutral\"（自然な普通の顔）にする。にやけ顔になる \"happy\" は使わない。\n"
-        "  - 驚き・衝撃の場面だけ \"surprised\" を使う。落ち着いた場面は \"relaxed\" も可。\n\n"
+        "  - 全ページ \"neutral\"（自然な普通の顔）にする。\n"
+        "  - \"happy\" / \"surprised\" / \"relaxed\" など他の値は使わない。\n\n"
         "■ AiDiy への言及は scene_999 の最後だけにする。scene_000 やそれ以外の本編では AiDiy に一切触れず、物語の語りに徹する\n\n"
         "■ scene_999 の long_narration の流れ\n"
-        "  (1) まずは小話のオチの余韻で楽しく前向きにまとめる（ここがメイン）\n"
+        "  (1) まずは小説・小話の余韻を楽しく前向きにまとめる（ここがメイン）\n"
         "  (2) チャンネル登録のお願いを添える\n"
         "  (3) 最後にひとことだけ、軽く『この動画は AiDiy のビデオページ生成で作りました』程度に触れる\n"
         "      （※ 長々と宣伝しない。AiDiy の説明は最後のひとことだけに留める）\n\n"
-        f"■ テーマ（元になる小話）: {topic}\n\n"
+        f"■ テーマ（元になる小説・小話）: {topic}\n\n"
         f'【作業 B】"{md_path}" の「シナリオ作成」チェックを [x] にしてください。\n\n'
         "【完了確認】scenario.js の先頭10行を表示してください。\n"
     )
@@ -274,7 +272,6 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
     def validate() -> bool:
         ok1 = check("scenario.js 存在", os.path.isfile(scenario_path))
         ok2 = False
-        ok_avatar = False
         if ok1:
             with open(scenario_path, encoding="utf-8") as f:
                 c = f.read()
@@ -282,11 +279,14 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
                 "scenario.js 内容（SCENARIO + scene_999 + folder_name）",
                 "window.SCENARIO" in c and "scene_999" in c and folder_name in c,
             )
-            ok_avatar = check("scenario.js avatar が VRM_female", "VRM_female.vrm" in c)
-        ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=10, label="小話シナリオ") if ok1 else False
-        ok4 = validate_scene_expressions(scenario_path, label="小話シナリオ") if ok1 else False
-        ok5 = validate_scene_media_refs(scenario_path, label="小話シナリオ") if ok1 else False
-        return ok1 and ok2 and ok_avatar and ok3 and ok4 and ok5
+        ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=28, label="小説小話シナリオ") if ok1 else False
+        ok4 = validate_scene_expressions(scenario_path, label="小説小話シナリオ") if ok1 else False
+        ok5 = validate_scene_media_refs(scenario_path, label="小説小話シナリオ") if ok1 else False
+        ok6 = False
+        if ok1:
+            updated = ensure_scene_html_pages(new_dir, scenario_path, language=ctx.language)
+            ok6 = check(f"scene HTML をシナリオ全件分生成（更新 {len(updated)} 件）", True)
+        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
@@ -309,19 +309,15 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
 
     step_summary = (
         f'  "{folder_name}" の index.html を scenario.js と今回テーマに合わせて修正します。\n'
-        "  <title>、.brand、.top-note、見出しを置き換え、アバターを VRM_female へ差し替えます。"
+        "  <title>、.brand、.top-note、見出しを今回のテーマへ置き換えます。"
     )
     index_path    = os.path.join(new_dir, "index.html")
     assets_path   = os.path.join(new_dir, "assets.json")
     scenario_path = os.path.join(new_dir, "scenario.js")
     md_path       = os.path.join(new_dir, f"{folder_name}.md")
-    guide_tts(ctx, f"{step_name} を開始します。画面のタイトルと説明、アバターを修正します。")
+    guide_tts(ctx, f"{step_name} を開始します。画面のタイトルと説明を修正します。")
 
     already_valid = index_html_matches_theme(index_path, scenario_path, folder_name, topic)
-    if already_valid and os.path.isfile(index_path):
-        with open(index_path, encoding="utf-8") as f:
-            existing_html = f.read()
-        already_valid = "VRM_female.vrm" in existing_html and "VRM_AiDiy.vrm" not in existing_html
     if already_valid:
         print("  [既存] index.html は機械検証済みです。CodeAgents の再実行を省略します")
 
@@ -346,16 +342,12 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
         "  - HTML/CSS/JavaScript の構造は維持する。\n"
         "  - 1アバター（シングル）表示、リップシンク、字幕表示ロジックは維持する。\n"
         "  - short_narration / long_narration の切り替え、short_audio / long_audio 再生ロジックは維持する。\n"
-        "  - テンプレート元（AiDiy 紹介）の文言だけを今回の小話テーマへ置き換える。\n\n"
+        "  - コピー元のレイアウトと再生ロジックを保ち、タイトルなどの内容だけを今回のテーマへ置き換える。\n\n"
         "【更新箇所】\n"
         f"  1. <title> タグにフォルダ名またはテーマ名を含める: {folder_name}\n"
-        "  2. .brand div の中身を今回の小話タイトル表示へ更新する（AiDiy 機能紹介の文言は残さない）。\n"
-        "  3. .top-note の中身を小話の簡潔な紹介文（1〜2文）へ更新する。\n"
+        "  2. .brand div の中身を今回の小説・小話タイトル表示へ更新する（AiDiy 機能紹介の文言は残さない）。\n"
+        "  3. .top-note の中身を小説・小話の簡潔な紹介文（1〜2文）へ更新する。\n"
         "  4. 見出し、サブタイトル、説明文などにテンプレート元テーマが残っていれば置き換える。\n"
-        f"  5. アバター VRM を女性モデルへ差し替える。index.html 内で VRM をロードしている箇所\n"
-        f'     （loadWith(loader, "../_vrm/VRM_AiDiy.vrm") のようなハードコードパス）を\n'
-        f'     "{AVATAR_VRM_PATH}" に変更する。"VRM_AiDiy.vrm" が残らないようにする。\n'
-        f"  6. assets.json があれば avatar_model を \"{AVATAR_VRM_PATH}\" に更新する。\n\n"
         "【今回のテーマ】\n"
         f"  フォルダ名: {folder_name}\n"
         f"  テーマ詳細: {topic}\n\n"
@@ -374,13 +366,7 @@ async def step_update_html(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
                   index_html_matches_theme(index_path, scenario_path, folder_name, topic))
             if ok1 else False
         )
-        ok3 = False
-        if ok1:
-            with open(index_path, encoding="utf-8") as f:
-                html = f.read()
-            ok3 = check("index.html アバターが VRM_female（VRM_AiDiy 残存なし）",
-                        "VRM_female.vrm" in html and "VRM_AiDiy.vrm" not in html)
-        return ok1 and ok2 and ok3
+        return ok1 and ok2
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
@@ -518,20 +504,26 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
         f'  index.html: "{index_path}"\n'
         f'  images フォルダ: "{images_dir}"\n\n'
         "【確認・修正方針】\n"
-        "  1. 小話のテーマと照らして筋が通らない内容、不適切な言葉があれば修正する。\n"
+        "  1. 小説・小話のテーマと照らして筋が通らない内容、不適切な言葉があれば修正する。\n"
         "  2. scene_000 や本編（scene_001〜）で AiDiy に触れていないか確認する（触れていたら物語の語りに直す）。\n"
         "  3. AiDiy への言及は scene_999 の最後のひとことだけに留まっているか確認する。長い宣伝になっていたら短くする。\n"
         "  4. short_narration は短い要約、long_narration は詳しい語りになっているか確認する。\n"
         "  5. 表情は基本 neutral で、にやけ顔の \"happy\" が残っていないか確認する（あれば neutral か surprised に直す）。\n"
-        "  6. アバターが VRM_female になっているか（scenario.js / index.html に VRM_AiDiy が残っていないか）確認する。\n"
-        "  7. scene_999 の締めが楽しく前向きなオチの余韻になっているか確認する。\n"
-        "  8. 問題がなければ不要な全面書き換えや再生成はしない。\n\n"
+        "  6. scene_999 の締めが楽しく前向きなオチの余韻になっているか確認する。\n"
+        "  7. 問題がなければ不要な全面書き換えや再生成はしない。\n\n"
         "【今回のテーマ】\n"
         f"  フォルダ名: {folder_name}\n"
         f"  テーマ詳細: {topic}\n\n"
         f'"{md_path}" の「中間確認」チェックを [x] にしてください。\n'
     )
-    await agent_run(ctx, ca, prompt, timeout_sec=600)
+    review_already_done = False
+    if os.path.isfile(md_path):
+        with open(md_path, encoding="utf-8-sig") as f:
+            review_already_done = "- [x] 中間確認" in f.read()
+    if review_already_done:
+        print("  [RESUME] 中間確認の完了印を検出しました。重複レビューを省略して成果物を再検証します")
+    else:
+        await agent_run(ctx, ca, prompt, timeout_sec=600)
     mark_step_done(md_path, "中間確認")
 
     def validate() -> bool:
@@ -609,7 +601,7 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         "  確認 5: _gen_audio.py が存在するか\n"
         "  確認 6: AiDiy への言及が scene_999 の最後のひとことだけに留まり、本編・冒頭で触れていないか\n"
         "  確認 7: 各 scene に short_narration / long_narration / short_audio / long_audio があるか\n"
-        "  確認 8: scenario.js / index.html のアバターが VRM_female で、VRM_AiDiy が残っていないか\n\n"
+        "  確認 8: コピー元のプレイヤー構造を壊していないか\n\n"
         "【手順 2】不足があれば修正\n"
         f'  images 不足: "{ctx.mcp_python}" "{gen_img_py}" を実行\n'
         f'  audio 不足:  "{ctx.mcp_python}" "{gen_aud_py}" を実行\n\n'
@@ -683,7 +675,7 @@ def main(argv: list | None = None) -> None:
             load_tasks_body=load_tasks_body,
             synthesize_body=synthesize_body,
             main_loop_body=main_loop_body,
-            script_docstring="ナレーション音声生成スクリプト（小話 / edge female / mcp 形式）",
+            script_docstring="ナレーション音声生成スクリプト（小説小話 / edge female / mcp 形式）",
         )
         return await step_generate_audio(ctx, ca, gen_aud_py, "_gen_audio.py", attempt=attempt)
 

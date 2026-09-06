@@ -26,7 +26,7 @@
 
     /* ── Layout ── */
     .app {
-      position: relative; z-index: 1;
+      position: relative;
       display: grid; grid-template-rows: 64px 1fr 44px;
       width: 100%; height: 100%; overflow: hidden;
     }
@@ -324,6 +324,8 @@
     }
   </style>
   <script src="scenario.js"></script>
+  <script src="../_common/playback_start_delay.js"></script>
+  <script src="../_common/playback_controls_autohide.js"></script>
   <script type="importmap">
     {
       "imports": {
@@ -444,6 +446,7 @@
 
     const audioPlayer = new Audio();
     audioPlayer.preload = "auto";
+    const playbackStartGate = AiDiyVideoPlayback.createStartGate();
     function applySpeakerState() {
       audioPlayer.volume = speakerEnabled ? 1 : 0;
       if (speakerBtn) {
@@ -605,14 +608,29 @@
     }
 
     function clearTimers() {
+      playbackStartGate.cancel();
       clearInterval(tickTimer);
       clearTimeout(turnEndTimer);
       clearTimeout(speechStartTimer);
       clearTimeout(subtitleExitTimer);
-      tickTimer    = null;
+      tickTimer = null;
       turnEndTimer = null;
       speechStartTimer = null;
       subtitleExitTimer = null;
+    }
+
+    function startTurnClock(token) {
+      clearInterval(tickTimer);
+      turnStartedAt = Date.now() - turnElapsedMs;
+      tickTimer = setInterval(() => {
+        if (token !== playbackToken || !playing) return;
+        if (Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0) {
+          turnElapsedMs = audioPlayer.currentTime * 1000;
+        } else {
+          turnElapsedMs = Date.now() - turnStartedAt;
+        }
+        updateTimerAndProgress();
+      }, 100);
     }
 
     function armTurnEndTimer(remainingMs, token) {
@@ -648,7 +666,9 @@
         } else if (sceneIndex < scenes.length - 1) {
           moveToScene(sceneIndex + 1, 0);
         } else if (_loopPlay) {
+          pause();
           moveToScene(0, 0);
+          play();
         } else {
           // End of presentation
           clearTimers();
@@ -777,27 +797,17 @@
     }
 
     function beginTurnPlayback() {
-      const turn  = currentTurn();
+      const turn = currentTurn();
       const token = ++playbackToken;
       clearTimers();
       if (!turn) {
-        turnStartedAt = Date.now();
-        armTurnEndTimer((_previewMinSceneSec || 5) * 1000, token);
+        playing = false;
+        playBtn.textContent = "▶";
+        updateTimerAndProgress();
         return;
       }
 
-      let effectiveDuration = turn.duration_sec || _previewMinSceneSec || 5;
-      turnStartedAt = Date.now() - turnElapsedMs;
-
-      tickTimer = setInterval(() => {
-        if (Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0) {
-          turnElapsedMs = audioPlayer.currentTime * 1000;
-        } else {
-          turnElapsedMs = Date.now() - turnStartedAt;
-        }
-        updateTimerAndProgress();
-      }, 100);
-
+      const effectiveDuration = turn.duration_sec || _previewMinSceneSec || 5;
       audioPlayer.pause();
       audioPlayer.currentTime = 0;
       _playTurnAudio(turn, token, effectiveDuration);
@@ -825,7 +835,11 @@
           if (!blobUrl) {
             setTtsStatus("");
             stopAllSpeakers();
-            armTurnEndTimer(effectiveDuration * 1000 - resumeMs + 200, token);
+            hideSubtitle();
+            playing = false;
+            playBtn.textContent = "▶";
+            clearTimers();
+            updateTimerAndProgress();
             return;
           }
           audioSrc = blobUrl;
@@ -833,17 +847,21 @@
           console.warn("TTS synthesis failed", e);
           setTtsStatus("");
           stopAllSpeakers();
-          armTurnEndTimer(effectiveDuration * 1000 - resumeMs + 200, token);
+          hideSubtitle();
+          playing = false;
+          playBtn.textContent = "▶";
+          clearTimers();
+          updateTimerAndProgress();
           return;
         }
         setTtsStatus("", 1500);  // Keep display for 1.5 sec after synthesis completes
       }
 
       turnElapsedMs = resumeMs;
-      turnStartedAt = Date.now() - resumeMs;
 
       audioPlayer.addEventListener("playing", () => {
-        if (token !== playbackToken) return;
+        if (token !== playbackToken || !playing) return;
+        if (!tickTimer) startTurnClock(token);
         clearTimeout(speechStartTimer);
         speechStartTimer = setTimeout(() => {
           if (token !== playbackToken || !playing) return;
@@ -864,26 +882,35 @@
       audioPlayer.currentTime = Math.min(resumeMs / 1000, Math.max(0, effectiveDuration - 0.05));
       audioPlayer.play()
         .then(() => {
-          if (token !== playbackToken) return;
+          if (token !== playbackToken || !playing) return;
+          if (!tickTimer) startTurnClock(token);
           const remaining = effectiveDuration * 1000 - (audioPlayer.currentTime * 1000) + 1200;
           armTurnEndTimer(remaining, token);
         })
         .catch(() => {
           stopAllSpeakers();
           hideSubtitle();
-          armTurnEndTimer(effectiveDuration * 1000 - resumeMs + 1200, token);
+          playing = false;
+          playBtn.textContent = "▶";
+          clearTimers();
+          updateTimerAndProgress();
         });
     }
 
-    function play() {
+    function play({ startDelay = true } = {}) {
       if (playing) return;
       const dur = (currentTurn()?.duration_sec || _previewMinSceneSec || 5) * 1000;
       if (turnElapsedMs >= dur - 80) turnElapsedMs = 0;
       playing = true;
       playBtn.textContent = "⏸";
-      resumeAudioContext();
-      renderTurn();
-      beginTurnPlayback();
+      const begin = () => {
+        if (!playing) return;
+        resumeAudioContext();
+        renderTurn();
+        beginTurnPlayback();
+      };
+      if (startDelay) playbackStartGate.start(begin);
+      else begin();
     }
 
     function pause() {
@@ -895,7 +922,7 @@
       turnElapsedMs = Math.min(
         Number.isFinite(audioPlayer.currentTime) && audioPlayer.currentTime > 0
           ? audioPlayer.currentTime * 1000
-          : Math.max(0, Date.now() - turnStartedAt),
+          : turnElapsedMs,
         dur
       );
       audioPlayer.pause();
@@ -936,11 +963,13 @@
       advanceTurn();
     });
     audioPlayer.addEventListener("error", () => {
-      if (playing) {
-        clearTimeout(turnEndTimer);
-        const token = playbackToken;
-        armTurnEndTimer(300, token);
-      }
+      if (!playing) return;
+      stopAllSpeakers();
+      hideSubtitle();
+      playing = false;
+      playBtn.textContent = "▶";
+      clearTimers();
+      updateTimerAndProgress();
     });
 
     // Init
@@ -962,7 +991,7 @@
     }
     window._triggerPlay = _triggerPlay;
     if (_autoPlay || _loopPlay) {
-      _autoplayFallbackTimer = setTimeout(_triggerPlay, 5000);
+      _autoplayFallbackTimer = setTimeout(_triggerPlay, 0);
     }
   </script>
 

@@ -11,15 +11,16 @@
 
 AiDiy は、日本語を第一言語とするフルスタック業務システム開発テンプレートです。
 
-- Backend: FastAPI + SQLAlchemy + SQLite。
+- Backend: FastAPI + SQLAlchemy + SQLite（core 8091 / apps 8098）。
 - Command Hermes: `aidiy_hermes` コード支援 CLI（常駐なし）。
-- Backend MCP: 19 個の MCP サーバー（Chrome / Desktop / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）。
+- Backend MCP: 19 個の MCP サーバー（Chrome / Desktop / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）（ポート 8095）。
 - Backend Local: OpenAI 互換の Gemma ローカル推論サーバー（ポート 8096）。
 - Backend TaskTeam: AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合したサーバー（ポート 8093）。
-- Frontend Web: Vue 3 + Vite + TypeScript。
-- Frontend Avatar: Electron / Web デュアルモードの AI Avatar UI。
+- Frontend Web: Vue 3 + Vite + TypeScript（ポート 8090）。
+- Frontend Avatar: Electron / Web デュアルモードの AI Avatar UI（ポート 8092）。
 - AI コア: チャット、音声、画像、ファイル、code1〜code6 のコード支援パネル。
 - AIタスク: 要求を AI が明細へ分解し Code CLI で自動実行する画面と実行基盤。
+- AIチーム: 複数の AI エージェントが目標を共有し、依頼と作業ループで協働する画面と実行基盤。
 
 業務システム機能追加の手順は `docs/` を参照してください。
 コアシステム機能調整の手順は [`_AIDIY/knowledge/_index.md`](./_AIDIY/knowledge/_index.md) を参照してください。

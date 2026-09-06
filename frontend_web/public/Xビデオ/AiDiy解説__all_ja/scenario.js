@@ -20,10 +20,10 @@ window.SCENARIO = {
       "headline": "日本語ファーストの\nフルスタック業務管理テンプレート AiDiy",
       "lead": "FastAPI + Vue 3 + AI コア + TOOL HUB を組み合わせた、日本語圏の開発者向けフルスタック開発環境です。",
       "image": "images/scene_000.png",
-      "source_summary": "AiDiy は日本語ファーストのフルスタック業務管理テンプレート。7 サービス構成（backend_server/backend_tools/frontend_web/frontend_avatar）で業務管理・AI コア・TOOL HUB・3D アバターを統合。この動画は ビデオページ生成機能で自動生成。",
+      "source_summary": "AiDiy は日本語ファーストのフルスタック業務管理テンプレート。7 サービス構成（backend_server 2 本/backend_tools/backend_taskteam/backend_local/frontend_web/frontend_avatar）で業務管理・AI コア・TOOL HUB・3D アバターを統合。この動画は ビデオページ生成機能で自動生成。",
       "factual_bullets": [
         "FastAPI + SQLAlchemy + SQLite (Python 3.13) + Vue 3 + Vite + TypeScript の構成",
-        "7 サービス: backend_server (8091/8098), backend_tools (8095), frontend_web (8090), frontend_avatar (8092)",
+        "7 サービス: backend_server (8091/8098), backend_tools (8095), backend_taskteam (8093), backend_local (8096), frontend_web (8090), frontend_avatar (8092)",
         "日本語ファースト設計: テーブル名・API パス・変数名すべて日本語",
         "業務サンプル（C/M/T/V/S系）・AI コア・19 MCP・Electron アバター を統合",
         "この動画は AiDiy のビデオページ生成機能で自動生成"
@@ -46,9 +46,9 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "AiDiy は 7 つのサービスで構成されるフルスタック開発環境です。",
-          "naration_text": "AiDiy は backend_server、backend_tools、frontend_web、frontend_avatar という複数のサービスが連携して動くフルスタックなシステムです。バックエンドは FastAPI と SQLAlchemy と SQLite を組み合わせ、Python 3.13 の最新環境で動かします。フロントエンドは Vue 3 と Vite と TypeScript で構成された Web UI と、Electron 対応の 3D アバター UI が揃っています。開発テンプレートとしても、AI 実験の基盤としても幅広く使えます。",
+          "naration_text": "AiDiy は backend_server が 2 本、MCP ハブの backend_tools、AIタスクと AIチームを動かす backend_taskteam、ローカル推論の backend_local、そして frontend_web と frontend_avatar という 7 つのサービスが連携して動くフルスタックなシステムです。バックエンドは FastAPI と SQLAlchemy と SQLite を組み合わせ、Python 3.13 の最新環境で動かします。フロントエンドは Vue 3 と Vite と TypeScript で構成された Web UI と、Electron 対応の 3D アバター UI が揃っています。開発テンプレートとしても、AI 実験の基盤としても幅広く使えます。",
           "audio": "audio/dlg_000_02_male.mp3",
-          "duration_sec": 29.52
+          "duration_sec": 35.304
         },
         {
           "speaker": "female",
@@ -62,12 +62,12 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "AI コアや TOOL HUB など、AI と自動化の最前線も組み込まれています。",
-          "naration_text": "業務サンプルだけでなく、AI 機能も充実しています。テキスト対話、音声認識、画像生成、コードエージェントをひとつの画面で使える AI コアパネルと、ブラウザ操作から OBS 録画制御まで 14 の機能を HTTP API で提供する AiDiy TOOL HUB が組み込まれています。業務管理と AI 自動化を組み合わせた、日本語圏の開発者向けの実用的な出発点を目指しています。",
+          "naration_text": "業務サンプルだけでなく、AI 機能も充実しています。テキスト対話、音声認識、画像生成、コードエージェントをひとつの画面で使える AI コアパネルと、ブラウザ操作から OBS 録画制御まで 19 の機能を HTTP API で提供する AiDiy TOOL HUB が組み込まれています。業務管理と AI 自動化を組み合わせた、日本語圏の開発者向けの実用的な出発点を目指しています。",
           "audio": "audio/dlg_000_04_male.mp3",
           "duration_sec": 24.096
         }
       ],
-      "duration_sec": 127.248
+      "duration_sec": 133.032
     },
     {
       "id": "scene_001",
@@ -262,11 +262,11 @@ window.SCENARIO = {
       "headline": "テキスト・音声・画像・コード\nマルチ AI 対話を 1 画面で",
       "lead": "WebSocket ストリーミングでリアルタイムに複数の AI を使い分けられる多パネル UI です。",
       "image": "images/scene_004.png",
-      "source_summary": "AiDiy AI コア: CHAT_AI_NAME(テキスト対話)・LIVE_AI_NAME(音声リアルタイム)・CODE_AI1〜6(コードエージェント 6パネル)。WebSocket ストリーミング。Code AI: claude_sdk/copilot_cli/codex_cli/antigravity_cli/opencode_cli/aidiy_hermes。A会話履歴に保存。",
+      "source_summary": "AiDiy AI コア: CHAT_AI_NAME(テキスト対話)・LIVE_AI_NAME(音声リアルタイム)・CODE_AI1〜6(コードエージェント 6パネル)。WebSocket ストリーミング。Code AI 8 種: claude_sdk/claude_cli/copilot_cli/codex_cli/antigravity_cli/grok_cli/opencode_cli/aidiy_hermes。A会話履歴に保存。",
       "factual_bullets": [
         "CHAT_AI_NAME: Claude/GPT/Gemini などのテキストチャット、WebSocket ストリーミング",
         "LIVE_AI_NAME: 音声リアルタイム対話、マイク入力→AI→音声出力",
-        "CODE_AI1〜6: 6 パネルに claude_sdk/copilot_cli/codex_cli/antigravity_cli/opencode_cli/aidiy_hermes を設定可能",
+        "CODE_AI1〜6: 6 パネルに claude_sdk/claude_cli/copilot_cli/codex_cli/antigravity_cli/grok_cli/opencode_cli/aidiy_hermes の 8 種から設定可能",
         "aidiy_hermes: 独自 Python エンジン、TUI、プロバイダ切り替え、subprocess 統合",
         "会話履歴は A会話履歴テーブルに保存"
       ],
@@ -296,9 +296,9 @@ window.SCENARIO = {
           "speaker": "female",
           "expression": "neutral",
           "telop_text": "Code AI パネルは 6 つあり、複数の AI コード CLI を同時に走らせることができます。",
-          "naration_text": "AI コアには code1 から code6 まで 6 枚のコードエージェントパネルがあります。各パネルに claude_sdk、copilot_cli、codex_cli、antigravity_cli、opencode_cli などの AI コード CLI を割り当てて、同時並行で動かすことができます。aidiy_hermes は AiDiy 独自の Python エンジンで、TUI インターフェース、プロバイダ切り替え、subprocess 統合を提供します。複数の AI を並べてコーディングの品質を比較したり、大きなタスクを分割して担当させたりできます。",
+          "naration_text": "AI コアには code1 から code6 まで 6 枚のコードエージェントパネルがあります。各パネルに claude_sdk、claude_cli、copilot_cli、codex_cli、antigravity_cli、grok_cli、opencode_cli、aidiy_hermes の 8 種類から AI コード CLI を割り当てて、同時並行で動かすことができます。aidiy_hermes は AiDiy 独自の Python エンジンで、TUI インターフェース、プロバイダ切り替え、subprocess 統合を提供します。複数の AI を並べてコーディングの品質を比較したり、大きなタスクを分割して担当させたりできます。",
           "audio": "audio/dlg_004_03_female.mp3",
-          "duration_sec": 33.168
+          "duration_sec": 36.504
         },
         {
           "speaker": "male",
@@ -309,7 +309,7 @@ window.SCENARIO = {
           "duration_sec": 23.976
         }
       ],
-      "duration_sec": 110.376
+      "duration_sec": 113.712
     },
     {
       "id": "scene_005",
@@ -510,14 +510,15 @@ window.SCENARIO = {
       "layout": "hero",
       "kicker": "AIDIY ALL-IN-ONE",
       "headline": "日本語ファーストの開発と\nAI 自動化の循環を体験しよう",
-      "lead": "業務管理テンプレート・AI コア・3D アバター・19 MCP TOOL HUB——すべてが AiDiy の中に揃っています。",
+      "lead": "業務管理テンプレート・AI コア・3D アバター・19 MCP TOOL HUB・AIタスクと AIチーム——すべてが AiDiy の中に揃っています。",
       "image": "images/scene_999.png",
-      "source_summary": "AiDiy 全体のまとめ: 日本語ファーストのフルスタック業務管理テンプレート・5サービス構成・業務サンプル・AI コア・frontend_avatar・AiDiy TOOL HUB・ビデオ自動生成まで。この動画も AiDiy が自動生成。チャンネル登録誘導。",
+      "source_summary": "AiDiy 全体のまとめ: 日本語ファーストのフルスタック業務管理テンプレート・7サービス構成・業務サンプル・AI コア・frontend_avatar・AiDiy TOOL HUB・AIタスク・AIチーム・ビデオ自動生成まで。この動画も AiDiy が自動生成。チャンネル登録誘導。",
       "factual_bullets": [
         "日本語ファーストの 7 サービス構成フルスタック業務管理テンプレート",
         "C/M/T/V/S 系の実践的な業務サンプル",
         "マルチ AI・WebSocket・Code AI 6 パネルの AI コア",
         "Electron/Web デュアルモード + VRM アバター",
+        "AIタスクと AIチーム: 要求を明細へ分解して自動実行、AI 要員が経験を貯めて協働",
         "19 MCP TOOL HUB + ビデオ Step00 から Step99 までの手順全自動生成"
       ],
       "forbidden_elements": [
@@ -530,17 +531,17 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "AiDiy は日本語ファーストのフルスタック業務管理テンプレートと AI 自動化基盤です。",
-          "naration_text": "今回の動画で紹介した AiDiy は、FastAPI と Vue 3 を軸にした日本語ファーストのフルスタック業務管理テンプレートです。7 つのサービスが連携し、業務管理サンプル、AI コア、3D アバター、19 の MCP サーバーという多彩な機能が組み込まれています。テーブル名からコード変数まで日本語で統一した設計は、日本語圏の開発者が業務ドメインとコードを直感的に対応させる上で大きな助けになります。",
+          "naration_text": "今回の動画で紹介した AiDiy は、FastAPI と Vue 3 を軸にした日本語ファーストのフルスタック業務管理テンプレートです。7 つのサービスが連携し、業務管理サンプル、AI コア、3D アバター、19 の MCP サーバー、そして AIタスクと AIチームという多彩な機能が組み込まれています。テーブル名からコード変数まで日本語で統一した設計は、日本語圏の開発者が業務ドメインとコードを直感的に対応させる上で大きな助けになります。",
           "audio": "audio/dlg_999_01_male.mp3",
-          "duration_sec": 25.728
+          "duration_sec": 27.696
         },
         {
           "speaker": "female",
           "expression": "neutral",
-          "telop_text": "業務サンプル・AI コア・アバター・19 MCP など、盛りだくさんの構成です。",
-          "naration_text": "特に印象的なのは、日本語ファースト設計のユニークさ、業務管理のリアルなサンプル、AI コアの多機能ぶり、Electron と Web の両対応アバター UI、そして 19 の MCP を集約した TOOL HUB という豊富な構成です。開発テンプレートとしても使えますし、AI 自動化の実験基盤としても活用できます。日本語を母国語とする開発者に向けて丁寧に作られていることが、細部からも伝わってきます。",
+          "telop_text": "業務サンプル・AI コア・アバター・19 MCP・AIタスクと AIチームなど、盛りだくさんの構成です。",
+          "naration_text": "特に印象的なのは、日本語ファースト設計のユニークさ、業務管理のリアルなサンプル、AI コアの多機能ぶり、Electron と Web の両対応アバター UI、19 の MCP を集約した TOOL HUB、そして日本語で書くだけで AI が手順へ分けて動かす AIタスクと AIチームという豊富な構成です。開発テンプレートとしても使えますし、AI 自動化の実験基盤としても活用できます。日本語を母国語とする開発者に向けて丁寧に作られていることが、細部からも伝わってきます。",
           "audio": "audio/dlg_999_02_female.mp3",
-          "duration_sec": 27.576
+          "duration_sec": 32.352
         },
         {
           "speaker": "male",
@@ -559,8 +560,8 @@ window.SCENARIO = {
           "duration_sec": 39.048
         }
       ],
-      "duration_sec": 117.552
+      "duration_sec": 124.296
     }
   ],
-  "total_duration_sec": 1192.08
+  "total_duration_sec": 1207.944
 };

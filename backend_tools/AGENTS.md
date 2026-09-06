@@ -126,6 +126,6 @@ SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場�
 - `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` は `127.0.0.1:8095/aidiy_text_to_speech/synthesize` の `play=true` を使い、進行案内を挟みながら実行する。
 - 題材、生成先、テンプレート、開始ステップは `aidiy_automations/ビデオページ生成/_ビデオページ生成_<種別>_設定.json`、`aidiy_automations/ビデオページ生成/_ビデオページ生成_<種別>_状況.json`、CLI 引数で管理する。`__main__` に全体の流れを置き、詳細処理は `step_*` 関数へ分ける。
 - 自動化ステップは `00` を初期確認、`01`〜`nn` を実行と検証、`99` を最終処理として並べる。
-- `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` と `aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` は `01`〜`99` の各ステップ完了後に、Chrome DevTools CDP で `?auto=loop` のビデオ表示を再描写する。
+- ビデオページ生成スクリプトは Step 02 以降の各ステップ完了後に Chrome DevTools CDP でプレビューを再描写する。Step 04〜08 は `?auto=loop&speaker=false` の無音ループとし、Step 09 の最終確認直後にだけ `?auto=loop&speaker=true` の音声つきループ再生へ切り替える。Step 99 は終了通知のみで再生状態を変更しない。
 - SSE / stdio の接続問題は `mcp_stdio.py` と `_AIDIY/knowledge/backend_tools,backend_server,運用手順.md` を確認する。
 - AIコード側の MCP 設定は `_config/AiDiy_mcp.json` と `CodeCLI_MCP設定.md` を確認する。

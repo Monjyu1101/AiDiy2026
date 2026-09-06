@@ -53,11 +53,11 @@ window.SCENARIO = {
         }
       ],
       "image_prompt": "Square 1:1 hero poster for AiDiy TOOL HUB. Central hub icon with 19 connected tool nodes glowing in cyan and electric blue, dark background, futuristic tech aesthetic, clean lines, text 'AiDiy TOOL HUB' in bold premium typography, professional software branding, no fake logos, no clutter.",
-      "short_narration": "AiDiy の backend_tools は 19 の MCP が集まる TOOL HUB です。",
+      "short_narration": "AiDiy の backend_tools は、19 の MCP をポート 8095 に集めた TOOL HUB です。",
       "long_narration": "この動画は AiDiy の video_generation 機能によって自動生成されました。今回は AiDiy のツール基盤である backend_tools、つまり「AiDiy TOOL HUB」を紹介します。ポート 8095 に 19 個の MCP サーバーが同居しており、ブラウザ操作からデータ確認、AI による画像・動画・音声の生成、コードエージェントまで、あらゆる自動化ツールが一カ所にまとまっています。Web、Python、AI エージェントのどこからでも同じ方法で呼び出せる点が TOOL HUB の大きな特徴です。",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
-      "short_duration_sec": 5.112,
+      "short_duration_sec": 6.408,
       "long_duration_sec": 30.264,
       "short_start_sec": 0.0,
       "long_start_sec": 0.0
@@ -286,11 +286,11 @@ window.SCENARIO = {
         }
       ],
       "image_prompt": "Vertical 2:3 poster showing browser automation: Python code block connecting to Chrome browser via CDP port 9222, with screenshot output panel, dark background, orange accent glow, clean flow arrows, enterprise tech style, no fake logos.",
-      "short_narration": "Python から Chrome を操作し、画面キャプチャも自動化できます。",
+      "short_narration": "Python から Chrome を操作し、画面キャプチャも自動化できます。E2E テストの自動確認にも使えます。",
       "long_narration": "aidiy_chrome_devtools は Chrome DevTools Protocol を使ってブラウザを Python から直接操作する MCP です。Node.js に依存せず、Python だけで動きます。Chrome は ChromeManager がプロセスを一元管理し、デバッグポート 9222 で起動します。ナビゲーション、クリック、テキスト入力、JavaScript の実行、コンソールログ取得、ネットワークキャプチャなど、E2E テストや画面自動化に必要な操作がそろっています。aidiy_desktop_capture は OS レベルのスクリーンショットを撮るツールで、モニター番号や座標指定、ウィンドウタイトルによるキャプチャが可能です。この 2 つを組み合わせると、ブラウザ内外を問わず画面操作と確認を自動化できます。",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
-      "short_duration_sec": 3.84,
+      "short_duration_sec": 6.72,
       "long_duration_sec": 34.944,
       "short_start_sec": 0.0,
       "long_start_sec": 0.0
@@ -454,11 +454,11 @@ window.SCENARIO = {
         }
       ],
       "image_prompt": "Vertical 2:3 poster showing AI media generation workflow: image generation panel showing a generated image, video clip frame, audio waveform and speech bubble, connected by flowing lines, multiple provider labels (OpenAI, Gemini, FreeAI), dark background, pink accent glow, creative technology style, no fake logos.",
-      "short_narration": "画像・動画・音声の生成を複数プロバイダでまとめて扱えます。",
+      "short_narration": "画像・動画・音声の生成を複数プロバイダでまとめて扱えます。この動画の画像と音声も、ここで作りました。",
       "long_narration": "AI によるメディア生成も TOOL HUB に統合されています。aidiy_image_generation は OpenAI の gpt-image や DALL-E-3、Gemini、FreeAI の 3 プロバイダを切り替えて使えます。aidiy_movie_generation は Google の Gemini Veo を使って 4 秒〜8 秒の動画を MP4 として生成します。音声合成の aidiy_text_to_speech は Edge TTS、OpenAI、Gemini、FreeAI の 4 プロバイダに対応し、MP3 ファイルとして出力できるほか、local_play オプションでその場で再生することもできます。発音辞書による自動読み替えも搭載済みです。音声認識の aidiy_speech_to_text はオフラインで動く speech_recognition と高精度な OpenAI Whisper の両方に対応しています。実はこの動画の音声ナレーションも TTS MCP によって生成されています。",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
-      "short_duration_sec": 4.656,
+      "short_duration_sec": 7.128,
       "long_duration_sec": 54.312,
       "short_start_sec": 0.0,
       "long_start_sec": 0.0
@@ -693,18 +693,18 @@ window.SCENARIO = {
         }
       ],
       "image_prompt": "Square 1:1 summary poster for AiDiy TOOL HUB. Central glowing hub with 19 connected nodes, bold text '19 MCP TOOL HUB' in cyan typography, dark background, celebratory but professional mood, clean composition, inspiring call-to-action feel, no clutter, no fake logos.",
-      "short_narration": "AiDiy TOOL HUB で、あらゆる自動化をひとつの基盤から始めましょう。",
+      "short_narration": "AiDiy TOOL HUB なら、あらゆる自動化をひとつの基盤から始められます。",
       "long_narration": "今回は AiDiy の TOOL HUB、つまり backend_tools が提供する 19 個の MCP サーバーを紹介しました。ブラウザ自動化からデータ確認、AI 画像・動画・音声生成、OBS や FFmpeg の制御、そして AI コードエージェントまで、すべてがポート 8095 ひとつに集まっています。SSE、HTTP、stdio の 3 つのトランスポートに対応しているので、Python スクリプトからでも AI エージェントからでも、同じツールを同じ感覚で呼び出せます。そしてこの動画自体が、AiDiy の video_generation 機能と TTS MCP を使って自動生成された成果物です。自分のプロジェクトでも試してみたいと思ったら、ぜひ AiDiy を手元で起動してみてください。きっと「あ、これ自分でもできる」という発見が待っています。参考になったらチャンネル登録と高評価をよろしくお願いします。次の動画でまた新しい AiDiy の機能をお届けします！",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
-      "short_duration_sec": 4.368,
+      "short_duration_sec": 4.752,
       "long_duration_sec": 51.456,
       "short_start_sec": 0.0,
       "long_start_sec": 0.0
     }
   ],
-  "short_duration_sec": 35.664,
-  "long_duration_sec": 339.6,
-  "total_short_duration_sec": 51.456,
+  "short_duration_sec": 58.488,
+  "long_duration_sec": 411.12,
+  "total_short_duration_sec": 58.488,
   "total_long_duration_sec": 411.12
 };

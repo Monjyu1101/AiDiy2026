@@ -30,7 +30,7 @@ window.SCENARIO = {
       "hero_image_focus": true,
       "background_word": "",
       "kicker": "INTRODUCTION",
-      "headline": "AiDiy's Big Picture and Design Philosophy\nIntroduced in 6 Scenes",
+      "headline": "AiDiy's Big Picture and Design Philosophy\nIntroduced in 7 Scenes",
       "lead": "From business-domain naming and service architecture to business samples, the AI Core and Avatar, the MCP TOOL HUB, AI Task and AI Team, and automated video generation — we walk through AiDiy in order.",
       "subtitle": "From naming conventions to AI Task and AI Team — the whole picture of AiDiy, in order.",
       "image": "images/scene_000.png",
@@ -41,13 +41,13 @@ window.SCENARIO = {
       "evidence": [],
       "image_prompt": "Square 1:1 hero poster for AiDiy. Make the word AiDiy itself the coolest central visual, with premium futuristic typography, strong cyan and electric blue glow, elegant Japanese enterprise AI platform mood, dark background, clean composition, high readability, polished technology branding aesthetic, no clutter, no extra fake logos, no dense paragraphs.",
       "short_narration": "This video walks through AiDiy: naming conventions, service architecture, the AI Core, the MCP TOOL HUB, and AI Task and AI Team.",
-      "long_narration": "This video was automatically generated using AiDiy's video page generation feature (ビデオページ生成機能). From scenario creation and image generation to speech synthesis and HTML assembly — everything is handled by MCP and CodeAgents. The name AiDiy combines AI and Do It Yourself — the idea of building your own business systems and automation tools with the power of AI. Built in Japan, AiDiy is a full-stack business management template built on FastAPI, SQLAlchemy, SQLite, Vue 3, Vite, and TypeScript, bundling practical business samples and an AI experimentation platform in one project. In this video, we cover AiDiy's full picture in 6 scenes: business-domain identifier conventions, service architecture, business samples, AI core and avatar, and the MCP TOOL HUB with automated video generation.",
+      "long_narration": "This video was automatically generated using AiDiy's video page generation feature (ビデオページ生成機能). From scenario creation and image generation to speech synthesis and HTML assembly — everything is handled by MCP and CodeAgents. The name AiDiy combines AI and Do It Yourself — the idea of building your own business systems and automation tools with the power of AI. Built in Japan, AiDiy is a full-stack business management template built on FastAPI, SQLAlchemy, SQLite, Vue 3, Vite, and TypeScript, bundling practical business samples and an AI experimentation platform in one project. In this video, we cover AiDiy's full picture in 7 scenes: business-domain identifier conventions, service architecture, business samples, AI core and avatar, and the MCP TOOL HUB with automated video generation.",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
       "short_start_sec": 0.0,
       "short_duration_sec": 8.904,
       "long_start_sec": 0.0,
-      "long_duration_sec": 47.184,
+      "long_duration_sec": 47.328,
       "duration_sec": 0.0
     },
     {
@@ -72,7 +72,7 @@ window.SCENARIO = {
       "metrics": [
         {
           "label": "Resident Servers",
-          "value": "3"
+          "value": "7"
         },
         {
           "label": "MCP",
@@ -80,7 +80,7 @@ window.SCENARIO = {
         },
         {
           "label": "Code AI",
-          "value": "7"
+          "value": "8"
         }
       ],
       "cards": [
@@ -220,22 +220,24 @@ window.SCENARIO = {
       "accent": "#ff6bd6",
       "accent_soft": "rgba(255, 107, 214, 0.18)",
       "kicker": "ARCHITECTURE",
-      "headline": "5 Services Running\nAround One Shared DB",
+      "headline": "7 Services Running\nAround One Shared DB",
       "lead": "Two backend_server processes, the backend_tools MCP hub, backend_taskteam for AI Task and AI Team, backend_local for on-device inference, plus frontend_web and frontend_avatar.",
-      "subtitle": "Four backend services and two frontends, all sharing a single SQLite database.",
+      "subtitle": "Five backend services and two frontends, all sharing a single SQLite database.",
       "image": "images/scene_003.png",
       "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 8098, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8092, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
       "chips": [
         "core_main port 8091",
         "apps_main port 8098",
         "backend_tools port 8095",
+        "backend_taskteam port 8093",
+        "backend_local port 8096",
         "frontend_web port 8090",
         "frontend_avatar port 8092"
       ],
       "metrics": [
         {
           "label": "Backend",
-          "value": "4 services"
+          "value": "5 services"
         },
         {
           "label": "Frontend",
@@ -290,7 +292,7 @@ window.SCENARIO = {
       ],
       "facts": [
         "backend_server is a 2-server configuration — core_main (8091) and apps_main (8098) — both sharing the same SQLite DB.",
-        "backend_tools (8095) hosts 14 MCP servers on the same port and provides SSE / Streamable HTTP / stdio transports.",
+        "backend_tools (8095) hosts 19 MCP servers on the same port and provides SSE / Streamable HTTP / stdio transports.",
         "frontend_web's Vite proxy routes /core to 8091 and /apps to 8098."
       ],
       "evidence": [
@@ -303,14 +305,14 @@ window.SCENARIO = {
           "text": "backend_server core 8091 / apps 8098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092."
         }
       ],
-      "short_narration": "Four backend services and two frontends. The MCP hub, the AI Task and Team platform, and local inference each run independently.",
-      "long_narration": "Let's look at how AiDiy is put together. There are four backend services. backend_server runs as two processes: core_main on port 8091 handles authentication and the AI Core, while apps_main on port 8098 handles business data. backend_tools is the MCP TOOL HUB on port 8095, consolidating nineteen MCP servers onto a single port. backend_taskteam on port 8093 is the execution platform for AI Task and AI Team. backend_local on port 8096 provides an OpenAI-compatible local inference server. On the frontend side there are two services: frontend_web on port 8090 for the business screens, and frontend_avatar on port 8092, which runs in both Electron and Web modes for the AI avatar. All services share a single SQLite database, so business data and AI execution history live in the same place.",
+      "short_narration": "Five backend services and two frontends. The MCP hub, the AI Task and Team platform, and local inference each run independently.",
+      "long_narration": "Let's look at how AiDiy is put together. There are five backend services. backend_server runs as two processes: core_main on port 8091 handles authentication and the AI Core, while apps_main on port 8098 handles business data. backend_tools is the MCP TOOL HUB on port 8095, consolidating nineteen MCP servers onto a single port. backend_taskteam on port 8093 is the execution platform for AI Task and AI Team. backend_local on port 8096 provides an OpenAI-compatible local inference server. On the frontend side there are two services: frontend_web on port 8090 for the business screens, and frontend_avatar on port 8092, which runs in both Electron and Web modes for the AI avatar. All services share a single SQLite database, so business data and AI execution history live in the same place.",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 7.992,
+      "short_duration_sec": 8.184,
       "long_start_sec": 0.0,
-      "long_duration_sec": 52.104,
+      "long_duration_sec": 52.224,
       "duration_sec": 0.0
     },
     {
@@ -430,7 +432,7 @@ window.SCENARIO = {
         },
         {
           "label": "Code AI Options",
-          "value": "7"
+          "value": "8"
         },
         {
           "label": "UI Modes",
@@ -447,11 +449,12 @@ window.SCENARIO = {
           ]
         },
         {
-          "title": "Code AI – 7 Options",
+          "title": "Code AI – 8 Options",
           "lines": [
             "claude_sdk / claude_cli",
             "copilot_cli / codex_cli",
-            "antigravity_cli / opencode_cli / aidiy_hermes"
+            "antigravity_cli / grok_cli",
+            "opencode_cli / aidiy_hermes"
           ]
         },
         {
@@ -473,13 +476,13 @@ window.SCENARIO = {
       ],
       "facts": [
         "The AI core is a multi-panel UI integrating WebSocket, multi-vendor AI, and Code CLI panels.",
-        "Valid Code AI values are 7 types: claude_sdk / claude_cli / copilot_cli / codex_cli / antigravity_cli / opencode_cli / aidiy_hermes.",
+        "Valid Code AI values are 8 types: claude_sdk / claude_cli / copilot_cli / codex_cli / antigravity_cli / grok_cli / opencode_cli / aidiy_hermes.",
         "frontend_avatar runs on both Electron desktop apps and standard web browsers."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "The AI core is a multi-panel UI integrating text, voice, image, file, and code support. Expected Code AI values include 7 types from claude_sdk to aidiy_hermes."
+          "text": "The AI core is a multi-panel UI integrating text, voice, image, file, and code support. Expected Code AI values include 8 types from claude_sdk to aidiy_hermes."
         },
         {
           "source": "frontend_avatar/AGENTS.md",
@@ -487,13 +490,13 @@ window.SCENARIO = {
         }
       ],
       "short_narration": "The AI core integrates multiple panels via WebSocket, and the VRM avatar operates in both Electron and Web modes.",
-      "long_narration": "The AI core is a multi-panel UI connecting chat, live voice, image processing, and code support via WebSocket. The Code AI panel has 6 slots from code1 to code6, each assignable to a different CLI. The 7 valid Code AI options are claude_sdk, claude_cli, copilot_cli, codex_cli, antigravity_cli, opencode_cli, and aidiy_hermes. frontend_avatar is an AI avatar client that runs on both Electron desktop and standard web browsers. It displays VRM models using Three.js and @pixiv/three-vrm, and controls expressions and motion using VRMA animations. State between Electron and Web is synchronized via BroadcastChannel avatar-desktop-sync.",
+      "long_narration": "The AI core is a multi-panel UI connecting chat, live voice, image processing, and code support via WebSocket. The Code AI panel has 6 slots from code1 to code6, each assignable to a different CLI. The 8 valid Code AI options are claude_sdk, claude_cli, copilot_cli, codex_cli, antigravity_cli, grok_cli, opencode_cli, and aidiy_hermes. frontend_avatar is an AI avatar client that runs on both Electron desktop and standard web browsers. It displays VRM models using Three.js and @pixiv/three-vrm, and controls expressions and motion using VRMA animations. State between Electron and Web is synchronized via BroadcastChannel avatar-desktop-sync.",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
       "short_start_sec": 0.0,
       "short_duration_sec": 6.48,
       "long_start_sec": 0.0,
-      "long_duration_sec": 44.448,
+      "long_duration_sec": 45.864,
       "duration_sec": 0.0
     },
     {
@@ -510,7 +513,7 @@ window.SCENARIO = {
       "image_prompt": "Vertical 2:3 MCP hub infographic poster, center AI agent node with nineteen connected utility nodes for browser, desktop, sqlite, postgres, logs, code check, backup, image generation, movie generation, speech-to-text, text-to-speech, OBS studio control, ffmpeg control, code agents, clean green-cyan enterprise network diagram on dark background, modern technical style, no mascots",
       "chips": [
         "port 8095",
-        "14 MCP",
+        "19 MCP",
         "SSE / HTTP / stdio",
         "Auto Video Generation",
         "9-Step Full Automation"
@@ -572,14 +575,14 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "backend_tools consolidates 14 MCP servers with 3 transports — SSE / Streamable HTTP / stdio — on the single port 8095.",
+        "backend_tools consolidates 19 MCP servers with 3 transports — SSE / Streamable HTTP / stdio — on the single port 8095.",
         "The video page generation feature (ビデオページ生成機能) provides 2 scripts (solo avatar / two-person dialogue) that automate the full 9 steps from topic to HTML.",
         "Knowledge management entry point is _AIDIY/knowledge/_index.md — the gateway to all HowTo guides."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "backend_tools consolidates 14 MCP servers with SSE / Streamable HTTP / stdio transports on the single port 8095."
+          "text": "backend_tools consolidates 19 MCP servers with SSE / Streamable HTTP / stdio transports on the single port 8095."
         },
         {
           "source": "AGENTS.md",
@@ -711,6 +714,6 @@ window.SCENARIO = {
       "duration_sec": 0.0
     }
   ],
-  "total_short_duration_sec": 68.904,
-  "total_long_duration_sec": 394.104
+  "total_short_duration_sec": 69.096,
+  "total_long_duration_sec": 395.784
 };

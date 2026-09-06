@@ -9,6 +9,7 @@ generation.py — コンテンツ生成系統合モジュール
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import os
 import re
@@ -80,6 +81,59 @@ def count_scenario_dialogues(path: str) -> int:
             if str(scene.get("long_narration", "") or "").strip():
                 count += 1
     return count
+
+
+def ensure_scene_html_pages(output_dir: str, scenario_path: str, *, language: str = "ja") -> list[str]:
+    """scenario.js の全 scene に対応する薄い HTML ラッパーを揃える。
+
+    コピー元の ``scene_000.html`` をひな型にするため、シングル版の
+    ``aidiy_scene.js``、掛け合い版の ``double_scene.js``、小説版の
+    ``scene-layout.js`` など、形式ごとの既存構造をそのまま維持できる。
+    既存ページもシナリオ配列上の index へ更新し、scene_999 の index が
+    ページ増減後に古いまま残る問題を防ぐ。
+    """
+    data = load_scenario_object(scenario_path)
+    scenes = data.get("scenes", [])
+    if not isinstance(scenes, list) or not scenes:
+        raise RuntimeError(f"scenario.js に scenes がありません: {scenario_path}")
+
+    template_path = os.path.join(output_dir, "scene_000.html")
+    if not os.path.isfile(template_path):
+        raise RuntimeError(f"scene HTML のひな型が見つかりません: {template_path}")
+    with open(template_path, encoding="utf-8-sig") as f:
+        template = f.read()
+
+    if not re.search(r"window\._SCENE_INDEX\s*=\s*\d+\s*;", template):
+        raise RuntimeError(f"scene_000.html に _SCENE_INDEX がありません: {template_path}")
+
+    title = html.escape(str(data.get("title") or data.get("project_name") or "Video"), quote=False)
+    lang = html.escape(str(language or "ja"), quote=True)
+    written: list[str] = []
+    for index, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            raise RuntimeError(f"scenes[{index}] が object ではありません")
+        scene_id = str(scene.get("id", ""))
+        if not re.fullmatch(r"scene_\d{3}", scene_id):
+            raise RuntimeError(f"不正な scene id: {scene_id!r}")
+
+        page = re.sub(r'<html\s+lang="[^"]*">', f'<html lang="{lang}">', template, count=1)
+        page = re.sub(r"<title>.*?</title>", f"<title>{title} {scene_id}</title>", page, count=1, flags=re.DOTALL)
+        page = re.sub(
+            r"window\._SCENE_INDEX\s*=\s*\d+\s*;",
+            f"window._SCENE_INDEX = {index};",
+            page,
+            count=1,
+        )
+        page_path = os.path.join(output_dir, f"{scene_id}.html")
+        current = ""
+        if os.path.isfile(page_path):
+            with open(page_path, encoding="utf-8-sig") as f:
+                current = f.read()
+        if current != page:
+            with open(page_path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(page)
+            written.append(page_path)
+    return written
 
 
 def validate_scene_id_range(
@@ -481,6 +535,13 @@ async def update_scenario_audio_durations(
     else:
         data["total_short_duration_sec"] = round(total_short_sec, 3)
         data["total_long_duration_sec"] = round(total_long_sec, 3)
+        # index.html の getTotalDurationSec() は、トップレベルの
+        # short_duration_sec / long_duration_sec があればそちらを優先する。
+        # ここを更新しないと、総再生時間の表示だけ古い値のまま残る。
+        if "short_duration_sec" in data:
+            data["short_duration_sec"] = round(total_short_sec, 3)
+        if "long_duration_sec" in data:
+            data["long_duration_sec"] = round(total_long_sec, 3)
 
     save_scenario_object(scenario_path, data)
     return {
@@ -628,15 +689,18 @@ def render_scene_image_script(
         "import json\n"
         "import os\n"
         "import sys\n"
-        "import time\n"
         "import urllib.error\n"
         "import urllib.request\n"
+        "from concurrent.futures import ThreadPoolExecutor, as_completed\n"
         + (extra_imports + "\n" if extra_imports else "")
         + "\n"
         "if sys.platform == 'win32':\n"
         "    sys.stdout.reconfigure(encoding='utf-8', errors='replace')\n"
         "    sys.stderr.reconfigure(encoding='utf-8', errors='replace')\n\n"
-        f"OUTPUT_DIR = {output_dir!r}\n"
+        # 出力先はスクリプト自身の位置から解決する。絶対パスを焼き込むと、
+        # 別マシンや別リポジトリへフォルダごとコピーしたとき旧パスへ書きに行く。
+        "_THIS_DIR = os.path.dirname(os.path.abspath(__file__))\n"
+        f"OUTPUT_DIR = os.path.join(_THIS_DIR, {os.path.basename(os.path.normpath(output_dir))!r})\n"
         f"TEMPLATE_IMAGE_DIR = {template_image_dir!r}\n"
         f"IMAGE_GEN_API_URL = {ctx.image_gen_api_url!r}\n"
         + lang_line
@@ -702,12 +766,20 @@ def render_scene_image_script(
         '        "model": result.get("model", "auto"),\n'
         '        "save_path": result.get("save_path", out_path),\n'
         "    }\n\n\n"
+        "def generate_scene(task):\n"
+        "    scene_id, scene, out_path, num_str = task\n"
+        "    prompt = build_prompt(scene)\n"
+        "    original_path = get_template_image(num_str)\n"
+        "    info = generate_one(prompt, out_path, original_path=original_path)\n"
+        "    size = os.path.getsize(out_path) if os.path.exists(out_path) else 0\n"
+        "    return scene_id, out_path, original_path, info, size\n\n\n"
         "def main():\n"
         "    scenes = load_scenes()\n"
         "    total = len(scenes)\n"
         "    done = 0\n"
         "    skip = 0\n"
         "    fail = 0\n\n"
+        "    tasks = []\n"
         "    for i, scene in enumerate(scenes):\n"
         "        if not isinstance(scene, dict):\n"
         "            continue\n"
@@ -718,27 +790,34 @@ def render_scene_image_script(
         '            print(f"  [SKIP] {os.path.basename(out_path)}")\n'
         "            skip += 1\n"
         "            continue\n\n"
-        "        prompt = build_prompt(scene)\n"
         "        original_path = get_template_image(num_str)\n"
         '        title = _clean_text(scene.get("title", scene_id))\n'
         '        ref_label = f" (ref: {os.path.basename(original_path)})" if original_path else ""\n'
-        '        print(f"  [GEN ] {os.path.basename(out_path)} : {title}{ref_label}")\n'
-        "        try:\n"
-        "            info = generate_one(prompt, out_path, original_path=original_path)\n"
-        "            size = os.path.getsize(out_path) if os.path.exists(out_path) else 0\n"
+        '        print(f"  [WAIT] {os.path.basename(out_path)} : {title}{ref_label}")\n'
+        "        tasks.append((scene_id, scene, out_path, num_str))\n\n"
+        "    worker_count = min(3, len(tasks))\n"
+        "    if worker_count:\n"
+        '        print(f"\\n画像生成を開始します（最大 {worker_count} 件並行）")\n'
+        "        with ThreadPoolExecutor(max_workers=worker_count) as executor:\n"
+        "            futures = {executor.submit(generate_scene, task): task for task in tasks}\n"
+        "            for future in as_completed(futures):\n"
+        "                task = futures[future]\n"
+        "                scene_id, _scene, out_path, _num_str = task\n"
+        "                try:\n"
+        "                    _scene_id, out_path, _original_path, info, size = future.result()\n"
+        "                except Exception as e:\n"
+        '                    print(f"  [ERR ] {os.path.basename(out_path)} -> {e}")\n'
+        "                    fail += 1\n"
+        "                    continue\n"
         "            if size > 1000:\n"
         "                print(\n"
-        "                    f\"         -> OK ({size:,} bytes) \"\n"
+        "                    f\"  [ OK ] {os.path.basename(out_path)} ({size:,} bytes) \"\n"
         "                    f\"[{info.get('provider', '?')}/{info.get('model', '?')}]\"\n"
         "                )\n"
         "                done += 1\n"
         "            else:\n"
-        '                print("         -> FAIL (empty or too small)")\n'
+        '                print(f"  [FAIL] {os.path.basename(out_path)} (empty or too small)")\n'
         "                fail += 1\n"
-        "        except Exception as e:\n"
-        '            print(f"         -> ERROR: {e}")\n'
-        "            fail += 1\n\n"
-        "        time.sleep(1)\n\n"
         '    print(f"\\n完了: {done} 生成, {skip} スキップ, {fail} 失敗 (合計 {total} 件)")\n'
         "    if fail:\n"
         "        raise SystemExit(1)\n\n\n"
@@ -796,7 +875,10 @@ def render_dialogue_audio_script(
         "if sys.platform == 'win32':\n"
         "    sys.stdout.reconfigure(encoding='utf-8', errors='replace')\n"
         "    sys.stderr.reconfigure(encoding='utf-8', errors='replace')\n\n"
-        f"OUTPUT_DIR = {output_dir!r}\n"
+        # 出力先はスクリプト自身の位置から解決する。絶対パスを焼き込むと、
+        # 別マシンや別リポジトリへフォルダごとコピーしたとき旧パスへ書きに行く。
+        "_THIS_DIR = os.path.dirname(os.path.abspath(__file__))\n"
+        f"OUTPUT_DIR = os.path.join(_THIS_DIR, {os.path.basename(os.path.normpath(output_dir))!r})\n"
         f"TTS_API_URL = {ctx.tts_api_url!r}\n"
         f"TTS_LANGUAGE = {ctx.language!r}\n"
         "os.makedirs(OUTPUT_DIR, exist_ok=True)\n\n\n"

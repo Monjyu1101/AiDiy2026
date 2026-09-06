@@ -20,13 +20,13 @@ window.SCENARIO = {
       "headline": "backend_tools が\nAiDiy TOOL HUB として進化した",
       "lead": "19 の MCP サーバーが SSE / Streamable HTTP / stdio の 3 トランスポートで提供され、Web・Python・AI エージェントいずれからも統一的に呼び出せます。",
       "image": "images/scene_000.png",
-      "source_summary": "AiDiy の backend_tools が AiDiy TOOL HUB として整備され、19 の MCP サーバーが 3 つのトランスポートと HTTP API で統一的に利用可能になった全体概要。この動画は video_generation 機能で自動生成。",
+      "source_summary": "AiDiy の backend_tools が AiDiy TOOL HUB として整備され、19 の MCP サーバーが 3 つのトランスポートと HTTP API で統一的に利用可能になった全体概要。この動画は ビデオページ生成機能で自動生成。",
       "factual_bullets": [
         "19 の MCP サーバーがポート 8095 に集約",
         "SSE / Streamable HTTP / stdio の 3 トランスポートを同一ポートで提供",
         "HTTP POST で直接利用でき MCP クライアント不要",
         "Web・Python・AI エージェントから同じインターフェースで呼び出せる",
-        "この動画は AiDiy の video_generation 機能で自動生成"
+        "この動画は AiDiy の ビデオページ生成機能で自動生成"
       ],
       "forbidden_elements": [
         "具体的な料金や商用サービスとしての断定",
@@ -37,10 +37,10 @@ window.SCENARIO = {
         {
           "speaker": "female",
           "expression": "neutral",
-          "telop_text": "AiDiy TOOL HUB を紹介します。この動画は AiDiy の video_generation 機能で自動生成されました。",
-          "naration_text": "今回の動画では、AiDiy の backend_tools が進化して誕生した「AiDiy TOOL HUB」について紹介します。ブラウザ操作から AI による画像・音声・動画の生成、録画制御、コードエージェントまで、開発と自動化に必要なツールが 19 種類まとまったツール基盤です。MCP の 3 つのトランスポートに対応しているので、AI エージェント、Python スクリプト、Web ブラウザのどこからでも統一的に呼び出せます。なお、この動画は AiDiy の video_generation 機能によって自動生成されました。シナリオ作成、画像生成、音声合成まで、すべて AiDiy が担当しています。",
+          "telop_text": "AiDiy TOOL HUB を紹介します。この動画は AiDiy の ビデオページ生成機能で自動生成されました。",
+          "naration_text": "今回の動画では、AiDiy の backend_tools が進化して誕生した「AiDiy TOOL HUB」について紹介します。ブラウザ操作から AI による画像・音声・動画の生成、録画制御、コードエージェントまで、開発と自動化に必要なツールが 19 種類まとまったツール基盤です。MCP の 3 つのトランスポートに対応しているので、AI エージェント、Python スクリプト、Web ブラウザのどこからでも統一的に呼び出せます。なお、この動画は AiDiy の ビデオページ生成機能によって自動生成されました。シナリオ作成、画像生成、音声合成まで、すべて AiDiy が担当しています。",
           "audio": "audio/dlg_000_01_female.mp3",
-          "duration_sec": 39.96
+          "duration_sec": 40.128
         },
         {
           "speaker": "male",
@@ -53,10 +53,10 @@ window.SCENARIO = {
         {
           "speaker": "female",
           "expression": "neutral",
-          "telop_text": "19 の MCP は 4 つのカテゴリに分類されています。",
-          "naration_text": "19 の MCP サーバーは、大きく 4 つのカテゴリで整理できます。まず、Chrome とデスクトップを操作するブラウザ・画面操作系。次に、SQLite、PostgreSQL、ログ、コードチェック、バックアップを扱うデータ管理・開発補助系。続いて、画像・動画・音声を生成する AI 生成系。最後に、OBS、FFmpeg、コードエージェントによる運用自動化系です。今日はこの 4 カテゴリを順番に見ていきます。",
+          "telop_text": "19 の MCP は 5 つのカテゴリに分類されています。",
+          "naration_text": "19 の MCP サーバーは、大きく 5 つのカテゴリで整理できます。まず、Chrome とデスクトップを操作するブラウザ・画面操作系。次に、SQLite、PostgreSQL、ログ、コードチェック、バックアップを扱うデータ管理・開発補助系。続いて、画像・動画・音声を生成する AI 生成系。続いて、OBS、FFmpeg、Windows 操作、通知音による運用自動化系。最後に、チャット LLM と AIタスク・AIチームをつなぐ AI 連携系です。今日はこの 5 カテゴリを順番に見ていきます。",
           "audio": "audio/dlg_000_03_female.mp3",
-          "duration_sec": 32.136
+          "duration_sec": 38.76
         },
         {
           "speaker": "male",
@@ -67,7 +67,7 @@ window.SCENARIO = {
           "duration_sec": 23.472
         }
       ],
-      "duration_sec": 120.792
+      "duration_sec": 127.584
     },
     {
       "id": "scene_001",
@@ -142,15 +142,14 @@ window.SCENARIO = {
       "headline": "19 の MCP サーバーが\n1 つのポートに集約",
       "lead": "ブラウザ操作・データ管理・AI 生成・運用自動化まで、開発に必要な機能をひとまとめにしました。",
       "image": "images/scene_002.png",
-      "source_summary": "AiDiy TOOL HUB に含まれる 19 の MCP サーバーの全体一覧と、4 カテゴリへの分類",
+      "source_summary": "AiDiy TOOL HUB に含まれる 19 の MCP サーバーの全体一覧と、5 カテゴリへの分類",
       "factual_bullets": [
-        "ブラウザ・画面操作系: aidiy_chrome_devtools, aidiy_desktop_capture",
-        "データ管理・開発補助系: aidiy_sqlite, aidiy_postgres, aidiy_logs, aidiy_code_check, aidiy_backup",
-        "AI 生成系: aidiy_image_generation, aidiy_movie_generation, aidiy_speech_to_text, aidiy_text_to_speech",
-        "運用自動化系: aidiy_obs_studio_control, aidiy_ffmpeg_control, aidiy_code_agents",
-        "ツール一覧は GET http://localhost:8095/{mcp_name}/list で確認できる",
-        "AI 連携系: aidiy_code_agents / aidiy_chat_llms / aidiy_task_agents / aidiy_team_agents",
-        "運用補助: aidiy_windows_control（Windows UI 操作）/ aidiy_notification_sounds（通知音）"
+        "ブラウザ・画面操作系(2): aidiy_chrome_devtools, aidiy_desktop_capture",
+        "データ管理・開発補助系(5): aidiy_sqlite, aidiy_postgres, aidiy_logs, aidiy_code_check, aidiy_backup",
+        "AI 生成系(4): aidiy_image_generation, aidiy_movie_generation, aidiy_speech_to_text, aidiy_text_to_speech",
+        "運用自動化系(4): aidiy_obs_studio_control, aidiy_ffmpeg_control, aidiy_windows_control, aidiy_notification_sounds",
+        "AI 連携系(4): aidiy_code_agents, aidiy_chat_llms, aidiy_task_agents, aidiy_team_agents",
+        "ツール一覧は GET http://localhost:8095/{mcp_name}/list で確認できる"
       ],
       "forbidden_elements": [
         "MCP サーバーの数を 19 以外で断言すること",
@@ -428,11 +427,11 @@ window.SCENARIO = {
       "headline": "OBS・FFmpeg・コードエージェントで\n運用を完全自動化",
       "lead": "aidiy_obs_studio_control / aidiy_ffmpeg_control / aidiy_code_agents が録画・動画処理・AI コード実行を担います。",
       "image": "images/scene_006.png",
-      "source_summary": "aidiy_obs_studio_control、aidiy_ffmpeg_control、aidiy_code_agents の 3 つの運用自動化系 MCP の機能と連携ワークフロー",
+      "source_summary": "運用自動化系 MCP のうち aidiy_obs_studio_control、aidiy_ffmpeg_control と、AI 連携系の aidiy_code_agents を詳しく解説。あわせて同カテゴリの aidiy_windows_control と aidiy_notification_sounds も紹介する。",
       "factual_bullets": [
         "aidiy_obs_studio_control: OBS Studio を WebSocket v5 で制御、録画・配信・シーン切替・音声ミュート",
         "aidiy_ffmpeg_control: ffmpeg / ffprobe / ffplay を MCP 経由で実行、動画トリミング・変換・字幕焼き込み",
-        "aidiy_code_agents: claude_sdk, copilot_cli, codex_cli, opencode_cli など複数の AI コード CLI を統一的に実行",
+        "aidiy_code_agents: claude_sdk, claude_cli, copilot_cli, codex_cli, antigravity_cli, grok_cli, opencode_cli, aidiy_hermes の 8 種を統一的に実行",
         "3 つを組み合わせると、コード生成→動作確認→録画→編集のサイクルを自動化できる",
         "aidiy_windows_control: キーボード・マウス・ウィンドウ操作と UI Automation",
         "aidiy_notification_sounds: 処理の区切りを通知音で知らせる"
@@ -476,9 +475,9 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "aidiy_code_agents は複数の AI コード CLI をまとめて実行できます。",
-          "naration_text": "aidiy_code_agents は、Claude SDK、Copilot CLI、Codex CLI、OpenCode CLI など、複数の AI コードエージェント CLI をまとめて実行できる MCP です。プロンプトと作業ディレクトリを渡すだけで、指定した AI エージェントがコード作業を実行し結果を返してくれます。Claude や Copilot といった複数の AI を、状況に合わせて使い分けられる点が魅力です。",
+          "naration_text": "aidiy_code_agents は、Claude SDK、Claude CLI、Copilot CLI、Codex CLI、Antigravity CLI、Grok CLI、OpenCode CLI、そして aidiy_hermes という 8 種類の AI コードエージェント CLI を、まとめて実行できる MCP です。プロンプトと作業ディレクトリを渡すだけで、指定した AI エージェントがコード作業を実行し結果を返してくれます。Claude や Copilot といった複数の AI を、状況に合わせて使い分けられる点が魅力です。",
           "audio": "audio/dlg_006_04_male.mp3",
-          "duration_sec": 24.12
+          "duration_sec": 28.584
         },
         {
           "speaker": "female",
@@ -489,7 +488,7 @@ window.SCENARIO = {
           "duration_sec": 24.888
         }
       ],
-      "duration_sec": 122.376
+      "duration_sec": 126.84
     },
     {
       "id": "scene_007",
@@ -610,13 +609,13 @@ window.SCENARIO = {
           "speaker": "female",
           "expression": "neutral",
           "telop_text": "AiDiy TOOL HUB を実際に動かして、自動化の可能性を体験してみてください！",
-          "naration_text": "この動画は AiDiy の video_generation 機能で自動生成しました。AiDiy は、業務システム開発テンプレートと AI 自動化ツールを組み合わせた、日本語ファーストの開発環境です。AiDiy TOOL HUB を実際に動かしてみると、自動化の可能性がどんどん広がっていくのを感じられます。皆さんもぜひ試してみてください。きっと、開発がもっと楽しくなりますよ！",
+          "naration_text": "この動画は AiDiy の ビデオページ生成機能で自動生成しました。AiDiy は、業務システム開発テンプレートと AI 自動化ツールを組み合わせた、日本語ファーストの開発環境です。AiDiy TOOL HUB を実際に動かしてみると、自動化の可能性がどんどん広がっていくのを感じられます。皆さんもぜひ試してみてください。きっと、開発がもっと楽しくなりますよ！",
           "audio": "audio/dlg_999_04_female.mp3",
-          "duration_sec": 24.6
+          "duration_sec": 24.744
         }
       ],
-      "duration_sec": 95.04
+      "duration_sec": 95.184
     }
   ],
-  "total_duration_sec": 1013.4
+  "total_duration_sec": 1024.8
 };

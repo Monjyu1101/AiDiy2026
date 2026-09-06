@@ -147,6 +147,7 @@ class conf_models:
         }
         self.CODE_CODEX_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
+            "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
             "gpt-5.6-sol": "yyyy/mm/dd - gpt-5.6-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
             "gpt-5.6-luna": "yyyy/mm/dd - gpt-5.6-luna",

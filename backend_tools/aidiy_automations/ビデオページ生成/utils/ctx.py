@@ -37,7 +37,7 @@ class VideoGenCtx:
     step_specified: bool
 
     # === スクリプト固有 ===
-    script_type: str        # "紹介" / "解説" / "翻訳ja2xx"
+    script_type: str        # "紹介" / "解説" / "小説小話" / "翻訳ja2xx"
     steps_json_path: str    # _ビデオページ生成_XXX_状況.json のパス
     steps_json_name: str    # ファイル名のみ
     setting_json_name: str  # 設定 JSON のファイル名（エラーメッセージ用）

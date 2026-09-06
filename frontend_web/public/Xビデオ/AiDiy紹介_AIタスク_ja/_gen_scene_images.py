@@ -17,7 +17,7 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-OUTPUT_DIR = 'D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ\\AiDiy紹介_AIタスク_ja\\images'
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
 TEMPLATE_IMAGE_DIR = ''
 IMAGE_GEN_API_URL = 'http://127.0.0.1:8095/aidiy_image_generation/generate'
 os.makedirs(OUTPUT_DIR, exist_ok=True)

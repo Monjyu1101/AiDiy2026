@@ -52,7 +52,7 @@ from utils.generation import (
     load_scenario_object, validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs,
     index_html_matches_theme, scenario_title_and_lead, ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, 参照画像ディレクトリ,
-    count_scenario_scenes, count_scenario_dialogues,
+    count_scenario_scenes, count_scenario_dialogues, ensure_scene_html_pages,
 )
 from utils.steps import (
     step00_preflight, step_add_routing, step_create_folder, step_generate_audio,
@@ -224,11 +224,14 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         '- "project_name" と top-level の "title" を今回テーマに合わせて更新\n'
         f'- assets_policy.audio_output_dir を "{audio_out_dir}" に変更\n'
         '- tts_male="edge:male", tts_female="edge:female" のまま\n\n'
-        "■ scenes 構成（最小7ページ、最大22ページ）\n"
+        "■ scenes 構成（最小7ページ、最大30ページ）\n"
         "  - scene_000: イントロ（掛け合い 4〜5 発言）\n"
         "  - scene_001〜scene_005: 各テーマ（4〜5 発言ずつ）\n"
+        "  - 必要に応じて scene_006〜scene_028 まで追加可\n"
         "  - scene_999: まとめ（最終発言は female）\n\n"
-        "■ ページ数はテーマの情報量に合わせて決めること（7 ページ固定ではない）\n"
+        "■ 通常は内容に応じて7〜20ページで構成する。30ページは絶対上限であり、目標ページ数ではない\n"
+        "  - 21〜30ページは、topic に明示指定がある場合、または20ページでは内容を詰め込みすぎる場合だけ使用する\n"
+        "  - ページ数はテーマの情報量に合わせて決めること（7ページ固定・30ページ固定ではない）\n"
         "  - 基本の考え方: 解説したい論点が N 個あるなら『イントロ + N + まとめ』にする\n"
         "  - 増やす判断: 1 つのシーンで話題が切り替わるなら分けてシーンを増やす。\n"
         "    掛け合いが 6 発言を超えて続くようなら、そこは 2 シーンに分けるサイン\n"
@@ -261,10 +264,14 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
                 "scenario.js 内容（SCENARIO + scene_999 + folder_name）",
                 "window.SCENARIO" in c and "scene_999" in c and folder_name in c,
             )
-        ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=20, label="解説シナリオ") if ok1 else False
+        ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=28, label="解説シナリオ") if ok1 else False
         ok4 = validate_scene_expressions(scenario_path, label="解説シナリオ") if ok1 else False
         ok5 = validate_scene_media_refs(scenario_path, label="解説シナリオ") if ok1 else False
-        return ok1 and ok2 and ok3 and ok4 and ok5
+        ok6 = False
+        if ok1:
+            updated = ensure_scene_html_pages(new_dir, scenario_path, language=ctx.language)
+            ok6 = check(f"scene HTML をシナリオ全件分生成（更新 {len(updated)} 件）", True)
+        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca, backup_url=ctx.backup_api_url,

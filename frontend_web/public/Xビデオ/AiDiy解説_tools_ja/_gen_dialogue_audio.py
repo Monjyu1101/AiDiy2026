@@ -14,7 +14,7 @@ import urllib.request
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-OUTPUT_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\AiDiy解説_tools_ja\\audio'
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'audio')
 TTS_API_URL = 'http://127.0.0.1:8095/aidiy_text_to_speech/synthesize'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 
-OUTPUT_DIR = 'D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ\\AiDiy紹介__all_en\\images'
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
 TEMPLATE_IMAGE_DIR = 'D:/OneDrive/_sandbox/AiDiy2026/frontend_web/public/Xビデオ/AiDiy紹介__all_ja\\images'
 IMAGE_GEN_API_URL = 'http://127.0.0.1:8095/aidiy_image_generation/generate'
 os.makedirs(OUTPUT_DIR, exist_ok=True)

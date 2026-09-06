@@ -446,7 +446,7 @@ PREVIEW_MIN_SCENE_SEC = 5.0
 #   yes    : 自動再生する（1 周で止まる）
 #   loop   : 自動再生してループする
 # 素材が揃っていない段階でループさせても同じ未完成画面を回すだけなので、
-# 段階を追って「表示だけ → 自動再生 → 音声つきループ」と上げていく。
+# 段階を追って「表示だけ → 無音ループ → 最終確認後の音声つきループ」と上げていく。
 PREVIEW_AUTO_NONE = "none"
 PREVIEW_AUTO_YES  = "yes"
 PREVIEW_AUTO_LOOP = "loop"
@@ -527,6 +527,21 @@ def ensure_preview_minimum_duration_mcp(index_path: str) -> None:
             "_longStartSecs.push(la);  la += (sc.long_duration_sec  || previewMinSceneSec || 0);",
         )
 
+    # 最終シーンから先頭へ戻る周回境界でも、初回と同じ 5・4・3 を表示する。
+    if """      } else if (fromAuto && isLoopPlayback()) {
+        moveToScene(0);
+      } else {""" in html:
+        html = html.replace(
+            """      } else if (fromAuto && isLoopPlayback()) {
+        moveToScene(0);
+      } else {""",
+            """      } else if (fromAuto && isLoopPlayback()) {
+        pause();
+        moveToScene(0);
+        play();
+      } else {""",
+        )
+
     if "function getTotalDurationSec() {\n      return audioMode === \"long\" ? (scenario.long_duration_sec || 1) : (scenario.short_duration_sec || 1);\n    }" in html:
         html = html.replace(
             '    function getTotalDurationSec() {\n'
@@ -594,6 +609,21 @@ def ensure_preview_minimum_duration_duo(index_path: str) -> None:
             "let effectiveDuration = turn.duration_sec || _previewMinSceneSec || 5;",
         )
 
+    # 男女会話型も周回境界で再生をいったん閉じ、共通ゲートから再開する。
+    if """        } else if (_loopPlay) {
+          moveToScene(0, 0);
+        } else {""" in html:
+        html = html.replace(
+            """        } else if (_loopPlay) {
+          moveToScene(0, 0);
+        } else {""",
+            """        } else if (_loopPlay) {
+          pause();
+          moveToScene(0, 0);
+          play();
+        } else {""",
+        )
+
     if html != original:
         with open(index_path, "w", encoding="utf-8", newline="\n") as f:
             f.write(html)
@@ -643,7 +673,10 @@ async def refresh_browser_preview(
             post_mcp_method,
             ctx.chrome_api_url,
             "navigate",
-            {"url": url, "show_automation_banner": False},
+            {
+                "url": url,
+                "show_automation_banner": False,
+            },
             90,
         )
         print(f"  [browser] {step_label}: {result}")
@@ -681,7 +714,7 @@ _TRIGGER_PLAY_JS = (
 async def _ensure_playback_started(ctx: "VideoGenCtx", step_label: str) -> None:
     """最終再生ページが実際に鳴り始めたか確かめ、止まっていれば起こす。
 
-    index.html は ?auto=loop を見て 5 秒後のフォールバックタイマーで自動再生を始める。
+    index.html は ?auto=loop を見て 5・4・3 のカウントダウン後に自動再生を始める。
     ページの読み込みが遅れるとそのタイマーが動く前にステップが終わり、開いただけで
     静止して見えることがあるため、ここで状態を確認して _triggerPlay() を呼ぶ。
     ブラウザ確認は補助なので、失敗してもステップの成否には影響させない。
@@ -736,16 +769,18 @@ async def _ensure_playback_started(ctx: "VideoGenCtx", step_label: str) -> None:
 
 
 async def start_final_playback(ctx: "VideoGenCtx", step_label: str) -> None:
-    """最終チェックが通ったあと、音声つきのループ再生を開始する。
+    """Step 09 の最終チェックが済んだあと、音声つきのループ再生を開始する。
 
     生成途中は refresh_browser_preview が無音（?speaker=false）＋ preview_min_sec つきで
-    進捗を映しているだけなので、仕上がりの確認にはならない。最終確認まで通ったら、
-    閲覧者が開くのと同じ ?auto=loop で開き直し、音声つきで最初から流す。
+    進捗を映しているだけなので、仕上がりの確認にはならない。Step 09 の最終確認を
+    終えたあと、閲覧者が開くのと同じ ?auto=loop で開き直し、音声つきで最初から流す。
+    Step 99 の完成案内では再生状態を変更しない。
 
-    ここだけ navigate ではなく launch_url を使う。navigate は起動済み Chrome の
-    既存タブを遷移させるだけで、--autoplay-policy=no-user-gesture-required のような
-    プロセス単位の起動引数が効いていない Chrome に当たると音声つき再生が始まらない。
-    launch_url は URL を Chrome の起動引数として渡すため、その条件を満たせる。
+    通常プレビューから最終再生まで、Chrome DevTools の無指定 ``default``
+    セッションにある同じタブを ``navigate`` で遷移させる。``launch_url`` は
+    起動済み Chrome に新規タブを追加するため、再生タブが重複する原因になる。
+    Chrome Manager は初回起動時に autoplay 許可オプションを付与するため、
+    ``navigate`` でも音声つき自動再生を維持できる。
     """
     if not ctx.browser_preview:
         return
@@ -759,8 +794,11 @@ async def start_final_playback(ctx: "VideoGenCtx", step_label: str) -> None:
         result = await asyncio.to_thread(
             post_mcp_method,
             ctx.chrome_api_url,
-            "launch_url",
-            {"url": url, "show_automation_banner": False},
+            "navigate",
+            {
+                "url": url,
+                "show_automation_banner": False,
+            },
             90,
         )
         print(f"  [browser] {step_label}: 音声つきループ再生を開始します -> {url}")
@@ -957,11 +995,11 @@ async def verify_and_backup_until_stable(
                 "（このステップは出力フォルダへ書き込んでいません）"
             )
         if diff_count == 0:
-            print("  [backup] 差分なし。次のステップへ進みます")
+            print(f"  [backup] 差分なし。{step_name} が完了しました")
             if ctx.use_english_voice:
-                _tts(f"{label} has no remaining differences. Moving to the next step.")
+                _tts(f"{label} has finished.")
             else:
-                _tts(f"{step_name} の差分はありません。次のステップへ進みます。")
+                _tts(f"{step_name} が終わりました。")
             return True
 
         print("  [backup] 差分あり。POST /aidiy_backup/save/run で保存します")
@@ -981,11 +1019,11 @@ async def verify_and_backup_until_stable(
             # 直前に validate() が通っていて差分も保存済みなので、このステップはここで完了。
             # 以前はここから次ラウンドへ戻して検証エージェントをもう一度丸ごと実行しており、
             # 1 ステップあたり数分を無駄にしていた（AI タスクの実行タイムアウトの原因）。
-            print("  [backup] 差分を保存しました。次のステップへ進みます")
+            print(f"  [backup] 差分を保存しました。{step_name} が完了しました")
             if ctx.use_english_voice:
-                _tts(f"{label} backup is saved. Moving to the next step.")
+                _tts(f"The backup is saved. {label} has finished.")
             else:
-                _tts(f"{step_name} の差分バックアップを保存しました。次のステップへ進みます。")
+                _tts(f"差分バックアップを保存し、{step_name} が終わりました。")
             return True
 
         print("  [backup] バックアップ後も差分が残っています。同ステップを継続します")
@@ -1065,7 +1103,16 @@ def build_ctx(
     if not topic:
         raise RuntimeError(f"{sn} の topic が空です")
 
-    template_dir = require_string(setting, "template_dir", sn)
+    # フォルダ設定は別環境へ持ち運べるよう相対指定を許可する。
+    # 実行時のカレントディレクトリではなく、設定 JSON の配置場所を基準にする。
+    setting_base_dir = os.path.dirname(os.path.abspath(setting_json_path))
+
+    def resolve_setting_path(value: str) -> str:
+        return os.path.abspath(value if os.path.isabs(value) else os.path.join(setting_base_dir, value))
+
+    template_dir = resolve_setting_path(require_string(setting, "template_dir", sn))
+    video_base_dir = resolve_setting_path(require_string(s_shared, "video_base_dir", sn))
+    language = require_string(setting, "language", sn)
 
     mcp_python = os.path.join(mcp_dir, ".venv", "Scripts", "python.exe") if mcp_dir else ""
     if not mcp_python or not os.path.isfile(mcp_python):
@@ -1075,14 +1122,14 @@ def build_ctx(
         folder_name=folder_name,
         topic=topic,
         template_dir=template_dir,
-        video_base_dir=require_string(s_shared, "video_base_dir", sn),
+        video_base_dir=video_base_dir,
         backup_api_url=require_string(s_shared, "backup_api_url", sn),
         tts_api_url=require_string(s_shared, "tts_api_url", sn),
         image_gen_api_url=require_string(s_shared, "image_gen_api_url", sn),
         code_agents_api_url=require_string(s_shared, "code_agents_api_url", sn),
         chrome_api_url=require_string(s_shared, "chrome_api_url", sn),
         ffmpeg_api_url=require_string(s_shared, "ffmpeg_api_url", sn),
-        language=require_string(setting, "language", sn),
+        language=language,
         tts_guide=require_bool(s_shared, "tts_guide", sn),
         frontend_base_url=require_string(s_shared, "frontend_base_url", sn),
         browser_preview=require_bool(s_shared, "browser_preview", sn),
@@ -1097,9 +1144,9 @@ def build_ctx(
         steps_json_path=steps_json_path,
         steps_json_name=steps_json_name,
         setting_json_name=setting_json_name,
-        fix_mode=os.path.normpath(template_dir) == os.path.normpath(
-            os.path.join(require_string(s_shared, "video_base_dir", sn), folder_name)
-        ),
+        fix_mode=os.path.normcase(os.path.normpath(template_dir)) == os.path.normcase(os.path.abspath(
+            os.path.join(video_base_dir, folder_name)
+        )),
         mcp_python=mcp_python,
         repo_dir=repo_dir,
         progress_tts_language=progress_tts_language,

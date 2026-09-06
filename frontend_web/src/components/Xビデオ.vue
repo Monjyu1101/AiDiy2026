@@ -15,30 +15,43 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const baseUrl = import.meta.env.BASE_URL || '/';
-const allUrl      = `${baseUrl}Xビデオ/AiDiy紹介__all_ja/index.html`;
-const allEnUrl    = `${baseUrl}Xビデオ/AiDiy紹介__all_en/index.html`;
-const 紹介ビデオ生成Url = `${baseUrl}Xビデオ/AiDiy紹介_ビデオ生成_ja/index.html`;
-const 解説ビデオ生成Url = `${baseUrl}Xビデオ/AiDiy解説_ビデオ生成_ja/index.html`;
-const backendUrl  = `${baseUrl}Xビデオ/AiDiy紹介_backend_ja/index.html`;
+// AiDiy紹介
+const allUrl = `${baseUrl}Xビデオ/AiDiy紹介__all_ja/index.html`;
+const allEnUrl = `${baseUrl}Xビデオ/AiDiy紹介__all_en/index.html`;
+const backendUrl = `${baseUrl}Xビデオ/AiDiy紹介_backend_ja/index.html`;
 const frontendUrl = `${baseUrl}Xビデオ/AiDiy紹介_frontend_ja/index.html`;
-const aiコアUrl   = `${baseUrl}Xビデオ/AiDiy紹介_AIコア_ja/index.html`;
+const aiコアUrl = `${baseUrl}Xビデオ/AiDiy紹介_AIコア_ja/index.html`;
 const aiタスクUrl = `${baseUrl}Xビデオ/AiDiy紹介_AIタスク_ja/index.html`;
 const aiチームUrl = `${baseUrl}Xビデオ/AiDiy紹介_AIチーム_ja/index.html`;
-const toolsUrl    = `${baseUrl}Xビデオ/AiDiy紹介_tools_ja/index.html`;
-const hermesUrl   = `${baseUrl}Xビデオ/AiDiy紹介_hermes_ja/index.html`;
-const avatarUrl   = `${baseUrl}Xビデオ/AiDiy紹介_avatar_ja/index.html`;
-const 配車管理Url  = `${baseUrl}Xビデオ/AiDiy実装_配車管理_ja/index.html`;
-const 生産管理Url  = `${baseUrl}Xビデオ/AiDiy実装_生産管理_ja/index.html`;
-const 在庫管理Url  = `${baseUrl}Xビデオ/AiDiy実装_在庫管理_ja/index.html`;
+const toolsUrl = `${baseUrl}Xビデオ/AiDiy紹介_tools_ja/index.html`;
+const hermesUrl = `${baseUrl}Xビデオ/AiDiy紹介_hermes_ja/index.html`;
+const avatarUrl = `${baseUrl}Xビデオ/AiDiy紹介_avatar_ja/index.html`;
+const 紹介ビデオ生成Url = `${baseUrl}Xビデオ/AiDiy紹介_ビデオ生成_ja/index.html`;
+
+// AiDiy実装・解説
+const 解説AllUrl = `${baseUrl}Xビデオ/AiDiy解説__all_ja/index.html`;
+const 解説AllEnUrl = `${baseUrl}Xビデオ/AiDiy解説__all_en/index.html`;
 const webAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_web_ja/index.html`;
 const avatarAiDiyUrl = `${baseUrl}Xビデオ/AiDiy実装_avatar_ja/index.html`;
-const 解説AllUrl          = `${baseUrl}Xビデオ/AiDiy解説__all_ja/index.html`;
-const 解説AllEnUrl        = `${baseUrl}Xビデオ/AiDiy解説__all_en/index.html`;
-const 解説toolsUrl        = `${baseUrl}Xビデオ/AiDiy解説_tools_ja/index.html`;
-const ニュースUrl       = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html`;
-const ニュースGoogleUrl  = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
-const ニュースOpenAIUrl  = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
-const ニュース_20260902_claudefablemythos_jaUrl = `${baseUrl}Xビデオ/ニュース_20260902_claudefablemythos_ja/index.html?auto=loop`;
+const 解説toolsUrl = `${baseUrl}Xビデオ/AiDiy解説_tools_ja/index.html`;
+const 解説ビデオ生成Url = `${baseUrl}Xビデオ/AiDiy解説_ビデオ生成_ja/index.html`;
+
+// AiDiy実装例
+const 配車管理Url = `${baseUrl}Xビデオ/AiDiy実装_配車管理_ja/index.html`;
+const 生産管理Url = `${baseUrl}Xビデオ/AiDiy実装_生産管理_ja/index.html`;
+const 在庫管理Url = `${baseUrl}Xビデオ/AiDiy実装_在庫管理_ja/index.html`;
+
+// 時事ニュース・解説
+const ニュースUrl = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html`;
+const ニュースGoogleUrl = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
+const ニュースOpenAIUrl = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
+const ニュース_20260906_fable51_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_fable51_ja/index.html`;
+const ニュース_20260906_gemini38flash_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_gemini38flash_ja/index.html`;
+
+// 小説
+const 小説解説_本好きの下剋上_jaUrl = `${baseUrl}Xビデオ/小説解説_本好きの下剋上_ja/index.html`;
+const 小説解説_AiDiy誕生_jaUrl = `${baseUrl}Xビデオ/小説解説_AiDiy誕生_ja/index.html`;
+const ニュース_20260906_gpt6astra_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_gpt6astra_ja/index.html`;
 
 const route = useRoute();
 const router = useRouter();
@@ -324,13 +337,58 @@ const handleReturn = () => {
             </div>
           </a>
 
-          <a class="menu-card menu-card-fixed" :href="ニュース_20260902_claudefablemythos_jaUrl" target="_blank" rel="noopener noreferrer">
+          <a class="menu-card menu-card-fixed" :href="ニュース_20260906_fable51_jaUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
-              <span class="icon">CFM</span>
-              Claude Fable 5.1 / Mythos 5.1 発表
+              <span class="icon">寓話</span>
+              Claude Fable 5.1 発表――AIが科学の現場で成果を出しはじめた
             </div>
             <div class="menu-card-description">
-              長時間の自律作業、コーディング、試作を支える性能向上とコスト削減を二人掛け合いで解説
+              Claude Fable 5.1の科学・開発性能と料金、安全性を解説
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="ニュース_20260906_gpt6astra_jaUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">極星</span>
+              GPT-6 Astra 発表――ベンチマークを塗りつぶした最上位モデル
+            </div>
+            <div class="menu-card-description">
+              GPT-6 Astraの性能とPC操作、料金、安全性を解説
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="ニュース_20260906_gemini38flash_jaUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">閃考</span>
+              Gemini 3.8 Flash 発表――安さと「よく考える」のトレードオフ
+            </div>
+            <div class="menu-card-description">
+              Gemini 3.8 Flashの性能と料金、速度特性を解説
+            </div>
+          </a>
+
+        </div>
+
+        <div class="section-label">小説</div>
+
+        <div class="menu-row">
+          <a class="menu-card menu-card-fixed" :href="小説解説_AiDiy誕生_jaUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">誕生</span>
+              小説解説『AiDiy誕生』
+            </div>
+            <div class="menu-card-description">
+              一枚の HTML から始まった AiDiy の誕生と歩みをひとり語りで紹介
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="小説解説_本好きの下剋上_jaUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">本好</span>
+              小説解説『本好きの下剋上』全5部
+            </div>
+            <div class="menu-card-description">
+              本を求める少女の転生から始まる全 5 部の物語をネタバレ込みで紹介
             </div>
           </a>
 

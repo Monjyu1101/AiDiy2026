@@ -15,7 +15,7 @@ import urllib.request
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-OUTPUT_DIR = 'D:\\OneDrive\\_sandbox\\AiDiy2026\\frontend_web\\public\\Xビデオ\\AiDiy解説_tools_ja\\images'
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
 IMAGE_GEN_API_URL = 'http://127.0.0.1:8095/aidiy_image_generation/generate'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

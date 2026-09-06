@@ -1,16 +1,16 @@
 {
   "project_name": "AiDiy紹介__all_en",
   "version": "mcp",
-  "title": "AiDiy - 日本語ファーストのフルスタック業務管理テンプレート完全紹介",
+  "title": "AiDiy - A Full-Stack Business Management Template Built for Real-World Business Apps",
   "source": {
     "type": "agents_and_knowledge",
-    "summary": "AiDiy の実装実態を AGENTS.md と _AIDIY/knowledge から抜粋し、全機能・特徴を網羅した事実ベース紹介として再構成する。"
+    "summary": "Extracted from AGENTS.md and _AIDIY/knowledge to provide a fact-based, comprehensive introduction covering all features and characteristics of AiDiy."
   },
   "target": {
     "language": "en",
     "format": "html_css_scene_player_with_media",
-    "tone": "事実ベース、簡潔、根拠付き、親しみやすく前向き",
-    "goal": "AiDiy の全体像を、構成・命名・サンプル・AI・MCP・ビデオ自動生成まで正確かつ楽しく伝える。"
+    "tone": "Fact-based, concise, evidence-backed, friendly and positive",
+    "goal": "Accurately and engagingly convey the full picture of AiDiy, from architecture and naming conventions to business samples, AI, MCP, and automated video generation."
   },
   "assets_policy": {
     "visual_style": "left_avatar_38_right_content_62",
@@ -22,7 +22,7 @@
   "scenes": [
     {
       "id": "scene_000",
-      "title": "この動画で紹介すること",
+      "title": "What This Video Covers",
       "expression": "neutral",
       "accent": "#29d8ff",
       "accent_soft": "rgba(41, 216, 255, 0.2)",
@@ -30,9 +30,9 @@
       "hero_image_focus": true,
       "background_word": "",
       "kicker": "INTRODUCTION",
-      "headline": "AiDiy の全体像と設計思想を\n6つのシーンで紹介します",
-      "lead": "日本語ファースト設計・サービス構成・業務サンプル・AI コア・MCP TOOL HUB・ビデオ自動生成まで、AiDiy の実態を順番に見ていきます。",
-      "subtitle": "日本語ファースト業務管理テンプレートの全機能・全特徴をわかりやすくお届けします。",
+      "headline": "AiDiy's Big Picture and Design Philosophy\nIntroduced in 7 Scenes",
+      "lead": "From business-domain naming and service architecture to business samples, the AI Core and Avatar, the MCP TOOL HUB, AI Task and AI Team, and automated video generation — we walk through AiDiy in order.",
+      "subtitle": "From naming conventions to AI Task and AI Team — the whole picture of AiDiy, in order.",
       "image": "images/scene_000.png",
       "chips": [],
       "metrics": [],
@@ -40,367 +40,382 @@
       "facts": [],
       "evidence": [],
       "image_prompt": "Square 1:1 hero poster for AiDiy. Make the word AiDiy itself the coolest central visual, with premium futuristic typography, strong cyan and electric blue glow, elegant Japanese enterprise AI platform mood, dark background, clean composition, high readability, polished technology branding aesthetic, no clutter, no extra fake logos, no dense paragraphs.",
-      "short_narration": "AiDiy は AI + Do It Yourself をコンセプトにした、日本語ファーストのフルスタック業務管理テンプレートです。",
-      "long_narration": "この動画は、AiDiy のビデオページ生成機能で自動生成されました。シナリオ作成から画像生成、音声合成、HTML 組み立てまで、すべてを MCP と CodeAgents が担当しています。AiDiy という名前には、AI と Do It Yourself、つまり AI の力を借りながら、自分たちの業務システムや自動化ツールを自分たちで作っていく、というコンセプトを込めています。日本語を第一言語として設計されたフルスタック業務管理テンプレートとして、FastAPI、SQLAlchemy、SQLite、Vue 3、Vite、TypeScript を中核に、実務に近い業務サンプルと AI 実験基盤をひとつにまとめています。このビデオでは、日本語ファースト設計、サービス構成、業務サンプル、AI コアとアバター、Code AI、そして MCP TOOL HUB とビデオ自動生成まで、AiDiy の全体像を 6 つのシーンで順番に紹介します。",
+      "short_narration": "This video walks through AiDiy: naming conventions, service architecture, the AI Core, the MCP TOOL HUB, and AI Task and AI Team.",
+      "long_narration": "This video was automatically generated using AiDiy's video page generation feature (ビデオページ生成機能). From scenario creation and image generation to speech synthesis and HTML assembly — everything is handled by MCP and CodeAgents. The name AiDiy combines AI and Do It Yourself — the idea of building your own business systems and automation tools with the power of AI. Built in Japan, AiDiy is a full-stack business management template built on FastAPI, SQLAlchemy, SQLite, Vue 3, Vite, and TypeScript, bundling practical business samples and an AI experimentation platform in one project. In this video, we cover AiDiy's full picture in 7 scenes: business-domain identifier conventions, service architecture, business samples, AI core and avatar, and the MCP TOOL HUB with automated video generation.",
       "short_audio": "audio/short_scene_000.mp3",
       "long_audio": "audio/long_scene_000.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 7.44,
+      "short_duration_sec": 8.904,
       "long_start_sec": 0.0,
-      "long_duration_sec": 51.528
+      "long_duration_sec": 47.328,
+      "duration_sec": 0.0
     },
     {
       "id": "scene_001",
-      "title": "AiDiy とは",
+      "title": "What is AiDiy",
       "expression": "neutral",
       "accent": "#29d8ff",
       "accent_soft": "rgba(41, 216, 255, 0.18)",
       "kicker": "PROJECT OVERVIEW",
-      "headline": "日本語ファーストの\nフルスタック業務管理テンプレート",
-      "lead": "FastAPI + SQLAlchemy + SQLite と Vue 3 + Vite + TypeScript を中核に、業務サンプルと AI 実験基盤をひとつにまとめています。",
-      "subtitle": "日本語識別子と業務サンプルを土台に、AI・音声・MCP まで一体化した基盤。",
+      "headline": "Full-Stack Business Management Template\nBuilt in Japan for Real-World Apps",
+      "lead": "With FastAPI + SQLAlchemy + SQLite and Vue 3 + Vite + TypeScript at its core, AiDiy bundles practical business samples and an AI experimentation platform into one.",
+      "subtitle": "Human-readable, domain-aligned identifiers and ready-to-use samples, with AI, voice, and MCP all integrated in one platform.",
       "image": "images/scene_001.png",
       "image_prompt": "Vertical 2:3 key visual for a Japanese enterprise AI development platform, accurate architecture mood, modular blocks suggesting backend_server, backend_tools, frontend_web, frontend_avatar, dark blueprint background, clean cyan and magenta lighting, no brand logos, realistic software diagram poster, high clarity, professional not playful",
       "chips": [
-        "日本語識別子",
+        "Japanese Identifiers",
         "FastAPI + SQLAlchemy + SQLite",
         "Python 3.13",
         "Vue 3 + Vite + TypeScript",
-        "業務サンプル同梱"
+        "Business Samples Included"
       ],
       "metrics": [
         {
-          "label": "常駐サーバー",
-          "value": "3"
+          "label": "Resident Servers",
+          "value": "7"
         },
         {
           "label": "MCP",
-          "value": "14"
+          "value": "19"
         },
         {
           "label": "Code AI",
-          "value": "7"
+          "value": "8"
         }
       ],
       "cards": [
         {
-          "title": "目的",
+          "title": "Purpose",
           "lines": [
-            "日本語ネイティブな開発環境の提供",
-            "実用的な業務管理テンプレート",
-            "AI・音声・画像・MCP の実験基盤"
+            "Domain-readable development environment using Japanese identifiers",
+            "Practical business management template",
+            "Experimentation platform for AI, voice, image, and MCP"
           ]
         },
         {
-          "title": "中核スタック",
+          "title": "Core Stack",
           "lines": [
             "backend_server / backend_tools",
             "frontend_web / frontend_avatar",
-            "SQLite 共有 DB"
+            "Shared SQLite DB"
           ]
         }
       ],
       "facts": [
-        "AiDiy は日本語を第一言語とするフルスタック業務管理システム開発フレームワーク / テンプレート。",
-        "権限、マスタ、トランザクション、スケジューラ、在庫管理の実装例を含む。",
-        "AI、音声、画像、Code CLI、MCP を統合する実験基盤でもある。"
+        "AiDiy is a full-stack business management system development framework / template with Japanese as its primary language.",
+        "Includes implementation examples for permissions, masters, transactions, schedulers, and inventory management.",
+        "Also serves as an experimentation platform integrating AI, voice, image generation, Code CLI, and MCP."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "AiDiy は、日本語を第一言語とするフルスタック業務管理システムの開発フレームワーク / テンプレート。"
+          "text": "AiDiy is a full-stack business management system development framework / template with Japanese as its primary language."
         },
         {
           "source": "AGENTS.md",
-          "text": "FastAPI + SQLAlchemy + SQLite (Python 3.13)、Vue 3 + Vite + TypeScript を中核とする。"
+          "text": "FastAPI + SQLAlchemy + SQLite (Python 3.13), Vue 3 + Vite + TypeScript at the core."
         }
       ],
-      "short_narration": "AiDiy は Python 3.13 の FastAPI と Vue 3 を中核に、業務サンプルと AI 実験基盤をひとつにまとめたテンプレートです。",
-      "long_narration": "AiDiy は、日本語を第一言語として設計されたフルスタック業務管理テンプレートです。Python 3.13 の FastAPI と SQLAlchemy、SQLite をバックエンドの中核に、フロントエンドは Vue 3 と Vite と TypeScript で構成します。権限管理、マスタ管理、トランザクション、スケジューラ、在庫管理などの業務サンプルを実装済みで含み、さらに AI チャット、音声、画像生成、Code AI エージェント、14 個の MCP ツールを統合した実験基盤でもあります。業務システムの開発テンプレートと AI 実験基盤を、ひとつのプロジェクトにまとめたのが AiDiy です。",
+      "short_narration": "AiDiy is a template that brings together business samples and an AI experimentation platform, with FastAPI (Python 3.13) and Vue 3 at its core.",
+      "long_narration": "AiDiy is a full-stack business management template designed with Japanese as its primary language. At the backend, it uses FastAPI, SQLAlchemy, and SQLite with Python 3.13. On the frontend, it is built with Vue 3, Vite, and TypeScript. It ships with ready-to-use business samples including permissions, master data, transactions, schedulers, and inventory management, and also serves as an experimentation platform integrating AI chat, voice, image generation, Code AI agents, and 19 MCP tools. AiDiy combines a business system development template with an AI experimentation platform in a single project.",
       "short_audio": "audio/short_scene_001.mp3",
       "long_audio": "audio/long_scene_001.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 9.072,
+      "short_duration_sec": 10.008,
       "long_start_sec": 0.0,
-      "long_duration_sec": 36.84
+      "long_duration_sec": 37.68,
+      "duration_sec": 0.0
     },
     {
       "id": "scene_002",
-      "title": "日本語ファースト設計",
+      "title": "Unified Business-Domain Naming",
       "expression": "neutral",
       "accent": "#7dffb3",
       "accent_soft": "rgba(125, 255, 179, 0.18)",
-      "kicker": "JAPANESE FIRST",
-      "headline": "DB / API / UI / Code を\n日本語で一直線につなぐ",
-      "lead": "AiDiy では業務語彙と実装名をできるだけ一致させ、日本語話者がコードと画面を直接対応づけられるようにしています。",
-      "subtitle": "業務語彙と実装名を揃え、読めるまま保守できる構成。",
+      "kicker": "NAMING CONVENTION",
+      "headline": "Connecting DB / API / UI / Code\nStraight Through in Japanese",
+      "lead": "In AiDiy, business vocabulary and implementation names are aligned as closely as possible so Japanese speakers can directly link code to the screen.",
+      "subtitle": "Aligned business vocabulary and implementation names — maintainable code you can read as you go.",
       "image": "images/scene_002.png",
-      "image_prompt": "Vertical 2:3 infographic of Japanese-first software design, layered database API UI code connection, enterprise blueprint poster, strong arrows, clean boxes, realistic development system diagram, dark background with green accent, no garbled logo emphasis, professional Japanese software architecture mood",
+      "image_prompt": "Vertical 2:3 infographic of business-domain identifier design, layered database API UI code connection, enterprise blueprint poster, strong arrows, clean boxes, realistic development system diagram, dark background with green accent, no garbled logo emphasis, professional Japanese software architecture mood",
       "chips": [
-        "UTF-8 固定",
-        "URL も日本語",
-        "JSON キーも日本語",
-        "一般名 request/query は英字可"
+        "UTF-8 Fixed",
+        "URLs in Japanese",
+        "JSON Keys in Japanese",
+        "Generic names like request/query may be English"
       ],
       "metrics": [
         {
-          "label": "統一レイヤー",
+          "label": "Unified Layers",
           "value": "4"
         },
         {
-          "label": "原則",
-          "value": "一致重視"
+          "label": "Principle",
+          "value": "Alignment"
         }
       ],
       "cards": [
         {
           "title": "Database",
           "lines": [
-            "テーブル名: `C権限` / `T配車`",
-            "カラム名: `利用者ID` / `配車日付`",
-            "監査フィールド標準装備"
+            "Table name: `C権限` / `T配車`",
+            "Column name: `利用者ID` / `配車日付`",
+            "Audit fields included as standard"
           ]
         },
         {
           "title": "API / JSON",
           "lines": [
-            "パス: `/core/利用者/一覧`",
-            "キー: `{\"利用者名\": \"admin\"}`",
-            "POST 中心の統一レスポンス"
+            "Path: `/core/利用者/一覧`",
+            "Key: `{\"利用者名\": \"admin\"}`",
+            "POST-centric unified response"
           ]
         },
         {
           "title": "Frontend",
           "lines": [
-            "ファイル: `C利用者一覧.vue`",
+            "File: `C利用者一覧.vue`",
             "Router: `/C管理/C利用者/一覧`",
-            "変数: `利用者名` / `配車日付`"
+            "Variable: `利用者名` / `配車日付`"
           ]
         },
         {
-          "title": "例外",
+          "title": "Exceptions",
           "lines": [
-            "request / query / items は英字",
-            "英字ライブラリ名はそのまま使用",
-            "全ファイルは UTF-8 固定"
+            "request / query / items remain in English",
+            "English library names used as-is",
+            "All files use UTF-8"
           ]
         }
       ],
       "facts": [
-        "画面、URL、JSON キー、識別子は日本語を原則とする。",
-        "DB 項目名、API 項目名、フロントエンド変数名はできるだけ一致させる。",
-        "request / query / items などのシステム用語と英字ライブラリ名は英字のまま使用する。"
+        "Screens, URLs, JSON keys, and identifiers are Japanese by default.",
+        "DB field names, API field names, and frontend variable names are aligned as closely as possible.",
+        "System terms like request / query / items and English library names are kept in English."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "全レイヤーで日本語識別子を使います。Database / API / Frontend / Code の例が明示されています。"
+          "text": "Japanese identifiers are used at every layer. Explicit examples are provided for Database, API, Frontend, and Code."
         },
         {
           "source": "CLAUDE.md",
-          "text": "テーブル名 C権限、API パス /core/利用者/一覧、JSON キー {\"利用者名\": \"admin\"}、ファイル名 C利用者一覧.vue。"
+          "text": "Table `C権限`, API path `/core/利用者/一覧`, JSON key `{\"利用者名\": \"admin\"}`, file `C利用者一覧.vue`."
         }
       ],
-      "short_narration": "画面から FastAPI、データベース、コード変数まで、すべてのレイヤーで日本語識別子を統一します。",
-      "long_narration": "AiDiy の最大の特徴は日本語ファースト設計です。データベースのテーブル名は C権限や T配車、API パスは /core/利用者/一覧、JSON キーは 利用者名 や 配車日付、Vue コンポーネントのファイル名は C利用者一覧.vue、Python の変数名まで、すべてのレイヤーで日本語識別子を使います。これにより業務語彙とコードの識別子が直接対応し、日本語話者が設計意図を保守の場面でもそのまま読み取れます。request、query、items といったシステム用語や英字ライブラリ名はそのまま英語で使います。全ファイルは UTF-8 固定です。",
+      "short_narration": "From screens to FastAPI, database, and code variables — Japanese identifiers are unified across all layers.",
+      "long_narration": "AiDiy's defining feature is its consistent use of business-domain identifiers across all layers. Database table names use identifiers like C権限 and T配車, API paths use /core/利用者/一覧, JSON keys use 利用者名 and 配車日付, Vue component filenames use C利用者一覧.vue, and even Python variable names follow the same Japanese convention. This means business vocabulary maps directly to code identifiers, allowing Japanese speakers to read the design intent during maintenance without any translation overhead. System terms like request, query, and items, as well as English library names, remain in English. All files use UTF-8.",
       "short_audio": "audio/short_scene_002.mp3",
       "long_audio": "audio/long_scene_002.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.936,
+      "short_duration_sec": 6.984,
       "long_start_sec": 0.0,
-      "long_duration_sec": 34.08
+      "long_duration_sec": 36.288,
+      "duration_sec": 0.0
     },
     {
       "id": "scene_003",
-      "title": "サービス構成",
+      "title": "Service Architecture",
       "expression": "neutral",
       "accent": "#ff6bd6",
       "accent_soft": "rgba(255, 107, 214, 0.18)",
       "kicker": "ARCHITECTURE",
-      "headline": "5 本のサービスが\nひとつの DB を中心に動く",
-      "lead": "backend_server が 2 本、backend_tools の MCP ハブ、frontend_web と frontend_avatar の 5 サービス構成です。",
-      "subtitle": "3 常駐バックエンド + 2 フロントエンドで、ひとつの SQLite DB を共有します。",
+      "headline": "7 Services Running\nAround One Shared DB",
+      "lead": "Two backend_server processes, the backend_tools MCP hub, backend_taskteam for AI Task and AI Team, backend_local for on-device inference, plus frontend_web and frontend_avatar.",
+      "subtitle": "Five backend services and two frontends, all sharing a single SQLite database.",
       "image": "images/scene_003.png",
       "image_prompt": "Vertical 2:3 architecture poster showing AiDiy five service diagram, two backend_server blocks labeled core 8091 and apps 8098, one backend_tools block labeled MCP Hub 8095, frontend_web 8090 and frontend_avatar 8092, connected to central SQLite DB, dark enterprise blueprint style, magenta accent, clean system diagram, no mascots",
       "chips": [
         "core_main port 8091",
         "apps_main port 8098",
         "backend_tools port 8095",
+        "backend_taskteam port 8093",
+        "backend_local port 8096",
         "frontend_web port 8090",
         "frontend_avatar port 8092"
       ],
       "metrics": [
         {
-          "label": "常駐サービス",
-          "value": "5"
+          "label": "Backend",
+          "value": "5 services"
         },
         {
-          "label": "共有DB",
-          "value": "SQLite"
+          "label": "Frontend",
+          "value": "2 services"
         },
         {
-          "label": "Vite proxy",
-          "value": "2本"
+          "label": "Shared DB",
+          "value": "1 SQLite"
         }
       ],
       "cards": [
         {
           "title": "backend_server",
           "lines": [
-            "core_main: 8091 (C系・認証・AIコア)",
-            "apps_main: 8098 (M系・T系・V系・S系)",
-            "SQLite DB を共有"
+            "core_main: 8091 (C-series, Auth, AI Core)",
+            "apps_main: 8098 (M/T/V/S-series)",
+            "Shared SQLite DB"
           ]
         },
         {
           "title": "backend_tools",
           "lines": [
             "tools_main: 8095 (MCP TOOL HUB)",
-            "14 個の MCP を同一ポートに集約",
-            "SSE / HTTP / stdio 3 トランスポート"
+            "19 MCPs on a single port",
+            "SSE / HTTP / stdio - 3 transports"
           ]
         },
         {
           "title": "frontend_web",
           "lines": [
             "8090: Vue 3 + Vite + TypeScript",
-            "/core → 8091, /apps → 8098 にプロキシ",
+            "/core → 8091, /apps → 8098 proxy",
             "qTubler + Pinia + Vue Router"
           ]
         },
         {
           "title": "frontend_avatar",
           "lines": [
-            "8092: Electron / Web デュアルモード",
+            "8092: Electron / Web dual-mode",
             "Three.js + @pixiv/three-vrm",
-            "AI アバタークライアント"
+            "AI avatar client"
+          ]
+        },
+        {
+          "title": "backend_taskteam / backend_local",
+          "lines": [
+            "taskteam: 8093 (AI Task + AI Team)",
+            "local: 8096 (OpenAI-compatible Gemma inference)",
+            "Shares the same SQLite DB as backend_server"
           ]
         }
       ],
       "facts": [
-        "backend_server は core_main (8091) と apps_main (8098) の 2 サーバー構成で同じ SQLite DB を共有する。",
-        "backend_tools (8095) は 14 個の MCP サーバーを同居させ SSE / Streamable HTTP / stdio を提供する。",
-        "frontend_web の Vite プロキシは /core を 8091、/apps を 8098 に振り分ける。"
+        "backend_server is a 2-server configuration — core_main (8091) and apps_main (8098) — both sharing the same SQLite DB.",
+        "backend_tools (8095) hosts 19 MCP servers on the same port and provides SSE / Streamable HTTP / stdio transports.",
+        "frontend_web's Vite proxy routes /core to 8091 and /apps to 8098."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "core_main.py と apps_main.py は同じ SQLite DB を共有します。フロントエンドは Vite proxy で /core/* を 8091、/apps/* を 8098 へ振り分けます。"
+          "text": "core_main.py and apps_main.py share the same SQLite DB. The frontend uses Vite proxy to route /core/* to 8091 and /apps/* to 8098."
         },
         {
           "source": "CLAUDE.md",
-          "text": "backend_server core 8091 / apps 8098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092。"
+          "text": "backend_server core 8091 / apps 8098, backend_tools 8095, frontend_web 8090, frontend_avatar 8092."
         }
       ],
-      "short_narration": "AiDiy は 5 本のサービスで動きます。2 つのバックエンド、MCP ハブ、Web と Avatar フロントエンドです。",
-      "long_narration": "AiDiy のサービス構成は 5 本です。backend_server の core_main が 8091 番ポートで認証・権限・AI コアを担当し、apps_main が 8098 番ポートで業務系 API を扱います。backend_tools は 8095 番ポートで 14 個の MCP ツールを提供するハブです。frontend_web は 8090 番ポートで Vue 3 の Web UI を提供し、Vite プロキシで /core を 8091 に、/apps を 8098 に振り分けます。frontend_avatar は 8092 番ポートで Electron とブラウザの両方に対応する AI アバタークライアントです。2 つのバックエンドは同じ SQLite DB ファイルを共有しています。",
+      "short_narration": "Five backend services and two frontends. The MCP hub, the AI Task and Team platform, and local inference each run independently.",
+      "long_narration": "Let's look at how AiDiy is put together. There are five backend services. backend_server runs as two processes: core_main on port 8091 handles authentication and the AI Core, while apps_main on port 8098 handles business data. backend_tools is the MCP TOOL HUB on port 8095, consolidating nineteen MCP servers onto a single port. backend_taskteam on port 8093 is the execution platform for AI Task and AI Team. backend_local on port 8096 provides an OpenAI-compatible local inference server. On the frontend side there are two services: frontend_web on port 8090 for the business screens, and frontend_avatar on port 8092, which runs in both Electron and Web modes for the AI avatar. All services share a single SQLite database, so business data and AI execution history live in the same place.",
       "short_audio": "audio/short_scene_003.mp3",
       "long_audio": "audio/long_scene_003.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.984,
+      "short_duration_sec": 8.184,
       "long_start_sec": 0.0,
-      "long_duration_sec": 39.96
+      "long_duration_sec": 52.224,
+      "duration_sec": 0.0
     },
     {
       "id": "scene_004",
-      "title": "業務サンプルと命名規則",
+      "title": "Business Samples and Naming Conventions",
       "expression": "neutral",
       "accent": "#ffbf47",
       "accent_soft": "rgba(255, 191, 71, 0.18)",
       "kicker": "BUSINESS PATTERNS",
-      "headline": "配車・生産・在庫を\n実装パターンごと持っている",
-      "lead": "AiDiy は見た目だけのデモではなく、業務サンプルと命名規則をセットで持つテンプレートです。",
-      "subtitle": "サンプル名と実装パターンが一致しているので、横展開しやすい。",
+      "headline": "Dispatch, Production, and Inventory —\nWith Implementation Patterns Included",
+      "lead": "AiDiy is not just a visual demo — it is a template that ships both business samples and naming conventions together.",
+      "subtitle": "Sample names match implementation patterns, making horizontal expansion easy.",
       "image": "images/scene_004.png",
       "image_prompt": "Vertical 2:3 collage of Japanese business software modules for dispatch management, production management, inventory management, with clean enterprise dashboards and taxonomy badges C M T V S A X, warm amber accent, realistic ERP style, precise and practical, no cartoon look",
       "chips": [
         "C / M / T / V / S / A / X",
-        "明細型パターン",
-        "JOIN / 集計 V系",
-        "Scheduler 付き"
+        "Line-item Pattern",
+        "JOIN / Aggregation V-series",
+        "Scheduler Included"
       ],
       "metrics": [
         {
-          "label": "接頭辞種",
+          "label": "Prefix Types",
           "value": "7"
         },
         {
-          "label": "業務例",
+          "label": "Business Examples",
           "value": "3"
         },
         {
-          "label": "明細型",
-          "value": "単一表"
+          "label": "Line-item",
+          "value": "Single Table"
         }
       ],
       "cards": [
         {
-          "title": "接頭辞の意味",
+          "title": "Prefix Meanings",
           "lines": [
             "C: Core/Common, M: Master",
             "T: Transaction, V: View endpoint",
-            "S: Scheduler, A: AI, X: 実験系"
+            "S: Scheduler, A: AI, X: Experimental"
           ]
         },
         {
-          "title": "業務サンプル",
+          "title": "Business Samples",
           "lines": [
-            "配車管理: M配車区分・M車両・T配車・S配車",
-            "生産管理: M商品・M商品構成・T生産",
-            "在庫管理: T商品入庫・T商品出庫・T商品棚卸"
+            "Dispatch: M配車区分・M車両・T配車・S配車",
+            "Production: M商品・M商品構成・T生産",
+            "Inventory: T商品入庫・T商品出庫・T商品棚卸"
           ]
         },
         {
-          "title": "明細型パターン",
+          "title": "Line-item Pattern",
           "lines": [
-            "明細SEQ=0 がヘッダー行",
-            "明細SEQ>=1 が明細行",
-            "M商品構成 と T生産 が代表例"
+            "明細SEQ=0 is the header row",
+            "明細SEQ>=1 are detail rows",
+            "M商品構成 and T生産 are representative examples"
           ]
         },
         {
-          "title": "V系の実態",
+          "title": "V-series Reality",
           "lines": [
-            "DB VIEW オブジェクトではない",
-            "Router 内の生 SQL JOIN / 集計",
-            "V商品推移表 など"
+            "Not DB VIEW objects",
+            "Raw SQL JOIN / aggregation in Router",
+            "e.g. V商品推移表"
           ]
         }
       ],
       "facts": [
-        "配車管理は `M配車区分`、`M車両`、`T配車`、`V配車`、`S配車_*` で構成される。",
-        "生産管理は `M商品構成` と `T生産` を含み、明細型パターンの実例になっている。",
-        "V系は DB VIEW オブジェクトではなく、生 SQL による JOIN / 集計エンドポイント。"
+        "Dispatch management is composed of `M配車区分`, `M車両`, `T配車`, `V配車`, and `S配車_*`.",
+        "Production management includes `M商品構成` and `T生産`, serving as working examples of the line-item pattern.",
+        "V-series are not DB VIEW objects — they are JOIN / aggregation endpoints written with raw SQL directly in Router files."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "テーブル命名規則として C / M / T / V / S / A / X の接頭辞が定義されています。"
+          "text": "Table naming conventions define prefixes C / M / T / V / S / A / X."
         },
         {
           "source": "AGENTS.md",
-          "text": "業務サンプルとして配車管理、生産管理、資材在庫管理が明示されています。V系は DB VIEW ではなく Router 内の生 SQL。"
+          "text": "Business samples include dispatch management, production management, and material inventory management. V-series are not DB VIEWs — they are raw SQL in Router files."
         }
       ],
-      "short_narration": "C・M・T の接頭辞で役割を分け、配車・生産・在庫の 3 業務を横展開できます。",
-      "long_narration": "AiDiy の業務サンプルは、配車管理、生産管理、在庫管理など実務に近い内容で構成されています。テーブルには C、M、T、V、S、A、X の 7 種類の接頭辞があります。C は権限・利用者などの共通機能、M はマスタ、T はトランザクション、V は生 SQL による集計エンドポイント、S はスケジューラ、A は AI 系、X は実験系を表します。M 商品構成と T 生産は、明細 SEQ=0 をヘッダー、1 以上を明細行とする明細型パターンの実例です。V 系はデータベースの VIEW オブジェクトではなく、Router ファイルに直接書く生 SQL による JOIN エンドポイントです。この命名規則に沿えば、新機能を既存パターンへ横展開しやすくなっています。",
+      "short_narration": "The C, M, T prefixes separate responsibilities, and 3 business domains — dispatch, production, inventory — can be expanded horizontally.",
+      "long_narration": "AiDiy's business samples cover practical domains including dispatch management, production management, and inventory management. Tables use 7 prefix types: C for core and common, M for master data, T for transactions, V for raw-SQL aggregation endpoints, S for schedulers, A for AI-related, and X for experimental. M商品構成 and T生産 are representative examples of the line-item pattern, where 明細SEQ=0 is the header row and values of 1 or greater are detail rows. V-series features are not implemented as database VIEW objects; they are raw SQL JOIN endpoints written directly inside Router files. Following this naming convention makes it easy to expand new features into existing patterns.",
       "short_audio": "audio/short_scene_004.mp3",
       "long_audio": "audio/long_scene_004.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.024,
+      "short_duration_sec": 8.616,
       "long_start_sec": 0.0,
-      "long_duration_sec": 44.52
+      "long_duration_sec": 39.672,
+      "duration_sec": 0.0
     },
     {
       "id": "scene_005",
-      "title": "AI コアとアバター",
+      "title": "AI Core and Avatar",
       "expression": "neutral",
       "accent": "#7b8cff",
       "accent_soft": "rgba(123, 140, 255, 0.18)",
       "kicker": "AI CORE + AVATAR",
-      "headline": "チャット・音声・画像・コード支援を\nアバター体験までつなぐ",
-      "lead": "AiDiy の AI コアは多パネル UI で、frontend_avatar は Electron と Web の両方に対応します。",
-      "subtitle": "AIコアの多パネル体験を、VRM アバターまで含めて運用できる。",
+      "headline": "Chat, Voice, Images, and Code Support —\nAll the Way to Avatar Experience",
+      "lead": "AiDiy's AI core is a multi-panel UI, and frontend_avatar works in both Electron and Web modes.",
+      "subtitle": "The AI core's multi-panel experience, operable with a VRM avatar included.",
       "image": "images/scene_005.png",
       "image_prompt": "Vertical 2:3 interface illustration of AI core with chat panel, voice waveform, image panel, six code panels, and a realistic VRM style avatar beside them, dual mode idea of web and desktop Electron, blue-violet accent, professional Japanese software interface aesthetic",
       "chips": [
@@ -412,112 +427,114 @@
       ],
       "metrics": [
         {
-          "label": "Code パネル",
+          "label": "Code Panels",
           "value": "6"
         },
         {
-          "label": "Code AI 候補",
-          "value": "7"
+          "label": "Code AI Options",
+          "value": "8"
         },
         {
-          "label": "UI モード",
+          "label": "UI Modes",
           "value": "2"
         }
       ],
       "cards": [
         {
-          "title": "AIコア",
+          "title": "AI Core",
           "lines": [
-            "テキスト・音声・画像・コード支援を統合",
+            "Integrates text, voice, image, and code support",
             "CHAT_AI_NAME / LIVE_AI_NAME",
-            "CODE_AI1_NAME 〜 CODE_AI6_NAME"
+            "CODE_AI1_NAME ~ CODE_AI6_NAME"
           ]
         },
         {
-          "title": "Code AI 7種",
+          "title": "Code AI – 8 Options",
           "lines": [
             "claude_sdk / claude_cli",
             "copilot_cli / codex_cli",
-            "antigravity_cli / opencode_cli / aidiy_hermes"
+            "antigravity_cli / grok_cli",
+            "opencode_cli / aidiy_hermes"
           ]
         },
         {
           "title": "Avatar",
           "lines": [
-            "Electron: 複数 BrowserWindow, localStorage",
-            "Web: 左アバター + 右タブ, sessionStorage",
-            "window.desktopApi で判定"
+            "Electron: multiple BrowserWindows, localStorage",
+            "Web: left avatar + right tabs, sessionStorage",
+            "Detected via window.desktopApi"
           ]
         },
         {
-          "title": "3D / 同期",
+          "title": "3D / Sync",
           "lines": [
             "Three.js + @pixiv/three-vrm",
-            "public/vrm/ と public/vrma/",
+            "public/vrm/ and public/vrma/",
             "BroadcastChannel avatar-desktop-sync"
           ]
         }
       ],
       "facts": [
-        "AIコアは WebSocket + マルチベンダー AI + Code CLI パネルを統合する多パネル UI。",
-        "Code AI の有効値は claude_sdk / claude_cli / copilot_cli / codex_cli / antigravity_cli / opencode_cli / aidiy_hermes の 7 種。",
-        "frontend_avatar は Electron デスクトップアプリと通常 Web ブラウザの両方で動作する。"
+        "The AI core is a multi-panel UI integrating WebSocket, multi-vendor AI, and Code CLI panels.",
+        "Valid Code AI values are 8 types: claude_sdk / claude_cli / copilot_cli / codex_cli / antigravity_cli / grok_cli / opencode_cli / aidiy_hermes.",
+        "frontend_avatar runs on both Electron desktop apps and standard web browsers."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "AIコアは、テキスト、音声、画像、ファイル、コード支援を統合する多パネル UI です。Code AI の有効値は claude_sdk〜aidiy_hermes の 7 種類を想定します。"
+          "text": "The AI core is a multi-panel UI integrating text, voice, image, file, and code support. Expected Code AI values include 8 types from claude_sdk to aidiy_hermes."
         },
         {
           "source": "frontend_avatar/AGENTS.md",
-          "text": "frontend_avatar は Electron デスクトップアプリと通常 Web ブラウザの両方で動作します。Electron / Web 判定は window.desktopApi で行います。"
+          "text": "frontend_avatar works in both Electron desktop app and standard web browser. Electron / Web mode is detected via window.desktopApi."
         }
       ],
-      "short_narration": "AI コアは WebSocket で多パネル統合し、VRM アバターが Electron と Web の両方で動きます。",
-      "long_narration": "AI コアはチャット、ライブ音声、画像処理、コード支援の 4 種類を WebSocket でつないだ多パネル UI です。Code AI パネルは code1 から code6 の 6 スロットに異なる CLI を割り当てられます。有効な Code AI は claude_sdk、claude_cli、copilot_cli、codex_cli、antigravity_cli、opencode_cli、そして aidiy_hermes の 7 種類です。frontend_avatar は Electron デスクトップと通常の Web ブラウザの両方で動作する AI アバタークライアントです。Three.js と @pixiv/three-vrm で VRM モデルを表示し、VRMA モーションで表情と動きを制御します。Electron と Web の状態は BroadcastChannel avatar-desktop-sync で同期します。",
+      "short_narration": "The AI core integrates multiple panels via WebSocket, and the VRM avatar operates in both Electron and Web modes.",
+      "long_narration": "The AI core is a multi-panel UI connecting chat, live voice, image processing, and code support via WebSocket. The Code AI panel has 6 slots from code1 to code6, each assignable to a different CLI. The 8 valid Code AI options are claude_sdk, claude_cli, copilot_cli, codex_cli, antigravity_cli, grok_cli, opencode_cli, and aidiy_hermes. frontend_avatar is an AI avatar client that runs on both Electron desktop and standard web browsers. It displays VRM models using Three.js and @pixiv/three-vrm, and controls expressions and motion using VRMA animations. State between Electron and Web is synchronized via BroadcastChannel avatar-desktop-sync.",
       "short_audio": "audio/short_scene_005.mp3",
       "long_audio": "audio/long_scene_005.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 7.296,
+      "short_duration_sec": 6.48,
       "long_start_sec": 0.0,
-      "long_duration_sec": 47.304
+      "long_duration_sec": 45.864,
+      "duration_sec": 0.0
     },
     {
       "id": "scene_006",
-      "title": "MCP TOOL HUB × 14 とビデオ自動生成",
+      "title": "MCP TOOL HUB × 19 and Automated Video Generation",
       "expression": "neutral",
       "accent": "#00e0b8",
       "accent_soft": "rgba(0, 224, 184, 0.18)",
       "kicker": "MCP HUB + AUTO VIDEO",
-      "headline": "14 の MCP がつながり、\nこの動画も全自動で生成された",
-      "lead": "backend_tools は 14 個の MCP をひとつのポートに集約し、AI エージェントがブラウザ操作から動画生成まで担います。",
-      "subtitle": "MCP は飾りではなく、AI の観測・生成・検証を支える実働ツール群。このビデオもその産物です。",
+      "headline": "Nineteen MCPs on a single port\nFrom browser control to video generation",
+      "lead": "backend_tools consolidates 19 MCPs onto a single port, with AI agents handling everything from browser operations to video generation.",
+      "subtitle": "MCPs are not decorative — they are a working toolset supporting AI observation, generation, and verification. This video is one of their outputs.",
       "image": "images/scene_006.png",
-      "image_prompt": "Vertical 2:3 MCP hub infographic poster, center AI agent node with fourteen connected utility nodes for browser, desktop, sqlite, postgres, logs, code check, backup, image generation, movie generation, speech-to-text, text-to-speech, OBS studio control, ffmpeg control, code agents, clean green-cyan enterprise network diagram on dark background, modern technical style, no mascots",
+      "image_prompt": "Vertical 2:3 MCP hub infographic poster, center AI agent node with nineteen connected utility nodes for browser, desktop, sqlite, postgres, logs, code check, backup, image generation, movie generation, speech-to-text, text-to-speech, OBS studio control, ffmpeg control, code agents, clean green-cyan enterprise network diagram on dark background, modern technical style, no mascots",
       "chips": [
         "port 8095",
-        "14 MCP",
+        "19 MCP",
         "SSE / HTTP / stdio",
-        "ビデオ自動生成",
-        "9ステップ全自動"
+        "Auto Video Generation",
+        "9-Step Full Automation"
       ],
       "metrics": [
         {
-          "label": "MCP数",
-          "value": "14"
+          "label": "MCP servers",
+          "value": "19"
         },
         {
-          "label": "ポート",
-          "value": "8095"
+          "label": "Port",
+          "value": "consolidated on 8095"
         },
         {
-          "label": "自動化ステップ",
-          "value": "9"
+          "label": "Transports",
+          "value": "SSE / HTTP / stdio"
         }
       ],
       "cards": [
         {
-          "title": "観測",
+          "title": "Observation",
           "lines": [
             "aidiy_chrome_devtools (CDP)",
             "aidiy_desktop_capture",
@@ -525,56 +542,150 @@
           ]
         },
         {
-          "title": "検証・保全",
+          "title": "Verification & Preservation",
           "lines": [
             "aidiy_code_check",
             "aidiy_backup (save / check)"
           ]
         },
         {
-          "title": "生成・制御",
+          "title": "Generation & Control",
           "lines": [
             "aidiy_image_generation / aidiy_movie_generation",
             "aidiy_speech_to_text / aidiy_text_to_speech",
-            "aidiy_obs_studio_control / aidiy_ffmpeg_control / aidiy_code_agents"
+            "aidiy_obs_studio_control / aidiy_ffmpeg_control",
+            "aidiy_windows_control / aidiy_notification_sounds"
           ]
         },
         {
-          "title": "ビデオ自動生成",
+          "title": "Automated Video Generation",
           "lines": [
-            "topic → scenario.js 生成",
-            "画像生成 → 音声合成 → HTML 組み立て",
-            "9 ステップを MCP + CodeAgents が全自動化"
+            "topic -> scenario.js generation",
+            "image generation -> speech synthesis -> HTML assembly",
+            "Step00 through Step99 fully automated by MCP + CodeAgents"
+          ]
+        },
+        {
+          "title": "AI Integration",
+          "lines": [
+            "aidiy_code_agents (Code CLI execution)",
+            "aidiy_chat_llms (chat LLMs)",
+            "aidiy_task_agents / aidiy_team_agents"
           ]
         }
       ],
       "facts": [
-        "backend_tools は 14 個の MCP サーバーを SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 に集約する。",
-        "ビデオページ生成は 2 スクリプト（ひとりアバター用 / 二人掛け合い用）で topic から HTML まで 9 ステップを全自動化する。",
-        "知識の整理は _AIDIY/knowledge/_index.md が全 HowTo の入口。"
+        "backend_tools consolidates 19 MCP servers with 3 transports — SSE / Streamable HTTP / stdio — on the single port 8095.",
+        "The video page generation feature (ビデオページ生成機能) provides 2 scripts (solo avatar / two-person dialogue) that automate the full 9 steps from topic to HTML.",
+        "Knowledge management entry point is _AIDIY/knowledge/_index.md — the gateway to all HowTo guides."
       ],
       "evidence": [
         {
           "source": "AGENTS.md",
-          "text": "backend_tools は 14 個の MCP サーバーを SSE / Streamable HTTP / stdio の 3 トランスポートで同一ポート 8095 に集約します。"
+          "text": "backend_tools consolidates 19 MCP servers with SSE / Streamable HTTP / stdio transports on the single port 8095."
         },
         {
           "source": "AGENTS.md",
-          "text": "ビデオページ生成自動化: topic から scenario.js 生成→画像生成→音声合成→HTML 組み立てまでを 9 ステップで全自動化。"
+          "text": "Video page generation automation: 9-step full automation from topic to scenario.js generation → image generation → speech synthesis → HTML assembly."
         }
       ],
-      "short_narration": "14 個の MCP がひとつのポートに集まり、この動画も AiDiy 自身の機能で全自動生成しています。",
-      "long_narration": "backend_tools は 8095 番ポートに 14 個の MCP サーバーを同居させた TOOL HUB です。ブラウザ自動操作、デスクトップキャプチャ、SQLite・PostgreSQL のデータ参照、ログ監視、コードチェック、バックアップ、画像生成、動画生成、音声認識、音声合成、OBS Studio 制御、FFmpeg 制御、コードエージェント実行まで揃っています。SSE・Streamable HTTP・stdio の 3 トランスポートを同一ポートで提供し、HTTP POST でどこからでも呼び出せます。そして今見ているこのビデオ自体が AiDiy のビデオページ生成機能で自動生成されています。シナリオ作成から画像生成、音声合成、HTML 組み立てまで 9 ステップを MCP と CodeAgents が全自動で処理しました。",
+      "short_narration": "19 MCPs are consolidated onto one port, and this video itself was fully auto-generated using AiDiy's own features.",
+      "long_narration": "backend_tools is a TOOL HUB hosting 19 MCP servers on port 8095. Its tools cover browser automation, desktop capture, SQLite and PostgreSQL data access, log monitoring, code checking, backup, image generation, video generation, speech-to-text, text-to-speech, OBS Studio control, FFmpeg control, and code agent execution. All three transports — SSE, Streamable HTTP, and stdio — are available on the same port, callable via HTTP POST from anywhere. And the very video you are watching now was automatically generated using AiDiy's own video page generation feature (ビデオページ生成機能). From scenario creation to image generation, speech synthesis, and HTML assembly — all 9 steps were fully automated by MCP and CodeAgents.",
       "short_audio": "audio/short_scene_006.mp3",
       "long_audio": "audio/long_scene_006.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.48,
+      "short_duration_sec": 7.08,
       "long_start_sec": 0.0,
-      "long_duration_sec": 48.84
+      "long_duration_sec": 45.432,
+      "duration_sec": 0.0
+    },
+    {
+      "id": "scene_007",
+      "title": "AI Task and AI Team",
+      "expression": "neutral",
+      "accent": "#7dffb3",
+      "accent_soft": "rgba(125, 255, 179, 0.18)",
+      "kicker": "AI TASK + AI TEAM",
+      "headline": "Write a request in plain language and it runs itself\nAI members work together in a 3D space",
+      "lead": "AI Task breaks a request written in plain language into execution steps and runs them, judging dependencies as it goes. Register a schedule and it keeps running without anyone present. In AI Team, AI members gather in a 3D space, discuss, share the work, and carry their experience forward.",
+      "subtitle": "Write the request -> AI splits it into steps -> order and parallelism are handled -> it starts on schedule.",
+      "image": "images/scene_007.png",
+      "image_prompt": "Vertical 2:3 concept poster split into two halves: the upper half shows an automated task flow with branching nodes and a clock icon indicating scheduled execution, the lower half shows several gentle glowing AI companions gathered in a park-like 3D space exchanging speech bubbles. Dark background, cyan and green glow, modern technical illustration, no text baked into the image.",
+      "chips": [
+        "Plain-language request",
+        "Auto-split into steps",
+        "Parallel execution via predecessors",
+        "Scheduled runs",
+        "AI members discuss"
+      ],
+      "metrics": [
+        {
+          "label": "Service",
+          "value": "backend_taskteam:8093"
+        },
+        {
+          "label": "API",
+          "value": "/task/* and /team/*"
+        },
+        {
+          "label": "Triggers",
+          "value": "immediate / at-time / interval / scheduled"
+        }
+      ],
+      "cards": [
+        {
+          "title": "AI Task",
+          "lines": [
+            "AI splits a plain-language request into steps",
+            "A DAG of predecessors decides order and parallelism",
+            "Immediate, at-time, interval, or scheduled execution"
+          ]
+        },
+        {
+          "title": "AI Team",
+          "lines": [
+            "Summon AI members modeled on historical figures",
+            "They discuss in a 3D space and decide the team's work",
+            "PlanDo and SPDCA work loops drive the cycle"
+          ]
+        },
+        {
+          "title": "Why you can trust it",
+          "lines": [
+            "A differential backup is taken before work starts",
+            "Verified steps retry automatically once on failure",
+            "Finished work becomes experience for the next assignment"
+          ]
+        }
+      ],
+      "facts": [
+        "AI Task and AI Team run on backend_taskteam (port 8093), with APIs under /task/* and /team/*.",
+        "Step dependencies form a DAG via predecessor SEQs; steps whose dependencies are met start in parallel.",
+        "Execution triggers are immediate, at-time, interval, and scheduled, with folder-change as an extra condition.",
+        "Team requests pick an assignee from accumulated experience, and completed work generates new experience."
+      ],
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "text": "Backend TaskTeam: a server that unifies AI task execution, scheduled tasks, and multi-agent team activity (port 8093)."
+        },
+        {
+          "source": "backend_taskteam/AGENTS.md",
+          "text": "The AI picks an assignee from the active member list and each member's accumulated experience, so prior knowledge is reused."
+        }
+      ],
+      "short_narration": "AI Task splits a plain-language request into steps and runs them for you. In AI Team, AI members gather and share the work between them.",
+      "long_narration": "AiDiy has two ways to hand the work itself over to AI. The first is AI Task. Write what you want done in plain language, and the AI reads it and breaks it into execution steps. Each step can declare its predecessors, so the system decides what must run in order and what can run at the same time. There are four ways to trigger a run: immediately, at a specific date and time, at an interval measured in minutes or hours, or on a daily, weekly, or monthly schedule. You can also trigger on changes in a watched folder. The second is AI Team. You summon AI members modeled on historical figures to form a team, and those members gather in a 3D space to discuss what should be done next. When you submit a request, the AI picks an assignee based on accumulated experience, and the work runs as an AI Task. Finished work becomes experience that feeds the next assignment. Both run on backend_taskteam, sharing the same SQLite database as the business data.",
+      "short_audio": "audio/short_scene_007.mp3",
+      "long_audio": "audio/long_scene_007.mp3",
+      "short_start_sec": 0.0,
+      "short_duration_sec": 7.848,
+      "long_start_sec": 0.0,
+      "long_duration_sec": 52.512
     },
     {
       "id": "scene_999",
-      "title": "ご視聴ありがとうございました",
+      "title": "Thank You for Watching",
       "expression": "neutral",
       "accent": "#c49bff",
       "accent_soft": "rgba(196, 155, 255, 0.2)",
@@ -582,9 +693,9 @@
       "hero_image_focus": true,
       "background_word": "",
       "kicker": "THANK YOU",
-      "headline": "ご視聴ありがとうございました。\nあなたなら AiDiy でなにを創りますか？",
-      "lead": "日本語ファースト設計と AI・MCP 実験基盤が一体になった AiDiy を、ぜひ手元で動かしてみてください。",
-      "subtitle": "チャンネル登録で応援してください。あなたの挑戦が AiDiy をさらに進化させます。",
+      "headline": "Thank you for watching.\nWhat will you build with AiDiy?",
+      "lead": "Try running AiDiy yourself — where domain-aligned identifiers and an AI and MCP experimentation platform come together as one.",
+      "subtitle": "Subscribe to support us. Your challenge will drive AiDiy even further.",
       "image": "images/scene_999.png",
       "chips": [],
       "metrics": [],
@@ -592,16 +703,17 @@
       "facts": [],
       "evidence": [],
       "image_prompt": "Square 1:1 ending visual for AiDiy. Beautiful typography centered on 'Thank you for Watching', refined luxury tech style, dark blue gradient background, subtle violet glow, clean centered layout, premium and readable, no extra UI elements, no character, no clutter. Polished square closing card suitable for a product introduction ending.",
-      "short_narration": "ご視聴ありがとうございました。チャンネル登録をぜひお願いします。AiDiy でなにを創りますか？",
-      "long_narration": "ご視聴ありがとうございました。この動画は AiDiy 自身のビデオページ生成機能で自動生成されました。シナリオ作成・画像生成・音声合成・HTML 組み立てを、すべて MCP と CodeAgents が担当しています。AiDiy には日本語ファースト設計、5 つのサービス、豊富な業務サンプル、AI コア、14 個の MCP ツール、そして自動ビデオ生成まで、いますぐ動かせる部品がそろっています。気に入っていただけたら、チャンネル登録でぜひ応援してください。次の動画でまた会いましょう！日本語ファースト設計と AI の組み合わせが気になった方は、ぜひ AiDiy を手元で動かしてみてください。あなたならこのテンプレートで、どんな業務システムや AI 実験を作りますか？",
+      "short_narration": "Thank you for watching. Please subscribe to support us. What will you build with AiDiy?",
+      "long_narration": "Thank you for watching. This video was automatically generated using AiDiy's own video page generation feature (ビデオページ生成機能). Scenario creation, image generation, speech synthesis, and HTML assembly were all handled by MCP and CodeAgents. AiDiy includes everything you need to get started right away: domain-aligned naming, 7 services, rich business samples, an AI core, 19 MCP tools, and automated video generation. If you enjoyed this video, please subscribe to support us. See you in the next video! If you were intrigued by the combination of practical domain naming and AI, please try running AiDiy yourself. What kind of business system or AI experiment would you build with this template?",
       "short_audio": "audio/short_scene_999.mp3",
       "long_audio": "audio/long_scene_999.mp3",
       "short_start_sec": 0.0,
-      "short_duration_sec": 6.024,
+      "short_duration_sec": 4.992,
       "long_start_sec": 0.0,
-      "long_duration_sec": 40.224
+      "long_duration_sec": 38.784,
+      "duration_sec": 0.0
     }
   ],
-  "total_short_duration_sec": 56.256,
-  "total_long_duration_sec": 343.296
+  "total_short_duration_sec": 69.096,
+  "total_long_duration_sec": 395.784
 }

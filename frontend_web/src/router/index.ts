@@ -147,9 +147,25 @@ const baseRoutes: RouteRecordRaw[] = [
         'X自己紹介/AiDiy紹介hermes/index.html',
         'X自己紹介'
     ),
+    // Xビデオ: AiDiy紹介
     createStaticAliasRoute(
         '/Xビデオ/AiDiy紹介__all_ja',
         'Xビデオ/AiDiy紹介__all_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介__all_en',
+        'Xビデオ/AiDiy紹介__all_en/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_backend_ja',
+        'Xビデオ/AiDiy紹介_backend_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_frontend_ja',
+        'Xビデオ/AiDiy紹介_frontend_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
@@ -168,18 +184,8 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ'
     ),
     createStaticAliasRoute(
-        '/Xビデオ/AiDiy紹介_backend_ja',
-        'Xビデオ/AiDiy紹介_backend_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/AiDiy紹介_frontend_ja',
-        'Xビデオ/AiDiy紹介_frontend_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/AiDiy紹介_avatar_ja',
-        'Xビデオ/AiDiy紹介_avatar_ja/index.html',
+        '/Xビデオ/AiDiy紹介_tools_ja',
+        'Xビデオ/AiDiy紹介_tools_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
@@ -188,10 +194,47 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ'
     ),
     createStaticAliasRoute(
-        '/Xビデオ/AiDiy紹介_tools_ja',
-        'Xビデオ/AiDiy紹介_tools_ja/index.html',
+        '/Xビデオ/AiDiy紹介_avatar_ja',
+        'Xビデオ/AiDiy紹介_avatar_ja/index.html',
         'Xビデオ'
     ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy紹介_ビデオ生成_ja',
+        'Xビデオ/AiDiy紹介_ビデオ生成_ja/index.html',
+        'Xビデオ'
+    ),
+    // Xビデオ: AiDiy実装・解説
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy解説__all_ja',
+        'Xビデオ/AiDiy解説__all_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy解説__all_en',
+        'Xビデオ/AiDiy解説__all_en/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_web_ja',
+        'Xビデオ/AiDiy実装_web_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy実装_avatar_ja',
+        'Xビデオ/AiDiy実装_avatar_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy解説_tools_ja',
+        'Xビデオ/AiDiy解説_tools_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/AiDiy解説_ビデオ生成_ja',
+        'Xビデオ/AiDiy解説_ビデオ生成_ja/index.html',
+        'Xビデオ'
+    ),
+    // Xビデオ: AiDiy実装例
     createStaticAliasRoute(
         '/Xビデオ/AiDiy実装_配車管理_ja',
         'Xビデオ/AiDiy実装_配車管理_ja/index.html',
@@ -207,16 +250,7 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ/AiDiy実装_在庫管理_ja/index.html',
         'Xビデオ'
     ),
-    createStaticAliasRoute(
-        '/Xビデオ/AiDiy実装_web_ja',
-        'Xビデオ/AiDiy実装_web_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/AiDiy実装_avatar_ja',
-        'Xビデオ/AiDiy実装_avatar_ja/index.html',
-        'Xビデオ'
-    ),
+    // Xビデオ: 時事ニュース・解説
     createStaticAliasRoute(
         '/Xビデオ/ニュース_20260521_anthropic2026前半_ja',
         'Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html',
@@ -233,8 +267,29 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ'
     ),
     createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260902_claudefablemythos_ja',
-        'Xビデオ/ニュース_20260902_claudefablemythos_ja/index.html',
+        '/Xビデオ/ニュース_20260906_fable51_ja',
+        'Xビデオ/ニュース_20260906_fable51_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260906_gemini38flash_ja',
+        'Xビデオ/ニュース_20260906_gemini38flash_ja/index.html',
+        'Xビデオ'
+    ),
+    // Xビデオ: 小説
+    createStaticAliasRoute(
+        '/Xビデオ/小説解説_本好きの下剋上_ja',
+        'Xビデオ/小説解説_本好きの下剋上_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/小説解説_AiDiy誕生_ja',
+        'Xビデオ/小説解説_AiDiy誕生_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260906_gpt6astra_ja',
+        'Xビデオ/ニュース_20260906_gpt6astra_ja/index.html',
         'Xビデオ'
     ),
 ]

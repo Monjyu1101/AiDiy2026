@@ -141,11 +141,23 @@ def remove_directory(path: Path, description: str) -> bool:
 def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
     deleted_count = 0
     print_info(f"{label}: __pycache__ フォルダを検索中...")
-    for pycache in target_dir.rglob("__pycache__"):
+    # 削除中に再帰探索の列挙結果が変わらないよう、全階層の対象を先に確定する。
+    # 万一キャッシュフォルダが入れ子でも、深い階層から削除する。
+    pycache_dirs = sorted(
+        (path for path in target_dir.rglob("__pycache__") if path.is_dir()),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    )
+    for pycache in pycache_dirs:
         if remove_directory(pycache, f"__pycache__ ({label})"):
             deleted_count += 1
     print_info(f"{label}: .pytest_cache フォルダを検索中...")
-    for pytest_cache in target_dir.rglob(".pytest_cache"):
+    pytest_cache_dirs = sorted(
+        (path for path in target_dir.rglob(".pytest_cache") if path.is_dir()),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    )
+    for pytest_cache in pytest_cache_dirs:
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
     return deleted_count

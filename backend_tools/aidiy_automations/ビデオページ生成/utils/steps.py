@@ -277,7 +277,7 @@ _VUE_SECTION_RULES = (
     ("AiDiy実装", "AiDiy実装例"),
     ("ニュース", "時事ニュース・解説"),
     ("解説", "時事ニュース・解説"),
-    ("小説", "時事ニュース・解説"),
+    ("小説", "小説"),
     ("", "時事ニュース・解説"),
 )
 
@@ -385,9 +385,9 @@ def _ensure_vue_menu_card(
     """Xビデオ.vue に URL const とメニューカードを 1 件追加する。戻り値は状態文字列。"""
     const_name = _vue_const_name(folder_name)
     page_path = f"{url_segment}/{folder_name}/index.html"
-    # 完成後のメニュー導線は音声つきループ再生が要件。既存カードについても、
-    # 以前の自動化が作ったクエリなし URL を再実行時に補正できるようにする。
-    page_url = f"{page_path}?auto=loop"
+    # メニュー導線はクエリなしの素の URL にする。既存カードについても、
+    # 以前の自動化が付けた ?auto=loop を再実行時に取り除けるようにする。
+    page_url = page_path
     expected_const = f"const {const_name} = `${{baseUrl}}{page_url}`;"
 
     with open(vue_path, encoding="utf-8") as f:
@@ -407,7 +407,7 @@ def _ensure_vue_menu_card(
             if const_updated:
                 with open(vue_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write("\n".join(lines))
-                return "更新（音声つきループ）"
+                return "更新"
             return "既存"
 
     # 1) <script setup> の URL 定義群の末尾へ const を追加する
@@ -480,7 +480,7 @@ async def step_add_routing(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
     vue_path, router_path, url_segment = _routing_target_paths(ctx)
     alias_path = f"/{url_segment}/{folder_name}"
     page_url = f"{url_segment}/{folder_name}/index.html"
-    menu_page_url = f"{page_url}?auto=loop"
+    menu_page_url = page_url
     const_name = _vue_const_name(folder_name)
 
     step_summary = (
@@ -552,7 +552,7 @@ async def step_add_routing(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
         ok1 = check(f"ルート登録: {alias_path}", f"'{alias_path}'" in router_text)
         ok2 = check(f"リダイレクト先: {page_url}", f"'{page_url}'" in router_text)
         ok3 = check(
-            f"メニュー URL const（音声つきループ）: {const_name}",
+            f"メニュー URL const: {const_name}",
             f"const {const_name} = `${{baseUrl}}{menu_page_url}`;" in vue_text,
         )
         ok4 = check(f"メニューカード参照: {const_name}", f':href="{const_name}"' in vue_text)
@@ -819,19 +819,17 @@ async def run_automation_loop(
                 # 表示は Step 02: ルーティング追加 が成功してから始める。
                 # Step 01 の直後はメニューもルートも未登録で、ページを開いても正しく表示できないため。
                 #
-                # 進み具合に合わせて再生モードを 4 段階で上げ、途中経過が見えるようにする。
+                # 進み具合に合わせて再生モードを上げ、途中経過が見えるようにする。
                 #   Step 02-03（ルーティング追加・シナリオ作成）: 表示のみ・無音
                 #     この時点は index.html がテンプレート元のままで画像も音声も無い。
                 #     再生させても中身の無い画面が流れるだけなので、表示の確認にとどめる。
-                #   Step 04-06（HTML修正〜中間確認）: ループ再生・無音
+                #   Step 04-08（HTML修正〜再生時間更新）: ループ再生・無音
                 #     今回のテーマが画面に載るので流して確認する。1 周で止めると
                 #     見に行ったときには終わっていることが多いのでループさせる。
-                #     音声はまだ生成前（Step 07）なので無音。
-                #   Step 07-08（音声生成・再生時間更新）: ループ再生・音声あり
-                #     Step 07 が終わった時点で audio/*.mp3 が揃い、動画として完成している。
-                #     ここを無音のままにすると「完成しているのに音が出ない」状態が
-                #     Step 09 が通るまで続き、Step 09 まで進まなければ永久に無音になる。
-                #   Step 09/99（最終確認・完成案内）: 音声つきループ再生
+                #     Step 07〜08 も、最終確認が済むまでは案内音声と動画音声を
+                #     重ねないため無音を維持する。
+                #   Step 09（最終確認）: 最終確認後に音声つきループ再生
+                #   Step 99（完成案内）: 終了通知のみ（再生状態は変更しない）
                 if 2 <= step_no <= 3:
                     await refresh_browser_preview(
                         ctx,
@@ -840,7 +838,7 @@ async def run_automation_loop(
                         speaker_enabled=False,
                         auto_mode=PREVIEW_AUTO_NONE,
                     )
-                elif 4 <= step_no <= 6:
+                elif 4 <= step_no <= 8:
                     await refresh_browser_preview(
                         ctx,
                         f"Step {step_no:02d}: {step_name}",
@@ -848,15 +846,7 @@ async def run_automation_loop(
                         speaker_enabled=False,
                         auto_mode=PREVIEW_AUTO_LOOP,
                     )
-                elif 7 <= step_no <= 8:
-                    await refresh_browser_preview(
-                        ctx,
-                        f"Step {step_no:02d}: {step_name}",
-                        ensure_fn=ensure_fn,
-                        speaker_enabled=True,
-                        auto_mode=PREVIEW_AUTO_LOOP,
-                    )
-                elif step_no in (9, 99):
+                elif step_no == 9:
                     await start_final_playback(ctx, f"Step {step_no:02d}: {step_name}")
                 break
             else:
