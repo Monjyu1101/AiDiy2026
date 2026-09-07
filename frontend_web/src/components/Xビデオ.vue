@@ -46,12 +46,13 @@ const ニュースUrl = `${baseUrl}Xビデオ/ニュース_20260521_anthropic202
 const ニュースGoogleUrl = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
 const ニュースOpenAIUrl = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
 const ニュース_20260906_fable51_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_fable51_ja/index.html`;
+const ニュース_20260906_gpt6astra_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_gpt6astra_ja/index.html`;
 const ニュース_20260906_gemini38flash_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_gemini38flash_ja/index.html`;
 
 // 小説
-const 小説解説_本好きの下剋上_jaUrl = `${baseUrl}Xビデオ/小説解説_本好きの下剋上_ja/index.html`;
 const 小説解説_AiDiy誕生_jaUrl = `${baseUrl}Xビデオ/小説解説_AiDiy誕生_ja/index.html`;
-const ニュース_20260906_gpt6astra_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_gpt6astra_ja/index.html`;
+const 小説解説_本好きの下剋上_jaUrl = `${baseUrl}Xビデオ/小説解説_本好きの下剋上_ja/index.html`;
+const 四コマ漫画_伝説のプログラマ_jaUrl = `${baseUrl}Xビデオ/四コマ漫画_伝説のプログラマ_ja/index.html`;
 
 const route = useRoute();
 const router = useRouter();
@@ -340,7 +341,7 @@ const handleReturn = () => {
           <a class="menu-card menu-card-fixed" :href="ニュース_20260906_fable51_jaUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">寓話</span>
-              Claude Fable 5.1 発表――AIが科学の現場で成果を出しはじめた
+              Claude Fable 5.1 発表
             </div>
             <div class="menu-card-description">
               Claude Fable 5.1の科学・開発性能と料金、安全性を解説
@@ -350,7 +351,7 @@ const handleReturn = () => {
           <a class="menu-card menu-card-fixed" :href="ニュース_20260906_gpt6astra_jaUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">極星</span>
-              GPT-6 Astra 発表――ベンチマークを塗りつぶした最上位モデル
+              GPT-6 Astra 発表
             </div>
             <div class="menu-card-description">
               GPT-6 Astraの性能とPC操作、料金、安全性を解説
@@ -360,7 +361,7 @@ const handleReturn = () => {
           <a class="menu-card menu-card-fixed" :href="ニュース_20260906_gemini38flash_jaUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">閃考</span>
-              Gemini 3.8 Flash 発表――安さと「よく考える」のトレードオフ
+              Gemini 3.8 Flash 発表
             </div>
             <div class="menu-card-description">
               Gemini 3.8 Flashの性能と料金、速度特性を解説
@@ -389,6 +390,16 @@ const handleReturn = () => {
             </div>
             <div class="menu-card-description">
               本を求める少女の転生から始まる全 5 部の物語をネタバレ込みで紹介
+            </div>
+          </a>
+
+          <a class="menu-card menu-card-fixed" :href="四コマ漫画_伝説のプログラマ_jaUrl" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">伝説</span>
+              四コマ漫画『伝説のプログラマ』
+            </div>
+            <div class="menu-card-description">
+              伝説のプログラマが繰り出す奇想天外な一手を、四コマ仕立てのひとり語りでテンポよく紹介
             </div>
           </a>
 

@@ -108,6 +108,15 @@ def ensure_scene_html_pages(output_dir: str, scenario_path: str, *, language: st
 
     title = html.escape(str(data.get("title") or data.get("project_name") or "Video"), quote=False)
     lang = html.escape(str(language or "ja"), quote=True)
+    expected_pages = {
+        f"{str(scene.get('id', ''))}.html"
+        for scene in scenes
+        if isinstance(scene, dict)
+    }
+    for name in os.listdir(output_dir):
+        if re.fullmatch(r"scene_\d{3}\.html", name) and name not in expected_pages:
+            os.remove(os.path.join(output_dir, name))
+
     written: list[str] = []
     for index, scene in enumerate(scenes):
         if not isinstance(scene, dict):
@@ -449,6 +458,69 @@ async def probe_media_duration_sec(ctx: "VideoGenCtx", media_path: str) -> float
         raise RuntimeError(f"ffmpeg API の duration_sec を数値化できません: {repr(raw)}") from e
 
 
+def _sync_mcp_assets_json(ctx: "VideoGenCtx", data: dict, new_dir: str) -> None:
+    """mcp 形式の scenario.js から assets.json を再構築する。"""
+    assets_path = os.path.join(new_dir, "assets.json")
+    assets_policy = data.get("assets_policy", {}) if isinstance(data.get("assets_policy"), dict) else {}
+    source = data.get("source", {}) if isinstance(data.get("source"), dict) else {}
+    source_ref = str(source.get("url", "") or source.get("name", "") or "").strip()
+
+    images = []
+    audio = []
+    for scene in data.get("scenes", []):
+        if not isinstance(scene, dict):
+            continue
+        scene_id = str(scene.get("id", "") or "").strip()
+        if not scene_id:
+            continue
+
+        image_ref = str(scene.get("image", f"images/{scene_id}.png") or "").strip()
+        image_path = image_ref.replace("/", os.sep)
+        if not os.path.isabs(image_path):
+            image_path = os.path.join(new_dir, image_path)
+        image_bytes = os.path.getsize(image_path) if os.path.isfile(image_path) else 0
+        images.append({
+            "scene_id": scene_id,
+            "status": "generated" if image_bytes > 1000 else "missing",
+            "path": image_ref,
+            "bytes": image_bytes,
+        })
+
+        audio_item = {"scene_id": scene_id, "status": "generated"}
+        audio_ok = True
+        for prefix in ("short", "long"):
+            audio_ref = str(scene.get(f"{prefix}_audio", "") or "").strip()
+            audio_path = audio_ref.replace("/", os.sep)
+            if not os.path.isabs(audio_path):
+                audio_path = os.path.join(new_dir, audio_path)
+            audio_bytes = os.path.getsize(audio_path) if os.path.isfile(audio_path) else 0
+            audio_item[f"{prefix}_path"] = audio_ref
+            audio_item[f"{prefix}_bytes"] = audio_bytes
+            audio_item[f"{prefix}_duration_sec"] = float(scene.get(f"{prefix}_duration_sec", 0) or 0)
+            audio_ok = audio_ok and audio_bytes > 500 and audio_item[f"{prefix}_duration_sec"] > 0
+        audio_item["status"] = "generated" if audio_ok else "missing"
+        audio.append(audio_item)
+
+    manifest = {
+        "project_name": str(data.get("project_name", ctx.folder_name) or ctx.folder_name),
+        "version": str(data.get("version", "mcp") or "mcp"),
+        "status": "complete" if images and audio and all(x["status"] == "generated" for x in images + audio) else "incomplete",
+        "policy": {
+            "visual_generation": "auto",
+            "audio_generation": str(assets_policy.get("tts_provider", "edge:female") or "edge:female").replace(":", "_"),
+            "language": ctx.language,
+            "layout": str(assets_policy.get("visual_style", "left_avatar_38_right_content_62") or "left_avatar_38_right_content_62"),
+            "avatar_model": str(assets_policy.get("avatar", "../_vrm/VRM_female.vrm") or "../_vrm/VRM_female.vrm"),
+            "evidence_source": [source_ref] if source_ref else [],
+        },
+        "images": images,
+        "audio": audio,
+    }
+    with open(assets_path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
 async def update_scenario_audio_durations(
     ctx: "VideoGenCtx",
     scenario_path: str,
@@ -486,6 +558,10 @@ async def update_scenario_audio_durations(
                     raise RuntimeError(f"音声ファイルが見つかりません: {audio_path}")
 
                 duration_sec = await probe_media_duration_sec(ctx, audio_path)
+                if prefix == "short":
+                    scene[f"{prefix}_start_sec"] = round(total_short_sec, 3)
+                else:
+                    scene[f"{prefix}_start_sec"] = round(total_long_sec, 3)
                 scene[d_key] = duration_sec
                 scene_sum += duration_sec
                 if prefix == "short":
@@ -544,6 +620,8 @@ async def update_scenario_audio_durations(
             data["long_duration_sec"] = round(total_long_sec, 3)
 
     save_scenario_object(scenario_path, data)
+    if version != "duo-v2":
+        _sync_mcp_assets_json(ctx, data, new_dir)
     return {
         "audio_count": updated_audio,
         "scene_count": updated_scenes,
@@ -691,7 +769,6 @@ def render_scene_image_script(
         "import sys\n"
         "import urllib.error\n"
         "import urllib.request\n"
-        "from concurrent.futures import ThreadPoolExecutor, as_completed\n"
         + (extra_imports + "\n" if extra_imports else "")
         + "\n"
         "if sys.platform == 'win32':\n"
@@ -795,29 +872,25 @@ def render_scene_image_script(
         '        ref_label = f" (ref: {os.path.basename(original_path)})" if original_path else ""\n'
         '        print(f"  [WAIT] {os.path.basename(out_path)} : {title}{ref_label}")\n'
         "        tasks.append((scene_id, scene, out_path, num_str))\n\n"
-        "    worker_count = min(3, len(tasks))\n"
-        "    if worker_count:\n"
-        '        print(f"\\n画像生成を開始します（最大 {worker_count} 件並行）")\n'
-        "        with ThreadPoolExecutor(max_workers=worker_count) as executor:\n"
-        "            futures = {executor.submit(generate_scene, task): task for task in tasks}\n"
-        "            for future in as_completed(futures):\n"
-        "                task = futures[future]\n"
-        "                scene_id, _scene, out_path, _num_str = task\n"
-        "                try:\n"
-        "                    _scene_id, out_path, _original_path, info, size = future.result()\n"
-        "                except Exception as e:\n"
-        '                    print(f"  [ERR ] {os.path.basename(out_path)} -> {e}")\n'
-        "                    fail += 1\n"
-        "                    continue\n"
-        "            if size > 1000:\n"
-        "                print(\n"
-        "                    f\"  [ OK ] {os.path.basename(out_path)} ({size:,} bytes) \"\n"
-        "                    f\"[{info.get('provider', '?')}/{info.get('model', '?')}]\"\n"
-        "                )\n"
-        "                done += 1\n"
-        "            else:\n"
-        '                print(f"  [FAIL] {os.path.basename(out_path)} (empty or too small)")\n'
-        "                fail += 1\n"
+        "    if tasks:\n"
+        '        print("\\n画像生成を開始します（直列実行）")\n'
+        "    for task in tasks:\n"
+        "        scene_id, _scene, out_path, _num_str = task\n"
+        "        try:\n"
+        "            _scene_id, out_path, _original_path, info, size = generate_scene(task)\n"
+        "        except Exception as e:\n"
+        '            print(f"  [ERR ] {os.path.basename(out_path)} -> {e}")\n'
+        "            fail += 1\n"
+        "            continue\n"
+        "        if size > 1000:\n"
+        "            print(\n"
+        "                f\"  [ OK ] {os.path.basename(out_path)} ({size:,} bytes) \"\n"
+        "                f\"[{info.get('provider', '?')}/{info.get('model', '?')}]\"\n"
+        "            )\n"
+        "            done += 1\n"
+        "        else:\n"
+        '            print(f"  [FAIL] {os.path.basename(out_path)} (empty or too small)")\n'
+        "            fail += 1\n"
         '    print(f"\\n完了: {done} 生成, {skip} スキップ, {fail} 失敗 (合計 {total} 件)")\n'
         "    if fail:\n"
         "        raise SystemExit(1)\n\n\n"

@@ -109,6 +109,13 @@ def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[
         # Teamテーブルを先に揃え、Task側の連携クリーンアップから同じDBを参照できるようにする。
         await _team_initialize(logger)
         await asyncio.to_thread(tasks_db.初期化)
+        初期タスクID = await asyncio.to_thread(tasks_db.初期タスクを投入)
+        if 初期タスクID:
+            logger.info(
+                "AIタスクが空だったため実行監視のひな形を投入しました: %s"
+                "（実行有効=0。監視対象タスクIDを書き換えて有効化すると動きます）",
+                初期タスクID,
+            )
         await asyncio.to_thread(tasks_watcher.起動時クリーンアップ, logger)
         await asyncio.to_thread(tasks_watcher.起動時実行条件初期化, logger)
         await asyncio.to_thread(team_watcher.起動時クリーンアップ, logger)

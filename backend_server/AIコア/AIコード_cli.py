@@ -24,6 +24,33 @@ from PIL import Image
 import io
 
 
+async def _長大行対応readline(stream: asyncio.StreamReader, 出力検知=None) -> bytes:
+    """StreamReader の上限を超える長い1行も、失わず最後まで読み取る。"""
+    chunks: list[bytes] = []
+    while True:
+        try:
+            chunk = await stream.readuntil(b"\n")
+            chunks.append(chunk)
+            if 出力検知:
+                出力検知()
+            return b"".join(chunks)
+        except asyncio.LimitOverrunError as e:
+            # readline() は既定上限（通常64KiB）を超えると例外で読取を終える。
+            # 区切り文字より前の安全な範囲を消費し、同じ1行の続きを読み取る。
+            chunk = await stream.read(max(e.consumed, 1))
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
+            if 出力検知:
+                出力検知()
+        except asyncio.IncompleteReadError as e:
+            if e.partial:
+                chunks.append(e.partial)
+                if 出力検知:
+                    出力検知()
+            return b"".join(chunks)
+
+
 class CodeAI:
     """
     CLI (subprocess) ベース CodeAI統合クラス
@@ -996,6 +1023,10 @@ class CodeAI:
             stderr_lines = []
             last_output_time = time.time()
 
+            def 出力時刻更新():
+                nonlocal last_output_time
+                last_output_time = time.time()
+
             # stdout監視タスク
             async def stdout_reader():
                 nonlocal last_output_time
@@ -1007,7 +1038,7 @@ class CodeAI:
                             await self._停止マーカー送信()
                             break
 
-                        line = await process.stdout.readline()
+                        line = await _長大行対応readline(process.stdout, 出力時刻更新)
                         if not line:
                             break
 
@@ -1048,7 +1079,7 @@ class CodeAI:
                             await self._停止マーカー送信()
                             break
 
-                        line = await process.stderr.readline()
+                        line = await _長大行対応readline(process.stderr, 出力時刻更新)
                         if not line:
                             break
 
@@ -1200,6 +1231,10 @@ class CodeAI:
             stderr_lines = []
             last_output_time = time.time()
 
+            def 出力時刻更新():
+                nonlocal last_output_time
+                last_output_time = time.time()
+
             async def stdout_reader():
                 nonlocal last_output_time
                 try:
@@ -1208,7 +1243,7 @@ class CodeAI:
                             logger.info("[antigravity] 強制停止要求検出、stdout読み取り中断")
                             await self._停止マーカー送信()
                             break
-                        line = await process.stdout.readline()
+                        line = await _長大行対応readline(process.stdout, 出力時刻更新)
                         if not line:
                             break
                         last_output_time = time.time()
@@ -1239,7 +1274,7 @@ class CodeAI:
                         if self._強制停止要求あり():
                             await self._停止マーカー送信()
                             break
-                        line = await process.stderr.readline()
+                        line = await _長大行対応readline(process.stderr, 出力時刻更新)
                         if not line:
                             break
                         last_output_time = time.time()

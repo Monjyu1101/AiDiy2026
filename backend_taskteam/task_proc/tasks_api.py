@@ -948,7 +948,18 @@ async def task_check_okng(request: タスク検証OKNGリクエスト) -> dict:
                 "いま実行を任されている明細だけが報告できます。他の明細の状態は変更できません。"
             )
         if 状態 == "完了":
-            item = tasks_db.明細完了(タスクID, request.SEQ, request.メッセージ)
+            # メッセージはそのまま明細の応答内容になり、後続ステップと最終検証へ
+            # 「実行済み記録」として渡る唯一の手段。空の完了報告を通すと、実際には
+            # 動いていたステップが記録なし扱いになり、最終検証が成果物なしでエラーにする。
+            メッセージ = request.メッセージ.strip()
+            if not メッセージ:
+                logger.warning(f"メッセージなしの完了報告を拒否しました: {タスクID} SEQ{request.SEQ}")
+                return _NG(
+                    f"タスク {タスクID} SEQ{request.SEQ} の完了報告にはメッセージが必要です。"
+                    "実行した内容・確認したこと・結果をメッセージに書いて報告し直してください。"
+                    "この本文がそのまま実行済み記録になり、後続ステップと最終検証はこれだけを読んで判断します。"
+                )
+            item = tasks_db.明細完了(タスクID, request.SEQ, メッセージ)
             return _OK({"item": item}, f"タスク {タスクID} SEQ{request.SEQ} を完了として登録しました。")
         item = tasks_db.明細失敗(タスクID, request.SEQ, request.メッセージ or "操作検証NG")
         return _OK({"item": item}, f"タスク {タスクID} SEQ{request.SEQ} をエラーとして登録しました。")

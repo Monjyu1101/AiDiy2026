@@ -406,16 +406,14 @@ def main() -> int:
         ログ(f"=== AIタスク生成 開始: {利用者ID}/{タスクID} ===")
         ログ(f"入力: {入力パス}")
 
-        # 0. 既存のタスク明細をクリアして再生成できる状態にする
-        #    （明細に PID が残っていれば API 側で処理を停止してからレコードを消去する）
-        res = POST送信(f"{TASK_API}/タスク明細/全消去", {"タスクID": タスクID}, timeout=60)
-        ログ(f"既存明細クリア: {json.dumps(res, ensure_ascii=False)[:200]}")
-
         出力DIR = os.path.join(BASE_DIR, "temp", "output")
         os.makedirs(出力DIR, exist_ok=True)
         出力JSONパス = os.path.join(出力DIR, f"{ファイルステム}.json").replace("\\", "/")
-        if os.path.exists(出力JSONパス):
-            os.remove(出力JSONパス)
+        # 既存の出力 JSON は、新しい分解結果の生成・検証が完了するまで残す。
+        # 同じディレクトリ内の一意な作業ファイルを使い、検証後に os.replace で置換する。
+        作業JSONパス = os.path.join(
+            出力DIR, f".{ファイルステム}.{os.getpid()}.pending.json"
+        ).replace("\\", "/")
 
         # 1. 第1ステップ: 指定プロジェクトフォルダで AI がタスク分解（ファイル書き込みなし）
         ログ(f"第1ステップ: タスク分解 (ai={task_ai_name}, model={plan_ai_model}, project_path={プロジェクト or '既定'})")
@@ -440,7 +438,7 @@ def main() -> int:
         for 試行 in range(1, JSON保存最大試行回数 + 1):
             try:
                 データ, 行リスト = JSON保存と検証(
-                    分解結果, 出力JSONパス, プロジェクト, task_ai_name, task_ai_model, plan_ai_model
+                    分解結果, 作業JSONパス, プロジェクト, task_ai_name, task_ai_model, plan_ai_model
                 )
                 break
             except Exception as e:
@@ -449,12 +447,19 @@ def main() -> int:
                     raise
                 ログ("自動リカバリー: 第2ステップ（JSON保存）を再試行します")
 
-        # 4. DB へ本登録（仮登録は置き換え）
+        # 4. 検証済み出力と DB を本登録時に置き換える。
+        #    DB 側の本登録は要求・明細を単一トランザクションで置換するため、事前全消去は不要。
+        os.replace(作業JSONパス, 出力JSONパス)
         本登録(データ, 行リスト, 要求内容)
         ログ("本登録 完了")
         return 0
 
     except Exception as e:
+        if "作業JSONパス" in locals() and os.path.exists(作業JSONパス):
+            try:
+                os.remove(作業JSONパス)
+            except OSError as cleanup_error:
+                ログ(f"作業 JSON の後片付けに失敗しました: {cleanup_error}")
         ログ(f"エラー: {e}\n{traceback.format_exc()}")
         失敗登録(str(e))
         return 1

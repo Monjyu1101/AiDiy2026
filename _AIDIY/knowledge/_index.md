@@ -102,6 +102,7 @@
 | ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 | backend / MCP / task・team 起動、ポート残留 | [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、[`backend_tools,構成.md`](./backend_tools,構成.md) |
 | AIタスク（要求分解・明細DAG・実行開始条件）、AIチーム（依頼・経験・作業ループ・自動会話）の仕様 | `backend_taskteam/AGENTS.md`（HowTo 化された内容が無いため、実装概要が正） |
+| AIタスクの実行済み記録が空になる、間隔実行が1回のエラーで止まる、実行監視タスクを作る | [`backend_taskteam,AIタスクの実行記録と繰り返し監視.md`](./backend_taskteam,AIタスクの実行記録と繰り返し監視.md) |
 | aidiy_hermes で MCP が `failed` / ツール未認識 | [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) |
 | upstream hermes-agent の新版を command_hermes へ取り込む、移植後に起動しない | [`command_hermes,upstream移植手順.md`](./command_hermes,upstream移植手順.md) |
 | Windows ネイティブで terminal / file 操作が落ちる、OS 分岐を入れたい | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |

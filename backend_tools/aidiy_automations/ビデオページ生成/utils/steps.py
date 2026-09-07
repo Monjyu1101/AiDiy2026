@@ -11,6 +11,7 @@ step_completion_notice を提供する。
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -652,12 +653,13 @@ async def step_update_durations(ctx: VideoGenCtx, ca: dict, attempt: int = 1) ->
     folder_name = ctx.folder_name
     topic = ctx.topic
     scenario_path = os.path.join(new_dir, "scenario.js")
+    assets_path = os.path.join(new_dir, "assets.json")
     audio_dir = os.path.join(new_dir, "audio")
     md_path = os.path.join(new_dir, f"{folder_name}.md")
 
     step_summary = (
         f'  "{folder_name}" の音声ファイル実時間で scenario.js の再生時間欄を更新します。\n'
-        "  duration_sec / short_duration_sec / long_duration_sec を揃えます。"
+        "  duration_sec / start_sec と assets.json の素材情報を揃えます。"
     )
 
     tts_msg = (
@@ -706,12 +708,29 @@ async def step_update_durations(ctx: VideoGenCtx, ca: dict, attempt: int = 1) ->
             "total duration 設定済み",
             stats["total_short_duration_sec"] > 0 and stats["total_long_duration_sec"] > 0,
         )
-        return ok1 and ok2 and ok3
+        ok4 = False
+        if os.path.isfile(assets_path):
+            try:
+                with open(assets_path, encoding="utf-8-sig") as f:
+                    assets = json.load(f)
+                scene_count = stats["scene_count"]
+                ok4 = check(
+                    "assets.json 対象作品・素材件数整合",
+                    assets.get("project_name") == folder_name
+                    and len(assets.get("images", [])) == scene_count
+                    and len(assets.get("audio", [])) == scene_count,
+                )
+            except (OSError, ValueError, TypeError) as e:
+                print(f"  [assets] 読み込み失敗: {e}")
+                check("assets.json 対象作品・素材件数整合", False)
+        else:
+            check("assets.json 存在", False)
+        return ok1 and ok2 and ok3 and ok4
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
-        target_paths=[scenario_path, audio_dir, md_path],
+        target_paths=[scenario_path, assets_path, audio_dir, md_path],
         validate=validate, verify_timeout_sec=300, attempt=attempt,
     )
 

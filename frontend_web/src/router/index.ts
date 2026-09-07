@@ -292,6 +292,11 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ/ニュース_20260906_gpt6astra_ja/index.html',
         'Xビデオ'
     ),
+    createStaticAliasRoute(
+        '/Xビデオ/四コマ漫画_伝説のプログラマ_ja',
+        'Xビデオ/四コマ漫画_伝説のプログラマ_ja/index.html',
+        'Xビデオ'
+    ),
 ]
 
 const router = createRouter({

@@ -370,6 +370,12 @@ def main() -> int:
                 最終行 = 明細1件取得(明細一覧取得(), 明細SEQ)
                 最終状態 = str(最終行.get("状態", "")).strip()
                 if 最終状態 == "完了":
+                    # 応答内容は AI が task_check_okng のメッセージへ書く。省かれると空のまま
+                    # 完了になり、後続ステップと最終検証（sub_end.py）へ「実行済み記録なし」として
+                    # 渡ってエラー判定の原因になる。空なら実行結果で埋め直しておく。
+                    if not str(最終行.get("応答内容", "")).strip():
+                        完了報告(str(res.get("result") or json.dumps(res, ensure_ascii=False)))
+                        ログ("応答内容が空だったため実行結果で補完しました")
                     ログ("ステップ完了（操作検証OK）")
                     return 0
                 elif 最終状態 == "エラー":

@@ -307,7 +307,7 @@ duration = MP3("audio/scene_001.mp3").info.length
 
 `freeai` プロバイダは生成時に実測 `duration_sec` を返すため、**生成ログの秒数を直接 scenario.js に書き込む**のが最も確実（ファイルの再読み不要）。
 
-`start_sec` は累積で再計算し、ルートの `duration_sec` も合計値で更新する。
+`start_sec` は short / long の系列ごとに 0 秒から累積で再計算し、ルートの合計尺も更新する。`assets.json` はコピー元のシーン情報を残さず、確定した `scenario.js` と実ファイルから再構築する。更新後は `project_name`、画像件数、音声件数、`bytes`、`duration_sec`、`status` が出力先と一致することを確認する。
 
 
 ## 目標尺の設定と尺調整ループ
@@ -404,9 +404,10 @@ mcp__aidiy_image_generation__generate_image
 - `source_documents` を `scenario.json` や `assets.json` に残し、あとで「この画像はどの情報を元にしたか」を追跡できるようにする
 - AGENTS.md や既存 UI と食い違う要素（未実装の製品ロゴ、存在しない画面構成、MCP 数違いなど）は `forbidden_elements` として先に明記する
 - `save_path` 先が存在しない場合はエラーになるため、事前に `os.makedirs()` で作成する
-- 1 枚あたり 10〜30 秒かかるため、シーン数が多い場合は **逐次実行**（並列不可）
+- 1 枚あたり 10〜30 秒かかるため、シーン数が多い場合も **逐次実行**（並列不可）。Codex 画像プロバイダーを同時実行すると一時出力パスが競合し、別シーンへ同一画像が保存される場合がある
 - `save_path` に既存ファイルがあると上書きされる
 - 生成完了後に `assets.json` の `images[].status` を `"generated"` に更新する
+- 生成完了の判定は件数とファイルサイズだけで済ませず、期待する `scene_NNN.png` の完全一致、SHA-256 の重複なし、画像寸法、目視での人物・場面・文字焼き込みの有無まで確認する
 
 ## 動画素材生成（aidiy_movie_generation）
 

@@ -57,7 +57,7 @@ from utils.generation import (
     validate_scene_id_range, validate_scene_expressions, validate_scene_media_refs, index_html_matches_theme,
     ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, 参照画像ディレクトリ,
-    count_scenario_scenes, count_scenario_dialogues, ensure_scene_html_pages,
+    count_scenario_scenes, count_scenario_dialogues, ensure_scene_html_pages, load_scenario_object,
 )
 from utils.steps import (
     step00_preflight, step_add_routing, step_create_folder, step_generate_audio,
@@ -434,9 +434,36 @@ async def step_generate_images(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         if not os.path.isdir(images_dir):
             check("images フォルダ存在", False)
             return False
-        expected = count_scenario_scenes(scenario_path) if os.path.isfile(scenario_path) else 8
-        pngs = [f for f in os.listdir(images_dir) if f.endswith(".png") and os.path.getsize(os.path.join(images_dir, f)) > 1000]
-        return check(f"images/*.png 生成数: {len(pngs)} 件（期待 {expected} 件以上）", expected > 0 and len(pngs) >= expected)
+        if not os.path.isfile(scenario_path):
+            return check("scenario.js 存在", False)
+
+        import hashlib
+
+        data = load_scenario_object(scenario_path)
+        expected_names = {
+            f"{scene.get('id')}.png"
+            for scene in data.get("scenes", [])
+            if isinstance(scene, dict) and scene.get("id")
+        }
+        pngs = {
+            f for f in os.listdir(images_dir)
+            if f.endswith(".png") and os.path.getsize(os.path.join(images_dir, f)) > 1000
+        }
+        ok_names = check(
+            f"images/*.png 構成: {len(pngs)} 件（期待 {len(expected_names)} 件）",
+            bool(expected_names) and pngs == expected_names,
+        )
+
+        hashes: dict[str, list[str]] = {}
+        for name in sorted(pngs & expected_names):
+            with open(os.path.join(images_dir, name), "rb") as f:
+                digest = hashlib.sha256(f.read()).hexdigest()
+            hashes.setdefault(digest, []).append(name)
+        duplicates = [names for names in hashes.values() if len(names) > 1]
+        ok_unique = check("シーン画像 SHA-256 重複なし", not duplicates)
+        if duplicates:
+            print(f"  [image] 重複画像: {duplicates}")
+        return ok_names and ok_unique
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
