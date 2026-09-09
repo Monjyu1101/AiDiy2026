@@ -8,6 +8,141 @@
   --scene-background: none;
 }
 
+/* 最終ページは、本編4コマと右上のオチ解説を同時表示する。 */
+.stage-recap .image-shell {
+  display: none;
+}
+
+.recap-grid {
+  position: absolute;
+  z-index: 3;
+  inset: 50% 36% auto 24px;
+  height: calc(100% - 128px);
+  transform: translateY(-50%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.recap-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  background: #101923;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+}
+
+.recap-panel img {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.recap-panel figcaption {
+  padding: 8px 10px;
+  color: #fff;
+  font-size: clamp(12px, 1.2vw, 19px);
+  line-height: 1.4;
+}
+
+/* 横表示（横長画面）は、下段を 1 コマ分だけ右へずらした 3 列構成にする。
+ *   1 2 ・
+ *   ・ 3 4
+ * 画面幅いっぱいに広げ、右上の本文レイヤーとの重なりは許容する。
+ */
+@media not all and (max-aspect-ratio: 1/1) {
+  .recap-grid {
+    inset: 50% 24px auto 24px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .recap-panel:nth-child(1) {
+    grid-area: 1 / 1;
+  }
+
+  .recap-panel:nth-child(2) {
+    grid-area: 1 / 2;
+  }
+
+  .recap-panel:nth-child(3) {
+    grid-area: 2 / 2;
+  }
+
+  .recap-panel:nth-child(4) {
+    grid-area: 2 / 3;
+  }
+}
+
+/* 縦表示（縦長画面）は、左寄せ・右寄せを交互にした 4 段の縦並びにする。
+ * 左端・右端まで振り切らず、画面の 1/4 だけ左右に寄せる。
+ * 右上の本文レイヤーやアバターとの重なりは許容する。
+ */
+@media (max-aspect-ratio: 1/1) {
+  .stage-recap .recap-grid {
+    inset: 50% 14px auto;
+    height: calc(100% - 88px);
+    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+  }
+
+  /* 1 段分の高さに 16:9 の画像がちょうど収まる幅を逆算し、左右の黒帯を出さない。 */
+  .stage-recap .recap-panel {
+    width: min(100%, calc(((100vh - 118px) / 4 - 31px) * 16 / 9));
+    justify-self: center;
+  }
+
+  .stage-recap .recap-panel:nth-child(1) {
+    grid-row: 1;
+    grid-column: 1 / span 3;
+  }
+
+  .stage-recap .recap-panel:nth-child(2) {
+    grid-row: 2;
+    grid-column: 2 / span 3;
+  }
+
+  .stage-recap .recap-panel:nth-child(3) {
+    grid-row: 3;
+    grid-column: 1 / span 3;
+  }
+
+  .stage-recap .recap-panel:nth-child(4) {
+    grid-row: 4;
+    grid-column: 2 / span 3;
+  }
+
+  .stage-recap .content-panel {
+    top: 52px;
+    right: 16px;
+    bottom: auto;
+    width: min(84vw, 420px);
+    max-height: calc(40% - 64px);
+    padding: 0;
+  }
+
+  .stage-recap .headline {
+    font-size: clamp(20px, 4.8vw, 30px);
+  }
+
+  .stage-recap .lead {
+    margin-top: 10px;
+  }
+
+  .recap-panel figcaption {
+    padding: 6px;
+    font-size: 12px;
+  }
+}
+
 html,
 body {
   overflow: hidden;
@@ -298,16 +433,12 @@ body::before {
     object-position: center center;
   }
 
-  .visual-panel::after {
-    background: linear-gradient(180deg, transparent 18%, rgba(2, 7, 15, 0.08) 40%, rgba(2, 7, 15, 0.86) 100%);
-  }
-
   .content-panel {
-    top: auto;
-    left: 5%;
-    right: 5%;
-    bottom: 4%;
-    width: auto;
+    top: 4%;
+    left: auto;
+    right: 4%;
+    bottom: auto;
+    width: clamp(260px, 44vw, 420px);
     max-height: 55%;
     padding: 14px 0 0;
   }
@@ -333,10 +464,12 @@ body::before {
   }
 
   .content-panel {
-    left: 16px;
+    top: 16px;
+    left: auto;
     right: 16px;
-    bottom: 12px;
-    max-height: 59%;
+    bottom: auto;
+    width: min(76vw, 300px);
+    max-height: 55%;
     padding: 10px 0 0;
   }
 

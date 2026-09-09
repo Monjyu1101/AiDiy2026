@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-ナレーション音声生成スクリプト（四コマ漫画 / edge female / mcp 形式）
+ナレーション音声生成スクリプト（四コマ漫画_伝説のプログラマ_ja / edge female / mcp 形式）
 
 既存の音声ファイル（500 bytes 超）は自動スキップします。
 """
 
+import argparse
 import json
 import os
 import sys
@@ -73,8 +74,22 @@ def synthesize_one(text, out_path):
     })
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="scenario.js からナレーション音声を生成します。")
+    parser.add_argument(
+        "--force-scene",
+        action="append",
+        default=[],
+        metavar="SCENE_ID",
+        help="既存音声も再生成するシーンID。複数回指定できます（例: scene_001）。",
+    )
+    return parser.parse_args()
+
+
 
 def main():
+    args = parse_args()
+    force_scenes = {scene_id.removeprefix("scene_") for scene_id in args.force_scene}
     total = len(NARRATIONS)
     done = 0
     skip = 0
@@ -82,7 +97,11 @@ def main():
     for scene_num, kind, text in NARRATIONS:
         fname = f"{kind}_scene_{scene_num}.mp3"
         fpath = os.path.join(OUTPUT_DIR, fname)
-        if os.path.exists(fpath) and os.path.getsize(fpath) > 500:
+        if (
+            scene_num not in force_scenes
+            and os.path.exists(fpath)
+            and os.path.getsize(fpath) > 500
+        ):
             print(f"  [SKIP] {fname}")
             skip += 1
             continue

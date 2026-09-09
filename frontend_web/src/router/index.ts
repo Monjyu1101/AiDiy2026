@@ -252,21 +252,6 @@ const baseRoutes: RouteRecordRaw[] = [
     ),
     // Xビデオ: 時事ニュース・解説
     createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260521_anthropic2026前半_ja',
-        'Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260521_google2026前半_ja',
-        'Xビデオ/ニュース_20260521_google2026前半_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260521_openai2026前半_ja',
-        'Xビデオ/ニュース_20260521_openai2026前半_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
         '/Xビデオ/ニュース_20260906_fable51_ja',
         'Xビデオ/ニュース_20260906_fable51_ja/index.html',
         'Xビデオ'

@@ -298,16 +298,12 @@ body::before {
     object-position: center center;
   }
 
-  .visual-panel::after {
-    background: linear-gradient(180deg, transparent 18%, rgba(2, 7, 15, 0.08) 40%, rgba(2, 7, 15, 0.86) 100%);
-  }
-
   .content-panel {
-    top: auto;
-    left: 5%;
-    right: 5%;
-    bottom: 4%;
-    width: auto;
+    top: 4%;
+    left: auto;
+    right: 4%;
+    bottom: auto;
+    width: clamp(260px, 44vw, 420px);
     max-height: 55%;
     padding: 14px 0 0;
   }
@@ -333,10 +329,12 @@ body::before {
   }
 
   .content-panel {
-    left: 16px;
+    top: 16px;
+    left: auto;
     right: 16px;
-    bottom: 12px;
-    max-height: 59%;
+    bottom: auto;
+    width: min(76vw, 300px);
+    max-height: 55%;
     padding: 10px 0 0;
   }
 

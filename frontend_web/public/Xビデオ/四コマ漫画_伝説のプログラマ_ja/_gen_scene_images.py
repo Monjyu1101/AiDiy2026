@@ -18,7 +18,7 @@ if sys.platform == 'win32':
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(_THIS_DIR, 'images')
-TEMPLATE_IMAGE_DIR = ''
+TEMPLATE_IMAGE_DIR = 'C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_web\\public\\Xビデオ\\小説解説_AiDiy誕生_ja\\images'
 IMAGE_GEN_API_URL = 'http://127.0.0.1:8095/aidiy_image_generation/generate'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -53,7 +53,7 @@ def build_prompt(scene):
     prompt = _clean(scene.get('image_prompt', ''))
     if prompt:
         return prompt
-    lines = ['Create a high-quality widescreen illustration for a warm Japanese four-panel manga story video.']
+    lines = ['Create a high-quality widescreen illustration for the Japanese four-panel comic story 四コマ漫画_伝説のプログラマ_ja.']
     if kicker: lines.append(f'Topic: {kicker}.')
     if title: lines.append(f'Title: {title}.')
     if headline: lines.append(f'Headline: {headline}.')

@@ -28,6 +28,7 @@
 """
 
 import asyncio
+import json
 import os
 import sys
 
@@ -58,6 +59,7 @@ from utils.generation import (
     ensure_step_markdown, mark_step_done,
     backup_images_for_fix_mode, 参照画像ディレクトリ,
     count_scenario_scenes, count_scenario_dialogues, ensure_scene_html_pages, load_scenario_object,
+    _sync_mcp_assets_json,
 )
 from utils.steps import (
     step00_preflight, step_add_routing, step_create_folder, step_generate_audio,
@@ -76,8 +78,26 @@ STEPS_JSON_NAME = "_ビデオページ生成_小説小話_状況.json"
 SETTING_JSON_PATH = os.path.join(_SCRIPT_DIR, SETTING_JSON_NAME)
 STEPS_JSON_PATH = os.path.join(_SCRIPT_DIR, STEPS_JSON_NAME)
 
+REQUIRED_SCENE_IDS = (
+    "scene_000",
+    "scene_001",
+    "scene_002",
+    "scene_003",
+    "scene_004",
+    "scene_999",
+)
+
 NEWS_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "backend_server,backend_tools,MCP活用手順.md")
 AUTO_VIDEO_KNOWLEDGE_PATH = os.path.join(REPO_DIR, "_AIDIY", "knowledge", "共通,mcp利用による自動ビデオ生成手順.md")
+
+
+def _is_four_panel_topic(topic: object) -> bool:
+    """topic が4コマ漫画を明示している場合だけ True を返す。"""
+    compact_topic = "".join(str(topic).split()).lower()
+    return any(
+        keyword in compact_topic
+        for keyword in ("4コマ", "４コマ", "四コマ", "four-panel", "fourpanel")
+    )
 
 # ================================================================== #
 # 小説小話固有: 補助スクリプト生成
@@ -181,6 +201,7 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
+    is_four_panel = _is_four_panel_topic(topic)
 
     step_summary = (
         f'  "{folder_name}" の scenario.js を作成・更新します。\n'
@@ -229,9 +250,11 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         "  - アバター 1 体が物語の語り手として読み聞かせる構成にする。\n"
         "  - 技術解説の数値や機能説明は入れない。chips / metrics / cards / facts / evidence は空配列でよい。\n"
         "  - 物語は headline / lead / subtitle と short/long narration で語る。\n\n"
-        "■ scenes 構成（最小7ページ、最大30ページ）\n"
+        "■ scenes 構成（通常は最小7ページ、最大30ページ。4コマ漫画指定時は例外として6ページ）\n"
         "  - scene_000: イントロ（小説・小話のつかみ）。先頭固定\n"
-        "  - scene_001〜scene_005: 物語の展開（起承転結＋オチへの前振り）。最低限必須\n"
+        "  - topic に4コマ漫画の指示がある場合は、scene_000、scene_001〜scene_004、scene_999 の全6ページ固定とする\n"
+        "    （scene_001〜scene_004を4コマ本編とし、追加シーンは作らない）\n"
+        "  - 4コマ漫画の指示がない場合は、scene_001〜scene_005 を物語の展開（起承転結＋オチへの前振り）として最低限必須とする\n"
         "  - 必要に応じて scene_006〜scene_028 まで追加可\n"
         "  - scene_999: まとめ（オチの余韻と締め）。最後固定\n\n"
         "■ 通常は物語の内容に応じて7〜20ページで構成する。30ページは絶対上限であり、目標ページ数ではない\n"
@@ -242,7 +265,9 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         "    オチまでの前振りが駆け足になるようなら、展開のシーンを足す\n"
         "  - 減らす判断: 話が進まないシーンを足して水増ししないこと。短い小話は最小構成に収め、\n"
         "    テンポとオチの切れ味を優先する\n"
-        "  - topic にシーン構成の指定があるときは、その指定を最優先する\n\n"
+        "  - topic にシーン構成の指定があるときは、その指定を最優先する\n"
+        "  - 再生時間の明示指示がなく、scene_000 と scene_999 を含む全体が6ページ以内の場合は、\n"
+        "    short/long のどちらの再生モードも全体で1分以内になる分量に仕上げる\n\n"
         "■ 各シーンの必須フィールド\n"
         '  "id", "title", "expression", "accent", "accent_soft",\n'
         '  "kicker", "headline", "lead", "subtitle",\n'
@@ -267,7 +292,8 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         f'【作業 B】"{md_path}" の「シナリオ作成」チェックを [x] にしてください。\n\n'
         "【完了確認】scenario.js の先頭10行を表示してください。\n"
     )
-    await agent_run(ctx, ca, prompt, timeout_sec=600)
+    agent_timeout_sec = 600 if _is_four_panel_topic(ctx.topic) else 1200
+    await agent_run(ctx, ca, prompt, timeout_sec=agent_timeout_sec)
 
     def validate() -> bool:
         ok1 = check("scenario.js 存在", os.path.isfile(scenario_path))
@@ -279,7 +305,11 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
                 "scenario.js 内容（SCENARIO + scene_999 + folder_name）",
                 "window.SCENARIO" in c and "scene_999" in c and folder_name in c,
             )
-        ok3 = validate_scene_id_range(scenario_path, min_mid=5, max_mid=28, label="小説小話シナリオ") if ok1 else False
+        min_mid = 4 if is_four_panel else 5
+        max_mid = 4 if is_four_panel else 28
+        ok3 = validate_scene_id_range(
+            scenario_path, min_mid=min_mid, max_mid=max_mid, label="小説小話シナリオ"
+        ) if ok1 else False
         ok4 = validate_scene_expressions(scenario_path, label="小説小話シナリオ") if ok1 else False
         ok5 = validate_scene_media_refs(scenario_path, label="小説小話シナリオ") if ok1 else False
         ok6 = False
@@ -550,7 +580,8 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
     if review_already_done:
         print("  [RESUME] 中間確認の完了印を検出しました。重複レビューを省略して成果物を再検証します")
     else:
-        await agent_run(ctx, ca, prompt, timeout_sec=600)
+        agent_timeout_sec = 600 if _is_four_panel_topic(ctx.topic) else 1200
+        await agent_run(ctx, ca, prompt, timeout_sec=agent_timeout_sec)
     mark_step_done(md_path, "中間確認")
 
     def validate() -> bool:
@@ -603,8 +634,22 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
     audio_dir     = os.path.join(new_dir, "audio")
     gen_img_py    = os.path.join(new_dir, "_gen_scene_images.py")
     gen_aud_py    = os.path.join(new_dir, "_gen_audio.py")
-    expected_audio_count = count_scenario_dialogues(scenario_path) if os.path.isfile(scenario_path) else 0
-    expected_image_count = count_scenario_scenes(scenario_path) if os.path.isfile(scenario_path) else 8
+    assets_path   = os.path.join(new_dir, "assets.json")
+    is_four_panel = _is_four_panel_topic(ctx.topic)
+    declared_scene_ids: list[str] = []
+    try:
+        declared_data = load_scenario_object(scenario_path)
+        declared_scene_ids = [
+            str(scene.get("id", ""))
+            for scene in declared_data.get("scenes", [])
+            if isinstance(scene, dict)
+        ]
+    except Exception as exc:
+        print(f"  [WARN] 最終確認前の scenario.js 読込に失敗: {exc}")
+    expected_scene_ids = list(REQUIRED_SCENE_IDS) if is_four_panel else declared_scene_ids
+    expected_audio_count = len(expected_scene_ids) * 2
+    expected_image_count = len(expected_scene_ids)
+    expected_scene_label = "、".join(expected_scene_ids) if expected_scene_ids else "scenario.js の全シーン"
     guide_tts(ctx, f"{step_name} を開始します。成果物を最終確認します。")
     ensure_step_markdown(md_path, folder_name, ctx.topic)
 
@@ -621,20 +666,42 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         "【確認対象フォルダ】\n"
         f'  "{new_dir}"\n\n'
         "【手順 1】検証スクリプトを書いて実行\n"
-        "  確認 1: scenario.js が存在し 'window.SCENARIO' と 'scene_999' が含まれるか\n"
-        f"  確認 2: images フォルダに *.png が {expected_image_count} 枚以上あるか\n"
-        f"  確認 3: audio フォルダに *.mp3 が {expected_audio_count} 個以上あるか\n"
+        f"  確認 1: scenario.js が存在し、シーンIDが {expected_scene_label} の順で完全一致するか\n"
+        f"  確認 2: images フォルダに全シーンのPNGが各1枚（合計{expected_image_count}枚）あるか\n"
+        f"  確認 3: audio フォルダに全シーンの short/long MP3 が各1個（合計{expected_audio_count}個）あるか\n"
         "  確認 4: index.html が存在し、今回のフォルダ名が含まれるか\n"
         "  確認 5: _gen_audio.py が存在するか\n"
         "  確認 6: AiDiy への言及が scene_999 の最後のひとことだけに留まり、本編・冒頭で触れていないか\n"
         "  確認 7: 各 scene に short_narration / long_narration / short_audio / long_audio があるか\n"
-        "  確認 8: コピー元のプレイヤー構造を壊していないか\n\n"
+        "  確認 8: assets.json の画像・音声のパス、status、bytes が実ファイルと一致するか\n"
+        "  確認 9: コピー元のプレイヤー構造を壊していないか\n\n"
         "【手順 2】不足があれば修正\n"
         f'  images 不足: "{ctx.mcp_python}" "{gen_img_py}" を実行\n'
         f'  audio 不足:  "{ctx.mcp_python}" "{gen_aud_py}" を実行\n\n'
         "  最後に、修正したファイルと未修正で OK と判断したファイルを一覧表示してください。\n"
     )
-    await agent_run(ctx, ca, prompt, timeout_sec=600)
+    review_already_done = False
+    if os.path.isfile(md_path):
+        with open(md_path, encoding="utf-8-sig") as f:
+            review_markdown = f.read()
+        review_already_done = (
+            "## Step 09 最終確認" in review_markdown
+            and "- [x] 素材最終確認" in review_markdown
+        )
+    if review_already_done:
+        print("  [RESUME] 最終確認の完了印を検出しました。重複レビューを省略して成果物を再検証します")
+    else:
+        agent_timeout_sec = 600 if is_four_panel else 1200
+        await agent_run(ctx, ca, prompt, timeout_sec=agent_timeout_sec)
+
+    manifest_sync_ok = False
+    try:
+        scenario_data = load_scenario_object(scenario_path)
+        _sync_mcp_assets_json(ctx, scenario_data, new_dir)
+        manifest_sync_ok = True
+        print("  [SYNC] assets.json を scenario.js と実ファイルから再構築しました")
+    except Exception as exc:
+        print(f"  [FAIL] assets.json の再構築に失敗: {exc}")
 
     def validate() -> bool:
         ok1 = check("scenario.js 存在", os.path.isfile(scenario_path))
@@ -642,25 +709,123 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         ok3 = check("_gen_scene_images.py 存在", os.path.isfile(gen_img_py))
         ok4 = check("_gen_audio.py 存在", os.path.isfile(gen_aud_py))
         ok5 = check(f"進捗 Markdown 存在: {md_path}", os.path.isfile(md_path))
-        ok6 = False
+        scenario_ids: list[str] = []
+        scenario_data: dict = {}
+        try:
+            scenario_data = load_scenario_object(scenario_path)
+            scenario_ids = [
+                str(scene.get("id", ""))
+                for scene in scenario_data.get("scenes", [])
+                if isinstance(scene, dict)
+            ]
+        except Exception as exc:
+            print(f"  [FAIL] scenario.js の検証用読込に失敗: {exc}")
+        if is_four_panel:
+            ok6 = check(
+                f"4コマ漫画の固定シーンID (実際={scenario_ids} / 必須={list(REQUIRED_SCENE_IDS)})",
+                scenario_ids == list(REQUIRED_SCENE_IDS),
+            )
+        else:
+            ok6 = validate_scene_id_range(
+                scenario_path, min_mid=5, max_mid=28, label="小説小話シナリオ"
+            ) and check(
+                f"シナリオ作成時の全シーンIDを維持 (実際={scenario_ids} / 期待={expected_scene_ids})",
+                bool(expected_scene_ids) and scenario_ids == expected_scene_ids,
+            )
+
+        expected_image_names = {f"{scene_id}.png" for scene_id in expected_scene_ids}
+        expected_audio_names = {
+            f"{prefix}_{scene_id}.mp3"
+            for prefix in ("short", "long")
+            for scene_id in expected_scene_ids
+        }
+        image_names = set()
+        audio_names = set()
         if os.path.isdir(images_dir):
-            pngs = [f for f in os.listdir(images_dir) if f.endswith(".png") and os.path.getsize(os.path.join(images_dir, f)) > 1000]
-            ok6 = check(f"images/*.png 生成数: {len(pngs)}/{expected_image_count}", expected_image_count > 0 and len(pngs) >= expected_image_count)
-        else:
-            check("images フォルダ存在", False)
-        ok7 = False
+            image_names = {name for name in os.listdir(images_dir) if name.endswith(".png")}
         if os.path.isdir(audio_dir):
-            mp3s = [f for f in os.listdir(audio_dir) if f.endswith(".mp3") and os.path.getsize(os.path.join(audio_dir, f)) > 500]
-            required = expected_audio_count if expected_audio_count > 0 else 1
-            ok7 = check(f"audio/*.mp3 生成数: {len(mp3s)}/{required}", len(mp3s) >= required)
-        else:
-            check("audio フォルダ存在", False)
-        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7
+            audio_names = {name for name in os.listdir(audio_dir) if name.endswith(".mp3")}
+        ok7 = check(
+            f"必須画像実体 (実際={sorted(image_names)} / 必須={sorted(expected_image_names)})",
+            image_names == expected_image_names
+            and all(os.path.getsize(os.path.join(images_dir, name)) > 1000 for name in image_names),
+        )
+        ok8 = check(
+            f"必須音声実体 (実際={sorted(audio_names)} / 必須={sorted(expected_audio_names)})",
+            audio_names == expected_audio_names
+            and all(os.path.getsize(os.path.join(audio_dir, name)) > 500 for name in audio_names),
+        )
+
+        manifest_ok = False
+        manifest_detail = "assets.json 未検証"
+        try:
+            with open(assets_path, encoding="utf-8-sig") as f:
+                manifest = json.load(f)
+            image_items = manifest.get("images", [])
+            audio_items = manifest.get("audio", [])
+            manifest_image_paths = {
+                str(item.get("path", "")) for item in image_items if isinstance(item, dict)
+            }
+            manifest_audio_paths = {
+                str(item.get(field, ""))
+                for item in audio_items if isinstance(item, dict)
+                for field in ("short_path", "long_path")
+            }
+            expected_image_paths = {f"images/{name}" for name in expected_image_names}
+            expected_audio_paths = {f"audio/{name}" for name in expected_audio_names}
+            image_bytes_ok = all(
+                isinstance(item, dict)
+                and item.get("status") == "generated"
+                and os.path.isfile(os.path.join(new_dir, str(item.get("path", "")).replace("/", os.sep)))
+                and item.get("bytes") == os.path.getsize(
+                    os.path.join(new_dir, str(item.get("path", "")).replace("/", os.sep))
+                )
+                for item in image_items
+            )
+            audio_bytes_ok = all(
+                isinstance(item, dict)
+                and item.get("status") == "generated"
+                and all(
+                    os.path.isfile(os.path.join(new_dir, str(item.get(field, "")).replace("/", os.sep)))
+                    and item.get(f"{prefix}_bytes") == os.path.getsize(
+                        os.path.join(new_dir, str(item.get(field, "")).replace("/", os.sep))
+                    )
+                    for prefix, field in (("short", "short_path"), ("long", "long_path"))
+                )
+                for item in audio_items
+            )
+            manifest_ok = (
+                manifest.get("status") == "complete"
+                and manifest_image_paths == expected_image_paths
+                and manifest_audio_paths == expected_audio_paths
+                and image_bytes_ok
+                and audio_bytes_ok
+            )
+            manifest_detail = (
+                f"status={manifest.get('status')!r}, images={len(image_items)}, audio={len(audio_items)}, "
+                f"image_bytes_ok={image_bytes_ok}, audio_bytes_ok={audio_bytes_ok}"
+            )
+        except Exception as exc:
+            manifest_detail = str(exc)
+        ok9 = check(
+            f"assets.json 実ファイル同期 ({manifest_detail})",
+            manifest_sync_ok and manifest_ok,
+        )
+        html_scene_names = {
+            name for name in os.listdir(new_dir)
+            if name.startswith("scene_") and name.endswith(".html")
+        } if os.path.isdir(new_dir) else set()
+        expected_html_names = {f"{scene_id}.html" for scene_id in expected_scene_ids}
+        ok10 = check(
+            f"シーンHTML構成 (実際={sorted(html_scene_names)} / 必須={sorted(expected_html_names)})",
+            html_scene_names == expected_html_names,
+        )
+        return all((ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10))
 
     ok = await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
-        target_paths=[scenario_path, os.path.join(new_dir, "index.html"), images_dir, audio_dir, gen_img_py, gen_aud_py, md_path],
+        target_paths=[scenario_path, os.path.join(new_dir, "index.html"), images_dir, audio_dir, assets_path, gen_img_py, gen_aud_py, md_path],
         validate=validate, verify_timeout_sec=300, attempt=attempt,
     )
     if not ok:

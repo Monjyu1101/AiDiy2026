@@ -226,6 +226,9 @@ class TextToSpeech:
     DEFAULT_PRONUNCIATION_DICTIONARY = [
         ("_", " "),
         ("-", " "),
+        ("本須麗乃", "もとすうらの"),
+        ("幼馴染", "おさななじみ"),
+        ("束の間", "つかのま"),
         (["AiDiy", "aidiy", "AIDIY"], "アイディ"),
         ("subprocess", "サブプロセス"),
         ("横展開", "よこてんかい"),

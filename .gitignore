@@ -34,20 +34,22 @@ dmypy.json
 .pytype/
 
 # Distribution / packaging
+# NOTE: lib / var / parts などの一般名は、リポジトリ直下に限定する。
+#       未限定にすると command_hermes/scripts/lib のような通常ディレクトリまで除外される。
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
+/develop-eggs/
+/downloads/
+/eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
@@ -152,13 +154,25 @@ julius/
 _MCP/
 
 # Secrets / sensitive
-*key.py
-*key.json
-*key.*
-*_key*
-*key*
+# NOTE: ここでは「実際の資格情報ファイル」だけを対象にする。
+#       *key* / *secret* のような広いパターンは、
+#       command_hermes/core/secret_scope.py や
+#       command_hermes/gateway/platforms/qqbot/keyboards.py のような
+#       通常のソースモジュールまで除外してしまうため使用しない。
 *.key
-*secret*
-*config*key*
+*.pem
+*.pfx
+*.p12
+*.keystore
+*_key.json
+*_keys.json
+*_apikey.json
+*_api_key.json
+*_secret.json
+*_secrets.json
+*_credential.json
+*_credentials.json
+.secrets
+.secrets.*
 AZiP*.*
 firiend*

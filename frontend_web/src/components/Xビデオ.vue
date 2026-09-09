@@ -42,9 +42,6 @@ const 生産管理Url = `${baseUrl}Xビデオ/AiDiy実装_生産管理_ja/index.
 const 在庫管理Url = `${baseUrl}Xビデオ/AiDiy実装_在庫管理_ja/index.html`;
 
 // 時事ニュース・解説
-const ニュースUrl = `${baseUrl}Xビデオ/ニュース_20260521_anthropic2026前半_ja/index.html`;
-const ニュースGoogleUrl = `${baseUrl}Xビデオ/ニュース_20260521_google2026前半_ja/index.html`;
-const ニュースOpenAIUrl = `${baseUrl}Xビデオ/ニュース_20260521_openai2026前半_ja/index.html`;
 const ニュース_20260906_fable51_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_fable51_ja/index.html`;
 const ニュース_20260906_gpt6astra_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_gpt6astra_ja/index.html`;
 const ニュース_20260906_gemini38flash_jaUrl = `${baseUrl}Xビデオ/ニュース_20260906_gemini38flash_ja/index.html`;
@@ -308,36 +305,6 @@ const handleReturn = () => {
         <div class="section-label">時事ニュース・解説</div>
 
         <div class="menu-row">
-          <a class="menu-card menu-card-fixed" :href="ニュースUrl" target="_blank" rel="noopener noreferrer">
-            <div class="menu-card-title">
-              <span class="icon">Xニュ</span>
-              ニュース (Anthropic)
-            </div>
-            <div class="menu-card-description">
-              Claude 4 / Claude Code / MCP 標準化など Anthropic 2026年前半のトピックを二人掛け合いで解説
-            </div>
-          </a>
-
-          <a class="menu-card menu-card-fixed" :href="ニュースGoogleUrl" target="_blank" rel="noopener noreferrer">
-            <div class="menu-card-title">
-              <span class="icon">XGo</span>
-              ニュース (Google)
-            </div>
-            <div class="menu-card-description">
-              Gemini 2.5 / Google I/O など Google 2026年前半のトピックを二人掛け合いで解説
-            </div>
-          </a>
-
-          <a class="menu-card menu-card-fixed" :href="ニュースOpenAIUrl" target="_blank" rel="noopener noreferrer">
-            <div class="menu-card-title">
-              <span class="icon">XOA</span>
-              ニュース (OpenAI)
-            </div>
-            <div class="menu-card-description">
-              GPT-5 / o3 / Codex など OpenAI 2026年前半のトピックを二人掛け合いで解説
-            </div>
-          </a>
-
           <a class="menu-card menu-card-fixed" :href="ニュース_20260906_fable51_jaUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">寓話</span>
@@ -396,10 +363,10 @@ const handleReturn = () => {
           <a class="menu-card menu-card-fixed" :href="四コマ漫画_伝説のプログラマ_jaUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">伝説</span>
-              四コマ漫画『伝説のプログラマ』
+              四コマ漫画『小話　伝説のプログラマ』
             </div>
             <div class="menu-card-description">
-              伝説のプログラマが繰り出す奇想天外な一手を、四コマ仕立てのひとり語りでテンポよく紹介
+              伝説のプログラマをめぐる小話を、日本語ナレーション付きの四コマ漫画で軽快に描く
             </div>
           </a>
 
