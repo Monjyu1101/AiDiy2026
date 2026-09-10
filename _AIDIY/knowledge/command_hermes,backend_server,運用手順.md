@@ -120,7 +120,16 @@ AiDiy の Code AI 連携では、タイトルやバナーを出さないため `
 - API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `anthropic`, `openai_oauth`
 - CLI bridge: `claude_cli`, `codex_cli`, `antigravity_cli`, `copilot_cli`
 
-AiDiy の初回起動時の既定 provider / model は `openai_oauth / gpt-5.6-sol`。OAuth 認証済みならこの組み合わせで起動し、未認証なら従来の FreeAI 設定へフォールバックする。OAuth を明示的に認証・選択する場合は `/model` または `--provider openai_oauth` を使う。
+AiDiy の既定設定は `openai_oauth / gpt-5.6-sol`。OAuth 認証済みなら OpenAI を使い、別 PC の初回起動や認証切れでは `freeai / gemini-3.8-flash` へ自動退避する。認証情報はリポジリではなく各 PC の `${HERMES_HOME:-~/.hermes}/auth.json` に保存される。`--provider openai_oauth` を明示した場合は自動退避せず OAuth 認証を開始できる。
+
+OAuth を手動でやり直す場合は、認証ファイルを削除せず次を実行する。成功した新しいトークンで旧状態が更新される。
+
+```powershell
+Set-Location command_hermes
+.venv\Scripts\python.exe hermes_main.py auth add openai-codex
+```
+
+Linux / macOS は `.venv/bin/python hermes_main.py auth add openai-codex` を使う。
 
 ## AiDiy 連携
 

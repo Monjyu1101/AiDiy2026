@@ -5020,6 +5020,15 @@ _AIDIY_INITIAL_MODEL = "openai_oauth/gpt-5.6-sol"
 # 使えるモデルは契約プランで変わるので、基本はライブ一覧の先頭を既定にする。
 _OPENAI_OAUTH_FALLBACK_MODEL = "gpt-5.6-sol"
 _openai_oauth_models_cache: Optional[List[str]] = None
+_FREEAI_DEFAULT_MODEL = "gemini-3.8-flash"
+
+
+def _normalize_aidiy_freeai_model(value: Any) -> str:
+    """FreeAI の旧既定値だけ現行の既定値へ読み替える。"""
+    model = str(value or _FREEAI_DEFAULT_MODEL).strip() or _FREEAI_DEFAULT_MODEL
+    if model == "gemini-3.5-flash":
+        return _FREEAI_DEFAULT_MODEL
+    return model
 
 
 def _openai_oauth_is_authenticated() -> bool:
@@ -5030,6 +5039,18 @@ def _openai_oauth_is_authenticated() -> bool:
         return bool((get_codex_auth_status() or {}).get("logged_in"))
     except Exception:
         return False
+
+
+def _should_start_aidiy_openai_oauth(
+    aidiy_slug: Any,
+    requested_provider: Any,
+) -> bool:
+    """AiDiy OpenAI OAuth 経路の未認証起動かを判定する。"""
+    slug = str(aidiy_slug or "").strip().lower()
+    runtime_provider = str(requested_provider or "").strip().lower()
+    return slug == _OPENAI_OAUTH_SLUG or (
+        not slug and runtime_provider == _OPENAI_OAUTH_RUNTIME_PROVIDER
+    )
 
 
 def _openai_oauth_access_token() -> Optional[str]:
@@ -12395,7 +12416,9 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         if provider == "gemini":
             return cfg.get("CHAT_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
         if provider == "freeai":
-            return cfg.get("CHAT_FREEAI_MODEL") or cfg.get("CHAT_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
+            return _normalize_aidiy_freeai_model(
+                cfg.get("CHAT_FREEAI_MODEL") or cfg.get("CHAT_GEMINI_MODEL")
+            )
         if provider == "anthropic":
             return cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-4-6"
         if provider == "local_chat":
@@ -19386,7 +19409,22 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # on a real TTY; quiet/single-query paths keep their own handling.
         try:
             if sys.stdin.isatty() and not self._runtime_credentials_ready():
-                self._offer_first_run_setup()
+                # AiDiy の既定は OpenAI OAuth。未認証の新規 PC でも
+                # FreeAI や汎用 provider picker へ逃がさず、ここで
+                # ChatGPT のデバイスコード認証を開始する。
+                aidiy_slug = (
+                    getattr(self, "_aidiy_provider_slug", None) or ""
+                ).strip().lower()
+                requested_provider = (
+                    self.requested_provider or ""
+                ).strip().lower()
+                if _should_start_aidiy_openai_oauth(
+                    aidiy_slug,
+                    requested_provider,
+                ):
+                    self._ensure_openai_oauth_auth()
+                else:
+                    self._offer_first_run_setup()
         except Exception:
             logger.debug("first-run setup offer failed", exc_info=True)
 
@@ -23655,12 +23693,11 @@ def _load_local_chat_defaults(cfg: dict[str, Any], model_override: str | None = 
 
 
 def _load_freeai_defaults(cfg: dict[str, Any], model_override: str | None = None) -> dict[str, str]:
-    model = str(
+    model = _normalize_aidiy_freeai_model(
         model_override
         or cfg.get("CHAT_FREEAI_MODEL")
         or cfg.get("CHAT_GEMINI_MODEL")
-        or "gemini-3.1-flash-image-preview"
-    ).strip()
+    )
     api_key = str(cfg.get("freeai_key_id") or "").strip()
     defaults = {
         "provider": "custom",
@@ -23721,9 +23758,7 @@ def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str,
     if openai_oauth_model is not None:
         if _openai_oauth_is_authenticated():
             return _load_openai_oauth_defaults(cfg, openai_oauth_model or None)
-        # 既定起動ではログインを強制せず、従来の FreeAI 設定で開始する。
-        # --provider openai_oauth の明示指定は provider 専用経路を通るため、
-        # 未認証でも OAuth ログイン操作を続けられる。
+        # 別 PC の初回起動や OAuth 切れでは、FreeAI の現行既定へ退避する。
         return _load_freeai_defaults(cfg)
     local_chat_model = _local_chat_model_from_value(model)
     if local_chat_model is not None:
