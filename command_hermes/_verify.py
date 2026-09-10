@@ -83,6 +83,7 @@ AIDIY_LAYER = {
         "def _model_picker_entry_label",              # ピッカーのタプル対応
         '_os.environ["HERMES_HOME"]',                 # HERMES_HOME 固定
         "def cli_entry",                              # argparse エントリ
+        "class _OneShotStderrProgress",              # one-shot の stderr 進捗
         "from tools.skills_sync import sync_skills",  # バンドルスキル同期
         "from tools.mcp_tool import discover_mcp_tools",  # MCP discovery
     ],

@@ -22832,6 +22832,122 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 # Main Entry Point
 # ============================================================================
 
+class _OneShotStderrProgress:
+    """ワンショット実行の途中経過だけを stderr へ出す。
+
+    stdout は最終回答を機械的に取得するための専用チャネルとして残す。
+    spinner のような更新表示は行わず、状態が変わったときだけ静的な
+    1 行を出すため、WebSocket やログへ転送しても同じ行が増殖しない。
+    """
+
+    _ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+    def __init__(self, stream=None):
+        self.stream = stream
+        self._last_line = ""
+        self._active_tools = 0
+        self._lock = threading.Lock()
+
+    @classmethod
+    def _compact(cls, value: Any, max_length: int = 240) -> str:
+        text = cls._ANSI_RE.sub("", str(value or ""))
+        text = " ".join(text.split())
+        if len(text) > max_length:
+            return text[: max_length - 3] + "..."
+        return text
+
+    def _emit(self, kind: str, message: Any) -> None:
+        text = self._compact(message)
+        if not text:
+            return
+        line = f"[{kind}] {text}"
+        with self._lock:
+            if line == self._last_line:
+                return
+            self._last_line = line
+            output = self.stream or sys.stderr
+            try:
+                output.write(line + "\n")
+                output.flush()
+            except (AttributeError, OSError, ValueError):
+                pass
+
+    def waiting_for_agent(self) -> None:
+        self._emit("wait", "エージェント初期化待機")
+
+    def waiting_for_ai(self) -> None:
+        self._emit("wait", "AI応答待機")
+
+    def thinking(self, text: str) -> None:
+        if text:
+            # ランダムな face / verb や spinner frame は転送せず、安定した
+            # 1 行だけを残す。
+            self.waiting_for_ai()
+
+    def tool_generating(self, tool_name: str) -> None:
+        name = self._compact(tool_name, max_length=100) or "ツール"
+        self._emit("wait", f"{name}待機")
+
+    def tool_progress(
+        self,
+        event_type: str,
+        function_name: str = None,
+        preview: str = None,
+        function_args: dict = None,
+        **kwargs,
+    ) -> None:
+        del function_args
+        name = self._compact(function_name, max_length=100) or "ツール"
+
+        if event_type == "tool.started":
+            with self._lock:
+                self._active_tools += 1
+            detail = self._compact(preview) or name
+            self._emit("step", f"{name}: {detail}" if detail != name else name)
+            return
+
+        if event_type == "tool.completed":
+            with self._lock:
+                self._active_tools = max(0, self._active_tools - 1)
+                active_tools = self._active_tools
+            duration = kwargs.get("duration")
+            suffix = ""
+            if isinstance(duration, (int, float)):
+                suffix = f" ({duration:.1f}s)"
+            self._emit("error" if kwargs.get("is_error") else "done", f"{name}{suffix}")
+            if active_tools == 0:
+                self.waiting_for_ai()
+            return
+
+        if event_type in {"_thinking", "reasoning.available"}:
+            detail = self._compact(preview)
+            if detail:
+                self._emit("thinking", detail)
+            return
+
+        if event_type == "moa.reference":
+            index = kwargs.get("moa_index")
+            count = kwargs.get("moa_count")
+            position = f" {index}/{count}" if index and count else ""
+            self._emit("step", f"MoA参照{position}: {name}")
+            return
+
+        if event_type == "moa.aggregating":
+            self._emit("wait", f"MoA集約待機: {name}")
+            return
+
+        if event_type == "tool.output_risk":
+            self._emit("warn", f"{name}: ツール出力に注意が必要です")
+
+    def status(self, event_type: str, message: str = None) -> None:
+        text = message if message is not None else event_type
+        kind = "warn" if event_type in {"warn", "warning", "error"} else "step"
+        self._emit(kind, text)
+
+    def finished(self, *, failed: bool = False) -> None:
+        self._emit("error" if failed else "done", "AI応答失敗" if failed else "AI応答完了")
+
+
 def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str) -> None:
     """Drive a kanban goal_mode worker through the Ralph-style goal loop.
 
@@ -23406,10 +23522,19 @@ def main(
                     # Best-effort enrichment; never block worker startup on it.
                     logger.debug("kanban image-ref extraction failed: %s", _exc)
             if quiet:
-                # Quiet mode: suppress banner, spinner, tool previews.
-                # Only print the final response and parseable session info.
+                # Quiet mode keeps stdout machine-readable: the final response
+                # is printed once below, while static progress is sent to
+                # stderr so AiDiy can show what is running in real time.
                 cli.tool_progress_mode = "off"
-                if cli._ensure_runtime_credentials():
+                progress = _OneShotStderrProgress()
+                progress.waiting_for_agent()
+                # Guard the stdout contract against legacy provider/tool code
+                # that still uses bare print(). The explicit final response is
+                # emitted after these redirect scopes have closed.
+                from contextlib import redirect_stdout
+                with redirect_stdout(sys.stderr):
+                    credentials_ready = cli._ensure_runtime_credentials()
+                if credentials_ready:
                     effective_query: Any = query
                     if single_query_images or single_query_image_urls:
                         # Honour the same image-routing decision used by the
@@ -23471,40 +23596,41 @@ def main(
                     turn_route = cli._resolve_turn_agent_config(effective_query)
                     if turn_route["signature"] != cli._active_agent_route_signature:
                         cli.agent = None
-                    if cli._init_agent(
-                        model_override=turn_route["model"],
-                        runtime_override=turn_route["runtime"],
-                        request_overrides=turn_route.get("request_overrides"),
-                    ):
+                    with redirect_stdout(sys.stderr):
+                        agent_ready = cli._init_agent(
+                            model_override=turn_route["model"],
+                            runtime_override=turn_route["runtime"],
+                            request_overrides=turn_route.get("request_overrides"),
+                        )
+                    if agent_ready:
                         cli.agent.quiet_mode = True
                         cli.agent.suppress_status_output = True
-                        # Suppress streaming display callbacks so stdout stays
-                        # machine-readable (no styled "Hermes" box, no tool-gen
-                        # status lines, no reasoning box).  The response is
-                        # printed once below.
+                        # Do not stream response/reasoning tokens: those belong
+                        # to the final stdout result. Operational state uses a
+                        # separate, line-oriented stderr reporter instead.
                         cli.agent.stream_delta_callback = None
-                        cli.agent.tool_gen_callback = None
+                        cli.agent.tool_gen_callback = progress.tool_generating
                         cli.agent.reasoning_callback = None
-                        # Inline-diff and progress callbacks print directly to
-                        # stdout and are gated by NEITHER quiet_mode nor
-                        # tool_progress_mode: _on_tool_complete renders full
-                        # file diffs via render_edit_diff_with_delta, and
-                        # _on_tool_progress prints MoA reference blocks before
-                        # its mode check. Neutralize them too so -Q stdout
-                        # carries only the final response (#93220).
-                        cli.agent.tool_progress_callback = None
+                        cli.agent.thinking_callback = progress.thinking
+                        cli.agent.tool_progress_callback = progress.tool_progress
+                        cli.agent.status_callback = progress.status
+                        # Inline diffs are intentionally omitted from one-shot
+                        # logs; concise step/done lines above are sufficient.
                         cli.agent.tool_start_callback = None
                         cli.agent.tool_complete_callback = None
                         # Belt-and-braces for the executor's direct prints
                         # (they check agent.tool_progress_mode, initialized
                         # from display.tool_progress at construction).
                         cli.agent.tool_progress_mode = "off"
+                        progress.waiting_for_ai()
                         try:
-                            result = cli.agent.run_conversation(
-                                user_message=effective_query,
-                                conversation_history=cli.conversation_history,
-                            )
+                            with redirect_stdout(sys.stderr):
+                                result = cli.agent.run_conversation(
+                                    user_message=effective_query,
+                                    conversation_history=cli.conversation_history,
+                                )
                         except KeyboardInterrupt:
+                            progress.finished(failed=True)
                             _emit_interrupted_session_end(cli, reason="keyboard_interrupt")
                             print(f"\nsession_id: {cli.session_id}", file=sys.stderr)
                             sys.exit(130)
@@ -23518,6 +23644,7 @@ def main(
                         ):
                             cli.session_id = cli.agent.session_id
                         response = result.get("final_response", "") if isinstance(result, dict) else str(result)
+                        run_failed = bool(isinstance(result, dict) and result.get("failed"))
                         # Surface backend errors that produced no visible output
                         # (e.g. invalid model slug → provider 4xx). Mirrors the
                         # interactive CLI path. Write to stderr so piped stdout
@@ -23528,9 +23655,13 @@ def main(
                             and result.get("error")
                             and (result.get("failed") or result.get("partial"))
                         ):
+                            progress.finished(failed=True)
                             print(f"Error: {result['error']}", file=sys.stderr)
                         elif response:
+                            progress.finished(failed=run_failed)
                             print(response)
+                        else:
+                            progress.finished(failed=True)
 
                         # Kanban goal-loop mode: a worker spawned for a
                         # goal_mode card keeps working in THIS session until an
@@ -23576,6 +23707,7 @@ def main(
                         sys.exit(_exit_code)
 
                 # Exit with error code if credentials or agent init fails
+                progress.finished(failed=True)
                 sys.exit(1)
             else:
                 # Single-query mode (`hermes chat -q "…"`): skip the welcome

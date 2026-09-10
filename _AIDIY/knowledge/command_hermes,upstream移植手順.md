@@ -125,6 +125,7 @@ Git Bash などの非コンソール環境では `NoConsoleScreenBufferError` �
 | `cli_main.py` | ステータスバーの CLI provider 名表示 |
 | `cli_main.py` | ブランディング（`_AIDIY_RESPONSE_LABEL` / `_AIDIY_WELCOME_TEXT` / `_build_compact_banner()`） |
 | `cli_main.py` | `main()` 冒頭の `sync_skills()` と `discover_mcp_tools()` |
+| `cli_main.py` | `_OneShotStderrProgress` と quiet 分岐（途中経過は stderr、最終回答だけ stdout） |
 | `cli_main.py` | `cli_entry()` argparse エントリ（`-Q` / `-z` / `--provider` / `--model` ほか）と `text_main()` |
 | `hermes_main.py` | `hermes` サブコマンド入口（AiDiy 専用ファイル。upstream には無い） |
 | `base/hermes_constants.py` | `_INSTALL_ROOT` と `_NODE_BOOTSTRAP_SCRIPT` を `parent.parent` へ補正 |
