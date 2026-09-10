@@ -744,8 +744,11 @@ class conf_models:
         }
 
     def _get_aidiy_hermes_models(self) -> Dict[str, str]:
-        """aidiy_hermes のモデル一覧を生成する（auto + Ollama + ローカル LLM）。"""
-        result = {"auto": "yyyy/mm/dd - auto (default)"}
+        """aidiy_hermes のモデル一覧を生成する（OpenAI OAuth + auto + Ollama + ローカル LLM）。"""
+        result = {
+            "openai_oauth/gpt-5.6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-sol (default)",
+            "auto": "yyyy/mm/dd - auto",
+        }
         if self.ollama_models:
             result.update(self.ollama_models)
         # backend_local（127.0.0.1:8096）経由のローカル LLM も選べるようにする

@@ -100,7 +100,7 @@ class conf_json:
         'CODE_CODEX_CLI_MODEL': 'auto',
         'CODE_CODEX_OLLAMA_MODEL': 'auto',
         'CODE_GROK_CLI_MODEL': 'auto',
-        'CODE_AIDIY_HERMES_MODEL': 'freeai',
+        'CODE_AIDIY_HERMES_MODEL': 'openai_oauth/gpt-5.6-sol',
         'CODE_OPENCODE_CLI_MODEL': 'auto',
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',

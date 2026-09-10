@@ -117,10 +117,10 @@ AiDiy の Code AI 連携では、タイトルやバナーを出さないため `
 
 ## 対応 provider
 
-- API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `anthropic`
+- API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `anthropic`, `openai_oauth`
 - CLI bridge: `claude_cli`, `codex_cli`, `antigravity_cli`, `copilot_cli`
 
-既定 provider は `ollama`。
+AiDiy の初回起動時の既定 provider / model は `openai_oauth / gpt-5.6-sol`。OAuth 認証済みならこの組み合わせで起動し、未認証なら従来の FreeAI 設定へフォールバックする。OAuth を明示的に認証・選択する場合は `/model` または `--provider openai_oauth` を使う。
 
 ## AiDiy 連携
 
@@ -129,7 +129,7 @@ AiDiy の Code AI 連携では、タイトルやバナーを出さないため `
 ```json
 {
   "CODE_AI1_NAME": "aidiy_hermes",
-  "CODE_AIDIY_HERMES_MODEL": "auto"
+  "CODE_AIDIY_HERMES_MODEL": "openai_oauth/gpt-5.6-sol"
 }
 ```
 

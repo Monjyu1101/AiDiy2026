@@ -22,6 +22,8 @@
 
 `auto` の場合、`_ensure_runtime_credentials()` が環境変数や設定ファイルから認証情報を検出し、利用可能な provider を自動選択します。
 
+AiDiy の `aidiy_hermes` エントリでは、この解決より前に `_load_aidiy_hermes_defaults()` が共通設定を読みます。`CODE_AIDIY_HERMES_MODEL` が未設定、または共通設定ファイルが未作成の初回起動では、OAuth 認証済みなら `openai_oauth/gpt-5.6-sol`、未認証なら `_load_freeai_defaults()` の設定を使います。`--provider openai_oauth` の明示指定はフォールバックせず、OAuth の認証・選択経路を維持します。CLI の `--model` / `--provider` は初期値より優先されます。
+
 ## Provider Overlay 一覧
 
 `hermes_cli/providers.py` の `HERMES_OVERLAYS` で 32 の provider が定義されています。各 overlay は transport、auth type、env var を指定します。

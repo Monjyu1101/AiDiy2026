@@ -5015,10 +5015,21 @@ _CLAUDE_BASE_URL = "https://api.anthropic.com"
 # 資格情報は AiDiy_key.json ではなく hermes 自身の auth store が解決する。
 _OPENAI_OAUTH_SLUG = "openai_oauth"
 _OPENAI_OAUTH_RUNTIME_PROVIDER = "openai-codex"
+_AIDIY_INITIAL_MODEL = "openai_oauth/gpt-5.6-sol"
 # Codex backend が返す一覧を取れなかったときだけ使う保険。ChatGPT アカウントで
 # 使えるモデルは契約プランで変わるので、基本はライブ一覧の先頭を既定にする。
 _OPENAI_OAUTH_FALLBACK_MODEL = "gpt-5.6-sol"
 _openai_oauth_models_cache: Optional[List[str]] = None
+
+
+def _openai_oauth_is_authenticated() -> bool:
+    """OpenAI OAuth の有効な認証情報が保存されているか確認する。"""
+    try:
+        from hermes_cli.auth import get_codex_auth_status
+
+        return bool((get_codex_auth_status() or {}).get("logged_in"))
+    except Exception:
+        return False
 
 
 def _openai_oauth_access_token() -> Optional[str]:
@@ -12484,7 +12495,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             # hermes の auth store（`hermes auth` で保存）から実行時に解決させる。
             entry = {
                 "slug": _OPENAI_OAUTH_SLUG,
-                "name": "OpenAI ChatGPT (subscription / OAuth)",
+                "name": "OpenAI (OAuth)",
                 "runtime_provider": _OPENAI_OAUTH_RUNTIME_PROVIDER,
                 "base_url": "",
                 "api_key": "",
@@ -23695,20 +23706,25 @@ def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str,
         with config_path.open("r", encoding="utf-8") as f:
             cfg = json.load(f)
     except Exception:
-        return {}
+        # AiDiy の共通設定が未作成でも、初回起動は OpenAI OAuth を使う。
+        cfg = {}
 
     host = str(cfg.get("ollama_host") or "http://localhost:11434").strip().rstrip("/")
     model = str(
         requested_model
         or cfg.get("CODE_AIDIY_HERMES_MODEL")
-        or cfg.get("CHAT_OLLAMA_MODEL")
-        or ""
+        or _AIDIY_INITIAL_MODEL
     ).strip()
     if not model or model.lower() == "auto":
         model = str(cfg.get("CHAT_OLLAMA_MODEL") or "deepseek-v4-flash:cloud").strip()
     openai_oauth_model = _openai_oauth_model_from_value(model)
     if openai_oauth_model is not None:
-        return _load_openai_oauth_defaults(cfg, openai_oauth_model or None)
+        if _openai_oauth_is_authenticated():
+            return _load_openai_oauth_defaults(cfg, openai_oauth_model or None)
+        # 既定起動ではログインを強制せず、従来の FreeAI 設定で開始する。
+        # --provider openai_oauth の明示指定は provider 専用経路を通るため、
+        # 未認証でも OAuth ログイン操作を続けられる。
+        return _load_freeai_defaults(cfg)
     local_chat_model = _local_chat_model_from_value(model)
     if local_chat_model is not None:
         return _load_local_chat_defaults(cfg, local_chat_model or None)
