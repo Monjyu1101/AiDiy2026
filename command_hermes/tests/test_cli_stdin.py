@@ -34,6 +34,44 @@ class CliStdinTest(unittest.TestCase):
         self.assertIs(main_mock.call_args.kwargs["quiet"], True)
         self.assertIs(main_mock.call_args.kwargs["oneshot"], True)
 
+    def test_omitted_model_keeps_native_auto_resolution(self):
+        with (
+            patch.object(cli_main.sys, "stdin", io.StringIO("質問")),
+            patch.object(cli_main, "_load_aidiy_hermes_defaults") as defaults_mock,
+            patch.object(cli_main, "_load_aidiy_hermes_provider_defaults") as provider_defaults_mock,
+            patch.object(cli_main, "main") as main_mock,
+        ):
+            result = cli_main.cli_entry(["--oneshot-stdin"])
+
+        self.assertEqual(0, result)
+        defaults_mock.assert_not_called()
+        provider_defaults_mock.assert_not_called()
+        self.assertIsNone(main_mock.call_args.kwargs["model"])
+        self.assertIsNone(main_mock.call_args.kwargs["provider"])
+
+    def test_explicit_model_keeps_aidiy_model_routing(self):
+        defaults = {
+            "provider": "custom",
+            "base_url": "https://example.invalid/v1",
+            "api_key": "test-key",
+            "model": "gemini-explicit",
+        }
+        with (
+            patch.object(cli_main.sys, "stdin", io.StringIO("質問")),
+            patch.object(cli_main, "_load_aidiy_hermes_defaults", return_value=defaults) as defaults_mock,
+            patch.object(cli_main, "main") as main_mock,
+        ):
+            result = cli_main.cli_entry([
+                "--oneshot-stdin",
+                "--model",
+                "freeai/gemini-explicit",
+            ])
+
+        self.assertEqual(0, result)
+        defaults_mock.assert_called_once_with("freeai/gemini-explicit")
+        self.assertEqual("gemini-explicit", main_mock.call_args.kwargs["model"])
+        self.assertEqual("custom", main_mock.call_args.kwargs["provider"])
+
     def test_blank_stdin_returns_two_without_calling_main(self):
         stderr = io.StringIO()
 

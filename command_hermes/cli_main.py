@@ -24007,7 +24007,16 @@ def cli_entry(argv: list[str] | None = None) -> int:
     # session alive for a bare ``-q`` on a TTY, so force the one-shot path.
     # AiDiy integration uses --oneshot-stdin to keep long prompts out of argv.
     oneshot = args.oneshot is not None or args.oneshot_stdin
-    defaults = _load_aidiy_hermes_provider_defaults(args.provider) if args.provider else _load_aidiy_hermes_defaults(args.model)
+    # モデル・provider の両方が未指定なら、Hermes 本来の auto 解決へ任せる。
+    # AIコードパネルで CODE_AI<N>_MODEL="auto" を選んだ場合もこの経路を通る。
+    # ここで AiDiy_key.json の CODE_AIDIY_HERMES_MODEL を補完すると、画面上は
+    # auto なのに特定モデル（OAuth 未認証時は FreeAI）を指定した起動になってしまう。
+    if args.provider:
+        defaults = _load_aidiy_hermes_provider_defaults(args.provider)
+    elif args.model:
+        defaults = _load_aidiy_hermes_defaults(args.model)
+    else:
+        defaults = {}
     # AiDiy 解決済みの runtime provider を優先（例: local_chat → "custom"）。
     # defaults に provider が無い未知プロバイダのみ args.provider をそのまま使う。
     provider = defaults.get("provider") or args.provider

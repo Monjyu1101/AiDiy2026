@@ -1185,7 +1185,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 model_key = f"CODE_AI{idx}_MODEL"
                 ai_name = セッション.モデル設定.get(ai_key, "")
                 ai_model = セッション.モデル設定.get(model_key, "")
-                if not ai_model or ai_model == "auto":
+                model_auto = not str(ai_model or "").strip() or str(ai_model).strip().lower() == "auto"
+                if model_auto and ai_name != "aidiy_hermes":
                     provider_key = ""
                     if ai_name == "claude_sdk":
                         provider_key = "CODE_CLAUDE_SDK_MODEL"
@@ -1209,6 +1210,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         provider_key = "CODE_CODEX_OLLAMA_MODEL"
                     if provider_key:
                         ai_model = セッション.モデル設定.get(provider_key, "")
+                elif model_auto:
+                    # aidiy_hermes の auto は CLI 側の自動解決を意味する。
+                    # CODE_AIDIY_HERMES_MODEL へ表示だけを置換すると、実際の起動指定と
+                    # 食い違って特定モデルを選択したように見えるため auto のまま示す。
+                    ai_model = "auto"
 
                 ウェルカム本文 = (
                     f"私は Code Agent ({idx}) です。\n"
