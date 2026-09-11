@@ -118,7 +118,7 @@ upstream のレイアウトを次の 3 点だけ読み替えています。
 
 | 対象 | 内容 |
 |------|------|
-| `cli_main.py` | layout shim / `_AIDIY_*` 設定ブロック / `_aidiy_*` メソッド群 / `chat()` の外部 CLI ディスパッチ / `/model` フック / quiet ワンショットの stderr 進捗 / `cli_entry` argparse エントリ |
+| `cli_main.py` | layout shim / `_AIDIY_*` 設定ブロック / `_aidiy_*` メソッド群 / `chat()` の外部 CLI ディスパッチ / `/model` フック / quiet ワンショットの stderr 進捗 / 長文入力用 `--oneshot-stdin` / `cli_entry` argparse エントリ |
 | ブランディング | `cli_main.py` の `_AIDIY_RESPONSE_LABEL` / `_AIDIY_WELCOME_TEXT` / `_build_compact_banner()`、`hermes_cli/banner.py` の `HERMES_AGENT_LOGO`（AIDIY-HERMES ワードマーク）と `format_banner_version_label()`、`hermes_cli/_startup_fast.py`、`acp_adapter/server.py` |
 | `tools/mcp_tool.py` | `_load_aidiy_mcp_servers()` と `_load_mcp_config()` へのマージ |
 | OpenAI サブスク対応 | `cli_main.py` の `openai_oauth` provider（upstream `openai-codex` / ChatGPT OAuth）。`auth_runtime` フラグ、`_openai_oauth_model_ids()`、`_ensure_openai_oauth_auth()` |

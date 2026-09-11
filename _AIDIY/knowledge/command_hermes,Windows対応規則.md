@@ -1,12 +1,20 @@
 # Windows 対応規則（aidiy_hermes）
 
-> 文書: `command_hermes,Windows対応規則.md` | 実装: `command_hermes/tools/environments/local.py`, `command_hermes/tools/environments/base.py`, `command_hermes/tools/file_operations.py`, `command_hermes/tools/file_tools.py`, `command_hermes/tools/terminal_tool.py`, `command_hermes/tools/process_registry.py`, `command_hermes/tools/daemon_pool.py`
+> 文書: `command_hermes,Windows対応規則.md` | 実装: `command_hermes/cli_main.py`, `backend_server/AIコア/AIコード_cli.py`, `command_hermes/tools/environments/local.py`, `command_hermes/tools/environments/base.py`, `command_hermes/tools/file_operations.py`, `command_hermes/tools/file_tools.py`, `command_hermes/tools/terminal_tool.py`, `command_hermes/tools/process_registry.py`, `command_hermes/tools/daemon_pool.py`
 
 ## このメモを使う場面
 
 - aidiy_hermes の terminal / file 操作系コードへ修正を入れるとき
 - Windows ネイティブ実行で `[exit -1]`、タイムアウト、パス解決エラーが出たとき
 - upstream `hermes-agent` の新版を取り込むとき
+
+## 長文プロンプトと WinError 206
+
+`[WinError 206] ファイル名または拡張子が長すぎます` は、実ファイル名だけでなく、Windows `CreateProcess` のコマンドライン全体が約 32,767 文字の上限を超えた場合にも発生します。`.cmd` を避けて Python と `cli_main.py` を直接起動しても、この `CreateProcess` の上限は残ります。
+
+AiDiy の Code AI 連携では、長さにかかわらず完全プロンプトを argv へ入れません。`backend_server/AIコア/AIコード_cli.py` が `aidiy_hermes -Q --oneshot-stdin` を起動し、本文を UTF-8 の標準入力で渡します。stdin 送信は stdout / stderr 監視と並行実行し、双方向パイプのデッドロックを避けます。
+
+手動実行用の `aidiy_hermes -Q -z "本文"` は互換性のため維持します。ただし、長文を自動連携する実装では `-z` に本文を渡さず、`--oneshot-stdin` を使います。
 
 ## 前提: Windows 対応は upstream 本体が持つ
 
@@ -41,10 +49,11 @@
 
 ## AiDiy 独自の Windows / ランタイム修正
 
-現在 `command_hermes` に残っている OS 起因の独自修正は次の 1 件のみです。
+現在 AiDiy に残っている Windows / ランタイム起因の主な独自修正は次のとおりです。
 
 | 対象 | 内容 |
 |------|------|
+| `cli_main.py` / `backend_server/AIコア/AIコード_cli.py` | Windows の argv 長制限を避けるため、AiDiy 連携の完全プロンプトを `--oneshot-stdin` + UTF-8 stdin で渡す。 |
 | `tools/daemon_pool.py` | Python 3.14 で `ThreadPoolExecutor` の worker 引数が `(ref, ctx, work_queue)` に変わったため、`_adjust_thread_count()` で `_create_worker_context` の有無を見て分岐する。upstream は `requires-python <3.14` のため未対応 |
 
 upstream の `requires-python` は `>=3.11,<3.14` ですが、AiDiy は 3.14 の venv で動かしています。
@@ -85,6 +94,8 @@ from tools.file_tools import read_file_tool, search_tool, write_file_tool, patch
 
 - `--list-tools -t aidiy_sqlite` で MCP ツールだけが列挙される
 - `-Q -z` の stdout に応答テキストしか出ない（session_id は stderr）
+- AiDiy 連携のコマンド配列に完全プロンプトが含まれず、`--oneshot-stdin` が含まれる
+- 数 MB の stdin / stdout を同時に扱っても停止せず、stdin を読まない子プロセスはタイムアウト後に残留しない
 
 ## Linux/macOS 回帰テスト
 

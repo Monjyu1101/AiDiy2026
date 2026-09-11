@@ -21,28 +21,30 @@ if /I "%UPDATE%"=="y" (
 :SELECT_MODEL
 ECHO.
 ECHO GitHub Copilot CLI model list
-ECHO   1: GPT-5.6 Sol - frontier reasoning and coding
-ECHO   2: GPT-5.6 Terra - balanced quality and cost
-ECHO   3: GPT-5.6 Luna - fast, high-volume work
-ECHO   4: Claude Fable 5.1 - highest Claude capability
-ECHO   5: Claude Opus 5 - complex agentic coding
-ECHO   6: Claude Sonnet 5 - balanced coding and speed
-ECHO   7: Claude Haiku 4.5 - fast and lightweight
-ECHO   8: Gemini 3.7 Flash
-ECHO   9: Gemini 3.8 Flash - latest Gemini Flash
+ECHO   1: GPT-6 Astra - frontier reasoning and coding
+ECHO   2: GPT-5.6 Sol - frontier reasoning and coding
+ECHO   3: GPT-5.6 Terra - balanced quality and cost
+ECHO   4: GPT-5.6 Luna - fast, high-volume work
+ECHO   5: Claude Fable 5.1 - highest Claude capability
+ECHO   6: Claude Opus 5 - complex agentic coding
+ECHO   7: Claude Sonnet 5 - balanced coding and speed
+ECHO   8: Claude Haiku 4.5 - fast and lightweight
+ECHO   9: Gemini 3.7 Flash
+ECHO   10: Gemini 3.8 Flash - latest Gemini Flash
 ECHO.
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: default]: "
 if not defined MODEL_NUMBER goto LAUNCH
-if "%MODEL_NUMBER%"=="1" set "MODEL=gpt-5.6-sol"
-if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-5.6-terra"
-if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-5.6-luna"
-if "%MODEL_NUMBER%"=="4" set "MODEL=claude-fable-5.1"
-if "%MODEL_NUMBER%"=="5" set "MODEL=claude-opus-5"
-if "%MODEL_NUMBER%"=="6" set "MODEL=claude-sonnet-5"
-if "%MODEL_NUMBER%"=="7" set "MODEL=claude-haiku-4.5"
-if "%MODEL_NUMBER%"=="8" set "MODEL=gemini-3.7-flash"
-if "%MODEL_NUMBER%"=="9" set "MODEL=gemini-3.8-flash"
+if "%MODEL_NUMBER%"=="1" set "MODEL=gpt-6-astra"
+if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-5.6-sol"
+if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-5.6-terra"
+if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-5.6-luna"
+if "%MODEL_NUMBER%"=="5" set "MODEL=claude-fable-5.1"
+if "%MODEL_NUMBER%"=="6" set "MODEL=claude-opus-5"
+if "%MODEL_NUMBER%"=="7" set "MODEL=claude-sonnet-5"
+if "%MODEL_NUMBER%"=="8" set "MODEL=claude-haiku-4.5"
+if "%MODEL_NUMBER%"=="9" set "MODEL=gemini-3.7-flash"
+if "%MODEL_NUMBER%"=="10" set "MODEL=gemini-3.8-flash"
 if defined MODEL goto LAUNCH
 ECHO Invalid input. Enter a number or press Enter.
 goto SELECT_MODEL

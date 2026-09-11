@@ -168,7 +168,7 @@
 - `FORCE_COLOR=1` または `CLICOLOR_FORCE` がある場合だけ明示的に色を許可する
 - `_build_tui()` は通常の Windows Terminal / cmd / PowerShell で実操作確認する。非コンソール環境では `NoConsoleScreenBufferError` になることがある
 - 非コンソール subprocess では `prompt_toolkit.print_formatted_text` が `NoConsoleScreenBufferError` になることがある。CLI 出力用の `_cprint()` は失敗時に通常 `print()` へ落とす
-- AiDiy Code AI から呼ぶ 1ショットは `aidiy_hermes -Q -z "本文"` の順にする。`-Q`（quiet）は真偽フラグ、`-z`（oneshot）は本文を値に取る `nargs="?"` なので、本文は必ず `-z` の直後へ置く
+- AiDiy Code AI から呼ぶ 1ショットは `aidiy_hermes -Q --oneshot-stdin` とし、完全プロンプトを UTF-8 標準入力で渡す。手動実行の `-Q -z "本文"` は互換性のため維持する
 
 ## spinner / status の要点
 

@@ -23748,6 +23748,7 @@ def _build_arg_parser():
     )
     parser.add_argument("--version", "-V", action="store_true")
     parser.add_argument("-z", "--oneshot", metavar="PROMPT", nargs="?", const="", default=None)
+    parser.add_argument("--oneshot-stdin", action="store_true", default=False)
     parser.add_argument("-q", "--query", metavar="PROMPT", default=None)
     parser.add_argument("--image", default=None)
     parser.add_argument("-m", "--model", default=None)
@@ -23994,11 +23995,18 @@ def cli_entry(argv: list[str] | None = None) -> int:
     if args.yolo:
         os.environ["HERMES_YOLO_MODE"] = "1"
 
-    query = args.oneshot or args.query or (" ".join(args.prompt) if args.prompt else None)
-    quiet = bool(args.quiet or args.oneshot is not None)
+    query = sys.stdin.read() if args.oneshot_stdin else (
+        args.oneshot or args.query or (" ".join(args.prompt) if args.prompt else None)
+    )
+    if args.oneshot_stdin and not query.strip():
+        print("--oneshot-stdin requires non-empty UTF-8 input.", file=sys.stderr)
+        return 2
+
+    quiet = bool(args.quiet or args.oneshot is not None or args.oneshot_stdin)
     # ``-z`` is AiDiy's answer-and-exit flag; upstream 0.21 keeps an interactive
     # session alive for a bare ``-q`` on a TTY, so force the one-shot path.
-    oneshot = args.oneshot is not None
+    # AiDiy integration uses --oneshot-stdin to keep long prompts out of argv.
+    oneshot = args.oneshot is not None or args.oneshot_stdin
     defaults = _load_aidiy_hermes_provider_defaults(args.provider) if args.provider else _load_aidiy_hermes_defaults(args.model)
     # AiDiy 解決済みの runtime provider を優先（例: local_chat → "custom"）。
     # defaults に provider が無い未知プロバイダのみ args.provider をそのまま使う。

@@ -369,7 +369,8 @@ class CodeAI:
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
 
         if self.code_ai == "aidiy_hermes":
-            # hermes は Python の argparse で受けるので改行をそのまま渡す（正規化しない）。
+            # 完全プロンプトは argv に載せず、呼び出し側から UTF-8 stdin で渡す。
+            # Windows CreateProcess のコマンドライン長制限（約 32,767 文字）を回避する。
             # cmd.exe の 8191 文字制限を避けるため、Windows では .cmd シムを経由せず
             # Python と cli_main.py を直接起動する。
             base = self._hermes直接実行コマンド() if not custom_cmd else None
@@ -386,11 +387,11 @@ class CodeAI:
                     "--api-key", "local",
                     "--model", "local_chat",
                 ]
-                return base + ["-Q"] + local_args + ["-z", プロンプト]
+                return base + ["-Q"] + local_args + ["--oneshot-stdin"]
 
             _model = self._ollama_cloud_suffix除去(self.code_model)
             model_args = ["--model", _model] if _model and _model.lower() != "auto" else []
-            return base + ["-Q"] + model_args + ["-z", プロンプト]
+            return base + ["-Q"] + model_args + ["--oneshot-stdin"]
 
         # 以降の CLI（claude/copilot/gemini/codex/opencode）は npm の .cmd シムを直接実行に
         # 解決して cmd.exe を回避する。cmd.exe を経由する場合のみ argv 長制限のため
@@ -962,7 +963,8 @@ class CodeAI:
                 result_text = await self._subprocess実行(
                     command=command,
                     cwd=作業ディレクトリ,
-                    timeout=タイムアウト秒数
+                    timeout=タイムアウト秒数,
+                    stdin_text=完全プロンプト if self.code_ai == "aidiy_hermes" else None,
                 )
 
             # codexの場合、セッションIDを抽出して保存（stderr から抽出）
@@ -992,7 +994,13 @@ class CodeAI:
 
             return エラーメッセージ
 
-    async def _subprocess実行(self, command: list, cwd: str, timeout: int) -> str:
+    async def _subprocess実行(
+        self,
+        command: list,
+        cwd: str,
+        timeout: int,
+        stdin_text: Optional[str] = None,
+    ) -> str:
         """
         subprocessでコマンドを実行し、stdoutをリアルタイムで監視
         ストリーム出力のみ行い、開始/終了/中断通知は親側で行う
@@ -1001,16 +1009,23 @@ class CodeAI:
             command: 実行コマンド配列
             cwd: 作業ディレクトリ
             timeout: タイムアウト秒数
+            stdin_text: UTF-8 で標準入力へ送る文字列（省略時は stdin を閉じる）
 
         Returns:
             実行結果の全テキスト
         """
+        process = None
+        tasks: list[asyncio.Task] = []
         try:
             self._停止マーカー送信済み = False
             # プロセス起動
             process = await asyncio.create_subprocess_exec(
                 *command,
-                stdin=asyncio.subprocess.DEVNULL,
+                stdin=(
+                    asyncio.subprocess.PIPE
+                    if stdin_text is not None
+                    else asyncio.subprocess.DEVNULL
+                ),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,
@@ -1026,6 +1041,21 @@ class CodeAI:
             def 出力時刻更新():
                 nonlocal last_output_time
                 last_output_time = time.time()
+
+            # stdin 送信は stdout/stderr の読み取りと並行して行う。
+            # 子が先に大量出力する場合でも、双方向のパイプ待ちを起こさない。
+            async def stdin_writer():
+                if stdin_text is None or process.stdin is None:
+                    return
+                try:
+                    process.stdin.write(stdin_text.encode("utf-8"))
+                    await process.stdin.drain()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                finally:
+                    # Windows ProactorEventLoop ではキャンセル中の
+                    # wait_closed() が InvalidStateError になることがあるため呼ばない。
+                    process.stdin.close()
 
             # stdout監視タスク
             async def stdout_reader():
@@ -1125,32 +1155,49 @@ class CodeAI:
             stderr_task = asyncio.create_task(stderr_reader())
             monitor_task = asyncio.create_task(timeout_monitor())
             process_task = asyncio.create_task(process.wait())
+            stdin_task = (
+                asyncio.create_task(stdin_writer())
+                if stdin_text is not None
+                else None
+            )
+            tasks = [stdout_task, stderr_task, monitor_task, process_task]
+            if stdin_task is not None:
+                tasks.append(stdin_task)
 
             # 最初の完了を待つ
-            done, pending = await asyncio.wait(
+            # stdin 送信完了だけで出力監視を終了させないため、stdin_task は含めない。
+            done, _ = await asyncio.wait(
                 [stdout_task, stderr_task, monitor_task, process_task],
                 return_when=asyncio.FIRST_COMPLETED
             )
 
+            monitor_error = None
             if monitor_task in done:
                 # タイムアウト or 強制停止 → 全タスクをキャンセル
-                for task in [stdout_task, stderr_task, process_task]:
+                try:
+                    await monitor_task
+                except asyncio.TimeoutError as e:
+                    monitor_error = e
+                cancel_targets = [stdout_task, stderr_task, process_task]
+                if stdin_task is not None:
+                    cancel_targets.append(stdin_task)
+                for task in cancel_targets:
                     if not task.done():
                         task.cancel()
-                        try:
-                            await task
-                        except (asyncio.CancelledError, Exception):
-                            pass
+                await asyncio.gather(*cancel_targets, return_exceptions=True)
             else:
                 # プロセス終了（または stdout/stderr 完了）→ monitor をキャンセルし
-                # stdout/stderr/process の残りを最大30秒待つ（バッファ読み切り）
+                # stdout/stderr/process/stdin の残りを最大30秒待つ。
                 if not monitor_task.done():
                     monitor_task.cancel()
                     try:
                         await monitor_task
                     except asyncio.CancelledError:
                         pass
-                remaining = [t for t in [stdout_task, stderr_task, process_task] if not t.done()]
+                completion_targets = [stdout_task, stderr_task, process_task]
+                if stdin_task is not None:
+                    completion_targets.append(stdin_task)
+                remaining = [t for t in completion_targets if not t.done()]
                 if remaining:
                     try:
                         await asyncio.wait_for(
@@ -1161,14 +1208,16 @@ class CodeAI:
                         for task in remaining:
                             if not task.done():
                                 task.cancel()
+                        await asyncio.gather(*remaining, return_exceptions=True)
 
             # プロセスが生きていればキル
             if process.returncode is None:
-                process.kill()
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    # returncode 反映直前に子プロセスが終了する競合。
+                    pass
                 await process.wait()
-
-            # プロセス参照をクリア
-            self.current_process = None
 
             # 結果を結合
             full_output = "\n".join(result_lines)
@@ -1176,6 +1225,9 @@ class CodeAI:
 
             # stderr を保存（セッションID抽出用）
             self.last_stderr_output = stderr_output
+
+            if monitor_error is not None:
+                raise monitor_error
 
             # stdout/stderr の行数と先頭内容を記録
             logger.info(f"[CodeAI] subprocess完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行, ai={self.code_ai}")
@@ -1202,6 +1254,23 @@ class CodeAI:
         except Exception as e:
             logger.error(f"subprocess実行エラー (command={command}, cwd={cwd}): {e}")
             return f"subprocess実行エラー: {str(e)}"
+
+        finally:
+            pending_tasks = [task for task in tasks if not task.done()]
+            for task in pending_tasks:
+                task.cancel()
+            if tasks:
+                # 完了済みタスクも gather し、stdin_writer 等の例外を
+                # "Task exception was never retrieved" に残さない。
+                await asyncio.gather(*tasks, return_exceptions=True)
+            if process is not None and process.returncode is None:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                await process.wait()
+            if process is not None and self.current_process is process:
+                self.current_process = None
 
     async def _antigravity実行(self, command: list, cwd: str, timeout: int) -> str:
         """
