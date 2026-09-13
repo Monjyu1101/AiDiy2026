@@ -49,6 +49,8 @@ const ニュース_20260906_gemini38flash_jaUrl = `${baseUrl}Xビデオ/ニュ�
 // 小説
 const 小説解説_AiDiy誕生_jaUrl = `${baseUrl}Xビデオ/小説解説_AiDiy誕生_ja/index.html`;
 const 小説解説_本好きの下剋上_jaUrl = `${baseUrl}Xビデオ/小説解説_本好きの下剋上_ja/index.html`;
+
+// 四コマ漫画
 const 四コマ漫画_伝説のプログラマ_jaUrl = `${baseUrl}Xビデオ/四コマ漫画_伝説のプログラマ_ja/index.html`;
 
 const route = useRoute();
@@ -360,6 +362,11 @@ const handleReturn = () => {
             </div>
           </a>
 
+        </div>
+
+        <div class="section-label">四コマ漫画</div>
+
+        <div class="menu-row">
           <a class="menu-card menu-card-fixed" :href="四コマ漫画_伝説のプログラマ_jaUrl" target="_blank" rel="noopener noreferrer">
             <div class="menu-card-title">
               <span class="icon">伝説</span>

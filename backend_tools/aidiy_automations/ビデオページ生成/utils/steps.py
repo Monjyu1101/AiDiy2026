@@ -278,9 +278,18 @@ _VUE_SECTION_RULES = (
     ("AiDiy実装", "AiDiy実装例"),
     ("ニュース", "時事ニュース・解説"),
     ("解説", "時事ニュース・解説"),
+    ("四コマ漫画", "四コマ漫画"),
     ("小説", "小説"),
     ("", "時事ニュース・解説"),
 )
+
+
+def _vue_section_label(folder_name: str) -> str:
+    """folder_name の接頭辞から Xビデオ.vue のセクション見出しを決める。"""
+    for prefix, label in _VUE_SECTION_RULES:
+        if prefix and folder_name.startswith(prefix):
+            return label
+    return _VUE_SECTION_RULES[-1][1]
 
 
 def _routing_target_paths(ctx: VideoGenCtx) -> tuple[str, str, str]:
@@ -422,17 +431,17 @@ def _ensure_vue_menu_card(
             return "失敗（URL const の定義位置が見つかりません）"
         lines.insert(insert_idx + 1, expected_const)
 
-    # 2) folder_name に合うセクションの menu-row 末尾へカードを追加する
-    section_label = _VUE_SECTION_RULES[-1][1]
-    for prefix, label in _VUE_SECTION_RULES:
-        if prefix and folder_name.startswith(prefix):
-            section_label = label
-            break
-
+    # 2) folder_name に合うセクションの menu-row 末尾へカードを追加する。
+    #    見出しが無い場合は既定セクションへ入れ、登録漏れにはしない。
+    section_label = _vue_section_label(folder_name)
     section_idx = None
-    for i, ln in enumerate(lines):
-        if f'<div class="section-label">{section_label}</div>' in ln:
-            section_idx = i
+    for label in dict.fromkeys((section_label, _VUE_SECTION_RULES[-1][1])):
+        section_idx = next(
+            (i for i, ln in enumerate(lines) if f'<div class="section-label">{label}</div>' in ln),
+            None,
+        )
+        if section_idx is not None:
+            section_label = label
             break
     if section_idx is None:
         return f"失敗（セクション見出しが見つかりません: {section_label}）"
@@ -541,34 +550,96 @@ async def step_add_routing(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool
     mark_step_done(md_path, "ルーティング追加")
 
     def validate() -> bool:
-        try:
-            with open(router_path, encoding="utf-8") as f:
-                router_text = f.read()
-            with open(vue_path, encoding="utf-8") as f:
-                vue_text = f.read()
-        except OSError as e:
-            print(f"  [routing] ファイル読み込みに失敗しました: {e}")
-            return False
-
-        ok1 = check(f"ルート登録: {alias_path}", f"'{alias_path}'" in router_text)
-        ok2 = check(f"リダイレクト先: {page_url}", f"'{page_url}'" in router_text)
-        ok3 = check(
-            f"メニュー URL const: {const_name}",
-            f"const {const_name} = `${{baseUrl}}{menu_page_url}`;" in vue_text,
-        )
-        ok4 = check(f"メニューカード参照: {const_name}", f':href="{const_name}"' in vue_text)
-        # カードを差し込んだあとにタグの数が合っているかだけ見る（簡易構文チェック）
-        ok5 = check(
-            "メニューカードのタグ整合",
-            vue_text.count('<a class="menu-card') == vue_text.count("</a>"),
-        )
-        return ok1 and ok2 and ok3 and ok4 and ok5
+        return _routing_registration_ok(vue_path, router_path, url_segment, folder_name)
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
         target_paths=[vue_path, router_path, md_path],
         validate=validate, verify_timeout_sec=240, attempt=attempt,
+    )
+
+
+def _routing_registration_ok(vue_path: str, router_path: str, url_segment: str, folder_name: str) -> bool:
+    """ルート・メニュー URL const・メニューカードが揃っているかを検証する（ファイルは変更しない）。"""
+    alias_path = f"/{url_segment}/{folder_name}"
+    page_url = f"{url_segment}/{folder_name}/index.html"
+    const_name = _vue_const_name(folder_name)
+    try:
+        with open(router_path, encoding="utf-8") as f:
+            router_text = f.read()
+        with open(vue_path, encoding="utf-8") as f:
+            vue_text = f.read()
+    except OSError as e:
+        print(f"  [routing] ファイル読み込みに失敗しました: {e}")
+        return False
+
+    ok1 = check(f"ルート登録: {alias_path}", f"'{alias_path}'" in router_text)
+    ok2 = check(f"リダイレクト先: {page_url}", f"'{page_url}'" in router_text)
+    ok3 = check(
+        f"メニュー URL const: {const_name}",
+        f"const {const_name} = `${{baseUrl}}{page_url}`;" in vue_text,
+    )
+    ok4 = check(f"メニューカード参照: {const_name}", f':href="{const_name}"' in vue_text)
+    # カードを差し込んだあとにタグの数が合っているかだけ見る（簡易構文チェック）
+    ok5 = check(
+        "メニューカードのタグ整合",
+        vue_text.count('<a class="menu-card') == vue_text.count("</a>"),
+    )
+    return ok1 and ok2 and ok3 and ok4 and ok5
+
+
+def video_menu_registration_paths(ctx: VideoGenCtx) -> list[str]:
+    """Xビデオメニュー登録で変更するファイル（メニュー Vue・router）のパスを返す。"""
+    vue_path, router_path, _ = _routing_target_paths(ctx)
+    return [vue_path, router_path]
+
+
+def video_menu_registration_ok(ctx: VideoGenCtx) -> bool:
+    """今回のビデオが Xビデオメニューとルーティングに登録済みかを検証する（ファイルは変更しない）。"""
+    vue_path, router_path, url_segment = _routing_target_paths(ctx)
+    return _routing_registration_ok(vue_path, router_path, url_segment, ctx.folder_name)
+
+
+def ensure_video_menu_registration(ctx: VideoGenCtx) -> bool:
+    """Xビデオメニューとルーティングへの登録を再確認し、抜けていれば登録し直す。
+
+    Step 02 で登録しても、後から Xビデオ.vue / router/index.ts が古い版へ戻されると
+    完成したビデオがメニューから外れる。最終確認と完成案内でもこの関数を呼び、
+    メニューから開けない状態のまま完成扱いにしない。
+    """
+    vue_path, router_path, url_segment = _routing_target_paths(ctx)
+    folder_name = ctx.folder_name
+    ok_vue = check(f"メニュー Vue 存在: {vue_path}", os.path.isfile(vue_path))
+    ok_router = check(f"ルーター存在: {router_path}", os.path.isfile(router_path))
+    if not (ok_vue and ok_router):
+        return False
+
+    icon, title, description = _menu_card_texts(folder_name, ctx.topic)
+    router_state = _ensure_router_alias(router_path, url_segment, folder_name)
+    print(f"  [routing] ルーティング再確認: {router_state} -> /{url_segment}/{folder_name}")
+    vue_state = _ensure_vue_menu_card(vue_path, url_segment, folder_name, icon, title, description)
+    print(f"  [routing] メニューカード再確認: {vue_state} -> {_vue_const_name(folder_name)}")
+    return _routing_registration_ok(vue_path, router_path, url_segment, folder_name)
+
+
+def video_menu_review_prompt(ctx: VideoGenCtx) -> str:
+    """最終確認プロンプトに差し込む「Xビデオメニュー登録の確認」指示を返す。"""
+    vue_path, router_path, url_segment = _routing_target_paths(ctx)
+    folder_name = ctx.folder_name
+    alias_path = f"/{url_segment}/{folder_name}"
+    page_url = f"{url_segment}/{folder_name}/index.html"
+    const_name = _vue_const_name(folder_name)
+    return (
+        f"【手順 3】{url_segment}メニューへの登録確認（完成の必須条件）\n"
+        f"  完成したビデオは {url_segment} メニューから開けなければなりません。次の 3 点を確認してください。\n"
+        f'  対象: "{vue_path}"\n'
+        f'        "{router_path}"\n'
+        f"  確認 A: {os.path.basename(router_path)} に createStaticAliasRoute('{alias_path}', '{page_url}', '{url_segment}') があるか\n"
+        f"  確認 B: {os.path.basename(vue_path)} に const {const_name} = `${{baseUrl}}{page_url}`; があるか\n"
+        f"  確認 C: 「{_vue_section_label(folder_name)}」セクションに :href=\"{const_name}\" のメニューカードがあり、\n"
+        "          見出し・説明・span.icon が今回のテーマに合っているか（機械生成の下書きのままなら直す）\n"
+        "  抜けていれば追加してください。他のメニューカード・他のルート定義は変更・削除しないこと。\n\n"
     )
 
 
@@ -761,6 +832,11 @@ async def step_completion_notice(
             print("  [NG] Step 09 の回復実行に失敗しました。")
             return False
         set_completed_step(ctx, 9)
+
+    # Step 09 完了済みで再開した場合も、メニューから外れたまま完成案内しない。
+    if not ensure_video_menu_registration(ctx):
+        print("  [NG] Xビデオメニューとルーティングへの登録を確認できませんでした。")
+        return False
 
     print(f"  [complete] Step 99: 完成案内: {ctx.folder_name}")
     tts_msg = (

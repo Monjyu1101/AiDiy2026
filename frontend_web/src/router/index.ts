@@ -261,6 +261,11 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ/ニュース_20260906_gemini38flash_ja/index.html',
         'Xビデオ'
     ),
+    createStaticAliasRoute(
+        '/Xビデオ/ニュース_20260906_gpt6astra_ja',
+        'Xビデオ/ニュース_20260906_gpt6astra_ja/index.html',
+        'Xビデオ'
+    ),
     // Xビデオ: 小説
     createStaticAliasRoute(
         '/Xビデオ/小説解説_本好きの下剋上_ja',
@@ -272,11 +277,7 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ/小説解説_AiDiy誕生_ja/index.html',
         'Xビデオ'
     ),
-    createStaticAliasRoute(
-        '/Xビデオ/ニュース_20260906_gpt6astra_ja',
-        'Xビデオ/ニュース_20260906_gpt6astra_ja/index.html',
-        'Xビデオ'
-    ),
+    // Xビデオ: 四コマ漫画
     createStaticAliasRoute(
         '/Xビデオ/四コマ漫画_伝説のプログラマ_ja',
         'Xビデオ/四コマ漫画_伝説のプログラマ_ja/index.html',

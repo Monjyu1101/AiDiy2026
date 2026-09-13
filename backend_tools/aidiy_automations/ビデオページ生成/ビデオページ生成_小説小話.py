@@ -64,6 +64,8 @@ from utils.generation import (
 from utils.steps import (
     step00_preflight, step_add_routing, step_create_folder, step_generate_audio,
     step_update_durations, step_completion_notice,
+    ensure_video_menu_registration, video_menu_registration_ok,
+    video_menu_registration_paths, video_menu_review_prompt,
 )
 
 # ================================================================== #
@@ -533,6 +535,7 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
         "  事実と異なる内容、不適切な言葉、問題のある画像があれば修正します。"
     )
     scenario_path = os.path.join(new_dir, "scenario.js")
+    scenario_json_path = os.path.join(new_dir, "scenario.json")
     index_path    = os.path.join(new_dir, "index.html")
     images_dir    = os.path.join(new_dir, "images")
     gen_img_py    = os.path.join(new_dir, "_gen_scene_images.py")
@@ -549,6 +552,21 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
                   f"index={os.path.isfile(index_path)}, images={_count_valid_images()}/{expected_image_count})")
         if not await _recover_sources(ctx, ca, reason=reason, attempt=attempt):
             return False
+
+    # scenario.json は静的成果物の可読なマニフェストとして配布されるため、
+    # プレイヤーが読む scenario.js と必ず同じ内容にそろえる。テンプレートから
+    # コピーされた旧題材の scenario.json が残ると、音声台本や外部検証だけが
+    # 別の物語を参照してしまうため、中間確認で同期・照合まで完結させる。
+    try:
+        scenario_data_for_json = load_scenario_object(scenario_path)
+        with open(scenario_json_path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(scenario_data_for_json, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        scenario_json_sync_ok = True
+        print("  [SYNC] scenario.json を scenario.js と同期しました")
+    except Exception as exc:
+        scenario_json_sync_ok = False
+        print(f"  [FAIL] scenario.json の同期に失敗: {exc}")
 
     prompt = (
         step_instruction_header(ctx, step_name, step_summary)
@@ -596,12 +614,22 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
                 ok5 = check("進捗 Markdown に中間確認反映", "- [x] 中間確認" in f.read())
         else:
             check("進捗 Markdown に中間確認反映", False)
-        return ok1 and ok2 and ok3 and ok4 and ok5
+        ok6 = check("scenario.json 同期", scenario_json_sync_ok and os.path.isfile(scenario_json_path))
+        if ok6:
+            try:
+                with open(scenario_json_path, encoding="utf-8-sig") as f:
+                    scenario_json_data = json.load(f)
+                scenario_js_data = load_scenario_object(scenario_path)
+                ok6 = check("scenario.json と scenario.js の内容一致", scenario_json_data == scenario_js_data)
+            except Exception as exc:
+                print(f"  [FAIL] scenario.json の照合に失敗: {exc}")
+                ok6 = check("scenario.json と scenario.js の内容一致", False)
+        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6
 
     ok = await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
-        target_paths=[scenario_path, index_path, images_dir, gen_img_py, md_path],
+        target_paths=[scenario_path, scenario_json_path, index_path, images_dir, gen_img_py, md_path],
         validate=validate, verify_timeout_sec=300, attempt=attempt,
         # 中間確認本体で内容確認・必要箇所の修正を済ませ、直後に存在・画像件数・
         # 進捗を機械検証する。検証エージェントを重ねると TaskTeam の20分上限を
@@ -657,6 +685,9 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         print("  [SKIP] Step 09 は既に完了済みです")
         return True
 
+    # Step 02 の登録が後から消えていても、最終確認の前にメニューへ戻しておく。
+    ensure_video_menu_registration(ctx)
+
     prompt = (
         step_instruction_header(ctx, step_name, step_summary)
         + "以下の手順で最終確認・修正を行ってください。\n\n"
@@ -678,7 +709,8 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         "【手順 2】不足があれば修正\n"
         f'  images 不足: "{ctx.mcp_python}" "{gen_img_py}" を実行\n'
         f'  audio 不足:  "{ctx.mcp_python}" "{gen_aud_py}" を実行\n\n'
-        "  最後に、修正したファイルと未修正で OK と判断したファイルを一覧表示してください。\n"
+        + video_menu_review_prompt(ctx)
+        + "  最後に、修正したファイルと未修正で OK と判断したファイルを一覧表示してください。\n"
     )
     review_already_done = False
     if os.path.isfile(md_path):
@@ -820,13 +852,19 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
             f"シーンHTML構成 (実際={sorted(html_scene_names)} / 必須={sorted(expected_html_names)})",
             html_scene_names == expected_html_names,
         )
-        return all((ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10))
+        ok11 = video_menu_registration_ok(ctx)
+        return all((ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11))
 
     ok = await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
-        target_paths=[scenario_path, os.path.join(new_dir, "index.html"), images_dir, audio_dir, assets_path, gen_img_py, gen_aud_py, md_path],
+        target_paths=[scenario_path, os.path.join(new_dir, "index.html"), images_dir, audio_dir, assets_path, gen_img_py, gen_aud_py, md_path,
+                      *video_menu_registration_paths(ctx)],
         validate=validate, verify_timeout_sec=300, attempt=attempt,
+        # Step 09 は、この関数の前段で完了済みレビュー印を確認している。
+        # 検証専用エージェントをさらに起動すると同じ Step 09 を再帰実行するため、
+        # ここでは Python 側の厳密な素材・manifest・メニュー検証とバックアップで確定する。
+        skip_agent_verify=True,
     )
     if not ok:
         return False

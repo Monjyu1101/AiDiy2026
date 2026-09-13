@@ -56,6 +56,8 @@ from utils.generation import (
 from utils.steps import (
     step00_preflight, step_add_routing, step_generate_audio,
     step_update_durations, step_completion_notice,
+    ensure_video_menu_registration, video_menu_registration_ok,
+    video_menu_registration_paths, video_menu_review_prompt,
     _テンプレートを機械コピー,
 )
 
@@ -699,6 +701,9 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         print("  [SKIP] Step 09 は既に完了済みです")
         return True
 
+    # Step 02 の登録が後から消えていても、最終確認の前にメニューへ戻しておく。
+    ensure_video_menu_registration(ctx)
+
     prompt = (
         step_instruction_header(ctx, step_name, step_summary)
         + "以下の手順で最終確認・修正を行ってください。\n\n"
@@ -718,7 +723,8 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         "【手順 2】不足があれば修正\n"
         f'  images 不足: "{ctx.mcp_python}" "{gen_img_py}" を実行\n'
         f'  audio 不足:  "{ctx.mcp_python}" "{gen_aud_py}" を実行\n\n'
-        "  最後に、修正したファイルと未修正で OK と判断したファイルを一覧表示してください。\n"
+        + video_menu_review_prompt(ctx)
+        + "  最後に、修正したファイルと未修正で OK と判断したファイルを一覧表示してください。\n"
     )
     await agent_run(ctx, ca, prompt, timeout_sec=600)
 
@@ -741,12 +747,14 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
             ok7 = check(f"audio/*.mp3 生成数: {len(mp3s)}/{required}", len(mp3s) >= required)
         else:
             check("audio フォルダ存在", False)
-        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7
+        ok8 = video_menu_registration_ok(ctx)
+        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8
 
     ok = await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
         step_name=step_name, step_summary=step_summary,
-        target_paths=[scenario_path, os.path.join(new_dir, "index.html"), images_dir, audio_dir, gen_img_py, gen_aud_py, md_path],
+        target_paths=[scenario_path, os.path.join(new_dir, "index.html"), images_dir, audio_dir, gen_img_py, gen_aud_py, md_path,
+                      *video_menu_registration_paths(ctx)],
         validate=validate, verify_timeout_sec=300, attempt=attempt,
     )
     if not ok:
