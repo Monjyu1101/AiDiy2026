@@ -110,7 +110,7 @@ const マイクレベル = ref(0)
 const スピーカーレベル = ref(0)
 const 音声エラー = ref('')
 const ウェルカムホバー中 = ref(false)
-type 表示選択型 = 'アバター' | 'カレンダーα' | 'xneko' | 'xeyes' | 'アナログ時計' | 'デジタル時計' | 'カレンダー' | '無し'
+type 表示選択型 = 'アバター' | 'カレンダーα' | 'xneko' | 'xeyes' | 'アナログ時計' | 'デジタル時計' | 'デジアナ時計' | 'カレンダー' | '無し'
 
 const 表示選択 = ref<表示選択型>('アバター')
 const 入力スペクトラム = ref<number[]>(初期スペクトラム())
@@ -174,6 +174,7 @@ const xneko表示中 = computed(() => 表示選択.value === 'xneko')
 const xeyes表示中 = computed(() => 表示選択.value === 'xeyes')
 const アナログ時計表示中 = computed(() => 表示選択.value === 'アナログ時計')
 const デジタル時計表示中 = computed(() => 表示選択.value === 'デジタル時計')
+const デジアナ時計表示中 = computed(() => 表示選択.value === 'デジアナ時計')
 const カレンダー表示中 = computed(() => 表示選択.value === 'カレンダー')
 const カレンダーα表示中 = computed(() => 表示選択.value === 'カレンダーα')
 
@@ -524,6 +525,20 @@ defineExpose({ 字幕追加 })
         :controls-visible="UI表示中"
       />
 
+      <!-- デジ+アナ時計: アナログを上寄せ、デジタルを下寄せで重ね合わせ -->
+      <template v-if="デジアナ時計表示中">
+        <component
+          :is="アナログ時計"
+          class="display-option-layer デジアナ時計-アナログ"
+          :controls-visible="UI表示中"
+        />
+        <component
+          :is="デジタル時計"
+          class="display-option-layer デジアナ時計-デジタル"
+          :controls-visible="UI表示中"
+        />
+      </template>
+
       <component
         v-if="カレンダー表示中"
         :is="カレンダー"
@@ -561,6 +576,7 @@ defineExpose({ 字幕追加 })
             <option value="xeyes">xeyes(目)</option>
             <option value="アナログ時計">アナログ時計</option>
             <option value="デジタル時計">デジタル時計</option>
+            <option value="デジアナ時計">デジ+アナ時計</option>
             <option value="カレンダー">カレンダー</option>
             <option value="無し">無し</option>
           </select>
@@ -929,6 +945,15 @@ defineExpose({ 字幕追加 })
 .カレンダーα時計 {
   align-items: flex-end;
   padding-bottom: 24px;
+}
+
+.デジアナ時計-アナログ {
+  transform: translateY(clamp(-40px, -6vh, -24px));
+}
+
+.デジアナ時計-デジタル {
+  z-index: 3;
+  transform: translateY(clamp(72px, 17vh, 112px));
 }
 
 .left-bottom-settings {
