@@ -525,16 +525,22 @@ defineExpose({ 字幕追加 })
         :controls-visible="UI表示中"
       />
 
-      <!-- デジ+アナ時計: アナログを上寄せ、デジタルを下寄せで重ね合わせ -->
+      <!-- デジ+アナ時計: 金色デジタル時計＋アナログ時計＋xneko の重ね合わせ -->
       <template v-if="デジアナ時計表示中">
         <component
+          :is="デジタル時計"
+          class="display-option-layer カレンダーα時計"
+          :controls-visible="UI表示中"
+          :前景色="'#FFB400'"
+        />
+        <component
           :is="アナログ時計"
-          class="display-option-layer デジアナ時計-アナログ"
+          class="display-option-layer"
           :controls-visible="UI表示中"
         />
         <component
-          :is="デジタル時計"
-          class="display-option-layer デジアナ時計-デジタル"
+          :is="xneko"
+          class="display-option-layer"
           :controls-visible="UI表示中"
         />
       </template>
@@ -945,15 +951,6 @@ defineExpose({ 字幕追加 })
 .カレンダーα時計 {
   align-items: flex-end;
   padding-bottom: 24px;
-}
-
-.デジアナ時計-アナログ {
-  transform: translateY(clamp(-40px, -6vh, -24px));
-}
-
-.デジアナ時計-デジタル {
-  z-index: 3;
-  transform: translateY(clamp(72px, 17vh, 112px));
 }
 
 .left-bottom-settings {
