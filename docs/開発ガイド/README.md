@@ -2,7 +2,7 @@
 
 このガイドは、**現在の AiDiy2026 実装** を前提に、最初に何を読めばよいかを整理するための案内です。
 
-古いテンプレート由来の PostgreSQL / Alembic / `base_server` 前提ではなく、**FastAPI + SQLite + Vue 3 + Electron** の現行構成に合わせています。
+古いテンプレート由来の PostgreSQL / Alembic / `base_server` 前提ではなく、**FastAPI + SQLite + Vue 3 + Electron + VS Code 拡張**の現行構成に合わせています。
 
 ---
 
@@ -16,6 +16,7 @@
   - `taskteam_main.py` : `8093`（AIタスク実行 + 定期タスク + 複数AIエージェントのチーム活動）
 - Web フロントは `frontend_web`、ポート `8090`
 - Avatar フロントは `frontend_avatar`、ポート `8092`
+- VS Code チャット拡張は `frontend_vscode`。`aidiy_hermes` を直接起動するため常駐ポートなし
 - DB は **SQLite**
   - `_data/AiDiy/database.db`
 - スキーマ変更は **Alembic なし**
@@ -66,6 +67,11 @@ AiDiy2026/
 │   ├── src/
 │   ├── public/
 │   └── AGENTS.md
+├── frontend_vscode/
+│   ├── src/
+│   ├── media/
+│   ├── test/
+│   └── AGENTS.md
 └── docs/
 ```
 
@@ -78,6 +84,8 @@ AiDiy2026/
 ```powershell
 python _setup.py
 ```
+
+`frontend_vscode` を選ぶと、Hermes のセットアップ後に VSIX を生成し、VS Code 拡張機能として配置します。
 
 ### 起動
 
@@ -217,7 +225,19 @@ npm run dev
 
 ---
 
-## 8. 変更反映と再起動
+## 8. フロントエンド VS Code の見方
+
+- 拡張エントリと会話状態: `frontend_vscode/src/extension.ts`
+- Hermes CLI の解決・起動・停止: `frontend_vscode/src/runner.ts`
+- AIコード互換 packet: `frontend_vscode/src/protocol.ts`
+- Webview: `frontend_vscode/src/webview.ts`, `frontend_vscode/media/`
+- 単独試用: `frontend_vscode/src/standalone.ts`, `frontend_vscode/standalone/bridge.js`
+
+常駐バックエンドや AI コア WebSocket は使わず、VS Code の拡張プロセスから `aidiy_hermes` を直接起動します。詳細は [frontend_vscode/AGENTS.md](../../frontend_vscode/AGENTS.md) を参照してください。
+
+---
+
+## 9. 変更反映と再起動
 
 `_start.py` で起動したバックエンドは `--reload` なしです。
 
@@ -232,19 +252,24 @@ echo. > backend_server/temp/reboot_apps.txt
 
 ---
 
-## 9. テスト方針
+## 10. テスト方針
 
-自動テストは `backend_server/tests/` の `unittest`（設定管理まわり）だけです。基本は手動確認です。
+自動テストは `backend_server/tests/` の `unittest`（設定管理まわり）と `frontend_vscode/test/` の Node.js テストがあります。それ以外は基本的に手動確認です。
 
 ```powershell
 cd backend_server
 .venv\Scripts\python.exe -m unittest discover -s tests -v
+
+cd ../frontend_vscode
+npm run check
+npm test
 ```
 
 - API: Swagger UI
 - Web UI: ブラウザ
 - Avatar: Electron / Web の両モード確認
 - フロント型チェック: `npm run type-check`（`npm run build` は明示依頼時のみ）
+- VS Code 拡張: `npm run check` / `npm test`。配布物確認時は `npm run package`
 
 実装追加後は最低でも以下を確認します。
 
@@ -258,7 +283,7 @@ cd backend_server
 
 ---
 
-## 10. まず読む順番
+## 11. まず読む順番
 
 1. [README.md](../../README.md)
 2. [AGENTS.md](../../AGENTS.md)
@@ -269,10 +294,11 @@ cd backend_server
 7. [command_hermes/AGENTS.md](../../command_hermes/AGENTS.md)
 8. [frontend_web/AGENTS.md](../../frontend_web/AGENTS.md)
 9. [frontend_avatar/AGENTS.md](../../frontend_avatar/AGENTS.md)
+10. [frontend_vscode/AGENTS.md](../../frontend_vscode/AGENTS.md)
 
 ---
 
-## 11. docs 配下の補助資料
+## 12. docs 配下の補助資料
 
 - `00_このプロジェクトの歩き方/`
   - 全体像と導入
@@ -291,7 +317,7 @@ cd backend_server
 
 ---
 
-## 12. 迷ったとき
+## 13. 迷ったとき
 
 - 古いテンプレート由来の `PostgreSQL`, `Alembic`, `base_server`, `base_client` 記述は現行実装には当てはまりません。
 - 実装事実を優先してください。

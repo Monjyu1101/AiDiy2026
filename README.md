@@ -14,6 +14,7 @@
 - [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
 - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
+- [frontend_vscode/AGENTS.md](./frontend_vscode/AGENTS.md)
 - [docs/](./docs/)
 
 ---
@@ -29,6 +30,7 @@
 - バックエンド TaskTeam: `backend_taskteam`（ポート 8093、AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
+- フロントエンド VS Code: TypeScript + VS Code Extension API（`aidiy_hermes` チャット、常駐なし）
 - 常駐バックエンドは **5 サーバー構成**
   - `core_main.py` : `8091`
   - `apps_main.py` : `8098`
@@ -47,6 +49,7 @@
 - **自己改善機構** — コードエージェントが修正完了後に `_AIDIY/knowledge/` へ知見を自動整理し、使うほど修正精度が上がる
 - **日本語ネイティブ** — テーブル名・API・コンポーネント名まで日本語で統一
 - **AI 音声対話コーディング** — Avatar に話しかけながらコードを書き進められる
+- **VS Code チャット** — セカンダリサイドバーから `aidiy_hermes` を直接操作し、選択コード添付、モデル選択、会話継続、停止、実行ログを利用
 
 ---
 
@@ -60,6 +63,7 @@
 | Node.js | 22 系 |
 | Git | 最新版推奨 |
 | uv | Python パッケージ管理に使用 |
+| VS Code | 1.106 以降（`frontend_vscode` を利用する場合） |
 
 ### リポジトリ取得
 
@@ -88,6 +92,7 @@ python _setup.py
 6. `frontend_web` の `npm install`
 7. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
 8. `command_hermes` の `.venv` 作成 / `uv sync --upgrade` / `aidiy_hermes` 登録試行
+9. `frontend_vscode` の依存導入 / VSIX 生成 / VS Code 拡張機能への配置
 
 補足:
 
@@ -118,6 +123,7 @@ python _start.py
 その後、選択したサービスを順に起動し、必要なポートの既存プロセスも自動で整理します。
 
 `command_hermes` は **常駐サーバーではないため `_start.py` の起動対象外** です。セットアップ後は、AIコードパネルから `aidiy_hermes` として呼び出すか、必要時に手動で起動します。
+`frontend_vscode` も常駐サービスではありません。セットアップ後は VS Code のコマンドパレットから **AiDiy: チャットを開く**を実行します。
 
 ### 個別起動
 
@@ -239,7 +245,7 @@ python _cleanup.py
 - `logs`
 - 必要に応じて SQLite DB
 
-`_cleanup.py` は `command_hermes` についても `.venv` / `venv` と Python キャッシュの削除対象を確認します。
+`_cleanup.py` は `command_hermes` の `.venv` / `venv` と Python キャッシュに加え、`frontend_vscode` の配置済み拡張機能、`node_modules`、`dist`、`out` も削除対象として確認します。
 常駐サービスを選択した場合は、対応する待受プロセス（Avatar は残留 Electron も含む）をファイル削除前に自動停止します。ルート `_start.py` の監視中でも選択対象は自動再起動から外れ、選択していないサービスは停止しません。
 
 クリーンアップ後は再度 `python _setup.py` が必要です。
@@ -252,6 +258,7 @@ python _cleanup.py
 - Claude 系のブラウザ自動操作を使う場合は `backend_tools` も起動してください。
 - `_start.py` 起動時のバックエンドは `uvicorn --reload` なしです。コード変更を即反映したい場合は個別起動か reboot 機構を使います。
 - `command_hermes` は `_start.py` では起動しません。`python _setup.py` で導入し、`aidiy_hermes` または `command_hermes\cli_main.py` を必要時に実行します。
+- `frontend_vscode` は `_start.py` の対象ではありません。拡張の設定や対応範囲は `frontend_vscode/README.md` を参照してください。
 - Web フロントの AI 画面ルートは **`/AiDiy`** です。
 - Avatar は Electron と Web の両モードがあります。Web モードでは認証情報を `sessionStorage` に保持します。
 - DB ファイルは通常 `_data/AiDiy/database.db` にあります。
@@ -268,4 +275,5 @@ python _cleanup.py
 6. [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
 7. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 8. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
-9. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)
+9. [frontend_vscode/AGENTS.md](./frontend_vscode/AGENTS.md)
+10. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

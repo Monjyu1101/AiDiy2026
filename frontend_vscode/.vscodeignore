@@ -1,0 +1,9 @@
+**/*
+!package.json
+!README.md
+!LICENSE
+!dist/extension.js
+!dist/webview.js
+!dist/THIRD_PARTY_NOTICES.txt
+!scripts/model-catalog.py
+!media/**

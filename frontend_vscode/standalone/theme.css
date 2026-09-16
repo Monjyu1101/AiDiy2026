@@ -1,0 +1,21 @@
+:root {
+  --vscode-sideBar-background:#181818; --vscode-foreground:#ddd;
+  --vscode-font-family:"Segoe UI","Yu Gothic UI",sans-serif; --vscode-font-size:13px;
+  --vscode-descriptionForeground:#aaa; --vscode-button-background:#0078d4;
+  --vscode-button-foreground:#fff; --vscode-button-hoverBackground:#026ec1;
+  --vscode-panel-border:#333; --vscode-input-background:#222; --vscode-input-foreground:#ddd;
+  --vscode-input-border:#444; --vscode-focusBorder:#0078d4; --vscode-textLink-foreground:#6cb6ff;
+  --vscode-toolbar-hoverBackground:#333; --vscode-textBlockQuote-background:#242424;
+  --vscode-textCodeBlock-background:#111; --vscode-errorForeground:#f88;
+  --vscode-editor-font-family:Consolas,monospace;
+}
+body { max-width:960px; margin:auto; }
+html { background:var(--vscode-sideBar-background); }
+#standalone-actions { display:block; }
+dialog { width:min(420px,90vw); color:var(--vscode-foreground); background:#222; border:1px solid #555; border-radius:8px; padding:20px; }
+dialog::backdrop { background:#0008; }
+dialog h2 { font-size:15px; margin:0 0 15px; }
+dialog label { margin:10px 0; }
+dialog select, dialog input { display:block; width:100%; background:#181818; color:#ddd; border:1px solid #555; padding:6px; font:inherit; margin-top:5px; }
+.picker-actions { display:flex; justify-content:flex-end; gap:8px; }
+.picker-error { color:var(--vscode-errorForeground); font-size:12px; }

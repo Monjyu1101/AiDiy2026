@@ -25,6 +25,7 @@
 - frontend_web/_cleanup.py     cleanup(choices)
 - frontend_avatar/_cleanup.py  cleanup(choices)
 - command_hermes/_cleanup.py   cleanup(choices)（ランチャー/PATH も解除）
+- frontend_vscode/_cleanup.py  cleanup(choices)（VS Code 拡張機能も解除）
 
 Usage:
     python _cleanup.py
@@ -161,10 +162,11 @@ def _remove_root_python_caches() -> None:
         remove_directory(pycache_dir, "__pycache__ (ルート)")
 
 
-def _run_folder_cleanup(folder: str, choices: dict) -> None:
-    """フォルダ別 `cleanup()` を実行し、import で残ったキャッシュを片付ける。"""
+def _run_folder_cleanup(folder: str, choices: dict) -> bool:
+    """フォルダ別 cleanup を実行し、明示的な False だけを失敗として返す。"""
     try:
-        _load_folder_module(folder).cleanup(choices)
+        result = _load_folder_module(folder).cleanup(choices)
+        return result is not False
     finally:
         _remove_folder_import_cache(folder)
 
@@ -196,7 +198,7 @@ SERVICE_CLEANUP_TARGETS = (
 # `_start.py` / `_cleanup.py` を import するフォルダ（= `__pycache__` が生成される）。
 IMPORT_CACHE_FOLDERS = tuple(
     folder for _choice_key, folder, _description, _service_names in SERVICE_CLEANUP_TARGETS
-) + (BACKEND_HERMES_PATH,)
+) + (BACKEND_HERMES_PATH, "frontend_vscode")
 
 # フォルダ別 `_cleanup.py` の担当外になる、ルート側の Python キャッシュ。
 ROOT_CACHE_SCAN_PATHS = ("scripts",)
@@ -416,6 +418,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "web":            False,
         "avatar":         False,
         "hermes":         False,
+        "vscode":         False,
         "hermes_envs":    {},
         "hermes_temp":    None,
     }
@@ -509,15 +512,18 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     f"  {BACKEND_HERMES_PATH}/temp フォルダを削除しますか？", default="y",
                 )
 
+    choices["vscode"] = ask_yes_no("フロントエンド(VS Code)をクリーンアップしますか？", default="y")
+
     return choices
 
 
 # ============================================================
 # メイン
 # ============================================================
-def execute_cleanup(base_dir: Path, choices: dict) -> None:
+def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     """選択済みの処理を、プロセス停止から順番に実行する。"""
     print_header("一括実行開始")
+    cleanup_errors: list[str] = []
 
     stop_all_services(choices)
 
@@ -578,6 +584,13 @@ def execute_cleanup(base_dir: Path, choices: dict) -> None:
         print_info("コマンド(hermes) のクリーンアップをスキップしました")
 
     print()
+    if choices["vscode"]:
+        if not _run_folder_cleanup("frontend_vscode", choices):
+            cleanup_errors.append("フロントエンド(VS Code)")
+    else:
+        print_info("フロントエンド(VS Code)のクリーンアップをスキップしました")
+
+    print()
     # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
     for folder in IMPORT_CACHE_FOLDERS:
         _remove_folder_import_cache(folder)
@@ -585,11 +598,20 @@ def execute_cleanup(base_dir: Path, choices: dict) -> None:
 
     print()
     print_header("クリーンアップ完了")
-    print_success("プロジェクトのクリーンアップが完了しました")
-    print_info("他の担当者にプロジェクトを渡す準備ができました")
+    if cleanup_errors:
+        print_warning("一部のクリーンアップを完了できませんでした:")
+        for location in cleanup_errors:
+            print_warning(f"  - {location}")
+    else:
+        print_success("プロジェクトのクリーンアップが完了しました")
+        print_info("他の担当者にプロジェクトを渡す準備ができました")
     print()
-    print_info("クリーンアップは正常終了しました。5秒後に終了します...")
+    if cleanup_errors:
+        print_warning("クリーンアップはエラー付きで終了しました。5秒後に終了します...")
+    else:
+        print_info("クリーンアップは正常終了しました。5秒後に終了します...")
     time.sleep(5)
+    return not cleanup_errors
 
 
 def main():
@@ -607,6 +629,7 @@ def main():
     print_info("  7. フロントエンド(Web)")
     print_info("  8. フロントエンド(Avatar)")
     print_info("  9. コマンド(hermes)")
+    print_info(" 10. フロントエンド(VS Code)")
     print()
 
     choices = collect_cleanup_choices(base_dir)
@@ -615,7 +638,9 @@ def main():
         return
 
     with cleanup_stop_request(choices):
-        execute_cleanup(base_dir, choices)
+        cleanup_ok = execute_cleanup(base_dir, choices)
+    if not cleanup_ok:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

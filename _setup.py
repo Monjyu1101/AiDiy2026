@@ -23,6 +23,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 - frontend_web/_setup.py     フロントエンド(Web)
 - frontend_avatar/_setup.py  フロントエンド(Avatar)
 - command_hermes/_setup.py   コマンド(hermes)
+- frontend_vscode/_setup.py  フロントエンド(VS Code)
 
 Usage:
     python _setup.py
@@ -137,6 +138,7 @@ IMPORT_CACHE_FOLDERS = (
     "frontend_web",
     "frontend_avatar",
     "command_hermes",
+    "frontend_vscode",
 )
 
 
@@ -603,6 +605,7 @@ def collect_setup_choices() -> dict | None:
         "web":                   False,
         "avatar":                False,
         "hermes":                False,
+        "vscode":                False,
         "continue_on_error":     False,
     }
 
@@ -630,6 +633,7 @@ def collect_setup_choices() -> dict | None:
     choices["web"] = ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y")
     choices["avatar"] = ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y")
     choices["hermes"] = ask_yes_no("コマンド(hermes)のセットアップを実行しますか？", default="y")
+    choices["vscode"] = ask_yes_no("フロントエンド(VS Code)のセットアップを実行しますか？", default="y")
 
     choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="y")
 
@@ -651,6 +655,7 @@ def main():
     print_info("  6. フロントエンド(Web)")
     print_info("  7. フロントエンド(Avatar)")
     print_info("  8. コマンド(hermes)")
+    print_info("  9. フロントエンド(VS Code)")
     print()
 
     ensure_prerequisites()
@@ -769,6 +774,17 @@ def main():
         print_warning("コマンド(hermes)のセットアップをスキップしました。")
 
     print()
+    if choices["vscode"]:
+        vscode_mod = _load_folder_module("frontend_vscode")
+        if not vscode_mod.setup(choices):
+            error_locations.append("フロントエンド(VS Code)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
+    else:
+        print_warning("フロントエンド(VS Code)のセットアップをスキップしました。")
+
+    print()
     remove_folder_import_caches()
 
     print_setup_summary(error_locations)
@@ -786,6 +802,7 @@ def main():
         print_info("    Hermes起動: aidiy_hermes.cmd または cd command_hermes && .venv/Scripts/python.exe cli_main.py")
     else:
         print_info("    Hermes起動: aidiy_hermes または cd command_hermes && .venv/bin/python cli_main.py")
+    print_info("    VS Code   : コマンドパレットから「AiDiy: チャットを開く」")
 
     print()
     print_success("セットアップは正常終了しました。")

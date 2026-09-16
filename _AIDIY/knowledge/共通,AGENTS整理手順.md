@@ -1,6 +1,6 @@
 # AGENTS.md 整理手順
 
-> 文書: `共通,AGENTS整理手順.md` | 実装: `AGENTS.md`, `CLAUDE.md`, `backend_server/AGENTS.md`, `frontend_web/AGENTS.md`
+> 文書: `共通,AGENTS整理手順.md` | 実装: `AGENTS.md`, `CLAUDE.md`, `backend_server/AGENTS.md`, `frontend_web/AGENTS.md`, `frontend_vscode/AGENTS.md`
 
 ## このメモを使う場面
 
@@ -44,6 +44,7 @@
 | `backend_tools/AGENTS.md` | backend_tools の概要、構成、実装入口。 |
 | `frontend_web/AGENTS.md` | frontend_web の概要、構成、実装入口。 |
 | `frontend_avatar/AGENTS.md` | frontend_avatar の概要、構成、実装入口。 |
+| `frontend_vscode/AGENTS.md` | frontend_vscode の概要、構成、実装入口。 |
 | `docs/` | 業務システム機能追加の手順。 |
 | `_AIDIY/knowledge/_index.md` | コアシステム機能調整や再利用 HowTo の入口。 |
 
@@ -58,8 +59,9 @@
 5. `backend_tools/AGENTS.md` — MCP 実装詳細
 6. `frontend_web/AGENTS.md` — Web UI 実装詳細
 7. `frontend_avatar/AGENTS.md` — Avatar UI 実装詳細
-8. `_AIDIY/knowledge/_index.md` — コアシステム機能調整の HowTo 入口
-9. `docs/` — 業務システム機能追加の手順（HTML）
+8. `frontend_vscode/AGENTS.md` — VS Code チャット拡張の実装詳細
+9. `_AIDIY/knowledge/_index.md` — コアシステム機能調整の HowTo 入口
+10. `docs/` — 業務システム機能追加の手順（HTML）
 
 各 AGENTS.md の記述より、実際のコードを最優先の同期元とします。
 docs と実装が食い違う場合は、現行実装を確認したうえで「現行実装では」と明記します。

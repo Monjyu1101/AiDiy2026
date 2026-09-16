@@ -1,0 +1,84 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } = require('node:fs');
+const { join, resolve, sep } = require('node:path');
+const { tmpdir } = require('node:os');
+const { CLI実行, 会話引数, 起動解決 } = require('../out/runner.cjs');
+const fake = resolve('test/fake-cli.cjs');
+const root = resolve('.');
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+function cleanup(dir) {
+  assert.ok(resolve(dir).startsWith(resolve(tmpdir()) + sep + 'aidiy-hermes-'));
+  rmSync(dir, { recursive: true, force: true });
+}
+function run(mode, extra = [], options = {}) {
+  return CLI実行({ 起動: { 実行ファイル: process.execPath, 引数: [fake, mode, ...extra] }, 作業フォルダ: root, 本文: '', 引数: [], 制限時間: 10000, ...options });
+}
+test('日本語長文を stdin で渡し、進捗・回答・会話IDを分離する', async () => {
+  const 本文 = '日本語 & | " ` $() %PATH%\n'.repeat(8000);
+  const 引数 = 会話引数('custom', 'model with spaces & symbols', 8, 'old-session');
+  const lines = [];
+  const result = await run('echo', [], { 本文, 引数, 進捗: line => lines.push(line) }).完了;
+  const answer = JSON.parse(result.回答);
+  assert.equal(answer.input, 本文);
+  assert.deepEqual(answer.args, 引数);
+  assert.equal(answer.cwd, root); assert.equal(answer.envCwd, root);
+  assert.equal(result.セッションID, 'test-session-001');
+  assert.equal(result.終了コード, 0);
+  assert.deepEqual(lines, ['[step] 日本語の進捗']);
+  assert.ok(!引数.includes('--yolo'));
+});
+test('非ゼロ終了と stderr を呼び出し元へ返す', async () => {
+  const result = await run('fail', [], { 本文: 'abc'.repeat(100000) }).完了;
+  assert.equal(result.終了コード, 7);
+  assert.match(result.ログ, /authentication failed/);
+});
+test('実行ファイルが存在しない場合に起動エラーを返す', async () => {
+  await assert.rejects(CLI実行({ 起動: { 実行ファイル: join(root, 'does-not-exist.exe'), 引数: [] }, 作業フォルダ: root, 本文: 'hello', 引数: [], 制限時間: 5000 }).完了, /CLI を起動できません/);
+});
+test('AiDiy .cmd の絶対パスを読み取り、シェルを経由せず起動できる', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aidiy-hermes-test-'));
+  try {
+    const cmd = join(dir, 'aidiy_hermes.cmd');
+    writeFileSync(cmd, `@echo off\nset "PY=${process.execPath}"\nset "CLI=${fake}"\n`);
+    assert.deepEqual(起動解決(cmd), { 実行ファイル: process.execPath, 引数: [fake] });
+    writeFileSync(cmd, '@echo off\nset "PY=%EVIL%"\nset "CLI=relative.py"\n');
+    assert.throws(() => 起動解決(cmd), /AiDiy の起動形式/);
+  } finally { cleanup(dir); }
+});
+for (const timeout of [false, true]) {
+  test(timeout ? 'タイムアウトで子孫プロセスも停止する' : '停止操作で子孫プロセスも停止する', { timeout: 15000 }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aidiy-hermes-process-'));
+    const pidFile = join(dir, 'pids.json');
+    const job = run('wait', [pidFile], { 制限時間: timeout ? 2000 : 10000 });
+    try {
+      for (let i = 0; i < 100 && !existsSync(pidFile); i++) await pause(30);
+      assert.ok(existsSync(pidFile));
+      const pids = JSON.parse(readFileSync(pidFile, 'utf8'));
+      if (!timeout) job.停止();
+      const result = await job.完了;
+      assert.match(result.停止理由, timeout ? /制限時間/ : /停止しました/);
+      for (const pid of Object.values(pids)) {
+        let alive = true;
+        for (let i = 0; i < 40; i++) {
+          try { process.kill(pid, 0); await pause(50); } catch { alive = false; break; }
+        }
+        assert.equal(alive, false, `プロセス ${pid} が残留しています`);
+      }
+    } finally { job.停止(); cleanup(dir); }
+  });
+}
+test('AIコードと同じ開始・stdout/stderrストリーム・終了・正式回答の順序で返す', async () => {
+  const { コード要求実行 } = require('../out/protocol.cjs');
+  const packets = [];
+  const result = await コード要求実行({ セッションID: 'ui-session', チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: 'テスト' }, {
+    起動: { 実行ファイル: process.execPath, 引数: [fake, 'echo'] }, 作業フォルダ: root, 引数: [], 制限時間: 10000
+  }, packet => packets.push(packet)).完了;
+  assert.equal(packets[0].メッセージ内容, '<<< 処理開始 >>>');
+  assert.ok(packets.some(p => p.出力元 === 'stderr' && p.メッセージ内容.includes('[step]')));
+  assert.ok(packets.some(p => p.出力元 === 'stdout'));
+  assert.equal(packets.at(-2).メッセージ内容, '<<< 処理終了 >>>');
+  assert.equal(packets.at(-1).メッセージ識別, 'output_text');
+  assert.equal(packets.at(-1).メッセージ内容, result.回答);
+  assert.ok(packets.every(p => p.セッションID === 'ui-session' && p.チャンネル === 'code1'));
+});
