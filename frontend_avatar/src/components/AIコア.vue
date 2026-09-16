@@ -525,18 +525,18 @@ defineExpose({ 字幕追加 })
         :controls-visible="UI表示中"
       />
 
-      <!-- デジ+アナ時計: 金色デジタル時計＋アナログ時計＋xneko の重ね合わせ -->
+      <!-- デジ+アナ時計: アナログ時計＋金色デジタル時計＋xneko の順に重ね合わせ -->
       <template v-if="デジアナ時計表示中">
+        <component
+          :is="アナログ時計"
+          class="display-option-layer"
+          :controls-visible="UI表示中"
+        />
         <component
           :is="デジタル時計"
           class="display-option-layer カレンダーα時計"
           :controls-visible="UI表示中"
           :前景色="'#FFB400'"
-        />
-        <component
-          :is="アナログ時計"
-          class="display-option-layer"
-          :controls-visible="UI表示中"
         />
         <component
           :is="xneko"
