@@ -32,6 +32,7 @@
 - Webview では Markdown の HTML と外部画像を無効のまま維持し、外部リンクは `http` / `https` のみにする。
 - `webview.ts` を変えた場合は VS Code 拡張モードと単独試用モードの両方を確認する。
 - Hermes の Provider / モデル一覧を複製せず、`scripts/model-catalog.py` から既存 picker を再利用する。
+- 外部 CLI Provider のモデルが `auto` の場合は `--model auto` を渡さず、Copilot / Codex / Claude CLI 自身の既定モデル選択へ任せる。
 
 ## セットアップと配置
 
@@ -66,6 +67,7 @@ npm run package
 - TypeScript の型エラーがない。
 - 日本語長文を stdin で渡せる。
 - stdout の正式回答、stderr の進捗、Hermes セッション ID を分離できる。
+- `copilot-cli`、`codex-cli`、`claude-code` が `-Q --oneshot-stdin` でも Hermes の API Provider 解決へ入らず、各 CLI を直接起動する。
 - 非ゼロ終了、起動エラー、停止、タイムアウトを呼び出し元へ返せる。
 - Windows の AiDiy `.cmd` をシェルなしで解決できる。
 - packet が開始、進捗、終了または中断、正式回答の順になる。

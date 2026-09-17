@@ -74,7 +74,7 @@ import uuid
 import textwrap
 from collections import deque
 from urllib.parse import unquote, urlparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext, redirect_stdout
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Mapping, Tuple
@@ -5246,7 +5246,9 @@ def _aidiy_cli_build_command(
         return common + ["--continue", "-p", one_line]
 
     if cli_slug == "copilot-cli":
-        common = [cmd_path]
+        # --silent keeps stdout limited to the final agent response so the
+        # VS Code runner can treat stderr as progress/diagnostics.
+        common = [cmd_path, "--silent"]
         if permissions != "none":
             common.append("--allow-all-tools")
         if repo_path:
@@ -12573,7 +12575,12 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 providers.append(entry)
         return providers
 
-    def _dispatch_aidiy_cli_subprocess(self, message, images: list = None) -> Optional[str]:
+    def _dispatch_aidiy_cli_subprocess(
+        self,
+        message,
+        images: list = None,
+        quiet_output: bool = False,
+    ) -> Optional[str]:
         # CLI providers (claude-code / copilot-cli / gemini-cli / codex-cli /
         # opencode) are handled by spawning the external CLI binary directly,
         # rather than by routing through the Hermes agent loop. Mirrors the
@@ -12583,6 +12590,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         cli_slug = (getattr(self, "_aidiy_provider_slug", "") or "").lower()
         if not cli_slug:
             return None
+        self._aidiy_cli_last_exit_code = None
+        self._aidiy_cli_last_stderr = ""
 
         if isinstance(message, list):
             try:
@@ -12633,11 +12642,13 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 env=os.environ.copy(),
             )
         except FileNotFoundError:
+            self._aidiy_cli_last_exit_code = 127
             err = f"CLI binary not found: {cmd[0]}"
             _cprint(f"  {err}")
             self.conversation_history.append({"role": "assistant", "content": err})
             return err
         except Exception as exc:
+            self._aidiy_cli_last_exit_code = 1
             err = f"CLI spawn failed: {exc}"
             _cprint(f"  {err}")
             self.conversation_history.append({"role": "assistant", "content": err})
@@ -12669,7 +12680,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                     last_output_time[0] = time.time()
                     text = line.rstrip("\r\n")
                     output_lines.append(text)
-                    _cprint(text)
+                    if not quiet_output:
+                        _cprint(text)
             except Exception as exc:
                 logging.warning("CLI stdout read error: %s", exc)
 
@@ -12720,7 +12732,10 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             _cprint(msg)
             output_lines.append(f"[idle-timeout] no output for {idle_timeout_sec}s — aborted")
 
-        self._aidiy_cli_session_started[cli_slug] = True
+        exit_code = 124 if timed_out[0] else (proc.returncode if proc.returncode is not None else 1)
+        self._aidiy_cli_last_exit_code = exit_code
+        self._aidiy_cli_last_stderr = "\n".join(stderr_lines).strip()
+        self._aidiy_cli_session_started[cli_slug] = exit_code == 0
 
         final = "\n".join(output_lines).strip() or "(no output)"
 
@@ -12729,12 +12744,13 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # Real-time stdout/stderr above is preserved; this is an additional
         # consolidated rendering that the agent layer (history, /save, etc.)
         # also treats as a normal assistant turn.
-        try:
-            self._reset_stream_state()
-            self._emit_stream_text(final + "\n")
-            self._flush_stream()
-        except Exception as exc:
-            logging.warning("CLI final render failed: %s", exc)
+        if not quiet_output:
+            try:
+                self._reset_stream_state()
+                self._emit_stream_text(final + "\n")
+                self._flush_stream()
+            except Exception as exc:
+                logging.warning("CLI final render failed: %s", exc)
 
         self.conversation_history.append({"role": "assistant", "content": final})
         return final
@@ -22948,6 +22964,57 @@ class _OneShotStderrProgress:
         self._emit("error" if failed else "done", "AI応答失敗" if failed else "AI応答完了")
 
 
+def _configure_aidiy_cli_provider(
+    cli: "HermesCLI",
+    provider: str | None,
+    *,
+    resumed: bool = False,
+) -> bool:
+    """外部 CLI provider を Hermes の API provider 解決から切り離す。"""
+    slug = (provider or "").strip().lower()
+    if not provider_entry_is_cli(slug):
+        return False
+    entry = cli._get_aidiy_provider_entry(slug, include_models=False)
+    if not entry or not entry.get("is_cli"):
+        return False
+    cli._apply_aidiy_provider_model(entry, "auto")
+    if resumed:
+        cli._aidiy_cli_session_started[slug] = True
+    return True
+
+
+def _run_aidiy_cli_quiet(
+    cli: "HermesCLI",
+    query: str,
+    images: list | None = None,
+) -> int:
+    """外部 CLI の進捗を stderr、完成回答だけを stdout へ出す。"""
+    progress = _OneShotStderrProgress()
+    progress.waiting_for_ai()
+    with redirect_stdout(sys.stderr):
+        response = cli._dispatch_aidiy_cli_subprocess(
+            query,
+            images=images,
+            quiet_output=True,
+        )
+
+    raw_exit_code = getattr(cli, "_aidiy_cli_last_exit_code", None)
+    exit_code = raw_exit_code if isinstance(raw_exit_code, int) and raw_exit_code >= 0 else 1
+    has_response = bool(response and response != "(no output)")
+    failed = exit_code != 0 or not has_response
+    if failed:
+        if has_response:
+            print(response, file=sys.stderr)
+        elif exit_code == 0:
+            print("External CLI completed without a response.", file=sys.stderr)
+        exit_code = exit_code or 1
+    else:
+        print(response)
+    progress.finished(failed=failed)
+    print(f"\nsession_id: {cli.session_id}", file=sys.stderr)
+    return exit_code
+
+
 def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str) -> None:
     """Drive a kanban goal_mode worker through the Ralph-style goal loop.
 
@@ -23284,22 +23351,30 @@ def main(
 
     # Create CLI instance
     try:
-        cli = HermesCLI(
-            model=model,
-            toolsets=toolsets_list,
-            provider=provider,
-            reasoning=reasoning,
-            api_key=api_key,
-            base_url=base_url,
-            max_turns=max_turns,
-            run_budget=run_budget,
-            verbose=verbose,
-            compact=compact,
-            resume=resume,
-            checkpoints=checkpoints,
-            pass_session_id=pass_session_id,
-            ignore_rules=ignore_rules,
-        )
+        # Quiet mode reserves stdout for the final answer. Constructor-time
+        # warnings (for example toolset discovery) are operational logs.
+        with (redirect_stdout(sys.stderr) if quiet else nullcontext()):
+            cli = HermesCLI(
+                model=model,
+                toolsets=toolsets_list,
+                provider=provider,
+                reasoning=reasoning,
+                api_key=api_key,
+                base_url=base_url,
+                max_turns=max_turns,
+                run_budget=run_budget,
+                verbose=verbose,
+                compact=compact,
+                resume=resume,
+                checkpoints=checkpoints,
+                pass_session_id=pass_session_id,
+                ignore_rules=ignore_rules,
+            )
+            cli_provider_configured = _configure_aidiy_cli_provider(
+                cli,
+                provider,
+                resumed=bool(resume),
+            )
     except ImportError as e:
         # Direct `python cli.py` / `python -m cli` bypasses cmd_chat's
         # ImportError handler. Same mixed-tree class as #96900.
@@ -23308,6 +23383,10 @@ def main(
         if emit_partial_update_hint(e):
             sys.exit(1)
         raise
+
+    if provider_entry_is_cli(provider or "") and not cli_provider_configured:
+        print(f"External CLI provider is not available: {provider}", file=sys.stderr)
+        sys.exit(2)
 
     if parsed_skills:
         # Load the skill payloads in the background: skill_view walks the
@@ -23484,6 +23563,10 @@ def main(
             sys.exit(1)
         try:
             query, single_query_images = _collect_query_images(query, image)
+            if quiet and provider_entry_is_cli(
+                getattr(cli, "_aidiy_provider_slug", "") or ""
+            ):
+                sys.exit(_run_aidiy_cli_quiet(cli, query, single_query_images))
             # Kanban workers spawn with ``hermes chat -q "work kanban task <id>"``;
             # the actual task description lives in the task body. Mirror the
             # gateway/CLI behaviour for inbound images by scanning the body for
@@ -23531,7 +23614,6 @@ def main(
                 # Guard the stdout contract against legacy provider/tool code
                 # that still uses bare print(). The explicit final response is
                 # emitted after these redirect scopes have closed.
-                from contextlib import redirect_stdout
                 with redirect_stdout(sys.stderr):
                     credentials_ready = cli._ensure_runtime_credentials()
                 if credentials_ready:
@@ -24011,8 +24093,11 @@ def cli_entry(argv: list[str] | None = None) -> int:
     # AIコードパネルで CODE_AI<N>_MODEL="auto" を選んだ場合もこの経路を通る。
     # ここで AiDiy_key.json の CODE_AIDIY_HERMES_MODEL を補完すると、画面上は
     # auto なのに特定モデル（OAuth 未認証時は FreeAI）を指定した起動になってしまう。
-    if args.provider:
+    cli_provider = provider_entry_is_cli(args.provider or "")
+    if args.provider and not cli_provider:
         defaults = _load_aidiy_hermes_provider_defaults(args.provider)
+    elif args.provider:
+        defaults = {}
     elif args.model:
         defaults = _load_aidiy_hermes_defaults(args.model)
     else:
@@ -24023,6 +24108,8 @@ def cli_entry(argv: list[str] | None = None) -> int:
     base_url = args.base_url or defaults.get("base_url")
     api_key = args.api_key or defaults.get("api_key")
     model = args.model if args.provider and args.model else (defaults.get("model") or args.model)
+    if cli_provider and (model or "").strip().lower() == "auto":
+        model = None
 
     try:
         main(

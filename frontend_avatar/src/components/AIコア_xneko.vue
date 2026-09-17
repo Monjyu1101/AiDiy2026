@@ -75,6 +75,9 @@ let nekoPosY = 32
 let mousePosX = 180
 let mousePosY = 160
 let noMouseFrames = 0  // マウス未操作フレーム数
+let autonomousTargetActive = false
+let lastElectronMouseX: number | null = null
+let lastElectronMouseY: number | null = null
 
 const NO_MOUSE_IDLE = 150  // 15秒後にマウスをネコ頭上へ
 const SNAPSHOT_INTERVAL_MS = 33
@@ -109,25 +112,24 @@ const resetIdleAnimation = () => {
   isSleeping.value   = false
 }
 
-const wakeUpAndRun = (width: number, height: number) => {
+const wakeUpAndRoam = (width: number, height: number) => {
   resetIdleAnimation()
   idleTime = 0
-  noMouseFrames = 0
-  const roll = Math.random()
-  const midY = CAT_MARGIN + Math.random() * (height - CAT_MARGIN * 2)
-  if (roll < 0.33) {
-    // 左壁へ: マウスを移動領域の外（左）に置く → ネコは左境界で止まる → カキかき
-    mousePosX = 0
-    mousePosY = midY
-  } else if (roll < 0.66) {
-    // 右壁へ: マウスを移動領域の外（右）に置く → ネコは右境界で止まる → カキかき
-    mousePosX = width
-    mousePosY = midY
-  } else {
-    // 内部ランダム（移動領域内）
-    mousePosX = CAT_MARGIN + Math.random() * (width  - CAT_MARGIN * 2)
-    mousePosY = CAT_MARGIN + Math.random() * (height - CAT_MARGIN * 2)
+  noMouseFrames = NO_MOUSE_IDLE
+  autonomousTargetActive = true
+  // マウス停止中の自動起床では壁の外を目標にしない。
+  // 画面内を少し歩いたら、また「たたずみ → zzz」へ戻る。
+  mousePosX = catMinX(width) + Math.random() * Math.max(0, catMaxX(width) - catMinX(width))
+  mousePosY = catMinY(height) + Math.random() * Math.max(0, catMaxY(height) - catMinY(height))
+}
+
+const registerPointerActivity = () => {
+  autonomousTargetActive = false
+  if (idleAnimation === 'sleeping') {
+    resetIdleAnimation()
   }
+  idleTime = 0
+  noMouseFrames = 0
 }
 
 const idle = (width: number, height: number) => {
@@ -156,7 +158,7 @@ const idle = (width: number, height: number) => {
       sleepFrames += 1
       setSprite('sleeping', Math.floor(idleAnimationFrame / 4))
       if (idleAnimationFrame > 192) idleAnimationFrame = 8
-      if (sleepFrames >= SLEEP_AFTER) { wakeUpAndRun(width, height); return }
+      if (sleepFrames >= SLEEP_AFTER) { wakeUpAndRoam(width, height); return }
       break
     case 'scratchWallN':
     case 'scratchWallS':
@@ -189,7 +191,7 @@ const frame = () => {
 
   // マウス未操作が15秒続いたらネコ頭上をマウス位置とみなす
   noMouseFrames += 1
-  if (noMouseFrames >= NO_MOUSE_IDLE) {
+  if (noMouseFrames >= NO_MOUSE_IDLE && !autonomousTargetActive) {
     mousePosX = nekoPosX
     mousePosY = nekoPosY
   }
@@ -207,6 +209,12 @@ const frame = () => {
   const stuckAtWall = stuckLeft || stuckRight || stuckTop || stuckBot
 
   if (distance < nekoSpeed || distance < 48 || stuckAtWall) {
+    if (autonomousTargetActive) {
+      autonomousTargetActive = false
+      mousePosX = nekoPosX
+      mousePosY = nekoPosY
+      noMouseFrames = NO_MOUSE_IDLE
+    }
     idle(width, height)
     return
   }
@@ -236,9 +244,25 @@ const updateElectronPointerTarget = async () => {
   snapshotLoading = true
   try {
     const snapshot = await window.desktopApi.getWindowPointerSnapshot(windowRole)
-    mousePosX = snapshot.mouse.x - (snapshot.bounds.x + stageRect.left)
-    mousePosY = snapshot.mouse.y - (snapshot.bounds.y + stageRect.top)
-    noMouseFrames = 0
+    const localMouseX = snapshot.mouse.x - (snapshot.bounds.x + stageRect.left)
+    const localMouseY = snapshot.mouse.y - (snapshot.bounds.y + stageRect.top)
+    const pointerMoved = lastElectronMouseX === null
+      || lastElectronMouseY === null
+      || snapshot.mouse.x !== lastElectronMouseX
+      || snapshot.mouse.y !== lastElectronMouseY
+    lastElectronMouseX = snapshot.mouse.x
+    lastElectronMouseY = snapshot.mouse.y
+
+    // IPC の定期取得そのものはマウス操作ではない。実座標が変わった時だけ
+    // 待機を解除し、停止中は「壁かき → たたずみ → zzz」の流れを維持する。
+    if (pointerMoved) {
+      mousePosX = localMouseX
+      mousePosY = localMouseY
+      registerPointerActivity()
+    } else if (noMouseFrames < NO_MOUSE_IDLE) {
+      mousePosX = localMouseX
+      mousePosY = localMouseY
+    }
   } catch {
     // 取得失敗時は Web 用 pointermove で最後に得た位置を使い続ける。
   } finally {
@@ -266,7 +290,7 @@ const handlePointerMove = (event: PointerEvent) => {
   // マウスはステージ全体を追跡（移動領域外も OK）
   mousePosX = event.clientX - stageRect.left
   mousePosY = event.clientY - stageRect.top
-  noMouseFrames = 0
+  registerPointerActivity()
 }
 
 const handleResize = () => {
@@ -291,6 +315,10 @@ const resetToStage = () => {
   mousePosY = clamp(height * 0.40, catMinY(height), catMaxY(height))
   frameCount = 0
   idleTime   = 0
+  noMouseFrames = 0
+  autonomousTargetActive = false
+  lastElectronMouseX = null
+  lastElectronMouseY = null
   resetIdleAnimation()
   applyPosition()
   setSprite('idle', 0)

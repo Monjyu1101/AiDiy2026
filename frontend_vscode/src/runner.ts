@@ -53,7 +53,8 @@ export function 起動解決(cliPath: string, pythonPath = '', 作業フォル�
 export function 会話引数(provider: string, model: string, maxTurns: number, セッションID?: string): string[] {
   const args = ['-Q', '--oneshot-stdin', '--max-turns', String(maxTurns)];
   if (provider.trim()) args.push('--provider', provider.trim());
-  if (model.trim()) args.push('--model', model.trim());
+  const modelId = model.trim();
+  if (modelId && modelId.toLowerCase() !== 'auto') args.push('--model', modelId);
   if (セッションID) args.push('--resume', セッションID);
   return args;
 }

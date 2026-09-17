@@ -28,6 +28,12 @@ test('日本語長文を stdin で渡し、進捗・回答・会話IDを分離�
   assert.deepEqual(lines, ['[step] 日本語の進捗']);
   assert.ok(!引数.includes('--yolo'));
 });
+test('モデル自動選択では --model を付けず CLI 既定へ任せる', () => {
+  for (const model of ['', 'auto', ' AUTO ']) {
+    const 引数 = 会話引数('copilot-cli', model, 30);
+    assert.deepEqual(引数, ['-Q', '--oneshot-stdin', '--max-turns', '30', '--provider', 'copilot-cli']);
+  }
+});
 test('非ゼロ終了と stderr を呼び出し元へ返す', async () => {
   const result = await run('fail', [], { 本文: 'abc'.repeat(100000) }).完了;
   assert.equal(result.終了コード, 7);
