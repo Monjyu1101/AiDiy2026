@@ -55,6 +55,14 @@ elif self.code_ai == "antigravity_cli":
 - 初回: `agy -p "プロンプト"`
 - 継続: `agy -p "プロンプト" -c`
 
+## stdout / stderr の役割
+
+- stdout: 正式回答として収集し、実行完了後に `output_text` で返す
+- stderr: 進捗・警告として `output_stream` へ随時送る
+- stdout は `output_stream` へ送らない。途中表示と最終回答の二重表示を防ぐため
+- stdout が空でも stderr を正式回答へ転用しない。stderr の内容はストリームと `last_stderr_output` に残る
+- `antigravity_cli` はコンソール直書きを避けるため専用の `_antigravity実行()` を使うが、出力の役割は `copilot_cli` / `opencode_cli` と同じ
+
 ## 注意点
 
 - `agy` は Go の標準フラグ解析機能を使用しており、オプションフラグの解析が厳密です。位置引数やフラグの指定順序が正しくない場合、引数解析エラー (`flag provided but not defined` 等) になる可能性があるため注意が必要です。

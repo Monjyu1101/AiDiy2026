@@ -31,6 +31,7 @@
 - ワークスペース未信頼時、仮想ワークスペース、Web 版では CLI を実行しない。
 - Webview では Markdown の HTML と外部画像を無効のまま維持し、外部リンクは `http` / `https` のみにする。
 - `webview.ts` を変えた場合は VS Code 拡張モードと単独試用モードの両方を確認する。
+- Provider / モデル選択は VS Code 上部の Quick Pick ではなく、`media/chat.html` のチャットパネル内ダイアログで行う。候補は `chooseModel` / `modelCatalog` / `modelCatalogError`、確定値は `setModel` で Webview と実行層の間を受け渡す。
 - Hermes の Provider / モデル一覧を複製せず、`scripts/model-catalog.py` から既存 picker を再利用する。
 - 外部 CLI Provider のモデルが `auto` の場合は `--model auto` を渡さず、Copilot / Codex / Claude CLI 自身の既定モデル選択へ任せる。
 - `antigravity-cli` は Hermes の外部 CLI Provider 一覧から取得する。`xai-oauth` は API Provider のカタログ入口に含め、`grok-4.6` を Hermes の curated model 一覧から取得する。

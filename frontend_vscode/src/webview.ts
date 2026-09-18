@@ -7,7 +7,15 @@ const element = <T extends HTMLElement>(id: string) => document.getElementById(i
 const prompt = element<HTMLTextAreaElement>('prompt');
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
+const modelPicker = element<HTMLDialogElement>('model-picker');
+const providerSelect = element<HTMLSelectElement>('provider-select');
+const modelSelect = element<HTMLSelectElement>('model-select');
+const customModel = element<HTMLInputElement>('custom-model');
+const customModelLabel = element<HTMLLabelElement>('custom-model-label');
+const modelPickerStatus = element<HTMLParagraphElement>('model-picker-status');
+const applyModel = element<HTMLButtonElement>('apply-model');
 let provider = '', model = '';
+let catalogProvider = '';
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 // 外部画像の読み込みやコマンド URI の実行を回答から発生させない。
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
@@ -43,6 +51,33 @@ const コンソール演出 = (content: HTMLDivElement, text: string, key: strin
 const ボタン更新 = () => {
   element<HTMLButtonElement>('send').disabled = !入力許可 || 実行中 || 送信待ち || !prompt.value.trim();
 };
+const 選択状態更新 = () => {
+  const custom = modelSelect.value === '__manual__';
+  customModel.hidden = customModelLabel.hidden = !custom;
+  applyModel.disabled = providerSelect.disabled || modelSelect.disabled || (custom && !customModel.value.trim());
+};
+const 候補取得 = (targetProvider: string) => {
+  catalogProvider = targetProvider;
+  providerSelect.disabled = true; modelSelect.disabled = true; applyModel.disabled = true;
+  modelPickerStatus.classList.remove('error');
+  modelPickerStatus.textContent = targetProvider ? 'モデルを取得中…' : 'プロバイダを取得中…';
+  post('chooseModel', { provider: targetProvider });
+};
+const 自動選択表示 = () => {
+  modelSelect.replaceChildren(new Option('CLI の設定を使用', ''));
+  modelSelect.disabled = true;
+  modelPickerStatus.textContent = 'プロバイダとモデルは CLI の設定に任せます。';
+  applyModel.disabled = false;
+  customModel.hidden = customModelLabel.hidden = true;
+};
+const モデル選択を開く = () => {
+  if (modelButton.disabled || modelPicker.open) return;
+  providerSelect.replaceChildren(new Option('取得中…', ''));
+  modelSelect.replaceChildren(new Option('取得中…', ''));
+  customModel.value = model;
+  modelPicker.showModal();
+  候補取得('');
+};
 prompt.addEventListener('input', () => { vscode.setState({ 下書き: prompt.value }); ボタン更新(); });
 element('composer').addEventListener('submit', event => {
   event.preventDefault();
@@ -56,9 +91,17 @@ prompt.addEventListener('keydown', event => {
   }
 });
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
-for (const [id, type] of Object.entries({ 'choose-model': 'chooseModel', 'remove-attachment': 'removeAttachment' })) {
-  element(id).addEventListener('click', () => post(type));
-}
+modelButton.addEventListener('click', モデル選択を開く);
+element('remove-attachment').addEventListener('click', () => post('removeAttachment'));
+providerSelect.addEventListener('change', () => providerSelect.value ? 候補取得(providerSelect.value) : 自動選択表示());
+modelSelect.addEventListener('change', 選択状態更新);
+customModel.addEventListener('input', 選択状態更新);
+applyModel.addEventListener('click', () => {
+  const selectedModel = modelSelect.value === '__manual__' ? customModel.value.trim() : modelSelect.value;
+  if (modelSelect.value === '__manual__' && !selectedModel) { customModel.focus(); return; }
+  post('setModel', { provider: providerSelect.value, model: selectedModel });
+  modelPicker.close();
+});
 document.addEventListener('click', event => {
   const link = (event.target as HTMLElement).closest('a');
   if (!link) return;
@@ -68,6 +111,39 @@ document.addEventListener('click', event => {
 });
 window.addEventListener('message', event => {
   const state = event.data;
+  if (state.type === 'modelCatalog') {
+    if (!modelPicker.open || state.provider !== catalogProvider) return;
+    const rows: { id: string; label: string }[] = Array.isArray(state.items) ? state.items.filter((item: unknown): item is { id: string; label: string } => {
+      if (!item || typeof item !== 'object') return false;
+      const row = item as Record<string, unknown>;
+      return typeof row.id === 'string' && typeof row.label === 'string';
+    }) : [];
+    if (!state.provider) {
+      providerSelect.replaceChildren(new Option('自動（CLI の設定）', ''), ...rows.map(item => new Option(item.label, item.id)));
+      providerSelect.value = provider;
+      if (providerSelect.selectedIndex < 0) providerSelect.selectedIndex = 0;
+      providerSelect.disabled = false;
+      if (providerSelect.value) 候補取得(providerSelect.value); else 自動選択表示();
+      return;
+    }
+    modelSelect.replaceChildren(new Option('既定モデル（プロバイダの設定）', ''), ...rows.map(item => new Option(item.label, item.id)));
+    if (state.provider === provider && model && !rows.some(item => item.id === model)) modelSelect.add(new Option(`${model}（現在のモデル）`, model));
+    modelSelect.add(new Option('一覧にないモデル ID を入力…', '__manual__'));
+    modelSelect.value = state.provider === provider ? model : '';
+    customModel.value = state.provider === provider ? model : '';
+    if (modelSelect.selectedIndex < 0) modelSelect.selectedIndex = 0;
+    providerSelect.disabled = false; modelSelect.disabled = false;
+    modelPickerStatus.textContent = '';
+    選択状態更新();
+    return;
+  }
+  if (state.type === 'modelCatalogError') {
+    if (!modelPicker.open || state.provider !== catalogProvider) return;
+    providerSelect.disabled = false; modelSelect.disabled = true; applyModel.disabled = true;
+    modelPickerStatus.classList.add('error');
+    modelPickerStatus.textContent = String(state.message ?? '候補を取得できません。');
+    return;
+  }
   if (state.メッセージ識別 === 'output_stream') {
     element('progress-section').hidden = false;
     const content = String(state.メッセージ内容 ?? '');

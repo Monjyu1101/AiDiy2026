@@ -1,10 +1,10 @@
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
 body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--vscode-sideBar-background); color: var(--vscode-foreground); font: var(--vscode-font-size)/1.6 var(--vscode-font-family); }
-button, textarea { font: inherit; }
+button, textarea, select, input { font: inherit; }
 button { cursor: pointer; color: var(--vscode-foreground); background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 4px 8px; }
 button:hover { background: var(--vscode-toolbar-hoverBackground); }
-button:focus-visible, textarea:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+button:focus-visible, textarea:focus, select:focus, input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
 button:disabled { opacity: .45; cursor: default; }
 [hidden] { display: none !important; }
 label { display: block; font-size: 11px; color: var(--vscode-descriptionForeground); }
@@ -35,8 +35,11 @@ footer { padding: 8px 12px 12px; }
 #composer { border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 8px; background: var(--vscode-input-background); overflow: hidden; }
 textarea { resize: vertical; display: block; width: 100%; min-height: 70px; max-height: 220px; padding: 10px; color: var(--vscode-input-foreground); background: transparent; border: none; }
 .composer-actions { display: flex; align-items: center; gap: 5px; padding: 5px; }
-#choose-model { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex: 1; min-width: 0; text-align: left; color: var(--vscode-descriptionForeground); font-size: 11px; }
+#choose-model { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left; color: var(--vscode-foreground); font-size: 11px; border-color: var(--vscode-input-border, var(--vscode-panel-border)); background: color-mix(in srgb, var(--vscode-button-background) 10%, transparent); }
+#choose-model:hover { border-color: var(--vscode-focusBorder); background: var(--vscode-toolbar-hoverBackground); }
+.model-caption { flex: 0 0 auto; padding: 1px 5px; border-radius: 3px; color: var(--vscode-button-foreground); background: var(--vscode-button-background); font-weight: 600; }
 #model-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-chevron { margin-left: auto; color: var(--vscode-descriptionForeground); }
 #send, #stop { flex-shrink: 0; }
 .primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
 .primary:hover { background: var(--vscode-button-hoverBackground); }
@@ -51,3 +54,15 @@ textarea { resize: vertical; display: block; width: 100%; min-height: 70px; max-
 #attachment { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px; color: var(--vscode-textLink-foreground); } #attachment-name { overflow-wrap: anywhere; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 #status { margin-top: 6px; font-size: 11px; color: var(--vscode-descriptionForeground); }
+dialog { width: min(420px, calc(100vw - 24px)); padding: 0; color: var(--vscode-foreground); background: var(--vscode-sideBar-background); border: 1px solid var(--vscode-panel-border); border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .45); }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+#model-picker-form { display: grid; gap: 7px; padding: 16px; }
+.picker-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 5px; }
+.picker-header h2 { margin: 0; font-size: 15px; }
+.picker-header p { margin: 2px 0 0; color: var(--vscode-descriptionForeground); font-size: 11px; }
+.picker-close { flex: 0 0 auto; padding: 0 5px; border: 0; font-size: 18px; line-height: 1.4; }
+select, input { width: 100%; min-height: 30px; padding: 4px 7px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 3px; }
+.picker-status { min-height: 18px; margin: 2px 0 0; color: var(--vscode-descriptionForeground); font-size: 11px; overflow-wrap: anywhere; }
+.picker-status.error { color: var(--vscode-errorForeground); }
+.picker-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 2px; }
+.picker-actions button { min-height: 30px; }

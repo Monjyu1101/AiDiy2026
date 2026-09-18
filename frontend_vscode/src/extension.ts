@@ -21,7 +21,6 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 破棄済み = false;
   private 会話ID = randomUUID();
   private 最終作業URI?: vscode.Uri;
-  private モデル選択中 = false;
   private 候補取得停止?: () => void;
   private 候補キャッシュ = new Map<string, { id: string; label: string }[]>();
   private readonly ログ = vscode.window.createOutputChannel('AiDiy');
@@ -123,7 +122,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       case 'attach': await this.選択添付(); break;
       case 'removeAttachment': if (!this.実行中) { this.添付 = undefined; this.通知(); } break;
       case 'settings': await vscode.commands.executeCommand('aidiyHermes.settings'); break;
-      case 'chooseModel': await this.モデル選択(); break;
+      case 'chooseModel': await this.モデル候補通知(data.provider); break;
+      case 'setModel': await this.モデル反映(data.provider, data.model); break;
       case 'terminal': await this.ターミナル(); break;
       case 'logs': this.ログ.show(true); break;
       case 'link':
@@ -157,42 +157,28 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     } finally { this.候補取得停止 = undefined; }
   }
 
-  private async モデル選択(): Promise<void> {
-    if (this.実行中 || this.モデル選択中) return;
-    this.モデル選択中 = true;
-    const 会話ID = this.会話ID;
+  private async モデル候補通知(value: unknown): Promise<void> {
+    if (this.実行中 || typeof value !== 'string' || value.length > 200) return;
     try {
-      const providers = await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: 'Hermes のプロバイダを取得中…' }, () => this.候補取得());
-      const selected = await vscode.window.showQuickPick([
-        { label: '自動', description: 'CLI の設定を使用', id: '' },
-        ...providers.map(item => ({ ...item, description: item.id === this.会話.provider ? `${item.id} · 選択中` : item.id }))
-      ], { title: 'Hermes: プロバイダを選択 (1/2)', placeHolder: 'プロバイダ名で検索', matchOnDescription: true });
-      if (!selected) return;
-      let model = '';
-      if (selected.id) {
-        const models = await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `${selected.label} のモデルを取得中…` }, () => this.候補取得(selected.id));
-        const choices = models.map(item => ({ ...item, description: item.id === this.会話.model && selected.id === this.会話.provider ? '選択中' : item.id }));
-        if (selected.id === this.会話.provider && this.会話.model && !models.some(item => item.id === this.会話.model)) choices.unshift({ id: this.会話.model, label: this.会話.model, description: '現在のモデル' });
-        const picked = await vscode.window.showQuickPick([
-          ...choices,
-          { label: '既定モデル', description: 'プロバイダの設定を使用', id: '' },
-          { label: 'モデル ID を入力…', description: '一覧にないモデルを指定', id: '__manual__' }
-        ], { title: `Hermes: ${selected.label} のモデルを選択 (2/2)`, placeHolder: 'モデル名で検索', matchOnDescription: true });
-        if (!picked) return;
-        model = picked.id;
-        if (model === '__manual__') {
-          const value = await vscode.window.showInputBox({ title: 'モデル ID', value: selected.id === this.会話.provider ? this.会話.model : '', validateInput: value => value.trim() && value.length <= 300 ? undefined : 'モデル ID を300文字以内で入力してください。' });
-          if (value === undefined) return;
-          model = value.trim();
-        }
-      }
-      if (this.破棄済み || this.実行中 || 会話ID !== this.会話ID) return;
-      this.会話.provider = selected.id; this.会話.model = model;
-      this.会話.モデル選択済み = true;
-      this.保存(); this.通知();
+      const items = await this.候補取得(value);
+      if (!this.破棄済み) await this.view?.webview.postMessage({ type: 'modelCatalog', provider: value, items });
     } catch (error) {
-      void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
-    } finally { this.モデル選択中 = false; }
+      if (!this.破棄済み) await this.view?.webview.postMessage({ type: 'modelCatalogError', provider: value, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  private async モデル反映(providerValue: unknown, modelValue: unknown): Promise<void> {
+    if (this.実行中 || typeof providerValue !== 'string' || typeof modelValue !== 'string'
+      || providerValue.length > 200 || modelValue.length > 300 || modelValue === '__manual__') return;
+    const selectedProvider = providerValue.trim();
+    const selectedModel = modelValue.trim();
+    if (selectedProvider) {
+      const providers = await this.候補取得();
+      if (!providers.some(item => item.id === selectedProvider)) throw new Error('選択したプロバイダを確認できません。');
+    }
+    this.会話.provider = selectedProvider; this.会話.model = selectedProvider ? selectedModel : '';
+    this.会話.モデル選択済み = true;
+    this.保存(); this.通知();
   }
 
   private async 送信(本文: string): Promise<void> {

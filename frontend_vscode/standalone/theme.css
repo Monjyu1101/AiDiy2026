@@ -12,10 +12,3 @@
 body { max-width:960px; margin:auto; }
 html { background:var(--vscode-sideBar-background); }
 #standalone-actions { display:block; }
-dialog { width:min(420px,90vw); color:var(--vscode-foreground); background:#222; border:1px solid #555; border-radius:8px; padding:20px; }
-dialog::backdrop { background:#0008; }
-dialog h2 { font-size:15px; margin:0 0 15px; }
-dialog label { margin:10px 0; }
-dialog select, dialog input { display:block; width:100%; background:#181818; color:#ddd; border:1px solid #555; padding:6px; font:inherit; margin-top:5px; }
-.picker-actions { display:flex; justify-content:flex-end; gap:8px; }
-.picker-error { color:var(--vscode-errorForeground); font-size:12px; }

@@ -55,6 +55,13 @@ if self.code_ai == "opencode_cli":
 - 該当条件: `self.code_ai in ["claude_cli", "copilot_cli", "antigravity_cli", "codex_cli", "opencode_cli", "grok_cli"]`
 - バージョン確認は `_バージョン確認実行()` の汎用パスで実行する
 
+## stdout / stderr の役割
+
+- stdout: 正式回答として収集し、実行完了後に `output_text` で返す
+- stderr: 進捗・警告として `output_stream` へ随時送る
+- stdout は `output_stream` へ送らない。途中表示と最終回答の二重表示を防ぐため
+- stdout が空でも stderr を正式回答へ転用しない。stderr の内容はストリームと `last_stderr_output` に残る
+
 ## モデル名の suffix 除去
 
 `_ollama_cloud_suffix除去()` は `opencode_cli` と `aidiy_hermes` の両方から呼ばれる。

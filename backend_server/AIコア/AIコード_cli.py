@@ -24,6 +24,15 @@ from PIL import Image
 import io
 
 
+# これらの CLI は stderr を進捗ストリーム、stdout を正式回答として扱う。
+# stdout を output_stream にも流すと、正式回答が途中表示と最終表示で重複する。
+_STDERR_STREAM_STDOUT_FINAL_AI = frozenset({
+    "copilot_cli",
+    "opencode_cli",
+    "antigravity_cli",
+})
+
+
 async def _長大行対応readline(stream: asyncio.StreamReader, 出力検知=None) -> bytes:
     """StreamReader の上限を超える長い1行も、失わず最後まで読み取る。"""
     chunks: list[bytes] = []
@@ -1070,8 +1079,10 @@ class CodeAI:
                             await self._停止マーカー送信()
                             break
 
-                        # parent_manager経由でoutput_stream送信（ストリーム出力のみ）
-                        if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                        # copilot/opencode は stdout を正式回答専用とし、
+                        # codex/claude 等の従来の stdout ストリーム挙動は維持する。
+                        stdoutをストリーム送信 = self.code_ai not in _STDERR_STREAM_STDOUT_FINAL_AI
+                        if stdoutをストリーム送信 and self.parent_manager and hasattr(self.parent_manager, '接続'):
                             try:
                                 await self.parent_manager.接続.send_to_channel(self.チャンネル, {
                                     "セッションID": self.セッションID,
@@ -1229,8 +1240,13 @@ class CodeAI:
                 return "!"
 
             result = full_output.strip()
-            # 非TTY環境でstderrに応答を出力するCLI（agy等）のフォールバック
-            if not result and stderr_output.strip():
+            # stdout を正式回答とする CLI では stderr を最終回答へ混ぜない。
+            # その他の CLI は、非TTY環境で stderr に回答を出す場合に備えて従来挙動を維持する。
+            if (
+                not result
+                and self.code_ai not in _STDERR_STREAM_STDOUT_FINAL_AI
+                and stderr_output.strip()
+            ):
                 logger.info(f"[CodeAI] stdout空のためstderrを戻り値に使用: ai={self.code_ai}")
                 result = stderr_output.strip()
             return result if result else "（応答なし）"
@@ -1309,18 +1325,7 @@ class CodeAI:
                         if self._強制停止要求あり():
                             await self._停止マーカー送信()
                             break
-                        if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                            try:
-                                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                                    "セッションID": self.セッションID,
-                                    "チャンネル": self.チャンネル,
-                                    "メッセージ識別": "output_stream",
-                                    "メッセージ内容": line_text,
-                                    "ファイル名": None,
-                                    "サムネイル画像": None
-                                })
-                            except Exception as e:
-                                logger.error(f"[antigravity] output_stream送信エラー(stdout): {e}")
+                        # antigravity の stdout は正式回答専用。途中表示には送らない。
                 except Exception as e:
                     logger.error(f"[antigravity] stdout読み取りエラー: {e}")
 
@@ -1421,9 +1426,6 @@ class CodeAI:
                 return "!"
 
             result = full_output.strip()
-            if not result and stderr_output.strip():
-                logger.info("[antigravity] stdout空のためstderrを戻り値に使用")
-                result = stderr_output.strip()
             return result if result else "（応答なし）"
 
         except asyncio.TimeoutError as e:
