@@ -5015,6 +5015,8 @@ _CLAUDE_BASE_URL = "https://api.anthropic.com"
 # 資格情報は AiDiy_key.json ではなく hermes 自身の auth store が解決する。
 _OPENAI_OAUTH_SLUG = "openai_oauth"
 _OPENAI_OAUTH_RUNTIME_PROVIDER = "openai-codex"
+_XAI_OAUTH_SLUG = "xai-oauth"
+_XAI_OAUTH_DEFAULT_MODEL = "grok-4.6"
 _AIDIY_INITIAL_MODEL = "openai_oauth/gpt-5.6-sol"
 # Codex backend が返す一覧を取れなかったときだけ使う保険。ChatGPT アカウントで
 # 使えるモデルは契約プランで変わるので、基本はライブ一覧の先頭を既定にする。
@@ -5051,6 +5053,41 @@ def _should_start_aidiy_openai_oauth(
     return slug == _OPENAI_OAUTH_SLUG or (
         not slug and runtime_provider == _OPENAI_OAUTH_RUNTIME_PROVIDER
     )
+
+
+def _should_start_aidiy_xai_oauth(
+    aidiy_slug: Any,
+    requested_provider: Any,
+) -> bool:
+    """AiDiy xAI OAuth 経路の未認証起動かを判定する。"""
+    slug = str(aidiy_slug or "").strip().lower()
+    runtime_provider = str(requested_provider or "").strip().lower()
+    return slug == _XAI_OAUTH_SLUG or (
+        not slug and runtime_provider == _XAI_OAUTH_SLUG
+    )
+
+
+def _xai_oauth_is_authenticated() -> bool:
+    """xAI OAuth の有効な認証情報が保存されているか確認する。"""
+    try:
+        from hermes_cli.auth import get_xai_oauth_auth_status
+
+        return bool((get_xai_oauth_auth_status() or {}).get("logged_in"))
+    except Exception:
+        return False
+
+
+def _xai_oauth_model_ids() -> List[str]:
+    """xAI OAuth で利用できる curated モデル ID 一覧。"""
+    try:
+        from hermes_cli.models import provider_model_ids
+
+        model_ids = [m for m in provider_model_ids(_XAI_OAUTH_SLUG) if m]
+    except Exception:
+        model_ids = []
+    if _XAI_OAUTH_DEFAULT_MODEL not in model_ids:
+        model_ids.insert(0, _XAI_OAUTH_DEFAULT_MODEL)
+    return model_ids
 
 
 def _openai_oauth_access_token() -> Optional[str]:
@@ -12368,7 +12405,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
     def _aidiy_provider_slugs() -> set:
         return {
             "ollama", "openai", "openrt", "openrouter", "gemini", "freeai", "anthropic",
-            "local_chat", _OPENAI_OAUTH_SLUG,
+            "local_chat", _OPENAI_OAUTH_SLUG, _XAI_OAUTH_SLUG,
             "claude-code", "antigravity-cli", "codex-cli", "copilot-cli", "opencode",
         }
 
@@ -12377,6 +12414,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         slug = (slug or "").lower()
         if slug == _OPENAI_OAUTH_SLUG:
             return _OPENAI_OAUTH_RUNTIME_PROVIDER
+        if slug == _XAI_OAUTH_SLUG:
+            return _XAI_OAUTH_SLUG
         if slug in {"openai", "openrouter"}:
             return slug
         if slug == "openrt":
@@ -12437,6 +12476,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             return cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it"
         if provider == _OPENAI_OAUTH_SLUG:
             return _resolve_openai_oauth_model(cfg)
+        if provider == _XAI_OAUTH_SLUG:
+            return _XAI_OAUTH_DEFAULT_MODEL
         return cfg.get("CODE_AIDIY_HERMES_MODEL") or cfg.get("CHAT_OLLAMA_MODEL") or "deepseek-v4-flash:cloud"
 
     def _get_aidiy_provider_entry(self, provider: str, include_models: bool = False) -> Optional[Dict[str, Any]]:
@@ -12539,6 +12580,19 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 # 資格情報を AiDiy_key.json ではなく hermes ランタイムから取る印。
                 "auth_runtime": True,
             }
+        elif provider == _XAI_OAUTH_SLUG:
+            # SuperGrok / X Premium+ の OAuth を使う。資格情報は
+            # AiDiy_key.json ではなく Hermes の auth store から解決する。
+            entry = {
+                "slug": _XAI_OAUTH_SLUG,
+                "name": "xAI Grok (OAuth)",
+                "runtime_provider": _XAI_OAUTH_SLUG,
+                "base_url": "",
+                "api_key": "",
+                "api_mode": "codex_responses",
+                "default_model": _XAI_OAUTH_DEFAULT_MODEL,
+                "auth_runtime": True,
+            }
         else:
             # Check CLI providers
             cli_def = next((p for p in _AIDIY_CLI_PROVIDERS if p["slug"] == provider), None)
@@ -12569,7 +12623,10 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
     def _list_aidiy_provider_entries(self, include_models: bool = False) -> List[Dict[str, Any]]:
         current = self._current_aidiy_provider_slug()
         providers: List[Dict[str, Any]] = []
-        for slug in (_OPENAI_OAUTH_SLUG, "ollama", "openai", "openrt", "gemini", "freeai", "anthropic", "local_chat"):
+        for slug in (
+            _OPENAI_OAUTH_SLUG, _XAI_OAUTH_SLUG, "ollama", "openai", "openrt",
+            "gemini", "freeai", "anthropic", "local_chat",
+        ):
             entry = self._get_aidiy_provider_entry(slug, include_models=include_models)
             if entry:
                 entry["is_current"] = entry["slug"] == current
@@ -12834,6 +12891,54 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         thread.start()
         return False
 
+    def _ensure_xai_oauth_auth(self) -> bool:
+        """xAI OAuth ログイン状態を確認し、未認証なら開始する。"""
+        try:
+            from hermes_cli.auth import get_xai_oauth_auth_status
+
+            if (get_xai_oauth_auth_status() or {}).get("logged_in"):
+                return True
+        except Exception:
+            logger.debug("xAI OAuth status check failed", exc_info=True)
+            return True
+
+        if getattr(self, "_xai_oauth_login_thread", None) is not None:
+            if self._xai_oauth_login_thread.is_alive():
+                _cprint("  xAI Grok サインインを待機中です。ブラウザで承認してください。")
+                return False
+
+        _cprint("  xAI Grok にサインインしていません。OAuth サインインを開始します...")
+
+        def _run_login() -> None:
+            try:
+                import argparse as _argparse
+                from hermes_cli.auth import (
+                    _login_xai_oauth,
+                    PROVIDER_REGISTRY,
+                    get_xai_oauth_auth_status as _status,
+                )
+
+                _login_xai_oauth(
+                    _argparse.Namespace(timeout=None, no_browser=False),
+                    PROVIDER_REGISTRY[_XAI_OAUTH_SLUG],
+                    force_new_login=True,
+                )
+                if (_status() or {}).get("logged_in"):
+                    _cprint("  xAI Grok サインイン完了。そのまま送信できます。")
+                else:
+                    _cprint("  xAI Grok サインインを完了できませんでした。")
+            except SystemExit:
+                _cprint("  xAI Grok サインインを中止しました。")
+            except Exception as exc:
+                _cprint(f"  xAI Grok サインインに失敗しました: {exc}")
+
+        thread = threading.Thread(
+            target=_run_login, name="aidiy-xai-oauth-login", daemon=True,
+        )
+        self._xai_oauth_login_thread = thread
+        thread.start()
+        return False
+
     def _apply_aidiy_provider_model(self, provider_entry: Dict[str, Any], model_name: str) -> None:
         is_cli = provider_entry.get("is_cli", False)
         # auth_runtime の provider は API キーを AiDiy_key.json から取らず、
@@ -12886,6 +12991,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # 切り替え直後にサインインを促す（ブラウザは自動で開く）。
         if provider_entry.get("slug") == _OPENAI_OAUTH_SLUG:
             self._ensure_openai_oauth_auth()
+        elif provider_entry.get("slug") == _XAI_OAUTH_SLUG:
+            self._ensure_xai_oauth_auth()
 
     def _show_aidiy_model_picker_fallback(self) -> None:
         current = self._current_aidiy_provider_slug() or self.provider
@@ -12906,6 +13013,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         _cprint("  Usage:")
         _cprint("    /model --provider openai")
         _cprint("    /model gpt-5.2 --provider openai")
+        _cprint("    /model grok-4.6 --provider xai-oauth")
         _cprint("    /model --provider claude-code")
         _cprint("    /model openrt:anthropic/claude-sonnet-4.5")
 
@@ -12975,6 +13083,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         try:
             if provider_entry.get("slug") == _OPENAI_OAUTH_SLUG:
                 return self._fetch_aidiy_codex_model_labels(limit=limit)
+            if provider_entry.get("slug") == _XAI_OAUTH_SLUG:
+                return [(model_id, model_id) for model_id in _xai_oauth_model_ids()[:limit]]
             if provider_entry.get("api_mode") == "anthropic_messages":
                 return self._fetch_aidiy_claude_model_labels(provider_entry, limit=limit)
 
@@ -19460,6 +19570,11 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                     requested_provider,
                 ):
                     self._ensure_openai_oauth_auth()
+                elif _should_start_aidiy_xai_oauth(
+                    aidiy_slug,
+                    requested_provider,
+                ):
+                    self._ensure_xai_oauth_auth()
                 else:
                     self._offer_first_run_setup()
         except Exception:
@@ -23973,6 +24088,26 @@ def _load_openai_oauth_defaults(cfg: dict[str, Any], model_override: str | None 
     }
 
 
+def _xai_oauth_model_from_value(value: str) -> str | None:
+    """``xai-oauth`` / ``xai-oauth/<model>`` を検出しモデル名を返す。"""
+    model = (value or "").strip()
+    lower_model = model.lower()
+    for prefix in (f"{_XAI_OAUTH_SLUG}/", f"{_XAI_OAUTH_SLUG}:"):
+        if lower_model.startswith(prefix):
+            return model[len(prefix):].strip() or ""
+    if lower_model == _XAI_OAUTH_SLUG:
+        return ""
+    return None
+
+
+def _load_xai_oauth_defaults(model_override: str | None = None) -> dict[str, str]:
+    """SuperGrok / X Premium+ OAuth 用のxAI provider 既定値。"""
+    return {
+        "provider": _XAI_OAUTH_SLUG,
+        "model": str(model_override or _XAI_OAUTH_DEFAULT_MODEL).strip(),
+    }
+
+
 def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str, str]:
     config_path = _AIDIY_KEY_JSON
     try:
@@ -23995,6 +24130,12 @@ def _load_aidiy_hermes_defaults(requested_model: str | None = None) -> dict[str,
         if _openai_oauth_is_authenticated():
             return _load_openai_oauth_defaults(cfg, openai_oauth_model or None)
         # 別 PC の初回起動や OAuth 切れでは、FreeAI の現行既定へ退避する。
+        return _load_freeai_defaults(cfg)
+    xai_oauth_model = _xai_oauth_model_from_value(model)
+    if xai_oauth_model is not None:
+        if _xai_oauth_is_authenticated():
+            return _load_xai_oauth_defaults(xai_oauth_model or None)
+        # Code AI の非対話起動では OAuth 承認を開始できないため FreeAI へ退避する。
         return _load_freeai_defaults(cfg)
     local_chat_model = _local_chat_model_from_value(model)
     if local_chat_model is not None:
@@ -24049,6 +24190,9 @@ def _load_aidiy_hermes_provider_defaults(provider: str | None) -> dict[str, str]
 
     if provider_slug in {_OPENAI_OAUTH_SLUG, "openai-oauth", "openai-codex"}:
         return _load_openai_oauth_defaults(cfg)
+
+    if provider_slug == _XAI_OAUTH_SLUG:
+        return _load_xai_oauth_defaults()
 
     return {}
 

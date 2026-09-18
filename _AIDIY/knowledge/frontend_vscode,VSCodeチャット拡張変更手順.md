@@ -26,13 +26,15 @@
 - 常駐バックエンドや AI コア WebSocket を経由せず、拡張プロセスから `aidiy_hermes` を直接起動する。
 - CLI は `shell: false` で起動し、要求本文は標準入力で渡す。要求文をコマンドライン引数へ埋め込まない。
 - 拡張側から `--yolo` を追加しない。
-- `input_text` / `input_request` / `cancel_run` / `output_stream` / `output_text` の識別子と、処理開始・終了・中断 marker を既存 AIコード実装と揃える。
+- `input_text` / `input_request` / `cancel_run` / `output_stream` / `output_text` の識別子と、開始 `STX`・終了 `ETX`・中断 `CAN` の1バイト制御値を既存 AIコード実装と揃える。制御値に改行を含めず、Webview にも表示しない。
 - `.cmd` は AiDiy `_setup.py` が生成する `PY` / `CLI` 形式だけを解析し、任意の batch を実行しない。
 - ワークスペース未信頼時、仮想ワークスペース、Web 版では CLI を実行しない。
 - Webview では Markdown の HTML と外部画像を無効のまま維持し、外部リンクは `http` / `https` のみにする。
 - `webview.ts` を変えた場合は VS Code 拡張モードと単独試用モードの両方を確認する。
 - Hermes の Provider / モデル一覧を複製せず、`scripts/model-catalog.py` から既存 picker を再利用する。
 - 外部 CLI Provider のモデルが `auto` の場合は `--model auto` を渡さず、Copilot / Codex / Claude CLI 自身の既定モデル選択へ任せる。
+- `antigravity-cli` は Hermes の外部 CLI Provider 一覧から取得する。`xai-oauth` は API Provider のカタログ入口に含め、`grok-4.6` を Hermes の curated model 一覧から取得する。
+- xAI OAuth の初回認証は静的なワンショット実行中ではなく、拡張の「対話 CLI」から `/model` で `xai-oauth` を選ぶか、`hermes auth add xai-oauth` を実行する。
 
 ## セットアップと配置
 

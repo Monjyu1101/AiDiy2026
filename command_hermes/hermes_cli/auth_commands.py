@@ -112,7 +112,7 @@ def _normalize_provider(provider: str) -> str:
     normalized = (provider or "").strip().lower()
     if normalized in {"or", "open-router"}:
         return "openrouter"
-    if normalized in {"grok-oauth", "xai-oauth", "x-ai-oauth", "xai-grok-oauth"}:
+    if normalized in {"xai-oauth", "x-ai-oauth"}:
         return "xai-oauth"
     # Check if it matches a custom provider name
     custom_key = _resolve_custom_provider_input(normalized)

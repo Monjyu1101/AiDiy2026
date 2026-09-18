@@ -23,6 +23,7 @@ import random
 from typing import Optional, Any
 from types import ModuleType
 from AIコア.AIバックアップ import バックアップ実行
+from AIコア.AIストリーム制御 import AIストリーム開始, AIストリーム終了, AIストリーム中断
 
 from log_config import get_logger
 
@@ -493,11 +494,10 @@ class CodeAgent:
                 "セッションID": self.セッションID,
                 "チャンネル": self.チャンネル,
                 "メッセージ識別": "output_stream",
-                "メッセージ内容": "<<< 処理開始 >>>",
+                "メッセージ内容": AIストリーム開始,
                 "ファイル名": None,
                 "サムネイル画像": None
             })
-            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} <<< 処理開始 >>>")
         except Exception as e:
             logger.error(f"[CodeAgent] ストリーム開始通知送信エラー: {e}")
 
@@ -508,11 +508,10 @@ class CodeAgent:
                 "セッションID": self.セッションID,
                 "チャンネル": self.チャンネル,
                 "メッセージ識別": "output_stream",
-                "メッセージ内容": "<<< 処理終了 >>>",
+                "メッセージ内容": AIストリーム終了,
                 "ファイル名": None,
                 "サムネイル画像": None
             })
-            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} <<< 処理終了 >>>")
         except Exception as e:
             logger.error(f"[CodeAgent] ストリーム終了通知送信エラー: {e}")
 
@@ -523,7 +522,7 @@ class CodeAgent:
                 "セッションID": self.セッションID,
                 "チャンネル": self.チャンネル,
                 "メッセージ識別": "output_stream",
-                "メッセージ内容": "<<< 処理中断 >>>",
+                "メッセージ内容": AIストリーム中断,
                 "ファイル名": None,
                 "サムネイル画像": None
             })
@@ -535,7 +534,6 @@ class CodeAgent:
                 "ファイル名": None,
                 "サムネイル画像": None
             })
-            logger.info(f"[CodeAgent] チャンネル{self.チャンネル} <<< 処理中断 >>>")
         except Exception as e:
             logger.error(f"[CodeAgent] 中断通知送信エラー: {e}")
 

@@ -77,6 +77,79 @@ class CliStdinTest(unittest.TestCase):
         self.assertEqual("gemini-explicit", main_mock.call_args.kwargs["model"])
         self.assertEqual("custom", main_mock.call_args.kwargs["provider"])
 
+    def test_xai_oauth_model_value_routes_to_xai_runtime(self):
+        with patch.object(cli_main, "_xai_oauth_is_authenticated", return_value=True):
+            defaults = cli_main._load_aidiy_hermes_defaults("xai-oauth/grok-4.6")
+
+        self.assertEqual("xai-oauth", defaults["provider"])
+        self.assertEqual("grok-4.6", defaults["model"])
+
+    def test_explicit_xai_oauth_provider_uses_grok_46(self):
+        with (
+            patch.object(cli_main.sys, "stdin", io.StringIO("質問")),
+            patch.object(cli_main, "main") as main_mock,
+        ):
+            result = cli_main.cli_entry([
+                "--oneshot-stdin",
+                "--provider",
+                "xai-oauth",
+                "--model",
+                "grok-4.6",
+            ])
+
+        self.assertEqual(0, result)
+        self.assertEqual("xai-oauth", main_mock.call_args.kwargs["provider"])
+        self.assertEqual("grok-4.6", main_mock.call_args.kwargs["model"])
+
+    def test_xai_oauth_picker_entry_includes_grok_46(self):
+        cli = cli_main.HermesCLI.__new__(cli_main.HermesCLI)
+        cli._aidiy_config = {}
+
+        entry = cli._get_aidiy_provider_entry("xai-oauth", include_models=True)
+
+        self.assertIsNotNone(entry)
+        self.assertEqual("xai-oauth", entry["runtime_provider"])
+        self.assertEqual("codex_responses", entry["api_mode"])
+        self.assertEqual("grok-4.6", entry["default_model"])
+        self.assertIn(("grok-4.6", "grok-4.6"), entry["models"])
+
+    def test_grok_oauth_alias_is_not_kept(self):
+        from hermes_cli.auth_commands import _normalize_provider
+        from hermes_cli.models import normalize_provider as normalize_model_provider
+        from hermes_cli.providers import normalize_provider
+
+        for normalizer in (normalize_provider, normalize_model_provider, _normalize_provider):
+            with self.subTest(normalizer=normalizer.__module__):
+                self.assertEqual("xai-oauth", normalizer("xai-oauth"))
+                self.assertEqual("grok-oauth", normalizer("grok-oauth"))
+
+    def test_xai_oauth_picker_selection_uses_runtime_auth(self):
+        cli = cli_main.HermesCLI.__new__(cli_main.HermesCLI)
+        cli._aidiy_provider_slug = None
+        cli._aidiy_config = {}
+        cli.provider = "custom"
+        cli.requested_provider = "custom"
+        cli.model = "old-model"
+        cli.api_mode = "chat_completions"
+        cli.base_url = "https://example.invalid/v1"
+        cli.api_key = "old-key"
+        cli._explicit_base_url = cli.base_url
+        cli._explicit_api_key = cli.api_key
+        cli.agent = None
+        cli._active_agent_route_signature = None
+        cli._ensure_xai_oauth_auth = unittest.mock.Mock(return_value=False)
+        entry = cli._get_aidiy_provider_entry("xai-oauth")
+
+        with patch.object(cli_main, "_cprint"):
+            cli._apply_aidiy_provider_model(entry, "grok-4.6")
+
+        self.assertEqual("xai-oauth", cli.provider)
+        self.assertEqual("grok-4.6", cli.model)
+        self.assertEqual("codex_responses", cli.api_mode)
+        self.assertEqual("", cli.base_url)
+        self.assertEqual("", cli.api_key)
+        cli._ensure_xai_oauth_auth.assert_called_once_with()
+
     def test_external_cli_auto_uses_provider_without_model_override(self):
         for provider in ("copilot-cli", "codex-cli", "claude-code", "antigravity-cli"):
             with self.subTest(provider=provider):

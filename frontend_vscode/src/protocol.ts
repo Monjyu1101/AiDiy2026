@@ -1,4 +1,7 @@
 import { CLI実行, type 実行要求 } from './runner';
+import { STREAM_CANCEL, STREAM_END, STREAM_START } from './stream-control';
+
+export { STREAM_CANCEL, STREAM_END, STREAM_START, streamControlOf, visibleStreamContent } from './stream-control';
 
 // AIコード.vue / AIコード.py / AIコード_cli.py と同じメッセージ項目・識別子。
 // 転送路は VS Code の Webview IPC。AiDiy サーバーの起動は不要。
@@ -18,12 +21,12 @@ export function コード要求実行(要求: コードパケット, 設定: Omi
     セッションID: 要求.セッションID, チャンネル: 要求.チャンネル,
     メッセージ識別, メッセージ内容, ファイル名: null, サムネイル画像: null, ...(出力元 ? { 出力元 } : {})
   });
-  送信('output_stream', '<<< 処理開始 >>>');
+  送信('output_stream', STREAM_START);
   const job = CLI実行({ ...設定, 本文: 要求.メッセージ内容, ストリーム: (line, source) => 送信('output_stream', line, source) });
   const 完了 = job.完了.then(result => {
-    送信('output_stream', result.停止理由 ? '<<< 処理中断 >>>' : result.終了コード !== 0 ? '!' : '<<< 処理終了 >>>');
+    送信('output_stream', result.停止理由 || result.終了コード !== 0 ? STREAM_CANCEL : STREAM_END);
     if (result.回答) 送信('output_text', result.回答);
     return result;
-  }, error => { 送信('output_stream', '!'); throw error; });
+  }, error => { 送信('output_stream', STREAM_CANCEL); throw error; });
   return { 完了, 停止: job.停止 };
 }

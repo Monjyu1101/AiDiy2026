@@ -22,7 +22,7 @@
 
 `auto` の場合、`_ensure_runtime_credentials()` が環境変数や設定ファイルから認証情報を検出し、利用可能な provider を自動選択します。
 
-AiDiy の `aidiy_hermes` エントリでは、この解決より前に `_load_aidiy_hermes_defaults()` が共通設定を読みます。`CODE_AIDIY_HERMES_MODEL` が `openai_oauth/gpt-5.6-sol` の場合、OAuth 認証済みなら OpenAI、未認証または認証切れなら `freeai/gemini-3.8-flash` を使います。`--provider openai_oauth` を明示指定した場合は FreeAI へ退避せず、OAuth 認証経路を維持します。CLI の `--model` / `--provider` は初期値より優先されます。
+AiDiy の `aidiy_hermes` エントリでは、この解決より前に `_load_aidiy_hermes_defaults()` が共通設定を読みます。`CODE_AIDIY_HERMES_MODEL` は `openai_oauth/gpt-5.6-sol` に加えて `xai-oauth/grok-4.6` を受理します。対応する OAuth が認証済みなら指定 provider を使い、非対話の Code AI 起動時に未認証または認証切れなら `freeai/gemini-3.8-flash` へ退避します。`--provider openai_oauth` / `--provider xai-oauth` を明示指定した場合は OAuth 経路を維持します。CLI の `--model` / `--provider` は初期値より優先されます。
 
 ## Provider Overlay 一覧
 
@@ -30,7 +30,7 @@ AiDiy の `aidiy_hermes` エントリでは、この解決より前に `_load_ai
 
 | カテゴリ | Provider |
 |---------|----------|
-| 汎用 API | `openrouter`, `nous`, `openai-codex` |
+| 汎用 API | `openrouter`, `nous`, `openai-codex`, `xai-oauth` |
 | 中国系 | `qwen-oauth`, `stepfun`, `minimax`, `minimax-oauth`, `minimax-cn`, `deepseek`, `alibaba`, `alibaba-coding-plan`, `xiaomi`, `tencent-tokenhub` |
 | Google | `google-gemini-cli` |
 | Microsoft | `copilot-acp`, `github-copilot`, `azure-foundry` |
@@ -39,7 +39,7 @@ AiDiy の `aidiy_hermes` エントリでは、この解決より前に `_load_ai
 
 ## Alias 解決
 
-70 のエイリアスが `ALIASES` 辞書に定義されています。フレンドリ名（`claude`, `grok`, `qwen` など）を canonical ID にマッピングします。`cli_main.py` の `process_command()` で `/model claude` のように使えます。
+エイリアスは `ALIASES` 辞書で canonical ID へマッピングします。xAI の OAuth provider は `xai-oauth` を正式名とし、`grok-oauth` / `xai-grok-oauth` の別名は使いません。
 
 ## Interactive Picker（/model コマンド）
 
@@ -55,6 +55,8 @@ Step 2: Model 選択
 ```
 
 `list_authenticated_providers()` は各 provider の認証情報（API Key の有無、OAuth トークン）をスキャンし、利用可能なものだけを表示対象とします。
+
+AiDiy 独自の `/model` picker には `xai-oauth` を常時表示し、`grok-4.6` を既定・先頭モデルとします。未認証で選択した場合は xAI の OAuth device-code ログインを開始します。
 
 ## 外部 CLI Bridge
 

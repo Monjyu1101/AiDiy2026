@@ -53,6 +53,8 @@ VS Code 拡張として試す場合は、次の手順を使います。
 - **プロバイダ／モデル**: 送信ボタン左の表示をクリックし、プロバイダ → モデルの順に検索・選択します。Hermes の既存モデル選択処理から候補を取得します。「自動」は CLI の設定を使用します。選択内容はすぐに表示・保存され、次の送信に使われます。
 
 初期値は `openai_oauth / gpt-5.6-sol` で、CLI にも両方を明示して渡します。選択済みのモデルと既存の会話は保持します。初期値での利用には OpenAI OAuth の認証が必要です。
+- `antigravity-cli` はプロバイダ候補から選択でき、モデルは Antigravity CLI の既定選択に任せます。
+- `xai-oauth / grok-4.6` もプロバイダ／モデル選択から指定できます。初回は「対話 CLI」を開き、`/model` で `xai-oauth` を選ぶか `hermes auth add xai-oauth` で認証してください。
 - **実行ログ**: stdout / stderr の実行状況を出力パネルで確認します。
 - **対話 CLI**: 認証、`/model` などの対話操作が必要な場合に利用します。
 
@@ -66,13 +68,13 @@ VS Code 拡張として試す場合は、次の手順を使います。
 |---|---|
 | 要求 | `input_text`（アダプターは `input_request` も受理） |
 | 停止 | `cancel_run` |
-| 開始 | `output_stream` / `<<< 処理開始 >>>` |
+| 開始 | `output_stream` / `STX` (`0x02`) |
 | 実行中 | stdout / stderr の各行を `output_stream` で逐次表示 |
-| 終了 | `output_stream` / `<<< 処理終了 >>>` |
-| 中断・異常 | `output_stream` / `<<< 処理中断 >>>` または `!` |
+| 終了 | `output_stream` / `ETX` (`0x03`) |
+| 中断・異常 | `output_stream` / `CAN` (`0x18`) |
 | 正式回答 | `output_text` |
 
-転送は Webview と拡張間のメッセージ通信で行い、拡張が CLI を直接起動します。AiDiy の常駐バックエンドへの WebSocket 接続は使用しません。
+制御コードはストリームの状態遷移にだけ使い、Webview には表示しません。転送は Webview と拡張間のメッセージ通信で行い、拡張が CLI を直接起動します。AiDiy の常駐バックエンドへの WebSocket 接続は使用しません。
 
 現行 Hermes の quiet モードは、処理ログを逐次出力し、回答本文を完成後に stdout へ出力します。そのため、実行状況はストリーム表示し、回答は完成後に Markdown で表示します。文字単位の回答ストリーミングには CLI 側の対応が必要です。
 

@@ -16,6 +16,7 @@ import { AI_WS_ENDPOINT } from '@/api/config'
 import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import apiClient from '@/api/client'
 import ファイル内容表示ダイアログ from '@/components/ファイル内容表示.vue'
+import { AIストリーム制御判定, AIストリーム表示内容 } from '@/utils/AIストリーム制御'
 
 type チャットモード = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 
@@ -371,15 +372,15 @@ const 音声出力受信処理 = (受信データ: any) => {
 
 const 出力ストリーム受信処理 = (受信データ: any) => {
   表示時アクティブ化()
-  console.log('[チャット] output_stream受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) return
+  const 制御種別 = AIストリーム制御判定(内容)
 
-  if (内容 === '<<< 処理開始 >>>') {
+  if (制御種別 === '開始') {
     const メッセージID = `stream-${新規メッセージID()}`
     ストリームメッセージID = メッセージID
     メッセージ一覧.value.push({
-      role: 'output_text', content: `${内容}\n`, id: メッセージID,
+      role: 'output_text', content: '', id: メッセージID,
       kind: 'text', render: 'effect', isStream: true,
     })
     nextTick(() => {
@@ -388,27 +389,28 @@ const 出力ストリーム受信処理 = (受信データ: any) => {
       const bubbleElement = メッセージ要素.querySelector('.bubble-content') as HTMLElement | null
       if (!bubbleElement) return
       演出初期化(メッセージID, bubbleElement)
-      演出キュー追加(メッセージID, `${内容}\n`, false)
     })
     return
   }
 
-  if (内容 === '<<< 処理終了 >>>') {
+  if (制御種別 === '終了' || 制御種別 === '中断') {
     const 対象メッセージ = メッセージ一覧.value.find(m => m.id === ストリームメッセージID)
     if (対象メッセージ) {
-      対象メッセージ.content += `${内容}\n`
       対象メッセージ.isCollapsed = true
     }
-    if (ストリームメッセージID) 演出キュー追加(ストリームメッセージID, `${内容}\n`, true)
+    if (ストリームメッセージID) 演出キュー追加(ストリームメッセージID, '', true)
     ストリームメッセージID = null
     最下部スクロール()
     return
   }
 
+  const 表示内容 = AIストリーム表示内容(内容)
+  if (!表示内容) return
+
   const 対象メッセージ = メッセージ一覧.value.find(m => m.id === ストリームメッセージID)
   if (対象メッセージ) {
-    対象メッセージ.content += `${内容}\n`
-    if (ストリームメッセージID) 演出キュー追加(ストリームメッセージID, `${内容}\n`, false)
+    対象メッセージ.content += `${表示内容}\n`
+    if (ストリームメッセージID) 演出キュー追加(ストリームメッセージID, `${表示内容}\n`, false)
     最下部スクロール()
   }
 }

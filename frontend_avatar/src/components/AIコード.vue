@@ -17,6 +17,7 @@ import { AI_WS_ENDPOINT } from '@/api/config'
 import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import AIコードファイル内容表示 from '@/dialog/ファイル内容表示.vue'
 import AIコード更新ファイル一覧 from '@/dialog/更新ファイル一覧.vue'
+import { AIストリーム制御判定, AIストリーム表示内容 } from '@/utils/AIストリーム制御'
 
 type コードチャンネル = '1' | '2' | '3' | '4' | '5' | '6'
 type 行種別 =
@@ -346,8 +347,9 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
   表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (!内容) return
+  const 制御種別 = AIストリーム制御判定(内容)
 
-  if (内容 === '<<< 処理開始 >>>') {
+  if (制御種別 === '開始') {
     const メッセージID = 新規メッセージID()
     ストリームメッセージID = メッセージID
     ストリーム受信中.value = true
@@ -367,14 +369,13 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
       const bubbleElement = メッセージ要素?.querySelector('.content-area') as HTMLElement | null
       if (!bubbleElement) return
       演出初期化(メッセージID, bubbleElement, '#00ff00', true)
-      演出キュー追加(メッセージID, `${内容}\n`, false)
     })
     return
   }
 
-  if (内容 === '<<< 処理終了 >>>' || 内容 === '<<< 処理中断 >>>' || 内容 === '!') {
+  if (制御種別 === '終了' || 制御種別 === '中断') {
     if (ストリームメッセージID) {
-      演出キュー追加(ストリームメッセージID, `${内容}\n`, true)
+      演出キュー追加(ストリームメッセージID, '', true)
       const target = メッセージ一覧.value.find((msg) => msg.id === ストリームメッセージID)
       if (target) {
         target.isCollapsed = true
@@ -386,8 +387,11 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
     return
   }
 
+  const 表示内容 = AIストリーム表示内容(内容)
+  if (!表示内容) return
+
   if (ストリームメッセージID) {
-    演出キュー追加(ストリームメッセージID, `${内容}\n`, false)
+    演出キュー追加(ストリームメッセージID, `${表示内容}\n`, false)
     return
   }
 
@@ -409,7 +413,7 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
     const bubbleElement = メッセージ要素?.querySelector('.content-area') as HTMLElement | null
     if (!bubbleElement) return
     演出初期化(メッセージID, bubbleElement, '#00ff00', true)
-    演出キュー追加(メッセージID, `${内容}\n`, false)
+    演出キュー追加(メッセージID, `${表示内容}\n`, false)
   })
 }
 

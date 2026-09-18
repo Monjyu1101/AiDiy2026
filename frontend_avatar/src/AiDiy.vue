@@ -33,6 +33,7 @@ import apiClient from '@/api/client'
 import { defaultModelSettings } from '@/api/config'
 import { AIWebSocket, createWebSocketUrl } from '@/api/websocket'
 import type { AuthUser, ChatMessage, MessageKind, ModelSettings } from '@/types'
+import { AIストリーム制御判定, AIストリーム表示内容 } from '@/utils/AIストリーム制御'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 type TaskKey = 'task1' | 'task2' | 'task3'
@@ -638,16 +639,17 @@ function 受信内容文字列(受信データ: any) {
 }
 
 function 出力ストリーム処理(message: Record<string, any>) {
-  const content = String(message.メッセージ内容 || '').trim()
+  const content = String(message.メッセージ内容 || '')
   if (!content) return
+  const 制御種別 = AIストリーム制御判定(content)
 
-  if (content === '<<< 処理開始 >>>') {
+  if (制御種別 === '開始') {
     const id = 新規メッセージID()
     ストリームメッセージID = id
     メッセージ一覧.value.push({
       id,
       kind: 'stream',
-      text: `${content}\n`,
+      text: '',
       timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       isStream: true,
       isCollapsed: false,
@@ -655,19 +657,21 @@ function 出力ストリーム処理(message: Record<string, any>) {
     return
   }
 
-  if (content === '<<< 処理終了 >>>') {
+  if (制御種別 === '終了' || 制御種別 === '中断') {
     const target = メッセージ一覧.value.find((m) => m.id === ストリームメッセージID)
     if (target) {
-      target.text += `${content}\n`
       target.isCollapsed = true
     }
     ストリームメッセージID = null
     return
   }
 
+  const 表示内容 = AIストリーム表示内容(content)
+  if (!表示内容) return
+
   const target = メッセージ一覧.value.find((m) => m.id === ストリームメッセージID)
   if (target) {
-    target.text += `${content}\n`
+    target.text += `${表示内容}\n`
   }
 }
 

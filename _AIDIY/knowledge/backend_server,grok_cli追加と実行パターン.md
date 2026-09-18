@@ -1,6 +1,6 @@
 # grok_cli 追加と実行パターン
 
-> 文書: `backend_server,grok_cli追加と実行パターン.md` | 実装: `backend_server/AIコア/AIコード_cli.py`, `backend_server/conf/conf_model.py`, `scripts/cli_bat/_grok_cli.bat`
+> 文書: `backend_server,grok_cli追加と実行パターン.md` | 実装: `_setup.py`, `backend_server/AIコア/AIコード_cli.py`, `backend_server/conf/conf_model.py`, `scripts/cli_bat/_grok_cli.bat`
 
 ## このメモを使う場面
 
@@ -16,6 +16,10 @@
 - Windows 導入: `irm https://x.ai/cli/install.ps1 | iex`
 - 導入先: `%USERPROFILE%\.grok\bin\grok.exe`（インストーラが同ディレクトリを PATH へ追加する）
 - 同名の別物が npm に複数ある。`@vibe-kit/grok-cli`、`grok-cli`、`@spikewang/grok-cli` はいずれも非公式または macOS 専用なので採用しない
+
+## 一括セットアップ
+
+ルートの `_setup.py` で「グローバル環境の AI CLI ツール」に `y` を選ぶと、Grok Build も並列導入対象になる。Windows では公式 `install.ps1`、macOS / Linux では公式 `install.sh` を一時ファイルへ取得して実行する。完了確認と失敗集計では `grok-build` として表示される。
 
 ## パス解決
 

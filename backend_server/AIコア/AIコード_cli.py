@@ -635,22 +635,10 @@ class CodeAI:
         return False
 
     async def _停止マーカー送信(self) -> None:
-        """強制停止時のストリーム終端マーカー（!）を1回だけ送信"""
+        """強制停止を1回だけ記録する。CAN 送信は親の CodeAgent が担当する。"""
         if self._停止マーカー送信済み:
             return
         self._停止マーカー送信済み = True
-        if self.parent_manager and hasattr(self.parent_manager, '接続'):
-            try:
-                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                    "セッションID": self.セッションID,
-                    "チャンネル": self.チャンネル,
-                    "メッセージ識別": "output_stream",
-                    "メッセージ内容": "!",
-                    "ファイル名": None,
-                    "サムネイル画像": None
-                })
-            except Exception as e:
-                logger.error(f"[CodeCli] 停止マーカー送信エラー: {e}")
 
     def _履歴追加(self, text: str, type: str):
         """履歴に項目を追加"""

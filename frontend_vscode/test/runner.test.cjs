@@ -34,6 +34,13 @@ test('モデル自動選択では --model を付けず CLI 既定へ任せる', 
     assert.deepEqual(引数, ['-Q', '--oneshot-stdin', '--max-turns', '30', '--provider', 'copilot-cli']);
   }
 });
+
+test('xAI OAuth の provider とモデルを Hermes へ渡す', () => {
+  assert.deepEqual(会話引数('xai-oauth', 'grok-4.6', 30), [
+    '-Q', '--oneshot-stdin', '--max-turns', '30',
+    '--provider', 'xai-oauth', '--model', 'grok-4.6'
+  ]);
+});
 test('非ゼロ終了と stderr を呼び出し元へ返す', async () => {
   const result = await run('fail', [], { 本文: 'abc'.repeat(100000) }).完了;
   assert.equal(result.終了コード, 7);
@@ -75,16 +82,33 @@ for (const timeout of [false, true]) {
   });
 }
 test('AIコードと同じ開始・stdout/stderrストリーム・終了・正式回答の順序で返す', async () => {
-  const { コード要求実行 } = require('../out/protocol.cjs');
+  const { コード要求実行, STREAM_START, STREAM_END, STREAM_CANCEL, streamControlOf, visibleStreamContent } = require('../out/protocol.cjs');
+  assert.deepEqual([...Buffer.from(STREAM_START)], [0x02]);
+  assert.deepEqual([...Buffer.from(STREAM_END)], [0x03]);
+  assert.deepEqual([...Buffer.from(STREAM_CANCEL)], [0x18]);
+  assert.equal(streamControlOf(`${STREAM_START}\n`), 'start');
+  assert.equal(streamControlOf(`${STREAM_END}\r\n`), 'end');
+  assert.equal(streamControlOf(`${STREAM_CANCEL}\n`), 'cancel');
+  assert.equal(visibleStreamContent(`${STREAM_START}\n`), '');
+  assert.equal(visibleStreamContent('1行\r\n\r\n'), '1行');
   const packets = [];
   const result = await コード要求実行({ セッションID: 'ui-session', チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: 'テスト' }, {
     起動: { 実行ファイル: process.execPath, 引数: [fake, 'echo'] }, 作業フォルダ: root, 引数: [], 制限時間: 10000
   }, packet => packets.push(packet)).完了;
-  assert.equal(packets[0].メッセージ内容, '<<< 処理開始 >>>');
+  assert.equal(packets[0].メッセージ内容, STREAM_START);
   assert.ok(packets.some(p => p.出力元 === 'stderr' && p.メッセージ内容.includes('[step]')));
   assert.ok(packets.some(p => p.出力元 === 'stdout'));
-  assert.equal(packets.at(-2).メッセージ内容, '<<< 処理終了 >>>');
+  assert.equal(packets.at(-2).メッセージ内容, STREAM_END);
   assert.equal(packets.at(-1).メッセージ識別, 'output_text');
   assert.equal(packets.at(-1).メッセージ内容, result.回答);
   assert.ok(packets.every(p => p.セッションID === 'ui-session' && p.チャンネル === 'code1'));
+});
+test('非ゼロ終了は CAN 1バイトで1回終端通知する', async () => {
+  const { コード要求実行, STREAM_CANCEL } = require('../out/protocol.cjs');
+  const packets = [];
+  await コード要求実行({ セッションID: 'ui-session', チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: 'テスト' }, {
+    起動: { 実行ファイル: process.execPath, 引数: [fake, 'fail'] }, 作業フォルダ: root, 引数: [], 制限時間: 10000
+  }, packet => packets.push(packet)).完了;
+  assert.equal(packets.filter(packet => packet.メッセージ内容 === STREAM_CANCEL).length, 1);
+  assert.equal(packets.filter(packet => packet.メッセージ識別 === 'output_stream').at(-1).メッセージ内容, STREAM_CANCEL);
 });

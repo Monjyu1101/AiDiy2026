@@ -760,9 +760,10 @@ class conf_models:
         }
 
     def _get_aidiy_hermes_models(self) -> Dict[str, str]:
-        """aidiy_hermes のモデル一覧を生成する（OpenAI OAuth + auto + Ollama + ローカル LLM）。"""
+        """aidiy_hermes のモデル一覧を生成する（OAuth + auto + Ollama + ローカル LLM）。"""
         result = {
             "openai_oauth/gpt-5.6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-sol (default)",
+            "xai-oauth/grok-4.6": "yyyy/mm/dd - xAI OAuth / grok-4.6",
             "auto": "yyyy/mm/dd - auto",
         }
         if self.ollama_models:

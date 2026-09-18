@@ -28,10 +28,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$k='HKCU:\Environment'; 
 rem  user settings in %USERPROFILE%\.antigravity are kept
 
 ECHO;
-ECHO ----
-ECHO grok
-ECHO ----
-rem  grok CLI has no uninstall subcommand, so remove it manually
+ECHO --------------
+ECHO Grok Build CLI
+ECHO --------------
+rem  Grok Build CLI (xai-org/grok-build, command: grok) has no uninstall subcommand, so remove it manually
 rem  installer: irm https://x.ai/cli/install.ps1 | iex  (root: %USERPROFILE%\.grok)
 rem  remove only bin / downloads / completions so config.toml is kept
 if exist "%USERPROFILE%\.grok\bin"         rmdir /s /q "%USERPROFILE%\.grok\bin"

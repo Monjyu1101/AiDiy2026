@@ -30,7 +30,10 @@ def catalog(cli_path: str, provider: str = "") -> dict:
             if not entry:
                 return {"models": []}
             return {"models": [{"label": str(label), "id": str(model)} for label, model in entry.get("models", [])]}
-        slugs = ["openai_oauth", "ollama", "openai", "openrt", "gemini", "freeai", "anthropic", "local_chat"]
+        slugs = [
+            "openai_oauth", "xai-oauth", "ollama", "openai", "openrt",
+            "gemini", "freeai", "anthropic", "local_chat",
+        ]
         slugs.extend(item["slug"] for item in cli._AIDIY_CLI_PROVIDERS)
         providers = []
         for slug in slugs:

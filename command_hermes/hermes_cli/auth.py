@@ -2814,7 +2814,6 @@ def resolve_provider(
         "google": "gemini", "google-gemini": "gemini", "google-ai-studio": "gemini",
         "x-ai": "xai", "x.ai": "xai", "grok": "xai",
         "xai-oauth": "xai-oauth", "x-ai-oauth": "xai-oauth",
-        "grok-oauth": "xai-oauth", "xai-grok-oauth": "xai-oauth",
         "kimi": "kimi-coding", "kimi-for-coding": "kimi-coding", "moonshot": "kimi-coding",
         "kimi-cn": "kimi-coding-cn", "moonshot-cn": "kimi-coding-cn",
         "step": "stepfun", "stepfun-coding-plan": "stepfun",

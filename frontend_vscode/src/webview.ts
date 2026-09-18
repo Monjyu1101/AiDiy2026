@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import { streamControlOf, visibleStreamContent } from './stream-control';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void; getState(): { 下書き?: string } | undefined; setState(state: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -69,9 +70,17 @@ window.addEventListener('message', event => {
   const state = event.data;
   if (state.メッセージ識別 === 'output_stream') {
     element('progress-section').hidden = false;
-    element('progress-title').textContent = String(state.メッセージ内容).slice(0, 160);
-    if (state.メッセージ内容 === '<<< 処理開始 >>>') element<HTMLDetailsElement>('progress-details').open = true;
-    else if (['<<< 処理終了 >>>', '<<< 処理中断 >>>', '!'].includes(state.メッセージ内容)) element<HTMLDetailsElement>('progress-details').open = false;
+    const content = String(state.メッセージ内容 ?? '');
+    const control = streamControlOf(content);
+    if (control === 'start') {
+      element('progress-title').textContent = '';
+      element<HTMLDetailsElement>('progress-details').open = true;
+    } else if (control === 'end' || control === 'cancel') {
+      element('progress-title').textContent = '';
+      element<HTMLDetailsElement>('progress-details').open = false;
+    } else {
+      element('progress-title').textContent = visibleStreamContent(content).slice(0, 160);
+    }
     return;
   }
   if (state.type === 'accepted') { prompt.value = ''; vscode.setState({ 下書き: '' }); 送信待ち = false; ボタン更新(); return; }

@@ -68,6 +68,10 @@ ANTIGRAVITY_INSTALL_COMMAND_WINDOWS = (
     "curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd"
 )
 ANTIGRAVITY_INSTALL_COMMAND_UNIX = "curl -fsSL https://antigravity.google/cli/install.sh | bash"
+GROK_BUILD_INSTALL_COMMAND_WINDOWS = (
+    "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"irm https://x.ai/cli/install.ps1 | iex\""
+)
+GROK_BUILD_INSTALL_COMMAND_UNIX = "curl -fsSL https://x.ai/cli/install.sh | bash"
 
 
 class Colors:
@@ -399,6 +403,10 @@ def get_antigravity_install_command() -> str:
     return ANTIGRAVITY_INSTALL_COMMAND_WINDOWS if sys.platform == "win32" else ANTIGRAVITY_INSTALL_COMMAND_UNIX
 
 
+def get_grok_build_install_command() -> str:
+    return GROK_BUILD_INSTALL_COMMAND_WINDOWS if sys.platform == "win32" else GROK_BUILD_INSTALL_COMMAND_UNIX
+
+
 def prepare_antigravity_installer():
     import tempfile
     import urllib.request
@@ -421,6 +429,33 @@ def prepare_antigravity_installer():
         return ["/bin/bash", str(installer_path)], installer_path
     except Exception as exc:
         print_error(f"antigravity インストーラーの準備に失敗しました: {exc}")
+        return None, None
+
+
+def prepare_grok_build_installer():
+    import tempfile
+    import urllib.request
+    install_url = "https://x.ai/cli/install.ps1" if sys.platform == "win32" else "https://x.ai/cli/install.sh"
+    suffix = ".ps1" if sys.platform == "win32" else ".sh"
+    try:
+        with urllib.request.urlopen(install_url) as response:
+            installer_bytes = response.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, prefix="grok_build_install_") as tmp:
+            tmp.write(installer_bytes)
+            installer_path = Path(tmp.name)
+        if sys.platform == "win32":
+            return [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(installer_path),
+            ], installer_path
+        installer_path.chmod(0o700)
+        return ["/bin/bash", str(installer_path)], installer_path
+    except Exception as exc:
+        print_error(f"Grok Build インストーラーの準備に失敗しました: {exc}")
         return None, None
 
 
@@ -447,13 +482,14 @@ def print_ai_cli_manual_setup():
         print_info("    npm 系 CLI : Node.js / npm を導入後に個別セットアップしてください")
         print_info("      https://nodejs.org/")
     print_info(f"    Antigravity: {get_antigravity_install_command()}")
+    print_info(f"    Grok Build : {get_grok_build_install_command()}")
     print_info(f"    Hermes Agent: {HERMES_AGENT_INSTALL_COMMAND}")
     print_info(f"    Ollama     : {OLLAMA_INSTALL_COMMAND}")
 
 
 def start_global_cli_tools_install():
     print_header("共通セットアップ: AI CLI ツール投入")
-    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / OpenCode / Antigravity")
+    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / OpenCode / Antigravity / Grok Build")
     print_info("参考: Hermes Agent は npm ではなく、次の bash installer で導入します。")
     print_info(f"      {HERMES_AGENT_INSTALL_COMMAND}")
     print_info("参考: Ollama は次のコマンドで導入できます。")
@@ -473,6 +509,10 @@ def start_global_cli_tools_install():
     antigravity_command, antigravity_temp_path = prepare_antigravity_installer()
     if antigravity_command:
         targets.append(("antigravity", antigravity_command, get_antigravity_install_command(), antigravity_temp_path))
+
+    grok_build_command, grok_build_temp_path = prepare_grok_build_installer()
+    if grok_build_command:
+        targets.append(("grok-build", grok_build_command, get_grok_build_install_command(), grok_build_temp_path))
 
     GLOBAL_CLI_INSTALL_PROCESSES.clear()
     for i, (label, command, display_command, temp_path) in enumerate(targets, 1):
@@ -612,7 +652,7 @@ def collect_setup_choices() -> dict | None:
     choices["common"] = ask_yes_no("共通セットアップを実行しますか？", default="y")
     if choices["common"]:
         choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
-        choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の AI CLI ツール(npm + Antigravity)をインストール/アップデートしますか？", default="n")
+        choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の AI CLI ツール(npm + Antigravity + Grok Build)をインストール/アップデートしますか？", default="n")
 
     choices["local"] = ask_yes_no("バックエンド(local)のセットアップを実行しますか？", default="y")
     if choices["local"]:

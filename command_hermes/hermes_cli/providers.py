@@ -303,10 +303,8 @@ ALIASES: Dict[str, str] = {
     "x-ai": "xai",
     "x.ai": "xai",
     "grok": "xai",
-    "grok-oauth": "xai-oauth",
     "xai-oauth": "xai-oauth",
     "x-ai-oauth": "xai-oauth",
-    "xai-grok-oauth": "xai-oauth",
 
     # nvidia
     "nim": "nvidia",
