@@ -9,6 +9,11 @@ import command_hermes.cli_main as cli_main
 
 
 class CliStdinTest(unittest.TestCase):
+    def test_gemini_cli_is_not_an_external_cli_provider(self):
+        self.assertIs(cli_main.provider_entry_is_cli("gemini-cli"), False)
+        self.assertNotIn("gemini-cli", cli_main.HermesCLI._aidiy_provider_slugs())
+        self.assertEqual([], cli_main._aidiy_cli_build_command("gemini-cli", "質問", True))
+
     def test_multiline_stdin_is_passed_to_main_unchanged(self):
         prompt = "1行目\n2行目\n"
 
@@ -73,7 +78,7 @@ class CliStdinTest(unittest.TestCase):
         self.assertEqual("custom", main_mock.call_args.kwargs["provider"])
 
     def test_external_cli_auto_uses_provider_without_model_override(self):
-        for provider in ("copilot-cli", "codex-cli", "claude-code"):
+        for provider in ("copilot-cli", "codex-cli", "claude-code", "antigravity-cli"):
             with self.subTest(provider=provider):
                 with (
                     patch.object(cli_main.sys, "stdin", io.StringIO("質問")),
@@ -108,7 +113,7 @@ class CliStdinTest(unittest.TestCase):
             def _apply_aidiy_provider_model(self, entry, model):
                 self.applied = (entry, model)
 
-        for provider in ("copilot-cli", "codex-cli", "claude-code"):
+        for provider in ("copilot-cli", "codex-cli", "claude-code", "antigravity-cli"):
             with self.subTest(provider=provider):
                 fake = FakeCli(provider)
                 fake.test_case = self
@@ -201,7 +206,7 @@ class CliStdinTest(unittest.TestCase):
                     True,
                     "/repo",
                 )
-                for provider in ("copilot-cli", "codex-cli", "claude-code")
+                for provider in ("copilot-cli", "codex-cli", "claude-code", "antigravity-cli")
             }
 
         for provider, command in commands.items():
@@ -225,6 +230,64 @@ class CliStdinTest(unittest.TestCase):
             "--continue",
             cli_main._aidiy_cli_build_command("claude-code", "続き", False, "/repo"),
         )
+        self.assertEqual(
+            ["agy", "--add-dir", "/repo", "--print-timeout", "20m", "-p", "質問"],
+            commands["antigravity-cli"],
+        )
+        with patch.object(cli_main, "_aidiy_cli_code_permissions", return_value="auto"):
+            self.assertEqual(
+                ["agy", "--dangerously-skip-permissions", "--add-dir", "/repo",
+                 "--print-timeout", "20m", "-p", "続き", "-c"],
+                cli_main._aidiy_cli_build_command("antigravity-cli", "続き", False, "/repo"),
+            )
+
+    def test_antigravity_cli_prefers_windows_local_install(self):
+        expected = cli_main.os.path.join(
+            r"C:\Users\tester", "AppData", "Local", "agy", "bin", "agy.exe"
+        )
+        with (
+            patch.object(cli_main.os, "name", "nt"),
+            patch.dict(cli_main.os.environ, {"USERPROFILE": r"C:\Users\tester"}),
+            patch.object(cli_main.os.path, "isfile", side_effect=lambda path: path == expected),
+        ):
+            self.assertEqual(expected, cli_main._aidiy_cli_command_path("antigravity-cli"))
+
+    def test_antigravity_cli_detaches_from_windows_console(self):
+        class FakeProcess:
+            stdout = io.StringIO("回答\n")
+            stderr = io.StringIO("")
+            returncode = 0
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        class FakeCli:
+            _aidiy_provider_slug = "antigravity-cli"
+            conversation_history = []
+
+        with (
+            patch.object(cli_main.os, "name", "nt"),
+            patch.object(
+                cli_main,
+                "_aidiy_cli_build_command",
+                return_value=["agy.exe", "-p", "質問"],
+            ),
+            patch("subprocess.DETACHED_PROCESS", 8, create=True),
+            patch("subprocess.Popen", return_value=FakeProcess()) as popen_mock,
+            redirect_stdout(io.StringIO()),
+        ):
+            result = cli_main.HermesCLI._dispatch_aidiy_cli_subprocess(
+                FakeCli(), "質問", quiet_output=True
+            )
+
+        self.assertEqual("回答", result)
+        self.assertEqual(8, popen_mock.call_args.kwargs["creationflags"])
 
     def test_blank_stdin_returns_two_without_calling_main(self):
         stderr = io.StringIO()

@@ -64,6 +64,8 @@ class conf_json:
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image',
         'CHAT_FREEAI_MODEL': 'gemini-3.8-flash',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image',
+        'CHAT_OPENAI_MODEL': 'gpt-5.6-sol',
+        'CHAT_OPENAI_OAUTH_MODEL': 'gpt-5.6-sol',
         'CHAT_OLLAMA_MODEL': 'deepseek-v4-flash:cloud',
         'CHAT_LOCAL_MODEL': 'google/gemma-4-E2B-it',
         'CHAT_LOCAL_DTYPE': 'bfloat16',
@@ -182,6 +184,10 @@ class conf_json:
         if self._migrate_port_keys():
             保存要否 = True
 
+        # 旧 ChatAI 名を現行名へ移行
+        if self._migrate_chat_ai_name():
+            保存要否 = True
+
         # 既存設定に不足しているデフォルト項目を補完
         if self._apply_default_keys():
             保存要否 = True
@@ -238,6 +244,15 @@ class conf_json:
                     変更あり = True
 
         return 変更あり
+
+    def _migrate_chat_ai_name(self) -> bool:
+        """openai_oauth_chat を簡潔な現行名 openai_oauth へ移行する。"""
+        config_data = object.__getattribute__(self, '_config_data')
+        if config_data.get('CHAT_AI_NAME') != 'openai_oauth_chat':
+            return False
+        config_data['CHAT_AI_NAME'] = 'openai_oauth'
+        logger.info('CHAT_AI_NAMEを移行しました: openai_oauth_chat -> openai_oauth')
+        return True
 
     @staticmethod
     def _normalize_port_value(key: str, value: Any) -> str:

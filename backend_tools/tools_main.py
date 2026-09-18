@@ -38,6 +38,7 @@ from fastapi.routing import APIRoute
 from starlette.applications import Starlette
 from starlette.requests import ClientDisconnect
 from starlette.routing import Route
+import mcp.server.streamable_http_manager as http_manager
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 from mcp.server.streamable_http_manager import (
@@ -75,6 +76,9 @@ from tools_proc import tools_task_agents, tools_team_agents, tools_windows_contr
 
 setup_logging()
 logger = get_logger(__name__)
+# MCP SDK の Streamable HTTP 管理ログは、実際に使用するロガー自体を
+# 短い名前へ差し替える。表示時だけ別名にする不一致は作らない。
+http_manager.logger = get_logger("http_manager")
 
 # 呼び出されたツール名をログに出力する（"Processing request of type CallToolRequest" の代替）
 _original_mcpserver_call_tool = MCPServer.call_tool

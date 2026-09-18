@@ -1,6 +1,6 @@
 # AIモデル設定変更手順
 
-> 文書: `backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md` | 実装: `_config/AiDiy_key.json`, `backend_server/conf/conf_json.py`, `frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue`
+> 文書: `backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md` | 実装: `_config/AiDiy_key.json`, `backend_server/conf/conf_json.py`, `backend_server/AIコア/AIチャット_openai.py`, `frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue`
 
 ## このメモを使う場面
 - Chat / Live / Code / Task / Team AI のモデルや API キーを変更する
@@ -21,7 +21,7 @@
 
 | キー | 末尾ルール | 例 |
 |------|-----------|----|
-| `CHAT_AI_NAME` | `_chat` | `gemini_chat`, `openrt_chat`, `freeai_chat`, `ollama_chat`, `local_chat` |
+| `CHAT_AI_NAME` | 原則 `_chat`（OAuth は例外） | `gemini_chat`, `openrt_chat`, `openai_chat`, `openai_oauth`, `freeai_chat`, `ollama_chat`, `local_chat` |
 | `LIVE_AI_NAME` | `_live` | `gemini_live`, `freeai_live`, `openai_live` |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `antigravity_cli`, `grok_cli`, `opencode_cli`, `aidiy_hermes` |
 | `TASK_AI_NAME` / `TEAM_AI_NAME` | Code AI と同じ候補を使用 | `claude_cli`, `codex_cli`, `aidiy_hermes` |
@@ -111,6 +111,11 @@ Electron では settings 専用ウィンドウ、Web では同じコンポーネ
 5. 再起動後の再接続で新設定を確認する
 
 新しい AI 種別を追加する場合は、backend が返す `available_models` のキー、frontend の `CHAT_MODEL_KEYS` / `LIVE_MODEL_KEYS` / `LIVE_VOICE_KEYS` / `CODE_MODEL_KEYS`、`conf_json.DEFAULT_CONFIG` を合わせる。
+
+`openai_chat` は `AiDiy_key.json` の `openai_key_id` を使い、`openai_oauth` は `command_hermes` の `openai-codex` 認証ストアを共用する。旧設定値 `openai_oauth_chat` は読込時に `openai_oauth` へ自動移行する。初回利用前に `command_hermes` で
+`.venv/Scripts/python.exe hermes_main.py auth add openai-codex` （Linux / macOS は `.venv/bin/python`）を実行し、ChatGPT アカウントへサインインする。OAuth token は
+`AiDiy_key.json` には保存せず、`${HERMES_HOME:-~/.hermes}/auth.json` から解決する。
+`aidiy_hermes` を起動して provider `openai_oauth` を選択する方法でも、同じ OAuth 認証を開始できる。
 
 `backend_local` が未起動の場合、`/core/AIコア/モデル情報/取得` は `local_chat` を chat / code モデル候補から除外する。`_start.py` の backend_local 起動デフォルトは No のため、local LLM を使うときだけ明示起動する。
 

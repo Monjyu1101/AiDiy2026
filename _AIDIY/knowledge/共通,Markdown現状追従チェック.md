@@ -59,7 +59,8 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - backend: `CODE_AI1_NAME`〜`CODE_AI6_NAME`
   - frontend: `code1`〜`code6`, `エージェント1`〜`エージェント6`
 - [ ] `CHAT_AI_NAME` の OpenRouter 系キーは `openrt_chat` として書く。
-  - 旧表現: `openai_chat`
+  - `openai_chat` は OpenAI API キーによる直接接続、`openai_oauth` は ChatGPT OAuth 接続に使う。
+  - OpenRouter 接続を `openai_chat` と説明する旧表現は使わない。
 - [ ] `_start.py` は対話形式、`--reload` なしとして書く。
   - コード変更反映は個別起動または `temp/reboot_*.txt`。
 - [ ] `_stop.py` を前提にしない。
@@ -98,7 +99,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 ```powershell
 $files = rg --files -g '*.md' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**/dist/**' -g '!**/backup/**'
 
-rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|openai_chat|16 サーバー|16 個の MCP|17 サーバー|17 個の MCP' $files
+rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|16 サーバー|16 個の MCP|17 サーバー|17 個の MCP' $files
 rg -n 'hermes_cli|aidiy_hermes|3サーバー構成|_start\.py.*command_hermes|AiDiy_code_hermes_cli' $files
 rg -n 'aidiy_backup|M取引先|V取引先|トークン更新|files_temp|reboot_tools|backend_taskteam|8093' $files
 rg -n '6 サーバー|旧分離バックエンド' $files

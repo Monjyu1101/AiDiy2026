@@ -56,6 +56,21 @@ Step 2: Model 選択
 
 `list_authenticated_providers()` は各 provider の認証情報（API Key の有無、OAuth トークン）をスキャンし、利用可能なものだけを表示対象とします。
 
+## 外部 CLI Bridge
+
+AiDiy の `/model` picker と `--provider` では、API provider に加えて次の外部 CLI を直接起動できます。
+
+| Provider slug | 実行コマンド |
+|---------------|--------------|
+| `claude-code` | `claude` |
+| `antigravity-cli` | `agy` |
+| `codex-cli` | `codex` |
+| `copilot-cli` | `copilot` |
+| `opencode` | `opencode` |
+| `grok-cli` | `grok` |
+
+`antigravity-cli` は本体の `antigravity_cli` と同じ引数規則を使います。初回は `-p <prompt>`、継続時はその後ろに `-c` を付け、`--add-dir <cwd>` と `--print-timeout 20m` を指定します。`CODE_PERMISSIONS` が `none` 以外なら `--dangerously-skip-permissions` も指定します。Windowsでは `%USERPROFILE%\AppData\Local\agy\bin\agy.exe` を優先し、`DETACHED_PROCESS` で親コンソールから切り離します。
+
 ## 新しい Provider 追加手順
 
 1. `hermes_cli/providers.py` の `HERMES_OVERLAYS` にエントリ追加

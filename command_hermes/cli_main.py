@@ -5112,10 +5112,10 @@ _AIDIY_CLI_PROVIDERS = [
         "is_cli": True,
     },
     {
-        "slug": "gemini-cli",
-        "name": "Gemini CLI",
-        "runtime_provider": "google-gemini-cli",
-        "api_mode": "chat_completions",
+        "slug": "antigravity-cli",
+        "name": "Antigravity CLI",
+        "runtime_provider": "anthropic",
+        "api_mode": "anthropic_messages",
         "is_cli": True,
     },
     {
@@ -5161,8 +5161,8 @@ def provider_entry_is_cli(slug: str) -> bool:
 
 def _aidiy_cli_command_path(cli_slug: str) -> str:
     # Mirrors backend_server/AIコア/AIコード_cli.py::_コマンドパス取得 so that
-    # command_hermes can spawn the same external CLIs (claude / copilot /
-    # gemini / codex / opencode) when the user picks one via /model.
+    # command_hermes can spawn the same external CLIs (claude / antigravity /
+    # copilot / codex / opencode / grok) when the user picks one via /model.
     env_var = f"{cli_slug.upper().replace('-', '_')}_CLI_PATH"
     custom = os.environ.get(env_var)
     if custom:
@@ -5177,6 +5177,15 @@ def _aidiy_cli_command_path(cli_slug: str) -> str:
                 if os.path.isfile(cand):
                     return cand
         return "opencode"
+    if cli_slug == "antigravity-cli":
+        if os.name == "nt":
+            userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+            candidate = os.path.join(
+                userprofile, "AppData", "Local", "agy", "bin", "agy.exe"
+            )
+            if os.path.isfile(candidate):
+                return candidate
+        return "agy"
     if cli_slug == "grok-cli":
         # 公式 Grok Build CLI（xai-org/grok-build）。npm ではなく ~/.grok/bin へ入る
         userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
@@ -5191,14 +5200,12 @@ def _aidiy_cli_command_path(cli_slug: str) -> str:
         names_nt = {
             "claude-code": "claude.cmd",
             "copilot-cli": "copilot.cmd",
-            "gemini-cli": "gemini.cmd",
             "codex-cli": "codex.cmd",
         }
         return os.path.join(npm_bin, names_nt.get(cli_slug, "claude.cmd"))
     names = {
         "claude-code": "claude",
         "copilot-cli": "copilot",
-        "gemini-cli": "gemini",
         "codex-cli": "codex",
     }
     return names.get(cli_slug, "claude")
@@ -5245,6 +5252,17 @@ def _aidiy_cli_build_command(
             return common + ["-p", one_line]
         return common + ["--continue", "-p", one_line]
 
+    if cli_slug == "antigravity-cli":
+        common = [cmd_path]
+        if permissions != "none":
+            common.append("--dangerously-skip-permissions")
+        if repo_path:
+            common.extend(["--add-dir", repo_path])
+        common.extend(["--print-timeout", "20m", "-p", one_line])
+        if not is_initial:
+            common.append("-c")
+        return common
+
     if cli_slug == "copilot-cli":
         # --silent keeps stdout limited to the final agent response so the
         # VS Code runner can treat stderr as progress/diagnostics.
@@ -5256,12 +5274,6 @@ def _aidiy_cli_build_command(
         if is_initial:
             return common + ["-p", one_line]
         return common + ["--continue", "-p", one_line]
-
-    if cli_slug == "gemini-cli":
-        common = [cmd_path]
-        if permissions != "none":
-            common.append("--yolo")
-        return common + ["--prompt", one_line]
 
     if cli_slug == "codex-cli":
         return [cmd_path, "exec", "--skip-git-repo-check",
@@ -12357,7 +12369,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         return {
             "ollama", "openai", "openrt", "openrouter", "gemini", "freeai", "anthropic",
             "local_chat", _OPENAI_OAUTH_SLUG,
-            "claude-code", "gemini-cli", "codex-cli", "copilot-cli", "opencode",
+            "claude-code", "antigravity-cli", "codex-cli", "copilot-cli", "opencode",
         }
 
     @staticmethod
@@ -12369,10 +12381,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             return slug
         if slug == "openrt":
             return "openrouter"
-        if slug in {"anthropic", "claude-code"}:
+        if slug in {"anthropic", "claude-code", "antigravity-cli"}:
             return "anthropic"
-        if slug == "gemini-cli":
-            return "google-gemini-cli"
         if slug == "codex-cli":
             return "openai-codex"
         if slug == "copilot-cli":
@@ -12581,8 +12591,9 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         images: list = None,
         quiet_output: bool = False,
     ) -> Optional[str]:
-        # CLI providers (claude-code / copilot-cli / gemini-cli / codex-cli /
-        # opencode) are handled by spawning the external CLI binary directly,
+        # CLI providers (claude-code / antigravity-cli / copilot-cli /
+        # codex-cli / opencode / grok-cli) are handled by spawning the external
+        # CLI binary directly,
         # rather than by routing through the Hermes agent loop. Mirrors the
         # dispatch pattern used by backend_server/AIコア/AIコード_cli.py.
         import subprocess as _subprocess
@@ -12629,6 +12640,15 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
         _cprint(f"  {_DIM}→ Spawning {cli_slug}: {os.path.basename(cmd[0])}{_RST}")
 
+        popen_kwargs = {}
+        if cli_slug == "antigravity-cli" and os.name == "nt":
+            # agy.exe may write directly to the parent console through CONOUT$.
+            # Detaching forces its output through the configured pipes, matching
+            # backend_server/AIコア/AIコード_cli.py::_antigravity実行().
+            creation_flag = getattr(_subprocess, "DETACHED_PROCESS", 0)
+            if creation_flag:
+                popen_kwargs["creationflags"] = creation_flag
+
         try:
             proc = _subprocess.Popen(
                 cmd,
@@ -12640,6 +12660,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 bufsize=1,  # line-buffered so readline() returns immediately
                 cwd=repo_path,
                 env=os.environ.copy(),
+                **popen_kwargs,
             )
         except FileNotFoundError:
             self._aidiy_cli_last_exit_code = 127
@@ -18131,7 +18152,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
         # CLI provider dispatch — bypass the Hermes agent loop entirely and
         # forward the user message to the selected external CLI subprocess
-        # (claude / copilot / gemini / codex / opencode / grok). Mirrors how
+        # (claude / antigravity / copilot / codex / opencode / grok). Mirrors how
         # backend_server/AIコア/AIコード_cli.py runs these CLIs from AiDiy.
         if provider_entry_is_cli(getattr(self, "_aidiy_provider_slug", "") or ""):
             return self._dispatch_aidiy_cli_subprocess(message, images=images)

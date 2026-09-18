@@ -103,6 +103,7 @@ class Chat:
         self.システム指示 = _load_or_create_chat_context()
         self.AIモジュール = self._select_ai_module()
         self.AIインスタンス = None
+        self.初期化エラー = ""
         self.is_alive = False
         self.チャット処理Ｑ = asyncio.Queue()
         self.worker_task: Optional[asyncio.Task] = None
@@ -113,6 +114,8 @@ class Chat:
         module_name = "AIコア.AIチャット_openrt"
         if self.AI_NAME in ("gemini_chat", "freeai_chat"):
             module_name = "AIコア.AIチャット_gemini"
+        elif self.AI_NAME in ("openai_chat", "openai_oauth"):
+            module_name = "AIコア.AIチャット_openai"
         elif self.AI_NAME == "ollama_chat":
             module_name = "AIコア.AIチャット_ollama"
         elif self.AI_NAME == "local_chat":
@@ -130,6 +133,7 @@ class Chat:
         if self.AIインスタンス:
             return self.AIインスタンス
         try:
+            self.初期化エラー = ""
             api_key = ""
             try:
                 conf_json = getattr(self.親, "conf", None)
@@ -142,6 +146,10 @@ class Chat:
                         api_key = conf_json.json.get("ollama_key_id", "ollama")
                     elif self.AI_NAME == "local_chat":
                         api_key = "local"  # backend_local は認証なし（ダミーキー）
+                    elif self.AI_NAME == "openai_oauth":
+                        api_key = ""  # command_hermes の OAuth auth store から取得
+                    elif self.AI_NAME == "openai_chat":
+                        api_key = conf_json.json.get("openai_key_id", "")
                     else:
                         api_key = conf_json.json.get("openrt_key_id", "")
             except Exception:
@@ -162,6 +170,7 @@ class Chat:
             )
             開始成功 = await self.AIインスタンス.開始()
             if (開始成功 is False) or (not getattr(self.AIインスタンス, "is_alive", False)):
+                self.初期化エラー = str(getattr(self.AIインスタンス, "last_error", "") or "")
                 logger.error(
                     f"[Chat] ChatAI開始失敗: AI={self.AI_NAME} モデル={self.AI_MODEL} "
                     f"セッション={self.セッションID}"
@@ -201,6 +210,15 @@ class Chat:
         api_key = ""
         if self.AI_NAME == "local_chat":
             api_key = "local"  # backend_local は認証なし（ダミーキー）
+        elif self.AI_NAME == "openai_oauth":
+            api_key = "oauth"  # command_hermes の auth store を使うため API キー検査は不要
+        elif self.AI_NAME == "openai_chat":
+            try:
+                conf_json = getattr(self.親, "conf", None)
+                if conf_json and hasattr(conf_json, "json"):
+                    api_key = conf_json.json.get("openai_key_id", "")
+            except Exception:
+                api_key = ""
         elif self.AI_NAME == "ollama_chat":
             try:
                 conf_json = getattr(self.親, "conf", None)
@@ -234,7 +252,8 @@ class Chat:
                 if instance and getattr(instance, "is_alive", False):
                     メッセージ = f"{ai_label}会話準備ができました。"
                 else:
-                    メッセージ = f"{ai_label}初期化に失敗しました。"
+                    詳細 = f" {self.初期化エラー}" if self.初期化エラー else ""
+                    メッセージ = f"{ai_label}初期化に失敗しました。{詳細}"
             except Exception:
                 メッセージ = f"{ai_label}初期化に失敗しました。"
 
@@ -349,6 +368,8 @@ class Chat:
                     )
                     # AI側が保存したファイル一覧を取得
                     出力ファイル一覧 = getattr(ai_instance, "last_output_files", []) or []
+                elif self.初期化エラー:
+                    出力メッセージ内容 = self.初期化エラー
             except Exception as e:
                 logger.error(f"[Chat] AI実行エラー: {e}")
                 出力メッセージ内容 = "!"

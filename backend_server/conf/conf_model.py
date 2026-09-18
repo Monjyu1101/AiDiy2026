@@ -707,6 +707,15 @@ class conf_models:
 
     def get_chat_models(self) -> Dict[str, Dict[str, str]]:
         """チャットAIモデル一覧を取得（日付情報付き）"""
+        try:
+            from AIコア.AIチャット_openai import get_openai_oauth_models
+
+            openai_oauth_models = get_openai_oauth_models()
+        except Exception as e:
+            logger.warning(f"OpenAI OAuth モデル一覧の初期化エラー: {e}")
+            openai_oauth_models = {
+                "gpt-5.6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-sol",
+            }
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
@@ -720,6 +729,13 @@ class conf_models:
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.openrt_models.items()
             },
+            "openai_chat": {
+                k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
+                for k, v in self.openai_models.items()
+            } or {
+                "gpt-5.6-sol": "yyyy/mm/dd - OpenAI API / gpt-5.6-sol",
+            },
+            "openai_oauth": openai_oauth_models,
         }
         if self.ollama_models:
             models["ollama_chat"] = self.ollama_models
