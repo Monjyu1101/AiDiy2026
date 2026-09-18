@@ -207,9 +207,11 @@ window.addEventListener('message', event => {
     メッセージJSON = json;
     演出候補.at(-1) && コンソール演出(演出候補.at(-1)!.content, 演出候補.at(-1)!.text, 演出候補.at(-1)!.key);
   }
-  element('progress-section').hidden = !state.進捗.length;
-  element('progress-title').textContent = 実行中 ? (state.進捗.at(-1) ?? '実行中…').slice(0, 160) : '直前の実行状況';
-  element('progress').textContent = state.進捗.join('\n');
+  // 拡張ホスト側で除外済みでも、古い状態や単独試用からの制御文字を防御的に表示しない。
+  const visibleProgress = state.進捗.map((line: string) => visibleStreamContent(String(line))).filter(Boolean);
+  element('progress-section').hidden = !visibleProgress.length;
+  element('progress-title').textContent = 実行中 ? (visibleProgress.at(-1) ?? '実行中…').slice(0, 160) : '直前の実行状況';
+  element('progress').textContent = visibleProgress.join('\n');
   ボタン更新();
 });
 post('ready');

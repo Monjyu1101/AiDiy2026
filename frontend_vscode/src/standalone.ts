@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { CLI実行, 会話引数, 起動解決, type 起動設定 } from './runner';
-import { コード要求実行 } from './protocol';
+import { コード要求実行, streamControlOf, visibleStreamContent } from './protocol';
 
 // 単独試用も拡張と同じ CLI・メッセージ形式・描画を使う。
 export async function 単独起動(project: string, launch?: 起動設定) {
@@ -43,7 +43,10 @@ export async function 単独起動(project: string, launch?: 起動設定) {
       }, packet => {
         broadcast(packet);
         if (packet.メッセージ識別 === 'output_stream') {
-          state.進捗 = [...state.進捗, packet.メッセージ内容.slice(0, 4000)].slice(-100); notify();
+          if (streamControlOf(packet.メッセージ内容)) return;
+          const line = visibleStreamContent(packet.メッセージ内容);
+          if (!line) return;
+          state.進捗 = [...state.進捗, line.slice(0, 4000)].slice(-100); notify();
         }
       });
       const result = await job.完了;

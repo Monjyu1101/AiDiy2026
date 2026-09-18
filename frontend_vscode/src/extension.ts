@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLI実行, 会話引数, 起動解決 } from './runner';
-import { コード要求実行 } from './protocol';
+import { コード要求実行, streamControlOf, visibleStreamContent } from './protocol';
 
 interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string }
 interface 会話 { メッセージ: メッセージ[]; 作業URI: string; セッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
@@ -205,7 +205,10 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
           if (this.破棄済み) return;
           void this.view?.webview.postMessage(packet);
           if (packet.メッセージ識別 !== 'output_stream') return;
-          const line = packet.メッセージ内容;
+          // STX / ETX / CAN はプロトコル制御用。進捗表示や出力ログには残さない。
+          if (streamControlOf(packet.メッセージ内容)) return;
+          const line = visibleStreamContent(packet.メッセージ内容);
+          if (!line) return;
           this.ログ.appendLine(line);
           this.進捗 = [...this.進捗, line.slice(0, 4000)].slice(-100);
           if (!this.通知タイマー) this.通知タイマー = setTimeout(() => { this.通知タイマー = undefined; this.通知(); }, 120);

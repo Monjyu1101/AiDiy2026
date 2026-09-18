@@ -90,6 +90,7 @@ test('AIコードと同じ開始・stdout/stderrストリーム・終了・正�
   assert.equal(streamControlOf(`${STREAM_END}\r\n`), 'end');
   assert.equal(streamControlOf(`${STREAM_CANCEL}\n`), 'cancel');
   assert.equal(visibleStreamContent(`${STREAM_START}\n`), '');
+  assert.equal(visibleStreamContent(`開始${STREAM_START}終了${STREAM_END}中断${STREAM_CANCEL}`), '開始終了中断');
   assert.equal(visibleStreamContent('1行\r\n\r\n'), '1行');
   const packets = [];
   const result = await コード要求実行({ セッションID: 'ui-session', チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: 'テスト' }, {
