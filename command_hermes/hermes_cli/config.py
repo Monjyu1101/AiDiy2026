@@ -6106,7 +6106,7 @@ def set_config_value(key: str, value: str, force: bool = False):
             user_config["model"] = {"default": _model_val}
     # Guard against #74995: a single-segment key that names an existing
     # mapping would silently overwrite the entire section with a scalar
-    # (e.g. ``hermes config set model gpt-5.6-sol`` when model already
+    # (e.g. ``hermes config set model gpt-6-sol`` when model already
     # contains default/provider/context_length).  Bare ``model`` is a
     # documented shorthand — redirect to ``model.default`` and preserve
     # siblings.  All other mapping sections are rejected unless --force.

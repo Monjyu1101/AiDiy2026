@@ -83,23 +83,17 @@ def _custom_provider_ssl_context(base_url: str):
 OPENROUTER_MODELS: list[tuple[str, str]] = [
     # Anthropic
     ("anthropic/claude-fable-5.1",             ""),
-    ("anthropic/claude-fable-5",               ""),
-    ("anthropic/claude-opus-5",                ""),
-    ("anthropic/claude-opus-5-fast",           "2x price, higher output speed"),
-    ("anthropic/claude-opus-4.8",              ""),
-    ("anthropic/claude-opus-4.8-fast",         "2x price, higher output speed"),
+    ("anthropic/claude-opus-5.5",              ""),
+    ("anthropic/claude-opus-5.5-fast",         "2x price, higher output speed"),
     ("anthropic/claude-sonnet-5",              ""),
     ("anthropic/claude-haiku-4.5",             ""),
     # OpenAI
-    ("openai/gpt-5.6-sol",                     ""),
-    ("openai/gpt-5.6-sol-pro",                 ""),
+    ("openai/gpt-6-sol",                     ""),
+    ("openai/gpt-6-sol-pro",                 ""),
     ("openai/gpt-5.6-terra",                   ""),
     ("openai/gpt-5.6-terra-pro",               ""),
-    ("openai/gpt-5.6-luna",                    ""),
-    ("openai/gpt-5.6-luna-pro",                ""),
-    ("openai/gpt-5.5",                         ""),
-    ("openai/gpt-5.5-pro",                     ""),
-    ("openai/gpt-5.4-mini",                    ""),
+    ("openai/gpt-6-luna",                    ""),
+    ("openai/gpt-6-luna-pro",                ""),
     # Google
     ("google/gemini-3.1-pro-preview",          ""),
     ("google/gemini-3.8-flash",                ""),
@@ -164,13 +158,12 @@ VERCEL_AI_GATEWAY_MODELS: list[tuple[str, str]] = [
     ("alibaba/qwen3.6-plus",                 ""),
     ("zai/glm-5.1",                          ""),
     ("minimax/minimax-m2.7",                 ""),
-    ("anthropic/claude-sonnet-4.6",          ""),
-    ("anthropic/claude-opus-4.7",            ""),
-    ("anthropic/claude-opus-4.6",            ""),
+    ("anthropic/claude-sonnet-5",             ""),
+    ("anthropic/claude-opus-5.5",             ""),
     ("anthropic/claude-haiku-4.5",           ""),
-    ("openai/gpt-5.4",                       ""),
-    ("openai/gpt-5.4-mini",                  ""),
-    ("openai/gpt-5.3-codex",                 ""),
+    ("openai/gpt-6-sol",                     ""),
+    ("openai/gpt-5.6-terra",                 ""),
+    ("openai/gpt-6-luna",                    ""),
     ("google/gemini-3.1-pro-preview",        ""),
     ("google/gemini-3-flash",                ""),
     ("google/gemini-3.1-flash-lite-preview", ""),
@@ -272,21 +265,16 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     "nous": [
         # Anthropic
         "anthropic/claude-fable-5.1",
-        "anthropic/claude-fable-5",
-        "anthropic/claude-opus-5",
-        "anthropic/claude-opus-4.8",
+        "anthropic/claude-opus-5.5",
         "anthropic/claude-sonnet-5",
         "anthropic/claude-haiku-4.5",
         # OpenAI
-        "openai/gpt-5.6-sol",
-        "openai/gpt-5.6-sol-pro",
+        "openai/gpt-6-sol",
+        "openai/gpt-6-sol-pro",
         "openai/gpt-5.6-terra",
         "openai/gpt-5.6-terra-pro",
-        "openai/gpt-5.6-luna",
-        "openai/gpt-5.6-luna-pro",
-        "openai/gpt-5.5",
-        "openai/gpt-5.5-pro",
-        "openai/gpt-5.4-mini",
+        "openai/gpt-6-luna",
+        "openai/gpt-6-luna-pro",
         # Google
         "google/gemini-3.1-pro-preview",
         "google/gemini-3.8-flash",
@@ -322,34 +310,24 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "sakana/fugu-ultra",
     ],
     # Native OpenAI Chat Completions (api.openai.com). Used by /model counts and
-    # provider_model_ids fallback when /v1/models is unavailable.
+    # provider_model_ids fallback when /v1/models is unavailable. Kept in sync
+    # with "openai-api" below — both ids normalize to the same route (models.py
+    # treats them as equivalent aliases throughout).
     "openai": [
-        "gpt-5.4",
-        "gpt-5.4-mini",
-        "gpt-5-mini",
-        "gpt-5.3-codex",
-        "gpt-5.2-codex",
-        "gpt-4.1",
-        "gpt-4o",
-        "gpt-4o-mini",
-    ],
-    "openai-api": [
-        "gpt-5.6-sol",
-        "gpt-5.6-sol-pro",
+        "gpt-6-sol",
+        "gpt-6-sol-pro",
         "gpt-5.6-terra",
         "gpt-5.6-terra-pro",
-        "gpt-5.6-luna",
-        "gpt-5.6-luna-pro",
-        "gpt-5.5",
-        "gpt-5.5-pro",
-        "gpt-5.4",
-        "gpt-5.4-mini",
-        "gpt-5.4-nano",
-        "gpt-5-mini",
-        "gpt-5.3-codex",
-        "gpt-4.1",
-        "gpt-4o",
-        "gpt-4o-mini",
+        "gpt-6-luna",
+        "gpt-6-luna-pro",
+    ],
+    "openai-api": [
+        "gpt-6-sol",
+        "gpt-6-sol-pro",
+        "gpt-5.6-terra",
+        "gpt-5.6-terra-pro",
+        "gpt-6-luna",
+        "gpt-6-luna-pro",
     ],
     "openai-codex": _codex_curated_models(),
     "xai-oauth": _xai_curated_models(),
@@ -357,18 +335,10 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "copilot-acp",
     ],
     "copilot": [
-        "gpt-5.4",
-        "gpt-5.4-mini",
-        "gpt-5-mini",
-        "gpt-5.3-codex",
-        "gpt-5.2-codex",
-        "gpt-4.1",
-        "gpt-4o",
-        "gpt-4o-mini",
-        "claude-sonnet-4.6",
+        "gpt-6-sol",
+        "gpt-5.6-terra",
+        "gpt-6-luna",
         "claude-sonnet-5",
-        "claude-sonnet-4",
-        "claude-sonnet-4.5",
         "claude-haiku-4.5",
         "gemini-3.1-pro-preview",
         "gemini-3-pro-preview",
@@ -461,16 +431,9 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "MiniMax-M2",
     ],
     "anthropic": [
-        "claude-fable-5",
+        "claude-fable-5-1",
+        "claude-opus-5-5",
         "claude-sonnet-5",
-        "claude-opus-4-8",
-        "claude-opus-4-7",
-        "claude-opus-4-6",
-        "claude-sonnet-4-6",
-        "claude-opus-4-5-20251101",
-        "claude-sonnet-4-5-20250929",
-        "claude-opus-4-20250514",
-        "claude-sonnet-4-20250514",
         "claude-haiku-4-5-20251001",
     ],
     "deepseek": [
@@ -505,8 +468,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "moonshotai/Kimi-K2.5",
         "google/gemini-3.1-flash-lite-preview",
         "anthropic/claude-sonnet-5",
-        "anthropic/claude-sonnet-4.6",
-        "openai/gpt-5.4",
+        "openai/gpt-6-sol",
     ],
     # Synced against https://opencode.ai/docs/zen/ + live GET /zen/v1/models
     # (2026-08-20). Zen/Go are _LIVE_FIRST_PICKER_PROVIDERS, so this list is a
@@ -517,9 +479,9 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "kimi-k3",
         "kimi-k2.5",
         "kimi-k2.6",
-        "gpt-5.6-sol",
+        "gpt-6-sol",
         "gpt-5.6-terra",
-        "gpt-5.6-luna",
+        "gpt-6-luna",
         "gpt-5.5",
         "gpt-5.5-pro",
         "gpt-5.4-pro",
@@ -538,15 +500,8 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "gpt-5-codex",
         "gpt-5-nano",
         "claude-fable-5",
-        "claude-opus-5",
+        "claude-opus-5-5",
         "claude-sonnet-5",
-        "claude-opus-4-8",
-        "claude-opus-4-7",
-        "claude-opus-4-6",
-        "claude-opus-4-5",
-        "claude-sonnet-4-6",
-        "claude-sonnet-4-5",
-        "claude-sonnet-4",
         "claude-haiku-4-5",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
@@ -609,7 +564,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "kimi-k2.7-code",
         "kimi-k2.6",
         "kimi-k2.5",
-        "gpt-5.6-luna",
+        "gpt-6-luna",
         "grok-4.5",
         "glm-5.3",
         "glm-5.3-flash",
@@ -639,9 +594,9 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "ox-alpha-free",
     ],
     "kilocode": [
-        "anthropic/claude-opus-4.6",
-        "anthropic/claude-sonnet-4.6",
-        "openai/gpt-5.4",
+        "anthropic/claude-opus-5.5",
+        "anthropic/claude-sonnet-5",
+        "openai/gpt-6-sol",
         "google/gemini-3-pro-preview",
         "google/gemini-3-flash-preview",
     ],
@@ -771,14 +726,11 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     # Use inference profile IDs (us.*) since most models require them.
     "bedrock": [
         "us.anthropic.claude-sonnet-5",
-        "us.anthropic.claude-sonnet-4-6",
-        "us.anthropic.claude-opus-4-6-v1",
+        "us.anthropic.claude-opus-5-5-v1",
         "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        "openai.gpt-5.5",
-        "openai.gpt-5.6-sol",
+        "openai.gpt-6-sol",
         "openai.gpt-5.6-terra",
-        "openai.gpt-5.6-luna",
+        "openai.gpt-6-luna",
         "us.amazon.nova-pro-v1:0",
         "us.amazon.nova-lite-v1:0",
         "us.amazon.nova-micro-v1:0",
@@ -6243,7 +6195,7 @@ def opencode_model_api_mode(provider_id: Optional[str], model_id: Optional[str])
     OpenCode routes different models behind different API surfaces:
 
     - GPT-5 / Codex / Grok models on Zen use ``/v1/responses``
-    - GPT / Grok models on Go (gpt-5.6-luna, grok-4.5) use ``/v1/responses``
+    - GPT / Grok models on Go (gpt-6-luna, grok-4.5) use ``/v1/responses``
     - Muse Spark on Go and Zen uses ``/v1/responses`` (chat/completions 503s)
     - Claude models on Zen use ``/v1/messages``
     - MiniMax and Qwen models on Go use ``/v1/messages``
@@ -6266,7 +6218,7 @@ def opencode_model_api_mode(provider_id: Optional[str], model_id: Optional[str])
 
     if family == "opencode-go":
         if normalized.startswith("gpt-") or normalized.startswith("grok-"):
-            # GPT and Grok models on Go (gpt-5.6-luna, grok-4.5) are served
+            # GPT and Grok models on Go (gpt-6-luna, grok-4.5) are served
             # via /v1/responses per the published Go endpoint table, same as
             # GPT/Grok on Zen: https://opencode.ai/docs/go/#endpoints
             return "codex_responses"
@@ -7378,7 +7330,7 @@ def validate_requested_model(
                         f"`{_base_guess}` enforces the standard 272K window on "
                         f"Codex, so no `-900k` option exists for it. Pick the "
                         f"base model, or a verified variant from the `/model` "
-                        f"picker (e.g. `gpt-5.6-sol-900k`)."
+                        f"picker (e.g. `gpt-6-sol-900k`)."
                     ),
                 }
         if catalog_models:

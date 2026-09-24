@@ -728,7 +728,7 @@ class ResponsesApiTransport(ProviderTransport):
         )
         kwargs = {
             # ``-900k`` large-context picker variants are Hermes-side aliases
-            # (gpt-5.6-sol-900k etc.) — the Codex/OpenAI backend only knows
+            # (gpt-6-sol-900k etc.) — the Codex/OpenAI backend only knows
             # the base slug, so strip the suffix before it hits the wire.
             "model": _strip_ctx_variant(model),
             "instructions": instructions,

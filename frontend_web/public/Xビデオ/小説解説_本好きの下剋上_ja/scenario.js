@@ -1,7 +1,7 @@
 window.SCENARIO = {
   "project_name": "小説解説_本好きの下剋上_ja",
   "version": "mcp",
-  "title": "小説解説『本好きの下剋上』改―紙一枚から図書館都市へ",
+  "title": "小説解説『本好きの下剋上』―紙一枚から図書館都市へ",
   "source": {
     "type": "wikipedia_ja",
     "name": "Wikipedia日本語版「本好きの下剋上」",

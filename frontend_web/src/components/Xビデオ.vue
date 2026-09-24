@@ -88,7 +88,7 @@ const handleReturn = () => {
     </h2>
 
     <div class="content">
-      <p>AiDiy 紹介ビデオ・プレゼンテーションへのアクセスリンクです。下記から選択してください。</p>
+      <p>AiDiy の紹介・実装解説、ニュース、小説、四コマ漫画のビデオです。下記から選択してください。</p>
 
       <div class="video-menu-sections">
         <div class="section-label">AiDiy紹介</div>

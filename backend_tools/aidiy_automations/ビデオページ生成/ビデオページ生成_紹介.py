@@ -118,8 +118,8 @@ def _build_narration_audio_bodies() -> tuple[str, str, str]:
         '        scene_num = str(scene.get("id", "")).replace("scene_", "")\n'
         '        short_text = str(scene.get("short_narration", "") or "").strip()\n'
         '        long_text  = str(scene.get("long_narration",  "") or "").strip()\n'
-        '        if short_text: narrations.append((scene_num, "short", short_text))\n'
-        '        if long_text:  narrations.append((scene_num, "long",  long_text))\n'
+        '        if "short_narration" in scene: narrations.append((scene_num, "short", short_text))\n'
+        '        if "long_narration" in scene:  narrations.append((scene_num, "long",  long_text))\n'
         "    return narrations\n\n"
         "NARRATIONS = load_tasks()\n"
     )

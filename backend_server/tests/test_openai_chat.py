@@ -35,7 +35,7 @@ class OpenAIChatTest(unittest.TestCase):
 
         for ai_name in ("openai_chat", "openai_oauth"):
             with self.subTest(ai_name=ai_name):
-                chat = Chat(AI_NAME=ai_name, AI_MODEL="gpt-5.6-sol")
+                chat = Chat(AI_NAME=ai_name, AI_MODEL="gpt-6-sol")
                 self.assertEqual(
                     chat.AIモジュール.__name__,
                     "AIコア.AIチャット_openai",
@@ -63,7 +63,7 @@ class OpenAIChatTest(unittest.TestCase):
         with patch.object(openai_module.openai, "OpenAI", return_value=fake_client) as factory:
             chat = openai_module.ChatAI(
                 AI_NAME="openai_chat",
-                AI_MODEL="gpt-5.6-sol",
+                AI_MODEL="gpt-6-sol",
                 api_key="openai-api-key",
             )
             self.assertTrue(asyncio.run(chat.開始()))
@@ -114,7 +114,7 @@ class OpenAIChatTest(unittest.TestCase):
         ):
             chat = openai_module.ChatAI(
                 AI_NAME="openai_oauth",
-                AI_MODEL="gpt-5.6-sol",
+                AI_MODEL="gpt-6-sol",
             )
             self.assertTrue(asyncio.run(chat.開始()))
             self.assertTrue(chat.oauth_mode)
@@ -123,7 +123,7 @@ class OpenAIChatTest(unittest.TestCase):
                 [
                     {
                         "provider": "openai-codex",
-                        "model": "gpt-5.6-sol",
+                        "model": "gpt-6-sol",
                         "api_mode": "codex_responses",
                     }
                 ],
@@ -144,7 +144,7 @@ class OpenAIChatTest(unittest.TestCase):
         ):
             chat = openai_module.ChatAI(
                 AI_NAME="openai_oauth",
-                AI_MODEL="gpt-5.6-sol",
+                AI_MODEL="gpt-6-sol",
             )
             self.assertFalse(asyncio.run(chat.開始()))
             self.assertIn("aidiy_hermes", chat.last_error)

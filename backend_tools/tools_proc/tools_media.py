@@ -86,7 +86,7 @@ class SttRequest(BaseModel):
 
 
 class TtsRequest(BaseModel):
-    speech_text: str = ""
+    speech_text: str
     language: str = "ja"
     provider: str = "edge"
     model: str = "auto"
@@ -137,7 +137,7 @@ _TTS_METHODS = [
         "name": "synthesize",
         "description": "テキストを音声合成する。レスポンスの base64_audio フィールドに MP3 の base64 文字列が入る",
         "parameters": {
-            "speech_text": {"type": "string", "required": True, "description": "読み上げテキスト"},
+            "speech_text": {"type": "string", "required": True, "description": "読み上げテキスト。JSONの空文字列を指定すると1秒の無音音声を生成"},
             "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（Edge の female/male 自動解決: en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja）"},
             "provider": {"type": "string", "required": False, "default": "edge", "description": "edge / openai / gemini / freeai"},
             "model": {"type": "string", "required": False, "default": "auto"},
@@ -356,7 +356,7 @@ def register_tts_tools(mcp_ts, tts):
         テキストを音声（MP3/WAV）に変換する。
 
         Args:
-            speech_text: 合成するテキスト
+            speech_text: 合成するテキスト。JSONの空文字列なら1秒の無音音声を生成する
             language: 言語コード（デフォルト "ja"）。Edge の female/male 自動解決は
                       en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja に対応
             provider: "auto"=edge→freeai /
@@ -614,7 +614,7 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                     "summary": "テキスト音声合成",
                     "description": "speech_text を音声合成して base64_audio（MP3）で返す。同時に save_path へ自動保存。",
                     "parameters": {
-                        "speech_text": {"type": "string", "required": True, "description": "読み上げるテキスト"},
+                        "speech_text": {"type": "string", "required": True, "description": "読み上げるテキスト。JSONの空文字列なら1秒の無音音声を生成"},
                         "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（Edge の female/male 自動解決: en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja）"},
                         "provider": {"type": "string", "required": False, "default": "edge", "values": ["edge", "gemini", "freeai", "openai"], "description": "音声合成プロバイダ。edge は無料・高速"},
                         "model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。auto でプロバイダ既定値"},
@@ -625,10 +625,15 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                         "play": {"type": "boolean", "required": False, "default": False, "description": "local_play の別名"},
                     },
                     "example_request": {"speech_text": "AiDiy のデモ動画へようこそ。", "provider": "freeai", "voice": "female", "ratio": 0},
+                    "silence_example_request": {"speech_text": "", "save_path": "audio/pause.mp3"},
                     "response_fields": {
                         "used_provider": "実際に使用したプロバイダ",
                         "audio_format": "mp3 または wav",
                         "audio_bytes_length": "音声データのバイト数",
+                        "is_silence": "空文字列要求による無音音声なら true",
+                        "silence_duration_sec": "生成した無音の秒数。通常の読み上げでは0",
+                        "pause_count": "空文字列要求なら1、通常の読み上げなら0",
+                        "pause_duration_sec": "空文字列要求なら1秒、通常の読み上げなら0秒",
                         "base64_audio": "base64 エンコードされた音声データ（常に返される）",
                         "save_path": "保存先パス（省略時は temp/output/ に自動生成）",
                         "local_play": "ローカル再生を要求したか",
@@ -647,8 +652,6 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
         """
         if method_name != "synthesize":
             return {"error": f"未知のメソッド: {method_name}"}
-        if not req.speech_text:
-            return {"error": "speech_text is required"}
         try:
             audio_bytes, info = await asyncio.to_thread(
                 tts.synthesize, req.speech_text, req.language, req.provider, req.model, req.voice, req.ratio

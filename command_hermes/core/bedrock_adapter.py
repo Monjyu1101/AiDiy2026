@@ -72,9 +72,9 @@ BEDROCK_OPENAI_RESPONSES_MODEL_IDS: Tuple[str, ...] = (
     # (balanced), Luna (fast/affordable). All are Mantle-only — the model
     # cards list bedrock-runtime/Converse as unsupported.
     # https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards-openai.html
-    "openai.gpt-5.6-sol",
+    "openai.gpt-6-sol",
     "openai.gpt-5.6-terra",
-    "openai.gpt-5.6-luna",
+    "openai.gpt-6-luna",
 )
 _BEDROCK_OPENAI_HOST_RE = re.compile(
     r"^bedrock-mantle\.([a-z0-9-]+)\.api\.aws$", re.IGNORECASE
@@ -1931,9 +1931,9 @@ BEDROCK_CONTEXT_LENGTHS: Dict[str, int] = {
     # OpenAI on Bedrock (Mantle/Responses route)
     # https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards-openai.html
     "openai.gpt-5.5":                272_000,
-    "openai.gpt-5.6-sol":            272_000,
+    "openai.gpt-6-sol":            272_000,
     "openai.gpt-5.6-terra":          272_000,
-    "openai.gpt-5.6-luna":           272_000,
+    "openai.gpt-6-luna":           272_000,
 }
 
 # Default for unknown Bedrock models

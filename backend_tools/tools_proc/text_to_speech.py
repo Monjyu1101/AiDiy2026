@@ -147,6 +147,10 @@ class TextToSpeech:
     GEMINI_CHANNELS = 1
     GEMINI_SAMPLE_WIDTH = 2  # 16-bit PCM
 
+    # JSON の空文字列（speech_text == ""）は、1秒の無音音声として扱う。
+    # 本文中のダブルクォートには特別な意味を持たせない。
+    PAUSE_SECONDS = 1.0
+
     PROVIDER_KEYS = {
         "openai": "openai_key_id",
         "gemini": "gemini_key_id",
@@ -229,6 +233,10 @@ class TextToSpeech:
         ("本須麗乃", "もとすうらの"),
         ("幼馴染", "おさななじみ"),
         ("束の間", "つかのま"),
+        ("側仕え", "そばづかえ"),
+        ("労い", "ねぎらい"),
+        ("神具", "かみぐ"),
+        ("王城", "おうじょう"),
         (["AiDiy", "aidiy", "AIDIY"], "アイディ"),
         ("subprocess", "サブプロセス"),
         ("横展開", "よこてんかい"),
@@ -442,6 +450,7 @@ class TextToSpeech:
             f" Edge の female/male 自動解決は {', '.join(self.EDGE_SUPPORTED_LANGUAGE_CODES)} "
             "に対応。language=ja の場合、AiDiy、DB、API、MCP などのシステム用語は "
             "_config/mcp_text_to_speech.json の読み上げ用辞書で自動変換する。"
+            " speech_text にJSONの空文字列を指定すると、1秒の無音音声を生成する。"
         )
         return desc
 
@@ -541,6 +550,123 @@ class TextToSpeech:
             return "wav"
         return "mp3"
 
+    def _synthesize_provider(
+        self,
+        provider: str,
+        text: str,
+        voice: str,
+        model: str,
+        ratio: float,
+    ) -> bytes:
+        """指定 provider で、1件の通常テキストを音声合成する。"""
+        if provider == "edge":
+            return self._synthesize_edge(text, voice, ratio)
+        if provider == "openai":
+            return self._synthesize_openai(text, voice, model, ratio)
+        if provider in ("gemini", "freeai"):
+            return self._synthesize_gemini(text, voice, model, provider, ratio)
+        raise TextToSpeechError(f"未対応の provider です: '{provider}'")
+
+    def _generate_silence_mp3(self, seconds: float = PAUSE_SECONDS) -> bytes:
+        """指定秒数のモノラル無音 MP3 を生成する。"""
+        duration = max(0.001, float(seconds))
+        if self.ffmpeg_path:
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+                out_path = tmp.name
+            try:
+                result = subprocess.run(
+                    [
+                        self.ffmpeg_path,
+                        "-f", "lavfi",
+                        "-i", "anullsrc=r=24000:cl=mono",
+                        "-t", f"{duration:.3f}",
+                        "-c:a", "libmp3lame",
+                        "-b:a", "128k",
+                        "-y", "-loglevel", "error",
+                        out_path,
+                    ],
+                    timeout=30,
+                    check=False,
+                )
+                if result.returncode == 0 and os.path.getsize(out_path) > 0:
+                    with open(out_path, "rb") as f:
+                        return f.read()
+                raise TextToSpeechError("ffmpeg による無音音声の生成に失敗しました")
+            finally:
+                try:
+                    os.remove(out_path)
+                except OSError:
+                    pass
+
+        # ffmpeg がない環境でも、既存依存の lameenc で無音 MP3 を作れるようにする。
+        try:
+            import lameenc
+            sample_rate = 24000
+            pcm = b"\x00\x00" * int(sample_rate * duration)
+            encoder = lameenc.Encoder()
+            encoder.set_bit_rate(128)
+            encoder.set_in_sample_rate(sample_rate)
+            encoder.set_channels(1)
+            encoder.set_quality(2)
+            return bytes(encoder.encode(pcm) + encoder.flush())
+        except Exception as exc:
+            raise TextToSpeechError(
+                f"1秒無音を生成できません。ffmpeg または lameenc が必要です: {exc}"
+            ) from exc
+
+    def _concat_audio_parts(self, audio_parts: list[bytes]) -> bytes:
+        """音声区間と無音区間を順番どおり1本の MP3 に連結する。"""
+        if not audio_parts:
+            raise TextToSpeechError("連結する音声区間がありません")
+        if len(audio_parts) == 1:
+            return audio_parts[0]
+
+        if not self.ffmpeg_path:
+            if all(self._detect_audio_format(part) == "mp3" for part in audio_parts):
+                # MP3 フレーム列は連結再生できる。ffmpeg 不在時だけのフォールバック。
+                return b"".join(audio_parts)
+            raise TextToSpeechError("WAV を含む音声連結には ffmpeg が必要です")
+
+        temp_dir = tempfile.mkdtemp(prefix="aidiy_tts_pause_")
+        output_path = os.path.join(temp_dir, "joined.mp3")
+        try:
+            input_args: list[str] = []
+            filter_parts: list[str] = []
+            concat_inputs: list[str] = []
+            for index, part in enumerate(audio_parts):
+                ext = self._detect_audio_format(part)
+                part_path = os.path.join(temp_dir, f"part_{index:04d}.{ext}")
+                with open(part_path, "wb") as f:
+                    f.write(part)
+                input_args.extend(["-i", part_path])
+                label = f"a{index}"
+                filter_parts.append(
+                    f"[{index}:a]aresample=24000,"
+                    f"aformat=sample_fmts=s16:channel_layouts=mono[{label}]"
+                )
+                concat_inputs.append(f"[{label}]")
+            filter_parts.append(
+                "".join(concat_inputs)
+                + f"concat=n={len(audio_parts)}:v=0:a=1[out]"
+            )
+            command = [
+                self.ffmpeg_path,
+                *input_args,
+                "-filter_complex", ";".join(filter_parts),
+                "-map", "[out]",
+                "-c:a", "libmp3lame",
+                "-b:a", "128k",
+                "-y", "-loglevel", "error",
+                output_path,
+            ]
+            result = subprocess.run(command, timeout=120, check=False)
+            if result.returncode != 0 or not os.path.isfile(output_path):
+                raise TextToSpeechError("ffmpeg による音声と無音の連結に失敗しました")
+            with open(output_path, "rb") as f:
+                return f.read()
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def synthesize(
         self,
         speech_text: str,
@@ -570,12 +696,47 @@ class TextToSpeech:
         Returns:
             (audio_bytes, info_dict)
         """
-        if not speech_text or not speech_text.strip():
+        if speech_text is None:
             raise TextToSpeechError("speech_text は必須です")
+        if not isinstance(speech_text, str):
+            raise TextToSpeechError("speech_text は文字列で指定してください")
 
         requested = self._normalize_provider(provider)
         model = model.strip().lower()
         language = language.strip().lower()
+
+        # JSON の "" はゼロバイト文字列であり、本文中の記号ではない。
+        # 空文字列を1件の音声生成要求として受けた場合、その1件を1秒無音にする。
+        if speech_text == "":
+            audio_bytes = self._generate_silence_mp3(self.PAUSE_SECONDS)
+            audio_format = self._detect_audio_format(audio_bytes)
+            info = {
+                "requested_provider": requested,
+                "used_provider": "silence",
+                "model": "silence",
+                "voice": "",
+                "language": language,
+                "ratio": 1.0,
+                "requested_ratio": ratio,
+                "speech_text": "",
+                "original_speech_text": "",
+                "pronunciation_replacements": [],
+                "is_silence": True,
+                "silence_duration_sec": self.PAUSE_SECONDS,
+                "pause_count": 1,
+                "pause_seconds_each": self.PAUSE_SECONDS,
+                "pause_duration_sec": self.PAUSE_SECONDS,
+                "audio_format": audio_format,
+                "audio_bytes_length": len(audio_bytes),
+                "mp3_bytes_length": len(audio_bytes),
+            }
+            return audio_bytes, info
+
+        if not speech_text.strip():
+            raise TextToSpeechError(
+                "speech_text は空文字列（1秒無音）または読み上げる文字列で指定してください"
+            )
+
         normalized_text, replacements = self.normalize_for_speech(speech_text, language)
         voice_input = voice
 
@@ -598,14 +759,9 @@ class TextToSpeech:
             resolved_voice = self._resolve_voice(voice_input, candidate, language)
             effective_ratio = self._resolve_ratio_for_provider(ratio, candidate)
             try:
-                if candidate == "edge":
-                    audio_bytes = self._synthesize_edge(normalized_text, resolved_voice, effective_ratio)
-                elif candidate == "openai":
-                    audio_bytes = self._synthesize_openai(normalized_text, resolved_voice, model, effective_ratio)
-                elif candidate in ("gemini", "freeai"):
-                    audio_bytes = self._synthesize_gemini(normalized_text, resolved_voice, model, candidate, effective_ratio)
-                else:
-                    raise TextToSpeechError(f"未対応の provider です: '{candidate}'")
+                audio_bytes = self._synthesize_provider(
+                    candidate, normalized_text, resolved_voice, model, effective_ratio
+                )
                 used = candidate
                 used_voice = resolved_voice
                 if candidate != requested:
@@ -636,6 +792,11 @@ class TextToSpeech:
             "speech_text": normalized_text,
             "original_speech_text": speech_text,
             "pronunciation_replacements": replacements,
+            "is_silence": False,
+            "silence_duration_sec": 0.0,
+            "pause_count": 0,
+            "pause_seconds_each": self.PAUSE_SECONDS,
+            "pause_duration_sec": 0.0,
             "audio_format": audio_format,
             "audio_bytes_length": len(audio_bytes),
             "mp3_bytes_length": len(audio_bytes),  # backward compat

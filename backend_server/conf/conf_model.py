@@ -130,12 +130,12 @@ class conf_models:
         self.CODE_COPILOT_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
             "claude-fable-5.1": "yyyy/mm/dd - claude-fable-5.1",
-            "claude-opus-5": "yyyy/mm/dd - claude-opus-5",
+            "claude-opus-5.5": "yyyy/mm/dd - claude-opus-5.5",
             "claude-sonnet-5": "yyyy/mm/dd - claude-sonnet-5",
             "claude-haiku-4.5": "yyyy/mm/dd - claude-haiku-4.5",
-            "gpt-5.6-sol": "yyyy/mm/dd - gpt-5.6-sol",
+            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
-            "gpt-5.6-luna": "yyyy/mm/dd - gpt-5.6-luna",
+            "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
             "gemini-3.7-flash": "yyyy/mm/dd - gemini-3.7-flash",
             "gemini-3.8-flash": "yyyy/mm/dd - gemini-3.8-flash",
         }
@@ -148,9 +148,9 @@ class conf_models:
         self.CODE_CODEX_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
             "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
-            "gpt-5.6-sol": "yyyy/mm/dd - gpt-5.6-sol",
+            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
-            "gpt-5.6-luna": "yyyy/mm/dd - gpt-5.6-luna",
+            "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
         }
         self.CODE_GROK_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
@@ -714,7 +714,7 @@ class conf_models:
         except Exception as e:
             logger.warning(f"OpenAI OAuth モデル一覧の初期化エラー: {e}")
             openai_oauth_models = {
-                "gpt-5.6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-sol",
+                "gpt-6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6-sol",
             }
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
@@ -733,7 +733,7 @@ class conf_models:
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.openai_models.items()
             } or {
-                "gpt-5.6-sol": "yyyy/mm/dd - OpenAI API / gpt-5.6-sol",
+                "gpt-6-sol": "yyyy/mm/dd - OpenAI API / gpt-6-sol",
             },
             "openai_oauth": openai_oauth_models,
         }
@@ -762,7 +762,7 @@ class conf_models:
     def _get_aidiy_hermes_models(self) -> Dict[str, str]:
         """aidiy_hermes のモデル一覧を生成する（OAuth + auto + Ollama + ローカル LLM）。"""
         result = {
-            "openai_oauth/gpt-5.6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-sol (default)",
+            "openai_oauth/gpt-6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6-sol (default)",
             "xai-oauth/grok-4.6": "yyyy/mm/dd - xAI OAuth / grok-4.6",
             "auto": "yyyy/mm/dd - auto",
         }

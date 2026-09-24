@@ -34,6 +34,8 @@
 ## TtsRequest フィールド仕様
 
 - `speech_text` のみ（`text` フィールドは廃止済み）
+- `speech_text` 全体が JSON の空文字列 `""` の場合だけ、1秒の無音MP3を生成する。本文中の `""` は間合い記号として扱わない
+- 稼働中のサービスが空文字列を `speech_text is required` として拒否する場合は旧版が動いている。再起動後に再確認するか、現行 `backend_tools/tools_proc/text_to_speech.py` の `TextToSpeech.synthesize(speech_text="")` を直接使用する
 - `save_path` 未指定でも常にファイルへ出力する
 - `local_play=true` または `play=true` でサーバー側ローカル再生を試行する
 

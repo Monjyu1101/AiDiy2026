@@ -162,7 +162,7 @@ def _build_audio_bodies() -> tuple[str, str, str]:
         "            if a_key in scene and t_key in scene:\n"
         "                text = str(scene[t_key] or '').strip()\n"
         "                audio = str(scene[a_key] or '').strip()\n"
-        '                if text and audio: tasks.append((text, "female", audio))\n'
+        '                if audio: tasks.append((text, "female", audio))\n'
         '        dialogues = scene.get("dialogue", [])\n'
         "        if isinstance(dialogues, list):\n"
         "            for dlg in dialogues:\n"
@@ -174,7 +174,7 @@ def _build_audio_bodies() -> tuple[str, str, str]:
         "                        text = str(dlg[tk] or '').strip()\n"
         "                        break\n"
         '                speaker = str(dlg.get("speaker", "female") or "female")\n'
-        "                if text and audio: tasks.append((text, speaker, audio))\n"
+        "                if audio: tasks.append((text, speaker, audio))\n"
         "    return tasks\n\n"
         "NARRATIONS = load_tasks()\n"
     )

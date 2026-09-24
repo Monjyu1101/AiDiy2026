@@ -144,6 +144,34 @@ PATH 上にない環境ではフルパスへ書き換える。MCP ツールは a
 ## Reboot
 
 `backend_tools/temp/reboot_tools.txt` を作成すると `tools_main.py` が自身を終了し、`_start.py` 起動中なら自動再起動される。
+ただし MCP クライアント（Code CLI 等）側の接続が不調な場合、この再起動では直らない（後述の HTTP フォールバックで切り分ける）。
+
+## MCP ツールが応答しない場合の切り分け（HTTP フォールバック）
+
+MCP 経由のツール呼び出しが `Invalid request parameters` 等で全般的に失敗する場合がある。原因は主に3層に分かれる。
+
+1. `backend_tools`（ポート8095）本体 — `curl http://127.0.0.1:8095/` で疎通確認。
+2. Chrome / 対象アプリ自体 — Chrome DevTools の場合 `curl http://127.0.0.1:9222/json/version` で疎通確認。
+3. MCP クライアント側（Code CLI・Claude Code 等）の stdio/SSE ブリッジ — 上記1・2が正常なのに MCP 経由の呼び出しだけ失敗するなら、この層が不調。
+
+1・2 が正常なら、**アクセスインターフェース（3種類）** の「HTTP POST（FastAPI）」で直接呼び出すことで作業を継続できる。
+
+```bash
+# 例: Chrome DevTools の navigate / screenshot を HTTP で直接叩く
+curl -s -X POST http://127.0.0.1:8095/aidiy_chrome_devtools/navigate \
+     -H "Content-Type: application/json; charset=utf-8" \
+     -d '{"url": "http://127.0.0.1:8090/..."}'
+
+curl -s -X POST http://127.0.0.1:8095/aidiy_chrome_devtools/screenshot \
+     -H "Content-Type: application/json" \
+     -d '{"save_path": "C:/path/to/out.png"}'
+```
+
+注意点:
+
+- 日本語などの非ASCIIを含む URL/パスは `curl -d` の直書きだと文字化け・パース失敗（`There was an error parsing the body`）することがある。UTF-8 で JSON ファイルへ書き出し、`--data-binary @file.json` で送る方が安全。
+- MCP 層が不調な間は `backend_tools/temp/reboot_tools.txt` によるサーバー再起動を試しても直らない（サーバー自体は正常なため）。MCP クライアント側の再接続（例: Code CLI の `/mcp` コマンド）や、クライアントの再起動が必要になる。
+- 各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` で確認できる。
 
 ## ログ
 

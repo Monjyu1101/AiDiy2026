@@ -35,14 +35,14 @@ test('単独画面: 接続制限・初期値・日本語送信・進捗・継続
   const stream = await connect(app);
   try {
     const initial = await stream.wait(p=>p.type==='state');
-    assert.equal(initial.provider,'openai_oauth'); assert.equal(initial.model,'gpt-5.6-sol');
+    assert.equal(initial.provider,'openai_oauth'); assert.equal(initial.model,'gpt-6-sol');
     assert.equal((await fetch(new URL('/events',app.url))).status,404);
     assert.equal((await post(app,{type:'new'},'https://example.com')).status,403);
     assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:'日本語で確認'})).status,200);
     const completed = await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.種別==='assistant'));
     const reply = JSON.parse(completed.メッセージ.find(m=>m.種別==='assistant').本文);
     assert.equal(reply.input,'日本語で確認'); assert.equal(reply.cwd,process.cwd());
-    assert.ok(reply.args.includes('gpt-5.6-sol')); assert.ok(reply.args.includes('openai_oauth'));
+    assert.ok(reply.args.includes('gpt-6-sol')); assert.ok(reply.args.includes('openai_oauth'));
     assert.ok(stream.packets.some(p=>p.メッセージ識別==='output_stream' && p.メッセージ内容.includes('日本語の進捗')));
     assert.ok(completed.進捗.every(line=>!/[\u0002\u0003\u0018]/.test(line)));
     await post(app,{type:'model',provider:'freeai',model:'custom-model'});

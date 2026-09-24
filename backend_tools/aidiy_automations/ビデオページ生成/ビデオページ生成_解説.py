@@ -123,8 +123,6 @@ def _build_dialogue_audio_bodies() -> tuple[str, str, str]:
         '        for turn, dlg in enumerate(scene.get("dialogue", []), start=1):\n'
         '            speaker = str(dlg.get("speaker", "female") or "female")\n'
         '            text = str(dlg.get("naration_text", "") or "").strip()\n'
-        "            if not text:\n"
-        "                continue\n"
         "            dialogues.append((scene_num, turn, speaker, text))\n"
         "    return dialogues\n\n"
         "NARRATIONS = load_tasks()\n"

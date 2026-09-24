@@ -41,13 +41,9 @@ _model_cache_lock = Lock()
 
 _FALLBACK_MODELS = (
     "gpt-6-astra",
-    "gpt-5.6-sol",
+    "gpt-6-sol",
     "gpt-5.6-terra",
-    "gpt-5.6-luna",
-    "gpt-5.5",
-    "gpt-5.4-mini",
-    "gpt-5.4",
-    "gpt-5.3-codex",
+    "gpt-6-luna",
 )
 
 
@@ -175,7 +171,7 @@ class ChatAI(OpenRouterChatAI):
         チャンネル: int = 0,
         絶対パス: str = None,
         AI_NAME: str = "openai_chat",
-        AI_MODEL: str = "gpt-5.6-sol",
+        AI_MODEL: str = "gpt-6-sol",
         api_key: str = None,
         system_instruction: str = None,
     ):
@@ -187,7 +183,7 @@ class ChatAI(OpenRouterChatAI):
             チャンネル=チャンネル,
             絶対パス=絶対パス,
             AI_NAME=AI_NAME,
-            AI_MODEL=AI_MODEL or "gpt-5.6-sol",
+            AI_MODEL=AI_MODEL or "gpt-6-sol",
             api_key=inherited_api_key,
             system_instruction=system_instruction,
         )
@@ -254,7 +250,7 @@ class ChatAI(OpenRouterChatAI):
 
             client, resolved_model = resolve_provider_client(
                 provider="openai-codex",
-                model=self.chat_model or "gpt-5.6-sol",
+                model=self.chat_model or "gpt-6-sol",
                 api_mode="codex_responses",
             )
             if client is None:

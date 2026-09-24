@@ -891,16 +891,16 @@ _CODEX_SPARK_COMPACTION_THRESHOLD = 0.70
 
 
 def _is_codex_gpt54_or_gpt55(model: Optional[str], provider: Optional[str] = None) -> bool:
-    """True for gpt-5.4 / gpt-5.5 / gpt-5.6 on the ChatGPT Codex OAuth backend.
+    """True for gpt-5.4 / gpt-5.5 / gpt-5.6-terra / gpt-6-sol / gpt-6-luna on the ChatGPT Codex OAuth backend.
 
     Matches only the Codex OAuth route (provider ``openai-codex``), not the
     direct OpenAI API, OpenRouter, or GitHub Copilot paths — those expose a
     larger context window for the same slug and must keep the user's default
     compaction threshold. ``-pro`` variants and dated snapshots are matched
     via prefix so the override tracks every 272K-capped family (5.4, 5.5,
-    5.6 sol/terra/luna incl. their ``-pro`` modes) without re-listing every
-    variant. (Name kept for backward compatibility with the
-    ``compression.codex_gpt55_autoraise`` config key.) The exact
+    gpt-6-sol / gpt-5.6-terra / gpt-6-luna incl. their ``-pro`` modes)
+    without re-listing every variant. (Name kept for backward compatibility
+    with the ``compression.codex_gpt55_autoraise`` config key.) The exact
     ``gpt-daybreak-blue-latest`` Codex slug is also a verified Sol-family
     alias and receives the same autoraise.
 
@@ -923,9 +923,15 @@ def _is_codex_gpt54_or_gpt55(model: Optional[str], provider: Optional[str] = Non
         or bare == "gpt-5.5"
         or bare.startswith("gpt-5.5-")
         or bare.startswith("gpt-5.5.")
-        or bare == "gpt-5.6"
-        or bare.startswith("gpt-5.6-")
-        or bare.startswith("gpt-5.6.")
+        or bare == "gpt-5.6-terra"
+        or bare.startswith("gpt-5.6-terra-")
+        or bare.startswith("gpt-5.6-terra.")
+        or bare == "gpt-6-sol"
+        or bare.startswith("gpt-6-sol-")
+        or bare.startswith("gpt-6-sol.")
+        or bare == "gpt-6-luna"
+        or bare.startswith("gpt-6-luna-")
+        or bare.startswith("gpt-6-luna.")
         or bare == "gpt-daybreak-blue-latest"
     )
 

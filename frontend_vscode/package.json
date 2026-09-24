@@ -147,7 +147,7 @@
         },
         "aidiyHermes.model": {
           "type": "string",
-          "default": "gpt-5.6-sol",
+          "default": "gpt-6-sol",
           "description": "AI モデル。空欄では CLI の設定を使います。"
         },
         "aidiyHermes.maxTurns": {

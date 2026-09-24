@@ -101,6 +101,35 @@ def _is_four_panel_topic(topic: object) -> bool:
         for keyword in ("4コマ", "４コマ", "四コマ", "four-panel", "fourpanel")
     )
 
+
+def _validate_narration_policy(scenario_path: str) -> bool:
+    """女性音声設定と、空文字列を本文内の記号として誤用していないことを検証する。"""
+    try:
+        scenario_data = load_scenario_object(scenario_path)
+        scenes = [
+            scene for scene in scenario_data.get("scenes", [])
+            if isinstance(scene, dict)
+        ]
+        embedded_marker_ids = [
+            str(scene.get("id", ""))
+            for scene in scenes
+            if '""' in str(scene.get("long_narration", "") or "")
+        ]
+        tts_provider = str(
+            (scenario_data.get("assets_policy") or {}).get("tts_provider", "")
+        ).strip().lower()
+        empty_string_ok = check(
+            f'空文字列を本文内の二文字記号として使用していない（誤用={embedded_marker_ids}）',
+            bool(scenes) and not embedded_marker_ids,
+        )
+        voice_ok = check(
+            f"女性ナレーター音声設定 (tts_provider={tts_provider!r})",
+            tts_provider == "edge:female",
+        )
+        return empty_string_ok and voice_ok
+    except Exception as exc:
+        return check(f"女性ナレーター・間合い方針の検証に失敗: {exc}", False)
+
 # ================================================================== #
 # 小説小話固有: 補助スクリプト生成
 # ================================================================== #
@@ -145,8 +174,8 @@ def _build_narration_audio_bodies() -> tuple[str, str, str]:
         '        scene_num = str(scene.get("id", "")).replace("scene_", "")\n'
         '        short_text = str(scene.get("short_narration", "") or "").strip()\n'
         '        long_text  = str(scene.get("long_narration",  "") or "").strip()\n'
-        '        if short_text: narrations.append((scene_num, "short", short_text))\n'
-        '        if long_text:  narrations.append((scene_num, "long",  long_text))\n'
+        '        if "short_narration" in scene: narrations.append((scene_num, "short", short_text))\n'
+        '        if "long_narration" in scene:  narrations.append((scene_num, "long",  long_text))\n'
         "    return narrations\n\n"
         "NARRATIONS = load_tasks()\n"
     )
@@ -250,8 +279,15 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         '- assets_policy の他の値はテンプレートのまま維持\n\n'
         "■ これは AiDiy の機能紹介ではなく『小説解説または小話』のひとり語り動画です。\n"
         "  - アバター 1 体が物語の語り手として読み聞かせる構成にする。\n"
+        "  - 語り手は日本語の女性ナレーターを前提とする。落ち着きと親しみがあり、情景や人物の感情を丁寧に伝える自然な話し言葉にする。\n"
+        "  - 女性であることを不自然に強調したり、過度に芝居がかった語尾にしたりせず、作品世界を尊重した聞きやすい語りにする。\n"
         "  - 技術解説の数値や機能説明は入れない。chips / metrics / cards / facts / evidence は空配列でよい。\n"
         "  - 物語は headline / lead / subtitle と short/long narration で語る。\n\n"
+        "■ 空文字列と無音の扱い\n"
+        "  - JSONの \"\" は文字数ゼロの空文字列であり、本文へ埋め込む二文字の記号ではない。\n"
+        "  - short_narration / long_narration の本文中に、間合い記号として \"\" を書き込まない。\n"
+        "  - 独立した音声生成単位の値が空文字列の場合だけ、aidiy_text_to_speech が1秒の無音音声を生成する。\n"
+        "  - 通常のナレーションでは、句読点と文の区切りで自然な間合いを作る。\n\n"
         "■ scenes 構成（通常は最小7ページ、最大30ページ。4コマ漫画指定時は例外として6ページ）\n"
         "  - scene_000: イントロ（小説・小話のつかみ）。先頭固定\n"
         "  - topic に4コマ漫画の指示がある場合は、scene_000、scene_001〜scene_004、scene_999 の全6ページ固定とする\n"
@@ -314,11 +350,12 @@ async def step_create_scenario(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> 
         ) if ok1 else False
         ok4 = validate_scene_expressions(scenario_path, label="小説小話シナリオ") if ok1 else False
         ok5 = validate_scene_media_refs(scenario_path, label="小説小話シナリオ") if ok1 else False
+        ok_pause = _validate_narration_policy(scenario_path) if ok1 else False
         ok6 = False
         if ok1:
             updated = ensure_scene_html_pages(new_dir, scenario_path, language=ctx.language)
             ok6 = check(f"scene HTML をシナリオ全件分生成（更新 {len(updated)} 件）", True)
-        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6
+        return ok1 and ok2 and ok3 and ok4 and ok5 and ok_pause and ok6
 
     return await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
@@ -583,9 +620,11 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
         "  2. scene_000 や本編（scene_001〜）で AiDiy に触れていないか確認する（触れていたら物語の語りに直す）。\n"
         "  3. AiDiy への言及は scene_999 の最後のひとことだけに留まっているか確認する。長い宣伝になっていたら短くする。\n"
         "  4. short_narration は短い要約、long_narration は詳しい語りになっているか確認する。\n"
-        "  5. 表情は基本 neutral で、にやけ顔の \"happy\" が残っていないか確認する（あれば neutral か surprised に直す）。\n"
-        "  6. scene_999 の締めが楽しく前向きなオチの余韻になっているか確認する。\n"
-        "  7. 問題がなければ不要な全面書き換えや再生成はしない。\n\n"
+        "  5. 女性ナレーターが自然に読み聞かせる前提の、落ち着きと親しみのある文章になっているか確認する。\n"
+        "  6. JSONの空文字列を本文内の二文字の間合い記号として誤用していないか確認する。\n"
+        "  7. 表情は基本 neutral で、にやけ顔の \"happy\" が残っていないか確認する（あれば neutral か surprised に直す）。\n"
+        "  8. scene_999 の締めが楽しく前向きなオチの余韻になっているか確認する。\n"
+        "  9. 問題がなければ不要な全面書き換えや再生成はしない。\n\n"
         "【今回のテーマ】\n"
         f"  フォルダ名: {folder_name}\n"
         f"  テーマ詳細: {topic}\n\n"
@@ -624,7 +663,8 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
             except Exception as exc:
                 print(f"  [FAIL] scenario.json の照合に失敗: {exc}")
                 ok6 = check("scenario.json と scenario.js の内容一致", False)
-        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6
+        ok7 = _validate_narration_policy(scenario_path) if ok1 else False
+        return ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7
 
     ok = await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,
@@ -704,8 +744,9 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         "  確認 5: _gen_audio.py が存在するか\n"
         "  確認 6: AiDiy への言及が scene_999 の最後のひとことだけに留まり、本編・冒頭で触れていないか\n"
         "  確認 7: 各 scene に short_narration / long_narration / short_audio / long_audio があるか\n"
-        "  確認 8: assets.json の画像・音声のパス、status、bytes が実ファイルと一致するか\n"
-        "  確認 9: コピー元のプレイヤー構造を壊していないか\n\n"
+        "  確認 8: 女性ナレーター向けの自然な文章で、JSONの空文字列を本文内の記号として誤用していないか\n"
+        "  確認 9: assets.json の画像・音声のパス、status、bytes が実ファイルと一致するか\n"
+        "  確認 10: コピー元のプレイヤー構造を壊していないか\n\n"
         "【手順 2】不足があれば修正\n"
         f'  images 不足: "{ctx.mcp_python}" "{gen_img_py}" を実行\n'
         f'  audio 不足:  "{ctx.mcp_python}" "{gen_aud_py}" を実行\n\n'
@@ -764,6 +805,7 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
                 f"シナリオ作成時の全シーンIDを維持 (実際={scenario_ids} / 期待={expected_scene_ids})",
                 bool(expected_scene_ids) and scenario_ids == expected_scene_ids,
             )
+        ok_narration = _validate_narration_policy(scenario_path) if ok1 else False
 
         expected_image_names = {f"{scene_id}.png" for scene_id in expected_scene_ids}
         expected_audio_names = {
@@ -853,7 +895,7 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
             html_scene_names == expected_html_names,
         )
         ok11 = video_menu_registration_ok(ctx)
-        return all((ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11))
+        return all((ok1, ok2, ok3, ok4, ok5, ok6, ok_narration, ok7, ok8, ok9, ok10, ok11))
 
     ok = await verify_and_backup_until_stable(
         ctx=ctx, ca=ca,

@@ -76,9 +76,9 @@ def count_scenario_dialogues(path: str) -> int:
         if isinstance(dialogues, list) and len(dialogues) > 0:
             count += sum(1 for dlg in dialogues if isinstance(dlg, dict))
         else:
-            if str(scene.get("short_narration", "") or "").strip():
+            if "short_narration" in scene:
                 count += 1
-            if str(scene.get("long_narration", "") or "").strip():
+            if "long_narration" in scene:
                 count += 1
     return count
 

@@ -14,33 +14,20 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CODEX_MODELS: List[str] = [
     # GPT-6 Astra is the current frontier Codex slug and sorts ahead of the
-    # GPT-5.6 series in the backend catalog, so keep it first in the curated
+    # Sol/Terra/Luna tier in the backend catalog, so keep it first in the curated
     # offline fallback too. Live discovery (_fetch_models_from_api) overrides
     # this ordering with the backend's own priority ranking when reachable.
     "gpt-6-astra",
-    # GPT-5.6 series (Sol/Terra/Luna). The public API exposes "-pro"
+    # GPT-6 Sol / GPT-5.6 Terra / GPT-6 Luna. The public API exposes "-pro"
     # variants, but the ChatGPT Codex OAuth backend rejects them with HTTP 400,
     # so the curated offline fallback must not surface those dead choices.
-    "gpt-5.6-sol",
+    "gpt-6-sol",
     "gpt-5.6-terra",
-    "gpt-5.6-luna",
-    "gpt-5.5",
-    "gpt-5.4-mini",
-    "gpt-5.4",
-    "gpt-5.3-codex",
-    # gpt-5.3-codex-spark is in research preview and is exposed *only* via
-    # the Codex CLI / OAuth backend (chatgpt.com/backend-api/codex/models)
-    # for ChatGPT Pro subscribers. It is NOT available in the public OpenAI
-    # API, so it intentionally stays out of the "openai" provider catalog
-    # in hermes_cli/models.py — only the openai-codex (OAuth) provider
-    # surfaces it. The Codex backend reports ``supported_in_api: false`` for
-    # this slug; that flag describes API availability, not Codex backend
-    # availability, so the fetch/cache code paths below intentionally do
-    # not filter on it. PR #12994 removed this entry on the assumption it
-    # was unsupported — that was wrong; restored here. Keep it in the
-    # curated fallback so Pro users still see Spark in `/model` when live
-    # discovery is unavailable (offline first run, transient API failure).
-    "gpt-5.3-codex-spark",
+    "gpt-6-luna",
+    # gpt-5.5 / gpt-5.4 / gpt-5.4-mini / gpt-5.3-codex / gpt-5.3-codex-spark
+    # (below the gpt-5.6 tier) were removed from the curated offline fallback
+    # as superseded. Live discovery still surfaces them if the Codex backend
+    # ever reports one as actually available.
     # NOTE: gpt-5.2-codex / gpt-5.1-codex-max / gpt-5.1-codex-mini were
     # previously listed here but the chatgpt.com Codex backend returns
     # HTTP 400 "The '<model>' model is not supported when using Codex with
@@ -56,18 +43,13 @@ DEFAULT_CODEX_MODELS: List[str] = [
 ]
 
 _FORWARD_COMPAT_TEMPLATE_MODELS: List[tuple[str, tuple[str, ...]]] = [
-    ("gpt-6-astra", ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")),
-    ("gpt-5.6-sol", ("gpt-5.5", "gpt-5.4")),
+    ("gpt-6-astra", ("gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna")),
+    ("gpt-6-sol", ("gpt-5.5", "gpt-5.4")),
     ("gpt-5.6-terra", ("gpt-5.5", "gpt-5.4")),
-    ("gpt-5.6-luna", ("gpt-5.5", "gpt-5.4")),
-    ("gpt-5.5", ("gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex")),
-    ("gpt-5.4-mini", ("gpt-5.3-codex",)),
-    ("gpt-5.4", ("gpt-5.3-codex",)),
-    # Surface Spark whenever any compatible Codex template is present so
-    # accounts hitting the live endpoint with an older lineup still see
-    # Spark in the picker. Backend gates real availability by ChatGPT Pro
-    # entitlement; Hermes does not.
-    ("gpt-5.3-codex-spark", ("gpt-5.3-codex",)),
+    ("gpt-6-luna", ("gpt-5.5", "gpt-5.4")),
+    # gpt-5.5 / gpt-5.4-mini / gpt-5.4 / gpt-5.3-codex-spark are below the
+    # gpt-5.6 tier and are no longer synthesized as forward-compat targets
+    # themselves — only used above as presence signals for the gpt-5.6 tier.
 ]
 
 
@@ -98,9 +80,9 @@ def _add_forward_compat_models(model_ids: List[str]) -> List[str]:
 def _add_context_variants(model_ids: List[str]) -> List[str]:
     """Insert ``-900k`` large-context picker variants after eligible base slugs.
 
-    The ChatGPT Codex backend advertises 272K for the gpt-5.4 / gpt-5.6
-    families but accepts ~911K (live-verified Aug 2026). The base slugs keep
-    the cheaper advertised 272K limit by default; each verified slug gets an
+    The ChatGPT Codex backend advertises 272K for the gpt-5.4 / gpt-5.6-terra /
+    gpt-6-sol / gpt-6-luna families but accepts ~911K (live-verified Aug 2026).
+    The base slugs keep the cheaper advertised 272K limit by default; each verified slug gets an
     explicit ``<slug>-900k`` picker entry that opts into the large window.
     The suffix is Hermes-side only — it is stripped before the model id hits
     the wire (agent/transports/codex.py, agent/auxiliary_client.py).
