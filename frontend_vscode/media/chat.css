@@ -49,11 +49,11 @@ footer { padding: 8px 12px 12px; }
 #composer { border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 8px; background: var(--vscode-input-background); overflow: hidden; }
 textarea { resize: vertical; display: block; width: 100%; min-height: 70px; max-height: 220px; padding: 10px; color: var(--vscode-input-foreground); background: transparent; border: none; }
 .composer-actions { display: flex; align-items: center; gap: 5px; padding: 5px; }
-#choose-model { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left; color: var(--vscode-foreground); font-size: 11px; border-color: var(--vscode-input-border, var(--vscode-panel-border)); background: color-mix(in srgb, var(--vscode-button-background) 10%, transparent); }
-#choose-model:hover { border-color: var(--vscode-focusBorder); background: var(--vscode-toolbar-hoverBackground); }
-.model-caption { flex: 0 0 auto; padding: 1px 5px; border-radius: 3px; color: var(--vscode-button-foreground); background: var(--vscode-button-background); font-weight: 600; }
+#choose-model { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left; color: #000; font-size: 11px; border-color: #fff; background: #fff; }
+#choose-model:hover { color: #000; border-color: #e8e8e8; background: #e8e8e8; }
+.model-caption { flex: 0 0 auto; padding: 1px 5px; border-radius: 3px; color: #000; background: transparent; font-weight: 600; }
 #model-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.model-chevron { margin-left: auto; color: var(--vscode-descriptionForeground); }
+.model-chevron { margin-left: auto; color: #000; }
 #send, #stop { flex-shrink: 0; }
 .primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
 .primary:hover { background: var(--vscode-button-hoverBackground); }
@@ -63,7 +63,10 @@ textarea { resize: vertical; display: block; width: 100%; min-height: 70px; max-
 #send:not(:disabled) img { filter: brightness(0) invert(1); }
 #send:not(:disabled):hover { background: #5a6fd8; border-color: #5a6fd8; }
 #send:disabled { background: rgba(255, 255, 255, .95); border-color: #667eea; opacity: 1; }
-#stop { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid #ff4444; border-radius: 2px; background: #ff4444; color: #fff; font-family: var(--vscode-editor-font-family); font-size: 9px; font-weight: bold; letter-spacing: .1px; }
+#stop { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid #ff4444; border-radius: 2px; background: #ff4444; color: #fff; font-family: var(--vscode-editor-font-family); }
+#stop .stop-icon { display: block; width: 34px; height: 25px; overflow: hidden; }
+#stop .stop-icon img { display: block; width: 43px; height: 43px; transform: translate(-4.5px, -10px); filter: brightness(0) invert(1); pointer-events: none; }
+#stop .stop-label { font-size: 8px; font-weight: bold; letter-spacing: .1px; line-height: 9px; }
 #stop:hover { background: #cc0000; border-color: #cc0000; }
 #attachment { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px; color: var(--vscode-textLink-foreground); } #attachment-name { overflow-wrap: anywhere; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
