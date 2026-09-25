@@ -12,15 +12,18 @@ export async function 単独起動(project: string, launch?: 起動設定) {
   if (!statSync(folder).isDirectory()) throw new Error('作業フォルダがありません。');
   const defaults = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).contributes.configuration.properties;
   const state = {
-    type: 'state', 会話ID: randomUUID(), 作業URI: folder, 信頼済み: true,
+    type: 'state', 会話ID: randomUUID() as string, 作業URI: folder, 信頼済み: true,
     作業フォルダ: { 名前: basename(folder), パス: folder },
     provider: String(defaults['aidiyHermes.provider'].default), model: String(defaults['aidiyHermes.model'].default),
     メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false,
-    セッションID: undefined as string | undefined
+    セッションID: undefined as string | undefined,
+    履歴: [] as { id: string; 題名: string; 更新日時: number }[]
   };
+  type 保存会話 = { id: string; メッセージ: typeof state.メッセージ; セッションID?: string; provider: string; model: string; 更新日時: number };
+  let history: 保存会話[] = [];
+  let lastModel = { provider: state.provider, model: state.model };
   const clients = new Set<ServerResponse>();
   let job: ReturnType<typeof コード要求実行> | undefined;
-  const catalogs = new Map<string, unknown>();
   const catalogJobs = new Set<ReturnType<typeof CLI実行>>();
   const token = randomBytes(24).toString('hex');
   const prefix = `/${token}/`;
@@ -28,6 +31,13 @@ export async function 単独起動(project: string, launch?: 起動設定) {
   let idle: NodeJS.Timeout | undefined;
   const broadcast = (packet: unknown) => { for (const client of clients) client.write(`data: ${JSON.stringify(packet)}\n\n`); };
   const notify = () => broadcast(state);
+  const save = () => {
+    if (!state.メッセージ.length && !state.セッションID) return;
+    const entry: 保存会話 = { id: state.会話ID, メッセージ: [...state.メッセージ], セッションID: state.セッションID,
+      provider: state.provider, model: state.model, 更新日時: Date.now() };
+    history = [entry, ...history.filter(item => item.id !== entry.id)];
+    state.履歴 = history.map(item => ({ id: item.id, 題名: item.メッセージ.find(message => message.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 80) || '新しい会話', 更新日時: item.更新日時 }));
+  };
   const trimHistory = () => {
     let size = 0;
     state.メッセージ = state.メッセージ.slice(-60).reverse().filter(item => (size += item.本文.length) <= 2_000_000).reverse();
@@ -35,7 +45,7 @@ export async function 単独起動(project: string, launch?: 起動設定) {
   const execute = async (text: string) => {
     state.実行中 = true; state.進捗 = [];
     state.メッセージ.push({ 種別: 'user', 本文: text }); trimHistory();
-    broadcast({type:'accepted'}); notify();
+    save(); broadcast({type:'accepted'}); notify();
     try {
       job = コード要求実行({ セッションID: state.会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: text }, {
         起動: launch ?? 起動解決('aidiy_hermes', '', folder), 作業フォルダ: folder,
@@ -56,7 +66,7 @@ export async function 単独起動(project: string, launch?: 起動設定) {
         state.メッセージ.push({ 種別: 'error', 本文: result.停止理由 || `CLI が回答を完了できませんでした。\n${result.ログ.slice(-3000)}` });
       }
     } catch (error) { state.メッセージ.push({ 種別: 'error', 本文: String(error) }); }
-    finally { state.実行中 = false; job = undefined; trimHistory(); notify(); }
+    finally { state.実行中 = false; job = undefined; trimHistory(); save(); notify(); }
   };
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -83,18 +93,15 @@ export async function 単独起動(project: string, launch?: 起動設定) {
       if (req.method === 'GET' && route === 'catalog') {
         const provider = url.searchParams.get('provider') ?? '';
         if (provider.length > 200) { reply(400, {error:'Provider too long'}); return; }
-        if (!catalogs.has(provider)) {
-          const cli = launch ?? 起動解決('aidiy_hermes', '', folder);
-          if (!cli.引数[0]?.endsWith('.py')) throw new Error('候補取得には AiDiy の CLI が必要です。');
-          const task = CLI実行({ 起動: {実行ファイル:cli.実行ファイル, 引数:[join(root,'scripts/model-catalog.py'),cli.引数[0],provider]}, 作業フォルダ:folder, 本文:'', 引数:[], 制限時間:30000 });
-          catalogJobs.add(task);
-          try {
-            const result = await task.完了;
-            if (result.終了コード !== 0) throw new Error('モデル候補を取得できません。');
-            catalogs.set(provider, JSON.parse(result.回答));
-          } finally { catalogJobs.delete(task); }
-        }
-        reply(200, catalogs.get(provider)); return;
+        const cli = launch ?? 起動解決('aidiy_hermes', '', folder);
+        if (!cli.引数[0]?.endsWith('.py')) throw new Error('候補取得には AiDiy の CLI が必要です。');
+        const task = CLI実行({ 起動: {実行ファイル:cli.実行ファイル, 引数:[join(root,'scripts/model-catalog.py'),cli.引数[0],provider]}, 作業フォルダ:folder, 本文:'', 引数:[], 制限時間:30000 });
+        catalogJobs.add(task);
+        try {
+          const result = await task.完了;
+          if (result.終了コード !== 0) throw new Error('モデル候補を取得できません。');
+          reply(200, JSON.parse(result.回答)); return;
+        } finally { catalogJobs.delete(task); }
       }
       if (req.method === 'POST' && route === 'message') {
         if (req.headers.origin !== origin || !req.headers['content-type']?.startsWith('application/json')) { reply(403, {error:'Forbidden'}); return; }
@@ -109,10 +116,26 @@ export async function 単独起動(project: string, launch?: 起動設定) {
           if (typeof data.メッセージ内容 !== 'string' || !data.メッセージ内容.trim() || data.メッセージ内容.length > 200000) { reply(400, {error:'入力が空か長すぎます。'}); return; }
           void execute(data.メッセージ内容);
         } else if (type === 'new') {
-          state.会話ID = randomUUID(); state.メッセージ = []; state.進捗 = []; state.セッションID = undefined; notify();
+          state.会話ID = randomUUID(); state.メッセージ = []; state.進捗 = []; state.セッションID = undefined;
+          state.provider = lastModel.provider; state.model = lastModel.model; notify();
+        } else if (type === 'selectHistory') {
+          const entry = history.find(item => item.id === data.id);
+          if (!entry) { reply(404, {error:'会話がありません。'}); return; }
+          state.会話ID = entry.id; state.メッセージ = [...entry.メッセージ]; state.セッションID = entry.セッションID;
+          state.provider = entry.provider; state.model = entry.model; state.進捗 = []; notify();
+        } else if (type === 'deleteHistory') {
+          const entry = history.find(item => item.id === data.id);
+          if (!entry) { reply(404, {error:'会話がありません。'}); return; }
+          history = history.filter(item => item.id !== data.id);
+          state.履歴 = state.履歴.filter(item => item.id !== data.id);
+          if (state.会話ID === data.id) {
+            state.会話ID = randomUUID(); state.メッセージ = []; state.進捗 = []; state.セッションID = undefined;
+            state.provider = lastModel.provider; state.model = lastModel.model;
+          }
+          notify();
         } else if (type === 'model') {
           if (typeof data.provider !== 'string' || typeof data.model !== 'string' || data.provider.length > 200 || data.model.length > 300) { reply(400, {error:'モデル指定が不正です。'}); return; }
-          state.provider = data.provider.trim(); state.model = data.model.trim(); notify();
+          state.provider = data.provider.trim(); state.model = data.model.trim(); lastModel = { provider: state.provider, model: state.model }; save(); notify();
         } else { reply(400, {error:'Unknown message'}); return; }
         reply(200, {ok:true}); return;
       }

@@ -38,6 +38,9 @@
         }).catch(value => emit({type:'modelCatalogError', provider, message:String(value.message || value)}));
       }
       else if (message.type === 'setModel') void send({type:'model',provider:message.provider,model:message.model}).catch(error);
+      else if (message.type === 'deleteHistory') {
+        if (window.confirm('この会話を削除しますか？')) void send(message).catch(error);
+      }
       else if (message.type === 'copy') void navigator.clipboard.writeText(message.text).catch(error);
       else if (message.type === 'link' && /^https?:\/\//i.test(message.url)) window.open(message.url,'_blank','noopener,noreferrer');
       else void send(message).catch(error);

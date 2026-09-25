@@ -7,6 +7,7 @@ const element = <T extends HTMLElement>(id: string) => document.getElementById(i
 const prompt = element<HTMLTextAreaElement>('prompt');
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
+const historyList = element<HTMLElement>('history-list');
 const modelPicker = element<HTMLDialogElement>('model-picker');
 const providerSelect = element<HTMLSelectElement>('provider-select');
 const modelSelect = element<HTMLSelectElement>('model-select');
@@ -21,6 +22,7 @@ const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 let 実行中 = false, 送信待ち = false, 入力許可 = false;
 let メッセージJSON = '';
+let 履歴JSON = '';
 let 会話ID = '';
 const 演出済み回答 = new Set<string>();
 let 演出タイマー: number | undefined;
@@ -50,6 +52,25 @@ const コンソール演出 = (content: HTMLDivElement, text: string, key: strin
 };
 const ボタン更新 = () => {
   element<HTMLButtonElement>('send').disabled = !入力許可 || 実行中 || 送信待ち || !prompt.value.trim();
+};
+const 履歴表示 = (entries: { id: string; 題名: string; 更新日時: number }[]) => {
+  element('history-count').textContent = `(${entries.length})`;
+  if (!entries.length) {
+    const empty = document.createElement('p'); empty.className = 'history-empty'; empty.textContent = 'このフォルダに会話履歴はありません';
+    historyList.replaceChildren(empty); return;
+  }
+  historyList.replaceChildren(...entries.map(entry => {
+    const row = document.createElement('div'); row.className = `history-row${entry.id === 会話ID ? ' active' : ''}`; row.setAttribute('role', 'listitem');
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'history-open'; open.disabled = 実行中;
+    open.title = entry.題名; open.setAttribute('aria-label', `会話を開く: ${entry.題名}`);
+    const title = document.createElement('span'); title.className = 'history-title'; title.textContent = entry.題名;
+    const date = document.createElement('span'); date.className = 'history-date'; date.textContent = new Date(entry.更新日時).toLocaleString('ja-JP');
+    open.append(title, date); open.addEventListener('click', () => post('selectHistory', { id: entry.id }));
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'history-delete'; remove.textContent = '×';
+    remove.title = '会話を削除'; remove.setAttribute('aria-label', `会話を削除: ${entry.題名}`); remove.disabled = 実行中;
+    remove.addEventListener('click', () => post('deleteHistory', { id: entry.id }));
+    row.append(open, remove); return row;
+  }));
 };
 const 選択状態更新 = () => {
   const custom = modelSelect.value === '__manual__';
@@ -161,12 +182,24 @@ window.addEventListener('message', event => {
   }
   if (state.type === 'accepted') { prompt.value = ''; vscode.setState({ 下書き: '' }); 送信待ち = false; ボタン更新(); return; }
   if (state.type !== 'state') return;
+  if (会話ID && 会話ID !== state.会話ID) {
+    メッセージJSON = '';
+    演出済み回答.clear();
+    state.メッセージ.forEach((item: { 種別: string; 本文: string }, index: number) => {
+      if (item.種別 === 'assistant') 演出済み回答.add(`${index}:${item.本文}`);
+    });
+    if (演出タイマー !== undefined) { clearTimeout(演出タイマー); 演出タイマー = undefined; }
+    prompt.value = ''; vscode.setState({ 下書き: '' });
+  }
   会話ID = state.会話ID;
   送信待ち = false; 実行中 = state.実行中;
   入力許可 = state.信頼済み && Boolean(state.作業フォルダ);
   const projectName = String(state.作業フォルダ?.名前 ?? '');
   projectFolder.textContent = 末尾省略(projectName);
   projectFolder.title = projectName;
+  const history = Array.isArray(state.履歴) ? state.履歴 : [];
+  const historyJSON = JSON.stringify([history, 会話ID, 実行中]);
+  if (historyJSON !== 履歴JSON) { 履歴表示(history); 履歴JSON = historyJSON; }
   provider = state.provider; model = state.model;
   const label = `${provider || '自動'} / ${model || (provider ? '既定モデル' : 'CLI の設定')}`;
   element('model-label').textContent = label;

@@ -33,6 +33,7 @@
 - `webview.ts` を変えた場合は VS Code 拡張モードと単独試用モードの両方を確認する。
 - Provider / モデル選択は VS Code 上部の Quick Pick ではなく、`media/chat.html` のチャットパネル内ダイアログで行う。候補は `chooseModel` / `modelCatalog` / `modelCatalogError`、確定値は `setModel` で Webview と実行層の間を受け渡す。
 - Hermes の Provider / モデル一覧を複製せず、`scripts/model-catalog.py` から既存 picker を再利用する。
+- モデル候補は provider ごとの固定キャッシュにせず、選択画面を開くたび CLI から取得する。特に `openai_oauth` は認証アカウントのライブ候補が変わり得る。
 - 外部 CLI Provider のモデルが `auto` の場合は `--model auto` を渡さず、Copilot / Codex / Claude CLI 自身の既定モデル選択へ任せる。
 - `antigravity-cli` は Hermes の外部 CLI Provider 一覧から取得する。`xai-oauth` は API Provider のカタログ入口に含め、`grok-4.6` を Hermes の curated model 一覧から取得する。
 - xAI OAuth の初回認証は静的なワンショット実行中ではなく、拡張の「対話 CLI」から `/model` で `xai-oauth` を選ぶか、`hermes auth add xai-oauth` を実行する。
@@ -74,7 +75,8 @@ npm run package
 - 非ゼロ終了、起動エラー、停止、タイムアウトを呼び出し元へ返せる。
 - Windows の AiDiy `.cmd` をシェルなしで解決できる。
 - packet が開始、進捗、終了または中断、正式回答の順になる。
-- 単独試用の接続制限、会話継続、新規会話、モデル変更、停止が動く。
+- 単独試用の接続制限、会話継続、新規会話、履歴の選択・削除、モデル変更、停止が動く。
+- VS Code 側で旧 `workspaceState` の単一会話を履歴へ移行でき、作業フォルダごとに履歴が分かれる。最終選択モデルが再起動後と新規会話へ引き継がれる。
 - `dist/aidiy-hermes-<version>.vsix` が生成される。
 
 Windows の実 VS Code で拡張ホストまで確認するときは、依存導入と compile 後に次を使う。

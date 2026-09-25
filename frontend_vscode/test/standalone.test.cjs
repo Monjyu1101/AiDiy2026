@@ -30,7 +30,7 @@ async function connect(app) {
 function post(app, data, origin = new URL(app.url).origin) {
   return fetch(app.url+'message',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)});
 }
-test('単独画面: 接続制限・初期値・日本語送信・進捗・継続・新規', async () => {
+test('単独画面: 接続制限・送信・継続・履歴選択と削除・最終モデル', async () => {
   const app = await 単独起動(process.cwd(), {実行ファイル:process.execPath, 引数:[fake,'echo']});
   const stream = await connect(app);
   try {
@@ -54,6 +54,16 @@ test('単独画面: 接続制限・初期値・日本語送信・進捗・継続
     await post(app,{type:'new'});
     const reset = await stream.wait(p=>p.type==='state' && p.会話ID!==initial.会話ID);
     assert.equal(reset.メッセージ.length,0); assert.equal(reset.セッションID,undefined);
+    assert.equal(reset.model,'custom-model');
+    assert.equal(reset.履歴.length,1);
+    assert.match(reset.履歴[0].題名,/日本語で確認/);
+    await post(app,{type:'selectHistory',id:initial.会話ID});
+    const reopened = await stream.wait(p=>p.type==='state' && p.会話ID===initial.会話ID && p.メッセージ.length>=4);
+    assert.equal(reopened.セッションID,'test-session-001');
+    await post(app,{type:'deleteHistory',id:initial.会話ID});
+    const deleted = await stream.wait(p=>p.type==='state' && p.会話ID!==initial.会話ID && p.履歴.length===0);
+    assert.equal(deleted.メッセージ.length,0);
+    assert.equal((await post(app,{type:'selectHistory',id:initial.会話ID})).status,404);
   } finally { await stream.close(); await app.close(); }
 });
 test('単独画面: 実行中のモデル変更を拒否して停止できる', async () => {

@@ -7,6 +7,8 @@ import { コード要求実行, streamControlOf, visibleStreamContent } from './
 
 interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string }
 interface 会話 { メッセージ: メッセージ[]; 作業URI: string; セッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
+interface 保存会話 extends 会話 { id: string; 更新日時: number }
+interface 会話履歴 { 現在ID: string; 一覧: 保存会話[] }
 interface 添付 { 名前: string; 本文: string }
 
 class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -19,22 +21,31 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 通知タイマー?: NodeJS.Timeout;
   private 保存待ち: PromiseLike<void> = Promise.resolve();
   private 破棄済み = false;
-  private 会話ID = randomUUID();
+  private 会話ID: string = randomUUID();
+  private 履歴: 保存会話[] = [];
+  private 最終モデル: { provider: string; model: string };
   private 最終作業URI?: vscode.Uri;
   private 候補取得停止?: () => void;
-  private 候補キャッシュ = new Map<string, { id: string; label: string }[]>();
   private readonly ログ = vscode.window.createOutputChannel('AiDiy');
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('aidiyHermes');
-    this.会話 = context.workspaceState.get<会話>('会話') ?? {
-      メッセージ: [], 作業URI: '', provider: config.get('provider', ''), model: config.get('model', '')
-    };
-    // 旧版の未使用の空欄だけを移行する。会話中や明示選択した「自動」は維持する。
-    if (!this.会話.モデル選択済み && !this.会話.provider && !this.会話.model
-      && !this.会話.セッションID && !this.会話.メッセージ.length) {
-      this.会話.provider = config.get('provider', '');
-      this.会話.model = config.get('model', '');
+    const old = context.workspaceState.get<会話>('会話');
+    const saved = context.workspaceState.get<会話履歴>('会話履歴');
+    this.履歴 = Array.isArray(saved?.一覧) ? saved.一覧.filter(item => typeof item?.id === 'string' && Array.isArray(item.メッセージ) && typeof item.作業URI === 'string') : [];
+    const selected = this.履歴.find(item => item.id === saved?.現在ID);
+    this.最終モデル = context.globalState.get<{ provider: string; model: string }>('最終モデル')
+      ?? (selected?.モデル選択済み ? { provider: selected.provider, model: selected.model }
+      : old?.モデル選択済み ? { provider: old.provider, model: old.model }
+        : { provider: config.get('provider', ''), model: config.get('model', '') });
+    if (selected) {
+      this.会話ID = selected.id;
+      this.会話 = { ...selected, メッセージ: [...selected.メッセージ] };
+    } else if (!saved && old && (old.メッセージ.length || old.セッションID)) {
+      this.会話 = old;
+      this.保存();
+    } else {
+      this.会話 = { メッセージ: [], 作業URI: '', ...this.最終モデル, モデル選択済み: true };
     }
     const 作業更新 = (editor: vscode.TextEditor | undefined) => {
       if (editor && vscode.workspace.getWorkspaceFolder(editor.document.uri)) this.最終作業URI = editor.document.uri;
@@ -64,27 +75,41 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   }
 
   private フォルダ一覧() { return (vscode.workspace.workspaceFolders ?? []).filter(item => item.uri.scheme === 'file'); }
+  private 選択フォルダ(): vscode.WorkspaceFolder | undefined {
+    const folders = this.フォルダ一覧();
+    const active = this.最終作業URI && vscode.workspace.getWorkspaceFolder(this.最終作業URI);
+    return folders.find(item => item.uri.toString() === active?.uri.toString()) ?? folders[0];
+  }
   private 現在フォルダ(): vscode.WorkspaceFolder | undefined {
     const folders = this.フォルダ一覧();
     // 再開する会話は開始時のフォルダを維持し、別プロジェクトへ履歴を渡さない。
     if (this.会話.作業URI) return folders.find(item => item.uri.toString() === this.会話.作業URI);
-    const active = this.最終作業URI && vscode.workspace.getWorkspaceFolder(this.最終作業URI);
-    return folders.find(item => item.uri.toString() === active?.uri.toString()) ?? folders[0];
+    return this.選択フォルダ();
   }
   private 通知(): void {
     if (this.破棄済み) return;
     const folder = this.現在フォルダ();
     void this.view?.webview.postMessage({
       type: 'state', ...this.会話, 会話ID: this.会話ID, 添付: this.添付?.名前, 実行中: this.実行中, 進捗: this.進捗,
+      履歴: this.履歴.filter(item => item.作業URI === folder?.uri.toString())
+        .sort((a, b) => b.更新日時 - a.更新日時)
+        .map(item => ({ id: item.id, 題名: this.題名(item), 更新日時: item.更新日時 })),
       作業フォルダ: folder ? { 名前: folder.name, パス: folder.uri.fsPath } : null, 信頼済み: vscode.workspace.isTrusted
     });
+  }
+  private 題名(item: 会話): string {
+    return item.メッセージ.find(message => message.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 80) || '新しい会話';
   }
   private 保存(): void {
     // 大量の会話による workspaceState 肥大化を防ぐ。Hermes 側の履歴はセッションIDで継続する。
     let サイズ = 0;
     const messages = this.会話.メッセージ.slice(-60).reverse().filter(item => (サイズ += item.本文.length) <= 2_000_000).reverse();
-    const snapshot = JSON.parse(JSON.stringify({ ...this.会話, メッセージ: messages })) as 会話;
-    this.保存待ち = this.保存待ち.then(() => this.context.workspaceState.update('会話', snapshot)).then(undefined, error => {
+    if (this.会話.作業URI && (messages.length || this.会話.セッションID)) {
+      const snapshot = JSON.parse(JSON.stringify({ ...this.会話, メッセージ: messages, id: this.会話ID, 更新日時: Date.now() })) as 保存会話;
+      this.履歴 = [snapshot, ...this.履歴.filter(item => item.id !== this.会話ID)];
+    }
+    const snapshot: 会話履歴 = { 現在ID: this.会話ID, 一覧: this.履歴 };
+    this.保存待ち = this.保存待ち.then(() => this.context.workspaceState.update('会話履歴', snapshot)).then(undefined, error => {
       this.ログ.appendLine(`会話を保存できません: ${String(error)}`);
     });
   }
@@ -119,6 +144,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
         break;
       case 'cancel_run': this.停止処理?.(); break;
       case 'new': this.新規(); break;
+      case 'selectHistory': if (typeof data.id === 'string') this.履歴選択(data.id); break;
+      case 'deleteHistory': if (typeof data.id === 'string') await this.履歴削除(data.id); break;
       case 'attach': await this.選択添付(); break;
       case 'removeAttachment': if (!this.実行中) { this.添付 = undefined; this.通知(); } break;
       case 'settings': await vscode.commands.executeCommand('aidiyHermes.settings'); break;
@@ -134,7 +161,6 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   }
 
   private async 候補取得(provider = ''): Promise<{ id: string; label: string }[]> {
-    if (this.候補キャッシュ.has(provider)) return this.候補キャッシュ.get(provider)!;
     this.信頼確認();
     const folder = this.作業フォルダ();
     const launch = this.起動設定(folder);
@@ -152,7 +178,6 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       const rows: unknown = provider ? parsed.models : parsed.providers;
       if (!Array.isArray(rows)) throw new Error('モデル候補の形式が不正です。');
       const items = rows.filter((item): item is { id: string; label: string } => typeof item?.id === 'string' && typeof item?.label === 'string');
-      this.候補キャッシュ.set(provider, items);
       return items;
     } finally { this.候補取得停止 = undefined; }
   }
@@ -178,6 +203,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     }
     this.会話.provider = selectedProvider; this.会話.model = selectedProvider ? selectedModel : '';
     this.会話.モデル選択済み = true;
+    this.最終モデル = { provider: this.会話.provider, model: this.会話.model };
+    void this.context.globalState.update('最終モデル', this.最終モデル).then(undefined, error => this.ログ.appendLine(`モデルを保存できません: ${String(error)}`));
     this.保存(); this.通知();
   }
 
@@ -231,9 +258,31 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 
   新規(): void {
     if (this.実行中) { void vscode.window.showInformationMessage('実行を停止してから新しい会話を開始してください。'); return; }
-    this.会話 = { メッセージ: [], 作業URI: '', provider: this.会話.provider, model: this.会話.model, モデル選択済み: this.会話.モデル選択済み };
+    this.会話 = { メッセージ: [], 作業URI: this.選択フォルダ()?.uri.toString() ?? '', ...this.最終モデル, モデル選択済み: true };
     this.会話ID = randomUUID();
     this.添付 = undefined; this.進捗 = []; this.保存(); this.通知();
+  }
+  private 履歴選択(id: string): void {
+    if (this.実行中) return;
+    const entry = this.履歴.find(item => item.id === id && item.作業URI === this.現在フォルダ()?.uri.toString());
+    if (!entry) return;
+    this.会話ID = entry.id;
+    this.会話 = { ...entry, メッセージ: [...entry.メッセージ] };
+    this.添付 = undefined; this.進捗 = [];
+    this.保存(); this.通知();
+  }
+  private async 履歴削除(id: string): Promise<void> {
+    if (this.実行中) return;
+    const entry = this.履歴.find(item => item.id === id && item.作業URI === this.現在フォルダ()?.uri.toString());
+    if (!entry) return;
+    const answer = await vscode.window.showWarningMessage(`「${this.題名(entry)}」を削除しますか？`, { modal: true }, '削除');
+    if (answer !== '削除' || this.実行中) return;
+    this.履歴 = this.履歴.filter(item => item.id !== id);
+    if (this.会話ID === id) {
+      this.会話 = { メッセージ: [], 作業URI: entry.作業URI, ...this.最終モデル, モデル選択済み: true };
+      this.会話ID = randomUUID(); this.添付 = undefined; this.進捗 = [];
+    }
+    this.保存(); this.通知();
   }
   async 選択添付(): Promise<void> {
     this.信頼確認();
