@@ -19,7 +19,7 @@ export async function 単独起動(project: string, launch?: 起動設定) {
     セッションID: undefined as string | undefined,
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
   };
-  type 保存会話 = { id: string; メッセージ: typeof state.メッセージ; セッションID?: string; provider: string; model: string; 更新日時: number };
+  type 保存会話 = { id: string; メッセージ: typeof state.メッセージ; セッションID?: string; provider: string; model: string; 更新日時: number; 初回依頼?: string };
   let history: 保存会話[] = [];
   let lastModel = { provider: state.provider, model: state.model };
   const clients = new Set<ServerResponse>();
@@ -31,12 +31,15 @@ export async function 単独起動(project: string, launch?: 起動設定) {
   let idle: NodeJS.Timeout | undefined;
   const broadcast = (packet: unknown) => { for (const client of clients) client.write(`data: ${JSON.stringify(packet)}\n\n`); };
   const notify = () => broadcast(state);
-  const save = () => {
+  const save = (更新日時を変更 = true) => {
     if (!state.メッセージ.length && !state.セッションID) return;
+    const previous = history.find(item => item.id === state.会話ID);
     const entry: 保存会話 = { id: state.会話ID, メッセージ: [...state.メッセージ], セッションID: state.セッションID,
-      provider: state.provider, model: state.model, 更新日時: Date.now() };
+      provider: state.provider, model: state.model, 更新日時: 更新日時を変更 ? Date.now() : previous?.更新日時 ?? Date.now(),
+      初回依頼: previous?.初回依頼 ?? state.メッセージ.find(message => message.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 160) };
     history = [entry, ...history.filter(item => item.id !== entry.id)];
-    state.履歴 = history.map(item => ({ id: item.id, 題名: item.メッセージ.find(message => message.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 80) || '新しい会話', 更新日時: item.更新日時 }));
+    state.履歴 = [...history].sort((a, b) => b.更新日時 - a.更新日時)
+      .map(item => ({ id: item.id, 題名: item.初回依頼 || '新しい会話', 更新日時: item.更新日時 }));
   };
   const trimHistory = () => {
     let size = 0;
@@ -135,7 +138,7 @@ export async function 単独起動(project: string, launch?: 起動設定) {
           notify();
         } else if (type === 'model') {
           if (typeof data.provider !== 'string' || typeof data.model !== 'string' || data.provider.length > 200 || data.model.length > 300) { reply(400, {error:'モデル指定が不正です。'}); return; }
-          state.provider = data.provider.trim(); state.model = data.model.trim(); lastModel = { provider: state.provider, model: state.model }; save(); notify();
+          state.provider = data.provider.trim(); state.model = data.model.trim(); lastModel = { provider: state.provider, model: state.model }; save(false); notify();
         } else { reply(400, {error:'Unknown message'}); return; }
         reply(200, {ok:true}); return;
       }

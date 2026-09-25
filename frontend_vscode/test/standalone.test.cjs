@@ -45,12 +45,17 @@ test('単独画面: 接続制限・送信・継続・履歴選択と削除・最
     assert.ok(reply.args.includes('gpt-6-sol')); assert.ok(reply.args.includes('openai_oauth'));
     assert.ok(stream.packets.some(p=>p.メッセージ識別==='output_stream' && p.メッセージ内容.includes('日本語の進捗')));
     assert.ok(completed.進捗.every(line=>!/[\u0002\u0003\u0018]/.test(line)));
+    assert.equal(completed.履歴[0].題名,'日本語で確認');
+    const lastMessageAt = completed.履歴[0].更新日時;
     await post(app,{type:'model',provider:'freeai',model:'custom-model'});
+    const modelChanged = await stream.wait(p=>p.type==='state' && p.model==='custom-model');
+    assert.equal(modelChanged.履歴[0].更新日時,lastMessageAt);
     await post(app,{メッセージ識別:'input_text',メッセージ内容:'続き'});
     const resumed = await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.filter(m=>m.種別==='assistant').length===2);
     const second = JSON.parse(resumed.メッセージ.at(-1).本文);
     assert.ok(second.args.includes('--resume')); assert.ok(second.args.includes('test-session-001'));
     assert.ok(second.args.includes('custom-model'));
+    assert.equal(resumed.履歴[0].題名,'日本語で確認');
     await post(app,{type:'new'});
     const reset = await stream.wait(p=>p.type==='state' && p.会話ID!==initial.会話ID);
     assert.equal(reset.メッセージ.length,0); assert.equal(reset.セッションID,undefined);

@@ -8,6 +8,7 @@ const prompt = element<HTMLTextAreaElement>('prompt');
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
 const historyList = element<HTMLElement>('history-list');
+const historyToggle = element<HTMLButtonElement>('history-toggle');
 const modelPicker = element<HTMLDialogElement>('model-picker');
 const providerSelect = element<HTMLSelectElement>('provider-select');
 const modelSelect = element<HTMLSelectElement>('model-select');
@@ -24,6 +25,7 @@ let 実行中 = false, 送信待ち = false, 入力許可 = false;
 let メッセージJSON = '';
 let 履歴JSON = '';
 let 会話ID = '';
+let 一覧表示中 = false;
 const 演出済み回答 = new Set<string>();
 let 演出タイマー: number | undefined;
 prompt.value = vscode.getState()?.下書き ?? '';
@@ -53,20 +55,35 @@ const コンソール演出 = (content: HTMLDivElement, text: string, key: strin
 const ボタン更新 = () => {
   element<HTMLButtonElement>('send').disabled = !入力許可 || 実行中 || 送信待ち || !prompt.value.trim();
 };
+const 一覧切替 = (show: boolean) => {
+  一覧表示中 = show;
+  historyList.hidden = !show;
+  element('conversation').hidden = show;
+  element('progress-section').hidden = show || !element('progress').textContent;
+  element('chat-footer').hidden = show;
+  element('view-title').textContent = show ? '会話一覧' : '今の会話';
+  historyToggle.textContent = show ? '戻る' : '一覧';
+  historyToggle.setAttribute('aria-expanded', String(show));
+};
+const 日時表示 = (value: number) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
 const 履歴表示 = (entries: { id: string; 題名: string; 更新日時: number }[]) => {
-  element('history-count').textContent = `(${entries.length})`;
   if (!entries.length) {
     const empty = document.createElement('p'); empty.className = 'history-empty'; empty.textContent = 'このフォルダに会話履歴はありません';
     historyList.replaceChildren(empty); return;
   }
-  historyList.replaceChildren(...entries.map(entry => {
+  historyList.replaceChildren(...[...entries].sort((a, b) => b.更新日時 - a.更新日時).map(entry => {
     const row = document.createElement('div'); row.className = `history-row${entry.id === 会話ID ? ' active' : ''}`; row.setAttribute('role', 'listitem');
     const open = document.createElement('button'); open.type = 'button'; open.className = 'history-open'; open.disabled = 実行中;
     open.title = entry.題名; open.setAttribute('aria-label', `会話を開く: ${entry.題名}`);
     const title = document.createElement('span'); title.className = 'history-title'; title.textContent = entry.題名;
-    const date = document.createElement('span'); date.className = 'history-date'; date.textContent = new Date(entry.更新日時).toLocaleString('ja-JP');
-    open.append(title, date); open.addEventListener('click', () => post('selectHistory', { id: entry.id }));
-    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'history-delete'; remove.textContent = '×';
+    const date = document.createElement('span'); date.className = 'history-date'; date.textContent = 日時表示(entry.更新日時);
+    open.append(date, title); open.addEventListener('click', () => { post('selectHistory', { id: entry.id }); 一覧切替(false); });
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'history-delete'; remove.textContent = '削除';
     remove.title = '会話を削除'; remove.setAttribute('aria-label', `会話を削除: ${entry.題名}`); remove.disabled = 実行中;
     remove.addEventListener('click', () => post('deleteHistory', { id: entry.id }));
     row.append(open, remove); return row;
@@ -113,6 +130,7 @@ prompt.addEventListener('keydown', event => {
 });
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
 modelButton.addEventListener('click', モデル選択を開く);
+historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
 element('remove-attachment').addEventListener('click', () => post('removeAttachment'));
 providerSelect.addEventListener('change', () => providerSelect.value ? 候補取得(providerSelect.value) : 自動選択表示());
 modelSelect.addEventListener('change', 選択状態更新);
@@ -242,7 +260,7 @@ window.addEventListener('message', event => {
   }
   // 拡張ホスト側で除外済みでも、古い状態や単独試用からの制御文字を防御的に表示しない。
   const visibleProgress = state.進捗.map((line: string) => visibleStreamContent(String(line))).filter(Boolean);
-  element('progress-section').hidden = !visibleProgress.length;
+  element('progress-section').hidden = 一覧表示中 || !visibleProgress.length;
   element('progress-title').textContent = 実行中 ? (visibleProgress.at(-1) ?? '実行中…').slice(0, 160) : '直前の実行状況';
   element('progress').textContent = visibleProgress.join('\n');
   ボタン更新();

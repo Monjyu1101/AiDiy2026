@@ -7,7 +7,7 @@ import { コード要求実行, streamControlOf, visibleStreamContent } from './
 
 interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string }
 interface 会話 { メッセージ: メッセージ[]; 作業URI: string; セッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
-interface 保存会話 extends 会話 { id: string; 更新日時: number }
+interface 保存会話 extends 会話 { id: string; 更新日時: number; 初回依頼?: string }
 interface 会話履歴 { 現在ID: string; 一覧: 保存会話[] }
 interface 添付 { 名前: string; 本文: string }
 
@@ -98,14 +98,17 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     });
   }
   private 題名(item: 会話): string {
-    return item.メッセージ.find(message => message.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 80) || '新しい会話';
+    return ('初回依頼' in item && typeof item.初回依頼 === 'string' ? item.初回依頼 : item.メッセージ.find(message => message.種別 === 'user')?.本文)?.replace(/\s+/g, ' ').slice(0, 160) || '新しい会話';
   }
-  private 保存(): void {
+  private 保存(更新日時を変更 = true): void {
     // 大量の会話による workspaceState 肥大化を防ぐ。Hermes 側の履歴はセッションIDで継続する。
     let サイズ = 0;
     const messages = this.会話.メッセージ.slice(-60).reverse().filter(item => (サイズ += item.本文.length) <= 2_000_000).reverse();
     if (this.会話.作業URI && (messages.length || this.会話.セッションID)) {
-      const snapshot = JSON.parse(JSON.stringify({ ...this.会話, メッセージ: messages, id: this.会話ID, 更新日時: Date.now() })) as 保存会話;
+      const previous = this.履歴.find(item => item.id === this.会話ID);
+      const snapshot = JSON.parse(JSON.stringify({ ...this.会話, メッセージ: messages, id: this.会話ID,
+        初回依頼: previous?.初回依頼 ?? this.会話.メッセージ.find(item => item.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 160),
+        更新日時: 更新日時を変更 ? Date.now() : previous?.更新日時 ?? Date.now() })) as 保存会話;
       this.履歴 = [snapshot, ...this.履歴.filter(item => item.id !== this.会話ID)];
     }
     const snapshot: 会話履歴 = { 現在ID: this.会話ID, 一覧: this.履歴 };
@@ -205,7 +208,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.会話.モデル選択済み = true;
     this.最終モデル = { provider: this.会話.provider, model: this.会話.model };
     void this.context.globalState.update('最終モデル', this.最終モデル).then(undefined, error => this.ログ.appendLine(`モデルを保存できません: ${String(error)}`));
-    this.保存(); this.通知();
+    this.保存(false); this.通知();
   }
 
   private async 送信(本文: string): Promise<void> {
@@ -269,7 +272,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.会話ID = entry.id;
     this.会話 = { ...entry, メッセージ: [...entry.メッセージ] };
     this.添付 = undefined; this.進捗 = [];
-    this.保存(); this.通知();
+    this.保存(false); this.通知();
   }
   private async 履歴削除(id: string): Promise<void> {
     if (this.実行中) return;
