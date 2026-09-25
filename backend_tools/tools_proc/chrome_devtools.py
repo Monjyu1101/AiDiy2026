@@ -90,14 +90,15 @@ class CDPClient:
     # 内部ヘルパー
     # ------------------------------------------------------------------ #
 
-    def _http_get(self, path: str) -> Any:
-        """Chrome DevTools HTTP エンドポイントに GET リクエスト"""
+    def _http_get(self, path: str, *, parse_json: bool = True) -> Any:
+        """Chrome DevTools HTTP エンドポイントに GET リクエスト。"""
         url = f"http://{self.host}:{self.port}{path}"
         try:
             # OS のシステムプロキシは loopback CDP 通信に不要。Windows では
             # 127.0.0.1 が proxy bypass 対象外となり、5秒タイムアウトする場合がある。
             with _NO_PROXY_OPENER.open(url, timeout=5) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+                body = resp.read().decode("utf-8")
+                return json.loads(body) if parse_json else body
         except urllib.error.URLError as e:
             raise ChromeDevToolsError(
                 f"Chrome に接続できません ({self.host}:{self.port})。\n"
@@ -334,7 +335,8 @@ class CDPClient:
     def close_tab_sync(self, tab_id: str) -> bool:
         """タブを閉じる (同期)"""
         try:
-            self._http_get(f"/json/close/{tab_id}")
+            # /json/close は JSON ではなくプレーンテキストを返す。
+            self._http_get(f"/json/close/{tab_id}", parse_json=False)
             return True
         except ChromeDevToolsError:
             return False
@@ -353,7 +355,8 @@ class CDPClient:
     def activate_tab_sync(self, tab_id: str) -> bool:
         """タブをアクティブにする (同期)"""
         try:
-            self._http_get(f"/json/activate/{tab_id}")
+            # /json/activate もプレーンテキストを返す。
+            self._http_get(f"/json/activate/{tab_id}", parse_json=False)
             return True
         except ChromeDevToolsError:
             return False
