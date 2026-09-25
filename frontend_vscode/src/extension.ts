@@ -264,6 +264,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.会話 = { メッセージ: [], 作業URI: this.選択フォルダ()?.uri.toString() ?? '', ...this.最終モデル, モデル選択済み: true };
     this.会話ID = randomUUID();
     this.添付 = undefined; this.進捗 = []; this.保存(); this.通知();
+    void this.view?.webview.postMessage({ type: 'showConversation' });
   }
   private 履歴選択(id: string): void {
     if (this.実行中) return;

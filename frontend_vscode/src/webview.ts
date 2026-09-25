@@ -35,6 +35,10 @@ const 最下部表示 = () => {
   const conversation = element('conversation');
   conversation.scrollTop = conversation.scrollHeight;
 };
+const 進捗末尾表示 = () => {
+  const progress = element('progress');
+  progress.scrollTop = progress.scrollHeight;
+};
 const コンソール演出 = (content: HTMLDivElement, text: string, key: string) => {
   content.classList.add('console-effect');
   const terminalText = document.createElement('span');
@@ -131,6 +135,9 @@ prompt.addEventListener('keydown', event => {
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
 modelButton.addEventListener('click', モデル選択を開く);
 historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
+element<HTMLDetailsElement>('progress-details').addEventListener('toggle', () => {
+  if (element<HTMLDetailsElement>('progress-details').open) 進捗末尾表示();
+});
 element('remove-attachment').addEventListener('click', () => post('removeAttachment'));
 providerSelect.addEventListener('change', () => providerSelect.value ? 候補取得(providerSelect.value) : 自動選択表示());
 modelSelect.addEventListener('change', 選択状態更新);
@@ -150,6 +157,7 @@ document.addEventListener('click', event => {
 });
 window.addEventListener('message', event => {
   const state = event.data;
+  if (state.type === 'showConversation') { 一覧切替(false); return; }
   if (state.type === 'modelCatalog') {
     if (!modelPicker.open || state.provider !== catalogProvider) return;
     const rows: { id: string; label: string }[] = Array.isArray(state.items) ? state.items.filter((item: unknown): item is { id: string; label: string } => {
@@ -184,13 +192,16 @@ window.addEventListener('message', event => {
     return;
   }
   if (state.メッセージ識別 === 'output_stream') {
-    element('progress-section').hidden = false;
+    const progressSection = element('progress-section');
+    progressSection.hidden = false;
     const content = String(state.メッセージ内容 ?? '');
     const control = streamControlOf(content);
     if (control === 'start') {
+      progressSection.classList.add('running');
       element('progress-title').textContent = '';
       element<HTMLDetailsElement>('progress-details').open = true;
     } else if (control === 'end' || control === 'cancel') {
+      progressSection.classList.remove('running');
       element('progress-title').textContent = '';
       element<HTMLDetailsElement>('progress-details').open = false;
     } else {
@@ -256,13 +267,24 @@ window.addEventListener('message', event => {
     }));
     if (下端) conversation.scrollTop = conversation.scrollHeight;
     メッセージJSON = json;
-    演出候補.at(-1) && コンソール演出(演出候補.at(-1)!.content, 演出候補.at(-1)!.text, 演出候補.at(-1)!.key);
+    const 最新応答 = 演出候補.at(-1);
+    if (最新応答) {
+      最下部表示();
+      コンソール演出(最新応答.content, 最新応答.text, 最新応答.key);
+    }
   }
   // 拡張ホスト側で除外済みでも、古い状態や単独試用からの制御文字を防御的に表示しない。
   const visibleProgress = state.進捗.map((line: string) => visibleStreamContent(String(line))).filter(Boolean);
-  element('progress-section').hidden = 一覧表示中 || !visibleProgress.length;
+  const progressSection = element('progress-section');
+  progressSection.hidden = 一覧表示中 || !visibleProgress.length;
+  progressSection.classList.toggle('running', 実行中);
   element('progress-title').textContent = 実行中 ? (visibleProgress.at(-1) ?? '実行中…').slice(0, 160) : '直前の実行状況';
-  element('progress').textContent = visibleProgress.join('\n');
+  const progress = element('progress');
+  const progressText = visibleProgress.join('\n');
+  if (progress.textContent !== progressText) {
+    progress.textContent = progressText;
+    進捗末尾表示();
+  }
   ボタン更新();
 });
 post('ready');

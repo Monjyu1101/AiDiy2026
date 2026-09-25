@@ -46,5 +46,7 @@
       else void send(message).catch(error);
     }
   });
-  document.getElementById('standalone-new').onclick = () => { void send({type:'new'}).catch(error); };
+  document.getElementById('standalone-new').onclick = () => {
+    void send({type:'new'}).then(() => emit({type:'showConversation'})).catch(error);
+  };
 })();
