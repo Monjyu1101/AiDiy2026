@@ -230,6 +230,10 @@ window.addEventListener('message', event => {
   const historyJSON = JSON.stringify([history, 会話ID, 実行中]);
   if (historyJSON !== 履歴JSON) { 履歴表示(history); 履歴JSON = historyJSON; }
   provider = state.provider; model = state.model;
+  const label = `${provider || '自動'} / ${model || (provider ? '既定モデル' : 'CLI の設定')}`;
+  const modelLabel = element('model-label');
+  modelLabel.textContent = label;
+  modelLabel.title = label;
   modelButton.title = 'プロバイダとモデルを選択';
   modelButton.disabled = 実行中 || !入力許可;
   element<HTMLButtonElement>('remove-attachment').disabled = 実行中;

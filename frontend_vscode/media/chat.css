@@ -49,10 +49,12 @@ footer { padding: 8px 12px 12px; }
 #composer { border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 8px; background: var(--vscode-input-background); overflow: hidden; }
 textarea { resize: vertical; display: block; width: 100%; min-height: 70px; max-height: 220px; padding: 10px; color: var(--vscode-input-foreground); background: transparent; border: none; }
 .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 5px; }
+.model-selection { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 #choose-model { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; padding: 2px 6px; color: #000; font-size: 11px; line-height: 1.2; border-color: #fff; background: #fff; }
 #choose-model:hover { color: #000; border-color: #e8e8e8; background: #e8e8e8; }
 .model-caption { color: #000; font-weight: 600; }
 .model-chevron { color: #000; }
+#model-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vscode-descriptionForeground); font-size: 11px; }
 #send, #stop { flex-shrink: 0; }
 .primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
 .primary:hover { background: var(--vscode-button-hoverBackground); }
