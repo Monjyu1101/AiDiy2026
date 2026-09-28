@@ -85,7 +85,7 @@ OPENROUTER_MODELS: list[tuple[str, str]] = [
     ("anthropic/claude-fable-5.1",             ""),
     ("anthropic/claude-opus-5.5",              ""),
     ("anthropic/claude-opus-5.5-fast",         "2x price, higher output speed"),
-    ("anthropic/claude-sonnet-5",              ""),
+    ("anthropic/claude-sonnet-5.5",              ""),
     ("anthropic/claude-haiku-4.5",             ""),
     # OpenAI
     ("openai/gpt-6-sol",                     ""),
@@ -158,7 +158,7 @@ VERCEL_AI_GATEWAY_MODELS: list[tuple[str, str]] = [
     ("alibaba/qwen3.6-plus",                 ""),
     ("zai/glm-5.1",                          ""),
     ("minimax/minimax-m2.7",                 ""),
-    ("anthropic/claude-sonnet-5",             ""),
+    ("anthropic/claude-sonnet-5.5",             ""),
     ("anthropic/claude-opus-5.5",             ""),
     ("anthropic/claude-haiku-4.5",           ""),
     ("openai/gpt-6-sol",                     ""),
@@ -266,7 +266,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         # Anthropic
         "anthropic/claude-fable-5.1",
         "anthropic/claude-opus-5.5",
-        "anthropic/claude-sonnet-5",
+        "anthropic/claude-sonnet-5.5",
         "anthropic/claude-haiku-4.5",
         # OpenAI
         "openai/gpt-6-sol",
@@ -338,7 +338,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "gpt-6-sol",
         "gpt-5.6-terra",
         "gpt-6-luna",
-        "claude-sonnet-5",
+        "claude-sonnet-5.5",
         "claude-haiku-4.5",
         "gemini-3.1-pro-preview",
         "gemini-3-pro-preview",
@@ -433,7 +433,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     "anthropic": [
         "claude-fable-5-1",
         "claude-opus-5-5",
-        "claude-sonnet-5",
+        "claude-sonnet-5-5",
         "claude-haiku-4-5-20251001",
     ],
     "deepseek": [
@@ -467,7 +467,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "deepseek-ai/DeepSeek-V3.2",
         "moonshotai/Kimi-K2.5",
         "google/gemini-3.1-flash-lite-preview",
-        "anthropic/claude-sonnet-5",
+        "anthropic/claude-sonnet-5.5",
         "openai/gpt-6-sol",
     ],
     # Synced against https://opencode.ai/docs/zen/ + live GET /zen/v1/models
@@ -501,7 +501,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "gpt-5-nano",
         "claude-fable-5",
         "claude-opus-5-5",
-        "claude-sonnet-5",
+        "claude-sonnet-5.5",
         "claude-haiku-4-5",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
@@ -595,7 +595,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     ],
     "kilocode": [
         "anthropic/claude-opus-5.5",
-        "anthropic/claude-sonnet-5",
+        "anthropic/claude-sonnet-5.5",
         "openai/gpt-6-sol",
         "google/gemini-3-pro-preview",
         "google/gemini-3-flash-preview",
@@ -725,7 +725,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     # prefers live discovery via ListFoundationModels + ListInferenceProfiles.
     # Use inference profile IDs (us.*) since most models require them.
     "bedrock": [
-        "us.anthropic.claude-sonnet-5",
+        "us.anthropic.claude-sonnet-5-5",
         "us.anthropic.claude-opus-5-5-v1",
         "us.anthropic.claude-haiku-4-5-20251001-v1:0",
         "openai.gpt-6-sol",
@@ -5760,6 +5760,7 @@ _COPILOT_MODEL_ALIASES = {
     "openai/o3-mini": "gpt-5-mini",
     "openai/o4-mini": "gpt-5-mini",
     "anthropic/claude-opus-4.6": "claude-opus-4.6",
+    "anthropic/claude-sonnet-5.5": "claude-sonnet-5.5",
     "anthropic/claude-sonnet-5": "claude-sonnet-5",
     "anthropic/claude-sonnet-4.6": "claude-sonnet-4.6",
     "anthropic/claude-sonnet-4": "claude-sonnet-4",
@@ -5770,6 +5771,7 @@ _COPILOT_MODEL_ALIASES = {
     # dot-notation.  Accept both so users who configure copilot + a
     # default hyphenated Claude model don't hit HTTP 400
     # "model_not_supported".  See issue #6879.
+    "claude-sonnet-5-5": "claude-sonnet-5.5",
     "claude-sonnet-5": "claude-sonnet-5",
     "claude-opus-4-6": "claude-opus-4.6",
     "claude-sonnet-4-6": "claude-sonnet-4.6",
@@ -5777,7 +5779,7 @@ _COPILOT_MODEL_ALIASES = {
     "claude-sonnet-4-5": "claude-sonnet-4.5",
     "claude-haiku-4-5": "claude-haiku-4.5",
     "anthropic/claude-opus-4-6": "claude-opus-4.6",
-    "anthropic/claude-sonnet-5": "claude-sonnet-5",
+    "anthropic/claude-sonnet-5-5": "claude-sonnet-5.5",
     "anthropic/claude-sonnet-4-6": "claude-sonnet-4.6",
     "anthropic/claude-sonnet-4-0": "claude-sonnet-4",
     "anthropic/claude-sonnet-4-5": "claude-sonnet-4.5",

@@ -131,7 +131,7 @@ class conf_models:
             "auto": "yyyy/mm/dd - auto (default)",
             "claude-fable-5.1": "yyyy/mm/dd - claude-fable-5.1",
             "claude-opus-5.5": "yyyy/mm/dd - claude-opus-5.5",
-            "claude-sonnet-5": "yyyy/mm/dd - claude-sonnet-5",
+            "claude-sonnet-5.5": "yyyy/mm/dd - claude-sonnet-5.5",
             "claude-haiku-4.5": "yyyy/mm/dd - claude-haiku-4.5",
             "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
