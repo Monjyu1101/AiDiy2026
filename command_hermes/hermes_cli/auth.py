@@ -4812,8 +4812,8 @@ def refresh_codex_oauth_pure(
             message = (
                 "Codex refresh token was already consumed by another client "
                 "(e.g. Codex CLI or VS Code extension). "
-                "Run `codex` in your terminal to generate fresh tokens, "
-                "then run `hermes auth` to re-authenticate."
+                "Re-read the shared Codex auth store or run `codex login` "
+                "if its current token is also invalid."
             )
             relogin_required = True
         # A 401/403 from the token endpoint always means the refresh token

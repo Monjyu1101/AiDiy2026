@@ -395,6 +395,14 @@ def auth_add_command(args) -> None:
         return
 
     if provider == "openai-codex":
+        try:
+            existing = auth_mod.resolve_codex_runtime_credentials()
+        except auth_mod.AuthError:
+            existing = None
+        if existing:
+            auth_mod.mark_provider_active_if_unset(provider)
+            print("Using the existing shared Codex CLI OAuth login.")
+            return
         creds = auth_mod._codex_device_code_login()
         auth_mod._save_codex_tokens(creds["tokens"], creds.get("last_refresh"))
         auth_mod.mark_provider_active_if_unset(provider)

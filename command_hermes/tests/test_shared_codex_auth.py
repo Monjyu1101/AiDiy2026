@@ -2,6 +2,8 @@
 
 import base64
 from contextlib import contextmanager
+from contextlib import redirect_stdout
+import io
 import json
 import os
 from pathlib import Path
@@ -11,6 +13,7 @@ from unittest.mock import patch
 
 import command_hermes.cli_main  # noqa: F401  # Hermes の module alias を初期化
 from hermes_cli import auth
+from hermes_cli import auth_commands
 from agent.credential_pool import load_pool
 
 
@@ -101,6 +104,41 @@ class SharedCodexAuthTest(unittest.TestCase):
             stored = json.loads((root / "codex" / "auth.json").read_text(encoding="utf-8"))
             self.assertNotIn("tokens", stored)
             self.assertFalse(auth.get_codex_auth_status()["logged_in"])
+
+    def test_auth_add_reuses_existing_codex_login(self):
+        with self._stores() as root:
+            auth._save_codex_tokens({
+                "access_token": _token("account-a"), "refresh_token": "refresh-a",
+            })
+            with (
+                patch.object(auth, "_codex_device_code_login") as login,
+                patch.object(auth, "mark_provider_active_if_unset"),
+                redirect_stdout(io.StringIO()) as output,
+            ):
+                auth_commands.auth_add_command(type("Args", (), {
+                    "provider": "openai-codex", "auth_type": "oauth",
+                })())
+            login.assert_not_called()
+            self.assertIn("existing shared Codex CLI OAuth login", output.getvalue())
+            self.assertFalse((root / "hermes" / "auth.json").exists())
+
+    def test_pool_refresh_uses_shared_store(self):
+        with self._stores() as root:
+            auth._save_codex_tokens({
+                "access_token": _token("account-a"), "refresh_token": "refresh-a",
+            })
+            pool = load_pool("openai-codex")
+            with patch.object(auth, "refresh_codex_oauth_pure", return_value={
+                "access_token": _token("account-a", 4102444802),
+                "refresh_token": "refresh-c",
+                "last_refresh": "2026-01-03T00:00:00Z",
+            }):
+                refreshed = pool._refresh_entry(pool.entries()[0], force=True)
+
+            self.assertIsNotNone(refreshed)
+            stored = json.loads((root / "codex" / "auth.json").read_text(encoding="utf-8"))
+            self.assertEqual("refresh-c", stored["tokens"]["refresh_token"])
+            self.assertFalse((root / "hermes" / "auth.json").exists())
 
 
 if __name__ == "__main__":
