@@ -54,6 +54,15 @@ class ConfJsonPortKeyTest(unittest.TestCase):
             for old_key in old_keys:
                 self.assertNotIn(old_key, self.conf_json.DEFAULT_CONFIG)
 
+    def test_missing_file_creates_openai_chat_defaults(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "AiDiy_key.json"
+            self.conf_json(json=str(config_path))
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
+
+        self.assertEqual("gpt-6-luna", saved["CHAT_OPENAI_MODEL"])
+        self.assertEqual("gpt-6-sol", saved["CHAT_OPENAI_OAUTH_MODEL"])
+
     def test_legacy_port_keys_are_migrated_and_removed(self):
         legacy = {
             "WEB_BASE": "18090",

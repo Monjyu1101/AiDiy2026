@@ -733,7 +733,7 @@ class conf_models:
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.openai_models.items()
             } or {
-                "gpt-6-sol": "yyyy/mm/dd - OpenAI API / gpt-6-sol",
+                "gpt-6-luna": "yyyy/mm/dd - OpenAI API / gpt-6-luna",
             },
             "openai_oauth": openai_oauth_models,
         }

@@ -238,6 +238,10 @@ class ChatAI:
             messages.append({"role": role, "content": item["text"]})
         return messages
 
+    def _画像生成モデル(self) -> bool:
+        """画像生成モデルは function calling に対応しない。"""
+        return "-image" in str(self.chat_model).lower()
+
     async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 120,
                    システムプロンプト: str = None, file_path: str = None,
                    completions_tools: dict = None, 自己ループ: bool = False,
@@ -265,7 +269,7 @@ class ChatAI:
             # 自己ループ（aidiy_chat_llms）: 自前 MCP 群をツールとして使い、
             # tool_calls をサーバー側で実行しながら応答が確定するまで回す。
             # completions（自己ループ=False）はここを通らずシングルアクションのまま。
-            if 自己ループ:
+            if 自己ループ and not self._画像生成モデル():
                 try:
                     from AIコア.AI内部ツール import MCPツールブリッジ, 自己ループ実行
                 except ImportError:
@@ -321,7 +325,11 @@ class ChatAI:
                 top_p=0.95,
                 top_k=32,
                 max_output_tokens=8192,
-                response_mime_type="text/plain"
+                **(
+                    {"response_modalities": ["TEXT", "IMAGE"]}
+                    if self._画像生成モデル()
+                    else {"response_mime_type": "text/plain"}
+                ),
             )
 
             # リクエスト作成
@@ -367,7 +375,8 @@ class ChatAI:
                     nonlocal result_text, output_files, last_stream_time
 
                     # api実行（ストリーミングなし）
-                    response = self.client.models.generate_content(
+                    response = await asyncio.to_thread(
+                        self.client.models.generate_content,
                         model=self.chat_model,
                         contents=request,
                         config=generation_config,
@@ -460,9 +469,10 @@ class ChatAI:
                     except asyncio.CancelledError:
                         pass
 
-                for task in done:
-                    if task == monitor_task:
-                        raise asyncio.TimeoutError(f"タイムアウト({タイムアウト秒数}秒)")
+                if execution_task in done:
+                    execution_task.result()
+                else:
+                    raise asyncio.TimeoutError(f"タイムアウト({タイムアウト秒数}秒)")
 
             except asyncio.TimeoutError:
                 logger.warning(f"api タイムアウト ({タイムアウト秒数}秒)")
