@@ -44,16 +44,7 @@ BASE_DIR = PROJECT_ROOT
 BACKEND_DIR = PROJECT_ROOT / "backend_server"
 CONFIG_DIR = PROJECT_ROOT / "_config"
 backend_tools_DIR = THIS_DIR
-backend_tools_ENV_CANDIDATES = [".venv", "venv", f".venv-{sys.platform}"]
-
-
-def uv_project_environment(base_dir: Path) -> Path | None:
-    """別 OS の .venv がある場合は、現在の OS 用環境へ切り替える。"""
-    default_env = base_dir / ".venv"
-    executable = Path("Scripts/python.exe") if sys.platform == "win32" else Path("bin/python")
-    if default_env.exists() and not (default_env / executable).exists():
-        return base_dir / f".venv-{sys.platform}"
-    return None
+backend_tools_ENV_CANDIDATES = [".venv", "venv"]
 
 FRONTEND_COMMAND = "npm"
 AUTO_MODE = False
@@ -578,7 +569,6 @@ def ensure_python_module_attribute(
     repair_command: list[str],
     cwd: Path,
     label: str,
-    env: dict[str, str] | None = None,
 ) -> bool:
     check_code = (
         "import importlib, sys; "
@@ -590,7 +580,7 @@ def ensure_python_module_attribute(
     if result.returncode == 0:
         return True
     print_warning(f"{label}: {module_name}.{attr_name} が見つかりません。依存関係を修復します。")
-    if not run_command(repair_command, cwd=cwd, env=env):
+    if not run_command(repair_command, cwd=cwd):
         return False
     result = subprocess.run(check_command, cwd=cwd, capture_output=True, text=True)
     if result.returncode == 0:
@@ -709,12 +699,13 @@ def setup_mcp_module(module: dict) -> bool:
         if not check_uv_installed():
             print_error(f"{label}: uv がインストールされていません。")
             return False
-        uv_env = os.environ.copy()
-        alternate_env = uv_project_environment(mcp_dir)
-        if alternate_env is not None:
-            uv_env["UV_PROJECT_ENVIRONMENT"] = str(alternate_env)
-            print_info(f"別 OS の .venv を保持し、{alternate_env.name} を使用します。")
-        if not run_command(["uv", "sync", "--upgrade", "--no-install-project"], cwd=mcp_dir, env=uv_env):
+        default_env = mcp_dir / ".venv"
+        executable = Path("Scripts/python.exe") if sys.platform == "win32" else Path("bin/python")
+        if default_env.exists() and not (default_env / executable).exists():
+            print_info("別 OS の .venv をクリアして再作成します。")
+            if not run_command(["uv", "venv", "--clear", ".venv"], cwd=mcp_dir):
+                return False
+        if not run_command(["uv", "sync", "--upgrade", "--no-install-project"], cwd=mcp_dir):
             print_error(f"{label}: uv sync --upgrade に失敗しました。")
             return False
         python_path = find_python_in_env(mcp_dir, backend_tools_ENV_CANDIDATES)
@@ -728,7 +719,6 @@ def setup_mcp_module(module: dict) -> bool:
             ["uv", "sync", "--no-install-project", "--reinstall-package", "click"],
             mcp_dir,
             label,
-            env=uv_env,
         ):
             return False
         print_success(f"{label}: Python 依存関係のインストールが完了しました。")

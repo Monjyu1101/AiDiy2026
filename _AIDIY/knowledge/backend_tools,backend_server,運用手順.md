@@ -64,11 +64,11 @@ MCP 2.x では `FastMCP` が `MCPServer` へ変更されているため、`mcp.s
 
 Node.js / `package.json` / `node_modules` は不要。
 
-別 OS で作成した `.venv` が残る環境では、`uv` が仮想環境を無効と判定する。Linux / macOS へ移した場合は、既存環境を退避してから再作成する。
+別 OS で作成した `.venv` が残る環境では、`uv` が仮想環境を無効と判定する。`backend_tools/_setup.py` はその場合に `.venv` をクリアし、現在の OS 用に同じパスで再作成する。手動で再作成する場合:
 
 ```sh
 cd backend_tools
-mv .venv .venv.windows
+uv venv --clear .venv
 uv sync --locked --no-install-project
 ```
 

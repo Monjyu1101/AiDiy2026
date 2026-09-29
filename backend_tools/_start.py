@@ -73,16 +73,7 @@ THIS_DIR = Path(__file__).resolve().parent
 BACKEND_TOOLS_DIR = THIS_DIR
 PORT_TOOLS = 8095
 APP = "tools_main:app"
-ENV_CANDIDATES = [".venv", "venv", f".venv-{sys.platform}"]
-
-
-def uv_project_environment(base_dir: Path) -> Path | None:
-    """別 OS の .venv がある場合は、現在の OS 用環境へ切り替える。"""
-    default_env = base_dir / ".venv"
-    executable = Path("Scripts/python.exe") if sys.platform == "win32" else Path("bin/python")
-    if default_env.exists() and not (default_env / executable).exists():
-        return base_dir / f".venv-{sys.platform}"
-    return None
+ENV_CANDIDATES = [".venv", "venv"]
 
 
 def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
@@ -130,6 +121,8 @@ def check_environment() -> tuple[bool, str]:
     if not (BACKEND_TOOLS_DIR / "pyproject.toml").exists():
         return False, f"pyproject.toml が見つかりません: {BACKEND_TOOLS_DIR / 'pyproject.toml'}"
     python_path = find_python_in_env(BACKEND_TOOLS_DIR, ENV_CANDIDATES)
+    if python_path is None and (BACKEND_TOOLS_DIR / ".venv").exists():
+        return False, "現在の OS で使えない .venv です。backend_tools/_setup.py を実行してください"
     if python_path is None and not check_command_exists("uv"):
         return False, f"Python 仮想環境 ({' / '.join(ENV_CANDIDATES)}) または uv が見つかりません"
     if (BACKEND_TOOLS_DIR / "package.json").exists():
@@ -142,21 +135,17 @@ def check_environment() -> tuple[bool, str]:
 def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen[bytes]:
     print_info(f"[{name}] 作業ディレクトリ: {cwd}")
     print_info(f"[{name}] コマンド: {' '.join(command)}")
-    env = os.environ.copy()
-    if command[0] == "uv":
-        alternate_env = uv_project_environment(cwd)
-        if alternate_env is not None:
-            env["UV_PROJECT_ENVIRONMENT"] = str(alternate_env)
-            print_info(f"[{name}] 仮想環境: {alternate_env}")
     if sys.platform == "win32":
         process = subprocess.Popen(
-            command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            bufsize=0, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, env=env,
+            command, cwd=str(cwd), stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            bufsize=0, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
     else:
         process = subprocess.Popen(
-            command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            bufsize=0, preexec_fn=os.setpgrp, env=env,
+            command, cwd=str(cwd), stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            bufsize=0, start_new_session=True,
         )
     print_success(f"[{name}] 起動しました")
     return process
