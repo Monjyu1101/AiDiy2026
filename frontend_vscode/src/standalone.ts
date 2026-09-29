@@ -50,9 +50,10 @@ export async function 単独起動(project: string, launch?: 起動設定) {
     state.メッセージ.push({ 種別: 'user', 本文: text }); trimHistory();
     save(); broadcast({type:'accepted'}); notify();
     try {
+      const 再開ID = state.セッションID;
       job = コード要求実行({ セッションID: state.会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: text }, {
         起動: launch ?? 起動解決('aidiy_hermes', '', folder), 作業フォルダ: folder,
-        引数: 会話引数(state.provider, state.model, 30, state.セッションID), 制限時間: 900_000
+        引数: 会話引数(state.provider, state.model, 30, 再開ID), 制限時間: 900_000
       }, packet => {
         broadcast(packet);
         if (packet.メッセージ識別 === 'output_stream') {
@@ -61,9 +62,10 @@ export async function 単独起動(project: string, launch?: 起動設定) {
           if (!line) return;
           state.進捗 = [...state.進捗, line.slice(0, 4000)].slice(-100); notify();
         }
-      });
+      }, 再開ID);
       const result = await job.完了;
-      if (result.セッションID) state.セッションID = result.セッションID;
+      if (result.セッション復旧) state.セッションID = undefined;
+      if (result.終了コード === 0 && result.セッションID) state.セッションID = result.セッションID;
       if (result.回答) state.メッセージ.push({ 種別: 'assistant', 本文: result.回答 });
       if (result.停止理由 || result.終了コード !== 0 || !result.回答) {
         state.メッセージ.push({ 種別: 'error', 本文: result.停止理由 || `CLI が回答を完了できませんでした。\n${result.ログ.slice(-3000)}` });

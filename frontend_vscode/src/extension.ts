@@ -228,9 +228,10 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.ログ.clear(); this.保存(); this.通知();
     void this.view?.webview.postMessage({ type: 'accepted' });
     try {
+      const 再開ID = this.会話.セッションID;
       const run = コード要求実行({ セッションID: this.会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: fullPrompt }, {
         起動, 作業フォルダ: folder.uri.fsPath,
-        引数: 会話引数(provider, model, Math.min(500, Math.max(1, config.get<number>('maxTurns', 30))), this.会話.セッションID),
+        引数: 会話引数(provider, model, Math.min(500, Math.max(1, config.get<number>('maxTurns', 30))), 再開ID),
         制限時間: Math.min(7200, Math.max(10, config.get<number>('timeoutSeconds', 900))) * 1000
       }, packet => {
           if (this.破棄済み) return;
@@ -243,10 +244,11 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
           this.ログ.appendLine(line);
           this.進捗 = [...this.進捗, line.slice(0, 4000)].slice(-100);
           if (!this.通知タイマー) this.通知タイマー = setTimeout(() => { this.通知タイマー = undefined; this.通知(); }, 120);
-      });
+      }, 再開ID);
       this.停止処理 = () => { run.停止(); this.進捗.push('停止処理中…'); this.通知(); };
       const result = await run.完了;
-      if (result.セッションID) this.会話.セッションID = result.セッションID;
+      if (result.セッション復旧) this.会話.セッションID = undefined;
+      if (result.終了コード === 0 && result.セッションID) this.会話.セッションID = result.セッションID;
       if (result.回答) this.会話.メッセージ.push({ 種別: 'assistant', 本文: result.回答 });
       if (result.停止理由) this.会話.メッセージ.push({ 種別: 'error', 本文: result.停止理由 });
       else if (result.終了コード !== 0 || !result.回答) {

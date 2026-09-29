@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } = require('node:fs');
 const { join, resolve, sep } = require('node:path');
 const { tmpdir } = require('node:os');
-const { CLI実行, 会話引数, 起動解決 } = require('../out/runner.cjs');
+const { CLI実行, 会話引数, 起動解決, 再開セッション不在 } = require('../out/runner.cjs');
 const fake = resolve('test/fake-cli.cjs');
 const root = resolve('.');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -45,6 +45,26 @@ test('非ゼロ終了と stderr を呼び出し元へ返す', async () => {
   const result = await run('fail', [], { 本文: 'abc'.repeat(100000) }).完了;
   assert.equal(result.終了コード, 7);
   assert.match(result.ログ, /authentication failed/);
+});
+test('保存済みセッションが消えた場合だけ resume を外して再実行する', async () => {
+  const { コード要求実行, STREAM_START, STREAM_END, STREAM_CANCEL } = require('../out/protocol.cjs');
+  const id = '20260929_140445_a8bbc2';
+  const args = 会話引数('xai-oauth', 'grok-4.6', 30, id);
+  const first = await run('missing-session', [], { 本文: '続き', 引数: args }).完了;
+  assert.equal(再開セッション不在(first, id), true);
+  assert.equal(再開セッション不在(first, 'different-id'), false);
+  const packets = [];
+  const result = await コード要求実行({ セッションID: 'ui-session', チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: '続き' }, {
+    起動: { 実行ファイル: process.execPath, 引数: [fake, 'missing-session'] },
+    作業フォルダ: root, 引数: args, 制限時間: 10000
+  }, packet => packets.push(packet), id).完了;
+  assert.equal(result.終了コード, 0);
+  assert.equal(result.セッション復旧, true);
+  assert.equal(result.セッションID, 'test-session-001');
+  assert.ok(!JSON.parse(result.回答).args.includes('--resume'));
+  assert.equal(packets.filter(packet => packet.メッセージ内容 === STREAM_START).length, 1);
+  assert.equal(packets.filter(packet => packet.メッセージ内容 === STREAM_END).length, 1);
+  assert.equal(packets.filter(packet => packet.メッセージ内容 === STREAM_CANCEL).length, 0);
 });
 test('実行ファイルが存在しない場合に起動エラーを返す', async () => {
   await assert.rejects(CLI実行({ 起動: { 実行ファイル: join(root, 'does-not-exist.exe'), 引数: [] }, 作業フォルダ: root, 本文: 'hello', 引数: [], 制限時間: 5000 }).完了, /CLI を起動できません/);

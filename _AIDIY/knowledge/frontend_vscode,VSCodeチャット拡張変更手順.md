@@ -37,6 +37,7 @@
 - 外部 CLI Provider のモデルが `auto` の場合は `--model auto` を渡さず、各 CLI 自身の既定モデル選択へ任せる。明示モデルを選んだ場合は Hermes の外部 CLI 実行まで `--model <ID>` を渡す。
 - `antigravity-cli` は Hermes の外部 CLI Provider 一覧から取得する。`xai-oauth` は API Provider のカタログ入口に含め、`grok-4.6` を Hermes の curated model 一覧から取得する。
 - xAI OAuth の初回認証は静的なワンショット実行中ではなく、拡張の「対話 CLI」から `/model` で `xai-oauth` を選ぶか、`hermes auth add xai-oauth` を実行する。
+- VS Code の履歴に残る Hermes セッション ID が CLI 側で見つからない場合、同じ依頼を `--resume` なしで一度だけ再実行する。再実行が成功したら新しいセッション ID を保存する。以前の CLI セッションの文脈は復元されないため、必要な前提は依頼文に含める。
 
 ## セットアップと配置
 
@@ -116,4 +117,5 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 | Provider / モデルが空 | `scripts/model-catalog.py`、Hermes 設定、Cli Path が AiDiy CLI を指すか |
 | 送信できない | ワークスペース信頼、フォルダが開かれているか、実行中状態 |
 | 回答が出ない | VS Code 出力の `AiDiy`、CLI の終了コード、認証が必要なら「対話 CLI」 |
+| `Session not found` | 古い拡張では新しい会話を開始する。更新版では `--resume` を外して一度だけ自動再試行するため、実行ログと保存セッション ID を確認する |
 | VSIX に変更が入らない | `npm run package` の prepublish、`dist/extension.js` / `dist/webview.js`、`--force` 配置 |

@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { stripVTControlCharacters } from 'node:util';
 
 export interface 起動設定 { 実行ファイル: string; 引数: string[] }
-export interface 実行結果 { 回答: string; ログ: string; セッションID?: string; 終了コード: number | null; 停止理由?: string }
+export interface 実行結果 { 回答: string; ログ: string; セッションID?: string; 終了コード: number | null; 停止理由?: string; セッション復旧?: boolean }
 export interface 実行要求 {
   起動: 起動設定; 作業フォルダ: string; 本文: string; 引数: string[]; 制限時間: number;
   進捗?: (行: string) => void;
@@ -57,6 +57,11 @@ export function 会話引数(provider: string, model: string, maxTurns: number, 
   if (modelId && modelId.toLowerCase() !== 'auto') args.push('--model', modelId);
   if (セッションID) args.push('--resume', セッションID);
   return args;
+}
+
+export function 再開セッション不在(結果: 実行結果, セッションID?: string): boolean {
+  if (!セッションID || 結果.終了コード === 0 || 結果.停止理由) return false;
+  return 結果.ログ.split(/\r?\n/).some(line => line.trim() === `Session not found: ${セッションID}`);
 }
 
 export function CLI実行(要求: 実行要求): { 完了: Promise<実行結果>; 停止: (理由?: string) => void } {

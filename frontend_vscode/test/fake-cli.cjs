@@ -11,6 +11,10 @@ if (mode === 'wait') {
   process.stderr.write('provider authentication failed\n');
   process.exitCode = 7;
   process.stdin.resume();
+} else if (mode === 'missing-session' && process.argv.includes('--resume')) {
+  process.stderr.write(`Session not found: ${process.argv[process.argv.indexOf('--resume') + 1]}\n`);
+  process.exitCode = 1;
+  process.stdin.resume();
 } else {
   let input = '';
   process.stdin.setEncoding('utf8');
