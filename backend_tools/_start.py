@@ -73,7 +73,16 @@ THIS_DIR = Path(__file__).resolve().parent
 BACKEND_TOOLS_DIR = THIS_DIR
 PORT_TOOLS = 8095
 APP = "tools_main:app"
-ENV_CANDIDATES = [".venv", "venv"]
+ENV_CANDIDATES = [".venv", "venv", f".venv-{sys.platform}"]
+
+
+def uv_project_environment(base_dir: Path) -> Path | None:
+    """別 OS の .venv がある場合は、現在の OS 用環境へ切り替える。"""
+    default_env = base_dir / ".venv"
+    executable = Path("Scripts/python.exe") if sys.platform == "win32" else Path("bin/python")
+    if default_env.exists() and not (default_env / executable).exists():
+        return base_dir / f".venv-{sys.platform}"
+    return None
 
 
 def find_python_in_env(base_dir: Path, env_candidates: list[str]) -> Path | None:
@@ -133,15 +142,21 @@ def check_environment() -> tuple[bool, str]:
 def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen[bytes]:
     print_info(f"[{name}] 作業ディレクトリ: {cwd}")
     print_info(f"[{name}] コマンド: {' '.join(command)}")
+    env = os.environ.copy()
+    if command[0] == "uv":
+        alternate_env = uv_project_environment(cwd)
+        if alternate_env is not None:
+            env["UV_PROJECT_ENVIRONMENT"] = str(alternate_env)
+            print_info(f"[{name}] 仮想環境: {alternate_env}")
     if sys.platform == "win32":
         process = subprocess.Popen(
             command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            bufsize=0, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            bufsize=0, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, env=env,
         )
     else:
         process = subprocess.Popen(
             command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            bufsize=0, preexec_fn=os.setpgrp,
+            bufsize=0, preexec_fn=os.setpgrp, env=env,
         )
     print_success(f"[{name}] 起動しました")
     return process
@@ -302,8 +317,10 @@ def main() -> None:
     print_info(f"  利用可能 ツール 一覧 : http://127.0.0.1:{PORT_TOOLS}/")
     print_info("Ctrl+C で停止します")
     try:
-        while True:
+        while process.poll() is None:
             time.sleep(1)
+        print_error(f"{name} が終了しました (exit code: {process.returncode})")
+        sys.exit(process.returncode or 1)
     except KeyboardInterrupt:
         print_header("停止処理")
         _stop(process, name)
