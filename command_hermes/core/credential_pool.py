@@ -1059,8 +1059,8 @@ class CredentialPool:
                     return
 
     def _persist(self, *, removed_ids: Optional[List[str]] = None) -> None:
-        if self.provider == "openai-codex":
-            # Codex CLI auth.json is the only persistent OAuth token store.
+        if self.provider in {"openai-codex", "xai-oauth"}:
+            # External CLI auth.json is the only persistent OAuth token store.
             return
         # Self-locking (RLock): snapshotting self._entries must not race a
         # concurrent rotation when called from the deferred refresh path.
@@ -1674,6 +1674,24 @@ class CredentialPool:
                 )
             except Exception as exc:
                 logger.debug("Codex shared credential refresh failed: %s", exc)
+                return None
+        if self.provider == "xai-oauth":
+            try:
+                from hermes_cli.auth import _read_xai_oauth_tokens, resolve_xai_oauth_runtime_credentials
+                creds = resolve_xai_oauth_runtime_credentials(force_refresh=force)
+                tokens = _read_xai_oauth_tokens()["tokens"]
+                return replace(
+                    entry,
+                    access_token=creds["api_key"],
+                    refresh_token=tokens["refresh_token"],
+                    last_status=None,
+                    last_error_code=None,
+                    last_error_reason=None,
+                    last_error_message=None,
+                    last_error_reset_at=None,
+                )
+            except Exception as exc:
+                logger.debug("Grok shared credential refresh failed: %s", exc)
                 return None
         if entry.auth_type != AUTH_TYPE_OAUTH or not entry.refresh_token:
             if force:
@@ -3786,6 +3804,23 @@ def load_pool(provider: str) -> CredentialPool:
                 access_token=tokens["access_token"],
                 refresh_token=tokens["refresh_token"],
                 base_url="https://chatgpt.com/backend-api/codex",
+                last_refresh=state.get("last_refresh"),
+            )
+            return CredentialPool(provider, [entry])
+        except Exception:
+            return CredentialPool(provider, [])
+    if provider == "xai-oauth":
+        # Grok Build owns this grant. Keep only an in-memory pool view.
+        try:
+            from hermes_cli.auth import _read_xai_oauth_tokens
+            state = _read_xai_oauth_tokens()
+            tokens = state["tokens"]
+            entry = PooledCredential(
+                provider=provider, id="grok-shared", label="Grok shared auth",
+                auth_type=AUTH_TYPE_OAUTH, priority=0, source="device_code",
+                access_token=tokens["access_token"],
+                refresh_token=tokens["refresh_token"],
+                base_url="https://api.x.ai/v1",
                 last_refresh=state.get("last_refresh"),
             )
             return CredentialPool(provider, [entry])

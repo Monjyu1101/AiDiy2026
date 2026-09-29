@@ -60,6 +60,8 @@ AiDiy 独自の `/model` picker には `xai-oauth` を常時表示し、`grok-4.
 
 `openai_oauth` は Codex CLI と同じ `${CODEX_HOME:-~/.codex}/auth.json` を使います。Hermes のログイン、認証確認、トークン更新もこのファイルを参照します。
 
+`xai-oauth` は Grok Build CLI と同じ `${GROK_HOME:-~/.grok}/auth.json` を使います。Grok でログイン済みなら Hermes からそのまま選択でき、Hermes のログインとトークン更新も Grok のストアへ保存します。旧 Hermes `auth.json` の xAI OAuth トークンは初回読込時に移し、旧コピーを削除します。`hermes auth remove xai-oauth` / `hermes logout xai-oauth` は Grok 側の共有ログインも解除します。
+
 ## 外部 CLI Bridge
 
 AiDiy の `/model` picker と `--provider` では、API provider に加えて次の外部 CLI を直接起動できます。

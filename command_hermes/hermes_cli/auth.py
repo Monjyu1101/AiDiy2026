@@ -2683,7 +2683,11 @@ def clear_provider_auth(provider_id: Optional[str] = None) -> bool:
         target = provider_id or auth_store.get("active_provider")
         if not target:
             return False
-        shared_cleared = _clear_codex_cli_tokens() if target == "openai-codex" else False
+        shared_cleared = (
+            _clear_codex_cli_tokens() if target == "openai-codex"
+            else _clear_grok_cli_tokens() if target == "xai-oauth"
+            else False
+        )
 
         providers = auth_store.get("providers", {})
         if not isinstance(providers, dict):
@@ -5275,8 +5279,104 @@ def _pool_codex_access_token() -> str:
 
 
 # =============================================================================
-# xAI Grok OAuth — tokens stored in ~/.hermes/auth.json
+# xAI Grok OAuth — Grok Build's auth.json is the single token store.
 # =============================================================================
+
+def _grok_cli_auth_path() -> Path:
+    grok_home = os.getenv("GROK_HOME", "").strip() or str(Path.home() / ".grok")
+    path = Path(grok_home).expanduser() / "auth.json"
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        real_path = (Path.home() / ".grok" / "auth.json").resolve(strict=False)
+        if path.resolve(strict=False) == real_path:
+            raise RuntimeError("Set GROK_HOME to a temporary directory during Grok auth tests.")
+    return path
+
+
+@contextmanager
+def _grok_auth_store_lock(timeout_seconds: float = AUTH_LOCK_TIMEOUT_SECONDS):
+    path = _grok_cli_auth_path()
+    with _file_lock(
+        path.with_name(path.name + ".lock"),
+        _auth_lock_holder_for(path),
+        timeout_seconds,
+        "Timed out waiting for Grok auth store lock",
+    ):
+        yield
+
+
+def _grok_auth_entry_key() -> str:
+    return f"{XAI_OAUTH_ISSUER}::{XAI_OAUTH_CLIENT_ID}"
+
+
+def _load_grok_cli_auth() -> Dict[str, Any]:
+    path = _grok_cli_auth_path()
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        raise AuthError(
+            "Grok auth.json could not be read. Check the Grok login store.",
+            provider="xai-oauth", code="xai_auth_invalid_json", relogin_required=True,
+        ) from exc
+    if not isinstance(payload, dict):
+        raise AuthError(
+            "Grok auth.json must contain a JSON object.",
+            provider="xai-oauth", code="xai_auth_invalid_shape", relogin_required=True,
+        )
+    return payload
+
+
+def _grok_token_expiry(access_token: str) -> Optional[str]:
+    claims = _decode_jwt_claims(access_token) or {}
+    exp = claims.get("exp")
+    if isinstance(exp, (int, float)):
+        return datetime.fromtimestamp(exp, timezone.utc).isoformat().replace("+00:00", "Z")
+    return None
+
+
+def _write_grok_cli_tokens(tokens: Dict[str, Any]) -> None:
+    path = _grok_cli_auth_path()
+    with _grok_auth_store_lock():
+        payload = _load_grok_cli_auth()
+        entry = payload.get(_grok_auth_entry_key())
+        entry = dict(entry) if isinstance(entry, dict) else {}
+        access_token = str(tokens.get("access_token") or "").strip()
+        refresh_token = str(tokens.get("refresh_token") or "").strip()
+        if not access_token or not refresh_token:
+            raise AuthError(
+                "xAI login did not return both OAuth tokens.",
+                provider="xai-oauth", code="xai_auth_invalid_shape", relogin_required=True,
+            )
+        entry.update({
+            "key": access_token,
+            "refresh_token": refresh_token,
+            "auth_mode": "oidc",
+            "oidc_issuer": XAI_OAUTH_ISSUER,
+            "oidc_client_id": XAI_OAUTH_CLIENT_ID,
+        })
+        entry.setdefault("create_time", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
+        expiry = _grok_token_expiry(access_token)
+        if expiry:
+            entry["expires_at"] = expiry
+        claims = _decode_jwt_claims(access_token) or {}
+        for claim, field in (("sub", "user_id"), ("principal_id", "principal_id"),
+                             ("principal_type", "principal_type"), ("team_id", "team_id")):
+            if isinstance(claims.get(claim), str) and claims[claim]:
+                entry[field] = claims[claim]
+        payload[_grok_auth_entry_key()] = entry
+        _write_codex_cli_auth(payload, path)
+
+
+def _clear_grok_cli_tokens() -> bool:
+    path = _grok_cli_auth_path()
+    with _grok_auth_store_lock():
+        payload = _load_grok_cli_auth()
+        if _grok_auth_entry_key() not in payload:
+            return False
+        del payload[_grok_auth_entry_key()]
+        _write_codex_cli_auth(payload, path)
+        return True
 
 def _xai_oauth_state_from_store(auth_store: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Return usable xAI OAuth state from provider state or credential pool."""
@@ -5316,43 +5416,64 @@ def _xai_oauth_state_from_store(auth_store: Dict[str, Any]) -> Optional[Dict[str
     return state if isinstance(state, dict) else None
 
 
-def _xai_oauth_state_has_usable_tokens(state: Optional[Dict[str, Any]]) -> bool:
-    tokens = state.get("tokens") if isinstance(state, dict) else None
-    return (
-        isinstance(tokens, dict)
-        and bool(str(tokens.get("access_token", "") or "").strip())
-        and bool(str(tokens.get("refresh_token", "") or "").strip())
-    )
+def _migrate_legacy_xai_oauth_auth() -> None:
+    """Import an old Hermes grant once, then remove Hermes token copies."""
+    paths = [_auth_file_path()]
+    global_path = _global_auth_file_path()
+    if global_path is not None and not (
+        os.environ.get("PYTEST_CURRENT_TEST")
+        and global_path.resolve(strict=False)
+        == (Path.home() / ".hermes" / "auth.json").resolve(strict=False)
+    ):
+        paths.append(global_path)
+    for path in paths:
+        if not path.is_file():
+            continue
+        with _auth_store_lock(target_path=path):
+            store = _load_auth_store(path)
+            state = _xai_oauth_state_from_store(store)
+            tokens = state.get("tokens") if isinstance(state, dict) else None
+            with _grok_auth_store_lock():
+                canonical = _load_grok_cli_auth().get(_grok_auth_entry_key())
+                has_canonical = (
+                    isinstance(canonical, dict)
+                    and bool(canonical.get("key"))
+                    and bool(canonical.get("refresh_token"))
+                )
+                if not has_canonical and isinstance(tokens, dict) and tokens.get("access_token") and tokens.get("refresh_token"):
+                    _write_grok_cli_tokens(tokens)
+                    has_canonical = True
+            if not has_canonical:
+                continue
+            changed = False
+            providers = store.get("providers")
+            if isinstance(providers, dict) and "xai-oauth" in providers:
+                del providers["xai-oauth"]
+                changed = True
+            pool = store.get("credential_pool")
+            if isinstance(pool, dict) and "xai-oauth" in pool:
+                del pool["xai-oauth"]
+                changed = True
+            if changed:
+                _save_auth_store(store, target_path=path)
 
 
 def _read_xai_oauth_tokens(*, _lock: bool = True) -> Dict[str, Any]:
     if _lock:
-        with _auth_store_lock():
-            auth_store = _load_auth_store()
+        _migrate_legacy_xai_oauth_auth()
+        with _grok_auth_store_lock():
+            entry = _load_grok_cli_auth().get(_grok_auth_entry_key())
     else:
-        auth_store = _load_auth_store()
-    state = _xai_oauth_state_from_store(auth_store)
-    if not _xai_oauth_state_has_usable_tokens(state):
-        global_state = _xai_oauth_state_from_store(_load_global_auth_store())
-        if _xai_oauth_state_has_usable_tokens(global_state):
-            state = global_state
-    if not state:
+        entry = _load_grok_cli_auth().get(_grok_auth_entry_key())
+    if not isinstance(entry, dict):
         raise AuthError(
-            "No xAI OAuth credentials stored. Select xAI Grok OAuth (SuperGrok / Premium+) in `hermes model`.",
+            "No xAI OAuth credentials stored. Run `grok login` or select xAI Grok OAuth in `hermes model`.",
             provider="xai-oauth",
             code="xai_auth_missing",
             relogin_required=True,
         )
-    tokens = state.get("tokens")
-    if not isinstance(tokens, dict):
-        raise AuthError(
-            "xAI OAuth state is missing tokens. Re-authenticate with `hermes model`.",
-            provider="xai-oauth",
-            code="xai_auth_invalid_shape",
-            relogin_required=True,
-        )
-    access_token = str(tokens.get("access_token", "") or "").strip()
-    refresh_token = str(tokens.get("refresh_token", "") or "").strip()
+    access_token = str(entry.get("key", "") or "").strip()
+    refresh_token = str(entry.get("refresh_token", "") or "").strip()
     if not access_token:
         raise AuthError(
             "xAI OAuth state is missing access_token. Re-authenticate with `hermes model`.",
@@ -5368,65 +5489,11 @@ def _read_xai_oauth_tokens(*, _lock: bool = True) -> Dict[str, Any]:
             relogin_required=True,
         )
     return {
-        "tokens": tokens,
-        "last_refresh": state.get("last_refresh"),
-        "discovery": state.get("discovery") or {},
-        "redirect_uri": state.get("redirect_uri"),
+        "tokens": {"access_token": access_token, "refresh_token": refresh_token},
+        "last_refresh": entry.get("create_time"),
+        "discovery": {},
+        "redirect_uri": None,
     }
-
-
-def _profile_has_own_xai_oauth_state(auth_store: Dict[str, Any]) -> bool:
-    """True when this store has its OWN ``providers.xai-oauth`` block.
-
-    Distinguishes a profile that genuinely shadows the root xAI grant from
-    one that only *reads* root via ``_load_provider_state``'s fallback. Only
-    the latter needs the refresh write-through below.
-    """
-    providers = auth_store.get("providers")
-    return isinstance(providers, dict) and isinstance(providers.get("xai-oauth"), dict)
-
-
-def _write_through_xai_oauth_to_global_root(state: Dict[str, Any]) -> None:
-    """Persist a rotated xAI OAuth ``state`` into the global-root auth.json.
-
-    Best-effort write-through for the multi-profile rotation hazard (#43589):
-    xAI rotates the refresh_token on every refresh, so when a profile session
-    refreshes a grant it resolved from the root fallback, the rotated chain
-    must land back in root. Otherwise root keeps a now-revoked refresh token
-    and every other profile reading the stale root grant dies with
-    ``invalid_grant`` once its access token expires.
-
-    Only updates ``providers.xai-oauth`` in the root store; never touches the
-    profile store (the caller already saved that). Swallows all errors — a
-    failed write-through degrades to the pre-existing behavior (root stale),
-    it must never break the profile's own successful save.
-    """
-    global_path = _global_auth_file_path()
-    if global_path is None:
-        # Classic mode (profile == root); the profile save already hit root.
-        return
-    # Seat belt: under pytest, refuse to write the real user's
-    # ~/.hermes/auth.json even when HERMES_HOME points at a profile path
-    # (mirrors the read-side guard in _load_global_auth_store). Uses the
-    # unmodified HOME env, not Path.home() which fixtures may monkeypatch.
-    if os.environ.get("PYTEST_CURRENT_TEST"):
-        real_home_env = os.environ.get("HOME", "")
-        if real_home_env:
-            real_root = Path(real_home_env) / ".hermes" / "auth.json"
-            try:
-                if global_path.resolve(strict=False) == real_root.resolve(strict=False):
-                    return
-            except Exception:
-                return
-    try:
-        _persist_provider_state_to_store(
-            "xai-oauth",
-            state,
-            global_path,
-            set_active=False,
-        )
-    except Exception as exc:  # pragma: no cover - best effort
-        logger.debug("xAI OAuth: write-through to global root failed: %s", exc)
 
 
 def _save_xai_oauth_tokens(
@@ -5438,57 +5505,13 @@ def _save_xai_oauth_tokens(
     auth_mode: str = "oauth_device_code",
     set_active: bool = True,
 ) -> None:
-    """Persist xAI OAuth tokens into the auth store.
-
-    When *set_active* is True (default), also promote ``xai-oauth`` to
-    ``active_provider`` — appropriate for intentional model/auth login.
-    Pass ``set_active=False`` for side-tool credential bootstrap (TTS/setup,
-    tools config, dashboard token save, token refresh) so inference routing
-    is unchanged.
-    """
-    if last_refresh is None:
-        last_refresh = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    with _auth_store_lock():
-        auth_store = _load_auth_store()
-        # A profile that lacks its own xai-oauth block is reading the root
-        # grant through _load_provider_state's fallback. When such a profile
-        # refreshes the (rotating) grant, we must write the rotated chain back
-        # to root too, or root is left holding a revoked refresh token (#43589).
-        # #74339: the old key-presence check (_profile_has_own_xai_oauth_state)
-        # decided write-through based on whether the profile had a
-        # providers.xai-oauth key BEFORE the save — but _store_provider_state
-        # unconditionally creates that key below. Use
-        # _load_provider_state_with_source to learn where the grant was
-        # resolved from and write back only to that source.
-        state, source_path = _load_provider_state_with_source(
-            auth_store, "xai-oauth"
-        )
-        if state is None:
-            state = {}
-        state["tokens"] = tokens
-        state["last_refresh"] = last_refresh
-        state["auth_mode"] = auth_mode
-        if discovery:
-            state["discovery"] = discovery
-        if redirect_uri:
-            state["redirect_uri"] = redirect_uri
-        global_root = _global_auth_file_path()
-        is_from_root = bool(
-            source_path is not None
-            and global_root is not None
-            and _same_path(source_path, global_root)
-        )
-        if is_from_root:
-            # Grant was resolved from root — write back to root only.
-            # Do NOT call _store_provider_state on the profile auth_store
-            # (it would create a shadowing providers.xai-oauth key that
-            # disables write-through on the next refresh — #74339).
-            _write_through_xai_oauth_to_global_root(state)
-        else:
-            # Profile genuinely owns this — write to profile store.
-            _store_provider_state(
-                auth_store, "xai-oauth", state, set_active=set_active
-            )
+    """Persist a Hermes login or refresh in Grok Build's shared store."""
+    del discovery, redirect_uri, last_refresh, auth_mode
+    _write_grok_cli_tokens(tokens)
+    if set_active:
+        with _auth_store_lock():
+            auth_store = _load_auth_store()
+            auth_store["active_provider"] = "xai-oauth"
             _save_auth_store(auth_store)
 
 
@@ -5795,14 +5818,6 @@ def _refresh_xai_oauth_tokens(
     redirect_uri: str = "",
     timeout_seconds: float,
 ) -> Dict[str, Any]:
-    # Re-persist whatever auth_mode is already stored (legacy pre-device-code
-    # logins may still carry ``oauth_pkce``): the refresh hot path must not
-    # relabel how the grant was originally obtained.
-    try:
-        state = _load_provider_state(_load_auth_store(), "xai-oauth") or {}
-        auth_mode = str(state.get("auth_mode") or "oauth_device_code")
-    except Exception:
-        auth_mode = "oauth_device_code"
     refreshed = refresh_xai_oauth_pure(
         str(tokens.get("access_token", "") or ""),
         str(tokens.get("refresh_token", "") or ""),
@@ -5823,7 +5838,7 @@ def _refresh_xai_oauth_tokens(
         discovery={"token_endpoint": token_endpoint},
         redirect_uri=redirect_uri,
         last_refresh=refreshed["last_refresh"],
-        auth_mode=auth_mode,
+        auth_mode="oidc",
         # Refresh must not flip active_provider — TTS/side tools can refresh
         # xAI tokens while chat still routes through another provider.
         set_active=False,
@@ -5854,7 +5869,7 @@ def resolve_xai_oauth_runtime_credentials(
     if (not should_refresh) and refresh_if_expiring:
         should_refresh = _xai_access_token_is_expiring(access_token, effective_skew)
     if should_refresh:
-        with _auth_store_lock(timeout_seconds=max(float(AUTH_LOCK_TIMEOUT_SECONDS), refresh_timeout_seconds + 5.0)):
+        with _grok_auth_store_lock(timeout_seconds=max(float(AUTH_LOCK_TIMEOUT_SECONDS), refresh_timeout_seconds + 5.0)):
             data = _read_xai_oauth_tokens(_lock=False)
             tokens = dict(data["tokens"])
             access_token = str(tokens.get("access_token", "") or "").strip()
@@ -5872,41 +5887,13 @@ def resolve_xai_oauth_runtime_credentials(
             if should_refresh:
                 if not token_endpoint:
                     token_endpoint = _xai_oauth_discovery(refresh_timeout_seconds)["token_endpoint"]
-                try:
-                    tokens = _refresh_xai_oauth_tokens(
-                        tokens,
-                        token_endpoint=token_endpoint,
-                        redirect_uri=redirect_uri,
-                        timeout_seconds=refresh_timeout_seconds,
-                    )
-                    access_token = str(tokens.get("access_token", "") or "").strip()
-                except AuthError as exc:
-                    if _is_terminal_xai_oauth_refresh_error(exc):
-                        # Terminal failure (HTTP 400/401/403 — invalid_grant, token revoked).
-                        # Clear dead tokens from auth.json so subsequent sessions fail fast
-                        # without a network retry. Mirrors credential_pool.py quarantine.
-                        try:
-                            _q_store = _load_auth_store()
-                            _q_state = _load_provider_state(_q_store, "xai-oauth") or {}
-                            _q_tokens = dict(_q_state.get("tokens") or {})
-                            _q_tokens.pop("access_token", None)
-                            _q_tokens.pop("refresh_token", None)
-                            _q_state["tokens"] = _q_tokens
-                            _q_state["last_auth_error"] = {
-                                "provider": "xai-oauth",
-                                "code": exc.code or "xai_refresh_failed",
-                                "message": str(exc),
-                                "reason": "runtime_refresh_failure",
-                                "relogin_required": True,
-                                "at": datetime.now(timezone.utc).isoformat(),
-                            }
-                            _store_provider_state(_q_store, "xai-oauth", _q_state, set_active=False)
-                            _save_auth_store(_q_store)
-                        except Exception as _save_exc:
-                            logger.debug(
-                                "xAI OAuth: failed to persist quarantined state: %s", _save_exc,
-                            )
-                    raise
+                tokens = _refresh_xai_oauth_tokens(
+                    tokens,
+                    token_endpoint=token_endpoint,
+                    redirect_uri=redirect_uri,
+                    timeout_seconds=refresh_timeout_seconds,
+                )
+                access_token = str(tokens.get("access_token", "") or "").strip()
 
     base_url = _xai_validate_inference_base_url(
         os.getenv("HERMES_XAI_BASE_URL", "").strip().rstrip("/")
@@ -5917,12 +5904,12 @@ def resolve_xai_oauth_runtime_credentials(
         "provider": "xai-oauth",
         "base_url": base_url,
         "api_key": access_token,
-        "source": "hermes-auth-store",
+        "source": "grok-cli-auth-store",
         "last_refresh": data.get("last_refresh"),
         # Display/telemetry only. Device-code is the only supported xAI OAuth
         # flow, so report it unconditionally — auth.json may still carry a
         # legacy ``oauth_pkce`` label, which the refresh path preserves as-is.
-        "auth_mode": "oauth_device_code",
+        "auth_mode": "oidc",
     }
 
 
@@ -7789,12 +7776,12 @@ def get_xai_oauth_auth_status() -> Dict[str, Any]:
                 if api_key and not _xai_access_token_is_expiring(api_key, 0):
                     return {
                         "logged_in": True,
-                        "auth_store": str(_auth_file_path()),
+                        "auth_store": str(_grok_cli_auth_path()),
                         "last_refresh": getattr(entry, "last_refresh", None),
                         # Display/telemetry only. Device-code is the only xAI
                         # OAuth flow, so report it unconditionally (auth.json
                         # may still carry a legacy ``oauth_pkce`` label).
-                        "auth_mode": "oauth_device_code",
+                        "auth_mode": "oidc",
                         "source": f"pool:{getattr(entry, 'label', 'unknown')}",
                         "api_key": api_key,
                     }
@@ -7805,7 +7792,7 @@ def get_xai_oauth_auth_status() -> Dict[str, Any]:
         creds = resolve_xai_oauth_runtime_credentials()
         return {
             "logged_in": True,
-            "auth_store": str(_auth_file_path()),
+            "auth_store": str(_grok_cli_auth_path()),
             "last_refresh": creds.get("last_refresh"),
             "auth_mode": creds.get("auth_mode"),
             "source": creds.get("source"),
@@ -7814,7 +7801,7 @@ def get_xai_oauth_auth_status() -> Dict[str, Any]:
     except AuthError as exc:
         return {
             "logged_in": False,
-            "auth_store": str(_auth_file_path()),
+            "auth_store": str(_grok_cli_auth_path()),
             "error": str(exc),
         }
 
@@ -8808,7 +8795,7 @@ def _login_xai_oauth(
             existing = resolve_xai_oauth_runtime_credentials()
             api_key = existing.get("api_key", "")
             if isinstance(api_key, str) and api_key and not _xai_access_token_is_expiring(api_key, 60):
-                print("Existing xAI OAuth credentials found in Hermes auth store.")
+                print("Existing xAI OAuth credentials found in Grok auth store.")
                 try:
                     reuse = input("Use existing credentials? [Y/n]: ").strip().lower()
                 except (EOFError, KeyboardInterrupt):
@@ -8827,7 +8814,7 @@ def _login_xai_oauth(
 
     print()
     print("Signing in to xAI Grok OAuth (SuperGrok / Premium+)...")
-    print("(Hermes creates its own local OAuth session)")
+    print("(Login is shared with Grok Build CLI)")
     print()
 
     timeout_seconds = float(getattr(args, "timeout", None) or 20.0)
@@ -8846,6 +8833,7 @@ def _login_xai_oauth(
         last_refresh=creds.get("last_refresh"),
         auth_mode="oauth_device_code",
     )
+    _migrate_legacy_xai_oauth_auth()
     # An explicit interactive re-login is a strong signal the user wants the
     # xAI credential re-enabled. ``hermes auth remove xai-oauth`` leaves a
     # ``device_code`` suppression marker that otherwise stops the singleton
@@ -8858,8 +8846,7 @@ def _login_xai_oauth(
     config_path = _update_config_for_provider("xai-oauth", creds.get("base_url", DEFAULT_XAI_OAUTH_BASE_URL))
     print()
     print("Login successful!")
-    from hermes_constants import display_hermes_home as _dhh
-    print(f"  Auth state: {_dhh()}/auth.json")
+    print(f"  Auth state: {_grok_cli_auth_path()}")
     print(f"  Config updated: {config_path} (model.provider=xai-oauth)")
 
 

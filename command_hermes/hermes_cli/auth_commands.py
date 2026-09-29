@@ -410,44 +410,22 @@ def auth_add_command(args) -> None:
         return
 
     if provider == "xai-oauth":
+        try:
+            existing = auth_mod.resolve_xai_oauth_runtime_credentials()
+        except auth_mod.AuthError:
+            existing = None
+        if existing:
+            auth_mod.mark_provider_active_if_unset(provider)
+            print("Using the existing shared Grok Build OAuth login.")
+            return
         creds = auth_mod._xai_oauth_device_code_login(
             timeout_seconds=getattr(args, "timeout", None) or 20.0,
             open_browser=not getattr(args, "no_browser", False),
         )
-        label = (getattr(args, "label", None) or "").strip() or label_from_token(
-            creds["tokens"]["access_token"],
-            _oauth_default_label(provider, len(pool.entries()) + 1),
-        )
-        # Add a distinct, self-contained pool entry per account (matching the
-        # openai-codex / qwen-oauth / minimax-oauth patterns) instead of
-        # routing through the singleton ``_save_xai_oauth_tokens`` save path.
-        # The singleton round-trip collapsed every added account into the
-        # latest login: a second ``hermes auth add xai-oauth`` overwrote the
-        # first account's singleton-mirrored ``device_code`` entry rather than
-        # creating an independent one. ``manual:device_code`` entries refresh
-        # from their own token pair (``_sync_xai_oauth_entry_from_auth_store``
-        # only adopts the singleton for ``source=="device_code"``), so they
-        # need no singleton shadow.
-        entry = PooledCredential(
-            provider=provider,
-            id=uuid.uuid4().hex[:6],
-            label=label,
-            auth_type=AUTH_TYPE_OAUTH,
-            priority=0,
-            source=SOURCE_MANUAL_DEVICE_CODE,
-            access_token=creds["tokens"]["access_token"],
-            refresh_token=creds["tokens"].get("refresh_token"),
-            base_url=creds.get("base_url") or auth_mod.DEFAULT_XAI_OAUTH_BASE_URL,
-            last_refresh=creds.get("last_refresh"),
-        )
-        first_credential = not pool.entries()
-        pool.add_entry(entry)
-        # Adding the first xAI credential should make it the active provider
-        # (the old singleton save path did this implicitly via
-        # _save_provider_state). Subsequent adds leave the active provider as-is.
-        if first_credential:
-            auth_mod.mark_provider_active_if_unset(provider)
-        print(f'Added {provider} OAuth credential #{len(pool.entries())}: "{entry.label}"')
+        auth_mod._save_xai_oauth_tokens(creds["tokens"], set_active=False)
+        auth_mod._migrate_legacy_xai_oauth_auth()
+        auth_mod.mark_provider_active_if_unset(provider)
+        print("Saved xAI OAuth credential to the shared Grok auth.json")
         return
 
     if provider == "qwen-oauth":
@@ -555,6 +533,10 @@ def auth_remove_command(args) -> None:
     if provider == "openai-codex":
         auth_mod._clear_codex_cli_tokens()
         print("Removed the shared Codex OAuth login (Codex CLI is signed out too).")
+        return
+    if provider == "xai-oauth":
+        auth_mod._clear_grok_cli_tokens()
+        print("Removed the shared Grok OAuth login (Grok Build CLI is signed out too).")
         return
     removed = pool.remove_index(index)
     if removed is None:
