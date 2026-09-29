@@ -307,7 +307,7 @@ class conf_models:
             "AiDiy_code_claude_cli.json",
             self.CODE_CLAUDE_CLI_MODELS,
         )
-        self.CODE_ANTIGRAVITY_CLI_MODELS = self._load_or_create_code_config(
+        self.CODE_ANTIGRAVITY_CLI_MODELS = self._sync_fixed_code_config(
             "AiDiy_code_antigravity_cli.json",
             self.CODE_ANTIGRAVITY_CLI_MODELS,
         )

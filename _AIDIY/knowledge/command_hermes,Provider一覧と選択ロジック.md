@@ -71,6 +71,8 @@ AiDiy の `/model` picker と `--provider` では、API provider に加えて次
 | `opencode` | `opencode` |
 | `grok-cli` | `grok` |
 
+VS Code 拡張から外部 CLI Provider を選ぶと、モデル候補は対応する `_config/AiDiy_code_*.json` から取得します。`auto` は各 CLI の既定モデルを使い、明示指定したモデルは `--model <ID>` で外部 CLI に渡します。Hermes の対話 `/model` picker は従来どおり外部 CLI に `auto` を表示します。
+
 `antigravity-cli` は本体の `antigravity_cli` と同じ引数規則を使います。初回は `-p <prompt>`、継続時はその後ろに `-c` を付け、`--add-dir <cwd>` と `--print-timeout 20m` を指定します。`CODE_PERMISSIONS` が `none` 以外なら `--dangerously-skip-permissions` も指定します。Windowsでは `%USERPROFILE%\AppData\Local\agy\bin\agy.exe` を優先し、`DETACHED_PROCESS` で親コンソールから切り離します。
 
 ## 新しい Provider 追加手順

@@ -5270,19 +5270,22 @@ def _aidiy_cli_build_command(
     prompt: str,
     is_initial: bool,
     repo_path: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> list:
-    # Mirrors backend_server/AIコア/AIコード_cli.py::_コマンド構築. Model is
-    # never passed (CLI provider in /model picker is locked to ``auto`` so the
-    # CLI uses its own default).
+    # Mirrors backend_server/AIコア/AIコード_cli.py::_コマンド構築.
+    # auto は外部 CLI の既定モデルに任せ、明示指定だけ --model へ渡す。
     cmd_path = _aidiy_cli_command_path(cli_slug)
     one_line = _aidiy_cli_normalize_prompt(prompt)
     permissions = _aidiy_cli_code_permissions()
+    selected_model = str(model or "").strip()
+    model_args = ["--model", selected_model] if selected_model and selected_model.lower() != "auto" else []
 
     if cli_slug == "claude-code":
         common = [cmd_path]
         if permissions != "none":
             common.extend(["--allow-dangerously-skip-permissions",
                            "--permission-mode", "bypassPermissions"])
+        common.extend(model_args)
         if repo_path:
             common.extend(["--add-dir", repo_path])
         if is_initial:
@@ -5293,6 +5296,7 @@ def _aidiy_cli_build_command(
         common = [cmd_path]
         if permissions != "none":
             common.append("--dangerously-skip-permissions")
+        common.extend(model_args)
         if repo_path:
             common.extend(["--add-dir", repo_path])
         common.extend(["--print-timeout", "20m", "-p", one_line])
@@ -5306,6 +5310,7 @@ def _aidiy_cli_build_command(
         common = [cmd_path, "--silent"]
         if permissions != "none":
             common.append("--allow-all-tools")
+        common.extend(model_args)
         if repo_path:
             common.extend(["--add-dir", repo_path])
         if is_initial:
@@ -5314,10 +5319,11 @@ def _aidiy_cli_build_command(
 
     if cli_slug == "codex-cli":
         return [cmd_path, "exec", "--skip-git-repo-check",
-                "--dangerously-bypass-approvals-and-sandbox", one_line]
+                "--dangerously-bypass-approvals-and-sandbox", *model_args, one_line]
 
     if cli_slug == "opencode":
         cmd_args = [cmd_path, "run"]
+        cmd_args.extend(model_args)
         cmd_args.append(one_line)
         if not is_initial:
             cmd_args.append("-c")
@@ -5328,6 +5334,7 @@ def _aidiy_cli_build_command(
         if permissions != "none":
             # --always-approve（別名 --yolo）で全ツール実行を自動承認
             common.append("--always-approve")
+        common.extend(model_args)
         if repo_path:
             common.extend(["--cwd", repo_path])
         # 自動更新チェックはヘッドレス実行では不要
@@ -12686,6 +12693,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             prompt=message_text,
             is_initial=is_initial,
             repo_path=repo_path,
+            model=getattr(self, "model", None),
         )
         if not cmd:
             _cprint(f"  CLI dispatch is not implemented for provider: {cli_slug}")
@@ -12945,7 +12953,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # hermes の auth store / credential pool に解決させる。
         auth_runtime = provider_entry.get("auth_runtime", False)
         if is_cli:
-            model_name = "auto"
+            model_name = str(model_name or "").strip() or "auto"
         else:
             model_name = _model_from_display_label(model_name) or provider_entry.get("default_model") or self.model
             if provider_entry.get("slug") == "ollama" and provider_entry.get("base_url", "").rstrip("/") == _OLLAMA_CLOUD_BASE_URL:
@@ -23105,6 +23113,7 @@ def _configure_aidiy_cli_provider(
     provider: str | None,
     *,
     resumed: bool = False,
+    requested_model: str | None = None,
 ) -> bool:
     """外部 CLI provider を Hermes の API provider 解決から切り離す。"""
     slug = (provider or "").strip().lower()
@@ -23113,7 +23122,7 @@ def _configure_aidiy_cli_provider(
     entry = cli._get_aidiy_provider_entry(slug, include_models=False)
     if not entry or not entry.get("is_cli"):
         return False
-    cli._apply_aidiy_provider_model(entry, "auto")
+    cli._apply_aidiy_provider_model(entry, requested_model or "auto")
     if resumed:
         cli._aidiy_cli_session_started[slug] = True
     return True
@@ -23510,6 +23519,7 @@ def main(
                 cli,
                 provider,
                 resumed=bool(resume),
+                requested_model=model,
             )
     except ImportError as e:
         # Direct `python cli.py` / `python -m cli` bypasses cmd_chat's

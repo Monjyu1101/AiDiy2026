@@ -2,11 +2,67 @@
 import contextlib
 import json
 from pathlib import Path
+import re
 import sys
 
 
+_CLI_MODEL_BATS = {
+    "claude-code": "_claude-code.bat",
+    "antigravity-cli": "_antigravity_cli.bat",
+    "codex-cli": "_codex_cli.bat",
+    "copilot-cli": "_copilot_cli.bat",
+    "grok-cli": "_grok_cli.bat",
+}
+_CLI_MODEL_CONFIGS = {
+    "claude-code": "AiDiy_code_claude_cli.json",
+    "antigravity-cli": "AiDiy_code_antigravity_cli.json",
+    "codex-cli": "AiDiy_code_codex_cli.json",
+    "copilot-cli": "AiDiy_code_copilot_cli.json",
+    "grok-cli": "AiDiy_code_grok_cli.json",
+}
+_MODEL_ID = re.compile(r"[A-Za-z0-9._:/-]+")
+_BAT_MODEL_LINE = re.compile(r'^if "%MODEL_NUMBER%"=="\d+" set "MODEL=([A-Za-z0-9._:-]+)"$')
+
+
+def _cli_models(project_root: Path, provider: str) -> list[dict[str, str]]:
+    """外部 CLI の設定 JSON を優先し、候補がなければ bat から補う。"""
+    config_name = _CLI_MODEL_CONFIGS.get(provider)
+    if config_name:
+        try:
+            payload = json.loads((project_root / "_config" / config_name).read_text(encoding="utf-8-sig"))
+            configured = payload.get("models", {})
+            if isinstance(configured, dict):
+                models = [
+                    {"label": label, "id": model}
+                    for model, label in configured.items()
+                    if isinstance(model, str) and _MODEL_ID.fullmatch(model)
+                    and isinstance(label, str) and label.strip()
+                ]
+                if any(item["id"] != "auto" for item in models):
+                    return [
+                        next((item for item in models if item["id"] == "auto"), {"label": "auto", "id": "auto"}),
+                        *(item for item in models if item["id"] != "auto"),
+                    ]
+        except (OSError, ValueError, AttributeError):
+            pass
+    filename = _CLI_MODEL_BATS.get(provider)
+    if not filename:
+        return [{"label": "auto", "id": "auto"}]
+    try:
+        lines = (project_root / "scripts" / "cli_bat" / filename).read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return [{"label": "auto", "id": "auto"}]
+    models = list(dict.fromkeys(
+        match.group(1)
+        for line in lines
+        if (match := _BAT_MODEL_LINE.fullmatch(line.strip()))
+    ))
+    return [{"label": "auto", "id": "auto"}, *({"label": model, "id": model} for model in models)]
+
+
 def catalog(cli_path: str, provider: str = "") -> dict:
-    sys.path.insert(0, str(Path(cli_path).resolve().parent))
+    cli_root = Path(cli_path).resolve().parent
+    sys.path.insert(0, str(cli_root))
     with contextlib.redirect_stdout(sys.stderr):
         import cli_main as cli
 
@@ -29,6 +85,8 @@ def catalog(cli_path: str, provider: str = "") -> dict:
             entry = picker._get_aidiy_provider_entry(provider, include_models=True)
             if not entry:
                 return {"models": []}
+            if entry.get("is_cli"):
+                return {"models": _cli_models(cli_root.parent, provider)}
             return {"models": [{"label": str(label), "id": str(model)} for label, model in entry.get("models", [])]}
         slugs = [
             "openai_oauth", "xai-oauth", "ollama", "openai", "openrt",

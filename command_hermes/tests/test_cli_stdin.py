@@ -171,6 +171,19 @@ class CliStdinTest(unittest.TestCase):
                 self.assertEqual(provider, main_mock.call_args.kwargs["provider"])
                 self.assertIsNone(main_mock.call_args.kwargs["model"])
 
+    def test_external_cli_explicit_model_reaches_main(self):
+        with (
+            patch.object(cli_main.sys, "stdin", io.StringIO("質問")),
+            patch.object(cli_main, "main") as main_mock,
+        ):
+            result = cli_main.cli_entry([
+                "--oneshot-stdin", "--provider", "codex-cli", "--model", "gpt-6-sol",
+            ])
+
+        self.assertEqual(0, result)
+        self.assertEqual("codex-cli", main_mock.call_args.kwargs["provider"])
+        self.assertEqual("gpt-6-sol", main_mock.call_args.kwargs["model"])
+
     def test_external_cli_provider_is_configured_and_resume_is_preserved(self):
         class FakeCli:
             def __init__(self, slug):
@@ -198,6 +211,23 @@ class CliStdinTest(unittest.TestCase):
                 self.assertIs(configured, True)
                 self.assertEqual(({"slug": provider, "is_cli": True}, "auto"), fake.applied)
                 self.assertIs(fake._aidiy_cli_session_started[provider], True)
+
+    def test_external_cli_explicit_model_is_preserved(self):
+        class FakeCli:
+            _aidiy_cli_session_started = {}
+
+            def _get_aidiy_provider_entry(self, provider, include_models=False):
+                return {"slug": provider, "is_cli": True}
+
+            def _apply_aidiy_provider_model(self, entry, model):
+                self.model = model
+
+        cli = FakeCli()
+        configured = cli_main._configure_aidiy_cli_provider(
+            cli, "codex-cli", requested_model="gpt-6-sol"
+        )
+        self.assertTrue(configured)
+        self.assertEqual("gpt-6-sol", cli.model)
 
     def test_external_cli_quiet_keeps_final_answer_on_stdout(self):
         class FakeCli:
@@ -314,6 +344,26 @@ class CliStdinTest(unittest.TestCase):
                 cli_main._aidiy_cli_build_command("antigravity-cli", "続き", False, "/repo"),
             )
 
+    def test_external_cli_commands_forward_explicit_model(self):
+        models = {
+            "copilot-cli": "gpt-6-sol",
+            "codex-cli": "gpt-6-sol",
+            "claude-code": "sonnet",
+            "antigravity-cli": "gemini-3.8-flash-high",
+            "grok-cli": "grok-4.7",
+        }
+        with patch.object(cli_main, "_aidiy_cli_code_permissions", return_value="none"):
+            for provider, model in models.items():
+                with self.subTest(provider=provider):
+                    command = cli_main._aidiy_cli_build_command(
+                        provider, "質問", True, "/repo", model=model
+                    )
+                    index = command.index("--model")
+                    self.assertEqual(model, command[index + 1])
+                    self.assertNotIn("--model", cli_main._aidiy_cli_build_command(
+                        provider, "質問", True, "/repo", model="auto"
+                    ))
+
     def test_antigravity_cli_prefers_windows_local_install(self):
         expected = cli_main.os.path.join(
             r"C:\Users\tester", "AppData", "Local", "agy", "bin", "agy.exe"
@@ -343,6 +393,7 @@ class CliStdinTest(unittest.TestCase):
         class FakeCli:
             _aidiy_provider_slug = "antigravity-cli"
             conversation_history = []
+            model = "gemini-3.8-flash-high"
 
         with (
             patch.object(cli_main.os, "name", "nt"),
@@ -350,7 +401,7 @@ class CliStdinTest(unittest.TestCase):
                 cli_main,
                 "_aidiy_cli_build_command",
                 return_value=["agy.exe", "-p", "質問"],
-            ),
+            ) as build_mock,
             patch("subprocess.DETACHED_PROCESS", 8, create=True),
             patch("subprocess.Popen", return_value=FakeProcess()) as popen_mock,
             redirect_stdout(io.StringIO()),
@@ -361,6 +412,7 @@ class CliStdinTest(unittest.TestCase):
 
         self.assertEqual("回答", result)
         self.assertEqual(8, popen_mock.call_args.kwargs["creationflags"])
+        self.assertEqual("gemini-3.8-flash-high", build_mock.call_args.kwargs["model"])
 
     def test_blank_stdin_returns_two_without_calling_main(self):
         stderr = io.StringIO()
