@@ -62,8 +62,8 @@ from utils.generation import (
     _sync_mcp_assets_json,
 )
 from utils.steps import (
-    step00_preflight, step_add_routing, step_create_folder, step_generate_audio,
-    step_update_durations, step_completion_notice,
+    step00_preflight, step_add_routing, step_create_folder, step_generate_audio, step_review_audio,
+    step_update_durations, step_completion_notice, ensure_audio_script_review_support,
     ensure_video_menu_registration, video_menu_registration_ok,
     video_menu_registration_paths, video_menu_review_prompt,
 )
@@ -182,6 +182,7 @@ def _build_narration_audio_bodies() -> tuple[str, str, str]:
     # ナレーション音声は edge / female（女性一人語り）。
     synthesize_body = (
         "def synthesize_one(text, out_path):\n"
+        "    text = apply_pronunciation(text, out_path)\n"
         "    return post_json(TTS_API_URL, {\n"
         '        "speech_text": text,\n'
         '        "language": TTS_LANGUAGE,\n'
@@ -191,14 +192,16 @@ def _build_narration_audio_bodies() -> tuple[str, str, str]:
         "    })\n"
     )
     main_loop_body = (
+        "    selected = set(sys.argv[2:]) if len(sys.argv) > 1 and sys.argv[1] == '--only-file' else set()\n"
         "    total = len(NARRATIONS)\n"
         "    done = 0\n"
         "    skip = 0\n"
         "    fail = 0\n"
         "    for scene_num, kind, text in NARRATIONS:\n"
         '        fname = f"{kind}_scene_{scene_num}.mp3"\n'
+        "        if selected and fname not in selected: continue\n"
         "        fpath = os.path.join(OUTPUT_DIR, fname)\n"
-        "        if os.path.exists(fpath) and os.path.getsize(fpath) > 500:\n"
+        "        if not selected and os.path.exists(fpath) and os.path.getsize(fpath) > 500:\n"
         '            print(f"  [SKIP] {fname}")\n'
         "            skip += 1\n"
         "            continue\n"
@@ -683,12 +686,12 @@ async def step_mid_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
 
 
 # ================================================================== #
-# Step 09: 最終確認
+# Step 10: 最終確認
 # ================================================================== #
 
 async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    sep("Step 09: 最終確認")
-    step_name = "Step 09: 最終確認"
+    sep("Step 10: 最終確認")
+    step_name = "Step 10: 最終確認"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
 
@@ -721,8 +724,8 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
     guide_tts(ctx, f"{step_name} を開始します。成果物を最終確認します。")
     ensure_step_markdown(md_path, folder_name, ctx.topic)
 
-    if step_value_to_int(get_completed_step(ctx)) >= 9:
-        print("  [SKIP] Step 09 は既に完了済みです")
+    if step_value_to_int(get_completed_step(ctx)) >= 10:
+        print("  [SKIP] Step 10 は既に完了済みです")
         return True
 
     # Step 02 の登録が後から消えていても、最終確認の前にメニューへ戻しておく。
@@ -758,7 +761,7 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         with open(md_path, encoding="utf-8-sig") as f:
             review_markdown = f.read()
         review_already_done = (
-            "## Step 09 最終確認" in review_markdown
+            ("## Step 10 最終確認" in review_markdown or "## Step 09 最終確認" in review_markdown)
             and "- [x] 素材最終確認" in review_markdown
         )
     if review_already_done:
@@ -903,8 +906,8 @@ async def step_final_review(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> boo
         target_paths=[scenario_path, os.path.join(new_dir, "index.html"), images_dir, audio_dir, assets_path, gen_img_py, gen_aud_py, md_path,
                       *video_menu_registration_paths(ctx)],
         validate=validate, verify_timeout_sec=300, attempt=attempt,
-        # Step 09 は、この関数の前段で完了済みレビュー印を確認している。
-        # 検証専用エージェントをさらに起動すると同じ Step 09 を再帰実行するため、
+        # Step 10 は、この関数の前段で完了済みレビュー印を確認している。
+        # 検証専用エージェントをさらに起動すると同じ Step 10 を再帰実行するため、
         # ここでは Python 側の厳密な素材・manifest・メニュー検証とバックアップで確定する。
         skip_agent_verify=True,
     )
@@ -924,7 +927,7 @@ def main(argv: list | None = None) -> None:
     if len(args) >= 2 and args[1] in ("-h", "--help", "/?"):
         print(f"使い方: python aidiy_automations\\ビデオページ生成\\{SCRIPT_FILE_NAME} [実行ステップ番号]")
         print("  実行ステップ番号: 0=初期確認 1=フォルダ作成 2=ルーティング追加 3=シナリオ作成 4=HTML修正")
-        print("                  5=画像生成 6=中間確認 7=音声生成 8=再生時間更新 9=最終確認 99=完成案内")
+        print("                  5=画像生成 6=中間確認 7=音声生成 8=音声照合 9=再生時間更新 10=最終確認 99=完成案内")
         return
 
     runner = VideoGenRunner.from_argv(
@@ -940,7 +943,7 @@ def main(argv: list | None = None) -> None:
 
     load_tasks_body, synthesize_body, main_loop_body = _build_narration_audio_bodies()
 
-    async def _step_gen_audio(ca: dict, attempt: int = 1) -> bool:
+    def _ensure_audio_script() -> None:
         ensure_dialogue_audio_script(
             ctx, gen_aud_py,
             output_dir=os.path.join(new_dir, "audio"),
@@ -949,7 +952,16 @@ def main(argv: list | None = None) -> None:
             main_loop_body=main_loop_body,
             script_docstring="ナレーション音声生成スクリプト（小説小話 / edge female / mcp 形式）",
         )
+    async def _step_gen_audio(ca: dict, attempt: int = 1) -> bool:
+        _ensure_audio_script()
         return await step_generate_audio(ctx, ca, gen_aud_py, "_gen_audio.py", attempt=attempt)
+
+    async def _step_review_audio(ca: dict, attempt: int = 1) -> bool:
+        if os.path.isfile(gen_aud_py):
+            ensure_audio_script_review_support(gen_aud_py)
+        else:
+            _ensure_audio_script()
+        return await step_review_audio(ctx, ca, gen_aud_py, attempt=attempt)
 
     steps = [
         (0,  "初期確認",     lambda ca, attempt=1: step00_preflight(ctx, ca, attempt=attempt)),
@@ -960,8 +972,9 @@ def main(argv: list | None = None) -> None:
         (5,  "画像生成",     lambda ca, attempt=1: step_generate_images(ctx, ca, attempt=attempt)),
         (6,  "中間確認",     lambda ca, attempt=1: step_mid_review(ctx, ca, attempt=attempt)),
         (7,  "音声生成",     _step_gen_audio),
-        (8,  "再生時間更新", lambda ca, attempt=1: step_update_durations(ctx, ca, attempt=attempt)),
-        (9,  "最終確認",     lambda ca, attempt=1: step_final_review(ctx, ca, attempt=attempt)),
+        (8,  "音声照合",     _step_review_audio),
+        (9,  "再生時間更新", lambda ca, attempt=1: step_update_durations(ctx, ca, attempt=attempt)),
+        (10, "最終確認",     lambda ca, attempt=1: step_final_review(ctx, ca, attempt=attempt)),
         (99, "完成案内",     lambda ca, attempt=1: step_completion_notice(
             ctx, ca, attempt=attempt, final_review_fn=step_final_review,
         )),

@@ -217,9 +217,9 @@ def next_step_after(value: str) -> int:
     current = step_value_to_int(value)
     if current < 0:
         return 0
-    if 0 <= current < 9:
+    if 0 <= current < 10:
         return current + 1
-    if current == 9:
+    if current == 10:
         return 99
     return 99
 
@@ -387,8 +387,9 @@ def progress_step_label(step_name: str) -> str:
         "Step 05: 画像生成": "Step five, image generation",
         "Step 06: 中間確認": "Step six, mid review",
         "Step 07: 音声生成": "Step seven, audio generation",
-        "Step 08: 再生時間更新": "Step eight, duration update",
-        "Step 09: 最終確認": "Step nine, final review",
+        "Step 08: 音声照合": "Step eight, audio review",
+        "Step 09: 再生時間更新": "Step nine, duration update",
+        "Step 10: 最終確認": "Step ten, final review",
         "Step 99: 完成案内": "Step ninety-nine, completion notice",
     }
     return labels.get(step_name, step_name)
@@ -769,10 +770,10 @@ async def _ensure_playback_started(ctx: "VideoGenCtx", step_label: str) -> None:
 
 
 async def start_final_playback(ctx: "VideoGenCtx", step_label: str) -> None:
-    """Step 09 の最終チェックが済んだあと、音声つきのループ再生を開始する。
+    """Step 10 の最終チェックが済んだあと、音声つきのループ再生を開始する。
 
     生成途中は refresh_browser_preview が無音（?speaker=false）＋ preview_min_sec つきで
-    進捗を映しているだけなので、仕上がりの確認にはならない。Step 09 の最終確認を
+    進捗を映しているだけなので、仕上がりの確認にはならない。Step 10 の最終確認を
     終えたあと、閲覧者が開くのと同じ ?auto=loop で開き直し、音声つきで最初から流す。
     Step 99 の完成案内では再生状態を変更しない。
 
@@ -853,6 +854,7 @@ async def agent_run(
     ca: dict,
     prompt: str,
     timeout_sec: int = 300,
+    code_permissions: str = "full",
 ) -> str:
     """aidiy_code_agents HTTP API に作業指示を投げる共通ラッパー。"""
     api_url = ca.get("api_url", ctx.code_agents_api_url)
@@ -864,7 +866,7 @@ async def agent_run(
         "max_turns": 15,
         "code_plan": "off",
         "code_verify": "off",
-        "code_permissions": "full",
+        "code_permissions": code_permissions,
         "resume": False,
         "timeout_sec": timeout_sec,
     }
@@ -1065,7 +1067,7 @@ def build_ctx(
     from .ctx import VideoGenCtx
 
     if valid_steps is None:
-        valid_steps = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 99}
+        valid_steps = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 99}
 
     setting = load_setting_json(setting_json_path, setting_json_name)
     sn = setting_json_name
@@ -1073,7 +1075,7 @@ def build_ctx(
     s_shared = require_mapping(setting, "shared", sn)
 
     if len(argv) > 2:
-        print("ERROR: 引数は実行ステップ番号を 1 つだけ指定できます（00、01〜09、99）")
+        print("ERROR: 引数は実行ステップ番号を 1 つだけ指定できます（00、01〜10、99）")
         sys.exit(1)
 
     step_specified = len(argv) == 2
@@ -1084,7 +1086,7 @@ def build_ctx(
             print(f"ERROR: 実行ステップは整数で指定してください（指定値: {argv[1]}）")
             sys.exit(1)
         if start_step not in valid_steps:
-            print(f"ERROR: 実行ステップは 00、01〜09、99 で指定してください（指定値: {start_step}）")
+            print(f"ERROR: 実行ステップは 00、01〜10、99 で指定してください（指定値: {start_step}）")
             sys.exit(1)
     else:
         data = ensure_steps_json(steps_json_path, steps_json_name, steps_keys)
@@ -1113,6 +1115,12 @@ def build_ctx(
     template_dir = resolve_setting_path(require_string(setting, "template_dir", sn))
     video_base_dir = resolve_setting_path(require_string(s_shared, "video_base_dir", sn))
     language = require_string(setting, "language", sn)
+
+    # 旧フローで Step 08/09 まで進んだ出力は、新設した音声照合から再開する。
+    if not step_specified and completed in ("08", "09"):
+        review_path = os.path.join(video_base_dir, folder_name, "audio_review.json")
+        if not os.path.isfile(review_path):
+            start_step = stop_step = 8
 
     mcp_python = os.path.join(mcp_dir, ".venv", "Scripts", "python.exe") if mcp_dir else ""
     if not mcp_python or not os.path.isfile(mcp_python):

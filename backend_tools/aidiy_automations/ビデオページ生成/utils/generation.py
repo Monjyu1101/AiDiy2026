@@ -9,6 +9,7 @@ generation.py — コンテンツ生成系統合モジュール
 from __future__ import annotations
 
 import asyncio
+import ast
 import html
 import json
 import os
@@ -75,11 +76,10 @@ def count_scenario_dialogues(path: str) -> int:
         dialogues = scene.get("dialogue", [])
         if isinstance(dialogues, list) and len(dialogues) > 0:
             count += sum(1 for dlg in dialogues if isinstance(dlg, dict))
-        else:
-            if "short_narration" in scene:
-                count += 1
-            if "long_narration" in scene:
-                count += 1
+        if "short_narration" in scene:
+            count += 1
+        if "long_narration" in scene:
+            count += 1
     return count
 
 
@@ -652,6 +652,7 @@ def ensure_step_markdown(md_path: str, folder_name: str, topic: str) -> None:
         "- [ ] 画像生成\n"
         "- [ ] 中間確認\n"
         "- [ ] 音声生成\n"
+        "- [ ] 音声照合\n"
         "- [ ] 再生時間更新\n"
         "- [ ] 完成\n"
     )
@@ -931,6 +932,7 @@ def render_dialogue_audio_script(
     main_loop_body: str,
     script_docstring: str = "ナレーション音声生成スクリプト",
     extra_imports: str = "",
+    pronunciation_overrides: dict[str, str] | None = None,
 ) -> str:
     """Step 07 用の _gen_audio.py 本文を返す。"""
     return (
@@ -954,6 +956,7 @@ def render_dialogue_audio_script(
         f"OUTPUT_DIR = os.path.join(_THIS_DIR, {os.path.basename(os.path.normpath(output_dir))!r})\n"
         f"TTS_API_URL = {ctx.tts_api_url!r}\n"
         f"TTS_LANGUAGE = {ctx.language!r}\n"
+        f"PRONUNCIATION_OVERRIDES = {pronunciation_overrides or {}!r}\n"
         "os.makedirs(OUTPUT_DIR, exist_ok=True)\n\n\n"
         + load_tasks_body
         + "\n\n\n"
@@ -974,6 +977,13 @@ def render_dialogue_audio_script(
         "    if isinstance(result, dict) and result.get('error'):\n"
         "        raise RuntimeError(result['error'])\n"
         "    return result\n\n\n"
+        "def apply_pronunciation(text, out_path):\n"
+        "    changes = PRONUNCIATION_OVERRIDES.get(os.path.basename(out_path), {})\n"
+        "    if isinstance(changes, str):\n"
+        "        return changes  # 旧形式の読み指定\n"
+        "    for source, reading in changes.items():\n"
+        "        text = text.replace(source, reading)\n"
+        "    return text\n\n\n"
         + synthesize_body
         + "\n\n\n"
         "def main():\n"
@@ -995,6 +1005,23 @@ def ensure_dialogue_audio_script(
     extra_imports: str = "",
 ) -> None:
     """Step 07 用の補助スクリプトを再生成する。"""
+    # Step 08 で確定した読み指定を Step 07 の再実行でも保持する。
+    overrides = {}
+    if os.path.isfile(gen_aud_py):
+        with open(gen_aud_py, encoding="utf-8-sig") as f:
+            old_source = f.read()
+        try:
+            for node in ast.parse(old_source).body:
+                if isinstance(node, ast.Assign) and any(
+                    isinstance(target, ast.Name) and target.id == "PRONUNCIATION_OVERRIDES"
+                    for target in node.targets
+                ):
+                    value = ast.literal_eval(node.value)
+                    if isinstance(value, dict):
+                        overrides = value
+                    break
+        except (SyntaxError, ValueError, TypeError):
+            pass
     content = render_dialogue_audio_script(
         ctx=ctx,
         output_dir=output_dir,
@@ -1003,6 +1030,7 @@ def ensure_dialogue_audio_script(
         main_loop_body=main_loop_body,
         script_docstring=script_docstring,
         extra_imports=extra_imports,
+        pronunciation_overrides=overrides,
     )
     with open(gen_aud_py, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)

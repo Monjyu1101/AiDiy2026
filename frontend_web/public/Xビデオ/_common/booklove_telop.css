@@ -3,7 +3,7 @@
   position: absolute;
   z-index: 2;
   left: calc(3vw + 45vh + 20px);
-  right: 24px;
+  right: 78px;
   bottom: 98px !important;
   height: auto;
   max-height: calc(100% - 114px);
@@ -26,7 +26,7 @@
 
   .frame-wrap > #subtitle {
     left: calc(1.5vw + min(32vh, 34vw) + 12px);
-    right: 12px;
+    right: 54px;
     padding: 12px 14px;
     font-size: 42px;
   }

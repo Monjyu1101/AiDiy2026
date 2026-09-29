@@ -3,7 +3,7 @@
 steps.py — 3 スクリプト共通ステップ実装
 
 step00_preflight, step_create_folder, step_generate_audio,
-step_update_durations, step_mid_review, step_final_review,
+step_review_audio, step_update_durations, step_mid_review, step_final_review,
 step_completion_notice を提供する。
 
 各関数は ctx: VideoGenCtx を受け取り、グローバル変数に依存しない。
@@ -36,6 +36,7 @@ from .generation import (
     count_scenario_scenes, count_scenario_dialogues,
     collect_scenario_duration_stats, update_scenario_audio_durations,
 )
+from .audio_review import audio_tasks, ensure_audio_script_review_support, review_audio_by_agent
 
 
 # ================================================================== #
@@ -713,13 +714,43 @@ async def step_generate_audio(
 
 
 # ================================================================== #
-# Step 08: 再生時間更新
+# Step 08: 音声照合
+# ================================================================== #
+
+async def step_review_audio(ctx: VideoGenCtx, ca: dict, gen_aud_py: str, attempt: int = 1) -> bool:
+    """全音声を音声認識(重ねた窓)と原稿から照合し、誤読される語の読み指定を codex_cli にもらって再合成する。
+
+    字幕（scenario.js の原稿）は変えない。TTS へ渡す文字だけを置き換える（_gen_audio.py の PRONUNCIATION_OVERRIDES）。
+    直った分だけ再合成し、直した箇所を再確認する（最大 2 回）。
+    """
+    sep("Step 08: 音声照合")
+    guide_tts(ctx, "Step eight, audio review is starting." if ctx.use_english_voice else "Step 08: 音声照合を開始します。")
+    report = await review_audio_by_agent(ctx, ca, gen_aud_py)
+    print(f"  [review] 照合 {len(report['files'])} 件、読み指定の追加 {len(report.get('readings_added', []))} 件、"
+          f"再合成 {len(report['regenerated'])} 件、未確定 {len(report['unresolved'])} 件")
+    for method in dict.fromkeys(report.get("methods", [])):
+        print(f"  [review] 確認方法: {method}")
+    md_path = os.path.join(ctx.output_dir, f"{ctx.folder_name}.md")
+    mark_step_done(md_path, "音声照合")
+    return await verify_and_backup_until_stable(
+        ctx=ctx, ca=ca, step_name="Step 08: 音声照合",
+        step_summary="全 MP3 を音声認識と原稿から照合し、誤読される語の読み指定（字幕は変えず TTS の入力だけ）を反映して再合成します。",
+        target_paths=[gen_aud_py, os.path.join(ctx.output_dir, "audio"),
+                      os.path.join(ctx.output_dir, "audio_review.json"), md_path],
+        validate=lambda: check("音声照合レポートと全件照合", os.path.isfile(os.path.join(ctx.output_dir, "audio_review.json"))
+                               and set(report["files"]) == set(audio_tasks(os.path.join(ctx.output_dir, "scenario.js")))),
+        verify_timeout_sec=300, attempt=attempt, skip_agent_verify=True,
+    )
+
+
+# ================================================================== #
+# Step 09: 再生時間更新
 # ================================================================== #
 
 async def step_update_durations(ctx: VideoGenCtx, ca: dict, attempt: int = 1) -> bool:
-    """Step 08: 音声ナレーションの実時間で scenario.js の duration_sec を更新する。"""
-    sep("Step 08: 再生時間更新")
-    step_name = "Step 08: 再生時間更新"
+    """Step 09: 音声ナレーションの実時間で scenario.js の duration_sec を更新する。"""
+    sep("Step 09: 再生時間更新")
+    step_name = "Step 09: 再生時間更新"
     new_dir = ctx.output_dir
     folder_name = ctx.folder_name
     topic = ctx.topic
@@ -734,7 +765,7 @@ async def step_update_durations(ctx: VideoGenCtx, ca: dict, attempt: int = 1) ->
     )
 
     tts_msg = (
-        "Step eight, duration update is starting. I will update the playback durations from the generated audio."
+        "Step nine, duration update is starting. I will update the playback durations from the generated audio."
         if ctx.use_english_voice else
         f"{step_name} を開始します。音声ナレーションの再生時間を反映します。"
     )
@@ -820,20 +851,20 @@ async def step_completion_notice(
     sep("Step 99: 完成案内")
 
     completed_step = get_completed_step(ctx)
-    if step_value_to_int(completed_step) < 9:
+    if step_value_to_int(completed_step) < 10:
         if final_review_fn is None:
-            print(f"  [NG] Step 09 が未完了です（現在: {completed_step or '未実行'}）")
-            print("  Step 09: 最終確認 を先に実行してください。")
+            print(f"  [NG] Step 10 が未完了です（現在: {completed_step or '未実行'}）")
+            print("  Step 10: 最終確認 を先に実行してください。")
             return False
 
-        print(f"  [recover] Step 09 が未記録です（現在: {completed_step or '未実行'}）")
+        print(f"  [recover] Step 10 が未記録です（現在: {completed_step or '未実行'}）")
         print("  成果物を最終確認し、成功した場合だけ完成案内を続行します。")
         if not await final_review_fn(ctx, ca, attempt=attempt):
-            print("  [NG] Step 09 の回復実行に失敗しました。")
+            print("  [NG] Step 10 の回復実行に失敗しました。")
             return False
-        set_completed_step(ctx, 9)
+        set_completed_step(ctx, 10)
 
-    # Step 09 完了済みで再開した場合も、メニューから外れたまま完成案内しない。
+    # Step 10 完了済みで再開した場合も、メニューから外れたまま完成案内しない。
     if not ensure_video_menu_registration(ctx):
         print("  [NG] Xビデオメニューとルーティングへの登録を確認できませんでした。")
         return False
@@ -918,12 +949,12 @@ async def run_automation_loop(
                 #   Step 02-03（ルーティング追加・シナリオ作成）: 表示のみ・無音
                 #     この時点は index.html がテンプレート元のままで画像も音声も無い。
                 #     再生させても中身の無い画面が流れるだけなので、表示の確認にとどめる。
-                #   Step 04-08（HTML修正〜再生時間更新）: ループ再生・無音
+                #   Step 04-09（HTML修正〜再生時間更新）: ループ再生・無音
                 #     今回のテーマが画面に載るので流して確認する。1 周で止めると
                 #     見に行ったときには終わっていることが多いのでループさせる。
-                #     Step 07〜08 も、最終確認が済むまでは案内音声と動画音声を
+                #     Step 07〜09 も、最終確認が済むまでは案内音声と動画音声を
                 #     重ねないため無音を維持する。
-                #   Step 09（最終確認）: 最終確認後に音声つきループ再生
+                #   Step 10（最終確認）: 最終確認後に音声つきループ再生
                 #   Step 99（完成案内）: 終了通知のみ（再生状態は変更しない）
                 if 2 <= step_no <= 3:
                     await refresh_browser_preview(
@@ -933,7 +964,7 @@ async def run_automation_loop(
                         speaker_enabled=False,
                         auto_mode=PREVIEW_AUTO_NONE,
                     )
-                elif 4 <= step_no <= 8:
+                elif 4 <= step_no <= 9:
                     await refresh_browser_preview(
                         ctx,
                         f"Step {step_no:02d}: {step_name}",
@@ -941,7 +972,7 @@ async def run_automation_loop(
                         speaker_enabled=False,
                         auto_mode=PREVIEW_AUTO_LOOP,
                     )
-                elif step_no == 9:
+                elif step_no == 10:
                     await start_final_playback(ctx, f"Step {step_no:02d}: {step_name}")
                 break
             else:

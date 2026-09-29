@@ -141,20 +141,30 @@
       hideSoon();
     }
 
-    window.addEventListener("pointermove", updateForPointer, { passive: true });
-    window.addEventListener("pointerup", releasePointer, { passive: true });
-    window.addEventListener("pointercancel", releasePointer, { passive: true });
-    window.addEventListener("focusin", revealTemporarily);
-    window.addEventListener("focusout", hideSoon);
-    controls.addEventListener("pointerenter", () => {
-      pointerInRevealZone = true;
-      reveal();
-    });
-    controls.addEventListener("pointerleave", () => {
-      pointerInRevealZone = false;
-      hideSoon();
-    });
-    controls.addEventListener("pointerdown", revealTemporarily);
+    // 連続再生ページ等の埋め込み用。?kiosk=1 ではポインタ位置で再生バーを出さない
+    // (放置したマウスが下端にあっても出しっぱなしにならない)。キー操作では従来どおり一時表示する。
+    const kiosk = new URLSearchParams(window.location.search).get("kiosk") === "1";
+    if (kiosk) {
+      document.querySelectorAll(".controls-reveal-zone").forEach((zone) => {
+        zone.style.pointerEvents = "none";
+      });
+      controls.style.pointerEvents = "none";
+    } else {
+      window.addEventListener("pointermove", updateForPointer, { passive: true });
+      window.addEventListener("pointerup", releasePointer, { passive: true });
+      window.addEventListener("pointercancel", releasePointer, { passive: true });
+      window.addEventListener("focusin", revealTemporarily);
+      window.addEventListener("focusout", hideSoon);
+      controls.addEventListener("pointerenter", () => {
+        pointerInRevealZone = true;
+        reveal();
+      });
+      controls.addEventListener("pointerleave", () => {
+        pointerInRevealZone = false;
+        hideSoon();
+      });
+      controls.addEventListener("pointerdown", revealTemporarily);
+    }
 
     // iframe が画面下端まで広がるページでは、検知領域を離れた後の
     // pointermove が親 window へ届かない。専用レイヤーの出入りを直接監視し、
