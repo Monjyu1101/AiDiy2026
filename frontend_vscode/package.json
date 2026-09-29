@@ -162,7 +162,7 @@
           "default": 900,
           "minimum": 10,
           "maximum": 7200,
-          "description": "1 回の依頼の制限時間（秒）。"
+          "description": "CLI 起動後、または stdout / stderr の最後の受信から停止までの待機時間（秒）。"
         }
       }
     }

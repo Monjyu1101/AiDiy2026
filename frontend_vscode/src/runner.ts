@@ -87,7 +87,13 @@ export function CLI実行(要求: 実行要求): { 完了: Promise<実行結果>
       強制停止 = setTimeout(() => kill('SIGKILL'), 1500);
     }
   };
-  const タイマー = setTimeout(() => 停止('制限時間を超えたため停止しました。設定で制限時間を変更できます。'), 要求.制限時間);
+  // stdout/stderr の受信ごとに更新する。改行のない途中チャンクも通信中とみなす。
+  let タイマー: NodeJS.Timeout;
+  const 受信待機開始 = () => {
+    clearTimeout(タイマー);
+    タイマー = setTimeout(() => 停止('最後の受信から制限時間を超えたため停止しました。設定で制限時間を変更できます。'), 要求.制限時間);
+  };
+  受信待機開始();
   const 行処理 = (line: string) => {
     const clean = stripVTControlCharacters(line).trim();
     if (!clean) return;
@@ -100,6 +106,7 @@ export function CLI実行(要求: 実行要求): { 完了: Promise<実行結果>
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
+      受信待機開始();
       回答 += chunk;
       標準出力保留 += chunk;
       const lines = 標準出力保留.split(/\r\n|\n/);
@@ -108,6 +115,7 @@ export function CLI実行(要求: 実行要求): { 完了: Promise<実行結果>
       if (回答.length > 2_000_000) { 回答 = 回答.slice(0, 2_000_000); 停止('回答が表示上限を超えたため停止しました。'); }
     });
     child.stderr.on('data', (chunk: string) => {
+      受信待機開始();
       ログ = (ログ + stripVTControlCharacters(chunk)).slice(-64_000);
       保留行 += chunk;
       const lines = 保留行.split(/\r\n|\r|\n/);

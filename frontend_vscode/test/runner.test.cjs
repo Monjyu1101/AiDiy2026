@@ -46,6 +46,23 @@ test('非ゼロ終了と stderr を呼び出し元へ返す', async () => {
   assert.equal(result.終了コード, 7);
   assert.match(result.ログ, /authentication failed/);
 });
+for (const 出力元 of ['stdout', 'stderr']) {
+  test(`${出力元} の改行なしチャンクを受信中は開始からの制限時間で停止しない`, { timeout: 5000 }, async () => {
+    const result = await run('pulse', [出力元], { 制限時間: 650 }).完了;
+    assert.equal(result.終了コード, 0);
+    assert.equal(result.停止理由, undefined);
+    assert.equal(出力元 === 'stdout' ? result.回答 : result.ログ, 'tickticktick');
+  });
+}
+test('最後の受信後に制限時間が経過すると停止する', { timeout: 6000 }, async () => {
+  const start = Date.now();
+  const job = run('pulse-hang', ['stdout'], { 制限時間: 650 });
+  try {
+    const result = await job.完了;
+    assert.match(result.停止理由, /最後の受信から制限時間/);
+    assert.ok(Date.now() - start >= 1200, '最後のチャンクより前に停止しました');
+  } finally { job.停止(); }
+});
 test('保存済みセッションが消えた場合だけ resume を外して再実行する', async () => {
   const { コード要求実行, STREAM_START, STREAM_END, STREAM_CANCEL } = require('../out/protocol.cjs');
   const id = '20260929_140445_a8bbc2';

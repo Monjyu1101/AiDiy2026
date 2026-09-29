@@ -33,31 +33,23 @@ _STDERR_STREAM_STDOUT_FINAL_AI = frozenset({
 })
 
 
-async def _長大行対応readline(stream: asyncio.StreamReader, 出力検知=None) -> bytes:
-    """StreamReader の上限を超える長い1行も、失わず最後まで読み取る。"""
-    chunks: list[bytes] = []
-    while True:
-        try:
-            chunk = await stream.readuntil(b"\n")
-            chunks.append(chunk)
-            if 出力検知:
-                出力検知()
-            return b"".join(chunks)
-        except asyncio.LimitOverrunError as e:
-            # readline() は既定上限（通常64KiB）を超えると例外で読取を終える。
-            # 区切り文字より前の安全な範囲を消費し、同じ1行の続きを読み取る。
-            chunk = await stream.read(max(e.consumed, 1))
-            if not chunk:
-                return b"".join(chunks)
-            chunks.append(chunk)
-            if 出力検知:
-                出力検知()
-        except asyncio.IncompleteReadError as e:
-            if e.partial:
-                chunks.append(e.partial)
-                if 出力検知:
-                    出力検知()
-            return b"".join(chunks)
+async def _出力行を順に取得(stream: asyncio.StreamReader, 出力検知=None):
+    """stdout/stderr の受信ごとに通知し、出力内容は行単位で返す。"""
+    pending: list[bytes] = []
+    while chunk := await stream.read(64 * 1024):
+        if 出力検知:
+            出力検知()
+        parts = chunk.split(b"\n")
+        if len(parts) == 1:
+            pending.append(chunk)
+            continue
+        pending.append(parts[0])
+        yield b"".join(pending) + b"\n"
+        for part in parts[1:-1]:
+            yield part + b"\n"
+        pending = [parts[-1]] if parts[-1] else []
+    if pending:
+        yield b"".join(pending)
 
 
 class CodeAI:
@@ -464,8 +456,8 @@ class CodeAI:
                 common.extend(["--model", self.code_model])
             if repo_path:
                 common.extend(["--add-dir", repo_path])
-            # --print-timeout: デフォルト5分を20分に延長
-            common.extend(["--print-timeout", "20m"])
+            # CLI 固有の固定上限を無効にし、stdout/stderr の無受信900秒で監視する。
+            common.extend(["--print-timeout", "0"])
             if 初回:
                 return common + ["-p", プロンプト]
             else:
@@ -765,7 +757,7 @@ class CodeAI:
             logger.error(f"codexセッションID抽出エラー: {e}")
             return None
 
-    async def 実行(self, 要求テキスト: str, タイムアウト秒数: int = 1800,
+    async def 実行(self, 要求テキスト: str, タイムアウト秒数: int = 900,
                    resume: bool = True, 読取専用: bool = False, 絶対パス: str = None, file_path: str = None, 変更ファイル一覧: list = None, 再プラン要求: bool = False) -> str:
         """
         CLI (subprocess) 実行
@@ -1033,11 +1025,11 @@ class CodeAI:
 
             result_lines = []
             stderr_lines = []
-            last_output_time = time.time()
+            last_output_time = time.monotonic()
 
             def 出力時刻更新():
                 nonlocal last_output_time
-                last_output_time = time.time()
+                last_output_time = time.monotonic()
 
             # stdin 送信は stdout/stderr の読み取りと並行して行う。
             # 子が先に大量出力する場合でも、双方向のパイプ待ちを起こさない。
@@ -1058,18 +1050,14 @@ class CodeAI:
             async def stdout_reader():
                 nonlocal last_output_time
                 try:
-                    while True:
+                    async for line in _出力行を順に取得(process.stdout, 出力時刻更新):
                         # 強制停止チェック（is_aliveがFalseならストリーム中断）
                         if self._強制停止要求あり():
                             logger.info("[CodeAI] 強制停止要求検出、stdout読み取り中断")
                             await self._停止マーカー送信()
                             break
 
-                        line = await _長大行対応readline(process.stdout, 出力時刻更新)
-                        if not line:
-                            break
-
-                        last_output_time = time.time()
+                        last_output_time = time.monotonic()
                         line_text = line.decode('utf-8', errors='replace').rstrip()
                         result_lines.append(line_text)
 
@@ -1101,18 +1089,14 @@ class CodeAI:
             async def stderr_reader():
                 nonlocal last_output_time
                 try:
-                    while True:
+                    async for line in _出力行を順に取得(process.stderr, 出力時刻更新):
                         # 強制停止チェック（is_aliveがFalseならストリーム中断）
                         if self._強制停止要求あり():
                             logger.info("[CodeAI] 強制停止要求検出、stderr読み取り中断")
                             await self._停止マーカー送信()
                             break
 
-                        line = await _長大行対応readline(process.stderr, 出力時刻更新)
-                        if not line:
-                            break
-
-                        last_output_time = time.time()
+                        last_output_time = time.monotonic()
                         line_text = line.decode('utf-8', errors='replace').rstrip()
                         stderr_lines.append(line_text)
 
@@ -1146,7 +1130,7 @@ class CodeAI:
                         logger.info("[CodeAI] 強制停止要求検出（monitor）")
                         await self._停止マーカー送信()
                         return
-                    if time.time() - last_output_time > timeout:
+                    if time.monotonic() - last_output_time > timeout:
                         raise asyncio.TimeoutError(f"タイムアウト({timeout}秒)")
 
             # タスク実行
@@ -1163,51 +1147,28 @@ class CodeAI:
             if stdin_task is not None:
                 tasks.append(stdin_task)
 
-            # 最初の完了を待つ
-            # stdin 送信完了だけで出力監視を終了させないため、stdin_task は含めない。
+            # プロセス・stdout/stderr・stdin がすべて終わるまで受信監視を続ける。
+            # 先に一方のパイプが閉じても、もう一方の出力で待機時間を更新する。
+            completion_targets = [stdout_task, stderr_task, process_task]
+            if stdin_task is not None:
+                completion_targets.append(stdin_task)
+            completion_task = asyncio.gather(*completion_targets, return_exceptions=True)
             done, _ = await asyncio.wait(
-                [stdout_task, stderr_task, monitor_task, process_task],
-                return_when=asyncio.FIRST_COMPLETED
+                [completion_task, monitor_task], return_when=asyncio.FIRST_COMPLETED
             )
 
             monitor_error = None
             if monitor_task in done:
-                # タイムアウト or 強制停止 → 全タスクをキャンセル
                 try:
                     await monitor_task
                 except asyncio.TimeoutError as e:
                     monitor_error = e
-                cancel_targets = [stdout_task, stderr_task, process_task]
-                if stdin_task is not None:
-                    cancel_targets.append(stdin_task)
-                for task in cancel_targets:
-                    if not task.done():
-                        task.cancel()
-                await asyncio.gather(*cancel_targets, return_exceptions=True)
+                completion_task.cancel()
+                await asyncio.gather(completion_task, return_exceptions=True)
             else:
-                # プロセス終了（または stdout/stderr 完了）→ monitor をキャンセルし
-                # stdout/stderr/process/stdin の残りを最大30秒待つ。
-                if not monitor_task.done():
-                    monitor_task.cancel()
-                    try:
-                        await monitor_task
-                    except asyncio.CancelledError:
-                        pass
-                completion_targets = [stdout_task, stderr_task, process_task]
-                if stdin_task is not None:
-                    completion_targets.append(stdin_task)
-                remaining = [t for t in completion_targets if not t.done()]
-                if remaining:
-                    try:
-                        await asyncio.wait_for(
-                            asyncio.gather(*remaining, return_exceptions=True),
-                            timeout=30
-                        )
-                    except asyncio.TimeoutError:
-                        for task in remaining:
-                            if not task.done():
-                                task.cancel()
-                        await asyncio.gather(*remaining, return_exceptions=True)
+                monitor_task.cancel()
+                await asyncio.gather(monitor_task, return_exceptions=True)
+                await completion_task
 
             # プロセスが生きていればキル
             if process.returncode is None:
@@ -1302,24 +1263,21 @@ class CodeAI:
 
             result_lines = []
             stderr_lines = []
-            last_output_time = time.time()
+            last_output_time = time.monotonic()
 
             def 出力時刻更新():
                 nonlocal last_output_time
-                last_output_time = time.time()
+                last_output_time = time.monotonic()
 
             async def stdout_reader():
                 nonlocal last_output_time
                 try:
-                    while True:
+                    async for line in _出力行を順に取得(process.stdout, 出力時刻更新):
                         if self._強制停止要求あり():
                             logger.info("[antigravity] 強制停止要求検出、stdout読み取り中断")
                             await self._停止マーカー送信()
                             break
-                        line = await _長大行対応readline(process.stdout, 出力時刻更新)
-                        if not line:
-                            break
-                        last_output_time = time.time()
+                        last_output_time = time.monotonic()
                         line_text = line.decode('utf-8', errors='replace').rstrip()
                         result_lines.append(line_text)
                         if self._強制停止要求あり():
@@ -1332,14 +1290,11 @@ class CodeAI:
             async def stderr_reader():
                 nonlocal last_output_time
                 try:
-                    while True:
+                    async for line in _出力行を順に取得(process.stderr, 出力時刻更新):
                         if self._強制停止要求あり():
                             await self._停止マーカー送信()
                             break
-                        line = await _長大行対応readline(process.stderr, 出力時刻更新)
-                        if not line:
-                            break
-                        last_output_time = time.time()
+                        last_output_time = time.monotonic()
                         line_text = line.decode('utf-8', errors='replace').rstrip()
                         stderr_lines.append(line_text)
                         if self._強制停止要求あり():
@@ -1357,6 +1312,7 @@ class CodeAI:
                                 })
                             except Exception as e:
                                 logger.error(f"[antigravity] output_stream送信エラー(stderr): {e}")
+
                 except Exception as e:
                     logger.error(f"[antigravity] stderr読み取りエラー: {e}")
 
@@ -1367,7 +1323,7 @@ class CodeAI:
                         logger.info("[antigravity] 強制停止要求検出（monitor）")
                         await self._停止マーカー送信()
                         return
-                    if time.time() - last_output_time > timeout:
+                    if time.monotonic() - last_output_time > timeout:
                         raise asyncio.TimeoutError(f"タイムアウト({timeout}秒)")
 
             stdout_task = asyncio.create_task(stdout_reader())
@@ -1375,37 +1331,25 @@ class CodeAI:
             monitor_task = asyncio.create_task(timeout_monitor())
             process_task = asyncio.create_task(process.wait())
 
+            completion_task = asyncio.gather(
+                stdout_task, stderr_task, process_task, return_exceptions=True
+            )
             done, _ = await asyncio.wait(
-                [stdout_task, stderr_task, monitor_task, process_task],
-                return_when=asyncio.FIRST_COMPLETED
+                [completion_task, monitor_task], return_when=asyncio.FIRST_COMPLETED
             )
 
+            monitor_error = None
             if monitor_task in done:
-                for task in [stdout_task, stderr_task, process_task]:
-                    if not task.done():
-                        task.cancel()
-                        try:
-                            await task
-                        except (asyncio.CancelledError, Exception):
-                            pass
+                try:
+                    await monitor_task
+                except asyncio.TimeoutError as e:
+                    monitor_error = e
+                completion_task.cancel()
+                await asyncio.gather(completion_task, return_exceptions=True)
             else:
-                if not monitor_task.done():
-                    monitor_task.cancel()
-                    try:
-                        await monitor_task
-                    except asyncio.CancelledError:
-                        pass
-                remaining = [t for t in [stdout_task, stderr_task, process_task] if not t.done()]
-                if remaining:
-                    try:
-                        await asyncio.wait_for(
-                            asyncio.gather(*remaining, return_exceptions=True),
-                            timeout=30
-                        )
-                    except asyncio.TimeoutError:
-                        for task in remaining:
-                            if not task.done():
-                                task.cancel()
+                monitor_task.cancel()
+                await asyncio.gather(monitor_task, return_exceptions=True)
+                await completion_task
 
             if process.returncode is None:
                 process.kill()
@@ -1415,6 +1359,8 @@ class CodeAI:
             full_output = "\n".join(result_lines)
             stderr_output = "\n".join(stderr_lines)
             self.last_stderr_output = stderr_output
+            if monitor_error is not None:
+                raise monitor_error
 
             logger.info(f"[antigravity] 完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行")
             if result_lines:

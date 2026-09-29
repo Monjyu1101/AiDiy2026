@@ -71,6 +71,8 @@
 - AIコードパネルから `aidiy_hermes` をモデル `auto` で呼ぶときは、`--model` / `--provider` を付けず、`command_hermes/cli_main.py` 側でも `CODE_AIDIY_HERMES_MODEL` へ置換せず Hermes 本来の auto 解決に任せる。パネルの welcome 表示も `Model: "auto"` のままにする
 - `aidiy_hermes` のワンショットでは、stdout は正式回答専用、stderr は thinking / step / tool 進捗 / 警告 / `session_id` 用に分ける
 - `copilot_cli` / `opencode_cli` / `antigravity_cli` も、stdout は正式回答専用、stderr は `output_stream` 専用とする。stdout を途中表示にも送ると最終回答と二重表示になるため、追加時は `AIコード_cli.py` の `_STDERR_STREAM_STDOUT_FINAL_AI` を確認する
+- Code CLI の実行待機は既定で900秒。stdout / stderr のどちらかで1チャンクでも受信したら、その時点から900秒を数え直す。画面へのストリーム表示は引き続き行単位にする
+- `antigravity_cli` は CLI 固有の `--print-timeout` に固定の時間を渡すと、受信が続いていても先に終了する。`0` を渡して固定上限を無効にし、バックエンド側の無受信監視に任せる
 - `CODE_AIDIY_HERMES_MODEL` が `auto` 以外のときは、`--provider ollama --model <model>` を渡す。AiDiy の設定画面で扱う `aidiy_hermes` モデル候補は Ollama 系を前提にする
 - TUI の `/model` では `AiDiy_key.json` を使い、`ollama` / `openai` / `openrt` / `gemini` / `freeai` / `anthropic` を選べるようにする。Code AI 経由のモデル指定とは役割を分ける
 - OpenAI / Claude / Google 系 provider を有効にする場合、`command_hermes/pyproject.toml` に `openai` / `anthropic` / `google-genai` を明示する

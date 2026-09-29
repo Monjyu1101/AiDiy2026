@@ -15,6 +15,11 @@ if (mode === 'wait') {
   process.stderr.write(`Session not found: ${process.argv[process.argv.indexOf('--resume') + 1]}\n`);
   process.exitCode = 1;
   process.stdin.resume();
+} else if (mode === 'pulse' || mode === 'pulse-hang') {
+  const output = process.argv[3] === 'stderr' ? process.stderr : process.stdout;
+  for (const delay of [0, 400, 800]) setTimeout(() => output.write('tick'), delay);
+  if (mode === 'pulse-hang') setInterval(() => {}, 1000);
+  else setTimeout(() => {}, 1050);
 } else {
   let input = '';
   process.stdin.setEncoding('utf8');
