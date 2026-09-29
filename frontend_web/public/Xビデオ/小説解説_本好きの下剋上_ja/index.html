@@ -9,12 +9,6 @@
       box-sizing: border-box;
     }
 
-    :root {
-      --avatar-left: 3vw;
-      --avatar-width: 45vh;
-      --control-height: 44px;
-    }
-
     html,
     body {
       margin: 0;
@@ -81,6 +75,10 @@
       font-weight: 900;
       color: #8fe8ff;
       letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 46vw;
     }
 
     .brand-sub {
@@ -96,6 +94,9 @@
       font-size: 12px;
       line-height: 1.4;
       text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .stage {
@@ -130,30 +131,21 @@
 
     .subtitle {
       position: absolute;
-      z-index: 2;
-      left: calc(var(--avatar-left) + var(--avatar-width) + 20px);
+      left: 24px;
       right: 24px;
-      height: auto;
-      max-height: calc(100% - 114px);
-      overflow-y: auto;
-      overflow-wrap: anywhere;
+      bottom: 20px;
       padding: 14px 18px;
       border-radius: 18px;
       background: rgba(4, 10, 18, 0.55);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.08);
       color: #f7fbff;
-      font-size: 54px;
+      font-size: 18px;
       font-weight: 700;
-      line-height: 1.3;
+      line-height: 1.7;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
       pointer-events: none;
     }
-
-    /* 共通の自動非表示スクリプトが .subtitle の bottom を上書きするため、このページで固定する。 */
-    #subtitle { bottom: 98px !important; }
-
-    .subtitle[hidden] { display: none; }
 
     .controls {
       grid-row: 3;
@@ -272,10 +264,10 @@
 
     #avatar-container {
       position: fixed;
-      left: var(--avatar-left);
+      left: 3vw;
       right: auto;
-      bottom: var(--control-height);
-      width: var(--avatar-width);
+      bottom: 44px;
+      width: 45vh;
       height: 75vh;
       max-height: calc(100vh - 108px);
       pointer-events: none;
@@ -295,12 +287,6 @@
     }
 
     @media (max-width: 980px) {
-      :root {
-        --avatar-left: 1.5vw;
-        --avatar-width: min(32vh, 34vw);
-        --control-height: 56px;
-      }
-
       .app {
         grid-template-rows: 65px 1fr 56px;
       }
@@ -326,16 +312,21 @@
       .controls { flex-wrap: nowrap; gap: 8px; }
 
       .subtitle {
-        left: calc(var(--avatar-left) + var(--avatar-width) + 12px);
+        left: 12px;
         right: 12px;
+        bottom: 12px;
         padding: 12px 14px;
-        font-size: 42px;
+        font-size: 14px;
       }
 
       .tts-status { bottom: 61px; }
 
       #avatar-container {
+        left: 1.5vw;
+        right: auto;
+        width: 32vh;
         height: 52vh;
+        bottom: 56px;
       }
     }
     .top-actions {
@@ -378,8 +369,8 @@
       color: #9eb2c6;
     }
   </style>
+  <link rel="stylesheet" href="../_common/booklove_telop.css">
   <script src="scenario.js"></script>
-  <script src="../_common/novel_telop_timing.js?v=20260923-light"></script>
   <script src="../_common/playback_start_delay.js"></script>
   <script src="../_common/playback_controls_autohide.js?v=20260905-2"></script>
   <script type="importmap">
@@ -407,7 +398,7 @@
     <main class="stage">
       <section class="frame-wrap">
         <iframe id="sceneFrame" class="scene-frame" title="本好きの下剋上 小説解説 scene"></iframe>
-        <div id="subtitle" class="subtitle" aria-live="off"></div>
+        <div id="subtitle" class="subtitle"></div>
       </section>
     </main>
 
@@ -477,41 +468,6 @@
       return audioMode === "long" ? (scene.long_narration || "") : (scene.short_narration || "");
     }
 
-    // 一文を読み始めから読み終わりまで表示する。空文字列の間合いは表示しない。
-    const telopCache = new WeakMap();
-    function getSceneTelops(scene) {
-      let byMode = telopCache.get(scene);
-      if (!byMode) {
-        byMode = {};
-        telopCache.set(scene, byMode);
-      }
-      const cacheKey = audioMode;
-      if (byMode[cacheKey]) return byMode[cacheKey];
-      byMode[cacheKey] = NovelTelopTiming.groups(getSceneNarration(scene));
-      return byMode[cacheKey];
-    }
-
-    function updateTelop() {
-      const scene = currentScene();
-      if (!playing || !audioHasStarted || audioPlayer.paused) {
-        if (subtitle.textContent) subtitle.textContent = "";
-        if (!subtitle.hidden) subtitle.hidden = true;
-        return;
-      }
-      const telops = getSceneTelops(scene);
-      const duration = effectiveSceneDuration || getSceneDurationSec(scene);
-      const elapsed = Number.isFinite(audioPlayer.currentTime)
-        ? Math.max(0, audioPlayer.currentTime) : Math.max(0, sceneElapsedMs / 1000);
-      const selected = NovelTelopTiming.select(scene, audioMode, audioPlayer, telops, elapsed, duration);
-      if (!selected) {
-        if (subtitle.textContent) subtitle.textContent = "";
-        if (!subtitle.hidden) subtitle.hidden = true;
-        return;
-      }
-      if (subtitle.textContent !== selected) subtitle.textContent = selected;
-      if (subtitle.hidden) subtitle.hidden = false;
-    }
-
     function getSceneDurationSec(scene) {
       const raw = audioMode === "long" ? (scene.long_duration_sec || 0) : (scene.short_duration_sec || 0);
       return raw || previewMinSceneSec;
@@ -568,7 +524,6 @@
 
     let sceneIndex = getInitialSceneIndex();
     let playing = false;
-    let audioHasStarted = false;
     let sceneElapsedMs = 0;
     let sceneStartedAt = 0;
     let tickTimer = null;
@@ -666,8 +621,6 @@
 
     function startSceneClock(token) {
       clearInterval(tickTimer);
-      audioHasStarted = true;
-      updateTelop();
       sceneStartedAt = Date.now() - sceneElapsedMs;
       tickTimer = setInterval(() => {
         if (token !== playbackToken || !playing) return;
@@ -941,11 +894,10 @@
 
     function renderScene() {
       const scene = currentScene();
-      audioHasStarted = false;
       sceneFrame.src = `${scenario.scenes[sceneIndex].id}.html`;
+      subtitle.textContent = scene.subtitle || scene.lead || "";
       setTtsStatus("");
       updateTimerAndProgress();
-      updateTelop();
       window.__avatarSetExpression?.(scene.expression || "neutral");
       prefetchSceneAudio(scene);
       prefetchSceneAudio(scenario.scenes[sceneIndex + 1]);
@@ -954,8 +906,6 @@
     async function beginPlayback() {
       const scene = currentScene();
       const token = ++playbackToken;
-      audioHasStarted = false;
-      updateTelop();
       clearTimers();
       effectiveSceneDuration = getSceneDurationSec(scene);
       audioPlayer.pause();
@@ -1015,9 +965,7 @@
       if (sceneElapsedMs >= dur * 1000 - 80) {
         sceneElapsedMs = 0;
       }
-      audioHasStarted = false;
       playing = true;
-      updateTelop();
       playBtn.textContent = "⏸";
       const begin = () => {
         if (!playing) return;
@@ -1031,8 +979,6 @@
     function pause() {
       if (!playing) return;
       playing = false;
-      audioHasStarted = false;
-      playbackToken++;
       playBtn.textContent = "▶";
       const pauseDur = effectiveSceneDuration > 0 ? effectiveSceneDuration : getSceneDurationSec(currentScene());
       sceneElapsedMs = Math.min(
@@ -1071,9 +1017,7 @@
         snapTimerToSceneScheduledEnd();
         progressFill.style.width = "100%";
         playing = false;
-        audioHasStarted = false;
         playBtn.textContent = "▶";
-        updateTelop();
       }
     }
 
@@ -1118,7 +1062,6 @@
 
     audioPlayer.addEventListener("ended", () => {
       window.__avatarOnAudioStop?.();
-      updateTelop();
       if (!playing) return;
       clearTimers();
       nextScene(true);
@@ -1138,9 +1081,7 @@
     });
     audioPlayer.addEventListener("pause", () => {
       window.__avatarOnAudioStop?.();
-      updateTelop();
     });
-    audioPlayer.addEventListener("timeupdate", updateTelop);
 
     updateModeBtn();
     renderScene();
@@ -1150,6 +1091,8 @@
     window.addEventListener("beforeunload", revokeTtsBlobs);
   </script>
 
+  <script src="../_common/novel_telop_timing.js?v=20260923-light"></script>
+  <script src="../_common/booklove_telop.js?v=20260923-light3"></script>
   <script type="module">
     import * as THREE from "three";
     import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

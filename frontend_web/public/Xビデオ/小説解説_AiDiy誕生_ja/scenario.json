@@ -21,6 +21,13 @@
     "avatar": "../_vrm/VRM_female.vrm",
     "tts_provider": "edge:female"
   },
+  "language": "ja",
+  "visual_direction": {
+    "aspect_ratio": "16:9",
+    "use_case": "illustration-story",
+    "style": "オリジナルの現代日本を舞台にしたシネマチックな物語挠絵。静かな壮大さと温かな余韻を、青と藍色を基調に描く。企業ロゴ・製品画面を入れず、読める文字を入れない。",
+    "continuity_guide": "Keep the single original Japanese male developer consistent across scenes: early forties, short black hair, navy cardigan over a white shirt. Prefer symbolic objects and compositions such as a small blue light, luminous gears, books, tools, gates and paths, and sealed letter-shaped lights for an unseen AI collaborator. Keep the palette quiet blue and indigo, epic yet intimate. Keep the left 38 percent quiet for the narrator overlay. No company logos, product screenshots, readable text, watermarks, real people, gore, or direct violence."
+  },
   "scenes": [
     {
       "id": "scene_000",

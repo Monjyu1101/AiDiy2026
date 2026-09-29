@@ -372,7 +372,7 @@ def start_global_npm_tools_install():
             print_error(f"  [{i}/{len(packages)}] {package}: 投入失敗 - {exc}")
 
     antigravity_command = (
-        "curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd"
+        "curl -fsSL https://antigravity.google/cli/install.cmd -o \"%TEMP%\\aidiy_agy_install.cmd\" && call \"%TEMP%\\aidiy_agy_install.cmd\" & del /q \"%TEMP%\\aidiy_agy_install.cmd\" >nul 2>&1"
         if sys.platform == "win32"
         else "curl -fsSL https://antigravity.google/cli/install.sh | bash"
     )

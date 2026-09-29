@@ -5,7 +5,6 @@
 既存の音声ファイル（500 bytes 超）は自動スキップします。
 """
 
-import argparse
 import json
 import os
 import sys
@@ -16,9 +15,11 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'audio')
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(_THIS_DIR, 'audio')
 TTS_API_URL = 'http://127.0.0.1:8095/aidiy_text_to_speech/synthesize'
 TTS_LANGUAGE = 'ja'
+PRONUNCIATION_OVERRIDES = {}
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -31,6 +32,10 @@ def load_tasks():
         json_str = json_str[len("window.SCENARIO ="):].strip()
     json_str = json_str.rstrip(";").strip()
     data = json.loads(json_str)
+    global PAUSE_SCENES
+    PAUSE_SCENES = {str(scene.get("id", "")).replace("scene_", "")
+                    for scene in data.get("scenes", [])
+                    if "pause_after_speech_text" in scene}
     narrations = []
     for scene in data.get("scenes", []):
         scene_num = str(scene.get("id", "")).replace("scene_", "")
@@ -63,7 +68,17 @@ def post_json(url, payload, timeout_sec=300):
     return result
 
 
+def apply_pronunciation(text, out_path):
+    changes = PRONUNCIATION_OVERRIDES.get(os.path.basename(out_path), {})
+    if isinstance(changes, str):
+        return changes
+    for old, reading in changes.items():
+        text = text.replace(old, reading)
+    return text
+
+
 def synthesize_one(text, out_path):
+    text = apply_pronunciation(text, out_path)
     return post_json(TTS_API_URL, {
         "speech_text": text,
         "language": TTS_LANGUAGE,
@@ -74,39 +89,30 @@ def synthesize_one(text, out_path):
 
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="scenario.js からナレーション音声を生成します。")
-    parser.add_argument(
-        "--force-scene",
-        action="append",
-        default=[],
-        metavar="SCENE_ID",
-        help="既存音声も再生成するシーンID。複数回指定できます（例: scene_001）。",
-    )
-    return parser.parse_args()
-
-
 def main():
-    args = parse_args()
-    force_scenes = {scene_id.removeprefix("scene_") for scene_id in args.force_scene}
+    selected_files = set(sys.argv[2:]) if len(sys.argv) > 1 and sys.argv[1] == '--only-file' else set()
+    force_long = "--force-long" in sys.argv[1:]
     total = len(NARRATIONS)
     done = 0
     skip = 0
     fail = 0
     for scene_num, kind, text in NARRATIONS:
         fname = f"{kind}_scene_{scene_num}.mp3"
+        if selected_files and fname not in selected_files: continue
         fpath = os.path.join(OUTPUT_DIR, fname)
-        if (
-            scene_num not in force_scenes
-            and os.path.exists(fpath)
-            and os.path.getsize(fpath) > 500
-        ):
+        if os.path.exists(fpath) and os.path.getsize(fpath) > 500 and not (force_long and kind == "long") and fname not in selected_files:
             print(f"  [SKIP] {fname}")
             skip += 1
             continue
         print(f"  [GEN ] {fname}")
         try:
             synthesize_one(text, fpath)
+            if scene_num in PAUSE_SCENES:
+                scripts_dir = os.path.abspath(os.path.join(_THIS_DIR, "..", "..", "..", "..", "scripts"))
+                if scripts_dir not in sys.path:
+                    sys.path.insert(0, scripts_dir)
+                from booklove_pause_pass import append_silence, ensure_silence
+                append_silence(fpath, ensure_silence())
             size = os.path.getsize(fpath) if os.path.exists(fpath) else 0
             if size > 500:
                 print(f"         -> OK ({size:,} bytes)")

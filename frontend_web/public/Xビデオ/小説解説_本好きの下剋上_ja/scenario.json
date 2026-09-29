@@ -21,6 +21,13 @@
     "avatar": "../_vrm/VRM_female.vrm",
     "tts_provider": "edge:female"
   },
+  "language": "ja",
+  "visual_direction": {
+    "aspect_ratio": "16:9",
+    "use_case": "illustration-story",
+    "style": "オリジナルの中世ヨーロッパ風ファンタジー挿絵。公式イラスト、アニメ、漫画、書影、作品ロゴ、既存キャラクターデザインを模倣・複製せず、読める文字を入れない。",
+    "continuity_guide": "Keep the central girl consistent across scenes: a small original girl with straight navy-blue hair and golden eyes, in original simple robes suited to each scene. Create every person as an original design. Prefer symbolic objects and group compositions such as handmade paper, books, libraries, temple corridors and warm family light. Keep the left 38 percent quiet for the narrator overlay. No official-art imitation, anime, manga, book covers, logos, emblems, readable text, watermarks, real people, gore, or direct violence."
+  },
   "scenes": [
     {
       "id": "scene_000",
