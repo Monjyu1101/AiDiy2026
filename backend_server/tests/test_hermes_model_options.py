@@ -20,7 +20,7 @@ class HermesModelOptionsTest(unittest.TestCase):
             bat,
             flags=re.MULTILINE,
         )
-        self.assertEqual(bat_models, ["gpt-6-astra", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna"])
+        self.assertEqual(bat_models, ["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"])
 
         models = conf_models._get_aidiy_hermes_models(object.__new__(conf_models))
         self.assertEqual(list(models), ["auto", *(f"openai_oauth/{model}" for model in bat_models)])

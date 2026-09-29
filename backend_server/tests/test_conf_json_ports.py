@@ -60,16 +60,16 @@ class ConfJsonPortKeyTest(unittest.TestCase):
             self.conf_json(json=str(config_path))
             saved = json.loads(config_path.read_text(encoding="utf-8"))
 
-        self.assertEqual("gpt-6-sol", saved["CHAT_OPENAI_MODEL"])
+        self.assertEqual("gpt-6.1-sol", saved["CHAT_OPENAI_MODEL"])
         self.assertNotIn("CHAT_OPENAI_OAUTH_MODEL", saved)
 
     def test_openai_oauth_model_is_migrated_to_shared_setting(self):
-        for ai_name, expected in (("openai_oauth", "gpt-6-astra"), ("openai_chat", "gpt-6-sol")):
+        for ai_name, expected in (("openai_oauth", "gpt-6-astra"), ("openai_chat", "gpt-6.1-sol")):
             with self.subTest(ai_name=ai_name), tempfile.TemporaryDirectory() as temp_dir:
                 config_path = Path(temp_dir) / "AiDiy_key.json"
                 config_path.write_text(json.dumps({
                     "CHAT_AI_NAME": ai_name,
-                    "CHAT_OPENAI_MODEL": "gpt-6-sol",
+                    "CHAT_OPENAI_MODEL": "gpt-6.1-sol",
                     "CHAT_OPENAI_OAUTH_MODEL": "gpt-6-astra",
                 }), encoding="utf-8")
 

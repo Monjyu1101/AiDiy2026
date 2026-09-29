@@ -131,7 +131,7 @@ class conf_models:
         self.CODE_COPILOT_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
             "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
-            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
+            "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
             "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
             "claude-fable-5.1": "yyyy/mm/dd - claude-fable-5.1",
@@ -149,7 +149,7 @@ class conf_models:
         self.CODE_CODEX_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
             "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
-            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
+            "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
             "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
         }
@@ -728,7 +728,7 @@ class conf_models:
                 openai_models = get_openai_oauth_models()
             except Exception as e:
                 logger.warning(f"OpenAI OAuth モデル一覧の初期化エラー: {e}")
-                openai_models = {"gpt-6-sol": "yyyy/mm/dd - gpt-6-sol"}
+                openai_models = {"gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol"}
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
@@ -772,7 +772,7 @@ class conf_models:
         return {
             "auto": "yyyy/mm/dd - auto",
             "openai_oauth/gpt-6-astra": "yyyy/mm/dd - OpenAI OAuth / gpt-6-astra",
-            "openai_oauth/gpt-6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6-sol (bat default)",
+            "openai_oauth/gpt-6.1-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6.1-sol (bat default)",
             "openai_oauth/gpt-5.6-terra": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-terra",
             "openai_oauth/gpt-6-luna": "yyyy/mm/dd - OpenAI OAuth / gpt-6-luna",
         }

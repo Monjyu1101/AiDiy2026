@@ -177,12 +177,12 @@ class CliStdinTest(unittest.TestCase):
             patch.object(cli_main, "main") as main_mock,
         ):
             result = cli_main.cli_entry([
-                "--oneshot-stdin", "--provider", "codex-cli", "--model", "gpt-6-sol",
+                "--oneshot-stdin", "--provider", "codex-cli", "--model", "gpt-6.1-sol",
             ])
 
         self.assertEqual(0, result)
         self.assertEqual("codex-cli", main_mock.call_args.kwargs["provider"])
-        self.assertEqual("gpt-6-sol", main_mock.call_args.kwargs["model"])
+        self.assertEqual("gpt-6.1-sol", main_mock.call_args.kwargs["model"])
 
     def test_external_cli_provider_is_configured_and_resume_is_preserved(self):
         class FakeCli:
@@ -224,10 +224,10 @@ class CliStdinTest(unittest.TestCase):
 
         cli = FakeCli()
         configured = cli_main._configure_aidiy_cli_provider(
-            cli, "codex-cli", requested_model="gpt-6-sol"
+            cli, "codex-cli", requested_model="gpt-6.1-sol"
         )
         self.assertTrue(configured)
-        self.assertEqual("gpt-6-sol", cli.model)
+        self.assertEqual("gpt-6.1-sol", cli.model)
 
     def test_external_cli_quiet_keeps_final_answer_on_stdout(self):
         class FakeCli:
@@ -346,8 +346,8 @@ class CliStdinTest(unittest.TestCase):
 
     def test_external_cli_commands_forward_explicit_model(self):
         models = {
-            "copilot-cli": "gpt-6-sol",
-            "codex-cli": "gpt-6-sol",
+            "copilot-cli": "gpt-6.1-sol",
+            "codex-cli": "gpt-6.1-sol",
             "claude-code": "sonnet",
             "antigravity-cli": "gemini-3.8-flash-high",
             "grok-cli": "grok-4.7",

@@ -88,8 +88,8 @@ OPENROUTER_MODELS: list[tuple[str, str]] = [
     ("anthropic/claude-sonnet-5.5",              ""),
     ("anthropic/claude-haiku-4.5",             ""),
     # OpenAI
-    ("openai/gpt-6-sol",                     ""),
-    ("openai/gpt-6-sol-pro",                 ""),
+    ("openai/gpt-6.1-sol",                     ""),
+    ("openai/gpt-6.1-sol-pro",                 ""),
     ("openai/gpt-5.6-terra",                   ""),
     ("openai/gpt-5.6-terra-pro",               ""),
     ("openai/gpt-6-luna",                    ""),
@@ -161,7 +161,7 @@ VERCEL_AI_GATEWAY_MODELS: list[tuple[str, str]] = [
     ("anthropic/claude-sonnet-5.5",             ""),
     ("anthropic/claude-opus-5.5",             ""),
     ("anthropic/claude-haiku-4.5",           ""),
-    ("openai/gpt-6-sol",                     ""),
+    ("openai/gpt-6.1-sol",                     ""),
     ("openai/gpt-5.6-terra",                 ""),
     ("openai/gpt-6-luna",                    ""),
     ("google/gemini-3.1-pro-preview",        ""),
@@ -269,8 +269,8 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "anthropic/claude-sonnet-5.5",
         "anthropic/claude-haiku-4.5",
         # OpenAI
-        "openai/gpt-6-sol",
-        "openai/gpt-6-sol-pro",
+        "openai/gpt-6.1-sol",
+        "openai/gpt-6.1-sol-pro",
         "openai/gpt-5.6-terra",
         "openai/gpt-5.6-terra-pro",
         "openai/gpt-6-luna",
@@ -314,16 +314,16 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     # with "openai-api" below — both ids normalize to the same route (models.py
     # treats them as equivalent aliases throughout).
     "openai": [
-        "gpt-6-sol",
-        "gpt-6-sol-pro",
+        "gpt-6.1-sol",
+        "gpt-6.1-sol-pro",
         "gpt-5.6-terra",
         "gpt-5.6-terra-pro",
         "gpt-6-luna",
         "gpt-6-luna-pro",
     ],
     "openai-api": [
-        "gpt-6-sol",
-        "gpt-6-sol-pro",
+        "gpt-6.1-sol",
+        "gpt-6.1-sol-pro",
         "gpt-5.6-terra",
         "gpt-5.6-terra-pro",
         "gpt-6-luna",
@@ -335,7 +335,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "copilot-acp",
     ],
     "copilot": [
-        "gpt-6-sol",
+        "gpt-6.1-sol",
         "gpt-5.6-terra",
         "gpt-6-luna",
         "claude-sonnet-5.5",
@@ -468,7 +468,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "moonshotai/Kimi-K2.5",
         "google/gemini-3.1-flash-lite-preview",
         "anthropic/claude-sonnet-5.5",
-        "openai/gpt-6-sol",
+        "openai/gpt-6.1-sol",
     ],
     # Synced against https://opencode.ai/docs/zen/ + live GET /zen/v1/models
     # (2026-08-20). Zen/Go are _LIVE_FIRST_PICKER_PROVIDERS, so this list is a
@@ -479,7 +479,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "kimi-k3",
         "kimi-k2.5",
         "kimi-k2.6",
-        "gpt-6-sol",
+        "gpt-6.1-sol",
         "gpt-5.6-terra",
         "gpt-6-luna",
         "gpt-5.5",
@@ -596,7 +596,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     "kilocode": [
         "anthropic/claude-opus-5.5",
         "anthropic/claude-sonnet-5.5",
-        "openai/gpt-6-sol",
+        "openai/gpt-6.1-sol",
         "google/gemini-3-pro-preview",
         "google/gemini-3-flash-preview",
     ],
@@ -728,7 +728,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "us.anthropic.claude-sonnet-5-5",
         "us.anthropic.claude-opus-5-5-v1",
         "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "openai.gpt-6-sol",
+        "openai.gpt-6.1-sol",
         "openai.gpt-5.6-terra",
         "openai.gpt-6-luna",
         "us.amazon.nova-pro-v1:0",
@@ -7332,7 +7332,7 @@ def validate_requested_model(
                         f"`{_base_guess}` enforces the standard 272K window on "
                         f"Codex, so no `-900k` option exists for it. Pick the "
                         f"base model, or a verified variant from the `/model` "
-                        f"picker (e.g. `gpt-6-sol-900k`)."
+                        f"picker (e.g. `gpt-6.1-sol-900k`)."
                     ),
                 }
         if catalog_models:

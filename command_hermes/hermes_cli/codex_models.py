@@ -18,10 +18,10 @@ DEFAULT_CODEX_MODELS: List[str] = [
     # offline fallback too. Live discovery (_fetch_models_from_api) overrides
     # this ordering with the backend's own priority ranking when reachable.
     "gpt-6-astra",
-    # GPT-6 Sol / GPT-5.6 Terra / GPT-6 Luna. The public API exposes "-pro"
+    # GPT-6.1 Sol / GPT-5.6 Terra / GPT-6 Luna. The public API exposes "-pro"
     # variants, but the ChatGPT Codex OAuth backend rejects them with HTTP 400,
     # so the curated offline fallback must not surface those dead choices.
-    "gpt-6-sol",
+    "gpt-6.1-sol",
     "gpt-5.6-terra",
     "gpt-6-luna",
     # gpt-5.5 / gpt-5.4 / gpt-5.4-mini / gpt-5.3-codex / gpt-5.3-codex-spark
@@ -43,8 +43,8 @@ DEFAULT_CODEX_MODELS: List[str] = [
 ]
 
 _FORWARD_COMPAT_TEMPLATE_MODELS: List[tuple[str, tuple[str, ...]]] = [
-    ("gpt-6-astra", ("gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna")),
-    ("gpt-6-sol", ("gpt-5.5", "gpt-5.4")),
+    ("gpt-6-astra", ("gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna")),
+    ("gpt-6.1-sol", ("gpt-5.5", "gpt-5.4")),
     ("gpt-5.6-terra", ("gpt-5.5", "gpt-5.4")),
     ("gpt-6-luna", ("gpt-5.5", "gpt-5.4")),
     # gpt-5.5 / gpt-5.4-mini / gpt-5.4 / gpt-5.3-codex-spark are below the
@@ -80,9 +80,10 @@ def _add_forward_compat_models(model_ids: List[str]) -> List[str]:
 def _add_context_variants(model_ids: List[str]) -> List[str]:
     """Insert ``-900k`` large-context picker variants after eligible base slugs.
 
-    The ChatGPT Codex backend advertises 272K for the gpt-5.4 / gpt-5.6-terra /
-    gpt-6-sol / gpt-6-luna families but accepts ~911K (live-verified Aug 2026).
-    The base slugs keep the cheaper advertised 272K limit by default; each verified slug gets an
+    The ChatGPT Codex backend advertised 272K for gpt-5.4, gpt-5.6-terra,
+    the earlier Sol model, and gpt-6-luna despite accepting ~911K in Aug 2026.
+    The gpt-6.1-sol entry carries forward the earlier Sol limit pending verification.
+    The base slugs keep the cheaper advertised 272K limit by default; each eligible slug gets an
     explicit ``<slug>-900k`` picker entry that opts into the large window.
     The suffix is Hermes-side only — it is stripped before the model id hits
     the wire (agent/transports/codex.py, agent/auxiliary_client.py).
