@@ -122,7 +122,9 @@ AiDiy の Code AI 連携では、Windows のコマンドライン長制限を避
 - API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `anthropic`, `openai_oauth`, `xai-oauth`
 - CLI bridge: `claude_cli`, `codex_cli`, `antigravity_cli`, `copilot_cli`
 
-AiDiy の既定設定は `openai_oauth / gpt-6-sol`。OAuth 認証済みなら OpenAI を使い、別 PC の初回起動や認証切れでは `freeai / gemini-3.8-flash` へ自動退避する。認証情報はリポジリではなく各 PC の `${HERMES_HOME:-~/.hermes}/auth.json` に保存される。`--provider openai_oauth` を明示した場合は自動退避せず OAuth 認証を開始できる。
+AiDiy の既定設定は `openai_oauth / gpt-6-sol`。OAuth 認証済みなら OpenAI を使い、別 PC の初回起動や認証切れでは `freeai / gemini-3.8-flash` へ自動退避する。OpenAI OAuth のトークンは Codex CLI と共通の `${CODEX_HOME:-~/.codex}/auth.json` に保存する。Hermes のログインと更新も同じファイルへ書き込む。`--provider openai_oauth` を明示した場合は自動退避せず OAuth 認証を開始できる。
+
+旧 Hermes 認証ストアにだけ OpenAI OAuth トークンがある場合、初回利用時に Codex の認証ファイルへ移し、Hermes 側のコピーを削除する。`hermes auth remove openai-codex` または `hermes logout openai-codex` は共有トークンを消すため、Codex CLI もサインアウト状態になる。Codex CLI が OS キーリングだけを使い、`auth.json` を保存していない環境では、ファイル保存に切り替えるか Hermes からログインする。
 
 OAuth を手動でやり直す場合は、認証ファイルを削除せず次を実行する。成功した新しいトークンで旧状態が更新される。
 

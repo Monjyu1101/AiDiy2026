@@ -58,6 +58,8 @@ Step 2: Model 選択
 
 AiDiy 独自の `/model` picker には `xai-oauth` を常時表示し、`grok-4.6` を既定・先頭モデルとします。未認証で選択した場合は xAI の OAuth device-code ログインを開始します。
 
+`openai_oauth` は Codex CLI と同じ `${CODEX_HOME:-~/.codex}/auth.json` を使います。Hermes のログイン、認証確認、トークン更新もこのファイルを参照します。
+
 ## 外部 CLI Bridge
 
 AiDiy の `/model` picker と `--provider` では、API provider に加えて次の外部 CLI を直接起動できます。

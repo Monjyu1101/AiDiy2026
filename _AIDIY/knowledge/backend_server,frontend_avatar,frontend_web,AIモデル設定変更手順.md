@@ -112,9 +112,9 @@ Electron では settings 専用ウィンドウ、Web では同じコンポーネ
 
 新しい AI 種別を追加する場合は、backend が返す `available_models` のキー、frontend の `CHAT_MODEL_KEYS` / `LIVE_MODEL_KEYS` / `LIVE_VOICE_KEYS` / `CODE_MODEL_KEYS`、`conf_json.DEFAULT_CONFIG` を合わせる。
 
-`openai_chat` は `AiDiy_key.json` の `openai_key_id` を使い、`openai_oauth` は `command_hermes` の `openai-codex` 認証ストアを共用する。旧設定値 `openai_oauth_chat` は読込時に `openai_oauth` へ自動移行する。初回利用前に `command_hermes` で
-`.venv/Scripts/python.exe hermes_main.py auth add openai-codex` （Linux / macOS は `.venv/bin/python`）を実行し、ChatGPT アカウントへサインインする。OAuth token は
-`AiDiy_key.json` には保存せず、`${HERMES_HOME:-~/.hermes}/auth.json` から解決する。
+`openai_chat` は `AiDiy_key.json` の `openai_key_id` を使い、`openai_oauth` は Codex CLI と `command_hermes` が共用する OAuth 認証ストアを使う。旧設定値 `openai_oauth_chat` は読込時に `openai_oauth` へ自動移行する。Codex CLI でログイン済みなら再認証は不要。初回利用前に `command_hermes` からログインする場合は
+`.venv/Scripts/python.exe hermes_main.py auth add openai-codex` （Linux / macOS は `.venv/bin/python`）を実行する。OAuth token は
+`AiDiy_key.json` には保存せず、`${CODEX_HOME:-~/.codex}/auth.json` から解決する。Hermes でログインや更新をした場合も同じファイルへ書き込む。
 `aidiy_hermes` を起動して provider `openai_oauth` を選択する方法でも、同じ OAuth 認証を開始できる。
 
 OpenAI Chat のモデル候補は API / OAuth で共通。API で取得した一覧があれば両方に使い、空の場合のみ OAuth の一覧を取得する。選択モデルも `CHAT_OPENAI_MODEL` を共用する。旧 `CHAT_OPENAI_OAUTH_MODEL` は設定読込時に移行し、現在の `CHAT_AI_NAME` が `openai_oauth` なら旧 OAuth 側の選択値を優先する。

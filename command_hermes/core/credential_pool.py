@@ -1059,6 +1059,9 @@ class CredentialPool:
                     return
 
     def _persist(self, *, removed_ids: Optional[List[str]] = None) -> None:
+        if self.provider == "openai-codex":
+            # Codex CLI auth.json is the only persistent OAuth token store.
+            return
         # Self-locking (RLock): snapshotting self._entries must not race a
         # concurrent rotation when called from the deferred refresh path.
         with self._lock:
@@ -1278,14 +1281,9 @@ class CredentialPool:
         if self.provider != "openai-codex" or entry.source not in ("device_code", "manual:device_code"):
             return entry
         try:
-            with _auth_store_lock():
-                auth_store = _load_auth_store()
-                state = _load_provider_state(auth_store, "openai-codex")
-            if not isinstance(state, dict):
-                return entry
-            tokens = state.get("tokens")
-            if not isinstance(tokens, dict):
-                return entry
+            from hermes_cli.auth import _read_codex_tokens
+            state = _read_codex_tokens()
+            tokens = state["tokens"]
             store_access = tokens.get("access_token", "")
             store_refresh = tokens.get("refresh_token", "")
             # Adopt auth.json tokens when either side differs.  Codex refresh
@@ -1659,6 +1657,24 @@ class CredentialPool:
             logger.debug("Failed to sync %s pool entry back to auth store: %s", self.provider, exc)
 
     def _refresh_entry(self, entry: PooledCredential, *, force: bool) -> Optional[PooledCredential]:
+        if self.provider == "openai-codex":
+            try:
+                from hermes_cli.auth import _read_codex_tokens, resolve_codex_runtime_credentials
+                creds = resolve_codex_runtime_credentials(force_refresh=force)
+                tokens = _read_codex_tokens()["tokens"]
+                return replace(
+                    entry,
+                    access_token=creds["api_key"],
+                    refresh_token=tokens["refresh_token"],
+                    last_status=None,
+                    last_error_code=None,
+                    last_error_reason=None,
+                    last_error_message=None,
+                    last_error_reset_at=None,
+                )
+            except Exception as exc:
+                logger.debug("Codex shared credential refresh failed: %s", exc)
+                return None
         if entry.auth_type != AUTH_TYPE_OAUTH or not entry.refresh_token:
             if force:
                 self._mark_exhausted(entry, None)
@@ -3791,6 +3807,24 @@ def _seed_custom_pool(pool_key: str, entries: List[PooledCredential]) -> Tuple[b
 
 def load_pool(provider: str) -> CredentialPool:
     provider = (provider or "").strip().lower()
+    if provider == "openai-codex":
+        # Keep a per-process view for the existing pool API; never persist a
+        # second copy of Codex OAuth credentials in Hermes auth.json.
+        try:
+            from hermes_cli.auth import _read_codex_tokens
+            state = _read_codex_tokens()
+            tokens = state["tokens"]
+            entry = PooledCredential(
+                provider=provider, id="codex-shared", label="Codex shared auth",
+                auth_type=AUTH_TYPE_OAUTH, priority=0, source="device_code",
+                access_token=tokens["access_token"],
+                refresh_token=tokens["refresh_token"],
+                base_url="https://chatgpt.com/backend-api/codex",
+                last_refresh=state.get("last_refresh"),
+            )
+            return CredentialPool(provider, [entry])
+        except Exception:
+            return CredentialPool(provider, [])
     if provider in SINGLE_USE_REFRESH_POOL_PROVIDERS:
         # One-time heal for installs that forked this grant across profiles
         # BEFORE the clone-strip / root-write-through existed: consolidate the

@@ -396,40 +396,9 @@ def auth_add_command(args) -> None:
 
     if provider == "openai-codex":
         creds = auth_mod._codex_device_code_login()
-        label = (getattr(args, "label", None) or "").strip() or label_from_token(
-            creds["tokens"]["access_token"],
-            _oauth_default_label(provider, len(pool.entries()) + 1),
-        )
-        # Add a distinct, self-contained pool entry per account (matching the
-        # qwen-oauth / minimax-oauth multi-account patterns, and the
-        # xai-oauth path below) instead of routing through the singleton
-        # ``_save_codex_tokens`` save path.
-        # The singleton round-trip collapsed every added account into the
-        # latest login: a second ``hermes auth add openai-codex`` overwrote
-        # the first account's singleton-mirrored ``device_code`` entry rather
-        # than creating an independent one (#39236). ``manual:device_code``
-        # entries refresh from their own token pair, so they need no singleton
-        # shadow.
-        entry = PooledCredential(
-            provider=provider,
-            id=uuid.uuid4().hex[:6],
-            label=label,
-            auth_type=AUTH_TYPE_OAUTH,
-            priority=0,
-            source=SOURCE_MANUAL_DEVICE_CODE,
-            access_token=creds["tokens"]["access_token"],
-            refresh_token=creds["tokens"].get("refresh_token"),
-            base_url=creds.get("base_url"),
-            last_refresh=creds.get("last_refresh"),
-        )
-        first_credential = not pool.entries()
-        pool.add_entry(entry)
-        # Adding the first Codex credential should make it the active provider
-        # (the old singleton save path did this implicitly via
-        # _save_provider_state). Subsequent adds leave the active provider as-is.
-        if first_credential:
-            auth_mod.mark_provider_active_if_unset(provider)
-        print(f'Added {provider} OAuth credential #{len(pool.entries())}: "{entry.label}"')
+        auth_mod._save_codex_tokens(creds["tokens"], creds.get("last_refresh"))
+        auth_mod.mark_provider_active_if_unset(provider)
+        print(f"Saved {provider} OAuth credential to the shared Codex auth.json")
         return
 
     if provider == "xai-oauth":
@@ -575,6 +544,10 @@ def auth_remove_command(args) -> None:
     index, matched, error = pool.resolve_target(target)
     if matched is None or index is None:
         raise SystemExit(f"{error} Provider: {provider}.")
+    if provider == "openai-codex":
+        auth_mod._clear_codex_cli_tokens()
+        print("Removed the shared Codex OAuth login (Codex CLI is signed out too).")
+        return
     removed = pool.remove_index(index)
     if removed is None:
         raise SystemExit(f'No credential matching "{target}" for provider {provider}.')
