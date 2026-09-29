@@ -83,11 +83,22 @@ class XaiSharedAuthTest(unittest.TestCase):
             "providers": {"xai-oauth": {"tokens": {
                 "access_token": _token(), "refresh_token": "old-refresh",
             }}},
+            "credential_pool": {"xai-oauth": [
+                {"id": "old-oauth", "auth_type": "oauth", "access_token": _token(),
+                 "refresh_token": "old-refresh"},
+                {"id": "api-key", "auth_type": "api_key", "access_token": "api-key-value"},
+            ]},
         }), encoding="utf-8")
 
         state = auth._read_xai_oauth_tokens()
         self.assertEqual("old-refresh", state["tokens"]["refresh_token"])
-        self.assertNotIn("xai-oauth", json.loads(path.read_text(encoding="utf-8"))["providers"])
+        migrated = json.loads(path.read_text(encoding="utf-8"))
+        self.assertNotIn("xai-oauth", migrated["providers"])
+        self.assertEqual(["api-key"], [e["id"] for e in migrated["credential_pool"]["xai-oauth"]])
+        self.assertEqual(
+            {"grok-shared", "api-key"},
+            {entry.id for entry in load_pool("xai-oauth").entries()},
+        )
         self.assertTrue(auth._load_grok_cli_auth()[auth._grok_auth_entry_key()]["key"])
 
 

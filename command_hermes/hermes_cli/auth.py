@@ -5452,8 +5452,17 @@ def _migrate_legacy_xai_oauth_auth() -> None:
                 changed = True
             pool = store.get("credential_pool")
             if isinstance(pool, dict) and "xai-oauth" in pool:
-                del pool["xai-oauth"]
-                changed = True
+                entries = pool["xai-oauth"]
+                if isinstance(entries, list):
+                    kept = [entry for entry in entries if isinstance(entry, dict)
+                            and entry.get("auth_type") == "api_key"
+                            and not entry.get("refresh_token")]
+                    if len(kept) != len(entries):
+                        if kept:
+                            pool["xai-oauth"] = kept
+                        else:
+                            del pool["xai-oauth"]
+                        changed = True
             if changed:
                 _save_auth_store(store, target_path=path)
 

@@ -759,8 +759,7 @@ def _write_through_provider_state_to_global_root(
     """Persist a rotated OAuth ``state`` into the global-root auth.json.
 
     Best-effort write-through for the multi-profile rotation hazard
-    (#48415 / #43589): nous, openai-codex, and xai-oauth rotate the
-    refresh_token on refresh, so when a profile pool refresh rotates a grant
+    (#48415): Nous rotates the refresh_token on refresh, so when a profile pool refresh rotates a grant
     it resolved from the root fallback, the rotated chain must land back in
     root. Otherwise root keeps a now-revoked refresh token and every other
     profile reading the stale root grant dies with ``refresh_token_reused`` /
@@ -769,9 +768,7 @@ def _write_through_provider_state_to_global_root(
     Only updates ``providers.<provider_id>`` in the root store; never touches
     the profile store (the caller already saved that). Swallows all errors — a
     failed write-through degrades to the pre-existing behavior (root stale), it
-    must never break the profile's own successful save. Mirrors
-    ``hermes_cli.auth._write_through_xai_oauth_to_global_root`` (which covers
-    the non-pool xAI refresh path) for the credential-pool refresh path.
+    must never break the profile's own successful save.
     """
     try:
         global_path = auth_mod._global_auth_file_path()
@@ -1059,15 +1056,19 @@ class CredentialPool:
                     return
 
     def _persist(self, *, removed_ids: Optional[List[str]] = None) -> None:
-        if self.provider in {"openai-codex", "xai-oauth"}:
-            # External CLI auth.json is the only persistent OAuth token store.
+        if self.provider == "openai-codex":
+            # Codex CLI auth.json is the only persistent OAuth token store.
             return
         # Self-locking (RLock): snapshotting self._entries must not race a
         # concurrent rotation when called from the deferred refresh path.
         with self._lock:
+            entries = self._entries
+            if self.provider == "xai-oauth":
+                # Preserve separately configured API keys, never copy Grok OAuth tokens.
+                entries = [entry for entry in entries if entry.auth_type == AUTH_TYPE_API_KEY]
             persist_pool_entries(
                 self.provider,
-                [entry.to_dict() for entry in self._entries],
+                [entry.to_dict() for entry in entries],
                 removed_ids=removed_ids,
             )
 
@@ -3810,7 +3811,12 @@ def load_pool(provider: str) -> CredentialPool:
         except Exception:
             return CredentialPool(provider, [])
     if provider == "xai-oauth":
-        # Grok Build owns this grant. Keep only an in-memory pool view.
+        # Grok Build owns the OAuth grant; Hermes may still store API keys.
+        entries = [PooledCredential.from_dict(provider, payload)
+                   for payload in read_credential_pool(provider)
+                   if isinstance(payload, dict)
+                   and payload.get("auth_type") == AUTH_TYPE_API_KEY
+                   and not payload.get("refresh_token")]
         try:
             from hermes_cli.auth import _read_xai_oauth_tokens
             state = _read_xai_oauth_tokens()
@@ -3823,9 +3829,9 @@ def load_pool(provider: str) -> CredentialPool:
                 base_url="https://api.x.ai/v1",
                 last_refresh=state.get("last_refresh"),
             )
-            return CredentialPool(provider, [entry])
+            return CredentialPool(provider, [entry, *entries])
         except Exception:
-            return CredentialPool(provider, [])
+            return CredentialPool(provider, entries)
     if provider in SINGLE_USE_REFRESH_POOL_PROVIDERS:
         # One-time heal for installs that forked this grant across profiles
         # BEFORE the clone-strip / root-write-through existed: consolidate the

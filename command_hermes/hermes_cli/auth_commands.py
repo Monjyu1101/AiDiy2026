@@ -534,7 +534,7 @@ def auth_remove_command(args) -> None:
         auth_mod._clear_codex_cli_tokens()
         print("Removed the shared Codex OAuth login (Codex CLI is signed out too).")
         return
-    if provider == "xai-oauth":
+    if provider == "xai-oauth" and matched.source == "device_code":
         auth_mod._clear_grok_cli_tokens()
         print("Removed the shared Grok OAuth login (Grok Build CLI is signed out too).")
         return
