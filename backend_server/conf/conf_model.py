@@ -127,16 +127,17 @@ class conf_models:
             "sonnet": "yyyy/mm/dd - sonnet",
             "haiku": "yyyy/mm/dd - haiku",
         }
+        # scripts/cli_bat/_copilot_cli.bat の MODEL 値だけを公開する。
         self.CODE_COPILOT_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
+            "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
+            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
+            "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
+            "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
             "claude-fable-5.1": "yyyy/mm/dd - claude-fable-5.1",
             "claude-opus-5.5": "yyyy/mm/dd - claude-opus-5.5",
             "claude-sonnet-5.5": "yyyy/mm/dd - claude-sonnet-5.5",
             "claude-haiku-4.5": "yyyy/mm/dd - claude-haiku-4.5",
-            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
-            "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
-            "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
-            "gemini-3.7-flash": "yyyy/mm/dd - gemini-3.7-flash",
             "gemini-3.8-flash": "yyyy/mm/dd - gemini-3.8-flash",
         }
         self.CODE_ANTIGRAVITY_CLI_MODELS = {
@@ -155,7 +156,7 @@ class conf_models:
         self.CODE_GROK_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
             "grok-4.6": "yyyy/mm/dd - grok-4.6",
-            "grok-4.5": "yyyy/mm/dd - grok-4.5",
+            "grok-4.7": "yyyy/mm/dd - grok-4.7",
         }
 
         # ローカル LLM（backend_local）チャットモデル一覧の既定値
@@ -278,6 +279,14 @@ class conf_models:
             logger.error(f"コード設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
             return default_models.copy()
 
+    def _sync_fixed_code_config(self, filename: str, models: Dict[str, str]) -> Dict[str, str]:
+        """bat と一致させる固定候補をローカル設定JSONにも反映する。"""
+        loaded_models = self._load_or_create_code_config(filename, models)
+        if loaded_models != models:
+            self._write_json_file(self._config_file_path(filename), {"models": models})
+            logger.info(f"コードモデル候補を bat の設定に同期しました: {filename}")
+        return models
+
     def _sync_local_model_configs(self) -> None:
         """ローカル設定JSONとモデル定義を同期"""
         self.LIVE_GEMINI_MODELS, self.LIVE_GEMINI_VOICES = self._load_or_create_live_config(
@@ -294,23 +303,22 @@ class conf_models:
             "AiDiy_code_claude_sdk.json",
             self.CODE_CLAUDE_SDK_MODELS,
         )
-        self.CODE_CLAUDE_CLI_MODELS = self._load_or_create_code_config(
+        self.CODE_CLAUDE_CLI_MODELS = self._sync_fixed_code_config(
             "AiDiy_code_claude_cli.json",
             self.CODE_CLAUDE_CLI_MODELS,
-        )
-        self.CODE_COPILOT_CLI_MODELS = self._load_or_create_code_config(
-            "AiDiy_code_copilot_cli.json",
-            self.CODE_COPILOT_CLI_MODELS,
         )
         self.CODE_ANTIGRAVITY_CLI_MODELS = self._load_or_create_code_config(
             "AiDiy_code_antigravity_cli.json",
             self.CODE_ANTIGRAVITY_CLI_MODELS,
         )
-        self.CODE_CODEX_CLI_MODELS = self._load_or_create_code_config(
-            "AiDiy_code_codex_cli.json",
-            self.CODE_CODEX_CLI_MODELS,
+        # Copilot / Codex / Grok CLI も bat の候補を正とし、古い設定を同期する。
+        self.CODE_COPILOT_CLI_MODELS = self._sync_fixed_code_config(
+            "AiDiy_code_copilot_cli.json", self.CODE_COPILOT_CLI_MODELS,
         )
-        self.CODE_GROK_CLI_MODELS = self._load_or_create_code_config(
+        self.CODE_CODEX_CLI_MODELS = self._sync_fixed_code_config(
+            "AiDiy_code_codex_cli.json", self.CODE_CODEX_CLI_MODELS,
+        )
+        self.CODE_GROK_CLI_MODELS = self._sync_fixed_code_config(
             "AiDiy_code_grok_cli.json",
             self.CODE_GROK_CLI_MODELS,
         )
@@ -707,15 +715,20 @@ class conf_models:
 
     def get_chat_models(self) -> Dict[str, Dict[str, str]]:
         """チャットAIモデル一覧を取得（日付情報付き）"""
-        try:
-            from AIコア.AIチャット_openai import get_openai_oauth_models
+        # API と OAuth は同じチャットモデル候補を共有する。
+        # API から取得できない場合だけ OAuth の一覧を使う。
+        openai_models = {
+            k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
+            for k, v in self.openai_models.items()
+        }
+        if not openai_models:
+            try:
+                from AIコア.AIチャット_openai import get_openai_oauth_models
 
-            openai_oauth_models = get_openai_oauth_models()
-        except Exception as e:
-            logger.warning(f"OpenAI OAuth モデル一覧の初期化エラー: {e}")
-            openai_oauth_models = {
-                "gpt-6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6-sol",
-            }
+                openai_models = get_openai_oauth_models()
+            except Exception as e:
+                logger.warning(f"OpenAI OAuth モデル一覧の初期化エラー: {e}")
+                openai_models = {"gpt-6-sol": "yyyy/mm/dd - gpt-6-sol"}
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
@@ -729,13 +742,8 @@ class conf_models:
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
                 for k, v in self.openrt_models.items()
             },
-            "openai_chat": {
-                k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
-                for k, v in self.openai_models.items()
-            } or {
-                "gpt-6-luna": "yyyy/mm/dd - OpenAI API / gpt-6-luna",
-            },
-            "openai_oauth": openai_oauth_models,
+            "openai_chat": openai_models,
+            "openai_oauth": openai_models,
         }
         if self.ollama_models:
             models["ollama_chat"] = self.ollama_models
@@ -760,17 +768,14 @@ class conf_models:
         }
 
     def _get_aidiy_hermes_models(self) -> Dict[str, str]:
-        """aidiy_hermes のモデル一覧を生成する（OAuth + auto + Ollama + ローカル LLM）。"""
-        result = {
-            "openai_oauth/gpt-6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6-sol (default)",
-            "xai-oauth/grok-4.6": "yyyy/mm/dd - xAI OAuth / grok-4.6",
+        """_hermes.bat の OpenAI OAuth モデルを画面用の候補にする。"""
+        return {
             "auto": "yyyy/mm/dd - auto",
+            "openai_oauth/gpt-6-astra": "yyyy/mm/dd - OpenAI OAuth / gpt-6-astra",
+            "openai_oauth/gpt-6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6-sol (bat default)",
+            "openai_oauth/gpt-5.6-terra": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-terra",
+            "openai_oauth/gpt-6-luna": "yyyy/mm/dd - OpenAI OAuth / gpt-6-luna",
         }
-        if self.ollama_models:
-            result.update(self.ollama_models)
-        # backend_local（127.0.0.1:8096）経由のローカル LLM も選べるようにする
-        result["local_chat"] = "backend_local (127.0.0.1:8096) 経由のローカル LLM"
-        return result
 
     def _get_opencode_cli_models(self) -> Dict[str, str]:
         """opencode_cli のモデル一覧を Ollama モデル一覧から動的生成する。"""

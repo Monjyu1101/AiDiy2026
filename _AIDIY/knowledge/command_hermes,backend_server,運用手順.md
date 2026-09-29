@@ -161,7 +161,7 @@ Linux / macOS は `.venv/bin/python hermes_main.py auth add xai-oauth` を使う
 - `conf_model.py`: `get_code_models()["aidiy_hermes"]`。
 - frontend の AI 設定画面: code AI 選択肢。
 
-`aidiy_hermes` は専用の `AiDiy_code_*.json` を持たず、モデル一覧は `conf_model.py` 側で動的に作る。
+`aidiy_hermes` は専用の `AiDiy_code_*.json` を持たない。設定画面の候補は `conf_model.py` が `_hermes.bat` の4つの OpenAI OAuth モデルに `auto` を加えて返す。候補値には `openai_oauth/` を付け、Hermes 側が OAuth provider とモデルを解決できるようにする。
 
 ## 変更時の確認
 

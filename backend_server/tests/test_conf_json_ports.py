@@ -60,8 +60,34 @@ class ConfJsonPortKeyTest(unittest.TestCase):
             self.conf_json(json=str(config_path))
             saved = json.loads(config_path.read_text(encoding="utf-8"))
 
-        self.assertEqual("gpt-6-luna", saved["CHAT_OPENAI_MODEL"])
-        self.assertEqual("gpt-6-sol", saved["CHAT_OPENAI_OAUTH_MODEL"])
+        self.assertEqual("gpt-6-sol", saved["CHAT_OPENAI_MODEL"])
+        self.assertNotIn("CHAT_OPENAI_OAUTH_MODEL", saved)
+
+    def test_openai_oauth_model_is_migrated_to_shared_setting(self):
+        for ai_name, expected in (("openai_oauth", "gpt-6-astra"), ("openai_chat", "gpt-6-sol")):
+            with self.subTest(ai_name=ai_name), tempfile.TemporaryDirectory() as temp_dir:
+                config_path = Path(temp_dir) / "AiDiy_key.json"
+                config_path.write_text(json.dumps({
+                    "CHAT_AI_NAME": ai_name,
+                    "CHAT_OPENAI_MODEL": "gpt-6-sol",
+                    "CHAT_OPENAI_OAUTH_MODEL": "gpt-6-astra",
+                }), encoding="utf-8")
+
+                config = self.conf_json(json=str(config_path))
+                saved = json.loads(config_path.read_text(encoding="utf-8"))
+
+                self.assertEqual(expected, config.CHAT_OPENAI_MODEL)
+                self.assertNotIn("CHAT_OPENAI_OAUTH_MODEL", saved)
+
+    def test_legacy_openai_model_update_uses_shared_setting(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "AiDiy_key.json"
+            config = self.conf_json(json=str(config_path))
+            self.assertTrue(config.update({"CHAT_OPENAI_OAUTH_MODEL": "gpt-6-astra"}))
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
+
+        self.assertEqual("gpt-6-astra", saved["CHAT_OPENAI_MODEL"])
+        self.assertNotIn("CHAT_OPENAI_OAUTH_MODEL", saved)
 
     def test_legacy_port_keys_are_migrated_and_removed(self):
         legacy = {

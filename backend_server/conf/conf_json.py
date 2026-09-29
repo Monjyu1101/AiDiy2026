@@ -64,8 +64,7 @@ class conf_json:
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image',
         'CHAT_FREEAI_MODEL': 'gemini-3.8-flash',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image',
-        'CHAT_OPENAI_MODEL': 'gpt-6-luna',
-        'CHAT_OPENAI_OAUTH_MODEL': 'gpt-6-sol',
+        'CHAT_OPENAI_MODEL': 'gpt-6-sol',
         'CHAT_OLLAMA_MODEL': 'deepseek-v4-flash:cloud',
         'CHAT_LOCAL_MODEL': 'google/gemma-4-E2B-it',
         'CHAT_LOCAL_DTYPE': 'bfloat16',
@@ -188,6 +187,10 @@ class conf_json:
         if self._migrate_chat_ai_name():
             保存要否 = True
 
+        # OpenAI API / OAuth のモデル設定を共通キーへ統合
+        if self._migrate_openai_chat_model():
+            保存要否 = True
+
         # 既存設定に不足しているデフォルト項目を補完
         if self._apply_default_keys():
             保存要否 = True
@@ -252,6 +255,18 @@ class conf_json:
             return False
         config_data['CHAT_AI_NAME'] = 'openai_oauth'
         logger.info('CHAT_AI_NAMEを移行しました: openai_oauth_chat -> openai_oauth')
+        return True
+
+    def _migrate_openai_chat_model(self) -> bool:
+        """旧 OAuth 専用モデルを統合し、現在利用中のモデルを引き継ぐ。"""
+        config_data = object.__getattribute__(self, '_config_data')
+        old_key = 'CHAT_OPENAI_OAUTH_MODEL'
+        if old_key not in config_data:
+            return False
+        if config_data.get('CHAT_AI_NAME') == 'openai_oauth' or 'CHAT_OPENAI_MODEL' not in config_data:
+            config_data['CHAT_OPENAI_MODEL'] = config_data[old_key]
+        del config_data[old_key]
+        logger.info('OpenAIチャットモデル設定を共通キーへ移行しました')
         return True
 
     @staticmethod
@@ -444,7 +459,14 @@ class conf_json:
 
         config_data = object.__getattribute__(self, '_config_data')
         updated = dict(config_data)
-        updated.update(self._normalize_port_updates(data))
+        normalized = self._normalize_port_updates(data)
+        old_key = 'CHAT_OPENAI_OAUTH_MODEL'
+        if old_key in normalized:
+            if 'CHAT_OPENAI_MODEL' not in normalized:
+                normalized['CHAT_OPENAI_MODEL'] = normalized[old_key]
+            del normalized[old_key]
+        updated.update(normalized)
+        updated.pop(old_key, None)
 
         # 防御的に旧キーを除去し、現行ポート値を再検証する
         for old_keys in self.LEGACY_PORT_KEYS.values():

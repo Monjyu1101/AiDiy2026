@@ -686,6 +686,10 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
 
         if "CODE_HERMES_CLI_MODEL" in 設定 and "CODE_AIDIY_HERMES_MODEL" not in 設定:
             設定["CODE_AIDIY_HERMES_MODEL"] = 設定["CODE_HERMES_CLI_MODEL"]
+        if "CHAT_OPENAI_OAUTH_MODEL" in 設定:
+            if "CHAT_OPENAI_MODEL" not in 設定:
+                設定["CHAT_OPENAI_MODEL"] = 設定["CHAT_OPENAI_OAUTH_MODEL"]
+            del 設定["CHAT_OPENAI_OAUTH_MODEL"]
         for idx in range(1, 7):
             ai_key = f"CODE_AI{idx}_NAME"
             if 設定.get(ai_key) == "hermes_cli":
@@ -694,7 +698,7 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
         # 設定可能なキーのホワイトリスト（セキュリティのため）
         許可キー = {
             # ChatAI設定
-            "CHAT_AI_NAME", "CHAT_GEMINI_MODEL", "CHAT_FREEAI_MODEL", "CHAT_OPENRT_MODEL", "CHAT_OPENAI_MODEL", "CHAT_OPENAI_OAUTH_MODEL", "CHAT_OLLAMA_MODEL", "CHAT_LOCAL_MODEL",
+            "CHAT_AI_NAME", "CHAT_GEMINI_MODEL", "CHAT_FREEAI_MODEL", "CHAT_OPENRT_MODEL", "CHAT_OPENAI_MODEL", "CHAT_OLLAMA_MODEL", "CHAT_LOCAL_MODEL",
             # LiveAI設定
             "LIVE_AI_NAME", "LIVE_GEMINI_MODEL", "LIVE_GEMINI_VOICE",
             "LIVE_FREEAI_MODEL", "LIVE_FREEAI_VOICE",
@@ -791,10 +795,8 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                     chat_model = ""
                     if chat_ai == "openrt_chat":
                         chat_model = 接続.モデル設定.get("CHAT_OPENRT_MODEL", "")
-                    elif chat_ai == "openai_chat":
+                    elif chat_ai in ("openai_chat", "openai_oauth"):
                         chat_model = 接続.モデル設定.get("CHAT_OPENAI_MODEL", "")
-                    elif chat_ai == "openai_oauth":
-                        chat_model = 接続.モデル設定.get("CHAT_OPENAI_OAUTH_MODEL", "")
                     elif chat_ai in ("gemini_chat", "freeai_chat"):
                         key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai_chat" else "CHAT_GEMINI_MODEL"
                         chat_model = 接続.モデル設定.get(key, "")
@@ -1019,10 +1021,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             chat_model = ""
             if chat_ai == "openrt_chat":
                 chat_model = セッション.モデル設定.get("CHAT_OPENRT_MODEL", "")
-            elif chat_ai == "openai_chat":
+            elif chat_ai in ("openai_chat", "openai_oauth"):
                 chat_model = セッション.モデル設定.get("CHAT_OPENAI_MODEL", "")
-            elif chat_ai == "openai_oauth":
-                chat_model = セッション.モデル設定.get("CHAT_OPENAI_OAUTH_MODEL", "")
             elif chat_ai in ("gemini_chat", "freeai_chat"):
                 key = "CHAT_FREEAI_MODEL" if chat_ai == "freeai_chat" else "CHAT_GEMINI_MODEL"
                 chat_model = セッション.モデル設定.get(key, "")

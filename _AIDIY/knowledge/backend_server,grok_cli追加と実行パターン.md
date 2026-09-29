@@ -86,13 +86,13 @@ if self.code_ai == "grok_cli":
 
 ## モデル候補
 
-同期元: `grok models`（ログイン済みアカウントで利用可能なモデルを返す）
+候補の照合元: `scripts/cli_bat/_grok_cli.bat`。利用可能性はログイン済みアカウントの `grok models` で確認する。
 
-現行の候補は `grok-4.6`（既定）と `grok-4.5` の 2 つ。
+現行の候補は `grok-4.6` と `grok-4.7` の 2 つ（設定画面には `auto` も表示）。
 `grok-4` / `grok-4-fast` / `grok-code-fast-1` / `grok-4.6-build` は `unknown model id` で拒否される。
 `grok-4.6-build` は `--output-format json` の `modelUsage` に出る内部名で、`-m` には渡せない。
 
-固定一覧方式のため `conf_model.py` の `CODE_GROK_CLI_MODELS` と `_config/AiDiy_code_grok_cli.json` を同期する。
+固定一覧方式のため `conf_model.py` の `CODE_GROK_CLI_MODELS` と `_config/AiDiy_code_grok_cli.json` を同期する。古いローカル設定JSONは `conf_model.py` の初期化時に更新する。
 
 ## 配線箇所
 

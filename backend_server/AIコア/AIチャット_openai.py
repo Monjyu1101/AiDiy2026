@@ -140,7 +140,7 @@ def get_openai_oauth_models(*, refresh: bool = False) -> Dict[str, str]:
         model_ids = list(_FALLBACK_MODELS)
 
     models = {
-        model_id: f"yyyy/mm/dd - OpenAI OAuth / {model_id}"
+        model_id: f"yyyy/mm/dd - {model_id}"
         for model_id in dict.fromkeys(model_ids)
     }
     with _model_cache_lock:

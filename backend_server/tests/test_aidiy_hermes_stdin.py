@@ -80,6 +80,20 @@ class AidiyHermesCommandTest(unittest.TestCase):
             command,
         )
 
+    def test_openai_oauth_model_is_passed_to_hermes_command(self):
+        code_ai = self.module.CodeAI(
+            AI_NAME="aidiy_hermes",
+            AI_MODEL="openai_oauth/gpt-6-astra",
+        )
+
+        with patch.dict(os.environ, {"AIDIY_HERMES_CLI_PATH": "aidiy_hermes_test"}):
+            command = code_ai._コマンド構築("質問", 初回=True)
+
+        self.assertEqual(
+            ["aidiy_hermes_test", "-Q", "--model", "openai_oauth/gpt-6-astra", "--oneshot-stdin"],
+            command,
+        )
+
 
 class AidiyHermesSubprocessTest(unittest.IsolatedAsyncioTestCase):
     @classmethod

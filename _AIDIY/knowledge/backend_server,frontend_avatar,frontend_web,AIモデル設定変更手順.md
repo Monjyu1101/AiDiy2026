@@ -117,6 +117,8 @@ Electron では settings 専用ウィンドウ、Web では同じコンポーネ
 `AiDiy_key.json` には保存せず、`${HERMES_HOME:-~/.hermes}/auth.json` から解決する。
 `aidiy_hermes` を起動して provider `openai_oauth` を選択する方法でも、同じ OAuth 認証を開始できる。
 
+OpenAI Chat のモデル候補は API / OAuth で共通。API で取得した一覧があれば両方に使い、空の場合のみ OAuth の一覧を取得する。選択モデルも `CHAT_OPENAI_MODEL` を共用する。旧 `CHAT_OPENAI_OAUTH_MODEL` は設定読込時に移行し、現在の `CHAT_AI_NAME` が `openai_oauth` なら旧 OAuth 側の選択値を優先する。
+
 `backend_local` が未起動の場合、`/core/AIコア/モデル情報/取得` は `local_chat` を chat / code モデル候補から除外する。`_start.py` の backend_local 起動デフォルトは No のため、local LLM を使うときだけ明示起動する。
 
 Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI では `auto` / `full` / `none` を選択でき、保存時は `AiDiy_key.json` へ書き込まれる。`none` の場合、Claude / Antigravity / Copilot / Grok 系の bypass、yolo、自動全ツール許可オプションは付与しない（`grok_cli` は `--always-approve` を省略する）。ただし `codex_cli` はサンドボックス無視を常に有効にするため、`--dangerously-bypass-approvals-and-sandbox` を付与する。CLI 実行時の具体的な反映処理は `AIコード_cli.py` / `AIコード_claude.py` / `command_hermes` 側の実装に合わせて確認する。
@@ -143,6 +145,11 @@ Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI �
 
 - `frontend_avatar/src/api/config.ts` の `defaultModelSettings()` は backend 取得前のフォールバック。`conf_json.py` のデフォルトとずれると初期表示が混乱する
 - `CODE_AI<N>_MODEL` はスロットごとの現在モデル、`CODE_CODEX_CLI_MODEL` のようなキーは CLI 種別ごとのデフォルト。混同しない
+- `claude_cli` のモデル候補は `scripts/cli_bat/_claude-code.bat` の `MODEL` 値と `auto` に揃える。`_config/AiDiy_code_claude_cli.json` が古い場合は `conf_model.py` の初期化時に候補を同期する
+- `copilot_cli` のモデル候補は `backend_server/conf/conf_model.py` で定義し、`scripts/cli_bat/_copilot_cli.bat` の `MODEL` 値と一致させる。`_config/AiDiy_code_copilot_cli.json` が古い場合は候補を同期する
+- `codex_cli` のモデル候補は `scripts/cli_bat/_codex_cli.bat` の `MODEL` 値と `auto` に揃える。`_config/AiDiy_code_codex_cli.json` が古い場合は `conf_model.py` の初期化時に候補を同期する
+- `grok_cli` のモデル候補も `scripts/cli_bat/_grok_cli.bat` の `MODEL` 値と `auto` に揃える。`_config/AiDiy_code_grok_cli.json` が古い場合は同様に同期する
+- `aidiy_hermes` の設定画面候補は `scripts/cli_bat/_hermes.bat` の OpenAI OAuth モデル4つと `auto` に揃える。候補値は `openai_oauth/<モデルID>` とし、専用の `AiDiy_code_*.json` は使わない
 - 設定変更は既存 WebSocket セッションへ即時完全反映される前提にしない。再起動後の再接続で確認する
 - Code AI は現行6枠。枠数確認は `backend_server/core_router/AIコア.py` と frontend の `PanelKey` を見る
 

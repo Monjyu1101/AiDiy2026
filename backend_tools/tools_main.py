@@ -15,6 +15,7 @@ SSE / Streamable HTTP / HTTP POST を 1 ポート (8095) で提供する。
 MCP ツールの実装は tools_proc/tools_*.py に分割してある。
 """
 
+import logging
 import os
 import sys
 import threading
@@ -82,6 +83,16 @@ logger = get_logger(__name__)
 # MCP SDK の Streamable HTTP 管理ログは、実際に使用するロガー自体を
 # 短い名前へ差し替える。表示時だけ別名にする不一致は作らない。
 http_manager.logger = get_logger("http_manager")
+
+
+class _StreamableHTTPLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = record.msg.replace("StreamableHTTP session", "Streamable HTTP session")
+        return True
+
+
+http_manager.logger.addFilter(_StreamableHTTPLogFilter())
 
 # 呼び出されたツール名をログに出力する（"Processing request of type CallToolRequest" の代替）
 _original_mcpserver_call_tool = MCPServer.call_tool
