@@ -12,7 +12,7 @@
 - Codex など stdio クライアント向けの SSE 変換入口は `backend_tools/mcp_stdio.py`
 - 再利用ロジックは `backend_tools/tools_proc/` に置く
 - `tools_main.py` からは `tools_proc.<module>` として import する
-- `tools_main.py` は MCP SDK 2.x の 19 本の `MCPServer` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す
+- `tools_main.py` は MCP SDK 2.x の `MCPServer` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す。Windows では 19 本、Linux / macOS では 18 本
 
 ## 関連ファイル
 - `backend_tools/tools_main.py`
@@ -93,7 +93,9 @@ print(res.json())  # {"save_path": "..."}
 | `aidiy_chat_llms` | AIチャット の ChatAI を MCP 化。OpenAI / Ollama 互換の `aidiy_chat_completions`（HTTP のみ）の実体 | `http://127.0.0.1:8095/aidiy_chat_llms/sse` |
 | `aidiy_task_agents` | backend_taskteam の Task API への AIタスク非同期投入、要求/明細状態取得 | `http://127.0.0.1:8095/aidiy_task_agents/sse` |
 | `aidiy_team_agents` | backend_taskteam の Team API への AIチーム依頼投入、依頼/要員状態取得 | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
-| `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
+| `aidiy_windows_control` | Windows でのみ公開するデスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
+
+Linux / macOS では `aidiy_windows_control` の import、MCP 登録、REST ルート、SSE マウントを行わない。`GET /` の `mcps` は 18 件で、Windows 操作の URL は 404 を返す。`uiautomation` も Windows だけにインストールする。`_config/AiDiy_mcp.json` はローカル生成設定であり、Windows で `_setup.py` の MCP 設定を実行すると Windows 操作 MCP を追加する。非 Windows で設定を実行すると、以前登録した Windows 操作 MCP をプロジェクト設定と各 CLI 設定から削除する。画面のない Linux 環境では `pyautogui` の初期化失敗を `desktop_capture.py` が保持し、キャプチャ呼び出し時にエラーを返す。
 
 ## 新規 MCP サーバー追加手順
 

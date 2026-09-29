@@ -18,7 +18,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 概要
 
-`backend_tools` はポート `8095` 上で 19 個の MCP サーバーを同居させる MCP SDK 2.x の `MCPServer` アプリケーションです。
+`backend_tools` はポート `8095` 上で Windows では 19 個、Linux / macOS では 18 個の MCP サーバーを同居させる MCP SDK 2.x の `MCPServer` アプリケーションです。
 ブラウザ操作、デスクトップキャプチャ、DB確認、ログ確認、コードチェック、バックアップ確認、画像/動画生成、音声認識/合成、OBS / ffmpeg 制御、通知音再生、コードエージェント実行、チャット LLM 実行、AIタスク非同期投入、AIチーム依頼投入、Windows デスクトップ操作制御を AI エージェントから利用できるようにします。
 加えて OpenAI / Ollama 互換の標準チャットインターフェース `aidiy_chat_completions` を HTTP で提供します。
 
@@ -44,7 +44,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `aidiy_chat_llms` | AI チャット LLM 実行（AIチャット.py 系 ChatAI 経由 / `aidiy_code_agents` 互換 IF） |
 | `aidiy_task_agents` | backend_taskteam の `/task` API への AIタスク非同期投入。`submit`の`task_id`は通常省略し、外部IDを引き継ぐ場合だけ指定。`project_path` / `ai_name` / `ai_model` も通常省略（null）で、統合サーバーが更新最終レコードの値 → 規定値で補完 |
 | `aidiy_team_agents` | backend_taskteam の `/team` API への AIチーム依頼投入。`submit`は`Aチーム依頼`を準備開始で登録し、依頼IDは統合サーバーが自動採番。`project_path` / `team_ai_*` / `task_ai_*` は通常省略（null）で、統合サーバーが更新最終レコードの値 → 規定値で補完 |
-| `aidiy_windows_control` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
+| `aidiy_windows_control` | Windows でのみ公開するデスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
 `aidiy_chat_llms` は SSE / Streamable HTTP / stdio の 3 トランスポートに対応します。
 さらに `aidiy_chat_completions`（HTTP のみ）が OpenAI Chat Completions / Ollama 互換の標準チャットインターフェースを提供し、同じ ChatAI をバックエンドに使います。
@@ -59,7 +59,7 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 
 | パス | 役割 |
 |------|------|
-| `tools_main.py` | FastAPI 上に 19 個の `MCPServer` を同居 |
+| `tools_main.py` | FastAPI 上に Windows では 19 個、Linux / macOS では 18 個の `MCPServer` を同居 |
 | `mcp_stdio.py` | stdio <-> SSE bridge |
 | `aidiy_automations/` | MCP / HTTP API を組み合わせる自動化スクリプト |
 | `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` | 一人アバター（AiDiy）による紹介・ガイド型ビデオ自動生成（version: "mcp"、short/long narration 形式） |

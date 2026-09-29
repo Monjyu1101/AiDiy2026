@@ -439,7 +439,7 @@ dependencies = [
     { name = "screeninfo" },
     { name = "speechrecognition" },
     { name = "starlette" },
-    { name = "uiautomation" },
+    { name = "uiautomation", marker = "sys_platform == 'win32'" },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
@@ -461,7 +461,7 @@ requires-dist = [
     { name = "screeninfo" },
     { name = "speechrecognition" },
     { name = "starlette" },
-    { name = "uiautomation" },
+    { name = "uiautomation", marker = "sys_platform == 'win32'" },
     { name = "uvicorn" },
     { name = "websockets" },
 ]

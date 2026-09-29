@@ -64,6 +64,14 @@ MCP 2.x では `FastMCP` が `MCPServer` へ変更されているため、`mcp.s
 
 Node.js / `package.json` / `node_modules` は不要。
 
+別 OS で作成した `.venv` が残る環境では、`uv` が仮想環境を無効と判定する。Linux / macOS へ移した場合は、既存環境を退避してから再作成する。
+
+```sh
+cd backend_tools
+mv .venv .venv.windows
+uv sync --locked --no-install-project
+```
+
 ## アクセスインターフェース（3種類）
 
 `backend_tools` は 1 ポート（8095）で 3 つのインターフェースを同時提供する。
@@ -113,7 +121,7 @@ print(res.json())
 | Chat LLM | `http://127.0.0.1:8095/aidiy_chat_llms/sse` |
 | Task Agents | `http://127.0.0.1:8095/aidiy_task_agents/sse` |
 | Team Agents | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
-| Windows Control | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
+| Windows Control（Windows のみ） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
 
 アクセスは localhost 限定。外部接続は 403。
 

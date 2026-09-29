@@ -21,7 +21,7 @@ dependencies = [
     "requests",
     "speechrecognition",
     "lameenc",
-    "uiautomation",
+    "uiautomation; sys_platform == 'win32'",
 ]
 
 [tool.hatch.build.targets.wheel]

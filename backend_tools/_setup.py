@@ -662,7 +662,7 @@ MCP_MODULES = [
             {"server_name": "aidiy_obs_studio_control","sse_url": "http://127.0.0.1:8095/aidiy_obs_studio_control/sse"},
             {"server_name": "aidiy_ffmpeg_control",    "sse_url": "http://127.0.0.1:8095/aidiy_ffmpeg_control/sse"},
             {"server_name": "aidiy_notification_sounds","sse_url": "http://127.0.0.1:8095/aidiy_notification_sounds/sse"},
-            {"server_name": "aidiy_windows_control",   "sse_url": "http://127.0.0.1:8095/aidiy_windows_control/sse"},
+            {"server_name": "aidiy_windows_control",   "sse_url": "http://127.0.0.1:8095/aidiy_windows_control/sse", "platforms": ["win32"]},
             # aidiy_code_agents / aidiy_chat_llms は自前 MCP 群をツールとして利用する
             # （他サーバーが出そろってから接続したい）ため、必ず末尾に並べる。
             {"server_name": "aidiy_code_agents",       "sse_url": "http://127.0.0.1:8095/aidiy_code_agents/sse"},
@@ -749,6 +749,8 @@ def show_current_config(module: dict | None = None) -> None:
     module = module or MODULE
     server_names = [module.get("server_name", module["name"])]
     for extra in module.get("extra_servers", []):
+        if sys.platform not in extra.get("platforms", [sys.platform]):
+            continue
         server_names.append(extra["server_name"])
 
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
@@ -816,6 +818,8 @@ def configure_clients(module: dict | None = None) -> bool:
     else:
         print_error(f"  {main_sn}: sse_url が未定義です。スキップします。")
     for extra in module.get("extra_servers", []):
+        if sys.platform not in extra.get("platforms", [sys.platform]):
+            continue
         url = extra.get("sse_url", "").strip()
         if url:
             servers.append((extra["server_name"], url))
@@ -831,10 +835,26 @@ def configure_clients(module: dict | None = None) -> bool:
         print_info(f"  ─ {sn} ({url})")
 
     all_ok = True
+    # 以前のセットアップで追加されたローカル Windows 専用 MCP も除外する。
+    if sys.platform != "win32":
+        windows_only = {"aidiy_windows_control"}
+        copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
+        for path, top_key in (
+            (Path.home() / ".claude.json", "mcpServers"),
+            (copilot_home / "mcp-config.json", "mcpServers"),
+            (get_antigravity_mcp_config_path(), "mcpServers"),
+            (get_opencode_config_path(), "mcp"),
+            (get_vscode_mcp_path(), "servers"),
+        ):
+            all_ok &= remove_json_mcp_servers(path, windows_only, top_key=top_key)
+        all_ok &= remove_codex_mcp_servers(windows_only)
+        all_ok &= remove_grok_mcp_servers(windows_only)
 
     # 1) AiDiy プロジェクト設定 (mcpServers)
     aidiy_mcp = CONFIG_DIR / "AiDiy_mcp.json"
     print_info(f"[AiDiy設定]   {aidiy_mcp}")
+    if sys.platform != "win32":
+        all_ok &= remove_json_mcp_servers(aidiy_mcp, {"aidiy_windows_control"})
     all_ok &= upsert_json_mcp_servers(aidiy_mcp, [(sn, {"type": "sse", "url": url}) for sn, url in servers])
 
     # 2) Claude Code (mcpServers)
