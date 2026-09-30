@@ -112,6 +112,10 @@ models.fetch_all_models()  # 起動時に1度呼ぶ
 3. 各 provider のモデルは recency フィルタ（3〜12ヶ月）と OpenRouter データのクロスリファレンスで拡充
 4. `get_chat_models()`, `get_live_models()`, `get_live_voices()`, `get_code_models()` で UI に公開
 
+### 起動中の Ollama 一覧取得が止まる場合
+
+Core プロセスが存在するのに 8091 が待受していない場合、`fetch_all_models()` 内の `ollama list` 待ちを確認する。Windows では Ollama が起動する子プロセスへ出力パイプが引き継がれると、`subprocess.run(capture_output=True, timeout=10)` のタイムアウト後もパイプ回収で待ち続ける場合がある。`_get_ollama_local_models()` は stdout / stderr を一時ファイルへ向け、10秒で打ち切って空の一覧で起動を続ける。確認は `python -m unittest discover -s tests -p test_ollama_local_models.py` で行う。
+
 ### ハードコードドデフォルト
 
 `fetch_all_models()` 未実行の場合のフォールバックとして、主要な live-AI モデル/音声と code-AI モデルのハードコードド辞書が用意されています。

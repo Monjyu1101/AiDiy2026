@@ -23,7 +23,7 @@ class CopilotModelOptionsTest(unittest.TestCase):
             bat,
             flags=re.MULTILINE,
         )
-        self.assertEqual(len(bat_models), 9)
+        self.assertEqual(len(bat_models), 10)
         self.assertIn("claude-opus-5.5", bat_models)
         self.assertIn("claude-sonnet-5.5", bat_models)
         self.assertNotIn("gemini-3.7-flash", bat_models)

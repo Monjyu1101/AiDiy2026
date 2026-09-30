@@ -132,6 +132,7 @@ class conf_models:
             "auto": "yyyy/mm/dd - auto (default)",
             "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
             "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
+            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
             "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
             "claude-fable-5.1": "yyyy/mm/dd - claude-fable-5.1",
@@ -150,12 +151,13 @@ class conf_models:
             "auto": "yyyy/mm/dd - auto (default)",
             "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
             "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
+            "gpt-6-sol": "yyyy/mm/dd - gpt-6-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
             "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
         }
         self.CODE_GROK_CLI_MODELS = {
             "auto": "yyyy/mm/dd - auto (default)",
-            "grok-4.6": "yyyy/mm/dd - grok-4.6",
+            "grok-4.8": "yyyy/mm/dd - grok-4.8",
             "grok-4.7": "yyyy/mm/dd - grok-4.7",
         }
 
@@ -411,14 +413,24 @@ class conf_models:
     def _get_ollama_local_models(self) -> Dict[str, str]:
         """ollama list コマンドでローカル利用可能モデル一覧を取得"""
         import subprocess
+        import tempfile
         result: Dict[str, str] = {}
         try:
-            proc = subprocess.run(
-                ["ollama", "list"],
-                capture_output=True, text=True, timeout=10
-            )
+            # WindowsではOllamaの子プロセスが出力ハンドルを引き継ぐと、
+            # PIPEの回収がtimeout後も止まらない。一時ファイルなら終了待ちを制限できる。
+            with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
+                proc = subprocess.run(
+                    ["ollama", "list"],
+                    stdin=subprocess.DEVNULL,
+                    stdout=stdout_file, stderr=stderr_file, timeout=10,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                )
+                stdout_file.seek(0)
+                stderr_file.seek(0)
+                stdout = stdout_file.read().decode("utf-8", errors="replace")
+                stderr = stderr_file.read().decode("utf-8", errors="replace")
             if proc.returncode == 0:
-                lines = proc.stdout.splitlines()
+                lines = stdout.splitlines()
                 for line in lines[1:]:  # ヘッダー行をスキップ
                     parts = line.split()
                     if len(parts) < 1:
@@ -431,9 +443,11 @@ class conf_models:
                     return result
                 logger.info("Ollamaモデルが見つかりません")
             else:
-                logger.info(f"ollama list 失敗: {proc.stderr.strip()}")
+                logger.info(f"ollama list 失敗: {stderr.strip()}")
         except FileNotFoundError:
             logger.info("ollama コマンドが見つかりません（未インストール）")
+        except subprocess.TimeoutExpired:
+            logger.info("ollama list 取得タイムアウト（10秒）")
         except Exception as e:
             logger.info(f"ollama list エラー: {e}")
         self.ollama_models = {}
@@ -728,7 +742,10 @@ class conf_models:
                 openai_models = get_openai_oauth_models()
             except Exception as e:
                 logger.warning(f"OpenAI OAuth モデル一覧の初期化エラー: {e}")
-                openai_models = {"gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol"}
+                openai_models = {
+                    model: f"yyyy/mm/dd - {model}"
+                    for model in ("gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna")
+                }
         models: Dict[str, Dict[str, str]] = {
             "gemini_chat": {
                 k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
@@ -773,6 +790,7 @@ class conf_models:
             "auto": "yyyy/mm/dd - auto",
             "openai_oauth/gpt-6-astra": "yyyy/mm/dd - OpenAI OAuth / gpt-6-astra",
             "openai_oauth/gpt-6.1-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6.1-sol (bat default)",
+            "openai_oauth/gpt-6-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6-sol",
             "openai_oauth/gpt-5.6-terra": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-terra",
             "openai_oauth/gpt-6-luna": "yyyy/mm/dd - OpenAI OAuth / gpt-6-luna",
         }

@@ -1013,7 +1013,8 @@ _OFFICIAL_DOCS_PRICING: Dict[tuple[str, str], PricingEntry] = {
 # onto the base entries so the snapshot stays single-source. The Hermes-side
 # "-900k" large-context Codex picker variants are the same underlying model
 # (the suffix is stripped on the wire), so they alias identically.
-for _base_56 in ("gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"):
+_OFFICIAL_DOCS_PRICING[("openai", "gpt-6-sol")] = _OFFICIAL_DOCS_PRICING[("openai", "gpt-6.1-sol")]
+for _base_56 in ("gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna"):
     _OFFICIAL_DOCS_PRICING[("openai", f"{_base_56}-pro")] = _OFFICIAL_DOCS_PRICING[
         ("openai", _base_56)
     ]

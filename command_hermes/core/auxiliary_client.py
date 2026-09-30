@@ -929,6 +929,9 @@ def _is_codex_gpt54_or_gpt55(model: Optional[str], provider: Optional[str] = Non
         or bare == "gpt-6.1-sol"
         or bare.startswith("gpt-6.1-sol-")
         or bare.startswith("gpt-6.1-sol.")
+        or bare == "gpt-6-sol"
+        or bare.startswith("gpt-6-sol-")
+        or bare.startswith("gpt-6-sol.")
         or bare == "gpt-6-luna"
         or bare.startswith("gpt-6-luna-")
         or bare.startswith("gpt-6-luna.")

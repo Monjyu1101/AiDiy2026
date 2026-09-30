@@ -18,10 +18,11 @@ DEFAULT_CODEX_MODELS: List[str] = [
     # offline fallback too. Live discovery (_fetch_models_from_api) overrides
     # this ordering with the backend's own priority ranking when reachable.
     "gpt-6-astra",
-    # GPT-6.1 Sol / GPT-5.6 Terra / GPT-6 Luna. The public API exposes "-pro"
+    # GPT-6.1 Sol / GPT-6 Sol / GPT-5.6 Terra / GPT-6 Luna. The public API exposes "-pro"
     # variants, but the ChatGPT Codex OAuth backend rejects them with HTTP 400,
     # so the curated offline fallback must not surface those dead choices.
     "gpt-6.1-sol",
+    "gpt-6-sol",
     "gpt-5.6-terra",
     "gpt-6-luna",
     # gpt-5.5 / gpt-5.4 / gpt-5.4-mini / gpt-5.3-codex / gpt-5.3-codex-spark
@@ -43,8 +44,9 @@ DEFAULT_CODEX_MODELS: List[str] = [
 ]
 
 _FORWARD_COMPAT_TEMPLATE_MODELS: List[tuple[str, tuple[str, ...]]] = [
-    ("gpt-6-astra", ("gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna")),
-    ("gpt-6.1-sol", ("gpt-5.5", "gpt-5.4")),
+    ("gpt-6-astra", ("gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna")),
+    ("gpt-6.1-sol", ("gpt-6-sol", "gpt-5.5", "gpt-5.4")),
+    ("gpt-6-sol", ("gpt-6.1-sol", "gpt-5.5", "gpt-5.4")),
     ("gpt-5.6-terra", ("gpt-5.5", "gpt-5.4")),
     ("gpt-6-luna", ("gpt-5.5", "gpt-5.4")),
     # gpt-5.5 / gpt-5.4-mini / gpt-5.4 / gpt-5.3-codex-spark are below the

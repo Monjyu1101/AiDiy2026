@@ -1,6 +1,6 @@
-# アバターモーション確認
+# Xアバター訓練中
 
-`index.html` を Web サーバー経由で開く。`frontend_web` の Vite 開発サーバーなら `/Xビデオ/アバターモーション確認/index.html`。
+`index.html` を Web サーバー経由で開く。`frontend_web` の Vite 開発サーバーなら `/Xアバター訓練中/index.html`。
 
 - `00`: `frontend_avatar/public/vrma/標準/VRMA_01.vrma` を複製した現行モーション。
 - `01`〜`20`: 少女アバターの待機中に使う仕草の候補。ポーズ名をファイル名に含む新規 VRMA。各ページで 8 秒のモーションを一回再生し、終了後は普通の立ち姿で止める。同じ番号を押すと再生し直せる。`18` のうなずきは一回。
@@ -13,4 +13,4 @@
 
 候補の角度や動きを変える場合は `vrma/generate.py` の `POSES` と `bone_angles()` を編集し、同ファイルを Python で実行する。生成ファイルは VRMA 仕様の T ポーズ骨階層を持つ。ファイル名やページの説明を変えたときは `motions.js` も合わせて更新する。
 
-アバターには共通の `../_vrm/VRM_female.vrm` を使用する。Three.js と VRM ライブラリは既存の Xビデオと同様に CDN から読み込む。
+アバターには共通の `../Xビデオ/_vrm/VRM_AiDiy.vrm` を使用する。これは `frontend_avatar/public/vrm/VRM_AiDiy.vrm` と同一のモデル。Three.js と VRM ライブラリは既存の Xビデオと同様に CDN から読み込む。

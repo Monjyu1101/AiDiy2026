@@ -44,6 +44,19 @@ class OpenAIModelOptionsTest(unittest.TestCase):
         self.assertEqual(chat_models["openai_chat"], chat_models["openai_oauth"])
         self.assertEqual(chat_models["openai_chat"], {"gpt-6-astra": "yyyy/mm/dd - gpt-6-astra"})
 
+    def test_fallback_retains_both_sol_models_when_discovery_fails(self):
+        oauth_module = types.ModuleType("AIコア.AIチャット_openai")
+        def fail_discovery():
+            raise RuntimeError("offline")
+        oauth_module.get_openai_oauth_models = fail_discovery
+        models = self.make_models({})
+
+        with patch.dict(sys.modules, {"AIコア.AIチャット_openai": oauth_module}):
+            chat_models = models.get_chat_models()
+
+        self.assertEqual(list(chat_models["openai_chat"]), ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna"])
+        self.assertEqual(chat_models["openai_chat"], chat_models["openai_oauth"])
+
 
 if __name__ == "__main__":
     unittest.main()

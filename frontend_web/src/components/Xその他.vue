@@ -19,6 +19,7 @@ const baseUrl = import.meta.env.BASE_URL || '/';
 const worldSceneryUrl = `${baseUrl}X世界の絶景/index.html`;
 const solarSystemUrl = `${baseUrl}X太陽系/index.html`;
 const bgmUrl = `${baseUrl}X動画再生BGM/index.html`;
+const アバター訓練中Url = `${baseUrl}Xアバター訓練中/index.html`;
 const AUTO_JUMP_MS = 60000;
 const AUTO_JUMP_PATH = '/Xその他/X自己紹介/表示';
 const cancelEvents = ['mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'];
@@ -105,6 +106,16 @@ onBeforeUnmount(() => {
               AiDiy の機能紹介・実装解説・時事ニュース解説ビデオの一覧
             </div>
           </router-link>
+
+          <a class="menu-card menu-card-fixed" :href="アバター訓練中Url" target="_blank" rel="noopener noreferrer">
+            <div class="menu-card-title">
+              <span class="icon">X動</span>
+              Xアバター訓練中
+            </div>
+            <div class="menu-card-description">
+              待機動作 20 種類をページ送りで確認
+            </div>
+          </a>
         </div>
 
         <div class="menu-row">

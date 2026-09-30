@@ -509,6 +509,7 @@ DEFAULT_CONTEXT_LENGTHS = {
     "gpt-6-luna": 1050000,
     "gpt-5.6-terra": 1050000,
     "gpt-6.1-sol": 1050000,
+    "gpt-6-sol": 1050000,
     "gpt-5.5": 1050000,
     "gpt-5.4-nano": 400000,           # 400k (not 1.05M like full 5.4)
     "gpt-5.4-mini": 400000,           # 400k (not 1.05M like full 5.4)
@@ -2632,6 +2633,7 @@ _CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
     "gpt-5.2-codex": 272_000,
     "gpt-5.4-mini": 272_000,
     "gpt-6.1-sol": 272_000,
+    "gpt-6-sol": 272_000,
     "gpt-5.6-terra": 272_000,
     "gpt-6-luna": 272_000,
     "gpt-daybreak-blue-latest": 272_000,
@@ -2676,6 +2678,7 @@ _CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
 # family would over-report for mini.
 _CODEX_OAUTH_VERIFIED_ABOVE_ADVERTISED_PREFIXES: Dict[str, int] = {
     "gpt-6.1-sol": 900_000,    # carried over from Sol; verify on this revision
+    "gpt-6-sol": 900_000,
     "gpt-5.6-terra": 900_000,  # verified live at 900K
     "gpt-6-luna": 900_000,     # verified live at 900K
 }
@@ -2700,12 +2703,13 @@ CODEX_CONTEXT_VARIANT_SUFFIX = "-900k"
 # via _CODEX_900K_SNAPSHOT_RE.
 _CODEX_900K_ELIGIBLE_BASES = frozenset({
     "gpt-6.1-sol",
+    "gpt-6-sol",
     "gpt-5.6-terra",
     "gpt-6-luna",
     "gpt-5.4",                    # exact; gpt-5.4-mini enforces 272K
     "gpt-daybreak-blue-latest",   # verified Sol alias
 })
-_CODEX_900K_SNAPSHOT_BASES = ("gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna")
+_CODEX_900K_SNAPSHOT_BASES = ("gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna")
 _CODEX_900K_SNAPSHOT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 

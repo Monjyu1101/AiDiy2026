@@ -445,14 +445,50 @@ watch(
   }
 );
 
+// 画面での変更時だけコピーし、読み込み時は保存済みの個別設定を維持する
+function copyCode4Settings() {
+  const models = Object.keys(availableModels.value?.code_models?.[selections.codeAi4] || {});
+  selections.codeModel4 = chooseAvailable(selections.codeModel4, models);
+  selections.codeAi5 = selections.codeAi4;
+  selections.codeAi6 = selections.codeAi4;
+  selections.codeModel5 = selections.codeModel4;
+  selections.codeModel6 = selections.codeModel4;
+}
+
+function copyTaskSettingsToTeam() {
+  selections.teamAi = selections.taskAi;
+  selections.teamModelPlan = selections.taskModelPlan;
+  selections.teamModelDo = selections.taskModelDo;
+  selections.teamModelCheck = selections.taskModelCheck;
+}
+
+function handleTaskAiChange() {
+  const models = Object.keys(availableModels.value?.code_models?.[selections.taskAi] || {});
+  for (const key of ['taskModelPlan', 'taskModelDo', 'taskModelCheck'] as const) {
+    selections[key] = chooseAvailable(selections[key], models);
+  }
+  copyTaskSettingsToTeam();
+}
+
+function handleTaskPlanChange() {
+  selections.taskModelDo = selections.taskModelPlan;
+  selections.taskModelCheck = selections.taskModelPlan;
+  copyTaskSettingsToTeam();
+}
+
+function handleTeamPlanChange() {
+  selections.teamModelDo = selections.teamModelPlan;
+  selections.teamModelCheck = selections.teamModelPlan;
+}
+
 watch(
   () => selections.codeAi1,
   (newValue) => {
     if (isInitializing.value) return;
     const models = availableModels.value?.code_models?.[newValue] || {};
-    const newModel = currentSettings.value.CODE_AI1_MODEL || Object.keys(models)[0] || '';
+    const newModel = chooseAvailable(currentSettings.value.CODE_AI1_MODEL, Object.keys(models));
     selections.codeModel1 = newModel;
-    // AI1変更時、AI2-4に両方（AIとMODEL）をコピー
+    // AI1変更時、AI2-6に両方（AIとMODEL）をコピー
     selections.codeAi2 = newValue;
     selections.codeAi3 = newValue;
     selections.codeAi4 = newValue;
@@ -763,7 +799,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-ai4-select">CODE_AI4_NAME:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-ai4-select" v-model="selections.codeAi4" class="config-panel-select">
+                      <select id="config-code-ai4-select" v-model="selections.codeAi4" class="config-panel-select" @change="copyCode4Settings">
                         <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                       </select>
                     </div>
@@ -771,7 +807,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-model4-select">CODE_MODEL4:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-model4-select" v-model="selections.codeModel4" class="config-panel-select">
+                      <select id="config-code-model4-select" v-model="selections.codeModel4" class="config-panel-select" @change="copyCode4Settings">
                         <option v-for="model in codeModelOptions4" :key="model.value" :value="model.value">{{ model.label }}</option>
                       </select>
                     </div>
@@ -817,7 +853,7 @@ onMounted(() => {
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-task-ai-select">TASK_AI_NAME:</label>
                 <div class="config-panel-control">
-                  <select id="config-task-ai-select" v-model="selections.taskAi" class="config-panel-select">
+                  <select id="config-task-ai-select" v-model="selections.taskAi" class="config-panel-select" @change="handleTaskAiChange">
                     <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                   </select>
                 </div>
@@ -825,7 +861,7 @@ onMounted(() => {
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-task-model-plan-select">TASK_AI_MODEL_plan:</label>
                 <div class="config-panel-control">
-                  <select id="config-task-model-plan-select" v-model="selections.taskModelPlan" class="config-panel-select">
+                  <select id="config-task-model-plan-select" v-model="selections.taskModelPlan" class="config-panel-select" @change="handleTaskPlanChange">
                     <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
                   </select>
                 </div>
@@ -833,7 +869,7 @@ onMounted(() => {
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-task-model-do-select">TASK_AI_MODEL_do:</label>
                 <div class="config-panel-control">
-                  <select id="config-task-model-do-select" v-model="selections.taskModelDo" class="config-panel-select">
+                  <select id="config-task-model-do-select" v-model="selections.taskModelDo" class="config-panel-select" @change="copyTaskSettingsToTeam">
                     <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
                   </select>
                 </div>
@@ -841,7 +877,7 @@ onMounted(() => {
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-task-model-check-select">TASK_AI_MODEL_check:</label>
                 <div class="config-panel-control">
-                  <select id="config-task-model-check-select" v-model="selections.taskModelCheck" class="config-panel-select">
+                  <select id="config-task-model-check-select" v-model="selections.taskModelCheck" class="config-panel-select" @change="copyTaskSettingsToTeam">
                     <option v-for="model in taskModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
                   </select>
                 </div>
@@ -861,7 +897,7 @@ onMounted(() => {
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-team-model-plan-select">TEAM_AI_MODEL_plan:</label>
                 <div class="config-panel-control">
-                  <select id="config-team-model-plan-select" v-model="selections.teamModelPlan" class="config-panel-select">
+                  <select id="config-team-model-plan-select" v-model="selections.teamModelPlan" class="config-panel-select" @change="handleTeamPlanChange">
                     <option v-for="model in teamModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
                   </select>
                 </div>

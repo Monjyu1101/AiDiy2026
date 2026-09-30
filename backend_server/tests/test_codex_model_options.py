@@ -23,7 +23,7 @@ class CodexModelOptionsTest(unittest.TestCase):
             bat,
             flags=re.MULTILINE,
         )
-        self.assertEqual(len(bat_models), 4)
+        self.assertEqual(len(bat_models), 5)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "AiDiy_code_codex_cli.json"

@@ -128,6 +128,11 @@ const baseRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: 'X自己紹介' }
     },
     createStaticAliasRoute(
+        '/Xその他/Xアバター訓練中/表示',
+        'Xアバター訓練中/index.html',
+        'Xアバター訓練中'
+    ),
+    createStaticAliasRoute(
         '/X自己紹介/aidiy紹介ビデオtake4/index.html',
         'X自己紹介/AiDiy紹介ビデオtake4/index.html',
         'X自己紹介'
@@ -270,11 +275,6 @@ const baseRoutes: RouteRecordRaw[] = [
     createStaticAliasRoute(
         '/Xビデオ/小説解説_本好きの下剋上_ja',
         'Xビデオ/小説解説_本好きの下剋上_ja/index.html',
-        'Xビデオ'
-    ),
-    createStaticAliasRoute(
-        '/Xビデオ/アバターモーション確認',
-        'Xビデオ/アバターモーション確認/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(

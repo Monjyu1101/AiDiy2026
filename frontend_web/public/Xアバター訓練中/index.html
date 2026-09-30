@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>アバターモーション確認</title>
+  <title>Xアバター訓練中</title>
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 100%; min-height: 100%; background: #07111f; color: #edf7ff; font-family: "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif; }
@@ -55,7 +55,7 @@
 </head>
 <body>
   <div class="app">
-    <header><strong>アバターモーション確認</strong><span>00 は現在の標準モーション / 01〜20 は待機動作の候補</span></header>
+    <header><strong>Xアバター訓練中</strong><span>00 は現在の標準モーション / 01〜20 は待機動作の候補</span></header>
     <main>
       <section class="avatar-pane" aria-label="モーションプレビュー">
         <canvas id="avatarCanvas"></canvas>
@@ -246,7 +246,7 @@
     window.showMotion = showMotion;
 
     try {
-      const gltf = await load(modelLoader, "../_vrm/VRM_female.vrm");
+      const gltf = await load(modelLoader, "../Xビデオ/_vrm/VRM_AiDiy.vrm");
       vrm = gltf.userData?.vrm;
       if (!vrm) throw new Error("VRM データがありません");
       VRMUtils.removeUnnecessaryVertices(gltf.scene);

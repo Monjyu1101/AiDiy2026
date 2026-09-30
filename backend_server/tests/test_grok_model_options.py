@@ -23,7 +23,7 @@ class GrokModelOptionsTest(unittest.TestCase):
             bat,
             flags=re.MULTILINE,
         )
-        self.assertEqual(bat_models, ["grok-4.6", "grok-4.7"])
+        self.assertEqual(bat_models, ["grok-4.8", "grok-4.7"])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "AiDiy_code_grok_cli.json"
