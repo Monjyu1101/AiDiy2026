@@ -273,6 +273,11 @@ const baseRoutes: RouteRecordRaw[] = [
         'Xビデオ'
     ),
     createStaticAliasRoute(
+        '/Xビデオ/アバターモーション確認',
+        'Xビデオ/アバターモーション確認/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
         '/Xビデオ/小説解説_AiDiy誕生_ja',
         'Xビデオ/小説解説_AiDiy誕生_ja/index.html',
         'Xビデオ'

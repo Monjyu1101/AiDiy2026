@@ -228,7 +228,10 @@ onBeforeUnmount(() => {
         <i
           v-for="(sample, index) in cpuSamples"
           :key="index"
-          :style="{ height: `${Math.max(3, Math.round(sample))}%`, backgroundColor: cpuBarColor(sample) }"
+          :style="{
+            height: `${sample}%`,
+            backgroundColor: cpuBarColor(sample),
+          }"
         ></i>
       </div>
     </div>
@@ -369,7 +372,7 @@ onBeforeUnmount(() => {
   left: 50%;
   bottom: 58px;
   width: min(220px, 56%);
-  height: 46px;
+  height: 72px;
   box-sizing: border-box;
   overflow: hidden;
   transform: translateX(-50%);

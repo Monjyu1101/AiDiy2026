@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アバターモーション確認</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; min-height: 100%; background: #07111f; color: #edf7ff; font-family: "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif; }
+    body { background: radial-gradient(circle at 20% 10%, #173a51 0, transparent 35%), linear-gradient(135deg, #07111f, #0d1a2d); }
+    .app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100dvh; min-height: 590px; }
+    header { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding: 16px 24px; border-bottom: 1px solid #2b455d; background: #07111fbb; }
+    header strong { color: #8fe8ff; font-size: 22px; }
+    header span { color: #aabfd2; font-size: 13px; text-align: right; }
+    main { min-height: 0; display: grid; grid-template-columns: minmax(310px, 43%) minmax(0, 1fr); }
+    .avatar-pane { position: relative; min-height: 0; overflow: hidden; border-right: 1px solid #2b455d; }
+    #avatarCanvas { display: block; width: 100%; height: 100%; }
+    .avatar-label { position: absolute; top: 18px; left: 20px; padding: 7px 12px; border-radius: 999px; background: #07111fbd; color: #8fe8ff; font-size: 13px; }
+    #loadStatus { position: absolute; left: 20px; right: 20px; bottom: 18px; padding: 10px 13px; border-radius: 10px; background: #07111fcb; color: #cfe1ed; font-size: 13px; }
+    #loadStatus:empty { display: none; }
+    .details { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+    #sceneFrame { border: 0; width: 100%; height: 100%; background: transparent; }
+    .index-panel { padding: 12px 20px 16px; border-top: 1px solid #2b455d; background: #081523a8; }
+    .index-title { margin-bottom: 9px; color: #aabfd2; font-size: 13px; }
+    #sceneIndex { display: flex; flex-wrap: wrap; gap: 6px; }
+    button { cursor: pointer; color: #edf7ff; background: #173046; border: 1px solid #3b5c74; border-radius: 10px; font: inherit; }
+    button:hover, button:focus-visible { border-color: #8fe8ff; background: #21445d; }
+    button:disabled { opacity: .4; cursor: default; }
+    .scene-chip { min-width: 40px; height: 34px; padding: 0 8px; font-size: 12px; }
+    .scene-chip.active { background: #087e9b; border-color: #78e6ff; color: white; }
+    footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; border-top: 1px solid #2b455d; background: #07111fdf; }
+    .navigation { display: flex; align-items: center; gap: 8px; }
+    .navigation button { padding: 9px 16px; font-weight: 700; }
+    #pageLabel { color: #cfe1ed; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .hint { color: #8ea8bb; font-size: 12px; }
+    @media (max-width: 800px) {
+      .app { min-height: 800px; height: 100dvh; }
+      main { grid-template-columns: 1fr; grid-template-rows: minmax(340px, 52%) minmax(0, 1fr); }
+      .avatar-pane { border-right: 0; border-bottom: 1px solid #2b455d; }
+      .index-panel { padding: 8px 12px; }
+      .scene-chip { min-width: 32px; height: 30px; }
+      header, footer { padding: 10px 12px; }
+      header span, .hint { display: none; }
+    }
+  </style>
+  <script src="motions.js"></script>
+  <script type="importmap">
+    {"imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
+      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.js",
+      "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.5.5/lib/three-vrm-animation.module.js"
+    }}
+  </script>
+</head>
+<body>
+  <div class="app">
+    <header><strong>アバターモーション確認</strong><span>00 は現在の標準モーション / 01〜20 は待機動作の候補</span></header>
+    <main>
+      <section class="avatar-pane" aria-label="モーションプレビュー">
+        <canvas id="avatarCanvas"></canvas>
+        <div class="avatar-label">VRM プレビュー</div>
+        <div id="loadStatus" role="status">アバターを読み込み中…</div>
+      </section>
+      <section class="details">
+        <iframe id="sceneFrame" title="モーション説明"></iframe>
+        <div class="index-panel"><div class="index-title">確認一覧：番号を選んで直接移動できます</div><div id="sceneIndex"></div></div>
+      </section>
+    </main>
+    <footer>
+      <div class="navigation">
+        <button id="firstBtn" type="button" aria-label="最初へ">|◁</button>
+        <button id="prevBtn" type="button">◁ 前へ</button>
+        <button id="nextBtn" type="button">次へ ▷</button>
+        <button id="lastBtn" type="button" aria-label="最後へ">▷|</button>
+      </div>
+      <div id="pageLabel" aria-live="polite"></div>
+      <div class="hint">← → キーでもページを送れます</div>
+    </footer>
+  </div>
+  <script>
+    const scenes = window.MOTION_SCENES;
+    const sceneFrame = document.getElementById("sceneFrame");
+    const sceneIndex = document.getElementById("sceneIndex");
+    const status = document.getElementById("loadStatus");
+    const params = new URLSearchParams(location.search);
+    const requested = params.get("scene");
+    let index = Math.max(0, scenes.findIndex(scene => scene.number === requested || scene.id === requested));
+    const chips = scenes.map((scene, n) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "scene-chip";
+      button.textContent = scene.number;
+      button.title = scene.title;
+      button.setAttribute("aria-label", `${scene.number} ${scene.title}`);
+      button.addEventListener("click", () => show(n));
+      sceneIndex.append(button);
+      return button;
+    });
+    function show(nextIndex) {
+      index = Math.min(scenes.length - 1, Math.max(0, nextIndex));
+      const selected = scenes[index];
+      sceneFrame.src = `scene_${selected.id}.html`;
+      chips.forEach((chip, n) => {
+        chip.classList.toggle("active", n === index);
+        chip.setAttribute("aria-current", n === index ? "page" : "false");
+      });
+      document.getElementById("pageLabel").textContent = `${selected.number} / ${selected.title}  (${index + 1}/${scenes.length})`;
+      document.getElementById("firstBtn").disabled = index === 0;
+      document.getElementById("prevBtn").disabled = index === 0;
+      document.getElementById("nextBtn").disabled = index === scenes.length - 1;
+      document.getElementById("lastBtn").disabled = index === scenes.length - 1;
+      history.replaceState(null, "", `?scene=${selected.number}`);
+      window.showMotion?.(selected);
+    }
+    document.getElementById("firstBtn").addEventListener("click", () => show(0));
+    document.getElementById("prevBtn").addEventListener("click", () => show(index - 1));
+    document.getElementById("nextBtn").addEventListener("click", () => show(index + 1));
+    document.getElementById("lastBtn").addEventListener("click", () => show(scenes.length - 1));
+    document.addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        show(index + (event.key === "ArrowRight" ? 1 : -1));
+      }
+    });
+    window.addEventListener("message", event => {
+      if (event.origin !== location.origin || event.source !== sceneFrame.contentWindow) return;
+      if (event.data?.type === "avatar-motion-page") show(index + event.data.direction);
+    });
+    show(index);
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { VRMHumanBoneList, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+    import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
+
+    const canvas = document.getElementById("avatarCanvas");
+    const pane = canvas.parentElement;
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    renderer.setClearColor(0, 0);
+    const scene = new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const key = new THREE.DirectionalLight(0xffffff, 2.0);
+    key.position.set(1.2, 1.5, 1.1);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xdde8ff, 1.0);
+    rim.position.set(-1.3, .7, 1.3);
+    scene.add(rim);
+    const container = new THREE.Group();
+    container.rotation.y = Math.PI;
+    scene.add(container);
+    const camera = new THREE.PerspectiveCamera(28, 1, .01, 40);
+    const modelLoader = new GLTFLoader();
+    modelLoader.register(parser => new VRMLoaderPlugin(parser));
+    const motionLoader = new GLTFLoader();
+    motionLoader.register(parser => new VRMAnimationLoaderPlugin(parser));
+    const clock = new THREE.Clock();
+    const motionCache = new Map();
+    const transitionSeconds = 1.1;
+    const bones = [];
+    let vrm = null;
+    let mixer = null;
+    let activeTracks = { rotation: new Set(), translation: new Set() };
+    let transition = null;
+    let ending = false;
+    let requestId = 0;
+    let targetHeight = 1.4;
+
+    function resize() {
+      const width = Math.max(1, pane.clientWidth);
+      const height = Math.max(1, pane.clientHeight);
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+    new ResizeObserver(resize).observe(pane);
+    resize();
+
+    function load(loader, url) {
+      return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+    }
+    function capturePose() {
+      return bones.map(({ node }) => ({
+        rotation: node.quaternion.clone(),
+        position: node.position.clone(),
+      }));
+    }
+    function startTransition() {
+      // 表示中の姿勢を起点にするため、補間中の連続ページ送りでも跳ねない。
+      transition = { from: capturePose(), elapsed: 0 };
+      mixer.stopAllAction();
+    }
+    async function showMotion(selected) {
+      const id = ++requestId;
+      if (!vrm || !mixer) return;
+      if (!selected.file) {
+        startTransition();
+        activeTracks = { rotation: new Set(), translation: new Set() };
+        ending = true;
+        status.textContent = "確認終了";
+        return;
+      }
+      status.textContent = `${selected.number} ${selected.title} を読み込み中…`;
+      try {
+        if (!motionCache.has(selected.file)) {
+          motionCache.set(selected.file, load(motionLoader, selected.file).then(gltf => {
+            const animation = gltf.userData?.vrmAnimations?.[0];
+            if (!animation) throw new Error("VRMA 内にアニメーションがありません");
+            return {
+              clip: createVRMAnimationClip(animation, vrm),
+              tracks: {
+                rotation: new Set(animation.humanoidTracks.rotation.keys()),
+                translation: new Set(animation.humanoidTracks.translation.keys()),
+              },
+            };
+          }));
+        }
+        const { clip, tracks } = await motionCache.get(selected.file);
+        if (id !== requestId) return;
+        startTransition();
+        activeTracks = tracks;
+        ending = false;
+        const action = mixer.clipAction(clip);
+        action.reset();
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.enabled = true;
+        action.setEffectiveWeight(1);
+        action.play();
+        status.textContent = "";
+      } catch (error) {
+        if (id !== requestId) return;
+        motionCache.delete(selected.file);
+        status.textContent = `モーションを読み込めませんでした: ${error.message || error}`;
+        console.error(error);
+      }
+    }
+    window.showMotion = showMotion;
+
+    try {
+      const gltf = await load(modelLoader, "../_vrm/VRM_female.vrm");
+      vrm = gltf.userData?.vrm;
+      if (!vrm) throw new Error("VRM データがありません");
+      VRMUtils.removeUnnecessaryVertices(gltf.scene);
+      VRMUtils.removeUnnecessaryJoints(gltf.scene);
+      vrm.scene.traverse(object => { object.frustumCulled = false; });
+      const box = new THREE.Box3().setFromObject(vrm.scene);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      vrm.scene.position.set(-center.x, -box.min.y, -center.z);
+      targetHeight = size.y * .88;
+      camera.position.set(0, size.y * .9, -size.y * 1.15);
+      camera.lookAt(0, targetHeight, 0);
+      container.add(vrm.scene);
+      for (const name of VRMHumanBoneList) {
+        const node = vrm.humanoid.getNormalizedBoneNode(name);
+        if (!node) continue;
+        const restRotation = node.quaternion.clone();
+        const idleRotation = restRotation.clone();
+        const idleAngles = {
+          leftUpperArm: [0, 0, -75], rightUpperArm: [0, 0, 75],
+          leftLowerArm: [0, 10, 0], rightLowerArm: [0, -10, 0],
+        }[name];
+        if (idleAngles) idleRotation.setFromEuler(new THREE.Euler(...idleAngles.map(THREE.MathUtils.degToRad)));
+        bones.push({ name, node, restRotation, idleRotation, restPosition: node.position.clone() });
+      }
+      mixer = new THREE.AnimationMixer(vrm.scene);
+      showMotion(scenes[index]);
+    } catch (error) {
+      status.textContent = `アバターを読み込めませんでした: ${error.message || error}`;
+      console.error(error);
+    }
+    function tick() {
+      const delta = Math.min(clock.getDelta(), .1);
+      mixer?.update(delta);
+      for (const bone of bones) {
+        const { name, node, restRotation, idleRotation, restPosition } = bone;
+        if (!activeTracks.rotation.has(name)) node.quaternion.copy(ending ? idleRotation : restRotation);
+        if (!activeTracks.translation.has(name)) node.position.copy(restPosition);
+      }
+      if (transition) {
+        transition.elapsed += delta;
+        const progress = Math.min(1, transition.elapsed / transitionSeconds);
+        const eased = progress * progress * (3 - 2 * progress);
+        bones.forEach((bone, index) => {
+          const from = transition.from[index];
+          bone.node.quaternion.slerpQuaternions(from.rotation, bone.node.quaternion, eased);
+          bone.node.position.lerpVectors(from.position, bone.node.position, eased);
+        });
+        if (progress >= 1) transition = null;
+      }
+      vrm?.update(delta);
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+    tick();
+  </script>
+</body>
+</html>
