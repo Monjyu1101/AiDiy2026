@@ -18,35 +18,55 @@ BASE = {
     "leftLowerArm": {"y": 10},
     "rightLowerArm": {"y": -10},
 }
-BONES = (
-    "hips", "spine", "chest", "upperChest", "neck", "head",
-    "leftShoulder", "rightShoulder", "leftUpperArm", "rightUpperArm",
-    "leftLowerArm", "rightLowerArm", "leftHand", "rightHand",
-)
+# glTF のノードも VRMA 仕様どおり T ポーズの階層として配置する。
+# 各位置は VRM_female.vrm のボーン長に近い値。回転の基準は全ノード identity。
+SKELETON = {
+    "hips": (None, (0, 0.9, 0)),
+    "spine": ("hips", (0, 0.10, 0)),
+    "chest": ("spine", (0, 0.15, 0)),
+    "upperChest": ("chest", (0, 0.15, 0)),
+    "neck": ("upperChest", (0, 0.14, 0)),
+    "head": ("neck", (0, 0.09, 0)),
+    "leftShoulder": ("upperChest", (0.06, 0.08, 0)),
+    "leftUpperArm": ("leftShoulder", (0.09, 0, 0)),
+    "leftLowerArm": ("leftUpperArm", (0.19, 0, 0)),
+    "leftHand": ("leftLowerArm", (0.18, 0, 0)),
+    "rightShoulder": ("upperChest", (-0.06, 0.08, 0)),
+    "rightUpperArm": ("rightShoulder", (-0.09, 0, 0)),
+    "rightLowerArm": ("rightUpperArm", (-0.19, 0, 0)),
+    "rightHand": ("rightLowerArm", (-0.18, 0, 0)),
+    "leftUpperLeg": ("hips", (0.09, -0.10, 0)),
+    "leftLowerLeg": ("leftUpperLeg", (0, -0.38, 0)),
+    "leftFoot": ("leftLowerLeg", (0, -0.36, 0.05)),
+    "rightUpperLeg": ("hips", (-0.09, -0.10, 0)),
+    "rightLowerLeg": ("rightUpperLeg", (0, -0.38, 0)),
+    "rightFoot": ("rightLowerLeg", (0, -0.36, 0.05)),
+}
+BONES = tuple(SKELETON)
 
 # 00 は既存の「標準/VRMA_01.vrma」をそのままコピーする。
 # 1〜20 は穏やかな待機動作の候補。腕の左右は VRM の左右に従う。
 POSES = [
-    ("右手を頬に添える", {"rightUpperArm": {"z": -30, "x": -10}, "rightLowerArm": {"z": -115, "y": -10}, "rightHand": {"z": 18}, "head": {"z": -4}}),
-    ("左手を頬に添える", {"leftUpperArm": {"z": 30, "x": -10}, "leftLowerArm": {"z": 115, "y": 10}, "leftHand": {"z": -18}, "head": {"z": 4}}),
-    ("左手を胸に当てる", {"leftUpperArm": {"z": -43, "x": -12}, "leftLowerArm": {"z": -125}, "leftHand": {"z": 12}}),
-    ("右手を胸に当てる", {"rightUpperArm": {"z": 43, "x": -12}, "rightLowerArm": {"z": 125}, "rightHand": {"z": -12}}),
-    ("両手を胸の前へ", {"leftUpperArm": {"z": -43, "x": -8}, "leftLowerArm": {"z": -120}, "rightUpperArm": {"z": 43, "x": -8}, "rightLowerArm": {"z": 120}}),
-    ("右手を顎の近くへ", {"rightUpperArm": {"z": -25, "x": -8}, "rightLowerArm": {"z": -125}, "rightHand": {"z": 25}, "head": {"x": 6}}),
-    ("左手を顎の近くへ", {"leftUpperArm": {"z": 25, "x": -8}, "leftLowerArm": {"z": 125}, "leftHand": {"z": -25}, "head": {"x": 6}}),
-    ("右手を軽く上げる", {"rightUpperArm": {"z": -25, "x": -12}, "rightLowerArm": {"z": -40}, "rightHand": {"z": 12}}),
-    ("左手を軽く上げる", {"leftUpperArm": {"z": 25, "x": -12}, "leftLowerArm": {"z": 40}, "leftHand": {"z": -12}}),
-    ("両手をお腹の前へ", {"leftUpperArm": {"z": -58, "x": -12}, "leftLowerArm": {"z": -75}, "rightUpperArm": {"z": 58, "x": -12}, "rightLowerArm": {"z": 75}}),
+    ("右手を頬に添える", {"rightUpperArm": {"z": 5, "x": -10}, "rightLowerArm": {"z": -130, "y": -10}, "rightHand": {"z": -8}, "head": {"z": -4}}),
+    ("後ろ手で少し前かがみ", {"leftUpperArm": {"z": -82, "y": -35}, "leftLowerArm": {"z": -25}, "rightUpperArm": {"z": 82, "y": 35}, "rightLowerArm": {"z": 25}, "spine": {"x": 8}, "chest": {"x": 5}, "neck": {"x": -8}, "head": {"x": -5, "z": 4}}),
+    ("左右にゆっくり揺れる", {}),
+    ("右手を胸に当てる", {"rightUpperArm": {"z": 70, "y": -35}, "rightLowerArm": {"z": 150}, "rightHand": {"z": -8}}),
+    ("両手を胸の前へ", {"leftUpperArm": {"z": -75, "y": 30}, "leftLowerArm": {"z": -145}, "rightUpperArm": {"z": 75, "y": -30}, "rightLowerArm": {"z": 145}}),
+    ("右手を顎の近くへ", {"rightUpperArm": {"z": 60, "y": -25}, "rightLowerArm": {"z": 185}, "rightHand": {"z": -8}, "head": {"x": 4}}),
+    ("目が合って照れてそらす", {"spine": {"y": 4, "x": 3}, "neck": {"y": 8, "x": 6}, "head": {"y": 13, "x": 10, "z": 5}}),
+    ("ひざをそろえて軽くかがむ", {"hips": {"x": 3}, "spine": {"x": 4}, "neck": {"x": -4}, "head": {"x": -5}, "leftUpperLeg": {"x": -20}, "rightUpperLeg": {"x": -20}, "leftLowerLeg": {"x": 40}, "rightLowerLeg": {"x": 40}, "leftFoot": {"x": -20}, "rightFoot": {"x": -20}}),
+    ("左向きから画面をのぞき込む", {"hips": {"x": 4, "y": -35}, "spine": {"x": 16}, "chest": {"x": 13}, "upperChest": {"x": 8}, "neck": {"x": -24, "y": 18}, "head": {"x": -22, "y": 17}}),
+    ("両手をお腹の前へ", {"leftUpperArm": {"z": -75, "y": 30}, "leftLowerArm": {"z": -85}, "rightUpperArm": {"z": 75, "y": -30}, "rightLowerArm": {"z": 85}}),
     ("背筋を少し伸ばす", {"spine": {"x": -4}, "chest": {"x": -4}, "head": {"x": -2}}),
-    ("右に重心を寄せる", {"hips": {"z": -4}, "spine": {"z": 3}, "head": {"z": 2}}),
+    ("片足を内側に寄せる", {}),
     ("左に重心を寄せる", {"hips": {"z": 4}, "spine": {"z": -3}, "head": {"z": -2}}),
     ("右に視線を向ける", {"neck": {"y": -9}, "head": {"y": -10}}),
-    ("左に視線を向ける", {"neck": {"y": 9}, "head": {"y": 10}}),
+    ("左肩越しに振り返る", {"hips": {"y": -14}, "spine": {"y": -12}, "chest": {"y": -9}, "neck": {"y": -9}, "head": {"y": -8, "z": 4}}),
     ("少しうつむく", {"neck": {"x": 5}, "head": {"x": 8}, "spine": {"x": 2}}),
     ("少し上を見る", {"neck": {"x": -5}, "head": {"x": -8}, "chest": {"x": -2}}),
-    ("肩を軽くすくめる", {"leftShoulder": {"z": 7}, "rightShoulder": {"z": -7}, "neck": {"x": 2}}),
-    ("右手を軽く差し出す", {"rightUpperArm": {"z": 42, "y": -12}, "rightLowerArm": {"z": -42, "y": -10}, "rightHand": {"x": 10}}),
-    ("左手を軽く差し出す", {"leftUpperArm": {"z": -42, "y": 12}, "leftLowerArm": {"z": 42, "y": 10}, "leftHand": {"x": 10}}),
+    ("小さく二回うなずく", {}),
+    ("左に首をかしげる", {"neck": {"z": 6}, "head": {"z": 10}, "chest": {"z": -2}}),
+    ("小さくおじぎする", {"spine": {"x": 7}, "chest": {"x": 5}, "neck": {"x": -2}, "head": {"x": 6}}),
 ]
 
 
@@ -70,11 +90,94 @@ def quaternion(angles):
     return tuple(v/length for v in result)
 
 
+def smoothstep(value):
+    x = max(0.0, min(1.0, value))
+    return x * x * (3 - 2 * x)
+
+
+def gesture_weight(t):
+    """中立 → ポーズ → 中立。両端は同じ姿勢なのでループで跳ねない。"""
+    return smoothstep((t - 0.25) / 1.8) * (1 - smoothstep((t - 5.4) / 1.8))
+
+
+def bone_angles(bone, pose, t, name):
+    base = BASE.get(bone, {})
+    goal = pose.get(bone, {})
+    is_lean = "画面をのぞき込む" in name
+    turn = smoothstep((t - 0.2) / 1.2) * (1 - smoothstep((t - 6.1) / 1.3))
+    bend = smoothstep((t - 1.1) / 1.7) * (1 - smoothstep((t - 5.1) / 1.6))
+    gaze = smoothstep((t - 1.6) / 1.2) * (1 - smoothstep((t - 4.9) / 1.8))
+    def weight_for(axis):
+        if name == "目が合って照れてそらす" and bone in ("neck", "head"):
+            return smoothstep((t - 1.5) / 1.0) * (1 - smoothstep((t - 5.1) / 1.4))
+        if not is_lean:
+            return gesture_weight(t)
+        if bone in ("neck", "head"):
+            return gaze
+        if bone == "hips" and axis == "y":
+            return turn
+        return bend
+    angles = {axis: base.get(axis, 0) + (goal.get(axis, base.get(axis, 0)) - base.get(axis, 0)) * weight_for(axis)
+              for axis in ("x", "y", "z")}
+    if name == "左右にゆっくり揺れる":
+        sway = math.sin(2 * math.pi * (t - 1.1) / 3.5) * gesture_weight(t)
+        if bone == "hips":
+            angles["z"] -= 5 * sway
+        elif bone == "spine":
+            angles["z"] += 4 * sway
+        elif bone == "head":
+            angles["z"] += 2 * sway
+        elif bone == "leftUpperArm":
+            angles["z"] -= 2 * sway
+        elif bone == "rightUpperArm":
+            angles["z"] += 2 * sway
+    elif name == "片足を内側に寄せる":
+        tap_window = smoothstep((t - 1.0) / 0.6) * (1 - smoothstep((t - 5.7) / 0.8))
+        tap = math.sin(math.pi * (t - 1.0) / 1.5) ** 2 * tap_window
+        if bone == "leftUpperLeg":
+            angles["x"] -= 7 * tap
+            angles["z"] -= 10 * tap
+        elif bone == "leftLowerLeg":
+            angles["x"] += 10 * tap
+            angles["z"] += 4 * tap
+        elif bone == "leftFoot":
+            angles["x"] -= 3 * tap
+            angles["y"] += 8 * tap
+            angles["z"] += 6 * tap
+    elif name == "小さく二回うなずく":
+        first = smoothstep((t - 1.2) / 0.35) * (1 - smoothstep((t - 2.2) / 0.45))
+        second = smoothstep((t - 3.4) / 0.35) * (1 - smoothstep((t - 4.4) / 0.45))
+        if bone == "chest":
+            angles["x"] += 1.5 * (first + second)
+        elif bone == "neck":
+            angles["x"] += 8 * (first + second)
+        elif bone == "head":
+            angles["x"] += 18 * (first + second)
+    # 前腕と手首も動かす。ポーズ保持中の動きは小さく、入口・出口は中立へ戻す。
+    breathing = math.sin(2 * math.pi * t / DURATION)
+    fidget = math.sin(4 * math.pi * t / DURATION)
+    if bone in ("spine", "chest"):
+        angles["x"] += breathing * 1.2
+    elif bone in ("neck", "head"):
+        angles["y"] += fidget * 1.5
+    elif bone in ("leftUpperArm", "rightUpperArm"):
+        angles["x"] += breathing * 2.5
+    elif bone in ("leftLowerArm", "rightLowerArm"):
+        angles["z"] += fidget * (4 if bone.startswith("left") else -4)
+    elif bone in ("leftHand", "rightHand"):
+        angles["z"] += breathing * (6 if bone.startswith("left") else -6)
+    return angles
+
+
 def make_vrma(name, pose):
     # 全候補で同じボーンを出力し、ページを戻したとき前の姿勢が残らないようにする。
     binary = bytearray()
     views, accessors, samplers, channels = [], [], [], []
-    nodes = [{"name": bone, "translation": [0, 0.9, 0] if bone == "hips" else [0, 0, 0]} for bone in BONES]
+    node_index = {bone: index for index, bone in enumerate(BONES)}
+    nodes = [{"name": bone, "translation": list(SKELETON[bone][1])} for bone in BONES]
+    for bone, (parent, _) in SKELETON.items():
+        if parent:
+            nodes[node_index[parent]].setdefault("children", []).append(node_index[bone])
 
     def accessor(values, width, minimum=None, maximum=None):
         offset = len(binary)
@@ -93,22 +196,27 @@ def make_vrma(name, pose):
     for node, bone in enumerate(BONES):
         values = []
         for t in TIMES:
-            # 8 秒の端点が一致。静止姿勢に呼吸とごく小さい揺れを加える。
-            breath = math.sin(2 * math.pi * t / DURATION)
-            sway = math.sin(4 * math.pi * t / DURATION)
-            angles = dict(BASE.get(bone, {}))
-            angles.update(pose.get(bone, {}))
-            if bone in ("spine", "chest"):
-                angles["x"] = angles.get("x", 0) + breath * 0.8
-            if bone in ("neck", "head"):
-                angles["y"] = angles.get("y", 0) + sway * 1.0
-            if bone in ("leftUpperArm", "rightUpperArm"):
-                angles["x"] = angles.get("x", 0) + breath * 1.2
-            values.extend(quaternion(angles))
+            values.extend(quaternion(bone_angles(bone, pose, t, name)))
         output = accessor(values, 4)
         sampler = len(samplers)
         samplers.append({"input": time_accessor, "output": output, "interpolation": "LINEAR"})
         channels.append({"sampler": sampler, "target": {"node": node, "path": "rotation"}})
+
+    hips_values = []
+    for t in TIMES:
+        weight = gesture_weight(t)
+        side = -1 if name == "右に重心を寄せる" else (1 if name == "左に重心を寄せる" else 0)
+        lean = "画面をのぞき込む" in name
+        lean_weight = smoothstep((t - 1.1) / 1.7) * (1 - smoothstep((t - 5.1) / 1.6))
+        hips_values.extend((side * 0.045 * weight,
+                            0.9 - (0.045 * lean_weight if lean else 0)
+                                - (0.045 * weight if name == "ひざをそろえて軽くかがむ" else 0)
+                                + 0.006 * math.sin(2 * math.pi * t / DURATION),
+                            0.08 * lean_weight if lean else 0.0))
+    hips_output = accessor(hips_values, 3)
+    hips_sampler = len(samplers)
+    samplers.append({"input": time_accessor, "output": hips_output, "interpolation": "LINEAR"})
+    channels.append({"sampler": hips_sampler, "target": {"node": node_index["hips"], "path": "translation"}})
 
     gltf = {
         "asset": {"version": "2.0", "generator": "AiDiy idle motion candidates"},
@@ -116,7 +224,7 @@ def make_vrma(name, pose):
         "extensions": {"VRMC_vrm_animation": {"specVersion": "1.0", "humanoid": {
             "humanBones": {bone: {"node": index} for index, bone in enumerate(BONES)}
         }}},
-        "scene": 0, "scenes": [{"nodes": list(range(len(BONES)))}], "nodes": nodes,
+        "scene": 0, "scenes": [{"nodes": [node_index["hips"]]}], "nodes": nodes,
         "animations": [{"name": name, "channels": channels, "samplers": samplers}],
         "accessors": accessors, "bufferViews": views, "buffers": [{"byteLength": len(binary)}],
     }

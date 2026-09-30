@@ -250,8 +250,8 @@
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
       vrm.scene.position.set(-center.x, -box.min.y, -center.z);
-      targetHeight = size.y * .88;
-      camera.position.set(0, size.y * .9, -size.y * 1.15);
+      targetHeight = size.y * .52;
+      camera.position.set(0, size.y * .55, -size.y * 2.2);
       camera.lookAt(0, targetHeight, 0);
       container.add(vrm.scene);
       for (const name of VRMHumanBoneList) {
