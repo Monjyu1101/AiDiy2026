@@ -40,7 +40,9 @@ let cpuTimerId: number | null = null
 
 const SNAPSHOT_INTERVAL_MS = 33
 const CPU_SAMPLE_INTERVAL_MS = 500
-const CPU_SAMPLE_LIMIT = 20
+const CPU_SAMPLE_LIMIT = 8
+const CPU_COLOR_START = 40
+const CPU_COLOR_FULL = 95
 const bloodshotTicks = Array.from({ length: 30 }, (_, index) => {
   const angleDeg = index * 12
   const angleRad = angleDeg * Math.PI / 180
@@ -60,8 +62,10 @@ function updateBloodshotLevel() {
   cpuAverage.value = samples.length
     ? samples.reduce((sum, value) => sum + value, 0) / samples.length
     : 0
-  cpuColorLevel.value = Math.min(1, Math.max(0, (cpuAverage.value - 40) / 50))
-  bloodshotLineLevel.value = Math.min(1, Math.max(0, (cpuAverage.value - 90) / 10))
+  // 40% 以下は白、95% 以上は赤。その間は色と血管を連続的に濃くする。
+  const level = Math.min(1, Math.max(0, (cpuAverage.value - CPU_COLOR_START) / (CPU_COLOR_FULL - CPU_COLOR_START)))
+  cpuColorLevel.value = level
+  bloodshotLineLevel.value = level
 }
 
 async function collectCpuUsage() {
@@ -268,21 +272,25 @@ onBeforeUnmount(() => {
   background:
     radial-gradient(
       ellipse at 34% 26%,
-      #ffffff 0 22%,
       rgb(
-        247,
-        calc(251 - (86 * var(--cpu-color-level))),
-        calc(255 - (92 * var(--cpu-color-level)))
+        255,
+        calc(255 - (180 * var(--cpu-color-level))),
+        calc(255 - (180 * var(--cpu-color-level)))
+      ) 0 22%,
+      rgb(
+        calc(247 + (8 * var(--cpu-color-level))),
+        calc(251 - (205 * var(--cpu-color-level))),
+        calc(255 - (210 * var(--cpu-color-level)))
       ) 48%,
       rgb(
-        214,
-        calc(224 - (96 * var(--cpu-color-level))),
-        calc(234 - (104 * var(--cpu-color-level)))
+        calc(214 + (41 * var(--cpu-color-level))),
+        calc(224 - (187 * var(--cpu-color-level))),
+        calc(234 - (194 * var(--cpu-color-level)))
       ) 100%
     );
   box-shadow:
     inset -9px -14px 18px rgba(72, 90, 112, 0.22),
-    inset 7px 10px 16px rgba(255, 255, 255, 0.88),
+    inset 7px 10px 16px rgba(255, 255, 255, calc(0.88 - (0.7 * var(--cpu-color-level)))),
     0 5px 14px rgba(0, 0, 0, 0.18);
 }
 
@@ -292,15 +300,28 @@ onBeforeUnmount(() => {
   height: 8%;
   transform-origin: 50% 0;
   border-radius: 999px;
-  background: rgba(230, 0, 0, calc(var(--bloodshot-line-level) * 0.55));
+  background: rgba(125, 0, 0, 0.6);
   opacity: var(--bloodshot-line-level);
   z-index: 1;
 }
 
+.bloodshot-ray::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 70%;
+  width: 1px;
+  height: 65%;
+  border-radius: 999px;
+  background: inherit;
+  transform-origin: 50% 0;
+  transform: rotate(35deg);
+}
+
 .bloodshot-ray.major {
   width: 2px;
-  height: 11%;
-  background: rgba(238, 0, 0, calc(var(--bloodshot-line-level) * 0.72));
+  height: 14%;
+  background: rgba(110, 0, 0, 0.78);
 }
 
 .xeyes-pupil {
