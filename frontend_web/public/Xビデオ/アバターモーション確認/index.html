@@ -165,7 +165,9 @@
     let mixer = null;
     let activeTracks = { rotation: new Set(), translation: new Set() };
     let transition = null;
-    let ending = false;
+    let ending = true;
+    let currentAction = null;
+    let finishPending = false;
     let requestId = 0;
     let targetHeight = 1.4;
 
@@ -191,6 +193,8 @@
     function startTransition() {
       // 表示中の姿勢を起点にするため、補間中の連続ページ送りでも跳ねない。
       transition = { from: capturePose(), elapsed: 0 };
+      currentAction = null;
+      finishPending = false;
       mixer.stopAllAction();
     }
     async function showMotion(selected) {
@@ -225,9 +229,11 @@
         ending = false;
         const action = mixer.clipAction(clip);
         action.reset();
-        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
         action.enabled = true;
         action.setEffectiveWeight(1);
+        currentAction = action;
         action.play();
         status.textContent = "";
       } catch (error) {
@@ -267,6 +273,9 @@
         bones.push({ name, node, restRotation, idleRotation, restPosition: node.position.clone() });
       }
       mixer = new THREE.AnimationMixer(vrm.scene);
+      mixer.addEventListener("finished", event => {
+        if (event.action === currentAction) finishPending = true;
+      });
       showMotion(scenes[index]);
     } catch (error) {
       status.textContent = `アバターを読み込めませんでした: ${error.message || error}`;
@@ -275,6 +284,11 @@
     function tick() {
       const delta = Math.min(clock.getDelta(), .1);
       mixer?.update(delta);
+      if (finishPending) {
+        startTransition();
+        activeTracks = { rotation: new Set(), translation: new Set() };
+        ending = true;
+      }
       for (const bone of bones) {
         const { name, node, restRotation, idleRotation, restPosition } = bone;
         if (!activeTracks.rotation.has(name)) node.quaternion.copy(ending ? idleRotation : restRotation);

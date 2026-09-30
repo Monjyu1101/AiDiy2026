@@ -13,7 +13,7 @@ if (!scene) {
   const note = document.createElement("p");
   note.className = "scene-note";
   note.textContent = scene.file
-    ? "左のアバターを見て、腕・手・首の位置と待機中の揺れを確認してください。"
+    ? "再生後は普通の立ち姿で止まります。同じ番号を押すと、もう一度確認できます。"
     : "前へ戻るか、下の一覧から任意のモーションを選べます。";
   const card = document.createElement("main");
   card.className = "scene-card";

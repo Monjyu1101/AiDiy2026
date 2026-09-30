@@ -17,7 +17,7 @@ window.MOTION_SCENES = [
   { id: "015", number: "15", title: "左肩越しに振り返る", description: "上半身ごとゆっくり左へ振り返り、正面に戻ります。", file: "vrma/VRMA_15_左肩越しに振り返る.vrma" },
   { id: "016", number: "16", title: "少しうつむく", description: "考え事をしているような控えめな姿勢です。", file: "vrma/VRMA_16_少しうつむく.vrma" },
   { id: "017", number: "17", title: "少し上を見る", description: "顔を少し上げる待機姿勢です。", file: "vrma/VRMA_17_少し上を見る.vrma" },
-  { id: "018", number: "18", title: "小さく二回うなずく", description: "首と頭を小さく二回動かして正面へ戻ります。", file: "vrma/VRMA_18_小さく二回うなずく.vrma" },
+  { id: "018", number: "18", title: "小さく一回うなずく", description: "首と頭を小さく一回動かして正面へ戻ります。", file: "vrma/VRMA_18_小さく一回うなずく.vrma" },
   { id: "019", number: "19", title: "左に首をかしげる", description: "首を左へそっと傾ける、待機中の小さな仕草です。", file: "vrma/VRMA_19_左に首をかしげる.vrma" },
   { id: "020", number: "20", title: "小さくおじぎする", description: "頭と上半身を少し倒してから戻る仕草です。", file: "vrma/VRMA_20_小さくおじぎする.vrma" },
   { id: "999", number: "999", title: "確認終了", description: "20 種類の確認はここで終わりです。気に入った番号を一覧から選び直せます。", file: null },

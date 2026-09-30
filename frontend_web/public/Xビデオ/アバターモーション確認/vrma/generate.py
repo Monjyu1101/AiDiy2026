@@ -48,15 +48,15 @@ BONES = tuple(SKELETON)
 # 1〜20 は穏やかな待機動作の候補。腕の左右は VRM の左右に従う。
 POSES = [
     ("右手を頬に添える", {"rightUpperArm": {"z": 5, "x": -10}, "rightLowerArm": {"z": -130, "y": -10}, "rightHand": {"z": -8}, "head": {"z": -4}}),
-    ("後ろ手で少し前かがみ", {"leftUpperArm": {"z": -82, "y": -35}, "leftLowerArm": {"z": -25}, "rightUpperArm": {"z": 82, "y": 35}, "rightLowerArm": {"z": 25}, "spine": {"x": 8}, "chest": {"x": 5}, "neck": {"x": -8}, "head": {"x": -5, "z": 4}}),
+    ("後ろ手で少し前かがみ", {"leftUpperArm": {"z": -75}, "leftLowerArm": {"z": -30}, "rightUpperArm": {"z": 75}, "rightLowerArm": {"z": 30}, "spine": {"x": 8}, "chest": {"x": 5}, "neck": {"x": -8}, "head": {"x": -5, "z": 4}}),
     ("左右にゆっくり揺れる", {}),
-    ("右手を胸に当てる", {"rightUpperArm": {"z": 70, "y": -35}, "rightLowerArm": {"z": 150}, "rightHand": {"z": -8}}),
-    ("両手を胸の前へ", {"leftUpperArm": {"z": -75, "y": 30}, "leftLowerArm": {"z": -145}, "rightUpperArm": {"z": 75, "y": -30}, "rightLowerArm": {"z": 145}}),
+    ("右手を胸に当てる", {"rightUpperArm": {"z": 60, "y": 40}, "rightLowerArm": {"z": 190, "y": -60}, "rightHand": {"z": -8}}),
+    ("両手を胸の前へ", {"leftUpperArm": {"z": -60, "y": -40}, "leftLowerArm": {"z": -190, "y": 60}, "rightUpperArm": {"z": 60, "y": 40}, "rightLowerArm": {"z": 190, "y": -60}}),
     ("右手を顎の近くへ", {"rightUpperArm": {"z": 60, "y": -25}, "rightLowerArm": {"z": 185}, "rightHand": {"z": -8}, "head": {"x": 4}}),
     ("目が合って照れてそらす", {"spine": {"y": 4, "x": 3}, "neck": {"y": 8, "x": 6}, "head": {"y": 13, "x": 10, "z": 5}}),
     ("ひざをそろえて軽くかがむ", {"hips": {"x": 3}, "spine": {"x": 4}, "neck": {"x": -4}, "head": {"x": -5}, "leftUpperLeg": {"x": -20}, "rightUpperLeg": {"x": -20}, "leftLowerLeg": {"x": 40}, "rightLowerLeg": {"x": 40}, "leftFoot": {"x": -20}, "rightFoot": {"x": -20}}),
     ("左向きから画面をのぞき込む", {"hips": {"x": 4, "y": -35}, "spine": {"x": 16}, "chest": {"x": 13}, "upperChest": {"x": 8}, "neck": {"x": -24, "y": 18}, "head": {"x": -22, "y": 17}}),
-    ("両手をお腹の前へ", {"leftUpperArm": {"z": -75, "y": 30}, "leftLowerArm": {"z": -85}, "rightUpperArm": {"z": 75, "y": -30}, "rightLowerArm": {"z": 85}}),
+    ("両手をお腹の前へ", {"leftUpperArm": {"z": -50, "y": -40}, "leftLowerArm": {"z": -140, "y": 100}, "rightUpperArm": {"z": 50, "y": 40}, "rightLowerArm": {"z": 140, "y": -100}}),
     ("背筋を少し伸ばす", {"spine": {"x": -4}, "chest": {"x": -4}, "head": {"x": -2}}),
     ("片足を内側に寄せる", {}),
     ("左に重心を寄せる", {"hips": {"z": 4}, "spine": {"z": -3}, "head": {"z": -2}}),
@@ -64,7 +64,7 @@ POSES = [
     ("左肩越しに振り返る", {"hips": {"y": -14}, "spine": {"y": -12}, "chest": {"y": -9}, "neck": {"y": -9}, "head": {"y": -8, "z": 4}}),
     ("少しうつむく", {"neck": {"x": 5}, "head": {"x": 8}, "spine": {"x": 2}}),
     ("少し上を見る", {"neck": {"x": -5}, "head": {"x": -8}, "chest": {"x": -2}}),
-    ("小さく二回うなずく", {}),
+    ("小さく一回うなずく", {}),
     ("左に首をかしげる", {"neck": {"z": 6}, "head": {"z": 10}, "chest": {"z": -2}}),
     ("小さくおじぎする", {"spine": {"x": 7}, "chest": {"x": 5}, "neck": {"x": -2}, "head": {"x": 6}}),
 ]
@@ -144,15 +144,14 @@ def bone_angles(bone, pose, t, name):
             angles["x"] -= 3 * tap
             angles["y"] += 8 * tap
             angles["z"] += 6 * tap
-    elif name == "小さく二回うなずく":
-        first = smoothstep((t - 1.2) / 0.35) * (1 - smoothstep((t - 2.2) / 0.45))
-        second = smoothstep((t - 3.4) / 0.35) * (1 - smoothstep((t - 4.4) / 0.45))
+    elif name == "小さく一回うなずく":
+        nod = smoothstep((t - 1.5) / 0.55) * (1 - smoothstep((t - 2.6) / 0.65))
         if bone == "chest":
-            angles["x"] += 1.5 * (first + second)
+            angles["x"] += 1.5 * nod
         elif bone == "neck":
-            angles["x"] += 8 * (first + second)
+            angles["x"] += 8 * nod
         elif bone == "head":
-            angles["x"] += 18 * (first + second)
+            angles["x"] += 18 * nod
     # 前腕と手首も動かす。ポーズ保持中の動きは小さく、入口・出口は中立へ戻す。
     breathing = math.sin(2 * math.pi * t / DURATION)
     fidget = math.sin(4 * math.pi * t / DURATION)
