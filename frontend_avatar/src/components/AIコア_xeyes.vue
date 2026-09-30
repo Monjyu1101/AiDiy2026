@@ -40,9 +40,11 @@ let cpuTimerId: number | null = null
 
 const SNAPSHOT_INTERVAL_MS = 33
 const CPU_SAMPLE_INTERVAL_MS = 500
-const CPU_SAMPLE_LIMIT = 8
-const CPU_COLOR_START = 40
-const CPU_COLOR_FULL = 95
+const CPU_SAMPLE_LIMIT = 12
+const CPU_COLOR_START = 50
+const CPU_COLOR_FULL = 90
+const CPU_BAR_COLOR_START = 50
+const CPU_BAR_COLOR_FULL = 95
 const bloodshotTicks = Array.from({ length: 30 }, (_, index) => {
   const angleDeg = index * 12
   const angleRad = angleDeg * Math.PI / 180
@@ -62,10 +64,16 @@ function updateBloodshotLevel() {
   cpuAverage.value = samples.length
     ? samples.reduce((sum, value) => sum + value, 0) / samples.length
     : 0
-  // 40% 以下は白、95% 以上は赤。その間は色と血管を連続的に濃くする。
+  // サンプル平均が50%以下なら白、90%以上なら淡いピンクにする。
   const level = Math.min(1, Math.max(0, (cpuAverage.value - CPU_COLOR_START) / (CPU_COLOR_FULL - CPU_COLOR_START)))
   cpuColorLevel.value = level
   bloodshotLineLevel.value = level
+}
+
+function cpuBarColor(usage: number) {
+  const level = Math.min(1, Math.max(0, (usage - CPU_BAR_COLOR_START) / (CPU_BAR_COLOR_FULL - CPU_BAR_COLOR_START)))
+  const channel = Math.round(255 * (1 - level))
+  return `rgb(255, ${channel}, ${channel})`
 }
 
 async function collectCpuUsage() {
@@ -211,16 +219,16 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
-    <div v-if="props.controlsVisible" class="cpu-meter" :style="{ '--cpu-color-level': effectiveCpuColorLevel.toFixed(3) }">
+    <div v-if="props.controlsVisible" class="cpu-meter">
       <div class="cpu-meter-header">
         <span>CPU</span>
-        <strong>{{ Math.round(cpuAverage) }}%</strong>
+        <strong :style="{ color: cpuBarColor(cpuAverage) }">{{ Math.round(cpuAverage) }}%</strong>
       </div>
       <div class="cpu-bars">
         <i
           v-for="(sample, index) in cpuSamples"
           :key="index"
-          :style="{ height: `${Math.max(3, Math.round(sample))}%` }"
+          :style="{ height: `${Math.max(3, Math.round(sample))}%`, backgroundColor: cpuBarColor(sample) }"
         ></i>
       </div>
     </div>
@@ -234,7 +242,7 @@ onBeforeUnmount(() => {
       <div class="options-row">
         <label class="options-check">
           <input type="checkbox" v-model="cpuColorEnabled">
-          <span>CPU使用率色変化</span>
+          <span>目のCPU色変化</span>
         </label>
       </div>
     </div>
@@ -269,29 +277,22 @@ onBeforeUnmount(() => {
   border: 2px solid rgba(18, 20, 25, 0.9);
   border-radius: 50%;
   overflow: hidden;
-  background:
-    radial-gradient(
-      ellipse at 34% 26%,
-      rgb(
-        255,
-        calc(255 - (180 * var(--cpu-color-level))),
-        calc(255 - (180 * var(--cpu-color-level)))
-      ) 0 22%,
-      rgb(
-        calc(247 + (8 * var(--cpu-color-level))),
-        calc(251 - (205 * var(--cpu-color-level))),
-        calc(255 - (210 * var(--cpu-color-level)))
-      ) 48%,
-      rgb(
-        calc(214 + (41 * var(--cpu-color-level))),
-        calc(224 - (187 * var(--cpu-color-level))),
-        calc(234 - (194 * var(--cpu-color-level)))
-      ) 100%
-    );
+  background: radial-gradient(ellipse at 34% 26%, #fff 0 22%, #f7fbff 48%, #d6e0ea 100%);
   box-shadow:
     inset -9px -14px 18px rgba(72, 90, 112, 0.22),
-    inset 7px 10px 16px rgba(255, 255, 255, calc(0.88 - (0.7 * var(--cpu-color-level)))),
+    inset 7px 10px 16px rgba(255, 255, 255, 0.55),
     0 5px 14px rgba(0, 0, 0, 0.18);
+}
+
+.xeyes-eye::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 34% 26%, #fff2f4 0 22%, #ffdce5 48%, #f2b9ca 100%);
+  opacity: var(--cpu-color-level);
+  transition: opacity 1s ease-out;
+  pointer-events: none;
 }
 
 .bloodshot-ray {
@@ -300,8 +301,9 @@ onBeforeUnmount(() => {
   height: 8%;
   transform-origin: 50% 0;
   border-radius: 999px;
-  background: rgba(125, 0, 0, 0.6);
+  background: rgba(186, 74, 95, 0.48);
   opacity: var(--bloodshot-line-level);
+  transition: opacity 1s ease-out;
   z-index: 1;
 }
 
@@ -321,7 +323,7 @@ onBeforeUnmount(() => {
 .bloodshot-ray.major {
   width: 2px;
   height: 14%;
-  background: rgba(110, 0, 0, 0.78);
+  background: rgba(173, 51, 78, 0.62);
 }
 
 .xeyes-pupil {
@@ -368,6 +370,8 @@ onBeforeUnmount(() => {
   bottom: 58px;
   width: min(220px, 56%);
   height: 46px;
+  box-sizing: border-box;
+  overflow: hidden;
   transform: translateX(-50%);
   z-index: 3;
   display: grid;
@@ -390,7 +394,6 @@ onBeforeUnmount(() => {
 }
 
 .cpu-meter-header strong {
-  color: rgb(255, calc(255 - (160 * var(--cpu-color-level))), calc(255 - (180 * var(--cpu-color-level))));
   font-size: 11px;
 }
 
@@ -398,14 +401,17 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-end;
   gap: 2px;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .cpu-bars i {
-  flex: 1;
-  min-width: 4px;
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
   border-radius: 1px 1px 0 0;
-  background: rgb(120, calc(235 - (175 * var(--cpu-color-level))), calc(255 - (210 * var(--cpu-color-level))));
+  transition: background-color 0.5s linear;
 }
 
 /* シンプルモード */
@@ -413,19 +419,25 @@ onBeforeUnmount(() => {
   background: transparent;
   border: 20px solid rgb(
     255,
-    calc(255 - (255 * var(--cpu-color-level))),
-    calc(255 - (255 * var(--cpu-color-level)))
+    calc(255 - (36 * var(--cpu-color-level))),
+    calc(255 - (28 * var(--cpu-color-level)))
   );
   box-shadow: none;
+  transition: border-color 1s ease-out;
+}
+
+.xeyes-eye.simple::before {
+  display: none;
 }
 
 .xeyes-pupil.simple {
   background: rgb(
     255,
-    calc(255 - (255 * var(--cpu-color-level))),
-    calc(255 - (255 * var(--cpu-color-level)))
+    calc(255 - (36 * var(--cpu-color-level))),
+    calc(255 - (28 * var(--cpu-color-level)))
   );
   box-shadow: none;
+  transition: transform 0.06s linear, background-color 1s ease-out;
 }
 
 /* オプションパネル */
