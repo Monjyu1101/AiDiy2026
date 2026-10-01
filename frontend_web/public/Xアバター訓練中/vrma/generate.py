@@ -46,17 +46,20 @@ BONES = tuple(SKELETON)
 
 # 00 は既存の「標準/VRMA_01.vrma」をそのままコピーする。
 # 1〜20 は穏やかな待機動作の候補。腕の左右は VRM の左右に従う。
+# 左右鏡映では Y/Z を反転し、長軸 X の回旋は同符号にする。
+# 上腕の X は長軸の回旋。肘は左 +Y / 右 -Y の屈曲（150度まで）。
+# 前腕 X は回内外（±60度）、手首は小さな Z の傾きだけにして掌の反転を避ける。
 POSES = [
-    ("右手を頬に添える", {"rightUpperArm": {"z": 5, "x": -10}, "rightLowerArm": {"z": -130, "y": -10}, "rightHand": {"z": -8}, "head": {"z": -4}}),
-    ("後ろ手で少し前かがみ", {"leftUpperArm": {"z": -75}, "leftLowerArm": {"z": -30}, "rightUpperArm": {"z": 75}, "rightLowerArm": {"z": 30}, "spine": {"x": 8}, "chest": {"x": 5}, "neck": {"x": -8}, "head": {"x": -5, "z": 4}}),
+    ("右手を頬に添える", {"rightUpperArm": {"z": 25, "x": 90}, "rightLowerArm": {"y": -150, "x": -60}, "rightHand": {"z": -5}, "head": {"z": -4}}),
+    ("後ろ手で少し前かがみ", {"leftUpperArm": {"z": -75, "y": 35}, "leftLowerArm": {"y": 20}, "rightUpperArm": {"z": 75, "y": -35}, "rightLowerArm": {"y": -20}, "spine": {"x": 8}, "chest": {"x": 5}, "neck": {"x": -8}, "head": {"x": -5, "z": 4}}),
     ("左右にゆっくり揺れる", {}),
-    ("右手を胸に当てる", {"rightUpperArm": {"z": 60, "y": 40}, "rightLowerArm": {"z": 190, "y": -60}, "rightHand": {"z": -8}}),
-    ("両手を胸の前へ", {"leftUpperArm": {"z": -60, "y": -40}, "leftLowerArm": {"z": -190, "y": 60}, "rightUpperArm": {"z": 60, "y": 40}, "rightLowerArm": {"z": 190, "y": -60}}),
-    ("右手を顎の近くへ", {"rightUpperArm": {"z": 60, "y": -25}, "rightLowerArm": {"z": 185}, "rightHand": {"z": -8}, "head": {"x": 4}}),
+    ("右手を胸に当てる", {"rightUpperArm": {"z": 60, "y": -20, "x": -140}, "rightLowerArm": {"y": -130}}),
+    ("両手を胸の前へ", {"leftUpperArm": {"z": -60, "y": 20, "x": -140}, "leftLowerArm": {"y": 130}, "rightUpperArm": {"z": 60, "y": -20, "x": -140}, "rightLowerArm": {"y": -130}}),
+    ("右手を顎の近くへ", {"rightUpperArm": {"z": 65, "x": 145}, "rightLowerArm": {"y": -150, "x": -60}, "rightHand": {"z": -5}, "head": {"x": 4}}),
     ("目が合って照れてそらす", {"spine": {"y": 4, "x": 3}, "neck": {"y": 8, "x": 6}, "head": {"y": 13, "x": 10, "z": 5}}),
     ("ひざをそろえて軽くかがむ", {"hips": {"x": 3}, "spine": {"x": 4}, "neck": {"x": -4}, "head": {"x": -5}, "leftUpperLeg": {"x": -20}, "rightUpperLeg": {"x": -20}, "leftLowerLeg": {"x": 40}, "rightLowerLeg": {"x": 40}, "leftFoot": {"x": -20}, "rightFoot": {"x": -20}}),
     ("左向きから画面をのぞき込む", {"hips": {"x": 4, "y": -35}, "spine": {"x": 16}, "chest": {"x": 13}, "upperChest": {"x": 8}, "neck": {"x": -24, "y": 18}, "head": {"x": -22, "y": 17}}),
-    ("両手をお腹の前へ", {"leftUpperArm": {"z": -50, "y": -40}, "leftLowerArm": {"z": -140, "y": 100}, "rightUpperArm": {"z": 50, "y": 40}, "rightLowerArm": {"z": 140, "y": -100}}),
+    ("両手をお腹の前へ", {"leftUpperArm": {"z": -70, "y": 15, "x": -135}, "leftLowerArm": {"y": 95}, "rightUpperArm": {"z": 70, "y": -15, "x": -135}, "rightLowerArm": {"y": -105}}),
     ("背筋を少し伸ばす", {"spine": {"x": -4}, "chest": {"x": -4}, "head": {"x": -2}}),
     ("片足を内側に寄せる", {}),
     ("左に重心を寄せる", {"hips": {"z": 4}, "spine": {"z": -3}, "head": {"z": -2}}),
@@ -88,6 +91,17 @@ def quaternion(angles):
         result = multiply(result, rotation)
     length = math.sqrt(sum(v*v for v in result))
     return tuple(v/length for v in result)
+
+
+def bone_quaternion(bone, angles):
+    """腕を向けてから長軸(X)で回旋する。肘の屈曲(Y)と回内外を混ぜない。"""
+    if bone in ("leftUpperArm", "rightUpperArm"):
+        swing = quaternion({"y": angles["y"], "z": angles["z"]})
+        return multiply(swing, quaternion({"x": angles["x"]}))
+    if bone in ("leftLowerArm", "rightLowerArm"):
+        flexion = quaternion({"y": angles["y"]})
+        return multiply(flexion, quaternion({"x": angles["x"], "z": angles["z"]}))
+    return quaternion(angles)
 
 
 def smoothstep(value):
@@ -162,9 +176,11 @@ def bone_angles(bone, pose, t, name):
     elif bone in ("leftUpperArm", "rightUpperArm"):
         angles["x"] += breathing * 2.5
     elif bone in ("leftLowerArm", "rightLowerArm"):
-        angles["z"] += fidget * (4 if bone.startswith("left") else -4)
+        angles["y"] += fidget * (2 if bone.startswith("left") else -2)
+        sign = 1 if bone.startswith("left") else -1
+        angles["y"] = sign * max(0, min(150, sign * angles["y"]))
     elif bone in ("leftHand", "rightHand"):
-        angles["z"] += breathing * (6 if bone.startswith("left") else -6)
+        angles["z"] += breathing * (2 if bone.startswith("left") else -2)
     return angles
 
 
@@ -195,7 +211,7 @@ def make_vrma(name, pose):
     for node, bone in enumerate(BONES):
         values = []
         for t in TIMES:
-            values.extend(quaternion(bone_angles(bone, pose, t, name)))
+            values.extend(bone_quaternion(bone, bone_angles(bone, pose, t, name)))
         output = accessor(values, 4)
         sampler = len(samplers)
         samplers.append({"input": time_accessor, "output": output, "interpolation": "LINEAR"})
