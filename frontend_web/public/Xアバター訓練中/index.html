@@ -170,6 +170,8 @@
     let finishPending = false;
     let requestId = 0;
     let targetHeight = 1.4;
+    let footContact = null;
+    let motionNumber = "999";
 
     function resize() {
       const width = Math.max(1, pane.clientWidth);
@@ -190,18 +192,127 @@
         position: node.position.clone(),
       }));
     }
-    function startTransition() {
+    function captureFeet() {
+      if (!footContact) return [];
+      return footContact.legs.map(leg => {
+        const position = leg.foot.getWorldPosition(new THREE.Vector3());
+        const hip = leg.upper.getWorldPosition(new THREE.Vector3());
+        const axis = position.clone().sub(hip).normalize();
+        const bend = leg.lower.getWorldPosition(new THREE.Vector3()).sub(hip);
+        bend.addScaledVector(axis, -bend.dot(axis));
+        return {
+          position, rotation: leg.foot.getWorldQuaternion(new THREE.Quaternion()),
+          bend: bend.lengthSq() > 1e-12 ? bend.normalize() : leg.bend.clone(),
+        };
+      });
+    }
+    function createFootContact() {
+      // VRMA の標準脚長ではなく、読み込んだモデルの正規化骨から接地位置と脚長を得る。
+      const hips = vrm.humanoid.getNormalizedBoneNode("hips");
+      const legs = ["left", "right"].map(side => {
+        const upper = vrm.humanoid.getNormalizedBoneNode(`${side}UpperLeg`);
+        const lower = vrm.humanoid.getNormalizedBoneNode(`${side}LowerLeg`);
+        const foot = vrm.humanoid.getNormalizedBoneNode(`${side}Foot`);
+        if (!upper || !lower || !foot) return null;
+        const hip = upper.getWorldPosition(new THREE.Vector3());
+        const knee = lower.getWorldPosition(new THREE.Vector3());
+        const anchor = foot.getWorldPosition(new THREE.Vector3());
+        const axis = anchor.clone().sub(hip).normalize();
+        const bend = knee.clone().sub(hip);
+        bend.addScaledVector(axis, -bend.dot(axis));
+        if (bend.lengthSq() < 1e-12) {
+          bend.set(0, 0, 1).transformDirection(vrm.scene.matrixWorld);
+        }
+        return { side, upper, lower, foot, anchor, bend: bend.normalize(),
+          rotation: foot.getWorldQuaternion(new THREE.Quaternion()),
+          upperLength: hip.distanceTo(knee), lowerLength: knee.distanceTo(anchor),
+          restReach: hip.distanceTo(anchor) };
+      }).filter(Boolean);
+      return hips && legs.length === 2 ? { hips, legs, sourcePose: null } : null;
+    }
+    function aimBone(node, child, target) {
+      const origin = node.getWorldPosition(new THREE.Vector3());
+      const from = child.getWorldPosition(new THREE.Vector3()).sub(origin).normalize();
+      const to = target.clone().sub(origin).normalize();
+      const world = node.getWorldQuaternion(new THREE.Quaternion());
+      world.premultiply(new THREE.Quaternion().setFromUnitVectors(from, to));
+      node.quaternion.copy(node.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
+      node.updateWorldMatrix(false, true);
+    }
+    function applyFootContact(blend = 1) {
+      if (!footContact || motionNumber === "00" || blend === 0) return;
+      const targets = footContact.legs.map((leg, index) => {
+        if (motionNumber === "12" && leg.side === "left") return null;
+        const from = transition?.feet[index];
+        const position = from ? from.position.clone().lerp(leg.anchor, blend) : leg.anchor.clone();
+        const rotation = from ? from.rotation.clone().slerp(leg.rotation, blend) : leg.rotation.clone();
+        const bend = leg.bend.clone();
+        if (from) {
+          const turn = new THREE.Quaternion().setFromUnitVectors(from.bend, bend);
+          bend.copy(from.bend).applyQuaternion(new THREE.Quaternion().slerp(turn, blend));
+        }
+        return { leg, position, rotation, bend };
+      }).filter(Boolean);
+      // 横への重心移動で伸び切った脚が届かなくなる分だけ、骨盤を下げる。
+      let drop = 0;
+      for (const { leg, position } of targets) {
+        const hip = leg.upper.getWorldPosition(new THREE.Vector3());
+        const reach = leg.restReach;
+        const horizontalSq = (hip.x - position.x) ** 2 + (hip.z - position.z) ** 2;
+        drop = Math.max(drop, hip.y - position.y - Math.sqrt(Math.max(0, reach ** 2 - horizontalSq)));
+      }
+      // 中立脚長までの余裕だけで立ち上がりを滑らかにし、伸び切り付近の膝速度の急変を避ける。
+      const soften = Math.min(...targets.map(({ leg }) => leg.upperLength + leg.lowerLength - leg.restReach));
+      if (soften > 0 && drop > 0) {
+        drop = drop < soften ? drop * drop / (2 * soften) : drop - soften / 2;
+      }
+      if (drop > 0) {
+        const { hips } = footContact;
+        const position = hips.getWorldPosition(new THREE.Vector3());
+        position.y -= drop;
+        hips.position.copy(hips.parent.worldToLocal(position));
+        hips.updateWorldMatrix(false, true);
+      }
+      for (const { leg, position, rotation, bend } of targets) {
+        // 既に接地している中立姿勢には丸め誤差由来の膝回転を加えない。
+        if (leg.foot.getWorldPosition(new THREE.Vector3()).distanceToSquared(position) < 1e-16
+            && leg.foot.getWorldQuaternion(new THREE.Quaternion()).angleTo(rotation) < 1e-7) continue;
+        const hip = leg.upper.getWorldPosition(new THREE.Vector3());
+        const axis = position.clone().sub(hip);
+        const distance = Math.max(1e-8, axis.length());
+        axis.divideScalar(distance);
+        const along = THREE.MathUtils.clamp((leg.upperLength ** 2 - leg.lowerLength ** 2 + distance ** 2) / (2 * distance), -leg.upperLength, leg.upperLength);
+        const height = Math.sqrt(Math.max(0, leg.upperLength ** 2 - along ** 2));
+        bend.addScaledVector(axis, -bend.dot(axis)).normalize();
+        const knee = hip.clone().addScaledVector(axis, along).addScaledVector(bend, height);
+        aimBone(leg.upper, leg.lower, knee);
+        aimBone(leg.lower, leg.foot, position);
+        leg.foot.quaternion.copy(leg.foot.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(rotation));
+        leg.foot.updateWorldMatrix(false, true);
+      }
+    }
+    function startTransition(nextMotion = "999") {
       // 表示中の姿勢を起点にするため、補間中の連続ページ送りでも跳ねない。
-      transition = { from: capturePose(), elapsed: 0 };
+      const from = transition?.elapsed === 0 ? transition.from : capturePose();
+      const feet = transition?.elapsed === 0 ? transition.feet : captureFeet();
+      // 中立から02へ入るときは、VRMA自身の外回り軌道をそのまま使う。
+      const armsAtIdle = bones.every((bone, index) =>
+        !["leftUpperArm", "rightUpperArm"].includes(bone.name)
+        || from[index].rotation.angleTo(bone.idleRotation) < 1e-4);
+      const clearSleeves = motionNumber === "02" || transition?.clearSleeves
+        || (nextMotion === "02" && !armsAtIdle);
+      transition = { from, feet, target: null, elapsed: 0, clearSleeves };
       currentAction = null;
       finishPending = false;
       mixer.stopAllAction();
+      if (footContact) footContact.sourcePose = null;
     }
     async function showMotion(selected) {
       const id = ++requestId;
       if (!vrm || !mixer) return;
       if (!selected.file) {
         startTransition();
+        motionNumber = "999";
         activeTracks = { rotation: new Set(), translation: new Set() };
         ending = true;
         status.textContent = "確認終了";
@@ -210,21 +321,41 @@
       status.textContent = `${selected.number} ${selected.title} を読み込み中…`;
       try {
         if (!motionCache.has(selected.file)) {
-          motionCache.set(selected.file, load(motionLoader, selected.file).then(gltf => {
+          const pending = load(motionLoader, selected.file).then(gltf => {
             const animation = gltf.userData?.vrmAnimations?.[0];
             if (!animation) throw new Error("VRMA 内にアニメーションがありません");
+            const clip = createVRMAnimationClip(animation, vrm);
+            // 候補の骨盤移動は、モデルの中立位置を起点にした相対移動として扱う。
+            if (selected.number !== "00") {
+              const hips = bones.find(bone => bone.name === "hips");
+              const track = clip.tracks.find(track => track.name === `${hips.node.name}.position`);
+              if (track) {
+                const offset = hips.restPosition.clone().sub(new THREE.Vector3().fromArray(track.values));
+                for (let i = 0; i < track.values.length; i += 3) {
+                  track.values[i] += offset.x;
+                  track.values[i + 1] += offset.y;
+                  track.values[i + 2] += offset.z;
+                }
+              }
+            }
             return {
-              clip: createVRMAnimationClip(animation, vrm),
+              clip,
               tracks: {
                 rotation: new Set(animation.humanoidTracks.rotation.keys()),
                 translation: new Set(animation.humanoidTracks.translation.keys()),
               },
             };
-          }));
+          }).catch(error => {
+            // 別ページへ移動済みでも失敗を残さず、次の選択で再読み込みする。
+            if (motionCache.get(selected.file) === pending) motionCache.delete(selected.file);
+            throw error;
+          });
+          motionCache.set(selected.file, pending);
         }
         const { clip, tracks } = await motionCache.get(selected.file);
         if (id !== requestId) return;
-        startTransition();
+        startTransition(selected.number);
+        motionNumber = selected.number;
         activeTracks = tracks;
         ending = false;
         const action = mixer.clipAction(clip);
@@ -238,7 +369,6 @@
         status.textContent = "";
       } catch (error) {
         if (id !== requestId) return;
-        motionCache.delete(selected.file);
         status.textContent = `モーションを読み込めませんでした: ${error.message || error}`;
         console.error(error);
       }
@@ -267,11 +397,12 @@
         const idleRotation = restRotation.clone();
         const idleAngles = {
           leftUpperArm: [0, 0, -75], rightUpperArm: [0, 0, 75],
-          leftLowerArm: [0, 10, 0], rightLowerArm: [0, -10, 0],
+          leftLowerArm: [0, -10, 0], rightLowerArm: [0, 10, 0],
         }[name];
         if (idleAngles) idleRotation.setFromEuler(new THREE.Euler(...idleAngles.map(THREE.MathUtils.degToRad)));
         bones.push({ name, node, restRotation, idleRotation, restPosition: node.position.clone() });
       }
+      footContact = createFootContact();
       mixer = new THREE.AnimationMixer(vrm.scene);
       mixer.addEventListener("finished", event => {
         if (event.action === currentAction) finishPending = true;
@@ -283,9 +414,19 @@
     }
     function tick() {
       const delta = Math.min(clock.getDelta(), .1);
+      // Mixer は値が変化しないトラックを再適用しないため、補間前の姿勢を復元する。
+      // 表示姿勢を次の補間先にすると、前ページの曲がった膝などが残ってしまう。
+      const sourcePose = footContact?.sourcePose || transition?.target;
+      if (sourcePose) {
+        bones.forEach(({ node }, index) => {
+          node.quaternion.copy(sourcePose[index].rotation);
+          node.position.copy(sourcePose[index].position);
+        });
+      }
       mixer?.update(delta);
       if (finishPending) {
         startTransition();
+        motionNumber = "999";
         activeTracks = { rotation: new Set(), translation: new Set() };
         ending = true;
       }
@@ -294,17 +435,40 @@
         if (!activeTracks.rotation.has(name)) node.quaternion.copy(ending ? idleRotation : restRotation);
         if (!activeTracks.translation.has(name)) node.position.copy(restPosition);
       }
+      // 接地補正も Mixer に戻さない。定数トラックや骨盤の補正量が次フレームに残るのを防ぐ。
+      if (footContact) {
+        if (!footContact.sourcePose) footContact.sourcePose = capturePose();
+        else bones.forEach(({ node }, index) => {
+          footContact.sourcePose[index].rotation.copy(node.quaternion);
+          footContact.sourcePose[index].position.copy(node.position);
+        });
+      }
+      let contactBlend = 1;
       if (transition) {
         transition.elapsed += delta;
         const progress = Math.min(1, transition.elapsed / transitionSeconds);
         const eased = progress * progress * (3 - 2 * progress);
+        contactBlend = eased;
+        if (!transition.target) transition.target = capturePose();
         bones.forEach((bone, index) => {
           const from = transition.from[index];
-          bone.node.quaternion.slerpQuaternions(from.rotation, bone.node.quaternion, eased);
-          bone.node.position.lerpVectors(from.position, bone.node.position, eased);
+          const target = transition.target[index];
+          target.rotation.copy(bone.node.quaternion);
+          target.position.copy(bone.node.position);
+          // 出力 quaternion を第2引数に渡すと上書きで補間できないため、別の値を使う。
+          bone.node.quaternion.slerpQuaternions(from.rotation, target.rotation, eased);
+          bone.node.position.lerpVectors(from.position, target.position, eased);
+          // 02の袖を腰の外側に回す。中断した姿勢から始め、両端では補正をゼロにする。
+          if (transition.clearSleeves && (bone.name === "leftUpperArm" || bone.name === "rightUpperArm")) {
+            const amount = Math.min(1, from.rotation.angleTo(target.rotation) / THREE.MathUtils.degToRad(15));
+            const direction = bone.name === "leftUpperArm" ? 1 : -1;
+            const angle = direction * THREE.MathUtils.degToRad(25) * 4 * eased * (1 - eased) * amount;
+            bone.node.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle));
+          }
         });
-        if (progress >= 1) transition = null;
       }
+      applyFootContact(contactBlend);
+      if (transition?.elapsed >= transitionSeconds) transition = null;
       vrm?.update(delta);
       renderer.render(scene, camera);
       requestAnimationFrame(tick);
