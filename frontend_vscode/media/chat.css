@@ -16,19 +16,20 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-
 button:disabled { opacity: .4; cursor: default; }
 [hidden] { display: none !important; }
 label { display: block; font-size: 11px; color: var(--muted); }
-#chat-header { position: relative; display: flex; flex: 0 0 auto; align-items: center; gap: 10px; min-height: 64px; padding: 12px 14px; border-bottom: 1px solid var(--border); background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
-#chat-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 15%, transparent), transparent); }
-#chat-header.running { background-image: none; animation: cyan-header-breathe 4.5s ease-in-out infinite; }
-#chat-header.running::before { background: linear-gradient(90deg, #00ffff, #00ffff80, #00ffff20); animation: cyan-breathe 4.5s ease-in-out infinite; }
-#chat-header.running::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00ffff; box-shadow: 0 0 12px #00ffff60; animation: cyan-breathe 4.5s ease-in-out infinite; pointer-events: none; }
+#chat-header { display: flex; flex-direction: column; flex: 0 0 auto; border-bottom: 1px solid var(--border); }
+#title-bar { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 14px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
+#activity-bar { flex: 0 0 auto; height: 2px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 15%, transparent), transparent); pointer-events: none; }
+#chat-header.running #title-bar { background-image: none; animation: cyan-header-breathe 4.5s ease-in-out infinite; }
+#chat-header.running #activity-bar { background: #00ffff; box-shadow: 0 0 12px #00ffff60; animation: cyan-breathe 4.5s ease-in-out infinite; }
 @keyframes cyan-breathe { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 @keyframes cyan-header-breathe { 0%, 100% { background-color: color-mix(in srgb, #00ffff 3%, var(--surface)); } 50% { background-color: color-mix(in srgb, #00ffff 14%, var(--surface)); } }
 .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .brand-icon { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; }
-.header-title { display: flex; flex-direction: column; min-width: 0; gap: 2px; line-height: 1.35; }
 .brand-name { white-space: nowrap; font-size: 16px; font-weight: 700; letter-spacing: -.5px; }
-#view-title { font-size: 10px; font-weight: 400; letter-spacing: 0; color: var(--muted); margin-left: 5px; }
-#project-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); }
+#conversation-toolbar { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 14px; }
+.conversation-context { display: flex; flex: 1; min-width: 0; align-items: center; gap: 10px; }
+#view-title { flex: 0 0 auto; white-space: nowrap; font-size: 11px; color: var(--muted); }
+#project-folder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); }
 #header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
 #header-actions button { padding: 5px 7px; border-color: var(--border); font-size: 11px; line-height: 1.4; }
 #new-chat { background: var(--accent-soft); }
@@ -133,10 +134,11 @@ select, input { width: 100%; min-height: 34px; padding: 5px 8px; color: var(--vs
 body.vscode-light { --terminal: #18724a; }
 body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vscode-contrastBorder); --terminal: var(--vscode-foreground); }
 @media (max-width: 440px) {
-  #chat-header { padding: 10px; gap: 7px; }
+  #title-bar { padding: 8px 10px; gap: 7px; }
+  #conversation-toolbar { padding: 6px 10px; gap: 7px; }
+  .conversation-context { gap: 7px; }
   .brand { gap: 7px; }
   .brand-icon { width: 24px; height: 24px; }
-  #view-title { display: none; }
   #desktop-controls { margin-left: 0; }
   main { padding: 18px 12px; }
   footer { padding-left: 10px; padding-right: 10px; }

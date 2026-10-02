@@ -9,13 +9,19 @@
 </head>
 <body>
   <header id="chat-header">
-    <div class="brand"><img class="brand-icon" src="{{APP_ICON}}" alt=""><div class="header-title"><div class="brand-name">AiDiy <span id="view-title">今の会話</span></div><span id="project-folder" title=""></span></div></div>
-    <nav id="header-actions" aria-label="会話操作"><button type="button" id="new-chat" title="新しい会話" disabled>＋ 新規</button><button type="button" id="history-toggle" aria-controls="history-list" aria-expanded="false">一覧</button></nav>
-    <nav id="desktop-controls" aria-label="ウィンドウ操作" hidden>
-      <button type="button" id="window-minimize" title="最小化" aria-label="最小化"><span class="window-minimize" aria-hidden="true"></span></button>
-      <button type="button" id="window-maximize" title="最大化" aria-label="最大化"><span class="window-maximize" aria-hidden="true"></span></button>
-      <button type="button" id="window-close" title="閉じる" aria-label="閉じる"><span class="window-close" aria-hidden="true">×</span></button>
-    </nav>
+    <div id="title-bar">
+      <div class="brand"><img class="brand-icon" src="{{APP_ICON}}" alt=""><div class="brand-name">AiDiy</div></div>
+      <nav id="desktop-controls" aria-label="ウィンドウ操作" hidden>
+        <button type="button" id="window-minimize" title="最小化" aria-label="最小化"><span class="window-minimize" aria-hidden="true"></span></button>
+        <button type="button" id="window-maximize" title="最大化" aria-label="最大化"><span class="window-maximize" aria-hidden="true"></span></button>
+        <button type="button" id="window-close" title="閉じる" aria-label="閉じる"><span class="window-close" aria-hidden="true">×</span></button>
+      </nav>
+    </div>
+    <div id="activity-bar" aria-hidden="true"></div>
+    <div id="conversation-toolbar">
+      <div class="conversation-context"><span id="view-title">今の会話</span><span id="project-folder" title=""></span></div>
+      <nav id="header-actions" aria-label="会話操作"><button type="button" id="new-chat" title="新しい会話" disabled>＋ 新規</button><button type="button" id="history-toggle" aria-controls="history-list" aria-expanded="false">一覧</button></nav>
+    </div>
   </header>
   <section id="history-list" role="list" aria-label="会話一覧" hidden></section>
   <main id="conversation" aria-label="会話">
