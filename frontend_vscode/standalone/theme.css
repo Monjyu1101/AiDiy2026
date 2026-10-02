@@ -13,13 +13,12 @@
   --vscode-editor-font-family: Consolas, "SFMono-Regular", monospace;
   --vscode-list-activeSelectionBackground: #252f49; --vscode-list-activeSelectionForeground: #fff;
 }
-html { background: var(--vscode-sideBar-background); }
-body { max-width: 1000px; margin: auto; }
-#title-bar { display: flex; min-height: 31px; padding: 1px 12px; gap: 8px; }
+html { background: var(--surface); }
+#title-bar { display: flex; min-height: 31px; padding: 1px 2px; gap: 8px; }
 .brand-icon { display: none; }
 .brand-name { font-size: 14px; }
 #activity-bar { height: 3px; }
-.desktop-window body { max-width: none; border: 1px solid var(--vscode-panel-border); }
+.desktop-window body { border: 1px solid var(--vscode-panel-border); }
 .desktop-window #title-bar { -webkit-app-region: drag; user-select: none; }
 .desktop-window #conversation-toolbar, .desktop-window #desktop-controls { -webkit-app-region: no-drag; }
 .desktop-window.window-maximized body { border: 0; }
