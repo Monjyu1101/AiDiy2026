@@ -304,6 +304,13 @@ def cleanup(choices: dict | None = None) -> bool:
 
     extension_ok, deleted_count = uninstall_extension()
     cleanup_ok = extension_ok
+    for launcher_name in ("aidiy_vscode.cmd", "aidiy_vscode"):
+        launcher_path = Path.home() / ".local" / "bin" / launcher_name
+        if launcher_path.is_file():
+            if remove_file(launcher_path, f"{launcher_path.name} ({label})"):
+                deleted_count += 1
+            else:
+                cleanup_ok = False
     for directory_name in ("node_modules", "dist", "out", "__pycache__", ".pytest_cache"):
         directory_path = FRONTEND_VSCODE_DIR / directory_name
         existed = directory_path.is_dir()

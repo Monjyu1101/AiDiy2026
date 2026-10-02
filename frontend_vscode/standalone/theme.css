@@ -11,4 +11,3 @@
 }
 body { max-width:960px; margin:auto; }
 html { background:var(--vscode-sideBar-background); }
-#standalone-actions { display:block; }

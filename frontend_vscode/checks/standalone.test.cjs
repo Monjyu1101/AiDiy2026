@@ -4,7 +4,7 @@ const { resolve, join } = require('node:path');
 const { mkdtempSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { 単独起動 } = require('../out/standalone.cjs');
-const fake = resolve('test/fake-cli.cjs');
+const fake = resolve('checks/fake-cli.cjs');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function connect(app) {
   const reader = (await fetch(app.url+'events')).body.getReader();

@@ -8,7 +8,7 @@
   <title>AiDiy</title>
 </head>
 <body>
-  <header id="chat-header"><div class="header-title"><strong id="view-title">今の会話</strong><span id="project-folder" title=""></span></div><nav id="header-actions"><div id="standalone-actions"><button type="button" id="standalone-new" title="新しい会話">＋ 新規</button></div><button type="button" id="history-toggle" aria-controls="history-list" aria-expanded="false">一覧</button></nav></header>
+  <header id="chat-header"><div class="header-title"><strong id="view-title">今の会話</strong><span id="project-folder" title=""></span></div><nav id="header-actions"><button type="button" id="new-chat" title="新しい会話" disabled>＋ 新規</button><button type="button" id="history-toggle" aria-controls="history-list" aria-expanded="false">一覧</button></nav></header>
   <section id="history-list" role="list" aria-label="会話一覧" hidden></section>
   <main id="conversation" aria-label="会話">
     <div id="messages"></div>
@@ -30,6 +30,14 @@
       <input id="custom-model" maxlength="300" autocomplete="off" spellcheck="false" hidden>
       <p id="model-picker-status" class="picker-status" role="status" aria-live="polite"></p>
       <div class="picker-actions"><button type="submit" value="cancel">キャンセル</button><button id="apply-model" type="button" class="primary">このモデルを使用</button></div>
+    </form>
+  </dialog>
+  <dialog id="delete-history-dialog" aria-labelledby="delete-history-title" aria-describedby="delete-history-message">
+    <form method="dialog" class="delete-history-form">
+      <h2 id="delete-history-title">会話を削除</h2>
+      <p id="delete-history-message">この会話を削除しますか？</p>
+      <p id="delete-history-name"></p>
+      <div class="picker-actions"><button type="submit" value="cancel">キャンセル</button><button id="confirm-delete-history" type="button" class="danger">削除</button></div>
     </form>
   </dialog>
   <script nonce="{{NONCE}}" src="{{SCRIPT}}"></script>

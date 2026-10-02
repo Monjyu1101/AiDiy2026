@@ -92,14 +92,9 @@
     "menus": {
       "view/title": [
         {
-          "command": "aidiyHermes.newChat",
-          "when": "view == aidiyHermes.chat",
-          "group": "navigation"
-        },
-        {
           "command": "aidiyHermes.settings",
           "when": "view == aidiyHermes.chat",
-          "group": "navigation"
+          "group": "aidiy"
         },
         {
           "command": "aidiyHermes.attachSelection",

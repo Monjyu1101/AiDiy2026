@@ -15,7 +15,7 @@ try {
     $arguments = @(
         '--new-window', '--disable-extensions', '--disable-gpu', '--skip-welcome', '--skip-release-notes',
         "--user-data-dir=$testRoot/user-data", "--extensions-dir=$testRoot/extensions",
-        "--extensionDevelopmentPath=$extensionRoot", "--extensionTestsPath=$extensionRoot/test/extension-host.cjs",
+        "--extensionDevelopmentPath=$extensionRoot", "--extensionTestsPath=$extensionRoot/checks/extension-host.cjs",
         "$testRoot/workspace"
     ) | ForEach-Object { '"' + $_ + '"' }
     $testProcess = Start-Process -FilePath $codeExe -ArgumentList $arguments -WindowStyle Hidden -PassThru -RedirectStandardOutput "$testRoot/stdout.log" -RedirectStandardError "$testRoot/stderr.log"

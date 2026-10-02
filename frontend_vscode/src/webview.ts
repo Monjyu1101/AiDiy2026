@@ -8,7 +8,10 @@ const prompt = element<HTMLTextAreaElement>('prompt');
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
 const historyList = element<HTMLElement>('history-list');
+const newChat = element<HTMLButtonElement>('new-chat');
 const historyToggle = element<HTMLButtonElement>('history-toggle');
+const deleteHistoryDialog = element<HTMLDialogElement>('delete-history-dialog');
+const deleteHistoryName = element<HTMLElement>('delete-history-name');
 const modelPicker = element<HTMLDialogElement>('model-picker');
 const providerSelect = element<HTMLSelectElement>('provider-select');
 const modelSelect = element<HTMLSelectElement>('model-select');
@@ -26,6 +29,7 @@ let メッセージJSON = '';
 let 履歴JSON = '';
 let 会話ID = '';
 let 一覧表示中 = false;
+let 削除対象ID = '';
 const 演出済み回答 = new Set<string>();
 let 演出タイマー: number | undefined;
 prompt.value = vscode.getState()?.下書き ?? '';
@@ -89,7 +93,12 @@ const 履歴表示 = (entries: { id: string; 題名: string; 更新日時: numbe
     open.append(date, title); open.addEventListener('click', () => { post('selectHistory', { id: entry.id }); 一覧切替(false); });
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'history-delete'; remove.textContent = '削除';
     remove.title = '会話を削除'; remove.setAttribute('aria-label', `会話を削除: ${entry.題名}`); remove.disabled = 実行中;
-    remove.addEventListener('click', () => post('deleteHistory', { id: entry.id }));
+    remove.addEventListener('click', () => {
+      if (実行中 || deleteHistoryDialog.open) return;
+      削除対象ID = entry.id;
+      deleteHistoryName.textContent = entry.題名;
+      deleteHistoryDialog.showModal();
+    });
     row.append(open, remove); return row;
   }));
 };
@@ -135,6 +144,17 @@ prompt.addEventListener('keydown', event => {
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
 modelButton.addEventListener('click', モデル選択を開く);
 historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
+newChat.addEventListener('click', () => {
+  if (newChat.disabled) return;
+  post('new');
+  一覧切替(false);
+});
+deleteHistoryDialog.addEventListener('close', () => { 削除対象ID = ''; });
+element<HTMLButtonElement>('confirm-delete-history').addEventListener('click', () => {
+  if (!削除対象ID || 実行中) return;
+  post('deleteHistory', { id: 削除対象ID });
+  deleteHistoryDialog.close();
+});
 element<HTMLDetailsElement>('progress-details').addEventListener('toggle', () => {
   if (element<HTMLDetailsElement>('progress-details').open) 進捗末尾表示();
 });
@@ -222,11 +242,13 @@ window.addEventListener('message', event => {
   }
   会話ID = state.会話ID;
   送信待ち = false; 実行中 = state.実行中;
-  入力許可 = state.信頼済み && Boolean(state.作業フォルダ);
+  入力許可 = state.信頼済み && state.接続済み !== false && Boolean(state.作業フォルダ);
+  newChat.disabled = 実行中 || !state.信頼済み || state.接続済み === false || (!state.作業フォルダ && !state.新規可能);
   const projectName = String(state.作業フォルダ?.名前 ?? '');
   projectFolder.textContent = 末尾省略(projectName);
   projectFolder.title = projectName;
   const history = Array.isArray(state.履歴) ? state.履歴 : [];
+  if (deleteHistoryDialog.open && (実行中 || !history.some((entry: { id: string }) => entry.id === 削除対象ID))) deleteHistoryDialog.close();
   const historyJSON = JSON.stringify([history, 会話ID, 実行中]);
   if (historyJSON !== 履歴JSON) { 履歴表示(history); 履歴JSON = historyJSON; }
   provider = state.provider; model = state.model;
@@ -240,7 +262,7 @@ window.addEventListener('message', event => {
   element('stop').hidden = !実行中;
   element('send').hidden = 実行中;
   const status = element('status');
-  status.textContent = !state.信頼済み ? 'VS Code でワークスペースを信頼してください' : !state.作業フォルダ ? (state.作業URI ? '新規の会話を開始してください' : 'VS Code でフォルダを開いてください') : '';
+  status.textContent = state.接続済み === false ? '接続が切れました。再接続しています…' : !state.信頼済み ? 'VS Code でワークスペースを信頼してください' : !state.作業フォルダ ? (state.作業URI ? '新規の会話を開始してください' : '作業フォルダを開いてください') : '';
   status.hidden = !status.textContent;
   element('attachment').hidden = !state.添付;
   element('attachment-name').textContent = state.添付 ?? '';

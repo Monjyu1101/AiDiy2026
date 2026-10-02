@@ -1,6 +1,6 @@
 # VS Code チャット拡張変更手順
 
-> 文書: `frontend_vscode,VSCodeチャット拡張変更手順.md` | 実装: `frontend_vscode/package.json`, `frontend_vscode/src/extension.ts`, `frontend_vscode/src/runner.ts`, `frontend_vscode/src/protocol.ts`, `frontend_vscode/src/webview.ts`, `frontend_vscode/src/standalone.ts`
+> 文書: `frontend_vscode,VSCodeチャット拡張変更手順.md` | 実装: `frontend_vscode/package.json`, `frontend_vscode/src/extension.ts`, `frontend_vscode/src/runner.ts`, `frontend_vscode/src/protocol.ts`, `frontend_vscode/src/webview.ts`, `frontend_vscode/src/standalone.ts`, `frontend_vscode/scripts/launch-standalone.mjs`
 
 ## このメモを使う場面
 
@@ -8,17 +8,18 @@
 - `aidiy_hermes` の起動、停止、Provider / モデル選択を調整する。
 - Webview と単独試用画面を変更する。
 - VSIX を生成し、VS Code へ配置して確認する。
+- 単独起動用の `aidiy_vscode` コマンドを配置する。
 
 ## 変更箇所の選び方
 
 | 変更内容 | 主なファイル | 同時に確認するもの |
 |----------|--------------|--------------------|
 | ビュー、コマンド、設定 | `package.json`, `src/extension.ts` | `README.md`, `media/chat.html` |
-| CLI 探索、引数、標準入出力、停止 | `src/runner.ts` | `test/runner.test.cjs` |
+| CLI 探索、引数、標準入出力、停止 | `src/runner.ts` | `checks/runner.test.cjs` |
 | AIコード互換 packet | `src/protocol.ts` | `backend_server/AIコア/AIコード.py`, `backend_server/AIコア/AIコード_cli.py` |
-| チャット表示、入力 | `src/webview.ts`, `media/chat.html`, `media/chat.css` | `standalone/bridge.js`, `test/standalone.test.cjs` |
+| チャット表示、入力 | `src/webview.ts`, `media/chat.html`, `media/chat.css` | `standalone/bridge.js`, `checks/standalone.test.cjs` |
 | Provider / モデル候補 | `scripts/model-catalog.py` | `command_hermes` の picker / Provider 実装 |
-| 単独試用サーバー | `src/standalone.ts`, `standalone/bridge.js` | `test/standalone.test.cjs` |
+| 単独試用サーバー | `src/standalone.ts`, `standalone/bridge.js` | `checks/standalone.test.cjs` |
 | bundle / VSIX | `scripts/build.mjs`, `package.json` | `.vscodeignore`, `dist/THIRD_PARTY_NOTICES.txt` |
 
 ## 実装上の維持事項
@@ -31,6 +32,8 @@
 - ワークスペース未信頼時、仮想ワークスペース、Web 版では CLI を実行しない。
 - Webview では Markdown の HTML と外部画像を無効のまま維持し、外部リンクは `http` / `https` のみにする。
 - `webview.ts` を変えた場合は VS Code 拡張モードと単独試用モードの両方を確認する。
+- 履歴削除の確認は `media/chat.html` のパネル内ダイアログで共通処理し、確認後に `deleteHistory` を送る。拡張ホストや単独画面のブリッジで別の確認ダイアログを出さない。
+- 「新規」「一覧」、モデル選択、履歴削除、送信、停止は Webview 内の共通 UI を主操作にする。VS Code 固有のコマンドは外部からの呼び出しやエディター連携用に残す。
 - Provider / モデル選択は VS Code 上部の Quick Pick ではなく、`media/chat.html` のチャットパネル内ダイアログで行う。候補は `chooseModel` / `modelCatalog` / `modelCatalogError`、確定値は `setModel` で Webview と実行層の間を受け渡す。
 - Provider と API モデルは `scripts/model-catalog.py` から Hermes の picker を再利用する。外部 CLI のモデルは `_config/AiDiy_code_*.json` を読み、設定がないか `auto` のみなら対応する `scripts/cli_bat` の `MODEL` 値を読む。`claude-code` は `AiDiy_code_claude_cli.json` に対応し、`claude_sdk` は Hermes の外部 CLI Provider には含まれない。
 - モデル候補は provider ごとの固定キャッシュにせず、選択画面を開くたび CLI から取得する。特に `openai_oauth` は認証アカウントのライブ候補が変わり得る。
@@ -53,7 +56,9 @@ python _setup.py
 python frontend_vscode/_setup.py
 ```
 
-`frontend_vscode/_setup.py` は `npm install`、`npm update`、VSIX 生成、`code --install-extension --force` を順に実行し、最後に拡張 ID とバージョンを再取得して配置を確認する。`code` が PATH に無い場合は、稼働中の Codespaces / Dev Container / Remote SSH の Remote CLI と VS Code の標準配置先も探索する。単にファイルが存在するだけでなく、`--version` に成功した CLI だけを使う。
+`frontend_vscode/_setup.py` は `npm install`、`npm update`、VSIX 生成、`code --install-extension --force` を順に実行し、最後に拡張 ID とバージョンを再取得して配置を確認する。VS Code CLI が見つからない場合は単独画面だけをコンパイルする。最後に `~/.local/bin/aidiy_vscode.cmd`（Windows）または `~/.local/bin/aidiy_vscode`（macOS / Linux）を作り、`scripts/launch-standalone.mjs` を絶対パスで呼び出す。`code` が PATH に無い場合は、稼働中の Codespaces / Dev Container / Remote SSH の Remote CLI と VS Code の標準配置先も探索する。単にファイルが存在するだけでなく、`--version` に成功した CLI だけを使う。
+
+単独画面は作業フォルダで `aidiy_vscode`、または `aidiy_vscode "C:\work\project"` のように明示して起動する。前者は起動時のカレントフォルダを使用する。`~/.local/bin` は Hermes のランチャーと共通なので PATH に含める。Windows の `.cmd` と macOS / Linux のシェルランチャーは、どちらも `scripts/launch-standalone.mjs` を直接呼ぶ。`launch-extension-dev.ps1` は Windows で VS Code 拡張の開発ホストを起動する。
 
 配置は拡張機能ファイルを更新するだけで、VS Code 本体や AiDiy の常駐サービスを停止しない。すでに VS Code が起動している場合、変更の反映にはウィンドウ再読み込みが必要になる。
 
@@ -104,7 +109,7 @@ Windows の実 VS Code で拡張ホストまで確認するときは、依存導
 python frontend_vscode/_cleanup.py
 ```
 
-ルートの `python _cleanup.py` でも、`command_hermes` の次に `frontend_vscode` を選択できる。配置済みの `aidiy.aidiy-hermes` を解除し、解除後に拡張一覧から消えたことを確認してから、`node_modules`、`dist`、`out`、Python cache を削除する。
+ルートの `python _cleanup.py` でも、`command_hermes` の次に `frontend_vscode` を選択できる。配置済みの `aidiy.aidiy-hermes` を解除し、解除後に拡張一覧から消えたことを確認してから、`~/.local/bin/aidiy_vscode.cmd` または `~/.local/bin/aidiy_vscode`、`node_modules`、`dist`、`out`、Python cache を削除する。
 
 cleanup は VS Code 本体を終了しない。起動中の拡張ホストには再読み込みまで旧コードが残る場合があるため、解除を画面へ反映するときだけ利用者が VS Code のウィンドウを再読み込みする。CLI が利用できない、解除後も拡張が残る、生成物を削除できない場合は失敗として終了する。
 
@@ -112,7 +117,7 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 
 | 症状 | 確認箇所 |
 |------|----------|
-| `code` が見つからない | VS Code CLI の PATH、`frontend_vscode/_setup.py` の `find_vscode_cli()` |
+| `code` が見つからず VSIX を配置できない | VS Code CLI の PATH、`frontend_vscode/_setup.py` の `find_vscode_cli()`。単独画面はセットアップ可能 |
 | Hermes が見つからない | `aidiyHermes.cliPath`、`~/.local/bin`、`command_hermes/.venv` |
 | Provider / モデルが空 | `scripts/model-catalog.py`、Hermes 設定、Cli Path が AiDiy CLI を指すか |
 | 送信できない | ワークスペース信頼、フォルダが開かれているか、実行中状態 |

@@ -4,7 +4,7 @@ const { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } = require
 const { join, resolve, sep } = require('node:path');
 const { tmpdir } = require('node:os');
 const { CLI実行, 会話引数, 起動解決, 再開セッション不在 } = require('../out/runner.cjs');
-const fake = resolve('test/fake-cli.cjs');
+const fake = resolve('checks/fake-cli.cjs');
 const root = resolve('.');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 function cleanup(dir) {

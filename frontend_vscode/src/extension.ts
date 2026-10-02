@@ -95,7 +95,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       履歴: this.履歴.filter(item => item.作業URI === folder?.uri.toString())
         .sort((a, b) => b.更新日時 - a.更新日時)
         .map(item => ({ id: item.id, 題名: this.題名(item), 更新日時: item.更新日時 })),
-      作業フォルダ: folder ? { 名前: folder.name, パス: folder.uri.fsPath } : null, 信頼済み: vscode.workspace.isTrusted
+      作業フォルダ: folder ? { 名前: folder.name, パス: folder.uri.fsPath } : null,
+      新規可能: Boolean(this.選択フォルダ()), 信頼済み: vscode.workspace.isTrusted
     });
   }
   private 題名(item: 会話): string {
@@ -149,7 +150,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       case 'cancel_run': this.停止処理?.(); break;
       case 'new': this.新規(); break;
       case 'selectHistory': if (typeof data.id === 'string') this.履歴選択(data.id); break;
-      case 'deleteHistory': if (typeof data.id === 'string') await this.履歴削除(data.id); break;
+      case 'deleteHistory': if (typeof data.id === 'string') this.履歴削除(data.id); break;
       case 'attach': await this.選択添付(); break;
       case 'removeAttachment': if (!this.実行中) { this.添付 = undefined; this.通知(); } break;
       case 'settings': await vscode.commands.executeCommand('aidiyHermes.settings'); break;
@@ -263,7 +264,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   }
 
   新規(): void {
-    if (this.実行中) { void vscode.window.showInformationMessage('実行を停止してから新しい会話を開始してください。'); return; }
+    if (this.実行中) return;
     this.会話 = { メッセージ: [], 作業URI: this.選択フォルダ()?.uri.toString() ?? '', ...this.最終モデル, モデル選択済み: true };
     this.会話ID = randomUUID();
     this.添付 = undefined; this.進捗 = []; this.保存(); this.通知();
@@ -278,12 +279,10 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.添付 = undefined; this.進捗 = [];
     this.保存(false); this.通知();
   }
-  private async 履歴削除(id: string): Promise<void> {
+  private 履歴削除(id: string): void {
     if (this.実行中) return;
     const entry = this.履歴.find(item => item.id === id && item.作業URI === this.現在フォルダ()?.uri.toString());
     if (!entry) return;
-    const answer = await vscode.window.showWarningMessage(`「${this.題名(entry)}」を削除しますか？`, { modal: true }, '削除');
-    if (answer !== '削除' || this.実行中) return;
     this.履歴 = this.履歴.filter(item => item.id !== id);
     if (this.会話ID === id) {
       this.会話 = { メッセージ: [], 作業URI: entry.作業URI, ...this.最終モデル, モデル選択済み: true };

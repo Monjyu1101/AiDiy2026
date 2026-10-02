@@ -24,12 +24,12 @@
         events = new EventSource('events');
         events.onmessage = event => {
           const data = JSON.parse(event.data);
-          if (data.type === 'state') { state = data; document.getElementById('standalone-new').disabled = data.実行中; }
+          if (data.type === 'state') state = data;
           emit(data);
         };
         events.onerror = () => {
-          if (state) emit({...state, 作業フォルダ:null});
-          error('接続が切れました。再接続しています…');
+          if (state) emit({...state, 作業フォルダ:null, 接続済み:false});
+          else error('接続が切れました。再接続しています…');
         };
       } else if (message.type === 'chooseModel') {
         const provider = typeof message.provider === 'string' ? message.provider : '';
@@ -38,15 +38,9 @@
         }).catch(value => emit({type:'modelCatalogError', provider, message:String(value.message || value)}));
       }
       else if (message.type === 'setModel') void send({type:'model',provider:message.provider,model:message.model}).catch(error);
-      else if (message.type === 'deleteHistory') {
-        if (window.confirm('この会話を削除しますか？')) void send(message).catch(error);
-      }
       else if (message.type === 'copy') void navigator.clipboard.writeText(message.text).catch(error);
       else if (message.type === 'link' && /^https?:\/\//i.test(message.url)) window.open(message.url,'_blank','noopener,noreferrer');
       else void send(message).catch(error);
     }
   });
-  document.getElementById('standalone-new').onclick = () => {
-    void send({type:'new'}).then(() => emit({type:'showConversation'})).catch(error);
-  };
 })();

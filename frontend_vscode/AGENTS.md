@@ -57,9 +57,11 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `media/chat.html` / `media/chat.css` | Webview の HTML と見た目 |
 | `standalone/bridge.js` | 単独試用画面と HTTP / SSE の橋渡し |
 | `scripts/model-catalog.py` | Hermes 既存 picker から Provider / モデル候補を取得 |
+| `scripts/launch-standalone.mjs` | 作業フォルダから単独サーバーを起動し、OS のブラウザで開く |
 | `scripts/build.mjs` | 拡張、単独試用、Webview の bundle と第三者ライセンス生成 |
-| `test/` | CLI 実行、protocol、停止、単独試用のテスト |
+| `checks/` | CLI 実行、protocol、停止、単独試用の検証 |
 | `_setup.py` / `_cleanup.py` | VSIX の生成・配置と、拡張・生成物の解除 |
+| `launch-extension-dev.ps1` | VS Code 開発ホストの Windows 起動入口 |
 
 ## 実行フロー
 
@@ -91,7 +93,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 ## 実装時の入口
 
 - VS Code のビュー、コマンド、設定を変える場合は `package.json` と `src/extension.ts` をセットで見る。
-- CLI の探索、引数、標準入出力、停止を変える場合は `src/runner.ts` と `test/runner.test.cjs` をセットで見る。
+- CLI の探索、引数、標準入出力、停止を変える場合は `src/runner.ts` と `checks/runner.test.cjs` をセットで見る。
 - packet を変える場合は `src/protocol.ts` と既存 AIコード実装との互換性を確認する。
 - チャット UI を変える場合は `media/chat.html`、`media/chat.css`、`src/webview.ts` をセットで見て、単独試用側も確認する。
 - Provider / モデル候補を変える場合は `scripts/model-catalog.py` と `command_hermes` の picker 実装を先に確認する。

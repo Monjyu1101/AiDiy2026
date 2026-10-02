@@ -10,7 +10,7 @@
 
 """フロントエンド(VS Code) セットアップスクリプト
 
-Node.js 依存関係を導入して VSIX を生成し、VS Code 拡張機能として配置します。
+Node.js 依存関係を導入して VSIX を配置し、単独起動用ランチャーも作成します。
 
 公開 API:
     setup(choices=None) -> bool
@@ -18,6 +18,7 @@ Node.js 依存関係を導入して VSIX を生成し、VS Code 拡張機能と�
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -253,12 +254,43 @@ def get_installed_extensions(vscode_cli: str, show_versions: bool = False) -> se
         return None
 
 
+def install_standalone_launcher() -> bool:
+    """作業フォルダから aidiy_vscode で単独画面を開けるようにする。"""
+    launcher_dir = Path.home() / ".local" / "bin"
+    launcher_path = launcher_dir / ("aidiy_vscode.cmd" if sys.platform == "win32" else "aidiy_vscode")
+    script_path = FRONTEND_VSCODE_DIR / "scripts" / "launch-standalone.mjs"
+    if not script_path.is_file():
+        print_error(f"単独起動スクリプトが見つかりません: {script_path}")
+        return False
+    if sys.platform == "win32":
+        content = (
+            "@echo off\n"
+            "setlocal\n"
+            f'node.exe "{script_path}" %*\n'
+            "exit /b %ERRORLEVEL%\n"
+        )
+    else:
+        content = f'#!/usr/bin/env sh\nexec node {shlex.quote(str(script_path))} "$@"\n'
+    try:
+        launcher_dir.mkdir(parents=True, exist_ok=True)
+        launcher_path.write_text(content, encoding="utf-8")
+        if sys.platform != "win32":
+            launcher_path.chmod(0o755)
+    except OSError as exc:
+        print_error(f"単独起動ランチャーを作成できません: {launcher_path} ({exc})")
+        return False
+    print_success(f"単独起動ランチャーを作成しました: {launcher_path}")
+    if str(launcher_dir).lower() not in (entry.lower() for entry in os.environ.get("PATH", "").split(os.pathsep)):
+        print_warning(f"{launcher_dir} を PATH に追加し、新しいターミナルから aidiy_vscode を実行してください。")
+    return True
+
+
 def setup(choices: dict | None = None) -> bool:
     del choices
     label = "フロントエンド(VS Code)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_VSCODE_DIR}")
-    print_info("対象: VS Code チャット拡張 / TypeScript / VSIX")
+    print_info("対象: VS Code チャット拡張 / 単独起動ランチャー / TypeScript / VSIX")
 
     package_json = FRONTEND_VSCODE_DIR / "package.json"
     if not package_json.is_file():
@@ -272,15 +304,6 @@ def setup(choices: dict | None = None) -> bool:
         return False
 
     vscode_cli = find_vscode_cli()
-    if vscode_cli is None:
-        print_error(f"{label}: VS Code CLI (code) が見つかりません。")
-        print_info("  VS Code をインストールし、code コマンドを PATH に追加してください。")
-        return False
-
-    metadata = get_extension_metadata()
-    if metadata is None:
-        return False
-    extension_id, version, vsix_path = metadata
 
     if not run_command([npm_path, "install"], cwd=FRONTEND_VSCODE_DIR):
         print_error(f"{label}: 依存関係の導入に失敗しました。")
@@ -288,29 +311,44 @@ def setup(choices: dict | None = None) -> bool:
     if not run_command([npm_path, "update"], cwd=FRONTEND_VSCODE_DIR):
         print_error(f"{label}: 依存関係の最新版への更新に失敗しました。")
         return False
-    if not run_command([npm_path, "run", "package"], cwd=FRONTEND_VSCODE_DIR):
-        print_error(f"{label}: VSIX の生成に失敗しました。")
-        return False
-    if not vsix_path.is_file():
-        print_error(f"{label}: 生成された VSIX が見つかりません: {vsix_path}")
+    if vscode_cli is None:
+        print_warning("VS Code CLI が見つからないため、単独画面だけをセットアップします。")
+        if not run_command([npm_path, "run", "compile"], cwd=FRONTEND_VSCODE_DIR):
+            print_error(f"{label}: 単独画面の生成に失敗しました。")
+            return False
+    else:
+        metadata = get_extension_metadata()
+        if metadata is None:
+            return False
+        extension_id, version, vsix_path = metadata
+        if not run_command([npm_path, "run", "package"], cwd=FRONTEND_VSCODE_DIR):
+            print_error(f"{label}: VSIX の生成に失敗しました。")
+            return False
+        if not vsix_path.is_file():
+            print_error(f"{label}: 生成された VSIX が見つかりません: {vsix_path}")
+            return False
+
+        if not run_command(
+            [vscode_cli, "--install-extension", str(vsix_path), "--force"],
+            cwd=FRONTEND_VSCODE_DIR,
+        ):
+            print_error(f"{label}: VS Code 拡張機能の配置に失敗しました。")
+            return False
+
+        installed = get_installed_extensions(vscode_cli, show_versions=True)
+        expected = f"{extension_id}@{version}".lower()
+        if installed is None or expected not in installed:
+            print_error(f"{label}: 配置後の確認に失敗しました: {expected}")
+            return False
+
+    if not install_standalone_launcher():
         return False
 
-    if not run_command(
-        [vscode_cli, "--install-extension", str(vsix_path), "--force"],
-        cwd=FRONTEND_VSCODE_DIR,
-    ):
-        print_error(f"{label}: VS Code 拡張機能の配置に失敗しました。")
-        return False
-
-    installed = get_installed_extensions(vscode_cli, show_versions=True)
-    expected = f"{extension_id}@{version}".lower()
-    if installed is None or expected not in installed:
-        print_error(f"{label}: 配置後の確認に失敗しました: {expected}")
-        return False
-
-    print_success(f"{label}: {extension_id} を VS Code 拡張機能として配置しました。")
-    print_info("  VS Code 本体や AiDiy の常駐サービスは停止していません。")
-    print_info("  VS Code に反映されない場合は、ウィンドウを再読み込みしてください。")
+    if vscode_cli is not None:
+        print_success(f"{label}: {extension_id} を VS Code 拡張機能として配置しました。")
+        print_info("  VS Code 本体や AiDiy の常駐サービスは停止していません。")
+        print_info("  VS Code に反映されない場合は、ウィンドウを再読み込みしてください。")
+    print_success(f"{label}: aidiy_vscode で単独画面を起動できます。")
     return True
 
 
