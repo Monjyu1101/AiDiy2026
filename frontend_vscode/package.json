@@ -1,6 +1,7 @@
 {
   "name": "aidiy-vscode",
   "displayName": "AiDiy",
+  "icon": "media/AiDiy.png",
   "description": "AiDiy の VS Code 拡張です。実行エンジンに aidiy_hermes CLI を使用し、右サイドバーで AI チャットを提供します。",
   "version": "0.1.0",
   "publisher": "aidiy",
@@ -42,7 +43,7 @@
         {
           "id": "aidiy-vscode",
           "title": "AiDiy",
-          "icon": "media/hermes.svg"
+          "icon": "media/AiDiy.png"
         }
       ]
     },
