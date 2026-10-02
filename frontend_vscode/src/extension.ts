@@ -321,7 +321,7 @@ export function activate(context: vscode.ExtensionContext): void {
     command('aidiyHermes.open', () => vscode.commands.executeCommand('aidiyHermes.chat.focus')),
     command('aidiyHermes.newChat', () => chat.新規()),
     command('aidiyHermes.attachSelection', () => chat.選択添付()),
-    command('aidiyHermes.settings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:aidiy.aidiy-hermes')),
+    command('aidiyHermes.settings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:aidiy.aidiy-vscode')),
     command('aidiyHermes.terminal', () => chat.ターミナル()),
     command('aidiyHermes.logs', () => chat.ログ表示())
   );

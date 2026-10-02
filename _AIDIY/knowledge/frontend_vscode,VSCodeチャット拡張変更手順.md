@@ -86,7 +86,7 @@ npm run package
 - packet が開始、進捗、終了または中断、正式回答の順になる。
 - 単独試用の接続制限、会話継続、新規会話、履歴の選択・削除、モデル変更、停止が動く。
 - VS Code 側で旧 `workspaceState` の単一会話を履歴へ移行でき、作業フォルダごとに履歴が分かれる。最終選択モデルが再起動後と新規会話へ引き継がれる。
-- `dist/aidiy-hermes-<version>.vsix` が生成される。
+- `dist/aidiy-vscode-<version>.vsix` が生成される。
 
 Windows の実 VS Code で拡張ホストまで確認するときは、依存導入と compile 後に次を使う。
 
@@ -112,7 +112,7 @@ Windows の実 VS Code で拡張ホストまで確認するときは、依存導
 python frontend_vscode/_cleanup.py
 ```
 
-ルートの `python _cleanup.py` でも、`command_hermes` の次に `frontend_vscode` を選択できる。配置済みの `aidiy.aidiy-hermes` を解除し、解除後に拡張一覧から消えたことを確認してから、`~/.local/bin/aidiy_vscode.cmd` または `~/.local/bin/aidiy_vscode`、`node_modules`、`dist`、`out`、Python cache を削除する。
+ルートの `python _cleanup.py` でも、`command_hermes` の次に `frontend_vscode` を選択できる。配置済みの `aidiy.aidiy-vscode` を解除し、解除後に拡張一覧から消えたことを確認してから、`~/.local/bin/aidiy_vscode.cmd` または `~/.local/bin/aidiy_vscode`、`node_modules`、`dist`、`out`、Python cache を削除する。
 
 cleanup は VS Code 本体を終了しない。起動中の拡張ホストには再読み込みまで旧コードが残る場合があるため、解除を画面へ反映するときだけ利用者が VS Code のウィンドウを再読み込みする。CLI が利用できない、解除後も拡張が残る、生成物を削除できない場合は失敗として終了する。
 

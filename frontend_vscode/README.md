@@ -1,6 +1,6 @@
 # AiDiy for VS Code
 
-`aidiy_hermes` CLI を、VS Code の右サイドバーにある専用チャットから操作する拡張機能です。
+AiDiy の VS Code 拡張機能です。パッケージ名は `aidiy-vscode`、拡張 ID は `aidiy.aidiy-vscode` です。実行エンジンとして `aidiy_hermes` CLI を使用し、右サイドバーの専用チャットから操作できます。
 
 拡張バージョンは当面 `0.1.0` に固定します。
 
@@ -12,7 +12,7 @@
 2. AiDiy ルートの `python _setup.py` で、Hermes の次に表示される **フロントエンド(VS Code)** を選びます。単体では `python frontend_vscode/_setup.py` を実行できます。
 3. 単独画面は作業フォルダで `aidiy_vscode` を実行します。拡張モードは VS Code でフォルダを開き、コマンドパレットから **AiDiy: チャットを開く**を実行します。
 
-セットアップは依存関係の導入、単独起動コマンドの作成と、VS Code CLI がある場合の VSIX 配置を実行します。ランチャーは `aidiy_hermes` と同じ `~/.local/bin` に配置します（Windows は `aidiy_vscode.cmd`、macOS / Linux は `aidiy_vscode`）。このフォルダが PATH にない場合は追加してください。手動で VSIX を配置する場合は、拡張機能画面の `…` → **VSIX からのインストール**で `dist/aidiy-hermes-0.1.0.vsix` を選びます。解除と生成物削除は `python frontend_vscode/_cleanup.py`、またはルートの `python _cleanup.py` から実行できます。
+セットアップは依存関係の導入、単独起動コマンドの作成と、VS Code CLI がある場合の VSIX 配置を実行します。ランチャーは `aidiy_hermes` と同じ `~/.local/bin` に配置します（Windows は `aidiy_vscode.cmd`、macOS / Linux は `aidiy_vscode`）。このフォルダが PATH にない場合は追加してください。手動で VSIX を配置する場合は、拡張機能画面の `…` → **VSIX からのインストール**で `dist/aidiy-vscode-0.1.0.vsix` を選びます。解除と生成物削除は `python frontend_vscode/_cleanup.py`、またはルートの `python _cleanup.py` から実行できます。
 
 既定では右側のセカンダリサイドバーに表示されます。VS Code の配置を変更している場合は、ビューの移動操作で配置を調整できます。
 
@@ -104,7 +104,7 @@ npm run package
 
 Windows の実 VS Code で登録・起動を確認する場合は、コンパイル後に `./scripts/test-extension-host.ps1` を実行します。専用の一時プロファイルを使います。画面の確認には単独画面の `aidiy_vscode` を使います。
 
-`dist/aidiy-hermes-0.1.0.vsix` が生成されます。`npm test` はモック CLI による通信・停止・メッセージ形式の検証で、AI API を呼びません。
+`dist/aidiy-vscode-0.1.0.vsix` が生成されます。`npm test` はモック CLI による通信・停止・メッセージ形式の検証で、AI API を呼びません。
 
 Marketplace で公開する場合は、所有する publisher ID に `package.json` の `publisher` を合わせて公開します。初期値 `aidiy` はローカル配布用の識別子です。
 

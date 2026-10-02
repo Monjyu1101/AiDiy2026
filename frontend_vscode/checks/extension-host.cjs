@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const vscode = require('vscode');
 const { writeFileSync } = require('node:fs');
 exports.run = async () => {
-  const extension = vscode.extensions.getExtension('aidiy.aidiy-hermes');
+  const extension = vscode.extensions.getExtension('aidiy.aidiy-vscode');
   assert.ok(extension, '拡張機能が登録されている');
   await extension.activate();
   assert.ok(extension.isActive);

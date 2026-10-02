@@ -1,7 +1,7 @@
 {
-  "name": "aidiy-hermes",
+  "name": "aidiy-vscode",
   "displayName": "AiDiy",
-  "description": "aidiy_hermes CLI を右サイドバーの専用チャットから操作します。",
+  "description": "AiDiy の VS Code 拡張です。実行エンジンに aidiy_hermes CLI を使用し、右サイドバーで AI チャットを提供します。",
   "version": "0.1.0",
   "publisher": "aidiy",
   "license": "SEE LICENSE IN LICENSE",
@@ -40,14 +40,14 @@
     "viewsContainers": {
       "secondarySidebar": [
         {
-          "id": "aidiy-hermes",
+          "id": "aidiy-vscode",
           "title": "AiDiy",
           "icon": "media/hermes.svg"
         }
       ]
     },
     "views": {
-      "aidiy-hermes": [
+      "aidiy-vscode": [
         {
           "type": "webview",
           "id": "aidiyHermes.chat",
@@ -167,7 +167,7 @@
     "compile": "node scripts/build.mjs",
     "test": "node scripts/test.mjs",
     "vscode:prepublish": "npm run check && npm run compile",
-    "package": "vsce package --no-dependencies --allow-missing-repository --out dist/aidiy-hermes-0.1.0.vsix"
+    "package": "vsce package --no-dependencies --allow-missing-repository --out dist/aidiy-vscode-0.1.0.vsix"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
