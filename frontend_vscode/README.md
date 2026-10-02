@@ -12,7 +12,7 @@ AiDiy の VS Code 拡張機能です。パッケージ名は `aidiy-vscode`、�
 2. AiDiy ルートの `python _setup.py` で、Hermes の次に表示される **フロントエンド(VS Code)** を選びます。単体では `python frontend_vscode/_setup.py` を実行できます。
 3. 単独画面は作業フォルダで `aidiy_vscode` を実行します。拡張モードは VS Code でフォルダを開き、コマンドパレットから **AiDiy: チャットを開く**を実行します。
 
-セットアップは依存関係の導入、単独起動コマンドの作成と、VS Code CLI がある場合の VSIX 配置を実行します。ランチャーは `aidiy_hermes` と同じ `~/.local/bin` に配置します（Windows は `aidiy_vscode.cmd`、macOS / Linux は `aidiy_vscode`）。このフォルダが PATH にない場合は追加してください。手動で VSIX を配置する場合は、拡張機能画面の `…` → **VSIX からのインストール**で `dist/aidiy-vscode-0.1.0.vsix` を選びます。解除と生成物削除は `python frontend_vscode/_cleanup.py`、またはルートの `python _cleanup.py` から実行できます。
+セットアップは依存関係と Electron バイナリの事前導入、単独起動コマンドの作成と、VS Code CLI がある場合の VSIX 配置を実行します。ランチャーは `aidiy_hermes` と同じ `~/.local/bin` に配置します（Windows は `aidiy_vscode.cmd`、macOS / Linux は `aidiy_vscode`）。このフォルダが PATH にない場合は追加してください。手動で VSIX を配置する場合は、拡張機能画面の `…` → **VSIX からのインストール**で `dist/aidiy-vscode-0.1.0.vsix` を選びます。解除と生成物削除は `python frontend_vscode/_cleanup.py`、またはルートの `python _cleanup.py` から実行できます。
 
 既定では右側のセカンダリサイドバーに表示されます。VS Code の配置を変更している場合は、ビューの移動操作で配置を調整できます。
 
@@ -32,7 +32,7 @@ aidiy_vscode
 
 単独画面は Electron のフレームレスウィンドウで開き、起動時のカレントフォルダを作業対象にします。AiDiy ロゴのあるヘッダーをドラッグして移動でき、右上のボタンで最小化・最大化／復元・終了を操作できます。ウィンドウの端でサイズを変更できます。モデル選択・送信・進捗表示・停止・新規会話・会話履歴の選択と削除は VS Code 拡張と共通です。会話は単独サーバーのメモリに保持し、終了すると消えます。専用ウィンドウを閉じるとサーバーと実行中の CLI を停止します。VS Code の選択コード添付は拡張モードで利用してください。
 
-既定ブラウザで開く場合は `aidiy_vscode --browser`（フォルダ指定も併用可能）を使います。Windows は Chrome / Edge のアプリウィンドウ、macOS / Linux は既定のブラウザで開きます。このモードはブラウザのウィンドウ枠を使用し、タブ／ウィンドウを閉じて60秒後にサーバーを停止します。Electron は `npm ci` またはセットアップで導入し、VSIX には含めません。
+既定ブラウザで開く場合は `aidiy_vscode --browser`（フォルダ指定も併用可能）を使います。Windows は Chrome / Edge のアプリウィンドウ、macOS / Linux は既定のブラウザで開きます。このモードはブラウザのウィンドウ枠を使用し、タブ／ウィンドウを閉じて60秒後にサーバーを停止します。Electron バイナリは `python frontend_vscode/_setup.py` で事前に取得・確認します。通常の取得が失敗した場合は Avatar と同様に Python で GitHub から取得します。起動時にはダウンロードせず、未準備の場合はセットアップの再実行を案内します。`npm ci` だけではバイナリが取得されない場合があります。Electron は VSIX には含めません。
 
 VS Code 拡張として試す場合は、次の手順を使います。
 

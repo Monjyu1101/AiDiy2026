@@ -10,7 +10,9 @@
 
 """フロントエンド(VS Code) セットアップスクリプト
 
-Node.js 依存関係を導入して VSIX を配置し、単独起動用ランチャーも作成します。
+Node.js 依存関係と Electron バイナリを事前に導入して VSIX を配置し、
+単独起動用ランチャーも作成します。Electron の通常取得が失敗した場合は
+frontend_avatar/_setup.py と同様に Python で GitHub から取得します。
 
 公開 API:
     setup(choices=None) -> bool
@@ -18,11 +20,15 @@ Node.js 依存関係を導入して VSIX を配置し、単独起動用ランチ
 
 import json
 import os
+import platform
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
+import urllib.request
+import zipfile
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -130,6 +136,103 @@ def run_command(command, cwd=None) -> bool:
 
 def npm_command() -> str:
     return f"{FRONTEND_COMMAND}.cmd" if sys.platform == "win32" else FRONTEND_COMMAND
+
+
+def electron_executable_name() -> str:
+    if sys.platform == "win32":
+        return "electron.exe"
+    if sys.platform == "darwin":
+        return "Electron.app/Contents/MacOS/Electron"
+    return "electron"
+
+
+def electron_binary_ready(frontend_dir: Path) -> bool:
+    """実行ファイル、path.txt、導入済みパッケージのバージョンを照合する。"""
+    electron_dir = frontend_dir / "node_modules" / "electron"
+    try:
+        package = json.loads((electron_dir / "package.json").read_text(encoding="utf-8"))
+        executable = electron_executable_name()
+        return (
+            (electron_dir / "path.txt").read_text(encoding="utf-8") == executable
+            and (electron_dir / "dist" / executable).is_file()
+            and (electron_dir / "dist" / "version").read_text(encoding="utf-8").strip().removeprefix("v")
+            == package["version"]
+        )
+    except (OSError, KeyError, json.JSONDecodeError):
+        return False
+
+
+def install_electron_binary(frontend_dir: Path, label: str) -> bool:
+    """Avatar と同じ GitHub リリース ZIP を Python で取得し、dist に配置する。"""
+    electron_dir = frontend_dir / "node_modules" / "electron"
+    try:
+        version = json.loads((electron_dir / "package.json").read_text(encoding="utf-8"))["version"]
+        machine = platform.machine().lower()
+        if machine in ("arm64", "aarch64"):
+            arch = "arm64"
+        elif machine in ("x86", "i386", "i686"):
+            arch = "ia32"
+        else:
+            arch = "x64"
+        plat = "win32" if sys.platform == "win32" else "darwin" if sys.platform == "darwin" else "linux"
+        zip_name = f"electron-v{version}-{plat}-{arch}.zip"
+        url = f"https://github.com/electron/electron/releases/download/v{version}/{zip_name}"
+        print_info(f"{label}: Electron v{version} ({plat}-{arch}) を Python でダウンロードします。")
+        print_info(f"  URL: {url}")
+        with tempfile.TemporaryDirectory(prefix="aidiy-vscode-electron-") as temporary:
+            archive = Path(temporary) / zip_name
+            with urllib.request.urlopen(url, timeout=60) as response, archive.open("wb") as output:
+                total = int(response.headers.get("Content-Length", 0))
+                downloaded = 0
+                milestone = 30
+                while block := response.read(1024 * 1024):
+                    output.write(block)
+                    downloaded += len(block)
+                    if total and downloaded * 100 // total >= milestone:
+                        print_info(f"  ダウンロード中... {min(downloaded * 100 // total, 100)}%")
+                        milestone += 30
+
+            # macOS のシンボリックリンクと Linux の実行権限も保持する。
+            extracted = Path(temporary) / "dist"
+            extracted.mkdir()
+            if sys.platform != "win32" and shutil.which("unzip"):
+                subprocess.run(["unzip", "-q", "-o", str(archive), "-d", str(extracted)], check=True)
+            else:
+                with zipfile.ZipFile(archive) as zipped:
+                    zipped.extractall(extracted)
+            executable = electron_executable_name()
+            if not (extracted / executable).is_file():
+                raise RuntimeError(f"展開した ZIP に {executable} がありません。")
+            binary_version = (extracted / "version").read_text(encoding="utf-8").strip().removeprefix("v")
+            if binary_version != version:
+                raise RuntimeError(f"Electron のバージョンが一致しません: {binary_version} / {version}")
+            if sys.platform != "win32":
+                (extracted / executable).chmod(0o755)
+            dist_dir = electron_dir / "dist"
+            if dist_dir.exists():
+                shutil.rmtree(dist_dir)
+            shutil.move(str(extracted), str(dist_dir))
+            (electron_dir / "path.txt").write_bytes(executable.encode("utf-8"))
+        print_success(f"{label}: Electron バイナリを配置しました。")
+        return electron_binary_ready(frontend_dir)
+    except (OSError, KeyError, ValueError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
+        print_error(f"{label}: Electron バイナリの取得・配置に失敗しました: {exc}")
+        return False
+
+
+def prepare_electron_binary(frontend_dir: Path, label: str) -> bool:
+    """npm の postinstall の有無に依存せず、セットアップ中に取得を完了する。"""
+    if electron_binary_ready(frontend_dir):
+        print_info(f"{label}: Electron バイナリを確認しました。")
+        return True
+    node = shutil.which("node.exe" if sys.platform == "win32" else "node")
+    installer = frontend_dir / "node_modules" / "electron" / "install.js"
+    if node and installer.is_file():
+        print_info(f"{label}: Electron のインストーラーを実行します。")
+        if run_command([node, str(installer)], cwd=frontend_dir) and electron_binary_ready(frontend_dir):
+            return True
+    print_warning(f"{label}: Electron バイナリを GitHub から手動取得します。")
+    return install_electron_binary(frontend_dir, label)
 
 
 def _is_working_vscode_cli(command: str) -> bool:
@@ -290,7 +393,7 @@ def setup(choices: dict | None = None) -> bool:
     label = "フロントエンド(VS Code)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_VSCODE_DIR}")
-    print_info("対象: VS Code チャット拡張 / 単独起動ランチャー / TypeScript / VSIX")
+    print_info("対象: VS Code チャット拡張 / Electron / 単独起動ランチャー / TypeScript / VSIX")
 
     package_json = FRONTEND_VSCODE_DIR / "package.json"
     if not package_json.is_file():
@@ -305,12 +408,24 @@ def setup(choices: dict | None = None) -> bool:
 
     vscode_cli = find_vscode_cli()
 
-    if not run_command([npm_path, "install"], cwd=FRONTEND_VSCODE_DIR):
-        print_error(f"{label}: 依存関係の導入に失敗しました。")
+    recovery_needed = False
+    for action in ("install", "update"):
+        if not run_command([npm_path, action], cwd=FRONTEND_VSCODE_DIR):
+            print_warning(f"{label}: npm {action} が失敗しました。postinstall をスキップして再試行します。")
+            recovery_needed = True
+            if not run_command([npm_path, action, "--ignore-scripts"], cwd=FRONTEND_VSCODE_DIR):
+                print_error(f"{label}: 依存関係の導入・更新に失敗しました。")
+                return False
+
+    if not prepare_electron_binary(FRONTEND_VSCODE_DIR, label):
         return False
-    if not run_command([npm_path, "update"], cwd=FRONTEND_VSCODE_DIR):
-        print_error(f"{label}: 依存関係の最新版への更新に失敗しました。")
-        return False
+    if recovery_needed:
+        # --ignore-scripts で導入した esbuild などの postinstall も完了させる。
+        if not run_command([npm_path, "rebuild"], cwd=FRONTEND_VSCODE_DIR):
+            return False
+        if not electron_binary_ready(FRONTEND_VSCODE_DIR):
+            print_error(f"{label}: Electron バイナリを確認できません。")
+            return False
     if vscode_cli is None:
         print_warning("VS Code CLI が見つからないため、単独画面だけをセットアップします。")
         if not run_command([npm_path, "run", "compile"], cwd=FRONTEND_VSCODE_DIR):

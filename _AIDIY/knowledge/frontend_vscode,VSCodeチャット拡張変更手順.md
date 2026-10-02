@@ -59,11 +59,15 @@ python frontend_vscode/_setup.py
 
 `frontend_vscode/_setup.py` は `npm install`、`npm update`、VSIX 生成、`code --install-extension --force` を順に実行し、最後に拡張 ID とバージョンを再取得して配置を確認する。VS Code CLI が見つからない場合は単独画面だけをコンパイルする。最後に `~/.local/bin/aidiy_vscode.cmd`（Windows）または `~/.local/bin/aidiy_vscode`（macOS / Linux）を作り、`scripts/launch-standalone.mjs` を絶対パスで呼び出す。`code` が PATH に無い場合は、稼働中の Codespaces / Dev Container / Remote SSH の Remote CLI と VS Code の標準配置先も探索する。単にファイルが存在するだけでなく、`--version` に成功した CLI だけを使う。
 
+Electron は VSIX 生成・単独画面コンパイルより前に準備する。npm の成功だけでは取得済みと判断せず、`node_modules/electron/dist` の実行ファイル・`version` と `path.txt` を導入済みパッケージのバージョンと照合する。未配置なら `node node_modules/electron/install.js` を実行し、失敗した場合は `frontend_avatar/_setup.py` と同じ GitHub リリース ZIP を Python で取得・展開する。npm の install / update が失敗した場合は `--ignore-scripts` で再試行し、Electron の準備後に `npm rebuild` で他の依存の postinstall も完了させる。Electron を準備できない場合はセットアップを失敗扱いにする。
+
 単独画面は作業フォルダで `aidiy_vscode`、または `aidiy_vscode "C:\work\project"` のように明示して起動する。前者は起動時のカレントフォルダを使用する。`~/.local/bin` は Hermes のランチャーと共通なので PATH に含める。Windows の `.cmd` と macOS / Linux のシェルランチャーは、どちらも `scripts/launch-standalone.mjs` を直接呼ぶ。`launch-extension-dev.ps1` は Windows で VS Code 拡張の開発ホストを起動する。
 
 配置は拡張機能ファイルを更新するだけで、VS Code 本体や AiDiy の常駐サービスを停止しない。すでに VS Code が起動している場合、変更の反映にはウィンドウ再読み込みが必要になる。
 
 単独起動は Electron のフレームレスウィンドウを使う。ヘッダーのドラッグ領域から会話操作・ウィンドウ操作ボタンを除外し、最小化・最大化／復元・閉じるを preload の限定 API で扱う。Node integration は無効、context isolation と sandbox は有効にする。専用ウィンドウ終了時はサーバーと CLI を終了する。`aidiy_vscode --browser` では従来のブラウザモードを使い、接続が無くなって60秒後に終了する。Electron は開発・単独起動用依存で、VSIX に含めない。
+
+`launch-standalone.mjs` は Electron の取得処理を呼ばず、準備済みの実行ファイルを使う。未配置またはバージョン不一致の場合は `python frontend_vscode/_setup.py` の再実行を案内する。`npm ci` だけで Electron バイナリが取得されるとは限らないため、専用ウィンドウを使う環境ではセットアップを実行する。
 
 ## 変更後の検証
 
@@ -73,6 +77,7 @@ npm ci
 npm run check
 npm test
 npm run package
+python -m unittest discover -s checks -p test_setup.py
 ```
 
 確認内容:
@@ -121,6 +126,7 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 | 症状 | 確認箇所 |
 |------|----------|
 | `code` が見つからず VSIX を配置できない | VS Code CLI の PATH、`frontend_vscode/_setup.py` の `find_vscode_cli()`。単独画面はセットアップ可能 |
+| Electron が未配置 / `fetch failed` | `python frontend_vscode/_setup.py` を再実行する。通常取得が失敗すると Python で GitHub から取得する。`dist/version`・実行ファイル・`path.txt` の照合まで成功しているか確認する |
 | Hermes が見つからない | `aidiyHermes.cliPath`、`~/.local/bin`、`command_hermes/.venv` |
 | Provider / モデルが空 | `scripts/model-catalog.py`、Hermes 設定、Cli Path が AiDiy CLI を指すか |
 | 送信できない | ワークスペース信頼、フォルダが開かれているか、実行中状態 |
