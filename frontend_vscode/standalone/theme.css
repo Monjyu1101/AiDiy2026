@@ -16,7 +16,7 @@
 }
 html { background: var(--vscode-sideBar-background); }
 body { max-width: 1000px; margin: auto; }
-#title-bar { min-height: 44px; padding: 4px 12px; gap: 8px; }
+#title-bar { min-height: 31px; padding: 1px 12px; gap: 8px; }
 .brand-icon { display: none; }
 .brand-name { font-size: 14px; }
 #activity-bar { height: 3px; }

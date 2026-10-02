@@ -17,14 +17,13 @@ button:disabled { opacity: .4; cursor: default; }
 [hidden] { display: none !important; }
 label { display: block; font-size: 11px; color: var(--muted); }
 #chat-header { display: flex; flex-direction: column; flex: 0 0 auto; border-bottom: 1px solid var(--border); }
-#title-bar { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 14px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
-#activity-bar { flex: 0 0 auto; height: 2px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 15%, transparent), transparent); pointer-events: none; }
-#chat-header.running #title-bar { background-image: none; animation: cyan-header-breathe 4.5s ease-in-out infinite; }
-#chat-header.running #activity-bar { background: #00ffff; box-shadow: 0 0 12px #00ffff60; animation: cyan-breathe 4.5s ease-in-out infinite; }
+#title-bar { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 3px 14px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
+#activity-bar { flex: 0 0 auto; height: 2px; box-sizing: content-box; border-top: 1px solid var(--border); background: #000; pointer-events: none; }
+#chat-header.running #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s ease-in-out infinite; }
 @keyframes cyan-breathe { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
-@keyframes cyan-header-breathe { 0%, 100% { background-color: color-mix(in srgb, #00ffff 3%, var(--surface)); } 50% { background-color: color-mix(in srgb, #00ffff 14%, var(--surface)); } }
+@keyframes cyan-bar-breathe { 0%, 100% { background-color: #000; } 50% { background-color: #00ffff; } }
 .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-.brand-icon { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; }
+.brand-icon { width: 21px; height: 21px; object-fit: contain; flex: 0 0 auto; }
 .brand-name { white-space: nowrap; font-size: 16px; font-weight: 700; letter-spacing: -.5px; }
 #conversation-toolbar { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 14px; }
 .conversation-context { display: flex; flex: 1; min-width: 0; align-items: center; gap: 10px; }
@@ -82,10 +81,9 @@ summary { cursor: pointer; overflow-wrap: anywhere; color: var(--muted); }
 #progress { max-height: 150px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--terminal); font-family: var(--vscode-editor-font-family); }
 #progress-section.running #progress::after { content: ''; display: inline-block; width: 7px; height: 1em; margin-left: 3px; vertical-align: -.15em; background: var(--terminal); animation: terminal-cursor-blink .7s step-end infinite; }
 footer { flex: 0 0 auto; padding: 0 14px 10px; }
-#composer { border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 14px; background: var(--vscode-input-background); overflow: hidden; transition: border-color .15s, box-shadow .15s; }
-#composer:focus-within { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 3px var(--accent-soft); }
-textarea { resize: vertical; display: block; width: 100%; min-height: 76px; max-height: min(220px, 35vh); padding: 13px 14px 6px; color: var(--vscode-input-foreground); background: transparent; border: none; }
-textarea:focus-visible { outline-offset: -3px; }
+#composer { border: 0; background: transparent; }
+textarea { resize: vertical; display: block; width: 100%; min-height: 76px; max-height: min(220px, 35vh); padding: 13px 14px 6px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 10px; }
+textarea:focus-visible { outline: none; border-color: var(--vscode-focusBorder); }
 textarea::placeholder { color: var(--vscode-input-placeholderForeground, var(--muted)); }
 .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 8px; }
 .model-selection { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
@@ -134,11 +132,10 @@ select, input { width: 100%; min-height: 34px; padding: 5px 8px; color: var(--vs
 body.vscode-light { --terminal: #18724a; }
 body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vscode-contrastBorder); --terminal: var(--vscode-foreground); }
 @media (max-width: 440px) {
-  #title-bar { padding: 8px 10px; gap: 7px; }
+  #title-bar { padding: 3px 10px; gap: 7px; }
   #conversation-toolbar { padding: 6px 10px; gap: 7px; }
   .conversation-context { gap: 7px; }
   .brand { gap: 7px; }
-  .brand-icon { width: 24px; height: 24px; }
   #desktop-controls { margin-left: 0; }
   main { padding: 18px 12px; }
   footer { padding-left: 10px; padding-right: 10px; }

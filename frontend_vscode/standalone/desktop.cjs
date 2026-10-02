@@ -21,7 +21,7 @@ app.on('window-all-closed', () => app.quit());
 app.whenReady().then(async () => {
   server = await 単独起動(resolve(args[0] || process.cwd()));
   window = new BrowserWindow({
-    title: 'AiDiy', width: 680, height: 860, minWidth: 360, minHeight: 480,
+    title: 'AiDiy', width: 476, height: 602, minWidth: 360, minHeight: 480,
     frame: false, show: false, backgroundColor: '#11151d',
     icon: join(__dirname, '../media/AiDiy.png'), autoHideMenuBar: true,
     webPreferences: {
