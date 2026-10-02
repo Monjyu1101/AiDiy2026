@@ -144,9 +144,12 @@ element('composer').addEventListener('submit', event => {
   vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: prompt.value });
 });
 prompt.addEventListener('keydown', event => {
-  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
-    event.preventDefault(); element<HTMLFormElement>('composer').requestSubmit();
-  }
+  if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey
+      || event.isComposing || event.keyCode === 229) return;
+  const send = element<HTMLButtonElement>('send');
+  if (send.disabled || send.hidden) return;
+  event.preventDefault();
+  send.focus();
 });
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
 modelButton.addEventListener('click', モデル選択を開く);

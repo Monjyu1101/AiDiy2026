@@ -169,6 +169,7 @@
 
 | 目的 | 参照ファイル |
 |------|--------------|
+| Avatar / VS Code の Electron を事前導入し、バイナリ・ZIP を再利用する | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md)（「Electron の共通セットアップ」） |
 | Vite proxy / CORS / ポートを調整する | [`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
 | Axios API クライアントのパターン・token 付与・401 ハンドリングを確認する | [`frontend_web,frontend_avatar,共通APIクライアントパターン.md`](./frontend_web,frontend_avatar,共通APIクライアントパターン.md) |
 | Monaco Editor / qAlert / qConfirm など共通ユーティリティを修正する | [`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) |

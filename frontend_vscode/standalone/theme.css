@@ -12,9 +12,15 @@
   --vscode-textCodeBlock-background: #0d1119; --vscode-errorForeground: #ff8e9e;
   --vscode-editor-font-family: Consolas, "SFMono-Regular", monospace;
   --vscode-list-activeSelectionBackground: #252f49; --vscode-list-activeSelectionForeground: #fff;
+  --terminal: #00ff00;
 }
 html { background: var(--vscode-sideBar-background); }
 body { max-width: 1000px; margin: auto; }
+#chat-header { min-height: 44px; padding: 4px 12px; gap: 8px; }
+.brand-icon { display: none; }
+.header-title { gap: 1px; }
+.brand-name { font-size: 14px; }
+#chat-header.running::before, #chat-header.running::after { height: 3px; }
 .desktop-window body { max-width: none; border: 1px solid var(--vscode-panel-border); }
 .desktop-window #chat-header { -webkit-app-region: drag; user-select: none; }
 .desktop-window #header-actions, .desktop-window #desktop-controls { -webkit-app-region: no-drag; }

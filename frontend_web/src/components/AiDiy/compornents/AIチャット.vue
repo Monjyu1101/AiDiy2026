@@ -67,6 +67,16 @@ const 送信モードラベル = computed(() => {
 });
 const チャット領域 = ref<HTMLElement | null>(null);
 const テキストエリア = ref<HTMLTextAreaElement | null>(null);
+const 送信ボタン = ref<HTMLButtonElement | null>(null);
+
+// Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。
+function キー入力処理(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey
+      || event.isComposing || event.keyCode === 229) return;
+  if (!送信ボタン.value || 送信ボタン.value.disabled) return;
+  event.preventDefault();
+  送信ボタン.value.focus();
+}
 const ドラッグ中 = ref(false);
 const 入力欄最大到達 = ref(false);
 const 入力欄最小高さ = 60;
@@ -860,9 +870,6 @@ const 接続状態表示 = computed(() => {
   return WebSocket接続中.value ? '接続中' : '切断';
 });
 
-// 送信はボタンのみ
-const キー入力処理 = (_event: KeyboardEvent) => {
-};
 </script>
 
 <template>
@@ -943,6 +950,7 @@ const キー入力処理 = (_event: KeyboardEvent) => {
             :style="{ maxHeight: `${入力欄最大高さ}px` }"
             placeholder="メッセージを入力..."
             maxlength="5000"
+            title="Enter で改行、Tab で送信ボタンへ移動"
             :disabled="!WebSocket接続中"
             @input="テキストエリア自動調整"
             @keydown="キー入力処理"
@@ -991,6 +999,7 @@ const キー入力処理 = (_event: KeyboardEvent) => {
 
       <!-- 送信ボタン -->
       <button
+        ref="送信ボタン"
         class="chat-send-btn"
         :class="{
           'ws-disabled': !WebSocket接続中,
@@ -998,7 +1007,7 @@ const キー入力処理 = (_event: KeyboardEvent) => {
         }"
         @click="メッセージ送信"
         :disabled="!入力テキスト.trim() || !WebSocket接続中"
-        title="送信"
+        title="送信（フォーカス中に Enter）"
       >
         <img src="/icons/sending.png" alt="送信" />
         <span class="send-mode-label">{{ 送信モードラベル }}</span>

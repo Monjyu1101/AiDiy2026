@@ -11,23 +11,16 @@
 """フロントエンド(Avatar) セットアップスクリプト
 
 Vue 3 / Vite / TypeScript / Electron の依存関係を導入し、宣言範囲内の最新版へ更新します。
-npm install で Electron バイナリが取得できない場合は GitHub から手動取得します。
+Electron は scripts/setup_electron.py の共通処理で準備し、配置済みバイナリと共有 ZIP を再利用します。
 
 公開 API:
     setup(choices=None) -> bool
 """
 
-import json
-import platform
-import re
 import shutil
-import ssl
 import subprocess
 import sys
-import tempfile
 import time
-import urllib.request
-import zipfile
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -39,6 +32,10 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_AVATAR_DIR = THIS_DIR
 FRONTEND_COMMAND = "npm"
+
+# 単体実行とルートセットアップの両方から共通処理を参照する。
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from setup_electron import setup_dependencies
 
 AUTO_MODE = False
 
@@ -151,163 +148,6 @@ def check_npm_installed():
 
 
 # ============================================================
-# Electron バイナリ取得
-# ============================================================
-def get_electron_version(frontend_dir: Path) -> str:
-    """node_modules/electron/package.json からバージョンを取得する。
-    見つからない場合は package.json の devDependencies から推測する。"""
-    pkg = frontend_dir / "node_modules" / "electron" / "package.json"
-    if pkg.exists():
-        with open(pkg, encoding="utf-8") as f:
-            data = json.load(f)
-        version = data.get("version", "")
-        if version:
-            return version
-
-    fallback_pkg = frontend_dir / "package.json"
-    if fallback_pkg.exists():
-        with open(fallback_pkg, encoding="utf-8") as f:
-            data2 = json.load(f)
-        ver_spec = data2.get("devDependencies", {}).get("electron", "")
-        if ver_spec:
-            m = re.search(r"(\d+\.\d+\.\d+)", ver_spec)
-            if m:
-                print_info(f"  node_modules からバージョン取得できず、package.json の指定 ({ver_spec}) より {m.group(1)} を使用します。")
-                return m.group(1)
-
-    return ""
-
-
-def get_electron_platform_str() -> str:
-    """Electronリリース用のプラットフォーム文字列を返す (例: win32-x64)"""
-    system = platform.system().lower()
-    machine = platform.machine().lower()
-    if system == "windows":
-        plat = "win32"
-    elif system == "darwin":
-        plat = "darwin"
-    else:
-        plat = "linux"
-    arch = "arm64" if machine in ("arm64", "aarch64") else "x64"
-    return f"{plat}-{arch}"
-
-
-def install_electron_binary(frontend_dir: Path, label: str) -> bool:
-    """GitHubからElectronバイナリをダウンロードして配置する"""
-    version = get_electron_version(frontend_dir)
-    if not version:
-        print_error(f"{label}: Electronのバージョンが取得できませんでした。")
-        return False
-
-    plat_str = get_electron_platform_str()
-    zip_name = f"electron-v{version}-{plat_str}.zip"
-    url = f"https://github.com/electron/electron/releases/download/v{version}/{zip_name}"
-
-    print_info(f"{label}: Electron v{version} ({plat_str}) をダウンロードします。")
-    print_info(f"  URL: {url}")
-
-    tmp_dir = Path(tempfile.gettempdir())
-    part_file = tmp_dir / f"{zip_name}.part"
-    final_file = tmp_dir / zip_name
-
-    for stale in [part_file, final_file]:
-        if stale.exists():
-            stale.unlink()
-
-    MILESTONES = [0, 30, 60, 90, 100]
-
-    def _download_with_ctx(ctx=None):
-        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx)) if ctx else urllib.request.build_opener()
-        with opener.open(url) as response:
-            total_size = int(response.headers.get("Content-Length", 0))
-            downloaded = 0
-            block_size = 8192
-            last_rep = [-1]
-            with open(part_file, "wb") as f:
-                while True:
-                    block = response.read(block_size)
-                    if not block:
-                        break
-                    f.write(block)
-                    downloaded += len(block)
-                    if total_size > 0:
-                        percent = int(downloaded * 100 / total_size)
-                        for ms in MILESTONES:
-                            if ms > last_rep[0] and percent >= ms:
-                                mb_done = downloaded // 1024 // 1024
-                                mb_total = total_size // 1024 // 1024
-                                print_info(f"  ダウンロード中... {ms}% ({mb_done}MB / {mb_total}MB)")
-                                last_rep[0] = ms
-
-    print_info(f"  ダウンロード先: {part_file}")
-    try:
-        _download_with_ctx()
-    except Exception as e:
-        is_ssl_error = "SSL" in str(e) or "certificate" in str(e).lower()
-        if is_ssl_error:
-            print_warning(f"{label}: SSL証明書エラー。証明書検証をスキップして再試行します。")
-            try:
-                _download_with_ctx(ssl._create_unverified_context())
-            except Exception as e2:
-                print_error(f"{label}: ダウンロード失敗: {e2}")
-                if part_file.exists():
-                    part_file.unlink()
-                return False
-        else:
-            print_error(f"{label}: ダウンロード失敗: {e}")
-            if part_file.exists():
-                part_file.unlink()
-            return False
-
-    part_file.rename(final_file)
-    size_mb = final_file.stat().st_size // 1024 // 1024
-    print_success(f"{label}: ダウンロード完了: {final_file} ({size_mb}MB)")
-
-    dist_dir = frontend_dir / "node_modules" / "electron" / "dist"
-    if dist_dir.exists():
-        shutil.rmtree(dist_dir)
-    dist_dir.mkdir(parents=True, exist_ok=True)
-
-    print_info(f"{label}: 展開中: {final_file} -> {dist_dir}")
-    try:
-        # macOS/Linux では unzip コマンドを使用してシンボリックリンクを正しく展開する
-        if sys.platform != "win32" and shutil.which("unzip"):
-            result = subprocess.run(
-                ["unzip", "-q", "-o", str(final_file), "-d", str(dist_dir)],
-                capture_output=True, text=True,
-            )
-            if result.returncode != 0:
-                raise RuntimeError(result.stderr or result.stdout)
-        else:
-            with zipfile.ZipFile(final_file, "r") as zf:
-                zf.extractall(dist_dir)
-    except Exception as e:
-        print_error(f"{label}: 展開失敗: {e}")
-        return False
-
-    if sys.platform == "win32":
-        exe_name = "electron.exe"
-        exe_path = dist_dir / exe_name
-    elif sys.platform == "darwin":
-        exe_name = "Electron.app/Contents/MacOS/Electron"
-        exe_path = dist_dir / "Electron.app" / "Contents" / "MacOS" / "Electron"
-    else:
-        exe_name = "electron"
-        exe_path = dist_dir / exe_name
-
-    if not exe_path.exists():
-        print_error(f"{label}: {exe_name} が展開先に見つかりませんでした: {dist_dir}")
-        return False
-
-    path_txt = frontend_dir / "node_modules" / "electron" / "path.txt"
-    path_txt.write_bytes(exe_name.encode("utf-8"))
-
-    print_success(f"{label}: Electronバイナリの配置が完了しました。")
-    print_info(f"  実行ファイル: {exe_path}")
-    return True
-
-
-# ============================================================
 # セットアップ本体
 # ============================================================
 def setup(choices: dict | None = None) -> bool:
@@ -325,40 +165,11 @@ def setup(choices: dict | None = None) -> bool:
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
         return False
 
-    # 1. npm install（postinstall で Electron バイナリも取得を試みる）
-    print_info(f"{label}: npm install を実行します...")
-    install_recovery_needed = False
-    if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-        print_warning(f"{label}: npm install が失敗しました。Electron バイナリの手動取得を試みます。")
-        install_recovery_needed = True
-        if not run_command([npm_command(), "install", "--ignore-scripts"], cwd=FRONTEND_AVATAR_DIR):
-            return False
-
-    # 2. package.json の宣言範囲内で最新版へ更新する
-    if not run_command([npm_command(), "update"], cwd=FRONTEND_AVATAR_DIR):
-        print_warning(f"{label}: npm update が失敗しました。postinstall をスキップして再試行します。")
-        install_recovery_needed = True
-        if not run_command([npm_command(), "update", "--ignore-scripts"], cwd=FRONTEND_AVATAR_DIR):
-            return False
-
-    exe_name = "electron.exe" if sys.platform == "win32" else "electron"
-    electron_exe = FRONTEND_AVATAR_DIR / "node_modules" / "electron" / "dist" / exe_name
-
-    # 3. Electron リカバリ処理
-    if not electron_exe.exists():
-        install_recovery_needed = True
-        if not install_electron_binary(FRONTEND_AVATAR_DIR, label):
-            return False
-
-    # 4. リカバリを行った場合は postinstall を含む通常インストールで仕上げる
-    if install_recovery_needed:
-        print_info(f"{label}: npm install を再実行してセットアップを完了させます...")
-        if not run_command([npm_command(), "install"], cwd=FRONTEND_AVATAR_DIR):
-            return False
-        if not electron_exe.exists():
-            print_error(f"{label}: Electron バイナリを確認できません: {electron_exe}")
-            return False
-        print_info(f"{label}: Electron のインストールを確認しました。")
+    if not setup_dependencies(
+        FRONTEND_AVATAR_DIR, npm_command(), label, run_command,
+        info=print_info, warning=print_warning, error=print_error,
+    ):
+        return False
 
     print_success(f"{label}: セットアップが完了しました。")
     return True

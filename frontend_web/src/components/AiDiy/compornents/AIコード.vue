@@ -60,6 +60,16 @@ const 接続状態 = computed<'disconnected' | 'connected'>(() => (
 // テキスト入力関連
 const 入力テキスト = ref('');
 const テキストエリア = ref<HTMLTextAreaElement | null>(null);
+const 送信ボタン = ref<HTMLButtonElement | null>(null);
+
+// Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。
+function キー入力処理(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey
+      || event.isComposing || event.keyCode === 229) return;
+  if (!送信ボタン.value || 送信ボタン.value.disabled) return;
+  event.preventDefault();
+  送信ボタン.value.focus();
+}
 const 送信中 = ref(false);
 const ドラッグ中 = ref(false);
 const ストリーム受信中 = ref(false);
@@ -917,13 +927,16 @@ const 状態表示テキスト = () => {
             :style="{ maxHeight: `${入力欄最大高さ}px` }"
             placeholder="メッセージを入力..."
             maxlength="5000"
+            title="Enter で改行、Tab で送信ボタンへ移動"
             :disabled="送信中 || !WebSocket接続中"
             @input="テキストエリア自動調整"
+            @keydown="キー入力処理"
             ref="テキストエリア"
           ></textarea>
         </div>
 
         <button
+          ref="送信ボタン"
           class="agent-send-btn"
           :class="{
             'ws-disabled': !WebSocket接続中,
@@ -931,7 +944,7 @@ const 状態表示テキスト = () => {
           }"
           @click="メッセージ送信"
           :disabled="!入力テキスト.trim() || 送信中 || !WebSocket接続中"
-          title="送信"
+          title="送信（フォーカス中に Enter）"
         >
           <img src="/icons/sending.png" alt="送信" />
           <span class="send-code-label">CODE</span>

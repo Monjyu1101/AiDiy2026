@@ -8,11 +8,11 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""フロントエンド(VS Code) セットアップスクリプト
+"""フロントエンド(vscode) セットアップスクリプト
 
 Node.js 依存関係と Electron バイナリを事前に導入して VSIX を配置し、
-単独起動用ランチャーも作成します。Electron の通常取得が失敗した場合は
-frontend_avatar/_setup.py と同様に Python で GitHub から取得します。
+単独起動用ランチャーも作成します。Electron は scripts/setup_electron.py の
+共通処理で準備し、配置済みバイナリと共有 ZIP を再利用します。
 
 公開 API:
     setup(choices=None) -> bool
@@ -20,15 +20,11 @@ frontend_avatar/_setup.py と同様に Python で GitHub から取得します�
 
 import json
 import os
-import platform
 import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
-import urllib.request
-import zipfile
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -38,6 +34,10 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_VSCODE_DIR = THIS_DIR
 FRONTEND_COMMAND = "npm"
+
+# 単体実行とルートセットアップの両方から共通処理を参照する。
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from setup_electron import setup_dependencies
 
 AUTO_MODE = False
 
@@ -121,10 +121,10 @@ def ask_start_mode(prompt, default="n"):
     return False, False
 
 
-def run_command(command, cwd=None) -> bool:
+def run_command(command, cwd=None, env=None) -> bool:
     try:
         print_info(f"実行中: {' '.join(str(part) for part in command)}")
-        subprocess.run(command, cwd=cwd, check=True, text=True)
+        subprocess.run(command, cwd=cwd, check=True, text=True, env=env)
         return True
     except subprocess.CalledProcessError as exc:
         print_error(f"コマンド実行エラー: {exc}")
@@ -136,103 +136,6 @@ def run_command(command, cwd=None) -> bool:
 
 def npm_command() -> str:
     return f"{FRONTEND_COMMAND}.cmd" if sys.platform == "win32" else FRONTEND_COMMAND
-
-
-def electron_executable_name() -> str:
-    if sys.platform == "win32":
-        return "electron.exe"
-    if sys.platform == "darwin":
-        return "Electron.app/Contents/MacOS/Electron"
-    return "electron"
-
-
-def electron_binary_ready(frontend_dir: Path) -> bool:
-    """実行ファイル、path.txt、導入済みパッケージのバージョンを照合する。"""
-    electron_dir = frontend_dir / "node_modules" / "electron"
-    try:
-        package = json.loads((electron_dir / "package.json").read_text(encoding="utf-8"))
-        executable = electron_executable_name()
-        return (
-            (electron_dir / "path.txt").read_text(encoding="utf-8") == executable
-            and (electron_dir / "dist" / executable).is_file()
-            and (electron_dir / "dist" / "version").read_text(encoding="utf-8").strip().removeprefix("v")
-            == package["version"]
-        )
-    except (OSError, KeyError, json.JSONDecodeError):
-        return False
-
-
-def install_electron_binary(frontend_dir: Path, label: str) -> bool:
-    """Avatar と同じ GitHub リリース ZIP を Python で取得し、dist に配置する。"""
-    electron_dir = frontend_dir / "node_modules" / "electron"
-    try:
-        version = json.loads((electron_dir / "package.json").read_text(encoding="utf-8"))["version"]
-        machine = platform.machine().lower()
-        if machine in ("arm64", "aarch64"):
-            arch = "arm64"
-        elif machine in ("x86", "i386", "i686"):
-            arch = "ia32"
-        else:
-            arch = "x64"
-        plat = "win32" if sys.platform == "win32" else "darwin" if sys.platform == "darwin" else "linux"
-        zip_name = f"electron-v{version}-{plat}-{arch}.zip"
-        url = f"https://github.com/electron/electron/releases/download/v{version}/{zip_name}"
-        print_info(f"{label}: Electron v{version} ({plat}-{arch}) を Python でダウンロードします。")
-        print_info(f"  URL: {url}")
-        with tempfile.TemporaryDirectory(prefix="aidiy-vscode-electron-") as temporary:
-            archive = Path(temporary) / zip_name
-            with urllib.request.urlopen(url, timeout=60) as response, archive.open("wb") as output:
-                total = int(response.headers.get("Content-Length", 0))
-                downloaded = 0
-                milestone = 30
-                while block := response.read(1024 * 1024):
-                    output.write(block)
-                    downloaded += len(block)
-                    if total and downloaded * 100 // total >= milestone:
-                        print_info(f"  ダウンロード中... {min(downloaded * 100 // total, 100)}%")
-                        milestone += 30
-
-            # macOS のシンボリックリンクと Linux の実行権限も保持する。
-            extracted = Path(temporary) / "dist"
-            extracted.mkdir()
-            if sys.platform != "win32" and shutil.which("unzip"):
-                subprocess.run(["unzip", "-q", "-o", str(archive), "-d", str(extracted)], check=True)
-            else:
-                with zipfile.ZipFile(archive) as zipped:
-                    zipped.extractall(extracted)
-            executable = electron_executable_name()
-            if not (extracted / executable).is_file():
-                raise RuntimeError(f"展開した ZIP に {executable} がありません。")
-            binary_version = (extracted / "version").read_text(encoding="utf-8").strip().removeprefix("v")
-            if binary_version != version:
-                raise RuntimeError(f"Electron のバージョンが一致しません: {binary_version} / {version}")
-            if sys.platform != "win32":
-                (extracted / executable).chmod(0o755)
-            dist_dir = electron_dir / "dist"
-            if dist_dir.exists():
-                shutil.rmtree(dist_dir)
-            shutil.move(str(extracted), str(dist_dir))
-            (electron_dir / "path.txt").write_bytes(executable.encode("utf-8"))
-        print_success(f"{label}: Electron バイナリを配置しました。")
-        return electron_binary_ready(frontend_dir)
-    except (OSError, KeyError, ValueError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
-        print_error(f"{label}: Electron バイナリの取得・配置に失敗しました: {exc}")
-        return False
-
-
-def prepare_electron_binary(frontend_dir: Path, label: str) -> bool:
-    """npm の postinstall の有無に依存せず、セットアップ中に取得を完了する。"""
-    if electron_binary_ready(frontend_dir):
-        print_info(f"{label}: Electron バイナリを確認しました。")
-        return True
-    node = shutil.which("node.exe" if sys.platform == "win32" else "node")
-    installer = frontend_dir / "node_modules" / "electron" / "install.js"
-    if node and installer.is_file():
-        print_info(f"{label}: Electron のインストーラーを実行します。")
-        if run_command([node, str(installer)], cwd=frontend_dir) and electron_binary_ready(frontend_dir):
-            return True
-    print_warning(f"{label}: Electron バイナリを GitHub から手動取得します。")
-    return install_electron_binary(frontend_dir, label)
 
 
 def _is_working_vscode_cli(command: str) -> bool:
@@ -353,7 +256,7 @@ def get_installed_extensions(vscode_cli: str, show_versions: bool = False) -> se
         )
         return {line.strip().lower() for line in result.stdout.splitlines() if line.strip()}
     except (OSError, subprocess.SubprocessError) as exc:
-        print_error(f"VS Code 拡張機能一覧の確認に失敗しました: {exc}")
+        print_error(f"vscode 拡張機能一覧の確認に失敗しました: {exc}")
         return None
 
 
@@ -390,10 +293,10 @@ def install_standalone_launcher() -> bool:
 
 def setup(choices: dict | None = None) -> bool:
     del choices
-    label = "フロントエンド(VS Code)"
+    label = "フロントエンド(vscode)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_VSCODE_DIR}")
-    print_info("対象: VS Code チャット拡張 / Electron / 単独起動ランチャー / TypeScript / VSIX")
+    print_info("対象: vscode チャット拡張 / Electron / 単独起動ランチャー / TypeScript / VSIX")
 
     package_json = FRONTEND_VSCODE_DIR / "package.json"
     if not package_json.is_file():
@@ -408,26 +311,13 @@ def setup(choices: dict | None = None) -> bool:
 
     vscode_cli = find_vscode_cli()
 
-    recovery_needed = False
-    for action in ("install", "update"):
-        if not run_command([npm_path, action], cwd=FRONTEND_VSCODE_DIR):
-            print_warning(f"{label}: npm {action} が失敗しました。postinstall をスキップして再試行します。")
-            recovery_needed = True
-            if not run_command([npm_path, action, "--ignore-scripts"], cwd=FRONTEND_VSCODE_DIR):
-                print_error(f"{label}: 依存関係の導入・更新に失敗しました。")
-                return False
-
-    if not prepare_electron_binary(FRONTEND_VSCODE_DIR, label):
+    if not setup_dependencies(
+        FRONTEND_VSCODE_DIR, npm_path, label, run_command,
+        info=print_info, warning=print_warning, error=print_error,
+    ):
         return False
-    if recovery_needed:
-        # --ignore-scripts で導入した esbuild などの postinstall も完了させる。
-        if not run_command([npm_path, "rebuild"], cwd=FRONTEND_VSCODE_DIR):
-            return False
-        if not electron_binary_ready(FRONTEND_VSCODE_DIR):
-            print_error(f"{label}: Electron バイナリを確認できません。")
-            return False
     if vscode_cli is None:
-        print_warning("VS Code CLI が見つからないため、単独画面だけをセットアップします。")
+        print_warning("vscode CLI が見つからないため、単独画面だけをセットアップします。")
         if not run_command([npm_path, "run", "compile"], cwd=FRONTEND_VSCODE_DIR):
             print_error(f"{label}: 単独画面の生成に失敗しました。")
             return False
@@ -447,7 +337,7 @@ def setup(choices: dict | None = None) -> bool:
             [vscode_cli, "--install-extension", str(vsix_path), "--force"],
             cwd=FRONTEND_VSCODE_DIR,
         ):
-            print_error(f"{label}: VS Code 拡張機能の配置に失敗しました。")
+            print_error(f"{label}: vscode 拡張機能の配置に失敗しました。")
             return False
 
         installed = get_installed_extensions(vscode_cli, show_versions=True)
@@ -460,18 +350,18 @@ def setup(choices: dict | None = None) -> bool:
         return False
 
     if vscode_cli is not None:
-        print_success(f"{label}: {extension_id} を VS Code 拡張機能として配置しました。")
-        print_info("  VS Code 本体や AiDiy の常駐サービスは停止していません。")
-        print_info("  VS Code に反映されない場合は、ウィンドウを再読み込みしてください。")
+        print_success(f"{label}: {extension_id} を vscode 拡張機能として配置しました。")
+        print_info("  vscode 本体や AiDiy の常駐サービスは停止していません。")
+        print_info("  vscode に反映されない場合は、ウィンドウを再読み込みしてください。")
     print_success(f"{label}: aidiy_vscode で単独画面を起動できます。")
     return True
 
 
 def main():
     global AUTO_MODE
-    print_header("フロントエンド(VS Code) セットアップ")
+    print_header("フロントエンド(vscode) セットアップ")
     run_setup, AUTO_MODE = ask_start_mode(
-        "フロントエンド(VS Code) のセットアップを実行しますか?", default="n"
+        "フロントエンド(vscode) のセットアップを実行しますか?", default="n"
     )
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
@@ -479,7 +369,7 @@ def main():
     if AUTO_MODE:
         print_info("AUTOモードで実行します。")
     if not setup():
-        print_error("フロントエンド(VS Code) のセットアップに失敗しました。")
+        print_error("フロントエンド(vscode) のセットアップに失敗しました。")
         sys.exit(1)
 
 

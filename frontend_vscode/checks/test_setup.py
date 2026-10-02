@@ -1,122 +1,206 @@
-"""Electron の事前取得、npm 失敗時の復旧、セットアップ失敗を確認する。"""
+"""Avatar / VS Code 共通セットアップの再利用と取得回数を確認する。"""
 
 import contextlib
 import importlib.util
 import io
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import zipfile
 
 
-SPEC = importlib.util.spec_from_file_location("vscode_setup", Path(__file__).resolve().parents[1] / "_setup.py")
-setup = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(setup)
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def load_setup(name):
+    spec = importlib.util.spec_from_file_location(name + '_setup', ROOT / name / '_setup.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+vscode = load_setup('frontend_vscode')
+avatar = load_setup('frontend_avatar')
+import setup_electron as common
 
 
 class ElectronSetupTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.electron = self.root / "node_modules" / "electron"
-        self.electron.mkdir(parents=True)
-        (self.electron / "package.json").write_text(json.dumps({"version": "44.5.1"}), encoding="utf-8")
-        (self.electron / "install.js").write_text("", encoding="utf-8")
-        (self.root / "package.json").write_text("{}", encoding="utf-8")
+        self.project = Path(temporary.name)
+        self.cache = self.project / '_cache' / 'electron'
+        self.enterContext(patch.object(common, 'CACHE_DIR', self.cache))
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))
+        self.root = self.make_app('frontend_vscode')
+        self.electron = self.root / 'node_modules' / 'electron'
 
-    def make_ready(self):
-        executable = setup.electron_executable_name()
-        binary = self.electron / "dist" / executable
+    def make_app(self, name, version='44.5.1', parent=None):
+        root = (parent or self.project) / name
+        electron = root / 'node_modules' / 'electron'
+        electron.mkdir(parents=True, exist_ok=True)
+        (electron / 'package.json').write_text(json.dumps({'version': version}), encoding='utf-8')
+        (root / 'package.json').write_text('{}', encoding='utf-8')
+        return root
+
+    def make_ready(self, root=None, version='44.5.1'):
+        electron = (root or self.root) / 'node_modules' / 'electron'
+        executable = common.electron_executable_name()
+        binary = electron / 'dist' / executable
         binary.parent.mkdir(parents=True, exist_ok=True)
-        binary.write_bytes(b"binary")
-        (self.electron / "dist" / "version").write_text("44.5.1", encoding="utf-8")
-        (self.electron / "path.txt").write_text(executable, encoding="utf-8")
+        binary.write_bytes(b'binary')
+        (electron / 'dist' / 'version').write_text(version, encoding='utf-8')
+        (electron / 'path.txt').write_text(executable, encoding='utf-8')
+
+    def zip_bytes(self, version='44.5.1'):
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, 'w') as zipped:
+            zipped.writestr(common.electron_executable_name(), b'binary')
+            zipped.writestr('version', version)
+        return archive.getvalue()
+
+    def response(self, version='44.5.1'):
+        data = self.zip_bytes(version)
+        response = io.BytesIO(data)
+        response.headers = {'Content-Length': str(len(data))}
+        return response
+
+    def test_both_frontends_use_the_same_setup_function(self):
+        self.assertIs(vscode.setup_dependencies, common.setup_dependencies)
+        self.assertIs(avatar.setup_dependencies, common.setup_dependencies)
 
     def test_existing_binary_requires_matching_version_and_path(self):
         self.make_ready()
-        self.assertTrue(setup.electron_binary_ready(self.root))
-        (self.electron / "dist" / "version").write_text("44.5.0", encoding="utf-8")
-        self.assertFalse(setup.electron_binary_ready(self.root))
-        (self.electron / "dist" / "version").write_text("44.5.1", encoding="utf-8")
-        (self.electron / "path.txt").unlink()
-        self.assertFalse(setup.electron_binary_ready(self.root))
+        self.assertTrue(common.electron_binary_ready(self.root))
+        (self.electron / 'dist' / 'version').write_text('44.5.0', encoding='utf-8')
+        self.assertFalse(common.electron_binary_ready(self.root))
+        (self.electron / 'dist' / 'version').write_text('44.5.1', encoding='utf-8')
+        (self.electron / 'path.txt').unlink()
+        self.assertFalse(common.electron_binary_ready(self.root))
 
-    def test_prepared_binary_needs_no_network_or_installer(self):
+    def test_prepared_binary_needs_no_network(self):
         self.make_ready()
-        with patch.object(setup, "run_command") as command, patch.object(setup, "install_electron_binary") as download:
-            self.assertTrue(setup.prepare_electron_binary(self.root, "test"))
-            command.assert_not_called()
+        with patch.object(common.urllib.request, 'urlopen') as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
             download.assert_not_called()
 
-    def test_installer_runs_even_after_successful_npm_without_postinstall(self):
-        with patch.object(setup.shutil, "which", return_value="node"), patch.object(
-            setup, "run_command", side_effect=lambda *args, **kwargs: self.make_ready() or True
-        ), patch.object(setup, "install_electron_binary") as download:
-            self.assertTrue(setup.prepare_electron_binary(self.root, "test"))
+    def test_missing_path_is_repaired_without_download(self):
+        self.make_ready()
+        (self.electron / 'path.txt').unlink()
+        with patch.object(common.urllib.request, 'urlopen') as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
             download.assert_not_called()
+        self.assertTrue(common.electron_binary_ready(self.root))
 
-    def test_failed_installer_falls_back_to_python_download(self):
-        with patch.object(setup.shutil, "which", return_value="node"), patch.object(
-            setup, "run_command", return_value=False
-        ), patch.object(setup, "install_electron_binary", return_value=True) as download:
-            self.assertTrue(setup.prepare_electron_binary(self.root, "test"))
-            download.assert_called_once_with(self.root, "test")
+    def test_peer_binary_is_copied_without_network(self):
+        peer = self.make_app('frontend_avatar')
+        self.make_ready(peer)
+        with patch.object(common.urllib.request, 'urlopen') as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_not_called()
+        shutil.rmtree(peer / 'node_modules' / 'electron' / 'dist')
+        self.assertTrue(common.electron_binary_ready(self.root))
+
+    def test_different_peer_version_is_not_reused(self):
+        peer = self.make_app('frontend_avatar', '44.5.0')
+        self.make_ready(peer, '44.5.0')
+        with patch.object(common.urllib.request, 'urlopen', return_value=self.response()) as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_called_once()
+        self.assertTrue(common.electron_binary_ready(self.root))
+
+    def test_download_is_shared_and_zip_survives_reinstall(self):
+        with patch.object(common.urllib.request, 'urlopen', return_value=self.response()) as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            peer = self.make_app('frontend_avatar')
+            self.assertTrue(common.prepare_electron_binary(peer, 'test'))
+            shutil.rmtree(self.electron / 'dist')
+            (self.electron / 'path.txt').unlink()
+            shutil.rmtree(peer / 'node_modules' / 'electron' / 'dist')
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_called_once()
+        self.assertEqual(len(list(self.cache.glob('*.zip'))), 1)
 
     def test_python_download_prepares_each_platform(self):
-        for platform_name, executable in (
-            ("win32", "electron.exe"),
-            ("linux", "electron"),
-            ("darwin", "Electron.app/Contents/MacOS/Electron"),
-        ):
-            with self.subTest(platform=platform_name):
-                archive = io.BytesIO()
-                with zipfile.ZipFile(archive, "w") as zipped:
-                    zipped.writestr(executable, b"binary")
-                    zipped.writestr("version", "44.5.1")
-                response = io.BytesIO(archive.getvalue())
-                response.headers = {"Content-Length": str(len(archive.getvalue()))}
-                with patch.object(setup.sys, "platform", platform_name), patch.object(
-                    setup.platform, "machine", return_value="AMD64"
-                ), patch.object(setup.shutil, "which", return_value=None), patch.object(
-                    setup.urllib.request, "urlopen", return_value=response
-                ) as download:
-                    self.assertTrue(setup.install_electron_binary(self.root, "test"))
-                    self.assertTrue(setup.electron_binary_ready(self.root))
-                    self.assertIn(f"electron-v44.5.1-{platform_name}-x64.zip", download.call_args.args[0])
+        for platform_name in ('win32', 'linux', 'darwin'):
+            with self.subTest(platform=platform_name), patch.object(common.sys, 'platform', platform_name), patch.object(
+                common.platform, 'machine', return_value='AMD64'
+            ), patch.object(common.shutil, 'which', return_value=None):
+                root = self.make_app('frontend_vscode', parent=self.project / platform_name)
+                with patch.object(common.urllib.request, 'urlopen', return_value=self.response()) as download:
+                    self.assertTrue(common.prepare_electron_binary(root, 'test'))
+                    self.assertTrue(common.electron_binary_ready(root))
+                    self.assertIn(f'electron-v44.5.1-{platform_name}-x64.zip', download.call_args.args[0])
 
-    def test_download_failure_is_reported_as_setup_failure(self):
-        with patch.object(setup.urllib.request, "urlopen", side_effect=OSError("offline")):
-            self.assertFalse(setup.install_electron_binary(self.root, "test"))
+    def test_corrupt_cached_zip_is_replaced(self):
+        self.cache.mkdir(parents=True)
+        with patch.object(common.sys, 'platform', 'win32'), patch.object(common.platform, 'machine', return_value='AMD64'):
+            archive = self.cache / 'electron-v44.5.1-win32-x64.zip'
+            archive.write_bytes(b'broken ZIP')
+            with patch.object(common.urllib.request, 'urlopen', return_value=self.response()) as download:
+                self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+                download.assert_called_once()
+            self.assertTrue(common._archive_ready(archive, '44.5.1'))
+
+    def test_failed_download_is_not_retried_or_cached(self):
+        with patch.object(common.urllib.request, 'urlopen', side_effect=OSError('offline')) as download:
+            self.assertFalse(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_called_once()
+            self.assertEqual(download.call_args.kwargs['timeout'], 30)
+        self.assertEqual(list(self.cache.iterdir()), [])
+
+    def test_incomplete_download_is_not_cached(self):
+        response = self.response()
+        response.headers['Content-Length'] = str(int(response.headers['Content-Length']) + 1)
+        with patch.object(common.urllib.request, 'urlopen', return_value=response):
+            self.assertFalse(common.prepare_electron_binary(self.root, 'test'))
+        self.assertEqual(list(self.cache.iterdir()), [])
+
+    def test_npm_skips_electron_download(self):
+        self.make_ready()
+        command = Mock(return_value=True)
+        self.assertTrue(common.setup_dependencies(self.root, 'npm', 'test', command))
+        self.assertEqual([call.args[0] for call in command.call_args_list], [['npm', 'install'], ['npm', 'update']])
+        for call in command.call_args_list:
+            self.assertEqual(call.kwargs['env']['ELECTRON_SKIP_BINARY_DOWNLOAD'], '1')
 
     def test_npm_recovery_rebuilds_before_compiling(self):
         self.make_ready()
-        with patch.object(setup, "FRONTEND_VSCODE_DIR", self.root), patch.object(
-            setup, "find_vscode_cli", return_value=None
-        ), patch.object(setup.shutil, "which", return_value="npm"), patch.object(
-            setup, "run_command", side_effect=[False, True, True, True, True]
-        ) as command, patch.object(setup, "install_standalone_launcher", return_value=True):
-            self.assertTrue(setup.setup())
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode, 'find_vscode_cli', return_value=None
+        ), patch.object(vscode.shutil, 'which', return_value='npm'), patch.object(
+            vscode, 'run_command', side_effect=[False, True, True, True, True]
+        ) as command, patch.object(vscode, 'install_standalone_launcher', return_value=True):
+            self.assertTrue(vscode.setup())
             self.assertEqual(
-                [["npm", "install"], ["npm", "install", "--ignore-scripts"], ["npm", "update"],
-                 ["npm", "rebuild"], ["npm", "run", "compile"]],
+                [['npm', 'install'], ['npm', 'install', '--ignore-scripts'], ['npm', 'update'],
+                 ['npm', 'rebuild'], ['npm', 'run', 'compile']],
                 [call.args[0] for call in command.call_args_list],
             )
 
+    def test_avatar_completes_with_shared_dependency_setup(self):
+        peer = self.make_app('frontend_avatar')
+        self.make_ready(peer)
+        with patch.object(avatar, 'FRONTEND_AVATAR_DIR', peer), patch.object(
+            avatar, 'check_npm_installed', return_value=True
+        ), patch.object(avatar, 'run_command', return_value=True) as command:
+            self.assertTrue(avatar.setup())
+            self.assertEqual([call.args[0][1] for call in command.call_args_list], ['install', 'update'])
+
     def test_electron_failure_does_not_publish_launcher(self):
-        with patch.object(setup, "FRONTEND_VSCODE_DIR", self.root), patch.object(
-            setup, "find_vscode_cli", return_value=None
-        ), patch.object(setup.shutil, "which", return_value="npm"), patch.object(
-            setup, "run_command", return_value=True
-        ), patch.object(setup, "prepare_electron_binary", return_value=False), patch.object(
-            setup, "install_standalone_launcher"
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode, 'find_vscode_cli', return_value=None
+        ), patch.object(vscode.shutil, 'which', return_value='npm'), patch.object(
+            vscode, 'run_command', return_value=True
+        ), patch.object(common, 'prepare_electron_binary', return_value=False), patch.object(
+            vscode, 'install_standalone_launcher'
         ) as launcher:
-            self.assertFalse(setup.setup())
+            self.assertFalse(vscode.setup())
             launcher.assert_not_called()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

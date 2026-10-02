@@ -55,6 +55,16 @@ interface メッセージ {
 const 入力テキスト = ref('')
 const チャット領域 = ref<HTMLElement | null>(null)
 const テキストエリア = ref<HTMLTextAreaElement | null>(null)
+const 送信ボタン = ref<HTMLButtonElement | null>(null)
+
+// Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。
+function キー入力処理(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey
+      || event.isComposing || event.keyCode === 229) return
+  if (!送信ボタン.value || 送信ボタン.value.disabled) return
+  event.preventDefault()
+  送信ボタン.value.focus()
+}
 const ドラッグ中 = ref(false)
 const 入力欄最大到達 = ref(false)
 const 入力欄固定中 = ref(false)
@@ -612,9 +622,6 @@ function メッセージ送信() {
   入力欄クリア()
 }
 
-function キー入力処理(_event: KeyboardEvent) {
-  // 送信はボタンのみ
-}
 
 // --- ファイル送信 ---
 
@@ -825,6 +832,7 @@ defineExpose({
             :style="{ maxHeight: `${入力欄最大高さ}px` }"
             placeholder="メッセージを入力..."
             maxlength="5000"
+            title="Enter で改行、Tab で送信ボタンへ移動"
             :disabled="!WebSocket接続中"
             @input="テキストエリア自動調整"
             @keydown="キー入力処理"
@@ -870,6 +878,7 @@ defineExpose({
       </div>
 
       <button
+        ref="送信ボタン"
         class="chat-send-btn"
         :class="{
           'ws-disabled': !WebSocket接続中,
@@ -877,7 +886,7 @@ defineExpose({
         }"
         type="button"
         :disabled="!入力テキスト.trim() || !WebSocket接続中"
-        title="送信"
+        title="送信（フォーカス中に Enter）"
         @click="メッセージ送信"
       >
         <img src="/icons/sending.png" alt="送信" />
