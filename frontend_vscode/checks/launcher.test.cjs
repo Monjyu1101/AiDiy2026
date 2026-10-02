@@ -23,7 +23,18 @@ function fixture(t) {
   const launch = () => spawnSync(process.execPath, [path.join(scripts, 'launch-standalone.mjs'), root], {
     encoding: 'utf8', timeout: 20000, env,
   });
-  return { root, electron, executable, binary, launch };
+  function desktop(source) {
+    fs.mkdirSync(path.dirname(binary), { recursive: true });
+    try { fs.linkSync(process.execPath, binary); }
+    catch { fs.copyFileSync(process.execPath, binary); }
+    fs.writeFileSync(path.join(electron, 'path.txt'), executable);
+    fs.writeFileSync(path.join(electron, 'dist', 'version'), '44.5.1');
+    fs.mkdirSync(path.join(root, 'dist'));
+    fs.writeFileSync(path.join(root, 'dist', 'standalone.cjs'), '');
+    fs.mkdirSync(path.join(root, 'standalone'));
+    fs.writeFileSync(path.join(root, 'standalone', 'desktop.cjs'), source);
+  }
+  return { root, electron, executable, binary, launch, desktop };
 }
 
 test('missing Electron gives setup guidance without downloading', t => {
@@ -48,18 +59,29 @@ test('outdated Electron requires setup before compiling or launching', t => {
 
 test('prepared Electron launches without loading its downloading entry point', t => {
   const f = fixture(t);
-  fs.mkdirSync(path.dirname(f.binary), { recursive: true });
-  try { fs.linkSync(process.execPath, f.binary); }
-  catch { fs.copyFileSync(process.execPath, f.binary); }
-  fs.writeFileSync(path.join(f.electron, 'path.txt'), f.executable);
-  fs.writeFileSync(path.join(f.electron, 'dist', 'version'), '44.5.1');
-  fs.mkdirSync(path.join(f.root, 'dist'));
-  fs.writeFileSync(path.join(f.root, 'dist', 'standalone.cjs'), '');
-  fs.mkdirSync(path.join(f.root, 'standalone'));
-  fs.writeFileSync(path.join(f.root, 'standalone', 'desktop.cjs'),
-    'require("node:fs").writeFileSync(process.argv[3], JSON.stringify({ url: "http://127.0.0.1:1234/" }));');
+  f.desktop('require("node:fs").writeFileSync(process.argv[3], JSON.stringify({ url: "http://127.0.0.1:1234/", windowShown: true }));');
   const result = f.launch();
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Project folder/);
   assert.doesNotMatch(result.stdout + result.stderr, /Downloading|UNEXPECTED_ELECTRON_DOWNLOAD/);
+  assert.doesNotMatch(result.stdout, /ウィンドウを閉じる|サーバー.*停止/);
+});
+
+test('server readiness alone does not report a visible desktop window', t => {
+  const f = fixture(t);
+  f.desktop('require("node:fs").writeFileSync(process.argv[3], JSON.stringify({ url: "http://127.0.0.1:1234/" }));');
+  const result = f.launch();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /専用ウィンドウの表示を確認できません/);
+  assert.doesNotMatch(result.stdout, /Project folder/);
+});
+
+test('startup failures show the child error and log location', t => {
+  const f = fixture(t);
+  f.desktop('console.error("画面の読み込みに失敗しました"); process.exitCode = 1;');
+  const result = f.launch();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /画面の読み込みに失敗しました/);
+  assert.match(result.stderr, /stderr\.log/);
+  assert.doesNotMatch(result.stdout, /Project folder/);
 });

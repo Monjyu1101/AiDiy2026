@@ -91,10 +91,11 @@ async function main() {
   // VS Code のターミナルから起動しても Electron を通常のデスクトップモードで動かす。
   if (!browserMode) delete env.ELECTRON_RUN_AS_NODE;
   const stdout = openSync(join(runRoot, `${runId}.stdout.log`), 'w');
-  const stderr = openSync(join(runRoot, `${runId}.stderr.log`), 'w');
+  const stderrPath = join(runRoot, `${runId}.stderr.log`);
+  const stderr = openSync(stderrPath, 'w');
   try {
     server = spawn(executable, [entry, projectRoot, readyPath], {
-      cwd: projectRoot, detached: true, stdio: ['ignore', stdout, stderr], windowsHide: true, env,
+      cwd: projectRoot, detached: true, stdio: ['ignore', stdout, stderr], windowsHide: browserMode, env,
     });
   } finally {
     closeSync(stdout); closeSync(stderr);
@@ -102,20 +103,28 @@ async function main() {
   let startupError;
   server.on('error', error => { startupError = error; });
   server.unref();
+  function startupFailure(message) {
+    let details = '';
+    try { details = readFileSync(stderrPath, 'utf8').trim().slice(-3000); } catch { /* log unavailable */ }
+    return new Error(`${message}\nログ: ${stderrPath}${details ? `\n${details}` : ''}`);
+  }
   const deadline = Date.now() + 15000;
   while (!existsSync(readyPath)) {
-    if (startupError) throw startupError;
-    if (server.exitCode !== null) throw new Error(`サーバー起動に失敗しました: ${join(runRoot, `${runId}.stderr.log`)}`);
+    if (startupError) throw startupFailure(startupError.message);
+    if (server.exitCode !== null) throw startupFailure(`起動に失敗しました (終了コード: ${server.exitCode})。`);
     if (Date.now() > deadline) {
       try { process.kill(server.pid); } catch { /* already exited */ }
-      throw new Error('サーバー起動がタイムアウトしました。');
+      throw startupFailure('起動がタイムアウトしました。');
     }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  const { url } = JSON.parse(readFileSync(readyPath, 'utf8'));
+  const { url, windowShown } = JSON.parse(readFileSync(readyPath, 'utf8'));
+  if (!browserMode && windowShown !== true) {
+    try { process.kill(server.pid); } catch { /* already exited */ }
+    throw startupFailure('専用ウィンドウの表示を確認できませんでした。');
+  }
   if (browserMode && !openBrowser(url)) console.log(`ブラウザで開いてください: ${url}`);
   console.log(`AiDiy - Project folder: ${projectRoot}`);
-  console.log(browserMode ? 'ウィンドウを閉じて60秒後にサーバーが停止します。' : '専用ウィンドウを閉じるとサーバーと実行中の CLI が停止します。');
 }
 
 main().catch(error => { console.error(error.message || String(error)); process.exitCode = 1; });

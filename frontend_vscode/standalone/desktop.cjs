@@ -54,7 +54,10 @@ app.whenReady().then(async () => {
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   window.webContents.session.setPermissionCheckHandler((_contents, permission, origin) =>
     permission === 'clipboard-sanitized-write' && origin === new URL(server.url).origin);
-  window.once('ready-to-show', () => window.show());
   await window.loadURL(server.url);
-  if (args[1]) writeFileSync(args[1], JSON.stringify({ url: server.url, pid: process.pid }), 'utf8');
+  // ready-to-show の通知だけに表示を依存させず、ロード完了後に明示的に表示する。
+  window.show();
+  window.focus();
+  if (!window.isVisible()) throw new Error('専用ウィンドウを表示できませんでした。');
+  if (args[1]) writeFileSync(args[1], JSON.stringify({ url: server.url, pid: process.pid, windowShown: true }), 'utf8');
 }).catch(error => { console.error(String(error)); app.quit(); process.exitCode = 1; });

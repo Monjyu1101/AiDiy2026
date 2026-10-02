@@ -69,6 +69,8 @@ Electron は VSIX 生成・単独画面コンパイルより前に準備する�
 
 `launch-standalone.mjs` は Electron の取得処理を呼ばず、準備済みの実行ファイルを使う。未配置またはバージョン不一致の場合は `python frontend_vscode/_setup.py` の再実行を案内する。`npm ci` だけで Electron バイナリが取得されるとは限らないため、専用ウィンドウを使う環境ではセットアップを実行する。
 
+専用ウィンドウはページ読み込み後に `show()` / `focus()` を呼び、`isVisible()` の確認後に起動完了ファイルへ `windowShown: true` を書く。ランチャーはその通知まで待ち、サーバーの準備だけで表示成功とは判断しない。Electron の起動では `windowsHide: false` とし、ブラウザモードの Node サーバーだけを非表示起動する。起動失敗・タイムアウト時は `out/standalone/<起動ID>.stderr.log` の場所と末尾のエラーを表示する。
+
 ## 変更後の検証
 
 ```powershell
@@ -127,6 +129,7 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 |------|----------|
 | `code` が見つからず VSIX を配置できない | VS Code CLI の PATH、`frontend_vscode/_setup.py` の `find_vscode_cli()`。単独画面はセットアップ可能 |
 | Electron が未配置 / `fetch failed` | `python frontend_vscode/_setup.py` を再実行する。通常取得が失敗すると Python で GitHub から取得する。`dist/version`・実行ファイル・`path.txt` の照合まで成功しているか確認する |
+| 専用ウィンドウが表示されない | ターミナルに出る起動エラーと `out/standalone/*.stderr.log` を確認する。`standalone/desktop.cjs` の表示後通知と `scripts/launch-standalone.mjs` の表示確認を両方使う |
 | Hermes が見つからない | `aidiyHermes.cliPath`、`~/.local/bin`、`command_hermes/.venv` |
 | Provider / モデルが空 | `scripts/model-catalog.py`、Hermes 設定、Cli Path が AiDiy CLI を指すか |
 | 送信できない | ワークスペース信頼、フォルダが開かれているか、実行中状態 |
