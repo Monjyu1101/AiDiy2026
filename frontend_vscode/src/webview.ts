@@ -34,6 +34,10 @@ const 演出済み回答 = new Set<string>();
 let 演出タイマー: number | undefined;
 prompt.value = vscode.getState()?.下書き ?? '';
 const post = (type: string, data = {}) => vscode.postMessage({ type, ...data });
+const 実行表示更新 = (running: boolean) => {
+  element('chat-header').classList.toggle('running', running);
+  element('activity').classList.toggle('running', running);
+};
 const 末尾省略 = (value: string, maximum = 28) => value.length > maximum ? `...${value.slice(-(maximum - 3))}` : value;
 const 最下部表示 = () => {
   const conversation = element('conversation');
@@ -44,6 +48,9 @@ const 進捗末尾表示 = () => {
   progress.scrollTop = progress.scrollHeight;
 };
 const コンソール演出 = (content: HTMLDivElement, text: string, key: string) => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    content.innerHTML = markdown.render(text); 演出済み回答.add(key); 最下部表示(); return;
+  }
   content.classList.add('console-effect');
   const terminalText = document.createElement('span');
   const cursor = document.createElement('span'); cursor.className = 'terminal-cursor';
@@ -217,10 +224,12 @@ window.addEventListener('message', event => {
     const content = String(state.メッセージ内容 ?? '');
     const control = streamControlOf(content);
     if (control === 'start') {
+      実行表示更新(true);
       progressSection.classList.add('running');
       element('progress-title').textContent = '';
       element<HTMLDetailsElement>('progress-details').open = true;
     } else if (control === 'end' || control === 'cancel') {
+      実行表示更新(false);
       progressSection.classList.remove('running');
       element('progress-title').textContent = '';
       element<HTMLDetailsElement>('progress-details').open = false;
@@ -243,6 +252,10 @@ window.addEventListener('message', event => {
   会話ID = state.会話ID;
   送信待ち = false; 実行中 = state.実行中;
   入力許可 = state.信頼済み && state.接続済み !== false && Boolean(state.作業フォルダ);
+  element('welcome').hidden = state.メッセージ.length > 0;
+  実行表示更新(実行中 && state.接続済み !== false);
+  element('activity').classList.toggle('unavailable', !入力許可);
+  element('activity-label').textContent = !入力許可 ? '待機中' : 実行中 ? '実行中' : '準備完了';
   newChat.disabled = 実行中 || !state.信頼済み || state.接続済み === false || (!state.作業フォルダ && !state.新規可能);
   const projectName = String(state.作業フォルダ?.名前 ?? '');
   projectFolder.textContent = 末尾省略(projectName);

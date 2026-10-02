@@ -20,6 +20,7 @@
 | チャット表示、入力 | `src/webview.ts`, `media/chat.html`, `media/chat.css` | `standalone/bridge.js`, `checks/standalone.test.cjs` |
 | Provider / モデル候補 | `scripts/model-catalog.py` | `command_hermes` の picker / Provider 実装 |
 | 単独試用サーバー | `src/standalone.ts`, `standalone/bridge.js` | `checks/standalone.test.cjs` |
+| 単独ウィンドウ、タイトルバー | `standalone/desktop.cjs`, `standalone/preload.cjs`, `scripts/launch-standalone.mjs` | `media/chat.html`, `media/chat.css`, `standalone/theme.css` |
 | bundle / VSIX | `scripts/build.mjs`, `package.json` | `.vscodeignore`, `dist/THIRD_PARTY_NOTICES.txt` |
 
 ## 実装上の維持事項
@@ -61,6 +62,8 @@ python frontend_vscode/_setup.py
 単独画面は作業フォルダで `aidiy_vscode`、または `aidiy_vscode "C:\work\project"` のように明示して起動する。前者は起動時のカレントフォルダを使用する。`~/.local/bin` は Hermes のランチャーと共通なので PATH に含める。Windows の `.cmd` と macOS / Linux のシェルランチャーは、どちらも `scripts/launch-standalone.mjs` を直接呼ぶ。`launch-extension-dev.ps1` は Windows で VS Code 拡張の開発ホストを起動する。
 
 配置は拡張機能ファイルを更新するだけで、VS Code 本体や AiDiy の常駐サービスを停止しない。すでに VS Code が起動している場合、変更の反映にはウィンドウ再読み込みが必要になる。
+
+単独起動は Electron のフレームレスウィンドウを使う。ヘッダーのドラッグ領域から会話操作・ウィンドウ操作ボタンを除外し、最小化・最大化／復元・閉じるを preload の限定 API で扱う。Node integration は無効、context isolation と sandbox は有効にする。専用ウィンドウ終了時はサーバーと CLI を終了する。`aidiy_vscode --browser` では従来のブラウザモードを使い、接続が無くなって60秒後に終了する。Electron は開発・単独起動用依存で、VSIX に含めない。
 
 ## 変更後の検証
 

@@ -1,4 +1,17 @@
 (() => {
+  if (window.aidiyWindow) {
+    document.documentElement.classList.add('desktop-window');
+    document.getElementById('desktop-controls').hidden = false;
+    document.getElementById('window-minimize').addEventListener('click', () => window.aidiyWindow.minimize());
+    document.getElementById('window-maximize').addEventListener('click', () => window.aidiyWindow.maximize());
+    document.getElementById('window-close').addEventListener('click', () => window.aidiyWindow.close());
+    window.aidiyWindow.onState(({ maximized }) => {
+      document.documentElement.classList.toggle('window-maximized', maximized);
+      const button = document.getElementById('window-maximize');
+      button.title = maximized ? '元のサイズに戻す' : '最大化';
+      button.setAttribute('aria-label', button.title);
+    });
+  }
   let state, draft = '', events;
   const emit = data => window.dispatchEvent(new MessageEvent('message', {data}));
   const error = value => {

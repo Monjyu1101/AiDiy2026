@@ -29,6 +29,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 - TypeScript。
 - VS Code Extension API / Webview API。
 - Node.js `child_process` / `http`。
+- Electron（単独試用のフレームレスウィンドウ）。
 - esbuild。
 - `@vscode/vsce`。
 - markdown-it。
@@ -56,8 +57,9 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `src/standalone.ts` | 単独試用用の localhost HTTP / SSE サーバー |
 | `media/chat.html` / `media/chat.css` | Webview の HTML と見た目 |
 | `standalone/bridge.js` | 単独試用画面と HTTP / SSE の橋渡し |
+| `standalone/desktop.cjs` / `standalone/preload.cjs` | 単独ウィンドウ、終了処理、限定したウィンドウ操作 IPC |
 | `scripts/model-catalog.py` | Hermes 既存 picker から Provider / モデル候補を取得 |
-| `scripts/launch-standalone.mjs` | 作業フォルダから単独サーバーを起動し、OS のブラウザで開く |
+| `scripts/launch-standalone.mjs` | 作業フォルダから専用ウィンドウを起動する。`--browser` ではブラウザで開く |
 | `scripts/build.mjs` | 拡張、単独試用、Webview の bundle と第三者ライセンス生成 |
 | `checks/` | CLI 実行、protocol、停止、単独試用の検証 |
 | `_setup.py` / `_cleanup.py` | VSIX の生成・配置と、拡張・生成物の解除 |

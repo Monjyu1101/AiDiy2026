@@ -67,6 +67,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       .replaceAll('{{CSP}}', view.webview.cspSource).replaceAll('{{NONCE}}', nonce)
       .replaceAll('{{STYLE}}', resource('media/chat.css')).replaceAll('{{SCRIPT}}', resource('dist/webview.js'))
       .replaceAll('{{SEND_ICON}}', resource('media/sending.png'))
+      .replaceAll('{{APP_ICON}}', resource('media/AiDiy.png'))
       .replaceAll('{{STOP_ICON}}', resource('media/abort.png'));
     view.webview.onDidReceiveMessage(message => {
       void this.受信(message).catch(error => this.エラー(error));

@@ -1,13 +1,21 @@
 :root {
-  --vscode-sideBar-background:#181818; --vscode-foreground:#ddd;
-  --vscode-font-family:"Segoe UI","Yu Gothic UI",sans-serif; --vscode-font-size:13px;
-  --vscode-descriptionForeground:#aaa; --vscode-button-background:#0078d4;
-  --vscode-button-foreground:#fff; --vscode-button-hoverBackground:#026ec1;
-  --vscode-panel-border:#333; --vscode-input-background:#222; --vscode-input-foreground:#ddd;
-  --vscode-input-border:#444; --vscode-focusBorder:#0078d4; --vscode-textLink-foreground:#6cb6ff;
-  --vscode-toolbar-hoverBackground:#333; --vscode-textBlockQuote-background:#242424;
-  --vscode-textCodeBlock-background:#111; --vscode-errorForeground:#f88;
-  --vscode-editor-font-family:Consolas,monospace;
+  color-scheme: dark;
+  --vscode-sideBar-background: #11151d; --vscode-foreground: #e3e9f2;
+  --vscode-font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif;
+  --vscode-font-size: 13px; --vscode-descriptionForeground: #8b98ad;
+  --vscode-button-background: #667eea; --vscode-button-foreground: #fff;
+  --vscode-button-hoverBackground: #7b90f2; --vscode-panel-border: #29313f;
+  --vscode-input-background: #191f2b; --vscode-input-foreground: #e3e9f2;
+  --vscode-input-border: #303b4f; --vscode-focusBorder: #889aff;
+  --vscode-textLink-foreground: #a6b8ff; --vscode-toolbar-hoverBackground: #242d3d;
+  --vscode-textBlockQuote-background: #1c2433; --vscode-textBlockQuote-border: #465574;
+  --vscode-textCodeBlock-background: #0d1119; --vscode-errorForeground: #ff8e9e;
+  --vscode-editor-font-family: Consolas, "SFMono-Regular", monospace;
+  --vscode-list-activeSelectionBackground: #252f49; --vscode-list-activeSelectionForeground: #fff;
 }
-body { max-width:960px; margin:auto; }
-html { background:var(--vscode-sideBar-background); }
+html { background: var(--vscode-sideBar-background); }
+body { max-width: 1000px; margin: auto; }
+.desktop-window body { max-width: none; border: 1px solid var(--vscode-panel-border); }
+.desktop-window #chat-header { -webkit-app-region: drag; user-select: none; }
+.desktop-window #header-actions, .desktop-window #desktop-controls { -webkit-app-region: no-drag; }
+.desktop-window.window-maximized body { border: 0; }

@@ -3,9 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const extensionRoot = fileURLToPath(new URL('..', import.meta.url));
-const projectRoot = resolve(process.argv[2] || process.cwd());
+const args = process.argv.slice(2);
+const browserMode = args.includes('--browser');
+const projectRoot = resolve(args.find(arg => arg !== '--browser') || process.cwd());
 const bundle = join(extensionRoot, 'dist', 'standalone.cjs');
 const runRoot = join(extensionRoot, 'out', 'standalone');
 
@@ -52,12 +55,22 @@ async function main() {
   mkdirSync(runRoot, { recursive: true });
   const runId = randomUUID().replaceAll('-', '');
   const readyPath = join(runRoot, `${runId}.json`);
+  let server;
+  let executable = process.execPath;
+  let entry = bundle;
+  if (!browserMode) {
+    try { executable = createRequire(import.meta.url)('electron'); }
+    catch { throw new Error('専用ウィンドウには Electron が必要です。frontend_vscode で npm ci を実行してください。ブラウザで開く場合は --browser を指定します。'); }
+    entry = join(extensionRoot, 'standalone', 'desktop.cjs');
+  }
+  const env = { ...process.env };
+  // VS Code のターミナルから起動しても Electron を通常のデスクトップモードで動かす。
+  if (!browserMode) delete env.ELECTRON_RUN_AS_NODE;
   const stdout = openSync(join(runRoot, `${runId}.stdout.log`), 'w');
   const stderr = openSync(join(runRoot, `${runId}.stderr.log`), 'w');
-  let server;
   try {
-    server = spawn(process.execPath, [bundle, projectRoot, readyPath], {
-      cwd: projectRoot, detached: true, stdio: ['ignore', stdout, stderr], windowsHide: true,
+    server = spawn(executable, [entry, projectRoot, readyPath], {
+      cwd: projectRoot, detached: true, stdio: ['ignore', stdout, stderr], windowsHide: true, env,
     });
   } finally {
     closeSync(stdout); closeSync(stderr);
@@ -76,9 +89,9 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   const { url } = JSON.parse(readFileSync(readyPath, 'utf8'));
-  if (!openBrowser(url)) console.log(`ブラウザで開いてください: ${url}`);
+  if (browserMode && !openBrowser(url)) console.log(`ブラウザで開いてください: ${url}`);
   console.log(`AiDiy - Project folder: ${projectRoot}`);
-  console.log('ウィンドウを閉じて60秒後にサーバーが停止します。');
+  console.log(browserMode ? 'ウィンドウを閉じて60秒後にサーバーが停止します。' : '専用ウィンドウを閉じるとサーバーと実行中の CLI が停止します。');
 }
 
 main().catch(error => { console.error(error.message || String(error)); process.exitCode = 1; });

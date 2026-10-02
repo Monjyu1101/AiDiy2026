@@ -145,6 +145,7 @@ export async function 単独起動(project: string, launch?: 起動設定) {
         reply(200, {ok:true}); return;
       }
       const assets: Record<string, [string, string]> = {
+        'AiDiy.png':['media/AiDiy.png','image/png'],
         'chat.css':['media/chat.css','text/css'], 'theme.css':['standalone/theme.css','text/css'], 'sending.png':['media/sending.png','image/png'], 'abort.png':['media/abort.png','image/png'],
         'bridge.js':['standalone/bridge.js','text/javascript'], 'webview.js':['dist/webview.js','text/javascript']
       };
@@ -155,9 +156,10 @@ export async function 単独起動(project: string, launch?: 起動設定) {
         const nonce = randomBytes(16).toString('hex');
         const html = readFileSync(join(root,'media/chat.html'),'utf8')
           .replaceAll('{{CSP}}', "'self'").replaceAll('{{NONCE}}',nonce)
+          .replaceAll('{{APP_ICON}}','AiDiy.png')
           .replaceAll('{{STYLE}}','chat.css').replaceAll('{{SCRIPT}}','webview.js').replaceAll('{{SEND_ICON}}','sending.png').replaceAll('{{STOP_ICON}}','abort.png')
           .replace("connect-src 'none'", "connect-src 'self'")
-          .replace('</head>', '<link rel="stylesheet" href="theme.css"></head>')
+          .replace('</head>', '<link rel="icon" type="image/png" href="AiDiy.png"><link rel="stylesheet" href="theme.css"></head>')
           .replace('<script nonce=', `<script nonce="${nonce}" src="bridge.js"></script><script nonce=`);
         res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
         res.writeHead(200, {'Content-Type':'text/html; charset=utf-8'}); res.end(html); return;
