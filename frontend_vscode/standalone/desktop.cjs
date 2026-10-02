@@ -9,7 +9,7 @@ app.setName('AiDiy');
 app.setPath('userData', join(app.getPath('appData'), 'AiDiy-vscode'));
 if (process.platform === 'win32') app.setAppUserModelId('AiDiy.vscode.standalone');
 
-let server, window, closing = false;
+let server, window, closing = false, opening = true;
 app.on('before-quit', event => {
   if (!server || closing) return;
   event.preventDefault();
@@ -22,7 +22,7 @@ app.whenReady().then(async () => {
   server = await 単独起動(resolve(args[0] || process.cwd()));
   window = new BrowserWindow({
     title: 'AiDiy', width: 476, height: 602, minWidth: 360, minHeight: 480,
-    frame: false, show: false, backgroundColor: '#11151d',
+    frame: false, roundedCorners: false, show: false, backgroundColor: '#000',
     icon: join(__dirname, '../media/AiDiy.png'), autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -39,7 +39,7 @@ app.whenReady().then(async () => {
     else if (action === 'maximize') window.isMaximized() ? window.unmaximize() : window.maximize();
     else if (action === 'close') window.close();
   });
-  const sendState = () => window.webContents.send('aidiy:window-state', { maximized: window.isMaximized() });
+  const sendState = () => window.webContents.send('aidiy:window-state', { maximized: window.isMaximized(), opening });
   window.on('maximize', sendState);
   window.on('unmaximize', sendState);
   window.webContents.on('did-finish-load', sendState);
@@ -55,9 +55,32 @@ app.whenReady().then(async () => {
   window.webContents.session.setPermissionCheckHandler((_contents, permission, origin) =>
     permission === 'clipboard-sanitized-write' && origin === new URL(server.url).origin);
   await window.loadURL(server.url);
-  // ready-to-show の通知だけに表示を依存させず、ロード完了後に明示的に表示する。
+  // 初回だけ、黒いウィンドウを最終位置の中心から拡大する。
+  const bounds = window.getBounds();
+  const resize = scale => {
+    const width = Math.round(bounds.width * scale), height = Math.round(bounds.height * scale);
+    window.setBounds({ x: Math.round(bounds.x + (bounds.width - width) / 2), y: Math.round(bounds.y + (bounds.height - height) / 2), width, height });
+  };
+  window.setMinimumSize(0, 0);
+  resize(.55);
   window.show();
   window.focus();
   if (!window.isVisible()) throw new Error('専用ウィンドウを表示できませんでした。');
+  const expanded = await new Promise(resolve => {
+    const started = Date.now();
+    const tick = () => {
+      if (window.isDestroyed()) { resolve(false); return; }
+      const progress = Math.min(1, (Date.now() - started) / 750);
+      resize(.55 + .45 * (1 - Math.pow(1 - progress, 3)));
+      if (progress < 1) setTimeout(tick, 16);
+      else resolve(true);
+    };
+    tick();
+  });
+  if (!expanded) return;
+  window.setBounds(bounds);
+  window.setMinimumSize(360, 480);
+  opening = false;
+  sendState();
   if (args[1]) writeFileSync(args[1], JSON.stringify({ url: server.url, pid: process.pid, windowShown: true }), 'utf8');
 }).catch(error => { console.error(String(error)); app.quit(); process.exitCode = 1; });

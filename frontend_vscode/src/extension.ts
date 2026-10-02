@@ -317,7 +317,7 @@ export function activate(context: vscode.ExtensionContext): void {
     try { await action(); } catch (error) { void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error)); }
   });
   context.subscriptions.push(chat,
-    vscode.window.registerWebviewViewProvider('aidiyHermes.chat', chat),
+    vscode.window.registerWebviewViewProvider('aidiyHermes.chat', chat, { webviewOptions: { retainContextWhenHidden: true } }),
     command('aidiyHermes.open', () => vscode.commands.executeCommand('aidiyHermes.chat.focus')),
     command('aidiyHermes.newChat', () => chat.新規()),
     command('aidiyHermes.attachSelection', () => chat.選択添付()),

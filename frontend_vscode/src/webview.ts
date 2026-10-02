@@ -19,6 +19,16 @@ const customModel = element<HTMLInputElement>('custom-model');
 const customModelLabel = element<HTMLLabelElement>('custom-model-label');
 const modelPickerStatus = element<HTMLParagraphElement>('model-picker-status');
 const applyModel = element<HTMLButtonElement>('apply-model');
+let 初期表示開始済み = false;
+const 初期表示開始 = () => {
+  if (初期表示開始済み) return;
+  初期表示開始済み = true;
+  clearTimeout(初期表示待ち);
+  // 状態反映後にレイアウトが確定するのを待ち、初回だけ黒から表示する。
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('ui-ready')));
+};
+// 初回通知が届かなくても、接続状況を確認できる画面は表示する。
+const 初期表示待ち = window.setTimeout(初期表示開始, 2500);
 let provider = '', model = '';
 let catalogProvider = '';
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
@@ -33,6 +43,10 @@ let 削除対象ID = '';
 const 演出済み回答 = new Set<string>();
 let 演出タイマー: number | undefined;
 prompt.value = vscode.getState()?.下書き ?? '';
+const 初期文字演出停止 = () => {
+  if (prompt.value.length > 0) element('welcome').classList.add('welcome-input-started');
+};
+初期文字演出停止();
 const post = (type: string, data = {}) => vscode.postMessage({ type, ...data });
 const 実行表示更新 = (running: boolean) => {
   element('chat-header').classList.toggle('running', running);
@@ -136,7 +150,7 @@ const モデル選択を開く = () => {
   modelPicker.showModal();
   候補取得('');
 };
-prompt.addEventListener('input', () => { vscode.setState({ 下書き: prompt.value }); ボタン更新(); });
+prompt.addEventListener('input', () => { 初期文字演出停止(); vscode.setState({ 下書き: prompt.value }); ボタン更新(); });
 element('composer').addEventListener('submit', event => {
   event.preventDefault();
   if (!入力許可 || 実行中 || 送信待ち || !prompt.value.trim()) return;
@@ -243,14 +257,15 @@ window.addEventListener('message', event => {
   }
   if (state.type === 'accepted') { prompt.value = ''; vscode.setState({ 下書き: '' }); 送信待ち = false; ボタン更新(); return; }
   if (state.type !== 'state') return;
-  if (会話ID && 会話ID !== state.会話ID) {
+  const 初回状態 = !会話ID;
+  if (会話ID !== state.会話ID) {
     メッセージJSON = '';
     演出済み回答.clear();
     state.メッセージ.forEach((item: { 種別: string; 本文: string }, index: number) => {
       if (item.種別 === 'assistant') 演出済み回答.add(`${index}:${item.本文}`);
     });
     if (演出タイマー !== undefined) { clearTimeout(演出タイマー); 演出タイマー = undefined; }
-    prompt.value = ''; vscode.setState({ 下書き: '' });
+    if (!初回状態) { prompt.value = ''; vscode.setState({ 下書き: '' }); }
   }
   会話ID = state.会話ID;
   送信待ち = false; 実行中 = state.実行中;
@@ -326,5 +341,6 @@ window.addEventListener('message', event => {
     進捗末尾表示();
   }
   ボタン更新();
+  初期表示開始();
 });
 post('ready');

@@ -25,7 +25,7 @@
 - frontend_web/_cleanup.py     cleanup(choices)
 - frontend_avatar/_cleanup.py  cleanup(choices)
 - command_hermes/_cleanup.py   cleanup(choices)（ランチャー/PATH も解除）
-- frontend_vscode/_cleanup.py  cleanup(choices)（VS Code 拡張機能も解除）
+- frontend_vscode/_cleanup.py  cleanup(choices)（vscode 拡張機能も解除）
 
 Usage:
     python _cleanup.py
@@ -512,7 +512,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     f"  {BACKEND_HERMES_PATH}/temp フォルダを削除しますか？", default="y",
                 )
 
-    choices["vscode"] = ask_yes_no("フロントエンド(VS Code)をクリーンアップしますか？", default="y")
+    choices["vscode"] = ask_yes_no("フロントエンド(vscode)をクリーンアップしますか？", default="y")
 
     return choices
 
@@ -586,9 +586,9 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     print()
     if choices["vscode"]:
         if not _run_folder_cleanup("frontend_vscode", choices):
-            cleanup_errors.append("フロントエンド(VS Code)")
+            cleanup_errors.append("フロントエンド(vscode)")
     else:
-        print_info("フロントエンド(VS Code)のクリーンアップをスキップしました")
+        print_info("フロントエンド(vscode)のクリーンアップをスキップしました")
 
     print()
     # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
@@ -629,7 +629,7 @@ def main():
     print_info("  7. フロントエンド(Web)")
     print_info("  8. フロントエンド(Avatar)")
     print_info("  9. コマンド(hermes)")
-    print_info(" 10. フロントエンド(VS Code)")
+    print_info(" 10. フロントエンド(vscode)")
     print()
 
     choices = collect_cleanup_choices(base_dir)

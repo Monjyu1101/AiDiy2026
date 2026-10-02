@@ -8,9 +8,9 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""フロントエンド(VS Code) クリーンアップスクリプト
+"""フロントエンド(vscode) クリーンアップスクリプト
 
-VS Code 拡張機能をアンインストールし、依存関係と生成物を削除します。
+vscode 拡張機能をアンインストールし、依存関係と生成物を削除します。
 
 公開 API:
     cleanup(choices=None) -> bool
@@ -255,7 +255,7 @@ def get_installed_extensions(vscode_cli: str) -> set[str] | None:
         )
         return {line.strip().lower() for line in result.stdout.splitlines() if line.strip()}
     except (OSError, subprocess.SubprocessError) as exc:
-        print_warning(f"VS Code 拡張機能一覧の確認に失敗しました: {exc}")
+        print_warning(f"vscode 拡張機能一覧の確認に失敗しました: {exc}")
         return None
 
 
@@ -265,7 +265,7 @@ def uninstall_extension() -> tuple[bool, int]:
     if extension_id is None:
         return False, 0
     if vscode_cli is None:
-        print_warning("VS Code CLI (code) が見つからないため、拡張機能の解除を確認できません。")
+        print_warning("vscode CLI (code) が見つからないため、拡張機能の解除を確認できません。")
         return False, 0
 
     try:
@@ -273,7 +273,7 @@ def uninstall_extension() -> tuple[bool, int]:
         if installed is None:
             return False, 0
         if extension_id.lower() not in installed:
-            print_info(f"VS Code 拡張機能は配置されていません: {extension_id}")
+            print_info(f"vscode 拡張機能は配置されていません: {extension_id}")
             return True, 0
         print_info(f"実行中: {vscode_cli} --uninstall-extension {extension_id}")
         subprocess.run(
@@ -284,22 +284,22 @@ def uninstall_extension() -> tuple[bool, int]:
         )
         installed_after = get_installed_extensions(vscode_cli)
         if installed_after is None or extension_id.lower() in installed_after:
-            print_warning(f"VS Code 拡張機能が解除されたことを確認できません: {extension_id}")
+            print_warning(f"vscode 拡張機能が解除されたことを確認できません: {extension_id}")
             return False, 0
-        print_success(f"VS Code 拡張機能を解除しました: {extension_id}")
-        print_info("  VS Code 本体は停止していません。反映にはウィンドウ再読み込みが必要です。")
+        print_success(f"vscode 拡張機能を解除しました: {extension_id}")
+        print_info("  vscode 本体は停止していません。反映にはウィンドウ再読み込みが必要です。")
         return True, 1
     except subprocess.CalledProcessError as exc:
-        print_warning(f"VS Code 拡張機能の解除に失敗しました: {exc}")
+        print_warning(f"vscode 拡張機能の解除に失敗しました: {exc}")
         return False, 0
     except Exception as exc:
-        print_warning(f"VS Code 拡張機能の確認に失敗しました: {exc}")
+        print_warning(f"vscode 拡張機能の確認に失敗しました: {exc}")
         return False, 0
 
 
 def cleanup(choices: dict | None = None) -> bool:
     del choices
-    label = "フロントエンド(VS Code)"
+    label = "フロントエンド(vscode)"
     print_header(f"{label} のクリーンアップ")
 
     extension_ok, deleted_count = uninstall_extension()
@@ -340,7 +340,7 @@ def cleanup(choices: dict | None = None) -> bool:
 
 def main():
     global AUTO_MODE
-    print_header("フロントエンド(VS Code) クリーンアップ")
+    print_header("フロントエンド(vscode) クリーンアップ")
     run_cleanup, AUTO_MODE = ask_start_mode("クリーンアップを実行しますか？", default="n")
     if not run_cleanup:
         print_info("クリーンアップをキャンセルしました")

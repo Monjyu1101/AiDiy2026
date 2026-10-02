@@ -9,6 +9,8 @@ async function launch({ loadError, visible = true } = {}) {
   const calls = [];
   const written = [];
   const errors = [];
+  const sizes = [], minimums = [], states = [];
+  let clock = 0;
   const app = new EventEmitter();
   Object.assign(app, {
     setName() {}, setPath() {}, setAppUserModelId() {}, getPath: () => '/tmp',
@@ -18,13 +20,20 @@ async function launch({ loadError, visible = true } = {}) {
     constructor(options) {
       super();
       assert.equal(options.frame, false);
+      assert.equal(options.roundedCorners, false);
+      this.bounds = { x: 100, y: 200, width: options.width, height: options.height };
       this.webContents = new EventEmitter();
       Object.assign(this.webContents, {
-        send() {}, setWindowOpenHandler() {},
+        send(_channel, state) { states.push(JSON.parse(JSON.stringify(state))); }, setWindowOpenHandler() {},
         session: { setPermissionRequestHandler() {}, setPermissionCheckHandler() {} },
       });
     }
     setMenu() {}
+    getBounds() { return this.bounds; }
+    setBounds(bounds) { this.bounds = bounds; sizes.push(JSON.parse(JSON.stringify(bounds))); }
+    setMinimumSize(width, height) { minimums.push([width, height]); }
+    isDestroyed() { return false; }
+    isMaximized() { return false; }
     async loadURL() { calls.push('load'); if (loadError) throw new Error(loadError); }
     show() { calls.push('show'); }
     focus() { calls.push('focus'); }
@@ -34,6 +43,8 @@ async function launch({ loadError, visible = true } = {}) {
   const fakeProcess = { argv: ['electron', filename, '/project', '/ready.json'], platform: 'win32', pid: 123 };
   vm.runInNewContext(readFileSync(filename, 'utf8'), {
     __filename: filename, __dirname: path.dirname(filename), process: fakeProcess,
+    Date: class extends Date { static now() { return clock; } },
+    setTimeout: (callback, milliseconds) => { clock += milliseconds; return setImmediate(callback); },
     console: { error: error => errors.push(String(error)) },
     require(name) {
       if (name === 'electron') return { app, BrowserWindow: Window, ipcMain: { handle() {} }, shell: {} };
@@ -42,8 +53,8 @@ async function launch({ loadError, visible = true } = {}) {
       return require(name);
     },
   });
-  await new Promise(resolve => setImmediate(resolve));
-  return { calls, written, errors, fakeProcess };
+  for (let i = 0; i < 100 && !written.length && !errors.length; i++) await new Promise(resolve => setImmediate(resolve));
+  return { calls, written, errors, fakeProcess, sizes, minimums, states };
 }
 
 test('window is shown and focused without waiting for ready-to-show, before notifying launcher', async () => {
@@ -51,6 +62,15 @@ test('window is shown and focused without waiting for ready-to-show, before noti
   assert.deepEqual(result.calls, ['load', 'show', 'focus', 'ready']);
   assert.equal(result.written[0].windowShown, true);
   assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.minimums, [[0, 0], [360, 480]]);
+  assert.ok(result.sizes[0].width < 476 && result.sizes[0].height < 602);
+  assert.deepEqual(result.sizes.at(-1), { x: 100, y: 200, width: 476, height: 602 });
+  result.sizes.forEach((size, index) => {
+    assert.ok(Math.abs(size.x + size.width / 2 - 338) <= .5);
+    assert.ok(Math.abs(size.y + size.height / 2 - 501) <= .5);
+    if (index) assert.ok(size.width >= result.sizes[index - 1].width && size.height >= result.sizes[index - 1].height);
+  });
+  assert.deepEqual(result.states.at(-1), { maximized: false, opening: false });
 });
 
 test('failed page load produces no startup success notification', async () => {

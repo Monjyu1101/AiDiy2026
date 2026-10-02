@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('aidiyWindow', {
   maximize: () => ipcRenderer.invoke('aidiy:window', 'maximize'),
   close: () => ipcRenderer.invoke('aidiy:window', 'close'),
   onState: callback => {
-    const listener = (_event, state) => callback({ maximized: Boolean(state.maximized) });
+    const listener = (_event, state) => callback({ maximized: Boolean(state.maximized), opening: Boolean(state.opening) });
     ipcRenderer.on('aidiy:window-state', listener);
     return () => ipcRenderer.removeListener('aidiy:window-state', listener);
   },
