@@ -370,22 +370,42 @@ const baseRoutes: RouteRecordRaw[] = [
     ),
     createStaticAliasRoute(
         '/Xビデオ/本好きの下剋上_貴族院編解説17_ja',
-        'Xビデオ/本好きの下剋上_貴族院編解説17_ja/index.html',
+        'Xビデオ/本好き_貴族院17_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/本好き_貴族院17_ja',
+        'Xビデオ/本好き_貴族院17_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/本好きの下剋上_貴族院編解説18_ja',
-        'Xビデオ/本好きの下剋上_貴族院編解説18_ja/index.html',
+        'Xビデオ/本好き_貴族院18_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/本好きの下剋上_貴族院編解説19_ja',
-        'Xビデオ/本好きの下剋上_貴族院編解説19_ja/index.html',
+        'Xビデオ/本好き_貴族院19_ja/index.html',
         'Xビデオ'
     ),
     createStaticAliasRoute(
         '/Xビデオ/本好きの下剋上_貴族院編解説20_ja',
-        'Xビデオ/本好きの下剋上_貴族院編解説20_ja/index.html',
+        'Xビデオ/本好き_貴族院20_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/本好き_貴族院18_ja',
+        'Xビデオ/本好き_貴族院18_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/本好き_貴族院19_ja',
+        'Xビデオ/本好き_貴族院19_ja/index.html',
+        'Xビデオ'
+    ),
+    createStaticAliasRoute(
+        '/Xビデオ/本好き_貴族院20_ja',
+        'Xビデオ/本好き_貴族院20_ja/index.html',
         'Xビデオ'
     ),
     // Xビデオ: 四コマ漫画

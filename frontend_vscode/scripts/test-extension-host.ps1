@@ -1,3 +1,4 @@
+param([ValidateSet('Both', 'Code', 'Live')][string]$Scenario = 'Both')
 $ErrorActionPreference = 'Stop'
 $extensionRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $testRoot = Join-Path $extensionRoot 'out/extension-host'
@@ -9,15 +10,20 @@ $codeExe = Join-Path (Split-Path (Split-Path $codeCmd -Parent) -Parent) 'Code.ex
 $resultPath = Join-Path $testRoot ('result-' + [guid]::NewGuid().ToString('N') + '.txt')
 $oldResult = $env:AIDIY_TEST_RESULT
 $oldElectron = $env:ELECTRON_RUN_AS_NODE
+$oldScenario = $env:AIDIY_TEST_SCENARIO
 try {
     $env:AIDIY_TEST_RESULT = $resultPath
     $env:ELECTRON_RUN_AS_NODE = $null
+    $env:AIDIY_TEST_SCENARIO = $Scenario
     $arguments = @(
         '--new-window', '--disable-extensions', '--disable-gpu', '--skip-welcome', '--skip-release-notes',
         "--user-data-dir=$testRoot/user-data", "--extensions-dir=$testRoot/extensions",
-        "--extensionDevelopmentPath=$extensionRoot", "--extensionTestsPath=$extensionRoot/checks/extension-host.cjs",
+        "--extensionTestsPath=$extensionRoot/checks/extension-host.cjs",
         "$testRoot/workspace"
-    ) | ForEach-Object { '"' + $_ + '"' }
+    )
+    if ($Scenario -ne 'Live') { $arguments += "--extensionDevelopmentPath=$extensionRoot" }
+    if ($Scenario -ne 'Code') { $arguments += "--extensionDevelopmentPath=$extensionRoot/aidiy_live" }
+    $arguments = $arguments | ForEach-Object { '"' + $_ + '"' }
     $testProcess = Start-Process -FilePath $codeExe -ArgumentList $arguments -WindowStyle Hidden -PassThru -RedirectStandardOutput "$testRoot/stdout.log" -RedirectStandardError "$testRoot/stderr.log"
     if (-not $testProcess.WaitForExit(60000)) {
         & "$env:SystemRoot/System32/taskkill.exe" /PID $testProcess.Id /T /F | Out-Null
@@ -31,4 +37,5 @@ try {
 } finally {
     $env:AIDIY_TEST_RESULT = $oldResult
     $env:ELECTRON_RUN_AS_NODE = $oldElectron
+    $env:AIDIY_TEST_SCENARIO = $oldScenario
 }

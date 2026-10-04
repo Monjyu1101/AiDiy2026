@@ -39,6 +39,9 @@ FRONTEND_COMMAND = "npm"
 sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
 from setup_electron import setup_dependencies
 
+sys.path.insert(0, str(THIS_DIR / "scripts"))
+from vscode_extensions import uninstall_aidiy_extensions
+
 AUTO_MODE = False
 
 
@@ -223,8 +226,8 @@ def find_vscode_cli() -> str | None:
     return None
 
 
-def get_extension_metadata() -> tuple[str, str, Path] | None:
-    package_json = FRONTEND_VSCODE_DIR / "package.json"
+def get_extension_metadata(package_root: Path | None = None) -> tuple[str, str, Path] | None:
+    package_json = (package_root or FRONTEND_VSCODE_DIR) / "package.json"
     try:
         package = json.loads(package_json.read_text(encoding="utf-8"))
         extension_id = f"{package['publisher']}.{package['name']}"
@@ -261,33 +264,70 @@ def get_installed_extensions(vscode_cli: str, show_versions: bool = False) -> se
 
 
 def install_standalone_launcher() -> bool:
-    """作業フォルダから aidiy_vscode で単独画面を開けるようにする。"""
+    """aidiy_code / aidiy_live の単独起動コマンドを配置する。"""
     launcher_dir = Path.home() / ".local" / "bin"
-    launcher_path = launcher_dir / ("aidiy_vscode.cmd" if sys.platform == "win32" else "aidiy_vscode")
-    script_path = FRONTEND_VSCODE_DIR / "scripts" / "launch-standalone.mjs"
-    if not script_path.is_file():
-        print_error(f"単独起動スクリプトが見つかりません: {script_path}")
-        return False
-    if sys.platform == "win32":
-        content = (
-            "@echo off\n"
-            "setlocal\n"
-            f'node.exe "{script_path}" %*\n'
-            "exit /b %ERRORLEVEL%\n"
-        )
-    else:
-        content = f'#!/usr/bin/env sh\nexec node {shlex.quote(str(script_path))} "$@"\n'
+    scripts = {name: FRONTEND_VSCODE_DIR / name / "launch.mjs" for name in ("aidiy_code", "aidiy_live")}
+    for script_path in scripts.values():
+        if not script_path.is_file():
+            print_error(f"単独起動スクリプトが見つかりません: {script_path}")
+            return False
     try:
         launcher_dir.mkdir(parents=True, exist_ok=True)
-        launcher_path.write_text(content, encoding="utf-8")
-        if sys.platform != "win32":
-            launcher_path.chmod(0o755)
+        for name, script_path in scripts.items():
+            launcher_path = launcher_dir / (f"{name}.cmd" if sys.platform == "win32" else name)
+            if sys.platform == "win32":
+                content = "@echo off\nsetlocal\n" + f'node.exe "{script_path}" %*\nexit /b %ERRORLEVEL%\n'
+            else:
+                content = f'#!/usr/bin/env sh\nexec node {shlex.quote(str(script_path))} "$@"\n'
+            launcher_path.write_text(content, encoding="utf-8")
+            if sys.platform != "win32":
+                launcher_path.chmod(0o755)
+            print_success(f"単独起動ランチャーを作成しました: {launcher_path}")
+        # この配置先から作った旧名だけを解除する。他の作業コピーのランチャーは残す。
+        old_script = FRONTEND_VSCODE_DIR / "scripts" / "launch-standalone.mjs"
+        for name in ("aidiy_vscode.cmd", "aidiy_vscode"):
+            legacy = launcher_dir / name
+            if legacy.is_file() and str(old_script) in legacy.read_text(encoding="utf-8"):
+                legacy.unlink()
+                print_info(f"旧名のランチャーを解除しました: {legacy}")
     except OSError as exc:
-        print_error(f"単独起動ランチャーを作成できません: {launcher_path} ({exc})")
+        print_error(f"単独起動ランチャーを更新できません: {launcher_dir} ({exc})")
         return False
-    print_success(f"単独起動ランチャーを作成しました: {launcher_path}")
     if str(launcher_dir).lower() not in (entry.lower() for entry in os.environ.get("PATH", "").split(os.pathsep)):
-        print_warning(f"{launcher_dir} を PATH に追加し、新しいターミナルから aidiy_vscode を実行してください。")
+        print_warning(f"{launcher_dir} を PATH に追加し、新しいターミナルから aidiy_code / aidiy_live を実行してください。")
+    return True
+
+
+def install_extensions(vscode_cli: str) -> bool:
+    """aidiy- 拡張を除去してから Code / Live を配置し、両 ID を確認する。"""
+    expected = set()
+    packages = []
+    for package_root in (FRONTEND_VSCODE_DIR, FRONTEND_VSCODE_DIR / "aidiy_live"):
+        metadata = get_extension_metadata(package_root)
+        if metadata is None:
+            return False
+        extension_id, version, vsix_path = metadata
+        if not vsix_path.is_file():
+            print_error(f"VSIX が見つかりません: {vsix_path}")
+            return False
+        packages.append(vsix_path)
+        expected.add(f"{extension_id}@{version}".lower())
+    # 両方の配布ファイルを確認してから既存拡張を解除する。
+    removed, _ = uninstall_aidiy_extensions(
+        lambda: get_installed_extensions(vscode_cli),
+        lambda extension_id: run_command([vscode_cli, "--uninstall-extension", extension_id], cwd=FRONTEND_VSCODE_DIR),
+        print_info, print_error,
+    )
+    if not removed:
+        return False
+    for vsix_path in packages:
+        if not run_command([vscode_cli, "--install-extension", str(vsix_path), "--force"], cwd=FRONTEND_VSCODE_DIR):
+            return False
+    installed = get_installed_extensions(vscode_cli, show_versions=True)
+    if installed is None or not expected.issubset(installed):
+        print_error(f"拡張機能の配置を確認できません: {', '.join(sorted(expected))}")
+        return False
+    print_success('AiDiy (Code) / AiDiy (Live) を別々の拡張機能として配置しました。')
     return True
 
 
@@ -322,43 +362,33 @@ def setup(choices: dict | None = None) -> bool:
             print_error(f"{label}: 単独画面の生成に失敗しました。")
             return False
     else:
-        metadata = get_extension_metadata()
-        if metadata is None:
-            return False
-        extension_id, version, vsix_path = metadata
         if not run_command([npm_path, "run", "package"], cwd=FRONTEND_VSCODE_DIR):
             print_error(f"{label}: VSIX の生成に失敗しました。")
             return False
-        if not vsix_path.is_file():
-            print_error(f"{label}: 生成された VSIX が見つかりません: {vsix_path}")
-            return False
-
-        if not run_command(
-            [vscode_cli, "--install-extension", str(vsix_path), "--force"],
-            cwd=FRONTEND_VSCODE_DIR,
-        ):
-            print_error(f"{label}: vscode 拡張機能の配置に失敗しました。")
-            return False
-
-        installed = get_installed_extensions(vscode_cli, show_versions=True)
-        expected = f"{extension_id}@{version}".lower()
-        if installed is None or expected not in installed:
-            print_error(f"{label}: 配置後の確認に失敗しました: {expected}")
+        if not install_extensions(vscode_cli):
             return False
 
     if not install_standalone_launcher():
         return False
 
     if vscode_cli is not None:
-        print_success(f"{label}: {extension_id} を vscode 拡張機能として配置しました。")
+        print_success(f"{label}: Code / Live の2つを vscode 拡張機能として配置しました。")
         print_info("  vscode 本体や AiDiy の常駐サービスは停止していません。")
         print_info("  vscode に反映されない場合は、ウィンドウを再読み込みしてください。")
-    print_success(f"{label}: aidiy_vscode で単独画面を起動できます。")
+    print_success(f"{label}: aidiy_code / aidiy_live で単独画面を起動できます。")
     return True
 
 
 def main():
     global AUTO_MODE
+    if sys.argv[1:] == ["--launchers-only"]:
+        raise SystemExit(0 if install_standalone_launcher() else 1)
+    if sys.argv[1:] == ["--extensions-only"]:
+        vscode_cli = find_vscode_cli()
+        if vscode_cli is None:
+            print_error('VS Code CLI が見つかりません。')
+            raise SystemExit(1)
+        raise SystemExit(0 if install_extensions(vscode_cli) else 1)
     print_header("フロントエンド(vscode) セットアップ")
     run_setup, AUTO_MODE = ask_start_mode(
         "フロントエンド(vscode) のセットアップを実行しますか?", default="n"

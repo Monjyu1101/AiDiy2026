@@ -12,7 +12,8 @@
 
 各フォルダの `_cleanup.py` を import し、不要なキャッシュ・ビルド成果物・
 仮想環境などを対話的に一括削除します。クリーンアップを実行する場合は、削除開始前に
-全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止します。ルート固有の
+全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
+Code / Live の単独実行と tools の MCP 接続プロセスも強制終了・確認します。ルート固有の
 処理（ルート temp / backup フォルダの削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
@@ -241,12 +242,19 @@ def cleanup_stop_request(choices: dict):
 
 
 def stop_all_services(choices: dict) -> None:
-    """全常駐サービスの待受プロセスを、ファイル削除前に停止する。"""
+    """常駐サービス・単独実行・MCP 接続を、ファイル削除前に強制終了する。"""
     _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
     print_header("クリーンアップ前の既存プロセス整理")
     for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
         print_info(f"{description} の既存プロセスを停止します")
         _load_folder_start_module(folder).kill_ports()
+
+    print_info("フロントエンド(vscode) の Code / Live 単独実行を停止します")
+    if not _load_folder_module("frontend_vscode").stop_standalone_processes():
+        raise RuntimeError("Code / Live の単独実行を終了できないため、クリーンアップを中止します。")
+    print_info("バックエンド(tools) の Python / MCP 接続を停止します")
+    if not _load_folder_module("backend_tools").stop_tools_processes():
+        raise RuntimeError("tools の Python / MCP 接続を終了できないため、クリーンアップを中止します。")
 
     # `_start.py` の起動前整理と同様に、OS側のポート解放を短時間待つ。
     time.sleep(1)
@@ -549,7 +557,8 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
 
     print()
     if choices["tools"]:
-        _run_folder_cleanup("backend_tools", choices)
+        if not _run_folder_cleanup("backend_tools", choices):
+            cleanup_errors.append("バックエンド(tools)")
     else:
         print_info("バックエンド(tools) のクリーンアップをスキップしました")
 

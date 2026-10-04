@@ -1,6 +1,13 @@
-# AiDiy for VS Code
+# AiDiy (Code) / AiDiy (Live)
 
-AiDiy の VS Code 拡張機能です。パッケージ名は `aidiy-vscode`、拡張 ID は `aidiy.aidiy-vscode` です。実行エンジンとして `aidiy_hermes` CLI を使用し、右サイドバーの専用チャットから操作できます。
+`frontend_vscode` 内にコード用の `aidiy_code` とライブ会話用の `aidiy_live` を置きます。画面の表示名はそれぞれ **AiDiy (Code)**、**AiDiy (Live)** です。両方とも VS Code 拡張とスタンドアロンを提供します。Code は `aidiy_hermes` CLI を直接起動し、Live は既存 AIコア（8091）へ接続します。
+
+| 表示名 | 拡張 ID | VSIX |
+|---|---|---|
+| AiDiy (Code) | `aidiy.aidiy-code` | `dist/aidiy-code-0.1.0.vsix` |
+| AiDiy (Live) | `aidiy.aidiy-live` | `dist/aidiy-live-0.1.0.vsix` |
+
+2つの拡張に相互依存はありません。VS Code の拡張機能一覧で片方の歯車から「無効にする」または「無効にする（ワークスペース）」を選ぶと、その拡張だけを停止できます。
 
 拡張バージョンは当面 `0.1.0` に固定します。
 
@@ -10,9 +17,9 @@ AiDiy の VS Code 拡張機能です。パッケージ名は `aidiy-vscode`、�
 
 1. セットアップ済みの `aidiy_hermes` を用意します。拡張モードを使う場合は VS Code **1.106 以降**も必要です。
 2. AiDiy ルートの `python _setup.py` で、Hermes の次に表示される **フロントエンド(vscode)** を選びます。単体では `python frontend_vscode/_setup.py` を実行できます。
-3. 単独画面は作業フォルダで `aidiy_vscode` を実行します。拡張モードは VS Code でフォルダを開き、コマンドパレットから **AiDiy: チャットを開く**を実行します。
+3. 単独画面は `aidiy_code` または `aidiy_live` を実行します。拡張モードは VS Code でフォルダを開き、コマンドパレットから **AiDiy (Code): チャットを開く**または **AiDiy (Live): ライブ会話を開く**を実行します。
 
-セットアップは依存関係と Electron バイナリの事前導入、単独起動コマンドの作成と、VS Code CLI がある場合の VSIX 配置を実行します。ランチャーは `aidiy_hermes` と同じ `~/.local/bin` に配置します（Windows は `aidiy_vscode.cmd`、macOS / Linux は `aidiy_vscode`）。このフォルダが PATH にない場合は追加してください。手動で VSIX を配置する場合は、拡張機能画面の `…` → **VSIX からのインストール**で `dist/aidiy-vscode-0.1.0.vsix` を選びます。解除と生成物削除は `python frontend_vscode/_cleanup.py`、またはルートの `python _cleanup.py` から実行できます。
+セットアップは依存関係と Electron バイナリの事前導入、単独起動コマンドの作成と、VS Code CLI がある場合の両 VSIX 配置を実行します。`aidiy_code` と `aidiy_live` のランチャーは `aidiy_hermes` と同じ `~/.local/bin` に配置します（Windows は `.cmd`）。このフォルダが PATH にない場合は追加してください。ランチャーだけを更新する場合は `python frontend_vscode/_setup.py --launchers-only` を使います。この作業コピーから配置した旧名 `aidiy_vscode` は解除します。手動で VSIX を配置する場合は、拡張機能画面の `…` → **VSIX からのインストール**で、表にある Code / Live の VSIX をそれぞれ選びます。解除と生成物削除は `python frontend_vscode/_cleanup.py`、またはルートの `python _cleanup.py` から実行できます。
 
 既定では右側のセカンダリサイドバーに表示されます。VS Code の配置を変更している場合は、ビューの移動操作で配置を調整できます。
 
@@ -25,14 +32,14 @@ CLI は PATH と `~/.local/bin` から探索します。AiDiy の `_setup.py` �
 セットアップ後は、作業対象フォルダで次を実行します（Node.js とセットアップ済みの Hermes が必要です）。
 
 ```powershell
-aidiy_vscode
+aidiy_code
 ```
 
-別のフォルダを明示する場合は `aidiy_vscode "C:\work\my-project"` と指定できます。セットアップ前の試用や開発中は、作業対象フォルダから `node /path/to/AiDiy2026/frontend_vscode/scripts/launch-standalone.mjs` を実行します。`launch-extension-dev.ps1` は Windows で VS Code 拡張の開発用ウィンドウを開くスクリプトです。
+別のフォルダを明示する場合は `aidiy_code "C:\work\my-project"` と指定できます。セットアップ前の試用や開発中は、作業対象フォルダから `node /path/to/AiDiy2026/frontend_vscode/aidiy_code/launch.mjs` を実行します。`launch-extension-dev.ps1` は Windows で VS Code 拡張の開発用ウィンドウを開くスクリプトです。
 
 単独画面は Electron のフレームレスウィンドウで開き、起動時のカレントフォルダを作業対象にします。AiDiy ロゴのあるヘッダーをドラッグして移動でき、右上のボタンで最小化・最大化／復元・終了を操作できます。ウィンドウの端でサイズを変更できます。モデル選択・送信・進捗表示・停止・新規会話・会話履歴の選択と削除は VS Code 拡張と共通です。会話は単独サーバーのメモリに保持し、終了すると消えます。専用ウィンドウを閉じるとサーバーと実行中の CLI を停止します。VS Code の選択コード添付は拡張モードで利用してください。
 
-既定ブラウザで開く場合は `aidiy_vscode --browser`（フォルダ指定も併用可能）を使います。Windows は Chrome / Edge のアプリウィンドウ、macOS / Linux は既定のブラウザで開きます。このモードはブラウザのウィンドウ枠を使用し、タブ／ウィンドウを閉じて60秒後にサーバーを停止します。Electron バイナリは `python frontend_vscode/_setup.py` で事前に取得・確認します。Avatar と共通のセットアップ処理で、同じバージョンの配置済みバイナリや `_cache/electron/` の保存済み ZIP を再利用します。未取得の場合だけ Python で GitHub から取得します。起動時にはダウンロードせず、未準備の場合はセットアップの再実行を案内します。`npm ci` だけではバイナリが取得されない場合があります。Electron は VSIX には含めません。
+既定ブラウザで開く場合は `aidiy_code --browser`（フォルダ指定も併用可能）を使います。Windows は Chrome / Edge のアプリウィンドウ、macOS / Linux は既定のブラウザで開きます。このモードはブラウザのウィンドウ枠を使用し、タブ／ウィンドウを閉じて60秒後にサーバーを停止します。Electron バイナリは `python frontend_vscode/_setup.py` で事前に取得・確認します。Avatar と共通のセットアップ処理で、同じバージョンの配置済みバイナリや `_cache/electron/` の保存済み ZIP を再利用します。未取得の場合だけ Python で GitHub から取得します。起動時にはダウンロードせず、未準備の場合はセットアップの再実行を案内します。`npm ci` だけではバイナリが取得されない場合があります。Electron は VSIX には含めません。
 
 VS Code 拡張として試す場合は、次の手順を使います。
 
@@ -42,7 +49,7 @@ VS Code 拡張として試す場合は、次の手順を使います。
 .\frontend_vscode\launch-extension-dev.ps1
 ```
 
-起動したフォルダがプロジェクトフォルダになります。VS Code の開発用ウィンドウが開くので、コマンドパレットの **AiDiy: チャットを開く**で操作してください。実 CLI に接続するため、通常のチャットと同様に依頼を実行します。
+起動したフォルダがプロジェクトフォルダになります。VS Code の開発用ウィンドウが開くので、コマンドパレットの **AiDiy (Code): チャットを開く**で操作してください。実 CLI に接続するため、通常のチャットと同様に依頼を実行します。
 
 試用時の VS Code 設定は `out/manual-profile` に保存します。通常の VS Code で同じフォルダを開いていても、試用ウィンドウで開けます。
 
@@ -102,10 +109,14 @@ npm test
 npm run package
 ```
 
-Windows の実 VS Code で登録・起動を確認する場合は、コンパイル後に `./scripts/test-extension-host.ps1` を実行します。専用の一時プロファイルを使います。画面の確認には単独画面の `aidiy_vscode` を使います。
+Windows の実 VS Code で登録・起動を確認する場合は、コンパイル後に `./scripts/test-extension-host.ps1 -Scenario Both`、`-Scenario Code`、`-Scenario Live` を順に実行します。専用の一時プロファイルで、両方同時と片方だけの起動を確認します。
 
-`dist/aidiy-vscode-0.1.0.vsix` が生成されます。`npm test` はモック CLI による通信・停止・メッセージ形式の検証で、AI API を呼びません。
+Code / Live の2つの VSIX が生成されます。生成済みの両 VSIX だけを配置する場合は、ルートから `python frontend_vscode/_setup.py --extensions-only` を実行します。セットアップは両 VSIX の存在を確認し、拡張名が `aidiy-` で始まる既存拡張（`publisher.aidiy-*`）をすべて除去してから Code / Live を配置します。旧 `aidiy-vscode` も対象です。クリーンアップも同じ判定で除去し、解除を確認できない場合はランチャー・生成物の削除を中止します。生成物を削除する前に、この作業コピーの Code / Live 単独実行と専用ブラウザも強制終了し、終了を確認します。手動では各 VSIX を個別にインストールできます。`npm test` はモック CLI、`npm run live:test` は模擬 AIコア・マイクによる検証で、AI API を呼びません。
 
 Marketplace で公開する場合は、所有する publisher ID に `package.json` の `publisher` を合わせて公開します。初期値 `aidiy` はローカル配布用の識別子です。
 
 仕様の参照: [Secondary Side Bar の拡張 API](https://code.visualstudio.com/updates/v1_106)、[Webview API](https://code.visualstudio.com/api/extension-guides/webview)、[VSIX の配布](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)。
+
+## aidiy_live スタンドアロン
+
+ライブ会話用の小さな専用画面も同梱しています。プロジェクトルートから `.\frontend_vscode\aidiy_live.cmd`、またはこのフォルダで `npm run live` を実行します。既存バックエンド（8091）が必要です。起動・操作・検証方法は [aidiy_live/README.md](./aidiy_live/README.md) を参照してください。

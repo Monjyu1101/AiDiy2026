@@ -2,12 +2,12 @@ import { createServer, type ServerResponse } from 'node:http';
 import { readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { CLI実行, 会話引数, 起動解決, type 起動設定 } from './runner';
-import { コード要求実行, streamControlOf, visibleStreamContent } from './protocol';
+import { CLI実行, 会話引数, 起動解決, type 起動設定 } from '../../src/runner';
+import { コード要求実行, streamControlOf, visibleStreamContent } from '../../src/protocol';
 
 // 単独試用も拡張と同じ CLI・メッセージ形式・描画を使う。
 export async function 単独起動(project: string, launch?: 起動設定) {
-  const root = resolve(__dirname, '..');
+  const root = resolve(__dirname, '../..');
   const folder = resolve(project);
   if (!statSync(folder).isDirectory()) throw new Error('作業フォルダがありません。');
   const defaults = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).contributes.configuration.properties;
@@ -146,8 +146,8 @@ export async function 単独起動(project: string, launch?: 起動設定) {
       }
       const assets: Record<string, [string, string]> = {
         'AiDiy.png':['media/AiDiy.png','image/png'],
-        'chat.css':['media/chat.css','text/css'], 'theme.css':['standalone/theme.css','text/css'], 'sending.png':['media/sending.png','image/png'], 'abort.png':['media/abort.png','image/png'],
-        'bridge.js':['standalone/bridge.js','text/javascript'], 'webview.js':['dist/webview.js','text/javascript']
+        'chat.css':['media/chat.css','text/css'], 'theme.css':['aidiy_code/theme.css','text/css'], 'sending.png':['media/sending.png','image/png'], 'abort.png':['media/abort.png','image/png'],
+        'bridge.js':['aidiy_code/bridge.js','text/javascript'], 'webview.js':['dist/webview.js','text/javascript']
       };
       if (req.method === 'GET' && Object.hasOwn(assets, route)) {
         const [file, type] = assets[route]; res.writeHead(200, {'Content-Type':`${type}; charset=utf-8`}); res.end(readFileSync(join(root,file))); return;
@@ -185,7 +185,7 @@ if (require.main === module) {
   const project = process.argv[2] || process.cwd();
   void 単独起動(project).then(app => {
     if (process.argv[3]) writeFileSync(process.argv[3], JSON.stringify({url:app.url, pid:process.pid}), 'utf8');
-    else console.log(`AiDiy: ${app.url}`);
+    else console.log(`AiDiy (Code): ${app.url}`);
     process.on('SIGINT', () => { void app.close(); });
     process.on('SIGTERM', () => { void app.close(); });
   }).catch(error => { console.error(String(error)); process.exitCode = 1; });

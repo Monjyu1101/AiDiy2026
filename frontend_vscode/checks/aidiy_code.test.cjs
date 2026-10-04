@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { resolve, join } = require('node:path');
 const { mkdtempSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { 単独起動 } = require('../out/standalone.cjs');
+const { 単独起動 } = require('../out/aidiy_code/server.cjs');
 const fake = resolve('checks/fake-cli.cjs');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function connect(app) {

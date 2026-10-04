@@ -19,10 +19,11 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 概要
 
-`frontend_vscode` は `aidiy_hermes` CLI を VS Code のセカンダリサイドバーから操作するチャット拡張です。
-拡張プロセスが CLI を直接起動するため、AiDiy の常駐バックエンドや AI コア WebSocket は使用しません。
+`frontend_vscode` は Code / Live の2つの独立した VS Code 拡張とスタンドアロンを提供します。Code（`aidiy.aidiy-code`）は `aidiy_hermes` CLI を直接起動し、常駐バックエンドは使いません。Live（`aidiy.aidiy-live`）は既存 AIコアへ接続します。拡張 ID、ビュー、設定、配布物を分け、片方を無効にしても他方が動作する構成です。
 
-通常の VS Code 拡張モードに加え、同じ Webview と CLI 実行層を使うチャット単独試用モードを持ちます。
+通常の VS Code 拡張モードに加え、同じ Webview と CLI 実行層を使う `aidiy_code/` のスタンドアロンを持ちます。コード版の表示名は `AiDiy (Code)`、ライブ会話版の表示名は `AiDiy (Live)` です。
+
+`aidiy_live/` は Live 拡張とスタンドアロンの共通画面・音声処理を持ちます。拡張ホスト側で REST / WebSocket と Windows マイクを扱い、Webview へ渡します。マイク補助は Python 標準ライブラリだけを使います。利用・検証方法は [`aidiy_live/README.md`](./aidiy_live/README.md) を参照してください。
 
 ## 技術スタック
 
@@ -36,7 +37,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 基本方針
 
-- `extensionKind` は `workspace` とし、ローカルファイルと CLI を扱える拡張ホストで動作する。
+- Code の `extensionKind` は `workspace`、Live はローカルマイクを扱う `ui` とする。
 - 拡張バージョンは、固定解除の明示的な指示があるまで `0.1.0` を維持する。
 - ワークスペースを信頼済みの場合だけ CLI 実行とコード添付を許可する。
 - `aidiy_hermes` は `shell: false` で起動し、要求本文は UTF-8 の標準入力で渡す。
@@ -54,14 +55,15 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `src/runner.ts` | CLI 解決、引数構築、子プロセス実行、停止、タイムアウト |
 | `src/protocol.ts` | AIコード互換 packet と開始・進捗・終了・回答の変換 |
 | `src/webview.ts` | チャット描画、入力、モデル表示、Webview IPC |
-| `src/standalone.ts` | 単独試用用の localhost HTTP / SSE サーバー |
+| `aidiy_code/src/server.ts` | 単独試用用の localhost HTTP / SSE サーバー |
 | `media/chat.html` / `media/chat.css` | Webview の HTML と見た目 |
-| `standalone/bridge.js` | 単独試用画面と HTTP / SSE の橋渡し |
-| `standalone/desktop.cjs` / `standalone/preload.cjs` | 単独ウィンドウ、終了処理、限定したウィンドウ操作 IPC |
+| `aidiy_code/bridge.js` | 単独試用画面と HTTP / SSE の橋渡し |
+| `aidiy_code/desktop.cjs` / `aidiy_code/preload.cjs` | 単独ウィンドウ、終了処理、限定したウィンドウ操作 IPC |
 | `scripts/model-catalog.py` | Hermes 既存 picker から Provider / モデル候補を取得 |
-| `scripts/launch-standalone.mjs` | 作業フォルダから専用ウィンドウを起動する。`--browser` ではブラウザで開く |
+| `aidiy_code/launch.mjs` | 作業フォルダから専用ウィンドウを起動する。`--browser` ではブラウザで開く |
 | `scripts/build.mjs` | 拡張、単独試用、Webview の bundle と第三者ライセンス生成 |
 | `checks/` | CLI 実行、protocol、停止、単独試用の検証 |
+| `aidiy_live/` | ライブ会話の専用画面、AudioWorklet 音声処理、localhost 通信中継、Electron 起動 |
 | `_setup.py` / `_cleanup.py` | VSIX の生成・配置と、拡張・生成物の解除 |
 | `launch-extension-dev.ps1` | VS Code 開発ホストの Windows 起動入口 |
 
@@ -72,7 +74,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 3. `protocol.ts` が要求を CLI 実行へ渡し、進捗と正式回答を AIコード互換 packet へ変換する。
 4. `webview.ts` が進捗と回答を表示し、VS Code の `workspaceState` へ保存する会話は `extension.ts` が管理する。
 
-単独試用では `standalone.ts` と `standalone/bridge.js` が VS Code API の代わりを担当し、`runner.ts`、`protocol.ts`、`webview.ts` は共用します。
+単独試用では `aidiy_code/src/server.ts` と `aidiy_code/bridge.js` が VS Code API の代わりを担当し、`runner.ts`、`protocol.ts`、`webview.ts` は共用します。
 
 ## CLI 解決と会話
 

@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{CSP}}; script-src 'nonce-{{NONCE}}'; img-src {{CSP}}; font-src 'none'; connect-src 'none';">
   <link rel="stylesheet" href="{{STYLE}}">
-  <title>AiDiy</title>
+  <title>AiDiy (Code)</title>
 </head>
 <body>
   <header id="chat-header">
     <div id="title-bar">
-      <div class="brand"><img class="brand-icon" src="{{APP_ICON}}" alt=""><div class="brand-name">AiDiy</div></div>
+      <div class="brand"><img class="brand-icon" src="{{APP_ICON}}" alt=""><div class="brand-name">AiDiy (Code)</div></div>
       <nav id="desktop-controls" aria-label="ウィンドウ操作" hidden>
         <button type="button" id="window-minimize" title="最小化" aria-label="最小化"><span class="window-minimize" aria-hidden="true"></span></button>
         <button type="button" id="window-maximize" title="最大化" aria-label="最大化"><span class="window-maximize" aria-hidden="true"></span></button>
@@ -25,7 +25,7 @@
   </header>
   <section id="history-list" role="list" aria-label="会話一覧" hidden></section>
   <main id="conversation" aria-label="会話">
-    <div id="welcome"><div class="welcome-mark" aria-hidden="true"><img src="{{APP_ICON}}" alt=""></div><p class="welcome-eyebrow"><span class="welcome-type"><span class="welcome-text">LET’S BUILD SOMETHING</span></span></p><h1><span class="welcome-type"><span class="welcome-text">何をつくりますか？</span></span></h1><p class="welcome-caption"><span class="welcome-type"><span class="welcome-text">ここから始まります。</span></span></p></div>
+    <div id="welcome" lang="en"><div class="welcome-mark" aria-hidden="true"><img src="{{APP_ICON}}" alt=""></div><p class="welcome-eyebrow"><span class="welcome-type"><span class="welcome-text">LET’S BUILD SOMETHING</span></span></p><h1><span class="welcome-type"><span class="welcome-text">WHAT WILL YOU BUILD?</span></span></h1><p class="welcome-caption"><span class="welcome-type"><span class="welcome-text">IT STARTS HERE.</span></span></p></div>
     <div id="messages"></div>
   </main>
   <section id="progress-section" hidden><details id="progress-details"><summary id="progress-title">実行状況</summary><pre id="progress"></pre></details></section>

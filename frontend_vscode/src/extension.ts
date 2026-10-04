@@ -26,7 +26,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 最終モデル: { provider: string; model: string };
   private 最終作業URI?: vscode.Uri;
   private 候補取得停止?: () => void;
-  private readonly ログ = vscode.window.createOutputChannel('AiDiy');
+  private readonly ログ = vscode.window.createOutputChannel('AiDiy (Code)');
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('aidiyHermes');
@@ -305,7 +305,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.信頼確認();
     const folder = this.作業フォルダ();
     const 起動 = this.起動設定(folder);
-    vscode.window.createTerminal({ name: 'AiDiy', shellPath: 起動.実行ファイル, shellArgs: 起動.引数, cwd: folder.uri.fsPath, env: { PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1', TERMINAL_CWD: folder.uri.fsPath } }).show();
+    vscode.window.createTerminal({ name: 'AiDiy (Code)', shellPath: 起動.実行ファイル, shellArgs: 起動.引数, cwd: folder.uri.fsPath, env: { PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1', TERMINAL_CWD: folder.uri.fsPath } }).show();
   }
   ログ表示(): void { this.ログ.show(true); }
   dispose(): void { this.破棄済み = true; this.停止処理?.(); this.候補取得停止?.(); clearTimeout(this.通知タイマー); this.ログ.dispose(); }
@@ -321,7 +321,7 @@ export function activate(context: vscode.ExtensionContext): void {
     command('aidiyHermes.open', () => vscode.commands.executeCommand('aidiyHermes.chat.focus')),
     command('aidiyHermes.newChat', () => chat.新規()),
     command('aidiyHermes.attachSelection', () => chat.選択添付()),
-    command('aidiyHermes.settings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:aidiy.aidiy-vscode')),
+    command('aidiyHermes.settings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:aidiy.aidiy-code')),
     command('aidiyHermes.terminal', () => chat.ターミナル()),
     command('aidiyHermes.logs', () => chat.ログ表示())
   );

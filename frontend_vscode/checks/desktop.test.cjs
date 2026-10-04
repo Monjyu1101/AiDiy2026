@@ -39,7 +39,7 @@ async function launch({ loadError, visible = true } = {}) {
     focus() { calls.push('focus'); }
     isVisible() { return visible && calls.includes('show'); }
   }
-  const filename = path.resolve(__dirname, '../standalone/desktop.cjs');
+  const filename = path.resolve(__dirname, '../aidiy_code/desktop.cjs');
   const fakeProcess = { argv: ['electron', filename, '/project', '/ready.json'], platform: 'win32', pid: 123 };
   vm.runInNewContext(readFileSync(filename, 'utf8'), {
     __filename: filename, __dirname: path.dirname(filename), process: fakeProcess,
@@ -49,7 +49,7 @@ async function launch({ loadError, visible = true } = {}) {
     require(name) {
       if (name === 'electron') return { app, BrowserWindow: Window, ipcMain: { handle() {} }, shell: {} };
       if (name === 'node:fs') return { writeFileSync: (file, value) => { calls.push('ready'); written.push(JSON.parse(value)); } };
-      if (name === '../dist/standalone.cjs') return { 単独起動: async () => ({ url: 'http://127.0.0.1:1234/', close: async () => {} }) };
+      if (name === '../dist/aidiy_code/server.cjs') return { 単独起動: async () => ({ url: 'http://127.0.0.1:1234/', close: async () => {} }) };
       return require(name);
     },
   });

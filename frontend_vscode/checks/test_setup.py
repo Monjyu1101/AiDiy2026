@@ -201,6 +201,105 @@ class ElectronSetupTest(unittest.TestCase):
             self.assertFalse(vscode.setup())
             launcher.assert_not_called()
 
+    def test_launcher_rename_installs_code_and_live_and_removes_owned_old_name(self):
+        for platform_name in ('win32', 'linux'):
+            with self.subTest(platform=platform_name):
+                home = self.project / platform_name
+                launchers = home / '.local' / 'bin'
+                launchers.mkdir(parents=True)
+                for name in ('aidiy_code', 'aidiy_live'):
+                    script = self.root / name / 'launch.mjs'
+                    script.parent.mkdir(exist_ok=True)
+                    script.write_text('', encoding='utf-8')
+                legacy = launchers / ('aidiy_vscode.cmd' if platform_name == 'win32' else 'aidiy_vscode')
+                legacy.write_text(str(self.root / 'scripts' / 'launch-standalone.mjs'), encoding='utf-8')
+                with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+                    vscode.Path, 'home', return_value=home
+                ), patch.object(vscode.sys, 'platform', platform_name):
+                    self.assertTrue(vscode.install_standalone_launcher())
+                self.assertFalse(legacy.exists())
+                for name in ('aidiy_code', 'aidiy_live'):
+                    launcher = launchers / (f'{name}.cmd' if platform_name == 'win32' else name)
+                    self.assertIn(str(self.root / name / 'launch.mjs'), launcher.read_text(encoding='utf-8'))
+
+    def test_launcher_rename_preserves_other_checkout_old_name(self):
+        home = self.project / 'other-home'
+        launchers = home / '.local' / 'bin'
+        launchers.mkdir(parents=True)
+        for name in ('aidiy_code', 'aidiy_live'):
+            script = self.root / name / 'launch.mjs'
+            script.parent.mkdir(exist_ok=True)
+            script.write_text('', encoding='utf-8')
+        legacy = launchers / 'aidiy_vscode.cmd'
+        legacy.write_text('node other-checkout/launch-standalone.mjs', encoding='utf-8')
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode.Path, 'home', return_value=home
+        ), patch.object(vscode.sys, 'platform', 'win32'):
+            self.assertTrue(vscode.install_standalone_launcher())
+        self.assertEqual(legacy.read_text(encoding='utf-8'), 'node other-checkout/launch-standalone.mjs')
+
+    def make_extension_packages(self):
+        for folder, name in ((self.root, 'aidiy-code'), (self.root / 'aidiy_live', 'aidiy-live')):
+            folder.mkdir(exist_ok=True)
+            (folder / 'package.json').write_text(json.dumps({'publisher': 'aidiy', 'name': name, 'version': '0.1.0'}), encoding='utf-8')
+            (self.root / 'dist').mkdir(exist_ok=True)
+            (self.root / 'dist' / f'{name}-0.1.0.vsix').write_bytes(b'vsix')
+
+    def test_aidiy_prefix_extensions_are_removed_before_both_are_installed(self):
+        self.make_extension_packages()
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode, 'run_command', return_value=True
+        ) as command, patch.object(vscode, 'get_installed_extensions', side_effect=[
+            {'aidiy.aidiy-code', 'aidiy.aidiy-live', 'aidiy.aidiy-vscode', 'other.aidiy-old', 'other.tool'},
+            {'other.tool'},
+            {'aidiy.aidiy-code@0.1.0', 'aidiy.aidiy-live@0.1.0', 'other.tool'},
+        ]):
+            self.assertTrue(vscode.install_extensions('code'))
+        calls = [call.args[0] for call in command.call_args_list]
+        self.assertEqual([call[2] for call in calls[:4]], ['aidiy.aidiy-code', 'aidiy.aidiy-live', 'aidiy.aidiy-vscode', 'other.aidiy-old'])
+        self.assertTrue(all(call[1] == '--uninstall-extension' for call in calls[:4]))
+        self.assertIn('aidiy-code-0.1.0.vsix', calls[4][2])
+        self.assertIn('aidiy-live-0.1.0.vsix', calls[5][2])
+
+    def test_live_install_failure_is_reported_after_removal(self):
+        self.make_extension_packages()
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode, 'run_command', side_effect=[True, False]
+        ) as command, patch.object(vscode, 'get_installed_extensions', return_value=set()):
+            self.assertFalse(vscode.install_extensions('code'))
+        self.assertEqual(len(command.call_args_list), 2)
+
+    def test_missing_live_in_installed_list_fails_verification(self):
+        self.make_extension_packages()
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode, 'run_command', return_value=True
+        ) as command, patch.object(vscode, 'get_installed_extensions', side_effect=[set(), {'aidiy.aidiy-code@0.1.0'}]):
+            self.assertFalse(vscode.install_extensions('code'))
+        self.assertEqual(len(command.call_args_list), 2)
+
+    def test_missing_vsix_does_not_remove_existing_extensions(self):
+        self.make_extension_packages()
+        (self.root / 'dist' / 'aidiy-live-0.1.0.vsix').unlink()
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(vscode, 'run_command') as command:
+            self.assertFalse(vscode.install_extensions('code'))
+        command.assert_not_called()
+
+    def test_uninstall_failure_stops_setup_before_install(self):
+        self.make_extension_packages()
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode, 'run_command', return_value=False
+        ) as command, patch.object(vscode, 'get_installed_extensions', return_value={'aidiy.aidiy-code'}):
+            self.assertFalse(vscode.install_extensions('code'))
+        self.assertEqual([call.args[0] for call in command.call_args_list], [['code', '--uninstall-extension', 'aidiy.aidiy-code']])
+
+    def test_remaining_aidiy_extension_stops_setup_before_install(self):
+        self.make_extension_packages()
+        with patch.object(vscode, 'FRONTEND_VSCODE_DIR', self.root), patch.object(
+            vscode, 'run_command', return_value=True
+        ) as command, patch.object(vscode, 'get_installed_extensions', return_value={'other.aidiy-old'}):
+            self.assertFalse(vscode.install_extensions('code'))
+        self.assertEqual([call.args[0] for call in command.call_args_list], [['code', '--uninstall-extension', 'other.aidiy-old']])
+
 
 if __name__ == '__main__':
     unittest.main()

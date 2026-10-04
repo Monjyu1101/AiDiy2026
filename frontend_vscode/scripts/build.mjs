@@ -2,7 +2,7 @@ import { build } from 'esbuild';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 
 await build({ entryPoints: ['src/extension.ts'], outfile: 'dist/extension.js', bundle: true, platform: 'node', target: 'node22', format: 'cjs', external: ['vscode'] });
-await build({ entryPoints: ['src/standalone.ts'], outfile: 'dist/standalone.cjs', bundle: true, platform: 'node', target: 'node22', format: 'cjs' });
+await import('../aidiy_code/build.mjs');
 const webview = await build({ entryPoints: ['src/webview.ts'], outfile: 'dist/webview.js', bundle: true, platform: 'browser', target: 'es2022', minify: true, metafile: true });
 const packages = new Set(Object.keys(webview.metafile.inputs).filter(path => path.startsWith('node_modules/')).map(path => path.split('/')[1]));
 const notices = [];
@@ -14,3 +14,4 @@ for (const name of [...packages].sort()) {
   }
 }
 await writeFile('dist/THIRD_PARTY_NOTICES.txt', notices.join('\n\n'));
+await import('../aidiy_live/build.mjs');

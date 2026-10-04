@@ -7,10 +7,14 @@ import { createRequire } from 'node:module';
 
 const extensionRoot = fileURLToPath(new URL('..', import.meta.url));
 const args = process.argv.slice(2);
+if (args.includes('--help')) {
+  console.log('aidiy_code [作業フォルダ] [--browser]');
+  process.exit(0);
+}
 const browserMode = args.includes('--browser');
 const projectRoot = resolve(args.find(arg => arg !== '--browser') || process.cwd());
-const bundle = join(extensionRoot, 'dist', 'standalone.cjs');
-const runRoot = join(extensionRoot, 'out', 'standalone');
+const bundle = join(extensionRoot, 'dist', 'aidiy_code', 'server.cjs');
+const runRoot = join(extensionRoot, 'out', 'aidiy_code');
 
 function electronExecutable() {
   const setupMessage = `専用ウィンドウにはセットアップ済みの Electron が必要です。python "${join(extensionRoot, '_setup.py')}" を実行してください。ブラウザで開く場合は --browser を指定します。`;
@@ -85,7 +89,7 @@ async function main() {
   let server;
   let entry = bundle;
   if (!browserMode) {
-    entry = join(extensionRoot, 'standalone', 'desktop.cjs');
+    entry = join(extensionRoot, 'aidiy_code', 'desktop.cjs');
   }
   const env = { ...process.env };
   // VS Code のターミナルから起動しても Electron を通常のデスクトップモードで動かす。
@@ -124,7 +128,7 @@ async function main() {
     throw startupFailure('専用ウィンドウの表示を確認できませんでした。');
   }
   if (browserMode && !openBrowser(url)) console.log(`ブラウザで開いてください: ${url}`);
-  console.log(`AiDiy - Project folder: ${projectRoot}`);
+  console.log(`AiDiy (Code) - Project folder: ${projectRoot}`);
 }
 
 main().catch(error => { console.error(error.message || String(error)); process.exitCode = 1; });

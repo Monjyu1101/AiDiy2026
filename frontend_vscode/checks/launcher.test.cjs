@@ -8,11 +8,11 @@ const { test } = require('node:test');
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aidiy-launcher-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const scripts = path.join(root, 'scripts');
+  const scripts = path.join(root, 'aidiy_code');
   const electron = path.join(root, 'node_modules', 'electron');
   fs.mkdirSync(scripts);
   fs.mkdirSync(electron, { recursive: true });
-  fs.copyFileSync(path.join(__dirname, '..', 'scripts', 'launch-standalone.mjs'), path.join(scripts, 'launch-standalone.mjs'));
+  fs.copyFileSync(path.join(__dirname, '..', 'aidiy_code', 'launch.mjs'), path.join(scripts, 'launch.mjs'));
   fs.writeFileSync(path.join(electron, 'package.json'), JSON.stringify({ version: '44.5.1', main: 'index.js' }));
   fs.writeFileSync(path.join(electron, 'index.js'), 'throw new Error("UNEXPECTED_ELECTRON_DOWNLOAD");');
   const executable = process.platform === 'win32' ? 'electron.exe'
@@ -20,7 +20,7 @@ function fixture(t) {
   const binary = path.join(electron, 'dist', executable);
   const env = { ...process.env };
   delete env.ELECTRON_OVERRIDE_DIST_PATH;
-  const launch = () => spawnSync(process.execPath, [path.join(scripts, 'launch-standalone.mjs'), root], {
+  const launch = () => spawnSync(process.execPath, [path.join(scripts, 'launch.mjs'), root], {
     encoding: 'utf8', timeout: 20000, env,
   });
   function desktop(source) {
@@ -29,10 +29,9 @@ function fixture(t) {
     catch { fs.copyFileSync(process.execPath, binary); }
     fs.writeFileSync(path.join(electron, 'path.txt'), executable);
     fs.writeFileSync(path.join(electron, 'dist', 'version'), '44.5.1');
-    fs.mkdirSync(path.join(root, 'dist'));
-    fs.writeFileSync(path.join(root, 'dist', 'standalone.cjs'), '');
-    fs.mkdirSync(path.join(root, 'standalone'));
-    fs.writeFileSync(path.join(root, 'standalone', 'desktop.cjs'), source);
+    fs.mkdirSync(path.join(root, 'dist', 'aidiy_code'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'dist', 'aidiy_code', 'server.cjs'), '');
+    fs.writeFileSync(path.join(root, 'aidiy_code', 'desktop.cjs'), source);
   }
   return { root, electron, executable, binary, launch, desktop };
 }

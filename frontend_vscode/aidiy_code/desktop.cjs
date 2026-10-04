@@ -1,13 +1,13 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
 const { join, resolve } = require('node:path');
 const { writeFileSync } = require('node:fs');
-const { 単独起動 } = require('../dist/standalone.cjs');
+const { 単独起動 } = require('../dist/aidiy_code/server.cjs');
 const entryIndex = process.argv.findIndex(arg => resolve(arg) === __filename);
 const args = process.argv.slice(entryIndex >= 0 ? entryIndex + 1 : 2);
 
-app.setName('AiDiy');
-app.setPath('userData', join(app.getPath('appData'), 'AiDiy-vscode'));
-if (process.platform === 'win32') app.setAppUserModelId('AiDiy.vscode.standalone');
+app.setName('aidiy_code');
+app.setPath('userData', join(app.getPath('appData'), 'aidiy_code'));
+if (process.platform === 'win32') app.setAppUserModelId('AiDiy.aidiy_code');
 
 let server, window, closing = false, opening = true;
 app.on('before-quit', event => {
@@ -20,8 +20,10 @@ app.on('window-all-closed', () => app.quit());
 
 app.whenReady().then(async () => {
   server = await 単独起動(resolve(args[0] || process.cwd()));
+  const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
-    title: 'AiDiy', width: 476, height: 602, minWidth: 360, minHeight: 480,
+    title: 'AiDiy (Code)', width: 476, height: 602, minWidth: 360, minHeight: 480,
+    x: workArea.x + 8, y: workArea.y + 8,
     frame: false, roundedCorners: false, show: false, backgroundColor: '#000',
     icon: join(__dirname, '../media/AiDiy.png'), autoHideMenuBar: true,
     webPreferences: {

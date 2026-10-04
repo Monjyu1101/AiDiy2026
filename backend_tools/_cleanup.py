@@ -15,11 +15,12 @@
 グローバル MCP 設定 (aidiy_*) の解除も行います。
 
 公開 API:
-    cleanup(choices: dict) -> None
+    cleanup(choices: dict) -> bool
     collect_choices() -> dict | None
 """
 
 import json
+import ntpath
 import os
 import shutil
 import stat
@@ -35,6 +36,8 @@ if sys.platform == "win32":
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_TOOLS_DIR = THIS_DIR
+sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
+from cleanup_processes import process_arguments, stop_matching
 BACKEND_TOOLS_ENV_LIST = [".venv", "venv"]
 BACKEND_TOOLS_SERVER_PREFIX = "aidiy_"
 VSCODE_CHAT_PROVIDER_PREFIX = "aidiy_"
@@ -145,28 +148,44 @@ def handle_remove_readonly(func, path, exc_info):
 def remove_directory(path: Path, description: str) -> bool:
     if path.exists() and path.is_dir():
         try:
-            shutil.rmtree(path, onerror=handle_remove_readonly)
+            resolved = path.resolve()
+            root = BACKEND_TOOLS_DIR.resolve()
+            if resolved == root or not resolved.is_relative_to(root):
+                raise ValueError(f"削除対象が backend_tools の外を参照しています: {resolved}")
+            for attempt in range(5):
+                try:
+                    shutil.rmtree(path, onerror=handle_remove_readonly)
+                    break
+                except PermissionError:
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.2)
             print_success(f"{description} を削除しました: {path}")
             return True
         except Exception as e:
             print_error(f"{description} の削除に失敗しました: {path}")
             print_error(f"  理由: {e}")
-            print_warning("  ヒント: 管理者権限で実行するか、手動で削除してください")
+            print_warning("  削除対象を使用中のプロセスが残っていないか確認してください")
             return False
     return False
 
 
-def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
+def cleanup_common_python_caches(target_dir: Path, label: str) -> tuple[int, bool]:
     deleted_count = 0
+    ok = True
     print_info(f"{label}: __pycache__ フォルダを検索中...")
     for pycache in target_dir.rglob("__pycache__"):
         if remove_directory(pycache, f"__pycache__ ({label})"):
             deleted_count += 1
+        else:
+            ok = False
     print_info(f"{label}: .pytest_cache フォルダを検索中...")
     for pytest_cache in target_dir.rglob(".pytest_cache"):
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
-    return deleted_count
+        else:
+            ok = False
+    return deleted_count, ok
 
 
 # ============================================================
@@ -424,14 +443,45 @@ def cleanup_global_mcp_configs(prefix: str = BACKEND_TOOLS_SERVER_PREFIX):
 # ============================================================
 # クリーンアップ本体
 # ============================================================
-def cleanup(choices: dict) -> None:
+def is_tools_process(process: dict, root: Path, windows: bool) -> bool:
+    name = (process.get('Name') or '').lower()
+    if not (name.startswith('python') and (not windows or name.endswith('.exe'))):
+        return False
+    try:
+        args = process_arguments(process.get('CommandLine') or '', windows)
+    except ValueError:
+        return False
+    normalize = (lambda value: ntpath.normcase(ntpath.normpath(value))) if windows else os.path.normpath
+    join = ntpath.join if windows else os.path.join
+    interpreters = {normalize(join(str(root), env, 'Scripts' if windows else 'bin', executable))
+                    for env in BACKEND_TOOLS_ENV_LIST
+                    for executable in (('python.exe', 'pythonw.exe') if windows else ('python', 'python3'))}
+    if normalize(process.get('ExecutablePath') or '') in interpreters:
+        return True
+    if args and normalize(args[0]) in interpreters:
+        # Windows の venv ランチャーが起動した通常 Python の子も含む。
+        return True
+    entry = next((arg for arg in args[1:] if not arg.startswith('-')), '')
+    return normalize(entry) in {normalize(join(str(root), filename))
+                               for filename in ('mcp_stdio.py', 'tools_main.py')}
+
+
+def stop_tools_processes() -> bool:
+    return stop_matching(lambda p: is_tools_process(p, BACKEND_TOOLS_DIR.resolve(), sys.platform == 'win32'),
+                         print_info, print_warning, 'バックエンド(tools) の Python / MCP 接続')
+
+
+def cleanup(choices: dict) -> bool:
     label = "バックエンド(tools)"
     print_header(f"{label} のクリーンアップ")
+    if not stop_tools_processes():
+        return False
+    cleanup_ok = True
 
     if not BACKEND_TOOLS_DIR.exists():
         print_warning(f"{label} のフォルダが見つかりません")
     else:
-        deleted_count = cleanup_common_python_caches(BACKEND_TOOLS_DIR, label)
+        deleted_count, cleanup_ok = cleanup_common_python_caches(BACKEND_TOOLS_DIR, label)
 
         tools_envs = choices.get("tools_envs", {})
         for env_name in BACKEND_TOOLS_ENV_LIST:
@@ -442,6 +492,7 @@ def cleanup(choices: dict) -> None:
                 if remove_directory(env_dir, f"{env_name} ({label})"):
                     deleted_count += 1
                 else:
+                    cleanup_ok = False
                     print_error(f"  {env_name} 削除失敗。手動で削除してください: {env_dir}")
             elif env_name in tools_envs:
                 print_info(f"  {env_name} はそのまま残します")
@@ -451,6 +502,8 @@ def cleanup(choices: dict) -> None:
             if choices.get("tools_node_modules") is True:
                 if remove_directory(node_modules_dir, f"node_modules ({label})"):
                     deleted_count += 1
+                else:
+                    cleanup_ok = False
             elif choices.get("tools_node_modules") is False:
                 print_info("  node_modules はそのまま残します")
 
@@ -459,10 +512,14 @@ def cleanup(choices: dict) -> None:
             if choices.get("tools_temp") is True:
                 if remove_directory(temp_dir, f"temp ({label})"):
                     deleted_count += 1
+                else:
+                    cleanup_ok = False
             elif choices.get("tools_temp") is False:
                 print_info("  temp はそのまま残します")
 
-        if deleted_count > 0:
+        if not cleanup_ok:
+            print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
+        elif deleted_count > 0:
             print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
         else:
             print_info(f"{label}: 削除対象はありませんでした")
@@ -470,6 +527,7 @@ def cleanup(choices: dict) -> None:
     # 各 CLI のグローバル MCP 設定 (aidiy_*) を解除する
     print()
     cleanup_global_mcp_configs(BACKEND_TOOLS_SERVER_PREFIX)
+    return cleanup_ok
 
 
 def collect_choices() -> dict | None:
@@ -499,7 +557,8 @@ def main():
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
     choices = collect_choices()
-    cleanup(choices)
+    if not cleanup(choices):
+        sys.exit(1)
     print_success("クリーンアップが完了しました")
 
 

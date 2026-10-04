@@ -16,7 +16,6 @@ vscode 拡張機能をアンインストールし、依存関係と生成物を�
     cleanup(choices=None) -> bool
 """
 
-import json
 import os
 import shutil
 import stat
@@ -31,6 +30,10 @@ if sys.platform == "win32":
 
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_VSCODE_DIR = THIS_DIR
+
+sys.path.insert(0, str(THIS_DIR / "scripts"))
+from vscode_extensions import uninstall_aidiy_extensions
+from standalone_processes import stop_standalone
 
 AUTO_MODE = False
 
@@ -125,7 +128,18 @@ def remove_directory(path: Path, description: str) -> bool:
     if not path.is_dir():
         return False
     try:
-        shutil.rmtree(path, onerror=handle_remove_readonly)
+        resolved = path.resolve()
+        root = FRONTEND_VSCODE_DIR.resolve()
+        if resolved == root or not resolved.is_relative_to(root):
+            raise ValueError(f"削除対象が frontend_vscode の外を参照しています: {resolved}")
+        for attempt in range(5):
+            try:
+                shutil.rmtree(path, onerror=handle_remove_readonly)
+                break
+            except PermissionError as exc:
+                if getattr(exc, 'winerror', None) not in (32, 33) or attempt == 4:
+                    raise
+                time.sleep(0.2)
         print_success(f"{description} を削除しました: {path}")
         return True
     except Exception as exc:
@@ -231,17 +245,6 @@ def find_vscode_cli() -> str | None:
     return None
 
 
-def get_extension_id() -> str | None:
-    try:
-        package = json.loads(
-            (FRONTEND_VSCODE_DIR / "package.json").read_text(encoding="utf-8")
-        )
-        return f"{package['publisher']}.{package['name']}"
-    except (OSError, KeyError, json.JSONDecodeError) as exc:
-        print_warning(f"拡張機能 ID の取得に失敗しました: {exc}")
-        return None
-
-
 def get_installed_extensions(vscode_cli: str) -> set[str] | None:
     try:
         result = subprocess.run(
@@ -260,35 +263,22 @@ def get_installed_extensions(vscode_cli: str) -> set[str] | None:
 
 
 def uninstall_extension() -> tuple[bool, int]:
-    extension_id = get_extension_id()
     vscode_cli = find_vscode_cli()
-    if extension_id is None:
-        return False, 0
     if vscode_cli is None:
         print_warning("vscode CLI (code) が見つからないため、拡張機能の解除を確認できません。")
         return False, 0
 
     try:
-        installed = get_installed_extensions(vscode_cli)
-        if installed is None:
-            return False, 0
-        if extension_id.lower() not in installed:
-            print_info(f"vscode 拡張機能は配置されていません: {extension_id}")
-            return True, 0
-        print_info(f"実行中: {vscode_cli} --uninstall-extension {extension_id}")
-        subprocess.run(
-            [vscode_cli, "--uninstall-extension", extension_id],
-            check=True,
-            text=True,
-            timeout=60,
+        def uninstall(name):
+            print_info(f"実行中: {vscode_cli} --uninstall-extension {name}")
+            subprocess.run([vscode_cli, "--uninstall-extension", name], check=True, text=True, timeout=60)
+            return True
+        ok, count = uninstall_aidiy_extensions(
+            lambda: get_installed_extensions(vscode_cli), uninstall, print_info, print_warning,
         )
-        installed_after = get_installed_extensions(vscode_cli)
-        if installed_after is None or extension_id.lower() in installed_after:
-            print_warning(f"vscode 拡張機能が解除されたことを確認できません: {extension_id}")
-            return False, 0
-        print_success(f"vscode 拡張機能を解除しました: {extension_id}")
-        print_info("  vscode 本体は停止していません。反映にはウィンドウ再読み込みが必要です。")
-        return True, 1
+        if ok and count:
+            print_info("  vscode 本体は停止していません。反映にはウィンドウ再読み込みが必要です。")
+        return ok, count
     except subprocess.CalledProcessError as exc:
         print_warning(f"vscode 拡張機能の解除に失敗しました: {exc}")
         return False, 0
@@ -297,21 +287,30 @@ def uninstall_extension() -> tuple[bool, int]:
         return False, 0
 
 
+def stop_standalone_processes() -> bool:
+    return stop_standalone(FRONTEND_VSCODE_DIR.resolve(), print_info, print_warning)
+
+
 def cleanup(choices: dict | None = None) -> bool:
     del choices
     label = "フロントエンド(vscode)"
     print_header(f"{label} のクリーンアップ")
 
     extension_ok, deleted_count = uninstall_extension()
+    if not extension_ok:
+        print_warning("拡張機能の解除を確認できないため、ランチャーと生成物の削除を中止します。")
+        return False
+    if not stop_standalone_processes():
+        return False
     cleanup_ok = extension_ok
-    for launcher_name in ("aidiy_vscode.cmd", "aidiy_vscode"):
+    for launcher_name in ("aidiy_code.cmd", "aidiy_code", "aidiy_live.cmd", "aidiy_live", "aidiy_vscode.cmd", "aidiy_vscode"):
         launcher_path = Path.home() / ".local" / "bin" / launcher_name
         if launcher_path.is_file():
             if remove_file(launcher_path, f"{launcher_path.name} ({label})"):
                 deleted_count += 1
             else:
                 cleanup_ok = False
-    for directory_name in ("node_modules", "dist", "out", "__pycache__", ".pytest_cache"):
+    for directory_name in ("node_modules", "dist", "aidiy_live/dist", "out", "__pycache__", "scripts/__pycache__", ".pytest_cache"):
         directory_path = FRONTEND_VSCODE_DIR / directory_name
         existed = directory_path.is_dir()
         if remove_directory(

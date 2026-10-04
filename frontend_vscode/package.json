@@ -1,6 +1,6 @@
 {
-  "name": "aidiy-vscode",
-  "displayName": "AiDiy",
+  "name": "aidiy-code",
+  "displayName": "AiDiy (Code)",
   "icon": "media/AiDiy.png",
   "description": "AiDiy の VS Code 拡張です。実行エンジンに aidiy_hermes CLI を使用し、右サイドバーで AI チャットを提供します。",
   "version": "0.1.0",
@@ -41,18 +41,18 @@
     "viewsContainers": {
       "secondarySidebar": [
         {
-          "id": "aidiy-vscode",
-          "title": "AiDiy",
+          "id": "aidiy-code",
+          "title": "AiDiy (Code)",
           "icon": "media/AiDiy.png"
         }
       ]
     },
     "views": {
-      "aidiy-vscode": [
+      "aidiy-code": [
         {
           "type": "webview",
           "id": "aidiyHermes.chat",
-          "name": "AiDiy"
+          "name": "AiDiy (Code)"
         }
       ]
     },
@@ -60,34 +60,34 @@
       {
         "command": "aidiyHermes.open",
         "title": "チャットを開く",
-        "category": "AiDiy"
+        "category": "AiDiy (Code)"
       },
       {
         "command": "aidiyHermes.newChat",
         "title": "新しい会話",
-        "category": "AiDiy",
+        "category": "AiDiy (Code)",
         "icon": "$(add)"
       },
       {
         "command": "aidiyHermes.attachSelection",
         "title": "選択コードをチャットに添付",
-        "category": "AiDiy"
+        "category": "AiDiy (Code)"
       },
       {
         "command": "aidiyHermes.settings",
         "title": "設定を開く",
-        "category": "AiDiy",
+        "category": "AiDiy (Code)",
         "icon": "$(settings-gear)"
       },
       {
         "command": "aidiyHermes.terminal",
         "title": "対話 CLI を開く",
-        "category": "AiDiy"
+        "category": "AiDiy (Code)"
       },
       {
         "command": "aidiyHermes.logs",
         "title": "実行ログを開く",
-        "category": "AiDiy"
+        "category": "AiDiy (Code)"
       }
     ],
     "menus": {
@@ -122,7 +122,7 @@
       ]
     },
     "configuration": {
-      "title": "AiDiy",
+      "title": "AiDiy (Code)",
       "properties": {
         "aidiyHermes.cliPath": {
           "type": "string",
@@ -164,11 +164,18 @@
     }
   },
   "scripts": {
-    "check": "tsc --noEmit",
+    "live": "node aidiy_live/launch.mjs",
+    "live:browser": "node aidiy_live/launch.mjs --browser",
+    "live:check": "tsc --noEmit -p aidiy_live/tsconfig.json",
+    "live:compile": "node aidiy_live/build.mjs",
+    "live:test": "node aidiy_live/test.mjs",
+    "check": "tsc --noEmit && tsc --noEmit -p aidiy_live/tsconfig.json",
     "compile": "node scripts/build.mjs",
     "test": "node scripts/test.mjs",
     "vscode:prepublish": "npm run check && npm run compile",
-    "package": "vsce package --no-dependencies --allow-missing-repository --out dist/aidiy-vscode-0.1.0.vsix"
+    "package": "node scripts/package.mjs",
+    "code": "node aidiy_code/launch.mjs",
+    "code:browser": "node aidiy_code/launch.mjs --browser"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
