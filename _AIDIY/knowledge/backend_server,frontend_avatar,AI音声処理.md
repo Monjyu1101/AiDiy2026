@@ -59,8 +59,14 @@ Gemini / FreeAI の native-audio モデルでは、`backend_server/AIコア/AI�
 字幕対応 LiveAI の出力音声は `AI音声処理.py` でローカル音声認識へ再投入せず、二重表示を避ける。
 [Google の音声字幕仕様](https://ai.google.dev/gemini-api/docs/live-api/capabilities#audio-transcriptions)を参照する。
 
+接続準備中はプロバイダーの `is_alive` が `False` のため、この値だけでテキスト送信を拒否しない。
+明示的な停止は `中断停止フラグ` で判定し、接続準備中の送信は Gemini / OpenAI の `テキスト送信()` 内の最大5秒の接続待ちを通す。
+送信失敗の共通案内は接続状態の確認と再接続を促す。APIキー未設定が原因とは限らない。
 送信が拒否された場合や LiveAI が停止中の場合は、`AIライブ.py` がチャンネル0へ `error` を返す。
 `!` だけの応答は画面で隠れるため、送信失敗の通知には使わない。
+OpenAI Realtime の `error` イベントは `AIライブ_openai.py` が `error` / `code` をテキスト受信キューへ入れ、`AIライブ.py` がチャンネル0の `error` と `エラーコード` へ変換する。
+`credit_balance_exhausted` は APIクレジット残高なしとして案内し、`insufficient_quota` 系は残高・利用上限の確認を促して自動再接続を停止する。後続の送信でも拒否理由を保持し、共通の送信エラーで上書きしない。
+原因の確認は [OpenAI公式エラーコード](https://developers.openai.com/api/docs/guides/error-codes) を参照する。キーの認証やモデル確認が成功しても、Realtime 接続が残高不足で拒否される場合がある。
 確認には `backend_server/tests/test_live_text_response.py` を使う。
 - スピーカー OFF でもビジュアライザー用の再生系を残す設計があるため、実音と視覚演出を分けて確認する。
 - キャンセル後に古いチャンクを再生しないよう、キュー世代管理を確認する。

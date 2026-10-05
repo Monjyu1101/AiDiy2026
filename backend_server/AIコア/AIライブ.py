@@ -447,6 +447,9 @@ class Live:
         try:
             if not self.接続:
                 return False
+            if isinstance(text_data, dict) and text_data.get("error"):
+                await self._送信エラー通知(str(text_data["error"]), text_data.get("code"))
+                return True
             text = text_data.get("text") if isinstance(text_data, dict) else None
             if not text:
                 return False
@@ -539,19 +542,21 @@ class Live:
 
     # ===== テキスト送信（LiveAIへ） =====
 
-    async def _送信エラー通知(self) -> None:
+    async def _送信エラー通知(self, message: str = "", code: str = None) -> None:
         """LiveAIへの送信失敗を画面へ通知する。"""
         if self.接続:
             await self.接続.send_to_channel("0", {
                 "セッションID": self.セッションID,
                 "メッセージ識別": "error",
-                "メッセージ内容": "LiveAI に送信できませんでした。APIキー・モデル設定を確認し、接続し直して再送してください。",
+                "メッセージ内容": message or "LiveAI に送信できませんでした。音声AIへの接続状態を確認し、接続し直して再送してください。",
+                **({"エラーコード": code} if code else {}),
             })
 
     async def テキスト送信(self, text: str) -> bool:
         """LiveAIへテキスト送信。失敗は画面へ通知する。"""
         try:
-            if self.AIインスタンス and self.AIインスタンス.is_alive:
+            # 接続準備中は is_alive=False。各プロバイダーの接続待ちを通してから送信する。
+            if self.AIインスタンス and not getattr(self.AIインスタンス, "中断停止フラグ", False):
                 セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
                 logger.info(
                     f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
@@ -564,7 +569,7 @@ class Live:
                 logger.warning("LiveAI実行:LiveAIが開始されていません")
         except Exception as e:
             logger.error(f"[Live] テキスト送信エラー: {e}")
-        await self._送信エラー通知()
+        await self._送信エラー通知(getattr(self.AIインスタンス, "最終エラー", ""))
         return False
 
     async def 画像送信(self, image_data, format: str = "jpeg") -> bool:

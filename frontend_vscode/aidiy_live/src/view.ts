@@ -11,6 +11,7 @@ const button = (id: string) => element<HTMLButtonElement>(id);
 const provider = element<HTMLSelectElement>('provider'), model = element<HTMLSelectElement>('model'), voice = element<HTMLSelectElement>('voice');
 const errorBox = element('error'), modelError = element('model-error'), status = element('status'), transcript = element('transcript');
 const initialWelcome = element('empty').cloneNode(true);
+let 回答演出停止: (() => void) | undefined;
 const environment = new LiveEnvironment();
 let connected = false, busy = false, mic = false, micBusy = false, changing = false, generation = 0;
 let micGeneration = 0;
@@ -93,11 +94,51 @@ function controls() {
   for (const select of [provider, model, voice]) select.disabled = busy || changing || modelLoading || !Object.keys(models).length;
   status.textContent = changing ? '再接続中' : busy ? '接続中' : connected ? mic ? '会話中' : '接続済み' : '未接続';
 }
-function message(role: 'user' | 'ai' | 'system', text: string) {
+function コンソール演出(row: HTMLDivElement, text: string) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    row.textContent = text; return;
+  }
+  row.classList.add('console-effect');
+  const terminalText = document.createElement('span');
+  const cursor = document.createElement('span'); cursor.className = 'terminal-cursor';
+  row.replaceChildren(terminalText, cursor);
+  const batch = Math.max(1, Math.floor(text.length / 50) + 1);
+  let index = 0, timer: number;
+  const finish = () => {
+    clearTimeout(timer);
+    row.classList.remove('console-effect'); row.textContent = text;
+    回答演出停止 = undefined;
+  };
+  const tick = () => {
+    const end = Math.min(index + batch, text.length);
+    terminalText.textContent += text.slice(index, end); index = end;
+    transcript.scrollTop = transcript.scrollHeight;
+    if (index < text.length) { timer = window.setTimeout(tick, 10); return; }
+    finish();
+    transcript.scrollTop = transcript.scrollHeight;
+  };
+  回答演出停止 = finish;
+  // Code の回答表示と同じく、500ms 待ってから10msごとに文字を追加する。
+  timer = window.setTimeout(tick, 500);
+}
+function message(role: 'user' | 'ai' | 'system', text: string, 音声認識 = false) {
   if (!text.trim() || ['!', '\x02', '\x03', '\x18'].includes(text.trim())) return;
   element('empty')?.remove();
   const row = document.createElement('div'); row.className = `message ${role}`;
-  row.textContent = text.slice(0, 20000); transcript.append(row);
+  if (音声認識) row.classList.add('recognition');
+  if (role === 'user' || 音声認識) {
+    row.title = 'クリックして入力欄へ戻す';
+    row.addEventListener('click', () => {
+      const input = element<HTMLTextAreaElement>('text');
+      input.value = text;
+      input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+      controls();
+    });
+  }
+  回答演出停止?.();
+  transcript.append(row);
+  if (role === 'ai') コンソール演出(row, text.slice(0, 20000));
+  else row.textContent = text.slice(0, 20000);
   while (transcript.children.length > 100) transcript.firstElementChild?.remove();
   transcript.scrollTop = transcript.scrollHeight;
 }
@@ -108,9 +149,10 @@ function receive(packet: Packet) {
   else if (['input_text', 'output_text', 'output_request', 'output', 'recognition_input', 'recognition_output'].includes(type || '') && packet.チャンネル === '0') {
     // 旧バックエンドの送信失敗通知も、無反応に見せず案内する。
     if (type === 'output_text' && String(packet.メッセージ内容 || '').trim() === '!') {
-      showError('LiveAI に送信できませんでした。APIキー・モデル設定を確認し、接続し直して再送してください。'); return;
+      showError('LiveAI に送信できませんでした。音声AIへの接続状態を確認し、接続し直して再送してください。'); return;
     }
-    message(type === 'input_text' || type === 'recognition_input' ? 'user' : 'ai', String(packet.メッセージ内容 || ''));
+    message(type === 'input_text' || type === 'recognition_input' ? 'user' : 'ai', String(packet.メッセージ内容 || ''),
+      type === 'recognition_input' || type === 'recognition_output');
   } else if (type === 'welcome_text') message('system', String(packet.メッセージ内容 || ''));
   else if (type === 'error') showError(String(packet.メッセージ内容 || packet.error || '会話エラーが発生しました。'));
 }
@@ -146,6 +188,7 @@ async function loadModels() {
   element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model], settings[keys(settings.LIVE_AI_NAME).voice]].filter(Boolean).join(' · ');
 }
 async function disconnect() {
+  回答演出停止?.();
   ++generation; connected = false; busy = false; mic = false; micBusy = false; changing = false;
   ++micGeneration;
   sessionProject = undefined;
@@ -170,7 +213,7 @@ async function connectSession(preserveConversation = false) {
     showFolder(config.作業フォルダ);
     sessionProject = config.作業フォルダ?.パス || '';
     if (run !== generation) return;
-    if (!preserveConversation) transcript.replaceChildren();
+    if (!preserveConversation) { 回答演出停止?.(); transcript.replaceChildren(); }
     await connection.connect({ codeBasePath: sessionProject, modelSettings: preferredSettings });
     if (run !== generation) return;
     await loadModels();

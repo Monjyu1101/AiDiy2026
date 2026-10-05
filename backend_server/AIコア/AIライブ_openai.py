@@ -17,6 +17,7 @@ import time
 import datetime
 import threading
 import json
+import re
 import asyncio
 import base64
 import io
@@ -104,6 +105,7 @@ class LiveAI:
         self.live_lasttime = time.time()    # 無通信検出用タイムスタンプ（送受信統合）
         self.中断停止フラグ = False
         self.エラーフラグ = False
+        self.最終エラー = ""
         self.エラータイム = 0  # 最後のエラーフラグ設定時刻
         self.再接続試行回数 = 0  # 連続エラー時の再接続試行回数
 
@@ -523,6 +525,7 @@ class LiveAI:
 
                 # 再接続時にエラーフラグをリセット
                 self.エラーフラグ = False
+                self.最終エラー = ""
 
                 try:
                     # WebSocket URL構築
@@ -676,6 +679,27 @@ class LiveAI:
             # logger.info("ライブセッションワーカー:終了")
             pass
 
+    async def _APIエラー通知(self, error: dict):
+        """OpenAI の拒否理由を画面へ通知し、残高不足時は自動再接続を止める。"""
+        code = str(error.get("code") or error.get("type") or "unknown_error")
+        if code == "credit_balance_exhausted":
+            message = "OpenAI API のクレジット残高がありません。OpenAI Platform の Billing で残高を確認し、追加後に接続し直してください。"
+        elif code == "insufficient_quota" or error.get("type") == "insufficient_quota":
+            message = "OpenAI API の利用枠を超えています。APIクレジット残高と利用上限を確認し、接続し直してください。"
+        elif code == "invalid_api_key":
+            message = "OpenAI API の認証に失敗しました。バックエンドの OpenAI APIキーを確認してください。"
+        else:
+            detail = str(error.get("message") or "OpenAI に要求が拒否されました。")
+            if self.api_key:
+                detail = detail.replace(self.api_key, "[REDACTED]")
+            detail = re.sub(r"sk-[^\s\"'<>]+", "[REDACTED]", detail)
+            message = f"OpenAI Realtime API エラー: {detail[:1000]}"
+        self.最終エラー = f"{message} ({code})"
+        if self.テキスト受信Ｑ is not None:
+            await self.テキスト受信Ｑ.put({"error": self.最終エラー, "code": code})
+        if code == "credit_balance_exhausted" or error.get("type") == "insufficient_quota" or code == "insufficient_quota":
+            self.中断停止フラグ = True
+
     async def _受信ワーカー(self):
         """受信専用ワーカー（TaskGroup内で実行）"""
         try:
@@ -712,6 +736,7 @@ class LiveAI:
                                 res_err = response_data.get('error')
                                 err_msg = res_err.get('message') if res_err else str(response_data)
                                 logger.error(f"OpenAI api エラー: {err_msg}")
+                                await self._APIエラー通知(res_err if isinstance(res_err, dict) else {"message": err_msg})
                                 self.エラーフラグ = True
                                 break
 

@@ -46,6 +46,8 @@
 - Code の説明は `frontend_vscode/README.md`、Live の説明は `frontend_vscode/aidiy_live/README.md` に分ける。VSIX 作成時はそれぞれの `extension/readme.md` が各拡張だけを説明していることを確認する。
 - Code は新規会話で入力欄と保存済み下書きを空にし、`welcome-input-started` を引き継がず起動画面のターミナル演出を最初から再開する。同じ会話の状態通知では演出を再開せず、初回の下書き復元時は入力済みとして演出を停止する。VS Code / 単独画面の共通処理は `src/webview.ts` に置く。
 - Live は手動切断・接続断・「新しい会話」で、会話欄を初期の案内（ターミナル演出を再開始）、入力欄を空、モデル表示を初期ラベルへ戻す。接続先とプロジェクト表示は保持する。未接続の「接続」は黒文字で背景を白〜水色（`--voice`）へ変化させ、接続済みの「切断」は白背景と黒文字で固定する（ホバー時も同じ）。
+- Code / Live の新しいAI回答は、500ms後に文字送りを開始し、10msごとに `max(1, floor(文字数 / 50) + 1)` 文字を追加する。演出中は0.7秒周期でカーソルを点滅させ、完了後に外す。Live は次のメッセージを表示するときに前の回答を全文表示し、新規会話・切断・画面終了で演出タイマーを破棄する。`prefers-reduced-motion: reduce` では両方ともAI回答を全文表示する。
+- Code / Live の手入力メッセージは白文字（`#fff`）で表示し、クリックで本文を入力欄へコピーしてフォーカスとカーソルを末尾へ移す。Live の `recognition_input` / `recognition_output` は少し灰色（`#b8b8b8`）にし、同じクリック操作でコピーする。演出中・表示文字数の制限中でも元の全文をコピーし、この操作だけで送信は行わない。
 - Live の文字表示には通常回答と音声認識に加え、コードエージェントの `output_request` を含める。旧バックエンドの `output_text: !` は送信エラーとして案内する。`aidiy_live/checks/view.test.cjs` で VS Code / 単独画面の両方を検証する。
 - 送信ボタンは Code / Live とも未接続・入力不可時は灰色と白い紙ヒコーキ（`ws-disabled`）。接続済みの空欄・空白入力では白背景（`rgba(255, 255, 255, .95)`）、青紫の枠（`#667eea`）、黒い紙ヒコーキ。送信可能時は `frontend_web/src/components/AiDiy/compornents/AIコード.vue` と同じ青紫（`#667eea`）、ホバー時は `#5a6fd8` にする。紙ヒコーキ画像は `brightness(0)` で黒、`brightness(0) invert(1)` で白にする。空欄・空白だけでは無効にし、VS Code テーマで色を上書きしない。
 - 入力欄の Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。日本語 IME の変換確定では送信しない。

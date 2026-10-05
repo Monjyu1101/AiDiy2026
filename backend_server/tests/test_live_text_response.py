@@ -9,7 +9,7 @@ import sys
 import tempfile
 import types as stdlib_types
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from google.genai import types
 
@@ -39,6 +39,7 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
         # patch.dict の復元で NumPy の C 拡張を再インポートしないよう、先に読み込む。
         importlib.import_module("numpy")
         cls.gemini_module = load_module("AIライブ_gemini.py")
+        cls.openai_module = load_module("AIライブ_openai.py")
         cls.live_module = load_module("AIライブ.py")
         cls.audio_module = load_module("AI音声処理.py")
 
@@ -131,6 +132,122 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual("0", channel)
                 self.assertEqual("error", packet["メッセージ識別"])
                 self.assertIn("送信できませんでした", packet["メッセージ内容"])
+
+    async def test_send_during_connection_waits_for_provider_session(self):
+        for module, session_field in ((self.gemini_module, "live_session"),
+                                      (self.openai_module, "ws_session")):
+            with self.subTest(provider=module.__name__):
+                ai = module.LiveAI.__new__(module.LiveAI)
+                ai.is_alive = False
+                ai.中断停止フラグ = False
+                ai.エラーフラグ = False
+                ai.live_session = None
+                ai.ws_session = None
+                ai.client = object()
+                session = stdlib_types.SimpleNamespace(send_client_content=AsyncMock(), send=Mock())
+                live = self.live_module.Live.__new__(self.live_module.Live)
+                live.セッションID = "session"
+                live.チャンネル = "0"
+                live.AIインスタンス = ai
+                live.接続 = stdlib_types.SimpleNamespace(send_to_channel=AsyncMock())
+
+                async def ready(_seconds):
+                    setattr(ai, session_field, session)
+                    ai.is_alive = True
+
+                with patch.object(module.asyncio, "sleep", side_effect=ready) as wait:
+                    self.assertTrue(await live.テキスト送信("接続直後の依頼"))
+                wait.assert_awaited()
+                live.接続.send_to_channel.assert_not_awaited()
+                if session_field == "live_session":
+                    session.send_client_content.assert_awaited_once()
+                    self.assertEqual("接続直後の依頼", session.send_client_content.call_args.kwargs["turns"].parts[0].text)
+                else:
+                    self.assertEqual(2, session.send.call_count)
+                    packet = json.loads(session.send.call_args_list[0].args[0])
+                    self.assertEqual("接続直後の依頼", packet["item"]["content"][0]["text"])
+
+    async def test_connection_timeout_still_reports_one_error(self):
+        ai = self.gemini()
+        ai.live_session = None
+        ai.client = object()
+        ai.is_alive = False
+        ai.中断停止フラグ = False
+        ai.エラーフラグ = False
+        live = self.live_module.Live.__new__(self.live_module.Live)
+        live.セッションID = "session"
+        live.チャンネル = "0"
+        live.AIインスタンス = ai
+        live.接続 = stdlib_types.SimpleNamespace(send_to_channel=AsyncMock())
+        with patch.object(self.gemini_module.asyncio, "sleep", new_callable=AsyncMock) as wait:
+            self.assertFalse(await live.テキスト送信("接続できないときの依頼"))
+        self.assertGreaterEqual(wait.await_count, 50)
+        self.assertLessEqual(wait.await_count, 51)
+        live.接続.send_to_channel.assert_awaited_once()
+        packet = live.接続.send_to_channel.call_args.args[1]
+        self.assertEqual("error", packet["メッセージ識別"])
+        self.assertIn("接続状態", packet["メッセージ内容"])
+        self.assertNotIn("APIキー", packet["メッセージ内容"])
+
+    async def test_explicitly_stopped_provider_is_not_sent_text(self):
+        live = self.live_module.Live.__new__(self.live_module.Live)
+        live.セッションID = "session"
+        live.チャンネル = "0"
+        live.AIインスタンス = stdlib_types.SimpleNamespace(
+            is_alive=False, 中断停止フラグ=True, テキスト送信=AsyncMock(return_value=True),
+        )
+        live.接続 = stdlib_types.SimpleNamespace(send_to_channel=AsyncMock())
+        self.assertFalse(await live.テキスト送信("停止後の依頼"))
+        live.AIインスタンス.テキスト送信.assert_not_awaited()
+        live.接続.send_to_channel.assert_awaited_once()
+
+    async def test_openai_credit_error_reaches_screen_and_stops_reconnect(self):
+        module = self.openai_module
+        ai = module.LiveAI(セッションID="session", api_key="test-key", live_model="gpt-realtime-2.1-mini", live_voice="marin")
+        ai.テキスト受信Ｑ = asyncio.Queue()
+        socket = Mock()
+        socket.recv.return_value = json.dumps({"type": "error", "error": {
+            "type": "insufficient_quota", "code": "credit_balance_exhausted",
+            "message": "You have no credits remaining.",
+        }})
+        with patch.object(module.websocket, "create_connection", return_value=socket) as connect:
+            await asyncio.wait_for(ai._ライブセッションワーカー(), timeout=3)
+        connect.assert_called_once()
+        self.assertIn("model=gpt-realtime-2.1-mini", connect.call_args.args[0])
+        socket.close.assert_called_once()
+        self.assertTrue(ai.中断停止フラグ)
+        self.assertFalse(ai.is_alive)
+        self.assertEqual(1, ai.テキスト受信Ｑ.qsize())
+        live = self.live_module.Live.__new__(self.live_module.Live)
+        live.セッションID = "session"
+        live.チャンネル = "0"
+        live.AIインスタンス = ai
+        live.接続 = stdlib_types.SimpleNamespace(send_to_channel=AsyncMock())
+        self.assertTrue(await live._send_output_text(await ai.テキスト受信Ｑ.get()))
+        channel, packet = live.接続.send_to_channel.call_args.args
+        self.assertEqual("0", channel)
+        self.assertEqual("error", packet["メッセージ識別"])
+        self.assertEqual("credit_balance_exhausted", packet["エラーコード"])
+        self.assertIn("クレジット残高がありません", packet["メッセージ内容"])
+        self.assertIn("Billing", packet["メッセージ内容"])
+        self.assertNotIn("APIキー", packet["メッセージ内容"])
+        # 続けて送信しても、残高不足の説明を共通エラーで上書きしない。
+        self.assertFalse(await live.テキスト送信("依頼"))
+        self.assertEqual(packet["メッセージ内容"], live.接続.send_to_channel.call_args.args[1]["メッセージ内容"])
+
+    async def test_openai_non_quota_error_keeps_retry_and_redacts_key(self):
+        ai = self.openai_module.LiveAI(セッションID="session", api_key="test-secret")
+        ai.テキスト受信Ｑ = asyncio.Queue()
+        await ai._APIエラー通知({
+            "type": "invalid_request_error", "code": "invalid_value",
+            "message": "Invalid value: test-secret sk-partially-masked for session.audio.output.voice",
+        })
+        self.assertFalse(ai.中断停止フラグ)
+        error = await ai.テキスト受信Ｑ.get()
+        self.assertEqual("invalid_value", error["code"])
+        self.assertIn("session.audio.output.voice", error["error"])
+        self.assertNotIn("test-secret", error["error"])
+        self.assertNotIn("sk-partially-masked", error["error"])
 
     async def test_native_transcript_avoids_duplicate_output_recognition(self):
         audio = self.audio_module
