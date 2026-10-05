@@ -447,7 +447,7 @@ class WebSocketManager:
             logger.info(f"新規セッション初期CODE_BASE_PATH: {code_base_path} (session={セッションID})")
         return model_settings
 
-    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True, code_base_path: Optional[str] = None) -> str:
+    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True, code_base_path: Optional[str] = None, live_model_settings: Optional[dict] = None) -> str:
         """
         WebSocket接続を登録（セッション単位）
 
@@ -459,6 +459,26 @@ class WebSocketManager:
         Returns:
             セッションID: 使用するセッションID
         """
+        # クライアント指定は Live のモデル・音声だけを初期設定へ反映する。
+        live_settings = {}
+        if live_model_settings is not None:
+            allowed = {"LIVE_AI_NAME", "LIVE_GEMINI_MODEL", "LIVE_GEMINI_VOICE",
+                       "LIVE_FREEAI_MODEL", "LIVE_FREEAI_VOICE", "LIVE_OPENAI_MODEL", "LIVE_OPENAI_VOICE"}
+            if not isinstance(live_model_settings, dict) or set(live_model_settings) - allowed:
+                raise ValueError("接続時のライブモデル設定が無効です。")
+            for key, value in live_model_settings.items():
+                if not isinstance(value, str):
+                    raise ValueError("ライブモデルと音声は文字列で指定してください。")
+                if value.strip():
+                    live_settings[key] = value.strip()
+            if "LIVE_AI_NAME" in live_settings and live_settings["LIVE_AI_NAME"] not in {"gemini_live", "freeai_live", "openai_live"}:
+                raise ValueError("指定されたライブAIに対応していません。")
+            existing = self.sessions.get(セッションID)
+            saved = self.session_states.get(セッションID, {})
+            current = existing.モデル設定 if existing else saved.get("モデル設定")
+            if current is not None and any(current.get(key) != value for key, value in live_settings.items()):
+                raise ValueError("セッションのライブモデルが一致しません。新しい会話で接続してください。")
+
         # フォルダを初期化通知・AI起動より先に確定する。
         project_path = None
         if code_base_path is not None:
@@ -509,6 +529,9 @@ class WebSocketManager:
 
         if project_path is not None:
             session.モデル設定["CODE_BASE_PATH"] = project_path
+        if live_settings:
+            session.モデル設定.update(live_settings)
+        if project_path is not None or live_settings:
             self.save_session_state(セッションID, ボタン=session.ボタン状態, モデル設定=session.モデル設定, ソース最終更新日時=session.ソース最終更新日時)
 
         logger.debug(f"セッションに接続: {セッションID}")

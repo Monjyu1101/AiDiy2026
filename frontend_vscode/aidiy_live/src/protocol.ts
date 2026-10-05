@@ -8,6 +8,7 @@ export interface LiveSocket {
   onerror: ((event: Event) => void) | null; onclose: ((event: CloseEvent) => void) | null;
   send(data: string): void; close(): void;
 }
+export type LiveConnectOptions = { codeBasePath?: string; modelSettings?: Record<string, string> };
 
 export function 入力レート(provider: string): number { return provider.includes('openai') ? 24000 : 16000; }
 export function 音声入力(base64: string): Packet {
@@ -25,29 +26,27 @@ export class LiveConnection {
   constructor(private url: string, private onPacket: (packet: Packet) => void, private onLost: () => void,
     private createSocket: (url: string) => LiveSocket = url => new WebSocket(url)) {}
 
-  async connect(prepare?: (session: string) => Promise<void>, codeBasePath = '') {
+  async connect(options: LiveConnectOptions = {}) {
     this.disconnect();
     const generation = this.generation;
     try {
-      const session = await this.open('input', '', generation, codeBasePath);
+      const session = await this.open('input', '', generation, options);
       if (generation !== this.generation) throw new Error('接続を中断しました。');
       this.session = session;
-      // LiveAIを起動するaudioソケットより先に、セッションのプロジェクトを設定する。
-      await prepare?.(this.session);
+      await this.open('0', this.session, generation, options);
       if (generation !== this.generation) throw new Error('接続を中断しました。');
-      await this.open('0', this.session, generation, codeBasePath);
-      if (generation !== this.generation) throw new Error('接続を中断しました。');
-      await this.open('audio', this.session, generation, codeBasePath);
+      await this.open('audio', this.session, generation, options);
     } catch (error) { if (generation === this.generation) this.disconnect(); throw error; }
   }
-  private open(channel: string, session: string, generation: number, codeBasePath: string): Promise<string> {
+  private open(channel: string, session: string, generation: number, options: LiveConnectOptions): Promise<string> {
     return new Promise((resolve, reject) => {
       const socket = this.createSocket(this.url);
       this.sockets.set(channel, socket);
       let ready = false;
       const timer = setTimeout(() => { reject(new Error('接続がタイムアウトしました。')); socket.close(); }, 30000);
       socket.onopen = () => socket.send(JSON.stringify({ type: 'connect', セッションID: session || null, ソケット番号: channel,
-        ...(codeBasePath ? { CODE_BASE_PATH: codeBasePath } : {}) }));
+        ...(options.codeBasePath ? { CODE_BASE_PATH: options.codeBasePath } : {}),
+        ...(options.modelSettings && Object.keys(options.modelSettings).length ? { モデル設定: options.modelSettings } : {}) }));
       socket.onmessage = event => {
         if (generation !== this.generation) return;
         let packet: Packet;
@@ -64,7 +63,7 @@ export class LiveConnection {
       socket.onerror = () => { clearTimeout(timer); if (!ready) reject(new Error('バックエンドに接続できません。')); };
       socket.onclose = () => {
         clearTimeout(timer);
-        if (!ready) reject(new Error('接続が閉じられました。'));
+        if (!ready) { reject(new Error('接続が閉じられました。')); return; }
         if (generation === this.generation) { this.disconnect(); this.onLost(); }
       };
     });

@@ -186,7 +186,7 @@ def _最大更新日時文字列(ファイルリスト: list[dict]) -> str:
 
 
 try:
-    from AIコア.AIセッション管理 import AIセッション管理, SessionConnection
+    from AIコア.AIセッション管理 import AIセッション管理, SessionConnection, 初期モデル設定生成
     from AIコア.AIストリーミング処理 import StreamingProcessor
     from AIコア.AI音声認識 import Recognition
     from AIコア.AI音声処理 import 音声入力データ処理, 統合音声分離ワーカー
@@ -476,7 +476,7 @@ async def セッション一覧():
 
 
 class モデル情報取得リクエスト(BaseModel):
-    セッションID: str
+    セッションID: str = ""
 
 
 class モデル設定リクエスト(BaseModel):
@@ -532,17 +532,9 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
     try:
         セッションID = request.セッションID
 
-        if not セッションID:
-            return {
-                "status": "NG",
-                "message": "セッションIDが指定されていません",
-                "data": {}
-            }
-
-        # WebSocketマネージャーから接続を取得
-        接続 = AIセッション管理.get_session(セッションID)
-
-        if not 接続:
+        # 接続前は共通設定の既定値と候補だけを返す（セッションは作成しない）。
+        接続 = AIセッション管理.get_session(セッションID) if セッションID else None
+        if セッションID and not 接続:
             return {
                 "status": "NG",
                 "message": f"セッションID {セッションID} が見つかりません",
@@ -563,7 +555,7 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
                 利用可能モデル = _local_chat候補除外(利用可能モデル)
 
         # ソケットのモデル設定を取得
-        現在設定 = 接続.モデル設定
+        現在設定 = 接続.モデル設定 if 接続 else 初期モデル設定生成(getattr(http_request.app, "conf", None))
 
         return {
             "status": "OK",
@@ -979,7 +971,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 socket_no=ソケット番号,
                 app_conf=getattr(WebSocket接続.app, "conf", None),
                 accept_in_connect=False,
-                code_base_path=初期データ.get("CODE_BASE_PATH")
+                code_base_path=初期データ.get("CODE_BASE_PATH"),
+                live_model_settings=初期データ.get("モデル設定")
             )
         except ValueError as e:
             await WebSocket接続.send_json({"メッセージ識別": "error", "メッセージ内容": str(e)})

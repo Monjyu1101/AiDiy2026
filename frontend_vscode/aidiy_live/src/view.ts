@@ -9,11 +9,13 @@ type DesktopApi = { windowAction: (action: string) => void; onState: (callback: 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const button = (id: string) => element<HTMLButtonElement>(id);
 const provider = element<HTMLSelectElement>('provider'), model = element<HTMLSelectElement>('model'), voice = element<HTMLSelectElement>('voice');
-const errorBox = element('error'), status = element('status'), transcript = element('transcript');
+const errorBox = element('error'), modelError = element('model-error'), status = element('status'), transcript = element('transcript');
 const initialWelcome = element('empty').cloneNode(true);
 const environment = new LiveEnvironment();
 let connected = false, busy = false, mic = false, micBusy = false, changing = false, generation = 0;
 let micGeneration = 0;
+let modelLoading = false;
+let preferredSettings: Record<string, string> = {};
 let sessionProject: string | undefined;
 let settings: Record<string, string> = {}, models: Catalog = {}, voices: Catalog = {};
 let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -33,8 +35,6 @@ environment.onMicrophoneStop(() => {
 });
 if (environment.host) {
   document.body.classList.add('vscode-host');
-  button('standalone').hidden = false;
-  button('standalone').onclick = () => environment.standalone();
 }
 const desktop = (window as Window & { aidiyLiveDesktop?: DesktopApi }).aidiyLiveDesktop;
 let stopDesktopState: (() => void) | undefined;
@@ -46,7 +46,9 @@ if (desktop) {
     control.addEventListener('click', () => desktop.windowAction(control.dataset.window!));
   });
 }
-function showError(message = '') { errorBox.textContent = message; errorBox.hidden = !message; }
+function showError(message = '') {
+  for (const box of [errorBox, modelError]) { box.textContent = message; box.hidden = !message; }
+}
 function showFolder(folder?: Folder | null) {
   const label = element('project-folder');
   label.textContent = folder?.名前 || '';
@@ -76,9 +78,20 @@ function controls() {
   button('speaker').setAttribute('aria-label', `スピーカー ${speakerOn ? 'ON' : 'OFF'}`);
   button('send').disabled = !connected || changing || !element<HTMLTextAreaElement>('text').value.trim();
   button('send').classList.toggle('ws-disabled', !connected);
-  button('apply').disabled = !connected || changing || !provider.value || !model.value;
-  for (const select of [provider, model, voice]) select.disabled = !connected || changing;
-  status.textContent = busy ? '接続中' : connected ? mic ? '会話中' : '接続済み' : '未接続';
+  const key = keys();
+  const selectionChanged = provider.value !== settings.LIVE_AI_NAME || model.value !== settings[key.model]
+    || voice.value !== (settings[key.voice] || '');
+  button('apply').disabled = busy || changing || modelLoading || !provider.value || !model.value || !selectionChanged;
+  button('apply').textContent = changing ? '再接続中…' : connected ? '変更して再接続' : '選択する';
+  element('model-behavior').textContent = connected || changing
+    ? 'モデルや音声を変更すると、音声AIへ自動で再接続します。マイクは OFF に戻ります。'
+    : '選択したモデルと音声で、次の接続を開始します。';
+  element('model-conversation').hidden = !connected && !changing;
+  button('choose-model').disabled = busy || changing || modelLoading;
+  button('cancel-model').disabled = changing;
+  button('close-model').disabled = changing;
+  for (const select of [provider, model, voice]) select.disabled = busy || changing || modelLoading || !Object.keys(models).length;
+  status.textContent = changing ? '再接続中' : busy ? '接続中' : connected ? mic ? '会話中' : '接続済み' : '未接続';
 }
 function message(role: 'user' | 'ai' | 'system', text: string) {
   if (!text.trim() || ['!', '\x02', '\x03', '\x18'].includes(text.trim())) return;
@@ -127,7 +140,7 @@ async function loadModels() {
   const run = generation;
   const data = await api('core/AIコア/モデル情報/取得', { セッションID: connection.session });
   if (run !== generation) return;
-  settings = data.モデル設定 || {}; models = data.available_models?.live_models || {}; voices = data.available_models?.live_voices || {};
+  settings = connection.session ? data.モデル設定 || {} : { ...data.モデル設定, ...preferredSettings }; models = data.available_models?.live_models || {}; voices = data.available_models?.live_voices || {};
   options(provider, Object.fromEntries(Object.keys(models).map(name => [name, name])), settings.LIVE_AI_NAME);
   modelOptions();
   element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model], settings[keys(settings.LIVE_AI_NAME).voice]].filter(Boolean).join(' · ');
@@ -146,9 +159,9 @@ async function disconnect() {
   modelPicker.close(); showError(); controls();
   element('session-label').textContent = '音声はマイク ON の間だけ送信します。';
 }
-button('connect').onclick = async () => {
-  if (connected) { await disconnect(); return; }
+async function connectSession(preserveConversation = false) {
   const run = ++generation; busy = true; showError(); controls();
+  if (heartbeat) clearInterval(heartbeat); heartbeat = undefined;
   try {
     await audio.unlock();
     if (run !== generation) return;
@@ -156,12 +169,9 @@ button('connect').onclick = async () => {
     if (run !== generation) return;
     showFolder(config.作業フォルダ);
     sessionProject = config.作業フォルダ?.パス || '';
-    transcript.replaceChildren();
-    await connection.connect(async session => {
-      if (sessionProject) await api('core/AIコア/モデル情報/設定', {
-        セッションID: session, モデル設定: { CODE_BASE_PATH: sessionProject }, save: false,
-      });
-    }, sessionProject);
+    if (run !== generation) return;
+    if (!preserveConversation) transcript.replaceChildren();
+    await connection.connect({ codeBasePath: sessionProject, modelSettings: preferredSettings });
     if (run !== generation) return;
     await loadModels();
     if (run !== generation) return;
@@ -169,7 +179,11 @@ button('connect').onclick = async () => {
     if (!environment.host) heartbeat = setInterval(() => connection.send('input', { type: 'ping' }), 20000);
     element('session-label').textContent = `会話 ${connection.session.slice(0, 12)}`;
   } catch (error) { if (run === generation) { await disconnect(); showError(error instanceof Error ? error.message : String(error)); } }
-  finally { if (run === generation) { busy = false; controls(); } }
+  finally { if (run === generation) { busy = false; changing = false; controls(); } }
+}
+button('connect').onclick = async () => {
+  if (connected) await disconnect();
+  else await connectSession();
 };
 button('mic').onclick = async () => {
   if (!connected || micBusy) return;
@@ -191,8 +205,15 @@ button('speaker').onclick = async () => {
 };
 button('new').onclick = disconnect;
 const modelPicker = element<HTMLDialogElement>('model-picker');
-button('choose-model').onclick = () => modelPicker.showModal();
+button('choose-model').onclick = async () => {
+  modelPicker.showModal(); modelLoading = true; showError(); controls();
+  try { await loadModels(); }
+  catch (error) { showError(error instanceof Error ? error.message : String(error)); }
+  finally { modelLoading = false; controls(); }
+};
 button('close-model').onclick = () => modelPicker.close();
+button('cancel-model').onclick = () => modelPicker.close();
+modelPicker.addEventListener('cancel', event => { if (changing) event.preventDefault(); });
 element<HTMLFormElement>('text-form').onsubmit = event => {
   event.preventDefault(); const input = element<HTMLTextAreaElement>('text'), text = input.value.trim();
   if (!connected || changing || !text) return;
@@ -211,16 +232,25 @@ element<HTMLTextAreaElement>('text').addEventListener('keydown', event => {
   event.preventDefault(); button('send').focus();
 });
 provider.onchange = modelOptions;
+model.onchange = controls;
+voice.onchange = controls;
 button('apply').onclick = async () => {
-  const run = generation; changing = true; showError(); mic = false; audio.stop(); audio.cancel(); connection.send('input', 音声操作(false, audio.speaker)); controls();
-  try {
-    const key = keys();
-    await api('core/AIコア/モデル情報/設定', { セッションID: connection.session, モデル設定: { LIVE_AI_NAME: provider.value, [key.model]: model.value, [key.voice]: voice.value }, save: false });
-    if (run !== generation) return;
-    await loadModels();
-    if (run === generation) { modelPicker.close(); message('system', 'モデルを切り替えました。マイクを ON にして会話を再開できます。'); }
-  } catch (error) { if (run === generation) showError(String(error)); }
-  finally { if (run === generation) { changing = false; controls(); } }
+  if (button('apply').disabled) return;
+  const key = keys();
+  preferredSettings = { LIVE_AI_NAME: provider.value, [key.model]: model.value,
+    ...(voice.value ? { [key.voice]: voice.value } : {}) };
+  if (!connected) {
+    settings = { ...settings, ...preferredSettings };
+    element('model-label').textContent = [provider.value, model.value, voice.value].filter(Boolean).join(' · ');
+    modelPicker.close(); showError(); controls(); return;
+  }
+  changing = true; ++micGeneration; mic = false; micBusy = false;
+  connection.send('input', 音声操作(false, audio.speaker)); audio.close(); connected = false; controls();
+  await connectSession(true);
+  if (connected) {
+    modelPicker.close();
+    message('system', '選択したモデルで接続しました。マイクを ON にして新しい会話を開始できます。');
+  }
 };
 window.addEventListener('pagehide', () => { stopDesktopState?.(); void disconnect(); cloud.dispose(); environment.dispose(); });
 let revealed = false;

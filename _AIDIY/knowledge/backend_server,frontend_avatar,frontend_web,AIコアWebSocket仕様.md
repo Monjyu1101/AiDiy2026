@@ -26,7 +26,7 @@
 | `audio` | `AIコア.vue` | `input_audio` 送信、`output_audio` / `cancel_audio` 受信 |
 | `chat` / `file` / `code1`〜`code6` | 各パネル | パネル別の出力受信 |
 
-接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号, CODE_BASE_PATH? }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
+接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号, CODE_BASE_PATH?, モデル設定? }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
 
 ## 主要メッセージ形式
 
@@ -135,3 +135,11 @@ Code AI の `output_stream` は、本文と同じパケットの `メッセー�
 `aidiy_live` は input／0／audio の接続時に作業フォルダを送信します。Web／Avatar は core 初期化情報の `モデル設定.CODE_BASE_PATH` を音声接続時に送信します。指定しない旧クライアントは従来のセッション設定を使用します。
 
 確認: `backend_server/tests/test_live_project_connection.py` で、初期化通知前の反映、音声への引継ぎ、フォルダ不一致・存在しないフォルダの拒否、旧クライアント互換を検証できます。
+
+## 接続時の Live モデル指定
+
+`connect.モデル設定` は任意のオブジェクトで、`LIVE_AI_NAME` と Gemini／FreeAI／OpenAI のモデル・音声キーのみを受け付けます。指定した値は `init` 通知・AI 初期化より先に新規セッションへ反映し、未指定・空文字の値は既定設定を使用します。共通設定ファイルには保存しません。既存セッションと異なるモデルを指定した場合は `error` と切断コード `1008` で拒否します。モデル変更は新規セッションで再接続してください。
+
+Live のモデル選択では、接続前に `/core/AIコア/モデル情報/取得` へ空の `セッションID` を指定し、既定設定と候補を取得できます。セッションは作成せず、実際の接続時にフォルダと選択したモデルを渡します。接続中の変更時もこの同じ接続方式を使います。
+
+`backend_server/tests/test_live_project_connection.py` で初期モデル・音声の反映、未指定時の既定値、既存セッションのモデル不一致、接続前の候補取得を検証できます。
