@@ -21,7 +21,8 @@ async function launch({ loadError, visible = true } = {}) {
       super();
       assert.equal(options.frame, false);
       assert.equal(options.roundedCorners, false);
-      this.bounds = { x: 100, y: 200, width: options.width, height: options.height };
+      assert.equal(options.x, 100); assert.equal(options.y, 200);
+      this.bounds = { x: options.x, y: options.y, width: options.width, height: options.height };
       this.webContents = new EventEmitter();
       Object.assign(this.webContents, {
         send(_channel, state) { states.push(JSON.parse(JSON.stringify(state))); }, setWindowOpenHandler() {},
@@ -47,7 +48,13 @@ async function launch({ loadError, visible = true } = {}) {
     setTimeout: (callback, milliseconds) => { clock += milliseconds; return setImmediate(callback); },
     console: { error: error => errors.push(String(error)) },
     require(name) {
-      if (name === 'electron') return { app, BrowserWindow: Window, ipcMain: { handle() {} }, shell: {} };
+      if (name === 'electron') return {
+        app, BrowserWindow: Window, ipcMain: { handle() {} }, shell: {},
+        screen: {
+          getCursorScreenPoint: () => ({ x: 300, y: 400 }),
+          getDisplayNearestPoint: () => ({ workArea: { x: 92, y: 192, width: 1920, height: 1080 } }),
+        },
+      };
       if (name === 'node:fs') return { writeFileSync: (file, value) => { calls.push('ready'); written.push(JSON.parse(value)); } };
       if (name === '../dist/aidiy_code/server.cjs') return { 単独起動: async () => ({ url: 'http://127.0.0.1:1234/', close: async () => {} }) };
       return require(name);

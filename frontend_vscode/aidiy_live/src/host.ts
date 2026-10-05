@@ -17,6 +17,9 @@ export class LiveHost {
   private requests = new Set<AbortController>();
   private mic?: Mic;
   private disposed = false;
+  private visible = true;
+  private input?: { id: number; session: string; speaker: boolean };
+  private heartbeat?: ReturnType<typeof setInterval>;
   private target: URL;
   constructor(backend: string, private post: (message: unknown) => void, private python: () => string, private microphoneFile: string) {
     this.target = backendUrl(backend);
@@ -31,13 +34,43 @@ export class LiveHost {
       this.sockets.set(id, socket);
       socket.onopen = () => this.post({ type: 'socket-opened', id });
       socket.onmessage = event => {
-        if (typeof event.data === 'string' && event.data.length <= 2_000_000) this.post({ type: 'socket-data', id, data: event.data });
+        if (typeof event.data === 'string' && event.data.length <= 2_000_000) {
+          if (this.input?.id === id) {
+            try {
+              const packet = JSON.parse(event.data);
+              if (packet.メッセージ識別 === 'init' && typeof packet.セッションID === 'string') {
+                this.input.session = packet.セッションID;
+                // 非表示中は Webview のタイマーが停止するため、拡張ホストで維持する。
+                if (!this.heartbeat) this.heartbeat = setInterval(() => this.sendInput({ type: 'ping' }), 20000);
+              }
+            } catch { /* 非 JSON は画面側で無視する */ }
+          }
+          this.post({ type: 'socket-data', id, data: event.data });
+        }
       };
       socket.onerror = () => this.post({ type: 'socket-error', id });
-      socket.onclose = () => { this.sockets.delete(id); if (!this.disposed) this.post({ type: 'socket-closed', id }); };
+      socket.onclose = () => {
+        this.sockets.delete(id);
+        if (this.input?.id === id) this.clearHeartbeat();
+        if (!this.disposed) this.post({ type: 'socket-closed', id });
+      };
     } else if (message.type === 'socket-send') {
       const socket = this.sockets.get(id);
-      if (socket?.readyState === 1 && socket.bufferedAmount < 128000 && typeof message.data === 'string' && message.data.length <= 128000) socket.send(message.data);
+      if (socket?.readyState === 1 && socket.bufferedAmount < 128000 && typeof message.data === 'string' && message.data.length <= 128000) {
+        try {
+          const packet = JSON.parse(message.data);
+          if (packet.type === 'connect' && packet.ソケット番号 === 'input') this.input = { id, session: '', speaker: true };
+          if (this.input?.id === id && packet.メッセージ識別 === 'operations') {
+            this.input.speaker = !!packet.メッセージ内容?.ボタン?.スピーカー;
+            if (!this.visible) {
+              this.sendInput({ チャンネル: 'input', メッセージ識別: 'operations', メッセージ内容: { ボタン: { マイク: false, スピーカー: this.input.speaker } } });
+              return;
+            }
+          }
+          if (!this.visible && packet.メッセージ識別 === 'input_audio') return;
+        } catch { /* パケット検証は既存バックエンドへ委ねる */ }
+        socket.send(message.data);
+      }
     } else if (message.type === 'socket-close') {
       this.sockets.get(id)?.close();
     } else if (message.type === 'api') {
@@ -56,7 +89,8 @@ export class LiveHost {
       } catch (error) { if (!this.disposed) this.post({ type: 'reply', id, error: error instanceof Error ? error.message : String(error) }); }
       finally { clearTimeout(timeout); this.requests.delete(controller); }
     } else if (message.type === 'mic-start') {
-      this.startMicrophone(id);
+      if (this.visible) this.startMicrophone(id);
+      else this.post({ type: 'reply', id, error: '画面が非表示のためマイク入力を停止しました。' });
     } else if (message.type === 'mic-stop' && this.mic?.id === id) this.stopMicrophone();
   }
   private startMicrophone(id: number) {
@@ -93,8 +127,26 @@ export class LiveHost {
     child.once('exit', () => clearTimeout(timeout));
   }
   private stopMicrophone() { this.mic?.stop(); this.mic = undefined; }
+  private sendInput(packet: object) {
+    const input = this.input, socket = input && this.sockets.get(input.id);
+    if (input?.session && socket?.readyState === 1 && socket.bufferedAmount < 128000)
+      socket.send(JSON.stringify({ ...packet, セッションID: input.session }));
+  }
+  private clearHeartbeat() {
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    this.heartbeat = undefined; this.input = undefined;
+  }
+  visibility(visible: boolean) {
+    const wasVisible = this.visible; this.visible = visible;
+    if (!visible) {
+      this.stopMicrophone();
+      this.sendInput({ チャンネル: 'input', メッセージ識別: 'operations', メッセージ内容: { ボタン: { マイク: false, スピーカー: this.input?.speaker ?? true } } });
+    }
+    if (!visible || !wasVisible) this.post({ type: 'mic-paused' });
+  }
   stop() {
     this.stopMicrophone();
+    this.clearHeartbeat();
     for (const controller of this.requests) controller.abort(); this.requests.clear();
     for (const socket of this.sockets.values()) socket.close(); this.sockets.clear();
     if (!this.disposed) this.post({ type: 'host-stop' });

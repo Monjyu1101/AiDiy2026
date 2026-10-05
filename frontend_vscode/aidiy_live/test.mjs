@@ -9,5 +9,5 @@ for (const name of ['protocol', 'audio', 'host']) {
   const result = await transform(await readFile(new URL(`src/${name}.ts`, import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs', target: 'node22' });
   await writeFile(new URL(`../out/aidiy_live/${name}.cjs`, import.meta.url), result.code);
 }
-const result = spawnSync(process.execPath, ['--test', 'aidiy_live/checks/live.test.cjs', 'aidiy_live/checks/host.test.cjs', 'aidiy_live/checks/launcher.test.cjs', 'aidiy_live/checks/permissions.test.cjs'], { cwd: root, stdio: 'inherit' });
+const result = spawnSync(process.execPath, ['--test', 'aidiy_live/checks/live.test.cjs', 'aidiy_live/checks/host.test.cjs', 'aidiy_live/checks/extension.test.cjs', 'aidiy_live/checks/launcher.test.cjs', 'aidiy_live/checks/permissions.test.cjs'], { cwd: root, stdio: 'inherit' });
 process.exitCode = result.status ?? 1;

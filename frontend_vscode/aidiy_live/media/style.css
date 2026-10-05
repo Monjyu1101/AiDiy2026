@@ -86,16 +86,18 @@ main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; 
 @keyframes welcome-rainbow { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
 @keyframes welcome-glow { 0%, 100% { opacity: .2; } 50% { opacity: .7; } }
 .empty p { margin: 0; font-family: var(--vscode-editor-font-family, Consolas, monospace); font-size: clamp(9px, 2.6vw, 12px); text-shadow: 0 1px 4px #000, 0 0 8px #000; }
-.empty .terminal-eyebrow { font-size: 9px; letter-spacing: 2px; margin-bottom: 10px; --typing-animation: live-type-eyebrow; --typing-steps: 25; }
-.empty .terminal-primary { color: var(--terminal); font-family: var(--vscode-editor-font-family, Consolas, monospace); font-size: clamp(9px, 3.4vw, 18px); font-weight: 600; letter-spacing: -.5px; margin: 0 0 8px; text-shadow: 0 1px 4px #000, 0 0 8px #000; --typing-animation: live-type-primary; --typing-steps: 31; }
-.empty .terminal-secondary { --typing-animation: live-type-secondary; --typing-steps: 26; }
+.empty .terminal-eyebrow { font-size: 9px; letter-spacing: 2px; margin-bottom: 10px; --typing-animation: live-type-eyebrow; --caret-animation: live-caret-eyebrow; --typing-steps: 25; }
+.empty .terminal-primary { color: var(--terminal); font-family: var(--vscode-editor-font-family, Consolas, monospace); font-size: clamp(9px, 3.4vw, 18px); font-weight: 600; letter-spacing: -.5px; margin: 0 0 8px; text-shadow: 0 1px 4px #000, 0 0 8px #000; --typing-animation: live-type-primary; --caret-animation: live-caret-primary; --typing-steps: 31; }
+.empty .terminal-secondary { --typing-animation: live-type-secondary; --caret-animation: live-caret-secondary; --typing-steps: 26; }
 .terminal-type { position: relative; display: inline-block; }
 .terminal-text { display: block; white-space: nowrap; animation: var(--typing-animation) 8s steps(var(--typing-steps), end) infinite; }
-.terminal-secondary .terminal-type::after { content: ''; position: absolute; left: 0; top: .35em; width: 6px; height: 1.15em; margin-left: 3px; background: #00ffff; pointer-events: none; animation: live-terminal-caret 8s steps(26, end) infinite, live-cursor-blink 1.2s step-end infinite; }
+.empty .terminal-type::after { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1ch; height: 1em; margin-left: .1ch; background: currentColor; pointer-events: none; animation: var(--caret-animation) 8s steps(var(--typing-steps), end) infinite, live-cursor-blink 1.2s step-end infinite; }
 @keyframes live-type-eyebrow { 0%, 4% { clip-path: inset(0 100% 0 0); } 18%, 100% { clip-path: inset(0 0 0 0); } }
 @keyframes live-type-primary { 0%, 21% { clip-path: inset(0 100% 0 0); } 32%, 100% { clip-path: inset(0 0 0 0); } }
 @keyframes live-type-secondary { 0%, 36% { clip-path: inset(0 100% 0 0); } 47%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes live-terminal-caret { 0%, 35.99% { left: 0; visibility: hidden; } 36% { left: 0; visibility: visible; } 47%, 100% { left: 100%; visibility: visible; } }
+@keyframes live-caret-eyebrow { 0%, 3.99% { left: 0; visibility: hidden; } 4% { left: 0; visibility: visible; } 18%, 100% { left: 100%; visibility: visible; } }
+@keyframes live-caret-primary { 0%, 20.99% { left: 0; visibility: hidden; } 21% { left: 0; visibility: visible; } 32%, 100% { left: 100%; visibility: visible; } }
+@keyframes live-caret-secondary { 0%, 35.99% { left: 0; visibility: hidden; } 36% { left: 0; visibility: visible; } 47%, 100% { left: 100%; visibility: visible; } }
 @keyframes live-cursor-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 .empty.input-started .terminal-text { animation: none; clip-path: none; }
 .empty.input-started .terminal-type::after { display: none; }
@@ -123,11 +125,11 @@ textarea:focus-visible { outline: none; border-color: var(--focus); }
 .model-caption { font-weight: 600; }
 .model-chevron { color: var(--muted); }
 #model-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10px; }
-#send { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; display: flex; align-items: center; justify-content: center; width: 34px; height: 100%; min-height: 34px; padding: 0; background: #fff; border-color: #fff; color: #000; }
+#send { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; display: flex; align-items: center; justify-content: center; width: 34px; height: 100%; min-height: 34px; padding: 0; background: #808080; border-color: #808080; color: #000; }
 #send img { width: 30px; height: 30px; object-fit: contain; filter: brightness(0); }
 #send:disabled { opacity: 1; }
-#send:enabled { background: var(--focus); border-color: var(--focus); }
-#send:hover:enabled { background: color-mix(in srgb, var(--focus) 85%, #fff); }
+#send:enabled { background: #c4b5fd; border-color: #c4b5fd; }
+#send:hover:enabled { background: color-mix(in srgb, #c4b5fd 85%, #fff); }
 #error { color: var(--vscode-errorForeground, #ff8e9e); background: #cc415708; border: 1px solid #cc415740; padding: 4px; border-radius: 0; font-size: 11px; overflow-wrap: anywhere; }
 dialog { width: min(420px, calc(100vw - 4px)); padding: 0; color: var(--foreground); background: var(--surface); border: 1px solid var(--border); border-radius: 0; box-shadow: 0 16px 60px rgba(0, 0, 0, .4); }
 dialog::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(3px); }

@@ -30,6 +30,7 @@ export class LiveEnvironment {
   private sockets = new Map<number, HostSocket>();
   private mic?: { id: number; context: AudioContext; destination: MediaStreamAudioDestinationNode; sources: Set<AudioBufferSourceNode>; next: number };
   private stopListeners: Array<(error?: string) => void> = [];
+  private microphoneStopListeners: Array<() => void> = [];
   private folderListeners: Array<(folder?: Folder | null) => void> = [];
   private presence?: EventSource;
   readonly host = !!this.config.host;
@@ -66,6 +67,7 @@ export class LiveEnvironment {
     return result;
   }
   onStop(listener: (error?: string) => void) { this.stopListeners.push(listener); }
+  onMicrophoneStop(listener: () => void) { this.microphoneStopListeners.push(listener); }
   onFolder(listener: (folder?: Folder | null) => void) { this.folderListeners.push(listener); }
   standalone() { this.vscode?.postMessage({ type: 'standalone' }); }
   ready() {
@@ -122,6 +124,8 @@ export class LiveEnvironment {
     } else if (reply.type === 'folder') {
       this.config.作業フォルダ = reply.作業フォルダ;
       for (const listener of this.folderListeners) listener(reply.作業フォルダ);
+    } else if (reply.type === 'mic-paused') {
+      this.releaseMicrophone(); for (const listener of this.microphoneStopListeners) listener();
     } else if (reply.type === 'host-stop' || reply.type === 'mic-error') {
       if (reply.type === 'mic-error' && this.mic?.id !== reply.id) return;
       this.releaseMicrophone(); for (const listener of this.stopListeners) listener(reply.error);

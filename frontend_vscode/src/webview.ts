@@ -343,4 +343,5 @@ window.addEventListener('message', event => {
   ボタン更新();
   初期表示開始();
 });
+ボタン更新();
 post('ready');

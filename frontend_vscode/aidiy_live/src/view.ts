@@ -12,6 +12,7 @@ const provider = element<HTMLSelectElement>('provider'), model = element<HTMLSel
 const errorBox = element('error'), status = element('status'), transcript = element('transcript');
 const environment = new LiveEnvironment();
 let connected = false, busy = false, mic = false, micBusy = false, changing = false, generation = 0;
+let micGeneration = 0;
 let settings: Record<string, string> = {}, models: Catalog = {}, voices: Catalog = {};
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 const cloud = new AudioCloud(element<HTMLCanvasElement>('audio-cloud'));
@@ -24,6 +25,9 @@ const connection = new LiveConnection(environment.socketUrl, receive, () => {
 environment.onStop(error => {
   void disconnect(); if (error) showError(error);
   void environment.backend().then(backend => { element<HTMLInputElement>('backend').value = backend; });
+});
+environment.onMicrophoneStop(() => {
+  ++micGeneration; mic = false; micBusy = false; audio.stop(); controls();
 });
 if (environment.host) {
   document.body.classList.add('vscode-host');
@@ -135,7 +139,7 @@ button('connect').onclick = async () => {
     await loadModels();
     if (run !== generation) return;
     connected = true; connection.send('input', 音声操作(false, audio.speaker));
-    heartbeat = setInterval(() => connection.send('input', { type: 'ping' }), 20000);
+    if (!environment.host) heartbeat = setInterval(() => connection.send('input', { type: 'ping' }), 20000);
     element('session-label').textContent = `会話 ${connection.session.slice(0, 12)}`;
   } catch (error) { if (run === generation) { await disconnect(); showError(error instanceof Error ? error.message : String(error)); } }
   finally { if (run === generation) { busy = false; controls(); } }
@@ -144,13 +148,13 @@ button('mic').onclick = async () => {
   if (!connected || micBusy) return;
   showError();
   if (mic) { mic = false; audio.stop(); connection.send('input', 音声操作(false, audio.speaker)); controls(); return; }
-  const run = generation; micBusy = true; controls();
+  const run = generation, micRun = ++micGeneration; micBusy = true; controls();
   try {
     mic = await audio.start(入力レート(settings.LIVE_AI_NAME || ''));
-    if (run !== generation) { audio.stop(); mic = false; return; }
+    if (run !== generation || micRun !== micGeneration) { audio.stop(); mic = false; return; }
     connection.send('input', 音声操作(mic, audio.speaker));
-  } catch (error) { if (run === generation) { mic = false; showError(`マイクを開始できません: ${microphoneError(error)}`); } }
-  finally { micBusy = false; controls(); }
+  } catch (error) { if (run === generation && micRun === micGeneration) { mic = false; showError(`マイクを開始できません: ${microphoneError(error)}`); } }
+  finally { if (micRun === micGeneration) { micBusy = false; controls(); } }
 };
 button('speaker').onclick = async () => {
   if (!connected || changing) return;

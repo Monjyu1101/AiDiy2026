@@ -35,7 +35,20 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
       .replace('src="AiDiy.png"', `src="${resource('dist/AiDiy.png')}"`)
       .replace('href="AiDiy.png"', `href="${resource('dist/AiDiy.png')}"`)
       .replace('</head>', `<script id="live-config" nonce="${nonce}" type="application/json">${boot}</script></head>`);
-    const host = this.host = new LiveHost(backend, message => { if (this.view === view) void view.webview.postMessage(message); }, () => microphonePython(
+    const pending: { message: unknown; size: number }[] = [];
+    let pendingSize = 0;
+    const host = this.host = new LiveHost(backend, message => {
+      if (this.view !== view) return;
+      if (view.visible) { void view.webview.postMessage(message); return; }
+      const packet = message as { type?: string; data?: string };
+      // 非表示中の音声を復帰時にまとめて再生しない。会話と接続通知は保持する。
+      if (packet.type === 'socket-data' && packet.data) {
+        try { if (JSON.parse(packet.data).メッセージ識別 === 'output_audio') return; } catch { return; }
+      }
+      const size = JSON.stringify(message).length;
+      pending.push({ message, size }); pendingSize += size;
+      while (pending.length > 200 || pendingSize > 2_000_000) pendingSize -= pending.shift()!.size;
+    }, () => microphonePython(
       vscode.workspace.getConfiguration('aidiyLive').get<string>('pythonPath', ''),
       (vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file').map(folder => folder.uri.fsPath)
     ), join(this.context.extensionPath, 'dist/microphone.py'));
@@ -46,7 +59,13 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
         else if (message?.type === 'standalone') void this.standalone().catch(error => { void vscode.window.showErrorMessage(String(error)); });
         else void host.receive(message).catch(error => { void vscode.window.showErrorMessage(String(error)); });
       }),
-      view.onDidChangeVisibility(() => { if (!view.visible) host.stop(); }),
+      view.onDidChangeVisibility(() => {
+        host.visibility(view.visible);
+        if (view.visible) {
+          for (const item of pending.splice(0)) void view.webview.postMessage(item.message);
+          pendingSize = 0; this.folderChanged();
+        }
+      }),
     ];
     view.onDidDispose(() => { host.dispose(); resources.forEach(resource => resource.dispose()); if (this.view === view) { this.view = undefined; this.host = undefined; } });
   }
@@ -71,7 +90,7 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
 export function activate(context: vscode.ExtensionContext) {
   const live = new LiveView(context);
   context.subscriptions.push(live,
-    vscode.window.registerWebviewViewProvider('aidiyLive.chat', live),
+    vscode.window.registerWebviewViewProvider('aidiyLive.chat', live, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.commands.registerCommand('aidiyLive.open', () => vscode.commands.executeCommand('aidiyLive.chat.focus')),
     vscode.commands.registerCommand('aidiyLive.stop', () => live.stop()),
     vscode.commands.registerCommand('aidiyLive.standalone', () => live.standalone()),
