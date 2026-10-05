@@ -68,7 +68,7 @@ export class AIWebSocket implements IWebSocketClient {
   private 要求セッションID: string | null = null; // 要求されたセッションID
   private 要求ソケット番号: string | null = null; // 要求されたソケット番号
 
-  constructor(private url: string, セッションID?: string, ソケット番号?: string) {
+  constructor(private url: string, セッションID?: string, ソケット番号?: string, private codeBasePath = '') {
     this.要求セッションID = セッションID || null;
     this.要求ソケット番号 = typeof ソケット番号 === 'string' ? ソケット番号 : null;
   }
@@ -78,6 +78,7 @@ export class AIWebSocket implements IWebSocketClient {
    */
   async connect(): Promise<string> {
     return new Promise((resolve, reject) => {
+      let initialized = false;
       try {
         console.log('[WebSocket] 接続開始:', this.url);
         this.ws = new WebSocket(this.url);
@@ -94,7 +95,8 @@ export class AIWebSocket implements IWebSocketClient {
             const initMessage = {
               type: 'connect',
               セッションID: this.要求セッションID,
-              ソケット番号: this.要求ソケット番号
+              ソケット番号: this.要求ソケット番号,
+              ...(this.codeBasePath ? { CODE_BASE_PATH: this.codeBasePath } : {}),
             };
             console.log('[WebSocket] セッションID送信:', this.要求セッションID, 'ソケット番号:', this.要求ソケット番号);
             this.ws.send(JSON.stringify(initMessage));
@@ -112,7 +114,12 @@ export class AIWebSocket implements IWebSocketClient {
 
             // 初期化メッセージの場合、セッションIDを保存
             const initType = message.type || message.メッセージ識別;
+            if (!initialized && initType === 'error') {
+              this.isIntentionallyClosed = true;
+              reject(new Error(String(message.メッセージ内容 || '接続に失敗しました。')));
+            }
             if (initType === 'init' && message.セッションID) {
+              initialized = true;
               this.セッションID = message.セッションID;
               this.要求セッションID = message.セッションID; // 以降の再接続で使用
               if (message.ソケット番号 !== undefined && message.ソケット番号 !== null) {
@@ -135,7 +142,7 @@ export class AIWebSocket implements IWebSocketClient {
           console.error('[WebSocket] ReadyState:', this.ws?.readyState);
 
           // 初回接続時のエラーはすぐにreject
-          if (this.isInitialConnection) {
+          if (!initialized) {
             console.log('[WebSocket] 初回接続エラー - フォールバックに切り替えます');
             reject(new Error('WebSocket connection error'));
           }
@@ -147,7 +154,7 @@ export class AIWebSocket implements IWebSocketClient {
           this.emitState(false);
 
           // 初回接続時のエラーはすぐにreject
-          if (this.isInitialConnection) {
+          if (!initialized) {
             console.log('[WebSocket] 初回接続失敗 - フォールバックに切り替えます');
             reject(new Error(`WebSocket connection closed: ${event.code} ${event.reason}`));
             return;

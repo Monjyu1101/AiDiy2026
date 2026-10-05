@@ -23,6 +23,7 @@ import secrets
 from log_config import get_logger
 from AIコア.AIストリーミング処理 import StreamingProcessor
 from AIコア.AI音声処理 import 初期化_音声データ
+from AIコア.AIバックアップ import コードベース絶対パス取得
 
 # ロガー取得
 logger = get_logger(__name__)
@@ -446,7 +447,7 @@ class WebSocketManager:
             logger.info(f"新規セッション初期CODE_BASE_PATH: {code_base_path} (session={セッションID})")
         return model_settings
 
-    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True) -> str:
+    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True, code_base_path: Optional[str] = None) -> str:
         """
         WebSocket接続を登録（セッション単位）
 
@@ -458,6 +459,22 @@ class WebSocketManager:
         Returns:
             セッションID: 使用するセッションID
         """
+        # フォルダを初期化通知・AI起動より先に確定する。
+        project_path = None
+        if code_base_path is not None:
+            if not isinstance(code_base_path, str) or not code_base_path.strip() or "\x00" in code_base_path:
+                raise ValueError("プロジェクトフォルダが無効です。")
+            project_path = コードベース絶対パス取得(セッション設定={"CODE_BASE_PATH": code_base_path})
+            if not os.path.isdir(project_path):
+                raise ValueError("プロジェクトフォルダをバックエンドから参照できません。フォルダの場所を確認してください。")
+            existing = self.sessions.get(セッションID)
+            saved = self.session_states.get(セッションID, {})
+            settings = existing.モデル設定 if existing else saved.get("モデル設定")
+            if settings is not None:
+                current_path = コードベース絶対パス取得(アプリ設定=app_conf, セッション設定=settings)
+                if os.path.normcase(current_path) != os.path.normcase(project_path):
+                    raise ValueError("セッションのプロジェクトフォルダが一致しません。新しい会話で接続してください。")
+
         # セッションID決定
         if セッションID and セッションID in self.sessions:
             logger.debug(f"既存セッション再接続: {セッションID}")
@@ -489,6 +506,10 @@ class WebSocketManager:
             self.sessions[セッションID] = session
         else:
             session = self.sessions[セッションID]
+
+        if project_path is not None:
+            session.モデル設定["CODE_BASE_PATH"] = project_path
+            self.save_session_state(セッションID, ボタン=session.ボタン状態, モデル設定=session.モデル設定, ソース最終更新日時=session.ソース最終更新日時)
 
         logger.debug(f"セッションに接続: {セッションID}")
 

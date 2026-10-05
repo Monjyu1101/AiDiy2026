@@ -74,7 +74,7 @@ export class LiveHost {
     } else if (message.type === 'socket-close') {
       this.sockets.get(id)?.close();
     } else if (message.type === 'api') {
-      if (!['core/AIコア/モデル情報/取得', 'core/AIコア/モデル設定'].includes(message.path || '') || this.requests.size >= 4) {
+      if (!['core/AIコア/モデル情報/取得', 'core/AIコア/モデル情報/設定'].includes(message.path || '') || this.requests.size >= 4) {
         this.post({ type: 'reply', id, error: '許可されていない要求です。' }); return;
       }
       const body = JSON.stringify(message.body || {});

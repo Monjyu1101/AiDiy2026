@@ -29,6 +29,7 @@ const props = defineProps<{
   sessionId: string;
   userLabel: string;
   liveModel: string;
+  codeBasePath?: string;
   welcomeInfo: string;
   welcomeBody?: string;
   inputConnected: boolean;
@@ -313,7 +314,7 @@ async function 音声接続開始() {
   音声切断(false)
   音声エラー.value = ''
 
-  const nextSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, 'audio')
+  const nextSocket = new AIWebSocket(AI_WS_ENDPOINT, props.sessionId, 'audio', props.codeBasePath || '')
   nextSocket.onStateChange((connected) => {
     if (currentGeneration !== 音声接続世代) return
     音声接続済み.value = connected
@@ -399,15 +400,15 @@ watch(() => props.liveModel, (model) => {
 })
 
 watch(
-  () => [props.sessionId, props.inputConnected] as const,
-  ([sessionId, inputConnected], previous) => {
-    const [prevSessionId, prevInputConnected] = previous ?? ['', false]
+  () => [props.sessionId, props.inputConnected, props.codeBasePath] as const,
+  ([sessionId, inputConnected, codeBasePath], previous) => {
+    const [prevSessionId, prevInputConnected, prevCodeBasePath] = previous ?? ['', false, undefined]
     if (!inputConnected || !sessionId) {
       音声切断()
       return
     }
 
-    if (!prevInputConnected || sessionId !== prevSessionId || !音声Socket.value?.isConnected()) {
+    if (!prevInputConnected || sessionId !== prevSessionId || codeBasePath !== prevCodeBasePath || !音声Socket.value?.isConnected()) {
       void 音声接続開始()
     }
   },

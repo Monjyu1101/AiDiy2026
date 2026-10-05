@@ -48,6 +48,7 @@ export interface Column {
 }
 
 export interface ModelSettings {
+  CODE_BASE_PATH?: string;
   CHAT_AI_NAME: string;
   LIVE_AI_NAME: string;
   CODE_AI1_NAME: string;

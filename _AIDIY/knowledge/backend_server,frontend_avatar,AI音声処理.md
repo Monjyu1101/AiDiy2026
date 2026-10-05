@@ -51,6 +51,17 @@
 - `output_audio` の Base64 音声をキューに積む。
 - PCM の場合は `createPcmAudioBuffer()`、それ以外は `decodeAudioData()` を試す。
 - `nextPlaybackTime` でチャンクを連続再生し、チャンク間の途切れを抑える。
+
+Gemini / FreeAI の native-audio モデルでは、`backend_server/AIコア/AIライブ_gemini.py` の
+`LiveConnectConfig` に `output_audio_transcription` を指定し、`server_content.output_transcription.text` を受け取る。
+字幕は `turn_complete` または `interrupted` でまとめてテキスト受信キューへ渡し、`AIライブ.py` がチャンネル0の `output_text` として通知する。
+`model_turn.parts.text` だけを監視すると音声回答の文字を受け取れない。
+字幕対応 LiveAI の出力音声は `AI音声処理.py` でローカル音声認識へ再投入せず、二重表示を避ける。
+[Google の音声字幕仕様](https://ai.google.dev/gemini-api/docs/live-api/capabilities#audio-transcriptions)を参照する。
+
+送信が拒否された場合や LiveAI が停止中の場合は、`AIライブ.py` がチャンネル0へ `error` を返す。
+`!` だけの応答は画面で隠れるため、送信失敗の通知には使わない。
+確認には `backend_server/tests/test_live_text_response.py` を使う。
 - スピーカー OFF でもビジュアライザー用の再生系を残す設計があるため、実音と視覚演出を分けて確認する。
 - キャンセル後に古いチャンクを再生しないよう、キュー世代管理を確認する。
 

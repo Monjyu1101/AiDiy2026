@@ -202,6 +202,8 @@ class LiveAI:
         # 受信キュー（サーバーとの連携用）
         self.音声受信Ｑ = None  # Geminiからの音声データをサーバーに送信
         self.テキスト受信Ｑ = None   # Geminiからのテキスト・ツール結果をサーバーに送信
+        self._出力字幕 = ""
+        self.音声出力字幕対応 = True
         
         # タスク管理（TaskGroup自動管理）
         
@@ -614,6 +616,7 @@ class LiveAI:
                         session_start_time = time.time()  # セッション開始時刻記録
                         セッションID = f"{int(session_start_time % 10000)}"  # セッション識別用ID（下4桁）
                         self.live_session = session
+                        self._出力字幕 = ""
                         self.task_group = tg
                         self.is_alive = True  # live_session確立時にTrueに設定
                         self.live_lasttime = time.time()  # セッション開始時にlive_lasttime更新
@@ -833,6 +836,7 @@ class LiveAI:
                 # Live接続設定（正しい構造）
                 config = types.LiveConnectConfig(
                     response_modalities=["AUDIO"],
+                    output_audio_transcription=types.AudioTranscriptionConfig(),
                     speech_config=types.SpeechConfig(
                         language_code="ja-JP",
                         voice_config=types.VoiceConfig(
@@ -857,6 +861,7 @@ class LiveAI:
                 logger.warning("最小設定で復旧試行")
                 return types.LiveConnectConfig(
                     response_modalities=["AUDIO"],
+                    output_audio_transcription=types.AudioTranscriptionConfig(),
                     speech_config=types.SpeechConfig(language_code="ja-JP"),
                     generation_config=types.GenerationConfig(),
                     system_instruction=types.Content(
@@ -957,6 +962,11 @@ class LiveAI:
             
             # logger.debug(f"サーバーコンテンツ処理:開始 model_turn={model_turn is not None} turn_complete={turn_complete} interrupted={interrupted}")
             
+            # native-audio の回答文字列は model_turn.parts.text ではなく字幕に届く。
+            字幕 = getattr(server_content, "output_transcription", None)
+            if 字幕 and 字幕.text:
+                self._出力字幕 += 字幕.text
+
             # model_turn処理
             if model_turn is not None:
                 parts = model_turn.parts
@@ -1003,13 +1013,11 @@ class LiveAI:
                                     logger.warning(f"音声送信エラー: {e}")
                                     
                         
-            # turn_complete処理
-            if turn_complete:
-                pass
-            
-            # interrupted処理
-            if interrupted:
-                pass
+            # 1ターンの字幕をまとめ、音声停止時も聞こえた部分を表示する。
+            if turn_complete or interrupted:
+                if self._出力字幕 and self.テキスト受信Ｑ is not None:
+                    await self.テキスト受信Ｑ.put({"text": self._出力字幕})
+                self._出力字幕 = ""
                 
         except Exception as e:
             # サーバーコンテンツ処理エラーも15秒制限付きエラー処理

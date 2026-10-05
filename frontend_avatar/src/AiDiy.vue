@@ -734,6 +734,7 @@ function 初期化処理(message: Record<string, any>) {
   const settings = payload.モデル設定 ?? {}
 
   モデル設定.value = {
+    CODE_BASE_PATH: settings.CODE_BASE_PATH || '',
     CHAT_AI_NAME: settings.CHAT_AI_NAME || '',
     LIVE_AI_NAME: settings.LIVE_AI_NAME || '',
     CODE_AI1_NAME: settings.CODE_AI1_NAME || '',
@@ -1543,6 +1544,7 @@ onBeforeUnmount(() => {
               ref="コアViewRef"
               :session-id="セッションID"
               :user-label="利用者ラベル"
+              :code-base-path="モデル設定.CODE_BASE_PATH"
               :live-model="モデル設定.LIVE_AI_NAME"
               :welcome-info="入力ウェルカム情報"
               :welcome-body="入力ウェルカム本文"
@@ -1679,6 +1681,7 @@ onBeforeUnmount(() => {
       ref="コアViewRef"
       :session-id="セッションID"
       :user-label="利用者ラベル"
+      :code-base-path="モデル設定.CODE_BASE_PATH"
       :live-model="モデル設定.LIVE_AI_NAME"
       :welcome-info="入力ウェルカム情報"
       :welcome-body="入力ウェルカム本文"

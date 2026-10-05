@@ -76,6 +76,7 @@ export const STANDARD_VRMA_FILES = [
 
 export function defaultModelSettings(): ModelSettings {
   return {
+    CODE_BASE_PATH: '',
     CHAT_AI_NAME: 'gemini_chat',
     LIVE_AI_NAME: 'gemini_live',
     CODE_AI1_NAME: 'codex_cli',

@@ -45,10 +45,14 @@ header { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) au
 #activity-bar { flex: 0 0 auto; height: 2px; box-sizing: content-box; border-top: 1px solid var(--border); background: #000; pointer-events: none; }
 body.connected #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s ease-in-out infinite; }
 @keyframes cyan-bar-breathe { 0%, 100% { background-color: #000; } 50% { background-color: #00ffff; } }
+#connect { color: #000; background: #fff; border-color: var(--voice); }
+#connect:disabled { opacity: 1; }
+#connect:hover:enabled { color: #000; background: var(--voice); }
+body.connected #connect { color: #000; background: var(--voice); }
 #connect.awaiting:enabled { animation: connect-breathe 4.5s ease-in-out infinite; }
 @keyframes connect-breathe {
-  0%, 100% { border-color: var(--border); color: var(--foreground); background-color: #000; }
-  50% { border-color: #00ffff; color: #00ffff; background-color: #00ffff18; }
+  0%, 100% { background-color: #fff; }
+  50% { background-color: var(--voice); }
 }
 main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow: auto; padding: 2px; }
 .primary { background: var(--accent-soft); color: var(--foreground); border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); }

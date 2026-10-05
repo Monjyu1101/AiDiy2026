@@ -972,13 +972,19 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         # WebSocket接続を登録（accept済み）
         既存セッション再接続 = bool(クライアントセッションID and クライアントセッションID in AIセッション管理.sessions)
         新規セッション = not クライアントセッションID or クライアントセッションID not in AIセッション管理.sessions
-        セッションID = await AIセッション管理.connect(
-            WebSocket接続,
-            セッションID=クライアントセッションID,
-            socket_no=ソケット番号,
-            app_conf=getattr(WebSocket接続.app, "conf", None),
-            accept_in_connect=False
-        )
+        try:
+            セッションID = await AIセッション管理.connect(
+                WebSocket接続,
+                セッションID=クライアントセッションID,
+                socket_no=ソケット番号,
+                app_conf=getattr(WebSocket接続.app, "conf", None),
+                accept_in_connect=False,
+                code_base_path=初期データ.get("CODE_BASE_PATH")
+            )
+        except ValueError as e:
+            await WebSocket接続.send_json({"メッセージ識別": "error", "メッセージ内容": str(e)})
+            await WebSocket接続.close(code=1008)
+            return
 
         セッション = AIセッション管理.get_session(セッションID)
         if not セッション:

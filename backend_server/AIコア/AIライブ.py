@@ -539,28 +539,33 @@ class Live:
 
     # ===== テキスト送信（LiveAIへ） =====
 
+    async def _送信エラー通知(self) -> None:
+        """LiveAIへの送信失敗を画面へ通知する。"""
+        if self.接続:
+            await self.接続.send_to_channel("0", {
+                "セッションID": self.セッションID,
+                "メッセージ識別": "error",
+                "メッセージ内容": "LiveAI に送信できませんでした。APIキー・モデル設定を確認し、接続し直して再送してください。",
+            })
+
     async def テキスト送信(self, text: str) -> bool:
-        """LiveAIへテキスト送信（旧実装準拠）"""
+        """LiveAIへテキスト送信。失敗は画面へ通知する。"""
         try:
             if self.AIインスタンス and self.AIインスタンス.is_alive:
-                # Chatと共通の処理要求ログ形式
                 セッションID_短縮 = self.セッションID[:10] if self.セッションID else '不明'
                 logger.info(
                     f"処理要求: チャンネル={self.チャンネル}, ソケット={セッションID_短縮}...,\n{text.rstrip()}\n"
                 )
                 result = await self.AIインスタンス.テキスト送信(text)
-                if not result:
-                    logger.warning("LiveAI実行:テキスト送信に失敗しました（!を返して継続）")
-                    await self._send_output_text({"text": "!"})
-                return result
+                if result:
+                    return True
+                logger.warning("LiveAI実行:テキスト送信に失敗しました")
             else:
-                # LiveAI停止中："!" を戻り値として返し継続
-                logger.warning("LiveAI実行:LiveAIが開始されていません（!を返して継続）")
-                await self._send_output_text({"text": "!"})
-                return True
+                logger.warning("LiveAI実行:LiveAIが開始されていません")
         except Exception as e:
             logger.error(f"[Live] テキスト送信エラー: {e}")
-            return False
+        await self._送信エラー通知()
+        return False
 
     async def 画像送信(self, image_data, format: str = "jpeg") -> bool:
         """LiveAIへ画像送信（旧実装準拠）"""

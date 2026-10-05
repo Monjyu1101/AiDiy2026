@@ -20,7 +20,7 @@ export async function ライブ起動(root: string, backend = 'http://127.0.0.1:
   const upstreamRequests = new Set<ReturnType<typeof httpRequest>>();
   const request = target.protocol === 'https:' ? httpsRequest : httpRequest;
   let origin = '';
-  const apiPaths = new Set(['/core/AIコア/モデル情報/取得', '/core/AIコア/モデル設定']);
+  const apiPaths = new Set(['/core/AIコア/モデル情報/取得', '/core/AIコア/モデル情報/設定']);
   const assets: Record<string, [string, string]> = {
     '': [join(root, packaged ? 'media/index.html' : 'aidiy_live/media/index.html'), 'text/html; charset=utf-8'],
     'view.js': [join(root, packaged ? 'dist/view.js' : 'dist/aidiy_live/view.js'), 'text/javascript; charset=utf-8'],

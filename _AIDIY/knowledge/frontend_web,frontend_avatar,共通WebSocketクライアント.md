@@ -27,12 +27,18 @@ AIWebSocket (implements IWebSocketClient)
 ## 共通の接続フロー
 
 ```text
-1. new AIWebSocket(url, セッションID?, ソケット番号?)
+1. new AIWebSocket(url, セッションID?, ソケット番号?, codeBasePath?)
 2. connect() → WebSocket 接続
-3. 接続確立 → { type: "connect", セッションID, ソケット番号 } を送信
+3. 接続確立 → { type: "connect", セッションID, ソケット番号, CODE_BASE_PATH? } を送信
 4. サーバー応答 → { type: "init", セッションID, ソケット番号 } → Promise resolve
 5. 以降は on() で登録したハンドラがメッセージを受信
 ```
+
+## 音声セッションのプロジェクトフォルダ
+
+Web／Avatar の親画面は `core` の初期化情報から `モデル設定.CODE_BASE_PATH` を保持し、AIコアの `codeBasePath` prop へ渡します。音声接続は `new AIWebSocket(url, sessionId, 'audio', codeBasePath)` で作成し、初回・再接続とも `connect` パケットに `CODE_BASE_PATH` を含めます。未指定時は従来のセッション設定を使用します。
+
+バックエンドは `init` を返す前にフォルダを確定し、LiveAI とコードエージェントの初期化に使用します。既存セッションと異なるフォルダや、バックエンドから参照できないフォルダは `error` 通知と切断コード `1008` で拒否します。Web／Avatar のフォルダ選択は既存のモデル設定画面を使い、設定後の音声接続でも同じ値を渡してください。
 
 ## 共通の再接続ポリシー
 

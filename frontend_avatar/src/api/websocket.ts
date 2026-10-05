@@ -88,6 +88,7 @@ export class AIWebSocket implements IWebSocketClient {
     private readonly url: string,
     private requestedSessionId = '',
     private requestedSocketNumber = '',
+    private readonly codeBasePath = '',
   ) {}
 
   async connect(): Promise<string> {
@@ -116,6 +117,7 @@ export class AIWebSocket implements IWebSocketClient {
           type: 'connect',
           セッションID: this.requestedSessionId || null,
           ソケット番号: this.requestedSocketNumber || null,
+          ...(this.codeBasePath ? { CODE_BASE_PATH: this.codeBasePath } : {}),
         }))
       }
 
@@ -128,6 +130,11 @@ export class AIWebSocket implements IWebSocketClient {
         }
 
         const messageType = String(message.メッセージ識別 || message.type || '')
+        if (!settled && messageType === 'error') {
+          this.intentionallyClosed = true
+          window.clearTimeout(timeoutId)
+          fail(new Error(String(message.メッセージ内容 || '接続に失敗しました。')))
+        }
         if (messageType === 'init' && typeof message.セッションID === 'string' && message.セッションID) {
           this.sessionId = message.セッションID
           this.requestedSessionId = message.セッションID

@@ -48,6 +48,7 @@ const コア処理中 = ref(false);
 const コアエラー = ref('');
 
 const モデル設定 = ref({
+  CODE_BASE_PATH: '',
   CHAT_AI_NAME: '',
   LIVE_AI_NAME: '',
   CODE_AI1_NAME: '',
@@ -117,6 +118,7 @@ function コア状態リセット() {
   音声状態シード.value = 0;
   チャットモード.value = 'live';
    モデル設定.value = {
+     CODE_BASE_PATH: '',
      CHAT_AI_NAME: '',
      LIVE_AI_NAME: '',
      CODE_AI1_NAME: '',
@@ -196,6 +198,7 @@ function 初期化処理(message: Record<string, any>) {
   const settings = payload.モデル設定 ?? {};
 
   モデル設定.value = {
+    CODE_BASE_PATH: settings.CODE_BASE_PATH || '',
     CHAT_AI_NAME: settings.CHAT_AI_NAME || '',
     LIVE_AI_NAME: settings.LIVE_AI_NAME || '',
     CODE_AI1_NAME: settings.CODE_AI1_NAME || '',
@@ -450,6 +453,7 @@ onBeforeUnmount(() => {
   <component
     :is="AIコアコントロール"
     :session-id="セッションID"
+    :code-base-path="モデル設定.CODE_BASE_PATH"
     :live-model="モデル設定.LIVE_AI_NAME"
     :input-connected="入力接続済み"
     :input-socket="入力ソケット"

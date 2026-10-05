@@ -25,26 +25,36 @@ export class LiveConnection {
   constructor(private url: string, private onPacket: (packet: Packet) => void, private onLost: () => void,
     private createSocket: (url: string) => LiveSocket = url => new WebSocket(url)) {}
 
-  async connect() {
+  async connect(prepare?: (session: string) => Promise<void>, codeBasePath = '') {
     this.disconnect();
     const generation = this.generation;
     try {
-      this.session = await this.open('input', '', generation);
-      await this.open('0', this.session, generation);
-      await this.open('audio', this.session, generation);
+      const session = await this.open('input', '', generation, codeBasePath);
+      if (generation !== this.generation) throw new Error('接続を中断しました。');
+      this.session = session;
+      // LiveAIを起動するaudioソケットより先に、セッションのプロジェクトを設定する。
+      await prepare?.(this.session);
+      if (generation !== this.generation) throw new Error('接続を中断しました。');
+      await this.open('0', this.session, generation, codeBasePath);
+      if (generation !== this.generation) throw new Error('接続を中断しました。');
+      await this.open('audio', this.session, generation, codeBasePath);
     } catch (error) { if (generation === this.generation) this.disconnect(); throw error; }
   }
-  private open(channel: string, session: string, generation: number): Promise<string> {
+  private open(channel: string, session: string, generation: number, codeBasePath: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const socket = this.createSocket(this.url);
       this.sockets.set(channel, socket);
       let ready = false;
       const timer = setTimeout(() => { reject(new Error('接続がタイムアウトしました。')); socket.close(); }, 30000);
-      socket.onopen = () => socket.send(JSON.stringify({ type: 'connect', セッションID: session || null, ソケット番号: channel }));
+      socket.onopen = () => socket.send(JSON.stringify({ type: 'connect', セッションID: session || null, ソケット番号: channel,
+        ...(codeBasePath ? { CODE_BASE_PATH: codeBasePath } : {}) }));
       socket.onmessage = event => {
         if (generation !== this.generation) return;
         let packet: Packet;
         try { packet = JSON.parse(String(event.data)); } catch { return; }
+        if (!ready && packet.メッセージ識別 === 'error') {
+          clearTimeout(timer); reject(new Error(String(packet.メッセージ内容 || '接続に失敗しました。')));
+        }
         if (packet.メッセージ識別 === 'init' && packet.セッションID) {
           if (session && packet.セッションID !== session) { reject(new Error('セッションが一致しません。')); socket.close(); return; }
           ready = true; clearTimeout(timer); resolve(packet.セッションID);

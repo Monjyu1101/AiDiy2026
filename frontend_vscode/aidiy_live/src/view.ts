@@ -10,9 +10,11 @@ const element = <T extends HTMLElement>(id: string) => document.getElementById(i
 const button = (id: string) => element<HTMLButtonElement>(id);
 const provider = element<HTMLSelectElement>('provider'), model = element<HTMLSelectElement>('model'), voice = element<HTMLSelectElement>('voice');
 const errorBox = element('error'), status = element('status'), transcript = element('transcript');
+const initialWelcome = element('empty').cloneNode(true);
 const environment = new LiveEnvironment();
 let connected = false, busy = false, mic = false, micBusy = false, changing = false, generation = 0;
 let micGeneration = 0;
+let sessionProject: string | undefined;
 let settings: Record<string, string> = {}, models: Catalog = {}, voices: Catalog = {};
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 const cloud = new AudioCloud(element<HTMLCanvasElement>('audio-cloud'));
@@ -20,7 +22,7 @@ const audio = new LiveAudio(base64 => connection.send('audio', 音声入力(base
   cloud.level(kind, value);
 }, (kind, values) => cloud.spectrum(kind, values), environment.captureUrl, environment.host ? environment.acquireMicrophone : undefined);
 const connection = new LiveConnection(environment.socketUrl, receive, () => {
-  void disconnect(); showError('接続が切れました。「接続する」で新しい会話を開始できます。');
+  void disconnect(); showError('接続が切れました。「接続」で新しい会話を開始できます。');
 }, environment.socket);
 environment.onStop(error => {
   void disconnect(); if (error) showError(error);
@@ -49,6 +51,10 @@ function showFolder(folder?: Folder | null) {
   const label = element('project-folder');
   label.textContent = folder?.名前 || '';
   label.title = folder?.パス || '';
+  if (sessionProject !== undefined && sessionProject !== (folder?.パス || '') && (connected || busy)) {
+    void disconnect();
+    showError('プロジェクトフォルダが変わりました。「接続」で新しいプロジェクトの会話を開始してください。');
+  }
 }
 environment.onFolder(showFolder);
 function controls() {
@@ -86,7 +92,11 @@ function receive(packet: Packet) {
   const type = packet.メッセージ識別;
   if (type === 'output_audio') audio.play(packet);
   else if (type === 'cancel_audio') audio.cancel();
-  else if (['input_text', 'output_text', 'output', 'recognition_input', 'recognition_output'].includes(type || '') && packet.チャンネル === '0') {
+  else if (['input_text', 'output_text', 'output_request', 'output', 'recognition_input', 'recognition_output'].includes(type || '') && packet.チャンネル === '0') {
+    // 旧バックエンドの送信失敗通知も、無反応に見せず案内する。
+    if (type === 'output_text' && String(packet.メッセージ内容 || '').trim() === '!') {
+      showError('LiveAI に送信できませんでした。APIキー・モデル設定を確認し、接続し直して再送してください。'); return;
+    }
     message(type === 'input_text' || type === 'recognition_input' ? 'user' : 'ai', String(packet.メッセージ内容 || ''));
   } else if (type === 'welcome_text') message('system', String(packet.メッセージ内容 || ''));
   else if (type === 'error') showError(String(packet.メッセージ内容 || packet.error || '会話エラーが発生しました。'));
@@ -124,8 +134,16 @@ async function loadModels() {
 }
 async function disconnect() {
   ++generation; connected = false; busy = false; mic = false; micBusy = false; changing = false;
+  ++micGeneration;
+  sessionProject = undefined;
   if (heartbeat) clearInterval(heartbeat); heartbeat = undefined;
-  connection.send('input', 音声操作(false, false)); audio.close(); connection.disconnect(); controls();
+  connection.send('input', 音声操作(false, false)); audio.close(); audio.mute(true); connection.disconnect();
+  transcript.replaceChildren(initialWelcome.cloneNode(true)); transcript.scrollTop = 0;
+  element<HTMLTextAreaElement>('text').value = '';
+  settings = {}; models = {}; voices = {};
+  for (const select of [provider, model, voice]) { select.replaceChildren(); select.value = ''; }
+  element('model-label').textContent = 'AiDiy のライブ会話';
+  modelPicker.close(); showError(); controls();
   element('session-label').textContent = '音声はマイク ON の間だけ送信します。';
 }
 button('connect').onclick = async () => {
@@ -134,8 +152,16 @@ button('connect').onclick = async () => {
   try {
     await audio.unlock();
     if (run !== generation) return;
+    const config = await environment.context();
+    if (run !== generation) return;
+    showFolder(config.作業フォルダ);
+    sessionProject = config.作業フォルダ?.パス || '';
     transcript.replaceChildren();
-    await connection.connect();
+    await connection.connect(async session => {
+      if (sessionProject) await api('core/AIコア/モデル情報/設定', {
+        セッションID: session, モデル設定: { CODE_BASE_PATH: sessionProject }, save: false,
+      });
+    }, sessionProject);
     if (run !== generation) return;
     await loadModels();
     if (run !== generation) return;
@@ -163,14 +189,16 @@ button('speaker').onclick = async () => {
   try { if (enabled) await audio.unlock(); audio.mute(enabled); connection.send('input', 音声操作(mic, enabled)); controls(); }
   catch (error) { showError(String(error)); }
 };
-button('new').onclick = async () => { await disconnect(); transcript.replaceChildren(); element('model-label').textContent = 'AiDiy のライブ会話'; message('system', '次の接続で新しい会話を開始します。'); };
+button('new').onclick = disconnect;
 const modelPicker = element<HTMLDialogElement>('model-picker');
 button('choose-model').onclick = () => modelPicker.showModal();
 button('close-model').onclick = () => modelPicker.close();
 element<HTMLFormElement>('text-form').onsubmit = event => {
   event.preventDefault(); const input = element<HTMLTextAreaElement>('text'), text = input.value.trim();
   if (!connected || changing || !text) return;
+  showError();
   if (connection.send('input', { チャンネル: '0', メッセージ識別: 'input_text', メッセージ内容: text, 送信モード: 'Live', 出力先チャンネル: '0' })) input.value = '';
+  else showError('送信できませんでした。接続を確認し、もう一度送信してください。');
   controls();
 };
 element<HTMLTextAreaElement>('text').addEventListener('input', () => {
@@ -187,7 +215,7 @@ button('apply').onclick = async () => {
   const run = generation; changing = true; showError(); mic = false; audio.stop(); audio.cancel(); connection.send('input', 音声操作(false, audio.speaker)); controls();
   try {
     const key = keys();
-    await api('core/AIコア/モデル設定', { セッションID: connection.session, モデル設定: { LIVE_AI_NAME: provider.value, [key.model]: model.value, [key.voice]: voice.value }, save: false });
+    await api('core/AIコア/モデル情報/設定', { セッションID: connection.session, モデル設定: { LIVE_AI_NAME: provider.value, [key.model]: model.value, [key.voice]: voice.value }, save: false });
     if (run !== generation) return;
     await loadModels();
     if (run === generation) { modelPicker.close(); message('system', 'モデルを切り替えました。マイクを ON にして会話を再開できます。'); }

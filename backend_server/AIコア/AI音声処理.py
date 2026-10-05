@@ -212,19 +212,14 @@ async def 統合音声分離ワーカー(接続):
 
                     combined_audio = b"".join(audio_buffer)
                     if len(combined_audio) >= MIN_AUDIO_BYTES and 接続.recognition_processor:
-                        # openai_live実行中は、送信音声のローカル音声認識を停止する
-                        # （OpenAI Realtimeがテキストを返すため重複回避）
+                        # LiveAI自身が音声字幕を返す場合は、二重表示を避ける。
                         live = getattr(接続, "live_processor", None)
                         live_ai = None
                         if live and getattr(live, "AIインスタンス", None):
                             live_ai = getattr(live.AIインスタンス, "LIVE_AI", None)
-                        if live_ai != "openai_live":
+                        字幕対応 = getattr(getattr(live, "AIインスタンス", None), "音声出力字幕対応", False)
+                        if live_ai != "openai_live" and not 字幕対応:
                             await 接続.recognition_processor.音声認識要求("output", combined_audio)
-                        else:
-                            # await 接続.recognition_processor.音声認識要求("output", combined_audio)
-                            # openai_live実行中は、OpenAI Realtimeのtext返却を使用するため送信しない
-                            pass
-
                 await asyncio.sleep(0.25 if _音声バッファあり(接続) else 0.50)
 
             except Exception as e:

@@ -26,7 +26,7 @@
 | `audio` | `AIコア.vue` | `input_audio` 送信、`output_audio` / `cancel_audio` 受信 |
 | `chat` / `file` / `code1`〜`code6` | 各パネル | パネル別の出力受信 |
 
-接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号 }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
+接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号, CODE_BASE_PATH? }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
 
 ## 主要メッセージ形式
 
@@ -127,3 +127,11 @@ Code AI の `output_stream` は、本文と同じパケットの `メッセー�
 - ブラウザ DevTools の Network で WebSocket frames を確認する
 - 接続直後に `connect` 送信と `init` 受信が見えることを確認する
 - 音声調査では `audio` チャンネルに `input_audio` / `output_audio` / `cancel_audio` が流れることを確認する
+
+## 接続時のプロジェクト指定
+
+`connect` の `CODE_BASE_PATH` は任意指定です。新規セッションでは `init` 通知・バックアップ・LiveAI／CodeAI 初期化より先にセッションのフォルダへ反映し、共通設定ファイルは変更しません。既存セッションでは同じフォルダを指定してください。相対パスは `backend_server/` 基準で解決します。参照できないフォルダや既存セッションと異なるフォルダは `error` と切断コード `1008` で拒否します。
+
+`aidiy_live` は input／0／audio の接続時に作業フォルダを送信します。Web／Avatar は core 初期化情報の `モデル設定.CODE_BASE_PATH` を音声接続時に送信します。指定しない旧クライアントは従来のセッション設定を使用します。
+
+確認: `backend_server/tests/test_live_project_connection.py` で、初期化通知前の反映、音声への引継ぎ、フォルダ不一致・存在しないフォルダの拒否、旧クライアント互換を検証できます。
