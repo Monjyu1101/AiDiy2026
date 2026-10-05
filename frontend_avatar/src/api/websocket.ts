@@ -97,6 +97,7 @@ export class AIWebSocket implements IWebSocketClient {
 
     return new Promise<string>((resolve, reject) => {
       const socket = new WebSocket(this.url)
+      this.socket = socket
       let settled = false
 
       const fail = (error: Error) => {
@@ -110,7 +111,10 @@ export class AIWebSocket implements IWebSocketClient {
       }, 30000)
 
       socket.onopen = () => {
-        this.socket = socket
+        if (this.socket !== socket || this.intentionallyClosed) {
+          socket.close()
+          return
+        }
         this.reconnectAttempts = 0
         this.emitState(true)
         socket.send(JSON.stringify({
@@ -122,6 +126,7 @@ export class AIWebSocket implements IWebSocketClient {
       }
 
       socket.onmessage = (event) => {
+        if (this.socket !== socket || this.intentionallyClosed) return
         let message: WebSocketMessage
         try {
           message = JSON.parse(String(event.data)) as WebSocketMessage
@@ -159,15 +164,17 @@ export class AIWebSocket implements IWebSocketClient {
       }
 
       socket.onclose = (event) => {
+        window.clearTimeout(timeoutId)
+        if (!settled) {
+          fail(new Error(`WebSocket connection closed: ${event.code} ${event.reason}`.trim()))
+        }
+        if (this.socket !== socket) return
         this.emitState(false)
         this.socket = null
         this.sessionId = null
         window.clearTimeout(timeoutId)
 
-        if (!settled) {
-          fail(new Error(`WebSocket connection closed: ${event.code} ${event.reason}`.trim()))
-          return
-        }
+        if (!settled) return
 
         if (!this.intentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts += 1

@@ -152,8 +152,12 @@ function コア切断() {
 }
 
 function ソケット状態バインド(client: IWebSocketClient, target: typeof 入力接続済み) {
+  // 接続情報（モデル・プロジェクトフォルダ）の反映後に各パネルを接続する。
   client.onStateChange((connected) => {
-    target.value = connected;
+    if (!connected) target.value = false;
+  });
+  client.on('init', () => {
+    target.value = client.isConnected();
   });
 }
 

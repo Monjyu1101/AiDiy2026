@@ -48,7 +48,7 @@ body.connected #activity-bar { background: #00ffff; animation: cyan-bar-breathe 
 #connect { color: #000; background: #fff; border-color: var(--voice); }
 #connect:disabled { opacity: 1; }
 #connect:hover:enabled { color: #000; background: var(--voice); }
-body.connected #connect { color: #000; background: var(--voice); }
+body.connected #connect, body.connected #connect:hover:enabled { color: #000; background: #fff; border-color: #fff; }
 #connect.awaiting:enabled { animation: connect-breathe 4.5s ease-in-out infinite; }
 @keyframes connect-breathe {
   0%, 100% { background-color: #fff; }

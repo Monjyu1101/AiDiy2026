@@ -175,6 +175,8 @@ async function 音声接続開始() {
     音声処理機?.cancelAudioOutput();
   });
 
+  // 接続待ちのソケットも保持し、切断・再接続時に確実に閉じる。
+  音声Socket.value = nextSocket;
   try {
     await nextSocket.connect();
     if (currentGeneration !== 音声接続世代) {
@@ -182,7 +184,6 @@ async function 音声接続開始() {
       return;
     }
 
-    音声Socket.value = nextSocket;
     音声状態通知();
 
     if (マイク有効.value) {

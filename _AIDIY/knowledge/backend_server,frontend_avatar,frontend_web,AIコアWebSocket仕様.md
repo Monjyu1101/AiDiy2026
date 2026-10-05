@@ -28,6 +28,10 @@
 
 接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号, CODE_BASE_PATH?, モデル設定? }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
 
+Avatar / Web の音声接続は、core ソケットの `init` に含まれるモデル設定と `CODE_BASE_PATH` が反映されてから開始する。WebSocket の `open` だけで入力接続済みにすると、既存セッションの復元時に空のフォルダ指定で音声接続し、設定受信後に再接続するため、Live の準備通知が二重になる。
+
+接続待ちの音声ソケットも保持し、フォルダ変更・切断・画面破棄時に閉じる。旧ソケットの遅延イベントで新しい接続状態を上書きしない。接続順序と競合の検証は、Avatar の依存関係を導入した環境で `node --test frontend_avatar/checks/audio-connection.test.cjs` を実行する（リポジトリルートから）。
+
 ## 主要メッセージ形式
 
 ```typescript
