@@ -109,8 +109,13 @@ async function main() {
     const run = randomUUID(), ready = join(runRoot, `${run}.json`), log = join(runRoot, `${run}.log`);
     const descriptor = openSync(log, 'w');
     const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+    // Chromium に接続先・ファイルパス・JSON を起動引数として解釈させない。
+    env.AIDIY_LIVE_BACKEND = backend;
+    env.AIDIY_LIVE_READY = ready;
+    env.AIDIY_LIVE_PROJECT = projectRoot;
+    env.AIDIY_LIVE_MODELS = JSON.stringify(modelSettings);
     let child;
-    try { child = spawn(executable, [join(root, 'aidiy_live/desktop.cjs'), backend, ready, projectRoot, JSON.stringify(modelSettings)], { cwd: root, detached: !foreground, stdio: foreground ? 'inherit' : ['ignore', descriptor, descriptor], windowsHide: false, env }); }
+    try { child = spawn(executable, [join(root, 'aidiy_live/desktop.cjs')], { cwd: root, detached: !foreground, stdio: foreground ? 'inherit' : ['ignore', descriptor, descriptor], windowsHide: false, env }); }
     finally { closeSync(descriptor); }
     let failure; child.on('error', error => { failure = error; }); if (!foreground) child.unref();
     const deadline = Date.now() + 15000;

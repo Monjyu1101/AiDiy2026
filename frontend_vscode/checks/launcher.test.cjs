@@ -20,6 +20,7 @@ function fixture(t) {
   const binary = path.join(electron, 'dist', executable);
   const env = { ...process.env };
   delete env.ELECTRON_OVERRIDE_DIST_PATH;
+  env.ELECTRON_RUN_AS_NODE = '1';
   const launch = (...args) => spawnSync(process.execPath, [path.join(scripts, 'launch.mjs'), root, ...args], {
     encoding: 'utf8', timeout: 20000, env,
   });
@@ -39,8 +40,11 @@ function fixture(t) {
 test('Code 起動引数: 指定した Provider / モデルを専用ウィンドウへ渡す', t => {
   const f = fixture(t);
   f.desktop(`const assert = require('node:assert/strict');
-    assert.deepEqual(JSON.parse(process.argv[4]), { provider: 'copilot-cli', model: 'claude-sonnet-5.5' });
-    require('node:fs').writeFileSync(process.argv[3], JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
+    assert.equal(process.argv.length, 2);
+    assert.equal(process.env.ELECTRON_RUN_AS_NODE, undefined);
+    assert.equal(process.env.AIDIY_CODE_PROJECT, ${JSON.stringify(f.root)});
+    assert.deepEqual(JSON.parse(process.env.AIDIY_CODE_MODEL), { provider: 'copilot-cli', model: 'claude-sonnet-5.5' });
+    require('node:fs').writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
   const result = f.launch('--provider=copilot_cli', '--model', 'claude-sonnet-5.5');
   assert.equal(result.status, 0, result.stderr);
 });
@@ -48,9 +52,9 @@ test('Code 起動引数: 指定した Provider / モデルを専用ウィンド�
 test('Code 起動引数: 未指定時は既定値を使い、Provider だけならモデルは自動', t => {
   const f = fixture(t);
   f.desktop(`const assert = require('node:assert/strict');
-    const settings = JSON.parse(process.argv[4]);
+    const settings = JSON.parse(process.env.AIDIY_CODE_MODEL);
     assert.deepEqual(settings, settings.provider ? { provider: 'copilot-cli', model: 'auto' } : {});
-    require('node:fs').writeFileSync(process.argv[3], JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
+    require('node:fs').writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
   for (const args of [[], ['--provider', 'copilot-cli']]) {
     const result = f.launch(...args);
     assert.equal(result.status, 0, result.stderr);
@@ -88,7 +92,7 @@ test('outdated Electron requires setup before compiling or launching', t => {
 
 test('prepared Electron launches without loading its downloading entry point', t => {
   const f = fixture(t);
-  f.desktop('require("node:fs").writeFileSync(process.argv[3], JSON.stringify({ url: "http://127.0.0.1:1234/", windowShown: true }));');
+  f.desktop('require("node:fs").writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({ url: "http://127.0.0.1:1234/", windowShown: true }));');
   const result = f.launch();
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Project folder/);
@@ -98,7 +102,7 @@ test('prepared Electron launches without loading its downloading entry point', t
 
 test('server readiness alone does not report a visible desktop window', t => {
   const f = fixture(t);
-  f.desktop('require("node:fs").writeFileSync(process.argv[3], JSON.stringify({ url: "http://127.0.0.1:1234/" }));');
+  f.desktop('require("node:fs").writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({ url: "http://127.0.0.1:1234/" }));');
   const result = f.launch();
   assert.equal(result.status, 1);
   assert.match(result.stderr, /専用ウィンドウの表示を確認できません/);

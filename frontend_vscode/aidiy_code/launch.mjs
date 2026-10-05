@@ -107,12 +107,19 @@ async function main() {
   const env = { ...process.env };
   const initialModel = { provider, model: model || (provider ? 'auto' : undefined) };
   // VS Code のターミナルから起動しても Electron を通常のデスクトップモードで動かす。
-  if (!browserMode) delete env.ELECTRON_RUN_AS_NODE;
+  if (!browserMode) {
+    delete env.ELECTRON_RUN_AS_NODE;
+    // Chromium に作業フォルダや JSON を起動引数として解釈させない。
+    env.AIDIY_CODE_PROJECT = projectRoot;
+    env.AIDIY_CODE_READY = readyPath;
+    env.AIDIY_CODE_MODEL = JSON.stringify(initialModel);
+  }
   const stdout = openSync(join(runRoot, `${runId}.stdout.log`), 'w');
   const stderrPath = join(runRoot, `${runId}.stderr.log`);
   const stderr = openSync(stderrPath, 'w');
   try {
-    server = spawn(executable, [entry, projectRoot, readyPath, JSON.stringify(initialModel)], {
+    const args = browserMode ? [entry, projectRoot, readyPath, JSON.stringify(initialModel)] : [entry];
+    server = spawn(executable, args, {
       cwd: projectRoot, detached: true, stdio: ['ignore', stdout, stderr], windowsHide: browserMode, env,
     });
   } finally {

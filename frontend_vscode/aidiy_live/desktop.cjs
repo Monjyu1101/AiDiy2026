@@ -3,10 +3,10 @@ const { join } = require('node:path');
 const { writeFileSync } = require('node:fs');
 const { audioPermission, audioRequest } = require('./permissions.cjs');
 const { ライブ起動 } = require('../dist/aidiy_live/server.cjs');
-const backend = process.argv[2];
-const ready = process.argv[3];
-const projectRoot = process.argv[4] || process.cwd();
-const modelSettings = process.argv[5] ? JSON.parse(process.argv[5]) : {};
+const backend = process.env.AIDIY_LIVE_BACKEND || process.argv[2];
+const ready = process.env.AIDIY_LIVE_READY || process.argv[3];
+const projectRoot = process.env.AIDIY_LIVE_PROJECT || process.argv[4] || process.cwd();
+const initialModels = process.env.AIDIY_LIVE_MODELS || process.argv[5];
 app.setName('aidiy_live');
 app.setPath('userData', join(app.getPath('appData'), 'aidiy_live'));
 if (process.platform === 'win32') app.setAppUserModelId('AiDiy.aidiy_live');
@@ -18,7 +18,7 @@ app.on('before-quit', event => {
 });
 app.on('window-all-closed', () => app.quit());
 app.whenReady().then(async () => {
-  server = await ライブ起動(join(__dirname, '..'), backend, false, projectRoot, modelSettings);
+  server = await ライブ起動(join(__dirname, '..'), backend, false, projectRoot, initialModels ? JSON.parse(initialModels) : {});
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
     title: 'AiDiy (Live)', width: 420, height: 650, minWidth: 320, minHeight: 480,

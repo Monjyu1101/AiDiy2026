@@ -132,7 +132,9 @@ Windows の実 VS Code で拡張ホストまで確認するときは、依存導
 
 通常の VS Code プロファイルへ配置する確認は `_setup.py` を使う。試用ホストの `out/manual-profile` と混同しない。
 
-Live の単独起動では、接続先と起動完了 JSON のパスを `AIDIY_LIVE_BACKEND` / `AIDIY_LIVE_READY` 環境変数で Electron へ渡す。Chromium が追加のファイル引数を解釈して異常終了する場合があるため、Electron の引数はエントリファイルだけにする。表示後の `windowShown: true` 通知は維持する。
+Code / Live の単独起動では、Electron の引数をエントリファイルだけにする。Chromium が追加のファイル引数を解釈して異常終了する場合があるため、起動設定は子プロセスの環境変数で渡す。Code は `AIDIY_CODE_PROJECT` / `AIDIY_CODE_READY` / `AIDIY_CODE_MODEL`、Live は `AIDIY_LIVE_BACKEND` / `AIDIY_LIVE_READY` / `AIDIY_LIVE_PROJECT` / `AIDIY_LIVE_MODELS` を使う。表示後の `windowShown: true` 通知は維持する。Code のブラウザ版は Node.js の引数で従来どおり渡す。
+
+ルートの `vscode_code.bat` / `vscode_live.bat` は起動失敗時に `pause` し、終了コードを保持する。ダブルクリックで起動した場合も、閉じる前に表示されたエラーを確認できる。Electron が未配置なら `python frontend_vscode/_setup.py` で準備する。ブラウザ版を確認する場合は、各 bat に `--browser` を付ける。bat は UTF-8、CRLF 改行で保存する。
 
 Live のブラウザ版は通常の `--browser` と Electron 失敗時の自動切り替えでサーバーを分離し、CMD / PowerShell へ戻る。画面は localhost 中継の `presence`（SSE）へ接続し、最後の画面が閉じて約60秒後にサーバーを終了する。`--browser --foreground` は診断用、`--serve` は URL の表示と手動終了用としてターミナル上で実行する。`aidiy_live/checks/launcher.test.cjs` では、GUI が常駐してもランチャーが戻ることと、Electron 失敗時にもブラウザ中継が動いたまま戻ることを検証する。
 

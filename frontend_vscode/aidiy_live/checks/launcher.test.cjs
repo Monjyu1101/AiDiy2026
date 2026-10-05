@@ -46,10 +46,14 @@ test('Live ランチャー: Electron が常駐しても表示確認後に CMD �
   fs.writeFileSync(join(electron, 'path.txt'), executable);
   fs.writeFileSync(join(electron, 'dist/version'), '44.5.1');
   fs.writeFileSync(join(f.app, 'desktop.cjs'), `const assert = require('node:assert/strict');
-    assert.equal(process.argv[2], 'http://127.0.0.1:8091');
-    assert.deepEqual(JSON.parse(process.argv[5]), { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'gpt-realtime-2.1-mini' });
-    require('node:fs').writeFileSync(process.argv[3], JSON.stringify({windowShown:true,pid:process.pid}));
+    assert.equal(process.argv.length, 2);
+    assert.equal(process.env.ELECTRON_RUN_AS_NODE, undefined);
+    assert.equal(process.env.AIDIY_LIVE_BACKEND, 'http://127.0.0.1:8091');
+    assert.equal(process.env.AIDIY_LIVE_PROJECT, ${JSON.stringify(tmpdir())});
+    assert.deepEqual(JSON.parse(process.env.AIDIY_LIVE_MODELS), { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'gpt-realtime-2.1-mini' });
+    require('node:fs').writeFileSync(process.env.AIDIY_LIVE_READY, JSON.stringify({windowShown:true,pid:process.pid}));
     setInterval(() => {}, 10000);`);
+  f.env.ELECTRON_RUN_AS_NODE = '1';
   const result = f.launch('--provider', 'openai', '--model', 'gpt-realtime-2.1-mini');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /aidiy_live を起動しました/);

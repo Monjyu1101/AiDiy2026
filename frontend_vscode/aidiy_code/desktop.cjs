@@ -4,6 +4,9 @@ const { writeFileSync } = require('node:fs');
 const { 単独起動 } = require('../dist/aidiy_code/server.cjs');
 const entryIndex = process.argv.findIndex(arg => resolve(arg) === __filename);
 const args = process.argv.slice(entryIndex >= 0 ? entryIndex + 1 : 2);
+const projectRoot = process.env.AIDIY_CODE_PROJECT || args[0] || process.cwd();
+const ready = process.env.AIDIY_CODE_READY || args[1];
+const initialModel = process.env.AIDIY_CODE_MODEL || args[2];
 
 app.setName('aidiy_code');
 app.setPath('userData', join(app.getPath('appData'), 'aidiy_code'));
@@ -19,7 +22,7 @@ app.on('before-quit', event => {
 app.on('window-all-closed', () => app.quit());
 
 app.whenReady().then(async () => {
-  server = await 単独起動(resolve(args[0] || process.cwd()), undefined, args[2] ? JSON.parse(args[2]) : {});
+  server = await 単独起動(resolve(projectRoot), undefined, initialModel ? JSON.parse(initialModel) : {});
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
     title: 'AiDiy (Code)', width: 476, height: 602, minWidth: 360, minHeight: 480,
@@ -84,5 +87,5 @@ app.whenReady().then(async () => {
   window.setMinimumSize(360, 480);
   opening = false;
   sendState();
-  if (args[1]) writeFileSync(args[1], JSON.stringify({ url: server.url, pid: process.pid, windowShown: true }), 'utf8');
+  if (ready) writeFileSync(ready, JSON.stringify({ url: server.url, pid: process.pid, windowShown: true }), 'utf8');
 }).catch(error => { console.error(String(error)); app.quit(); process.exitCode = 1; });

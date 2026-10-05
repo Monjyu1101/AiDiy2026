@@ -54,6 +54,14 @@ call "%~dp0frontend_vscode\aidiy_live.cmd" --provider "%PROVIDER%" --model "%MOD
 set "EXIT_CODE=%ERRORLEVEL%"
 
 :FINISH
+if "%EXIT_CODE%"=="0" goto EXIT
+ECHO.
+ECHO 起動に失敗しました。上のエラー内容を確認してください。
+ECHO Electron の未配置エラーの場合は、python frontend_vscode\_setup.py を実行してください。
+ECHO ブラウザで開く場合は、%~nx0 --browser を実行してください。
+pause
+
+:EXIT
 endlocal & exit /b %EXIT_CODE%
 
 :END
