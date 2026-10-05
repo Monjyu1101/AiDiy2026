@@ -5,6 +5,7 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void; getS
 const vscode = acquireVsCodeApi();
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const prompt = element<HTMLTextAreaElement>('prompt');
+const 初期起動画面 = element('welcome').cloneNode(true);
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
 const historyList = element<HTMLElement>('history-list');
@@ -268,6 +269,12 @@ window.addEventListener('message', event => {
     });
     if (演出タイマー !== undefined) { clearTimeout(演出タイマー); 演出タイマー = undefined; }
     if (!初回状態) { prompt.value = ''; vscode.setState({ 下書き: '' }); }
+    if (!state.メッセージ.length) {
+      // 新規会話では入力で停止した状態を戻し、CSS のターミナル演出を最初から再開する。
+      element('welcome').replaceWith(初期起動画面.cloneNode(true));
+      初期文字演出停止();
+      element('conversation').scrollTop = 0;
+    }
   }
   会話ID = state.会話ID;
   送信待ち = false; 実行中 = state.実行中;
