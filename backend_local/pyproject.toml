@@ -7,10 +7,12 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pydantic",
-    "transformers",
+    # Gemma 4 対応版を使い、古い tokenizers への依存解決を防ぐ。
+    "transformers>=5.5,<6",
     "torch",
     "accelerate",
-    "huggingface-hub",
+    # tokenizers が対応する Hub 1 系に揃える。
+    "huggingface-hub>=1.5,<2",
     "sentencepiece",
     "protobuf",
     "pillow",
