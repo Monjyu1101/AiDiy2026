@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-setlocal
+setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 
 title AiDiy Code
@@ -10,68 +10,63 @@ ECHO   AiDiy Code
 ECHO   %~nx0
 ECHO ============================================================
 
+set "LAUNCHER=%USERPROFILE%\.local\bin\aidiy_code.cmd"
+if not exist "%LAUNCHER%" set "LAUNCHER=aidiy_code"
+
 :SELECT_MODEL
 ECHO.
-ECHO モデル選択
-ECHO   1: Sonnet 5.5     (copilot_cli)
-ECHO   2: GPT-6 Astra    (openai_oauth)
-ECHO   3: GPT-6.1 Sol    (openai_oauth)
-ECHO   4: GPT-5.6 Terra  (openai_oauth)
-ECHO   5: GPT-6 Luna     (openai_oauth)
-ECHO   0: 終了
+ECHO AiDiy Code model list
+ECHO   1: Sonnet 5.5 (Copilot CLI)
+ECHO   2: GPT-6 Astra
+ECHO   3: GPT-6.1 Sol
+ECHO   4: GPT-5.6 Terra
+ECHO   5: GPT-6 Luna
+ECHO   0: Exit
 ECHO.
-ECHO 未入力で Enter: モデルを指定せずに起動します。
-ECHO Provider は選んだモデルに合わせて自動設定します。
-ECHO 起動後も画面の「モデル」から選択できます。
+ECHO Press Enter to use the default provider and model.
+ECHO You can also select the model in the application.
 ECHO.
 set "PROVIDER="
 set "MODEL="
 set "MODEL_NUMBER="
-set /p "MODEL_NUMBER=番号 [Enter: 指定なし]: "
-if not defined MODEL_NUMBER goto LAUNCH_DEFAULT
+set /p "MODEL_NUMBER=Model number [Enter: default]: "
 if "%MODEL_NUMBER%"=="0" goto END
-if "%MODEL_NUMBER%"=="1" (
-    set "PROVIDER=copilot-cli"
-    set "MODEL=claude-sonnet-5.5"
-)
-if "%MODEL_NUMBER%"=="2" (
-    set "PROVIDER=openai_oauth"
-    set "MODEL=gpt-6-astra"
-)
-if "%MODEL_NUMBER%"=="3" (
-    set "PROVIDER=openai_oauth"
-    set "MODEL=gpt-6.1-sol"
-)
-if "%MODEL_NUMBER%"=="4" (
-    set "PROVIDER=openai_oauth"
-    set "MODEL=gpt-5.6-terra"
-)
-if "%MODEL_NUMBER%"=="5" (
-    set "PROVIDER=openai_oauth"
-    set "MODEL=gpt-6-luna"
-)
-if defined PROVIDER goto LAUNCH_SELECTED
-ECHO 0〜5 の番号を入力するか、Enter を押してください。
+if not defined MODEL_NUMBER goto LAUNCH_DEFAULT
+if "%MODEL_NUMBER%"=="1" set "PROVIDER=copilot-cli"
+if "%MODEL_NUMBER%"=="1" set "MODEL=claude-sonnet-5.5"
+if "%MODEL_NUMBER%"=="2" set "PROVIDER=openai_oauth"
+if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-6-astra"
+if "%MODEL_NUMBER%"=="3" set "PROVIDER=openai_oauth"
+if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-6.1-sol"
+if "%MODEL_NUMBER%"=="4" set "PROVIDER=openai_oauth"
+if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-5.6-terra"
+if "%MODEL_NUMBER%"=="5" set "PROVIDER=openai_oauth"
+if "%MODEL_NUMBER%"=="5" set "MODEL=gpt-6-luna"
+if defined MODEL goto LAUNCH_SELECTED
+ECHO Invalid input. Enter a number or press Enter.
 goto SELECT_MODEL
 
 :LAUNCH_DEFAULT
-call "%~dp0frontend_vscode\aidiy_code.cmd" %*
+ECHO aidiy_code %*
+call "%LAUNCHER%" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 goto FINISH
 
 :LAUNCH_SELECTED
-call "%~dp0frontend_vscode\aidiy_code.cmd" --provider "%PROVIDER%" --model "%MODEL%" %*
+ECHO aidiy_code --provider "%PROVIDER%" --model "%MODEL%" %*
+call "%LAUNCHER%" --provider "%PROVIDER%" --model "%MODEL%" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 
 :FINISH
-if "%EXIT_CODE%"=="0" goto EXIT
-ECHO.
-ECHO 起動に失敗しました。上のエラー内容を確認してください。
-ECHO Electron の未配置エラーの場合は、python frontend_vscode\_setup.py を実行してください。
-ECHO ブラウザで開く場合は、%~nx0 --browser を実行してください。
-pause
+if "%EXIT_CODE%"=="0" goto END
 
-:EXIT
+:FAILED
+ECHO.
+ECHO AiDiy Code failed to start. Exit code: %EXIT_CODE%
+ECHO Check the error shown above.
+ECHO If the command was not found, run the frontend_vscode setup in your AiDiy installation.
+ECHO Browser mode: %~nx0 --browser
+pause
 endlocal & exit /b %EXIT_CODE%
 
 :END

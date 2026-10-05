@@ -276,10 +276,10 @@ def install_standalone_launcher() -> bool:
         for name, script_path in scripts.items():
             launcher_path = launcher_dir / (f"{name}.cmd" if sys.platform == "win32" else name)
             if sys.platform == "win32":
-                content = "@echo off\nsetlocal\n" + f'node.exe "{script_path}" %*\nexit /b %ERRORLEVEL%\n'
+                content = "@echo off\nchcp 65001 >nul\nsetlocal\n" + f'node.exe "{script_path}" %*\nexit /b %ERRORLEVEL%\n'
             else:
                 content = f'#!/usr/bin/env sh\nexec node {shlex.quote(str(script_path))} "$@"\n'
-            launcher_path.write_text(content, encoding="utf-8")
+            launcher_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8") if sys.platform == "win32" else content.encode("utf-8"))
             if sys.platform != "win32":
                 launcher_path.chmod(0o755)
             print_success(f"単独起動ランチャーを作成しました: {launcher_path}")

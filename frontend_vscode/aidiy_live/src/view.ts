@@ -204,11 +204,12 @@ async function disconnect() {
   modelPicker.close(); showError(); controls();
   element('session-label').textContent = '音声はマイク ON の間だけ送信します。';
 }
-async function connectSession(preserveConversation = false) {
+async function connectSession(preserveConversation = false, automatic = false) {
   const run = ++generation; busy = true; showError(); controls();
   if (heartbeat) clearInterval(heartbeat); heartbeat = undefined;
   try {
-    await audio.unlock();
+    // 起動時の接続を、ブラウザの音声再生許可待ちで止めない。
+    if (!automatic) await audio.unlock();
     if (run !== generation) return;
     await initialContext;
     if (run !== generation) return;
@@ -238,6 +239,8 @@ button('mic').onclick = async () => {
   if (mic) { mic = false; audio.stop(); connection.send('input', 音声操作(false, audio.speaker)); controls(); return; }
   const run = generation, micRun = ++micGeneration; micBusy = true; controls();
   try {
+    await audio.unlock();
+    if (run !== generation || micRun !== micGeneration) return;
     mic = await audio.start(入力レート(settings.LIVE_AI_NAME || ''));
     if (run !== generation || micRun !== micGeneration) { audio.stop(); mic = false; return; }
     connection.send('input', 音声操作(mic, audio.speaker));
@@ -265,6 +268,7 @@ element<HTMLFormElement>('text-form').onsubmit = event => {
   event.preventDefault(); const input = element<HTMLTextAreaElement>('text'), text = input.value.trim();
   if (!connected || changing || !text) return;
   showError();
+  void audio.unlock().catch(error => showError(String(error)));
   if (connection.send('input', { チャンネル: '0', メッセージ識別: 'input_text', メッセージ内容: text, 送信モード: 'Live', 出力先チャンネル: '0' })) input.value = '';
   else showError('送信できませんでした。接続を確認し、もう一度送信してください。');
   controls();
@@ -316,6 +320,11 @@ const initialContext = environment.context().then(config => {
     settings = { ...settings, ...preferredSettings };
     element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model]].filter(Boolean).join(' · ');
   }
-}).catch(() => showError('接続先情報を取得できません。')).finally(reveal);
+  // 起動引数でモデルを指定した単独画面だけ、初回に自動接続する。
+  return !environment.host && !!config.モデル設定?.[keys(config.モデル設定.LIVE_AI_NAME).model];
+}).catch(() => { showError('接続先情報を取得できません。'); return false; }).finally(reveal);
 controls();
 environment.ready();
+void initialContext.then(automatic => {
+  if (automatic && generation === 0 && !connected && !busy) void connectSession(false, true);
+});

@@ -221,6 +221,10 @@ class ElectronSetupTest(unittest.TestCase):
                 for name in ('aidiy_code', 'aidiy_live'):
                     launcher = launchers / (f'{name}.cmd' if platform_name == 'win32' else name)
                     self.assertIn(str(self.root / name / 'launch.mjs'), launcher.read_text(encoding='utf-8'))
+                    if platform_name == 'win32':
+                        content = launcher.read_bytes()
+                        self.assertTrue(content.startswith(b'@echo off\r\nchcp 65001 >nul\r\n'))
+                        self.assertNotIn(b'\n', content.replace(b'\r\n', b''))
 
     def test_launcher_rename_preserves_other_checkout_old_name(self):
         home = self.project / 'other-home'

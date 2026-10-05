@@ -838,11 +838,11 @@ def main():
     print_info(f"    バックエンド(task,team)起動: cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発  : cd frontend_web && npm run dev")
     print_info("    Avatar   : cd frontend_avatar && npm run dev")
-    if sys.platform == "win32":
-        print_info("    Hermes起動: aidiy_hermes.cmd または cd command_hermes && .venv/Scripts/python.exe cli_main.py")
-    else:
-        print_info("    Hermes起動: aidiy_hermes または cd command_hermes && .venv/bin/python cli_main.py")
-    print_info("    vscode    : コマンドパレットから「AiDiy: チャットを開く」")
+    print_info("    Hermes起動: aidiy_hermes")
+    print_info("    Code起動  : aidiy_code")
+    print_info("    Live起動  : aidiy_live")
+    print_info("    起動コマンドは ~/.local/bin を PATH に登録した新しいターミナルで実行してください。")
+    print_info("    vscode    : コマンドパレットから「AiDiy (Code): チャットを開く」または「AiDiy (Live): ライブ会話を開く」")
 
     print()
     print_success("セットアップは正常終了しました。")

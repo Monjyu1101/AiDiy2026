@@ -5,8 +5,9 @@ const { join } = require('node:path');
 const { runInNewContext } = require('node:vm');
 const protocol = require('../../out/aidiy_live/protocol.cjs');
 
-function screen(host, rejectProject = false, holdInput = false, reducedMotion = true, initialModelSettings) {
+function screen(host, rejectProject = false, holdInput = false, reducedMotion = true, initialModelSettings, blockAudioUnlock = false) {
   const elements = new Map(), sockets = [], calls = [], events = new Map(), intervals = new Set(), timers = new Map();
+  const audioCalls = [];
   let clock = 0, timerNumber = 0;
   let folder = { 名前: '別プロジェクト', パス: 'C:\\work\\別プロジェクト' }, folderListener, sessionNumber = 0, intervalNumber = 0;
   const defaults = { LIVE_AI_NAME: 'gemini_live', LIVE_GEMINI_MODEL: 'live-model', LIVE_GEMINI_VOICE: 'Kore',
@@ -77,7 +78,8 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
       if (name === './bridge') return { LiveEnvironment: function () { return environment; } };
       if (name === './audio') return { LiveAudio: class {
         speaker = true;
-        async unlock() {} async start() { return true; } close() {} stop() {} cancel() {} play() {}
+        async unlock() { audioCalls.push('unlock'); if (blockAudioUnlock) await new Promise(() => {}); }
+        async start() { audioCalls.push('start'); return true; } close() {} stop() {} cancel() {} play() {}
         mute(enabled) { this.speaker = enabled; }
       } };
       if (name === './visualizer') return { AudioCloud: class { dispose() {} } };
@@ -90,7 +92,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     clearTimeout: id => timers.delete(id), requestAnimationFrame: callback => callback(),
     setInterval() { const id = ++intervalNumber; intervals.add(id); return id; }, clearInterval: id => intervals.delete(id),
   });
-  return { element, sockets, calls, intervals, timers, releaseInput,
+  return { element, sockets, calls, intervals, timers, releaseInput, audioCalls,
     advance(milliseconds) {
       const target = clock + milliseconds;
       while (true) {
@@ -105,7 +107,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
   };
 }
 
-test('Live 単独画面: 起動時の3種のモデル選択を最初の接続へ渡し、画面で変更できる', async t => {
+test('Live 単独画面: 起動時の3種のモデル指定で自動接続し、画面で変更できる', async t => {
   for (const [provider, key, model] of [
     ['freeai_live', 'LIVE_FREEAI_MODEL', 'free-model'],
     ['gemini_live', 'LIVE_GEMINI_MODEL', 'live-model-2'],
@@ -116,10 +118,14 @@ test('Live 単独画面: 起動時の3種のモデル選択を最初の接続へ
       const ui = screen(false, false, false, true, initial); t.after(() => ui.close());
       await ui.ready();
       assert.match(ui.element('model-label').textContent, new RegExp(model));
-      await ui.element('connect').onclick();
+       assert.equal(ui.element('connect').textContent, '切断');
+       assert.equal(ui.element('mic').strong.textContent, 'OFF');
       const connects = ui.calls.filter(call=>call.packet?.type==='connect');
       assert.equal(connects.length, 3);
-      for (const call of connects) assert.deepEqual(call.packet.モデル設定, initial);
+       for (const call of connects) {
+         assert.deepEqual(call.packet.モデル設定, initial);
+         assert.equal(call.packet.CODE_BASE_PATH, 'C:\\work\\別プロジェクト');
+       }
       await ui.element('connect').onclick();
       await ui.element('choose-model').onclick();
       ui.element('provider').value = 'gemini_live'; ui.element('provider').onchange();
@@ -133,6 +139,43 @@ test('Live 単独画面: 起動時の3種のモデル選択を最初の接続へ
       }
     });
   }
+});
+
+test('Live 単独画面: 自動接続は音声再生の許可を待たず、マイクを開始しない', async t => {
+  const initial = { LIVE_AI_NAME: 'gemini_live', LIVE_GEMINI_MODEL: 'live-model' };
+  const ui = screen(false, false, false, true, initial, true); t.after(() => ui.close());
+  await ui.ready();
+  assert.equal(ui.element('connect').textContent, '切断');
+  assert.equal(ui.sockets.length, 3);
+  assert.deepEqual(ui.audioCalls, []);
+  assert.equal(ui.element('mic').strong.textContent, 'OFF');
+  await ui.element('connect').onclick(); await ui.ready();
+  assert.equal(ui.element('connect').textContent, '接続');
+  assert.equal(ui.sockets.length, 3); // 手動切断後は自動でつなぎ直さない。
+});
+
+test('Live: モデル未指定・Provider だけの指定・VS Code では自動接続しない', async t => {
+  for (const [host, initial] of [[false, undefined], [false, { LIVE_AI_NAME: 'gemini_live' }],
+    [true, { LIVE_AI_NAME: 'gemini_live', LIVE_GEMINI_MODEL: 'live-model' }]]) {
+    const ui = screen(host, false, false, true, initial); t.after(() => ui.close());
+    await ui.ready();
+    assert.equal(ui.element('connect').textContent, '接続');
+    assert.equal(ui.sockets.length, 0);
+  }
+});
+
+test('Live 単独画面: 自動接続の失敗は画面に表示し、再試行を繰り返さない', async t => {
+  const ui = screen(false, true, false, true, { LIVE_AI_NAME: 'gemini_live', LIVE_GEMINI_MODEL: 'live-model' });
+  t.after(() => ui.close()); await ui.ready();
+  assert.equal(ui.element('connect').textContent, '接続');
+  assert.match(ui.element('error').textContent, /プロジェクト設定失敗/);
+  assert.equal(ui.sockets.length, 1); assert.equal(ui.sockets[0].readyState, 3);
+});
+
+test('Live 単独画面: 初期設定の読み込み中に画面を閉じたら自動接続しない', async () => {
+  const ui = screen(false, false, false, true, { LIVE_AI_NAME: 'gemini_live', LIVE_GEMINI_MODEL: 'live-model' });
+  ui.close(); await ui.ready();
+  assert.equal(ui.sockets.length, 0);
 });
 
 for (const host of [true, false]) {

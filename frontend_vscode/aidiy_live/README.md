@@ -24,16 +24,16 @@ VS Code の Webview はマイク権限を提供しないため、Windows の入�
 
 セットアップ後は `aidiy_live` コマンドで起動できます。
 
-ルートの `vscode_live.bat` は FreeAI／Gemini／OpenAI の音声モデル の選択メニューを表示します。**未入力で Enter を押すと、Provider／モデルの起動引数を付けずに起動し、既定値とモデル選択は Live モジュールに任せます。** 番号を入力した場合は、対応する `--provider` / `--model` を渡します。追加の引数はそのまま転送します。起動後も画面の「モデル」から選択できます。`vscode_live.bat --browser` でブラウザ起動もできます。
+ルートの `vscode_live.bat` は FreeAI／Gemini／OpenAI の音声モデルの選択メニューを表示します。**未入力で Enter を押すと、Provider／モデルの起動引数を付けずに起動し、画面の「接続」で接続します。** 番号を入力した場合は、対応する `--provider` / `--model` を渡し、画面の準備後にそのモデルで自動接続します。マイクは OFF のままです。追加の引数はそのまま転送します。起動後も画面の「モデル」から選択できます。`vscode_live.bat --browser` でブラウザ起動もできます。bat だけを別プロジェクトのルートへコピーして使う場合は、コピー先を作業フォルダにしてセットアップ済みの `aidiy_live` を呼び出します。
 
-モデルを起動時に指定する場合は `--provider` / `--model` 引数を使います。最初の接続パケットの `モデル設定` に反映します。直接指定する場合:
+モデルを起動時に指定する場合は `--provider` / `--model` 引数を使います。Electron / ブラウザとも指定したモデルで初回に自動接続し、最初の接続パケットの `モデル設定` に反映します。接続に失敗した場合は画面に理由を表示します。直接指定する場合:
 
 ```powershell
 aidiy_live --provider freeai --model gemini-2.5-flash-native-audio-preview-09-2025
 aidiy_live --provider openai --model gpt-realtime-2.1-mini --browser
 ```
 
-Provider は `freeai` / `gemini` / `openai`（内部名の `freeai_live` / `gemini_live` / `openai_live` も可）を指定します。モデル指定時は Provider も指定してください。Provider だけ指定した場合は、その Provider のバックエンド既定モデルを使います。引数なしの `aidiy_live` はバックエンドの既定設定で起動します。`--project "C:\work\project"` で作業フォルダも指定できます。設定は子プロセスにも起動引数で渡し、環境変数は使いません。共通設定ファイルは変更しません。
+Provider は `freeai` / `gemini` / `openai`（内部名の `freeai_live` / `gemini_live` / `openai_live` も可）を指定します。モデル指定時は Provider も指定してください。Provider だけ指定した場合は、その Provider のバックエンド既定モデルを使い、接続は画面から行います。引数なしの `aidiy_live` はバックエンドの既定設定で起動します。`--project "C:\work\project"` で作業フォルダも指定できます。Electron の子プロセスには環境変数、ブラウザ中継の子プロセスには起動引数で設定を渡します。共通設定ファイルは変更しません。
 
 ```powershell
 .\frontend_vscode\aidiy_live.cmd
