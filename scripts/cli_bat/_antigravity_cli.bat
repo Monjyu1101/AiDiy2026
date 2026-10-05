@@ -28,9 +28,11 @@ ECHO Antigravity CLI model list
 ECHO   1: Gemini 3.8 Flash (High)
 ECHO   2: Gemini 3.8 Flash (Medium) - default
 ECHO   3: Gemini 3.8 Flash (Low)
+ECHO   0: Exit
 ECHO.
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: default]: "
+if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER goto LAUNCH
 if "%MODEL_NUMBER%"=="1" set "MODEL=gemini-3.8-flash-high"
 if "%MODEL_NUMBER%"=="2" set "MODEL=gemini-3.8-flash-medium"
@@ -73,3 +75,6 @@ endlocal & exit /b 1
 del /q "%ANTIGRAVITY_INSTALLER%" >nul 2>&1
 ECHO Antigravity CLI installation failed.
 endlocal & exit /b 1
+
+:END
+endlocal & exit /b 0

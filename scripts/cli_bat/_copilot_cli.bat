@@ -31,9 +31,11 @@ ECHO   7: Claude Opus 5.5 - complex agentic coding
 ECHO   8: Claude Sonnet 5.5 - balanced coding and speed
 ECHO   9: Claude Haiku 4.5 - fast and lightweight
 ECHO  10: Gemini 3.8 Flash - latest Gemini Flash
+ECHO   0: Exit
 ECHO.
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: default]: "
+if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER goto LAUNCH
 if "%MODEL_NUMBER%"=="1" set "MODEL=gpt-6-astra"
 if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-6.1-sol"
@@ -63,3 +65,6 @@ endlocal & exit /b %EXIT_CODE%
 :INSTALL_FAILED
 ECHO GitHub Copilot CLI installation failed.
 endlocal & exit /b 1
+
+:END
+endlocal & exit /b 0

@@ -25,9 +25,11 @@ ECHO   1: Fable - latest Claude Fable
 ECHO   2: Opus - latest Claude Opus
 ECHO   3: Sonnet - latest Claude Sonnet
 ECHO   4: Haiku - latest Claude Haiku
+ECHO   0: Exit
 ECHO.
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: default]: "
+if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER goto LAUNCH
 if "%MODEL_NUMBER%"=="1" set "MODEL=fable"
 if "%MODEL_NUMBER%"=="2" set "MODEL=opus"
@@ -51,3 +53,6 @@ endlocal & exit /b %EXIT_CODE%
 :INSTALL_FAILED
 ECHO Claude Code installation failed.
 endlocal & exit /b 1
+
+:END
+endlocal & exit /b 0

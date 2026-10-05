@@ -35,9 +35,11 @@ ECHO   2: GPT-6.1 Sol - frontier reasoning and coding
 ECHO   3: GPT-6 Sol
 ECHO   4: GPT-5.6 Terra - balanced quality and cost
 ECHO   5: GPT-6 Luna - fast, high-volume work
+ECHO   0: Exit
 ECHO.
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: previous (%PREVIOUS_MODEL_LABEL%)]: "
+if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER (
     set "MODEL=%PREVIOUS_MODEL%"
     goto LAUNCH
@@ -69,3 +71,6 @@ endlocal & exit /b %EXIT_CODE%
 :INSTALL_FAILED
 ECHO Codex CLI installation failed.
 endlocal & exit /b 1
+
+:END
+endlocal & exit /b 0

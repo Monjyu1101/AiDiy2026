@@ -17,10 +17,12 @@ ECHO   2: GPT-6.1 Sol - frontier reasoning and coding
 ECHO   3: GPT-6 Sol
 ECHO   4: GPT-5.6 Terra - balanced quality and cost
 ECHO   5: GPT-6 Luna - fast, high-volume work
+ECHO   0: Exit
 ECHO.
 set "MODEL="
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: GPT-6.1 Sol]: "
+if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER set "MODEL_NUMBER=2"
 if "%MODEL_NUMBER%"=="1" set "MODEL=gpt-6-astra"
 if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-6.1-sol"
@@ -37,3 +39,6 @@ call aidiy_hermes --yolo --provider openai_oauth --model "%MODEL%" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 
 endlocal & exit /b %EXIT_CODE%
+
+:END
+endlocal & exit /b 0
