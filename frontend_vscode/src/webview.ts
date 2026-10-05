@@ -82,7 +82,9 @@ const コンソール演出 = (content: HTMLDivElement, text: string, key: strin
   演出タイマー = window.setTimeout(tick, 500);
 };
 const ボタン更新 = () => {
-  element<HTMLButtonElement>('send').disabled = !入力許可 || 実行中 || 送信待ち || !prompt.value.trim();
+  const send = element<HTMLButtonElement>('send');
+  send.disabled = !入力許可 || 実行中 || 送信待ち || !prompt.value.trim();
+  send.classList.toggle('ws-disabled', !入力許可);
 };
 const 一覧切替 = (show: boolean) => {
   一覧表示中 = show;

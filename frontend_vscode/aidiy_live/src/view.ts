@@ -69,6 +69,7 @@ function controls() {
   button('speaker').querySelector('strong')!.textContent = speakerOn ? 'ON' : 'OFF';
   button('speaker').setAttribute('aria-label', `スピーカー ${speakerOn ? 'ON' : 'OFF'}`);
   button('send').disabled = !connected || changing || !element<HTMLTextAreaElement>('text').value.trim();
+  button('send').classList.toggle('ws-disabled', !connected);
   button('apply').disabled = !connected || changing || !provider.value || !model.value;
   for (const select of [provider, model, voice]) select.disabled = !connected || changing;
   status.textContent = busy ? '接続中' : connected ? mic ? '会話中' : '接続済み' : '未接続';
