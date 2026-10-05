@@ -5,7 +5,7 @@ const { join } = require('node:path');
 const { runInNewContext } = require('node:vm');
 const protocol = require('../../out/aidiy_live/protocol.cjs');
 
-function screen(host, rejectProject = false, holdInput = false, reducedMotion = true) {
+function screen(host, rejectProject = false, holdInput = false, reducedMotion = true, initialModelSettings) {
   const elements = new Map(), sockets = [], calls = [], events = new Map(), intervals = new Set(), timers = new Map();
   let clock = 0, timerNumber = 0;
   let folder = { 名前: '別プロジェクト', パス: 'C:\\work\\別プロジェクト' }, folderListener, sessionNumber = 0, intervalNumber = 0;
@@ -58,7 +58,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
   const environment = {
     host, socketUrl: '', captureUrl: '', socket: () => new Socket(),
     onStop() {}, onMicrophoneStop() {}, onFolder(callback) { folderListener = callback; },
-    async context() { return { backend: 'http://localhost:8091', 作業フォルダ: folder }; },
+    async context() { return { backend: 'http://localhost:8091', 作業フォルダ: folder, モデル設定: initialModelSettings }; },
     async api(path, body) {
       calls.push({ kind: 'api', path, body });
       assert.equal(path, 'core/AIコア/モデル情報/取得'); // 設定APIで起動後に差し替えない。
@@ -104,6 +104,36 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     changeFolder(value) { folder = value; folderListener(value); }, close() { events.get('pagehide')(); },
   };
 }
+
+test('Live 単独画面: 起動時の3種のモデル選択を最初の接続へ渡し、画面で変更できる', async t => {
+  for (const [provider, key, model] of [
+    ['freeai_live', 'LIVE_FREEAI_MODEL', 'free-model'],
+    ['gemini_live', 'LIVE_GEMINI_MODEL', 'live-model-2'],
+    ['openai_live', 'LIVE_OPENAI_MODEL', 'realtime-model'],
+  ]) {
+    await t.test(provider, async t => {
+      const initial = { LIVE_AI_NAME: provider, [key]: model };
+      const ui = screen(false, false, false, true, initial); t.after(() => ui.close());
+      await ui.ready();
+      assert.match(ui.element('model-label').textContent, new RegExp(model));
+      await ui.element('connect').onclick();
+      const connects = ui.calls.filter(call=>call.packet?.type==='connect');
+      assert.equal(connects.length, 3);
+      for (const call of connects) assert.deepEqual(call.packet.モデル設定, initial);
+      await ui.element('connect').onclick();
+      await ui.element('choose-model').onclick();
+      ui.element('provider').value = 'gemini_live'; ui.element('provider').onchange();
+      ui.element('model').value = 'live-model'; ui.element('model').onchange();
+      ui.element('voice').value = 'Kore'; ui.element('voice').onchange();
+      assert.equal(ui.element('apply').disabled, false);
+      await ui.element('apply').onclick();
+      await ui.element('connect').onclick();
+      for (const call of ui.calls.filter(call=>call.packet?.type==='connect').slice(-3)) {
+        assert.deepEqual(call.packet.モデル設定, { LIVE_AI_NAME: 'gemini_live', LIVE_GEMINI_MODEL: 'live-model', LIVE_GEMINI_VOICE: 'Kore' });
+      }
+    });
+  }
+});
 
 for (const host of [true, false]) {
   test(`Live ${host ? 'VS Code' : '単独画面'}: 手入力と音声認識をクリックして入力欄へコピーする`, async t => {

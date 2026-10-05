@@ -6,7 +6,7 @@ import { CLI実行, 会話引数, 起動解決, type 起動設定 } from '../../
 import { コード要求実行, streamControlOf, visibleStreamContent } from '../../src/protocol';
 
 // 単独試用も拡張と同じ CLI・メッセージ形式・描画を使う。
-export async function 単独起動(project: string, launch?: 起動設定) {
+export async function 単独起動(project: string, launch?: 起動設定, initialModel: { provider?: string; model?: string } = {}) {
   const root = resolve(__dirname, '../..');
   const folder = resolve(project);
   if (!statSync(folder).isDirectory()) throw new Error('作業フォルダがありません。');
@@ -14,7 +14,8 @@ export async function 単独起動(project: string, launch?: 起動設定) {
   const state = {
     type: 'state', 会話ID: randomUUID() as string, 作業URI: folder, 信頼済み: true,
     作業フォルダ: { 名前: basename(folder), パス: folder },
-    provider: String(defaults['aidiyHermes.provider'].default), model: String(defaults['aidiyHermes.model'].default),
+    provider: initialModel.provider?.trim() || String(defaults['aidiyHermes.provider'].default),
+    model: initialModel.model?.trim() || String(defaults['aidiyHermes.model'].default),
     メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false,
     セッションID: undefined as string | undefined,
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
@@ -183,7 +184,7 @@ export async function 単独起動(project: string, launch?: 起動設定) {
 
 if (require.main === module) {
   const project = process.argv[2] || process.cwd();
-  void 単独起動(project).then(app => {
+  void 単独起動(project, undefined, process.argv[4] ? JSON.parse(process.argv[4]) : {}).then(app => {
     if (process.argv[3]) writeFileSync(process.argv[3], JSON.stringify({url:app.url, pid:process.pid}), 'utf8');
     else console.log(`AiDiy (Code): ${app.url}`);
     process.on('SIGINT', () => { void app.close(); });

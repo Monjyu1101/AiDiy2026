@@ -19,7 +19,7 @@ app.on('before-quit', event => {
 app.on('window-all-closed', () => app.quit());
 
 app.whenReady().then(async () => {
-  server = await 単独起動(resolve(args[0] || process.cwd()));
+  server = await 単独起動(resolve(args[0] || process.cwd()), undefined, args[2] ? JSON.parse(args[2]) : {});
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
     title: 'AiDiy (Code)', width: 476, height: 602, minWidth: 360, minHeight: 480,

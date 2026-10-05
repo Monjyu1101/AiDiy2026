@@ -12,6 +12,19 @@ const { LiveConnection, 入力レート, 音声入力, 音声操作 } = require(
 const { LiveAudio } = require('../../out/aidiy_live/audio.cjs');
 const root = join(__dirname, '../..');
 
+test('単独起動: 起動時の Provider / モデルを画面設定へ渡す', async t => {
+  for (const [provider, modelKey] of [
+    ['freeai_live', 'LIVE_FREEAI_MODEL'], ['gemini_live', 'LIVE_GEMINI_MODEL'], ['openai_live', 'LIVE_OPENAI_MODEL'],
+  ]) {
+    await t.test(provider, async t => {
+      const live = await ライブ起動(root, undefined, false, process.cwd(), { LIVE_AI_NAME: provider, [modelKey]: 'launch-model' });
+      t.after(() => live.close());
+      const config = await (await fetch(new URL('config', live.url))).json();
+      assert.deepEqual(config.モデル設定, { LIVE_AI_NAME: provider, [modelKey]: 'launch-model' });
+    });
+  }
+});
+
 test('ブラウザ版の起動コマンドがURLを返し、終了できる', { timeout: 8000 }, async t => {
   const child = spawn(process.execPath, ['aidiy_live/launch.mjs', '--serve'], { cwd: root });
   t.after(() => child.kill());

@@ -180,6 +180,8 @@ function modelOptions() {
 }
 async function loadModels() {
   const run = generation;
+  await initialContext;
+  if (run !== generation) return;
   const data = await api('core/AIコア/モデル情報/取得', { セッションID: connection.session });
   if (run !== generation) return;
   settings = connection.session ? data.モデル設定 || {} : { ...data.モデル設定, ...preferredSettings }; models = data.available_models?.live_models || {}; voices = data.available_models?.live_voices || {};
@@ -207,6 +209,8 @@ async function connectSession(preserveConversation = false) {
   if (heartbeat) clearInterval(heartbeat); heartbeat = undefined;
   try {
     await audio.unlock();
+    if (run !== generation) return;
+    await initialContext;
     if (run !== generation) return;
     const config = await environment.context();
     if (run !== generation) return;
@@ -304,9 +308,14 @@ function reveal() {
 }
 // 接続先情報が遅れても操作できる画面を表示する。
 const revealTimeout = window.setTimeout(reveal, 2500);
-environment.context().then(config => {
+const initialContext = environment.context().then(config => {
   element<HTMLInputElement>('backend').value = config.backend || '';
   showFolder(config.作業フォルダ);
+  preferredSettings = { ...config.モデル設定, ...preferredSettings };
+  if (Object.keys(preferredSettings).length) {
+    settings = { ...settings, ...preferredSettings };
+    element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model]].filter(Boolean).join(' · ');
+  }
 }).catch(() => showError('接続先情報を取得できません。')).finally(reveal);
 controls();
 environment.ready();

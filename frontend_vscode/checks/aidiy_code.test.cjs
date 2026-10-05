@@ -30,6 +30,27 @@ async function connect(app) {
 function post(app, data, origin = new URL(app.url).origin) {
   return fetch(app.url+'message',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)});
 }
+test('単独画面: 起動時の Provider / モデルを表示・実行・新規会話に反映する', async t => {
+  for (const [provider, model] of [['copilot-cli', 'claude-sonnet-5.5'], ['openai_oauth', 'gpt-6-astra'], ['claude-code', 'auto'], ['codex-cli', 'auto'], ['copilot-cli', 'auto']]) {
+    await t.test(provider, async () => {
+      const app = await 単独起動(process.cwd(), {実行ファイル:process.execPath, 引数:[fake,'echo']}, { provider: ` ${provider} `, model: ` ${model} ` });
+      const stream = await connect(app);
+      try {
+        const initial = await stream.wait(p=>p.type==='state');
+        assert.equal(initial.provider, provider); assert.equal(initial.model, model);
+        await post(app, {メッセージ識別:'input_text', メッセージ内容:'起動時の選択を確認'});
+        const completed = await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.種別==='assistant'));
+        const reply = JSON.parse(completed.メッセージ.find(m=>m.種別==='assistant').本文);
+        assert.equal(reply.args[reply.args.indexOf('--provider')+1], provider);
+        if (model === 'auto') assert.ok(!reply.args.includes('--model'));
+        else assert.equal(reply.args[reply.args.indexOf('--model')+1], model);
+        await post(app, {type:'new'});
+        const reset = await stream.wait(p=>p.type==='state' && p.会話ID!==initial.会話ID);
+        assert.equal(reset.provider, provider); assert.equal(reset.model, model);
+      } finally { await stream.close(); await app.close(); }
+    });
+  }
+});
 test('単独画面: 接続制限・送信・継続・履歴選択と削除・最終モデル', async () => {
   const app = await 単独起動(process.cwd(), {実行ファイル:process.execPath, 引数:[fake,'echo']});
   const stream = await connect(app);

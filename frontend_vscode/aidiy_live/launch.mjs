@@ -4,19 +4,37 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { parseArgs } from 'node:util';
 const root = fileURLToPath(new URL('..', import.meta.url));
-const projectRoot = resolve(process.env.AIDIY_LIVE_PROJECT || process.cwd());
-const args = process.argv.slice(2);
-let backend = 'http://127.0.0.1:8091', mode = 'desktop', foreground = false;
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--backend' && args[i + 1]) backend = args[++i];
-  else if (args[i] === '--browser') mode = 'browser';
-  else if (args[i] === '--serve') mode = 'serve';
-  else if (args[i] === '--foreground') foreground = true;
-  else if (args[i] === '--help') {
-    console.log('aidiy_live [--browser | --serve] [--backend http://127.0.0.1:8091] [--foreground]'); process.exit(0);
-  } else { console.error(`不明な引数: ${args[i]}`); process.exit(1); }
+let options;
+try {
+  options = parseArgs({ options: {
+    provider: { type: 'string' }, model: { type: 'string' }, backend: { type: 'string' },
+    project: { type: 'string' }, 'ready-file': { type: 'string' },
+    browser: { type: 'boolean' }, serve: { type: 'boolean' }, foreground: { type: 'boolean' }, help: { type: 'boolean' },
+  } }).values;
+  for (const name of ['provider', 'model', 'backend', 'project', 'ready-file']) {
+    if (options[name] !== undefined && !options[name].trim()) throw new Error(`--${name} に値を指定してください。`);
+  }
+  if (options.model && !options.provider) throw new Error('Live の --model には --provider も指定してください。');
+} catch (error) { console.error(error.message); process.exit(1); }
+if (options.help) {
+  console.log('aidiy_live [--provider freeai|gemini|openai] [--model モデル名] [--project 作業フォルダ] [--browser | --serve] [--backend http://127.0.0.1:8091] [--foreground]');
+  console.log('指定なし: バックエンドの既定設定で起動。起動後も画面の「モデル」から選択できます。'); process.exit(0);
 }
+const providerAliases = { freeai: 'freeai_live', gemini: 'gemini_live', openai: 'openai_live', freeai_live: 'freeai_live', gemini_live: 'gemini_live', openai_live: 'openai_live' };
+const requestedProvider = options.provider?.trim();
+if (requestedProvider && !Object.hasOwn(providerAliases, requestedProvider)) {
+  console.error('Live の Provider は freeai / gemini / openai を指定してください。'); process.exit(1);
+}
+const provider = providerAliases[requestedProvider], model = options.model?.trim();
+const projectRoot = resolve(options.project || process.cwd());
+const backend = options.backend || 'http://127.0.0.1:8091';
+const mode = options.serve ? 'serve' : options.browser ? 'browser' : 'desktop';
+const foreground = !!options.foreground;
+const modelArgs = [...(provider ? ['--provider', provider] : []), ...(model ? ['--model', model] : [])];
+const modelKeys = { freeai_live: 'LIVE_FREEAI_MODEL', gemini_live: 'LIVE_GEMINI_MODEL', openai_live: 'LIVE_OPENAI_MODEL' };
+const modelSettings = provider ? { LIVE_AI_NAME: provider, ...(model ? { [modelKeys[provider]]: model } : {}) } : {};
 function electronExecutable() {
   const error = new Error('Electron が未配置です。python frontend_vscode/_setup.py を実行するか、--browser を指定してください。');
   try {
@@ -34,7 +52,7 @@ async function main() {
   if (!existsSync(join(root, 'dist/aidiy_live/server.cjs')) || !existsSync(join(root, 'dist/aidiy_live/view.js'))) await import('./build.mjs');
   async function startBrowser(open = true) {
     const { ライブ起動 } = createRequire(import.meta.url)('../dist/aidiy_live/server.cjs');
-    const server = await ライブ起動(root, backend, false, projectRoot);
+    const server = await ライブ起動(root, backend, false, projectRoot, modelSettings);
     console.log(`aidiy_live: ${server.url}\n接続先: ${backend}\n終了: Ctrl+C`);
     let idle;
     const close = () => { void server.close().then(() => process.exit(0)); };
@@ -61,7 +79,7 @@ async function main() {
       catch (error) { await server.close(); throw new Error(`ブラウザを開けません: ${error.message}`); }
       browser.unref();
       idle = setInterval(() => { if (server.idleMilliseconds() >= 60000) { clearInterval(idle); close(); } }, 5000);
-      if (process.env.AIDIY_LIVE_BROWSER_READY) writeFileSync(process.env.AIDIY_LIVE_BROWSER_READY, JSON.stringify({ url: server.url, pid: process.pid }));
+      if (options['ready-file']) writeFileSync(options['ready-file'], JSON.stringify({ url: server.url, pid: process.pid }));
     }
     return;
   }
@@ -70,9 +88,8 @@ async function main() {
     const run = randomUUID(), ready = join(runRoot, `${run}.browser.json`), log = join(runRoot, `${run}.browser.log`);
     const descriptor = openSync(log, 'w');
     let child;
-    try { child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--foreground', '--backend', backend], {
+    try { child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--foreground', '--backend', backend, '--project', projectRoot, '--ready-file', ready, ...modelArgs], {
       cwd: root, detached: true, windowsHide: true, stdio: ['ignore', descriptor, descriptor],
-      env: { ...process.env, AIDIY_LIVE_BROWSER_READY: ready, AIDIY_LIVE_PROJECT: projectRoot },
     }); } finally { closeSync(descriptor); }
     let failure; child.once('error', error => { failure = error; }); child.unref();
     const deadline = Date.now() + 15000;
@@ -91,10 +108,9 @@ async function main() {
     const executable = electronExecutable(), runRoot = join(root, 'out/aidiy_live'); mkdirSync(runRoot, { recursive: true });
     const run = randomUUID(), ready = join(runRoot, `${run}.json`), log = join(runRoot, `${run}.log`);
     const descriptor = openSync(log, 'w');
-    const env = { ...process.env, ELECTRON_ENABLE_LOGGING: '1', AIDIY_LIVE_BACKEND: backend, AIDIY_LIVE_READY: ready, AIDIY_LIVE_PROJECT: projectRoot }; delete env.ELECTRON_RUN_AS_NODE;
+    const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
     let child;
-    // Chromium にアプリの設定ファイルを解釈させないよう、起動設定は環境変数で渡す。
-    try { child = spawn(executable, [join(root, 'aidiy_live/desktop.cjs')], { cwd: root, detached: !foreground, stdio: foreground ? 'inherit' : ['ignore', descriptor, descriptor], windowsHide: false, env }); }
+    try { child = spawn(executable, [join(root, 'aidiy_live/desktop.cjs'), backend, ready, projectRoot, JSON.stringify(modelSettings)], { cwd: root, detached: !foreground, stdio: foreground ? 'inherit' : ['ignore', descriptor, descriptor], windowsHide: false, env }); }
     finally { closeSync(descriptor); }
     let failure; child.on('error', error => { failure = error; }); if (!foreground) child.unref();
     const deadline = Date.now() + 15000;

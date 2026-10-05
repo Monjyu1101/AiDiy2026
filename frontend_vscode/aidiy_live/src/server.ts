@@ -6,7 +6,7 @@ import { basename, join } from 'node:path';
 import type { Socket } from 'node:net';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
-export async function ライブ起動(root: string, backend = 'http://127.0.0.1:8091', packaged = false, projectPath: string | null = process.cwd()) {
+export async function ライブ起動(root: string, backend = 'http://127.0.0.1:8091', packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}) {
   const 作業フォルダ = projectPath ? { 名前: basename(projectPath) || projectPath, パス: projectPath } : null;
   const target = new URL(backend);
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.pathname !== '/' || target.search || target.hash) {
@@ -47,7 +47,7 @@ export async function ライブ起動(root: string, backend = 'http://127.0.0.1:
     }
     if (path === 'config' && req.method === 'GET') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ backend: target.origin, 作業フォルダ })); return;
+      res.end(JSON.stringify({ backend: target.origin, 作業フォルダ, ...(Object.keys(モデル設定).length ? { モデル設定 } : {}) })); return;
     }
     if (path !== null && assets[path] && req.method === 'GET') {
       try {

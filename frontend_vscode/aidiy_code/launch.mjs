@@ -4,15 +4,28 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync } fr
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { parseArgs } from 'node:util';
 
 const extensionRoot = fileURLToPath(new URL('..', import.meta.url));
-const args = process.argv.slice(2);
-if (args.includes('--help')) {
-  console.log('aidiy_code [作業フォルダ] [--browser]');
+let options;
+try {
+  options = parseArgs({ allowPositionals: true, options: {
+    provider: { type: 'string' }, model: { type: 'string' }, browser: { type: 'boolean' }, help: { type: 'boolean' },
+  } });
+  if (options.positionals.length > 1) throw new Error('作業フォルダは1つだけ指定してください。');
+  for (const name of ['provider', 'model']) {
+    if (options.values[name] !== undefined && !options.values[name].trim()) throw new Error(`--${name} に値を指定してください。`);
+  }
+} catch (error) { console.error(error.message); process.exit(1); }
+if (options.values.help) {
+  console.log('aidiy_code [作業フォルダ] [--provider Provider] [--model モデル名] [--browser]');
+  console.log('指定なし: 既定の Provider / モデルで起動。起動後も画面の「モデル」から選択できます。');
   process.exit(0);
 }
-const browserMode = args.includes('--browser');
-const projectRoot = resolve(args.find(arg => arg !== '--browser') || process.cwd());
+const browserMode = options.values.browser;
+const projectRoot = resolve(options.positionals[0] || process.cwd());
+const provider = options.values.provider?.trim().replace(/^copilot_cli$/, 'copilot-cli');
+const model = options.values.model?.trim();
 const bundle = join(extensionRoot, 'dist', 'aidiy_code', 'server.cjs');
 const runRoot = join(extensionRoot, 'out', 'aidiy_code');
 
@@ -92,13 +105,14 @@ async function main() {
     entry = join(extensionRoot, 'aidiy_code', 'desktop.cjs');
   }
   const env = { ...process.env };
+  const initialModel = { provider, model: model || (provider ? 'auto' : undefined) };
   // VS Code のターミナルから起動しても Electron を通常のデスクトップモードで動かす。
   if (!browserMode) delete env.ELECTRON_RUN_AS_NODE;
   const stdout = openSync(join(runRoot, `${runId}.stdout.log`), 'w');
   const stderrPath = join(runRoot, `${runId}.stderr.log`);
   const stderr = openSync(stderrPath, 'w');
   try {
-    server = spawn(executable, [entry, projectRoot, readyPath], {
+    server = spawn(executable, [entry, projectRoot, readyPath, JSON.stringify(initialModel)], {
       cwd: projectRoot, detached: true, stdio: ['ignore', stdout, stderr], windowsHide: browserMode, env,
     });
   } finally {

@@ -20,7 +20,7 @@ function fixture(t) {
   const binary = path.join(electron, 'dist', executable);
   const env = { ...process.env };
   delete env.ELECTRON_OVERRIDE_DIST_PATH;
-  const launch = () => spawnSync(process.execPath, [path.join(scripts, 'launch.mjs'), root], {
+  const launch = (...args) => spawnSync(process.execPath, [path.join(scripts, 'launch.mjs'), root, ...args], {
     encoding: 'utf8', timeout: 20000, env,
   });
   function desktop(source) {
@@ -35,6 +35,36 @@ function fixture(t) {
   }
   return { root, electron, executable, binary, launch, desktop };
 }
+
+test('Code 起動引数: 指定した Provider / モデルを専用ウィンドウへ渡す', t => {
+  const f = fixture(t);
+  f.desktop(`const assert = require('node:assert/strict');
+    assert.deepEqual(JSON.parse(process.argv[4]), { provider: 'copilot-cli', model: 'claude-sonnet-5.5' });
+    require('node:fs').writeFileSync(process.argv[3], JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
+  const result = f.launch('--provider=copilot_cli', '--model', 'claude-sonnet-5.5');
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('Code 起動引数: 未指定時は既定値を使い、Provider だけならモデルは自動', t => {
+  const f = fixture(t);
+  f.desktop(`const assert = require('node:assert/strict');
+    const settings = JSON.parse(process.argv[4]);
+    assert.deepEqual(settings, settings.provider ? { provider: 'copilot-cli', model: 'auto' } : {});
+    require('node:fs').writeFileSync(process.argv[3], JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
+  for (const args of [[], ['--provider', 'copilot-cli']]) {
+    const result = f.launch(...args);
+    assert.equal(result.status, 0, result.stderr);
+  }
+});
+
+test('Code 起動引数: 値不足と未知の引数を起動前に拒否する', t => {
+  const f = fixture(t);
+  for (const args of [['--model'], ['--provider', ''], ['--unknown']]) {
+    const result = f.launch(...args);
+    assert.equal(result.status, 1);
+    assert.doesNotMatch(result.stderr, /_setup\.py/);
+  }
+});
 
 test('missing Electron gives setup guidance without downloading', t => {
   const { launch } = fixture(t);
