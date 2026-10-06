@@ -1,6 +1,6 @@
 # Vite プロキシ設定
 
-> 文書: `frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md` | 実装: `frontend_web/vite.config.ts`, `frontend_avatar/vite.config.ts`
+> 文書: `frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md` | 実装: `frontend_web/vite.config.ts`, `frontend_avatar/vite.config.mts`
 
 ## このメモを使う場面
 - フロントから API を呼ぶと CORS エラーになる
@@ -9,7 +9,7 @@
 
 ## 関連ファイル
 - `frontend_web/vite.config.ts` — Web 用 Vite Proxy（port 8090）
-- `frontend_avatar/vite.config.ts` — Avatar 用 Vite Proxy（port 8092）
+- `frontend_avatar/vite.config.mts` — Avatar 用 Vite Proxy（port 8092）
 - `frontend_web/src/api/client.ts` — `baseURL: '/'` 前提の Axios クライアント
 - `frontend_avatar/src/api/config.ts` — `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` / `VITE_TASKTEAM_BASE_URL` の解決
 - `frontend_avatar/src/api/client.ts` — `apiClient`（core）、`taskClient` / `teamClient`（backend_taskteam）
@@ -67,7 +67,7 @@ proxy: {
 `backend_taskteam` には CORS ミドルウェアがないため、ブラウザからの `/task` / `/team` 呼び出しは必ず Vite proxy（または Nginx 等のリバースプロキシ）経由にする。`frontend_avatar` の Electron 本番では `TASKTEAM_BASE_URL` が `http://127.0.0.1:8093` を指し、用途別クライアントが同じ統合サーバーへ直結する。
 
 ## ポート変更時の手順
-1. `frontend_web/vite.config.ts` または `frontend_avatar/vite.config.ts` の `server.port` を更新する。
+1. `frontend_web/vite.config.ts` または `frontend_avatar/vite.config.mts` の `server.port` を更新する。
 2. `backend_server/core_main.py` / `apps_main.py` の CORS origins にフロントの新URLを追加する。
 3. 固定URLを参照している表示部品（例: `_TopBar.vue` のサーバー状態表示）を確認する。
 4. `frontend_avatar` で明示 URL を使う場合は `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` / `VITE_TASKTEAM_BASE_URL` も更新する。

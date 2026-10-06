@@ -34,6 +34,8 @@ AIWebSocket (implements IWebSocketClient)
 5. 以降は on() で登録したハンドラがメッセージを受信
 ```
 
+`onopen` では `connect` パケットを送信してから `onStateChange(true)` を通知する。状態ハンドラが操作状態を同期するため、先に通知すると `operations` がサーバーの初回受信になり、その後の `connect` が「不明なメッセージ識別: None」になる。初回接続・再接続の送信順序は `node --test frontend_avatar/checks/websocket-handshake.test.cjs` で確認する。
+
 ## 音声セッションのプロジェクトフォルダ
 
 Web／Avatar の親画面は `core` の初期化情報から `モデル設定.CODE_BASE_PATH` を保持し、AIコアの `codeBasePath` prop へ渡します。音声接続は `new AIWebSocket(url, sessionId, 'audio', codeBasePath)` で作成し、初回・再接続とも `connect` パケットに `CODE_BASE_PATH` を含めます。未指定時は従来のセッション設定を使用します。

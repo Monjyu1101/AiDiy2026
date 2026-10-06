@@ -258,7 +258,7 @@
 
  frontend_avatar/ # AIアバタークライアント
   src/ # Vue 3 + TypeScript
-  vite.config.ts # Avatar Webモード (8092)
+  vite.config.mts # Avatar Webモード (8092)
   AGENTS.md
 
  backend_tools/ # MCPサーバー群 (ポート8095、19個)
@@ -377,7 +377,7 @@
  <div>
  <strong>ポート変更時の注意</strong>
  <p>
- フロントエンドのポートを変更する場合、<code>frontend_web/vite.config.ts</code> または <code>frontend_avatar/vite.config.ts</code> の <code>server.port</code> だけでなく、
+ フロントエンドのポートを変更する場合、<code>frontend_web/vite.config.ts</code> または <code>frontend_avatar/vite.config.mts</code> の <code>server.port</code> だけでなく、
  以下の設定も連動して更新する必要があります。
  </p>
  <ul>

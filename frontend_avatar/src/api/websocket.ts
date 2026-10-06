@@ -116,13 +116,14 @@ export class AIWebSocket implements IWebSocketClient {
           return
         }
         this.reconnectAttempts = 0
-        this.emitState(true)
         socket.send(JSON.stringify({
           type: 'connect',
           セッションID: this.requestedSessionId || null,
           ソケット番号: this.requestedSocketNumber || null,
           ...(this.codeBasePath ? { CODE_BASE_PATH: this.codeBasePath } : {}),
         }))
+        // 接続通知を先に送り、状態ハンドラの送信が初回受信になるのを防ぐ。
+        this.emitState(true)
       }
 
       socket.onmessage = (event) => {

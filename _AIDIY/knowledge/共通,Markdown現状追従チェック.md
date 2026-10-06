@@ -28,7 +28,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 - [ ] 常駐バックエンドは 5 サーバー構成（core 8091 / apps 8098 / tools 8095 / local 8096 / task・team 8093）として記載している。
 - [ ] Vite proxy は `/core` → 8091、`/apps` → 8098、`/task` → 8093、`/team` → 8093 で記載している。
   - `frontend_avatar` は上記 4 経路。`frontend_web` はこれに `/mcp` → 8095（rewrite で prefix 除去）を加えた 5 経路。
-  - 同期元: `frontend_web/vite.config.ts`, `frontend_avatar/vite.config.ts`
+  - 同期元: `frontend_web/vite.config.ts`, `frontend_avatar/vite.config.mts`
 - [ ] `backend_taskteam` は「AIタスク実行 + 定期タスク + 複数AIエージェントのチーム活動」として記載している。
   - 同期元: `backend_taskteam/task_proc/tasks_api.py`, `backend_taskteam/task_proc/tasks_watcher.py`, `backend_taskteam/team_proc/team_api.py`, `backend_taskteam/team_proc/team_watcher.py`
   - AIタスクとAIチームは `backend_taskteam` の単一サービスとして記載する。

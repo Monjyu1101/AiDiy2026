@@ -88,7 +88,6 @@ export class AIWebSocket implements IWebSocketClient {
           console.log('[WebSocket] 接続確立');
           this.reconnectAttempts = 0;
           this.isInitialConnection = false; // 初回接続完了
-          this.emitState(true);
 
           // セッションIDを送信
           if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -100,6 +99,8 @@ export class AIWebSocket implements IWebSocketClient {
             };
             console.log('[WebSocket] セッションID送信:', this.要求セッションID, 'ソケット番号:', this.要求ソケット番号);
             this.ws.send(JSON.stringify(initMessage));
+            // 接続通知を先に送り、状態ハンドラの送信が初回受信になるのを防ぐ。
+            this.emitState(true);
           }
         };
 

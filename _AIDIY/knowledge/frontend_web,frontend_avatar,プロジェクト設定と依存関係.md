@@ -1,6 +1,6 @@
 # プロジェクト設定と依存関係
 
-> 文書: `frontend_web,frontend_avatar,プロジェクト設定と依存関係.md` | 実装: `frontend_web/package.json`, `frontend_avatar/package.json`, `frontend_web/tsconfig.json`, `frontend_avatar/tsconfig.json`, `frontend_web/vite.config.ts`, `frontend_avatar/vite.config.ts`
+> 文書: `frontend_web,frontend_avatar,プロジェクト設定と依存関係.md` | 実装: `frontend_web/package.json`, `frontend_avatar/package.json`, `frontend_web/tsconfig.json`, `frontend_avatar/tsconfig.json`, `frontend_web/vite.config.ts`, `frontend_avatar/vite.config.mts`
 
 ## このメモを使う場面
 
@@ -85,6 +85,8 @@ frontend_avatar の型を frontend_web で使うとき:
 | proxy (/task) | 8093 | 8093（同一） |
 | optimizeDeps.include | monaco-editor | monaco-editor, three, @pixiv/three-vrm, @pixiv/three-vrm-animation |
 | resolve.alias | @ → ./src | @ → ./src（同一） |
+
+Avatar の Vite 設定は `vite.config.mts` とし、ESM として読み込ませる。Electron は `tsconfig.electron.json` の `module: "CommonJS"` で出力するため、Vite の警告対策でプロジェクト全体を `"type": "module"` に変更しない。
 
 ### Vite proxy 変更時の手順
 

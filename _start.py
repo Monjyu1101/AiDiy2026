@@ -341,19 +341,34 @@ def kill_process_on_port(port: int) -> bool:
 # ============================================================
 # 出力集約 / 安定待機
 # ============================================================
+_OUTPUT_LOCK = threading.Lock()
+
+
 def stream_output(name: str, stream, last_output_times: dict[str, float]) -> None:
     if stream is None:
         return
+    pending = b""
+
+    def write_line(line: bytes) -> None:
+        # UTF-8の途中でデコードせず、サービス名は行頭に1回だけ付ける。
+        text = line.decode("utf-8", errors="replace")
+        with _OUTPUT_LOCK:
+            sys.stdout.write(f"{Colors.OKCYAN}[{name}]{Colors.ENDC} {text}\n")
+            sys.stdout.flush()
+
     try:
         while True:
             chunk = stream.read(1024)
             if not chunk:
                 break
             last_output_times[name] = time.time()
-            text = chunk.decode("utf-8", errors="replace")
-            for line in text.splitlines(keepends=True):
-                sys.stdout.write(f"{Colors.OKCYAN}[{name}]{Colors.ENDC} {line}")
-            sys.stdout.flush()
+            lines = (pending + chunk).split(b"\n")
+            pending = lines.pop()
+            for line in lines:
+                write_line(line.rstrip(b"\r"))
+        # 改行のない最終行も、他サービスのログと連結させずに表示する。
+        if pending:
+            write_line(pending.rstrip(b"\r"))
     except Exception:
         pass
 
