@@ -9,6 +9,7 @@ function fixture(t) {
   const root = fs.mkdtempSync(join(tmpdir(), 'aidiy-live-launch-'));
   const app = join(root, 'aidiy_live'), bundle = join(root, 'dist/aidiy_live');
   fs.mkdirSync(app); fs.mkdirSync(bundle, { recursive: true });
+  fs.copyFileSync(join(__dirname, '../local-backend.cjs'), join(app, 'local-backend.cjs'));
   const source = fs.readFileSync(join(__dirname, '../launch.mjs'), 'utf8');
   assert.ok(source.includes('spawn(command, browserArgs,'));
   // OS のブラウザ起動だけを代替し、親子の起動・常駐・通知処理は実コードで検証する。
@@ -92,4 +93,17 @@ test('Live 起動引数: 値不足・未知の引数・不正な Provider を起
     assert.equal(result.status, 1);
     assert.doesNotMatch(result.stdout, /起動しました/);
   }
+});
+
+test('Live 接続先: 共通PORT_COREを自動参照し、接続先の指定を要求しない', async t => {
+  const f = fixture(t);
+  fs.mkdirSync(join(f.root, '_config'));
+  fs.writeFileSync(join(f.root, '_config/AiDiy_key.json'), JSON.stringify({ PORT_CORE: '9091' }));
+  const result = f.launch('--browser');
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /接続先:/);
+  const url = result.stdout.match(/ブラウザ版を起動しました: (http[^\r\n]+)/)[1];
+  assert.equal((await (await fetch(new URL('config', url))).json()).backend, 'http://127.0.0.1:9091');
+  assert.doesNotMatch(f.launch('--help').stdout, /--backend/);
+  assert.equal(f.launch('--backend', 'https://example.test').status, 1);
 });

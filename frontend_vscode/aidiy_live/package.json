@@ -31,7 +31,6 @@
       { "command": "aidiyLive.settings", "when": "view == aidiyLive.chat", "group": "navigation" }
     ] },
     "configuration": { "title": "AiDiy (Live)", "properties": {
-      "aidiyLive.backendUrl": { "type": "string", "default": "http://127.0.0.1:8091", "scope": "machine", "description": "既存 AIコアの接続先。http(s)://ホスト:ポート を指定します。" },
       "aidiyLive.pythonPath": { "type": "string", "default": "", "scope": "machine", "description": "Windows マイク入力用 Python の実行ファイル。空欄では作業フォルダの backend_tools/.venv、その後 PATH の python を使います。追加ライブラリは不要です。" }
     } }
   },

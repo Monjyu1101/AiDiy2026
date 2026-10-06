@@ -33,7 +33,6 @@ const connection = new LiveConnection(environment.socketUrl, receive, () => {
 }, environment.socket);
 environment.onStop(error => {
   void disconnect(); if (error) showError(error);
-  void environment.backend().then(backend => { element<HTMLInputElement>('backend').value = backend; });
 });
 environment.onMicrophoneStop(() => {
   ++micGeneration; mic = false; micBusy = false; audio.stop(); controls();
@@ -360,7 +359,6 @@ function reveal() {
 // 接続先情報が遅れても操作できる画面を表示する。
 const revealTimeout = window.setTimeout(reveal, 2500);
 const initialContext = environment.context().then(config => {
-  element<HTMLInputElement>('backend').value = config.backend || '';
   showFolder(config.作業フォルダ);
   const saved = config.保存モデル設定;
   // 明示した起動設定を優先し、未指定なら最後に手動で選択したモデル・音声を復元する。

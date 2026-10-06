@@ -249,7 +249,7 @@ class LiveAI:
     
     
     async def 終了(self) -> bool:
-        """終了（中断停止フラグ設定のみ）"""
+        """処理を中断し、ワーカーの接続回収完了まで待つ。"""
         try:
             # 中断停止フラグ設定
             self.中断停止フラグ = True
@@ -501,6 +501,23 @@ class LiveAI:
     
     # ===== LiveAI受信ワーカー（特化版） =====
     
+    async def _WebSocket接続(self, url, headers):
+        # to_threadのキャンセルだけでは接続中のスレッドは止まらない。
+        # 遅れて接続したソケットも回収してから終了する。
+        connecting = asyncio.create_task(asyncio.to_thread(
+            websocket.create_connection, url, header=headers, timeout=LIVEAI_TIMEOUT,
+        ))
+        try:
+            return await asyncio.shield(connecting)
+        except asyncio.CancelledError:
+            try:
+                socket = await connecting
+                if socket:
+                    await asyncio.to_thread(socket.close)
+            except Exception:
+                pass
+            raise
+
     async def _ライブセッションワーカー(self):
         """ライブセッションワーカー（OpenAI WebSocketパターン）"""
         try:
@@ -559,12 +576,7 @@ class LiveAI:
                     # websocket.create_connectionは同期関数なので、別スレッドで実行
                     # 一部環境ではサブプロトコル指定がエラーになるため未指定（monjyu実装と同等）
                     try:
-                        self.ws_session = await asyncio.to_thread(
-                            websocket.create_connection,
-                            ws_url,
-                            header=headers_dict,
-                            timeout=LIVEAI_TIMEOUT,  # タイムアウト設定追加
-                        )
+                        self.ws_session = await self._WebSocket接続(ws_url, headers_dict)
                     except Exception as e:
                         logger.warning(f"WebSocket接続(ヘッダdict)失敗: {type(e).__name__}; ヘッダ配列で再試行")
                         headers_list = [
@@ -572,12 +584,7 @@ class LiveAI:
                         ]
                         if self.organization:
                             headers_list.append(f"OpenAI-Organization: {self.organization}")
-                        self.ws_session = await asyncio.to_thread(
-                            websocket.create_connection,
-                            ws_url,
-                            header=headers_list,
-                            timeout=LIVEAI_TIMEOUT,  # タイムアウト設定追加
-                        )
+                        self.ws_session = await self._WebSocket接続(ws_url, headers_list)
 
                     if self.ws_session:
                         # recv()のタイムアウトを設定（キープアライブ確認用）
@@ -678,9 +685,17 @@ class LiveAI:
         except Exception as e:
             logger.error(f"ライブセッションワーカーエラー: {e}")
         finally:
+            # TaskGroupのキャンセルでも通常ループ末尾を通らず終了するため、ここで回収する。
+            socket = self.ws_session
+            self.ws_session = None
             self.live_session = None
             self.task_group = None
             self.is_alive = False  # ワーカー終了時にFalseに設定
+            if socket:
+                try:
+                    await asyncio.to_thread(socket.close)
+                except Exception:
+                    pass
             # 正常終了の場合はログ出力を抑制（パフォーマンス最適化）
             if not self.中断停止フラグ or self.エラーフラグ:
                 logger.error(f"live_session破棄完了（ワーカー終了時）: is_alive={self.is_alive}")

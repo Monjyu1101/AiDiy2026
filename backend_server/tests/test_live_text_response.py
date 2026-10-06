@@ -9,6 +9,7 @@ import queue
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import time
 import types as stdlib_types
 import unittest
@@ -442,6 +443,51 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("private-", result["error"])
             self.assertNotIn("test-key", result["error"])
             self.assertFalse(ai.中断停止フラグ)
+
+    async def test_openai_stop_closes_active_websocket(self):
+        module = self.openai_module
+        ai = module.LiveAI(セッションID="session", api_key="test-key")
+        closed = threading.Event()
+        def receive():
+            closed.wait(1)
+            return "{}"
+        socket = Mock()
+        socket.recv.side_effect = receive
+        socket.close.side_effect = closed.set
+        with patch.object(module.websocket, "create_connection", return_value=socket):
+            await ai.開始(asyncio.Queue(), asyncio.Queue())
+            await self.wait_until(lambda: ai.live_session is not None)
+            await ai.終了()
+        socket.close.assert_called_once()
+        self.assertIsNone(ai.ws_session)
+        self.assertIsNone(ai.live_session)
+        self.assertFalse(ai.is_alive)
+
+    async def test_openai_stop_during_handshake_closes_late_connection(self):
+        module = self.openai_module
+        ai = module.LiveAI(セッションID="session", api_key="test-key")
+        started = threading.Event()
+        release = threading.Event()
+        socket = Mock()
+        def connect(*args, **kwargs):
+            started.set()
+            release.wait(2)
+            return socket
+        with patch.object(module.websocket, "create_connection", side_effect=connect):
+            await ai.開始(asyncio.Queue(), asyncio.Queue())
+            await self.wait_until(started.is_set)
+            stop = asyncio.create_task(ai.終了())
+            try:
+                await self.wait_until(lambda: ai.中断停止フラグ)
+                await asyncio.sleep(0)
+                release.set()
+                await asyncio.wait_for(stop, 2)
+            finally:
+                release.set()
+        socket.close.assert_called_once()
+        socket.send.assert_not_called()
+        self.assertIsNone(ai.ws_session)
+        self.assertFalse(ai.is_alive)
 
     async def test_native_transcript_avoids_duplicate_output_recognition(self):
         audio = self.audio_module

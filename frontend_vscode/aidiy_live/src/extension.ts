@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LiveHost, microphonePython, backendUrl } from './host';
+import { LiveHost, microphonePython } from './host';
+import { ローカル接続先 } from '../local-backend.cjs';
 import { ライブモデル読込, ライブモデル保存 } from '../../src/model-preferences';
 
 class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -21,8 +22,7 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
   folderChanged() { void this.view?.webview.postMessage({ type: 'folder', 作業フォルダ: this.folder() }); }
   resolveWebviewView(view: vscode.WebviewView) {
     this.host?.dispose(); this.view = view; this.ready = false;
-    const config = vscode.workspace.getConfiguration('aidiyLive');
-    const backend = backendUrl(config.get<string>('backendUrl', 'http://127.0.0.1:8091')).origin;
+    const backend = ローカル接続先(this.context.extensionPath, this.folder()?.パス);
     view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media'), vscode.Uri.joinPath(this.context.extensionUri, 'dist')] };
     const resource = (path: string) => view.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, path)).toString();
     const nonce = randomBytes(24).toString('hex');
@@ -79,13 +79,12 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
     view.onDidDispose(() => { host.dispose(); resources.forEach(resource => resource.dispose()); if (this.view === view) { this.view = undefined; this.host = undefined; } });
   }
   stop() { this.host?.stop(); }
-  backendChanged() { this.host?.backend(vscode.workspace.getConfiguration('aidiyLive').get<string>('backendUrl', 'http://127.0.0.1:8091')); }
   async standalone() {
     if (!vscode.workspace.isTrusted) throw new Error('ライブ会話は信頼済みのワークスペースで開いてください。');
     this.stop();
     const generation = ++this.generation;
     await this.browser?.close(); this.browser = undefined;
-    const backend = backendUrl(vscode.workspace.getConfiguration('aidiyLive').get<string>('backendUrl', 'http://127.0.0.1:8091')).origin;
+    const backend = ローカル接続先(this.context.extensionPath, this.folder()?.パス);
     // 配布済み Live 拡張だけで使えるブラウザ版。Code / 開発フォルダに依存しない。
     const { ライブ起動 } = await import('./server');
     const server = await ライブ起動(this.context.extensionPath, backend, true, this.folder()?.パス || null);
@@ -105,12 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('aidiyLive.standalone', () => live.standalone()),
     vscode.commands.registerCommand('aidiyLive.settings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:aidiy.aidiy-live')),
     vscode.workspace.onDidChangeWorkspaceFolders(() => live.folderChanged()),
-    vscode.window.onDidChangeActiveTextEditor(() => live.folderChanged()),
-    vscode.workspace.onDidChangeConfiguration(event => {
-      if (event.affectsConfiguration('aidiyLive.backendUrl')) {
-        try { live.backendChanged(); } catch (error) { void vscode.window.showErrorMessage(String(error)); }
-      }
-    })
+    vscode.window.onDidChangeActiveTextEditor(() => live.folderChanged())
   );
   return { stop: () => live.stop(), getState: () => ({ ready: live.ready }) };
 }

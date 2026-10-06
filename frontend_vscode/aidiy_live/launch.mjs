@@ -5,21 +5,22 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
+import localBackend from './local-backend.cjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 let options;
 try {
   options = parseArgs({ options: {
-    provider: { type: 'string' }, model: { type: 'string' }, backend: { type: 'string' },
+    provider: { type: 'string' }, model: { type: 'string' },
     project: { type: 'string' }, 'ready-file': { type: 'string' },
     browser: { type: 'boolean' }, serve: { type: 'boolean' }, foreground: { type: 'boolean' }, help: { type: 'boolean' },
   } }).values;
-  for (const name of ['provider', 'model', 'backend', 'project', 'ready-file']) {
+  for (const name of ['provider', 'model', 'project', 'ready-file']) {
     if (options[name] !== undefined && !options[name].trim()) throw new Error(`--${name} に値を指定してください。`);
   }
   if (options.model && !options.provider) throw new Error('Live の --model には --provider も指定してください。');
 } catch (error) { console.error(error.message); process.exit(1); }
 if (options.help) {
-  console.log('aidiy_live [--provider freeai|gemini|openai] [--model モデル名] [--project 作業フォルダ] [--browser | --serve] [--backend http://127.0.0.1:8091] [--foreground]');
+  console.log('aidiy_live [--provider freeai|gemini|openai] [--model モデル名] [--project 作業フォルダ] [--browser | --serve] [--foreground]');
   console.log('モデル未指定: 前回の手動選択（未保存ならバックエンドの既定設定）で起動。画面の「モデル」から変更できます。'); process.exit(0);
 }
 const providerAliases = { freeai: 'freeai_live', gemini: 'gemini_live', openai: 'openai_live', freeai_live: 'freeai_live', gemini_live: 'gemini_live', openai_live: 'openai_live' };
@@ -29,7 +30,7 @@ if (requestedProvider && !Object.hasOwn(providerAliases, requestedProvider)) {
 }
 const provider = providerAliases[requestedProvider], model = options.model?.trim();
 const projectRoot = resolve(options.project || process.cwd());
-const backend = options.backend || 'http://127.0.0.1:8091';
+const backend = localBackend.ローカル接続先(root, projectRoot);
 const mode = options.serve ? 'serve' : options.browser ? 'browser' : 'desktop';
 const foreground = !!options.foreground;
 const modelArgs = [...(provider ? ['--provider', provider] : []), ...(model ? ['--model', model] : [])];
@@ -53,7 +54,7 @@ async function main() {
   async function startBrowser(open = true) {
     const { ライブ起動 } = createRequire(import.meta.url)('../dist/aidiy_live/server.cjs');
     const server = await ライブ起動(root, backend, false, projectRoot, modelSettings);
-    console.log(`aidiy_live: ${server.url}\n接続先: ${backend}\n終了: Ctrl+C`);
+    console.log(`aidiy_live: ${server.url}\n終了: Ctrl+C`);
     let idle;
     const close = () => { void server.close().then(() => process.exit(0)); };
     process.once('SIGINT', close); process.once('SIGTERM', close);
@@ -88,7 +89,7 @@ async function main() {
     const run = randomUUID(), ready = join(runRoot, `${run}.browser.json`), log = join(runRoot, `${run}.browser.log`);
     const descriptor = openSync(log, 'w');
     let child;
-    try { child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--foreground', '--backend', backend, '--project', projectRoot, '--ready-file', ready, ...modelArgs], {
+    try { child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--foreground', '--project', projectRoot, '--ready-file', ready, ...modelArgs], {
       cwd: root, detached: true, windowsHide: true, stdio: ['ignore', descriptor, descriptor],
     }); } finally { closeSync(descriptor); }
     let failure; child.once('error', error => { failure = error; }); child.unref();
@@ -101,7 +102,7 @@ async function main() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     const info = JSON.parse(readFileSync(ready, 'utf8'));
-    console.log(`ブラウザ版を起動しました: ${info.url}\n接続先: ${backend}\n画面を閉じるとサーバーも自動終了します。`);
+    console.log(`ブラウザ版を起動しました: ${info.url}\n画面を閉じるとサーバーも自動終了します。`);
   }
   if (mode !== 'desktop') return mode === 'browser' && !foreground ? startBrowserDetached() : startBrowser(mode === 'browser');
   async function startDesktop() {
@@ -127,7 +128,7 @@ async function main() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     if (JSON.parse(readFileSync(ready, 'utf8')).windowShown !== true) throw new Error(`表示を確認できません。ログ: ${log}`);
-    console.log(`aidiy_live を起動しました。接続先: ${backend}`);
+    console.log(`aidiy_live を起動しました。`);
   }
   try { await startDesktop(); }
   catch (error) {

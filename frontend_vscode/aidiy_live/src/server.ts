@@ -5,11 +5,12 @@ import { readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { Socket } from 'node:net';
 import { ライブモデル読込, ライブモデル保存, モデル保存先 } from '../../src/model-preferences';
+import { ローカル接続先 } from '../local-backend.cjs';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
-export async function ライブ起動(root: string, backend = 'http://127.0.0.1:8091', packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live')) {
+export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live')) {
   const 作業フォルダ = projectPath ? { 名前: basename(projectPath) || projectPath, パス: projectPath } : null;
-  const target = new URL(backend);
+  const target = new URL(backend || ローカル接続先(root, projectPath));
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.pathname !== '/' || target.search || target.hash) {
     throw new Error('バックエンドには http(s)://ホスト:ポート を指定してください。');
   }
