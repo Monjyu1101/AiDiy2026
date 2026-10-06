@@ -964,8 +964,8 @@ defineExpose({
 }
 
 .terminal-line.stream-output .line-content {
-  background: rgba(255, 180, 200, 0.12);
-  border: 1px solid rgba(255, 100, 150, 0.5);
+  background: rgba(0, 255, 255, 0.12);
+  border: 1px solid rgba(0, 255, 255, 0.5);
   border-radius: 4px;
   padding: 0;
   display: block;

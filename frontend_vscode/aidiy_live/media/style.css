@@ -9,6 +9,7 @@
   --border: #242424;
   --muted: #9aa7b8;
   --terminal: #00ff00;
+  --stream: #00ffff;
   --focus: var(--vscode-focusBorder, #889aff);
   --mic: #ff536e;
   --voice: #69dcff;
@@ -108,7 +109,7 @@ main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; 
 .message { width: fit-content; margin-bottom: 4px; padding: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; border: 1px solid var(--border); text-shadow: 0 1px 4px #000, 0 0 8px #000; }
 .message:last-child { margin-bottom: 0; }
 .message.user { color: #fff; cursor: pointer; max-width: 70%; margin-left: auto; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); }
-.message.ai { max-width: 90%; color: var(--terminal); font-family: var(--vscode-editor-font-family, Consolas, monospace); background: color-mix(in srgb, var(--terminal) 3%, var(--surface)); border-color: color-mix(in srgb, var(--terminal) 16%, var(--border)); }
+.message.ai { max-width: 90%; color: var(--terminal); font-family: var(--vscode-editor-font-family, Consolas, monospace); background: color-mix(in srgb, var(--stream) 3%, var(--surface)); border-color: color-mix(in srgb, var(--stream) 16%, var(--border)); }
 .message.ai .terminal-cursor { display: inline-block; width: 1ch; height: 1em; margin-left: .1ch; vertical-align: text-bottom; background: currentColor; animation: live-cursor-blink .7s step-end infinite; }
 .message.recognition { color: #b8b8b8; cursor: pointer; }
 .message.user:hover, .message.recognition:hover { border-color: var(--focus); }
@@ -116,7 +117,7 @@ main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; 
 #chat-footer { flex: 0 0 auto; padding: 0 2px 2px; }
 #text-form { border: 0; background: transparent; }
 textarea, input, select { border: 1px solid var(--border); background: var(--input-surface); border-radius: 0; padding: 4px; min-width: 0; }
-textarea { display: block; width: 100%; resize: vertical; max-height: min(220px, 35vh); min-height: 76px; }
+textarea { field-sizing: content; display: block; width: 100%; resize: none; max-height: min(220px, 35vh); min-height: 76px; overflow-y: auto; }
 textarea::placeholder { color: var(--muted); }
 textarea:focus-visible { outline: none; border-color: var(--focus); }
 .composer-actions { display: grid; grid-template-columns: minmax(0, 1fr) 34px; grid-template-rows: auto auto; gap: 2px 6px; align-items: center; padding: 2px 0; }
