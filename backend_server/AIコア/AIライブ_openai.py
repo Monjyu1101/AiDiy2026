@@ -118,7 +118,11 @@ class LiveAI:
 
         # TaskGroupパターン用の管理変数
         self.task_group = None
-        
+        self._応答生成ロック = asyncio.Lock()
+        self._応答中 = False
+        self._応答生成待ち = False
+        self._ツールタスク = set()
+
         # 受信キュー（サーバーとの連携用）
         self.音声受信Ｑ = None  # OpenAIからの音声データをサーバーに送信
         self.テキスト受信Ｑ = None   # OpenAIからのテキスト・ツール結果をサーバーに送信
@@ -322,9 +326,8 @@ class LiveAI:
             }
             await asyncio.to_thread(self.ws_session.send, json.dumps(text_event))
 
-            # 応答生成指示
-            response_msg = {"type": "response.create"}
-            await asyncio.to_thread(self.ws_session.send, json.dumps(response_msg))
+            # 応答中の追加入力は、現在の応答終了後にまとめて回答する。
+            await self._応答生成要求()
             # logger.info(f"テキスト送信:完了 text={text[:50]}{'...' if len(text) > 50 else ''}")
             pass
             return True
@@ -526,6 +529,8 @@ class LiveAI:
                 # 再接続時にエラーフラグをリセット
                 self.エラーフラグ = False
                 self.最終エラー = ""
+                self._応答中 = False
+                self._応答生成待ち = False
 
                 try:
                     # WebSocket URL構築
@@ -625,6 +630,9 @@ class LiveAI:
                                     # logger.info(f"セッション維持中 (ループ{loop_count}): live_session={self.live_session is not None}, 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
                                     pass
 
+                            # 停止・切断時にツール処理を次の接続へ持ち越さない。
+                            for task in tuple(self._ツールタスク):
+                                task.cancel()
                             session_duration = time.time() - self.session_start_time
                             # 正常終了（中断停止フラグがTrueでエラーフラグがFalse）の場合は情報ログ
                             if self.中断停止フラグ and not self.エラーフラグ:
@@ -735,6 +743,12 @@ class LiveAI:
                             if msg_type == "error":
                                 res_err = response_data.get('error')
                                 err_msg = res_err.get('message') if res_err else str(response_data)
+                                if isinstance(res_err, dict) and res_err.get("code") == "conversation_already_has_active_response":
+                                    # VADの自動応答と送信が競合した場合は、終了イベントを待つ。
+                                    self._応答中 = True
+                                    self._応答生成待ち = True
+                                    logger.info("OpenAI応答生成を現在の応答終了まで延期します。")
+                                    continue
                                 logger.error(f"OpenAI api エラー: {err_msg}")
                                 await self._APIエラー通知(res_err if isinstance(res_err, dict) else {"message": err_msg})
                                 self.エラーフラグ = True
@@ -800,18 +814,35 @@ class LiveAI:
                                 # logger.info(f"ユーザー音声: {transcript}")
                                 pass
 
-                            # Function Call処理
-                            elif msg_type == "response.function_call_arguments.done":
-                                await self._openai_function_call処理(response_data)
+                            elif msg_type == "response.created":
+                                self._応答中 = True
+
+                            elif msg_type == "response.done":
+                                self._応答中 = False
+                                text_buffer = ""
+                                response = response_data.get("response") or {}
+                                # 引数確定だけでは応答は終了していない。完了した呼び出しだけ実行する。
+                                calls = []
+                                if response.get("status") == "completed":
+                                    calls = [item for item in response.get("output", [])
+                                             if item.get("type") == "function_call"
+                                             and item.get("status") == "completed"]
+                                if calls:
+                                    task = self.task_group.create_task(self._ツール応答処理(calls))
+                                    self._ツールタスク.add(task)
+                                    task.add_done_callback(self._ツールタスク.discard)
+                                else:
+                                    await self._応答生成送信()
 
                             # その他の応答タイプ（ログ削減）
                             elif msg_type in [
-                                "session.created", "session.updated", "response.created",
+                                "session.created", "session.updated",
                                 "conversation.item.created", "rate_limits.updated",
                                 "response.output_item.added", "response.audio.done",
                                 "response.output_audio.done",
                                 "response.content_part.added", "response.content_part.done",
-                                "response.output_item.done", "response.done",
+                                "response.output_item.done",
+                                "response.function_call_arguments.delta", "response.function_call_arguments.done",
                                 "input_audio_buffer.speech_started",
                                 "input_audio_buffer.speech_stopped",
                                 "input_audio_buffer.committed",
@@ -1004,8 +1035,46 @@ class LiveAI:
                 },
             }
 
-    async def _openai_function_call処理(self, response_data: dict):
-        """OpenAI Function Call処理"""
+    async def _応答生成要求(self):
+        """応答開始要求を予約し、同じ会話での応答の重複を避ける。"""
+        self._応答生成待ち = True
+        await self._応答生成送信()
+
+    async def _応答生成送信(self):
+        async with self._応答生成ロック:
+            if (not self._応答生成待ち or self._応答中 or self._ツールタスク
+                    or not self.ws_session or self.中断停止フラグ or self.エラーフラグ):
+                return
+            # response.created の受信前でも、次の要求を送らないよう先に予約する。
+            self._応答中 = True
+            self._応答生成待ち = False
+            try:
+                await asyncio.to_thread(self.ws_session.send, json.dumps({"type": "response.create"}))
+            except Exception:
+                self._応答中 = False
+                self._応答生成待ち = True
+                raise
+
+    async def _ツール応答処理(self, calls: list):
+        """全ツールの結果を返してから、一度だけ応答を再開する。受信は継続する。"""
+        sent = False
+        try:
+            for call in calls:
+                if self.中断停止フラグ or self.エラーフラグ:
+                    break
+                sent = await self._openai_function_call処理(call) or sent
+        finally:
+            self._ツールタスク.discard(asyncio.current_task())
+        if sent:
+            self._応答生成待ち = True
+        try:
+            await self._応答生成送信()
+        except Exception as e:
+            logger.error(f"ツール応答生成エラー: {e}")
+            self._エラーフラグ制限設定(f"ツール応答生成エラー: {e}")
+
+    async def _openai_function_call処理(self, response_data: dict) -> bool:
+        """確定済みの Function Call を実行し、結果だけを返す。"""
         try:
             f_id = response_data.get('call_id')
             f_name = response_data.get('name')
@@ -1027,7 +1096,11 @@ class LiveAI:
                 f_kwargs_short = f_kwargs_escaped[:20] + ("..." if len(f_kwargs_escaped) > 20 else "")
 
                 # ツール実行（共通インターフェース）
-                result = await self.tool_instance.execute_tool_call(f_name, f_args_dict)
+                try:
+                    result = await self.tool_instance.execute_tool_call(f_name, f_args_dict)
+                except Exception as e:
+                    logger.error(f"ツール実行エラー[{f_name}]: {e}")
+                    result = json.dumps({"error": "ツールの実行に失敗しました。"}, ensure_ascii=False)
 
                 # リアルタイム処理最適化：ツール名を行内に埋め込み、パラメータ・結果を別行表示
                 result_escaped = str(result).replace('\n', '\\n').replace('\r', '\\r')
@@ -1046,12 +1119,12 @@ class LiveAI:
                 }
                 await asyncio.to_thread(self.ws_session.send, json.dumps(result_msg))
 
-                # 応答生成指示（WebSocket送信を非同期化）
-                response_msg = {"type": "response.create"}
-                await asyncio.to_thread(self.ws_session.send, json.dumps(response_msg))
+                return True
 
         except Exception as e:
             logger.error(f"ツール呼び出し処理エラー: {e}")
+            self._エラーフラグ制限設定(f"ツール結果送信エラー: {e}")
+        return False
 
     
     async def _キープアライブ確認(self):

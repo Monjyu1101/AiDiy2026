@@ -67,6 +67,11 @@ Gemini / FreeAI の native-audio モデルでは、`backend_server/AIコア/AI�
 OpenAI Realtime の `error` イベントは `AIライブ_openai.py` が `error` / `code` をテキスト受信キューへ入れ、`AIライブ.py` がチャンネル0の `error` と `エラーコード` へ変換する。
 `credit_balance_exhausted` は APIクレジット残高なしとして案内し、`insufficient_quota` 系は残高・利用上限の確認を促して自動再接続を停止する。後続の送信でも拒否理由を保持し、共通の送信エラーで上書きしない。
 原因の確認は [OpenAI公式エラーコード](https://developers.openai.com/api/docs/guides/error-codes) を参照する。キーの認証やモデル確認が成功しても、Realtime 接続が残高不足で拒否される場合がある。
+OpenAI のツール呼び出しは `response.done` の `completed` 応答に含まれる確定済みの `function_call` を実行する。
+`response.function_call_arguments.done` は応答全体の終了ではないため、ここで `response.create` を送ると `conversation_already_has_active_response` が発生する。
+複数の呼び出しは全ての `function_call_output` を返してから1回だけ応答を開始する。ツール実行中も受信を継続し、追加入力の応答開始は現在の応答とツール処理が終わるまで待つ。
+音声の自動応答と開始要求が競合した場合、このエラーだけは再接続せず、`response.done` 後に開始要求を再送する。停止・切断時はツール処理をキャンセルする。
+[OpenAI の Realtime ツール呼び出し仕様](https://developers.openai.com/api/docs/guides/realtime-conversations#function-calling)を参照する。
 確認には `backend_server/tests/test_live_text_response.py` を使う。
 - スピーカー OFF でもビジュアライザー用の再生系を残す設計があるため、実音と視覚演出を分けて確認する。
 - キャンセル後に古いチャンクを再生しないよう、キュー世代管理を確認する。

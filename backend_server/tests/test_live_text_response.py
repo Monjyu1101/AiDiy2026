@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from contextlib import asynccontextmanager
 import importlib.util
 import json
 import logging
+import queue
 from pathlib import Path
 import sys
 import tempfile
+import time
 import types as stdlib_types
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
@@ -137,7 +140,8 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
         for module, session_field in ((self.gemini_module, "live_session"),
                                       (self.openai_module, "ws_session")):
             with self.subTest(provider=module.__name__):
-                ai = module.LiveAI.__new__(module.LiveAI)
+                ai = (module.LiveAI(セッションID="session", api_key="test-key")
+                      if session_field == "ws_session" else module.LiveAI.__new__(module.LiveAI))
                 ai.is_alive = False
                 ai.中断停止フラグ = False
                 ai.エラーフラグ = False
@@ -166,6 +170,131 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(2, session.send.call_count)
                     packet = json.loads(session.send.call_args_list[0].args[0])
                     self.assertEqual("接続直後の依頼", packet["item"]["content"][0]["text"])
+
+    @asynccontextmanager
+    async def openai_events(self):
+        ai = self.openai_module.LiveAI(セッションID="session", api_key="test-key")
+        ai.session_start_time = time.time()
+        ai.テキスト受信Ｑ = asyncio.Queue()
+        ai.tool_instance = stdlib_types.SimpleNamespace(execute_tool_call=AsyncMock(return_value="依頼受付"))
+        incoming = queue.Queue()
+        ai.ws_session = Mock(recv=lambda: incoming.get(timeout=2))
+
+        async def exchange(*events):
+            for event in events:
+                incoming.put(json.dumps(event))
+            # 受信側が先行イベントを処理したことを確認する。
+            incoming.put(json.dumps({"type": "response.output_audio_transcript.done", "transcript": "barrier"}))
+            self.assertEqual("barrier", (await asyncio.wait_for(ai.テキスト受信Ｑ.get(), 2))["text"])
+
+        async with asyncio.TaskGroup() as group:
+            ai.task_group = group
+            reader = group.create_task(ai._受信ワーカー())
+            try:
+                yield ai, exchange
+            finally:
+                ai.中断停止フラグ = True
+                for task in tuple(ai._ツールタスク):
+                    task.cancel()
+                incoming.put("{}")
+                await asyncio.wait_for(reader, 2)
+
+    async def wait_until(self, predicate):
+        async def wait():
+            while not predicate():
+                await asyncio.sleep(0.001)
+        await asyncio.wait_for(wait(), 2)
+
+    def function_call(self, call_id="call1", status="completed"):
+        return {"type": "function_call", "status": status, "call_id": call_id,
+                "name": "code_agent", "arguments": json.dumps({"依頼": "画像と文書流し込みを修正"})}
+
+    def response_done(self, *calls, status="completed"):
+        return {"type": "response.done", "response": {"id": "resp1", "status": status, "output": list(calls)}}
+
+    async def test_openai_tools_wait_for_response_done_and_resume_once(self):
+        async with self.openai_events() as (ai, exchange):
+            await exchange({"type": "response.created", "response": {"id": "resp1"}},
+                           {**self.function_call(), "type": "response.function_call_arguments.done"})
+            ai.tool_instance.execute_tool_call.assert_not_awaited()
+            ai.ws_session.send.assert_not_called()
+            await exchange(self.response_done(self.function_call(), self.function_call("call2")))
+            await self.wait_until(lambda: ai.ws_session.send.call_count == 3)
+            packets = [json.loads(call.args[0]) for call in ai.ws_session.send.call_args_list]
+            self.assertEqual(["conversation.item.create", "conversation.item.create", "response.create"],
+                             [packet["type"] for packet in packets])
+            self.assertEqual(["call1", "call2"], [packet["item"]["call_id"] for packet in packets[:2]])
+            self.assertEqual(2, ai.tool_instance.execute_tool_call.await_count)
+            self.assertFalse(ai.エラーフラグ)
+
+    async def test_openai_does_not_execute_interrupted_or_incomplete_calls(self):
+        async with self.openai_events() as (ai, exchange):
+            for status in ("cancelled", "failed", "incomplete"):
+                await exchange({**self.function_call(), "type": "response.function_call_arguments.done"},
+                               self.response_done(self.function_call(), status=status))
+            await exchange(self.response_done(self.function_call(status="incomplete")))
+            ai.tool_instance.execute_tool_call.assert_not_awaited()
+            ai.ws_session.send.assert_not_called()
+
+    async def test_openai_additional_text_waits_for_active_response(self):
+        async with self.openai_events() as (ai, exchange):
+            # response.created をまだ受信していなくても2回目の開始を防ぐ。
+            self.assertTrue(await ai.テキスト送信("最初の依頼"))
+            self.assertTrue(await ai.テキスト送信("補足の依頼"))
+            packets = [json.loads(call.args[0]) for call in ai.ws_session.send.call_args_list]
+            self.assertEqual(1, sum(packet["type"] == "response.create" for packet in packets))
+            await exchange({"type": "response.created"}, self.response_done())
+            packets = [json.loads(call.args[0]) for call in ai.ws_session.send.call_args_list]
+            self.assertEqual(2, sum(packet["type"] == "response.create" for packet in packets))
+
+    async def test_openai_receives_while_tool_runs_and_waits_for_vad_response(self):
+        async with self.openai_events() as (ai, exchange):
+            gate = asyncio.Event()
+            async def execute(*_args):
+                await gate.wait()
+                return "依頼受付"
+            ai.tool_instance.execute_tool_call.side_effect = execute
+            await exchange(self.response_done(self.function_call()))
+            await self.wait_until(lambda: ai.tool_instance.execute_tool_call.await_count == 1)
+            self.assertTrue(await ai.テキスト送信("追加の依頼"))
+            # ツール実行中も自動応答の開始を受信し、ツール結果の回答開始を延期する。
+            await exchange({"type": "response.created"})
+            gate.set()
+            await self.wait_until(lambda: not ai._ツールタスク)
+            packets = [json.loads(call.args[0]) for call in ai.ws_session.send.call_args_list]
+            self.assertFalse(any(packet["type"] == "response.create" for packet in packets))
+            await exchange(self.response_done())
+            packets = [json.loads(call.args[0]) for call in ai.ws_session.send.call_args_list]
+            self.assertEqual(1, sum(packet["type"] == "response.create" for packet in packets))
+
+    async def test_openai_active_response_conflict_keeps_connection_and_retries_after_done(self):
+        async with self.openai_events() as (ai, exchange):
+            await exchange({"type": "response.created"}, {"type": "error", "error": {
+                "code": "conversation_already_has_active_response", "message": "active response"}})
+            self.assertFalse(ai.エラーフラグ)
+            ai.ws_session.send.assert_not_called()
+            await exchange(self.response_done())
+            self.assertEqual({"type": "response.create"}, json.loads(ai.ws_session.send.call_args.args[0]))
+
+    async def test_openai_failed_tool_returns_error_and_resumes(self):
+        async with self.openai_events() as (ai, exchange):
+            ai.tool_instance.execute_tool_call.side_effect = RuntimeError("tool failure")
+            with self.assertLogs(level="ERROR"):
+                await exchange(self.response_done(self.function_call()))
+                await self.wait_until(lambda: ai.ws_session.send.call_count == 2)
+            packets = [json.loads(call.args[0]) for call in ai.ws_session.send.call_args_list]
+            self.assertIn("error", json.loads(packets[0]["item"]["output"]))
+            self.assertEqual("response.create", packets[1]["type"])
+
+    async def test_openai_stop_cancels_tool_without_continuation(self):
+        async with self.openai_events() as (ai, exchange):
+            async def execute(*_args):
+                await asyncio.Event().wait()
+            ai.tool_instance.execute_tool_call.side_effect = execute
+            await exchange(self.response_done(self.function_call()))
+            await self.wait_until(lambda: ai.tool_instance.execute_tool_call.await_count == 1)
+        self.assertFalse(ai._ツールタスク)
+        ai.ws_session.send.assert_not_called()
 
     async def test_connection_timeout_still_reports_one_error(self):
         ai = self.gemini()
