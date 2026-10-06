@@ -242,7 +242,7 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_openai_does_not_execute_interrupted_or_incomplete_calls(self):
         async with self.openai_events() as (ai, exchange):
-            for status in ("cancelled", "failed", "incomplete"):
+            for status in ("cancelled", "incomplete"):
                 await exchange({**self.function_call(), "type": "response.function_call_arguments.done"},
                                self.response_done(self.function_call(), status=status))
             await exchange(self.response_done(self.function_call(status="incomplete")))
@@ -390,6 +390,58 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("session.audio.output.voice", error["error"])
         self.assertNotIn("test-secret", error["error"])
         self.assertNotIn("sk-partially-masked", error["error"])
+
+    async def test_openai_failed_response_reports_reason_without_running_tools_or_retrying_response(self):
+        for code in ("credit_balance_exhausted", "server_error", None):
+            with self.subTest(code=code):
+                ai = self.openai_module.LiveAI(セッションID="session", api_key="test-key")
+                ai.テキスト受信Ｑ = asyncio.Queue()
+                ai._応答生成待ち = True
+                ai.tool_instance = stdlib_types.SimpleNamespace(execute_tool_call=AsyncMock())
+                packet = self.response_done(self.function_call(), status="failed")
+                if code:
+                    packet["response"]["status_details"] = {"error": {"code": code, "message": "generation failed"}}
+                def receive():
+                    ai.中断停止フラグ = True  # 1イベントで受信テストを終了する。
+                    return json.dumps(packet)
+                ai.ws_session = Mock(recv=receive)
+                await ai._受信ワーカー()
+                result = await ai.テキスト受信Ｑ.get()
+                self.assertEqual(code or "response_failed", result["code"])
+                self.assertFalse(ai._応答生成待ち)
+                ai.ws_session.send.assert_not_called()
+                ai.tool_instance.execute_tool_call.assert_not_awaited()
+
+    async def test_openai_handshake_credit_rejection_reaches_screen_and_stops_reconnect(self):
+        module = self.openai_module
+        ai = module.LiveAI(セッションID="session", api_key="test-key")
+        ai.テキスト受信Ｑ = asyncio.Queue()
+        error = module.websocket.WebSocketBadStatusException("private-response-headers", 429, resp_body=json.dumps({
+            "error": {"code": "credit_balance_exhausted", "message": "no credits"},
+        }))
+        with patch.object(module.websocket, "create_connection", side_effect=error) as connect:
+            await asyncio.wait_for(ai._ライブセッションワーカー(), 2)
+        self.assertEqual(2, connect.call_count)  # 既存のヘッダdict / 配列による接続試行。
+        self.assertTrue(ai.中断停止フラグ)
+        result = await ai.テキスト受信Ｑ.get()
+        self.assertEqual("credit_balance_exhausted", result["code"])
+        self.assertIn("クレジット残高", result["error"])
+        self.assertNotIn("private-response-headers", result["error"])
+
+    async def test_openai_connection_exception_reports_type_without_headers_or_keys(self):
+        module = self.openai_module
+        ai = module.LiveAI(セッションID="session", api_key="test-key")
+        ai.テキスト受信Ｑ = asyncio.Queue()
+        for error, code in (
+            (module.websocket.WebSocketBadStatusException("private-headers", 503, resp_body="<html>private-body</html>"), "http_503"),
+            (TimeoutError("timed out test-key Bearer private-token"), "TimeoutError"),
+        ):
+            await ai._接続エラー通知(error)
+            result = await ai.テキスト受信Ｑ.get()
+            self.assertEqual(code, result["code"])
+            self.assertNotIn("private-", result["error"])
+            self.assertNotIn("test-key", result["error"])
+            self.assertFalse(ai.中断停止フラグ)
 
     async def test_native_transcript_avoids_duplicate_output_recognition(self):
         audio = self.audio_module

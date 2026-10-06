@@ -566,7 +566,7 @@ class LiveAI:
                             timeout=LIVEAI_TIMEOUT,  # タイムアウト設定追加
                         )
                     except Exception as e:
-                        logger.warning(f"WebSocket接続(ヘッダdict)失敗: {e}; ヘッダ配列で再試行")
+                        logger.warning(f"WebSocket接続(ヘッダdict)失敗: {type(e).__name__}; ヘッダ配列で再試行")
                         headers_list = [
                             f"Authorization: Bearer {self.api_key}",
                         ]
@@ -651,7 +651,7 @@ class LiveAI:
                     self.再接続試行回数 += 1  # エラー時にカウンタ増加
                     logger.error(f"セッション接続エラー詳細 (試行回数:{self.再接続試行回数}/{MAX_RETRY_COUNT}):")
                     logger.error(f"  エラータイプ: {type(e).__name__}")
-                    logger.error(f"  エラーメッセージ: {str(e)}")
+                    await self._接続エラー通知(e)
                     # logger.error(f"  api Key設定: {'***設定済み***' if self.api_key else '未設定'}")  # パフォーマンス最適化
                     # logger.error(f"  モデル: {self.LIVE_MODEL}")  # パフォーマンス最適化
 
@@ -687,6 +687,23 @@ class LiveAI:
             # logger.info("ライブセッションワーカー:終了")
             pass
 
+    async def _接続エラー通知(self, error: Exception):
+        """HTTP拒否はJSONのエラーだけを取り出し、ヘッダーや応答全体は画面へ渡さない。"""
+        body = getattr(error, "resp_body", None)
+        try:
+            payload = json.loads(body) if isinstance(body, (str, bytes)) else None
+        except (ValueError, UnicodeDecodeError):
+            payload = None
+        if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
+            await self._APIエラー通知(payload["error"])
+            return
+        status = getattr(error, "status_code", None)
+        code = f"http_{status}" if isinstance(status, int) else type(error).__name__
+        # HTTP例外のstrには応答ヘッダーやHTMLが含まれるため使用しない。
+        detail = (f"HTTP {status} で接続を拒否されました。" if status is not None
+                  else str(error) or "接続がタイムアウトしたか、通信が切断されました。")
+        await self._APIエラー通知({"code": code, "message": f"OpenAIへの接続失敗: {detail}"})
+
     async def _APIエラー通知(self, error: dict):
         """OpenAI の拒否理由を画面へ通知し、残高不足時は自動再接続を止める。"""
         code = str(error.get("code") or error.get("type") or "unknown_error")
@@ -701,8 +718,10 @@ class LiveAI:
             if self.api_key:
                 detail = detail.replace(self.api_key, "[REDACTED]")
             detail = re.sub(r"sk-[^\s\"'<>]+", "[REDACTED]", detail)
+            detail = re.sub(r"(?i)Bearer\s+[^\s\"'<>]+", "Bearer [REDACTED]", detail)
             message = f"OpenAI Realtime API エラー: {detail[:1000]}"
         self.最終エラー = f"{message} ({code})"
+        logger.error(self.最終エラー)
         if self.テキスト受信Ｑ is not None:
             await self.テキスト受信Ｑ.put({"error": self.最終エラー, "code": code})
         if code == "credit_balance_exhausted" or error.get("type") == "insufficient_quota" or code == "insufficient_quota":
@@ -749,7 +768,6 @@ class LiveAI:
                                     self._応答生成待ち = True
                                     logger.info("OpenAI応答生成を現在の応答終了まで延期します。")
                                     continue
-                                logger.error(f"OpenAI api エラー: {err_msg}")
                                 await self._APIエラー通知(res_err if isinstance(res_err, dict) else {"message": err_msg})
                                 self.エラーフラグ = True
                                 break
@@ -821,6 +839,14 @@ class LiveAI:
                                 self._応答中 = False
                                 text_buffer = ""
                                 response = response_data.get("response") or {}
+                                if response.get("status") == "failed":
+                                    self._応答生成待ち = False
+                                    details = response.get("status_details") or {}
+                                    error = details.get("error") if isinstance(details, dict) else None
+                                    await self._APIエラー通知(error if isinstance(error, dict) else {
+                                        "code": "response_failed", "message": "音声応答の生成に失敗しました。再送してください。",
+                                    })
+                                    continue
                                 # 引数確定だけでは応答は終了していない。完了した呼び出しだけ実行する。
                                 calls = []
                                 if response.get("status") == "completed":

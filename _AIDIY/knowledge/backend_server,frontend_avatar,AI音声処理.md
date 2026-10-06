@@ -66,6 +66,8 @@ Gemini / FreeAI の native-audio モデルでは、`backend_server/AIコア/AI�
 送信が拒否された場合や LiveAI が停止中の場合は、`AIライブ.py` がチャンネル0へ `error` を返す。
 `!` だけの応答は画面で隠れるため、送信失敗の通知には使わない。
 OpenAI Realtime の `error` イベントは `AIライブ_openai.py` が `error` / `code` をテキスト受信キューへ入れ、`AIライブ.py` がチャンネル0の `error` と `エラーコード` へ変換する。
+`response.done` の `status=failed` も `status_details.error` を同じ経路へ渡す。失敗応答からツールを実行したり、保留中の `response.create` を自動で再送したりしない。WebSocket接続自体が失敗した場合も、HTTP応答のJSONエラー、またはHTTP状態・例外名を通知する。応答ヘッダー・HTML全体は表示せず、APIキーを伏せ字にする。
+`aidiy_live` と `aidiy_discord` の音声会話はこの処理を共用する。ただしDiscordパネルのBotログイン失敗はOpenAI接続前の別段階であり、同じ原因と決めつけない。Windowsでの原因調査はそのPCの画面とCoreログを確認する。
 `credit_balance_exhausted` は APIクレジット残高なしとして案内し、`insufficient_quota` 系は残高・利用上限の確認を促して自動再接続を停止する。後続の送信でも拒否理由を保持し、共通の送信エラーで上書きしない。
 原因の確認は [OpenAI公式エラーコード](https://developers.openai.com/api/docs/guides/error-codes) を参照する。キーの認証やモデル確認が成功しても、Realtime 接続が残高不足で拒否される場合がある。
 OpenAI のツール呼び出しは `response.done` の `completed` 応答に含まれる確定済みの `function_call` を実行する。
