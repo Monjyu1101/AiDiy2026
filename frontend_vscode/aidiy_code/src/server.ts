@@ -4,18 +4,22 @@ import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { CLI実行, 会話引数, 起動解決, type 起動設定 } from '../../src/runner';
 import { コード要求実行, streamControlOf, visibleStreamContent } from '../../src/protocol';
+import { コードモデル読込, コードモデル保存, モデル保存先 } from '../../src/model-preferences';
 
 // 単独試用も拡張と同じ CLI・メッセージ形式・描画を使う。
-export async function 単独起動(project: string, launch?: 起動設定, initialModel: { provider?: string; model?: string } = {}) {
+export async function 単独起動(project: string, launch?: 起動設定, initialModel: { provider?: string; model?: string } = {}, modelFile = モデル保存先('code')) {
   const root = resolve(__dirname, '../..');
   const folder = resolve(project);
   if (!statSync(folder).isDirectory()) throw new Error('作業フォルダがありません。');
   const defaults = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).contributes.configuration.properties;
+  const savedModel = コードモデル読込(modelFile);
+  const requestedProvider = initialModel.provider?.trim(), requestedModel = initialModel.model?.trim();
+  const remembered = !requestedModel && (!requestedProvider || requestedProvider === savedModel?.provider) ? savedModel : undefined;
   const state = {
     type: 'state', 会話ID: randomUUID() as string, 作業URI: folder, 信頼済み: true,
     作業フォルダ: { 名前: basename(folder), パス: folder },
-    provider: initialModel.provider?.trim() || String(defaults['aidiyHermes.provider'].default),
-    model: initialModel.model?.trim() || String(defaults['aidiyHermes.model'].default),
+    provider: remembered?.provider ?? (requestedProvider || String(defaults['aidiyHermes.provider'].default)),
+    model: remembered?.model ?? (requestedModel || (requestedProvider ? 'auto' : String(defaults['aidiyHermes.model'].default))),
     メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false,
     セッションID: undefined as string | undefined,
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
@@ -141,7 +145,8 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
           notify();
         } else if (type === 'model') {
           if (typeof data.provider !== 'string' || typeof data.model !== 'string' || data.provider.length > 200 || data.model.length > 300) { reply(400, {error:'モデル指定が不正です。'}); return; }
-          state.provider = data.provider.trim(); state.model = data.model.trim(); lastModel = { provider: state.provider, model: state.model }; save(false); notify();
+          const selected = コードモデル保存({ provider: data.provider, model: data.model }, modelFile);
+          state.provider = selected.provider; state.model = selected.model; lastModel = selected; save(false); notify();
         } else { reply(400, {error:'Unknown message'}); return; }
         reply(200, {ok:true}); return;
       }

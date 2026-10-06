@@ -49,11 +49,11 @@ test('Code 起動引数: 指定した Provider / モデルを専用ウィンド�
   assert.equal(result.status, 0, result.stderr);
 });
 
-test('Code 起動引数: 未指定時は既定値を使い、Provider だけならモデルは自動', t => {
+test('Code 起動引数: 未指定モデルを自動へ置き換えず、保存済み設定の復元へ渡す', t => {
   const f = fixture(t);
   f.desktop(`const assert = require('node:assert/strict');
     const settings = JSON.parse(process.env.AIDIY_CODE_MODEL);
-    assert.deepEqual(settings, settings.provider ? { provider: 'copilot-cli', model: 'auto' } : {});
+    assert.deepEqual(settings, settings.provider ? { provider: 'copilot-cli' } : {});
     require('node:fs').writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
   for (const args of [[], ['--provider', 'copilot-cli']]) {
     const result = f.launch(...args);

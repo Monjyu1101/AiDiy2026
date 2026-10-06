@@ -4,9 +4,10 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { Socket } from 'node:net';
+import { ライブモデル読込, ライブモデル保存, モデル保存先 } from '../../src/model-preferences';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
-export async function ライブ起動(root: string, backend = 'http://127.0.0.1:8091', packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}) {
+export async function ライブ起動(root: string, backend = 'http://127.0.0.1:8091', packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live')) {
   const 作業フォルダ = projectPath ? { 名前: basename(projectPath) || projectPath, パス: projectPath } : null;
   const target = new URL(backend);
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.pathname !== '/' || target.search || target.hash) {
@@ -47,7 +48,8 @@ export async function ライブ起動(root: string, backend = 'http://127.0.0.1:
     }
     if (path === 'config' && req.method === 'GET') {
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ backend: target.origin, 作業フォルダ, ...(Object.keys(モデル設定).length ? { モデル設定 } : {}) })); return;
+      res.end(JSON.stringify({ backend: target.origin, 作業フォルダ, 保存モデル設定: ライブモデル読込(modelFile),
+        ...(Object.keys(モデル設定).length ? { モデル設定 } : {}) })); return;
     }
     if (path !== null && assets[path] && req.method === 'GET') {
       try {
@@ -60,7 +62,8 @@ export async function ライブ起動(root: string, backend = 'http://127.0.0.1:
     let api = '';
     try { api = path?.startsWith('api/') ? '/' + decodeURI(path.slice(4)) : ''; }
     catch { res.writeHead(400).end(); return; }
-    if (!apiPaths.has(api) || req.method !== 'POST') { res.writeHead(404).end(); return; }
+    const saveModel = path === 'model';
+    if ((!saveModel && !apiPaths.has(api)) || req.method !== 'POST') { res.writeHead(404).end(); return; }
     if (req.headers.origin !== origin || !req.headers['content-type']?.startsWith('application/json')) { res.writeHead(403).end(); return; }
     try {
       const chunks: Buffer[] = [];
@@ -71,6 +74,15 @@ export async function ライブ起動(root: string, backend = 'http://127.0.0.1:
         chunks.push(chunk);
       }
       const body = Buffer.concat(chunks);
+      if (saveModel) {
+        try {
+          ライブモデル保存(JSON.parse(body.toString('utf8')), modelFile);
+          res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true }));
+        } catch (error) {
+          res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: error instanceof Error ? error.message : String(error) }));
+        }
+        return;
+      }
       const proxy = request(new URL(api, target), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': body.length }, timeout: 30000 }, upstream => {
         res.writeHead(upstream.statusCode || 502, { 'Content-Type': 'application/json' });
         upstream.on('error', () => res.destroy());

@@ -19,7 +19,7 @@ try {
 } catch (error) { console.error(error.message); process.exit(1); }
 if (options.values.help) {
   console.log('aidiy_code [作業フォルダ] [--provider Provider] [--model モデル名] [--browser]');
-  console.log('指定なし: 既定の Provider / モデルで起動。起動後も画面の「モデル」から選択できます。');
+  console.log('モデル未指定: 前回の手動選択（未保存なら既定設定）で起動。画面の「モデル」から変更できます。');
   process.exit(0);
 }
 const browserMode = options.values.browser;
@@ -105,7 +105,7 @@ async function main() {
     entry = join(extensionRoot, 'aidiy_code', 'desktop.cjs');
   }
   const env = { ...process.env };
-  const initialModel = { provider, model: model || (provider ? 'auto' : undefined) };
+  const initialModel = { provider, model };
   // VS Code のターミナルから起動しても Electron を通常のデスクトップモードで動かす。
   if (!browserMode) {
     delete env.ELECTRON_RUN_AS_NODE;

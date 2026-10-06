@@ -20,7 +20,7 @@ try {
 } catch (error) { console.error(error.message); process.exit(1); }
 if (options.help) {
   console.log('aidiy_live [--provider freeai|gemini|openai] [--model モデル名] [--project 作業フォルダ] [--browser | --serve] [--backend http://127.0.0.1:8091] [--foreground]');
-  console.log('指定なし: バックエンドの既定設定で起動。起動後も画面の「モデル」から選択できます。'); process.exit(0);
+  console.log('モデル未指定: 前回の手動選択（未保存ならバックエンドの既定設定）で起動。画面の「モデル」から変更できます。'); process.exit(0);
 }
 const providerAliases = { freeai: 'freeai_live', gemini: 'gemini_live', openai: 'openai_live', freeai_live: 'freeai_live', gemini_live: 'gemini_live', openai_live: 'openai_live' };
 const requestedProvider = options.provider?.trim();

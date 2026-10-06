@@ -1,16 +1,54 @@
-const { test } = require('node:test');
+const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { createServer } = require('node:http');
 const { connect } = require('node:net');
 const { createHash } = require('node:crypto');
 const { join } = require('node:path');
-const { readFileSync } = require('node:fs');
+const { readFileSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs');
+const { tmpdir } = require('node:os');
 const { runInNewContext } = require('node:vm');
 const { spawn } = require('node:child_process');
-const { ライブ起動 } = require('../../dist/aidiy_live/server.cjs');
+const { ライブ起動: start } = require('../../dist/aidiy_live/server.cjs');
+const preferences = mkdtempSync(join(tmpdir(), 'aidiy-live-model-'));
+after(() => rmSync(preferences, { recursive: true, force: true }));
+let fileNumber = 0;
+const ライブ起動 = (root, backend, packaged, project, model, file = join(preferences, `${++fileNumber}.json`)) => start(root, backend, packaged, project, model, file);
 const { LiveConnection, 入力レート, 音声入力, 音声操作 } = require('../../out/aidiy_live/protocol.cjs');
 const { LiveAudio } = require('../../out/aidiy_live/audio.cjs');
 const root = join(__dirname, '../..');
+
+test('Live: 手動選択のモデル・音声を保存し、再起動時に復元、明示指定や不正要求では上書きしない', async t => {
+  const file = join(preferences, 'remember.json');
+  const selected = { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'gpt-realtime-2.1-mini', LIVE_OPENAI_VOICE: 'marin' };
+  let live = await ライブ起動(root, undefined, false, process.cwd(), {}, file);
+  const save = (body, origin = new URL(live.url).origin) => fetch(new URL('model', live.url), {
+    method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  try {
+    assert.equal((await save(selected, 'https://example.com')).status, 403);
+    assert.equal((await save(selected)).status, 200);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), selected);
+    for (const body of [{ ...selected, openai_key_id: 'secret' }, { LIVE_AI_NAME: 'unknown' }, { ...selected, LIVE_OPENAI_MODEL: '' }]) {
+      assert.equal((await save(body)).status, 400);
+      assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), selected);
+    }
+  } finally { await live.close(); }
+  for (const initial of [{}, { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'explicit' }, {}]) {
+    live = await ライブ起動(root, undefined, false, preferences, initial, file);
+    try {
+      const config = await (await fetch(new URL('config', live.url))).json();
+      assert.deepEqual(config.保存モデル設定, selected);
+      assert.deepEqual(config.モデル設定 || {}, initial);
+      assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), selected);
+    } finally { await live.close(); }
+  }
+  writeFileSync(file, '{broken', 'utf8');
+  live = await ライブ起動(root, undefined, false, process.cwd(), {}, file);
+  try {
+    assert.equal((await (await fetch(new URL('config', live.url))).json()).保存モデル設定, undefined);
+    assert.equal(readFileSync(file, 'utf8'), '{broken');
+  } finally { await live.close(); }
+});
 
 test('単独起動: 起動時の Provider / モデルを画面設定へ渡す', async t => {
   for (const [provider, modelKey] of [

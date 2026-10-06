@@ -19,6 +19,7 @@
 | AIコード互換 packet | `src/protocol.ts` | `backend_server/AIコア/AIコード.py`, `backend_server/AIコア/AIコード_cli.py` |
 | チャット表示、入力 | `src/webview.ts`, `media/chat.html`, `media/chat.css` | `aidiy_code/bridge.js`, `checks/aidiy_code.test.cjs` |
 | Provider / モデル候補 | `scripts/model-catalog.py` | `command_hermes` の picker / Provider 実装 |
+| 最終手動モデルの保存・復元 | `src/model-preferences.ts`, `src/extension.ts`, `aidiy_code/src/server.ts`, `aidiy_live/src/extension.ts`, `aidiy_live/src/server.ts`, `aidiy_live/src/bridge.ts`, `aidiy_live/src/view.ts` | Code / Live の画面・サーバー検証、両 README |
 | 単独試用サーバー | `aidiy_code/src/server.ts`, `aidiy_code/bridge.js` | `checks/aidiy_code.test.cjs` |
 | 単独ウィンドウ、タイトルバー | `aidiy_code/desktop.cjs`, `aidiy_code/preload.cjs`, `aidiy_code/launch.mjs` | `media/chat.html`, `media/chat.css`, `aidiy_code/theme.css` |
 | bundle / VSIX | `scripts/build.mjs`, `scripts/package.mjs`, `package.json`, `aidiy_live/build.mjs`, `aidiy_live/package.json` | 両 `.vscodeignore`, `dist/THIRD_PARTY_NOTICES.txt` |
@@ -41,13 +42,14 @@
 - 専用ウィンドウの起動位置は、マウスポインターがある画面の作業領域を基準に Code を左上、Live を右上にする。端に約8pxの余白を設け、Live は拡大演出後の実際の幅で右端を合わせる。
 - Live は `retainContextWhenHidden` で画面を保持し、タブ切り替えでは接続を閉じない。非表示中はマイクだけを停止し、heartbeat は拡張ホストで継続する。会話・接続通知を上限つきで保持して再表示時に反映し、非表示中の音声は再生しない。
 - Live の input／0／audio の `connect` パケットに `CODE_BASE_PATH` と任意の `モデル設定`（Live の AI 名・モデル・音声）を含め、バックエンドの初期化前に反映する。接続後の設定 API による差し替えは行わない。接続中に別フォルダへ変わった場合は切断し、次回の接続に反映する。
-- Live のモデル候補は `/core/AIコア/モデル情報/取得` を使う。接続前は空の `セッションID` で既定設定と候補を取得でき、セッションは作成しない。未接続の「選択する」はローカルの次回接続設定だけを更新し、接続中の「変更して再接続」は新しいセッションで3ソケットを接続し直す。画面の会話・入力は保持し、マイクは OFF に戻す。キャンセル後の再表示では確定済み設定から選択値を復元する。
+- Live のモデル候補は `/core/AIコア/モデル情報/取得` を使う。起動時に空の `セッションID` で `AiDiy_key.json` に基づく既定設定と候補を取得し、接続前から AI 名・モデル・音声を表示する（セッションは作成しない）。起動引数の指定値を優先し、候補一覧にない設定値も選択肢へ補う。未接続の「選択する」はローカルの次回接続設定だけを更新し、接続中の「変更して再接続」は新しいセッションで3ソケットを接続し直す。画面の会話・入力は保持し、マイクは OFF に戻す。キャンセル後の再表示では確定済み設定から選択値を復元する。取得が遅れて接続や終了の後に応答した場合は、その既定値で現在設定を上書きしない。
 - モデル選択の「専用ウィンドウで開く」は外し、VS Code のビュータイトル／コマンドパレットから実行する。確定操作は「選択する」または「変更して再接続」の1つにし、変更がある場合だけ有効にする。
+- Code / Live の最終手動選択はユーザーのホームフォルダの `.aidiy/aidiy_code_model.json` / `.aidiy/aidiy_live_model.json` に分けて保存し、それぞれ VS Code 拡張・単独画面で共用する。保存は画面で確定したときだけ行い、起動引数・接続・新規会話・キャンセルでは上書きしない。モデル未指定なら保存済み選択を復元し、明示モデルは優先する。Provider のみ指定した場合は同じ Provider の保存値を復元し、異なる場合はその Provider の既定値（Code は `auto`）を使う。Code の自動選択（空の Provider / モデル）も復元する。Live は音声も保存するが、保存値の復元だけでは自動接続しない。未保存・破損時は既定設定を使い、保存失敗時は現在設定を変更せずエラーを表示する。JSON は一時ファイルへ書いて原子的に置換する。`AiDiy_key.json` と会話履歴はこの選択記録へ保存しない。
 - Code の説明は `frontend_vscode/README.md`、Live の説明は `frontend_vscode/aidiy_live/README.md` に分ける。VSIX 作成時はそれぞれの `extension/readme.md` が各拡張だけを説明していることを確認する。
 - Code は新規会話で入力欄と保存済み下書きを空にし、`welcome-input-started` を引き継がず起動画面のターミナル演出を最初から再開する。同じ会話の状態通知では演出を再開せず、初回の下書き復元時は入力済みとして演出を停止する。VS Code / 単独画面の共通処理は `src/webview.ts` に置く。
-- Live は手動切断・接続断で、会話欄を初期の案内（ターミナル演出を再開始）、入力欄を空、モデル表示を初期ラベルへ戻す。接続先とプロジェクト表示は保持する。接続中の「新しい会話」は会話欄と入力をクリアし、現在のモデル・音声・作業フォルダで新規セッションへ接続し直す。マイクとスピーカーの ON/OFF は保持する。未接続時は表示と入力だけをクリアする。未接続の「接続」は黒文字で背景を白〜水色（`--voice`）へ変化させ、接続済みの「切断」は白背景と黒文字で固定する（ホバー時も同じ）。
+- Live は手動切断・接続断で、会話欄を初期の案内（ターミナル演出を再開始）、入力欄を空へ戻す。確定したモデル・音声の表示、接続先とプロジェクト表示は保持する。接続中の「新しい会話」は会話欄と入力をクリアし、現在のモデル・音声・作業フォルダで新規セッションへ接続し直す。マイクとスピーカーの ON/OFF は保持する。未接続時は表示と入力だけをクリアする。未接続の「接続」は黒文字で背景を白〜水色（`--voice`）へ変化させ、接続済みの「切断」は白背景と黒文字で固定する（ホバー時も同じ）。
 - Code / Live の新しいAI回答は、500ms後に文字送りを開始し、10msごとに `max(1, floor(文字数 / 50) + 1)` 文字を追加する。演出中は0.7秒周期でカーソルを点滅させ、完了後に外す。Live は次のメッセージを表示するときに前の回答を全文表示し、新規会話・切断・画面終了で演出タイマーを破棄する。`prefers-reduced-motion: reduce` では両方ともAI回答を全文表示する。
-- Code / Live の手入力メッセージは白文字（`#fff`）で表示し、クリックで本文を入力欄へコピーしてフォーカスとカーソルを末尾へ移す。Live の `recognition_input` / `recognition_output` は少し灰色（`#b8b8b8`）にし、同じクリック操作でコピーする。演出中・表示文字数の制限中でも元の全文をコピーし、この操作だけで送信は行わない。
+- Code / Live の手入力メッセージは白文字（`#fff`）で表示し、クリックで本文を入力欄へコピーしてフォーカスとカーソルを末尾へ移す。Live の `recognition_input` は灰色（`#e5e7eb`）、`recognition_output` は淡い緑（`#9ae6b4`）にし、同じクリック操作でコピーする。演出中・表示文字数の制限中でも元の全文をコピーし、この操作だけで送信は行わない。
 - Live の文字表示には通常回答と音声認識に加え、コードエージェントの `output_request` を含める。旧バックエンドの `output_text: !` は送信エラーとして案内する。`aidiy_live/checks/view.test.cjs` で VS Code / 単独画面の両方を検証する。
 - 送信ボタンは Code / Live とも未接続・入力不可時は灰色と白い紙ヒコーキ（`ws-disabled`）。接続済みの空欄・空白入力では白背景（`rgba(255, 255, 255, .95)`）、青紫の枠（`#667eea`）、黒い紙ヒコーキ。送信可能時は `frontend_web/src/components/AiDiy/compornents/AIコード.vue` と同じ青紫（`#667eea`）、ホバー時は `#5a6fd8` にする。紙ヒコーキ画像は `brightness(0)` で黒、`brightness(0) invert(1)` で白にする。空欄・空白だけでは無効にし、VS Code テーマで色を上書きしない。
 - 入力欄の Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。日本語 IME の変換確定では送信しない。
@@ -58,7 +60,7 @@
 - 「新規」「一覧」、モデル選択、履歴削除、送信、停止は Webview 内の共通 UI を主操作にする。VS Code 固有のコマンドは外部からの呼び出しやエディター連携用に残す。
 - 単独画面の上部はタイトルバー、実行状態バー、会話操作行の順に置く。VS Code 拡張ではアイコンと AiDiy のタイトル行を非表示にし、実行状態バーと会話操作行を表示する。「今の会話／会話一覧」、フォルダ名、「新規」「一覧」は会話操作行にまとめる。単独ウィンドウのドラッグ領域はタイトルバーだけに指定し、会話操作行を含めない。
 - Code の正式回答の緑はスタンドアロンと共通の `#00ff00` を `media/chat.css` で定義する。VS Code の明暗・高コントラストテーマでも、この色を上書きしない。
-- ストリーム表示枠はシアン `#00ffff` を基調にした枠線と薄い背景を使い、文字と点滅カーソルも鮮やかなシアンにする（Live の AI 回答は表示完了後も同色）。Code の実行状況枠と Live の AI 表示枠は CSS の `--stream` で指定し、Web / Avatar の `AIコード.vue` の `.stream-output .line-content` も同じ配色に揃える。
+- Code の実行状況枠は CSS の `--stream`（シアン `#00ffff`）を基調にした枠線と薄い背景を使い、文字と点滅カーソルもシアンにする。Web / Avatar の `AIコード.vue` の `.stream-output .line-content` も同じ配色に揃える。Live の会話は `メッセージ識別` を行のクラスに残し、AIチャットパネルと同じく通常出力（`output_text`）は緑 `#00ff00`、コードエージェントの回答（`output_request`）はシアン `#00ffff`、音声出力認識は淡い緑で分ける。本文・文字送りカーソル・枠・背景はその種別の色を基調にし、文字送り完了後もクラスを保持する。
 - 拡張機能一覧のアイコンは `package.json` 直下の `icon`、サイドバーのアイコンは `contributes.viewsContainers` の `icon` で指定する。両方とも `media/AiDiy.png`（`frontend_web/public/icons/AiDiy.png` と同じ画像）を使い、変更後は VSIX を再生成・再配置する。
 - Live のマイク・スピーカーは `frontend_web/public/icons/microphone.png` / `speaker.png` を `aidiy_live/media/` にコピーし、CSS のマスクで赤／水色に表示する。画像追加時は Live の `.vscodeignore` と `src/server.ts` のリソース許可一覧へ含め、配布ディレクトリだけで読み込めることを確認する。
 - Provider / モデル選択は VS Code 上部の Quick Pick ではなく、`media/chat.html` のチャットパネル内ダイアログで行う。候補は `chooseModel` / `modelCatalog` / `modelCatalogError`、確定値は `setModel` で Webview と実行層の間を受け渡す。

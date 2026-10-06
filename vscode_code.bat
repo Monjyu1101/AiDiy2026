@@ -23,13 +23,13 @@ ECHO   4: GPT-5.6 Terra
 ECHO   5: GPT-6 Luna
 ECHO   0: Exit
 ECHO.
-ECHO Press Enter to use the default provider and model.
+ECHO Press Enter to use the last selected model (or defaults).
 ECHO You can also select the model in the application.
 ECHO.
 set "PROVIDER="
 set "MODEL="
 set "MODEL_NUMBER="
-set /p "MODEL_NUMBER=Model number [Enter: default]: "
+set /p "MODEL_NUMBER=Model number [Enter: last/default]: "
 if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER goto LAUNCH_DEFAULT
 if "%MODEL_NUMBER%"=="1" set "PROVIDER=copilot-cli"

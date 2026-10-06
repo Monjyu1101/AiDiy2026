@@ -109,9 +109,12 @@ main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; 
 .message { width: fit-content; margin-bottom: 4px; padding: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; border: 1px solid var(--border); text-shadow: 0 1px 4px #000, 0 0 8px #000; }
 .message:last-child { margin-bottom: 0; }
 .message.user { color: #fff; cursor: pointer; max-width: 70%; margin-left: auto; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); }
-.message.ai { max-width: 90%; color: var(--stream); font-family: var(--vscode-editor-font-family, Consolas, monospace); background: color-mix(in srgb, var(--stream) 3%, var(--surface)); border-color: color-mix(in srgb, var(--stream) 16%, var(--border)); }
+.message.ai { --message-color: #00ff00; max-width: 90%; color: var(--message-color); font-family: var(--vscode-editor-font-family, Consolas, monospace); background: color-mix(in srgb, var(--message-color) 3%, var(--surface)); border-color: color-mix(in srgb, var(--message-color) 16%, var(--border)); }
+.message.ai.output_request { --message-color: var(--stream); }
+.message.ai.recognition_output { --message-color: #9ae6b4; }
 .message.ai .terminal-cursor { display: inline-block; width: 1ch; height: 1em; margin-left: .1ch; vertical-align: text-bottom; background: currentColor; animation: live-cursor-blink .7s step-end infinite; }
-.message.recognition { color: #b8b8b8; cursor: pointer; }
+.message.recognition { cursor: pointer; }
+.message.recognition_input { color: #e5e7eb; }
 .message.user:hover, .message.recognition:hover { border-color: var(--focus); }
 .message.system { max-width: 100%; color: var(--muted); font-size: 11px; border: 0; padding: 2px; }
 #chat-footer { flex: 0 0 auto; padding: 0 2px 2px; }

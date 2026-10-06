@@ -1,10 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
+const { readFileSync, mkdtempSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { runInNewContext } = require('node:vm');
 
-test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通知を復帰時に届ける', () => {
+test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通知を復帰時に届ける', t => {
+  const home = mkdtempSync(join(tmpdir(), 'aidiy-live-extension-model-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
   const extensionPath = join(__dirname, '..');
   const packets = [], sockets = [], timers = new Map();
   let provider, options, receive, visibility, dispose, timerId = 0;
@@ -31,7 +34,7 @@ test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通�
   }
   const module = { exports: {} };
   runInNewContext(readFileSync(join(extensionPath, 'dist/extension.js'), 'utf8'), {
-    module, exports: module.exports, require: name => name === 'vscode' ? vscode : require(name),
+    module, exports: module.exports, require: name => name === 'vscode' ? vscode : name === 'node:os' ? { homedir: () => home } : require(name),
     WebSocket: Socket, process, Buffer, URL, AbortController, console,
     setTimeout, clearTimeout,
     setInterval: callback => { timers.set(++timerId, callback); return timerId; },
@@ -52,6 +55,16 @@ test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通�
   };
   provider.resolveWebviewView(view);
   try {
+    const settings = { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'saved-model', LIVE_FREEAI_VOICE: 'Zephyr' };
+    receive({ type: 'save-model', id: 90, settings });
+    assert.deepEqual(JSON.parse(readFileSync(join(home, '.aidiy/aidiy_live_model.json'), 'utf8')), settings);
+    assert.equal(packets.at(-1).id, 90); assert.equal(packets.at(-1).value.ok, true);
+    provider.resolveWebviewView(view);
+    const boot = JSON.parse(view.webview.html.match(/id="live-config"[^>]*>(.*?)<\/script>/)[1]);
+    assert.deepEqual(boot.保存モデル設定, settings);
+    receive({ type: 'save-model', id: 91, settings: { ...settings, LIVE_AI_NAME: 'unknown' } });
+    assert.ok(packets.at(-1).error);
+    assert.deepEqual(JSON.parse(readFileSync(join(home, '.aidiy/aidiy_live_model.json'), 'utf8')), settings);
     for (const [index, channel] of ['input', '0', 'audio'].entries()) {
       const id = index + 1;
       receive({ type: 'socket-open', id }); sockets[index].onopen();

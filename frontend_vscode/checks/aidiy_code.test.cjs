@@ -1,9 +1,13 @@
-const { test } = require('node:test');
+const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { resolve, join } = require('node:path');
-const { mkdtempSync, rmSync } = require('node:fs');
+const { mkdtempSync, rmSync, readFileSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { 単独起動 } = require('../out/aidiy_code/server.cjs');
+const { 単独起動: start } = require('../out/aidiy_code/server.cjs');
+const preferences = mkdtempSync(join(tmpdir(), 'aidiy-code-model-'));
+after(() => rmSync(preferences, { recursive: true, force: true }));
+let fileNumber = 0;
+const 単独起動 = (project, launch, initial, file = join(preferences, `${++fileNumber}.json`)) => start(project, launch, initial, file);
 const fake = resolve('checks/fake-cli.cjs');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function connect(app) {
@@ -30,6 +34,45 @@ async function connect(app) {
 function post(app, data, origin = new URL(app.url).origin) {
   return fetch(app.url+'message',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)});
 }
+test('Code: 手動選択をJSONへ保存し、再起動・別フォルダで復元、起動引数では上書きしない', async () => {
+  const file = join(preferences, 'remember.json');
+  const launch = { 実行ファイル: process.execPath, 引数: [fake, 'echo'] };
+  let app = await 単独起動(process.cwd(), launch, {}, file), stream = await connect(app);
+  try {
+    await stream.wait(p => p.type === 'state');
+    assert.equal((await post(app, { type: 'model', provider: 'freeai', model: '手動-model' })).status, 200);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { provider: 'freeai', model: '手動-model' });
+  } finally { await stream.close(); await app.close(); }
+  for (const [project, initial, provider, model] of [
+    [preferences, {}, 'freeai', '手動-model'],
+    [process.cwd(), { provider: 'freeai' }, 'freeai', '手動-model'],
+    [process.cwd(), { provider: 'copilot-cli' }, 'copilot-cli', 'auto'],
+    [process.cwd(), { provider: 'codex-cli', model: 'explicit' }, 'codex-cli', 'explicit'],
+    [process.cwd(), {}, 'freeai', '手動-model'],
+  ]) {
+    app = await 単独起動(project, launch, initial, file); stream = await connect(app);
+    try {
+      const state = await stream.wait(p => p.type === 'state');
+      assert.equal(state.provider, provider); assert.equal(state.model, model);
+      assert.equal(JSON.parse(readFileSync(file, 'utf8')).model, '手動-model');
+    } finally { await stream.close(); await app.close(); }
+  }
+  app = await 単独起動(process.cwd(), launch, {}, file); stream = await connect(app);
+  try { await post(app, { type: 'model', provider: '', model: '' }); }
+  finally { await stream.close(); await app.close(); }
+  app = await 単独起動(process.cwd(), launch, {}, file); stream = await connect(app);
+  try {
+    const state = await stream.wait(p => p.type === 'state');
+    assert.equal(state.provider, ''); assert.equal(state.model, '');
+  } finally { await stream.close(); await app.close(); }
+  writeFileSync(file, '{broken', 'utf8');
+  app = await 単独起動(process.cwd(), launch, {}, file); stream = await connect(app);
+  try {
+    const state = await stream.wait(p => p.type === 'state');
+    assert.equal(state.provider, 'openai_oauth'); assert.equal(state.model, 'gpt-6.1-sol');
+    assert.equal(readFileSync(file, 'utf8'), '{broken');
+  } finally { await stream.close(); await app.close(); }
+});
 test('単独画面: 起動時の Provider / モデルを表示・実行・新規会話に反映する', async t => {
   for (const [provider, model] of [['copilot-cli', 'claude-sonnet-5.5'], ['openai_oauth', 'gpt-6-astra'], ['claude-code', 'auto'], ['codex-cli', 'auto'], ['copilot-cli', 'auto']]) {
     await t.test(provider, async () => {

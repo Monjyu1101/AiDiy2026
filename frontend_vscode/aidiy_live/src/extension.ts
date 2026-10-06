@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { LiveHost, microphonePython, backendUrl } from './host';
+import { ライブモデル読込, ライブモデル保存 } from '../../src/model-preferences';
 
 class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
   private host?: LiveHost;
@@ -26,7 +27,7 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
     const resource = (path: string) => view.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, path)).toString();
     const nonce = randomBytes(24).toString('hex');
     const csp = `default-src 'none'; style-src ${view.webview.cspSource}; script-src 'nonce-${nonce}' ${view.webview.cspSource}; img-src ${view.webview.cspSource}; connect-src ${view.webview.cspSource}; worker-src ${view.webview.cspSource} blob:; base-uri 'none';`;
-    const boot = JSON.stringify({ host: true, backend, captureUrl: resource('media/capture.js'), 作業フォルダ: this.folder() }).replaceAll('<', '\\u003c');
+    const boot = JSON.stringify({ host: true, backend, captureUrl: resource('media/capture.js'), 作業フォルダ: this.folder(), 保存モデル設定: ライブモデル読込() }).replaceAll('<', '\\u003c');
     view.webview.html = readFileSync(join(this.context.extensionPath, 'media/index.html'), 'utf8')
       .replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${csp}">`)
       .replace('href="style.css"', `href="${resource('media/style.css')}"`)
@@ -56,6 +57,14 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
       view.webview.onDidReceiveMessage(message => {
         if (!vscode.workspace.isTrusted) { host.stop(); return; }
         if (message?.type === 'ui-ready') this.ready = true;
+        else if (message?.type === 'save-model' && Number.isSafeInteger(message.id) && message.id > 0) {
+          try {
+            ライブモデル保存(message.settings);
+            void view.webview.postMessage({ type: 'reply', id: message.id, value: { ok: true } });
+          } catch (error) {
+            void view.webview.postMessage({ type: 'reply', id: message.id, error: error instanceof Error ? error.message : String(error) });
+          }
+        }
         else if (message?.type === 'standalone') void this.standalone().catch(error => { void vscode.window.showErrorMessage(String(error)); });
         else void host.receive(message).catch(error => { void vscode.window.showErrorMessage(String(error)); });
       }),

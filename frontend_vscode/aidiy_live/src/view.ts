@@ -18,6 +18,7 @@ const environment = new LiveEnvironment();
 let connected = false, busy = false, mic = false, micBusy = false, changing = false, generation = 0;
 let micGeneration = 0;
 let modelLoading = false;
+let modelSaving = false;
 let preferredSettings: Record<string, string> = {};
 let sessionProject: string | undefined;
 let settings: Record<string, string> = {}, models: Catalog = {}, voices: Catalog = {};
@@ -68,8 +69,8 @@ function controls() {
   element('activity').classList.toggle('connected', connected);
   element('activity').classList.toggle('running', busy || mic);
   button('connect').textContent = busy ? '接続中…' : connected ? '切断' : '接続';
-  button('connect').disabled = busy || changing;
-  button('new').disabled = busy || changing;
+  button('connect').disabled = busy || changing || modelSaving;
+  button('new').disabled = busy || changing || modelSaving;
   button('mic').disabled = !connected || micBusy || changing;
   button('mic').setAttribute('aria-pressed', String(mic));
   button('mic').querySelector('strong')!.textContent = mic ? 'ON' : 'OFF';
@@ -85,16 +86,16 @@ function controls() {
   const key = keys();
   const selectionChanged = provider.value !== settings.LIVE_AI_NAME || model.value !== settings[key.model]
     || voice.value !== (settings[key.voice] || '');
-  button('apply').disabled = busy || changing || modelLoading || !provider.value || !model.value || !selectionChanged;
-  button('apply').textContent = changing ? '再接続中…' : connected ? '変更して再接続' : '選択する';
+  button('apply').disabled = busy || changing || modelLoading || modelSaving || !provider.value || !model.value || !selectionChanged;
+  button('apply').textContent = modelSaving ? '保存中…' : changing ? '再接続中…' : connected ? '変更して再接続' : '選択する';
   element('model-behavior').textContent = connected || changing
     ? 'モデルや音声を変更すると、音声AIへ自動で再接続します。マイクは OFF に戻ります。'
     : '選択したモデルと音声で、次の接続を開始します。';
   element('model-conversation').hidden = !connected && !changing;
-  button('choose-model').disabled = busy || changing || modelLoading;
-  button('cancel-model').disabled = changing;
-  button('close-model').disabled = changing;
-  for (const select of [provider, model, voice]) select.disabled = busy || changing || modelLoading || !Object.keys(models).length;
+  button('choose-model').disabled = busy || changing || modelLoading || modelSaving;
+  button('cancel-model').disabled = changing || modelSaving;
+  button('close-model').disabled = changing || modelSaving;
+  for (const select of [provider, model, voice]) select.disabled = busy || changing || modelLoading || modelSaving || !Object.keys(models).length;
   status.textContent = changing ? '再接続中' : busy ? '接続中' : connected ? mic ? '会話中' : '接続済み' : '未接続';
 }
 function コンソール演出(row: HTMLDivElement, text: string) {
@@ -125,10 +126,12 @@ function コンソール演出(row: HTMLDivElement, text: string) {
   // Code の回答表示と同じく、500ms 待ってから10msごとに文字を追加する。
   timer = window.setTimeout(tick, 500);
 }
-function message(role: 'user' | 'ai' | 'system', text: string, 音声認識 = false) {
+function message(role: 'user' | 'ai' | 'system', text: string, type = '') {
   if (!text.trim() || ['!', '\x02', '\x03', '\x18'].includes(text.trim())) return;
   element('empty')?.remove();
   const row = document.createElement('div'); row.className = `message ${role}`;
+  if (type) row.classList.add(type);
+  const 音声認識 = type === 'recognition_input' || type === 'recognition_output';
   if (音声認識) row.classList.add('recognition');
   if (role === 'user' || 音声認識) {
     row.title = 'クリックして入力欄へ戻す';
@@ -155,8 +158,7 @@ function receive(packet: Packet) {
     if (type === 'output_text' && String(packet.メッセージ内容 || '').trim() === '!') {
       showError('LiveAI に送信できませんでした。音声AIへの接続状態を確認し、接続し直して再送してください。'); return;
     }
-    message(type === 'input_text' || type === 'recognition_input' ? 'user' : 'ai', String(packet.メッセージ内容 || ''),
-      type === 'recognition_input' || type === 'recognition_output');
+    message(type === 'input_text' || type === 'recognition_input' ? 'user' : 'ai', String(packet.メッセージ内容 || ''), type);
   } else if (type === 'welcome_text') message('system', String(packet.メッセージ内容 || ''));
   else if (type === 'error') showError(String(packet.メッセージ内容 || packet.error || '会話エラーが発生しました。'));
 }
@@ -182,6 +184,11 @@ function modelOptions() {
   options(voice, voices[provider.value] || {}, settings[key.voice]);
   controls();
 }
+function showModels() {
+  options(provider, Object.fromEntries(Object.keys(models).map(name => [name, name])), settings.LIVE_AI_NAME);
+  modelOptions();
+  element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model], settings[keys(settings.LIVE_AI_NAME).voice]].filter(Boolean).join(' · ') || 'AiDiy のライブ会話';
+}
 async function loadModels() {
   const run = generation;
   await initialContext;
@@ -189,22 +196,20 @@ async function loadModels() {
   const data = await api('core/AIコア/モデル情報/取得', { セッションID: connection.session });
   if (run !== generation) return;
   settings = connection.session ? data.モデル設定 || {} : { ...data.モデル設定, ...preferredSettings }; models = data.available_models?.live_models || {}; voices = data.available_models?.live_voices || {};
-  options(provider, Object.fromEntries(Object.keys(models).map(name => [name, name])), settings.LIVE_AI_NAME);
-  modelOptions();
-  element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model], settings[keys(settings.LIVE_AI_NAME).voice]].filter(Boolean).join(' · ');
+  showModels();
 }
 async function disconnect() {
   回答演出停止?.();
-  ++generation; connected = false; busy = false; mic = false; micBusy = false; changing = false;
+  ++generation; connected = false; busy = false; mic = false; micBusy = false; changing = false; modelSaving = false;
   ++micGeneration;
   sessionProject = undefined;
   if (heartbeat) clearInterval(heartbeat); heartbeat = undefined;
   connection.send('input', 音声操作(false, false)); audio.close(); audio.mute(true); connection.disconnect();
   transcript.replaceChildren(initialWelcome.cloneNode(true)); transcript.scrollTop = 0;
   element<HTMLTextAreaElement>('text').value = '';
-  settings = {}; models = {}; voices = {};
-  for (const select of [provider, model, voice]) { select.replaceChildren(); select.value = ''; }
-  element('model-label').textContent = 'AiDiy のライブ会話';
+  // 未接続でも次回のモデル・音声を確認できるよう、確定した設定を表示する。
+  settings = { ...settings, ...preferredSettings };
+  showModels();
   modelPicker.close(); showError(); controls();
   element('session-label').textContent = '音声はマイク ON の間だけ送信します。';
 }
@@ -287,7 +292,7 @@ button('choose-model').onclick = async () => {
 };
 button('close-model').onclick = () => modelPicker.close();
 button('cancel-model').onclick = () => modelPicker.close();
-modelPicker.addEventListener('cancel', event => { if (changing) event.preventDefault(); });
+modelPicker.addEventListener('cancel', event => { if (changing || modelSaving) event.preventDefault(); });
 element<HTMLFormElement>('text-form').onsubmit = event => {
   event.preventDefault(); const input = element<HTMLTextAreaElement>('text'), text = input.value.trim();
   if (!connected || changing || !text) return;
@@ -312,8 +317,15 @@ voice.onchange = controls;
 button('apply').onclick = async () => {
   if (button('apply').disabled) return;
   const key = keys();
-  preferredSettings = { LIVE_AI_NAME: provider.value, [key.model]: model.value,
+  const selected = { LIVE_AI_NAME: provider.value, [key.model]: model.value,
     ...(voice.value ? { [key.voice]: voice.value } : {}) };
+  const run = generation;
+  modelSaving = true; showError(); controls();
+  try { await environment.saveModel(selected); }
+  catch (error) { if (run === generation) showError(`モデルを保存できません: ${error instanceof Error ? error.message : String(error)}`); return; }
+  finally { modelSaving = false; controls(); }
+  if (run !== generation) return;
+  preferredSettings = selected;
   if (!connected) {
     settings = { ...settings, ...preferredSettings };
     element('model-label').textContent = [provider.value, model.value, voice.value].filter(Boolean).join(' · ');
@@ -339,16 +351,26 @@ const revealTimeout = window.setTimeout(reveal, 2500);
 const initialContext = environment.context().then(config => {
   element<HTMLInputElement>('backend').value = config.backend || '';
   showFolder(config.作業フォルダ);
-  preferredSettings = { ...config.モデル設定, ...preferredSettings };
+  const saved = config.保存モデル設定;
+  // 明示した起動設定を優先し、未指定なら最後に手動で選択したモデル・音声を復元する。
+  const remember = !config.モデル設定?.[keys(config.モデル設定?.LIVE_AI_NAME).model]
+    && (!config.モデル設定?.LIVE_AI_NAME || config.モデル設定.LIVE_AI_NAME === saved?.LIVE_AI_NAME);
+  preferredSettings = { ...(remember ? saved : {}), ...config.モデル設定, ...preferredSettings };
   if (Object.keys(preferredSettings).length) {
     settings = { ...settings, ...preferredSettings };
-    element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model]].filter(Boolean).join(' · ');
+    showModels();
   }
   // 起動引数でモデルを指定した単独画面だけ、初回に自動接続する。
   return !environment.host && !!config.モデル設定?.[keys(config.モデル設定.LIVE_AI_NAME).model];
 }).catch(() => { showError('接続先情報を取得できません。'); return false; }).finally(reveal);
 controls();
 environment.ready();
-void initialContext.then(automatic => {
+void initialContext.then(async automatic => {
+  if (generation !== 0) return;
+  // セッションを作らず、AiDiy_key.json の既定設定とモデル・音声候補を取得する。
+  modelLoading = true; controls();
+  try { await loadModels(); }
+  catch (error) { if (generation === 0) showError(error instanceof Error ? error.message : String(error)); }
+  finally { modelLoading = false; controls(); }
   if (automatic && generation === 0 && !connected && !busy) void connectSession(false, true);
 });

@@ -2,7 +2,7 @@ import type { LiveSocket } from './protocol';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 export type Folder = { 名前: string; パス: string };
-type Config = { host?: boolean; backend?: string; captureUrl?: string; 作業フォルダ?: Folder | null; モデル設定?: Record<string, string> };
+type Config = { host?: boolean; backend?: string; captureUrl?: string; 作業フォルダ?: Folder | null; モデル設定?: Record<string, string>; 保存モデル設定?: Record<string, string> };
 type Reply = { type: string; id?: number; data?: string; value?: unknown; error?: string; rate?: number; 作業フォルダ?: Folder | null };
 
 class HostSocket implements LiveSocket {
@@ -59,6 +59,13 @@ export class LiveEnvironment {
     return (await fetch(new URL('config', location.href))).json();
   }
   async backend() { return (await this.context()).backend || ''; }
+  async saveModel(settings: Record<string, string>) {
+    if (this.host) { await this.request('save-model', { settings }).result; return; }
+    const response = await fetch(new URL('model', location.href), { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings), signal: AbortSignal.timeout(35000) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'モデルを保存できません。');
+  }
   async api(path: string, body: object) {
     if (this.host) return this.request('api', { path, body }).result;
     const response = await fetch(new URL(`api/${path}`, location.href), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(35000) });

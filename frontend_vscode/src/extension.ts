@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { コードモデル読込, コードモデル保存 } from './model-preferences';
 import { CLI実行, 会話引数, 起動解決 } from './runner';
 import { コード要求実行, streamControlOf, visibleStreamContent } from './protocol';
 
@@ -34,7 +35,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     const saved = context.workspaceState.get<会話履歴>('会話履歴');
     this.履歴 = Array.isArray(saved?.一覧) ? saved.一覧.filter(item => typeof item?.id === 'string' && Array.isArray(item.メッセージ) && typeof item.作業URI === 'string') : [];
     const selected = this.履歴.find(item => item.id === saved?.現在ID);
-    this.最終モデル = context.globalState.get<{ provider: string; model: string }>('最終モデル')
+    this.最終モデル = コードモデル読込() ?? context.globalState.get<{ provider: string; model: string }>('最終モデル')
       ?? (selected?.モデル選択済み ? { provider: selected.provider, model: selected.model }
       : old?.モデル選択済み ? { provider: old.provider, model: old.model }
         : { provider: config.get('provider', ''), model: config.get('model', '') });
@@ -207,7 +208,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       const providers = await this.候補取得();
       if (!providers.some(item => item.id === selectedProvider)) throw new Error('選択したプロバイダを確認できません。');
     }
-    this.会話.provider = selectedProvider; this.会話.model = selectedProvider ? selectedModel : '';
+    const persisted = コードモデル保存({ provider: selectedProvider, model: selectedModel });
+    this.会話.provider = persisted.provider; this.会話.model = persisted.model;
     this.会話.モデル選択済み = true;
     this.最終モデル = { provider: this.会話.provider, model: this.会話.model };
     void this.context.globalState.update('最終モデル', this.最終モデル).then(undefined, error => this.ログ.appendLine(`モデルを保存できません: ${String(error)}`));
