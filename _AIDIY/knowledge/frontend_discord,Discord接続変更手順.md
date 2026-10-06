@@ -35,9 +35,9 @@
 
 全体スクリプトの検証はルートで `python -X utf8 -m unittest discover -s frontend_discord/checks -p "test_*.py"` を実行する。プロセス停止はモック、削除は一時ディレクトリで確認し、実環境の `_cleanup.py` を検証目的で実行しない。全体 `_setup.py` は Discord 既定 Yes、`_start.py` の Discord 選択は既定 No、`_cleanup.py` の削除選択は既定 Yes。
 
-`aidiy_discord` / `discord.bat` / `npm start` は `panel/launch.mjs` から Electron の小型パネルを開く。画面位置はマウスのあるディスプレイの workArea 上部中央とする。単独起動は未接続、全体 `_start.py` で Yes の場合は `--wait --connect` を渡して自動接続する。接続開始時に共通設定を再読込し、前回のモデルを適用する。接続・再接続中でも停止でき、終了時は worker に shutdown を送り、Code CLI・Live・Gateway を回収する。正常終了に応答しない場合だけ worker の子孫を停止する。Electron はセットアップで事前配置し、起動中にはダウンロードしない。
+`aidiy_discord` / `npm start` は `panel/launch.mjs` から Electron の小型パネルを開く。画面位置はマウスのあるディスプレイの workArea 上部中央とする。単独起動は未接続、全体 `_start.py` で Yes の場合は `--wait --connect` を渡して自動接続する。接続開始時に共通設定を再読込し、前回のモデルを適用する。接続・再接続中でも停止でき、終了時は worker に shutdown を送り、Code CLI・Live・Gateway を回収する。正常終了に応答しない場合だけ worker の子孫を停止する。Electron はセットアップで事前配置し、起動中にはダウンロードしない。
 
-Windows の `discord.bat` は CRLF・UTF-8（BOM なし）を維持する。起動引数のソースパスは絶対パスにし、`discord_processes.py` の照合と同期する。動作確認は `discord.bat --check` で行う（Discord への接続なし）。
+起動引数のソースパスは絶対パスにし、`discord_processes.py` の照合と同期する。動作確認は `aidiy_discord --check` で行う（Discord への接続なし）。
 
 ## 音声変更時の注意
 

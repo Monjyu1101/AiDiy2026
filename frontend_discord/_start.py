@@ -10,6 +10,12 @@ sys.path.insert(0, str(THIS_DIR))
 from discord_processes import stop_discord_processes
 
 
+def print_header(message: str) -> None:
+    print(f'\n\033[97m{"=" * 60}\033[0m')
+    print(f'\033[97m{message}\033[0m')
+    print(f'\033[97m{"=" * 60}\033[0m\n')
+
+
 def launch_command() -> list[str]:
     node = shutil.which('node')
     if not node:
@@ -49,6 +55,7 @@ def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
 
 
 def main() -> None:
+    print_header('フロントエンド(Discord) パネル起動')
     try:
         sys.exit(subprocess.call(launch_command() + sys.argv[1:], cwd=THIS_DIR))
     except (OSError, RuntimeError) as error:

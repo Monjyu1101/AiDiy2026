@@ -79,13 +79,13 @@ aidiy_discord
 
 最後に手動選択した Live モデル・音声は `~/.aidiy/aidiy_discord_model.json`、コード AI・モデルは `~/.aidiy/aidiy_discord_code_model.json` に保存します。単独起動でも全体起動からの自動接続でも、両方を復元して適用します。保存処理は `aidiy_live` / `aidiy_code` と共用し、保存ファイルは Discord 専用です。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
 
-Windows はルートの `discord.bat`、または `cd frontend_discord` 後の `npm start`、`python frontend_discord/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `discord.bat --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは `frontend_discord/out/aidiy_discord/` に保存します。
+`cd frontend_discord` 後の `npm start`、`python frontend_discord/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは `frontend_discord/out/aidiy_discord/` に保存します。
 
 ## クリーンアップ
 
 ルート `python _cleanup.py` の Discord 項目は既定 Yes です。削除前にこの作業コピーの Bot を子孫プロセスごと停止し、終了できない場合は削除を中止します。Discord の削除を選ばない場合でも、全体 cleanup の開始時には他サービスと同じく Bot を停止します。
 
-削除対象は `frontend_discord` 内の `node_modules`、生成物、temp、Python キャッシュと、この作業コピーを指す `aidiy_discord` ランチャーです。ソース、`package-lock.json`、`discord.bat`、共通 `_config/AiDiy_key.json`、前回のモデル選択は残ります。単独 cleanup は `python frontend_discord/_cleanup.py` です。
+削除対象は `frontend_discord` 内の `node_modules`、生成物、temp、Python キャッシュと、この作業コピーを指す `aidiy_discord` ランチャーです。ソース、`package-lock.json`、共通 `_config/AiDiy_key.json`、前回のモデル選択は残ります。単独 cleanup は `python frontend_discord/_cleanup.py` です。
 
 ## 会話のしかた
 

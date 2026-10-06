@@ -14,7 +14,7 @@
 仮想環境などを対話的に一括削除します。クリーンアップを実行する場合は、削除開始前に
 全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
 Code / Live の単独実行と tools の MCP 接続プロセスも強制終了・確認します。ルート固有の
-処理（ルート temp / backup フォルダの削除、グローバル npm ツールの
+処理（ルート temp / _temp / backup フォルダの削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
 
@@ -64,7 +64,7 @@ BACKEND_HERMES_PATH = "command_hermes"
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
 
 BACKUP_PATH = "backup"
-ROOT_TEMP_PATH = "temp"
+ROOT_TEMP_PATHS = ("temp", "_temp")
 CLEANUP_STOP_REQUEST_PATH = BASE_DIR / ".cleanup_stop_request.json"
 
 DATABASE_TYPE = "sqlite"
@@ -546,10 +546,11 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
 
     print()
-    root_temp_dir = base_dir / ROOT_TEMP_PATH
-    if root_temp_dir.exists():
-        print_header("ルート temp フォルダのクリーンアップ")
-        remove_directory(root_temp_dir, "ルート temp")
+    for root_temp_name in ROOT_TEMP_PATHS:
+        root_temp_dir = base_dir / root_temp_name
+        if root_temp_dir.exists():
+            print_header(f"ルート {root_temp_name} フォルダのクリーンアップ")
+            remove_directory(root_temp_dir, f"ルート {root_temp_name}")
 
     print()
     cleanup_backup(base_dir, choices)
@@ -641,7 +642,7 @@ def main():
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  1. ルート temp フォルダ")
+    print_info("  1. ルート temp / _temp フォルダ")
     print_info("  2. ルート backup フォルダ")
     print_info("  3. バックエンド(local)")
     print_info("  4. バックエンド(tools)")

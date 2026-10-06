@@ -17,7 +17,7 @@
 - Web フロントは `frontend_web`、ポート `8090`
 - Avatar フロントは `frontend_avatar`、ポート `8092`
 - VS Code 拡張は `frontend_vscode`。AiDiy (Code) は `aidiy_hermes` を直接起動し、AiDiy (Live) は Core（`8091`）の AIコアへ接続する。どちらも常駐ポートなし（単独起動版は `aidiy_code` / `aidiy_live`）
-- Discord Bot は `frontend_discord`（任意起動、待受ポートなし）。専用テキストチャンネルを `aidiy_hermes`、専用ボイスチャンネルを Core（`8091`）の AIコア Live へ接続する。起動は `aidiy_discord`（または `discord.bat`）
+- Discord Bot は `frontend_discord`（任意起動、待受ポートなし）。専用テキストチャンネルを `aidiy_hermes`、専用ボイスチャンネルを Core（`8091`）の AIコア Live へ接続する。起動は `aidiy_discord`
 - DB は **SQLite**
   - `_data/AiDiy/database.db`
 - スキーマ変更は **Alembic なし**
@@ -142,7 +142,7 @@ npm run dev
 cd frontend_avatar
 npm run dev
 
-# frontend discord（接続パネルを開き、開始ボタンで接続）
+# frontend discord
 aidiy_discord
 ```
 

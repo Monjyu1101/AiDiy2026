@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import OpusScript from 'opusscript';
-import { Discord音声出力, 音声入力ミキサー, 入力PCM変換, 出力PCM変換 } from '../src/audio';
+import { Discord音声出力, 音声入力ミキサー, 入力PCM変換, 出力PCM変換, 出力バッファ上限 } from '../src/audio';
 
 test('48kHz stereo → 16/24kHz mono、24kHz mono → 48kHz stereo のレートと音量を検証', () => {
   const stereo = Buffer.alloc(3840);
@@ -76,7 +76,8 @@ test('再生側の要求ごとに20msのOpusを即座に供給し、余計な無
       assert.equal(decoder.decode(opus).length, 3840);
     }
     assert.deepEqual(stream.read(), Buffer.from([0xf8, 0xff, 0xfe]));
-    assert.throws(() => stream.追加(Buffer.alloc(720002)), /上限/);
+    stream.追加(Buffer.alloc(24000 * 2 * 30)); // 30秒分の先行受信は長い応答として許容する
+    assert.throws(() => stream.追加(Buffer.alloc(出力バッファ上限)), /上限/);
     assert.throws(() => stream.追加(Buffer.alloc(1)), /上限/);
   } finally { stream.destroy(); decoder.delete(); }
   assert.equal(stream.destroyed, true);

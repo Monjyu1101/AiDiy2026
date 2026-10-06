@@ -129,7 +129,7 @@ python _start.py
 `command_hermes` は **常駐サーバーではないため `_start.py` の起動対象外** です。セットアップ後は、AIコードパネルから `aidiy_hermes` として呼び出すか、必要時に手動で起動します。
 `frontend_vscode` も常駐サービスではありません。セットアップ後は VS Code のコマンドパレットから **AiDiy (Code): チャットを開く** / **AiDiy (Live): ライブ会話を開く**を実行します。単独ウィンドウは作業フォルダで `aidiy_code` / `aidiy_live`（ルートでは `vscode_code.bat` / `vscode_live.bat`）を実行します。Live は `backend_server`（8091）の起動が必要です。
 
-`frontend_discord` は `_config/AiDiy_key.json` の `DISCORD_*` を設定後、全体 `_start.py` で選択して起動します（デフォルト No）。`aidiy_discord`、`discord.bat` または `cd frontend_discord && npm start` での個別起動も可能です（接続パネルが開き、開始ボタンで接続）。専用テキストチャンネルへの普通の投稿に Hermes が返信し、専用ボイスチャンネルへの入退室に合わせて AIコアとの音声会話を自動開始・終了します。導入と権限設定は [frontend_discord/README.md](./frontend_discord/README.md) を参照してください。
+`frontend_discord` は `_config/AiDiy_key.json` の `DISCORD_*` を設定後、全体 `_start.py` で選択して起動します（デフォルト No）。`aidiy_discord` または `cd frontend_discord && npm start` での個別起動も可能です。専用テキストチャンネルへの普通の投稿に Hermes が返信し、専用ボイスチャンネルへの入退室に合わせて AIコアとの音声会話を自動開始・終了します。導入と権限設定は [frontend_discord/README.md](./frontend_discord/README.md) を参照してください。
 
 ### 個別起動
 

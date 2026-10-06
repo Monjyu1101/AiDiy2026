@@ -829,12 +829,15 @@ def main():
     else:
         print_warning("フロントエンド(vscode)のセットアップをスキップしました。")
 
+    print()
     if choices.get("discord"):
         if not _load_folder_module("frontend_discord").setup(choices):
             error_locations.append("フロントエンド(Discord)")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
+    else:
+        print_warning("フロントエンド(Discord)のセットアップをスキップしました。")
 
     print()
     remove_folder_import_caches()
@@ -854,7 +857,7 @@ def main():
     print_info("    Hermes起動: aidiy_hermes")
     print_info("    Code起動  : aidiy_code")
     print_info("    Live起動  : aidiy_live")
-    print_info("    Discord   : aidiy_discord（または discord.bat）でパネルを開き、開始ボタンで接続")
+    print_info("    Discord起動: aidiy_discord")
 
     print()
     print_success("セットアップは正常終了しました。")

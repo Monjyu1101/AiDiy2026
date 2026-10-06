@@ -91,6 +91,7 @@ coverage/
 *.log
 logs/
 temp/
+_temp/
 backend_server/temp/
 backend_server/temp/**
 backend_tools/temp/

@@ -13,6 +13,38 @@ from discord_processes import stop_discord_processes
 from launcher import remove_launcher
 
 TARGETS = ('node_modules', 'dist', 'out', 'temp', '__pycache__', '.pytest_cache')
+LABEL = 'フロントエンド(Discord)'
+
+
+class Colors:
+    HEADER = '\033[97m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+
+def print_header(message):
+    print(f'\n{Colors.HEADER}{"=" * 60}{Colors.ENDC}')
+    print(f'{Colors.HEADER}{message}{Colors.ENDC}')
+    print(f'{Colors.HEADER}{"=" * 60}{Colors.ENDC}\n')
+
+
+def print_success(message):
+    print(f'{Colors.OKBLUE}[OK] {message}{Colors.ENDC}')
+
+
+def print_error(message):
+    print(f'{Colors.FAIL}[NG] {message}{Colors.ENDC}')
+
+
+def print_warning(message):
+    print(f'{Colors.WARNING}[WARN] {message}{Colors.ENDC}')
+
+
+def print_info(message):
+    print(f'{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}')
 
 
 def remove_directory(path: Path) -> bool:
@@ -32,27 +64,46 @@ def remove_directory(path: Path) -> bool:
             func(name)
 
         shutil.rmtree(path, onerror=writable)
-        print(f'[OK] 削除しました: {path}')
+        print_success(f'削除しました: {path}')
         return True
     except (OSError, ValueError):
-        print(f'[NG] 削除できません: {path}')
+        print_error(f'削除できません: {path}')
         return False
 
 
 def cleanup(choices: dict | None = None) -> bool:
     if choices is not None and choices.get('discord') is False:
         return True
+    print_header(f'{LABEL} のクリーンアップ')
     if not stop_discord_processes(THIS_DIR):
+        print_warning('Discord Bot の停止を確認できないため、ランチャーと生成物の削除を中止します。')
         return False
     ok = remove_launcher(THIS_DIR)
+    deleted_count = 0
+
+    def remove_counted(path: Path) -> None:
+        nonlocal ok, deleted_count
+        existed = path.exists()
+        if remove_directory(path):
+            deleted_count += existed
+        else:
+            ok = False
+
     for name in TARGETS:
-        ok = remove_directory(THIS_DIR / name) and ok
+        remove_counted(THIS_DIR / name)
     for path in sorted(THIS_DIR.rglob('__pycache__'), key=lambda item: len(item.parts), reverse=True):
-        ok = remove_directory(path) and ok
+        remove_counted(path)
+    if ok and deleted_count:
+        print_success(f'{LABEL} のクリーンアップ完了 ({deleted_count}個削除)')
+    elif ok:
+        print_info(f'{LABEL}: 削除対象はありませんでした')
+    else:
+        print_warning(f'{LABEL}: 一部のクリーンアップを完了できませんでした')
     return ok
 
 
 def main() -> None:
+    print_header(f'{LABEL} クリーンアップ')
     answer = input('Discord Bot を停止し、依存関係・キャッシュを削除しますか？ ([n]/y): ').strip().lower()
     if answer == 'y':
         spec = importlib.util.spec_from_file_location('aidiy_discord_root_cleanup', THIS_DIR.parent / '_cleanup.py')

@@ -2,6 +2,8 @@ import { Readable } from 'node:stream';
 import OpusScript from 'opusscript';
 
 const FRAME_BYTES = 960 * 2 * 2; // Discord: 48kHz / stereo / PCM16、20ms
+// LiveAI は実時間より速く音声を送るため、長い応答でも途切れない余裕を持たせる（暴走時の安全上限）。
+export const 出力バッファ上限 = 24000 * 2 * 120;
 
 export function 入力PCM変換(stereo: Buffer, rate: number): Buffer {
   if (rate !== 16000 && rate !== 24000) throw new Error('入力レートが不正です。');
@@ -59,7 +61,7 @@ export class Discord音声出力 extends Readable {
   constructor() { super({ objectMode: true, highWaterMark: 2 }); }
   追加(pcm: Buffer) {
     if (this.destroyed) return;
-    if (pcm.length % 2 || this.pcm.length + pcm.length > 24000 * 2 * 15) throw new Error('AI 音声の再生バッファ上限を超えました。');
+    if (pcm.length % 2 || this.pcm.length + pcm.length > 出力バッファ上限) throw new Error('AI 音声の再生バッファ上限を超えました。');
     if (pcm.length) this.lastAudioAt = Date.now();
     this.pcm = Buffer.concat([this.pcm, pcm]);
   }
