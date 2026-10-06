@@ -67,6 +67,7 @@ function controls() {
   element('activity').classList.toggle('running', busy || mic);
   button('connect').textContent = busy ? '接続中…' : connected ? '切断' : '接続';
   button('connect').disabled = busy || changing;
+  button('new').disabled = busy || changing;
   button('mic').disabled = !connected || micBusy || changing;
   button('mic').setAttribute('aria-pressed', String(mic));
   button('mic').querySelector('strong')!.textContent = mic ? 'ON' : 'OFF';
@@ -233,10 +234,9 @@ button('connect').onclick = async () => {
   if (connected) await disconnect();
   else await connectSession();
 };
-button('mic').onclick = async () => {
-  if (!connected || micBusy) return;
+async function startMicrophone() {
+  if (!connected || mic || micBusy || changing) return;
   showError();
-  if (mic) { mic = false; audio.stop(); connection.send('input', 音声操作(false, audio.speaker)); controls(); return; }
   const run = generation, micRun = ++micGeneration; micBusy = true; controls();
   try {
     await audio.unlock();
@@ -246,6 +246,11 @@ button('mic').onclick = async () => {
     connection.send('input', 音声操作(mic, audio.speaker));
   } catch (error) { if (run === generation && micRun === micGeneration) { mic = false; showError(`マイクを開始できません: ${microphoneError(error)}`); } }
   finally { if (micRun === micGeneration) { micBusy = false; controls(); } }
+}
+button('mic').onclick = async () => {
+  if (!connected || micBusy || changing) return;
+  if (mic) { showError(); mic = false; audio.stop(); connection.send('input', 音声操作(false, audio.speaker)); controls(); return; }
+  await startMicrophone();
 };
 button('speaker').onclick = async () => {
   if (!connected || changing) return;
@@ -253,7 +258,23 @@ button('speaker').onclick = async () => {
   try { if (enabled) await audio.unlock(); audio.mute(enabled); connection.send('input', 音声操作(mic, enabled)); controls(); }
   catch (error) { showError(String(error)); }
 };
-button('new').onclick = disconnect;
+button('new').onclick = async () => {
+  if (busy || changing) return;
+  const reconnect = connected, speaker = audio.speaker, microphone = mic;
+  const selectedSettings = { ...preferredSettings };
+  for (const key of ['LIVE_AI_NAME', ...Object.values(keys(settings.LIVE_AI_NAME))]) {
+    if (settings[key]) selectedSettings[key] = settings[key];
+  }
+  const reset = disconnect(), run = generation;
+  await reset;
+  if (!reconnect || run !== generation) return;
+  preferredSettings = selectedSettings;
+  audio.mute(speaker);
+  // 表示を初期化したうえで、同じモデル・音声の新しいセッションを作る。
+  const connecting = connectSession(true), reconnectRun = generation;
+  await connecting;
+  if (microphone && reconnectRun === generation && connected) await startMicrophone();
+};
 const modelPicker = element<HTMLDialogElement>('model-picker');
 button('choose-model').onclick = async () => {
   modelPicker.showModal(); modelLoading = true; showError(); controls();

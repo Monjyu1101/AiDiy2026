@@ -23,7 +23,7 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
       super();
       assert.equal(options.frame, false);
       if (!live) assert.equal(options.roundedCorners, false);
-      assert.equal(options.x, live ? 1584 : 100); assert.equal(options.y, 200);
+      assert.equal(options.x, live ? 1528 : 100); assert.equal(options.y, 200);
       this.bounds = { x: options.x, y: options.y, width: options.width, height: options.height };
       this.webContents = new EventEmitter();
       Object.assign(this.webContents, {

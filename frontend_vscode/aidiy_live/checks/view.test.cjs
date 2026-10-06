@@ -93,6 +93,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     setInterval() { const id = ++intervalNumber; intervals.add(id); return id; }, clearInterval: id => intervals.delete(id),
   });
   return { element, sockets, calls, intervals, timers, releaseInput, audioCalls,
+    rejectNextConnection() { rejectProject = true; },
     advance(milliseconds) {
       const target = clock + milliseconds;
       while (true) {
@@ -179,6 +180,72 @@ test('Live 単独画面: 初期設定の読み込み中に画面を閉じたら�
 });
 
 for (const host of [true, false]) {
+  test(`Live ${host ? 'VS Code' : '単独画面'}: 接続中の新しい会話は設定を保って新規セッションへ接続する`, async t => {
+    const ui = screen(host); t.after(() => ui.close()); await ui.ready();
+    await ui.element('connect').onclick();
+    const session = ui.sockets[0].session;
+    ui.sockets[1].emit({ メッセージ識別: 'output_text', メッセージ内容: '前の会話です。' });
+    ui.element('text').value = '前の下書き';
+    await ui.element('mic').onclick(); await ui.element('speaker').onclick();
+    await ui.element('new').onclick();
+    assert.equal(ui.element('connect').textContent, '切断');
+    assert.equal(ui.element('status').textContent, '会話中');
+    assert.equal(ui.element('mic').strong.textContent, 'ON');
+    assert.equal(ui.element('speaker').strong.textContent, 'OFF');
+    assert.equal(ui.audioCalls.filter(call => call === 'start').length, 2);
+    assert.deepEqual(ui.calls.filter(call => call.packet?.メッセージ識別 === 'operations').at(-1).packet.メッセージ内容,
+      { ボタン: { マイク: true, スピーカー: false } });
+    assert.equal(ui.element('text').value, '');
+    assert.equal(ui.element('transcript').children.length, 1);
+    assert.equal(ui.element('transcript').children[0].id, 'empty');
+    assert.equal(ui.sockets.length, 6);
+    assert.ok(ui.sockets.slice(0, 3).every(socket => socket.readyState === 3));
+    assert.ok(ui.sockets.slice(3).every(socket => socket.readyState === 1));
+    assert.deepEqual(ui.sockets.slice(3).map(socket => socket.channel), ['input', '0', 'audio']);
+    assert.notEqual(ui.sockets[3].session, session);
+    for (const call of ui.calls.filter(call => call.packet?.type === 'connect').slice(-3)) {
+      assert.equal(call.packet.CODE_BASE_PATH, 'C:\\work\\別プロジェクト');
+      assert.deepEqual(call.packet.モデル設定, {
+        LIVE_AI_NAME: 'gemini_live', LIVE_GEMINI_MODEL: 'live-model', LIVE_GEMINI_VOICE: 'Kore',
+      });
+    }
+    assert.equal(ui.intervals.size, host ? 0 : 1);
+    await ui.element('connect').onclick();
+    await ui.element('new').onclick();
+    assert.equal(ui.element('connect').textContent, '接続');
+    assert.equal(ui.sockets.length, 6); // 未接続の新しい会話では接続を開始しない。
+  });
+
+  test(`Live ${host ? 'VS Code' : '単独画面'}: 新しい会話でもマイク OFF とスピーカー ON を保持する`, async t => {
+    const ui = screen(host); t.after(() => ui.close()); await ui.ready();
+    await ui.element('connect').onclick();
+    await ui.element('new').onclick();
+    assert.equal(ui.element('status').textContent, '接続済み');
+    assert.equal(ui.element('mic').strong.textContent, 'OFF');
+    assert.equal(ui.element('speaker').strong.textContent, 'ON');
+    assert.ok(!ui.audioCalls.includes('start'));
+    assert.deepEqual(ui.calls.filter(call => call.packet?.メッセージ識別 === 'operations').at(-1).packet.メッセージ内容,
+      { ボタン: { マイク: false, スピーカー: true } });
+  });
+
+  test(`Live ${host ? 'VS Code' : '単独画面'}: 新しい会話の再接続失敗を表示する`, async t => {
+    const ui = screen(host); t.after(() => ui.close()); await ui.ready();
+    await ui.element('connect').onclick(); ui.rejectNextConnection();
+    await ui.element('new').onclick();
+    assert.equal(ui.element('connect').textContent, '接続');
+    assert.equal(ui.sockets.length, 4);
+    assert.ok(ui.sockets.every(socket => socket.readyState === 3));
+    assert.match(ui.element('error').textContent, /プロジェクト設定失敗/);
+    assert.equal(ui.intervals.size, 0);
+  });
+
+  test(`Live ${host ? 'VS Code' : '単独画面'}: 新しい会話の初期化中に画面を閉じたら再接続しない`, async () => {
+    const ui = screen(host); await ui.ready(); await ui.element('connect').onclick();
+    const restarting = ui.element('new').onclick(); ui.close(); await restarting;
+    assert.equal(ui.sockets.length, 3);
+    assert.ok(ui.sockets.every(socket => socket.readyState === 3));
+  });
+
   test(`Live ${host ? 'VS Code' : '単独画面'}: 手入力と音声認識をクリックして入力欄へコピーする`, async t => {
     const ui = screen(host, false, false, false); t.after(() => ui.close()); await ui.ready();
     await ui.element('connect').onclick();

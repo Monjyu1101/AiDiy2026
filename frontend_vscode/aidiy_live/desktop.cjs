@@ -21,8 +21,8 @@ app.whenReady().then(async () => {
   server = await ライブ起動(join(__dirname, '..'), backend, false, projectRoot, initialModels ? JSON.parse(initialModels) : {});
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
-    title: 'AiDiy (Live)', width: 420, height: 650, minWidth: 320, minHeight: 480,
-    x: workArea.x + Math.max(0, workArea.width - 420 - 8), y: workArea.y + 8,
+    title: 'AiDiy (Live)', width: 476, height: 602, minWidth: 360, minHeight: 480,
+    x: workArea.x + Math.max(0, workArea.width - 476 - 8), y: workArea.y + 8,
     frame: false, roundedCorners: false, show: false, backgroundColor: '#000', autoHideMenuBar: true,
     icon: join(__dirname, '../media/AiDiy.png'),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
@@ -67,7 +67,7 @@ app.whenReady().then(async () => {
   });
   if (!expanded) return;
   window.setBounds(bounds);
-  window.setMinimumSize(320, 480);
+  window.setMinimumSize(360, 480);
   // Windows の拡大率による丸めを含め、実際の幅で右端を合わせる。
   window.setBounds({ x: workArea.x + Math.max(0, workArea.width - window.getBounds().width - 8), y: workArea.y + 8 });
   opening = false;

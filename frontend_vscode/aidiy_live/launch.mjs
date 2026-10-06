@@ -71,7 +71,7 @@ async function main() {
         const executable = candidates.find(existsSync);
         if (executable) {
           command = executable;
-          browserArgs = [`--app=${server.url}`, `--user-data-dir=${join(root, 'out/aidiy_live/browser-profile')}`, '--no-first-run', '--no-default-browser-check', '--window-size=420,650'];
+          browserArgs = [`--app=${server.url}`, `--user-data-dir=${join(root, 'out/aidiy_live/browser-profile')}`, '--no-first-run', '--no-default-browser-check', '--window-size=640,820'];
         }
       }
       const browser = spawn(command, browserArgs, { stdio: 'ignore', windowsHide: false, detached: true });
