@@ -94,20 +94,20 @@ main { flex: 1; min-height: 60px; overflow-y: auto; padding: 2px; }
 @keyframes welcome-rainbow { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
 @keyframes welcome-glow { 0%, 100% { opacity: .2; } 50% { opacity: .7; } }
 #welcome .welcome-eyebrow { color: var(--muted); font-size: 9px; letter-spacing: 2px; margin: 0 0 10px; }
-#welcome h1 { margin: 0 0 8px; font-size: clamp(14px, 4vw, 24px); letter-spacing: -.5px; font-weight: 600; }
+#welcome h1 { color: var(--terminal); margin: 0 0 8px; font-size: clamp(14px, 4vw, 24px); letter-spacing: -.5px; font-weight: 600; }
 #welcome p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.9; }
 #welcome .welcome-type { position: relative; display: inline-block; font-family: var(--vscode-editor-font-family, monospace); }
-#welcome .welcome-text { display: block; white-space: nowrap; animation: var(--typing-animation) 8s steps(var(--typing-steps), end) infinite; }
+#welcome .welcome-text { display: block; white-space: nowrap; animation: var(--typing-animation) 12s steps(var(--typing-steps), end) infinite; }
 #welcome .welcome-eyebrow { --typing-animation: welcome-typewriter-eyebrow; --caret-animation: welcome-caret-eyebrow; --typing-steps: 21; }
 #welcome h1 { --typing-animation: welcome-typewriter-title; --caret-animation: welcome-caret-title; --typing-steps: 20; }
 #welcome .welcome-caption { --typing-animation: welcome-typewriter-caption; --caret-animation: welcome-caret-caption; --typing-steps: 15; }
-#welcome .welcome-type::after { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1ch; height: 1em; margin-left: .1ch; background: currentColor; pointer-events: none; animation: var(--caret-animation) 8s steps(var(--typing-steps), end) infinite, terminal-cursor-blink 1.2s step-end infinite; }
-@keyframes welcome-typewriter-eyebrow { 0%, 4% { clip-path: inset(0 100% 0 0); } 18%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes welcome-typewriter-title { 0%, 21% { clip-path: inset(0 100% 0 0); } 32%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes welcome-typewriter-caption { 0%, 36% { clip-path: inset(0 100% 0 0); } 47%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes welcome-caret-eyebrow { 0%, 3.99% { left: 0; visibility: hidden; } 4% { left: 0; visibility: visible; } 18%, 20.99% { left: 100%; visibility: visible; } 21%, 100% { left: 100%; visibility: hidden; } }
-@keyframes welcome-caret-title { 0%, 20.99% { left: 0; visibility: hidden; } 21% { left: 0; visibility: visible; } 32%, 35.99% { left: 100%; visibility: visible; } 36%, 100% { left: 100%; visibility: hidden; } }
-@keyframes welcome-caret-caption { 0%, 35.99% { left: 0; visibility: hidden; } 36% { left: 0; visibility: visible; } 47%, 100% { left: 100%; visibility: visible; } }
+#welcome .welcome-type::after { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1ch; height: 1em; margin-left: .1ch; background: currentColor; pointer-events: none; animation: var(--caret-animation) 12s steps(var(--typing-steps), end) infinite, terminal-cursor-blink 1.2s step-end infinite; }
+@keyframes welcome-typewriter-eyebrow { 0%, 4% { clip-path: inset(0 100% 0 0); } 16%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes welcome-typewriter-title { 0%, 26% { clip-path: inset(0 100% 0 0); } 38%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes welcome-typewriter-caption { 0%, 48% { clip-path: inset(0 100% 0 0); } 60%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes welcome-caret-eyebrow { 0%, 3.99% { left: 0; visibility: hidden; } 4% { left: 0; visibility: visible; } 16%, 25.99% { left: 100%; visibility: visible; } 26%, 100% { left: 100%; visibility: hidden; } }
+@keyframes welcome-caret-title { 0%, 25.99% { left: 0; visibility: hidden; } 26% { left: 0; visibility: visible; } 38%, 47.99% { left: 100%; visibility: visible; } 48%, 100% { left: 100%; visibility: hidden; } }
+@keyframes welcome-caret-caption { 0%, 47.99% { left: 0; visibility: hidden; } 48% { left: 0; visibility: visible; } 60%, 100% { left: 100%; visibility: visible; } }
 #welcome.welcome-input-started .welcome-text { animation: none !important; clip-path: none; }
 #welcome.welcome-input-started .welcome-type::after { display: none; }
 .message { margin-bottom: 4px; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; }
@@ -206,6 +206,6 @@ body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vsc
   .welcome-mark::before { animation: welcome-rotate-clockwise 20s linear infinite, welcome-glow 8s ease-in-out infinite, welcome-rainbow 12s linear infinite !important; }
   .welcome-mark::after { animation: welcome-rotate-counterclockwise 20s linear infinite, welcome-glow 8s ease-in-out -4s infinite, welcome-rainbow 12s linear -6s infinite !important; }
   /* 初期画面の文字は位置を動かさず、表示範囲とカーソルだけを変化させる。 */
-  #welcome .welcome-text { animation: var(--typing-animation) 8s steps(var(--typing-steps), end) infinite !important; }
-  #welcome .welcome-type::after { animation: var(--caret-animation) 8s steps(var(--typing-steps), end) infinite, terminal-cursor-blink 1.2s step-end infinite !important; }
+  #welcome .welcome-text { animation: var(--typing-animation) 12s steps(var(--typing-steps), end) infinite !important; }
+  #welcome .welcome-type::after { animation: var(--caret-animation) 12s steps(var(--typing-steps), end) infinite, terminal-cursor-blink 1.2s step-end infinite !important; }
 }

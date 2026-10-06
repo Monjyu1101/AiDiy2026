@@ -118,14 +118,14 @@ main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; 
 .empty .terminal-primary { color: var(--terminal); font-family: var(--vscode-editor-font-family, Consolas, monospace); font-size: clamp(9px, 3.4vw, 18px); font-weight: 600; letter-spacing: -.5px; margin: 0 0 8px; text-shadow: 0 1px 4px #000, 0 0 8px #000; --typing-animation: live-type-primary; --caret-animation: live-caret-primary; --typing-steps: 31; }
 .empty .terminal-secondary { --typing-animation: live-type-secondary; --caret-animation: live-caret-secondary; --typing-steps: 26; }
 .terminal-type { position: relative; display: inline-block; }
-.terminal-text { display: block; white-space: nowrap; animation: var(--typing-animation) 8s steps(var(--typing-steps), end) infinite; }
-.empty .terminal-type::after { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1ch; height: 1em; margin-left: .1ch; background: currentColor; pointer-events: none; animation: var(--caret-animation) 8s steps(var(--typing-steps), end) infinite, live-cursor-blink 1.2s step-end infinite; }
-@keyframes live-type-eyebrow { 0%, 4% { clip-path: inset(0 100% 0 0); } 18%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes live-type-primary { 0%, 21% { clip-path: inset(0 100% 0 0); } 32%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes live-type-secondary { 0%, 36% { clip-path: inset(0 100% 0 0); } 47%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes live-caret-eyebrow { 0%, 3.99% { left: 0; visibility: hidden; } 4% { left: 0; visibility: visible; } 18%, 20.99% { left: 100%; visibility: visible; } 21%, 100% { left: 100%; visibility: hidden; } }
-@keyframes live-caret-primary { 0%, 20.99% { left: 0; visibility: hidden; } 21% { left: 0; visibility: visible; } 32%, 35.99% { left: 100%; visibility: visible; } 36%, 100% { left: 100%; visibility: hidden; } }
-@keyframes live-caret-secondary { 0%, 35.99% { left: 0; visibility: hidden; } 36% { left: 0; visibility: visible; } 47%, 100% { left: 100%; visibility: visible; } }
+.terminal-text { display: block; white-space: nowrap; animation: var(--typing-animation) 12s steps(var(--typing-steps), end) infinite; }
+.empty .terminal-type::after { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1ch; height: 1em; margin-left: .1ch; background: currentColor; pointer-events: none; animation: var(--caret-animation) 12s steps(var(--typing-steps), end) infinite, live-cursor-blink 1.2s step-end infinite; }
+@keyframes live-type-eyebrow { 0%, 4% { clip-path: inset(0 100% 0 0); } 16%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes live-type-primary { 0%, 26% { clip-path: inset(0 100% 0 0); } 38%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes live-type-secondary { 0%, 48% { clip-path: inset(0 100% 0 0); } 60%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes live-caret-eyebrow { 0%, 3.99% { left: 0; visibility: hidden; } 4% { left: 0; visibility: visible; } 16%, 25.99% { left: 100%; visibility: visible; } 26%, 100% { left: 100%; visibility: hidden; } }
+@keyframes live-caret-primary { 0%, 25.99% { left: 0; visibility: hidden; } 26% { left: 0; visibility: visible; } 38%, 47.99% { left: 100%; visibility: visible; } 48%, 100% { left: 100%; visibility: hidden; } }
+@keyframes live-caret-secondary { 0%, 47.99% { left: 0; visibility: hidden; } 48% { left: 0; visibility: visible; } 60%, 100% { left: 100%; visibility: visible; } }
 @keyframes live-cursor-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 .empty.input-started .terminal-text { animation: none; clip-path: none; }
 .empty.input-started .terminal-type::after { display: none; }
