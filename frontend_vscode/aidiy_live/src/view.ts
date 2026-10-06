@@ -1,3 +1,4 @@
+import { 最下部追従 } from '../../src/scroll-follow';
 import { LiveConnection, 入力レート, 音声入力, 音声操作, type Packet } from './protocol';
 import { LiveAudio } from './audio';
 import { AudioCloud } from './visualizer';
@@ -10,6 +11,7 @@ const element = <T extends HTMLElement>(id: string) => document.getElementById(i
 const button = (id: string) => element<HTMLButtonElement>(id);
 const provider = element<HTMLSelectElement>('provider'), model = element<HTMLSelectElement>('model'), voice = element<HTMLSelectElement>('voice');
 const errorBox = element('error'), modelError = element('model-error'), status = element('status'), transcript = element('transcript');
+const 最下部表示 = 最下部追従([transcript]);
 const initialWelcome = element('empty').cloneNode(true);
 let 回答演出停止: (() => void) | undefined;
 const environment = new LiveEnvironment();
@@ -97,7 +99,7 @@ function controls() {
 }
 function コンソール演出(row: HTMLDivElement, text: string) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    row.textContent = text; return;
+    row.textContent = text; 最下部表示(); return;
   }
   row.classList.add('console-effect');
   const terminalText = document.createElement('span');
@@ -109,14 +111,15 @@ function コンソール演出(row: HTMLDivElement, text: string) {
     clearTimeout(timer);
     row.classList.remove('console-effect'); row.textContent = text;
     回答演出停止 = undefined;
+    最下部表示();
   };
   const tick = () => {
     const end = Math.min(index + batch, text.length);
     terminalText.textContent += text.slice(index, end); index = end;
-    transcript.scrollTop = transcript.scrollHeight;
+    最下部表示();
     if (index < text.length) { timer = window.setTimeout(tick, 10); return; }
     finish();
-    transcript.scrollTop = transcript.scrollHeight;
+    最下部表示();
   };
   回答演出停止 = finish;
   // Code の回答表示と同じく、500ms 待ってから10msごとに文字を追加する。
@@ -133,7 +136,7 @@ function message(role: 'user' | 'ai' | 'system', text: string, 音声認識 = fa
       const input = element<HTMLTextAreaElement>('text');
       input.value = text;
       input.focus(); input.setSelectionRange(input.value.length, input.value.length);
-      controls();
+      controls(); 最下部表示();
     });
   }
   回答演出停止?.();
@@ -141,7 +144,7 @@ function message(role: 'user' | 'ai' | 'system', text: string, 音声認識 = fa
   if (role === 'ai') コンソール演出(row, text.slice(0, 20000));
   else row.textContent = text.slice(0, 20000);
   while (transcript.children.length > 100) transcript.firstElementChild?.remove();
-  transcript.scrollTop = transcript.scrollHeight;
+  最下部表示();
 }
 function receive(packet: Packet) {
   const type = packet.メッセージ識別;
@@ -292,11 +295,11 @@ element<HTMLFormElement>('text-form').onsubmit = event => {
   void audio.unlock().catch(error => showError(String(error)));
   if (connection.send('input', { チャンネル: '0', メッセージ識別: 'input_text', メッセージ内容: text, 送信モード: 'Live', 出力先チャンネル: '0' })) input.value = '';
   else showError('送信できませんでした。接続を確認し、もう一度送信してください。');
-  controls();
+  controls(); 最下部表示();
 };
 element<HTMLTextAreaElement>('text').addEventListener('input', () => {
   element('empty')?.classList.add('input-started');
-  controls();
+  controls(); 最下部表示();
 });
 element<HTMLTextAreaElement>('text').addEventListener('keydown', event => {
   if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey

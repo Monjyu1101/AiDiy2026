@@ -1,5 +1,6 @@
 import MarkdownIt from 'markdown-it';
 import { streamControlOf, visibleStreamContent } from './stream-control';
+import { 最下部追従 } from './scroll-follow';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void; getState(): { 下書き?: string } | undefined; setState(state: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -54,14 +55,7 @@ const 実行表示更新 = (running: boolean) => {
   element('activity').classList.toggle('running', running);
 };
 const 末尾省略 = (value: string, maximum = 28) => value.length > maximum ? `...${value.slice(-(maximum - 3))}` : value;
-const 最下部表示 = () => {
-  const conversation = element('conversation');
-  conversation.scrollTop = conversation.scrollHeight;
-};
-const 進捗末尾表示 = () => {
-  const progress = element('progress');
-  progress.scrollTop = progress.scrollHeight;
-};
+const 最下部表示 = 最下部追従([element('conversation'), element('progress')]);
 const コンソール演出 = (content: HTMLDivElement, text: string, key: string) => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     content.innerHTML = markdown.render(text); 演出済み回答.add(key); 最下部表示(); return;
@@ -96,6 +90,7 @@ const 一覧切替 = (show: boolean) => {
   element('view-title').textContent = show ? '会話一覧' : '今の会話';
   historyToggle.textContent = show ? '戻る' : '一覧';
   historyToggle.setAttribute('aria-expanded', String(show));
+  if (!show) 最下部表示();
 };
 const 日時表示 = (value: number) => {
   const date = new Date(value);
@@ -153,11 +148,11 @@ const モデル選択を開く = () => {
   modelPicker.showModal();
   候補取得('');
 };
-prompt.addEventListener('input', () => { 初期文字演出停止(); vscode.setState({ 下書き: prompt.value }); ボタン更新(); });
+prompt.addEventListener('input', () => { 初期文字演出停止(); vscode.setState({ 下書き: prompt.value }); ボタン更新(); 最下部表示(); });
 element('composer').addEventListener('submit', event => {
   event.preventDefault();
   if (!入力許可 || 実行中 || 送信待ち || !prompt.value.trim()) return;
-  送信待ち = true; ボタン更新();
+  送信待ち = true; ボタン更新(); 最下部表示();
   vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: prompt.value });
 });
 prompt.addEventListener('keydown', event => {
@@ -183,7 +178,7 @@ element<HTMLButtonElement>('confirm-delete-history').addEventListener('click', (
   deleteHistoryDialog.close();
 });
 element<HTMLDetailsElement>('progress-details').addEventListener('toggle', () => {
-  if (element<HTMLDetailsElement>('progress-details').open) 進捗末尾表示();
+  最下部表示();
 });
 element('remove-attachment').addEventListener('click', () => post('removeAttachment'));
 providerSelect.addEventListener('change', () => providerSelect.value ? 候補取得(providerSelect.value) : 自動選択表示());
@@ -256,9 +251,10 @@ window.addEventListener('message', event => {
     } else {
       element('progress-title').textContent = visibleStreamContent(content).slice(0, 160);
     }
+    最下部表示();
     return;
   }
-  if (state.type === 'accepted') { prompt.value = ''; vscode.setState({ 下書き: '' }); 送信待ち = false; ボタン更新(); return; }
+  if (state.type === 'accepted') { prompt.value = ''; vscode.setState({ 下書き: '' }); 送信待ち = false; ボタン更新(); 最下部表示(); return; }
   if (state.type !== 'state') return;
   const 初回状態 = !会話ID;
   if (会話ID !== state.会話ID) {
@@ -309,8 +305,6 @@ window.addEventListener('message', event => {
   const json = JSON.stringify(state.メッセージ);
   if (json !== メッセージJSON) {
     if (演出タイマー !== undefined) { clearTimeout(演出タイマー); 演出タイマー = undefined; }
-    const conversation = element('conversation');
-    const 下端 = conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight < 70;
     const 演出候補: { content: HTMLDivElement; text: string; key: string }[] = [];
     const 最新応答index = state.メッセージ.reduce((latest: number, item: { 種別: string }, index: number) => item.種別 === 'assistant' ? index : latest, -1);
     element('messages').replaceChildren(...state.メッセージ.map((item: { 種別: string; 本文: string }, index: number) => {
@@ -324,12 +318,12 @@ window.addEventListener('message', event => {
         content.title = 'クリックして入力欄へ戻す';
         content.addEventListener('click', () => {
           prompt.value = item.本文; vscode.setState({ 下書き: prompt.value });
-          prompt.focus(); prompt.setSelectionRange(prompt.value.length, prompt.value.length); ボタン更新();
+          prompt.focus(); prompt.setSelectionRange(prompt.value.length, prompt.value.length); ボタン更新(); 最下部表示();
         });
       }
       article.append(content); return article;
     }));
-    if (下端) conversation.scrollTop = conversation.scrollHeight;
+    最下部表示();
     メッセージJSON = json;
     const 最新応答 = 演出候補.at(-1);
     if (最新応答) {
@@ -347,7 +341,7 @@ window.addEventListener('message', event => {
   const progressText = visibleProgress.join('\n');
   if (progress.textContent !== progressText) {
     progress.textContent = progressText;
-    進捗末尾表示();
+    最下部表示();
   }
   ボタン更新();
   初期表示開始();

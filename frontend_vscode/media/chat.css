@@ -110,8 +110,8 @@ blockquote { border-left: 2px solid var(--vscode-textBlockQuote-border, var(--bo
 #progress-section { margin: 0 2px 2px; border: 1px solid color-mix(in srgb, var(--stream) 16%, var(--border)); border-radius: 0; background: color-mix(in srgb, var(--stream) 3%, var(--surface)); padding: 4px; font-size: 11px; }
 #progress-section.running { border-color: color-mix(in srgb, var(--stream) 35%, var(--border)); }
 summary { cursor: pointer; overflow-wrap: anywhere; color: var(--muted); }
-#progress { max-height: 150px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--terminal); font-family: var(--vscode-editor-font-family); }
-#progress-section.running #progress::after { content: ''; display: inline-block; width: 7px; height: 1em; margin-left: 3px; vertical-align: -.15em; background: var(--terminal); animation: terminal-cursor-blink .7s step-end infinite; }
+#progress { max-height: 150px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--stream); font-family: var(--vscode-editor-font-family); }
+#progress-section.running #progress::after { content: ''; display: inline-block; width: 7px; height: 1em; margin-left: 3px; vertical-align: -.15em; background: var(--stream); animation: terminal-cursor-blink .7s step-end infinite; }
 footer { flex: 0 0 auto; padding: 0 2px 2px; }
 #composer { border: 0; background: transparent; }
 textarea { field-sizing: content; resize: none; display: block; width: 100%; min-height: 76px; max-height: min(220px, 35vh); overflow-y: auto; padding: 4px; color: var(--foreground); background: var(--input-surface); border: 1px solid var(--border); border-radius: 0; }

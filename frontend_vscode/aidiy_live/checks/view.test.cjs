@@ -4,8 +4,10 @@ const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { runInNewContext } = require('node:vm');
 const protocol = require('../../out/aidiy_live/protocol.cjs');
+const { scrollRuntime } = require('../../checks/scroll-screen.cjs');
 
 function screen(host, rejectProject = false, holdInput = false, reducedMotion = true, initialModelSettings, blockAudioUnlock = false) {
+  const scrolling = scrollRuntime();
   const elements = new Map(), sockets = [], calls = [], events = new Map(), intervals = new Set(), timers = new Map();
   const audioCalls = [];
   let clock = 0, timerNumber = 0;
@@ -19,6 +21,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     const values = new Set();
     const node = {
       id, value: '', _textContent: '', children: [], hidden: false, strong: { textContent: '' }, listeners: new Map(),
+      scrollTop: 0, scrollHeight: 1000, clientHeight: 300,
       get textContent() { return this.children.length ? this.children.map(child => child.textContent).join('') : this._textContent; },
       set textContent(text) { this.children = []; this._textContent = text; },
       get firstElementChild() { return this.children[0]; },
@@ -74,6 +77,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     matchMedia: () => ({ matches: reducedMotion }), addEventListener: (name, handler) => events.set(name, handler) };
   runInNewContext(readFileSync(join(__dirname, '../../out/aidiy_live/view.cjs'), 'utf8'), {
     require(name) {
+      if (name === '../../src/scroll-follow') return { 最下部追従: scrolling.follow };
       if (name === './protocol') return protocol;
       if (name === './bridge') return { LiveEnvironment: function () { return environment; } };
       if (name === './audio') return { LiveAudio: class {
@@ -92,7 +96,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     clearTimeout: id => timers.delete(id), requestAnimationFrame: callback => callback(),
     setInterval() { const id = ++intervalNumber; intervals.add(id); return id; }, clearInterval: id => intervals.delete(id),
   });
-  return { element, sockets, calls, intervals, timers, releaseInput, audioCalls,
+  return { element, sockets, calls, intervals, timers, releaseInput, audioCalls, ...scrolling,
     rejectNextConnection() { rejectProject = true; },
     advance(milliseconds) {
       const target = clock + milliseconds;
@@ -107,6 +111,50 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     changeFolder(value) { folder = value; folderListener(value); }, close() { events.get('pagehide')(); },
   };
 }
+
+test('Live: 入力・送信直後と会話表示後、描画後の履歴末尾へ揃える', async t => {
+  for (const host of [false, true]) {
+    await t.test(host ? 'VS Code' : '単独画面', async t => {
+      const ui = screen(host); t.after(() => ui.close()); await ui.ready();
+      await ui.element('connect').onclick();
+      const transcript = ui.element('transcript'), input = ui.element('text');
+      input.value = '長い\n入力';
+      transcript.scrollTop = 0;
+      input.listeners.get('input')();
+      transcript.scrollHeight = 1200; ui.render();
+      assert.equal(transcript.scrollTop, 1200);
+      transcript.scrollTop = 0;
+      ui.element('text-form').onsubmit({ preventDefault() {} });
+      assert.equal(input.value, '');
+      transcript.scrollHeight = 1400; ui.render();
+      assert.equal(transcript.scrollTop, 1400);
+      for (const type of ['input_text', 'output_text', 'output_request', 'recognition_output']) {
+        transcript.scrollTop = 0;
+        ui.sockets[1].emit({ メッセージ識別: type, メッセージ内容: '表示する会話です。' });
+        transcript.scrollHeight += 100; ui.render();
+        assert.equal(transcript.scrollTop, transcript.scrollHeight);
+      }
+    });
+  }
+});
+
+test('Live: 回答演出の完了と表示領域の伸縮後も履歴末尾へ追従する', async t => {
+  for (const host of [false, true]) {
+    await t.test(host ? 'VS Code' : '単独画面', async t => {
+      const ui = screen(host, false, false, false); t.after(() => ui.close()); await ui.ready();
+      await ui.element('connect').onclick();
+      const transcript = ui.element('transcript');
+      ui.sockets[1].emit({ メッセージ識別: 'output_text', メッセージ内容: '回答全文の表示です。' });
+      ui.advance(1000);
+      transcript.scrollHeight = 1600; ui.render();
+      assert.equal(transcript.scrollTop, 1600);
+      assert.equal(transcript.children.at(-1).textContent, '回答全文の表示です。');
+      transcript.scrollTop = 0; transcript.clientHeight = 100;
+      ui.resize(transcript); ui.render();
+      assert.equal(transcript.scrollTop, 1600);
+    });
+  }
+});
 
 test('Live 単独画面: 起動時の3種のモデル指定で自動接続し、画面で変更できる', async t => {
   for (const [provider, key, model] of [

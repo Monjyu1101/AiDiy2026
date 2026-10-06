@@ -378,7 +378,7 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
       const メッセージ要素 = document.getElementById(メッセージID)
       const bubbleElement = メッセージ要素?.querySelector('.content-area') as HTMLElement | null
       if (!bubbleElement) return
-      演出初期化(メッセージID, bubbleElement, '#00ff00', true)
+      演出初期化(メッセージID, bubbleElement, '#00ffff', true)
     })
     return
   }
@@ -422,7 +422,7 @@ function 出力ストリーム受信処理(message: Record<string, unknown>) {
     const メッセージ要素 = document.getElementById(メッセージID)
     const bubbleElement = メッセージ要素?.querySelector('.content-area') as HTMLElement | null
     if (!bubbleElement) return
-    演出初期化(メッセージID, bubbleElement, '#00ff00', true)
+    演出初期化(メッセージID, bubbleElement, '#00ffff', true)
     演出キュー追加(メッセージID, `${表示内容}\n`, false)
   })
 }
@@ -964,6 +964,7 @@ defineExpose({
 }
 
 .terminal-line.stream-output .line-content {
+  color: #00ffff;
   background: rgba(0, 255, 255, 0.12);
   border: 1px solid rgba(0, 255, 255, 0.5);
   border-radius: 4px;
@@ -1052,7 +1053,6 @@ defineExpose({
 
 :deep(.terminal-cursor) {
   display: inline !important;
-  background-color: #00ff00 !important;
   color: #000000 !important;
   padding: 0 2px !important;
   margin-left: 0 !important;
