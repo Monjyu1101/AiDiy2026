@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -29,19 +29,31 @@ try {
   if (!existsSync(executable)) throw new Error();
   const logs = join(root, 'out', 'aidiy_discord'); mkdirSync(logs, { recursive: true });
   const id = randomUUID(), ready = join(logs, `${id}.ready.json`);
-  const stdout = openSync(join(logs, `${id}.stdout.log`), 'a'), stderr = openSync(join(logs, `${id}.stderr.log`), 'a');
   const env = { ...process.env, AIDIY_DISCORD_NODE: process.execPath, AIDIY_DISCORD_READY: ready, AIDIY_DISCORD_CONNECT: args.includes('--connect') ? '1' : '0' };
   delete env.ELECTRON_RUN_AS_NODE;
-  // Windows の GUI アプリには SW_HIDE を渡さず、パネルの表示を許可する。
-  const child = spawn(executable, [join(root, 'panel/desktop.cjs')], { cwd: root, env, detached: !args.includes('--wait'), stdio: ['ignore', stdout, stderr], windowsHide: false });
-  closeSync(stdout); closeSync(stderr);
-  let failed = false; child.on('error', () => { failed = true; });
-  if (!args.includes('--wait')) child.unref();
-  const limit = Date.now() + 15_000;
+  let failed = false;
+  const start = () => {
+    const stdout = openSync(join(logs, `${id}.stdout.log`), 'a'), stderr = openSync(join(logs, `${id}.stderr.log`), 'a');
+    // Windows の GUI アプリには SW_HIDE を渡さず、パネルの表示を許可する。
+    const child = spawn(executable, [join(root, 'panel/desktop.cjs')], { cwd: root, env, detached: !args.includes('--wait'), stdio: ['ignore', stdout, stderr], windowsHide: false });
+    closeSync(stdout); closeSync(stderr);
+    child.on('error', () => { failed = true; });
+    if (!args.includes('--wait')) child.unref();
+    return child;
+  };
+  let child = start();
+  // 既存パネルが終了中なら、worker回収とロック解放を待ってから1回ずつ起動し直す。
+  const limit = Date.now() + 40_000;
   while (Date.now() < limit && !failed) {
-    if (existsSync(ready) && JSON.parse(readFileSync(ready, 'utf8')).windowShown) {
+    const state = existsSync(ready) ? JSON.parse(readFileSync(ready, 'utf8')) : {};
+    if (state.closing && Number.isInteger(state.pid) && state.pid > 0) {
+      let running = true;
+      try { process.kill(state.pid, 0); }
+      catch (error) { if (error.code === 'ESRCH') running = false; }
+      if (!running) { unlinkSync(ready); child = start(); }
+    } else if (state.windowShown) {
       console.log(args.includes('--connect') ? 'AiDiy (Discord) パネルを開き、自動接続を開始しました。' : 'AiDiy (Discord) パネルを開きました。「開始」で接続します。');
-      if (args.includes('--wait') && child.exitCode === null) await new Promise(resolve => child.once('exit', resolve));
+      if (args.includes('--wait') && child.exitCode === null && child.signalCode === null) await new Promise(resolve => child.once('exit', resolve));
       process.exit(child.exitCode ?? 0);
     }
     await new Promise(resolve => setTimeout(resolve, 100));

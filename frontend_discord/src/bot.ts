@@ -27,6 +27,7 @@ export class DiscordBot {
   private live?: Live実体;
   private liveTextChannel = '';
   private closing = false;
+  private shutdown?: Promise<void>;
   private connected = false;
   private voiceSync?: Promise<void>;
   private voiceDirty = false;
@@ -195,11 +196,15 @@ export class DiscordBot {
     }
   }
   async 起動() { await this.client.login(this.config.token); }
-  async 終了() {
-    if (this.closing) return;
-    this.closing = true; this.live?.終了();
-    await this.code.終了();
-    await Promise.allSettled([...this.chatQueue.values(), ...(this.voiceSync ? [this.voiceSync] : [])]);
-    await this.client.destroy();
+  終了(): Promise<void> {
+    if (this.shutdown) return this.shutdown;
+    this.closing = true; this.connected = false;
+    // REST応答やコード実行の完了待ちより先に音声・Gatewayを切断する。
+    // 遅れて完了する受信処理は closing の判定で再接続・返信を抑止する。
+    const cleanup = [() => this.live?.終了(), () => this.code.終了(), () => this.client.destroy()];
+    this.shutdown = Promise.allSettled(cleanup.map(stop => Promise.resolve().then(stop))).then(results => {
+      if (results.some(result => result.status === 'rejected')) throw new Error('Discord 接続の終了処理に失敗しました。');
+    });
+    return this.shutdown;
   }
 }

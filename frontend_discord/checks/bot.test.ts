@@ -31,6 +31,37 @@ function fixture(inVoice = true) {
   return { client, channel, sent, message, voiceChange, textChannel };
 }
 
+test('REST待ちの音声接続準備があってもGatewayを切断し、終了後に音声接続を再開しない', async () => {
+  const f = fixture(); let release!: (value: any) => void, fetched = false, destroyed = 0, started = 0;
+  f.client.channels.fetch = (() => { fetched = true; return new Promise(resolve => { release = resolve; }); }) as any;
+  f.client.destroy = async () => { destroyed++; };
+  const bot = new DiscordBot(config(), f.client, undefined, (_config, channel) => {
+    started++; return { channel, 接続: async () => {}, 終了: () => {}, テキスト送信: () => {} };
+  });
+  f.client.emit(Events.ClientReady, f.client as any);
+  await waitFor(() => fetched);
+  const stopped = bot.終了(); assert.equal(bot.終了(), stopped);
+  await stopped;
+  assert.equal(destroyed, 1); assert.equal(started, 0);
+  release(f.textChannel); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(started, 0);
+});
+
+test('コード終了が遅れても音声とGatewayを先に切断し、同時終了は同じ完了を待つ', async () => {
+  const f = fixture(); let finish!: () => void, voiceStopped = 0, destroyed = 0;
+  const code = { 終了: () => new Promise<void>(resolve => { finish = resolve; }) } as Code接続;
+  f.client.destroy = async () => { destroyed++; };
+  const bot = new DiscordBot(config(), f.client, code, (_config, channel, _notify, closed) => ({
+    channel, 接続: async () => {}, 終了: () => { voiceStopped++; closed(); }, テキスト送信: () => {},
+  }));
+  await bot.メッセージ受信(f.message('!aidiy live'));
+  const stopped = bot.終了(); let completed = false; void stopped.then(() => { completed = true; });
+  assert.equal(bot.終了(), stopped);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(voiceStopped, 1); assert.equal(destroyed, 1); assert.equal(completed, false);
+  finish(); await stopped;
+});
+
 test('受信からHermes実行・回答まで動作し、非許可要求では実行・返信しない', async () => {
   const f = fixture();
   const code = new Code接続(config(), { 実行ファイル: process.execPath, 引数: [fileURLToPath(new URL('./fake-cli.cjs', import.meta.url))] });

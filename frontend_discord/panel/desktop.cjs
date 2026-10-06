@@ -9,7 +9,7 @@ const page = pathToFileURL(join(__dirname, 'index.html')).href;
 app.setName('aidiy_discord');
 app.setPath('userData', join(app.getPath('appData'), 'aidiy_discord'));
 if (process.platform === 'win32') app.setAppUserModelId('AiDiy.aidiy_discord');
-let window, worker, quitting = false, shutdown;
+let window, worker, quitting = false, shutdownComplete = false, shutdown;
 let sequence = 0;
 const pending = new Map();
 const readyFile = process.env.AIDIY_DISCORD_READY;
@@ -29,18 +29,30 @@ function request(action, value) {
 function stopWorker() {
   if (shutdown) return shutdown;
   shutdown = new Promise(resolve => {
-    if (!worker || worker.exitCode !== null) { resolve(); return; }
+    if (!worker || !worker.pid || worker.exitCode !== null || worker.signalCode !== null) { resolve(); return; }
+    let deadline;
+    const done = () => { clearTimeout(timer); clearTimeout(deadline); resolve(); };
+    const killWorker = () => { try { worker.kill('SIGKILL'); } catch {} };
     const timer = setTimeout(() => {
       // 通常は IPC で CLI・音声を回収。応答しない場合だけ、この worker の子孫を停止する。
+      console.error('Discord の終了応答がないため、接続処理プロセスを停止します。');
       if (process.platform === 'win32') {
         const kill = spawn('taskkill', ['/PID', String(worker.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
-        kill.on('error', () => worker.kill());
+        kill.on('error', killWorker);
+        kill.on('exit', code => { if (code !== 0) killWorker(); });
+        // taskkill 自身が応答しなくても Electron の終了を無期限に止めない。
+        deadline = setTimeout(() => { kill.kill(); killWorker(); done(); }, 3000);
       }
-      else { try { process.kill(-worker.pid, 'SIGKILL'); } catch {} }
+      else {
+        try { process.kill(-worker.pid, 'SIGKILL'); } catch { killWorker(); }
+        deadline = setTimeout(done, 3000);
+      }
     }, 15_000);
-    worker.once('exit', () => { clearTimeout(timer); resolve(); });
-    if (worker.connected) worker.send({ action: 'shutdown' }, () => {});
-    else worker.kill();
+    worker.once('exit', done);
+    try {
+      if (worker.connected) worker.send({ action: 'shutdown' }, () => {});
+      else worker.kill();
+    } catch { killWorker(); }
   });
   return shutdown;
 }
@@ -48,15 +60,25 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
   app.quit();
 } else {
   app.on('second-instance', (_event, _argv, _cwd, data) => {
+    // 起動側はこのプロセスの終了後に再試行する。消える画面を起動成功と通知しない。
+    if (quitting) {
+      if (data.readyFile) writeFileSync(data.readyFile, JSON.stringify({ closing: true, pid: process.pid }));
+      return;
+    }
     if (!window || window.isDestroyed()) return;
     if (window.isMinimized()) window.restore();
     window.show(); window.focus(); ready(data.readyFile);
     if (data.autoConnect) void request('start').catch(() => {});
   });
   app.on('before-quit', event => {
+    if (shutdownComplete) return;
+    event.preventDefault();
     if (quitting) return;
-    event.preventDefault(); quitting = true;
-    void stopWorker().finally(() => app.quit());
+    quitting = true;
+    for (const job of pending.values()) { clearTimeout(job.timer); job.reject(new Error('パネルを終了しています。')); }
+    pending.clear();
+    if (window && !window.isDestroyed()) window.webContents.send('discord:state', { phase: 'stopping', message: '接続を終了しています…', fatal: true });
+    void stopWorker().finally(() => { shutdownComplete = true; app.quit(); });
   });
   app.on('window-all-closed', () => app.quit());
   app.whenReady().then(async () => {
@@ -66,7 +88,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: true, detached: process.platform !== 'win32',
     });
     worker.on('message', message => {
-      if (message.type === 'state') { if (!window?.isDestroyed()) window?.webContents.send('discord:state', message.state); return; }
+      if (message.type === 'state') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:state', message.state); return; }
       const job = pending.get(message.id); if (!job) return;
       clearTimeout(job.timer); pending.delete(message.id);
       if (message.error) job.reject(new Error(message.error)); else job.resolve(message.result);
@@ -87,6 +109,10 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
       webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
     });
     window.setMenu(null);
+    window.on('close', event => {
+      if (shutdownComplete) return;
+      event.preventDefault(); app.quit();
+    });
     window.webContents.session.setPermissionCheckHandler(() => false);
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     const trusted = event => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === page;

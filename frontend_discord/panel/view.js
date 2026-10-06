@@ -17,7 +17,13 @@ function controls() {
   toggle.textContent = ['connecting', 'connected', 'reconnecting'].includes(state.phase) ? '停止' : state.phase === 'stopping' ? '停止中' : '開始';
   toggle.dataset.stop = String(!editable);
 }
-function showState(value) { state = value; fatal ||= !!value.fatal; el('dot').dataset.phase = value.phase; el('status-text').textContent = value.message; controls(); }
+function showState(value) {
+  state = value; fatal ||= !!value.fatal;
+  el('dot').dataset.phase = value.phase; el('status-text').textContent = value.message;
+  el('error-detail').value = value.details || ''; el('error-detail').hidden = !value.details;
+  if (value.details) el('error-detail').scrollIntoView({ block: 'nearest' });
+  controls();
+}
 function options(select, values, selected) {
   select.replaceChildren();
   if (selected && !(selected in values)) values = { [selected]: selected, ...values };

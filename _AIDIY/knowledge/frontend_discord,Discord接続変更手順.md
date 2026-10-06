@@ -39,6 +39,14 @@
 
 起動引数のソースパスは絶対パスにし、`discord_processes.py` の照合と同期する。動作確認は `aidiy_discord --check` で行う（Discord への接続なし）。
 
+## 接続に失敗する場合
+
+- パネルのエラー詳細欄を選択してコピーし、失敗段階（設定読込 / Hermes確認 / モデル確認 / Bot作成 / Discord接続 / 準備完了待ち）、経過時間、エラー名・コード・本文・入れ子の原因を確認する。同じ情報を `frontend_discord/out/aidiy_discord/*.stderr.log` にも出力する。
+- `src/connection-error.ts` は Bot トークンなどの認証情報を伏せ字にし、HTTP要求オブジェクト全体・本文・スタックを出力しない。エラーを拡張する場合もこの範囲を維持する。
+- `TokenInvalid` / `Authentication failed` はトークン認証、`Used disallowed intents` は Message Content Intent、`ENOTFOUND` はDNS、`UND_ERR_CONNECT_TIMEOUT` / `ETIMEDOUT` は通信タイムアウトの切り分けに使う。経過時間だけで原因を断定しない。パネルの接続待ち上限は40秒で、それ以前にもSDK側のエラーが返る。
+- `Hermes確認` の失敗は、実際に動かしているPCで `aidiy_discord --check` を実行してPython・CLIの起動パスを確認する。開発環境の不足を別PCの原因とみなさない。
+- `checks/connection-error.test.ts` / `checks/panel.test.ts` で原因別の案内、詳細の伏せ字、失敗後の回収、再試行で詳細が消えることを確認する。Windows実機の接続可否は別途確認する。
+
 ## 音声変更時の注意
 
 - Discord 音声は Opus / 48kHz / stereo。AI 入力は PCM16LE / mono / 16kHz または24kHz、出力は24kHz。
@@ -71,3 +79,12 @@
 - `src/live-catalog.ts` が `_config/AiDiy_live_gemini.json` / `AiDiy_live_openai.json` の `models` / `voices` を表示順ごと読み込む。FreeAI は Gemini と同じ一覧を使う。Core 未起動でも候補を表示できる。
 - パネルの Live モデル・音声は選択式とし、共通設定や保存済み設定から候補を追加しない。保存時・開始時も候補と照合し、削除されたモデル・音声では接続せず選び直しを促す。読込失敗時は既定候補へ置き換えない。
 - `checks/live-catalog.test.ts` / `checks/panel.test.ts` で JSON 読込、順序、FreeAI 共有、削除済み選択による保存・起動の拒否を確認する。候補編集後はパネルを開き直し、Core 側の候補も更新する場合は Core を再起動する。
+
+## 接続中にパネルを閉じる・直後に再起動する場合
+
+- `panel/desktop.cjs` は worker の終了までウィンドウを保持する。閉じる操作が重なっても終了処理は一度だけ開始し、終了待ち中の `before-quit` は毎回キャンセルする。
+- worker の終了済み判定には `exitCode` と `signalCode` の両方を使う。シグナル終了時は `exitCode` が `null` のため、この値だけで判定すると、発火済みの `exit` を再び待って重複起動ロックが残る。起動失敗で PID が無い場合も待たない。
+- 終了応答が15秒無い場合は対象 worker のプロセスツリーを停止する。強制停止後も最大3秒で待機を終える。通常の Node / Electron や別アプリを名前だけで停止しない。
+- 終了待ち中の `second-instance` には `closing` と親 PID を通知する。`panel/launch.mjs` は旧プロセス終了後に起動し直し、表示完了まで確認する。消える予定のウィンドウを起動成功と通知しない。
+- Bot の終了は Live・Code・Gateway の回収を並行して開始する。返信先取得などの REST 応答やモデル候補 CLI の完了を待ってから Gateway を切断する順序に戻さない。遅れて戻った音声開始処理は `closing` で拒否する。
+- `checks/desktop.test.ts` / `checks/launch-restart.test.ts` で閉じる連打、シグナル終了済み、worker 起動失敗、強制停止、終了中の再起動をモック確認する。`checks/bot.test.ts` / `checks/panel.test.ts` では通信・CLI待ちが切断開始を妨げないことを確認する。実際の Discord 通話と Windows の GUI 再起動は別途確認する。

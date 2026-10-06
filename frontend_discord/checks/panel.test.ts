@@ -98,6 +98,20 @@ test('login が先に完了してもサーバー情報の受信まで接続中�
   } finally { await panel.終了(); f.cleanup(); }
 });
 
+test('終了時はモデル候補CLIの完了を待つ前にBotの切断を開始する', async () => {
+  const f = fixture(), panel = f.panel(); let finish!: () => void, catalogStopped = false;
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  try {
+    await panel.開始();
+    (panel as any).catalogs.add({ 停止() { catalogStopped = true; }, 完了: pending });
+    const shutdown = panel.終了();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(f.counts(), [1, 1]); assert.equal(catalogStopped, true);
+    await panel.開始(); assert.deepEqual(f.counts(), [1, 1]);
+    finish(); await shutdown;
+  } finally { finish(); await panel.終了(); f.cleanup(); }
+});
+
 test('接続途中の停止とパネル終了はログイン完了を待たず回収し、遅い結果で復帰しない', async () => {
   const f = fixture(); let finish!: () => void, stopped = 0;
   const panel = new Discordパネル(() => {}, f.read, () => ({
@@ -116,17 +130,36 @@ test('接続途中の停止とパネル終了はログイン完了を待たず�
 test('接続失敗は秘密を表示せず回収し、再試行できる。タイムアウトも回収する', async () => {
   const f = fixture(); let attempt = 0, stopped = 0;
   const panel = new Discordパネル(() => {}, f.read, () => ({
-    起動: async () => { if (++attempt === 1) throw new Error('secret-token'); },
+    起動: async () => { if (++attempt === 1) throw Object.assign(new Error(`invalid token: ${f.read().token}`), { code: 'TokenInvalid' }); },
     終了: async () => { stopped++; }, client: { isReady: () => true },
   }), f.file, () => {}, undefined, undefined, () => f.catalog);
   try {
     await panel.開始(); assert.equal(panel.状態.phase, 'error'); assert.equal(stopped, 1);
-    assert.doesNotMatch(panel.状態.message, /secret-token/);
-    await panel.開始(); assert.equal(panel.状態.phase, 'connected'); await panel.終了();
+    assert.match(panel.状態.message, /トークン認証/);
+    assert.match(panel.状態.details || '', /失敗段階: Discord接続/);
+    assert.match(panel.状態.details || '', /コード: TokenInvalid/);
+    assert.ok(!JSON.stringify(panel.状態).includes(f.read().token));
+    await panel.開始(); assert.equal(panel.状態.phase, 'connected'); assert.equal(panel.状態.details, undefined); await panel.終了();
     const timeout = new Discordパネル(() => {}, f.read, () => ({
       起動: () => new Promise<void>(() => {}), 終了: async () => { stopped++; }, client: { isReady: () => false },
     }), f.file, () => {}, 10, undefined, () => f.catalog);
     await timeout.開始(); await waitFor(() => timeout.状態.phase === 'error');
+    assert.match(timeout.状態.message, /Discord接続が0.01秒以内/);
+    assert.match(timeout.状態.details || '', /失敗段階: Discord接続/);
     assert.equal(stopped, 3); await timeout.終了();
+  } finally { await panel.終了(); f.cleanup(); }
+});
+
+test('Hermes確認で失敗した場合はBotに接続せず原因を表示する', async () => {
+  const f = fixture();
+  const panel = new Discordパネル(() => {}, f.read, f.create, f.file, () => {
+    throw new Error('Python が見つかりません。Python Path を確認してください。');
+  }, undefined, undefined, () => f.catalog);
+  try {
+    await panel.開始();
+    assert.equal(panel.状態.phase, 'error'); assert.deepEqual(f.counts(), [0, 0]);
+    assert.match(panel.状態.message, /Hermes用のPython/);
+    assert.match(panel.状態.details || '', /失敗段階: Hermes確認/);
+    assert.match(panel.状態.details || '', /Python Path/);
   } finally { await panel.終了(); f.cleanup(); }
 });

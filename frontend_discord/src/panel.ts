@@ -4,9 +4,10 @@ import { DiscordBot } from './bot';
 import { 設定読込, 設定エラー, プロジェクトルート, type Discord設定 } from './config';
 import { ライブ選択エラー, ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存, 起動解決, CLI実行 } from './vscode';
 import { ライブ候補読込 } from './live-catalog';
+import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from './connection-error';
 
 export const モデル保存先 = join(homedir(), '.aidiy', 'aidiy_discord_model.json');
-export type パネル状態 = { phase: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopping' | 'error'; message: string };
+export type パネル状態 = { phase: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopping' | 'error'; message: string; details?: string };
 type Bot = Pick<DiscordBot, '起動' | '終了'> & { client: { isReady(): boolean } };
 
 // UI に渡すのは表示用モデル情報と状態だけ。トークンや接続 ID は worker 内に保持する。
@@ -31,8 +32,8 @@ export class Discordパネル {
     this.preferred = ライブモデル読込(preferenceFile) || {};
     this.codePreferred = コードモデル読込(codePreferenceFile);
   }
-  private 状態変更(phase: パネル状態['phase'], message: string) {
-    this.状態 = { phase, message }; this.changed(this.状態);
+  private 状態変更(phase: パネル状態['phase'], message: string, details?: string) {
+    this.状態 = { phase, message, ...(details ? { details } : {}) }; this.changed(this.状態);
   }
   async 初期情報() {
     const config = this.readConfig();
@@ -71,18 +72,26 @@ export class Discordパネル {
     this.状態変更('connecting', 'Discord に接続しています…');
     let timer: ReturnType<typeof setTimeout> | undefined;
     let readyTimer: ReturnType<typeof setInterval> | undefined;
+    let stage: 接続段階 = '設定読込';
+    let token = '';
+    const startedAt = Date.now();
     try {
-      const config = this.readConfig(); this.validateCLI(config);
+      const config = this.readConfig(); token = config.token;
+      stage = 'Hermes確認'; this.validateCLI(config);
+      stage = 'モデル確認';
       const error = ライブ選択エラー({ ...config.liveModels, ...this.preferred }, this.readCatalog());
       if (error) throw new 設定エラー(error);
+      stage = 'Bot作成';
       const bot = this.createBot({ ...config, ...this.codePreferred, liveModels: { ...config.liveModels, ...this.preferred } });
       this.bot = bot;
       const cancelled = new Promise<void>(resolve => { this.cancel = resolve; });
-      const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error()), this.timeoutMs); });
+      const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new 設定エラー(`${stage}が${this.timeoutMs / 1000}秒以内に完了しませんでした。Discordへの通信状態を確認してください。`)), this.timeoutMs); });
       const connected = (async () => {
+        stage = 'Discord接続';
         await bot.起動();
         if (run !== this.generation) return;
         // Gateway の login 完了後、サーバー・チャンネルの受信完了を待つ。
+        stage = '準備完了待ち';
         if (!bot.client.isReady()) await new Promise<void>(resolve => {
           readyTimer = setInterval(() => { if (bot.client.isReady()) resolve(); }, 100);
         });
@@ -93,8 +102,11 @@ export class Discordパネル {
       this.状態変更('connected', '接続中 · コード／音声会話を利用できます。');
     } catch (error) {
       if (run !== this.generation) return;
+      const message = 接続失敗案内(error, stage);
+      const details = 接続エラー詳細(error, stage, token, Date.now() - startedAt);
+      console.error(`[Discord] 接続失敗: ${message}\n${details}`);
       await this.停止();
-      if (!this.closed) this.状態変更('error', error instanceof 設定エラー ? error.message : '接続できません。Bot 設定、通信、Hermes の導入を確認して再試行してください。');
+      if (!this.closed) this.状態変更('error', message, details);
     } finally {
       clearTimeout(timer);
       clearInterval(readyTimer);
@@ -125,8 +137,9 @@ export class Discordパネル {
   }
   async 終了() {
     this.closed = true;
+    const stopping = this.停止();
     for (const job of this.catalogs) job.停止();
-    await Promise.allSettled([...this.catalogs].map(job => job.完了));
-    await this.停止();
+    const results = await Promise.allSettled([stopping, ...[...this.catalogs].map(job => job.完了)]);
+    if (results[0].status === 'rejected') throw results[0].reason;
   }
 }
