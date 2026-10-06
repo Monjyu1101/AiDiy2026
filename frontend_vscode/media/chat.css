@@ -28,9 +28,32 @@ label { display: block; font-size: 11px; color: var(--muted); }
 #chat-header { display: flex; flex-direction: column; flex: 0 0 auto; border-bottom: 1px solid var(--border); }
 #title-bar { display: none; align-items: center; gap: 10px; min-height: 34px; padding: 2px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
 #activity-bar { flex: 0 0 auto; height: 2px; box-sizing: content-box; border-top: 1px solid var(--border); background: #000; pointer-events: none; }
-#chat-header.running #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s ease-in-out infinite; }
+#chat-header.running #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s linear infinite; }
 @keyframes cyan-breathe { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
-@keyframes cyan-bar-breathe { 0%, 100% { background-color: #000; } 50% { background-color: #00ffff; } }
+/* Web の _TopBar.vue と同じ |sin(2πt / 9)| を、4.5秒の明滅周期に沿って標本化する。 */
+@keyframes cyan-bar-breathe {
+  0%, 100% { background-color: rgb(0, 0, 0); }
+  2.5%, 97.5% { background-color: rgb(0, 20, 20); }
+  5%, 95% { background-color: rgb(0, 40, 40); }
+  7.5%, 92.5% { background-color: rgb(0, 60, 60); }
+  10%, 90% { background-color: rgb(0, 79, 79); }
+  12.5%, 87.5% { background-color: rgb(0, 98, 98); }
+  15%, 85% { background-color: rgb(0, 116, 116); }
+  17.5%, 82.5% { background-color: rgb(0, 133, 133); }
+  20%, 80% { background-color: rgb(0, 150, 150); }
+  22.5%, 77.5% { background-color: rgb(0, 166, 166); }
+  25%, 75% { background-color: rgb(0, 180, 180); }
+  27.5%, 72.5% { background-color: rgb(0, 194, 194); }
+  30%, 70% { background-color: rgb(0, 206, 206); }
+  32.5%, 67.5% { background-color: rgb(0, 217, 217); }
+  35%, 65% { background-color: rgb(0, 227, 227); }
+  37.5%, 62.5% { background-color: rgb(0, 236, 236); }
+  40%, 60% { background-color: rgb(0, 243, 243); }
+  42.5%, 57.5% { background-color: rgb(0, 248, 248); }
+  45%, 55% { background-color: rgb(0, 252, 252); }
+  47.5%, 52.5% { background-color: rgb(0, 254, 254); }
+  50% { background-color: rgb(0, 255, 255); }
+}
 .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .brand-icon { width: 21px; height: 21px; object-fit: contain; flex: 0 0 auto; }
 .brand-name { white-space: nowrap; font-size: 16px; font-weight: 700; letter-spacing: -.5px; }
@@ -178,7 +201,7 @@ body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vsc
   *, *::before, *::after { animation: none !important; transition: none !important; }
   body.ui-ready { animation: startup-fade-in .8s ease-out both !important; }
   /* 処理中を伝えるゆっくりした明滅は、動きを減らす設定でも維持する。 */
-  #chat-header.running #activity-bar { animation: cyan-bar-breathe 4.5s ease-in-out infinite !important; }
+  #chat-header.running #activity-bar { animation: cyan-bar-breathe 4.5s linear infinite !important; }
   /* 浮遊は止め、指定された2つの枠のゆっくりした回転と明滅を維持する。 */
   .welcome-mark::before { animation: welcome-rotate-clockwise 20s linear infinite, welcome-glow 8s ease-in-out infinite, welcome-rainbow 12s linear infinite !important; }
   .welcome-mark::after { animation: welcome-rotate-counterclockwise 20s linear infinite, welcome-glow 8s ease-in-out -4s infinite, welcome-rainbow 12s linear -6s infinite !important; }

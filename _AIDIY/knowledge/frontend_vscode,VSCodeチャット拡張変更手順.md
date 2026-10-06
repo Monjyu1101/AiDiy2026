@@ -59,6 +59,7 @@
 - 履歴削除の確認は `media/chat.html` のパネル内ダイアログで共通処理し、確認後に `deleteHistory` を送る。拡張ホストや単独画面のブリッジで別の確認ダイアログを出さない。
 - 「新規」「一覧」、モデル選択、履歴削除、送信、停止は Webview 内の共通 UI を主操作にする。VS Code 固有のコマンドは外部からの呼び出しやエディター連携用に残す。
 - 単独画面の上部はタイトルバー、実行状態バー、会話操作行の順に置く。VS Code 拡張ではアイコンと AiDiy のタイトル行を非表示にし、実行状態バーと会話操作行を表示する。「今の会話／会話一覧」、フォルダ名、「新規」「一覧」は会話操作行にまとめる。単独ウィンドウのドラッグ領域はタイトルバーだけに指定し、会話操作行を含めない。
+- Code / Live の上部シアンバーは Web の `frontend_web/src/components/_TopBar.vue` と同じ `abs(sin(2πt / 9))` の明滅に揃える。`media/chat.css` と `aidiy_live/media/style.css` の `cyan-bar-breathe` は、4.5秒の周期を2.5%刻みで標本化したRGB値を `linear` で補間する。`ease-in-out` に戻すとカーブが変わるため、通常表示・動きを減らす設定の両方で `linear` を維持する。
 - Code の正式回答の緑はスタンドアロンと共通の `#00ff00` を `media/chat.css` で定義する。VS Code の明暗・高コントラストテーマでも、この色を上書きしない。
 - Code の実行状況枠は CSS の `--stream`（シアン `#00ffff`）を基調にした枠線と薄い背景を使い、文字と点滅カーソルもシアンにする。Web / Avatar の `AIコード.vue` の `.stream-output .line-content` も同じ配色に揃える。Live の会話は `メッセージ識別` を行のクラスに残し、AIチャットパネルと同じく通常出力（`output_text`）は緑 `#00ff00`、コードエージェントの回答（`output_request`）はシアン `#00ffff`、音声出力認識は淡い緑で分ける。本文・文字送りカーソル・枠・背景はその種別の色を基調にし、文字送り完了後もクラスを保持する。
 - 拡張機能一覧のアイコンは `package.json` 直下の `icon`、サイドバーのアイコンは `contributes.viewsContainers` の `icon` で指定する。両方とも `media/AiDiy.png`（`frontend_web/public/icons/AiDiy.png` と同じ画像）を使い、変更後は VSIX を再生成・再配置する。
