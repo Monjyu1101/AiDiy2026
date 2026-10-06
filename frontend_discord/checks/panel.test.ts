@@ -18,9 +18,36 @@ function fixture() {
     return { 起動: async () => { startCount++; }, 終了: async () => { stopCount++; }, client: { isReady: () => ready } };
   };
   const read = () => ({ ...config(), liveModels: { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'common-model', LIVE_FREEAI_VOICE: 'Zephyr' } });
-  const panel = () => new Discordパネル(() => {}, read, create, file, () => {});
-  return { file, configurations, read, create, panel, counts: () => [startCount, stopCount], setReady: (value: boolean) => { ready = value; }, cleanup: () => rmSync(directory, { recursive: true, force: true }) };
+  const catalog = { models: { freeai_live: { 'common-model': 'Common' }, openai_live: { 'test-live-model': 'Test' } },
+    voices: { freeai_live: { Zephyr: 'Zephyr' }, openai_live: { marin: 'Marin', cedar: 'Cedar' } } };
+  const panel = () => new Discordパネル(() => {}, read, create, file, () => {}, undefined, undefined, () => catalog);
+  return { file, configurations, read, create, panel, catalog, counts: () => [startCount, stopCount], setReady: (value: boolean) => { ready = value; }, cleanup: () => rmSync(directory, { recursive: true, force: true }) };
 }
+
+test('候補の順序を維持し、保存済みでも削除されたモデル・声は追加表示・使用しない', async () => {
+  const f = fixture();
+  try {
+    writeFileSync(f.file, JSON.stringify(selection));
+    const panel = f.panel();
+    delete (f.catalog.voices.openai_live as Record<string, string>).marin;
+    const info = await panel.初期情報();
+    assert.deepEqual(Object.keys(info.voices.openai_live), ['cedar']);
+    assert.match(info.notice, /声を選び直して/);
+    assert.throws(() => panel.選択保存(selection), /声を選び直して/);
+    assert.deepEqual(JSON.parse(readFileSync(f.file, 'utf8')), selection);
+    await panel.開始();
+    assert.equal(panel.状態.phase, 'error'); assert.equal(f.configurations.length, 0);
+    panel.選択保存({ ...selection, LIVE_OPENAI_VOICE: 'cedar' });
+    await panel.開始();
+    assert.equal(f.configurations[0].liveModels.LIVE_OPENAI_VOICE, 'cedar');
+    await panel.停止();
+    delete (f.catalog.models.openai_live as Record<string, string>)['test-live-model'];
+    assert.deepEqual((await panel.初期情報()).models.openai_live, {});
+    await panel.開始();
+    assert.equal(panel.状態.phase, 'error'); assert.equal(f.configurations.length, 1);
+    await panel.終了();
+  } finally { f.cleanup(); }
+});
 
 test('起動時は未接続、初回は共通モデルを使い開始と停止だけで Bot を制御する', async () => {
   const f = fixture(), panel = f.panel();
@@ -76,7 +103,7 @@ test('接続途中の停止とパネル終了はログイン完了を待たず�
   const panel = new Discordパネル(() => {}, f.read, () => ({
     起動: () => new Promise<void>(resolve => { finish = resolve; }),
     終了: async () => { stopped++; }, client: { isReady: () => true },
-  }), f.file, () => {});
+  }), f.file, () => {}, undefined, undefined, () => f.catalog);
   try {
     const connecting = panel.開始(); assert.equal(panel.状態.phase, 'connecting');
     await panel.停止(); await connecting; assert.equal(stopped, 1);
@@ -91,14 +118,14 @@ test('接続失敗は秘密を表示せず回収し、再試行できる。タ�
   const panel = new Discordパネル(() => {}, f.read, () => ({
     起動: async () => { if (++attempt === 1) throw new Error('secret-token'); },
     終了: async () => { stopped++; }, client: { isReady: () => true },
-  }), f.file, () => {});
+  }), f.file, () => {}, undefined, undefined, () => f.catalog);
   try {
     await panel.開始(); assert.equal(panel.状態.phase, 'error'); assert.equal(stopped, 1);
     assert.doesNotMatch(panel.状態.message, /secret-token/);
     await panel.開始(); assert.equal(panel.状態.phase, 'connected'); await panel.終了();
     const timeout = new Discordパネル(() => {}, f.read, () => ({
       起動: () => new Promise<void>(() => {}), 終了: async () => { stopped++; }, client: { isReady: () => false },
-    }), f.file, () => {}, 10);
+    }), f.file, () => {}, 10, undefined, () => f.catalog);
     await timeout.開始(); await waitFor(() => timeout.状態.phase === 'error');
     assert.equal(stopped, 3); await timeout.終了();
   } finally { await panel.終了(); f.cleanup(); }

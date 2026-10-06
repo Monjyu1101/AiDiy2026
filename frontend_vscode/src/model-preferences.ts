@@ -5,11 +5,8 @@ import { randomUUID } from 'node:crypto';
 
 export type CodeModel = { provider: string; model: string };
 export type LiveModel = Record<string, string>;
-export const LIVE_KEYS: Record<string, { model: string; voice: string }> = {
-  freeai_live: { model: 'LIVE_FREEAI_MODEL', voice: 'LIVE_FREEAI_VOICE' },
-  gemini_live: { model: 'LIVE_GEMINI_MODEL', voice: 'LIVE_GEMINI_VOICE' },
-  openai_live: { model: 'LIVE_OPENAI_MODEL', voice: 'LIVE_OPENAI_VOICE' },
-};
+import { LIVE_KEYS } from '../aidiy_live/src/model-catalog';
+export { LIVE_KEYS };
 
 export function モデル保存先(kind: 'code' | 'live') {
   return join(homedir(), '.aidiy', `aidiy_${kind}_model.json`);

@@ -4,6 +4,7 @@ import { LiveAudio } from './audio';
 import { AudioCloud } from './visualizer';
 import { LiveEnvironment, type Folder } from './bridge';
 import { microphoneError } from './microphone-error';
+import { ライブ選択エラー } from './model-catalog';
 
 type Catalog = Record<string, Record<string, string>>;
 type DesktopApi = { windowAction: (action: string) => void; onState: (callback: (state: { opening: boolean }) => void) => () => void };
@@ -86,7 +87,8 @@ function controls() {
   const key = keys();
   const selectionChanged = provider.value !== settings.LIVE_AI_NAME || model.value !== settings[key.model]
     || voice.value !== (settings[key.voice] || '');
-  button('apply').disabled = busy || changing || modelLoading || modelSaving || !provider.value || !model.value || !selectionChanged;
+  const selectionError = ライブ選択エラー({ LIVE_AI_NAME: provider.value, [key.model]: model.value, [key.voice]: voice.value }, { models, voices });
+  button('apply').disabled = busy || changing || modelLoading || modelSaving || !!selectionError || !selectionChanged;
   button('apply').textContent = modelSaving ? '保存中…' : changing ? '再接続中…' : connected ? '変更して再接続' : '選択する';
   element('model-behavior').textContent = connected || changing
     ? 'モデルや音声を変更すると、音声AIへ自動で再接続します。マイクは OFF に戻ります。'
@@ -169,10 +171,13 @@ async function api(path: string, body: object) {
 }
 function options(select: HTMLSelectElement, values: Record<string, string>, selected = '') {
   select.replaceChildren();
-  // 設定済みの値がカタログにない場合も表示・維持する。
-  if (selected && !(selected in values)) values = { [selected]: selected, ...values };
+  const missing = !!selected && !Object.hasOwn(values, selected);
+  if (missing || !Object.keys(values).length) {
+    const placeholder = new Option('候補から選択してください', '');
+    placeholder.disabled = true; select.add(placeholder);
+  }
   for (const [value, label] of Object.entries(values)) select.add(new Option(String(label), value));
-  if (selected) select.value = selected;
+  if (selected) select.value = missing ? '' : selected;
 }
 function keys(name = provider.value) {
   const vendor = name === 'openai_live' ? 'OPENAI' : name === 'freeai_live' ? 'FREEAI' : 'GEMINI';
@@ -189,14 +194,15 @@ function showModels() {
   modelOptions();
   element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model], settings[keys(settings.LIVE_AI_NAME).voice]].filter(Boolean).join(' · ') || 'AiDiy のライブ会話';
 }
-async function loadModels() {
+async function loadModels(session = connection.session) {
   const run = generation;
   await initialContext;
   if (run !== generation) return;
-  const data = await api('core/AIコア/モデル情報/取得', { セッションID: connection.session });
+  const data = await api('core/AIコア/モデル情報/取得', { セッションID: session });
   if (run !== generation) return;
-  settings = connection.session ? data.モデル設定 || {} : { ...data.モデル設定, ...preferredSettings }; models = data.available_models?.live_models || {}; voices = data.available_models?.live_voices || {};
+  settings = session ? data.モデル設定 || {} : { ...data.モデル設定, ...preferredSettings }; models = data.available_models?.live_models || {}; voices = data.available_models?.live_voices || {};
   showModels();
+  if (!session) showError(ライブ選択エラー(settings, { models, voices }));
 }
 async function disconnect() {
   回答演出停止?.();
@@ -222,6 +228,11 @@ async function connectSession(preserveConversation = false, automatic = false) {
     if (run !== generation) return;
     await initialContext;
     if (run !== generation) return;
+    // 保存済み・起動引数の指定も、接続を作る前に最新の候補と照合する。
+    await loadModels('');
+    if (run !== generation) return;
+    const selectionError = ライブ選択エラー(settings, { models, voices });
+    if (selectionError) throw new Error(selectionError);
     const config = await environment.context();
     if (run !== generation) return;
     showFolder(config.作業フォルダ);

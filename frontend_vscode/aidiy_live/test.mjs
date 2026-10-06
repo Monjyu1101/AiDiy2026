@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import './build.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 await mkdir(new URL('../out/aidiy_live/', import.meta.url), { recursive: true });
-for (const name of ['protocol', 'audio', 'host', 'view']) {
+for (const name of ['protocol', 'audio', 'host', 'view', 'model-catalog']) {
   const result = await transform(await readFile(new URL(`src/${name}.ts`, import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs', target: 'node22' });
   await writeFile(new URL(`../out/aidiy_live/${name}.cjs`, import.meta.url), result.code);
 }

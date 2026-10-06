@@ -2,12 +2,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { DiscordBot } from './bot';
 import { 設定読込, 設定エラー, プロジェクトルート, type Discord設定 } from './config';
-import { LIVE_KEYS, ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存, 起動解決, CLI実行 } from './vscode';
+import { ライブ選択エラー, ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存, 起動解決, CLI実行 } from './vscode';
+import { ライブ候補読込 } from './live-catalog';
 
 export const モデル保存先 = join(homedir(), '.aidiy', 'aidiy_discord_model.json');
 export type パネル状態 = { phase: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopping' | 'error'; message: string };
 type Bot = Pick<DiscordBot, '起動' | '終了'> & { client: { isReady(): boolean } };
-type カタログ = Record<string, Record<string, string>>;
 
 // UI に渡すのは表示用モデル情報と状態だけ。トークンや接続 ID は worker 内に保持する。
 export class Discordパネル {
@@ -26,7 +26,8 @@ export class Discordパネル {
     private preferenceFile = モデル保存先,
     private validateCLI = (config: Discord設定) => { 起動解決(config.cli, config.python, config.folder); },
     private timeoutMs = 40_000,
-    private codePreferenceFile = join(dirname(preferenceFile), 'aidiy_discord_code_model.json')) {
+    private codePreferenceFile = join(dirname(preferenceFile), 'aidiy_discord_code_model.json'),
+    private readCatalog = ライブ候補読込) {
     this.preferred = ライブモデル読込(preferenceFile) || {};
     this.codePreferred = コードモデル読込(codePreferenceFile);
   }
@@ -36,23 +37,8 @@ export class Discordパネル {
   async 初期情報() {
     const config = this.readConfig();
     const settings = { ...config.liveModels, ...this.preferred };
-    const models: カタログ = {}, voices: カタログ = {};
-    for (const [provider, keys] of Object.entries(LIVE_KEYS)) {
-      models[provider] = settings[keys.model] ? { [settings[keys.model]]: settings[keys.model] } : {};
-      voices[provider] = settings[keys.voice] ? { [settings[keys.voice]]: settings[keys.voice] } : {};
-    }
-    let notice = '';
-    try {
-      const url = new URL(config.coreUrl); url.protocol = 'http:'; url.pathname = '/core/AIコア/モデル情報/取得';
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(4000) });
-      const result = await response.json() as { status: string; data?: { available_models?: { live_models?: カタログ; live_voices?: カタログ } } };
-      if (!response.ok || result.status !== 'OK') throw new Error();
-      const available = result.data?.available_models;
-      for (const provider of Object.keys(LIVE_KEYS)) {
-        Object.assign(models[provider], available?.live_models?.[provider]);
-        Object.assign(voices[provider], available?.live_voices?.[provider]);
-      }
-    } catch { notice = 'モデル一覧を取得できません。共通設定・前回の選択を表示しています。音声には Core の起動が必要です。'; }
+    const { models, voices } = this.readCatalog();
+    const notice = ライブ選択エラー(settings, { models, voices });
     return { state: this.状態, settings, models, voices, notice, code: this.codePreferred || { provider: config.provider, model: config.model } };
   }
   async コード候補(provider: unknown) {
@@ -74,6 +60,8 @@ export class Discordパネル {
   }
   選択保存(value: unknown) {
     if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('停止してからモデルを選択してください。');
+    const error = ライブ選択エラー({ ...this.readConfig().liveModels, ...value as Record<string, string> }, this.readCatalog());
+    if (error) throw new 設定エラー(error);
     this.preferred = ライブモデル保存(value, this.preferenceFile);
     return this.preferred;
   }
@@ -85,6 +73,8 @@ export class Discordパネル {
     let readyTimer: ReturnType<typeof setInterval> | undefined;
     try {
       const config = this.readConfig(); this.validateCLI(config);
+      const error = ライブ選択エラー({ ...config.liveModels, ...this.preferred }, this.readCatalog());
+      if (error) throw new 設定エラー(error);
       const bot = this.createBot({ ...config, ...this.codePreferred, liveModels: { ...config.liveModels, ...this.preferred } });
       this.bot = bot;
       const cancelled = new Promise<void>(resolve => { this.cancel = resolve; });

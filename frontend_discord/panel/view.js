@@ -13,7 +13,7 @@ function controls() {
   document.body.classList.toggle('connected', state.phase === 'connected');
   const editable = loaded && !fatal && ['idle', 'error'].includes(state.phase);
   for (const input of [provider, model, voice, codeProvider, codeModel]) input.disabled = !editable || saving;
-  toggle.disabled = !loaded || fatal || saving || state.phase === 'stopping' || editable && !model.value.trim();
+  toggle.disabled = !loaded || fatal || saving || state.phase === 'stopping' || editable && (!model.value || !voice.value);
   toggle.textContent = ['connecting', 'connected', 'reconnecting'].includes(state.phase) ? '停止' : state.phase === 'stopping' ? '停止中' : '開始';
   toggle.dataset.stop = String(!editable);
 }
@@ -26,10 +26,19 @@ function options(select, values, selected) {
 }
 function showModels() {
   const [modelKey, voiceKey] = keys[provider.value];
-  options(voice, voices[provider.value] || {}, settings[voiceKey]);
-  model.value = settings[modelKey] || Object.keys(models[provider.value] || {})[0] || '';
-  el('models').replaceChildren(...Object.entries(models[provider.value] || {}).map(([value, label]) => new Option(label, value)));
+  liveOptions(voice, voices[provider.value] || {}, settings[voiceKey]);
+  liveOptions(model, models[provider.value] || {}, settings[modelKey]);
   controls();
+}
+function liveOptions(select, values, selected) {
+  select.replaceChildren();
+  const missing = !!selected && !Object.hasOwn(values, selected);
+  if (missing || !Object.keys(values).length) {
+    const placeholder = new Option('候補から選択してください', '');
+    placeholder.disabled = true; select.add(placeholder);
+  }
+  for (const [value, label] of Object.entries(values)) select.add(new Option(label, value));
+  if (selected) select.value = missing ? '' : selected;
 }
 function selection() {
   const [modelKey, voiceKey] = keys[provider.value];
@@ -37,7 +46,7 @@ function selection() {
 }
 function save() {
   const value = selection();
-  if (!model.value.trim()) { note('モデル名を指定してください。', true); controls(); return Promise.resolve(false); }
+  if (!model.value || !voice.value) { note('モデルと音声を候補から選択してください。', true); controls(); return Promise.resolve(false); }
   saving = true; controls();
   saveQueue = saveQueue.then(async () => {
     try {
@@ -45,7 +54,7 @@ function save() {
       await api.selectCode({ provider: codeProvider.value, model: codeModel.value.trim() });
       note('選択を保存しました。次回もこのモデル・音声を使用します。'); return true;
     }
-    catch { note('選択を保存できませんでした。保存先を確認して再試行してください。', true); return false; }
+    catch (error) { note(error.message || '選択を保存できませんでした。保存先を確認して再試行してください。', true); return false; }
     finally { saving = false; controls(); }
   });
   return saveQueue;
