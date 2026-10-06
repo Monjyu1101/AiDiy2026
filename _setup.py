@@ -24,6 +24,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 - frontend_avatar/_setup.py  フロントエンド(Avatar)
 - command_hermes/_setup.py   コマンド(hermes)
 - frontend_vscode/_setup.py  フロントエンド(vscode)
+- frontend_discord/_setup.py フロントエンド(Discord、任意)
 
 Usage:
     python _setup.py
@@ -143,6 +144,7 @@ IMPORT_CACHE_FOLDERS = (
     "frontend_avatar",
     "command_hermes",
     "frontend_vscode",
+    "frontend_discord",
 )
 
 
@@ -646,6 +648,7 @@ def collect_setup_choices() -> dict | None:
         "avatar":                False,
         "hermes":                False,
         "vscode":                False,
+        "discord":               False,
         "continue_on_error":     False,
     }
 
@@ -674,6 +677,7 @@ def collect_setup_choices() -> dict | None:
     choices["avatar"] = ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y")
     choices["hermes"] = ask_yes_no("コマンド(hermes)のセットアップを実行しますか？", default="y")
     choices["vscode"] = ask_yes_no("フロントエンド(vscode)のセットアップを実行しますか？", default="y")
+    choices["discord"] = ask_yes_no("フロントエンド(Discord)のセットアップを実行しますか？", default="y")
 
     choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="y")
 
@@ -696,6 +700,7 @@ def main():
     print_info("  7. フロントエンド(Avatar)")
     print_info("  8. コマンド(hermes)")
     print_info("  9. フロントエンド(vscode)")
+    print_info(" 10. フロントエンド(Discord、任意)")
     print()
 
     ensure_prerequisites()
@@ -824,6 +829,13 @@ def main():
     else:
         print_warning("フロントエンド(vscode)のセットアップをスキップしました。")
 
+    if choices.get("discord"):
+        if not _load_folder_module("frontend_discord").setup(choices):
+            error_locations.append("フロントエンド(Discord)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
+
     print()
     remove_folder_import_caches()
 
@@ -842,6 +854,7 @@ def main():
     print_info("    Hermes起動: aidiy_hermes")
     print_info("    Code起動  : aidiy_code")
     print_info("    Live起動  : aidiy_live")
+    print_info("    Discord   : aidiy_discord（または discord.bat）でパネルを開き、開始ボタンで接続")
 
     print()
     print_success("セットアップは正常終了しました。")

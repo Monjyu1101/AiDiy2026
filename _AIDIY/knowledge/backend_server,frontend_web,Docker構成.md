@@ -13,7 +13,7 @@
 - `docker/docker_1build.bat` — 初回ビルド、再ビルド
 - `docker/docker_2start.bat` — 起動
 - `docker/docker_3stop.bat` — 停止
-- `frontend_web/dist/` — Docker が配信するビルド済み静的ファイル
+- `docker/Dockerfile` — イメージ内で `frontend_web` をビルドし、`/app/frontend_web/dist` へ配置する。ホスト側の `frontend_web/dist/` は不要
 
 ## 構成
 

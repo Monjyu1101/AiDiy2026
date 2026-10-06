@@ -42,7 +42,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `aidiy_notification_sounds` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは text_to_speech で読み上げ合成） |
 | `aidiy_code_agents` | AI コードエージェント実行（CodeAI CLI 経由） |
 | `aidiy_chat_llms` | AI チャット LLM 実行（AIチャット.py 系 ChatAI 経由 / `aidiy_code_agents` 互換 IF） |
-| `aidiy_task_agents` | backend_taskteam の `/task` API への AIタスク非同期投入。`submit`の`task_id`は通常省略し、外部IDを引き継ぐ場合だけ指定。`project_path` / `ai_name` / `ai_model` も通常省略（null）で、統合サーバーが更新最終レコードの値 → 規定値で補完 |
+| `aidiy_task_agents` | backend_taskteam の `/task` API への AIタスク非同期投入。`submit`の`task_id`は通常省略し、外部IDを引き継ぐ場合だけ指定。`project_path` / `ai_name` / `ai_model_plan` / `ai_model_do` / `ai_model_check` も通常省略（null）で、統合サーバーが更新最終レコードの値 → 規定値で補完 |
 | `aidiy_team_agents` | backend_taskteam の `/team` API への AIチーム依頼投入。`submit`は`Aチーム依頼`を準備開始で登録し、依頼IDは統合サーバーが自動採番。`project_path` / `team_ai_*` / `task_ai_*` は通常省略（null）で、統合サーバーが更新最終レコードの値 → 規定値で補完 |
 | `aidiy_windows_control` | Windows でのみ公開するデスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
@@ -92,7 +92,7 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 
 ## アーキテクチャ
 
-### アクセストランスポート（3種類）
+### MCP トランスポート（3種類）と REST API
 
 | トランスポート | エンドポイント / コマンド | 主な利用者 |
 |----------------|--------------------------|-----------|
@@ -114,9 +114,9 @@ print(res.json())
 ```
 
 Chrome DevTools は Node.js 版ではなく Python 実装の CDP client を使います。
-Chrome は `ChromeManager` が単一 subprocess として管理し、必要時に `--remote-debugging-port=9222` で起動します。
+Chrome は `ChromeSessionRegistry` がセッションごとに `ChromeManager` と CDP client を管理します。既定セッションはポート `9222`、名前付きセッションは `9223`〜`9299` の空きポートと個別プロファイルを使います。
 
-アクセスは localhost 限定です。
+現行実装では通常の起動は `0.0.0.0` で待ち受け、REST API 全体を localhost に制限する処理はありません。MCP SDK に渡す `host="127.0.0.1"` は SSE / Streamable HTTP 側の設定です。
 SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場合もまずアプリ API で再現できないか確認します。
 
 ## 実装時の入口

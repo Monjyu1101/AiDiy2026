@@ -35,11 +35,11 @@ paths.database_path      # _data/AiDiy/database.db
 paths.icons_path         # プロジェクトルートの _icons/
 ```
 
-`init()` は `__file__` から実行パスを解決し、末尾 `/` 付きの絶対パス（フォワードスラッシュ）に正規化します。
+`init()` は `__file__` から実行パスを解決し、フォワードスラッシュの絶対パスに正規化します。ディレクトリには末尾 `/` を付け、DB ファイルの `database_path` には付けません。
 
 共有ディレクトリの相対デフォルトは `backend_server/` 基準で、`../_config`、`../_data`、`../_data/AiDiy/database.db`、`../_icons` です。コードでは `DEFAULT_CONFIG_DIR`、`DEFAULT_DATA_DIR`、`DEFAULT_DATABASE_PATH`、`DEFAULT_ICONS_DIR` を参照し、同じパス文字列を個別に重複定義しないようにします。
 
-`_discover_agents_projects()` は `external_root_path` 以下で `_AIDIY.md` を持つフォルダを探索し、`{フォルダ名: 絶対パス}` の辞書を構築します。
+`_discover_agents_projects()` は `external_root_path` の直下と、その1階層下で `_AIDIY.md` を持つフォルダを探索し、`{フォルダ名: 絶対パス}` の辞書を構築します。
 
 ## conf_json — JSON 設定管理
 
@@ -70,12 +70,14 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 | カテゴリ | 主なキー |
 |---------|---------|
 | サービス / WebUI | `PORT_WEB`, `PORT_CORE`, `PORT_AVATAR`, `PORT_TASKTEAM`, `PORT_TOOLS`, `PORT_LOCAL`, `PORT_APPS`, `WEBUI_FIRST_PAGE` |
+| Discord | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_USER_ID`, `DISCORD_TEXT_CHANNEL_ID`, `DISCORD_VOICE_CHANNEL_ID` の接続情報5項目。ID は単一文字列。旧 `*_IDS` の1件配列は自動移行。Live / Code は共通設定を使用（詳細は `frontend_discord/README.md`） |
 | API Key | `gemini_key_id`, `freeai_key_id`, `claude_key_id`, `openai_key_id`, `copilot_key_id`, `openrt_key_id`, `ollama_key_id` |
 | OpenAI/Azure | `openai_api_type`, `openai_organization`, `azure_endpoint`, `azure_version`, `azure_key_id` |
 | Ollama | `ollama_host` |
-| ChatAI | `CHAT_AI_NAME`, `CHAT_GEMINI_MODEL`, `CHAT_FREEAI_MODEL`, `CHAT_OPENRT_MODEL`, `CHAT_OLLAMA_MODEL` |
+| ChatAI | `CHAT_AI_NAME`, `CHAT_GEMINI_MODEL`, `CHAT_FREEAI_MODEL`, `CHAT_OPENRT_MODEL`, `CHAT_OPENAI_MODEL`, `CHAT_OLLAMA_MODEL`, `CHAT_LOCAL_MODEL` |
 | LiveAI | `LIVE_AI_NAME`, `LIVE_GEMINI_MODEL/VOICE`, `LIVE_FREEAI_MODEL/VOICE`, `LIVE_OPENAI_MODEL/VOICE` |
 | CodeAI | `CODE_BASE_PATH`, `CODE_AI1~6_NAME/MODEL`, `CODE_CLAUDE_SDK_MODEL`, `CODE_MAX_TURNS`, `CODE_PLAN`, `CODE_VERIFY` |
+| TaskAI / TeamAI | `TASK_AI_NAME`, `TEAM_AI_NAME`, `TASK_AI_MODEL_plan/do/check`, `TEAM_AI_MODEL_plan/do/check`（各フェーズを別キーで保持） |
 
 ### `:cloud` サフィックスの扱い
 
@@ -136,5 +138,5 @@ Core プロセスが存在するのに 8091 が待受していない場合、`fe
 
 - **conf_json の即時保存**: `obj.key = value` で即座に JSON ファイルへ書き込まれる。バッチ更新は `update()` を使うこと
 - **conf_models の起動順序**: `conf_json` が先に初期化されている必要がある（API キー参照のため）
-- **conf_path の init**: `conf_path.init()` は起動時に1度だけ呼ぶ。複数回呼ぶとパスがズレる
+- **conf_path の init**: `conf_path.init()` は `__file__` 基準でパスを再計算する。繰り返し呼んでも階層はズレず、外部プロジェクト一覧も再探索する
 - **外部プロジェクト探索**: `_AIDIY.md` の有無で判定。新しい外部エージェントを追加したらこのファイルを配置する

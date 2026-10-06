@@ -11,26 +11,29 @@
 
 ## 共通依存パッケージ（バージョン同期必須）
 
-以下のパッケージは両プロジェクトに共通です。バージョンを揃えないと型チェックやビルド結果に差が出ます。
+以下は現行の両 `package.json` に共通する依存と指定範囲です。解決された版は各 `package-lock.json` で確認します。
 
 ### 本番依存
 
 | パッケージ | frontend_web | frontend_avatar | 備考 |
 |-----------|-------------|-----------------|------|
-| `vue` | ^3.5.24 | ^3.5.24 | 同期済み |
-| `axios` | ^1.13.2 | ^1.13.1 | ずれている。合わせること |
-| `monaco-editor` | ^0.55.1 | ^0.55.1 | 同期済み |
+| `vue` | ^3.5.41 | ^3.5.41 | 共通 |
+| `axios` | ^1.20.0 | ^1.20.0 | 共通 |
+| `monaco-editor` | ^0.56.0 | ^0.56.0 | 共通 |
+| `mermaid` | ^11.17.2 | ^11.17.2 | 図の描画 |
+| `three` | ^0.185.1 | ^0.185.1 | 3Dレンダリング |
 
 ### 開発依存
 
 | パッケージ | frontend_web | frontend_avatar | 備考 |
 |-----------|-------------|-----------------|------|
-| `vite` | ^7.2.4 | ^7.2.4 | 同期済み |
-| `vue-tsc` | ^3.2.2 | ^3.2.2 | 同期済み |
-| `typescript` | ^5.9.3 | ^5.9.3 | 同期済み |
-| `@vitejs/plugin-vue` | ^6.0.1 | ^6.0.1 | 同期済み |
-| `@vue/tsconfig` | ^0.8.1 | ^0.8.1 | 同期済み |
-| `@types/node` | ^25.0.9 | ^25.0.9 | 同期済み |
+| `vite` | ^8.2.2 | ^8.2.2 | 共通 |
+| `vue-tsc` | ^3.3.11 | ^3.3.11 | 共通 |
+| `typescript` | ^5.9.3 | ^5.9.3 | 共通 |
+| `@vitejs/plugin-vue` | ^6.0.8 | ^6.0.8 | 共通 |
+| `@vue/tsconfig` | ^0.9.1 | ^0.9.1 | 共通 |
+| `@types/node` | ^26.3.0 | ^26.3.0 | 共通 |
+| `@types/three` | ^0.185.4 | ^0.185.4 | 共通 |
 
 ### バージョン同期ルール
 
@@ -48,7 +51,6 @@
 | `jquery` | web | DOM操作（CDN等でも可） |
 | `qrcode` | web | QRコード表示 |
 | `@guolao/vue-monaco-editor` | web | Monaco Editor Vue ラッパー |
-| `three` | avatar | 3Dレンダリング |
 | `@pixiv/three-vrm` | avatar | VRMモデル読み込み |
 | `@pixiv/three-vrm-animation` | avatar | VRMAモーション再生 |
 | `electron` (dev) | avatar | Electron |
@@ -78,12 +80,15 @@ frontend_avatar の型を frontend_web で使うとき:
 | 項目 | frontend_web | frontend_avatar |
 |------|-------------|-----------------|
 | port | 8090 | 8092 |
-| host | 未指定（localhost） | 127.0.0.1 |
+| host | 127.0.0.1 | 127.0.0.1 |
 | strictPort | 未指定（false） | true |
 | proxy (/core) | 8091 ws:true | 8091 ws:true（同一） |
 | proxy (/apps) | 8098 ws:true | 8098 ws:true（同一） |
 | proxy (/task) | 8093 | 8093（同一） |
-| optimizeDeps.include | monaco-editor | monaco-editor, three, @pixiv/three-vrm, @pixiv/three-vrm-animation |
+| proxy (/team) | 8093 | 8093（同一） |
+| proxy (/mcp) | 8095（`/mcp` を除去） | なし |
+| optimizeDeps.include | monaco-editor, mermaid | monaco-editor, mermaid, three, @pixiv/three-vrm, @pixiv/three-vrm-animation |
+| optimizeDeps.exclude | three, @pixiv/three-vrm, @pixiv/three-vrm-animation | 未指定 |
 | resolve.alias | @ → ./src | @ → ./src（同一） |
 
 Avatar の Vite 設定は `vite.config.mts` とし、ESM として読み込ませる。Electron は `tsconfig.electron.json` の `module: "CommonJS"` で出力するため、Vite の警告対策でプロジェクト全体を `"type": "module"` に変更しない。

@@ -106,6 +106,19 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
         await ai._サーバーコンテンツ処理(types.LiveServerContent(turn_complete=True))
         self.assertTrue(ai.テキスト受信Ｑ.empty())
 
+    async def test_thought_parts_are_not_forwarded_as_conversation_answers(self):
+        ai = self.gemini()
+        await ai._サーバーコンテンツ処理(types.LiveServerContent(
+            model_turn=types.Content(parts=[
+                types.Part(text="internal reasoning", thought=True),
+                types.Part.from_bytes(data=b"\x00\x00", mime_type="audio/pcm;rate=24000"),
+            ]),
+            output_transcription=types.Transcription(text="こんにちは。"), turn_complete=True,
+        ))
+        self.assertEqual(1, ai.音声受信Ｑ.qsize())
+        self.assertEqual({"text": "こんにちは。"}, await ai.テキスト受信Ｑ.get())
+        self.assertTrue(ai.テキスト受信Ｑ.empty())
+
     async def test_interrupted_transcript_is_flushed_and_next_turn_is_separate(self):
         ai = self.gemini()
         await ai._サーバーコンテンツ処理(types.LiveServerContent(

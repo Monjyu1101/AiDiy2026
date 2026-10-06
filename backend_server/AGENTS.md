@@ -146,7 +146,7 @@ AI 名の規約:
 
 | 設定キー | 規約 |
 |----------|------|
-| `CHAT_AI_NAME` | `_chat` で終わる |
+| `CHAT_AI_NAME` | 原則 `_chat` で終わる。OAuth 接続の `openai_oauth` は例外 |
 | `LIVE_AI_NAME` | `_live` で終わる |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外として `aidiy_hermes` |
 | `TASK_AI_NAME` | Code AI と同じ規約。`backend_taskteam` の AIタスク自動実行で使用 |
@@ -155,7 +155,7 @@ AI 名の規約:
 比較は完全一致を前提にし、前方一致へ寄せない。
 
 TASK / TEAM のモデルは `TASK_AI_MODEL_plan` / `_do` / `_check` の3種指定です（TEAM も同様）。
-旧版の単一キー `TASK_AI_MODEL` / `TEAM_AI_MODEL` は `conf_json` が読込時と更新時に3キーへ移行します。
+現行実装では、旧版の単一キー `TASK_AI_MODEL` / `TEAM_AI_MODEL` から3キーへの自動移行は行いません。フェーズ別キーが不足している場合は既定値で補完されるため、旧設定を引き継ぐ場合は各キーへ明示的に設定します。
 
 ## MCP 連携
 

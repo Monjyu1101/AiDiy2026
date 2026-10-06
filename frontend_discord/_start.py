@@ -1,0 +1,60 @@
+# -*- coding: utf-8 -*-
+"""Discord パネルの単独起動と cleanup 用の停止 API。"""
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR))
+from discord_processes import stop_discord_processes
+
+
+def launch_command() -> list[str]:
+    node = shutil.which('node')
+    if not node:
+        raise RuntimeError('Node.js 22.12 以降が必要です。')
+    return [node, str(THIS_DIR / 'panel/launch.mjs')]
+
+
+def check_environment() -> tuple[bool, str]:
+    if not (THIS_DIR / 'node_modules/tsx/dist/loader.mjs').is_file():
+        return False, '依存関係がありません。python frontend_discord/_setup.py を実行してください。'
+    sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
+    from setup_electron import electron_binary_ready
+    if not electron_binary_ready(THIS_DIR):
+        return False, 'Electron が未準備です。python frontend_discord/_setup.py を実行してください。'
+    try:
+        result = subprocess.run(launch_command() + ['--check'], cwd=THIS_DIR, capture_output=True,
+                                encoding='utf-8', errors='replace', timeout=30)
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return False, 'Node.js / Discord 設定を確認できません。npm run config:check で確認してください。'
+    if result.returncode:
+        # Node/依存ライブラリの出力全体には実行環境の情報が含まれるため転記しない。
+        return False, 'Discord 設定または Hermes が未準備です。frontend_discord で npm run config:check を実行してください。'
+    return True, 'Node.js / Discord 設定 / Hermes（外部接続なし）'
+
+
+def kill_ports() -> None:
+    """cleanup 用 API。ポートの代わりにパネル・worker の実行入口で照合する。"""
+    if not stop_discord_processes(THIS_DIR):
+        raise RuntimeError('Discord Bot を終了できないため処理を中止します。')
+
+
+def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
+    kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == 'win32' else {'start_new_session': True}
+    args = ['--wait'] + (['--connect'] if auto_connect else [])
+    return subprocess.Popen(launch_command() + args, cwd=THIS_DIR, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, bufsize=0, **kwargs)
+
+
+def main() -> None:
+    try:
+        sys.exit(subprocess.call(launch_command() + sys.argv[1:], cwd=THIS_DIR))
+    except (OSError, RuntimeError) as error:
+        print(error)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

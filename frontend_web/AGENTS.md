@@ -26,7 +26,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 ## 概要
 
 `frontend_web` は AiDiy の通常 Web UI です。
-管理画面、マスタ、トランザクション、ビュー、スケジューラ、AIコア、AIタスク、X系デモを提供します。
+管理画面、マスタ、トランザクション、ビュー、スケジューラ、AIコア、AIタスク、AIチーム、X系デモを提供します。
 
 ## 技術スタック
 
@@ -98,7 +98,7 @@ JWT token と user は `frontend_web` では `localStorage` に保存します�
 
 ## AI コア
 
-`frontend_web` 版 AI コアは backend の `/core/AIコア` と WebSocket で接続します。
+`frontend_web` 版 AI コアは backend の `/core/ws/AIコア` と WebSocket で接続します。
 code1〜code6、ファイル、画像、チャット、設定ダイアログを扱います。
 
 AI packet やモデル設定の詳細は `_AIDIY/knowledge` の AI コア関連 HowTo を参照してください。

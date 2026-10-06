@@ -56,6 +56,7 @@ Gemini / FreeAI の native-audio モデルでは、`backend_server/AIコア/AI�
 `LiveConnectConfig` に `output_audio_transcription` を指定し、`server_content.output_transcription.text` を受け取る。
 字幕は `turn_complete` または `interrupted` でまとめてテキスト受信キューへ渡し、`AIライブ.py` がチャンネル0の `output_text` として通知する。
 `model_turn.parts.text` だけを監視すると音声回答の文字を受け取れない。
+`model_turn.parts` の `thought=True` は内部推論なので、会話の回答や字幕へ転送しない。
 字幕対応 LiveAI の出力音声は `AI音声処理.py` でローカル音声認識へ再投入せず、二重表示を避ける。
 [Google の音声字幕仕様](https://ai.google.dev/gemini-api/docs/live-api/capabilities#audio-transcriptions)を参照する。
 

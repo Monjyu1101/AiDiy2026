@@ -2,7 +2,7 @@
 
 このガイドは、**現在の AiDiy2026 実装** を前提に、最初に何を読めばよいかを整理するための案内です。
 
-古いテンプレート由来の PostgreSQL / Alembic / `base_server` 前提ではなく、**FastAPI + SQLite + Vue 3 + Electron + VS Code 拡張**の現行構成に合わせています。
+古いテンプレート由来の PostgreSQL / Alembic / `base_server` 前提ではなく、**FastAPI + SQLite + Vue 3 + Electron + VS Code 拡張 + Discord Bot**の現行構成に合わせています。
 
 ---
 
@@ -16,7 +16,8 @@
   - `taskteam_main.py` : `8093`（AIタスク実行 + 定期タスク + 複数AIエージェントのチーム活動）
 - Web フロントは `frontend_web`、ポート `8090`
 - Avatar フロントは `frontend_avatar`、ポート `8092`
-- VS Code チャット拡張は `frontend_vscode`。`aidiy_hermes` を直接起動するため常駐ポートなし
+- VS Code 拡張は `frontend_vscode`。AiDiy (Code) は `aidiy_hermes` を直接起動し、AiDiy (Live) は Core（`8091`）の AIコアへ接続する。どちらも常駐ポートなし（単独起動版は `aidiy_code` / `aidiy_live`）
+- Discord Bot は `frontend_discord`（任意起動、待受ポートなし）。専用テキストチャンネルを `aidiy_hermes`、専用ボイスチャンネルを Core（`8091`）の AIコア Live へ接続する。起動は `aidiy_discord`（または `discord.bat`）
 - DB は **SQLite**
   - `_data/AiDiy/database.db`
 - スキーマ変更は **Alembic なし**
@@ -70,7 +71,14 @@ AiDiy2026/
 ├── frontend_vscode/
 │   ├── src/
 │   ├── media/
-│   ├── test/
+│   ├── aidiy_code/
+│   ├── aidiy_live/
+│   ├── checks/
+│   └── AGENTS.md
+├── frontend_discord/
+│   ├── src/
+│   ├── panel/
+│   ├── checks/
 │   └── AGENTS.md
 └── docs/
 ```
@@ -85,7 +93,7 @@ AiDiy2026/
 python _setup.py
 ```
 
-`frontend_vscode` を選ぶと、Hermes のセットアップ後に VSIX を生成し、VS Code 拡張機能として配置します。
+`frontend_vscode` を選ぶと、Hermes のセットアップ後に Code / Live の VSIX を生成して VS Code 拡張機能として配置し、単独起動用の `aidiy_code` / `aidiy_live` コマンドも作成します。`frontend_discord`（既定 Yes）を選ぶと、依存導入と `aidiy_discord` コマンドの作成、`_config/AiDiy_key.json` の不足 `DISCORD_*` 補完を行います。Bot トークンやチャンネル ID の設定は [frontend_discord/README.md](../../frontend_discord/README.md) を参照してください。
 
 ### 起動
 
@@ -101,6 +109,7 @@ python _start.py
 - バックエンド(task,team)
 - フロントエンド(Web)
 - フロントエンド(Avatar)
+- フロントエンド(Discord)（デフォルト No。Yes の場合は接続パネルを開いて自動接続）
 
 ### 個別起動
 
@@ -132,6 +141,9 @@ npm run dev
 # frontend avatar
 cd frontend_avatar
 npm run dev
+
+# frontend discord（接続パネルを開き、開始ボタンで接続）
+aidiy_discord
 ```
 
 ---
@@ -145,7 +157,7 @@ npm run dev
 | Apps API Docs | http://127.0.0.1:8098/docs |
 | Task / Team API Docs | http://127.0.0.1:8093/docs |
 | Local API Docs | http://127.0.0.1:8096/docs |
-| Backend MCP 一覧（19 サーバー） | http://127.0.0.1:8095/ |
+| Backend MCP 一覧（Windows 19 / Linux・macOS 18） | http://127.0.0.1:8095/ |
 | Backend MCP ツール一覧 | http://127.0.0.1:8095/{mcp_name}/list |
 | Backend MCP SSE 接続 | http://127.0.0.1:8095/{mcp_name}/sse （例: `aidiy_chrome_devtools`） |
 | Avatar Web モード | http://127.0.0.1:8092 |
@@ -225,15 +237,28 @@ npm run dev
 
 ---
 
-## 8. フロントエンド VS Code の見方
+## 8. フロントエンド VS Code / Discord の見方
 
-- 拡張エントリと会話状態: `frontend_vscode/src/extension.ts`
+AiDiy (Code) と AiDiy (Live) の 2 つの独立した拡張と、同じ画面を使う単独起動版（`aidiy_code` / `aidiy_live`）で構成します。
+
+- Code 拡張エントリと会話状態: `frontend_vscode/src/extension.ts`
 - Hermes CLI の解決・起動・停止: `frontend_vscode/src/runner.ts`
 - AIコード互換 packet: `frontend_vscode/src/protocol.ts`
 - Webview: `frontend_vscode/src/webview.ts`, `frontend_vscode/media/`
-- 単独試用: `frontend_vscode/src/standalone.ts`, `frontend_vscode/standalone/bridge.js`
+- Code 単独起動: `frontend_vscode/aidiy_code/`（`launch.mjs`, `desktop.cjs`, `src/server.ts`, `bridge.js`）
+- Live 拡張・単独起動: `frontend_vscode/aidiy_live/`（`src/extension.ts`, `src/host.ts`, `src/view.ts`, `src/server.ts`, `launch.mjs`）
 
-常駐バックエンドや AI コア WebSocket は使わず、VS Code の拡張プロセスから `aidiy_hermes` を直接起動します。詳細は [frontend_vscode/AGENTS.md](../../frontend_vscode/AGENTS.md) を参照してください。
+Code は常駐バックエンドや AI コア WebSocket を使わず、VS Code の拡張プロセスから `aidiy_hermes` を直接起動します。Live は `backend_server`（8091）の AIコア WebSocket とモデル情報 API へ接続し、音声・文字のライブ会話を行います。詳細は [frontend_vscode/AGENTS.md](../../frontend_vscode/AGENTS.md) を参照してください。
+
+`frontend_discord` は Discord Bot から同じ Code / Live を使う任意起動のクライアントです。`frontend_vscode` の `src/runner.ts`、`src/protocol.ts`、`aidiy_live/src/protocol.ts`、`src/model-preferences.ts` を `frontend_discord/src/vscode.ts` 経由で直接共有するため、これらを変更すると Discord 側にも影響します。
+
+- 起動・設定確認: `frontend_discord/src/main.ts`
+- 接続パネル: `frontend_discord/panel/`、`src/panel.ts`、`src/panel-worker.ts`
+- Discord イベント・返信: `frontend_discord/src/bot.ts`、`src/commands.ts`
+- Code（Hermes 会話継続）: `frontend_discord/src/code.ts`
+- Live（ボイスチャンネルと AIコアの中継）: `frontend_discord/src/live.ts`、`src/audio.ts`
+
+接続情報は `_config/AiDiy_key.json` の `DISCORD_*` 5項目だけで、Live・作業フォルダ・Hermes モデルは共通設定を使います。詳細は [frontend_discord/AGENTS.md](../../frontend_discord/AGENTS.md) を参照してください。
 
 ---
 
@@ -254,7 +279,7 @@ echo. > backend_server/temp/reboot_apps.txt
 
 ## 10. テスト方針
 
-自動テストは `backend_server/tests/` の `unittest`（設定管理まわり）と `frontend_vscode/test/` の Node.js テストがあります。それ以外は基本的に手動確認です。
+自動テストは `backend_server/tests/` の `unittest`（AIコア・Code CLI 連携・設定管理まわり）と、`frontend_vscode/checks/`（Code）・`frontend_vscode/aidiy_live/checks/`（Live）の Node.js テスト、`frontend_vscode/checks/` の Python テスト、`frontend_discord/checks/` の Node.js / Python テストがあります。`backend_tools/tests/`、`backend_taskteam/tests/`、`command_hermes/tests/` にも `unittest` があります。`frontend_avatar/checks/` の Web / Avatar 接続テストと `scripts/test_start_output.py` の起動ログテストもあります。実行方法は [開発環境運用手順](../../_AIDIY/knowledge/共通,開発環境運用手順.md) の「自動テスト」を参照してください。画面操作は手動でも確認します。
 
 ```powershell
 cd backend_server
@@ -263,13 +288,20 @@ cd backend_server
 cd ../frontend_vscode
 npm run check
 npm test
+npm run live:test
+python -m unittest discover -s checks -p "test_*.py"
+
+cd ../frontend_discord
+npm run check
+npm test
 ```
 
 - API: Swagger UI
 - Web UI: ブラウザ
 - Avatar: Electron / Web の両モード確認
-- フロント型チェック: `npm run type-check`（`npm run build` は明示依頼時のみ）
-- VS Code 拡張: `npm run check` / `npm test`。配布物確認時は `npm run package`
+- フロント型チェック: `npm run type-check`（`npm run build` は配布物作成・成果物確認・明示依頼など、実行理由がある場合のみ）
+- VS Code 拡張: `npm run check` / `npm test` / `npm run live:test`。配布物確認時は `npm run package`（Code / Live の 2 つの VSIX を生成）
+- Discord Bot: `npm run check` / `npm test`（ビルド不要、Discord への接続なし）
 
 実装追加後は最低でも以下を確認します。
 
@@ -295,6 +327,7 @@ npm test
 8. [frontend_web/AGENTS.md](../../frontend_web/AGENTS.md)
 9. [frontend_avatar/AGENTS.md](../../frontend_avatar/AGENTS.md)
 10. [frontend_vscode/AGENTS.md](../../frontend_vscode/AGENTS.md)
+11. [frontend_discord/AGENTS.md](../../frontend_discord/AGENTS.md)
 
 ---
 

@@ -10,7 +10,7 @@
 ## 関連ファイル
 - `_config/AiDiy_mcp.json` — Claude Agent SDK に渡す MCP 接続定義
 - `backend_server/AIコア/AIコード_claude.py` — Claude Agent SDK で MCP を使う処理
-- `backend_tools/tools_main.py` — 19個の SSE MCP サーバー入口
+- `backend_tools/tools_main.py` — Windows は19個、Linux / macOS は18個の MCP サーバー入口
 - `backend_tools/mcp_stdio.py` — SSE を stdio client へ中継
 - `backend_tools/tools_proc/` — 各 MCP のロジック
 
@@ -86,13 +86,13 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 
 `aidiy_task_agents.submit`の`task_id`は通常は指定不要で、省略時はbackend_taskteamが`TASK.mmdd.hhmmss`形式で自動採番する。呼出元のIDをAタスク要求まで引き継ぐ必要がある場合だけ指定する。
 
-`aidiy_task_agents.submit`の`project_path` / `ai_name` / `ai_model`も通常は指定不要（null）。未指定時はbackend_taskteamがAIタスク_要求編集ダイアログの新規時と同じ条件、つまり利用者IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`TASK_AI_NAME` / `TASK_AI_MODEL_do`）を使う。特定のプロジェクトやAIを狙う場合だけ明示指定する（`project_path`の空文字は「プロジェクト空欄」の明示指定として扱う）。
+`aidiy_task_agents.submit`の`project_path` / `ai_name` / `ai_model_plan` / `ai_model_do` / `ai_model_check`も通常は指定不要（null）。未指定時はbackend_taskteamがAIタスク_要求編集ダイアログの新規時と同じ条件、つまり利用者IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`CODE_BASE_PATH` / `TASK_AI_NAME` / フェーズ別の`TASK_AI_MODEL_*`）を使う。特定のプロジェクトやAIを狙う場合だけ明示指定する（`project_path`の空文字は「プロジェクト空欄」の明示指定として扱う）。
 
-`aidiy_team_agents.submit`は`Aチーム依頼`を`状態=準備開始`で追加する。依頼IDはbackend_taskteamが`TR`＋8桁で自動採番するため指定できない。`member_id`（要員ID、既定`admin`）はAチーム要員の要員IDで、候補は`get_member_list`で確認する。`project_path` / `team_ai_name` / `team_ai_model` / `task_ai_name` / `task_ai_model`は通常は指定不要（null）で、未指定時はbackend_taskteamがAIチーム_依頼編集ダイアログの新規時と同じ条件、つまり要員IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`CODE_BASE_PATH` / `TEAM_AI_*` / `TASK_AI_*`）を使う。登録後はbackend_taskteamの監視ループ（5秒間隔）が`aidiy_task_agents`へ投入するため、AIタスクを直接作る場合は`aidiy_task_agents`を使う。
+`aidiy_team_agents.submit`は`Aチーム依頼`を`状態=準備開始`で追加する。依頼IDはbackend_taskteamが`TR`＋8桁で自動採番するため指定できない。`member_id`（要員ID、既定`admin`）はAチーム要員の要員IDで、候補は`get_member_list`で確認する。`project_path` / `team_ai_name` / `task_ai_name`と、`team_ai_model_plan` / `_do` / `_check`、`task_ai_model_plan` / `_do` / `_check`は通常は指定不要（null）で、未指定時はbackend_taskteamがAIチーム_依頼編集ダイアログの新規時と同じ条件、つまり要員IDの更新最終レコードの値を引き継ぎ、レコードが無ければ規定値（`AiDiy_key.json`の`CODE_BASE_PATH` / `TEAM_AI_*` / `TASK_AI_*`）を使う。登録後はbackend_taskteamの監視ループ（5秒間隔）が`aidiy_task_agents`へ投入するため、AIタスクを直接作る場合は`aidiy_task_agents`を使う。
 
-## アクセスインターフェース（3種類）
+## MCP トランスポート（3種類）と REST API
 
-各 MCP は同一ポート（8095）で 3 つのインターフェースを同時提供する。
+各 MCP は SSE / Streamable HTTP / stdio gateway の3トランスポートに対応する。サーバー側の接続先は同一ポート（8095）で、ツールと同じ処理を直接呼ぶ REST API も提供する。
 
 | インターフェース | 説明 |
 |----------------|------|
@@ -101,7 +101,7 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 | **stdio gateway** | `mcp_stdio.py --sse-url .../sse` — SSE を stdin/stdout に変換。Codex など stdio 専用 CLI が使う |
 | **HTTP POST（FastAPI）** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` — REST API として直接呼び出し可能。Swagger UI (`/docs`) で試行できる |
 
-各 MCP の引数仕様 JSON: `GET http://127.0.0.1:8095/{mcp_name}/list`（`/{mcp_name}/docs` は存在しない。Swagger UI は本体の `http://127.0.0.1:8095/docs`）
+各 MCP の引数仕様 JSON: `GET http://127.0.0.1:8095/{mcp_name}/list`。Swagger UI は本体の `http://127.0.0.1:8095/docs`。`aidiy_task_agents` などは個別の `/{mcp_name}/docs` でも HTTP 利用例を返す。
 
 ## Python から利用する場合
 

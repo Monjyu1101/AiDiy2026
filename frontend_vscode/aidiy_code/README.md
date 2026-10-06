@@ -13,6 +13,6 @@ aidiy_code --provider copilot_cli --model claude-sonnet-5.5
 aidiy_code --provider openai_oauth --model gpt-6-astra --browser
 ```
 
-`copilot_cli` は Hermes の `copilot-cli` として処理します。引数なしの `aidiy_code` は従来の既定値（`openai_oauth` / `gpt-6.1-sol`）で起動します。Provider だけ指定した場合はモデルを自動にし、モデルだけ指定した場合は既定の Provider を使います。モデル指定は子プロセスにも起動引数で渡し、環境変数は使いません。
+`copilot_cli` は Hermes の `copilot-cli` として処理します。引数なしの `aidiy_code` は最後に画面で手動選択したモデル（`~/.aidiy/aidiy_code_model.json`、未保存なら既定値 `openai_oauth` / `gpt-6.1-sol`）で起動します。Provider だけ指定した場合は、保存済みと同じ Provider ならそのモデルを復元し、異なる場合はモデルを自動にします。モデルだけ指定した場合は既定の Provider を使います。起動引数だけでは保存済み選択を上書きしません。モデル指定は子プロセスにも起動引数で渡し、環境変数は使いません。
 
 共通の利用・検証方法は [`../README.md`](../README.md) を参照してください。起動処理は `launch.mjs`、専用ウィンドウは `desktop.cjs`、単独サーバーは `src/server.ts` に分けています。

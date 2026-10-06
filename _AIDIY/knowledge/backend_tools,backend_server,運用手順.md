@@ -72,17 +72,18 @@ uv venv --clear .venv
 uv sync --locked --no-install-project
 ```
 
-## アクセスインターフェース（3種類）
+## MCP トランスポート（3種類）と REST API
 
-`backend_tools` は 1 ポート（8095）で 3 つのインターフェースを同時提供する。
+`backend_tools` は SSE / Streamable HTTP / stdio gateway の3トランスポートに対応する。サーバー側の接続先は同一ポート（8095）で、ツールと同じ処理を直接呼ぶ REST API も提供する。
 
 | インターフェース | 説明 | 代表 URL / コマンド |
 |----------------|------|-------------------|
 | **SSE（MCP標準）** | AI エージェント・MCP クライアントが使う標準トランスポート | `http://127.0.0.1:8095/{mcp_name}/sse` |
+| **Streamable HTTP** | MCP クライアントが JSON-RPC を送る。`/sse` は POST / DELETE を受け付ける | `http://127.0.0.1:8095/{mcp_name}/mcp` または `/{mcp_name}/sse` |
 | **stdio gateway** | `mcp_stdio.py` が SSE を stdin/stdout に変換。Codex 等の stdio 専用 CLI が使う | `mcp_stdio.py --sse-url .../sse` |
 | **HTTP POST（FastAPI）** | REST API として直接呼び出せる。Swagger UI (`/docs`) で試行可能。Python から最も簡単に利用できる | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` |
 
-各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` で JSON 取得できる（`/{mcp_name}/docs` は存在しない。Swagger UI は本体の `http://127.0.0.1:8095/docs`）。
+各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` で JSON 取得できる。Swagger UI は本体の `http://127.0.0.1:8095/docs`。`aidiy_task_agents` などは個別の `/{mcp_name}/docs` でも HTTP 利用例を返す。
 
 ### Python から利用する例
 
@@ -123,14 +124,14 @@ print(res.json())
 | Team Agents | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
 | Windows Control（Windows のみ） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
 
-アクセスは localhost 限定。外部接続は 403。
+現行実装では通常の起動は `0.0.0.0` で待ち受け、REST API 全体に接続元を localhost へ制限する処理はない。`tools_main.py` が MCP SDK へ渡す `host="127.0.0.1"` は SSE / Streamable HTTP 側の設定であり、REST 全体の接続制限とは異なる。
 
 ## 環境変数
 
 | 変数名 | 既定 | 用途 |
 |--------|------|------|
 | `CHROME_DEBUG_PORT` | `9222` | Chrome デバッグポート |
-| `MCP_PORT` | `8095` | MCP サーバーポート |
+| `PORT_TOOLS` / `MCP_PORT` | `8095` | `tools_main.py` を直接起動するときのポート。`PORT_TOOLS` を優先。通常の `_start.py` 起動ではランチャーの `PORT_TOOLS`（8095）を `uvicorn --port` に渡す |
 | `CHROME_EXECUTABLE` | 未設定 | Chrome 実行ファイルの明示指定 |
 | `AIDIY_PG_DSN` | 未設定 | PostgreSQL DSN |
 | `AIDIY_PG_HOST` など | 未設定 | PostgreSQL 個別接続情報 |
@@ -162,7 +163,7 @@ MCP 経由のツール呼び出しが `Invalid request parameters` 等で全般�
 2. Chrome / 対象アプリ自体 — Chrome DevTools の場合 `curl http://127.0.0.1:9222/json/version` で疎通確認。
 3. MCP クライアント側（Code CLI・Claude Code 等）の stdio/SSE ブリッジ — 上記1・2が正常なのに MCP 経由の呼び出しだけ失敗するなら、この層が不調。
 
-1・2 が正常なら、**アクセスインターフェース（3種類）** の「HTTP POST（FastAPI）」で直接呼び出すことで作業を継続できる。
+1・2 が正常なら、上記の「HTTP POST（FastAPI）」で直接呼び出すことで作業を継続できる。
 
 ```bash
 # 例: Chrome DevTools の navigate / screenshot を HTTP で直接叩く

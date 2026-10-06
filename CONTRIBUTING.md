@@ -18,6 +18,7 @@
   - `frontend_web/AGENTS.md`
   - `frontend_avatar/AGENTS.md`
   - `frontend_vscode/AGENTS.md`
+  - `frontend_discord/AGENTS.md`
 
 ## ライセンス（重要）
 
@@ -32,7 +33,7 @@
 
 ## テスト
 
-主な自動テストは `backend_server/tests/` の `unittest` と `frontend_vscode/test/` の Node.js テストです。サーバー起動は不要です。
+主な自動テストは `backend_server/tests/` の `unittest` と、`frontend_vscode/checks/`（Code）・`frontend_vscode/aidiy_live/checks/`（Live）の Node.js テスト、`frontend_vscode/checks/` の Python テスト、`frontend_discord/checks/` の Node.js / Python テストです。サーバー起動や Discord への接続は不要です。`backend_tools/tests/`、`backend_taskteam/tests/`、`command_hermes/tests/` にも `unittest` があります。
 
 ```powershell
 cd backend_server
@@ -41,15 +42,22 @@ cd backend_server
 cd ../frontend_vscode
 npm run check
 npm test
+npm run live:test
+python -m unittest discover -s checks -p "test_*.py"
+
+cd ../frontend_discord
+npm run check
+npm test
 ```
 
-そのほかは手動テストで確認してください。
+`frontend_avatar/checks/` には Web / Avatar の接続を検証する Node.js テスト、`scripts/test_start_output.py` にはルート起動ログのテストもあります。実行方法は [開発環境運用手順](./_AIDIY/knowledge/共通,開発環境運用手順.md) の「自動テスト」を参照し、変更対象に応じて実行してください。画面操作は手動でも確認します。
 
 - API: http://127.0.0.1:8091/docs / http://127.0.0.1:8098/docs / http://127.0.0.1:8093/docs
 - UI: http://127.0.0.1:8090
-- 型チェック: `frontend_web` / `frontend_avatar` は `npm run type-check`（`npm run build` は明示依頼時のみ）
-- VS Code 拡張変更時: `frontend_vscode` で `npm run check` / `npm test`。配布物確認時は `npm run package`
-- MCP 連携変更時: `backend_tools` の 19 MCP サーバー（一覧は `GET http://127.0.0.1:8095/`、SSE は `http://127.0.0.1:8095/<mcp_name>/sse`）も確認
+- 型チェック: `frontend_web` / `frontend_avatar` は `npm run type-check`（`npm run build` は配布物作成・成果物確認・明示依頼など、実行理由がある場合のみ）
+- VS Code 拡張変更時: `frontend_vscode` で `npm run check` / `npm test` / `npm run live:test`。配布物確認時は `npm run package`（Code / Live の 2 つの VSIX を生成）。`frontend_discord` は `frontend_vscode` の CLI 実行・Live 通信・モデル保存処理を共有するため、これらを変えた場合は Discord のテストも実行
+- Discord Bot 変更時: `frontend_discord` で `npm run check` / `npm test`（ビルド不要）。ルートで `python -X utf8 -m unittest discover -s frontend_discord/checks -p "test_*.py"`
+- MCP 連携変更時: `backend_tools` の MCP サーバー（Windows は19、Linux / macOS は18）（一覧は `GET http://127.0.0.1:8095/`、SSE は `http://127.0.0.1:8095/<mcp_name>/sse`）も確認
 
 ## セキュリティ
 

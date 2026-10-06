@@ -11,7 +11,7 @@
 """開発環境起動スクリプト（まとめ役）
 
 各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps/task,team)・
-フロントエンド(Web/Avatar) を統一手順で起動します。各サービスの環境確認・
+フロントエンド(Web/Avatar/Discord) を統一手順で起動します。各サービスの環境確認・
 起動コマンドはフォルダ側に委譲し、このスクリプトは起動順序・出力集約・
 ブラウザ表示・自動再起動監視・一括停止を一元管理します。
 
@@ -22,6 +22,7 @@
 - backend_taskteam/_start.py PORT_TASKTEAM / check_environment / start / kill_ports
 - frontend_web/_start.py     PORT_WEB / check_environment / start / kill_ports
 - frontend_avatar/_start.py  PORT_AVATAR / check_environment / start / kill_electron_processes
+- frontend_discord/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
 標準の起動順:
 1. バックエンド(local)
@@ -31,8 +32,9 @@
 5. バックエンド(task,team)
 6. フロントエンド(Web)
 7. フロントエンド(Avatar)
-8. ページ表示
-9. 自動再起動監視
+8. フロントエンド(Discord、選択時にパネルを開いて自動接続)
+9. ページ表示
+10. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -123,10 +125,11 @@ MANAGED_SERVICE_NAMES = frozenset({
     "バックエンド(task,team)",
     "フロントエンド(Web)",
     "フロントエンド(Avatar)",
+    "フロントエンド(Discord)",
 })
 
 # フォルダ別 _start.py モジュール（_init_modules で設定）
-LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = None
+LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = DISCORD = None
 
 
 def _load_folder_module(folder: str):
@@ -156,16 +159,17 @@ def _remove_folder_import_cache(folder: str) -> None:
 
 
 def _init_modules() -> None:
-    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR
+    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR, DISCORD
     LOCAL = _load_folder_module("backend_local")
     TOOLS = _load_folder_module("backend_tools")
     SERVER = _load_folder_module("backend_server")
     TASKTEAM = _load_folder_module("backend_taskteam")
     WEB = _load_folder_module("frontend_web")
     AVATAR = _load_folder_module("frontend_avatar")
+    DISCORD = _load_folder_module("frontend_discord")
 
     # 起動そのものには不要なので、import で残ったキャッシュは畳んでおく。
-    for folder in ("frontend_web", "frontend_avatar"):
+    for folder in ("frontend_web", "frontend_avatar", "frontend_discord"):
         _remove_folder_import_cache(folder)
 
 
@@ -436,7 +440,7 @@ def is_r_pressed() -> bool:
 
 
 def prompt_choice(question: str, default_yes: bool) -> bool:
-    bracket = "[y]/n" if default_yes else "y/[n]"
+    bracket = "[y]/n" if default_yes else "[n]/y"
     print(f"{Colors.FAIL}{question} {bracket}{Colors.ENDC}", end="  ", flush=True)
 
     if sys.platform == "win32":
@@ -455,7 +459,7 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
     return default_yes
 
 
-def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool]:
+def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool, bool]:
     print_header("起動条件の確認")
     local_enabled         = prompt_choice("バックエンド(local)     起動しますか?", default_yes=False)
     backend_tools_enabled = prompt_choice("バックエンド(tools)     起動しますか?", default_yes=True)
@@ -463,7 +467,8 @@ def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool]:
     backend_taskteam_enabled = prompt_choice("バックエンド(task,team) 起動しますか?", default_yes=True)
     web_enabled           = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
     avatar_enabled        = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
-    return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled
+    discord_enabled       = prompt_choice("フロントエンド(Discord) 起動・自動接続しますか?", default_yes=False)
+    return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled, discord_enabled
 
 
 # ============================================================
@@ -517,6 +522,7 @@ def open_browser_via_tools(port: int) -> bool:
 # ============================================================
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
     avatar_was_running = "フロントエンド(Avatar)" in processes
+    discord_was_running = "フロントエンド(Discord)" in processes
     for name, process in list(processes.items()):
         try:
             print_info(f"[{name}] 停止しています")
@@ -548,6 +554,8 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
     # Avatar を起動していた場合は残留 Electron プロセスも終了する
     if avatar_was_running and AVATAR is not None:
         AVATAR.kill_electron_processes()
+    if discord_was_running and DISCORD is not None:
+        DISCORD.kill_ports()
 
 
 # ============================================================
@@ -560,6 +568,7 @@ def validate_initial_environment(
     backend_taskteam_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
+    discord_enabled: bool = False,
 ) -> tuple[bool, str | None]:
     print_header("環境確認")
     has_error = False
@@ -626,6 +635,13 @@ def validate_initial_environment(
             print_info(f"  対応例: cd frontend_avatar && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
 
+    if discord_enabled:
+        ok, detail = DISCORD.check_environment()
+        if ok:
+            print_success(f"フロントエンド(Discord): OK ({detail})")
+        else:
+            print_error(f"フロントエンド(Discord): 未準備 ({detail})")
+            has_error = True
     return (not has_error), npm_command
 
 
@@ -687,6 +703,8 @@ def start_service(
                 print_error("フロントエンド(Avatar): npm コマンドが見つかりません")
                 return False
             process = AVATAR.start(npm_command)
+        elif name == "フロントエンド(Discord)":
+            process = DISCORD.start(auto_connect=True)
         else:
             print_error(f"未対応のサービスです: {name}")
             return False
@@ -706,6 +724,7 @@ def maybe_kill_initial_ports(
     backend_taskteam_enabled: bool,
     web_enabled: bool,
     avatar_enabled: bool,
+    discord_enabled: bool = False,
 ) -> None:
     print_header("既存プロセス整理")
     if local_enabled:
@@ -723,6 +742,8 @@ def maybe_kill_initial_ports(
         kill_process_on_port(AVATAR.PORT_AVATAR)
         # electronmon が spawn した electron.exe は別プロセスグループで残留する場合があるため
         AVATAR.kill_electron_processes()
+    if discord_enabled:
+        DISCORD.kill_ports()
     time.sleep(1)
 
 
@@ -736,6 +757,7 @@ def start_initial_services(
     processes: dict[str, subprocess.Popen[bytes]],
     last_output_times: dict[str, float],
     npm_command: str | None,
+    discord_enabled: bool = False,
 ) -> dict[str, bool]:
     selected_flags = {
         "バックエンド(local)": start_backend_local_enabled,
@@ -745,6 +767,8 @@ def start_initial_services(
         "バックエンド(task,team)": start_backend_taskteam_enabled,
         "フロントエンド(Web)": web_enabled,
         "フロントエンド(Avatar)": False,
+        # 接続・停止はパネルから操作する。手動で閉じたパネルは自動で開き直さない。
+        "フロントエンド(Discord)": False,
     }
 
     maybe_kill_initial_ports(
@@ -754,6 +778,7 @@ def start_initial_services(
         backend_taskteam_enabled=start_backend_taskteam_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
+        discord_enabled=discord_enabled,
     )
 
     if start_backend_local_enabled:
@@ -795,6 +820,11 @@ def start_initial_services(
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
+
+    if discord_enabled:
+        print_header("フロントエンド(Discord) パネル起動・自動接続")
+        if start_service("フロントエンド(Discord)", processes, last_output_times, npm_command):
+            wait_for_services_quiet(last_output_times, ["フロントエンド(Discord)"], label="フロントエンド(Discord)")
 
     if web_enabled and "フロントエンド(Web)" in processes:
         if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(WEB.PORT_WEB)):
@@ -894,6 +924,7 @@ def main() -> None:
         backend_taskteam_enabled,
         web_enabled,
         avatar_enabled,
+        discord_enabled,
     ) = collect_startup_choices()
 
     is_ready, npm_command = validate_initial_environment(
@@ -903,6 +934,7 @@ def main() -> None:
         backend_taskteam_enabled=backend_taskteam_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
+        discord_enabled=discord_enabled,
     )
     if not is_ready:
         print()
@@ -927,6 +959,7 @@ def main() -> None:
                 processes=processes,
                 last_output_times=last_output_times,
                 npm_command=npm_command,
+                discord_enabled=discord_enabled,
             )
 
             print_header("起動完了")
@@ -947,6 +980,8 @@ def main() -> None:
                 print_success(f"フロントエンド(Web): http://127.0.0.1:{WEB.PORT_WEB}/")
             if "フロントエンド(Avatar)" in processes:
                 print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{AVATAR.PORT_AVATAR}")
+            if "フロントエンド(Discord)" in processes:
+                print_success("フロントエンド(Discord): パネル起動済み（接続状態はパネルで確認してください）")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)
 
         except KeyboardInterrupt:

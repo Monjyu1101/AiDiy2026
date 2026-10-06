@@ -64,13 +64,13 @@ findstr /S /N /C:"AiDiy" /C:"aidiy" *.py
 `.venv` と AiDiy 専用ファイル（下表）だけ残し、それ以外を削除してから upstream をコピーします。
 
 **残すもの**: `.venv`、`_setup.py`、`_start.py`、`_cleanup.py`、`_verify.py`、`aidiy_hermes_exec.bat`、
-`aidiy_hermes_logo.txt`、`AGENTS.md`、`NOTICE.md`、`pyproject.toml`、`uv.lock`、`temp`
+`aidiy_hermes_logo.txt`、`AGENTS.md`、`NOTICE.md`、`pyproject.toml`、`uv.lock`、`temp`、AiDiy 固有の `tests/`
 
 **コピーするもの**: `agent/`→`core/`、ルート `*.py`→`base/`（`cli.py`・`setup.py` を除く）、`cli.py`→`cli_main.py`、
 `tools/`、`hermes_cli/`、`gateway/`、`plugins/`、`cron/`、`acp_adapter/`、`tui_gateway/`、`providers/`、
 `skills/`、`optional-skills/`、`optional-mcps/`、`locales/`、`native/`、`assets/`、`scripts/`
 
-**コピーしないもの**（実行時に参照されないことを確認済み）: `ui-tui/`、`web/`、`website/`、`evals/`、`tests/`、
+**upstream からコピーしないもの**（実行時に参照されないことを確認済み）: `ui-tui/`、`web/`、`website/`、`evals/`、`tests/`、
 `tests-js/`、`docker/`、`nix/`、`docs/`、`contributors/`、`mcp-research-data/`、`datagen-config-examples/`、`apps/`
 
 upstream ルートの `setup.py` は wheel ビルド用ガードです。`base/` に置くと `import setup` を汚すので除外します。

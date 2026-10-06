@@ -1,11 +1,12 @@
 # VS Code チャット拡張変更手順
 
-> 文書: `frontend_vscode,VSCodeチャット拡張変更手順.md` | 実装: `frontend_vscode/package.json`, `frontend_vscode/src/extension.ts`, `frontend_vscode/src/runner.ts`, `frontend_vscode/src/protocol.ts`, `frontend_vscode/src/webview.ts`, `frontend_vscode/aidiy_code/src/server.ts`, `frontend_vscode/aidiy_code/launch.mjs`
+> 文書: `frontend_vscode,VSCodeチャット拡張変更手順.md` | 実装: `frontend_vscode/package.json`, `frontend_vscode/src/extension.ts`, `frontend_vscode/src/runner.ts`, `frontend_vscode/src/protocol.ts`, `frontend_vscode/src/webview.ts`, `frontend_vscode/aidiy_code/src/server.ts`, `frontend_vscode/aidiy_code/launch.mjs`, `frontend_vscode/src/model-preferences.ts`, `frontend_vscode/aidiy_live/`, `frontend_vscode/_setup.py`, `frontend_vscode/_cleanup.py`
 
 ## このメモを使う場面
 
-- VS Code の AiDiy チャット、コマンド、設定を変更する。
+- VS Code の AiDiy (Code) / AiDiy (Live) 拡張のビュー、コマンド、設定を変更する。
 - `aidiy_hermes` の起動、停止、Provider / モデル選択を調整する。
+- Live のライブ会話画面、音声入出力、AIコアへの接続を調整する。
 - Webview と単独試用画面を変更する。
 - VSIX を生成し、VS Code へ配置して確認する。
 - 単独起動用の `aidiy_code` / `aidiy_live` コマンドを配置する。
@@ -23,7 +24,10 @@
 | 単独試用サーバー | `aidiy_code/src/server.ts`, `aidiy_code/bridge.js` | `checks/aidiy_code.test.cjs` |
 | 単独ウィンドウ、タイトルバー | `aidiy_code/desktop.cjs`, `aidiy_code/preload.cjs`, `aidiy_code/launch.mjs` | `media/chat.html`, `media/chat.css`, `aidiy_code/theme.css` |
 | bundle / VSIX | `scripts/build.mjs`, `scripts/package.mjs`, `package.json`, `aidiy_live/build.mjs`, `aidiy_live/package.json` | 両 `.vscodeignore`, `dist/THIRD_PARTY_NOTICES.txt` |
-| Live 拡張、通信、マイク | `aidiy_live/src/extension.ts`, `src/host.ts`, `src/bridge.ts`, `microphone.py`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/host.test.cjs`, `aidiy_live/README.md` |
+| Live 拡張、通信、マイク | `aidiy_live/src/extension.ts`, `src/host.ts`, `src/bridge.ts`, `microphone.py`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/host.test.cjs`, `aidiy_live/checks/extension.test.cjs`, `aidiy_live/README.md` |
+| Live 画面、音声、音量表示 | `aidiy_live/src/view.ts`, `src/audio.ts`, `src/visualizer.ts`, `src/protocol.ts`, `media/`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/view.test.cjs`, `aidiy_live/checks/live.test.cjs` |
+| Live 単独起動、中継、マイク許可 | `aidiy_live/launch.mjs`, `desktop.cjs`, `permissions.cjs`, `src/server.ts`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/launcher.test.cjs`, `aidiy_live/checks/permissions.test.cjs`, `checks/desktop.test.cjs` |
+| セットアップ、ランチャー、クリーンアップ | `_setup.py`, `_cleanup.py`, `scripts/vscode_extensions.py`, `scripts/standalone_processes.py`, ルートの `vscode_code.bat` / `vscode_live.bat` | `checks/test_setup.py`, `checks/test_extensions.py`, `checks/test_cleanup_processes.py` |
 
 ## 実装上の維持事項
 
@@ -37,6 +41,7 @@
 - ワークスペース未信頼時、仮想ワークスペース、Web 版では CLI を実行しない。
 - Webview では Markdown の HTML と外部画像を無効のまま維持し、外部リンクは `http` / `https` のみにする。
 - `webview.ts` を変えた場合は VS Code 拡張モードと単独試用モードの両方を確認する。
+- `src/runner.ts`、`src/protocol.ts`、`aidiy_live/src/protocol.ts`、`src/model-preferences.ts`、`scripts/model-catalog.py` を変えた場合は、これらを直接共有する `frontend_discord` で `npm run check` / `npm test` も実行する。詳細は [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) を参照する。
 - 初回は最初の状態通知を反映してから黒い画面からフェードインする。履歴復元時の保存済み回答にはタイプ表示を再適用せず、新しい回答だけを演出する。状態更新や会話切り替えではフェードインを繰り返さない。
 - スタンドアロンの専用ウィンドウは中心を保ちながら初回だけ拡大する。拡大中は `opening` 通知で内容と初期画面の演出を止め、拡大後に最小サイズを戻して内容を表示する。ブラウザモードは CSS の拡大表示を使う。
 - 専用ウィンドウの起動位置は、マウスポインターがある画面の作業領域を基準に Code を左上、Live を右上にする。端に約8pxの余白を設け、Live は拡大演出後の実際の幅で右端を合わせる。
@@ -87,7 +92,7 @@ python _setup.py
 python frontend_vscode/_setup.py
 ```
 
-`frontend_vscode/_setup.py` は `npm install`、`npm update`、VSIX 生成、`code --install-extension --force` を順に実行し、最後に拡張 ID とバージョンを再取得して配置を確認する。VS Code CLI が見つからない場合は単独画面だけをコンパイルする。最後に `~/.local/bin/aidiy_code.cmd`（Windows）または `~/.local/bin/aidiy_code`（macOS / Linux）を作り、`aidiy_code/launch.mjs` を絶対パスで呼び出す。`code` が PATH に無い場合は、稼働中の Codespaces / Dev Container / Remote SSH の Remote CLI と VS Code の標準配置先も探索する。単にファイルが存在するだけでなく、`--version` に成功した CLI だけを使う。
+`frontend_vscode/_setup.py` は `npm install`、`npm update`、Electron の準備、`npm run package` による Code / Live の VSIX 生成、`code --install-extension --force` を順に実行し、最後に両拡張の ID とバージョンを再取得して配置を確認する。VS Code CLI が見つからない場合は単独画面だけをコンパイルする。最後に `~/.local/bin/aidiy_code.cmd`（Windows）または `~/.local/bin/aidiy_code`（macOS / Linux）を作り、`aidiy_code/launch.mjs` を絶対パスで呼び出す。`code` が PATH に無い場合は、稼働中の Codespaces / Dev Container / Remote SSH の Remote CLI と VS Code の標準配置先も探索する。単にファイルが存在するだけでなく、`--version` に成功した CLI だけを使う。
 
 同時に `aidiy_live` のランチャーも作り、`aidiy_live/launch.mjs` を呼び出す。ランチャーだけの更新は `python frontend_vscode/_setup.py --launchers-only` を使う。この作業コピーから配置した旧名 `aidiy_vscode` は新しいランチャーの配置後に解除する。生成済み VSIX だけを配置する場合は `python frontend_vscode/_setup.py --extensions-only` を使う。通常セットアップと `--extensions-only` は両 VSIX の存在を確認してから、拡張名が `aidiy-` で始まる既存拡張（`publisher.aidiy-*`）をすべて除去し、除去を確認した後に Code / Live を配置する。旧 `aidiy-vscode` も同じ判定で対象になる。表示名は `AiDiy (Code)` / `AiDiy (Live)`、内部モジュール名・起動コマンドは `aidiy_code` / `aidiy_live` とする。拡張パッケージ名は `aidiy-code` / `aidiy-live`、拡張 ID は `aidiy.aidiy-code` / `aidiy.aidiy-live` とする。
 
@@ -95,7 +100,7 @@ python frontend_vscode/_setup.py
 
 Electron は VSIX 生成・単独画面コンパイルより前に `scripts/setup_electron.py` の共通処理で準備する。配置済みの実行ファイル・`version`・`path.txt` を照合し、未配置なら Avatar の同じバージョンのバイナリ、`_cache/electron/` の共有 ZIP の順に再利用する。まだ取得されていない場合だけ Python で GitHub から取得する。npm の install / update / rebuild では Electron の自動取得をスキップし、同じ取得を繰り返さない。Electron を準備できない場合はセットアップを失敗扱いにする。詳細は [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) の「Electron の共通セットアップ」を参照する。
 
-単独画面は作業フォルダで `aidiy_code`、または `aidiy_code "C:\work\project"` のように明示して起動する。前者は起動時のカレントフォルダを使用する。`~/.local/bin` は Hermes のランチャーと共通なので PATH に含める。Windows の `.cmd` と macOS / Linux のシェルランチャーは、どちらも `aidiy_code/launch.mjs` を直接呼ぶ。`launch-extension-dev.ps1` は Windows で VS Code 拡張の開発ホストを起動する。
+単独画面は作業フォルダで `aidiy_code`、または `aidiy_code "C:\work\project"` のように明示して起動する。前者は起動時のカレントフォルダを使用する。`~/.local/bin` は Hermes のランチャーと共通なので PATH に含める。Windows の `.cmd` と macOS / Linux のシェルランチャーは、どちらも `aidiy_code/launch.mjs` を直接呼ぶ。`launch-extension-dev.ps1` は Windows で Code / Live の両方を `--extensionDevelopmentPath` に指定した VS Code 拡張の開発ホストを起動する。
 
 配置は拡張機能ファイルを更新するだけで、VS Code 本体や AiDiy の常駐サービスを停止しない。すでに VS Code が起動している場合、変更の反映にはウィンドウ再読み込みが必要になる。
 
@@ -112,9 +117,12 @@ Set-Location frontend_vscode
 npm ci
 npm run check
 npm test
+npm run live:test
 npm run package
-python -m unittest discover -s checks -p test_setup.py
+python -m unittest discover -s checks -p "test_*.py"
 ```
+
+`npm run check` は Code / Live の型チェック、`npm test` は Code 側の Node.js テスト（`checks/*.test.cjs`。専用ウィンドウの起動は Live も含む）、`npm run live:test` は Live の Node.js テスト（`aidiy_live/checks/`）を実行する。Python テストはセットアップ・Electron 準備・拡張解除・クリーンアップ・モデル候補をモックで検証する。いずれも AI API や実バックエンドを呼ばない。
 
 確認内容:
 
@@ -128,6 +136,7 @@ python -m unittest discover -s checks -p test_setup.py
 - 単独試用の接続制限、会話継続、新規会話、履歴の選択・削除、モデル変更、停止が動く。
 - VS Code 側で旧 `workspaceState` の単一会話を履歴へ移行でき、作業フォルダごとに履歴が分かれる。最終選択モデルが再起動後と新規会話へ引き継がれる。
 - `dist/aidiy-code-<version>.vsix` と `dist/aidiy-live-<version>.vsix` が生成され、それぞれのファイルだけを含む。
+- Live のセッション・音声パケット・WebSocket 中継・モデル API・切断・Origin 拒否を模擬バックエンドで確認できる。VS Code / 単独画面の両方で会話表示と末尾追従が動き、単独画面では起動時のモデル指定で1回だけ自動接続する。拡張ではタブを切り替えても接続を保持し、非表示中はマイクを止める。
 
 Windows の実 VS Code で拡張ホストまで確認するときは、依存導入と compile 後に次を使う。
 
@@ -151,9 +160,10 @@ Live のブラウザ版は通常の `--browser` と Electron 失敗時の自動�
 
 当面のバージョン番号は `0.1.0` に固定する。機能変更だけを理由に更新しない。将来、明示的に固定解除または改版する場合は次を同時に確認する。
 
-- `package.json` の `version`。
-- `package.json` の `package` script にある VSIX ファイル名。
-- `README.md` の手動配置用 VSIX ファイル名。
+- `package.json` と `aidiy_live/package.json` の `version`。
+- `scripts/package.mjs` に固定している VSIX ファイル名（`-0.1.0.vsix`）。`_setup.py` は `package.json` の `version` から VSIX のパスを組み立てるため、両者を揃える。
+- `README.md` と `aidiy_live/README.md` の手動配置用 VSIX ファイル名。
+- `checks/test_setup.py` / `checks/test_extensions.py` のバージョンを含む期待値。
 
 `scripts/build.mjs` は Webview の依存パッケージから `dist/THIRD_PARTY_NOTICES.txt` を再生成する。依存追加後は VSIX 内にライセンス文書が含まれることを確認する。
 
@@ -163,7 +173,7 @@ Live のブラウザ版は通常の `--browser` と Electron 失敗時の自動�
 python frontend_vscode/_cleanup.py
 ```
 
-ルートの `python _cleanup.py` でも、`command_hermes` の次に `frontend_vscode` を選択できる。拡張名が `aidiy-` で始まる配置済み拡張（`publisher.aidiy-*`）をすべて解除し、拡張一覧に対象が残っていないことを確認してから、`~/.local/bin` の Code / Live ランチャー、`node_modules`、`dist`、`out`、Python cache を削除する。セットアップとクリーンアップの対象判定・解除確認は `frontend_vscode/scripts/vscode_extensions.py` で共有する。解除が失敗した場合はランチャー・生成物を削除しない。
+ルートの `python _cleanup.py` でも、`command_hermes` の次に `frontend_vscode` を選択できる。拡張名が `aidiy-` で始まる配置済み拡張（`publisher.aidiy-*`）をすべて解除し、拡張一覧に対象が残っていないことを確認してから、`~/.local/bin` の Code / Live ランチャー（旧名 `aidiy_vscode` を含む）、`node_modules`、`dist`、`aidiy_live/dist`、`out`、`frontend_vscode` 直下の `*.vsix`、Python cache を削除する。セットアップとクリーンアップの対象判定・解除確認は `frontend_vscode/scripts/vscode_extensions.py` で共有する。解除が失敗した場合はランチャー・生成物を削除しない。
 
 cleanup は VS Code 本体を終了しない。起動中の拡張ホストには再読み込みまで旧コードが残る場合があるため、解除を画面へ反映するときだけ利用者が VS Code のウィンドウを再読み込みする。CLI が利用できない、解除後も拡張が残る、生成物を削除できない場合は失敗として終了する。
 
@@ -179,7 +189,7 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 | Hermes が見つからない | `aidiyHermes.cliPath`、`~/.local/bin`、`command_hermes/.venv` |
 | Provider / モデルが空 | `scripts/model-catalog.py`、Hermes 設定、Cli Path が AiDiy CLI を指すか |
 | 送信できない | ワークスペース信頼、フォルダが開かれているか、実行中状態 |
-| 回答が出ない | VS Code 出力の `AiDiy`、CLI の終了コード、認証が必要なら「対話 CLI」 |
+| 回答が出ない | VS Code 出力パネルの `AiDiy (Code)`、CLI の終了コード、認証が必要なら「対話 CLI」 |
 | `Session not found` | 古い拡張では新しい会話を開始する。更新版では `--resume` を外して一度だけ自動再試行するため、実行ログと保存セッション ID を確認する |
-| VSIX に変更が入らない | `npm run package` の prepublish、`dist/extension.js` / `dist/webview.js`、`--force` 配置 |
+| VSIX に変更が入らない | `npm run package` の prepublish、Code の `dist/extension.js` / `dist/webview.js`、Live の `aidiy_live/dist/extension.js` / `aidiy_live/dist/view.js`、`--force` 配置 |
 | Live の専用ウィンドウでマイクが ON にならない | `aidiy_live/permissions.cjs` の origin 正規化と音声・メインフレーム制限。Windows のサウンド入力にデバイスがあるかを確認する。リモートデスクトップでは録音転送を有効にして再接続する。詳細は `aidiy_live/README.md` の「マイクを ON にできない場合」 |

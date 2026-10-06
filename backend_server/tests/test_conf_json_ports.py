@@ -54,6 +54,80 @@ class ConfJsonPortKeyTest(unittest.TestCase):
             for old_key in old_keys:
                 self.assertNotIn(old_key, self.conf_json.DEFAULT_CONFIG)
 
+    def test_discord_defaults_preserve_existing_secrets_and_custom_values(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "AiDiy_key.json"
+            config_path.write_text(json.dumps({
+                "openai_key_id": "existing-test-secret",
+                "DISCORD_BOT_TOKEN": "existing-test-bot-token",
+                "DISCORD_ALLOWED_USER_IDS": ["222222222222222222"],
+                "CUSTOM_SETTING": "keep",
+            }), encoding="utf-8")
+            self.conf_json(json=str(config_path))
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved["openai_key_id"], "existing-test-secret")
+        self.assertEqual(saved["DISCORD_BOT_TOKEN"], "existing-test-bot-token")
+        self.assertEqual(saved["DISCORD_ALLOWED_USER_ID"], "222222222222222222")
+        self.assertEqual(saved["DISCORD_TEXT_CHANNEL_ID"], "")
+        self.assertEqual(saved["CODE_MAX_TURNS"], 999)
+        self.assertEqual(len([key for key in saved if key.startswith("DISCORD_")]), 5)
+        self.assertEqual(saved["CUSTOM_SETTING"], "keep")
+
+    def test_discord_channel_arrays_migrate_to_single_ids_and_stay_migrated(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "AiDiy_key.json"
+            expected = dict(zip(self.conf_json.LEGACY_DISCORD_IDS.values(),
+                                ["222222222222222222", "333333333333333333", "444444444444444444"]))
+            legacy = {old: [expected[new]] for old, new in self.conf_json.LEGACY_DISCORD_IDS.items()}
+            config_path.write_text(json.dumps(legacy), encoding="utf-8")
+            config = self.conf_json(json=str(config_path))
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
+            for key, value in expected.items():
+                self.assertEqual(saved[key], value)
+            self.assertFalse(set(legacy) & saved.keys())
+            self.assertTrue(config.update(legacy))
+            self.assertEqual(saved, json.loads(config_path.read_text(encoding="utf-8")))
+            self.conf_json(json=str(config_path))
+            self.assertEqual(saved, json.loads(config_path.read_text(encoding="utf-8")))
+
+    def test_discord_multiple_legacy_ids_require_explicit_choice_and_preserve_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "AiDiy_key.json"
+            original = json.dumps({"DISCORD_ALLOWED_USER_IDS": ["222222222222222222", "333333333333333333"]})
+            config_path.write_text(original, encoding="utf-8")
+            with self.assertRaises(ValueError):
+                self.conf_json(json=str(config_path))
+            self.assertEqual(original, config_path.read_text(encoding="utf-8"))
+            config_path.write_text(json.dumps({**json.loads(original), "DISCORD_ALLOWED_USER_ID": "333333333333333333"}), encoding="utf-8")
+            config = self.conf_json(json=str(config_path))
+            self.assertEqual(config.DISCORD_ALLOWED_USER_ID, "333333333333333333")
+            self.assertNotIn("DISCORD_ALLOWED_USER_IDS", json.loads(config_path.read_text(encoding="utf-8")))
+
+    def test_removed_discord_overrides_do_not_change_shared_config_or_return_on_save(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "AiDiy_key.json"
+            original = {
+                "DISCORD_BOT_TOKEN": "keep-test-token",
+                "DISCORD_GUILD_ID": "111111111111111111",
+                "LIVE_AI_NAME": "openai_live",
+                "LIVE_OPENAI_MODEL": "shared-live-model",
+                "CODE_BASE_PATH": "../",
+                "CODE_AIDIY_HERMES_MODEL": "openai_oauth/gpt-6.1-sol",
+                "CODE_MAX_TURNS": 999,
+                "CUSTOM_SETTING": "keep",
+            }
+            old_settings = dict.fromkeys(self.conf_json.REMOVED_DISCORD_KEYS, "old-override")
+            config_path.write_text(json.dumps({**original, **old_settings}), encoding="utf-8")
+            config = self.conf_json(json=str(config_path))
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
+            for key, value in original.items():
+                self.assertEqual(saved[key], value)
+            self.assertFalse(set(old_settings) & saved.keys())
+            self.assertTrue(config.update(old_settings))
+            self.assertEqual(saved, json.loads(config_path.read_text(encoding="utf-8")))
+            self.conf_json(json=str(config_path))
+            self.assertEqual(saved, json.loads(config_path.read_text(encoding="utf-8")))
+
     def test_missing_file_creates_openai_chat_defaults(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "AiDiy_key.json"

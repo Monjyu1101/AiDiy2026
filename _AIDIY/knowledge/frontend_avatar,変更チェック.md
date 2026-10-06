@@ -86,18 +86,18 @@ Web では IPC がないため、必ず `isElectron` 分岐と fallback を確�
 - `src/api/config.ts`
 - `src/api/client.ts`
 - `src/api/websocket.ts`
-- backend の `/core/AIコア/ws/*`
+- backend の `/core/ws/AIコア`
 - Vite proxy。
 
 WebSocket packet は `AIコアWebSocket仕様.md` を確認する。
 
 ## モデル設定を変える場合
 
-- `CHAT_AI_NAME` は `_chat` 末尾。
+- `CHAT_AI_NAME` は原則 `_chat` 末尾。OAuth 接続の `openai_oauth` は例外。
 - `LIVE_AI_NAME` は `_live` 末尾。
 - `CODE_AI*_NAME` は原則 `_sdk` または `_cli`、例外として `aidiy_hermes` を許容する。
 - 比較は完全一致を使い、`startswith` に寄せない。
-- backend の `_config/AiDiy_key.json`、`conf_model.py`、`AIセッション管理.py` と整合させる。
+- プロジェクトルートの `_config/AiDiy_key.json`、backend の `conf/conf_model.py`、`AIコア/AIセッション管理.py` と整合させる。
 
 詳細は `AIモデル設定変更手順.md` と `AIコードパネル拡張手順.md` を使う。
 

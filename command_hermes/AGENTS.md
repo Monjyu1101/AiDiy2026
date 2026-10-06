@@ -132,7 +132,7 @@ upstream のレイアウトを次の 3 点だけ読み替えています。
 | `pyproject.toml` | upstream の core 依存 + AiDiy 追加分（anthropic / google-genai / fal-client / mcp / windows-curses） |
 
 `ui-tui/`、`web/`、`website/`、`evals/`、`tests/`、`mcp-research-data/`、`datagen-config-examples/`、
-`docker/`、`nix/` は同梱しません（いずれも実行時に参照されません）。
+`docker/`、`nix/` は upstream から同梱しません（いずれも実行時に参照されません）。AiDiy 固有の `tests/` は別に持ち、標準入力と共用認証ストアの連携を検証します。
 upstream ルートの `setup.py` は wheel ビルド用のガードなので `base/` へは置きません。
 
 ### バンドル資産の実行時配置

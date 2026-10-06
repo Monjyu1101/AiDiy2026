@@ -23,7 +23,8 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | frontend_web 画面追加 | [`_AIDIY/knowledge/frontend_web,画面追加手順.md`](./_AIDIY/knowledge/frontend_web,画面追加手順.md) |
 | frontend_web Router / Store パターン | [`_AIDIY/knowledge/frontend_web,Vue Routerパターン.md`](./_AIDIY/knowledge/frontend_web,Vue Routerパターン.md)、[`_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md`](./_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md) |
 | frontend_avatar / Electron / VRM / 音声 | [`_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md`](./_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md)、[`_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md`](./_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md)、[`_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md`](./_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md) |
-| frontend_vscode / VS Code チャット拡張 | [`_AIDIY/knowledge/frontend_vscode,VSCodeチャット拡張変更手順.md`](./_AIDIY/knowledge/frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| frontend_vscode / VS Code 拡張（Code / Live） | [`_AIDIY/knowledge/frontend_vscode,VSCodeチャット拡張変更手順.md`](./_AIDIY/knowledge/frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| frontend_discord / Discord（Code / Live） | [`_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md`](./_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md) |
 | AI コア / Code CLI / MCP | [`_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md`](./_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md) |
 | command_hermes Provider / Slash Command | [`_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](./_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md)、[`_AIDIY/knowledge/command_hermes,Slash Command一覧.md`](./_AIDIY/knowledge/command_hermes,Slash Command一覧.md) |
 | GitHub issue 運用 | [`_AIDIY/knowledge/共通,GitHubIssue運用手順.md`](./_AIDIY/knowledge/共通,GitHubIssue運用手順.md) |
@@ -43,7 +44,8 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md) | AIタスク実行・定期タスク・複数AIエージェントのチーム活動を統合した FastAPI サーバーの実装詳細 |
 | [frontend_web/AGENTS.md](./frontend_web/AGENTS.md) | Vue 3 + Vite + TypeScript の Web UI 実装詳細 |
 | [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md) | Electron/Web デュアルモード Avatar の実装詳細 |
-| [frontend_vscode/AGENTS.md](./frontend_vscode/AGENTS.md) | `aidiy_hermes` を操作する VS Code チャット拡張の実装詳細 |
+| [frontend_vscode/AGENTS.md](./frontend_vscode/AGENTS.md) | VS Code 拡張 AiDiy (Code) / AiDiy (Live) と単独起動版の実装詳細 |
+| [frontend_discord/AGENTS.md](./frontend_discord/AGENTS.md) | Discord Bot の Hermes チャット / AIコア Live 音声接続の実装詳細 |
 | [docs/](./docs/) | HTML 形式の詳細ドキュメント |
 
 人間向けの紹介資料は [frontend_web/public/X自己紹介/index.html](./frontend_web/public/X自己紹介/index.html) です。
@@ -96,7 +98,8 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `command_hermes` | `aidiy_hermes` CLI 基盤 | 常駐なし |
 | `frontend_web` | 通常 Web UI | 8090 |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar | 8092 |
-| `frontend_vscode` | `aidiy_hermes` を操作する VS Code チャット拡張 | 常駐なし |
+| `frontend_vscode` | `aidiy_hermes` を操作する AiDiy (Code) と、AIコアへ接続する音声会話の AiDiy (Live) の VS Code 拡張 / 単独起動版 | 常駐なし |
+| `frontend_discord` | Discord のテキストチャンネルを `aidiy_hermes`、ボイスチャンネルを AIコア Live へ接続する任意起動の Bot | 待受ポートなし |
 
 `core_main.py`、`apps_main.py`、`taskteam_main.py` は同じ SQLite DB を共有します。`taskteam_main.py` は `Aタスク*` と `Aチーム*` を同一プロセスで管理します。
 フロントエンドは Vite proxy で `/core/*` を 8091、`/apps/*` を 8098、`/task/*` と `/team/*` を同じ 8093 へ振り分けます。
@@ -112,7 +115,8 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `backend_taskteam/` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー（`/task/*`、`/team/*`、各監視ループ） |
 | `frontend_web/` | Vue 3 + Vite + TypeScript の Web UI |
 | `frontend_avatar/` | Electron/Web 対応の AI Avatar UI |
-| `frontend_vscode/` | `aidiy_hermes` を右サイドバーから操作する VS Code チャット拡張 |
+| `frontend_vscode/` | VS Code 拡張 AiDiy (Code)（`aidiy_hermes` 操作）/ AiDiy (Live)（AIコア音声会話）と、`aidiy_code` / `aidiy_live` 単独起動版 |
+| `frontend_discord/` | `frontend_vscode` の CLI / Live 接続処理を共有する Discord Bot。接続情報は `_config/AiDiy_key.json` の `DISCORD_*` |
 | `_config/` | API キー、AI モデル、MCP などの共通設定 |
 | `_data/` | 共通 SQLite DB などの永続データ |
 | `_icons/` | アプリケーション共通アイコン |
@@ -277,12 +281,18 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 
 ## frontend_vscode 概要
 
-`frontend_vscode` は `aidiy_hermes` を VS Code のセカンダリサイドバーから操作するチャット拡張です。
+`frontend_vscode` は、VS Code のセカンダリサイドバーに表示する 2 つの独立した拡張と、同じ画面を使う単独起動版を提供します。
 
-- 拡張プロセスから Hermes CLI を直接起動し、常駐バックエンドや AI コア WebSocket を必要としない。
-- VS Code Webview、選択コード添付、Provider / モデル選択、会話継続、停止、実行ログ、対話 CLI を提供する。
-- 既存 AIコードと同じ packet 識別子を使い、進捗と正式回答を分離する。
-- 通常の拡張モードと、同じ UI / CLI 実行層を使う単独試用モードを持つ。
+| 拡張 | 拡張 ID | 役割 | 単独起動 |
+|------|---------|------|----------|
+| AiDiy (Code) | `aidiy.aidiy-code` | `aidiy_hermes` CLI を拡張プロセスから直接起動するコード支援チャット。常駐バックエンドや AIコア WebSocket は不要 | `aidiy_code`（`vscode_code.bat`） |
+| AiDiy (Live) | `aidiy.aidiy-live` | 既存 AIコア（`backend_server` 8091）へ接続するライブ音声・文字会話。VS Code 拡張内のマイクは Windows の Python 標準ライブラリ（WinMM）で取り込む | `aidiy_live`（`vscode_live.bat`） |
+
+- 拡張 ID、ビュー、設定、VSIX（`dist/aidiy-code-0.1.0.vsix` / `dist/aidiy-live-0.1.0.vsix`）を分け、片方を無効にしても他方が動作する。
+- Code は選択コード添付、Provider / モデル選択、会話継続、停止、実行ログ、対話 CLI を提供し、既存 AIコードと同じ packet 識別子で進捗と正式回答を分離する。
+- Live は接続時に作業フォルダを `CODE_BASE_PATH` として渡し、LiveAI とコードエージェントの回答（`output_request`）を表示する。
+- 単独起動版は Electron のフレームレスウィンドウ、または `--browser` でブラウザを使う。
+- Code / Live とも最後に手動選択したモデルを `~/.aidiy/aidiy_code_model.json` / `aidiy_live_model.json` に保存し、拡張と単独起動版で共用する。
 - Windows デスクトップ版 VS Code を主対象とし、VS Code 1.106 以降を前提とする。
 
 詳細は `frontend_vscode/AGENTS.md` を参照してください。
@@ -336,5 +346,6 @@ MCP の使い分けと設定は `_AIDIY/knowledge/backend_server,backend_tools,M
 - Web: `frontend_web/AGENTS.md`
 - Avatar: `frontend_avatar/AGENTS.md`
 - VS Code: `frontend_vscode/AGENTS.md`
+- Discord: `frontend_discord/AGENTS.md`
 
 docs と実装が食い違う場合は、現行実装を確認したうえで「現行実装では」と明記します。

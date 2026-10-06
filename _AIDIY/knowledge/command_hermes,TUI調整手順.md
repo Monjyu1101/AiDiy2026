@@ -43,7 +43,9 @@
 同梱: `core/`（upstream `agent/`）、`base/`、`tools/`、`hermes_cli/`、`gateway/`、`tui_gateway/`、`cron/`、
 `acp_adapter/`、`plugins/`、`providers/`、`skills/`、`optional-skills/`、`locales/`、`assets/`、`scripts/`、`native/`
 
-非同梱: `ui-tui/`（Node/TS TUI）、`web/`、`website/`、`evals/`、`tests/`、`docker/`、`nix/`
+upstream から非同梱: `ui-tui/`（Node/TS TUI）、`web/`、`website/`、`evals/`、`tests/`、`docker/`、`nix/`
+
+AiDiy 固有の `command_hermes/tests/` は別に存在する。upstream のテスト除外と混同せず、更新時も保持する。
 
 0.12 系では `cron/`、`gateway/`、`tui_gateway/`、`acp_adapter/` を削除・スタブ化していましたが、
 0.21 では upstream コードが相互に参照するため **そのまま同梱**しています（AiDiy では常駐させないだけ）。

@@ -24,7 +24,8 @@
 | `backend_taskteam` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
-| `frontend_vscode` | `aidiy_hermes` を操作する VS Code チャット拡張 |
+| `frontend_vscode` | VS Code 拡張 AiDiy (Code)（`aidiy_hermes` 操作）/ AiDiy (Live)（AIコア音声会話）と単独起動版 |
+| `frontend_discord` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
 
 例:
 
@@ -102,7 +103,7 @@
 | backend の層構造、実装パターン、落とし穴 | [`backend_server,実装パターン.md`](./backend_server,実装パターン.md) |
 | ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 | backend / MCP / task・team 起動、ポート残留 | [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、[`backend_tools,構成.md`](./backend_tools,構成.md) |
-| AIタスク（要求分解・明細DAG・実行開始条件）、AIチーム（依頼・経験・作業ループ・自動会話）の仕様 | `backend_taskteam/AGENTS.md`（HowTo 化された内容が無いため、実装概要が正） |
+| AIタスク（要求分解・明細DAG・実行開始条件）、AIチーム（依頼・経験・作業ループ・自動会話）の仕様 | `backend_taskteam/AGENTS.md`（構成・仕様の入口。実行記録と繰り返し監視の HowTo は次項） |
 | AIタスクの実行済み記録が空になる、間隔実行が1回のエラーで止まる、実行監視タスクを作る | [`backend_taskteam,AIタスクの実行記録と繰り返し監視.md`](./backend_taskteam,AIタスクの実行記録と繰り返し監視.md) |
 | aidiy_hermes で MCP が `failed` / ツール未認識 | [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) |
 | upstream hermes-agent の新版を command_hermes へ取り込む、移植後に起動しない | [`command_hermes,upstream移植手順.md`](./command_hermes,upstream移植手順.md) |
@@ -114,11 +115,14 @@
 | frontend_web の UI ルール、qTubler、明細型編集 | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md) |
 | 画面コンポーネントを直す（**frontend_avatar に同名コピーがあるので両方直す**） | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md)（「frontend_avatar との二重管理」）、[`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) |
 | frontend_avatar、Electron、VRM / VRMA、音声 | [`frontend_avatar,変更チェック.md`](./frontend_avatar,変更チェック.md)、[`frontend_avatar,ElectronIPC追加手順.md`](./frontend_avatar,ElectronIPC追加手順.md)、[`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、[`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、[`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
-| VS Code の AiDiy チャット拡張を変更・検証・配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| VS Code の AiDiy (Code) / AiDiy (Live) 拡張を変更・検証・配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| Discord の Code / Live 接続、Bot 設定、音声中継を変更・検証する | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) |
+| Discord 音声のチャンク境界で無音が混ざる、発話末尾が欠ける、Opus 回帰テストを見直す | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md)（「出力チャンク境界と末尾処理の再修正チェック」） |
 | command_hermes の CLI 起動・確認 | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
 | backend_tools の起動・SSE・環境変数 | [`backend_tools,backend_server,運用手順.md`](./backend_tools,backend_server,運用手順.md) |
 | backend_tools の `/tts` `/imageGen` `/movieGen` HTTP API、save_path 挙動、SSE マウント方法 | [`backend_tools,HTTP_API_save_path挙動.md`](./backend_tools,HTTP_API_save_path挙動.md) |
 | Markdown、BOM、ナレッジ整理 | [`共通,Markdown現状追従チェック.md`](./共通,Markdown現状追従チェック.md)、[`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md)、[`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
+| フォルダ確認結果の件数・参照内容・検証範囲を照合する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)（「フォルダ確認結果の根拠と記録の整合性」） |
 | 開発環境操作、DB、Swagger、よくある問題 | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | GitHub issue の確認・close | [`共通,GitHubIssue運用手順.md`](./共通,GitHubIssue運用手順.md) |
 | MCP（TTS / OBS / ffmpeg / Chrome devtools）で紹介動画を自動生成する | [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) ※ 実装済み自動化: `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py`, `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` |
@@ -201,7 +205,7 @@
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| VS Code チャット拡張を変更・検証・VSIX 配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| VS Code 拡張（Code / Live）と単独起動版を変更・検証・VSIX 配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
 | 拡張機能をセットアップして VS Code へ配置する | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | 配置済み拡張機能と生成物を解除する | [`共通,クリーンアップ手順.md`](./共通,クリーンアップ手順.md) |
 
@@ -262,6 +266,8 @@
 | Markdown を現行実装へ追従させる | [`共通,Markdown現状追従チェック.md`](./共通,Markdown現状追従チェック.md) |
 | `AGENTS.md` 系ドキュメントを概要と HowTo に分離する | [`共通,AGENTS整理手順.md`](./共通,AGENTS整理手順.md) |
 | `_AIDIY/knowledge` を更新する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
+| フォルダ確認後に知見のみ整理し、本体修正と区別する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)（「確認依頼と自己改善書き込みの区別」） |
+| 確認結果の根拠、索引・最終参照の整合性、未実施の検証を区別する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)（「フォルダ確認結果の根拠と記録の整合性」） |
 | UTF-8 BOM を検出・除去する | [`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md) |
 | 一時ファイル・バックアップを整理する | [`共通,クリーンアップ手順.md`](./共通,クリーンアップ手順.md) |
 | GitHub issue を確認・close する | [`共通,GitHubIssue運用手順.md`](./共通,GitHubIssue運用手順.md) |

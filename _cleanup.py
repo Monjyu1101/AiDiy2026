@@ -27,6 +27,7 @@ Code / Live の単独実行と tools の MCP 接続プロセスも強制終了�
 - frontend_avatar/_cleanup.py  cleanup(choices)
 - command_hermes/_cleanup.py   cleanup(choices)（ランチャー/PATH も解除）
 - frontend_vscode/_cleanup.py  cleanup(choices)（vscode 拡張機能も解除）
+- frontend_discord/_cleanup.py cleanup(choices)（Bot 停止・依存物削除）
 
 Usage:
     python _cleanup.py
@@ -194,6 +195,7 @@ SERVICE_CLEANUP_TARGETS = (
         "フロントエンド(Avatar)",
         ("フロントエンド(Avatar)",),
     ),
+    ("discord", "frontend_discord", "フロントエンド(Discord)", ("フロントエンド(Discord)",)),
 )
 
 # `_start.py` / `_cleanup.py` を import するフォルダ（= `__pycache__` が生成される）。
@@ -206,14 +208,15 @@ ROOT_CACHE_SCAN_PATHS = ("scripts",)
 
 
 @contextmanager
-def cleanup_stop_request(choices: dict):
-    """ルート `_start.py` に、全常駐サービスの自動再起動停止を通知する。"""
+def cleanup_stop_request(choices: dict, services: list[str] | None = None):
+    """ルート監視へ停止を通知する。省略時は全サービス、単独cleanupは対象名を渡す。"""
     _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
-    services = [
-        service_name
-        for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
-        for service_name in service_names
-    ]
+    if services is None:
+        services = [
+            service_name
+            for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
+            for service_name in service_names
+        ]
     payload = {
         "owner_pid": os.getpid(),
         "services": services,
@@ -427,6 +430,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "avatar":         False,
         "hermes":         False,
         "vscode":         False,
+        "discord":        False,
         "hermes_envs":    {},
         "hermes_temp":    None,
     }
@@ -521,6 +525,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                 )
 
     choices["vscode"] = ask_yes_no("フロントエンド(vscode)をクリーンアップしますか？", default="y")
+    choices["discord"] = ask_yes_no("フロントエンド(Discord)をクリーンアップしますか？", default="y")
 
     return choices
 
@@ -600,6 +605,13 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
         print_info("フロントエンド(vscode)のクリーンアップをスキップしました")
 
     print()
+    if choices.get("discord"):
+        if not _run_folder_cleanup("frontend_discord", choices):
+            cleanup_errors.append("フロントエンド(Discord)")
+    else:
+        print_info("フロントエンド(Discord)のクリーンアップをスキップしました")
+
+    print()
     # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
     for folder in IMPORT_CACHE_FOLDERS:
         _remove_folder_import_cache(folder)
@@ -639,6 +651,7 @@ def main():
     print_info("  8. フロントエンド(Avatar)")
     print_info("  9. コマンド(hermes)")
     print_info(" 10. フロントエンド(vscode)")
+    print_info(" 11. フロントエンド(Discord)")
     print()
 
     choices = collect_cleanup_choices(base_dir)

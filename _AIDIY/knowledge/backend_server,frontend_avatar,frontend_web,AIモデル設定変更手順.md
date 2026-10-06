@@ -53,8 +53,9 @@
   内部フェーズ（準備 / 各ステップ / 最終確認）に対応する。
 - Aタスクを作らず code_agents を直に呼ぶ段（S・P・C・A）は `段のモデル()` が区分に対応する
   フェーズを選び、`auto` なら共通設定のフェーズ別値へ落とす。
-- 旧版の単一キー（`TASK_AI_MODEL` / `TEAM_AI_MODEL`）は廃止済み。設定・DB列・API・MCP のいずれにも
-  存在しないので、新しいキーだけを使う。
+- 現行実装ではフェーズ別キーを使う。`conf_json` は旧版の単一キー（`TASK_AI_MODEL` / `TEAM_AI_MODEL`）を
+  フェーズ別キーへ自動移行しない。旧キーは未知キーとして JSON に残り得るが、フェーズ別キーの不足分は
+  既定値で補完される。旧値を引き継ぐ場合は plan / do / check それぞれへ明示的に設定する。
 - API（`/task/タスク要求/AI登録`・`/更新登録`、`/team/目標/保存`・`/team/依頼/登録`・`/変更`）は
   フェーズ別キーだけを受け付ける。未指定の項目は更新最終レコード → 規定値の順で補完される。
 - MCP の `aidiy_task_agents.submit` は `ai_model_plan` / `_do` / `_check`、
@@ -98,17 +99,23 @@
 
 ### 設定 UI から変更する場合
 
-`AI設定再起動.vue` から保存すると、`POST /core/AIコア/モデル設定/更新` が `AiDiy_key.json` を更新し、Reboot 機構で core server を再起動する。
+現行実装では `POST /core/AIコア/モデル情報/設定` に `セッションID` と `モデル設定` を送る。セッション内の設定更新、JSON 保存、サーバー再起動は次の指定で分かれる。
+
+- `save: true`: `AiDiy_key.json` へ保存する。再起動要求がなければサーバーは再起動しない。
+- `再起動要求`: `reboot_core` / `reboot_apps` / `reboot_tools` / `reboot_local` / `reboot_task` / `reboot_team` の指定先だけに再起動を要求する。Task / Team は同じ統合プロセスが対象。
+- `リセット: true`: 設定を既定値へ戻して保存する。UI のリセット操作では全バックエンドの再起動も要求する。
+
+Web / Avatar とも「保存(json書換)」は `save: true`、再起動要求なし。「設定/再起動」は apps / tools の再起動を要求するが、現行実装では Web は `save: true`、Avatar は `save: false` で送る。Avatar で次回起動にも設定を残す場合は「保存(json書換)」を使う。
 
 Electron では settings 専用ウィンドウ、Web では同じコンポーネントのモーダル表示を使う。`AI設定再起動.vue` に `window.desktopApi` 前提の処理を直接入れない。
 
 ## available_models の流れ
 
-1. frontend が `/core/AIコア/モデル情報/取得` を呼ぶ
+1. frontend が `POST /core/AIコア/モデル情報/取得` を呼ぶ
 2. backend が現在設定と `available_models` を返す
 3. 設定 UI が `chat_models` / `live_models` / `code_models` から選択肢を作る
-4. 保存時に `/core/AIコア/モデル設定/更新` へ送る
-5. 再起動後の再接続で新設定を確認する
+4. 設定時に `POST /core/AIコア/モデル情報/設定` へ送り、保存する場合は `save: true` を指定する
+5. モデル情報の再取得で設定を確認し、再起動を要求した場合は再接続後も確認する
 
 新しい AI 種別を追加する場合は、backend が返す `available_models` のキー、frontend の `CHAT_MODEL_KEYS` / `LIVE_MODEL_KEYS` / `LIVE_VOICE_KEYS` / `CODE_MODEL_KEYS`、`conf_json.DEFAULT_CONFIG` を合わせる。
 
@@ -149,12 +156,12 @@ Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI �
 - `copilot_cli` のモデル候補は `backend_server/conf/conf_model.py` で定義し、`scripts/cli_bat/_copilot_cli.bat` の `MODEL` 値と一致させる。`_config/AiDiy_code_copilot_cli.json` が古い場合は候補を同期する
 - `codex_cli` のモデル候補は `scripts/cli_bat/_codex_cli.bat` の `MODEL` 値と `auto` に揃える。`_config/AiDiy_code_codex_cli.json` が古い場合は `conf_model.py` の初期化時に候補を同期する
 - `grok_cli` のモデル候補も `scripts/cli_bat/_grok_cli.bat` の `MODEL` 値と `auto` に揃える。`_config/AiDiy_code_grok_cli.json` が古い場合は同様に同期する
-- `aidiy_hermes` の設定画面候補は `scripts/cli_bat/_hermes.bat` の OpenAI OAuth モデル4つと `auto` に揃える。候補値は `openai_oauth/<モデルID>` とし、専用の `AiDiy_code_*.json` は使わない
+- `aidiy_hermes` の設定画面候補は `scripts/cli_bat/_hermes_cli.bat` の OpenAI OAuth モデルと `auto` に揃える。候補は `conf_model.py` の `_get_aidiy_hermes_models()` で定義する。候補値は `openai_oauth/<モデルID>` とし、専用の `AiDiy_code_*.json` は使わない
 - 設定変更は既存 WebSocket セッションへ即時完全反映される前提にしない。再起動後の再接続で確認する
 - Code AI は現行6枠。枠数確認は `backend_server/core_router/AIコア.py` と frontend の `PanelKey` を見る
 
 ## 確認方法
 
-- `GET http://127.0.0.1:8091/core/AIコア/モデル情報/取得` で現在設定と利用可能モデル一覧を確認する（要認証）
+- `POST http://127.0.0.1:8091/core/AIコア/モデル情報/取得` に `{"セッションID": "対象セッションID"}` を送り、現在設定と利用可能モデル一覧を確認する。接続前は `{}` を送り、共通設定の既定値と候補を取得できる
 - 設定 UI で Chat / Live / Code1〜Code6 / Task / Team の選択肢が出ることを確認する（Task / Team は plan / do / check の3行）
-- 保存後に `AiDiy_key.json` が更新され、core server が再起動することを確認する
+- 「保存(json書換)」で `AiDiy_key.json` が更新され、サーバーが再起動しないことを確認する。再起動を要求した場合は、指定したサーバーの再起動と再接続を確認する

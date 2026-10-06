@@ -972,6 +972,9 @@ class LiveAI:
                 parts = model_turn.parts
                 # logger.debug(f"model_turn処理:parts数={len(parts) if parts else 0}")
                 for part in parts:
+                    # 推論用テキストは会話の回答として送らない。音声の字幕は別途集約する。
+                    if getattr(part, "thought", False):
+                        continue
                     if part.text is not None:
                         # logger.info(f"テキスト受信:{part.text[:100]}{'...' if len(part.text) > 100 else ''} length={len(part.text)}")
                         pass

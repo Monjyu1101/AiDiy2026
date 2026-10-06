@@ -108,7 +108,7 @@ def generate() -> None:
         futures = [pool.submit(one, job) for job in jobs()]
         for count, future in enumerate(as_completed(futures), 1):
             print(f"[{count}/{len(futures)}] {future.result()}", flush=True)
-    print(f"全{len(futures)}本の再録完了。本番音声はまだ変更していません。", flush=True)
+    print(f"全{len(futures)}本の音声準備完了（入力が同じ既存音声の再利用を含む）。本番音声はまだ変更していません。", flush=True)
 
 
 def review() -> None:
@@ -167,7 +167,7 @@ def review() -> None:
         result.update(asr_windows=windows, asr_phonetic_similarity=round(phonetic, 4),
                       asr_text_similarity=round(surface, 4),
                       verdict="pending_manual_review",
-                      review_note="全文かな指定。原稿・最終TTS入力・音声ハッシュを照合。ASRの別表記は聴覚上の誤読を直接証明しない。")
+                      review_note="TTS専用原稿・音声ハッシュを照合。最終入力の記録と再構成した期待値は生成記録で区別する。ASRの別表記は聴覚上の誤読を直接証明しない。")
         write_json(review_path, result)
         return result
 

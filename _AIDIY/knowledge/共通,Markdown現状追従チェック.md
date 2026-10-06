@@ -22,7 +22,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 
 ## 実装追従チェックリスト
 
-- [ ] MCP は 19 サーバー構成として記載している。
+- [ ] MCP は Windows で19、Linux / macOS で18サーバー構成として記載している。
   - 同期元: `backend_tools/tools_main.py`, `backend_tools/tools_proc/`
   - 含める: `aidiy_backup`（旧表現: `aidiy_backup_check` / `aidiy_backup_save`）、`aidiy_task_agents`、`aidiy_team_agents`、`aidiy_windows_control`
 - [ ] 常駐バックエンドは 5 サーバー構成（core 8091 / apps 8098 / tools 8095 / local 8096 / task・team 8093）として記載している。
@@ -43,9 +43,13 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - MCP 検証はローカル起動を前提に書く。AIタスク・AIチーム画面は Docker 構成では動かない。
   - `frontend_web` のビルドは `docker/Dockerfile` の `frontend-builder` ステージがイメージ内で行う。ホストの `npm run build` や `frontend_web/dist/` のマウントを前提にしない。
   - ホストへ公開するポートは `8091` / `8098` / `80` / `443` だけ。`8090` はコンテナ内部のみ。
-- [ ] 自動テストは `backend_server/tests/` の `unittest` だけとして書く。
-  - `backend_tools/tests/`（`test_mcp_smoke.py` など）は存在しない。
-  - コマンドは `python -m unittest discover -s tests -v`。
+- [ ] 自動テストは現存するディレクトリと実行方法に合わせて書く。
+  - Python: `backend_server/tests/`、`backend_tools/tests/`、`backend_taskteam/tests/`、`command_hermes/tests/`。各プロジェクトで `python -m unittest discover -s tests -v`。
+  - VS Code: `frontend_vscode/checks/`（Code の Node.js / Python）、`frontend_vscode/aidiy_live/checks/`（Live の Node.js）。実行は `frontend_vscode` で `npm test` / `npm run live:test` / `python -m unittest discover -s checks -p "test_*.py"`。
+  - Discord: `frontend_discord/checks/`（Node.js / Python）。`frontend_discord` で `npm run check` / `npm test`、ルートで `python -X utf8 -m unittest discover -s frontend_discord/checks -p "test_*.py"`。
+  - Avatar / Web の接続: `frontend_avatar/checks/` の Node.js テスト。ルートで `node --test frontend_avatar/checks/*.test.cjs`。
+  - ルート起動: `scripts/test_start_output.py`。ルートで `python -m unittest discover -s scripts -p test_start_output.py`。
+  - X系にも個別テストがある。実行条件は各画面の README を確認し、存在しないテスト名を案内しない。
 - [ ] `C利用者` のパスワードは bcrypt ハッシュ保存として書く。
   - 旧表現: 「平文比較」。認証はプレーン一致 → bcrypt 照合の順で既存 DB 互換を保つ。
   - 同期元: `backend_server/core_crud/C利用者.py`
@@ -64,7 +68,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 - [ ] `_start.py` は対話形式、`--reload` なしとして書く。
   - コード変更反映は個別起動または `temp/reboot_*.txt`。
 - [ ] `_stop.py` を前提にしない。
-- [ ] `npm run build` は明示依頼時または Docker 反映時に限定し、通常検証は `npm run type-check` を優先する。
+- [ ] `npm run build` は配布物作成、成果物確認、Docker 反映、明示依頼など実行理由がある場合に使い、通常検証は `npm run type-check` を優先する。
 
 ## 認証チェックリスト
 
@@ -110,7 +114,7 @@ rg -n 'start\.py|_stop\.py|8095.*Docker|npm run build' $files
 rg -n 'core_router/AIコア/|core_router\\AIコア\\|backend_server/_config|_config/aidiy_|aidiy_automations/ビデオページ生成_|_AiDiy\.bat|src/stores/AIモデル設定|components/Avatar\.vue|13 MCP|14 個の MCP' $files
 
 # 実在しないテスト・旧仕様の残骸
-rg -n 'backend_tools.tests|test_mcp_smoke|test_post_api_smoke|test_c利用者_password|平文比較|自動テストは整備されていません' $files
+rg -n 'frontend_vscode/test/|test_mcp_smoke|test_post_api_smoke|test_c利用者_password|平文比較|自動テストは整備されていません' $files
 
 # コンポーネント配置（サブフォルダ化済み。1階層直下で書いていないか）
 rg -n 'components/C管理/C利用者一覧\.vue|components/C管理/C権限一覧\.vue|components/C管理/C採番一覧\.vue' $files

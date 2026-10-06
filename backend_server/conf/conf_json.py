@@ -59,6 +59,13 @@ class conf_json:
         'huggingface_key_read': '< your huggingface read key >',
         'huggingface_key_write': '< your huggingface write key >',
 
+        # Discord接続（未設定では起動しない。IDは文字列で指定）
+        'DISCORD_BOT_TOKEN': '',
+        'DISCORD_GUILD_ID': '',
+        'DISCORD_ALLOWED_USER_ID': '',
+        'DISCORD_TEXT_CHANNEL_ID': '',
+        'DISCORD_VOICE_CHANNEL_ID': '',
+
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image',
@@ -119,6 +126,22 @@ class conf_json:
         'TEAM_AI_MODEL_plan': 'auto',
         'TEAM_AI_MODEL_do': 'auto',
         'TEAM_AI_MODEL_check': 'auto',
+    }
+
+    # Discord は接続情報のみ保持し、実行設定は共通の PORT_CORE / LIVE_* / CODE_* を使う。
+    # 旧上書き値を共通設定へ転記すると他フロントエンドへ影響するため、除去だけ行う。
+    REMOVED_DISCORD_KEYS = (
+        'DISCORD_COMMAND_PREFIX', 'DISCORD_CORE_URL',
+        'DISCORD_LIVE_AI_NAME', 'DISCORD_LIVE_MODEL', 'DISCORD_LIVE_VOICE',
+        'DISCORD_CODE_BASE_PATH', 'DISCORD_CODE_CLI', 'DISCORD_CODE_PYTHON',
+        'DISCORD_CODE_PROVIDER', 'DISCORD_CODE_MODEL',
+        'DISCORD_CODE_MAX_TURNS', 'DISCORD_CODE_TIMEOUT_SECONDS',
+    )
+
+    LEGACY_DISCORD_IDS = {
+        'DISCORD_ALLOWED_USER_IDS': 'DISCORD_ALLOWED_USER_ID',
+        'DISCORD_TEXT_CHANNEL_IDS': 'DISCORD_TEXT_CHANNEL_ID',
+        'DISCORD_VOICE_CHANNEL_IDS': 'DISCORD_VOICE_CHANNEL_ID',
     }
 
     # 旧版のポート設定は読み込み時に新しいキーへ一度だけ移行する。
@@ -189,6 +212,13 @@ class conf_json:
 
         # OpenAI API / OAuth のモデル設定を共通キーへ統合
         if self._migrate_openai_chat_model():
+            保存要否 = True
+
+        # Discord の1件配列を単一IDへ移行してから不足項目を補完する。
+        config_data = object.__getattribute__(self, '_config_data')
+        normalized = self._normalize_discord_ids(config_data)
+        if normalized != config_data:
+            object.__setattr__(self, '_config_data', normalized)
             保存要否 = True
 
         # 既存設定に不足しているデフォルト項目を補完
@@ -336,6 +366,24 @@ class conf_json:
 
         return normalized
 
+    def _normalize_discord_ids(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """旧配列が1件なら単一IDへ移行。複数候補を勝手に選ばない。"""
+        normalized = dict(data)
+        for old_key, new_key in self.LEGACY_DISCORD_IDS.items():
+            if old_key not in normalized:
+                continue
+            value = normalized.pop(old_key)
+            if new_key in normalized:
+                continue
+            values = value.replace(',', ' ').split() if isinstance(value, str) else value
+            if not isinstance(values, list) or len(values) > 1 or any(
+                not isinstance(item, str) or not item.isascii() or not item.isdigit() or not 17 <= len(item) <= 20
+                for item in values
+            ):
+                raise ValueError(f'{new_key} に利用する1つのIDを文字列で設定してください（元ファイルは変更しません）')
+            normalized[new_key] = values[0] if values else ''
+        return normalized
+
     def _ordered_config_data(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """既定キーを先頭へ並べ、未知キーの現在順を末尾に維持する。"""
         ordered = {}
@@ -343,7 +391,7 @@ class conf_json:
             if key in config_data:
                 ordered[key] = config_data[key]
         for key, value in config_data.items():
-            if key not in ordered:
+            if key not in ordered and key not in self.REMOVED_DISCORD_KEYS and key not in self.LEGACY_DISCORD_IDS:
                 ordered[key] = value
         return ordered
 
@@ -459,7 +507,7 @@ class conf_json:
 
         config_data = object.__getattribute__(self, '_config_data')
         updated = dict(config_data)
-        normalized = self._normalize_port_updates(data)
+        normalized = self._normalize_discord_ids(self._normalize_port_updates(data))
         old_key = 'CHAT_OPENAI_OAUTH_MODEL'
         if old_key in normalized:
             if 'CHAT_OPENAI_MODEL' not in normalized:

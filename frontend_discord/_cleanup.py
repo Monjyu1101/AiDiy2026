@@ -1,0 +1,66 @@
+# -*- coding: utf-8 -*-
+"""Discord Bot の停止を確認してから依存物とキャッシュを削除する。共通設定は保持する。"""
+import importlib.util
+import os
+from pathlib import Path
+import shutil
+import stat
+import sys
+
+THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR))
+from discord_processes import stop_discord_processes
+from launcher import remove_launcher
+
+TARGETS = ('node_modules', 'dist', 'out', 'temp', '__pycache__', '.pytest_cache')
+
+
+def remove_directory(path: Path) -> bool:
+    root = THIS_DIR.resolve()
+    # junction / symlink の解決後にも、指定したコンポーネント内だけを削除する。
+    try:
+        target = path.resolve()
+        if target == root or not target.is_relative_to(root):
+            raise ValueError('コンポーネント外のパスです。')
+        if not path.exists():
+            return True
+        if not path.is_dir():
+            raise ValueError('ディレクトリではありません。')
+
+        def writable(func, name, _error):
+            os.chmod(name, stat.S_IWRITE)
+            func(name)
+
+        shutil.rmtree(path, onerror=writable)
+        print(f'[OK] 削除しました: {path}')
+        return True
+    except (OSError, ValueError):
+        print(f'[NG] 削除できません: {path}')
+        return False
+
+
+def cleanup(choices: dict | None = None) -> bool:
+    if choices is not None and choices.get('discord') is False:
+        return True
+    if not stop_discord_processes(THIS_DIR):
+        return False
+    ok = remove_launcher(THIS_DIR)
+    for name in TARGETS:
+        ok = remove_directory(THIS_DIR / name) and ok
+    for path in sorted(THIS_DIR.rglob('__pycache__'), key=lambda item: len(item.parts), reverse=True):
+        ok = remove_directory(path) and ok
+    return ok
+
+
+def main() -> None:
+    answer = input('Discord Bot を停止し、依存関係・キャッシュを削除しますか？ ([n]/y): ').strip().lower()
+    if answer == 'y':
+        spec = importlib.util.spec_from_file_location('aidiy_discord_root_cleanup', THIS_DIR.parent / '_cleanup.py')
+        root_cleanup = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(root_cleanup)
+        with root_cleanup.cleanup_stop_request({}, services=['フロントエンド(Discord)']):
+            sys.exit(0 if cleanup() else 1)
+
+
+if __name__ == '__main__':
+    main()
