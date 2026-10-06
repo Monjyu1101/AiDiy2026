@@ -152,7 +152,7 @@ const セクション一覧 = computed(() => {
   border: 1px solid #4b5563;
   border-radius: 4px;
   color: #f3f4f6;
-  font-size: 13px;
+  font-size: 11px;
   font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
   white-space: pre-wrap;
   word-break: break-word;

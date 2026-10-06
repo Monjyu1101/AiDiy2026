@@ -940,6 +940,7 @@ const 登録 = async () => {
 }
 
 .detail-textarea {
+  font-size: 12px;
   margin: 3px 0;
   flex: 1;
   min-height: 92px;

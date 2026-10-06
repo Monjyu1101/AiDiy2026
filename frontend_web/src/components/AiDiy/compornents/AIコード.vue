@@ -1276,7 +1276,7 @@ const 状態表示テキスト = () => {
   display: inline;
   color: #ffffff !important;
   font-family: 'Courier New', monospace;
-  font-size: 14px;
+  font-size: inherit;
   font-weight: bold;
   opacity: 1 !important;
   animation: none !important;
@@ -1367,7 +1367,7 @@ const 状態表示テキスト = () => {
   border: 2px solid rgba(255, 255, 255, 0.5);
   border-radius: 0;
   outline: none;
-  font-size: 14px;
+  font-size: 12px;
   background: rgba(0, 0, 0, 0.35);
   color: #e0e0e0;
   box-sizing: border-box;

@@ -616,6 +616,7 @@ const 登録 = async () => {
 }
 
 .detail-textarea {
+  font-size: 12px;
   min-height: 170px;
   resize: vertical;
 }

@@ -474,7 +474,7 @@ onBeforeUnmount(() => 経過計測停止());
   padding-top: 4px;
   padding-bottom: 4px;
 }
-.detail-textarea { min-height: 170px; resize: vertical; line-height: 1.55; }
+.detail-textarea { font-size: 12px; min-height: 170px; resize: vertical; line-height: 1.55; }
 .detail-input:disabled, .detail-select:disabled, .detail-textarea:disabled { opacity: 0.65; }
 .value-inline { gap: 8px; }
 .required-mark { margin-left: 2px; color: #ff7eb6; }
@@ -508,7 +508,7 @@ onBeforeUnmount(() => 経過計測停止());
   color: #edf5fa;
   background: #05070b;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;

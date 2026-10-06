@@ -100,6 +100,13 @@ const color = await qColorPicker('#ff0000', '色を選択')
 - frontend_web の `qMessage()` を frontend_avatar に追加してもよいが、対応する `MessageDialogInstance` コンポーネントも必要です。
 - 新しいダイアログ種別を追加する場合は、両プロジェクトでセットで実装します（型定義 + `setXxxInstance` + `qXxx` 関数 + 呼び出し側コンポーネント）。
 
+## AI 会話表示とメッセージ入力の文字サイズ
+
+- 会話本文とストリーム本文は `11px`、メッセージ入力欄は `12px` に揃える。
+- 対象は Web / Avatar の `AIチャット.vue`、`AIコード.vue`、`AIイメージ.vue`、AIチームの会話要求 / 依頼編集 / 応答内容、AIタスクの要求編集 / 明細編集 / 応答内容、VS Code / 単独画面の Code / Live。Code / Live の設定元は `frontend_vscode/media/chat.css` と `frontend_vscode/aidiy_live/media/style.css`。
+- Web / Avatar の入力欄は通常 `12px` とし、高さ上限に達した `.at-limit` 状態では従来どおり `8px` へ縮小する。
+- VS Code テーマの基本文字サイズを継承させず、会話本文と入力欄に上記サイズを明示する。文字送りカーソルは本文のサイズを継承する。
+
 ## AI メッセージ入力のキー操作
 
 `AIチャット.vue`、`AIコード.vue`、`AIイメージ.vue` の入力欄は、両プロジェクトで同じ操作にする。
