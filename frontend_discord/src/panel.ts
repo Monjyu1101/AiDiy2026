@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { DiscordBot } from './bot';
 import { 設定読込, 設定エラー, プロジェクトルート, type Discord設定 } from './config';
 import { ライブ選択エラー, ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存, 起動解決, CLI実行 } from './vscode';
@@ -7,12 +7,13 @@ import { ライブ候補読込 } from './live-catalog';
 import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from './connection-error';
 
 export const モデル保存先 = join(homedir(), '.aidiy', 'aidiy_discord_model.json');
+export type パネル発言 = { who: string; text: string; role: 'user' | 'ai' };
 export type パネル状態 = { phase: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopping' | 'error'; message: string; details?: string };
-type Bot = Pick<DiscordBot, '起動' | '終了'> & { client: { isReady(): boolean } };
+type Bot = Pick<DiscordBot, '起動' | '終了' | '表示' | 'メーター' | '音声'> & Partial<Pick<DiscordBot, 'モニター設定'>> & { client: { isReady(): boolean } };
 
 // UI に渡すのは表示用モデル情報と状態だけ。トークンや接続 ID は worker 内に保持する。
 export class Discordパネル {
-  状態: パネル状態 = { phase: 'idle', message: '未接続 · 開始ボタンで接続します。' };
+  状態: パネル状態 = { phase: 'idle', message: '未接続 · 接続ボタンで接続します。' };
   private bot?: Bot;
   private cancel?: () => void;
   private stopping?: Promise<void>;
@@ -21,6 +22,9 @@ export class Discordパネル {
   private preferred: Record<string, string>;
   private codePreferred?: { provider: string; model: string };
   private catalogs = new Set<ReturnType<typeof CLI実行>>();
+  発言?: (value: パネル発言) => void;
+  音量?: (value: { kind: 'input' | 'output'; level: number; bins: number[] }) => void;
+  音声?: (value: { kind: 'input' | 'output'; data: string; rate: number }) => void;
   constructor(private changed: (state: パネル状態) => void,
     private readConfig = 設定読込,
     private createBot: (config: Discord設定) => Bot = config => new DiscordBot(config),
@@ -40,7 +44,7 @@ export class Discordパネル {
     const settings = { ...config.liveModels, ...this.preferred };
     const { models, voices } = this.readCatalog();
     const notice = ライブ選択エラー(settings, { models, voices });
-    return { state: this.状態, settings, models, voices, notice, code: this.codePreferred || { provider: config.provider, model: config.model } };
+    return { state: this.状態, settings, models, voices, notice, code: this.codePreferred || { provider: config.provider, model: config.model }, folder: { name: basename(config.folder) || config.folder, path: config.folder } };
   }
   async コード候補(provider: unknown) {
     if (this.closed || typeof provider !== 'string' || provider.length > 200) throw new Error();
@@ -55,12 +59,12 @@ export class Discordパネル {
     } finally { this.catalogs.delete(job); }
   }
   コード選択保存(value: unknown) {
-    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('停止してからモデルを選択してください。');
+    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してからモデルを選択してください。');
     this.codePreferred = コードモデル保存(value, this.codePreferenceFile);
     return this.codePreferred;
   }
   選択保存(value: unknown) {
-    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('停止してからモデルを選択してください。');
+    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してからモデルを選択してください。');
     const error = ライブ選択エラー({ ...this.readConfig().liveModels, ...value as Record<string, string> }, this.readCatalog());
     if (error) throw new 設定エラー(error);
     this.preferred = ライブモデル保存(value, this.preferenceFile);
@@ -84,6 +88,9 @@ export class Discordパネル {
       stage = 'Bot作成';
       const bot = this.createBot({ ...config, ...this.codePreferred, liveModels: { ...config.liveModels, ...this.preferred } });
       this.bot = bot;
+      bot.音声 = (kind, pcm, rate) => { if (run === this.generation) this.音声?.({ kind, data: pcm.toString('base64'), rate }); };
+      bot.メーター = (kind, level, bins) => { if (run === this.generation) this.音量?.({ kind, level, bins }); };
+      bot.表示 = (who, text, role) => { if (run === this.generation) this.発言?.({ who: who.slice(0, 100), text: text.slice(0, 2000), role }); };
       const cancelled = new Promise<void>(resolve => { this.cancel = resolve; });
       const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new 設定エラー(`${stage}が${this.timeoutMs / 1000}秒以内に完了しませんでした。Discordへの通信状態を確認してください。`)), this.timeoutMs); });
       const connected = (async () => {
@@ -113,6 +120,13 @@ export class Discordパネル {
       if (run === this.generation) this.cancel = undefined;
     }
   }
+  /** 接続中の音声をパネルで聞くかどうか。新しい接続は常に OFF から始まる。 */
+  モニター(value: unknown) {
+    if (typeof value !== 'boolean') throw new Error();
+    if (value && this.状態.phase !== 'connected' && this.状態.phase !== 'reconnecting') throw new 設定エラー('接続中だけモニターできます。');
+    this.bot?.モニター設定?.(value);
+    return value;
+  }
   接続確認() {
     if (!this.bot || !['connected', 'reconnecting'].includes(this.状態.phase)) return;
     const ready = this.bot.client.isReady();
@@ -123,10 +137,10 @@ export class Discordパネル {
     if (this.stopping) return this.stopping;
     ++this.generation; this.cancel?.(); this.cancel = undefined;
     const bot = this.bot; this.bot = undefined;
-    if (!bot) { this.状態変更('idle', '停止しました。開始すると再接続します。'); return Promise.resolve(); }
+    if (!bot) { this.状態変更('idle', '切断しました。接続すると再接続します。'); return Promise.resolve(); }
     this.状態変更('stopping', '会話を終了し、Discord から切断しています…');
     this.stopping = (async () => {
-      try { await bot.終了(); this.状態変更('idle', '停止しました。開始すると再接続します。'); }
+      try { await bot.終了(); this.状態変更('idle', '切断しました。接続すると再接続します。'); }
       catch {
         this.closed = true;
         this.状態変更('error', '終了処理に失敗しました。パネルを閉じて開き直してください。');

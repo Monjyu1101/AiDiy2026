@@ -7,6 +7,7 @@ import type { Socket } from 'node:net';
 import { ライブモデル読込, ライブモデル保存, モデル保存先 } from '../../src/model-preferences';
 import { ローカル接続先 } from '../local-backend.cjs';
 import { 接続エラー詳細 } from './connection-error';
+import { 接続元許可 } from '../../src/forwarded-origin';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
 export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live'), 自動接続 = false) {
@@ -18,11 +19,13 @@ export async function ライブ起動(root: string, backend?: string, packaged =
   const prefix = `/${randomBytes(24).toString('hex')}/`;
   const sockets = new Set<Socket>();
   const viewers = new Set<import('node:http').ServerResponse>();
-  let lastViewer = Date.now();
+  // 3本共通: 画面を閉じて60秒、一度も開かれなければ120秒で終了する（判定は launch.mjs の60秒）。
+  let lastViewer = Date.now() + 60_000;
   const upstreamSockets = new Set<Socket>();
   const upstreamRequests = new Set<ReturnType<typeof httpRequest>>();
   const request = target.protocol === 'https:' ? httpsRequest : httpRequest;
   let origin = '';
+  let allowed: 接続元許可 | undefined;
   const apiPaths = new Set(['/core/AIコア/モデル情報/取得', '/core/AIコア/モデル情報/設定']);
   const assets: Record<string, [string, string]> = {
     '': [join(root, packaged ? 'media/index.html' : 'aidiy_live/media/index.html'), 'text/html; charset=utf-8'],
@@ -38,7 +41,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
-    if (req.headers.host !== new URL(origin).host || (req.headers.origin && req.headers.origin !== origin)) {
+    if (!allowed?.host(req.headers.host) || (req.headers.origin && !allowed.origin(req.headers.origin))) {
       res.writeHead(403).end(); return;
     }
     const path = req.url?.startsWith(prefix) ? req.url.slice(prefix.length) : null;
@@ -67,7 +70,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
     catch { res.writeHead(400).end(); return; }
     const saveModel = path === 'model';
     if ((!saveModel && !apiPaths.has(api)) || req.method !== 'POST') { res.writeHead(404).end(); return; }
-    if (req.headers.origin !== origin || !req.headers['content-type']?.startsWith('application/json')) { res.writeHead(403).end(); return; }
+    if (!allowed?.origin(req.headers.origin) || !req.headers['content-type']?.startsWith('application/json')) { res.writeHead(403).end(); return; }
     try {
       const chunks: Buffer[] = [];
       let size = 0;
@@ -103,7 +106,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
   });
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
   server.on('upgrade', (req, socket, head) => {
-    if (req.url !== prefix + 'socket' || req.headers.host !== new URL(origin).host || req.headers.origin !== origin) {
+    if (req.url !== prefix + 'socket' || !allowed?.host(req.headers.host) || !allowed.origin(req.headers.origin)) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return;
     }
     const proxy = request(new URL('/core/ws/AIコア', target), {
@@ -138,8 +141,10 @@ export async function ライブ起動(root: string, backend?: string, packaged =
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('待受ポートを取得できません。');
   origin = `http://127.0.0.1:${address.port}`;
+  allowed = new 接続元許可(address.port);
   return {
     url: origin + prefix,
+    publicUrl: allowed.公開URL(prefix),
     idleMilliseconds: () => viewers.size ? 0 : Date.now() - lastViewer,
     close: async () => {
       for (const proxy of upstreamRequests) proxy.destroy();

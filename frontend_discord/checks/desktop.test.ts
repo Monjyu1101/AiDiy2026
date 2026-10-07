@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import * as url from 'node:url';
 import { runInNewContext } from 'node:vm';
+import { createRequire } from 'node:module';
 
 async function desktop(platform = 'win32') {
   const file = fileURLToPath(new URL('../panel/desktop.cjs', import.meta.url));
@@ -34,10 +35,13 @@ async function desktop(platform = 'win32') {
       mainFrame: { url: url.pathToFileURL(path.join(dirname(file), 'index.html')).href },
       send(_name: string, state: any) { states.push(state); },
       session: { setPermissionCheckHandler() {}, setPermissionRequestHandler() {} }, setWindowOpenHandler() {},
+      async insertCSS() { return 'css'; }, async removeInsertedCSS() {}, async executeJavaScript() {},
     });
-    constructor(_options: any) { super(); window = this; }
-    setMenu() {} setPosition() {} show() {} focus() {} restore() {} minimize() {}
-    getBounds() { return { width: 476 }; }
+    constructor(options: any) { super(); if (!options.transparent) window = this; }
+    setMenu() {} setPosition() {} setBounds() {} setMinimumSize() {} show() {} focus() {} restore() {} minimize() {}
+    // 初回演出（frontend_vscode/scripts/window-opening.cjs）の透明キャンバスと透明度。
+    showInactive() {} setOpacity() {} destroy() { this.destroyed = true; }
+    getBounds() { return { x: 722, y: 8, width: 476, height: 414 }; }
     isDestroyed() { return this.destroyed; } isMinimized() { return false; } isVisible() { return !this.destroyed; }
     async loadURL() {}
     close() {
@@ -47,12 +51,14 @@ async function desktop(platform = 'win32') {
     }
   }
   runInNewContext(readFileSync(file, 'utf8'), {
-    __dirname: dirname(file), console,
+    __dirname: dirname(file), console, Date: { now: () => clock },
     process: { platform, pid: 999, env: { AIDIY_DISCORD_READY: '/first-ready' }, kill: (...args: any[]) => { kills.push(args); } },
     setTimeout(callback: () => void, ms: number) { const id = ++sequence; timers.set(id, { at: clock + ms, callback }); return id; },
     clearTimeout(id: number) { timers.delete(id); },
     require(name: string) {
       if (name === 'node:path') return path;
+      // 3本共通のウィンドウ大きさ・初回演出は実物を使う。
+      if (name.startsWith('../../frontend_vscode/scripts/')) return createRequire(import.meta.url)(name);
       if (name === 'node:url') return url;
       if (name === 'node:fs') return { writeFileSync(file: string, value: string) { files.set(file, JSON.parse(value)); } };
       if (name === 'node:child_process') return { fork: () => worker, spawn: (...args: any[]) => {
@@ -65,6 +71,10 @@ async function desktop(platform = 'win32') {
   });
   const flush = () => new Promise(resolve => setImmediate(resolve));
   await flush();
+  // 登場時の拡大演出（750ms）を模擬時刻で完了させる。
+  for (let entry; (entry = [...timers.entries()].sort((a, b) => a[1].at - b[1].at)[0]) && entry[1].at <= 1000;) {
+    clock = entry[1].at; timers.delete(entry[0]); entry[1].callback(); await flush();
+  }
   return { app, worker, window, files, requests, kills, states, timers, flush,
     exited: () => exited, locked: () => locked,
     exitWorker(code: number | null, signal: string | null = null) {

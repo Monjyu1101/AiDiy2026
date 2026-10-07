@@ -28,7 +28,7 @@ def is_discord_process(process: dict, root: Path, windows: bool) -> bool:
 
     main = normalize(path_module.join(str(root), 'src', 'main.ts'))
     entries = {main, *(normalize(path_module.join(str(root), *parts)) for parts in (
-        ('src', 'panel-worker.ts'), ('panel', 'desktop.cjs'), ('panel', 'launch.mjs'),
+        ('src', 'panel-worker.ts'), ('src', 'web-server.ts'), ('panel', 'desktop.cjs'), ('panel', 'launch.mjs'),
     ))}
     cli = normalize(path_module.join(str(root), 'node_modules', 'tsx', 'dist', 'cli.mjs'))
     loader = normalize(path_module.join(str(root), 'node_modules', 'tsx', 'dist', 'loader.mjs'))

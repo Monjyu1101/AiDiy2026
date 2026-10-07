@@ -7,6 +7,11 @@ import { pathToFileURL } from 'node:url'
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const shouldOpenDevTools = process.env.VITE_OPEN_DEVTOOLS === '1'
 const APP_USER_MODEL_ID = 'AiDiy.frontend_avatar'
+// aidiy_code / aidiy_live / aidiy_discord と共通の初回演出（透明キャンバスの中で中央から拡大してから表示する）。
+// ウィンドウを毎フレーム広げると Windows で未描画の縁が白くちらつくため、共通実装を使う。
+const { 拡大表示 } = require(path.join(__dirname, '../../frontend_vscode/scripts/window-opening.cjs')) as {
+  拡大表示: (browserWindow: typeof BrowserWindow, window: BrowserWindow, options?: { background?: string }) => Promise<boolean>
+}
 
 type WindowMode = 'login' | 'core'
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
@@ -289,6 +294,13 @@ function waitForReady(window: BrowserWindow) {
     window.once('ready-to-show', () => resolve())
     window.webContents.once('did-finish-load', () => resolve())
   })
+}
+
+// ログイン・コアの主ウィンドウを表示する。非表示から開く時だけ拡大演出を行う。
+async function 主ウィンドウ表示(window: BrowserWindow) {
+  if (window.isDestroyed()) return
+  if (window.isVisible()) { window.show(); window.focus(); return }
+  await 拡大表示(BrowserWindow, window, { background: '#000' })
 }
 
 function clampWindowBounds(window: BrowserWindow, nextBounds: WindowBounds): WindowBounds {
@@ -667,9 +679,8 @@ async function openCoreWindow(sourceWindow?: BrowserWindow | null) {
   ensureAllPanelWindows()
   await waitForReady(nextCoreWindow)
   if (!nextCoreWindow.isDestroyed()) {
-    nextCoreWindow.show()
-    nextCoreWindow.focus()
-    nextCoreWindow.webContents.send('window:shown')
+    await 主ウィンドウ表示(nextCoreWindow)
+    if (!nextCoreWindow.isDestroyed()) nextCoreWindow.webContents.send('window:shown')
   }
 
   if (loginWindow && !loginWindow.isDestroyed()) {
@@ -692,9 +703,8 @@ async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
       nextLoginWindow.restore()
     }
     nextLoginWindow.center()
-    nextLoginWindow.show()
-    nextLoginWindow.focus()
-    nextLoginWindow.webContents.send('window:shown')
+    await 主ウィンドウ表示(nextLoginWindow)
+    if (!nextLoginWindow.isDestroyed()) nextLoginWindow.webContents.send('window:shown')
   }
 
   if (coreWindow && !coreWindow.isDestroyed()) {
@@ -961,7 +971,9 @@ app.whenReady().then(() => {
 
   ipcMain.handle('system:get-cpu-usage', () => getSystemCpuUsagePercent())
 
-  createLoginWindow()
+  // 起動時のログイン画面も、読み込み後に拡大演出で表示する。
+  const startupLogin = createLoginWindow(false)
+  void waitForReady(startupLogin).then(() => 主ウィンドウ表示(startupLogin))
 
   app.on('activate', () => {
     if (!loginWindow && !coreWindow && BrowserWindow.getAllWindows().length === 0) {

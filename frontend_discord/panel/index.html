@@ -6,22 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AiDiy (Discord)</title>
   <link rel="stylesheet" href="style.css">
+  <script src="visualizer.js" defer></script>
   <script src="view.js" defer></script>
 </head>
 <body>
-  <header><div class="brand"><strong>AiDiy (Discord)</strong></div><div class="window-actions"><button id="minimize" title="最小化" aria-label="最小化">−</button><button id="close" title="閉じる" aria-label="閉じる">×</button></div></header>
+  <canvas id="audio-cloud" aria-hidden="true"></canvas>
+  <header><div id="status" role="status" aria-live="polite"><i id="dot"></i><span id="status-text">設定を読み込んでいます…</span></div><div class="brand"><strong>AiDiy (Discord)</strong></div><div class="window-actions"><button id="minimize" title="最小化" aria-label="最小化">−</button><button id="close" title="閉じる" aria-label="閉じる">×</button></div></header>
   <div id="activity-bar" aria-hidden="true"></div>
+  <div class="conversation-toolbar"><div class="conversation-context"><span class="project-label">プロジェクト:</span><span id="project-folder"></span></div><button id="toggle" class="awaiting" disabled>接続</button></div>
   <main>
+    <div id="settings">
     <div class="section-label">音声会話 <span>LIVE</span></div>
     <div class="row"><label for="provider">AI</label><select id="provider" disabled></select><label class="voice-label" for="voice">音声</label><select id="voice" disabled></select></div>
     <div class="row"><label for="model">モデル</label><select id="model" disabled></select></div>
     <div class="section-label code-section">コード <span>CODE</span><small>aidiy_hermes</small></div>
     <div class="row"><label for="code-provider">コード AI</label><select id="code-provider" disabled></select></div>
     <div class="row code-last"><label for="code-model">モデル</label><input id="code-model" list="code-models" maxlength="300" spellcheck="false" autocomplete="off" disabled><datalist id="code-models"></datalist></div>
-    <div class="connection"><div id="status" role="status" aria-live="polite"><i id="dot"></i><span id="status-text">設定を読み込んでいます…</span></div><button id="toggle" class="primary" disabled>開始</button></div>
     <textarea id="error-detail" readonly hidden aria-label="接続エラーの詳細（選択してコピーできます）"></textarea>
     <p class="hint">専用チャンネルに投稿、またはボイスチャンネルに参加。</p>
     <p id="note" class="note" role="status">Live・コードとも、最後に選んだモデルを次回も使用します。</p>
+    </div>
+    <!-- 接続後は aidiy_live の初期画面と同じ演出で、最後のやり取りだけを1回表示する。 -->
+    <section id="stage" aria-label="最後のやり取り">
+      <div class="welcome-mark" aria-hidden="true"><img src="../../frontend_vscode/media/AiDiy.png" alt=""></div>
+      <div id="stage-log" aria-live="polite"><div id="stage-idle" class="stage-entry"><span class="stage-who">接続先</span><span class="stage-text">専用チャンネルに投稿、またはボイスチャンネルに参加。</span></div><div id="stage-message" class="stage-entry" hidden><span id="stage-who" class="stage-who"></span><span id="stage-text" class="stage-text"></span></div></div>
+    </section>
   </main>
+  <!-- 接続中だけ画面左下に出すモニター切替。接続ごとに OFF から始める。 -->
+  <button id="monitor" role="switch" aria-checked="false" title="接続中の音声（入力・AI の声）をこのPCで聞く"><span class="monitor-label">モニター</span><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span><span id="monitor-state">OFF</span></button>
 </body>
 </html>

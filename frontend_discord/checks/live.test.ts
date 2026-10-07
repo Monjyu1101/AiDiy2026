@@ -224,3 +224,40 @@ test('音声ソケットの接続拒否でも先に開いたソケットとDisco
     await waitFor(() => [...f.sockets.values()].every(socket => socket.readyState === 3));
   } finally { await f.cleanup(); }
 });
+
+test('文字起こしはパネルへ逐次表示し、Discord へは人間側の最後の発言とAIの応答を1件にまとめて送る', { timeout: 10000 }, async () => {
+  const f = await fixture();
+  const shown: string[] = [];
+  f.connection.表示 = (who, text, role) => { shown.push(`${role}:${who}:${text}`); };
+  try {
+    await f.connection.接続();
+    const send = (type: string, text: string) => f.sockets.get('0')!.send(JSON.stringify({ チャンネル: '0', メッセージ識別: type, メッセージ内容: text }));
+    send('recognition_input', '最初の発言'); send('recognition_input', '今日の天気は？');
+    send('recognition_output', '晴れです。'); send('output_text', '晴れです。'); send('recognition_output', '気温は20度です。');
+    await waitFor(() => shown.length === 5);
+    assert.equal(shown[1], 'user:あなた（音声）:今日の天気は？');
+    assert.equal(f.notices.length, 0, '応答が続く間は投稿しない');
+    await waitFor(() => f.notices.length === 1, 4000);
+    assert.equal(f.notices[0], '**あなた（音声）**: 今日の天気は？\n**AiDiy**: 晴れです。\n気温は20度です。');
+  } finally { await f.cleanup(); }
+});
+
+test('モニター送信は設定した間だけ、無音を除く通過音声をレート付きで渡す', { timeout: 10000 }, async () => {
+  const f = await fixture();
+  const encoder = new OpusScript(48000, 2, OpusScript.Application.AUDIO);
+  const monitored: { kind: string; size: number; rate: number }[] = [];
+  try {
+    await f.connection.接続();
+    await waitFor(() => f.received.some(packet => packet.メッセージ識別 === 'input_audio'));
+    assert.equal(monitored.length, 0, '既定ではモニターしない');
+    f.connection.モニター送信 = (kind, pcm, rate) => { monitored.push({ kind, size: pcm.length, rate }); };
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(monitored.length, 0, '無音フレームは送らない');
+    f.speaking.emit('start', userId);
+    const pcm = Buffer.alloc(3840);
+    for (let i = 0; i < pcm.length / 2; i++) pcm.writeInt16LE(Math.round(Math.sin(i / 20) * 12000), i * 2);
+    f.streams.get(userId)!.write(encoder.encode(pcm, 960));
+    await waitFor(() => monitored.length > 0);
+    assert.deepEqual(monitored[0], { kind: 'input', size: 960, rate: 24000 });
+  } finally { encoder.delete(); await f.cleanup(); }
+});

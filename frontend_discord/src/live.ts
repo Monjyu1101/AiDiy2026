@@ -5,9 +5,12 @@ import OpusScript from 'opusscript';
 import type { LiveSocket, Packet } from '../../frontend_vscode/aidiy_live/src/protocol';
 import { LiveConnection, 入力レート, 音声入力, 音声操作 } from './vscode';
 import type { Discord設定 } from './config';
-import { Discord音声出力, 音声入力ミキサー } from './audio';
+import { Discord音声出力, 音声入力ミキサー, 音声スペクトル, 音声レベル } from './audio';
 import { ライブ接続エラー, type ライブ接続段階 } from './connection-error';
 import { Discord音声通信 } from './network';
+
+// 音声レベル（RMS×5）で 0.02 ≒ -48dBFS。これ未満はインジケーター上の無音とする。
+const 無音閾値 = 0.02;
 
 const 音声トランスポート = {
   join: (channel: VoiceChannel, network: Discord音声通信) => joinVoiceChannel({ channelId: channel.id, guildId: channel.guild.id,
@@ -28,8 +31,6 @@ export class Live接続 {
   private sockets = new Set<WebSocket>();
   private heartbeat?: NodeJS.Timeout;
   private capture?: NodeJS.Timeout;
-  private transcriptTimer?: NodeJS.Timeout;
-  private transcript = '';
   private rate = 16000;
   private closed = false;
   private ready = false;
@@ -43,6 +44,19 @@ export class Live接続 {
   private receivedVoice = false;
   private receivedOutput = false;
   private voiceNetwork?: Discord音声通信;
+  /** 文字起こしをパネルへ逐次表示する。 */
+  表示?: (who: string, text: string, role: 'user' | 'ai') => void;
+  // Discord へは発言ごとに投稿せず、AI の応答が落ち着いたら「人間側の最後の発言＋AI の応答」を1件にまとめて送る。
+  private lastUser?: { who: string; text: string };
+  private aiTexts: string[] = [];
+  private transcriptTimer?: NodeJS.Timeout;
+  /** 通過する入力・再生音の音量と周波数分布。パネルの円型インジケーター用に50msごとへ間引く。 */
+  メーター?: (kind: 'input' | 'output', level: number, bins: number[]) => void;
+  /** パネルのモニター ON の間だけ設定される。通過する PCM16 mono（20ms分）をそのまま渡す。 */
+  モニター送信?: (kind: 'input' | 'output', pcm: Buffer, rate: number) => void;
+  private meterAt = { input: 0, output: 0 };
+  private meterSilent = { input: true, output: true };
+  private meterBins: Record<'input' | 'output', number[] | undefined> = { input: undefined, output: undefined };
   constructor(private config: Discord設定, readonly channel: VoiceChannel, private notify: (text: string) => Promise<void>, private onClose: () => void,
     private transport = 音声トランスポート) {
     this.rate = 入力レート(config.liveModels.LIVE_AI_NAME || '');
@@ -84,11 +98,34 @@ export class Live接続 {
     const phase = code === undefined ? '未開始' : phases[code] ?? '不明';
     return new Error(`ボイス状態: ${state?.status ?? '未開始'} / 音声通信: ${phase}\n音声接続先: ${this.voiceNetwork?.接続先 ?? '未通知'}`, { cause });
   }
+  private 計測(kind: 'input' | 'output', pcm: Buffer) {
+    if (this.モニター送信 && !this.closed && pcm.some(value => value !== 0)) this.モニター送信(kind, pcm, kind === 'input' ? this.rate : 24000);
+    if (!this.メーター || this.closed) return;
+    // dB 尺度の分布は、ほぼ聞こえない雑音（-50dBFS 程度）でも大きく出る。
+    // 閾値未満は無音として扱い、aidiy_live と同じく音がない時の円を静かに保つ。
+    const silent = 音声レベル(pcm) < 無音閾値;
+    // 無音は変化した時だけ通知し、IPC を増やさない。
+    if (silent) {
+      this.meterBins[kind] = undefined;
+      if (!this.meterSilent[kind]) { this.meterSilent[kind] = true; this.メーター(kind, 0, []); }
+      return;
+    }
+    const now = Date.now();
+    if (!this.meterSilent[kind] && now - this.meterAt[kind] < 50) return;
+    this.meterSilent[kind] = false; this.meterAt[kind] = now;
+    // AnalyserNode の smoothingTimeConstant 0.8（約16ms毎）を50ms間隔に換算した平滑化。
+    const current = 音声スペクトル(pcm), previous = this.meterBins[kind];
+    const bins = previous ? current.map((value, i) => Math.round(previous[i] * .5 + value * .5)) : current;
+    this.meterBins[kind] = bins;
+    // aidiy_live と同じ正規化: 入力は RMS、再生は周波数分布の平均。
+    this.メーター(kind, kind === 'input' ? 音声レベル(pcm) : Math.min(1, bins.reduce((sum, value) => sum + value, 0) / bins.length / 128), bins);
+  }
   private 再生開始() {
     this.player.stop(true);
     this.output?.destroy();
     if (this.closed) return;
     this.output = new Discord音声出力();
+    this.output.通過 = pcm => this.計測('output', pcm);
     this.output.on('error', () => this.失敗('AI 音声を再生できません。'));
     this.player.play(createAudioResource(this.output, { inputType: StreamType.Opus }));
   }
@@ -117,17 +154,25 @@ export class Live接続 {
       message: typeof packet.メッセージ内容 === 'string' ? packet.メッセージ内容 : 'バックエンドの設定・ログを確認してください。',
       code: packet.エラーコード,
     });
-    else if (packet.チャンネル === '0' && ['output_text', 'output_request', 'recognition_output', 'output'].includes(packet.メッセージ識別 || '')) {
+    else if (packet.チャンネル === '0' && ['output_text', 'output_request', 'recognition_input', 'recognition_output', 'output'].includes(packet.メッセージ識別 || '')) {
       const text = String(packet.メッセージ内容 || '').trim();
       if (text === '!') { this.失敗('LiveAI への送信に失敗しました。AIコアの接続設定を確認してください。'); return; }
-      if (text) {
-        this.transcript = (this.transcript + text + '\n').slice(-32000);
-        if (!this.transcriptTimer) this.transcriptTimer = setTimeout(() => {
-          const content = this.transcript; this.transcript = ''; this.transcriptTimer = undefined;
-          if (!this.closed) this.通知(`【Live】\n${content}`);
-        }, 1500);
-      }
+      if (!text || ['\x02', '\x03', '\x18'].includes(text)) return;
+      const user = packet.メッセージ識別 === 'recognition_input';
+      const who = user ? `${this.channel.members.get(this.config.userId)?.displayName ?? 'あなた'}（音声）` : 'AiDiy';
+      this.表示?.(who, text, user ? 'user' : 'ai');
+      if (user) { this.lastUser = { who, text }; return; }
+      if (this.aiTexts.at(-1) !== text) this.aiTexts = [...this.aiTexts, text].slice(-20);
+      clearTimeout(this.transcriptTimer);
+      this.transcriptTimer = setTimeout(() => this.文字起こし送信(), 1500);
     }
+  }
+  private 文字起こし送信() {
+    this.transcriptTimer = undefined;
+    if (this.closed || !this.aiTexts.length) return;
+    const lines = [...(this.lastUser ? [`**${this.lastUser.who}**: ${this.lastUser.text}`] : []), `**AiDiy**: ${this.aiTexts.join('\n')}`];
+    this.lastUser = undefined; this.aiTexts = [];
+    this.通知(lines.join('\n').slice(0, 6000));
   }
   async 接続() {
     if (this.started || this.closed) throw new Error('ライブ接続は開始済みです。');
@@ -163,7 +208,9 @@ export class Live接続 {
       for (const user of this.voice.receiver.speaking.users.keys()) this.話者開始(user);
       this.capture = setInterval(() => {
         for (const user of this.inputs.keys()) if (!this.話者許可(user)) this.話者停止(user);
-        if (!this.core.send('audio', 音声入力(this.mixer.フレーム(this.rate).toString('base64')))) {
+        const frame = this.mixer.フレーム(this.rate);
+        this.計測('input', frame);
+        if (!this.core.send('audio', 音声入力(frame.toString('base64')))) {
           this.失敗('AIコアへの音声送信が滞留しました。ボイスチャンネルに入り直してください。');
         }
       }, 20);
@@ -227,6 +274,7 @@ export class Live接続 {
     this.voice?.receiver.speaking.off('start', this.話者開始);
     for (const user of this.inputs.keys()) this.話者停止(user);
     this.player.stop(true); this.output?.destroy();
+    for (const kind of ['input', 'output'] as const) if (!this.meterSilent[kind]) this.メーター?.(kind, 0, []);
     if (this.voice && this.voice.state.status !== VoiceConnectionStatus.Destroyed) this.voice.destroy();
     this.voiceNetwork?.終了();
     this.onClose();

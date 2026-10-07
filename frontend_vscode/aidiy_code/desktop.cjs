@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
 const { join, resolve } = require('node:path');
 const { writeFileSync } = require('node:fs');
+const size = require('../scripts/window-size.cjs');
+const { 拡大表示 } = require('../scripts/window-opening.cjs');
 const { 単独起動 } = require('../dist/aidiy_code/server.cjs');
 const entryIndex = process.argv.findIndex(arg => resolve(arg) === __filename);
 const args = process.argv.slice(entryIndex >= 0 ? entryIndex + 1 : 2);
@@ -25,7 +27,7 @@ app.whenReady().then(async () => {
   server = await 単独起動(resolve(projectRoot), undefined, initialModel ? JSON.parse(initialModel) : {});
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
-    title: 'AiDiy (Code)', width: 476, height: 602, minWidth: 360, minHeight: 480,
+    title: 'AiDiy (Code)', width: size.幅, height: size.会話高さ, minWidth: size.最小幅, minHeight: size.会話最小高さ,
     x: workArea.x + 8, y: workArea.y + 8,
     frame: false, roundedCorners: false, show: false, backgroundColor: '#000',
     icon: join(__dirname, '../media/AiDiy.png'), autoHideMenuBar: true,
@@ -60,31 +62,9 @@ app.whenReady().then(async () => {
   window.webContents.session.setPermissionCheckHandler((_contents, permission, origin) =>
     permission === 'clipboard-sanitized-write' && origin === new URL(server.url).origin);
   await window.loadURL(server.url);
-  // 初回だけ、黒いウィンドウを最終位置の中心から拡大する。
-  const bounds = window.getBounds();
-  const resize = scale => {
-    const width = Math.round(bounds.width * scale), height = Math.round(bounds.height * scale);
-    window.setBounds({ x: Math.round(bounds.x + (bounds.width - width) / 2), y: Math.round(bounds.y + (bounds.height - height) / 2), width, height });
-  };
-  window.setMinimumSize(0, 0);
-  resize(.55);
-  window.show();
-  window.focus();
+  // 初回だけ、最終位置の中心から黒い矩形を拡大してから表示する（3本共通: scripts/window-opening.cjs）。
+  if (!(await 拡大表示(BrowserWindow, window, { background: '#000' }))) return;
   if (!window.isVisible()) throw new Error('専用ウィンドウを表示できませんでした。');
-  const expanded = await new Promise(resolve => {
-    const started = Date.now();
-    const tick = () => {
-      if (window.isDestroyed()) { resolve(false); return; }
-      const progress = Math.min(1, (Date.now() - started) / 750);
-      resize(.55 + .45 * (1 - Math.pow(1 - progress, 3)));
-      if (progress < 1) setTimeout(tick, 16);
-      else resolve(true);
-    };
-    tick();
-  });
-  if (!expanded) return;
-  window.setBounds(bounds);
-  window.setMinimumSize(360, 480);
   opening = false;
   sendState();
   if (ready) writeFileSync(ready, JSON.stringify({ url: server.url, pid: process.pid, windowShown: true }), 'utf8');

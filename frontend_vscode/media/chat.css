@@ -58,9 +58,11 @@ label { display: block; font-size: 11px; color: var(--muted); }
 .brand-icon { width: 21px; height: 21px; object-fit: contain; flex: 0 0 auto; }
 .brand-name { white-space: nowrap; font-size: 16px; font-weight: 700; letter-spacing: -.5px; }
 #conversation-toolbar { display: flex; align-items: center; gap: 10px; min-height: 28px; padding: 2px; }
-.conversation-context { display: flex; flex: 1; min-width: 0; align-items: center; gap: 10px; }
-#view-title { flex: 0 0 auto; white-space: nowrap; font-size: 11px; color: var(--muted); }
-#project-folder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); }
+.conversation-context { display: flex; flex: 1; min-width: 0; align-items: baseline; gap: 4px; }
+/* aidiy_live と共通: 「プロジェクト: フォルダ名」 */
+.project-label { flex: 0 0 auto; white-space: nowrap; font-size: 11px; color: var(--muted); }
+#project-folder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--foreground); }
+#project-folder:empty::before { content: '未選択'; color: var(--muted); }
 #header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
 #header-actions button { padding: 2px 7px; border-color: var(--border); font-size: 11px; line-height: 1.4; }
 #new-chat { background: var(--accent-soft); }
@@ -192,7 +194,6 @@ body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vsc
 @media (max-width: 440px) {
   #title-bar { padding: 2px; gap: 7px; }
   #conversation-toolbar { padding: 2px; gap: 7px; }
-  .conversation-context { gap: 7px; }
   .brand { gap: 7px; }
   #desktop-controls { margin-left: 0; }
   .keyboard-hint { font-size: 8px; }

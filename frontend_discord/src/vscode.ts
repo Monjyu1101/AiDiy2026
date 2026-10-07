@@ -8,3 +8,4 @@ export const { コード要求実行 } = require('../../frontend_vscode/src/prot
 export const { LiveConnection, 入力レート, 音声入力, 音声操作 } = require('../../frontend_vscode/aidiy_live/src/protocol.ts') as typeof import('../../frontend_vscode/aidiy_live/src/protocol');
 export const { ライブ選択エラー } = require('../../frontend_vscode/aidiy_live/src/model-catalog.ts') as typeof import('../../frontend_vscode/aidiy_live/src/model-catalog');
 export const { LIVE_KEYS, ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存 } = require('../../frontend_vscode/src/model-preferences.ts') as typeof import('../../frontend_vscode/src/model-preferences');
+export const { 接続元許可 } = require('../../frontend_vscode/src/forwarded-origin.ts') as typeof import('../../frontend_vscode/src/forwarded-origin');

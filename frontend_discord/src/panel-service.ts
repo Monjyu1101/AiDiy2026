@@ -1,0 +1,36 @@
+import { Discordパネル } from './panel';
+import { 設定エラー, 設定読込 } from './config';
+
+// Electron 版（panel-worker.ts）とブラウザ版（web-server.ts）で共通の、パネル操作と通知の中継。
+// 通信路（IPC / WebSocket）だけをそれぞれの入口が受け持つ。
+export type パネル通知 = Record<string, unknown> & { type: 'state' | 'activity' | 'meter' | 'audio' };
+
+export function パネルサービス(send: (data: パネル通知) => void, project = process.env.AIDIY_DISCORD_PROJECT) {
+  // aidiy_code / aidiy_live と同じく、起動入口で決めたプロジェクトフォルダをコードの作業フォルダにする。
+  const panel = new Discordパネル(state => send({ type: 'state', state }), () => ({ ...設定読込(), ...(project ? { folder: project } : {}) }));
+  panel.発言 = activity => send({ type: 'activity', activity });
+  panel.音量 = meter => send({ type: 'meter', meter });
+  panel.音声 = audio => send({ type: 'audio', audio });
+  const timer = setInterval(() => panel.接続確認(), 1000);
+  async function 要求(action: unknown, value: unknown): Promise<{ result?: unknown; error?: string }> {
+    try {
+      let result: unknown;
+      switch (action) {
+        case 'initial': result = await panel.初期情報(); break;
+        case 'select': result = panel.選択保存(value); break;
+        case 'select-code': result = panel.コード選択保存(value); break;
+        case 'catalog-code': result = await panel.コード候補(value); break;
+        case 'start': await panel.開始(); break;
+        case 'stop': await panel.停止(); break;
+        case 'monitor': result = panel.モニター(value); break;
+        default: throw new Error();
+      }
+      return { result };
+    } catch (error) {
+      // 予期しない API / OS エラーの本文を画面やログへ流さない。
+      return { error: error instanceof 設定エラー ? error.message : '操作できませんでした。設定・保存先を確認して再試行してください。' };
+    }
+  }
+  async function 終了() { clearInterval(timer); await panel.終了(); }
+  return { panel, 要求, 終了 };
+}

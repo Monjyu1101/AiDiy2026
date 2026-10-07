@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import OpusScript from 'opusscript';
-import { Discord音声出力, 音声入力ミキサー, 入力PCM変換, 出力PCM変換, 出力バッファ上限 } from '../src/audio';
+import { Discord音声出力, 音声入力ミキサー, 入力PCM変換, 出力PCM変換, 出力バッファ上限, 音声スペクトル, 音声レベル } from '../src/audio';
 
 test('48kHz stereo → 16/24kHz mono、24kHz mono → 48kHz stereo のレートと音量を検証', () => {
   const stereo = Buffer.alloc(3840);
@@ -118,4 +118,21 @@ test('再生側の要求ごとに20msのOpusを即座に供給し、余計な無
     assert.throws(() => stream.追加(Buffer.alloc(1)), /上限/);
   } finally { stream.destroy(); decoder.delete(); }
   assert.equal(stream.destroyed, true);
+});
+
+test('パネルの円型インジケーター用に、通過する PCM の音量と周波数分布を AnalyserNode と同じ尺度で求める', () => {
+  // 24kHz で 750Hz は fftSize 256 の 8 番目の帯域に当たる。
+  const sine = (amplitude: number) => {
+    const pcm = Buffer.alloc(960);
+    for (let i = 0; i < 480; i++) pcm.writeInt16LE(Math.round(amplitude * Math.sin(2 * Math.PI * 750 * i / 24000)), i * 2);
+    return pcm;
+  };
+  // 255 で頭打ちにならない音量で、ピークの帯域を確認する。
+  const bins = 音声スペクトル(sine(300)), tone = sine(10000);
+  assert.equal(bins.length, 128);
+  assert.equal(bins.indexOf(Math.max(...bins)), 8);
+  assert.ok(bins.every(value => Number.isInteger(value) && value >= 0 && value <= 255));
+  assert.ok(音声レベル(tone) > 0.9);
+  assert.deepEqual(new Set(音声スペクトル(Buffer.alloc(960))), new Set([0]));
+  assert.equal(音声レベル(Buffer.alloc(0)), 0);
 });

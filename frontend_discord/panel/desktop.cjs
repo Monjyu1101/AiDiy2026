@@ -3,6 +3,8 @@ const { fork, spawn } = require('node:child_process');
 const { join } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { writeFileSync } = require('node:fs');
+const size = require('../../frontend_vscode/scripts/window-size.cjs');
+const { 拡大表示 } = require('../../frontend_vscode/scripts/window-opening.cjs');
 
 const root = join(__dirname, '..');
 const page = pathToFileURL(join(__dirname, 'index.html')).href;
@@ -89,6 +91,9 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     });
     worker.on('message', message => {
       if (message.type === 'state') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:state', message.state); return; }
+      if (message.type === 'audio') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:audio', message.audio); return; }
+      if (message.type === 'meter') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:meter', message.meter); return; }
+      if (message.type === 'activity') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:activity', message.activity); return; }
       const job = pending.get(message.id); if (!job) return;
       clearTimeout(job.timer); pending.delete(message.id);
       if (message.error) job.reject(new Error(message.error)); else job.resolve(message.result);
@@ -100,9 +105,10 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     };
     worker.on('exit', failed); worker.on('error', failed);
     const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-    const width = Math.min(476, area.width), height = Math.min(414, area.height);
+    // 幅は aidiy_code / aidiy_live と共通、高さは設定パネル用（frontend_vscode/scripts/window-size.cjs）。
+    const width = Math.min(size.幅, area.width), height = Math.min(size.パネル高さ, area.height);
     window = new BrowserWindow({
-      title: 'AiDiy (Discord)', width, height, minWidth: 380, minHeight: 414,
+      title: 'AiDiy (Discord)', width, height, minWidth: size.最小幅, minHeight: size.パネル高さ,
       x: area.x + Math.round((area.width - width) / 2), y: area.y + 8,
       frame: false, roundedCorners: false, show: false, backgroundColor: '#101217', autoHideMenuBar: true,
       icon: join(root, '../frontend_vscode/media/AiDiy.png'),
@@ -117,7 +123,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     const trusted = event => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === page;
     ipcMain.handle('discord:request', (event, action, value) => {
-      if (!trusted(event) || !['initial', 'select', 'select-code', 'catalog-code', 'start', 'stop'].includes(action)) throw new Error('許可されていない操作です。');
+      if (!trusted(event) || !['initial', 'select', 'select-code', 'catalog-code', 'start', 'stop', 'monitor'].includes(action)) throw new Error('許可されていない操作です。');
       return request(action, value);
     });
     ipcMain.handle('discord:window', (event, action) => {
@@ -129,10 +135,13 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     window.webContents.on('will-redirect', event => event.preventDefault());
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     await window.loadURL(page);
-    window.show(); window.focus();
-    if (!window.isVisible()) throw new Error();
-    // Windows の画面拡大率による丸め後の幅で中央を合わせる。
+    // Windows の画面拡大率による丸め後の幅で中央を合わせてから表示する。
     window.setPosition(area.x + Math.round((area.width - window.getBounds().width) / 2), area.y + 8);
+    // aidiy_code / aidiy_live と同じ初回演出（scripts/window-opening.cjs）。拡大が終わってから内容をフェード表示する。
+    const hidden = await window.webContents.insertCSS('body{opacity:0}');
+    if (!(await 拡大表示(BrowserWindow, window, { background: '#101217' }))) return;
+    if (!window.isVisible()) throw new Error();
+    await window.webContents.removeInsertedCSS(hidden);
     ready();
     if (autoConnect) void request('start').catch(() => {});
   }).catch(error => { console.error(`Discord パネルを開けませんでした: ${error.message}`); app.quit(); process.exitCode = 1; });

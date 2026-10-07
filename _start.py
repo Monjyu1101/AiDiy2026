@@ -570,6 +570,22 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
         DISCORD.kill_ports()
 
 
+def stop_all_tasks() -> None:
+    """Ctrl+C 時に `_cleanup.py` と同じ手順で全サービスを停止する。
+
+    起動したプロセスだけでなく、各フォルダの `kill_ports()`（別起動の常駐・Discord Bot を含む）、
+    Code / Live の単独実行、tools の MCP 接続まで止める。停止手順は `_cleanup.stop_all_services`
+    に一本化し、ここで個別に重複させない。
+    """
+    try:
+        spec = importlib.util.spec_from_file_location("aidiy_root_cleanup_for_start", BASE_DIR / "_cleanup.py")
+        cleanup = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cleanup)
+        cleanup.stop_all_services({})
+    except Exception as exc:
+        print_warning(f"一部のタスクを停止できませんでした: {exc}")
+
+
 # ============================================================
 # 環境確認 / サービス起動
 # ============================================================
@@ -1042,6 +1058,8 @@ def main() -> None:
             print_header("停止処理")
             print_info("Ctrl+C を検出しました。起動中プロセスを停止します")
             stop_processes(processes)
+            print_info("クリーンアップと同じ手順で、残っているタスクもすべて停止します")
+            stop_all_tasks()
 
             if sys.platform == "win32":
                 clear_keyboard_buffer()

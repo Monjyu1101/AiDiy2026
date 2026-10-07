@@ -11,10 +11,9 @@ function fixture(t) {
   fs.mkdirSync(app); fs.mkdirSync(bundle, { recursive: true });
   fs.copyFileSync(join(__dirname, '../local-backend.cjs'), join(app, 'local-backend.cjs'));
   fs.copyFileSync(join(__dirname, '../build-state.cjs'), join(app, 'build-state.cjs'));
-  const source = fs.readFileSync(join(__dirname, '../launch.mjs'), 'utf8');
-  assert.ok(source.includes('spawn(command, browserArgs,'));
-  // OS のブラウザ起動だけを代替し、親子の起動・常駐・通知処理は実コードで検証する。
-  fs.writeFileSync(join(app, 'launch.mjs'), source.replace('spawn(command, browserArgs,', "spawn(process.execPath, ['-e', 'process.exit(0)'],"));
+  fs.mkdirSync(join(root, 'scripts'));
+  for (const name of ['launch-project.mjs', 'window-size.cjs']) fs.copyFileSync(join(__dirname, '../../scripts', name), join(root, 'scripts', name));
+  fs.copyFileSync(join(__dirname, '../launch.mjs'), join(app, 'launch.mjs'));
   fs.writeFileSync(join(bundle, 'view.js'), '');
   fs.writeFileSync(join(bundle, 'server.cjs'), `exports.ライブ起動 = async (root, backend, packaged, project, models, modelFile, autoConnect) => {
     const server = require('node:http').createServer((req, res) => res.end(req.url === '/config' ? JSON.stringify({backend, project, models, autoConnect}) : 'mock live'));
@@ -44,7 +43,10 @@ function fixture(t) {
     await new Promise(resolve => setTimeout(resolve, 150));
     await fs.promises.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
-  const env = { ...process.env };
+  // OS のブラウザ起動だけを $BROWSER（共通の起動処理が最優先で使う）で代替し、
+  // 親子の起動・常駐・通知処理は実コードで検証する。node に URL を渡すだけなので何も開かない。
+  const env = { ...process.env, BROWSER: process.execPath };
+  delete env.CODESPACES;
   return { root, app, env, launch: (...args) => spawnSync(process.execPath, [join(app, 'launch.mjs'), ...args], {
     cwd: tmpdir(), env, encoding: 'utf8', timeout: 6000,
   }) };
@@ -91,7 +93,7 @@ test('Live 全体起動: --connect をモデルなしでブラウザ・Electron�
 test('Live ランチャー: Electron 失敗時もブラウザサーバーを分離して CMD へ戻れる', async t => {
   const f = fixture(t), result = f.launch('--provider', 'freeai', '--model', 'launch-model', '--project', tmpdir());
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /ブラウザの専用ウィンドウに切り替えます/);
+  assert.match(result.stderr, /ブラウザ版に切り替えます/);
   assert.match(result.stdout, /ブラウザ版を起動しました/);
   const out = join(f.root, 'out/aidiy_live');
   const ready = fs.readdirSync(out).find(name => name.endsWith('.browser.json'));

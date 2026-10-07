@@ -85,7 +85,7 @@ Discord 専用設定はこの5項目だけです。すべて必須で、ID は�
 
 Hermes と Python は VS Code と同じ起動探索で自動解決します。OpenAI OAuth の指定は CLI の provider と model に分けて渡し、認証エラー時に別 provider へ切り替えません。CLI の無応答タイムアウトは15分です。
 
-旧 Discord 専用の Live / Code / URL / 接頭辞設定は廃止しました。セットアップまたは backend の設定読み込みで除去し、共通設定には転記しません。接続情報・Code 設定の変更は、パネルで停止して再度開始すると読み直します。
+旧 Discord 専用の Live / Code / URL / 接頭辞設定は廃止しました。セットアップまたは backend の設定読み込みで除去し、共通設定には転記しません。接続情報・Code 設定の変更は、パネルで切断して再度接続すると読み直します。
 
 許可したユーザーは Bot 実行ユーザーの権限で Hermes のコード・ツールを利用できます。信頼する利用者を登録し、返信や音声を共有してよいチャンネルを指定してください。音声入力は許可ユーザーのみを取り込みますが、AI の発言は同じボイスチャンネルの参加者に聞こえます。
 
@@ -95,7 +95,7 @@ Hermes と Python は VS Code と同じ起動探索で自動解決します。Op
 aidiy_discord
 ```
 
-画面中央上部に小さなパネルが開きます。Live の AI・モデル・音声と、コード AI（Hermes の Provider）・モデルを選び、「開始」で Discord に接続します。Live のモデル・音声は `_config/AiDiy_live_gemini.json`（Gemini / FreeAI）と `_config/AiDiy_live_openai.json` の候補から選択します。コードモデルは直接入力もできます。コードの候補取得は `aidiy_code` と同じカタログを使います。「停止」でチャット・音声を終了して切断し、パネルを閉じた場合も Bot と実行中の CLI を終了します。接続中のモデル変更は停止してから行います。パネルを重ねて起動すると既存の画面を表示します。
+画面中央上部に小さなパネルが開きます。Live の AI・モデル・音声と、コード AI（Hermes の Provider）・モデルを選び、右上の「接続」で Discord に接続します。左上には作業フォルダを「プロジェクト: フォルダ名」で表示します。作業フォルダは aidiy_code / aidiy_live と同じく、`aidiy_discord [作業フォルダ]`（または `--project`）で指定し、省略時は起動したフォルダです。Live のモデル・音声は `_config/AiDiy_live_gemini.json`（Gemini / FreeAI）と `_config/AiDiy_live_openai.json` の候補から選択します。コードモデルは直接入力もできます。コードの候補取得は `aidiy_code` と同じカタログを使います。「切断」でチャット・音声を終了して切断し、パネルを閉じた場合も Bot と実行中の CLI を終了します。接続中のモデル変更は切断してから行います。パネルを重ねて起動すると既存の画面を表示します。
 
 単独の `aidiy_discord` は未接続で開きます。ルート `_start.py` で Discord を Yes にした場合（または明示的な `aidiy_discord --connect`）は、前回のモデルで自動接続します。全体起動からのパネルも手動で停止・終了でき、閉じたパネルを監視ループで再表示しません。全体の Ctrl+C・cleanup では Discord のプロセスも停止します。
 
@@ -106,6 +106,10 @@ JSON の候補から削除されたモデル・音声は自動使用せず、選
 最後に手動選択した Live モデル・音声は `~/.aidiy/aidiy_discord_model.json`、コード AI・モデルは `~/.aidiy/aidiy_discord_code_model.json` に保存します。単独起動でも全体起動からの自動接続でも、両方を復元して適用します。保存処理は `aidiy_live` / `aidiy_code` と共用し、保存ファイルは Discord 専用です。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
 
 `cd frontend_discord` 後の `npm start`、`python frontend_discord/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは `frontend_discord/out/aidiy_discord/` に保存します。
+
+### ブラウザ版（Codespaces など）
+
+`aidiy_discord --browser` で、Electron の代わりにブラウザでパネルを開きます。画面・操作は Electron 版と同じで、パネルのサーバー（`src/web-server.ts`）と WebSocket でやり取りします。GitHub Codespaces（`CODESPACES=true`）と画面のない Linux（`DISPLAY` / `WAYLAND_DISPLAY` なし）では、`--browser` を省略してもブラウザ版で開きます。ブラウザは VS Code / Codespaces が設定する `$BROWSER` を優先して手元の PC で開き、Codespaces ではポート転送先の URL（`https://<名前>-<ポート>.app.github.dev/…`）を使います。開けない場合は URL を表示します。判定と起動は `frontend_vscode/scripts/launch-project.mjs`、接続元の許可は `frontend_vscode/src/forwarded-origin.ts` で aidiy_code / aidiy_live / aidiy_discord 共通です。Electron 版でパネルを閉じた時と同じく、画面を閉じると60秒後（一度も開かれなければ120秒後）に Bot も終了します。3本（aidiy_code / aidiy_live / aidiy_discord）の起動規則は `frontend_vscode/scripts/launch-project.mjs` の冒頭に一覧し、そこで共通化しています。Electron の専用ウィンドウを開けない場合（未セットアップ・起動失敗）は、理由を表示してブラウザ版に切り替えます。ブラウザ版のサーバーは、画面を閉じて60秒（一度も開かれなければ120秒）で終了します。Bot の音声は Discord の UDP 通信を使うため、Codespaces で音声会話がつながるかは環境によります。
 
 ## クリーンアップ
 
@@ -124,7 +128,7 @@ JSON の候補から削除されたモデル・音声は自動使用せず、選
 
 Code の会話は「サーバー・テキストチャンネル・ユーザー」ごとに分かれ、プロセス内で最新200会話まで保持します。Bot 再起動後は新規会話です。Hermes 自身の保存セッションは削除しません。続けて届いたメッセージは同じ会話内で順番に処理し、実行中を含む待機数は10件まで、全体の並行実行は4件までです。長文回答は添付テキストにし、回答内の `@everyone` などは通知を発生させません。
 
-Live は指定ユーザーが指定ボイスチャンネルへ入室すると自動接続します。Bot 起動時も参加状態を確認します。AI の文字回答は指定テキストチャンネルに送ります。指定ユーザーの退出、Discord / AIコアの切断で終了します。別のユーザーやチャンネルでは開始しません。接続失敗時はボイスチャンネルに入り直してください。DM、Stage チャンネル、画面共有・映像には対応しません。
+Live は指定ユーザーが指定ボイスチャンネルへ入室すると自動接続します。Bot 起動時も参加状態を確認します。音声の文字起こしはパネルに表示し、指定テキストチャンネルには AI の応答が終わるごとに「あなたの最後の発言＋AI の応答」を1件にまとめて送ります。指定ユーザーの退出、Discord / AIコアの切断で終了します。別のユーザーやチャンネルでは開始しません。接続失敗時はボイスチャンネルに入り直してください。DM、Stage チャンネル、画面共有・映像には対応しません。
 
 ## 検証・音声仕様
 

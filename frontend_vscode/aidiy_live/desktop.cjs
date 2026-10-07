@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const { join } = require('node:path');
 const { writeFileSync } = require('node:fs');
 const { audioPermission, audioRequest } = require('./permissions.cjs');
+const size = require('../scripts/window-size.cjs');
+const { 拡大表示 } = require('../scripts/window-opening.cjs');
 const { ライブ起動 } = require('../dist/aidiy_live/server.cjs');
 const backend = process.env.AIDIY_LIVE_BACKEND || process.argv[2];
 const ready = process.env.AIDIY_LIVE_READY || process.argv[3];
@@ -21,8 +23,9 @@ app.whenReady().then(async () => {
   server = await ライブ起動(join(__dirname, '..'), backend, false, projectRoot, initialModels ? JSON.parse(initialModels) : {}, undefined, process.env.AIDIY_LIVE_CONNECT === '1');
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
-    title: 'AiDiy (Live)', width: 476, height: 602, minWidth: 360, minHeight: 480,
-    x: workArea.x + Math.max(0, workArea.width - 476 - 8), y: workArea.y + 8,
+    // 大きさは aidiy_code と同じ（scripts/window-size.cjs）。位置だけ Code と重ならないよう右上にする。
+    title: 'AiDiy (Live)', width: size.幅, height: size.会話高さ, minWidth: size.最小幅, minHeight: size.会話最小高さ,
+    x: workArea.x + Math.max(0, workArea.width - size.幅 - 8), y: workArea.y + 8,
     frame: false, roundedCorners: false, show: false, backgroundColor: '#000', autoHideMenuBar: true,
     icon: join(__dirname, '../media/AiDiy.png'),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
@@ -44,32 +47,11 @@ app.whenReady().then(async () => {
   const sendState = () => window.webContents.send('aidiy-live:window-state', { opening });
   window.webContents.on('did-finish-load', sendState);
   await window.loadURL(server.url);
-  // Code と同じ初回演出。拡大が終わってから内容をフェード表示する。
-  const bounds = window.getBounds();
-  const resize = scale => {
-    const width = Math.round(bounds.width * scale), height = Math.round(bounds.height * scale);
-    window.setBounds({ x: Math.round(bounds.x + (bounds.width - width) / 2), y: Math.round(bounds.y + (bounds.height - height) / 2), width, height });
-  };
-  window.setMinimumSize(0, 0);
-  resize(.55);
-  window.show(); window.focus();
-  if (!window.isVisible()) throw new Error('ウィンドウの表示を確認できませんでした。');
-  const expanded = await new Promise(resolve => {
-    const started = Date.now();
-    const tick = () => {
-      if (window.isDestroyed()) { resolve(false); return; }
-      const progress = Math.min(1, (Date.now() - started) / 750);
-      resize(.55 + .45 * (1 - Math.pow(1 - progress, 3)));
-      if (progress < 1) setTimeout(tick, 16);
-      else resolve(true);
-    };
-    tick();
-  });
-  if (!expanded) return;
-  window.setBounds(bounds);
-  window.setMinimumSize(360, 480);
-  // Windows の拡大率による丸めを含め、実際の幅で右端を合わせる。
+  // Windows の拡大率による丸めを含め、実際の幅で右端を合わせてから表示する。
   window.setBounds({ x: workArea.x + Math.max(0, workArea.width - window.getBounds().width - 8), y: workArea.y + 8 });
+  // Code と同じ初回演出（scripts/window-opening.cjs）。拡大が終わってから内容をフェード表示する。
+  if (!(await 拡大表示(BrowserWindow, window, { background: '#000' }))) return;
+  if (!window.isVisible()) throw new Error('ウィンドウの表示を確認できませんでした。');
   opening = false;
   sendState();
   if (ready) writeFileSync(ready, JSON.stringify({ url: server.url, windowShown: true }));

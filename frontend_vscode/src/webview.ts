@@ -87,7 +87,6 @@ const 一覧切替 = (show: boolean) => {
   element('conversation').hidden = show;
   element('progress-section').hidden = show || !element('progress').textContent;
   element('chat-footer').hidden = show;
-  element('view-title').textContent = show ? '会話一覧' : '今の会話';
   historyToggle.textContent = show ? '戻る' : '一覧';
   historyToggle.setAttribute('aria-expanded', String(show));
   if (!show) 最下部表示();

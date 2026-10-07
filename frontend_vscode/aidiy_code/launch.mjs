@@ -1,37 +1,39 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync } from 'node:fs';
-import { delimiter, dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
+import { プロジェクト引数書式, プロジェクトフォルダ決定, ブラウザ自動判定, ブラウザ版表示, ブラウザ版へ切替 } from '../scripts/launch-project.mjs';
 
 const extensionRoot = fileURLToPath(new URL('..', import.meta.url));
-let options;
+let options, projectRoot;
 try {
   options = parseArgs({ allowPositionals: true, options: {
-    provider: { type: 'string' }, model: { type: 'string' }, browser: { type: 'boolean' }, wait: { type: 'boolean' }, help: { type: 'boolean' },
+    provider: { type: 'string' }, model: { type: 'string' }, project: { type: 'string' }, browser: { type: 'boolean' }, wait: { type: 'boolean' }, help: { type: 'boolean' },
   } });
-  if (options.positionals.length > 1) throw new Error('作業フォルダは1つだけ指定してください。');
+  if (!options.values.help) projectRoot = プロジェクトフォルダ決定(options.positionals, options.values.project);
   for (const name of ['provider', 'model']) {
     if (options.values[name] !== undefined && !options.values[name].trim()) throw new Error(`--${name} に値を指定してください。`);
   }
 } catch (error) { console.error(error.message); process.exit(1); }
 if (options.values.help) {
-  console.log('aidiy_code [作業フォルダ] [--provider Provider] [--model モデル名] [--browser] [--wait]');
+  console.log(`aidiy_code ${プロジェクト引数書式} [--provider Provider] [--model モデル名] [--browser] [--wait]`);
   console.log('モデル未指定: 前回の手動選択（未保存なら既定設定）で起動。画面の「モデル」から変更できます。');
+  console.log('Codespaces・画面のない Linux では --browser を省略してもブラウザ版で開きます。');
   process.exit(0);
 }
-const browserMode = options.values.browser;
+// 明示しなくても、Codespaces・画面のない Linux ではブラウザ版にする（3本共通の規則は launch-project.mjs）。
+const requestedBrowser = !!options.values.browser || ブラウザ自動判定();
 const wait = !!options.values.wait;
-const projectRoot = resolve(options.positionals[0] || process.cwd());
 const provider = options.values.provider?.trim().replace(/^copilot_cli$/, 'copilot-cli');
 const model = options.values.model?.trim();
 const bundle = join(extensionRoot, 'dist', 'aidiy_code', 'server.cjs');
 const runRoot = join(extensionRoot, 'out', 'aidiy_code');
 
 function electronExecutable() {
-  const setupMessage = `専用ウィンドウにはセットアップ済みの Electron が必要です。python "${join(extensionRoot, '_setup.py')}" を実行してください。ブラウザで開く場合は --browser を指定します。`;
+  const setupMessage = `専用ウィンドウにはセットアップ済みの Electron が必要です。python "${join(extensionRoot, '_setup.py')}" を実行してください。`;
   try {
     // electron 本体を require すると、未配置時に起動中のダウンロードが始まる。
     // メタデータと実行ファイルだけを読み、取得は事前セットアップに任せる。
@@ -56,41 +58,7 @@ function electronExecutable() {
   }
 }
 
-function commandOnPath(name) {
-  return (process.env.PATH || '').split(delimiter).filter(Boolean).map(folder => join(folder, name)).find(existsSync);
-}
-
-function launchDetached(command, args) {
-  const child = spawn(command, args, { detached: true, stdio: 'ignore' });
-  child.on('error', error => console.error(`ブラウザを開けません: ${error.message}`));
-  child.unref();
-}
-
-function openBrowser(url) {
-  if (process.platform === 'win32') {
-    const candidates = [
-      [process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'],
-      [process.env['PROGRAMFILES(X86)'], 'Google/Chrome/Application/chrome.exe'],
-      [process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe'],
-      [process.env['PROGRAMFILES(X86)'], 'Microsoft/Edge/Application/msedge.exe'],
-      [process.env.PROGRAMFILES, 'Microsoft/Edge/Application/msedge.exe'],
-    ].filter(([base]) => Boolean(base)).map(([base, tail]) => join(base, tail));
-    const browser = candidates.find(existsSync);
-    if (browser) {
-      launchDetached(browser, [`--app=${url}`, `--user-data-dir=${join(runRoot, 'browser-profile')}`, '--no-first-run', '--no-default-browser-check', '--window-size=640,820']);
-    } else {
-      launchDetached('explorer.exe', [url]);
-    }
-    return true;
-  }
-  const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
-  if (!commandOnPath(opener)) return false;
-  launchDetached(opener, [url]);
-  return true;
-}
-
-async function main() {
-  if (!existsSync(projectRoot) || !statSync(projectRoot).isDirectory()) throw new Error(`作業フォルダがありません: ${projectRoot}`);
+async function main(browserMode) {
   const executable = browserMode ? process.execPath : electronExecutable();
   if (!existsSync(bundle)) {
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -145,13 +113,19 @@ async function main() {
     }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  const { url, windowShown } = JSON.parse(readFileSync(readyPath, 'utf8'));
+  const { url, publicUrl, windowShown } = JSON.parse(readFileSync(readyPath, 'utf8'));
   if (!browserMode && windowShown !== true) {
     try { process.kill(server.pid); } catch { /* already exited */ }
     throw startupFailure('専用ウィンドウの表示を確認できませんでした。');
   }
-  if (browserMode && !openBrowser(url)) console.log(`ブラウザで開いてください: ${url}`);
+  // Codespaces ではポート転送先の URL を開く。$BROWSER があれば手元の PC のブラウザで開く。
+  if (browserMode) await ブラウザ版表示(publicUrl || url, { profile: join(runRoot, 'browser-profile') });
   console.log(`AiDiy (Code) - Project folder: ${projectRoot}`);
 }
 
-main().catch(error => { console.error(error.message || String(error)); process.exitCode = 1; });
+main(requestedBrowser).catch(error => {
+  if (requestedBrowser) throw error;
+  // 専用ウィンドウを開けなければ、理由を表示してブラウザ版に切り替える。
+  ブラウザ版へ切替(error);
+  return main(true);
+}).catch(error => { console.error(error.message || String(error)); process.exitCode = 1; });

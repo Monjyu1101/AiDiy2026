@@ -25,9 +25,68 @@ body.connected #activity-bar { background: #00ffff; animation: cyan-bar-breathe 
   47.5%, 52.5% { background-color: rgb(0, 254, 254); }
   50% { background-color: rgb(0, 255, 255); }
 }
-*{box-sizing:border-box}body{margin:0;border:1px solid #333948;min-height:100vh}header{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;min-height:31px;padding:1px 2px;gap:8px;font-family:"Segoe UI","Yu Gothic UI",sans-serif;color:#e3e9f2;line-height:1.65;background:linear-gradient(110deg,color-mix(in srgb,#667eea 5%,transparent),transparent 65%),#000;border-bottom:1px solid #242424;-webkit-app-region:drag;user-select:none}
+*{box-sizing:border-box}body{transition:opacity .45s ease-out;margin:0;border:1px solid #333948;height:100vh;display:flex;flex-direction:column;overflow:hidden}header{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;min-height:31px;padding:1px 2px;gap:8px;font-family:"Segoe UI","Yu Gothic UI",sans-serif;color:#e3e9f2;line-height:1.65;background:linear-gradient(110deg,color-mix(in srgb,#667eea 5%,transparent),transparent 65%),#000;border-bottom:1px solid #242424;-webkit-app-region:drag;user-select:none}
 .brand{grid-column:2;display:flex;align-items:center;justify-content:center;gap:7px;font-size:14px;letter-spacing:-.5px}.window-actions{grid-column:3;justify-self:end;display:flex;gap:2px}button,select,input{-webkit-app-region:no-drag;font:inherit}button{cursor:pointer}.window-actions button{border:0;background:none;color:#9aa7b8;font-size:18px;width:28px;height:28px;padding:0}.window-actions button:hover{background:color-mix(in srgb,#667eea 8%,#000)}#close:hover{color:#fff;background:#cc415714}
-main{padding:17px 18px 12px}.section-label{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;gap:8px;align-items:center}.section-label span{font-size:9px;letter-spacing:1px;color:#a8b9ff;border:1px solid #405283;border-radius:3px;padding:1px 5px}
-.row{display:flex;align-items:center;gap:8px;margin:9px 0}label{width:50px;flex-shrink:0;color:#aeb7ce;font-size:11px}select,input{min-width:0;border:1px solid #353e53;background:#1b202c;color:#e9ecf5;border-radius:5px;padding:6px 8px;height:32px}select:focus,input:focus,button:focus-visible{outline:2px solid #8d9fff;outline-offset:1px}#provider{flex:1.1}#voice{flex:1}.voice-label{width:auto;margin-left:6px}#model,#code-model,#code-provider{flex:1;font-size:12px}.code-section{margin:17px 0 10px}.section-label small{margin-left:auto;font-weight:400;font-size:10px;color:#7d89a4}.code-last{margin-bottom:16px}.connection{display:flex;align-items:center;gap:12px;padding-top:14px;border-top:1px solid #2c3342}#status{flex:1;font-size:11px;display:flex;align-items:center;gap:8px;min-width:0}#dot{display:block;border-radius:50%;width:7px;height:7px;flex-shrink:0;background:#727e98}#dot[data-phase=connected]{background:#66d6a0;box-shadow:0 0 8px #66d6a055}#dot[data-phase=error]{background:#f79c9c}#dot[data-phase=connecting],#dot[data-phase=reconnecting]{background:#e7c57b}.primary{width:76px;border:1px solid #7187f5;border-radius:6px;padding:8px 10px;background:#526ade;color:#fff;font-weight:600}.primary:hover{background:#657bf0}.primary[data-stop=true]{border-color:#616e8c;background:#30394e}:disabled{opacity:.6;cursor:default}.hint{font-size:11px;color:#adb6cb;margin:13px 0 0}.note{font-size:10px;color:#7d89a4;margin:5px 0 0;line-height:1.5}.note.error{color:#f4aaa8}
+main{flex:1;min-height:0;overflow:auto;padding:17px 18px 12px}.section-label{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;gap:8px;align-items:center}.section-label span{font-size:9px;letter-spacing:1px;color:#a8b9ff;border:1px solid #405283;border-radius:3px;padding:1px 5px}
+.row{display:flex;align-items:center;gap:8px;margin:9px 0}label{width:50px;flex-shrink:0;color:#aeb7ce;font-size:11px}select,input{min-width:0;border:1px solid #353e53;background:#1b202c;color:#e9ecf5;border-radius:5px;padding:6px 8px;height:32px}select:focus,input:focus,button:focus-visible{outline:2px solid #8d9fff;outline-offset:1px}#provider{flex:1.1}#voice{flex:1}.voice-label{width:auto;margin-left:6px}#model,#code-model,#code-provider{flex:1;font-size:12px}.code-section{margin:17px 0 10px}.section-label small{margin-left:auto;font-weight:400;font-size:10px;color:#7d89a4}.code-last{margin-bottom:16px}#status{grid-column:1;justify-self:start;font-size:10px;display:flex;align-items:center;gap:5px;min-width:0;margin-left:6px;color:#9aa7b8;font-family:"Yu Gothic UI","Meiryo",sans-serif;line-height:1.3}#status-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#dot{display:block;border-radius:50%;width:5px;height:5px;flex-shrink:0;background:#9aa7b8}#dot[data-phase=connected]{background:#00ff00}#dot[data-phase=error]{background:#ff8e9e}#dot[data-phase=connecting],#dot[data-phase=reconnecting],#dot[data-phase=stopping]{background:#00ffff;box-shadow:0 0 0 3px #00ffff15,0 0 10px #00ffff60}:disabled{opacity:.6;cursor:default}.hint{font-size:11px;color:#adb6cb;margin:13px 0 0}.note{font-size:10px;color:#7d89a4;margin:5px 0 0;line-height:1.5}.note.error{color:#f4aaa8}
 
 #error-detail{display:block;width:100%;height:130px;margin-top:10px;resize:vertical;border:1px solid #70434a;border-radius:5px;padding:8px;background:#171b23;color:#f4aaa8;font:11px/1.6 Consolas,"Yu Gothic UI",monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}#error-detail[hidden]{display:none}
+
+/* aidiy_live と同じ「プロジェクト: フォルダ名」と接続ボタン。 */
+.conversation-toolbar{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:28px;padding:2px 4px;color:#9aa7b8;font-size:11px;border-bottom:1px solid #242424;background:#000}
+.conversation-context{display:flex;flex:1;min-width:0;align-items:baseline;gap:4px}
+.project-label{flex:0 0 auto;white-space:nowrap;font-size:11px;color:#9aa7b8}
+#project-folder{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#e3e9f2}
+#project-folder:empty::before{content:'未選択';color:#9aa7b8}
+#toggle{flex:0 0 auto;border:1px solid #69dcff;border-radius:0;padding:2px 7px;font-size:11px;line-height:1.4;color:#000;background:#fff;transition:background .15s,border-color .15s}
+#toggle:disabled{opacity:1}
+#toggle:hover:enabled{color:#000;background:#69dcff}
+body.connected #toggle,body.connected #toggle:hover:enabled{color:#000;background:#fff;border-color:#fff}
+#toggle.awaiting:enabled{animation:connect-breathe 4.5s ease-in-out infinite}
+@keyframes connect-breathe{0%,100%{background-color:#fff}50%{background-color:#69dcff}}
+
+/* 接続後のステージ。aidiy_live の初期画面（AiDiy 絵と回転する四角形）に揃える。 */
+#stage{display:none}
+body.live-view{background:#000}
+body.live-view #settings{display:none}
+body.live-view main{display:flex;flex-direction:column;overflow:visible;padding:36px 12px 10px}
+body.live-view #stage{display:flex;flex:1;min-height:0;flex-direction:column;align-items:center}
+.welcome-mark{position:relative;display:grid;place-items:center;flex-shrink:0;width:88px;height:88px;background:radial-gradient(circle at 25% 15%,color-mix(in srgb,#667eea 5%,transparent),transparent 75%);animation:welcome-float 6s ease-in-out infinite}
+.welcome-mark::before,.welcome-mark::after{content:'';position:absolute;inset:0;border:1px solid #00ffff;box-shadow:0 0 24px #00ffff40,inset 0 0 16px #00ffff15;pointer-events:none}
+.welcome-mark::before{transform:rotate(-6deg);animation:welcome-rotate-clockwise 20s linear infinite,welcome-glow 6s ease-in-out infinite,welcome-rainbow 12s linear infinite}
+.welcome-mark::after{transform:rotate(6deg);animation:welcome-rotate-counterclockwise 20s linear infinite,welcome-glow 6s ease-in-out -3s infinite,welcome-rainbow 12s linear -6s infinite}
+.welcome-mark img{position:relative;z-index:1;width:54px;height:54px;object-fit:contain}
+@keyframes welcome-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes welcome-rotate-clockwise{from{transform:rotate(-6deg)}to{transform:rotate(354deg)}}
+@keyframes welcome-rotate-counterclockwise{from{transform:rotate(6deg)}to{transform:rotate(-354deg)}}
+@keyframes welcome-rainbow{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}
+@keyframes welcome-glow{0%,100%{opacity:.2}50%{opacity:.7}}
+#stage-log{display:flex;flex:1;min-height:0;width:100%;flex-direction:column;align-items:center;margin-top:26px}
+#stage-idle[hidden],#stage-message[hidden]{display:none}
+/* 案内（接続先）とやり取りは同じ形: 枠の左肩に発言者名を置く。 */
+.stage-entry{display:flex;min-height:0;max-width:100%;flex-direction:column;transition:opacity .6s ease-out}
+#stage-message.fading{opacity:0}
+.stage-who{align-self:flex-start;margin-bottom:3px;color:#9aa7b8;font-size:10px;line-height:1.4}
+.stage-text{--message-color:#00ff00;min-height:0;overflow:auto;padding:4px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--message-color);font:11px/1.5 Consolas,"Yu Gothic UI",monospace;border:1px solid color-mix(in srgb,var(--message-color) 16%,#242424);background:color-mix(in srgb,var(--message-color) 3%,#000);text-shadow:0 1px 4px #000,0 0 8px #000}
+#stage-idle .stage-text{color:#9aa7b8;font-family:"Yu Gothic UI","Meiryo",sans-serif;border-color:#2c3342;background:#000}
+#stage-message[data-role=user] #stage-text{color:#fff;font-family:"Yu Gothic UI","Meiryo",sans-serif;border-color:color-mix(in srgb,#667eea 25%,#242424);background:color-mix(in srgb,#667eea 5%,#000)}
+.terminal-cursor{display:inline-block;width:1ch;height:1em;margin-left:.1ch;vertical-align:text-bottom;background:currentColor;animation:live-cursor-blink .7s step-end infinite}
+@keyframes live-cursor-blink{0%,50%{opacity:1}51%,100%{opacity:0}}
+#audio-cloud{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;display:none}
+body{isolation:isolate}
+body.live-view #audio-cloud{display:block}
+/* 画面左下のモニター切替: モニター（〇　）OFF / モニター（　〇）ON */
+#monitor{position:fixed;left:10px;bottom:8px;display:none;align-items:center;gap:6px;border:0;padding:2px 4px;background:none;color:#9aa7b8;font-size:11px;line-height:1.4}
+body.live-view #monitor{display:flex}
+#monitor:hover .switch-track{border-color:#69dcff}
+.switch-track{position:relative;width:28px;height:14px;border:1px solid #3a4152;border-radius:7px;background:#000;transition:background .15s,border-color .15s}
+.switch-knob{position:absolute;top:2px;left:2px;width:8px;height:8px;border-radius:50%;background:#9aa7b8;transition:left .15s,background .15s}
+#monitor-state{min-width:2.2em;text-align:left}
+#monitor[aria-checked=true]{color:#e3e9f2}
+#monitor[aria-checked=true] .switch-track{border-color:#69dcff;background:color-mix(in srgb,#69dcff 25%,#000)}
+#monitor[aria-checked=true] .switch-knob{left:16px;background:#69dcff}
+/* ブラウザ版（web-bridge.js が付与）: ウィンドウ操作はブラウザに任せ、パネル幅の列として中央に置く。
+   transform で固定配置（円型インジケーター・モニター切替）の基準をこの列にする。 */
+.browser-mode{background:#000}
+.browser-mode .window-actions{visibility:hidden}
+.browser-mode body{max-width:476px;margin:0 auto;transform:translateZ(0)}

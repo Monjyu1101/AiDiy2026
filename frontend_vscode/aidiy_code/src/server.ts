@@ -5,6 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { CLI実行, 会話引数, 起動解決, type 起動設定 } from '../../src/runner';
 import { コード要求実行, streamControlOf, visibleStreamContent } from '../../src/protocol';
 import { コードモデル読込, コードモデル保存, モデル保存先 } from '../../src/model-preferences';
+import { 接続元許可 } from '../../src/forwarded-origin';
 
 // 単独試用も拡張と同じ CLI・メッセージ形式・描画を使う。
 export async function 単独起動(project: string, launch?: 起動設定, initialModel: { provider?: string; model?: string } = {}, modelFile = モデル保存先('code')) {
@@ -33,6 +34,7 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
   const token = randomBytes(24).toString('hex');
   const prefix = `/${token}/`;
   let origin = '';
+  let allowed: 接続元許可 | undefined;
   let idle: NodeJS.Timeout | undefined;
   const broadcast = (packet: unknown) => { for (const client of clients) client.write(`data: ${JSON.stringify(packet)}\n\n`); };
   const notify = () => broadcast(state);
@@ -84,9 +86,9 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
     res.setHeader('Referrer-Policy', 'no-referrer');
     const reply = (code: number, value: unknown) => { res.writeHead(code, {'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(value)); };
     try {
-      // ローカル専用。別サイトからの CLI 実行、DNS rebinding を受け付けない。
-      if (req.headers.host !== origin.slice(7) || !req.url?.startsWith(prefix)) { reply(404, {error:'Not found'}); return; }
-      if (req.headers.origin && req.headers.origin !== origin) { reply(403, {error:'Forbidden'}); return; }
+      // ローカル（Codespaces ではポート転送先も）専用。別サイトからの CLI 実行、DNS rebinding を受け付けない。
+      if (!allowed?.host(req.headers.host) || !req.url?.startsWith(prefix)) { reply(404, {error:'Not found'}); return; }
+      if (req.headers.origin && !allowed.origin(req.headers.origin)) { reply(403, {error:'Forbidden'}); return; }
       const url = new URL(req.url, origin);
       const route = url.pathname.slice(prefix.length);
       if (req.method === 'GET' && route === 'events') {
@@ -114,7 +116,7 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
         } finally { catalogJobs.delete(task); }
       }
       if (req.method === 'POST' && route === 'message') {
-        if (req.headers.origin !== origin || !req.headers['content-type']?.startsWith('application/json')) { reply(403, {error:'Forbidden'}); return; }
+        if (!allowed.origin(req.headers.origin) || !req.headers['content-type']?.startsWith('application/json')) { reply(403, {error:'Forbidden'}); return; }
         req.setEncoding('utf8');
         let body = '';
         for await (const chunk of req) { body += chunk.toString(); if (body.length > 1_000_000) { reply(413, {error:'Message too long'}); return; } }
@@ -183,14 +185,15 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('起動できません。');
   origin = `http://127.0.0.1:${address.port}`;
+  allowed = new 接続元許可(address.port);
   idle = setTimeout(() => { void close(); }, 120_000);
-  return {url:origin+prefix, close};
+  return {url:origin+prefix, publicUrl:allowed.公開URL(prefix), close};
 }
 
 if (require.main === module) {
   const project = process.argv[2] || process.cwd();
   void 単独起動(project, undefined, process.argv[4] ? JSON.parse(process.argv[4]) : {}).then(app => {
-    if (process.argv[3]) writeFileSync(process.argv[3], JSON.stringify({url:app.url, pid:process.pid}), 'utf8');
+    if (process.argv[3]) writeFileSync(process.argv[3], JSON.stringify({url:app.url, publicUrl:app.publicUrl, pid:process.pid}), 'utf8');
     else console.log(`AiDiy (Code): ${app.url}`);
     process.on('SIGINT', () => { void app.close(); });
     process.on('SIGTERM', () => { void app.close(); });

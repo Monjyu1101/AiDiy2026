@@ -58,6 +58,8 @@ export class Discord音声出力 extends Readable {
   private pcm: Buffer = Buffer.alloc(0);
   private lastAudioAt = 0;
   private encoder = new OpusScript(48000, 2, OpusScript.Application.AUDIO);
+  /** 再生へ渡した20ms分の PCM（無音時は空）。パネルの音量表示に使う。 */
+  通過?: (pcm: Buffer) => void;
   constructor() { super({ objectMode: true, highWaterMark: 2 }); }
   追加(pcm: Buffer) {
     if (this.destroyed) return;
@@ -70,11 +72,13 @@ export class Discord音声出力 extends Readable {
     try {
       // チャンク境界を発話末尾と扱わない。続きは最大60ms待ち、末尾の端数だけ無音で埋める。
       if (!this.pcm.length || this.pcm.length < 960 && Date.now() - this.lastAudioAt < 60) {
+        this.通過?.(Buffer.alloc(0));
         this.push(Buffer.from([0xf8, 0xff, 0xfe])); return;
       }
       const frame = Buffer.alloc(960); // 24kHz mono、20ms
       this.pcm.copy(frame, 0, 0, 960);
       this.pcm = this.pcm.subarray(Math.min(960, this.pcm.length));
+      this.通過?.(frame);
       // ここでも20ms待つとエンコード時間分だけ遅れ、AudioPlayer が無音を挟んでしまう。
       this.push(this.encoder.encode(出力PCM変換(frame), 960));
     } catch { this.destroy(new Error('Discord 音声の変換に失敗しました。')); }
@@ -82,4 +86,35 @@ export class Discord音声出力 extends Readable {
   override _destroy(error: Error | null, callback: (error?: Error | null) => void) {
     this.pcm = Buffer.alloc(0); this.encoder.delete(); callback(error);
   }
+}
+
+// パネルの円型インジケーター用。aidiy_live の AnalyserNode（fftSize 256・Blackman 窓・-100〜-30dB）と同じ尺度で
+// 通過する PCM16 mono の周波数分布（0〜255 の128帯域）と音量を求める。音声そのものはパネルへ渡さない。
+const SPECTRUM_SIZE = 256;
+const blackman = Float64Array.from({ length: SPECTRUM_SIZE }, (_, i) => {
+  const x = 2 * Math.PI * i / (SPECTRUM_SIZE - 1);
+  return 0.42 - 0.5 * Math.cos(x) + 0.08 * Math.cos(2 * x);
+});
+export function 音声スペクトル(pcm: Buffer): number[] {
+  const count = Math.min(SPECTRUM_SIZE, Math.floor(pcm.length / 2)), start = Math.floor(pcm.length / 2) - count;
+  const samples = new Float64Array(SPECTRUM_SIZE);
+  for (let i = 0; i < count; i++) samples[SPECTRUM_SIZE - count + i] = pcm.readInt16LE((start + i) * 2) / 32768 * blackman[SPECTRUM_SIZE - count + i];
+  const bins: number[] = [];
+  for (let k = 0; k < SPECTRUM_SIZE / 2; k++) {
+    let re = 0, im = 0;
+    for (let n = 0; n < SPECTRUM_SIZE; n++) {
+      const angle = 2 * Math.PI * k * n / SPECTRUM_SIZE;
+      re += samples[n] * Math.cos(angle); im -= samples[n] * Math.sin(angle);
+    }
+    const db = 20 * Math.log10(Math.hypot(re, im) / SPECTRUM_SIZE || 1e-12);
+    bins.push(Math.max(0, Math.min(255, Math.round((db + 100) / 70 * 255))));
+  }
+  return bins;
+}
+export function 音声レベル(pcm: Buffer): number {
+  const count = Math.floor(pcm.length / 2);
+  if (!count) return 0;
+  let sum = 0;
+  for (let i = 0; i < count; i++) sum += (pcm.readInt16LE(i * 2) / 32768) ** 2;
+  return Math.min(1, Math.sqrt(sum / count) * 5);
 }

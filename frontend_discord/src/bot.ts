@@ -20,7 +20,7 @@ async function チャンネル回答送信(channel: SendableChannels, text: stri
   for (const content of 本文分割(text)) await channel.send({ content, allowedMentions: メンション禁止 });
 }
 
-type Live実体 = Pick<Live接続, '接続' | '終了' | 'テキスト送信' | 'channel'>;
+type Live実体 = Pick<Live接続, '接続' | '終了' | 'テキスト送信' | 'channel' | '表示' | 'メーター' | 'モニター送信'>;
 type Live生成 = (config: Discord設定, channel: VoiceChannel, notify: (text: string) => Promise<void>, onClose: () => void) => Live実体;
 
 export class DiscordBot {
@@ -36,6 +36,16 @@ export class DiscordBot {
   private chatQueue = new Map<string, Promise<void>>();
   private chatCount = new Map<string, number>();
   private network?: Discord通信;
+  // パネル下部に最後の発言を表示する。Discord への投稿とは独立している。
+  表示?: (who: string, text: string, role: 'user' | 'ai') => void;
+  メーター?: (kind: 'input' | 'output', level: number, bins: number[]) => void;
+  /** パネルのモニター用。ON の間だけ Live の音声を渡す（接続直後は OFF）。 */
+  音声?: (kind: 'input' | 'output', pcm: Buffer, rate: number) => void;
+  private monitor = false;
+  モニター設定(on: boolean) {
+    this.monitor = on;
+    if (this.live) this.live.モニター送信 = on ? (kind, pcm, rate) => this.音声?.(kind, pcm, rate) : undefined;
+  }
   constructor(private config: Discord設定, client?: Client, code?: Code接続,
     private createLive: Live生成 = (...args) => new Live接続(...args)) {
     if (!client) this.network = new Discord通信();
@@ -104,12 +114,18 @@ export class DiscordBot {
     if (count >= 10) throw new Error('返信待ちのメッセージが多いため、少し待ってから送ってください。');
     this.chatCount.set(key, count + 1);
     const previous = this.chatQueue.get(key) || Promise.resolve();
+    this.表示?.(message.member?.displayName ?? message.author.displayName, text, 'user');
     const pending = previous.catch(() => {}).then(async () => {
       if (this.closing) return;
       const run = this.code.実行(key, text);
       const typing = () => { if ('sendTyping' in message.channel) void message.channel.sendTyping().catch(() => {}); };
       typing(); const timer = setInterval(typing, 8000);
-      try { const answer = await run; if (!this.closing) await 回答送信(message, answer); }
+      try {
+        const answer = await run;
+        if (this.closing) return;
+        this.表示?.(this.client.user?.displayName ?? 'AiDiy', answer, 'ai');
+        await 回答送信(message, answer);
+      }
       finally { clearInterval(timer); }
     });
     this.chatQueue.set(key, pending);
@@ -154,7 +170,7 @@ export class DiscordBot {
       if (this.live) continue;
       const channel = this.希望ボイス();
       if (!channel) continue;
-      // 字幕と接続通知は設定した専用テキストチャンネルへ送る。
+      // 接続通知は設定した専用テキストチャンネルへ送る。字幕はパネル表示のみ。
       const textId = this.config.textChannelId;
       const textChannel = await this.client.channels.fetch(textId);
       if (!textChannel?.isSendable() || !('guildId' in textChannel) || textChannel.guildId !== this.config.guildId) throw new Error('音声会話の返信先がありません。');
@@ -190,6 +206,9 @@ export class DiscordBot {
     live = this.createLive(this.config, channel, notify, () => {
       if (this.live === live) { this.live = undefined; this.liveTextChannel = ''; }
     });
+    live.表示 = (who, text, role) => this.表示?.(who, text, role);
+    live.メーター = (kind, level, bins) => this.メーター?.(kind, level, bins);
+    if (this.monitor) live.モニター送信 = (kind, pcm, rate) => this.音声?.(kind, pcm, rate);
     // await 前に登録し、同時に live / leave が届いても接続を重複生成しない。
     this.live = live; this.liveTextChannel = textId;
     try {

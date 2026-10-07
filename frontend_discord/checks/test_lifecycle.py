@@ -192,7 +192,7 @@ class DiscordProcessMatchingTest(unittest.TestCase):
         self.assertTrue(processes.is_discord_process(dict(Name='node', CommandLine=command), root, False))
 
     def test_panel_worker_and_electron_match_only_this_checkout(self):
-        for entry, name in (('panel/launch.mjs', 'node.exe'), ('src/panel-worker.ts', 'node.exe'), ('panel/desktop.cjs', 'electron.exe')):
+        for entry, name in (('panel/launch.mjs', 'node.exe'), ('src/panel-worker.ts', 'node.exe'), ('src/web-server.ts', 'node.exe'), ('panel/desktop.cjs', 'electron.exe')):
             self.assertTrue(self.owned(f'{name} "{FRONTEND / entry}"', name))
             self.assertFalse(self.owned(f'{name} "{FRONTEND}.other/{entry}"', name))
             self.assertFalse(self.owned(f'{name} other.js "{FRONTEND / entry}"', name))

@@ -13,6 +13,8 @@ function fixture(t) {
   fs.mkdirSync(scripts);
   fs.mkdirSync(electron, { recursive: true });
   fs.copyFileSync(path.join(__dirname, '..', 'aidiy_code', 'launch.mjs'), path.join(scripts, 'launch.mjs'));
+  fs.mkdirSync(path.join(root, 'scripts'));
+  for (const name of ['launch-project.mjs', 'window-size.cjs']) fs.copyFileSync(path.join(__dirname, '..', 'scripts', name), path.join(root, 'scripts', name));
   fs.writeFileSync(path.join(electron, 'package.json'), JSON.stringify({ version: '44.5.1', main: 'index.js' }));
   fs.writeFileSync(path.join(electron, 'index.js'), 'throw new Error("UNEXPECTED_ELECTRON_DOWNLOAD");');
   const executable = process.platform === 'win32' ? 'electron.exe'
@@ -20,6 +22,8 @@ function fixture(t) {
   const binary = path.join(electron, 'dist', executable);
   const env = { ...process.env };
   delete env.ELECTRON_OVERRIDE_DIST_PATH;
+  delete env.CODESPACES; // 自動のブラウザ判定に左右されないようにする。
+  env.BROWSER = process.execPath; // ブラウザを開く代わりに node へ URL を渡すだけにする。
   env.ELECTRON_RUN_AS_NODE = '1';
   const launch = (...args) => spawnSync(process.execPath, [path.join(scripts, 'launch.mjs'), root, ...args], {
     encoding: 'utf8', timeout: 20000, env,
@@ -85,6 +89,19 @@ test('missing Electron gives setup guidance without downloading', t => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /_setup\.py/);
   assert.doesNotMatch(result.stdout + result.stderr, /Downloading|UNEXPECTED_ELECTRON_DOWNLOAD/);
+});
+
+test('Electron が使えない時は理由を表示してブラウザ版に切り替える（3本共通の規則）', t => {
+  const { root, launch } = fixture(t);
+  fs.mkdirSync(path.join(root, 'dist', 'aidiy_code'), { recursive: true });
+  // ブラウザ版のサーバーの代わりに、準備完了だけを書いて終了する。
+  fs.writeFileSync(path.join(root, 'dist', 'aidiy_code', 'server.cjs'),
+    'require("node:fs").writeFileSync(process.argv[3], JSON.stringify({ url: "http://127.0.0.1:1/local/", publicUrl: "https://example-1.app.github.dev/local/", pid: process.pid }));');
+  const result = launch();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /_setup\.py[\s\S]*ブラウザ版に切り替えます/);
+  assert.match(result.stdout, /ブラウザ版を起動しました: https:\/\/example-1\.app\.github\.dev\/local\//);
+  assert.match(result.stdout, /画面を閉じると60秒後にサーバーも終了します/);
 });
 
 test('outdated Electron requires setup before compiling or launching', t => {

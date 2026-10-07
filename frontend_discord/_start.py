@@ -50,14 +50,15 @@ def kill_ports() -> None:
 def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
     kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == 'win32' else {'start_new_session': True}
     args = ['--wait'] + (['--connect'] if auto_connect else [])
-    return subprocess.Popen(launch_command() + args, cwd=THIS_DIR, stdout=subprocess.PIPE,
+    # aidiy_code / aidiy_live と同じく、全体起動ではリポジトリ直下をプロジェクトにする。
+    return subprocess.Popen(launch_command() + args, cwd=THIS_DIR.parent, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, bufsize=0, **kwargs)
 
 
 def main() -> None:
     print_header('フロントエンド(Discord) パネル起動')
     try:
-        sys.exit(subprocess.call(launch_command() + sys.argv[1:], cwd=THIS_DIR))
+        sys.exit(subprocess.call(launch_command() + sys.argv[1:], cwd=THIS_DIR.parent))
     except (OSError, RuntimeError) as error:
         print(error)
         sys.exit(1)
