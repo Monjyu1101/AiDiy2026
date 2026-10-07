@@ -52,9 +52,12 @@
 - `src/network.ts` は起動時の HTTP(S)_PROXY / NO_PROXY を読み、REST は Undici の安定API `Agent.factory` / `ProxyAgent`、Gateway は `https-proxy-agent` を使う。REST dispatcher を指定しただけで Gateway 対応済みとしない。
 - 現行の `@discordjs/ws` 1.2.3 は Node で `ws` を使用し、`ws` が `createConnection` を指定するため `https.globalAgent` の変更だけではプロキシが適用されない。正規の `ws.buildStrategy` / `WorkerShardingStrategy` と `src/gateway-worker.mjs` で Gateway を専用スレッドへ分離し、その中の `https.request` に Gateway と resume の `*.discord.gg` だけ agent を渡す。停止時はSDKによる worker 終了まで待ち、CONNECT待ち・再接続タイマー・ソケットをまとめて回収する。RESTはBot本体の dispatcher をdestroyする。通常のBot workerの通信関数やローカルAIコアには適用しない。SDK更新時は、この経路とSDKの正規拡張点の有無を再確認する。node_modulesは編集しない。
 - ローカルAIコアは常に直接接続する。プロキシURL・資格情報をIPCやログへ渡さず、`connection-error.ts` でも環境プロキシURLを伏せる。
+- 音声用WebSocketは通常Gatewayとは別経路。`src/live.ts` のvoice adapterは `onVoiceServerUpdate` のendpointを `src/network.ts` の `Discord音声通信.接続先登録` へ渡してからSDKへ通知する。voice 0.19.2にはagent指定APIがないため、通知されたホスト・ポートへの `https.request` だけを捕捉する。非443ポート、NO_PROXY、音声サーバー変更・再接続を維持し、Live終了時にrequest関数・CONNECT待ち・ソケットを回収する。SDK更新時は正規のagent指定APIの有無を再確認する。
+- 「WebSocket接続中」のタイムアウトでは「音声接続先」のホスト・ポートと「プロキシ経由／直接接続」を照合し、プロキシのCONNECT許可も確認する。HTTPプロキシ対応はUDP中継を含まない。「UDP接続・IP検出中」の失敗はUDP経路を別途確認する。音声のトークン・セッションID・暗号鍵・プロキシURLはログへ出さない。
 - 設定方法は `frontend_discord/README.md` を参照する。環境変更後は旧パネルを閉じ、設定済みの起動元から開き直す。`panel/desktop.cjs` の fork は親環境を標準で継承する。GUIの起動元が端末と同じ環境を持つかは実機で確認する。
 - `checks/network.test.ts` は外部通信なしで大小文字・NO_PROXY・直接経路・失敗後の回収を検証する。模擬HTTP CONNECTプロキシとHTTPS/Gatewayを用い、実際の discord.js ClientReady と resume、認証付きプロキシ、ローカル通信の除外、実SDKの接続途中停止とスレッド終了も確認する。`checks/fixtures/network-*.fixture` はテスト専用の自己署名証明書・秘密鍵であり、製品には使用しない。子プロセスの `NODE_EXTRA_CA_CERTS` だけで信頼し、TLS検証を無効化しない。
 - `node checks/network-diagnostic.mjs` はBot設定を読まず、直接経路と環境経路の公開REST・認証前Gateway HELLOを比較する。通常テストから分離し、経路の失敗だけでは非ゼロ終了しない。Bot認証、対象PCのGUI接続、Hermes返信、音声UDPと実通話は別途確認する。
+- `checks/fixtures/network-runner.ts` は実際のLive adapterとvoice SDKを使い、模擬CONNECTプロキシ経由の非443ポートへの音声WSS接続、ローカル通信の除外、接続待ち中の停止も確認する。模擬音声WSSの成功を、UDP・DAVE・実通話の成功とは扱わない。
 
 ## 音声変更時の注意
 

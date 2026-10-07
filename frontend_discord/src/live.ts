@@ -7,10 +7,14 @@ import { LiveConnection, 入力レート, 音声入力, 音声操作 } from './v
 import type { Discord設定 } from './config';
 import { Discord音声出力, 音声入力ミキサー } from './audio';
 import { ライブ接続エラー, type ライブ接続段階 } from './connection-error';
+import { Discord音声通信 } from './network';
 
 const 音声トランスポート = {
-  join: (channel: VoiceChannel) => joinVoiceChannel({ channelId: channel.id, guildId: channel.guild.id,
-    adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: false, selfMute: false }),
+  join: (channel: VoiceChannel, network: Discord音声通信) => joinVoiceChannel({ channelId: channel.id, guildId: channel.guild.id,
+    adapterCreator: methods => channel.guild.voiceAdapterCreator({ ...methods, onVoiceServerUpdate: packet => {
+      if (packet.endpoint) network.接続先登録(packet.endpoint);
+      methods.onVoiceServerUpdate(packet);
+    } }), selfDeaf: false, selfMute: false }),
   ready: (voice: VoiceConnection, signal: AbortSignal) => entersState(voice, VoiceConnectionStatus.Ready, signal),
 };
 
@@ -38,6 +42,7 @@ export class Live接続 {
   private failure?: ライブ接続エラー;
   private receivedVoice = false;
   private receivedOutput = false;
+  private voiceNetwork?: Discord音声通信;
   constructor(private config: Discord設定, readonly channel: VoiceChannel, private notify: (text: string) => Promise<void>, private onClose: () => void,
     private transport = 音声トランスポート) {
     this.rate = 入力レート(config.liveModels.LIVE_AI_NAME || '');
@@ -77,7 +82,7 @@ export class Live接続 {
     const code = state && 'networking' in state ? state.networking.state.code : undefined;
     const phases = ['WebSocket接続中', 'WebSocket認証中', 'UDP接続・IP検出中', '音声暗号方式選択中', 'Ready', '再接続中', 'Closed'];
     const phase = code === undefined ? '未開始' : phases[code] ?? '不明';
-    return new Error(`ボイス状態: ${state?.status ?? '未開始'} / 音声通信: ${phase}`, { cause });
+    return new Error(`ボイス状態: ${state?.status ?? '未開始'} / 音声通信: ${phase}\n音声接続先: ${this.voiceNetwork?.接続先 ?? '未通知'}`, { cause });
   }
   private 再生開始() {
     this.player.stop(true);
@@ -130,7 +135,8 @@ export class Live接続 {
     this.startedAt = Date.now();
     try {
       console.log('[Discord Live] Discordボイス接続を開始します。');
-      this.voice = this.transport.join(this.channel);
+      this.voiceNetwork = new Discord音声通信();
+      this.voice = this.transport.join(this.channel, this.voiceNetwork);
       this.voice.on('error', error => this.失敗('Discord のボイス接続でエラーが発生しました。', this.ボイス通信エラー(error), 'Discordボイス接続'));
       this.voice.on(VoiceConnectionStatus.Disconnected, () => {
         const state = this.voice!.state;
@@ -172,7 +178,7 @@ export class Live接続 {
       this.stage = 'LiveAI';
       console.log('[Discord Live] LiveAIの待受準備が完了し、音声中継を開始しました。');
     } catch (error) {
-      const failure = this.failure ?? new ライブ接続エラー(error, this.stage, this.config.token, Date.now() - this.startedAt);
+      const failure = this.failure ?? new ライブ接続エラー(this.stage === 'Discordボイス接続' ? this.ボイス通信エラー(error) : error, this.stage, this.config.token, Date.now() - this.startedAt);
       this.終了(); throw failure;
     }
   }
@@ -222,6 +228,7 @@ export class Live接続 {
     for (const user of this.inputs.keys()) this.話者停止(user);
     this.player.stop(true); this.output?.destroy();
     if (this.voice && this.voice.state.status !== VoiceConnectionStatus.Destroyed) this.voice.destroy();
+    this.voiceNetwork?.終了();
     this.onClose();
   }
 }

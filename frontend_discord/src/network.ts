@@ -73,6 +73,60 @@ class GatewayAgent extends HttpsProxyAgent<string> {
   }
 }
 
+let voiceOwner: Discord音声通信 | undefined;
+
+// voice 0.19.2 に agent の指定APIがないため、SDKが通知した音声接続先だけを
+// ws → https.request で捕捉する。Gatewayは別worker、AIコアは常に直接接続。
+export class Discord音声通信 {
+  private route: ReturnType<typeof プロキシ経路>;
+  private agents = new Map<string, GatewayAgent>();
+  private targets = new Set<string>();
+  private abort = new AbortController();
+  private previous?: typeof https.request;
+  private request?: typeof https.request;
+  private closed = false;
+  private endpoint = '未通知';
+  constructor(env: NodeJS.ProcessEnv = process.env) { this.route = プロキシ経路(env); }
+  接続先登録(endpoint: string) {
+    if (this.closed) return;
+    const url = new URL(`https://${endpoint}`);
+    this.endpoint = `${url.hostname}:${url.port || 443} / ${this.route(url) ? 'プロキシ経由' : '直接接続'}`;
+    if (!this.route(url)) return;
+    this.targets.add(`${url.hostname}:${url.port || 443}`);
+    if (this.request) return;
+    if (voiceOwner) throw new Error('Discord 音声通信は既に接続中です。');
+    this.previous = https.request;
+    const original = this.previous;
+    this.request = ((...args: unknown[]) => {
+      const options = args[0];
+      if (options && typeof options === 'object' && !(options instanceof URL)) {
+        const requestOptions = options as https.RequestOptions;
+        const host = (requestOptions.hostname || requestOptions.host || '').toLowerCase();
+        const target = `${host}:${requestOptions.port || 443}`;
+        const proxy = this.targets.has(target) ? this.route(`https://${target}`) : '';
+        if (proxy) {
+          let agent = this.agents.get(proxy);
+          if (!agent) { agent = new GatewayAgent(proxy, this.abort.signal); this.agents.set(proxy, agent); }
+          args[0] = { ...requestOptions, agent };
+        }
+      }
+      return Reflect.apply(original, https, args);
+    }) as typeof https.request;
+    https.request = this.request;
+    voiceOwner = this;
+  }
+  get 接続先() { return this.endpoint; }
+  終了() {
+    if (this.closed) return;
+    this.closed = true;
+    if (this.request && https.request === this.request) https.request = this.previous!;
+    if (voiceOwner === this) voiceOwner = undefined;
+    this.abort.abort();
+    for (const agent of this.agents.values()) agent.destroy();
+    this.agents.clear(); this.targets.clear();
+  }
+}
+
 export class Discord通信 {
   readonly rest: Agent;
   private route: ReturnType<typeof プロキシ経路>;

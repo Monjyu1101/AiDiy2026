@@ -4,11 +4,13 @@ import https from 'node:https';
 import http from 'node:http';
 import net from 'node:net';
 import { once } from 'node:events';
-import { Client, Events } from 'discord.js';
+import { Client, Events, type VoiceChannel } from 'discord.js';
+import type { DiscordGatewayAdapterLibraryMethods } from '@discordjs/voice';
 import { WebSocket, WebSocketServer } from 'ws';
 import { request, Agent } from 'undici';
 import { Discord通信, Gateway戦略 } from '../../src/network';
 import { DiscordBot } from '../../src/bot';
+import { Live接続 } from '../../src/live';
 import { config, waitFor } from '../helpers';
 
 const tls = { key: readFileSync(new URL('./network-key.fixture', import.meta.url)), cert: readFileSync(new URL('./network-cert.fixture', import.meta.url)) };
@@ -98,6 +100,51 @@ try {
     } finally { await Promise.all([directClient.destroy(), direct.終了()]); }
   }
   gatewayHost = 'gateway.discord.gg';
+
+  // 実voice SDKとLiveのadapterを使い、音声専用WSSも非443ポートへCONNECTする。
+  // Voice Ready以降のUDPはこのHTTPプロキシ検証には含めない。
+  async function voiceCheck(endpoint: string, env: NodeJS.ProcessEnv, proxied: boolean) {
+    for (const key of ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy']) delete process.env[key];
+    Object.assign(process.env, env);
+    let methods!: DiscordGatewayAdapterLibraryMethods;
+    const settings = config();
+    const channel = { id: settings.voiceChannelId, guild: { id: settings.guildId,
+      voiceAdapterCreator: (callbacks: DiscordGatewayAdapterLibraryMethods) => {
+        methods = callbacks;
+        return { sendPayload: () => true, destroy: () => {} };
+      } } } as unknown as VoiceChannel;
+    let closed = 0;
+    const live = new Live接続(settings, channel, async () => {}, () => { closed++; });
+    const connecting = live.接続();
+    const rejected = assert.rejects(connecting, /Discordボイス接続/);
+    const before = targets.length;
+    const upgraded = hanging ? undefined : once(gateway, 'connection');
+    try {
+      methods.onVoiceStateUpdate({ guild_id: settings.guildId, channel_id: channel.id,
+        user_id: settings.userId, session_id: 'private-voice-session', deaf: false, mute: false,
+        self_deaf: false, self_mute: false, suppress: false, self_video: false, request_to_speak_timestamp: null });
+      methods.onVoiceServerUpdate({ guild_id: settings.guildId, endpoint, token: 'private-voice-token' });
+      if (proxied) await waitFor(() => targets.length > before);
+      if (upgraded) await upgraded;
+      assert.equal(targets.length - before, proxied ? 1 : 0);
+      if (proxied) assert.equal(targets.at(-1), endpoint);
+      // AIコアと同じローカルWSSは音声経路登録中も直接接続。
+      if (!hanging) {
+        const local = new WebSocket(`wss://127.0.0.1:${tlsPort}`);
+        local.on('error', () => {}); await once(local, 'open'); local.terminate();
+        assert.equal(targets.length - before, proxied ? 1 : 0);
+      }
+    } finally { live.終了(); await rejected; }
+    assert.equal(closed, 1);
+    assert.equal(https.request, originalRequest);
+    await waitFor(() => sockets.size === 0);
+  }
+  await voiceCheck(`resume.discord.gg:${tlsPort}`, { HTTPS_PROXY: proxyUrl }, true);
+  await voiceCheck(`localhost:${tlsPort}`, { HTTPS_PROXY: proxyUrl }, false);
+  await voiceCheck(`localhost:${tlsPort}`, { HTTPS_PROXY: proxyUrl, NO_PROXY: '*' }, false);
+  hanging = true;
+  await voiceCheck(`resume.discord.gg:${tlsPort}`, { HTTPS_PROXY: proxyUrl }, true);
+  hanging = false;
 
   // CONNECT応答前の停止でもプロキシへのTCP接続を回収する。
   hanging = true;
