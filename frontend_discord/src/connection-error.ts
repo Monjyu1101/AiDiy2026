@@ -35,7 +35,8 @@ export function 接続失敗案内(error: unknown, stage: 接続段階): string 
 
 export function 接続エラー詳細(error: unknown, stage: 接続段階, token = '', elapsedMs = 0): string {
   const redact = (value: string) => {
-    for (const secret of [token, token ? encodeURIComponent(token) : '']) {
+    for (const secret of [token, token ? encodeURIComponent(token) : '',
+      ...['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY'].map(key => process.env[key] || '')]) {
       if (secret) value = value.split(secret).join('[REDACTED]');
     }
     return value

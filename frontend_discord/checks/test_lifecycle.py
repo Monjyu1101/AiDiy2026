@@ -145,7 +145,9 @@ class DiscordLifecycleTest(unittest.TestCase):
             self.assertTrue(all(not (component / name).exists() for name in discord_cleanup.TARGETS))
 
     def test_launch_uses_absolute_entry_and_check_cannot_connect(self):
-        with patch.object(discord_start.shutil, 'which', return_value='node'):
+        with patch.object(discord_start.shutil, 'which', return_value='node'), patch.object(
+            discord_start.Path, 'is_file', return_value=True
+        ), patch.dict('sys.modules', {'setup_electron': Mock(electron_binary_ready=Mock(return_value=True))}):
             command = discord_start.launch_command()
             self.assertEqual(command[-1], str(FRONTEND / 'panel/launch.mjs'))
             with patch.object(discord_start.subprocess, 'run', return_value=Mock(returncode=0)) as run:

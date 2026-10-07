@@ -9,7 +9,7 @@ import { runInNewContext } from 'node:vm';
 test('終了中のパネルは起動成功とせず、旧プロセス終了後に再起動して表示を確認する', async () => {
   const moduleUrl = new URL('../panel/launch.mjs', import.meta.url).href;
   // 起動コード全体を実行し、Electron・時刻・ファイルだけを置き換える。
-  const source = readFileSync(fileURLToPath(moduleUrl), 'utf8').replace(/^import .*;\n/gm, '')
+  const source = readFileSync(fileURLToPath(moduleUrl), 'utf8').replace(/^import .*;\r?\n/gm, '')
     .replaceAll('import.meta.url', 'moduleUrl').replaceAll('process.exit(', 'return process.exit(');
   const files = new Map<string, string>(), starts: number[] = [], messages: string[] = [];
   let clock = 0, probes = 0, exitCode: number | undefined;

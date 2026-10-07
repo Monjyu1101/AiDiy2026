@@ -3,6 +3,7 @@ import { Code接続 } from './code';
 import { Live接続 } from './live';
 import type { Discord設定 } from './config';
 import { コマンド解析, メンション禁止, 会話キー, 利用許可, 本文分割 } from './commands';
+import { Discord通信, Gateway戦略 } from './network';
 
 export async function 回答送信(message: Message, text: string) {
   if (!message.channel.isSendable()) return;
@@ -33,9 +34,11 @@ export class DiscordBot {
   private voiceDirty = false;
   private chatQueue = new Map<string, Promise<void>>();
   private chatCount = new Map<string, number>();
+  private network?: Discord通信;
   constructor(private config: Discord設定, client?: Client, code?: Code接続,
     private createLive: Live生成 = (...args) => new Live接続(...args)) {
-    this.client = client ?? new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildVoiceStates], allowedMentions: メンション禁止 });
+    if (!client) this.network = new Discord通信();
+    this.client = client ?? new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildVoiceStates], allowedMentions: メンション禁止, rest: { agent: this.network!.rest }, ws: { buildStrategy: Gateway戦略 } });
     this.code = code ?? new Code接続(config);
     this.client.on(Events.ClientReady, () => {
       console.log('[Discord] 接続しました。専用チャンネルに話しかけると返信します。音声は入退室に合わせて接続します。');
@@ -43,7 +46,7 @@ export class DiscordBot {
     });
     this.client.on(Events.ShardResume, () => { this.connected = true; void this.自動ライブ同期(); });
     this.client.on(Events.MessageCreate, message => { void this.メッセージ受信(message).catch(() => console.error('[Discord] メッセージ処理・返信に失敗しました。権限と接続状態を確認してください。')); });
-    this.client.on(Events.Error, () => console.error('[Discord] Gateway エラーが発生しました。接続設定を確認してください。'));
+    this.client.on(Events.Error, () => { if (!this.closing) console.error('[Discord] Gateway エラーが発生しました。接続設定を確認してください。'); });
     this.client.on(Events.ShardDisconnect, () => { this.connected = false; this.live?.終了(); });
     this.client.on(Events.VoiceStateUpdate, (oldState, state) => this.ボイス状態変更(oldState, state));
   }
@@ -195,13 +198,17 @@ export class DiscordBot {
       throw new Error('ライブに接続できませんでした。AIコアの起動、LiveAI 設定、Discord の音声権限を確認してください。');
     }
   }
-  async 起動() { await this.client.login(this.config.token); }
+  async 起動() {
+    if (this.closing) throw new Error('Discord 接続は終了しています。');
+    try { await this.client.login(this.config.token); }
+    catch (error) { await this.終了().catch(() => {}); throw error; }
+  }
   終了(): Promise<void> {
     if (this.shutdown) return this.shutdown;
     this.closing = true; this.connected = false;
     // REST応答やコード実行の完了待ちより先に音声・Gatewayを切断する。
     // 遅れて完了する受信処理は closing の判定で再接続・返信を抑止する。
-    const cleanup = [() => this.live?.終了(), () => this.code.終了(), () => this.client.destroy()];
+    const cleanup = [() => this.live?.終了(), () => this.code.終了(), () => this.client.destroy(), () => this.network?.終了()];
     this.shutdown = Promise.allSettled(cleanup.map(stop => Promise.resolve().then(stop))).then(results => {
       if (results.some(result => result.status === 'rejected')) throw new Error('Discord 接続の終了処理に失敗しました。');
     });

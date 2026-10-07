@@ -18,7 +18,7 @@ test('単独起動・自動接続は無効なトークンを Electron 起動前�
     cpSync(join(source, 'src'), join(frontend, 'src'), { recursive: true });
     cpSync(join(source, 'panel/launch.mjs'), join(frontend, 'panel/launch.mjs'));
     writeFileSync(join(frontend, 'package.json'), '{"type":"module"}');
-    for (const name of ['tsx', 'discord.js', '@discordjs/voice', 'opusscript', 'ws']) {
+    for (const name of ['tsx', 'discord.js', '@discordjs/voice', '@discordjs/ws', 'opusscript', 'ws', 'https-proxy-agent', 'undici']) {
       const target = join(frontend, 'node_modules', name);
       mkdirSync(dirname(target), { recursive: true });
       symlinkSync(join(source, 'node_modules', name), target, 'junction');

@@ -33,3 +33,14 @@ test('循環参照・長文・文字列の例外でも詳細を安全に生成�
   assert.ok(接続エラー詳細(error, 'Discord接続').length < 1700);
   assert.match(接続エラー詳細('string exception', 'Discord接続'), /string exception/);
 });
+
+test('環境プロキシURLは認証なしの場合もログ・パネル詳細に表示しない', () => {
+  const previous = process.env.HTTPS_PROXY;
+  process.env.HTTPS_PROXY = 'http://private-proxy.example:8000';
+  try {
+    const details = 接続エラー詳細(new Error(`connect ${process.env.HTTPS_PROXY}`), 'Discord接続');
+    assert.match(details, /\[REDACTED\]/); assert.doesNotMatch(details, /private-proxy/);
+  } finally {
+    if (previous === undefined) delete process.env.HTTPS_PROXY; else process.env.HTTPS_PROXY = previous;
+  }
+});

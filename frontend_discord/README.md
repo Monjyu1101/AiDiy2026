@@ -17,6 +17,28 @@ python frontend_discord/_setup.py
 
 ルート `_setup.py` の「フロントエンド(Discord)」からも導入できます。セットアップは既定 Yes（`[y]/n`）で、Electron の事前配置と `~/.local/bin/aidiy_discord`（Windows は `.cmd`）の登録も行います。ルート `_start.py` の Discord 起動は既定 No（`[n]/y`）で、Yes を選ぶとパネルを開いて自動接続します。
 
+## プロキシが必要なネットワーク
+
+Discord への直接接続が制限される環境では、パネルを起動する親プロセスに `HTTPS_PROXY` を設定します。例のURLは、利用環境のHTTP(S)プロキシへ置き換えてください。
+
+```powershell
+$env:HTTPS_PROXY = 'http://proxy.example:8080'
+$env:NO_PROXY = 'localhost,127.0.0.1,::1'
+aidiy_discord
+```
+
+`HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` と小文字版に対応します。同じ変数が両方ある場合は空でない小文字版を優先し、HTTPS用が無ければHTTP用を使います。プロキシ未設定なら従来の直接接続です。`NO_PROXY` はカンマ・空白区切りのホスト名、ポート指定、`.example.com` / `*.example.com`、全除外の `*` を使えます。localhost・127系・IPv6ループバックは常に直接接続します。
+
+REST と Gateway（再接続・resumeを含む）をそれぞれプロキシ対応します。環境変数を変更したら **パネルを閉じ、環境変数を設定した端末から起動し直してください**。既存パネルを呼び出すだけでは新しい環境は継承されません。OSのGUIから起動する場合も、その起動元に設定が必要です。プロキシURLを共通キーJSONやソースに追加する必要はありません。
+
+認証不要の疎通確認は `frontend_discord` で次を実行します。環境変数の存在有無、公開RESTのHTTP状態、Gatewayの認証前HELLOを確認し、URLや認証情報は表示しません。外部通信を使うため `npm test` とは分けて実行します。
+
+```text
+node checks/network-diagnostic.mjs
+```
+
+診断結果はBot認証や音声の成功を保証しません。HTTPプロキシではDiscord音声のUDP通信を運べないため、Live音声は対象ネットワークでボイス入室・双方向音声・退出まで確認してください。
+
 ## Discord 側の準備
 
 1. [Discord Developer Portal](https://discord.com/developers/applications) で Application / Bot を作成します。

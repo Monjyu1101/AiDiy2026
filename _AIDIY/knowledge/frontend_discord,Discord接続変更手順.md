@@ -47,6 +47,15 @@
 - `Hermes確認` の失敗は、実際に動かしているPCで `aidiy_discord --check` を実行してPython・CLIの起動パスを確認する。開発環境の不足を別PCの原因とみなさない。
 - `checks/connection-error.test.ts` / `checks/panel.test.ts` で原因別の案内、詳細の伏せ字、失敗後の回収、再試行で詳細が消えることを確認する。Windows実機の接続可否は別途確認する。
 
+### REST / Gateway のプロキシ経路を確認する
+
+- `src/network.ts` は起動時の HTTP(S)_PROXY / NO_PROXY を読み、REST は Undici の安定API `Agent.factory` / `ProxyAgent`、Gateway は `https-proxy-agent` を使う。REST dispatcher を指定しただけで Gateway 対応済みとしない。
+- 現行の `@discordjs/ws` 1.2.3 は Node で `ws` を使用し、`ws` が `createConnection` を指定するため `https.globalAgent` の変更だけではプロキシが適用されない。正規の `ws.buildStrategy` / `WorkerShardingStrategy` と `src/gateway-worker.mjs` で Gateway を専用スレッドへ分離し、その中の `https.request` に Gateway と resume の `*.discord.gg` だけ agent を渡す。停止時はSDKによる worker 終了まで待ち、CONNECT待ち・再接続タイマー・ソケットをまとめて回収する。RESTはBot本体の dispatcher をdestroyする。通常のBot workerの通信関数やローカルAIコアには適用しない。SDK更新時は、この経路とSDKの正規拡張点の有無を再確認する。node_modulesは編集しない。
+- ローカルAIコアは常に直接接続する。プロキシURL・資格情報をIPCやログへ渡さず、`connection-error.ts` でも環境プロキシURLを伏せる。
+- 設定方法は `frontend_discord/README.md` を参照する。環境変更後は旧パネルを閉じ、設定済みの起動元から開き直す。`panel/desktop.cjs` の fork は親環境を標準で継承する。GUIの起動元が端末と同じ環境を持つかは実機で確認する。
+- `checks/network.test.ts` は外部通信なしで大小文字・NO_PROXY・直接経路・失敗後の回収を検証する。模擬HTTP CONNECTプロキシとHTTPS/Gatewayを用い、実際の discord.js ClientReady と resume、認証付きプロキシ、ローカル通信の除外、実SDKの接続途中停止とスレッド終了も確認する。`checks/fixtures/network-*.fixture` はテスト専用の自己署名証明書・秘密鍵であり、製品には使用しない。子プロセスの `NODE_EXTRA_CA_CERTS` だけで信頼し、TLS検証を無効化しない。
+- `node checks/network-diagnostic.mjs` はBot設定を読まず、直接経路と環境経路の公開REST・認証前Gateway HELLOを比較する。通常テストから分離し、経路の失敗だけでは非ゼロ終了しない。Bot認証、対象PCのGUI接続、Hermes返信、音声UDPと実通話は別途確認する。
+
 ## 音声変更時の注意
 
 - Discord 音声は Opus / 48kHz / stereo。AI 入力は PCM16LE / mono / 16kHz または24kHz、出力は24kHz。
