@@ -330,7 +330,7 @@ def get_opencode_config_path() -> Path:
 
 
 def get_antigravity_mcp_config_path() -> Path:
-    return Path.home() / ".gemini" / "antigravity-cli" / "mcp_config.json"
+    return Path.home() / ".gemini" / "config" / "mcp_config.json"
 
 
 def get_grok_config_path() -> Path:
@@ -412,6 +412,8 @@ def cleanup_global_mcp_configs(prefix: str = BACKEND_TOOLS_SERVER_PREFIX):
         (Path.home() / ".claude.json",            "mcpServers"),
         (copilot_home / "mcp-config.json",        "mcpServers"),
         (get_antigravity_mcp_config_path(),       "mcpServers"),
+        # 以前のセットアップが書き込んだ stdio 設定も解除する。
+        (Path.home() / ".gemini" / "antigravity-cli" / "mcp_config.json", "mcpServers"),
         (get_opencode_config_path(),              "mcp"),
         (get_vscode_mcp_path(),                   "servers"),
     ]

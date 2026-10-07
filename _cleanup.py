@@ -14,7 +14,7 @@
 仮想環境などを対話的に一括削除します。クリーンアップを実行する場合は、削除開始前に
 全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
 Code / Live の単独実行と tools の MCP 接続プロセスも強制終了・確認します。ルート固有の
-処理（ルート temp / _temp / backup フォルダの削除、グローバル npm ツールの
+処理（全階層の temp / _temp / .temp とルート backup の削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
 
@@ -64,7 +64,7 @@ BACKEND_HERMES_PATH = "command_hermes"
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
 
 BACKUP_PATH = "backup"
-ROOT_TEMP_PATHS = ("temp", "_temp")
+TEMP_DIR_NAMES = frozenset(("temp", "_temp", ".temp"))
 CLEANUP_STOP_REQUEST_PATH = BASE_DIR / ".cleanup_stop_request.json"
 
 DATABASE_TYPE = "sqlite"
@@ -354,6 +354,60 @@ def remove_directory(path: Path, description: str) -> bool:
     return False
 
 
+def _is_directory_link(path: Path) -> bool:
+    return path.is_symlink() or getattr(path, "is_junction", lambda: False)()
+
+
+def find_temp_directories(base_dir: Path) -> list[Path]:
+    """全階層の一時ディレクトリを集める。Git 管理情報とリンク先は巡回しない。"""
+    root = base_dir.resolve(strict=True)
+    if not root.is_dir():
+        raise NotADirectoryError(root)
+    targets: list[Path] = []
+
+    def scan_error(error):
+        raise error
+
+    for current, directories, _files in os.walk(root, followlinks=False, onerror=scan_error):
+        for name in list(directories):
+            path = Path(current) / name
+            if name.lower() == ".git" or _is_directory_link(path):
+                directories.remove(name)
+                continue
+            if name.lower() in TEMP_DIR_NAMES:
+                # 親 temp ごと削除するため、その内側は重複して列挙しない。
+                directories.remove(name)
+                targets.append(path)
+    return sorted(targets)
+
+
+def cleanup_temp_directories(base_dir: Path) -> bool:
+    """実体パスを削除直前にも検証し、プロジェクト内の一時ディレクトリを削除する。"""
+    print_header("全階層の temp / _temp / .temp フォルダのクリーンアップ")
+    try:
+        root = base_dir.resolve(strict=True)
+        targets = find_temp_directories(root)
+    except (OSError, RuntimeError) as e:
+        print_error(f"一時フォルダの検索に失敗しました: {e}")
+        return False
+
+    ok = True
+    for path in targets:
+        try:
+            resolved = path.resolve(strict=True)
+            if (_is_directory_link(path) or resolved != path
+                    or resolved == root or not resolved.is_relative_to(root)):
+                raise ValueError(f"削除対象がプロジェクト内の通常フォルダではありません: {path}")
+            if not remove_directory(path, f"一時フォルダ ({path.relative_to(root)})"):
+                ok = False
+        except FileNotFoundError:
+            continue
+        except (OSError, RuntimeError, ValueError) as e:
+            print_error(f"一時フォルダの削除に失敗しました: {e}")
+            ok = False
+    return ok
+
+
 def cleanup_backup(base_dir: Path, choices: dict):
     backup_dir = base_dir / BACKUP_PATH
     if not backup_dir.exists():
@@ -407,6 +461,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     print_header("クリーンアップ内容の選択")
     print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
     print_info("常駐サービスが起動中の場合は、削除開始前にすべて停止します。")
+    print_info("全階層の temp / _temp / .temp はフォルダ選択に関係なく削除します（ダウンロード済みモデルを含む）。")
 
     choices: dict = {
         "npm_uninstall":  False,
@@ -414,7 +469,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "tools":            False,
         "tools_envs":       {},
         "tools_node_modules": None,
-        "tools_temp":       None,
+        "tools_temp":       None,  # 一時フォルダは最後の全階層処理でまとめて削除する。
         "backend":        False,
         "backend_envs":   {},
         "backend_logs":   None,
@@ -451,10 +506,6 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     choices["local_envs"][env_name] = ask_yes_no(
                         f"  {BACKEND_LOCAL_PATH}/{env_name} を削除しますか？", default="y",
                     )
-            if (backend_local_dir / "temp").exists():
-                choices["local_temp"] = ask_yes_no(
-                    f"  {BACKEND_LOCAL_PATH}/temp フォルダ(ダウンロード済みモデル含む)を削除しますか？", default="y",
-                )
 
     choices["tools"] = ask_yes_no("バックエンド(tools) をクリーンアップしますか？", default="y")
     if choices["tools"]:
@@ -469,10 +520,6 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                 choices["tools_node_modules"] = ask_yes_no(
                     f"  {BACKEND_TOOLS_PATH}/node_modules を削除しますか？", default="y",
                 )
-            if (backend_tools_dir / "temp").exists():
-                choices["tools_temp"] = ask_yes_no(
-                    f"  {BACKEND_TOOLS_PATH}/temp フォルダを削除しますか？", default="y",
-                )
 
     choices["backend"] = ask_yes_no("バックエンド(core,apps)をクリーンアップしますか？", default="y")
     if choices["backend"]:
@@ -483,10 +530,6 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     choices["backend_envs"][env_name] = ask_yes_no(
                         f"  {BACKEND_PATH}/{env_name} を削除しますか？", default="y",
                     )
-            if (backend_dir / "temp").exists():
-                choices["backend_temp"] = ask_yes_no(
-                    f"  {BACKEND_PATH}/temp フォルダを削除しますか？", default="y",
-                )
             if (
                 DATABASE_TYPE.lower() == "sqlite"
                 and (base_dir / SQLITE_DB_REL_PATH).exists()
@@ -502,10 +545,6 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     choices["taskteam_envs"][env_name] = ask_yes_no(
                         f"  {BACKEND_TASKTEAM_PATH}/{env_name} を削除しますか？", default="y",
                     )
-            if (taskteam_dir / "temp").exists():
-                choices["taskteam_temp"] = ask_yes_no(
-                    f"  {BACKEND_TASKTEAM_PATH}/temp フォルダを削除しますか？", default="y",
-                )
 
     choices["web"] = ask_yes_no("フロントエンド(Web)をクリーンアップしますか？", default="y")
     choices["avatar"] = ask_yes_no("フロントエンド(Avatar)をクリーンアップしますか？", default="y")
@@ -519,10 +558,6 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                     choices["hermes_envs"][env_name] = ask_yes_no(
                         f"  {BACKEND_HERMES_PATH}/{env_name} を削除しますか？", default="y",
                     )
-            if (hermes_dir / "temp").exists():
-                choices["hermes_temp"] = ask_yes_no(
-                    f"  {BACKEND_HERMES_PATH}/temp フォルダを削除しますか？", default="y",
-                )
 
     choices["vscode"] = ask_yes_no("フロントエンド(vscode)をクリーンアップしますか？", default="y")
     choices["discord"] = ask_yes_no("フロントエンド(Discord)をクリーンアップしますか？", default="y")
@@ -544,13 +579,6 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
         uninstall_global_npm_tools()
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
-
-    print()
-    for root_temp_name in ROOT_TEMP_PATHS:
-        root_temp_dir = base_dir / root_temp_name
-        if root_temp_dir.exists():
-            print_header(f"ルート {root_temp_name} フォルダのクリーンアップ")
-            remove_directory(root_temp_dir, f"ルート {root_temp_name}")
 
     print()
     cleanup_backup(base_dir, choices)
@@ -613,6 +641,10 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
         print_info("フロントエンド(Discord)のクリーンアップをスキップしました")
 
     print()
+    if not cleanup_temp_directories(base_dir):
+        cleanup_errors.append("全階層の temp / _temp / .temp")
+
+    print()
     # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
     for folder in IMPORT_CACHE_FOLDERS:
         _remove_folder_import_cache(folder)
@@ -642,7 +674,7 @@ def main():
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  1. ルート temp / _temp フォルダ")
+    print_info("  1. 全階層の temp / _temp / .temp フォルダ")
     print_info("  2. ルート backup フォルダ")
     print_info("  3. バックエンド(local)")
     print_info("  4. バックエンド(tools)")

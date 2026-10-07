@@ -5,11 +5,11 @@
 ## このメモを使う場面
 - `backend_tools` の入口、SSE サーバー、stdio bridge の役割を確認する
 - MCP サーバーを追加、分割、修正する
-- Codex など stdio クライアントから AiDiy MCP を使う経路を調査する
+- Codex / Antigravity の Streamable HTTP 接続や、stdio クライアントから AiDiy MCP を使う経路を調査する
 
 ## 構成方針
 - 常駐入口は `backend_tools/tools_main.py`
-- Codex など stdio クライアント向けの SSE 変換入口は `backend_tools/mcp_stdio.py`
+- Codex / Antigravity は Streamable HTTP の `/mcp` へ直接接続する。stdio 接続を選ぶクライアント向けの SSE 変換入口は `backend_tools/mcp_stdio.py`
 - 再利用ロジックは `backend_tools/tools_proc/` に置く
 - `tools_main.py` からは `tools_proc.<module>` として import する
 - `tools_main.py` は MCP SDK 2.x の `MCPServer` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す。Windows では 19 本、Linux / macOS では 18 本
@@ -48,9 +48,9 @@
 | トランスポート | アクセス方法 | 用途 |
 |----------------|-------------|------|
 | **SSE Transport** | `GET /{mcp_name}/sse` + `POST /{mcp_name}/messages/` | Claude や公式 MCP SSE クライアントが接続 |
-| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` | Grok の `type=sse`（initialize を `/sse` へ POST）と Streamable HTTP クライアント。REST の `{method_name}` より先にミドルウェアが受け取る |
+| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` | Codex / Antigravity（`/mcp`）、Grok の `type=sse`（initialize を `/sse` へ POST）と Streamable HTTP クライアント。REST の `{method_name}` より先にミドルウェアが受け取る |
 | **HTTP POST（REST）** | `POST /{mcp_name}/{method_name}` | Python / curl / 自動化スクリプトが直接呼び出し |
-| **stdio gateway** | `mcp_stdio.py --sse-url .../sse` | Codex など stdio 専用の Code CLI が経由 |
+| **stdio gateway** | `mcp_stdio.py --sse-url .../sse` | stdio 接続を選ぶ MCP クライアントが経由 |
 
 MCP一覧: `GET http://127.0.0.1:8095/` — 全 MCP 名を返す。  
 ツール一覧: `GET http://127.0.0.1:8095/{mcp_name}/list` — ツール名・説明・引数スキーマを JSON で返す。  
@@ -157,7 +157,7 @@ Chrome DevTools 系ツールは `_ensure_chrome()` で Chrome の起動状態を
 
 ## stdio bridge の注意点
 
-- Codex の `url = ...` は streamable HTTP 用。AiDiy の SSE エンドポイントは `mcp_stdio.py` を挟む
+- Codex の `url = ...` は Streamable HTTP 用で、セットアップは `/mcp` を指定する。stdio 接続を選ぶクライアントは `mcp_stdio.py` で SSE へ中継する
 - MCP SDK 2.x の SSE クライアントは `httpx2.AsyncClient` を使う。`httpx.AsyncClient` を factory から返すと `AsyncClient object has no attribute sse` になる
 - 低レベル `Server` の中継ハンドラーは `Server(..., on_list_tools=..., on_call_tool=...)` で登録する。1.x の `server.request_handlers[...]` は使わない
 - 初期化結果は `server_info`、要求パラメータは `CallToolRequestParams` などの snake_case 属性で参照する

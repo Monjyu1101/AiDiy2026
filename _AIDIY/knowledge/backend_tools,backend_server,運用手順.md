@@ -39,7 +39,7 @@ Set-Location backend_tools
 uv run uvicorn tools_main:app --host 0.0.0.0 --port 8095
 ```
 
-Codex など stdio クライアントから使う場合:
+stdio 接続を選ぶクライアントから使う場合:
 
 ```powershell
 Set-Location backend_tools
@@ -79,8 +79,8 @@ uv sync --locked --no-install-project
 | インターフェース | 説明 | 代表 URL / コマンド |
 |----------------|------|-------------------|
 | **SSE（MCP標準）** | AI エージェント・MCP クライアントが使う標準トランスポート | `http://127.0.0.1:8095/{mcp_name}/sse` |
-| **Streamable HTTP** | MCP クライアントが JSON-RPC を送る。`/sse` は POST / DELETE を受け付ける | `http://127.0.0.1:8095/{mcp_name}/mcp` または `/{mcp_name}/sse` |
-| **stdio gateway** | `mcp_stdio.py` が SSE を stdin/stdout に変換。Codex 等の stdio 専用 CLI が使う | `mcp_stdio.py --sse-url .../sse` |
+| **Streamable HTTP** | Codex / Antigravity は `/mcp` へ直接接続する。`/sse` は POST / DELETE も受け付ける | `http://127.0.0.1:8095/{mcp_name}/mcp` または `/{mcp_name}/sse` |
+| **stdio gateway** | `mcp_stdio.py` が SSE を stdin/stdout に変換。stdio 接続を選ぶクライアント向け | `mcp_stdio.py --sse-url .../sse` |
 | **HTTP POST（FastAPI）** | REST API として直接呼び出せる。Swagger UI (`/docs`) で試行可能。Python から最も簡単に利用できる | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` |
 
 各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` で JSON 取得できる。Swagger UI は本体の `http://127.0.0.1:8095/docs`。`aidiy_task_agents` などは個別の `/{mcp_name}/docs` でも HTTP 利用例を返す。

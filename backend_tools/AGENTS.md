@@ -97,9 +97,9 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 | トランスポート | エンドポイント / コマンド | 主な利用者 |
 |----------------|--------------------------|-----------|
 | **SSE Transport** | `GET /{mcp_name}/sse` + `POST /{mcp_name}/messages/` | Claude Code、stdio bridge、公式 MCP SSE クライアント |
-| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` | Grok（`type=sse` は initialize を `/sse` へ POST する）、MCP Streamable HTTP クライアント |
+| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` | Codex / Antigravity（`/mcp` へ直接接続）、Grok（`type=sse` は initialize を `/sse` へ POST する）、MCP Streamable HTTP クライアント |
 | **HTTP POST（REST）** | `POST /{mcp_name}/{method_name}` | Python スクリプト、curl、自動化処理 |
-| **stdio gateway** | `mcp_stdio.py --sse-url http://127.0.0.1:8095/{mcp_name}/sse` | Codex など stdio 専用の Code CLI |
+| **stdio gateway** | `mcp_stdio.py --sse-url http://127.0.0.1:8095/{mcp_name}/sse` | stdio 接続を選ぶ MCP クライアント |
 
 MCP一覧は `GET http://127.0.0.1:8095/` で確認できます。  
 各 MCP のツール一覧・引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` が JSON で返します。  

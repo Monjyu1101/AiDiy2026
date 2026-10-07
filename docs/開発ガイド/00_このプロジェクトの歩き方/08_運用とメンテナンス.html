@@ -179,6 +179,7 @@ npm install</code></pre>
  python _cleanup.py</code></pre>
 
  <p>このスクリプトは<strong>対話形式</strong>で対象を最初にまとめて選択し、常駐サービスを停止してからクリーンアップします。</p>
+ <p><code>temp</code>・<code>_temp</code>・<code>.temp</code> は、個別フォルダの選択に関係なくプロジェクト内の全階層から削除します。隠しフォルダ内やダウンロード済みモデルも含みます。Git管理情報とリンク先は巡回せず、削除直前に実体パスがプロジェクト内であることを確認します。</p>
 
  <h3>主な選択対象</h3>
  <table>
@@ -187,11 +188,11 @@ npm install</code></pre>
  </thead>
  <tbody>
  <tr><td>グローバルAI CLI</td><td>npm系AI CLIツールのアンインストール</td><td><strong>n</strong></td></tr>
- <tr><td><code>backend_local</code></td><td>仮想環境とtemp（ダウンロード済みモデルを含む）</td><td>対象選択 y</td></tr>
- <tr><td><code>backend_tools</code></td><td>仮想環境、node_modules、temp、MCP設定解除</td><td>対象選択 y</td></tr>
- <tr><td><code>backend_server</code></td><td>仮想環境、temp、SQLite DB</td><td>対象選択 y / DB削除は<strong>n</strong></td></tr>
- <tr><td><code>backend_taskteam</code></td><td>仮想環境とtemp</td><td>対象選択 y</td></tr>
- <tr><td><code>command_hermes</code></td><td>仮想環境、temp、ランチャー/PATH登録</td><td>対象選択 y</td></tr>
+ <tr><td><code>backend_local</code></td><td>仮想環境</td><td>対象選択 y</td></tr>
+ <tr><td><code>backend_tools</code></td><td>仮想環境、node_modules、MCP設定解除</td><td>対象選択 y</td></tr>
+ <tr><td><code>backend_server</code></td><td>仮想環境、SQLite DB</td><td>対象選択 y / DB削除は<strong>n</strong></td></tr>
+ <tr><td><code>backend_taskteam</code></td><td>仮想環境</td><td>対象選択 y</td></tr>
+ <tr><td><code>command_hermes</code></td><td>仮想環境、ランチャー/PATH登録</td><td>対象選択 y</td></tr>
  </tbody>
  </table>
 
@@ -212,13 +213,13 @@ npm install</code></pre>
  <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
  </thead>
  <tbody>
- <tr><td><code>backup/</code></td><td><code>aidiy_backup</code> の差分バックアップ出力。削除前に復旧要否を確認</td><td>存在時 y</td></tr>
+ <tr><td><code>backup/</code></td><td><code>aidiy_backup</code> の差分バックアップ出力。内部のtemp / _temp / .tempは共通削除対象</td><td>存在時 y</td></tr>
  </tbody>
  </table>
 
  <div>
  <strong>Tip</strong>
- <p>SQLite DB、backup、ダウンロード済みモデルを消す選択は復旧不能になり得ます。選択内容を確認してから実行してください。<br>
+ <p>SQLite DBとbackup本体は選択式で削除します。ダウンロード済みモデルを含む一時フォルダは共通処理で削除します。<br>
  仮想環境やnode_modulesを削除した後は <code>python _setup.py</code> で再セットアップします。</p>
  </div>
  </section>

@@ -255,7 +255,10 @@ def write_json_list_file(path: Path, data: list) -> bool:
         return False
 
 
-def upsert_json_mcp_servers(path: Path, entries: list[tuple[str, dict]], top_key: str = "mcpServers") -> bool:
+def upsert_json_mcp_servers(
+    path: Path, entries: list[tuple[str, dict]], top_key: str = "mcpServers",
+    *, remove_keys: tuple[str, ...] = (),
+) -> bool:
     """複数サーバーをまとめて 1 つの JSON ファイルへ書き込む（読み書き各 1 回）。"""
     try:
         data = load_json_dict_file(path)
@@ -266,6 +269,8 @@ def upsert_json_mcp_servers(path: Path, entries: list[tuple[str, dict]], top_key
             current = servers.get(server_name)
             if isinstance(current, dict):
                 merged = dict(current)
+                for key in remove_keys:
+                    merged.pop(key, None)
                 merged.update(server_config)
                 servers[server_name] = merged
             else:
@@ -337,7 +342,7 @@ def get_opencode_config_path() -> Path:
 
 
 def get_antigravity_mcp_config_path() -> Path:
-    return Path.home() / ".gemini" / "antigravity-cli" / "mcp_config.json"
+    return Path.home() / ".gemini" / "config" / "mcp_config.json"
 
 
 def get_grok_config_path() -> Path:
@@ -591,25 +596,14 @@ def ensure_python_module_attribute(
 
 
 def upsert_codex_backend_tools_config(module: dict) -> bool:
+    """Codex CLI へ Streamable HTTP の /mcp 接続を登録する。"""
     config_path = Path.home() / ".codex" / "config.toml"
     server_name = module.get("server_name", module["name"])
-    sse_url = module.get("sse_url", "").strip()
+    sse_url = module.get("sse_url", "").strip().rstrip("/")
+    mcp_url = sse_url.removesuffix("/sse") + "/mcp"
     table_header = f"[mcp_servers.{server_name}]"
-    python_path = find_python_in_env(backend_tools_DIR, backend_tools_ENV_CANDIDATES)
-    if python_path is None:
-        print_error(f"Codex 設定用の Python 仮想環境が見つかりません: {backend_tools_DIR}")
-        return False
-    script_path = backend_tools_DIR / "mcp_stdio.py"
-    if not script_path.exists():
-        print_error(f"Codex 設定用のスクリプトが見つかりません: {script_path}")
-        return False
     body_lines = [
-        f'command = "{toml_escape_string(str(python_path))}"',
-        "args = [",
-        f'    "{toml_escape_string(str(script_path))}",',
-        '    "--sse-url",',
-        f'    "{toml_escape_string(sse_url)}",',
-        "]",
+        f'url = "{toml_escape_string(mcp_url)}"',
         "startup_timeout_sec = 60",
     ]
     if not upsert_toml_table(config_path, table_header, body_lines):
@@ -767,7 +761,7 @@ def show_current_config(module: dict | None = None) -> None:
     targets = [
         ("グローバル ~/.claude.json (Claude Code)",               Path.home() / ".claude.json",            "mcpServers"),
         ("グローバル ~/.copilot/mcp-config.json (Copilot CLI)",    copilot_home / "mcp-config.json",        "mcpServers"),
-        ("グローバル ~/.gemini/antigravity-cli/mcp_config.json (Antigravity)", antigravity_mcp,               "mcpServers"),
+        ("グローバル ~/.gemini/config/mcp_config.json (Antigravity)", antigravity_mcp,               "mcpServers"),
         ("グローバル ~/.config/opencode/opencode.json (OpenCode)", opencode_mcp,                            "mcp"),
         ("グローバル ~/.codex/config.toml (Codex CLI)",            Path.home() / ".codex" / "config.toml",  "mcpServers"),
         ("グローバル ~/.grok/config.toml (Grok CLI)",              get_grok_config_path(),                  "mcpServers"),
@@ -783,7 +777,7 @@ def show_current_config(module: dict | None = None) -> None:
                     for sn in server_names:
                         table_header = f"[mcp_servers.{sn}]"
                         if table_header in content:
-                            print_success(f"  [{label}] {sn}: stdio bridge configured")
+                            print_success(f"  [{label}] {sn}: configured")
                         else:
                             print_warning(f"  [{label}] ファイルあり、{sn} エントリなし")
                 else:
@@ -813,7 +807,7 @@ def configure_clients(module: dict | None = None) -> bool:
     label = f"{module['name']} MCP 設定"
     print_header(label)
     print_info("Claude / GitHub Copilot / Antigravity / OpenCode / Codex / Grok / VS Code 用のグローバル設定ファイルを書き込みます。")
-    print_info("Codex / Antigravity は stdio の mcp_stdio.py を起動し、その先で backend_tools の SSE へ接続します。")
+    print_info("Codex / Antigravity は Streamable HTTP の /mcp へ直接接続します。")
     print_info("Grok CLI は ~/.grok/config.toml へ type=sse で直接登録します。")
 
     servers: list[tuple[str, str]] = []
@@ -877,38 +871,19 @@ def configure_clients(module: dict | None = None) -> bool:
     code_cli_servers = [(sn, url) for sn, url in servers if sn not in CODE_CLI_MCP_EXCLUDE]
     code_cli_excluded = sorted(sn for sn, _ in servers if sn in CODE_CLI_MCP_EXCLUDE)
 
-    # 4) Antigravity (mcpServers - stdio型)
+    # 4) Antigravity (mcpServers - Streamable HTTP)
     antigravity_mcp = get_antigravity_mcp_config_path()
     print_info(f"[Antigravity] {antigravity_mcp}")
     if code_cli_excluded:
         print_info(f"  Codex/Antigravity 除外: {', '.join(code_cli_excluded)}")
     all_ok &= remove_json_mcp_servers(antigravity_mcp, CODE_CLI_MCP_EXCLUDE)
 
-    python_path = find_python_in_env(backend_tools_DIR, backend_tools_ENV_CANDIDATES)
-    script_path = backend_tools_DIR / "mcp_stdio.py"
-
-    if python_path is None or not script_path.exists():
-        print_error("Antigravity 設定用の Python 仮想環境または mcp_stdio.py が見つかりません。")
-        all_ok = False
-    else:
-        try:
-            if antigravity_mcp.exists():
-                data = load_json_dict_file(antigravity_mcp)
-                servers_dict = data.get("mcpServers", {})
-                if isinstance(servers_dict, dict):
-                    for sn, _ in code_cli_servers:
-                        if sn in servers_dict and isinstance(servers_dict[sn], dict):
-                            servers_dict[sn].pop("serverUrl", None)
-                    data["mcpServers"] = servers_dict
-                    write_json_file(antigravity_mcp, data)
-        except Exception as e:
-            print_warning(f"Antigravity の旧 serverUrl 設定削除中にエラーが発生しました: {e}")
-
-        antigravity_entries = []
-        for sn, url in code_cli_servers:
-            config = {"command": str(python_path), "args": [str(script_path), "--sse-url", url]}
-            antigravity_entries.append((sn, config))
-        all_ok &= upsert_json_mcp_servers(antigravity_mcp, antigravity_entries)
+    # 旧 stdio の起動キーや別形式の URL を除き、利用者のその他の設定は残す。
+    all_ok &= upsert_json_mcp_servers(
+        antigravity_mcp,
+        [(sn, {"serverUrl": url.rstrip("/").removesuffix("/sse") + "/mcp"}) for sn, url in code_cli_servers],
+        remove_keys=("command", "args", "env", "cwd", "type", "url", "httpUrl"),
+    )
 
     # 5) OpenCode (tools)
     opencode_global = get_opencode_config_path()
@@ -919,7 +894,7 @@ def configure_clients(module: dict | None = None) -> bool:
         top_key="mcp",
     )
 
-    # 6) Codex CLI (TOML, stdio ブリッジ)
+    # 6) Codex CLI (TOML, Streamable HTTP)
     codex_path = Path.home() / ".codex" / "config.toml"
     print_info(f"[Codex CLI]   {codex_path}")
     all_ok &= remove_codex_mcp_servers(CODE_CLI_MCP_EXCLUDE)

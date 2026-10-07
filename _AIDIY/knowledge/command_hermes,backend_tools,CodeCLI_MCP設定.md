@@ -1,6 +1,6 @@
 # Code CLI の MCP 設定
 
-> 文書: `command_hermes,backend_tools,CodeCLI_MCP設定.md` | 実装: `command_hermes/`, `backend_tools/tools_main.py`
+> 文書: `command_hermes,backend_tools,CodeCLI_MCP設定.md` | 実装: `backend_tools/_setup.py`, `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`
 
 ## このメモを使う場面
 - Claude / Gemini / Codex / Antigravity などの Code CLI から AiDiy MCP を使わせる
@@ -13,8 +13,8 @@
 |-----|-------------|------|
 | Claude | `C:\Users\admin\.claude.json`、または project `.mcp.json` | `claude mcp add -s project` は `.mcp.json` を作る |
 | Gemini | project `.gemini/settings.json` | BOM なし UTF-8 で保存する |
-| Antigravity | `C:\Users\admin\.gemini\antigravity-cli\mcp_config.json` | `mcp_stdio.py` を経由した stdio server として登録する（Codexと同様） |
-| Codex | `C:\Users\admin\.codex\config.toml` | `mcp_stdio.py` を stdio server として登録する |
+| Antigravity | `C:\Users\admin\.gemini\config\mcp_config.json` | Streamable HTTP の `/{mcp_name}/mcp` を `serverUrl` で登録する |
+| Codex | `C:\Users\admin\.codex\config.toml` | Streamable HTTP の `/{mcp_name}/mcp` を `url` で登録する |
 | Grok | `C:\Users\admin\.grok\config.toml` | ネイティブ SSE（`type = "sse"`）。stdio ブリッジは使わない |
 | Copilot | `C:\Users\admin\.copilot\mcp-config.json` | `_setup.py` / `_cleanup.py` の対象 |
 | OpenCode | `C:\Users\admin\.config\opencode\opencode.json` | 公式 docs では `mcp` キー配下。`.opencode/` は agents / commands / plugins などのディレクトリ用途 |
@@ -24,13 +24,14 @@
 - `.gemini/settings.json`
 - `.gitignore`
 - `_setup.py`
+- `backend_tools/_setup.py`
 - `_cleanup.py`
 - `scripts/cli_bat/_claude-code.bat`
 - `scripts/cli_bat/_codex_cli.bat`
 - `backend_tools/mcp_stdio.py`
 - `C:\Users\admin\.codex\config.toml`
 - `C:\Users\admin\.grok\config.toml`
-- `C:\Users\admin\.gemini\antigravity-cli\mcp_config.json`
+- `C:\Users\admin\.gemini\config\mcp_config.json`
 
 ## Grok へ SSE で直接登録する設定
 
@@ -48,39 +49,39 @@ enabled = true
 
 `grok mcp add --transport sse <name> <sse-url>` でも同じ内容になる。`~/.claude.json` も読むが、同名は `~/.grok/config.toml` が優先する。
 
-## Codex / Antigravity から stdio ブリッジを介して AiDiy MCP を使う設定
+## Codex から Streamable HTTP で直接接続する設定
 
-Codex や Antigravity CLI からは、AiDiy の SSE エンドポイントを直接扱わず、 `backend_tools/mcp_stdio.py` ブリッジスクリプトを挟んで stdio サーバとして登録します。
+Codex CLI は stdio と Streamable HTTP に対応する。AiDiy のセットアップでは `/{mcp_name}/mcp` へ直接接続する設定を生成する。
 
 ### Codex の設定例 (config.toml)
 ```toml
 [mcp_servers.aidiy_chrome_devtools]
-command = "<repo>\\backend_tools\\.venv\\Scripts\\python.exe"
-args = [
-  "<repo>\\backend_tools\\mcp_stdio.py",
-  "--sse-url",
-  "http://127.0.0.1:8095/aidiy_chrome_devtools/sse",
-]
+url = "http://127.0.0.1:8095/aidiy_chrome_devtools/mcp"
 startup_timeout_sec = 60
 ```
+
+`backend_tools/_setup.py` の `upsert_codex_backend_tools_config()` は、共通定義の `sse_url` 末尾を `/sse` から `/mcp` へ変換する。既存の同名テーブルを置き換えるため、旧 stdio 設定の `command` / `args` も除去される。Codex 用の設定生成自体は Python 仮想環境や `mcp_stdio.py` の存在に依存しない。
+
+登録対象と除外対象は同ファイルの `MCP_MODULES` / `CODE_CLI_MCP_EXCLUDE` に従う。接続時は `backend_tools` を起動し、設定変更後は Codex を再起動する。
+
+## Antigravity から Streamable HTTP で直接接続する設定
+
+Antigravity CLI は `~/.gemini/config/mcp_config.json` の `mcpServers` に HTTP 接続先を登録する。AiDiy のセットアップでは Codex と同じ `/mcp` へ直接接続する。
 
 ### Antigravity の設定例 (mcp_config.json)
 ```json
 {
   "mcpServers": {
     "aidiy_chrome_devtools": {
-      "command": "<repo>\\\\backend_tools\\\\.venv\\\\Scripts\\\\python.exe",
-      "args": [
-        "<repo>\\\\backend_tools\\\\mcp_stdio.py",
-        "--sse-url",
-        "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
-      ]
+      "serverUrl": "http://127.0.0.1:8095/aidiy_chrome_devtools/mcp"
     }
   }
 }
 ```
 
-他の AiDiy MCP も同様に `--sse-url` の URL を `/aidiy_sqlite/sse` などの正しいマウントパスへ変えて登録します。
+登録対象は Codex と共通の `CODE_CLI_MCP_EXCLUDE` に従う。同名の旧 stdio 設定があれば `command` / `args` / `env` / `cwd` と旧形式の `type` / `url` / `httpUrl` を除去し、`serverUrl` を更新する。他のサーバーや接続方式に関係しない設定は保持する。設定生成自体は Python 仮想環境や `mcp_stdio.py` に依存しない。
+
+旧設定先 `~/.gemini/antigravity-cli/mcp_config.json` への新規書き込みは行わない。cleanup は新旧両方の設定先から `aidiy_*` を解除する。詳細は [`Antigravity CLI の MCP 接続設定`](./command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md) を参照する。
 
 ## セットアップ/クリーンアップの方針
 
@@ -99,7 +100,7 @@ startup_timeout_sec = 60
 - Claude のグローバル設定に旧 `chrome-devtools` が残ると `claude mcp list` で失敗表示になる。現行は `aidiy_chrome_devtools`
 - OpenCode の公式なグローバル設定は `~/.config/opencode/opencode.json`。`.opencode/` は project / home 配下で agents、commands、plugins などを置く用途
 - `scripts/cli_bat/_claude-code.bat` は `--mcp-config` を付けず、グローバル設定を使う前提
-- Codex や Antigravity から AiDiy MCP へつなぐ場合は、`backend_tools` と対象 SSE サーバーが起動済みであることを先に確認する
+- Codex や Antigravity から AiDiy MCP へつなぐ場合は、`backend_tools` が起動済みであることを先に確認する。どちらも Streamable HTTP を使う
 - ローカル CLI 設定はユーザー環境依存なので、project の同期対象へ入れない
 
 ## 確認方法
@@ -108,10 +109,18 @@ startup_timeout_sec = 60
 claude mcp list
 gemini mcp list
 codex mcp list
+agy mcp list
 grok mcp list
 grok inspect
 python _setup.py
 python _cleanup.py
 ```
 
-`_setup.py` 実行後は `.gitignore` に `.claude/` と `.gemini/` が含まれること、Codex/Antigravity 設定では `mcp_stdio.py --sse-url ...` 形式になっていることを確認する。Codex は `startup_timeout_sec` を使うため、古い `startup_timeout_ms` が残っている場合は秒指定へ更新する。Grok は `~/.grok/config.toml` の各 `aidiy_*` に `type = "sse"` があること、`grok mcp list` にサーバーが出ることを確認する。
+`_setup.py` 実行後は、次を確認する。
+
+- `.gitignore` に `.claude/` と `.gemini/` が含まれること。
+- Codex の各 `aidiy_*` が `url = "http://127.0.0.1:8095/<名前>/mcp"` と `startup_timeout_sec = 60` を持ち、旧 `command` / `args` が残らないこと。`codex mcp list --json` の `transport.type` は `streamable_http` になる。
+- Antigravity の各 `aidiy_*` が `serverUrl: "http://127.0.0.1:8095/<名前>/mcp"` を持ち、旧 `command` / `args` が残らないこと。`agy mcp list` の TYPE は `http` になる。
+- Grok は各 `aidiy_*` に `type = "sse"` があり、`grok mcp list` にサーバーが出ること。
+
+`codex mcp list` は設定の読み込み確認であり、ツール実行の疎通確認とは分ける。実接続は Codex から対象 MCP のツールを呼び出して確認する。非対話の `codex exec` で承認が必要なツールが `approval policy is never` により止まる場合は、依頼済みの操作を承認審査に回せる `--approve-for-me` を使う。これは接続エラーではない。

@@ -97,8 +97,8 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 | インターフェース | 説明 |
 |----------------|------|
 | **SSE（MCP標準）** | `GET /{mcp_name}/sse` + `POST /{mcp_name}/messages/` — Claude や公式 MCP SSE クライアント |
-| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` — Grok の `type=sse` は initialize を `/sse` へ POST する。同じ URL の GET は従来 SSE のまま |
-| **stdio gateway** | `mcp_stdio.py --sse-url .../sse` — SSE を stdin/stdout に変換。Codex など stdio 専用 CLI が使う |
+| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` — Codex / Antigravity は `/mcp` へ直接接続する。Grok の `type=sse` は initialize を `/sse` へ POST する。同じ URL の GET は従来 SSE のまま |
+| **stdio gateway** | `mcp_stdio.py --sse-url .../sse` — SSE を stdin/stdout に変換。stdio 接続を選ぶクライアント向け |
 | **HTTP POST（FastAPI）** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` — REST API として直接呼び出し可能。Swagger UI (`/docs`) で試行できる |
 
 各 MCP の引数仕様 JSON: `GET http://127.0.0.1:8095/{mcp_name}/list`。Swagger UI は本体の `http://127.0.0.1:8095/docs`。`aidiy_task_agents` などは個別の `/{mcp_name}/docs` でも HTTP 利用例を返す。
@@ -141,13 +141,13 @@ print(res.json())
 
 ## stdio クライアントから使う場合
 
-Codex など SSE を直接扱えないクライアントは `backend_tools/mcp_stdio.py` を使う。
+stdio 接続を選ぶクライアントは `backend_tools/mcp_stdio.py` を使う。
 
 ```powershell
 backend_tools\.venv\Scripts\python.exe backend_tools\mcp_stdio.py --sse-url http://127.0.0.1:8095/aidiy_sqlite/sse
 ```
 
-Codex の `url = ...` は streamable HTTP 用なので、AiDiy MCP の SSE URL を直接指定しない。
+Codex / Antigravity のセットアップは Streamable HTTP の `/mcp` へ直接接続する設定を生成する（Codex は `url`、Antigravity は `serverUrl`）。詳細は [`Code CLI の MCP 設定`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) を参照する。
 
 ## 起動・再起動
 

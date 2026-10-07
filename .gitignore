@@ -90,12 +90,10 @@ coverage/
 # Logs & temp
 *.log
 logs/
+# 一時フォルダは全階層で除外する（末尾 / はディレクトリだけに一致）。
 temp/
 _temp/
-backend_server/temp/
-backend_server/temp/**
-backend_tools/temp/
-backend_tools/temp/**
+.temp/
 _work/
 _log/
 

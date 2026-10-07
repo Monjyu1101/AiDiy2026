@@ -13,6 +13,10 @@
 他の担当者にプロジェクトを渡す前に、
 不要なキャッシュファイルやビルド成果物を削除します。
 
+このサンプルは backend_server / frontend_web の2構成向けの学習用です。
+現行 AiDiy の全階層 temp / _temp / .temp 整理は、リポジトリ直下の
+`_cleanup.py` の `cleanup_temp_directories()` を参照してください。
+
 Usage:
  python cleanup.py
 """
