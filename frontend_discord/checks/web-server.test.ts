@@ -28,7 +28,10 @@ test('ブラウザ版の画面は Electron 版と同じ index.html に WebSocket
 
 test('ブラウザ版サーバー: 許可した接続元の要求だけを中継し、通知を配信して、画面が閉じたら終了する', { timeout: 10000 }, async () => {
   const service = fakeService();
+  const codespaces = process.env.CODESPACES;
+  delete process.env.CODESPACES; // Codespaces ではポート転送先の URL になるため。
   const app = await パネルWeb起動({ service: service.factory, idleMs: 50 });
+  if (codespaces !== undefined) process.env.CODESPACES = codespaces;
   try {
     const origin = new URL(app.url).origin;
     assert.equal(app.publicUrl, app.url, 'Codespaces 以外ではローカルURLを開く');
@@ -66,5 +69,28 @@ test('ブラウザ版サーバー: 一度も画面が開かれなければ猶予
   const service = fakeService();
   const app = await パネルWeb起動({ service: service.factory, firstIdleMs: 30 });
   await app.closed;
+  assert.equal(service.stopped(), 1);
+});
+
+test('Codespaces は初回画面接続を120秒以上待っても終了しない', async t => {
+  const service = fakeService();
+  const env = { CODESPACES: 'true', CODESPACE_NAME: 'aidiy-test', GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: 'app.github.dev' };
+  const saved = { ...process.env };
+  Object.assign(process.env, env);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let app;
+  try { app = await パネルWeb起動({ service: service.factory }); }
+  finally {
+    for (const key of Object.keys(env)) {
+      if (key in saved) process.env[key] = saved[key];
+      else delete process.env[key];
+    }
+  }
+  try {
+    t.mock.timers.tick(120_001);
+    t.mock.timers.reset();
+    assert.equal(service.stopped(), 0);
+    assert.equal((await fetch(app.url)).status, 200);
+  } finally { await app.close(); }
   assert.equal(service.stopped(), 1);
 });

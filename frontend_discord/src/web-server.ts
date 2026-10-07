@@ -25,8 +25,8 @@ export function ブラウザ用HTML(html: string) {
 }
 
 export async function パネルWeb起動(options: { idleMs?: number; firstIdleMs?: number; service?: typeof パネルサービス } = {}) {
-  // aidiy_code / aidiy_live と共通: 画面を閉じて60秒、一度も開かれなければ120秒で終了する。
-  const { idleMs = 60_000, firstIdleMs = 120_000 } = options;
+  // 画面を閉じて60秒で終了する。Codespaces では初回接続まで終了しない。
+  const { idleMs = 60_000 } = options;
   const prefix = `/${randomBytes(24).toString('hex')}/`;
   const clients = new Set<WebSocket>();
   const broadcast = (data: パネル通知) => {
@@ -106,7 +106,8 @@ export async function パネルWeb起動(options: { idleMs?: number; firstIdleMs
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('待受ポートを取得できません。');
   allowed = new 接続元許可(address.port);
-  待機開始(firstIdleMs);
+  const firstIdleMs = options.firstIdleMs ?? allowed.初回待機時間;
+  if (firstIdleMs !== undefined) 待機開始(firstIdleMs);
   return { url: allowed.ローカル + prefix, publicUrl: allowed.公開URL(prefix), service, close, closed };
 }
 

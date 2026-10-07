@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -16,7 +17,9 @@ from conf.conf_model import conf_models
 
 class HermesModelOptionsTest(unittest.TestCase):
     def test_cli_configs_and_defaults_match_bat_choices(self):
-        with patch.object(conf_models, "_sync_local_model_configs"):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        with patch.object(conf_models, "_config_dir_path", return_value=temp_dir.name):
             models = conf_models()
         expected_gpt_models = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna"]
         for cli, defaults in (
@@ -29,12 +32,12 @@ class HermesModelOptionsTest(unittest.TestCase):
                 self.assertEqual([int(number) for number, _ in choices], list(range(1, len(choices) + 1)))
                 bat_models = [model for _, model in choices]
                 self.assertEqual(bat_models[:5], expected_gpt_models)
-                config = json.loads((ROOT / f"_config/AiDiy_code_{cli}_cli.json").read_text(encoding="utf-8"))
+                config = json.loads((Path(temp_dir.name) / f"AiDiy_code_{cli}_cli.json").read_text(encoding="utf-8"))
                 self.assertEqual(list(config["models"]), ["auto", *bat_models])
                 self.assertEqual(list(defaults), ["auto", *bat_models])
 
     def test_choices_match_bat_with_oauth_provider(self):
-        bat = (ROOT / "scripts/cli_bat/_hermes.bat").read_text(encoding="utf-8")
+        bat = (ROOT / "scripts/cli_bat/_hermes_cli.bat").read_text(encoding="utf-8")
         bat_models = re.findall(
             r'^if "%MODEL_NUMBER%"=="\d+" set "MODEL=([^"]+)"',
             bat,

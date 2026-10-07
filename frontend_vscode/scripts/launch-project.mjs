@@ -3,8 +3,8 @@
 //  1. プロジェクト: 位置引数 / --project、指定がなければ起動したフォルダ。
 //  2. 表示: --browser、または Codespaces・画面のない Linux ではブラウザ版。それ以外は Electron の専用ウィンドウ。
 //  3. 専用ウィンドウを開けなければ、理由を表示してブラウザ版に切り替える。
-//  4. ブラウザ版は $BROWSER → OS 標準の順で開き、Codespaces ではポート転送先の URL を開く。案内文も共通。
-//  5. ブラウザ版のサーバーは、画面を閉じて60秒（一度も開かれなければ120秒）で終了する。
+//  4. ブラウザ版は $BROWSER → OS 標準の順。Codespaces の $BROWSER には localhost を渡し、VS Code に転送を任せる。
+//  5. ブラウザ版は画面を閉じて60秒で終了。初回は120秒、Codespaces では初回接続まで待つ。
 //  6. 接続元の許可は frontend_vscode/src/forwarded-origin.ts（サーバー側）で共通。
 import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
@@ -38,10 +38,10 @@ export function ブラウザ自動判定(env = process.env, platform = process.p
 /** ブラウザ版のアプリ表示も専用ウィンドウと同じ大きさ（window-size.cjs）。Discord は height にパネル高さを渡す。 */
 export { ウィンドウ };
 
-export async function ブラウザで開く(url, { profile, height = ウィンドウ.会話高さ } = {}) {
+export async function ブラウザで開く(url, { profile, height = ウィンドウ.会話高さ, ローカルURL } = {}) {
   const candidates = [];
   const browser = (process.env.BROWSER || '').split(delimiter)[0]?.trim();
-  if (browser) candidates.push([browser, [url]]);
+  if (browser) candidates.push([browser, [ローカルURL || url]]);
   if (process.platform === 'win32') {
     const app = [
       [process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'],
@@ -76,7 +76,22 @@ export function ブラウザ版案内(url, opened = true) {
 
 /** ブラウザ版の URL を開いて共通の案内を表示する。 */
 export async function ブラウザ版表示(url, options) {
-  const opened = await ブラウザで開く(url, options);
+  let ローカルURL;
+  if (process.env.CODESPACES === 'true') {
+    const parsed = new URL(url), host = parsed.hostname;
+    const prefix = `${process.env.CODESPACE_NAME}-`;
+    const suffix = `.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`;
+    const port = host.startsWith(prefix) && host.endsWith(suffix) ? host.slice(prefix.length, -suffix.length) : '';
+    // localhost URL の出力で Codespaces の自動ポート転送を促す。
+    if (/^\d+$/.test(port)) {
+      ローカルURL = `http://127.0.0.1:${port}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      console.log(`ローカル待受: ${ローカルURL}`);
+    }
+    console.log('初回の画面接続まで待機します。ページが開けない場合は「ポート」の転送状態を確認し、URL を再度開いてください。');
+  }
+  // 手で組み立てた転送先を直接開くと、VS Code の転送開始・URI 解決を経由しない。
+  // $BROWSER は VS Code の --openExternal を呼ぶため、元の localhost URL を渡す。
+  const opened = await ブラウザで開く(url, { ...options, ローカルURL });
   ブラウザ版案内(url, opened);
   return opened;
 }

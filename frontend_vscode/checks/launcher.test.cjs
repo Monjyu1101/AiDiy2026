@@ -23,6 +23,7 @@ function fixture(t) {
   const env = { ...process.env };
   delete env.ELECTRON_OVERRIDE_DIST_PATH;
   delete env.CODESPACES; // 自動のブラウザ判定に左右されないようにする。
+  env.DISPLAY ||= ':0'; // 画面のない Linux もブラウザ判定になるため、仮の表示先を与える。
   env.BROWSER = process.execPath; // ブラウザを開く代わりに node へ URL を渡すだけにする。
   env.ELECTRON_RUN_AS_NODE = '1';
   const launch = (...args) => spawnSync(process.execPath, [path.join(scripts, 'launch.mjs'), root, ...args], {

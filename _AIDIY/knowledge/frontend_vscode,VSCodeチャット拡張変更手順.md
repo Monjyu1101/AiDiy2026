@@ -203,3 +203,10 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 - `checks/launcher.test.cjs` で既定起動と共通ポート変更後の起動を確認する。単独起動の `launch.mjs` は `build-state.cjs` でソース・生成物のハッシュを照合し、不一致・生成物欠落・旧配置で記録がない場合に起動前に再生成する。HTMLだけ更新され、削除済み要素を参照する古いJavaScriptが残る状態を避ける。手動では `frontend_vscode` の `npm run live:compile` で更新できる。VS Code拡張はVSIXの更新も必要。
 - 画面テストの `getElementById` は実HTMLにないIDへ `null` を返す。任意IDのモック要素を生成すると、HTMLとJavaScriptの不整合を見逃す。
 - モデル情報APIへの通信失敗は、単独版・拡張とも実際の接続先と原因コードを表示する。`ECONNREFUSED` ならローカルCoreの起動・待受ポートを確認する。OpenAI側の障害と区別し、画面表示だけでAPIキーやモデルの問題と判断しない。
+
+## Codespaces でブラウザ版が正常終了してしまう場合
+
+- Code / Live / Discord は、通常のブラウザ版では初回120秒、最後の画面切断後60秒で終了する。Codespaces では転送登録・ブラウザ認証が遅れるため、`src/forwarded-origin.ts` の `接続元許可.初回待機時間` を未設定にし、初回接続まで自動終了しない。接続後の60秒の終了条件は維持する。
+- `scripts/launch-project.mjs` はトークン付き localhost URL を `$BROWSER`（VS Code の `--openExternal`）へ渡す。転送先 URL を手で組み立てて直接渡すと、VS Code の localhost 転送・URI 解決を経由しない。localhost URL も端末へ表示し、自動転送を促す。転送先のルートではなく起動時のパスを含む URL を開く。再起動するとポートとパスが変わる。
+- `[WARN] ... 終了コード: 0` は正常終了であり、ポート転送の障害とは限らない。待受プロセス、転送登録、トークン付きパスへの環境内応答、認証付き外部応答を照合する。
+- `checks/browser-mode.test.cjs`、`aidiy_live/checks/live.test.cjs`、Discord の `checks/web-server.test.ts` で初回120秒以上待っても終了しないことと画面切断後の終了を確認する。

@@ -19,8 +19,9 @@ export async function ライブ起動(root: string, backend?: string, packaged =
   const prefix = `/${randomBytes(24).toString('hex')}/`;
   const sockets = new Set<Socket>();
   const viewers = new Set<import('node:http').ServerResponse>();
-  // 3本共通: 画面を閉じて60秒、一度も開かれなければ120秒で終了する（判定は launch.mjs の60秒）。
+  // 画面を閉じて60秒で終了する。Codespaces では初回接続まで終了しない。
   let lastViewer = Date.now() + 60_000;
+  let 画面接続済み = false;
   const upstreamSockets = new Set<Socket>();
   const upstreamRequests = new Set<ReturnType<typeof httpRequest>>();
   const request = target.protocol === 'https:' ? httpsRequest : httpRequest;
@@ -46,6 +47,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
     }
     const path = req.url?.startsWith(prefix) ? req.url.slice(prefix.length) : null;
     if (path === 'presence' && req.method === 'GET') {
+      画面接続済み = true;
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Connection': 'keep-alive' });
       res.write('data: connected\n\n'); viewers.add(res);
       res.on('close', () => { viewers.delete(res); lastViewer = Date.now(); });
@@ -145,7 +147,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
   return {
     url: origin + prefix,
     publicUrl: allowed.公開URL(prefix),
-    idleMilliseconds: () => viewers.size ? 0 : Date.now() - lastViewer,
+    idleMilliseconds: () => viewers.size || (!画面接続済み && allowed?.初回待機時間 === undefined) ? 0 : Date.now() - lastViewer,
     close: async () => {
       for (const proxy of upstreamRequests) proxy.destroy();
       for (const socket of upstreamSockets) socket.destroy();

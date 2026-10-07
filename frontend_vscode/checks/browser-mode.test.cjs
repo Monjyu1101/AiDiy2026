@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, rmSync } = require('node:fs');
+const { mkdtempSync, rmSync, writeFileSync, readFileSync, chmodSync, existsSync } = require('node:fs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const { pathToFileURL } = require('node:url');
@@ -20,6 +20,7 @@ test('ブラウザ版の起動判断: Codespaces と画面のない Linux だけ
 
 test('接続元の許可: 通常は 127.0.0.1 だけ、Codespaces ではポート転送先も許可する', () => {
   const local = new 接続元許可(8123, {});
+  assert.equal(local.初回待機時間, 120_000);
   assert.equal(local.公開URL('/t/'), 'http://127.0.0.1:8123/t/');
   assert.ok(local.host('127.0.0.1:8123') && local.origin('http://127.0.0.1:8123'));
   for (const value of ['localhost:8123', 'aidiy-test-8123.app.github.dev', 'evil.example']) assert.equal(local.host(value), false);
@@ -27,6 +28,7 @@ test('接続元の許可: 通常は 127.0.0.1 だけ、Codespaces ではポー�
   assert.equal(local.origin(undefined), false);
 
   const forwarded = new 接続元許可(8123, codespace);
+  assert.equal(forwarded.初回待機時間, undefined);
   assert.equal(forwarded.公開URL('/t/'), 'https://aidiy-test-8123.app.github.dev/t/');
   for (const origin of ['http://127.0.0.1:8123', 'https://aidiy-test-8123.app.github.dev', 'http://localhost:8123']) assert.ok(forwarded.origin(origin), origin);
   for (const origin of ['https://aidiy-test-9999.app.github.dev', 'https://evil.example', 'http://aidiy-test-8123.app.github.dev']) assert.equal(forwarded.origin(origin), false, origin);
@@ -35,13 +37,16 @@ test('接続元の許可: 通常は 127.0.0.1 だけ、Codespaces ではポー�
   assert.equal(転送オリジン(8123, { ...codespace, GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: 'evil.example/x' }), undefined);
 });
 
-test('Code ブラウザ版: Codespaces の転送元からの操作だけを受け付け、公開URLを返す', async () => {
+test('Code ブラウザ版: Codespaces は初回接続まで終了せず、転送元からの操作だけを受け付ける', async t => {
   const saved = { ...process.env };
   Object.assign(process.env, codespace);
   const preferences = mkdtempSync(join(tmpdir(), 'aidiy-browser-mode-'));
   const { 単独起動 } = require('../out/aidiy_code/server.cjs');
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const app = await 単独起動(process.cwd(), undefined, {}, join(preferences, 'model.json'));
   try {
+    t.mock.timers.tick(120_001);
+    t.mock.timers.reset();
     const port = new URL(app.url).port, path = new URL(app.url).pathname;
     assert.equal(app.publicUrl, `https://aidiy-test-${port}.app.github.dev${path}`);
     const get = headers => fetch(app.url, { headers }).then(response => response.status);
@@ -50,7 +55,38 @@ test('Code ブラウザ版: Codespaces の転送元からの操作だけを受�
     assert.equal(await get({ origin: 'https://evil.example' }), 403);
   } finally {
     await app.close();
-    for (const key of Object.keys(codespace)) if (!(key in saved)) delete process.env[key];
+    for (const key of Object.keys(codespace)) {
+      if (key in saved) process.env[key] = saved[key];
+      else delete process.env[key];
+    }
     rmSync(preferences, { recursive: true, force: true });
+  }
+});
+
+// 転送 URL を直に開かず、VS Code のブラウザヘルパーへ元の URL を渡す。
+test('Codespaces のブラウザヘルパーへ localhost のポート・トークン付きパスを渡す', { skip: process.platform === 'win32' }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aidiy-opener-'));
+  const log = join(dir, 'opened.json'), browser = join(dir, 'browser');
+  writeFileSync(browser, `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));\n`);
+  chmodSync(browser, 0o755);
+  const overrides = { ...codespace, BROWSER: browser }, saved = { ...process.env };
+  Object.assign(process.env, overrides);
+  const output = [], originalLog = console.log;
+  console.log = text => output.push(text);
+  try {
+    const { ブラウザ版表示 } = await import(pathToFileURL(join(__dirname, '../scripts/launch-project.mjs')).href);
+    const publicUrl = 'https://aidiy-test-8123.app.github.dev/token/?view=live#chat';
+    assert.equal(await ブラウザ版表示(publicUrl), true);
+    const deadline = Date.now() + 2000;
+    while (!existsSync(log) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.deepEqual(JSON.parse(readFileSync(log, 'utf8')), ['http://127.0.0.1:8123/token/?view=live#chat']);
+    assert.ok(output.some(line => line.includes(publicUrl)), '手動で開くための外部 URL は案内する');
+  } finally {
+    console.log = originalLog;
+    for (const key of Object.keys(overrides)) {
+      if (key in saved) process.env[key] = saved[key];
+      else delete process.env[key];
+    }
+    rmSync(dir, { recursive: true, force: true });
   }
 });

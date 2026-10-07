@@ -74,7 +74,8 @@ test('単独起動: 起動時の Provider / モデルを画面設定へ渡す', 
 });
 
 test('ブラウザ版の起動コマンドがURLを返し、終了できる', { timeout: 8000 }, async t => {
-  const child = spawn(process.execPath, ['aidiy_live/launch.mjs', '--serve'], { cwd: root });
+  const env = { ...process.env }; delete env.CODESPACES; // Codespaces ではポート転送先の URL が出力されるため。
+  const child = spawn(process.execPath, ['aidiy_live/launch.mjs', '--serve'], { cwd: root, env });
   t.after(() => child.kill());
   let stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; });
   const output = await new Promise((resolve, reject) => {
@@ -99,9 +100,20 @@ test('Live の配布ディレクトリだけで専用画面の全リソースを
   assert.equal((await (await fetch(new URL('config', live.url))).json()).backend, 'http://127.0.0.1:8091');
 });
 
-test('画面の接続監視: 開いている間は常駐し、閉じたら終了待ちへ移る', async t => {
+test('画面の接続監視: Codespaces は初回接続まで終了せず、閉じたら終了待ちへ移る', async t => {
+  const env = { CODESPACES: 'true', CODESPACE_NAME: 'aidiy-test', GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: 'app.github.dev' };
+  const saved = { ...process.env };
+  Object.assign(process.env, env);
+  t.mock.timers.enable({ apis: ['Date'] });
   const live = await ライブ起動(root, 'http://127.0.0.1:8091');
+  for (const key of Object.keys(env)) {
+    if (key in saved) process.env[key] = saved[key];
+    else delete process.env[key];
+  }
   t.after(() => live.close());
+  t.mock.timers.tick(120_001);
+  assert.equal(live.idleMilliseconds(), 0, '転送登録・認証を待っている間は自動終了しない');
+  t.mock.timers.reset();
   const response = await fetch(new URL('presence', live.url));
   const reader = response.body.getReader();
   assert.match(new TextDecoder().decode((await reader.read()).value), /connected/);

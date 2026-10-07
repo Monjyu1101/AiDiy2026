@@ -15,11 +15,14 @@ export function 転送オリジン(port: number, env: 環境 = process.env): str
 export class 接続元許可 {
   readonly ローカル: string;
   readonly 転送?: string;
+  readonly 初回待機時間?: number;
   private hosts: Set<string>;
   private origins: Set<string>;
   constructor(port: number, env: 環境 = process.env) {
     this.ローカル = `http://127.0.0.1:${port}`;
     this.転送 = 転送オリジン(port, env);
+    // Codespaces は転送登録・ブラウザ認証に時間がかかるため、初回接続までは終了しない。
+    this.初回待機時間 = this.転送 ? undefined : 120_000;
     // VS Code デスクトップから Codespace に接続した場合は、手元の http://localhost:ポート へ転送される。
     this.origins = new Set([this.ローカル, ...(this.転送 ? [this.転送, `http://localhost:${port}`] : [])]);
     this.hosts = new Set([...this.origins].map(origin => new URL(origin).host));

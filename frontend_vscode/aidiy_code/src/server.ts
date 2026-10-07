@@ -186,7 +186,7 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
   if (!address || typeof address === 'string') throw new Error('起動できません。');
   origin = `http://127.0.0.1:${address.port}`;
   allowed = new 接続元許可(address.port);
-  idle = setTimeout(() => { void close(); }, 120_000);
+  if (allowed.初回待機時間 !== undefined) idle = setTimeout(() => { void close(); }, allowed.初回待機時間);
   return {url:origin+prefix, publicUrl:allowed.公開URL(prefix), close};
 }
 

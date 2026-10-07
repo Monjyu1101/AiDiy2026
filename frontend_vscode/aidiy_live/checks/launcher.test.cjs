@@ -47,6 +47,7 @@ function fixture(t) {
   // 親子の起動・常駐・通知処理は実コードで検証する。node に URL を渡すだけなので何も開かない。
   const env = { ...process.env, BROWSER: process.execPath };
   delete env.CODESPACES;
+  env.DISPLAY ||= ':0'; // 画面のない Linux もブラウザ判定になるため、仮の表示先を与える。
   return { root, app, env, launch: (...args) => spawnSync(process.execPath, [join(app, 'launch.mjs'), ...args], {
     cwd: tmpdir(), env, encoding: 'utf8', timeout: 6000,
   }) };
