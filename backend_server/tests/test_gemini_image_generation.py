@@ -66,6 +66,16 @@ class GeminiImageGenerationTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(config.response_mime_type)
         tools_stub.MCPツールブリッジ.assert_not_called()
 
+    def test_nano_banana_is_treated_as_image_model(self):
+        for model, expected in (
+            ("gemini-nano-banana-2.1", True),
+            ("gemini-3.1-flash-lite-image", True),
+            ("gemini-3-pro-image", True),
+            ("gemini-3.8-flash", False),
+        ):
+            chat = self.ChatAI(AI_NAME="gemini_chat", AI_MODEL=model, api_key="test-key")
+            self.assertEqual(expected, chat._画像生成モデル(), model)
+
     async def test_api_error_is_returned_to_chat(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             chat = self.ChatAI(

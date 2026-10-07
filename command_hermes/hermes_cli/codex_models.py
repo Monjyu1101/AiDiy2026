@@ -12,17 +12,26 @@ import os
 
 logger = logging.getLogger(__name__)
 
+
+def filter_retired_models(model_ids: List[str]) -> List[str]:
+    """旧 Sol を API・設定・キャッシュ由来のモデル候補から除外する。"""
+    def is_retired(model_id: str) -> bool:
+        slug = model_id.strip().lower().rsplit("/", 1)[-1].removeprefix("openai.")
+        return slug == "gpt-6-sol" or slug.startswith(("gpt-6-sol-", "gpt-6-sol."))
+
+    return [model_id for model_id in model_ids if not is_retired(model_id)]
+
+
 DEFAULT_CODEX_MODELS: List[str] = [
     # GPT-6 Astra is the current frontier Codex slug and sorts ahead of the
     # Sol/Terra/Luna tier in the backend catalog, so keep it first in the curated
     # offline fallback too. Live discovery (_fetch_models_from_api) overrides
     # this ordering with the backend's own priority ranking when reachable.
     "gpt-6-astra",
-    # GPT-6.1 Sol / GPT-6 Sol / GPT-5.6 Terra / GPT-6 Luna. The public API exposes "-pro"
+    # GPT-6.1 Sol / GPT-5.6 Terra / GPT-6 Luna. The public API exposes "-pro"
     # variants, but the ChatGPT Codex OAuth backend rejects them with HTTP 400,
     # so the curated offline fallback must not surface those dead choices.
     "gpt-6.1-sol",
-    "gpt-6-sol",
     "gpt-5.6-terra",
     "gpt-6-luna",
     # gpt-5.5 / gpt-5.4 / gpt-5.4-mini / gpt-5.3-codex / gpt-5.3-codex-spark
@@ -44,9 +53,8 @@ DEFAULT_CODEX_MODELS: List[str] = [
 ]
 
 _FORWARD_COMPAT_TEMPLATE_MODELS: List[tuple[str, tuple[str, ...]]] = [
-    ("gpt-6-astra", ("gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna")),
-    ("gpt-6.1-sol", ("gpt-6-sol", "gpt-5.5", "gpt-5.4")),
-    ("gpt-6-sol", ("gpt-6.1-sol", "gpt-5.5", "gpt-5.4")),
+    ("gpt-6-astra", ("gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna")),
+    ("gpt-6.1-sol", ("gpt-5.5", "gpt-5.4")),
     ("gpt-5.6-terra", ("gpt-5.5", "gpt-5.4")),
     ("gpt-6-luna", ("gpt-5.5", "gpt-5.4")),
     # gpt-5.5 / gpt-5.4-mini / gpt-5.4 / gpt-5.3-codex-spark are below the
@@ -109,7 +117,7 @@ def _add_context_variants(model_ids: List[str]) -> List[str]:
 
 def _finalize_codex_models(model_ids: List[str]) -> List[str]:
     """Forward-compat synthesis + large-context variant synthesis."""
-    return _add_context_variants(_add_forward_compat_models(model_ids))
+    return _add_context_variants(_add_forward_compat_models(filter_retired_models(model_ids)))
 
 
 def _extract_chatgpt_account_id(access_token: str) -> Optional[str]:

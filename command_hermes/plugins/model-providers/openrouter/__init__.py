@@ -27,7 +27,7 @@ _ANTHROPIC_REASONING_OPTIONAL_SUBSTRINGS = (
     "claude-opus-4-2025", "claude-sonnet-4-2025",  # date-stamped 4.0 IDs
     "claude-opus-4-5", "claude-opus-4.5",
     "claude-sonnet-4-5", "claude-sonnet-4.5",
-    "claude-haiku-4-5", "claude-haiku-4.5",
+    "claude-haiku-4-5", "claude-haiku-5.5",
 )
 
 

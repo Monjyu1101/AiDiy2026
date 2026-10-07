@@ -73,7 +73,7 @@ CODEX_LEGACY_EFFORTS: tuple[str, ...] = (
     "none", "low", "medium", "high", "xhigh",
 )
 
-_CODEX_GPT56_MARKERS = ("gpt-5.6-terra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna")
+_CODEX_GPT56_MARKERS = ("gpt-5.6-terra", "gpt-6.1-sol", "gpt-6-luna")
 
 
 def codex_supported_efforts(model: Optional[str]) -> tuple[str, ...]:

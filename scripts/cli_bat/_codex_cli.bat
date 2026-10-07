@@ -15,6 +15,10 @@ set "MODEL_SETTING_DIR=%LOCALAPPDATA%\AiDiy"
 set "MODEL_SETTING_FILE=%MODEL_SETTING_DIR%\codex_cli_model.txt"
 set "PREVIOUS_MODEL="
 if exist "%MODEL_SETTING_FILE%" set /p "PREVIOUS_MODEL="<"%MODEL_SETTING_FILE%"
+if "%PREVIOUS_MODEL%"=="gpt-6-sol" (
+    set "PREVIOUS_MODEL=gpt-6.1-sol"
+    >"%MODEL_SETTING_FILE%" ECHO gpt-6.1-sol
+)
 if defined PREVIOUS_MODEL (
     set "PREVIOUS_MODEL_LABEL=%PREVIOUS_MODEL%"
 ) else (
@@ -32,9 +36,8 @@ ECHO.
 ECHO Codex CLI model list
 ECHO   1: GPT-6 Astra - frontier reasoning and coding
 ECHO   2: GPT-6.1 Sol - frontier reasoning and coding
-ECHO   3: GPT-6 Sol
-ECHO   4: GPT-5.6 Terra - balanced quality and cost
-ECHO   5: GPT-6 Luna - fast, high-volume work
+ECHO   3: GPT-5.6 Terra - balanced quality and cost
+ECHO   4: GPT-6 Luna - fast, high-volume work
 ECHO   0: Exit
 ECHO.
 set "MODEL_NUMBER="
@@ -46,9 +49,8 @@ if not defined MODEL_NUMBER (
 )
 if "%MODEL_NUMBER%"=="1" set "MODEL=gpt-6-astra"
 if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-6.1-sol"
-if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-6-sol"
-if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-5.6-terra"
-if "%MODEL_NUMBER%"=="5" set "MODEL=gpt-6-luna"
+if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-5.6-terra"
+if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-6-luna"
 if defined MODEL (
     if not exist "%MODEL_SETTING_DIR%" mkdir "%MODEL_SETTING_DIR%" >nul 2>&1
     >"%MODEL_SETTING_FILE%" ECHO %MODEL%

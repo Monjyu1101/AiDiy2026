@@ -364,7 +364,7 @@ window.SCENARIO = {
       "image": "images/scene_005.png",
       "source_summary": "aidiy_image_generation、aidiy_movie_generation、aidiy_speech_to_text、aidiy_text_to_speech の 4 つの AI 生成系 MCP の機能と対応プロバイダー",
       "factual_bullets": [
-        "aidiy_image_generation: OpenAI (gpt-image-2, DALL-E 3), Gemini, FreeAI に対応",
+        "aidiy_image_generation: OpenAI (gpt-image-2.5 (sunburst / flare), DALL-E 3), Gemini, FreeAI に対応",
         "aidiy_movie_generation: Google Veo モデルで最大 8 秒の動画生成、image-to-video にも対応",
         "aidiy_speech_to_text: speech_recognition (無料) と OpenAI Whisper に対応",
         "aidiy_text_to_speech: Edge TTS, OpenAI TTS, Gemini TTS, FreeAI に対応",

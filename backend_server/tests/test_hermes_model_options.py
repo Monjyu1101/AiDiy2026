@@ -21,7 +21,7 @@ class HermesModelOptionsTest(unittest.TestCase):
         self.addCleanup(temp_dir.cleanup)
         with patch.object(conf_models, "_config_dir_path", return_value=temp_dir.name):
             models = conf_models()
-        expected_gpt_models = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna"]
+        expected_gpt_models = ["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"]
         for cli, defaults in (
             ("codex", models.CODE_CODEX_CLI_MODELS),
             ("copilot", models.CODE_COPILOT_CLI_MODELS),
@@ -31,7 +31,7 @@ class HermesModelOptionsTest(unittest.TestCase):
                 choices = re.findall(r'^if "%MODEL_NUMBER%"=="(\d+)" set "MODEL=([^"]+)"', bat, re.MULTILINE)
                 self.assertEqual([int(number) for number, _ in choices], list(range(1, len(choices) + 1)))
                 bat_models = [model for _, model in choices]
-                self.assertEqual(bat_models[:5], expected_gpt_models)
+                self.assertEqual(bat_models[:4], expected_gpt_models)
                 config = json.loads((Path(temp_dir.name) / f"AiDiy_code_{cli}_cli.json").read_text(encoding="utf-8"))
                 self.assertEqual(list(config["models"]), ["auto", *bat_models])
                 self.assertEqual(list(defaults), ["auto", *bat_models])
@@ -43,7 +43,7 @@ class HermesModelOptionsTest(unittest.TestCase):
             bat,
             flags=re.MULTILINE,
         )
-        self.assertEqual(bat_models, ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna"])
+        self.assertEqual(bat_models, ["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"])
 
         models = conf_models._get_aidiy_hermes_models(object.__new__(conf_models))
         self.assertEqual(list(models), ["auto", *(f"openai_oauth/{model}" for model in bat_models)])

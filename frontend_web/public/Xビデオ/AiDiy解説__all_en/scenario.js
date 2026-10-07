@@ -304,7 +304,7 @@ window.SCENARIO = {
           "speaker": "male",
           "expression": "neutral",
           "telop_text": "The image generation panel supports multiple AI providers like OpenAI and Gemini.",
-          "naration_text": "AI Core also includes an image generation panel. You can choose from multiple AI image generation providers — OpenAI's gpt-image-2 or DALL-E 3, Google Gemini, and others — and generate images simply by typing a text prompt. It also integrates with the aidiy_image_generation MCP in AiDiy TOOL HUB, making it straightforward to incorporate into automated pipelines.",
+          "naration_text": "AI Core also includes an image generation panel. You can choose from multiple AI image generation providers — OpenAI's gpt-image-2.5 or DALL-E 3, Google Gemini, and others — and generate images simply by typing a text prompt. It also integrates with the aidiy_image_generation MCP in AiDiy TOOL HUB, making it straightforward to incorporate into automated pipelines.",
           "audio": "audio/dlg_004_04_male.mp3",
           "duration_sec": 22.056
         }

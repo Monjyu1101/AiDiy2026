@@ -12475,7 +12475,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         if provider in ("openrt", "openrouter"):
             return cfg.get("CHAT_OPENRT_MODEL") or "google/gemini-3.1-flash-image-preview"
         if provider == "gemini":
-            return cfg.get("CHAT_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
+            return cfg.get("CHAT_GEMINI_MODEL") or "gemini-nano-banana-2.1"
         if provider == "freeai":
             return _normalize_aidiy_freeai_model(
                 cfg.get("CHAT_FREEAI_MODEL") or cfg.get("CHAT_GEMINI_MODEL")

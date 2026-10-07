@@ -330,7 +330,7 @@ class ChatAI:
             }
 
             # 画像生成モデルの場合はmodalitiesを指定（OpenRouterサンプル準拠）
-            if "image" in str(self.chat_model):
+            if "image" in str(self.chat_model) or "banana" in str(self.chat_model).lower():
                 parm_kwargs["extra_body"] = {"modalities": ["image", "text"]}
 
             # tools が実際に指定（非空）されているときのみ tools などの追加パラメータをマージ。

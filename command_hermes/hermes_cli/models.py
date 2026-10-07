@@ -86,12 +86,10 @@ OPENROUTER_MODELS: list[tuple[str, str]] = [
     ("anthropic/claude-opus-5.5",              ""),
     ("anthropic/claude-opus-5.5-fast",         "2x price, higher output speed"),
     ("anthropic/claude-sonnet-5.5",              ""),
-    ("anthropic/claude-haiku-4.5",             ""),
+    ("anthropic/claude-haiku-5.5",             ""),
     # OpenAI
     ("openai/gpt-6.1-sol",                     ""),
-    ("openai/gpt-6-sol",                     ""),
     ("openai/gpt-6.1-sol-pro",                 ""),
-    ("openai/gpt-6-sol-pro",                 ""),
     ("openai/gpt-5.6-terra",                   ""),
     ("openai/gpt-5.6-terra-pro",               ""),
     ("openai/gpt-6-luna",                    ""),
@@ -162,9 +160,8 @@ VERCEL_AI_GATEWAY_MODELS: list[tuple[str, str]] = [
     ("minimax/minimax-m2.7",                 ""),
     ("anthropic/claude-sonnet-5.5",             ""),
     ("anthropic/claude-opus-5.5",             ""),
-    ("anthropic/claude-haiku-4.5",           ""),
+    ("anthropic/claude-haiku-5.5",           ""),
     ("openai/gpt-6.1-sol",                     ""),
-    ("openai/gpt-6-sol",                     ""),
     ("openai/gpt-5.6-terra",                 ""),
     ("openai/gpt-6-luna",                    ""),
     ("google/gemini-3.1-pro-preview",        ""),
@@ -270,12 +267,10 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "anthropic/claude-fable-5.1",
         "anthropic/claude-opus-5.5",
         "anthropic/claude-sonnet-5.5",
-        "anthropic/claude-haiku-4.5",
+        "anthropic/claude-haiku-5.5",
         # OpenAI
         "openai/gpt-6.1-sol",
-        "openai/gpt-6-sol",
         "openai/gpt-6.1-sol-pro",
-        "openai/gpt-6-sol-pro",
         "openai/gpt-5.6-terra",
         "openai/gpt-5.6-terra-pro",
         "openai/gpt-6-luna",
@@ -321,9 +316,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     "openai": [
         "gpt-6-astra",
         "gpt-6.1-sol",
-        "gpt-6-sol",
         "gpt-6.1-sol-pro",
-        "gpt-6-sol-pro",
         "gpt-5.6-terra",
         "gpt-5.6-terra-pro",
         "gpt-6-luna",
@@ -332,9 +325,7 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     "openai-api": [
         "gpt-6-astra",
         "gpt-6.1-sol",
-        "gpt-6-sol",
         "gpt-6.1-sol-pro",
-        "gpt-6-sol-pro",
         "gpt-5.6-terra",
         "gpt-5.6-terra-pro",
         "gpt-6-luna",
@@ -348,11 +339,10 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     "copilot": [
         "gpt-6-astra",
         "gpt-6.1-sol",
-        "gpt-6-sol",
         "gpt-5.6-terra",
         "gpt-6-luna",
         "claude-sonnet-5.5",
-        "claude-haiku-4.5",
+        "claude-haiku-5.5",
         "gemini-3.1-pro-preview",
         "gemini-3-pro-preview",
         "gemini-3-flash-preview",
@@ -482,7 +472,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "google/gemini-3.1-flash-lite-preview",
         "anthropic/claude-sonnet-5.5",
         "openai/gpt-6.1-sol",
-        "openai/gpt-6-sol",
     ],
     # Synced against https://opencode.ai/docs/zen/ + live GET /zen/v1/models
     # (2026-08-20). Zen/Go are _LIVE_FIRST_PICKER_PROVIDERS, so this list is a
@@ -494,7 +483,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "kimi-k2.5",
         "kimi-k2.6",
         "gpt-6.1-sol",
-        "gpt-6-sol",
         "gpt-5.6-terra",
         "gpt-6-luna",
         "gpt-5.5",
@@ -612,7 +600,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "anthropic/claude-opus-5.5",
         "anthropic/claude-sonnet-5.5",
         "openai/gpt-6.1-sol",
-        "openai/gpt-6-sol",
         "google/gemini-3-pro-preview",
         "google/gemini-3-flash-preview",
     ],
@@ -745,7 +732,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "us.anthropic.claude-opus-5-5-v1",
         "us.anthropic.claude-haiku-4-5-20251001-v1:0",
         "openai.gpt-6.1-sol",
-        "openai.gpt-6-sol",
         "openai.gpt-5.6-terra",
         "openai.gpt-6-luna",
         "us.amazon.nova-pro-v1:0",
@@ -4408,6 +4394,13 @@ def _openai_discovery_base_url(provider: str) -> str:
 
 
 def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) -> list[str]:
+    """廃止済みモデルを除いた provider の候補を返す。"""
+    from hermes_cli.codex_models import filter_retired_models
+
+    return filter_retired_models(_provider_model_ids(provider, force_refresh=force_refresh))
+
+
+def _provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) -> list[str]:
     """Return the best known model catalog for a provider.
 
     Tries live API endpoints for providers that support them (Codex, Nous),
@@ -5011,6 +5004,10 @@ def cached_provider_model_ids(
     cache = _load_provider_models_cache()
     fp = _credential_fingerprint(normalized)
     entry = cache.get(normalized)
+    if isinstance(entry, dict) and isinstance(entry.get("models"), list):
+        from hermes_cli.codex_models import filter_retired_models
+
+        entry = {**entry, "models": filter_retired_models(entry["models"])}
     now = time.time()
 
     allow_empty_ollama = normalized == "ollama"
@@ -5782,7 +5779,7 @@ _COPILOT_MODEL_ALIASES = {
     "anthropic/claude-sonnet-4.6": "claude-sonnet-4.6",
     "anthropic/claude-sonnet-4": "claude-sonnet-4",
     "anthropic/claude-sonnet-4.5": "claude-sonnet-4.5",
-    "anthropic/claude-haiku-4.5": "claude-haiku-4.5",
+    "anthropic/claude-haiku-5.5": "claude-haiku-5.5",
     # Dash-notation fallbacks: Hermes' default Claude IDs elsewhere use
     # hyphens (anthropic native format), but Copilot's API only accepts
     # dot-notation.  Accept both so users who configure copilot + a
@@ -5794,13 +5791,13 @@ _COPILOT_MODEL_ALIASES = {
     "claude-sonnet-4-6": "claude-sonnet-4.6",
     "claude-sonnet-4-0": "claude-sonnet-4",
     "claude-sonnet-4-5": "claude-sonnet-4.5",
-    "claude-haiku-4-5": "claude-haiku-4.5",
+    "claude-haiku-4-5": "claude-haiku-5.5",
     "anthropic/claude-opus-4-6": "claude-opus-4.6",
     "anthropic/claude-sonnet-5-5": "claude-sonnet-5.5",
     "anthropic/claude-sonnet-4-6": "claude-sonnet-4.6",
     "anthropic/claude-sonnet-4-0": "claude-sonnet-4",
     "anthropic/claude-sonnet-4-5": "claude-sonnet-4.5",
-    "anthropic/claude-haiku-4-5": "claude-haiku-4.5",
+    "anthropic/claude-haiku-4-5": "claude-haiku-5.5",
 }
 
 

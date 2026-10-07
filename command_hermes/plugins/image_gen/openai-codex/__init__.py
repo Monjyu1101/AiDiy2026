@@ -1,7 +1,7 @@
 """OpenAI image generation backend — ChatGPT/Codex OAuth variant.
 
 Identical model catalog and tier semantics to the ``openai`` image-gen plugin
-(``gpt-image-2`` at low/medium/high quality), but routes the request through
+(``gpt-image-2.5-sunburst`` / ``gpt-image-2.5-flare`` at low/medium/high quality), but routes the request through
 the Codex Responses API ``image_generation`` tool instead of the
 ``images.generate`` REST endpoint. This lets users who are already
 authenticated with Codex/ChatGPT generate images without configuring a
@@ -12,7 +12,7 @@ Selection precedence for the tier (first hit wins):
 1. ``OPENAI_IMAGE_MODEL`` env var (escape hatch for scripts / tests)
 2. ``image_gen.openai-codex.model`` in ``config.yaml``
 3. ``image_gen.model`` in ``config.yaml`` (when it's one of our tier IDs)
-4. :data:`DEFAULT_MODEL` — ``gpt-image-2-medium``
+4. :data:`DEFAULT_MODEL` — ``gpt-image-2.5-sunburst-medium``
 
 Output is saved as PNG under ``$HERMES_HOME/cache/images/``. Source images for
 image-to-image/editing are sent as Responses ``input_image`` content parts.
@@ -83,30 +83,63 @@ def _summarize_error_body(body: str) -> str:
 # Model catalog — mirrors the ``openai`` plugin so the picker UX is identical.
 # ---------------------------------------------------------------------------
 
-API_MODEL = "gpt-image-2"
+# Fallback only; each catalog entry carries its own ``api_model``.
+API_MODEL = "gpt-image-2.5-sunburst"
 
 _MODELS: Dict[str, Dict[str, Any]] = {
-    "gpt-image-2-low": {
-        "display": "GPT Image 2 (Low)",
+    "gpt-image-2.5-sunburst-low": {
+        "display": "GPT Image 2.5 Sunburst (Low)",
+        "api_model": "gpt-image-2.5-sunburst",
         "speed": "~15s",
-        "strengths": "Fast iteration, lowest cost",
+        "strengths": "Sunburst: editing precision; fast iteration, lowest cost",
         "quality": "low",
     },
-    "gpt-image-2-medium": {
-        "display": "GPT Image 2 (Medium)",
-        "speed": "~40s",
-        "strengths": "Balanced — default",
+    "gpt-image-2.5-sunburst-medium": {
+        "display": "GPT Image 2.5 Sunburst (Medium)",
+        "api_model": "gpt-image-2.5-sunburst",
+        "speed": "moderate",
+        "strengths": "Sunburst: editing precision; balanced — default",
         "quality": "medium",
     },
-    "gpt-image-2-high": {
-        "display": "GPT Image 2 (High)",
-        "speed": "~2min",
-        "strengths": "Highest fidelity, strongest prompt adherence",
+    "gpt-image-2.5-sunburst-high": {
+        "display": "GPT Image 2.5 Sunburst (High)",
+        "api_model": "gpt-image-2.5-sunburst",
+        "speed": "slow",
+        "strengths": "Sunburst: editing precision; highest fidelity, strongest prompt adherence",
+        "quality": "high",
+    },
+    "gpt-image-2.5-flare-low": {
+        "display": "GPT Image 2.5 Flare (Low)",
+        "api_model": "gpt-image-2.5-flare",
+        "speed": "~15s",
+        "strengths": "Flare: fastest family; fast iteration, lowest cost",
+        "quality": "low",
+    },
+    "gpt-image-2.5-flare-medium": {
+        "display": "GPT Image 2.5 Flare (Medium)",
+        "api_model": "gpt-image-2.5-flare",
+        "speed": "moderate",
+        "strengths": "Flare: fastest family; balanced",
+        "quality": "medium",
+    },
+    "gpt-image-2.5-flare-high": {
+        "display": "GPT Image 2.5 Flare (High)",
+        "api_model": "gpt-image-2.5-flare",
+        "speed": "slow",
+        "strengths": "Flare: fastest family; highest fidelity, strongest prompt adherence",
         "quality": "high",
     },
 }
 
-DEFAULT_MODEL = "gpt-image-2-medium"
+# Legacy tier IDs (pre-2.5) still resolve so existing config.yaml / env values
+# keep working; they are not offered in the model picker.
+_LEGACY_ALIASES: Dict[str, str] = {
+    "gpt-image-2-low": "gpt-image-2.5-sunburst-low",
+    "gpt-image-2-medium": "gpt-image-2.5-sunburst-medium",
+    "gpt-image-2-high": "gpt-image-2.5-sunburst-high",
+}
+
+DEFAULT_MODEL = "gpt-image-2.5-sunburst-medium"
 
 _SIZES = {
     "landscape": "1536x1024",
@@ -126,7 +159,7 @@ _CODEX_INSTRUCTIONS = (
 
 _MAX_REFERENCE_IMAGES = 16
 _MAX_INPUT_IMAGE_BYTES = 25 * 1024 * 1024
-# gpt-image-2's Responses ``input_image`` accepts raster formats only. The
+# gpt-image-2.5's Responses ``input_image`` accepts raster formats only. The
 # shared magic-byte sniffer also recognizes SVG/TIFF/ICO, which the API
 # rejects server-side — gate to this allowlist so unsupported inputs fail
 # locally with a clear error instead of an opaque HTTP 400.
@@ -158,6 +191,7 @@ def _resolve_model() -> Tuple[str, Dict[str, Any]]:
     import os
 
     env_override = os.environ.get("OPENAI_IMAGE_MODEL")
+    env_override = _LEGACY_ALIASES.get(env_override, env_override) if env_override else env_override
     if env_override and env_override in _MODELS:
         return env_override, _MODELS[env_override]
 
@@ -166,10 +200,12 @@ def _resolve_model() -> Tuple[str, Dict[str, Any]]:
     candidate: Optional[str] = None
     if isinstance(sub, dict):
         value = sub.get("model")
+        value = _LEGACY_ALIASES.get(value, value) if isinstance(value, str) else value
         if isinstance(value, str) and value in _MODELS:
             candidate = value
     if candidate is None:
         top = cfg.get("model")
+        top = _LEGACY_ALIASES.get(top, top) if isinstance(top, str) else top
         if isinstance(top, str) and top in _MODELS:
             candidate = top
 
@@ -202,7 +238,7 @@ def _sniff_image_mime(raw: bytes) -> Optional[str]:
 
     Delegates magic-byte detection to the shared sniffer in
     ``agent.image_routing`` (single source of truth), then gates the result
-    to :data:`_ACCEPTED_INPUT_MIME` — the raster formats gpt-image-2's
+    to :data:`_ACCEPTED_INPUT_MIME` — the raster formats gpt-image-2.5's
     ``input_image`` actually accepts. SVG/TIFF/ICO (which the shared sniffer
     also recognizes) are rejected here so they fail locally with a clear
     error instead of an opaque server-side HTTP 400.
@@ -311,6 +347,7 @@ def _build_responses_payload(
     size: str,
     quality: str,
     input_images: Optional[List[Dict[str, str]]] = None,
+    api_model: str = API_MODEL,
 ) -> Dict[str, Any]:
     """Build the Codex Responses request body for an image_generation call."""
     content: List[Dict[str, Any]] = [{"type": "input_text", "text": prompt}]
@@ -327,7 +364,7 @@ def _build_responses_payload(
         }],
         "tools": [{
             "type": "image_generation",
-            "model": API_MODEL,
+            "model": api_model,
             "size": size,
             "quality": quality,
             "output_format": "png",
@@ -459,6 +496,7 @@ def _collect_image_b64(
     size: str,
     quality: str,
     input_images: Optional[List[Dict[str, str]]] = None,
+    api_model: str = API_MODEL,
 ) -> Optional[Dict[str, str]]:
     """Stream a Codex Responses image_generation call.
 
@@ -482,6 +520,7 @@ def _collect_image_b64(
         size=size,
         quality=quality,
         input_images=input_images,
+        api_model=api_model,
     )
     timeout = httpx.Timeout(300.0, connect=30.0, read=300.0, write=30.0, pool=30.0)
 
@@ -517,7 +556,7 @@ def _collect_image_b64(
 
 
 class OpenAICodexImageGenProvider(ImageGenProvider):
-    """gpt-image-2 routed through ChatGPT/Codex OAuth instead of an API key."""
+    """gpt-image-2.5 routed through ChatGPT/Codex OAuth instead of an API key."""
 
     @property
     def name(self) -> str:
@@ -555,7 +594,7 @@ class OpenAICodexImageGenProvider(ImageGenProvider):
         return {
             "name": "OpenAI (Codex auth)",
             "badge": "free",
-            "tag": "gpt-image-2 via ChatGPT/Codex OAuth — no API key required; supports text and image inputs",
+            "tag": "gpt-image-2.5 (sunburst / flare) via ChatGPT/Codex OAuth — no API key required; supports text and image inputs",
             "env_vars": [],
             "post_setup_hint": (
                 "Sign in with `hermes auth codex` (or `hermes setup` → Codex) "
@@ -649,6 +688,7 @@ class OpenAICodexImageGenProvider(ImageGenProvider):
                     size=size,
                     quality=meta["quality"],
                     input_images=input_images or None,
+                    api_model=meta.get("api_model", API_MODEL),
                 )
                 if collected and collected.get("source") == "final" and collected.get("b64"):
                     break

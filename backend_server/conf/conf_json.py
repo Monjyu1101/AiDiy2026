@@ -68,7 +68,7 @@ class conf_json:
 
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
-        'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image',
+        'CHAT_GEMINI_MODEL': 'gemini-nano-banana-2.1',
         'CHAT_FREEAI_MODEL': 'gemini-3.8-flash',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image',
         'CHAT_OPENAI_MODEL': 'gpt-6.1-sol',

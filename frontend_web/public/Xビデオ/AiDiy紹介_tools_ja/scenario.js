@@ -442,7 +442,7 @@ window.SCENARIO = {
         }
       ],
       "facts": [
-        "aidiy_image_generation は OpenAI（gpt-image-2 / DALL-E-3）、Gemini、FreeAI の 3 プロバイダに対応する。",
+        "aidiy_image_generation は OpenAI（gpt-image-2.5 (sunburst / flare) / DALL-E-3）、Gemini、FreeAI の 3 プロバイダに対応する。",
         "aidiy_movie_generation は Google Gemini Veo で動画を生成し MP4 として保存する。",
         "aidiy_text_to_speech は Edge / OpenAI / Gemini / FreeAI の 4 プロバイダで MP3 を出力する。",
         "aidiy_speech_to_text は speech_recognition（オフライン）と OpenAI Whisper に対応する。"

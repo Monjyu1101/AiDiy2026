@@ -250,7 +250,7 @@ SCENARIOS: List[Dict[str, Any]] = [
 
 def setup_isolated_home(enabled: bool, listing: str = "off",
                         listing_max_tokens: int = 4000,
-                        model: str = "anthropic/claude-haiku-4.5") -> Path:
+                        model: str = "anthropic/claude-haiku-5.5") -> Path:
     """Create a fresh ~/.hermes/ for one test, copying minimal credentials.
 
     Also reads OPENROUTER_API_KEY from the user's real ``~/.hermes/.env`` so
@@ -389,7 +389,7 @@ def run_one_scenario(scenario: Dict[str, Any], enabled: bool, out_dir: Path) -> 
         from run_agent import AIAgent
         agent = AIAgent(
             provider="openrouter",
-            model="anthropic/claude-haiku-4.5",
+            model="anthropic/claude-haiku-5.5",
             enabled_toolsets=None,  # Default = all available toolsets, including the registered mcp-fake tools
             quiet_mode=True,
             save_trajectories=False,
@@ -427,7 +427,7 @@ def run_one_scenario(scenario: Dict[str, Any], enabled: bool, out_dir: Path) -> 
         "scenario_id": scenario["id"],
         "scenario_description": scenario["description"],
         "tool_search_enabled": enabled,
-        "model": "anthropic/claude-haiku-4.5 (via openrouter)",
+        "model": "anthropic/claude-haiku-5.5 (via openrouter)",
         "prompt": scenario["prompt"],
         "expected_underlying_tools": scenario.get("expected_underlying_tools", []),
         "n_fake_tools_registered": n_registered,

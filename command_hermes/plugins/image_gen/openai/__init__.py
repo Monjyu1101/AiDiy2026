@@ -1,15 +1,16 @@
 """OpenAI image generation backend.
 
-Exposes OpenAI's ``gpt-image-2`` model at three quality tiers as an
-:class:`ImageGenProvider` implementation. The tiers are implemented as
-three virtual model IDs so the ``hermes tools`` model picker and the
+Exposes OpenAI's ``gpt-image-2.5-sunburst`` (precision / editing, default) and
+``gpt-image-2.5-flare`` (fast, everyday) models, each at three quality tiers,
+as an :class:`ImageGenProvider` implementation. The tiers are implemented as
+virtual model IDs so the ``hermes tools`` model picker and the
 ``image_gen.model`` config key behave like any other multi-model backend:
 
-    gpt-image-2-low     ~15s   fastest, good for iteration
-    gpt-image-2-medium  ~40s   default — balanced
-    gpt-image-2-high    ~2min  slowest, highest fidelity
+    gpt-image-2.5-{sunburst,flare}-low     fastest, good for iteration
+    gpt-image-2.5-{sunburst,flare}-medium  default tier — balanced
+    gpt-image-2.5-{sunburst,flare}-high    slowest, highest fidelity
 
-All three hit the same underlying API model (``gpt-image-2``) with a
+Each ID hits its underlying API model (``api_model``) with a
 different ``quality`` parameter. Output is base64 JSON → saved under
 ``$HERMES_HOME/cache/images/``.
 
@@ -18,7 +19,7 @@ Selection precedence (first hit wins):
 1. ``OPENAI_IMAGE_MODEL`` env var (escape hatch for scripts / tests)
 2. ``image_gen.openai.model`` in ``config.yaml``
 3. ``image_gen.model`` in ``config.yaml`` (when it's one of our tier IDs)
-4. :data:`DEFAULT_MODEL` — ``gpt-image-2-medium``
+4. :data:`DEFAULT_MODEL` — ``gpt-image-2.5-sunburst-medium``
 """
 
 from __future__ import annotations
@@ -50,30 +51,63 @@ logger = logging.getLogger(__name__)
 # ``quality`` setting. ``api_model`` is what gets sent to OpenAI;
 # ``quality`` is the knob that changes generation time and output fidelity.
 
-API_MODEL = "gpt-image-2"
+# Fallback only; each catalog entry carries its own ``api_model``.
+API_MODEL = "gpt-image-2.5-sunburst"
 
 _MODELS: Dict[str, Dict[str, Any]] = {
-    "gpt-image-2-low": {
-        "display": "GPT Image 2 (Low)",
+    "gpt-image-2.5-sunburst-low": {
+        "display": "GPT Image 2.5 Sunburst (Low)",
+        "api_model": "gpt-image-2.5-sunburst",
         "speed": "~15s",
-        "strengths": "Fast iteration, lowest cost",
+        "strengths": "Sunburst: editing precision; fast iteration, lowest cost",
         "quality": "low",
     },
-    "gpt-image-2-medium": {
-        "display": "GPT Image 2 (Medium)",
-        "speed": "~40s",
-        "strengths": "Balanced — default",
+    "gpt-image-2.5-sunburst-medium": {
+        "display": "GPT Image 2.5 Sunburst (Medium)",
+        "api_model": "gpt-image-2.5-sunburst",
+        "speed": "moderate",
+        "strengths": "Sunburst: editing precision; balanced — default",
         "quality": "medium",
     },
-    "gpt-image-2-high": {
-        "display": "GPT Image 2 (High)",
-        "speed": "~2min",
-        "strengths": "Highest fidelity, strongest prompt adherence",
+    "gpt-image-2.5-sunburst-high": {
+        "display": "GPT Image 2.5 Sunburst (High)",
+        "api_model": "gpt-image-2.5-sunburst",
+        "speed": "slow",
+        "strengths": "Sunburst: editing precision; highest fidelity, strongest prompt adherence",
+        "quality": "high",
+    },
+    "gpt-image-2.5-flare-low": {
+        "display": "GPT Image 2.5 Flare (Low)",
+        "api_model": "gpt-image-2.5-flare",
+        "speed": "~15s",
+        "strengths": "Flare: fastest family; fast iteration, lowest cost",
+        "quality": "low",
+    },
+    "gpt-image-2.5-flare-medium": {
+        "display": "GPT Image 2.5 Flare (Medium)",
+        "api_model": "gpt-image-2.5-flare",
+        "speed": "moderate",
+        "strengths": "Flare: fastest family; balanced",
+        "quality": "medium",
+    },
+    "gpt-image-2.5-flare-high": {
+        "display": "GPT Image 2.5 Flare (High)",
+        "api_model": "gpt-image-2.5-flare",
+        "speed": "slow",
+        "strengths": "Flare: fastest family; highest fidelity, strongest prompt adherence",
         "quality": "high",
     },
 }
 
-DEFAULT_MODEL = "gpt-image-2-medium"
+# Legacy tier IDs (pre-2.5) still resolve so existing config.yaml / env values
+# keep working; they are not offered in the model picker.
+_LEGACY_ALIASES: Dict[str, str] = {
+    "gpt-image-2-low": "gpt-image-2.5-sunburst-low",
+    "gpt-image-2-medium": "gpt-image-2.5-sunburst-medium",
+    "gpt-image-2-high": "gpt-image-2.5-sunburst-high",
+}
+
+DEFAULT_MODEL = "gpt-image-2.5-sunburst-medium"
 
 _SIZES = {
     "landscape": "1536x1024",
@@ -98,6 +132,7 @@ def _load_openai_config() -> Dict[str, Any]:
 def _resolve_model() -> Tuple[str, Dict[str, Any]]:
     """Decide which tier to use and return ``(model_id, meta)``."""
     env_override = os.environ.get("OPENAI_IMAGE_MODEL")
+    env_override = _LEGACY_ALIASES.get(env_override, env_override) if env_override else env_override
     if env_override and env_override in _MODELS:
         return env_override, _MODELS[env_override]
 
@@ -106,10 +141,12 @@ def _resolve_model() -> Tuple[str, Dict[str, Any]]:
     candidate: Optional[str] = None
     if isinstance(openai_cfg, dict):
         value = openai_cfg.get("model")
+        value = _LEGACY_ALIASES.get(value, value) if isinstance(value, str) else value
         if isinstance(value, str) and value in _MODELS:
             candidate = value
     if candidate is None:
         top = cfg.get("model")
+        top = _LEGACY_ALIASES.get(top, top) if isinstance(top, str) else top
         if isinstance(top, str) and top in _MODELS:
             candidate = top
 
@@ -163,7 +200,7 @@ def _load_image_bytes(ref: str) -> Tuple[bytes, str]:
 
 
 class OpenAIImageGenProvider(ImageGenProvider):
-    """OpenAI ``images.generate`` / ``images.edit`` backend — gpt-image-2."""
+    """OpenAI ``images.generate`` / ``images.edit`` backend — gpt-image-2.5 (sunburst / flare)."""
 
     @property
     def name(self) -> str:
@@ -201,7 +238,7 @@ class OpenAIImageGenProvider(ImageGenProvider):
         return {
             "name": "OpenAI",
             "badge": "paid",
-            "tag": "gpt-image-2 at low/medium/high quality tiers — text-to-image & image editing",
+            "tag": "gpt-image-2.5 (sunburst / flare) at low/medium/high quality tiers — text-to-image & image editing",
             "env_vars": [
                 {
                     "key": "OPENAI_API_KEY",
@@ -212,7 +249,7 @@ class OpenAIImageGenProvider(ImageGenProvider):
         }
 
     def capabilities(self) -> Dict[str, Any]:
-        # gpt-image-2 supports editing via images.edit() with up to 16 source
+        # gpt-image-2.5 supports editing via images.edit() with up to 16 source
         # images.
         return {"modalities": ["text", "image"], "max_reference_images": 16}
 
@@ -268,7 +305,7 @@ class OpenAIImageGenProvider(ImageGenProvider):
             sources.append(image_url.strip())
         for ref in (normalize_reference_images(reference_image_urls) or []):
             sources.append(ref)
-        sources = sources[:16]  # gpt-image-2 edit caps at 16 images
+        sources = sources[:16]  # gpt-image-2.5 edit caps at 16 images
         is_edit = bool(sources)
         modality = "image" if is_edit else "text"
 
@@ -298,7 +335,7 @@ class OpenAIImageGenProvider(ImageGenProvider):
 
             try:
                 response = client.images.edit(
-                    model=API_MODEL,
+                    model=meta.get("api_model", API_MODEL),
                     image=files if len(files) > 1 else files[0],
                     prompt=prompt,
                     size=size,  # type: ignore[arg-type]  # _SIZES values are valid gpt-image sizes
@@ -316,10 +353,10 @@ class OpenAIImageGenProvider(ImageGenProvider):
                     aspect_ratio=aspect,
                 )
         else:
-            # gpt-image-2 returns b64_json unconditionally and REJECTS
+            # gpt-image-2.5 returns b64_json unconditionally and REJECTS
             # ``response_format`` as an unknown parameter. Don't send it.
             payload: Dict[str, Any] = {
-                "model": API_MODEL,
+                "model": meta.get("api_model", API_MODEL),
                 "prompt": prompt,
                 "size": size,
                 "n": 1,
@@ -369,7 +406,7 @@ class OpenAIImageGenProvider(ImageGenProvider):
                 )
             image_ref = str(saved_path)
         elif url:
-            # Defensive — gpt-image-2 returns b64 today, but OpenAI's API
+            # Defensive — gpt-image-2.5 returns b64 today, but OpenAI's API
             # has previously returned URLs.  Cache the bytes locally so the
             # gateway never tries to fetch an ephemeral / signed URL after
             # it expires — same rationale as the xAI provider (#26942).

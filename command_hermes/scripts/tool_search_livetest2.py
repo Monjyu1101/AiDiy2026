@@ -98,7 +98,7 @@ def run_one(scenario: Dict[str, Any], mode: str, rep: int, out_dir: Path) -> Dic
     try:
         from run_agent import AIAgent
         agent = AIAgent(
-            provider="openrouter", model="anthropic/claude-haiku-4.5",
+            provider="openrouter", model="anthropic/claude-haiku-5.5",
             quiet_mode=True, save_trajectories=False,
             skip_context_files=True, skip_memory=True,
             platform="cli", max_iterations=15,

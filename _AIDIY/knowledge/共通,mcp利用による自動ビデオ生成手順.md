@@ -371,7 +371,7 @@ total = round(s, 3)  # 合計が目標以下か確認
 | 設定 | 推奨値 | 備考 |
 |------|--------|------|
 | provider | openai | 品質・安定性のバランスが良い |
-| model | gpt-image-2 | 現時点の最新 |
+| model | gpt-image-2.5-sunburst | 現時点の最新（高精度）。高速重視なら gpt-image-2.5-flare |
 | size | 1792x1024 | 16:9 横長（動画向け） |
 | quality | medium | コスト削減しつつ十分な品質 |
 | save_path | images/scene_001.png〜 | PNG 拡張子で自動保存 |
@@ -382,7 +382,7 @@ total = round(s, 3)  # 合計が目標以下か確認
 mcp__aidiy_image_generation__generate_image
   prompt: <image_prompt の内容。source_summary と factual_bullets の要点を含める>
   provider: openai
-  model: gpt-image-2
+  model: gpt-image-2.5-sunburst
   size: 1792x1024
   quality: medium
   save_path: D:/path/to/images/scene_001.png
@@ -392,7 +392,7 @@ mcp__aidiy_image_generation__generate_image
 > ```
 > POST http://127.0.0.1:8095/aidiy_image_generation/generate
 > Content-Type: application/json
-> Body: { "prompt": "...", "provider": "openai", "model": "gpt-image-2",
+> Body: { "prompt": "...", "provider": "openai", "model": "gpt-image-2.5-sunburst",
 >         "size": "1792x1024", "quality": "medium",
 >         "save_path": "D:/path/to/images/scene_001.png" }
 > Response: image/png バイナリ（save_path 指定時はファイルにも同時保存）

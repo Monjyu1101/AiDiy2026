@@ -929,9 +929,6 @@ def _is_codex_gpt54_or_gpt55(model: Optional[str], provider: Optional[str] = Non
         or bare == "gpt-6.1-sol"
         or bare.startswith("gpt-6.1-sol-")
         or bare.startswith("gpt-6.1-sol.")
-        or bare == "gpt-6-sol"
-        or bare.startswith("gpt-6-sol-")
-        or bare.startswith("gpt-6-sol.")
         or bare == "gpt-6-luna"
         or bare.startswith("gpt-6-luna-")
         or bare.startswith("gpt-6-luna.")
@@ -1039,7 +1036,7 @@ _FAST_MODEL_FAMILIES: tuple = (
     "gpt-5.4-nano",
     "gpt-5.4-mini",
     "gpt-5-mini",
-    "haiku-4.5",
+    "haiku-5.5",
     "gemini-3.6-flash",
     "flash-lite",
     "-nano",
@@ -1073,7 +1070,7 @@ def _model_recency_key(model_id: str) -> tuple:
     ``-mini``, ``-flash``, ``haiku`` — and a provider serves every generation of
     those it hasn't retired. Compared as plain strings, the oldest wins:
     ``gpt-3.5-mini`` sorts before ``gpt-5.4-mini``, and ``claude-3-haiku`` before
-    ``claude-haiku-4.5``. So the rung meant to keep us current on a provider's
+    ``claude-haiku-5.5``. So the rung meant to keep us current on a provider's
     small tier was pinning us to its most obsolete member.
 
     Splitting digit runs out and comparing them as numbers fixes both the

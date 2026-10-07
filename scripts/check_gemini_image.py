@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", default="gemini-3.1-flash-image")
+    parser.add_argument("--model", default="gemini-nano-banana-2.1")
     parser.add_argument("--prompt", default="かわいい猫の画像を作ってください。")
     parser.add_argument(
         "--output",

@@ -63,7 +63,7 @@ DEFAULT_COMPACT_THRESHOLD = 200_000
 # Sol and Luna were promoted to the gpt-6 line (gpt-6.1-sol / gpt-6-luna) while
 # Terra and bare/dated gpt-5.6 snapshots stayed on gpt-5.6, so both markers
 # are checked.
-_ELIGIBLE_MODEL_MARKERS = ("gpt-5.6", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna")
+_ELIGIBLE_MODEL_MARKERS = ("gpt-5.6", "gpt-6.1-sol", "gpt-6-luna")
 
 
 def is_native_compaction_model(model: Optional[str]) -> bool:

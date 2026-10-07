@@ -240,7 +240,8 @@ class ChatAI:
 
     def _画像生成モデル(self) -> bool:
         """画像生成モデルは function calling に対応しない。"""
-        return "-image" in str(self.chat_model).lower()
+        モデル名 = str(self.chat_model).lower()
+        return "-image" in モデル名 or "nano-banana" in モデル名
 
     async def 実行(self, 要求テキスト: str, テキスト受信処理Ｑ=None, タイムアウト秒数: int = 120,
                    システムプロンプト: str = None, file_path: str = None,
@@ -854,7 +855,7 @@ if __name__ == "__main__":
             return {}
 
     conf = _load_config()
-    AI_MODEL = conf.get("CHAT_GEMINI_MODEL", "gemini-3-pro-image-preview")
+    AI_MODEL = conf.get("CHAT_GEMINI_MODEL", "gemini-nano-banana-2.1")
     api_key = conf.get("gemini_key_id")
 
     if not api_key or str(api_key).startswith("<"):

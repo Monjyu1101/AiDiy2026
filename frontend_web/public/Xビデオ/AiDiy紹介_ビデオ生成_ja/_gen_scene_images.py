@@ -92,7 +92,7 @@ def post_json(url, payload, timeout_sec=600):
 
 def generate_one(prompt, out_path, original_path=None):
     attempts = [
-        ("openai", "gpt-image-2", "1536x1024", "medium"),
+        ("openai", "gpt-image-2.5-sunburst", "1536x1024", "medium"),
         ("freeai", "auto", "1920x1080", "auto"),
         ("auto", "auto", "1024x1024", "auto"),
     ]

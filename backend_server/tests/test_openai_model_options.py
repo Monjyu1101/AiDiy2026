@@ -44,7 +44,44 @@ class OpenAIModelOptionsTest(unittest.TestCase):
         self.assertEqual(chat_models["openai_chat"], chat_models["openai_oauth"])
         self.assertEqual(chat_models["openai_chat"], {"gpt-6-astra": "yyyy/mm/dd - gpt-6-astra"})
 
-    def test_fallback_retains_both_sol_models_when_discovery_fails(self):
+    def test_api_and_openrouter_catalogs_exclude_retired_sol_variants(self):
+        models = self.make_models({
+            model: {"作成日": "2026/09/01"}
+            for model in ("gpt-6-sol", "gpt-6-sol-pro", "gpt-6.1-sol")
+        })
+        models.openrt_models = {
+            "openai/gpt-6-sol": {},
+            "openai/gpt-6.1-sol": {},
+        }
+
+        chat_models = models.get_chat_models()
+
+        self.assertEqual(list(chat_models["openai_chat"]), ["gpt-6.1-sol"])
+        self.assertEqual(list(chat_models["openrt_chat"]), ["openai/gpt-6.1-sol"])
+
+    def test_oauth_catalog_excludes_retired_sol_from_cache(self):
+        oauth_module = types.ModuleType("AIコア.AIチャット_openai")
+        oauth_module.get_openai_oauth_models = lambda: {
+            "gpt-6-sol-900k": "旧モデル",
+            "gpt-6.1-sol": "新モデル",
+        }
+
+        with patch.dict(sys.modules, {"AIコア.AIチャット_openai": oauth_module}):
+            chat_models = self.make_models({}).get_chat_models()
+
+        self.assertEqual(chat_models["openai_oauth"], {"gpt-6.1-sol": "新モデル"})
+
+    def test_retired_only_oauth_catalog_uses_current_fallback(self):
+        oauth_module = types.ModuleType("AIコア.AIチャット_openai")
+        oauth_module.get_openai_oauth_models = lambda: {"gpt-6-sol": "旧モデル"}
+
+        with patch.dict(sys.modules, {"AIコア.AIチャット_openai": oauth_module}):
+            chat_models = self.make_models({}).get_chat_models()
+
+        self.assertIn("gpt-6.1-sol", chat_models["openai_oauth"])
+        self.assertNotIn("gpt-6-sol", chat_models["openai_oauth"])
+
+    def test_fallback_uses_current_sol_when_discovery_fails(self):
         oauth_module = types.ModuleType("AIコア.AIチャット_openai")
         def fail_discovery():
             raise RuntimeError("offline")
@@ -54,7 +91,7 @@ class OpenAIModelOptionsTest(unittest.TestCase):
         with patch.dict(sys.modules, {"AIコア.AIチャット_openai": oauth_module}):
             chat_models = models.get_chat_models()
 
-        self.assertEqual(list(chat_models["openai_chat"]), ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-terra", "gpt-6-luna"])
+        self.assertEqual(list(chat_models["openai_chat"]), ["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"])
         self.assertEqual(chat_models["openai_chat"], chat_models["openai_oauth"])
 
 

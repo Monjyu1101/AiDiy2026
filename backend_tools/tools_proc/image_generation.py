@@ -11,7 +11,7 @@
 """
 画像生成モジュール
 
-OpenAI API（DALL-E 3 / GPT Image 2）、Gemini / FreeAI（Google Gemini API）、
+OpenAI API（DALL-E 3 / GPT Image 1 / 2 / 2.5）、Gemini / FreeAI（Google Gemini API）、
 Codex CLI / Antigravity CLI / Grok CLI を使って画像を生成する。
 """
 
@@ -71,6 +71,20 @@ class ImageGeneration:
     # ================================================================== #
 
     _MODELS = {
+        "gpt-image-2.5-sunburst": {
+            "display": "GPT Image 2.5 Sunburst",
+            "api_model": "gpt-image-2.5-sunburst",
+            "qualities": ["low", "medium", "high"],
+            "default_quality": "medium",
+            "valid_sizes": {"1024x1024", "1536x1024", "1024x1536"},
+        },
+        "gpt-image-2.5-flare": {
+            "display": "GPT Image 2.5 Flare",
+            "api_model": "gpt-image-2.5-flare",
+            "qualities": ["low", "medium", "high"],
+            "default_quality": "medium",
+            "valid_sizes": {"1024x1024", "1536x1024", "1024x1536"},
+        },
         "gpt-image-2": {
             "display": "GPT Image 2",
             "api_model": "gpt-image-2",
@@ -94,7 +108,7 @@ class ImageGeneration:
         },
     }
 
-    OPENAI_DEFAULT_MODEL = "gpt-image-2"
+    OPENAI_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
     OPENAI_DEFAULT_SIZE = "1024x1024"
 
     # ================================================================== #
@@ -102,18 +116,28 @@ class ImageGeneration:
     # ================================================================== #
 
     _GEMINI_MODELS = {
+        "gemini-nano-banana-2.1": {
+            "display": "Gemini Nano Banana 2.1",
+        },
+        "gemini-3.1-flash-lite-image": {
+            "display": "Gemini 3.1 Flash Lite Image",
+        },
+        "gemini-3-pro-image": {
+            "display": "Gemini 3 Pro Image (Nano Banana Pro)",
+        },
         "gemini-3.1-flash-image-preview": {
             "display": "Gemini 3.1 Flash Image (Nano Banana 2)",
+            "supports_512": True,
         },
         "gemini-3-pro-image-preview": {
-            "display": "Gemini 3 Pro Image (Nano Banana Pro)",
+            "display": "Gemini 3 Pro Image Preview (Nano Banana Pro)",
         },
         "gemini-2.5-flash-image": {
             "display": "Gemini 2.5 Flash Image (Nano Banana)",
         },
     }
 
-    GEMINI_DEFAULT_MODEL = "gemini-3.1-flash-image-preview"
+    GEMINI_DEFAULT_MODEL = "gemini-nano-banana-2.1"
     GEMINI_DEFAULT_SIZE = "1024x1024"
     FREEAI_DEFAULT_SIZE = "512x512"
 
@@ -715,6 +739,9 @@ class ImageGeneration:
             model if model != "auto" else None
         )
         size_conf = self._resolve_gemini_size(size if size != "auto" else default_size)
+        if size_conf["image_size"] == "512" and not model_meta.get("supports_512"):
+            # 512 は一部モデルのみ対応（それ以外は 400 になる）ため 1K に引き上げる
+            size_conf = {**size_conf, "image_size": "1K"}
 
         client = genai.Client(api_key=api_key)
 
@@ -803,14 +830,14 @@ class ImageGeneration:
             provider: "auto" / "openai" / "gemini" / "freeai" / "codex" / "antigravity" / "grok"
             original_path: 参照画像のパス（省略可）
             model:
-              OpenAI: "auto"=gpt-image-2 / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
-              Gemini/FreeAI: "auto"=gemini-3.1-flash-image-preview
+              OpenAI: "auto"=gpt-image-2.5-sunburst / "gpt-image-2.5-sunburst" / "gpt-image-2.5-flare" / "gpt-image-2" / "gpt-image-1" / "dall-e-3"
+              Gemini/FreeAI: "auto"=gemini-nano-banana-2.1 / "gemini-3.1-flash-lite-image" / "gemini-3-pro-image" / ...
               Auto/Codex/Antigravity/Grok: 指定値は無視
             size:
               OpenAI: "auto"=1024x1024 / "1024x1024" / "1536x1024" / "1024x1536" / ...
               Gemini/FreeAI: "auto"=1024x1024 / "512x512" / "1024x1024" / "1920x1080" / "1080x1920"
             quality:
-              OpenAI only: "auto"（モデル既定値） / gpt-image-2: "low","medium","high" / dall-e-3: "standard","hd"
+              OpenAI only: "auto"（モデル既定値） / gpt-image-2.5-* / gpt-image-2: "low","medium","high" / dall-e-3: "standard","hd"
 
         Returns:
             (image, info_dict)

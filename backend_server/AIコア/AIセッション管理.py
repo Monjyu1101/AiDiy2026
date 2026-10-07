@@ -48,7 +48,7 @@ def 初期モデル設定生成(app_conf) -> dict:
     設定 = {
         # ChatAI設定
         "CHAT_AI_NAME": app_conf.json.get("CHAT_AI_NAME", "freeai_chat"),
-        "CHAT_GEMINI_MODEL": app_conf.json.get("CHAT_GEMINI_MODEL", "gemini-3-pro-image-preview"),
+        "CHAT_GEMINI_MODEL": app_conf.json.get("CHAT_GEMINI_MODEL", "gemini-nano-banana-2.1"),
         "CHAT_FREEAI_MODEL": app_conf.json.get("CHAT_FREEAI_MODEL", "gemini-2.5-flash"),
         "CHAT_OPENRT_MODEL": app_conf.json.get("CHAT_OPENRT_MODEL", "google/gemini-3-pro-image-preview"),
         "CHAT_OPENAI_MODEL": app_conf.json.get("CHAT_OPENAI_MODEL", "gpt-6.1-sol"),
