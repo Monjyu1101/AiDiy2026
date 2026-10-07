@@ -7,6 +7,7 @@ const protocol = require('../../out/aidiy_live/protocol.cjs');
 const { scrollRuntime } = require('../../checks/scroll-screen.cjs');
 
 function screen(host, rejectProject = false, holdInput = false, reducedMotion = true, initialModelSettings, blockAudioUnlock = false, backendOptions = {}) {
+  const htmlIds = new Set([...readFileSync(join(__dirname, '../media/index.html'), 'utf8').matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
   const scrolling = scrollRuntime();
   const elements = new Map(), sockets = [], calls = [], events = new Map(), intervals = new Set(), timers = new Map();
   const audioCalls = [];
@@ -98,7 +99,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
       throw new Error(name);
     },
     window, document: { body: element('body'), documentElement: element('html'),
-      getElementById: element, createElement: () => element(), querySelectorAll: () => [] },
+      getElementById: id => htmlIds.has(id) ? element(id) : null, createElement: () => element(), querySelectorAll: () => [] },
     Option: function (text, value) { this.text = text; this.value = value; },
     clearTimeout: id => timers.delete(id), requestAnimationFrame: callback => callback(),
     setInterval() { const id = ++intervalNumber; intervals.add(id); return id; }, clearInterval: id => intervals.delete(id),

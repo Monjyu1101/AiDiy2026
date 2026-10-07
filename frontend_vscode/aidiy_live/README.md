@@ -49,7 +49,7 @@ Provider は `freeai` / `gemini` / `openai`（内部名の `freeai_live` / `gemi
 npm run live
 ```
 
-Electron は既存の `frontend_vscode/node_modules` の配置済みバイナリを使います。依存が未導入の場合は従来の `python frontend_vscode/_setup.py` でセットアップしてください。ライブ画面の変更後は `npm run live:compile` で更新します。
+Electron は既存の `frontend_vscode/node_modules` の配置済みバイナリを使います。依存が未導入の場合は従来の `python frontend_vscode/_setup.py` でセットアップしてください。単独起動では画面・接続処理のソースと生成物を照合し、古い生成物が残っている場合は起動前に自動更新します。手動更新は `npm run live:compile` でも実行できます。VS Code 拡張には VSIX の再生成・再配置が必要です。
 
 専用ウィンドウの初期サイズは Code と同じ476×602、最小サイズは360×480です。Electron が未配置、または起動に失敗した場合はブラウザへ自動で切り替えます。Windows では Chrome / Edge があれば Code のブラウザ版と同じ640×820の専用ウィンドウで開きます。通常起動とブラウザ版起動は、起動後に CMD / PowerShell へ戻ります。ブラウザ中継は別プロセスで動き、最後の画面を閉じて約60秒後に終了します。`--foreground` は起動診断用で、サーバーをターミナルで実行します。
 
@@ -62,6 +62,8 @@ npm run live:browser
 ターミナル上で実行したい場合は `npm run live -- --browser --foreground` を使い、Ctrl+C でサーバーを終了します。URL だけを表示する場合は `npm run live -- --serve` を使います。
 
 モデル選択画面に接続先の表示・入力欄はありません。`--backend` と `aidiyLive.backendUrl` は使用しません。ポートを変更する場合は共通設定の `PORT_CORE` を変更し、Core と Live を再起動してください。
+
+AIコアのモデル情報を取得できない場合は、実際の接続先とエラー詳細を表示します。`127.0.0.1:8091` に対する `ECONNREFUSED` なら、そのPCのCore APIが指定ポートで起動しているかを確認してください。これはOpenAIへの接続前の段階です。
 
 ## 操作
 

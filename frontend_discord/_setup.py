@@ -44,7 +44,7 @@ def setup(choices=None) -> bool:
     del choices
     print_header("フロントエンド(Discord) セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
-    print_info("対象: Discord Bot パネル / Electron / 共通設定の不足キー補完")
+    print_info("対象: Discord Bot パネル / Electron / 単独起動ランチャー / TypeScript")
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
     if not npm:
         print_error("Node.js 22.12 以降と npm を導入してください。")

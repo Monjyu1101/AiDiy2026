@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { 接続エラー詳細 } from './connection-error';
 
 type Message = { type?: string; id?: number; path?: string; body?: unknown; data?: string };
 type Mic = { id: number; process: ChildProcessWithoutNullStreams; stop: () => void };
@@ -86,7 +87,7 @@ export class LiveHost {
         const value = await response.json() as { message?: string };
         if (!response.ok) throw new Error(value.message || `接続エラー (${response.status})`);
         if (!this.disposed) this.post({ type: 'reply', id, value });
-      } catch (error) { if (!this.disposed) this.post({ type: 'reply', id, error: error instanceof Error ? error.message : String(error) }); }
+      } catch (error) { if (!this.disposed) this.post({ type: 'reply', id, error: 接続エラー詳細(this.target, error) }); }
       finally { clearTimeout(timeout); this.requests.delete(controller); }
     } else if (message.type === 'mic-start') {
       if (this.visible) this.startMicrophone(id);

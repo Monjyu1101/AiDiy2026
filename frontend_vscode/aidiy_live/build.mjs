@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import { copyFile, mkdir } from 'node:fs/promises';
+import buildState from './build-state.cjs';
 const root = fileURLToPath(new URL('.', import.meta.url));
 await build({ absWorkingDir: root, entryPoints: ['src/server.ts'], outfile: '../dist/aidiy_live/server.cjs', bundle: true, platform: 'node', target: 'node22', format: 'cjs' });
 await build({ absWorkingDir: root, entryPoints: ['src/view.ts'], outfile: '../dist/aidiy_live/view.js', bundle: true, platform: 'browser', target: 'es2022' });
@@ -13,3 +14,4 @@ await Promise.all([
   copyFile(new URL('microphone.py', import.meta.url), new URL('dist/microphone.py', import.meta.url)),
   copyFile(new URL('../LICENSE', import.meta.url), new URL('LICENSE', import.meta.url)),
 ]);
+buildState.ビルド状態保存(fileURLToPath(new URL('..', import.meta.url)));

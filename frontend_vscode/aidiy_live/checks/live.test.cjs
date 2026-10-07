@@ -213,6 +213,27 @@ test('localhost中継: API、音声WebSocket、Origin拒否、終了', { timeout
   await new Promise(resolve => { if (ws.socket.destroyed) resolve(); else ws.socket.once('close', resolve); });
 });
 
+test('Live 接続失敗: 単独画面と拡張に実際のローカル接続先・拒否理由を返す', { timeout: 8000 }, async t => {
+  const { LiveHost } = require('../../out/aidiy_live/host.cjs');
+  const backend = createServer();
+  await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve));
+  const target = `http://127.0.0.1:${backend.address().port}`;
+  await new Promise(resolve => backend.close(resolve));
+  const live = await ライブ起動(root, target);
+  t.after(() => live.close());
+  const response = await fetch(new URL('api/core/AIコア/モデル情報/取得', live.url), {
+    method: 'POST', headers: { 'Content-Type': 'application/json', origin: new URL(live.url).origin }, body: '{}',
+  });
+  assert.equal(response.status, 502);
+  const packets = [], host = new LiveHost(target, packet => packets.push(packet), () => 'python', '/microphone.py');
+  t.after(() => host.dispose());
+  await host.receive({ type: 'api', id: 1, path: 'core/AIコア/モデル情報/取得', body: {} });
+  for (const message of [(await response.json()).message, packets[0].error]) {
+    assert.ok(message.includes(target), message);
+    assert.match(message, /ECONNREFUSED/);
+  }
+});
+
 test('音声レートと既存の操作・PCMパケット', () => {
   assert.equal(入力レート('openai_live'), 24000); assert.equal(入力レート('gemini_live'), 16000);
   assert.equal(音声入力('abc').メッセージ内容, 'audio/pcm');

@@ -336,7 +336,7 @@ def setup(choices: dict | None = None) -> bool:
     label = "フロントエンド(vscode)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_VSCODE_DIR}")
-    print_info("対象: vscode チャット拡張 / Electron / 単独起動ランチャー / TypeScript / VSIX")
+    print_info("対象: VS Code 拡張（Code / Live） / Electron / 単独起動ランチャー / TypeScript / VSIX")
 
     package_json = FRONTEND_VSCODE_DIR / "package.json"
     if not package_json.is_file():

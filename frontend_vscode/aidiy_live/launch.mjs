@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import localBackend from './local-backend.cjs';
+import buildState from './build-state.cjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 let options;
 try {
@@ -51,7 +52,10 @@ function electronExecutable() {
   } catch { throw error; }
 }
 async function main() {
-  if (!existsSync(join(root, 'dist/aidiy_live/server.cjs')) || !existsSync(join(root, 'dist/aidiy_live/view.js'))) await import('./build.mjs');
+  if (buildState.ビルド更新が必要(root)) {
+    console.log('Live の画面・接続処理を更新しています…');
+    await import('./build.mjs');
+  }
   async function startBrowser(open = true) {
     const { ライブ起動 } = createRequire(import.meta.url)('../dist/aidiy_live/server.cjs');
     const server = await ライブ起動(root, backend, false, projectRoot, modelSettings, undefined, autoConnect);

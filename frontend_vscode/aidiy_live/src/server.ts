@@ -6,6 +6,7 @@ import { basename, join } from 'node:path';
 import type { Socket } from 'node:net';
 import { ライブモデル読込, ライブモデル保存, モデル保存先 } from '../../src/model-preferences';
 import { ローカル接続先 } from '../local-backend.cjs';
+import { 接続エラー詳細 } from './connection-error';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
 export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live'), 自動接続 = false) {
@@ -93,8 +94,8 @@ export async function ライブ起動(root: string, backend?: string, packaged =
       upstreamRequests.add(proxy);
       proxy.on('close', () => upstreamRequests.delete(proxy));
       proxy.on('timeout', () => proxy.destroy(new Error('接続タイムアウト')));
-      proxy.on('error', () => {
-        if (!res.headersSent) res.writeHead(502).end(JSON.stringify({ status: 'NG', message: 'バックエンドへ接続できません。' }));
+      proxy.on('error', error => {
+        if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify({ status: 'NG', message: 接続エラー詳細(target, error) }));
         else res.destroy();
       });
       proxy.end(body);

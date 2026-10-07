@@ -200,4 +200,6 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 
 - 接続先の画面表示、`--backend`、`aidiyLive.backendUrl` は使わない。`aidiy_live/local-backend.cjs` がホストを `127.0.0.1` に固定し、AiDiy配置先から親へ、次に作業フォルダから親へ `_config/AiDiy_key.json` を探索して `PORT_CORE` を使う。設定ファイルが無い配布済み拡張では8091を使う。読込失敗・不正ポートは既定値で隠さずエラーにする。
 - ランチャー・ブラウザ中継・拡張ホストで同じ解決処理を使う。ポート変更後はCoreとLiveを再起動する。モデル選択画面に接続先欄を再追加しない。
-- `checks/launcher.test.cjs` で既定起動と共通ポート変更後の起動を確認する。画面ソースの変更をWindowsへ反映するには `frontend_vscode` で `npm run live:compile` を実行する。VS Code拡張はVSIXの更新も必要。
+- `checks/launcher.test.cjs` で既定起動と共通ポート変更後の起動を確認する。単独起動の `launch.mjs` は `build-state.cjs` でソース・生成物のハッシュを照合し、不一致・生成物欠落・旧配置で記録がない場合に起動前に再生成する。HTMLだけ更新され、削除済み要素を参照する古いJavaScriptが残る状態を避ける。手動では `frontend_vscode` の `npm run live:compile` で更新できる。VS Code拡張はVSIXの更新も必要。
+- 画面テストの `getElementById` は実HTMLにないIDへ `null` を返す。任意IDのモック要素を生成すると、HTMLとJavaScriptの不整合を見逃す。
+- モデル情報APIへの通信失敗は、単独版・拡張とも実際の接続先と原因コードを表示する。`ECONNREFUSED` ならローカルCoreの起動・待受ポートを確認する。OpenAI側の障害と区別し、画面表示だけでAPIキーやモデルの問題と判断しない。

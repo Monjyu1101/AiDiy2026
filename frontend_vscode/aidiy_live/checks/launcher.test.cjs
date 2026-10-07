@@ -10,6 +10,7 @@ function fixture(t) {
   const app = join(root, 'aidiy_live'), bundle = join(root, 'dist/aidiy_live');
   fs.mkdirSync(app); fs.mkdirSync(bundle, { recursive: true });
   fs.copyFileSync(join(__dirname, '../local-backend.cjs'), join(app, 'local-backend.cjs'));
+  fs.copyFileSync(join(__dirname, '../build-state.cjs'), join(app, 'build-state.cjs'));
   const source = fs.readFileSync(join(__dirname, '../launch.mjs'), 'utf8');
   assert.ok(source.includes('spawn(command, browserArgs,'));
   // OS のブラウザ起動だけを代替し、親子の起動・常駐・通知処理は実コードで検証する。
@@ -21,6 +22,19 @@ function fixture(t) {
     return {url: 'http://127.0.0.1:' + server.address().port + '/', idleMilliseconds: () => 0,
       close: () => new Promise(resolve => server.close(resolve))};
   };`);
+  fs.mkdirSync(join(app, 'dist'));
+  fs.writeFileSync(join(app, 'dist/extension.js'), '');
+  fs.writeFileSync(join(app, 'dist/view.js'), '');
+  fs.writeFileSync(join(app, 'build.mjs'), `
+    import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+    import { fileURLToPath } from 'node:url';
+    import state from './build-state.cjs';
+    const root = fileURLToPath(new URL('..', import.meta.url));
+    const count = new URL('../build-count', import.meta.url);
+    writeFileSync(count, String((existsSync(count) ? Number(readFileSync(count, 'utf8')) : 0) + 1));
+    state.ビルド状態保存(root);
+  `);
+  require('../build-state.cjs').ビルド状態保存(root);
   t.after(async () => {
     const out = join(root, 'out/aidiy_live');
     if (fs.existsSync(out)) for (const name of fs.readdirSync(out).filter(name => name.endsWith('.json'))) {
@@ -119,4 +133,22 @@ test('Live 接続先: 共通PORT_COREを自動参照し、接続先の指定を�
   assert.equal((await (await fetch(new URL('config', url))).json()).backend, 'http://127.0.0.1:9091');
   assert.doesNotMatch(f.launch('--help').stdout, /--backend/);
   assert.equal(f.launch('--backend', 'https://example.test').status, 1);
+});
+
+test('Live 更新: 旧生成物が残っていても画面変更を検知し、更新後だけ起動する', t => {
+  const f = fixture(t);
+  fs.mkdirSync(join(f.app, 'media'));
+  fs.writeFileSync(join(f.app, 'media/index.html'), '<html>接続先欄のない新画面</html>');
+  const first = f.launch('--browser');
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /画面・接続処理を更新/);
+  assert.equal(fs.readFileSync(join(f.root, 'build-count'), 'utf8'), '1');
+  const next = f.launch('--browser');
+  assert.equal(next.status, 0, next.stderr);
+  assert.doesNotMatch(next.stdout, /画面・接続処理を更新/);
+  assert.equal(fs.readFileSync(join(f.root, 'build-count'), 'utf8'), '1');
+  // 記録のない従来の配置からの初回起動も更新する。
+  fs.unlinkSync(join(f.root, 'dist/aidiy_live/build-state.json'));
+  assert.equal(f.launch('--browser').status, 0);
+  assert.equal(fs.readFileSync(join(f.root, 'build-count'), 'utf8'), '2');
 });
