@@ -58,7 +58,6 @@ export class LiveEnvironment {
     if (this.host) return this.config;
     return (await fetch(new URL('config', location.href))).json();
   }
-  async backend() { return (await this.context()).backend || ''; }
   async saveModel(settings: Record<string, string>) {
     if (this.host) { await this.request('save-model', { settings }).result; return; }
     const response = await fetch(new URL('model', location.href), { method: 'POST',
@@ -76,7 +75,6 @@ export class LiveEnvironment {
   onStop(listener: (error?: string) => void) { this.stopListeners.push(listener); }
   onMicrophoneStop(listener: () => void) { this.microphoneStopListeners.push(listener); }
   onFolder(listener: (folder?: Folder | null) => void) { this.folderListeners.push(listener); }
-  standalone() { this.vscode?.postMessage({ type: 'standalone' }); }
   ready() {
     this.vscode?.postMessage({ type: 'ui-ready', audioWorklet: typeof AudioWorkletNode !== 'undefined' });
     if (!this.host && !this.presence) this.presence = new EventSource(new URL('presence', location.href));
@@ -126,8 +124,6 @@ export class LiveEnvironment {
       mic.sources.add(source); source.onended = () => { source.disconnect(); mic.sources.delete(source); };
       mic.next = Math.max(mic.context.currentTime + .015, mic.next);
       source.start(mic.next); mic.next += buffer.duration;
-    } else if (reply.type === 'backend') {
-      this.config.backend = reply.data;
     } else if (reply.type === 'folder') {
       this.config.作業フォルダ = reply.作業フォルダ;
       for (const listener of this.folderListeners) listener(reply.作業フォルダ);

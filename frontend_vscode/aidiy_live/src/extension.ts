@@ -65,7 +65,6 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
             void view.webview.postMessage({ type: 'reply', id: message.id, error: error instanceof Error ? error.message : String(error) });
           }
         }
-        else if (message?.type === 'standalone') void this.standalone().catch(error => { void vscode.window.showErrorMessage(String(error)); });
         else void host.receive(message).catch(error => { void vscode.window.showErrorMessage(String(error)); });
       }),
       view.onDidChangeVisibility(() => {

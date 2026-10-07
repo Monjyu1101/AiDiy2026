@@ -153,7 +153,6 @@ export class LiveHost {
     if (!this.disposed) this.post({ type: 'host-stop' });
   }
   dispose() { this.stop(); this.disposed = true; }
-  backend(value: string) { this.target = backendUrl(value); this.post({ type: 'backend', data: this.target.origin }); this.stop(); }
 }
 
 export function microphonePython(configured: string, folders: string[]) {
