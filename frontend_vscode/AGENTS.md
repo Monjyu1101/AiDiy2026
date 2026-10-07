@@ -43,7 +43,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 基本方針
 
-- Code の `extensionKind` は `workspace`、Live はローカルマイクを扱う `ui` とする。
+- Code の `extensionKind` は `workspace`、Live はローカルマイクを扱う `ui` を優先し、Codespaces では `workspace` の拡張ホストで動作する。
 - 拡張バージョンは、固定解除の明示的な指示があるまで `0.1.0` を維持する。
 - ワークスペースを信頼済みの場合だけ、Code の CLI 実行・コード添付と、Live のマイク入力・AIコア接続を許可する。
 - `aidiy_hermes` は `shell: false` で起動し、要求本文は UTF-8 の標準入力で渡す。
@@ -52,7 +52,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 - Live は既存 AIコアの WebSocket（`/core/ws/AIコア`）とモデル情報 API をそのまま使い、拡張専用の API を追加しない。
 - `src/runner.ts`、`src/protocol.ts`、`aidiy_live/src/protocol.ts`、`src/model-preferences.ts`、`scripts/model-catalog.py` は `frontend_discord` と共有する。export 名や引数を変える場合は `frontend_discord/src/vscode.ts` と利用箇所を合わせて更新する。
 - HTML を含む Markdown は無効化し、外部画像や任意の command URI を回答から実行しない。
-- Windows デスクトップ版 VS Code を主対象とする。Web 版、仮想ワークスペース、Remote SSH / WSL は対象外。
+- Windows デスクトップ版 VS Code を主対象とする。Codespaces のブラウザ版ではリモートの Node.js 拡張ホストを使う。Live 拡張のマイク入力は Windows のローカルホストで扱い、Codespaces では単独ブラウザ版を使う。リモートホストの Live 接続先はそのホストの AIコアとなる。仮想ワークスペースと、リモート拡張ホストのない Web 版は対象外。
 
 ## ファイル構成
 

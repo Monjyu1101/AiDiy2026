@@ -11,7 +11,7 @@
   "categories": ["AI", "Other"],
   "keywords": ["aidiy", "live", "voice"],
   "main": "./dist/extension.js",
-  "extensionKind": ["ui"],
+  "extensionKind": ["ui", "workspace"],
   "capabilities": {
     "untrustedWorkspaces": { "supported": false, "description": "マイク入力とローカル AIコアへの接続は信頼済みのワークスペースで利用します。" },
     "virtualWorkspaces": { "supported": false, "description": "Windows のマイクとローカル AIコアを使用します。" }

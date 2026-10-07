@@ -148,6 +148,8 @@ Windows の実 VS Code で拡張ホストまで確認するときは、依存導
 
 通常の VS Code プロファイルへ配置する確認は `_setup.py` を使う。試用ホストの `out/manual-profile` と混同しない。
 
+Codespaces で Code だけが配置され、Live のインストール時に「このセットアップでは実行されないように宣言されている」と表示される場合は、Live の `package.json` の `extensionKind` と VSIX 内の同じ設定を確認する。`["ui"]` だけではブラウザ版 Codespaces に必要なリモート拡張ホストで実行できないため、`["ui", "workspace"]` とする。`npm run package` で VSIX を再生成し、`python frontend_vscode/_setup.py --extensions-only` で配置して、Code / Live の両 ID が拡張一覧にあることを確認する。Live のマイクは Windows のローカルホスト用であり、Codespaces では単独ブラウザ版を使用する。
+
 Code / Live の単独起動では、Electron の引数をエントリファイルだけにする。Chromium が追加のファイル引数を解釈して異常終了する場合があるため、起動設定は子プロセスの環境変数で渡す。Code は `AIDIY_CODE_PROJECT` / `AIDIY_CODE_READY` / `AIDIY_CODE_MODEL`、Live は `AIDIY_LIVE_BACKEND` / `AIDIY_LIVE_READY` / `AIDIY_LIVE_PROJECT` / `AIDIY_LIVE_MODELS` を使う。表示後の `windowShown: true` 通知は維持する。Code のブラウザ版は Node.js の引数で従来どおり渡す。
 
 ルートの `vscode_code.bat` / `vscode_live.bat` は `scripts/cli_bat/_hermes_cli.bat` と同じ形式でモデルを選び、セットアップ済みの `aidiy_code` / `aidiy_live` コマンドを呼ぶ。`%USERPROFILE%\.local\bin\` の生成済み `.cmd` があれば使い、無ければ PATH 上の同名コマンドを呼ぶ。bat を別プロジェクトのルートへコピーすると、bat の配置先が作業フォルダになる。コピー先に `frontend_vscode` を置く必要はない。起動失敗時は `pause` し、終了コードを保持する。ダブルクリックで起動した場合も、閉じる前に表示されたエラーを確認できる。Electron が未配置なら AiDiy の配置先で `python frontend_vscode/_setup.py` を実行して準備する。ブラウザ版を確認する場合は、各 bat に `--browser` を付ける。bat 本体の案内とメニューは ASCII、改行は CRLF で保存する。Node.js の日本語出力とパス表示が文字化けしないよう、bat / `.cmd` の先頭では `chcp 65001 >nul` を実行する。生成済みランチャーだけを更新する場合は `python frontend_vscode/_setup.py --launchers-only` を使う。
