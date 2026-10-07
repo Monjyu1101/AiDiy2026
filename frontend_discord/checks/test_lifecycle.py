@@ -43,7 +43,7 @@ class DiscordLifecycleTest(unittest.TestCase):
         self.assertEqual(next(call.kwargs['default'] for call in ask.call_args_list if 'Discord' in call.args[0]), 'y')
         with patch.object(start, 'prompt_choice', side_effect=lambda _prompt, default_yes: default_yes) as ask:
             flags = start.collect_startup_choices()
-        self.assertEqual(len(flags), 7)
+        self.assertEqual(len(flags), 9)
         self.assertFalse(flags[-1])
         self.assertIn('Discord', ask.call_args.args[0])
         with tempfile.TemporaryDirectory() as folder, patch.object(cleanup, 'ask_start_mode', return_value=(True, False)), patch.object(

@@ -12,7 +12,7 @@ try {
   options = parseArgs({ options: {
     provider: { type: 'string' }, model: { type: 'string' },
     project: { type: 'string' }, 'ready-file': { type: 'string' },
-    browser: { type: 'boolean' }, serve: { type: 'boolean' }, foreground: { type: 'boolean' }, help: { type: 'boolean' },
+    browser: { type: 'boolean' }, serve: { type: 'boolean' }, foreground: { type: 'boolean' }, connect: { type: 'boolean' }, help: { type: 'boolean' },
   } }).values;
   for (const name of ['provider', 'model', 'project', 'ready-file']) {
     if (options[name] !== undefined && !options[name].trim()) throw new Error(`--${name} に値を指定してください。`);
@@ -20,7 +20,7 @@ try {
   if (options.model && !options.provider) throw new Error('Live の --model には --provider も指定してください。');
 } catch (error) { console.error(error.message); process.exit(1); }
 if (options.help) {
-  console.log('aidiy_live [--provider freeai|gemini|openai] [--model モデル名] [--project 作業フォルダ] [--browser | --serve] [--foreground]');
+  console.log('aidiy_live [--provider freeai|gemini|openai] [--model モデル名] [--project 作業フォルダ] [--browser | --serve] [--foreground] [--connect]');
   console.log('モデル未指定: 前回の手動選択（未保存ならバックエンドの既定設定）で起動。画面の「モデル」から変更できます。'); process.exit(0);
 }
 const providerAliases = { freeai: 'freeai_live', gemini: 'gemini_live', openai: 'openai_live', freeai_live: 'freeai_live', gemini_live: 'gemini_live', openai_live: 'openai_live' };
@@ -33,6 +33,7 @@ const projectRoot = resolve(options.project || process.cwd());
 const backend = localBackend.ローカル接続先(root, projectRoot);
 const mode = options.serve ? 'serve' : options.browser ? 'browser' : 'desktop';
 const foreground = !!options.foreground;
+const autoConnect = !!options.connect;
 const modelArgs = [...(provider ? ['--provider', provider] : []), ...(model ? ['--model', model] : [])];
 const modelKeys = { freeai_live: 'LIVE_FREEAI_MODEL', gemini_live: 'LIVE_GEMINI_MODEL', openai_live: 'LIVE_OPENAI_MODEL' };
 const modelSettings = provider ? { LIVE_AI_NAME: provider, ...(model ? { [modelKeys[provider]]: model } : {}) } : {};
@@ -53,7 +54,7 @@ async function main() {
   if (!existsSync(join(root, 'dist/aidiy_live/server.cjs')) || !existsSync(join(root, 'dist/aidiy_live/view.js'))) await import('./build.mjs');
   async function startBrowser(open = true) {
     const { ライブ起動 } = createRequire(import.meta.url)('../dist/aidiy_live/server.cjs');
-    const server = await ライブ起動(root, backend, false, projectRoot, modelSettings);
+    const server = await ライブ起動(root, backend, false, projectRoot, modelSettings, undefined, autoConnect);
     console.log(`aidiy_live: ${server.url}\n終了: Ctrl+C`);
     let idle;
     const close = () => { void server.close().then(() => process.exit(0)); };
@@ -89,7 +90,7 @@ async function main() {
     const run = randomUUID(), ready = join(runRoot, `${run}.browser.json`), log = join(runRoot, `${run}.browser.log`);
     const descriptor = openSync(log, 'w');
     let child;
-    try { child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--foreground', '--project', projectRoot, '--ready-file', ready, ...modelArgs], {
+    try { child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--foreground', '--project', projectRoot, '--ready-file', ready, ...modelArgs, ...(autoConnect ? ['--connect'] : [])], {
       cwd: root, detached: true, windowsHide: true, stdio: ['ignore', descriptor, descriptor],
     }); } finally { closeSync(descriptor); }
     let failure; child.once('error', error => { failure = error; }); child.unref();
@@ -115,6 +116,7 @@ async function main() {
     env.AIDIY_LIVE_READY = ready;
     env.AIDIY_LIVE_PROJECT = projectRoot;
     env.AIDIY_LIVE_MODELS = JSON.stringify(modelSettings);
+    env.AIDIY_LIVE_CONNECT = autoConnect ? '1' : '0';
     let child;
     try { child = spawn(executable, [join(root, 'aidiy_live/desktop.cjs')], { cwd: root, detached: !foreground, stdio: foreground ? 'inherit' : ['ignore', descriptor, descriptor], windowsHide: false, env }); }
     finally { closeSync(descriptor); }

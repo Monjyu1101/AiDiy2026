@@ -17,6 +17,16 @@ const { LiveConnection, 入力レート, 音声入力, 音声操作 } = require(
 const { LiveAudio } = require('../../out/aidiy_live/audio.cjs');
 const root = join(__dirname, '../..');
 
+test('Live 中継: 自動接続指定を画面設定へ渡し、通常起動は手動接続', async t => {
+  for (const automatic of [false, true]) {
+    const live = await start(root, undefined, false, process.cwd(), {}, join(preferences, `${++fileNumber}.json`), automatic);
+    try {
+      const config = await (await fetch(new URL('config', live.url))).json();
+      assert.equal(config.自動接続, automatic);
+    } finally { await live.close(); }
+  }
+});
+
 test('Live: 手動選択のモデル・音声を保存し、再起動時に復元、明示指定や不正要求では上書きしない', async t => {
   const file = join(preferences, 'remember.json');
   const selected = { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'gpt-realtime-2.1-mini', LIVE_OPENAI_VOICE: 'marin' };

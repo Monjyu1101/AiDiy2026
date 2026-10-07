@@ -2,7 +2,7 @@ import type { LiveSocket } from './protocol';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 export type Folder = { 名前: string; パス: string };
-type Config = { host?: boolean; backend?: string; captureUrl?: string; 作業フォルダ?: Folder | null; モデル設定?: Record<string, string>; 保存モデル設定?: Record<string, string> };
+type Config = { host?: boolean; backend?: string; captureUrl?: string; 作業フォルダ?: Folder | null; モデル設定?: Record<string, string>; 保存モデル設定?: Record<string, string>; 自動接続?: boolean };
 type Reply = { type: string; id?: number; data?: string; value?: unknown; error?: string; rate?: number; 作業フォルダ?: Folder | null };
 
 class HostSocket implements LiveSocket {

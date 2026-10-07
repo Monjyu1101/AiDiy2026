@@ -369,8 +369,8 @@ const initialContext = environment.context().then(config => {
     settings = { ...settings, ...preferredSettings };
     showModels();
   }
-  // 起動引数でモデルを指定した単独画面だけ、初回に自動接続する。
-  return !environment.host && !!config.モデル設定?.[keys(config.モデル設定.LIVE_AI_NAME).model];
+  // 全体起動の接続指定、またはモデル指定がある単独画面は初回に自動接続する。
+  return !environment.host && (config.自動接続 === true || !!config.モデル設定?.[keys(config.モデル設定.LIVE_AI_NAME).model]);
 }).catch(() => { showError('接続先情報を取得できません。'); return false; }).finally(reveal);
 controls();
 environment.ready();

@@ -10,7 +10,7 @@ const extensionRoot = fileURLToPath(new URL('..', import.meta.url));
 let options;
 try {
   options = parseArgs({ allowPositionals: true, options: {
-    provider: { type: 'string' }, model: { type: 'string' }, browser: { type: 'boolean' }, help: { type: 'boolean' },
+    provider: { type: 'string' }, model: { type: 'string' }, browser: { type: 'boolean' }, wait: { type: 'boolean' }, help: { type: 'boolean' },
   } });
   if (options.positionals.length > 1) throw new Error('作業フォルダは1つだけ指定してください。');
   for (const name of ['provider', 'model']) {
@@ -18,11 +18,12 @@ try {
   }
 } catch (error) { console.error(error.message); process.exit(1); }
 if (options.values.help) {
-  console.log('aidiy_code [作業フォルダ] [--provider Provider] [--model モデル名] [--browser]');
+  console.log('aidiy_code [作業フォルダ] [--provider Provider] [--model モデル名] [--browser] [--wait]');
   console.log('モデル未指定: 前回の手動選択（未保存なら既定設定）で起動。画面の「モデル」から変更できます。');
   process.exit(0);
 }
 const browserMode = options.values.browser;
+const wait = !!options.values.wait;
 const projectRoot = resolve(options.positionals[0] || process.cwd());
 const provider = options.values.provider?.trim().replace(/^copilot_cli$/, 'copilot-cli');
 const model = options.values.model?.trim();
@@ -120,14 +121,15 @@ async function main() {
   try {
     const args = browserMode ? [entry, projectRoot, readyPath, JSON.stringify(initialModel)] : [entry];
     server = spawn(executable, args, {
-      cwd: projectRoot, detached: true, stdio: ['ignore', stdout, stderr], windowsHide: browserMode, env,
+      cwd: projectRoot, detached: !wait, stdio: wait ? 'inherit' : ['ignore', stdout, stderr], windowsHide: browserMode, env,
     });
   } finally {
     closeSync(stdout); closeSync(stderr);
   }
   let startupError;
   server.on('error', error => { startupError = error; });
-  server.unref();
+  if (!wait) server.unref();
+  else server.on('exit', (code, signal) => { process.exitCode = code ?? (signal ? 1 : 0); });
   function startupFailure(message) {
     let details = '';
     try { details = readFileSync(stderrPath, 'utf8').trim().slice(-3000); } catch { /* log unavailable */ }

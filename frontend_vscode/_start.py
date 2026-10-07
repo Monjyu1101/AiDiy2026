@@ -1,0 +1,53 @@
+# -*- coding: utf-8 -*-
+"""aidiy_code / aidiy_live のコマンド起動と停止を全体起動へ提供する。"""
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR / 'scripts'))
+from standalone_processes import stop_standalone
+
+
+def launch_command(module: str) -> list[str]:
+    if module not in ('code', 'live'):
+        raise ValueError(f'未対応のフロントエンドです: {module}')
+    node = shutil.which('node')
+    if not node:
+        raise RuntimeError('Node.js が必要です。')
+    # aidiy_code / aidiy_live と同じ入口を絶対パスで呼び、作業フォルダは維持する。
+    return [node, str(THIS_DIR / f'aidiy_{module}/launch.mjs')]
+
+
+def check_environment(module: str) -> tuple[bool, str]:
+    try:
+        launch_command(module)
+    except (OSError, RuntimeError) as error:
+        return False, str(error)
+    if not (THIS_DIR / f'dist/aidiy_{module}/server.cjs').is_file():
+        return False, '画面が未準備です。python frontend_vscode/_setup.py を実行してください。'
+    sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
+    from setup_electron import electron_binary_ready
+    if not electron_binary_ready(THIS_DIR):
+        return False, 'Electron が未準備です。python frontend_vscode/_setup.py を実行してください。'
+    return True, f'aidiy_{module} / Electron'
+
+
+def _start(module: str, args: list[str]) -> subprocess.Popen[bytes]:
+    kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == 'win32' else {'start_new_session': True}
+    return subprocess.Popen(launch_command(module) + args, cwd=THIS_DIR.parent,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0, **kwargs)
+
+
+def start_code() -> subprocess.Popen[bytes]:
+    return _start('code', ['--wait'])
+
+
+def start_live(auto_connect: bool = False) -> subprocess.Popen[bytes]:
+    return _start('live', ['--foreground'] + (['--connect'] if auto_connect else []))
+
+
+def kill_ports(module: str | None = None) -> None:
+    if not stop_standalone(THIS_DIR, print, print, module=module):
+        raise RuntimeError('Code / Live の単独実行を終了できないため処理を中止します。')

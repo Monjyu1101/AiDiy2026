@@ -216,7 +216,7 @@ def cleanup_stop_request(choices: dict, services: list[str] | None = None):
             service_name
             for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
             for service_name in service_names
-        ]
+        ] + ["フロントエンド(code)", "フロントエンド(live)"]
     payload = {
         "owner_pid": os.getpid(),
         "services": services,

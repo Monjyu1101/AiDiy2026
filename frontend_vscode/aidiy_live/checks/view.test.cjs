@@ -62,7 +62,7 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
   const environment = {
     host, socketUrl: '', captureUrl: '', socket: () => new Socket(),
     onStop() {}, onMicrophoneStop() {}, onFolder(callback) { folderListener = callback; },
-    async context() { return { backend: 'http://localhost:8091', 作業フォルダ: folder, モデル設定: initialModelSettings, 保存モデル設定: backendOptions.saved }; },
+    async context() { return { backend: 'http://localhost:8091', 作業フォルダ: folder, モデル設定: initialModelSettings, 保存モデル設定: backendOptions.saved, 自動接続: backendOptions.autoConnect }; },
     async saveModel(settings) {
       await backendOptions.saveModel?.();
       calls.push({ kind: 'save-model', settings: JSON.parse(JSON.stringify(settings)) });
@@ -118,6 +118,32 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
     changeFolder(value) { folder = value; folderListener(value); }, close() { events.get('pagehide')(); },
   };
 }
+
+test('Live 全体起動: 自動接続指定で既定・保存モデルに一度だけ接続し、マイクはOFF', async t => {
+  for (const saved of [undefined, { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'realtime-model', LIVE_OPENAI_VOICE: 'marin' }]) {
+    const ui = screen(false, false, false, true, undefined, true, { autoConnect: true, saved });
+    t.after(() => ui.close()); await ui.ready();
+    assert.equal(ui.element('status').textContent, '接続済み');
+    assert.equal(ui.sockets.length, 3);
+    assert.equal(ui.element('mic').strong.textContent, 'OFF');
+    assert.deepEqual(ui.audioCalls, []);
+    const requests = ui.calls.filter(call => call.packet?.type === 'connect');
+    assert.equal(requests.length, 3);
+    if (saved) for (const request of requests) assert.deepEqual(request.packet.モデル設定, saved);
+    await ui.element('connect').onclick(); await ui.ready();
+    assert.equal(ui.element('status').textContent, '未接続');
+    assert.equal(ui.calls.filter(call => call.packet?.type === 'connect').length, 3);
+  }
+});
+
+test('Live 自動接続指定: 拡張では接続せず、接続失敗後も自動再試行しない', async t => {
+  for (const [host, reject] of [[true, false], [false, true]]) {
+    const ui = screen(host, reject, false, true, undefined, false, { autoConnect: true });
+    t.after(() => ui.close()); await ui.ready(); await ui.ready();
+    assert.equal(ui.element('status').textContent, '未接続');
+    assert.equal(ui.sockets.length, host ? 0 : 1);
+  }
+});
 
 test('Live: 入力・送信直後と会話表示後、描画後の履歴末尾へ揃える', async t => {
   for (const host of [false, true]) {

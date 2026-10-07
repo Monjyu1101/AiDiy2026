@@ -18,7 +18,7 @@ app.on('before-quit', event => {
 });
 app.on('window-all-closed', () => app.quit());
 app.whenReady().then(async () => {
-  server = await ライブ起動(join(__dirname, '..'), backend, false, projectRoot, initialModels ? JSON.parse(initialModels) : {});
+  server = await ライブ起動(join(__dirname, '..'), backend, false, projectRoot, initialModels ? JSON.parse(initialModels) : {}, undefined, process.env.AIDIY_LIVE_CONNECT === '1');
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
     title: 'AiDiy (Live)', width: 476, height: 602, minWidth: 360, minHeight: 480,

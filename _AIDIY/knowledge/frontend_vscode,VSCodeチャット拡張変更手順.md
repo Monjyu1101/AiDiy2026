@@ -152,7 +152,9 @@ Code / Live の単独起動では、Electron の引数をエントリファイ�
 
 ルートの `vscode_code.bat` / `vscode_live.bat` は `scripts/cli_bat/_hermes_cli.bat` と同じ形式でモデルを選び、セットアップ済みの `aidiy_code` / `aidiy_live` コマンドを呼ぶ。`%USERPROFILE%\.local\bin\` の生成済み `.cmd` があれば使い、無ければ PATH 上の同名コマンドを呼ぶ。bat を別プロジェクトのルートへコピーすると、bat の配置先が作業フォルダになる。コピー先に `frontend_vscode` を置く必要はない。起動失敗時は `pause` し、終了コードを保持する。ダブルクリックで起動した場合も、閉じる前に表示されたエラーを確認できる。Electron が未配置なら AiDiy の配置先で `python frontend_vscode/_setup.py` を実行して準備する。ブラウザ版を確認する場合は、各 bat に `--browser` を付ける。bat 本体の案内とメニューは ASCII、改行は CRLF で保存する。Node.js の日本語出力とパス表示が文字化けしないよう、bat / `.cmd` の先頭では `chcp 65001 >nul` を実行する。生成済みランチャーだけを更新する場合は `python frontend_vscode/_setup.py --launchers-only` を使う。
 
-Live の単独画面では起動設定の `モデル設定` にモデル名がある場合、初期設定の読み込み後に1回だけ自動接続する。モデル未指定・Provider だけの指定・VS Code 拡張は手動で接続する。自動接続は音声再生の許可待ちで止めず、マイクは OFF にする。接続失敗・手動切断・画面終了の後には自動再試行しない。`aidiy_live/checks/view.test.cjs` で3種のモデル、接続失敗、音声再生の許可待ち、画面終了を検証する。
+Live の単独画面では起動設定の `モデル設定` にモデル名がある場合、または `--connect` が指定された場合、初期設定の読み込み後に1回だけ自動接続する。`--connect` は Electron の `AIDIY_LIVE_CONNECT` とブラウザ起動引数を通り、中継の画面設定 `自動接続` へ渡す。モデル未指定なら保存済み選択（未保存なら Core の既定設定）を使う。モデル未指定・Provider だけの指定で `--connect` が無い場合と、VS Code 拡張は手動で接続する。自動接続は音声再生の許可待ちで止めず、マイクは OFF にする。接続失敗・手動切断・画面終了の後には自動再試行しない。`aidiy_live/checks/view.test.cjs` で3種のモデル、接続失敗、音声再生の許可待ち、画面終了を検証する。
+
+ルート `_start.py` の Code / Live は `frontend_vscode/_start.py` から同じコマンド入口を使う。Code は `--wait` で子ウィンドウ終了まで待機し、Live は `--foreground --connect` で起動する。手動で閉じた画面は自動再表示せず、全体停止時は起動したモジュールだけを `scripts/standalone_processes.py` で照合する。共通の Electron バイナリだけで判定して未選択の Code / Live を止めない。起動選択・既定値・コマンド引数・停止対象は `checks/test_start.py` と Discord の `checks/test_lifecycle.py` で外部接続なしに検証する。
 
 Live のブラウザ版は通常の `--browser` と Electron 失敗時の自動切り替えでサーバーを分離し、CMD / PowerShell へ戻る。画面は localhost 中継の `presence`（SSE）へ接続し、最後の画面が閉じて約60秒後にサーバーを終了する。`--browser --foreground` は診断用、`--serve` は URL の表示と手動終了用としてターミナル上で実行する。`aidiy_live/checks/launcher.test.cjs` では、GUI が常駐してもランチャーが戻ることと、Electron 失敗時にもブラウザ中継が動いたまま戻ることを検証する。
 

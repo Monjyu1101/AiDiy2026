@@ -61,6 +61,15 @@ test('Code 起動引数: 未指定モデルを自動へ置き換えず、保存�
   }
 });
 
+test('Code 全体起動: --wait で画面終了を待ち、終了コードを返す', t => {
+  const f = fixture(t);
+  f.desktop(`require('node:fs').writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({windowShown:true}));
+    setTimeout(() => process.exit(7), 300);`);
+  const result = f.launch('--wait');
+  assert.equal(result.status, 7, result.stderr);
+  assert.match(result.stdout, /Project folder/);
+});
+
 test('Code 起動引数: 値不足と未知の引数を起動前に拒否する', t => {
   const f = fixture(t);
   for (const args of [['--model'], ['--provider', ''], ['--unknown']]) {

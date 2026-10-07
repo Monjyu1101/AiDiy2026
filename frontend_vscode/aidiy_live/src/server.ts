@@ -8,7 +8,7 @@ import { ライブモデル読込, ライブモデル保存, モデル保存先 
 import { ローカル接続先 } from '../local-backend.cjs';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
-export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live')) {
+export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live'), 自動接続 = false) {
   const 作業フォルダ = projectPath ? { 名前: basename(projectPath) || projectPath, パス: projectPath } : null;
   const target = new URL(backend || ローカル接続先(root, projectPath));
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.pathname !== '/' || target.search || target.hash) {
@@ -50,6 +50,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
     if (path === 'config' && req.method === 'GET') {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ backend: target.origin, 作業フォルダ, 保存モデル設定: ライブモデル読込(modelFile),
+        自動接続,
         ...(Object.keys(モデル設定).length ? { モデル設定 } : {}) })); return;
     }
     if (path !== null && assets[path] && req.method === 'GET') {

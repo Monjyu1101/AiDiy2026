@@ -86,10 +86,10 @@ test('Live: 追加の起動引数なしで接続先・作業フォルダ・モ�
   const models = { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'gpt-realtime-2.1-mini' };
   const result = await launch({ module: 'aidiy_live', env: {
     AIDIY_LIVE_BACKEND: 'http://127.0.0.1:9091', AIDIY_LIVE_READY: '/ready with spaces.json',
-    AIDIY_LIVE_PROJECT: '日本語 project', AIDIY_LIVE_MODELS: JSON.stringify(models),
+    AIDIY_LIVE_PROJECT: '日本語 project', AIDIY_LIVE_MODELS: JSON.stringify(models), AIDIY_LIVE_CONNECT: '1',
   } });
   assert.deepEqual(result.errors, []);
-  assert.deepEqual(result.serverArgs[0].slice(1), ['http://127.0.0.1:9091', false, '日本語 project', models]);
+  assert.deepEqual(result.serverArgs[0].slice(1), ['http://127.0.0.1:9091', false, '日本語 project', models, null, true]);
   assert.deepEqual(result.files, ['/ready with spaces.json']);
   assert.equal(result.written[0].windowShown, true);
 });

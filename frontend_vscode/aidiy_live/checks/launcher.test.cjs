@@ -15,8 +15,8 @@ function fixture(t) {
   // OS のブラウザ起動だけを代替し、親子の起動・常駐・通知処理は実コードで検証する。
   fs.writeFileSync(join(app, 'launch.mjs'), source.replace('spawn(command, browserArgs,', "spawn(process.execPath, ['-e', 'process.exit(0)'],"));
   fs.writeFileSync(join(bundle, 'view.js'), '');
-  fs.writeFileSync(join(bundle, 'server.cjs'), `exports.ライブ起動 = async (root, backend, packaged, project, models) => {
-    const server = require('node:http').createServer((req, res) => res.end(req.url === '/config' ? JSON.stringify({backend, project, models}) : 'mock live'));
+  fs.writeFileSync(join(bundle, 'server.cjs'), `exports.ライブ起動 = async (root, backend, packaged, project, models, modelFile, autoConnect) => {
+    const server = require('node:http').createServer((req, res) => res.end(req.url === '/config' ? JSON.stringify({backend, project, models, autoConnect}) : 'mock live'));
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     return {url: 'http://127.0.0.1:' + server.address().port + '/', idleMilliseconds: () => 0,
       close: () => new Promise(resolve => server.close(resolve))};
@@ -51,14 +51,27 @@ test('Live ランチャー: Electron が常駐しても表示確認後に CMD �
     assert.equal(process.env.ELECTRON_RUN_AS_NODE, undefined);
     assert.equal(process.env.AIDIY_LIVE_BACKEND, 'http://127.0.0.1:8091');
     assert.equal(process.env.AIDIY_LIVE_PROJECT, ${JSON.stringify(tmpdir())});
+    assert.equal(process.env.AIDIY_LIVE_CONNECT, '1');
     assert.deepEqual(JSON.parse(process.env.AIDIY_LIVE_MODELS), { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'gpt-realtime-2.1-mini' });
     require('node:fs').writeFileSync(process.env.AIDIY_LIVE_READY, JSON.stringify({windowShown:true,pid:process.pid}));
     setInterval(() => {}, 10000);`);
   f.env.ELECTRON_RUN_AS_NODE = '1';
-  const result = f.launch('--provider', 'openai', '--model', 'gpt-realtime-2.1-mini');
+  const result = f.launch('--provider', 'openai', '--model', 'gpt-realtime-2.1-mini', '--connect');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /aidiy_live を起動しました/);
   assert.doesNotMatch(result.stderr, /ブラウザ/);
+});
+
+test('Live 全体起動: --connect をモデルなしでブラウザ・Electron失敗時へ引き継ぐ', async t => {
+  const f = fixture(t);
+  for (const args of [['--browser', '--connect'], ['--connect']]) {
+    const result = f.launch(...args);
+    assert.equal(result.status, 0, result.stderr);
+    const url = result.stdout.match(/ブラウザ版を起動しました: (http[^\r\n]+)/)[1];
+    const config = await (await fetch(new URL('config', url))).json();
+    assert.equal(config.autoConnect, true);
+    assert.deepEqual(config.models, {});
+  }
 });
 
 test('Live ランチャー: Electron 失敗時もブラウザサーバーを分離して CMD へ戻れる', async t => {
