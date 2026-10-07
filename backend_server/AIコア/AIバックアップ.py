@@ -73,6 +73,9 @@ _WINDOWS予約デバイス名 = (
 # ファイルコピーは軽量な並列数で実行（呼び出し元APIは同期で待機）
 _バックアップコピー並列数 = 4
 
+# 除外後の対象がこの件数以上なら、コピー開始前にキャンセルする
+_バックアップキャンセル件数 = 50_000
+
 
 class ファイル情報(TypedDict):
     パス: str
@@ -119,9 +122,9 @@ def バックアップ実行_共通ログ(
     セッション設定: Optional[dict] = None,
 ) -> Optional[Tuple[str, List[ファイル情報], List[str], bool, str]]:
     """
-    呼び出し元ロガーに開始/終了を必ず出す共通ラッパー
+    呼び出し元ロガーに開始と終了または中止を出す共通ラッパー
     - 開始は呼び出し直後に出力
-    - 終了は結果の有無に関わらず出力（差分なしは件数0）
+    - 結果があれば終了、なければ中止を出力（差分なしは件数0）
     """
     base_path = _コードベース絶対パス取得(
         アプリ設定=アプリ設定,
@@ -136,12 +139,14 @@ def バックアップ実行_共通ログ(
         セッション設定=セッション設定,
         ログ出力=False,
     )
-    count = len(result[2]) if result else 0
-    log.info(f"バックアップ終了(件数={count}, 全件={len(result[1]) if result else 0})")
+    if result is None:
+        log.info(f"バックアップ中止({base_path})")
+    else:
+        log.info(f"バックアップ終了(件数={len(result[2])}, 全件={len(result[1])})")
     return result
 
 
-def _全ファイルスキャン(ベースパス: str) -> List[_内部ファイル情報]:
+def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[int] = None) -> List[_内部ファイル情報]:
     files: List[_内部ファイル情報] = []
     workspace_root = os.path.abspath(ベースパス)
     # 高速ルックアップ用セット
@@ -174,6 +179,11 @@ def _全ファイルスキャン(ベースパス: str) -> List[_内部ファイ�
             rel_path = os.path.relpath(file_path, workspace_root).replace("\\", "/")
             更新日時 = datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M:%S")
             files.append({"パス": rel_path, "更新日時": 更新日時, "更新時刻": mtime})
+            if 最大件数 is not None and len(files) >= 最大件数:
+                raise RuntimeError(
+                    f"バックアップキャンセル: 対象ファイル数が{最大件数:,}件以上です"
+                    f"（検出件数={len(files):,}, 対象={workspace_root}）"
+                )
     return files
 
 
@@ -221,6 +231,7 @@ def バックアップ実行(
     シンプル差分バックアップ実行
     - 初回（*.allフォルダなし）→ 全件バックアップ
     - 2回目以降 → 最終バックアップ時刻+1秒以降の差分のみ
+    - 除外後の全対象ファイルが50,000件以上 → ERRORログを残してキャンセル
 
     セッション設定: セッション固有のCODE_BASE_PATHを含む辞書（オプション）
     戻り値: (最終更新時刻, 全ファイル一覧[パス/更新日時], バックアップファイル一覧, 全件フラグ, バックアップフォルダ絶対パス) または None（エラー時のみ）
@@ -236,7 +247,7 @@ def バックアップ実行(
         最終バックアップ結果 = _バックアップ全体の最終日時取得(backup_root)
 
         # 全ファイル一覧を走査（パス/更新日時/更新時刻）
-        all_scan = _全ファイルスキャン(base_path)
+        all_scan = _全ファイルスキャン(base_path, 最大件数=_バックアップキャンセル件数)
         if not all_scan:
             return None
         max_mtime = max(f["更新時刻"] for f in all_scan)

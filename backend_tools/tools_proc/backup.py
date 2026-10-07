@@ -93,6 +93,7 @@ class BackupSave:
         if result is None:
             return {
                 "ok": False,
+                "error": "バックアップが中止されました。サーバーログを確認してください。",
                 "最終時刻": "",
                 "全件数": 0,
                 "バックアップ件数": 0,
