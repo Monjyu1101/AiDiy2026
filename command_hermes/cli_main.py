@@ -17,7 +17,10 @@ Usage:
 # package under ``agent/``.  This tree keeps them under ``base/`` and
 # ``core/`` respectively, so register both before any upstream import runs.
 import sys as _sys
+import os as _os
 from pathlib import Path as _Path
+
+_AIDIY_PARENT_PID = _os.getppid()
 
 _PROJECT_ROOT = _Path(__file__).resolve().parent
 _BASE_DIR = _PROJECT_ROOT / "base"
@@ -24248,6 +24251,11 @@ def cli_entry(argv: list[str] | None = None) -> int:
         except Exception:
             print("aidiy_hermes")
         return 0
+
+    # 親 CLI / 拡張が終了したら MCP・terminal の子孫も破棄する。
+    sys.path.insert(0, str(_PROJECT_ROOT.parent / "scripts"))
+    from process_lifetime import guard_parent
+    guard_parent(_AIDIY_PARENT_PID)
 
     if args.yolo:
         os.environ["HERMES_YOLO_MODE"] = "1"

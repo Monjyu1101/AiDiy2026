@@ -1,6 +1,6 @@
 # backend_tools 運用手順
 
-> 文書: `backend_tools,backend_server,運用手順.md` | 実装: `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`
+> 文書: `backend_tools,backend_server,運用手順.md` | 実装: `backend_tools/tools_main.py`, `backend_tools/mcp_stdio.py`, `backend_server/AIコア/AIコード_cli.py`, `command_hermes/cli_main.py`, `scripts/process_lifetime.py`
 
 ## このメモを使う場面
 
@@ -154,6 +154,30 @@ PATH 上にない環境ではフルパスへ書き換える。MCP ツールは a
 
 `backend_tools/temp/reboot_tools.txt` を作成すると `tools_main.py` が自身を終了し、`_start.py` 起動中なら自動再起動される。
 ただし MCP クライアント（Code CLI 等）側の接続が不調な場合、この再起動では直らない（後述の HTTP フォールバックで切り分ける）。
+
+## CLI / stdio MCP の子プロセス終了
+
+- `backend_server/AIコア/AIコード_cli.py` は `scripts/process_lifetime.py` を介して CLI を起動する。MCP の `aidiy_code_agents` と Task / Team も、この共通 CLI 実行処理を使う場合は同じ寿命管理になる。
+- 親終了を監視するスレッドは `daemon=True`。通常終了、停止、タイムアウト、キャンセル、起動元の異常終了時に、その実行で起動した子・孫を破棄する。起動元の終了検知は約0.5秒間隔で行う。
+- Windows は起動前に監視プロセス自身を Job Object に入れ、子孫にも継承する。最後の Job ハンドルが閉じると子孫が終了するため、監視プロセスの強制終了にも対応する。Job の関連付けが失敗した場合は、保護なしで処理を続けず起動を失敗させる。
+- Linux は子孫の PID と起動時刻、および実行単位の環境変数 `AIDIY_PROCESS_OWNER_TOKEN` で追跡する。CLI が先に終了した子や別セッションへ移った孫も識別子で回収し、subreaper で終了済みの子孫を回収する。環境変数を消して別ユーザーで動く処理などは追跡の対象外になることがある。
+- `mcp_stdio.py` と単独起動の `aidiy_hermes` も親終了を監視する。stdio が開いたままでも、起動元が終了したらブリッジを終了する。
+- 監視ラッパーは CLI 実行中に1プロセス追加される。登録した stdio MCP ごとのプロセスや並行セッションによる増加は通常動作であり、終了後に残るかで判断する。共有の `tools_main.py` は個々のクライアント終了では停止しない。
+
+依存更新と反映（プロジェクトルートから実行）:
+
+```sh
+uv sync --project backend_server --locked
+uv sync --project backend_tools --locked --no-install-project
+```
+
+更新後はバックエンドと、MCP を起動する Code CLI / VS Code / Discord を再起動する。既に残っている旧プロセスには新しい監視処理は付かない。
+
+API キーや実際の AI 呼び出しを使わずに、子孫の終了と別セッションの独立性を確認できる:
+
+```sh
+python -m unittest discover -s backend_server/tests -p test_process_lifetime.py -v
+```
 
 ## MCP ツールが応答しない場合の切り分け（HTTP フォールバック）
 

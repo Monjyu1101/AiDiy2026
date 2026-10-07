@@ -24,8 +24,12 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import sys
+from pathlib import Path
 from contextlib import AsyncExitStack
 from typing import Any
+
+_起動元PID = os.getppid()
 
 import anyio
 import httpx2
@@ -344,6 +348,9 @@ async def async_main() -> None:
 
 
 def main() -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from process_lifetime import guard_parent
+    guard_parent(_起動元PID)
     try:
         anyio.run(async_main)
     except KeyboardInterrupt:

@@ -18,6 +18,7 @@ import datetime
 import asyncio
 import base64
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 from PIL import Image
@@ -31,6 +32,27 @@ _STDERR_STREAM_STDOUT_FINAL_AI = frozenset({
     "opencode_cli",
     "antigravity_cli",
 })
+
+
+_PROCESS_LIFETIME = Path(__file__).resolve().parents[2] / "scripts" / "process_lifetime.py"
+
+
+async def _所有プロセス終了(process):
+    """監視ラッパーを終了する。ラッパーが当該 CLI の子孫だけを破棄する。"""
+    if process.returncode is not None:
+        return
+    try:
+        process.terminate()
+    except ProcessLookupError:
+        return
+    try:
+        await asyncio.wait_for(asyncio.shield(process.wait()), timeout=5)
+    except asyncio.TimeoutError:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        await asyncio.wait_for(process.wait(), timeout=3)
 
 
 async def _出力行を順に取得(stream: asyncio.StreamReader, 出力検知=None):
@@ -619,8 +641,7 @@ class CodeAI:
         self.is_alive = False  # ストリーム送信を即座に停止
         if self.current_process and self.current_process.returncode is None:
             try:
-                self.current_process.kill()
-                await self.current_process.wait()
+                await _所有プロセス終了(self.current_process)
                 logger.info(f"[CodeAI] subprocess強制終了完了")
             except Exception as e:
                 logger.warning(f"[CodeAI] subprocess強制終了エラー: {e}")
@@ -989,6 +1010,7 @@ class CodeAI:
         cwd: str,
         timeout: int,
         stdin_text: Optional[str] = None,
+        creationflags: int = 0,
     ) -> str:
         """
         subprocessでコマンドを実行し、stdoutをリアルタイムで監視
@@ -1008,8 +1030,12 @@ class CodeAI:
         try:
             self._停止マーカー送信済み = False
             # プロセス起動
-            process = await asyncio.create_subprocess_exec(
-                *command,
+            if os.name == "nt" and not creationflags:
+                creationflags = subprocess.CREATE_NO_WINDOW
+            spawn_task = asyncio.create_task(asyncio.create_subprocess_exec(
+                sys.executable, str(_PROCESS_LIFETIME),
+                "--parent-pid", str(os.getpid()),
+                "--creationflags", str(creationflags), "--", *command,
                 stdin=(
                     asyncio.subprocess.PIPE
                     if stdin_text is not None
@@ -1018,8 +1044,16 @@ class CodeAI:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,
-                env=os.environ.copy()
-            )
+                env=os.environ.copy(),
+                start_new_session=(os.name != "nt"),
+                creationflags=creationflags,
+            ))
+            try:
+                process = await asyncio.shield(spawn_task)
+            except asyncio.CancelledError:
+                # 起動直後にキャンセルされても PID を受け取り、finally で回収する。
+                process = await spawn_task
+                raise
             # 強制終了用に参照を保持
             self.current_process = process
 
@@ -1172,12 +1206,7 @@ class CodeAI:
 
             # プロセスが生きていればキル
             if process.returncode is None:
-                try:
-                    process.kill()
-                except ProcessLookupError:
-                    # returncode 反映直前に子プロセスが終了する競合。
-                    pass
-                await process.wait()
+                await _所有プロセス終了(process)
 
             # 結果を結合
             full_output = "\n".join(result_lines)
@@ -1229,158 +1258,16 @@ class CodeAI:
                 # "Task exception was never retrieved" に残さない。
                 await asyncio.gather(*tasks, return_exceptions=True)
             if process is not None and process.returncode is None:
-                try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
-                await process.wait()
+                await _所有プロセス終了(process)
             if process is not None and self.current_process is process:
                 self.current_process = None
 
     async def _antigravity実行(self, command: list, cwd: str, timeout: int) -> str:
-        """
-        antigravity_cli (agy.exe) 専用実行メソッド。
-        DETACHED_PROCESS フラグで起動し、Go バイナリが親コンソールを
-        直接書き込む CONOUT$ バイパスを防ぐ。stdout/stderr は PIPE 経由で取得。
-        """
-        try:
-            self._停止マーカー送信済み = False
-
-            # DETACHED_PROCESS: 親コンソールから切り離して起動
-            # → WriteConsole(CONOUT$) が使えなくなり stdout PIPE に出力される
-            create_flags = subprocess.DETACHED_PROCESS if hasattr(subprocess, 'DETACHED_PROCESS') else 0
-
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=cwd,
-                env=os.environ.copy(),
-                creationflags=create_flags
-            )
-            self.current_process = process
-
-            result_lines = []
-            stderr_lines = []
-            last_output_time = time.monotonic()
-
-            def 出力時刻更新():
-                nonlocal last_output_time
-                last_output_time = time.monotonic()
-
-            async def stdout_reader():
-                nonlocal last_output_time
-                try:
-                    async for line in _出力行を順に取得(process.stdout, 出力時刻更新):
-                        if self._強制停止要求あり():
-                            logger.info("[antigravity] 強制停止要求検出、stdout読み取り中断")
-                            await self._停止マーカー送信()
-                            break
-                        last_output_time = time.monotonic()
-                        line_text = line.decode('utf-8', errors='replace').rstrip()
-                        result_lines.append(line_text)
-                        if self._強制停止要求あり():
-                            await self._停止マーカー送信()
-                            break
-                        # antigravity の stdout は正式回答専用。途中表示には送らない。
-                except Exception as e:
-                    logger.error(f"[antigravity] stdout読み取りエラー: {e}")
-
-            async def stderr_reader():
-                nonlocal last_output_time
-                try:
-                    async for line in _出力行を順に取得(process.stderr, 出力時刻更新):
-                        if self._強制停止要求あり():
-                            await self._停止マーカー送信()
-                            break
-                        last_output_time = time.monotonic()
-                        line_text = line.decode('utf-8', errors='replace').rstrip()
-                        stderr_lines.append(line_text)
-                        if self._強制停止要求あり():
-                            await self._停止マーカー送信()
-                            break
-                        if self.parent_manager and hasattr(self.parent_manager, '接続'):
-                            try:
-                                await self.parent_manager.接続.send_to_channel(self.チャンネル, {
-                                    "セッションID": self.セッションID,
-                                    "チャンネル": self.チャンネル,
-                                    "メッセージ識別": "output_stream",
-                                    "メッセージ内容": line_text,
-                                    "ファイル名": None,
-                                    "サムネイル画像": None
-                                })
-                            except Exception as e:
-                                logger.error(f"[antigravity] output_stream送信エラー(stderr): {e}")
-
-                except Exception as e:
-                    logger.error(f"[antigravity] stderr読み取りエラー: {e}")
-
-            async def timeout_monitor():
-                while True:
-                    await asyncio.sleep(1)
-                    if self._強制停止要求あり():
-                        logger.info("[antigravity] 強制停止要求検出（monitor）")
-                        await self._停止マーカー送信()
-                        return
-                    if time.monotonic() - last_output_time > timeout:
-                        raise asyncio.TimeoutError(f"タイムアウト({timeout}秒)")
-
-            stdout_task = asyncio.create_task(stdout_reader())
-            stderr_task = asyncio.create_task(stderr_reader())
-            monitor_task = asyncio.create_task(timeout_monitor())
-            process_task = asyncio.create_task(process.wait())
-
-            completion_task = asyncio.gather(
-                stdout_task, stderr_task, process_task, return_exceptions=True
-            )
-            done, _ = await asyncio.wait(
-                [completion_task, monitor_task], return_when=asyncio.FIRST_COMPLETED
-            )
-
-            monitor_error = None
-            if monitor_task in done:
-                try:
-                    await monitor_task
-                except asyncio.TimeoutError as e:
-                    monitor_error = e
-                completion_task.cancel()
-                await asyncio.gather(completion_task, return_exceptions=True)
-            else:
-                monitor_task.cancel()
-                await asyncio.gather(monitor_task, return_exceptions=True)
-                await completion_task
-
-            if process.returncode is None:
-                process.kill()
-                await process.wait()
-            self.current_process = None
-
-            full_output = "\n".join(result_lines)
-            stderr_output = "\n".join(stderr_lines)
-            self.last_stderr_output = stderr_output
-            if monitor_error is not None:
-                raise monitor_error
-
-            logger.info(f"[antigravity] 完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行")
-            if result_lines:
-                logger.info(f"[antigravity] stdout先頭: {repr(result_lines[0][:80])}")
-            if stderr_lines:
-                logger.info(f"[antigravity] stderr先頭: {repr(stderr_lines[0][:80])}")
-
-            if self._停止マーカー送信済み:
-                return "!"
-
-            result = full_output.strip()
-            return result if result else "（応答なし）"
-
-        except asyncio.TimeoutError as e:
-            logger.warning(f"[antigravity] タイムアウト: {e}")
-            return f"処理タイムアウト({timeout}秒)が発生しました。"
-
-        except Exception as e:
-            logger.error(f"[antigravity] 実行エラー (command={command}, cwd={cwd}): {e}")
-            return f"subprocess実行エラー: {str(e)}"
+        """CONOUT$ を切り離し、共通の親監視・終了処理で Antigravity を実行する。"""
+        return await self._subprocess実行(
+            command, cwd, timeout,
+            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
+        )
 
 
 # ===== 使用例とテストコード =====
