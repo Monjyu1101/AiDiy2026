@@ -517,6 +517,57 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(["input"] if subtitles or provider == "openai_live" else ["input", "output"], recognized)
                 self.assertFalse(data["音声出力データ"]["音声出力バッファ"])
 
+    async def test_live_audio_keeps_long_speech_and_trailing_silence_for_provider_vad(self):
+        import numpy as np
+        audio = self.audio_module
+        for provider, rate in (("openai_live", 24000), ("gemini_live", 16000)):
+            with self.subTest(provider=provider):
+                ai = (self.openai_module.LiveAI(セッションID="session", api_key="test-key")
+                      if provider == "openai_live" else self.gemini())
+                ai.input_rate = rate
+                ai.live_session = stdlib_types.SimpleNamespace(send_realtime_input=AsyncMock())
+                ai.ws_session = Mock()
+                connection = stdlib_types.SimpleNamespace(
+                    セッションID="session", audio_data=audio.初期化_音声データ(),
+                    send_to_channel=AsyncMock(),
+                    live_processor=stdlib_types.SimpleNamespace(AIインスタンス=ai),
+                )
+                # Discord の20ms枠: 4秒の一定音量の発話後、1.6秒の無音。
+                # 独自レベル判定が途中で発話を見失っても、Provider の VAD へ全量届く。
+                speech = np.full(rate // 50, 12000, dtype="<i2").tobytes()
+                silence = bytes(rate // 50 * 2)
+                frames = [speech] * 200 + [silence] * 80
+                for index, frame in enumerate(frames):
+                    with patch.object(audio.time, "time", return_value=1000 + index * .02):
+                        await audio.音声入力データ処理(connection, frame)
+                if provider == "openai_live":
+                    import base64
+                    sent = [base64.b64decode(json.loads(call.args[0])["audio"])
+                            for call in ai.ws_session.send.call_args_list]
+                else:
+                    sent = [call.kwargs["audio"].data
+                            for call in ai.live_session.send_realtime_input.call_args_list]
+                    self.assertTrue(all(call.kwargs["audio"].mime_type == "audio/pcm;rate=16000"
+                                        for call in ai.live_session.send_realtime_input.call_args_list))
+                self.assertEqual(len(frames), len(sent))
+                self.assertEqual(frames, sent)
+
+    async def test_live_audio_below_local_threshold_is_sent_without_starting_recognition(self):
+        audio = self.audio_module
+        data = audio.初期化_音声データ()
+        send = AsyncMock()
+        connection = stdlib_types.SimpleNamespace(
+            audio_data=data, send_to_channel=AsyncMock(),
+            live_processor=stdlib_types.SimpleNamespace(AIインスタンス=stdlib_types.SimpleNamespace(音声送信=send)),
+        )
+        for frame in (bytes(960), b"\xe8\x03" * 480):  # 無音と振幅1000の小声
+            await audio.音声入力データ処理(connection, frame)
+        self.assertEqual(2, send.await_count)
+        self.assertEqual(bytes(960), send.call_args_list[0].args[0])
+        self.assertEqual(b"\xe8\x03" * 480, send.call_args_list[1].args[0])
+        self.assertFalse(data["音声入力データ"]["音声入力バッファ"])
+        connection.send_to_channel.assert_not_awaited()
+
     async def test_project_context_reads_selected_folder_instead_of_aidiy_root(self):
         live = self.live_module
         with tempfile.TemporaryDirectory() as temp_dir:

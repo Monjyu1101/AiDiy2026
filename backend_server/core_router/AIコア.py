@@ -1273,6 +1273,10 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         while True:
             try:
                 受信データ = await WebSocket接続.receive_json()
+                # ブラウザ / Live 拡張のJSON heartbeatは会話や音声の要求に混ぜない。
+                if 受信データ.get("type") == "ping":
+                    await WebSocket接続.send_json({"type": "pong", "セッションID": セッションID})
+                    continue
                 メッセージ識別 = 受信データ.get("メッセージ識別")
 
                 # fileチャンネル：ファイル系メッセージを独立処理

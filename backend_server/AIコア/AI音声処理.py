@@ -109,17 +109,19 @@ async def 音声入力データ処理(接続, 音声データ: bytes):
                     data["音声入力中"] = True
                 await _send_cancel_audio_user(接続)
 
+        # Provider の VAD には小声・発話途中・末尾の無音も含めて連続PCMを渡す。
+        # 独自音量判定は音声認識バッファと再生割り込みにだけ使い、転送を止めない。
+        try:
+            live = getattr(接続, "live_processor", None)
+            ai = getattr(live, "AIインスタンス", None)
+            if ai and hasattr(ai, "音声送信"):
+                await ai.音声送信(音声データ)
+        except Exception as e:
+            logger.warning(f"LiveAI音声送信エラー: {e}")
+
         if data.get("音声入力最終時刻") and (
             current_time - data["音声入力最終時刻"] <= data["音声認識遅延"]
         ):
-            # LiveAI連携: 入力音声をLiveAIへ送信
-            try:
-                live = getattr(接続, "live_processor", None)
-                if live and getattr(live, "AIインスタンス", None):
-                    if hasattr(live.AIインスタンス, "音声送信"):
-                        await live.AIインスタンス.音声送信(音声データ)
-            except Exception as e:
-                logger.warning(f"LiveAI音声送信エラー: {e}")
             if len(data["音声入力バッファ"]) == 0:
                 data["音声入力開始時刻"] = current_time
             data["音声入力バッファ"].append(音声データ)

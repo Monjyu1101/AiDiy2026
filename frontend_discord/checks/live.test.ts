@@ -9,12 +9,12 @@ import type { VoiceChannel } from 'discord.js';
 import { Live接続 } from '../src/live';
 import { config, userId, guildId, voiceId, waitFor } from './helpers';
 
-async function fixture(rejectChannel = '') {
+async function fixture(rejectChannel = '', provider = 'openai_live', selectedProvider = provider) {
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await once(server, 'listening');
   const address = server.address(); assert.ok(address && typeof address !== 'string');
   const settings = config(); settings.coreUrl = `ws://127.0.0.1:${address.port}/core/ws/AIコア`;
-  settings.liveModels = { LIVE_AI_NAME: 'openai_live' };
+  settings.liveModels = { LIVE_AI_NAME: selectedProvider };
   const received: Record<string, any>[] = [];
   const sockets = new Map<string, WebSocket>();
   server.on('connection', socket => {
@@ -25,7 +25,7 @@ async function fixture(rejectChannel = '') {
         channel = packet.ソケット番号; sockets.set(channel, socket);
         socket.send(JSON.stringify(channel === rejectChannel
           ? { メッセージ識別: 'error', メッセージ内容: 'テストで拒否' }
-          : { メッセージ識別: 'init', セッションID: 'live-test-session', モデル設定: settings.liveModels }));
+          : { メッセージ識別: 'init', セッションID: 'live-test-session', モデル設定: { ...settings.liveModels, LIVE_AI_NAME: provider } }));
       }
     });
   });
@@ -100,6 +100,23 @@ test('AI出力音声を再生し、cancel_audioで古いリソースを破棄、
     await waitFor(() => f.notices.some(text => text.includes('接続が切れました')));
   } finally { await f.cleanup(); }
 });
+
+for (const [provider, rate] of [['openai_live', 24000], ['gemini_live', 16000], ['freeai_live', 16000]] as const) {
+  test(`${provider}の入力は初期選択よりinitを優先し、20msのPCM16 monoを同じaudioソケットへ送る`, { timeout: 10000 }, async () => {
+    const f = await fixture('', provider, provider === 'openai_live' ? 'gemini_live' : 'openai_live');
+    try {
+      await f.connection.接続();
+      await waitFor(() => f.received.some(packet => packet.メッセージ識別 === 'input_audio'));
+      const frames = f.received.filter(packet => packet.メッセージ識別 === 'input_audio');
+      for (const frame of frames) {
+        assert.equal(frame.socket, 'audio');
+        assert.equal(frame.メッセージ内容, 'audio/pcm');
+        assert.equal(Buffer.from(frame.ファイル名, 'base64').length, rate / 50 * 2);
+        assert.ok(Buffer.from(frame.ファイル名, 'base64').equals(Buffer.alloc(rate / 50 * 2)));
+      }
+    } finally { await f.cleanup(); }
+  });
+}
 
 test('音声ソケットの接続拒否でも先に開いたソケットとDiscord接続を回収する', { timeout: 10000 }, async () => {
   const f = await fixture('audio');

@@ -62,6 +62,9 @@
 - 出力の20ms送出間隔は `@discordjs/voice` の AudioPlayer に任せる。Readable 側でも20ms待つとエンコード時間分の遅れが累積して無音が挿入されるため、要求時に即座に1フレームを渡し、highWaterMark で先読み量を制限する。
 - AI 出力チャンクは20ms（24kHz mono PCM16で960バイト）単位とは限らない。端数を到着ごとに無音で埋めると、連続音声の途中に無音が混ざる。端数は次のチャンクと結合し、追加が60ms止まったときだけ発話末尾として無音で埋める。`checks/audio.test.ts` で分割受信時のOpusが連続PCMから生成したOpusと一致すること、および末尾の端数が失われないことを確認する。実通話でのざらつきが解消したかは別途試聴する。
 - 音声間の無音を省くと AI の発話終了判定が止まる場合がある。
+- `backend_server/AIコア/AI音声処理.py` の `音声入力データ処理` は、独自音量判定と切り離して全入力PCMをLiveAIへ渡す。音量判定で転送を絞ると、小声や一定音量の長い発話、発話末尾の無音が欠ける。OpenAI の `server_vad` は受信した無音で発話終了を判定するため、クライアントからの無音をバックエンドでも維持する。独自判定は音声認識バッファと再生割り込みに使う。
+- レートの検証はサイズだけでなく実Opusの1秒音声の時間・周波数・音量を比較する。`checks/live.test.ts` では初期選択と異なる `init.LIVE_AI_NAME` でも、OpenAI が20msあたり960バイト、Gemini / FreeAI が640バイトのPCM16 monoを同じaudioソケットへ送ることを確認する。
+- バックエンドの連続転送は `backend_server` で `uv run --locked python -X utf8 -m unittest tests.test_live_text_response` を実行する。4秒の一定音量発話と1.6秒の無音を、OpenAI / Gemini の送信アダプターまで欠落なく渡す回帰テストを含む。実Providerの発話終了イベントと実通話は別途確認する。
 - 古い受信ストリームの遅延 close で、新しい同一話者のストリームを削除しない。
 - 明示的終了、片側切断、途中の接続失敗、参加者全員の退出のすべてでタイマー・ソケット・Opus・プレイヤーを回収する。
 - Discord パッケージ更新時は DAVE ライブラリと Node.js 必要版を実際の package.json / 公式資料で確認し、package-lock.json を更新する。

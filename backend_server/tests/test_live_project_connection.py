@@ -2,14 +2,17 @@
 """音声接続のプロジェクト確定を、実際のセッション管理で検証する。"""
 import importlib.util
 import ast
+import asyncio
+import base64
+import json
 import logging
 from pathlib import Path
 import sys
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
-from starlette.websockets import WebSocketState
+from unittest.mock import AsyncMock, Mock, patch
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 BACKEND = Path(__file__).resolve().parents[1]
 
@@ -145,3 +148,45 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.manager.sessions, {})
         invalid = await namespace['モデル情報取得'](http, namespace['モデル情報取得リクエスト'](セッションID='missing'))
         self.assertEqual(invalid['status'], 'NG')
+
+    async def test_json_ping_replies_on_same_socket_and_keeps_audio_processing(self):
+        # 実際のエンドポイントを使い、DB・Provider・起動処理だけをモックする。
+        tree = ast.parse((BACKEND / 'core_router' / 'AIコア.py').read_text(encoding='utf-8'))
+        endpoint = next(node for node in tree.body if getattr(node, 'name', '') == 'websocket_endpoint')
+        endpoint.decorator_list = []
+        session = types.SimpleNamespace(
+            初期化ロック=asyncio.Lock(), モデル設定={}, streaming_processor=None,
+            recognition_processor=object(), chat_processor=types.SimpleNamespace(is_alive=True),
+            code_agent_processors=[types.SimpleNamespace(is_alive=True) for _ in range(6)],
+            tools_instance=object(), live_processor=types.SimpleNamespace(is_alive=True),
+            audio_split_task=Mock(done=Mock(return_value=False)),
+        )
+        manager = types.SimpleNamespace(sessions={'bound-session': session},
+            connect=AsyncMock(return_value='bound-session'), get_session=Mock(return_value=session),
+            disconnect=AsyncMock())
+        pcm = bytes(960)
+        packets = [
+            {'type': 'connect', 'セッションID': 'bound-session', 'ソケット番号': 'input'},
+            {'type': 'ping', 'セッションID': 'untrusted-id'},
+            {'type': 'ping', 'timestamp': 123},
+            {'メッセージ識別': 'input_audio', 'ファイル名': base64.b64encode(pcm).decode('ascii')},
+        ]
+        socket = types.SimpleNamespace(app=types.SimpleNamespace(conf=None), accept=AsyncMock(),
+            receive_json=AsyncMock(side_effect=[*packets, WebSocketDisconnect()]), send_json=AsyncMock())
+        logger = Mock()
+        audio = AsyncMock()
+        namespace = {
+            'WebSocket': object, 'WebSocketDisconnect': WebSocketDisconnect, 'AIセッション管理': manager,
+            'logger': logger, '_ws_log': Mock(), 'バックエンドディレクトリ': str(BACKEND),
+            'コードベース絶対パス取得': Mock(return_value=str(BACKEND)), 'welcome対象チャンネル一覧': (),
+            '音声入力データ処理': audio, 'asyncio': asyncio, 'base64': base64, 'json': json,
+            '_is_disconnect_like_error': Mock(return_value=False), '_is_ws_connected': Mock(return_value=True),
+        }
+        exec(compile(ast.Module(body=[endpoint], type_ignores=[]), 'AIコア.py', 'exec'), namespace)
+        await namespace['websocket_endpoint'](socket)
+        self.assertEqual(2, socket.send_json.await_count)
+        for call in socket.send_json.call_args_list:
+            self.assertEqual({'type': 'pong', 'セッションID': 'bound-session'}, call.args[0])
+        audio.assert_awaited_once_with(session, pcm)
+        logger.error.assert_not_called()
+        manager.disconnect.assert_awaited_once_with('bound-session', socket_no='input')

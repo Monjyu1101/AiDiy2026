@@ -69,6 +69,8 @@ Code AI の `output_stream` は、本文と同じパケットの `メッセー�
 
 音声は `audio` チャンネル専用に扱う。
 
+接続維持用の `{ type: "ping" }` は、通常の `メッセージ識別` を持つパケットより先に処理する。バックエンドは受信したソケットへ `{ type: "pong", セッションID: "<確定ID>" }` を返し、AI処理や会話履歴へ渡さない。VS Code Live / Web / Avatar はJSON形式、現行DiscordはWebSocket制御フレームのpingを使うため、両者を区別する。`不明なメッセージ識別: None data={"type":"ping", ...}` はバックエンドのJSON heartbeat受け口を確認する。`backend_server/tests/test_live_project_connection.py` でpong応答後も音声処理を続けることを検証する。
+
 ```typescript
 // マイクPCM送信
 {
