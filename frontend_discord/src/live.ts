@@ -6,11 +6,12 @@ import type { LiveSocket, Packet } from '../../frontend_vscode/aidiy_live/src/pr
 import { LiveConnection, 入力レート, 音声入力, 音声操作 } from './vscode';
 import type { Discord設定 } from './config';
 import { Discord音声出力, 音声入力ミキサー } from './audio';
+import { ライブ接続エラー, type ライブ接続段階 } from './connection-error';
 
 const 音声トランスポート = {
   join: (channel: VoiceChannel) => joinVoiceChannel({ channelId: channel.id, guildId: channel.guild.id,
     adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: false, selfMute: false }),
-  ready: (voice: VoiceConnection) => entersState(voice, VoiceConnectionStatus.Ready, 30000),
+  ready: (voice: VoiceConnection, signal: AbortSignal) => entersState(voice, VoiceConnectionStatus.Ready, signal),
 };
 
 export class Live接続 {
@@ -31,6 +32,12 @@ export class Live接続 {
   private started = false;
   private notifyQueue = Promise.resolve();
   private pendingNotices = 0;
+  private joinAbort = new AbortController();
+  private stage: ライブ接続段階 = 'Discordボイス接続';
+  private startedAt = 0;
+  private failure?: ライブ接続エラー;
+  private receivedVoice = false;
+  private receivedOutput = false;
   constructor(private config: Discord設定, readonly channel: VoiceChannel, private notify: (text: string) => Promise<void>, private onClose: () => void,
     private transport = 音声トランスポート) {
     this.rate = 入力レート(config.liveModels.LIVE_AI_NAME || '');
@@ -38,9 +45,12 @@ export class Live接続 {
       const socket = new WebSocket(url, { handshakeTimeout: 15000, maxPayload: 8 * 1024 * 1024 });
       this.sockets.add(socket);
       socket.once('close', () => this.sockets.delete(socket));
+      socket.once('error', error => {
+        this.failure ??= new ライブ接続エラー(error, 'AIコア接続', config.token, Date.now() - this.startedAt);
+      });
       return socket as unknown as LiveSocket;
     });
-    this.player.on('error', () => this.失敗('Discord の音声再生に失敗しました。'));
+    this.player.on('error', error => this.失敗('Discord の音声再生に失敗しました。', error, '音声中継'));
   }
   private 通知(text: string) {
     if (this.pendingNotices >= 8) return;
@@ -49,9 +59,25 @@ export class Live接続 {
       console.error('[Discord] ライブ通知を送信できません。');
     }).finally(() => { this.pendingNotices--; });
   }
-  private 失敗(text: string) {
+  private 失敗(text: string, cause?: unknown, stage = this.stage) {
     if (this.closed) return;
-    this.終了(); this.通知(text);
+    const active = this.ready;
+    this.failure ??= new ライブ接続エラー(cause ?? new Error(text), stage, this.config.token, Date.now() - this.startedAt);
+    this.終了();
+    // 開始待ち中は接続()の呼出し元が通知する。接続後の障害はここで一度だけ通知する。
+    if (active) {
+      console.error(`[Discord Live] ${this.failure.message}`);
+      this.通知(`${text}\n${this.failure.details}`);
+    }
+  }
+  private ボイス通信エラー(cause: unknown): Error {
+    const state = this.voice?.state;
+    // networking全体やSDKのdebugにはボイストークン・暗号鍵が含まれる。
+    // 状態名だけを取り出し、元の例外は既存の伏せ字処理へ渡す。
+    const code = state && 'networking' in state ? state.networking.state.code : undefined;
+    const phases = ['WebSocket接続中', 'WebSocket認証中', 'UDP接続・IP検出中', '音声暗号方式選択中', 'Ready', '再接続中', 'Closed'];
+    const phase = code === undefined ? '未開始' : phases[code] ?? '不明';
+    return new Error(`ボイス状態: ${state?.status ?? '未開始'} / 音声通信: ${phase}`, { cause });
   }
   private 再生開始() {
     this.player.stop(true);
@@ -73,9 +99,19 @@ export class Live接続 {
       if (!mime.startsWith('audio/pcm') || sampleRate && sampleRate !== '24000') {
         this.失敗('AIコアから対応外の音声形式を受信しました（24kHz PCM16 が必要です）。'); return;
       }
-      try { this.output?.追加(Buffer.from(packet.ファイル名, 'base64')); }
+      try {
+        const pcm = Buffer.from(packet.ファイル名, 'base64');
+        this.output?.追加(pcm);
+        if (!this.receivedOutput && pcm.some(value => value !== 0)) {
+          this.receivedOutput = true;
+          console.log('[Discord Live] AIの音声応答を受信しました。');
+        }
+      }
       catch { this.失敗('AI 音声のサイズまたは形式が不正です。接続し直してください。'); }
-    } else if (packet.メッセージ識別 === 'error') this.失敗('AIコアでライブ接続エラーが発生しました。バックエンドの設定・ログを確認してください。');
+    } else if (packet.メッセージ識別 === 'error') this.失敗('AIコアでライブ接続エラーが発生しました。', {
+      message: typeof packet.メッセージ内容 === 'string' ? packet.メッセージ内容 : 'バックエンドの設定・ログを確認してください。',
+      code: packet.エラーコード,
+    });
     else if (packet.チャンネル === '0' && ['output_text', 'output_request', 'recognition_output', 'output'].includes(packet.メッセージ識別 || '')) {
       const text = String(packet.メッセージ内容 || '').trim();
       if (text === '!') { this.失敗('LiveAI への送信に失敗しました。AIコアの接続設定を確認してください。'); return; }
@@ -91,17 +127,29 @@ export class Live接続 {
   async 接続() {
     if (this.started || this.closed) throw new Error('ライブ接続は開始済みです。');
     this.started = true;
+    this.startedAt = Date.now();
     try {
+      console.log('[Discord Live] Discordボイス接続を開始します。');
       this.voice = this.transport.join(this.channel);
-      this.voice.on('error', () => this.失敗('Discord のボイス接続でエラーが発生しました。'));
-      this.voice.on(VoiceConnectionStatus.Disconnected, () => this.失敗('ボイス接続が切れました。ボイスチャンネルに入り直してください。'));
+      this.voice.on('error', error => this.失敗('Discord のボイス接続でエラーが発生しました。', this.ボイス通信エラー(error), 'Discordボイス接続'));
+      this.voice.on(VoiceConnectionStatus.Disconnected, () => {
+        const state = this.voice!.state;
+        this.失敗('ボイス接続が切れました。ボイスチャンネルに入り直してください。', {
+          message: 'Discord のボイス接続が切れました。',
+          code: 'closeCode' in state ? state.closeCode : undefined,
+          cause: { message: 'reason' in state ? `切断理由: ${state.reason}` : '切断理由なし' },
+        }, 'Discordボイス接続');
+      });
       this.voice.on(VoiceConnectionStatus.Destroyed, () => this.終了());
-      await this.transport.ready(this.voice);
+      await this.transport.ready(this.voice, AbortSignal.any([this.joinAbort.signal, AbortSignal.timeout(30000)]));
       if (this.closed) throw new Error('ライブ接続を中断しました。');
+      console.log('[Discord Live] Discordボイス接続が完了しました。AIコアへ接続します。');
+      this.stage = 'AIコア接続';
       this.voice.subscribe(this.player);
       this.再生開始();
-      await this.core.connect({ codeBasePath: this.config.folder, modelSettings: this.config.liveModels });
+      await this.core.connect({ codeBasePath: this.config.folder, modelSettings: this.config.liveModels, waitForLiveReady: true });
       if (this.closed) throw new Error('ライブ接続を中断しました。');
+      this.stage = '音声中継';
       if (!this.core.send('input', 音声操作(true, true))) throw new Error('AIコアへ音声設定を送信できません。');
       this.ready = true;
       this.voice.receiver.speaking.on('start', this.話者開始);
@@ -121,7 +169,12 @@ export class Live接続 {
           alive.set(socket, false); socket.ping();
         }
       }, 20000);
-    } catch (error) { this.終了(); throw error; }
+      this.stage = 'LiveAI';
+      console.log('[Discord Live] LiveAIの待受準備が完了し、音声中継を開始しました。');
+    } catch (error) {
+      const failure = this.failure ?? new ライブ接続エラー(error, this.stage, this.config.token, Date.now() - this.startedAt);
+      this.終了(); throw failure;
+    }
   }
   private 話者許可(user: string): boolean {
     const member = this.channel.members.get(user);
@@ -135,12 +188,18 @@ export class Live接続 {
       this.inputs.set(user, { stream, decoder });
       stream.on('data', (opus: Buffer) => {
         if (!this.話者許可(user)) { this.話者停止(user); return; }
-        try { this.mixer.追加(user, decoder.decode(opus)); }
-        catch { this.失敗('Discord の受信音声を復号できません。ボイスチャンネルに入り直してください。'); }
+        try {
+          this.mixer.追加(user, decoder.decode(opus));
+          if (!this.receivedVoice) {
+            this.receivedVoice = true;
+            console.log('[Discord Live] Discordの受信音声を復号し、AIコアへ送信します。');
+          }
+        }
+        catch (error) { this.失敗('Discord の受信音声を復号できません。ボイスチャンネルに入り直してください。', this.ボイス通信エラー(error), '音声中継'); }
       });
-      stream.on('error', () => this.失敗('Discord の音声受信に失敗しました。'));
+      stream.on('error', error => this.失敗('Discord の音声受信に失敗しました。', this.ボイス通信エラー(error), '音声中継'));
       stream.once('close', () => { if (this.inputs.get(user)?.stream === stream) this.話者停止(user); });
-    } catch { this.失敗('Discord の音声受信を開始できません。'); }
+    } catch (error) { this.失敗('Discord の音声受信を開始できません。', this.ボイス通信エラー(error), '音声中継'); }
   };
   private 話者停止(user: string) {
     const input = this.inputs.get(user);
@@ -154,6 +213,7 @@ export class Live接続 {
   終了() {
     if (this.closed) return;
     this.closed = true; this.ready = false;
+    this.joinAbort.abort();
     clearInterval(this.capture); clearInterval(this.heartbeat); clearTimeout(this.transcriptTimer);
     this.core.send('input', 音声操作(false, false)); this.core.disconnect();
     for (const socket of this.sockets) socket.terminate();

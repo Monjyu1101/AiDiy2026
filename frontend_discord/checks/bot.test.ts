@@ -5,6 +5,7 @@ import { ChannelType, Events, type Client, type Message, type VoiceChannel } fro
 import { fileURLToPath } from 'node:url';
 import { DiscordBot, 回答送信 } from '../src/bot';
 import { Code接続 } from '../src/code';
+import { ライブ接続エラー } from '../src/connection-error';
 import { config, guildId, textId, voiceId, userId, botId, waitFor } from './helpers';
 
 function fixture(inVoice = true) {
@@ -174,4 +175,24 @@ test('返信先の取得中に退出した場合は音声接続を作らない',
     await new Promise(resolve => setTimeout(resolve, 20));
     assert.equal(started, 0);
   } finally { finish?.(f.textChannel); await bot.終了(); }
+});
+
+test('自動Live開始の失敗通知に段階・Providerの拒否理由を残し、秘密値を出さない', async () => {
+  const f = fixture();
+  const failure = new ライブ接続エラー({ code: 'credit_balance_exhausted', message: 'APIクレジットがありません test-token' }, 'AIコア接続', 'test-token');
+  const bot = new DiscordBot(config(), f.client, undefined, (_config, channel, _notify, closed) => ({
+    channel, 接続: async () => { throw failure; }, 終了: closed, テキスト送信: () => {},
+  }));
+  try {
+    f.client.emit(Events.ClientReady, f.client as any);
+    await waitFor(() => f.sent.length > 0);
+    assert.equal(f.sent.length, 1);
+    assert.match(f.sent[0].content, /AIコア接続/);
+    assert.match(f.sent[0].content, /credit_balance_exhausted/);
+    assert.match(f.sent[0].content, /APIクレジットがありません/);
+    assert.doesNotMatch(f.sent[0].content, /test-token/);
+    assert.ok(!f.sent.some(packet => packet.content.includes('音声会話に接続しました')));
+    await bot.メッセージ受信(f.message('!aidiy live'));
+    assert.match(f.sent.at(-1).content, /credit_balance_exhausted/, '手動開始も同じ拒否理由を返す');
+  } finally { await bot.終了(); }
 });

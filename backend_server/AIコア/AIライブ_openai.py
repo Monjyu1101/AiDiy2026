@@ -94,6 +94,7 @@ class LiveAI:
         # WebSocketセッション（Geminiのclientに相当）
         self.client = None  # Gemini互換性のためNoneで初期化
         self.ws_session = None  # OpenAI WebSocketセッション（内部管理用）
+        self.設定反映済み = False  # session.updated を受信するまでは待受準備中
 
         # WebSocket音声処理設定
         self.input_rate = 24000  # OpenAI Realtime api用
@@ -546,6 +547,7 @@ class LiveAI:
                 # 再接続時にエラーフラグをリセット
                 self.エラーフラグ = False
                 self.最終エラー = ""
+                self.設定反映済み = False
                 self._応答中 = False
                 self._応答生成待ち = False
 
@@ -689,6 +691,7 @@ class LiveAI:
             socket = self.ws_session
             self.ws_session = None
             self.live_session = None
+            self.設定反映済み = False
             self.task_group = None
             self.is_alive = False  # ワーカー終了時にFalseに設定
             if socket:
@@ -875,9 +878,12 @@ class LiveAI:
                                 else:
                                     await self._応答生成送信()
 
+                            elif msg_type == "session.updated":
+                                self.設定反映済み = True
+
                             # その他の応答タイプ（ログ削減）
                             elif msg_type in [
-                                "session.created", "session.updated",
+                                "session.created",
                                 "conversation.item.created", "rate_limits.updated",
                                 "response.output_item.added", "response.audio.done",
                                 "response.output_audio.done",

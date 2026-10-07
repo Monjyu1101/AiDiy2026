@@ -149,7 +149,7 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
         invalid = await namespace['モデル情報取得'](http, namespace['モデル情報取得リクエスト'](セッションID='missing'))
         self.assertEqual(invalid['status'], 'NG')
 
-    async def test_json_ping_replies_on_same_socket_and_keeps_audio_processing(self):
+    def endpoint_fixture(self, packets):
         # 実際のエンドポイントを使い、DB・Provider・起動処理だけをモックする。
         tree = ast.parse((BACKEND / 'core_router' / 'AIコア.py').read_text(encoding='utf-8'))
         endpoint = next(node for node in tree.body if getattr(node, 'name', '') == 'websocket_endpoint')
@@ -158,19 +158,13 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
             初期化ロック=asyncio.Lock(), モデル設定={}, streaming_processor=None,
             recognition_processor=object(), chat_processor=types.SimpleNamespace(is_alive=True),
             code_agent_processors=[types.SimpleNamespace(is_alive=True) for _ in range(6)],
-            tools_instance=object(), live_processor=types.SimpleNamespace(is_alive=True),
+            tools_instance=object(), live_processor=types.SimpleNamespace(is_alive=True,
+                終了=AsyncMock(), 接続時welcome送信=AsyncMock(), 待受準備確認=AsyncMock()),
             audio_split_task=Mock(done=Mock(return_value=False)),
         )
         manager = types.SimpleNamespace(sessions={'bound-session': session},
             connect=AsyncMock(return_value='bound-session'), get_session=Mock(return_value=session),
             disconnect=AsyncMock())
-        pcm = bytes(960)
-        packets = [
-            {'type': 'connect', 'セッションID': 'bound-session', 'ソケット番号': 'input'},
-            {'type': 'ping', 'セッションID': 'untrusted-id'},
-            {'type': 'ping', 'timestamp': 123},
-            {'メッセージ識別': 'input_audio', 'ファイル名': base64.b64encode(pcm).decode('ascii')},
-        ]
         socket = types.SimpleNamespace(app=types.SimpleNamespace(conf=None), accept=AsyncMock(),
             receive_json=AsyncMock(side_effect=[*packets, WebSocketDisconnect()]), send_json=AsyncMock())
         logger = Mock()
@@ -183,10 +177,55 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
             '_is_disconnect_like_error': Mock(return_value=False), '_is_ws_connected': Mock(return_value=True),
         }
         exec(compile(ast.Module(body=[endpoint], type_ignores=[]), 'AIコア.py', 'exec'), namespace)
-        await namespace['websocket_endpoint'](socket)
+        return namespace['websocket_endpoint'], socket, session, manager, logger, audio
+
+    async def test_json_ping_replies_on_same_socket_and_keeps_audio_processing(self):
+        pcm = bytes(960)
+        endpoint, socket, session, manager, logger, audio = self.endpoint_fixture([
+            {'type': 'connect', 'セッションID': 'bound-session', 'ソケット番号': 'input'},
+            {'type': 'ping', 'セッションID': 'untrusted-id'},
+            {'type': 'ping', 'timestamp': 123},
+            {'メッセージ識別': 'input_audio', 'ファイル名': base64.b64encode(pcm).decode('ascii')},
+        ])
+        await endpoint(socket)
         self.assertEqual(2, socket.send_json.await_count)
         for call in socket.send_json.call_args_list:
             self.assertEqual({'type': 'pong', 'セッションID': 'bound-session'}, call.args[0])
         audio.assert_awaited_once_with(session, pcm)
         logger.error.assert_not_called()
         manager.disconnect.assert_awaited_once_with('bound-session', socket_no='input')
+
+    async def test_audio_socket_waits_for_provider_ready_and_rejection_is_not_success(self):
+        for rejected in (False, True):
+            with self.subTest(rejected=rejected):
+                endpoint, socket, session, manager, logger, _ = self.endpoint_fixture([
+                    {'type': 'connect', 'セッションID': 'bound-session', 'ソケット番号': 'audio', 'Live準備確認': True},
+                ])
+                waiting = asyncio.Event()
+                release = asyncio.Event()
+
+                async def ready():
+                    waiting.set()
+                    await release.wait()
+                    if rejected:
+                        raise RuntimeError('APIクレジットがありません')
+
+                session.live_processor.待受準備確認.side_effect = ready
+                task = asyncio.create_task(endpoint(socket))
+                try:
+                    await asyncio.wait_for(waiting.wait(), 2)
+                    socket.send_json.assert_not_awaited()
+                    release.set()
+                    await asyncio.wait_for(task, 2)
+                    packet = socket.send_json.call_args.args[0]
+                    self.assertEqual('error' if rejected else 'live_ready', packet['メッセージ識別'])
+                    self.assertEqual('bound-session', packet['セッションID'])
+                    if rejected:
+                        self.assertEqual('APIクレジットがありません', packet['メッセージ内容'])
+                    logger.error.assert_not_called()
+                    manager.disconnect.assert_awaited_once_with('bound-session', socket_no='audio')
+                finally:
+                    release.set()
+                    if not task.done():
+                        task.cancel()
+                        await asyncio.gather(task, return_exceptions=True)

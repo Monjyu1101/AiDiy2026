@@ -1145,6 +1145,23 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
             if セッション.audio_split_task is None or セッション.audio_split_task.done():
                 セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
 
+        # init はソケット登録だけを示す。要求したクライアントにはProviderの準備完了も通知する。
+        if ソケット番号 == "audio" and 初期データ.get("Live準備確認") is True:
+            try:
+                await セッション.live_processor.待受準備確認()
+            except Exception as e:
+                await WebSocket接続.send_json({
+                    "セッションID": セッションID,
+                    "メッセージ識別": "error",
+                    "メッセージ内容": str(e),
+                })
+                return
+            await WebSocket接続.send_json({
+                "セッションID": セッションID,
+                "メッセージ識別": "live_ready",
+                "メッセージ内容": "LiveAIの音声待受準備が完了しました。",
+            })
+
         # 出力ソケット接続時にwelcome_info/welcome_textを送信（core/input含む）
         if ソケット番号 in welcome対象チャンネル一覧:
             追加メッセージ = ""

@@ -344,6 +344,88 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
         live.AIインスタンス.テキスト送信.assert_not_awaited()
         live.接続.send_to_channel.assert_awaited_once()
 
+    async def test_openai_waits_for_session_update_ack_before_live_ready(self):
+        async with self.openai_events() as (ai, exchange):
+            ai.live_session = ai.ws_session
+            live = self.live_module.Live.__new__(self.live_module.Live)
+            live.AIインスタンス = ai
+            live.is_alive = True
+            pending = asyncio.create_task(live.待受準備確認())
+            try:
+                await exchange({"type": "session.created"})
+                self.assertFalse(ai.設定反映済み)
+                self.assertFalse(pending.done(), "WebSocket作成だけでは待受完了にしない")
+                await exchange({"type": "session.updated"})
+                await asyncio.wait_for(pending, 2)
+                self.assertTrue(ai.設定反映済み)
+                ai.ws_session.send.assert_not_called()
+            finally:
+                if not pending.done():
+                    pending.cancel()
+                    await asyncio.gather(pending, return_exceptions=True)
+
+    async def test_gemini_waits_for_provider_session_before_live_ready(self):
+        ai = stdlib_types.SimpleNamespace(api_key="test-key", live_session=None,
+            エラーフラグ=False, 中断停止フラグ=False)
+        live = self.live_module.Live.__new__(self.live_module.Live)
+        live.AIインスタンス = ai
+        live.is_alive = True
+        pending = asyncio.create_task(live.待受準備確認())
+        try:
+            await asyncio.sleep(0)
+            self.assertFalse(pending.done())
+            ai.live_session = object()
+            await asyncio.wait_for(pending, 2)
+        finally:
+            if not pending.done():
+                pending.cancel()
+                await asyncio.gather(pending, return_exceptions=True)
+
+    async def test_live_ready_rejects_missing_key_provider_failure_stop_and_timeout(self):
+        live = self.live_module.Live.__new__(self.live_module.Live)
+        for values, message in (
+            ({"api_key": None}, "APIキーが未設定"),
+            ({"エラーフラグ": True, "最終エラー": "APIクレジットがありません"}, "APIクレジット"),
+            ({"中断停止フラグ": True}, "LiveAI への接続に失敗"),
+            ({}, "待受準備が完了しません"),
+        ):
+            with self.subTest(values=values):
+                live.is_alive = True
+                live.AIインスタンス = stdlib_types.SimpleNamespace(
+                    **{"api_key": "test-key", "live_session": None, **values})
+                with self.assertRaisesRegex(RuntimeError if values else TimeoutError, message):
+                    await live.待受準備確認(timeout=0)
+        live.is_alive = False
+        with self.assertRaisesRegex(RuntimeError, "開始されていません"):
+            await live.待受準備確認()
+
+    async def test_provider_start_failure_does_not_mark_live_running_or_launch_relay_workers(self):
+        ai = stdlib_types.SimpleNamespace(開始=AsyncMock(return_value=False), 終了=AsyncMock(return_value=True))
+        live = self.live_module.Live.__new__(self.live_module.Live)
+        live.セッションID = "session"
+        live.AI_NAME = "openai_live"
+        live.AI_MODEL = "test-model"
+        live.AI_VOICE = "marin"
+        live.システム指示 = "日本語で話してください。"
+        live.親 = stdlib_types.SimpleNamespace(conf=stdlib_types.SimpleNamespace(json={"openai_key_id": "test-key"}))
+        live.AIモジュール = stdlib_types.SimpleNamespace(LiveAI=Mock(return_value=ai))
+        live.AIインスタンス = None
+        live.接続 = stdlib_types.SimpleNamespace(send_to_channel=AsyncMock())
+        live.is_alive = False
+        live._initializing = False
+        live.音声受信Ｑ = live.テキスト受信Ｑ = None
+        live._audio_task = live._text_task = None
+        await live.開始()
+        ai.開始.assert_awaited_once()
+        ai.終了.assert_awaited_once()
+        self.assertFalse(live.is_alive)
+        self.assertIsNone(live.AIインスタンス)
+        self.assertIsNone(live._audio_task)
+        self.assertIsNone(live._text_task)
+        packet = live.接続.send_to_channel.call_args.args[1]
+        self.assertEqual("error", packet["メッセージ識別"])
+        self.assertIn("LiveAIを開始できませんでした", packet["メッセージ内容"])
+
     async def test_openai_credit_error_reaches_screen_and_stops_reconnect(self):
         module = self.openai_module
         ai = module.LiveAI(セッションID="session", api_key="test-key", live_model="gpt-realtime-2.1-mini", live_voice="marin")

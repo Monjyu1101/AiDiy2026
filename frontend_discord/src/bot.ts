@@ -4,6 +4,7 @@ import { Live接続 } from './live';
 import type { Discord設定 } from './config';
 import { コマンド解析, メンション禁止, 会話キー, 利用許可, 本文分割 } from './commands';
 import { Discord通信, Gateway戦略 } from './network';
+import { ライブ接続エラー } from './connection-error';
 
 export async function 回答送信(message: Message, text: string) {
   if (!message.channel.isSendable()) return;
@@ -93,7 +94,7 @@ export class DiscordBot {
     } catch (error) {
       if (!this.closing) {
         // Discord/API内部エラーのオブジェクトには認証情報が含まれ得るため出力しない。
-        const text = error instanceof Error && error.constructor === Error ? error.message : '処理に失敗しました。設定・権限・接続状態を確認してください。';
+        const text = error instanceof ライブ接続エラー || error instanceof Error && error.constructor === Error ? error.message : '処理に失敗しました。設定・権限・接続状態を確認してください。';
         await reply(text.slice(0, 1800));
       }
     }
@@ -161,9 +162,11 @@ export class DiscordBot {
       if (this.希望ボイス()?.id !== channel.id) { this.voiceDirty = true; continue; }
       const notify = (text: string) => チャンネル回答送信(textChannel, text);
       try { await this.チャンネルライブ開始(channel, textId, notify); }
-      catch {
+      catch (error) {
         if (!this.closing && this.connected && this.希望ボイス()?.id === channel.id) {
-          await notify('音声会話に接続できませんでした。少し待って、ボイスチャンネルに入り直してください。');
+          const failure = error instanceof ライブ接続エラー ? error : new ライブ接続エラー(error, 'ボイス参加確認', this.config.token);
+          console.error(`[Discord Live] ${failure.message}`);
+          await notify(`${failure.message}\nボイスチャンネルに入り直すと再試行します。`);
         }
       }
     }
@@ -193,9 +196,9 @@ export class DiscordBot {
       if (this.live !== live || this.closing) { live.終了(); return; }
       await live.接続();
       if (this.live === live && !this.closing) await notify('音声会話に接続しました。そのまま話しかけてください。');
-    } catch {
+    } catch (error) {
       live.終了();
-      throw new Error('ライブに接続できませんでした。AIコアの起動、LiveAI 設定、Discord の音声権限を確認してください。');
+      throw error instanceof ライブ接続エラー ? error : new ライブ接続エラー(error, 'Discordボイス接続', this.config.token);
     }
   }
   async 起動() {

@@ -1,6 +1,17 @@
 import { 設定エラー } from './config';
 
-export type 接続段階 = '設定読込' | 'Hermes確認' | 'モデル確認' | 'Bot作成' | 'Discord接続' | '準備完了待ち';
+export type ライブ接続段階 = 'ボイス参加確認' | 'Discordボイス接続' | 'AIコア接続' | '音声中継' | 'LiveAI';
+export type 接続段階 = '設定読込' | 'Hermes確認' | 'モデル確認' | 'Bot作成' | 'Discord接続' | '準備完了待ち' | ライブ接続段階;
+
+export class ライブ接続エラー extends Error {
+  readonly details: string;
+  constructor(error: unknown, readonly stage: ライブ接続段階, token: string, elapsedMs = 0) {
+    const details = 接続エラー詳細(error, stage, token, elapsedMs);
+    super(`音声会話に接続できません（${stage}）。\n${details}`);
+    this.name = 'ライブ接続エラー';
+    this.details = details;
+  }
+}
 
 // 要約は既知の原因を固定文へ変換し、詳細は必要な項目だけを伏せ字処理して表示する。
 export function 接続失敗案内(error: unknown, stage: 接続段階): string {

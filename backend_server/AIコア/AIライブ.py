@@ -293,7 +293,13 @@ class Live:
                 self.音声受信Ｑ = asyncio.Queue()
             if self.テキスト受信Ｑ is None:
                 self.テキスト受信Ｑ = asyncio.Queue()
-            await self.AIインスタンス.開始(self.音声受信Ｑ, self.テキスト受信Ｑ)
+            started = await self.AIインスタンス.開始(self.音声受信Ｑ, self.テキスト受信Ｑ)
+            if not started:
+                failed_ai = self.AIインスタンス
+                self.AIインスタンス = None
+                await failed_ai.終了()
+                logger.error("[Live] LiveAIの開始要求が失敗しました。APIキーとバックエンドの設定を確認してください。")
+                return None
             logger.info(f"[Live] LiveAI初期化完了: {self.AI_NAME} (AIコアセッション: {self.セッションID})")
             return self.AIインスタンス
         except Exception as e:
@@ -309,8 +315,12 @@ class Live:
 
         self._initializing = True
         try:
+            ai = await self._ensure_ai_instance()
+            if ai is None:
+                self.is_alive = False
+                await self._送信エラー通知("LiveAIを開始できませんでした。APIキーとバックエンドの初期化ログを確認してください。")
+                return
             self.is_alive = True
-            await self._ensure_ai_instance()
             if self._audio_task is None or self._audio_task.done():
                 self._audio_task = asyncio.create_task(self._音声受信ワーカー())
             if self._text_task is None or self._text_task.done():
@@ -318,6 +328,30 @@ class Live:
             # 統合音声分離ワーカーはaudio_processing.pyで起動済み（重複回避）
         finally:
             self._initializing = False
+
+    async def 待受準備確認(self, timeout: float = 20.0):
+        """ソケットの init とは別に、Provider が音声を受け付ける準備を確認する。"""
+        deadline = asyncio.get_running_loop().time() + timeout
+        while True:
+            ai = self.AIインスタンス
+            if ai is None or not self.is_alive:
+                raise RuntimeError("LiveAI が開始されていません。バックエンドの初期化ログを確認してください。")
+            if not getattr(ai, "api_key", None):
+                raise RuntimeError("LiveAI の APIキーが未設定または仮設定です。バックエンドの設定を確認してください。")
+            if getattr(ai, "中断停止フラグ", False) or getattr(ai, "エラーフラグ", False):
+                raise RuntimeError(getattr(ai, "最終エラー", "") or "LiveAI への接続に失敗しました。バックエンドのログを確認してください。")
+            session = getattr(ai, "live_session", None)
+            # OpenAI はWebSocket接続だけでは設定が受理されたか分からない。
+            settings_ready = getattr(ai, "設定反映済み", True)
+            if session is not None and settings_ready:
+                logger.info("[Live] LiveAIの音声待受準備が完了しました")
+                return
+            task = getattr(ai, "_background_task", None)
+            if task is not None and task.done():
+                raise RuntimeError("LiveAI の接続ワーカーが停止しました。バックエンドのログを確認してください。")
+            if asyncio.get_running_loop().time() >= deadline:
+                raise TimeoutError("LiveAI の音声待受準備が完了しませんでした。バックエンドの接続設定・ログを確認してください。")
+            await asyncio.sleep(0.05)
 
     async def 接続時welcome送信(self) -> None:
         """audioチャンネル接続時にLiveAI APIキーを確認し、結果をwelcome_textでch0に送信"""

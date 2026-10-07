@@ -58,6 +58,11 @@
 
 ## 音声変更時の注意
 
+- 音声開始の成功判定にはソケット登録の `init` とProviderの待受準備を区別する。Discordはaudioの `connect` に `Live準備確認: true` を付け、同じセッションの `live_ready` を待ってからマイク中継・接続成功通知を開始する。バックエンドの `AIライブ.py` の `待受準備確認` は、Gemini / FreeAI のLiveセッション確立、OpenAIの `session.updated` による設定反映を確認する。要求しない旧クライアントは従来のinit完了方式を維持する。変更反映にはcoreとDiscordの両方を再起動する。
+- 「接続しました」後に無応答なら、`[Discord Live]` の「待受準備が完了」「Discordの受信音声を復号」「AIの音声応答を受信」を順に確認する。最初の音声フレームだけを記録し、PCMや話者ID・設定値をログに出さない。Providerの拒否理由・コードは `connection-error.ts` で秘密値を伏せ、開始失敗時はBot、開始後はLive接続から一度だけ通知する。Discordの音声接続待ちは停止時にAbortSignalで解除する。
+- 「Discord のボイス接続でエラー」はVoiceConnectionの例外であり、BotのGateway接続成功やLiveAIの準備完了とは別に確認する。通知の「ボイス状態」「音声通信」（WebSocket接続・認証、UDP接続・IP検出、暗号方式選択、Ready、再接続）と、後続の「原因 / 種類・コード・内容」を照合する。汎用案内だけではネットワーク障害や暗号化の失敗を断定しない。受信ストリームの暗号化例外とOpus復号例外も元の原因を保持する。SDKのdebugやnetworking全体にはボイストークン・暗号鍵が含まれるため出力せず、状態名と伏せ字済み例外だけを残す。`checks/live.test.ts` で接続後のボイスエラー・受信エラーの原因保持、秘密値除外、一度だけの終了通知を確認する。
+- `checks/live.test.ts` と `checks/bot.test.ts` でinitのみでは入力を始めないこと、待受完了後の入力、準備中の終了、拒否理由の保持と伏せ字を確認する。バックエンドは `tests.test_live_text_response` と `tests.test_live_project_connection` でProvider設定受理と `live_ready` / `error` の通知順を検証する。
+
 - Discord 音声は Opus / 48kHz / stereo。AI 入力は PCM16LE / mono / 16kHz または24kHz、出力は24kHz。
 - 出力の20ms送出間隔は `@discordjs/voice` の AudioPlayer に任せる。Readable 側でも20ms待つとエンコード時間分の遅れが累積して無音が挿入されるため、要求時に即座に1フレームを渡し、highWaterMark で先読み量を制限する。
 - AI 出力チャンクは20ms（24kHz mono PCM16で960バイト）単位とは限らない。端数を到着ごとに無音で埋めると、連続音声の途中に無音が混ざる。端数は次のチャンクと結合し、追加が60ms止まったときだけ発話末尾として無音で埋める。`checks/audio.test.ts` で分割受信時のOpusが連続PCMから生成したOpusと一致すること、および末尾の端数が失われないことを確認する。実通話でのざらつきが解消したかは別途試聴する。

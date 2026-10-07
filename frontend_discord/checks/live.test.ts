@@ -9,7 +9,8 @@ import type { VoiceChannel } from 'discord.js';
 import { Live接続 } from '../src/live';
 import { config, userId, guildId, voiceId, waitFor } from './helpers';
 
-async function fixture(rejectChannel = '', provider = 'openai_live', selectedProvider = provider) {
+async function fixture(rejectChannel = '', provider = 'openai_live', selectedProvider = provider,
+  options: { holdReady?: boolean; ready?: (voice: VoiceConnection, signal: AbortSignal) => Promise<VoiceConnection> } = {}) {
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await once(server, 'listening');
   const address = server.address(); assert.ok(address && typeof address !== 'string');
@@ -26,6 +27,8 @@ async function fixture(rejectChannel = '', provider = 'openai_live', selectedPro
         socket.send(JSON.stringify(channel === rejectChannel
           ? { メッセージ識別: 'error', メッセージ内容: 'テストで拒否' }
           : { メッセージ識別: 'init', セッションID: 'live-test-session', モデル設定: { ...settings.liveModels, LIVE_AI_NAME: provider } }));
+        if (channel === 'audio' && channel !== rejectChannel && packet.Live準備確認 && !options.holdReady)
+          socket.send(JSON.stringify({ メッセージ識別: 'live_ready', セッションID: 'live-test-session' }));
       }
     });
   });
@@ -43,7 +46,7 @@ async function fixture(rejectChannel = '', provider = 'openai_live', selectedPro
   const notices: string[] = []; let closed = 0;
   const connection = new Live接続(settings, channel, async text => { notices.push(text); }, () => { closed++; }, {
     join: () => voice as unknown as VoiceConnection,
-    ready: async () => voice as unknown as VoiceConnection,
+    ready: options.ready ?? (async () => voice as unknown as VoiceConnection),
   });
   return { connection, received, sockets, speaking, streams, voice, notices, members, closed: () => closed,
     async cleanup() {
@@ -83,6 +86,66 @@ test('Live実装がinput→0→audioのinitを待ち、許可話者のOpusと無
   } finally { encoder.delete(); await f.cleanup(); }
 });
 
+test('initだけで接続済みにせず、LiveAIの待受準備完了後にマイクを開始する', { timeout: 10000 }, async () => {
+  const f = await fixture('', 'openai_live', 'openai_live', { holdReady: true });
+  let connected = false;
+  const pending = f.connection.接続().then(() => { connected = true; });
+  try {
+    await waitFor(() => f.sockets.has('audio'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(connected, false);
+    assert.equal(f.received.some(packet => packet.メッセージ識別 === 'input_audio'), false);
+    assert.equal(f.received.some(packet => packet.メッセージ識別 === 'operations'), false);
+    assert.equal(f.received.find(packet => packet.ソケット番号 === 'audio')!.Live準備確認, true);
+    f.sockets.get('audio')!.send(JSON.stringify({ メッセージ識別: 'live_ready', セッションID: 'wrong-session' }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(connected, false);
+    f.sockets.get('audio')!.send(JSON.stringify({ メッセージ識別: 'live_ready', セッションID: 'live-test-session' }));
+    await pending;
+    await waitFor(() => f.received.some(packet => packet.メッセージ識別 === 'input_audio'));
+    assert.equal(connected, true);
+  } finally { await f.cleanup(); await pending.catch(() => {}); }
+});
+
+test('LiveAIの開始拒否理由を保ち、秘密値を伏せ、接続済みとは扱わない', { timeout: 10000 }, async () => {
+  const f = await fixture('', 'openai_live', 'openai_live', { holdReady: true });
+  const pending = f.connection.接続();
+  const rejected = assert.rejects(pending, (error: Error) => {
+    assert.match(error.message, /AIコア接続/);
+    assert.match(error.message, /credit_balance_exhausted/);
+    assert.match(error.message, /APIクレジットがありません/);
+    assert.doesNotMatch(error.message, /test-token|sk-private/);
+    return true;
+  });
+  try {
+    await waitFor(() => f.sockets.has('audio'));
+    f.sockets.get('0')!.send(JSON.stringify({ メッセージ識別: 'error', エラーコード: 'credit_balance_exhausted',
+      メッセージ内容: 'APIクレジットがありません test-token sk-private' }));
+    await rejected;
+    assert.equal(f.closed(), 1);
+    assert.equal(f.received.some(packet => packet.メッセージ識別 === 'input_audio'), false);
+    assert.equal(f.notices.length, 0, '開始待ち中の通知はBotに任せ、重複送信しない');
+  } finally { await f.cleanup(); }
+});
+
+test('停止するとDiscordボイス接続の準備待ちも解除し、AIコアへ接続しない', { timeout: 10000 }, async () => {
+  let waiting = false;
+  const f = await fixture('', 'openai_live', 'openai_live', { ready: (_voice, signal) => new Promise((_resolve, reject) => {
+    waiting = true;
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  }) });
+  const pending = f.connection.接続();
+  const rejected = assert.rejects(pending, /Discordボイス接続/);
+  try {
+    await waitFor(() => waiting);
+    f.connection.終了();
+    await rejected;
+    assert.equal(f.closed(), 1);
+    assert.equal(f.sockets.size, 0);
+    assert.equal(f.voice.state.status, VoiceConnectionStatus.Destroyed);
+  } finally { await f.cleanup(); }
+});
+
 test('AI出力音声を再生し、cancel_audioで古いリソースを破棄、片側切断で全体を終了', { timeout: 10000 }, async () => {
   const f = await fixture();
   try {
@@ -98,6 +161,41 @@ test('AI出力音声を再生し、cancel_audioで古いリソースを破棄、
     await waitFor(() => f.closed() === 1);
     assert.equal(f.voice.state.status, VoiceConnectionStatus.Destroyed);
     await waitFor(() => f.notices.some(text => text.includes('接続が切れました')));
+  } finally { await f.cleanup(); }
+});
+
+test('接続後のボイスエラーは通信状態と元の例外を保持し、秘密値を伏せて一度だけ終了する', { timeout: 10000 }, async () => {
+  const f = await fixture();
+  try {
+    await f.connection.接続();
+    Object.assign(f.voice.state, { networking: { state: { code: 4, connectionOptions: { token: 'private-voice-token' },
+      connectionData: { secretKey: 'private-voice-key' } } } });
+    const error = Object.assign(new Error('send failed test-token token=private-session-token'), { code: 'ENETUNREACH' });
+    f.voice.emit('error', error);
+    f.voice.emit('error', error);
+    await waitFor(() => f.notices.length === 1);
+    assert.match(f.notices[0], /Discord のボイス接続でエラー/);
+    assert.match(f.notices[0], /ボイス状態: ready \/ 音声通信: Ready/);
+    assert.match(f.notices[0], /ENETUNREACH/);
+    assert.match(f.notices[0], /send failed/);
+    assert.doesNotMatch(f.notices[0], /test-token|private-/);
+    assert.equal(f.closed(), 1);
+    assert.equal(f.voice.state.status, VoiceConnectionStatus.Destroyed);
+    await waitFor(() => f.sockets.size === 3 && [...f.sockets.values()].every(socket => socket.readyState === 3));
+  } finally { await f.cleanup(); }
+});
+
+test('受信ストリームの暗号化エラーを一般案内で隠さず、音声中継の失敗として通知する', { timeout: 10000 }, async () => {
+  const f = await fixture();
+  try {
+    await f.connection.接続();
+    f.speaking.emit('start', userId);
+    f.streams.get(userId)!.emit('error', new Error('Failed to decrypt: DecryptionFailed(UnencryptedWhenPassthroughDisabled)'));
+    await waitFor(() => f.notices.length === 1);
+    assert.match(f.notices[0], /失敗段階: 音声中継/);
+    assert.match(f.notices[0], /DecryptionFailed\(UnencryptedWhenPassthroughDisabled\)/);
+    assert.equal(f.closed(), 1);
+    assert.equal(f.streams.get(userId)!.destroyed, true);
   } finally { await f.cleanup(); }
 });
 

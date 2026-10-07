@@ -8,7 +8,7 @@ export interface LiveSocket {
   onerror: ((event: Event) => void) | null; onclose: ((event: CloseEvent) => void) | null;
   send(data: string): void; close(): void;
 }
-export type LiveConnectOptions = { codeBasePath?: string; modelSettings?: Record<string, string> };
+export type LiveConnectOptions = { codeBasePath?: string; modelSettings?: Record<string, string>; waitForLiveReady?: boolean };
 
 export function 入力レート(provider: string): number { return provider.includes('openai') ? 24000 : 16000; }
 export function 音声入力(base64: string): Packet {
@@ -18,7 +18,8 @@ export function 音声操作(mic: boolean, speaker: boolean): Packet {
   return { チャンネル: 'input', メッセージ識別: 'operations', メッセージ内容: { ボタン: { マイク: mic, スピーカー: speaker } } };
 }
 
-// init 到着で確定する。途中の失敗では3ソケット全部を閉じる。
+// 通常は init、待受準備確認を要求した audio は live_ready 到着で確定する。
+// 途中の失敗では3ソケット全部を閉じる。
 export class LiveConnection {
   private sockets = new Map<string, LiveSocket>();
   private generation = 0;
@@ -43,9 +44,15 @@ export class LiveConnection {
       const socket = this.createSocket(this.url);
       this.sockets.set(channel, socket);
       let ready = false;
-      const timer = setTimeout(() => { reject(new Error('接続がタイムアウトしました。')); socket.close(); }, 30000);
+      let initialized = false;
+      const waitForLive = channel === 'audio' && options.waitForLiveReady === true;
+      const timer = setTimeout(() => {
+        reject(new Error(waitForLive ? 'LiveAIの待受準備通知が届きませんでした。AIコアを再起動し、バックエンドのログを確認してください。' : '接続がタイムアウトしました。'));
+        socket.close();
+      }, 30000);
       socket.onopen = () => socket.send(JSON.stringify({ type: 'connect', セッションID: session || null, ソケット番号: channel,
         ...(options.codeBasePath ? { CODE_BASE_PATH: options.codeBasePath } : {}),
+        ...(waitForLive ? { Live準備確認: true } : {}),
         ...(options.modelSettings && Object.keys(options.modelSettings).length ? { モデル設定: options.modelSettings } : {}) }));
       socket.onmessage = event => {
         if (generation !== this.generation) return;
@@ -56,7 +63,11 @@ export class LiveConnection {
         }
         if (packet.メッセージ識別 === 'init' && packet.セッションID) {
           if (session && packet.セッションID !== session) { reject(new Error('セッションが一致しません。')); socket.close(); return; }
-          ready = true; clearTimeout(timer); resolve(packet.セッションID);
+          initialized = true;
+          if (!waitForLive) { ready = true; clearTimeout(timer); resolve(packet.セッションID); }
+        }
+        if (waitForLive && initialized && packet.メッセージ識別 === 'live_ready' && packet.セッションID === session) {
+          ready = true; clearTimeout(timer); resolve(session);
         }
         this.onPacket(packet);
       };

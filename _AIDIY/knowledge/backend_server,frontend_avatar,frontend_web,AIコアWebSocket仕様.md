@@ -140,6 +140,8 @@ Code AI の `output_stream` は、本文と同じパケットの `メッセー�
 
 `aidiy_live` と `frontend_discord`（Live）は input／0／audio の接続時に作業フォルダを送信します。Web／Avatar は core 初期化情報の `モデル設定.CODE_BASE_PATH` を音声接続時に送信します。指定しない旧クライアントは従来のセッション設定を使用します。
 
+Discordのaudio接続は `connect.Live準備確認: true` を指定し、ソケット登録の `init` に加えて `{ メッセージ識別: "live_ready", セッションID: "<確定ID>" }` を待つ。backendの `Live.待受準備確認()` がProviderの準備完了を確認してから同じaudioソケットへ返す。開始拒否・未設定キー・準備タイムアウトは `error` を返す。`Live準備確認` を指定しない接続は従来のinit方式を維持する。共有クライアントでは `waitForLiveReady: true` を指定した場合のみこの確認を使う。
+
 確認: `backend_server/tests/test_live_project_connection.py` で、初期化通知前の反映、音声への引継ぎ、フォルダ不一致・存在しないフォルダの拒否、旧クライアント互換を検証できます。
 
 ## 接続時の Live モデル指定
