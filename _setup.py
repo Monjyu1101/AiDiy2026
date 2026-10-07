@@ -851,7 +851,7 @@ def main():
     print_info(f"    Core起動   : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port {PORT_CORE}")
     print_info(f"    Apps起動   : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port {PORT_APPS}")
     print_info("    バックエンド(task,team)起動:")
-    print_info(f"                cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
+    print_info(f"                 cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発    : cd frontend_web && npm run dev")
     print_info("    Avatar     : cd frontend_avatar && npm run dev")
     print_info("    Hermes起動 : aidiy_hermes")
