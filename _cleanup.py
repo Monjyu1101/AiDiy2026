@@ -12,9 +12,10 @@
 
 各フォルダの `_cleanup.py` を import し、不要なキャッシュ・ビルド成果物・
 仮想環境などを対話的に一括削除します。クリーンアップを実行する場合は、削除開始前に
-全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
-Code / Live の単独実行と tools の MCP 接続プロセスも強制終了・確認します。ルート固有の
-処理（全階層の temp / _temp / .temp とルート backup の削除、グローバル npm ツールの
+全常駐サービス（Discord Bot を含む）を各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
+Code / Live の単独実行と tools の MCP 接続プロセスも強制終了・確認します。この停止手順
+（`stop_all_services`）はルート `_start.py` の起動前・Ctrl+C 終了時にも共通で使います。ルート固有の
+処理（全階層の temp / _temp / .temp / test / _test / .test とルート backup の削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
 
@@ -65,6 +66,11 @@ BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
 
 BACKUP_PATH = "backup"
 TEMP_DIR_NAMES = frozenset(("temp", "_temp", ".temp"))
+# 試験用の作業フォルダ。正式なテスト（tests/ など）は名前が違うため対象外。
+TEST_DIR_NAMES = frozenset(("test", "_test", ".test"))
+# test は依存パッケージ内で正規の構成要素にもなるため、この配下では test 系を削除しない。
+DEPENDENCY_DIR_NAMES = frozenset(("node_modules", ".venv", "venv", "site-packages"))
+TEMP_TARGET_LABEL = "temp / _temp / .temp / test / _test / .test"
 CLEANUP_STOP_REQUEST_PATH = BASE_DIR / ".cleanup_stop_request.json"
 
 DATABASE_TYPE = "sqlite"
@@ -244,23 +250,55 @@ def cleanup_stop_request(choices: dict, services: list[str] | None = None):
             pass
 
 
-def stop_all_services(choices: dict) -> None:
-    """常駐サービス・単独実行・MCP 接続を、ファイル削除前に強制終了する。"""
+def stop_all_services(
+    choices: dict | None = None,
+    *,
+    title: str = "クリーンアップ前の既存プロセス整理",
+    strict: bool = True,
+) -> bool:
+    """起動中の常駐サービス・単独実行・MCP 接続をすべて強制終了する。
+
+    `_cleanup.py` のファイル削除前と、`_start.py` の起動前・Ctrl+C 終了時で共通の停止手順。
+    1 件失敗しても残りの停止は続け、最後に `strict` なら RuntimeError、そうでなければ
+    警告だけ出して False を返す。
+    """
     _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
-    print_header("クリーンアップ前の既存プロセス整理")
+    print_header(title)
+    failures: list[str] = []
+
+    def run_stop(description: str, action) -> None:
+        try:
+            if action() is False:
+                failures.append(description)
+        except Exception as e:
+            print_warning(f"{description} の停止に失敗しました: {e}")
+            failures.append(description)
+
     for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
         print_info(f"{description} の既存プロセスを停止します")
-        _load_folder_start_module(folder).kill_ports()
+        run_stop(description, lambda folder=folder: _load_folder_start_module(folder).kill_ports())
 
     print_info("フロントエンド(vscode) の Code / Live 単独実行を停止します")
-    if not _load_folder_module("frontend_vscode").stop_standalone_processes():
-        raise RuntimeError("Code / Live の単独実行を終了できないため、クリーンアップを中止します。")
+    run_stop(
+        "Code / Live の単独実行",
+        lambda: _load_folder_module("frontend_vscode").stop_standalone_processes(),
+    )
     print_info("バックエンド(tools) の Python / MCP 接続を停止します")
-    if not _load_folder_module("backend_tools").stop_tools_processes():
-        raise RuntimeError("tools の Python / MCP 接続を終了できないため、クリーンアップを中止します。")
+    run_stop(
+        "tools の Python / MCP 接続",
+        lambda: _load_folder_module("backend_tools").stop_tools_processes(),
+    )
 
     # `_start.py` の起動前整理と同様に、OS側のポート解放を短時間待つ。
     time.sleep(1)
+
+    if not failures:
+        return True
+    message = f"{'、'.join(failures)} を終了できませんでした"
+    if strict:
+        raise RuntimeError(f"{message}。クリーンアップを中止します。")
+    print_warning(message)
+    return False
 
 
 # 以前の内部名を参照するテスト・補助コードとの互換性を保つ。
@@ -359,7 +397,11 @@ def _is_directory_link(path: Path) -> bool:
 
 
 def find_temp_directories(base_dir: Path) -> list[Path]:
-    """全階層の一時ディレクトリを集める。Git 管理情報とリンク先は巡回しない。"""
+    """全階層の一時・試験用ディレクトリを集める。Git 管理情報とリンク先は巡回しない。
+
+    temp 系は依存フォルダの中も含めて全階層、test 系は依存フォルダ（node_modules / venv 等）の
+    外側だけを対象にする。名前は大文字・小文字を区別せず完全一致で判定する。
+    """
     root = base_dir.resolve(strict=True)
     if not root.is_dir():
         raise NotADirectoryError(root)
@@ -369,26 +411,31 @@ def find_temp_directories(base_dir: Path) -> list[Path]:
         raise error
 
     for current, directories, _files in os.walk(root, followlinks=False, onerror=scan_error):
+        current_path = Path(current)
+        in_dependency = any(
+            part.lower() in DEPENDENCY_DIR_NAMES for part in current_path.relative_to(root).parts
+        )
         for name in list(directories):
-            path = Path(current) / name
-            if name.lower() == ".git" or _is_directory_link(path):
+            path = current_path / name
+            lower = name.lower()
+            if lower == ".git" or _is_directory_link(path):
                 directories.remove(name)
                 continue
-            if name.lower() in TEMP_DIR_NAMES:
-                # 親 temp ごと削除するため、その内側は重複して列挙しない。
+            if lower in TEMP_DIR_NAMES or (lower in TEST_DIR_NAMES and not in_dependency):
+                # 親フォルダごと削除するため、その内側は重複して列挙しない。
                 directories.remove(name)
                 targets.append(path)
     return sorted(targets)
 
 
 def cleanup_temp_directories(base_dir: Path) -> bool:
-    """実体パスを削除直前にも検証し、プロジェクト内の一時ディレクトリを削除する。"""
-    print_header("全階層の temp / _temp / .temp フォルダのクリーンアップ")
+    """実体パスを削除直前にも検証し、プロジェクト内の一時・試験用ディレクトリを削除する。"""
+    print_header(f"全階層の {TEMP_TARGET_LABEL} フォルダのクリーンアップ")
     try:
         root = base_dir.resolve(strict=True)
         targets = find_temp_directories(root)
     except (OSError, RuntimeError) as e:
-        print_error(f"一時フォルダの検索に失敗しました: {e}")
+        print_error(f"一時・試験用フォルダの検索に失敗しました: {e}")
         return False
 
     ok = True
@@ -398,12 +445,12 @@ def cleanup_temp_directories(base_dir: Path) -> bool:
             if (_is_directory_link(path) or resolved != path
                     or resolved == root or not resolved.is_relative_to(root)):
                 raise ValueError(f"削除対象がプロジェクト内の通常フォルダではありません: {path}")
-            if not remove_directory(path, f"一時フォルダ ({path.relative_to(root)})"):
+            if not remove_directory(path, f"一時・試験用フォルダ ({path.relative_to(root)})"):
                 ok = False
         except FileNotFoundError:
             continue
         except (OSError, RuntimeError, ValueError) as e:
-            print_error(f"一時フォルダの削除に失敗しました: {e}")
+            print_error(f"一時・試験用フォルダの削除に失敗しました: {e}")
             ok = False
     return ok
 
@@ -461,7 +508,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     print_header("クリーンアップ内容の選択")
     print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
     print_info("常駐サービスが起動中の場合は、削除開始前にすべて停止します。")
-    print_info("全階層の temp / _temp / .temp はフォルダ選択に関係なく削除します（ダウンロード済みモデルを含む）。")
+    print_info(f"全階層の {TEMP_TARGET_LABEL} はフォルダ選択に関係なく削除します（ダウンロード済みモデルを含む）。")
 
     choices: dict = {
         "npm_uninstall":  False,
@@ -642,7 +689,7 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
 
     print()
     if not cleanup_temp_directories(base_dir):
-        cleanup_errors.append("全階層の temp / _temp / .temp")
+        cleanup_errors.append(f"全階層の {TEMP_TARGET_LABEL}")
 
     print()
     # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
@@ -674,7 +721,7 @@ def main():
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  1. 全階層の temp / _temp / .temp フォルダ")
+    print_info(f"  1. 全階層の {TEMP_TARGET_LABEL} フォルダ")
     print_info("  2. ルート backup フォルダ")
     print_info("  3. バックエンド(local)")
     print_info("  4. バックエンド(tools)")

@@ -25,7 +25,11 @@
 - frontend_vscode/_start.py  check_environment / start_code / start_live / kill_ports
 - frontend_discord/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
+起動前と Ctrl+C 終了時は、選択に関係なく起動中の全サービス（Discord Bot・Code / Live の
+単独実行・tools の MCP 接続を含む）を `_cleanup.stop_all_services` と同じ手順で停止します。
+
 標準の起動順:
+0. 既存プロセス整理（起動中サービスをすべて停止）
 1. バックエンド(local)
 2. バックエンド(tools)
 3. バックエンド(core)
@@ -570,20 +574,24 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
         DISCORD.kill_ports()
 
 
-def stop_all_tasks() -> None:
-    """Ctrl+C 時に `_cleanup.py` と同じ手順で全サービスを停止する。
+def stop_all_tasks(title: str = "起動中サービスの一括停止") -> None:
+    """起動前・Ctrl+C 終了時に `_cleanup.py` と同じ手順で全サービスを停止する。
 
     起動したプロセスだけでなく、各フォルダの `kill_ports()`（別起動の常駐・Discord Bot を含む）、
     Code / Live の単独実行、tools の MCP 接続まで止める。停止手順は `_cleanup.stop_all_services`
-    に一本化し、ここで個別に重複させない。
+    に一本化し、ここで個別に重複させない。停止できないものがあっても起動・終了は続ける。
     """
     try:
         spec = importlib.util.spec_from_file_location("aidiy_root_cleanup_for_start", BASE_DIR / "_cleanup.py")
         cleanup = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cleanup)
-        cleanup.stop_all_services({})
+        cleanup.stop_all_services({}, title=title, strict=False)
     except Exception as exc:
         print_warning(f"一部のタスクを停止できませんでした: {exc}")
+    finally:
+        # 停止用に import したフォルダ側スクリプトのキャッシュを畳む。
+        for folder in ("frontend_web", "frontend_avatar", "frontend_vscode", "frontend_discord"):
+            _remove_folder_import_cache(folder)
 
 
 # ============================================================
@@ -760,41 +768,6 @@ def start_service(
     return True
 
 
-def maybe_kill_initial_ports(
-    local_enabled: bool,
-    backend_tools_enabled: bool,
-    backend_enabled: bool,
-    backend_taskteam_enabled: bool,
-    web_enabled: bool,
-    avatar_enabled: bool,
-    discord_enabled: bool = False,
-    code_enabled: bool = False,
-    live_enabled: bool = False,
-) -> None:
-    print_header("既存プロセス整理")
-    if local_enabled:
-        kill_process_on_port(LOCAL.PORT_LOCAL)
-    if backend_tools_enabled:
-        kill_process_on_port(TOOLS.PORT_TOOLS)
-    if backend_enabled:
-        kill_process_on_port(SERVER.PORT_CORE)
-        kill_process_on_port(SERVER.PORT_APPS)
-    if backend_taskteam_enabled:
-        kill_process_on_port(TASKTEAM.PORT_TASKTEAM)
-    if web_enabled:
-        kill_process_on_port(WEB.PORT_WEB)
-    if avatar_enabled:
-        kill_process_on_port(AVATAR.PORT_AVATAR)
-        # electronmon が spawn した electron.exe は別プロセスグループで残留する場合があるため
-        AVATAR.kill_electron_processes()
-    for module, enabled in (("code", code_enabled), ("live", live_enabled)):
-        if enabled:
-            VSCODE.kill_ports(module)
-    if discord_enabled:
-        DISCORD.kill_ports()
-    time.sleep(1)
-
-
 def start_initial_services(
     start_backend_local_enabled: bool,
     start_backend_tools_enabled: bool,
@@ -823,17 +796,8 @@ def start_initial_services(
         "フロントエンド(Discord)": False,
     }
 
-    maybe_kill_initial_ports(
-        local_enabled=start_backend_local_enabled,
-        backend_tools_enabled=start_backend_tools_enabled,
-        backend_enabled=start_backend_enabled,
-        backend_taskteam_enabled=start_backend_taskteam_enabled,
-        web_enabled=web_enabled,
-        avatar_enabled=avatar_enabled,
-        discord_enabled=discord_enabled,
-        code_enabled=code_enabled,
-        live_enabled=live_enabled,
-    )
+    # 選択に関係なく、前回の残り・別起動分（Discord Bot や Code / Live を含む）をすべて止めてから起動する。
+    stop_all_tasks("既存プロセス整理（起動中サービスをすべて停止）")
 
     if start_backend_local_enabled:
         print_header("バックエンド(local) 起動")
@@ -1059,7 +1023,7 @@ def main() -> None:
             print_info("Ctrl+C を検出しました。起動中プロセスを停止します")
             stop_processes(processes)
             print_info("クリーンアップと同じ手順で、残っているタスクもすべて停止します")
-            stop_all_tasks()
+            stop_all_tasks("終了時の既存プロセス整理（起動中サービスをすべて停止）")
 
             if sys.platform == "win32":
                 clear_keyboard_buffer()

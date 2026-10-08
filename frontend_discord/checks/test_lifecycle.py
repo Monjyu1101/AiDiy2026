@@ -62,16 +62,18 @@ class DiscordLifecycleTest(unittest.TestCase):
 
     def test_root_start_only_launches_discord_when_selected_and_requests_autoconnect(self):
         running = {}
-        with patch.object(start, 'start_service') as launch, patch.object(start.time, 'sleep'):
+        # 起動前の全サービス停止は実プロセスを止めるため、必ずモックする。
+        with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'start_service') as launch, patch.object(start.time, 'sleep'):
             flags = start.start_initial_services(False, False, False, False, False, False, running, {}, None)
         launch.assert_not_called()
+        stop_all.assert_called_once()  # 未選択でも cleanup と同じ手順で Discord を含む全停止を行う。
         self.assertFalse(flags[NAME]); self.assertNotIn(NAME, running)
         module = Mock()
-        with patch.object(start, 'DISCORD', module), patch.object(start, 'attach_output_thread'), patch.object(
+        with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'DISCORD', module), patch.object(start, 'attach_output_thread'), patch.object(
             start, 'cleanup_stop_requested_services', return_value=set()
         ), patch.object(start, 'wait_for_services_quiet'), patch.object(start.time, 'sleep'):
             flags = start.start_initial_services(False, False, False, False, False, False, running, {}, None, discord_enabled=True)
-        module.kill_ports.assert_called_once()
+        stop_all.assert_called_once()
         module.start.assert_called_once_with(auto_connect=True)
         self.assertIn(NAME, running)
         self.assertFalse(flags[NAME])  # 手動で閉じた画面を監視ループから再表示しない。

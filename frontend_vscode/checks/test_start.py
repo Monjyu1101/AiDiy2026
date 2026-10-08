@@ -37,7 +37,7 @@ class StartupTest(unittest.TestCase):
 
     def test_only_selected_windows_launch_and_do_not_reopen(self):
         for code, live in ((False, False), (True, False), (False, True), (True, True)):
-            with patch.object(start, 'maybe_kill_initial_ports'), patch.object(start, 'start_service', return_value=True) as launch, patch.object(start, 'wait_for_services_quiet'):
+            with patch.object(start, 'stop_all_tasks'), patch.object(start, 'start_service', return_value=True) as launch, patch.object(start, 'wait_for_services_quiet'):
                 flags = start.start_initial_services(False, False, False, False, False, False, {}, {}, None,
                                                      code_enabled=code, live_enabled=live)
             self.assertEqual([c.args[0] for c in launch.call_args_list],
@@ -71,11 +71,18 @@ class StartupTest(unittest.TestCase):
             standalone.start_live()
             self.assertNotIn('--connect', spawn.call_args.args[0])
 
-    def test_initial_stop_does_not_stop_unselected_window(self):
-        module = Mock()
-        with patch.object(start, 'VSCODE', module), patch.object(start.time, 'sleep'):
-            start.maybe_kill_initial_ports(False, False, False, False, False, False, live_enabled=True)
-        module.kill_ports.assert_called_once_with('live')
+    def test_initial_stop_uses_cleanup_procedure_for_all_services(self):
+        # 起動前は選択に関係なく、cleanup と同じ全サービス停止を 1 回だけ行う。
+        with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'start_service', return_value=True), patch.object(start, 'wait_for_services_quiet'):
+            start.start_initial_services(False, False, False, False, False, False, {}, {}, None, live_enabled=True)
+        stop_all.assert_called_once()
+
+    def test_stop_all_tasks_continues_on_failure(self):
+        root_cleanup = Mock()
+        root_cleanup.stop_all_services.side_effect = RuntimeError('停止失敗')
+        with patch.object(start.importlib.util, 'module_from_spec', return_value=root_cleanup), patch.object(start.importlib.util, 'spec_from_file_location', return_value=Mock()), patch.object(start, '_remove_folder_import_cache'):
+            start.stop_all_tasks('テスト')
+        root_cleanup.stop_all_services.assert_called_once_with({}, title='テスト', strict=False)
 
     def test_shutdown_reclaims_only_started_window(self):
         module = Mock()
@@ -87,7 +94,7 @@ class StartupTest(unittest.TestCase):
         module.kill_ports.assert_called_once_with('live')
 
     def test_main_passes_code_live_selections_to_validation_and_launch(self):
-        with patch.object(start, '_init_modules'), patch.object(start, 'collect_startup_choices', return_value=(False, False, False, False, False, False, True, True, False)), patch.object(start, 'validate_initial_environment', return_value=(True, None)) as validate, patch.object(start, 'start_initial_services', return_value={}) as launch, patch.object(start, 'monitor_and_restart', side_effect=KeyboardInterrupt), patch.object(start, 'stop_processes'), patch.object(start.time, 'sleep'), patch.object(start.sys, 'platform', 'linux'):
+        with patch.object(start, '_init_modules'), patch.object(start, 'collect_startup_choices', return_value=(False, False, False, False, False, False, True, True, False)), patch.object(start, 'validate_initial_environment', return_value=(True, None)) as validate, patch.object(start, 'start_initial_services', return_value={}) as launch, patch.object(start, 'monitor_and_restart', side_effect=KeyboardInterrupt), patch.object(start, 'stop_processes'), patch.object(start, 'stop_all_tasks'), patch.object(start.time, 'sleep'), patch.object(start.sys, 'platform', 'linux'):
             start.main()
         for invocation in (validate.call_args, launch.call_args):
             self.assertTrue(invocation.kwargs['code_enabled'])

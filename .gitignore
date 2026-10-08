@@ -94,6 +94,10 @@ logs/
 temp/
 _temp/
 .temp/
+# 試験用の作業フォルダも全階層で除外する（tests/ などの正式なテストは対象外）。
+test/
+_test/
+.test/
 _work/
 _log/
 

@@ -103,6 +103,25 @@ class CleanupProcessesTest(unittest.TestCase):
         self.assertEqual([call.args[0] for call in load.call_args_list], ['frontend_vscode', 'backend_tools'])
         standalone.stop_standalone_processes.assert_called_once()
 
+    def test_root_stop_continues_after_failure(self):
+        spec = importlib.util.spec_from_file_location('root_cleanup_process_failure_tests', ROOT.parent / '_cleanup.py')
+        root_cleanup = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(root_cleanup)
+        start = Mock()
+        start.kill_ports.side_effect = [RuntimeError('停止失敗')] + [None] * len(root_cleanup.SERVICE_CLEANUP_TARGETS)
+        folder = Mock()
+        with patch.object(root_cleanup, '_load_folder_start_module', return_value=start), patch.object(
+            root_cleanup, '_load_folder_module', return_value=folder
+        ), patch.object(root_cleanup.time, 'sleep'):
+            # cleanup では残りを止めてから中止し、_start では警告だけで続行する。
+            with self.assertRaises(RuntimeError):
+                root_cleanup.stop_all_services({})
+            self.assertEqual(start.kill_ports.call_count, len(root_cleanup.SERVICE_CLEANUP_TARGETS))
+            folder.stop_tools_processes.assert_called_once()
+            start.kill_ports.side_effect = None
+            folder.stop_standalone_processes.return_value = False
+            self.assertFalse(root_cleanup.stop_all_services({}, strict=False))
+
     def test_transient_sharing_violation_is_retried(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
