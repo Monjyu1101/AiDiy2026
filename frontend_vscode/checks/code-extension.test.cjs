@@ -86,6 +86,21 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     assert.ok(posts.some(p=>p.type==='state' && p.接続中 && !p.接続済み));
     assert.equal(posts.findLast(p=>p.type==='state').接続済み,true);
     assert.equal(latest().provider,'codex_cli');assert.equal(latest().model,'auto');
+    assert.equal(latest().自動接続,true);
+    const sessionBeforeToggle = latest().コアセッションID;
+    const conversationBeforeToggle = latest().会話ID;
+    ui.element('auto-connect').listeners.get('click')();await flush();
+    assert.equal(latest().自動接続,false);assert.equal(latest().接続済み,false);
+    assert.ok(backend.sockets.every(socket=>socket.readyState===3));
+    const socketCount = backend.sockets.length;
+    receive({type:'ready'});await flush();
+    receive({type:'new'});await flush();
+    receive({type:'selectHistory',id:conversationBeforeToggle});await flush();
+    assert.equal(latest().会話ID,conversationBeforeToggle);
+    assert.equal(backend.sockets.length,socketCount);
+    ui.element('auto-connect').listeners.get('click')();await flush();
+    assert.equal(latest().自動接続,true);assert.equal(latest().接続済み,true);
+    assert.equal(latest().コアセッションID,sessionBeforeToggle);
     receive({type:'chooseModel',provider:'aidiy_hermes'});await flush();
     assert.ok(posts.findLast(p=>p.type==='modelCatalog').items.some(m=>m.id==='openai_oauth/gpt-6.1-sol'));
     receive({type:'setModel',provider:'copilot_cli',model:'gpt-6-sol'});await flush();
@@ -101,6 +116,11 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     }
     view.visible=false;visibility();view.visible=true;visibility();assert.equal(posts.findLast(p=>p.type==='state').接続済み,true);
     const coreSession = latest().コアセッションID;
+    backend.hold=true;
+    receive({メッセージ識別:'input_text',メッセージ内容:'スイッチ変更拒否の確認'});await flush();
+    receive({type:'autoConnect',enabled:false});await flush();
+    assert.equal(latest().自動接続,true);assert.equal(latest().接続済み,true);
+    receive({メッセージ識別:'cancel_run'});await flush();backend.hold=false;
     receive({type:'disconnect'});await flush();
     assert.equal(latest().接続済み,false);assert.equal(latest().provider,'aidiy_hermes');
     assert.equal(latest().model,'openai_oauth/gpt-6.1-sol');
@@ -138,6 +158,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     provider.dispose();loaded.exports.activate(context);provider.resolveWebviewView(view);visibility();
     assert.equal(latest().provider,'aidiy_hermes');assert.equal(latest().model,'copilot_cli/auto');
     receive({type:'ready'});await flush();assert.equal(latest().provider,'copilot_cli');assert.equal(latest().model,'gpt-6-sol');
+    assert.equal(latest().自動接続,true);
     receive({type:'disconnect'});await flush();vscode.workspace.isTrusted=false;
     receive({メッセージ識別:'input_text',メッセージ内容:'未信頼'});await flush();assert.equal(runs.length,2);
     assert.match(latest().メッセージ.at(-1).本文,/信頼/);vscode.workspace.isTrusted=true;

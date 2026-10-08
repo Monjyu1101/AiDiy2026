@@ -43,7 +43,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 基本方針
 
-- Code の `extensionKind` は `workspace`、Live はローカルマイクを扱う `ui` を優先し、Codespaces では `workspace` の拡張ホストで動作する。
+- Code / Live の `extensionKind` はどちらも `workspace` とし、配置・解除対象を同じ実行環境に揃える。リモート接続では接続先の拡張ホストで動作し、Live の Windows マイク入力は Windows の拡張ホストでのみ使う。
 - 拡張バージョンは、固定解除の明示的な指示があるまで `0.1.0` を維持する。
 - ワークスペースを信頼済みの場合だけ、Code の CLI 実行・コード添付と、Live のマイク入力・AIコア接続を許可する。
 - 直接CLIを使う対話CLI・Discordでは `shell: false` と UTF-8 の標準入力を維持する。

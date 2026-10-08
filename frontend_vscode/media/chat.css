@@ -30,6 +30,8 @@ label { display: block; font-size: 11px; color: var(--muted); }
 .vscode-host #title-bar { display: none; }
 #activity-bar { flex: 0 0 auto; height: 2px; box-sizing: content-box; border-top: 1px solid var(--border); background: #000; pointer-events: none; }
 #chat-header.connected #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s linear infinite; }
+#chat-header.auto-connect-off #activity-bar { background: #ff0000; animation: red-bar-breathe 4.5s linear infinite; }
+@keyframes red-bar-breathe { 0%, 100% { background-color: #000; } 50% { background-color: #ff0000; } }
 @keyframes cyan-breathe { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 /* Web の _TopBar.vue と同じ |sin(2πt / 9)| を、4.5秒の明滅周期に沿って標本化する。 */
 @keyframes cyan-bar-breathe {
@@ -66,6 +68,11 @@ label { display: block; font-size: 11px; color: var(--muted); }
 #project-folder:empty::before { content: '未選択'; color: var(--muted); }
 #header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
 #header-actions button { padding: 2px 7px; border-color: var(--border); font-size: 11px; line-height: 1.4; }
+#auto-connect { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.auto-connect-track { display: inline-flex; align-items: center; width: 26px; height: 14px; padding: 2px; border-radius: 7px; background: #444; }
+.auto-connect-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; transition: transform .15s; }
+#auto-connect[aria-checked="true"] .auto-connect-track { background: #008b8b; }
+#auto-connect[aria-checked="true"] .auto-connect-thumb { transform: translateX(12px); }
 #new-chat { background: var(--accent-soft); }
 #history-toggle[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-soft); }
 #desktop-controls { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; margin-left: 4px; }
@@ -209,6 +216,7 @@ body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vsc
   body.ui-ready { animation: startup-fade-in .8s ease-out both !important; }
   /* 処理中を伝えるゆっくりした明滅は、動きを減らす設定でも維持する。 */
   #chat-header.connected #activity-bar { animation: cyan-bar-breathe 4.5s linear infinite !important; }
+  #chat-header.auto-connect-off #activity-bar { animation: red-bar-breathe 4.5s linear infinite !important; }
   /* 浮遊は止め、指定された2つの枠のゆっくりした回転と明滅を維持する。 */
   .welcome-mark::before { animation: welcome-rotate-clockwise 20s linear infinite, welcome-glow 8s ease-in-out infinite, welcome-rainbow 12s linear infinite !important; }
   .welcome-mark::after { animation: welcome-rotate-counterclockwise 20s linear infinite, welcome-glow 8s ease-in-out -4s infinite, welcome-rainbow 12s linear -6s infinite !important; }

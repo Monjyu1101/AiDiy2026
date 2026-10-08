@@ -41,7 +41,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     作業フォルダ: { 名前: basename(folder), パス: folder },
     ...modeModels[initialModel.offline ? 'offline' : 'online'],
     オフライン対応: true, 実行モード: (initialModel.offline ? 'offline' : 'online') as 'online' | 'offline',
-    接続済み: false, 接続中: false, 接続エラー: '', モデル変更中: false,
+    自動接続: !initialModel.offline, 接続済み: false, 接続中: false, 接続エラー: '', モデル変更中: false,
     メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false,
     セッションID: undefined as string | undefined,
     HermesセッションID: undefined as string | undefined,
@@ -59,7 +59,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
   let allowed: 接続元許可 | undefined;
   let idle: NodeJS.Timeout | undefined;
   const broadcast = (packet: unknown) => { for (const client of clients) client.write(`data: ${JSON.stringify(packet)}\n\n`); };
-  // 自動再接続は継続し、未接続中とHermes実行中だけ単独実行の状態を画面へ返す。
+  // 自動接続ONでは再試行を継続し、未接続中とHermes実行中は単独実行の状態を画面へ返す。
   const オフライン使用 = () => state.実行モード === 'offline' || !state.接続済み || Boolean(offlineJob);
   const 表示状態 = () => オフライン使用() ? { ...state, 実行モード: 'offline',
     ...(state.実行モード === 'offline' ? {} : modeModels.offline),
@@ -112,7 +112,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     notify();
   });
   const reconnect = () => {
-    if (state.実行モード === 'offline') { connection.disconnect(); state.接続済み = false; state.接続中 = false; state.接続エラー = ''; state.モデル変更中 = false; notify(); }
+    if (!state.自動接続 || state.実行モード === 'offline') { connection.disconnect(); state.接続済み = false; state.接続中 = false; state.接続エラー = ''; state.モデル変更中 = false; notify(); }
     else connection.start(folder, { provider: state.provider, model: state.model }, state.セッションID, state.メッセージ);
   };
   const newConversation = () => {
@@ -195,10 +195,18 @@ export async function 単独起動(project: string, backend?: string, initialMod
         if (type === 'cancel_run') {
           if (offlineJob || state.実行モード === 'offline') offlineJob?.停止();
           else if (!connection.send({ メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' })) { reply(409, {error:'AIコアが未接続です。'}); return; }
+        } else if (type === 'autoConnect') {
+          if (typeof data.enabled !== 'boolean') { reply(400, {error:'自動接続の指定が不正です。'}); return; }
+          if (state.実行中 || offlineJob || connection.modelChanging) { reply(409, {error:'実行中またはモデル変更中は自動接続を変更できません。'}); return; }
+          state.自動接続 = data.enabled;
+          if (data.enabled && state.実行モード === 'offline') {
+            save(false); modeModels.offline = { provider:state.provider, model:state.model };
+            state.実行モード = 'online'; newConversation();
+          } else { reconnect(); notify(); }
         } else if (type === 'disconnect' || type === 'connect') {
           if (state.実行モード === 'offline') { reply(409, {error:'オフラインではAIコアへ接続しません。'}); return; }
-          if (type === 'disconnect') connection.disconnect();
-          else { 接続開始済み = true; reconnect(); }
+          state.自動接続 = type === 'connect';
+          接続開始済み = true; reconnect();
         }
         else if (connection.modelChanging) { reply(409, {error:'モデルを変更しています。'}); return; }
         else if (state.実行中 || offlineJob) { reply(409, {error:'実行中です。'}); return; }
@@ -206,7 +214,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
           if (!['online','offline'].includes(data.mode)) { reply(400, {error:'実行モードが不正です。'}); return; }
           if (state.実行モード !== data.mode) {
             save(false); modeModels[state.実行モード] = { provider:state.provider, model:state.model };
-            state.実行モード = data.mode; newConversation();
+            state.自動接続 = data.mode === 'online'; state.実行モード = data.mode; newConversation();
           }
         }
         else if (type === 'input_text') {
@@ -219,6 +227,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
           if (!entry) { reply(404, {error:'会話がありません。'}); return; }
           modeModels[state.実行モード] = { provider:state.provider, model:state.model };
           state.実行モード = entry.実行モード;
+          if (state.実行モード === 'offline') state.自動接続 = false;
           state.会話ID = entry.id; state.メッセージ = [...entry.メッセージ]; state.セッションID = entry.セッションID;
           state.HermesセッションID = entry.HermesセッションID;
           state.provider = entry.provider; state.model = entry.model; state.進捗 = []; reconnect(); notify();

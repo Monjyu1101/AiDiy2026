@@ -4,6 +4,38 @@ const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { screen } = require('./code-screen.cjs');
 
+test('Code: プロジェクトバーの自動接続は初期ON、OFFで赤いバーに切り替わる', () => {
+  const ui = screen(); ui.state({});
+  const toggle = ui.element('auto-connect'), header = ui.element('chat-header');
+  assert.equal(toggle.getAttribute('aria-checked'), 'true');
+  assert.equal(toggle.title, '自動接続 ON');
+  assert.equal(header.classList.contains('auto-connect-off'), false);
+  toggle.listeners.get('click')();
+  assert.equal(ui.posts.at(-1).type, 'autoConnect');
+  assert.equal(ui.posts.at(-1).enabled, false);
+  ui.state({自動接続:false, 接続済み:false, オフライン対応:true});
+  assert.equal(toggle.getAttribute('aria-checked'), 'false');
+  assert.equal(header.classList.contains('auto-connect-off'), true);
+  assert.equal(header.classList.contains('connected'), false);
+  ui.input('自動接続OFFでもHermesへ送信');
+  assert.equal(ui.element('send').disabled, false);
+  toggle.listeners.get('click')();
+  assert.equal(ui.posts.at(-1).enabled, true);
+  ui.state({自動接続:true, 接続済み:false});
+  assert.equal(header.classList.contains('auto-connect-off'), false);
+  assert.equal(header.classList.contains('connected'), false);
+  ui.state({接続済み:true, 実行中:true});
+  assert.equal(header.classList.contains('connected'), true);
+  assert.equal(toggle.disabled, true);
+  const count = ui.posts.length; toggle.listeners.get('click')();
+  assert.equal(ui.posts.length, count);
+  ui.state({実行中:false, モデル変更中:true}); assert.equal(toggle.disabled, true);
+  const html = readFileSync(join(__dirname, '../media/chat.html'), 'utf8');
+  const toolbar = html.slice(html.indexOf('id="conversation-toolbar"'), html.indexOf('</header>'));
+  assert.ok(toolbar.indexOf('id="auto-connect"') < toolbar.indexOf('id="new-chat"'));
+  assert.ok(toolbar.indexOf('id="new-chat"') < toolbar.indexOf('id="history-toggle"'));
+});
+
 test('Code: 履歴を上へスクロール中でも、入力メッセージ追加と送信受理後は末尾へ移動する', () => {
   const ui = screen(), history = ui.element('conversation');
   ui.state({ メッセージ: [{ 種別: 'user', 本文: '以前の入力' }] }); ui.render();

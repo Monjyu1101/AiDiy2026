@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
@@ -24,6 +25,35 @@ class ExtensionRemovalTest(unittest.TestCase):
             'AiDiy.AiDiy-Code@0.1.0', 'aidiy.aidiy-code', 'other.aidiy-future',
             'aidiy-tools.other', 'other.my-aidiy-code', 'other.aidiycode', 'aidiy-code',
         }), ['aidiy.aidiy-code', 'other.aidiy-future'])
+
+    def test_code_and_live_use_the_same_workspace_extension_host(self):
+        for package in (ROOT / 'package.json', ROOT / 'aidiy_live/package.json'):
+            with self.subTest(package=package):
+                manifest = json.loads(package.read_text(encoding='utf-8'))
+                self.assertEqual(manifest['extensionKind'], ['workspace'])
+
+    def test_linux_remote_cli_removes_code_and_live_and_verifies_both(self):
+        cli = '/vscode/server/bin/remote-cli/code'
+        with patch.object(cleanup.sys, 'platform', 'linux'), patch.object(
+            cleanup, 'find_vscode_cli', return_value=cli
+        ), patch.object(cleanup, 'get_installed_extensions', side_effect=[
+            {'aidiy.aidiy-code', 'aidiy.aidiy-live', 'other.tool'}, {'other.tool'},
+        ]) as listing, patch.object(cleanup.subprocess, 'run') as command, patch.object(cleanup, 'print_info') as info:
+            self.assertEqual(cleanup.uninstall_extension(), (True, 2))
+        self.assertEqual([call.args[0] for call in command.call_args_list], [
+            [cli, '--uninstall-extension', 'aidiy.aidiy-code'],
+            [cli, '--uninstall-extension', 'aidiy.aidiy-live'],
+        ])
+        self.assertEqual([call.args for call in listing.call_args_list], [(cli,), (cli,)])
+        self.assertTrue(any('接続元の旧 AiDiy (Live)' in call.args[0] for call in info.call_args_list))
+
+    def test_live_remaining_on_linux_is_reported_as_a_failure(self):
+        with patch.object(cleanup.sys, 'platform', 'linux'), patch.object(
+            cleanup, 'find_vscode_cli', return_value='/vscode/server/bin/remote-cli/code'
+        ), patch.object(cleanup, 'get_installed_extensions', side_effect=[
+            {'aidiy.aidiy-code', 'aidiy.aidiy-live'}, {'aidiy.aidiy-live'},
+        ]), patch.object(cleanup.subprocess, 'run'):
+            self.assertEqual(cleanup.uninstall_extension(), (False, 0))
 
     def test_failed_list_does_not_attempt_removal(self):
         uninstall = Mock()

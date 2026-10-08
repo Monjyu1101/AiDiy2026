@@ -34,6 +34,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 最終作業URI?: vscode.Uri;
   private connection?: CodeConnection;
   private 接続フォルダ = '';
+  private 自動接続 = true;
   private readonly ログ = vscode.window.createOutputChannel('AiDiy (Code)');
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -113,6 +114,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       type: 'state', ...this.会話, 会話ID: this.会話ID, 添付: this.添付?.名前, 実行中: this.実行中, 進捗: this.進捗,
       ...(this.オフライン使用() ? this.オフラインモデル : {}),
       オフライン対応: true, 実行モード: this.オフライン使用() ? 'offline' : 'online',
+      自動接続: this.自動接続,
       履歴: this.履歴.filter(item => item.作業URI === folder?.uri.toString())
         .sort((a, b) => b.更新日時 - a.更新日時)
         .map(item => ({ id: item.id, 題名: this.題名(item), 更新日時: item.更新日時 })),
@@ -163,8 +165,13 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     const data = message as Record<string, unknown>;
     switch (data.メッセージ識別 ?? data.type) {
       case 'ready': this.接続更新(); this.通知(); break;
-      case 'connect': this.信頼確認(); this.接続更新(true); break;
-      case 'disconnect': this.connection?.disconnect(); break;
+      case 'autoConnect':
+        if (typeof data.enabled !== 'boolean') throw new Error('自動接続の指定が不正です。');
+        if (this.実行中 || this.オフラインジョブ || this.connection?.modelChanging) throw new Error('実行中またはモデル変更中は自動接続を変更できません。');
+        if (data.enabled) this.信頼確認();
+        this.自動接続 = data.enabled; this.接続更新(true); this.通知(); break;
+      case 'connect': this.信頼確認(); this.自動接続 = true; this.接続更新(true); break;
+      case 'disconnect': this.自動接続 = false; this.接続更新(); this.通知(); break;
       case 'input_text':
       case 'input_request':
         if (typeof data.メッセージ内容 === 'string') {
@@ -194,7 +201,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 
   private 接続更新(force = false): void {
     const folder = this.現在フォルダ();
-    if (!vscode.workspace.isTrusted || !folder || this.破棄済み) { this.connection?.disconnect(); return; }
+    if (!this.自動接続 || !vscode.workspace.isTrusted || !folder || this.破棄済み) { this.connection?.disconnect(); this.接続フォルダ = ''; return; }
     if (!this.connection) this.connection = new CodeConnection(
       ローカル接続先(this.context.extensionPath, folder.uri.fsPath), packet => {
         if (!this.オフラインジョブ) this.パケット受信(packet);

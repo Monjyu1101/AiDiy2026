@@ -46,6 +46,56 @@ async function connect(app) {
 function post(app, data, origin = new URL(app.url).origin) {
   return fetch(app.url+'message',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)});
 }
+test('Code: 自動接続OFFは再試行・新規・履歴復帰からの接続を止め、ONで再開し再起動はON', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
+  const file = join(preferences, 'auto-connect.json');
+  let app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {}, file), stream = await connect(app);
+  try {
+    const ready = await stream.wait(p=>p.type==='state' && p.接続済み);
+    assert.equal(ready.自動接続,true);
+    assert.equal((await post(app,{type:'autoConnect',enabled:'false'})).status,400);
+    backend.hold=true;
+    await post(app,{メッセージ識別:'input_text',メッセージ内容:'接続切替前'});
+    assert.equal((await post(app,{type:'autoConnect',enabled:false})).status,409);
+    await post(app,{メッセージ識別:'cancel_run'});backend.hold=false;
+    await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.length>0);
+    // 通信切断で予約された5秒後の再試行もOFFでキャンセルする。
+    backend.sockets.at(-1).close();
+    assert.equal((await post(app,{type:'autoConnect',enabled:false})).status,200);
+    const off = await stream.wait(p=>p.type==='state' && p.自動接続===false);
+    assert.equal(off.接続済み,false);assert.equal(off.接続中,false);assert.equal(off.接続エラー,'');
+    const socketCount = backend.sockets.length, requestCount = backend.requests.length;
+    await post(app,{type:'new'});
+    await post(app,{type:'selectHistory',id:ready.会話ID});
+    await pause(5100);
+    assert.equal(backend.sockets.length,socketCount);assert.equal(backend.requests.length,requestCount);
+    assert.ok(backend.sockets.every(socket=>socket.readyState===3));
+    assert.equal((await post(app,{type:'autoConnect',enabled:true})).status,200);
+    await stream.wait(p=>p.type==='state' && p.自動接続 && p.接続済み && backend.sockets.length>socketCount);
+    assert.equal(backend.sockets.at(-1).session,ready.セッションID);
+    await post(app,{type:'autoConnect',enabled:false});
+  } finally { await stream.close(); await app.close(); }
+  app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {}, file);stream = await connect(app);
+  try {
+    const restarted = await stream.wait(p=>p.type==='state' && p.接続済み);
+    assert.equal(restarted.自動接続,true);
+  } finally { await stream.close(); await app.close(); }
+});
+test('Code: --offline 起動から自動接続ONで新規オンライン会話へ切り替える', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
+  const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {offline:true}), stream = await connect(app);
+  try {
+    const offline = await stream.wait(p=>p.type==='state');
+    assert.equal(offline.自動接続,false);assert.equal(backend.sockets.length,0);
+    assert.equal((await post(app,{type:'autoConnect',enabled:true})).status,200);
+    const online = await stream.wait(p=>p.type==='state' && p.接続済み);
+    assert.equal(online.自動接続,true);assert.equal(online.実行モード,'online');
+    assert.notEqual(online.会話ID,offline.会話ID);
+    assert.equal(backend.sockets[0].sent[0].セッションID,null);
+    assert.equal(backend.sockets[1].sent[0].セッションID,online.セッションID);
+  } finally { await stream.close(); await app.close(); }
+});
+
 test('Code: AIコアのモデル候補・選択値・送信と停止を中継する', async t => {
   const backend = require('./fake-core.cjs').core(); backend.install(t);
   const file = join(preferences, 'remember.json');

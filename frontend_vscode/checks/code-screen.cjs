@@ -8,7 +8,7 @@ function screen(postMessage = () => {}) {
   const runtime = scrollRuntime(), nodes = new Map(), events = new Map(), posts = [];
   function element(id = '') {
     if (nodes.has(id)) return nodes.get(id);
-    const classes = new Set();
+    const classes = new Set(), attributes = new Map();
     const node = {
       value: '', textContent: '', hidden: false, children: [], listeners: new Map(),
       scrollHeight: 1000, clientHeight: 300, scrollTop: 0,
@@ -17,7 +17,7 @@ function screen(postMessage = () => {}) {
         toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name) },
       addEventListener(name, callback) { this.listeners.set(name, callback); },
       querySelector() { return element('activity-dot'); },
-      setAttribute() {}, focus() {}, setSelectionRange() {},
+      setAttribute(name, value) { attributes.set(name, value); }, getAttribute(name) { return attributes.get(name); }, focus() {}, setSelectionRange() {},
       append(...children) { this.children.push(...children); },
       add(child) { this.children.push(child); },
       replaceChildren(...children) { this.children = children; },

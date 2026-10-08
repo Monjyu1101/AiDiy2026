@@ -114,7 +114,7 @@ Electron は VSIX 生成・単独画面コンパイルより前に `scripts/setu
 
 ## 変更後の検証
 
-`aidiy_code` 単独起動版とVS Code拡張は未接続中の送信を自動的にHermesへ渡す。拡張の `src/extension.ts` も `aidiy_code/src/offline.ts` の固定候補・既定値探索・実行処理を共用する。表示用のprovider/modelだけを接続状態で切り替え、会話内のオンラインモデルへオフライン選択を代入しない。通常起動では5秒ごとの再接続を継続し、復帰時も実行中のHermesジョブを維持する。AIコアとHermesのセッションID・保存モデルは分離し、次の送信からAIコアへ戻す。画面の `executionMode` または `--offline` で明示したオフラインは再接続しない。画面に専用のオフライン表示・モードボタンは設けない。`aidiy_code/src/offline.ts` は既存の `runner.ts` / `protocol.ts` を使ってHermesを直接実行し、AIコア・バックアップ・検証ループは呼ばない。コードAIは `aidiy_hermes` に限定し、モデルIDはオンラインのHermesと同じ形式を使う。オンライン用の `aidiy_code_model.json` はそのまま保持し、オフライン用を `aidiy_code_model_offline.json` に別保存する。両ファイルを拡張・単独版で共用し、未接続のモデル変更はオフライン用ファイルだけへ保存する。Hermesの再開IDは `HermesセッションID` に保持し、`コアセッションID` と混在させない。オフラインのコードAI欄は `aidiy_hermes` 固定・変更不可とし、モデル候補は `auto` と同梱の `_hermes_cli.bat` の選択値（`codex_cli/auto`、`copilot_cli/auto`、`openai_oauth/` 付きの4モデル）だけにする。既定値・保存値から候補を追加しない。候補外の保存値は共通設定の既定値へ戻し、既定値も候補外なら `auto` を使う。bat未配置でも同じ固定候補を使う。モデルAPIへの接続・モデルIDの手入力は不要。単独版の初期モデルは明示した起動引数、モード別の保存値、`_config/AiDiy_key.json` の `CODE_AIDIY_HERMES_MODEL` の順に優先し、共通設定が未配置・未指定の場合だけ `auto` を使う。既定値は配置先、作業フォルダの順で親へ探索し、AIコア接続前から表示する。候補外の起動引数・モデル変更要求は拒否する。
+`aidiy_code` 単独起動版とVS Code拡張は未接続中の送信を自動的にHermesへ渡す。拡張の `src/extension.ts` も `aidiy_code/src/offline.ts` の固定候補・既定値探索・実行処理を共用する。表示用のprovider/modelだけを接続状態で切り替え、会話内のオンラインモデルへオフライン選択を代入しない。通常起動は自動接続ONを既定とし、5秒ごとの再接続を継続する。プロジェクトバー右側の「自動接続」「新規」「一覧」のスイッチでOFFにすると接続・再試行を止め、新規・履歴復帰・ready通知でも再開しない。ONへ戻すと接続を再開し、OFFの選択は次回起動へ保存しない。実行中・モデル変更中の切り替えはUIとホスト側の両方で拒否する。バーはONの未接続で黒、接続済みで従来のシアン明滅、OFFで赤の明滅にする。復帰時も実行中のHermesジョブを維持する。AIコアとHermesのセッションID・保存モデルは分離し、次の送信からAIコアへ戻す。`executionMode` または `--offline` で明示したオフラインは自動接続OFFにし、再接続しない。この場合にスイッチをONへ戻すと新しいオンライン会話へ切り替え、HermesセッションIDをAIコアへ渡さない。明示オフラインの履歴復帰でもOFFへ切り替える。画面に専用のオフライン表示・モードボタンは設けない。`aidiy_code/src/offline.ts` は既存の `runner.ts` / `protocol.ts` を使ってHermesを直接実行し、AIコア・バックアップ・検証ループは呼ばない。コードAIは `aidiy_hermes` に限定し、モデルIDはオンラインのHermesと同じ形式を使う。オンライン用の `aidiy_code_model.json` はそのまま保持し、オフライン用を `aidiy_code_model_offline.json` に別保存する。両ファイルを拡張・単独版で共用し、未接続のモデル変更はオフライン用ファイルだけへ保存する。Hermesの再開IDは `HermesセッションID` に保持し、`コアセッションID` と混在させない。オフラインのコードAI欄は `aidiy_hermes` 固定・変更不可とし、モデル候補は `auto` と同梱の `_hermes_cli.bat` の選択値（`codex_cli/auto`、`copilot_cli/auto`、`openai_oauth/` 付きの4モデル）だけにする。既定値・保存値から候補を追加しない。候補外の保存値は共通設定の既定値へ戻し、既定値も候補外なら `auto` を使う。bat未配置でも同じ固定候補を使う。モデルAPIへの接続・モデルIDの手入力は不要。単独版の初期モデルは明示した起動引数、モード別の保存値、`_config/AiDiy_key.json` の `CODE_AIDIY_HERMES_MODEL` の順に優先し、共通設定が未配置・未指定の場合だけ `auto` を使う。既定値は配置先、作業フォルダの順で親へ探索し、AIコア接続前から表示する。候補外の起動引数・モデル変更要求は拒否する。
 
 モード変更は実行中に拒否する。切り替え後は新規会話とし、一覧の各会話に実行モードを保持してAIコアのセッションIDをHermesへ渡さない。CLIジョブ終了前のモード変更・新規・モデル変更も拒否し、停止／サーバー終了では子プロセスを停止する。明示オフラインへオンライン接続の遅延通知を反映しない。自動オフラインでは再接続通知で実行中フラグを解除せず、停止を進行中のHermesジョブへ渡す。共通Webviewは `オフライン対応` が真の単独版・拡張で未接続時のHermes送信を許可し、オフライン中は検証0固定、オンライン復帰時は直前の検証回数へ戻す。
 
@@ -141,7 +141,7 @@ python -m unittest discover -s checks -p "test_*.py"
 - 非ゼロ終了、起動エラー、停止、タイムアウトを呼び出し元へ返せる。
 - Windows の AiDiy `.cmd` をシェルなしで解決できる。
 - packet が開始、進捗、終了または中断、正式回答の順になる。
-- Code の両init前・切断中のHermes実行と検証0固定、オンライン／オフライン別のモデル保存・再起動後の復元、Hermes実行中の再接続と完了後のオンライン復帰、5秒間隔の再接続、遅延イベント無視、モデルAPIのNG、破棄を確認する。接続済みで送信・停止・履歴復帰・CLI別モデル候補が動く。
+- Code の両init前・切断中のHermes実行と検証0固定、オンライン／オフライン別のモデル保存・再起動後の復元、Hermes実行中の再接続と完了後のオンライン復帰、5秒間隔の再接続、自動接続OFFによる予約済み再試行の中止と新規・履歴復帰からの接続抑止、ONへの復帰と起動時ON、遅延イベント無視、モデルAPIのNG、破棄を確認する。接続済みで送信・停止・履歴復帰・CLI別モデル候補が動く。
 - VS Code 側で旧 `workspaceState` の単一会話を履歴へ移行でき、作業フォルダごとに履歴が分かれる。最終選択モデルが再起動後と新規会話へ引き継がれる。
 - `dist/aidiy-code-<version>.vsix` と `dist/aidiy-live-<version>.vsix` が生成され、それぞれのファイルだけを含む。
 - Live のセッション・音声パケット・WebSocket 中継・モデル API・切断・Origin 拒否を模擬バックエンドで確認できる。VS Code / 単独画面の両方で会話表示と末尾追従が動き、単独画面では起動時のモデル指定で1回だけ自動接続する。拡張ではタブを切り替えても接続を保持し、非表示中はマイクを止める。
@@ -156,7 +156,7 @@ Windows の実 VS Code で拡張ホストまで確認するときは、依存導
 
 通常の VS Code プロファイルへ配置する確認は `_setup.py` を使う。試用ホストの `out/manual-profile` と混同しない。
 
-Codespaces で Code だけが配置され、Live のインストール時に「このセットアップでは実行されないように宣言されている」と表示される場合は、Live の `package.json` の `extensionKind` と VSIX 内の同じ設定を確認する。`["ui"]` だけではブラウザ版 Codespaces に必要なリモート拡張ホストで実行できないため、`["ui", "workspace"]` とする。`npm run package` で VSIX を再生成し、`python frontend_vscode/_setup.py --extensions-only` で配置して、Code / Live の両 ID が拡張一覧にあることを確認する。Live のマイクは Windows のローカルホスト用であり、Codespaces では単独ブラウザ版を使用する。
+Code / Live はどちらも `package.json` の `extensionKind` を `["workspace"]` とし、配置・解除の対象環境を揃える。Remote SSH / WSL / Codespaces では接続先の拡張ホストで動かす。旧版の Live の `["ui", "workspace"]` は接続元を優先するため、Windows 側に配置された Live を Linux の Remote CLI で解除できない。既存の接続元 Live は接続元の拡張機能一覧、または `code --uninstall-extension aidiy.aidiy-live` で一度解除する。`npm run package` で VSIX を再生成し、`python frontend_vscode/_setup.py --extensions-only` で接続先に配置して、Code / Live の両 ID が同じ拡張一覧にあることを確認する。Live の WinMM マイクは Windows の拡張ホスト用であり、Linux の拡張ホストでは単独ブラウザ版を使用する。Linux の cleanup は接続先で両 ID の解除と解除後の一覧を確認し、Live が残れば失敗にする。Remote CLI では接続元の旧 Live を確認できないことも表示する。
 
 Code / Live の単独起動では、Electron の引数をエントリファイルだけにする。Chromium が追加のファイル引数を解釈して異常終了する場合があるため、起動設定は子プロセスの環境変数で渡す。Code は `AIDIY_CODE_PROJECT` / `AIDIY_CODE_READY` / `AIDIY_CODE_MODEL`、Live は `AIDIY_LIVE_BACKEND` / `AIDIY_LIVE_READY` / `AIDIY_LIVE_PROJECT` / `AIDIY_LIVE_MODELS` を使う。表示後の `windowShown: true` 通知は維持する。Code のブラウザ版は Node.js の引数で従来どおり渡す。
 

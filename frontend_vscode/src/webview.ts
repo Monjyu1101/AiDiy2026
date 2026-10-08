@@ -14,6 +14,7 @@ let オンライン検証回数 = '1';
 const 初期起動画面 = element('welcome').cloneNode(true);
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
+const 自動接続スイッチ = element<HTMLButtonElement>('auto-connect');
 const historyList = element<HTMLElement>('history-list');
 const newChat = element<HTMLButtonElement>('new-chat');
 const historyToggle = element<HTMLButtonElement>('history-toggle');
@@ -42,6 +43,7 @@ const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 // 外部画像の読み込みやコマンド URI の実行を回答から発生させない。
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 let 実行中 = false, 送信待ち = false, 入力許可 = false, 接続済み = false;
+let 自動接続 = true;
 let メッセージJSON = '';
 let 履歴JSON = '';
 let 会話ID = '';
@@ -170,6 +172,9 @@ prompt.addEventListener('keydown', event => {
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
 modelButton.addEventListener('click', モデル選択を開く);
 historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
+自動接続スイッチ.addEventListener('click', () => {
+  if (!自動接続スイッチ.disabled) post('autoConnect', { enabled: !自動接続 });
+});
 newChat.addEventListener('click', () => {
   if (newChat.disabled) return;
   post('new');
@@ -293,6 +298,11 @@ window.addEventListener('message', event => {
   element('model-picker-description').textContent = オフライン ? 'aidiy_hermes を直接実行します。オンラインとは別のモデルを保存します。' : 'AIコアのコードAIを選択します。';
   送信待ち = false; 実行中 = state.実行中;
   接続済み = state.接続済み === true;
+  自動接続 = state.自動接続 !== false;
+  自動接続スイッチ.setAttribute('aria-checked', String(自動接続));
+  自動接続スイッチ.title = `自動接続 ${自動接続 ? 'ON' : 'OFF'}`;
+  自動接続スイッチ.disabled = 実行中 || 送信待ち || state.モデル変更中 || !state.信頼済み;
+  element('chat-header').classList.toggle('auto-connect-off', !自動接続);
   入力許可 = state.信頼済み && (オフライン || 接続済み) && !state.モデル変更中 && Boolean(state.作業フォルダ);
   element('welcome').hidden = state.メッセージ.length > 0;
   実行表示更新(実行中 && (オフライン || state.接続済み !== false));

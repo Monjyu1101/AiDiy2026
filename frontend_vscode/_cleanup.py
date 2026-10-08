@@ -268,6 +268,11 @@ def uninstall_extension() -> tuple[bool, int]:
         print_warning("vscode CLI (code) が見つからないため、拡張機能の解除を確認できません。")
         return False, 0
 
+    remote_cli = Path(vscode_cli).parent.name == "remote-cli"
+    if remote_cli:
+        print_info("Remote CLI で接続先の AiDiy (Code) / AiDiy (Live) を解除します。")
+        print_info("接続元の旧 AiDiy (Live) は確認できません。残っている場合は接続元で code --uninstall-extension aidiy.aidiy-live を実行してください。")
+
     try:
         def uninstall(name):
             print_info(f"実行中: {vscode_cli} --uninstall-extension {name}")
