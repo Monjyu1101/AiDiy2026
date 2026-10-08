@@ -98,10 +98,16 @@ body.live-view #monitor{display:flex}
 .feature-switch[aria-checked=true] .switch-track{border-color:#69dcff;background:color-mix(in srgb,#69dcff 25%,#000)}
 .feature-switch[aria-checked=true] .switch-knob{left:16px;background:#69dcff}
 .feature-switch:disabled{opacity:.6}
-/* 接続中の左上: Live ON/OFF  Code ON/OFF */
-#features{display:none;gap:6px;margin-left:6px;white-space:nowrap}
+/* 接続中: プロジェクト行の下に、機能ごとの状態チップを並べる。ON は水色に発光、OFF は消灯。 */
+#features{display:none;justify-content:flex-end;gap:5px;padding:3px 4px;background:#000}
 body.live-view #features{display:flex}
-#features b{font-weight:400;color:#69dcff}
-#features .off b{color:#7d89a4}
+.feature-chip{display:inline-flex;align-items:center;gap:4px;padding:0 6px 0 5px;border:1px solid #69dcff80;border-radius:999px;background:color-mix(in srgb,#69dcff 8%,#000);color:#e3e9f2;font-size:9px;line-height:1.5;letter-spacing:.8px;box-shadow:0 0 8px #69dcff30,inset 0 0 6px #69dcff18;transition:border-color .3s,box-shadow .3s,color .3s}
+.feature-chip i{width:4px;height:4px;border-radius:50%;background:#69dcff;box-shadow:0 0 4px #69dcff,0 0 8px #69dcff80;animation:chip-pulse 2.4s ease-in-out infinite}
+.feature-chip em{font-style:normal;font-weight:600}
+.feature-chip b{font-weight:600;color:#69dcff;text-shadow:0 0 8px #69dcff80}
+.feature-chip.off{border-color:#2c3342;background:#000;color:#5f6b82;box-shadow:none}
+.feature-chip.off i{background:#3a4152;box-shadow:none;animation:none}
+.feature-chip.off b{color:#5f6b82;text-shadow:none}
+@keyframes chip-pulse{0%,100%{opacity:1}50%{opacity:.45}}
 /* Live OFF の間は音声インジケーター・モニターを出さない。 */
 body.live-off #audio-cloud,body.live-off #monitor{display:none!important}
