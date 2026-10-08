@@ -36,7 +36,7 @@ let catalogProvider = '';
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 // 外部画像の読み込みやコマンド URI の実行を回答から発生させない。
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
-let 実行中 = false, 送信待ち = false, 入力許可 = false;
+let 実行中 = false, 送信待ち = false, 入力許可 = false, 接続済み = false;
 let メッセージJSON = '';
 let 履歴JSON = '';
 let 会話ID = '';
@@ -133,9 +133,9 @@ const 候補取得 = (targetProvider: string) => {
   post('chooseModel', { provider: targetProvider });
 };
 const 自動選択表示 = () => {
-  modelSelect.replaceChildren(new Option('CLI の設定を使用', ''));
+  modelSelect.replaceChildren(new Option('AIコアの設定を使用', ''));
   modelSelect.disabled = true;
-  modelPickerStatus.textContent = 'プロバイダとモデルは CLI の設定に任せます。';
+  modelPickerStatus.textContent = 'コードAIとモデルは AIコアの設定を使います。';
   applyModel.disabled = false;
   customModel.hidden = customModelLabel.hidden = true;
 };
@@ -163,6 +163,7 @@ prompt.addEventListener('keydown', event => {
   send.focus();
 });
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
+element('connect-toggle').addEventListener('click', () => post(接続済み ? 'disconnect' : 'connect'));
 modelButton.addEventListener('click', モデル選択を開く);
 historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
 newChat.addEventListener('click', () => {
@@ -207,7 +208,7 @@ window.addEventListener('message', event => {
       return typeof row.id === 'string' && typeof row.label === 'string';
     }) : [];
     if (!state.provider) {
-      providerSelect.replaceChildren(new Option('自動（CLI の設定）', ''), ...rows.map(item => new Option(item.label, item.id)));
+      providerSelect.replaceChildren(new Option('自動（AIコアの設定）', ''), ...rows.map(item => new Option(item.label, item.id)));
       providerSelect.value = provider;
       if (providerSelect.selectedIndex < 0) providerSelect.selectedIndex = 0;
       providerSelect.disabled = false;
@@ -273,12 +274,19 @@ window.addEventListener('message', event => {
   }
   会話ID = state.会話ID;
   送信待ち = false; 実行中 = state.実行中;
-  入力許可 = state.信頼済み && state.接続済み !== false && Boolean(state.作業フォルダ);
+  接続済み = state.接続済み === true;
+  入力許可 = state.信頼済み && 接続済み && !state.モデル変更中 && Boolean(state.作業フォルダ);
   element('welcome').hidden = state.メッセージ.length > 0;
   実行表示更新(実行中 && state.接続済み !== false);
   element('activity').classList.toggle('unavailable', !入力許可);
-  element('activity-label').textContent = !入力許可 ? '待機中' : 実行中 ? '実行中' : '準備完了';
-  newChat.disabled = 実行中 || !state.信頼済み || state.接続済み === false || (!state.作業フォルダ && !state.新規可能);
+  element('activity').classList.toggle('connected', 接続済み);
+  element('activity-label').textContent = 接続済み ? '接続中' : '未接続';
+  const dot = element('activity').querySelector('.activity-dot');
+  if (dot) dot.textContent = 接続済み ? '●' : '〇';
+  const connectToggle = element<HTMLButtonElement>('connect-toggle');
+  connectToggle.textContent = 接続済み ? '切断' : '接続';
+  connectToggle.disabled = !state.信頼済み || !state.作業フォルダ;
+  newChat.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || state.接続済み === false || (!state.作業フォルダ && !state.新規可能);
   const projectName = String(state.作業フォルダ?.名前 ?? '');
   projectFolder.textContent = 末尾省略(projectName);
   projectFolder.title = projectName;
@@ -287,17 +295,18 @@ window.addEventListener('message', event => {
   const historyJSON = JSON.stringify([history, 会話ID, 実行中]);
   if (historyJSON !== 履歴JSON) { 履歴表示(history); 履歴JSON = historyJSON; }
   provider = state.provider; model = state.model;
-  const label = `${provider || '自動'} / ${model || (provider ? '既定モデル' : 'CLI の設定')}`;
+  const label = `${provider || '自動'} / ${model || (provider ? '既定モデル' : 'AIコアの設定')}`;
   const modelLabel = element('model-label');
   modelLabel.textContent = label;
   modelLabel.title = label;
-  modelButton.title = 'プロバイダとモデルを選択';
-  modelButton.disabled = 実行中 || !入力許可;
+  modelButton.title = 'コードAIとモデルを選択';
+  modelButton.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || !state.作業フォルダ;
   element<HTMLButtonElement>('remove-attachment').disabled = 実行中;
   element('stop').hidden = !実行中;
+  element<HTMLButtonElement>('stop').disabled = !接続済み;
   element('send').hidden = 実行中;
   const status = element('status');
-  status.textContent = state.接続済み === false ? '接続が切れました。再接続しています…' : !state.信頼済み ? 'VS Code でワークスペースを信頼してください' : !state.作業フォルダ ? (state.作業URI ? '新規の会話を開始してください' : '作業フォルダを開いてください') : '';
+  status.textContent = state.接続エラー || (!state.信頼済み ? 'VS Code でワークスペースを信頼してください' : !state.作業フォルダ ? (state.作業URI ? '新規の会話を開始してください' : '作業フォルダを開いてください') : '');
   status.hidden = !status.textContent;
   element('attachment').hidden = !state.添付;
   element('attachment-name').textContent = state.添付 ?? '';

@@ -2,25 +2,25 @@ import { createServer, type ServerResponse } from 'node:http';
 import { readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { CLI実行, 会話引数, 起動解決, type 起動設定 } from '../../src/runner';
-import { コード要求実行, streamControlOf, visibleStreamContent } from '../../src/protocol';
+import { CodeConnection, コード選択 } from '../../src/code-connection';
+import { ローカル接続先 } from '../../aidiy_live/local-backend.cjs';
+import { streamControlOf, visibleStreamContent } from '../../src/protocol';
 import { コードモデル読込, コードモデル保存, モデル保存先 } from '../../src/model-preferences';
 import { 接続元許可 } from '../../src/forwarded-origin';
 
-// 単独試用も拡張と同じ CLI・メッセージ形式・描画を使う。
-export async function 単独起動(project: string, launch?: 起動設定, initialModel: { provider?: string; model?: string } = {}, modelFile = モデル保存先('code')) {
+// 単独画面と拡張で AIコア接続・メッセージ形式・描画を共用する。
+export async function 単独起動(project: string, backend?: string, initialModel: { provider?: string; model?: string } = {}, modelFile = モデル保存先('code')) {
   const root = resolve(__dirname, '../..');
   const folder = resolve(project);
   if (!statSync(folder).isDirectory()) throw new Error('作業フォルダがありません。');
-  const defaults = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).contributes.configuration.properties;
   const savedModel = コードモデル読込(modelFile);
   const requestedProvider = initialModel.provider?.trim(), requestedModel = initialModel.model?.trim();
   const remembered = !requestedModel && (!requestedProvider || requestedProvider === savedModel?.provider) ? savedModel : undefined;
   const state = {
     type: 'state', 会話ID: randomUUID() as string, 作業URI: folder, 信頼済み: true,
     作業フォルダ: { 名前: basename(folder), パス: folder },
-    provider: remembered?.provider ?? (requestedProvider || String(defaults['aidiyHermes.provider'].default)),
-    model: remembered?.model ?? (requestedModel || (requestedProvider ? 'auto' : String(defaults['aidiyHermes.model'].default))),
+    ...コード選択({ provider: remembered?.provider ?? requestedProvider ?? '', model: remembered?.model ?? requestedModel ?? '' }),
+    接続済み: false, 接続エラー: '', モデル変更中: false,
     メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false,
     セッションID: undefined as string | undefined,
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
@@ -29,8 +29,8 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
   let history: 保存会話[] = [];
   let lastModel = { provider: state.provider, model: state.model };
   const clients = new Set<ServerResponse>();
-  let job: ReturnType<typeof コード要求実行> | undefined;
-  const catalogJobs = new Set<ReturnType<typeof CLI実行>>();
+  let 接続開始済み = false;
+  let closed = false;
   const token = randomBytes(24).toString('hex');
   const prefix = `/${token}/`;
   let origin = '';
@@ -52,33 +52,37 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
     let size = 0;
     state.メッセージ = state.メッセージ.slice(-60).reverse().filter(item => (size += item.本文.length) <= 2_000_000).reverse();
   };
-  const execute = async (text: string) => {
+  const connection = new CodeConnection(backend || ローカル接続先(root, folder), packet => {
+    broadcast(packet);
+    const text = typeof packet.メッセージ内容 === 'string' ? packet.メッセージ内容 : '';
+    if (packet.メッセージ識別 === 'output_stream') {
+      const control = streamControlOf(text);
+      if (control === 'start') state.実行中 = true;
+      else if (control === 'cancel') state.実行中 = false;
+      else if (!control && text) state.進捗 = [...state.進捗, visibleStreamContent(text).slice(0, 4000)].slice(-100);
+    } else if (packet.メッセージ識別 === 'output_text' || packet.メッセージ識別 === 'output') {
+      if (text) state.メッセージ.push({ 種別: 'assistant', 本文: text });
+      state.実行中 = false;
+    } else if (['error', 'cancel_run', 'output_end'].includes(packet.メッセージ識別 || '')) {
+      if (text) state.メッセージ.push({ 種別: 'error', 本文: text });
+      state.実行中 = false;
+    } else return;
+    trimHistory(); save(); notify();
+  }, () => {
+    state.モデル変更中 = connection.modelChanging;
+    state.接続済み = connection.connected; state.接続エラー = connection.error;
+    if (connection.connected) {
+      state.セッションID = connection.session;
+      state.provider = connection.model.provider; state.model = connection.model.model;
+    } else state.実行中 = false;
+    notify();
+  });
+  const reconnect = () => connection.start(folder, { provider: state.provider, model: state.model }, state.セッションID, state.メッセージ);
+  const execute = (text: string) => {
+    if (!connection.send({ メッセージ識別: 'input_text', メッセージ内容: text })) throw new Error('AIコアが未接続のため送信できません。');
     state.実行中 = true; state.進捗 = [];
     state.メッセージ.push({ 種別: 'user', 本文: text }); trimHistory();
     save(); broadcast({type:'accepted'}); notify();
-    try {
-      const 再開ID = state.セッションID;
-      job = コード要求実行({ セッションID: state.会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: text }, {
-        起動: launch ?? 起動解決('aidiy_hermes', '', folder), 作業フォルダ: folder,
-        引数: 会話引数(state.provider, state.model, 30, 再開ID), 制限時間: 900_000
-      }, packet => {
-        broadcast(packet);
-        if (packet.メッセージ識別 === 'output_stream') {
-          if (streamControlOf(packet.メッセージ内容)) return;
-          const line = visibleStreamContent(packet.メッセージ内容);
-          if (!line) return;
-          state.進捗 = [...state.進捗, line.slice(0, 4000)].slice(-100); notify();
-        }
-      }, 再開ID);
-      const result = await job.完了;
-      if (result.セッション復旧) state.セッションID = undefined;
-      if (result.終了コード === 0 && result.セッションID) state.セッションID = result.セッションID;
-      if (result.回答) state.メッセージ.push({ 種別: 'assistant', 本文: result.回答 });
-      if (result.停止理由 || result.終了コード !== 0 || !result.回答) {
-        state.メッセージ.push({ 種別: 'error', 本文: result.停止理由 || `CLI が回答を完了できませんでした。\n${result.ログ.slice(-3000)}` });
-      }
-    } catch (error) { state.メッセージ.push({ 種別: 'error', 本文: String(error) }); }
-    finally { state.実行中 = false; job = undefined; trimHistory(); save(); notify(); }
   };
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -95,6 +99,7 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
         clearTimeout(idle);
         res.writeHead(200, {'Content-Type':'text/event-stream', Connection:'keep-alive'});
         clients.add(res); res.write(`data: ${JSON.stringify(state)}\n\n`);
+        if (!接続開始済み) { 接続開始済み = true; reconnect(); }
         const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
         res.on('close', () => {
           clearInterval(heartbeat); clients.delete(res);
@@ -105,15 +110,8 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
       if (req.method === 'GET' && route === 'catalog') {
         const provider = url.searchParams.get('provider') ?? '';
         if (provider.length > 200) { reply(400, {error:'Provider too long'}); return; }
-        const cli = launch ?? 起動解決('aidiy_hermes', '', folder);
-        if (!cli.引数[0]?.endsWith('.py')) throw new Error('候補取得には AiDiy の CLI が必要です。');
-        const task = CLI実行({ 起動: {実行ファイル:cli.実行ファイル, 引数:[join(root,'scripts/model-catalog.py'),cli.引数[0],provider]}, 作業フォルダ:folder, 本文:'', 引数:[], 制限時間:30000 });
-        catalogJobs.add(task);
-        try {
-          const result = await task.完了;
-          if (result.終了コード !== 0) throw new Error('モデル候補を取得できません。');
-          reply(200, JSON.parse(result.回答)); return;
-        } finally { catalogJobs.delete(task); }
+        const items = await connection.catalog(provider);
+        reply(200, provider ? { models: items } : { providers: items }); return;
       }
       if (req.method === 'POST' && route === 'message') {
         if (!allowed.origin(req.headers.origin) || !req.headers['content-type']?.startsWith('application/json')) { reply(403, {error:'Forbidden'}); return; }
@@ -122,19 +120,24 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
         for await (const chunk of req) { body += chunk.toString(); if (body.length > 1_000_000) { reply(413, {error:'Message too long'}); return; } }
         const data = JSON.parse(body);
         const type = data.メッセージ識別 ?? data.type;
-        if (type === 'cancel_run') job?.停止();
+        if (type === 'cancel_run') {
+          if (!connection.send({ メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' })) { reply(409, {error:'AIコアが未接続です。'}); return; }
+        } else if (type === 'disconnect') connection.disconnect();
+        else if (type === 'connect') { 接続開始済み = true; reconnect(); }
+        else if (connection.modelChanging) { reply(409, {error:'モデルを変更しています。'}); return; }
         else if (state.実行中) { reply(409, {error:'実行中です。'}); return; }
         else if (type === 'input_text') {
           if (typeof data.メッセージ内容 !== 'string' || !data.メッセージ内容.trim() || data.メッセージ内容.length > 200000) { reply(400, {error:'入力が空か長すぎます。'}); return; }
-          void execute(data.メッセージ内容);
+          if (!state.接続済み) { reply(409, {error:'AIコアが未接続のため送信できません。'}); return; }
+          execute(data.メッセージ内容);
         } else if (type === 'new') {
           state.会話ID = randomUUID(); state.メッセージ = []; state.進捗 = []; state.セッションID = undefined;
-          state.provider = lastModel.provider; state.model = lastModel.model; notify();
+          state.provider = lastModel.provider; state.model = lastModel.model; reconnect(); notify();
         } else if (type === 'selectHistory') {
           const entry = history.find(item => item.id === data.id);
           if (!entry) { reply(404, {error:'会話がありません。'}); return; }
           state.会話ID = entry.id; state.メッセージ = [...entry.メッセージ]; state.セッションID = entry.セッションID;
-          state.provider = entry.provider; state.model = entry.model; state.進捗 = []; notify();
+          state.provider = entry.provider; state.model = entry.model; state.進捗 = []; reconnect(); notify();
         } else if (type === 'deleteHistory') {
           const entry = history.find(item => item.id === data.id);
           if (!entry) { reply(404, {error:'会話がありません。'}); return; }
@@ -142,12 +145,14 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
           state.履歴 = state.履歴.filter(item => item.id !== data.id);
           if (state.会話ID === data.id) {
             state.会話ID = randomUUID(); state.メッセージ = []; state.進捗 = []; state.セッションID = undefined;
-            state.provider = lastModel.provider; state.model = lastModel.model;
+            state.provider = lastModel.provider; state.model = lastModel.model; reconnect();
           }
           notify();
         } else if (type === 'model') {
           if (typeof data.provider !== 'string' || typeof data.model !== 'string' || data.provider.length > 200 || data.model.length > 300) { reply(400, {error:'モデル指定が不正です。'}); return; }
-          const selected = コードモデル保存({ provider: data.provider, model: data.model }, modelFile);
+          const selected = コード選択({ provider: data.provider, model: data.model });
+          await connection.setModel(selected);
+          コードモデル保存(selected, modelFile);
           state.provider = selected.provider; state.model = selected.model; lastModel = selected; save(false); notify();
         } else { reply(400, {error:'Unknown message'}); return; }
         reply(200, {ok:true}); return;
@@ -176,7 +181,10 @@ export async function 単独起動(project: string, launch?: 起動設定, initi
     } catch (error) { if (!res.headersSent) reply(500, {error: error instanceof Error ? error.message : '処理に失敗しました。'}); else res.end(); }
   });
   async function close() {
-    clearTimeout(idle); job?.停止(); for (const task of catalogJobs) task.停止();
+    if (closed) return; closed = true;
+    clearTimeout(idle);
+    if (state.実行中) connection.send({ メッセージ識別: 'cancel_run' });
+    connection.dispose();
     for (const client of clients) client.end(); clients.clear();
     server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()));
     clearTimeout(idle);

@@ -8,7 +8,6 @@ const preferences = mkdtempSync(join(tmpdir(), 'aidiy-code-model-'));
 after(() => rmSync(preferences, { recursive: true, force: true }));
 let fileNumber = 0;
 const 単独起動 = (project, launch, initial, file = join(preferences, `${++fileNumber}.json`)) => start(project, launch, initial, file);
-const fake = resolve('checks/fake-cli.cjs');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function connect(app) {
   const reader = (await fetch(app.url+'events')).body.getReader();
@@ -34,116 +33,61 @@ async function connect(app) {
 function post(app, data, origin = new URL(app.url).origin) {
   return fetch(app.url+'message',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)});
 }
-test('Code: 手動選択をJSONへ保存し、再起動・別フォルダで復元、起動引数では上書きしない', async () => {
+test('Code: AIコアのモデル候補・選択値・送信と停止を中継し、未接続では送信を拒否する', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
   const file = join(preferences, 'remember.json');
-  const launch = { 実行ファイル: process.execPath, 引数: [fake, 'echo'] };
-  let app = await 単独起動(process.cwd(), launch, {}, file), stream = await connect(app);
+  const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {}, file);
+  const stream = await connect(app);
   try {
-    await stream.wait(p => p.type === 'state');
-    assert.equal((await post(app, { type: 'model', provider: 'freeai', model: '手動-model' })).status, 200);
-    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { provider: 'freeai', model: '手動-model' });
+    const ready = await stream.wait(p => p.type === 'state' && p.接続済み);
+    assert.equal(ready.provider, 'aidiy_hermes'); assert.equal(ready.model, 'openai_oauth/gpt-6.1-sol');
+    assert.deepEqual(backend.sockets.map(socket => socket.channel), ['input', '1']);
+    assert.ok(backend.sockets.every(socket => socket.sent[0].CODE_BASE_PATH === process.cwd()));
+    const providers = await (await fetch(app.url + 'catalog')).json();
+    assert.ok(providers.providers.some(item => item.id === 'copilot_cli'));
+    const hermes = await (await fetch(app.url + 'catalog?provider=aidiy_hermes')).json();
+    assert.ok(hermes.models.some(item => item.id === 'openai_oauth/gpt-6.1-sol'));
+    assert.equal((await fetch(new URL('/events', app.url))).status, 404);
+    assert.equal((await post(app, {type:'new'}, 'https://example.com')).status, 403);
+    await post(app, { type:'model', provider:'copilot_cli', model:'gpt-6-sol' });
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { provider:'copilot_cli', model:'gpt-6-sol' });
+    assert.equal((await post(app, {メッセージ識別:'input_text', メッセージ内容:'日本語で確認'})).status, 200);
+    const completed = await stream.wait(p => p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.種別==='assistant'));
+    const reply = JSON.parse(completed.メッセージ.at(-1).本文);
+    assert.equal(reply.input, '日本語で確認');
+    assert.equal(reply.settings.CODE_AI1_NAME, 'copilot_cli'); assert.equal(reply.settings.CODE_AI1_MODEL, 'gpt-6-sol');
+    assert.ok(completed.進捗.every(line=>!/[\u0002\u0003\u0018]/.test(line)));
+    await post(app, {type:'new'});
+    await stream.wait(p=>p.type==='state' && p.会話ID!==ready.会話ID && p.接続済み);
+    await post(app, {type:'selectHistory', id:ready.会話ID});
+    const reopened = await stream.wait(p=>p.type==='state' && p.会話ID===ready.会話ID && p.接続済み && p.メッセージ.length===2);
+    assert.equal(reopened.セッションID, ready.セッションID);
+    await post(app, {type:'disconnect'});
+    assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:'切断中'})).status,409);
+    await post(app, {type:'connect'});
+    await pause(30);
+    backend.hold = true;
+    await post(app, {メッセージ識別:'input_text',メッセージ内容:'待機'});
+    await stream.wait(p=>p.type==='state' && p.実行中 && p.メッセージ.at(-1)?.本文==='待機');
+    assert.equal((await post(app,{type:'model',provider:'aidiy_hermes',model:'auto'})).status,409);
+    await post(app,{メッセージ識別:'cancel_run'});
+    await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.at(-1)?.本文==='処理中断！');
   } finally { await stream.close(); await app.close(); }
-  for (const [project, initial, provider, model] of [
-    [preferences, {}, 'freeai', '手動-model'],
-    [process.cwd(), { provider: 'freeai' }, 'freeai', '手動-model'],
-    [process.cwd(), { provider: 'copilot-cli' }, 'copilot-cli', 'auto'],
-    [process.cwd(), { provider: 'codex-cli', model: 'explicit' }, 'codex-cli', 'explicit'],
-    [process.cwd(), {}, 'freeai', '手動-model'],
+});
+
+test('Code: 最終選択を復元し、旧Hermes Providerを組み合わせモデルへ移行する', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
+  const file = join(preferences,'migration.json');
+  writeFileSync(file, JSON.stringify({provider:'openai_oauth',model:'gpt-6.1-sol'}));
+  for (const [initial, provider, model] of [
+    [{}, 'aidiy_hermes', 'openai_oauth/gpt-6.1-sol'],
+    [{provider:'copilot-cli',model:'gpt-6-sol'}, 'copilot_cli', 'gpt-6-sol'],
   ]) {
-    app = await 単独起動(project, launch, initial, file); stream = await connect(app);
+    const app = await 単独起動(process.cwd(),'http://127.0.0.1:18091',initial,file), stream = await connect(app);
     try {
-      const state = await stream.wait(p => p.type === 'state');
-      assert.equal(state.provider, provider); assert.equal(state.model, model);
-      assert.equal(JSON.parse(readFileSync(file, 'utf8')).model, '手動-model');
+      const state = await stream.wait(p=>p.type==='state' && p.接続済み);
+      assert.equal(state.provider,provider); assert.equal(state.model,model);
+      assert.equal(JSON.parse(readFileSync(file,'utf8')).provider,'openai_oauth');
     } finally { await stream.close(); await app.close(); }
   }
-  app = await 単独起動(process.cwd(), launch, {}, file); stream = await connect(app);
-  try { await post(app, { type: 'model', provider: '', model: '' }); }
-  finally { await stream.close(); await app.close(); }
-  app = await 単独起動(process.cwd(), launch, {}, file); stream = await connect(app);
-  try {
-    const state = await stream.wait(p => p.type === 'state');
-    assert.equal(state.provider, ''); assert.equal(state.model, '');
-  } finally { await stream.close(); await app.close(); }
-  writeFileSync(file, '{broken', 'utf8');
-  app = await 単独起動(process.cwd(), launch, {}, file); stream = await connect(app);
-  try {
-    const state = await stream.wait(p => p.type === 'state');
-    assert.equal(state.provider, 'openai_oauth'); assert.equal(state.model, 'gpt-6.1-sol');
-    assert.equal(readFileSync(file, 'utf8'), '{broken');
-  } finally { await stream.close(); await app.close(); }
-});
-test('単独画面: 起動時の Provider / モデルを表示・実行・新規会話に反映する', async t => {
-  for (const [provider, model] of [['copilot-cli', 'claude-sonnet-5.5'], ['openai_oauth', 'gpt-6-astra'], ['claude-code', 'auto'], ['codex-cli', 'auto'], ['copilot-cli', 'auto']]) {
-    await t.test(provider, async () => {
-      const app = await 単独起動(process.cwd(), {実行ファイル:process.execPath, 引数:[fake,'echo']}, { provider: ` ${provider} `, model: ` ${model} ` });
-      const stream = await connect(app);
-      try {
-        const initial = await stream.wait(p=>p.type==='state');
-        assert.equal(initial.provider, provider); assert.equal(initial.model, model);
-        await post(app, {メッセージ識別:'input_text', メッセージ内容:'起動時の選択を確認'});
-        const completed = await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.種別==='assistant'));
-        const reply = JSON.parse(completed.メッセージ.find(m=>m.種別==='assistant').本文);
-        assert.equal(reply.args[reply.args.indexOf('--provider')+1], provider);
-        if (model === 'auto') assert.ok(!reply.args.includes('--model'));
-        else assert.equal(reply.args[reply.args.indexOf('--model')+1], model);
-        await post(app, {type:'new'});
-        const reset = await stream.wait(p=>p.type==='state' && p.会話ID!==initial.会話ID);
-        assert.equal(reset.provider, provider); assert.equal(reset.model, model);
-      } finally { await stream.close(); await app.close(); }
-    });
-  }
-});
-test('単独画面: 接続制限・送信・継続・履歴選択と削除・最終モデル', async () => {
-  const app = await 単独起動(process.cwd(), {実行ファイル:process.execPath, 引数:[fake,'echo']});
-  const stream = await connect(app);
-  try {
-    const initial = await stream.wait(p=>p.type==='state');
-    assert.equal(initial.provider,'openai_oauth'); assert.equal(initial.model,'gpt-6.1-sol');
-    assert.equal((await fetch(new URL('/events',app.url))).status,404);
-    assert.equal((await post(app,{type:'new'},'https://example.com')).status,403);
-    assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:'日本語で確認'})).status,200);
-    const completed = await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.種別==='assistant'));
-    const reply = JSON.parse(completed.メッセージ.find(m=>m.種別==='assistant').本文);
-    assert.equal(reply.input,'日本語で確認'); assert.equal(reply.cwd,process.cwd());
-    assert.ok(reply.args.includes('gpt-6.1-sol')); assert.ok(reply.args.includes('openai_oauth'));
-    assert.ok(stream.packets.some(p=>p.メッセージ識別==='output_stream' && p.メッセージ内容.includes('日本語の進捗')));
-    assert.ok(completed.進捗.every(line=>!/[\u0002\u0003\u0018]/.test(line)));
-    assert.equal(completed.履歴[0].題名,'日本語で確認');
-    const lastMessageAt = completed.履歴[0].更新日時;
-    await post(app,{type:'model',provider:'freeai',model:'custom-model'});
-    const modelChanged = await stream.wait(p=>p.type==='state' && p.model==='custom-model');
-    assert.equal(modelChanged.履歴[0].更新日時,lastMessageAt);
-    await post(app,{メッセージ識別:'input_text',メッセージ内容:'続き'});
-    const resumed = await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.filter(m=>m.種別==='assistant').length===2);
-    const second = JSON.parse(resumed.メッセージ.at(-1).本文);
-    assert.ok(second.args.includes('--resume')); assert.ok(second.args.includes('test-session-001'));
-    assert.ok(second.args.includes('custom-model'));
-    assert.equal(resumed.履歴[0].題名,'日本語で確認');
-    await post(app,{type:'new'});
-    const reset = await stream.wait(p=>p.type==='state' && p.会話ID!==initial.会話ID);
-    assert.equal(reset.メッセージ.length,0); assert.equal(reset.セッションID,undefined);
-    assert.equal(reset.model,'custom-model');
-    assert.equal(reset.履歴.length,1);
-    assert.match(reset.履歴[0].題名,/日本語で確認/);
-    await post(app,{type:'selectHistory',id:initial.会話ID});
-    const reopened = await stream.wait(p=>p.type==='state' && p.会話ID===initial.会話ID && p.メッセージ.length>=4);
-    assert.equal(reopened.セッションID,'test-session-001');
-    await post(app,{type:'deleteHistory',id:initial.会話ID});
-    const deleted = await stream.wait(p=>p.type==='state' && p.会話ID!==initial.会話ID && p.履歴.length===0);
-    assert.equal(deleted.メッセージ.length,0);
-    assert.equal((await post(app,{type:'selectHistory',id:initial.会話ID})).status,404);
-  } finally { await stream.close(); await app.close(); }
-});
-test('単独画面: 実行中のモデル変更を拒否して停止できる', async () => {
-  const dir = mkdtempSync(join(tmpdir(),'aidiy-standalone-'));
-  const app = await 単独起動(process.cwd(),{実行ファイル:process.execPath,引数:[fake,'wait',join(dir,'pid.json')]});
-  const stream = await connect(app);
-  try {
-    await post(app,{メッセージ識別:'input_text',メッセージ内容:'待機'});
-    await stream.wait(p=>p.メッセージ識別==='output_stream' && p.メッセージ内容==='waiting');
-    assert.equal((await post(app,{type:'model',provider:'freeai',model:''})).status,409);
-    await post(app,{メッセージ識別:'cancel_run'});
-    await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.種別==='error' && m.本文.includes('停止')));
-  } finally { await stream.close(); await app.close(); rmSync(dir,{recursive:true,force:true}); }
 });

@@ -35,6 +35,7 @@
     getState: () => ({下書き:draft}), setState: value => { draft = value.下書き; },
     postMessage: message => {
       if (message.type === 'ready') {
+        if (events) return;
         events = new EventSource('events');
         events.onmessage = event => {
           const data = JSON.parse(event.data);
@@ -42,7 +43,7 @@
           emit(data);
         };
         events.onerror = () => {
-          if (state) emit({...state, 作業フォルダ:null, 接続済み:false});
+          if (state) emit({...state, 接続済み:false, 実行中:false});
           else error('接続が切れました。再接続しています…');
         };
       } else if (message.type === 'chooseModel') {

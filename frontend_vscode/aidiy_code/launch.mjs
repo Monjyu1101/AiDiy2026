@@ -27,7 +27,7 @@ if (options.values.help) {
 // 明示しなくても、Codespaces・画面のない Linux ではブラウザ版にする（3本共通の規則は launch-project.mjs）。
 const requestedBrowser = !!options.values.browser || ブラウザ自動判定();
 const wait = !!options.values.wait;
-const provider = options.values.provider?.trim().replace(/^copilot_cli$/, 'copilot-cli');
+const provider = options.values.provider?.trim();
 const model = options.values.model?.trim();
 const bundle = join(extensionRoot, 'dist', 'aidiy_code', 'server.cjs');
 const runRoot = join(extensionRoot, 'out', 'aidiy_code');

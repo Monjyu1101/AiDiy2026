@@ -3,11 +3,14 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { コードモデル読込, コードモデル保存 } from './model-preferences';
-import { CLI実行, 会話引数, 起動解決 } from './runner';
-import { コード要求実行, streamControlOf, visibleStreamContent } from './protocol';
+import { 起動解決 } from './runner';
+import { CodeConnection, コード選択 } from './code-connection';
+import { ローカル接続先 } from '../aidiy_live/local-backend.cjs';
+import type { Packet } from '../aidiy_live/src/protocol';
+import { streamControlOf, visibleStreamContent } from './protocol';
 
 interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string }
-interface 会話 { メッセージ: メッセージ[]; 作業URI: string; セッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
+interface 会話 { メッセージ: メッセージ[]; 作業URI: string; コアセッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
 interface 保存会話 extends 会話 { id: string; 更新日時: number; 初回依頼?: string }
 interface 会話履歴 { 現在ID: string; 一覧: 保存会話[] }
 interface 添付 { 名前: string; 本文: string }
@@ -17,16 +20,15 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 会話: 会話;
   private 添付?: 添付;
   private 実行中 = false;
-  private 停止処理?: () => void;
   private 進捗: string[] = [];
-  private 通知タイマー?: NodeJS.Timeout;
   private 保存待ち: PromiseLike<void> = Promise.resolve();
   private 破棄済み = false;
   private 会話ID: string = randomUUID();
   private 履歴: 保存会話[] = [];
   private 最終モデル: { provider: string; model: string };
   private 最終作業URI?: vscode.Uri;
-  private 候補取得停止?: () => void;
+  private connection?: CodeConnection;
+  private 接続フォルダ = '';
   private readonly ログ = vscode.window.createOutputChannel('AiDiy (Code)');
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -42,12 +44,14 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     if (selected) {
       this.会話ID = selected.id;
       this.会話 = { ...selected, メッセージ: [...selected.メッセージ] };
-    } else if (!saved && old && (old.メッセージ.length || old.セッションID)) {
+    } else if (!saved && old && (old.メッセージ.length || old.コアセッションID)) {
       this.会話 = old;
       this.保存();
     } else {
       this.会話 = { メッセージ: [], 作業URI: '', ...this.最終モデル, モデル選択済み: true };
     }
+    this.最終モデル = コード選択(this.最終モデル);
+    Object.assign(this.会話, コード選択(this.会話));
     const 作業更新 = (editor: vscode.TextEditor | undefined) => {
       if (editor && vscode.workspace.getWorkspaceFolder(editor.document.uri)) this.最終作業URI = editor.document.uri;
       this.通知();
@@ -55,7 +59,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     作業更新(vscode.window.activeTextEditor);
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor(作業更新),
-      vscode.workspace.onDidChangeWorkspaceFolders(() => this.通知())
+      vscode.workspace.onDidChangeWorkspaceFolders(() => { this.接続更新(); this.通知(); })
     );
   }
 
@@ -73,7 +77,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     view.webview.onDidReceiveMessage(message => {
       void this.受信(message).catch(error => this.エラー(error));
     }, undefined, this.context.subscriptions);
-    view.onDidDispose(() => { if (this.view === view) this.view = undefined; }, undefined, this.context.subscriptions);
+    view.onDidDispose(() => { if (this.view === view) { this.view = undefined; this.connection?.disconnect(); this.接続フォルダ = ''; } }, undefined, this.context.subscriptions);
     view.onDidChangeVisibility(() => this.通知(), undefined, this.context.subscriptions);
   }
 
@@ -98,17 +102,18 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
         .sort((a, b) => b.更新日時 - a.更新日時)
         .map(item => ({ id: item.id, 題名: this.題名(item), 更新日時: item.更新日時 })),
       作業フォルダ: folder ? { 名前: folder.name, パス: folder.uri.fsPath } : null,
-      新規可能: Boolean(this.選択フォルダ()), 信頼済み: vscode.workspace.isTrusted
+      新規可能: Boolean(this.選択フォルダ()), 信頼済み: vscode.workspace.isTrusted,
+      モデル変更中: this.connection?.modelChanging === true, 接続済み: this.connection?.connected === true, 接続エラー: this.connection?.error || ''
     });
   }
   private 題名(item: 会話): string {
     return ('初回依頼' in item && typeof item.初回依頼 === 'string' ? item.初回依頼 : item.メッセージ.find(message => message.種別 === 'user')?.本文)?.replace(/\s+/g, ' ').slice(0, 160) || '新しい会話';
   }
   private 保存(更新日時を変更 = true): void {
-    // 大量の会話による workspaceState 肥大化を防ぐ。Hermes 側の履歴はセッションIDで継続する。
+    // 大量の会話による workspaceState 肥大化を防ぐ。AIコアの履歴はコアセッションIDで継続する。
     let サイズ = 0;
     const messages = this.会話.メッセージ.slice(-60).reverse().filter(item => (サイズ += item.本文.length) <= 2_000_000).reverse();
-    if (this.会話.作業URI && (messages.length || this.会話.セッションID)) {
+    if (this.会話.作業URI && (messages.length || this.会話.コアセッションID)) {
       const previous = this.履歴.find(item => item.id === this.会話ID);
       const snapshot = JSON.parse(JSON.stringify({ ...this.会話, メッセージ: messages, id: this.会話ID,
         初回依頼: previous?.初回依頼 ?? this.会話.メッセージ.find(item => item.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 160),
@@ -142,14 +147,16 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     if (!message || typeof message !== 'object') return;
     const data = message as Record<string, unknown>;
     switch (data.メッセージ識別 ?? data.type) {
-      case 'ready': this.通知(); break;
+      case 'ready': this.接続更新(); this.通知(); break;
+      case 'connect': this.信頼確認(); this.接続更新(true); break;
+      case 'disconnect': this.connection?.disconnect(); break;
       case 'input_text':
       case 'input_request':
         if (typeof data.メッセージ内容 === 'string') {
           await this.送信(data.メッセージ内容);
         }
         break;
-      case 'cancel_run': this.停止処理?.(); break;
+      case 'cancel_run': this.connection?.send({ メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }); break;
       case 'new': this.新規(); break;
       case 'selectHistory': if (typeof data.id === 'string') this.履歴選択(data.id); break;
       case 'deleteHistory': if (typeof data.id === 'string') this.履歴削除(data.id); break;
@@ -167,26 +174,48 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     }
   }
 
+  private 接続更新(force = false): void {
+    const folder = this.現在フォルダ();
+    if (!vscode.workspace.isTrusted || !folder || this.破棄済み) { this.connection?.disconnect(); return; }
+    if (!this.connection) this.connection = new CodeConnection(
+      ローカル接続先(this.context.extensionPath, folder.uri.fsPath), packet => this.パケット受信(packet), () => {
+        if (this.connection?.connected) {
+          this.会話.コアセッションID = this.connection.session;
+          this.会話.provider = this.connection.model.provider; this.会話.model = this.connection.model.model;
+          this.保存(false);
+        } else this.実行中 = false;
+        this.通知();
+      });
+    if (!force && this.接続フォルダ === folder.uri.fsPath) return;
+    if (!this.会話.作業URI) this.会話.作業URI = folder.uri.toString();
+    this.接続フォルダ = folder.uri.fsPath;
+    this.connection.start(folder.uri.fsPath, this.会話, this.会話.コアセッションID, this.会話.メッセージ);
+  }
+  private パケット受信(packet: Packet): void {
+    if (this.破棄済み) return;
+    void this.view?.webview.postMessage(packet);
+    const text = typeof packet.メッセージ内容 === 'string' ? packet.メッセージ内容 : '';
+    if (packet.メッセージ識別 === 'output_stream') {
+      const control = streamControlOf(text);
+      if (control === 'start') this.実行中 = true;
+      else if (control === 'cancel') this.実行中 = false;
+      else if (!control && text) {
+        const line = visibleStreamContent(text);
+        this.ログ.appendLine(line); this.進捗 = [...this.進捗, line.slice(0, 4000)].slice(-100);
+      }
+    } else if (packet.メッセージ識別 === 'output_text' || packet.メッセージ識別 === 'output') {
+      if (text) this.会話.メッセージ.push({ 種別: 'assistant', 本文: text });
+      this.実行中 = false;
+    } else if (['error', 'cancel_run', 'output_end'].includes(packet.メッセージ識別 || '')) {
+      if (text) this.会話.メッセージ.push({ 種別: 'error', 本文: text });
+      this.実行中 = false;
+    } else return;
+    this.保存(); this.通知();
+  }
   private async 候補取得(provider = ''): Promise<{ id: string; label: string }[]> {
-    this.信頼確認();
-    const folder = this.作業フォルダ();
-    const launch = this.起動設定(folder);
-    const cliPath = launch.引数[0];
-    if (!cliPath || !/\.py$/i.test(cliPath)) throw new Error('候補取得には AiDiy の .cmd または cli_main.py を Cli Path に指定してください。');
-    const job = CLI実行({
-      起動: { 実行ファイル: launch.実行ファイル, 引数: [join(this.context.extensionPath, 'scripts', 'model-catalog.py'), cliPath, provider] },
-      作業フォルダ: folder.uri.fsPath, 本文: '', 引数: [], 制限時間: 30000
-    });
-    this.候補取得停止 = job.停止;
-    try {
-      const result = await job.完了;
-      if (result.終了コード !== 0 || result.停止理由) throw new Error('モデル候補を取得できません。Hermes の設定を確認してください。');
-      const parsed = JSON.parse(result.回答);
-      const rows: unknown = provider ? parsed.models : parsed.providers;
-      if (!Array.isArray(rows)) throw new Error('モデル候補の形式が不正です。');
-      const items = rows.filter((item): item is { id: string; label: string } => typeof item?.id === 'string' && typeof item?.label === 'string');
-      return items;
-    } finally { this.候補取得停止 = undefined; }
+    this.信頼確認(); this.接続更新();
+    if (!this.connection) throw new Error('作業フォルダを開いてください。');
+    return this.connection.catalog(provider);
   }
 
   private async モデル候補通知(value: unknown): Promise<void> {
@@ -208,7 +237,10 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       const providers = await this.候補取得();
       if (!providers.some(item => item.id === selectedProvider)) throw new Error('選択したプロバイダを確認できません。');
     }
-    const persisted = コードモデル保存({ provider: selectedProvider, model: selectedModel });
+    if (!this.connection) throw new Error('作業フォルダを開いてください。');
+    const selected = コード選択({ provider: selectedProvider, model: selectedModel });
+    await this.connection.setModel(selected);
+    const persisted = コードモデル保存(selected);
     this.会話.provider = persisted.provider; this.会話.model = persisted.model;
     this.会話.モデル選択済み = true;
     this.最終モデル = { provider: this.会話.provider, model: this.会話.model };
@@ -218,59 +250,26 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 
   private async 送信(本文: string): Promise<void> {
     if (this.実行中 || !本文.trim()) return;
+    if (this.connection?.modelChanging) throw new Error('モデルを変更しています。');
     this.信頼確認();
     const { provider, model } = this.会話;
     if (本文.length > 200_000 || provider.length > 200 || model.length > 300) throw new Error('入力が長すぎます。文章を分けて送信してください。');
     const folder = this.作業フォルダ();
-    const 起動 = this.起動設定(folder);
-    const config = vscode.workspace.getConfiguration('aidiyHermes', folder.uri);
     const fullPrompt = this.添付 ? `${本文}\n\n--- 選択コード: ${this.添付.名前} ---\n${this.添付.本文}\n--- 選択コードここまで ---` : 本文;
+    if (!this.connection?.send({ メッセージ識別: 'input_text', メッセージ内容: fullPrompt }))
+      throw new Error('AIコアが未接続のため送信できません。');
     this.会話.作業URI = folder.uri.toString();
-    this.会話.provider = provider.trim(); this.会話.model = model.trim();
     this.会話.メッセージ.push({ 種別: 'user', 本文: fullPrompt });
-    this.添付 = undefined; this.実行中 = true; this.進捗 = ['Hermes を起動しています…'];
+    this.添付 = undefined; this.実行中 = true; this.進捗 = [];
     this.ログ.clear(); this.保存(); this.通知();
     void this.view?.webview.postMessage({ type: 'accepted' });
-    try {
-      const 再開ID = this.会話.セッションID;
-      const run = コード要求実行({ セッションID: this.会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: fullPrompt }, {
-        起動, 作業フォルダ: folder.uri.fsPath,
-        引数: 会話引数(provider, model, Math.min(500, Math.max(1, config.get<number>('maxTurns', 30))), 再開ID),
-        制限時間: Math.min(7200, Math.max(10, config.get<number>('timeoutSeconds', 900))) * 1000
-      }, packet => {
-          if (this.破棄済み) return;
-          void this.view?.webview.postMessage(packet);
-          if (packet.メッセージ識別 !== 'output_stream') return;
-          // STX / ETX / CAN はプロトコル制御用。進捗表示や出力ログには残さない。
-          if (streamControlOf(packet.メッセージ内容)) return;
-          const line = visibleStreamContent(packet.メッセージ内容);
-          if (!line) return;
-          this.ログ.appendLine(line);
-          this.進捗 = [...this.進捗, line.slice(0, 4000)].slice(-100);
-          if (!this.通知タイマー) this.通知タイマー = setTimeout(() => { this.通知タイマー = undefined; this.通知(); }, 120);
-      }, 再開ID);
-      this.停止処理 = () => { run.停止(); this.進捗.push('停止処理中…'); this.通知(); };
-      const result = await run.完了;
-      if (result.セッション復旧) this.会話.セッションID = undefined;
-      if (result.終了コード === 0 && result.セッションID) this.会話.セッションID = result.セッションID;
-      if (result.回答) this.会話.メッセージ.push({ 種別: 'assistant', 本文: result.回答 });
-      if (result.停止理由) this.会話.メッセージ.push({ 種別: 'error', 本文: result.停止理由 });
-      else if (result.終了コード !== 0 || !result.回答) {
-        this.会話.メッセージ.push({ 種別: 'error', 本文: `CLI が回答を完了できませんでした（終了コード: ${result.終了コード}）。「実行ログ」で詳細を確認してください。認証が必要な場合は「対話 CLI」を利用してください。\n\n${result.ログ.slice(-3000)}` });
-      }
-    } catch (error) { this.エラー(error); }
-    finally {
-      this.実行中 = false; this.停止処理 = undefined;
-      clearTimeout(this.通知タイマー); this.通知タイマー = undefined;
-      this.保存(); this.通知();
-    }
   }
 
   新規(): void {
     if (this.実行中) return;
     this.会話 = { メッセージ: [], 作業URI: this.選択フォルダ()?.uri.toString() ?? '', ...this.最終モデル, モデル選択済み: true };
     this.会話ID = randomUUID();
-    this.添付 = undefined; this.進捗 = []; this.保存(); this.通知();
+    this.添付 = undefined; this.進捗 = []; this.保存(); this.接続更新(true); this.通知();
     void this.view?.webview.postMessage({ type: 'showConversation' });
   }
   private 履歴選択(id: string): void {
@@ -280,7 +279,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.会話ID = entry.id;
     this.会話 = { ...entry, メッセージ: [...entry.メッセージ] };
     this.添付 = undefined; this.進捗 = [];
-    this.保存(false); this.通知();
+    this.保存(false); this.接続更新(true); this.通知();
   }
   private 履歴削除(id: string): void {
     if (this.実行中) return;
@@ -289,7 +288,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.履歴 = this.履歴.filter(item => item.id !== id);
     if (this.会話ID === id) {
       this.会話 = { メッセージ: [], 作業URI: entry.作業URI, ...this.最終モデル, モデル選択済み: true };
-      this.会話ID = randomUUID(); this.添付 = undefined; this.進捗 = [];
+      this.会話ID = randomUUID(); this.添付 = undefined; this.進捗 = []; this.接続更新(true);
     }
     this.保存(); this.通知();
   }
@@ -310,7 +309,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     vscode.window.createTerminal({ name: 'AiDiy (Code)', shellPath: 起動.実行ファイル, shellArgs: 起動.引数, cwd: folder.uri.fsPath, env: { PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1', TERMINAL_CWD: folder.uri.fsPath } }).show();
   }
   ログ表示(): void { this.ログ.show(true); }
-  dispose(): void { this.破棄済み = true; this.停止処理?.(); this.候補取得停止?.(); clearTimeout(this.通知タイマー); this.ログ.dispose(); }
+  dispose(): void { this.破棄済み = true; if (this.実行中) this.connection?.send({ メッセージ識別: 'cancel_run' }); this.connection?.dispose(); this.ログ.dispose(); }
 }
 
 export function activate(context: vscode.ExtensionContext): void {

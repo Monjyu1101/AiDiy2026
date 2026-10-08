@@ -48,7 +48,7 @@ test('Code 起動引数: 指定した Provider / モデルを専用ウィンド�
     assert.equal(process.argv.length, 2);
     assert.equal(process.env.ELECTRON_RUN_AS_NODE, undefined);
     assert.equal(process.env.AIDIY_CODE_PROJECT, ${JSON.stringify(f.root)});
-    assert.deepEqual(JSON.parse(process.env.AIDIY_CODE_MODEL), { provider: 'copilot-cli', model: 'claude-sonnet-5.5' });
+    assert.deepEqual(JSON.parse(process.env.AIDIY_CODE_MODEL), { provider: 'copilot_cli', model: 'claude-sonnet-5.5' });
     require('node:fs').writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({ url: 'http://127.0.0.1:1234/', windowShown: true }));`);
   const result = f.launch('--provider=copilot_cli', '--model', 'claude-sonnet-5.5');
   assert.equal(result.status, 0, result.stderr);

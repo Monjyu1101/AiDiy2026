@@ -2,7 +2,7 @@
   "name": "aidiy-code",
   "displayName": "AiDiy (Code)",
   "icon": "media/AiDiy.png",
-  "description": "AiDiy の VS Code 拡張です。実行エンジンに aidiy_hermes CLI を使用し、右サイドバーで AI チャットを提供します。",
+  "description": "AIコアに接続し、各 Code CLI を選択して右サイドバーでコード支援チャットを提供します。",
   "version": "0.1.0",
   "publisher": "aidiy",
   "license": "SEE LICENSE IN LICENSE",
@@ -128,7 +128,7 @@
           "type": "string",
           "default": "aidiy_hermes",
           "scope": "machine",
-          "description": "CLI の実行ファイル、AiDiy の .cmd、または cli_main.py の絶対パス。既定では PATH と ~/.local/bin を探索します。"
+          "description": "「対話 CLI」を開くための Hermes 実行ファイルまたは cli_main.py のパス。チャットはAIコア経由。"
         },
         "aidiyHermes.pythonPath": {
           "type": "string",
@@ -138,27 +138,13 @@
         },
         "aidiyHermes.provider": {
           "type": "string",
-          "default": "openai_oauth",
-          "description": "AI provider。空欄では CLI の設定を使います。"
+          "default": "",
+          "description": "AIコアのコードAI名（copilot_cli、codex_cli、aidiy_hermes 等）。空欄はAIコアの既定設定。"
         },
         "aidiyHermes.model": {
           "type": "string",
-          "default": "gpt-6.1-sol",
-          "description": "AI モデル。空欄では CLI の設定を使います。"
-        },
-        "aidiyHermes.maxTurns": {
-          "type": "integer",
-          "default": 30,
-          "minimum": 1,
-          "maximum": 500,
-          "description": "1 回の依頼で実行する最大ターン数。"
-        },
-        "aidiyHermes.timeoutSeconds": {
-          "type": "integer",
-          "default": 900,
-          "minimum": 10,
-          "maximum": 7200,
-          "description": "CLI 起動後、または stdout / stderr の最後の受信から停止までの待機時間（秒）。"
+          "default": "",
+          "description": "選択したコードAIのモデル。aidiy_hermes は openai_oauth/gpt-6.1-sol のように指定。"
         }
       }
     }

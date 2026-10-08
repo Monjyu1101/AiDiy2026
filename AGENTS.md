@@ -98,7 +98,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `command_hermes` | `aidiy_hermes` CLI 基盤 | 常駐なし |
 | `frontend_web` | 通常 Web UI | 8090 |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar | 8092 |
-| `frontend_vscode` | `aidiy_hermes` を操作する AiDiy (Code) と、AIコアへ接続する音声会話の AiDiy (Live) の VS Code 拡張 / 単独起動版 | 常駐なし |
+| `frontend_vscode` | AIコアへ接続するコード支援の AiDiy (Code) と、音声会話の AiDiy (Live) の VS Code 拡張 / 単独起動版 | 常駐なし |
 | `frontend_discord` | Discord のテキストチャンネルを `aidiy_hermes`、ボイスチャンネルを AIコア Live へ接続する任意起動の Bot | 待受ポートなし |
 
 `core_main.py`、`apps_main.py`、`taskteam_main.py` は同じ SQLite DB を共有します。`taskteam_main.py` は `Aタスク*` と `Aチーム*` を同一プロセスで管理します。
@@ -115,7 +115,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `backend_taskteam/` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー（`/task/*`、`/team/*`、各監視ループ） |
 | `frontend_web/` | Vue 3 + Vite + TypeScript の Web UI |
 | `frontend_avatar/` | Electron/Web 対応の AI Avatar UI |
-| `frontend_vscode/` | VS Code 拡張 AiDiy (Code)（`aidiy_hermes` 操作）/ AiDiy (Live)（AIコア音声会話）と、`aidiy_code` / `aidiy_live` 単独起動版 |
+| `frontend_vscode/` | VS Code 拡張 AiDiy (Code)（AIコアの Code CLI 操作）/ AiDiy (Live)（AIコア音声会話）と、`aidiy_code` / `aidiy_live` 単独起動版 |
 | `frontend_discord/` | `frontend_vscode` の CLI / Live 接続処理を共有する Discord Bot。接続情報は `_config/AiDiy_key.json` の `DISCORD_*` |
 | `_config/` | API キー、AI モデル、MCP などの共通設定 |
 | `_data/` | 共通 SQLite DB などの永続データ |
@@ -285,7 +285,7 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 
 | 拡張 | 拡張 ID | 役割 | 単独起動 |
 |------|---------|------|----------|
-| AiDiy (Code) | `aidiy.aidiy-code` | `aidiy_hermes` CLI を拡張プロセスから直接起動するコード支援チャット。常駐バックエンドや AIコア WebSocket は不要 | `aidiy_code`（`vscode_code.bat`） |
+| AiDiy (Code) | `aidiy.aidiy-code` | 既存AIコアへ接続するコード支援チャット。`AIコード.vue` と同じ Code CLI・モデルを選択する | `aidiy_code`（`vscode_code.bat`） |
 | AiDiy (Live) | `aidiy.aidiy-live` | 既存 AIコア（`backend_server` 8091）へ接続するライブ音声・文字会話。VS Code 拡張内のマイクは Windows の Python 標準ライブラリ（WinMM）で取り込む | `aidiy_live`（`vscode_live.bat`） |
 
 - 拡張 ID、ビュー、設定、VSIX（`dist/aidiy-code-0.1.0.vsix` / `dist/aidiy-live-0.1.0.vsix`）を分け、片方を無効にしても他方が動作する。

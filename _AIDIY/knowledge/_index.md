@@ -24,7 +24,7 @@
 | `backend_taskteam` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
-| `frontend_vscode` | VS Code 拡張 AiDiy (Code)（`aidiy_hermes` 操作）/ AiDiy (Live)（AIコア音声会話）と単独起動版 |
+| `frontend_vscode` | VS Code 拡張 AiDiy (Code)（AIコアの Code CLI 操作）/ AiDiy (Live)（AIコア音声会話）と単独起動版 |
 | `frontend_discord` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
 
 例:

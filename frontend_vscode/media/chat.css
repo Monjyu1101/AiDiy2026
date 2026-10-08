@@ -26,7 +26,7 @@ button:disabled { opacity: .4; cursor: default; }
 [hidden] { display: none !important; }
 label { display: block; font-size: 11px; color: var(--muted); }
 #chat-header { display: flex; flex-direction: column; flex: 0 0 auto; border-bottom: 1px solid var(--border); }
-#title-bar { display: none; align-items: center; gap: 10px; min-height: 34px; padding: 2px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
+#title-bar { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 2px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
 #activity-bar { flex: 0 0 auto; height: 2px; box-sizing: content-box; border-top: 1px solid var(--border); background: #000; pointer-events: none; }
 #chat-header.running #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s linear infinite; }
 @keyframes cyan-breathe { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
@@ -164,10 +164,11 @@ textarea::placeholder { color: var(--muted); }
 #stop .stop-label { position: absolute; bottom: 3px; left: 0; width: 100%; font-size: 7px; font-weight: bold; line-height: 8px; text-align: center; }
 #stop:hover { background: #c83246; border-color: #c83246; }
 .composer-meta { grid-column: 1; grid-row: 2; display: flex; justify-content: space-between; align-items: center; gap: 6px; color: var(--muted); font-size: 9px; line-height: 1.3; }
-#activity { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; white-space: nowrap; }
-.activity-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--terminal); }
-.running .activity-dot { background: #00ffff; box-shadow: 0 0 0 3px #00ffff15, 0 0 10px #00ffff60; animation: cyan-breathe 4.5s ease-in-out infinite; }
-.unavailable .activity-dot { background: var(--muted); }
+#activity { display: inline-flex; font-size: 11px; align-items: center; gap: 5px; margin-left: 4px; white-space: nowrap; }
+.activity-dot { color: var(--muted); font-size: 12px; line-height: 1; }
+#activity.connected .activity-dot { color: var(--terminal); }
+.running .activity-dot { color: #00ffff; box-shadow: 0 0 0 3px #00ffff15, 0 0 10px #00ffff60; animation: cyan-breathe 4.5s ease-in-out infinite; }
+.unavailable .activity-dot { color: var(--muted); }
 .keyboard-hint { grid-column: 1; grid-row: 1; text-align: left; color: var(--muted); font-size: 9px; line-height: 1.3; }
 .keyboard-hint span { padding: 0 3px; }
 #attachment { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; color: var(--vscode-textLink-foreground); } #attachment-name { overflow-wrap: anywhere; }

@@ -19,7 +19,7 @@
 | CLI 探索、引数、標準入出力、停止 | `src/runner.ts` | `checks/runner.test.cjs` |
 | AIコード互換 packet | `src/protocol.ts` | `backend_server/AIコア/AIコード.py`, `backend_server/AIコア/AIコード_cli.py` |
 | チャット表示、入力 | `src/webview.ts`, `media/chat.html`, `media/chat.css` | `aidiy_code/bridge.js`, `checks/aidiy_code.test.cjs` |
-| Provider / モデル候補 | `scripts/model-catalog.py` | `command_hermes` の picker / Provider 実装 |
+| Code の接続・モデル候補 | `src/code-connection.ts` | `aidiy_live/local-backend.cjs`, AIコアのモデル情報API、`checks/code-connection.test.cjs`、`checks/code-extension.test.cjs` |
 | 最終手動モデルの保存・復元 | `src/model-preferences.ts`, `src/extension.ts`, `aidiy_code/src/server.ts`, `aidiy_live/src/extension.ts`, `aidiy_live/src/server.ts`, `aidiy_live/src/bridge.ts`, `aidiy_live/src/view.ts` | Code / Live の画面・サーバー検証、両 README |
 | 単独試用サーバー | `aidiy_code/src/server.ts`, `aidiy_code/bridge.js` | `checks/aidiy_code.test.cjs` |
 | 単独ウィンドウ、タイトルバー | `aidiy_code/desktop.cjs`, `aidiy_code/preload.cjs`, `aidiy_code/launch.mjs` | `media/chat.html`, `media/chat.css`, `aidiy_code/theme.css` |
@@ -31,7 +31,7 @@
 
 ## 実装上の維持事項
 
-- Code は常駐バックエンドを経由せず `aidiy_hermes` を直接起動する。Live は既存 AIコアの WebSocket とモデル情報 API を利用し、拡張専用の API を追加しない。
+- Code / Live は既存AIコアのWebSocketとモデル情報APIを使う。Code の接続は `src/code-connection.ts` が input → セッション設定API → 出力1 の順に行い、両init完了まで送信を拒否する。
 - Code / Live は別々の拡張 ID・コマンド・設定・VSIX を維持し、`extensionDependencies` / `extensionPack` で相互依存させない。片方の非導入・無効化で他方が起動できることを確認する。
 - Live の Windows マイクは Webview の権限に依存せず、拡張ホストの Python 標準ライブラリ補助で取り込む。音声処理と自動減衰はスタンドアロンと共有し、非表示・切断・無効化でマイクを終了する。
 - CLI は `shell: false` で起動し、要求本文は標準入力で渡す。要求文をコマンドライン引数へ埋め込まない。
@@ -61,22 +61,22 @@
 - 入力欄の Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。日本語 IME の変換確定では送信しない。
 - Code / Live の入力欄は共通の `field-sizing: content` で改行・折り返しに合わせて上へ伸縮する。最小高さは 76px、上限は 220px と画面高さの 35% の小さい方にし、上限を超えた内容は入力欄内でスクロールする。下書き復元・会話からのコピー・送信後のクリアにも自動で反映する。
 - Code / Live の会話末尾への追従は `src/scroll-follow.ts` を共用する。メッセージ追加・入力・送信受理・ストリーム枠の更新／開閉で即時と次の描画フレームに末尾へ移動し、`ResizeObserver` で会話領域の伸縮にも追従する。Code は会話履歴と進捗の両方を揃え、一覧から会話へ戻る際も末尾へ移す。確認は `checks/webview.test.cjs` と `aidiy_live/checks/view.test.cjs` で、入力直後・表示枠の開閉・描画後の高さ変更を検証する。
-- 入力欄下の操作部は「上段：Enter の操作説明」「下段：左に状態、右にモデル選択とモデル名」のコンパクトな2段にし、右端の送信／停止ボタンは2段分の高さにする。両モードで共通の HTML / CSS を使う。
+- Code の接続表示はタイトルバーに `〇 未接続` / `● 接続中` とする。入力欄下は「上段：Enter の操作説明」「下段：モデル選択とモデル名」の2段にし、右端の送信／停止ボタンは2段分の高さにする。両モードで共通の HTML / CSS を使う。
 - 履歴削除の確認は `media/chat.html` のパネル内ダイアログで共通処理し、確認後に `deleteHistory` を送る。拡張ホストや単独画面のブリッジで別の確認ダイアログを出さない。
 - 「新規」「一覧」、モデル選択、履歴削除、送信、停止は Webview 内の共通 UI を主操作にする。VS Code 固有のコマンドは外部からの呼び出しやエディター連携用に残す。
-- 単独画面の上部はタイトルバー、実行状態バー、会話操作行の順に置く。VS Code 拡張ではアイコンと AiDiy のタイトル行を非表示にし、実行状態バーと会話操作行を表示する。「今の会話／会話一覧」、フォルダ名、「新規」「一覧」は会話操作行にまとめる。単独ウィンドウのドラッグ領域はタイトルバーだけに指定し、会話操作行を含めない。
+- 単独画面の上部はタイトルバー、実行状態バー、会話操作行の順に置く。VS Code 拡張でも接続状態を示すタイトル行を表示する。「今の会話／会話一覧」、フォルダ名、「新規」「一覧」は会話操作行にまとめる。単独ウィンドウのドラッグ領域はタイトルバーだけに指定し、会話操作行を含めない。
 - Code / Live の上部シアンバーは Web の `frontend_web/src/components/_TopBar.vue` と同じ `abs(sin(2πt / 9))` の明滅に揃える。`media/chat.css` と `aidiy_live/media/style.css` の `cyan-bar-breathe` は、4.5秒の周期を2.5%刻みで標本化したRGB値を `linear` で補間する。`ease-in-out` に戻すとカーブが変わるため、通常表示・動きを減らす設定の両方で `linear` を維持する。
 - Code の正式回答の緑はスタンドアロンと共通の `#00ff00` を `media/chat.css` で定義する。VS Code の明暗・高コントラストテーマでも、この色を上書きしない。
 - Code の実行状況枠は CSS の `--stream`（シアン `#00ffff`）を基調にした枠線と薄い背景を使い、文字と点滅カーソルもシアンにする。Web / Avatar の `AIコード.vue` の `.stream-output .line-content` も同じ配色に揃える。Live の会話は `メッセージ識別` を行のクラスに残し、AIチャットパネルと同じく通常出力（`output_text`）は緑 `#00ff00`、コードエージェントの回答（`output_request`）はシアン `#00ffff`、音声出力認識は淡い緑で分ける。本文・文字送りカーソル・枠・背景はその種別の色を基調にし、文字送り完了後もクラスを保持する。
 - 拡張機能一覧のアイコンは `package.json` 直下の `icon`、サイドバーのアイコンは `contributes.viewsContainers` の `icon` で指定する。両方とも `media/AiDiy.png`（`frontend_web/public/icons/AiDiy.png` と同じ画像）を使い、変更後は VSIX を再生成・再配置する。
 - Live のマイク・スピーカーは `frontend_web/public/icons/microphone.png` / `speaker.png` を `aidiy_live/media/` にコピーし、CSS のマスクで赤／水色に表示する。画像追加時は Live の `.vscodeignore` と `src/server.ts` のリソース許可一覧へ含め、配布ディレクトリだけで読み込めることを確認する。
 - Provider / モデル選択は VS Code 上部の Quick Pick ではなく、`media/chat.html` のチャットパネル内ダイアログで行う。候補は `chooseModel` / `modelCatalog` / `modelCatalogError`、確定値は `setModel` で Webview と実行層の間を受け渡す。
-- Provider と API モデルは `scripts/model-catalog.py` から Hermes の picker を再利用する。外部 CLI のモデルは `_config/AiDiy_code_*.json` を読み、設定がないか `auto` のみなら対応する `scripts/cli_bat` の `MODEL` 値を読む。`claude-code` は `AiDiy_code_claude_cli.json` に対応し、`claude_sdk` は Hermes の外部 CLI Provider には含まれない。
-- モデル候補は provider ごとの固定キャッシュにせず、選択画面を開くたび CLI から取得する。特に `openai_oauth` は認証アカウントのライブ候補が変わり得る。
+- Discord の直接CLI用 Provider と API モデルは `scripts/model-catalog.py` から Hermes の picker を再利用する。外部 CLI のモデルは `_config/AiDiy_code_*.json` を読み、設定がないか `auto` のみなら対応する `scripts/cli_bat` の `MODEL` 値を読む。`claude-code` は `AiDiy_code_claude_cli.json` に対応し、`claude_sdk` は Hermes の外部 CLI Provider には含まれない。
+- Code は選択画面を開くたび `/core/AIコア/モデル情報/取得` の `available_models.code_models` を取得する。`aidiy_hermes` は `openai_oauth/gpt-6.1-sol` のような組み合わせID、`copilot_cli` はCLIのモデルIDをそのまま渡す。
 - 外部 CLI Provider のモデルが `auto` の場合は `--model auto` を渡さず、各 CLI 自身の既定モデル選択へ任せる。明示モデルを選んだ場合は Hermes の外部 CLI 実行まで `--model <ID>` を渡す。
 - `antigravity-cli` は Hermes の外部 CLI Provider 一覧から取得する。`xai-oauth` は API Provider のカタログ入口に含め、`grok-4.6` を Hermes の curated model 一覧から取得する。
 - xAI OAuth の初回認証は静的なワンショット実行中ではなく、拡張の「対話 CLI」から `/model` で `xai-oauth` を選ぶか、`hermes auth add xai-oauth` を実行する。
-- VS Code の履歴に残る Hermes セッション ID が CLI 側で見つからない場合、同じ依頼を `--resume` なしで一度だけ再実行する。再実行が成功したら新しいセッション ID を保存する。以前の CLI セッションの文脈は復元されないため、必要な前提は依頼文に含める。
+- Code の履歴には `コアセッションID` を保存する。旧 `セッションID` はHermes用なのでAIコアへ渡さず、表示履歴だけ保持する。通信切断・初回失敗では約5秒後に再試行し、手動切断・画面破棄・サーバー終了ではタイマーと接続待ちを破棄する。
 
 ## セットアップと配置
 
@@ -122,7 +122,7 @@ npm run package
 python -m unittest discover -s checks -p "test_*.py"
 ```
 
-`npm run check` は Code / Live の型チェック、`npm test` は Code 側の Node.js テスト（`checks/*.test.cjs`。専用ウィンドウの起動は Live も含む）、`npm run live:test` は Live の Node.js テスト（`aidiy_live/checks/`）を実行する。Python テストはセットアップ・Electron 準備・拡張解除・クリーンアップ・モデル候補をモックで検証する。いずれも AI API や実バックエンドを呼ばない。
+`npm run check` は Code / Live の型チェック、`npm test` は Code 側の Node.js テスト（`checks/*.test.cjs`。専用ウィンドウの起動は Live も含む）、`npm run live:test` は Live の Node.js テスト（`aidiy_live/checks/`）を実行する。Python テストはセットアップ・Electron 準備・拡張解除・クリーンアップ・モデル候補をモックで検証する。いずれも AI API や実バックエンドを呼ばない。Code のAIコア中継は模擬WebSocket/APIと実HTTP/SSEを組み合わせて検証する。
 
 確認内容:
 
@@ -133,7 +133,7 @@ python -m unittest discover -s checks -p "test_*.py"
 - 非ゼロ終了、起動エラー、停止、タイムアウトを呼び出し元へ返せる。
 - Windows の AiDiy `.cmd` をシェルなしで解決できる。
 - packet が開始、進捗、終了または中断、正式回答の順になる。
-- 単独試用の接続制限、会話継続、新規会話、履歴の選択・削除、モデル変更、停止が動く。
+- Code の両init前・切断中の送信拒否、5秒間隔の再接続、遅延イベント無視、モデルAPIのNG、破棄を確認する。接続済みで送信・停止・履歴復帰・CLI別モデル候補が動く。
 - VS Code 側で旧 `workspaceState` の単一会話を履歴へ移行でき、作業フォルダごとに履歴が分かれる。最終選択モデルが再起動後と新規会話へ引き継がれる。
 - `dist/aidiy-code-<version>.vsix` と `dist/aidiy-live-<version>.vsix` が生成され、それぞれのファイルだけを含む。
 - Live のセッション・音声パケット・WebSocket 中継・モデル API・切断・Origin 拒否を模擬バックエンドで確認できる。VS Code / 単独画面の両方で会話表示と末尾追従が動き、単独画面では起動時のモデル指定で1回だけ自動接続する。拡張ではタブを切り替えても接続を保持し、非表示中はマイクを止める。

@@ -21,9 +21,9 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 概要
 
-`frontend_vscode` は Code / Live の2つの独立した VS Code 拡張とスタンドアロンを提供します。Code（`aidiy.aidiy-code`）は `aidiy_hermes` CLI を直接起動し、常駐バックエンドは使いません。Live（`aidiy.aidiy-live`）は既存 AIコアへ接続します。拡張 ID、ビュー、設定、配布物を分け、片方を無効にしても他方が動作する構成です。
+`frontend_vscode` は Code / Live の2つの独立した VS Code 拡張とスタンドアロンを提供します。Code（`aidiy.aidiy-code`）と Live（`aidiy.aidiy-live`）は既存 AIコアへ接続します。Code は `AIコード.vue` と同じ Code CLI・モデルを選択します。拡張 ID、ビュー、設定、配布物を分け、片方を無効にしても他方が動作する構成です。
 
-通常の VS Code 拡張モードに加え、同じ Webview と CLI 実行層を使う `aidiy_code/` のスタンドアロンを持ちます。コード版の表示名は `AiDiy (Code)`、ライブ会話版の表示名は `AiDiy (Live)` です。
+通常の VS Code 拡張モードに加え、同じ Webview と AIコア接続層を使う `aidiy_code/` のスタンドアロンを持ちます。コード版の表示名は `AiDiy (Code)`、ライブ会話版の表示名は `AiDiy (Live)` です。
 
 `aidiy_live/` は Live 拡張とスタンドアロンの共通画面・音声処理を持ちます。拡張ホスト側で REST / WebSocket と Windows マイクを扱い、Webview へ渡します。マイク補助は Python 標準ライブラリだけを使います。利用・検証方法は [`aidiy_live/README.md`](./aidiy_live/README.md) を参照してください。
 
@@ -46,9 +46,9 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 - Code の `extensionKind` は `workspace`、Live はローカルマイクを扱う `ui` を優先し、Codespaces では `workspace` の拡張ホストで動作する。
 - 拡張バージョンは、固定解除の明示的な指示があるまで `0.1.0` を維持する。
 - ワークスペースを信頼済みの場合だけ、Code の CLI 実行・コード添付と、Live のマイク入力・AIコア接続を許可する。
-- `aidiy_hermes` は `shell: false` で起動し、要求本文は UTF-8 の標準入力で渡す。
+- 直接CLIを使う対話CLI・Discordでは `shell: false` と UTF-8 の標準入力を維持する。
 - 拡張側から `--yolo` を付与せず、Hermes 側の承認・ツール設定を維持する。
-- Code の Webview と拡張間では、既存の `AIコード.vue` / `AIコード.py` / `AIコード_cli.py` と同じメッセージ識別子を使う。
+- Code の AIコア接続と Webview 中継では、既存の `AIコード.vue` / `AIコード.py` / `AIコード_cli.py` と同じメッセージ識別子を使う。
 - Live は既存 AIコアの WebSocket（`/core/ws/AIコア`）とモデル情報 API をそのまま使い、拡張専用の API を追加しない。
 - `src/runner.ts`、`src/protocol.ts`、`aidiy_live/src/protocol.ts`、`src/model-preferences.ts`、`scripts/model-catalog.py` は `frontend_discord` と共有する。export 名や引数を変える場合は `frontend_discord/src/vscode.ts` と利用箇所を合わせて更新する。
 - HTML を含む Markdown は無効化し、外部画像や任意の command URI を回答から実行しない。
@@ -60,7 +60,8 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 |------|------|
 | `package.json` | 拡張 ID、ビュー、コマンド、設定、ビルド / 配布スクリプト |
 | `src/extension.ts` | 拡張のエントリ、WebviewView、会話状態、VS Code コマンド、モデル選択 |
-| `src/runner.ts` | CLI 解決、引数構築、子プロセス実行、停止、タイムアウト |
+| `src/code-connection.ts` | AIコアの入力・コード出力接続、モデルAPI、接続状態、再接続 |
+| `src/runner.ts` | 対話CLI・Discord用のCLI解決と実行 |
 | `src/protocol.ts` | AIコード互換 packet と開始・進捗・終了・回答の変換 |
 | `src/stream-control.ts` | STX / ETX / CAN 制御コードの判定と表示用除去 |
 | `src/model-preferences.ts` | Code / Live の最終手動モデルを `~/.aidiy/aidiy_*_model.json` へ読込・保存（Live bundle にも内包） |
@@ -84,25 +85,22 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 実行フロー
 
-1. `extension.ts` が対象ワークスペース、会話、Provider / モデル、添付コードを確定する。
-2. `runner.ts` が `aidiy_hermes`、AiDiy 形式の `.cmd`、または `cli_main.py` を安全に解決する。
-3. `protocol.ts` が要求を CLI 実行へ渡し、進捗と正式回答を AIコード互換 packet へ変換する。
-4. `webview.ts` が進捗と回答を表示し、VS Code の `workspaceState` へ保存する会話は `extension.ts` が管理する。
+1. `extension.ts` または `aidiy_code/src/server.ts` が対象フォルダ・会話・モデル・添付コードを管理する。
+2. `src/code-connection.ts` が Live と共通のローカル接続先を解決し、入力・コード出力ソケットとモデルAPIを管理する。
+3. 送信・停止はAIコアへ渡し、`webview.ts` が進捗・正式回答と接続状態を表示する。
 
-単独試用では `aidiy_code/src/server.ts` と `aidiy_code/bridge.js` が VS Code API の代わりを担当し、`runner.ts`、`protocol.ts`、`webview.ts` は共用します。
+単独起動では `aidiy_code/src/server.ts` と `aidiy_code/bridge.js` が VS Code API の代わりを担当し、接続層と描画を共用します。
 
 Live では `aidiy_live/src/view.ts` が画面と音声を担当し、`bridge.ts` の `LiveEnvironment` が実行環境に応じて接続方法を切り替えます。VS Code 拡張では `host.ts`（拡張ホスト）が AIコアの WebSocket、モデル情報 API、Windows マイク（`microphone.py`）を扱い、Webview へ中継します。単独起動では `src/server.ts` の localhost 中継が同じ役割を担います。接続時は input / 0 / audio の 3 本の WebSocket を開き、`connect` パケットで作業フォルダ（`CODE_BASE_PATH`）と選択したモデル設定を渡します。
 
-## CLI 解決と会話
+## 接続と会話
 
-- 既定の CLI 名は `aidiy_hermes`。
-- PATH と `~/.local/bin` を探索し、作業フォルダ内の `command_hermes/cli_main.py` も候補にする。
-- AiDiy が生成した `.cmd` は `PY` / `CLI` の絶対パスを読み取り、バッチ自体をシェル実行しない。
-- Python ファイルを直接指定する場合は、隣接する `.venv` または設定された Python を使う。
-- Provider / モデル候補は `scripts/model-catalog.py` から Hermes の既存 picker を再利用する。
-- Hermes のセッション ID を保持し、次回要求では `--resume` で会話を継続する。
-- 会話履歴は作業フォルダ別に一覧表示し、会話ごとの表示履歴は最新 60 件、合計 200 万文字を上限としてワークスペース単位で保存する。単独起動版の会話履歴はサーバーのメモリだけに保持する。
-- 最後に手動選択した Provider / モデルは `~/.aidiy/aidiy_code_model.json` に保存し、VS Code 拡張と単独起動版で共用する。
+- Code は input／1、Live は input／0／audio のソケットを使う。
+- Code のコードAIとモデルはAIコアのモデル情報APIから取得し、接続中のセッションへ反映する。
+- Code は通信切断時に約5秒間隔で再接続する。明示的な切断・破棄は再試行を止める。
+- Code の会話履歴は作業フォルダ別に管理し、AIコアのセッションIDで再開する。旧Hermesの表示履歴は保持するが、CLIセッションIDをコアへ渡さない。
+- 最終手動モデルは `~/.aidiy/aidiy_code_model.json` で拡張・単独画面共通に保存する。
+- `src/runner.ts` と `src/protocol.ts` は引き続き Discord の直接CLI実行と対話CLIを支える。
 
 ## セキュリティ境界
 
@@ -120,7 +118,7 @@ Live では `aidiy_live/src/view.ts` が画面と音声を担当し、`bridge.ts
 - CLI の探索、引数、標準入出力、停止を変える場合は `src/runner.ts` と `checks/runner.test.cjs` をセットで見る。
 - packet を変える場合は `src/protocol.ts` と既存 AIコード実装との互換性を確認する。
 - チャット UI を変える場合は `media/chat.html`、`media/chat.css`、`src/webview.ts` をセットで見て、単独試用側も確認する。
-- Provider / モデル候補を変える場合は `scripts/model-catalog.py` と `command_hermes` の picker 実装を先に確認する。
+- Code のコードAI／モデル候補を変える場合は `src/code-connection.ts` とAIコアのモデル情報APIを確認する。Discord の直接CLI候補は `scripts/model-catalog.py` を使う。
 - モデル選択の保存・復元を変える場合は `src/model-preferences.ts` と、Code / Live それぞれの拡張・単独起動の読込箇所をセットで見る。
 - Live の画面・音声を変える場合は `aidiy_live/src/view.ts`、`audio.ts`、`visualizer.ts`、`aidiy_live/media/` をセットで見て、`aidiy_live/checks/view.test.cjs` で VS Code / 単独画面の両方を確認する。
 - Live の通信を変える場合は、拡張ホスト（`aidiy_live/src/host.ts`）と単独起動の中継（`aidiy_live/src/server.ts`）の許可範囲を揃える。
