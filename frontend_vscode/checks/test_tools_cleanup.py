@@ -70,6 +70,17 @@ class ToolsCleanupTest(unittest.TestCase):
         ), patch.object(processes.subprocess, 'run'), patch.object(processes.time, 'monotonic', side_effect=[0, 6]):
             self.assertFalse(processes.stop_matching(lambda _: True, Mock(), Mock(), 'tools'))
 
+    def test_excluded_pids_are_not_stopped(self):
+        # _start.py は aidiy_code 配下の MCP 接続を除外して停止する。
+        root = PROJECT / 'backend_tools'
+        command = f'"{root / ".venv/Scripts/python.exe"}" "{root / "mcp_stdio.py"}"'
+        record = lambda pid: dict(ProcessId=pid, Name='python.exe', ExecutablePath='', CommandLine=command)
+        with patch.object(tools, 'stop_matching', return_value=True) as stop, patch.object(tools.sys, 'platform', 'win32'):
+            self.assertTrue(tools.stop_tools_processes(exclude_pids=frozenset({11})))
+        matches = stop.call_args.args[0]
+        self.assertFalse(matches(record(11)))
+        self.assertTrue(matches(record(12)))
+
     def test_failed_stop_preserves_tools_files(self):
         with patch.object(tools, 'stop_tools_processes', return_value=False), patch.object(
             tools, 'remove_directory'

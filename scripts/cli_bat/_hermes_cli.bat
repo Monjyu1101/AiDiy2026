@@ -11,29 +11,39 @@ ECHO ============================================================
 
 :SELECT_MODEL
 ECHO.
-ECHO GPT model list
-ECHO   1: GPT-6 Astra - frontier reasoning and coding
-ECHO   2: GPT-6.1 Sol - frontier reasoning and coding
-ECHO   3: GPT-5.6 Terra - balanced quality and cost
-ECHO   4: GPT-6 Luna - fast, high-volume work
+ECHO Model list
+ECHO   1: codex_cli/auto
+ECHO   2: copilot_cli/auto
+ECHO   3: openai_oauth/gpt-6-astra
+ECHO   4: openai_oauth/gpt-6.1-sol
+ECHO   5: openai_oauth/gpt-5.6-terra
+ECHO   6: openai_oauth/gpt-6-luna
 ECHO   0: Exit
 ECHO.
 set "MODEL="
 set "MODEL_NUMBER="
-set /p "MODEL_NUMBER=Model number [Enter: GPT-6.1 Sol]: "
+set /p "MODEL_NUMBER=Model number [Enter: openai_oauth/gpt-6.1-sol]: "
 if "%MODEL_NUMBER%"=="0" goto END
-if not defined MODEL_NUMBER set "MODEL_NUMBER=2"
-if "%MODEL_NUMBER%"=="1" set "MODEL=gpt-6-astra"
-if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-6.1-sol"
-if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-5.6-terra"
-if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-6-luna"
+if not defined MODEL_NUMBER set "MODEL_NUMBER=4"
+if "%MODEL_NUMBER%"=="1" set "MODEL=codex_cli/auto"
+if "%MODEL_NUMBER%"=="2" set "MODEL=copilot_cli/auto"
+if "%MODEL_NUMBER%"=="3" set "MODEL=openai_oauth/gpt-6-astra"
+if "%MODEL_NUMBER%"=="4" set "MODEL=openai_oauth/gpt-6.1-sol"
+if "%MODEL_NUMBER%"=="5" set "MODEL=openai_oauth/gpt-5.6-terra"
+if "%MODEL_NUMBER%"=="6" set "MODEL=openai_oauth/gpt-6-luna"
 if defined MODEL goto LAUNCH
 ECHO Invalid input. Enter a number or press Enter.
 goto SELECT_MODEL
 
 :LAUNCH
-ECHO aidiy_hermes --yolo --provider openai_oauth --model %MODEL% %*
-call aidiy_hermes --yolo --provider openai_oauth --model "%MODEL%" %*
+for /f "tokens=1,* delims=/" %%A in ("%MODEL%") do (
+    set "MODEL_PROVIDER=%%A"
+    set "MODEL_NAME=%%B"
+)
+if "%MODEL_PROVIDER%"=="codex_cli" set "MODEL_PROVIDER=codex-cli"
+if "%MODEL_PROVIDER%"=="copilot_cli" set "MODEL_PROVIDER=copilot-cli"
+ECHO aidiy_hermes --yolo --provider %MODEL_PROVIDER% --model %MODEL_NAME% %*
+call aidiy_hermes --yolo --provider "%MODEL_PROVIDER%" --model "%MODEL_NAME%" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 
 endlocal & exit /b %EXIT_CODE%

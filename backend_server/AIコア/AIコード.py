@@ -845,7 +845,7 @@ class CodeAgent:
                     サムネイル画像=None
                 )
 
-            # バックアップ＋自己検証ループ（self_check_loop=0ならバックアップなし・エージェント呼び出しのみ）
+            # 要求ごとの検証回数。未指定の既存クライアントはセッション設定を使う。
             今回更新あり = False
             try:
                 セッション設定 = self.接続.モデル設定 if self.接続 and hasattr(self.接続, "モデル設定") else None
@@ -853,6 +853,11 @@ class CodeAgent:
                     self_check_loop = int(セッション設定.get("CODE_SELF_CHECK_LOOP", 1)) if isinstance(セッション設定, dict) else 1
                 except (TypeError, ValueError):
                     self_check_loop = 1
+                if "self_check_loop" in 受信データ:
+                    try:
+                        self_check_loop = max(0, min(3, int(受信データ["self_check_loop"])))
+                    except (TypeError, ValueError, OverflowError):
+                        pass  # 不正な指定はセッション設定へフォールバック
                 if self_check_loop > 0:
                     logger.info(f"[CodeAgent] バックアップ検証ループを開始します（最大{self_check_loop}回）")
                     今回更新あり = await self._バックアップ検証ループ(ai_instance, self_check_loop)

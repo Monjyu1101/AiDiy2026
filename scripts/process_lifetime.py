@@ -206,7 +206,15 @@ def main() -> int:
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
     try:
-        process = subprocess.Popen(command, creationflags=args.creationflags)
+        # CREATE_NO_WINDOW で起動した Windows 子プロセスにも、監視ラッパーの
+        # 標準ハンドルを明示して渡す。省略するとパイプ出力が失われる。
+        process = subprocess.Popen(
+            command,
+            stdin=sys.stdin,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            creationflags=args.creationflags,
+        )
         with guard.lock:
             guard._remember()
         while process.poll() is None:

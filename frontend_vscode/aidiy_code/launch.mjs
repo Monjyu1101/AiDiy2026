@@ -11,7 +11,7 @@ const extensionRoot = fileURLToPath(new URL('..', import.meta.url));
 let options, projectRoot;
 try {
   options = parseArgs({ allowPositionals: true, options: {
-    provider: { type: 'string' }, model: { type: 'string' }, project: { type: 'string' }, browser: { type: 'boolean' }, wait: { type: 'boolean' }, help: { type: 'boolean' },
+    provider: { type: 'string' }, model: { type: 'string' }, project: { type: 'string' }, browser: { type: 'boolean' }, wait: { type: 'boolean' }, offline: { type: 'boolean' }, help: { type: 'boolean' },
   } });
   if (!options.values.help) projectRoot = プロジェクトフォルダ決定(options.positionals, options.values.project);
   for (const name of ['provider', 'model']) {
@@ -19,7 +19,8 @@ try {
   }
 } catch (error) { console.error(error.message); process.exit(1); }
 if (options.values.help) {
-  console.log(`aidiy_code ${プロジェクト引数書式} [--provider Provider] [--model モデル名] [--browser] [--wait]`);
+  console.log(`aidiy_code ${プロジェクト引数書式} [--provider Provider] [--model モデル名] [--offline] [--browser] [--wait]`);
+  console.log('--offline: AIコアを使わず aidiy_hermes を直接実行（検証0回）。モデルはオンラインと別保存。');
   console.log('モデル未指定: 前回の手動選択（未保存なら既定設定）で起動。画面の「モデル」から変更できます。');
   console.log('Codespaces・画面のない Linux では --browser を省略してもブラウザ版で開きます。');
   process.exit(0);
@@ -74,7 +75,7 @@ async function main(browserMode) {
     entry = join(extensionRoot, 'aidiy_code', 'desktop.cjs');
   }
   const env = { ...process.env };
-  const initialModel = { provider, model };
+  const initialModel = { provider, model, ...(options.values.offline ? { offline: true } : {}) };
   // VS Code のターミナルから起動しても Electron を通常のデスクトップモードで動かす。
   if (!browserMode) {
     delete env.ELECTRON_RUN_AS_NODE;

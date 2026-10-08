@@ -468,8 +468,10 @@ def is_tools_process(process: dict, root: Path, windows: bool) -> bool:
                                for filename in ('mcp_stdio.py', 'tools_main.py')}
 
 
-def stop_tools_processes() -> bool:
-    return stop_matching(lambda p: is_tools_process(p, BACKEND_TOOLS_DIR.resolve(), sys.platform == 'win32'),
+def stop_tools_processes(exclude_pids: frozenset[int] = frozenset()) -> bool:
+    """tools の Python / MCP 接続を止める。`exclude_pids`（例: aidiy_code 配下）は対象外。"""
+    return stop_matching(lambda p: p.get('ProcessId') not in exclude_pids
+                         and is_tools_process(p, BACKEND_TOOLS_DIR.resolve(), sys.platform == 'win32'),
                          print_info, print_warning, 'バックエンド(tools) の Python / MCP 接続')
 
 

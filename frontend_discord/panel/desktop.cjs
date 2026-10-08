@@ -5,6 +5,7 @@ const { pathToFileURL } = require('node:url');
 const { writeFileSync } = require('node:fs');
 const size = require('../../frontend_vscode/scripts/window-size.cjs');
 const { 拡大表示 } = require('../../frontend_vscode/scripts/window-opening.cjs');
+const { 起動ロック } = require('../../frontend_vscode/scripts/single-instance.cjs');
 
 const root = join(__dirname, '..');
 const page = pathToFileURL(join(__dirname, 'index.html')).href;
@@ -16,6 +17,8 @@ let sequence = 0;
 const pending = new Map();
 const readyFile = process.env.AIDIY_DISCORD_READY;
 const autoConnect = process.env.AIDIY_DISCORD_CONNECT === '1';
+let instance;
+app.on('will-quit', () => { void instance?.close(); });
 function ready(file = readyFile) { if (file) writeFileSync(file, JSON.stringify({ windowShown: true })); }
 function request(action, value) {
   return new Promise((resolve, reject) => {
@@ -67,7 +70,10 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
       if (data.readyFile) writeFileSync(data.readyFile, JSON.stringify({ closing: true, pid: process.pid }));
       return;
     }
-    if (!window || window.isDestroyed()) return;
+    if (!window || window.isDestroyed()) {
+      if (data.readyFile) writeFileSync(data.readyFile, JSON.stringify({ alreadyRunning: true }));
+      return;
+    }
     if (window.isMinimized()) window.restore();
     window.show(); window.focus(); ready(data.readyFile);
     if (data.autoConnect) void request('start').catch(() => {});
@@ -84,6 +90,16 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
   });
   app.on('window-all-closed', () => app.quit());
   app.whenReady().then(async () => {
+    instance = await 起動ロック('aidiy_discord', () => {
+      if (quitting || !window || window.isDestroyed()) return;
+      if (window.isMinimized()) window.restore();
+      window.show(); window.focus();
+    });
+    if (!instance) {
+      if (readyFile) writeFileSync(readyFile, JSON.stringify({ alreadyRunning: true }));
+      app.quit();
+      return;
+    }
     worker = fork(join(root, 'src/panel-worker.ts'), [], {
       cwd: root, execPath: process.env.AIDIY_DISCORD_NODE,
       execArgv: ['--import', pathToFileURL(join(root, 'node_modules/tsx/dist/loader.mjs')).href],

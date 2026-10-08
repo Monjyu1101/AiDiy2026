@@ -1094,11 +1094,12 @@ defineExpose({
 .prompt-symbol {
   position: absolute;
   left: 8px;
-  top: 16px;
+  top: 12px;
   color: #ffffff;
   font-family: "Courier New", monospace;
   font-weight: bold;
   font-size: 16px;
+  line-height: 1;
   cursor: pointer;
   user-select: none;
   z-index: 1;

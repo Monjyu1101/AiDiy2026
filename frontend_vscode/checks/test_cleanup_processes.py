@@ -122,6 +122,47 @@ class CleanupProcessesTest(unittest.TestCase):
             folder.stop_standalone_processes.return_value = False
             self.assertFalse(root_cleanup.stop_all_services({}, strict=False))
 
+    def test_start_stop_keeps_standalone_code(self):
+        spec = importlib.util.spec_from_file_location('root_cleanup_keep_code_tests', ROOT.parent / '_cleanup.py')
+        root_cleanup = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(root_cleanup)
+        start = Mock()
+        start.process_tree_pids.return_value = {111, 222}
+        folder = Mock()
+        with patch.object(root_cleanup, '_load_folder_start_module', return_value=start), patch.object(
+            root_cleanup, '_load_folder_module', return_value=folder
+        ), patch.object(root_cleanup.time, 'sleep'):
+            self.assertTrue(root_cleanup.stop_all_services({}, strict=False, keep_code=True))
+        # _start.py 用: Live だけ止め、Code を含む一括停止は呼ばない。
+        start.kill_ports.assert_any_call('live')
+        self.assertNotIn(unittest.mock.call('code'), start.kill_ports.call_args_list)
+        folder.stop_standalone_processes.assert_not_called()
+        # aidiy_code 配下（hermes の MCP 接続など）は tools の停止対象から外す。
+        start.process_tree_pids.assert_called_once_with('code')
+        folder.stop_tools_processes.assert_called_once_with(exclude_pids=frozenset({111, 222}))
+
+        # 配下を判別できないときは tools の MCP 接続を止めず、失敗として報告する。
+        start.process_tree_pids.side_effect = OSError('一覧取得失敗')
+        folder.stop_tools_processes.reset_mock()
+        with patch.object(root_cleanup, '_load_folder_start_module', return_value=start), patch.object(
+            root_cleanup, '_load_folder_module', return_value=folder
+        ), patch.object(root_cleanup.time, 'sleep'):
+            self.assertFalse(root_cleanup.stop_all_services({}, strict=False, keep_code=True))
+        folder.stop_tools_processes.assert_not_called()
+
+    def test_standalone_tree_includes_descendants_only_of_selected_module(self):
+        code = dict(ProcessId=10, ParentProcessId=1, Name='node.exe',
+                    CommandLine=f'node.exe "{ROOT / "aidiy_code" / "launch.mjs"}"')
+        hermes = dict(ProcessId=11, ParentProcessId=10, Name='python.exe', CommandLine='python.exe hermes')
+        mcp = dict(ProcessId=12, ParentProcessId=11, Name='python.exe', CommandLine='python.exe mcp_stdio.py')
+        live = dict(ProcessId=20, ParentProcessId=1, Name='node.exe',
+                    CommandLine=f'node.exe "{ROOT / "aidiy_live" / "launch.mjs"}"')
+        other = dict(ProcessId=30, ParentProcessId=1, Name='python.exe', CommandLine='python.exe mcp_stdio.py')
+        with patch.object(processes, 'list_processes', return_value=[code, hermes, mcp, live, other]), patch.object(
+            processes.sys, 'platform', 'win32'
+        ):
+            self.assertEqual(processes.standalone_tree_pids(ROOT, 'code'), {10, 11, 12})
+
     def test_transient_sharing_violation_is_retried(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

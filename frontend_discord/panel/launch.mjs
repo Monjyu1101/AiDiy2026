@@ -69,6 +69,7 @@ async function パネル起動(browser) {
   const limit = Date.now() + 40_000;
   while (Date.now() < limit && !failed) {
     const state = existsSync(ready) ? JSON.parse(readFileSync(ready, 'utf8')) : {};
+    if (state.alreadyRunning) { console.log('aidiy_discord は起動済みです。'); return 0; }
     if (state.closing && Number.isInteger(state.pid) && state.pid > 0) {
       let running = true;
       try { process.kill(state.pid, 0); }

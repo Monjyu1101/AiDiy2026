@@ -255,12 +255,16 @@ def stop_all_services(
     *,
     title: str = "クリーンアップ前の既存プロセス整理",
     strict: bool = True,
+    keep_code: bool = False,
+    keep_discord: bool = False,
 ) -> bool:
     """起動中の常駐サービス・単独実行・MCP 接続をすべて強制終了する。
 
     `_cleanup.py` のファイル削除前と、`_start.py` の起動前・Ctrl+C 終了時で共通の停止手順。
     1 件失敗しても残りの停止は続け、最後に `strict` なら RuntimeError、そうでなければ
-    警告だけ出して False を返す。
+    警告だけ出して False を返す。`keep_code` なら aidiy_code の単独実行とその配下
+    （hermes が使う tools の MCP 接続など）は止めず、aidiy_live だけを止める
+    （`_start.py` 用）。`keep_discord` なら Discord 本体とその配下も停止しない。
     """
     _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
     print_header(title)
@@ -275,19 +279,46 @@ def stop_all_services(
             failures.append(description)
 
     for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
+        if keep_discord and folder == "frontend_discord":
+            print_info("フロントエンド(Discord) は継続します")
+            continue
         print_info(f"{description} の既存プロセスを停止します")
         run_stop(description, lambda folder=folder: _load_folder_start_module(folder).kill_ports())
 
-    print_info("フロントエンド(vscode) の Code / Live 単独実行を停止します")
-    run_stop(
-        "Code / Live の単独実行",
-        lambda: _load_folder_module("frontend_vscode").stop_standalone_processes(),
-    )
+    if keep_code:
+        # aidiy_live は通常 core 無しに動作できないため、core と一緒に止めてよい。
+        print_info("フロントエンド(vscode) の Live 単独実行を停止します（aidiy_code は停止しません）")
+        run_stop("Live の単独実行", lambda: _load_folder_start_module("frontend_vscode").kill_ports("live"))
+    else:
+        print_info("フロントエンド(vscode) の Code / Live 単独実行を停止します")
+        run_stop(
+            "Code / Live の単独実行",
+            lambda: _load_folder_module("frontend_vscode").stop_standalone_processes(),
+        )
     print_info("バックエンド(tools) の Python / MCP 接続を停止します")
-    run_stop(
-        "tools の Python / MCP 接続",
-        lambda: _load_folder_module("backend_tools").stop_tools_processes(),
-    )
+    if keep_code or keep_discord:
+        try:
+            protected_pids: set[int] = set()
+            if keep_code:
+                protected_pids.update(_load_folder_start_module("frontend_vscode").process_tree_pids("code"))
+            if keep_discord:
+                protected_pids.update(_load_folder_start_module("frontend_discord").process_tree_pids())
+        except Exception as e:
+            # 継続対象の配下を判別できないときは、巻き込まないよう MCP 接続を止めない。
+            print_warning(f"継続対象の配下を確認できないため、tools の MCP 接続は停止しません: {e}")
+            failures.append("tools の Python / MCP 接続")
+        else:
+            if protected_pids:
+                print_info(f"継続対象の配下は停止対象から外します: {len(protected_pids)} 件")
+            run_stop(
+                "tools の Python / MCP 接続",
+                lambda: _load_folder_module("backend_tools").stop_tools_processes(exclude_pids=frozenset(protected_pids)),
+            )
+    else:
+        run_stop(
+            "tools の Python / MCP 接続",
+            lambda: _load_folder_module("backend_tools").stop_tools_processes(),
+        )
 
     # `_start.py` の起動前整理と同様に、OS側のポート解放を短時間待つ。
     time.sleep(1)

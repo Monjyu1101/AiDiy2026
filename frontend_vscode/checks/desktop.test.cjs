@@ -5,7 +5,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const vm = require('node:vm');
 
-async function launch({ loadError, visible = true, module = 'aidiy_code', env = {} } = {}) {
+async function launch({ loadError, visible = true, module = 'aidiy_code', env = {}, owned = true } = {}) {
   const calls = [];
   const written = [];
   const errors = [];
@@ -40,6 +40,8 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
     setBounds(bounds) { this.bounds = bounds; sizes.push(JSON.parse(JSON.stringify(bounds))); }
     setMinimumSize(width, height) { minimums.push([width, height]); }
     isDestroyed() { return !!this.destroyed; }
+    isMinimized() { return false; }
+    restore() { calls.push('restore'); }
     isMaximized() { return false; }
     async loadURL() { if (this.canvas) { calls.push('canvas'); return; } calls.push('load'); if (loadError) throw new Error(loadError); }
     showInactive() { calls.push('canvas-show'); }
@@ -50,7 +52,7 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
     isVisible() { return visible && calls.includes('show'); }
   }
   const filename = path.resolve(__dirname, '..', module, 'desktop.cjs');
-  const fakeProcess = { argv: live ? ['electron', filename] : ['electron', filename, '/project', '/ready.json'], env, platform: 'win32', pid: 123 };
+  const fakeProcess = { argv: live ? ['electron', filename] : ['electron', filename, '/project', '/ready.json'], env, platform: 'win32', pid: 123, cwd: () => '/project' };
   vm.runInNewContext(readFileSync(filename, 'utf8'), {
     __filename: filename, __dirname: path.dirname(filename), process: fakeProcess,
     Date: class extends Date { static now() { return clock; } },
@@ -70,6 +72,7 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
         return { url: 'http://127.0.0.1:1234/', close: async () => {} };
       } };
       if (name === './permissions.cjs') return require('../aidiy_live/permissions.cjs');
+      if (name === '../scripts/single-instance.cjs') return { 起動ロック: async () => owned ? { close: async () => {} } : null };
       // 初回演出は実物を、時刻だけ模擬した環境で動かす。
       if (name === '../scripts/window-opening.cjs') {
         const loaded = { exports: {} };
@@ -107,6 +110,15 @@ test('Live: 追加の起動引数なしで接続先・作業フォルダ・モ�
   assert.deepEqual(result.serverArgs[0].slice(1), ['http://127.0.0.1:9091', false, '日本語 project', models, null, true]);
   assert.deepEqual(result.files, ['/ready with spaces.json']);
   assert.equal(result.written[0].windowShown, true);
+});
+
+test('Live: 既存プロセスがあると画面と接続を作らず、ランチャーへ起動済みを通知する', async () => {
+  const result = await launch({ module: 'aidiy_live', owned: false, env: { AIDIY_LIVE_READY: '/repeat.json' } });
+  assert.deepEqual(result.serverArgs, []);
+  assert.deepEqual(result.canvases, []);
+  assert.deepEqual(result.written, [{ alreadyRunning: true }]);
+  assert.ok(result.calls.includes('quit'));
+  assert.deepEqual(result.errors, []);
 });
 
 test('window is shown and focused without waiting for ready-to-show, before notifying launcher', async () => {

@@ -17,6 +17,8 @@ Electron は scripts/setup_electron.py の共通処理で準備し、配置済�
     setup(choices=None) -> bool
 """
 
+import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -147,6 +149,35 @@ def check_npm_installed():
     return shutil.which(npm_command()) is not None or shutil.which(FRONTEND_COMMAND) is not None
 
 
+def install_standalone_launcher(launcher_dir: Path | None = None) -> bool:
+    """既存の Avatar 起動処理を aidiy_avatar コマンドとして登録する。"""
+    script_path = FRONTEND_AVATAR_DIR / "_start.py"
+    if not script_path.is_file():
+        print_error(f"起動スクリプトが見つかりません: {script_path}")
+        return False
+    launcher_dir = launcher_dir or Path.home() / ".local" / "bin"
+    launcher_path = launcher_dir / ("aidiy_avatar.cmd" if sys.platform == "win32" else "aidiy_avatar")
+    try:
+        launcher_dir.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "win32":
+            content = (
+                "@echo off\nchcp 65001 >nul\nsetlocal EnableExtensions DisableDelayedExpansion\n"
+                f'"{sys.executable}" -X utf8 "{script_path}" %*\nexit /b %ERRORLEVEL%\n'
+            )
+            launcher_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
+        else:
+            content = f'#!/usr/bin/env sh\nexec {shlex.quote(sys.executable)} -X utf8 {shlex.quote(str(script_path))} "$@"\n'
+            launcher_path.write_text(content, encoding="utf-8")
+            launcher_path.chmod(0o755)
+    except OSError as exc:
+        print_error(f"ランチャーを登録できません: {launcher_path} ({exc})")
+        return False
+    print_success(f"起動ランチャーを登録しました: {launcher_path}")
+    if str(launcher_dir).lower() not in (entry.lower() for entry in os.environ.get("PATH", "").split(os.pathsep)):
+        print_warning(f"{launcher_dir} を PATH に追加し、新しいターミナルから aidiy_avatar を実行してください。")
+    return True
+
+
 # ============================================================
 # セットアップ本体
 # ============================================================
@@ -154,7 +185,7 @@ def setup(choices: dict | None = None) -> bool:
     label = "フロントエンド(Avatar)"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_AVATAR_DIR}")
-    print_info("対象: Vue 3 / Vite / TypeScript / Electron")
+    print_info("対象: Vue 3 / Vite / TypeScript / Electron / aidiy_avatar ランチャー")
 
     if not FRONTEND_AVATAR_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {FRONTEND_AVATAR_DIR}")
@@ -171,12 +202,18 @@ def setup(choices: dict | None = None) -> bool:
     ):
         return False
 
+    if not install_standalone_launcher():
+        return False
+
     print_success(f"{label}: セットアップが完了しました。")
+    print_info("起動方法: aidiy_avatar （または cd frontend_avatar && npm run dev）")
     return True
 
 
 def main():
     global AUTO_MODE
+    if sys.argv[1:] == ["--launchers-only"]:
+        raise SystemExit(0 if install_standalone_launcher() else 1)
     print_header("フロントエンド(Avatar) セットアップ")
     run_setup, AUTO_MODE = ask_start_mode("フロントエンド(Avatar) のセットアップを実行しますか?", default="n")
     if not run_setup:

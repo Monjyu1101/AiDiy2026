@@ -10,7 +10,7 @@
 <body>
   <header id="chat-header">
     <div id="title-bar">
-      <span id="activity" role="status" aria-live="polite"><span class="activity-dot" aria-hidden="true">〇</span><span id="activity-label">未接続</span></span>
+      <span id="activity" role="status" aria-live="polite"><span class="activity-dot" aria-hidden="true"></span><span id="activity-label">未接続</span></span>
       <div class="brand"><img class="brand-icon" src="{{APP_ICON}}" alt=""><div class="brand-name">AiDiy (Code)</div></div>
       <nav id="desktop-controls" aria-label="ウィンドウ操作" hidden>
         <button type="button" id="window-minimize" title="最小化" aria-label="最小化"><span class="window-minimize" aria-hidden="true"></span></button>
@@ -21,7 +21,7 @@
     <div id="activity-bar" aria-hidden="true"></div>
     <div id="conversation-toolbar">
       <div class="conversation-context"><span id="view-title" class="project-label">プロジェクト:</span><span id="project-folder" title=""></span></div>
-      <nav id="header-actions" aria-label="会話操作"><button type="button" id="connect-toggle">接続</button><button type="button" id="new-chat" title="新しい会話" disabled>＋ 新規</button><button type="button" id="history-toggle" aria-controls="history-list" aria-expanded="false">一覧</button></nav>
+      <nav id="header-actions" aria-label="会話操作"><button type="button" id="new-chat" title="新しい会話" disabled>＋ 新規</button><button type="button" id="history-toggle" aria-controls="history-list" aria-expanded="false">一覧</button></nav>
     </div>
   </header>
   <section id="history-list" role="list" aria-label="会話一覧" hidden></section>
@@ -32,12 +32,20 @@
   <section id="progress-section" hidden><details id="progress-details"><summary id="progress-title">実行状況</summary><pre id="progress"></pre></details></section>
   <footer id="chat-footer">
     <div id="attachment" hidden><span id="attachment-name"></span><button id="remove-attachment" aria-label="添付を外す">×</button></div>
-    <form id="composer"><label class="sr-only" for="prompt">AiDiy へのメッセージ</label><textarea id="prompt" rows="3" maxlength="200000" placeholder="AiDiyに依頼する..." title="Enter で改行、Tab で送信ボタンへ移動"></textarea><div class="composer-actions"><span class="keyboard-hint">Enter で改行 <span>·</span> Tab → Enter で送信</span><div class="composer-meta"><div class="model-selection"><button type="button" id="choose-model" aria-label="コードAIとモデルを選択" aria-haspopup="dialog" aria-controls="model-picker"><span class="model-caption">モデル</span><span class="model-chevron" aria-hidden="true">▾</span></button><span id="model-label"></span></div></div><button type="button" id="stop" aria-label="実行を停止" hidden><img class="stop-icon" src="{{STOP_ICON}}" alt=""><span class="stop-label" aria-hidden="true">STOP</span></button><button type="submit" id="send" class="primary" aria-label="送信" title="送信（フォーカス中に Enter）" disabled><img src="{{SEND_ICON}}" alt=""></button></div></form>
+    <form id="composer"><label class="sr-only" for="prompt">AiDiy へのメッセージ</label><textarea id="prompt" rows="3" maxlength="200000" placeholder="AiDiyに依頼する..." title="Enter で改行、Tab で送信ボタンへ移動"></textarea><div class="composer-actions"><span class="keyboard-hint">Enter で改行 <span>·</span> Tab → Enter で送信</span><div class="composer-meta"><div class="model-selection"><button type="button" id="choose-model" aria-label="コードAIとモデルを選択" aria-haspopup="dialog" aria-controls="model-picker"><span class="model-caption">モデル</span><span class="model-chevron" aria-hidden="true">▾</span></button><span id="model-label"></span></div></div><div class="verification-options"><label for="self-check-loop">検証</label>
+      <select id="self-check-loop" title="0回はバックアップ・検証なし" aria-describedby="verification-hint">
+        <option value="0">0回</option>
+        <option value="1" selected>1回</option>
+        <option value="2">2回</option>
+        <option value="3">3回</option>
+      </select>
+    <span id="verification-hint">0回:バックアップ・検証無</span></div><button type="button" id="stop" aria-label="実行を停止" hidden><img class="stop-icon" src="{{STOP_ICON}}" alt=""><span class="stop-label" aria-hidden="true">STOP</span></button><button type="submit" id="send" class="primary" aria-label="送信" title="送信（フォーカス中に Enter）" disabled><img src="{{SEND_ICON}}" alt=""></button></div></form>
     <div id="status" role="status" hidden></div>
+    <div id="error" role="alert" hidden></div>
   </footer>
   <dialog id="model-picker" aria-labelledby="model-picker-title">
     <form method="dialog" id="model-picker-form">
-      <div class="picker-header"><div><h2 id="model-picker-title">使用するAIモデル</h2><p>AIコアのコードAIを選択します。</p></div><button type="submit" value="cancel" class="picker-close" aria-label="閉じる">×</button></div>
+      <div class="picker-header"><div><h2 id="model-picker-title">使用するAIモデル</h2><p id="model-picker-description">AIコアのコードAIを選択します。</p></div><button type="submit" value="cancel" class="picker-close" aria-label="閉じる">×</button></div>
       <label for="provider-select">コードAI</label>
       <select id="provider-select"></select>
       <label for="model-select">モデル</label>

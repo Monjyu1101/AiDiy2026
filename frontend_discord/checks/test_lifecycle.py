@@ -66,7 +66,7 @@ class DiscordLifecycleTest(unittest.TestCase):
         with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'start_service') as launch, patch.object(start.time, 'sleep'):
             flags = start.start_initial_services(False, False, False, False, False, False, running, {}, None)
         launch.assert_not_called()
-        stop_all.assert_called_once()  # 未選択でも cleanup と同じ手順で Discord を含む全停止を行う。
+        stop_all.assert_called_once()  # 未選択でも Code / Discord を保護した既存プロセス整理を行う。
         self.assertFalse(flags[NAME]); self.assertNotIn(NAME, running)
         module = Mock()
         with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'DISCORD', module), patch.object(start, 'attach_output_thread'), patch.object(
@@ -90,7 +90,7 @@ class DiscordLifecycleTest(unittest.TestCase):
                     self.assertIn(name, json.loads(path.read_text(encoding='utf-8'))['services'])
                     start.suspend_services_for_cleanup(flags, running, crash)
                     self.assertFalse(flags[name]); self.assertNotIn(name, running); self.assertNotIn(name, crash)
-                    stop.assert_called_once_with({name: proc})
+                    stop.assert_called_once_with({name: proc}, keep_standalone=False)
                     self.assertFalse(start.start_service(name, {}, {}, None))
                 self.assertFalse(path.exists())
                 self.assertFalse(flags[name])
@@ -157,16 +157,66 @@ class DiscordLifecycleTest(unittest.TestCase):
             self.assertEqual(run.call_args.args[0][-1], '--check')
             with patch.object(discord_start.subprocess, 'Popen') as spawn:
                 discord_start.start()
-            self.assertEqual(spawn.call_args.args[0], command + ['--wait'])
+            self.assertEqual(spawn.call_args.args[0], command)
             self.assertNotIn('shell', spawn.call_args.kwargs)
             with patch.object(discord_start.subprocess, 'Popen') as spawn:
                 discord_start.start(auto_connect=True)
-            self.assertEqual(spawn.call_args.args[0], command + ['--wait', '--connect'])
+            self.assertEqual(spawn.call_args.args[0], command + ['--connect'])
+
+    def test_start_stop_preserves_discord_and_code_descendants(self):
+        for keep_code in (False, True):
+            modules = {folder: Mock() for _, folder, _, _ in cleanup.SERVICE_CLEANUP_TARGETS}
+            modules['frontend_vscode'] = Mock()
+            modules['frontend_vscode'].process_tree_pids.return_value = {100, 101}
+            modules['frontend_discord'].process_tree_pids.return_value = {200, 201, 202}
+            tools = Mock()
+            with patch.object(cleanup, '_load_folder_start_module', side_effect=modules.get), patch.object(
+                cleanup, '_load_folder_module', return_value=tools
+            ), patch.object(cleanup.time, 'sleep'):
+                self.assertTrue(cleanup.stop_all_services({}, strict=False, keep_code=keep_code, keep_discord=True))
+            modules['frontend_discord'].kill_ports.assert_not_called()
+            expected = {200, 201, 202} | ({100, 101} if keep_code else set())
+            tools.stop_tools_processes.assert_called_once_with(exclude_pids=frozenset(expected))
+
+        modules['frontend_discord'].process_tree_pids.side_effect = OSError('一覧取得失敗')
+        tools.stop_tools_processes.reset_mock()
+        with patch.object(cleanup, '_load_folder_start_module', side_effect=modules.get), patch.object(
+            cleanup, '_load_folder_module', return_value=tools
+        ), patch.object(cleanup.time, 'sleep'):
+            self.assertFalse(cleanup.stop_all_services({}, strict=False, keep_code=True, keep_discord=True))
+        tools.stop_tools_processes.assert_not_called()
+
+    def test_shutdown_preserves_started_discord_but_explicit_cleanup_stops_it(self):
+        for keep in (True, False):
+            module = Mock()
+            proc = Mock(pid=123456)
+            with patch.object(start, 'DISCORD', module), patch.object(start, 'VSCODE', None), patch.object(
+                start.sys, 'platform', 'win32'
+            ), patch.object(start.subprocess, 'run') as kill:
+                running = {NAME: proc}
+                start.stop_processes(running, keep_standalone=keep)
+            self.assertEqual(running, {})
+            if keep:
+                kill.assert_not_called(); module.kill_ports.assert_not_called(); proc.wait.assert_not_called()
+            else:
+                self.assertEqual(kill.call_args.args[0], ['taskkill', '/F', '/T', '/PID', '123456'])
+                module.kill_ports.assert_called_once()
 
 
 class DiscordProcessMatchingTest(unittest.TestCase):
     def owned(self, command, name='node.exe'):
         return processes.is_discord_process(dict(Name=name, CommandLine=command), FRONTEND, True)
+
+    def test_preserved_discord_tree_contains_hermes_and_mcp_only(self):
+        records = [
+            dict(ProcessId=10, ParentProcessId=1, Name='node.exe', CommandLine=f'node.exe "{FRONTEND / "src/web-server.ts"}"'),
+            dict(ProcessId=11, ParentProcessId=10, Name='python.exe', CommandLine='python.exe hermes'),
+            dict(ProcessId=12, ParentProcessId=11, Name='python.exe', CommandLine='python.exe mcp_stdio.py'),
+            dict(ProcessId=20, ParentProcessId=1, Name='node.exe', CommandLine='node.exe other.js'),
+            dict(ProcessId=21, ParentProcessId=20, Name='python.exe', CommandLine='python.exe mcp_stdio.py'),
+        ]
+        with patch.object(processes, 'list_processes', return_value=records), patch.object(processes.sys, 'platform', 'win32'):
+            self.assertEqual(processes.discord_tree_pids(FRONTEND), {10, 11, 12})
 
     def test_root_launcher_bat_and_npm_entrypoints(self):
         main = FRONTEND / 'src/main.ts'; cli = FRONTEND / 'node_modules/tsx/dist/cli.mjs'; loader = FRONTEND / 'node_modules/tsx/dist/loader.mjs'

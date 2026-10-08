@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util';
 import { プロジェクト引数書式, プロジェクトフォルダ決定, ブラウザ自動判定, ブラウザ版表示, ブラウザ版案内, ブラウザ版へ切替 } from '../scripts/launch-project.mjs';
 import localBackend from './local-backend.cjs';
 import buildState from './build-state.cjs';
+import instanceLock from '../scripts/single-instance.cjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 let options, projectRoot;
 try {
@@ -54,7 +55,16 @@ function electronExecutable() {
     return executable;
   } catch { throw error; }
 }
+let instance;
 async function main() {
+  if (mode === 'serve' || (mode === 'browser' && foreground)) {
+    instance = await instanceLock.起動ロック('aidiy_live');
+    if (!instance) {
+      if (options['ready-file']) writeFileSync(options['ready-file'], JSON.stringify({ alreadyRunning: true }));
+      console.log('aidiy_live は起動済みです。');
+      return;
+    }
+  }
   if (buildState.ビルド更新が必要(root)) {
     console.log('Live の画面・接続処理を更新しています…');
     await import('./build.mjs');
@@ -92,6 +102,7 @@ async function main() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     const info = JSON.parse(readFileSync(ready, 'utf8'));
+    if (info.alreadyRunning) { console.log('aidiy_live は起動済みです。'); return; }
     ブラウザ版案内(info.publicUrl || info.url);
   }
   if (mode !== 'desktop') return mode === 'browser' && !foreground ? startBrowserDetached() : startBrowser(mode === 'browser');
@@ -118,7 +129,9 @@ async function main() {
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    if (JSON.parse(readFileSync(ready, 'utf8')).windowShown !== true) throw new Error(`表示を確認できません。ログ: ${log}`);
+    const info = JSON.parse(readFileSync(ready, 'utf8'));
+    if (info.alreadyRunning) { console.log('aidiy_live は起動済みです。'); return; }
+    if (info.windowShown !== true) throw new Error(`表示を確認できません。ログ: ${log}`);
     console.log(`aidiy_live を起動しました。`);
   }
   try { await startDesktop(); }
@@ -129,4 +142,4 @@ async function main() {
   }
 }
 if (mode !== 'serve') console.log('AiDiy (Live) を起動しています…');
-main().catch(error => { console.error(error.message || String(error)); process.exitCode = 1; });
+main().catch(async error => { await instance?.close(); console.error(error.message || String(error)); process.exitCode = 1; });

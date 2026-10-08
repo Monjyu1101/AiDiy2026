@@ -43,6 +43,7 @@ export class CodeConnection {
   session = '';
   model: CodeModel = { provider: '', model: '' };
   error = '';
+  get 接続中() { return this.connecting; }
   constructor(backend: string, private onPacket: (packet: Packet) => void, private onState: () => void,
     private createSocket: (url: string) => LiveSocket = url => new WebSocket(url), private request: typeof fetch = fetch) {
     this.target = backendUrl(backend);
@@ -108,6 +109,7 @@ export class CodeConnection {
     if (!this.enabled || this.disposed || this.connecting || this.connected) return;
     this.connecting = true;
     const generation = this.generation;
+    this.onState();
     const current = () => generation === this.generation && this.enabled && !this.disposed;
     try {
       const session = await this.open('input', this.session, generation);

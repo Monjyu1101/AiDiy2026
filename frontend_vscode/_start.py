@@ -7,7 +7,7 @@ import sys
 
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR / 'scripts'))
-from standalone_processes import stop_standalone
+from standalone_processes import standalone_tree_pids, stop_standalone
 
 
 def launch_command(module: str) -> list[str]:
@@ -41,11 +41,17 @@ def _start(module: str, args: list[str]) -> subprocess.Popen[bytes]:
 
 
 def start_code() -> subprocess.Popen[bytes]:
-    return _start('code', ['--wait'])
+    # --wait を付けず、画面とログをランチャーから独立させる。
+    return _start('code', [])
 
 
 def start_live(auto_connect: bool = False) -> subprocess.Popen[bytes]:
     return _start('live', ['--foreground'] + (['--connect'] if auto_connect else []))
+
+
+def process_tree_pids(module: str) -> set[int]:
+    """全体起動の停止から保護するため、単独実行とその子孫の PID を返す。"""
+    return standalone_tree_pids(THIS_DIR, module)
 
 
 def kill_ports(module: str | None = None) -> None:

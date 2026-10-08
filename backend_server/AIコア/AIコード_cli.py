@@ -1219,7 +1219,7 @@ class CodeAI:
                 raise monitor_error
 
             # stdout/stderr の行数と先頭内容を記録
-            logger.info(f"[CodeAI] subprocess完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行, ai={self.code_ai}")
+            logger.info(f"[CodeAI] subprocess完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行, ai={self.code_ai}, 終了コード={process.returncode}")
             if result_lines:
                 logger.info(f"[CodeAI] stdout先頭: {repr(result_lines[0][:80])}")
                 logger.info(f"[CodeAI] stdout末尾: {repr(result_lines[-1][:80])}")

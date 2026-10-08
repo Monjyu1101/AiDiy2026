@@ -50,7 +50,7 @@ const プロパティ = defineProps<{
 }>()
 
 const 通知 = defineEmits<{
-  submit: [text: string, channel: コードチャンネル]
+  submit: [text: string, channel: コードチャンネル, 検証ループ回数: number]
   cancel: [channel: コードチャンネル]
   'send-file': [payload: { channel: コードチャンネル; fileName: string; base64: string }]
   activate: []
@@ -75,6 +75,7 @@ function キー入力処理(event: KeyboardEvent) {
   送信ボタン.value.focus()
 }
 const 送信中 = ref(false)
+const 検証ループ回数 = ref(1)
 const ストリーム受信中 = ref(false)
 const ドラッグ中 = ref(false)
 const 入力欄最大到達 = ref(false)
@@ -538,7 +539,7 @@ function テキストエリア自動調整() {
 function メッセージ送信() {
   const text = 入力テキスト.value.trim()
   if (!text || 送信中.value || !WebSocket接続中.value) return
-  通知('submit', text, プロパティ.チャンネル)
+  通知('submit', text, プロパティ.チャンネル, 検証ループ回数.value)
   入力テキスト.value = ''
   入力欄状態リセット()
   送信中.value = true
@@ -829,6 +830,19 @@ defineExpose({
           ></textarea>
         </div>
 
+        <div class="verification-options">
+          <label class="verification-row">
+            <span class="verification-label">検証</span>
+            <select v-model.number="検証ループ回数" class="verification-select" title="0回はバックアップ・検証なし">
+              <option :value="0">0回</option>
+              <option :value="1">1回</option>
+              <option :value="2">2回</option>
+              <option :value="3">3回</option>
+            </select>
+          </label>
+          <span class="verification-hint">0回:バックアップ・検証無</span>
+        </div>
+
         <button
           ref="送信ボタン"
           class="agent-send-btn"
@@ -872,6 +886,57 @@ defineExpose({
 </template>
 
 <style scoped>
+.verification-options {
+  display: grid;
+  flex: 0 0 auto;
+  height: 48px;
+  margin-bottom: 20px;
+  align-content: center;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.verification-row {
+  display: grid;
+  grid-template-columns: 1fr 52px;
+  align-items: center;
+  gap: 6px;
+}
+
+.verification-label {
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 0 8px;
+  line-height: normal;
+  background: #fff;
+  color: #000;
+  font-size: 12px;
+}
+
+.verification-select {
+  box-sizing: border-box;
+  width: 52px;
+  height: 22px;
+  margin: 0;
+  padding: 0 2px;
+  border: 1px solid #666;
+  border-radius: 0;
+  background: #333;
+  color: #ccc;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.verification-hint {
+  color: #999;
+  font-size: 9px;
+  line-height: 11px;
+}
+
 .agent-container {
   width: 100%;
   height: 100%;
@@ -1090,17 +1155,19 @@ defineExpose({
 .input-container {
   position: relative;
   flex: 1;
+  min-width: 0;
   margin-bottom: 0;
 }
 
 .prompt-symbol {
   position: absolute;
   left: 8px;
-  top: 16px;
+  top: 12px;
   color: #ffffff;
   font-family: 'Courier New', monospace;
   font-weight: bold;
   font-size: 16px;
+  line-height: 1;
   cursor: pointer;
   user-select: none;
   z-index: 1;
@@ -1157,7 +1224,6 @@ defineExpose({
   width: 56px;
   height: 48px;
   margin-bottom: 20px;
-  margin-left: 10px;
   background: rgba(255, 255, 255, 0.95);
   color: #ffffff;
 }

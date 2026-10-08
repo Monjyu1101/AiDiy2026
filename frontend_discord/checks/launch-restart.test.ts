@@ -78,3 +78,12 @@ test('Electron が使えない時は理由を表示してブラウザ版に切�
   assert.equal(server.options.env.AIDIY_DISCORD_CONNECT, '1');
   assert.deepEqual(result.opened, ['https://example-1.app.github.dev/local/'], 'Codespaces では転送先の URL を開く');
 });
+
+test('既存ブラウザ版を検出したら、別の画面を開かず成功終了する', async () => {
+  const result = await 起動実行({ argv: ['--browser'], electron: false, ready: () => ({ alreadyRunning: true }) });
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.spawned.length, 1);
+  assert.match(result.messages[0], /起動済み/);
+  assert.deepEqual(result.opened, []);
+  assert.deepEqual(result.warnings, []);
+});

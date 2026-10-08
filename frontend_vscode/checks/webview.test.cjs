@@ -2,56 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
-const { runInNewContext } = require('node:vm');
-const { transformSync } = require('esbuild');
-const { scrollRuntime } = require('./scroll-screen.cjs');
-
-function screen() {
-  const runtime = scrollRuntime(), nodes = new Map(), events = new Map(), posts = [];
-  function element(id = '') {
-    if (nodes.has(id)) return nodes.get(id);
-    const classes = new Set();
-    const node = {
-      value: '', textContent: '', hidden: false, children: [], listeners: new Map(),
-      scrollHeight: 1000, clientHeight: 300, scrollTop: 0,
-      classList: { add: name => classes.add(name), remove: name => classes.delete(name),
-        toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name) },
-      addEventListener(name, callback) { this.listeners.set(name, callback); },
-      querySelector() { return element('activity-dot'); },
-      setAttribute() {}, focus() {}, setSelectionRange() {},
-      append(...children) { this.children.push(...children); },
-      replaceChildren(...children) { this.children = children; },
-      replaceWith() {}, cloneNode() { return element(); },
-      close() { this.open = false; }, showModal() { this.open = true; },
-    };
-    if (id) nodes.set(id, node);
-    return node;
-  }
-  runInNewContext(transformSync(readFileSync(join(__dirname, '../src/webview.ts'), 'utf8'), {
-    loader: 'ts', format: 'cjs',
-  }).code, {
-    require(name) {
-      if (name === './scroll-follow') return { 最下部追従: runtime.follow };
-      if (name === './stream-control') return {
-        streamControlOf: text => ({ '\x02': 'start', '\x03': 'end', '\x18': 'cancel' })[text],
-        visibleStreamContent: text => text,
-      };
-      return require(name);
-    },
-    acquireVsCodeApi: () => ({ getState() {}, setState() {}, postMessage(message) { posts.push(message); } }),
-    document: { getElementById: element, createElement: () => element(), body: element('body'), addEventListener() {} },
-    window: { addEventListener: (name, callback) => events.set(name, callback), setTimeout() {},
-      matchMedia: () => ({ matches: true }) },
-    requestAnimationFrame: runtime.requestAnimationFrame, clearTimeout() {},
-  });
-  let state = { type: 'state', 会話ID: 'conversation-1', メッセージ: [], 進捗: [], 履歴: [],
-    信頼済み: true, 接続済み: true, 作業フォルダ: { 名前: 'project' }, 実行中: false };
-  return { ...runtime, element, posts,
-    notify(data) { events.get('message')({ data }); },
-    state(data) { state = { ...state, ...data }; events.get('message')({ data: state }); },
-    input(text) { element('prompt').value = text; element('prompt').listeners.get('input')(); },
-  };
-}
+const { screen } = require('./code-screen.cjs');
 
 test('Code: 履歴を上へスクロール中でも、入力メッセージ追加と送信受理後は末尾へ移動する', () => {
   const ui = screen(), history = ui.element('conversation');
@@ -96,21 +47,105 @@ test('Code: 入力欄の伸縮と一覧からの復帰後も、描画後の履�
   assert.equal(history.scrollTop, 1400);
 });
 
+test('Code: 検証ループは初期値1回、選択した0〜3回を送信する', () => {
+  const ui = screen(); ui.state({});
+  assert.equal(ui.element('self-check-loop').value, '1');
+  for (const count of [1, 0, 2, 3]) {
+    ui.element('self-check-loop').value = String(count);
+    ui.input('検証回数の確認');
+    ui.element('composer').listeners.get('submit')({ preventDefault() {} });
+    assert.equal(ui.posts.at(-1).self_check_loop, count);
+    assert.equal(ui.posts.at(-1).メッセージ識別, 'input_text');
+    ui.notify({ type: 'accepted' });
+    assert.equal(ui.element('self-check-loop').value, String(count));
+  }
+});
+
+test('Code offline: 未接続でも送信でき、検証0を固定し、オンラインの回数へ復帰する', () => {
+  const ui = screen(); ui.state({オフライン対応:true,実行モード:'online'});
+  ui.element('self-check-loop').value='3';
+  ui.state({接続済み:false});
+  ui.input(' ');
+  assert.equal(ui.element('send').disabled,true);
+  ui.input('未接続でも依頼');
+  assert.equal(ui.element('send').disabled,false);
+  ui.element('composer').listeners.get('submit')({preventDefault(){}});
+  assert.equal(ui.posts.at(-1).self_check_loop,0);
+  assert.equal(ui.element('send').disabled,true);
+  ui.notify({type:'accepted'});
+  assert.equal(ui.element('chat-header').classList.contains('connected'),false);
+  assert.equal(ui.element('self-check-loop').value,'0');
+  assert.equal(ui.element('self-check-loop').disabled,true);
+  ui.state({接続済み:false});
+  assert.equal(ui.element('self-check-loop').value,'0');
+  ui.state({接続済み:true});
+  assert.equal(ui.element('self-check-loop').value,'3');
+  assert.equal(ui.element('self-check-loop').disabled,false);
+  assert.equal(ui.element('chat-header').classList.contains('connected'),true);
+  ui.state({接続済み:false});
+  ui.state({実行モード:'offline',接続済み:false,provider:'aidiy_hermes',model:'auto'});
+  ui.input('単独実行');
+  assert.equal(ui.element('activity-label').textContent,'未接続');
+  assert.equal(ui.element('activity').hidden,false);
+  assert.equal(ui.element('self-check-loop').value,'0');
+  assert.equal(ui.element('self-check-loop').disabled,true);
+  assert.equal(ui.element('send').disabled,false);
+  assert.equal(ui.element('new-chat').disabled,false);
+  ui.element('composer').listeners.get('submit')({preventDefault(){}});
+  assert.equal(ui.posts.at(-1).self_check_loop,0);
+  ui.state({実行中:true});
+  assert.equal(ui.element('stop').disabled,false);
+  ui.state({実行中:false,実行モード:'online',接続済み:true});
+  assert.equal(ui.element('self-check-loop').value,'3'); assert.equal(ui.element('self-check-loop').disabled,false);
+  assert.equal(ui.element('activity').hidden,false);
+});
+
+test('Code offline: モデル選択は取得した固定候補だけで、手入力・既定の空欄を追加しない', () => {
+  const ui = screen(); ui.state({オフライン対応:true,実行モード:'offline',provider:'aidiy_hermes',model:'auto',接続済み:false});
+  ui.element('choose-model').listeners.get('click')();
+  ui.notify({type:'modelCatalog',provider:'',items:[{id:'aidiy_hermes',label:'aidiy_hermes'}]});
+  ui.notify({type:'modelCatalog',provider:'aidiy_hermes',items:[{id:'auto',label:'auto'},{id:'openai_oauth/gpt-6.1-sol',label:'openai_oauth/gpt-6.1-sol'}]});
+  assert.deepEqual(ui.element('provider-select').children.map(item=>item.value),['aidiy_hermes']);
+  assert.equal(ui.element('provider-select').disabled,true);
+  assert.equal(ui.element('apply-model').disabled,false);
+  assert.deepEqual(ui.element('model-select').children.map(item=>item.value),['auto','openai_oauth/gpt-6.1-sol']);
+  assert.equal(ui.element('custom-model').hidden,true);
+  ui.element('model-select').value='openai_oauth/gpt-6.1-sol';
+  ui.element('apply-model').listeners.get('click')();
+  assert.equal(ui.posts.at(-1).model,'openai_oauth/gpt-6.1-sol');
+});
+
 test('Code: タイトルバーに接続状態を表示し、切断中は送信を無効化する', () => {
   const ui = screen(); ui.state({}); ui.input('依頼');
-  assert.equal(ui.element('activity-label').textContent, '接続中');
-  assert.equal(ui.element('activity-dot').textContent, '●');
+  assert.equal(ui.element('activity-label').textContent, '接続済み');
+  assert.equal(ui.element('chat-header').classList.contains('connected'), true);
+  assert.equal(ui.element('activity').classList.contains('connected'), true);
   assert.equal(ui.element('send').disabled, false);
   ui.state({接続済み:false});
   assert.equal(ui.element('activity-label').textContent, '未接続');
-  assert.equal(ui.element('activity-dot').textContent, '〇');
+  assert.equal(ui.element('chat-header').classList.contains('connected'), false);
+  assert.equal(ui.element('activity').classList.contains('connected'), false);
   assert.equal(ui.element('send').disabled, true);
   const count = ui.posts.length;
   ui.element('composer').listeners.get('submit')({preventDefault(){}});
   assert.equal(ui.posts.length,count);
-  ui.state({接続済み:true});
+  ui.state({接続中:true});
+  assert.equal(ui.element('activity-label').textContent, '接続中');
+  assert.equal(ui.element('chat-header').classList.contains('connected'),false);
+  assert.equal(ui.element('send').disabled,true);
+  ui.state({接続済み:true,接続中:false});
   assert.equal(ui.element('send').disabled,false);
+  ui.state({実行中:true});
+  assert.equal(ui.element('activity-label').textContent, '接続済み');
+  assert.equal(ui.element('chat-header').classList.contains('connected'), true);
+  assert.equal(ui.element('activity').classList.contains('running'), true);
+  ui.state({実行中:false});
+  assert.equal(ui.element('activity-label').textContent, '接続済み');
+  assert.equal(ui.element('chat-header').classList.contains('connected'), true);
+  assert.equal(ui.element('activity').classList.contains('running'), false);
   const html = readFileSync(join(__dirname,'../media/chat.html'),'utf8');
+  assert.ok(!html.includes('id="connect-toggle"'));
+  assert.ok(!html.includes('id="execution-mode'));
   assert.ok(html.indexOf('id="activity"') < html.indexOf('id="conversation-toolbar"'));
   assert.ok(!html.slice(html.indexOf('<footer')).includes('id="activity"'));
 });

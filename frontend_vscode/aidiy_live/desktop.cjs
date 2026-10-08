@@ -4,6 +4,7 @@ const { writeFileSync } = require('node:fs');
 const { audioPermission, audioRequest } = require('./permissions.cjs');
 const size = require('../scripts/window-size.cjs');
 const { 拡大表示 } = require('../scripts/window-opening.cjs');
+const { 起動ロック } = require('../scripts/single-instance.cjs');
 const { ライブ起動 } = require('../dist/aidiy_live/server.cjs');
 const backend = process.env.AIDIY_LIVE_BACKEND || process.argv[2];
 const ready = process.env.AIDIY_LIVE_READY || process.argv[3];
@@ -13,6 +14,8 @@ app.setName('aidiy_live');
 app.setPath('userData', join(app.getPath('appData'), 'aidiy_live'));
 if (process.platform === 'win32') app.setAppUserModelId('AiDiy.aidiy_live');
 let server, window, closing = false, opening = true;
+let instance;
+app.on('will-quit', () => { void instance?.close(); });
 app.on('before-quit', event => {
   if (!server || closing) return;
   event.preventDefault(); closing = true;
@@ -20,6 +23,16 @@ app.on('before-quit', event => {
 });
 app.on('window-all-closed', () => app.quit());
 app.whenReady().then(async () => {
+  instance = await 起動ロック('aidiy_live', () => {
+    if (closing || !window || window.isDestroyed()) return;
+    if (window.isMinimized()) window.restore();
+    window.show(); window.focus();
+  });
+  if (!instance) {
+    if (ready) writeFileSync(ready, JSON.stringify({ alreadyRunning: true }));
+    app.quit();
+    return;
+  }
   server = await ライブ起動(join(__dirname, '..'), backend, false, projectRoot, initialModels ? JSON.parse(initialModels) : {}, undefined, process.env.AIDIY_LIVE_CONNECT === '1');
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({

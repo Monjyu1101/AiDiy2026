@@ -31,7 +31,7 @@
 
 ## 実装上の維持事項
 
-- Code / Live は既存AIコアのWebSocketとモデル情報APIを使う。Code の接続は `src/code-connection.ts` が input → セッション設定API → 出力1 の順に行い、両init完了まで送信を拒否する。
+- Code / Live は既存AIコアのWebSocketとモデル情報APIを使う。Code の接続は `src/code-connection.ts` が input → セッション設定API → 出力1 の順に行い、両init完了後にAIコアへ送信する。未接続中のCode送信はHermesの直接実行へ渡す。
 - Code / Live は別々の拡張 ID・コマンド・設定・VSIX を維持し、`extensionDependencies` / `extensionPack` で相互依存させない。片方の非導入・無効化で他方が起動できることを確認する。
 - Live の Windows マイクは Webview の権限に依存せず、拡張ホストの Python 標準ライブラリ補助で取り込む。音声処理と自動減衰はスタンドアロンと共有し、非表示・切断・無効化でマイクを終了する。
 - CLI は `shell: false` で起動し、要求本文は標準入力で渡す。要求文をコマンドライン引数へ埋め込まない。
@@ -61,10 +61,10 @@
 - 入力欄の Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。日本語 IME の変換確定では送信しない。
 - Code / Live の入力欄は共通の `field-sizing: content` で改行・折り返しに合わせて上へ伸縮する。最小高さは 76px、上限は 220px と画面高さの 35% の小さい方にし、上限を超えた内容は入力欄内でスクロールする。下書き復元・会話からのコピー・送信後のクリアにも自動で反映する。
 - Code / Live の会話末尾への追従は `src/scroll-follow.ts` を共用する。メッセージ追加・入力・送信受理・ストリーム枠の更新／開閉で即時と次の描画フレームに末尾へ移動し、`ResizeObserver` で会話領域の伸縮にも追従する。Code は会話履歴と進捗の両方を揃え、一覧から会話へ戻る際も末尾へ移す。確認は `checks/webview.test.cjs` と `aidiy_live/checks/view.test.cjs` で、入力直後・表示枠の開閉・描画後の高さ変更を検証する。
-- Code の接続表示はタイトルバーに `〇 未接続` / `● 接続中` とする。入力欄下は「上段：Enter の操作説明」「下段：モデル選択とモデル名」の2段にし、右端の送信／停止ボタンは2段分の高さにする。両モードで共通の HTML / CSS を使う。
+- Code の接続表示は Live と同じタイトル左側の配置・文字色・10px文字・5pxの丸印に揃える。未接続は灰色、接続済みは緑、オンライン実行中は水色とし、文字は `未接続` / `接続中` / `接続済み` とする。CodeConnectionの接続開始・成功・失敗通知を単独版と拡張の `接続中` / `接続済み` に反映し、5秒の再試行待ちは未接続とする。シアンバーは実行状態ではなく接続状態へ連動させ、AIコアの入力・コード出力ソケットの初期化とモデル設定完了後に表示し、切断時に消す。オフライン中もタイトル左側は `未接続` を表示し、専用のオフライン表示・モードボタンは設けない。入力欄下は「上段：Enter の操作説明」「下段：モデル選択とモデル名」の2段にし、右端の送信／停止ボタンは2段分の高さにする。両モードで共通の HTML / CSS を使う。
 - 履歴削除の確認は `media/chat.html` のパネル内ダイアログで共通処理し、確認後に `deleteHistory` を送る。拡張ホストや単独画面のブリッジで別の確認ダイアログを出さない。
 - 「新規」「一覧」、モデル選択、履歴削除、送信、停止は Webview 内の共通 UI を主操作にする。VS Code 固有のコマンドは外部からの呼び出しやエディター連携用に残す。
-- 単独画面の上部はタイトルバー、実行状態バー、会話操作行の順に置く。VS Code 拡張でも接続状態を示すタイトル行を表示する。「今の会話／会話一覧」、フォルダ名、「新規」「一覧」は会話操作行にまとめる。単独ウィンドウのドラッグ領域はタイトルバーだけに指定し、会話操作行を含めない。
+- 単独画面の上部はタイトルバー、実行状態バー、会話操作行の順に置く。VS Code 拡張では接続状態の文字を含むタイトル行を省略し、シアンバーを表示する。「今の会話／会話一覧」、フォルダ名、「新規」「一覧」は会話操作行にまとめる。単独ウィンドウのドラッグ領域はタイトルバーだけに指定し、会話操作行を含めない。
 - Code / Live の上部シアンバーは Web の `frontend_web/src/components/_TopBar.vue` と同じ `abs(sin(2πt / 9))` の明滅に揃える。`media/chat.css` と `aidiy_live/media/style.css` の `cyan-bar-breathe` は、4.5秒の周期を2.5%刻みで標本化したRGB値を `linear` で補間する。`ease-in-out` に戻すとカーブが変わるため、通常表示・動きを減らす設定の両方で `linear` を維持する。
 - Code の正式回答の緑はスタンドアロンと共通の `#00ff00` を `media/chat.css` で定義する。VS Code の明暗・高コントラストテーマでも、この色を上書きしない。
 - Code の実行状況枠は CSS の `--stream`（シアン `#00ffff`）を基調にした枠線と薄い背景を使い、文字と点滅カーソルもシアンにする。Web / Avatar の `AIコード.vue` の `.stream-output .line-content` も同じ配色に揃える。Live の会話は `メッセージ識別` を行のクラスに残し、AIチャットパネルと同じく通常出力（`output_text`）は緑 `#00ff00`、コードエージェントの回答（`output_request`）はシアン `#00ffff`、音声出力認識は淡い緑で分ける。本文・文字送りカーソル・枠・背景はその種別の色を基調にし、文字送り完了後もクラスを保持する。
@@ -79,6 +79,8 @@
 - Code の履歴には `コアセッションID` を保存する。旧 `セッションID` はHermes用なのでAIコアへ渡さず、表示履歴だけ保持する。通信切断・初回失敗では約5秒後に再試行し、手動切断・画面破棄・サーバー終了ではタイマーと接続待ちを破棄する。
 
 ## セットアップと配置
+
+VS Code の Code Webview では `<body class="vscode-host">` を拡張側で付け、`#title-bar` を非表示にする。Live は `view.ts` が同じクラスを付け、`aidiy_live/media/style.css` の `.vscode-host > header` を非表示にする。両方とも接続状態の文字を含むタイトル行を省略し、シアンバーとプロジェクト・会話操作行は表示する。単独版にはこのクラスを付けず、ウィンドウのタイトル行と操作を維持する。
 
 プロジェクト全体ではルートから実行し、`command_hermes` の次に `frontend_vscode` を選ぶ。
 
@@ -112,6 +114,12 @@ Electron は VSIX 生成・単独画面コンパイルより前に `scripts/setu
 
 ## 変更後の検証
 
+`aidiy_code` 単独起動版とVS Code拡張は未接続中の送信を自動的にHermesへ渡す。拡張の `src/extension.ts` も `aidiy_code/src/offline.ts` の固定候補・既定値探索・実行処理を共用する。表示用のprovider/modelだけを接続状態で切り替え、会話内のオンラインモデルへオフライン選択を代入しない。通常起動では5秒ごとの再接続を継続し、復帰時も実行中のHermesジョブを維持する。AIコアとHermesのセッションID・保存モデルは分離し、次の送信からAIコアへ戻す。画面の `executionMode` または `--offline` で明示したオフラインは再接続しない。画面に専用のオフライン表示・モードボタンは設けない。`aidiy_code/src/offline.ts` は既存の `runner.ts` / `protocol.ts` を使ってHermesを直接実行し、AIコア・バックアップ・検証ループは呼ばない。コードAIは `aidiy_hermes` に限定し、モデルIDはオンラインのHermesと同じ形式を使う。オンライン用の `aidiy_code_model.json` はそのまま保持し、オフライン用を `aidiy_code_model_offline.json` に別保存する。両ファイルを拡張・単独版で共用し、未接続のモデル変更はオフライン用ファイルだけへ保存する。Hermesの再開IDは `HermesセッションID` に保持し、`コアセッションID` と混在させない。オフラインのコードAI欄は `aidiy_hermes` 固定・変更不可とし、モデル候補は `auto` と同梱の `_hermes_cli.bat` の選択値（`codex_cli/auto`、`copilot_cli/auto`、`openai_oauth/` 付きの4モデル）だけにする。既定値・保存値から候補を追加しない。候補外の保存値は共通設定の既定値へ戻し、既定値も候補外なら `auto` を使う。bat未配置でも同じ固定候補を使う。モデルAPIへの接続・モデルIDの手入力は不要。単独版の初期モデルは明示した起動引数、モード別の保存値、`_config/AiDiy_key.json` の `CODE_AIDIY_HERMES_MODEL` の順に優先し、共通設定が未配置・未指定の場合だけ `auto` を使う。既定値は配置先、作業フォルダの順で親へ探索し、AIコア接続前から表示する。候補外の起動引数・モデル変更要求は拒否する。
+
+モード変更は実行中に拒否する。切り替え後は新規会話とし、一覧の各会話に実行モードを保持してAIコアのセッションIDをHermesへ渡さない。CLIジョブ終了前のモード変更・新規・モデル変更も拒否し、停止／サーバー終了では子プロセスを停止する。明示オフラインへオンライン接続の遅延通知を反映しない。自動オフラインでは再接続通知で実行中フラグを解除せず、停止を進行中のHermesジョブへ渡す。共通Webviewは `オフライン対応` が真の単独版・拡張で未接続時のHermes送信を許可し、オフライン中は検証0固定、オンライン復帰時は直前の検証回数へ戻す。
+
+Code の検証ループ選択（0〜3回、初期値1回）は `media/chat.html` / `src/webview.ts` で扱い、送信パケットに `self_check_loop` を含める。単独版の `aidiy_code/src/server.ts` と拡張の `src/extension.ts` の両方でAIコアまで渡す。0回はバックアップ・検証を省略する。UI・HTTP中継・拡張中継の確認は `checks/webview.test.cjs`、`checks/aidiy_code.test.cjs`、`checks/code-extension.test.cjs` を使う。単独版は既存のbundleを使うため、変更後に `npm run compile` で生成物を更新する。
+
 ```powershell
 Set-Location frontend_vscode
 npm ci
@@ -133,7 +141,7 @@ python -m unittest discover -s checks -p "test_*.py"
 - 非ゼロ終了、起動エラー、停止、タイムアウトを呼び出し元へ返せる。
 - Windows の AiDiy `.cmd` をシェルなしで解決できる。
 - packet が開始、進捗、終了または中断、正式回答の順になる。
-- Code の両init前・切断中の送信拒否、5秒間隔の再接続、遅延イベント無視、モデルAPIのNG、破棄を確認する。接続済みで送信・停止・履歴復帰・CLI別モデル候補が動く。
+- Code の両init前・切断中のHermes実行と検証0固定、オンライン／オフライン別のモデル保存・再起動後の復元、Hermes実行中の再接続と完了後のオンライン復帰、5秒間隔の再接続、遅延イベント無視、モデルAPIのNG、破棄を確認する。接続済みで送信・停止・履歴復帰・CLI別モデル候補が動く。
 - VS Code 側で旧 `workspaceState` の単一会話を履歴へ移行でき、作業フォルダごとに履歴が分かれる。最終選択モデルが再起動後と新規会話へ引き継がれる。
 - `dist/aidiy-code-<version>.vsix` と `dist/aidiy-live-<version>.vsix` が生成され、それぞれのファイルだけを含む。
 - Live のセッション・音声パケット・WebSocket 中継・モデル API・切断・Origin 拒否を模擬バックエンドで確認できる。VS Code / 単独画面の両方で会話表示と末尾追従が動き、単独画面では起動時のモデル指定で1回だけ自動接続する。拡張ではタブを切り替えても接続を保持し、非表示中はマイクを止める。
@@ -156,7 +164,7 @@ Code / Live の単独起動では、Electron の引数をエントリファイ�
 
 Live の単独画面では起動設定の `モデル設定` にモデル名がある場合、または `--connect` が指定された場合、初期設定の読み込み後に1回だけ自動接続する。`--connect` は Electron の `AIDIY_LIVE_CONNECT` とブラウザ起動引数を通り、中継の画面設定 `自動接続` へ渡す。モデル未指定なら保存済み選択（未保存なら Core の既定設定）を使う。モデル未指定・Provider だけの指定で `--connect` が無い場合と、VS Code 拡張は手動で接続する。自動接続は音声再生の許可待ちで止めず、マイクは OFF にする。接続失敗・手動切断・画面終了の後には自動再試行しない。`aidiy_live/checks/view.test.cjs` で3種のモデル、接続失敗、音声再生の許可待ち、画面終了を検証する。
 
-ルート `_start.py` の Code / Live は `frontend_vscode/_start.py` から同じコマンド入口を使う。Code は `--wait` で子ウィンドウ終了まで待機し、Live は `--foreground --connect` で起動する。手動で閉じた画面は自動再表示せず、全体停止時は起動したモジュールだけを `scripts/standalone_processes.py` で照合する。共通の Electron バイナリだけで判定して未選択の Code / Live を止めない。起動選択・既定値・コマンド引数・停止対象は `checks/test_start.py` と Discord の `checks/test_lifecycle.py` で外部接続なしに検証する。
+ルート `_start.py` の Code / Live は `frontend_vscode/_start.py` から同じコマンド入口を使う。Code は待機指定を付けず独立起動し、Live は `--foreground --connect` で起動する。手動で閉じた画面は自動再表示せず、全体起動の起動前整理・終了時は Code / Discord とその配下を継続し、Live を `scripts/standalone_processes.py` で照合して停止する。明示的な cleanup では Code / Discord も停止する。共通の Electron バイナリだけで判定して未選択の Code / Live を止めない。起動選択・既定値・コマンド引数・停止対象は `checks/test_start.py` と Discord の `checks/test_lifecycle.py` で外部接続なしに検証する。
 
 Live のブラウザ版は通常の `--browser` と Electron 失敗時の自動切り替えでサーバーを分離し、CMD / PowerShell へ戻る。画面は localhost 中継の `presence`（SSE）へ接続し、最後の画面が閉じて約60秒後にサーバーを終了する。`--browser --foreground` は診断用、`--serve` は URL の表示と手動終了用としてターミナル上で実行する。`aidiy_live/checks/launcher.test.cjs` では、GUI が常駐してもランチャーが戻ることと、Electron 失敗時にもブラウザ中継が動いたまま戻ることを検証する。
 

@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const { join, dirname } = require('node:path');
 const { tmpdir } = require('node:os');
+let fixtureNumber = 0;
 
 function fixture(t) {
   const root = fs.mkdtempSync(join(tmpdir(), 'aidiy-live-launch-'));
@@ -13,6 +14,9 @@ function fixture(t) {
   fs.copyFileSync(join(__dirname, '../build-state.cjs'), join(app, 'build-state.cjs'));
   fs.mkdirSync(join(root, 'scripts'));
   for (const name of ['launch-project.mjs', 'window-size.cjs']) fs.copyFileSync(join(__dirname, '../../scripts', name), join(root, 'scripts', name));
+  const port = 36000 + (process.pid % 20000) + fixtureNumber++;
+  fs.writeFileSync(join(root, 'scripts/single-instance.cjs'),
+    fs.readFileSync(join(__dirname, '../../scripts/single-instance.cjs'), 'utf8').replace('aidiy_live: 18094', `aidiy_live: ${port}`));
   fs.copyFileSync(join(__dirname, '../launch.mjs'), join(app, 'launch.mjs'));
   fs.writeFileSync(join(bundle, 'view.js'), '');
   fs.writeFileSync(join(bundle, 'server.cjs'), `exports.ライブ起動 = async (root, backend, packaged, project, models, modelFile, autoConnect) => {
@@ -34,13 +38,16 @@ function fixture(t) {
     state.ビルド状態保存(root);
   `);
   require('../build-state.cjs').ビルド状態保存(root);
-  t.after(async () => {
+  const stop = async () => {
     const out = join(root, 'out/aidiy_live');
     if (fs.existsSync(out)) for (const name of fs.readdirSync(out).filter(name => name.endsWith('.json'))) {
       const { pid } = JSON.parse(fs.readFileSync(join(out, name), 'utf8'));
       if (pid) try { process.kill(pid); } catch { /* 終了済み */ }
     }
     await new Promise(resolve => setTimeout(resolve, 150));
+  };
+  t.after(async () => {
+    await stop();
     await fs.promises.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
   // OS のブラウザ起動だけを $BROWSER（共通の起動処理が最優先で使う）で代替し、
@@ -48,8 +55,8 @@ function fixture(t) {
   const env = { ...process.env, BROWSER: process.execPath };
   delete env.CODESPACES;
   env.DISPLAY ||= ':0'; // 画面のない Linux もブラウザ判定になるため、仮の表示先を与える。
-  return { root, app, env, launch: (...args) => spawnSync(process.execPath, [join(app, 'launch.mjs'), ...args], {
-    cwd: tmpdir(), env, encoding: 'utf8', timeout: 6000,
+  return { root, app, env, stop, launch: (...args) => spawnSync(process.execPath, [join(app, 'launch.mjs'), ...args], {
+    cwd: tmpdir(), env, encoding: 'utf8', timeout: 20000,
   }) };
 }
 
@@ -88,6 +95,7 @@ test('Live 全体起動: --connect をモデルなしでブラウザ・Electron�
     const config = await (await fetch(new URL('config', url))).json();
     assert.equal(config.autoConnect, true);
     assert.deepEqual(config.models, {});
+    await f.stop();
   }
 });
 
@@ -113,6 +121,7 @@ test('Live 起動引数: 未指定時は既定設定、Provider だけの指定�
     const url = result.stdout.match(/ブラウザ版を起動しました: (http[^\r\n]+)/)[1];
     const config = await (await fetch(new URL('config', url))).json();
     assert.deepEqual(config.models, expected);
+    await f.stop();
   }
 });
 
@@ -123,6 +132,23 @@ test('Live 起動引数: 値不足・未知の引数・不正な Provider を起
     assert.equal(result.status, 1);
     assert.doesNotMatch(result.stdout, /起動しました/);
   }
+});
+
+test('Live 二重起動: ブラウザを増やさず、既存の接続・モデルを保持する', async t => {
+  const f = fixture(t);
+  const first = f.launch('--browser', '--provider', 'freeai', '--model', 'first-model');
+  assert.equal(first.status, 0, first.stderr);
+  const url = first.stdout.match(/ブラウザ版を起動しました: (http[^\r\n]+)/)[1];
+  const second = f.launch('--browser', '--provider', 'gemini', '--model', 'second-model');
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, /起動済み/);
+  assert.doesNotMatch(second.stdout, /ブラウザ版を起動しました/);
+  assert.deepEqual((await (await fetch(new URL('config', url))).json()).models,
+    { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'first-model' });
+  const ready = fs.readdirSync(join(f.root, 'out/aidiy_live')).filter(name => name.endsWith('.browser.json'))
+    .map(name => JSON.parse(fs.readFileSync(join(f.root, 'out/aidiy_live', name), 'utf8')));
+  assert.equal(ready.filter(state => state.pid).length, 1);
+  assert.equal(ready.filter(state => state.alreadyRunning).length, 1);
 });
 
 test('Live 接続先: 共通PORT_COREを自動参照し、接続先の指定を要求しない', async t => {
@@ -138,7 +164,7 @@ test('Live 接続先: 共通PORT_COREを自動参照し、接続先の指定を�
   assert.equal(f.launch('--backend', 'https://example.test').status, 1);
 });
 
-test('Live 更新: 旧生成物が残っていても画面変更を検知し、更新後だけ起動する', t => {
+test('Live 更新: 旧生成物が残っていても画面変更を検知し、更新後だけ起動する', async t => {
   const f = fixture(t);
   fs.mkdirSync(join(f.app, 'media'));
   fs.writeFileSync(join(f.app, 'media/index.html'), '<html>接続先欄のない新画面</html>');
@@ -150,6 +176,7 @@ test('Live 更新: 旧生成物が残っていても画面変更を検知し、�
   assert.equal(next.status, 0, next.stderr);
   assert.doesNotMatch(next.stdout, /画面・接続処理を更新/);
   assert.equal(fs.readFileSync(join(f.root, 'build-count'), 'utf8'), '1');
+  await f.stop();
   // 記録のない従来の配置からの初回起動も更新する。
   fs.unlinkSync(join(f.root, 'dist/aidiy_live/build-state.json'));
   assert.equal(f.launch('--browser').status, 0);

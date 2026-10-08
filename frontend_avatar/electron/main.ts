@@ -779,6 +779,17 @@ function openSettingsWindow(sessionId: string) {
   void settingsWindow.loadURL(url.toString())
 }
 
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+app.on('second-instance', () => {
+  const window = coreWindow ?? loginWindow ?? BrowserWindow.getAllWindows().find(item => item.isVisible())
+  if (!window || window.isDestroyed()) return
+  if (window.isMinimized()) window.restore()
+  window.show()
+  window.focus()
+})
+
 app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId(APP_USER_MODEL_ID)
@@ -987,3 +998,4 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+}

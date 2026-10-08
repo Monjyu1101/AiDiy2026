@@ -128,7 +128,7 @@
           "type": "string",
           "default": "aidiy_hermes",
           "scope": "machine",
-          "description": "「対話 CLI」を開くための Hermes 実行ファイルまたは cli_main.py のパス。チャットはAIコア経由。"
+          "description": "未接続時のチャット実行と「対話 CLI」に使う Hermes 実行ファイルまたは cli_main.py のパス。接続済みのチャットはAIコア経由。"
         },
         "aidiyHermes.pythonPath": {
           "type": "string",

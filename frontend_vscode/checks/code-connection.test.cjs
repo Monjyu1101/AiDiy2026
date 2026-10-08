@@ -5,17 +5,19 @@ const { core } = require('./fake-core.cjs');
 const flush = async () => { for (let n = 0; n < 12; n++) await Promise.resolve(); };
 function connection(backend) {
   const packets = [], states = [];
-  const client = new CodeConnection('http://127.0.0.1:18091', packet => packets.push(packet), () => states.push(client.connected), url => new backend.Socket(url), backend.request);
+  const client = new CodeConnection('http://127.0.0.1:18091', packet => packets.push(packet), () => states.push({connected:client.connected,connecting:client.接続中}), url => new backend.Socket(url), backend.request);
   return { client, packets, states };
 }
 
 test('Code 接続: inputのinit・モデル設定後に出力ソケットを開き、両init前は送信しない', async () => {
-  const backend = core(), { client, packets } = connection(backend);
+  const backend = core(), { client, packets, states } = connection(backend);
   try {
     client.start('/project', {provider:'copilot_cli',model:'gpt-6-sol'});
+    assert.deepEqual(states, [{connected:false,connecting:false},{connected:false,connecting:true}]);
     assert.equal(client.send({メッセージ識別:'input_text',メッセージ内容:'早すぎる送信'}),false);
     await flush();
     assert.equal(client.connected,true);
+    assert.deepEqual(states.at(-1),{connected:true,connecting:false});
     assert.deepEqual(backend.sockets.map(s=>s.channel),['input','1']);
     assert.equal(backend.requests.at(-1).body.モデル設定.CODE_AI1_MODEL,'gpt-6-sol');
     assert.equal(backend.requests.at(-1).body.save,false);
@@ -34,7 +36,7 @@ test('Code 接続: inputのinit・モデル設定後に出力ソケットを開�
 
 test('Code 接続: 切断から5秒後に再接続し、同じセッションと会話を保持、遅延イベントを無視する', async t => {
   t.mock.timers.enable({ apis:['setTimeout','setInterval'] });
-  const backend = core(), {client, packets} = connection(backend);
+  const backend = core(), {client, packets, states} = connection(backend);
   try {
     client.start('/project',{provider:'copilot_cli',model:'gpt-6-sol'}); await flush();
     const session = client.session;
@@ -42,9 +44,11 @@ test('Code 接続: 切断から5秒後に再接続し、同じセッションと
     const old = backend.sockets[1], count = packets.filter(p=>p.メッセージ識別==='output_text').length;
     const settings = backend.requests.filter(r=>r.path.endsWith('設定')).length;
     old.close(); assert.equal(client.connected,false); assert.equal(backend.sockets[0].readyState,3);
+    assert.deepEqual(states.at(-1),{connected:false,connecting:false});
     assert.equal(client.send({メッセージ識別:'input_text',メッセージ内容:'切断中'}),false);
     t.mock.timers.tick(4999); await flush(); assert.equal(backend.sockets.length,2);
     t.mock.timers.tick(1); await flush();
+    assert.deepEqual(states.slice(-2),[{connected:false,connecting:true},{connected:true,connecting:false}]);
     assert.equal(client.connected,true); assert.equal(client.session,session);
     assert.equal(backend.sockets.length,4);
     assert.equal(packets.filter(p=>p.メッセージ識別==='output_text').length,count,'履歴再送で回答が二重にならない');

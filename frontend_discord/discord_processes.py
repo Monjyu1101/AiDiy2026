@@ -6,7 +6,7 @@ import sys
 from urllib.parse import unquote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
-from cleanup_processes import process_arguments, stop_matching
+from cleanup_processes import list_processes, process_arguments, stop_matching
 
 
 def is_discord_process(process: dict, root: Path, windows: bool) -> bool:
@@ -61,6 +61,17 @@ def is_discord_process(process: dict, root: Path, windows: bool) -> bool:
         return True
     # npm start の tsx ランチャーも対象。別スクリプトを実行中なら停止しない。
     return entry == cli and index + 1 < len(args) and normalize(args[index + 1]) in (main, relative_main)
+
+
+def discord_tree_pids(root: Path) -> set[int]:
+    """継続する Discord 本体と、その配下の Hermes / MCP の PID を返す。"""
+    records = list_processes()
+    pids = {item['ProcessId'] for item in records if is_discord_process(item, root, sys.platform == 'win32')}
+    while True:
+        children = {item['ProcessId'] for item in records if item.get('ParentProcessId') in pids} - pids
+        if not children:
+            return pids
+        pids |= children
 
 
 def stop_discord_processes(root: Path) -> bool:

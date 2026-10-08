@@ -71,6 +71,7 @@ function キー入力処理(event: KeyboardEvent) {
   送信ボタン.value.focus();
 }
 const 送信中 = ref(false);
+const 検証ループ回数 = ref(1);
 const ドラッグ中 = ref(false);
 const ストリーム受信中 = ref(false);
 const 入力欄最大到達 = ref(false);
@@ -126,7 +127,8 @@ const メッセージ送信 = async () => {
       セッションID: セッションID.value,
       チャンネル: チャンネル,
       メッセージ識別: 'input_text',
-      メッセージ内容: 送信内容
+      メッセージ内容: 送信内容,
+      self_check_loop: 検証ループ回数.value
     });
   }
 };
@@ -935,6 +937,19 @@ const 状態表示テキスト = () => {
           ></textarea>
         </div>
 
+        <div class="verification-options">
+          <label class="verification-row">
+            <span class="verification-label">検証</span>
+            <select v-model.number="検証ループ回数" class="verification-select" title="0回はバックアップ・検証なし">
+              <option :value="0">0回</option>
+              <option :value="1">1回</option>
+              <option :value="2">2回</option>
+              <option :value="3">3回</option>
+            </select>
+          </label>
+          <span class="verification-hint">0回:バックアップ・検証無</span>
+        </div>
+
         <button
           ref="送信ボタン"
           class="agent-send-btn"
@@ -980,6 +995,57 @@ const 状態表示テキスト = () => {
 </template>
 
 <style scoped>
+.verification-options {
+  display: grid;
+  flex: 0 0 auto;
+  height: 48px;
+  margin-bottom: 20px;
+  align-content: center;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.verification-row {
+  display: grid;
+  grid-template-columns: 1fr 52px;
+  align-items: center;
+  gap: 6px;
+}
+
+.verification-label {
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 0 8px;
+  line-height: normal;
+  background: #fff;
+  color: #000;
+  font-size: 12px;
+}
+
+.verification-select {
+  box-sizing: border-box;
+  width: 52px;
+  height: 22px;
+  margin: 0;
+  padding: 0 2px;
+  border: 1px solid #666;
+  border-radius: 0;
+  background: #333;
+  color: #ccc;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.verification-hint {
+  color: #999;
+  font-size: 9px;
+  line-height: 11px;
+}
+
 .agent-container {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 2px;
@@ -1344,6 +1410,7 @@ const 状態表示テキスト = () => {
 .input-container {
   position: relative;
   flex: 1;
+  min-width: 0;
   margin-bottom: 0;
 }
 
@@ -1416,7 +1483,6 @@ const 状態表示テキスト = () => {
   margin-bottom: 20px;
   background: rgba(255, 255, 255, 0.95);
   color: white;
-  margin-left: 10px;
 }
 
 .agent-send-btn img {

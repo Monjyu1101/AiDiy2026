@@ -303,7 +303,7 @@ for (const host of [true, false]) {
     const saved = { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'realtime-model', LIVE_OPENAI_VOICE: 'marin' };
     const ui = screen(host, false, false, true, undefined, false, { saved });
     t.after(() => ui.close()); await ui.ready();
-    assert.equal(ui.element('model-label').textContent, 'openai_live · realtime-model · marin');
+    assert.equal(ui.element('model-label').textContent, 'openai_live - realtime-model');
     assert.equal(ui.sockets.length, 0);
     assert.ok(!ui.calls.some(call => call.kind === 'save-model'));
     await ui.element('choose-model').onclick();
@@ -327,7 +327,7 @@ for (const host of [true, false]) {
     ui.element('provider').value = 'freeai_live'; ui.element('provider').onchange();
     await ui.element('apply').onclick();
     assert.match(ui.element('error').textContent, /モデルを保存できません.*書込失敗/);
-    assert.equal(ui.element('model-label').textContent, 'gemini_live · live-model · Kore');
+    assert.equal(ui.element('model-label').textContent, 'gemini_live - live-model');
     assert.equal(ui.element('status').textContent, '接続済み');
     assert.equal(ui.sockets.length, 3);
     assert.ok(ui.sockets.every(socket => socket.readyState === 1));
@@ -339,7 +339,7 @@ for (const host of [true, false]) {
       const ui = screen(host, false, false, true, { LIVE_AI_NAME: provider }, false, { saved });
       t.after(() => ui.close()); await ui.ready();
       assert.equal(ui.element('model-label').textContent, provider === 'openai_live'
-        ? 'openai_live · realtime-model · marin' : 'freeai_live · free-model · Zephyr');
+        ? 'openai_live - realtime-model' : 'freeai_live - free-model');
       assert.equal(ui.sockets.length, 0);
       await ui.element('connect').onclick();
       assert.deepEqual(ui.calls.find(call => call.packet?.type === 'connect').packet.モデル設定,
@@ -367,7 +367,7 @@ for (const host of [true, false]) {
     const initial = { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'free-model' };
     const ui = screen(host, false, false, true, initial, false, { saved });
     t.after(() => ui.close()); await ui.ready();
-    assert.equal(ui.element('model-label').textContent, 'freeai_live · free-model · Zephyr');
+    assert.equal(ui.element('model-label').textContent, 'freeai_live - free-model');
     assert.ok(!ui.calls.some(call => call.kind === 'save-model'));
     if (host) await ui.element('connect').onclick();
     for (const call of ui.calls.filter(call => call.packet?.type === 'connect')) assert.deepEqual(call.packet.モデル設定, initial);
@@ -390,7 +390,7 @@ for (const host of [true, false]) {
     t.after(() => ui.close()); await ui.ready();
     assert.equal(ui.sockets.length, 0);
     assert.deepEqual(ui.calls.map(call => call.body.セッションID), ['']);
-    assert.equal(ui.element('model-label').textContent, `${settings.LIVE_AI_NAME} · ${settings.LIVE_FREEAI_MODEL} · Zephyr`);
+    assert.equal(ui.element('model-label').textContent, `${settings.LIVE_AI_NAME} - ${settings.LIVE_FREEAI_MODEL}`);
     assert.equal(ui.element('status').textContent, '未接続');
     await ui.element('choose-model').onclick();
     assert.equal(ui.element('provider').value, 'freeai_live');
@@ -413,13 +413,13 @@ for (const host of [true, false]) {
     ui.element('provider').value = 'openai_live'; ui.element('provider').onchange();
     await ui.element('apply').onclick();
     assert.equal(ui.sockets.length, 0);
-    assert.equal(ui.element('model-label').textContent, 'openai_live · gpt-realtime-2.1-mini · marin');
+    assert.equal(ui.element('model-label').textContent, 'openai_live - gpt-realtime-2.1-mini');
     await ui.element('connect').onclick();
     for (const call of ui.calls.filter(call => call.packet?.type === 'connect')) {
       assert.deepEqual(call.packet.モデル設定, { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: settings.LIVE_OPENAI_MODEL, LIVE_OPENAI_VOICE: 'marin' });
     }
     await ui.element('connect').onclick();
-    assert.equal(ui.element('model-label').textContent, 'openai_live · gpt-realtime-2.1-mini · marin');
+    assert.equal(ui.element('model-label').textContent, 'openai_live - gpt-realtime-2.1-mini');
     await ui.element('choose-model').onclick();
     assert.equal(ui.element('provider').value, 'openai_live');
     assert.equal(ui.element('apply').disabled, true);
@@ -437,7 +437,7 @@ for (const host of [true, false]) {
     failing = false;
     await ui.element('choose-model').onclick();
     assert.equal(ui.element('error').hidden, true);
-    assert.equal(ui.element('model-label').textContent, 'gemini_live · live-model · Kore');
+    assert.equal(ui.element('model-label').textContent, 'gemini_live - live-model');
   });
 
   test(`Live ${host ? 'VS Code' : '単独画面'}: 起動時の候補取得中は接続を待ち、選択を照合してから開始する`, async t => {
@@ -452,7 +452,7 @@ for (const host of [true, false]) {
     assert.equal(ui.sockets.length, 0);
     assert.equal(ui.element('model-label').textContent, 'openai_live');
     release(); await connecting; await ui.ready();
-    assert.equal(ui.element('model-label').textContent, 'openai_live · realtime-model · marin');
+    assert.equal(ui.element('model-label').textContent, 'openai_live - realtime-model');
     assert.equal(ui.element('status').textContent, '接続済み');
   });
 
@@ -679,7 +679,7 @@ for (const host of [true, false]) {
     assert.equal(ui.element('status').textContent, '未接続');
     assert.equal(ui.element('text').value, '');
     assert.equal(ui.element('error').hidden, true);
-    assert.equal(ui.element('model-label').textContent, 'gemini_live · live-model-2 · Kore');
+    assert.equal(ui.element('model-label').textContent, 'gemini_live - live-model-2');
     assert.equal(ui.element('transcript').children[0].id, 'empty');
     assert.equal(ui.element('mic').strong.textContent, 'OFF');
     assert.equal(ui.element('speaker').strong.textContent, 'OFF');

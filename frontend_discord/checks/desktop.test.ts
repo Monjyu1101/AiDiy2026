@@ -9,7 +9,7 @@ import * as url from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { createRequire } from 'node:module';
 
-async function desktop(platform = 'win32') {
+async function desktop(platform = 'win32', owned = true) {
   const file = fileURLToPath(new URL('../panel/desktop.cjs', import.meta.url));
   const timers = new Map<number, { at: number; callback: () => void }>();
   const files = new Map<string, any>(), requests: any[] = [], kills: any[] = [], states: any[] = [];
@@ -57,6 +57,7 @@ async function desktop(platform = 'win32') {
     clearTimeout(id: number) { timers.delete(id); },
     require(name: string) {
       if (name === 'node:path') return path;
+      if (name === '../../frontend_vscode/scripts/single-instance.cjs') return { 起動ロック: async () => owned ? { close: async () => {} } : null };
       // 3本共通のウィンドウ大きさ・初回演出は実物を使う。
       if (name.startsWith('../../frontend_vscode/scripts/')) return createRequire(import.meta.url)(name);
       if (name === 'node:url') return url;
@@ -91,6 +92,14 @@ async function desktop(platform = 'win32') {
     },
   };
 }
+
+test('ブラウザ版が起動中なら Electron の画面・worker を増やさない', async () => {
+  const f = await desktop('win32', false);
+  assert.equal(f.window, undefined);
+  assert.equal(f.requests.length, 0);
+  assert.equal(f.files.get('/first-ready').alreadyRunning, true);
+  assert.equal(f.exited(), true);
+});
 
 test('閉じる連打でも接続回収は1回、完了までは画面を保持し、終了後に起動ロックを解放する', async () => {
   const f = await desktop();

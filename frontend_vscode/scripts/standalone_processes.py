@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
-from cleanup_processes import process_arguments, stop_matching
+from cleanup_processes import list_processes, process_arguments, stop_matching
 
 
 def is_standalone(process: dict, root: Path, windows: bool, module: str | None = None) -> bool:
@@ -41,6 +41,18 @@ def is_standalone(process: dict, root: Path, windows: bool, module: str | None =
     # 実行入口は最初の非オプション引数。別スクリプトの引数に同じパスがあっても対象外。
     entry = next((arg for arg in args[1:] if not arg.startswith('-')), '')
     return normalize(entry) in entries
+
+
+def standalone_tree_pids(root: Path, module: str | None = None) -> set[int]:
+    """単独実行プロセスと、その子孫（hermes や tools の MCP 接続など）の PID を返す。"""
+    windows = sys.platform == 'win32'
+    processes = list_processes()
+    pids = {p['ProcessId'] for p in processes if is_standalone(p, root, windows, module)}
+    while True:
+        children = {p['ProcessId'] for p in processes if p.get('ParentProcessId') in pids} - pids
+        if not children:
+            return pids
+        pids |= children
 
 
 def stop_standalone(root: Path, info, error, module: str | None = None) -> bool:

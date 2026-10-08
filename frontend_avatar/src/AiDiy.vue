@@ -1149,11 +1149,12 @@ async function チャットファイルドロップ処理(files: File[]) {
   }
 }
 
-function コード送信処理(text: string, channel: コードチャンネル) {
+function コード送信処理(text: string, channel: コードチャンネル, 検証ループ回数: number = 1) {
   ウィンドウから入力ペイロード送信({
     チャンネル: channel,
     メッセージ識別: 'input_text',
     メッセージ内容: text,
+    self_check_loop: 検証ループ回数,
   })
 }
 
@@ -1467,7 +1468,7 @@ onBeforeUnmount(() => {
               :active="アクティブタブ === 'code2'"
               :code-ai="コードAI名('2')"
               :入力接続済み="入力接続済み"
-              @submit="(t: string) => コード送信処理(t, '2')"
+              @submit="コード送信処理"
               @cancel="() => コードキャンセル処理('2')"
               @send-file="コードファイル送信処理"
               @activate="パネル有効化('code2')"
@@ -1485,7 +1486,7 @@ onBeforeUnmount(() => {
               :active="アクティブタブ === 'code4'"
               :code-ai="コードAI名('4')"
               :入力接続済み="入力接続済み"
-              @submit="(t: string) => コード送信処理(t, '4')"
+              @submit="コード送信処理"
               @cancel="() => コードキャンセル処理('4')"
               @send-file="コードファイル送信処理"
               @activate="パネル有効化('code4')"
@@ -1503,7 +1504,7 @@ onBeforeUnmount(() => {
               :active="アクティブタブ === 'code6'"
               :code-ai="コードAI名('6')"
               :入力接続済み="入力接続済み"
-              @submit="(t: string) => コード送信処理(t, '6')"
+              @submit="コード送信処理"
               @cancel="() => コードキャンセル処理('6')"
               @send-file="コードファイル送信処理"
               @activate="パネル有効化('code6')"
@@ -1595,7 +1596,7 @@ onBeforeUnmount(() => {
               :active="右アクティブタブ === 'code1'"
               :code-ai="コードAI名('1')"
               :入力接続済み="入力接続済み"
-              @submit="(t: string) => コード送信処理(t, '1')"
+              @submit="コード送信処理"
               @cancel="() => コードキャンセル処理('1')"
               @send-file="コードファイル送信処理"
               @activate="パネル有効化('code1')"
@@ -1611,7 +1612,7 @@ onBeforeUnmount(() => {
               :active="右アクティブタブ === 'code3'"
               :code-ai="コードAI名('3')"
               :入力接続済み="入力接続済み"
-              @submit="(t: string) => コード送信処理(t, '3')"
+              @submit="コード送信処理"
               @cancel="() => コードキャンセル処理('3')"
               @send-file="コードファイル送信処理"
               @activate="パネル有効化('code3')"
@@ -1627,7 +1628,7 @@ onBeforeUnmount(() => {
               :active="右アクティブタブ === 'code5'"
               :code-ai="コードAI名('5')"
               :入力接続済み="入力接続済み"
-              @submit="(t: string) => コード送信処理(t, '5')"
+              @submit="コード送信処理"
               @cancel="() => コードキャンセル処理('5')"
               @send-file="コードファイル送信処理"
               @activate="パネル有効化('code5')"

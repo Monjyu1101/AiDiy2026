@@ -25,11 +25,12 @@
 - frontend_vscode/_start.py  check_environment / start_code / start_live / kill_ports
 - frontend_discord/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
-起動前と Ctrl+C 終了時は、選択に関係なく起動中の全サービス（Discord Bot・Code / Live の
-単独実行・tools の MCP 接続を含む）を `_cleanup.stop_all_services` と同じ手順で停止します。
+起動前と Ctrl+C 終了時は、常駐サービス・Live の単独実行・tools の MCP 接続を
+`_cleanup.stop_all_services` と同じ手順で停止します。aidiy_code / aidiy_discord とその配下は
+停止対象から外し、全体起動スクリプトの終了後も継続します。
 
 標準の起動順:
-0. 既存プロセス整理（起動中サービスをすべて停止）
+0. 既存プロセス整理（aidiy_code / aidiy_discord とその配下を除いて停止）
 1. バックエンド(local)
 2. バックエンド(tools)
 3. バックエンド(core)
@@ -532,11 +533,17 @@ def open_browser_via_tools(port: int) -> bool:
 # ============================================================
 # プロセス停止
 # ============================================================
-def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
+def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standalone: bool = True) -> None:
     avatar_was_running = "フロントエンド(Avatar)" in processes
-    standalone_modules = [module for module in ("code", "live") if f"フロントエンド({module})" in processes]
-    discord_was_running = "フロントエンド(Discord)" in processes
+    # 通常終了では Code / Discord を継続し、明示的な cleanup 要求では停止する。
+    standalone_modules = [module for module in (("live",) if keep_standalone else ("code", "live"))
+                          if f"フロントエンド({module})" in processes]
+    discord_was_running = not keep_standalone and "フロントエンド(Discord)" in processes
     for name, process in list(processes.items()):
+        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(Discord)"):
+            print_info(f"[{name}] 全体停止の対象外として継続します")
+            processes.pop(name, None)
+            continue
         try:
             print_info(f"[{name}] 停止しています")
             if sys.platform == "win32":
@@ -577,15 +584,16 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]]) -> None:
 def stop_all_tasks(title: str = "起動中サービスの一括停止") -> None:
     """起動前・Ctrl+C 終了時に `_cleanup.py` と同じ手順で全サービスを停止する。
 
-    起動したプロセスだけでなく、各フォルダの `kill_ports()`（別起動の常駐・Discord Bot を含む）、
-    Code / Live の単独実行、tools の MCP 接続まで止める。停止手順は `_cleanup.stop_all_services`
-    に一本化し、ここで個別に重複させない。停止できないものがあっても起動・終了は続ける。
+    常駐サービス、Live の単独実行、tools の MCP 接続を止める。
+    aidiy_code / aidiy_discord は継続するため、本体とその配下を強制停止しない。
+    停止手順は `_cleanup.stop_all_services` に一本化し、ここで個別に重複させない。
+    停止できないものがあっても起動・終了は続ける。
     """
     try:
         spec = importlib.util.spec_from_file_location("aidiy_root_cleanup_for_start", BASE_DIR / "_cleanup.py")
         cleanup = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cleanup)
-        cleanup.stop_all_services({}, title=title, strict=False)
+        cleanup.stop_all_services({}, title=title, strict=False, keep_code=True, keep_discord=True)
     except Exception as exc:
         print_warning(f"一部のタスクを停止できませんでした: {exc}")
     finally:
@@ -796,8 +804,8 @@ def start_initial_services(
         "フロントエンド(Discord)": False,
     }
 
-    # 選択に関係なく、前回の残り・別起動分（Discord Bot や Code / Live を含む）をすべて止めてから起動する。
-    stop_all_tasks("既存プロセス整理（起動中サービスをすべて停止）")
+    # Code / Discord とその配下を継続し、それ以外の前回の残り・別起動分を止める。
+    stop_all_tasks("既存プロセス整理（Code / Discord は継続）")
 
     if start_backend_local_enabled:
         print_header("バックエンド(local) 起動")
@@ -881,7 +889,7 @@ def suspend_services_for_cleanup(
         process_crash_time.pop(name, None)
         print_warning(f"[{name}] クリーンアップ対象のため自動再起動を停止します")
         if process is not None:
-            stop_processes({name: process})
+            stop_processes({name: process}, keep_standalone=False)
 
     return requested_services
 
@@ -1020,10 +1028,10 @@ def main() -> None:
 
         except KeyboardInterrupt:
             print_header("停止処理")
-            print_info("Ctrl+C を検出しました。起動中プロセスを停止します")
+            print_info("Ctrl+C を検出しました。Code / Discord を継続し、他のプロセスを停止します")
             stop_processes(processes)
-            print_info("クリーンアップと同じ手順で、残っているタスクもすべて停止します")
-            stop_all_tasks("終了時の既存プロセス整理（起動中サービスをすべて停止）")
+            print_info("Code / Discord とその配下を除き、残っているタスクを停止します")
+            stop_all_tasks("終了時の既存プロセス整理（Code / Discord は継続）")
 
             if sys.platform == "win32":
                 clear_keyboard_buffer()

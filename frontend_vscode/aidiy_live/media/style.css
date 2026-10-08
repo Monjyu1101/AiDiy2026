@@ -153,14 +153,14 @@ textarea:focus-visible { outline: none; border-color: var(--focus); }
 .keyboard-hint span { padding: 0 3px; }
 .composer-meta { grid-column: 1; grid-row: 2; display: flex; justify-content: flex-start; align-items: center; gap: 6px; color: var(--muted); font-size: 9px; line-height: 1.3; }
 #activity { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; white-space: nowrap; }
-/* 接続状況はタイトル左側に表示する。VS Code 内はビュー名が上にあるため、状況だけの細い行にする。 */
+/* 単独版の接続状況はタイトル左側に表示する。 */
 header > #activity { grid-column: 1; justify-self: start; min-width: 0; margin-left: 6px; color: var(--muted); font-size: 10px; }
 .activity-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
 .connected .activity-dot { background: var(--terminal); }
 .running .activity-dot { background: #00ffff; box-shadow: 0 0 0 3px #00ffff15, 0 0 10px #00ffff60; }
 .model-selection { display: flex; align-items: center; gap: 6px; min-width: 0; }
 #choose-model { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 2px 6px; font-size: 10px; line-height: 1.4; border-color: var(--border); background: var(--surface); }
-.model-caption { font-weight: 600; }
+.model-caption { padding: 0 4px; font-size: 11px; font-weight: 400; line-height: calc(1.65em - 2px); background: #fff; color: #000; }
 .model-chevron { color: var(--muted); }
 #model-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10px; }
 #send { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; display: flex; align-items: center; justify-content: center; width: 34px; height: 100%; min-height: 34px; padding: 0; background: rgba(255, 255, 255, .95); border-color: #667eea; color: #000; }
@@ -184,8 +184,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(3px); }
 .settings-content label { display: grid; grid-template-columns: 68px 1fr; gap: 6px; align-items: center; }
 .settings-content input, .settings-content select { min-height: 34px; }
 [hidden] { display: none !important; }
-.vscode-host header { display: flex; min-height: 20px; padding: 0 2px; background: none; }
-.vscode-host header .brand { display: none; }
+.vscode-host > header { display: none; }
 .vscode-host { min-width: 200px; }
 @media (max-width: 440px) { .keyboard-hint { font-size: 8px; } }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } .welcome-mark { animation: none; } .welcome-mark::before { animation: welcome-rotate-clockwise 20s linear infinite, welcome-glow 8s ease-in-out infinite, welcome-rainbow 12s linear infinite; } .welcome-mark::after { animation: welcome-rotate-counterclockwise 20s linear infinite, welcome-glow 8s ease-in-out -4s infinite, welcome-rainbow 12s linear -6s infinite; } }

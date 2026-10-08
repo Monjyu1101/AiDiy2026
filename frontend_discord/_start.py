@@ -7,7 +7,7 @@ import sys
 
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
-from discord_processes import stop_discord_processes
+from discord_processes import discord_tree_pids, stop_discord_processes
 
 
 def print_header(message: str) -> None:
@@ -47,9 +47,14 @@ def kill_ports() -> None:
         raise RuntimeError('Discord Bot を終了できないため処理を中止します。')
 
 
+def process_tree_pids() -> set[int]:
+    return discord_tree_pids(THIS_DIR)
+
+
 def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
     kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == 'win32' else {'start_new_session': True}
-    args = ['--wait'] + (['--connect'] if auto_connect else [])
+    # パネルはログファイルを使って独立起動し、全体起動の終了後も継続する。
+    args = ['--connect'] if auto_connect else []
     # aidiy_code / aidiy_live と同じく、全体起動ではリポジトリ直下をプロジェクトにする。
     return subprocess.Popen(launch_command() + args, cwd=THIS_DIR.parent, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, bufsize=0, **kwargs)

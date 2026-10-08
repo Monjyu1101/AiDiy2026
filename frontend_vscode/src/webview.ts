@@ -6,6 +6,11 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void; getS
 const vscode = acquireVsCodeApi();
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const prompt = element<HTMLTextAreaElement>('prompt');
+const 検証ループ = element<HTMLSelectElement>('self-check-loop');
+検証ループ.value = '1';
+let オフライン = false;
+let 検証なし = false;
+let オンライン検証回数 = '1';
 const 初期起動画面 = element('welcome').cloneNode(true);
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
@@ -52,7 +57,7 @@ const 初期文字演出停止 = () => {
 const post = (type: string, data = {}) => vscode.postMessage({ type, ...data });
 const 実行表示更新 = (running: boolean) => {
   element('chat-header').classList.toggle('running', running);
-  element('activity').classList.toggle('running', running);
+  element('activity').classList.toggle('running', running && 接続済み);
 };
 const 末尾省略 = (value: string, maximum = 28) => value.length > maximum ? `...${value.slice(-(maximum - 3))}` : value;
 const 最下部表示 = 最下部追従([element('conversation'), element('progress')]);
@@ -123,7 +128,7 @@ const 履歴表示 = (entries: { id: string; 題名: string; 更新日時: numbe
 const 選択状態更新 = () => {
   const custom = modelSelect.value === '__manual__';
   customModel.hidden = customModelLabel.hidden = !custom;
-  applyModel.disabled = providerSelect.disabled || modelSelect.disabled || (custom && !customModel.value.trim());
+  applyModel.disabled = (!オフライン && providerSelect.disabled) || modelSelect.disabled || (custom && !customModel.value.trim());
 };
 const 候補取得 = (targetProvider: string) => {
   catalogProvider = targetProvider;
@@ -152,7 +157,7 @@ element('composer').addEventListener('submit', event => {
   event.preventDefault();
   if (!入力許可 || 実行中 || 送信待ち || !prompt.value.trim()) return;
   送信待ち = true; ボタン更新(); 最下部表示();
-  vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: prompt.value });
+  vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: prompt.value, self_check_loop: オフライン ? 0 : Number(検証ループ.value) });
 });
 prompt.addEventListener('keydown', event => {
   if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey
@@ -163,7 +168,6 @@ prompt.addEventListener('keydown', event => {
   send.focus();
 });
 element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
-element('connect-toggle').addEventListener('click', () => post(接続済み ? 'disconnect' : 'connect'));
 modelButton.addEventListener('click', モデル選択を開く);
 historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
 newChat.addEventListener('click', () => {
@@ -208,27 +212,29 @@ window.addEventListener('message', event => {
       return typeof row.id === 'string' && typeof row.label === 'string';
     }) : [];
     if (!state.provider) {
-      providerSelect.replaceChildren(new Option('自動（AIコアの設定）', ''), ...rows.map(item => new Option(item.label, item.id)));
+      providerSelect.replaceChildren(...(オフライン ? [] : [new Option('自動（AIコアの設定）', '')]), ...rows.map(item => new Option(item.label, item.id)));
       providerSelect.value = provider;
       if (providerSelect.selectedIndex < 0) providerSelect.selectedIndex = 0;
-      providerSelect.disabled = false;
+      providerSelect.disabled = オフライン;
       if (providerSelect.value) 候補取得(providerSelect.value); else 自動選択表示();
       return;
     }
-    modelSelect.replaceChildren(new Option('既定モデル（プロバイダの設定）', ''), ...rows.map(item => new Option(item.label, item.id)));
-    if (state.provider === provider && model && !rows.some(item => item.id === model)) modelSelect.add(new Option(`${model}（現在のモデル）`, model));
-    modelSelect.add(new Option('一覧にないモデル ID を入力…', '__manual__'));
-    modelSelect.value = state.provider === provider ? model : '';
+    modelSelect.replaceChildren(...(オフライン ? [] : [new Option('既定モデル（プロバイダの設定）', '')]), ...rows.map(item => new Option(item.label, item.id)));
+    if (!オフライン) {
+      if (state.provider === provider && model && !rows.some(item => item.id === model)) modelSelect.add(new Option(`${model}（現在のモデル）`, model));
+      modelSelect.add(new Option('一覧にないモデル ID を入力…', '__manual__'));
+    }
+    modelSelect.value = state.provider === provider ? model : オフライン ? 'auto' : '';
     customModel.value = state.provider === provider ? model : '';
     if (modelSelect.selectedIndex < 0) modelSelect.selectedIndex = 0;
-    providerSelect.disabled = false; modelSelect.disabled = false;
+    providerSelect.disabled = オフライン; modelSelect.disabled = false;
     modelPickerStatus.textContent = '';
     選択状態更新();
     return;
   }
   if (state.type === 'modelCatalogError') {
     if (!modelPicker.open || state.provider !== catalogProvider) return;
-    providerSelect.disabled = false; modelSelect.disabled = true; applyModel.disabled = true;
+    providerSelect.disabled = オフライン; modelSelect.disabled = true; applyModel.disabled = true;
     modelPickerStatus.classList.add('error');
     modelPickerStatus.textContent = String(state.message ?? '候補を取得できません。');
     return;
@@ -273,20 +279,28 @@ window.addEventListener('message', event => {
     }
   }
   会話ID = state.会話ID;
+  const nextOffline = state.実行モード === 'offline' || (state.オフライン対応 === true && state.接続済み !== true);
+  if (nextOffline !== オフライン) {
+    if (modelPicker.open) modelPicker.close();
+  }
+  オフライン = nextOffline;
+  const nextNoVerification = オフライン || (state.オフライン対応 && state.接続済み !== true);
+  if (nextNoVerification && !検証なし) オンライン検証回数 = 検証ループ.value;
+  if (!nextNoVerification && 検証なし) 検証ループ.value = オンライン検証回数;
+  検証なし = Boolean(nextNoVerification);
+  検証ループ.disabled = 検証なし;
+  if (検証なし) 検証ループ.value = '0';
+  element('model-picker-description').textContent = オフライン ? 'aidiy_hermes を直接実行します。オンラインとは別のモデルを保存します。' : 'AIコアのコードAIを選択します。';
   送信待ち = false; 実行中 = state.実行中;
   接続済み = state.接続済み === true;
-  入力許可 = state.信頼済み && 接続済み && !state.モデル変更中 && Boolean(state.作業フォルダ);
+  入力許可 = state.信頼済み && (オフライン || 接続済み) && !state.モデル変更中 && Boolean(state.作業フォルダ);
   element('welcome').hidden = state.メッセージ.length > 0;
-  実行表示更新(実行中 && state.接続済み !== false);
+  実行表示更新(実行中 && (オフライン || state.接続済み !== false));
   element('activity').classList.toggle('unavailable', !入力許可);
   element('activity').classList.toggle('connected', 接続済み);
-  element('activity-label').textContent = 接続済み ? '接続中' : '未接続';
-  const dot = element('activity').querySelector('.activity-dot');
-  if (dot) dot.textContent = 接続済み ? '●' : '〇';
-  const connectToggle = element<HTMLButtonElement>('connect-toggle');
-  connectToggle.textContent = 接続済み ? '切断' : '接続';
-  connectToggle.disabled = !state.信頼済み || !state.作業フォルダ;
-  newChat.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || state.接続済み === false || (!state.作業フォルダ && !state.新規可能);
+  element('chat-header').classList.toggle('connected', 接続済み);
+  element('activity-label').textContent = 接続済み ? '接続済み' : state.接続中 ? '接続中' : '未接続';
+  newChat.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || (!オフライン && state.接続済み === false) || (!state.作業フォルダ && !state.新規可能);
   const projectName = String(state.作業フォルダ?.名前 ?? '');
   projectFolder.textContent = 末尾省略(projectName);
   projectFolder.title = projectName;
@@ -295,19 +309,22 @@ window.addEventListener('message', event => {
   const historyJSON = JSON.stringify([history, 会話ID, 実行中]);
   if (historyJSON !== 履歴JSON) { 履歴表示(history); 履歴JSON = historyJSON; }
   provider = state.provider; model = state.model;
-  const label = `${provider || '自動'} / ${model || (provider ? '既定モデル' : 'AIコアの設定')}`;
+  const label = `${provider || '自動'} - ${model || (provider ? '既定モデル' : 'AIコアの設定')}`;
   const modelLabel = element('model-label');
   modelLabel.textContent = label;
   modelLabel.title = label;
   modelButton.title = 'コードAIとモデルを選択';
-  modelButton.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || !state.作業フォルダ;
+  modelButton.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || (!オフライン && !state.作業フォルダ);
   element<HTMLButtonElement>('remove-attachment').disabled = 実行中;
   element('stop').hidden = !実行中;
-  element<HTMLButtonElement>('stop').disabled = !接続済み;
+  element<HTMLButtonElement>('stop').disabled = !オフライン && !接続済み;
   element('send').hidden = 実行中;
   const status = element('status');
-  status.textContent = state.接続エラー || (!state.信頼済み ? 'VS Code でワークスペースを信頼してください' : !state.作業フォルダ ? (state.作業URI ? '新規の会話を開始してください' : '作業フォルダを開いてください') : '');
+  status.textContent = !state.信頼済み ? 'VS Code でワークスペースを信頼してください' : !state.作業フォルダ ? (state.作業URI ? '新規の会話を開始してください' : '作業フォルダを開いてください') : '';
   status.hidden = !status.textContent;
+  const errorBox = element('error');
+  errorBox.textContent = String(state.接続エラー || '');
+  errorBox.hidden = !errorBox.textContent;
   element('attachment').hidden = !state.添付;
   element('attachment-name').textContent = state.添付 ?? '';
   const json = JSON.stringify(state.メッセージ);

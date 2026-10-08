@@ -8,6 +8,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { パネルサービス, type パネル通知 } from './panel-service';
 import { プロジェクトルート } from './config';
 import { 接続元許可 } from './vscode';
+import instanceLock from '../../frontend_vscode/scripts/single-instance.cjs';
 
 // ブラウザ版パネル（GitHub Codespaces・画面のない Linux 用）。画面は Electron 版と同じ panel/ のファイルを使い、
 // IPC の代わりに WebSocket で panel-service.ts へ中継する。接続元の確認は aidiy_code / aidiy_live と共通。
@@ -112,7 +113,14 @@ export async function パネルWeb起動(options: { idleMs?: number; firstIdleMs
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  let instance: Awaited<ReturnType<typeof instanceLock.起動ロック>> | undefined;
   try {
+    instance = await instanceLock.起動ロック('aidiy_discord');
+    if (!instance) {
+      if (process.env.AIDIY_DISCORD_READY) writeFileSync(process.env.AIDIY_DISCORD_READY, JSON.stringify({ alreadyRunning: true }));
+      console.log('aidiy_discord は起動済みです。');
+      process.exit(0);
+    }
     const app = await パネルWeb起動();
     const shutdown = () => { void app.close().then(() => process.exit(0), () => process.exit(1)); };
     process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
@@ -121,6 +129,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(`AiDiy (Discord) ブラウザ版: ${app.publicUrl}`);
     if (process.env.AIDIY_DISCORD_CONNECT === '1') void app.service.要求('start', undefined);
   } catch (error) {
+    await instance?.close();
     console.error(`Discord パネル（ブラウザ版）を起動できません: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   }

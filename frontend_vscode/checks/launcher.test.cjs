@@ -66,6 +66,14 @@ test('Code 起動引数: 未指定モデルを自動へ置き換えず、保存�
   }
 });
 
+test('Code 起動引数: --offline を単独ウィンドウへ渡す', t => {
+  const f = fixture(t);
+  f.desktop(`const model=JSON.parse(process.env.AIDIY_CODE_MODEL); if(model.offline!==true) process.exit(3);
+    require('node:fs').writeFileSync(process.env.AIDIY_CODE_READY,JSON.stringify({windowShown:true}));`);
+  const result=f.launch('--offline');
+  assert.equal(result.status,0,result.stderr);
+});
+
 test('Code 全体起動: --wait で画面終了を待ち、終了コードを返す', t => {
   const f = fixture(t);
   f.desktop(`require('node:fs').writeFileSync(process.env.AIDIY_CODE_READY, JSON.stringify({windowShown:true}));

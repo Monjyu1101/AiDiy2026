@@ -853,7 +853,7 @@ def main():
     print_info("    バックエンド(task,team)起動:")
     print_info(f"                 cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発    : cd frontend_web && npm run dev")
-    print_info("    Avatar     : cd frontend_avatar && npm run dev")
+    print_info("    Avatar起動 : aidiy_avatar （または cd frontend_avatar && npm run dev）")
     print_info("    Hermes起動 : aidiy_hermes")
     print_info("    Code起動   : aidiy_code")
     print_info("    Live起動   : aidiy_live")

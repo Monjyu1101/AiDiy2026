@@ -63,7 +63,7 @@ class StartupTest(unittest.TestCase):
     def test_launchers_use_same_command_entry_without_shell(self):
         with patch.object(standalone.shutil, 'which', return_value='node'), patch.object(standalone.subprocess, 'Popen') as spawn:
             standalone.start_code()
-            self.assertEqual(spawn.call_args.args[0], ['node', str(ROOT / 'aidiy_code/launch.mjs'), '--wait'])
+            self.assertEqual(spawn.call_args.args[0], ['node', str(ROOT / 'aidiy_code/launch.mjs')])
             self.assertEqual(spawn.call_args.kwargs['cwd'], ROOT.parent)
             self.assertNotIn('shell', spawn.call_args.kwargs)
             standalone.start_live(auto_connect=True)
@@ -82,16 +82,30 @@ class StartupTest(unittest.TestCase):
         root_cleanup.stop_all_services.side_effect = RuntimeError('停止失敗')
         with patch.object(start.importlib.util, 'module_from_spec', return_value=root_cleanup), patch.object(start.importlib.util, 'spec_from_file_location', return_value=Mock()), patch.object(start, '_remove_folder_import_cache'):
             start.stop_all_tasks('テスト')
-        root_cleanup.stop_all_services.assert_called_once_with({}, title='テスト', strict=False)
+        root_cleanup.stop_all_services.assert_called_once_with({}, title='テスト', strict=False, keep_code=True, keep_discord=True)
 
     def test_shutdown_reclaims_only_started_window(self):
         module = Mock()
         process = Mock(pid=123456)
-        with patch.object(start, 'VSCODE', module), patch.object(start.sys, 'platform', 'linux'), patch.object(start.os, 'getpgid', return_value=123456), patch.object(start.os, 'killpg'), patch.object(start.time, 'sleep'):
+        with patch.object(start, 'VSCODE', module), patch.object(start.sys, 'platform', 'linux'), patch.object(start.os, 'getpgid', return_value=123456, create=True), patch.object(start.os, 'killpg', create=True), patch.object(start.time, 'sleep'):
             running = {'フロントエンド(live)': process}
             start.stop_processes(running)
         self.assertEqual(running, {})
         module.kill_ports.assert_called_once_with('live')
+
+    def test_shutdown_keeps_started_code_running(self):
+        module = Mock()
+        process = Mock(pid=123456)
+        with patch.object(start, 'VSCODE', module), patch.object(start.sys, 'platform', 'win32'), patch.object(
+            start.subprocess, 'run'
+        ) as run, patch.object(start.time, 'sleep'):
+            running = {'フロントエンド(code)': process}
+            start.stop_processes(running)
+        self.assertEqual(running, {})
+        run.assert_not_called()
+        process.wait.assert_not_called()
+        process.kill.assert_not_called()
+        module.kill_ports.assert_not_called()
 
     def test_main_passes_code_live_selections_to_validation_and_launch(self):
         with patch.object(start, '_init_modules'), patch.object(start, 'collect_startup_choices', return_value=(False, False, False, False, False, False, True, True, False)), patch.object(start, 'validate_initial_environment', return_value=(True, None)) as validate, patch.object(start, 'start_initial_services', return_value={}) as launch, patch.object(start, 'monitor_and_restart', side_effect=KeyboardInterrupt), patch.object(start, 'stop_processes'), patch.object(start, 'stop_all_tasks'), patch.object(start.time, 'sleep'), patch.object(start.sys, 'platform', 'linux'):

@@ -191,7 +191,7 @@ function modelOptions() {
 function showModels() {
   options(provider, Object.fromEntries(Object.keys(models).map(name => [name, name])), settings.LIVE_AI_NAME);
   modelOptions();
-  element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model], settings[keys(settings.LIVE_AI_NAME).voice]].filter(Boolean).join(' · ') || 'AiDiy のライブ会話';
+  element('model-label').textContent = [settings.LIVE_AI_NAME, settings[keys(settings.LIVE_AI_NAME).model]].filter(Boolean).join(' - ') || 'AiDiy のライブ会話';
 }
 async function loadModels(session = connection.session) {
   const run = generation;
@@ -338,7 +338,7 @@ button('apply').onclick = async () => {
   preferredSettings = selected;
   if (!connected) {
     settings = { ...settings, ...preferredSettings };
-    element('model-label').textContent = [provider.value, model.value, voice.value].filter(Boolean).join(' · ');
+    element('model-label').textContent = [provider.value, model.value].filter(Boolean).join(' - ');
     modelPicker.close(); showError(); controls(); return;
   }
   changing = true; ++micGeneration; mic = false; micBusy = false;
